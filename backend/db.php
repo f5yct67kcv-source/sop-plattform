@@ -137,14 +137,22 @@ set_exception_handler(function (Throwable $e): void {
     $meldung = 'Unerwarteter Serverfehler';
     if ($e instanceof PDOException) {
         switch ((string)$e->getCode()) {
+            // Beide Meldungen nennen den Weg, den es HEUTE gibt. Bis hierher
+            // verwiesen sie auf schema_planung.sql in phpMyAdmin -- seit
+            // ENT-033 traegt die Einrichtung fehlende Tabellen und Spalten
+            // selbst nach, und der alte Text schickte zu einer Datei, die
+            // niemand mehr von Hand ausfuehrt. Eine Fehlermeldung, die den
+            // falschen Ausweg nennt, kostet mehr Zeit als gar keine.
             case '42S02':   // Tabelle fehlt
                 $meldung = 'Eine benoetigte Tabelle fehlt in der Datenbank. '
-                    . 'Wurde backend/schema_planung.sql schon in phpMyAdmin ausgefuehrt?';
+                    . 'Im Dashboard unten links „Einrichtung" oeffnen und '
+                    . '„Pruefen und einrichten" ausfuehren.';
                 break;
             case '42S22':   // Spalte fehlt
                 $meldung = 'Eine benoetigte Spalte fehlt in der Datenbank. '
-                    . 'Vermutlich wurde nur die aeltere Fassung von schema_planung.sql ausgefuehrt '
-                    . '-- Teil B der Datei ergaenzt die fehlenden Spalten.';
+                    . 'Das passiert nach einer Neuerung, deren Einrichtung noch nicht gelaufen ist: '
+                    . 'im Dashboard unten links „Einrichtung" oeffnen und '
+                    . '„Pruefen und einrichten" ausfuehren.';
                 break;
             case '23000':   // Fremdschluessel oder Eindeutigkeit verletzt
                 $meldung = 'Der Datensatz verletzt eine Regel der Datenbank '
