@@ -30,7 +30,7 @@ header h1 { font-size: 15px; font-weight: 700; }
 /* Kopfzeile: nur noch Weg zurueck, Logo und Abmelden. Alles andere war
    Zierde und hat den Blick vom Formular abgezogen (ENT-028). */
 .kopf-btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-  min-height: 38px; min-width: 38px; padding: 0 11px; border-radius: 9px; border: 1px solid var(--shell-line);
+  min-height: 44px; min-width: 44px; padding: 0 11px; border-radius: 9px; border: 1px solid var(--shell-line);
   background: var(--shell-hi); color: var(--shell-txt-hi); font: inherit; font-size: 13px; font-weight: 620;
   text-decoration: none; cursor: pointer; white-space: nowrap; }
 .kopf-btn:hover { background: #262A33; }
@@ -53,7 +53,12 @@ header img { width: 30px; height: 30px; border-radius: 8px; }
 .field:last-child { margin-bottom: 0; }
 .field label { display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; color: var(--sub); margin-bottom: 5px; text-transform: uppercase; letter-spacing: .4px; }
 .req { color: var(--red); font-size: 14px; line-height: 1; }
-.field input, .field select, .field textarea { width: 100%; border: 1.5px solid var(--border); border-radius: 9px; padding: 12px 14px; font-size: 15px; color: var(--text); background: var(--bg); transition: border-color .15s, background .15s; -webkit-appearance: none; appearance: none; font-family: inherit; }
+/* 16px ist keine Geschmacksfrage: Darunter zoomt iOS beim Antippen in das
+   Feld hinein und bleibt dort -- der Rest des Formulars ist dann nur noch
+   durch Wischen erreichbar. Dieses Werkzeug wird draussen auf dem Handy
+   ausgefuellt, also gilt es hier zuerst. 44px Mindesthoehe aus demselben
+   Grund: kalte Finger treffen 43px schlechter, als es aussieht. */
+.field input, .field select, .field textarea { width: 100%; min-height: 44px; border: 1.5px solid var(--border); border-radius: 9px; padding: 12px 14px; font-size: 16px; color: var(--text); background: var(--bg); transition: border-color .15s, background .15s; -webkit-appearance: none; appearance: none; font-family: inherit; }
 .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--accent); background: #fff; }
 .field input.error, .field select.error { border-color: var(--red); background: #FFF5F5; }
 .field .err-msg { font-size: 11px; color: var(--red); margin-top: 4px; display: none; }
@@ -68,7 +73,9 @@ select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
 .sig-wrap { border: 1.5px solid var(--border); border-radius: 9px; overflow: hidden; background: #fff; position: relative; }
 .sig-wrap canvas { display: block; width: 100%; touch-action: none; cursor: crosshair; }
 .sig-actions { display: flex; justify-content: flex-end; padding: 8px 10px; border-top: 1px solid var(--border); }
-.sig-clear { font-size: 12px; color: var(--red); background: none; border: none; cursor: pointer; font-weight: 600; padding: 4px 8px; border-radius: 6px; }
+/* Danebengetippt heisst hier: die Unterschrift des Kunden ist weg. Gerade
+   dieser Knopf braucht die volle Trefferflaeche. */
+.sig-clear { font-size: 13px; color: var(--red); background: none; border: none; cursor: pointer; font-weight: 600; min-height: 44px; padding: 0 12px; border-radius: 6px; }
 .sig-clear:hover { background: var(--red-bg); }
 .sig-placeholder { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); font-size: 13px; color: #C4C9D4; pointer-events: none; text-align: center; line-height: 1.5; }
 
@@ -78,7 +85,7 @@ select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
 .confirm-box.box-error { background: var(--red-bg); border-color: #FCA5A5; }
 .confirm-box.box-error label { color: var(--red); }
 
-.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 13px 20px; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; border: none; transition: all .15s; font-family: inherit; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 13px 20px; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; border: none; transition: all .15s; font-family: inherit; }
 .btn-primary { background: var(--accent); color: #fff; width: 100%; }
 .btn-primary:active { background: #1835a0; transform: scale(.98); }
 .btn-ghost { background: transparent; border: 1.5px solid var(--border); color: var(--text); }
@@ -110,7 +117,7 @@ tr:hover td { background: var(--accent-light); }
 .badge-blue { background: var(--accent-light); color: var(--accent); }
 
 .filter-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
-.filter-row input, .filter-row select { border: 1.5px solid var(--border); border-radius: 8px; padding: 9px 12px; font-size: 13px; background: var(--surface); -webkit-appearance: none; appearance: none; font-family: inherit; color: var(--text); }
+.filter-row input, .filter-row select { min-height: 44px; border: 1.5px solid var(--border); border-radius: 8px; padding: 9px 12px; font-size: 16px; background: var(--surface); -webkit-appearance: none; appearance: none; font-family: inherit; color: var(--text); }
 .filter-row input { flex: 1; min-width: 140px; }
 
 .ma-stat-row { display: flex; align-items: center; justify-content: space-between; padding: 13px 0; border-bottom: 1px solid var(--border); }
@@ -152,7 +159,7 @@ tr:hover td { background: var(--accent-light); }
 
 .pw-wrap { position: relative; }
 .pw-wrap input { padding-right: 42px; }
-.pw-toggle { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 17px; padding: 6px; color: var(--sub); line-height: 1; }
+.pw-toggle { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 17px; min-height: 44px; min-width: 44px; padding: 6px; color: var(--sub); line-height: 1; }
 
 #printArea { display: none; }
 @media print {
@@ -778,7 +785,9 @@ function mapRapport(r) {
 function loadAll() {
   apiCall('rapport_list.php').then(({ ok, data }) => {
     if (!ok || data.status !== 'ok') { if (!ok) doLogout(); return; }
-    rapports = data.rapporte.map(mapRapport);
+    // Fehlt das Feld, ist die Liste leer -- nicht die Seite kaputt. Ein
+    // fehlendes Feld ist ein Fall, kein Absturz.
+    rapports = (data.rapporte || []).map(mapRapport);
     renderTable(); renderMaStats();
   });
 }
@@ -789,7 +798,7 @@ function loadAll() {
 const T = {
     'h-title':'Stundenrapport','tab-erfassen':'Erfassen','tab-uebersicht':'Übersicht',
     'tab-mitarbeiter':'Mitarbeiter','tab-admin':'Admin',
-    'lbl-sec-ma':'Mitarbeiter','lbl-name':'Name','err-ma':'Bitte Mitarbeiter wählen.',
+    'lbl-sec-ma':'Mitarbeiter','lbl-name':'Name',
     'lbl-sec-auftrag':'Auftrag','lbl-kunde':'Kundenname','err-kunde':'Pflichtfeld',
     'lbl-strasse':'Strasse','err-strasse':'Pflichtfeld',
     'lbl-ort':'Ort / PLZ','err-ort':'Pflichtfeld',
@@ -810,19 +819,15 @@ const T = {
     'btn-neuer':'Neuer Rapport',
     'btn-filter-clear':'Löschen','btn-csv':'↓ CSV',
     'lbl-sec-mastats':'Gesamtstunden pro Mitarbeiter',
-    'lbl-pin-hint':'Admin-PIN eingeben','lbl-pin-sub':'Standard-PIN: 1234',
     'lbl-sec-adminma':'Mitarbeiterliste verwalten','btn-add-ma':'+ Hinzufügen',
-    'lbl-sec-pin':'PIN ändern','lbl-new-pin':'Neuer PIN (4 Ziffern)',
-    'btn-change-pin':'PIN speichern','lbl-sec-danger':'Daten',
-    'btn-clear-all':'Alle Rapporte löschen','btn-logout':'Abmelden',
+    'btn-logout':'Abmelden',
     'modal-del-title':'Rapport löschen?',
     'modal-del-body':'Dieser Eintrag wird unwiderruflich gelöscht.',
     'btn-modal-cancel':'Abbrechen','btn-modal-ok':'Löschen',
-    'ea':['Verkehrsdienst','Absperrung','Veranstaltung','Escort','Sonstiges'],
     'pa':['Keine Pause','15 Minuten','30 Minuten','45 Minuten','1 Stunde','1.5 Stunden','2 Stunden'],
     'th':['Datum','Mitarbeiter','Kunde','Adresse','Art','Zeit','Pause','Netto','Unterschrift / Unterzeichner',''],
     'no-data':'Keine Rapporte vorhanden.','del':'Löschen',
-    'ph-ma':'— wählen —','ph-filter':'Suche...','ph-new-ma':'Name hinzufügen...',
+    'ph-filter':'Suche...','ph-new-ma':'Name hinzufügen...',
     'ph-signame':'Vor- und Nachname',
     'ph-kunde':'z.B. Stadt Bern','ph-strasse':'z.B. Bahnhofstrasse 12',
     'ph-ort':'z.B. 3011 Bern','ph-auftragNr':'optional',
@@ -830,11 +835,10 @@ const T = {
     'stat-r':'Rapporte','stat-h':'Stunden','stat-ma':'Mitarbeiter',
     'lbl-einsaetze':'Einsätze','lbl-letzter':'Letzter',
     'min':'Min.',
-    'tSaved':'✓ Rapport gespeichert!','tMaAdd':'✓ Mitarbeiter hinzugefügt.',
-    'tMaRem':'Mitarbeiter entfernt.','tPinOk':'✓ PIN geändert.',
-    'tAllDel':'Alle Rapporte gelöscht.','tDel':'Rapport gelöscht.',
+    'tMaAdd':'✓ Mitarbeiter hinzugefügt.',
+    'tMaRem':'Mitarbeiter entfernt.',
+    'tDel':'Rapport gelöscht.',
     'tCsv':'✓ CSV exportiert.','tNoData':'Keine Daten.',
-    'tWrongPin':'Falscher PIN.','tPinInvalid':'PIN muss 4 Ziffern haben.',
     'tName':'Bitte Namen eingeben.','tConfirm':'Bitte Bestätigung anhaken.',
 };
 const t = k => T[k] || k;
@@ -843,15 +847,15 @@ const t = k => T[k] || k;
 // Alle sichtbaren Texte kommen aus T, damit dieselbe Sache ueberall gleich heisst.
 function applyLang() {
   const ids = ['h-title','tab-erfassen','tab-uebersicht','tab-mitarbeiter','tab-admin',
-    'lbl-sec-ma','lbl-name','err-ma','lbl-sec-auftrag','lbl-kunde','err-kunde',
+    'lbl-sec-ma','lbl-name','lbl-sec-auftrag','lbl-kunde','err-kunde',
     'lbl-strasse','err-strasse','lbl-ort','err-ort','lbl-datum','err-datum',
     'lbl-einsatzart','lbl-auftragNr','lbl-sec-zeiten','lbl-von','err-von',
     'lbl-bis','err-bis','lbl-pause','netLbl','lbl-sec-sig','lbl-optional',
     'lbl-sig-hint','lbl-sig-name','sigPlaceholder','btn-sig-clear',
     'lbl-sec-bem','lbl-confirm','btn-save','success-title','success-sub','btn-neuer',
-    'btn-filter-clear','btn-csv','lbl-sec-mastats','lbl-pin-hint','lbl-pin-sub',
-    'lbl-sec-adminma','btn-add-ma','lbl-sec-pin','lbl-new-pin','btn-change-pin',
-    'lbl-sec-danger','btn-clear-all','btn-logout',
+    'btn-filter-clear','btn-csv','lbl-sec-mastats',
+    'lbl-sec-adminma','btn-add-ma',
+    'btn-logout',
     'modal-del-title','modal-del-body','btn-modal-cancel','btn-modal-ok'];
   ids.forEach(id => { const el = document.getElementById(id); if (el) el.textContent = t(id); });
 
@@ -1041,8 +1045,12 @@ function clearFilter(){document.getElementById('filterQ').value='';document.getE
 function renderMaStats() {
   apiCall('mitarbeiter_stats.php').then(({ok,data})=>{
     const con=document.getElementById('maStatsList');
-    if(!ok||data.status!=='ok'||!data.stats.length){con.innerHTML=`<div class="empty"><div class="ico">👤</div><p>${t('no-data')}</p></div>`;return;}
-    con.innerHTML=data.stats.map(d=>`<div class="ma-stat-row"><div><div class="ma-stat-name">${d.name}</div><div class="ma-stat-meta">${d.anzahl} ${t('lbl-einsaetze')} · ${t('lbl-letzter')}: ${d.letzter?fmtDate(d.letzter):'–'}</div></div><div class="ma-stat-h">${parseFloat(d.stunden).toFixed(2)} h</div></div>`).join('');
+    // (data.stats || []) statt data.stats: Kam die Antwort ohne das Feld,
+    // stuerzte die ganze Seite mit "undefined.length" ab -- und zwar
+    // wortlos, mitten im Laden.
+    const stats=(ok&&data.status==='ok'&&Array.isArray(data.stats))?data.stats:[];
+    if(!stats.length){con.innerHTML=`<div class="empty"><div class="ico">👤</div><p>${t('no-data')}</p></div>`;return;}
+    con.innerHTML=stats.map(d=>`<div class="ma-stat-row"><div><div class="ma-stat-name">${d.name}</div><div class="ma-stat-meta">${d.anzahl} ${t('lbl-einsaetze')} · ${t('lbl-letzter')}: ${d.letzter?fmtDate(d.letzter):'–'}</div></div><div class="ma-stat-h">${parseFloat(d.stunden).toFixed(2)} h</div></div>`).join('');
   });
 }
 
