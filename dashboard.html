@@ -4132,7 +4132,12 @@ function go(view) {
       $('agVon').value = isoTag(new Date(h.getFullYear(), h.getMonth() - 1, h.getDate()));
       $('agBis').value = isoTag();
     }
-    (einsaetze.length ? Promise.resolve() : loadEinsaetze()).then(renderAbgleich);
+    // Die Rapporte gehoeren dazu, seit ein Schicht-Rapport an der Zeile
+    // haengen kann (ENT-082) -- ohne sie faende die Ansicht nie einen.
+    Promise.all([
+      einsaetze.length ? Promise.resolve() : loadEinsaetze(),
+      rapporte.length ? Promise.resolve() : loadRapporte(),
+    ]).then(renderAbgleich);
   }
   // Das Untermenü ist nur aufgeklappt, solange Kunden der aktive Bereich ist
   // -- kein Zustand, der beim Verlassen hängen bleibt (ENT-039).
@@ -9237,6 +9242,31 @@ function agZeilenBauen() {
     || String(a.wer).localeCompare(String(b.wer), 'de'));
 }
 
+// ── Schicht-Rapport an der Zeile (ENT-082) ──────────────────────────────
+// Der Rapport ist ein BELEG, keine Festschreibung: er schreibt nichts in den
+// Abgleich, bis der Planer ihn ausdruecklich uebernimmt. Mehrere Rapporte zur
+// selben Zuteilung sind moeglich -- massgeblich ist der zuletzt erfasste.
+function agRapport(z) {
+  if (!z.mitarbeiter_id) return null;
+  const treffer = rapporte.filter(r =>
+    Number(r.einsatz_id) === Number(z.einsatz_id) && Number(r.mitarbeiter_id) === Number(z.mitarbeiter_id));
+  if (!treffer.length) return null;
+  return treffer.slice().sort((a, b) => String(b.erfasst_am).localeCompare(String(a.erfasst_am)))[0];
+}
+
+// Weicht der Rapport vom Plan ab? Verglichen wird gegen den PLAN, nicht gegen
+// bereits erfasste Ist-Zeiten -- die Meldung sagt "der Mitarbeitende hat etwas
+// anderes gemeldet als geplant war", und genau das ist der Anlass hinzusehen.
+function agRapportAbweichung(z, r) {
+  if (!r) return null;
+  const ab = [];
+  if (hm(r.von) !== hm(z.von)) ab.push(`von ${hm(z.von)} → ${hm(r.von)}`);
+  if (hm(r.bis) !== hm(z.bis)) ab.push(`bis ${hm(z.bis)} → ${hm(r.bis)}`);
+  const pausePlan = z.ist_pause_min === null || z.ist_pause_min === undefined ? null : Number(z.ist_pause_min);
+  if (pausePlan !== null && Number(r.pause_min) !== pausePlan) ab.push(`Pause ${nf(pausePlan)}′ → ${nf(r.pause_min)}′`);
+  return ab.length ? ab : null;
+}
+
 function agGefiltert() {
   const q = ($('agQ').value || '').toLowerCase().trim();
   const von = $('agVon').value, bis = $('agBis').value;
@@ -9346,7 +9376,11 @@ function renderAbgleich() {
         <td>${z.titel ? esc(z.titel) : `<span style="color:var(--ink-3)">${esc(z.einsatzart)}</span>`}
             <div class="ag-plan">${esc(z.ort)}${z.sparte === 'reinigung' ? ' · Reinigung' : ''}</div></td>
         <td>${z.mitarbeiter_id
-          ? `${esc(z.wer)}${z.personalnummer ? ` <span class="ag-plan">(${esc(z.personalnummer)})</span>` : ''}`
+          ? `${esc(z.wer)}${z.personalnummer ? ` <span class="ag-plan">(${esc(z.personalnummer)})</span>` : ''}${
+              (() => { const r = agRapport(z); if (!r) return '';
+                const ab = agRapportAbweichung(z, r);
+                return `<div class="ag-plan" style="color:${ab ? 'var(--warn)' : 'var(--ink-3)'}">${
+                  ab ? 'Rapport weicht ab: ' + esc(ab.join(', ')) : 'Rapport wie geplant'}</div>`; })()}`
           : '<span style="color:var(--neg)">niemand eingeteilt</span>'}</td>
         <td class="nowrap">${dmy(z.datum)}<div class="ag-plan">${hm(z.von)}–${hm(z.bis)}</div></td>
         <td><input class="inp" type="time" value="${esc(vVon)}"${ohne ? ' disabled' : ''} data-ag="von" data-k="${esc(k)}" aria-label="Tatsächlich von"></td>
@@ -9397,6 +9431,10 @@ function agKarten() {
         !offen && z.ist_pause_min ? ` · Pause ${esc(String(z.ist_pause_min))} min${
           Number(z.ist_pause_bezahlt_ma) === 1 ? ' (bezahlt)' : ''}` : ''}${
         netto ? ` · Netto <b>${esc(netto)}</b>` : ''}</div>
+      ${(() => { const r = agRapport(z); if (!r) return '';
+        const ab = agRapportAbweichung(z, r);
+        return `<div class="zeiten" style="color:${ab ? 'var(--warn)' : 'var(--ink-3)'}">${
+          ab ? 'Rapport weicht ab: ' + esc(ab.join(', ')) : 'Rapport wie geplant'}</div>`; })()}
       <div class="marken">
         <span class="chip ${st[1]}">${esc(zu && z.ist_status === 'anwesend' ? 'Abgeglichen' : st[0])}${zu ? SCHLOSS_ZU : ''}</span>
         ${offen ? '<span class="ag-plan">Abgleichen am Desktop</span>' : ''}
@@ -9601,6 +9639,34 @@ function openAbgleich(k) {
         ${z.bemerkung ? `<br><br>Bemerkung aus der Planung: ${esc(z.bemerkung)}` : ''}
       </div>
     </div>
+    ${(() => {
+      const r = agRapport(z);
+      if (!r) return '';
+      const ab = agRapportAbweichung(z, r);
+      // Der Hinweis nach ENT-082 statt einer automatischen Pausendauer: die
+      // Schwelle wird GENANNT, aber nichts gerechnet und nichts vorbelegt.
+      // Die Bemessungsgrundlage ist offen (GAV-AUS-007), und eine nicht
+      // gemeldete Pause ist nicht dasselbe wie keine Pause.
+      const roh = agRohMin(hm(r.von), hm(r.bis));
+      const pauseHinweis = Number(r.pause_min) === 0 && roh !== null && roh > 330;
+      return `<div class="zone">
+        <div class="zone-hd">Rapport des Mitarbeitenden</div>
+        <div class="zone-note">
+          ${esc(hm(r.von))}–${esc(hm(r.bis))} Uhr · Pause ${nf(r.pause_min)} Min.
+          · erfasst am ${esc(dmy(r.erfasst_am))}, ${esc(String(r.erfasst_am).slice(11, 16))}
+          ${r.bemerkung ? `<br>Bemerkung: ${esc(r.bemerkung)}` : ''}
+          <br><br>${ab
+            ? `<b>Weicht vom Plan ab:</b> ${esc(ab.join(', '))}.`
+            : 'Stimmt mit dem Plan überein.'}
+          Der Rapport ist ein Beleg — festgeschrieben wird erst durch das Speichern hier.
+        </div>
+        ${pauseHinweis ? `<div class="zone-note" style="color:var(--warn);margin-top:6px">
+          Rohzeit über 5½ Std., keine Pause gemeldet, Bemessungsgrundlage ungeklärt
+          (GAV-AUS-007) — bitte prüfen. Es wird bewusst nichts vorbelegt.
+        </div>` : ''}
+        ${zu ? '' : `<button class="btn btn-plain btn-sm" type="button" onclick="agdRapportUebernehmen('${esc(k)}')">Rapportzeiten übernehmen</button>`}
+      </div>`;
+    })()}
     ${zu ? `<div class="zone zu-zone">
       <div class="zone-hd">${schlossAuf} Diese Zeile ist festgeschrieben</div>
       <div class="zone-note">
@@ -9720,6 +9786,26 @@ function agdEntsperren(k) {
     + 'die bisher erfassten Ist-Zeiten bleiben stehen, bis du neu speicherst.',
     'Sperre aufheben',
     () => { agEntsperrt.add(k); openAbgleich(k); });
+}
+
+// Rapportzeiten in die Felder der Schublade holen (ENT-082). Uebernommen
+// werden Von, Bis, Pause und Bemerkung -- NICHT die Bezahlt-Kennzeichen: die
+// setzt nach ENT-046/GAV-AUS-004 der Planer je Zeile, und der Mitarbeitende
+// kann sie gar nicht beurteilen. Gespeichert wird erst mit dem Knopf darunter.
+function agdRapportUebernehmen(k) {
+  const z = agZeilen.find(x => agKey(x) === k);
+  if (!z) return;
+  const r = agRapport(z);
+  if (!r) { toast('Kein Rapport zu dieser Zeile.'); return; }
+  $('agdStatus').value = 'anwesend';
+  agdStatusUm();
+  $('agdVon').value = hm(r.von);
+  $('agdBis').value = hm(r.bis);
+  $('agdPause').value = String(Number(r.pause_min) || 0);
+  $('agdPause').classList.remove('vorschlag');
+  if (r.bemerkung && !$('agdBemerkung').value.trim()) { $('agdBemerkung').value = r.bemerkung; }
+  agdPauseHinweis();
+  toast('Rapportzeiten übernommen — noch nicht gespeichert.');
 }
 
 function agdSpeichern() {

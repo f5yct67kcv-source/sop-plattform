@@ -705,6 +705,11 @@ $spalten = [
     ['einsaetze', 'taetigkeit',     'ALTER TABLE einsaetze ADD COLUMN taetigkeit TEXT NULL AFTER treffpunkt'],
     ['einsaetze', 'qualifikation',  'ALTER TABLE einsaetze ADD COLUMN qualifikation VARCHAR(200) NULL AFTER taetigkeit'],
     ['einsaetze', 'zustaendig_id',  'ALTER TABLE einsaetze ADD COLUMN zustaendig_id INT NULL AFTER qualifikation'],
+
+    // Schicht rapportieren (ENT-082): Verweis vom Rapport auf die Schicht.
+    // NULL bleibt der Normalfall fuer den bestehenden manuellen Rapport --
+    // nur wer ueber "Schicht rapportieren" kommt, traegt hier einen Wert ein.
+    ['rapporte', 'einsatz_id', 'ALTER TABLE rapporte ADD COLUMN einsatz_id INT NULL AFTER mitarbeiter_id'],
 ];
 foreach ($spalten as [$tabelle, $spalte, $sql]) {
     if (!hat_tabelle_jetzt($pdo, $tabelle) || hat_spalte($pdo, $tabelle, $spalte)) {
@@ -887,6 +892,10 @@ $verweise = [
     ['einsaetze', 'objekt_id',        'ALTER TABLE einsaetze ADD FOREIGN KEY (objekt_id) REFERENCES objekte(id) ON DELETE SET NULL'],
     ['einsaetze', 'masterschicht_id', 'ALTER TABLE einsaetze ADD FOREIGN KEY (masterschicht_id) REFERENCES masterschichten(id) ON DELETE SET NULL'],
     ['einsaetze', 'abgeglichen_von',  'ALTER TABLE einsaetze ADD FOREIGN KEY (abgeglichen_von) REFERENCES mitarbeiter(id) ON DELETE SET NULL'],
+    // Verliert die Schicht spaeter ihren Datensatz, bleibt der Rapport als
+    // Beleg stehen -- er ist ein Dokument ueber einen bestimmten Tag, kein
+    // Verweis, der mit der Schicht sterben darf (ENT-082).
+    ['rapporte', 'einsatz_id', 'ALTER TABLE rapporte ADD FOREIGN KEY (einsatz_id) REFERENCES einsaetze(id) ON DELETE SET NULL'],
 ];
 foreach ($verweise as [$tabelle, $spalte, $sql]) {
     if (!hat_spalte($pdo, $tabelle, $spalte) || hat_fremdschluessel($pdo, $tabelle, $spalte)) {
