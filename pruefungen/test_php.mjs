@@ -9,6 +9,7 @@
 import { WURZEL, HIER, OUT, browserPfad } from './pfade.mjs';
 import { execFileSync } from 'child_process';
 import { readFileSync } from 'fs';
+import { dirname, resolve } from 'path';
 
 const ok = [], bad = [];
 const check = (n, c) => (c ? ok : bad).push(n);
@@ -287,6 +288,54 @@ if (ohneEinbindung.length) { bad.push('ohne rechte.php: ' + ohneEinbindung.join(
   if (toteAusnahmen.length) { bad.push('Ausnahme ohne Datei: ' + toteAusnahmen.join(', ')); }
 }
 
+
+// Keine Bibliothek darf zweimal geladen werden.
+//
+// Vorgefallen am 22.08.2026: planung_einrichten.php band mitarbeiter.php ein
+// (das seinerseits kunden.php laedt) und danach kunden.php noch einmal mit
+// require statt require_once. PHP bricht dann beim zweiten Anlegen derselben
+// Funktion HART ab -- am Ausnahmehandler vorbei, ohne lesbare Antwort. Der
+// Endpunkt war vollstaendig tot, und die Oberflaeche konnte nur "fehlgeschlagen"
+// sagen. Der Einrichtungsweg lag damit lahm, ohne dass es jemandem auffiel.
+//
+// Geprueft wird der tatsaechliche Ladeweg, nicht die Schreibweise: require ist
+// an sich in Ordnung, solange dieselbe Datei nicht auf zwei Wegen ankommt.
+{
+  const pfad = (von, ziel) => resolve(dirname(von), ziel.replace(/^\/+/, ''));
+  const liest = f => { try { return readFileSync(f, 'utf8'); } catch { return ''; } };
+  // Deklariert die Datei Funktionen ungeschuetzt? Nur dann ist ein zweites
+  // Laden toedlich -- db.php etwa kapselt seine Funktionen in function_exists.
+  const gefaehrlich = f => {
+    const q = liest(f);
+    return !/function_exists/.test(q) && /^\s*function\s+\w+\s*\(/m.test(q);
+  };
+  const bindungen = f => [...liest(f).matchAll(
+    /^\s*(require|include)(_once)?\s*\(?\s*__DIR__\s*\.\s*['"]([^'"]+)['"]/gm)]
+    .map(m => ({ ziel: pfad(f, m[3]), once: !!m[2] }));
+
+  const doppelt = [];
+  for (const datei of apiDateien) {
+    const start = `${WURZEL}/backend/api/${datei}`;
+    const zaehler = new Map();
+    const geh = f => {
+      for (const { ziel, once } of bindungen(f)) {
+        const z = zaehler.get(ziel) || { plain: 0, once: 0 };
+        z[once ? 'once' : 'plain']++;
+        zaehler.set(ziel, z);
+        if (z.plain + z.once === 1) { geh(ziel); }
+      }
+    };
+    geh(start);
+    for (const [ziel, z] of zaehler) {
+      if (z.plain >= 1 && z.plain + z.once > 1 && gefaehrlich(ziel)) {
+        doppelt.push(`${datei} laedt ${ziel.split('/').pop()} zweimal`);
+      }
+    }
+  }
+  check('KRITISCH: kein Endpunkt laedt dieselbe Bibliothek zweimal (harter Abbruch)',
+    doppelt.length === 0);
+  doppelt.forEach(d => bad.push(d));
+}
 
 // Und umgekehrt: kein Endpunkt darf noch selbst auf ist_admin pruefen.
 // Eine zweite Pruefstelle waere eine zweite Wahrheit.
