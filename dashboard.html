@@ -1338,23 +1338,73 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
    Nur ab Tabletbreite: darunter ist die Leiste ohnehin ausgeklappt-verborgen
    und wird über den Burger geöffnet. */
 @media (min-width: 901px) {
-  .shell.schmal { --side-w: 64px; }
-  .shell.schmal .side-nav { padding: 14px 8px; }
-  .shell.schmal .side-foot { padding: 10px 8px; }
-  .shell.schmal .nav-lbl { display: none; }
-  .shell.schmal .nav-item { justify-content: center; gap: 0; padding: 10px 0; }
-  .shell.schmal .nav-item .lbl, .shell.schmal .nav-item .tag { display: none; }
-  /* Kein Platz für ein ausgeklapptes Untermenü neben blossen Symbolen --
-     "Kunden" bleibt anklickbar und führt weiterhin auf die Übersicht. */
-  .shell.schmal .nav-eltern .chev, .shell.schmal .nav-kinder { display: none; }
-  .shell.schmal .side-brand { justify-content: center; padding: 0 8px; }
-  .shell.schmal .side-brand .txt { display: none; }
-  .shell.schmal .side-user { justify-content: center; padding: 7px 0; }
-  .shell.schmal .side-user .who { display: none; }
+  /* "aus" faellt hier bewusst auf die schmale Leiste zurueck: Unter
+     1281 px ist im Kopfbereich neben Titel, Thema-Schalter und
+     "Bearbeiten" kein Platz fuer die Navigation. Ein Rueckfall ist
+     ehrlicher als eine Leiste, die umbricht. */
+  .shell.schmal, .shell.aus { --side-w: 64px; }
+  .shell.schmal .side-nav, .shell.aus .side-nav { padding: 14px 8px; }
+  .shell.schmal .side-foot, .shell.aus .side-foot { padding: 10px 8px; }
+  .shell.schmal .nav-lbl, .shell.aus .nav-lbl { display: none; }
+  .shell.schmal .nav-item, .shell.aus .nav-item { justify-content: center; gap: 0; padding: 10px 0; }
+  .shell.schmal .nav-item .lbl, .shell.schmal .nav-item .tag,
+  .shell.aus .nav-item .lbl, .shell.aus .nav-item .tag { display: none; }
+  /* Neben blossen Symbolen ist kein Platz für ein eingerücktes Untermenü.
+     Statt es zu verstecken -- so war es bis hierher, und damit waren
+     "Objekte" und "Rapporte" im schmalen Modus GAR NICHT erreichbar --
+     wird es ein schwebendes Feld. Dieselben Knöpfe, dieselben IDs, nur
+     anders platziert: rechteAnwenden() wirkt unverändert weiter. Eine
+     zweite Kopie der Einträge im Kopfbereich müsste bei jeder
+     Rechteänderung mitgepflegt werden, und eine der beiden Kopien würde
+     vergessen. */
+  .shell.schmal .nav-eltern .chev, .shell.aus .nav-eltern .chev { display: none; }
+  .shell.schmal .nav-gruppe.offen .nav-kinder,
+  .shell.aus .nav-gruppe.offen .nav-kinder {
+    display: block; position: fixed; z-index: 50; min-width: 190px;
+    padding: 6px; margin: 0;
+    background: var(--shell); border: 1px solid var(--shell-line);
+    border-radius: var(--r-sm); box-shadow: var(--sh-3);
+  }
+  .shell.schmal .nav-gruppe.offen .nav-kind,
+  .shell.aus .nav-gruppe.offen .nav-kind { padding: 10px 12px; }
+  .shell.schmal .side-brand, .shell.aus .side-brand { justify-content: center; padding: 0 8px; }
+  .shell.schmal .side-brand .txt, .shell.aus .side-brand .txt { display: none; }
+  .shell.schmal .side-user, .shell.aus .side-user { justify-content: center; padding: 7px 0; }
+  .shell.schmal .side-user .who, .shell.aus .side-user .who { display: none; }
   /* Die Trennlinie zwischen den Gruppen bleibt als schmaler Strich sichtbar,
      damit die Gliederung nicht ganz verloren geht. */
   .shell.schmal .side-nav .nav-lbl + .nav-item { margin-top: 10px; border-top: 1px solid var(--shell-line); padding-top: 14px; }
 }
+/* ─── Dritter Hüllenzustand (ENT-086): die Seitenleiste wird zur Kopfleiste.
+   Bewusst eine reine Darstellungsänderung -- dasselbe Markup wandert nicht
+   im DOM umher, es legt sich waagrecht. Damit bleiben IDs, Klickpfade und
+   rechteAnwenden() unberührt.
+   Erst ab 1281 px: darunter greift der Rückfall auf 64 px weiter oben. */
+@media (min-width: 1281px) {
+  .shell.aus { --side-w: 0px; }
+  .shell.aus .side {
+    right: 0; bottom: auto; width: auto; height: var(--top-h);
+    flex-direction: row; align-items: center; gap: 4px;
+    padding: 0 14px; border-bottom: 1px solid var(--shell-line);
+  }
+  .shell.aus .side-brand { height: auto; padding: 0 10px 0 0; border-bottom: none; flex: none; }
+  .shell.aus .side-nav {
+    display: flex; flex-direction: row; align-items: center; gap: 2px;
+    flex: 1; padding: 0; overflow: visible;
+  }
+  .shell.aus .nav-gruppe { flex: none; }
+  .shell.aus .nav-item { width: auto; min-width: 40px; min-height: 38px; margin-bottom: 0; padding: 8px 10px; }
+  .shell.aus .side-foot {
+    display: flex; flex-direction: row; align-items: center; gap: 2px;
+    flex: none; padding: 0; border-top: none;
+  }
+  .shell.aus .side-foot .nav-item { margin-top: 0; }
+  /* Der Inhalt rückt unter die Leiste statt neben sie. Die Werkzeugleiste
+     klebt darunter, nicht darüber -- sonst verdeckt sie die Navigation. */
+  .shell.aus .main { padding-top: var(--top-h); }
+  .shell.aus .topbar { top: var(--top-h); }
+}
+
 .btn-schmal { display: inline-flex; }
 @media (max-width: 900px) { .btn-schmal { display: none; } }
 
@@ -3491,10 +3541,7 @@ function enter() {
   }
   $('gate').style.display = 'none';
   $('shell').classList.add('on');
-  if (localStorage.getItem('rv3_schmal') === '1') {
-    $('shell').classList.add('schmal');
-    $('btnSchmal').title = 'Seitenleiste ausklappen';
-  }
+  huelleSetzen(huelleLesen(), false);
   $('uName').textContent = me.name;
   // Statt immer "Administration" die tatsaechlichen Rollen. Wer als Planung
   // angemeldet ist, soll das sehen -- sonst wundert er sich, warum Knoepfe
@@ -4090,6 +4137,7 @@ function weiteAnsicht(an) {
 }
 
 function go(view) {
+  navFlyoutZu();
   document.querySelectorAll('.view').forEach(v => v.classList.remove('on'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('on'));
   $('view-' + view).classList.add('on');
@@ -4213,11 +4261,111 @@ document.addEventListener('click', e => {
 
 // Schmale Seitenleiste: mehr Platz für die breiten Raster. Die Wahl bleibt
 // erhalten, damit sie nicht bei jedem Laden neu getroffen werden muss.
-function seiteUm() {
-  const schmal = $('shell').classList.toggle('schmal');
-  localStorage.setItem('rv3_schmal', schmal ? '1' : '0');
-  $('btnSchmal').title = schmal ? 'Seitenleiste ausklappen' : 'Seitenleiste einklappen';
+// ══════════════════════════════════════════ HUELLE (ENT-086)
+// Drei Zustaende statt zwei: 232 px -- 64 px -- Kopfleiste. Der Knopf
+// schaltet reihum weiter. Absichtlich EIN Knopf statt dreier: Wer den
+// Platz braucht, drueckt so lange, bis es passt; ein Wahlfeld mit drei
+// Moeglichkeiten waere fuer eine Groesse zu viel Bedienung.
+const HUELLE_ZUSTAENDE = ['voll', 'schmal', 'aus'];
+const HUELLE_TITEL = {
+  voll:   'Seitenleiste einklappen',
+  schmal: 'Seitenleiste ausblenden',
+  aus:    'Seitenleiste einblenden',
+};
+
+function huelleLesen() {
+  const z = localStorage.getItem('rv3_huelle');
+  if (HUELLE_ZUSTAENDE.includes(z)) { return z; }
+  // Uebernahme des alten Schalters: Wer eingeklappt gearbeitet hat, soll
+  // nach dem Update nicht ploetzlich die breite Leiste vorfinden.
+  if (localStorage.getItem('rv3_schmal') === '1') { return 'schmal'; }
+  return 'voll';
 }
+
+// Bewusst im Browser gemerkt und nicht am Konto: Der Zustand haengt an der
+// Bildschirmbreite, nicht an der Person. Dieselbe Person will am Notebook
+// etwas anderes als am Breitbild.
+function huelleSetzen(zustand, merken = true) {
+  if (!HUELLE_ZUSTAENDE.includes(zustand)) { zustand = 'voll'; }
+  const sh = $('shell');
+  if (!sh) { return; }
+  sh.classList.remove('schmal', 'aus');
+  if (zustand !== 'voll') { sh.classList.add(zustand); }
+  if (merken) { localStorage.setItem('rv3_huelle', zustand); }
+  const b = $('btnSchmal');
+  if (b) { b.title = HUELLE_TITEL[zustand]; b.setAttribute('aria-label', HUELLE_TITEL[zustand]); }
+  navFlyoutZu(true);
+}
+
+function seiteUm() {
+  const i = HUELLE_ZUSTAENDE.indexOf(huelleLesen());
+  huelleSetzen(HUELLE_ZUSTAENDE[(i + 1) % HUELLE_ZUSTAENDE.length]);
+}
+
+// Kompakt heisst: Die Beschriftungen sind weg, ein eingeruecktes Untermenue
+// hat keinen Platz. Gilt fuer beide kompakten Zustaende -- und nur oberhalb
+// von 900 px, darunter ist die Leiste eine Schublade mit voller Breite.
+function huelleKompakt() {
+  const sh = $('shell');
+  return !!sh
+      && (sh.classList.contains('schmal') || sh.classList.contains('aus'))
+      && window.matchMedia('(min-width: 901px)').matches;
+}
+
+function navFlyoutZu(auchImmer = false) {
+  if (!auchImmer && !huelleKompakt()) { return; }
+  document.querySelectorAll('.nav-gruppe.offen').forEach(g => g.classList.remove('offen'));
+}
+
+// Gibt true zurueck, wenn der Klick als Flyout behandelt wurde -- die
+// Aufrufer entscheiden daran, ob ihre bisherige Logik noch dran ist.
+function navFlyoutKlick(gruppenId) {
+  if (!huelleKompakt()) { return false; }
+  const g = $(gruppenId);
+  if (!g) { return false; }
+  const warOffen = g.classList.contains('offen');
+  navFlyoutZu();
+  if (!warOffen) { g.classList.add('offen'); navFlyoutPlatzieren(g); }
+  return true;
+}
+
+// Gemessen statt gerechnet: Die Groesse des Feldes wird am eingeblendeten
+// Element abgenommen, nicht aus der Zahl der Kinder geschaetzt. Sonst
+// stimmt die Kollisionspruefung am Rand nicht.
+function navFlyoutPlatzieren(gruppe) {
+  const knopf = gruppe.querySelector('.nav-eltern');
+  const feld  = gruppe.querySelector('.nav-kinder');
+  if (!knopf || !feld) { return; }
+  feld.style.left = '-9999px';
+  feld.style.top  = '0px';
+  const r = knopf.getBoundingClientRect();
+  const b = feld.getBoundingClientRect();
+  const imKopf = $('shell').classList.contains('aus')
+              && window.matchMedia('(min-width: 1281px)').matches;
+  // Senkrecht: an der Kante der LEISTE ausrichten, nicht an der des Knopfes.
+  // Der Knopf endet wegen des Innenabstands frueher -- das Feld lag dadurch
+  // 2 px ueber der Leiste statt sauber daneben.
+  const leiste = document.getElementById('side');
+  const kante  = leiste ? leiste.getBoundingClientRect().right : r.right;
+  let links = imKopf ? r.left : kante + 6;
+  let oben  = imKopf ? r.bottom + 6 : r.top;
+  if (links + b.width  > window.innerWidth  - 8) { links = window.innerWidth  - b.width  - 8; }
+  if (oben  + b.height > window.innerHeight - 8) { oben  = window.innerHeight - b.height - 8; }
+  feld.style.left = Math.max(8, links) + 'px';
+  feld.style.top  = Math.max(8, oben)  + 'px';
+}
+
+document.addEventListener('click', ev => {
+  if (!huelleKompakt()) { return; }
+  if (ev.target.closest && ev.target.closest('.nav-gruppe')) { return; }
+  navFlyoutZu();
+});
+document.addEventListener('keydown', ev => {
+  if (ev.key === 'Escape') { navFlyoutZu(); }
+});
+// Wird das Fenster schmaler, greift der Rueckfall auf die 64-px-Leiste.
+// Ein Feld, das noch an der alten Stelle steht, zeigt dann ins Leere.
+window.addEventListener('resize', () => navFlyoutZu(true));
 
 // ══════════════════════════════════════════ LADEN
 function reloadAll() {
@@ -5984,6 +6132,7 @@ const TAB_CRUMB = {
 // noch das Untermenue zu (bzw. wieder auf) -- ohne den view() zu berühren,
 // denn navigieren beim Zuklappen wuerde ihn sofort wieder aufreissen.
 function kuNavKlick() {
+  if (navFlyoutKlick('navg-kunden')) { return; }
   if ($('view-kunden').classList.contains('on')) {
     $('navg-kunden').classList.toggle('offen');
   } else {
@@ -6294,6 +6443,7 @@ function saveObjekt() {
 // Klick auf "Administration": oeffnet die erste Unterseite, statt nur
 // auf- und zuzuklappen. Ein Menuepunkt, der nichts tut, ist ein Aergernis.
 function adminNavKlick() {
+  if (navFlyoutKlick('navg-admin')) { return; }
   const offen = $('navg-admin').classList.contains('offen');
   const drin = $('view-mitarbeiter').classList.contains('on') || $('view-betrieb').classList.contains('on');
   if (offen && drin) { $('navg-admin').classList.toggle('offen'); return; }
@@ -6461,6 +6611,7 @@ function pnMeldung(st) {
 }
 
 function kontrolleNavKlick() {
+  if (navFlyoutKlick('navg-kontrolle')) { return; }
   const offen = $('navg-kontrolle').classList.contains('offen');
   if (offen && $('view-pensen').classList.contains('on')) {
     $('navg-kontrolle').classList.toggle('offen');
