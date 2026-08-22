@@ -7633,10 +7633,15 @@ function eiOeffnen() { openDlg('dlgEinrichtung'); planungEinrichten(); }
 function planungEinrichten() {
   const b = $('eiBtn'); if (b) b.disabled = true;
   $('eiInhalt').innerHTML = '<p class="zone-note">Prüfe …</p>';
-  api('planung_einrichten.php', { method: 'POST' }).then(({ ok, data }) => {
+  api('planung_einrichten.php', { method: 'POST' }).then(({ ok, status, data }) => {
     if (b) b.disabled = false;
     if (!ok) {
-      $('eiInhalt').innerHTML = `<div class="msg-err">${esc(data.message || 'Einrichtung fehlgeschlagen.')}</div>`;
+      // Ohne lesbare Antwort blieb hier nur "Einrichtung fehlgeschlagen." --
+      // eine Sackgasse, die genau nichts sagt. Der Statuscode kommt mit:
+      // 403 heisst fehlendes Recht, 500 ein Abbruch im Server, 0 keine
+      // Verbindung. Drei verschiedene Ursachen, drei verschiedene Wege.
+      $('eiInhalt').innerHTML = `<div class="msg-err">${esc(data.message
+        || `Einrichtung fehlgeschlagen — der Server hat keine lesbare Antwort geschickt (HTTP ${status || 'keine Antwort'}).`)}</div>`;
       return;
     }
     // Der Abstand haengt an der POSITION, nicht am Titeltext: Die erste

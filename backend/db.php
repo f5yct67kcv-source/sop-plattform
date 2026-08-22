@@ -166,6 +166,33 @@ set_exception_handler(function (Throwable $e): void {
     json_response(['status' => 'error', 'message' => $meldung], 500);
 });
 
+// Ein schwerer Fehler laeuft NICHT durch den Handler oben: Zeitueberschreitung
+// und erschoepfter Speicher beenden PHP sofort. Dann kommt beim Browser ein
+// leerer oder halber Rumpf an, der sich nicht als JSON lesen laesst -- die
+// Oberflaeche zeigt darauf nur ihren eigenen Ersatztext ohne Grund. Genau so
+// stand am 22.08.2026 "Einrichtung fehlgeschlagen." im Dialog, ohne dass
+// irgendwo zu sehen war, woran es lag.
+//
+// Diese Absicherung macht daraus wenigstens eine lesbare Antwort. Sie
+// erfindet nichts: Was PHP als letzten Fehler gemeldet hat, wird benannt.
+register_shutdown_function(function (): void {
+    $letzter = error_get_last();
+    $schwer = [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR];
+    if (!$letzter || !in_array($letzter['type'], $schwer, true)) { return; }
+    // Wurde schon etwas gesendet, laesst sich nichts mehr geradebiegen --
+    // ein zweiter Rumpf waere schlimmer als der halbe.
+    if (headers_sent()) { return; }
+    $art = $letzter['type'] === E_ERROR && stripos($letzter['message'], 'maximum execution time') !== false
+        ? 'Der Vorgang hat zu lange gedauert und wurde abgebrochen.'
+        : 'Der Vorgang ist unerwartet abgebrochen.';
+    http_response_code(500);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode([
+        'status'  => 'error',
+        'message' => $art . ' (' . basename((string)$letzter['file']) . ', Zeile ' . $letzter['line'] . ')',
+    ], JSON_UNESCAPED_UNICODE);
+});
+
 // Gibt es diese Spalte? Steht hier und nicht mehr nur im Einrichtungsskript
 // (gefunden beim Ausbau des Mitarbeiterstamms): pensen.php ruft die Funktion
 // auf, bindet das Einrichtungsskript aber nicht ein -- und lief damit auf
