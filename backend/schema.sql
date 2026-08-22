@@ -44,6 +44,11 @@ CREATE TABLE kunden (
 CREATE TABLE rapporte (
   id INT AUTO_INCREMENT PRIMARY KEY,
   mitarbeiter_id INT NOT NULL,
+  -- Schicht rapportieren (ENT-082). NULL = manuell erfasster Rapport, wie
+  -- bisher. Der Fremdschluessel auf einsaetze(id) steht bewusst NICHT hier:
+  -- einsaetze entsteht erst mit der Einsatzplanung, die spaeter laeuft. Ihn
+  -- traegt die Einrichtung nach (backend/api/planung_einrichten.php).
+  einsatz_id INT NULL,
   datum DATE NOT NULL,
   kunde VARCHAR(200) NOT NULL,
   strasse VARCHAR(200) NOT NULL,

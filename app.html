@@ -74,6 +74,18 @@ svg.i-sm { width: 17px; height: 17px; }
 .inp:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .msg-err { font-size: 14px; color: var(--neg); background: var(--neg-soft); border-radius: var(--r-sm); padding: 11px 13px; margin-bottom: 16px; }
 
+/* Unterschrift-Canvas fuer "Schicht rapportieren" (ENT-082), gleiches Muster
+   wie im bestehenden Rapport Tool (index.html). */
+.sig-wrap { border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; background: var(--surface); position: relative; margin-bottom: 16px; }
+.sig-wrap canvas { display: block; width: 100%; touch-action: none; cursor: crosshair; }
+.sig-actions { display: flex; justify-content: flex-end; padding: 8px 10px; border-top: 1px solid var(--line); }
+/* 44px auch hier: "Loeschen" ist ein Bedienelement auf dem Handy wie jedes
+   andere, und danebengetippt heisst hier, die Unterschrift des Kunden zu
+   verlieren. Im alten Rapport Tool (index.html) ist er kleiner -- das ist
+   kein Grund, den Fehler mitzunehmen. */
+.sig-clear { font-size: 13.5px; color: var(--neg); background: none; border: none; cursor: pointer; font-weight: 640; padding: 0 12px; border-radius: 6px; min-height: 44px; }
+.sig-placeholder { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); font-size: 13px; color: var(--ink-3); pointer-events: none; text-align: center; line-height: 1.5; }
+
 /* ══════════════════════════════════════════ ZUGANG */
 #gate { position: fixed; inset: 0; z-index: 900; background: var(--shell); display: flex; flex-direction: column; padding: 28px 22px calc(28px + env(safe-area-inset-bottom)); }
 .gate-oben { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
@@ -378,6 +390,13 @@ const W = {
     neuerRapport: 'Neuer Rapport', meineRapporte: 'Meine Rapporte',
     keineRapporte: 'Noch keine Rapporte', keineRapporteText: 'Erfasste Einsätze erscheinen hier.',
     zurErfassung: 'Zur Rapporterfassung',
+    schichtRapportieren: 'Schicht rapportieren', schichtRapportTitel: 'Schicht rapportieren',
+    schonRapportiert: 'Bereits rapportiert am', erneutSendenKorrigiert: 'Erneutes Senden korrigiert diese Angaben.',
+    strasse: 'Strasse', ort: 'Ort', arbeitsbeginn: 'Arbeitsbeginn', arbeitsende: 'Arbeitsende',
+    pauseMinuten: 'Pause (Minuten)', unterzeichnerName: 'Name Unterzeichner', vorUndNachname: 'Vor- und Nachname',
+    unterschriftKunde: 'Unterschrift Kunde', hierUnterschreiben: '✍ Hier unterschreiben', loeschen: 'Löschen',
+    senden: 'Senden', beideZeitenNoetig: 'Bitte Arbeitsbeginn und Arbeitsende angeben.',
+    rapportGesendet: 'Rapport gesendet.',
     diesenMonat: 'Diesen Monat', stunden: 'Stunden', einsaetze: 'Einsätze',
     meineStunden: 'Meine Stunden',
     geleistet: 'Geleistet', zeitbonus: 'Zeitbonus', gesamt: 'Total',
@@ -442,6 +461,8 @@ let stdMonat = '';          // JJJJ-MM des angezeigten Monats
 let stdSchichten = null;    // null = noch nicht geladen
 let reiter = 'heute';
 let blattId = null;
+// Unterschrift-Canvas fuer "Schicht rapportieren" (ENT-082).
+let sigCtx = null, isDrawing = false, lastX = 0, lastY = 0, sigDirty = false;
 
 // ── Hilfen
 const $ = id => document.getElementById(id);
@@ -1056,7 +1077,11 @@ function blattAuf(id) {
       <dt>Status</dt><dd><span class="marke ${st[1]}">${esc(w(st[0]))}</span> <span class="marke ${zu[1]}">${esc(w(zu[0]))}</span></dd>
       ${Number(e.im_team) > 1 ? `<dt>${esc(w('schicht'))}</dt><dd>${Number(e.im_team)} ${esc(w('imTeam'))}</dd>` : ''}
       ${e.bemerkung ? `<dt>${esc(w('bemerkung'))}</dt><dd>${esc(e.bemerkung)}</dd>` : ''}
-    </dl>`;
+    </dl>
+    ${darfSchichtRapportieren(e) ? `<button class="btn btn-primary btn-wide" style="margin-top:4px" onclick="schichtRapportBlatt(${Number(e.id)})">${esc(w('schichtRapportieren'))}</button>` : ''}
+    ${(() => { const r = rapportFuerSchicht(e.id); return r
+      ? `<p style="font-size:12.5px;color:var(--ink-3);text-align:center;margin-top:8px">${esc(w('schonRapportiert'))} ${dmy(r.erfasst_am)}, ${String(r.erfasst_am).slice(11, 16)}</p>`
+      : ''; })()}`;
 
   // Rückmeldung ist freiwillig -- die Einteilung bleibt so oder so bestehen.
   $('blFuss').innerHTML = e.status === 'abgesagt' ? `
@@ -1064,6 +1089,28 @@ function blattAuf(id) {
     <button class="btn ${e.zusage === 'abgelehnt' ? 'btn-neg' : 'btn-plain'}" onclick="melden('abgelehnt')">${esc(w('ablehnen'))}</button>
     <button class="btn ${e.zusage === 'zugesagt' ? 'btn-pos' : 'btn-primary'}" onclick="melden('zugesagt')">${esc(w('zusagen'))}</button>`;
   blattZeigen();
+}
+
+// Nur bei zugesagtem Verkehrsdienst, und erst sobald die Schicht begonnen hat
+// -- rapportiert wird, was geschah, nicht, was noch bevorsteht (ENT-082).
+function darfSchichtRapportieren(e) {
+  if (e.status === 'abgesagt' || e.zusage !== 'zugesagt' || e.einsatzart !== 'Verkehrsdienst') return false;
+  const sp = spanne(e.datum, e.von, e.bis);
+  return !!sp && sp[0] <= Date.now();
+}
+
+// "Korrektur, neueste zaehlt": mehrere Schicht-Rapporte zur selben Zuteilung
+// sind moeglich, hier zaehlt nur der zuletzt erfasste.
+//
+// Die Person muss mitgeprueft werden, nicht nur die Schicht: Wer das Recht
+// "abgleich" hat, bekommt von rapport_list.php ALLE Rapporte. Auf einer
+// Schicht zu zweit waere sonst der Rapport der Kollegin als der eigene
+// erschienen -- und die Korrektur haette ihn mit fremden Angaben vorbefuellt.
+function rapportFuerSchicht(einsatzId) {
+  const treffer = rapporte.filter(r =>
+    Number(r.einsatz_id) === Number(einsatzId) && r.mitarbeiter === (ich && ich.name));
+  if (!treffer.length) return null;
+  return treffer.slice().sort((a, b) => String(b.erfasst_am).localeCompare(String(a.erfasst_am)))[0];
 }
 
 function melden(zusage) {
@@ -1077,6 +1124,103 @@ function melden(zusage) {
     toast(w('gemeldet'));
   });
 }
+
+// ══════════════════════════════════════════ SCHICHT RAPPORTIEREN (ENT-082)
+// Vorbefuellt aus der Schicht -- Kunde und Adresse stehen dort bereits.
+// Der bestehende manuelle Rapport (index.html) bleibt daneben bestehen; das
+// hier ist derselbe rapporte-Datensatz, nur mit gesetzter einsatz_id.
+function schichtRapportBlatt(id) {
+  const e = schichten.find(x => Number(x.id) === Number(id));
+  if (!e) return;
+  blattId = Number(id);
+  const bisher = rapportFuerSchicht(id);
+  const q = bisher || { kunde: e.kunde_name, strasse: e.strasse || '', ort: e.ort,
+    einsatzart: e.einsatzart, von: e.von, bis: e.bis, pause_min: 0, bemerkung: '', unterzeichner: '' };
+
+  $('blTitel').textContent = w('schichtRapportTitel');
+  $('blBody').innerHTML = `
+    ${bisher ? `<div class="msg-err" style="color:var(--ink-2);background:var(--line-soft)">
+        ${esc(w('schonRapportiert'))} ${dmy(bisher.erfasst_am)}, ${String(bisher.erfasst_am).slice(11, 16)}.
+        ${esc(w('erneutSendenKorrigiert'))}
+      </div>` : ''}
+    <div class="f"><label for="srKunde">${esc(w('kunde'))}</label><input class="inp" id="srKunde" value="${esc(q.kunde)}"></div>
+    <div class="f"><label for="srStrasse">${esc(w('strasse'))}</label><input class="inp" id="srStrasse" value="${esc(q.strasse || '')}"></div>
+    <div class="f"><label for="srOrt">${esc(w('ort'))}</label><input class="inp" id="srOrt" value="${esc(q.ort)}"></div>
+    <div class="f"><label for="srEinsatzart">${esc(w('einsatzart'))}</label><input class="inp" id="srEinsatzart" value="${esc(q.einsatzart)}"></div>
+    <div class="f"><label for="srVon">${esc(w('arbeitsbeginn'))}</label><input class="inp" id="srVon" type="time" value="${esc(hm(q.von))}"></div>
+    <div class="f"><label for="srBis">${esc(w('arbeitsende'))}</label><input class="inp" id="srBis" type="time" value="${esc(hm(q.bis))}"></div>
+    <div class="f"><label for="srPause">${esc(w('pauseMinuten'))}</label><input class="inp" id="srPause" type="number" min="0" max="600" step="5" value="${esc(String(bisher ? bisher.pause_min : 0))}"></div>
+    <div class="f"><label for="srBemerkung">${esc(w('bemerkung'))}</label><textarea class="inp" id="srBemerkung" rows="2">${esc(q.bemerkung || '')}</textarea></div>
+    <div class="f"><label for="srSigName">${esc(w('unterzeichnerName'))}</label><input class="inp" id="srSigName" placeholder="${esc(w('vorUndNachname'))}" value="${esc(q.unterzeichner || '')}"></div>
+    <div class="f"><label>${esc(w('unterschriftKunde'))}</label>
+      <div class="sig-wrap">
+        <canvas id="sigCanvas" height="160"></canvas>
+        <div class="sig-placeholder" id="sigPlaceholder">${esc(w('hierUnterschreiben'))}</div>
+        <div class="sig-actions"><button type="button" class="sig-clear" onclick="clearSig()">${esc(w('loeschen'))}</button></div>
+      </div>
+    </div>
+    <div id="srErr" class="msg-err" style="display:none"></div>`;
+  $('blFuss').innerHTML = `
+    <button class="btn btn-plain" onclick="blattZu()">${esc(w('abbrechen'))}</button>
+    <button class="btn btn-primary" id="srBtn" onclick="schichtRapportSenden(${Number(id)})">${esc(w('senden'))}</button>`;
+  blattZeigen();
+  initSig();
+}
+
+function schichtRapportSenden(einsatzId) {
+  const e = schichten.find(x => Number(x.id) === Number(einsatzId));
+  if (!e) return;
+  const err = $('srErr'); err.style.display = 'none';
+  const von = $('srVon').value, bis = $('srBis').value;
+  if (!von || !bis) { err.textContent = w('beideZeitenNoetig'); err.style.display = ''; return; }
+  const b = $('srBtn'); b.disabled = true;
+  api('rapport_create.php', { method: 'POST', body: {
+    einsatz_id: einsatzId,
+    datum: String(e.datum).slice(0, 10),
+    kunde: $('srKunde').value.trim(), strasse: $('srStrasse').value.trim(), ort: $('srOrt').value.trim(),
+    einsatzart: $('srEinsatzart').value.trim(),
+    von, bis, pause: $('srPause').value,
+    bemerkung: $('srBemerkung').value.trim(),
+    sigName: $('srSigName').value.trim(),
+    sig: getSigData(),
+  } }).then(({ ok, data }) => {
+    b.disabled = false;
+    if (!ok || data.status !== 'ok') { err.textContent = data.message || w('netzfehler'); err.style.display = ''; return; }
+    blattZu();
+    ladeRapporte().then(zeichne);
+    toast(w('rapportGesendet'));
+  });
+}
+
+// Unterschrift-Canvas, gleiches Muster wie im bestehenden Rapport Tool
+// (index.html) -- dieselbe Aufzeichnung, hier nur fuer die Vorbefuellung
+// aus der Schicht statt aus einem leeren Formular.
+function initSig() {
+  const canvas = $('sigCanvas');
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = canvas.parentElement.clientWidth * dpr;
+  canvas.height = 160 * dpr;
+  canvas.style.height = '160px';
+  sigCtx = canvas.getContext('2d');
+  sigCtx.scale(dpr, dpr);
+  sigCtx.strokeStyle = '#1A1D23'; sigCtx.lineWidth = 2.2; sigCtx.lineCap = 'round'; sigCtx.lineJoin = 'round';
+  sigDirty = false;
+  const pos = e => { const r = canvas.getBoundingClientRect(), s = e.touches ? e.touches[0] : e; return [s.clientX - r.left, s.clientY - r.top]; };
+  const start = e => { e.preventDefault(); isDrawing = true; [lastX, lastY] = pos(e); $('sigPlaceholder').style.display = 'none'; };
+  const draw = e => { e.preventDefault(); if (!isDrawing) return; const [x, y] = pos(e); sigCtx.beginPath(); sigCtx.moveTo(lastX, lastY); sigCtx.lineTo(x, y); sigCtx.stroke(); [lastX, lastY] = [x, y]; sigDirty = true; };
+  const stop = e => { e.preventDefault(); isDrawing = false; };
+  canvas.addEventListener('mousedown', start); canvas.addEventListener('mousemove', draw);
+  canvas.addEventListener('mouseup', stop);    canvas.addEventListener('mouseleave', stop);
+  canvas.addEventListener('touchstart', start, { passive: false });
+  canvas.addEventListener('touchmove', draw, { passive: false });
+  canvas.addEventListener('touchend', stop, { passive: false });
+}
+function clearSig() {
+  const c = $('sigCanvas');
+  sigCtx.clearRect(0, 0, c.width, c.height); sigDirty = false;
+  $('sigPlaceholder').style.display = '';
+}
+const getSigData = () => sigDirty ? $('sigCanvas').toDataURL('image/png') : null;
 
 // ══════════════════════════════════════════ ZEITBONUS ERKLAERT (ENT-052)
 // Der Zeitbonus steht als Zahl auf der Kachel, aber die wenigsten kennen den
