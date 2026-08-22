@@ -7639,15 +7639,24 @@ function planungEinrichten() {
       $('eiInhalt').innerHTML = `<div class="msg-err">${esc(data.message || 'Einrichtung fehlgeschlagen.')}</div>`;
       return;
     }
-    const zeile = (t, liste, leer) => !liste || !liste.length ? '' : `
-      <div class="titel" style="margin-top:${t === 'Jetzt ergänzt' ? '0' : '14px'}">${esc(t)}</div>
+    // Der Abstand haengt an der POSITION, nicht am Titeltext: Die erste
+    // vorhandene Liste steht direkt unter dem Kasten, jede weitere bekommt
+    // Luft. Vorher entschied darueber das Wort "Jetzt ergänzt" -- sobald
+    // eine andere Liste zuerst kam, sass der Abstand am falschen Platz.
+    const zeile = (t, liste, farbe) => !liste || !liste.length ? '' : `
+      <div class="titel" data-ei-liste style="margin-top:14px${farbe ? ';color:' + farbe : ''}">${esc(t)}</div>
       <ul style="margin:0;padding-left:18px;font-size:13px;color:var(--ink-2);line-height:1.7">
         ${liste.map(x => `<li>${esc(x)}</li>`).join('')}
       </ul>`;
     $('eiInhalt').innerHTML =
       `<div class="msg-err" style="background:${data.status === 'ok' ? 'var(--pos-soft)' : 'var(--neg-soft)'};color:${data.status === 'ok' ? 'var(--pos)' : 'var(--neg)'}">${esc(data.message)}</div>`
+      // Fehlgeschlagenes zuerst: Wer den Dialog oeffnet, weil etwas nicht
+      // geht, soll den Grund lesen, ohne an zwei gruenen Listen vorbeizurollen.
+      + zeile('Fehlgeschlagen', data.fehler, 'var(--neg)')
       + zeile('Jetzt ergänzt', data.getan)
       + zeile('War schon vorhanden', data.unveraendert);
+    const erste = $('eiInhalt').querySelector('[data-ei-liste]');
+    if (erste) { erste.style.marginTop = '0'; }
     if (data.status === 'ok') {
       Promise.all([loadEinsaetze(), loadObjekte(), ladeFeiertagMap(), ladeSperren()]);
     }

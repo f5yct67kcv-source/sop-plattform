@@ -51,6 +51,29 @@ function hat_fremdschluessel(PDO $pdo, string $tabelle, string $spalte): bool {
 
 $getan = [];
 $schon = [];
+// Was nicht durchging. Bis hierher riss der erste fehlgeschlagene Schritt den
+// ganzen Lauf mit: Die Ausnahme lief in den Handler in db.php, der Endpunkt
+// antwortete mit 500, und im Dialog stand "Einrichtung fehlgeschlagen." ohne
+// jeden Grund -- waehrend die vorher gelaufenen Schritte bereits gewirkt
+// hatten. Jeder Schritt steht jetzt fuer sich; was scheitert, wird namentlich
+// gemeldet, statt den Rest zu verhindern.
+$fehler = [];
+
+// Ein Schritt. Gibt zurueck, ob er durchging.
+//
+// Die Datenbankmeldung wird MITGEGEBEN, anders als sonst in db.php: Diesen
+// Endpunkt darf nur aufrufen, wer das Recht "betrieb" hat -- also die Person,
+// die den Fehler beheben soll. Ohne den Grund bleibt ihr nur Raten.
+function schritt(PDO $pdo, string $sql, string $was, array &$getan, array &$fehler): bool {
+    try {
+        $pdo->exec($sql);
+        $getan[] = $was . ' ergaenzt';
+        return true;
+    } catch (Throwable $e) {
+        $fehler[] = $was . ' — ' . $e->getMessage();
+        return false;
+    }
+}
 
 // ── 1. Tabellen. Reihenfolge zaehlt: worauf verwiesen wird, muss zuerst da sein.
 $tabellen = [
@@ -508,8 +531,12 @@ foreach ($tabellen as $name => $sql) {
         continue;
     }
     if ($nurPruefen) { $getan[] = "Tabelle $name fehlt noch"; continue; }
-    $pdo->exec($sql);
-    $getan[] = "Tabelle $name angelegt";
+    try {
+        $pdo->exec($sql);
+        $getan[] = "Tabelle $name angelegt";
+    } catch (Throwable $e) {
+        $fehler[] = "Tabelle $name — " . $e->getMessage();
+    }
 }
 
 // ── 2. Spalten nachtragen, falls die erste Fassung schon lief
@@ -716,8 +743,7 @@ foreach ($spalten as [$tabelle, $spalte, $sql]) {
         continue;
     }
     if ($nurPruefen) { $getan[] = "Spalte $tabelle.$spalte fehlt noch"; continue; }
-    $pdo->exec($sql);
-    $getan[] = "Spalte $tabelle.$spalte ergaenzt";
+    schritt($pdo, $sql, "Spalte $tabelle.$spalte", $getan, $fehler);
 }
 
 // ── 2b. Kundennummern nachtragen, wenn Kunden ohne eigene Nummer bestehen --
@@ -902,8 +928,10 @@ foreach ($verweise as [$tabelle, $spalte, $sql]) {
         continue;
     }
     if ($nurPruefen) { $getan[] = "Verweis $tabelle.$spalte fehlt noch"; continue; }
-    $pdo->exec($sql);
-    $getan[] = "Verweis $tabelle.$spalte ergaenzt";
+    // Ein Verweis ist eine Absicherung, keine Voraussetzung: Die Spalte
+    // arbeitet auch ohne ihn. Scheitert er -- etwa weil eine Tabelle noch
+    // MyISAM ist --, darf das den Rest nicht aufhalten.
+    schritt($pdo, $sql, "Verweis $tabelle.$spalte", $getan, $fehler);
 }
 
 // ── 4. Ergebnis. Fehlt am Schluss etwas, wird das gesagt statt verschwiegen.
@@ -916,14 +944,21 @@ foreach (array_keys($tabellen) as $name) {
     }
 }
 
+// Bewusst mit HTTP 200, auch wenn etwas schieflief: Bei einem Fehlerstatus
+// verwirft die Oberflaeche den Rumpf und zeigt nur ihren eigenen Ersatztext.
+// Genau daran ging der Grund verloren. Rot wird der Kasten ueber 'status',
+// die Einzelheiten stehen in 'fehler'.
 json_response([
-    'status' => (!$nurPruefen && $fehlt) ? 'error' : 'ok',
+    'status' => (!$nurPruefen && ($fehlt || $fehler)) ? 'error' : 'ok',
     'message' => $nurPruefen
         ? ($getan ? count($getan) . ' Punkt(e) stehen noch aus.' : 'Alles ist eingerichtet.')
         : ($fehlt
             ? 'Diese Tabellen fehlen weiterhin: ' . implode(', ', $fehlt)
-            : ($getan ? 'Einrichtung abgeschlossen.' : 'Alles war bereits eingerichtet.')),
+            : ($fehler
+                ? count($fehler) . ' Schritt(e) sind fehlgeschlagen — die uebrigen sind gelaufen.'
+                : ($getan ? 'Einrichtung abgeschlossen.' : 'Alles war bereits eingerichtet.'))),
     'getan' => $getan,
     'unveraendert' => $schon,
+    'fehler' => $fehler,
     'ausstehend' => count($getan),
 ]);
