@@ -8,6 +8,13 @@ Repository** (`sop-projekt`), nicht hier.
 **Am Projekt arbeiten mehrere Sitzungen gleichzeitig.** Alles unten folgt
 daraus.
 
+**Lies zu Beginn ausserdem `STARTPROMPT.md`.** Dort steht, wie die Arbeit auf
+mehrere Sitzungen geschnitten wird: ein Chat, eine Aufgabe; welche Bereiche es
+gibt und welche Dateien dazugehoeren; was querliegend ist und allein laufen
+muss; und was vor dem Schliessen eines Chats zu tun ist. Sagt der Projektinhaber
+nur einen Bereich und eine Aufgabe, findest du den Rest dort — frag nicht nach,
+was dort schon steht.
+
 ---
 
 ## Vor der Arbeit
