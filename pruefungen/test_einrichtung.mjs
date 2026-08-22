@@ -17,6 +17,9 @@ let ANTWORT = { status: 'ok', message: 'Einrichtung abgeschlossen.',
   unveraendert: ['Tabelle objekte war bereits vorhanden', 'Tabelle einsaetze war bereits vorhanden'],
   ausstehend: 1 };
 let PRUEFUNG = { status: 'ok', message: 'Alles ist eingerichtet.', getan: [], unveraendert: [], ausstehend: 0 };
+// Gesetzt = der Endpunkt antwortet mit etwas, das KEIN JSON ist (schwerer
+// PHP-Abbruch). Wie ANTWORT/PRUEFUNG umschaltbar, statt die Route zu tauschen.
+let ROH = null;
 
 const browser = await chromium.launch({ executablePath: EXE });
 const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
@@ -27,7 +30,12 @@ await page.route('**/api/**', route => {
   const send = b => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) });
   if (p.includes('login')) return send({ status: 'ok', token: 't', name: 'a', ist_admin: true });
   // Alles laedt normal durch -- genau der Fall, in dem der Knopf bisher fehlte.
-  if (p.includes('planung_einrichten')) return send(req.method() === 'GET' ? PRUEFUNG : ANTWORT);
+  if (p.includes('planung_einrichten')) {
+    if (ROH && req.method() !== 'GET') {
+      return route.fulfill({ status: ROH.status, contentType: 'text/html', body: ROH.body });
+    }
+    return send(req.method() === 'GET' ? PRUEFUNG : ANTWORT);
+  }
   return send({ status: 'ok', einsaetze: [], kunden: [], rapporte: [], objekte: [], mitarbeiter: [],
     feiertage: [], gepflegt: {}, sperren: [], kpi: {}, verlauf: [], angemeldet: [],
     pro_mitarbeiter: [], letzte_rapporte: [] });
@@ -138,6 +146,23 @@ check('Fehlgeschlagenes steht VOR dem Gelungenen',
 check('Die erste Liste sitzt buendig am Kasten, ohne doppelten Abstand',
   await page.evaluate(() =>
     document.querySelector('#eiInhalt [data-ei-liste]').style.marginTop === '0px'));
+
+// ══════════ UNLESBARE ANTWORT IST EINE SACKGASSE -- ES SEI DENN, SIE SAGT WAS
+//
+// Bricht PHP schwer ab (Zeitueberschreitung, Speicher), kommt kein JSON an.
+// Dann stand hier nur "Einrichtung fehlgeschlagen." -- ohne Statuscode war
+// nicht zu unterscheiden, ob ein Recht fehlt, der Server abgebrochen ist oder
+// gar keine Verbindung bestand.
+ROH = { status: 500, body: '<b>Fatal error</b>: Maximum execution time exceeded' };
+await page.click('#eiBtn');
+await page.waitForTimeout(500);
+const kaputt = await page.textContent('#eiInhalt');
+check('KRITISCH: eine unlesbare Antwort nennt wenigstens den Statuscode',
+  kaputt.includes('500'));
+check('Sie sagt auch, dass die Antwort selbst das Problem ist',
+  kaputt.toLowerCase().includes('keine lesbare antwort'));
+check('Der Knopf bleibt auch danach bedienbar',
+  !(await page.evaluate(() => $('eiBtn').disabled)));
 
 // ══════════ SCHMALE SEITENLEISTE
 await page.evaluate(() => closeDlg('dlgEinrichtung'));
