@@ -18,7 +18,12 @@ require_once __DIR__ . '/../rechte.php';
 // ma_felder() wird fuer die Nulldatum-Reparatur weiter unten gebraucht --
 // die Feldliste steht dort und wird hier nicht nachgebaut.
 require_once __DIR__ . '/../mitarbeiter.php';
-require __DIR__ . '/../kunden.php';
+// require_once, nicht require: mitarbeiter.php eine Zeile hoeher bindet
+// kunden.php bereits ein. Ein zweites Laden legt naechste_kundennummer() ein
+// zweites Mal an -- PHP bricht dann hart ab, am Ausnahmehandler vorbei. Genau
+// daran ist dieser Endpunkt am 22.08.2026 vollstaendig gestorben, ohne dass
+// eine lesbare Meldung herauskam.
+require_once __DIR__ . '/../kunden.php';
 
 $user = require_session();
 require_recht($user, 'betrieb');
