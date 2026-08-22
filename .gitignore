@@ -21,3 +21,7 @@ Thumbs.db
 # Pruefungen: Abhaengigkeiten und Bildschirmfotos entstehen bei jedem Lauf neu
 pruefungen/node_modules/
 pruefungen/bilder/
+# Entsteht bei "npm install" in pruefungen/. Versioniert war hier noch nie
+# eines -- gepflegt wird package.json. Wer die Playwright-Fassung doch
+# festnageln will, entscheidet das bewusst und nimmt die Zeile wieder raus.
+pruefungen/package-lock.json
