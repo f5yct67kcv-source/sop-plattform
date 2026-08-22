@@ -106,6 +106,39 @@ check('Ein Fehler wird als solcher gezeigt',
   (await page.textContent('#eiInhalt')).includes('fehlen weiterhin'));
 check('Der Knopf bleibt bedienbar', !(await page.evaluate(() => $('eiBtn').disabled)));
 
+// ══════════ EIN FEHLGESCHLAGENER SCHRITT REISST DEN REST NICHT MIT
+//
+// Vorgefallen am 22.08.2026: Ein einzelner fehlgeschlagener ALTER lief in den
+// Ausnahmehandler, der Endpunkt antwortete mit 500, und im Dialog stand
+// "Einrichtung fehlgeschlagen." ohne Grund -- obwohl die Schritte davor
+// bereits gewirkt hatten. Die Ursache war dadurch nicht zu erkennen.
+ANTWORT = { status: 'error',
+  message: '1 Schritt(e) sind fehlgeschlagen — die uebrigen sind gelaufen.',
+  getan: ['Spalte rapporte.einsatz_id ergaenzt'],
+  unveraendert: ['Tabelle objekte war bereits vorhanden'],
+  fehler: ['Verweis rapporte.einsatz_id — SQLSTATE[HY000]: 1215 Cannot add foreign key constraint'] };
+await page.click('#eiBtn');
+await page.waitForTimeout(500);
+const fehlText = await page.textContent('#eiInhalt');
+check('KRITISCH: der Grund des Fehlschlags steht im Dialog, nicht nur "fehlgeschlagen"',
+  fehlText.includes('foreign key constraint'));
+check('KRITISCH: der fehlgeschlagene Schritt wird namentlich genannt',
+  fehlText.includes('Verweis rapporte.einsatz_id'));
+check('KRITISCH: was trotzdem lief, wird weiterhin ausgewiesen -- der Lauf bricht nicht ab',
+  fehlText.includes('Spalte rapporte.einsatz_id ergaenzt'));
+check('Der Kasten ist rot, nicht gruen -- ein Teilerfolg ist kein Erfolg',
+  await page.evaluate(() => {
+    const k = document.querySelector('#eiInhalt .msg-err');
+    return getComputedStyle(k).backgroundColor === getComputedStyle(document.documentElement)
+      .getPropertyValue('--neg-soft').trim()
+      || k.style.background.includes('neg');
+  }));
+check('Fehlgeschlagenes steht VOR dem Gelungenen',
+  fehlText.indexOf('Fehlgeschlagen') < fehlText.indexOf('Jetzt ergänzt'));
+check('Die erste Liste sitzt buendig am Kasten, ohne doppelten Abstand',
+  await page.evaluate(() =>
+    document.querySelector('#eiInhalt [data-ei-liste]').style.marginTop === '0px'));
+
 // ══════════ SCHMALE SEITENLEISTE
 await page.evaluate(() => closeDlg('dlgEinrichtung'));
 await page.evaluate(() => { if (!document.querySelector('.shell').classList.contains('schmal')) seiteUm(); });
