@@ -397,6 +397,43 @@ try {
   ts = await mass(p, '#topSub');
   check('Ein Bereich ohne Unterkategorien zeigt keine leere Leiste', ts.display === 'none');
 
+  // Mittig -- und zwar unabhaengig davon, WIE VIELE es sind und wie lang
+  // der Titel links ist. Mit einem Flex-Abstandhalter waere die Leiste bei
+  // "Kunden" anders platziert als bei "Administration", weil Titel und
+  // Knopfgruppe verschieden breit sind. Das Raster haelt sie an derselben
+  // Stelle.
+  const mitteVon = async (fn) => {
+    await p.evaluate(fn); await p.waitForTimeout(300);
+    return p.evaluate(() => {
+      const e = document.querySelector('#topSub');
+      const r = e.getBoundingClientRect();
+      return { anzahl: e.children.length, mitte: Math.round(r.left + r.width / 2),
+               breite: Math.round(r.width) };
+    });
+  };
+  const mKunden = await mitteVon(() => go('kunden'));
+  const mAdmin  = await mitteVon(() => go('mitarbeiter'));
+  check('Bei den Kunden stehen drei Unterkategorien', mKunden.anzahl === 3);
+  check('Bei der Administration zwei', mAdmin.anzahl === 2);
+  check('KRITISCH: drei Unterkategorien stehen in der Fenstermitte',
+    Math.abs(mKunden.mitte - 800) <= 4);
+  check('KRITISCH: zwei ebenfalls -- die Zahl aendert die Mitte nicht',
+    Math.abs(mAdmin.mitte - 800) <= 4);
+  check('Und die Leisten sind wirklich verschieden breit',
+    Math.abs(mKunden.breite - mAdmin.breite) > 20);
+
+  // Ohne Unterkategorien darf die rechte Gruppe NICHT in die Mitte rutschen.
+  // Ein Element mit display:none ist kein Rasterfeld -- ohne ausdrueckliche
+  // Spaltenzuweisung legt die Automatik die verbleibenden zwei Kinder in
+  // Spalte 1 und 2, und die Knopfgruppe sitzt mitten im Kopf.
+  await p.evaluate(() => go('abgleich')); await p.waitForTimeout(300);
+  const rechts = await p.evaluate(() => {
+    const r = document.querySelector('.tb-rechts').getBoundingClientRect();
+    return Math.round(window.innerWidth - r.right);
+  });
+  check('KRITISCH: ohne Unterkategorien bleibt die Knopfgruppe rechts aussen',
+    rechts <= 30);
+
   await p.screenshot({ path: `${OUT}/huelle-kopf-beschriftet.png` });
   await p.close();
 } catch (e) { bad.push('Unterkategorien: ' + String(e).split('\n')[0].slice(0, 120)); }
