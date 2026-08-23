@@ -350,10 +350,17 @@ a.nav-item { text-decoration: none; }
 .delta.flat { color: var(--ink-3); background: var(--line-soft); }
 
 /* Balken */
+/* Die Balkenhoehe steckt nicht mehr in Pixeln im Erzeugten, sondern als
+   ANTEIL in der flex-basis. Damit skaliert das Bild mit der Kartenhoehe;
+   vorher rechnete renderChart() fest 108 px und blieb bei jeder Kartenhoehe
+   gleich gross. 71 % ist der bisherige Wert (108 von 152) -- die Standardhoehe
+   sieht damit unveraendert aus. */
 .bars { display: flex; align-items: flex-end; gap: 8px; height: 152px; padding-top: 6px; }
-.bar { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 7px; min-width: 0; }
+.dash-item.dh .bars { height: 100%; }
+.bar { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+  gap: 7px; min-width: 0; height: 100%; }
 .bar-val { font-size: 11px; font-weight: 650; color: var(--ink-2); }
-.bar-fill { width: 100%; max-width: 46px; background: var(--accent-soft); border: 1px solid var(--accent-line); border-bottom: none; border-radius: var(--r-xs) var(--r-xs) 0 0; min-height: 3px; transition: background .13s; }
+.bar-fill { width: 100%; max-width: 46px; flex: 0 0 auto; background: var(--accent-soft); border: 1px solid var(--accent-line); border-bottom: none; border-radius: var(--r-xs) var(--r-xs) 0 0; min-height: 3px; transition: background .13s; }
 .bar:hover .bar-fill { background: var(--accent-line); }
 .bar.now .bar-fill { background: var(--accent); border-color: var(--accent); }
 .bar-lbl { font-size: 10.5px; color: var(--ink-3); white-space: nowrap; letter-spacing: .2px; }
@@ -1073,6 +1080,11 @@ tbody tr.zu .i-schloss { color: var(--warn); }
 .begr-kopf h2 { font-size: 21px; font-weight: 720; letter-spacing: -.3px; margin-bottom: 4px; }
 .begr-kopf p { font-size: 13.5px; color: var(--ink-2); line-height: 1.5; min-height: 1.4em; }
 .begr-router { margin-top: 18px; }
+/* Waechst die Karte, waechst das Eingabefeld -- das ist der einzige Teil der
+   Begruessung, der mit mehr Hoehe etwas anfangen kann. */
+.dash-item.dh .begr-router { display: flex; flex-direction: column; min-height: 0; }
+.dash-item.dh .begr-eingabe { flex: 1 1 auto; min-height: 0; display: flex; }
+.dash-item.dh .begr-router textarea#rtText { flex: 1 1 auto; min-height: 88px; }
 .begr-eingabe { position: relative; border-radius: var(--r-sm); transition: outline-color .15s; outline: 2px dashed transparent; outline-offset: 2px; }
 .begr-eingabe.rt-ueber { outline-color: var(--accent); background: var(--accent-soft); }
 .begr-router textarea#rtText { resize: vertical; }
@@ -1109,6 +1121,12 @@ tbody tr.zu .i-schloss { color: var(--warn); }
    Zeile halb leer und sieht aus wie ein Rest. */
 .kw-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 2px 18px; }
 .dash-item.dw-voll .kw-grid { grid-template-columns: repeat(4, 1fr); }
+/* Hier stand bis zum 23.08.2026 eine eigene Regel, die dem Raster Hoehe geben
+   sollte. Die Gegenprobe zeigte: Sie tat nichts. Das Raster ist der letzte
+   Teil des Rumpfes und waechst schon ueber die Regel weiter oben; die Zeilen
+   verteilen sich dann von selbst, weil align-content bei Rastern stretch ist.
+   Eine Regel, die nichts bewirkt, sieht aus wie eine Absicherung und ist
+   keine -- darum ist sie weg statt bloss auskommentiert. */
 /* Die Medienabfrage steht HINTER den Grundregeln. Weiter oben waere sie
    wirkungslos: Bei gleicher Eigenspezifitaet gewinnt die spaetere Regel, und
    eine Gestaltungsregel kann wirkungslos bleiben, ohne dass etwas kaputtgeht. */
@@ -1190,7 +1208,30 @@ tbody tr.zu .i-schloss { color: var(--warn); }
 .dash-griff-h::after { content: ''; position: absolute; left: 50%; bottom: 4px; transform: translateX(-50%);
   width: 46px; height: 4px; border-radius: 2px; background: var(--line-hi); transition: background .15s; }
 .dash-griff-h:hover::after { background: var(--accent); }
-.dash-item.dh > .card, .dash-item.dh > .grid { min-height: var(--dh); }
+/* Eine gesetzte Hoehe muss bis in den INHALT durchschlagen, sonst waechst nur
+   der Rahmen und darunter steht Leere. Darum height statt min-height und eine
+   Spalte: Kopf und Fuss bleiben, der Rumpf nimmt den Rest.
+   min-height 0 ist noetig, weil ein Flex-Kind sonst nicht unter seinen Inhalt
+   schrumpfen kann und der Rumpf statt zu rollen ueber die Karte hinauswaechst. */
+.dash-item.dh > .card { height: var(--dh); display: flex; flex-direction: column; }
+.dash-item.dh > .card > .card-bd { flex: 1 1 auto; min-height: 0; overflow: auto;
+  display: flex; flex-direction: column; }
+/* NUR DER LETZTE Teil nimmt die zusaetzliche Hoehe. Waechst jeder mit, reisst
+   es zusammengehoerende Zeilen auseinander -- in der Begruessung stand
+   ploetzlich Luft zwischen "Kein anstehender Einsatz geplant." und dem
+   Eingabefeld. Was oben steht, behaelt seine Groesse; was unten steht, fuellt.
+   Wachsen ja, schrumpfen nein: Sonst wird der Inhalt gedrueckt, statt dass
+   der Rumpf rollt. */
+.dash-item.dh > .card > .card-bd > * { flex: 0 0 auto; min-width: 0; }
+.dash-item.dh > .card > .card-bd > :last-child { flex: 1 0 auto; }
+/* Die Kennzahlen sind kein Karteninhalt, sondern selbst das Raster. Ihre
+   Zeilen wachsen mit (align-content ist bei Rastern von Haus aus stretch),
+   und in der hoeheren Kachel verteilt sich der Inhalt: Beschriftung oben,
+   Zahl darunter, Vergleich unten -- dieselbe Ordnung wie vorher, nur ueber
+   die ganze Hoehe. */
+.dash-item.dh > .grid { height: var(--dh); }
+.dash-item.dh .kpi { display: flex; flex-direction: column; justify-content: space-between; }
+.dash-item.dh .kpi-foot { margin-top: 0; }
 /* Freie Flaeche als Ablageziel: Bis zum 23.08.2026 liess sich dorthin nichts
    ziehen -- ein Container konnte nur AUF einen anderen fallen. Die Luecke
    neben einem halben Container sah aus wie ein Platz und war keiner. */
@@ -4895,10 +4936,14 @@ function renderChart() {
   const max = Math.max(1, ...v.map(x => x.stunden));
   $('chart').innerHTML =
     `<div class="bars">` + v.map((x, i) => {
-      const h = Math.round((x.stunden / max) * 108);
+      // Anteil statt Pixel -- siehe .bars in der Gestaltung. Kein Mindestwert
+      // hier: Den garantiert min-height am .bar-fill, damit eine Woche ohne
+      // Stunden sichtbar bleibt. Zwei Untergrenzen fuer dieselbe Sache waeren
+      // eine zu viel -- und die eine wuerde spaeter geaendert, die andere nicht.
+      const h = Math.round((x.stunden / max) * 710) / 10;
       return `<div class="bar ${i === v.length - 1 ? 'now' : ''}" title="KW ${x.kw} · ${nf(x.stunden,1)} h aus ${x.anzahl} Rapporten">
         <div class="bar-val">${x.stunden ? nf(x.stunden, 0) : ''}</div>
-        <div class="bar-fill" style="height:${Math.max(3, h)}px"></div>
+        <div class="bar-fill" style="flex-basis:${h}%"></div>
         <div class="bar-lbl">KW&nbsp;${x.kw}</div>
       </div>`;
     }).join('') + `</div><div class="bars-axis"></div>`;

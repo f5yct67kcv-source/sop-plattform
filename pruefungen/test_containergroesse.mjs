@@ -20,7 +20,7 @@ const check = (n, c) => (c ? ok : bad).push(n);
 
 const browser = await chromium.launch({ executablePath: EXE });
 
-async function seite(vorbelegt, breite = 1600) {
+async function seite(vorbelegt, breite = 1600, rapporte = 0) {
   const p = await browser.newPage({ viewport: { width: breite, height: 1000 } });
   p.setDefaultTimeout(5000);
   p.on('pageerror', e => bad.push('JS-Fehler: ' + e.message));
@@ -34,7 +34,12 @@ async function seite(vorbelegt, breite = 1600) {
     if (pf.includes('dashboard_stats')) return send({ status: 'ok',
       kpi: { rapporte_monat: 6, stunden_monat: 38, mitarbeiter: 5, kunden: 3, rapporte_total: 6,
              rapporte_vormonat: 0, stunden_vormonat: 0 },
-      verlauf: [], angemeldet: [], pro_mitarbeiter: [], letzte_rapporte: [], ereignisse: [],
+      verlauf: Array.from({ length: 8 }, (_, i) => ({ kw: 26 + i, stunden: [12, 30, 18, 44, 26, 38, 9, 41][i], anzahl: 3 })),
+      angemeldet: [], pro_mitarbeiter: [], ereignisse: [],
+      // Erfundene Zeilen, nur damit der Rumpf ueberlaeuft.
+      letzte_rapporte: Array.from({ length: rapporte }, (_, i) => ({
+        id: i + 1, datum: '2026-01-0' + ((i % 9) + 1), name: 'person' + i, vorname: 'Vorname', nachname: 'Nachname' + i,
+        kunde_name: 'Kunde ' + i, ort: 'Ort', einsatzart: 'Verkehrsdienst', netto_h: '7.50' })),
       ereignisse_gesamt: 0, ereignisse_gekuerzt: false, ereignisse_unvollstaendig: [] });
     return send({ status: 'ok', rapporte: [], objekte: [], masterschichten: [], einsaetze: [],
       kunden: [], mitarbeiter: [], orte: [], feiertage: [], gepflegt: {}, sperren: [] });
@@ -143,6 +148,83 @@ try {
     Math.abs(auto.h - vorher.h) <= 2);
   await p.close();
 } catch (e) { bad.push('Höhe: ' + String(e).split('\n')[0].slice(0, 120)); }
+
+// ══════════════════════════════ DER INHALT FUELLT DIE HOEHE
+//
+// Vom Projektinhaber am 2026-08-23: "der inhalt innerhalb der kacheln passt
+// nicht an die grösse". Eine gesetzte Hoehe, die nur den Rahmen aufzieht und
+// darunter Leere laesst, ist keine Groesseneinstellung, sondern ein Loch.
+try {
+  const p = await seite(JSON.stringify([
+    { id: 'begruessung', sichtbar: true, hoehe: 420 }, { id: 'kpi', sichtbar: true, hoehe: 420 },
+    { id: 'kurzwahl', sichtbar: true, hoehe: 420 }, { id: 'verlauf', sichtbar: true, hoehe: 420 },
+  ]));
+  const m = await p.evaluate(() => {
+    const karte = id => document.querySelector(`[data-widget="${id}"] > .card`).getBoundingClientRect();
+    const rumpf = id => document.querySelector(`[data-widget="${id}"] > .card > .card-bd`).getBoundingClientRect();
+    const k = karte('kurzwahl'), r = rumpf('kurzwahl');
+    return {
+      kartenHoehe: Math.round(k.height),
+      rumpfEndetMitKarte: Math.abs(r.bottom - k.bottom) < 2,
+      kwGrid: Math.round(document.querySelector('#kwGrid').getBoundingClientRect().height),
+      // Nicht nur "das Raster ist hoch", sondern: Der letzte Weg steht auch
+      // wirklich unten. Ein Raster kann hoch sein und seine Zeilen trotzdem
+      // oben zusammendraengen.
+      letzterWegUnten: (() => {
+        const w = [...document.querySelectorAll('#kwGrid .kw')];
+        const r = document.querySelector('[data-widget="kurzwahl"] > .card > .card-bd').getBoundingClientRect();
+        return r.bottom - w[w.length - 1].getBoundingClientRect().bottom;
+      })(),
+      rumpfInnen: Math.round(r.height),
+      kpiRaster: Math.round(document.querySelector('#kpiGrid').getBoundingClientRect().height),
+      kpiKachel: Math.round(document.querySelector('#kpiGrid > *').getBoundingClientRect().height),
+      balken: Math.round(document.querySelector('.bars').getBoundingClientRect().height),
+      textarea: Math.round(document.querySelector('#rtText').getBoundingClientRect().height),
+    };
+  });
+  check('KRITISCH: die Karte ist genau so hoch wie eingestellt', m.kartenHoehe === 420);
+  check('KRITISCH: der Rumpf reicht bis ans untere Ende der Karte', m.rumpfEndetMitKarte);
+  check('KRITISCH: der Schnellzugriff füllt den Rumpf, statt oben zu kleben',
+    m.kwGrid >= m.rumpfInnen - 40 && m.letzterWegUnten < 30);
+  check('KRITISCH: das Kennzahlen-Raster füllt die eingestellte Höhe', m.kpiRaster === 420);
+  check('KRITISCH: und die einzelne Kachel wächst mit', m.kpiKachel > 150);
+  check('KRITISCH: das Balkenbild füllt den Rumpf', m.balken >= m.rumpfInnen - 40);
+  check('Das Eingabefeld der Begrüssung nimmt die zusätzliche Höhe', m.textarea > 150);
+  await p.screenshot({ path: `${OUT}/inhalt-fuellt.png` });
+  await p.close();
+} catch (e) { bad.push('Inhalt füllt: ' + String(e).split('\n')[0].slice(0, 120)); }
+
+// Das Balkenbild rechnete bis zum 23.08.2026 feste 108 px. Es sah bei jeder
+// Kartenhoehe gleich aus -- der teuerste Fall, weil es aussieht wie gewollt.
+try {
+  const hoehen = [];
+  for (const h of [300, 620]) {
+    const p = await seite(JSON.stringify([{ id: 'verlauf', sichtbar: true, hoehe: h },
+                                          { id: 'begruessung', sichtbar: true }]));
+    hoehen.push(await p.evaluate(() => Math.round(Math.max(...[...document.querySelectorAll('.bar-fill')]
+      .map(e => e.getBoundingClientRect().height)))));
+    await p.close();
+  }
+  check('KRITISCH: der höchste Balken wächst mit der Kartenhöhe',
+    hoehen[1] > hoehen[0] + 100);
+} catch (e) { bad.push('Balken: ' + String(e).split('\n')[0].slice(0, 120)); }
+
+// Eine gesetzte Hoehe ist eine HOEHE, keine Mindesthoehe: Mehr Inhalt als
+// Platz muss rollen, nicht die Karte aufblaehen -- sonst verschoebe ein
+// voller Tag die ganze Anordnung.
+try {
+  const p = await seite(JSON.stringify([{ id: 'letzte', sichtbar: true, hoehe: 240 },
+                                        { id: 'begruessung', sichtbar: true }]), 1600, 40);
+  const m = await p.evaluate(() => {
+    const k = document.querySelector('[data-widget="letzte"] > .card');
+    const b = k.querySelector('.card-bd');
+    return { karte: Math.round(k.getBoundingClientRect().height),
+             rollt: b.scrollHeight > b.clientHeight + 4 };
+  });
+  check('KRITISCH: zu viel Inhalt bläht die Karte nicht auf', m.karte === 240);
+  check('KRITISCH: sondern der Rumpf rollt', m.rollt);
+  await p.close();
+} catch (e) { bad.push('Rollen: ' + String(e).split('\n')[0].slice(0, 120)); }
 
 // ══════════════════════════════ BREITE UMSCHALTEN
 try {
