@@ -20,10 +20,16 @@
 //     Rollenmodell arbeiten womoeglich mehrere an der Planung; ob das so
 //     bleiben soll, ist offen (OP-90).
 //
-//  3. EIN EREIGNIS, DAS SICH VON SELBST ERLEDIGT, BRAUCHT KEINE MARKIERUNG.
-//     Der offene Abgleich verschwindet, sobald abgeglichen wurde. Ihn
-//     zusaetzlich abhaken zu koennen, hiesse: er ist weg, obwohl die Arbeit
-//     noch aussteht. Genau das darf ein Feed nicht koennen.
+//  3. NUR WAS NEU HINZUKOMMT. Ein Ereignis ist etwas, das GESCHEHEN ist:
+//     ein Rapport ist eingegangen, jemand hat sich einen Tag gesperrt, jemand
+//     hat auf eine Schicht geantwortet. Ein andauernder Zustand -- etwa eine
+//     Schicht ohne Abgleich -- gehoert nicht hierher. Er stand bis zum
+//     23.08.2026 mit drin und wurde auf ausdrueckliche Ansage des
+//     Projektinhabers entfernt: "fehlende, noch nicht abgeschlossene
+//     Schichten sollen nicht in die Ereignisse kommen. nur ereignisse, die
+//     neu hinzukommen." Fuer offene Abgleiche gibt es die Ansicht Abgleich;
+//     im Feed haetten sie taeglich dieselbe Meldung erzeugt und die
+//     tatsaechlichen Neuigkeiten verdraengt.
 declare(strict_types=1);
 
 // Welche Arten es gibt und ob sie sich abhaken lassen. EINE Liste --
@@ -32,7 +38,7 @@ const EREIGNIS_ARTEN = [
     'rapport'  => ['tabelle' => 'rapporte',          'spalte' => 'gesehen_am'],
     'sperrtag' => ['tabelle' => 'verfuegbarkeiten',  'spalte' => 'gesehen_am'],
     'zusage'   => ['tabelle' => 'einsatz_zuteilung', 'spalte' => 'zusage_gesehen_am'],
-    // 'abgleich' fehlt hier mit Absicht -- siehe Festlegung 3.
+    // Mehr nicht. Ein andauernder Zustand ist kein Ereignis -- Festlegung 3.
 ];
 
 function ereignis_abhakbar(string $typ): bool
@@ -117,20 +123,8 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12): array
         ];
     }
 
-    // ── Schicht vorbei, aber nicht abgeglichen. Kein Abhaken moeglich: Der
-    // Eintrag verschwindet, wenn abgeglichen wurde, und nur dann.
-    foreach (ereignis_lesen($pdo,
-        "SELECT e.id, e.datum, e.von, e.bis, e.kunde_name, e.titel AS einsatz_titel, e.ort
-           FROM einsaetze e
-          WHERE e.datum < CURDATE() AND e.status <> 'abgesagt' AND e.ist_status = 'offen'
-          ORDER BY e.datum DESC LIMIT 20", $fehler, 'abgleich') as $e) {
-        $liste[] = [
-            'typ' => 'abgleich', 'id' => (int)$e['id'], 'zeit' => $e['datum'] . ' 23:59:59',
-            'titel' => 'Abgleich offen',
-            'datum' => $e['datum'], 'von' => $e['von'], 'bis' => $e['bis'],
-            'kunde' => $e['kunde_name'], 'einsatz_titel' => $e['einsatz_titel'], 'ort' => $e['ort'],
-        ];
-    }
+    // Hier stand bis zum 23.08.2026 eine vierte Abfrage: vergangene Schichten
+    // ohne Abgleich. Sie ist mit Absicht weg -- siehe Festlegung 3.
 
     // Neueste zuerst. Ein leerer Zeitstempel sortiert nach hinten statt eine
     // Ausnahme zu werfen.

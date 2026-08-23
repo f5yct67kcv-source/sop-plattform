@@ -495,6 +495,14 @@ th.sortbar.aktiv .pf { opacity: 1; color: var(--accent); }
 .rank .h { font-size: 14px; font-weight: 680; font-variant-numeric: tabular-nums; }
 .rank-track { height: 3px; background: var(--line-soft); border-radius: 2px; margin-top: 5px; overflow: hidden; }
 .rank-track i { display: block; height: 100%; background: var(--accent); border-radius: 2px; }
+/* Fehlt ein Teil des Feeds, sagt das eine eigene Zeile ganz oben -- in der
+   Warnfarbe und in voller Breite. Eine graue Notiz in der Kopfzeile hat
+   genau einmal nicht gereicht (ENT-089). */
+.erg-luecke { display: block; padding: 13px 18px; background: var(--warn-soft, rgba(200,140,0,.12));
+  border-bottom: 1px solid var(--line); font-size: 12.5px; line-height: 1.55; }
+.erg-luecke b { color: var(--warn); }
+.erg-luecke span { display: block; color: var(--ink-2); margin-top: 2px; }
+
 /* Aufgeklappte Ereigniszeile (ENT-089). Sie sitzt unter der Zeile statt in
    einem Fenster: Wer drei Ereignisse pruefen will, soll sie nebeneinander
    sehen, ohne dreimal ein Fenster zu oeffnen und zu schliessen. */
@@ -4667,11 +4675,16 @@ const EREIGNIS_ART = {
   rapport:  { punkt: 'ok',   wort: 'hat einen Rapport gesendet' },
   sperrtag: { punkt: 'warn', wort: 'hat sich einen Tag gesperrt' },
   zusage:   { punkt: 'ok',   wort: 'hat eine Schicht beantwortet' },
-  abgleich: { punkt: 'warn', wort: 'wartet auf den Abgleich' },
 };
 
 function renderEreignisse() {
-  const f    = stats.ereignisse || [];
+  // Nur bekannte Arten. Eine Art, die der Feed nicht kennt, wuerde sonst als
+  // leere Zeile erscheinen -- eine Zeile ohne Aussage ist schlimmer als gar
+  // keine. Das Ergebnis wird zurueckgeschrieben, weil Aufklappen und Abhaken
+  // ueber denselben Index auf stats.ereignisse zugreifen.
+  const roh  = stats.ereignisse || [];
+  const f    = roh.filter(x => EREIGNIS_ART[x.typ]);
+  if (f.length !== roh.length) { stats.ereignisse = f; }
   const note = $('ereignisNote');
   const fehlt = stats.ereignisse_unvollstaendig || [];
 
@@ -4685,14 +4698,27 @@ function renderEreignisse() {
     note.style.color = fehlt.length ? 'var(--warn)' : '';
   }
 
+  // Ein Teil, der sich nicht abfragen laesst, bekommt eine EIGENE ZEILE ganz
+  // oben -- nicht bloss eine graue Notiz in der Kopfzeile. Bis zum 23.08.2026
+  // stand der Hinweis nur dort, und genau das ist passiert: Ein gesendeter
+  // Rapport erschien nicht, weil die Spalte fehlte, und die Liste sah
+  // trotzdem aus wie eine vollstaendige. Eine Luecke, die man uebersehen
+  // kann, ist keine Meldung.
+  const hinweis = fehlt.length ? `
+    <div class="erg-luecke">
+      <b>Unvollständig — hier fehlt etwas.</b>
+      <span>${esc(fehlt.join(', '))} ${fehlt.length > 1 ? 'lassen' : 'lässt'} sich nicht abfragen: Der Datenbank fehlt eine Spalte.
+      Das ist <b>nicht</b> dasselbe wie „nichts passiert". Seitenleiste → Einrichtung ausführen.</span>
+    </div>` : '';
+
   if (!f.length) {
     $('ereignisFeed').innerHTML = fehlt.length
-      ? EMPTY('Nicht abfragbar', 'Für ' + fehlt.join(', ') + ' fehlt die Einrichtung. Das ist nicht dasselbe wie "nichts passiert" — führe die Einrichtung aus.')
-      : EMPTY('Nichts Neues', 'Hier erscheinen eingegangene Rapporte, Sperrtage, Rückmeldungen und offene Abgleiche.');
+      ? hinweis
+      : EMPTY('Nichts Neues', 'Hier erscheinen eingegangene Rapporte, Sperrtage und Rückmeldungen zu Schichten.');
     return;
   }
 
-  $('ereignisFeed').innerHTML = f.map((x, i) => {
+  $('ereignisFeed').innerHTML = hinweis + f.map((x, i) => {
     const art  = EREIGNIS_ART[x.typ] || { punkt: 'warn', wort: '' };
     const wer  = x.person ? (fullName(x.person) || x.person.name) : (x.kunde || '—');
     return `
@@ -4711,9 +4737,9 @@ function renderEreignisse() {
   }).join('');
 }
 
-// Der offene Abgleich laesst sich nicht abhaken -- er verschwindet, wenn
-// abgeglichen wurde, und nur dann. Dieselbe Liste wie im Endpunkt, hier
-// bloss zum Ausblenden des Knopfes.
+// Dieselbe Liste wie im Endpunkt, hier bloss zum Ausblenden des Knopfes.
+// Alle drei Arten lassen sich abhaken: Jede von ihnen ist etwas Geschehenes,
+// das man zur Kenntnis nimmt.
 function ereignisAbhakbar(typ) {
   return typ === 'rapport' || typ === 'sperrtag' || typ === 'zusage';
 }
@@ -4722,7 +4748,6 @@ function ereignisZeile(x) {
   if (x.typ === 'rapport')  { return `hat einen Rapport gesendet — ${x.kunde || '?'}, ${dmy(x.datum)}`; }
   if (x.typ === 'sperrtag') { return `hat sich ${dmy(x.datum)} gesperrt${x.bemerkung ? ' — ' + x.bemerkung : ''}`; }
   if (x.typ === 'zusage')   { return `${x.zusage === 'abgesagt' ? 'hat abgesagt' : 'hat zugesagt'} — ${x.kunde || x.einsatz_titel || '?'}, ${dmy(x.datum)}`; }
-  if (x.typ === 'abgleich') { return `Schicht vom ${dmy(x.datum)} ist noch nicht abgeglichen — ${x.kunde || x.einsatz_titel || '?'}`; }
   return x.titel || '';
 }
 
@@ -4741,9 +4766,6 @@ function ereignisAufklappen(i, zeile) {
   }
   if (x.datum) {
     wege.push(`<button class="btn btn-plain btn-sm" onclick="event.stopPropagation(); ereignisZumTag('${esc(String(x.datum).slice(0, 10))}')">Zum Tagesplan</button>`);
-  }
-  if (x.typ === 'abgleich') {
-    wege.push(`<button class="btn btn-plain btn-sm" onclick="event.stopPropagation(); go('abgleich')">Zum Abgleich</button>`);
   }
   const zeilen = [];
   if (x.datum)      { zeilen.push(['Datum', dmy(x.datum)]); }

@@ -13,8 +13,16 @@ require '/workspace/rapport_cupi24/backend/ereignisse.php';
 pruef('Ein Rapport laesst sich abhaken',            ereignis_abhakbar('rapport'));
 pruef('Ein Sperrtag ebenfalls',                     ereignis_abhakbar('sperrtag'));
 pruef('Eine Zusage ebenfalls',                      ereignis_abhakbar('zusage'));
-pruef('KRITISCH: der offene Abgleich NICHT -- er verschwindet, wenn abgeglichen wurde, und nur dann',
-    ereignis_abhakbar('abgleich') === false);
+// Eine offene, noch nicht abgeglichene Schicht ist KEIN Ereignis, sondern ein
+// andauernder Zustand. Sie war bis zum 23.08.2026 eine eigene Art und wurde
+// auf ausdrueckliche Ansage des Projektinhabers entfernt: "fehlende, noch
+// nicht abgeschlossene Schichten sollen nicht in die Ereignisse kommen. nur
+// ereignisse, die neu hinzukommen." Diese Pruefung haelt das fest -- sonst
+// kaeme die Art beim naechsten Ausbau geraeuschlos zurueck.
+pruef('KRITISCH: der offene Abgleich ist gar keine Art mehr',
+    !array_key_exists('abgleich', EREIGNIS_ARTEN) && ereignis_abhakbar('abgleich') === false);
+pruef('KRITISCH: es gibt genau drei Arten -- Rapport, Sperrtag, Zusage',
+    count(EREIGNIS_ARTEN) === 3);
 pruef('Eine erfundene Art auch nicht',              ereignis_abhakbar('irgendwas') === false);
 pruef('Und eine leere erst recht nicht',            ereignis_abhakbar('') === false);
 
