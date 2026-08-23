@@ -111,7 +111,7 @@ check('8 Balken gerendert', (await page.$$('#chart .bar')).length === 8);
 check('Letzte KW hervorgehoben', (await page.getAttribute('#chart .bar:last-child', 'class')).includes('now'));
 // Gemessen statt am style-Attribut abgelesen: Seit dem 23.08.2026 steht die
 // Balkenhoehe als Anteil in flex-basis, damit das Bild mit der Kartenhoehe
-// waechst (ENT-100). Die Aussage bleibt dieselbe -- eine Woche ohne Stunden
+// waechst (ENT-099). Die Aussage bleibt dieselbe -- eine Woche ohne Stunden
 // ist trotzdem SICHTBAR, sonst sieht "0" aus wie "kein Balken gezeichnet".
 const leerBar = await page.$eval('#chart .bar:nth-child(4) .bar-fill',
   e => Math.round(e.getBoundingClientRect().height));
