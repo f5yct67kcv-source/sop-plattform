@@ -23,6 +23,11 @@ const LAYOUT_BEREICHE = ['uebersicht', 'ma_detail'];
 // kein Bedienvorgang mehr.
 const LAYOUT_MAX_EINTRAEGE = 60;
 const LAYOUT_MAX_ID = 40;
+// Grenzen der Container-Hoehe in Pixeln (ENT-098). Dieselben Werte wie in der
+// Oberflaeche; sie stehen hier noch einmal, weil der Server einem Wert aus dem
+// Browser nicht glaubt.
+const LAYOUT_H_MIN = 140;
+const LAYOUT_H_MAX = 1600;
 
 function layout_bereich_gueltig(string $bereich): bool
 {
@@ -47,7 +52,17 @@ function layout_pruefen($roh): ?array
         // Ein Container zweimal in einer Anordnung ergibt keinen Sinn.
         if (isset($gesehen[$id])) { return null; }
         $gesehen[$id] = true;
-        $sauber[] = ['id' => $id, 'sichtbar' => ($eintrag['sichtbar'] ?? true) !== false];
+        $satz = ['id' => $id, 'sichtbar' => ($eintrag['sichtbar'] ?? true) !== false];
+        // Groesse je Container (ENT-098). Eng geprueft und begrenzt: Der Wert
+        // kommt aus dem Browser. Fehlt er, bleibt er weg -- das heisst
+        // "automatisch" und ist etwas anderes als ein gesetzter Wert.
+        $h = $eintrag['hoehe'] ?? null;
+        if (is_numeric($h) && (int)$h >= LAYOUT_H_MIN && (int)$h <= LAYOUT_H_MAX) {
+            $satz['hoehe'] = (int)$h;
+        }
+        $br = $eintrag['breite'] ?? null;
+        if ($br === 'halb' || $br === 'voll') { $satz['breite'] = $br; }
+        $sauber[] = $satz;
     }
     return $sauber ?: null;
 }

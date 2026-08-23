@@ -226,14 +226,18 @@ try {
     check(`Planung/${t} nutzt die volle Breite`, await weit());
   }
 
-  for (const v of ['abgleich', 'pensen', 'einsatzplan', 'masterschichten']) {
+  // "uebersicht" steht seit dem 23.08.2026 hier statt weiter unten: Der
+  // Projektinhaber hat die volle Breite fuer die Startseite ausdruecklich
+  // verlangt (ENT-098). Der Deckel schuetzt lange Textzeilen -- die
+  // Uebersicht traegt keine, sondern nebeneinanderstehende Container.
+  for (const v of ['uebersicht', 'abgleich', 'pensen', 'einsatzplan', 'masterschichten']) {
     await p.evaluate(x => go(x), v); await p.waitForTimeout(250);
     check(`${v} nutzt die volle Breite`, await weit());
   }
 
   // Und die Gegenrichtung: Wo Formulare stehen, bleibt die Lesebreite.
   // Ein 2500 px breites Formular ist nicht besser, sondern unlesbar.
-  for (const v of ['uebersicht', 'betrieb', 'kunden', 'mitarbeiter']) {
+  for (const v of ['betrieb', 'kunden', 'mitarbeiter']) {
     await p.evaluate(x => go(x), v); await p.waitForTimeout(250);
     check(`KRITISCH: ${v} behaelt die Lesebreite`, (await weit()) === false);
   }

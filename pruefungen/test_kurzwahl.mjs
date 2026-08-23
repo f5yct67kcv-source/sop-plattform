@@ -58,6 +58,12 @@ try {
     return new Set(l).size;
   });
   check('KRITISCH: die Wege stehen in zwei Spalten', spalten === 2);
+  // Acht Wege gehen durch zwei und durch vier glatt auf. Bei fuenf Spalten
+  // stuenden in der zweiten Zeile drei und daneben eine Luecke -- dieselbe
+  // Familie wie die vierte Kennzahl allein in ihrer Zeile.
+  const zeilen = await p.evaluate(() => new Set([...document.querySelectorAll('#kwGrid .kw')]
+    .map(e => Math.round(e.getBoundingClientRect().top))).size);
+  check('KRITISCH: und füllen ihre Zeilen ganz aus — vier mal zwei', zeilen === 4);
 
   // Trefferflaeche: Auf dem Handy gilt 44 px. Ein Weg, den man nicht trifft,
   // ist kein Schnellzugriff.
