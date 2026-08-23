@@ -1385,24 +1385,13 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
   .shell.schmal .nav-item, .shell.aus .nav-item { justify-content: center; gap: 0; padding: 10px 0; }
   .shell.schmal .nav-item .lbl, .shell.schmal .nav-item .tag,
   .shell.aus .nav-item .lbl, .shell.aus .nav-item .tag { display: none; }
-  /* Neben blossen Symbolen ist kein Platz für ein eingerücktes Untermenü.
-     Statt es zu verstecken -- so war es bis hierher, und damit waren
-     "Objekte" und "Rapporte" im schmalen Modus GAR NICHT erreichbar --
-     wird es ein schwebendes Feld. Dieselben Knöpfe, dieselben IDs, nur
-     anders platziert: rechteAnwenden() wirkt unverändert weiter. Eine
-     zweite Kopie der Einträge im Kopfbereich müsste bei jeder
-     Rechteänderung mitgepflegt werden, und eine der beiden Kopien würde
-     vergessen. */
+  /* Kein Untermenü an der Leiste, weder eingerückt noch schwebend: Die
+     Unterkategorien stehen im kompakten Zustand in der Werkzeugleiste
+     (siehe .top-sub). Beides zugleich war dem Projektinhaber zu viel --
+     und er hat recht: dieselbe Auswahl zweimal im selben Bild ist
+     Doppelung, nicht Komfort. */
   .shell.schmal .nav-eltern .chev, .shell.aus .nav-eltern .chev { display: none; }
-  .shell.schmal .nav-gruppe.offen .nav-kinder,
-  .shell.aus .nav-gruppe.offen .nav-kinder {
-    display: block; position: fixed; z-index: 50; min-width: 190px;
-    padding: 6px; margin: 0;
-    background: var(--shell); border: 1px solid var(--shell-line);
-    border-radius: var(--r-sm); box-shadow: var(--sh-3);
-  }
-  .shell.schmal .nav-gruppe.offen .nav-kind,
-  .shell.aus .nav-gruppe.offen .nav-kind { padding: 10px 12px; }
+  .shell.schmal .nav-kinder, .shell.aus .nav-kinder { display: none; }
   .shell.schmal .side-brand, .shell.aus .side-brand { justify-content: center; padding: 0 8px; }
   .shell.schmal .side-brand .txt, .shell.aus .side-brand .txt { display: none; }
   .shell.schmal .side-user, .shell.aus .side-user { justify-content: center; padding: 7px 0; }
@@ -3607,7 +3596,6 @@ function enter() {
   $('gate').style.display = 'none';
   $('shell').classList.add('on');
   huelleSetzen(huelleLesen(), false);
-  navHoverEinrichten();
   $('uName').textContent = me.name;
   // Statt immer "Administration" die tatsaechlichen Rollen. Wer als Planung
   // angemeldet ist, soll das sehen -- sonst wundert er sich, warum Knoepfe
@@ -4217,7 +4205,7 @@ function weiteAnsicht(an) {
 }
 
 function go(view) {
-  navFlyoutZu();
+  if (huelleKompakt()) { navGruppenZu(); }
   document.querySelectorAll('.view').forEach(v => v.classList.remove('on'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('on'));
   $('view-' + view).classList.add('on');
@@ -4226,8 +4214,14 @@ function go(view) {
   // die Kunden -- "Mitarbeitende", "Betrieb" und "Pensen" blieben unmarkiert,
   // man sah also nicht, wo man steht. Die Werkzeugleiste braucht es jetzt.
   document.querySelectorAll('.nav-kind').forEach(b => b.classList.remove('on'));
-  const kind = document.querySelector('.nav-kind[id$="-' + view + '"]');
-  if (kind) { kind.classList.add('on'); }
+  // NUR wenn die Ansicht keinen eigenen Haupteintrag hat. Sonst trifft der
+  // Suffix-Vergleich daneben: go('uebersicht') fand "nav-kunden-uebersicht"
+  // und markierte "Adressen" -- die Werkzeugleiste zeigte auf der Uebersicht
+  // die Unterkategorien der Kunden.
+  if (!nav) {
+    const kind = document.querySelector('.nav-kind[id$="-' + view + '"]');
+    if (kind) { kind.classList.add('on'); }
+  }
   $('pgTitle').textContent = TITLES[view][0];
   $('pgCrumb').textContent = TITLES[view][1];
   // Ueber toggleSide schliessen, nicht die Klasse von Hand entfernen: seit
@@ -4383,7 +4377,7 @@ function huelleSetzen(zustand, merken = true) {
   if (merken) { localStorage.setItem('rv3_huelle', zustand); }
   const b = $('btnSchmal');
   if (b) { b.title = HUELLE_TITEL[zustand]; b.setAttribute('aria-label', HUELLE_TITEL[zustand]); }
-  navFlyoutZu(true);
+  navGruppenZu();
   topSubZeichnen();
 }
 
@@ -4402,60 +4396,22 @@ function huelleKompakt() {
       && window.matchMedia('(min-width: 901px)').matches;
 }
 
-function navFlyoutZu(auchImmer = false) {
-  if (!auchImmer && !huelleKompakt()) { return; }
-  document.querySelectorAll('.nav-gruppe.offen').forEach(g => g.classList.remove('offen'));
-}
-
-// Gibt true zurueck, wenn der Klick als Flyout behandelt wurde -- die
-// Aufrufer entscheiden daran, ob ihre bisherige Logik noch dran ist.
-function navFlyoutKlick(gruppenId) {
+// Im kompakten Zustand fuehrt ein Klick auf eine Gruppe direkt in ihren
+// Bereich. Ein Untermenue an der Leiste gibt es dort nicht mehr -- die
+// Unterkategorien stehen in der Werkzeugleiste. Ohne diese Weiche wuerde
+// die alte Aufklapp-Logik greifen und die Kinder eingerueckt in eine 64 px
+// schmale Leiste oder in die Kopfzeile schreiben.
+function navGruppeKompakt(zielAnsicht) {
   if (!huelleKompakt()) { return false; }
-  const g = $(gruppenId);
-  if (!g) { return false; }
-  const warOffen = g.classList.contains('offen');
-  // Mit Maus hat das Ueberfahren schon geoeffnet. Ein Klick auf dasselbe
-  // Symbol soll dann in den Bereich fuehren, nicht das eben aufgegangene
-  // Menue wieder zuklappen -- das fuehlt sich an wie ein Fehlklick.
-  if (warOffen && navMausZeiger()) { return false; }
-  navFlyoutZu();
-  if (!warOffen) { g.classList.add('offen'); navFlyoutPlatzieren(g); }
+  navGruppenZu();
+  go(zielAnsicht);
   return true;
 }
 
-// Gemessen statt gerechnet: Die Groesse des Feldes wird am eingeblendeten
-// Element abgenommen, nicht aus der Zahl der Kinder geschaetzt. Sonst
-// stimmt die Kollisionspruefung am Rand nicht.
-function navFlyoutPlatzieren(gruppe) {
-  const knopf = gruppe.querySelector('.nav-eltern');
-  const feld  = gruppe.querySelector('.nav-kinder');
-  if (!knopf || !feld) { return; }
-  feld.style.left = '-9999px';
-  feld.style.top  = '0px';
-  const r = knopf.getBoundingClientRect();
-  const b = feld.getBoundingClientRect();
-  const imKopf = $('shell').classList.contains('aus') && huelleKompakt();
-  // Senkrecht: an der Kante der LEISTE ausrichten, nicht an der des Knopfes.
-  // Der Knopf endet wegen des Innenabstands frueher -- das Feld lag dadurch
-  // 2 px ueber der Leiste statt sauber daneben.
-  const leiste = document.getElementById('side');
-  const kante  = leiste ? leiste.getBoundingClientRect().right : r.right;
-  let links = imKopf ? r.left : kante + 6;
-  let oben  = imKopf ? r.bottom + 6 : r.top;
-  if (links + b.width  > window.innerWidth  - 8) { links = window.innerWidth  - b.width  - 8; }
-  if (oben  + b.height > window.innerHeight - 8) { oben  = window.innerHeight - b.height - 8; }
-  feld.style.left = Math.max(8, links) + 'px';
-  feld.style.top  = Math.max(8, oben)  + 'px';
-}
-
-// Aufklappen beim Ueberfahren -- aber NUR mit einer echten Maus. Auf einem
-// Touchgeraet gibt es kein Ueberfahren; dort meldet der Browser Hover
-// bestenfalls beim ersten Tippen, und ein Menue, das sich beim Tippen
-// oeffnet und beim zweiten Tippen gleich wieder schliesst, ist unbedienbar.
-// Der Klickweg bleibt in jedem Fall bestehen.
-let flyoutZeit = null;
-function navMausZeiger() {
-  return window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+// Aufgeklappte Gruppen schliessen -- im kompakten Zustand darf keine offen
+// stehenbleiben, ihre Kinder wuerden dort ins Nichts gezeichnet.
+function navGruppenZu() {
+  document.querySelectorAll('.nav-gruppe.offen').forEach(g => g.classList.remove('offen'));
 }
 
 // Unterkategorien des offenen Bereichs in der Werkzeugleiste (ENT-086).
@@ -4486,38 +4442,7 @@ function topSubZeichnen() {
   leiste.style.display = 'flex';
 }
 
-function navHoverEinrichten() {
-  if (!navMausZeiger()) { return; }
-  document.querySelectorAll('.nav-gruppe').forEach(g => {
-    g.addEventListener('mouseenter', () => {
-      clearTimeout(flyoutZeit);
-      if (!huelleKompakt() || g.classList.contains('offen')) { return; }
-      navFlyoutZu();
-      g.classList.add('offen');
-      navFlyoutPlatzieren(g);
-    });
-    // Verzoegert schliessen: Zwischen Leiste und Feld liegen 6 px. Ohne die
-    // Wartezeit faellt das Menue zu, waehrend die Maus den Spalt quert --
-    // man kaeme nie hin. Das Feld ist ein Kind der Gruppe, das Wiedereintreten
-    // bricht den Zeitgeber also ab.
-    g.addEventListener('mouseleave', () => {
-      clearTimeout(flyoutZeit);
-      flyoutZeit = setTimeout(() => navFlyoutZu(), 220);
-    });
-  });
-}
-
-document.addEventListener('click', ev => {
-  if (!huelleKompakt()) { return; }
-  if (ev.target.closest && ev.target.closest('.nav-gruppe')) { return; }
-  navFlyoutZu();
-});
-document.addEventListener('keydown', ev => {
-  if (ev.key === 'Escape') { navFlyoutZu(); }
-});
-// Wird das Fenster schmaler, greift der Rueckfall auf die 64-px-Leiste.
-// Ein Feld, das noch an der alten Stelle steht, zeigt dann ins Leere.
-window.addEventListener('resize', () => { navFlyoutZu(true); topSubZeichnen(); });
+window.addEventListener('resize', () => { if (huelleKompakt()) { navGruppenZu(); } topSubZeichnen(); });
 
 // ══════════════════════════════════════════ LADEN
 function reloadAll() {
@@ -6284,7 +6209,7 @@ const TAB_CRUMB = {
 // noch das Untermenue zu (bzw. wieder auf) -- ohne den view() zu berühren,
 // denn navigieren beim Zuklappen wuerde ihn sofort wieder aufreissen.
 function kuNavKlick() {
-  if (navFlyoutKlick('navg-kunden')) { return; }
+  if (navGruppeKompakt('kunden')) { return; }
   if ($('view-kunden').classList.contains('on')) {
     $('navg-kunden').classList.toggle('offen');
   } else {
@@ -6596,7 +6521,7 @@ function saveObjekt() {
 // Klick auf "Administration": oeffnet die erste Unterseite, statt nur
 // auf- und zuzuklappen. Ein Menuepunkt, der nichts tut, ist ein Aergernis.
 function adminNavKlick() {
-  if (navFlyoutKlick('navg-admin')) { return; }
+  if (navGruppeKompakt('mitarbeiter')) { return; }
   const offen = $('navg-admin').classList.contains('offen');
   const drin = $('view-mitarbeiter').classList.contains('on') || $('view-betrieb').classList.contains('on');
   if (offen && drin) { $('navg-admin').classList.toggle('offen'); return; }
@@ -6764,7 +6689,7 @@ function pnMeldung(st) {
 }
 
 function kontrolleNavKlick() {
-  if (navFlyoutKlick('navg-kontrolle')) { return; }
+  if (navGruppeKompakt('pensen')) { return; }
   const offen = $('navg-kontrolle').classList.contains('offen');
   if (offen && $('view-pensen').classList.contains('on')) {
     $('navg-kontrolle').classList.toggle('offen');

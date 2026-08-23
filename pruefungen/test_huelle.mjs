@@ -91,49 +91,48 @@ const zustand = p => p.evaluate(() => {
   await p.close();
 }
 
-// ══════════════════════════════ UNTERMENUE -- die geschlossene Luecke
-{
+// ══════════════════════════════ KEIN UNTERMENUE AN DER LEISTE
+//
+// Bis 2026-08-23 klappte im kompakten Zustand ein schwebendes Feld an der
+// Leiste auf. Der Projektinhaber: "dropdown und untertitel etwas too much".
+// Er hat recht -- dieselbe Auswahl zweimal im selben Bild ist Doppelung.
+// Die Unterkategorien stehen jetzt nur noch in der Werkzeugleiste.
+try {
   const p = await seite(1600, 900);
   await p.click('#btnSchmal'); await p.waitForTimeout(250);   // schmal
 
-  let kinder = await mass(p, '#navg-kunden .nav-kinder');
-  check('Im schmalen Zustand ist das Untermenue zunaechst zu', kinder.display === 'none');
+  await p.click('#nav-kunden'); await p.waitForTimeout(350);
+  const k = await mass(p, '#navg-kunden .nav-kinder');
+  check('KRITISCH: an der Leiste klappt nichts mehr auf', k.display === 'none');
+  check('KRITISCH: der Klick fuehrt stattdessen in den Bereich',
+    (await p.textContent('#pgTitle')) === 'Kunden');
+  const ts = await mass(p, '#topSub');
+  check('Und die Unterkategorien stehen in der Werkzeugleiste', ts.display === 'flex');
 
-  await p.click('#nav-kunden'); await p.waitForTimeout(250);
-  kinder = await mass(p, '#navg-kunden .nav-kinder');
-  const objekte = await mass(p, '#nav-kunden-objekte');
-  check('KRITISCH: ein Klick oeffnet es als schwebendes Feld', kinder.display === 'block' && kinder.position === 'fixed');
-  check('KRITISCH: "Objekte" ist damit erreichbar -- vorher war es das nicht',
-    objekte.w > 0 && objekte.h > 0);
-  check('Das Feld steht neben der Leiste, nicht darunter versteckt', kinder.x >= 64);
-  check('Und ragt nicht aus dem Fenster', kinder.x + kinder.w <= 1600 && kinder.y + kinder.h <= 900);
-
-  await p.keyboard.press('Escape'); await p.waitForTimeout(200);
-  kinder = await mass(p, '#navg-kunden .nav-kinder');
-  check('Escape schliesst es', kinder.display === 'none');
-
-  await p.click('#nav-kunden'); await p.waitForTimeout(200);
-  await p.mouse.click(800, 500); await p.waitForTimeout(250);
-  kinder = await mass(p, '#navg-kunden .nav-kinder');
-  check('Ein Klick daneben schliesst es ebenfalls', kinder.display === 'none');
-
-  await p.click('#nav-kunden'); await p.waitForTimeout(200);
-  await p.evaluate(() => go('planung')); await p.waitForTimeout(250);
-  kinder = await mass(p, '#navg-kunden .nav-kinder');
-  check('Und ein Seitenwechsel laesst es nicht offen stehen', kinder.display === 'none');
-
-  // Dasselbe im Kopfleisten-Zustand: das Feld haengt dann UNTER dem Symbol
+  // Dasselbe im Kopfleisten-Zustand
+  await p.evaluate(() => go('uebersicht')); await p.waitForTimeout(200);
   await p.click('#btnSchmal'); await p.waitForTimeout(250);   // aus
-  await p.click('#nav-kunden'); await p.waitForTimeout(250);
-  kinder = await mass(p, '#navg-kunden .nav-kinder');
-  const knopf = await mass(p, '#nav-kunden');
-  check('KRITISCH: in der Kopfleiste oeffnet dasselbe Feld nach unten',
-    kinder.display === 'block' && kinder.y >= knopf.y + knopf.h);
-  check('Es bleibt im Fenster', kinder.x >= 0 && kinder.x + kinder.w <= 1600);
+  await p.click('#nav-kunden'); await p.waitForTimeout(350);
+  check('Auch in der Kopfleiste klappt nichts auf',
+    (await mass(p, '#navg-kunden .nav-kinder')).display === 'none');
+  check('Und der Bereich wird trotzdem erreicht',
+    (await p.textContent('#pgTitle')) === 'Kunden');
+
+  // Bei voller Leiste bleibt das Aufklappen wie bisher
+  await p.click('#btnSchmal'); await p.waitForTimeout(250);   // voll
+  await p.evaluate(() => go('kunden')); await p.waitForTimeout(250);
+  // Zustand ablesen statt annehmen: Der Klick SCHALTET um, er oeffnet nicht.
+  const vorher = await p.evaluate(() => document.getElementById('navg-kunden').classList.contains('offen'));
+  if (vorher) { await p.click('#nav-kunden'); await p.waitForTimeout(250); }
+  await p.click('#nav-kunden'); await p.waitForTimeout(300);
+  check('Bei voller Leiste klappt die Gruppe weiterhin auf',
+    (await mass(p, '#navg-kunden .nav-kinder')).display === 'block');
+  check('Und "Objekte" ist dort direkt anklickbar',
+    (await mass(p, '#nav-kunden-objekte')).h > 0);
 
   await p.screenshot({ path: `${OUT}/huelle-kopfleiste.png` });
   await p.close();
-}
+} catch (e) { bad.push('Untermenue: ' + String(e).split('\n')[0].slice(0, 120)); }
 
 // ══════════════════════════════ EIN MARKUP, KEINE ZWEITE KOPIE
 {
@@ -214,45 +213,6 @@ const zustand = p => p.evaluate(() => {
   const kompakt = await p.evaluate(() => huelleKompakt());
   check('KRITISCH: und der kompakte Zustand greift dort nicht', kompakt === false);
   await p.close();
-}
-
-// ══════════════════════════════ AUFKLAPPEN BEIM UEBERFAHREN
-//
-// Der ganze Block liegt in try/catch. Faellt das Ueberfahren aus, ist das
-// eine FEHLGESCHLAGENE Pruefung -- kein Absturz der Suite. Eine Suite, die
-// beim ersten Problem abbricht, verschweigt alles, was danach kaeme.
-try {
-  const p = await seite(1600, 900);
-  await p.click('#btnSchmal'); await p.waitForTimeout(250);   // schmal
-
-  await p.hover('#nav-kunden'); await p.waitForTimeout(250);
-  let k = await mass(p, '#navg-kunden .nav-kinder');
-  check('KRITISCH: Ueberfahren oeffnet das Untermenue', k.display === 'block');
-
-  // Vom Symbol ins Feld wechseln -- der 6-px-Spalt darf es nicht zufallen lassen
-  await p.hover('#nav-kunden-objekte'); await p.waitForTimeout(300);
-  k = await mass(p, '#navg-kunden .nav-kinder');
-  check('KRITISCH: der Weg zum Eintrag laesst es offen', k.display === 'block');
-
-  // Wegfahren schliesst -- aber erst nach der Wartezeit
-  await p.hover('#nav-uebersicht'); await p.waitForTimeout(120);
-  k = await mass(p, '#navg-kunden .nav-kinder');
-  check('Direkt nach dem Wegfahren ist es noch offen (Wartezeit)', k.display === 'block');
-  await p.waitForTimeout(300);
-  k = await mass(p, '#navg-kunden .nav-kinder');
-  check('Danach schliesst es von selbst', k.display === 'none');
-
-  // Ein Klick auf ein bereits offenes Menue fuehrt in den Bereich,
-  // statt das eben Aufgegangene wieder zuzuklappen
-  await p.evaluate(() => go('planung')); await p.waitForTimeout(200);
-  await p.hover('#nav-kunden'); await p.waitForTimeout(250);
-  await p.click('#nav-kunden'); await p.waitForTimeout(300);
-  check('KRITISCH: Klick auf das offene Symbol fuehrt in den Bereich',
-    (await p.textContent('#pgTitle')) === 'Kunden');
-
-  await p.close();
-} catch (e) {
-  bad.push('Aufklappen beim Ueberfahren: ' + String(e).split('\n')[0].slice(0, 120));
 }
 
 // ══════════════════════════════ BREITE JE ANSICHT
@@ -433,6 +393,16 @@ try {
   });
   check('KRITISCH: ohne Unterkategorien bleibt die Knopfgruppe rechts aussen',
     rechts <= 30);
+
+  // Die Uebersicht hat keine Unterkategorien -- zeigte aber die der Kunden.
+  // Ursache war ein Suffix-Vergleich: go('uebersicht') traf die ID
+  // "nav-kunden-uebersicht" und markierte damit "Adressen".
+  await p.evaluate(() => go('kunden')); await p.waitForTimeout(250);
+  await p.evaluate(() => go('uebersicht')); await p.waitForTimeout(300);
+  const ue = await mass(p, '#topSub');
+  const kindMarkiert = await p.evaluate(() => document.querySelectorAll('.nav-kind.on').length);
+  check('KRITISCH: die Uebersicht zeigt keine fremden Unterkategorien', ue.display === 'none');
+  check('Und markiert auch keine', kindMarkiert === 0);
 
   await p.screenshot({ path: `${OUT}/huelle-kopf-beschriftet.png` });
   await p.close();
