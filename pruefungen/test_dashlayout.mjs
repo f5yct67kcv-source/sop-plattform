@@ -51,6 +51,36 @@ check('Der Bearbeiten-Knopf verschwindet auf anderen Ansichten',
 await page.evaluate(() => go('uebersicht'));
 await page.waitForTimeout(150);
 
+// ══════════ BREITEN: ZWEI CONTAINER NEBENEINANDER
+//
+// Vom Projektinhaber am 2026-08-23 verlangt: "halbseitgrosse, das zwei
+// nebeneinander platz haben ... das erste widget, willkommen zurück würde
+// nämlich eine halbe seite reichen. Das neue ereigniss widget, darf auch auf
+// der vollen breite dargestellt werden."
+//
+// Gemessen am gerenderten Zustand, nicht im Quelltext nachgelesen: Eine
+// CSS-Regel kann wirkungslos bleiben, ohne dass etwas kaputtgeht.
+try {
+  const m = await page.evaluate(() => {
+    const r = id => document.querySelector(`[data-widget="${id}"]`).getBoundingClientRect();
+    const flow = document.getElementById('dashFlow').getBoundingClientRect();
+    return { flow: flow.width, begr: r('begruessung'), kpi: r('kpi'), erg: r('ereignisse'),
+             wachsen: getComputedStyle(document.querySelector('[data-widget="begruessung"]')).flexGrow };
+  });
+  const halb = (m.flow - 16) / 2;
+  check('KRITISCH: die Begrüssung nimmt die halbe Seite', Math.abs(m.begr.width - halb) < 1.5);
+  check('KRITISCH: die Kennzahlen stehen DANEBEN, nicht darunter',
+    Math.abs(m.begr.top - m.kpi.top) < 1 && m.kpi.left >= m.begr.right - 1);
+  check('Und die beiden füllen die Zeile zusammen aus',
+    Math.abs((m.begr.width + m.kpi.width + 16) - m.flow) < 1.5);
+  check('KRITISCH: die Ereignisse bleiben auf voller Breite',
+    Math.abs(m.erg.width - m.flow) < 1.5);
+  // Ein halber Container, der allein in seiner Zeile steht, soll halb bleiben
+  // -- "eine halbe Seite reicht" ist eine Aussage ueber den Inhalt, nicht
+  // ueber die Nachbarn. Mit flex-grow 1 zoege er sich auf die volle Breite.
+  check('KRITISCH: ein halber Container wächst nicht auf die volle Breite', m.wachsen === '0');
+} catch (e) { bad.push('Breiten: ' + String(e).split('\n')[0].slice(0, 120)); }
+
 // ══════════ BEARBEITUNGSMODUS
 await page.click('#btnDashBearbeiten');
 await page.waitForTimeout(200);

@@ -498,6 +498,48 @@ th.sortbar.aktiv .pf { opacity: 1; color: var(--accent); }
 /* Fehlt ein Teil des Feeds, sagt das eine eigene Zeile ganz oben -- in der
    Warnfarbe und in voller Breite. Eine graue Notiz in der Kopfzeile hat
    genau einmal nicht gereicht (ENT-089). */
+/* Der Feed steht in Spalten: Absender, Beschreibung, Datum. Vorher standen
+   Absender und Beschreibung uebereinander -- lesbar, aber nicht vergleichbar:
+   Wer wissen will, von wem die letzten fuenf Meldungen kamen, musste fuenfmal
+   in eine andere Zeilenhoehe schauen. Ein Raster statt Flex, damit die
+   Ueberschriften exakt ueber ihren Werten stehen; mit Flex stuenden sie nur
+   ungefaehr dort. Die Beschriftung steht OBEN und ist fein und versal
+   gesetzt, der Wert darunter -- dieselbe Ordnung wie bei den Kennzahlen. */
+/* Die Datumsspalte hat eine FESTE Breite. Kopfzeile und Liste sind zwei
+   getrennte Raster; eine auto-Spalte richtet sich nach ihrem eigenen Inhalt,
+   und "Datum" ist schmaler als "vor 18 Min.". Die Ueberschrift stuende dann
+   um ein paar Pixel neben ihrer Spalte -- gemessen aufgefallen, im Quelltext
+   nicht zu sehen. Aus demselben Grund min-width 0 auf allen Zellen: Sonst
+   bestimmt der laengste Text die Spaltenbreite, und die beiden Raster
+   kommen erneut auf verschiedene Werte. */
+.erg-spalten { display: grid; grid-template-columns: 12px minmax(110px, 1.1fr) 2.4fr 96px 27px;
+  grid-template-areas: "dot abs txt datum haken"; align-items: center; gap: 12px; }
+.erg-kopf { padding: 9px 18px; border-bottom: 1px solid var(--line);
+  font-size: 10.5px; font-weight: 640; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+.erg-spalten > * { min-width: 0; }
+.erg-kopf .k-abs { grid-area: abs; }
+.erg-kopf .k-txt { grid-area: txt; }
+.erg-kopf .k-datum { grid-area: datum; text-align: right; }
+.rank.erg .dot { grid-area: dot; }
+.erg-abs { grid-area: abs; min-width: 0; font-size: 13px; font-weight: 620;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.erg-txt { grid-area: txt; min-width: 0; font-size: 12px; color: var(--ink-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.erg-datum { grid-area: datum; text-align: right; white-space: nowrap; }
+.erg-datum b { display: block; font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.erg-datum span { display: block; font-size: 10.5px; color: var(--ink-3); }
+.rank.erg .rank-erledigt, .rank.erg .erg-platz { grid-area: haken; }
+.erg-platz { display: block; width: 27px; height: 1px; }
+/* Schmal: Die Ueberschriften verschwinden und die Beschreibung rueckt unter
+   den Absender. Fuenf Spalten auf einem Telefon waeren fuenf unlesbare
+   Streifen -- und eine Ueberschrift ueber einer Spalte, die es nicht mehr
+   gibt, waere schlimmer als keine. */
+@media (max-width: 760px) {
+  .erg-kopf { display: none; }
+  .rank.erg { grid-template-columns: 12px 1fr 96px 27px;
+    grid-template-areas: "dot abs datum haken" "dot txt txt haken"; row-gap: 2px; }
+  .erg-txt { white-space: normal; }
+}
 .erg-luecke { display: block; padding: 13px 18px; background: var(--warn-soft, rgba(200,140,0,.12));
   border-bottom: 1px solid var(--line); font-size: 12.5px; line-height: 1.55; }
 .erg-luecke b { color: var(--warn); }
@@ -1059,8 +1101,19 @@ tbody tr.zu .i-schloss { color: var(--warn); }
 .md-tabs .btn { margin-left: 4px; }
 .dash-item { position: relative; min-width: 0; }
 .dash-item.dw-voll   { flex: 1 1 100%; }
+/* Halbe Seite -- zwei Container passen nebeneinander. Bewusst OHNE Wachsen
+   (flex-grow 0): Steht ein halber Container allein in seiner Zeile, bleibt er
+   halb, statt sich auf die volle Breite zu ziehen. "Eine halbe Seite reicht"
+   ist eine Aussage ueber den Inhalt, nicht ueber die Nachbarn. 8px ist die
+   halbe Luecke der Zeile (gap 16px), damit zwei Haelften genau aufgehen. */
+.dash-item.dw-halb   { flex: 0 1 calc(50% - 8px); }
 .dash-item.dw-breit  { flex: 2 1 460px; }
 .dash-item.dw-schmal { flex: 1 1 300px; }
+/* Die Kennzahlen richten sich nach ihrem Container, nicht nach dem Fenster:
+   In halber Breite stehen sie zu zweit, in voller zu viert. Eine
+   Fenster-Medienabfrage kann das nicht -- sie weiss nichts davon, dass der
+   Container nur die halbe Seite hat. */
+.dash-item.dw-halb .g-kpi { grid-template-columns: repeat(auto-fit, minmax(186px, 1fr)); }
 .dash-item.versteckt { display: none; }
 
 /* Bearbeitungsmodus */
@@ -1091,7 +1144,7 @@ tbody tr.zu .i-schloss { color: var(--warn); }
 .dash-item.versteckt .dash-werk .dash-auge { color: var(--accent); }
 .dash-leer { text-align: center; padding: 60px 20px; }
 @media (max-width: 1180px) {
-  .dash-item.dw-breit, .dash-item.dw-schmal { flex-basis: 100%; }
+  .dash-item.dw-breit, .dash-item.dw-schmal, .dash-item.dw-halb { flex-basis: 100%; }
 }
 
 /* ── Umschalter hell/dunkel (ENT-029) */
@@ -2001,7 +2054,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
       <section class="view on" id="view-uebersicht">
         <div class="dash-flow" id="dashFlow" ondragover="ordDragUeber(event)">
 
-          <div class="dash-item dw-voll" data-widget="begruessung">
+          <div class="dash-item dw-halb" data-widget="begruessung">
             <div class="card begr-karte">
               <div class="card-bd">
                 <div class="begr-kopf">
@@ -2040,11 +2093,11 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
             </div>
           </div>
 
-          <div class="dash-item dw-voll" data-widget="kpi">
+          <div class="dash-item dw-halb" data-widget="kpi">
             <div class="grid g-kpi" id="kpiGrid"></div>
           </div>
 
-          <div class="dash-item dw-breit" data-widget="verlauf">
+          <div class="dash-item dw-halb" data-widget="verlauf">
             <div class="card">
               <div class="card-hd">
                 <h2>Stundenverlauf</h2>
@@ -2055,7 +2108,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
             </div>
           </div>
 
-          <div class="dash-item dw-schmal" data-widget="angemeldet">
+          <div class="dash-item dw-halb" data-widget="angemeldet">
             <div class="card">
               <div class="card-hd">
                 <h2>Angemeldete Benutzer</h2>
@@ -2066,7 +2119,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
             </div>
           </div>
 
-          <div class="dash-item dw-breit" data-widget="letzte">
+          <div class="dash-item dw-halb" data-widget="letzte">
             <div class="card">
               <div class="card-hd">
                 <h2>Letzte Rapporte</h2>
@@ -2077,7 +2130,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
             </div>
           </div>
 
-          <div class="dash-item dw-schmal" data-widget="proma">
+          <div class="dash-item dw-halb" data-widget="proma">
             <div class="card">
               <div class="card-hd">
                 <h2>Stunden je Mitarbeitende</h2>
@@ -4718,20 +4771,27 @@ function renderEreignisse() {
     return;
   }
 
-  $('ereignisFeed').innerHTML = hinweis + f.map((x, i) => {
+  // Die Ueberschriften stehen nur ueber einer gefuellten Liste. Ueber einem
+  // Leerzustand waeren sie eine Tabelle, die etwas verspricht, was nicht da
+  // ist -- und "Kein Treffer" laese sich schlechter statt besser.
+  const kopf = `<div class="erg-kopf erg-spalten">
+      <span class="k-abs">Absender</span>
+      <span class="k-txt">Beschreibung</span>
+      <span class="k-datum">Datum</span>
+    </div>`;
+
+  $('ereignisFeed').innerHTML = hinweis + kopf + f.map((x, i) => {
     const art  = EREIGNIS_ART[x.typ] || { punkt: 'warn', wort: '' };
     const wer  = x.person ? (fullName(x.person) || x.person.name) : (x.kunde || '—');
     return `
-    <div class="rank click erg" onclick="ereignisAufklappen(${i}, this)">
+    <div class="rank click erg erg-spalten" onclick="ereignisAufklappen(${i}, this)">
       <span class="dot ${art.punkt}"></span>
-      <div class="who">
-        <b>${esc(wer)}</b>
-        <span>${esc(ereignisZeile(x))}</span>
-      </div>
-      <div style="text-align:right;font-size:12px;color:var(--ink-3);white-space:nowrap">${esc(relZeit(x.zeit))}</div>
+      <div class="erg-abs">${esc(wer)}</div>
+      <div class="erg-txt">${esc(ereignisZeile(x))}</div>
+      <div class="erg-datum" title="Eingegangen am ${esc(dmyZeit(x.zeit))}"><b>${esc(relZeit(x.zeit))}</b><span>${esc(dmy(x.zeit))}</span></div>
       ${ereignisAbhakbar(x.typ) ? `<button class="rank-erledigt" title="Als erledigt markieren" aria-label="Als erledigt markieren" onclick="event.stopPropagation(); ereignisErledigt(${i})">
         <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-      </button>` : '<span style="width:27px;flex:none"></span>'}
+      </button>` : '<span class="erg-platz"></span>'}
     </div>
     <div class="erg-detail" id="ergDetail${i}" style="display:none"></div>`;
   }).join('');
