@@ -188,6 +188,83 @@ const zustand = p => p.evaluate(() => {
   await p.close();
 }
 
+// ══════════════════════════════ AUFKLAPPEN BEIM UEBERFAHREN
+//
+// Der ganze Block liegt in try/catch. Faellt das Ueberfahren aus, ist das
+// eine FEHLGESCHLAGENE Pruefung -- kein Absturz der Suite. Eine Suite, die
+// beim ersten Problem abbricht, verschweigt alles, was danach kaeme.
+try {
+  const p = await seite(1600, 900);
+  await p.click('#btnSchmal'); await p.waitForTimeout(250);   // schmal
+
+  await p.hover('#nav-kunden'); await p.waitForTimeout(250);
+  let k = await mass(p, '#navg-kunden .nav-kinder');
+  check('KRITISCH: Ueberfahren oeffnet das Untermenue', k.display === 'block');
+
+  // Vom Symbol ins Feld wechseln -- der 6-px-Spalt darf es nicht zufallen lassen
+  await p.hover('#nav-kunden-objekte'); await p.waitForTimeout(300);
+  k = await mass(p, '#navg-kunden .nav-kinder');
+  check('KRITISCH: der Weg zum Eintrag laesst es offen', k.display === 'block');
+
+  // Wegfahren schliesst -- aber erst nach der Wartezeit
+  await p.hover('#nav-uebersicht'); await p.waitForTimeout(120);
+  k = await mass(p, '#navg-kunden .nav-kinder');
+  check('Direkt nach dem Wegfahren ist es noch offen (Wartezeit)', k.display === 'block');
+  await p.waitForTimeout(300);
+  k = await mass(p, '#navg-kunden .nav-kinder');
+  check('Danach schliesst es von selbst', k.display === 'none');
+
+  // Ein Klick auf ein bereits offenes Menue fuehrt in den Bereich,
+  // statt das eben Aufgegangene wieder zuzuklappen
+  await p.evaluate(() => go('planung')); await p.waitForTimeout(200);
+  await p.hover('#nav-kunden'); await p.waitForTimeout(250);
+  await p.click('#nav-kunden'); await p.waitForTimeout(300);
+  check('KRITISCH: Klick auf das offene Symbol fuehrt in den Bereich',
+    (await p.textContent('#pgTitle')) === 'Kunden');
+
+  await p.close();
+} catch (e) {
+  bad.push('Aufklappen beim Ueberfahren: ' + String(e).split('\n')[0].slice(0, 120));
+}
+
+// ══════════════════════════════ BREITE JE ANSICHT
+{
+  const p = await seite(1600, 900);
+  const weit = async () => p.evaluate(() => document.querySelector('.content').classList.contains('weit'));
+
+  for (const t of ['uebersicht', 'einsaetze', 'objektplan', 'tag']) {
+    await p.evaluate(() => go('planung'));
+    await p.evaluate(x => goTab(x), t); await p.waitForTimeout(250);
+    check(`Planung/${t} nutzt die volle Breite`, await weit());
+  }
+
+  for (const v of ['abgleich', 'pensen', 'einsatzplan', 'masterschichten']) {
+    await p.evaluate(x => go(x), v); await p.waitForTimeout(250);
+    check(`${v} nutzt die volle Breite`, await weit());
+  }
+
+  // Und die Gegenrichtung: Wo Formulare stehen, bleibt die Lesebreite.
+  // Ein 2500 px breites Formular ist nicht besser, sondern unlesbar.
+  for (const v of ['uebersicht', 'betrieb', 'kunden', 'mitarbeiter']) {
+    await p.evaluate(x => go(x), v); await p.waitForTimeout(250);
+    check(`KRITISCH: ${v} behaelt die Lesebreite`, (await weit()) === false);
+  }
+
+  // Gemessen statt geglaubt, und im Zustand, in dem es zaehlt: ausgeblendete
+  // Leiste, 1600 px Fenster. Die Einsatzliste nutzt sie ganz, die Kundenseite
+  // bleibt beim Deckel von 1440 px. Der Unterschied ist der ganze Punkt.
+  await p.evaluate(() => huelleSetzen('aus')); await p.waitForTimeout(250);
+  await p.evaluate(() => go('planung'));
+  await p.evaluate(() => goTab('einsaetze')); await p.waitForTimeout(250);
+  const bEins = (await mass(p, '.content')).w;
+  await p.evaluate(() => go('kunden')); await p.waitForTimeout(250);
+  const bKund = (await mass(p, '.content')).w;
+  check('KRITISCH: die Einsatzliste nutzt die ganze Breite', bEins === 1600);
+  check('KRITISCH: die Kundenseite bleibt bei der Lesebreite', bKund === 1440);
+
+  await p.close();
+}
+
 await browser.close();
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }

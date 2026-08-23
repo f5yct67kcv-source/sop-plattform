@@ -3542,6 +3542,7 @@ function enter() {
   $('gate').style.display = 'none';
   $('shell').classList.add('on');
   huelleSetzen(huelleLesen(), false);
+  navHoverEinrichten();
   $('uName').textContent = me.name;
   // Statt immer "Administration" die tatsaechlichen Rollen. Wer als Planung
   // angemeldet ist, soll das sehen -- sonst wundert er sich, warum Knoepfe
@@ -4131,6 +4132,20 @@ function themaUm() {
   themaSetzen(document.documentElement.getAttribute('data-thema') === 'dunkel' ? 'hell' : 'dunkel');
 }
 
+// Welche Ansichten die volle Breite wollen -- EINE Liste statt verstreuter
+// Bedingungen (ENT-086, OP-87). Mehr Platz ist nicht ueberall besser: Eine
+// Liste gewinnt Spalten, ein Formular verliert Lesbarkeit, wenn Beschriftung
+// und Feld quer ueber den Bildschirm auseinanderfallen. Darum je Ansicht
+// entschieden und hier nachschlagbar, statt an drei Stellen im Code.
+//
+// Nicht dabei und mit Absicht: 'uebersicht' (Karten, die ohnehin ein Raster
+// bilden), 'betrieb' (nur Formulare) sowie 'kunden' und 'mitarbeiter' --
+// die tragen Liste UND Detailseite in derselben Ansicht. Sie brauchen erst
+// eine eigene Breitenbegrenzung fuer die Formulare, sonst wird die
+// Personalakte zum quer gezogenen Fragebogen. Siehe OP-87.
+const ANSICHT_WEIT   = ['planung', 'abgleich', 'pensen', 'einsatzplan', 'masterschichten'];
+const PLANUNG_WEIT   = ['uebersicht', 'einsaetze', 'objektplan', 'tag'];
+
 function weiteAnsicht(an) {
   const c = document.querySelector('.content');
   if (c) c.classList.toggle('weit', !!an);
@@ -4155,7 +4170,9 @@ function go(view) {
   // Umgekehrt der globale Sprechen-Knopf: die Übersicht hat den Diktat-Router
   // schon im Begrüssungs-Container, ein zweiter daneben wäre doppelt (ENT-038).
   $('btnSprechen').style.display = view === 'uebersicht' ? 'none' : '';
-  if (view !== 'planung') weiteAnsicht(false);
+  // Die Planung entscheidet gleich noch je Reiter nach; alle anderen
+  // Ansichten sind hier abschliessend geklaert.
+  if (view !== 'planung') { weiteAnsicht(ANSICHT_WEIT.includes(view)); }
   if (view === 'planung' && MOBIL() && pTab === 'uebersicht') goTab('einsaetze');
   if (view === 'mitarbeiter' && !mitarbeiter.length) loadMitarbeiter();
   if (view === 'betrieb') { ladeBetrieb(); zfLaden(); rvLaden(); }
@@ -4324,6 +4341,10 @@ function navFlyoutKlick(gruppenId) {
   const g = $(gruppenId);
   if (!g) { return false; }
   const warOffen = g.classList.contains('offen');
+  // Mit Maus hat das Ueberfahren schon geoeffnet. Ein Klick auf dasselbe
+  // Symbol soll dann in den Bereich fuehren, nicht das eben aufgegangene
+  // Menue wieder zuklappen -- das fuehlt sich an wie ein Fehlklick.
+  if (warOffen && navMausZeiger()) { return false; }
   navFlyoutZu();
   if (!warOffen) { g.classList.add('offen'); navFlyoutPlatzieren(g); }
   return true;
@@ -4353,6 +4374,37 @@ function navFlyoutPlatzieren(gruppe) {
   if (oben  + b.height > window.innerHeight - 8) { oben  = window.innerHeight - b.height - 8; }
   feld.style.left = Math.max(8, links) + 'px';
   feld.style.top  = Math.max(8, oben)  + 'px';
+}
+
+// Aufklappen beim Ueberfahren -- aber NUR mit einer echten Maus. Auf einem
+// Touchgeraet gibt es kein Ueberfahren; dort meldet der Browser Hover
+// bestenfalls beim ersten Tippen, und ein Menue, das sich beim Tippen
+// oeffnet und beim zweiten Tippen gleich wieder schliesst, ist unbedienbar.
+// Der Klickweg bleibt in jedem Fall bestehen.
+let flyoutZeit = null;
+function navMausZeiger() {
+  return window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+}
+
+function navHoverEinrichten() {
+  if (!navMausZeiger()) { return; }
+  document.querySelectorAll('.nav-gruppe').forEach(g => {
+    g.addEventListener('mouseenter', () => {
+      clearTimeout(flyoutZeit);
+      if (!huelleKompakt() || g.classList.contains('offen')) { return; }
+      navFlyoutZu();
+      g.classList.add('offen');
+      navFlyoutPlatzieren(g);
+    });
+    // Verzoegert schliessen: Zwischen Leiste und Feld liegen 6 px. Ohne die
+    // Wartezeit faellt das Menue zu, waehrend die Maus den Spalt quert --
+    // man kaeme nie hin. Das Feld ist ein Kind der Gruppe, das Wiedereintreten
+    // bricht den Zeitgeber also ab.
+    g.addEventListener('mouseleave', () => {
+      clearTimeout(flyoutZeit);
+      flyoutZeit = setTimeout(() => navFlyoutZu(), 220);
+    });
+  });
 }
 
 document.addEventListener('click', ev => {
@@ -6100,7 +6152,7 @@ function goTab(t) {
   $('pv-' + t).classList.add('on');
   $('ptab-' + t).classList.add('on');
   $('pgCrumb').textContent = TAB_CRUMB[t] || '';
-  weiteAnsicht(['uebersicht', 'objektplan'].includes(t));
+  weiteAnsicht(PLANUNG_WEIT.includes(t));
   if (t === 'uebersicht') renderMatrix();
   if (t === 'einsaetze') renderPlanung();
   if (t === 'objektplan') {
