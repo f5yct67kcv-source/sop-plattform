@@ -1093,10 +1093,42 @@ tbody tr.zu .i-schloss { color: var(--warn); }
 .rt-bild button { position: absolute; top: -8px; right: -8px; width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: var(--sh-2); }
 .rt-bild button:hover { color: var(--neg); }
 .begr-router .sprach { margin-top: 10px; }
-.begr-router .sprach .sp { flex: 1; }
+/* ── Die drei Knoepfe der Begruessung (ENT-101)
+   Skizze des Projektinhabers vom 2026-08-23, dazu wörtlich: "cta button alle
+   in selben eckigen design. sprechen blau, rest neutral je nach hell/dunkel".
+   Aus der Skizze: 140 x 40 px, links ausgerichtet, Reihenfolge Sprechen,
+   Erkennen, Bild.
+
+   Gleiche Form heisst hier eckig: Der Sprechen-Knopf war eine Pille (999 px),
+   die anderen zwei traten als Radius var(--r-sm) auf. Drei Knoepfe
+   nebeneinander in zwei Formen lesen sich wie zwei Gruppen, obwohl sie eine
+   sind. Farbe traegt die Unterscheidung, nicht die Form. */
+.begr-router .sprach { flex-wrap: wrap; }
+.begr-router .sprach .cta {
+  flex: none; width: 140px; height: 40px; min-height: 40px;
+  justify-content: center; gap: 8px; padding: 0 14px;
+  border-radius: var(--r-sm); font-size: 13px; font-weight: 600;
+}
+/* Sprechen blau. Die uebrigen bleiben neutral und holen ihre Farben aus den
+   Themenwerten -- damit stimmen sie in Hell UND Dunkel, ohne zweite Regel. */
+.begr-router .sprach .sprach-btn.cta {
+  background: var(--accent); border-color: var(--accent); color: #fff;
+}
+.begr-router .sprach .sprach-btn.cta:hover { background: var(--accent-hi); border-color: var(--accent-hi); }
+/* Waehrend der Aufnahme rot -- NACH der blauen Regel, sonst gewinnt bei
+   gleicher Eigenspezifitaet die spaetere und der laufende Zustand waere
+   nicht mehr zu sehen. */
+.begr-router .sprach .sprach-btn.cta.laeuft { background: var(--neg); border-color: var(--neg); color: #fff; }
+.begr-router .sprach .sprach-btn.cta.laeuft:hover { background: var(--neg-hi); border-color: var(--neg-hi); }
+/* Die Pegelanzeige steht hinter den Knoepfen und nimmt den Rest der Zeile --
+   dafuer brauchte es bisher einen eigenen Abstandhalter. */
+.begr-router .sprach .viz { flex: 1 1 60px; }
 @media (max-width: 620px) {
-  .begr-router .sprach { flex-wrap: wrap; }
-  .begr-router .sprach .sp { flex-basis: 100%; height: 0; }
+  /* Drei Knoepfe zu 140 px passen nicht in eine schmale Zeile. Sie teilen
+     sie sich dann, und die Hoehe steigt auf die 44 px, die ein Finger
+     zuverlaessig trifft. */
+  .begr-router .sprach .cta { width: auto; flex: 1 1 132px; height: auto; min-height: 44px; }
+  .begr-router .sprach .viz { flex-basis: 100%; }
 }
 
 /* ── Konfigurierbares Dashboard (ENT-031)
@@ -2167,19 +2199,18 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
                     </div>
                   </div>
                   <div class="sprach" id="rtSprach">
-                    <button class="sprach-btn" id="rtMik" onclick="sprachUm('rtText','rt')">
+                    <button class="sprach-btn cta" id="rtMik" onclick="sprachUm('rtText','rt')">
                       <span class="pkt"></span>
                       <svg class="i i-sm" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
                       <span class="lb">Sprechen</span>
                     </button>
-                    <div class="viz" id="rtViz"></div>
-                    <div class="sp"></div>
+                    <button class="btn btn-plain cta" id="rtBtn" onclick="rtErkennen()">Erkennen</button>
                     <input type="file" id="rtDatei" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none" onchange="rtDateiGewaehlt(this.files[0])">
-                    <button class="btn btn-plain btn-sm" onclick="$('rtDatei').click()" title="Bild auswählen">
+                    <button class="btn btn-plain cta" onclick="$('rtDatei').click()" title="Bild auswählen">
                       <svg class="i i-sm" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
                       <span class="lbl">Bild</span>
                     </button>
-                    <button class="btn btn-primary btn-sm" id="rtBtn" onclick="rtErkennen()">Erkennen</button>
+                    <div class="viz" id="rtViz"></div>
                   </div>
                   <div class="sprach-hint" id="rtSprachHint"></div>
                   <div class="msg-err" id="rtErr" style="display:none"></div>

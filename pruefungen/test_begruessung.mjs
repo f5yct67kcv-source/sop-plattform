@@ -238,6 +238,106 @@ await page.waitForTimeout(400);
 check('Ein gezogenes Bild erzeugt ebenfalls eine Vorschau', await page.isVisible('#rtBildVorschau'));
 await page.evaluate(() => rtBildEntfernen());
 
+// ══════════════════════════════ DIE DREI KNOEPFE (ENT-101)
+//
+// Skizze des Projektinhabers vom 2026-08-23 (1728 x 971 px), dazu woertlich:
+// "cta button alle in selben eckigen design. sprechen blau, rest neutral je
+// nach hell/dunkel". Aus der Skizze: 140 x 40 px, links, Reihenfolge
+// Sprechen, Erkennen, Bild.
+//
+// Gemessen am gerenderten Zustand: Eine Gestaltungsregel kann wirkungslos
+// bleiben, ohne dass etwas kaputtgeht.
+try {
+  await page.setViewportSize({ width: 1728, height: 971 });
+  await page.waitForTimeout(300);
+  const m = await page.evaluate(() => {
+    const g = s => { const e = document.querySelector(s), r = e.getBoundingClientRect(), c = getComputedStyle(e);
+      return { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height),
+               radius: c.borderRadius, bg: c.backgroundColor }; };
+    return { sprechen: g('#rtMik'), erkennen: g('#rtBtn'), bild: g('#rtSprach button[title="Bild auswählen"]'),
+             akzent: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim(),
+             flaeche: getComputedStyle(document.documentElement).getPropertyValue('--surface').trim() };
+  });
+  check('KRITISCH: alle drei Knöpfe sind 140 x 40 px',
+    [m.sprechen, m.erkennen, m.bild].every(k => k.w === 140 && k.h === 40));
+  check('KRITISCH: alle drei tragen dieselbe eckige Form',
+    m.sprechen.radius === m.erkennen.radius && m.erkennen.radius === m.bild.radius
+    && parseFloat(m.sprechen.radius) > 0 && parseFloat(m.sprechen.radius) < 20);
+  check('KRITISCH: die Reihenfolge ist Sprechen, Erkennen, Bild',
+    m.sprechen.x < m.erkennen.x && m.erkennen.x < m.bild.x);
+  check('Sie stehen auf einer Höhe',
+    m.sprechen.y === m.erkennen.y && m.erkennen.y === m.bild.y);
+  check('Und links, nicht am rechten Rand', m.sprechen.x < 400);
+  await page.screenshot({ path: `${OUT}/begr-knoepfe.png` });
+} catch (e) { bad.push('Knöpfe: ' + String(e).split('\n')[0].slice(0, 120)); }
+
+// Farbe traegt die Unterscheidung, nicht die Form -- in BEIDEN Themen. Ein
+// fester Farbwert saehe in einem der beiden falsch aus.
+for (const thema of ['hell', 'dunkel']) {
+  try {
+    await page.evaluate(t => themaSetzen(t), thema);
+    await page.waitForTimeout(200);
+    const f = await page.evaluate(() => {
+      const bg = s => getComputedStyle(document.querySelector(s)).backgroundColor;
+      const wurzel = getComputedStyle(document.documentElement);
+      const alsRgb = w => { const d = document.createElement('div'); d.style.color = w;
+        document.body.appendChild(d); const r = getComputedStyle(d).color; d.remove(); return r; };
+      return { sprechen: bg('#rtMik'), erkennen: bg('#rtBtn'),
+               bild: bg('#rtSprach button[title="Bild auswählen"]'),
+               akzent: alsRgb(wurzel.getPropertyValue('--accent').trim()),
+               flaeche: alsRgb(wurzel.getPropertyValue('--surface').trim()) };
+    });
+    check(`KRITISCH: ${thema} — Sprechen trägt die Akzentfarbe`, f.sprechen === f.akzent);
+    check(`KRITISCH: ${thema} — Erkennen und Bild sind neutral`,
+      f.erkennen === f.flaeche && f.bild === f.flaeche);
+    check(`${thema} — und heben sich vom Sprechen-Knopf ab`, f.erkennen !== f.sprechen);
+  } catch (e) { bad.push(`Farben ${thema}: ` + String(e).split('\n')[0].slice(0, 110)); }
+}
+// Nach dem Themenwechsel abwarten: Auch er laeuft ueber einen Uebergang, und
+// ein Wert mitten darin ist weder der alte noch der neue.
+await page.evaluate(() => themaSetzen('hell'));
+await page.waitForTimeout(400);
+
+// Der laufende Zustand muss sichtbar bleiben. Der Knopf ist jetzt von Haus
+// aus blau -- eine Regel in der falschen Reihenfolge wuerde das Rot der
+// Aufnahme still ueberschreiben.
+try {
+  // ABWARTEN, bevor gemessen wird: Der Knopf hat einen Farbuebergang von
+  // 0.13 s. Wer direkt nach dem Klassenwechsel liest, bekommt noch den ALTEN
+  // Wert und haelt eine wirksame Regel faelschlich fuer wirkungslos -- genau
+  // das ist hier zuerst passiert.
+  const vorher = await page.evaluate(() => getComputedStyle(document.querySelector('#rtMik')).backgroundColor);
+  await page.evaluate(() => document.querySelector('#rtMik').classList.add('laeuft'));
+  await page.waitForTimeout(300);
+  const laeuft = await page.evaluate(() => getComputedStyle(document.querySelector('#rtMik')).backgroundColor);
+  await page.evaluate(() => document.querySelector('#rtMik').classList.remove('laeuft'));
+  await page.waitForTimeout(400);
+  check('KRITISCH: während der Aufnahme wechselt der Sprechen-Knopf die Farbe', laeuft !== vorher);
+  check('KRITISCH: und danach wieder zurück auf blau',
+    (await page.evaluate(() => getComputedStyle(document.querySelector('#rtMik')).backgroundColor)) === vorher);
+} catch (e) { bad.push('Aufnahmezustand: ' + String(e).split('\n')[0].slice(0, 110)); }
+
+// Auf dem Handy passen drei Knoepfe zu 140 px nicht in eine Zeile. Sie
+// duerfen dann umbrechen -- aber nicht unter die Trefferflaeche fallen, die
+// ein Finger zuverlaessig erwischt.
+try {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForTimeout(300);
+  const m = await page.evaluate(() => {
+    const g = s => { const r = document.querySelector(s).getBoundingClientRect();
+      return { x: Math.round(r.x), w: Math.round(r.width), h: Math.round(r.height) }; };
+    return { sprechen: g('#rtMik'), erkennen: g('#rtBtn'), bild: g('#rtSprach button[title="Bild auswählen"]'),
+             quer: document.documentElement.scrollWidth > window.innerWidth + 1 };
+  });
+  check('KRITISCH: auf dem Handy mindestens 44 px hoch',
+    [m.sprechen, m.erkennen, m.bild].every(k => k.h >= 44));
+  check('KRITISCH: kein Querscrollen auf dem Handy', m.quer === false);
+  check('Sie füllen die schmale Zeile aus, statt bei 140 px zu bleiben',
+    m.sprechen.w !== 140 || m.erkennen.w !== 140);
+  await page.setViewportSize({ width: 1500, height: 1100 });
+  await page.waitForTimeout(250);
+} catch (e) { bad.push('Handy: ' + String(e).split('\n')[0].slice(0, 120)); }
+
 // ══════════ DER CONTAINER GEHÖRT ZUM KONFIGURIERBAREN DASHBOARD (ENT-031)
 await page.click('#btnDashBearbeiten');
 await page.waitForTimeout(200);
