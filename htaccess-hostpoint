@@ -20,7 +20,7 @@
 # Quelltext im Klartext aus. Dann waeren die Zugangsdaten oeffentlich.
 # Diese Dateien werden nur von den Endpunkten unter /api eingebunden und nie
 # direkt aufgerufen; ein direkter Abruf ist also immer verkehrt.
-<FilesMatch "^(db|ai|planung|kunden|mitarbeiter|layout|anmeldung|zweifaktor|rechte|logbuch|setup)\.php$">
+<FilesMatch "^(db|ai|planung|kunden|mitarbeiter|layout|anmeldung|zweifaktor|rechte|logbuch|ereignisse|setup)\.php$">
   <IfModule mod_authz_core.c>
     Require all denied
   </IfModule>

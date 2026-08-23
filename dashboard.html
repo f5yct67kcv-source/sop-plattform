@@ -495,6 +495,20 @@ th.sortbar.aktiv .pf { opacity: 1; color: var(--accent); }
 .rank .h { font-size: 14px; font-weight: 680; font-variant-numeric: tabular-nums; }
 .rank-track { height: 3px; background: var(--line-soft); border-radius: 2px; margin-top: 5px; overflow: hidden; }
 .rank-track i { display: block; height: 100%; background: var(--accent); border-radius: 2px; }
+/* Aufgeklappte Ereigniszeile (ENT-089). Sie sitzt unter der Zeile statt in
+   einem Fenster: Wer drei Ereignisse pruefen will, soll sie nebeneinander
+   sehen, ohne dreimal ein Fenster zu oeffnen und zu schliessen. */
+.erg-detail { background: var(--hover); border-bottom: 1px solid var(--line); }
+.erg-in { padding: 14px 18px 16px; }
+.erg-in .dl { grid-template-columns: 118px 1fr; margin-bottom: 12px; }
+.erg-in dt { font-size: 11px; text-transform: uppercase; letter-spacing: .4px; color: var(--ink-3); }
+.erg-in dd { margin: 0; font-size: 13px; }
+.erg-wege { display: flex; flex-wrap: wrap; gap: 8px; }
+/* Auf dem Handy volle Trefferflaeche statt drei Knoepfe nebeneinander,
+   die je 60 px breit sind (Gestaltungsregel: mindestens 44 px). */
+@media (max-width: 640px) {
+  .erg-wege .btn { min-height: 44px; }
+}
 .rank-erledigt { display: inline-flex; align-items: center; justify-content: center; width: 27px; height: 27px; flex: none;
   border-radius: 50%; border: none; background: none; color: var(--ink-3); cursor: pointer; padding: 0; }
 .rank-erledigt:hover { background: var(--pos-soft); color: var(--pos); }
@@ -2066,14 +2080,14 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
             </div>
           </div>
 
-          <div class="dash-item dw-voll" data-widget="sperrfeed">
+          <div class="dash-item dw-voll" data-widget="ereignisse">
             <div class="card">
               <div class="card-hd">
-                <h2>Neue Sperrtage</h2>
+                <h2>Ereignisse</h2>
                 <div class="sp"></div>
-                <span class="note">kommende Tage</span>
+                <span class="note" id="ereignisNote"></span>
               </div>
-              <div class="card-bd flush"><div id="sperrFeed"></div></div>
+              <div class="card-bd flush"><div id="ereignisFeed"></div></div>
             </div>
           </div>
 
@@ -3703,7 +3717,7 @@ const DASH_WIDGETS = [
   { id: 'angemeldet', titel: 'Angemeldete Benutzer' },
   { id: 'letzte', titel: 'Letzte Rapporte' },
   { id: 'proma', titel: 'Stunden je Mitarbeitende' },
-  { id: 'sperrfeed', titel: 'Neue Sperrtage' },
+  { id: 'ereignisse', titel: 'Ereignisse' },
 ];
 
 const ORD_BEREICHE = {
@@ -3718,6 +3732,13 @@ const ORD_BEREICHE = {
     laden: () => {
       let g = null;
       try { g = JSON.parse(localStorage.getItem('rv3_dash_layout') || 'null'); } catch (e) {}
+      // Aus "sperrfeed" wurde "ereignisse" (ENT-089). Ohne diese Umschrift
+      // faende die gespeicherte Anordnung den Container nicht mehr -- die
+      // Kachel waere fuer jeden verschwunden, der seine Uebersicht einmal
+      // angepasst hat, und niemand haette einen Anhaltspunkt warum.
+      if (Array.isArray(g)) {
+        g = g.map(x => (x && x.id === 'sperrfeed') ? { ...x, id: 'ereignisse' } : x);
+      }
       return Promise.resolve(g);
     },
     speichern: layout => {
@@ -4459,7 +4480,7 @@ function loadStats() {
     if (status === 401) return doLogout();
     if (!ok || data.status !== 'ok') { toast(data.message || 'Kennzahlen konnten nicht geladen werden.'); return; }
     stats = data;
-    renderKpi(); renderChart(); renderAngemeldet(); renderLetzte(); renderProMa(); renderSperrFeed();
+    renderKpi(); renderChart(); renderAngemeldet(); renderLetzte(); renderProMa(); renderEreignisse();
   });
 }
 
@@ -4636,43 +4657,137 @@ function renderLetzte() {
 // Neu gesetzte Sperrtage als Ereignisliste (ENT-030). Nur die Fakten, die
 // die Planung wirklich mitgeteilt bekommt -- keine Vermutung ueber Grund
 // oder Dringlichkeit, das steht hoechstens in der freiwilligen Notiz.
-function renderSperrFeed() {
-  const f = stats.sperr_ereignisse || [];
+// Ereignis-Feed der Uebersicht (ENT-089). Loest den Sperrtage-Feed ab.
+//
+// Eine Zeile laesst sich aufklappen; darin stehen die Einzelheiten und die
+// Wege weiter -- zur Person, zum Tag, zur Schicht. Bewusst aufklappen statt
+// eines Fensters: Wer drei Ereignisse pruefen will, soll sie nebeneinander
+// sehen koennen, ohne dreimal ein Fenster zu oeffnen und zu schliessen.
+const EREIGNIS_ART = {
+  rapport:  { punkt: 'ok',   wort: 'hat einen Rapport gesendet' },
+  sperrtag: { punkt: 'warn', wort: 'hat sich einen Tag gesperrt' },
+  zusage:   { punkt: 'ok',   wort: 'hat eine Schicht beantwortet' },
+  abgleich: { punkt: 'warn', wort: 'wartet auf den Abgleich' },
+};
+
+function renderEreignisse() {
+  const f    = stats.ereignisse || [];
+  const note = $('ereignisNote');
+  const fehlt = stats.ereignisse_unvollstaendig || [];
+
+  if (note) {
+    // Zwei verschiedene Aussagen, nie dieselbe Zeile: Eine gekuerzte Liste
+    // ist etwas anderes als eine vollstaendige, und eine Art, die sich nicht
+    // abfragen liess, ist etwas anderes als "nichts passiert".
+    note.textContent = fehlt.length
+      ? 'unvollständig — ' + fehlt.join(', ') + ' nicht abfragbar'
+      : (stats.ereignisse_gekuerzt ? f.length + ' von ' + (stats.ereignisse_gesamt || f.length) : '');
+    note.style.color = fehlt.length ? 'var(--warn)' : '';
+  }
+
   if (!f.length) {
-    $('sperrFeed').innerHTML = EMPTY('Keine neuen Sperrtage', 'Sobald sich jemand einen Tag sperrt, erscheint es hier.');
+    $('ereignisFeed').innerHTML = fehlt.length
+      ? EMPTY('Nicht abfragbar', 'Für ' + fehlt.join(', ') + ' fehlt die Einrichtung. Das ist nicht dasselbe wie "nichts passiert" — führe die Einrichtung aus.')
+      : EMPTY('Nichts Neues', 'Hier erscheinen eingegangene Rapporte, Sperrtage, Rückmeldungen und offene Abgleiche.');
     return;
   }
-  $('sperrFeed').innerHTML = f.map(x => `
-    <div class="rank click" onclick="sperrEreignisAn('${esc(x.datum).slice(0, 10)}')">
-      <span class="dot warn"></span>
+
+  $('ereignisFeed').innerHTML = f.map((x, i) => {
+    const art  = EREIGNIS_ART[x.typ] || { punkt: 'warn', wort: '' };
+    const wer  = x.person ? (fullName(x.person) || x.person.name) : (x.kunde || '—');
+    return `
+    <div class="rank click erg" onclick="ereignisAufklappen(${i}, this)">
+      <span class="dot ${art.punkt}"></span>
       <div class="who">
-        <b>${esc(fullName(x) || x.name)}</b>
-        <span>hat sich ${esc(dmy(x.datum))} gesperrt${x.bemerkung ? ' — ' + esc(x.bemerkung) : ''}</span>
+        <b>${esc(wer)}</b>
+        <span>${esc(ereignisZeile(x))}</span>
       </div>
-      <div style="text-align:right;font-size:12px;color:var(--ink-3);white-space:nowrap">${esc(relZeit(x.erfasst_am))}</div>
-      <button class="rank-erledigt" title="Als erledigt markieren" aria-label="Als erledigt markieren" onclick="event.stopPropagation(); sperrErledigt(${Number(x.id)}, this)">
+      <div style="text-align:right;font-size:12px;color:var(--ink-3);white-space:nowrap">${esc(relZeit(x.zeit))}</div>
+      ${ereignisAbhakbar(x.typ) ? `<button class="rank-erledigt" title="Als erledigt markieren" aria-label="Als erledigt markieren" onclick="event.stopPropagation(); ereignisErledigt(${i})">
         <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-      </button>
-    </div>`).join('');
+      </button>` : '<span style="width:27px;flex:none"></span>'}
+    </div>
+    <div class="erg-detail" id="ergDetail${i}" style="display:none"></div>`;
+  }).join('');
+}
+
+// Der offene Abgleich laesst sich nicht abhaken -- er verschwindet, wenn
+// abgeglichen wurde, und nur dann. Dieselbe Liste wie im Endpunkt, hier
+// bloss zum Ausblenden des Knopfes.
+function ereignisAbhakbar(typ) {
+  return typ === 'rapport' || typ === 'sperrtag' || typ === 'zusage';
+}
+
+function ereignisZeile(x) {
+  if (x.typ === 'rapport')  { return `hat einen Rapport gesendet — ${x.kunde || '?'}, ${dmy(x.datum)}`; }
+  if (x.typ === 'sperrtag') { return `hat sich ${dmy(x.datum)} gesperrt${x.bemerkung ? ' — ' + x.bemerkung : ''}`; }
+  if (x.typ === 'zusage')   { return `${x.zusage === 'abgesagt' ? 'hat abgesagt' : 'hat zugesagt'} — ${x.kunde || x.einsatz_titel || '?'}, ${dmy(x.datum)}`; }
+  if (x.typ === 'abgleich') { return `Schicht vom ${dmy(x.datum)} ist noch nicht abgeglichen — ${x.kunde || x.einsatz_titel || '?'}`; }
+  return x.titel || '';
+}
+
+function ereignisAufklappen(i, zeile) {
+  const box = $('ergDetail' + i);
+  if (!box) { return; }
+  if (box.style.display !== 'none') { box.style.display = 'none'; return; }
+  const x = (stats.ereignisse || [])[i];
+  if (!x) { return; }
+  const wege = [];
+  if (x.person && x.person.name) {
+    wege.push(`<button class="btn btn-plain btn-sm" onclick="event.stopPropagation(); ereignisZurPerson('${esc(x.person.name)}')">Zur Person</button>`);
+  }
+  if (x.typ === 'rapport') {
+    wege.push(`<button class="btn btn-plain btn-sm" onclick="event.stopPropagation(); go('kunden'); kuGoTab('rapporte')">Zu den Rapporten</button>`);
+  }
+  if (x.datum) {
+    wege.push(`<button class="btn btn-plain btn-sm" onclick="event.stopPropagation(); ereignisZumTag('${esc(String(x.datum).slice(0, 10))}')">Zum Tagesplan</button>`);
+  }
+  if (x.typ === 'abgleich') {
+    wege.push(`<button class="btn btn-plain btn-sm" onclick="event.stopPropagation(); go('abgleich')">Zum Abgleich</button>`);
+  }
+  const zeilen = [];
+  if (x.datum)      { zeilen.push(['Datum', dmy(x.datum)]); }
+  if (x.von)        { zeilen.push(['Zeit', `${x.von} – ${x.bis}`]); }
+  if (x.kunde)      { zeilen.push(['Kunde', x.kunde]); }
+  if (x.ort)        { zeilen.push(['Ort', x.ort]); }
+  if (x.einsatzart) { zeilen.push(['Einsatzart', x.einsatzart]); }
+  if (x.netto_h)    { zeilen.push(['Netto', x.netto_h + ' h']); }
+  if (x.bemerkung)  { zeilen.push(['Bemerkung', x.bemerkung]); }
+  box.innerHTML = `<div class="erg-in">
+      <div class="dl">${zeilen.map(z => `<dt>${esc(z[0])}</dt><dd>${esc(String(z[1]))}</dd>`).join('')}</div>
+      <div class="erg-wege">${wege.join('')}</div>
+    </div>`;
+  box.style.display = '';
+}
+
+function ereignisZurPerson(name) {
+  go('mitarbeiter');
+  if (typeof mdOeffnen === 'function') { mdOeffnen(name); }
+  else if (typeof maDetail === 'function') { maDetail(name); }
 }
 
 // Von der Übersicht direkt zum Tagesplan des betroffenen Tages.
-function sperrEreignisAn(datum) {
+function ereignisZumTag(datum) {
   pTab = 'tag';
   $('tgD').value = datum;
   go('planung');
 }
 
-// Nimmt einen Eintrag aus dem Ereignis-Feed, ohne die Sperre selbst zu
-// loeschen -- sie bleibt in der Planung sichtbar (ENT-033). Optimistisch:
+// Nimmt einen Eintrag aus dem Feed, ohne den Datensatz selbst zu aendern --
+// Rapport, Sperre und Zusage bleiben gueltig (ENT-033/ENT-089). Optimistisch:
 // die Zeile verschwindet sofort, ein Fehlschlag holt sie beim naechsten
 // loadStats() zurueck.
-function sperrErledigt(id, knopf) {
-  const zeile = knopf.closest('.rank');
-  if (zeile) zeile.remove();
-  stats.sperr_ereignisse = (stats.sperr_ereignisse || []).filter(x => Number(x.id) !== id);
-  if (!stats.sperr_ereignisse.length) renderSperrFeed();
-  api('sperr_erledigt.php', { method: 'POST', body: { id } }).catch(() => {});
+function ereignisErledigt(i) {
+  const x = (stats.ereignisse || [])[i];
+  if (!x) { return; }
+  stats.ereignisse = (stats.ereignisse || []).filter((y, k) => k !== i);
+  // NEU ZEICHNEN, nicht bloss die Zeile entfernen. Die Zeilen verweisen ueber
+  // ihren Platz in der Liste auf das Ereignis; faellt einer weg, zeigen alle
+  // dahinter auf das jeweils naechste. Ein Haken haette dann das falsche
+  // Ereignis abgehakt -- gefunden hat es die Pruefung, nicht das Auge.
+  renderEreignisse();
+  api('ereignis_erledigt.php', { method: 'POST',
+    body: { typ: x.typ, id: x.id, mitarbeiter_id: x.mitarbeiter_id || 0 } }).catch(() => {});
 }
 
 function renderProMa() {
