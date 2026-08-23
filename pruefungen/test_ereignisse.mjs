@@ -1,4 +1,4 @@
-// Ereignis-Feed der Übersicht (ENT-089).
+// Ereignis-Feed der Übersicht (ENT-090).
 //
 // Der teuerste Fehler wäre hier nicht ein fehlendes Ereignis, sondern eines,
 // das sich abhaken lässt, obwohl die Arbeit noch aussteht -- oder eine leere
@@ -300,7 +300,7 @@ try {
 // ══════════════════════════════ UEBERNOMMEN AUS test_sperrfeed.mjs
 //
 // Diese Suite ersetzt test_sperrfeed.mjs -- die Kachel "Neue Sperrtage" ist
-// im Ereignis-Feed aufgegangen (ENT-089). Die folgenden Pruefungen stammen
+// im Ereignis-Feed aufgegangen (ENT-090). Die folgenden Pruefungen stammen
 // von dort; ihre Absicht gilt unveraendert weiter, nur die Kachel heisst
 // anders. Sie hier zu wiederholen ist kein Zufall, sondern der Grund, warum
 // die alte Suite geloescht werden durfte.
