@@ -238,7 +238,7 @@ await page.waitForTimeout(400);
 check('Ein gezogenes Bild erzeugt ebenfalls eine Vorschau', await page.isVisible('#rtBildVorschau'));
 await page.evaluate(() => rtBildEntfernen());
 
-// ══════════════════════════════ DIE DREI KNOEPFE (ENT-101)
+// ══════════════════════════════ DIE DREI KNOEPFE (ENT-100)
 //
 // Skizze des Projektinhabers vom 2026-08-23 (1728 x 971 px), dazu woertlich:
 // "cta button alle in selben eckigen design. sprechen blau, rest neutral je
