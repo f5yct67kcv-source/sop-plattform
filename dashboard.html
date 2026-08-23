@@ -277,6 +277,20 @@ a.nav-item { text-decoration: none; }
 .topbar h1 { font-size: 16px; font-weight: 680; letter-spacing: -.2px; }
 .topbar .crumb { font-size: 12px; color: var(--ink-3); margin-top: 1px; }
 .topbar .sp { flex: 1; }
+/* Unterkategorien des offenen Bereichs, in der Werkzeugleiste neben dem
+   Titel (ENT-086). Nur wenn die Seitenleiste kompakt ist -- steht sie voll
+   da, zeigt sie die Kinder ohnehin, und eine zweite Liste daneben waere
+   Doppelung ohne Gewinn. Die Knoepfe werden AUS den Originalen erzeugt und
+   geben den Klick an sie weiter; was ein Recht ausblendet, taucht hier
+   darum gar nicht erst auf. */
+.top-sub { display: none; align-items: center; gap: 2px; margin-left: 22px; }
+.top-sub button {
+  border: none; background: transparent; color: var(--ink-2); font: inherit;
+  font-size: 13px; font-weight: 560; padding: 7px 11px; border-radius: var(--r-sm);
+  cursor: pointer; white-space: nowrap; transition: background .13s, color .13s;
+}
+.top-sub button:hover { background: var(--hover); color: var(--ink); }
+.top-sub button.on { color: var(--accent); background: var(--accent-soft); }
 .btn-burger { display: none; }
 
 .content { padding: 26px; max-width: 1440px; width: 100%; }
@@ -1394,6 +1408,20 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
   }
   .shell.aus .nav-gruppe { flex: none; }
   .shell.aus .nav-item { width: auto; min-width: 40px; min-height: 38px; margin-bottom: 0; padding: 8px 10px; }
+  /* Symbole allein sagen nicht, was sie sind. In der Kopfleiste ist Platz
+     fuer die Beschriftung darunter -- Ueberschrift oben, Wert darunter, wie
+     ueberall sonst auch. Nur die Hauptnavigation bekommt sie; die Knoepfe
+     im Fussteil (Einrichtung, Zur App, Abmelden) bleiben Symbole, sonst
+     wird die Zeile auf schmalen Bildschirmen zu lang. */
+  .shell.aus .side-nav .nav-item {
+    flex-direction: column; justify-content: center; gap: 2px;
+    min-width: 62px; padding: 5px 8px;
+  }
+  .shell.aus .side-nav .nav-item .lbl {
+    display: block; font-size: 9.5px; font-weight: 650;
+    letter-spacing: .3px; line-height: 1.1; white-space: nowrap;
+  }
+  .shell.aus .side-nav .nav-item svg.i { width: 19px; height: 19px; }
   .shell.aus .side-foot {
     display: flex; flex-direction: row; align-items: center; gap: 2px;
     flex: none; padding: 0; border-top: none;
@@ -1881,6 +1909,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
         <h1 id="pgTitle">Übersicht</h1>
         <div class="crumb" id="pgCrumb">Laufender Monat</div>
       </div>
+      <nav class="top-sub" id="topSub"></nav>
       <div class="sp"></div>
       <!-- Prominent statt ein Standard-Knopf: die Spracherkennung ist ein
            Hauptmerkmal des Werkzeugs, kein Nebenwerkzeug (ENT-038). Auf der
@@ -4157,6 +4186,12 @@ function go(view) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('on'));
   $('view-' + view).classList.add('on');
   const nav = $('nav-' + view); if (nav) nav.classList.add('on');
+  // Auch die Unterkategorie markieren. Bis hierher tat das nur kuGoTab fuer
+  // die Kunden -- "Mitarbeitende", "Betrieb" und "Pensen" blieben unmarkiert,
+  // man sah also nicht, wo man steht. Die Werkzeugleiste braucht es jetzt.
+  document.querySelectorAll('.nav-kind').forEach(b => b.classList.remove('on'));
+  const kind = document.querySelector('.nav-kind[id$="-' + view + '"]');
+  if (kind) { kind.classList.add('on'); }
   $('pgTitle').textContent = TITLES[view][0];
   $('pgCrumb').textContent = TITLES[view][1];
   // Ueber toggleSide schliessen, nicht die Klasse von Hand entfernen: seit
@@ -4173,6 +4208,7 @@ function go(view) {
   // Die Planung entscheidet gleich noch je Reiter nach; alle anderen
   // Ansichten sind hier abschliessend geklaert.
   if (view !== 'planung') { weiteAnsicht(ANSICHT_WEIT.includes(view)); }
+  topSubZeichnen();
   if (view === 'planung' && MOBIL() && pTab === 'uebersicht') goTab('einsaetze');
   if (view === 'mitarbeiter' && !mitarbeiter.length) loadMitarbeiter();
   if (view === 'betrieb') { ladeBetrieb(); zfLaden(); rvLaden(); }
@@ -4312,6 +4348,7 @@ function huelleSetzen(zustand, merken = true) {
   const b = $('btnSchmal');
   if (b) { b.title = HUELLE_TITEL[zustand]; b.setAttribute('aria-label', HUELLE_TITEL[zustand]); }
   navFlyoutZu(true);
+  topSubZeichnen();
 }
 
 function seiteUm() {
@@ -4386,6 +4423,34 @@ function navMausZeiger() {
   return window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 }
 
+// Unterkategorien des offenen Bereichs in der Werkzeugleiste (ENT-086).
+//
+// Die Knoepfe werden aus den Originalen der Seitenleiste ERZEUGT und geben
+// den Klick an sie weiter. Damit gibt es weiterhin nur eine Quelle dafuer,
+// welche Eintraege es gibt und welche ein Recht ausblendet -- eine von Hand
+// gepflegte zweite Liste wuerde beim naechsten neuen Eintrag vergessen.
+function topSubZeichnen() {
+  const leiste = $('topSub');
+  if (!leiste) { return; }
+  leiste.innerHTML = '';
+  // Steht die Seitenleiste voll da, zeigt sie die Kinder selbst.
+  if (!huelleKompakt()) { leiste.style.display = 'none'; return; }
+  const aktiv = document.querySelector('.nav-kind.on');
+  const gruppe = aktiv ? aktiv.closest('.nav-gruppe') : null;
+  if (!gruppe || gruppe.style.display === 'none') { leiste.style.display = 'none'; return; }
+  const kinder = [...gruppe.querySelectorAll('.nav-kind')]
+    .filter(b => getComputedStyle(b).display !== 'none');
+  if (kinder.length < 2) { leiste.style.display = 'none'; return; }
+  kinder.forEach(orig => {
+    const b = document.createElement('button');
+    b.textContent = orig.textContent;
+    b.className = orig.classList.contains('on') ? 'on' : '';
+    b.onclick = () => orig.click();
+    leiste.appendChild(b);
+  });
+  leiste.style.display = 'flex';
+}
+
 function navHoverEinrichten() {
   if (!navMausZeiger()) { return; }
   document.querySelectorAll('.nav-gruppe').forEach(g => {
@@ -4417,7 +4482,7 @@ document.addEventListener('keydown', ev => {
 });
 // Wird das Fenster schmaler, greift der Rueckfall auf die 64-px-Leiste.
 // Ein Feld, das noch an der alten Stelle steht, zeigt dann ins Leere.
-window.addEventListener('resize', () => navFlyoutZu(true));
+window.addEventListener('resize', () => { navFlyoutZu(true); topSubZeichnen(); });
 
 // ══════════════════════════════════════════ LADEN
 function reloadAll() {
@@ -6200,6 +6265,7 @@ function kuGoTab(t) {
   // Die Detailseite ist kein eigener Seitenleisten-Ziel, sondern ein
   // Drilldown aus Adressen -- "Adressen" bleibt entsprechend markiert.
   ($('nav-kunden-' + t) || $('nav-kunden-uebersicht')).classList.add('on');
+  topSubZeichnen();
   $('pgCrumb').textContent = t === 'objekte' ? 'Daueraufträge und ihre Masterschichten'
     : t === 'rapporte' ? 'Alle erfassten Einsätze'
     : t === 'detail' ? 'Kundendetails' : 'Stammdaten';
