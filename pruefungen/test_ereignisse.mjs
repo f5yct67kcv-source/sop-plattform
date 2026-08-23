@@ -103,6 +103,72 @@ try {
   await p.close();
 } catch (e) { bad.push('Vier Arten: ' + String(e).split('\n')[0].slice(0, 120)); }
 
+// ══════════════════════════════ SPALTEN MIT UEBERSCHRIFTEN
+//
+// Vom Projektinhaber am 2026-08-23: "die ereigniss spalte noch mit
+// überchriften Absender, Beschreibung und Datum ganz rechts."
+//
+// Eine Ueberschrift, die nicht ueber ihrer Spalte steht, ist schlimmer als
+// keine -- sie behauptet eine Zuordnung, die nicht stimmt. Darum wird die
+// Ausrichtung GEMESSEN, nicht im Quelltext nachgelesen.
+try {
+  const p = await seite();
+  const kopf = (await p.textContent('#ereignisFeed .erg-kopf')).replace(/\s+/g, ' ').trim();
+  check('KRITISCH: die drei Ueberschriften stehen da', kopf === 'Absender Beschreibung Datum');
+
+  const m = await p.evaluate(() => {
+    const q = s => document.querySelector(s).getBoundingClientRect();
+    const zeile = document.querySelector('#ereignisFeed .rank.erg');
+    const inZeile = s => zeile.querySelector(s).getBoundingClientRect();
+    return { kAbs: q('.erg-kopf .k-abs'), kTxt: q('.erg-kopf .k-txt'), kDat: q('.erg-kopf .k-datum'),
+             abs: inZeile('.erg-abs'), txt: inZeile('.erg-txt'), dat: inZeile('.erg-datum'),
+             kopfUnten: q('#ereignisFeed .erg-kopf').bottom, zeileOben: zeile.getBoundingClientRect().top,
+             feld: q('#ereignisFeed').right };
+  });
+  check('KRITISCH: "Absender" steht genau über dem Namen', Math.abs(m.kAbs.left - m.abs.left) < 1);
+  check('KRITISCH: "Beschreibung" steht genau über der Beschreibung', Math.abs(m.kTxt.left - m.txt.left) < 1);
+  check('KRITISCH: "Datum" steht genau über dem Datum', Math.abs(m.kDat.right - m.dat.right) < 1);
+  check('KRITISCH: das Datum steht ganz rechts', m.dat.left > m.txt.right && m.dat.right < m.feld);
+  check('Die Beschreibung steht rechts vom Absender, nicht darunter',
+    m.txt.left > m.abs.right - 1 && Math.abs(m.txt.top - m.abs.top) < 3);
+  check('Die Kopfzeile steht ÜBER der ersten Zeile', m.kopfUnten <= m.zeileOben + 1);
+
+  // Der Feed zeigt zwei Zeitangaben: "vor 18 Min." liest sich schnell, das
+  // Datum sagt, welcher Tag gemeint ist. Ohne das Datum stuende unter der
+  // Ueberschrift "Datum" gar keines.
+  const dat = (await p.textContent('#ereignisFeed .rank.erg .erg-datum')).replace(/\s+/g, ' ');
+  check('KRITISCH: unter "Datum" steht auch wirklich ein Datum', /\d{2}\.\d{2}\.\d{4}/.test(dat));
+  check('Und daneben die gelesene Zeitspanne', /vor \d+ Min\./.test(dat));
+  await p.screenshot({ path: `${OUT}/ereignisse-spalten.png` });
+  await p.close();
+
+  // Ohne Ereignisse keine Kopfzeile: Ueberschriften ueber einer leeren Liste
+  // versprechen eine Tabelle, die es nicht gibt.
+  const q = await seite({ ereignisse: [], ereignisse_gesamt: 0 });
+  check('Über einem Leerzustand steht keine Kopfzeile',
+    (await q.$$('#ereignisFeed .erg-kopf')).length === 0);
+  await q.close();
+} catch (e) { bad.push('Spalten: ' + String(e).split('\n')[0].slice(0, 120)); }
+
+// ══════════════════════════════ SCHMAL: KEINE SPALTEN, KEINE UEBERSCHRIFTEN
+try {
+  const p = await seite();
+  await p.setViewportSize({ width: 390, height: 844 });
+  await p.waitForTimeout(250);
+  const m = await p.evaluate(() => {
+    const zeile = document.querySelector('#ereignisFeed .rank.erg');
+    const abs = zeile.querySelector('.erg-abs').getBoundingClientRect();
+    const txt = zeile.querySelector('.erg-txt').getBoundingClientRect();
+    const kopf = document.querySelector('#ereignisFeed .erg-kopf');
+    return { kopfWeg: getComputedStyle(kopf).display === 'none', absU: abs.bottom, txtO: txt.top,
+             quer: document.documentElement.scrollWidth > window.innerWidth + 1 };
+  });
+  check('KRITISCH: auf dem Handy verschwinden die Überschriften', m.kopfWeg);
+  check('KRITISCH: und die Beschreibung rückt UNTER den Absender', m.txtO >= m.absU - 1);
+  check('KRITISCH: kein Querscrollen auf dem Handy', m.quer === false);
+  await p.close();
+} catch (e) { bad.push('Schmal: ' + String(e).split('\n')[0].slice(0, 120)); }
+
 // ══════════════════════════════ AUFKLAPPEN UND WEITERGEHEN
 try {
   const p = await seite();
