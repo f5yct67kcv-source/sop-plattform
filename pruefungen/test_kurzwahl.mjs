@@ -1,4 +1,4 @@
-// Schnellzugriff auf der Uebersicht (ENT-094).
+// Schnellzugriff auf der Uebersicht (ENT-096).
 //
 // Nachgebaut nach der "Kurzwahl" von AbaNinja, mit eigenen Wegen. Der
 // teuerste Fehler waere hier nicht ein fehlender Eintrag, sondern einer, der
