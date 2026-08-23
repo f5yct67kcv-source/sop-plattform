@@ -109,8 +109,13 @@ check('Delta Rapporte positiv (+21%)', /21/.test(d0) && (await page.getAttribute
 // ── 4. Diagramm
 check('8 Balken gerendert', (await page.$$('#chart .bar')).length === 8);
 check('Letzte KW hervorgehoben', (await page.getAttribute('#chart .bar:last-child', 'class')).includes('now'));
-const leerBar = await page.$eval('#chart .bar:nth-child(4) .bar-fill', e => e.style.height);
-check('Leere Woche hat Mindesthöhe', leerBar === '3px');
+// Gemessen statt am style-Attribut abgelesen: Seit dem 23.08.2026 steht die
+// Balkenhoehe als Anteil in flex-basis, damit das Bild mit der Kartenhoehe
+// waechst (ENT-100). Die Aussage bleibt dieselbe -- eine Woche ohne Stunden
+// ist trotzdem SICHTBAR, sonst sieht "0" aus wie "kein Balken gezeichnet".
+const leerBar = await page.$eval('#chart .bar:nth-child(4) .bar-fill',
+  e => Math.round(e.getBoundingClientRect().height));
+check('Leere Woche hat Mindesthöhe', leerBar >= 2);
 
 // ── 5. Angemeldete + Ranking
 check('2 angemeldete Benutzer', (await page.$$('#angemeldet .rank')).length === 2);
