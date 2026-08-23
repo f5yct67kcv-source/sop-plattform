@@ -22,6 +22,9 @@ const MORGEN  = isoDat(new Date(Date.now() + 864e5));
 const vorMin = m => new Date(Date.now() - m * 6e4).toISOString().slice(0, 19).replace('T', ' ');
 const GESTERN = isoDat(new Date(Date.now() - 864e5));
 
+// Drei Arten, mehr nicht: Rapport, Sperrtag, Rueckmeldung zu einer Schicht.
+// Ein vierter Eintrag "offener Abgleich" wurde am 23.08.2026 entfernt -- er
+// war ein Zustand, kein Ereignis.
 const EREIGNISSE = [
   { typ: 'rapport', id: 7, zeit: vorMin(5),
     person: { id: 3, name: 'anna', vorname: 'Anna', nachname: 'Muster' },
@@ -34,9 +37,6 @@ const EREIGNISSE = [
     person: { id: 3, name: 'anna', vorname: 'Anna', nachname: 'Muster' },
     titel: 'Schicht zugesagt', zusage: 'zugesagt', datum: MORGEN,
     von: '07:00', bis: '16:00', kunde: 'Muster AG', ort: 'Musterstadt' },
-  { typ: 'abgleich', id: 22, zeit: GESTERN + ' 23:59:59',
-    titel: 'Abgleich offen', datum: GESTERN, von: '05:15', bis: '05:30',
-    kunde: 'Beispiel GmbH', ort: 'Beispielstadt' },
 ];
 
 const browser = await chromium.launch({ executablePath: EXE });
@@ -68,22 +68,37 @@ async function seite(daten = {}) {
   return p;
 }
 
-// ══════════════════════════════ DIE VIER ARTEN
+// ══════════════════════════════ DIE DREI ARTEN
 try {
   const p = await seite();
   const zeilen = await p.$$eval('#ereignisFeed .rank', els => els.map(e => e.textContent.replace(/\s+/g, ' ').trim()));
-  check('KRITISCH: alle vier Ereignisse stehen im Feed', zeilen.length === 4);
+  check('KRITISCH: alle drei Ereignisse stehen im Feed', zeilen.length === 3);
   check('Der Rapport nennt Person und Kunde',
     /Anna Muster.*Rapport gesendet.*Muster AG/.test(zeilen[0] || ''));
   check('Der Sperrtag nennt den Grund', /Beat Beispiel.*gesperrt.*Weiterbildung/.test(zeilen[1] || ''));
   check('Die Zusage sagt, dass zugesagt wurde', /Anna Muster.*hat zugesagt/.test(zeilen[2] || ''));
-  check('KRITISCH: der offene Abgleich steht drin', /nicht abgeglichen/.test(zeilen[3] || ''));
 
-  // Der offene Abgleich verschwindet erst, wenn abgeglichen wurde --
-  // ihn abhaken zu koennen hiesse: weg, obwohl die Arbeit aussteht.
+  // Ein Ereignis ist etwas, das GESCHEHEN ist. Eine offene, noch nicht
+  // abgeglichene Schicht ist ein andauernder Zustand und stand bis zum
+  // 23.08.2026 faelschlich mit drin: "fehlende, noch nicht abgeschlossene
+  // Schichten sollen nicht in die Ereignisse kommen. nur ereignisse, die neu
+  // hinzukommen." Der Feed darf so etwas auch dann nicht anzeigen, wenn der
+  // Server es eines Tages wieder mitschickt.
+  const mitAbgleich = await seite({ ereignisse: [...EREIGNISSE,
+    { typ: 'abgleich', id: 22, zeit: vorMin(200), titel: 'Abgleich offen', datum: GESTERN,
+      von: '05:15', bis: '05:30', kunde: 'Beispiel GmbH', ort: 'Beispielstadt' }],
+    ereignisse_gesamt: 4 });
+  const woerter = (await mitAbgleich.textContent('#ereignisFeed')).replace(/\s+/g, ' ');
+  check('KRITISCH: eine offene Schicht taucht nirgends als Ereignis auf',
+    !/nicht abgeglichen/.test(woerter) && !/Abgleich offen/.test(woerter));
+  check('KRITISCH: sie hinterlaesst auch keine leere Zeile',
+    (await mitAbgleich.$$('#ereignisFeed .rank')).length === 3);
+  check('KRITISCH: und sie bekommt schon gar keinen Weg "Zum Abgleich"',
+    !/Zum Abgleich/.test(await mitAbgleich.innerHTML('#ereignisFeed')));
+  await mitAbgleich.close();
+
   const haken = await p.$$eval('#ereignisFeed .rank', els => els.map(e => !!e.querySelector('.rank-erledigt')));
-  check('KRITISCH: drei Arten lassen sich abhaken', haken.slice(0, 3).every(Boolean));
-  check('KRITISCH: der offene Abgleich NICHT', haken[3] === false);
+  check('KRITISCH: alle drei Arten lassen sich abhaken', haken.length === 3 && haken.every(Boolean));
   await p.screenshot({ path: `${OUT}/ereignisse.png` });
   await p.close();
 } catch (e) { bad.push('Vier Arten: ' + String(e).split('\n')[0].slice(0, 120)); }
@@ -120,7 +135,7 @@ try {
   gesendet.length = 0;
   await p.click('#ereignisFeed .rank .rank-erledigt'); await p.waitForTimeout(400);
   check('KRITISCH: die Zeile verschwindet sofort',
-    (await p.$$('#ereignisFeed .rank')).length === 3);
+    (await p.$$('#ereignisFeed .rank')).length === 2);
   check('KRITISCH: der Server bekommt Art UND Nummer',
     gesendet.length === 1 && gesendet[0].typ === 'rapport' && gesendet[0].id === 7);
 
@@ -147,17 +162,41 @@ try {
   const t2 = (await q.textContent('#ereignisFeed')).replace(/\s+/g, ' ');
   const note = (await q.textContent('#ereignisNote')).replace(/\s+/g, ' ');
   check('KRITISCH: eine gescheiterte Abfrage sieht NICHT aus wie "nichts passiert"',
-    /Nicht abfragbar/.test(t2) && !/Nichts Neues/.test(t2));
+    /Unvollständig/.test(t2) && !/Nichts Neues/.test(t2));
   check('Und sie benennt, welche Arten fehlen', /rapport/.test(t2) && /zusage/.test(t2));
+  check('Und sie sagt, was zu tun ist', /Einrichtung/.test(t2));
   check('Die Kopfzeile weist ebenfalls darauf hin', /unvollständig/.test(note));
   await q.close();
+
+  // Der teuerste Fall ist NICHT die leere Liste, sondern die gefuellte mit
+  // einer Luecke darin: Sie sieht vollstaendig aus. Genau das ist am
+  // 23.08.2026 passiert -- ein gesendeter Rapport fehlte, weil die Spalte
+  // rapporte.gesehen_am nicht angelegt war, und der Feed zeigte trotzdem
+  // ungeruehrt seine anderen Zeilen. Der Hinweis muss deshalb IM Feed
+  // stehen, ueber der Liste, nicht nur als graue Notiz in der Kopfzeile.
+  const l = await seite({ ereignisse_unvollstaendig: ['rapport'] });
+  const banner = await l.$('#ereignisFeed .erg-luecke');
+  check('KRITISCH: die Luecke wird auch bei gefuellter Liste angezeigt', !!banner);
+  const oben = await l.evaluate(() => {
+    const b = document.querySelector('#ereignisFeed .erg-luecke');
+    const z = document.querySelector('#ereignisFeed .rank');
+    return b && z ? b.getBoundingClientRect().top < z.getBoundingClientRect().top : false;
+  });
+  check('KRITISCH: und zwar UEBER der Liste, nicht darunter versteckt', oben);
+  const sichtbarG = await l.evaluate(() => {
+    const b = document.querySelector('#ereignisFeed .erg-luecke');
+    const r = b.getBoundingClientRect();
+    return r.height > 20 && r.width > 100 && getComputedStyle(b).display !== 'none';
+  });
+  check('Sie ist auch wirklich sichtbar -- gemessen, nicht nachgelesen', sichtbarG);
+  await l.close();
 } catch (e) { bad.push('Leerzustaende: ' + String(e).split('\n')[0].slice(0, 120)); }
 
 // ══════════════════════════════ GEKUERZT IST NICHT VOLLSTAENDIG
 try {
   const p = await seite({ ereignisse_gesamt: 31, ereignisse_gekuerzt: true });
   const note = (await p.textContent('#ereignisNote')).replace(/\s+/g, ' ').trim();
-  check('KRITISCH: eine gekuerzte Liste sagt es -- "4 von 31"', note === '4 von 31');
+  check('KRITISCH: eine gekuerzte Liste sagt es -- "3 von 31"', note === '3 von 31');
   await p.close();
   const q = await seite();
   check('Eine vollstaendige Liste behauptet nichts',
@@ -173,7 +212,7 @@ try {
     const send = b => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) });
     if (pf.includes('login')) return send({ status: 'ok', token: 't', name: 'adrian', ist_admin: true });
     if (pf.includes('dashboard_stats')) return send({ status: 'ok', kpi: {}, verlauf: [], angemeldet: [],
-      pro_mitarbeiter: [], letzte_rapporte: [], ereignisse: EREIGNISSE, ereignisse_gesamt: 4,
+      pro_mitarbeiter: [], letzte_rapporte: [], ereignisse: EREIGNISSE, ereignisse_gesamt: 3,
       ereignisse_gekuerzt: false, ereignisse_unvollstaendig: [] });
     return send({ status: 'ok', rapporte: [], objekte: [], masterschichten: [], einsaetze: [],
       kunden: [], mitarbeiter: [], orte: [], feiertage: [], gepflegt: {} });
@@ -212,7 +251,7 @@ try {
 
 try {
   const p = await seite();
-  // Reihenfolge: neuestes zuerst. Der Feed mischt vier Quellen -- ohne
+  // Reihenfolge: neuestes zuerst. Der Feed mischt drei Quellen -- ohne
   // gemeinsame Sortierung stuende die aelteste Art zuoberst, je nachdem,
   // welche Abfrage zufaellig zuerst lief.
   const zeiten = await p.$$eval('#ereignisFeed .rank', els =>
