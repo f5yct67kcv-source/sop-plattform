@@ -693,7 +693,7 @@ $spalten = [
     ['kunden', 'plz',         'ALTER TABLE kunden ADD COLUMN plz VARCHAR(10) NULL AFTER adresszusatz'],
     ['kunden', 'uid',         'ALTER TABLE kunden ADD COLUMN uid VARCHAR(20) NULL AFTER ort'],
     ['kunden', 'mwst_nr',     'ALTER TABLE kunden ADD COLUMN mwst_nr VARCHAR(20) NULL AFTER uid'],
-    // Ereignis-Feed der Uebersicht (ENT-089). "Gesehen" wird am Datensatz
+    // Ereignis-Feed der Uebersicht (ENT-090). "Gesehen" wird am Datensatz
     // selbst vermerkt, nicht in einer eigenen Ereignistabelle -- genauso, wie
     // es verfuegbarkeiten.gesehen_am seit ENT-033 macht. Eine zweite Tabelle
     // koennte mit der Wirklichkeit auseinanderlaufen; ein Zeitstempel an der

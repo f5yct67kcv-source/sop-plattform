@@ -74,7 +74,7 @@ $stmt = db()->prepare(
 $stmt->execute([$monatStart]);
 $proMitarbeiter = $stmt->fetchAll();
 
-// ── Ereignis-Feed (ENT-089). Loest den frueheren Sperrtage-Feed ab: Er ist
+// ── Ereignis-Feed (ENT-090). Loest den frueheren Sperrtage-Feed ab: Er ist
 // jetzt EINE der Arten, nicht der ganze Inhalt. Die Zusammenstellung steht in
 // backend/ereignisse.php, damit sie pruefbar ist und nicht im Endpunkt liegt.
 $ereignisse = ereignisse_sammeln(db());

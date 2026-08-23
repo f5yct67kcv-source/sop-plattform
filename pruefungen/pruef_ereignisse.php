@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-// Der Ereignis-Kern (ENT-089), ohne Datenbank: die Abgrenzung, welche Arten
+// Der Ereignis-Kern (ENT-090), ohne Datenbank: die Abgrenzung, welche Arten
 // sich abhaken lassen, und dass ein Fehler eine Art ausfallen laesst statt
 // den ganzen Feed.
 

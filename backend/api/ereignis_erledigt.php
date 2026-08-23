@@ -1,5 +1,5 @@
 <?php
-// Ein Ereignis im Feed der Uebersicht als erledigt markieren (ENT-089).
+// Ein Ereignis im Feed der Uebersicht als erledigt markieren (ENT-090).
 //
 // Loest sperr_erledigt.php ab und kann alle abhakbaren Arten. Zwei Endpunkte
 // fuer dieselbe Sache waeren zwei Stellen, an denen die Rechtepruefung

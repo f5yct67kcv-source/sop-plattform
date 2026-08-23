@@ -497,7 +497,7 @@ th.sortbar.aktiv .pf { opacity: 1; color: var(--accent); }
 .rank-track i { display: block; height: 100%; background: var(--accent); border-radius: 2px; }
 /* Fehlt ein Teil des Feeds, sagt das eine eigene Zeile ganz oben -- in der
    Warnfarbe und in voller Breite. Eine graue Notiz in der Kopfzeile hat
-   genau einmal nicht gereicht (ENT-089). */
+   genau einmal nicht gereicht (ENT-090). */
 /* Der Feed steht in Spalten: Absender, Beschreibung, Datum. Vorher standen
    Absender und Beschreibung uebereinander -- lesbar, aber nicht vergleichbar:
    Wer wissen will, von wem die letzten fuenf Meldungen kamen, musste fuenfmal
@@ -545,7 +545,7 @@ th.sortbar.aktiv .pf { opacity: 1; color: var(--accent); }
 .erg-luecke b { color: var(--warn); }
 .erg-luecke span { display: block; color: var(--ink-2); margin-top: 2px; }
 
-/* Aufgeklappte Ereigniszeile (ENT-089). Sie sitzt unter der Zeile statt in
+/* Aufgeklappte Ereigniszeile (ENT-090). Sie sitzt unter der Zeile statt in
    einem Fenster: Wer drei Ereignisse pruefen will, soll sie nebeneinander
    sehen, ohne dreimal ein Fenster zu oeffnen und zu schliessen. */
 .erg-detail { background: var(--hover); border-bottom: 1px solid var(--line); }
@@ -3793,7 +3793,7 @@ const ORD_BEREICHE = {
     laden: () => {
       let g = null;
       try { g = JSON.parse(localStorage.getItem('rv3_dash_layout') || 'null'); } catch (e) {}
-      // Aus "sperrfeed" wurde "ereignisse" (ENT-089). Ohne diese Umschrift
+      // Aus "sperrfeed" wurde "ereignisse" (ENT-090). Ohne diese Umschrift
       // faende die gespeicherte Anordnung den Container nicht mehr -- die
       // Kachel waere fuer jeden verschwunden, der seine Uebersicht einmal
       // angepasst hat, und niemand haette einen Anhaltspunkt warum.
@@ -4718,7 +4718,7 @@ function renderLetzte() {
 // Neu gesetzte Sperrtage als Ereignisliste (ENT-030). Nur die Fakten, die
 // die Planung wirklich mitgeteilt bekommt -- keine Vermutung ueber Grund
 // oder Dringlichkeit, das steht hoechstens in der freiwilligen Notiz.
-// Ereignis-Feed der Uebersicht (ENT-089). Loest den Sperrtage-Feed ab.
+// Ereignis-Feed der Uebersicht (ENT-090). Loest den Sperrtage-Feed ab.
 //
 // Eine Zeile laesst sich aufklappen; darin stehen die Einzelheiten und die
 // Wege weiter -- zur Person, zum Tag, zur Schicht. Bewusst aufklappen statt
@@ -4856,7 +4856,7 @@ function ereignisZumTag(datum) {
 }
 
 // Nimmt einen Eintrag aus dem Feed, ohne den Datensatz selbst zu aendern --
-// Rapport, Sperre und Zusage bleiben gueltig (ENT-033/ENT-089). Optimistisch:
+// Rapport, Sperre und Zusage bleiben gueltig (ENT-033/ENT-090). Optimistisch:
 // die Zeile verschwindet sofort, ein Fehlschlag holt sie beim naechsten
 // loadStats() zurueck.
 function ereignisErledigt(i) {
