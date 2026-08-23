@@ -272,6 +272,10 @@ if (ohneEinbindung.length) { bad.push('ohne rechte.php: ' + ohneEinbindung.join(
     'einsatz_abgleich.php':   'setzt die Sperre selbst -- muss schreiben duerfen',
     'schichten_erzeugen.php': 'legt nur neue Schichten an; eine neue kann nicht abgeglichen sein',
     'meine_zusage.php':       'aendert nur die eigene Zu-/Absage, nicht den Plan',
+    // Setzt nur einen Zeitstempel "gesehen" auf der Zuteilung. Der Plan, die
+    // Zeiten und der Abgleich bleiben unberuehrt -- eine gelesene Meldung
+    // aendert nichts an dem, was festgeschrieben wurde.
+    'ereignis_erledigt.php': 'markiert nur als gesehen; aendert weder Plan noch Ist-Zeiten',
   };
   const luecken = apiDateien.filter(f => {
     const q = ohneKommentar(f);

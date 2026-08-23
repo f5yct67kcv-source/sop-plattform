@@ -43,7 +43,7 @@ check('Die Bearbeitungsleiste ist zunächst verborgen', !(await page.isVisible('
 check('Alle sieben Container sind da',
   await page.evaluate(() => document.querySelectorAll('.dash-item').length === 7));
 check('Standardreihenfolge stimmt',
-  JSON.stringify(await reihenfolge(page)) === JSON.stringify(['begruessung', 'kpi', 'verlauf', 'angemeldet', 'letzte', 'proma', 'sperrfeed']));
+  JSON.stringify(await reihenfolge(page)) === JSON.stringify(['begruessung', 'kpi', 'verlauf', 'angemeldet', 'letzte', 'proma', 'ereignisse']));
 check('Kein Container ist ausgeblendet',
   await page.evaluate(() => document.querySelectorAll('.dash-item.versteckt').length === 0));
 check('Der Bearbeiten-Knopf verschwindet auf anderen Ansichten',
@@ -67,7 +67,7 @@ await page.screenshot({ path: OUT + '/71-bearbeiten.png' });
 await page.click('.dash-item[data-widget="letzte"] .dash-werk button[title="Weiter vorne"]');
 await page.waitForTimeout(150);
 check('„Letzte Rapporte“ ist einen Platz nach vorne gerückt',
-  JSON.stringify(await reihenfolge(page)) === JSON.stringify(['begruessung', 'kpi', 'verlauf', 'letzte', 'angemeldet', 'proma', 'sperrfeed']));
+  JSON.stringify(await reihenfolge(page)) === JSON.stringify(['begruessung', 'kpi', 'verlauf', 'letzte', 'angemeldet', 'proma', 'ereignisse']));
 check('Erster Container kann nicht weiter nach vorne',
   await page.evaluate(() => document.querySelector('.dash-item[data-widget="begruessung"] button[title="Weiter vorne"]').disabled === false));
 // (der Pfeil ist nicht deaktiviert, da wir keine harte Grenzanzeige gebaut haben -- geprüft wird stattdessen, dass es an der Grenze nichts tut)
@@ -87,7 +87,7 @@ await page.screenshot({ path: OUT + '/72-ausgeblendet.png' });
 
 // ══════════ ZIEHEN PER GRIFF
 await page.evaluate(() => {
-  const von = document.querySelector('.dash-item[data-widget="sperrfeed"] .griff');
+  const von = document.querySelector('.dash-item[data-widget="ereignisse"] .griff');
   const auf = document.querySelector('.dash-item[data-widget="verlauf"]');
   const dt = new DataTransfer();
   von.dispatchEvent(new DragEvent('dragstart', { dataTransfer: dt, bubbles: true }));
@@ -97,14 +97,14 @@ await page.evaluate(() => {
 });
 await page.waitForTimeout(200);
 const nachZiehen = await reihenfolge(page);
-check('Ziehen setzt „Neue Sperrtage“ vor „Stundenverlauf“',
-  nachZiehen.indexOf('sperrfeed') === nachZiehen.indexOf('verlauf') - 1);
+check('Ziehen setzt „Ereignisse“ vor „Stundenverlauf“',
+  nachZiehen.indexOf('ereignisse') === nachZiehen.indexOf('verlauf') - 1);
 
 // ══════════ ABBRECHEN VERWIRFT
 await page.click('#dashEditleiste button:has-text("Abbrechen")');
 await page.waitForTimeout(200);
 check('Nach Abbrechen gilt wieder die alte Reihenfolge',
-  JSON.stringify(await reihenfolge(page)) === JSON.stringify(['begruessung', 'kpi', 'verlauf', 'angemeldet', 'letzte', 'proma', 'sperrfeed']));
+  JSON.stringify(await reihenfolge(page)) === JSON.stringify(['begruessung', 'kpi', 'verlauf', 'angemeldet', 'letzte', 'proma', 'ereignisse']));
 check('Nach Abbrechen ist nichts mehr ausgeblendet',
   await page.evaluate(() => document.querySelectorAll('.dash-item.versteckt').length === 0));
 check('Der Bearbeiten-Knopf ist wieder da', await page.isVisible('#btnDashBearbeiten'));
@@ -114,7 +114,7 @@ check('Nichts wurde in den Speicher geschrieben', !(await page.evaluate(() => lo
 await page.click('#btnDashBearbeiten');
 await page.waitForTimeout(150);
 await page.click('.dash-item[data-widget="proma"] .dash-werk button[title="Weiter vorne"]');
-await page.click('.dash-item[data-widget="sperrfeed"] .dash-auge');
+await page.click('.dash-item[data-widget="ereignisse"] .dash-auge');
 await page.waitForTimeout(150);
 await page.click('#dashEditleiste button:has-text("Speichern")');
 await page.waitForTimeout(250);
@@ -122,10 +122,10 @@ check('Nach Speichern ist der Bearbeitungsmodus vorbei', !(await page.isVisible(
 const gespeichert = JSON.parse(await page.evaluate(() => localStorage.getItem('rv3_dash_layout')));
 check('Die neue Reihenfolge steht im Speicher',
   gespeichert.findIndex(x => x.id === 'proma') < gespeichert.findIndex(x => x.id === 'letzte'));
-check('„Neue Sperrtage“ ist als ausgeblendet gespeichert',
-  gespeichert.find(x => x.id === 'sperrfeed').sichtbar === false);
+check('„Ereignisse“ ist als ausgeblendet gespeichert',
+  gespeichert.find(x => x.id === 'ereignisse').sichtbar === false);
 check('Ausgeblendet ist jetzt wirklich unsichtbar',
-  await page.evaluate(() => getComputedStyle(document.querySelector('.dash-item[data-widget="sperrfeed"]')).display === 'none'));
+  await page.evaluate(() => getComputedStyle(document.querySelector('.dash-item[data-widget="ereignisse"]')).display === 'none'));
 await page.screenshot({ path: OUT + '/73-gespeichert.png' });
 await browser.close();
 
@@ -133,7 +133,7 @@ await browser.close();
 ({ browser, page } = await starte());
 await page.click('#btnDashBearbeiten');
 await page.waitForTimeout(150);
-for (const w of ['begruessung', 'kpi', 'verlauf', 'angemeldet', 'letzte', 'proma', 'sperrfeed']) {
+for (const w of ['begruessung', 'kpi', 'verlauf', 'angemeldet', 'letzte', 'proma', 'ereignisse']) {
   await page.click(`.dash-item[data-widget="${w}"] .dash-auge`);
 }
 await page.waitForTimeout(150);
@@ -152,7 +152,7 @@ await page.waitForTimeout(150);
 await page.click('#dashEditleiste button:has-text("Zurücksetzen")');
 await page.waitForTimeout(200);
 check('Zurücksetzen stellt die Standardreihenfolge im Entwurf her',
-  JSON.stringify(await reihenfolge(page)) === JSON.stringify(['begruessung', 'kpi', 'verlauf', 'angemeldet', 'letzte', 'proma', 'sperrfeed']));
+  JSON.stringify(await reihenfolge(page)) === JSON.stringify(['begruessung', 'kpi', 'verlauf', 'angemeldet', 'letzte', 'proma', 'ereignisse']));
 check('Zurücksetzen blendet alles wieder ein',
   await page.evaluate(() => document.querySelectorAll('.dash-item.versteckt').length === 0));
 check('Bleibt im Bearbeitungsmodus -- noch nicht gespeichert', await page.isVisible('#dashEditleiste'));
@@ -167,13 +167,13 @@ await browser.close();
 
 // ══════════ KÜNFTIGE CONTAINER REIHEN SICH EIN
 const alteVersion = JSON.stringify([
-  { id: 'sperrfeed', sichtbar: true }, { id: 'kpi', sichtbar: false },
+  { id: 'ereignisse', sichtbar: true }, { id: 'kpi', sichtbar: false },
   { id: 'ein-entferntes-widget', sichtbar: true },
 ]);
 ({ browser, page } = await starte(alteVersion));
 const geladen = await reihenfolge(page);
 check('Ein unbekannter, entfernter Eintrag verschwindet lautlos', !geladen.includes('ein-entferntes-widget'));
-check('Bekannte gespeicherte Reihenfolge bleibt erhalten', geladen[0] === 'sperrfeed' && geladen[1] === 'kpi');
+check('Bekannte gespeicherte Reihenfolge bleibt erhalten', geladen[0] === 'ereignisse' && geladen[1] === 'kpi');
 check('Neue, damals unbekannte Container werden angehängt',
   geladen.slice(2).sort().join(',') === ['angemeldet', 'letzte', 'proma', 'verlauf', 'begruessung'].sort().join(','));
 check('Die gespeicherte Sichtbarkeit gilt weiter',

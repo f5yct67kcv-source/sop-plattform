@@ -693,6 +693,13 @@ $spalten = [
     ['kunden', 'plz',         'ALTER TABLE kunden ADD COLUMN plz VARCHAR(10) NULL AFTER adresszusatz'],
     ['kunden', 'uid',         'ALTER TABLE kunden ADD COLUMN uid VARCHAR(20) NULL AFTER ort'],
     ['kunden', 'mwst_nr',     'ALTER TABLE kunden ADD COLUMN mwst_nr VARCHAR(20) NULL AFTER uid'],
+    // Ereignis-Feed der Uebersicht (ENT-089). "Gesehen" wird am Datensatz
+    // selbst vermerkt, nicht in einer eigenen Ereignistabelle -- genauso, wie
+    // es verfuegbarkeiten.gesehen_am seit ENT-033 macht. Eine zweite Tabelle
+    // koennte mit der Wirklichkeit auseinanderlaufen; ein Zeitstempel an der
+    // Quelle kann das nicht.
+    ['rapporte',          'gesehen_am',        'ALTER TABLE rapporte ADD COLUMN gesehen_am DATETIME NULL'],
+    ['einsatz_zuteilung', 'zusage_gesehen_am', 'ALTER TABLE einsatz_zuteilung ADD COLUMN zusage_gesehen_am DATETIME NULL AFTER zusage'],
     // Schichtabgleich (ENT-045): das Ist neben dem Plan. Vorgabe 'offen', damit
     // der Bestand sichtbar unabgeglichen bleibt, statt faelschlich als
     // bestaetigt zu gelten -- was nie geprueft wurde, darf nicht so aussehen,

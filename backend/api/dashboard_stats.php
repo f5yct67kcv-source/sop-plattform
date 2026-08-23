@@ -3,6 +3,7 @@
 declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../rechte.php';
+require_once __DIR__ . '/../ereignisse.php';
 
 $user = require_session();
 require_verwaltung($user);
@@ -73,24 +74,10 @@ $stmt = db()->prepare(
 $stmt->execute([$monatStart]);
 $proMitarbeiter = $stmt->fetchAll();
 
-// ── Neueste Sperrtage (ENT-030). Nur kuenftige/heutige Tage: eine Sperre fuer
-// einen bereits vergangenen Tag ist kein aktuelles Ereignis mehr.
-// Die Tabelle kann fehlen, solange OP-29 nicht erledigt ist -- dann bleibt
-// die Liste leer, statt das ganze Dashboard mitzureissen (ENT-024-Prinzip:
-// lieber ehrlich leer als ein Fehler, der alles blockiert).
-$sperrEreignisse = [];
-try {
-    $sperrEreignisse = db()->query(
-        "SELECT v.id, v.mitarbeiter_id, m.name, m.vorname, m.nachname, v.datum, v.bemerkung, v.erfasst_am
-         FROM verfuegbarkeiten v
-         JOIN mitarbeiter m ON m.id = v.mitarbeiter_id
-         WHERE v.datum >= CURDATE() AND v.gesehen_am IS NULL
-         ORDER BY v.erfasst_am DESC
-         LIMIT 8"
-    )->fetchAll();
-} catch (Throwable $e) {
-    $sperrEreignisse = [];
-}
+// ── Ereignis-Feed (ENT-089). Loest den frueheren Sperrtage-Feed ab: Er ist
+// jetzt EINE der Arten, nicht der ganze Inhalt. Die Zusammenstellung steht in
+// backend/ereignisse.php, damit sie pruefbar ist und nicht im Endpunkt liegt.
+$ereignisse = ereignisse_sammeln(db());
 
 // ── Letzte Rapporte
 $letzte = db()->query(
@@ -116,5 +103,12 @@ json_response([
     'angemeldet'      => $angemeldet,
     'pro_mitarbeiter' => $proMitarbeiter,
     'letzte_rapporte' => $letzte,
-    'sperr_ereignisse' => $sperrEreignisse,
+    'ereignisse'            => $ereignisse['ereignisse'],
+    'ereignisse_gesamt'     => $ereignisse['gesamt'],
+    'ereignisse_gekuerzt'   => $ereignisse['gekuerzt'],
+    // Welche Arten sich nicht abfragen liessen -- meist eine Spalte, die die
+    // Einrichtung noch nicht angelegt hat. Die Oberflaeche muss den
+    // Unterschied hinschreiben koennen: "nichts passiert" und "hier fehlt
+    // etwas" sehen sonst gleich aus.
+    'ereignisse_unvollstaendig' => $ereignisse['unvollstaendig'],
 ]);

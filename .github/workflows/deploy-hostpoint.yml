@@ -34,6 +34,7 @@ jobs:
           cp backend/zweifaktor.php dist/zweifaktor.php
           cp backend/rechte.php dist/rechte.php
           cp backend/logbuch.php dist/logbuch.php
+          cp backend/ereignisse.php dist/ereignisse.php
           # Schutzeinstellungen (ENT-075). Im Repository heisst die Datei
           # bewusst ohne fuehrenden Punkt -- sonst uebersieht man sie.
           cp htaccess-hostpoint dist/.htaccess
