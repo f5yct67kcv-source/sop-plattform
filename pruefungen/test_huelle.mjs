@@ -150,14 +150,42 @@ const zustand = p => p.evaluate(() => {
   await p.close();
 }
 
-// ══════════════════════════════ RUECKFALL AUF SCHMALEN BILDSCHIRMEN
+// ══════════════════════════════ AUCH AUF KLEINEREN BILDSCHIRMEN
+//
+// Die Grenze lag zuerst bei 1281 px -- geraten, nicht gemessen. Auf einem
+// Notebook mit doppelter Aufloesung ist ein Fenster oft nur 1000 CSS-Pixel
+// breit; dort fiel der dritte Zustand wortlos auf die schmale Leiste
+// zurueck, und der Knopf sah aus, als tue er nichts. Gemessen braucht die
+// Kopfleiste bei 1000 px nur 539 px.
 {
-  const p = await seite(1200, 800);
+  const p = await seite(1000, 800);
   await p.evaluate(() => huelleSetzen('aus'));
   await p.waitForTimeout(250);
-  const z = await zustand(p), side = await mass(p, '#side');
-  check('KRITISCH: unter 1281 px faellt "aus" auf die schmale Leiste zurueck', z.sideW === '64px');
-  check('Sie bleibt dabei senkrecht, nicht halb umgebaut', side.h > 200 && side.w === 64);
+  const z = await zustand(p), side = await mass(p, '#side'), main = await mass(p, '.main');
+  check('KRITISCH: bei 1000 px erscheint die Kopfleiste wirklich', z.sideW === '0px');
+  check('Sie liegt waagrecht ueber die volle Breite', side.w === 1000 && side.h === 60);
+  check('Der Inhalt rueckt darunter', main.ml === '0px' && main.pt === '60px');
+  const platz = await p.evaluate(() => {
+    const n = document.querySelector('.side-nav').getBoundingClientRect();
+    const b = document.querySelector('.side-brand').getBoundingClientRect();
+    const f = document.querySelector('.side-foot').getBoundingClientRect();
+    return { ueberlappt: n.left < b.right - 1 || n.right > f.left + 1,
+             mittig: Math.abs((n.left + n.width / 2) - 500) <= 4 };
+  });
+  check('KRITISCH: nichts ueberlappt bei 1000 px', platz.ueberlappt === false);
+  check('Und die Symbole stehen auch dort mittig', platz.mittig);
+  await p.close();
+}
+
+// ══════════════════════════════ HANDYBREITE BLEIBT DIE SCHUBLADE
+{
+  const p = await seite(800, 800);
+  await p.evaluate(() => huelleSetzen('aus'));
+  await p.waitForTimeout(250);
+  const kompakt = await p.evaluate(() => huelleKompakt());
+  const main = await mass(p, '.main');
+  check('KRITISCH: unter 901 px greift der kompakte Zustand nicht', kompakt === false);
+  check('Der Inhalt bekommt keinen Kopfleisten-Abstand', main.pt !== '60px');
   await p.close();
 }
 
@@ -293,6 +321,25 @@ try {
     return e ? e.getBoundingClientRect().height : 0;
   });
   check('Der Fussteil bleibt bei Symbolen', fuss === 0);
+
+  // Mittig heisst: in der Mitte des Fensters, nicht in der Mitte des
+  // Rests zwischen Logo und Fussteil. Die beiden sind verschieden breit --
+  // ein Flex-Abstandhalter haette die Navigation sichtbar danebengesetzt.
+  const mitte = await p.evaluate(() => {
+    const n = document.querySelector('.side-nav').getBoundingClientRect();
+    const b = document.querySelector('.side-brand').getBoundingClientRect();
+    const f = document.querySelector('.side-foot').getBoundingClientRect();
+    return { navMitte: Math.round(n.left + n.width / 2),
+             fenster: Math.round(window.innerWidth / 2),
+             brandLinks: Math.round(b.left), fussRechts: Math.round(f.right),
+             breiteUngleich: Math.abs(b.width - f.width) > 20 };
+  });
+  check('KRITISCH: die Symbole stehen in der Mitte des Fensters',
+    Math.abs(mitte.navMitte - mitte.fenster) <= 4);
+  check('Und das, obwohl Logo und Fussteil verschieden breit sind',
+    mitte.breiteUngleich);
+  check('Das Logo bleibt links', mitte.brandLinks <= 20);
+  check('Der Fussteil bleibt rechts', mitte.fussRechts >= 1600 - 20);
   await p.close();
 } catch (e) { bad.push('Beschriftungen: ' + String(e).split('\n')[0].slice(0, 120)); }
 

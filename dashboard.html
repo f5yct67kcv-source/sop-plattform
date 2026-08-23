@@ -1352,11 +1352,15 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
    Nur ab Tabletbreite: darunter ist die Leiste ohnehin ausgeklappt-verborgen
    und wird über den Burger geöffnet. */
 @media (min-width: 901px) {
-  /* "aus" faellt hier bewusst auf die schmale Leiste zurueck: Unter
-     1281 px ist im Kopfbereich neben Titel, Thema-Schalter und
-     "Bearbeiten" kein Platz fuer die Navigation. Ein Rueckfall ist
-     ehrlicher als eine Leiste, die umbricht. */
-  .shell.schmal, .shell.aus { --side-w: 64px; }
+  .shell.schmal { --side-w: 64px; }
+  /* "aus" bekommt seinen eigenen Wert weiter unten. Hier stand vorher ein
+     Rueckfall auf 64 px fuer alles unter 1281 px -- eine GERATENE Grenze.
+     Gemessen braucht die Kopfleiste bei 1000 px Fensterbreite nur 539 px.
+     Auf einem Notebook mit doppelter Aufloesung ist ein Fenster oft genau
+     so breit; dort erschien der dritte Zustand nie, und der Knopf sah aus,
+     als tue er nichts. Die Grenze ist jetzt dieselbe wie fuer den schmalen
+     Zustand: ab 901 px. Darunter ist die Leiste ohnehin eine Schublade. */
+  .shell.aus { --side-w: 64px; }
   .shell.schmal .side-nav, .shell.aus .side-nav { padding: 14px 8px; }
   .shell.schmal .side-foot, .shell.aus .side-foot { padding: 10px 8px; }
   .shell.schmal .nav-lbl, .shell.aus .nav-lbl { display: none; }
@@ -1393,8 +1397,8 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
    Bewusst eine reine Darstellungsänderung -- dasselbe Markup wandert nicht
    im DOM umher, es legt sich waagrecht. Damit bleiben IDs, Klickpfade und
    rechteAnwenden() unberührt.
-   Erst ab 1281 px: darunter greift der Rückfall auf 64 px weiter oben. */
-@media (min-width: 1281px) {
+   Ab 901 px -- derselben Grenze wie der schmale Zustand. */
+@media (min-width: 901px) {
   .shell.aus { --side-w: 0px; }
   .shell.aus .side {
     right: 0; bottom: auto; width: auto; height: var(--top-h);
@@ -1402,9 +1406,20 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
     padding: 0 14px; border-bottom: 1px solid var(--shell-line);
   }
   .shell.aus .side-brand { height: auto; padding: 0 10px 0 0; border-bottom: none; flex: none; }
+  /* Raster statt Abstandhalter: Die Symbole sollen in der Mitte des
+     FENSTERS stehen, nicht in der Mitte des Rests zwischen Logo und
+     Fussteil. Die beiden sind verschieden breit -- mit "flex: 1" saesse
+     die Navigation sichtbar daneben. 1fr auto 1fr loest das, weil die
+     beiden Aussenspalten gleich gross bleiben, egal was darin steht. */
+  .shell.aus .side {
+    display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
+  }
+  .shell.aus .side-brand { grid-column: 1; justify-self: start; }
+  .shell.aus .side-foot  { grid-column: 3; justify-self: end; }
   .shell.aus .side-nav {
+    grid-column: 2; justify-self: center;
     display: flex; flex-direction: row; align-items: center; gap: 2px;
-    flex: 1; padding: 0; overflow: visible;
+    flex: none; padding: 0; overflow: visible;
   }
   .shell.aus .nav-gruppe { flex: none; }
   .shell.aus .nav-item { width: auto; min-width: 40px; min-height: 38px; margin-bottom: 0; padding: 8px 10px; }
@@ -4398,8 +4413,7 @@ function navFlyoutPlatzieren(gruppe) {
   feld.style.top  = '0px';
   const r = knopf.getBoundingClientRect();
   const b = feld.getBoundingClientRect();
-  const imKopf = $('shell').classList.contains('aus')
-              && window.matchMedia('(min-width: 1281px)').matches;
+  const imKopf = $('shell').classList.contains('aus') && huelleKompakt();
   // Senkrecht: an der Kante der LEISTE ausrichten, nicht an der des Knopfes.
   // Der Knopf endet wegen des Innenabstands frueher -- das Feld lag dadurch
   // 2 px ueber der Leiste statt sauber daneben.
