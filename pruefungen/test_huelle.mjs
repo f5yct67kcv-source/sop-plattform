@@ -293,6 +293,25 @@ try {
     return e ? e.getBoundingClientRect().height : 0;
   });
   check('Der Fussteil bleibt bei Symbolen', fuss === 0);
+
+  // Mittig heisst: in der Mitte des Fensters, nicht in der Mitte des
+  // Rests zwischen Logo und Fussteil. Die beiden sind verschieden breit --
+  // ein Flex-Abstandhalter haette die Navigation sichtbar danebengesetzt.
+  const mitte = await p.evaluate(() => {
+    const n = document.querySelector('.side-nav').getBoundingClientRect();
+    const b = document.querySelector('.side-brand').getBoundingClientRect();
+    const f = document.querySelector('.side-foot').getBoundingClientRect();
+    return { navMitte: Math.round(n.left + n.width / 2),
+             fenster: Math.round(window.innerWidth / 2),
+             brandLinks: Math.round(b.left), fussRechts: Math.round(f.right),
+             breiteUngleich: Math.abs(b.width - f.width) > 20 };
+  });
+  check('KRITISCH: die Symbole stehen in der Mitte des Fensters',
+    Math.abs(mitte.navMitte - mitte.fenster) <= 4);
+  check('Und das, obwohl Logo und Fussteil verschieden breit sind',
+    mitte.breiteUngleich);
+  check('Das Logo bleibt links', mitte.brandLinks <= 20);
+  check('Der Fussteil bleibt rechts', mitte.fussRechts >= 1600 - 20);
   await p.close();
 } catch (e) { bad.push('Beschriftungen: ' + String(e).split('\n')[0].slice(0, 120)); }
 

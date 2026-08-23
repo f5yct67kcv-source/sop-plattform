@@ -1402,9 +1402,20 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
     padding: 0 14px; border-bottom: 1px solid var(--shell-line);
   }
   .shell.aus .side-brand { height: auto; padding: 0 10px 0 0; border-bottom: none; flex: none; }
+  /* Raster statt Abstandhalter: Die Symbole sollen in der Mitte des
+     FENSTERS stehen, nicht in der Mitte des Rests zwischen Logo und
+     Fussteil. Die beiden sind verschieden breit -- mit "flex: 1" saesse
+     die Navigation sichtbar daneben. 1fr auto 1fr loest das, weil die
+     beiden Aussenspalten gleich gross bleiben, egal was darin steht. */
+  .shell.aus .side {
+    display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
+  }
+  .shell.aus .side-brand { grid-column: 1; justify-self: start; }
+  .shell.aus .side-foot  { grid-column: 3; justify-self: end; }
   .shell.aus .side-nav {
+    grid-column: 2; justify-self: center;
     display: flex; flex-direction: row; align-items: center; gap: 2px;
-    flex: 1; padding: 0; overflow: visible;
+    flex: none; padding: 0; overflow: visible;
   }
   .shell.aus .nav-gruppe { flex: none; }
   .shell.aus .nav-item { width: auto; min-width: 40px; min-height: 38px; margin-bottom: 0; padding: 8px 10px; }
