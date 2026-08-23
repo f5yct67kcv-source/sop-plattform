@@ -62,9 +62,17 @@ await page.waitForSelector('#shell.on');
 await page.waitForTimeout(300);
 check('Schmal bleibt nach dem Neuladen', Math.round(await breite()) === 64);
 
+// Seit ENT-086 hat der Knopf DREI Zustaende: 232 -- 64 -- Kopfleiste.
+// Der zweite Klick blendet die Leiste also aus, statt sie aufzuklappen;
+// erst der dritte fuehrt zurueck. Die Absicht dieser beiden Pruefungen
+// bleibt dieselbe: Der Zustand muss umkehrbar sein und das Neuladen
+// ueberleben. Nur die Zahl der Klicks hat sich geaendert.
 await page.click('#btnSchmal');
 await page.waitForTimeout(250);
-check('Zurueckklappen geht wieder', Math.round(await breite()) === 232);
+check('Der zweite Klick blendet die Leiste aus (ENT-086)', Math.round(await breite()) === 1440);
+await page.click('#btnSchmal');
+await page.waitForTimeout(250);
+check('KRITISCH: der dritte Klick fuehrt zurueck zur vollen Leiste', Math.round(await breite()) === 232);
 await page.reload();
 await page.waitForSelector('#shell.on');
 await page.waitForTimeout(300);
