@@ -98,6 +98,22 @@ try {
     kpiZeilen.kacheln !== 4 || kpiZeilen.zeilen === 2);
 } catch (e) { bad.push('Breiten: ' + String(e).split('\n')[0].slice(0, 120)); }
 
+// ══════════ VOLLE BREITE
+//
+// Vom Projektinhaber am 2026-08-23: "im vollbild modus die gesamte breite
+// ausnützen". Der Deckel von 1440 px schuetzt lange Textzeilen -- die
+// Uebersicht traegt keine.
+try {
+  const m = await page.evaluate(() => {
+    const c = document.querySelector('.content');
+    return { weit: c.classList.contains('weit'), deckel: getComputedStyle(c).maxWidth,
+             breite: Math.round(c.getBoundingClientRect().width),
+             flow: Math.round(document.getElementById('dashFlow').getBoundingClientRect().width) };
+  });
+  check('KRITISCH: die Übersicht hat keinen Breitendeckel mehr', m.weit && m.deckel === 'none');
+  check('KRITISCH: der Inhalt füllt die Fläche wirklich aus', m.flow > 900);
+} catch (e) { bad.push('Breite: ' + String(e).split('\n')[0].slice(0, 120)); }
+
 // ══════════ BEARBEITUNGSMODUS
 await page.click('#btnDashBearbeiten');
 await page.waitForTimeout(200);
