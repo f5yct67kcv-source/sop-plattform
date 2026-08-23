@@ -1099,6 +1099,20 @@ tbody tr.zu .i-schloss { color: var(--warn); }
 /* Reiterzeile der Detailseite traegt rechts die Werkzeuge zum Anpassen. */
 .md-tabs { display: flex; align-items: center; gap: 4px; }
 .md-tabs .btn { margin-left: 4px; }
+/* ── Schnellzugriff (ENT-094)
+   Zwei Spalten Wege, jeder eine Zeile hoch. Kein Kachelraster: Ein Weg ist
+   eine Beschriftung, kein Bild -- Kacheln kosten die dreifache Hoehe fuer
+   dieselbe Aussage. Mindestens 44 px hoch, damit der Finger trifft. */
+.kw-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(214px, 1fr)); gap: 2px 18px; }
+.kw { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px;
+  padding: 10px 8px; border: none; border-radius: var(--r-sm); background: none;
+  font: inherit; font-size: 13.5px; color: var(--accent); text-align: left; cursor: pointer; }
+.kw:hover { background: var(--bg); }
+.kw:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.kw svg { width: 19px; height: 19px; flex: none; color: var(--ink-3);
+  stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.kw b { min-width: 0; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 .dash-item { position: relative; min-width: 0; }
 .dash-item.dw-voll   { flex: 1 1 100%; }
 /* Halbe Seite -- zwei Container passen nebeneinander. Bewusst OHNE Wachsen
@@ -1113,7 +1127,7 @@ tbody tr.zu .i-schloss { color: var(--warn); }
    In halber Breite stehen sie zu zweit, in voller zu viert. Eine
    Fenster-Medienabfrage kann das nicht -- sie weiss nichts davon, dass der
    Container nur die halbe Seite hat. */
-.dash-item.dw-halb .g-kpi { grid-template-columns: repeat(auto-fit, minmax(186px, 1fr)); }
+.dash-item.dw-halb .g-kpi { grid-template-columns: repeat(auto-fit, minmax(232px, 1fr)); }
 .dash-item.versteckt { display: none; }
 
 /* Bearbeitungsmodus */
@@ -2095,6 +2109,13 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 
           <div class="dash-item dw-halb" data-widget="kpi">
             <div class="grid g-kpi" id="kpiGrid"></div>
+          </div>
+
+          <div class="dash-item dw-halb" data-widget="kurzwahl">
+            <div class="card">
+              <div class="card-hd"><h2>Schnellzugriff</h2></div>
+              <div class="card-bd"><div class="kw-grid" id="kwGrid"></div></div>
+            </div>
           </div>
 
           <div class="dash-item dw-halb" data-widget="verlauf">
@@ -3740,6 +3761,10 @@ function rechteAnwenden() {
       (darf('personal_lesen') || darf('betrieb')) ? '' : 'none';
   }
   mdReiterPruefen();
+  // Der Schnellzugriff haengt an denselben Rechten wie die Navigation und
+  // wird darum hier mitgezeichnet -- nicht beim Laden der Kennzahlen: Er
+  // braucht keine Zahlen, nur die Rechte.
+  renderKurzwahl();
 }
 
 // ══════════════════════════════════════════ NAVIGATION
@@ -3774,6 +3799,7 @@ const TITLES = {
 const DASH_WIDGETS = [
   { id: 'begruessung', titel: 'Begrüssung' },
   { id: 'kpi', titel: 'Kennzahlen' },
+  { id: 'kurzwahl', titel: 'Schnellzugriff' },
   { id: 'verlauf', titel: 'Stundenverlauf' },
   { id: 'angemeldet', titel: 'Angemeldete Benutzer' },
   { id: 'letzte', titel: 'Letzte Rapporte' },
@@ -4729,6 +4755,77 @@ const EREIGNIS_ART = {
   sperrtag: { punkt: 'warn', wort: 'hat sich einen Tag gesperrt' },
   zusage:   { punkt: 'ok',   wort: 'hat eine Schicht beantwortet' },
 };
+
+// ══════════════════════════════════════════ SCHNELLZUGRIFF (ENT-094)
+//
+// Nachgebaut nach der "Kurzwahl" von AbaNinja, die der Projektinhaber am
+// 2026-08-23 als Vorbild geschickt hat -- mit eigenen Wegen: Rechnung,
+// Offerte und Lieferschein gibt es hier nicht.
+//
+// Drei Festlegungen:
+//
+//  1. NUR WEGE, DIE ES SCHON GIBT. Jeder Eintrag ruft auf, was auch ueber
+//     die Navigation erreichbar ist. Ein Schnellzugriff, der etwas Eigenes
+//     tut, waere eine zweite Fassung derselben Sache -- und die eine wuerde
+//     irgendwann geaendert und die andere nicht.
+//  2. RECHTE AN EINER STELLE. Jeder Eintrag nennt sein Recht und wird
+//     ausgeblendet, wenn es fehlt. Dieselbe Pruefung wie in der Navigation
+//     (ENT-077); der Server prueft ohnehin noch einmal.
+//  3. KEINE ABSPIELKNOEPFE. Im Vorbild fuehren sie zu Lehrfilmen. Es gibt
+//     keine -- ein Knopf, der nichts abspielt, ist schlimmer als keiner.
+const KW_IKONEN = {
+  plus:    '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+  person:  '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+  haus:    '<path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/>',
+  firma:   '<rect x="3" y="7" width="18" height="14" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
+  haken:   '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
+  kalender:'<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+  raster:  '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+  blatt:   '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/>',
+};
+
+// Links anlegen, rechts hingehen -- die Reihenfolge des Rasters fuellt
+// spaltenweise von oben nach unten waere schoener, geht aber nur mit fester
+// Zeilenzahl. Bei zwei Spalten laeuft es abwechselnd, darum stehen die Paare
+// hier schon so, dass links immer ein "Neu" und rechts immer ein Weg steht.
+const KURZWAHL = [
+  { recht: 'plan',           ikone: 'plus',     titel: 'Einsatz erstellen',        tun: () => { go('planung'); goTab('einsaetze'); openEinsatzNeu(); } },
+  { recht: 'abgleich',       ikone: 'haken',    titel: 'Schichten abgleichen',     tun: () => go('abgleich') },
+  { recht: 'kunden',         ikone: 'firma',    titel: 'Kunde erfassen',           tun: () => { go('kunden'); kuGoTab('uebersicht'); openKundeNeu(); } },
+  { recht: 'plan',           ikone: 'kalender', titel: 'Tagesplan öffnen',         tun: () => { go('planung'); goTab('tag'); } },
+  { recht: 'kunden',         ikone: 'haus',     titel: 'Objekt erfassen',          tun: () => { go('kunden'); kuGoTab('objekte'); openObjektNeu(); } },
+  { recht: 'plan',           ikone: 'raster',   titel: 'Objektplanung öffnen',     tun: () => { go('planung'); goTab('objektplan'); } },
+  { recht: 'personal_lesen', ikone: 'person',   titel: 'Mitarbeitenden erfassen',  tun: () => { go('mitarbeiter'); maGoTab('liste'); mbNeu(); } },
+  { recht: 'kunden',         ikone: 'blatt',    titel: 'Rapporte ansehen',         tun: () => { go('kunden'); kuGoTab('rapporte'); } },
+];
+
+function kwStarten(i) {
+  const e = KURZWAHL[i];
+  // Noch einmal gegen das Recht, nicht nur beim Zeichnen: Wer den Aufruf von
+  // Hand absetzt, soll nicht an der Oberflaeche vorbeikommen. Der Server
+  // prueft trotzdem selbst -- das hier erspart nur eine sinnlose Anfrage.
+  if (!e || !darf(e.recht)) { return; }
+  e.tun();
+}
+
+function renderKurzwahl() {
+  const el = $('kwGrid');
+  if (!el) { return; }
+  const sichtbar = KURZWAHL.map((e, i) => ({ e, i })).filter(x => darf(x.e.recht));
+  if (!sichtbar.length) {
+    // "Nichts erlaubt" ist etwas anderes als "nichts vorhanden". Wer das
+    // gleich aussehen laesst, laesst eine Rollenfrage wie einen leeren
+    // Bestand aussehen.
+    el.innerHTML = EMPTY('Keine Kurzbefehle freigegeben',
+      'Für keinen der hinterlegten Wege trägt deine Rolle das Recht.');
+    return;
+  }
+  el.innerHTML = sichtbar.map(({ e, i }) => `
+    <button type="button" class="kw" onclick="kwStarten(${i})">
+      <svg viewBox="0 0 24 24">${KW_IKONEN[e.ikone] || KW_IKONEN.plus}</svg>
+      <b>${esc(e.titel)}</b>
+    </button>`).join('');
+}
 
 function renderEreignisse() {
   // Nur bekannte Arten. Eine Art, die der Feed nicht kennt, wuerde sonst als
