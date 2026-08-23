@@ -265,6 +265,95 @@ try {
   await p.close();
 }
 
+// ══════════════════════════════ BESCHRIFTUNG UNTER DEN SYMBOLEN
+try {
+  const p = await seite(1600, 900);
+  await p.evaluate(() => huelleSetzen('aus')); await p.waitForTimeout(300);
+
+  const lbl = await p.evaluate(() => [...document.querySelectorAll('.side-nav .nav-item .lbl')]
+    .map(e => ({ text: e.textContent.trim(), sichtbar: e.getBoundingClientRect().height > 0 })));
+  check('KRITISCH: die Hauptnavigation traegt Beschriftungen', lbl.length >= 6);
+  check('KRITISCH: sie sind auch sichtbar, nicht nur vorhanden', lbl.every(l => l.sichtbar));
+  check('Und tragen die erwarteten Namen',
+    ['Übersicht', 'Planung', 'Abgleich', 'Kunden'].every(n => lbl.some(l => l.text === n)));
+
+  // Ueberschrift oben, Wert darunter -- das Symbol steht ueber der Schrift
+  const paar = await p.evaluate(() => {
+    const it = document.querySelector('#nav-planung');
+    const i = it.querySelector('svg.i').getBoundingClientRect();
+    const l = it.querySelector('.lbl').getBoundingClientRect();
+    return { symbolOben: i.top < l.top, drin: it.getBoundingClientRect().bottom <= 60 };
+  });
+  check('Das Symbol steht ueber der Beschriftung', paar.symbolOben);
+  check('Und alles bleibt in der 60 px hohen Leiste', paar.drin);
+
+  // Die Knoepfe im Fussteil bleiben bewusst ohne Schrift
+  const fuss = await p.evaluate(() => {
+    const e = document.querySelector('.side-foot .nav-item .lbl');
+    return e ? e.getBoundingClientRect().height : 0;
+  });
+  check('Der Fussteil bleibt bei Symbolen', fuss === 0);
+  await p.close();
+} catch (e) { bad.push('Beschriftungen: ' + String(e).split('\n')[0].slice(0, 120)); }
+
+// ══════════════════════════════ KEIN UEBERLAUF AM UNTEREN RAND (1281 px)
+try {
+  const p = await seite(1281, 800);
+  await p.evaluate(() => huelleSetzen('aus')); await p.waitForTimeout(300);
+  const platz = await p.evaluate(() => {
+    const n = document.querySelector('.side-nav');
+    const letzte = [...document.querySelectorAll('.side-foot .nav-item, .side-foot .side-user')].pop();
+    return { ueberlauf: n.scrollWidth - n.clientWidth,
+             rechts: letzte ? Math.round(letzte.getBoundingClientRect().right) : 0 };
+  });
+  check('KRITISCH: bei 1281 px laeuft die Navigation nicht ueber', platz.ueberlauf <= 1);
+  check('KRITISCH: der letzte Knopf bleibt im Fenster', platz.rechts > 0 && platz.rechts <= 1281);
+  await p.close();
+} catch (e) { bad.push('Ueberlauf 1281: ' + String(e).split('\n')[0].slice(0, 120)); }
+
+// ══════════════════════════════ UNTERKATEGORIEN IN DER WERKZEUGLEISTE
+try {
+  const p = await seite(1600, 900);
+
+  // Voll ausgefahren: nicht noetig, die Seitenleiste zeigt sie selbst
+  await p.evaluate(() => go('kunden')); await p.waitForTimeout(300);
+  let ts = await mass(p, '#topSub');
+  check('Bei voller Leiste bleibt die Werkzeugleiste frei', ts.display === 'none');
+
+  await p.evaluate(() => huelleSetzen('aus')); await p.waitForTimeout(300);
+  ts = await mass(p, '#topSub');
+  const namen = await p.evaluate(() => [...document.querySelectorAll('#topSub button')].map(b => b.textContent));
+  check('KRITISCH: kompakt erscheinen die Unterkategorien oben', ts.display === 'flex');
+  check('KRITISCH: mit den richtigen Namen',
+    JSON.stringify(namen) === JSON.stringify(['Adressen', 'Objekte', 'Rapporte']));
+  const markiert = await p.evaluate(() => {
+    const b = document.querySelector('#topSub button.on'); return b ? b.textContent : null; });
+  check('Die aktuelle ist hervorgehoben', markiert === 'Adressen');
+
+  // Der Klick fuehrt wirklich weiter
+  await p.evaluate(() => [...document.querySelectorAll('#topSub button')].find(b => b.textContent === 'Objekte').click());
+  await p.waitForTimeout(350);
+  check('KRITISCH: ein Klick wechselt die Unterkategorie',
+    (await p.textContent('#pgCrumb')).includes('Dauerauftr'));
+  const m2 = await p.evaluate(() => {
+    const b = document.querySelector('#topSub button.on'); return b ? b.textContent : null; });
+  check('Und die Hervorhebung wandert mit', m2 === 'Objekte');
+
+  // Administration: bis hierher war dort gar nichts markiert
+  await p.evaluate(() => go('mitarbeiter')); await p.waitForTimeout(300);
+  const n2 = await p.evaluate(() => [...document.querySelectorAll('#topSub button')].map(b => b.textContent));
+  check('KRITISCH: auch die Administration zeigt ihre Unterkategorien',
+    JSON.stringify(n2) === JSON.stringify(['Mitarbeitende', 'Betrieb']));
+
+  // Ein Bereich ohne Untergruppen zeigt keine leere Leiste
+  await p.evaluate(() => go('abgleich')); await p.waitForTimeout(300);
+  ts = await mass(p, '#topSub');
+  check('Ein Bereich ohne Unterkategorien zeigt keine leere Leiste', ts.display === 'none');
+
+  await p.screenshot({ path: `${OUT}/huelle-kopf-beschriftet.png` });
+  await p.close();
+} catch (e) { bad.push('Unterkategorien: ' + String(e).split('\n')[0].slice(0, 120)); }
+
 await browser.close();
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
