@@ -252,10 +252,15 @@ await oeffnen();
     knopf: !!document.getElementById('btnDashBearbeiten'),
     items: document.querySelectorAll('#dashFlow .dash-item').length,
     werkzeuge: document.querySelectorAll('#dashFlow .dash-werk').length,
+    registriert: DASH_WIDGETS.length,
   }));
   check('Die Uebersicht hat weiterhin ihren Bearbeiten-Knopf', d.knopf);
+  // Nicht gegen eine feste Zahl: Die Aussage ist "JEDER Container bekommt
+  // seine Werkzeugleiste nachgeruestet", nicht "es sind genau sieben". Eine
+  // feste Zahl wird beim naechsten neuen Container rot, ohne dass etwas
+  // kaputt ist -- und wer das ein paarmal erlebt, glaubt dem Rot nicht mehr.
   check('KRITISCH: ihre Container haben die Werkzeugleiste, obwohl sie nicht mehr im HTML steht',
-    d.items === 7 && d.werkzeuge === 7);
+    d.items === d.registriert && d.werkzeuge === d.items && d.items > 0);
 }
 
 // ══════════════ EIN FEHLGESCHLAGENER ABRUF WIRD BENANNT

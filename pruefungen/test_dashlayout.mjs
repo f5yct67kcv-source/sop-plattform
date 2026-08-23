@@ -32,6 +32,12 @@ async function starte(vorbelegt) {
   await page.waitForSelector('#shell.on'); await page.waitForTimeout(400);
   return { browser, page };
 }
+// Die Standardreihenfolge steht EINMAL hier. Sie wird zusaetzlich gegen die
+// Registrierung im Dashboard geprueft -- so muss ein neuer Container nur an
+// einer Stelle nachgetragen werden, und die Pruefung sagt trotzdem noch
+// etwas aus: Sie haelt fest, in welcher Reihenfolge die Uebersicht startet.
+const STANDARD = ['begruessung', 'kpi', 'kurzwahl', 'verlauf', 'angemeldet', 'letzte', 'proma', 'ereignisse'];
+
 const reihenfolge = page => page.evaluate(() =>
   [...document.querySelectorAll('.dash-item')].sort((a, b) => Number(a.style.order) - Number(b.style.order)).map(e => e.dataset.widget));
 
@@ -40,10 +46,12 @@ let { browser, page } = await starte();
 // ══════════ GRUNDZUSTAND
 check('„Bearbeiten“ steht oben rechts', await page.isVisible('#btnDashBearbeiten'));
 check('Die Bearbeitungsleiste ist zunächst verborgen', !(await page.isVisible('#dashEditleiste')));
-check('Alle sieben Container sind da',
-  await page.evaluate(() => document.querySelectorAll('.dash-item').length === 7));
+check('Alle acht Container sind da',
+  await page.evaluate(n => document.querySelectorAll('.dash-item').length === n, STANDARD.length));
+check('KRITISCH: die Pruefung kennt dieselben Container wie das Dashboard',
+  JSON.stringify(await page.evaluate(() => DASH_WIDGETS.map(w => w.id))) === JSON.stringify(STANDARD));
 check('Standardreihenfolge stimmt',
-  JSON.stringify(await reihenfolge(page)) === JSON.stringify(['begruessung', 'kpi', 'verlauf', 'angemeldet', 'letzte', 'proma', 'ereignisse']));
+  JSON.stringify(await reihenfolge(page)) === JSON.stringify(STANDARD));
 check('Kein Container ist ausgeblendet',
   await page.evaluate(() => document.querySelectorAll('.dash-item.versteckt').length === 0));
 check('Der Bearbeiten-Knopf verschwindet auf anderen Ansichten',
@@ -79,6 +87,15 @@ try {
   // -- "eine halbe Seite reicht" ist eine Aussage ueber den Inhalt, nicht
   // ueber die Nachbarn. Mit flex-grow 1 zoege er sich auf die volle Breite.
   check('KRITISCH: ein halber Container wächst nicht auf die volle Breite', m.wachsen === '0');
+
+  // Vier Kennzahlen in halber Breite gehoeren zwei mal zwei, nicht drei plus
+  // eine: Eine Kachel allein in der zweiten Zeile sieht aus wie ein Rest.
+  const kpiZeilen = await page.evaluate(() => {
+    const o = [...document.querySelectorAll('#kpiGrid > *')].map(e => Math.round(e.getBoundingClientRect().top));
+    return { zeilen: new Set(o).size, kacheln: o.length };
+  });
+  check('KRITISCH: vier Kennzahlen stehen zwei mal zwei',
+    kpiZeilen.kacheln !== 4 || kpiZeilen.zeilen === 2);
 } catch (e) { bad.push('Breiten: ' + String(e).split('\n')[0].slice(0, 120)); }
 
 // ══════════ BEARBEITUNGSMODUS
@@ -89,15 +106,20 @@ check('Die drei Knöpfe erscheinen', await page.isVisible('#dashEditleiste'));
 check('Zurücksetzen, Abbrechen, Speichern in dieser Reihenfolge',
   (await page.textContent('#dashEditleiste')).replace(/\s+/g, ' ').includes('Zurücksetzen Abbrechen Speichern'));
 check('Jeder Container zeigt jetzt sein Werkzeug',
-  await page.evaluate(() => document.querySelectorAll('.dash-werk').length === 7 &&
-    [...document.querySelectorAll('.dash-werk')].every(w => getComputedStyle(w).display !== 'none')));
+  await page.evaluate(n => document.querySelectorAll('.dash-werk').length === n &&
+    [...document.querySelectorAll('.dash-werk')].every(w => getComputedStyle(w).display !== 'none'), STANDARD.length));
 await page.screenshot({ path: OUT + '/71-bearbeiten.png' });
 
 // ══════════ MIT PFEILEN VERSCHIEBEN
 await page.click('.dash-item[data-widget="letzte"] .dash-werk button[title="Weiter vorne"]');
 await page.waitForTimeout(150);
+const umEinsNachVorne = (liste, id) => {
+  const k = [...liste], i = k.indexOf(id);
+  k.splice(i - 1, 0, k.splice(i, 1)[0]);
+  return k;
+};
 check('„Letzte Rapporte“ ist einen Platz nach vorne gerückt',
-  JSON.stringify(await reihenfolge(page)) === JSON.stringify(['begruessung', 'kpi', 'verlauf', 'letzte', 'angemeldet', 'proma', 'ereignisse']));
+  JSON.stringify(await reihenfolge(page)) === JSON.stringify(umEinsNachVorne(STANDARD, 'letzte')));
 check('Erster Container kann nicht weiter nach vorne',
   await page.evaluate(() => document.querySelector('.dash-item[data-widget="begruessung"] button[title="Weiter vorne"]').disabled === false));
 // (der Pfeil ist nicht deaktiviert, da wir keine harte Grenzanzeige gebaut haben -- geprüft wird stattdessen, dass es an der Grenze nichts tut)
@@ -134,7 +156,7 @@ check('Ziehen setzt „Ereignisse“ vor „Stundenverlauf“',
 await page.click('#dashEditleiste button:has-text("Abbrechen")');
 await page.waitForTimeout(200);
 check('Nach Abbrechen gilt wieder die alte Reihenfolge',
-  JSON.stringify(await reihenfolge(page)) === JSON.stringify(['begruessung', 'kpi', 'verlauf', 'angemeldet', 'letzte', 'proma', 'ereignisse']));
+  JSON.stringify(await reihenfolge(page)) === JSON.stringify(STANDARD));
 check('Nach Abbrechen ist nichts mehr ausgeblendet',
   await page.evaluate(() => document.querySelectorAll('.dash-item.versteckt').length === 0));
 check('Der Bearbeiten-Knopf ist wieder da', await page.isVisible('#btnDashBearbeiten'));
@@ -163,7 +185,7 @@ await browser.close();
 ({ browser, page } = await starte());
 await page.click('#btnDashBearbeiten');
 await page.waitForTimeout(150);
-for (const w of ['begruessung', 'kpi', 'verlauf', 'angemeldet', 'letzte', 'proma', 'ereignisse']) {
+for (const w of STANDARD) {
   await page.click(`.dash-item[data-widget="${w}"] .dash-auge`);
 }
 await page.waitForTimeout(150);
@@ -182,7 +204,7 @@ await page.waitForTimeout(150);
 await page.click('#dashEditleiste button:has-text("Zurücksetzen")');
 await page.waitForTimeout(200);
 check('Zurücksetzen stellt die Standardreihenfolge im Entwurf her',
-  JSON.stringify(await reihenfolge(page)) === JSON.stringify(['begruessung', 'kpi', 'verlauf', 'angemeldet', 'letzte', 'proma', 'ereignisse']));
+  JSON.stringify(await reihenfolge(page)) === JSON.stringify(STANDARD));
 check('Zurücksetzen blendet alles wieder ein',
   await page.evaluate(() => document.querySelectorAll('.dash-item.versteckt').length === 0));
 check('Bleibt im Bearbeitungsmodus -- noch nicht gespeichert', await page.isVisible('#dashEditleiste'));
@@ -205,7 +227,7 @@ const geladen = await reihenfolge(page);
 check('Ein unbekannter, entfernter Eintrag verschwindet lautlos', !geladen.includes('ein-entferntes-widget'));
 check('Bekannte gespeicherte Reihenfolge bleibt erhalten', geladen[0] === 'ereignisse' && geladen[1] === 'kpi');
 check('Neue, damals unbekannte Container werden angehängt',
-  geladen.slice(2).sort().join(',') === ['angemeldet', 'letzte', 'proma', 'verlauf', 'begruessung'].sort().join(','));
+  geladen.slice(2).sort().join(',') === STANDARD.filter(x => x !== 'ereignisse' && x !== 'kpi').sort().join(','));
 check('Die gespeicherte Sichtbarkeit gilt weiter',
   await page.evaluate(() => document.querySelector('.dash-item[data-widget="kpi"]').classList.contains('versteckt')));
 await browser.close();
