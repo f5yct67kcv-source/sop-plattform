@@ -228,6 +228,16 @@ svg.i-sm { width: 17px; height: 17px; }
 
 /* Unterlagen zur Schicht (ENT-117). Ganze Zeile als Trefferfläche und
    mindestens 44 px hoch -- am Bauzaun wird das mit Handschuhen getippt. */
+/* Der Routenknopf steht in der Adresszeile und ist ein echtes Bedienelement
+   auf einem Telefon -- 44 px Trefferflaeche wie jedes andere auch. */
+.route-knopf { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px;
+  min-height: 44px; padding: 0 14px; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--surface); color: var(--ink); font-size: 13.5px; font-weight: 620;
+  text-decoration: none; }
+.route-knopf:active { background: var(--flaeche-2, rgba(127,127,127,.12)); }
+.route-i { width: 15px; height: 15px; flex: none; stroke: currentColor; stroke-width: 1.9;
+  fill: none; stroke-linecap: round; stroke-linejoin: round; }
+
 .dok-kopf { font-size: 12px; font-weight: 650; letter-spacing: .3px; text-transform: uppercase;
   color: var(--ink-3); margin: 18px 0 8px; }
 .dok-liste { display: flex; flex-direction: column; gap: 8px; }
@@ -397,6 +407,7 @@ const W = {
     kunde: 'Kunde', arbeitsort: 'Arbeitsort', zeit: 'Zeit', einsatzart: 'Einsatzart',
     bemerkung: 'Bemerkung', objekt: 'Objekt', imTeam: 'im Team',
     treffpunkt: 'Treffpunkt', kontaktVorOrt: 'Kontakt vor Ort',
+    route: 'Route öffnen', routeFehlt: 'Für diese Schicht ist keine Adresse hinterlegt.',
     dokumente: 'Unterlagen', dokumenteLaden: 'wird geladen …',
     dokumentFehler: 'Die Unterlage liess sich nicht öffnen.',
     taetigkeit: 'Tätigkeit', qualifikation: 'Qualifikation',
@@ -1098,7 +1109,10 @@ function blattAuf(id) {
       <dt>${esc(w('zeit'))}</dt><dd>${esc(wd)}, ${dmy(e.datum)}</dd>
       <dt>${esc(w('kunde'))}</dt><dd>${esc(e.kunde_name)}</dd>
       ${e.objekt_name ? `<dt>${esc(w('objekt'))}</dt><dd>${esc(e.objekt_name)}</dd>` : ''}
-      <dt>${esc(w('arbeitsort'))}</dt><dd>${e.strasse ? esc(e.strasse) + '<br>' : ''}${esc(e.ort)}${e.kanton ? ' ' + esc(e.kanton) : ''}</dd>
+      <dt>${esc(w('arbeitsort'))}</dt><dd>${e.strasse ? esc(e.strasse) + '<br>' : ''}${esc(e.ort)}${e.kanton ? ' ' + esc(e.kanton) : ''}${
+        schichtAdresse(e) ? `<br><a class="route-knopf" target="_blank" rel="noopener"
+          href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(schichtAdresse(e))}"
+          >${ROUTE_IKONE}${esc(w('route'))}</a>` : ''}</dd>
       ${e.treffpunkt ? `<dt>${esc(w('treffpunkt'))}</dt><dd>${esc(e.treffpunkt)}</dd>` : ''}
       ${e.kontakt_vorname || e.kontakt_nachname || e.kontakt_telefon ? `<dt>${esc(w('kontaktVorOrt'))}</dt><dd>${
         esc([e.kontakt_vorname, e.kontakt_nachname].filter(Boolean).join(' '))
@@ -1135,6 +1149,27 @@ function blattAuf(id) {
 // Sicherheitskonzept. Der Endpunkt gibt sie nur an Eingeteilte dieses
 // Einsatzes heraus -- hier wird nichts zusätzlich geprüft, weil eine Prüfung
 // in der Oberfläche keine ist.
+// Adresse der Schicht als Zieladresse fuer die Navigation (ENT-119).
+//
+// ABGRENZUNG: Das hat NICHTS mit der Wegstrecke nach Art. 18 GAV zu tun
+// (ENT-116). Dort geht es um die KUERZESTE Strecke ab Hauptanstellungsort als
+// Grundlage fuer den Auslagenersatz, sie wird von einem Menschen abgelesen und
+// gespeichert, und die Zoneneinteilung ist als GAV-AUS-011 offen. Hier geht es
+// nur darum, dass die eingeteilte Person den Ort findet -- eine Navigation vom
+// jeweiligen Standort aus, ohne origin, ohne gespeicherte Zahl, ohne jede
+// Wirkung auf Lohn oder Rechnung. Diese beiden Wege duerfen nie zusammenlaufen.
+//
+// Kein origin: Der Startpunkt ist der Standort der Person, den kennt ihr Geraet
+// -- und wir wollen ihn nicht wissen.
+function schichtAdresse(e) {
+  if (!e) { return ''; }
+  return [e.strasse, e.ort, e.kanton].map(t => String(t || '').trim()).filter(Boolean).join(', ');
+}
+
+const ROUTE_IKONE = '<svg viewBox="0 0 24 24" aria-hidden="true" class="route-i">'
+  + '<path d="M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 0 1 18 0z"/>'
+  + '<circle cx="12" cy="10" r="3"/></svg>';
+
 function blattDokLaden(einsatzId) {
   const el = $('blDok'); if (!el) return;
   el.innerHTML = '';

@@ -13,7 +13,7 @@ $von = trim((string)($_GET['von'] ?? ''));
 $bis = trim((string)($_GET['bis'] ?? ''));
 $eingegrenzt = preg_match('/^\d{4}-\d{2}-\d{2}$/', $von) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $bis);
 
-$sql = 'SELECT id, kunde_id, kunde_name, objekt_id, masterschicht_id, titel, strasse, ort, kanton,
+$sql = 'SELECT id, kunde_id, kunde_name, objekt_id, masterschicht_id, serie_id, titel, strasse, ort, kanton,
                einsatzart, sparte, datum, von, bis, bedarf, status, bemerkung, erstellt_am,
                -- ENT-115: Diese Spalten gab es laengst, geliefert wurden sie nie.
                -- Die Einsatzplan-Ansicht las e.treffpunkt und bekam immer undefined.
