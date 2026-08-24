@@ -39,6 +39,14 @@ const EREIGNISSE = [
     von: '07:00', bis: '16:00', kunde: 'Muster AG', ort: 'Musterstadt' },
 ];
 
+// Eine Ablehnung -- bewusst NICHT im gemeinsamen Bestand: Die uebrigen
+// Pruefungen zaehlen dort drei Ereignisse, und eine vierte Zeile haette sie
+// alle rot gefaerbt, ohne dass am Produkt etwas falsch waere.
+const ABLEHNUNG = { typ: 'zusage', id: 12, mitarbeiter_id: 4, zeit: vorMin(20),
+  person: { id: 4, name: 'urs', vorname: 'Urs', nachname: 'Beispiel' },
+  titel: 'Schicht abgelehnt', zusage: 'abgelehnt', datum: MORGEN,
+  von: '07:00', bis: '16:00', kunde: 'Borner AG', ort: 'Olten' };
+
 const browser = await chromium.launch({ executablePath: EXE });
 const gesendet = [];
 
@@ -339,6 +347,34 @@ try {
   await q.close();
   await p.close();
 } catch (e) { bad.push('Reihenfolge/Knopf: ' + String(e).split('\n')[0].slice(0, 120)); }
+
+// ══════════ EINE ABLEHNUNG IST KEINE ZUSAGE (ENT-113)
+// Der Vergleich lief gegen 'abgesagt' -- diesen Wert kennt meine_zusage.php
+// nicht (offen | zugesagt | abgelehnt). Jede Ablehnung stand darum als
+// Zusage im Feed: das Gegenteil dessen, was passiert war.
+const seiteAbl = await seite({ ereignisse: [...EREIGNISSE, ABLEHNUNG],
+                               ereignisse_gesamt: EREIGNISSE.length + 1 });
+const abl = await seiteAbl.evaluate(() => {
+  const z = [...document.querySelectorAll('#ereignisFeed .erg')]
+    .find(r => r.textContent.includes('Urs'));
+  return z ? { txt: z.textContent.replace(/\s+/g, ' '), klasse: z.className,
+               punkt: (z.querySelector('.dot') || {}).className || '' } : null;
+});
+check('KRITISCH: eine Ablehnung wird als Ablehnung ausgewiesen',
+  abl && abl.txt.includes('HAT ABGELEHNT'));
+check('KRITISCH: und nicht mehr als Zusage', abl && !/hat zugesagt/.test(abl.txt));
+check('KRITISCH: die Zeile ist hervorgehoben', abl && abl.klasse.includes('erg-abgelehnt'));
+check('KRITISCH: ihr Punkt ist nicht grün', abl && abl.punkt.includes('neg'));
+// Nach der Zusage-Zeile suchen, nicht nach der Person: Anna steht auch mit
+// einem Rapport im Feed, und der traf beim ersten Versuch zuerst zu.
+const anna = await seiteAbl.evaluate(() => {
+  const z = [...document.querySelectorAll('#ereignisFeed .erg')]
+    .find(r => r.textContent.includes('hat zugesagt'));
+  return z ? { txt: z.textContent.replace(/\s+/g, ' '), klasse: z.className } : null;
+});
+check('Die Zusage daneben bleibt unverändert',
+  anna && anna.txt.includes('hat zugesagt') && !anna.klasse.includes('erg-abgelehnt'));
+await seiteAbl.close();
 
 await browser.close();
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);

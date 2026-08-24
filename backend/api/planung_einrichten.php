@@ -700,6 +700,12 @@ $spalten = [
     // Quelle kann das nicht.
     ['rapporte',          'gesehen_am',        'ALTER TABLE rapporte ADD COLUMN gesehen_am DATETIME NULL'],
     ['einsatz_zuteilung', 'zusage_gesehen_am', 'ALTER TABLE einsatz_zuteilung ADD COLUMN zusage_gesehen_am DATETIME NULL AFTER zusage'],
+    // Wann der oder die Eingeteilte die Schicht in der App GEOEFFNET hat
+    // (ENT-113). Nicht zu verwechseln mit zusage_gesehen_am darueber: Das
+    // haelt fest, wann der PLANER das Ereignis im Feed abgehakt hat. Zwei
+    // verschiedene Personen, zwei verschiedene Aussagen -- der aehnliche
+    // Name ist Erblast, der Inhalt nicht derselbe.
+    ['einsatz_zuteilung', 'gesehen_am', 'ALTER TABLE einsatz_zuteilung ADD COLUMN gesehen_am DATETIME NULL AFTER zusage_gesehen_am'],
     // Schichtabgleich (ENT-045): das Ist neben dem Plan. Vorgabe 'offen', damit
     // der Bestand sichtbar unabgeglichen bleibt, statt faelschlich als
     // bestaetigt zu gelten -- was nie geprueft wurde, darf nicht so aussehen,

@@ -1057,6 +1057,14 @@ function blattAuf(id) {
   const e = schichten.find(x => Number(x.id) === Number(id));
   if (!e) return;
   blattId = Number(id);
+  // Der Planung zeigen, dass diese Schicht angesehen wurde (ENT-113).
+  // Beilaeufig: Ohne Rueckmeldung, ohne Wartezeit -- wer seine Schicht
+  // ansieht, soll davon nichts merken. Schlaegt es fehl, fehlt das Auge in
+  // der Planung; das darf das Oeffnen der Schicht nicht aufhalten.
+  if (!e.gesehen_am) {
+    e.gesehen_am = 'jetzt';
+    api('meine_gesehen.php', { method: 'POST', body: { einsatz_id: Number(id) } }).catch(() => {});
+  }
   const st = STATUS_MARKE[e.status] || STATUS_MARKE.geplant;
   const zu = ZUSAGE_MARKE[e.zusage] || ZUSAGE_MARKE.offen;
   const wd = WOCHENTAG[new Date(tagVon(e) + 'T12:00:00').getDay()];

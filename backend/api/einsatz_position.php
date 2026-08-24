@@ -29,7 +29,7 @@ $pdo = db();
 /** Positionen eines Einsatzes, jeweils mit der zugeteilten Person. */
 function positionen(PDO $pdo, int $einsatzId): array {
     $s = $pdo->prepare(
-        'SELECT p.*, z.mitarbeiter_id, z.zusage, m.name AS ma_name, m.vorname, m.nachname
+        'SELECT p.*, z.mitarbeiter_id, z.zusage, z.gesehen_am, m.name AS ma_name, m.vorname, m.nachname
          FROM einsatz_position p
          LEFT JOIN einsatz_zuteilung z ON z.position_id = p.id
          LEFT JOIN mitarbeiter m ON m.id = z.mitarbeiter_id
@@ -57,6 +57,8 @@ function positionen(PDO $pdo, int $einsatzId): array {
             'vorname' => $p['vorname'],
             'nachname' => $p['nachname'],
             'zusage' => $p['zusage'],
+            // Wann die Person die Schicht in der App geoeffnet hat (ENT-113).
+            'gesehen_am' => $p['gesehen_am'],
         ];
     }, $s->fetchAll());
 }

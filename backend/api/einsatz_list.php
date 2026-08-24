@@ -31,7 +31,7 @@ $einsaetze = $stmt->fetchAll();
 
 // Zuteilungen in einem Zug holen und zuordnen -- eine Abfrage je Einsatz waere
 // bei einem Monatsplan schnell dreistellig.
-$zsql = 'SELECT z.einsatz_id, z.mitarbeiter_id, z.zusage, m.personalnummer,
+$zsql = 'SELECT z.einsatz_id, z.mitarbeiter_id, z.zusage, z.gesehen_am, m.personalnummer,
                 z.ist_status, z.ist_von, z.ist_bis, z.ist_pause_von, z.ist_pause_min,
                 z.ist_pause_bezahlt_ma, z.ist_pause_bezahlt_kunde, z.ist_bemerkung, z.abgeglichen_am,
                 m.name, m.vorname, m.nachname
@@ -52,6 +52,7 @@ foreach ($zstmt->fetchAll() as $z) {
         'vorname' => $z['vorname'],
         'nachname' => $z['nachname'],
         'zusage' => $z['zusage'],
+        'gesehen_am' => $z['gesehen_am'],
         'personalnummer' => $z['personalnummer'],
         // Der Abgleich je Person (ENT-045). 'offen' heisst "noch nicht
         // geprueft" und ist bewusst von 'abwesend' unterschieden.

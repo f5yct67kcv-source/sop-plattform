@@ -25,7 +25,7 @@ $stmt = db()->prepare(
     // sie wuerde eine Zahl ausweisen, die es nicht gibt.
     'SELECT e.id, e.kunde_name, e.titel, e.strasse, e.ort, e.einsatzart, e.sparte,
             e.datum, e.von, e.bis, e.status, e.bemerkung,
-            z.zusage, o.name AS objekt_name,
+            z.zusage, z.gesehen_am, o.name AS objekt_name,
             -- Der eigene Ist-Stand (ENT-049): damit die Person ihre
             -- geleistete Zeit selbst nachschlagen kann. Weiterhin strikt auf
             -- die eigene Zuteilung gefiltert -- fremde Ist-Zeiten sind hier

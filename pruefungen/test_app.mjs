@@ -332,6 +332,27 @@ await page.screenshot({ path: OUT + '/42-app-plan.png' });
 await page.evaluate(() => blattAuf(41)); await page.waitForTimeout(300);
 await page.screenshot({ path: OUT + '/43-app-blatt.png' });
 
+// ══════════ DAS ÖFFNEN EINER SCHICHT WIRD QUITTIERT (ENT-113)
+// Der Planung soll ein Auge zeigen, dass die Person hineingeschaut hat.
+// Gestempelt wird beim Öffnen, nicht beim Laden der Liste.
+const vorGesehen = rufe.filter(r => r.p.includes('meine_gesehen')).length;
+await page.evaluate(() => blattAuf(42));
+await page.waitForTimeout(400);
+const gesehenRufe = rufe.filter(r => r.p.includes('meine_gesehen'));
+check('KRITISCH: das Öffnen einer Schicht meldet sich zurück', gesehenRufe.length > vorGesehen);
+check('KRITISCH: und nennt die Schicht',
+  gesehenRufe.some(r => r.body && Number(r.body.einsatz_id) === 42));
+check('KRITISCH: die eigene Kennung wird NICHT mitgeschickt — sie kommt aus der Sitzung',
+  gesehenRufe.every(r => !r.body || r.body.mitarbeiter_id === undefined));
+// Ein zweites Öffnen quittiert nicht noch einmal.
+const nachErstem = rufe.filter(r => r.p.includes('meine_gesehen')).length;
+await page.evaluate(() => { blattZu(); });
+await page.waitForTimeout(200);
+await page.evaluate(() => blattAuf(42));
+await page.waitForTimeout(400);
+check('Ein zweites Öffnen meldet sich nicht erneut',
+  rufe.filter(r => r.p.includes('meine_gesehen')).length === nachErstem);
+
 await browser.close();
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }

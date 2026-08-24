@@ -276,6 +276,10 @@ if (ohneEinbindung.length) { bad.push('ohne rechte.php: ' + ohneEinbindung.join(
     // Zeiten und der Abgleich bleiben unberuehrt -- eine gelesene Meldung
     // aendert nichts an dem, was festgeschrieben wurde.
     'ereignis_erledigt.php': 'markiert nur als gesehen; aendert weder Plan noch Ist-Zeiten',
+    // Setzt nur einen Lesevermerk der eingeteilten Person (ENT-113). Eine
+    // festgeschriebene Schicht darf angesehen werden -- der Vermerk beruehrt
+    // weder den Plan noch die Ist-Zeiten, auf denen die Feststellung beruht.
+    'meine_gesehen.php': 'haelt nur fest, dass die eigene Schicht angesehen wurde',
   };
   const luecken = apiDateien.filter(f => {
     const q = ohneKommentar(f);
@@ -364,6 +368,7 @@ const NUR_EIGENE_DATEN = [
   'meine_schichten.php',       // eigene Einsaetze
   'meine_verfuegbarkeit.php',  // eigene Sperrtage
   'meine_zusage.php',          // eigene Zu-/Absage
+  'meine_gesehen.php',         // eigene Schicht als angesehen vermerken
   'rapport_create.php',        // eigenen Rapport erfassen
   'rapport_list.php',          // eigene Rapporte -- mehr nur mit Recht "abgleich"
   'kunden_list.php',           // Kundenliste fuer die App; Zusatzangaben nur mit Recht
