@@ -62,13 +62,30 @@ function positionen(PDO $pdo, int $einsatzId): array {
 }
 
 function einsatz_oder_ende(PDO $pdo, int $id): array {
-    $s = $pdo->prepare('SELECT id, datum, von, bis, bedarf FROM einsaetze WHERE id = ?');
+    $s = $pdo->prepare('SELECT id, datum, von, bis, bedarf, einsatzart FROM einsaetze WHERE id = ?');
     $s->execute([$id]);
     $e = $s->fetch();
     if (!$e) {
         json_response(['status' => 'error', 'message' => 'Einsatz nicht gefunden.'], 404);
     }
     return $e;
+}
+
+/**
+ * Sobald ein Einsatz Positionen hat, ist ihre Anzahl die Wahrheit -- 'bedarf'
+ * wird mitgeschrieben statt danebengehalten.
+ *
+ * Grund: Beide Zahlen beantworten dieselbe Frage ("wie viele Leute braucht
+ * dieser Einsatz"), und sie stehen an verschiedenen Stellen der Oberflaeche --
+ * die Liste und die Kacheln lesen 'bedarf', das Raster zaehlt Positionen.
+ * Zwei Quellen fuer dieselbe Aussage laufen frueher oder spaeter auseinander,
+ * und dann zeigt die Liste "1/2", waehrend im Raster drei Zeilen stehen.
+ * Darum genau eine Stelle, an der nachgefuehrt wird: hier.
+ */
+function bedarf_nachfuehren(PDO $pdo, int $einsatzId): void {
+    $pdo->prepare(
+        'UPDATE einsaetze SET bedarf = (SELECT COUNT(*) FROM einsatz_position WHERE einsatz_id = ?) WHERE id = ?'
+    )->execute([$einsatzId, $einsatzId]);
 }
 
 function zeit_oder_ende(string $wert, string $feld): string {
@@ -123,6 +140,58 @@ $einsatz = einsatz_oder_ende($pdo, $einsatzId);
 // ansehen, nur nicht mehr aendern.
 einsatz_sperre_pruefen($pdo, $einsatzId);
 
+// ── Positionen aus dem Bedarf anlegen ────────────────────────────────────
+//
+// Ein Einsatz sagt mit 'bedarf', wie viele Leute er braucht. Bis hierher war
+// das nur eine Zahl: Wer die Planungsansicht oeffnete, fand ein leeres Raster
+// und musste jede Zeile einzeln anlegen -- obwohl die Anzahl laengst feststand.
+//
+// Diese Aktion legt darum beim ersten Oeffnen so viele Positionen an, wie der
+// Einsatz braucht, jede mit seiner eigenen Zeit. Verschoben, gestaffelt und
+// umbenannt wird danach.
+//
+// Sie legt NUR an, wo noch gar keine Position steht. Ein Einsatz, an dem
+// schon geplant wurde, wird nicht angefasst -- sonst kaeme bei jedem Oeffnen
+// eine Zeile dazu.
+if ($aktion === 'aus_bedarf') {
+    $vorhanden = $pdo->prepare('SELECT COUNT(*) FROM einsatz_position WHERE einsatz_id = ?');
+    $vorhanden->execute([$einsatzId]);
+    if ((int)$vorhanden->fetchColumn() > 0) {
+        json_response(['status' => 'ok', 'positionen' => positionen($pdo, $einsatzId)]);
+    }
+
+    // Wer bereits am Einsatz steht, bekommt einen Platz. Zuteilungen aus der
+    // Zeit vor den Positionen tragen position_id = NULL; ohne diesen Schritt
+    // waeren sie im Raster unsichtbar, obwohl die Person eingeteilt ist.
+    $z = $pdo->prepare('SELECT id FROM einsatz_zuteilung WHERE einsatz_id = ? ORDER BY id');
+    $z->execute([$einsatzId]);
+    $zuteilungen = $z->fetchAll(PDO::FETCH_COLUMN);
+
+    // Mindestens so viele Plaetze wie zugeteilte Personen -- eine eingeteilte
+    // Person darf nie herausfallen, auch wenn 'bedarf' kleiner ist.
+    $anzahl = max((int)$einsatz['bedarf'], count($zuteilungen));
+    if ($anzahl < 1) {
+        json_response(['status' => 'ok', 'positionen' => []]);
+    }
+
+    // Die Funktion kommt aus der Einsatzart: ein Verkehrsdienst-Einsatz
+    // erzeugt Verkehrsdienst-Positionen, nicht irgendeine Vorgabe.
+    $funktion = trim((string)($einsatz['einsatzart'] ?? '')) ?: null;
+
+    $ins = $pdo->prepare('INSERT INTO einsatz_position (einsatz_id, nr, funktion, von, bis) VALUES (?, ?, ?, ?, ?)');
+    $setz = $pdo->prepare('UPDATE einsatz_zuteilung SET position_id = ? WHERE id = ?');
+    $pdo->beginTransaction();
+    for ($i = 0; $i < $anzahl; $i++) {
+        $ins->execute([$einsatzId, $i + 1, $funktion, $einsatz['von'], $einsatz['bis']]);
+        if (isset($zuteilungen[$i])) {
+            $setz->execute([(int)$pdo->lastInsertId(), (int)$zuteilungen[$i]]);
+        }
+    }
+    $pdo->commit();
+    bedarf_nachfuehren($pdo, $einsatzId);
+    json_response(['status' => 'ok', 'positionen' => positionen($pdo, $einsatzId)]);
+}
+
 if ($aktion === 'speichern') {
     $id = (int)($in['id'] ?? 0);
     // Ohne eigene Zeit gilt die des Einsatzes -- so entsteht aus einem Klick
@@ -162,6 +231,7 @@ if ($aktion === 'speichern') {
         $s = $pdo->prepare($sql);
         $s->execute(array_values($felder));
         $id = (int)$pdo->lastInsertId();
+        bedarf_nachfuehren($pdo, $einsatzId);
     }
     json_response(['status' => 'ok', 'id' => $id, 'positionen' => positionen($pdo, $einsatzId)]);
 }
@@ -172,6 +242,7 @@ if ($aktion === 'entfernen') {
     // geloest: die Person bleibt am Einsatz, bis jemand sie bewusst entfernt.
     $pdo->prepare('UPDATE einsatz_zuteilung SET position_id = NULL WHERE position_id = ?')->execute([$id]);
     $pdo->prepare('DELETE FROM einsatz_position WHERE id = ? AND einsatz_id = ?')->execute([$id, $einsatzId]);
+    bedarf_nachfuehren($pdo, $einsatzId);
     json_response(['status' => 'ok', 'positionen' => positionen($pdo, $einsatzId)]);
 }
 
