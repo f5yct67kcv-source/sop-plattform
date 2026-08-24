@@ -406,6 +406,33 @@ tbody tr.aus td { opacity: .55; }
 .ep-p i { flex: none; width: 8px; height: 8px; border-radius: 50%; }
 .ep-p .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ep-p .wo { font-size: 10.5px; }
+/* Kopfbereich des Einsatzes.
+   Beschriftung OBEN, Wert darunter -- nie umgekehrt und nie nebeneinander.
+   Vorher standen beide ohne eigene Regel im selben Fluss, was sie zu
+   "Nummer75" zusammenzog. */
+.ep-kopf { display: grid; grid-template-columns: repeat(auto-fit, minmax(165px, 1fr));
+  gap: 14px 22px; padding: 14px 16px; }
+.ep-kf { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.ep-kf > span { font-size: 10px; letter-spacing: .5px; text-transform: uppercase; color: var(--ink-3); }
+.ep-kf > b { font-size: 13px; font-weight: 600; color: var(--ink); line-height: 1.35;
+  overflow-wrap: anywhere; }
+/* Mehrzeilige Werte (Strasse, dann PLZ und Ort) bleiben eine Einheit. */
+.ep-kf > b small { display: block; font-size: 12px; font-weight: 500; color: var(--ink-2); }
+
+/* Werkzeuge einer Schichtzeile: Schloss, Bearbeiten, Klonen. */
+.ep-werk { display: flex; align-items: center; gap: 2px; }
+.ep-werk button { background: none; border: none; cursor: pointer; color: var(--ink-3);
+  padding: 3px; border-radius: var(--r-xs); display: flex; align-items: center; line-height: 0; }
+.ep-werk button:hover { background: var(--surface-3); color: var(--ink); }
+.ep-wahl { width: 26px; text-align: center; }
+.ep-wahl input { cursor: pointer; margin: 0; }
+
+/* Leiste unter dem Raster: was mit den angehakten Schichten geschehen soll. */
+.ep-sammel { display: flex; align-items: center; gap: 9px; padding: 9px 12px;
+  border-top: 1px solid var(--line-soft); font-size: 12.5px; flex-wrap: wrap; }
+.ep-sammel select { height: 32px; font-size: 12.5px; width: auto; }
+.ep-sammel .zahl { color: var(--ink-3); }
+
 .ep-plan { overflow: hidden; }
 .ep-plan-kopf { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-bottom: 1px solid var(--line-soft); font-size: 12.5px; }
 .ep-hinweis { font-size: 11.5px; color: var(--ink-3); }
@@ -2947,9 +2974,9 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
           <button class="btn btn-plain btn-sm" onclick="go('planung')">Zurück zur Planung</button>
           <button class="btn btn-quiet btn-sm" onclick="epEinsatzOeffnen()">Einsatz bearbeiten</button>
           <div class="sp" style="flex:1"></div>
+          <button class="btn btn-quiet btn-sm" onclick="epBemerkungAuf()">Bemerkung</button>
           <button class="btn btn-quiet btn-sm" onclick="epLaden()">Aktualisieren</button>
           <button class="btn btn-quiet btn-sm" onclick="window.print()">Drucken</button>
-          <button class="btn btn-primary btn-sm" onclick="epPosNeu()">Position hinzufügen</button>
         </div>
 
         <div class="card"><div id="epKopf"></div></div>
@@ -2965,12 +2992,25 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 
           <div class="card ep-plan">
             <div class="ep-plan-kopf">
-              <b>Positionen</b>
+              <b>Schichten</b>
+              <!-- Der Knopf steht seit ENT-109 hier statt in der obersten
+                   Leiste: Er wirkt auf diese Karte, und ganz oben rechts
+                   stand er weit weg von dem, was er verändert. -->
+              <button class="btn btn-primary btn-sm" onclick="epPosNeu()">Neue Schicht</button>
               <span class="ep-hinweis" id="epHinweis">Position wählen, dann Person anklicken</span>
               <div class="sp" style="flex:1"></div>
               <div class="ep-soll" id="epSoll"></div>
             </div>
             <div class="ep-scroll"><div id="epRaster"></div></div>
+            <div class="ep-sammel" id="epSammel" style="display:none">
+              <span class="zahl" id="epSammelZahl"></span>
+              <select class="inp" id="epSammelWas" aria-label="Was mit den ausgewählten Schichten geschehen soll">
+                <option value="editieren">Schichten editieren</option>
+                <option value="leeren">Schichten leeren</option>
+                <option value="loeschen">Schichten löschen</option>
+              </select>
+              <button class="btn btn-plain btn-sm" onclick="epSammelAusfuehren()">Ausführen</button>
+            </div>
           </div>
         </div>
       </section>
@@ -3089,6 +3129,69 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
      zweites Mal und wäre mit dem grösseren Umfang zur doppelten Pflege
      geworden. Auch Ziel des Diktat-Routers, der nur vorbefüllt — gespeichert
      wird ausschliesslich durch den Knopf unten (ENT-015). -->
+<!-- ══════════ EINE SCHICHT BEARBEITEN (ENT-109) ══════════
+     Nicht jede Person arbeitet den ganzen Einsatz durch: Eine Pausenablösung
+     dauert zwei Stunden, eine Frühschicht endet mittags. Darum trägt jede
+     Schicht ihre eigene Zeit. Derselbe Dialog bearbeitet auch mehrere
+     angehakte Schichten auf einmal. -->
+<div class="dlg-scrim" id="dlgSchicht">
+  <div class="dlg">
+    <div class="dlg-hd">
+      <h2 id="epsTitel">Schicht bearbeiten</h2>
+      <p id="epsText"></p>
+    </div>
+    <div class="dlg-bd">
+      <div class="msg-err" id="epsErr" style="display:none"></div>
+      <div class="form-grid">
+        <div class="f"><label for="eps_von">Von</label>
+          <input class="inp" id="eps_von" type="time"></div>
+        <div class="f"><label for="eps_bis">Bis</label>
+          <input class="inp" id="eps_bis" type="time"></div>
+        <div class="f"><label for="eps_funktion">Funktion</label>
+          <input class="inp" id="eps_funktion" placeholder="z. B. Verkehrsdienst"></div>
+        <div class="f"><label for="eps_position">Bezeichnung</label>
+          <input class="inp" id="eps_position" placeholder="z. B. Pausenablösung"></div>
+        <div class="f"><label for="eps_std">Stundenansatz (CHF)</label>
+          <input class="inp" id="eps_std" type="number" step="0.05" min="0" placeholder="—"></div>
+        <div class="f"><label for="eps_pauschal">Pauschal (CHF)</label>
+          <input class="inp" id="eps_pauschal" type="number" step="0.05" min="0" placeholder="—"></div>
+        <div class="f" style="grid-column:1/-1"><label for="eps_qualifikation">Qualifikation</label>
+          <input class="inp" id="eps_qualifikation" placeholder="—"></div>
+      </div>
+      <p class="note" id="epsFenster" style="margin-top:10px"></p>
+    </div>
+    <div class="dlg-ft">
+      <button class="btn btn-plain" onclick="closeDlg('dlgSchicht')">Abbrechen</button>
+      <div style="flex:1"></div>
+      <button class="btn btn-primary" id="epsBtn" onclick="epSchichtSpeichern()">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ BEMERKUNG FÜR DIE EINGETEILTEN (ENT-109) ══════════
+     Hängt am Einsatz, nicht an der einzelnen Schicht — nur so erreicht sie
+     die App der Mitarbeitenden, die den Einsatz anzeigt und Positionen nicht
+     kennt. -->
+<div class="dlg-scrim" id="dlgEpBemerkung">
+  <div class="dlg">
+    <div class="dlg-hd">
+      <h2>Bemerkung zum Einsatz</h2>
+      <p>Steht allen, die auf diesem Einsatz eingeteilt sind, in ihrer App bei der Schicht.</p>
+    </div>
+    <div class="dlg-bd">
+      <div class="msg-err" id="epbErr" style="display:none"></div>
+      <div class="f"><label for="epbText">Was die Eingeteilten wissen müssen</label>
+        <textarea class="inp" id="epbText" rows="5"
+          placeholder="z. B. Treffpunkt beim Haupteingang, Schlüssel bei der Réception, Warnweste mitbringen."></textarea></div>
+    </div>
+    <div class="dlg-ft">
+      <button class="btn btn-plain" onclick="closeDlg('dlgEpBemerkung')">Abbrechen</button>
+      <div style="flex:1"></div>
+      <button class="btn btn-primary" id="epbBtn" onclick="epBemerkungSpeichern()">Speichern</button>
+    </div>
+  </div>
+</div>
+
 <div class="dlg-scrim" id="dlgKunde">
   <div class="dlg breit">
     <div class="dlg-hd">
@@ -7775,11 +7878,18 @@ function askDeleteObjekt() {
 // verliert die Staffelung.
 const EP_TAKT = 15;
 let epId = null, epEinsatz = null, epPos = [], epGewaehlt = null, epFilter = 'alle';
+// Angehakte Schichten (Sammelaktionen) und die gerade bearbeiteten Schichten
+// im Dialog. Beides bewusst neben epGewaehlt, nicht darin -- siehe epHaken().
+let epAngehakt = new Set(), epBearbeitet = [];
 
 function epAuf(id) {
   epId = Number(id);
   epGewaehlt = null;
   epFilter = 'alle';
+  // Eine Auswahl aus dem vorigen Einsatz darf hier nicht weiterleben: Die
+  // Schicht-Nummern kaemen zwar nie doppelt vor, aber eine Sammelaktion auf
+  // einer unsichtbaren Auswahl waere trotzdem nicht nachvollziehbar.
+  epAngehakt.clear();
   go('einsatzplan');
   epLaden();
 }
@@ -7855,6 +7965,9 @@ function epKopfZeichnen() {
   if (!e) return;
   const zu = epPos.filter(p => p.mitarbeiter_id).length;
   const soll = epPos.length || Number(e.bedarf || 0);
+  // Beschriftung oben, Wert darunter. Ein Wert darf dabei zweizeilig sein --
+  // beim Ort gehoeren Strasse und Ortschaft zusammen und werden nicht in zwei
+  // Felder zerlegt, nur damit jede Zeile gleich aussieht.
   const feld = (k, w) => `<div class="ep-kf"><span>${k}</span><b>${w || '—'}</b></div>`;
   // Eine abgeglichene Schicht ist festgeschrieben (ENT-045). Das muss hier
   // OBEN stehen: Die Ansicht bietet sonst Knoepfe an, die der Server zu Recht
@@ -7866,21 +7979,22 @@ function epKopfZeichnen() {
         Sie lässt sich ansehen, aber nicht mehr ändern — der erfasste Ist-Stand
         ist die Grundlage einer bereits geprüften Feststellung. Zum Ändern zuerst
         unter „Abgleich“ die Sperre aufheben.</span></div></div>` : ''}
-    <div class="card-bd" style="padding:12px 16px">
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px 18px;font-size:12.5px">
+    <div class="ep-kopf">
       ${feld('Nummer', e.id)}
       ${feld('Datum', dmy(e.datum))}
       ${feld('Uhrzeit', hm(e.von) + '–' + hm(e.bis))}
       ${feld('Besetzung', `${zu} / ${soll}`)}
       ${feld('Kunde', esc(e.kunde_name || ''))}
       ${feld('Veranstaltung', esc(e.veranstaltung || e.titel || ''))}
-      ${feld('Ort', esc([e.strasse, e.ort].filter(Boolean).join(', ')))}
+      ${feld('Ort', e.strasse
+        ? `${esc(e.strasse)}<small>${esc(e.ort || '')}</small>`
+        : esc(e.ort || ''))}
       ${feld('Einsatzart', esc(e.einsatzart || ''))}
       ${feld('Treffpunkt', esc(e.treffpunkt || ''))}
       ${feld('Tätigkeit', esc(e.taetigkeit || ''))}
       ${feld('Qualifikation', esc(e.qualifikation || ''))}
       ${feld('Bemerkung', esc(e.bemerkung || ''))}
-    </div></div>`;
+    </div>`;
 }
 
 function epRasterZeichnen() {
@@ -7925,13 +8039,24 @@ function epRasterZeichnen() {
     const links = (a / slots * 100).toFixed(3), breite = ((b - a) / slots * 100).toFixed(3);
     const name = p.mitarbeiter_id ? esc(([p.vorname, p.nachname].filter(Boolean).join(' ')) || p.mitarbeiter) : 'offen';
     return `<tr class="${epGewaehlt === p.id ? 'gewaehlt' : ''}" onclick="epWaehlen(${p.id})">
+      <td class="fest ep-wahl"><input type="checkbox" ${epAngehakt.has(p.id) ? 'checked' : ''}
+        aria-label="Schicht ${p.nr} auswählen"
+        onclick="event.stopPropagation();epHaken(${p.id},this.checked)"></td>
       <td class="fest">${p.nr}. ${esc(p.funktion || (epEinsatz && epEinsatz.einsatzart) || 'Position')}</td>
       <td class="fest">${esc(p.position || '—')}</td>
       <td class="fest" style="text-align:right">${p.pauschal != null ? nf(p.pauschal, 2) + ' pausch.'
         : (p.std_verrechnung != null ? nf(p.std_verrechnung, 2) + ' CHF' : '—')}</td>
       <td class="fest">${hm(p.von)}–${hm(p.bis)} <span style="color:var(--ink-3)">(${std(b - a)}h)</span></td>
-      <td class="fest"><button class="ep-schloss${p.gesperrt ? ' zu' : ''}" title="${p.gesperrt ? 'Einteilung steht' : 'Nicht gesperrt'}"
-        onclick="event.stopPropagation();epSperren(${p.id},${p.gesperrt ? 0 : 1})">${p.gesperrt ? '🔒' : '🔓'}</button></td>
+      <td class="fest"><div class="ep-werk">
+        <button class="ep-schloss${p.gesperrt ? ' zu' : ''}" title="${p.gesperrt ? 'Einteilung steht' : 'Nicht gesperrt'}"
+          onclick="event.stopPropagation();epSperren(${p.id},${p.gesperrt ? 0 : 1})">${p.gesperrt ? '🔒' : '🔓'}</button>
+        <button title="Schicht bearbeiten" aria-label="Schicht ${p.nr} bearbeiten"
+          onclick="event.stopPropagation();epBearbeiten(${p.id})">
+          <svg class="i i-sm" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+        <button title="Schicht klonen" aria-label="Schicht ${p.nr} klonen"
+          onclick="event.stopPropagation();epKlonen(${p.id})">
+          <svg class="i i-sm" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+      </div></td>
       <td class="raster" colspan="${slots}">
         <div class="ep-balken ${p.mitarbeiter_id ? 'besetzt' : 'offen'}" style="left:${links}%;width:${breite}%">
           <span style="overflow:hidden;text-overflow:ellipsis">${name}</span>
@@ -7942,14 +8067,76 @@ function epRasterZeichnen() {
     </tr>`;
   };
 
+  // Sechs feste Spalten seit dem Auswahlkaestchen -- die Soll-/Ist-Zeile
+  // muss sie alle ueberspannen, sonst rutscht das Zeitraster um eine Spalte.
+  const alleDrin = epPos.length > 0 && epPos.every(p => epAngehakt.has(p.id));
   $('epRaster').innerHTML = `<table class="ep-gitter"><thead>
-      <tr><th class="fest">Funktion</th><th class="fest">Position</th><th class="fest">Verrechnung</th>
+      <tr><th class="fest ep-wahl"><input type="checkbox" ${alleDrin ? 'checked' : ''}
+            aria-label="Alle Schichten auswählen" onclick="epAlleHaken(this.checked)"></th>
+          <th class="fest">Funktion</th><th class="fest">Position</th><th class="fest">Verrechnung</th>
           <th class="fest">Zeit</th><th class="fest"></th>${kopfUhr}</tr>
-      <tr><th class="fest" colspan="5" style="text-align:right">Soll</th>
+      <tr><th class="fest" colspan="6" style="text-align:right">Soll</th>
           ${soll.map(n => `<th class="zahl">${n || ''}</th>`).join('')}</tr>
-      <tr><th class="fest" colspan="5" style="text-align:right">Ist</th>
+      <tr><th class="fest" colspan="6" style="text-align:right">Ist</th>
           ${ist.map((n, i) => `<th class="zahl${n < soll[i] ? ' fehlt' : ''}">${n || ''}</th>`).join('')}</tr>
     </thead><tbody>${epPos.map(zeile).join('')}</tbody></table>`;
+  epSammelZeichnen();
+}
+
+// ── Angehakte Schichten und was mit ihnen geschehen soll ──────────────────
+// Getrennt von epGewaehlt: Das eine ist "auf diese Position kommt gleich eine
+// Person", das andere "diese Schichten will ich gemeinsam anfassen". Beides
+// in einen Zustand zu legen hiesse, dass ein Klick ins Raster die Auswahl
+// fuer die Sammelaktion still umwirft.
+function epHaken(id, an) {
+  if (an) { epAngehakt.add(id); } else { epAngehakt.delete(id); }
+  epRasterZeichnen();
+}
+
+function epAlleHaken(an) {
+  epAngehakt.clear();
+  if (an) epPos.forEach(p => epAngehakt.add(p.id));
+  epRasterZeichnen();
+}
+
+function epSammelZeichnen() {
+  const leiste = $('epSammel');
+  if (!leiste) return;
+  // Nur zeigen, was gerade etwas bewirkt. Eine dauerhaft sichtbare Leiste,
+  // deren Knopf nichts tut, ist eine Einladung zum Fehlklick.
+  const n = epPos.filter(p => epAngehakt.has(p.id)).length;
+  leiste.style.display = n ? '' : 'none';
+  if (!n) return;
+  $('epSammelZahl').textContent = n === 1 ? '1 Schicht ausgewählt' : `${n} Schichten ausgewählt`;
+}
+
+function epSammelAusfuehren() {
+  const ids = epPos.filter(p => epAngehakt.has(p.id)).map(p => p.id);
+  const was = $('epSammelWas').value;
+  if (!ids.length || !was) return;
+  if (was === 'editieren') { epBearbeiten(ids); return; }
+  if (was === 'leeren') {
+    // "Leeren" nimmt die Person herunter, behaelt die Schicht. "Loeschen"
+    // nimmt die Schicht selbst weg. Zwei verschiedene Absichten -- darum
+    // stehen sie als zwei Eintraege da und nicht als einer.
+    const drin = epPos.filter(p => epAngehakt.has(p.id) && p.mitarbeiter_id);
+    if (!drin.length) { toast('Auf den gewählten Schichten steht niemand.'); return; }
+    askConfirm('Schichten leeren?',
+      `Auf ${drin.length === 1 ? 'einer Schicht' : drin.length + ' Schichten'} wird die eingeteilte Person entfernt. Die Schichten selbst bleiben stehen.`,
+      'Leeren', () => epReihum(drin.map(p => ({ aktion: 'loesen', position_id: p.id }))));
+    return;
+  }
+  askConfirm('Schichten löschen?',
+    `${ids.length === 1 ? 'Eine Schicht wird' : ids.length + ' Schichten werden'} aus dem Raster entfernt. Zugeteilte Personen bleiben am Einsatz.`,
+    'Löschen', () => epReihum(ids.map(id => ({ aktion: 'entfernen', id }))));
+}
+
+// Nacheinander statt gleichzeitig: Jede Antwort bringt den vollstaendigen
+// neuen Stand mit. Parallel gesendet gewaenne die zuletzt eintreffende
+// Antwort, und die haette von den uebrigen Aenderungen noch nichts gewusst.
+function epReihum(schritte) {
+  return schritte.reduce((kette, k) => kette.then(() => epSenden(k)), Promise.resolve())
+    .then(() => { epAngehakt.clear(); epRasterZeichnen(); });
 }
 
 function epWaehlen(id) {
@@ -8047,6 +8234,149 @@ function epPosNeu() {
   // Die neue Position uebernimmt die Zeit des Einsatzes; verschoben wird danach.
   epSenden({ aktion: 'speichern', von: hm(epEinsatz.von), bis: hm(epEinsatz.bis) })
     .then(gut => { if (gut) toast('Position angelegt — Zeit und Funktion über die Zeile ändern.'); });
+}
+
+function epKlonen(posId) { epSenden({ aktion: 'klonen', id: posId }); }
+
+// ── Schicht bearbeiten ────────────────────────────────────────────────────
+// Nimmt eine einzelne Schicht oder eine Liste (Sammelaktion). Bei mehreren
+// bleibt ein leer gelassenes Feld unveraendert -- sonst traege jede
+// Sammelaenderung die uebrigen Angaben der Schichten mit weg.
+function epBearbeiten(was) {
+  const ids = Array.isArray(was) ? was : [was];
+  epBearbeitet = epPos.filter(p => ids.includes(p.id));
+  if (!epBearbeitet.length) return;
+  if (epEinsatz && enGesperrt(epEinsatz)) {
+    toast('Diese Schicht ist abgeglichen und festgeschrieben — zum Ändern zuerst unter „Abgleich“ die Sperre aufheben.');
+    return;
+  }
+  const viele = epBearbeitet.length > 1;
+  const p = epBearbeitet[0];
+  const gleich = f => viele && !epBearbeitet.every(x => String(x[f] ?? '') === String(p[f] ?? '')) ? '' : (p[f] ?? '');
+
+  $('epsTitel').textContent = viele ? `${epBearbeitet.length} Schichten bearbeiten` : `Schicht ${p.nr} bearbeiten`;
+  $('epsText').textContent = viele
+    ? 'Was leer bleibt, bleibt bei jeder Schicht unverändert.'
+    : 'Zeit, Funktion und Verrechnung dieser einen Schicht.';
+  $('epsErr').style.display = 'none';
+  $('eps_funktion').value = gleich('funktion');
+  $('eps_position').value = gleich('position');
+  $('eps_von').value = viele ? (gleich('von') ? hm(p.von) : '') : hm(p.von);
+  $('eps_bis').value = viele ? (gleich('bis') ? hm(p.bis) : '') : hm(p.bis);
+  $('eps_std').value = gleich('std_verrechnung');
+  $('eps_pauschal').value = gleich('pauschal');
+  $('eps_qualifikation').value = gleich('qualifikation');
+  $('epsFenster').textContent = epEinsatz
+    ? `Der Einsatz läuft ${hm(epEinsatz.von)}–${hm(epEinsatz.bis)}. Eine Schicht beginnt innerhalb davon und darf länger dauern.`
+    : '';
+  openDlg('dlgSchicht');
+}
+
+function epSchichtSpeichern() {
+  const err = $('epsErr'); err.style.display = 'none';
+  const zeigen = t => { err.textContent = t; err.style.display = ''; };
+  const viele = epBearbeitet.length > 1;
+  const roh = {
+    funktion: $('eps_funktion').value.trim(),
+    position: $('eps_position').value.trim(),
+    von: $('eps_von').value.trim(),
+    bis: $('eps_bis').value.trim(),
+    std_verrechnung: $('eps_std').value.trim(),
+    pauschal: $('eps_pauschal').value.trim(),
+    qualifikation: $('eps_qualifikation').value.trim(),
+  };
+  if (!viele && (!roh.von || !roh.bis)) { zeigen('Von und Bis sind Pflicht.'); return; }
+  if (roh.std_verrechnung && roh.pauschal) {
+    zeigen('Entweder ein Stundenansatz oder ein Pauschalbetrag — nicht beides.'); return;
+  }
+  // Dieselbe Rechnung wie im Raster und im Server: Der Beginn muss INNERHALB
+  // des Einsatzfensters liegen. Ein reiner Uhrzeitvergleich ginge bei einer
+  // Schicht über Mitternacht schief -- 00:30 ist dort später als 22:00.
+  const pruefZeit = (von, bis) => {
+    if (!epEinsatz) return null;
+    const [sh, sm] = hm(epEinsatz.von).split(':').map(Number);
+    const start = sh * 60 + sm;
+    const dauer = epMinuten(epEinsatz.bis, start) || 1440;
+    const a = epMinuten(von, start), b = epMinuten(bis, start) || 1440;
+    if (a >= dauer) return 'Die Schicht beginnt ausserhalb des Einsatzes. Zuerst die Zeit des Einsatzes anpassen.';
+    if (b <= a) return 'Das Ende muss nach dem Beginn liegen.';
+    return null;
+  };
+
+  const koerper = epBearbeitet.map(p => {
+    const nimm = (f, alt) => (viele && roh[f] === '') ? alt : roh[f];
+    const zahl = w => (w === '' || w == null) ? null : Number(w);
+    return {
+      aktion: 'speichern', id: p.id,
+      funktion: nimm('funktion', p.funktion || ''),
+      position: nimm('position', p.position || ''),
+      von: nimm('von', hm(p.von)),
+      bis: nimm('bis', hm(p.bis)),
+      std_verrechnung: zahl(nimm('std_verrechnung', p.std_verrechnung)),
+      pauschal: zahl(nimm('pauschal', p.pauschal)),
+      qualifikation: nimm('qualifikation', p.qualifikation || ''),
+      // Nicht im Dialog, darf aber nicht verlorengehen: Der Server schreibt
+      // alle Felder, die er bekommt -- was fehlt, wuerde geleert.
+      bemerkung: p.bemerkung || '',
+    };
+  });
+  for (const k of koerper) {
+    const fehler = pruefZeit(k.von, k.bis);
+    if (fehler) { zeigen(fehler); return; }
+  }
+  const b = $('epsBtn'); b.disabled = true;
+  epReihum(koerper).then(() => {
+    b.disabled = false;
+    closeDlg('dlgSchicht');
+    toast(koerper.length === 1 ? 'Schicht gespeichert.' : `${koerper.length} Schichten gespeichert.`);
+  }).catch(() => { b.disabled = false; zeigen('Speichern fehlgeschlagen.'); });
+}
+
+// ── Bemerkung für die Mitarbeitenden ──────────────────────────────────────
+// Sie haengt am Einsatz, nicht an der einzelnen Schicht: Nur so erreicht sie
+// die App, die den Einsatz anzeigt (app.html) -- Positionen kennt sie nicht.
+// Eine Bemerkung, die der Mitarbeitende nicht sieht, verfehlt den Zweck.
+function epBemerkungAuf() {
+  if (!epEinsatz) return;
+  if (enGesperrt(epEinsatz)) {
+    toast('Diese Schicht ist abgeglichen und festgeschrieben — zum Ändern zuerst unter „Abgleich“ die Sperre aufheben.');
+    return;
+  }
+  $('epbText').value = epEinsatz.bemerkung || '';
+  $('epbErr').style.display = 'none';
+  openDlg('dlgEpBemerkung');
+  $('epbText').focus();
+}
+
+function epBemerkungSpeichern() {
+  const e = epEinsatz;
+  if (!e) return;
+  const b = $('epbBtn'); b.disabled = true;
+  // einsatz_save.php schreibt den ganzen Satz -- was fehlt, wuerde geleert.
+  // Der Bedarf kommt aus den Positionen, damit die Nachfuehrung nicht
+  // ruecklaeufig ueberschrieben wird.
+  const body = {
+    id: e.id, kunde_id: e.kunde_id, kunde_name: e.kunde_name, titel: e.titel,
+    strasse: e.strasse, ort: e.ort, einsatzart: e.einsatzart, sparte: e.sparte,
+    datum: e.datum, von: hm(e.von), bis: hm(e.bis),
+    bedarf: epPos.length || Number(e.bedarf || 0), status: e.status,
+    bemerkung: $('epbText').value.trim(),
+  };
+  api('einsatz_save.php', { method: 'POST', body }).then(({ ok, data }) => {
+    b.disabled = false;
+    if (!ok || data.status !== 'ok') {
+      $('epbErr').textContent = data.message || 'Speichern fehlgeschlagen.';
+      $('epbErr').style.display = '';
+      return;
+    }
+    closeDlg('dlgEpBemerkung');
+    loadEinsaetze().then(() => {
+      const frisch = einsaetze.find(x => Number(x.id) === epId);
+      if (frisch) { epEinsatz = frisch; epKopfZeichnen(); }
+      renderPlanung();
+      toast('Bemerkung gespeichert — sie steht den Eingeteilten in der App.');
+    });
+  }).catch(() => { b.disabled = false; $('epbErr').textContent = 'Netzwerkfehler.'; $('epbErr').style.display = ''; });
 }
 
 function epPosWeg(posId) {

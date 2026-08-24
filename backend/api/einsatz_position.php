@@ -88,6 +88,45 @@ function bedarf_nachfuehren(PDO $pdo, int $einsatzId): void {
     )->execute([$einsatzId, $einsatzId]);
 }
 
+/**
+ * Minuten seit Einsatzbeginn. Dieselbe Rechnung wie in der Oberflaeche:
+ * Endet die Schicht am Folgetag, laeuft die Achse ueber Mitternacht weiter --
+ * 22:00 bis 06:00 sind acht Stunden, nicht minus sechzehn.
+ */
+function minuten_ab(string $zeit, int $start): int {
+    [$h, $m] = array_map('intval', explode(':', substr($zeit, 0, 5)));
+    $min = $h * 60 + $m - $start;
+    return $min < 0 ? $min + 1440 : $min;
+}
+
+/**
+ * Eine Position liegt innerhalb ihres Einsatzes -- ihr Beginn jedenfalls;
+ * ihr Ende darf darueber hinausgehen (die Achse waechst mit).
+ *
+ * Warum nicht einfach "von >= Einsatzbeginn" im Uhrzeitvergleich: Bei einer
+ * Schicht ueber Mitternacht (22:00-06:00) ist 00:30 spaeter als 22:00, obwohl
+ * die Zahl kleiner ist. Gerechnet wird darum in Minuten ab Einsatzbeginn.
+ *
+ * Ohne diese Pruefung liesse sich eine Position auf 07:00 setzen, wo der
+ * Einsatz um 07:30 beginnt -- die Oberflaeche zeichnete den Balken dann bei
+ * 23,5 Stunden statt eine halbe Stunde davor, weil sie den negativen Wert als
+ * "am Folgetag" deutet.
+ */
+function zeitfenster_pruefen(array $einsatz, string $von, string $bis): void {
+    [$sh, $sm] = array_map('intval', explode(':', substr((string)$einsatz['von'], 0, 5)));
+    $start = $sh * 60 + $sm;
+    $dauer = minuten_ab((string)$einsatz['bis'], $start) ?: 1440;
+    $a = minuten_ab($von, $start);
+    $b = minuten_ab($bis, $start) ?: 1440;
+    if ($a >= $dauer) {
+        json_response(['status' => 'error',
+            'message' => 'Die Schicht beginnt ausserhalb des Einsatzes. Zuerst die Zeit des Einsatzes anpassen.'], 422);
+    }
+    if ($b <= $a) {
+        json_response(['status' => 'error', 'message' => 'Das Ende muss nach dem Beginn liegen.'], 422);
+    }
+}
+
 function zeit_oder_ende(string $wert, string $feld): string {
     if (!preg_match('/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/', $wert)) {
         json_response(['status' => 'error', 'message' => "$feld ist keine gültige Uhrzeit."], 422);
@@ -198,6 +237,10 @@ if ($aktion === 'speichern') {
     // eine brauchbare Position, die man danach verschiebt.
     $von = zeit_oder_ende((string)($in['von'] ?? $einsatz['von']), 'Von');
     $bis = zeit_oder_ende((string)($in['bis'] ?? $einsatz['bis']), 'Bis');
+    // Zweite Verteidigung, nicht die einzige: Die Oberflaeche prueft dasselbe,
+    // damit die Begruendung sofort dasteht. Eine Regel, die man am Browser
+    // vorbei umgehen kann, ist keine.
+    zeitfenster_pruefen($einsatz, $von, $bis);
 
     $zahl = function ($w) {
         if ($w === null || $w === '') return null;
@@ -234,6 +277,29 @@ if ($aktion === 'speichern') {
         bedarf_nachfuehren($pdo, $einsatzId);
     }
     json_response(['status' => 'ok', 'id' => $id, 'positionen' => positionen($pdo, $einsatzId)]);
+}
+
+// Eine Schicht verdoppeln: gleiche Zeit, gleiche Funktion, gleiche
+// Verrechnung -- nur ohne die Person. Wer vier gleiche Plaetze braucht,
+// stellt einen davon ein und klont ihn, statt viermal dasselbe zu tippen.
+if ($aktion === 'klonen') {
+    $id = (int)($in['id'] ?? 0);
+    $q = $pdo->prepare('SELECT * FROM einsatz_position WHERE id = ? AND einsatz_id = ?');
+    $q->execute([$id, $einsatzId]);
+    $p = $q->fetch();
+    if (!$p) {
+        json_response(['status' => 'error', 'message' => 'Schicht nicht gefunden.'], 404);
+    }
+    $n = $pdo->prepare('SELECT COALESCE(MAX(nr), 0) + 1 FROM einsatz_position WHERE einsatz_id = ?');
+    $n->execute([$einsatzId]);
+    $pdo->prepare(
+        'INSERT INTO einsatz_position (einsatz_id, nr, funktion, position, von, bis,
+                                       std_verrechnung, pauschal, qualifikation, bemerkung)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    )->execute([$einsatzId, (int)$n->fetchColumn(), $p['funktion'], $p['position'], $p['von'], $p['bis'],
+                $p['std_verrechnung'], $p['pauschal'], $p['qualifikation'], $p['bemerkung']]);
+    bedarf_nachfuehren($pdo, $einsatzId);
+    json_response(['status' => 'ok', 'positionen' => positionen($pdo, $einsatzId)]);
 }
 
 if ($aktion === 'entfernen') {
