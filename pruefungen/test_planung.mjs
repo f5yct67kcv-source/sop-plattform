@@ -194,6 +194,28 @@ check('Oeffnen schreibt nichts', writes().length === 0);
 check('Kunde vorbefuellt', (await page.inputValue('#enEKunde_name')) === 'Einwohnergemeinde Niedergösgen');
 check('Arbeitsort vorbefuellt', (await page.inputValue('#enEOrt')) === '5013 Niedergösgen');
 check('Zeiten vorbefuellt', (await page.inputValue('#enEVon')) === '12:00' && (await page.inputValue('#enEBis')) === '18:00');
+// Im Anlegen-Dialog waren die Zeitfelder gestaucht, bis von "07" nur noch
+// "0" zu sehen war: `.zeitpaar .zp .inp` griff seit ENT-110 auf VIER
+// Auswahlfelder statt auf zwei Zeitfelder und drückte jedes auf
+// "flex:1; min-width:0".
+//
+// Der Dialog ist seit ENT-114 weg, und in den verbliebenen Stellen ist
+// genug Platz -- der Fall lässt sich hier also nicht mehr an einer Breite
+// zeigen. Geprüft wird darum die REGEL selbst: dass die Auswahlfelder ihre
+// Mindestbreite behalten und nicht die des Zeitpaars erben. Eine Prüfung
+// auf eine Breite, die ohnehin reicht, prüfte nichts.
+try {
+  const mb = await page.evaluate(() => {
+    const h = document.getElementById('enEVon').__zw;
+    if (!h) return null;
+    return { select: getComputedStyle(h.std).minWidth,
+             huelle: getComputedStyle(h.std.closest('.zeitwahl')).minWidth };
+  });
+  check('KRITISCH: die Auswahlfelder behalten eine eigene Mindestbreite',
+    mb && parseFloat(mb.select) >= 40);
+  check('Gestaucht wird die Hülle, nicht das einzelne Feld',
+    mb && parseFloat(mb.huelle) >= 40);
+} catch (e) { bad.push('Zeitbreite: ' + String(e).split('\n')[0].slice(0, 100)); }
 check('Status vorbefuellt', (await page.inputValue('#enEStatus')) === 'bestaetigt');
 check('Alle aktiven Mitarbeitenden zur Auswahl', (await page.$$('#enEMa label')).length === 3);
 check('Zugeteilte Person angehakt', await page.isChecked('#enEMa input[value="1"]'));
@@ -337,13 +359,13 @@ calls = [];
 await page.evaluate(() => { go('planung'); goTab('einsaetze'); });
 await page.waitForTimeout(400);
 await page.click('#view-planung button:has-text("Neuer Einsatz")');
-await page.waitForSelector('#dlgEnNeu.on');
-check('Anlegen-Dialog offen', await page.isVisible('#dlgEnNeu.on'));
+await page.waitForSelector('#view-einsatzneu.on');
+check('Die Anlegen-Ansicht steht offen', await page.isVisible('#view-einsatzneu.on'));
 check('Titel ohne Diktat', (await page.textContent('#enNeuTitel')) === 'Neuer Einsatz');
 check('Diktat-Hinweis ausgeblendet', !(await page.isVisible('#enNeuKiHint')));
 check('Datum auf heute vorbelegt', (await page.inputValue('#enNDatum')) === HEUTE);
 check('Einsatzart vorbelegt', (await page.inputValue('#enNEinsatzart')) === 'Verkehrsdienst');
-check('Keine blauen Markierungen von Hand', (await page.$$('#dlgEnNeu .inp.ki')).length === 0);
+check('Keine blauen Markierungen von Hand', (await page.$$('#view-einsatzneu .inp.ki')).length === 0);
 check('Kundenvorschlaege verfuegbar', (await page.$$('#dlKunden option')).length === 2);
 await page.click('#enNeuBtn');
 await page.waitForTimeout(250);
@@ -359,7 +381,7 @@ check('Anlegen ruft einsatz_save', !!cr);
 check('Anlegen sendet keine id', cr && !('id' in cr.body));
 check('Unbekannter Kunde bleibt reiner Text', cr && !('kunde_id' in cr.body) && cr.body.kunde_name === 'Neuer Kunde ohne Datei');
 check('Standardstatus geplant', cr && cr.body.status === 'geplant');
-check('Dialog schliesst nach Anlegen', !(await page.isVisible('#dlgEnNeu.on')));
+check('Die Ansicht schliesst nach dem Anlegen', !(await page.isVisible('#view-einsatzneu.on')));
 
 // ══════════ DIKTAT
 // Seit ENT-042 gibt es keinen eigenen Diktat-Knopf in der Planung mehr --
@@ -377,7 +399,7 @@ await page.waitForTimeout(200);
 check('Leeres Diktat wird abgewiesen', !calls.some(c => c.path.includes('ki_router_parse')));
 await page.fill('#gsText', 'Neuer Einsatz für die Studer Immobilien AG morgen von 7 bis 17 Uhr');
 await page.click('#gsBtn');
-await page.waitForSelector('#dlgEnNeu.on');
+await page.waitForSelector('#view-einsatzneu.on');
 await page.waitForTimeout(300);
 const parse = calls.find(c => c.path.includes('ki_router_parse'));
 check('Diktat ruft den Router-Endpunkt', !!parse);
@@ -393,7 +415,7 @@ check('Zeiten uebernommen', (await page.inputValue('#enNVon')) === '07:00' && (a
 check('Bedarf uebernommen', (await page.inputValue('#enNBedarf')) === '2');
 // Seit ENT-060 ist die Bezeichnung ein verstecktes Feld -- ein Feld weniger,
 // das sich blau markieren laesst.
-check('Uebernommene Felder blau markiert', (await page.$$('#dlgEnNeu .inp.ki')).length === 7);
+check('Uebernommene Felder blau markiert', (await page.$$('#view-einsatzneu .inp.ki')).length === 7);
 check('Nicht genanntes Feld unmarkiert', !(await page.getAttribute('#enNBemerkung', 'class')).includes('ki'));
 check('Genannte Personen vorgehakt', await page.isChecked('#enNMa input[value="3"]') && await page.isChecked('#enNMa input[value="2"]'));
 check('Nicht genannte Person nicht vorgehakt', !(await page.isChecked('#enNMa input[value="1"]')));
@@ -417,14 +439,47 @@ check('Bekannter Kunde wird verknuepft', dcr && dcr.body.kunde_id === 1);
 await page.evaluate(() => goTab('einsaetze'));
 await page.waitForTimeout(300);
 await page.click('#view-planung button:has-text("Neuer Einsatz")');
-await page.waitForSelector('#dlgEnNeu.on');
+await page.waitForSelector('#view-einsatzneu.on');
 await page.waitForTimeout(200);
 check('Handeingabe ohne Diktat-Hinweis', !(await page.isVisible('#enNeuKiHint')));
-check('Handeingabe ohne blaue Markierungen', (await page.$$('#dlgEnNeu .inp.ki')).length === 0);
+check('Handeingabe ohne blaue Markierungen', (await page.$$('#view-einsatzneu .inp.ki')).length === 0);
 check('Handeingabe ohne Vorauswahl beim Personal', (await page.$$('#enNMa input:checked')).length === 0);
 check('Bezeichnung wieder leer', (await page.inputValue('#enNTitel')) === '');
-await page.keyboard.press('Escape');
-await page.waitForTimeout(200);
+// Seit ENT-114 ist das Anlegen eine Ansicht, kein Dialog: Escape schliesst
+// sie nicht -- der Weg zurück führt über den Knopf.
+await page.evaluate(() => enNeuAbbrechen());
+await page.waitForTimeout(300);
+check('KRITISCH: „Zurück" führt in die Planung, aus der man kam',
+  await page.isVisible('#view-planung.on'));
+
+// ══════════ DAS ANLEGEN IST EINE EIGENE ANSICHT (ENT-114)
+// Eingefasst: Führt der Weg nicht dorthin, soll das als benannte Prüfung rot
+// werden und nicht die ganze Suite mitreissen.
+try {
+await page.click('#view-planung button:has-text("Neuer Einsatz")', { timeout: 5000 });
+await page.waitForSelector('#view-einsatzneu.on', { timeout: 5000 });
+await page.waitForTimeout(300);
+check('KRITISCH: es ist kein Dialog mehr',
+  await page.evaluate(() => !document.getElementById('dlgEnNeu')));
+check('Die Ansicht trägt einen eigenen Seitentitel',
+  (await page.textContent('#pgTitle')).trim() === 'Neuer Einsatz');
+check('Kein verdunkelter Hintergrund mehr',
+  await page.evaluate(() => !document.querySelector('.dlg-scrim.on')));
+// Die Feldkennungen sind unverändert -- daran hängt die gesamte bestehende
+// Logik (enSammeln, pickRender, artSparteKoppeln, der Diktat-Weg).
+check('KRITISCH: alle Felder tragen unverändert ihre Kennung',
+  await page.evaluate(() => ['enNKunde_name', 'enNEinsatzart', 'enNDatum', 'enNVon', 'enNBis',
+    'enNStrasse', 'enNOrt', 'enNSparte', 'enNBedarf', 'enNStatus', 'enNMa', 'enNBemerkung',
+    'enNTitel', 'enNeuBtn', 'enNeuErr', 'enNeuKiHint'].every(i => !!document.getElementById(i))));
+// Die Zeitbreite wird NICHT hier gemessen: In dieser Ansicht ist ohnehin
+// Platz, eine Zahl von hier prüft nichts. Der enge Fall ist die
+// Bearbeiten-Schublade -- dort stehen vier Auswahlfelder in einer schmalen
+// Spalte. Geprüft wird er weiter unten, wo die Schublade offen steht.
+check('Die Personenliste hat in der Breite Platz',
+  await page.evaluate(() => document.getElementById('enNMa').getBoundingClientRect().width > 500));
+await page.evaluate(() => enNeuAbbrechen());
+await page.waitForTimeout(250);
+} catch (e) { bad.push('Anlegen-Ansicht: ' + String(e).split('\n')[0].slice(0, 110)); }
 
 // ══════════ MOBIL
 await page.setViewportSize({ width: 390, height: 844 });

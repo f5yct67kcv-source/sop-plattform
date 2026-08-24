@@ -78,7 +78,9 @@ try {
 // Ein Eintrag, der dasteht und nichts tut, ist schlimmer als keiner: Er
 // verspricht einen Weg. Darum wird jeder einzeln geklickt.
 const ZIELE = [
-  ['Einsatz erstellen',       'Planung',              '#dlgEnNeu'],
+  // Seit ENT-114 ist das Anlegen eine eigene Ansicht, kein Dialog über der
+  // Planung -- der Seitentitel heisst darum jetzt "Neuer Einsatz".
+  ['Einsatz erstellen',       'Neuer Einsatz',        '#view-einsatzneu'],
   ['Schichten abgleichen',    'Schichten abgleichen', null],
   ['Kunde erfassen',          'Kunden',               '#dlgKunde'],
   ['Tagesplan öffnen',        'Planung',              null],

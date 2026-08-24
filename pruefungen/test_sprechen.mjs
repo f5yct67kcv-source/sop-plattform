@@ -166,7 +166,7 @@ await page.fill('#gsText', 'Neuer Einsatz für morgen');
 await page.click('#gsBtn');
 await page.waitForTimeout(400);
 check('„einsatz“ öffnet den Einsatz-Neu-Dialog, auch von einer fachfremden Seite aus',
-  await page.evaluate(() => document.getElementById('dlgEnNeu').classList.contains('on')));
+  await page.evaluate(() => document.getElementById('view-einsatzneu').classList.contains('on')));
 check('Einsatzfelder vorbefüllt', (await page.inputValue('#enNKunde_name')) === 'Borner AG');
 await page.screenshot({ path: OUT + '/96-sprechen-dispatch.png' });
 await page.keyboard.press('Escape');
