@@ -399,8 +399,12 @@ await page.waitForTimeout(400);
 const cr = calls.find(c => c.path.includes('einsatz_save'));
 check('KRITISCH: der Kanton geht mit an den Server', cr && cr.body.kanton === 'SO');
 check('KRITISCH: die Kontaktperson geht getrennt mit',
-  cr && cr.body.kontakt_vorname === 'Petra' && cr.body.kontakt_nachname === 'Muster'
-  && cr.body.kontakt_telefon === '079 111 22 33');
+  cr && cr.body.kontakt_vorname === 'Petra' && cr.body.kontakt_nachname === 'Muster');
+// Seit ENT-118 international. Eingetippt wurde '079 111 22 33'; gespeichert
+// wird '+41 79 111 22 33', damit der tel:-Link in der App auch aus dem
+// Ausland waehlt. Die eigenen Grenzfaelle stehen in test_zeitraum.mjs.
+check('KRITISCH: die Telefonnummer geht mit Landesvorwahl an den Server',
+  cr && cr.body.kontakt_telefon === '+41 79 111 22 33');
 check('Der Treffpunkt geht mit', cr && cr.body.treffpunkt === 'Haupteingang');
 
 // ══════════ WEG, ZONE UND FAHRZEIT (ENT-116)
@@ -494,15 +498,27 @@ try {
     const ab = [...document.querySelectorAll('#view-einsatzneu .abschnitt h3')].map(h => h.textContent.trim());
     const raster = document.querySelector('#view-einsatzneu .form-breit');
     const spalten = getComputedStyle(raster).gridTemplateColumns.split(' ').length;
+    const rasterBreite = Math.round(raster.getBoundingClientRect().width);
     const karte = document.querySelector('#view-einsatzneu .card').getBoundingClientRect();
-    return { ab, spalten, breite: Math.round(karte.width), fenster: window.innerWidth };
+    return { ab, spalten, raster: rasterBreite, breite: Math.round(karte.width),
+             fenster: window.innerWidth };
   });
   check('KRITISCH: die Abschnitte stehen in der Reihenfolge der Vorlage',
     m.ab[0].startsWith('Stammdaten') && m.ab[1].startsWith('Zeit und Arbeitsort')
     && m.ab[2].startsWith('Weg und Auslagenersatz') && m.ab[3].startsWith('Kontaktperson')
     && m.ab[4].startsWith('Zuteilung') && m.ab[5].startsWith('Angaben für die Eingeteilten'));
   check('KRITISCH: die Angaben für die Eingeteilten stehen zuunterst', m.ab.length === 6);
-  check('KRITISCH: auf breitem Schirm mehr als zwei Spalten — der Platz wird genutzt', m.spalten > 2);
+  // ENT-115 wollte: Die Spalten wachsen mit dem Fenster, statt bei zwei zu
+  // bleiben und die halbe Flaeche leer zu lassen. Die Zahl "mehr als zwei bei
+  // 1440 px" war dafuer nur ein Stellvertreter -- und er stimmt seit ENT-117
+  // (Beschriftung links statt oben) nicht mehr: Von einer Spalte geht jetzt
+  // erst die Beschriftung ab. Vier Spalten bei 1440 px hiessen 58 px
+  // Eingabefeld, gemessen. Geprueft wird darum, was ENT-115 wirklich meinte:
+  // Der Platz wird genutzt (das Raster fuellt die Karte) UND die Spalten
+  // wachsen mit dem Fenster (unten bei 1920 px). Dass die Felder dabei
+  // benutzbar breit bleiben, prueft test_zeitraum.mjs.
+  check('KRITISCH: das Raster fuellt die Kartenbreite — kein Rand statt Inhalt',
+    m.breite - m.raster < 45);
   check('Die Karte nutzt die Breite der Ansicht', m.breite > m.fenster * 0.7);
 } catch (e) { bad.push('Gestaltung Anlegen: ' + String(e).split('\n')[0].slice(0, 110)); }
 
