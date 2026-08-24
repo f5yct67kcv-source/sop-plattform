@@ -91,11 +91,36 @@ await page.route('**/api/**', route => {
       : send({ status: 'ok', positionen: ausBedarf(e) });
     if (body.aktion === 'speichern') {
       POS[id] = POS[id] || [];
-      POS[id].push({ id: ++posSeq, nr: POS[id].length + 1, funktion: e.einsatzart, position: null,
-        von: body.von + ':00', bis: body.bis + ':00', std_verrechnung: null, pauschal: null,
-        qualifikation: null, gesperrt: 0, bemerkung: null, mitarbeiter_id: null,
-        mitarbeiter: null, vorname: null, nachname: null, zusage: null });
+      const vorhanden = body.id ? POS[id].find(q => q.id === Number(body.id)) : null;
+      if (vorhanden) {
+        // Der Server schreibt alle Felder, die er bekommt -- der Nachbau auch,
+        // sonst bliebe unbemerkt, dass die Oberflaeche eines vergisst.
+        ['funktion', 'position', 'qualifikation'].forEach(f => { vorhanden[f] = body[f] || null; });
+        vorhanden.von = body.von + ':00';
+        vorhanden.bis = body.bis + ':00';
+        vorhanden.std_verrechnung = body.std_verrechnung == null ? null : Number(body.std_verrechnung);
+        vorhanden.pauschal = body.pauschal == null ? null : Number(body.pauschal);
+      } else {
+        POS[id].push({ id: ++posSeq, nr: POS[id].length + 1, funktion: e.einsatzart, position: null,
+          von: body.von + ':00', bis: body.bis + ':00', std_verrechnung: null, pauschal: null,
+          qualifikation: null, gesperrt: 0, bemerkung: null, mitarbeiter_id: null,
+          mitarbeiter: null, vorname: null, nachname: null, zusage: null });
+      }
       e.bedarf = POS[id].length;
+      return send({ status: 'ok', positionen: POS[id] });
+    }
+    if (body.aktion === 'klonen') {
+      const q = POS[id].find(x => x.id === Number(body.id));
+      POS[id].push({ ...q, id: ++posSeq, nr: POS[id].length + 1,
+        mitarbeiter_id: null, mitarbeiter: null, vorname: null, nachname: null });
+      e.bedarf = POS[id].length;
+      return send({ status: 'ok', positionen: POS[id] });
+    }
+    if (body.aktion === 'loesen') {
+      POS[id].forEach(q => { if (q.id === Number(body.position_id)) {
+        q.mitarbeiter_id = null; q.mitarbeiter = null; q.vorname = null; q.nachname = null; } });
+      e.mitarbeiter = POS[id].filter(q => q.mitarbeiter_id)
+        .map(q => ({ id: q.mitarbeiter_id, name: q.mitarbeiter, vorname: q.vorname, nachname: q.nachname }));
       return send({ status: 'ok', positionen: POS[id] });
     }
     if (body.aktion === 'zuteilen') {
@@ -112,6 +137,11 @@ await page.route('**/api/**', route => {
       return send({ status: 'ok', positionen: POS[id] });
     }
     return send({ status: 'ok', positionen: POS[id] || [] });
+  }
+  if (p.includes('einsatz_save')) {
+    const e = einsatzVon(body.id);
+    if (e) { e.bemerkung = body.bemerkung || null; }
+    return send({ status: 'ok', id: body.id });
   }
   if (p.includes('objekt_list')) return send({ status: 'ok', objekte: [] });
   if (p.includes('masterschicht_list')) return send({ status: 'ok', masterschichten: [] });
@@ -175,7 +205,9 @@ check('KRITISCH: und es geht keine zweite Anlege-Anfrage los', posRufe('aus_beda
 // -- danach faende keine der uebrigen Pruefungen mehr statt. Ein Abbruch sagt
 // weniger als ein Rot mit Namen.
 try {
-  await page.click('#epRaster table.ep-gitter tbody tr:first-child', { timeout: 4000 });
+  // Gezielt die Funktions-Zelle statt der Zeilenmitte: Die Mitte der Zeile
+  // liegt im Balken, und dort sitzt der ×-Knopf.
+  await page.click('#epRaster table.ep-gitter tbody tr:first-child td.fest:nth-child(2)', { timeout: 4000 });
   await page.waitForTimeout(200);
   check('Die gewählte Position wird benannt', (await page.textContent('#epHinweis')).includes('Position 1'));
   await page.click('#epListe .ep-p:first-child', { timeout: 4000 });
@@ -238,6 +270,184 @@ check('KRITISCH: nach fehlgeschlagenem Anlegen steht der geöffnete Einsatz im K
 check('KRITISCH: und nicht mehr das Raster des vorherigen Einsatzes',
   (await page.textContent('#epRaster')).includes('Noch keine Position'));
 kaputt = null;
+
+// ══════════ KOPFBEREICH: BESCHRIFTUNG OBEN, WERT DARUNTER (ENT-109)
+// Vorher lief beides im selben Fluss und las sich als "Nummer75".
+// Gemessen statt im Quelltext nachgelesen: Eine Regel kann wirkungslos
+// bleiben, ohne dass etwas kaputtgeht.
+await oeffne(71);
+try {
+  const m = await page.evaluate(() => {
+    const f = document.querySelector('#epKopf .ep-kf');
+    const l = f.querySelector('span').getBoundingClientRect();
+    const w = f.querySelector('b').getBoundingClientRect();
+    return { lb: Math.round(l.bottom), wt: Math.round(w.top), lx: Math.round(l.left), wx: Math.round(w.left),
+             felder: document.querySelectorAll('#epKopf .ep-kf').length };
+  });
+  check('KRITISCH: die Beschriftung steht über dem Wert, nicht daneben', m.lb <= m.wt);
+  check('KRITISCH: beide beginnen an derselben Kante', m.lx === m.wx);
+  check('Alle zwölf Angaben stehen im Kopf', m.felder === 12);
+} catch (e) { bad.push('Kopf: ' + String(e).split('\n')[0].slice(0, 110)); }
+check('Strasse und Ort stehen als eine Angabe untereinander',
+  await page.evaluate(() => !!document.querySelector('#epKopf .ep-kf b small')));
+
+// ══════════ DER KNOPF STEHT BEI DEM, WAS ER VERÄNDERT (ENT-109)
+check('„Neue Schicht" steht im Kopf der Schichten-Karte',
+  await page.evaluate(() => !!document.querySelector('.ep-plan-kopf button')));
+check('Und nicht mehr in der obersten Leiste',
+  await page.evaluate(() => ![...document.querySelectorAll('#view-einsatzplan .bar-tools button')]
+    .some(b => /Neue Schicht|Position hinzuf/.test(b.textContent))));
+
+// ══════════ EINE EINZELNE SCHICHT BEARBEITEN
+// Der eigentliche Anlass: Nicht jede Person arbeitet den ganzen Einsatz --
+// eine Pausenablösung dauert zwei Stunden.
+const balkenBreite = () => page.evaluate(() =>
+  Math.round(document.querySelectorAll('#epRaster .ep-balken')[1].getBoundingClientRect().width));
+const vorher = await balkenBreite();
+await page.click('#epRaster table.ep-gitter tbody tr:nth-child(2) .ep-werk button[title="Schicht bearbeiten"]');
+await page.waitForTimeout(300);
+check('Der Schicht-Dialog geht auf', await page.isVisible('#dlgSchicht.on'));
+check('Er nennt die Schicht', (await page.textContent('#epsTitel')).includes('Schicht 2'));
+check('Er nennt das Zeitfenster des Einsatzes',
+  (await page.textContent('#epsFenster')).includes('07:30–16:30'));
+check('Die heutige Zeit steht vorbefüllt drin', (await page.inputValue('#eps_von')) === '07:30');
+
+// Beginn vor dem Einsatz wird abgefangen -- sonst zeichnet das Raster den
+// Balken bei 23,5 Stunden statt eine halbe Stunde davor.
+await page.fill('#eps_von', '07:00');
+await page.fill('#eps_bis', '13:00');
+const vorFalsch = posRufe('speichern');
+await page.click('#epsBtn');
+await page.waitForTimeout(300);
+// Auf den WORTLAUT prüfen, nicht nur darauf, dass irgendeine Meldung steht:
+// 07:00-13:00 verletzt beide Regeln zugleich (Beginn ausserhalb UND, weil
+// 07:00 als Folgetag gerechnet wird, Ende vor Beginn). Eine Prüfung auf
+// „irgendein Fehler" wäre auch dann grün, wenn genau die Fensterprüfung fehlt.
+check('KRITISCH: ein Beginn vor dem Einsatz wird abgefangen',
+  (await page.textContent('#epsErr')).includes('ausserhalb des Einsatzes'));
+check('KRITISCH: und geht gar nicht erst an den Server', posRufe('speichern') === vorFalsch);
+check('Der Dialog bleibt dafür offen', await page.isVisible('#dlgSchicht.on'));
+
+// Ende vor Beginn ebenso.
+await page.fill('#eps_von', '13:00');
+await page.fill('#eps_bis', '11:00');
+await page.click('#epsBtn');
+await page.waitForTimeout(300);
+check('Ein Ende vor dem Beginn wird abgefangen',
+  (await page.textContent('#epsErr')).includes('nach dem Beginn'));
+
+// Stundenansatz UND Pauschale zugleich ergibt keinen Sinn.
+await page.fill('#eps_von', '11:00');
+await page.fill('#eps_bis', '13:00');
+await page.fill('#eps_std', '38');
+await page.fill('#eps_pauschal', '200');
+await page.click('#epsBtn');
+await page.waitForTimeout(250);
+check('Stundenansatz und Pauschale zugleich werden abgefangen',
+  (await page.textContent('#epsErr')).includes('nicht beides'));
+await page.fill('#eps_pauschal', '');
+
+// Jetzt der gültige Fall: die Pausenablösung.
+await page.fill('#eps_position', 'Pausenablösung');
+await page.click('#epsBtn');
+await page.waitForTimeout(600);
+check('Der Dialog schliesst nach dem Speichern', !(await page.isVisible('#dlgSchicht.on')));
+check('KRITISCH: die Schicht trägt die neue Zeit',
+  (await page.textContent('#epRaster')).includes('11:00–13:00'));
+check('Die Bezeichnung steht in der Zeile', (await page.textContent('#epRaster')).includes('Pausenablösung'));
+check('Der Stundenansatz steht in der Zeile', (await page.textContent('#epRaster')).includes('38.00 CHF'));
+check('KRITISCH: der Balken ist kürzer als vorher — gemessen', (await balkenBreite()) < vorher * 0.5);
+await page.screenshot({ path: OUT + '/85-schicht-bearbeitet.png' });
+
+// ══════════ EINE SCHICHT KLONEN
+const vorKlon = await zeilen();
+await page.click('#epRaster table.ep-gitter tbody tr:nth-child(2) .ep-werk button[title="Schicht klonen"]');
+await page.waitForTimeout(600);
+check('Klonen legt eine weitere Schicht an', (await zeilen()) === vorKlon + 1);
+check('Der Klon übernimmt Zeit und Bezeichnung',
+  await page.evaluate(() => {
+    const tr = document.querySelectorAll('#epRaster table.ep-gitter tbody tr');
+    return tr[tr.length - 1].textContent.includes('11:00–13:00')
+        && tr[tr.length - 1].textContent.includes('Pausenablösung');
+  }));
+check('Der Klon ist unbesetzt',
+  await page.evaluate(() => {
+    const tr = document.querySelectorAll('#epRaster table.ep-gitter tbody tr');
+    return !!tr[tr.length - 1].querySelector('.ep-balken.offen');
+  }));
+
+// ══════════ AUSWAHL UND SAMMELAKTIONEN
+check('Ohne Auswahl ist die Sammelleiste unsichtbar', !(await page.isVisible('#epSammel')));
+await page.click('#epRaster table.ep-gitter thead input[type="checkbox"]');
+await page.waitForTimeout(250);
+check('Das Kästchen im Kopf hakt alle an', await page.isVisible('#epSammel'));
+check('Und die Leiste sagt, wie viele', (await page.textContent('#epSammelZahl')).startsWith('3 '));
+await page.click('#epRaster table.ep-gitter thead input[type="checkbox"]');
+await page.waitForTimeout(250);
+check('Nochmal geklickt hakt alle ab', !(await page.isVisible('#epSammel')));
+
+// Leeren nimmt die Person herunter, die Schicht bleibt.
+await page.click('#epRaster table.ep-gitter tbody tr:first-child input[type="checkbox"]');
+await page.waitForTimeout(200);
+check('Eine einzelne Auswahl wird richtig gezählt',
+  (await page.textContent('#epSammelZahl')) === '1 Schicht ausgewählt');
+const vorLeeren = await zeilen();
+await page.selectOption('#epSammelWas', 'leeren');
+await page.click('#epSammel button');
+await page.waitForTimeout(300);
+check('Leeren fragt zuerst nach', await page.isVisible('#dlgConfirm.on'));
+await page.click('#cfBtn');
+await page.waitForTimeout(700);
+check('KRITISCH: die Person ist von der Schicht herunter',
+  !(await page.textContent('#epRaster')).includes('Adrian'));
+check('KRITISCH: die Schicht selbst steht noch', (await zeilen()) === vorLeeren);
+check('Die Auswahl ist danach aufgehoben', !(await page.isVisible('#epSammel')));
+
+// Löschen nimmt die Schicht selbst weg. Eingefasst: Hat ein Fehler weiter
+// oben bereits Zeilen verschwinden lassen, soll das hier als benannte
+// Prüfung rot werden und nicht die ganze Suite abbrechen.
+try {
+  await page.click('#epRaster table.ep-gitter tbody tr:nth-child(2) input[type="checkbox"]', { timeout: 4000 });
+  await page.click('#epRaster table.ep-gitter tbody tr:nth-child(3) input[type="checkbox"]', { timeout: 4000 });
+  await page.waitForTimeout(250);
+  await page.selectOption('#epSammelWas', 'loeschen');
+  await page.click('#epSammel button');
+  await page.waitForTimeout(300);
+  await page.click('#cfBtn');
+  await page.waitForTimeout(900);
+  check('KRITISCH: Löschen entfernt genau die angehakten Schichten', (await zeilen()) === vorLeeren - 2);
+} catch (e) { bad.push('Löschen: ' + String(e).split('\n')[0].slice(0, 110)); }
+
+// Sammel-Bearbeiten: was leer bleibt, bleibt unverändert.
+// Nach dem Löschen steht nur noch eine Schicht -- für eine Sammelaktion
+// braucht es mehrere, sonst prüft der Fall nichts.
+await page.click('#epRaster table.ep-gitter tbody tr:first-child .ep-werk button[title="Schicht klonen"]');
+await page.waitForTimeout(600);
+check('Für die Sammelaktion stehen wieder mehrere Schichten da', (await zeilen()) >= 2);
+await page.click('#epRaster table.ep-gitter thead input[type="checkbox"]');
+await page.waitForTimeout(250);
+await page.selectOption('#epSammelWas', 'editieren');
+await page.click('#epSammel button');
+await page.waitForTimeout(300);
+check('Der Dialog nennt die Anzahl', (await page.textContent('#epsTitel')).includes('Schichten'));
+check('Und sagt, dass Leeres unverändert bleibt',
+  (await page.textContent('#epsText')).includes('unverändert'));
+await page.evaluate(() => closeDlg('dlgSchicht'));
+await page.waitForTimeout(200);
+
+// ══════════ BEMERKUNG FÜR DIE EINGETEILTEN
+await page.click('#view-einsatzplan .bar-tools button:has-text("Bemerkung")');
+await page.waitForTimeout(300);
+check('Der Bemerkungs-Dialog geht auf', await page.isVisible('#dlgEpBemerkung.on'));
+await page.fill('#epbText', 'Treffpunkt beim Haupteingang, Warnweste mitbringen.');
+await page.click('#epbBtn');
+await page.waitForTimeout(700);
+check('Die Bemerkung geht an den Einsatz, nicht an die Schicht',
+  rufe.some(r => r.p.includes('einsatz_save') && r.body
+    && r.body.bemerkung === 'Treffpunkt beim Haupteingang, Warnweste mitbringen.'));
+check('KRITISCH: der Bedarf wird dabei nicht rückwärts überschrieben',
+  rufe.filter(r => r.p.includes('einsatz_save')).every(r => Number(r.body.bedarf) >= 1));
+check('Sie steht danach im Kopf', (await page.textContent('#epKopf')).includes('Haupteingang'));
 
 // ══════════ GESTALTUNG: GEMESSEN, NICHT NACHGELESEN
 await oeffne(71);
