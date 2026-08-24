@@ -1135,8 +1135,12 @@ tbody tr.zu .i-schloss { color: var(--warn); }
 .ma-pick .who .clash { display: block; font-size: 11.5px; font-weight: 620; color: var(--warn); margin-top: 2px; }
 
 /* Von und Bis nebeneinander (ENT-060) -- sie werden zusammen gelesen. */
-.zeitpaar .zp { display: flex; align-items: center; gap: 8px; }
-.zeitpaar .zp .inp { flex: 1; min-width: 0; }
+.zeitpaar .zp { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+/* NUR direkte Kinder: Seit die Uhrzeit über zwei Auswahlfelder läuft
+   (ENT-110), stünden sonst vier statt zwei Elemente unter dieser Regel --
+   jedes auf "flex:1; min-width:0" gestaucht, bis von "07" nur noch "0"
+   übrig war. Die Hülle flext, die Felder darin nicht. */
+.zeitpaar .zp > .inp, .zeitpaar .zp > .zeitwahl { flex: 1; min-width: 130px; }
 .zeitpaar .zp .tr { color: var(--ink-3); flex: none; }
 
 /* ── Begrüssungs-Container mit Diktat-Router (ENT-032) */
@@ -3002,6 +3006,87 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
         </div>
       </section>
 
+      <!-- ══════════════════════════ NEUER EINSATZ ══════════════════════════
+           Eine eigene Ansicht statt eines Dialogs (ENT-114). Beim Anlegen
+           stehen Kunde, Ort, Zeit, Sparte und die Zuteilung samt Konflikt-
+           und Ruhezeitpruefung nebeneinander -- in einem Dialog draengt sich
+           das in eine Spalte, und die Personenliste wird zum Guckloch.
+
+           Die Feldkennungen sind unveraendert aus dem Dialog uebernommen:
+           enSammeln(), pickRender(), artSparteKoppeln() und der Diktat-Weg
+           arbeiten damit weiter, ohne dass eine Zeile davon angefasst wurde. -->
+      <section class="view" id="view-einsatzneu">
+        <div class="bar-tools">
+          <button class="btn btn-plain btn-sm" onclick="enNeuAbbrechen()">Zurück zur Planung</button>
+          <div class="sp" style="flex:1"></div>
+          <button class="btn btn-primary btn-sm" id="enNeuBtn" onclick="createEinsatz()">Einsatz anlegen</button>
+        </div>
+
+        <div class="card"><div class="card-bd">
+          <div class="ki-hint" id="enNeuKiHint">
+            <svg class="i i-sm" viewBox="0 0 24 24" style="margin-top:1px;flex:none"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+            <span id="enNeuKiText"></span>
+          </div>
+          <div class="msg-err" id="enNeuErr" style="display:none"></div>
+          <p class="note" id="enNeuText">Kunde, Arbeitsort, Datum und Zeit sind Pflicht.</p>
+          <h2 id="enNeuTitel" style="display:none">Neuer Einsatz</h2>
+<div class="form-grid">
+        <div class="f wide">
+          <label for="enNKunde_name">Kunde *</label>
+          <input class="inp" id="enNKunde_name" list="dlKunden" autocomplete="off" placeholder="Firma aus der Kundendatei oder frei eingeben">
+        </div>
+        <!-- Die Bezeichnung ist kein Eingabefeld mehr (ENT-060), aber sie darf
+             nicht verlorengehen: Objektschichten tragen hier den Namen ihrer
+             Masterschicht ("Revierdienst Öffnungsrunde"). Als verstecktes Feld
+             laeuft der Wert unveraendert durch Laden und Speichern. -->
+        <input type="hidden" id="enNTitel" value="">
+        <div class="f"><label for="enNEinsatzart">Einsatzart</label>
+          <!-- Mit "Reinigung" (ENT-062). Die Einsatzart sagt, WELCHE ARBEIT
+               ansteht, die Sparte daneben sagt, WELCHE REGELN gelten -- und
+               massgeblich fuer den GAV bleibt die SPARTE (ENT-061). Damit die
+               beiden nicht auseinanderlaufen, zieht artSparteKoppeln() die
+               Sparte mit und spartenKonflikt() meldet einen Widerspruch. -->
+          <select class="inp" id="enNEinsatzart" onchange="artSparteKoppeln('enN')">
+            <option>Verkehrsdienst</option>
+            <option>Revierdienst</option>
+            <option>Sicherheitsdienst</option>
+            <option>Reinigung</option>
+          </select>
+        </div>
+        <div class="f"><label for="enNDatum">Datum *</label><input class="inp" id="enNDatum" type="date" onchange="pickRefresh('enN')"></div>
+        <!-- Von und Bis nebeneinander: sie gehoeren zusammen und werden
+             zusammen gelesen. -->
+        <div class="f zeitpaar">
+          <label>Zeit *</label>
+          <div class="zp">
+            <input class="inp" id="enNVon" type="time" aria-label="Von" onchange="pickRefresh('enN')">
+            <span class="tr">–</span>
+            <input class="inp" id="enNBis" type="time" aria-label="Bis" onchange="pickRefresh('enN')">
+          </div>
+        </div>
+        <div class="f wide">
+          <label for="enNStrasse">Arbeitsort — Strasse</label>
+          <input class="inp" id="enNStrasse" placeholder="nicht der Firmensitz des Kunden">
+        </div>
+        <div class="f"><label for="enNOrt">Arbeitsort — PLZ / Ort *</label><input class="inp" id="enNOrt"></div>
+        <div class="f"><label for="enNSparte">Sparte</label>
+          <select class="inp" id="enNSparte" onchange="spartenKonflikt('enN')">
+            <option value="sicherheit">Sicherheit</option>
+            <option value="reinigung">Reinigung</option>
+          </select>
+          <div id="enNSparteHint"></div>
+        </div>
+        <div class="f"><label for="enNBedarf">Benötigte Mitarbeitende</label><input class="inp" id="enNBedarf" type="number" min="0" max="99" value="1" oninput="pickFoot('enN')"></div>
+        <div class="f"><label for="enNStatus">Status</label><select class="inp" id="enNStatus"><option value="geplant">Geplant</option><option value="bestaetigt">Bestätigt</option><option value="abgesagt">Abgesagt</option></select></div>
+        <div class="f wide">
+          <label>Zugeteilte Mitarbeitende</label>
+          <div class="ma-pick" id="enNMa"></div>
+          <div class="pick-foot" id="enNMaFoot"></div>
+        </div>
+        <div class="f wide"><label for="enNBemerkung">Bemerkung</label><textarea class="inp" id="enNBemerkung" rows="3" style="min-height:84px"></textarea></div>
+        </div></div>
+      </section>
+
       <!-- ══════════════════════════ EINSATZPLAN ══════════════════════════
            Intraday-Planung eines einzelnen Einsatzes (ENT-076). Wer mehrere
            Leute gestaffelt einteilt, braucht das Raster: eine Liste sagt
@@ -3357,81 +3442,6 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 
 <!-- Neuer Einsatz. Auch das Ziel des Planungs-Diktats — gespeichert wird erst
      durch den Knopf unten. -->
-<div class="dlg-scrim" id="dlgEnNeu">
-  <div class="dlg wide">
-    <div class="dlg-hd">
-      <h2 id="enNeuTitel">Neuer Einsatz</h2>
-      <p id="enNeuText">Kunde, Arbeitsort, Datum und Zeit sind Pflicht.</p>
-    </div>
-    <div class="dlg-bd">
-      <div class="ki-hint" id="enNeuKiHint">
-        <svg class="i i-sm" viewBox="0 0 24 24" style="margin-top:1px;flex:none"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
-        <span id="enNeuKiText"></span>
-      </div>
-      <div class="msg-err" id="enNeuErr" style="display:none"></div>
-      <div class="form-grid">
-        <div class="f wide">
-          <label for="enNKunde_name">Kunde *</label>
-          <input class="inp" id="enNKunde_name" list="dlKunden" autocomplete="off" placeholder="Firma aus der Kundendatei oder frei eingeben">
-        </div>
-        <!-- Die Bezeichnung ist kein Eingabefeld mehr (ENT-060), aber sie darf
-             nicht verlorengehen: Objektschichten tragen hier den Namen ihrer
-             Masterschicht ("Revierdienst Öffnungsrunde"). Als verstecktes Feld
-             laeuft der Wert unveraendert durch Laden und Speichern. -->
-        <input type="hidden" id="enNTitel" value="">
-        <div class="f"><label for="enNEinsatzart">Einsatzart</label>
-          <!-- Mit "Reinigung" (ENT-062). Die Einsatzart sagt, WELCHE ARBEIT
-               ansteht, die Sparte daneben sagt, WELCHE REGELN gelten -- und
-               massgeblich fuer den GAV bleibt die SPARTE (ENT-061). Damit die
-               beiden nicht auseinanderlaufen, zieht artSparteKoppeln() die
-               Sparte mit und spartenKonflikt() meldet einen Widerspruch. -->
-          <select class="inp" id="enNEinsatzart" onchange="artSparteKoppeln('enN')">
-            <option>Verkehrsdienst</option>
-            <option>Revierdienst</option>
-            <option>Sicherheitsdienst</option>
-            <option>Reinigung</option>
-          </select>
-        </div>
-        <div class="f"><label for="enNDatum">Datum *</label><input class="inp" id="enNDatum" type="date" onchange="pickRefresh('enN')"></div>
-        <!-- Von und Bis nebeneinander: sie gehoeren zusammen und werden
-             zusammen gelesen. -->
-        <div class="f zeitpaar">
-          <label>Zeit *</label>
-          <div class="zp">
-            <input class="inp" id="enNVon" type="time" aria-label="Von" onchange="pickRefresh('enN')">
-            <span class="tr">–</span>
-            <input class="inp" id="enNBis" type="time" aria-label="Bis" onchange="pickRefresh('enN')">
-          </div>
-        </div>
-        <div class="f wide">
-          <label for="enNStrasse">Arbeitsort — Strasse</label>
-          <input class="inp" id="enNStrasse" placeholder="nicht der Firmensitz des Kunden">
-        </div>
-        <div class="f"><label for="enNOrt">Arbeitsort — PLZ / Ort *</label><input class="inp" id="enNOrt"></div>
-        <div class="f"><label for="enNSparte">Sparte</label>
-          <select class="inp" id="enNSparte" onchange="spartenKonflikt('enN')">
-            <option value="sicherheit">Sicherheit</option>
-            <option value="reinigung">Reinigung</option>
-          </select>
-          <div id="enNSparteHint"></div>
-        </div>
-        <div class="f"><label for="enNBedarf">Benötigte Mitarbeitende</label><input class="inp" id="enNBedarf" type="number" min="0" max="99" value="1" oninput="pickFoot('enN')"></div>
-        <div class="f"><label for="enNStatus">Status</label><select class="inp" id="enNStatus"><option value="geplant">Geplant</option><option value="bestaetigt">Bestätigt</option><option value="abgesagt">Abgesagt</option></select></div>
-        <div class="f wide">
-          <label>Zugeteilte Mitarbeitende</label>
-          <div class="ma-pick" id="enNMa"></div>
-          <div class="pick-foot" id="enNMaFoot"></div>
-        </div>
-        <div class="f wide"><label for="enNBemerkung">Bemerkung</label><textarea class="inp" id="enNBemerkung" rows="3" style="min-height:84px"></textarea></div>
-      </div>
-    </div>
-    <div class="dlg-ft">
-      <button class="btn btn-plain" onclick="closeDlg('dlgEnNeu')">Abbrechen</button>
-      <button class="btn btn-primary" id="enNeuBtn" onclick="createEinsatz()">Einsatz anlegen</button>
-    </div>
-  </div>
-</div>
-
 <!-- Objekt anlegen oder ändern -->
 <div class="dlg-scrim" id="dlgObNeu">
   <div class="dlg">
@@ -4115,6 +4125,7 @@ const TITLES = {
   betrieb:     ['Betrieb', 'Einstellungen zum eigenen Unternehmen'],
   pensen:      ['Pensen', 'Jahresstunden gegen die Anstellungskategorie'],
   masterschichten: ['Masterschichten', 'Vorlagen, aus denen die Schichten entstehen'],
+  einsatzneu:  ['Neuer Einsatz', 'Kunde, Ort, Zeit und Zuteilung'],
   einsatzplan: ['Einsatz planen', 'Positionen und Zeiten im Detail']
 };
 
@@ -6797,9 +6808,16 @@ function openEinsatzNeu(felder, maNamen) {
     $('enNeuKiText').innerHTML = t;
   }
   $('enNeuErr').style.display = 'none';
-  openDlg('dlgEnNeu');
+  // Woher man kam, damit "Zurueck" nicht blind in die Planung springt: Der
+  // Diktat-Weg startet auch von der Uebersicht aus (ENT-114).
+  enNeuHer = document.querySelector('.view.on') ? document.querySelector('.view.on').id.replace('view-', '') : 'planung';
+  if (enNeuHer === 'einsatzneu') enNeuHer = 'planung';
+  go('einsatzneu');
   $('enNKunde_name').focus();
 }
+
+let enNeuHer = 'planung';
+function enNeuAbbrechen() { go(enNeuHer || 'planung'); }
 
 // Formularwerte einsammeln. Gibt null zurück, wenn ein Pflichtfeld fehlt.
 function enSammeln(prefix) {
@@ -6835,8 +6853,11 @@ function createEinsatz() {
   api('einsatz_save.php', { method: 'POST', body }).then(({ ok, data }) => {
     b.disabled = false;
     if (!ok || data.status !== 'ok') { err.textContent = data.message || 'Anlegen fehlgeschlagen.'; err.style.display = ''; return; }
-    closeDlg('dlgEnNeu');
-    loadEinsaetze().then(() => toast('Einsatz angelegt.'));
+    loadEinsaetze().then(() => {
+      go(enNeuHer || 'planung');
+      if ((enNeuHer || 'planung') === 'planung') renderPlanung();
+      toast('Einsatz angelegt.');
+    });
   });
 }
 

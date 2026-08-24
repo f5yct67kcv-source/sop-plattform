@@ -28,7 +28,10 @@
 // zwei HTML-Dateien gepflegt werden.
 const STIL = `
 .zeitwahl { display: inline-flex; align-items: center; gap: 4px; width: 100%; min-width: 0; }
-.zeitwahl select { flex: 1 1 0; min-width: 0; text-align: center; }
+/* Mindestbreite: Zwei Ziffern plus Aufklapp-Pfeil müssen immer passen.
+   Ohne sie staucht ein enges Umfeld die Felder, bis von "07" ein "0" wird --
+   gemessen im Anlegen-Dialog, wo vier Felder in eine Spalte mussten. */
+.zeitwahl select { flex: 1 1 0; min-width: 4.2em; text-align: center; }
 .zeitwahl-tr { color: var(--ink-3, #8B919D); font-weight: 600; flex: none; }
 @media (max-width: 720px) { .zeitwahl select { min-height: 44px; font-size: 16px; } }
 `;

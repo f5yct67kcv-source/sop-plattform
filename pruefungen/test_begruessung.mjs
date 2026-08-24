@@ -144,12 +144,12 @@ routerAntwort = [{ status: 'ok', bereich: 'einsatz',
 await page.fill('#rtText', 'Neuer Einsatz für die Borner AG morgen 7 bis 16 Uhr');
 await page.click('#rtBtn');
 await page.waitForTimeout(500);
-check('Einsatz-Dialog geht auf', await page.isVisible('#dlgEnNeu.on'));
+check('Die Anlegen-Ansicht geht auf', await page.isVisible('#view-einsatzneu.on'));
 check('Kunde ist vorbefüllt', (await page.inputValue('#enNKunde_name')) === 'Borner AG');
 check('Zugeteilte Person ist angehakt',
   await page.evaluate(() => document.querySelector('#enNMa input[value="1"]').checked));
 await page.screenshot({ path: OUT + '/81-router-einsatz.png' });
-await page.evaluate(() => closeDlg('dlgEnNeu'));
+await page.evaluate(() => enNeuAbbrechen());
 routerAntwort = null;
 
 // ══════════ ROUTER: FEHLER DES MODELLS
@@ -159,7 +159,7 @@ await page.click('#rtBtn');
 await page.waitForTimeout(400);
 check('Fehler des Modells wird gezeigt', (await page.textContent('#rtErr')).includes('keinem Bereich'));
 check('Kein Dialog öffnet sich dabei',
-  !(await page.isVisible('#mv-bearbeiten.on')) && !(await page.isVisible('#dlgKunde.on')) && !(await page.isVisible('#dlgEnNeu.on')));
+  !(await page.isVisible('#mv-bearbeiten.on')) && !(await page.isVisible('#dlgKunde.on')) && !(await page.isVisible('#view-einsatzneu.on')));
 check('Der Text bleibt für eine Korrektur stehen', (await page.inputValue('#rtText')) === 'irgendwas Unklares');
 routerAntwort = null;
 await page.fill('#rtText', '');
@@ -180,10 +180,10 @@ const bildRuf = rufe.filter(r => r.p.includes('ki_einsatz_bild'));
 check('Bild wird statt Text gesendet, wenn beides da wäre', bildRuf.length === 1);
 check('Der Bild-Rumpf enthält base64 und Mime',
   typeof bildRuf[0].body.bild === 'string' && bildRuf[0].body.bild.length > 0 && bildRuf[0].body.mime === 'image/jpeg');
-check('Einsatz-Dialog geht nach Bild-Erkennung auf', await page.isVisible('#dlgEnNeu.on'));
+check('Die Anlegen-Ansicht geht nach Bild-Erkennung auf', await page.isVisible('#view-einsatzneu.on'));
 check('Titel aus dem Bild ist vorbefüllt', (await page.inputValue('#enNTitel')) === 'Baustelle Kreisel');
 check('Die Bildvorschau ist danach wieder leer', !(await page.isVisible('#rtBildVorschau')));
-await page.evaluate(() => closeDlg('dlgEnNeu'));
+await page.evaluate(() => enNeuAbbrechen());
 bildAntwort = null;
 
 // ══════════ BILD: ENTFERNEN VOR DEM SENDEN
@@ -205,7 +205,7 @@ bildAntwort = [{ status: 'error', message: 'Im Bild liess sich kein Auftrag erke
 await page.click('#rtBtn');
 await page.waitForTimeout(400);
 check('Erklärung bei unlesbarem Bild', (await page.textContent('#rtErr')).includes('kein Auftrag erkennen'));
-check('Kein Dialog bei Fehler', !(await page.isVisible('#dlgEnNeu.on')));
+check('Kein Dialog bei Fehler', !(await page.isVisible('#view-einsatzneu.on')));
 bildAntwort = null;
 await page.evaluate(() => rtBildEntfernen('rt'));
 

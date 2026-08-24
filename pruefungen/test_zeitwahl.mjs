@@ -81,7 +81,7 @@ check('Das Aussehen bringt die Komponente selbst mit',
 // ══════════ PLANUNG: NUR VIERTELSTUNDEN
 await page.evaluate(() => openEinsatzNeu());
 await page.waitForTimeout(400);
-check('Der Anlegen-Dialog steht offen', await page.isVisible('#dlgEnNeu.on'));
+check('Die Anlegen-Ansicht steht offen', await page.isVisible('#view-einsatzneu.on'));
 check('KRITISCH: in der Planung stehen nur Viertelstunden zur Wahl',
   JSON.stringify(await optionen('enNVon', 'min')) === JSON.stringify(['00', '15', '30', '45']));
 check('Die Stunden gehen von 00 bis 23',
@@ -96,7 +96,7 @@ check('Eine halbe Angabe ergibt noch keine Uhrzeit', await page.evaluate(() => {
   el.__zw.std.dispatchEvent(new Event('change', { bubbles: true }));
   return el.value === '';
 }));
-await page.evaluate(() => closeDlg('dlgEnNeu'));
+await page.evaluate(() => enNeuAbbrechen());
 await page.waitForTimeout(250);
 
 // ══════════ IST-ZEITEN BLEIBEN MINUTENGENAU

@@ -86,9 +86,9 @@ routerAntwort = [{ status: 'ok', bereich: 'einsatz',
 await page.fill('#peText', 'Neuer Einsatz für die Borner AG morgen 7 bis 16 Uhr');
 await page.click('#peBtn');
 await page.waitForTimeout(500);
-check('Einsatz-Dialog geht auf', await page.isVisible('#dlgEnNeu.on'));
+check('Die Anlegen-Ansicht geht auf', await page.isVisible('#view-einsatzneu.on'));
 check('Kunde ist vorbefüllt', (await page.inputValue('#enNKunde_name')) === 'Borner AG');
-await page.evaluate(() => closeDlg('dlgEnNeu'));
+await page.evaluate(() => enNeuAbbrechen());
 routerAntwort = null;
 await page.fill('#peText', '');
 
@@ -109,10 +109,10 @@ await page.click('#peBtn');
 await page.waitForTimeout(500);
 const bildRuf = rufe.filter(r => r.p.includes('ki_einsatz_bild'));
 check('Bild wird gesendet', bildRuf.length === 1);
-check('Einsatz-Dialog geht nach Bild-Erkennung auf', await page.isVisible('#dlgEnNeu.on'));
+check('Die Anlegen-Ansicht geht nach Bild-Erkennung auf', await page.isVisible('#view-einsatzneu.on'));
 check('Titel aus dem Bild ist vorbefüllt', (await page.inputValue('#enNTitel')) === 'Baustelle Kreisel');
 check('Die Bildvorschau ist danach wieder leer', !(await page.isVisible('#peBildVorschau')));
-await page.evaluate(() => closeDlg('dlgEnNeu'));
+await page.evaluate(() => enNeuAbbrechen());
 bildAntwort = null;
 
 // ══════════ ZIEHEN UND FALLENLASSEN
