@@ -42,6 +42,16 @@ let EINSAETZE = [
   bau(74, { datum: HEUTE, ist_status: 'offen',
             mitarbeiter: [{ id: 3, name: 'hans', vorname: 'Hans', nachname: 'Meier', ist_status: 'anwesend' }] }),
   bau(75, { kunde_name: 'Axians', bedarf: 3 }),
+  // 76 — drei Rückmeldungen nebeneinander: zugesagt, abgelehnt, offen aber
+  //      angesehen. Genau die drei Zustände, die der Balken zeigen soll.
+  bau(76, { kunde_name: 'Rückmeldungen', bedarf: 3, mitarbeiter: [
+    // Der Zeitpunkt selbst wird nirgends geprüft, nur ob überhaupt einer da
+    // ist. Trotzdem relativ statt fest: Ein festes Datum nahe beim heutigen
+    // Tag altert und macht die Suite mit der Zeit brüchig (test_datumsfest).
+    { id: 1, name: 'adrian', vorname: 'Adrian', nachname: 'von Arb', zusage: 'zugesagt', gesehen_am: tag(-1) + ' 08:00:00' },
+    { id: 2, name: 'daniele', vorname: 'Daniele', nachname: 'Ciardo', zusage: 'abgelehnt', gesehen_am: tag(-1) + ' 09:00:00' },
+    { id: 3, name: 'hans', vorname: 'Hans', nachname: 'Meier', zusage: 'offen', gesehen_am: null },
+  ] }),
 ];
 
 // ── Nachbau des Servers (einsatz_position.php) ────────────────────────────
@@ -63,7 +73,8 @@ function ausBedarf(e) {
       von: e.von, bis: e.bis, std_verrechnung: null, pauschal: null, qualifikation: null,
       gesperrt: 0, bemerkung: null, mitarbeiter_id: m ? Number(m.id) : null,
       mitarbeiter: m ? m.name : null, vorname: m ? m.vorname : null,
-      nachname: m ? m.nachname : null, zusage: null };
+      nachname: m ? m.nachname : null, zusage: m ? (m.zusage || 'offen') : null,
+      gesehen_am: m ? (m.gesehen_am || null) : null };
   });
   e.bedarf = POS[e.id].length;   // bedarf_nachfuehren()
   return POS[e.id];
@@ -631,6 +642,43 @@ try {
   await page.setViewportSize({ width: 1500, height: 1000 });
   await page.waitForTimeout(250);
 } catch (e) { bad.push('Handy: ' + String(e).split('\n')[0].slice(0, 110)); }
+
+// ══════════ RÜCKMELDUNG IM RASTER (ENT-113)
+await oeffne(76);
+const balken = () => page.evaluate(() => [...document.querySelectorAll('#epRaster .ep-balken')]
+  .map(b => ({ k: b.className, auge: !!b.querySelector('.ep-auge'), t: b.getAttribute('title') || '', txt: b.textContent.trim() })));
+const bs = await balken();
+check('KRITISCH: die zugesagte Schicht ist grün, nicht gelb',
+  bs.some(b => b.txt.includes('Adrian') && b.k.includes('zugesagt') && !b.k.includes('besetzt')));
+check('KRITISCH: die abgelehnte Schicht ist hervorgehoben',
+  bs.some(b => b.txt.includes('Daniele') && b.k.includes('abgelehnt')));
+check('KRITISCH: ohne Rückmeldung bleibt es beim bisherigen Gelb',
+  bs.some(b => b.txt.includes('Hans') && b.k.includes('besetzt')));
+check('KRITISCH: das Auge steht bei den angesehenen Schichten',
+  bs.filter(b => b.auge).length === 2);
+check('KRITISCH: und nicht bei der ungesehenen',
+  bs.some(b => b.txt.includes('Hans') && !b.auge));
+check('Der Titel sagt, woran man ist',
+  bs.some(b => b.t.includes('HAT ABGELEHNT'))
+  && bs.some(b => b.t.includes('Hat zugesagt'))
+  && bs.some(b => b.t.includes('noch nicht angesehen')));
+await page.screenshot({ path: OUT + '/88-rueckmeldungen.png' });
+
+// ══════════ EINE ABGELEHNTE SCHICHT IST WIEDER OFFEN (ENT-113)
+check('KRITISCH: der Kopf zählt die Abgelehnte nicht als besetzt',
+  (await page.textContent('#epKopf')).includes('2 / 3'));
+await page.evaluate(() => { go('planung'); goTab('einsaetze'); });
+await page.waitForTimeout(600);
+const zeile76 = await page.evaluate(() => {
+  const tr = [...document.querySelectorAll('#plTable tbody tr')]
+    .find(r => r.textContent.includes('Rückmeldungen'));
+  return tr ? { txt: tr.textContent.replace(/\s+/g, ' '), durch: !!tr.querySelector('.nm-abgelehnt') } : null;
+});
+check('KRITISCH: die Planungsliste zeigt 2 von 3 statt 3 von 3',
+  zeile76 && zeile76.txt.includes('2/3'));
+check('KRITISCH: sie meldet den offenen Platz', zeile76 && zeile76.txt.includes('1 offen'));
+check('KRITISCH: der Name der abgelehnten Person bleibt sichtbar, aber gekennzeichnet',
+  zeile76 && zeile76.durch && zeile76.txt.includes('Daniele'));
 
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }

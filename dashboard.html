@@ -462,6 +462,17 @@ table.ep-gitter td.raster { position: relative; padding: 0; }
 .ep-balken { position: absolute; top: 3px; bottom: 3px; border-radius: 3px; display: flex; align-items: center;
   justify-content: center; gap: 6px; font-size: 11px; font-weight: 600; overflow: hidden; white-space: nowrap; padding: 0 6px; }
 .ep-balken.besetzt { background: var(--warn); color: #1a1205; }
+/* Eine abgelehnte Schicht ist der eine Eintrag im Feed, der nicht untergehen
+   darf: Sie ist wieder offen und niemand weiss es (ENT-113). */
+.erg.erg-abgelehnt { background: var(--neg-soft); box-shadow: inset 3px 0 0 var(--neg); }
+.erg.erg-abgelehnt .erg-txt { color: var(--neg); font-weight: 660; }
+
+/* Rueckmeldung der eingeteilten Person (ENT-113). */
+.ep-balken.zugesagt { background: var(--pos); color: #06210f; }
+.ep-balken.abgelehnt { background: var(--neg); color: #fff; font-weight: 700;
+  box-shadow: 0 0 0 2px var(--neg-soft); }
+.ep-auge { width: 13px; height: 13px; flex: none; fill: none; stroke: currentColor;
+  stroke-width: 2; opacity: .75; }
 .ep-balken.offen { background: var(--line-soft); color: var(--ink-3); border: 1px dashed var(--line); }
 /* Ragt ueber das Einsatzende hinaus (ENT-111). Erlaubt, aber nicht
    stillschweigend: gestreift, damit ein Verklicken im Raster auffaellt. */
@@ -525,6 +536,9 @@ th.sortbar.aktiv .pf { opacity: 1; color: var(--accent); }
 .chip-p { background: var(--pos-soft); color: var(--pos); }
 .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--pos); flex: none; box-shadow: 0 0 0 3px var(--pos-soft); }
 .dot.warn { background: var(--warn); box-shadow: 0 0 0 3px var(--warn-soft); }
+.dot.neg { background: var(--neg); box-shadow: 0 0 0 3px var(--neg-soft); }
+/* Wer abgesagt hat, bleibt sichtbar -- aber als das, was er ist (ENT-113). */
+.nm.nm-abgelehnt { background: var(--neg-soft); color: var(--neg); text-decoration: line-through; }
 .rank.click { cursor: pointer; }
 .rank.click:hover { background: var(--bg); }
 
@@ -5364,10 +5378,15 @@ function renderEreignisse() {
     </div>`;
 
   $('ereignisFeed').innerHTML = hinweis + kopf + f.map((x, i) => {
-    const art  = EREIGNIS_ART[x.typ] || { punkt: 'warn', wort: '' };
+    let art  = EREIGNIS_ART[x.typ] || { punkt: 'warn', wort: '' };
+    // Eine Ablehnung ist kein gruener Punkt. Sie bedeutet, dass eine Schicht
+    // wieder offen ist -- und das ist die Zeile, die der Planer als Erstes
+    // finden muss (ENT-113).
+    const abgelehnt = x.typ === 'zusage' && x.zusage === 'abgelehnt';
+    if (abgelehnt) art = { punkt: 'neg', wort: 'hat eine Schicht abgelehnt' };
     const wer  = x.person ? (fullName(x.person) || x.person.name) : (x.kunde || '—');
     return `
-    <div class="rank click erg erg-spalten" onclick="ereignisAufklappen(${i}, this)">
+    <div class="rank click erg erg-spalten${abgelehnt ? ' erg-abgelehnt' : ''}" onclick="ereignisAufklappen(${i}, this)">
       <span class="dot ${art.punkt}"></span>
       <div class="erg-abs">${esc(wer)}</div>
       <div class="erg-txt">${esc(ereignisZeile(x))}</div>
@@ -5390,7 +5409,10 @@ function ereignisAbhakbar(typ) {
 function ereignisZeile(x) {
   if (x.typ === 'rapport')  { return `hat einen Rapport gesendet — ${x.kunde || '?'}, ${dmy(x.datum)}`; }
   if (x.typ === 'sperrtag') { return `hat sich ${dmy(x.datum)} gesperrt${x.bemerkung ? ' — ' + x.bemerkung : ''}`; }
-  if (x.typ === 'zusage')   { return `${x.zusage === 'abgesagt' ? 'hat abgesagt' : 'hat zugesagt'} — ${x.kunde || x.einsatz_titel || '?'}, ${dmy(x.datum)}`; }
+  // 'abgesagt' gibt es nicht -- meine_zusage.php kennt offen | zugesagt |
+  // abgelehnt. Der Vergleich traf nie zu, und JEDE Ablehnung stand hier als
+  // Zusage: das Gegenteil dessen, was passiert war (ENT-113).
+  if (x.typ === 'zusage')   { return `${x.zusage === 'abgelehnt' ? 'HAT ABGELEHNT' : 'hat zugesagt'} — ${x.kunde || x.einsatz_titel || '?'}, ${dmy(x.datum)}`; }
   return x.titel || '';
 }
 
@@ -6416,7 +6438,24 @@ function ruheLuecken(datum, von, bis, ausserId) {
   return map;
 }
 
-const fehlend = e => (e.status === 'abgesagt' ? 0 : Math.max(0, Number(e.bedarf) - (e.mitarbeiter || []).length));
+// Wer abgelehnt hat, besetzt die Schicht nicht (ENT-113). Vorher zaehlte
+// jede Zuteilung mit, auch die abgesagte -- die Liste zeigte "2/2 besetzt",
+// waehrend eine der beiden Personen abgesagt hatte. Eine Zahl, die etwas
+// verspricht, was nicht stimmt.
+//
+// Der NAME bleibt trotzdem in der Liste stehen, nur eben als abgelehnt
+// gekennzeichnet: Wer abgesagt hat, ist die wichtigste Information ueberhaupt
+// -- ihn herauszufiltern hiesse, sie zu verstecken.
+const zusageVon = m => String((m && m.zusage) || 'offen');
+// Ein Name in der Liste sagt jetzt auch, ob die Person abgesagt hat.
+// Ohne das stuende sie unauffaellig zwischen den anderen, obwohl ihr Platz
+// wieder offen ist (ENT-113).
+const nameChip = m => zusageVon(m) === 'abgelehnt'
+  ? `<span class="nm nm-abgelehnt" title="Hat abgelehnt — der Platz ist wieder offen">${esc(fullName(m) || m.name)}</span>`
+  : `<span class="nm">${esc(fullName(m) || m.name)}</span>`;
+const besetzt = e => (e.mitarbeiter || []).filter(m => zusageVon(m) !== 'abgelehnt');
+const hatAbgelehnt = e => (e.mitarbeiter || []).some(m => zusageVon(m) === 'abgelehnt');
+const fehlend = e => (e.status === 'abgesagt' ? 0 : Math.max(0, Number(e.bedarf) - besetzt(e).length));
 
 // Ein leeres Feld heisst "kein Limit auf dieser Seite" -- damit deckt derselbe
 // Zeitraum sowohl "ab heute" (von gesetzt, bis offen) als auch "wirklich alles"
@@ -6556,7 +6595,7 @@ function renderPlanung() {
 
     const zug = e.mitarbeiter || [];
     const fehlt = fehlend(e);
-    const teile = zug.slice(0, 3).map(m => `<span class="nm">${esc(fullName(m) || m.name)}</span>`);
+    const teile = zug.slice(0, 3).map(nameChip);
     if (zug.length > 3) teile.push(`<span class="nm">+${zug.length - 3}</span>`);
     if (fehlt) teile.push(`<span class="nm off">${fehlt} offen</span>`);
     const st = EN_STATUS[e.status] || EN_STATUS.geplant;
@@ -6567,7 +6606,7 @@ function renderPlanung() {
         <td class="strong">${esc(e.kunde_name)}${e.titel ? `<div class="sec">${esc(e.titel)}</div>` : ''}</td>
         <td>${esc(e.ort)}${e.strasse ? `<div class="sec">${esc(e.strasse)}</div>` : ''}</td>
         <td><span class="chip chip-n">${esc(e.einsatzart)}</span>${sparteChip(e)}</td>
-        <td class="num"><span class="chip ${e.status === 'abgesagt' ? 'chip-n' : (fehlt ? 'chip-w' : 'chip-p')}">${zug.length}/${nf(e.bedarf)}</span></td>
+        <td class="num"><span class="chip ${e.status === 'abgesagt' ? 'chip-n' : (fehlt ? 'chip-w' : 'chip-p')}">${besetzt(e).length}/${nf(e.bedarf)}</span></td>
         <td>${teile.length ? `<div class="crew">${teile.join('')}</div>` : '<span style="color:var(--ink-3)">–</span>'}</td>
         <td><span class="chip ${st[1]}">${st[0]}</span></td>
       </tr>`;
@@ -6600,13 +6639,13 @@ function renderPlanung() {
     return kopf + `<div class="ag-karte click" onclick="openEinsatz(${Number(e.id)})">
       <div class="kopf">
         <b>${enSchloss(e)}${esc(hm(e.von))}–${esc(hm(e.bis))}${ueberNacht(e) ? ' <span class="ag-plan">bis Folgetag</span>' : ''}</b>
-        <span class="chip ${e.status === 'abgesagt' ? 'chip-n' : (fehlt ? 'chip-w' : 'chip-p')}">${zug.length}/${nf(e.bedarf)}</span>
+        <span class="chip ${e.status === 'abgesagt' ? 'chip-n' : (fehlt ? 'chip-w' : 'chip-p')}">${besetzt(e).length}/${nf(e.bedarf)}</span>
       </div>
       <div class="wer">${esc(e.kunde_name)}${e.titel ? ` · ${esc(e.titel)}` : ''}</div>
       <div class="zeiten">${esc(e.ort)}${e.strasse ? ` · ${esc(e.strasse)}` : ''}</div>
       <div class="marken">
         <span class="chip ${st[1]}">${st[0]}</span>
-        ${zug.slice(0, 3).map(m => `<span class="nm">${esc(fullName(m) || m.name)}</span>`).join('')}
+        ${zug.slice(0, 3).map(nameChip).join('')}
         ${zug.length > 3 ? `<span class="nm">+${zug.length - 3}</span>` : ''}
         ${fehlt ? `<span class="nm off">${fehlt} offen</span>` : ''}
       </div>
@@ -8015,7 +8054,7 @@ function epZeichnen() {
 function epKopfZeichnen() {
   const e = epEinsatz;
   if (!e) return;
-  const zu = epPos.filter(p => p.mitarbeiter_id).length;
+  const zu = epPos.filter(epBesetzt).length;
   const soll = epPos.length || Number(e.bedarf || 0);
   // Beschriftung oben, Wert darunter. Ein Wert darf dabei zweizeilig sein --
   // beim Ort gehoeren Strasse und Ortschaft zusammen und werden nicht in zwei
@@ -8049,6 +8088,24 @@ function epKopfZeichnen() {
     </div>`;
 }
 
+// Der Balken sagt jetzt, woran man ist (ENT-113): gelb = eingeteilt, aber
+// noch keine Rueckmeldung; gruen = zugesagt; rot = abgelehnt. Vorher war
+// jede besetzte Schicht gelb, und ob jemand abgesagt hatte, stand nirgends.
+const EP_ZUSAGE_KLASSE = { zugesagt: 'zugesagt', abgelehnt: 'abgelehnt' };
+const epZusageKlasse = p => EP_ZUSAGE_KLASSE[String(p.zusage || 'offen')] || 'besetzt';
+// Wer abgelehnt hat, besetzt die Position nicht -- dieselbe Regel wie in der
+// Planungsliste (ENT-113). Ohne sie zaehlte der Kopf "3 / 3", waehrend im
+// Raster eine Absage rot leuchtet.
+const epBesetzt = p => !!p.mitarbeiter_id && String(p.zusage || 'offen') !== 'abgelehnt';
+const epZusageWort = p => !p.mitarbeiter_id ? ''
+  : (p.zusage === 'zugesagt' ? 'Hat zugesagt'
+    : p.zusage === 'abgelehnt' ? 'HAT ABGELEHNT — die Schicht ist offen'
+    : 'Eingeteilt, noch keine Rückmeldung')
+    + (p.gesehen_am ? ' · Schicht in der App angesehen' : ' · noch nicht angesehen');
+// Auge: die Person hat die Schicht in der App geoeffnet.
+const EP_AUGE = '<svg class="ep-auge" viewBox="0 0 24 24" aria-hidden="true">'
+  + '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+
 function epRasterZeichnen() {
   const { start, slots } = epAchse();
   if (!epPos.length) {
@@ -8074,7 +8131,7 @@ function epRasterZeichnen() {
   epPos.forEach(p => {
     const a = Math.floor(epMinuten(p.von, start) / EP_TAKT);
     const b = Math.ceil((epMinuten(p.bis, start) || 1440) / EP_TAKT);
-    for (let i = a; i < b && i < slots; i++) { soll[i]++; if (p.mitarbeiter_id) ist[i]++; }
+    for (let i = a; i < b && i < slots; i++) { soll[i]++; if (epBesetzt(p)) ist[i]++; }
   });
   const std = n => nf(n * EP_TAKT / 60, 2);
   $('epSoll').innerHTML = `Soll <b>${std(soll.reduce((a, b) => a + b, 0))} h</b> ·
@@ -8110,9 +8167,11 @@ function epRasterZeichnen() {
           <svg class="i i-sm" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
       </div></td>
       <td class="raster" colspan="${slots}">
-        <div class="ep-balken ${p.mitarbeiter_id ? 'besetzt' : 'offen'}${epUeberhang(hm(p.von), hm(p.bis)) ? ' ueber' : ''}"
-             title="${epUeberhang(hm(p.von), hm(p.bis)) ? `Endet ${esc(epStd(epUeberhang(hm(p.von), hm(p.bis))))} nach dem Einsatz` : ''}"
+        <div class="ep-balken ${p.mitarbeiter_id ? epZusageKlasse(p) : 'offen'}${epUeberhang(hm(p.von), hm(p.bis)) ? ' ueber' : ''}"
+             title="${esc([epZusageWort(p), epUeberhang(hm(p.von), hm(p.bis))
+               ? `Endet ${epStd(epUeberhang(hm(p.von), hm(p.bis)))} nach dem Einsatz` : ''].filter(Boolean).join(' · '))}"
              style="left:${links}%;width:${breite}%">
+          ${p.mitarbeiter_id && p.gesehen_am ? EP_AUGE : ''}
           <span style="overflow:hidden;text-overflow:ellipsis">${name}</span>
           ${p.mitarbeiter_id ? `<button title="Person entfernen" onclick="event.stopPropagation();epLoesen(${p.id})">×</button>`
             : `<button title="Position entfernen" onclick="event.stopPropagation();epPosWeg(${p.id})">×</button>`}
@@ -9177,7 +9236,7 @@ function oplZellen(d) {
   Object.values(z).forEach(c => {
     c.aktiv = c.li.filter(e => e.status !== 'abgesagt');
     if (c.li.length) {
-      c.ist = c.aktiv.reduce((a, e) => a + (e.mitarbeiter || []).length, 0);
+      c.ist = c.aktiv.reduce((a, e) => a + besetzt(e).length, 0);
       c.soll = c.aktiv.reduce((a, e) => a + Number(e.bedarf), 0);
       c.prov = c.aktiv.length > 0 && c.aktiv.every(e => e.status === 'provisorisch');
     }
@@ -10154,7 +10213,7 @@ function mxFelderFuellen() {
 function zellenStand(liste) {
   const aktiv = liste.filter(e => e.status !== 'abgesagt');
   if (!aktiv.length) return { klasse: liste.length ? 'z-ab' : 'z-nix', text: liste.length ? '–' : '·' };
-  const zug = aktiv.reduce((s, e) => s + (e.mitarbeiter || []).length, 0);
+  const zug = aktiv.reduce((s, e) => s + besetzt(e).length, 0);
   const bed = aktiv.reduce((s, e) => s + Number(e.bedarf), 0);
   if (aktiv.every(e => e.status === 'provisorisch')) return { klasse: 'z-prov', text: String(zug) };
   if (zug >= bed) return { klasse: 'z-voll', text: String(zug) };
@@ -10283,7 +10342,7 @@ function renderMatrix() {
       const wd = new Date(d + 'T12:00:00').getDay();
       const kl = feiertage[d] ? 'fei' : (wd === 0 || wd === 6 ? 'we' : '');
       const titel = liste.length
-        ? dmy(d) + '\n' + liste.map(e => `${hm(e.von)}–${hm(e.bis)} ${e.titel || e.kunde_name} — ${(e.mitarbeiter || []).length}/${e.bedarf}${e.status !== 'geplant' ? ' (' + e.status + ')' : ''}`).join('\n')
+        ? dmy(d) + '\n' + liste.map(e => `${hm(e.von)}–${hm(e.bis)} ${e.titel || e.kunde_name} — ${besetzt(e).length}/${e.bedarf}${e.status !== 'geplant' ? ' (' + e.status + ')' : ''}`).join('\n')
         : dmy(d) + ' — nichts geplant';
       // Der Belegungszustand steht auch am Tagesfeld selbst, damit die Farbe
       // das ganze Feld füllt und nicht nur den Knopf darin (ENT-035).
@@ -10392,13 +10451,13 @@ function renderTagesplan() {
     return `<div class="ag-karte click" onclick="openEinsatz(${Number(e.id)})">
       <div class="kopf">
         <b>${enSchloss(e)}${esc(hm(e.von))}–${esc(hm(e.bis))}${ueberNacht(e) ? ' <span class="ag-plan">bis Folgetag</span>' : ''}</b>
-        <span class="chip ${e.status === 'abgesagt' ? 'chip-n' : (fehlt ? 'chip-w' : 'chip-p')}">${zug.length}/${nf(e.bedarf)}</span>
+        <span class="chip ${e.status === 'abgesagt' ? 'chip-n' : (fehlt ? 'chip-w' : 'chip-p')}">${besetzt(e).length}/${nf(e.bedarf)}</span>
       </div>
       <div class="wer">${esc(e.kunde_name)}${e.titel ? ` · ${esc(e.titel)}` : ''}</div>
       <div class="zeiten">${esc(e.ort)}${e.strasse ? ` · ${esc(e.strasse)}` : ''}</div>
       <div class="marken">
         <span class="chip ${st[1]}">${st[0]}</span>
-        ${zug.length ? zug.map(mm => `<span class="nm">${esc(fullName(mm) || mm.name)}</span>`).join('') : ''}
+        ${zug.length ? zug.map(nameChip).join('') : ''}
         ${fehlt ? `<span class="nm off">${fehlt} offen</span>` : ''}
       </div>
     </div>`;
@@ -10411,13 +10470,13 @@ function renderTagesplan() {
       const zug = e.mitarbeiter || [];
       const fehlt = fehlend(e);
       const st = EN_STATUS[e.status] || EN_STATUS.geplant;
-      const teile = zug.map(mm => `<span class="nm">${esc(fullName(mm) || mm.name)}</span>`);
+      const teile = zug.map(nameChip);
       if (fehlt) teile.push(`<span class="nm off">${fehlt} offen</span>`);
       return `<tr class="click${enGesperrt(e) ? ' zu' : ''}" onclick="openEinsatz(${Number(e.id)})">
         <td class="nowrap num">${enSchloss(e)}${hm(e.von)}–${hm(e.bis)}${ueberNacht(e) ? '<div class="sec">bis Folgetag</div>' : ''}</td>
         <td class="strong">${esc(e.kunde_name)}${e.titel ? `<div class="sec">${esc(e.titel)}</div>` : ''}</td>
         <td>${esc(e.ort)}${e.strasse ? `<div class="sec">${esc(e.strasse)}</div>` : ''}</td>
-        <td class="num"><span class="chip ${e.status === 'abgesagt' ? 'chip-n' : (fehlt ? 'chip-w' : 'chip-p')}">${zug.length}/${nf(e.bedarf)}</span></td>
+        <td class="num"><span class="chip ${e.status === 'abgesagt' ? 'chip-n' : (fehlt ? 'chip-w' : 'chip-p')}">${besetzt(e).length}/${nf(e.bedarf)}</span></td>
         <td>${teile.length ? `<div class="crew">${teile.join('')}</div>` : '<span style="color:var(--ink-3)">–</span>'}</td>
         <td><span class="chip ${st[1]}">${st[0]}</span></td>
       </tr>`;

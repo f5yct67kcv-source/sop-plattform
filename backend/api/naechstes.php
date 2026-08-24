@@ -14,7 +14,8 @@ $heute = date('Y-m-d');
 // Zuerst ein Einsatz mit offener Stelle, sonst der naechste ueberhaupt --
 // eine unbesetzte Schicht ist dringlicher als eine bereits volle.
 $sql = "SELECT e.id, e.kunde_name, e.titel, e.ort, e.datum, e.von, e.bis, e.bedarf, o.name AS objekt_name,
-               (SELECT COUNT(*) FROM einsatz_zuteilung z WHERE z.einsatz_id = e.id) AS zugeteilt
+               (SELECT COUNT(*) FROM einsatz_zuteilung z
+                 WHERE z.einsatz_id = e.id AND z.zusage <> 'abgelehnt') AS zugeteilt
         FROM einsaetze e
         LEFT JOIN objekte o ON o.id = e.objekt_id
         WHERE e.status <> 'abgesagt' AND e.datum >= ?

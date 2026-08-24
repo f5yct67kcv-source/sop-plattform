@@ -116,7 +116,11 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12): array
             'mitarbeiter_id' => (int)$z['mitarbeiter_id'], 'zeit' => $z['zugeteilt_am'],
             'person' => ['id' => (int)$z['mitarbeiter_id'], 'name' => $z['name'],
                          'vorname' => $z['vorname'], 'nachname' => $z['nachname']],
-            'titel' => $z['zusage'] === 'abgesagt' ? 'Schicht abgesagt' : 'Schicht zugesagt',
+            // 'abgesagt' gibt es nicht: meine_zusage.php kennt nur
+            // offen | zugesagt | abgelehnt. Der Vergleich traf darum nie zu,
+            // und JEDE Ablehnung stand hier als Zusage -- das Gegenteil
+            // dessen, was passiert war (ENT-113).
+            'titel' => $z['zusage'] === 'abgelehnt' ? 'Schicht abgelehnt' : 'Schicht zugesagt',
             'zusage' => $z['zusage'], 'datum' => $z['datum'],
             'von' => $z['von'], 'bis' => $z['bis'],
             'kunde' => $z['kunde_name'], 'einsatz_titel' => $z['einsatz_titel'], 'ort' => $z['ort'],
