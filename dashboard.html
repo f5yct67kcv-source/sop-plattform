@@ -7792,8 +7792,30 @@ function epLaden() {
   $('pgCrumb').textContent = `${dmy(e.datum)} · ${hm(e.von)}–${hm(e.bis)} · ${e.kunde_name || ''}`;
   return api('einsatz_position.php?einsatz_id=' + epId).then(({ ok, data }) => {
     epPos = (ok && data.status === 'ok') ? (data.positionen || []) : [];
+    // Beim ersten Oeffnen entstehen die Positionen aus dem Bedarf des
+    // Einsatzes. Ohne das stuende hier ein Leerzustand, obwohl die Zahl der
+    // benoetigten Leute laengst feststeht -- und jede Zeile muesste einzeln
+    // von Hand geklickt werden, bevor sich ueberhaupt jemand einteilen laesst.
+    //
+    // Eine festgeschriebene Schicht bleibt unberuehrt (ENT-045): Dort wird
+    // nichts angelegt, auch nicht auf Vorrat. Der Server weist denselben
+    // Versuch ohnehin ab; die Pruefung hier erspart die abgewiesene Anfrage.
+    //
+    // Erst zeichnen, dann anlegen -- nicht umgekehrt. Schlaegt das Anlegen
+    // fehl (Netz, Serverfehler, Sperre), stuende sonst weiter der ZUVOR
+    // geoeffnete Einsatz auf dem Bildschirm: falscher Kopf, fremdes Raster,
+    // und nichts, was darauf hinweist. Lieber einen Lidschlag den
+    // Leerzustand zeigen als dauerhaft den falschen Einsatz.
     epZeichnen();
+    if (!epPos.length && !enGesperrt(e) && epSollZahl(e) > 0) return epSenden({ aktion: 'aus_bedarf' });
   });
+}
+
+// Wie viele Plaetze der Einsatz braucht: seine eigene Zahl, mindestens aber so
+// viele, wie schon Personen daran haengen. Wer eingeteilt ist, braucht einen
+// Platz -- sonst faellt er aus dem Raster, obwohl er am Einsatz steht.
+function epSollZahl(e) {
+  return Math.max(Number(e && e.bedarf) || 0, ((e && e.mitarbeiter) || []).length);
 }
 
 // Minuten seit Einsatzbeginn. Endet die Schicht am Folgetag, laeuft die Achse
@@ -7864,10 +7886,18 @@ function epKopfZeichnen() {
 function epRasterZeichnen() {
   const { start, slots } = epAchse();
   if (!epPos.length) {
+    // Seit die Positionen beim Oeffnen aus dem Bedarf entstehen, steht hier
+    // nur noch, wer wirklich keine hat: ein Einsatz ohne Bedarf und ohne
+    // eingeteilte Person -- oder eine festgeschriebene Schicht, in der
+    // bewusst nichts mehr angelegt wird (ENT-045).
     $('epRaster').innerHTML = `<div class="empty" style="padding:34px 24px">
       <h3>Noch keine Position</h3>
-      <p>Eine Position ist ein Platz mit eigener Zeit. Vier Positionen heissen vier Leute,
-         die sich auch unterschiedlich ablösen dürfen.</p></div>`;
+      <p>${enGesperrt(epEinsatz)
+        ? `Diese Schicht ist abgeglichen und festgeschrieben — es wird nichts mehr angelegt.`
+        : `Dieser Einsatz nennt keine benötigte Anzahl. Eine Position ist ein Platz mit eigener
+           Zeit: Vier Positionen heissen vier Leute, die sich auch unterschiedlich ablösen dürfen.`}</p>
+      ${enGesperrt(epEinsatz) ? '' : `<button class="btn btn-primary btn-sm" style="margin-top:14px"
+        onclick="epPosNeu()">Erste Position anlegen</button>`}</div>`;
     $('epSoll').innerHTML = '';
     return;
   }
@@ -7895,7 +7925,7 @@ function epRasterZeichnen() {
     const links = (a / slots * 100).toFixed(3), breite = ((b - a) / slots * 100).toFixed(3);
     const name = p.mitarbeiter_id ? esc(([p.vorname, p.nachname].filter(Boolean).join(' ')) || p.mitarbeiter) : 'offen';
     return `<tr class="${epGewaehlt === p.id ? 'gewaehlt' : ''}" onclick="epWaehlen(${p.id})">
-      <td class="fest">${p.nr}. ${esc(p.funktion || 'Ordnungsdienst')}</td>
+      <td class="fest">${p.nr}. ${esc(p.funktion || (epEinsatz && epEinsatz.einsatzart) || 'Position')}</td>
       <td class="fest">${esc(p.position || '—')}</td>
       <td class="fest" style="text-align:right">${p.pauschal != null ? nf(p.pauschal, 2) + ' pausch.'
         : (p.std_verrechnung != null ? nf(p.std_verrechnung, 2) + ' CHF' : '—')}</td>
@@ -7992,8 +8022,14 @@ function epSenden(koerper) {
       epPos = data.positionen || [];
       epZeichnen();
       // Die Planungsliste zeigt die Besetzung -- ohne Nachladen stuende dort
-      // weiter der alte Stand.
-      loadEinsaetze().then(renderPlanung);
+      // weiter der alte Stand. Danach zeigt auch der Kopf wieder den frischen
+      // Einsatz: Seit die Anzahl Positionen den Bedarf nachfuehrt, ist das
+      // zwischengespeicherte Objekt nach jedem Schreiben veraltet.
+      loadEinsaetze().then(() => {
+        const frisch = einsaetze.find(x => Number(x.id) === epId);
+        if (frisch) { epEinsatz = frisch; epKopfZeichnen(); }
+        renderPlanung();
+      });
       return true;
     });
 }
