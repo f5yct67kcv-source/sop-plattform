@@ -5,6 +5,7 @@
 // gespeichert wird.
 import { WURZEL, HIER, OUT, browserPfad } from './pfade.mjs';
 import { chromium } from 'playwright';
+import { zeitSetzen } from './zeitfeld.mjs';
 
 const EXE = browserPfad();
 const ok = [], bad = [];
@@ -204,8 +205,14 @@ check('Der Tooltip nennt Artikel und Grund',
 check('KRITISCH: der Vorschlag allein speichert nichts', schreibt().length === 0);
 check('Netto zieht die vorgeschlagene Pause ab',
   (await page.textContent(`#agTable tbody tr:nth-child(${langZ}) td:nth-child(8)`)).trim() === '09:00');
+// Seit ENT-110 steht dort die Zeitwahl; sichtbar ist ihre Huelle, nicht das
+// wertfuehrende Feld.
 check('Pausenbeginn ist ein eigenes Feld',
-  await page.isVisible(`#agTable tbody tr:nth-child(${langZ}) [data-ag="pausevon"]`));
+  await page.evaluate(z => {
+    const el = document.querySelector(`#agTable tbody tr:nth-child(${z}) [data-ag="pausevon"]`);
+    const h = el && el.closest('.zeitwahl');
+    return !!h && h.getBoundingClientRect().height > 0;
+  }, langZ));
 // Zu kurze Pause wird markiert, aber nicht verhindert
 await page.fill(pauseFeld(langZ), '20');
 await page.waitForTimeout(150);
@@ -247,8 +254,8 @@ await page.waitForTimeout(150);
 check('Kopf-Haken waehlt alle', (await page.textContent('#agSammelZahl')).startsWith('4 Zeilen'));
 
 // ══════════════════════════════════════════ MASTERZEITEN
-await page.fill('#agMzVon', '22:15');
-await page.fill('#agMzBis', '23:45');
+await zeitSetzen(page, '#agMzVon', '22:15');
+await zeitSetzen(page, '#agMzBis', '23:45');
 await page.click('#agMzZeitBtn');
 await page.waitForTimeout(200);
 check('Schichtzeiten anpassen setzt alle ausgewaehlten Zeilen',
@@ -320,7 +327,7 @@ check('Der Stift bleibt erreichbar -- er ist der Weg zurueck',
 // Sammelaktionen duerfen eine gesperrte Zeile nicht nebenbei ueberschreiben.
 rufe = [];
 await page.check('#agAlle');
-await page.fill('#agMzVon', '05:00');
+await zeitSetzen(page, '#agMzVon', '05:00');
 await page.click('#agMzZeitBtn');
 await page.waitForTimeout(200);
 check('KRITISCH: Masterzeiten fassen gesperrte Zeilen nicht an',
@@ -369,7 +376,8 @@ check('KRITISCH: Der Hinweis sagt, dass nichts gerechnet wird',
   (await page.textContent('#drBody')).toLowerCase().includes('auslegungsregister'));
 check('Vorwahl anwesend -- ein Klick genuegt im Normalfall',
   (await page.inputValue('#agdStatus')) === 'anwesend');
-check('Schublade hat ein eigenes Feld fuer den Pausenbeginn', await page.isVisible('#agdPauseVon'));
+check('Schublade hat ein eigenes Feld fuer den Pausenbeginn',
+  await page.isVisible('[data-zeitwahl-fuer="agdPauseVon"]'));
 check('Beide Bezahlt-Kennzeichnungen stehen zur Wahl',
   await page.isVisible('#agdBezMa') && await page.isVisible('#agdBezKunde'));
 check('KRITISCH: keine davon ist vorbelegt -- GAV-AUS-004 ist offen',
@@ -384,7 +392,7 @@ await page.selectOption('#agdStatus', 'anwesend');
 await page.waitForTimeout(200);
 rufe = [];
 await page.fill('#agdBemerkung', 'kam eine Viertelstunde spaeter');
-await page.fill('#agdVon', '22:15');
+await zeitSetzen(page, '#agdVon', '22:15');
 await page.click('#drFoot .btn-primary');
 await page.waitForTimeout(500);
 const e = rufe.find(r => r.p.includes('einsatz_abgleich'));
@@ -462,7 +470,7 @@ check('KRITISCH: die Mahnung speichert nichts', !rufe.some(r => r.p.includes('ei
 check('Speichern bleibt trotz zu kurzer Pause moeglich -- der Abgleich beschoenigt nicht',
   await page.isEnabled('#drFoot .btn-primary'));
 await page.check('#agdBezMa');
-await page.fill('#agdPauseVon', '12:00');
+await zeitSetzen(page, '#agdPauseVon', '12:00');
 rufe = [];
 await page.click('#drFoot .btn-primary');
 await page.waitForTimeout(500);

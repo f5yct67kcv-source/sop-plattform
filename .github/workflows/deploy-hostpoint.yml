@@ -21,6 +21,10 @@ jobs:
           # Fehlt sie hier, laden dashboard.html und app.html ins Leere und
           # rechnen gar nichts mehr -- derselbe Fallstrick wie bei ENT-040.
           cp gav.js dist/gav.js
+          # zeitwahl.js traegt das Zeit-Bedienelement fuer BEIDE Oberflaechen
+          # (ENT-110). Fehlt sie hier, sind alle Zeitfelder unsichtbar und es
+          # laesst sich keine Zeit mehr eintragen -- derselbe Fallstrick.
+          cp zeitwahl.js dist/zeitwahl.js
           cp manifest.json dist/manifest.json
           cp sw.js dist/sw.js
           cp icons/*.png dist/icons/

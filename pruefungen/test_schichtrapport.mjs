@@ -13,6 +13,7 @@
 //    GAV-AUS-004: nirgends vorbelegt).
 import { WURZEL, HIER, OUT, browserPfad } from './pfade.mjs';
 import { chromium } from 'playwright';
+import { zeitSetzen } from './zeitfeld.mjs';
 import { readFileSync } from 'fs';
 
 const EXE = browserPfad();
@@ -134,9 +135,14 @@ check('Eingabefelder mindestens 16px -- sonst zoomt iOS hinein',
 check('Bedienelemente mindestens 44px hoch',
   await page.evaluate(() => [...document.querySelectorAll('#blFuss .btn')]
     .every(b => b.getBoundingClientRect().height >= 44)));
+// srVon ist seit ENT-110 ein Auswahl-Bedienelement: Das Feld mit der Kennung
+// traegt nur noch den Wert, zu sehen und zu tippen ist die Huelle daneben.
+// Gemessen wird darum, was der Finger trifft.
 check('Auch die Eingabefelder sind mindestens 44px hoch',
-  await page.evaluate(() => ['srKunde', 'srVon', 'srPause', 'srSigName']
-    .every(i => document.getElementById(i).getBoundingClientRect().height >= 44)));
+  await page.evaluate(() => ['srKunde', 'srPause', 'srSigName']
+    .every(i => document.getElementById(i).getBoundingClientRect().height >= 44)
+    && [...document.querySelectorAll('[data-zeitwahl-fuer="srVon"] select')]
+      .every(s => s.getBoundingClientRect().height >= 44)));
 check('KRITISCH: auch "Loeschen" unter der Unterschrift ist 44px -- danebengetippt kostet die Unterschrift',
   await page.evaluate(() =>
     document.querySelector('.sig-clear').getBoundingClientRect().height >= 44));
@@ -154,8 +160,8 @@ await page.screenshot({ path: `${OUT}/sr-01-formular.png` });
 
 // ── Abweichung erfassen und senden
 rufe = [];
-await page.fill('#srVon', '08:15');
-await page.fill('#srBis', '17:30');
+await zeitSetzen(page, '#srVon', '08:15');
+await zeitSetzen(page, '#srBis', '17:30');
 await page.fill('#srBemerkung', 'Baustelle laenger offen');
 await page.click('#srBtn');
 await page.waitForTimeout(500);

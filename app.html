@@ -357,6 +357,7 @@ svg.i-sm { width: 17px; height: 17px; }
 <div class="toast" id="toast"></div>
 
 <script src="gav.js"></script>
+<script src="zeitwahl.js"></script>
 <script>
 /* ══════════════════════════════════════════════════════════════════
    WORTLAUT — alle sichtbaren Texte an einer Stelle, damit dieselbe Sache
@@ -1147,8 +1148,8 @@ function schichtRapportBlatt(id) {
     <div class="f"><label for="srStrasse">${esc(w('strasse'))}</label><input class="inp" id="srStrasse" value="${esc(q.strasse || '')}"></div>
     <div class="f"><label for="srOrt">${esc(w('ort'))}</label><input class="inp" id="srOrt" value="${esc(q.ort)}"></div>
     <div class="f"><label for="srEinsatzart">${esc(w('einsatzart'))}</label><input class="inp" id="srEinsatzart" value="${esc(q.einsatzart)}"></div>
-    <div class="f"><label for="srVon">${esc(w('arbeitsbeginn'))}</label><input class="inp" id="srVon" type="time" value="${esc(hm(q.von))}"></div>
-    <div class="f"><label for="srBis">${esc(w('arbeitsende'))}</label><input class="inp" id="srBis" type="time" value="${esc(hm(q.bis))}"></div>
+    <div class="f"><label for="srVon">${esc(w('arbeitsbeginn'))}</label><input class="inp" id="srVon" type="time" data-zeit="fein" value="${esc(hm(q.von))}"></div>
+    <div class="f"><label for="srBis">${esc(w('arbeitsende'))}</label><input class="inp" id="srBis" type="time" data-zeit="fein" value="${esc(hm(q.bis))}"></div>
     <div class="f"><label for="srPause">${esc(w('pauseMinuten'))}</label><input class="inp" id="srPause" type="number" min="0" max="600" step="5" value="${esc(String(bisher ? bisher.pause_min : 0))}"></div>
     <div class="f"><label for="srBemerkung">${esc(w('bemerkung'))}</label><textarea class="inp" id="srBemerkung" rows="2">${esc(q.bemerkung || '')}</textarea></div>
     <div class="f"><label for="srSigName">${esc(w('unterzeichnerName'))}</label><input class="inp" id="srSigName" placeholder="${esc(w('vorUndNachname'))}" value="${esc(q.unterzeichner || '')}"></div>

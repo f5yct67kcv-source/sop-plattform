@@ -1965,6 +1965,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 }
 </style>
 <script src="gav.js"></script>
+<script src="zeitwahl.js"></script>
 <script>
 /* Muss VOR dem ersten Zeichnen laufen, sonst blitzt die helle Fassung
    kurz auf, bevor die dunkle greift (ENT-029). Ohne gespeicherte Wahl
@@ -2658,9 +2659,9 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
           <div class="sp" style="flex:1"></div>
           <div class="ag-mz">
             <span>Zeiten setzen:</span>
-            <input class="inp" type="time" id="agMzVon" aria-label="Sammelzeit von">
+            <input class="inp" type="time" id="agMzVon" data-zeit="fein" aria-label="Sammelzeit von">
             <span class="tool-bis">bis</span>
-            <input class="inp" type="time" id="agMzBis" aria-label="Sammelzeit bis">
+            <input class="inp" type="time" id="agMzBis" data-zeit="fein" aria-label="Sammelzeit bis">
             <button class="btn btn-quiet btn-sm" id="agMzZeitBtn" onclick="agMasterZeiten()">Übernehmen</button>
           </div>
           <div class="ag-mz">
@@ -10622,10 +10623,10 @@ function renderAbgleich() {
                   ab ? 'Rapport weicht ab: ' + esc(ab.join(', ')) : 'Rapport wie geplant'}</div>`; })()}`
           : '<span style="color:var(--neg)">niemand eingeteilt</span>'}</td>
         <td class="nowrap">${dmy(z.datum)}<div class="ag-plan">${hm(z.von)}–${hm(z.bis)}</div></td>
-        <td><input class="inp" type="time" value="${esc(vVon)}"${ohne ? ' disabled' : ''} data-ag="von" data-k="${esc(k)}" aria-label="Tatsächlich von"></td>
-        <td><input class="inp" type="time" value="${esc(vBis)}"${ohne ? ' disabled' : ''} data-ag="bis" data-k="${esc(k)}" aria-label="Tatsächlich bis"></td>
+        <td><input class="inp" type="time" data-zeit="fein" value="${esc(vVon)}"${ohne ? ' disabled' : ''} data-ag="von" data-k="${esc(k)}" aria-label="Tatsächlich von"></td>
+        <td><input class="inp" type="time" data-zeit="fein" value="${esc(vBis)}"${ohne ? ' disabled' : ''} data-ag="bis" data-k="${esc(k)}" aria-label="Tatsächlich bis"></td>
         <td class="nowrap ag-pause">
-          <input class="inp pv" type="time" value="${esc(vPauseVon)}"${ohne ? ' disabled' : ''} data-ag="pausevon" data-k="${esc(k)}" aria-label="Pause ab" title="Pause ab (Beginn)">
+          <input class="inp pv" type="time" data-zeit="fein" value="${esc(vPauseVon)}"${ohne ? ' disabled' : ''} data-ag="pausevon" data-k="${esc(k)}" aria-label="Pause ab" title="Pause ab (Beginn)">
           <span class="tr">/</span>
           <input class="inp pause${vorgeschlagen ? ' vorschlag' : ''}" type="number" min="0" max="600" step="5" value="${esc(String(vPause))}"${ohne ? ' disabled' : ''} data-ag="pause" data-k="${esc(k)}" aria-label="Pausendauer in Minuten" title="${esc(agPauseTitel(soll, vorgeschlagen, z.sparte))}">
           <span class="tr">min</span>
@@ -10920,11 +10921,11 @@ function openAbgleich(k) {
       <div class="f wide"><label for="agdStatus">Was ist passiert?</label>
         <select class="inp" id="agdStatus" onchange="agdStatusUm()"${sperr}>${opt}</select></div>
       <div class="f"><label for="agdVon">Tatsächlich von</label>
-        <input class="inp" id="agdVon" type="time"${sperr} oninput="agdPauseHinweis()" value="${esc(agZeilenwert(k, 'von', erst ? hm(z.von) : (z.ist_von ? hm(z.ist_von) : '')))}"></div>
+        <input class="inp" id="agdVon" type="time" data-zeit="fein"${sperr} oninput="agdPauseHinweis()" value="${esc(agZeilenwert(k, 'von', erst ? hm(z.von) : (z.ist_von ? hm(z.ist_von) : '')))}"></div>
       <div class="f"><label for="agdBis">Tatsächlich bis</label>
-        <input class="inp" id="agdBis" type="time"${sperr} oninput="agdPauseHinweis()" value="${esc(agZeilenwert(k, 'bis', erst ? hm(z.bis) : (z.ist_bis ? hm(z.ist_bis) : '')))}"></div>
+        <input class="inp" id="agdBis" type="time" data-zeit="fein"${sperr} oninput="agdPauseHinweis()" value="${esc(agZeilenwert(k, 'bis', erst ? hm(z.bis) : (z.ist_bis ? hm(z.ist_bis) : '')))}"></div>
       <div class="f"><label for="agdPauseVon">Pause ab</label>
-        <input class="inp" id="agdPauseVon" type="time"${sperr} value="${esc(agZeilenwert(k, 'pausevon', z.ist_pause_von ? hm(z.ist_pause_von) : ''))}"></div>
+        <input class="inp" id="agdPauseVon" type="time" data-zeit="fein"${sperr} value="${esc(agZeilenwert(k, 'pausevon', z.ist_pause_von ? hm(z.ist_pause_von) : ''))}"></div>
       <div class="f"><label for="agdPause">Pause (Minuten)</label>
         <input class="inp${dPauseVorschlag ? ' vorschlag' : ''}" id="agdPause" type="number" min="0" max="600" step="5"${sperr} oninput="this.classList.remove('vorschlag');agdPauseHinweis()" value="${esc(String(dPause))}"></div>
       <div class="f wide" id="agdPauseGav"></div>

@@ -1,5 +1,6 @@
 import { WURZEL, HIER, OUT, browserPfad } from './pfade.mjs';
 import { chromium } from 'playwright';
+import { zeitSetzen } from './zeitfeld.mjs';
 
 
 const URL = `file://${WURZEL}/dashboard.html`;
@@ -321,8 +322,8 @@ await page.selectOption('#msRhythmus', 'intervall');
 await page.waitForTimeout(150);
 check('Intervall blendet das Wochenmuster aus', !(await page.isVisible('#msWoche')) && await page.isVisible('#msIntervall'));
 await page.selectOption('#msRhythmus', 'woche');
-await page.fill('#msVon', '08:00');
-await page.fill('#msBis', '12:30');
+await zeitSetzen(page, '#msVon', '08:00');
+await zeitSetzen(page, '#msBis', '12:30');
 await page.dispatchEvent('#msBis', 'change');
 await page.waitForTimeout(150);
 check('Arbeitszeit wird vorgeschlagen', (await page.inputValue('#msArbeitszeit')) === '4.5');
@@ -331,8 +332,8 @@ await page.dispatchEvent('#msPauseMin', 'input');
 await page.waitForTimeout(150);
 check('Pause wird abgezogen', (await page.inputValue('#msArbeitszeit')) === '4');
 // Nachtschicht ueber Mitternacht
-await page.fill('#msVon', '22:00');
-await page.fill('#msBis', '02:00');
+await zeitSetzen(page, '#msVon', '22:00');
+await zeitSetzen(page, '#msBis', '02:00');
 await page.fill('#msPauseMin', '0');
 await page.dispatchEvent('#msBis', 'change');
 await page.waitForTimeout(150);
