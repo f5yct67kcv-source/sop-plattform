@@ -539,25 +539,29 @@ await page.evaluate(tag => {
 }, HEUTE);
 await page.waitForTimeout(400);
 check('Der Herkunftsfilter ist da', await page.isVisible('#pHerkunft'));
-check('Die Vorgabe zeigt beides', (await page.inputValue('#pHerkunft')) === '');
+// Vorgabe seit ENT-106: nur Einsaetze, keine Objektschichten. Wer die
+// Objektplanung sucht, hat dafuer einen eigenen Reiter -- diese Liste ist
+// fuer den frei angelegten Einsatz.
+check('KRITISCH: die Vorgabe zeigt nur Einsätze, keine Objektschichten',
+  (await page.inputValue('#pHerkunft')) === 'einsatz');
 const zaehl = () => page.evaluate(() => pFiltered().length);
-const alleZ = await zaehl();
+const einZ = await zaehl();
+check('KRITISCH: "Nur Einsaetze" (als Vorgabe) laesst nur Zeilen ohne objekt_id uebrig',
+  await page.evaluate(() => pFiltered().every(e => !e.objekt_id)) && einZ > 0);
 await page.selectOption('#pHerkunft', 'objekt');
 await page.waitForTimeout(300);
 const objZ = await zaehl();
 check('KRITISCH: "Nur Objektschichten" laesst nur Zeilen mit objekt_id uebrig',
   await page.evaluate(() => pFiltered().every(e => !!e.objekt_id)) && objZ > 0);
-await page.selectOption('#pHerkunft', 'einsatz');
+await page.selectOption('#pHerkunft', '');
 await page.waitForTimeout(300);
-const einZ = await zaehl();
-check('KRITISCH: "Nur Einsaetze" laesst nur Zeilen ohne objekt_id uebrig',
-  await page.evaluate(() => pFiltered().every(e => !e.objekt_id)) && einZ > 0);
+const alleZ = await zaehl();
 check('Zusammen ergeben beide wieder alles', objZ + einZ === alleZ);
 check('KRITISCH: unterschieden wird nach Herkunft, nicht nach Einsatzart',
   await page.evaluate(() => new Set(einsaetze.map(e => e.einsatzart)).size === 1));
-await page.selectOption('#pHerkunft', '');
+await page.selectOption('#pHerkunft', 'einsatz');
 await page.waitForTimeout(300);
-check('Zuruecksetzen zeigt wieder alles', (await zaehl()) === alleZ);
+check('Zuruecksetzen auf die Vorgabe zeigt wieder nur Einsätze', (await zaehl()) === einZ);
 
 // ══════════════ BENENNUNG (ENT-058)
 const kpiTxt = await page.textContent('#plKpi');

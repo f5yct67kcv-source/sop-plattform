@@ -290,6 +290,10 @@ await d.waitForTimeout(400);
 await d.evaluate(t => { $('pVon').value = t; $('pBis').value = t; renderPlanung(); }, TAG);
 await d.waitForTimeout(400);
 const zeilen = () => d.evaluate(() => document.querySelectorAll('#plTable tbody tr:not(.gruppe)').length);
+// Baseline explizit auf "beides" setzen statt den Vorgabewert zu nehmen --
+// die Vorgabe ist seit ENT-106 "Nur Einsätze", nicht mehr "beides".
+await d.selectOption('#pHerkunft', '');
+await d.waitForTimeout(300);
 const alleZeilen = await zeilen();
 await d.selectOption('#pHerkunft', 'reinigung');
 await d.waitForTimeout(400);
