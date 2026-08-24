@@ -48,6 +48,15 @@
   --neg:      #C2382A;  --neg-soft:  #FCEDEB;
   --warn:     #9A6B08;  --warn-soft: #FBF3E0;
 
+  /* Reihe (ENT-119). Violett, weil es der einzige Farbton in dieser
+     Oberflaeche ist, der noch keine Bedeutung traegt: Blau heisst Auswahl und
+     KI, Gruen heisst zugesagt, Gelb heisst Warnung und festgeschrieben, Rot
+     heisst gesperrt. Eine davon noch einmal zu vergeben hiesse, zwei
+     verschiedene Dinge gleich einzufaerben.
+     Nur als Flaeche, NICHT als linker Streifen an der Zeile: Der Streifen ist
+     bereits doppelt belegt (blau = heute, gelb = festgeschrieben). */
+  --serie:      #6B4FA8;  --serie-soft: #F5F2FC;  --serie-line: #DED4F2;
+
   /* Abstufungen der Arbeitsflaeche -- bisher hart im Regelwerk verstreut */
   --surface-2:  #FBFCFD;   /* Tabellenkoepfe, ruhige Flaechen */
   --surface-3:  #FAFBFD;   /* Zeile unter dem Zeiger */
@@ -120,6 +129,7 @@ html[data-thema="dunkel"] {
   --glas:     rgba(23,26,32,.86);
   --neg-hi:   #FF9A8C;  --neg-line:  #4A2823;  --neg-flaeche: #241715;
   --warn:     #E2B156;  --warn-soft: #2B2314;  --warn-line:   #4A3C1C;
+  --serie:    #B6A0EA;  --serie-soft: #241E36;  --serie-line:  #3D3357;
 
   /* Auf dunklem Grund traegt der Rand, nicht der Schatten. */
   --sh-1: 0 1px 2px rgba(0,0,0,.4);
@@ -986,6 +996,40 @@ tbody tr.heute td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
    "abgesagt" verwechseln. */
 tbody tr.zu > td:first-child { box-shadow: inset 2px 0 0 var(--warn); }
 tbody tr.zu .i-schloss { color: var(--warn); }
+
+/* ══════════════════════════════════════════════ REIHE / GRUPPE (ENT-119)
+   Ein Einsatz, der nicht allein steht: entweder zusammen mit anderen angelegt
+   (serie_id) oder aus einer Masterschicht entstanden (masterschicht_id). Fuer
+   den Planer ist das dasselbe, darum dieselbe Darstellung.
+   Die Flaeche allein sagt nur "gehoert zu irgendeiner Reihe". Welche, sagt der
+   Text "Tag 2 von 3" -- an einem Tag koennen mehrere Reihen nebeneinander
+   laufen, und dafuer waeren mehrere Farbtoene noetig, die es nicht gibt. */
+tbody tr.serie > td { background: var(--serie-soft); }
+.ag-karte.serie { background: var(--serie-soft); }
+.serie-marke {
+  display: inline-flex; align-items: center; gap: 5px; margin-top: 3px;
+  border: 1px solid var(--serie-line); background: var(--surface); color: var(--serie);
+  border-radius: 999px; padding: 2px 8px 2px 6px; font-size: 11px; font-weight: 620;
+  line-height: 1.6; white-space: nowrap; cursor: pointer; font-family: inherit;
+}
+.serie-marke:hover { background: var(--serie-soft); border-color: var(--serie); }
+.serie-marke svg { width: 12px; height: 12px; flex: none; stroke: currentColor;
+  stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+/* Auf dem Handy ist die Marke ein echtes Bedienelement und haelt die
+   Trefferflaeche von 44 px ein. Sie steht dort auf einer eigenen Zeile unter
+   den Marken-Chips und nicht zwischen ihnen: Ein 44 px hohes Element neben
+   20 px hohen Chips zieht die Zeile auseinander und wiegt schwerer, als es
+   soll. Am Schreibtisch waere dieselbe Hoehe in einer Tabellenzeile
+   unverhaeltnismaessig -- dort bleibt sie klein. */
+@media (max-width: 720px) {
+  .serie-marke { min-height: 44px; padding: 4px 14px 4px 11px; margin-top: 8px; font-size: 12px; }
+}
+/* Der Hinweis, dass gerade nur eine Reihe gezeigt wird. Ohne ihn sieht eine
+   gefilterte Liste aus wie die ganze Planung. */
+.serie-filter { display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
+  border: 1px solid var(--serie-line); background: var(--serie-soft);
+  border-radius: var(--r-sm); padding: 9px 12px; margin-bottom: 12px; font-size: 12.5px; }
+.serie-filter b { color: var(--serie); font-weight: 660; }
 .inp[readonly] { background: var(--surface-2); color: var(--ink-3); cursor: default; }
 .wahl-reihe { display: flex; gap: 18px; align-items: center; min-height: 38px; }
 .wahl-reihe label { display: flex; align-items: center; gap: 7px; cursor: pointer; font-size: 13.5px; font-weight: 500; }
@@ -2685,6 +2729,9 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
           </div>
         </div>
 
+        <!-- Sichtbarer Hinweis, wenn gerade nur eine Reihe gezeigt wird (ENT-119).
+             Eine gefilterte Liste ohne Hinweis sieht aus wie die ganze Planung. -->
+        <div class="serie-filter" id="pSerieFilter" style="display:none"></div>
         <div class="card"><div class="card-bd flush"><div class="tw" id="plTable"></div></div></div>
         </div>
 
@@ -6830,6 +6877,14 @@ function planStatusPasst(e, st) {
 }
 
 function pFiltered() {
+  // Eine gewaehlte Reihe schlaegt jeden anderen Filter (ENT-119). Wer auf
+  // "Tag 2 von 3" klickt, will die drei Tage sehen -- nicht die drei Tage
+  // geschnitten mit Zeitraum, Herkunft, Status und Suchbegriff. Der Hinweis
+  // ueber der Liste sagt ausdruecklich, dass gerade nur eine Reihe dasteht.
+  if (pSerie) {
+    return (serieVerzeichnis().get(pSerie) || [])
+      .slice().sort((a, b) => (tagVon(a) + ' ' + a.von).localeCompare(tagVon(b) + ' ' + b.von));
+  }
   const q = ($('pQ').value || '').toLowerCase().trim();
   const { von, bis } = pZeitraum();
   const st = $('pStatus').value;
@@ -6884,6 +6939,94 @@ function renderPlKpi() {
     </div>`).join('');
 }
 
+// ═════════════════════════════════════════════════ REIHE / GRUPPE (ENT-119)
+//
+// Zwei Herkuenfte, eine Darstellung: Zusammen angelegte Einsaetze tragen
+// serie_id (ENT-118), aus einer Masterschicht erzeugte tragen
+// masterschicht_id (ENT-058). Fuer den Planer ist beides dieselbe Aussage --
+// "dieser Einsatz steht nicht allein". Sie getrennt darzustellen hiesse, dass
+// nur eine der beiden Sorten Reihe sichtbar waere.
+function serieSchluessel(e) {
+  if (!e) { return null; }
+  if (e.serie_id) { return 's' + Number(e.serie_id); }
+  if (e.masterschicht_id) { return 'm' + Number(e.masterschicht_id); }
+  return null;
+}
+
+// Verzeichnis aller Reihen, einmal je geladener Einsatzliste gebaut.
+// Ohne den Zwischenspeicher liefe fuer jede Zeile ein Durchlauf ueber alle
+// Einsaetze -- bei einem Jahresplan ist das quadratisch.
+let serieIdxFuer = null, serieIdx = new Map();
+function serieVerzeichnis() {
+  if (serieIdxFuer === einsaetze) { return serieIdx; }
+  serieIdx = new Map();
+  einsaetze.forEach(e => {
+    const k = serieSchluessel(e);
+    if (!k) { return; }
+    if (!serieIdx.has(k)) { serieIdx.set(k, []); }
+    serieIdx.get(k).push(e);
+  });
+  serieIdx.forEach(liste => liste.sort((a, b) =>
+    (tagVon(a) + ' ' + a.von).localeCompare(tagVon(b) + ' ' + b.von)));
+  serieIdxFuer = einsaetze;
+  return serieIdx;
+}
+
+// Nummer und Anzahl beziehen sich auf die GANZE Reihe, nie auf die gerade
+// gefilterte Liste: "Tag 2 von 3" waere sonst je nach Filter etwas anderes,
+// und eine Zahl, die vom Filter abhaengt, ohne das zu sagen, ist eine falsche
+// Zahl.
+function serieStand(e) {
+  const k = serieSchluessel(e);
+  if (!k) { return null; }
+  const alle = serieVerzeichnis().get(k) || [];
+  // Ein einzelner Einsatz ist keine Reihe. Eine Masterschicht, aus der bisher
+  // ein Tag entstanden ist, darf nicht als Gruppe erscheinen.
+  if (alle.length < 2) { return null; }
+  const nr = alle.findIndex(x => Number(x.id) === Number(e.id)) + 1;
+  if (!nr) { return null; }
+  return { schluessel: k, nr, anzahl: alle.length, alle };
+}
+
+const SERIE_IKONE = '<svg viewBox="0 0 24 24" aria-hidden="true">'
+  + '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/>'
+  + '<path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>';
+
+function serieMarke(e) {
+  const st = serieStand(e);
+  if (!st) { return ''; }
+  // stopPropagation: Die Zeile selbst oeffnet den Einsatz. Ohne das oeffnete
+  // ein Klick auf die Marke beides zugleich.
+  return `<button type="button" class="serie-marke" onclick="event.stopPropagation();serieZeigen('${st.schluessel}')"
+    title="Gehört zu einer Reihe von ${st.anzahl} Einsätzen — anzeigen">${SERIE_IKONE}Tag ${st.nr} von ${st.anzahl}</button>`;
+}
+
+// Nur die Geschwister zeigen. Bewusst OHNE die uebrigen Filter: Die Vorgabe
+// der Liste ist "Nur Einsätze" (ENT-106), eine Reihe aus einer Masterschicht
+// waere damit sofort wieder unsichtbar -- ein Klick, der nichts zeigt, sieht
+// aus wie "gibt es nicht".
+let pSerie = null;
+function serieZeigen(k) {
+  pSerie = k;
+  go('planung'); goTab('einsaetze');
+  renderPlanung();
+  const el = $('plTable'); if (el && el.scrollIntoView) { el.scrollIntoView({ block: 'start' }); }
+}
+function serieFilterWeg() { pSerie = null; renderPlanung(); }
+
+function serieFilterZeile() {
+  const el = $('pSerieFilter');
+  if (!el) { return; }
+  if (!pSerie) { el.innerHTML = ''; el.style.display = 'none'; return; }
+  const liste = serieVerzeichnis().get(pSerie) || [];
+  const art = pSerie.charAt(0) === 'm' ? 'Objektschichten aus einer Masterschicht' : 'zusammen angelegte Einsätze';
+  el.style.display = '';
+  el.innerHTML = `${SERIE_IKONE}<span>Es wird nur <b>eine Reihe</b> gezeigt —
+      ${liste.length} ${art}${liste.length ? `, ${esc(dmy(tagVon(liste[0])))} bis ${esc(dmy(tagVon(liste[liste.length - 1])))}` : ''}.</span>
+    <span class="sp" style="flex:1"></span>
+    <button class="btn btn-quiet btn-sm" onclick="serieFilterWeg()">Ganze Planung zeigen</button>`;
+}
+
 function renderPlanung() {
   // Die Schnellauswahl darf nie etwas anderes behaupten als von/bis zeigen --
   // "Alle" erkennt man daran, dass beide Felder leer sind.
@@ -6892,6 +7035,7 @@ function renderPlanung() {
   renderPlKpi();
 
   const d = pFiltered();
+  serieFilterZeile();
   // Die Kopfzeile gehört dem gerade offenen Reiter — sie darf nicht von der
   // Einsatzliste überschrieben werden, während die Übersicht sichtbar ist.
   if ($('view-planung').classList.contains('on') && $('pv-einsaetze').classList.contains('on')) {
@@ -6900,7 +7044,11 @@ function renderPlanung() {
       + (offen ? ` · ${nf(offen)} offene ${offen === 1 ? 'Schicht' : 'Schichten'}` : '');
   }
   if (!d.length) {
-    $('plTable').innerHTML = einsaetze.length
+    // Drei verschiedene Aussagen, nicht eine: „nichts geplant", „der Filter
+    // trifft nichts" und „die Reihe gibt es nicht mehr" sind nicht dasselbe.
+    $('plTable').innerHTML = pSerie
+      ? EMPTY('Diese Reihe gibt es nicht mehr', 'Die Einsätze dieser Reihe wurden gelöscht oder umgehängt.')
+      : einsaetze.length
       ? EMPTY('Keine Treffer', 'Für diesen Filter gibt es keine Einsätze. Zeitraum auf „Alle“ stellen oder Suche leeren.')
       : EMPTY('Noch nichts geplant', 'Mit „Neuer Einsatz“ den ersten Einsatz anlegen — oder ihn diktieren.');
     return;
@@ -6932,8 +7080,8 @@ function renderPlanung() {
     const st = EN_STATUS[e.status] || EN_STATUS.geplant;
 
     return kopf + `
-      <tr class="click${tag === heute ? ' heute' : ''}${enGesperrt(e) ? ' zu' : ''}" onclick="openEinsatz(${Number(e.id)})">
-        <td class="nowrap num">${enSchloss(e)}${hm(e.von)}–${hm(e.bis)}${ueberNacht(e) ? '<div class="sec">bis Folgetag</div>' : ''}</td>
+      <tr class="click${tag === heute ? ' heute' : ''}${enGesperrt(e) ? ' zu' : ''}${serieStand(e) ? ' serie' : ''}" onclick="openEinsatz(${Number(e.id)})">
+        <td class="nowrap num">${enSchloss(e)}${hm(e.von)}–${hm(e.bis)}${ueberNacht(e) ? '<div class="sec">bis Folgetag</div>' : ''}${serieMarke(e)}</td>
         <td class="strong">${esc(e.kunde_name)}${e.titel ? `<div class="sec">${esc(e.titel)}</div>` : ''}</td>
         <td>${esc(e.ort)}${e.strasse ? `<div class="sec">${esc(e.strasse)}</div>` : ''}</td>
         <td><span class="chip chip-n">${esc(e.einsatzart)}</span>${sparteChip(e)}</td>
@@ -6967,7 +7115,7 @@ function renderPlanung() {
     const zug = e.mitarbeiter || [];
     const fehlt = fehlend(e);
     const st = EN_STATUS[e.status] || EN_STATUS.geplant;
-    return kopf + `<div class="ag-karte click" onclick="openEinsatz(${Number(e.id)})">
+    return kopf + `<div class="ag-karte click${serieStand(e) ? ' serie' : ''}" onclick="openEinsatz(${Number(e.id)})">
       <div class="kopf">
         <b>${enSchloss(e)}${esc(hm(e.von))}–${esc(hm(e.bis))}${ueberNacht(e) ? ' <span class="ag-plan">bis Folgetag</span>' : ''}</b>
         <span class="chip ${e.status === 'abgesagt' ? 'chip-n' : (fehlt ? 'chip-w' : 'chip-p')}">${besetzt(e).length}/${nf(e.bedarf)}</span>
@@ -6980,6 +7128,7 @@ function renderPlanung() {
         ${zug.length > 3 ? `<span class="nm">+${zug.length - 3}</span>` : ''}
         ${fehlt ? `<span class="nm off">${fehlt} offen</span>` : ''}
       </div>
+      ${serieMarke(e)}
     </div>`;
   }).join('');
 
@@ -7410,13 +7559,25 @@ function createEinsatz() {
   // sonst dreissig gleichzeitige Anfragen mit je mehreren Megabyte (ENT-116).
   const angelegt = [], ohne = [];
   let anhangFehler = [];
+  // Zusammengehoerigkeit der Reihe (ENT-119). Die Kennung vergibt der Server:
+  // Der erste Tag bekommt seine eigene Nummer als Serienkennung zurueck, die
+  // uebrigen bekommen sie mit. Eine im Browser gewuerfelte Zahl koennte sich
+  // mit einer anderen Sitzung ueberschneiden.
+  // Scheitert der erste Tag, uebernimmt der naechste die Rolle -- serieId ist
+  // dann noch leer, und serie_neu geht erneut mit.
+  const reihe = tage.length > 1;
+  let serieId = null;
   const naechster = i => {
     if (i >= tage.length) { return Promise.resolve(); }
     const tagBody = Object.assign({}, body, { datum: tage[i] });
+    if (reihe) {
+      if (serieId) { tagBody.serie_id = serieId; } else { tagBody.serie_neu = true; }
+    }
     return api('einsatz_save.php', { method: 'POST', body: tagBody })
       .then(({ ok, data }) => {
         if (!ok || data.status !== 'ok') { ohne.push(dmy(tage[i])); return; }
         angelegt.push(data.id);
+        if (reihe && !serieId && data.serie_id) { serieId = Number(data.serie_id); }
         const weiter = fahrzeit ? enFahrzeitAnlegen(data.id, tagBody) : Promise.resolve();
         // Dokumente erst jetzt: Vorher gab es keine Nummer, an der sie haengen
         // koennten (ENT-117). Und an JEDEM Tag: Der Objektplan gilt am

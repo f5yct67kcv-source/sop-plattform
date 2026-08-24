@@ -240,6 +240,14 @@ CREATE TABLE IF NOT EXISTS einsaetze (
   kunde_name VARCHAR(200) NOT NULL,
   objekt_id INT NULL,
   masterschicht_id INT NULL,
+  -- Zusammen angelegte Einsaetze einer Reihe (ENT-119). Alle Tage einer
+  -- Reihe tragen dieselbe Kennung; sie ist die id des ERSTEN Tages, damit
+  -- sie ohne eigene Tabelle und ohne Kollisionsrisiko entsteht.
+  -- Bewusst NUR eine Zugehoerigkeit, keine eigene Serientabelle: Die
+  -- Einsaetze bleiben eigenstaendig, es gibt keine gemeinsamen Daten, die
+  -- ueber sie hinausgingen. Rhythmus und Wochentage liegen weiterhin an
+  -- der Masterschicht des Objekts (ENT-118).
+  serie_id INT NULL,
   titel VARCHAR(200),
   strasse VARCHAR(200),
   ort VARCHAR(200) NOT NULL,
@@ -566,6 +574,9 @@ foreach ($tabellen as $name => $sql) {
 $spalten = [
     ['einsaetze', 'objekt_id',        'ALTER TABLE einsaetze ADD COLUMN objekt_id INT NULL AFTER kunde_name'],
     ['einsaetze', 'masterschicht_id', 'ALTER TABLE einsaetze ADD COLUMN masterschicht_id INT NULL AFTER objekt_id'],
+    // ENT-119: Zugehoerigkeit zu einer zusammen angelegten Reihe. NULL heisst
+    // "gehoert zu keiner" -- bestehende Einsaetze bleiben unberuehrt.
+    ['einsaetze', 'serie_id', 'ALTER TABLE einsaetze ADD COLUMN serie_id INT NULL AFTER masterschicht_id'],
     ['einsatz_zuteilung', 'zusage',   "ALTER TABLE einsatz_zuteilung ADD COLUMN zusage VARCHAR(20) NOT NULL DEFAULT 'offen' AFTER mitarbeiter_id"],
     ['objekte', 'einsatzart',         "ALTER TABLE objekte ADD COLUMN einsatzart VARCHAR(100) NOT NULL DEFAULT 'Revierdienst' AFTER kanton"],
     ['verfuegbarkeiten', 'gesehen_am', 'ALTER TABLE verfuegbarkeiten ADD COLUMN gesehen_am DATETIME NULL AFTER erfasst_am'],
