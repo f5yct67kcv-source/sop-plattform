@@ -695,6 +695,18 @@ th.sortbar.aktiv .pf { opacity: 1; color: var(--accent); }
 /* Formular im Schubladen-/Dialogkontext */
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
 .form-grid .f.wide { grid-column: 1 / -1; }
+/* Anlegen-Ansicht (ENT-115): eine Seite, kein Dialog -- also nutzt sie die
+   Breite. Die Spalten wachsen mit dem Fenster, statt bei zwei zu bleiben und
+   die halbe Flaeche leer zu lassen. */
+.form-breit { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 0 18px; }
+/* Abschnitte in der Reihenfolge, in der geplant wird: erst wer und was,
+   dann wann und wo, dann wer vor Ort, dann wer arbeitet, zuletzt was die
+   Eingeteilten wissen muessen. */
+.abschnitt { border-top: 1px solid var(--line-soft); margin-top: 4px; padding-top: 16px; }
+.abschnitt:first-of-type { border-top: none; margin-top: 0; padding-top: 0; }
+.abschnitt > h3 { font-size: 11px; letter-spacing: .6px; text-transform: uppercase;
+  color: var(--ink-3); margin-bottom: 12px; font-weight: 600; }
+.abschnitt > h3 .note { text-transform: none; letter-spacing: 0; font-weight: 500; margin-left: 8px; }
 .zone { border: 1px solid var(--line); border-radius: var(--r-sm); padding: 14px; margin-top: 18px; }
 .zone-hd { font-size: 11px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--ink-3); margin-bottom: 4px; }
 .zone-note { font-size: 12px; color: var(--ink-3); line-height: 1.5; margin-bottom: 11px; }
@@ -3030,7 +3042,12 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
           <div class="msg-err" id="enNeuErr" style="display:none"></div>
           <p class="note" id="enNeuText">Kunde, Arbeitsort, Datum und Zeit sind Pflicht.</p>
           <h2 id="enNeuTitel" style="display:none">Neuer Einsatz</h2>
-<div class="form-grid">
+<!-- Gegliedert in der Reihenfolge, in der geplant wird (ENT-115).
+     Die Feldkennungen sind unveraendert -- enSammeln(), pickRender() und der
+     Diktat-Weg arbeiten damit weiter, nur die Anordnung wechselt. -->
+<div class="abschnitt">
+  <h3>Stammdaten</h3>
+  <div class="form-grid form-breit">
         <div class="f wide">
           <label for="enNKunde_name">Kunde *</label>
           <input class="inp" id="enNKunde_name" list="dlKunden" autocomplete="off" placeholder="Firma aus der Kundendatei oder frei eingeben">
@@ -3053,9 +3070,27 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
             <option>Reinigung</option>
           </select>
         </div>
+        <div class="f"><label for="enNSparte">Sparte</label>
+          <select class="inp" id="enNSparte" onchange="spartenKonflikt('enN')">
+            <option value="sicherheit">Sicherheit</option>
+            <option value="reinigung">Reinigung</option>
+          </select>
+          <div id="enNSparteHint"></div>
+        </div>
+        <div class="f"><label for="enNVeranstaltung">Veranstaltung</label>
+          <input class="inp" id="enNVeranstaltung" placeholder="z. B. Fasnachtsumzug"></div>
+        <div class="f"><label for="enNStatus">Status</label><select class="inp" id="enNStatus"><option value="geplant">Geplant</option><option value="bestaetigt">Bestätigt</option><option value="abgesagt">Abgesagt</option></select></div>
+  </div>
+</div>
+
+<div class="abschnitt">
+  <h3>Zeit und Arbeitsort</h3>
+  <div class="form-grid form-breit">
+        <!-- Datum und Zeit stehen beieinander: Sie werden zusammen gelesen
+             und zusammen eingegeben. Ein Enddatum gibt es bewusst nicht --
+             ist die Endzeit kleiner als die Startzeit, liegt sie am Folgetag,
+             so rechnet das ganze System (ENT-115). -->
         <div class="f"><label for="enNDatum">Datum *</label><input class="inp" id="enNDatum" type="date" onchange="pickRefresh('enN')"></div>
-        <!-- Von und Bis nebeneinander: sie gehoeren zusammen und werden
-             zusammen gelesen. -->
         <div class="f zeitpaar">
           <label>Zeit *</label>
           <div class="zp">
@@ -3065,25 +3100,61 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
           </div>
         </div>
         <div class="f wide">
-          <label for="enNStrasse">Arbeitsort — Strasse</label>
+          <label for="enNStrasse">Arbeitsort — Strasse und Nummer *</label>
           <input class="inp" id="enNStrasse" placeholder="nicht der Firmensitz des Kunden">
         </div>
         <div class="f"><label for="enNOrt">Arbeitsort — PLZ / Ort *</label><input class="inp" id="enNOrt"></div>
-        <div class="f"><label for="enNSparte">Sparte</label>
-          <select class="inp" id="enNSparte" onchange="spartenKonflikt('enN')">
-            <option value="sicherheit">Sicherheit</option>
-            <option value="reinigung">Reinigung</option>
+        <div class="f"><label for="enNKanton">Kanton *</label>
+          <select class="inp" id="enNKanton">
+            <option value="">bitte wählen …</option>
+            <option>AG</option><option>AI</option><option>AR</option><option>BE</option>
+            <option>BL</option><option>BS</option><option>FR</option><option>GE</option>
+            <option>GL</option><option>GR</option><option>JU</option><option>LU</option>
+            <option>NE</option><option>NW</option><option>OW</option><option>SG</option>
+            <option>SH</option><option>SO</option><option>SZ</option><option>TG</option>
+            <option>TI</option><option>UR</option><option>VD</option><option>VS</option>
+            <option>ZG</option><option>ZH</option>
           </select>
-          <div id="enNSparteHint"></div>
         </div>
         <div class="f"><label for="enNBedarf">Benötigte Mitarbeitende</label><input class="inp" id="enNBedarf" type="number" min="0" max="99" value="1" oninput="pickFoot('enN')"></div>
-        <div class="f"><label for="enNStatus">Status</label><select class="inp" id="enNStatus"><option value="geplant">Geplant</option><option value="bestaetigt">Bestätigt</option><option value="abgesagt">Abgesagt</option></select></div>
+  </div>
+</div>
+
+<div class="abschnitt">
+  <h3>Kontaktperson vor Ort<span class="note">wird den Eingeteilten in der App angezeigt</span></h3>
+  <div class="form-grid form-breit">
+        <div class="f"><label for="enNKontakt_vorname">Vorname</label><input class="inp" id="enNKontakt_vorname"></div>
+        <div class="f"><label for="enNKontakt_nachname">Nachname</label><input class="inp" id="enNKontakt_nachname"></div>
+        <!-- Eigenes Feld statt im Fliesstext: Auf dem Handy soll die Nummer
+             waehlbar sein, und dafuer muss sie fuer sich stehen. -->
+        <div class="f"><label for="enNKontakt_telefon">Telefon</label>
+          <input class="inp" id="enNKontakt_telefon" type="tel" inputmode="tel" placeholder="079 000 00 00"></div>
+  </div>
+</div>
+
+<div class="abschnitt">
+  <h3>Zuteilung</h3>
+  <div class="form-grid form-breit">
         <div class="f wide">
           <label>Zugeteilte Mitarbeitende</label>
           <div class="ma-pick" id="enNMa"></div>
           <div class="pick-foot" id="enNMaFoot"></div>
         </div>
+  </div>
+</div>
+
+<div class="abschnitt">
+  <h3>Angaben für die Eingeteilten<span class="note">steht in der App bei der Schicht</span></h3>
+  <div class="form-grid form-breit">
+        <div class="f"><label for="enNTreffpunkt">Treffpunkt</label>
+          <input class="inp" id="enNTreffpunkt" placeholder="z. B. Haupteingang, Réception"></div>
+        <div class="f"><label for="enNQualifikation">Qualifikation</label>
+          <input class="inp" id="enNQualifikation" placeholder="z. B. Verkehrsdienstausweis"></div>
+        <div class="f wide"><label for="enNTaetigkeit">Durchzuführende Tätigkeit</label>
+          <textarea class="inp" id="enNTaetigkeit" rows="2" style="min-height:64px"></textarea></div>
         <div class="f wide"><label for="enNBemerkung">Bemerkung</label><textarea class="inp" id="enNBemerkung" rows="3" style="min-height:84px"></textarea></div>
+  </div>
+</div>
         </div></div>
       </section>
 
@@ -6370,6 +6441,11 @@ function einsatzartOptionen(wert) {
 }
 
 const EN_FELDER = ['kunde_name', 'titel', 'strasse', 'ort', 'einsatzart', 'sparte', 'datum', 'von', 'bis', 'bedarf', 'bemerkung'];
+// Nur in der Anlegen-Ansicht vorhanden (ENT-115). Bewusst NICHT in
+// EN_FELDER: Diese Liste laeuft auch ueber die Bearbeiten-Schublade, die
+// diese Felder nicht hat -- dort waere jeder Zugriff ein Absturz.
+const EN_FELDER_ANSICHT = ['kanton', 'veranstaltung', 'treffpunkt', 'taetigkeit',
+  'qualifikation', 'kontakt_vorname', 'kontakt_nachname', 'kontakt_telefon'];
 const EN_LABEL = { kunde_name: 'Kunde', titel: 'Bezeichnung', strasse: 'Strasse', ort: 'Arbeitsort',
   einsatzart: 'Einsatzart', sparte: 'Sparte', datum: 'Datum', von: 'Von', bis: 'Bis', bedarf: 'Anzahl', bemerkung: 'Bemerkung' };
 // enN… für den Dialog, enE… für die Schublade — beide nach demselben Muster.
@@ -6782,6 +6858,8 @@ function openEinsatzNeu(felder, maNamen) {
     el.classList.toggle('ki', ausDiktat && hat);
   });
   $('enNStatus').value = 'geplant';
+  // Beim zweiten Oeffnen duerfen keine Reste des vorigen Einsatzes stehen.
+  EN_FELDER_ANSICHT.forEach(f => { const el = $(enId('enN', f)); if (el) el.value = ''; });
 
   const ids = maNamen.map(n => (mitarbeiter.find(m => m.name === n) || {}).id).filter(Boolean);
   pickRender('enN', ids, null);
@@ -6820,6 +6898,19 @@ let enNeuHer = 'planung';
 function enNeuAbbrechen() { go(enNeuHer || 'planung'); }
 
 // Formularwerte einsammeln. Gibt null zurück, wenn ein Pflichtfeld fehlt.
+// Nur die Felder mitschicken, die es in dieser Oberflaeche wirklich gibt.
+// Ein Feld, das der Server bekommt, wird geschrieben -- eines, das er als
+// leeren Text bekommt, wird geleert. Beim Bearbeiten in der Schublade, die
+// diese Felder nicht zeigt, waere das ein unbemerkter Datenverlust.
+function enWennDa(prefix, felder) {
+  const raus = {};
+  for (const f of felder) {
+    const el = $(enId(prefix, f));
+    if (el) raus[f] = (el.value || '').trim();
+  }
+  return raus;
+}
+
 function enSammeln(prefix) {
   const v = f => ($(enId(prefix, f)).value || '').trim();
   const body = {
@@ -6830,6 +6921,12 @@ function enSammeln(prefix) {
     bedarf: Math.min(99, Math.max(0, parseInt(v('bedarf'), 10) || 0)),
     status: v('status') || 'geplant',
     bemerkung: v('bemerkung'),
+    // ENT-115. Die Felder gibt es nur in der Anlegen-Ansicht; die
+    // Bearbeiten-Schublade kennt sie (noch) nicht. Fehlt das Feld, bleibt der
+    // Wert weg statt undefined zu werden -- der Server wuerde ihn sonst
+    // leeren, und ein stiller Datenverlust beim Bearbeiten waere die Folge.
+    ...enWennDa(prefix, ['kanton', 'veranstaltung', 'treffpunkt', 'taetigkeit',
+                         'qualifikation', 'kontakt_vorname', 'kontakt_nachname', 'kontakt_telefon']),
     mitarbeiter: pickIds(prefix),
     // Nur wer ausdruecklich bestaetigt wurde, wird umgeplant (ENT-060). Die
     // Liste geht mit, damit der Server dieselbe Entscheidung trifft wie die
@@ -6849,6 +6946,18 @@ function createEinsatz() {
   const err = $('enNeuErr'); err.style.display = 'none';
   const body = enSammeln('enN');
   if (!body) { err.textContent = 'Kunde, Arbeitsort, Datum, Von und Bis sind Pflicht.'; err.style.display = ''; return; }
+  // Strasse und Kanton sind Pflicht -- aber nur hier, nicht im Server
+  // (ENT-115). Sie serverseitig zu erzwingen wuerde die automatischen Wege
+  // lahmlegen, die keinen Kanton kennen: Masterschichten, Objektplanung und
+  // der Einrichtungslauf legen Einsaetze ohne Oberflaeche an.
+  const fehlt = [];
+  if (!body.strasse) fehlt.push('Strasse und Nummer');
+  if (!body.kanton) fehlt.push('Kanton');
+  if (fehlt.length) {
+    err.textContent = `Bitte noch ergänzen: ${fehlt.join(' und ')}. Beides wird für die Wegstrecke gebraucht.`;
+    err.style.display = '';
+    return;
+  }
   const b = $('enNeuBtn'); b.disabled = true;
   api('einsatz_save.php', { method: 'POST', body }).then(({ ok, data }) => {
     b.disabled = false;

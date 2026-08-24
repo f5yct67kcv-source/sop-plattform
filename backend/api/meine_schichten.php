@@ -25,6 +25,11 @@ $stmt = db()->prepare(
     // sie wuerde eine Zahl ausweisen, die es nicht gibt.
     'SELECT e.id, e.kunde_name, e.titel, e.strasse, e.ort, e.einsatzart, e.sparte,
             e.datum, e.von, e.bis, e.status, e.bemerkung,
+            -- ENT-115: Was die eingeteilte Person vor Ort braucht. Der
+            -- Treffpunkt und die Ansprechperson stehen sonst nur in der
+            -- Verwaltung -- also genau dort, wo sie niemandem nuetzen.
+            e.kanton, e.veranstaltung, e.treffpunkt, e.taetigkeit, e.qualifikation,
+            e.kontakt_vorname, e.kontakt_nachname, e.kontakt_telefon,
             z.zusage, z.gesehen_am, o.name AS objekt_name,
             -- Der eigene Ist-Stand (ENT-049): damit die Person ihre
             -- geleistete Zeit selbst nachschlagen kann. Weiterhin strikt auf

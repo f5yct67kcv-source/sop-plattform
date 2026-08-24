@@ -383,6 +383,8 @@ const W = {
     naechste: 'Nächster Einsatz', jetztLaeuft: 'Läuft jetzt', gleich: 'Beginnt bald',
     kunde: 'Kunde', arbeitsort: 'Arbeitsort', zeit: 'Zeit', einsatzart: 'Einsatzart',
     bemerkung: 'Bemerkung', objekt: 'Objekt', imTeam: 'im Team',
+    treffpunkt: 'Treffpunkt', kontaktVorOrt: 'Kontakt vor Ort',
+    taetigkeit: 'Tätigkeit', qualifikation: 'Qualifikation',
     zusagen: 'Zusagen', ablehnen: 'Ablehnen', zugesagt: 'Zugesagt', abgelehnt: 'Abgelehnt',
     offen: 'Noch offen', gemeldet: 'Rückmeldung gespeichert.',
     geplant: 'Geplant', bestaetigt: 'Bestätigt', provisorisch: 'Auf Abruf', abgesagt: 'Abgesagt',
@@ -1081,7 +1083,14 @@ function blattAuf(id) {
       <dt>${esc(w('zeit'))}</dt><dd>${esc(wd)}, ${dmy(e.datum)}</dd>
       <dt>${esc(w('kunde'))}</dt><dd>${esc(e.kunde_name)}</dd>
       ${e.objekt_name ? `<dt>${esc(w('objekt'))}</dt><dd>${esc(e.objekt_name)}</dd>` : ''}
-      <dt>${esc(w('arbeitsort'))}</dt><dd>${e.strasse ? esc(e.strasse) + '<br>' : ''}${esc(e.ort)}</dd>
+      <dt>${esc(w('arbeitsort'))}</dt><dd>${e.strasse ? esc(e.strasse) + '<br>' : ''}${esc(e.ort)}${e.kanton ? ' ' + esc(e.kanton) : ''}</dd>
+      ${e.treffpunkt ? `<dt>${esc(w('treffpunkt'))}</dt><dd>${esc(e.treffpunkt)}</dd>` : ''}
+      ${e.kontakt_vorname || e.kontakt_nachname || e.kontakt_telefon ? `<dt>${esc(w('kontaktVorOrt'))}</dt><dd>${
+        esc([e.kontakt_vorname, e.kontakt_nachname].filter(Boolean).join(' '))
+      }${e.kontakt_telefon ? `${e.kontakt_vorname || e.kontakt_nachname ? '<br>' : ''}<a href="tel:${
+        esc(String(e.kontakt_telefon).replace(/[^+0-9]/g, ''))}">${esc(e.kontakt_telefon)}</a>` : ''}</dd>` : ''}
+      ${e.taetigkeit ? `<dt>${esc(w('taetigkeit'))}</dt><dd>${esc(e.taetigkeit)}</dd>` : ''}
+      ${e.qualifikation ? `<dt>${esc(w('qualifikation'))}</dt><dd>${esc(e.qualifikation)}</dd>` : ''}
       <dt>${esc(w('einsatzart'))}</dt><dd>${esc(e.einsatzart)}</dd>
       <dt>Status</dt><dd><span class="marke ${st[1]}">${esc(w(st[0]))}</span> <span class="marke ${zu[1]}">${esc(w(zu[0]))}</span></dd>
       ${Number(e.im_team) > 1 ? `<dt>${esc(w('schicht'))}</dt><dd>${Number(e.im_team)} ${esc(w('imTeam'))}</dd>` : ''}
