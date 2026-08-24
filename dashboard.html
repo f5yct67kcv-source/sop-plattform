@@ -1079,21 +1079,33 @@ tbody tr.zu .i-schloss { color: var(--warn); }
 .begr-karte .card-bd { padding: 22px 24px; }
 .begr-kopf h2 { font-size: 21px; font-weight: 720; letter-spacing: -.3px; margin-bottom: 4px; }
 .begr-kopf p { font-size: 13.5px; color: var(--ink-2); line-height: 1.5; min-height: 1.4em; }
-.begr-router { margin-top: 18px; }
+/* ── Diktat-Router (ENT-032), seit ENT-107 mit Prefix mehrfach einsetzbar --
+   auf der Übersicht als Teil der Begrüssung, in Planung/Einsätze als eigene
+   Zeile unter der Filterleiste. Eine gemeinsame Klasse statt einer zweiten
+   Kopie: Die erste Kopie (der globale Sprechen-Dialog, ENT-038) ist ohne
+   Bild-Erkennung stehengeblieben, weil niemand beide Stellen pflegte -- das
+   soll sich hier nicht wiederholen. */
+.diktat-router { margin-top: 18px; }
+/* Steht der Router allein in einer Karte -- so wie in Planung/Einsätze --,
+   braucht es den Abstand von oben nicht, den er in der Begrüssung nach der
+   Grussformel hat. */
+.card-bd > .diktat-router { margin-top: 0; }
 /* Waechst die Karte, waechst das Eingabefeld -- das ist der einzige Teil der
-   Begruessung, der mit mehr Hoehe etwas anfangen kann. */
-.dash-item.dh .begr-router { display: flex; flex-direction: column; min-height: 0; }
-.dash-item.dh .begr-eingabe { flex: 1 1 auto; min-height: 0; display: flex; }
-.dash-item.dh .begr-router textarea#rtText { flex: 1 1 auto; min-height: 88px; }
-.begr-eingabe { position: relative; border-radius: var(--r-sm); transition: outline-color .15s; outline: 2px dashed transparent; outline-offset: 2px; }
-.begr-eingabe.rt-ueber { outline-color: var(--accent); background: var(--accent-soft); }
-.begr-router textarea#rtText { resize: vertical; }
+   Begruessung, der mit mehr Hoehe etwas anfangen kann. Gilt nur dort: Nur
+   der Begruessungs-Router steckt je in einem hoehenverstellbaren Container
+   (ENT-099), darum bleibt die Textfeld-Regel auf seine ID beschraenkt. */
+.dash-item.dh .diktat-router { display: flex; flex-direction: column; min-height: 0; }
+.dash-item.dh .diktat-eingabe { flex: 1 1 auto; min-height: 0; display: flex; }
+.dash-item.dh .diktat-router textarea#rtText { flex: 1 1 auto; min-height: 88px; }
+.diktat-eingabe { position: relative; border-radius: var(--r-sm); transition: outline-color .15s; outline: 2px dashed transparent; outline-offset: 2px; }
+.diktat-eingabe.rt-ueber { outline-color: var(--accent); background: var(--accent-soft); }
+.diktat-router textarea { resize: vertical; }
 .rt-bild { position: relative; display: inline-block; margin-top: 10px; }
 .rt-bild img { display: block; max-width: 220px; max-height: 140px; border-radius: var(--r-sm); border: 1px solid var(--line); object-fit: cover; }
 .rt-bild button { position: absolute; top: -8px; right: -8px; width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: var(--sh-2); }
 .rt-bild button:hover { color: var(--neg); }
-.begr-router .sprach { margin-top: 10px; }
-/* ── Die drei Knoepfe der Begruessung (ENT-100)
+.diktat-router .sprach { margin-top: 10px; }
+/* ── Die drei Knoepfe des Diktat-Routers (ENT-100)
    Skizze des Projektinhabers vom 2026-08-23, dazu wörtlich: "cta button alle
    in selben eckigen design. sprechen blau, rest neutral je nach hell/dunkel".
    Aus der Skizze: 140 x 40 px, links ausgerichtet, Reihenfolge Sprechen,
@@ -1103,32 +1115,32 @@ tbody tr.zu .i-schloss { color: var(--warn); }
    die anderen zwei traten als Radius var(--r-sm) auf. Drei Knoepfe
    nebeneinander in zwei Formen lesen sich wie zwei Gruppen, obwohl sie eine
    sind. Farbe traegt die Unterscheidung, nicht die Form. */
-.begr-router .sprach { flex-wrap: wrap; }
-.begr-router .sprach .cta {
+.diktat-router .sprach { flex-wrap: wrap; }
+.diktat-router .sprach .cta {
   flex: none; width: 140px; height: 40px; min-height: 40px;
   justify-content: center; gap: 8px; padding: 0 14px;
   border-radius: var(--r-sm); font-size: 13px; font-weight: 600;
 }
 /* Sprechen blau. Die uebrigen bleiben neutral und holen ihre Farben aus den
    Themenwerten -- damit stimmen sie in Hell UND Dunkel, ohne zweite Regel. */
-.begr-router .sprach .sprach-btn.cta {
+.diktat-router .sprach .sprach-btn.cta {
   background: var(--accent); border-color: var(--accent); color: #fff;
 }
-.begr-router .sprach .sprach-btn.cta:hover { background: var(--accent-hi); border-color: var(--accent-hi); }
+.diktat-router .sprach .sprach-btn.cta:hover { background: var(--accent-hi); border-color: var(--accent-hi); }
 /* Waehrend der Aufnahme rot -- NACH der blauen Regel, sonst gewinnt bei
    gleicher Eigenspezifitaet die spaetere und der laufende Zustand waere
    nicht mehr zu sehen. */
-.begr-router .sprach .sprach-btn.cta.laeuft { background: var(--neg); border-color: var(--neg); color: #fff; }
-.begr-router .sprach .sprach-btn.cta.laeuft:hover { background: var(--neg-hi); border-color: var(--neg-hi); }
+.diktat-router .sprach .sprach-btn.cta.laeuft { background: var(--neg); border-color: var(--neg); color: #fff; }
+.diktat-router .sprach .sprach-btn.cta.laeuft:hover { background: var(--neg-hi); border-color: var(--neg-hi); }
 /* Die Pegelanzeige steht hinter den Knoepfen und nimmt den Rest der Zeile --
    dafuer brauchte es bisher einen eigenen Abstandhalter. */
-.begr-router .sprach .viz { flex: 1 1 60px; }
+.diktat-router .sprach .viz { flex: 1 1 60px; }
 @media (max-width: 620px) {
   /* Drei Knoepfe zu 140 px passen nicht in eine schmale Zeile. Sie teilen
      sie sich dann, und die Hoehe steigt auf die 44 px, die ein Finger
      zuverlaessig trifft. */
-  .begr-router .sprach .cta { width: auto; flex: 1 1 132px; height: auto; min-height: 44px; }
-  .begr-router .sprach .viz { flex-basis: 100%; }
+  .diktat-router .sprach .cta { width: auto; flex: 1 1 132px; height: auto; min-height: 44px; }
+  .diktat-router .sprach .viz { flex-basis: 100%; }
 }
 
 /* ── Konfigurierbares Dashboard (ENT-031)
@@ -2188,12 +2200,12 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
                   <h2 id="begrGruss">Guten Tag</h2>
                   <p id="begrNaechstes">Einen Moment …</p>
                 </div>
-                <div class="begr-router">
-                  <div class="begr-eingabe" id="begrDropzone" ondragover="rtDragUeber(event)" ondragleave="rtDragWeg(event)" ondrop="rtDrop(event)">
-                    <textarea class="inp" id="rtText" rows="2" placeholder="Diktieren, tippen oder ein Bild einfügen (Strg+V) — z. B. „Neuer Einsatz für die Borner AG morgen 7 bis 16 Uhr“ oder ein Screenshot einer Auftrags-E-Mail." onpaste="rtEinfuegen(event)"></textarea>
+                <div class="diktat-router">
+                  <div class="diktat-eingabe" id="rtDropzone" ondragover="rtDragUeber(event,'rt')" ondragleave="rtDragWeg('rt')" ondrop="rtDrop(event,'rt')">
+                    <textarea class="inp" id="rtText" rows="2" placeholder="Diktieren, tippen oder ein Bild einfügen (Strg+V) — z. B. „Neuer Einsatz für die Borner AG morgen 7 bis 16 Uhr“ oder ein Screenshot einer Auftrags-E-Mail." onpaste="rtEinfuegen(event,'rt')"></textarea>
                     <div id="rtBildVorschau" class="rt-bild" style="display:none">
                       <img id="rtBildImg" alt="">
-                      <button type="button" onclick="rtBildEntfernen()" title="Bild entfernen" aria-label="Bild entfernen">
+                      <button type="button" onclick="rtBildEntfernen('rt')" title="Bild entfernen" aria-label="Bild entfernen">
                         <svg class="i i-sm" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                       </button>
                     </div>
@@ -2204,8 +2216,8 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
                       <svg class="i i-sm" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
                       <span class="lb">Sprechen</span>
                     </button>
-                    <button class="btn btn-plain cta" id="rtBtn" onclick="rtErkennen()">Erkennen</button>
-                    <input type="file" id="rtDatei" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none" onchange="rtDateiGewaehlt(this.files[0])">
+                    <button class="btn btn-plain cta" id="rtBtn" onclick="rtErkennen('rt')">Erkennen</button>
+                    <input type="file" id="rtDatei" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none" onchange="rtDateiGewaehlt(this.files[0],'rt')">
                     <button class="btn btn-plain cta" onclick="$('rtDatei').click()" title="Bild auswählen">
                       <svg class="i i-sm" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
                       <span class="lbl">Bild</span>
@@ -2432,6 +2444,41 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
             Neuer Einsatz
           </button>
         </div>
+
+        <!-- Diktat-Router auch hier, wie auf der Uebersicht (ENT-107) --
+             dieselbe Zeile, eigener Prefix "pe" statt "rt". -->
+        <div class="card">
+          <div class="card-bd">
+            <div class="diktat-router">
+              <div class="diktat-eingabe" id="peDropzone" ondragover="rtDragUeber(event,'pe')" ondragleave="rtDragWeg('pe')" ondrop="rtDrop(event,'pe')">
+                <textarea class="inp" id="peText" rows="2" placeholder="Diktieren, tippen oder ein Bild einfügen (Strg+V) — z. B. „Neuer Einsatz für die Borner AG morgen 7 bis 16 Uhr“ oder ein Screenshot einer Auftrags-E-Mail." onpaste="rtEinfuegen(event,'pe')"></textarea>
+                <div id="peBildVorschau" class="rt-bild" style="display:none">
+                  <img id="peBildImg" alt="">
+                  <button type="button" onclick="rtBildEntfernen('pe')" title="Bild entfernen" aria-label="Bild entfernen">
+                    <svg class="i i-sm" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  </button>
+                </div>
+              </div>
+              <div class="sprach" id="peSprach">
+                <button class="sprach-btn cta" id="peMik" onclick="sprachUm('peText','pe')">
+                  <span class="pkt"></span>
+                  <svg class="i i-sm" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+                  <span class="lb">Sprechen</span>
+                </button>
+                <button class="btn btn-plain cta" id="peBtn" onclick="rtErkennen('pe')">Erkennen</button>
+                <input type="file" id="peDatei" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none" onchange="rtDateiGewaehlt(this.files[0],'pe')">
+                <button class="btn btn-plain cta" onclick="$('peDatei').click()" title="Bild auswählen">
+                  <svg class="i i-sm" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                  <span class="lbl">Bild</span>
+                </button>
+                <div class="viz" id="peViz"></div>
+              </div>
+              <div class="sprach-hint" id="peSprachHint"></div>
+              <div class="msg-err" id="peErr" style="display:none"></div>
+            </div>
+          </div>
+        </div>
+
         <div class="card"><div class="card-bd flush"><div class="tw" id="plTable"></div></div></div>
         </div>
 
@@ -4325,7 +4372,7 @@ const BEGR_GRUSS = {
   abend: ['Guten Abend', 'Noch spät unterwegs?', 'Guten Abend'],
 };
 let naechstesDaten = null;
-let rtBild = null;   // { base64, mime, url } eines vorbereiteten Bildes
+let rtBild = {};   // { base64, mime, url } eines vorbereiteten Bildes, je Router-Prefix
 
 function begrTageszeit() {
   const h = new Date().getHours();
@@ -4388,17 +4435,24 @@ function renderBegruessung() {
 const hmKurz = t => String(t || '').slice(0, 5);
 
 // ── Router: Text/Diktat
-function rtErkennen() {
-  if (rtBild) { rtBildErkennen(); return; }
-  const text = $('rtText').value.trim();
-  const err = $('rtErr'); err.style.display = 'none';
+//
+// Seit ENT-107 mit einem Prefix statt fest an "rt" gebunden -- derselbe
+// Router steht jetzt an zwei Stellen (Begruessung und Planung/Einsaetze).
+// Bewusst NICHT ein zweites Mal als eigene Funktionsfamilie geschrieben: Der
+// globale Sprechen-Dialog (gsOeffnen/gsErkennen, ENT-038) ist genau so
+// entstanden und blieb seither ohne Bild-Erkennung stehen, weil niemand
+// beide Kopien parallel pflegte.
+function rtErkennen(prefix) {
+  if (rtBild[prefix]) { rtBildErkennen(prefix); return; }
+  const text = $(prefix + 'Text').value.trim();
+  const err = $(prefix + 'Err'); err.style.display = 'none';
   if (!text) { err.textContent = 'Bitte etwas eingeben, diktieren oder ein Bild einfügen.'; err.style.display = ''; return; }
-  const b = $('rtBtn'); b.disabled = true; b.textContent = 'Erkenne …';
+  const b = $(prefix + 'Btn'); b.disabled = true; b.textContent = 'Erkenne …';
   api('ki_router_parse.php', { method: 'POST', body: { text, heute: isoTag() } }).then(({ ok, data }) => {
     b.disabled = false; b.textContent = 'Erkennen';
     if (!ok || data.status !== 'ok') { err.textContent = data.message || 'Erkennung fehlgeschlagen.'; err.style.display = ''; return; }
     rtDialogOeffnen(data);
-    rtZuruecksetzen();
+    rtZuruecksetzen(prefix);
   }).catch(() => { b.disabled = false; b.textContent = 'Erkennen'; err.textContent = 'Netzwerkfehler.'; err.style.display = ''; });
 }
 
@@ -4456,57 +4510,58 @@ function gsErkennen() {
   }).catch(() => { b.disabled = false; b.textContent = 'Erkennen'; err.textContent = 'Netzwerkfehler.'; err.style.display = ''; });
 }
 
-function rtZuruecksetzen() {
-  $('rtText').value = '';
-  rtBildEntfernen();
+function rtZuruecksetzen(prefix) {
+  $(prefix + 'Text').value = '';
+  rtBildEntfernen(prefix);
 }
 
 // ── Router: Bild
-function rtBildErkennen() {
-  if (!rtBild) return;
-  const err = $('rtErr'); err.style.display = 'none';
-  const b = $('rtBtn'); b.disabled = true; b.textContent = 'Lese Bild …';
-  api('ki_einsatz_bild.php', { method: 'POST', body: { bild: rtBild.base64, mime: rtBild.mime, heute: isoTag() } })
+function rtBildErkennen(prefix) {
+  const bild = rtBild[prefix];
+  if (!bild) return;
+  const err = $(prefix + 'Err'); err.style.display = 'none';
+  const b = $(prefix + 'Btn'); b.disabled = true; b.textContent = 'Lese Bild …';
+  api('ki_einsatz_bild.php', { method: 'POST', body: { bild: bild.base64, mime: bild.mime, heute: isoTag() } })
     .then(({ ok, data }) => {
       b.disabled = false; b.textContent = 'Erkennen';
       if (!ok || data.status !== 'ok') { err.textContent = data.message || 'Erkennung fehlgeschlagen.'; err.style.display = ''; return; }
       openEinsatzNeu(data.felder || {}, data.mitarbeiter_login_namen || []);
-      rtZuruecksetzen();
+      rtZuruecksetzen(prefix);
     }).catch(() => { b.disabled = false; b.textContent = 'Erkennen'; err.textContent = 'Netzwerkfehler.'; err.style.display = ''; });
 }
 
-function rtDragUeber(e) { e.preventDefault(); $('begrDropzone').classList.add('rt-ueber'); }
-function rtDragWeg() { $('begrDropzone').classList.remove('rt-ueber'); }
-function rtDrop(e) {
+function rtDragUeber(e, prefix) { e.preventDefault(); $(prefix + 'Dropzone').classList.add('rt-ueber'); }
+function rtDragWeg(prefix) { $(prefix + 'Dropzone').classList.remove('rt-ueber'); }
+function rtDrop(e, prefix) {
   e.preventDefault();
-  $('begrDropzone').classList.remove('rt-ueber');
+  $(prefix + 'Dropzone').classList.remove('rt-ueber');
   const datei = [...(e.dataTransfer.files || [])].find(f => f.type.startsWith('image/'));
-  if (datei) rtBildSetzen(datei);
+  if (datei) rtBildSetzen(datei, prefix);
 }
-function rtEinfuegen(e) {
+function rtEinfuegen(e, prefix) {
   const eintrag = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith('image/'));
   if (!eintrag) return;   // normaler Text darf ganz normal eingefuegt werden
   e.preventDefault();
-  rtBildSetzen(eintrag.getAsFile());
+  rtBildSetzen(eintrag.getAsFile(), prefix);
 }
-function rtDateiGewaehlt(datei) {
-  if (datei) rtBildSetzen(datei);
-  $('rtDatei').value = '';
+function rtDateiGewaehlt(datei, prefix) {
+  if (datei) rtBildSetzen(datei, prefix);
+  $(prefix + 'Datei').value = '';
 }
 
-function rtBildSetzen(datei) {
+function rtBildSetzen(datei, prefix) {
   bildVerkleinern(datei).then(({ base64, mime, url }) => {
-    rtBild = { base64, mime, url };
-    $('rtBildImg').src = url;
-    $('rtBildVorschau').style.display = '';
-    $('rtErr').style.display = 'none';
-    $('rtBtn').textContent = 'Erkennen';
-  }).catch(() => { $('rtErr').textContent = 'Dieses Bild liess sich nicht lesen.'; $('rtErr').style.display = ''; });
+    rtBild[prefix] = { base64, mime, url };
+    $(prefix + 'BildImg').src = url;
+    $(prefix + 'BildVorschau').style.display = '';
+    $(prefix + 'Err').style.display = 'none';
+    $(prefix + 'Btn').textContent = 'Erkennen';
+  }).catch(() => { $(prefix + 'Err').textContent = 'Dieses Bild liess sich nicht lesen.'; $(prefix + 'Err').style.display = ''; });
 }
-function rtBildEntfernen() {
-  rtBild = null;
-  $('rtBildVorschau').style.display = 'none';
-  $('rtBildImg').src = '';
+function rtBildEntfernen(prefix) {
+  rtBild[prefix] = null;
+  $(prefix + 'BildVorschau').style.display = 'none';
+  $(prefix + 'BildImg').src = '';
 }
 
 // Auf eine vernuenftige Groesse verkleinern, bevor es zum Server geht --
@@ -6748,6 +6803,11 @@ function goTab(t) {
   $('ptab-' + t).classList.add('on');
   $('pgCrumb').textContent = TAB_CRUMB[t] || '';
   weiteAnsicht(PLANUNG_WEIT.includes(t));
+  // Einsaetze traegt seit ENT-107 den Diktat-Router eingebettet -- derselbe
+  // Grund wie bei der Uebersicht (ENT-038): der globale Knopf waere daneben
+  // doppelt. Auf den uebrigen Planungs-Reitern bleibt er sichtbar, das
+  // erledigt go() bereits fuer die Ansicht als Ganzes.
+  if ($('btnSprechen')) { $('btnSprechen').style.display = t === 'einsaetze' ? 'none' : ''; }
   if (t === 'uebersicht') renderMatrix();
   if (t === 'einsaetze') renderPlanung();
   if (t === 'objektplan') {

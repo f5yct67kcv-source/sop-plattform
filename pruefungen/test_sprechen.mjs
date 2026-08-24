@@ -67,7 +67,7 @@ for (const [name, hin] of [
 await page.evaluate(() => go('planung'));
 await page.waitForTimeout(200);
 for (const [name, tab] of [
-  ['Planung/Übersicht', 'uebersicht'], ['Planung/Einsätze', 'einsaetze'],
+  ['Planung/Übersicht', 'uebersicht'],
   ['Planung/Objektplanung', 'objektplan'], ['Planung/Tagesplan', 'tag'],
 ]) {
   await page.evaluate(t => goTab(t), tab);
@@ -75,6 +75,23 @@ for (const [name, tab] of [
   check(`Auf ${name} ist der Knopf sichtbar (keine Sonderrolle wie bei der Dashboard-Übersicht)`,
     await page.isVisible('#btnSprechen'));
 }
+// Seit ENT-107 hat Planung/Einsätze denselben Router eingebettet wie die
+// Übersicht -- dieselbe Regel wie dort (ENT-038): ein zweiter Weg daneben
+// wäre doppelt gemoppelt, also verschwindet der globale Knopf hier auch.
+await page.evaluate(() => goTab('einsaetze'));
+await page.waitForTimeout(200);
+check('KRITISCH: auf Planung/Einsätze ist der globale Knopf jetzt versteckt -- der Router sitzt hier eingebettet',
+  !(await page.isVisible('#btnSprechen')));
+check('Und die eingebettete Zeile ist wirklich da', await page.isVisible('#peText'));
+// Wechsel zurueck auf einen Reiter ohne eigenen Router muss den Knopf wieder
+// zeigen -- sonst bliebe er nach dem ersten Besuch von Einsätze fuer immer
+// versteckt.
+await page.evaluate(() => goTab('objektplan'));
+await page.waitForTimeout(200);
+check('KRITISCH: beim Wechsel weg von Einsätze taucht der Knopf wieder auf',
+  await page.isVisible('#btnSprechen'));
+await page.evaluate(() => goTab('einsaetze'));
+await page.waitForTimeout(200);
 await page.screenshot({ path: OUT + '/95-sprechen-planung.png' });
 
 // Objekte sind seit ENT-039 ein Unterpunkt von Kunden, nicht mehr der Planung.

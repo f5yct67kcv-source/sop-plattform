@@ -207,7 +207,7 @@ await page.waitForTimeout(400);
 check('Erklärung bei unlesbarem Bild', (await page.textContent('#rtErr')).includes('kein Auftrag erkennen'));
 check('Kein Dialog bei Fehler', !(await page.isVisible('#dlgEnNeu.on')));
 bildAntwort = null;
-await page.evaluate(() => rtBildEntfernen());
+await page.evaluate(() => rtBildEntfernen('rt'));
 
 // ══════════ EINFÜGEN AUS DER ZWISCHENABLAGE
 await page.evaluate(async (b64) => {
@@ -221,7 +221,7 @@ await page.evaluate(async (b64) => {
 }, (await (await import('fs')).promises.readFile(BILD)).toString('base64'));
 await page.waitForTimeout(400);
 check('Ein eingefügtes Bild erzeugt ebenfalls eine Vorschau', await page.isVisible('#rtBildVorschau'));
-await page.evaluate(() => rtBildEntfernen());
+await page.evaluate(() => rtBildEntfernen('rt'));
 
 // ══════════ ZIEHEN UND FALLENLASSEN
 await page.evaluate(async (b64) => {
@@ -230,13 +230,13 @@ await page.evaluate(async (b64) => {
   for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
   const file = new File([arr], 'gezogen.png', { type: 'image/png' });
   const dt = new DataTransfer(); dt.items.add(file);
-  const zone = document.getElementById('begrDropzone');
+  const zone = document.getElementById('rtDropzone');
   zone.dispatchEvent(new DragEvent('dragover', { dataTransfer: dt, bubbles: true, cancelable: true }));
   zone.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
 }, (await (await import('fs')).promises.readFile(BILD)).toString('base64'));
 await page.waitForTimeout(400);
 check('Ein gezogenes Bild erzeugt ebenfalls eine Vorschau', await page.isVisible('#rtBildVorschau'));
-await page.evaluate(() => rtBildEntfernen());
+await page.evaluate(() => rtBildEntfernen('rt'));
 
 // ══════════════════════════════ DIE DREI KNOEPFE (ENT-100)
 //
