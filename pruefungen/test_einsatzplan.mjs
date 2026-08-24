@@ -360,6 +360,95 @@ check('Der Stundenansatz steht in der Zeile', (await page.textContent('#epRaster
 check('KRITISCH: der Balken ist kürzer als vorher — gemessen', (await balkenBreite()) < vorher * 0.5);
 await page.screenshot({ path: OUT + '/85-schicht-bearbeitet.png' });
 
+// ══════════ WARNUNG, WENN DIE SCHICHT ÜBER DEN EINSATZ HINAUSLÄUFT (ENT-111)
+// Erlaubt ist es -- verhindert wird nichts. Es soll nur auffallen, solange
+// sich ein Verklicken noch folgenlos zurücknehmen lässt.
+await page.click('#epRaster table.ep-gitter tbody tr:first-child .ep-werk button[title="Schicht bearbeiten"]');
+await page.waitForTimeout(350);
+check('Ohne Überhang steht keine Warnung da', !(await page.isVisible('#epsUeber')));
+await zeitSetzen(page, '#eps_bis', '19:30');
+await page.waitForTimeout(250);
+check('KRITISCH: ein Überhang wird sofort gemeldet', await page.isVisible('#epsUeber'));
+const warnTxt = await page.textContent('#epsUeber');
+check('KRITISCH: die Warnung nennt die Dauer des Überhangs', warnTxt.includes('3 h'));
+check('Und die beiden Zeiten', warnTxt.includes('16:30') && warnTxt.includes('19:30'));
+check('KRITISCH: gespeichert werden darf trotzdem — es ist kein Fehler',
+  !(await page.isVisible('#epsErr')));
+// Zurück ins Fenster: die Warnung muss wieder verschwinden.
+await zeitSetzen(page, '#eps_bis', '16:30');
+await page.waitForTimeout(250);
+check('KRITISCH: zurück im Fenster verschwindet die Warnung', !(await page.isVisible('#epsUeber')));
+// Jetzt bewusst mit Überhang speichern.
+await zeitSetzen(page, '#eps_bis', '19:30');
+await page.waitForTimeout(200);
+await page.click('#epsBtn');
+await page.waitForTimeout(700);
+check('Der Überhang lässt sich speichern', !(await page.isVisible('#dlgSchicht.on')));
+check('KRITISCH: der Balken ist im Raster als Überhang gekennzeichnet',
+  await page.evaluate(() => document.querySelectorAll('#epRaster .ep-balken.ueber').length === 1));
+check('Und sagt beim Überfahren, wie weit',
+  await page.evaluate(() => {
+    const b = document.querySelector('#epRaster .ep-balken.ueber');
+    return !!b && (b.getAttribute('title') || '').includes('nach dem Einsatz');
+  }));
+await page.screenshot({ path: OUT + '/87-ueberhang.png' });
+// Wieder zurücksetzen, damit die folgenden Prüfungen auf bekanntem Stand stehen.
+await page.click('#epRaster table.ep-gitter tbody tr:first-child .ep-werk button[title="Schicht bearbeiten"]');
+await page.waitForTimeout(300);
+await zeitSetzen(page, '#eps_bis', '16:30');
+await page.click('#epsBtn');
+await page.waitForTimeout(700);
+check('Nach dem Zurücksetzen ist kein Balken mehr gekennzeichnet',
+  await page.evaluate(() => document.querySelectorAll('#epRaster .ep-balken.ueber').length === 0));
+
+// ══════════ DEN DIALOG BEISEITESCHIEBEN (ENT-111)
+// Zweck: eine Zahl aus dem Hintergrund lesen, ohne den Dialog zu schliessen
+// und die Eingabe zu verlieren.
+try {
+  await page.click('#epRaster table.ep-gitter tbody tr:first-child .ep-werk button[title="Schicht bearbeiten"]');
+  await page.waitForTimeout(300);
+  const vor = await page.evaluate(() => {
+    const r = document.querySelector('#dlgSchicht .dlg').getBoundingClientRect();
+    return { x: Math.round(r.left), y: Math.round(r.top) };
+  });
+  const kopf = await page.evaluate(() => {
+    const r = document.querySelector('#dlgSchicht .dlg-hd').getBoundingClientRect();
+    return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + 10) };
+  });
+  await page.mouse.move(kopf.x, kopf.y);
+  await page.mouse.down();
+  await page.mouse.move(kopf.x - 260, kopf.y + 90, { steps: 8 });
+  await page.mouse.up();
+  await page.waitForTimeout(200);
+  const nach = await page.evaluate(() => {
+    const r = document.querySelector('#dlgSchicht .dlg').getBoundingClientRect();
+    return { x: Math.round(r.left), y: Math.round(r.top) };
+  });
+  check('KRITISCH: der Dialog lässt sich am Kopf verschieben — gemessen',
+    Math.abs(nach.x - (vor.x - 260)) <= 4 && Math.abs(nach.y - (vor.y + 90)) <= 4);
+  check('KRITISCH: die Eingaben bleiben dabei erhalten',
+    (await page.inputValue('#eps_bis')) === '16:30');
+  check('KRITISCH: der Hintergrund wird dabei sichtbarer',
+    await page.evaluate(() => {
+      const bg = getComputedStyle(document.getElementById('dlgSchicht')).backgroundColor;
+      const a = (bg.match(/[\d.]+\)$/) || ['1)'])[0];
+      return parseFloat(a) < 0.3;
+    }));
+  // Beim nächsten Öffnen steht er wieder mittig -- sonst sucht man ihn.
+  await page.evaluate(() => closeDlg('dlgSchicht'));
+  await page.waitForTimeout(200);
+  await page.click('#epRaster table.ep-gitter tbody tr:first-child .ep-werk button[title="Schicht bearbeiten"]');
+  await page.waitForTimeout(300);
+  const neuAuf = await page.evaluate(() => {
+    const r = document.querySelector('#dlgSchicht .dlg').getBoundingClientRect();
+    return { x: Math.round(r.left), y: Math.round(r.top) };
+  });
+  check('KRITISCH: beim nächsten Öffnen steht er wieder an seinem Platz',
+    Math.abs(neuAuf.x - vor.x) <= 2 && Math.abs(neuAuf.y - vor.y) <= 2);
+  await page.evaluate(() => closeDlg('dlgSchicht'));
+  await page.waitForTimeout(200);
+} catch (e) { bad.push('Verschieben: ' + String(e).split('\n')[0].slice(0, 110)); }
+
 // ══════════ EINE SCHICHT KLONEN
 const vorKlon = await zeilen();
 await page.click('#epRaster table.ep-gitter tbody tr:nth-child(2) .ep-werk button[title="Schicht klonen"]');
