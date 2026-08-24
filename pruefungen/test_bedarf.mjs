@@ -3,6 +3,7 @@
 // sagen warum, statt etwas Falsches zu behaupten.
 import { WURZEL, HIER, OUT, browserPfad } from './pfade.mjs';
 import { chromium } from 'playwright';
+import { zeitSetzen } from './zeitfeld.mjs';
 
 const EXE = browserPfad();
 const iso = d => new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
@@ -92,7 +93,7 @@ const vorgaben = await page.evaluate(() =>
 check('Neue Vorlage startet mit Bedarf 1 je Tag', vorgaben.every(v => v === '1'));
 // Wer alles auf 0 setzt, bekommt eine Erklärung statt einer wirkungslosen Vorlage
 await page.fill('#msName', 'Testrunde');
-await page.fill('#msVon', '08:00'); await page.fill('#msBis', '09:00');
+await zeitSetzen(page, '#msVon', '08:00'); await zeitSetzen(page, '#msBis', '09:00');
 for (const t of ['mo','di','mi','do','fr','sa','so','feiertag']) await page.fill('#msBedarf_' + t, '0');
 const vorSave = rufe.filter(r => r.p.includes('masterschicht_save')).length;
 await page.click('#msBtn');

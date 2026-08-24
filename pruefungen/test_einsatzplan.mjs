@@ -8,6 +8,7 @@
 // Die Suite gab es vorher nicht; die Ansicht lief ungeprueft (OP-75).
 import { WURZEL, HIER, OUT, browserPfad } from './pfade.mjs';
 import { chromium } from 'playwright';
+import { zeitSetzen } from './zeitfeld.mjs';
 
 const EXE = browserPfad();
 const iso = d => new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
@@ -314,8 +315,8 @@ check('Die heutige Zeit steht vorbefüllt drin', (await page.inputValue('#eps_vo
 
 // Beginn vor dem Einsatz wird abgefangen -- sonst zeichnet das Raster den
 // Balken bei 23,5 Stunden statt eine halbe Stunde davor.
-await page.fill('#eps_von', '07:00');
-await page.fill('#eps_bis', '13:00');
+await zeitSetzen(page, '#eps_von', '07:00');
+await zeitSetzen(page, '#eps_bis', '13:00');
 const vorFalsch = posRufe('speichern');
 await page.click('#epsBtn');
 await page.waitForTimeout(300);
@@ -329,16 +330,16 @@ check('KRITISCH: und geht gar nicht erst an den Server', posRufe('speichern') ==
 check('Der Dialog bleibt dafür offen', await page.isVisible('#dlgSchicht.on'));
 
 // Ende vor Beginn ebenso.
-await page.fill('#eps_von', '13:00');
-await page.fill('#eps_bis', '11:00');
+await zeitSetzen(page, '#eps_von', '13:00');
+await zeitSetzen(page, '#eps_bis', '11:00');
 await page.click('#epsBtn');
 await page.waitForTimeout(300);
 check('Ein Ende vor dem Beginn wird abgefangen',
   (await page.textContent('#epsErr')).includes('nach dem Beginn'));
 
 // Stundenansatz UND Pauschale zugleich ergibt keinen Sinn.
-await page.fill('#eps_von', '11:00');
-await page.fill('#eps_bis', '13:00');
+await zeitSetzen(page, '#eps_von', '11:00');
+await zeitSetzen(page, '#eps_bis', '13:00');
 await page.fill('#eps_std', '38');
 await page.fill('#eps_pauschal', '200');
 await page.click('#epsBtn');

@@ -1,5 +1,6 @@
 import { WURZEL, HIER, OUT, browserPfad } from './pfade.mjs';
 import { chromium } from 'playwright';
+import { zeitSetzen } from './zeitfeld.mjs';
 
 
 const URL = `file://${WURZEL}/dashboard.html`;
@@ -212,8 +213,8 @@ await page.screenshot({ path: `${OUT}/23-planung-schublade.png` });
 // Daniele ist am selben Tag 08:00-12:00 bei einem vergangenen Einsatz -- kein
 // Konflikt. Wir pruefen mit Adrian: er ist 07:00-16:00 eingeteilt (Einsatz 11).
 // Ein neuer Einsatz zur selben Zeit darf ihn nicht mehr anbieten.
-await page.fill('#enEVon', '08:00');
-await page.fill('#enEBis', '14:00');
+await zeitSetzen(page, '#enEVon', '08:00');
+await zeitSetzen(page, '#enEBis', '14:00');
 await page.dispatchEvent('#enEBis', 'change');
 await page.waitForTimeout(250);
 check('Zugeteilter mit Konflikt bleibt bedienbar', !(await page.isDisabled('#enEMa input[value="1"]')));
@@ -269,8 +270,8 @@ check('KRITISCH: eine Person ohne Konflikt landet NICHT auf der Umplanungsliste'
 await page.click('#enEMa input[value="1"]');
 await page.waitForTimeout(150);
 // Zeitfenster aus der Ueberschneidung heraus -> Person wieder waehlbar
-await page.fill('#enEVon', '17:00');
-await page.fill('#enEBis', '20:00');
+await zeitSetzen(page, '#enEVon', '17:00');
+await zeitSetzen(page, '#enEBis', '20:00');
 await page.dispatchEvent('#enEBis', 'change');
 await page.waitForTimeout(250);
 check('Ohne Ueberschneidung kein Hinweis mehr', (await page.$$('#enEMa .clash')).length === 0);
@@ -349,8 +350,8 @@ await page.waitForTimeout(250);
 check('Ohne Pflichtfelder kein Anlegen', writes().length === 0 && await page.isVisible('#enNeuErr'));
 await page.fill('#enNKunde_name', 'Neuer Kunde ohne Datei');
 await page.fill('#enNOrt', '4600 Olten');
-await page.fill('#enNVon', '08:00');
-await page.fill('#enNBis', '12:00');
+await zeitSetzen(page, '#enNVon', '08:00');
+await zeitSetzen(page, '#enNBis', '12:00');
 await page.click('#enNeuBtn');
 await page.waitForTimeout(400);
 const cr = calls.find(c => c.path.includes('einsatz_save'));

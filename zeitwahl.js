@@ -79,6 +79,10 @@ function zeitwahlBauen(el) {
   const fein = el.dataset.zeit === 'fein';
   const huelle = document.createElement('span');
   huelle.className = 'zeitwahl';
+  // Das Feld mit der Kennung traegt seit dem Umbau nur noch den Wert; zu
+  // sehen und zu bedienen ist die Huelle. Wer nach Sichtbarkeit oder Groesse
+  // fragt, muss sie finden koennen, ohne die Innereien zu kennen.
+  if (el.id) huelle.dataset.zeitwahlFuer = el.id;
   const bau = (art, beschriftung) => {
     const s = document.createElement('select');
     s.className = 'inp';
