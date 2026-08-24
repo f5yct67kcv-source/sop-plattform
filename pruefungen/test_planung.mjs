@@ -363,7 +363,12 @@ check('Dialog schliesst nach Anlegen', !(await page.isVisible('#dlgEnNeu.on')));
 // ══════════ DIKTAT
 // Seit ENT-042 gibt es keinen eigenen Diktat-Knopf in der Planung mehr --
 // der globale Sprechen-Knopf deckt auch den Einsatz-Bereich ab (Router).
+// Seit ENT-107 ist der globale Knopf auf dem Einsaetze-Reiter selbst
+// ausgeblendet (dort steht die eingebettete Zeile) -- fuer diese Pruefung
+// darum auf einen anderen Planungs-Reiter wechseln, auf dem er weiterhin da ist.
 calls = [];
+await page.evaluate(() => goTab('objektplan'));
+await page.waitForTimeout(300);
 await page.click('#btnSprechen');
 await page.waitForSelector('#dlgSprechen.on');
 await page.click('#gsBtn');
@@ -406,7 +411,10 @@ check('Diktierte Werte landen im Aufruf', dcr && dcr.body.titel === 'Fasnachtsum
 check('Zuteilung landet im Aufruf', dcr && JSON.stringify(dcr.body.mitarbeiter.sort()) === JSON.stringify([2, 3]));
 check('Bekannter Kunde wird verknuepft', dcr && dcr.body.kunde_id === 1);
 
-// Handeingabe danach wieder sauber
+// Handeingabe danach wieder sauber -- der Knopf dafuer steht nur auf dem
+// Einsaetze-Reiter, zurueck wechseln.
+await page.evaluate(() => goTab('einsaetze'));
+await page.waitForTimeout(300);
 await page.click('#view-planung button:has-text("Neuer Einsatz")');
 await page.waitForSelector('#dlgEnNeu.on');
 await page.waitForTimeout(200);
