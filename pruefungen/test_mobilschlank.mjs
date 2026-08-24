@@ -13,7 +13,7 @@ const EXE = browserPfad();
 const ok = [], bad = [];
 const check = (n, c) => (c ? ok : bad).push(n);
 const iso = d => new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
-const H = iso(new Date()), G = iso(new Date(Date.now() - 864e5));
+const H = iso(new Date());
 const A = { id: 1, name: 'a', vorname: 'Anna', nachname: 'Muster', zusage: 'ja' };
 
 const mock = page => page.route('**/api/**', r => {
@@ -31,7 +31,7 @@ const mock = page => page.route('**/api/**', r => {
       einsatzart: 'Revierdienst', datum: H, von: '22:00:00', bis: '22:30:00', bedarf: 2, status: 'geplant',
       mitarbeiter: [A] },
     { id: 2, kunde_name: 'Muster GmbH', objekt_id: null, titel: 'Baustelle mit sehr langem Namen zum Testen',
-      strasse: 'Sehr lange Gassenbezeichnung 99', ort: 'Anderswo', einsatzart: 'Verkehrsdienst', datum: G,
+      strasse: 'Sehr lange Gassenbezeichnung 99', ort: 'Anderswo', einsatzart: 'Verkehrsdienst', datum: H,
       von: '07:00:00', bis: '16:00:00', bedarf: 1, status: 'bestaetigt', mitarbeiter: [A], ist_status: 'offen' }]});
   return send({ status: 'ok', kpi: { rapporte_monat: 3, stunden_monat: 12, mitarbeiter: 1, kunden: 1 },
     verlauf: [], angemeldet: [], pro_mitarbeiter: [], letzte_rapporte: [], rapporte: [], kunden: [],

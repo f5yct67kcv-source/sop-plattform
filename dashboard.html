@@ -2401,7 +2401,11 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
           <select class="inp" id="pHerkunft" style="width:auto" onchange="renderPlanung()" aria-label="Nach Herkunft oder Sparte filtern">
             <option value="">Einsätze und Objektschichten</option>
             <optgroup label="Herkunft">
-              <option value="einsatz">Nur Einsätze</option>
+              <!-- Vorgabe seit ENT-106: frei angelegte Einsaetze, keine
+                   Objektschichten -- diese Liste ist fuer den einzelnen,
+                   ausserhalb der Objektplanung entstandenen Einsatz gedacht.
+                   Wer beides sehen will, waehlt es hier bewusst. -->
+              <option value="einsatz" selected>Nur Einsätze</option>
               <option value="objekt">Nur Objektschichten</option>
             </optgroup>
             <optgroup label="Sparte">
