@@ -21,7 +21,11 @@ const SCHICHTEN = () => ({ status: 'ok', von: GESTERN, bis: tag(90), schichten: 
   { id: 41, kunde_name: 'Einwohnergemeinde Niedergösgen', titel: 'Revierdienst Nacht',
     strasse: 'Sehr Lange Hauptstrasse 44', ort: '4632 Trimbach', einsatzart: 'Revierdienst',
     datum: LAUF_DATUM, von: hm(beginn), bis: hm(ende), status: 'geplant', bemerkung: 'Schluessel beim Hauswart',
-    zusage: 'offen', objekt_name: 'Einkaufszentrum Nord West', im_team: 2 },
+    zusage: 'offen', objekt_name: 'Einkaufszentrum Nord West', im_team: 2,
+    // ENT-115: Angaben, die vor Ort gebraucht werden.
+    kanton: 'SO', treffpunkt: 'Haupteingang Nord', taetigkeit: 'Rundgang alle zwei Stunden',
+    qualifikation: 'Revierdienstausweis',
+    kontakt_vorname: 'Petra', kontakt_nachname: 'Muster', kontakt_telefon: '079 111 22 33' },
   { id: 42, kunde_name: 'Einwohnergemeinde Niedergösgen', titel: 'Baustelle Kreiselumfahrung',
     strasse: 'Dorfstrasse 1', ort: '5013 Niedergösgen', einsatzart: 'Verkehrsdienst',
     datum: MORGEN, von: '07:30:00', bis: '16:30:00', status: 'bestaetigt', bemerkung: null,
@@ -302,6 +306,21 @@ check('Kein Seiten-Scroll – offenes Blatt @320', mBlatt.scroll <= 1);
 check('Nichts ragt heraus – offenes Blatt @320', mBlatt.ueber.length === 0);
 if (mBlatt.ueber.length) bad.push('   ↳ Blatt @320: ' + mBlatt.ueber.join(' | '));
 check('Blatt zeigt die Bemerkung', (await T('#blBody')).includes('Hauswart'));
+
+// ══════════ ANGABEN FÜR VOR ORT (ENT-115)
+// Sie werden in der Verwaltung erfasst und nützen nur, wenn sie hier ankommen.
+const blatt = await T('#blBody');
+check('KRITISCH: der Treffpunkt steht in der App', blatt.includes('Haupteingang Nord'));
+check('KRITISCH: die Ansprechperson vor Ort steht in der App', blatt.includes('Petra Muster'));
+check('Die Tätigkeit steht in der App', blatt.includes('Rundgang alle zwei Stunden'));
+check('Die Qualifikation steht in der App', blatt.includes('Revierdienstausweis'));
+check('Der Kanton steht beim Arbeitsort', blatt.includes('SO'));
+// Auf dem Handy muss die Nummer wählbar sein -- ein Fliesstext ist sie nicht.
+check('KRITISCH: die Telefonnummer ist wählbar hinterlegt',
+  await page.evaluate(() => {
+    const a = document.querySelector('#blBody a[href^="tel:"]');
+    return !!a && a.getAttribute('href').replace('tel:', '').replace(/\D/g, '') === '0791112233';
+  }));
 await page.evaluate(() => blattZu());
 
 // ══════════════ TIPPFLAECHEN

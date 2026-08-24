@@ -30,6 +30,20 @@ $bis        = trim((string)($input['bis'] ?? ''));
 $bedarf     = (int)($input['bedarf'] ?? 1);
 $status     = trim((string)($input['status'] ?? 'geplant'));
 $bemerkung  = trim((string)($input['bemerkung'] ?? '')) ?: null;
+// ENT-115. Diese Felder gab es in der Datenbank laengst und die
+// Einsatzplan-Ansicht zeigte sie an -- erfassen liess sich keines davon.
+// Ein Anzeigepfad ohne Eingabepfad zeigt immer nur einen Strich.
+$kanton     = strtoupper(trim((string)($input['kanton'] ?? ''))) ?: null;
+$veranst    = trim((string)($input['veranstaltung'] ?? '')) ?: null;
+$treffpunkt = trim((string)($input['treffpunkt'] ?? '')) ?: null;
+$taetigkeit = trim((string)($input['taetigkeit'] ?? '')) ?: null;
+$qualifik   = trim((string)($input['qualifikation'] ?? '')) ?: null;
+$kVorname   = trim((string)($input['kontakt_vorname'] ?? '')) ?: null;
+$kNachname  = trim((string)($input['kontakt_nachname'] ?? '')) ?: null;
+$kTelefon   = trim((string)($input['kontakt_telefon'] ?? '')) ?: null;
+if ($kanton !== null && !preg_match('/^[A-Z]{2}$/', $kanton)) {
+    json_response(['status' => 'error', 'message' => 'Kanton als zweistelliges Kuerzel, z. B. SO'], 400);
+}
 
 // Eine abgeglichene Schicht ist festgeschrieben (ENT-045) -- der Plan darf
 // die Grundlage einer bereits bestaetigten Feststellung nicht rueckwirkend
@@ -131,11 +145,14 @@ try {
     if ($id > 0) {
         $stmt = $pdo->prepare(
             'UPDATE einsaetze SET kunde_id = ?, kunde_name = ?, titel = ?, strasse = ?, ort = ?,
-                    einsatzart = ?, sparte = ?, datum = ?, von = ?, bis = ?, bedarf = ?, status = ?, bemerkung = ?
+                    kanton = ?, einsatzart = ?, sparte = ?, datum = ?, von = ?, bis = ?, bedarf = ?,
+                    status = ?, bemerkung = ?, veranstaltung = ?, treffpunkt = ?, taetigkeit = ?,
+                    qualifikation = ?, kontakt_vorname = ?, kontakt_nachname = ?, kontakt_telefon = ?
              WHERE id = ?'
         );
-        $stmt->execute([$kundeId, $kundeName, $titel, $strasse, $ort, $einsatzart, $sparte,
-            $datum, $von, $bis, $bedarf, $status, $bemerkung, $id]);
+        $stmt->execute([$kundeId, $kundeName, $titel, $strasse, $ort, $kanton, $einsatzart, $sparte,
+            $datum, $von, $bis, $bedarf, $status, $bemerkung, $veranst, $treffpunkt, $taetigkeit,
+            $qualifik, $kVorname, $kNachname, $kTelefon, $id]);
         if ($stmt->rowCount() === 0) {
             // Kein Treffer heisst entweder "gibt es nicht" oder "nichts geaendert" --
             // die Existenz wird darum ausdruecklich geprueft.
@@ -149,12 +166,15 @@ try {
         $pdo->prepare('DELETE FROM einsatz_zuteilung WHERE einsatz_id = ?')->execute([$id]);
     } else {
         $stmt = $pdo->prepare(
-            'INSERT INTO einsaetze (kunde_id, kunde_name, titel, strasse, ort, einsatzart, sparte,
-                                    datum, von, bis, bedarf, status, bemerkung, erstellt_von)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+            'INSERT INTO einsaetze (kunde_id, kunde_name, titel, strasse, ort, kanton, einsatzart, sparte,
+                                    datum, von, bis, bedarf, status, bemerkung, veranstaltung,
+                                    treffpunkt, taetigkeit, qualifikation,
+                                    kontakt_vorname, kontakt_nachname, kontakt_telefon, erstellt_von)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
-        $stmt->execute([$kundeId, $kundeName, $titel, $strasse, $ort, $einsatzart, $sparte,
-            $datum, $von, $bis, $bedarf, $status, $bemerkung, (int)$user['id']]);
+        $stmt->execute([$kundeId, $kundeName, $titel, $strasse, $ort, $kanton, $einsatzart, $sparte,
+            $datum, $von, $bis, $bedarf, $status, $bemerkung, $veranst, $treffpunkt, $taetigkeit,
+            $qualifik, $kVorname, $kNachname, $kTelefon, (int)$user['id']]);
         $id = (int)$pdo->lastInsertId();
     }
 

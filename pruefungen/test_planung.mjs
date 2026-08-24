@@ -374,9 +374,57 @@ await page.fill('#enNKunde_name', 'Neuer Kunde ohne Datei');
 await page.fill('#enNOrt', '4600 Olten');
 await zeitSetzen(page, '#enNVon', '08:00');
 await zeitSetzen(page, '#enNBis', '12:00');
+// Strasse und Kanton sind seit ENT-115 Pflicht -- ohne sie kommt die
+// Ergaenzungsmeldung statt eines Schreibaufrufs.
+const vorPflicht = writes().length;
+await page.click('#enNeuBtn');
+await page.waitForTimeout(300);
+check('KRITISCH: ohne Strasse und Kanton wird nicht gespeichert', writes().length === vorPflicht);
+check('Die Meldung nennt beide fehlenden Angaben',
+  /Strasse und Nummer/.test(await page.textContent('#enNeuErr'))
+  && /Kanton/.test(await page.textContent('#enNeuErr')));
+await page.fill('#enNStrasse', 'Bahnhofstrasse 1');
+await page.selectOption('#enNKanton', 'SO');
+await page.fill('#enNKontakt_vorname', 'Petra');
+await page.fill('#enNKontakt_nachname', 'Muster');
+await page.fill('#enNKontakt_telefon', '079 111 22 33');
+await page.fill('#enNTreffpunkt', 'Haupteingang');
 await page.click('#enNeuBtn');
 await page.waitForTimeout(400);
 const cr = calls.find(c => c.path.includes('einsatz_save'));
+check('KRITISCH: der Kanton geht mit an den Server', cr && cr.body.kanton === 'SO');
+check('KRITISCH: die Kontaktperson geht getrennt mit',
+  cr && cr.body.kontakt_vorname === 'Petra' && cr.body.kontakt_nachname === 'Muster'
+  && cr.body.kontakt_telefon === '079 111 22 33');
+check('Der Treffpunkt geht mit', cr && cr.body.treffpunkt === 'Haupteingang');
+
+// ══════════ GESTALTUNG DER ANLEGEN-ANSICHT (ENT-115)
+// Gemessen, nicht im Quelltext nachgelesen.
+try {
+  await page.evaluate(() => openEinsatzNeu());
+  await page.waitForTimeout(350);
+  const m = await page.evaluate(() => {
+    const ab = [...document.querySelectorAll('#view-einsatzneu .abschnitt h3')].map(h => h.textContent.trim());
+    const raster = document.querySelector('#view-einsatzneu .form-breit');
+    const spalten = getComputedStyle(raster).gridTemplateColumns.split(' ').length;
+    const karte = document.querySelector('#view-einsatzneu .card').getBoundingClientRect();
+    return { ab, spalten, breite: Math.round(karte.width), fenster: window.innerWidth };
+  });
+  check('KRITISCH: die Abschnitte stehen in der Reihenfolge der Vorlage',
+    m.ab[0].startsWith('Stammdaten') && m.ab[1].startsWith('Zeit und Arbeitsort')
+    && m.ab[2].startsWith('Kontaktperson') && m.ab[3].startsWith('Zuteilung')
+    && m.ab[4].startsWith('Angaben für die Eingeteilten'));
+  check('KRITISCH: die Angaben für die Eingeteilten stehen zuunterst', m.ab.length === 5);
+  check('KRITISCH: auf breitem Schirm mehr als zwei Spalten — der Platz wird genutzt', m.spalten > 2);
+  check('Die Karte nutzt die Breite der Ansicht', m.breite > m.fenster * 0.7);
+} catch (e) { bad.push('Gestaltung Anlegen: ' + String(e).split('\n')[0].slice(0, 110)); }
+
+// Beim zweiten Öffnen darf nichts vom vorigen Einsatz stehenbleiben.
+check('KRITISCH: die neuen Felder sind beim Öffnen leer',
+  (await page.inputValue('#enNKanton')) === '' && (await page.inputValue('#enNKontakt_vorname')) === ''
+  && (await page.inputValue('#enNTreffpunkt')) === '');
+await page.evaluate(() => enNeuAbbrechen());
+await page.waitForTimeout(250);
 check('Anlegen ruft einsatz_save', !!cr);
 check('Anlegen sendet keine id', cr && !('id' in cr.body));
 check('Unbekannter Kunde bleibt reiner Text', cr && !('kunde_id' in cr.body) && cr.body.kunde_name === 'Neuer Kunde ohne Datei');
@@ -425,6 +473,20 @@ check('Hinweis nennt die vorgeschlagene Zuteilung', hint.includes('Daniele Ciard
 check('Erfundener Name taucht nicht auf', !hint.includes('gibtsnicht'));
 check('Besetzung im Diktat berechnet', (await page.textContent('#enNMaFoot')).includes('2/2'));
 await page.screenshot({ path: `${OUT}/21-planung-diktat.png` });
+
+// Seit ENT-115 sind Strasse und Kanton Pflicht. Der Router liefert die
+// Strasse manchmal, den Kanton nie -- also bleibt beides am Planer haengen.
+// Das ist gewollt und wird hier ausdruecklich festgehalten: Ein Diktat
+// allein reicht nicht mehr zum Speichern.
+const vorFehlend = writes().length;
+await page.click('#enNeuBtn');
+await page.waitForTimeout(300);
+check('KRITISCH: ohne Kanton wird auch aus dem Diktat nichts gespeichert', writes().length === vorFehlend);
+check('Und die Meldung sagt, was fehlt',
+  (await page.textContent('#enNeuErr')).includes('Kanton'));
+await page.selectOption('#enNKanton', 'SO');
+await page.waitForTimeout(150);
+
 await page.click('#enNeuBtn');
 await page.waitForTimeout(400);
 const dcr = calls.find(c => c.path.includes('einsatz_save'));
@@ -436,7 +498,7 @@ check('Bekannter Kunde wird verknuepft', dcr && dcr.body.kunde_id === 1);
 
 // Handeingabe danach wieder sauber -- der Knopf dafuer steht nur auf dem
 // Einsaetze-Reiter, zurueck wechseln.
-await page.evaluate(() => goTab('einsaetze'));
+await page.evaluate(() => { go('planung'); goTab('einsaetze'); });
 await page.waitForTimeout(300);
 await page.click('#view-planung button:has-text("Neuer Einsatz")');
 await page.waitForSelector('#view-einsatzneu.on');

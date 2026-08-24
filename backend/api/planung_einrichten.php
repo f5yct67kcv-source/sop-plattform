@@ -750,6 +750,16 @@ $spalten = [
     ['einsaetze', 'taetigkeit',     'ALTER TABLE einsaetze ADD COLUMN taetigkeit TEXT NULL AFTER treffpunkt'],
     ['einsaetze', 'qualifikation',  'ALTER TABLE einsaetze ADD COLUMN qualifikation VARCHAR(200) NULL AFTER taetigkeit'],
     ['einsaetze', 'zustaendig_id',  'ALTER TABLE einsaetze ADD COLUMN zustaendig_id INT NULL AFTER qualifikation'],
+    // ENT-115: Der Kanton gehoert zum Arbeitsort und stand bisher nur am
+    // Objekt. Fuer den freien Einsatz fehlte er -- er wird aber gebraucht,
+    // sobald Wegstrecken und Zonen daran haengen.
+    ['einsaetze', 'kanton',          'ALTER TABLE einsaetze ADD COLUMN kanton VARCHAR(2) NULL AFTER ort'],
+    // Ansprechperson vor Ort. Vor- und Nachname getrennt, damit sich daraus
+    // eine Anrede bilden laesst; die Nummer eigenstaendig, weil sie auf dem
+    // Handy waehlbar sein soll und nicht aus einem Fliesstext geklaubt.
+    ['einsaetze', 'kontakt_vorname', 'ALTER TABLE einsaetze ADD COLUMN kontakt_vorname VARCHAR(100) NULL AFTER zustaendig_id'],
+    ['einsaetze', 'kontakt_nachname','ALTER TABLE einsaetze ADD COLUMN kontakt_nachname VARCHAR(100) NULL AFTER kontakt_vorname'],
+    ['einsaetze', 'kontakt_telefon', 'ALTER TABLE einsaetze ADD COLUMN kontakt_telefon VARCHAR(50) NULL AFTER kontakt_nachname'],
 
     // Schicht rapportieren (ENT-082): Verweis vom Rapport auf die Schicht.
     // NULL bleibt der Normalfall fuer den bestehenden manuellen Rapport --
