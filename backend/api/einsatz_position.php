@@ -42,6 +42,9 @@ function positionen(PDO $pdo, int $einsatzId): array {
             'id' => (int)$p['id'],
             'nr' => (int)$p['nr'],
             'funktion' => $p['funktion'],
+            // Keine Arbeitszeit (Art. 18 Ziff. 2). Die Oberflaeche nimmt sie
+            // darum aus Soll und Ist heraus.
+            'ist_fahrzeit' => (int)$p['ist_fahrzeit'],
             'position' => $p['position'],
             'von' => $p['von'],
             'bis' => $p['bis'],
@@ -242,7 +245,12 @@ if ($aktion === 'speichern') {
     // Zweite Verteidigung, nicht die einzige: Die Oberflaeche prueft dasselbe,
     // damit die Begruendung sofort dasteht. Eine Regel, die man am Browser
     // vorbei umgehen kann, ist keine.
-    zeitfenster_pruefen($einsatz, $von, $bis);
+    // Eine Fahrzeit-Position liegt naturgemaess VOR dem Einsatz (Hinfahrt)
+    // oder danach (Rueckfahrt) -- sie ist von der Fensterpruefung ausgenommen.
+    // Die Zeitachse traegt das, weil sie den Vorlauf aus weg_minuten kennt.
+    if (empty($in['ist_fahrzeit'])) {
+        zeitfenster_pruefen($einsatz, $von, $bis);
+    }
 
     $zahl = function ($w) {
         if ($w === null || $w === '') return null;
@@ -250,6 +258,7 @@ if ($aktion === 'speichern') {
     };
     $felder = [
         'funktion' => trim((string)($in['funktion'] ?? '')) ?: null,
+        'ist_fahrzeit' => !empty($in['ist_fahrzeit']) ? 1 : 0,
         'position' => trim((string)($in['position'] ?? '')) ?: null,
         'von' => $von,
         'bis' => $bis,

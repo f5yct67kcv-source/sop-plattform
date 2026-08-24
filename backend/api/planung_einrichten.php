@@ -760,6 +760,24 @@ $spalten = [
     ['einsaetze', 'kontakt_vorname', 'ALTER TABLE einsaetze ADD COLUMN kontakt_vorname VARCHAR(100) NULL AFTER zustaendig_id'],
     ['einsaetze', 'kontakt_nachname','ALTER TABLE einsaetze ADD COLUMN kontakt_nachname VARCHAR(100) NULL AFTER kontakt_vorname'],
     ['einsaetze', 'kontakt_telefon', 'ALTER TABLE einsaetze ADD COLUMN kontakt_telefon VARCHAR(50) NULL AFTER kontakt_nachname'],
+    // ENT-116: Weg vom Hauptanstellungsort zum Einsatzort (Art. 18 Ziff. 2).
+    // Die Kilometer werden gespeichert, nicht bei jeder Anzeige neu ermittelt:
+    // Eine spaetere Neuberechnung darf eine abgerechnete Vergangenheit nicht
+    // veraendern (GAV-AUS-011, Punkt B).
+    ['einsaetze', 'weg_km',      'ALTER TABLE einsaetze ADD COLUMN weg_km DECIMAL(6,2) NULL AFTER kontakt_telefon'],
+    ['einsaetze', 'weg_minuten', 'ALTER TABLE einsaetze ADD COLUMN weg_minuten INT NULL AFTER weg_km'],
+    // Die Adresse, zu der die Kilometer gehoeren. Aendert jemand den
+    // Arbeitsort, passt die gespeicherte Zahl nicht mehr -- ohne diesen
+    // Abgleich faellt das niemandem auf.
+    ['einsaetze', 'weg_adresse', 'ALTER TABLE einsaetze ADD COLUMN weg_adresse VARCHAR(300) NULL AFTER weg_minuten'],
+    // Eine Fahrzeit-Position ist KEINE Arbeitszeit (Art. 18 Ziff. 2, wörtlich:
+    // "wird nicht an die Arbeitszeit gemäss diesem GAV angerechnet"). Sie
+    // steht im Raster, damit der Planer die Anfahrt sieht -- sie darf aber
+    // niemals in die Stundensummen einfliessen (Sperrwirkung im
+    // Auslegungsregister). Darum ein eigenes Kennzeichen an der Position und
+    // nicht bloss eine Funktion, die "Fahrzeit" heisst: Ein Name laesst sich
+    // umschreiben, ein Kennzeichen nicht versehentlich.
+    ['einsatz_position', 'ist_fahrzeit', 'ALTER TABLE einsatz_position ADD COLUMN ist_fahrzeit TINYINT NOT NULL DEFAULT 0 AFTER funktion'],
 
     // Schicht rapportieren (ENT-082): Verweis vom Rapport auf die Schicht.
     // NULL bleibt der Normalfall fuer den bestehenden manuellen Rapport --
