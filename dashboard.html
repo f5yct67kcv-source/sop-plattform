@@ -437,6 +437,23 @@ tbody tr.aus td { opacity: .55; }
 .ep-sammel select { height: 32px; font-size: 12.5px; width: auto; }
 .ep-sammel .zahl { color: var(--ink-3); }
 
+/* Angehaengte Dokumente (ENT-117). */
+.dok-liste { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.dok-liste:empty { display: none; }
+.dok-zeile { display: flex; align-items: center; gap: 9px; padding: 7px 10px;
+  background: var(--surface-3); border-radius: var(--r-xs); font-size: 12.5px; }
+.dok-zeile .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dok-zeile .gr { color: var(--ink-3); font-size: 11.5px; flex: none; }
+.dok-zeile button { border: none; background: none; cursor: pointer; color: var(--ink-3);
+  padding: 2px 5px; border-radius: var(--r-xs); }
+.dok-zeile button:hover { background: var(--neg-soft); color: var(--neg); }
+/* Dieselbe feine Versalbeschriftung wie ueber den Kopffeldern -- der Block
+   haengt an derselben Karte und soll nicht wie ein Fremdkoerper wirken. */
+.ep-dok-kopf { font-size: 10px; letter-spacing: .5px; text-transform: uppercase;
+  color: var(--ink-3); margin-bottom: 7px; }
+.dok-zeile a.nm { color: var(--ink); text-decoration: none; }
+.dok-zeile a.nm:hover { text-decoration: underline; }
+
 .ep-plan { overflow: hidden; }
 .ep-plan-kopf { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-bottom: 1px solid var(--line-soft); font-size: 12.5px; }
 .ep-hinweis { font-size: 11.5px; color: var(--ink-3); }
@@ -699,6 +716,26 @@ th.sortbar.aktiv .pf { opacity: 1; color: var(--accent); }
    Breite. Die Spalten wachsen mit dem Fenster, statt bei zwei zu bleiben und
    die halbe Flaeche leer zu lassen. */
 .form-breit { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 0 18px; }
+/* Kompakte Zeilenform (ENT-117): Beschriftung links, Feld rechts. Spart rund
+   die Haelfte der Hoehe -- ein Anlegeformular mit zwanzig Feldern ist sonst
+   zwei Bildschirme hoch, und was zusammengehoert, sieht man nicht mehr
+   gleichzeitig.
+   Das steht NICHT im Widerspruch zu ENT-070: Die Regel "Ueberschrift oben,
+   Wert darunter" gilt fuer ANZEIGEN -- eine Kennzahl, ein Kopfbereich, wo
+   die Beschriftung ueber der grossen Zahl steht. Ein Eingabeformular liest
+   sich anders: Dort fuehrt die Beschriftung zum Feld, das man ausfuellt. */
+.form-zeilen .f { display: grid; grid-template-columns: minmax(120px, 190px) minmax(0, 1fr);
+  align-items: center; gap: 0 14px; margin-bottom: 9px; }
+.form-zeilen .f > label { margin: 0; text-align: left; }
+.form-zeilen .f.wide { grid-column: 1 / -1; }
+.form-zeilen .f.hoch { align-items: start; }
+.form-zeilen .f.hoch > label { padding-top: 9px; }
+/* Auf schmalem Schirm zurueck untereinander -- nebeneinander bliebe fuer das
+   Feld zu wenig uebrig, und die Beschriftung braecke um. */
+@media (max-width: 720px) {
+  .form-zeilen .f { grid-template-columns: 1fr; gap: 0; }
+  .form-zeilen .f > label { margin-bottom: 5px; }
+}
 /* Abschnitte in der Reihenfolge, in der geplant wird: erst wer und was,
    dann wann und wo, dann wer vor Ort, dann wer arbeitet, zuletzt was die
    Eingeteilten wissen muessen. */
@@ -3047,7 +3084,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
      Diktat-Weg arbeiten damit weiter, nur die Anordnung wechselt. -->
 <div class="abschnitt">
   <h3>Stammdaten</h3>
-  <div class="form-grid form-breit">
+  <div class="form-grid form-breit form-zeilen">
         <div class="f wide">
           <label for="enNKunde_name">Kunde *</label>
           <input class="inp" id="enNKunde_name" list="dlKunden" autocomplete="off" placeholder="Firma aus der Kundendatei oder frei eingeben">
@@ -3085,7 +3122,18 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 
 <div class="abschnitt">
   <h3>Zeit und Arbeitsort</h3>
-  <div class="form-grid form-breit">
+  <!-- Kein zweites Serienwerkzeug (ENT-117): Rhythmus, Wochentage,
+       Intervall, Feiertage und die Vorschau gibt es an den Objekten schon
+       und sind dort geprueft. Zwei Serienlogiken nebeneinander driften
+       auseinander -- dieselbe Lehre wie bei ENT-107. Hier steht darum nur
+       der Weg dorthin. -->
+  <div class="note" id="enNSerieHinweis" style="margin-bottom:12px">
+    Ein Einsatz, ein Tag. Läuft er über Wochen oder wiederholt sich er regelmässig,
+    gehört er als <b>Objekt mit Masterschicht</b> angelegt — dort gibt es Wochentage,
+    Rhythmus, Feiertagsregeln und eine Vorschau, bevor etwas entsteht.
+    <a href="#" onclick="return enZuObjekten()">Zur Objektplanung</a>
+  </div>
+  <div class="form-grid form-breit form-zeilen">
         <!-- Datum und Zeit stehen beieinander: Sie werden zusammen gelesen
              und zusammen eingegeben. Ein Enddatum gibt es bewusst nicht --
              ist die Endzeit kleiner als die Startzeit, liegt sie am Folgetag,
@@ -3128,7 +3176,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
        GAV-AUS-011 offen — dessen Sperrwirkung verlangt ausdrücklich „eine
        Einzelfallbestätigung durch einen Menschen". Der Link öffnet die
        Route; abgelesen und eingetragen wird von Hand. -->
-  <div class="form-grid form-breit">
+  <div class="form-grid form-breit form-zeilen">
         <div class="f wide">
           <div id="enNWegHinweis" class="note" style="margin-bottom:8px"></div>
           <a class="btn btn-quiet btn-sm" id="enNWegLink" target="_blank" rel="noopener"
@@ -3156,7 +3204,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 
 <div class="abschnitt">
   <h3>Kontaktperson vor Ort<span class="note">wird den Eingeteilten in der App angezeigt</span></h3>
-  <div class="form-grid form-breit">
+  <div class="form-grid form-breit form-zeilen">
         <div class="f"><label for="enNKontakt_vorname">Vorname</label><input class="inp" id="enNKontakt_vorname"></div>
         <div class="f"><label for="enNKontakt_nachname">Nachname</label><input class="inp" id="enNKontakt_nachname"></div>
         <!-- Eigenes Feld statt im Fliesstext: Auf dem Handy soll die Nummer
@@ -3168,7 +3216,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 
 <div class="abschnitt">
   <h3>Zuteilung</h3>
-  <div class="form-grid form-breit">
+  <div class="form-grid form-breit form-zeilen">
         <div class="f wide">
           <label>Zugeteilte Mitarbeitende</label>
           <div class="ma-pick" id="enNMa"></div>
@@ -3179,14 +3227,26 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 
 <div class="abschnitt">
   <h3>Angaben für die Eingeteilten<span class="note">steht in der App bei der Schicht</span></h3>
-  <div class="form-grid form-breit">
+  <div class="form-grid form-breit form-zeilen">
         <div class="f"><label for="enNTreffpunkt">Treffpunkt</label>
           <input class="inp" id="enNTreffpunkt" placeholder="z. B. Haupteingang, Réception"></div>
         <div class="f"><label for="enNQualifikation">Qualifikation</label>
           <input class="inp" id="enNQualifikation" placeholder="z. B. Verkehrsdienstausweis"></div>
         <div class="f wide"><label for="enNTaetigkeit">Durchzuführende Tätigkeit</label>
           <textarea class="inp" id="enNTaetigkeit" rows="2" style="min-height:64px"></textarea></div>
-        <div class="f wide"><label for="enNBemerkung">Bemerkung</label><textarea class="inp" id="enNBemerkung" rows="3" style="min-height:84px"></textarea></div>
+        <div class="f wide hoch"><label for="enNBemerkung">Bemerkung</label><textarea class="inp" id="enNBemerkung" rows="3" style="min-height:84px"></textarea></div>
+        <div class="f wide hoch">
+          <label>Dokumente</label>
+          <div>
+            <div id="enNDokListe" class="dok-liste"></div>
+            <input type="file" id="enNDokDatei" accept="application/pdf" style="display:none"
+                   onchange="enDokGewaehlt(this.files[0])">
+            <button type="button" class="btn btn-quiet btn-sm" onclick="$('enNDokDatei').click()">PDF anhängen</button>
+            <div class="note" style="margin-top:6px">Nur PDF, höchstens 4 MB. Die Eingeteilten
+              öffnen es in ihrer App — Objektplan, Verkehrsanordnung, Sicherheitskonzept.</div>
+            <div class="msg-err" id="enNDokErr" style="display:none;margin-top:8px"></div>
+          </div>
+        </div>
   </div>
 </div>
         </div></div>
@@ -6896,6 +6956,9 @@ function openEinsatzNeu(felder, maNamen) {
   // Beim zweiten Oeffnen duerfen keine Reste des vorigen Einsatzes stehen.
   EN_FELDER_ANSICHT.forEach(f => { const el = $(enId('enN', f)); if (el) el.value = ''; });
   if ($('enNFahrzeit')) { $('enNFahrzeit').checked = false; delete $('enNFahrzeit').dataset.beruehrt; }
+  // Angehaengte, aber nie gespeicherte Dateien duerfen nicht am naechsten
+  // Einsatz kleben (ENT-117).
+  enNDok = []; enDokZeichnen(); $('enNDokErr').style.display = 'none';
   enWegZone();
 
   const ids = maNamen.map(n => (mitarbeiter.find(m => m.name === n) || {}).id).filter(Boolean);
@@ -7077,12 +7140,19 @@ function createEinsatz() {
       err.textContent = data.message || 'Anlegen fehlgeschlagen.'; err.style.display = ''; return;
     }
     const weiter = fahrzeit ? enFahrzeitAnlegen(data.id, body) : Promise.resolve();
-    return weiter.then(() => {
+    // Dokumente erst jetzt: Vorher gab es keine Nummer, an der sie hängen
+    // könnten (ENT-117).
+    return weiter.then(() => enDokHochladen(data.id)).then(fehler => {
       b.disabled = false;
+      enNDok = [];
       loadEinsaetze().then(() => {
         go(enNeuHer || 'planung');
         if ((enNeuHer || 'planung') === 'planung') renderPlanung();
-        toast(fahrzeit ? 'Einsatz angelegt — mit Hin- und Rückfahrt.' : 'Einsatz angelegt.');
+        // Ein fehlgeschlagener Anhang darf nicht unter „Einsatz angelegt“
+        // verschwinden — der Einsatz steht, das Dokument fehlt.
+        toast((fehler && fehler.length)
+          ? `Einsatz angelegt — aber nicht angehängt: ${fehler.join(', ')}.`
+          : fahrzeit ? 'Einsatz angelegt — mit Hin- und Rückfahrt.' : 'Einsatz angelegt.');
       });
     });
   }).catch(() => { b.disabled = false; err.textContent = 'Netzwerkfehler.'; err.style.display = ''; });
@@ -7109,6 +7179,165 @@ function enFahrzeitAnlegen(einsatzId, body) {
     body: { einsatz_id: einsatzId, aktion: 'speichern', ist_fahrzeit: 1,
             funktion: w.funktion, von: w.von, bis: w.bis },
   })), Promise.resolve());
+}
+
+// ── Dokumente zum Einsatz (ENT-117) ─────────────────────────────
+
+// Serien gehören an die Objekte, nicht hierher — der Hinweis führt dorthin,
+// statt ein zweites Serienwerkzeug aufzumachen.
+function enZuObjekten() {
+  go('kunden');
+  kuGoTab('objekte');
+  return false;
+}
+
+// Dieselbe Grenze wie im Endpunkt (DOK_MAX). Hier nur, damit eine zu grosse
+// Datei sofort auffällt und nicht erst nach dem Hochladen von Megabytes —
+// die verbindliche Prüfung bleibt der Server.
+const DOK_MAX_JS = 4 * 1024 * 1024;
+const dokGr = b => b >= 1048576 ? nf(b / 1048576, 1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB';
+
+// Datei → base64, ohne den "data:...;base64," davor.
+function dokLesen(datei) {
+  return new Promise((ja, nein) => {
+    const r = new FileReader();
+    r.onerror = () => nein(new Error('lesen'));
+    r.onload = () => ja(String(r.result).split(',')[1] || '');
+    r.readAsDataURL(datei);
+  });
+}
+
+// Der Endpunkt verlangt den Anmelde-Kopf, ein einfaches <a href> trägt ihn
+// nicht mit. Also holen und als Blob öffnen. Das Fenster wird VOR dem Holen
+// aufgemacht — nach einem await gilt der Klick nicht mehr als Nutzeraktion
+// und der Browser blockiert es.
+function dokOeffnen(id, name) {
+  const w = window.open('', '_blank');
+  const kopf = token ? { 'X-Auth-Token': token } : {};
+  fetch(API + 'einsatz_dokument.php?id=' + encodeURIComponent(id), { headers: kopf })
+    .then(r => { if (!r.ok) throw new Error('http'); return r.blob(); })
+    .then(b => {
+      if (!w) {
+        // NICHT ersatzweise dieses Fenster umleiten: Wer gerade ein Formular
+        // ausfüllt, verliert dabei alles Eingetippte. Lieber sagen, woran es
+        // liegt -- der Blockierer sitzt im Browser des Planers.
+        return toast('Der Browser hat das Fenster blockiert — Pop-ups für diese Seite erlauben.');
+      }
+      const url = URL.createObjectURL(b);
+      w.location = url;
+      // Erst freigeben, wenn das Fenster es geladen hat.
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    })
+    .catch(() => { if (w) w.close(); toast('Das Dokument liess sich nicht öffnen.'); });
+}
+
+// Eine Zeile in der Dokumentliste. loeschen = null heißt: nur ansehen.
+function dokZeile(d, oeffnen, loeschen) {
+  return `<div class="dok-zeile">
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7"
+         aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+    ${oeffnen ? `<a class="nm" href="#" onclick="${oeffnen}">${esc(d.dateiname)}</a>`
+              : `<span class="nm">${esc(d.dateiname)}</span>`}
+    <span class="gr">${dokGr(Number(d.groesse) || 0)}</span>
+    ${loeschen ? `<button type="button" title="Entfernen" onclick="${loeschen}">×</button>` : ''}
+  </div>`;
+}
+
+// ── Auf der Seite "Neue Schicht": Der Einsatz hat noch keine Nummer, an der
+// ein Dokument hängen könnte. Die Dateien werden darum gehalten und erst nach
+// erfolgreichem Speichern hochgeladen — dieselbe Reihenfolge wie bei der
+// Fahrzeit. Wer abbricht, lädt nichts hoch.
+let enNDok = [];
+
+function enDokZeichnen() {
+  const el = $('enNDokListe'); if (!el) return;
+  el.innerHTML = enNDok.map((d, i) => dokZeile(d, null, `enDokWeg(${i})`)).join('');
+}
+
+function enDokWeg(i) { enNDok.splice(i, 1); enDokZeichnen(); }
+
+function enDokGewaehlt(datei) {
+  const err = $('enNDokErr'); err.style.display = 'none';
+  const zeigen = t => { err.textContent = t; err.style.display = ''; };
+  $('enNDokDatei').value = '';
+  if (!datei) return;
+  // Auf den Typ UND die Endung zu schauen ist hier nur Bequemlichkeit —
+  // verbindlich prüft der Server am Inhalt (%PDF-).
+  if (datei.type !== 'application/pdf' && !/\.pdf$/i.test(datei.name)) {
+    return zeigen('Nur PDF-Dateien.');
+  }
+  if (datei.size > DOK_MAX_JS) {
+    return zeigen(`„${datei.name}“ ist ${dokGr(datei.size)} gross — höchstens 4 MB pro Dokument.`);
+  }
+  if (enNDok.some(d => d.dateiname === datei.name)) {
+    return zeigen(`„${datei.name}“ ist schon angehängt.`);
+  }
+  dokLesen(datei)
+    .then(inhalt => { enNDok.push({ dateiname: datei.name, groesse: datei.size, inhalt }); enDokZeichnen(); })
+    .catch(() => zeigen('Die Datei liess sich nicht lesen.'));
+}
+
+// Nacheinander, nicht parallel: Bei vier Anhängen wären das sonst vier
+// Megabyte-Anfragen gleichzeitig. Schlägt eines fehl, wird es benannt — der
+// Einsatz selbst ist da schon gespeichert und darf nicht verloren gehen.
+function enDokHochladen(einsatzId) {
+  if (!einsatzId || !enNDok.length) return Promise.resolve([]);
+  const fehler = [];
+  return enNDok.reduce((kette, d) => kette.then(() => api('einsatz_dokument.php', {
+    method: 'POST',
+    body: { aktion: 'hochladen', einsatz_id: einsatzId, dateiname: d.dateiname, inhalt: d.inhalt },
+  }).then(({ ok, data }) => { if (!ok || data.status !== 'ok') fehler.push(d.dateiname); })
+    .catch(() => fehler.push(d.dateiname))), Promise.resolve()).then(() => fehler);
+}
+
+// ── Im Einsatzplan: Hier gibt es die Nummer, also wird sofort hochgeladen.
+let epDok = [];
+
+function epDokLaden() {
+  if (!epEinsatz) { epDok = []; return Promise.resolve(); }
+  return api('einsatz_dokument.php?einsatz_id=' + epEinsatz.id).then(({ ok, data }) => {
+    epDok = (ok && data.status === 'ok') ? (data.dokumente || []) : [];
+  }).catch(() => { epDok = []; });
+}
+
+function epDokBlock() {
+  const gesperrt = enGesperrt(epEinsatz);
+  return `<div class="card-bd" style="padding:0 16px 14px">
+    <div class="ep-dok-kopf">Dokumente</div>
+    <div class="dok-liste">${epDok.map(d =>
+      dokZeile(d, `dokOeffnen(${d.id});return false`, gesperrt ? null : `epDokWeg(${d.id})`)).join('')}</div>
+    ${epDok.length ? '' : `<div class="note">Noch keine Unterlagen angehängt.</div>`}
+    ${gesperrt ? '' : `<input type="file" id="epDokDatei" accept="application/pdf" style="display:none"
+        onchange="epDokGewaehlt(this.files[0])">
+      <button type="button" class="btn btn-quiet btn-sm" style="margin-top:8px"
+        onclick="$('epDokDatei').click()">PDF anhängen</button>
+      <div class="note" style="margin-top:6px">Nur PDF, höchstens 4 MB. Die Eingeteilten
+        öffnen es in ihrer App.</div>`}
+  </div>`;
+}
+
+function epDokGewaehlt(datei) {
+  const el = $('epDokDatei'); if (el) el.value = '';
+  if (!datei) return;
+  if (datei.type !== 'application/pdf' && !/\.pdf$/i.test(datei.name)) return toast('Nur PDF-Dateien.');
+  if (datei.size > DOK_MAX_JS) return toast(`„${datei.name}“ ist ${dokGr(datei.size)} gross — höchstens 4 MB.`);
+  dokLesen(datei).then(inhalt => api('einsatz_dokument.php', {
+    method: 'POST',
+    body: { aktion: 'hochladen', einsatz_id: epEinsatz.id, dateiname: datei.name, inhalt },
+  })).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') return toast(data.message || 'Hochladen fehlgeschlagen.');
+    return epDokLaden().then(() => { epKopfZeichnen(); toast('Dokument angehängt.'); });
+  }).catch(() => toast('Hochladen fehlgeschlagen.'));
+}
+
+function epDokWeg(id) {
+  const d = epDok.find(x => Number(x.id) === Number(id));
+  if (!confirm(`„${d ? d.dateiname : 'Dokument'}“ entfernen?`)) return;
+  api('einsatz_dokument.php', { method: 'POST', body: { aktion: 'entfernen', id } })
+    .then(({ ok, data }) => {
+      if (!ok || data.status !== 'ok') return toast(data.message || 'Entfernen fehlgeschlagen.');
+      return epDokLaden().then(() => { epKopfZeichnen(); toast('Dokument entfernt.'); });
+    }).catch(() => toast('Entfernen fehlgeschlagen.'));
 }
 
 // ── Bearbeiten
@@ -8262,6 +8491,10 @@ function epLaden() {
   if (!e) { toast('Einsatz nicht gefunden.'); go('planung'); return; }
   epEinsatz = e;
   $('pgCrumb').textContent = `${dmy(e.datum)} · ${hm(e.von)}–${hm(e.bis)} · ${e.kunde_name || ''}`;
+  // Die Dokumente des vorigen Einsatzes duerfen nicht stehen bleiben, bis die
+  // neue Liste da ist -- sonst zeigt der Kopf kurz fremde Unterlagen (ENT-117).
+  epDok = [];
+  epDokLaden().then(() => epKopfZeichnen());
   return api('einsatz_position.php?einsatz_id=' + epId).then(({ ok, data }) => {
     epPos = (ok && data.status === 'ok') ? (data.positionen || []) : [];
     // Beim ersten Oeffnen entstehen die Positionen aus dem Bedarf des
@@ -8379,7 +8612,8 @@ function epKopfZeichnen() {
       ${feld('Qualifikation', esc(e.qualifikation || ''))}
       ${feld('Bemerkung', esc(e.bemerkung || ''))}
     </div>
-    ${epWegWarnung(e)}`;
+    ${epWegWarnung(e)}
+    ${epDokBlock()}`;
 }
 
 // Der Balken sagt jetzt, woran man ist (ENT-113): gelb = eingeteilt, aber
