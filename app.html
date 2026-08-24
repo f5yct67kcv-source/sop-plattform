@@ -226,6 +226,19 @@ svg.i-sm { width: 17px; height: 17px; }
 .dl dd { font-size: 15px; font-weight: 550; padding: 11px 0; border-bottom: 1px solid var(--line-soft); word-break: break-word; }
 .dl dt:last-of-type, .dl dd:last-of-type { border-bottom: none; }
 
+/* Unterlagen zur Schicht (ENT-117). Ganze Zeile als Trefferfläche und
+   mindestens 44 px hoch -- am Bauzaun wird das mit Handschuhen getippt. */
+.dok-kopf { font-size: 12px; font-weight: 650; letter-spacing: .3px; text-transform: uppercase;
+  color: var(--ink-3); margin: 18px 0 8px; }
+.dok-liste { display: flex; flex-direction: column; gap: 8px; }
+.dok-zeile { display: flex; align-items: center; gap: 11px; width: 100%; min-height: 48px;
+  padding: 11px 13px; text-align: left; font: inherit; font-size: 15px; font-weight: 550;
+  color: var(--ink); background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r-sm); cursor: pointer; }
+.dok-zeile:active { background: var(--accent-soft); border-color: var(--accent-line); }
+.dok-zeile .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dok-zeile .gr { flex: none; font-size: 12.5px; font-weight: 550; color: var(--ink-3); }
+
 /* Antippbare Zeile, die eine Unterseite oeffnet (ENT-051). Sieht aus wie ein
    Eintrag, verhaelt sich wie ein Knopf -- darum ein <button>, kein <div> mit
    onclick: nur so ist sie mit der Tastatur und mit Vorlesehilfen erreichbar. */
@@ -384,6 +397,8 @@ const W = {
     kunde: 'Kunde', arbeitsort: 'Arbeitsort', zeit: 'Zeit', einsatzart: 'Einsatzart',
     bemerkung: 'Bemerkung', objekt: 'Objekt', imTeam: 'im Team',
     treffpunkt: 'Treffpunkt', kontaktVorOrt: 'Kontakt vor Ort',
+    dokumente: 'Unterlagen', dokumenteLaden: 'wird geladen …',
+    dokumentFehler: 'Die Unterlage liess sich nicht öffnen.',
     taetigkeit: 'Tätigkeit', qualifikation: 'Qualifikation',
     zusagen: 'Zusagen', ablehnen: 'Ablehnen', zugesagt: 'Zugesagt', abgelehnt: 'Abgelehnt',
     offen: 'Noch offen', gemeldet: 'Rückmeldung gespeichert.',
@@ -1096,10 +1111,16 @@ function blattAuf(id) {
       ${Number(e.im_team) > 1 ? `<dt>${esc(w('schicht'))}</dt><dd>${Number(e.im_team)} ${esc(w('imTeam'))}</dd>` : ''}
       ${e.bemerkung ? `<dt>${esc(w('bemerkung'))}</dt><dd>${esc(e.bemerkung)}</dd>` : ''}
     </dl>
+    <!-- Unterlagen des Planers (ENT-117). Der Platz steht schon, der Inhalt
+         kommt nach: Die Liste ist eine eigene Abfrage und darf das Öffnen der
+         Schicht nicht aufhalten. Ohne Unterlagen bleibt hier nichts stehen. -->
+    <div id="blDok"></div>
     ${darfSchichtRapportieren(e) ? `<button class="btn btn-primary btn-wide" style="margin-top:4px" onclick="schichtRapportBlatt(${Number(e.id)})">${esc(w('schichtRapportieren'))}</button>` : ''}
     ${(() => { const r = rapportFuerSchicht(e.id); return r
       ? `<p style="font-size:12.5px;color:var(--ink-3);text-align:center;margin-top:8px">${esc(w('schonRapportiert'))} ${dmy(r.erfasst_am)}, ${String(r.erfasst_am).slice(11, 16)}</p>`
       : ''; })()}`;
+
+  blattDokLaden(Number(e.id));
 
   // Rückmeldung ist freiwillig -- die Einteilung bleibt so oder so bestehen.
   $('blFuss').innerHTML = e.status === 'abgesagt' ? `
@@ -1107,6 +1128,52 @@ function blattAuf(id) {
     <button class="btn ${e.zusage === 'abgelehnt' ? 'btn-neg' : 'btn-plain'}" onclick="melden('abgelehnt')">${esc(w('ablehnen'))}</button>
     <button class="btn ${e.zusage === 'zugesagt' ? 'btn-pos' : 'btn-primary'}" onclick="melden('zugesagt')">${esc(w('zusagen'))}</button>`;
   blattZeigen();
+}
+
+// ── Unterlagen zur Schicht (ENT-117) ────────────────────────────────────
+// Was der Planer angehängt hat: Objektplan, Verkehrsanordnung,
+// Sicherheitskonzept. Der Endpunkt gibt sie nur an Eingeteilte dieses
+// Einsatzes heraus -- hier wird nichts zusätzlich geprüft, weil eine Prüfung
+// in der Oberfläche keine ist.
+function blattDokLaden(einsatzId) {
+  const el = $('blDok'); if (!el) return;
+  el.innerHTML = '';
+  api('einsatz_dokument.php?einsatz_id=' + einsatzId).then(({ ok, data }) => {
+    // Blatt inzwischen gewechselt? Dann gehört diese Antwort nicht mehr hierher.
+    if (blattId !== einsatzId) return;
+    const dok = (ok && data.status === 'ok') ? (data.dokumente || []) : [];
+    if (!dok.length) return;
+    el.innerHTML = `<div class="dok-kopf">${esc(w('dokumente'))}</div>
+      <div class="dok-liste">${dok.map(d => `
+        <button type="button" class="dok-zeile" onclick="dokOeffnen(${Number(d.id)})">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+               stroke-width="1.7" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+          <span class="nm">${esc(d.dateiname)}</span>
+          <span class="gr">${dokGr(Number(d.groesse) || 0)}</span>
+        </button>`).join('')}</div>`;
+  }).catch(() => {});
+}
+
+const dokGr = b => b >= 1048576 ? nf(b / 1048576, 1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB';
+
+// Der Endpunkt verlangt den Anmelde-Kopf, ein <a href> trägt ihn nicht mit.
+// Das Fenster wird VOR dem Holen geöffnet: nach einem await gilt der Tipp
+// nicht mehr als Nutzeraktion und der Browser blockiert es.
+function dokOeffnen(id) {
+  const f = window.open('', '_blank');
+  fetch(API + 'einsatz_dokument.php?id=' + encodeURIComponent(id),
+        { headers: token ? { 'X-Auth-Token': token } : {} })
+    .then(r => { if (!r.ok) throw new Error('http'); return r.blob(); })
+    .then(b => {
+      const url = URL.createObjectURL(b);
+      // Hier ist das Umleiten der richtige Rückfall, anders als im Dashboard:
+      // In der installierten App gibt es oft gar kein zweites Fenster, und es
+      // steht kein Formular offen, das dabei verloren ginge -- die Schicht ist
+      // nach dem Zurückgehen einen Fingertipp entfernt.
+      if (f) { f.location = url; } else { location.href = url; }
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    })
+    .catch(() => { if (f) f.close(); toast(w('dokumentFehler')); });
 }
 
 // Nur bei zugesagtem Verkehrsdienst, und erst sobald die Schicht begonnen hat

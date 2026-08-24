@@ -297,6 +297,24 @@ CREATE TABLE IF NOT EXISTS einsaetze (
 // alle, und "bedarf" sagt, wie viele gebraucht werden. So laufen alle
 // bestehenden Einsaetze unveraendert weiter.
 'einsatz_position' => "
+CREATE TABLE IF NOT EXISTS einsatz_dokument (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  einsatz_id INT NOT NULL,
+  dateiname VARCHAR(255) NOT NULL,
+  mime VARCHAR(100) NOT NULL,
+  groesse INT NOT NULL,
+  -- Der Inhalt liegt in der Datenbank, nicht im Dateisystem (ENT-117).
+  -- Kein Pfad, kein Verzeichnis, keine .htaccess, die versehentlich nicht
+  -- greift: Ein PDF mit Objektplaenen oder Kundenangaben darf nie ueber eine
+  -- geratene Adresse abrufbar sein. Der einzige Weg heraus fuehrt ueber den
+  -- Endpunkt, der die Rechte prueft.
+  inhalt LONGBLOB NOT NULL,
+  hochgeladen_von INT NULL,
+  hochgeladen_am DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_einsatz (einsatz_id),
+  FOREIGN KEY (einsatz_id) REFERENCES einsaetze(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS einsatz_position (
   id INT AUTO_INCREMENT PRIMARY KEY,
   einsatz_id INT NOT NULL,
