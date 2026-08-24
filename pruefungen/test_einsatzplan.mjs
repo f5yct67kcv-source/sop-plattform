@@ -140,8 +140,17 @@ await page.route('**/api/**', route => {
     return send({ status: 'ok', positionen: POS[id] || [] });
   }
   if (p.includes('einsatz_save')) {
+    // Der echte Endpunkt schreibt den ganzen Satz. Der Nachbau auch -- sonst
+    // bliebe unbemerkt, dass die Oberfläche ein Feld vergisst oder eines
+    // zurücksetzt, das sie mitschicken müsste.
     const e = einsatzVon(body.id);
-    if (e) { e.bemerkung = body.bemerkung || null; }
+    if (e) {
+      e.bemerkung = body.bemerkung || null;
+      e.von = String(body.von).slice(0, 5) + ':00';
+      e.bis = String(body.bis).slice(0, 5) + ':00';
+      e.bedarf = Number(body.bedarf);
+      e.status = body.status;
+    }
     return send({ status: 'ok', id: body.id });
   }
   if (p.includes('objekt_list')) return send({ status: 'ok', objekte: [] });
@@ -378,12 +387,43 @@ check('KRITISCH: gespeichert werden darf trotzdem — es ist kein Fehler',
 await zeitSetzen(page, '#eps_bis', '16:30');
 await page.waitForTimeout(250);
 check('KRITISCH: zurück im Fenster verschwindet die Warnung', !(await page.isVisible('#epsUeber')));
-// Jetzt bewusst mit Überhang speichern.
+// Jetzt bewusst mit Überhang speichern -- seit ENT-112 mit Rückfrage.
 await zeitSetzen(page, '#eps_bis', '19:30');
 await page.waitForTimeout(200);
 await page.click('#epsBtn');
-await page.waitForTimeout(700);
+await page.waitForTimeout(400);
+const rueckfrageDa = await page.isVisible('#dlgUeberhang.on');
+check('KRITISCH: beim Speichern kommt eine Rückfrage', rueckfrageDa);
+// Ohne Rückfrage hat der Rest dieses Blocks kein Ziel -- dann liefe jeder
+// Klick 30 s ins Leere und risse die ganze Suite mit. Ein benanntes Rot
+// sagt mehr als ein Abbruch.
+if (!rueckfrageDa) { bad.push('Rückfrage fehlt — der Überhang-Block wurde übersprungen'); }
+else {
+check('Sie nennt die Dauer und beide Zeiten',
+  (await page.textContent('#epuText')).includes('3 h')
+  && (await page.textContent('#epuText')).includes('16:30')
+  && (await page.textContent('#epuText')).includes('19:30'));
+check('Der Verlängern-Knopf nennt die Zeit',
+  (await page.textContent('#epuVerlaengern')).includes('19:30'));
+// Zurück: nichts gespeichert, der Schicht-Dialog steht noch offen.
+const vorZurueck = posRufe('speichern');
+await page.click('#dlgUeberhang .btn-plain');
+await page.waitForTimeout(300);
+check('KRITISCH: „Zurück" speichert nichts', posRufe('speichern') === vorZurueck);
+check('Und der Schicht-Dialog bleibt offen', await page.isVisible('#dlgSchicht.on'));
+check('Die Eingabe steht noch da', (await page.inputValue('#eps_bis')) === '19:30');
+// Diesmal: nur die Schicht, Einsatz unverändert.
+await page.click('#epsBtn');
+await page.waitForTimeout(400);
+const vorNur = rufe.filter(r => r.p.includes('einsatz_save')).length;
+await page.click('#epuNur');
+await page.waitForTimeout(800);
 check('Der Überhang lässt sich speichern', !(await page.isVisible('#dlgSchicht.on')));
+check('KRITISCH: „Nur die Schicht" lässt den Einsatz unangetastet',
+  rufe.filter(r => r.p.includes('einsatz_save')).length === vorNur);
+check('Der Einsatz endet weiterhin um 16:30',
+  (await page.textContent('#epKopf')).includes('07:30–16:30'));
+}
 check('KRITISCH: der Balken ist im Raster als Überhang gekennzeichnet',
   await page.evaluate(() => document.querySelectorAll('#epRaster .ep-balken.ueber').length === 1));
 check('Und sagt beim Überfahren, wie weit',
@@ -391,6 +431,27 @@ check('Und sagt beim Überfahren, wie weit',
     const b = document.querySelector('#epRaster .ep-balken.ueber');
     return !!b && (b.getAttribute('title') || '').includes('nach dem Einsatz');
   }));
+
+// ══════════ DER ZWEITE WEG: DEN EINSATZ MITVERLÄNGERN (ENT-112)
+// Eingefasst: Bleibt die Rückfrage aus, liefe der Klick 30 s ins Leere und
+// risse die Suite mit, statt eine Prüfung rot zu melden.
+try {
+await page.click('#epRaster table.ep-gitter tbody tr:first-child .ep-werk button[title="Schicht bearbeiten"]', { timeout: 4000 });
+await page.waitForTimeout(300);
+await zeitSetzen(page, '#eps_bis', '18:00');
+await page.click('#epsBtn');
+await page.waitForTimeout(400);
+await page.click('#epuVerlaengern', { timeout: 4000 });
+await page.waitForTimeout(900);
+check('KRITISCH: der Einsatz wurde bis zur Schicht verlängert',
+  rufe.some(r => r.p.includes('einsatz_save') && r.body && r.body.bis === '18:00'));
+check('KRITISCH: der Bedarf wird dabei nicht zurückgesetzt',
+  rufe.filter(r => r.p.includes('einsatz_save')).every(r => Number(r.body.bedarf) >= 1));
+check('KRITISCH: der Kopf zeigt die neue Einsatzzeit',
+  (await page.textContent('#epKopf')).includes('07:30–18:00'));
+check('KRITISCH: danach ragt keine Schicht mehr über den Einsatz hinaus',
+  await page.evaluate(() => document.querySelectorAll('#epRaster .ep-balken.ueber').length === 0));
+} catch (e) { bad.push('Verlängern: ' + String(e).split('\n')[0].slice(0, 110)); }
 await page.screenshot({ path: OUT + '/87-ueberhang.png' });
 // Wieder zurücksetzen, damit die folgenden Prüfungen auf bekanntem Stand stehen.
 await page.click('#epRaster table.ep-gitter tbody tr:first-child .ep-werk button[title="Schicht bearbeiten"]');

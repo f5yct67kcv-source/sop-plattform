@@ -3196,6 +3196,30 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
   </div>
 </div>
 
+<!-- ══════════ RÜCKFRAGE BEIM ÜBERHANG (ENT-112) ══════════
+     Zwei der drei Wege sind richtig — welcher, weiss nur der Planer:
+     Entweder die Schicht geht wirklich länger als der Einsatz, oder der
+     Einsatz war zu kurz angesetzt. Automatisch zu entscheiden hiesse raten,
+     und zwar an einer Stelle, die den Einsatz für alle verändert. -->
+<div class="dlg-scrim" id="dlgUeberhang">
+  <div class="dlg">
+    <div class="dlg-hd">
+      <h2>Die Schicht endet nach dem Einsatz</h2>
+      <p id="epuText"></p>
+    </div>
+    <div class="dlg-bd">
+      <p class="note">Beides ist möglich. Soll die Schicht so stehen bleiben, oder war
+        der Einsatz zu kurz angesetzt?</p>
+    </div>
+    <div class="dlg-ft" style="flex-wrap:wrap;gap:8px">
+      <button class="btn btn-plain" onclick="closeDlg('dlgUeberhang')">Zurück</button>
+      <div style="flex:1"></div>
+      <button class="btn btn-quiet" id="epuNur">Nur die Schicht speichern</button>
+      <button class="btn btn-primary" id="epuVerlaengern">Speichern und Einsatz verlängern</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══════════ BEMERKUNG FÜR DIE EINGETEILTEN (ENT-109) ══════════
      Hängt am Einsatz, nicht an der einzelnen Schicht — nur so erreicht sie
      die App der Mitarbeitenden, die den Einsatz anzeigt und Positionen nicht
@@ -8386,12 +8410,70 @@ function epSchichtSpeichern() {
     const fehler = pruefZeit(k.von, k.bis);
     if (fehler) { zeigen(fehler); return; }
   }
+  // Ein Ueberhang wird nicht verhindert, aber er wird auch nicht beilaeufig
+  // gespeichert: Wer ihn will, sagt es einmal ausdruecklich (ENT-112 --
+  // revidiert insoweit ENT-111, das mit dem stehenden Hinweis auskam).
+  const ueber = Math.max(...koerper.map(k => epUeberhang(k.von, k.bis)));
+  if (ueber > 0) { epUeberFragen(koerper, ueber); return; }
+  epSchichtSchreiben(koerper);
+}
+
+function epSchichtSchreiben(koerper, auchEinsatz) {
   const b = $('epsBtn'); b.disabled = true;
+  const err = $('epsErr');
   epReihum(koerper).then(() => {
     b.disabled = false;
     closeDlg('dlgSchicht');
-    toast(koerper.length === 1 ? 'Schicht gespeichert.' : `${koerper.length} Schichten gespeichert.`);
-  }).catch(() => { b.disabled = false; zeigen('Speichern fehlgeschlagen.'); });
+    if (!auchEinsatz) {
+      toast(koerper.length === 1 ? 'Schicht gespeichert.' : `${koerper.length} Schichten gespeichert.`);
+      return;
+    }
+    // Der Einsatz umschliesst danach wieder alle seine Schichten.
+    epEinsatzBisSetzen(auchEinsatz);
+  }).catch(() => { b.disabled = false; err.textContent = 'Speichern fehlgeschlagen.'; err.style.display = ''; });
+}
+
+// Rueckfrage mit drei Wegen. Zwei davon sind richtig -- welcher, weiss nur
+// der Planer: Entweder die Schicht geht wirklich laenger als der Einsatz,
+// oder der Einsatz war zu kurz angesetzt. Automatisch entscheiden hiesse
+// raten, und zwar an einer Stelle, die den Einsatz fuer alle veraendert.
+function epUeberFragen(koerper, ueber) {
+  const bis = koerper.reduce((a, k) => epUeberhang(k.von, k.bis) >= epUeberhang(a.von, a.bis) ? k : a).bis;
+  $('epuText').innerHTML = `${koerper.length === 1 ? 'Die Schicht endet' : 'Eine der Schichten endet'}
+    <b>${esc(epStd(ueber))} nach dem Einsatz</b> — der Einsatz läuft bis ${esc(hm(epEinsatz.bis))},
+    ${koerper.length === 1 ? 'die Schicht' : 'sie'} bis ${esc(bis)}.`;
+  $('epuVerlaengern').textContent = `Speichern und Einsatz bis ${bis} verlängern`;
+  $('epuVerlaengern').onclick = () => { closeDlg('dlgUeberhang'); epSchichtSchreiben(koerper, bis); };
+  $('epuNur').onclick = () => { closeDlg('dlgUeberhang'); epSchichtSchreiben(koerper); };
+  openDlg('dlgUeberhang');
+}
+
+// Nur das Ende des Einsatzes verschieben. einsatz_save.php schreibt den
+// ganzen Satz -- was fehlt, wuerde geleert; der Bedarf kommt aus den
+// Positionen, damit die Nachfuehrung aus ENT-108 nicht zurueckfaellt.
+function epEinsatzBisSetzen(bis) {
+  const e = epEinsatz;
+  if (!e) return;
+  const body = {
+    id: e.id, kunde_id: e.kunde_id, kunde_name: e.kunde_name, titel: e.titel,
+    strasse: e.strasse, ort: e.ort, einsatzart: e.einsatzart, sparte: e.sparte,
+    datum: e.datum, von: hm(e.von), bis, bedarf: epPos.length || Number(e.bedarf || 0),
+    status: e.status, bemerkung: e.bemerkung,
+  };
+  api('einsatz_save.php', { method: 'POST', body }).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') {
+      toast(data.message || 'Die Schicht ist gespeichert, das Verlängern des Einsatzes nicht.');
+      return;
+    }
+    loadEinsaetze().then(() => {
+      const frisch = einsaetze.find(x => Number(x.id) === epId);
+      if (frisch) epEinsatz = frisch;
+      // Die Zeitachse haengt am Einsatz -- ohne Neuzeichnen bliebe das alte Raster stehen.
+      epZeichnen();
+      renderPlanung();
+      toast(`Gespeichert — der Einsatz läuft jetzt bis ${bis}.`);
+    });
+  }).catch(() => toast('Die Schicht ist gespeichert, das Verlängern des Einsatzes nicht.'));
 }
 
 // ── Bemerkung für die Mitarbeitenden ──────────────────────────────────────
