@@ -19,6 +19,7 @@ $sql = 'SELECT id, kunde_id, kunde_name, objekt_id, masterschicht_id, titel, str
                -- Die Einsatzplan-Ansicht las e.treffpunkt und bekam immer undefined.
                veranstaltung, treffpunkt, taetigkeit, qualifikation,
                kontakt_vorname, kontakt_nachname, kontakt_telefon,
+               weg_km, weg_minuten, weg_adresse,
                ist_status, ist_von, ist_bis, ist_pause_von, ist_pause_min,
                ist_pause_bezahlt_ma, ist_pause_bezahlt_kunde, ist_bemerkung, abgeglichen_am
         FROM einsaetze';

@@ -611,6 +611,44 @@ check('KRITISCH: der Bedarf wird dabei nicht rückwärts überschrieben',
   rufe.filter(r => r.p.includes('einsatz_save')).every(r => Number(r.body.bedarf) >= 1));
 check('Sie steht danach im Kopf', (await page.textContent('#epKopf')).includes('Haupteingang'));
 
+// ══════════ FAHRZEIT ZÄHLT NICHT ALS ARBEITSZEIT (ENT-116)
+// Sperrwirkung aus dem Auslegungsregister: "Der Fahrzeitersatz darf niemals
+// in die Stundensummen einfliessen." Art. 18 Ziff. 2 GAV, wörtlich: "wird
+// nicht an die Arbeitszeit gemäss diesem GAV angerechnet."
+await oeffne(71);
+const sollVorher = await page.textContent('#epSoll');
+await page.evaluate(() => {
+  // Eine Fahrzeit-Position dazustellen, wie sie beim Anlegen entsteht.
+  epPos.push({ id: 9001, nr: 99, funktion: 'Fahrzeit Hinweg', ist_fahrzeit: 1,
+    position: null, von: '07:00:00', bis: '07:30:00', std_verrechnung: null,
+    pauschal: null, qualifikation: null, gesperrt: 0, bemerkung: null,
+    mitarbeiter_id: 1, mitarbeiter: 'adrian', vorname: 'Adrian', nachname: 'von Arb',
+    zusage: 'zugesagt', gesehen_am: null });
+  epEinsatz.weg_minuten = 30;
+  epZeichnen();
+});
+await page.waitForTimeout(300);
+check('Die Fahrzeit steht als Zeile im Raster',
+  (await page.textContent('#epRaster')).includes('Fahrzeit Hinweg'));
+check('KRITISCH: sie ist als „keine Arbeitszeit" gekennzeichnet',
+  (await page.textContent('#epRaster')).includes('keine Arbeitszeit'));
+check('KRITISCH: die Stundensummen ändern sich durch sie NICHT',
+  (await page.textContent('#epSoll')) === sollVorher);
+check('KRITISCH: die Achse beginnt früher, damit die Hinfahrt hineinpasst',
+  await page.evaluate(() => {
+    const erste = document.querySelector('#epRaster th.uhr span');
+    return erste && erste.textContent.trim() === '07:00';
+  }));
+check('Der Balken der Hinfahrt liegt links vom Einsatzbeginn',
+  await page.evaluate(() => {
+    const zeilen = [...document.querySelectorAll('#epRaster table.ep-gitter tbody tr')];
+    const fz = zeilen.find(t => t.textContent.includes('Fahrzeit Hinweg'));
+    const normal = zeilen.find(t => !t.textContent.includes('Fahrzeit'));
+    if (!fz || !normal) return false;
+    return fz.querySelector('.ep-balken').getBoundingClientRect().left
+         < normal.querySelector('.ep-balken').getBoundingClientRect().left;
+  }));
+
 // ══════════ GESTALTUNG: GEMESSEN, NICHT NACHGELESEN
 await oeffne(71);
 try {

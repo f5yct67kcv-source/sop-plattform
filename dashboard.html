@@ -3063,7 +3063,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
                massgeblich fuer den GAV bleibt die SPARTE (ENT-061). Damit die
                beiden nicht auseinanderlaufen, zieht artSparteKoppeln() die
                Sparte mit und spartenKonflikt() meldet einen Widerspruch. -->
-          <select class="inp" id="enNEinsatzart" onchange="artSparteKoppeln('enN')">
+          <select class="inp" id="enNEinsatzart" onchange="artSparteKoppeln('enN');enWegZone()">
             <option>Verkehrsdienst</option>
             <option>Revierdienst</option>
             <option>Sicherheitsdienst</option>
@@ -3071,7 +3071,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
           </select>
         </div>
         <div class="f"><label for="enNSparte">Sparte</label>
-          <select class="inp" id="enNSparte" onchange="spartenKonflikt('enN')">
+          <select class="inp" id="enNSparte" onchange="spartenKonflikt('enN');enWegZone()">
             <option value="sicherheit">Sicherheit</option>
             <option value="reinigung">Reinigung</option>
           </select>
@@ -3117,6 +3117,40 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
           </select>
         </div>
         <div class="f"><label for="enNBedarf">Benötigte Mitarbeitende</label><input class="inp" id="enNBedarf" type="number" min="0" max="99" value="1" oninput="pickFoot('enN')"></div>
+  </div>
+</div>
+
+<div class="abschnitt">
+  <h3>Weg und Auslagenersatz<span class="note">Art. 18 GAV — nur für die Sparte Sicherheit</span></h3>
+  <!-- Bewusst KEINE automatische Abfrage bei Google (ENT-116): Der GAV
+       verlangt die KÜRZESTE Wegstrecke, Google liefert voreingestellt die
+       schnellste. Welche Route gilt, ist im Auslegungsregister als
+       GAV-AUS-011 offen — dessen Sperrwirkung verlangt ausdrücklich „eine
+       Einzelfallbestätigung durch einen Menschen". Der Link öffnet die
+       Route; abgelesen und eingetragen wird von Hand. -->
+  <div class="form-grid form-breit">
+        <div class="f wide">
+          <div id="enNWegHinweis" class="note" style="margin-bottom:8px"></div>
+          <a class="btn btn-quiet btn-sm" id="enNWegLink" target="_blank" rel="noopener"
+             href="#" onclick="return enWegLinkKlick()">Route in Google Maps öffnen</a>
+        </div>
+        <div class="f"><label for="enNWeg_km">Wegstrecke ab HAO (km, einfach)</label>
+          <input class="inp" id="enNWeg_km" type="number" step="0.1" min="0" max="9999"
+                 placeholder="—" oninput="enWegZone()"></div>
+        <div class="f"><label for="enNWeg_minuten">Fahrzeit je Weg (Minuten)</label>
+          <input class="inp" id="enNWeg_minuten" type="number" step="5" min="0" max="1440"
+                 placeholder="—" oninput="enWegZone()"></div>
+        <div class="f wide"><div id="enNZone"></div></div>
+        <div class="f wide" id="enNFzWahl" style="display:none">
+          <label style="display:flex;align-items:center;gap:9px;cursor:pointer">
+            <input type="checkbox" id="enNFahrzeit" style="margin:0"
+                   onchange="this.dataset.beruehrt='1'">
+            <span>Fahrzeit-Schichten mit anlegen (Hin- und Rückfahrt)</span>
+          </label>
+          <div class="note" style="margin-top:6px">Sie erscheinen im Raster, zählen aber
+            <b>nicht</b> in die Arbeitszeit — der Fahrzeitersatz ist nach Art. 18 Ziff. 2
+            keine Arbeitszeit und gehört in die getrennte Spesenabrechnung.</div>
+        </div>
   </div>
 </div>
 
@@ -6445,7 +6479,8 @@ const EN_FELDER = ['kunde_name', 'titel', 'strasse', 'ort', 'einsatzart', 'spart
 // EN_FELDER: Diese Liste laeuft auch ueber die Bearbeiten-Schublade, die
 // diese Felder nicht hat -- dort waere jeder Zugriff ein Absturz.
 const EN_FELDER_ANSICHT = ['kanton', 'veranstaltung', 'treffpunkt', 'taetigkeit',
-  'qualifikation', 'kontakt_vorname', 'kontakt_nachname', 'kontakt_telefon'];
+  'qualifikation', 'kontakt_vorname', 'kontakt_nachname', 'kontakt_telefon',
+  'weg_km', 'weg_minuten'];
 const EN_LABEL = { kunde_name: 'Kunde', titel: 'Bezeichnung', strasse: 'Strasse', ort: 'Arbeitsort',
   einsatzart: 'Einsatzart', sparte: 'Sparte', datum: 'Datum', von: 'Von', bis: 'Bis', bedarf: 'Anzahl', bemerkung: 'Bemerkung' };
 // enN… für den Dialog, enE… für die Schublade — beide nach demselben Muster.
@@ -6860,6 +6895,8 @@ function openEinsatzNeu(felder, maNamen) {
   $('enNStatus').value = 'geplant';
   // Beim zweiten Oeffnen duerfen keine Reste des vorigen Einsatzes stehen.
   EN_FELDER_ANSICHT.forEach(f => { const el = $(enId('enN', f)); if (el) el.value = ''; });
+  if ($('enNFahrzeit')) { $('enNFahrzeit').checked = false; delete $('enNFahrzeit').dataset.beruehrt; }
+  enWegZone();
 
   const ids = maNamen.map(n => (mitarbeiter.find(m => m.name === n) || {}).id).filter(Boolean);
   pickRender('enN', ids, null);
@@ -6926,7 +6963,8 @@ function enSammeln(prefix) {
     // Wert weg statt undefined zu werden -- der Server wuerde ihn sonst
     // leeren, und ein stiller Datenverlust beim Bearbeiten waere die Folge.
     ...enWennDa(prefix, ['kanton', 'veranstaltung', 'treffpunkt', 'taetigkeit',
-                         'qualifikation', 'kontakt_vorname', 'kontakt_nachname', 'kontakt_telefon']),
+                         'qualifikation', 'kontakt_vorname', 'kontakt_nachname', 'kontakt_telefon',
+                         'weg_km', 'weg_minuten']),
     mitarbeiter: pickIds(prefix),
     // Nur wer ausdruecklich bestaetigt wurde, wird umgeplant (ENT-060). Die
     // Liste geht mit, damit der Server dieselbe Entscheidung trifft wie die
@@ -6940,6 +6978,75 @@ function enSammeln(prefix) {
   const k = kunden.find(x => x.name === body.kunde_name);
   if (k) body.kunde_id = k.id;
   return body;
+}
+
+// ══════════════════════════════════════════ WEG UND AUSLAGENERSATZ (ENT-116)
+//
+// Die Kilometer werden NICHT automatisch bei Google geholt. Der GAV verlangt
+// die kuerzeste Wegstrecke, Google liefert voreingestellt die schnellste --
+// welche gilt, ist als GAV-AUS-011 offen. Dessen Sperrwirkung laesst eine
+// automatische Zonenzuordnung ausdruecklich nicht zu. Der Link oeffnet die
+// Route, ein Mensch liest die kuerzeste ab und traegt sie ein.
+
+// Adresse des Arbeitsorts, wie sie in den Link und in weg_adresse geht.
+function enWegAdresse() {
+  const teile = [($('enNStrasse') || {}).value, ($('enNOrt') || {}).value, ($('enNKanton') || {}).value];
+  return teile.map(t => (t || '').trim()).filter(Boolean).join(', ');
+}
+
+function enWegLinkKlick() {
+  const hao = typeof aoHao === 'function' ? aoHao() : null;
+  const ziel = enWegAdresse();
+  if (!hao) { toast('Kein Hauptanstellungsort hinterlegt — unter Betrieb erfassen.'); return false; }
+  if (!ziel) { toast('Zuerst den Arbeitsort eintragen.'); return false; }
+  const von = [hao.strasse, hao.plz, hao.ort].filter(Boolean).join(', ');
+  // dir/?api=1 zeigt die Routenliste samt Alternativen -- genau das, was der
+  // GAV verlangt: Nicht die erste Route gilt, sondern die kuerzeste.
+  window.open('https://www.google.com/maps/dir/?api=1&origin=' + encodeURIComponent(von)
+    + '&destination=' + encodeURIComponent(ziel), '_blank', 'noopener');
+  return false;
+}
+
+// Zone und Auslagenersatz aus der eingetragenen Distanz. Rechnet nichts
+// selbst: gavZone() traegt die Regel, hier wird sie nur angezeigt.
+function enWegZone() {
+  const feld = $('enNZone');
+  if (!feld) return;
+  const hinweis = $('enNWegHinweis');
+  if (hinweis) hinweis.textContent = typeof GAV_WEGSTRECKE_HINWEIS === 'string' ? GAV_WEGSTRECKE_HINWEIS : '';
+  const km = ($('enNWeg_km').value || '').trim();
+  const sparte = ($('enNSparte') || {}).value || 'sicherheit';
+
+  if (typeof gavGilt === 'function' && !gavGilt(sparte)) {
+    feld.innerHTML = `<div class="msg-warn">Für die Sparte Reinigung gilt der GAV Sicherheit nicht
+      (ENT-061) — kein Auslagenersatz nach Art. 18.</div>`;
+    $('enNFzWahl').style.display = 'none';
+    return;
+  }
+  if (km === '') {
+    // "Nicht bekannt" darf nie wie "keine Entschaedigung" aussehen -- das ist
+    // der teuerste Fehler in diesem ganzen Bereich.
+    feld.innerHTML = `<div class="note">Ohne Wegstrecke lässt sich die Zone <b>nicht bestimmen</b>.
+      Das ist etwas anderes als „keine Entschädigung".</div>`;
+    $('enNFzWahl').style.display = 'none';
+    return;
+  }
+  const nao = typeof aoNao === 'function' ? aoNao() : null;
+  const z = typeof gavZone === 'function'
+    ? gavZone(km, null, nao ? nao.km_zum_anderen : null) : null;
+  if (!z) {
+    feld.innerHTML = `<div class="msg-warn">Die Zone lässt sich mit dieser Angabe nicht bestimmen.</div>`;
+    $('enNFzWahl').style.display = 'none';
+    return;
+  }
+  feld.innerHTML = z.entschaedigung
+    ? `<div class="msg-warn"><b>${esc(z.name)} — Auslagenersatz geschuldet.</b>
+        Fahrzeit- und Fahrkostenersatz nach ${esc(z.quelle)}. Die Zoneneinteilung beruht auf
+        einer noch offenen Auslegung (GAV-AUS-011) und gilt als deine Bestätigung.</div>`
+    : `<div class="note"><b>${esc(z.name)}</b> — nach ${esc(z.quelle)} kein Auslagenersatz.</div>`;
+  $('enNFzWahl').style.display = z.entschaedigung ? '' : 'none';
+  // Vorbelegt nach Zone, aber aenderbar: Der Planer entscheidet je Einsatz.
+  if (z.entschaedigung && !$('enNFahrzeit').dataset.beruehrt) $('enNFahrzeit').checked = true;
 }
 
 function createEinsatz() {
@@ -6958,16 +7065,50 @@ function createEinsatz() {
     err.style.display = '';
     return;
   }
+  // Die Adresse mitschreiben, zu der die Kilometer gehoeren -- sonst laesst
+  // sich spaeter nicht erkennen, dass jemand den Arbeitsort geaendert hat und
+  // die gespeicherte Strecke nicht mehr passt (ENT-116).
+  if (body.weg_km) body.weg_adresse = enWegAdresse();
+  const fahrzeit = $('enNFahrzeit') && $('enNFahrzeit').checked && Number(body.weg_minuten) > 0;
   const b = $('enNeuBtn'); b.disabled = true;
   api('einsatz_save.php', { method: 'POST', body }).then(({ ok, data }) => {
-    b.disabled = false;
-    if (!ok || data.status !== 'ok') { err.textContent = data.message || 'Anlegen fehlgeschlagen.'; err.style.display = ''; return; }
-    loadEinsaetze().then(() => {
-      go(enNeuHer || 'planung');
-      if ((enNeuHer || 'planung') === 'planung') renderPlanung();
-      toast('Einsatz angelegt.');
+    if (!ok || data.status !== 'ok') {
+      b.disabled = false;
+      err.textContent = data.message || 'Anlegen fehlgeschlagen.'; err.style.display = ''; return;
+    }
+    const weiter = fahrzeit ? enFahrzeitAnlegen(data.id, body) : Promise.resolve();
+    return weiter.then(() => {
+      b.disabled = false;
+      loadEinsaetze().then(() => {
+        go(enNeuHer || 'planung');
+        if ((enNeuHer || 'planung') === 'planung') renderPlanung();
+        toast(fahrzeit ? 'Einsatz angelegt — mit Hin- und Rückfahrt.' : 'Einsatz angelegt.');
+      });
     });
-  });
+  }).catch(() => { b.disabled = false; err.textContent = 'Netzwerkfehler.'; err.style.display = ''; });
+}
+
+// Hin- und Rueckfahrt als eigene Positionen. Sie tragen ist_fahrzeit und
+// zaehlen darum NICHT in die Stundensummen -- der Fahrzeitersatz ist nach
+// Art. 18 Ziff. 2 keine Arbeitszeit (Sperrwirkung im Auslegungsregister).
+function enFahrzeitAnlegen(einsatzId, body) {
+  const min = Number(body.weg_minuten) || 0;
+  if (!einsatzId || min <= 0) return Promise.resolve();
+  const verschoben = (zeit, delta) => {
+    const [h, m] = String(zeit).slice(0, 5).split(':').map(Number);
+    const t = ((h * 60 + m + delta) % 1440 + 1440) % 1440;
+    return String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0');
+  };
+  const wege = [
+    { funktion: 'Fahrzeit Hinweg', von: verschoben(body.von, -min), bis: hm(body.von) },
+    { funktion: 'Fahrzeit Rückweg', von: hm(body.bis), bis: verschoben(body.bis, min) },
+  ];
+  // Nacheinander: Jede Antwort bringt den vollstaendigen neuen Stand mit.
+  return wege.reduce((kette, w) => kette.then(() => api('einsatz_position.php', {
+    method: 'POST',
+    body: { einsatz_id: einsatzId, aktion: 'speichern', ist_fahrzeit: 1,
+            funktion: w.funktion, von: w.von, bis: w.bis },
+  })), Promise.resolve());
 }
 
 // ── Bearbeiten
@@ -8161,7 +8302,14 @@ function epMinuten(zeit, start) {
 function epAchse() {
   if (!epEinsatz) return { start: 0, dauer: 0, slots: 0 };
   const [sh, sm] = hm(epEinsatz.von).split(':').map(Number);
-  const start = sh * 60 + sm;
+  // Eine Fahrzeit-Position beginnt VOR dem Einsatz (ENT-116). Die Achse
+  // startet darum entsprechend frueher -- und zwar um den am Einsatz
+  // gespeicherten Vorlauf, NICHT aus den Positionszeiten zurueckgerechnet:
+  // Ein Beginn vor dem Achsenstart landet in epMinuten() als "am Folgetag"
+  // und zoege den Balken 24 Stunden nach rechts. Genau dieser Fehler ist bei
+  // ENT-109 schon einmal aufgetreten.
+  const vorlauf = epPos.some(p => p.ist_fahrzeit) ? (Number(epEinsatz.weg_minuten) || 0) : 0;
+  const start = ((sh * 60 + sm) - vorlauf + 1440) % 1440;
   let dauer = epMinuten(epEinsatz.bis, start);
   if (dauer <= 0) dauer = 1440;
   // Positionen duerfen ueber das Einsatzende hinausgehen; die Achse waechst mit.
@@ -8179,6 +8327,21 @@ function epZeichnen() {
   epKopfZeichnen();
   epRasterZeichnen();
   epLeuteZeichnen();
+}
+
+// Die gespeicherte Wegstrecke gehoert zu einer bestimmten Adresse (ENT-116).
+// Wird der Arbeitsort spaeter geaendert, bleibt die Zahl stehen -- absichtlich,
+// denn eine stille Neuberechnung koennte eine bereits abgerechnete Zone
+// veraendern (GAV-AUS-011). Sichtbar sein muss es trotzdem.
+function epWegWarnung(e) {
+  if (!e || !e.weg_km || !e.weg_adresse) return '';
+  const jetzt = [e.strasse, e.ort, e.kanton].map(t => (t || '').trim()).filter(Boolean).join(', ');
+  if (jetzt === e.weg_adresse) return '';
+  return `<div class="card-bd" style="padding:0 16px 14px">
+    <div class="msg-warn"><b>Die gespeicherte Wegstrecke gehört zu einer anderen Adresse.</b>
+      ${esc(nf(e.weg_km, 1))} km wurden für „${esc(e.weg_adresse)}" ermittelt, der Arbeitsort
+      lautet jetzt „${esc(jetzt)}". Die Zahl bleibt stehen, damit eine bereits abgerechnete
+      Zone nicht rückwirkend kippt — neu ablesen und eintragen, wenn sie gelten soll.</div></div>`;
 }
 
 function epKopfZeichnen() {
@@ -8215,7 +8378,8 @@ function epKopfZeichnen() {
       ${feld('Tätigkeit', esc(e.taetigkeit || ''))}
       ${feld('Qualifikation', esc(e.qualifikation || ''))}
       ${feld('Bemerkung', esc(e.bemerkung || ''))}
-    </div>`;
+    </div>
+    ${epWegWarnung(e)}`;
 }
 
 // Der Balken sagt jetzt, woran man ist (ENT-113): gelb = eingeteilt, aber
@@ -8259,6 +8423,12 @@ function epRasterZeichnen() {
   // davon besetzt. Genau daraus liest man, ob um 02:00 noch jemand da ist.
   const soll = new Array(slots).fill(0), ist = new Array(slots).fill(0);
   epPos.forEach(p => {
+    // Fahrzeit ist keine Arbeitszeit (Art. 18 Ziff. 2 GAV, woertlich: "wird
+    // nicht an die Arbeitszeit gemaess diesem GAV angerechnet"). Sie steht im
+    // Raster, damit die Anfahrt sichtbar ist -- sie darf aber niemals in die
+    // Stundensummen einfliessen. Sperrwirkung aus dem Auslegungsregister,
+    // keine Gestaltungsfrage.
+    if (p.ist_fahrzeit) return;
     const a = Math.floor(epMinuten(p.von, start) / EP_TAKT);
     const b = Math.ceil((epMinuten(p.bis, start) || 1440) / EP_TAKT);
     for (let i = a; i < b && i < slots; i++) { soll[i]++; if (epBesetzt(p)) ist[i]++; }
@@ -8281,7 +8451,8 @@ function epRasterZeichnen() {
       <td class="fest ep-wahl"><input type="checkbox" ${epAngehakt.has(p.id) ? 'checked' : ''}
         aria-label="Schicht ${p.nr} auswählen"
         onclick="event.stopPropagation();epHaken(${p.id},this.checked)"></td>
-      <td class="fest">${p.nr}. ${esc(p.funktion || (epEinsatz && epEinsatz.einsatzart) || 'Position')}</td>
+      <td class="fest">${p.nr}. ${esc(p.funktion || (epEinsatz && epEinsatz.einsatzart) || 'Position')}${
+        p.ist_fahrzeit ? ' <span class="chip chip-n" title="Fahrzeit zählt nach Art. 18 Ziff. 2 nicht als Arbeitszeit">keine Arbeitszeit</span>' : ''}</td>
       <td class="fest">${esc(p.position || '—')}</td>
       <td class="fest" style="text-align:right">${p.pauschal != null ? nf(p.pauschal, 2) + ' pausch.'
         : (p.std_verrechnung != null ? nf(p.std_verrechnung, 2) + ' CHF' : '—')}</td>

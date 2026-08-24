@@ -41,6 +41,18 @@ $qualifik   = trim((string)($input['qualifikation'] ?? '')) ?: null;
 $kVorname   = trim((string)($input['kontakt_vorname'] ?? '')) ?: null;
 $kNachname  = trim((string)($input['kontakt_nachname'] ?? '')) ?: null;
 $kTelefon   = trim((string)($input['kontakt_telefon'] ?? '')) ?: null;
+// ENT-116. Die Kilometer stammen aus einer menschlichen Ablesung auf Google
+// Maps (GAV-AUS-011 ist offen -- keine automatische Zonenzuordnung). Sie
+// werden hier nur entgegengenommen und gespeichert, nicht ausgelegt.
+$wegKm = ($input['weg_km'] ?? '') === '' ? null : round((float)$input['weg_km'], 2);
+$wegMin = ($input['weg_minuten'] ?? '') === '' ? null : (int)$input['weg_minuten'];
+$wegAdr = trim((string)($input['weg_adresse'] ?? '')) ?: null;
+if ($wegKm !== null && ($wegKm < 0 || $wegKm > 9999)) {
+    json_response(['status' => 'error', 'message' => 'Wegstrecke zwischen 0 und 9999 km'], 400);
+}
+if ($wegMin !== null && ($wegMin < 0 || $wegMin > 1440)) {
+    json_response(['status' => 'error', 'message' => 'Fahrzeit zwischen 0 und 1440 Minuten'], 400);
+}
 if ($kanton !== null && !preg_match('/^[A-Z]{2}$/', $kanton)) {
     json_response(['status' => 'error', 'message' => 'Kanton als zweistelliges Kuerzel, z. B. SO'], 400);
 }
@@ -147,12 +159,13 @@ try {
             'UPDATE einsaetze SET kunde_id = ?, kunde_name = ?, titel = ?, strasse = ?, ort = ?,
                     kanton = ?, einsatzart = ?, sparte = ?, datum = ?, von = ?, bis = ?, bedarf = ?,
                     status = ?, bemerkung = ?, veranstaltung = ?, treffpunkt = ?, taetigkeit = ?,
-                    qualifikation = ?, kontakt_vorname = ?, kontakt_nachname = ?, kontakt_telefon = ?
+                    qualifikation = ?, kontakt_vorname = ?, kontakt_nachname = ?, kontakt_telefon = ?,
+                    weg_km = ?, weg_minuten = ?, weg_adresse = ?
              WHERE id = ?'
         );
         $stmt->execute([$kundeId, $kundeName, $titel, $strasse, $ort, $kanton, $einsatzart, $sparte,
             $datum, $von, $bis, $bedarf, $status, $bemerkung, $veranst, $treffpunkt, $taetigkeit,
-            $qualifik, $kVorname, $kNachname, $kTelefon, $id]);
+            $qualifik, $kVorname, $kNachname, $kTelefon, $wegKm, $wegMin, $wegAdr, $id]);
         if ($stmt->rowCount() === 0) {
             // Kein Treffer heisst entweder "gibt es nicht" oder "nichts geaendert" --
             // die Existenz wird darum ausdruecklich geprueft.
@@ -169,12 +182,13 @@ try {
             'INSERT INTO einsaetze (kunde_id, kunde_name, titel, strasse, ort, kanton, einsatzart, sparte,
                                     datum, von, bis, bedarf, status, bemerkung, veranstaltung,
                                     treffpunkt, taetigkeit, qualifikation,
-                                    kontakt_vorname, kontakt_nachname, kontakt_telefon, erstellt_von)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                                    kontakt_vorname, kontakt_nachname, kontakt_telefon,
+                                    weg_km, weg_minuten, weg_adresse, erstellt_von)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
         $stmt->execute([$kundeId, $kundeName, $titel, $strasse, $ort, $kanton, $einsatzart, $sparte,
             $datum, $von, $bis, $bedarf, $status, $bemerkung, $veranst, $treffpunkt, $taetigkeit,
-            $qualifik, $kVorname, $kNachname, $kTelefon, (int)$user['id']]);
+            $qualifik, $kVorname, $kNachname, $kTelefon, $wegKm, $wegMin, $wegAdr, (int)$user['id']]);
         $id = (int)$pdo->lastInsertId();
     }
 

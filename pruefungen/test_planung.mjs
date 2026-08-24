@@ -72,6 +72,11 @@ async function setup(page) {
     if (path.includes('mitarbeiter_list')) return send(MA);
     if (path.includes('kunden_list')) return send(KU);
     if (path.includes('einsatz_list')) return send(EINSAETZE);
+    // Hauptanstellungsort fuer die Wegberechnung (ENT-116).
+    if (path.includes('anstellungsorte')) return send({ status: 'ok', orte: [
+      { id: 1, bezeichnung: 'Betrieb Olten', rolle: 'hao', strasse: 'Bahnhofstrasse 1',
+        plz: '4600', ort: 'Olten', km_zum_anderen: null, aktiv: 1 },
+    ] });
     if (path.includes('objekt_list')) return send({ status: 'ok', objekte: [] });
     if (path.includes('masterschicht_list')) return send({ status: 'ok', masterschichten: [] });
     if (path.includes('feiertage_list')) return send({ status: 'ok', feiertage: [], gepflegt: {} });
@@ -398,6 +403,88 @@ check('KRITISCH: die Kontaktperson geht getrennt mit',
   && cr.body.kontakt_telefon === '079 111 22 33');
 check('Der Treffpunkt geht mit', cr && cr.body.treffpunkt === 'Haupteingang');
 
+// ══════════ WEG, ZONE UND FAHRZEIT (ENT-116)
+// Die Kilometer werden NICHT automatisch geholt: Der GAV verlangt die
+// kuerzeste Route, Google liefert die schnellste -- GAV-AUS-011 ist offen
+// und laesst keine automatische Zonenzuordnung zu.
+await page.evaluate(() => openEinsatzNeu());
+await page.waitForTimeout(400);
+check('KRITISCH: es geht keine Abfrage an Google',
+  !calls.some(c => /maps|distance|directions/i.test(c.path)));
+check('Der Messhinweis nennt die kürzeste Strecke — nicht die schnellste',
+  /kürzeste/i.test(await page.textContent('#enNWegHinweis'))
+  && /nicht die schnellste/i.test(await page.textContent('#enNWegHinweis')));
+check('KRITISCH: ohne Wegstrecke steht „nicht bestimmbar", nicht „keine Entschädigung"',
+  (await page.textContent('#enNZone')).includes('nicht bestimmen'));
+check('Und das Fahrzeit-Häkchen ist dann gar nicht da', !(await page.isVisible('#enNFzWahl')));
+
+// Anstellungsgebiet: unter 10 km, keine Entschädigung.
+await page.fill('#enNWeg_km', '8');
+await page.waitForTimeout(250);
+check('8 km ergeben das Anstellungsgebiet',
+  (await page.textContent('#enNZone')).includes('Anstellungsgebiet'));
+check('KRITISCH: dort wird kein Auslagenersatz gemeldet',
+  !(await page.textContent('#enNZone')).includes('geschuldet'));
+check('Und kein Fahrzeit-Häkchen angeboten', !(await page.isVisible('#enNFzWahl')));
+
+// Pauschalzone 1: über 10 km, Entschädigung geschuldet.
+await page.fill('#enNWeg_km', '15');
+await page.waitForTimeout(250);
+const zoneTxt = await page.textContent('#enNZone');
+check('KRITISCH: 15 km ergeben Pauschalzone 1 mit Auslagenersatz',
+  zoneTxt.includes('Pauschalzone 1') && zoneTxt.includes('geschuldet'));
+check('Die Fundstelle wird genannt', zoneTxt.includes('Art. 18'));
+check('KRITISCH: der Hinweis nennt die offene Auslegung', zoneTxt.includes('GAV-AUS-011'));
+check('Das Fahrzeit-Häkchen erscheint und ist vorbelegt',
+  (await page.isVisible('#enNFzWahl')) && (await page.isChecked('#enNFahrzeit')));
+
+// Reinigung: der GAV Sicherheit gilt nicht (ENT-061).
+await page.selectOption('#enNSparte', 'reinigung');
+await page.waitForTimeout(250);
+check('KRITISCH: für Reinigung gilt Art. 18 nicht',
+  (await page.textContent('#enNZone')).includes('Reinigung'));
+check('Und es wird keine Fahrzeit angeboten', !(await page.isVisible('#enNFzWahl')));
+await page.selectOption('#enNSparte', 'sicherheit');
+await page.waitForTimeout(250);
+
+// Der Maps-Link öffnet die Route ab HAO -- ohne dass wir selbst abfragen.
+await page.fill('#enNStrasse', 'Kantonsstrasse 2');
+await page.fill('#enNOrt', '6000 Luzern');
+await page.selectOption('#enNKanton', 'LU');
+const linkZiel = await page.evaluate(() => {
+  let auf = null;
+  const alt = window.open;
+  window.open = (u) => { auf = u; return null; };
+  enWegLinkKlick();
+  window.open = alt;
+  return auf;
+});
+check('KRITISCH: der Link führt von der HAO-Adresse zum Arbeitsort',
+  linkZiel && linkZiel.includes('Bahnhofstrasse') && linkZiel.includes('Kantonsstrasse'));
+check('Er öffnet die Routenliste, nicht eine einzelne Route',
+  linkZiel && linkZiel.includes('/maps/dir/?api=1'));
+
+// Anlegen mit Fahrzeit: zwei zusätzliche Positionen, als Nicht-Arbeitszeit.
+await page.fill('#enNKunde_name', 'Studer Immobilien AG');
+await zeitSetzen(page, '#enNVon', '08:00');
+await zeitSetzen(page, '#enNBis', '12:00');
+await page.fill('#enNWeg_minuten', '30');
+await page.waitForTimeout(200);
+calls = [];
+await page.click('#enNeuBtn');
+await page.waitForTimeout(900);
+const gespeichert = calls.find(c => c.path.includes('einsatz_save'));
+check('KRITISCH: die Wegstrecke geht mit an den Server', gespeichert && Number(gespeichert.body.weg_km) === 15);
+check('KRITISCH: die Adresse zur Wegstrecke wird mitgeschrieben',
+  gespeichert && (gespeichert.body.weg_adresse || '').includes('Kantonsstrasse 2'));
+const fz = calls.filter(c => c.path.includes('einsatz_position') && c.body && c.body.ist_fahrzeit);
+check('KRITISCH: Hin- und Rückfahrt werden angelegt', fz.length === 2);
+check('KRITISCH: beide sind als Fahrzeit gekennzeichnet', fz.every(c => c.body.ist_fahrzeit === 1));
+check('KRITISCH: die Hinfahrt endet, wenn der Einsatz beginnt',
+  fz.some(c => c.body.von === '07:30' && c.body.bis === '08:00'));
+check('KRITISCH: die Rückfahrt beginnt, wenn der Einsatz endet',
+  fz.some(c => c.body.von === '12:00' && c.body.bis === '12:30'));
+
 // ══════════ GESTALTUNG DER ANLEGEN-ANSICHT (ENT-115)
 // Gemessen, nicht im Quelltext nachgelesen.
 try {
@@ -412,9 +499,9 @@ try {
   });
   check('KRITISCH: die Abschnitte stehen in der Reihenfolge der Vorlage',
     m.ab[0].startsWith('Stammdaten') && m.ab[1].startsWith('Zeit und Arbeitsort')
-    && m.ab[2].startsWith('Kontaktperson') && m.ab[3].startsWith('Zuteilung')
-    && m.ab[4].startsWith('Angaben für die Eingeteilten'));
-  check('KRITISCH: die Angaben für die Eingeteilten stehen zuunterst', m.ab.length === 5);
+    && m.ab[2].startsWith('Weg und Auslagenersatz') && m.ab[3].startsWith('Kontaktperson')
+    && m.ab[4].startsWith('Zuteilung') && m.ab[5].startsWith('Angaben für die Eingeteilten'));
+  check('KRITISCH: die Angaben für die Eingeteilten stehen zuunterst', m.ab.length === 6);
   check('KRITISCH: auf breitem Schirm mehr als zwei Spalten — der Platz wird genutzt', m.spalten > 2);
   check('Die Karte nutzt die Breite der Ansicht', m.breite > m.fenster * 0.7);
 } catch (e) { bad.push('Gestaltung Anlegen: ' + String(e).split('\n')[0].slice(0, 110)); }
