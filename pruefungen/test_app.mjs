@@ -142,22 +142,99 @@ const blText = await T('#blBody');
 check('Blatt zeigt Kunde und Ort', blText.includes('Niedergösgen'));
 check('Blatt zeigt die Einsatzart', blText.includes('Verkehrsdienst'));
 
+// Knoepfe im Fussbereich ueber ihre Beschriftung treffen, nicht ueber eine
+// Klasse: Nach ENT-120 ist ".btn-plain" mal "Ablehnen" und mal "Antwort
+// ändern". Und ein fehlender Knopf muss eine ROTE PRUEFUNG geben statt die
+// Suite abzubrechen -- ein Abbruch sieht im Sammellauf aus wie ein Fehler im
+// Pruefwerkzeug, nicht wie einer im Produkt. Genau das ist in einer
+// Gegenprobe passiert.
+const fussKlick = (name, beschriftung) => page.evaluate(t => {
+  const b = [...document.querySelectorAll('#blFuss button')]
+    .find(x => x.textContent.trim().includes(t));
+  if (!b) { return false; }
+  b.click();
+  return true;
+}, beschriftung).then(g => { check(name, g); return g; });
+
+// ── Eine bereits beantwortete Schicht verlangt die Antwort nicht noch einmal
+//    (ENT-120). Schicht 42 steht in den Testdaten auf "zugesagt".
+const fussJa = await T('#blFuss');
+check('KRITISCH: eine beantwortete Schicht zeigt keine Zusagen/Ablehnen-Knoepfe mehr',
+  !/Zusagen|Ablehnen/.test(fussJa));
+check('KRITISCH: stattdessen steht da, was beantwortet wurde', /Du hast zugesagt/.test(fussJa));
+check('Die Marke sagt es auch kurz',
+  await page.evaluate(() => !!document.querySelector('#blFuss .ft-stand .m-p')));
+check('KRITISCH: die Antwort laesst sich aendern — ein Fehlgriff auf dem Telefon darf nicht endgueltig sein',
+  /Antwort ändern/.test(fussJa));
+check('Der Knopf zum Aendern wird nicht ueber die volle Breite gezogen',
+  await page.evaluate(() => {
+    const b = [...document.querySelectorAll('#blFuss .btn')].find(x => /ändern/.test(x.textContent));
+    return !!b && b.getBoundingClientRect().width
+      < document.getElementById('blFuss').getBoundingClientRect().width * 0.8;
+  }));
+check('Beide Knoepfe halten die Trefferflaeche von 44 px ein',
+  await page.evaluate(() => [...document.querySelectorAll('#blFuss .btn')]
+    .every(b => b.getBoundingClientRect().height >= 44)));
+
+// Eine noch nicht beantwortete Schicht bekommt sehr wohl beide Knoepfe.
+await page.evaluate(() => blattZu());
+await page.evaluate(() => blattAuf(43));
+await page.waitForTimeout(250);
+const fussOffen = await T('#blFuss');
+check('KRITISCH: eine unbeantwortete Schicht fragt weiterhin',
+  /Zusagen/.test(fussOffen) && /Ablehnen/.test(fussOffen) && !/Antwort ändern/.test(fussOffen));
+await page.evaluate(() => blattZu());
+
+// Blatt vorsichtshalber schliessen: Liegt es noch offen, faengt es den Klick
+// auf die Liste ab, und aus einer roten Pruefung wird eine
+// Zeitueberschreitung, die die ganze Suite abbricht.
+await page.evaluate(() => blattZu());
+await page.waitForTimeout(150);
+await page.click('#v-plan .schicht[onclick="blattAuf(42)"]');
+await page.waitForTimeout(250);
 const vorher = rufe.filter(r => r.p.includes('meine_zusage')).length;
-await page.click('#blFuss .btn-plain');   // Ablehnen
+// Nicht "es wurde nichts gesendet" pruefen -- das waere hier leer erfuellbar,
+// weil niemand geklickt hat. Gemeint ist: Es gibt gar keinen Knopf, der eine
+// Rueckmeldung ausloesen koennte, solange die Antwort nicht geoeffnet wurde.
+check('KRITISCH: solange die Antwort steht, gibt es keinen Knopf, der sie ueberschreibt',
+  await page.evaluate(() => [...document.querySelectorAll('#blFuss button')]
+    .every(b => !/melden\(/.test(b.getAttribute('onclick') || ''))));
+await page.evaluate(() => antwortAendern());
+await page.waitForTimeout(200);
+check('KRITISCH: nach "Antwort ändern" stehen beide Knoepfe wieder da',
+  /Zusagen/.test(await T('#blFuss')) && /Ablehnen/.test(await T('#blFuss')));
+await fussKlick('Der Ablehnen-Knopf ist da und lässt sich drücken', 'Ablehnen');
 await page.waitForTimeout(300);
 const zRufe = rufe.filter(r => r.p.includes('meine_zusage'));
+// Ueber einen leeren Ruf stolpern statt ihn zu pruefen waere ein Abbruch der
+// ganzen Suite -- und ein Abbruch sieht im Sammellauf aus wie ein Fehler im
+// Pruefwerkzeug, nicht wie einer im Produkt.
+const letzterZ = (zRufe.at(-1) || {}).body || {};
 check('Rueckmeldung wird genau einmal gesendet', zRufe.length === vorher + 1);
-check('Rueckmeldung sendet die richtige Schicht', zRufe.at(-1).body.einsatz_id === 42);
-check('Rueckmeldung sendet den richtigen Wert', zRufe.at(-1).body.zusage === 'abgelehnt');
+check('Rueckmeldung sendet die richtige Schicht', letzterZ.einsatz_id === 42);
+check('Rueckmeldung sendet den richtigen Wert', letzterZ.zusage === 'abgelehnt');
 check('Blatt schliesst nach der Rueckmeldung',
   !(await page.evaluate(() => document.getElementById('blatt').classList.contains('on'))));
 check('Liste zeigt die Ablehnung sofort', (await T('#v-plan')).includes('Abgelehnt'));
 
+// Beim naechsten Oeffnen ist der geaenderte Stand da -- und wieder zugeklappt.
+await page.evaluate(() => blattZu());
+await page.waitForTimeout(150);
+await page.click('#v-plan .schicht[onclick="blattAuf(42)"]');
+await page.waitForTimeout(250);
+const fussNein = await T('#blFuss');
+check('KRITISCH: die geaenderte Antwort steht beim naechsten Oeffnen da',
+  /Du hast abgelehnt/.test(fussNein));
+check('KRITISCH: "Antwort ändern" wirkt nur fuer dieses eine Oeffnen',
+  !/Zusagen|Ablehnen/.test(fussNein));
+check('Die Marke der Ablehnung ist die negative',
+  await page.evaluate(() => !!document.querySelector('#blFuss .ft-stand .m-x')));
+
 // Ein Fehler der Schnittstelle darf die Anzeige nicht faelschen
 zusageAntwort = [{ status: 'error', message: 'Diese Schicht gehoert nicht zu dir' }, 404];
-await page.click('#v-plan .schicht[onclick="blattAuf(42)"]');
+await page.evaluate(() => antwortAendern());
 await page.waitForTimeout(200);
-await page.click('#blFuss .btn-primary, #blFuss .btn-pos');
+await fussKlick('Der Zusagen-Knopf ist da und lässt sich drücken', 'Zusagen');
 await page.waitForTimeout(300);
 check('Fehler der Schnittstelle wird gemeldet',
   await page.evaluate(() => document.getElementById('toast').classList.contains('on')));
