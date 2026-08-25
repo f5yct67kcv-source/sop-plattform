@@ -47,10 +47,12 @@ const EINSAETZE = { status: 'ok', einsaetze: [
   { id: 13, kunde_id: 1, kunde_name: 'Studer Immobilien AG', titel: 'Nachtdienst', strasse: null,
     ort: '4600 Olten', einsatzart: 'Sicherheitsdienst', datum: MORGEN, von: '22:00:00', bis: '06:00:00',
     bedarf: 1, status: 'geplant', bemerkung: null, mitarbeiter: [] },
-  // vergangen
+  // vergangen, abgeschlossen (ENT-128: der Status entscheidet, nicht mehr das
+  // Kalenderdatum -- ein FRUEHER-Einsatz mit status 'bestaetigt' waere seit
+  // ENT-128 NICHT mehr "abgeschlossen", siehe test_einsatzplan.mjs)
   { id: 14, kunde_id: 2, kunde_name: 'Einwohnergemeinde Niedergösgen', titel: null, strasse: null,
     ort: '5013 Niedergösgen', einsatzart: 'Verkehrsdienst', datum: FRUEHER, von: '08:00:00', bis: '12:00:00',
-    bedarf: 1, status: 'bestaetigt', bemerkung: null, mitarbeiter: [D] },
+    bedarf: 1, status: 'abgeschlossen', bemerkung: null, mitarbeiter: [D] },
   // abgesagt, in der Zukunft -- zaehlt nirgends als offen
   { id: 15, kunde_id: 1, kunde_name: 'Studer Immobilien AG', titel: null, strasse: null,
     ort: '4632 Trimbach', einsatzart: 'Verkehrsdienst', datum: SPAETER, von: '08:00:00', bis: '12:00:00',
@@ -156,9 +158,9 @@ check('Filter „unterbesetzt“ zeigt nur Luecken', z.filter(r => !r.grp).lengt
 await page.selectOption('#pStatus', 'abgeschlossen');
 await page.waitForTimeout(200);
 z = await zeilen();
-check('KRITISCH: Filter „abgeschlossen“ zeigt nur Einsaetze vor heute',
+check('KRITISCH: Filter „abgeschlossen“ zeigt nur Einsaetze mit diesem Status (ENT-128)',
   z.filter(r => !r.grp).length === 1 && z.some(r => r.t.includes(dmy(FRUEHER))));
-check('Heutiges und Zukuenftiges zaehlt NICHT als abgeschlossen',
+check('Ein anderer Status zaehlt NICHT als abgeschlossen, auch wenn er in der Vergangenheit liegt',
   !z.some(r => r.t.includes(dmy(HEUTE)) || r.t.includes(dmy(SPAETER))));
 await page.selectOption('#pStatus', '');
 await page.selectOption('#pSchnell', 'monat');
@@ -748,6 +750,35 @@ await page.evaluate(() => {
   const e = einsaetze.find(x => Number(x.id) === 14);
   e.mitarbeiter[0].ist_status = 'offen';
 });
+
+// ══════════ STATUS "ABGESCHLOSSEN" SPERRT NUR SICH SELBST, NICHT DIE GANZE SCHUBLADE (ENT-128)
+// Anders als die ENT-045-Sperre (enGesperrt, oben): "abgeschlossen" kommt vom
+// Server und darf hier nicht von Hand zurueckgedreht werden -- aber die
+// UEBRIGEN Felder (Kunde, Bemerkung, ...) bleiben bearbeitbar, weil dieser
+// Einsatz nicht zwingend auch abgeglichen ist.
+await page.evaluate(() => { einsaetze.find(x => Number(x.id) === 11).status = 'abgeschlossen'; renderPlanung(); });
+await page.waitForTimeout(200);
+check('KRITISCH: die Liste zeigt "Abgeschlossen" als Status-Badge',
+  await page.evaluate(() => {
+    const tr = [...document.querySelectorAll('#plTable tbody tr')]
+      .find(r => r.getAttribute('onclick') === 'openEinsatz(11)');
+    return !!tr && /Abgeschlossen/.test(tr.textContent);
+  }));
+await page.evaluate(() => openEinsatzDrawer(11));
+await page.waitForSelector('#drawer.on');
+await page.waitForTimeout(250);
+check('KRITISCH: das Statusfeld ist gesperrt, sobald der Status "abgeschlossen" ist',
+  await page.evaluate(() => document.getElementById('enEStatus').disabled));
+check('KRITISCH: andere Felder bleiben trotzdem bedienbar -- keine Vollsperre',
+  await page.evaluate(() => !document.getElementById('enEKunde_name').disabled
+    && !document.getElementById('enEBemerkung').disabled));
+check('Speichern steht weiterhin bereit -- nur der Status selbst ist geschuetzt',
+  await page.isVisible('#drFoot .btn-primary'));
+check('Der Statuswert zeigt "Abgeschlossen" an, nicht die erste Option',
+  (await page.$eval('#enEStatus', el => el.options[el.selectedIndex].value)) === 'abgeschlossen');
+await page.evaluate(() => closeDrawer());
+await page.waitForTimeout(200);
+await page.evaluate(() => { einsaetze.find(x => Number(x.id) === 11).status = 'geplant'; });
 
 // ══════════ FEHLENDE TABELLE
 await page.evaluate(() => { einsaetze = []; });

@@ -214,6 +214,7 @@ if (zfBeanstandet.length) { zfBeanstandet.forEach(z => bad.push('PHP-Zweifaktor:
 for (const [datei, titel] of [
   ['pruef_rechte.php',  'KRITISCH: die Rollen geben genau die entschiedenen Rechte'],
   ['pruef_logbuch.php', 'KRITISCH: das Logbuch haelt fest, wer was geaendert hat'],
+  ['pruef_einsatz_abgeschlossen.php', 'KRITISCH: "abgeschlossen" verlangt ALLE zugesagten Rapporte (ENT-128)'],
 ]) {
   let aus = '', code = 0;
   try {
@@ -295,6 +296,35 @@ if (ohneEinbindung.length) { bad.push('ohne rechte.php: ' + ohneEinbindung.join(
   check('Die Ausnahmeliste der Sperre nennt nur Endpunkte, die es gibt', toteAusnahmen.length === 0);
   if (toteAusnahmen.length) { bad.push('Ausnahme ohne Datei: ' + toteAusnahmen.join(', ')); }
 }
+
+// "Abgeschlossen" (ENT-128): der eigentliche Rechenkern
+// (einsatz_vollstaendig_rapportiert) laeuft echt gegen SQLite in
+// pruef_einsatz_abgeschlossen.php -- hier nur, dass rapport_create.php und
+// rapport_delete.php ihn ueberhaupt aufrufen. Ohne diese Quelltext-Pruefung
+// wuerde kein Test bemerken, wenn die Verdrahtung verschwindet: Die
+// Playwright-Suiten taeuschen die Serverantwort vor und fuehren die
+// eigentliche PHP-Datei nie aus.
+{
+  const create = ohneKommentar('rapport_create.php');
+  const del = ohneKommentar('rapport_delete.php');
+  check('KRITISCH: rapport_create.php prueft auf Vollstaendigkeit, bevor es den Status setzt',
+    /einsatz_vollstaendig_rapportiert\(db\(\), \$einsatzId\)/.test(create)
+    && /UPDATE einsaetze SET status = 'abgeschlossen'/.test(create));
+  check('KRITISCH: die Festschreibung (ENT-045) schuetzt auch diesen neuen Schreibweg',
+    /!einsatz_abgeglichen\(db\(\), \$einsatzId\)/.test(create)
+    && /!einsatz_abgeglichen\(db\(\), \$einsatzId\)/.test(del));
+  check('Ein abgesagter Einsatz wird nie auf abgeschlossen ueberschrieben',
+    /status != 'abgesagt'/.test(create));
+  check('KRITISCH: rapport_delete.php macht "abgeschlossen" rueckgaengig, wenn es wieder unvollstaendig wird',
+    /!einsatz_vollstaendig_rapportiert\(db\(\), \$einsatzId\)/.test(del)
+    && /UPDATE einsaetze SET status = 'bestaetigt' WHERE id = \? AND status = 'abgeschlossen'/.test(del));
+}
+
+// einsatz_save.php muss 'abgeschlossen' beim Speichern anderer Felder
+// akzeptieren (Bemerkung, Zeitverschiebung schicken status: e.status mit) --
+// sonst waere ein Speichern an einem abgeschlossenen Einsatz ein Fehler.
+check('KRITISCH: einsatz_save.php lehnt einen bereits abgeschlossenen Einsatz beim Speichern nicht ab',
+  /in_array\(\$status, \[[^\]]*'abgeschlossen'[^\]]*\], true\)/.test(ohneKommentar('einsatz_save.php')));
 
 
 // Keine Bibliothek darf zweimal geladen werden.
