@@ -3289,7 +3289,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
             <div class="zr">
               <span class="zr-gr">
                 <input class="inp" id="enNDatum" type="date" aria-label="Datum von"
-                       onchange="enZeitraum();pickRefresh('enN')">
+                       onchange="enZeitraum();pickRefresh('enN');enWegZone()">
                 <span class="tr">–</span>
                 <input class="inp" id="enNDatumBis" type="date" aria-label="Datum bis"
                        onchange="enZeitraum()">
@@ -7203,6 +7203,10 @@ function pickWahl(prefix, el) {
     menge.delete(id);
   }
   pickFoot(prefix);
+  // Die Namensliste in der GAV-AUS-010-Warnung haengt an der Auswahl --
+  // aendert sie sich, muss die Warnung mitziehen (ENT-124). Nur fuer 'enN':
+  // enWegZone() kennt keinen anderen Prefix.
+  if (prefix === 'enN' && typeof enWegZone === 'function') { enWegZone(); }
 }
 
 function pickRefresh(prefix) {
@@ -7364,6 +7368,29 @@ function enWegLinkKlick() {
 
 // Zone und Auslagenersatz aus der eingetragenen Distanz. Rechnet nichts
 // selbst: gavZone() traegt die Regel, hier wird sie nur angezeigt.
+// GAV-AUS-010 ist offen (OP-66): "Pro Tag kann nur ein Hin- und Rueckweg zum
+// Einsatzort mit Pauschalen abgerechnet werden" -- WELCHER von mehreren
+// Einsaetzen am selben Tag das ist, ist nicht geklaert.
+//
+// Anders als konflikte(): Dort geht es um ZEITLICHE UEBERLAPPUNG (niemand ist
+// an zwei Orten zugleich). Hier geht es um denselben KALENDERTAG, auch wenn
+// die Einsaetze zeitlich getrennt sind -- genau das ist ein
+// Revierdienst-Morgen mit mehreren Runden an verschiedenen Objekten.
+function gavAus010SelbeTag(datum, ids, ausserId) {
+  if (!datum || !ids || !ids.length) { return []; }
+  const treffer = [];
+  (ids || []).forEach(id => {
+    const andere = einsaetze.filter(e =>
+      Number(e.id) !== Number(ausserId) && e.status !== 'abgesagt' &&
+      tagVon(e) === datum && (e.mitarbeiter || []).some(m => Number(m.id) === Number(id)));
+    if (andere.length) {
+      const m = mitarbeiter.find(x => Number(x.id) === Number(id));
+      treffer.push({ id, name: (m && (fullName(m) || m.name)) || ('#' + id), andere });
+    }
+  });
+  return treffer;
+}
+
 function enWegZone() {
   const feld = $('enNZone');
   if (!feld) return;
@@ -7391,11 +7418,24 @@ function enWegZone() {
     feld.innerHTML = `<div class="msg-warn">Die Zone lässt sich mit dieser Angabe nicht bestimmen.</div>`;
     return;
   }
-  feld.innerHTML = z.entschaedigung
-    ? `<div class="msg-warn"><b>${esc(z.name)} — Auslagenersatz geschuldet.</b>
-        Fahrzeit- und Fahrkostenersatz nach ${esc(z.quelle)}. Die Zoneneinteilung beruht auf
-        einer noch offenen Auslegung (GAV-AUS-011) und gilt als deine Bestätigung.</div>`
-    : `<div class="note"><b>${esc(z.name)}</b> — nach ${esc(z.quelle)} kein Auslagenersatz.</div>`;
+  if (!z.entschaedigung) {
+    feld.innerHTML = `<div class="note"><b>${esc(z.name)}</b> — nach ${esc(z.quelle)} kein Auslagenersatz.</div>`;
+    return;
+  }
+  const datum = ($('enNDatum') || {}).value || '';
+  const traeger = gavAus010SelbeTag(datum, pickIds('enN'), null);
+  feld.innerHTML = `<div class="msg-warn"><b>${esc(z.name)} — Auslagenersatz geschuldet.</b>
+      Fahrzeit- und Fahrkostenersatz nach ${esc(z.quelle)}. Die Zoneneinteilung beruht auf
+      einer noch offenen Auslegung (GAV-AUS-011) und gilt als deine Bestätigung.</div>
+    <div class="zone danger" style="margin-top:8px">
+      <div class="zone-hd">GAV-AUS-010 ist offen</div>
+      <div class="zone-note">${esc(typeof GAV_AUS010_HINWEIS === 'string' ? GAV_AUS010_HINWEIS : '')}${
+        traeger.length
+          ? `<br><br><b>Betrifft bereits: ${traeger.map(t => esc(t.name)).join(', ')}.</b>
+             ${traeger.length === 1 ? 'Diese Person ist' : 'Diese Personen sind'} an diesem Tag
+             bereits auf einem anderen Einsatz eingeteilt.`
+          : ''}</div>
+    </div>`;
 }
 
 // ══════════════════════════════════════════════════════ TELEFON (ENT-118)
@@ -8115,8 +8155,28 @@ function zoneChip(o) {
   }
   if (!z) { return '<span class="chip chip-w" title="Wegstrecke nicht hinterlegt — nicht beurteilbar">? offen</span>'; }
   return z.entschaedigung
-    ? `<span class="chip chip-w" title="${esc(z.name)}, ${esc(z.quelle)}">${esc(z.name)}</span>`
+    ? `<span class="chip chip-w" title="${esc(z.name)}, ${esc(z.quelle)} — ${esc(typeof GAV_AUS010_HINWEIS === 'string' ? GAV_AUS010_HINWEIS : '')}">${esc(z.name)}</span>`
     : `<span class="chip chip-p" title="${esc(z.name)}, ${esc(z.quelle)}">keine</span>`;
+}
+
+// Balken ueber der Objektliste, sobald mindestens EIN Objekt in eine
+// entschaedigungspflichtige Zone faellt (OP-66). Bewusst kein blosser
+// Tooltip: Der Moment, in dem ein Objekt ueber 10 km liegt, ist der Ausloeser
+// dafuer, dass GAV-AUS-010 scharf wird -- das darf nicht an der Maus haengen,
+// die zufaellig ueber der richtigen Zeile schwebt.
+function gavAus010Balken(liste) {
+  if (!anstellungsorte.length) { return ''; }
+  const betroffen = liste.filter(o => o.aktiv).filter(o => {
+    const z = objektZone(o);
+    return z && z.entschaedigung;
+  });
+  if (!betroffen.length) { return ''; }
+  const namen = betroffen.map(o => esc(o.name)).join(', ');
+  return `<div class="zone danger" style="margin:0 0 16px">
+    <div class="zone-hd">Auslagenersatz betrifft ${betroffen.length} ${betroffen.length === 1 ? 'Objekt' : 'Objekte'}</div>
+    <div class="zone-note">${esc(typeof GAV_AUS010_HINWEIS === 'string' ? GAV_AUS010_HINWEIS : '')}<br>
+    <b>Betroffen:</b> ${namen}.</div>
+  </div>`;
 }
 
 function renderObjekte() {
@@ -8124,13 +8184,17 @@ function renderObjekte() {
   const mitInaktiv = $('oInaktiv').checked;
   const d = objekte.filter(o => (mitInaktiv || o.aktiv) &&
     (!q || [o.name, o.kunde_name, o.ort, o.strasse].some(f => String(f || '').toLowerCase().includes(q))));
+  // Ueber der GANZEN Liste, nicht nur der gefilterten Ansicht (OP-66): Sonst
+  // verschwindet der Hinweis, sobald jemand einen Suchbegriff eintippt, und
+  // genau das darf bei einer Auslagenpflicht nicht passieren.
+  const balken = gavAus010Balken(objekte);
   if (!d.length) {
-    $('oTable').innerHTML = objekte.length
+    $('oTable').innerHTML = balken + (objekte.length
       ? EMPTY('Keine Treffer', 'Für diese Suche gibt es keine Objekte.')
-      : EMPTY('Noch keine Objekte', 'Ein Objekt ist der feste Einsatzort eines Dauerauftrags. Mit „Neues Objekt“ das erste anlegen.');
+      : EMPTY('Noch keine Objekte', 'Ein Objekt ist der feste Einsatzort eines Dauerauftrags. Mit „Neues Objekt“ das erste anlegen.'));
     return;
   }
-  $('oTable').innerHTML = `<table><thead><tr>
+  $('oTable').innerHTML = balken + `<table><thead><tr>
       <th>Objekt</th><th>Kunde</th><th>Ort</th><th>Kanton</th><th>Einsatzart</th>
       <th>Auslagen</th>
       <th class="num">Masterschichten</th><th class="num">Std. je Durchgang</th><th>Zustand</th>
@@ -8242,11 +8306,11 @@ function obZoneAktualisieren() {
     return;
   }
   hint.innerHTML = z.entschaedigung
-    ? `<div class="ki-hint on" style="color:var(--warn);background:var(--warn-soft)">
-        <span><b>${esc(z.name)} — Auslagenersatz faellt an.</b> Fuer Einsaetze an diesem Objekt
-        sind Fahrzeit- und Fahrkostenersatz nach ${esc(z.quelle)} geschuldet. Der Betrag wird hier
-        bewusst nicht gerechnet, solange offen ist, wie mehrere Einsaetze am selben Tag zu
-        behandeln sind (Art. 18 Ziff. 8).</span></div>`
+    ? `<div class="zone danger" style="margin-top:12px">
+        <div class="zone-hd">${esc(z.name)} — Auslagenersatz fällt an</div>
+        <div class="zone-note">Für Einsätze an diesem Objekt sind Fahrzeit- und Fahrkostenersatz
+        nach ${esc(z.quelle)} geschuldet.<br><br>${esc(typeof GAV_AUS010_HINWEIS === 'string' ? GAV_AUS010_HINWEIS : '')}</div>
+      </div>`
     : `<div class="ki-hint web on">
         <span><b>${esc(z.name)} — kein Auslagenersatz.</b> Bis 10 km ab Anstellungsort ist
         nach ${esc(z.quelle)} nichts geschuldet.</span></div>`;
@@ -8948,6 +9012,10 @@ function epLaden() {
   // neue Liste da ist -- sonst zeigt der Kopf kurz fremde Unterlagen (ENT-117).
   epDok = [];
   epDokLaden().then(() => epKopfZeichnen());
+  // Fuer die GAV-AUS-010-Warnung im Kopf wird die Zone gebraucht, und die
+  // braucht die Anstellungsorte -- geladen werden sie nur einmal, nicht bei
+  // jedem Oeffnen (OP-66).
+  if (!anstellungsorte.length) { ladeAnstellungsorte().then(() => epKopfZeichnen()); }
   return api('einsatz_position.php?einsatz_id=' + epId).then(({ ok, data }) => {
     epPos = (ok && data.status === 'ok') ? (data.positionen || []) : [];
     // Beim ersten Oeffnen entstehen die Positionen aus dem Bedarf des
@@ -9019,6 +9087,31 @@ function epZeichnen() {
 // Wird der Arbeitsort spaeter geaendert, bleibt die Zahl stehen -- absichtlich,
 // denn eine stille Neuberechnung koennte eine bereits abgerechnete Zone
 // veraendern (GAV-AUS-011). Sichtbar sein muss es trotzdem.
+// GAV-AUS-010 im Einsatzplan (OP-66): Anders als beim Anlegen ist hier auch
+// bekannt, wer TATSAECHLICH zugeteilt ist -- nicht nur, wer im Formular
+// angehakt wurde. Der Hinweis nennt darum die eingeteilten Personen, die an
+// diesem Tag bereits einen anderen Einsatz haben.
+function epGavAus010Warnung(e) {
+  if (!e || !e.weg_km || !anstellungsorte.length) { return ''; }
+  const nao = typeof aoNao === 'function' ? aoNao() : null;
+  const z = typeof gavZone === 'function'
+    ? gavZone(e.weg_km, null, nao ? nao.km_zum_anderen : null) : null;
+  if (!z || !z.entschaedigung) { return ''; }
+  const ids = [...new Set((epPos || []).filter(epBesetzt).map(p => Number(p.mitarbeiter_id)))];
+  const traeger = typeof gavAus010SelbeTag === 'function'
+    ? gavAus010SelbeTag(e.datum, ids, Number(e.id)) : [];
+  return `<div class="card-bd" style="padding:0 16px 14px">
+    <div class="zone danger">
+      <div class="zone-hd">${esc(z.name)} — Auslagenersatz geschuldet</div>
+      <div class="zone-note">${esc(typeof GAV_AUS010_HINWEIS === 'string' ? GAV_AUS010_HINWEIS : '')}${
+        traeger.length
+          ? `<br><br><b>Betrifft: ${traeger.map(t => esc(t.name)).join(', ')}.</b>
+             ${traeger.length === 1 ? 'Diese Person ist' : 'Diese Personen sind'} an diesem Tag
+             bereits auf einem anderen Einsatz eingeteilt.`
+          : ''}</div>
+    </div></div>`;
+}
+
 function epWegWarnung(e) {
   if (!e || !e.weg_km || !e.weg_adresse) return '';
   const jetzt = [e.strasse, e.ort, e.kanton].map(t => (t || '').trim()).filter(Boolean).join(', ');
@@ -9066,6 +9159,7 @@ function epKopfZeichnen() {
       ${feld('Bemerkung', esc(e.bemerkung || ''))}
     </div>
     ${epWegWarnung(e)}
+    ${epGavAus010Warnung(e)}
     ${epDokBlock()}`;
 }
 
