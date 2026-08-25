@@ -2687,6 +2687,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
             <option value="bestaetigt">Nur bestätigt</option>
             <option value="offen">Nur unterbesetzt</option>
             <option value="abgesagt">Nur abgesagt</option>
+            <option value="abgeschlossen">Nur abgeschlossen</option>
           </select>
           <!-- Suche hinter den Filtern, Abstandhalter davor dem Knopf:
                so stehen die Filter links beisammen und "Neuer Einsatz"
@@ -2822,6 +2823,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
               <option value="bestaetigt">Nur bestätigt</option>
               <option value="offen">Nur unterbesetzt</option>
               <option value="abgesagt">Nur abgesagt</option>
+              <option value="abgeschlossen">Nur abgeschlossen</option>
             </select>
             <!-- Der schnelle Weg (ENT-057). Auf dem Handy ist der Tagesplan die
                  Startseite der Planung -- wer dort eine Lücke sieht, soll den
@@ -6894,6 +6896,10 @@ function planHerkunftPasst(e, herkunft) {
 
 function planStatusPasst(e, st) {
   if (st === 'offen') { return fehlend(e) > 0; }
+  // Kein eigener Status, sondern berechnet wie "offen": das Einsatzdatum
+  // liegt vor heute -- unabhaengig davon, ob die Ist-Zeiten schon
+  // abgeglichen sind (das ist eine andere Frage, siehe agGefiltert()).
+  if (st === 'abgeschlossen') { return tagVon(e) < isoTag(); }
   return !st || e.status === st;
 }
 

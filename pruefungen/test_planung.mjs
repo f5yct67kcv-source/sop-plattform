@@ -153,6 +153,13 @@ await page.selectOption('#pStatus', 'offen');
 await page.waitForTimeout(200);
 z = await zeilen();
 check('Filter „unterbesetzt“ zeigt nur Luecken', z.filter(r => !r.grp).length === 2);
+await page.selectOption('#pStatus', 'abgeschlossen');
+await page.waitForTimeout(200);
+z = await zeilen();
+check('KRITISCH: Filter „abgeschlossen“ zeigt nur Einsaetze vor heute',
+  z.filter(r => !r.grp).length === 1 && z.some(r => r.t.includes(dmy(FRUEHER))));
+check('Heutiges und Zukuenftiges zaehlt NICHT als abgeschlossen',
+  !z.some(r => r.t.includes(dmy(HEUTE)) || r.t.includes(dmy(SPAETER))));
 await page.selectOption('#pStatus', '');
 await page.selectOption('#pSchnell', 'monat');
 await page.waitForTimeout(200);
