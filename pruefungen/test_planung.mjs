@@ -1,9 +1,11 @@
 import { WURZEL, HIER, OUT, browserPfad } from './pfade.mjs';
 import { chromium } from 'playwright';
 import { zeitSetzen } from './zeitfeld.mjs';
+import { readFileSync } from 'fs';
 
 
 const URL = `file://${WURZEL}/dashboard.html`;
+const dash = readFileSync(`${WURZEL}/dashboard.html`, 'utf8');
 const EXE = browserPfad();
 
 // Datum lokal, gleiche Rechnung wie im Dashboard
@@ -420,7 +422,8 @@ check('Der Messhinweis nennt die kürzeste Strecke — nicht die schnellste',
   && /nicht die schnellste/i.test(await page.textContent('#enNWegHinweis')));
 check('KRITISCH: ohne Wegstrecke steht „nicht bestimmbar", nicht „keine Entschädigung"',
   (await page.textContent('#enNZone')).includes('nicht bestimmen'));
-check('Und das Fahrzeit-Häkchen ist dann gar nicht da', !(await page.isVisible('#enNFzWahl')));
+check('Kein Fahrzeit-Häkchen mehr (ENT-122)',
+  await page.evaluate(() => !document.getElementById('enNFzWahl') && !document.getElementById('enNFahrzeit')));
 
 // Anstellungsgebiet: unter 10 km, keine Entschädigung.
 await page.fill('#enNWeg_km', '8');
@@ -429,7 +432,8 @@ check('8 km ergeben das Anstellungsgebiet',
   (await page.textContent('#enNZone')).includes('Anstellungsgebiet'));
 check('KRITISCH: dort wird kein Auslagenersatz gemeldet',
   !(await page.textContent('#enNZone')).includes('geschuldet'));
-check('Und kein Fahrzeit-Häkchen angeboten', !(await page.isVisible('#enNFzWahl')));
+check('Auch im Anstellungsgebiet kein Fahrzeit-Häkchen',
+  await page.evaluate(() => !document.getElementById('enNFzWahl')));
 
 // Pauschalzone 1: über 10 km, Entschädigung geschuldet.
 await page.fill('#enNWeg_km', '15');
@@ -439,15 +443,19 @@ check('KRITISCH: 15 km ergeben Pauschalzone 1 mit Auslagenersatz',
   zoneTxt.includes('Pauschalzone 1') && zoneTxt.includes('geschuldet'));
 check('Die Fundstelle wird genannt', zoneTxt.includes('Art. 18'));
 check('KRITISCH: der Hinweis nennt die offene Auslegung', zoneTxt.includes('GAV-AUS-011'));
-check('Das Fahrzeit-Häkchen erscheint und ist vorbelegt',
-  (await page.isVisible('#enNFzWahl')) && (await page.isChecked('#enNFahrzeit')));
+// ENT-122: Auch wenn Auslagenersatz geschuldet ist, entstehen keine
+// Fahrzeit-Zeilen mehr. Der Anspruch folgt aus der Zone (Art. 18 Ziff. 3),
+// nicht aus zwei Zeilen im Raster.
+check('KRITISCH: auch bei geschuldetem Auslagenersatz kein Fahrzeit-Häkchen',
+  await page.evaluate(() => !document.getElementById('enNFzWahl')));
 
 // Reinigung: der GAV Sicherheit gilt nicht (ENT-061).
 await page.selectOption('#enNSparte', 'reinigung');
 await page.waitForTimeout(250);
 check('KRITISCH: für Reinigung gilt Art. 18 nicht',
   (await page.textContent('#enNZone')).includes('Reinigung'));
-check('Und es wird keine Fahrzeit angeboten', !(await page.isVisible('#enNFzWahl')));
+check('Bei Reinigung erst recht keine Fahrzeit-Zeilen',
+  await page.evaluate(() => !document.getElementById('enNFzWahl')));
 await page.selectOption('#enNSparte', 'sicherheit');
 await page.waitForTimeout(250);
 
@@ -468,7 +476,7 @@ check('KRITISCH: der Link führt von der HAO-Adresse zum Arbeitsort',
 check('Er öffnet die Routenliste, nicht eine einzelne Route',
   linkZiel && linkZiel.includes('/maps/dir/?api=1'));
 
-// Anlegen mit Fahrzeit: zwei zusätzliche Positionen, als Nicht-Arbeitszeit.
+// Anlegen mit eingetragener Fahrzeit: es entstehen KEINE Positionen (ENT-122).
 await page.fill('#enNKunde_name', 'Studer Immobilien AG');
 await zeitSetzen(page, '#enNVon', '08:00');
 await zeitSetzen(page, '#enNBis', '12:00');
@@ -481,13 +489,22 @@ const gespeichert = calls.find(c => c.path.includes('einsatz_save'));
 check('KRITISCH: die Wegstrecke geht mit an den Server', gespeichert && Number(gespeichert.body.weg_km) === 15);
 check('KRITISCH: die Adresse zur Wegstrecke wird mitgeschrieben',
   gespeichert && (gespeichert.body.weg_adresse || '').includes('Kantonsstrasse 2'));
+// ENT-122: Die Minuten werden weiterhin gespeichert -- sie sind die
+// Grundlage des Fahrzeitersatzes -- aber es entstehen keine Positionen mehr.
+check('KRITISCH: die Fahrzeit-Minuten gehen weiterhin an den Server',
+  gespeichert && Number(gespeichert.body.weg_minuten) === 30);
 const fz = calls.filter(c => c.path.includes('einsatz_position') && c.body && c.body.ist_fahrzeit);
-check('KRITISCH: Hin- und Rückfahrt werden angelegt', fz.length === 2);
-check('KRITISCH: beide sind als Fahrzeit gekennzeichnet', fz.every(c => c.body.ist_fahrzeit === 1));
-check('KRITISCH: die Hinfahrt endet, wenn der Einsatz beginnt',
-  fz.some(c => c.body.von === '07:30' && c.body.bis === '08:00'));
-check('KRITISCH: die Rückfahrt beginnt, wenn der Einsatz endet',
-  fz.some(c => c.body.von === '12:00' && c.body.bis === '12:30'));
+check('KRITISCH: es entstehen keine Fahrzeit-Positionen mehr', fz.length === 0);
+check('KRITISCH: ueberhaupt keine Position wird beim Anlegen erzeugt',
+  calls.filter(c => c.path.includes('einsatz_position') && c.body
+    && c.body.aktion === 'speichern').length === 0);
+// Die Behandlung BESTEHENDER Fahrzeit-Positionen bleibt unangetastet und
+// wird in test_einsatzplan.mjs geprueft: Sie stehen im Raster, tragen die
+// Marke "keine Arbeitszeit" und zaehlen nicht in die Stundensummen
+// (Sperrwirkung GAV-AUS-009). Wuerde das wegfallen, liefen die in der
+// Datenbank liegenden Zeilen ab sofort als Arbeitszeit mit.
+check('KRITISCH: die Ausnahme bestehender Fahrzeit-Positionen ist nicht entfernt worden',
+  /if \(p\.ist_fahrzeit\) return;/.test(dash));
 
 // ══════════ GESTALTUNG DER ANLEGEN-ANSICHT (ENT-115)
 // Gemessen, nicht im Quelltext nachgelesen.
