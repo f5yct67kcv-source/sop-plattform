@@ -949,6 +949,68 @@ const krume = await page.textContent('#pgCrumb');
 check('Auch die Kopfzeile sagt Schichten, nicht Stellen',
   !/Stelle/.test(krume));
 
+// ══════════════ SPALTENBREITEN (ENT-137)
+// Der Projektinhaber, mit einer markierten Planungs-Tabelle: die Spalten
+// wirkten ungleichmaessig -- Zwischenraeume unterschiedlich breit, "Status"
+// weit nach rechts verschoben, obwohl das Padding je Zelle die ganze Zeit
+// gleich war. Grund: table-layout:auto orientierte die Breite jeder Spalte
+// am breitesten Inhalt ueber ALLE Zeilen hinweg -- eine einzelne Zeile mit
+// vielen Namen in "Zugeteilt" blaehte diese eine Spalte auf und verdraengte
+// die uebrigen. Feste Prozentbreiten (table-layout:fixed + colgroup) beheben
+// das strukturell, nicht durch Zufall der zufaellig groessten Zeile.
+await page.evaluate(() => { go('planung'); goTab('einsaetze'); });
+await page.selectOption('#pSchnell', 'alle');
+await page.waitForTimeout(300);
+// Absichtlich viel Inhalt in EINER Zelle -- genau der Fall, der table-layout:
+// auto zuvor aus der Fassung brachte. Datum weit in der Vergangenheit (2000):
+// harmlos fuer test_datumsfest.mjs, das nur Daten NAHE bei heute verbietet.
+await page.evaluate(() => {
+  einsaetze.push({ id: 900, kunde_id: 1, kunde_name: 'Eine sehr sehr lange Kundenbezeichnung AG',
+    titel: 'Und ein ebenso langer Titel dazu', strasse: null, ort: '4632 Trimbach',
+    einsatzart: 'Verkehrsdienst', datum: '2000-01-01', von: '07:00:00', bis: '16:00:00',
+    bedarf: 5, status: 'geplant', bemerkung: null,
+    mitarbeiter: [{ id: 101, name: 'x1', vorname: 'Adrian', nachname: 'Von Arb' },
+      { id: 102, name: 'x2', vorname: 'Daniele', nachname: 'Ciardo' },
+      { id: 103, name: 'x3', vorname: 'Hans', nachname: 'Meier' }] });
+  renderPlanung();
+});
+await page.waitForTimeout(200);
+const spalten = await page.evaluate(() => {
+  const table = document.querySelector('#plTable table.pl-tab');
+  if (!table) return null;
+  const breite = table.getBoundingClientRect().width;
+  return [...table.querySelectorAll('thead th')].map(th => (th.getBoundingClientRect().width / breite) * 100);
+});
+check('KRITISCH: die Planung-Tabelle traegt feste Spaltenbreiten (table-layout:fixed)', !!spalten);
+// Enge Toleranz mit Bedacht gewaehlt: table-layout:fixed haelt die Breite auf
+// 0.01 Prozentpunkte genau ein. Ohne fixed (nur colgroup, table-layout:auto)
+// wich "Besetzung" bereits um über 1 Prozentpunkt ab (9.2 statt 8 -- der
+// Browser respektiert col-Breiten als Hinweis, nicht als Vorgabe, sobald
+// Inhalt umbricht). 0.5 trennt beide Faelle sauber; 2 (die erste Fassung
+// dieser Pruefung) haette den Regressionsfall durchgelassen -- beim Schreiben
+// der Gegenprobe selbst bemerkt und korrigiert.
+const ERWARTET_SPALTEN = [10, 18, 15, 13, 8, 24, 12];
+check('KRITISCH: jede Spalte behaelt ihre vorgesehene Breite, auch mit ueberlangem Inhalt in einer einzelnen Zeile',
+  !!spalten && spalten.length === ERWARTET_SPALTEN.length
+  && spalten.every((p, i) => Math.abs(p - ERWARTET_SPALTEN[i]) < 0.5));
+await page.evaluate(() => { einsaetze.splice(einsaetze.findIndex(e => Number(e.id) === 900), 1); });
+
+// Dasselbe Muster gilt fuer den Tagesplan -- dieselbe Liste, nur nach einem
+// Tag gefiltert, mit denselben zwei Fallstricken (table-layout, viele Namen).
+await page.evaluate(() => goTab('tag'));
+await page.waitForTimeout(300);
+const spaltenTag = await page.evaluate(() => {
+  const table = document.querySelector('#tgBody table.pl-tab');
+  if (!table) return null;
+  const breite = table.getBoundingClientRect().width;
+  return [...table.querySelectorAll('thead th')].map(th => (th.getBoundingClientRect().width / breite) * 100);
+});
+check('KRITISCH: die Tagesplan-Tabelle traegt ebenfalls feste Spaltenbreiten', !!spaltenTag);
+const ERWARTET_TAG = [11, 22, 18, 9, 26, 14];
+check('Die Tagesplan-Spalten entsprechen den vorgesehenen Breiten',
+  !!spaltenTag && spaltenTag.length === ERWARTET_TAG.length
+  && spaltenTag.every((p, i) => Math.abs(p - ERWARTET_TAG[i]) < 0.5));
+
 await browser.close();
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
