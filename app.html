@@ -138,6 +138,14 @@ svg.i-sm { width: 17px; height: 17px; }
 .karte-haken { position: absolute; top: 10px; right: 10px; width: 24px; height: 24px; border-radius: 50%;
   background: var(--pos); color: #fff; display: flex; align-items: center; justify-content: center; }
 .karte-haken svg { width: 14px; height: 14px; stroke-width: 2.6; }
+/* Ueberfaelliger Rapport (ENT-134): Schicht seit ueber 2 Std. zu Ende, kein
+   eigener Rapport hinterlegt. Warnfarbe statt Fehlerfarbe -- es ist noch kein
+   Fehlschlag, nur eine Erinnerung, und die Karte bleibt so anklickbar wie jede
+   andere auch. */
+.karte.ueberfaellig { border-color: var(--warn); background: var(--warn-soft); }
+.karte-warn { position: absolute; top: 10px; right: 10px; width: 24px; height: 24px; border-radius: 50%;
+  background: var(--warn); color: #fff; display: flex; align-items: center; justify-content: center;
+  font-size: 14px; line-height: 1; }
 
 /* ── Schichtkarte: die Zeit ist die wichtigste Angabe */
 .schicht { display: block; width: 100%; text-align: left; border: none; background: transparent; font: inherit; color: inherit; cursor: pointer; padding: 0; }
@@ -466,6 +474,7 @@ const W = {
     zurErfassung: 'Zur Rapporterfassung',
     schichtRapportieren: 'Schicht rapportieren', schichtRapportTitel: 'Schicht rapportieren',
     schonRapportiert: 'Bereits rapportiert am', erneutSendenKorrigiert: 'Erneutes Senden korrigiert diese Angaben.',
+    rapportUeberfaellig: 'Noch nicht rapportiert',
     strasse: 'Strasse', ort: 'Ort', arbeitsbeginn: 'Arbeitsbeginn', arbeitsende: 'Arbeitsende',
     pauseMinuten: 'Pause (Minuten)', unterzeichnerName: 'Name Unterzeichner', vorUndNachname: 'Vor- und Nachname',
     unterschriftKunde: 'Unterschrift Kunde', hierUnterschreiben: '✍ Hier unterschreiben', loeschen: 'Löschen',
@@ -684,6 +693,7 @@ const ZUSAGE_MARKE = { zugesagt: ['zugesagt', 'm-p'], abgelehnt: ['abgelehnt', '
 // zuerst gesucht.
 function schichtKarte(e, mitDatum) {
   const abgeschlossen = e.status === 'abgeschlossen';
+  const ueberfaellig = !abgeschlossen && schichtUeberfaellig(e);
   const bal = e.status === 'abgesagt' ? 'ab' : (e.status === 'provisorisch' ? 'prov' : (e.status === 'bestaetigt' || abgeschlossen ? 'best' : ''));
   const st = STATUS_MARKE[e.status] || STATUS_MARKE.geplant;
   const zu = ZUSAGE_MARKE[e.zusage] || ZUSAGE_MARKE.offen;
@@ -691,10 +701,11 @@ function schichtKarte(e, mitDatum) {
   // Abgleich wie im Schichtblatt, nur zusaetzlich schon auf der Karte
   // sichtbar, ohne dafuer erst hineinklicken zu muessen.
   const rap = abgeschlossen ? rapportFuerSchicht(e.id) : null;
-  return `<div class="karte${abgeschlossen ? ' abgeschlossen' : ''}">
+  return `<div class="karte${abgeschlossen ? ' abgeschlossen' : ''}${ueberfaellig ? ' ueberfaellig' : ''}">
     ${abgeschlossen ? `<div class="karte-haken" aria-hidden="true" title="${esc(w(st[0]))}">
       <svg class="i" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
     </div>` : ''}
+    ${ueberfaellig ? `<div class="karte-warn" aria-hidden="true" title="${esc(w('rapportUeberfaellig'))}">⚠️</div>` : ''}
     <button class="schicht" onclick="blattAuf(${Number(e.id)})">
       <div class="oben">
         <span class="balken ${bal}"></span>
@@ -751,7 +762,11 @@ function zeichneHeute() {
 // ══════════════════════════════════════════ PLAN
 function zeichnePlan() {
   const heute = isoTag();
-  const kommend = schichten.filter(e => tagVon(e) >= heute)
+  // ENT-134: der ganze laufende Monat, nicht nur ab heute -- sonst
+  // verschwindet eine bereits abgeschlossene Schicht von vorhin aus dem Plan,
+  // noch bevor der Monat vorbei ist.
+  const monatsanfang = heute.slice(0, 8) + '01';
+  const kommend = schichten.filter(e => tagVon(e) >= monatsanfang)
     .sort((a, b) => tagVon(a).localeCompare(tagVon(b)) || String(a.von).localeCompare(String(b.von)));
   if (!kommend.length) {
     $('v-plan').innerHTML = LEER(w('keinePlan'), w('keinePlanText'),
@@ -1354,6 +1369,19 @@ function darfSchichtRapportieren(e) {
   if (e.status === 'abgesagt' || e.zusage !== 'zugesagt' || e.einsatzart !== 'Verkehrsdienst') return false;
   const sp = spanne(e.datum, e.von, e.bis);
   return !!sp && sp[0] <= Date.now();
+}
+
+// Erinnerung, kein Fehler (ENT-134): mehr als zwei Stunden nach Schichtende
+// noch kein eigener Rapport. Nur dort sinnvoll, wo ueberhaupt rapportiert
+// werden darf -- sonst waere die Warnung ein Versprechen ohne Knopf dazu.
+// Ist die Schicht bereits als "abgeschlossen" markiert, hat diese Person
+// zwangslaeufig schon rapportiert (ENT-128 verlangt das von allen
+// Zugeteilten), darum reicht die Pruefung ueber rapportFuerSchicht allein.
+function schichtUeberfaellig(e) {
+  if (!darfSchichtRapportieren(e)) return false;
+  const sp = spanne(e.datum, e.von, e.bis);
+  if (!sp || Date.now() < sp[1] + 2 * 3600e3) return false;
+  return !rapportFuerSchicht(e.id);
 }
 
 // "Korrektur, neueste zaehlt": mehrere Schicht-Rapporte zur selben Zuteilung

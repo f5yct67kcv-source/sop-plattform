@@ -18,6 +18,21 @@ const beginn = new Date(jetzt.getTime() - 3600e3), ende = new Date(jetzt.getTime
 const hm = d => String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0') + ':00';
 const LAUF_DATUM = iso(beginn);
 
+// ENT-134: ein Tag, der eindeutig VOR heute liegt, aber noch im laufenden
+// Monat -- gibt es ihn nicht (heute ist der Monatserste), entfaellt der
+// betroffene Testfall weiter unten, statt einen falschen Tag zu erfinden.
+const gesternDatum = new Date(jetzt.getTime() - 864e5);
+const frueherImMonat = gesternDatum.getMonth() === jetzt.getMonth() ? GESTERN : null;
+
+// Ein Tag sicher im VORHERGEHENDEN Kalendermonat -- der 15. reicht, unabhaengig
+// von der Laenge des laufenden Monats.
+const VORMONAT = iso(new Date(jetzt.getFullYear(), jetzt.getMonth() - 1, 15));
+
+// Fuer die Zwei-Stunden-Schwelle der Ueberfaellig-Warnung: vor ueber 2 Std.
+// zu Ende ist ueberfaellig, vor weniger als 2 Std. noch nicht.
+const vorEinerStunde = new Date(jetzt.getTime() - 3600e3);
+const vorZweiStunden = new Date(jetzt.getTime() - 2 * 3600e3);
+
 const SCHICHTEN = () => ({ status: 'ok', von: GESTERN, bis: tag(90), schichten: [
   { id: 41, kunde_name: 'Einwohnergemeinde Niedergösgen', titel: 'Revierdienst Nacht',
     strasse: 'Sehr Lange Hauptstrasse 44', ort: '4632 Trimbach', einsatzart: 'Revierdienst',
@@ -84,6 +99,20 @@ const page = await browser.newPage({ viewport: { width: 390, height: 844 }, devi
 page.on('pageerror', e => bad.push('JS-Fehler: ' + e.message));
 
 let schichtenDaten = SCHICHTEN();
+// ENT-134: eine bereits vergangene Schicht des laufenden Monats -- lange
+// genug her, dass sie zugleich als "ueberfaellig, nie rapportiert" dient.
+if (frueherImMonat) {
+  schichtenDaten.schichten.push({ id: 47, kunde_name: 'Cupi24 GmbH', titel: 'Frueher im Monat, nie rapportiert',
+    strasse: null, ort: '4632 Trimbach', einsatzart: 'Verkehrsdienst',
+    datum: frueherImMonat, von: '08:00:00', bis: '10:00:00', status: 'bestaetigt', bemerkung: null,
+    zusage: 'zugesagt', objekt_name: null, im_team: 1 });
+}
+// Gegenprobe zur Monatsansicht: liegt ausserhalb des laufenden Monats und
+// darf im Plan nicht auftauchen.
+schichtenDaten.schichten.push({ id: 48, kunde_name: 'Cupi24 GmbH', titel: 'Schicht aus dem Vormonat',
+  strasse: null, ort: '4632 Trimbach', einsatzart: 'Verkehrsdienst',
+  datum: VORMONAT, von: '08:00:00', bis: '10:00:00', status: 'bestaetigt', bemerkung: null,
+  zusage: 'zugesagt', objekt_name: null, im_team: 1 });
 const rufe = [];           // welche Endpunkte mit welchem Rumpf aufgerufen wurden
 let zusageAntwort = null;  // erlaubt es, eine Fehlerantwort zu erzwingen
 let passwortAntwort = null;
@@ -209,6 +238,67 @@ check('Abgesagte Schicht zaehlt nicht als Schicht des Tages',
     while (j >= 0 && !kinder[j].classList.contains('tag-kopf')) { j--; }
     return j >= 0 && !/1 Schicht/.test(kinder[j].textContent);
   }));
+
+// ══════════════ MONATSANSICHT + UEBERFAELLIG (ENT-134)
+// Bisher zeigte "Plan" nur Schichten ab heute -- eine bereits vergangene
+// Schicht des laufenden Monats verschwand daraus, sobald der Tag um war.
+if (frueherImMonat) {
+  check('Plan zeigt eine bereits vergangene Schicht des laufenden Monats',
+    planText.includes('Frueher im Monat, nie rapportiert'));
+} else {
+  check('Kein Testfall fuer "frueher im Monat" moeglich, weil heute der Monatserste ist', true);
+}
+check('Plan zeigt KEINE Schicht aus dem Vormonat',
+  !planText.includes('Schicht aus dem Vormonat'));
+
+if (frueherImMonat) {
+  check('KRITISCH: die ueberfaellige Karte traegt die Ueberfaellig-Kennzeichnung',
+    await page.evaluate(() => {
+      const k = [...document.querySelectorAll('#v-plan .karte')]
+        .find(x => x.textContent.includes('Frueher im Monat, nie rapportiert'));
+      return !!k && k.classList.contains('ueberfaellig');
+    }));
+  check('KRITISCH: sie zeigt das Warnzeichen',
+    await page.evaluate(() => {
+      const k = [...document.querySelectorAll('#v-plan .karte')]
+        .find(x => x.textContent.includes('Frueher im Monat, nie rapportiert'));
+      return !!k && !!k.querySelector('.karte-warn');
+    }));
+  // Am gerenderten Zustand gemessen (CLAUDE.md, Gestaltung).
+  check('Die ueberfaellige Karte hebt sich farblich vom Regelfall ab',
+    await page.evaluate(() => {
+      const alle = [...document.querySelectorAll('#v-plan .karte')];
+      const normal = alle.find(k => !k.classList.contains('ueberfaellig') && !k.classList.contains('abgeschlossen'));
+      const spaet = alle.find(k => k.classList.contains('ueberfaellig'));
+      if (!normal || !spaet) return false;
+      const a = getComputedStyle(normal), b = getComputedStyle(spaet);
+      return a.borderColor !== b.borderColor || a.backgroundColor !== b.backgroundColor;
+    }));
+}
+
+// Die Zwei-Stunden-Schwelle selbst, direkt an der Funktion gemessen -- ein
+// DOM-Test dafuer haenge von der Testlaufzeit ab (jetzt +/- Sekunden), die
+// Funktion selbst nicht.
+const zp = await page.evaluate(({ gestern, geradeEbenDatum, geradeEbenVon, geradeEbenBis }) => {
+  const laengstVorbei = { id: 9001, einsatzart: 'Verkehrsdienst', zusage: 'zugesagt', status: 'bestaetigt',
+    datum: gestern, von: '08:00:00', bis: '10:00:00' };
+  const geradeEbenVorbei = { id: 9002, einsatzart: 'Verkehrsdienst', zusage: 'zugesagt', status: 'bestaetigt',
+    datum: geradeEbenDatum, von: geradeEbenVon, bis: geradeEbenBis };
+  return {
+    laengstUeberfaellig: schichtUeberfaellig(laengstVorbei),
+    geradeEbenNochNicht: schichtUeberfaellig(geradeEbenVorbei),
+    keinVerkehrsdienst: schichtUeberfaellig({ ...laengstVorbei, id: 9003, einsatzart: 'Revierdienst' }),
+    nichtZugesagt: schichtUeberfaellig({ ...laengstVorbei, id: 9004, zusage: 'offen' }),
+    abgesagt: schichtUeberfaellig({ ...laengstVorbei, id: 9005, status: 'abgesagt' }),
+    schonRapportiertFall: schichtUeberfaellig({ ...laengstVorbei, id: 46 }),
+  };
+}, { gestern: GESTERN, geradeEbenDatum: iso(vorZweiStunden), geradeEbenVon: hm(vorZweiStunden), geradeEbenBis: hm(vorEinerStunde) });
+check('KRITISCH: ueberfaellig, wenn seit ueber 2 Std. zu Ende und nicht rapportiert', zp.laengstUeberfaellig);
+check('Noch NICHT ueberfaellig, wenn erst vor 1 Std. zu Ende (< 2 Std.)', !zp.geradeEbenNochNicht);
+check('Kein Verkehrsdienst -- keine Ueberfaellig-Warnung', !zp.keinVerkehrsdienst);
+check('Nicht zugesagt -- keine Ueberfaellig-Warnung', !zp.nichtZugesagt);
+check('Abgesagte Schicht -- keine Ueberfaellig-Warnung', !zp.abgesagt);
+check('Bereits eigener Rapport vorhanden (Schicht 46) -- keine Ueberfaellig-Warnung', !zp.schonRapportiertFall);
 
 // ══════════════ BLATT + ZUSAGE
 await page.click('#v-plan .schicht[onclick="blattAuf(42)"]');
