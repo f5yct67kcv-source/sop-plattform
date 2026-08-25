@@ -187,12 +187,12 @@ const GAV_WEGSTRECKE_HINWEIS =
 
    Eine einzige Quelle (wie GAV_WEGSTRECKE_HINWEIS oben), weil der Text an
    mehreren Stellen gebraucht wird: Objektliste, Objektdialog, Neue-Schicht,
-   Einsatzplan (siehe OP-66). */
+   Einsatzplan (siehe OP-104). */
 const GAV_AUS010_HINWEIS =
   'GAV-AUS-010 ist offen: Für Tage mit mehr als einem Einsatz je Person darf '
   + 'nach heutigem Stand kein Auslagenersatz berechnet oder angezeigt werden — '
   + 'es ist nicht geklärt, welcher Einsatz als „der eine Hin- und Rückweg" gilt '
-  + '(Art. 18 Ziff. 8). Vor einer Abrechnung muss das die PaKo klären (OP-66).';
+  + '(Art. 18 Ziff. 8). Vor einer Abrechnung muss das die PaKo klären (OP-104).';
 
 const GAV_ZONEN = [
   { schluessel: 'anstellungsgebiet', name: 'Anstellungsgebiet',

@@ -50,6 +50,23 @@ const MA_SPRACHEN = ['de', 'fr', 'it', 'en'];
 // Kein Ja/Nein, weil der Wortlaut vier verschiedene aufzaehlt.
 const MA_FACHAUSWEISE = ['Personenschutz', 'Bewachung', 'Anlaesse', 'Zentralendienste'];
 
+// Womit die Person UEBLICHERWEISE zum Einsatz anreist (ENT-123/ENT-125).
+// Massgeblich fuer den Fahrkostenersatz nach Art. 18 Ziff. 4 und 5 -- der
+// Fahrzeitersatz ist davon unabhaengig und in jedem Fall geschuldet.
+//   Privatfahrzeug      -- eigenes Auto/Motorrad: voller Fahrkostenersatz
+//   Oeffentlicher Verkehr -- Preis des Billetts, 2. Klasse (Ziff. 4)
+//   Mitfahrer           -- faehrt bei jemand anderem mit: einzig Fahrzeitersatz
+//   Geschaeftsfahrzeug   -- Geschaeftsfahrzeug oder vom Arbeitgeber organisiert:
+//                          einzig Fahrzeitersatz (Ziff. 4 bzw. 5)
+// Werte als lesbarer deutscher Text, ASCII ohne Umlaute -- wie MA_FACHAUSWEISE.
+// Das generische Auswahlfeld (mbAuswahl in dashboard.html) zeigt den
+// gespeicherten Wert unveraendert als Beschriftung; ein Programmier-Code
+// wie "oev" erschiene dort unuebersetzt.
+// Das ist die VORGABE der Person. Je Einsatz laesst sie sich ueberschreiben
+// (einsatz_zuteilung.verkehrsmittel) -- fuer die Fahrgemeinschaft, die es nur
+// diesmal gibt.
+const MA_VERKEHRSMITTEL = ['Privatfahrzeug', 'Oeffentlicher Verkehr', 'Mitfahrer', 'Geschaeftsfahrzeug'];
+
 // ── Feldliste ────────────────────────────────────────────────────────────
 // Reihenfolge und Typ an EINER Stelle. Wer ein Feld ergaenzt, ergaenzt es
 // hier -- Endpunkte und Pruefungen ziehen daraus.
@@ -127,6 +144,12 @@ function ma_felder(): array
         // Zugang
         'sprache'    => 'liste',
         'zugang_bis' => 'datum',
+        // Auslagenersatz (ENT-123/ENT-125). Nicht vertraulich. In der
+        // Sammelliste (ma_listenfelder), weil sie dort gebraucht wird: Der
+        // Einsatzplan zeigt die Vorgabe neben der Ausnahme-Auswahl, damit
+        // klar ist, wovon die Ausnahme ueberhaupt abweicht -- ohne einen
+        // eigenen Abruf je Person.
+        'verkehrsmittel' => 'liste',
     ];
 }
 
@@ -154,6 +177,7 @@ function ma_listenfelder(): array
         // sonst plant man jemanden auf einen Einsatz, den er nicht leisten
         // darf. Das WANN einer Ausbildung braucht dafuer niemand.
         'fachausweis', 'diensthundefuehrer', 'waffentragberechtigt',
+        'verkehrsmittel',
     ];
 }
 
@@ -358,6 +382,7 @@ function ma_erlaubte_werte(string $feld): ?array
         case 'aufenthaltsbewilligung': return MA_AUSWEISE;
         case 'sprache':                return MA_SPRACHEN;
         case 'fachausweis':            return MA_FACHAUSWEISE;
+        case 'verkehrsmittel':         return MA_VERKEHRSMITTEL;
         default:                       return null;
     }
 }
