@@ -764,6 +764,22 @@ check('KRITISCH: die Liste zeigt "Abgeschlossen" als Status-Badge',
       .find(r => r.getAttribute('onclick') === 'openEinsatz(11)');
     return !!tr && /Abgeschlossen/.test(tr.textContent);
   }));
+// Gemessen am gerenderten Zustand, nicht im Quelltext nachgelesen (CLAUDE.md):
+// eine CSS-Regel kann wirkungslos bleiben, ohne dass etwas kaputtgeht.
+check('Die Zeile eines abgeschlossenen Einsatzes tritt sichtbar zurueck (Opacity < 1)',
+  await page.evaluate(() => {
+    const tr = [...document.querySelectorAll('#plTable tbody tr')]
+      .find(r => r.getAttribute('onclick') === 'openEinsatz(11)');
+    const td = tr && tr.querySelector('td');
+    return !!td && parseFloat(getComputedStyle(td).opacity) < 1;
+  }));
+check('Eine geplante Zeile bleibt dagegen voll sichtbar (Opacity 1) -- kein pauschales Ausgrauen',
+  await page.evaluate(() => {
+    const tr = [...document.querySelectorAll('#plTable tbody tr')]
+      .find(r => r.getAttribute('onclick') === 'openEinsatz(12)');
+    const td = tr && tr.querySelector('td');
+    return !!td && parseFloat(getComputedStyle(td).opacity) === 1;
+  }));
 await page.evaluate(() => openEinsatzDrawer(11));
 await page.waitForSelector('#drawer.on');
 await page.waitForTimeout(250);
