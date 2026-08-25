@@ -1042,6 +1042,30 @@ if (hat_spalte($pdo, 'kunden', 'plz')) {
     }
 }
 
+// ── 2c2. "Abgeschlossen" nachtragen fuer laengst vollstaendig rapportierte
+// Einsaetze (ENT-128). Noetig, weil der Uebergang nur im Moment eines NEUEN
+// Rapports ausgeloest wird (rapport_create.php) -- ein Rapport, der schon
+// vor dieser Aenderung bestand, hat ihn nie durchlaufen. Ausgenommen bleiben
+// abgesagte und bereits abgeglichene Einsaetze (ENT-045), genau wie beim
+// laufenden Uebergang. Beliebig oft wiederholbar.
+if (hat_tabelle_jetzt($pdo, 'einsaetze') && hat_tabelle_jetzt($pdo, 'einsatz_zuteilung')
+    && hat_tabelle_jetzt($pdo, 'rapporte') && hat_spalte($pdo, 'einsaetze', 'status')) {
+    $kandidaten = $pdo->query(
+        "SELECT id FROM einsaetze WHERE status NOT IN ('abgesagt', 'abgeschlossen') ORDER BY id"
+    )->fetchAll(PDO::FETCH_COLUMN);
+    $nachzutragen = array_values(array_filter($kandidaten, fn($eid) =>
+        !einsatz_abgeglichen($pdo, (int)$eid) && einsatz_vollstaendig_rapportiert($pdo, (int)$eid)));
+    if ($nachzutragen) {
+        if ($nurPruefen) {
+            $getan[] = count($nachzutragen) . ' Einsatz/Einsaetze bereits vollständig rapportiert, aber noch nicht als abgeschlossen markiert';
+        } else {
+            $s = $pdo->prepare("UPDATE einsaetze SET status = 'abgeschlossen' WHERE id = ?");
+            foreach ($nachzutragen as $eid) { $s->execute([$eid]); }
+            $getan[] = count($nachzutragen) . ' Einsatz/Einsaetze auf "abgeschlossen" nachgetragen';
+        }
+    }
+}
+
 // ── 3. Verweise und Index nachtragen, wenn die Spalten neu dazugekommen sind
 $verweise = [
     ['einsaetze', 'objekt_id',        'ALTER TABLE einsaetze ADD FOREIGN KEY (objekt_id) REFERENCES objekte(id) ON DELETE SET NULL'],

@@ -326,6 +326,20 @@ if (ohneEinbindung.length) { bad.push('ohne rechte.php: ' + ohneEinbindung.join(
 check('KRITISCH: einsatz_save.php lehnt einen bereits abgeschlossenen Einsatz beim Speichern nicht ab',
   /in_array\(\$status, \[[^\]]*'abgeschlossen'[^\]]*\], true\)/.test(ohneKommentar('einsatz_save.php')));
 
+// Backfill fuer laengst vollstaendig rapportierte Einsaetze (ENT-128): der
+// Uebergang wird sonst nur im Moment eines NEUEN Rapports ausgeloest -- ohne
+// diesen Nachtrag bliebe jeder Einsatz, dessen Rapport(e) schon vor diesem
+// Deploy bestanden, fuer immer auf dem alten Status stehen.
+{
+  const einrichten = execFileSync('cat', [`${WURZEL}/backend/api/planung_einrichten.php`], { encoding: 'utf8' });
+  check('KRITISCH: die Einrichtung traegt "abgeschlossen" nach fuer Einsaetze, die es laengst waeren',
+    /einsatz_vollstaendig_rapportiert\(\$pdo, \(int\)\$eid\)/.test(einrichten)
+    && /!einsatz_abgeglichen\(\$pdo, \(int\)\$eid\)/.test(einrichten)
+    && /UPDATE einsaetze SET status = 'abgeschlossen' WHERE id = \?/.test(einrichten));
+  check('Ausgenommen sind abgesagte und bereits abgeschlossene Einsaetze -- keine unnoetige Arbeit',
+    /status NOT IN \('abgesagt', 'abgeschlossen'\)/.test(einrichten));
+}
+
 
 // Keine Bibliothek darf zweimal geladen werden.
 //

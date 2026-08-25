@@ -398,6 +398,12 @@ td.num, th.num { text-align: right; }
 td.num.leer { color: var(--ink-3); }
 tbody tr.summe td { background: var(--surface-2); font-weight: 650; border-top: 1px solid var(--line); }
 tbody tr.aus td { opacity: .55; }
+/* Abgeschlossene Einsaetze treten in der Liste zurueck (ENT-128) -- erledigt,
+   nicht mehr handlungsbeduerftig. Gleiche Staerke wie tr.aus, eigener Name:
+   "aus" heisst anderswo deaktiviert, nicht erledigt. Gilt fuer Einsaetze UND
+   Tagesplan -- dieselbe Liste, nur nach einem Tag gefiltert. */
+tbody tr.status-abgeschlossen td { opacity: .55; }
+.ag-karte.status-abgeschlossen { opacity: .55; }
 #msSeiteTabelle td:last-child .btn { margin-left: 6px; }
 
 /* ── Einsatzplan (ENT-076) ──────────────────────────────────────────────
@@ -7118,7 +7124,7 @@ function renderPlanung() {
     const st = EN_STATUS_ANZEIGE[e.status] || EN_STATUS.geplant;
 
     return kopf + `
-      <tr class="click${tag === heute ? ' heute' : ''}${enGesperrt(e) ? ' zu' : ''}${serieStand(e) ? ' serie' : ''}" onclick="openEinsatz(${Number(e.id)})">
+      <tr class="click${tag === heute ? ' heute' : ''}${enGesperrt(e) ? ' zu' : ''}${serieStand(e) ? ' serie' : ''}${e.status === 'abgeschlossen' ? ' status-abgeschlossen' : ''}" onclick="openEinsatz(${Number(e.id)})">
         <td class="nowrap num">${enSchloss(e)}${hm(e.von)}–${hm(e.bis)}${ueberNacht(e) ? '<div class="sec">bis Folgetag</div>' : ''}${serieMarke(e)}</td>
         <td class="strong">${esc(e.kunde_name)}${e.titel ? `<div class="sec">${esc(e.titel)}</div>` : ''}</td>
         <td>${esc(e.ort)}${e.strasse ? `<div class="sec">${esc(e.strasse)}</div>` : ''}</td>
@@ -7153,7 +7159,7 @@ function renderPlanung() {
     const zug = e.mitarbeiter || [];
     const fehlt = fehlend(e);
     const st = EN_STATUS_ANZEIGE[e.status] || EN_STATUS.geplant;
-    return kopf + `<div class="ag-karte click${serieStand(e) ? ' serie' : ''}" onclick="openEinsatz(${Number(e.id)})">
+    return kopf + `<div class="ag-karte click${serieStand(e) ? ' serie' : ''}${e.status === 'abgeschlossen' ? ' status-abgeschlossen' : ''}" onclick="openEinsatz(${Number(e.id)})">
       <div class="kopf">
         <b>${enSchloss(e)}${esc(hm(e.von))}–${esc(hm(e.bis))}${ueberNacht(e) ? ' <span class="ag-plan">bis Folgetag</span>' : ''}</b>
         <span class="chip ${e.status === 'abgesagt' ? 'chip-n' : (fehlt ? 'chip-w' : 'chip-p')}">${besetzt(e).length}/${nf(e.bedarf)}</span>
@@ -11872,7 +11878,7 @@ function renderTagesplan() {
       const st = EN_STATUS_ANZEIGE[e.status] || EN_STATUS.geplant;
       const teile = zug.map(nameChip);
       if (fehlt) teile.push(`<span class="nm off">${fehlt} offen</span>`);
-      return `<tr class="click${enGesperrt(e) ? ' zu' : ''}" onclick="openEinsatz(${Number(e.id)})">
+      return `<tr class="click${enGesperrt(e) ? ' zu' : ''}${e.status === 'abgeschlossen' ? ' status-abgeschlossen' : ''}" onclick="openEinsatz(${Number(e.id)})">
         <td class="nowrap num">${enSchloss(e)}${hm(e.von)}–${hm(e.bis)}${ueberNacht(e) ? '<div class="sec">bis Folgetag</div>' : ''}</td>
         <td class="strong">${esc(e.kunde_name)}${e.titel ? `<div class="sec">${esc(e.titel)}</div>` : ''}</td>
         <td>${esc(e.ort)}${e.strasse ? `<div class="sec">${esc(e.strasse)}</div>` : ''}</td>
