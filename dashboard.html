@@ -3360,16 +3360,6 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
           </div>
         </div>
         <div class="f wide"><div id="enNZone"></div></div>
-        <div class="f wide" id="enNFzWahl" style="display:none">
-          <label style="display:flex;align-items:center;gap:9px;cursor:pointer">
-            <input type="checkbox" id="enNFahrzeit" style="margin:0"
-                   onchange="this.dataset.beruehrt='1'">
-            <span>Fahrzeit-Schichten mit anlegen (Hin- und Rückfahrt)</span>
-          </label>
-          <div class="note" style="margin-top:6px">Sie erscheinen im Raster, zählen aber
-            <b>nicht</b> in die Arbeitszeit — der Fahrzeitersatz ist nach Art. 18 Ziff. 2
-            keine Arbeitszeit und gehört in die getrennte Spesenabrechnung.</div>
-        </div>
   </div>
 </div>
 
@@ -7253,7 +7243,6 @@ function openEinsatzNeu(felder, maNamen) {
   $('enNStatus').value = 'geplant';
   // Beim zweiten Oeffnen duerfen keine Reste des vorigen Einsatzes stehen.
   EN_FELDER_ANSICHT.forEach(f => { const el = $(enId('enN', f)); if (el) el.value = ''; });
-  if ($('enNFahrzeit')) { $('enNFahrzeit').checked = false; delete $('enNFahrzeit').dataset.beruehrt; }
   // Angehaengte, aber nie gespeicherte Dateien duerfen nicht am naechsten
   // Einsatz kleben (ENT-117).
   enNDok = []; enDokZeichnen(); $('enNDokErr').style.display = 'none';
@@ -7386,7 +7375,6 @@ function enWegZone() {
   if (typeof gavGilt === 'function' && !gavGilt(sparte)) {
     feld.innerHTML = `<div class="msg-warn">Für die Sparte Reinigung gilt der GAV Sicherheit nicht
       (ENT-061) — kein Auslagenersatz nach Art. 18.</div>`;
-    $('enNFzWahl').style.display = 'none';
     return;
   }
   if (km === '') {
@@ -7394,7 +7382,6 @@ function enWegZone() {
     // der teuerste Fehler in diesem ganzen Bereich.
     feld.innerHTML = `<div class="note">Ohne Wegstrecke lässt sich die Zone <b>nicht bestimmen</b>.
       Das ist etwas anderes als „keine Entschädigung".</div>`;
-    $('enNFzWahl').style.display = 'none';
     return;
   }
   const nao = typeof aoNao === 'function' ? aoNao() : null;
@@ -7402,7 +7389,6 @@ function enWegZone() {
     ? gavZone(km, null, nao ? nao.km_zum_anderen : null) : null;
   if (!z) {
     feld.innerHTML = `<div class="msg-warn">Die Zone lässt sich mit dieser Angabe nicht bestimmen.</div>`;
-    $('enNFzWahl').style.display = 'none';
     return;
   }
   feld.innerHTML = z.entschaedigung
@@ -7410,9 +7396,6 @@ function enWegZone() {
         Fahrzeit- und Fahrkostenersatz nach ${esc(z.quelle)}. Die Zoneneinteilung beruht auf
         einer noch offenen Auslegung (GAV-AUS-011) und gilt als deine Bestätigung.</div>`
     : `<div class="note"><b>${esc(z.name)}</b> — nach ${esc(z.quelle)} kein Auslagenersatz.</div>`;
-  $('enNFzWahl').style.display = z.entschaedigung ? '' : 'none';
-  // Vorbelegt nach Zone, aber aenderbar: Der Planer entscheidet je Einsatz.
-  if (z.entschaedigung && !$('enNFahrzeit').dataset.beruehrt) $('enNFahrzeit').checked = true;
 }
 
 // ══════════════════════════════════════════════════════ TELEFON (ENT-118)
@@ -7552,7 +7535,6 @@ function createEinsatz() {
     err.style.display = ''; return;
   }
 
-  const fahrzeit = $('enNFahrzeit') && $('enNFahrzeit').checked && Number(body.weg_minuten) > 0;
   enNeuSperre(true);
 
   // Nacheinander, nicht gleichzeitig: Bei einer Reihe mit Anhang waeren das
@@ -7578,11 +7560,10 @@ function createEinsatz() {
         if (!ok || data.status !== 'ok') { ohne.push(dmy(tage[i])); return; }
         angelegt.push(data.id);
         if (reihe && !serieId && data.serie_id) { serieId = Number(data.serie_id); }
-        const weiter = fahrzeit ? enFahrzeitAnlegen(data.id, tagBody) : Promise.resolve();
         // Dokumente erst jetzt: Vorher gab es keine Nummer, an der sie haengen
         // koennten (ENT-117). Und an JEDEM Tag: Der Objektplan gilt am
         // Sonntag so wie am Freitag, nicht nur am ersten Tag der Reihe.
-        return weiter.then(() => enDokHochladen(data.id)).then(f => {
+        return enDokHochladen(data.id).then(f => {
           if (f && f.length) { anhangFehler = anhangFehler.concat(f); }
         });
       }, () => { ohne.push(dmy(tage[i])); })
@@ -7601,7 +7582,6 @@ function createEinsatz() {
     return loadEinsaetze().then(() => {
       const teile = [angelegt.length === 1
         ? 'Einsatz angelegt' : `${angelegt.length} Einsätze angelegt`];
-      if (fahrzeit) { teile.push('mit Hin- und Rückfahrt'); }
       // Ein misslungener Tag oder Anhang darf nicht unter „angelegt“
       // verschwinden — der Einsatz steht, das Dokument fehlt.
       if (ohne.length) { teile.push(`nicht angelegt: ${ohne.join(', ')}`); }
@@ -7631,28 +7611,24 @@ function enNeuSperre(an) {
   ['enNeuBtn', 'enNeuBtn2'].forEach(id => { const b = $(id); if (b) { b.disabled = !!an; } });
 }
 
-// Hin- und Rueckfahrt als eigene Positionen. Sie tragen ist_fahrzeit und
-// zaehlen darum NICHT in die Stundensummen -- der Fahrzeitersatz ist nach
-// Art. 18 Ziff. 2 keine Arbeitszeit (Sperrwirkung im Auslegungsregister).
-function enFahrzeitAnlegen(einsatzId, body) {
-  const min = Number(body.weg_minuten) || 0;
-  if (!einsatzId || min <= 0) return Promise.resolve();
-  const verschoben = (zeit, delta) => {
-    const [h, m] = String(zeit).slice(0, 5).split(':').map(Number);
-    const t = ((h * 60 + m + delta) % 1440 + 1440) % 1440;
-    return String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0');
-  };
-  const wege = [
-    { funktion: 'Fahrzeit Hinweg', von: verschoben(body.von, -min), bis: hm(body.von) },
-    { funktion: 'Fahrzeit Rückweg', von: hm(body.bis), bis: verschoben(body.bis, min) },
-  ];
-  // Nacheinander: Jede Antwort bringt den vollstaendigen neuen Stand mit.
-  return wege.reduce((kette, w) => kette.then(() => api('einsatz_position.php', {
-    method: 'POST',
-    body: { einsatz_id: einsatzId, aktion: 'speichern', ist_fahrzeit: 1,
-            funktion: w.funktion, von: w.von, bis: w.bis },
-  })), Promise.resolve());
-}
+// FAHRZEIT-SCHICHTEN WERDEN NICHT MEHR ANGELEGT (ENT-122).
+//
+// Bis ENT-116 entstanden zum Einsatz zwei zusaetzliche Positionen "Fahrzeit
+// Hinweg" und "Fahrzeit Rueckweg". Sie waren reine Darstellung: Aus der
+// Arbeitszeit waren sie ohnehin ausgenommen (Art. 18 Ziff. 2), berechnet
+// wurde nie etwas daraus. Fuer die Planung waren sie damit Aufwand ohne
+// Gegenwert -- zwei Zeilen mehr im Raster pro Einsatz.
+//
+// WAS BLEIBT UND WARUM: Die Behandlung BESTEHENDER Fahrzeit-Positionen ist
+// unveraendert. Sie liegen in der Datenbank, und wuerde man ihre Ausnahme
+// aus den Stundensummen entfernen, liefen sie ab sofort als Arbeitszeit mit
+// -- genau das verbietet die Sperrwirkung zu GAV-AUS-009. Auch der Vorlauf
+// der Zeitachse und die Marke "keine Arbeitszeit" bleiben deshalb bestehen.
+// Was in der Datenbank steht, wird nicht angefasst.
+//
+// Der Anspruch selbst ist davon nicht beruehrt: Fahrzeit- und
+// Fahrkostenersatz folgen aus der Zone (Art. 18 Ziff. 3) und nicht aus
+// diesen Zeilen.
 
 // ── Dokumente zum Einsatz (ENT-117) ─────────────────────────────
 
