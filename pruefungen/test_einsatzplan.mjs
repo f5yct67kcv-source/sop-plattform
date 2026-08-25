@@ -314,6 +314,27 @@ check('KRITISCH: er ist ausgegraut, keine echte Funktion',
     const btn = [...document.querySelectorAll('#epKopf button')].find(b => b.textContent.includes('Rechnung erstellen'));
     return !!btn && btn.disabled && /noch nicht verfügbar/i.test(btn.title);
   }));
+// Am gerenderten Zustand gemessen (ENT-130, CLAUDE.md "Gestaltung"): ein
+// Knopf ohne Rahmen und ohne Hintergrund ist nicht als Knopf zu erkennen --
+// genau das war beruits gemeldet worden. border-style/background-color
+// muessen tatsaechlich sichtbar sein, nicht nur "nicht transparent" im
+// Sinne der reinen CSS-Eigenschaft.
+check('Der Knopf ist optisch als Knopf erkennbar (Rahmen oder Hintergrund), nicht wie Fliesstext',
+  await page.evaluate(() => {
+    const btn = [...document.querySelectorAll('#epKopf button')].find(b => b.textContent.includes('Rechnung erstellen'));
+    if (!btn) return false;
+    const s = getComputedStyle(btn);
+    // .btn selbst setzt bereits "border: 1px solid transparent" -- border-style
+    // ist darum IMMER "solid", auch ganz ohne sichtbaren Rahmen. Massgeblich
+    // ist die FARBE, nicht ob ueberhaupt ein Style gesetzt ist.
+    const transparent = c => c === 'transparent' || c === 'rgba(0, 0, 0, 0)';
+    return !transparent(s.borderColor) || !transparent(s.backgroundColor);
+  }));
+check('Und zusaetzlich sichtbar gedaempft (Opacity < 1), nicht nur per cursor',
+  await page.evaluate(() => {
+    const btn = [...document.querySelectorAll('#epKopf button')].find(b => b.textContent.includes('Rechnung erstellen'));
+    return !!btn && parseFloat(getComputedStyle(btn).opacity) < 1;
+  }));
 
 // ══════════ RAPPORT-ÜBERSICHT AM ABGESCHLOSSENEN EINSATZ (ENT-128)
 const kopf77 = await page.textContent('#epKopf');

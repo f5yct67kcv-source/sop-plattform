@@ -52,7 +52,14 @@ const SCHICHTEN = () => ({ status: 'ok', von: GESTERN, bis: tag(90), schichten: 
   { id: 45, kunde_name: 'Einwohnergemeinde Niedergösgen', titel: 'Ohne Namensliste',
     strasse: null, ort: '4632 Trimbach', einsatzart: 'Revierdienst',
     datum: tag(6), von: '06:00:00', bis: '10:00:00', status: 'geplant', bemerkung: null,
-    zusage: 'offen', objekt_name: null, im_team: 2, team: [] }]});
+    zusage: 'offen', objekt_name: null, im_team: 2, team: [] },
+  // ENT-128/130: vom Server gesetzt, sobald alle zugesagten Personen
+  // rapportiert haben -- app.html fuehrt seine eigene STATUS_MARKE-Kopie und
+  // hatte "abgeschlossen" zunaechst vergessen (fiel still auf "Geplant" zurueck).
+  { id: 46, kunde_name: 'Cupi24 GmbH', titel: 'Bereits rapportiert',
+    strasse: null, ort: '4632 Trimbach', einsatzart: 'Verkehrsdienst',
+    datum: GESTERN, von: '08:00:00', bis: '10:00:00', status: 'abgeschlossen', bemerkung: null,
+    zusage: 'zugesagt', objekt_name: null, im_team: 1 }]});
 
 const PROFIL = { status: 'ok', monat: { anzahl: 3, stunden: 22.5 }, profil: {
   name: 'daniele.ciardo', ist_admin: false, personalnummer: 'P-014', anrede: 'Herr',
@@ -563,6 +570,19 @@ const klein = await page.evaluate(() => {
 });
 check('Alle Schaltflaechen sind mit dem Daumen bedienbar', klein.length === 0);
 if (klein.length) bad.push('   ↳ zu klein: ' + klein.join(' | '));
+
+// ══════════════ STATUS "ABGESCHLOSSEN" (ENT-128/130)
+// app.html fuehrt STATUS_MARKE unabhaengig vom Dashboard -- der Fehler
+// (Rueckfall auf "Geplant") war nur hier, nicht im Rechenkern selbst.
+await page.evaluate(() => blattAuf(46));
+await page.waitForTimeout(300);
+check('KRITISCH: das Schichtblatt zeigt "Abgeschlossen", faellt nicht auf "Geplant" zurueck',
+  (await T('#blBody')).includes('Abgeschlossen'));
+check('Kein Rueckfall auf "Geplant" fuer einen abgeschlossenen Einsatz',
+  !(await page.evaluate(() =>
+    [...document.querySelectorAll('#blBody .marke')].some(m => /^Geplant$/i.test(m.textContent.trim())))));
+await page.evaluate(() => blattZu());
+await page.waitForTimeout(200);
 
 // ══════════════ ABMELDEN
 await page.click('#t-profil'); await page.waitForTimeout(200);
