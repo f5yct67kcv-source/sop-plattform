@@ -29,12 +29,12 @@ check('KRITISCH: nirgends wird ein Auslagenersatz-Betrag in Franken berechnet',
   !/CHF.{0,40}entschaedigung.{0,40}\*/.test(GAVJS + DASH)
   && !/gavAus010.{0,200}CHF/.test(DASH));
 // Auf die Konstante selbst pruefen, nicht auf die ganze Datei: Ein
-// erklaerender Code-Kommentar erwaehnt OP-66 ebenfalls, und eine Pruefung
+// erklaerender Code-Kommentar erwaehnt OP-104 ebenfalls, und eine Pruefung
 // gegen die Gesamtdatei wuerde bestehen, auch wenn die WARNUNG SELBST den
 // Verweis verloeren wuerde -- genau das ist einer Gegenprobe passiert.
 const hinweisText = (GAVJS.match(/const GAV_AUS010_HINWEIS =[\s\S]*?;/) || [''])[0];
 check('Der Hinweistext nennt GAV-AUS-010 ausdrücklich', /GAV-AUS-010/.test(hinweisText));
-check('Und den Verweis auf OP-66', /OP-66/.test(hinweisText));
+check('Und den Verweis auf OP-104', /OP-104/.test(hinweisText));
 check('Eine einzige Quelle für den Text (wie beim Wegstrecken-Hinweis)',
   (DASH.match(/GAV_AUS010_HINWEIS/g) || []).length >= 3);
 
@@ -116,7 +116,7 @@ check('Und das betroffene Objekt beim Namen', /Fernes Objekt/.test(balkenTxt));
 check('KRITISCH: das Objekt in der sicheren Zone wird NICHT genannt',
   !/Nahes Objekt/.test(balkenTxt));
 
-// Der Balken bleibt stehen, auch wenn die Suche etwas anderes zeigt (OP-66).
+// Der Balken bleibt stehen, auch wenn die Suche etwas anderes zeigt (OP-104).
 await page.fill('#oQ', 'Nahes');
 await page.waitForTimeout(300);
 check('KRITISCH: der Balken verschwindet nicht, nur weil gefiltert wird',

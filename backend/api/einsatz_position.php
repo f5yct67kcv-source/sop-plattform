@@ -29,7 +29,8 @@ $pdo = db();
 /** Positionen eines Einsatzes, jeweils mit der zugeteilten Person. */
 function positionen(PDO $pdo, int $einsatzId): array {
     $s = $pdo->prepare(
-        'SELECT p.*, z.mitarbeiter_id, z.zusage, z.gesehen_am, m.name AS ma_name, m.vorname, m.nachname
+        'SELECT p.*, z.mitarbeiter_id, z.zusage, z.gesehen_am,
+                z.verkehrsmittel, z.oev_rappen, m.name AS ma_name, m.vorname, m.nachname
          FROM einsatz_position p
          LEFT JOIN einsatz_zuteilung z ON z.position_id = p.id
          LEFT JOIN mitarbeiter m ON m.id = z.mitarbeiter_id
@@ -62,6 +63,11 @@ function positionen(PDO $pdo, int $einsatzId): array {
             'zusage' => $p['zusage'],
             // Wann die Person die Schicht in der App geoeffnet hat (ENT-113).
             'gesehen_am' => $p['gesehen_am'],
+            // Verkehrsmittel-AUSNAHME dieser Zuteilung (ENT-123/ENT-125) --
+            // NULL heisst: die Vorgabe der Person gilt. Die Vorgabe selbst
+            // steht im Mitarbeiter-Stammblatt, nicht hier.
+            'verkehrsmittel' => $p['verkehrsmittel'],
+            'oev_rappen' => $p['oev_rappen'] === null ? null : (int)$p['oev_rappen'],
         ];
     }, $s->fetchAll());
 }

@@ -995,6 +995,11 @@ tbody tr.heute td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
    die Daempfung nur den Hinweis -- ausgegraut allein wuerde man mit
    "abgesagt" verwechseln. */
 tbody tr.zu > td:first-child { box-shadow: inset 2px 0 0 var(--warn); }
+/* Auslagenersatz-Zeile ohne bestimmbaren Betrag (ENT-125) -- dieselbe Familie
+   wie tr.zu: dezent markiert, nicht rot, weil nichts verboten ist, sondern
+   etwas noch fehlt (Verkehrsmittel, GAV-AUS-010-Klaerung). */
+tbody tr.au-gesperrt > td:first-child { box-shadow: inset 2px 0 0 var(--warn); }
+tbody tr.au-gesperrt { background: var(--warn-soft); }
 tbody tr.zu .i-schloss { color: var(--warn); }
 
 /* ══════════════════════════════════════════════ REIHE / GRUPPE (ENT-119)
@@ -2344,6 +2349,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
         </button>
         <div class="nav-kinder">
           <button class="nav-kind" id="nav-kontrolle-pensen" onclick="go('pensen')">Pensen</button>
+          <button class="nav-kind" id="nav-kontrolle-auslagen" onclick="go('auslagen')">Auslagenersatz</button>
         </div>
       </div>
 
@@ -3152,6 +3158,28 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
         <div id="pnKopf"></div>
         <div id="pnListe"></div>
         <div id="pnHinweis"></div>
+      </section>
+
+      <!-- ══════════════════════ AUSLAGENERSATZ (ENT-125) ══════════════════════
+           Chronologisches Protokoll je Mitarbeitendem nach Art. 18 Ziff. 10.
+           Zeigt NUR, was beim Abgleich bereits einen Schnappschuss bekommen
+           hat (einsatz_auslagen) -- keine Live-Berechnung hier, die Rechnung
+           steht ausschliesslich in backend/auslagen.php. -->
+      <section class="view" id="view-auslagen">
+        <div class="bar-tools">
+          <div class="tool-gruppe">
+            <input class="inp" type="date" id="auVon" style="width:auto" onchange="ladeAuslagen()" aria-label="Zeitraum von">
+            <span class="tool-bis">bis</span>
+            <input class="inp" type="date" id="auBis" style="width:auto" onchange="ladeAuslagen()" aria-label="Zeitraum bis">
+          </div>
+          <select class="inp" id="auMa" style="width:auto" onchange="zeichneAuslagen()" aria-label="Mitarbeitende auswählen">
+            <option value="">Alle Mitarbeitenden</option>
+          </select>
+          <div class="sp" style="flex:1"></div>
+          <button class="btn btn-quiet btn-sm" onclick="auslagenCsv()">CSV</button>
+        </div>
+        <div id="auKopf"></div>
+        <div id="auListe"></div>
       </section>
 
       <!-- ══════════════════════════ MASTERSCHICHTEN ══════════════════════════
@@ -4470,6 +4498,7 @@ const TITLES = {
   kunden:      ['Kunden', 'Stammdaten'],
   betrieb:     ['Betrieb', 'Einstellungen zum eigenen Unternehmen'],
   pensen:      ['Pensen', 'Jahresstunden gegen die Anstellungskategorie'],
+  auslagen:    ['Auslagenersatz', 'Chronologisches Protokoll je Mitarbeitendem — Art. 18 Ziff. 10'],
   masterschichten: ['Masterschichten', 'Vorlagen, aus denen die Schichten entstehen'],
   einsatzneu:  ['Neuer Einsatz', 'Kunde, Ort, Zeit und Zuteilung'],
   einsatzplan: ['Einsatz planen', 'Positionen und Zeiten im Detail']
@@ -5162,7 +5191,7 @@ function themaUm() {
 // einem breiten Schirm Rand statt Inhalt, waehrend die Felder selbst zu schmal
 // waren. Die Fliesstext-Felder darin behalten ihren eigenen Deckel (siehe
 // .form-zeilen textarea.inp).
-const ANSICHT_WEIT   = ['uebersicht', 'planung', 'abgleich', 'pensen', 'einsatzplan', 'masterschichten', 'einsatzneu'];
+const ANSICHT_WEIT   = ['uebersicht', 'planung', 'abgleich', 'pensen', 'auslagen', 'einsatzplan', 'masterschichten', 'einsatzneu'];
 const PLANUNG_WEIT   = ['uebersicht', 'einsaetze', 'objektplan', 'tag'];
 
 function weiteAnsicht(an) {
@@ -5217,10 +5246,12 @@ function go(view) {
   document.querySelectorAll('#navg-admin .nav-kind').forEach(k => k.classList.remove('on'));
   if (view === 'mitarbeiter') { $('nav-admin-mitarbeiter').classList.add('on'); }
   if (view === 'betrieb') { $('nav-admin-betrieb').classList.add('on'); }
-  $('navg-kontrolle').classList.toggle('offen', view === 'pensen');
-  if (view === 'pensen') { $('nav-kontrolle').classList.add('on'); $('nav-kontrolle-pensen').classList.add('on'); }
-  else { $('nav-kontrolle-pensen').classList.remove('on'); }
+  $('navg-kontrolle').classList.toggle('offen', view === 'pensen' || view === 'auslagen');
+  if (view === 'pensen' || view === 'auslagen') { $('nav-kontrolle').classList.add('on'); }
+  $('nav-kontrolle-pensen').classList.toggle('on', view === 'pensen');
+  $('nav-kontrolle-auslagen').classList.toggle('on', view === 'auslagen');
   if (view === 'pensen') { ladePensen(); }
+  if (view === 'auslagen') { auslagenVorgabe(); ladeAuslagen(); }
   if (view === 'abgleich') {
     // Vorgabe: der zurückliegende Monat bis heute. Wer weiter zurück will,
     // stellt den Zeitraum um.
@@ -7368,7 +7399,7 @@ function enWegLinkKlick() {
 
 // Zone und Auslagenersatz aus der eingetragenen Distanz. Rechnet nichts
 // selbst: gavZone() traegt die Regel, hier wird sie nur angezeigt.
-// GAV-AUS-010 ist offen (OP-66): "Pro Tag kann nur ein Hin- und Rueckweg zum
+// GAV-AUS-010 ist offen (OP-104): "Pro Tag kann nur ein Hin- und Rueckweg zum
 // Einsatzort mit Pauschalen abgerechnet werden" -- WELCHER von mehreren
 // Einsaetzen am selben Tag das ist, ist nicht geklaert.
 //
@@ -8160,7 +8191,7 @@ function zoneChip(o) {
 }
 
 // Balken ueber der Objektliste, sobald mindestens EIN Objekt in eine
-// entschaedigungspflichtige Zone faellt (OP-66). Bewusst kein blosser
+// entschaedigungspflichtige Zone faellt (OP-104). Bewusst kein blosser
 // Tooltip: Der Moment, in dem ein Objekt ueber 10 km liegt, ist der Ausloeser
 // dafuer, dass GAV-AUS-010 scharf wird -- das darf nicht an der Maus haengen,
 // die zufaellig ueber der richtigen Zeile schwebt.
@@ -8184,7 +8215,7 @@ function renderObjekte() {
   const mitInaktiv = $('oInaktiv').checked;
   const d = objekte.filter(o => (mitInaktiv || o.aktiv) &&
     (!q || [o.name, o.kunde_name, o.ort, o.strasse].some(f => String(f || '').toLowerCase().includes(q))));
-  // Ueber der GANZEN Liste, nicht nur der gefilterten Ansicht (OP-66): Sonst
+  // Ueber der GANZEN Liste, nicht nur der gefilterten Ansicht (OP-104): Sonst
   // verschwindet der Hinweis, sobald jemand einen Suchbegriff eintippt, und
   // genau das darf bei einer Auslagenpflicht nicht passieren.
   const balken = gavAus010Balken(objekte);
@@ -8527,6 +8558,152 @@ function pnMeldung(st) {
       bewerteten Zeit.</span>`);
   }
   return teile.length ? `<div class="sub" style="margin-top:6px;line-height:1.5">${teile.join(' ')}</div>` : '';
+}
+
+// ══════════════════════════════ AUSLAGENERSATZ (ENT-125) ══════════════════
+//
+// Zeigt NUR den Schnappschuss aus einsatz_auslagen -- keine Live-Berechnung
+// im Browser. Der Betrag entsteht ausschliesslich beim Abgleich
+// (backend/auslagen.php), hier wird er nur gelesen und dargestellt.
+let auslagenDaten = null;
+
+const auRp = rp => rp == null ? null : 'CHF ' + nf(rp / 100, 2);
+
+// Was hinter einem gesperrten Betrag steckt -- ausformuliert, nicht als Code.
+// "Unbekannt darf nie wie keine aussehen": eine Luecke ohne Grund sieht wie
+// ein Programmfehler aus, mit Grund ist sie eine offene Aufgabe.
+const AUSLAGEN_GRUND = {
+  gav_aus_010: 'Mehrere Einsätze am selben Tag — welcher als „der eine Hin- und Rückweg" gilt, ist offen (GAV-AUS-010). Vor einer Abrechnung muss das die PaKo klären.',
+  verkehrsmittel_unbekannt: 'Kein Verkehrsmittel hinterlegt — im Stammblatt der Person nachtragen.',
+  oev_preis_unbekannt: 'Öffentlicher Verkehr, aber kein Billettpreis erfasst.',
+  wegstrecke_unbekannt: 'Keine Wegstrecke zum Einsatz hinterlegt.',
+  sparte_reinigung: 'Sparte Reinigung — der GAV Sicherheit gilt hier nicht, ein anderer ist nicht geprüft (OP-32).',
+  regelwerk_unbekannt: 'Kein gültiges Regelwerk für dieses Datum.',
+};
+
+// Vorgabe wie beim Abgleich (ENT-045): der zurückliegende Monat bis heute.
+// Auslagenersatz gibt es nur zu bereits abgeglichenen Schichten -- ein
+// Zeitraum, der ausschliesslich in der Zukunft liegt, waere immer leer.
+function auslagenVorgabe() {
+  if ($('auVon').value) { return; }
+  const h = new Date();
+  $('auVon').value = isoTag(new Date(h.getFullYear(), h.getMonth() - 1, h.getDate()));
+  $('auBis').value = isoTag(h);
+}
+
+function ladeAuslagen() {
+  const von = $('auVon').value, bis = $('auBis').value;
+  if (!von || !bis) { return; }
+  $('auListe').innerHTML = '<div class="leer">…</div>';
+  return api(`auslagen_list.php?von=${encodeURIComponent(von)}&bis=${encodeURIComponent(bis)}`).then(({ ok, data }) => {
+    auslagenDaten = (ok && data.status === 'ok') ? data : null;
+    // Auswahl fuellen, aber eine bereits getroffene Wahl nicht verwerfen --
+    // sonst spraenge der Filter beim Nachladen unbemerkt auf "alle" zurueck.
+    const sel = $('auMa'), bisher = sel.value;
+    const leute = mitarbeiter.slice().sort((a, b) => (a.nachname || a.name).localeCompare(b.nachname || b.name));
+    sel.innerHTML = '<option value="">Alle Mitarbeitenden</option>'
+      + leute.map(m => `<option value="${Number(m.id)}">${esc(fullName(m) || m.name)}</option>`).join('');
+    sel.value = leute.some(m => String(m.id) === bisher) ? bisher : '';
+    zeichneAuslagen();
+  });
+}
+
+function zeichneAuslagen() {
+  if (!auslagenDaten) {
+    $('auKopf').innerHTML = '';
+    $('auListe').innerHTML = EMPTY('Auslagenersatz nicht verfügbar',
+      'Das Protokoll konnte nicht geladen werden. Über „Einrichtung" prüfen, ob die Tabelle besteht.');
+    return;
+  }
+  const maFilter = $('auMa').value;
+  const zeilen = auslagenDaten.zeilen.filter(z => !maFilter || String(z.mitarbeiter_id) === maFilter);
+
+  $('auKopf').innerHTML = `<div class="pn-kopf">
+    <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap">
+      <b style="font-size:16px">${esc(dmy(auslagenDaten.von))} – ${esc(dmy(auslagenDaten.bis))}</b>
+      <span class="sp" style="flex:1"></span>
+      <span class="note">${nf(zeilen.length)} ${zeilen.length === 1 ? 'Eintrag' : 'Einträge'}</span>
+    </div>
+    <p class="zone-note" style="margin-top:10px">Art. 18 Ziff. 10 GAV verlangt eine eigene,
+      nachvollziehbare Spesenabrechnung mit Einsatzdatum, -ort und Zone — <b>getrennt von der
+      Arbeitszeitabrechnung</b>. Gezeigt wird ausschließlich, was beim Abgleich bereits
+      festgeschrieben wurde; noch nicht abgeglichene Schichten erscheinen erst danach.</p>
+  </div>`;
+
+  if (!zeilen.length) {
+    $('auListe').innerHTML = EMPTY('Nichts zu zeigen',
+      'Für diesen Zeitraum ist noch kein Auslagenersatz festgeschrieben — Schichten erst abgleichen.');
+    return;
+  }
+
+  // Gruppiert je Person, chronologisch je Gruppe -- die Reihenfolge kommt
+  // bereits so aus auslagen_list.php (ORDER BY Name, Datum).
+  const gruppen = [];
+  let letzte = null;
+  zeilen.forEach(z => {
+    if (!letzte || letzte.mitarbeiter_id !== z.mitarbeiter_id) {
+      letzte = { mitarbeiter_id: z.mitarbeiter_id, name: z.mitarbeiter, zeilen: [] };
+      gruppen.push(letzte);
+    }
+    letzte.zeilen.push(z);
+  });
+
+  $('auListe').innerHTML = gruppen.map(g => {
+    // Nur tatsaechlich bestimmte Betraege summieren -- ein NULL darf nie als
+    // 0 in die Summe einfliessen, sonst verschwaende eine offene Zeile
+    // stillschweigend in einer zu niedrigen Summe.
+    const summeFz = g.zeilen.reduce((s, z) => s + (z.fahrzeitersatz_rappen ?? 0), 0);
+    const summeFk = g.zeilen.reduce((s, z) => s + (z.fahrkostenersatz_rappen ?? 0), 0);
+    const gesperrt = g.zeilen.filter(z => z.gesperrt_grund).length;
+    return `<div class="card" style="margin-bottom:14px"><div class="card-hd">
+        <h2>${esc(g.name)}</h2>
+        <span class="note">${auRp(summeFz)} Fahrzeit · ${auRp(summeFk)} Fahrkosten${
+          gesperrt ? ` · <span style="color:var(--warn)">${nf(gesperrt)} ohne Betrag</span>` : ''}</span>
+      </div>
+      <div class="card-bd flush"><table class="tbl">
+        <thead><tr><th>Datum</th><th>Kunde / Ort</th><th>Zone</th><th>Verkehrsmittel</th>
+          <th class="num">Fahrzeit</th><th class="num">Fahrkosten</th></tr></thead>
+        <tbody>${g.zeilen.map(z => `<tr${z.gesperrt_grund ? ' class="au-gesperrt"' : ''}>
+            <td class="nowrap">${esc(dmy(z.datum))}</td>
+            <td>${esc(z.kunde_name || '')}${z.ort ? `<div class="sec">${esc(z.ort)}</div>` : ''}</td>
+            <td>${z.zone_name ? esc(z.zone_name) : '<span style="color:var(--ink-3)">–</span>'}</td>
+            <td>${z.verkehrsmittel ? esc(z.verkehrsmittel) : '<span style="color:var(--ink-3)">–</span>'}</td>
+            <td class="num">${z.gesperrt_grund && z.fahrzeitersatz_rappen == null
+              ? `<span class="chip chip-w" title="${esc(AUSLAGEN_GRUND[z.gesperrt_grund] || z.gesperrt_grund)}">offen</span>`
+              : (auRp(z.fahrzeitersatz_rappen) || '–')}</td>
+            <td class="num">${z.gesperrt_grund && z.fahrkostenersatz_rappen == null
+              ? `<span class="chip chip-w" title="${esc(AUSLAGEN_GRUND[z.gesperrt_grund] || z.gesperrt_grund)}">offen</span>`
+              : (auRp(z.fahrkostenersatz_rappen) || '–')}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div>
+    </div>`;
+  }).join('');
+}
+
+function auslagenCsv() {
+  if (!auslagenDaten || !auslagenDaten.zeilen.length) { toast('Nichts zu exportieren.'); return; }
+  const maFilter = $('auMa').value;
+  const zeilen = auslagenDaten.zeilen.filter(z => !maFilter || String(z.mitarbeiter_id) === maFilter);
+  if (!zeilen.length) { toast('Nichts zu exportieren.'); return; }
+  const kopf = ['Mitarbeitende', 'Datum', 'Kunde', 'Ort', 'Zone', 'Wegstrecke km', 'Verkehrsmittel',
+    'Fahrzeitersatz CHF', 'Fahrkostenersatz CHF', 'Nicht bestimmbar', 'Regelwerk'];
+  const feld = w => `"${String(w == null ? '' : w).replace(/"/g, '""')}"`;
+  const csvZeilen = zeilen.map(z => [z.mitarbeiter, z.datum, z.kunde_name, z.ort, z.zone_name || '',
+    z.weg_km ?? '', z.verkehrsmittel || '',
+    z.fahrzeitersatz_rappen == null ? '' : (z.fahrzeitersatz_rappen / 100).toFixed(2),
+    z.fahrkostenersatz_rappen == null ? '' : (z.fahrkostenersatz_rappen / 100).toFixed(2),
+    z.gesperrt_grund ? (AUSLAGEN_GRUND[z.gesperrt_grund] || z.gesperrt_grund) : '',
+    z.regelwerk].map(feld).join(';'));
+  // Semikolon und BOM, damit Excel die Datei ohne Zutun richtig oeffnet --
+  // dasselbe Muster wie beim Masterschichten-Export (msSeiteCsv).
+  const blob = new Blob(['﻿' + [kopf.map(feld).join(';'), ...csvZeilen].join('\r\n')],
+    { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `auslagenersatz-${auslagenDaten.von}-${auslagenDaten.bis}.csv`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
 function kontrolleNavKlick() {
@@ -9014,7 +9191,7 @@ function epLaden() {
   epDokLaden().then(() => epKopfZeichnen());
   // Fuer die GAV-AUS-010-Warnung im Kopf wird die Zone gebraucht, und die
   // braucht die Anstellungsorte -- geladen werden sie nur einmal, nicht bei
-  // jedem Oeffnen (OP-66).
+  // jedem Oeffnen (OP-104).
   if (!anstellungsorte.length) { ladeAnstellungsorte().then(() => epKopfZeichnen()); }
   return api('einsatz_position.php?einsatz_id=' + epId).then(({ ok, data }) => {
     epPos = (ok && data.status === 'ok') ? (data.positionen || []) : [];
@@ -9087,7 +9264,7 @@ function epZeichnen() {
 // Wird der Arbeitsort spaeter geaendert, bleibt die Zahl stehen -- absichtlich,
 // denn eine stille Neuberechnung koennte eine bereits abgerechnete Zone
 // veraendern (GAV-AUS-011). Sichtbar sein muss es trotzdem.
-// GAV-AUS-010 im Einsatzplan (OP-66): Anders als beim Anlegen ist hier auch
+// GAV-AUS-010 im Einsatzplan (OP-104): Anders als beim Anlegen ist hier auch
 // bekannt, wer TATSAECHLICH zugeteilt ist -- nicht nur, wer im Formular
 // angehakt wurde. Der Hinweis nennt darum die eingeteilten Personen, die an
 // diesem Tag bereits einen anderen Einsatz haben.
@@ -9160,7 +9337,80 @@ function epKopfZeichnen() {
     </div>
     ${epWegWarnung(e)}
     ${epGavAus010Warnung(e)}
+    ${epVerkehrsmittelBlock(e)}
     ${epDokBlock()}`;
+}
+
+// ── Verkehrsmittel je Zuteilung (ENT-125) ───────────────────────────────
+//
+// Nur sichtbar, wenn die Zone ueberhaupt Auslagenersatz ausloest -- in einer
+// Zone ohne Entschaedigung waere die Frage "womit reist du an" fuer den
+// Anspruch folgenlos, und ein Auswahlfeld ohne Wirkung ist Ballast.
+function epVerkehrsmittelBlock(e) {
+  if (!e || !e.weg_km || enGesperrt(e)) { return ''; }
+  const nao = typeof aoNao === 'function' ? aoNao() : null;
+  const z = typeof gavZone === 'function'
+    ? gavZone(e.weg_km, null, nao ? nao.km_zum_anderen : null) : null;
+  if (!z || !z.entschaedigung) { return ''; }
+
+  const leute = (epPos || []).filter(epBesetzt);
+  if (!leute.length) { return ''; }
+
+  const optionen = ['Privatfahrzeug', 'Oeffentlicher Verkehr', 'Mitfahrer', 'Geschaeftsfahrzeug'];
+  const zeile = p => {
+    const ma = mitarbeiter.find(m => Number(m.id) === Number(p.mitarbeiter_id));
+    const vorgabe = ma ? ma.verkehrsmittel : null;
+    const wert = p.verkehrsmittel || '';   // '' heisst: die Vorgabe gilt
+    const name = (ma && (fullName(ma) || ma.name)) || p.mitarbeiter || ('#' + p.mitarbeiter_id);
+    return `<div class="f" style="margin-bottom:9px">
+      <label>${esc(name)}${vorgabe ? '' : ' <span class="note" style="font-weight:500">— keine Vorgabe hinterlegt</span>'}</label>
+      <div class="inp-row">
+        <select class="inp" data-vm-ma="${Number(p.mitarbeiter_id)}" onchange="epVerkehrsmittelGeaendert(this)">
+          <option value="">${vorgabe ? 'Vorgabe: ' + esc(vorgabe) : '– kein Verkehrsmittel gewählt –'}</option>
+          ${optionen.map(o => `<option value="${esc(o)}"${wert === o ? ' selected' : ''}>${esc(o)}</option>`).join('')}
+        </select>
+        <input class="inp" type="number" min="0" max="999.99" step="0.05" data-vm-oev="${Number(p.mitarbeiter_id)}"
+               style="max-width:130px;display:${wert === 'Oeffentlicher Verkehr' ? '' : 'none'}"
+               placeholder="Billett CHF" value="${p.oev_rappen != null ? (p.oev_rappen / 100).toFixed(2) : ''}"
+               onchange="epVerkehrsmittelSpeichern(${Number(p.mitarbeiter_id)})">
+      </div>
+    </div>`;
+  };
+
+  return `<div class="card-bd" style="padding:0 16px 14px">
+    <div class="zone">
+      <div class="zone-hd">Verkehrsmittel zum Einsatz</div>
+      <div class="zone-note">Massgeblich für den Fahrkostenersatz (Art. 18 Ziff. 4/5) — der
+        Fahrzeitersatz ist davon unabhängig. Ohne Angabe wird beim Abgleich die im Stammblatt
+        hinterlegte Vorgabe verwendet; hier lässt sie sich nur für diesen einen Einsatz
+        überschreiben, etwa für eine Fahrgemeinschaft.</div>
+      ${leute.map(zeile).join('')}
+    </div></div>`;
+}
+
+function epVerkehrsmittelGeaendert(sel) {
+  const maId = Number(sel.dataset.vmMa);
+  const oevFeld = document.querySelector(`[data-vm-oev="${maId}"]`);
+  if (oevFeld) { oevFeld.style.display = sel.value === 'Oeffentlicher Verkehr' ? '' : 'none'; }
+  epVerkehrsmittelSpeichern(maId);
+}
+
+function epVerkehrsmittelSpeichern(maId) {
+  const sel = document.querySelector(`[data-vm-ma="${maId}"]`);
+  const oevFeld = document.querySelector(`[data-vm-oev="${maId}"]`);
+  if (!sel || !epEinsatz) { return; }
+  const verkehrsmittel = sel.value;
+  const oevRappen = (verkehrsmittel === 'Oeffentlicher Verkehr' && oevFeld && oevFeld.value !== '')
+    ? Math.round(Number(oevFeld.value.replace(',', '.')) * 100) : '';
+  api('einsatz_verkehrsmittel.php', { method: 'POST', body: {
+    einsatz_id: epEinsatz.id, mitarbeiter_id: maId, verkehrsmittel, oev_rappen: oevRappen,
+  } }).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') { toast(data.message || 'Verkehrsmittel liess sich nicht speichern.'); return; }
+    const p = epPos.find(x => Number(x.mitarbeiter_id) === maId);
+    if (p) { p.verkehrsmittel = verkehrsmittel || null;
+      p.oev_rappen = oevRappen === '' ? null : oevRappen; }
+    toast('Verkehrsmittel gespeichert.');
+  });
 }
 
 // Der Balken sagt jetzt, woran man ist (ENT-113): gelb = eingeteilt, aber
@@ -12517,6 +12767,14 @@ const MB_ABSCHNITTE = [
     ['beruf',             'Beruf',          'f'],
     ['eintritt',          'Eintritt',       'd'],
     ['austritt',          'Austritt',       'd'],
+    // Auslagenersatz nach Art. 18 GAV (ENT-123/ENT-125): womit die Person
+    // UEBLICHERWEISE anreist. Massgeblich fuer den Fahrkostenersatz -- der
+    // Fahrzeitersatz ist davon unabhaengig und immer geschuldet. Je Einsatz
+    // ueberschreibbar in der Zuteilung, fuer die Fahrgemeinschaft, die es
+    // nur diesmal gibt.
+    ['verkehrsmittel',    'Verkehrsmittel zum Einsatz', 'a',
+      ['Privatfahrzeug', 'Oeffentlicher Verkehr', 'Mitfahrer', 'Geschaeftsfahrzeug'],
+      'Für den Fahrkostenersatz nach Art. 18 GAV — ohne Angabe wird er nicht berechnet'],
   ]},
   // Personenstand, Herkunft, Bewilligungen und Registerauszüge in EINEM
   // Block -- so wie es die Referenz des Projektinhabers unter
@@ -12769,7 +13027,12 @@ function mbZeichnen() {
     const id = 'mb_' + f;
     let steuer;
     if (typ === 'a') {
-      steuer = `<select class="inp${mark(f)}" id="${id}">${mbAuswahl(f, quelle, wert(f))}</select>`;
+      // Ein Hinweistext war bislang nur fuer Text/Zahl/Datum vorgesehen
+      // (als Platzhalter) -- eine Auswahl kann keinen Platzhalter tragen.
+      // Fuers Verkehrsmittel (ENT-125) ist der Hinweis aber wichtig: bleibt
+      // das Feld leer, wird schweigend nichts berechnet.
+      steuer = `<select class="inp${mark(f)}" id="${id}">${mbAuswahl(f, quelle, wert(f))}</select>`
+        + (hinweis ? `<div class="note" style="margin-top:4px">${esc(hinweis)}</div>` : '');
     } else {
       const t = typ === 'd' ? 'date' : typ === 'z' ? 'number' : 'text';
       const horcher = (f === 'vorname' || f === 'nachname') ? ' oninput="mbNameVorschlag()"' : '';
