@@ -452,6 +452,7 @@ const W = {
     antwortAendern: 'Antwort ändern',
     offen: 'Noch offen', gemeldet: 'Rückmeldung gespeichert.',
     geplant: 'Geplant', bestaetigt: 'Bestätigt', provisorisch: 'Auf Abruf', abgesagt: 'Abgesagt',
+    abgeschlossen: 'Abgeschlossen',
     abgesagtHinweis: 'Dieser Einsatz wurde abgesagt.',
     provisorischHinweis: 'Auf Abruf — ob der Einsatz stattfindet, entscheidet sich kurzfristig.',
     neuerRapport: 'Neuer Rapport', meineRapporte: 'Meine Rapporte',
@@ -665,7 +666,11 @@ const LEER = (t, p, ic) => `<div class="karte"><div class="leer">
 
 const STATUS_MARKE = {
   geplant: ['geplant', 'm-n'], bestaetigt: ['bestaetigt', 'm-p'],
-  provisorisch: ['provisorisch', 'm-w'], abgesagt: ['abgesagt', 'm-x']
+  provisorisch: ['provisorisch', 'm-w'], abgesagt: ['abgesagt', 'm-x'],
+  // ENT-128: vom Server gesetzt, sobald alle zugesagten Personen rapportiert
+  // haben -- dieselbe Bedeutung wie im Dashboard, eigene Kopie, weil app.html
+  // seine Markierungen unabhaengig fuehrt.
+  abgeschlossen: ['abgeschlossen', 'm-p'],
 };
 const ZUSAGE_MARKE = { zugesagt: ['zugesagt', 'm-p'], abgelehnt: ['abgelehnt', 'm-x'], offen: ['offen', 'm-n'] };
 

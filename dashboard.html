@@ -194,6 +194,10 @@ select.inp { padding-right: 30px; background-image: linear-gradient(45deg, trans
 .btn-primary { background: var(--accent); color: #fff; }
 .btn-primary:hover { background: var(--accent-hi); }
 .btn-primary:disabled { opacity: .55; cursor: default; }
+/* Bislang nur fuer btn-primary -- ein ausgegrauter btn-plain/btn-quiet ohne
+   Deckkraftverlust sieht aus wie ein blosser Text, nicht wie ein (derzeit
+   nicht verfuegbarer) Knopf. Gleiche Staerke wie oben, fuer jeden Knopf. */
+.btn:disabled { opacity: .55; cursor: default; }
 /* Bewusst kein .btn-plain/.btn-quiet: die Spracherkennung ist ein
    Hauptmerkmal, kein Nebenwerkzeug -- der Knopf hebt sich in Form und Farbe
    von den übrigen Kopfzeilen-Knöpfen ab (ENT-038). */
@@ -9405,13 +9409,18 @@ function epRapportBlock(e) {
 // Nur sichtbar bei abgeschlossenen Einsaetzen -- eine kuenftige Schicht laesst
 // sich nicht abrechnen. Ausdruecklich noch ohne Funktion: "Rechnung
 // erstellen" gibt es im System noch nirgends (ENT-040 hat das bewusst
-// zurueckgestellt), ein eigenes, deutlich groesseres Vorhaben. Gleiche
-// Bauart wie der ausgegraute Punkt im Kunden-Zeilenmenue -- kein zweites,
-// abweichend gestaltetes Muster fuer dieselbe Aussage.
+// zurueckgestellt), ein eigenes, deutlich groesseres Vorhaben.
+//
+// btn-plain statt btn-quiet (ENT-130): Im Kunden-Zeilenmenue steht derselbe
+// Platzhalter als schmucklose Menuezeile -- dort gibt der umgebende
+// Popover-Kontext die Form vor. Hier steht der Knopf frei in der Karte;
+// btn-quiet hat weder Rahmen noch Hintergrund und blieb dadurch nicht als
+// Knopf erkennbar, sondern sah wie normaler Fliesstext aus (am gerenderten
+// Zustand gemessen, nicht im Quelltext vermutet).
 function epRechnungBlock(e) {
   if (!e || !einsatzAbgeschlossen(e)) { return ''; }
   return `<div class="card-bd" style="padding:0 16px 14px">
-    <button type="button" class="btn btn-quiet btn-sm" disabled title="Noch nicht verfügbar">Rechnung erstellen</button>
+    <button type="button" class="btn btn-plain btn-sm" disabled title="Noch nicht verfügbar">Rechnung erstellen</button>
   </div>`;
 }
 
