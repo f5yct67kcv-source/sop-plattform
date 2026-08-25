@@ -6894,12 +6894,16 @@ function planHerkunftPasst(e, herkunft) {
   return true;
 }
 
+// Kein eigener Status, sondern berechnet wie "unterbesetzt" (ENT-126): das
+// Einsatzdatum liegt vor heute -- unabhaengig davon, ob die Ist-Zeiten schon
+// abgeglichen sind (das ist eine andere Frage, siehe agGefiltert()). Eine
+// einzige Stelle, damit der Statusfilter und der Rechnung-Platzhalter (ENT-127)
+// nie auseinanderlaufen koennen.
+function einsatzAbgeschlossen(e) { return tagVon(e) < isoTag(); }
+
 function planStatusPasst(e, st) {
   if (st === 'offen') { return fehlend(e) > 0; }
-  // Kein eigener Status, sondern berechnet wie "offen": das Einsatzdatum
-  // liegt vor heute -- unabhaengig davon, ob die Ist-Zeiten schon
-  // abgeglichen sind (das ist eine andere Frage, siehe agGefiltert()).
-  if (st === 'abgeschlossen') { return tagVon(e) < isoTag(); }
+  if (st === 'abgeschlossen') { return einsatzAbgeschlossen(e); }
   return !st || e.status === st;
 }
 
@@ -9344,7 +9348,23 @@ function epKopfZeichnen() {
     ${epWegWarnung(e)}
     ${epGavAus010Warnung(e)}
     ${epVerkehrsmittelBlock(e)}
+    ${epRechnungBlock(e)}
     ${epDokBlock()}`;
+}
+
+// ── Rechnung-Platzhalter (ENT-127) ──────────────────────────────────────
+//
+// Nur sichtbar bei abgeschlossenen Einsaetzen -- eine kuenftige Schicht laesst
+// sich nicht abrechnen. Ausdruecklich noch ohne Funktion: "Rechnung
+// erstellen" gibt es im System noch nirgends (ENT-040 hat das bewusst
+// zurueckgestellt), ein eigenes, deutlich groesseres Vorhaben. Gleiche
+// Bauart wie der ausgegraute Punkt im Kunden-Zeilenmenue -- kein zweites,
+// abweichend gestaltetes Muster fuer dieselbe Aussage.
+function epRechnungBlock(e) {
+  if (!e || !einsatzAbgeschlossen(e)) { return ''; }
+  return `<div class="card-bd" style="padding:0 16px 14px">
+    <button type="button" class="btn btn-quiet btn-sm" disabled title="Noch nicht verfügbar">Rechnung erstellen</button>
+  </div>`;
 }
 
 // ── Verkehrsmittel je Zuteilung (ENT-125) ───────────────────────────────
