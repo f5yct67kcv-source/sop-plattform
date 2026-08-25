@@ -326,6 +326,15 @@ if (ohneEinbindung.length) { bad.push('ohne rechte.php: ' + ohneEinbindung.join(
 check('KRITISCH: einsatz_save.php lehnt einen bereits abgeschlossenen Einsatz beim Speichern nicht ab',
   /in_array\(\$status, \[[^\]]*'abgeschlossen'[^\]]*\], true\)/.test(ohneKommentar('einsatz_save.php')));
 
+// Monatsansicht in der App (ENT-134): ohne von/bis-Parameter fehlten bereits
+// vergangene Schichten des laufenden Monats, sobald sie mehr als einen Tag
+// zurueckliegen -- der Standardzeitraum muss beim Monatsanfang beginnen, mit
+// dem Vortag als zusaetzlicher unterer Schranke (Nachtschicht ueber den
+// Monatswechsel).
+check('KRITISCH: meine_schichten.php laedt ohne Parameter ab Monatsanfang, nicht erst ab gestern',
+  /\$von = min\(\$monatsanfang, \$vortag\)/.test(ohneKommentar('meine_schichten.php'))
+  && /\$monatsanfang = date\('Y-m-01'\)/.test(ohneKommentar('meine_schichten.php')));
+
 // Backfill fuer laengst vollstaendig rapportierte Einsaetze (ENT-128): der
 // Uebergang wird sonst nur im Moment eines NEUEN Rapports ausgeloest -- ohne
 // diesen Nachtrag bliebe jeder Einsatz, dessen Rapport(e) schon vor diesem

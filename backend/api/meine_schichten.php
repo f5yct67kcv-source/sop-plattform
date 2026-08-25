@@ -12,8 +12,14 @@ $heute = date('Y-m-d');
 $von = trim((string)($_GET['von'] ?? ''));
 $bis = trim((string)($_GET['bis'] ?? ''));
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $von)) {
-    // Der Vortag muss mit: eine Nachtschicht von gestern laeuft heute noch.
-    $von = date('Y-m-d', strtotime('-1 day'));
+    // Der ganze laufende Monat gehoert dazu (ENT-134) -- sonst verschwinden
+    // bereits vergangene Schichten des Monats aus der App, sobald sie mehr
+    // als einen Tag zurueckliegen. Der Vortag muss zusaetzlich mit: am
+    // Monatsersten reicht der Monatsanfang allein nicht zurueck genug, eine
+    // Nachtschicht von gestern (noch im Vormonat) laeuft heute noch.
+    $monatsanfang = date('Y-m-01');
+    $vortag = date('Y-m-d', strtotime('-1 day'));
+    $von = min($monatsanfang, $vortag);
 }
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $bis)) {
     $bis = date('Y-m-d', strtotime('+90 days'));
