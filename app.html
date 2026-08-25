@@ -474,7 +474,7 @@ const W = {
     zurErfassung: 'Zur Rapporterfassung',
     schichtRapportieren: 'Schicht rapportieren', schichtRapportTitel: 'Schicht rapportieren',
     schonRapportiert: 'Bereits rapportiert am', erneutSendenKorrigiert: 'Erneutes Senden korrigiert diese Angaben.',
-    rapportUeberfaellig: 'Noch nicht rapportiert',
+    rapportUeberfaellig: 'Rapport noch ausfüllen',
     strasse: 'Strasse', ort: 'Ort', arbeitsbeginn: 'Arbeitsbeginn', arbeitsende: 'Arbeitsende',
     pauseMinuten: 'Pause (Minuten)', unterzeichnerName: 'Name Unterzeichner', vorUndNachname: 'Vor- und Nachname',
     unterschriftKunde: 'Unterschrift Kunde', hierUnterschreiben: '✍ Hier unterschreiben', loeschen: 'Löschen',
@@ -722,6 +722,7 @@ function schichtKarte(e, mitDatum) {
       ${e.status !== 'abgesagt' ? `<span class="marke ${zu[1]}">${esc(w(zu[0]))}</span>` : ''}
       ${Number(e.im_team) > 1 ? `<span class="marke m-n">${Number(e.im_team)} ${esc(w('imTeam'))}</span>` : ''}
       ${rap ? `<span class="marke m-n">${esc(w('schonRapportiert'))} ${dmy(rap.erfasst_am)}, ${String(rap.erfasst_am).slice(11, 16)}</span>` : ''}
+      ${ueberfaellig ? `<span class="marke m-w">${esc(w('rapportUeberfaellig'))}</span>` : ''}
     </div>
   </div>`;
 }

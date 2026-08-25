@@ -264,6 +264,14 @@ if (frueherImMonat) {
         .find(x => x.textContent.includes('Frueher im Monat, nie rapportiert'));
       return !!k && !!k.querySelector('.karte-warn');
     }));
+  // ENT-135: das Warnzeichen allein sagt nicht, WAS zu tun ist -- ohne Text
+  // dazu weiss die eingeteilte Person nicht, worum es geht.
+  check('KRITISCH: sie erklaert in Textform, was zu tun ist',
+    await page.evaluate(() => {
+      const k = [...document.querySelectorAll('#v-plan .karte')]
+        .find(x => x.textContent.includes('Frueher im Monat, nie rapportiert'));
+      return !!k && k.textContent.includes('Rapport noch ausfüllen');
+    }));
   // Am gerenderten Zustand gemessen (CLAUDE.md, Gestaltung).
   check('Die ueberfaellige Karte hebt sich farblich vom Regelfall ab',
     await page.evaluate(() => {
