@@ -86,8 +86,12 @@ if (!preg_match('/^\d{2}:\d{2}(:\d{2})?$/', $von) || !preg_match('/^\d{2}:\d{2}(
     json_response(['status' => 'error', 'message' => 'Zeiten im Format HH:MM erforderlich'], 400);
 }
 // provisorisch: aus einer Masterschicht "auf Abruf" entstanden, zaehlt nicht
-// als offene Stelle (ENT-021).
-if (!in_array($status, ['geplant', 'bestaetigt', 'abgesagt', 'provisorisch'], true)) {
+// als offene Stelle (ENT-021). 'abgeschlossen' steht hier nur, damit ein
+// Speichern anderer Felder (Bemerkung, Zeitverschiebung) einen bereits
+// abgeschlossenen Einsatz nicht ablehnt oder zurueckstuft -- der Wert selbst
+// wird ausschliesslich vom Server gesetzt, sobald alle Rapporte vorliegen
+// (ENT-128, rapport_create.php), nie ueber das Auswahlfeld in der Oberflaeche.
+if (!in_array($status, ['geplant', 'bestaetigt', 'abgesagt', 'provisorisch', 'abgeschlossen'], true)) {
     json_response(['status' => 'error', 'message' => 'unbekannter Status'], 400);
 }
 if ($bedarf < 0 || $bedarf > 99) {

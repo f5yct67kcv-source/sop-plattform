@@ -6698,6 +6698,11 @@ const EN_STATUS = {
   geplant: ['Geplant', 'chip-n'], bestaetigt: ['Bestätigt', 'chip-p'],
   provisorisch: ['Provisorisch', 'chip-a'], abgesagt: ['Abgesagt', 'chip-x']
 };
+// Nur fuer die ANZEIGE (Badges/Listen) -- EN_STATUS selbst bleibt unveraendert,
+// weil das Bearbeiten-Formular seine Auswahloptionen direkt aus dessen
+// Schluesseln baut. "Abgeschlossen" darf dort NICHT waehlbar sein: es wird
+// ausschliesslich vom Server gesetzt, sobald alle Rapporte vorliegen (ENT-128).
+const EN_STATUS_ANZEIGE = Object.assign({ abgeschlossen: ['Abgeschlossen', 'chip-p'] }, EN_STATUS);
 // Vorgegebene Einsatzarten (ENT-060). Vom Projektinhaber festgelegt.
 // Mit 'Reinigung' (ENT-062, auf Wunsch des Projektinhabers). Damit sagen zwei
 // Felder dasselbe -- das ist gewollt, aber es braucht eine Klammer:
@@ -6894,12 +6899,14 @@ function planHerkunftPasst(e, herkunft) {
   return true;
 }
 
-// Kein eigener Status, sondern berechnet wie "unterbesetzt" (ENT-126): das
-// Einsatzdatum liegt vor heute -- unabhaengig davon, ob die Ist-Zeiten schon
-// abgeglichen sind (das ist eine andere Frage, siehe agGefiltert()). Eine
-// einzige Stelle, damit der Statusfilter und der Rechnung-Platzhalter (ENT-127)
-// nie auseinanderlaufen koennen.
-function einsatzAbgeschlossen(e) { return tagVon(e) < isoTag(); }
+// "Abgeschlossen" (ENT-128, revidiert ENT-126): ein echter, vom Server
+// gesetzter Status -- nicht mehr das Kalenderdatum. Ein heutiger, bereits
+// vollstaendig rapportierter Einsatz zaehlt so schon jetzt, nicht erst morgen;
+// ein vergangener, aber noch nicht rapportierter Einsatz zaehlt weiterhin
+// NICHT (dafuer bleibt der Abgleich-Bereich zustaendig, siehe agGefiltert()).
+// Eine einzige Stelle, damit der Statusfilter und der Rechnung-Platzhalter
+// (ENT-127) nie auseinanderlaufen koennen.
+function einsatzAbgeschlossen(e) { return e.status === 'abgeschlossen'; }
 
 function planStatusPasst(e, st) {
   if (st === 'offen') { return fehlend(e) > 0; }
@@ -7108,7 +7115,7 @@ function renderPlanung() {
     const teile = zug.slice(0, 3).map(nameChip);
     if (zug.length > 3) teile.push(`<span class="nm">+${zug.length - 3}</span>`);
     if (fehlt) teile.push(`<span class="nm off">${fehlt} offen</span>`);
-    const st = EN_STATUS[e.status] || EN_STATUS.geplant;
+    const st = EN_STATUS_ANZEIGE[e.status] || EN_STATUS.geplant;
 
     return kopf + `
       <tr class="click${tag === heute ? ' heute' : ''}${enGesperrt(e) ? ' zu' : ''}${serieStand(e) ? ' serie' : ''}" onclick="openEinsatz(${Number(e.id)})">
@@ -7145,7 +7152,7 @@ function renderPlanung() {
     }
     const zug = e.mitarbeiter || [];
     const fehlt = fehlend(e);
-    const st = EN_STATUS[e.status] || EN_STATUS.geplant;
+    const st = EN_STATUS_ANZEIGE[e.status] || EN_STATUS.geplant;
     return kopf + `<div class="ag-karte click${serieStand(e) ? ' serie' : ''}" onclick="openEinsatz(${Number(e.id)})">
       <div class="kopf">
         <b>${enSchloss(e)}${esc(hm(e.von))}–${esc(hm(e.bis))}${ueberNacht(e) ? ' <span class="ag-plan">bis Folgetag</span>' : ''}</b>
@@ -7906,9 +7913,18 @@ function openEinsatzDrawer(id) {
   // wechseln, nur um nachzusehen, was geplant war.
   const zu = enGesperrt(e);
   const sperr = zu ? ' disabled' : '';
-
-  const opt = Object.keys(EN_STATUS)
-    .map(s => `<option value="${s}"${e.status === s ? ' selected' : ''}>${EN_STATUS[s][0]}</option>`).join('');
+  // "Abgeschlossen" (ENT-128) ist kein waehlbarer Wert von EN_STATUS -- er
+  // wird ausschliesslich vom Server gesetzt. Steht er trotzdem am Einsatz,
+  // muss die Liste ihn als eigene, aber gesperrte Option zeigen: sonst waere
+  // beim Oeffnen der Schublade keine Option vorausgewaehlt, der Browser zeigt
+  // dann die erste (geplant) als selektiert an, und ein Speichern ohne
+  // Beruehren des Feldes wuerde den Status still zurueckstufen (dasselbe
+  // Muster wie einsatzartOptionen() fuer einen unbekannten Wert).
+  const statusSperr = zu || e.status === 'abgeschlossen' ? ' disabled' : '';
+  const statusSchluessel = e.status === 'abgeschlossen'
+    ? Object.keys(EN_STATUS).concat('abgeschlossen') : Object.keys(EN_STATUS);
+  const opt = statusSchluessel
+    .map(s => `<option value="${s}"${e.status === s ? ' selected' : ''}>${EN_STATUS_ANZEIGE[s][0]}</option>`).join('');
 
   $('drTitle').textContent = e.kunde_name;
   $('drBody').innerHTML = `
@@ -7950,7 +7966,7 @@ function openEinsatzDrawer(id) {
         <div id="enESparteHint"></div>
       </div>
       <div class="f"><label for="enEBedarf">Benötigte Mitarbeitende</label><input class="inp" id="enEBedarf"${sperr} type="number" min="0" max="99" value="${Number(e.bedarf)}" oninput="pickFoot('enE')"></div>
-      <div class="f"><label for="enEStatus">Status</label><select class="inp" id="enEStatus"${sperr}>${opt}</select></div>
+      <div class="f"><label for="enEStatus">Status</label><select class="inp" id="enEStatus"${statusSperr}>${opt}</select></div>
       <div class="f wide">
         <label>Zugeteilte Mitarbeitende</label>
         <div class="ma-pick" id="enEMa"></div>
@@ -9348,8 +9364,34 @@ function epKopfZeichnen() {
     ${epWegWarnung(e)}
     ${epGavAus010Warnung(e)}
     ${epVerkehrsmittelBlock(e)}
+    ${epRapportBlock(e)}
     ${epRechnungBlock(e)}
     ${epDokBlock()}`;
+}
+
+// ── Rapport-Übersicht am abgeschlossenen Einsatz (ENT-128) ──────────────
+//
+// Nur sichtbar bei abgeschlossenen Einsaetzen, und nur was tatsaechlich
+// eingegangen ist -- kein Platzhalter fuer Fehlendes, das erledigt der
+// Abgleich-Bereich. Reine Anzeige (Zeiten, Pause, Bemerkung); Aendern oder
+// Uebernehmen bleibt Sache des Abgleichs (agdRapportUebernehmen()).
+function epRapportBlock(e) {
+  if (!e || !einsatzAbgeschlossen(e)) { return ''; }
+  const treffer = (rapporte || []).filter(r => Number(r.einsatz_id) === Number(e.id));
+  if (!treffer.length) { return ''; }
+  const zeile = r => {
+    const ma = mitarbeiter.find(m => Number(m.id) === Number(r.mitarbeiter_id));
+    const name = (ma && (fullName(ma) || ma.name)) || r.mitarbeiter || ('#' + r.mitarbeiter_id);
+    return `<div class="f" style="margin-bottom:9px">
+      <label>${esc(name)}</label>
+      <div class="zone-note">${hm(r.von)}–${hm(r.bis)}${r.pause_min ? `, ${nf(r.pause_min)}′ Pause` : ''} · Netto ${nf(r.netto_h)} h
+        ${r.bemerkung ? `<br>${esc(r.bemerkung)}` : ''}</div>
+    </div>`;
+  };
+  return `<div class="card-bd" style="padding:0 16px 14px">
+    <div class="ep-dok-kopf">Rapport${treffer.length > 1 ? 'e' : ''}</div>
+    ${treffer.map(zeile).join('')}
+  </div>`;
 }
 
 // ── Rechnung-Platzhalter (ENT-127) ──────────────────────────────────────
@@ -11805,7 +11847,7 @@ function renderTagesplan() {
   const tgKarten = `<div class="card nur-schmal"><div class="card-bd flush">` + liste.map(e => {
     const zug = e.mitarbeiter || [];
     const fehlt = fehlend(e);
-    const st = EN_STATUS[e.status] || EN_STATUS.geplant;
+    const st = EN_STATUS_ANZEIGE[e.status] || EN_STATUS.geplant;
     return `<div class="ag-karte click" onclick="openEinsatz(${Number(e.id)})">
       <div class="kopf">
         <b>${enSchloss(e)}${esc(hm(e.von))}–${esc(hm(e.bis))}${ueberNacht(e) ? ' <span class="ag-plan">bis Folgetag</span>' : ''}</b>
@@ -11827,7 +11869,7 @@ function renderTagesplan() {
     </tr></thead><tbody>` + liste.map(e => {
       const zug = e.mitarbeiter || [];
       const fehlt = fehlend(e);
-      const st = EN_STATUS[e.status] || EN_STATUS.geplant;
+      const st = EN_STATUS_ANZEIGE[e.status] || EN_STATUS.geplant;
       const teile = zug.map(nameChip);
       if (fehlt) teile.push(`<span class="nm off">${fehlt} offen</span>`);
       return `<tr class="click${enGesperrt(e) ? ' zu' : ''}" onclick="openEinsatz(${Number(e.id)})">

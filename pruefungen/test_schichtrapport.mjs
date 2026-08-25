@@ -429,11 +429,25 @@ check('Alle drei Grenzen antworten mit einem Fehler, nicht mit einem stillen NUL
 check('einsatz_id wird tatsaechlich in die Tabelle geschrieben',
   /INSERT INTO rapporte[\s\S]{0,200}einsatz_id/.test(q));
 
-// Der Rapport selbst schreibt NICHT an den Schicht-Tabellen -- er ist ein
-// Beleg. Genau darum braucht er auch keine Sperrpruefung; wuerde er dort
-// schreiben, muesste er sie haben (ENT-045, test_php.mjs bewacht das).
-check('KRITISCH: der Rapport schreibt nicht an einsaetze/einsatz_zuteilung (ENT-045 unangetastet)',
-  !/(UPDATE|DELETE FROM|INSERT INTO)\s+(einsaetze|einsatz_zuteilung|einsatz_position)\b/.test(q));
+// Der Rapport bleibt grundsaetzlich ein Beleg, kein Full-Override des Plans:
+// er schreibt weiterhin NICHT an einsatz_zuteilung/einsatz_position -- die
+// Ist-Zeiten und die Zuteilung selbst aendert er nie, genau darum braucht
+// er dafuer auch keine Sperrpruefung (ENT-045, test_php.mjs bewacht das).
+//
+// Seit ENT-128 gibt es EINE gezielte, bewusste Ausnahme (Revision der
+// urspruenglichen ENT-082-Abgrenzung "der Rapport schreibt nichts"): er darf
+// an einsaetze den Status auf "abgeschlossen" setzen, sobald ALLE zugesagten
+// Personen rapportiert haben. Das ist eine reine Statusanzeige, keine
+// Festschreibung von Zeiten -- und die ENT-045-Sperre bleibt trotzdem
+// respektiert (siehe !einsatz_abgeglichen() in rapport_create.php).
+check('KRITISCH: der Rapport schreibt nicht an einsatz_zuteilung/einsatz_position',
+  !/(UPDATE|DELETE FROM|INSERT INTO)\s+(einsatz_zuteilung|einsatz_position)\b/.test(q));
+const einsaetzeUpdates = q.match(/UPDATE\s+einsaetze\s+SET\s+[^;]*?(?=\s+WHERE)/g) || [];
+check('Es gibt ueberhaupt eine UPDATE-Anweisung an einsaetze, sonst prueft das Folgende nichts',
+  einsaetzeUpdates.length > 0);
+check('KRITISCH: an einsaetze schreibt er ausschliesslich den Status, sonst nichts (ENT-128)',
+  !/(DELETE FROM|INSERT INTO)\s+einsaetze\b/.test(q)
+  && einsaetzeUpdates.every(u => /^UPDATE\s+einsaetze\s+SET\s+status\s*=\s*'[a-z]+'$/.test(u.trim())));
 
 // Die Spalte muss auch tatsaechlich angelegt werden -- eine Abfrage auf eine
 // Spalte, die die Einrichtung nie ergaenzt, faellt erst im Betrieb auf.

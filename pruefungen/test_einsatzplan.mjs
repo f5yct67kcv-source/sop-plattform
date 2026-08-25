@@ -30,7 +30,11 @@ const KU = [{ id: 1, name: 'Stranag', strasse: 'Kantonsstrasse', ort: '6000 Luze
 // 73 — kein Bedarf, niemand eingeteilt: hier gibt es nichts anzulegen.
 // 74 — abgeglichen und festgeschrieben (ENT-045).
 // 75 — fuer die Pruefung, was passiert, wenn das Anlegen fehlschlaegt.
-// 77 — abgeschlossen (Datum vor heute), fuer den Rechnung-Platzhalter (ENT-127).
+// 77 — status 'abgeschlossen', aber HEUTE datiert (ENT-128: der Status
+//      entscheidet, nicht mehr das Kalenderdatum) -- fuer den
+//      Rechnung-Platzhalter und die Rapport-Uebersicht (ENT-127/128).
+// 78 — in der Vergangenheit, aber NICHT abgeschlossen (status 'bestaetigt').
+//      Genau der Fall, den ENT-126 allein am Datum falsch entschieden hätte.
 const bau = (id, zus) => ({ id, kunde_id: 1, kunde_name: 'Stranag', titel: null,
   strasse: 'Kantonsstrasse', ort: '6000 Luzern', einsatzart: 'Verkehrsdienst',
   datum: MORGEN, von: '07:30:00', bis: '16:30:00', bedarf: 2, status: 'geplant',
@@ -43,7 +47,9 @@ let EINSAETZE = [
   bau(74, { datum: HEUTE, ist_status: 'offen',
             mitarbeiter: [{ id: 3, name: 'hans', vorname: 'Hans', nachname: 'Meier', ist_status: 'anwesend' }] }),
   bau(75, { kunde_name: 'Axians', bedarf: 3 }),
-  bau(77, { kunde_name: 'Vergangen', datum: FRUEHER }),
+  bau(77, { kunde_name: 'Abgeschlossen', datum: HEUTE, status: 'abgeschlossen',
+            mitarbeiter: [{ id: 2, name: 'daniele', vorname: 'Daniele', nachname: 'Ciardo' }] }),
+  bau(78, { kunde_name: 'Vergangen, nicht abgeschlossen', datum: FRUEHER, status: 'bestaetigt' }),
   // 76 — drei Rückmeldungen nebeneinander: zugesagt, abgelehnt, offen aber
   //      angesehen. Genau die drei Zustände, die der Balken zeigen soll.
   bau(76, { kunde_name: 'Rückmeldungen', bedarf: 3, mitarbeiter: [
@@ -54,6 +60,14 @@ let EINSAETZE = [
     { id: 2, name: 'daniele', vorname: 'Daniele', nachname: 'Ciardo', zusage: 'abgelehnt', gesehen_am: tag(-1) + ' 09:00:00' },
     { id: 3, name: 'hans', vorname: 'Hans', nachname: 'Meier', zusage: 'offen', gesehen_am: null },
   ] }),
+];
+
+// Rapport zu Einsatz 77 -- fuer die Rapport-Uebersicht am abgeschlossenen
+// Einsatz (ENT-128).
+const RAPPORTE = [
+  { id: 900, einsatz_id: 77, mitarbeiter_id: 2, mitarbeiter: 'daniele',
+    von: '07:00:00', bis: '15:00:00', pause_min: 30, netto_h: 7.5,
+    bemerkung: 'Alles ruhig, keine besonderen Vorkommnisse.', erfasst_am: HEUTE + ' 15:10:00' },
 ];
 
 // ── Nachbau des Servers (einsatz_position.php) ────────────────────────────
@@ -166,6 +180,7 @@ await page.route('**/api/**', route => {
     }
     return send({ status: 'ok', id: body.id });
   }
+  if (p.includes('rapport_list')) return send({ status: 'ok', rapporte: RAPPORTE });
   if (p.includes('objekt_list')) return send({ status: 'ok', objekte: [] });
   if (p.includes('masterschicht_list')) return send({ status: 'ok', masterschichten: [] });
   if (p.includes('feiertage_list')) return send({ status: 'ok', feiertage: [], gepflegt: {} });
@@ -282,22 +297,34 @@ check('Das Raster erklärt den Leerzustand statt einen Knopf anzubieten',
   (await page.textContent('#epRaster')).includes('festgeschrieben')
   && !(await page.isVisible('#epRaster button')));
 
-// ══════════ RECHNUNG-PLATZHALTER NUR BEI ABGESCHLOSSENEN EINSAETZEN (ENT-127)
+// ══════════ RECHNUNG-PLATZHALTER NUR BEI STATUS "ABGESCHLOSSEN" (ENT-127/128)
 // Ausdruecklich noch ohne Funktion (ENT-040) -- nur der Knopf, ausgegraut.
-await oeffne(71);   // MORGEN, kuenftig
+// Massgeblich ist seit ENT-128 der STATUS, nicht mehr das Kalenderdatum.
+await oeffne(71);   // MORGEN, status 'geplant'
 check('KRITISCH: kein Rechnung-Knopf bei einem kuenftigen Einsatz',
   !(await page.textContent('#epKopf')).includes('Rechnung erstellen'));
-await oeffne(74);   // HEUTE -- heute reicht nicht, "abgeschlossen" heisst vorbei
-check('KRITISCH: auch am selben Tag noch kein Rechnung-Knopf',
+await oeffne(78);   // FRUEHER, aber status 'bestaetigt' -- die Vergangenheit allein reicht seit ENT-128 nicht
+check('KRITISCH: kein Rechnung-Knopf bei einem vergangenen, aber nicht abgeschlossenen Einsatz',
   !(await page.textContent('#epKopf')).includes('Rechnung erstellen'));
-await oeffne(77);   // FRUEHER
-check('KRITISCH: bei einem abgeschlossenen Einsatz erscheint der Rechnung-Knopf',
+await oeffne(77);   // HEUTE, aber status 'abgeschlossen'
+check('KRITISCH: bei status "abgeschlossen" erscheint der Rechnung-Knopf, auch am selben Tag',
   (await page.textContent('#epKopf')).includes('Rechnung erstellen'));
 check('KRITISCH: er ist ausgegraut, keine echte Funktion',
   await page.evaluate(() => {
     const btn = [...document.querySelectorAll('#epKopf button')].find(b => b.textContent.includes('Rechnung erstellen'));
     return !!btn && btn.disabled && /noch nicht verfügbar/i.test(btn.title);
   }));
+
+// ══════════ RAPPORT-ÜBERSICHT AM ABGESCHLOSSENEN EINSATZ (ENT-128)
+const kopf77 = await page.textContent('#epKopf');
+check('KRITISCH: der Rapport erscheint im Kopf des abgeschlossenen Einsatzes',
+  kopf77.includes('07:00') && kopf77.includes('15:00'));
+check('Die Person steht dabei', kopf77.includes('Daniele Ciardo'));
+check('Die Bemerkung aus dem Rapport ist zu lesen', kopf77.includes('Alles ruhig'));
+check('Die Pause ist ausgewiesen', kopf77.includes('30'));
+await oeffne(78);   // vergangen, aber nicht abgeschlossen, kein Rapport in der Fixture
+check('KRITISCH: ohne Status "abgeschlossen" erscheint keine Rapport-Übersicht',
+  !(await page.textContent('#epKopf')).includes('Rapport'));
 
 // ══════════ SCHLÄGT DAS ANLEGEN FEHL, STEHT TROTZDEM DER RICHTIGE EINSATZ DA
 // Sonst bliebe der zuvor geoeffnete Einsatz auf dem Bildschirm -- falscher
