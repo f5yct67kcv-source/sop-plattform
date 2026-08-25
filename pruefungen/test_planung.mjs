@@ -709,6 +709,83 @@ check('Offene Schichten tragen kein Schloss',
 check('KRITISCH: eine Zuteilung mit Ist-Stand sperrt die ganze Schicht',
   await page.evaluate(() => enGesperrt(einsaetze.find(x => Number(x.id) === 14))));
 
+// ══════════ STATUS-CHIP "ABGEGLICHEN" STATT ROHSTATUS, SCHLOSS IM CHIP (ENT-136)
+// Der Projektinhaber, per Screenshot der Planung: dieselbe abgeglichene
+// Schicht wie oben zeigte im STATUS-Feld weiterhin "Geplant" -- das Schloss
+// stand nur separat vor der Zeit, sagte aber nichts ueber den Status selbst.
+// Ausserdem: "Das Schloss Symbol daneben, nicht am Anfang" -- es gehoert in
+// den Chip, hinter das Wort, nicht mehr vor die Uhrzeit.
+check('KRITISCH: der Status-Chip zeigt "Abgeglichen" statt des Rohstatus',
+  await page.evaluate(() => {
+    const tr = [...document.querySelectorAll('#plTable tbody tr')]
+      .find(r => r.getAttribute('onclick') === 'openEinsatz(14)');
+    const chip = tr && tr.querySelector('td:last-child .chip');
+    return !!chip && chip.textContent.includes('Abgeglichen') && chip.classList.contains('chip-p');
+  }));
+check('KRITISCH: das Schloss steht im Status-Chip, hinter dem Wort',
+  await page.evaluate(() => {
+    const tr = [...document.querySelectorAll('#plTable tbody tr')]
+      .find(r => r.getAttribute('onclick') === 'openEinsatz(14)');
+    const chip = tr && tr.querySelector('td:last-child .chip');
+    return !!chip && !!chip.querySelector('.i-schloss');
+  }));
+check('Das Schloss steht NICHT mehr am Anfang des Zeitfelds',
+  await page.evaluate(() => {
+    const tr = [...document.querySelectorAll('#plTable tbody tr')]
+      .find(r => r.getAttribute('onclick') === 'openEinsatz(14)');
+    const zeit = tr && tr.querySelector('td:first-child');
+    return !!zeit && !zeit.querySelector('.i-schloss');
+  }));
+check('Eine offene Schicht zeigt weiterhin ihren echten Status, nicht "Abgeglichen"',
+  await page.evaluate(() => {
+    const tr = [...document.querySelectorAll('#plTable tbody tr')]
+      .find(r => r.getAttribute('onclick') === 'openEinsatz(11)');
+    const chip = tr && tr.querySelector('td:last-child .chip');
+    return !!chip && !chip.textContent.includes('Abgeglichen');
+  }));
+// Diese Fixtur traegt zugleich status:'abgeschlossen' UND ist jetzt
+// abgeglichen -- genau der Fall, in dem beides zusammentrifft. Abgeglichen
+// muss dabei sichtbar gewinnen: nicht verblassen, sondern staerker auffallen
+// (Wunsch des Projektinhabers), und nicht die Warnfarbe von "gesperrt"
+// anderswo (Sperrtage) tragen, sondern dieselbe gruene Aussage wie das
+// Haekchen in der App (ENT-133). Am gerenderten Zustand gemessen (CLAUDE.md).
+check('KRITISCH: eine zugleich abgeschlossene UND abgeglichene Zeile verblasst NICHT',
+  await page.evaluate(() => {
+    const tr = [...document.querySelectorAll('#plTable tbody tr')]
+      .find(r => r.getAttribute('onclick') === 'openEinsatz(14)');
+    const td = tr && tr.querySelector('td');
+    return !!tr && tr.classList.contains('status-abgeschlossen') && tr.classList.contains('abgeglichen')
+      && !!td && parseFloat(getComputedStyle(td).opacity) === 1;
+  }));
+check('KRITISCH: das Schloss im Chip ist gruen eingefaerbt wie der Chip selbst, nicht die Warnfarbe der Zeile',
+  await page.evaluate(() => {
+    const tr = [...document.querySelectorAll('#plTable tbody tr')]
+      .find(r => r.getAttribute('onclick') === 'openEinsatz(14)');
+    const chip = tr && tr.querySelector('td:last-child .chip');
+    const icon = chip && chip.querySelector('.i-schloss');
+    if (!chip || !icon) return false;
+    return getComputedStyle(icon).color === getComputedStyle(chip).color;
+  }));
+// Nicht nur "irgendein Rahmenakzent", sondern nachweislich GRUEN (--pos) --
+// tr.zu allein traegt anderswo bereits einen Rahmenakzent in der Warnfarbe
+// (--warn, "gesperrt"); ein Vergleich gegen eine gewoehnliche Zeile allein
+// haette diesen Fall nicht von der Warnfarbe unterschieden. Die Sonde
+// rendert denselben CSS-Ausdruck einmal isoliert und vergleicht das Ergebnis
+// wortgleich -- die einzig verlaessliche Art, eine CSS-Custom-Property am
+// gerenderten Zustand zu pruefen, statt Text- oder Hex-Werte zu vergleichen.
+check('KRITISCH: der Rahmenakzent der abgeglichenen Zeile ist gruen (--pos), nicht die Warnfarbe von "gesperrt" anderswo',
+  await page.evaluate(() => {
+    const tr = [...document.querySelectorAll('#plTable tbody tr')].find(r => r.getAttribute('onclick') === 'openEinsatz(14)');
+    const td = tr && tr.querySelector('td:first-child');
+    if (!td) return false;
+    const sonde = document.createElement('div');
+    sonde.style.boxShadow = 'inset 2px 0 0 var(--pos)';
+    document.body.appendChild(sonde);
+    const erwartet = getComputedStyle(sonde).boxShadow;
+    sonde.remove();
+    return getComputedStyle(td).boxShadow === erwartet;
+  }));
+
 // openEinsatz() fuehrt seit 3392470 in die Einsatzplan-Ansicht. Die
 // Schublade -- und mit ihr der Schreibschutz, den die folgenden Pruefungen
 // belegen -- haengt dort hinter "Einsatz bearbeiten"; direkt aufgerufen ist

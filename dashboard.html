@@ -408,6 +408,27 @@ tbody tr.aus td { opacity: .55; }
    Tagesplan -- dieselbe Liste, nur nach einem Tag gefiltert. */
 tbody tr.status-abgeschlossen td { opacity: .55; }
 .ag-karte.status-abgeschlossen { opacity: .55; }
+/* Abgeglichene Zeile in Planung/Tagesplan (ENT-136): eigene, kraeftigere
+   Kennzeichnung als das allgemeine ".zu" (das anderswo "gesperrt/blockiert"
+   bedeutet, z. B. bei Sperrtagen, und darum Warnfarbe traegt). Hier ist Gruen
+   richtig -- dieselbe Aussage wie das Haekchen in der App (ENT-133): fertig,
+   nichts mehr zu tun. Selektor bewusst ".zu.abgeglichen" (beide Klassen
+   stehen immer gemeinsam an der Zeile) statt nur ".abgeglichen" allein: so
+   gewinnt die Regel ueber tr.zu unabhaengig von der Reihenfolge im
+   Stylesheet, nicht nur zufaellig durch die Position hier. Ueberschreibt
+   bewusst auch die Abschlossen-Blaessung: eine abgeglichene Schicht ist der
+   spaeteste Stand und soll auffallen, nicht verblassen. */
+tbody tr.zu.abgeglichen > td:first-child { box-shadow: inset 2px 0 0 var(--pos); }
+tbody tr.zu.abgeglichen > td { background: var(--pos-soft); }
+tbody tr.status-abgeschlossen.zu.abgeglichen td { opacity: 1; }
+.ag-karte.abgeglichen { border: 1px solid var(--pos); background: var(--pos-soft); }
+.ag-karte.status-abgeschlossen.abgeglichen { opacity: 1; }
+/* Das Schloss-Symbol im gruenen Status-Chip uebernimmt die Chipfarbe, nicht
+   die Zeilenfarbe -- sonst wuerde tr.zu .i-schloss (Zeilenregel weiter unten,
+   hoehere Spezifitaet als ".chip .i-schloss" allein) es grundsaetzlich orange
+   einfaerben, auch im gruenen "Abgeglichen"-Chip. Drei Klassen statt zwei,
+   damit die Regel unabhaengig von der Position im Stylesheet gewinnt. */
+.chip.chip-p .i-schloss { color: inherit; }
 #msSeiteTabelle td:last-child .btn { margin-left: 6px; }
 
 /* ── Einsatzplan (ENT-076) ──────────────────────────────────────────────
@@ -7125,17 +7146,18 @@ function renderPlanung() {
     const teile = zug.slice(0, 3).map(nameChip);
     if (zug.length > 3) teile.push(`<span class="nm">+${zug.length - 3}</span>`);
     if (fehlt) teile.push(`<span class="nm off">${fehlt} offen</span>`);
-    const st = EN_STATUS_ANZEIGE[e.status] || EN_STATUS.geplant;
+    const gesperrt = enGesperrt(e);
+    const st = enStatusMarke(e);
 
     return kopf + `
-      <tr class="click${tag === heute ? ' heute' : ''}${enGesperrt(e) ? ' zu' : ''}${serieStand(e) ? ' serie' : ''}${e.status === 'abgeschlossen' ? ' status-abgeschlossen' : ''}" onclick="openEinsatz(${Number(e.id)})">
-        <td class="nowrap num">${enSchloss(e)}${hm(e.von)}–${hm(e.bis)}${ueberNacht(e) ? '<div class="sec">bis Folgetag</div>' : ''}${serieMarke(e)}</td>
+      <tr class="click${tag === heute ? ' heute' : ''}${gesperrt ? ' zu abgeglichen' : ''}${serieStand(e) ? ' serie' : ''}${e.status === 'abgeschlossen' ? ' status-abgeschlossen' : ''}" onclick="openEinsatz(${Number(e.id)})">
+        <td class="nowrap num">${hm(e.von)}–${hm(e.bis)}${ueberNacht(e) ? '<div class="sec">bis Folgetag</div>' : ''}${serieMarke(e)}</td>
         <td class="strong">${esc(e.kunde_name)}${e.titel ? `<div class="sec">${esc(e.titel)}</div>` : ''}</td>
         <td>${esc(e.ort)}${e.strasse ? `<div class="sec">${esc(e.strasse)}</div>` : ''}</td>
         <td><span class="chip chip-n">${esc(e.einsatzart)}</span>${sparteChip(e)}</td>
         <td class="num"><span class="chip ${e.status === 'abgesagt' ? 'chip-n' : (fehlt ? 'chip-w' : 'chip-p')}">${besetzt(e).length}/${nf(e.bedarf)}</span></td>
         <td>${teile.length ? `<div class="crew">${teile.join('')}</div>` : '<span style="color:var(--ink-3)">–</span>'}</td>
-        <td><span class="chip ${st[1]}">${st[0]}</span></td>
+        <td><span class="chip ${st[1]}">${st[0]}${gesperrt ? SCHLOSS_ZU : ''}</span></td>
       </tr>`;
   }).join('');
 
@@ -7162,16 +7184,17 @@ function renderPlanung() {
     }
     const zug = e.mitarbeiter || [];
     const fehlt = fehlend(e);
-    const st = EN_STATUS_ANZEIGE[e.status] || EN_STATUS.geplant;
-    return kopf + `<div class="ag-karte click${serieStand(e) ? ' serie' : ''}${e.status === 'abgeschlossen' ? ' status-abgeschlossen' : ''}" onclick="openEinsatz(${Number(e.id)})">
+    const gesperrt = enGesperrt(e);
+    const st = enStatusMarke(e);
+    return kopf + `<div class="ag-karte click${serieStand(e) ? ' serie' : ''}${e.status === 'abgeschlossen' ? ' status-abgeschlossen' : ''}${gesperrt ? ' abgeglichen' : ''}" onclick="openEinsatz(${Number(e.id)})">
       <div class="kopf">
-        <b>${enSchloss(e)}${esc(hm(e.von))}–${esc(hm(e.bis))}${ueberNacht(e) ? ' <span class="ag-plan">bis Folgetag</span>' : ''}</b>
+        <b>${esc(hm(e.von))}–${esc(hm(e.bis))}${ueberNacht(e) ? ' <span class="ag-plan">bis Folgetag</span>' : ''}</b>
         <span class="chip ${e.status === 'abgesagt' ? 'chip-n' : (fehlt ? 'chip-w' : 'chip-p')}">${besetzt(e).length}/${nf(e.bedarf)}</span>
       </div>
       <div class="wer">${esc(e.kunde_name)}${e.titel ? ` · ${esc(e.titel)}` : ''}</div>
       <div class="zeiten">${esc(e.ort)}${e.strasse ? ` · ${esc(e.strasse)}` : ''}</div>
       <div class="marken">
-        <span class="chip ${st[1]}">${st[0]}</span>
+        <span class="chip ${st[1]}">${st[0]}${gesperrt ? SCHLOSS_ZU : ''}</span>
         ${zug.slice(0, 3).map(nameChip).join('')}
         ${zug.length > 3 ? `<span class="nm">+${zug.length - 3}</span>` : ''}
         ${fehlt ? `<span class="nm off">${fehlt} offen</span>` : ''}
@@ -7906,8 +7929,16 @@ function enGesperrt(e) {
   if ((e.ist_status || 'offen') !== 'offen') return true;
   return (e.mitarbeiter || []).some(m => (m.ist_status || 'offen') !== 'offen');
 }
-// Kleines Schloss vor dem Zeitfeld einer Listenzeile.
-const enSchloss = e => enGesperrt(e) ? `<span title="Abgeglichen und festgeschrieben">${SCHLOSS_ZU}</span>` : '';
+// Abgeglichen (ENT-045) hat in der Statusanzeige Vorrang vor dem Rohstatus:
+// eine festgeschriebene Schicht ist der spaeteste, endgueltigste Stand -- der
+// Planer soll das auf einen Blick sehen, nicht "Geplant" oder "Abgeschlossen"
+// lesen und denken, hier fehle noch etwas. Dasselbe Muster wie im Abgleich
+// (agZeilen weiter unten): das Schloss steht HINTER dem Wort im Chip, nicht
+// mehr davor im Zeitfeld -- ein Wunsch des Projektinhabers, weil das Schloss
+// dort wie ein Rand-Detail wirkte statt wie eine Aussage ueber den Status.
+function enStatusMarke(e) {
+  return enGesperrt(e) ? ['Abgeglichen', 'chip-p'] : (EN_STATUS_ANZEIGE[e.status] || EN_STATUS.geplant);
+}
 
 function openEinsatz(id) { epAuf(id); }
 
@@ -11862,16 +11893,17 @@ function renderTagesplan() {
   const tgKarten = `<div class="card nur-schmal"><div class="card-bd flush">` + liste.map(e => {
     const zug = e.mitarbeiter || [];
     const fehlt = fehlend(e);
-    const st = EN_STATUS_ANZEIGE[e.status] || EN_STATUS.geplant;
-    return `<div class="ag-karte click" onclick="openEinsatz(${Number(e.id)})">
+    const gesperrt = enGesperrt(e);
+    const st = enStatusMarke(e);
+    return `<div class="ag-karte click${gesperrt ? ' abgeglichen' : ''}" onclick="openEinsatz(${Number(e.id)})">
       <div class="kopf">
-        <b>${enSchloss(e)}${esc(hm(e.von))}–${esc(hm(e.bis))}${ueberNacht(e) ? ' <span class="ag-plan">bis Folgetag</span>' : ''}</b>
+        <b>${esc(hm(e.von))}–${esc(hm(e.bis))}${ueberNacht(e) ? ' <span class="ag-plan">bis Folgetag</span>' : ''}</b>
         <span class="chip ${e.status === 'abgesagt' ? 'chip-n' : (fehlt ? 'chip-w' : 'chip-p')}">${besetzt(e).length}/${nf(e.bedarf)}</span>
       </div>
       <div class="wer">${esc(e.kunde_name)}${e.titel ? ` · ${esc(e.titel)}` : ''}</div>
       <div class="zeiten">${esc(e.ort)}${e.strasse ? ` · ${esc(e.strasse)}` : ''}</div>
       <div class="marken">
-        <span class="chip ${st[1]}">${st[0]}</span>
+        <span class="chip ${st[1]}">${st[0]}${gesperrt ? SCHLOSS_ZU : ''}</span>
         ${zug.length ? zug.map(nameChip).join('') : ''}
         ${fehlt ? `<span class="nm off">${fehlt} offen</span>` : ''}
       </div>
@@ -11884,16 +11916,17 @@ function renderTagesplan() {
     </tr></thead><tbody>` + liste.map(e => {
       const zug = e.mitarbeiter || [];
       const fehlt = fehlend(e);
-      const st = EN_STATUS_ANZEIGE[e.status] || EN_STATUS.geplant;
+      const gesperrt = enGesperrt(e);
+      const st = enStatusMarke(e);
       const teile = zug.map(nameChip);
       if (fehlt) teile.push(`<span class="nm off">${fehlt} offen</span>`);
-      return `<tr class="click${enGesperrt(e) ? ' zu' : ''}${e.status === 'abgeschlossen' ? ' status-abgeschlossen' : ''}" onclick="openEinsatz(${Number(e.id)})">
-        <td class="nowrap num">${enSchloss(e)}${hm(e.von)}–${hm(e.bis)}${ueberNacht(e) ? '<div class="sec">bis Folgetag</div>' : ''}</td>
+      return `<tr class="click${gesperrt ? ' zu abgeglichen' : ''}${e.status === 'abgeschlossen' ? ' status-abgeschlossen' : ''}" onclick="openEinsatz(${Number(e.id)})">
+        <td class="nowrap num">${hm(e.von)}–${hm(e.bis)}${ueberNacht(e) ? '<div class="sec">bis Folgetag</div>' : ''}</td>
         <td class="strong">${esc(e.kunde_name)}${e.titel ? `<div class="sec">${esc(e.titel)}</div>` : ''}</td>
         <td>${esc(e.ort)}${e.strasse ? `<div class="sec">${esc(e.strasse)}</div>` : ''}</td>
         <td class="num"><span class="chip ${e.status === 'abgesagt' ? 'chip-n' : (fehlt ? 'chip-w' : 'chip-p')}">${besetzt(e).length}/${nf(e.bedarf)}</span></td>
         <td>${teile.length ? `<div class="crew">${teile.join('')}</div>` : '<span style="color:var(--ink-3)">–</span>'}</td>
-        <td><span class="chip ${st[1]}">${st[0]}</span></td>
+        <td><span class="chip ${st[1]}">${st[0]}${gesperrt ? SCHLOSS_ZU : ''}</span></td>
       </tr>`;
     }).join('') + `</tbody></table></div></div></div>`;
 }
