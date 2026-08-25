@@ -228,6 +228,24 @@ svg.i-sm { width: 17px; height: 17px; }
 
 /* Unterlagen zur Schicht (ENT-117). Ganze Zeile als Trefferfläche und
    mindestens 44 px hoch -- am Bauzaun wird das mit Handschuhen getippt. */
+/* Wer sonst eingeteilt ist (ENT-121). Der Aufklapper ist ein Bedienelement
+   auf einem Telefon und haelt die Trefferflaeche von 44 px ein. */
+.team-auf { display: inline-flex; align-items: center; gap: 7px; min-height: 44px;
+  padding: 0; border: none; background: none; color: var(--ink); font: inherit;
+  font-size: 13.5px; font-weight: 550; cursor: pointer; text-align: left; }
+.team-pfeil { width: 15px; height: 15px; flex: none; stroke: currentColor; stroke-width: 2;
+  fill: none; stroke-linecap: round; stroke-linejoin: round; transition: transform .15s; }
+.team-auf[aria-expanded="true"] .team-pfeil { transform: rotate(180deg); }
+.team-liste { display: none; margin: 0 0 6px; padding: 0; list-style: none; }
+.team-liste.auf { display: block; }
+.team-liste li { font-size: 13.5px; padding: 5px 0 5px 13px; position: relative; color: var(--ink); }
+/* Punkt statt Aufzaehlungszeichen -- die Liste steht in einer Datenzeile und
+   soll nicht wie ein eigener Absatz wirken. */
+.team-liste li::before { content: ''; position: absolute; left: 0; top: 12px;
+  width: 4px; height: 4px; border-radius: 50%; background: var(--ink-3); }
+.team-liste li.ich { font-weight: 650; }
+.team-du { font-size: 11.5px; color: var(--ink-3); font-weight: 500; }
+
 /* Der Routenknopf steht in der Adresszeile und ist ein echtes Bedienelement
    auf einem Telefon -- 44 px Trefferflaeche wie jedes andere auch. */
 .route-knopf { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px;
@@ -268,9 +286,18 @@ svg.i-sm { width: 17px; height: 17px; }
 /* ── Blatt von unten (Schichtdetail, Passwort) */
 .abdunkeln { position: fixed; inset: 0; z-index: 60; background: rgba(16,18,22,.45); opacity: 0; pointer-events: none; transition: opacity .2s; }
 .abdunkeln.on { opacity: 1; pointer-events: auto; }
+/* Volle Hoehe seit ENT-121. Vorher standen oben rund 12 vh ungenutzt --
+   ausgerechnet in der Ansicht, in der am meisten steht (Zeit, Kunde, Ort,
+   Route, Unterlagen, Team, Rapport, Rueckmeldung).
+   top/bottom statt einer vh-Angabe: Auf dem Telefon wandert die Adressleiste
+   beim Scrollen, und 100vh ist dann groesser als das, was man sieht -- der
+   Fussbereich mit den Knoepfen rutscht unter den Rand. Mit top: 0 und
+   bottom: 0 rechnet der Browser selbst.
+   Die Polsterung oben haelt den Griff aus der Statusleiste und der Kamera. */
 .blatt {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 61; max-height: 88vh;
-  background: var(--surface); border-radius: var(--r-lg) var(--r-lg) 0 0; box-shadow: var(--sh-3);
+  position: fixed; left: 0; right: 0; top: 0; bottom: 0; z-index: 61;
+  padding-top: env(safe-area-inset-top);
+  background: var(--surface); box-shadow: var(--sh-3);
   transform: translateY(100%); transition: transform .24s cubic-bezier(.32,.72,0,1);
   display: flex; flex-direction: column;
 }
@@ -419,6 +446,7 @@ const W = {
     dokumentFehler: 'Die Unterlage liess sich nicht öffnen.',
     taetigkeit: 'Tätigkeit', qualifikation: 'Qualifikation',
     zusagen: 'Zusagen', ablehnen: 'Ablehnen', zugesagt: 'Zugesagt', abgelehnt: 'Abgelehnt',
+    duSelbst: 'du', teamZeigen: 'Wer sonst eingeteilt ist',
     hastZugesagt: 'Du hast zugesagt.', hastAbgelehnt: 'Du hast abgelehnt.',
     planungSiehtEs: 'Die Planung sieht deine Rückmeldung.',
     antwortAendern: 'Antwort ändern',
@@ -1132,7 +1160,7 @@ function blattAuf(id) {
       ${e.qualifikation ? `<dt>${esc(w('qualifikation'))}</dt><dd>${esc(e.qualifikation)}</dd>` : ''}
       <dt>${esc(w('einsatzart'))}</dt><dd>${esc(e.einsatzart)}</dd>
       <dt>Status</dt><dd><span class="marke ${st[1]}">${esc(w(st[0]))}</span> <span class="marke ${zu[1]}">${esc(w(zu[0]))}</span></dd>
-      ${Number(e.im_team) > 1 ? `<dt>${esc(w('schicht'))}</dt><dd>${Number(e.im_team)} ${esc(w('imTeam'))}</dd>` : ''}
+      ${Number(e.im_team) > 1 ? `<dt>${esc(w('schicht'))}</dt><dd>${teamBlock(e)}</dd>` : ''}
       ${e.bemerkung ? `<dt>${esc(w('bemerkung'))}</dt><dd>${esc(e.bemerkung)}</dd>` : ''}
     </dl>
     <!-- Unterlagen des Planers (ENT-117). Der Platz steht schon, der Inhalt
@@ -1206,6 +1234,38 @@ function blattFussZeichnen(e) {
 // Sicherheitskonzept. Der Endpunkt gibt sie nur an Eingeteilte dieses
 // Einsatzes heraus -- hier wird nichts zusätzlich geprüft, weil eine Prüfung
 // in der Oberfläche keine ist.
+// ── Wer sonst auf der Schicht steht (ENT-121) ───────────────────────────
+//
+// Bis dahin gab es nur die Anzahl. Der Projektinhaber hat das fuer die
+// Absprache vor Ort revidiert (ENT-023 Ziff. „nur die Anzahl" ist damit
+// ueberholt) -- ausdruecklich NUR die Namen: keine Telefonnummer, keine
+// Personalnummer, kein Rueckmeldestand der anderen. Der Endpunkt gibt auch
+// nicht mehr heraus; hier wird nur angezeigt, was ankommt.
+//
+// Eingeklappt, weil die Zahl in den meisten Faellen genuegt. Wer wissen will,
+// wen er vor Ort sucht, klappt auf.
+const TEAM_PFEIL = '<svg viewBox="0 0 24 24" aria-hidden="true" class="team-pfeil">'
+  + '<polyline points="6 9 12 15 18 9"/></svg>';
+
+function teamBlock(e) {
+  const liste = Array.isArray(e.team) ? e.team : [];
+  const zahl = `${Number(e.im_team)} ${esc(w('imTeam'))}`;
+  // Ohne Namensliste bleibt es bei der Zahl -- ein Knopf, der nichts
+  // aufklappt, ist schlimmer als kein Knopf.
+  if (liste.length < 2) { return zahl; }
+  return `<button type="button" class="team-auf" aria-expanded="false"
+      title="${esc(w('teamZeigen'))}" onclick="teamUm(this)"><span>${zahl}</span>${TEAM_PFEIL}</button>
+    <ul class="team-liste">${liste.map(m => `<li${m.bin_ich ? ' class="ich"' : ''}>${esc(m.name)}${
+      m.bin_ich ? ` <span class="team-du">${esc(w('duSelbst'))}</span>` : ''}</li>`).join('')}</ul>`;
+}
+
+function teamUm(b) {
+  const auf = b.getAttribute('aria-expanded') === 'true';
+  b.setAttribute('aria-expanded', auf ? 'false' : 'true');
+  const l = b.nextElementSibling;
+  if (l) { l.classList.toggle('auf', !auf); }
+}
+
 // Adresse der Schicht als Zieladresse fuer die Navigation (ENT-119).
 //
 // ABGRENZUNG: Das hat NICHTS mit der Wegstrecke nach Art. 18 GAV zu tun

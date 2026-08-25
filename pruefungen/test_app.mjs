@@ -1,5 +1,6 @@
 import { WURZEL, HIER, OUT, browserPfad } from './pfade.mjs';
 import { chromium } from 'playwright';
+import { readFileSync } from 'fs';
 
 const EXE = browserPfad();
 const iso = d => new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
@@ -21,7 +22,11 @@ const SCHICHTEN = () => ({ status: 'ok', von: GESTERN, bis: tag(90), schichten: 
   { id: 41, kunde_name: 'Einwohnergemeinde Niedergösgen', titel: 'Revierdienst Nacht',
     strasse: 'Sehr Lange Hauptstrasse 44', ort: '4632 Trimbach', einsatzart: 'Revierdienst',
     datum: LAUF_DATUM, von: hm(beginn), bis: hm(ende), status: 'geplant', bemerkung: 'Schluessel beim Hauswart',
-    zusage: 'offen', objekt_name: 'Einkaufszentrum Nord West', im_team: 2,
+    zusage: 'offen', objekt_name: 'Einkaufszentrum Nord West', im_team: 3,
+    // ENT-121: die Namen der Eingeteilten -- und NUR die Namen.
+    team: [{ name: 'Daniele Ciardo', bin_ich: true },
+           { name: 'Berta Beispiel', bin_ich: false },
+           { name: 'Carlo Muster', bin_ich: false }],
     // ENT-115: Angaben, die vor Ort gebraucht werden.
     kanton: 'SO', treffpunkt: 'Haupteingang Nord', taetigkeit: 'Rundgang alle zwei Stunden',
     qualifikation: 'Revierdienstausweis',
@@ -29,7 +34,8 @@ const SCHICHTEN = () => ({ status: 'ok', von: GESTERN, bis: tag(90), schichten: 
   { id: 42, kunde_name: 'Einwohnergemeinde Niedergösgen', titel: 'Baustelle Kreiselumfahrung',
     strasse: 'Dorfstrasse 1', ort: '5013 Niedergösgen', einsatzart: 'Verkehrsdienst',
     datum: MORGEN, von: '07:30:00', bis: '16:30:00', status: 'bestaetigt', bemerkung: null,
-    zusage: 'zugesagt', objekt_name: null, im_team: 1 },
+    zusage: 'zugesagt', objekt_name: null, im_team: 1,
+    team: [{ name: 'Daniele Ciardo', bin_ich: true }] },
   { id: 43, kunde_name: 'Einwohnergemeinde Niedergösgen', titel: 'Schliessrunde',
     strasse: null, ort: '4632 Trimbach', einsatzart: 'Revierdienst',
     datum: tag(2), von: '22:00:00', bis: '05:30:00', status: 'provisorisch', bemerkung: null,
@@ -37,7 +43,16 @@ const SCHICHTEN = () => ({ status: 'ok', von: GESTERN, bis: tag(90), schichten: 
   { id: 44, kunde_name: 'Einwohnergemeinde Niedergösgen', titel: 'Abgesagter Einsatz',
     strasse: null, ort: '5013 Niedergösgen', einsatzart: 'Verkehrsdienst',
     datum: tag(3), von: '08:00:00', bis: '12:00:00', status: 'abgesagt', bemerkung: null,
-    zusage: 'offen', objekt_name: null, im_team: 1 }]});
+    zusage: 'offen', objekt_name: null, im_team: 1 },
+  // Anzahl sagt 2, aber es kommt keine Namensliste -- so antwortet ein Server,
+  // der die Erweiterung aus ENT-121 noch nicht hat. Die App darf dann KEINEN
+  // Aufklapper zeigen, der nichts aufklappt. Bewusst zuunterst angehaengt:
+  // Weiter oben eingefuegt verschiebt es die Reihenfolge, an der andere
+  // Pruefungen dieser Suite haengen.
+  { id: 45, kunde_name: 'Einwohnergemeinde Niedergösgen', titel: 'Ohne Namensliste',
+    strasse: null, ort: '4632 Trimbach', einsatzart: 'Revierdienst',
+    datum: tag(6), von: '06:00:00', bis: '10:00:00', status: 'geplant', bemerkung: null,
+    zusage: 'offen', objekt_name: null, im_team: 2, team: [] }]});
 
 const PROFIL = { status: 'ok', monat: { anzahl: 3, stunden: 22.5 }, profil: {
   name: 'daniele.ciardo', ist_admin: false, personalnummer: 'P-014', anrede: 'Herr',
@@ -130,8 +145,24 @@ check('Plan zeigt die Schicht auf Abruf', planText.includes('Auf Abruf'));
 check('Plan zeigt die abgesagte Schicht', planText.includes('Abgesagter Einsatz'));
 const koepfe = await page.evaluate(() => [...document.querySelectorAll('#v-plan .tag-kopf')].length);
 check('Plan gruppiert nach Tagen', koepfe >= 3);
+// Ueber die Struktur pruefen, nicht ueber einen Vorwaertsblick im Text: Der
+// alte Ausdruck suchte ab "Abgesagter Einsatz" beliebig weit nach "1 Schicht"
+// und wurde rot, sobald IRGENDEIN spaeterer Tag eine Schicht hatte. Gemeint
+// ist die Tagesueberschrift, zu der die abgesagte Schicht gehoert.
 check('Abgesagte Schicht zaehlt nicht als Schicht des Tages',
-  !/Abgesagter Einsatz[\s\S]*?1 Schicht/.test(planText));
+  await page.evaluate(() => {
+    // Auf der Ebene der direkten Kinder von #v-plan suchen: Dort stehen
+    // Tagesueberschrift und Karte als Geschwister. Die Schaltflaeche .schicht
+    // liegt eine Ebene tiefer -- von ihr aus gibt es keinen Geschwisterweg
+    // zur Ueberschrift.
+    const kinder = [...document.getElementById('v-plan').children];
+    const i = kinder.findIndex(x => x.textContent.includes('Abgesagter Einsatz')
+      && !x.classList.contains('tag-kopf'));
+    if (i < 1) { return false; }
+    let j = i - 1;
+    while (j >= 0 && !kinder[j].classList.contains('tag-kopf')) { j--; }
+    return j >= 0 && !/1 Schicht/.test(kinder[j].textContent);
+  }));
 
 // ══════════════ BLATT + ZUSAGE
 await page.click('#v-plan .schicht[onclick="blattAuf(42)"]');
@@ -141,6 +172,126 @@ check('Blatt zeigt den Titel', (await T('#blTitel')) === 'Baustelle Kreiselumfah
 const blText = await T('#blBody');
 check('Blatt zeigt Kunde und Ort', blText.includes('Niedergösgen'));
 check('Blatt zeigt die Einsatzart', blText.includes('Verkehrsdienst'));
+
+// ══════════════ WER SONST EINGETEILT IST (ENT-121)
+//
+// Bis dahin gab es ausdruecklich nur die Anzahl, keinen Namen -- so stand es
+// in ENT-023 und so stand es im Endpunkt. Der Projektinhaber hat das fuer die
+// Absprache vor Ort revidiert, und zwar eng: NUR die Namen.
+//
+// Diese Suite haelt genau diese Grenze. Waechst sie je zu "und die
+// Telefonnummer", ist das keine Pruefung, die angepasst werden muss, sondern
+// eine Entscheidung, die getroffen werden muss.
+const MS = readFileSync(`${WURZEL}/backend/api/meine_schichten.php`, 'utf8');
+const teamAbfrage = (MS.match(/SELECT z\.einsatz_id[\s\S]*?ORDER BY[^"]*/) || [''])[0];
+check('KRITISCH: der Endpunkt gibt Namen der Eingeteilten heraus',
+  /m\.vorname, m\.nachname/.test(teamAbfrage));
+check('KRITISCH: aber keine Telefonnummer und keine E-Mail',
+  !/telefon|mobil|email/i.test(teamAbfrage));
+check('KRITISCH: und keine Personalnummer und keinen Anmeldenamen als Schluessel',
+  !/personalnummer/i.test(teamAbfrage));
+check('KRITISCH: die mitarbeiter_id fremder Personen geht nicht mit',
+  !/'mitarbeiter_id'|\bmitarbeiter_id\b\s*=>/.test(MS.split('$team[$eid][] =')[1] || ''));
+check('KRITISCH: der Rueckmeldestand der anderen geht nicht mit',
+  !/z\.zusage/.test(teamAbfrage));
+check('KRITISCH: die Abfrage laeuft nur ueber die eigenen Einsatznummern',
+  /WHERE z\.einsatz_id IN \(\$marken\)/.test(teamAbfrage));
+check('Die eigene Person ist als solche gekennzeichnet',
+  /z\.mitarbeiter_id = \?\) AS bin_ich/.test(MS));
+
+await page.evaluate(() => blattZu());
+await page.waitForTimeout(150);
+await page.evaluate(() => blattAuf(41));
+await page.waitForTimeout(300);
+check('KRITISCH: die Anzahl im Team steht weiterhin da',
+  /3 im Team/.test(await T('#blBody')));
+check('KRITISCH: die Namen sind zunaechst eingeklappt',
+  !(await page.isVisible('#blBody .team-liste')));
+check('Aber im Blatt vorhanden',
+  await page.evaluate(() => !!document.querySelector('#blBody .team-liste')));
+check('KRITISCH: der Aufklapper haelt die Trefferflaeche von 44 px ein',
+  await page.evaluate(() => {
+    const b = document.querySelector('#blBody .team-auf');
+    return !!b && b.getBoundingClientRect().height >= 44;
+  }));
+// Ein fehlender Aufklapper muss eine ROTE PRUEFUNG geben, nicht die Suite
+// abbrechen -- ein Abbruch sieht im Sammellauf aus wie ein Fehler im
+// Pruefwerkzeug, nicht wie einer im Produkt.
+check('Der Aufklapper ist da und laesst sich druecken',
+  await page.evaluate(() => {
+    const b = document.querySelector('#blBody .team-auf');
+    if (!b) { return false; }
+    b.click();
+    return true;
+  }));
+await page.waitForTimeout(250);
+check('KRITISCH: aufgeklappt stehen die Namen da',
+  await page.isVisible('#blBody .team-liste'));
+// Nicht ueber page.textContent holen: Fehlt die Liste, wirft das und bricht
+// die ganze Suite ab, statt die Pruefungen darunter rot werden zu lassen.
+const teamTxt = await page.evaluate(() => {
+  const l = document.querySelector('#blBody .team-liste');
+  return l ? l.textContent : '';
+});
+check('KRITISCH: und zwar alle drei',
+  /Daniele Ciardo/.test(teamTxt) && /Berta Beispiel/.test(teamTxt) && /Carlo Muster/.test(teamTxt));
+check('Die eigene Person ist erkennbar',
+  await page.evaluate(() => {
+    const ich = document.querySelector('#blBody .team-liste li.ich');
+    return !!ich && /Daniele Ciardo/.test(ich.textContent) && /du/.test(ich.textContent);
+  }));
+check('KRITISCH: keine Telefonnummer in der Liste', !/\+41|07\d/.test(teamTxt));
+check('Nochmaliges Tippen klappt wieder zu',
+  await page.evaluate(() => {
+    const b = document.querySelector('#blBody .team-auf');
+    const l = document.querySelector('#blBody .team-liste');
+    if (!b || !l) { return false; }
+    b.click();
+    return !l.classList.contains('auf');
+  }));
+
+// Allein auf der Schicht: kein Aufklapper, der nichts aufklappt
+await page.evaluate(() => blattZu());
+await page.waitForTimeout(150);
+await page.evaluate(() => blattAuf(42));
+await page.waitForTimeout(300);
+check('KRITISCH: wer allein eingeteilt ist, bekommt keinen Aufklapper',
+  await page.evaluate(() => !document.querySelector('#blBody .team-auf')));
+
+// Anzahl da, Namensliste nicht -- der Fall, den ein Server ohne die
+// Erweiterung liefert. Das ist der Fall, der die Absicherung im Code wirklich
+// prueft: Bei "allein eingeteilt" faellt die ganze Zeile schon vorher weg,
+// dort waere die Pruefung leer erfuellt.
+await page.evaluate(() => blattZu());
+await page.waitForTimeout(150);
+await page.evaluate(() => blattAuf(45));
+await page.waitForTimeout(300);
+check('KRITISCH: ohne Namensliste steht nur die Anzahl da',
+  /2 im Team/.test(await T('#blBody')));
+check('KRITISCH: und kein Aufklapper, der nichts aufklappt',
+  await page.evaluate(() => !document.querySelector('#blBody .team-auf')
+    && !document.querySelector('#blBody .team-liste')));
+
+// ══════════════ DAS BLATT NUTZT DIE VOLLE HOEHE (ENT-121)
+const hoehe = await page.evaluate(() => {
+  const b = document.getElementById('blatt').getBoundingClientRect();
+  const fuss = document.getElementById('blFuss').getBoundingClientRect();
+  return { blatt: Math.round(b.height), fenster: window.innerHeight,
+           oben: Math.round(b.top), fussUnten: Math.round(fuss.bottom),
+           ueberlauf: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+});
+check('KRITISCH: das Blatt nutzt die volle Fensterhoehe',
+  hoehe.blatt >= hoehe.fenster - 2);
+check('Oben bleibt kein Platz mehr liegen', hoehe.oben <= 1);
+check('KRITISCH: der Fussbereich bleibt trotzdem im Bild — die Knoepfe duerfen nicht unter den Rand rutschen',
+  hoehe.fussUnten <= hoehe.fenster + 1);
+check('Kein Querlauf durch das volle Blatt', hoehe.ueberlauf <= 1);
+await page.evaluate(() => blattZu());
+await page.waitForTimeout(200);
+// Zurueck zu Schicht 42: Die Pruefungen zum Antwortzustand darunter setzen
+// voraus, dass genau diese Schicht offen ist.
+await page.click('#v-plan .schicht[onclick="blattAuf(42)"]');
+await page.waitForTimeout(250);
 
 // Knoepfe im Fussbereich ueber ihre Beschriftung treffen, nicht ueber eine
 // Klasse: Nach ENT-120 ist ".btn-plain" mal "Ablehnen" und mal "Antwort
