@@ -282,6 +282,13 @@ svg.i-sm { width: 17px; height: 17px; }
 .blatt-bd { padding: 18px 20px; overflow-y: auto; flex: 1; }
 .blatt-ft { padding: 14px 20px calc(14px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line-soft); display: flex; gap: 10px; flex: none; }
 .blatt-ft .btn { flex: 1; }
+/* Beantworteter Zustand (ENT-120): erst die Aussage, darunter die Knoepfe.
+   Ueberschrift oben, Wert darunter -- und die Knoepfe stehen nebeneinander,
+   damit keiner allein ueber die volle Breite gezogen wird. */
+.blatt-ft.gestapelt { flex-direction: column; align-items: stretch; gap: 12px; }
+.blatt-ft .ft-stand { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.blatt-ft .ft-txt { font-size: 12.5px; color: var(--ink-3); line-height: 1.5; flex: 1 1 160px; }
+.blatt-ft .ft-reihe { display: flex; gap: 10px; }
 
 /* ── Hinweis */
 .toast { position: fixed; left: 16px; right: 16px; bottom: calc(var(--tab-h) + 18px + env(safe-area-inset-bottom)); background: var(--shell); color: #fff; padding: 13px 18px; border-radius: var(--r-sm); font-size: 14.5px; font-weight: 560; box-shadow: var(--sh-2); z-index: 200; opacity: 0; pointer-events: none; transform: translateY(8px); transition: opacity .18s, transform .18s; text-align: center; }
@@ -412,6 +419,9 @@ const W = {
     dokumentFehler: 'Die Unterlage liess sich nicht öffnen.',
     taetigkeit: 'Tätigkeit', qualifikation: 'Qualifikation',
     zusagen: 'Zusagen', ablehnen: 'Ablehnen', zugesagt: 'Zugesagt', abgelehnt: 'Abgelehnt',
+    hastZugesagt: 'Du hast zugesagt.', hastAbgelehnt: 'Du hast abgelehnt.',
+    planungSiehtEs: 'Die Planung sieht deine Rückmeldung.',
+    antwortAendern: 'Antwort ändern',
     offen: 'Noch offen', gemeldet: 'Rückmeldung gespeichert.',
     geplant: 'Geplant', bestaetigt: 'Bestätigt', provisorisch: 'Auf Abruf', abgesagt: 'Abgesagt',
     abgesagtHinweis: 'Dieser Einsatz wurde abgesagt.',
@@ -1136,12 +1146,59 @@ function blattAuf(id) {
 
   blattDokLaden(Number(e.id));
 
-  // Rückmeldung ist freiwillig -- die Einteilung bleibt so oder so bestehen.
-  $('blFuss').innerHTML = e.status === 'abgesagt' ? `
-    <button class="btn btn-plain" onclick="blattZu()">${esc(w('schliessen'))}</button>` : `
-    <button class="btn ${e.zusage === 'abgelehnt' ? 'btn-neg' : 'btn-plain'}" onclick="melden('abgelehnt')">${esc(w('ablehnen'))}</button>
-    <button class="btn ${e.zusage === 'zugesagt' ? 'btn-pos' : 'btn-primary'}" onclick="melden('zugesagt')">${esc(w('zusagen'))}</button>`;
+  // Eine bereits gegebene Antwort wird nicht noch einmal verlangt (ENT-120).
+  antwortOffen = false;
+  blattFussZeichnen(e);
   blattZeigen();
+}
+
+// ── Fussbereich der Schichtansicht (ENT-120)
+//
+// Wer zu- oder abgesagt hat, bekommt beim naechsten Oeffnen nicht wieder zwei
+// gleich grosse Knoepfe vorgesetzt, die eine Entscheidung verlangen, die
+// laengst gefallen ist. Stattdessen steht da, WAS beantwortet wurde.
+//
+// Die Knoepfe verschwinden aber nicht ersatzlos, sondern hinter „Antwort
+// ändern": Auf einem Telefon liegen „Ablehnen" und „Zusagen" nebeneinander,
+// und ein Fehlgriff ist schnell passiert. Waere die Antwort danach
+// unwiderruflich, plante die Einsatzleitung mit einer Zusage, die niemand so
+// gemeint hat -- und wer nach der Zusage krank wird, haette in der App
+// ueberhaupt keinen Weg mehr. Eine Rueckmeldung, die sich nicht berichtigen
+// laesst, ist schlechter als gar keine.
+let antwortOffen = false;
+
+function antwortAendern() {
+  antwortOffen = true;
+  const e = schichten.find(x => Number(x.id) === blattId);
+  if (e) { blattFussZeichnen(e); }
+}
+
+function blattFussZeichnen(e) {
+  const el = $('blFuss');
+  if (!el) { return; }
+  const schliessen = `<button class="btn btn-plain" onclick="blattZu()">${esc(w('schliessen'))}</button>`;
+  if (e.status === 'abgesagt') { el.className = 'blatt-ft'; el.innerHTML = schliessen; return; }
+
+  // Rückmeldung ist freiwillig -- die Einteilung bleibt so oder so bestehen.
+  const beantwortet = e.zusage === 'zugesagt' || e.zusage === 'abgelehnt';
+  if (!beantwortet || antwortOffen) {
+    el.className = 'blatt-ft';
+    el.innerHTML = `
+      <button class="btn ${e.zusage === 'abgelehnt' ? 'btn-neg' : 'btn-plain'}" onclick="melden('abgelehnt')">${esc(w('ablehnen'))}</button>
+      <button class="btn ${e.zusage === 'zugesagt' ? 'btn-pos' : 'btn-primary'}" onclick="melden('zugesagt')">${esc(w('zusagen'))}</button>`;
+    return;
+  }
+  const ja = e.zusage === 'zugesagt';
+  el.className = 'blatt-ft gestapelt';
+  el.innerHTML = `
+    <div class="ft-stand">
+      <span class="marke ${ja ? 'm-p' : 'm-x'}">${esc(w(ja ? 'zugesagt' : 'abgelehnt'))}</span>
+      <span class="ft-txt">${esc(w(ja ? 'hastZugesagt' : 'hastAbgelehnt'))} ${esc(w('planungSiehtEs'))}</span>
+    </div>
+    <div class="ft-reihe">
+      <button class="btn btn-plain" onclick="antwortAendern()">${esc(w('antwortAendern'))}</button>
+      ${schliessen}
+    </div>`;
 }
 
 // ── Unterlagen zur Schicht (ENT-117) ────────────────────────────────────
