@@ -50,6 +50,11 @@ let EINSAETZE = [
   bau(77, { kunde_name: 'Abgeschlossen', datum: HEUTE, status: 'abgeschlossen',
             mitarbeiter: [{ id: 2, name: 'daniele', vorname: 'Daniele', nachname: 'Ciardo' }] }),
   bau(78, { kunde_name: 'Vergangen, nicht abgeschlossen', datum: FRUEHER, status: 'bestaetigt' }),
+  // 79 — abgeschlossen, Rapport deckungsgleich mit dem Plan, UND diese eine
+  // Zuteilung bereits abgeglichen (ENT-138): "Direkt abgleichen" darf hier
+  // nicht mehr angeboten werden -- nichts mehr zu uebernehmen.
+  bau(79, { kunde_name: 'Bereits abgeglichen', datum: HEUTE, status: 'abgeschlossen',
+            mitarbeiter: [{ id: 2, name: 'daniele', vorname: 'Daniele', nachname: 'Ciardo', ist_status: 'anwesend' }] }),
   // 76 — drei Rückmeldungen nebeneinander: zugesagt, abgelehnt, offen aber
   //      angesehen. Genau die drei Zustände, die der Balken zeigen soll.
   bau(76, { kunde_name: 'Rückmeldungen', bedarf: 3, mitarbeiter: [
@@ -68,6 +73,11 @@ const RAPPORTE = [
   { id: 900, einsatz_id: 77, mitarbeiter_id: 2, mitarbeiter: 'daniele',
     von: '07:00:00', bis: '15:00:00', pause_min: 30, netto_h: 7.5,
     bemerkung: 'Alles ruhig, keine besonderen Vorkommnisse.', erfasst_am: HEUTE + ' 15:10:00' },
+  // Zu Einsatz 79 (ENT-138): Zeiten decken sich exakt mit dem Plan (07:30–16:30) --
+  // bewusst KEINE Abweichung, damit dieser Testfall nur die Sperre prueft.
+  { id: 901, einsatz_id: 79, mitarbeiter_id: 2, mitarbeiter: 'daniele',
+    von: '07:30:00', bis: '16:30:00', pause_min: 30, netto_h: 8.5,
+    bemerkung: null, erfasst_am: HEUTE + ' 16:40:00' },
 ];
 
 // ── Nachbau des Servers (einsatz_position.php) ────────────────────────────
@@ -233,6 +243,47 @@ check('Die Zeitachse ist da',
 check('Soll und Ist stehen im Kopf der Karte', /Soll/.test(await page.textContent('#epSoll')));
 await page.screenshot({ path: OUT + '/84-einsatzplan-raster.png' });
 
+// ══════════ SPALTE "VERRECHNUNG" ENTFERNT, ZEIT BETONT, LEGENDE (ENT-139)
+// Der Projektinhaber, per Foto des Schichten-Rasters: die Verrechnung-Spalte
+// weg fuer mehr Platz und mehr Praesenz der Schichtzeiten, dazu eine
+// horizontale Legende unter der letzten Schicht, die Symbole und Farben
+// erklaert -- Orientierungshilfe fuer einen neuen Planer.
+check('KRITISCH: die Spalte "Verrechnung" ist aus dem Rasterkopf verschwunden',
+  !(await page.textContent('#epRaster table.ep-gitter thead')).includes('Verrechnung'));
+check('KRITISCH: die Schichtzeit ist hervorgehoben (fett), nicht mehr gewoehnlicher Text',
+  await page.evaluate(() => {
+    const b = document.querySelector('#epRaster table.ep-gitter tbody tr td:nth-child(4) b');
+    return !!b && parseInt(getComputedStyle(b).fontWeight, 10) >= 700;
+  }));
+check('KRITISCH: die Legende steht unter der Tabelle, mit allen fuenf Erklaerungen',
+  await page.evaluate(() => {
+    const texte = [...document.querySelectorAll('#epRaster .ep-legende .ep-lg-item')].map(x => x.textContent.trim());
+    return texte.length === 5
+      && texte.some(t => t === 'Offen')
+      && texte.some(t => t.includes('keine Rückmeldung'))
+      && texte.some(t => t === 'Zugesagt')
+      && texte.some(t => t === 'Abgelehnt')
+      && texte.some(t => t.includes('in der App angesehen'));
+  }));
+check('KRITISCH: das Augen-Symbol steht in der Legende (dasselbe Symbol wie im Balken)',
+  await page.evaluate(() => !!document.querySelector('#epRaster .ep-legende .ep-lg-item .ep-auge')));
+// Am gerenderten Zustand gemessen, nicht angenommen (CLAUDE.md, Gestaltung):
+// die Legendenfarben muessen mit den tatsaechlichen Balkenfarben uebereinstimmen,
+// nicht nur eine eigene, unabhaengig gepflegte Farbe zeigen, die zufaellig
+// aehnlich aussieht.
+check('KRITISCH: jede Legendenfarbe stimmt mit der echten Balkenfarbe exakt ueberein',
+  await page.evaluate(() => {
+    const pruefen = klasse => {
+      const balken = document.createElement('div'); balken.className = 'ep-balken ' + klasse;
+      const swatch = document.createElement('i'); swatch.className = 'ep-lg-swatch ' + klasse;
+      document.body.append(balken, swatch);
+      const gleich = getComputedStyle(balken).backgroundColor === getComputedStyle(swatch).backgroundColor;
+      balken.remove(); swatch.remove();
+      return gleich;
+    };
+    return ['offen', 'besetzt', 'zugesagt', 'abgelehnt'].every(pruefen);
+  }));
+
 // ══════════ EIN ZWEITES ÖFFNEN LEGT NICHT NOCH EINMAL AN
 await oeffne(71);
 check('KRITISCH: beim zweiten Öffnen entsteht keine weitere Position', (await zeilen()) === 2);
@@ -343,6 +394,55 @@ check('KRITISCH: der Rapport erscheint im Kopf des abgeschlossenen Einsatzes',
 check('Die Person steht dabei', kopf77.includes('Daniele Ciardo'));
 check('Die Bemerkung aus dem Rapport ist zu lesen', kopf77.includes('Alles ruhig'));
 check('Die Pause ist ausgewiesen', kopf77.includes('30'));
+
+// ══════════ ABWEICHUNGSWARNUNG, RAPPORT ANSEHEN, DIREKT ABGLEICHEN (ENT-138)
+// Der Projektinhaber: der Rapport hat oft abweichende, finale Zeiten -- das
+// System soll die Abweichung erkennen und den Planer sichtbar warnen, sowie
+// direkt aus dem Einsatzplan heraus mit dem Rapport abgleichen lassen.
+check('KRITISCH: eine vom Plan abweichende Rapportzeit wird als Warnung angezeigt',
+  kopf77.includes('⚠️') && kopf77.includes('Rapport weicht ab')
+  && kopf77.includes('07:30 → 07:00') && kopf77.includes('16:30 → 15:00'));
+check('KRITISCH: "Rapport ansehen" fuehrt zum bestehenden Rapport-Betrachter (openDrawer)',
+  await page.evaluate(() => {
+    const btn = [...document.querySelectorAll('#epKopf button')].find(b => b.textContent.includes('Rapport ansehen'));
+    return !!btn && btn.getAttribute('onclick') === 'openDrawer(900)';
+  }));
+await page.evaluate(() => [...document.querySelectorAll('#epKopf button')]
+  .find(b => b.textContent.includes('Rapport ansehen')).click());
+await page.waitForTimeout(300);
+check('KRITISCH: der Rapport-Betrachter zeigt tatsaechlich diesen Rapport',
+  (await page.textContent('#drBody')).includes('Alles ruhig'));
+await page.evaluate(() => closeDrawer());
+await page.waitForTimeout(200);
+
+check('KRITISCH: "Direkt abgleichen" ist vorhanden und zielt auf genau diese Zuteilung',
+  await page.evaluate(() => {
+    const btn = [...document.querySelectorAll('#epKopf button')].find(b => b.textContent.includes('Direkt abgleichen'));
+    return !!btn && btn.getAttribute('onclick') === 'epDirektAbgleichen(77,2)';
+  }));
+await page.evaluate(() => [...document.querySelectorAll('#epKopf button')]
+  .find(b => b.textContent.includes('Direkt abgleichen')).click());
+await page.waitForTimeout(300);
+check('KRITISCH: der Abgleich oeffnet sich vorbefuellt mit den Rapportzeiten',
+  (await page.inputValue('#agdVon')) === '07:00' && (await page.inputValue('#agdBis')) === '15:00');
+check('KRITISCH: der Status wird auf "anwesend" vorbefuellt, nicht auf die erste Option',
+  (await page.$eval('#agdStatus', el => el.value)) === 'anwesend');
+check('Noch nichts gespeichert -- der Planer muss selbst bestaetigen (Q2-Entscheid)',
+  !rufe.some(r => r.p.includes('einsatz_abgleich')));
+await page.evaluate(() => closeDrawer());
+await page.waitForTimeout(200);
+
+// Gegenprobe zur Sperre: dieselbe Konstellation, aber die Zuteilung ist
+// bereits abgeglichen -- der Knopf darf dann nicht mehr angeboten werden.
+await oeffne(79);
+const kopf79 = await page.textContent('#epKopf');
+check('KRITISCH: bei einer bereits abgeglichenen Zuteilung fehlt "Direkt abgleichen"',
+  !kopf79.includes('Direkt abgleichen'));
+check('"Rapport ansehen" bleibt trotzdem verfuegbar -- ansehen ist keine Aenderung',
+  kopf79.includes('Rapport ansehen'));
+check('Keine Abweichungswarnung, wenn der Rapport dem Plan entspricht',
+  !kopf79.includes('⚠️'));
+
 await oeffne(78);   // vergangen, aber nicht abgeschlossen, kein Rapport in der Fixture
 check('KRITISCH: ohne Status "abgeschlossen" erscheint keine Rapport-Übersicht',
   !(await page.textContent('#epKopf')).includes('Rapport'));
@@ -443,8 +543,18 @@ check('Der Dialog schliesst nach dem Speichern', !(await page.isVisible('#dlgSch
 check('KRITISCH: die Schicht trägt die neue Zeit',
   (await page.textContent('#epRaster')).includes('11:00–13:00'));
 check('Die Bezeichnung steht in der Zeile', (await page.textContent('#epRaster')).includes('Pausenablösung'));
-check('Der Stundenansatz steht in der Zeile', (await page.textContent('#epRaster')).includes('38.00 CHF'));
+// Die Verrechnung-Spalte im Raster ist mit ENT-139 bewusst entfernt (mehr
+// Platz fuer die Schichtzeiten) -- der Wert bleibt trotzdem gespeichert und
+// im Bearbeiten-Dialog abrufbar, nur nicht mehr in der Zeile selbst sichtbar.
+check('KRITISCH: der Stundenansatz steht NICHT mehr in der Raster-Zeile (ENT-139)',
+  !(await page.textContent('#epRaster')).includes('38.00 CHF'));
 check('KRITISCH: der Balken ist kürzer als vorher — gemessen', (await balkenBreite()) < vorher * 0.5);
+await page.click('#epRaster table.ep-gitter tbody tr:nth-child(2) .ep-werk button[title="Schicht bearbeiten"]');
+await page.waitForSelector('#dlgSchicht.on');
+check('Der Stundenansatz bleibt aber gespeichert und im Bearbeiten-Dialog sichtbar',
+  (await page.inputValue('#eps_std')) === '38');
+await page.click('#dlgSchicht .btn-plain');
+await page.waitForTimeout(200);
 await page.screenshot({ path: OUT + '/85-schicht-bearbeitet.png' });
 
 // ══════════ WARNUNG, WENN DIE SCHICHT ÜBER DEN EINSATZ HINAUSLÄUFT (ENT-111)

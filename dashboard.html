@@ -439,6 +439,12 @@ tbody tr.status-abgeschlossen.zu.abgeglichen td { opacity: 1; }
    einfaerben, auch im gruenen "Abgeglichen"-Chip. Drei Klassen statt zwei,
    damit die Regel unabhaengig von der Position im Stylesheet gewinnt. */
 .chip.chip-p .i-schloss { color: inherit; }
+/* Rapport weicht vom Plan ab (ENT-138): ein eigenstaendiges Zeichen neben dem
+   Status-Chip, nicht Teil davon -- es sagt etwas ueber die Datenqualitaet
+   (stimmt der Rapport mit dem Plan ueberein?), nicht ueber den Status selbst
+   (geplant/abgeschlossen/abgeglichen). Beide Aussagen sollen unabhaengig
+   voneinander lesbar bleiben, darum getrennt statt ineinander verschachtelt. */
+.rap-abw { margin-left: 4px; font-size: 12px; }
 #msSeiteTabelle td:last-child .btn { margin-left: 6px; }
 
 /* ── Einsatzplan (ENT-076) ──────────────────────────────────────────────
@@ -550,6 +556,21 @@ table.ep-gitter td.raster { position: relative; padding: 0; }
   width: 15px; height: 15px; line-height: 13px; font-size: 12px; padding: 0; flex: none; }
 .ep-schloss { background: none; border: none; cursor: pointer; color: var(--ink-3); padding: 0 4px; font-size: 12px; }
 .ep-schloss.zu { color: var(--warn); }
+
+/* Legende unter dem Schichten-Raster (ENT-139): erklaert Farben und Symbole
+   der Balken auf einen Blick -- gedacht fuer den (neuen) Planer, der die
+   Bedeutung noch nicht auswendig kennt. Eine horizontale Reihe statt einer
+   Liste, weil sie unter der letzten Zeile steht und nicht wie ein weiterer
+   Tabellenblock wirken soll. */
+.ep-legende { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px;
+  padding: 10px 8px 4px; font-size: 11px; color: var(--ink-3); }
+.ep-lg-item { display: inline-flex; align-items: center; gap: 6px; }
+.ep-lg-swatch { width: 12px; height: 12px; border-radius: 3px; flex: none; }
+.ep-lg-swatch.offen { background: var(--line-soft); border: 1px dashed var(--line); }
+.ep-lg-swatch.besetzt { background: var(--warn); }
+.ep-lg-swatch.zugesagt { background: var(--pos); }
+.ep-lg-swatch.abgelehnt { background: var(--neg); }
+.ep-lg-item .ep-auge { opacity: 1; }
 @media (max-width: 1180px) { .ep-raum { grid-template-columns: 1fr; } #epListe { max-height: 240px; } }
 td .sec { font-size: 11.5px; color: var(--ink-3); }
 .strong { font-weight: 620; }
@@ -7167,7 +7188,7 @@ function renderPlanung() {
         <td><span class="chip chip-n">${esc(e.einsatzart)}</span>${sparteChip(e)}</td>
         <td class="num"><span class="chip ${e.status === 'abgesagt' ? 'chip-n' : (fehlt ? 'chip-w' : 'chip-p')}">${besetzt(e).length}/${nf(e.bedarf)}</span></td>
         <td>${teile.length ? `<div class="crew">${teile.join('')}</div>` : '<span style="color:var(--ink-3)">–</span>'}</td>
-        <td><span class="chip ${st[1]}">${st[0]}${gesperrt ? SCHLOSS_ZU : ''}</span></td>
+        <td><span class="chip ${st[1]}">${st[0]}${gesperrt ? SCHLOSS_ZU : ''}</span>${einsatzRapportWeichtAb(e) ? ` <span class="rap-abw" title="Rapport weicht vom Plan ab">⚠️</span>` : ''}</td>
       </tr>`;
   }).join('');
 
@@ -7204,7 +7225,7 @@ function renderPlanung() {
       <div class="wer">${esc(e.kunde_name)}${e.titel ? ` · ${esc(e.titel)}` : ''}</div>
       <div class="zeiten">${esc(e.ort)}${e.strasse ? ` · ${esc(e.strasse)}` : ''}</div>
       <div class="marken">
-        <span class="chip ${st[1]}">${st[0]}${gesperrt ? SCHLOSS_ZU : ''}</span>
+        <span class="chip ${st[1]}">${st[0]}${gesperrt ? SCHLOSS_ZU : ''}</span>${einsatzRapportWeichtAb(e) ? ` <span class="rap-abw" title="Rapport weicht vom Plan ab">⚠️</span>` : ''}
         ${zug.slice(0, 3).map(nameChip).join('')}
         ${zug.length > 3 ? `<span class="nm">+${zug.length - 3}</span>` : ''}
         ${fehlt ? `<span class="nm off">${fehlt} offen</span>` : ''}
@@ -7951,6 +7972,19 @@ function enGesperrt(e) {
 // dort wie ein Rand-Detail wirkte statt wie eine Aussage ueber den Status.
 function enStatusMarke(e) {
   return enGesperrt(e) ? ['Abgeglichen', 'chip-p'] : (EN_STATUS_ANZEIGE[e.status] || EN_STATUS.geplant);
+}
+
+// Schnellcheck fuer die Liste (Planung/Tagesplan, ENT-138): weicht IRGENDEIN
+// eingegangener Rapport dieses Einsatzes vom Plan ab? Dieselbe Pruefung wie
+// im Abgleich (agRapportAbweichung, weiter unten definiert -- Funktionsdekla-
+// rationen sind gehoisted, die Reihenfolge im Quelltext spielt hier keine
+// Rolle), nur ohne agZeilen: die Liste zeigt Einsaetze, nicht einzelne
+// Zuteilungen, und braucht darum bloss ein Ja/Nein pro Einsatz.
+function einsatzRapportWeichtAb(e) {
+  return (e.mitarbeiter || []).some(m => {
+    const r = agRapport({ einsatz_id: e.id, mitarbeiter_id: m.id });
+    return !!r && !!agRapportAbweichung({ von: e.von, bis: e.bis, ist_pause_min: m.ist_pause_min }, r);
+  });
 }
 
 function openEinsatz(id) { epAuf(id); }
@@ -9423,29 +9457,64 @@ function epKopfZeichnen() {
     ${epDokBlock()}`;
 }
 
-// ── Rapport-Übersicht am abgeschlossenen Einsatz (ENT-128) ──────────────
+// ── Rapport-Übersicht am abgeschlossenen Einsatz (ENT-128, erweitert ENT-138) ──
 //
 // Nur sichtbar bei abgeschlossenen Einsaetzen, und nur was tatsaechlich
 // eingegangen ist -- kein Platzhalter fuer Fehlendes, das erledigt der
-// Abgleich-Bereich. Reine Anzeige (Zeiten, Pause, Bemerkung); Aendern oder
-// Uebernehmen bleibt Sache des Abgleichs (agdRapportUebernehmen()).
+// Abgleich-Bereich. Massgeblich ist je Person der ZULETZT erfasste Rapport
+// (agRapport(), dieselbe "neueste zaehlt"-Regel wie im Abgleich, ENT-082) --
+// nicht jede eingegangene Korrektur einzeln, sonst erschiene dieselbe Person
+// mehrfach.
+//
+// Drei Handlungen je Zeile, alle ausdruecklich einen Klick entfernt:
+//   - "Rapport ansehen" oeffnet den bestehenden Rapport-Betrachter
+//     (openDrawer(), dieselbe Ansicht wie unter "Rapporte").
+//   - Eine Abweichungswarnung, wenn der Rapport vom Plan abweicht
+//     (agRapportAbweichung(), dieselbe Pruefung wie im Abgleich).
+//   - "Direkt abgleichen" (epDirektAbgleichen()) oeffnet den vorbefuellten
+//     Abgleich fuer GENAU diese Person -- Planer prueft und speichert dort
+//     wie gewohnt selbst (agdSpeichern()). Kein automatisches Schreiben:
+//     der Rapport bleibt Beleg, keine Festschreibung (ENT-082). Nur sichtbar,
+//     wenn diese Zuteilung nicht schon abgeglichen ist -- danach gibt es
+//     nichts mehr zu uebernehmen.
 function epRapportBlock(e) {
   if (!e || !einsatzAbgeschlossen(e)) { return ''; }
-  const treffer = (rapporte || []).filter(r => Number(r.einsatz_id) === Number(e.id));
-  if (!treffer.length) { return ''; }
-  const zeile = r => {
-    const ma = mitarbeiter.find(m => Number(m.id) === Number(r.mitarbeiter_id));
-    const name = (ma && (fullName(ma) || ma.name)) || r.mitarbeiter || ('#' + r.mitarbeiter_id);
+  const personen = (e.mitarbeiter || [])
+    .map(m => ({ m, r: agRapport({ einsatz_id: e.id, mitarbeiter_id: m.id }) }))
+    .filter(x => x.r);
+  if (!personen.length) { return ''; }
+  const zeile = ({ m, r }) => {
+    const name = fullName(m) || m.name || ('#' + m.id);
+    const abweichung = agRapportAbweichung({ von: e.von, bis: e.bis, ist_pause_min: m.ist_pause_min }, r);
+    const gesperrt = agGesperrt(m);
     return `<div class="f" style="margin-bottom:9px">
       <label>${esc(name)}</label>
       <div class="zone-note">${hm(r.von)}–${hm(r.bis)}${r.pause_min ? `, ${nf(r.pause_min)}′ Pause` : ''} · Netto ${nf(r.netto_h)} h
         ${r.bemerkung ? `<br>${esc(r.bemerkung)}` : ''}</div>
+      ${abweichung ? `<div class="zone-note" style="color:var(--warn)">⚠️ Rapport weicht ab: ${esc(abweichung.join(', '))}</div>` : ''}
+      <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">
+        <button type="button" class="btn btn-quiet btn-sm" onclick="openDrawer(${Number(r.id)})">Rapport ansehen</button>
+        ${gesperrt ? '' : `<button type="button" class="btn btn-plain btn-sm" onclick="epDirektAbgleichen(${Number(e.id)},${Number(m.id)})">Direkt abgleichen</button>`}
+      </div>
     </div>`;
   };
   return `<div class="card-bd" style="padding:0 16px 14px">
-    <div class="ep-dok-kopf">Rapport${treffer.length > 1 ? 'e' : ''}</div>
-    ${treffer.map(zeile).join('')}
+    <div class="ep-dok-kopf">Rapport${personen.length > 1 ? 'e' : ''}</div>
+    ${personen.map(zeile).join('')}
   </div>`;
+}
+
+// Direkter Weg vom Einsatzplan in den vorbefuellten Abgleich (ENT-138).
+// agZeilen wird hier bewusst frisch gebaut (nicht die evtl. veraltete oder
+// gefilterte Fassung aus einem vorherigen Besuch des Abgleich-Tabs
+// wiederverwendet) -- sonst faende openAbgleich() die Zeile nicht, wenn der
+// Abgleich-Tab in dieser Sitzung noch nie geoeffnet wurde oder sein Filter
+// diese Zeile gerade ausblendet.
+function epDirektAbgleichen(einsatzId, mitarbeiterId) {
+  agZeilen = agZeilenBauen();
+  const k = `${Number(einsatzId)}:${Number(mitarbeiterId)}`;
+  openAbgleich(k);
+  agdRapportUebernehmen(k);
 }
 
 // ── Rechnung-Platzhalter (ENT-127) ──────────────────────────────────────
@@ -9612,9 +9681,7 @@ function epRasterZeichnen() {
       <td class="fest">${p.nr}. ${esc(p.funktion || (epEinsatz && epEinsatz.einsatzart) || 'Position')}${
         p.ist_fahrzeit ? ' <span class="chip chip-n" title="Fahrzeit zählt nach Art. 18 Ziff. 2 nicht als Arbeitszeit">keine Arbeitszeit</span>' : ''}</td>
       <td class="fest">${esc(p.position || '—')}</td>
-      <td class="fest" style="text-align:right">${p.pauschal != null ? nf(p.pauschal, 2) + ' pausch.'
-        : (p.std_verrechnung != null ? nf(p.std_verrechnung, 2) + ' CHF' : '—')}</td>
-      <td class="fest">${hm(p.von)}–${hm(p.bis)} <span style="color:var(--ink-3)">(${std(b - a)}h)</span></td>
+      <td class="fest"><b style="font-size:13px">${hm(p.von)}–${hm(p.bis)}</b> <span style="color:var(--ink-3)">(${std(b - a)}h)</span></td>
       <td class="fest"><div class="ep-werk">
         <button class="ep-schloss${p.gesperrt ? ' zu' : ''}" title="${p.gesperrt ? 'Einteilung steht' : 'Nicht gesperrt'}"
           onclick="event.stopPropagation();epSperren(${p.id},${p.gesperrt ? 0 : 1})">${p.gesperrt ? '🔒' : '🔓'}</button>
@@ -9639,19 +9706,30 @@ function epRasterZeichnen() {
     </tr>`;
   };
 
-  // Sechs feste Spalten seit dem Auswahlkaestchen -- die Soll-/Ist-Zeile
-  // muss sie alle ueberspannen, sonst rutscht das Zeitraster um eine Spalte.
+  // Fuenf feste Spalten seit dem Auswahlkaestchen (ENT-139: "Verrechnung"
+  // entfernt, mehr Platz fuer die Schichtzeiten) -- die Soll-/Ist-Zeile muss
+  // sie alle ueberspannen, sonst rutscht das Zeitraster um eine Spalte.
   const alleDrin = epPos.length > 0 && epPos.every(p => epAngehakt.has(p.id));
+  // Legende unter dem Raster (ENT-139): erklaert Farbe und Symbol der
+  // Balken fuer den (neuen) Planer -- dieselben Klassen/Woerter wie im
+  // Balken selbst (epZusageKlasse/epZusageWort), keine zweite Wahrheit.
+  const legende = `<div class="ep-legende">
+      <span class="ep-lg-item"><i class="ep-lg-swatch offen"></i>Offen</span>
+      <span class="ep-lg-item"><i class="ep-lg-swatch besetzt"></i>Eingeteilt, keine Rückmeldung</span>
+      <span class="ep-lg-item"><i class="ep-lg-swatch zugesagt"></i>Zugesagt</span>
+      <span class="ep-lg-item"><i class="ep-lg-swatch abgelehnt"></i>Abgelehnt</span>
+      <span class="ep-lg-item">${EP_AUGE}Schicht in der App angesehen</span>
+    </div>`;
   $('epRaster').innerHTML = `<table class="ep-gitter"><thead>
       <tr><th class="fest ep-wahl"><input type="checkbox" ${alleDrin ? 'checked' : ''}
             aria-label="Alle Schichten auswählen" onclick="epAlleHaken(this.checked)"></th>
-          <th class="fest">Funktion</th><th class="fest">Position</th><th class="fest">Verrechnung</th>
+          <th class="fest">Funktion</th><th class="fest">Position</th>
           <th class="fest">Zeit</th><th class="fest"></th>${kopfUhr}</tr>
-      <tr><th class="fest" colspan="6" style="text-align:right">Soll</th>
+      <tr><th class="fest" colspan="5" style="text-align:right">Soll</th>
           ${soll.map(n => `<th class="zahl">${n || ''}</th>`).join('')}</tr>
-      <tr><th class="fest" colspan="6" style="text-align:right">Ist</th>
+      <tr><th class="fest" colspan="5" style="text-align:right">Ist</th>
           ${ist.map((n, i) => `<th class="zahl${n < soll[i] ? ' fehlt' : ''}">${n || ''}</th>`).join('')}</tr>
-    </thead><tbody>${epPos.map(zeile).join('')}</tbody></table>`;
+    </thead><tbody>${epPos.map(zeile).join('')}</tbody></table>${legende}`;
   epSammelZeichnen();
 }
 
@@ -11916,7 +11994,7 @@ function renderTagesplan() {
       <div class="wer">${esc(e.kunde_name)}${e.titel ? ` · ${esc(e.titel)}` : ''}</div>
       <div class="zeiten">${esc(e.ort)}${e.strasse ? ` · ${esc(e.strasse)}` : ''}</div>
       <div class="marken">
-        <span class="chip ${st[1]}">${st[0]}${gesperrt ? SCHLOSS_ZU : ''}</span>
+        <span class="chip ${st[1]}">${st[0]}${gesperrt ? SCHLOSS_ZU : ''}</span>${einsatzRapportWeichtAb(e) ? ` <span class="rap-abw" title="Rapport weicht vom Plan ab">⚠️</span>` : ''}
         ${zug.length ? zug.map(nameChip).join('') : ''}
         ${fehlt ? `<span class="nm off">${fehlt} offen</span>` : ''}
       </div>
@@ -11942,7 +12020,7 @@ function renderTagesplan() {
         <td>${esc(e.ort)}${e.strasse ? `<div class="sec">${esc(e.strasse)}</div>` : ''}</td>
         <td class="num"><span class="chip ${e.status === 'abgesagt' ? 'chip-n' : (fehlt ? 'chip-w' : 'chip-p')}">${besetzt(e).length}/${nf(e.bedarf)}</span></td>
         <td>${teile.length ? `<div class="crew">${teile.join('')}</div>` : '<span style="color:var(--ink-3)">–</span>'}</td>
-        <td><span class="chip ${st[1]}">${st[0]}${gesperrt ? SCHLOSS_ZU : ''}</span></td>
+        <td><span class="chip ${st[1]}">${st[0]}${gesperrt ? SCHLOSS_ZU : ''}</span>${einsatzRapportWeichtAb(e) ? ` <span class="rap-abw" title="Rapport weicht vom Plan ab">⚠️</span>` : ''}</td>
       </tr>`;
     }).join('') + `</tbody></table></div></div></div>`;
 }

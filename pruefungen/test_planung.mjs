@@ -18,7 +18,17 @@ const STATS = { status: 'ok',
   verlauf: Array.from({ length: 8 }, (_, i) => ({ kw: 26 + i, stunden: 80, anzahl: 10 })),
   angemeldet: [], pro_mitarbeiter: [], letzte_rapporte: [] };
 
-const RAPPORTE = { status: 'ok', rapporte: [] };
+// ENT-138: 14 traegt einen Rapport mit vom Plan abweichenden Zeiten (Warnung
+// erwartet), 12 einen deckungsgleichen (keine Warnung erwartet) -- Plan und
+// Rapport nebeneinander in den jeweiligen Fixturen unten geprueft.
+const RAPPORTE = { status: 'ok', rapporte: [
+  { id: 500, einsatz_id: 14, mitarbeiter_id: 2, mitarbeiter: 'daniele.ciardo',
+    von: '08:15:00', bis: '12:00:00', pause_min: 0, netto_h: 3.75,
+    bemerkung: null, erfasst_am: null },
+  { id: 501, einsatz_id: 12, mitarbeiter_id: 1, mitarbeiter: 'adrian',
+    von: '12:00:00', bis: '18:00:00', pause_min: 0, netto_h: 6,
+    bemerkung: null, erfasst_am: null },
+] };
 
 const MA = { status: 'ok', mitarbeiter: [
   { id: 1, name: 'adrian', ist_admin: 1, vorname: 'Adrian', nachname: 'Von Arb', ort: '4632 Trimbach' },
@@ -784,6 +794,22 @@ check('KRITISCH: der Rahmenakzent der abgeglichenen Zeile ist gruen (--pos), nic
     const erwartet = getComputedStyle(sonde).boxShadow;
     sonde.remove();
     return getComputedStyle(td).boxShadow === erwartet;
+  }));
+
+// ══════════ ABWEICHUNGSWARNUNG IN DER LISTE (ENT-138)
+// Der Projektinhaber wollte die Abweichung nicht erst beim Hineinklicken
+// sehen, sondern schon in der Liste -- eigene Kennzeichnung neben dem
+// Status-Chip, unabhaengig davon, ob die Zeile ausserdem gesperrt/abgeglichen
+// ist (beides sind unabhaengige Aussagen).
+check('KRITISCH: eine Schicht mit vom Plan abweichendem Rapport traegt das Warnzeichen in der Liste',
+  await page.evaluate(() => {
+    const tr = [...document.querySelectorAll('#plTable tbody tr')].find(r => r.getAttribute('onclick') === 'openEinsatz(14)');
+    return !!tr && !!tr.querySelector('.rap-abw');
+  }));
+check('Eine Schicht mit deckungsgleichem Rapport traegt KEIN Warnzeichen',
+  await page.evaluate(() => {
+    const tr = [...document.querySelectorAll('#plTable tbody tr')].find(r => r.getAttribute('onclick') === 'openEinsatz(12)');
+    return !!tr && !tr.querySelector('.rap-abw');
   }));
 
 // openEinsatz() fuehrt seit 3392470 in die Einsatzplan-Ansicht. Die
