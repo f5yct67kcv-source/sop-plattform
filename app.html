@@ -130,8 +130,14 @@ svg.i-sm { width: 17px; height: 17px; }
 .tabs button .punkt { width: 5px; height: 5px; border-radius: 50%; background: var(--neg); position: absolute; margin: -16px 0 0 18px; }
 
 /* ── Karten */
-.karte { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--sh-1); margin-bottom: 12px; overflow: hidden; }
+.karte { position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--sh-1); margin-bottom: 12px; overflow: hidden; }
 .karte-bd { padding: 16px; }
+/* Abgeschlossene Schicht (ENT-133): auf einen Blick erkennbar, ohne den
+   Rapport-Korrekturweg zu sperren -- die Karte bleibt anklickbar. */
+.karte.abgeschlossen { border-color: var(--pos); background: var(--pos-soft); }
+.karte-haken { position: absolute; top: 10px; right: 10px; width: 24px; height: 24px; border-radius: 50%;
+  background: var(--pos); color: #fff; display: flex; align-items: center; justify-content: center; }
+.karte-haken svg { width: 14px; height: 14px; stroke-width: 2.6; }
 
 /* ── Schichtkarte: die Zeit ist die wichtigste Angabe */
 .schicht { display: block; width: 100%; text-align: left; border: none; background: transparent; font: inherit; color: inherit; cursor: pointer; padding: 0; }
@@ -677,10 +683,18 @@ const ZUSAGE_MARKE = { zugesagt: ['zugesagt', 'm-p'], abgelehnt: ['abgelehnt', '
 // Eine Schichtkarte. Die Zeit steht vorne und gross -- danach wird draussen
 // zuerst gesucht.
 function schichtKarte(e, mitDatum) {
-  const bal = e.status === 'abgesagt' ? 'ab' : (e.status === 'provisorisch' ? 'prov' : (e.status === 'bestaetigt' ? 'best' : ''));
+  const abgeschlossen = e.status === 'abgeschlossen';
+  const bal = e.status === 'abgesagt' ? 'ab' : (e.status === 'provisorisch' ? 'prov' : (e.status === 'bestaetigt' || abgeschlossen ? 'best' : ''));
   const st = STATUS_MARKE[e.status] || STATUS_MARKE.geplant;
   const zu = ZUSAGE_MARKE[e.zusage] || ZUSAGE_MARKE.offen;
-  return `<div class="karte">
+  // Der eigene Rapport, sofern schon eingereicht (ENT-133) -- derselbe
+  // Abgleich wie im Schichtblatt, nur zusaetzlich schon auf der Karte
+  // sichtbar, ohne dafuer erst hineinklicken zu muessen.
+  const rap = abgeschlossen ? rapportFuerSchicht(e.id) : null;
+  return `<div class="karte${abgeschlossen ? ' abgeschlossen' : ''}">
+    ${abgeschlossen ? `<div class="karte-haken" aria-hidden="true" title="${esc(w(st[0]))}">
+      <svg class="i" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+    </div>` : ''}
     <button class="schicht" onclick="blattAuf(${Number(e.id)})">
       <div class="oben">
         <span class="balken ${bal}"></span>
@@ -696,6 +710,7 @@ function schichtKarte(e, mitDatum) {
       <span class="marke ${st[1]}">${esc(w(st[0]))}</span>
       ${e.status !== 'abgesagt' ? `<span class="marke ${zu[1]}">${esc(w(zu[0]))}</span>` : ''}
       ${Number(e.im_team) > 1 ? `<span class="marke m-n">${Number(e.im_team)} ${esc(w('imTeam'))}</span>` : ''}
+      ${rap ? `<span class="marke m-n">${esc(w('schonRapportiert'))} ${dmy(rap.erfasst_am)}, ${String(rap.erfasst_am).slice(11, 16)}</span>` : ''}
     </div>
   </div>`;
 }

@@ -58,7 +58,7 @@ const SCHICHTEN = () => ({ status: 'ok', von: GESTERN, bis: tag(90), schichten: 
   // hatte "abgeschlossen" zunaechst vergessen (fiel still auf "Geplant" zurueck).
   { id: 46, kunde_name: 'Cupi24 GmbH', titel: 'Bereits rapportiert',
     strasse: null, ort: '4632 Trimbach', einsatzart: 'Verkehrsdienst',
-    datum: GESTERN, von: '08:00:00', bis: '10:00:00', status: 'abgeschlossen', bemerkung: null,
+    datum: HEUTE, von: '08:00:00', bis: '10:00:00', status: 'abgeschlossen', bemerkung: null,
     zusage: 'zugesagt', objekt_name: null, im_team: 1 }]});
 
 const PROFIL = { status: 'ok', monat: { anzahl: 3, stunden: 22.5 }, profil: {
@@ -71,7 +71,13 @@ const RAP = { status: 'ok', rapporte: [{ id: 1, datum: GESTERN, mitarbeiter: 'da
   kunde: 'Einwohnergemeinde Niedergösgen', strasse: 'Dorfstrasse 1', ort: '5013 Niedergösgen',
   auftrag_nr: 'A-118', einsatzart: 'Verkehrsdienst', von: '07:00:00', bis: '16:00:00',
   pause_min: 30, netto_h: '8.50', unterzeichner: 'R. Muster', unterschrift: null,
-  bemerkung: null, erfasst_am: GESTERN + ' 16:12:00' }]};
+  bemerkung: null, erfasst_am: GESTERN + ' 16:12:00' },
+  // Zu Schicht 46 (status 'abgeschlossen'), fuer die Kartenanzeige (ENT-133).
+  { id: 2, einsatz_id: 46, datum: GESTERN, mitarbeiter: 'daniele.ciardo',
+    kunde: 'Cupi24 GmbH', strasse: null, ort: '4632 Trimbach',
+    auftrag_nr: null, einsatzart: 'Verkehrsdienst', von: '08:00:00', bis: '10:00:00',
+    pause_min: 0, netto_h: '2.00', unterzeichner: null, unterschrift: null,
+    bemerkung: null, erfasst_am: GESTERN + ' 15:30:00' }]};
 
 const browser = await chromium.launch({ executablePath: EXE });
 const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
@@ -139,7 +145,40 @@ check('Heute zeigt den Arbeitsort', heuteText.includes('4632 Trimbach'));
 check('Heute zeigt die Teamgroesse', /2\s/.test(heuteText) && heuteText.includes('Team'));
 check('Morgen gehoert nicht zu Heute', !heuteText.includes('Baustelle Kreiselumfahrung'));
 const karten = await page.evaluate(() => document.querySelectorAll('#v-heute .schicht').length);
-check('Genau eine Schichtkarte unter Heute', karten === 1);
+// Zwei statt einer, seit Schicht 46 (status 'abgeschlossen', ENT-133) HEUTE
+// datiert ist -- absichtlich derselbe Tag wie die laufende Schicht, genau
+// das Bild aus der gemeldeten Situation (zwei Karten unter Heute, eine davon
+// abgeschlossen).
+check('Zwei Schichtkarten unter Heute (die laufende und die abgeschlossene)', karten === 2);
+
+// ══════════════ ABGESCHLOSSENE KARTE (ENT-133)
+// Auf einen Blick erkennbar: eigene Kartenfarbe, Haken-Abzeichen, und der
+// eigene Rapport samt Zeitpunkt -- ohne erst in die Schicht hineinklicken zu
+// muessen.
+check('KRITISCH: die Karte traegt die Abgeschlossen-Kennzeichnung',
+  await page.evaluate(() => !!document.querySelector('#v-heute .karte.abgeschlossen')));
+check('KRITISCH: sie zeigt einen Haken',
+  await page.evaluate(() => !!document.querySelector('#v-heute .karte.abgeschlossen .karte-haken svg polyline')));
+check('KRITISCH: der eigene Rapport samt Zeitpunkt steht auf der Karte',
+  await page.evaluate(() => {
+    const k = document.querySelector('#v-heute .karte.abgeschlossen');
+    return !!k && /Bereits rapportiert am.*15:30/.test(k.textContent);
+  }));
+check('Eine nicht abgeschlossene Karte traegt die Kennzeichnung NICHT',
+  await page.evaluate(() => {
+    const alle = [...document.querySelectorAll('#v-heute .karte')];
+    return alle.length === 2 && alle.filter(k => k.classList.contains('abgeschlossen')).length === 1;
+  }));
+// Am gerenderten Zustand gemessen (CLAUDE.md, Gestaltung): Rahmenfarbe und
+// Hintergrund muessen sich tatsaechlich vom Regelfall unterscheiden.
+check('Die Karte hebt sich farblich vom Regelfall ab',
+  await page.evaluate(() => {
+    const normal = [...document.querySelectorAll('#v-heute .karte')].find(k => !k.classList.contains('abgeschlossen'));
+    const fertig = document.querySelector('#v-heute .karte.abgeschlossen');
+    if (!normal || !fertig) return false;
+    const a = getComputedStyle(normal), b = getComputedStyle(fertig);
+    return a.borderColor !== b.borderColor || a.backgroundColor !== b.backgroundColor;
+  }));
 
 // ══════════════ PLAN
 await page.click('#t-plan');
