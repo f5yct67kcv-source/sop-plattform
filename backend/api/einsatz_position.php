@@ -213,7 +213,13 @@ if ($aktion === 'aus_bedarf') {
     // Wer bereits am Einsatz steht, bekommt einen Platz. Zuteilungen aus der
     // Zeit vor den Positionen tragen position_id = NULL; ohne diesen Schritt
     // waeren sie im Raster unsichtbar, obwohl die Person eingeteilt ist.
-    $z = $pdo->prepare('SELECT id FROM einsatz_zuteilung WHERE einsatz_id = ? ORDER BY id');
+    // einsatz_zuteilung hat KEINE Spalte `id` -- ihr Schluessel ist
+    // zusammengesetzt aus (einsatz_id, mitarbeiter_id). Bis ENT-185 stand hier
+    // `SELECT id`, was zur Laufzeit immer eine Ausnahme warf: Dieser Zweig
+    // laeuft nur, wenn ein Einsatz noch gar keine Position hat, und genau dann
+    // brach das Oeffnen des Einsatzplans ab. Gefunden durch pruef_sql.php.
+    $z = $pdo->prepare('SELECT mitarbeiter_id FROM einsatz_zuteilung
+                         WHERE einsatz_id = ? ORDER BY mitarbeiter_id');
     $z->execute([$einsatzId]);
     $zuteilungen = $z->fetchAll(PDO::FETCH_COLUMN);
 
@@ -229,12 +235,14 @@ if ($aktion === 'aus_bedarf') {
     $funktion = trim((string)($einsatz['einsatzart'] ?? '')) ?: null;
 
     $ins = $pdo->prepare('INSERT INTO einsatz_position (einsatz_id, nr, funktion, von, bis) VALUES (?, ?, ?, ?, ?)');
-    $setz = $pdo->prepare('UPDATE einsatz_zuteilung SET position_id = ? WHERE id = ?');
+    // Ebenfalls ueber den zusammengesetzten Schluessel, nicht ueber `id`.
+    $setz = $pdo->prepare('UPDATE einsatz_zuteilung SET position_id = ?
+                            WHERE einsatz_id = ? AND mitarbeiter_id = ?');
     $pdo->beginTransaction();
     for ($i = 0; $i < $anzahl; $i++) {
         $ins->execute([$einsatzId, $i + 1, $funktion, $einsatz['von'], $einsatz['bis']]);
         if (isset($zuteilungen[$i])) {
-            $setz->execute([(int)$pdo->lastInsertId(), (int)$zuteilungen[$i]]);
+            $setz->execute([(int)$pdo->lastInsertId(), $einsatzId, (int)$zuteilungen[$i]]);
         }
     }
     $pdo->commit();
