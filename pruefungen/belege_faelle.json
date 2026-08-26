@@ -1,0 +1,74 @@
+[
+  {
+    "name": "OF-0093, echte Offerte aus dem Fremdsystem",
+    "rabatt_bp": 700,
+    "positionen": [
+      { "menge": 70, "einzelpreis_rappen": 4200, "mwst_satz_bp": 810 },
+      { "menge": 10, "einzelpreis_rappen": 1680, "mwst_satz_bp": 0 },
+      { "menge": 1, "einzelpreis_rappen": 0, "mwst_satz_bp": 0 }
+    ]
+  },
+  {
+    "name": "Ohne jeden Rabatt",
+    "rabatt_bp": 0,
+    "positionen": [
+      { "menge": 8, "einzelpreis_rappen": 4500, "mwst_satz_bp": 810 }
+    ]
+  },
+  {
+    "name": "Positionsrabatt und Gesamtrabatt zusammen",
+    "rabatt_bp": 1000,
+    "positionen": [
+      { "menge": 1, "einzelpreis_rappen": 10000, "mwst_satz_bp": 810, "rabatt_bp": 1000 },
+      { "menge": 3, "einzelpreis_rappen": 2500, "mwst_satz_bp": 260, "rabatt_bp": 500 }
+    ]
+  },
+  {
+    "name": "Zwei Positionen mit demselben Satz -- nur einmal runden",
+    "rabatt_bp": 0,
+    "positionen": [
+      { "menge": 1, "einzelpreis_rappen": 333, "mwst_satz_bp": 810 },
+      { "menge": 1, "einzelpreis_rappen": 333, "mwst_satz_bp": 810 }
+    ]
+  },
+  {
+    "name": "Krumme Mengen",
+    "rabatt_bp": 333,
+    "positionen": [
+      { "menge": 7.25, "einzelpreis_rappen": 4200, "mwst_satz_bp": 810 },
+      { "menge": 0.5, "einzelpreis_rappen": 4200, "mwst_satz_bp": 810 },
+      { "menge": 0.33, "einzelpreis_rappen": 999, "mwst_satz_bp": 260 }
+    ]
+  },
+  {
+    "name": "Drei verschiedene Saetze nebeneinander",
+    "rabatt_bp": 250,
+    "positionen": [
+      { "menge": 2, "einzelpreis_rappen": 12345, "mwst_satz_bp": 810 },
+      { "menge": 2, "einzelpreis_rappen": 12345, "mwst_satz_bp": 380 },
+      { "menge": 2, "einzelpreis_rappen": 12345, "mwst_satz_bp": 260 },
+      { "menge": 2, "einzelpreis_rappen": 12345, "mwst_satz_bp": 0 }
+    ]
+  },
+  {
+    "name": "Leerer Beleg",
+    "rabatt_bp": 700,
+    "positionen": []
+  },
+  {
+    "name": "Voller Rabatt",
+    "rabatt_bp": 10000,
+    "positionen": [
+      { "menge": 1, "einzelpreis_rappen": 10000, "mwst_satz_bp": 810 }
+    ]
+  },
+  {
+    "name": "Betraege, die auf jeder Stufe krumm runden",
+    "rabatt_bp": 777,
+    "positionen": [
+      { "menge": 1.37, "einzelpreis_rappen": 4133, "mwst_satz_bp": 810 },
+      { "menge": 2.51, "einzelpreis_rappen": 777, "mwst_satz_bp": 810, "rabatt_bp": 1234 },
+      { "menge": 9.99, "einzelpreis_rappen": 101, "mwst_satz_bp": 260 }
+    ]
+  }
+]

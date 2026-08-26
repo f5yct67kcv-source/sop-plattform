@@ -126,8 +126,14 @@ try {
   // ersten Fassung dieser Pruefung passiert.
   const rumpf = (php.match(/function rechte_katalog\(\): array\s*\{[\s\S]*?\n\}/) || [''])[0];
   const phpRechte = [...rumpf.matchAll(/'(\w+)' *=> '[^']+',/g)].map(m => m[1]);
-  check('Der Server kennt genau die acht entschiedenen Rechte',
-    phpRechte.length === 8 && phpRechte.includes('personal_vertraulich'));
+  // Neun seit ENT-181 ('offerten' kam dazu). Die feste Zahl ist Absicht und
+  // keine Bequemlichkeit: Sie zwingt jeden, der ein Recht ergaenzt, hier
+  // vorbeizukommen und es bewusst zu tun -- die Regel aus ENT-077 lautet
+  // "grob geschnitten, nicht sechzig", und ein stillschweigend wachsender
+  // Katalog waere genau der Weg dorthin.
+  check('Der Server kennt genau die neun entschiedenen Rechte',
+    phpRechte.length === 9 && phpRechte.includes('personal_vertraulich')
+    && phpRechte.includes('offerten'));
 } catch (e) { check('Katalogvergleich lief durch: ' + e.message, false); }
 
 // ══════════════ VOLLE RECHTE: ALLES DA
