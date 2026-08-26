@@ -335,8 +335,9 @@ try {
   ts = await mass(p, '#topSub');
   const namen = await p.evaluate(() => [...document.querySelectorAll('#topSub button')].map(b => b.textContent));
   check('KRITISCH: kompakt erscheinen die Unterkategorien oben', ts.display === 'flex');
+  // Seit ENT-181 sind es vier: Offerten kam dazu.
   check('KRITISCH: mit den richtigen Namen',
-    JSON.stringify(namen) === JSON.stringify(['Adressen', 'Objekte', 'Rapporte']));
+    JSON.stringify(namen) === JSON.stringify(['Adressen', 'Objekte', 'Rapporte', 'Offerten']));
   const markiert = await p.evaluate(() => {
     const b = document.querySelector('#topSub button.on'); return b ? b.textContent : null; });
   check('Die aktuelle ist hervorgehoben', markiert === 'Adressen');
@@ -353,8 +354,9 @@ try {
   // Administration: bis hierher war dort gar nichts markiert
   await p.evaluate(() => go('mitarbeiter')); await p.waitForTimeout(300);
   const n2 = await p.evaluate(() => [...document.querySelectorAll('#topSub button')].map(b => b.textContent));
+  // Seit ENT-181 drei: Produkte steht zwischen Mitarbeitenden und Betrieb.
   check('KRITISCH: auch die Administration zeigt ihre Unterkategorien',
-    JSON.stringify(n2) === JSON.stringify(['Mitarbeitende', 'Betrieb']));
+    JSON.stringify(n2) === JSON.stringify(['Mitarbeitende', 'Produkte', 'Betrieb']));
 
   // Ein Bereich ohne Untergruppen zeigt keine leere Leiste
   await p.evaluate(() => go('abgleich')); await p.waitForTimeout(300);
@@ -377,11 +379,11 @@ try {
   };
   const mKunden = await mitteVon(() => go('kunden'));
   const mAdmin  = await mitteVon(() => go('mitarbeiter'));
-  check('Bei den Kunden stehen drei Unterkategorien', mKunden.anzahl === 3);
-  check('Bei der Administration zwei', mAdmin.anzahl === 2);
-  check('KRITISCH: drei Unterkategorien stehen in der Fenstermitte',
+  check('Bei den Kunden stehen vier Unterkategorien (ENT-181)', mKunden.anzahl === 4);
+  check('Bei der Administration drei (ENT-181)', mAdmin.anzahl === 3);
+  check('KRITISCH: vier Unterkategorien stehen in der Fenstermitte',
     Math.abs(mKunden.mitte - 800) <= 4);
-  check('KRITISCH: zwei ebenfalls -- die Zahl aendert die Mitte nicht',
+  check('KRITISCH: drei ebenfalls -- die Zahl aendert die Mitte nicht',
     Math.abs(mAdmin.mitte - 800) <= 4);
   check('Und die Leisten sind wirklich verschieden breit',
     Math.abs(mKunden.breite - mAdmin.breite) > 20);
