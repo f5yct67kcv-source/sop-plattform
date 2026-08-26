@@ -153,7 +153,7 @@ const RAPPORTE = [
     bemerkung: null, erfasst_am: HEUTE + ' 11:05:00' },
 ];
 
-let BETRIEB = { firma: '', zusatz: '', fusszeile: null, logo: null, logo_mime: null, logo_groesse: null };
+let BETRIEB = { firma: '', zusatz: '', fusszeile: null, fusszeile2: null, logo: null, logo_mime: null, logo_groesse: null };
 const gesendet = [];
 
 const browser = await chromium.launch({ executablePath: EXE });
@@ -172,7 +172,8 @@ await page.route('**/api/**', route => {
       gesendet.push(body);
       if (body.logo_weg) { BETRIEB = { ...BETRIEB, logo: null, logo_mime: null, logo_groesse: null }; }
       else if (body.logo) { BETRIEB = { ...BETRIEB, logo: 'data:' + body.logo_mime + ';base64,' + body.logo, logo_mime: body.logo_mime, logo_groesse: 120 }; }
-      else { BETRIEB = { ...BETRIEB, firma: body.firma, zusatz: body.zusatz, fusszeile: body.fusszeile || null }; }
+      else { BETRIEB = { ...BETRIEB, firma: body.firma, zusatz: body.zusatz,
+        fusszeile: body.fusszeile || null, fusszeile2: body.fusszeile2 || null }; }
     }
     return s({ status: 'ok', betrieb: BETRIEB });
   }
@@ -214,15 +215,28 @@ check('Sie sagt, dass diese Angaben an Kunden herausgehen',
 await page.fill('#bkFirma', 'CUPI 24 GmbH');
 await page.fill('#bkZusatz', 'Sicherheits- und Verkehrsdienst');
 await page.fill('#bkFuss', 'Musterweg 1 · 4600 Olten · 062 000 00 00');
+await page.fill('#bkFuss2', 'Zweigstelle · Bahnhofstrasse 3 · 8200 Schaffhausen');
 await page.click('#bkKarte .btn-primary');
 await page.waitForTimeout(400);
 check('KRITISCH: der Briefkopf wird gespeichert',
   gesendet.some(b => b.firma === 'CUPI 24 GmbH' && b.zusatz === 'Sicherheits- und Verkehrsdienst'));
+check('Die zweite Fusszeile wird mitgeschickt',
+  gesendet.some(b => b.fusszeile2 === 'Zweigstelle · Bahnhofstrasse 3 · 8200 Schaffhausen'));
 
 html = await drucken(10);
 check('KRITISCH: der gepflegte Firmenname steht jetzt im Kopf', /CUPI 24 GmbH/.test(html));
 check('Der Zusatz ebenfalls', /Sicherheits- und Verkehrsdienst/.test(html));
 check('KRITISCH: die Fusszeile steht am Seitenende', /Musterweg 1 · 4600 Olten/.test(html));
+check('KRITISCH: die zweite Fusszeile (Zweitsitz) steht daneben', /Bahnhofstrasse 3/.test(html));
+check('KRITISCH: beide Fusszeilen-Bloecke stehen vertikal zueinander zentriert, nicht oben ausgerichtet',
+  await page.evaluate(() => {
+    const bloecke = [...document.querySelectorAll('#printArea div[style*="white-space:pre-line"]')];
+    if (bloecke.length !== 2) return false;
+    return getComputedStyle(bloecke[0].parentElement).alignItems === 'center';
+  }));
+check('KRITISCH: Firma und Zusatz im Kopf sind zueinander zentriert, nicht rechtsbuendig',
+  /text-align:center;font-size:12px;color:#6B7280;line-height:1.5">[\s\S]*?CUPI 24 GmbH/.test(html)
+    && !/text-align:right;font-size:12px;color:#6B7280;line-height:1.5">[\s\S]*?CUPI 24 GmbH/.test(html));
 
 // ── Kundennummer und Adresse: nur bei sauberer Verknuepfung
 check('KRITISCH: bei einem aus einer Schicht entstandenen Rapport steht die Kunden-Nr.',
@@ -277,6 +291,17 @@ check('Und bietet an, es wieder zu entfernen', await page.isVisible('#bkLogoWeg'
 html = await drucken(10);
 check('KRITISCH: das Logo steht im Kopf des Ausdrucks',
   await page.evaluate(() => !!document.querySelector('#printArea img[src^="data:image/png"]')));
+// Groesser und praesenter (ENT-169) -- vorher max-height:56px.
+check('KRITISCH: das Logo im Ausdruck ist groesser als vor der Ueberarbeitung',
+  /max-height:88px/.test(html));
+check('KRITISCH: das Logo steht ueber Firma/Zusatz zentriert statt daneben rechtsbuendig',
+  await page.evaluate(() => {
+    const logo = document.querySelector('#printArea img[src^="data:image/png"]');
+    const firma = [...document.querySelectorAll('#printArea div')].find(d => d.textContent === 'CUPI 24 GmbH');
+    if (!logo || !firma) return false;
+    const lr = logo.getBoundingClientRect(), fr = firma.getBoundingClientRect();
+    return Math.abs((lr.left + lr.width / 2) - (fr.left + fr.width / 2)) < 1;
+  }));
 
 await page.evaluate(() => { go('betrieb'); });
 await page.waitForTimeout(300);

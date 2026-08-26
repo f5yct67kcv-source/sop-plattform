@@ -1,9 +1,9 @@
 <?php
 // Briefkopf des eigenen Betriebs fuer den Rapport-Ausdruck (ENT-155).
 //
-// GET  -> { status, betrieb: {firma, zusatz, fusszeile, logo_mime,
+// GET  -> { status, betrieb: {firma, zusatz, fusszeile, fusszeile2, logo_mime,
 //           logo_groesse, logo(dataURL|null)} }
-// POST -> speichern {firma, zusatz, fusszeile}
+// POST -> speichern {firma, zusatz, fusszeile, fusszeile2}
 //         Logo setzen  {logo: base64, logo_mime, logo_dateiname?}
 //         Logo weg     {logo_weg: true}
 //
@@ -33,11 +33,11 @@ const LOGO_MIME_ERLAUBT = ['image/png', 'image/jpeg', 'image/svg+xml', 'image/we
 
 function betrieb_lesen(bool $mitLogo): array {
     $r = db()->query(
-        'SELECT firma, zusatz, fusszeile, logo_mime, logo_groesse, logo
+        'SELECT firma, zusatz, fusszeile, fusszeile2, logo_mime, logo_groesse, logo
          FROM betrieb WHERE id = 1'
     )->fetch();
     if (!$r) {
-        return ['firma' => '', 'zusatz' => '', 'fusszeile' => null,
+        return ['firma' => '', 'zusatz' => '', 'fusszeile' => null, 'fusszeile2' => null,
                 'logo_mime' => null, 'logo_groesse' => null, 'logo' => null];
     }
     $roh = $r['logo'];
@@ -45,6 +45,7 @@ function betrieb_lesen(bool $mitLogo): array {
         'firma'        => (string)$r['firma'],
         'zusatz'       => (string)$r['zusatz'],
         'fusszeile'    => $r['fusszeile'],
+        'fusszeile2'   => $r['fusszeile2'],
         'logo_mime'    => $r['logo_mime'],
         'logo_groesse' => $r['logo_groesse'] === null ? null : (int)$r['logo_groesse'],
         // Als Daten-URL, damit der Ausdruck es ohne zweiten Abruf einbauen
@@ -109,12 +110,15 @@ if (isset($in['logo'])) {
 $firma  = trim((string)($in['firma'] ?? ''));
 $zusatz = trim((string)($in['zusatz'] ?? ''));
 $fuss   = trim((string)($in['fusszeile'] ?? ''));
+// Zweiter Fusszeilen-Block fuer einen Zweitsitz (ENT-169) -- optional, leer
+// erlaubt, derselbe Umgang wie der erste Block.
+$fuss2  = trim((string)($in['fusszeile2'] ?? ''));
 if (mb_strlen($firma) > 200 || mb_strlen($zusatz) > 200) {
     json_response(['status' => 'error',
         'message' => 'Firma und Zusatz dürfen höchstens 200 Zeichen haben.'], 400);
 }
-$pdo->prepare('UPDATE betrieb SET firma = ?, zusatz = ?, fusszeile = ?,
+$pdo->prepare('UPDATE betrieb SET firma = ?, zusatz = ?, fusszeile = ?, fusszeile2 = ?,
                geaendert_am = NOW(), geaendert_von = ? WHERE id = 1')
-    ->execute([$firma, $zusatz, $fuss === '' ? null : $fuss, (int)$user['id']]);
+    ->execute([$firma, $zusatz, $fuss === '' ? null : $fuss, $fuss2 === '' ? null : $fuss2, (int)$user['id']]);
 
 json_response(['status' => 'ok', 'betrieb' => betrieb_lesen(true)]);

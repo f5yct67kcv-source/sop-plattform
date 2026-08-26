@@ -837,6 +837,10 @@ $spalten = [
     ['einsaetze', 'unterzeichner',    'ALTER TABLE einsaetze ADD COLUMN unterzeichner VARCHAR(200) NULL AFTER unterschrift'],
     ['einsaetze', 'unterschrift_von', 'ALTER TABLE einsaetze ADD COLUMN unterschrift_von INT NULL AFTER unterzeichner'],
     ['einsaetze', 'unterschrift_am',  'ALTER TABLE einsaetze ADD COLUMN unterschrift_am DATETIME NULL AFTER unterschrift_von'],
+    // Zweiter Fusszeilen-Block auf dem Ausdruck, fuer einen Zweitsitz
+    // (ENT-169) -- derselbe Umgang wie die erste Fusszeile aus ENT-155:
+    // freier Text, leer erlaubt, keine erfundenen Angaben.
+    ['betrieb', 'fusszeile2', 'ALTER TABLE betrieb ADD COLUMN fusszeile2 TEXT NULL AFTER fusszeile'],
     // TINYINT NULL, nicht NOT NULL DEFAULT 0: NULL heisst 'noch nicht
     // entschieden', 0 heisst 'geprueft und nein'. Der Unterschied ist bei
     // GAV-AUS-004 wesentlich -- eine Vorbelegung waere eine Auslegung.
