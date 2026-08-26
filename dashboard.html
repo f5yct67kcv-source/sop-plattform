@@ -1128,12 +1128,35 @@ table.pl-tab td .serie-marke { display: flex; width: fit-content; margin-left: a
 }
 /* Der Hinweis, dass gerade nur eine Reihe gezeigt wird. Ohne ihn sieht eine
    gefilterte Liste aus wie die ganze Planung. */
-.serie-filter { display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
+.serie-filter { display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
   border: 1px solid var(--serie-line); background: var(--serie-soft);
-  border-radius: var(--r-sm); padding: 9px 12px; margin-bottom: 12px; font-size: 12.5px; }
+  border-radius: var(--r-sm); padding: 9px 12px; margin-bottom: 12px; font-size: 12.5px;
+  scroll-margin-top: var(--top-h); }
 .serie-filter b { color: var(--serie); font-weight: 660; }
-.serie-filter > svg { width: 16px; height: 16px; flex: none; stroke: currentColor; color: var(--serie);
+/* Der Rueckweg: ein echter, klar erkennbarer Zurueck-Knopf, keine kleine
+   Randnotiz. Steht darum zuerst im Markup und trägt eigene Farbe (--serie
+   voll, nicht nur der Rahmen) statt der zurueckhaltenden .btn-quiet-Optik --
+   das ist die Aktion, die diese Zeile ueberhaupt anbietet. */
+.serie-zurueck {
+  display: inline-flex; align-items: center; gap: 5px; flex: none;
+  border: 1px solid var(--serie); background: var(--surface); color: var(--serie);
+  border-radius: 999px; padding: 6px 12px 6px 8px; font-size: 12.5px; font-weight: 620;
+  font-family: inherit; cursor: pointer; white-space: nowrap;
+}
+.serie-zurueck:hover { background: var(--serie); color: var(--surface); }
+.serie-zurueck svg { width: 15px; height: 15px; flex: none; stroke: currentColor;
+  stroke-width: 2.4; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.serie-filter-text { display: flex; align-items: center; gap: 9px; flex: 1 1 260px; min-width: 0; }
+.serie-filter-text > svg { width: 16px; height: 16px; flex: none; stroke: currentColor; color: var(--serie);
   stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+@media (max-width: 720px) {
+  .serie-filter { flex-direction: column; align-items: stretch; }
+  .serie-zurueck { justify-content: center; min-height: 44px; padding: 4px 12px; }
+  /* flex-basis wirkt in flex-direction:column auf die HOEHE, nicht die
+     Breite -- die fuer die Zeilen-Anordnung gedachten 260px rissen hier
+     sonst eine 260px hohe Luecke zwischen Knopf und Text auf. */
+  .serie-filter-text { flex: none; }
+}
 /* Serien-Gruppierung (ENT-142): der Auf/Zu-Pfeil beim ersten Tag, die
    schlanke Verweis-Zeile bei den uebrigen Tagen, der eingerueckte Rahmen
    fuer die ausgeklappten Tage darunter. */
@@ -7201,7 +7224,11 @@ function serieZeigen(k) {
   pSerie = k;
   go('planung'); goTab('einsaetze');
   renderPlanung();
-  const el = $('plTable'); if (el && el.scrollIntoView) { el.scrollIntoView({ block: 'start' }); }
+  // Der Banner mit dem Rueckweg wird angesprungen, nicht die Tabelle darunter
+  // -- sonst rutscht der Banner beim Scrollen an den obersten Rand und damit
+  // teilweise hinter die feste Kopfzeile (60 px, .topbar). scroll-margin-top
+  // auf .serie-filter haelt denselben Abstand ein.
+  const el = $('pSerieFilter'); if (el && el.scrollIntoView) { el.scrollIntoView({ block: 'start' }); }
 }
 function serieFilterWeg() { pSerie = null; renderPlanung(); }
 
@@ -7235,11 +7262,18 @@ function serieFilterZeile() {
   if (!pSerie) { el.innerHTML = ''; el.style.display = 'none'; return; }
   const liste = serieVerzeichnis().get(pSerie) || [];
   const art = pSerie.charAt(0) === 'm' ? 'Objektschichten aus einer Masterschicht' : 'zusammen angelegte Einsätze';
+  // Der Rueckweg steht zuerst, nicht am Ende eines Fliesstexts hinter einem
+  // Abstandhalter: als eigenes, immer gleich grosses Element ist er nie davon
+  // abhaengig, wie lang der Beschreibungssatz gerade ausfaellt oder wie die
+  // Zeile umbricht -- er kann nicht "verschwinden", weil kein Platz mehr da
+  // ist. Das ist der Rueckweg aus der ganzen isolierten Ansicht, kein Detail
+  // dieser einen Zeile -- er verdient die Prominenz eines echten Zurueck.
   el.style.display = '';
-  el.innerHTML = `${SERIE_IKONE}<span>Es wird nur <b>eine Reihe</b> gezeigt —
-      ${liste.length} ${art}${liste.length ? `, ${esc(dmy(tagVon(liste[0])))} bis ${esc(dmy(tagVon(liste[liste.length - 1])))}` : ''}.</span>
-    <span class="sp" style="flex:1"></span>
-    <button class="btn btn-quiet btn-sm" onclick="serieFilterWeg()">Ganze Planung zeigen</button>`;
+  el.innerHTML = `<button type="button" class="serie-zurueck" onclick="serieFilterWeg()">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+      Zurück zu allen Einsätzen</button>
+    <span class="serie-filter-text">${SERIE_IKONE}<span>Es wird nur <b>eine Reihe</b> gezeigt —
+      ${liste.length} ${art}${liste.length ? `, ${esc(dmy(tagVon(liste[0])))} bis ${esc(dmy(tagVon(liste[liste.length - 1])))}` : ''}.</span></span>`;
 }
 
 // Eine volle Tabellenzeile fuer genau einen Einsatz -- unveraendert fuer den
