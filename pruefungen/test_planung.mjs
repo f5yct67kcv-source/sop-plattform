@@ -1037,6 +1037,52 @@ check('Die Tagesplan-Spalten entsprechen den vorgesehenen Breiten',
   !!spaltenTag && spaltenTag.length === ERWARTET_TAG.length
   && spaltenTag.every((p, i) => Math.abs(p - ERWARTET_TAG[i]) < 0.5));
 
+// ══════════════ SICHTBARE SPALTENGRENZEN (ENT-140)
+// Der Projektinhaber meldete trotz ENT-137 (Breiten bereits exakt, siehe
+// oben) weiterhin "nicht sauber ausgerichtete" Spalten. Eine duenne, aber
+// durchgehende Trennlinie macht die Spaltengrenze objektiv sichtbar, statt
+// sie nur aus Textabstaenden zu erraten -- dasselbe Prinzip wie im
+// Einsatzplan-Raster (table.ep-gitter .fest { border-right }).
+check('KRITISCH: jede Spalte ausser der letzten traegt eine sichtbare Trennlinie (Planung)',
+  await page.evaluate(() => {
+    const zellen = [...document.querySelectorAll('#plTable table.pl-tab thead th')];
+    if (zellen.length < 2) return false;
+    const transparent = c => c === 'transparent' || c === 'rgba(0, 0, 0, 0)';
+    return zellen.slice(0, -1).every(z => !transparent(getComputedStyle(z).borderRightColor)
+      && getComputedStyle(z).borderRightWidth !== '0px');
+  }));
+check('Die letzte Spalte (Status) traegt KEINE Trennlinie danach -- kein Rand ins Leere',
+  await page.evaluate(() => {
+    const letzte = document.querySelector('#plTable table.pl-tab thead th:last-child');
+    return !!letzte && getComputedStyle(letzte).borderRightWidth === '0px';
+  }));
+check('Die Tagesueberschrift-Zeile (eine einzige, spannende Zelle) bleibt ohne Trennlinie',
+  await page.evaluate(() => {
+    const grpTd = document.querySelector('#plTable table.pl-tab tbody tr.grp td');
+    return !!grpTd && getComputedStyle(grpTd).borderRightWidth === '0px';
+  }));
+// Am gerenderten Zustand gemessen: dieselbe Farbe wie eine isolierte Sonde
+// mit der erwarteten CSS-Custom-Property, nicht nur "irgendeine" Farbe.
+check('KRITISCH: die Trennlinie hat die vorgesehene, dezente Farbe (--line-soft)',
+  await page.evaluate(() => {
+    const zelle = document.querySelector('#plTable table.pl-tab thead th');
+    const sonde = document.createElement('div');
+    sonde.style.borderRight = '1px solid var(--line-soft)';
+    document.body.appendChild(sonde);
+    const erwartet = getComputedStyle(sonde).borderRightColor;
+    sonde.remove();
+    return !!zelle && getComputedStyle(zelle).borderRightColor === erwartet;
+  }));
+check('Dieselbe Trennlinie gilt auch fuer den Tagesplan',
+  await page.evaluate(() => {
+    const zellen = [...document.querySelectorAll('#tgBody table.pl-tab thead th')];
+    if (zellen.length < 2) return false;
+    const transparent = c => c === 'transparent' || c === 'rgba(0, 0, 0, 0)';
+    return zellen.slice(0, -1).every(z => !transparent(getComputedStyle(z).borderRightColor)
+        && getComputedStyle(z).borderRightWidth !== '0px')
+      && getComputedStyle(zellen[zellen.length - 1]).borderRightWidth === '0px';
+  }));
+
 await browser.close();
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
