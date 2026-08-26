@@ -213,6 +213,12 @@ select.inp { padding-right: 30px; background-image: linear-gradient(45deg, trans
 .btn-plain:hover { background: var(--bg); border-color: var(--line-hi); }
 .btn-quiet { background: transparent; color: var(--ink-2); }
 .btn-quiet:hover { background: var(--line-soft); color: var(--ink); }
+/* Umrissener Akzent-Knopf (ENT-150): fuer die Handlung, die einen Vorgang
+   weitertraegt, wo daneben schon ein gefuellter Akzent-Knopf steht. Zwei
+   gefuellte blaue Flaechen nebeneinander waeren zwei Hauptknoepfe, und dann
+   ist keiner mehr der Hauptknopf. */
+.btn-akzent { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.btn-akzent:hover { background: var(--accent); color: #fff; }
 .btn-wide { width: 100%; }
 .btn-sm { padding: 6px 11px; font-size: 12px; }
 
@@ -519,6 +525,20 @@ tbody tr.status-abgeschlossen.zu.abgeglichen td { opacity: 1; }
   color: var(--ink-3); margin-bottom: 7px; }
 .dok-zeile a.nm { color: var(--ink); text-decoration: none; }
 .dok-zeile a.nm:hover { text-decoration: underline; }
+/* Rapport und Dokumente stehen nebeneinander, sobald Platz dafuer da ist
+   (ENT-150). Untereinander wuchs der Abschnitt in die Hoehe, waehrend rechts
+   daneben die halbe Karte leer blieb.
+   auto-fit statt zwei fester Spalten: steht nur einer der beiden Bloecke da
+   -- kein Rapport erfasst, oder der Einsatz ist noch gar nicht abgeschlossen
+   -- nimmt er die volle Breite ein, statt eine leere Spalte offenzulassen.
+   Unter 320 px je Spalte bricht das Raster von selbst auf eine Spalte um; auf
+   dem Handy steht damit weiterhin alles untereinander. */
+.ep-zone { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 4px 28px; align-items: start; padding: 0 16px 14px; }
+.ep-zone-teil { min-width: 0; }
+/* Der Rechnungs-Knopf steht rechts unter beiden Spalten -- die Abschluss-
+   Handlung der Karte, nicht Teil einer der beiden Spalten. */
+.ep-rechnung { display: flex; justify-content: flex-end; padding: 0 16px 14px; }
 
 .ep-plan { overflow: hidden; }
 .ep-plan-kopf { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-bottom: 1px solid var(--line-soft); font-size: 12.5px; }
@@ -8165,14 +8185,16 @@ function epDokLaden() {
 
 function epDokBlock() {
   const gesperrt = enGesperrt(epEinsatz);
-  return `<div class="card-bd" style="padding:0 16px 14px">
+  // Kein eigenes .card-bd mehr: der Block ist seit ENT-150 eine Spalte
+  // neben dem Rapport, die Aussenabstaende gehoeren dem Raster (.ep-zone).
+  return `<div class="ep-zone-teil">
     <div class="ep-dok-kopf">Dokumente</div>
     <div class="dok-liste">${epDok.map(d =>
       dokZeile(d, `dokOeffnen(${d.id});return false`, gesperrt ? null : `epDokWeg(${d.id})`)).join('')}</div>
     ${epDok.length ? '' : `<div class="note">Noch keine Unterlagen angehängt.</div>`}
     ${gesperrt ? '' : `<input type="file" id="epDokDatei" accept="application/pdf" style="display:none"
         onchange="epDokGewaehlt(this.files[0])">
-      <button type="button" class="btn btn-quiet btn-sm" style="margin-top:8px"
+      <button type="button" class="btn btn-plain btn-sm" style="margin-top:8px"
         onclick="$('epDokDatei').click()">PDF anhängen</button>
       <div class="note" style="margin-top:6px">Nur PDF, höchstens 4 MB. Die Eingeteilten
         öffnen es in ihrer App.</div>`}
@@ -9712,9 +9734,8 @@ function epKopfZeichnen() {
     ${epWegWarnung(e)}
     ${epGavAus010Warnung(e)}
     ${epVerkehrsmittelBlock(e)}
-    ${epRapportBlock(e)}
-    ${epRechnungBlock(e)}
-    ${epDokBlock()}`;
+    <div class="card-bd ep-zone">${epRapportBlock(e)}${epDokBlock()}</div>
+    ${epRechnungBlock(e)}`;
 }
 
 // ── Rapport-Übersicht am abgeschlossenen Einsatz (ENT-128, erweitert ENT-138) ──
@@ -9753,12 +9774,13 @@ function epRapportBlock(e) {
         ${r.bemerkung ? `<br>${esc(r.bemerkung)}` : ''}</div>
       ${abweichung ? `<div class="zone-note" style="color:var(--warn)">⚠️ Rapport weicht ab: ${esc(abweichung.join(', '))}</div>` : ''}
       <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">
-        <button type="button" class="btn btn-quiet btn-sm" onclick="openDrawer(${Number(r.id)})">Rapport ansehen</button>
-        ${gesperrt ? '' : `<button type="button" class="btn btn-plain btn-sm" onclick="epDirektAbgleichen(${Number(e.id)},${Number(m.id)})">Direkt abgleichen</button>`}
+        <button type="button" class="btn btn-plain btn-sm" onclick="openDrawer(${Number(r.id)})">Rapport ansehen</button>
+        ${gesperrt ? '' : `<button type="button" class="btn btn-akzent btn-sm" onclick="epDirektAbgleichen(${Number(e.id)},${Number(m.id)})">Direkt abgleichen</button>`}
       </div>
     </div>`;
   };
-  return `<div class="card-bd" style="padding:0 16px 14px">
+  // Kein eigenes .card-bd mehr: seit ENT-150 eine Spalte im Raster .ep-zone.
+  return `<div class="ep-zone-teil">
     <div class="ep-dok-kopf">Rapport${personen.length > 1 ? 'e' : ''}</div>
     ${personen.map(zeile).join('')}
   </div>`;
@@ -9790,10 +9812,17 @@ function epDirektAbgleichen(einsatzId, mitarbeiterId) {
 // btn-quiet hat weder Rahmen noch Hintergrund und blieb dadurch nicht als
 // Knopf erkennbar, sondern sah wie normaler Fliesstext aus (am gerenderten
 // Zustand gemessen, nicht im Quelltext vermutet).
+//
+// Seit ENT-150 auf ausdrueckliche Ansage des Projektinhabers blau (btn-primary)
+// und rechts unter den beiden Spalten. `disabled` bleibt: der Knopf hat
+// weiterhin KEINE Funktion (ENT-040/ENT-127 haben die Rechnungsstellung
+// bewusst zurueckgestellt) -- die Deckkraft aus .btn:disabled sagt das auch
+// in Blau, und ohne sie waere der auffaelligste Knopf der Karte einer, der
+// nichts tut.
 function epRechnungBlock(e) {
   if (!e || !einsatzAbgeschlossen(e)) { return ''; }
-  return `<div class="card-bd" style="padding:0 16px 14px">
-    <button type="button" class="btn btn-plain btn-sm" disabled title="Noch nicht verfügbar">Rechnung erstellen</button>
+  return `<div class="card-bd ep-rechnung">
+    <button type="button" class="btn btn-primary btn-sm" disabled title="Noch nicht verfügbar">Rechnung erstellen</button>
   </div>`;
 }
 

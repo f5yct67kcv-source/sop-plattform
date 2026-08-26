@@ -387,6 +387,76 @@ check('Und zusaetzlich sichtbar gedaempft (Opacity < 1), nicht nur per cursor',
     return !!btn && parseFloat(getComputedStyle(btn).opacity) < 1;
   }));
 
+// ══════════ ANORDNUNG UND FARBE DES ABSCHLUSS-BEREICHS (ENT-150)
+// Der Projektinhaber: Dokumente sollen neben den Rapport, damit der
+// Abschnitt schmaler wird; der Rechnungs-Knopf blau und nach rechts; die
+// beiden Rapport-Knoepfe sollen sich farblich besser abheben. Alles am
+// gerenderten Zustand gemessen (CLAUDE.md „Gestaltung“) -- eine Rasterregel
+// kann wirkungslos bleiben, ohne dass etwas kaputtgeht.
+const zone = await page.evaluate(() => {
+  const rap = document.querySelector('#epKopf .ep-zone .ep-zone-teil:first-child');
+  const dok = document.querySelector('#epKopf .ep-zone .ep-zone-teil:last-child');
+  const rBtn = [...document.querySelectorAll('#epKopf button')].find(b => b.textContent.includes('Rechnung erstellen'));
+  const zoneEl = document.querySelector('#epKopf .ep-zone');
+  if (!rap || !dok || !rBtn || !zoneEl) { return null; }
+  const r = el => el.getBoundingClientRect();
+  return {
+    zweiTeile: rap !== dok,
+    rapRechts: r(rap).right, dokLinks: r(dok).left,
+    rapOben: r(rap).top, dokOben: r(dok).top,
+    zoneRechts: r(zoneEl).right, zoneLinks: r(zoneEl).left,
+    rBtnRechts: r(rBtn).right, rBtnUnten: r(rBtn).bottom,
+    zoneUnten: r(zoneEl).bottom,
+    dokText: dok.textContent, rapText: rap.textContent,
+  };
+});
+check('KRITISCH: Rapport und Dokumente stehen NEBENEINANDER, nicht mehr untereinander',
+  !!zone && zone.zweiTeile && zone.dokLinks >= zone.rapRechts - 1);
+check('Und zwar auf gleicher Hoehe beginnend — nicht versetzt',
+  !!zone && Math.abs(zone.rapOben - zone.dokOben) < 2);
+check('Die linke Spalte traegt den Rapport, die rechte die Dokumente',
+  !!zone && /Rapport/.test(zone.rapText) && /Dokumente/.test(zone.dokText));
+check('KRITISCH: der Rechnungs-Knopf steht rechts, nicht links am Spaltenanfang',
+  !!zone && (zone.rBtnRechts > zone.zoneLinks + (zone.zoneRechts - zone.zoneLinks) / 2));
+check('KRITISCH: und unterhalb beider Spalten, nicht in einer davon',
+  !!zone && zone.rBtnUnten > zone.zoneUnten);
+// Blau heisst hier: dieselbe Farbe, die eine isolierte Sonde mit
+// var(--accent) liefert -- nicht "irgendeine" Farbe.
+check('KRITISCH: der Rechnungs-Knopf ist blau (--accent), wie ausdruecklich verlangt',
+  await page.evaluate(() => {
+    const btn = [...document.querySelectorAll('#epKopf button')].find(b => b.textContent.includes('Rechnung erstellen'));
+    const sonde = document.createElement('div');
+    sonde.style.background = 'var(--accent)';
+    document.body.appendChild(sonde);
+    const erwartet = getComputedStyle(sonde).backgroundColor;
+    sonde.remove();
+    return !!btn && getComputedStyle(btn).backgroundColor === erwartet;
+  }));
+check('KRITISCH: er bleibt trotz Blau ausgegraut — er hat weiterhin keine Funktion (ENT-040/127)',
+  await page.evaluate(() => {
+    const btn = [...document.querySelectorAll('#epKopf button')].find(b => b.textContent.includes('Rechnung erstellen'));
+    return !!btn && btn.disabled && parseFloat(getComputedStyle(btn).opacity) < 1;
+  }));
+// Die beiden Rapport-Knoepfe: beide muessen als Knopf erkennbar sein (Rahmen
+// ODER Flaeche) und sich VONEINANDER unterscheiden -- vorher war einer davon
+// btn-quiet, also ganz ohne beides.
+const rapKnoepfe = await page.evaluate(() => {
+  const btn = t => [...document.querySelectorAll('#epKopf button')].find(b => b.textContent.includes(t));
+  const a = btn('Rapport ansehen'), d = btn('Direkt abgleichen');
+  if (!a || !d) { return null; }
+  const transparent = c => c === 'transparent' || c === 'rgba(0, 0, 0, 0)';
+  const lies = el => { const s = getComputedStyle(el);
+    return { bg: s.backgroundColor, rand: s.borderColor, farbe: s.color,
+      sichtbar: !transparent(s.backgroundColor) || !transparent(s.borderColor) }; };
+  return { a: lies(a), d: lies(d) };
+});
+check('KRITISCH: "Rapport ansehen" ist als Knopf erkennbar (Rahmen oder Fläche), nicht wie Fliesstext',
+  !!rapKnoepfe && rapKnoepfe.a.sichtbar);
+check('KRITISCH: "Direkt abgleichen" ebenfalls', !!rapKnoepfe && rapKnoepfe.d.sichtbar);
+check('KRITISCH: die beiden unterscheiden sich sichtbar voneinander — sie sind nicht dieselbe Handlung',
+  !!rapKnoepfe && (rapKnoepfe.a.bg !== rapKnoepfe.d.bg
+    || rapKnoepfe.a.rand !== rapKnoepfe.d.rand || rapKnoepfe.a.farbe !== rapKnoepfe.d.farbe));
+
 // ══════════ RAPPORT-ÜBERSICHT AM ABGESCHLOSSENEN EINSATZ (ENT-128)
 const kopf77 = await page.textContent('#epKopf');
 check('KRITISCH: der Rapport erscheint im Kopf des abgeschlossenen Einsatzes',
