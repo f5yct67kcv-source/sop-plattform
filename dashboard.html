@@ -2167,6 +2167,17 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
   /* Container verschieben ist eine Zeigergeraet-Aufgabe -- auf dem Telefon
      bleibt die zuletzt gespeicherte Anordnung einfach stehen (ENT-031). */
   #btnDashBearbeiten, .dash-editleiste, .dash-werk { display: none !important; }
+  /* Startseite mobil schlanker (ENT-166): Stundenverlauf und Angemeldete
+     Benutzer sind Auswertungen fuer den Schreibtisch, kein Blick unterwegs
+     -- auf dem Desktop bleiben beide unveraendert bestehen. */
+  .dash-item[data-widget="verlauf"], .dash-item[data-widget="angemeldet"] { display: none !important; }
+  /* Von den vier KPI-Kacheln bleiben nur Rapporte und Nettostunden: Bestand
+     (Mitarbeitende, Kunden) ist eine Zahl fuers Buero, kein Tagesgeschaeft.
+     #kpiGrid statt .kpi, weil dieselbe Kachel-Klasse auch im Planungs-KPI
+     (#plKpi) und anderswo vorkommt -- nur diese eine Kachelreihe soll sich
+     aendern. Reihenfolge aus renderKpi() (dashboard.html): 1 Rapporte,
+     2 Nettostunden, 3 Mitarbeitende, 4 Kunden. */
+  #kpiGrid .kpi:nth-child(3), #kpiGrid .kpi:nth-child(4) { display: none !important; }
   /* Tagesplan ganz nach aussen links (ENT-068). Ab hier ist "Übersicht"
      bereits ausgeblendet (.nur-desktop); von den drei verbleibenden Reitern
      ist der Tagesplan der, den die Startseite und die Ereignis-Kacheln
@@ -2199,7 +2210,9 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
      geholt. :first-of-type träfe damit den ausgeblendeten Übersichts-Reiter
      und :last-of-type ausgerechnet den Tagesplan -- also genau verkehrt. */
   #ptab-tag { text-align: left; }
-  #ptab-objektplan { text-align: right; }
+  /* Objektplanung ist hier (ENT-165) durch Rapporte ersetzt -- sie nimmt
+     jetzt deren Platz ganz aussen rechts ein, die Regel zieht mit um. */
+  #ptab-rapporte { text-align: right; }
 }
 
 @media (max-width: 620px) {
@@ -2779,8 +2792,22 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
         <div class="tabs">
           <button class="tab on nur-desktop" id="ptab-uebersicht" onclick="goTab('uebersicht')">Übersicht</button>
           <button class="tab" id="ptab-einsaetze" onclick="goTab('einsaetze')">Einsätze</button>
-          <button class="tab" id="ptab-objektplan" onclick="goTab('objektplan')">Objektplanung</button>
+          <!-- Auf dem Handy nicht mehr Teil der Reiterleiste (ENT-165):
+               eine 31-Spalten-Matrix ist dort ohnehin nur als Tagesliste
+               nutzbar (ENT-024), und der Projektinhaber greift von hier aus
+               unterwegs eher auf Rapporte zu als auf die Objektdetailplanung.
+               Andere Wege dorthin -- Klick auf einen Objektnamen, Kurzwahl,
+               Diktat -- bleiben unveraendert bestehen, nur der Reiter selbst
+               verschwindet auf schmalen Schirmen. -->
+          <button class="tab nur-desktop" id="ptab-objektplan" onclick="goTab('objektplan')">Objektplanung</button>
           <button class="tab" id="ptab-tag" onclick="goTab('tag')">Tagesplan</button>
+          <!-- Ersetzt die Objektplanung an ihrem Platz in der mobilen
+               Reiterleiste. Kein eigener Reiter innerhalb der Planung --
+               das wuerde die bereits bestehende, global gepflegte
+               Rapporte-Ansicht unter Kunden ein zweites Mal nachbauen.
+               Stattdessen derselbe Sprung wie aus der Kurzwahl
+               ("Rapporte ansehen") und der Seitenleiste. -->
+          <button class="tab nur-schmal" id="ptab-rapporte" onclick="go('kunden'); kuGoTab('rapporte')">Rapporte</button>
           <div class="sp" style="flex:1"></div>
           <!-- Auf der Trennlinie statt in einer eigenen Werkzeugleiste (ENT-038)
                -- gilt reiterübergreifend, spart aber Platz in jeder Leiste. -->

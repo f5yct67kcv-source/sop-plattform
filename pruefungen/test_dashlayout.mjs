@@ -250,12 +250,41 @@ await browser.close();
 
 // ══════════ MOBIL: KEINE BEARBEITUNG
 ({ browser, page } = await starte());
+// Auf dem Desktop (Startgroesse von starte(), 1500px) stehen alle vier
+// KPI-Kacheln und beide Auswertungswidgets -- erst der Wechsel auf mobil
+// weiter unten veraendert etwas (ENT-166).
+const kachelnDesktop = await page.$$eval('#kpiGrid .kpi', els => els.map(e => e.querySelector('.kpi-top span').textContent));
+check('KRITISCH: auf dem Desktop stehen alle vier KPI-Kacheln, inklusive Mitarbeitende und Kunden',
+  kachelnDesktop.join(',') === 'Rapporte,Nettostunden,Mitarbeitende,Kunden');
+check('Stundenverlauf und Angemeldete Benutzer stehen auf dem Desktop',
+  await page.isVisible('.dash-item[data-widget="verlauf"]') && await page.isVisible('.dash-item[data-widget="angemeldet"]'));
+
 await page.setViewportSize({ width: 390, height: 844 });
 await page.waitForTimeout(250);
 check('„Bearbeiten“ ist auf dem Handy nicht da',
   await page.evaluate(() => getComputedStyle($('btnDashBearbeiten')).display === 'none'));
 const mobScroll = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 check('Kein Seiten-Scroll auf dem Handy', mobScroll <= 1);
+
+// ── Mobil schlanker (ENT-166): Bestandszahlen und Buero-Auswertungen weg,
+// Tagesgeschaeft bleibt. Existenz im DOM statt blossem isVisible() geprueft
+// (dieselbe Faustregel wie in test_planung.mjs, ENT-165) -- sonst besteht
+// die Pruefung auch, wenn das Element versehentlich ganz entfernt wird statt
+// nur per CSS versteckt zu sein.
+check('KRITISCH: "Stundenverlauf" existiert weiterhin im DOM, ist auf dem Handy aber unsichtbar',
+  (await page.locator('.dash-item[data-widget="verlauf"]').count()) === 1 && !(await page.isVisible('.dash-item[data-widget="verlauf"]')));
+check('KRITISCH: "Angemeldete Benutzer" existiert weiterhin im DOM, ist auf dem Handy aber unsichtbar',
+  (await page.locator('.dash-item[data-widget="angemeldet"]').count()) === 1 && !(await page.isVisible('.dash-item[data-widget="angemeldet"]')));
+const kachelnMobil = await page.$$eval('#kpiGrid .kpi',
+  els => els.map(e => ({ label: e.querySelector('.kpi-top span').textContent, sichtbar: e.getClientRects().length > 0 })));
+check('KRITISCH: "Rapporte" und "Nettostunden" bleiben auf dem Handy sichtbar -- Tagesgeschaeft',
+  kachelnMobil[0].label === 'Rapporte' && kachelnMobil[0].sichtbar
+    && kachelnMobil[1].label === 'Nettostunden' && kachelnMobil[1].sichtbar);
+check('KRITISCH: "Mitarbeitende" und "Kunden" verschwinden auf dem Handy -- Bestand, kein Tagesgeschaeft',
+  kachelnMobil[2].label === 'Mitarbeitende' && !kachelnMobil[2].sichtbar
+    && kachelnMobil[3].label === 'Kunden' && !kachelnMobil[3].sichtbar);
+check('Alle vier Kacheln bleiben trotzdem im DOM', kachelnMobil.length === 4);
+
 await browser.close();
 
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
