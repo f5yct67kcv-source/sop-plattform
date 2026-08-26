@@ -160,6 +160,33 @@ check('Das Gedruckte ist der gemeinsame Bericht, nicht der Einzelrapport',
   await page.evaluate(() => /Kundenrapport/.test($('printArea').innerHTML)
     && /Daniele Ciardo/.test($('printArea').innerHTML)));
 
+// ── Kein leeres zweites Blatt beim Drucken (ENT-179): @page setzt einen
+// festen Rand, statt ihn dem Browser-Standard plus dem eigenen CSS-Padding
+// zu ueberlassen -- die doppelte Randbreite hatte ein knapp einseitiges
+// Blatt zuvor auf eine fast leere zweite Seite gedraengt (in Safari
+// gemeldet, hier ueber die Druck-Medienabfrage nachgebildet).
+await page.emulateMedia({ media: 'print' });
+const seitenrand = await page.evaluate(() => {
+  // @page steckt in @media print -- eine flache Suche in cssRules findet nur
+  // die CSSMediaRule selbst, nicht die darin verschachtelte @page-Regel.
+  function alle(regeln) {
+    let out = [];
+    for (const r of regeln) { out.push(r); if (r.cssRules) { out = out.concat(alle(r.cssRules)); } }
+    return out;
+  }
+  const regel = [...document.styleSheets].flatMap(s => {
+    try { return alle(s.cssRules); } catch { return []; }
+  }).find(r => r instanceof CSSPageRule);
+  return {
+    pageRuleMargin: regel ? regel.style.margin : null,
+    printAreaPadding: getComputedStyle(document.getElementById('printArea')).padding,
+  };
+});
+check('KRITISCH: @page setzt einen eigenen Seitenrand (12mm)', seitenrand.pageRuleMargin === '12mm');
+check('KRITISCH: #printArea verdoppelt den Rand im Druck nicht mehr mit eigenem Padding',
+  seitenrand.printAreaPadding === '0px');
+await page.emulateMedia({ media: 'screen' });
+
 await browser.close();
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
