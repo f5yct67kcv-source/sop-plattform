@@ -292,10 +292,27 @@ check('KRITISCH: es steht sichtbar da, dass gerade nur eine Reihe gezeigt wird',
 // Grössenvorgabe direkt im Banner, ohne umschliessendes .serie-marke.
 check('KRITISCH: das Reihen-Icon im Banner ist klein, nicht bildschirmfüllend',
   await page.evaluate(() => {
-    const svg = document.querySelector('#pSerieFilter > svg');
+    const svg = document.querySelector('#pSerieFilter .serie-filter-text > svg');
     if (!svg) { return false; }
     const r = svg.getBoundingClientRect();
     return r.width > 0 && r.width <= 24 && r.height > 0 && r.height <= 24;
+  }));
+// ENT-145: der Rueckweg steht seit der Rueckmeldung des Projektinhabers
+// ("hier wäre ein Button wieder sinnvoll") als eigenes, immer sichtbares
+// Element ZUERST im Banner -- nicht als kleine Randnotiz hinter einem
+// Abstandhalter, wo er je nach Zeilenlaenge aus dem Blick geraten konnte.
+check('KRITISCH: der Rückweg ist ein eigener, klar erkennbarer Knopf, sofort sichtbar',
+  await page.evaluate(() => {
+    const btn = document.querySelector('#pSerieFilter .serie-zurueck');
+    if (!btn) { return false; }
+    const bannerRight = document.getElementById('pSerieFilter').getBoundingClientRect().right;
+    const r = btn.getBoundingClientRect();
+    return r.width > 0 && r.height > 0 && r.right <= bannerRight + 1 && /Zurück/.test(btn.textContent);
+  }));
+check('Er steht als erstes Element im Banner, nicht hinter dem Beschreibungstext',
+  await page.evaluate(() => {
+    const kinder = [...document.getElementById('pSerieFilter').children];
+    return kinder[0] && kinder[0].classList.contains('serie-zurueck');
   }));
 const hinweis = await page.textContent('#pSerieFilter');
 check('Der Hinweis nennt die Anzahl', /3\s/.test(hinweis));
@@ -324,9 +341,9 @@ await page.waitForTimeout(400);
 check('KRITISCH: eine Objektschicht-Reihe zeigt sich trotz Herkunftsfilter — ein Klick, der nichts zeigt, sieht aus wie "gibt es nicht"',
   (await marken()).length === 2);
 await klick('Der Hinweis trägt einen Weg zurück zur ganzen Planung',
-  { sel: '#pSerieFilter .btn' });
+  { sel: '#pSerieFilter .serie-zurueck' });
 await page.waitForTimeout(400);
-check('KRITISCH: "Ganze Planung zeigen" hebt den Filter wieder auf',
+check('KRITISCH: "Zurück zu allen Einsätzen" hebt den Filter wieder auf',
   !(await page.isVisible('#pSerieFilter')));
 check('Und die Vorgabe-Filter greifen danach wieder',
   !(await marken()).some(x => x.endsWith('von 2')));
@@ -349,6 +366,50 @@ check('KRITISCH: sie hält die Trefferfläche von 44 px ein', handy && handy.hoe
 check('Sie wird nicht über die volle Kartenbreite gezogen',
   handy && handy.breite < handy.kartenBreite * 0.8);
 check('Kein Querlauf auf dem Handy', handy && handy.ueberlauf <= 1);
+
+// ── Handy: auch der Rückweg selbst haelt die Trefferflaeche ein, isoliert
+// wieder aufgerufen (der obige Block hat den Filter schon aufgehoben)
+await page.evaluate(() => serieZeigen('s1'));
+await page.waitForTimeout(400);
+const zurueckHandy = await page.evaluate(() => {
+  const b = document.querySelector('#pSerieFilter .serie-zurueck');
+  if (!b) { return null; }
+  const r = b.getBoundingClientRect();
+  return { hoehe: Math.round(r.height), ueberlauf: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+});
+check('KRITISCH: auch auf dem Handy hält der Rückweg-Knopf 44 px ein', zurueckHandy && zurueckHandy.hoehe >= 44);
+check('Kein Querlauf durch den Rückweg-Knopf', zurueckHandy && zurueckHandy.ueberlauf <= 1);
+
+// Zwei am gerenderten Zustand gefundene Maengel beim Bauen dieses Knopfs,
+// beide nicht durch Quelltext-Lesen zu finden gewesen (CLAUDE.md):
+// serieZeigen() sprang bisher die Tabelle an, nicht den Banner -- auf dem
+// Handy schob das den Banner (und mit ihm den neuen Knopf) grossteils hinter
+// die 60 px hohe feste Kopfzeile. Und die fuer die Zeilen-Anordnung gedachte
+// flex-basis von 260px wirkt in flex-direction:column auf die HOEHE, nicht
+// die Breite, und riss dort eine 260px hohe Luecke zwischen Knopf und Text.
+const bannerGeo = await page.evaluate(() => {
+  const topbarUnten = document.querySelector('.topbar').getBoundingClientRect().bottom;
+  const knopf = document.querySelector('#pSerieFilter .serie-zurueck').getBoundingClientRect();
+  const textBox = document.querySelector('#pSerieFilter .serie-filter-text').getBoundingClientRect();
+  // Gemessen wird der Abstand zur TATSAECHLICH SICHTBAREN Ikone, nicht zur
+  // Aussenkante des Flex-Elements: bei einer ueberhoehten Box (der reale
+  // Fehler unten) bleibt die Aussenkante nah am Knopf, waehrend der
+  // sichtbare Inhalt -- durch align-items:center -- mitten in der Box
+  // "schwebt" und damit optisch weit vom Knopf entfernt steht. Eine Pruefung
+  // gegen die Aussenkante haette genau diesen Fehler NICHT gefunden.
+  const ikone = document.querySelector('#pSerieFilter .serie-filter-text > svg').getBoundingClientRect();
+  return { knopfOben: knopf.top, topbarUnten, luecke: ikone.top - knopf.bottom, textBoxHoehe: textBox.height };
+});
+check('KRITISCH: der Rückweg-Knopf steht sichtbar UNTER der festen Kopfzeile, nicht dahinter verdeckt',
+  bannerGeo.knopfOben >= bannerGeo.topbarUnten - 1);
+check('KRITISCH: zwischen Knopf und dem sichtbaren Text-Symbol klafft keine grosse Lücke (Handy-Spaltenlayout)',
+  bannerGeo.luecke < 30);
+check('Die Text-Zeile selbst ist nicht überhöht — ihre Box passt sich dem Inhalt an, statt ihre alte Zeilen-Breitenvorgabe als Höhe zu übernehmen',
+  bannerGeo.textBoxHoehe < 60);
+
+await page.evaluate(() => { serieFilterWeg(); });
+await page.waitForTimeout(300);
+
 await page.setViewportSize({ width: 1500, height: 1000 });
 await page.close();
 
