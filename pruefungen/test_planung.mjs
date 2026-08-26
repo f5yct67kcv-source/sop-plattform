@@ -1119,6 +1119,162 @@ check('Dieselbe Trennlinie gilt auch fuer den Tagesplan',
       && getComputedStyle(zellen[zellen.length - 1]).borderRightWidth === '0px';
   }));
 
+// ══════════════ SERIEN-GRUPPIERUNG (ENT-142) ═══════════════════════════════
+// Der Projektinhaber hat ausdrücklich die grössere, invasivere Variante
+// gewählt (gegen die Empfehlung der unaufdringlicheren Variante A): alle Tage
+// einer Reihe klappen sich zu EINER Zeile beim ersten Tag zusammen; die
+// übrigen Tage stehen standardmässig als schlanke Verweiszeile in ihrem
+// eigenen Tagesblock -- nie einfach weg (ENT-069: "nichts vorhanden" darf nie
+// etwas anderes bedeuten als nichts vorhanden).
+await page.evaluate(({ a, b, c, d }) => {
+  einsaetze = [
+    { id: 201, kunde_id: 1, kunde_name: 'Strabag AG', titel: 'Belagseinbau', strasse: 'Kantonsstrasse 3',
+      ort: '6000 Luzern', einsatzart: 'Verkehrsdienst', datum: a, von: '06:00:00', bis: '18:00:00',
+      bedarf: 1, status: 'geplant', bemerkung: null, mitarbeiter: [], serie_id: 201, objekt_id: null, masterschicht_id: null },
+    { id: 202, kunde_id: 1, kunde_name: 'Strabag AG', titel: 'Belagseinbau', strasse: 'Kantonsstrasse 3',
+      ort: '6000 Luzern', einsatzart: 'Verkehrsdienst', datum: b, von: '06:00:00', bis: '18:00:00',
+      bedarf: 1, status: 'geplant', bemerkung: null, mitarbeiter: [], serie_id: 201, objekt_id: null, masterschicht_id: null },
+    { id: 203, kunde_id: 1, kunde_name: 'Strabag AG', titel: 'Belagseinbau', strasse: 'Kantonsstrasse 3',
+      ort: '6000 Luzern', einsatzart: 'Verkehrsdienst', datum: c, von: '06:00:00', bis: '18:00:00',
+      bedarf: 1, status: 'geplant', bemerkung: null, mitarbeiter: [], serie_id: 201, objekt_id: null, masterschicht_id: null },
+    { id: 204, kunde_id: 2, kunde_name: 'Einzelkunde AG', titel: null, strasse: null,
+      ort: '4600 Olten', einsatzart: 'Revierdienst', datum: d, von: '08:00:00', bis: '12:00:00',
+      bedarf: 1, status: 'geplant', bemerkung: null, mitarbeiter: [], serie_id: null, objekt_id: null, masterschicht_id: null },
+  ];
+  pSerie = null; pSerieOffen = new Set();
+  $('pHerkunft').value = ''; $('pQ').value = '';
+  $('pSchnell').value = 'alle'; pSchnellSetzen();
+  renderPlanung();
+}, { a: tage(2), b: tage(3), c: tage(4), d: tage(5) });
+await page.waitForTimeout(300);
+
+const stand1 = await page.evaluate(() => {
+  const rows = [...document.querySelectorAll('#plTable table.pl-tab tbody tr')];
+  const anker = rows.find(r => r.getAttribute('onclick') === 'openEinsatz(201)');
+  const folge202 = rows.find(r => r.classList.contains('serie-folge') && r.textContent.includes('Tag 2 von 3'));
+  const folge203 = rows.find(r => r.classList.contains('serie-folge') && r.textContent.includes('Tag 3 von 3'));
+  return {
+    ankerDa: !!anker,
+    ankerHatMarke: !!(anker && anker.querySelector('.serie-marke') && anker.querySelector('.serie-marke').textContent.trim() === 'Tag 1 von 3'),
+    ankerHatKlapp: !!(anker && anker.querySelector('.serie-klapp')),
+    klappZu: anker && anker.querySelector('.serie-klapp') && anker.querySelector('.serie-klapp').textContent.trim(),
+    folge202Da: !!folge202, folge203Da: !!folge203,
+    volle202FehltNoch: !rows.find(r => r.getAttribute('onclick') === 'openEinsatz(202)'),
+    volle203FehltNoch: !rows.find(r => r.getAttribute('onclick') === 'openEinsatz(203)'),
+  };
+});
+check('KRITISCH: der erste Tag der Reihe zeigt die volle Zeile, mit der bestehenden Marke "Tag 1 von 3" unverändert', stand1.ankerDa && stand1.ankerHatMarke);
+check('KRITISCH: der erste Tag trägt zusätzlich den Auf/Zu-Pfeil', stand1.ankerHatKlapp);
+check('Eingeklappt zeigt der Pfeil nach rechts (zu)', stand1.klappZu === '▸');
+check('KRITISCH: Tag 2 und Tag 3 stehen als schlanke Verweiszeile in ihrem eigenen Tagesblock',
+  stand1.folge202Da && stand1.folge203Da);
+check('KRITISCH: solange eingeklappt, erscheinen Tag 2 und Tag 3 NICHT als volle Zeile',
+  stand1.volle202FehltNoch && stand1.volle203FehltNoch);
+
+// ENT-069: Ein Tagesblock, dessen einziger Einsatz eine eingeklappte
+// Verweiszeile ist, darf trotzdem die richtige Anzahl zeigen -- sonst sieht
+// "1 Einsatz an diesem Tag" aus wie "nichts geplant".
+const kopfTag2 = await page.evaluate(bIso => {
+  const dmyB = dmy(bIso);
+  const grp = [...document.querySelectorAll('#plTable table.pl-tab tbody tr.grp')]
+    .find(g => g.textContent.includes(dmyB));
+  return grp ? grp.textContent.replace(/\s+/g, ' ').trim() : null;
+}, tage(3));
+check('KRITISCH: der Tagesblock des zweiten Reihentags zeigt weiterhin "1 Einsatz" -- die eingeklappte Verweiszeile lässt ihn nicht leer erscheinen (ENT-069)',
+  !!kopfTag2 && /\b1 Einsatz\b/.test(kopfTag2) && !/0 Einsätze/.test(kopfTag2));
+
+// ── Aufklappen über den Pfeil
+await page.evaluate(() => { document.querySelector('tr[onclick="openEinsatz(201)"] .serie-klapp').click(); });
+await page.waitForTimeout(250);
+const stand2 = await page.evaluate(() => {
+  const rows = [...document.querySelectorAll('#plTable table.pl-tab tbody tr')];
+  const idx = attr => rows.findIndex(r => r.getAttribute('onclick') === attr);
+  const volle202 = rows.find(r => r.getAttribute('onclick') === 'openEinsatz(202)');
+  const anker = rows.find(r => r.getAttribute('onclick') === 'openEinsatz(201)');
+  return {
+    volle202Da: !!volle202, volle203Da: !!rows.find(r => r.getAttribute('onclick') === 'openEinsatz(203)'),
+    volle202IstKind: !!(volle202 && volle202.classList.contains('serie-kind')),
+    volle202HatEigenesDatum: !!(volle202 && volle202.querySelector('.serie-kind-datum')),
+    direktNachAnker: idx('openEinsatz(201)') + 1 === idx('openEinsatz(202)'),
+    klappAuf: anker && anker.querySelector('.serie-klapp').textContent.trim(),
+    folgeInEigenemTagNochDa: !!rows.find(r => r.classList.contains('serie-folge') && r.textContent.includes('Tag 2 von 3')),
+  };
+});
+check('KRITISCH: nach dem Aufklappen zeigt der Pfeil nach unten (auf)', stand2.klappAuf === '▾');
+check('KRITISCH: Tag 2 und Tag 3 erscheinen jetzt als volle Zeile, direkt unter dem ersten Tag',
+  stand2.volle202Da && stand2.volle203Da && stand2.direktNachAnker);
+check('KRITISCH: die eingeschobene Zeile trägt ihr eigenes Datum -- sie steht ausserhalb ihres Tagesblocks',
+  stand2.volle202IstKind && stand2.volle202HatEigenesDatum);
+check('KRITISCH: der eigene Tagesblock von Tag 2 zeigt weiterhin den schlanken Verweis -- die Gruppe verschwindet dort nicht, nur weil sie oben ausgeklappt ist',
+  stand2.folgeInEigenemTagNochDa);
+
+// ── Wieder einklappen, dann über die Verweiszeile selbst aufklappen
+await page.evaluate(() => { document.querySelector('tr[onclick="openEinsatz(201)"] .serie-klapp').click(); });
+await page.waitForTimeout(250);
+check('Wieder eingeklappt: die Kennung ist aus pSerieOffen entfernt',
+  await page.evaluate(() => !pSerieOffen.has('s201')));
+await page.evaluate(() => {
+  [...document.querySelectorAll('#plTable table.pl-tab tbody tr.serie-folge')]
+    .find(r => r.textContent.includes('Tag 2 von 3')).click();
+});
+await page.waitForTimeout(300);
+check('KRITISCH: ein Klick auf die Verweiszeile klappt die Reihe auf',
+  await page.evaluate(() => pSerieOffen.has('s201')));
+check('Der angeklickte Tag erscheint danach als volle Zeile',
+  await page.evaluate(() => !!document.querySelector('tr[onclick="openEinsatz(202)"]')));
+
+// ── Ausserhalb der Serie greift die Gruppierung nicht: einzelner Einsatz, und die isolierte Reihenansicht
+check('Ein einzelner Einsatz bekommt weder Pfeil noch Verweiszeile',
+  await page.evaluate(() => {
+    const tr = [...document.querySelectorAll('#plTable table.pl-tab tbody tr')].find(r => r.getAttribute('onclick') === 'openEinsatz(204)');
+    return !!tr && !tr.querySelector('.serie-klapp') && !tr.classList.contains('serie-folge');
+  }));
+await page.evaluate(() => { serieZeigen('s201'); });
+await page.waitForTimeout(300);
+check('KRITISCH: in der isolierten Reihenansicht (serieZeigen) steht jeder Tag als volle Zeile, ohne Gruppierung',
+  await page.evaluate(() => {
+    const rows = [...document.querySelectorAll('#plTable table.pl-tab tbody tr')];
+    return [201, 202, 203].every(id => !!rows.find(r => r.getAttribute('onclick') === `openEinsatz(${id})`))
+      && !rows.some(r => r.classList.contains('serie-folge'));
+  }));
+await page.evaluate(() => { serieFilterWeg(); pSerieOffen = new Set(); renderPlanung(); });
+await page.waitForTimeout(300);
+
+// ── Handy: derselbe Mechanismus, mit Trefferflächen
+await page.setViewportSize({ width: 390, height: 844 });
+await page.waitForTimeout(300);
+const handy1 = await page.evaluate(() => {
+  const karten = [...document.querySelectorAll('#plTable .nur-schmal .ag-karte')];
+  const anker = karten.find(k => k.getAttribute('onclick') === 'openEinsatz(201)');
+  const folge = karten.find(k => k.classList.contains('serie-folge') && k.textContent.includes('Tag 2 von 3'));
+  const klapp = anker && anker.querySelector('.serie-klapp');
+  const kr = klapp ? klapp.getBoundingClientRect() : null;
+  const fr = folge ? folge.getBoundingClientRect() : null;
+  return {
+    ankerDa: !!anker, folgeDa: !!folge,
+    klappHoehe: kr && Math.round(kr.height), klappBreite: kr && Math.round(kr.width),
+    folgeHoehe: fr && Math.round(fr.height),
+    ueberlauf: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  };
+});
+check('KRITISCH: auch die Handy-Karte zeigt den ersten Tag mit Pfeil, die weiteren als Verweis-Karte',
+  handy1.ankerDa && handy1.folgeDa);
+check('KRITISCH: der Pfeil hält die Trefferfläche von 44 px ein', handy1.klappHoehe >= 44 && handy1.klappBreite >= 44);
+check('KRITISCH: die Verweis-Karte hält ebenfalls 44 px ein — sie ist als Ganzes klickbar',
+  handy1.folgeHoehe >= 44);
+check('Kein Querlauf auf dem Handy', handy1.ueberlauf <= 1);
+
+await page.evaluate(() => { document.querySelector('.ag-karte[onclick="openEinsatz(201)"] .serie-klapp').click(); });
+await page.waitForTimeout(250);
+check('KRITISCH: auch auf dem Handy erscheinen die weiteren Tage nach dem Aufklappen als volle Karte, eingerückt',
+  await page.evaluate(() => {
+    const k = document.querySelector('#plTable .nur-schmal .ag-karte[onclick="openEinsatz(202)"]');
+    return !!k && k.classList.contains('serie-kind');
+  }));
+await page.setViewportSize({ width: 1440, height: 1000 });
+await page.evaluate(() => { pSerieOffen = new Set(); renderPlanung(); });
+await page.waitForTimeout(300);
+
 await browser.close();
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }

@@ -219,21 +219,33 @@ await page.waitForTimeout(400);
 
 const marken = () => page.evaluate(() =>
   [...document.querySelectorAll('#plTable table .serie-marke')].map(b => b.textContent.trim()));
+// Ab ENT-142 traegt nur noch der erste Tag einer Reihe (der "Anker") die
+// Marke -- die weiteren Tage stehen standardmaessig als schlanke Verweiszeile
+// in ihrem eigenen Tagesblock. Die Zaehlung "Tag X von Y" bleibt trotzdem an
+// jedem Tag lesbar, nur eben ueber den Verweistext statt ueber die Marke.
+const folgen = () => page.evaluate(() =>
+  [...document.querySelectorAll('#plTable table .serie-folge-in')].map(b => b.textContent.replace(/\s+/g, ' ').trim()));
 
 const m = await marken();
-check('KRITISCH: jeder Tag einer Reihe sagt, der wievielte er ist',
-  m.includes('Tag 1 von 3') && m.includes('Tag 2 von 3') && m.includes('Tag 3 von 3'));
+const f = await folgen();
+check('KRITISCH: der erste Tag einer Reihe traegt die Marke',
+  m.includes('Tag 1 von 3') && m.includes('Tag 1 von 2'));
+check('KRITISCH: die weiteren Tage der dreitaegigen Reihe verweisen zurueck, mit korrekter Zaehlung',
+  f.some(x => x.includes('Tag 2 von 3')) && f.some(x => x.includes('Tag 3 von 3')));
 check('KRITISCH: Objektschichten derselben Masterschicht gelten auch als Reihe',
-  m.filter(x => x === 'Tag 1 von 2').length === 1 && m.filter(x => x === 'Tag 2 von 2').length === 1);
-check('KRITISCH: ein einzelner Einsatz bekommt keine Marke', m.length === 5);
+  m.includes('Tag 1 von 2') && f.some(x => x.includes('Tag 2 von 2')));
+check('KRITISCH: ein einzelner Einsatz bekommt weder Marke noch Verweis',
+  m.length === 2 && f.length === 3);
 check('Eine Masterschicht mit nur einem Tag ist keine Reihe',
   await page.evaluate(() => !serieStand(einsaetze.find(e => e.id === 7))));
 
 // ── Die Zeile ist eingefaerbt, und zwar NICHT in einer belegten Farbe
+// "normal" heisst hier ausdruecklich weder Anker (.serie) noch Verweiszeile
+// (.serie-folge) -- beide gehoeren farblich zur selben Reihen-Familie.
 const farben = await page.evaluate(() => {
   const zeilen = [...document.querySelectorAll('#plTable table tbody tr.click')];
   const serie = zeilen.find(z => z.classList.contains('serie'));
-  const normal = zeilen.find(z => !z.classList.contains('serie'));
+  const normal = zeilen.find(z => !z.classList.contains('serie') && !z.classList.contains('serie-folge'));
   const gs = el => getComputedStyle(el.querySelector('td')).backgroundColor;
   const wurzel = getComputedStyle(document.documentElement);
   const tok = n => wurzel.getPropertyValue(n).trim();

@@ -1112,6 +1112,31 @@ tbody tr.serie > td { background: var(--serie-soft); }
   border: 1px solid var(--serie-line); background: var(--serie-soft);
   border-radius: var(--r-sm); padding: 9px 12px; margin-bottom: 12px; font-size: 12.5px; }
 .serie-filter b { color: var(--serie); font-weight: 660; }
+/* Serien-Gruppierung (ENT-142): der Auf/Zu-Pfeil beim ersten Tag, die
+   schlanke Verweis-Zeile bei den uebrigen Tagen, der eingerueckte Rahmen
+   fuer die ausgeklappten Tage darunter. */
+.serie-klapp {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; margin-right: 4px; padding: 0; flex: none;
+  border: 1px solid var(--serie-line); border-radius: 5px; background: var(--surface);
+  color: var(--serie); font-size: 11px; line-height: 1; cursor: pointer; vertical-align: middle;
+}
+.serie-klapp:hover { background: var(--serie-soft); border-color: var(--serie); }
+tr.serie-folge, .ag-karte.serie-folge { cursor: pointer; background: var(--serie-soft); padding: 0; }
+tr.serie-folge:hover td, .ag-karte.serie-folge:hover { background: var(--serie-line); }
+.serie-folge-in { display: flex; align-items: center; gap: 7px; padding: 8px 4px; color: var(--serie); font-size: 12.5px; font-weight: 560; }
+.ag-karte.serie-folge .serie-folge-in { padding: 12px 14px; }
+.serie-folge-in svg { width: 13px; height: 13px; flex: none; stroke: currentColor;
+  stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.serie-folge-mehr { white-space: nowrap; font-weight: 620; }
+tr.serie-kind > td { background: var(--serie-soft); border-left: 3px solid var(--serie-line); }
+.ag-karte.serie-kind { margin-left: 14px; border-left: 3px solid var(--serie-line); border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.serie-kind-datum { display: inline-block; font-size: 10.5px; font-weight: 660; color: var(--serie);
+  text-transform: uppercase; letter-spacing: .02em; margin-right: 6px; }
+@media (max-width: 720px) {
+  .serie-klapp { width: 44px; height: 44px; }
+  .ag-karte.serie-folge .serie-folge-in { min-height: 44px; }
+}
 .inp[readonly] { background: var(--surface-2); color: var(--ink-3); cursor: default; }
 .wahl-reihe { display: flex; gap: 18px; align-items: center; min-height: 38px; }
 .wahl-reihe label { display: flex; align-items: center; gap: 7px; cursor: pointer; font-size: 13.5px; font-weight: 500; }
@@ -7145,6 +7170,30 @@ function serieZeigen(k) {
 }
 function serieFilterWeg() { pSerie = null; renderPlanung(); }
 
+// ── Serien-Gruppierung in der Planungsliste (ENT-142) ──────────────────────
+// Der erste Tag einer Reihe traegt die ganze Gruppe zusammengeklappt. Jeder
+// weitere Tag bleibt in seinem eigenen Tagesblock stehen -- nicht als volle
+// Zeile, sondern als schlanker Verweis zurueck zum ersten Tag. Ohne diesen
+// Verweis wuerde ein Tagesblock, dessen einziger Einsatz Teil einer
+// eingeklappten Reihe ist, mit "0 Einsaetze" oder gar nicht erscheinen --
+// genau die falsche Aussage, die ENT-069 verbietet ("nichts vorhanden" darf
+// nie etwas anderes bedeuten als nichts vorhanden). Ausgeklappt erscheinen
+// die uebrigen Tage zusaetzlich als volle Zeilen direkt unter dem ersten Tag,
+// mit eigenem Datum -- dort fehlt der Tageskopf ja.
+let pSerieOffen = new Set();
+function serieAufKlappen(schluessel) {
+  if (pSerieOffen.has(schluessel)) { pSerieOffen.delete(schluessel); } else { pSerieOffen.add(schluessel); }
+  renderPlanung();
+}
+function serieZuAnker(schluessel) {
+  pSerieOffen.add(schluessel);
+  renderPlanung();
+  ['serie-anker-' + schluessel, 'serie-anker-k-' + schluessel].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.scrollIntoView) { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+  });
+}
+
 function serieFilterZeile() {
   const el = $('pSerieFilter');
   if (!el) { return; }
@@ -7156,6 +7205,85 @@ function serieFilterZeile() {
       ${liste.length} ${art}${liste.length ? `, ${esc(dmy(tagVon(liste[0])))} bis ${esc(dmy(tagVon(liste[liste.length - 1])))}` : ''}.</span>
     <span class="sp" style="flex:1"></span>
     <button class="btn btn-quiet btn-sm" onclick="serieFilterWeg()">Ganze Planung zeigen</button>`;
+}
+
+// Eine volle Tabellenzeile fuer genau einen Einsatz -- unveraendert fuer den
+// Normalfall, mit optionalem Auf/Zu-Pfeil fuer den ersten Tag einer Reihe und
+// optionalem Datumshinweis fuer einen ausgeklappten weiteren Tag, der ausserhalb
+// seines eigenen Tageskopfs steht.
+function plZeile(e, opts) {
+  opts = opts || {};
+  const zug = e.mitarbeiter || [];
+  const fehlt = fehlend(e);
+  const teile = zug.slice(0, 3).map(m => nameChip(m, e));
+  if (zug.length > 3) teile.push(`<span class="nm">+${zug.length - 3}</span>`);
+  if (fehlt) teile.push(`<span class="nm off">${fehlt} offen</span>`);
+  const gesperrt = enGesperrt(e);
+  const st = enStatusMarke(e);
+  const istHeute = tagVon(e) === isoTag();
+  const ankerId = opts.ankerId ? ` id="serie-anker-${opts.ankerId}"` : '';
+  const klapp = opts.klappbar
+    ? `<button type="button" class="serie-klapp" onclick="event.stopPropagation();serieAufKlappen('${opts.klappbar}')"
+        title="${opts.offen ? 'Reihe einklappen' : 'Weitere Tage der Reihe zeigen'}">${opts.offen ? '▾' : '▸'}</button>`
+    : '';
+  return `
+    <tr${ankerId} class="click${istHeute ? ' heute' : ''}${gesperrt ? ' zu abgeglichen' : ''}${serieStand(e) ? ' serie' : ''}${e.status === 'abgeschlossen' ? ' status-abgeschlossen' : ''}${opts.verschachtelt ? ' serie-kind' : ''}" onclick="openEinsatz(${Number(e.id)})">
+      <td class="nowrap num">${klapp}${opts.verschachtelt ? `<span class="serie-kind-datum">${dmy(tagVon(e))} · </span>` : ''}${hm(e.von)}–${hm(e.bis)}${ueberNacht(e) ? '<div class="sec">bis Folgetag</div>' : ''}${!opts.verschachtelt ? serieMarke(e) : ''}</td>
+      <td class="strong">${esc(e.kunde_name)}${e.titel ? `<div class="sec">${esc(e.titel)}</div>` : ''}</td>
+      <td>${esc(e.ort)}${e.strasse ? `<div class="sec">${esc(e.strasse)}</div>` : ''}</td>
+      <td><span class="chip chip-n">${esc(e.einsatzart)}</span>${sparteChip(e)}</td>
+      <td class="num"><span class="chip ${e.status === 'abgesagt' ? 'chip-n' : (fehlt ? 'chip-w' : 'chip-p')}">${besetzt(e).length}/${nf(e.bedarf)}</span></td>
+      <td>${teile.length ? `<div class="crew">${teile.join('')}</div>` : '<span style="color:var(--ink-3)">–</span>'}</td>
+      <td><span class="chip ${st[1]}">${st[0]}${gesperrt ? SCHLOSS_ZU : ''}</span>${einsatzRapportWeichtAb(e) ? ` <span class="rap-abw" title="Rapport weicht vom Plan ab">⚠️</span>` : ''}</td>
+    </tr>`;
+}
+
+// Die schlanke Verweis-Zeile eines weiteren Reihentags in seinem eigenen
+// Tagesblock -- ersetzt die volle Zeile, solange die Reihe eingeklappt ist
+// oder nachdem sie ausgeklappt wurde (die volle Zeile steht dann beim ersten
+// Tag). Ein Klick klappt auf und springt dorthin.
+function plFolgeZeile(e, gk) {
+  const st = serieStand(e);
+  return `<tr class="click serie-folge" onclick="serieZuAnker('${gk}')">
+    <td colspan="7"><div class="serie-folge-in">${SERIE_IKONE}<span>Teil der Reihe · ${esc(e.kunde_name)} — Tag ${st.nr} von ${st.anzahl}</span><span class="sp" style="flex:1"></span><span class="serie-folge-mehr">zur Reihe ›</span></div></td>
+  </tr>`;
+}
+
+// Dieselbe Zeile als Handy-Karte.
+function plKarte(e, opts) {
+  opts = opts || {};
+  const zug = e.mitarbeiter || [];
+  const fehlt = fehlend(e);
+  const gesperrt = enGesperrt(e);
+  const st = enStatusMarke(e);
+  const ankerId = opts.ankerId ? ` id="serie-anker-k-${opts.ankerId}"` : '';
+  const klapp = opts.klappbar
+    ? `<button type="button" class="serie-klapp" onclick="event.stopPropagation();serieAufKlappen('${opts.klappbar}')"
+        title="${opts.offen ? 'Reihe einklappen' : 'Weitere Tage der Reihe zeigen'}">${opts.offen ? '▾' : '▸'}</button>`
+    : '';
+  return `<div${ankerId} class="ag-karte click${serieStand(e) ? ' serie' : ''}${e.status === 'abgeschlossen' ? ' status-abgeschlossen' : ''}${gesperrt ? ' abgeglichen' : ''}${opts.verschachtelt ? ' serie-kind' : ''}" onclick="openEinsatz(${Number(e.id)})">
+    <div class="kopf">
+      ${opts.verschachtelt ? `<span class="serie-kind-datum">${dmy(tagVon(e))}</span>` : ''}
+      <b>${esc(hm(e.von))}–${esc(hm(e.bis))}${ueberNacht(e) ? ' <span class="ag-plan">bis Folgetag</span>' : ''}</b>
+      <span class="chip ${e.status === 'abgesagt' ? 'chip-n' : (fehlt ? 'chip-w' : 'chip-p')}">${besetzt(e).length}/${nf(e.bedarf)}</span>
+      ${klapp}
+    </div>
+    <div class="wer">${esc(e.kunde_name)}${e.titel ? ` · ${esc(e.titel)}` : ''}</div>
+    <div class="zeiten">${esc(e.ort)}${e.strasse ? ` · ${esc(e.strasse)}` : ''}</div>
+    <div class="marken">
+      <span class="chip ${st[1]}">${st[0]}${gesperrt ? SCHLOSS_ZU : ''}</span>${einsatzRapportWeichtAb(e) ? ` <span class="rap-abw" title="Rapport weicht vom Plan ab">⚠️</span>` : ''}
+      ${zug.slice(0, 3).map(m => nameChip(m, e)).join('')}
+      ${zug.length > 3 ? `<span class="nm">+${zug.length - 3}</span>` : ''}
+      ${fehlt ? `<span class="nm off">${fehlt} offen</span>` : ''}
+    </div>
+    ${!opts.verschachtelt ? serieMarke(e) : ''}
+  </div>`;
+}
+function plFolgeKarte(e, gk) {
+  const st = serieStand(e);
+  return `<div class="ag-karte click serie-folge" onclick="serieZuAnker('${gk}')">
+    <div class="serie-folge-in">${SERIE_IKONE}<span>Teil der Reihe · ${esc(e.kunde_name)} — Tag ${st.nr} von ${st.anzahl}</span><span class="sp" style="flex:1"></span><span class="serie-folge-mehr">zur Reihe ›</span></div>
+  </div>`;
 }
 
 function renderPlanung() {
@@ -7185,6 +7313,27 @@ function renderPlanung() {
     return;
   }
 
+  // Gruppierung nur in der ungefilterten Reihenansicht (ENT-142) -- steht
+  // pSerie schon fest, zeigt pFiltered() ohnehin nur die eine Reihe komplett,
+  // dort waere ein Zusammenklappen sinnlos. Bewusst ueber die gerade
+  // sichtbare Liste `d` gebildet, nicht ueber alle Einsaetze: Ein Zeitfilter
+  // kann eine Reihe auf einen einzelnen sichtbaren Tag zusammenschrumpfen,
+  // dann ist es keine Gruppe mehr.
+  const serieGruppen = new Map();
+  if (!pSerie) {
+    d.forEach(e => {
+      const k = serieSchluessel(e);
+      if (!k) { return; }
+      if (!serieGruppen.has(k)) { serieGruppen.set(k, []); }
+      serieGruppen.get(k).push(e);
+    });
+    // Der erste Tag ist immer der chronologisch erste, nie der erste in der
+    // gerade angezeigten Reihenfolge -- bei "Alle" steht das Neueste zuoberst,
+    // sonst waere je nach Sortierung ein anderer Tag der "erste".
+    serieGruppen.forEach(liste => liste.sort((a, b) => (tagVon(a) + ' ' + a.von).localeCompare(tagVon(b) + ' ' + b.von)));
+    Array.from(serieGruppen.keys()).forEach(k => { if (serieGruppen.get(k).length < 2) { serieGruppen.delete(k); } });
+  }
+
   const heute = isoTag();
   let letzterTag = '';
   const zeilen = d.map(e => {
@@ -7203,24 +7352,16 @@ function renderPlanung() {
         </div></td></tr>`;
     }
 
-    const zug = e.mitarbeiter || [];
-    const fehlt = fehlend(e);
-    const teile = zug.slice(0, 3).map(m => nameChip(m, e));
-    if (zug.length > 3) teile.push(`<span class="nm">+${zug.length - 3}</span>`);
-    if (fehlt) teile.push(`<span class="nm off">${fehlt} offen</span>`);
-    const gesperrt = enGesperrt(e);
-    const st = enStatusMarke(e);
-
-    return kopf + `
-      <tr class="click${tag === heute ? ' heute' : ''}${gesperrt ? ' zu abgeglichen' : ''}${serieStand(e) ? ' serie' : ''}${e.status === 'abgeschlossen' ? ' status-abgeschlossen' : ''}" onclick="openEinsatz(${Number(e.id)})">
-        <td class="nowrap num">${hm(e.von)}–${hm(e.bis)}${ueberNacht(e) ? '<div class="sec">bis Folgetag</div>' : ''}${serieMarke(e)}</td>
-        <td class="strong">${esc(e.kunde_name)}${e.titel ? `<div class="sec">${esc(e.titel)}</div>` : ''}</td>
-        <td>${esc(e.ort)}${e.strasse ? `<div class="sec">${esc(e.strasse)}</div>` : ''}</td>
-        <td><span class="chip chip-n">${esc(e.einsatzart)}</span>${sparteChip(e)}</td>
-        <td class="num"><span class="chip ${e.status === 'abgesagt' ? 'chip-n' : (fehlt ? 'chip-w' : 'chip-p')}">${besetzt(e).length}/${nf(e.bedarf)}</span></td>
-        <td>${teile.length ? `<div class="crew">${teile.join('')}</div>` : '<span style="color:var(--ink-3)">–</span>'}</td>
-        <td><span class="chip ${st[1]}">${st[0]}${gesperrt ? SCHLOSS_ZU : ''}</span>${einsatzRapportWeichtAb(e) ? ` <span class="rap-abw" title="Rapport weicht vom Plan ab">⚠️</span>` : ''}</td>
-      </tr>`;
+    const gk = serieSchluessel(e);
+    const gruppe = gk ? serieGruppen.get(gk) : null;
+    if (gruppe) {
+      if (gruppe[0] !== e) { return kopf + plFolgeZeile(e, gk); }
+      const offen = pSerieOffen.has(gk);
+      let zeile = kopf + plZeile(e, { klappbar: gk, offen, ankerId: gk });
+      if (offen) { zeile += gruppe.slice(1).map(x => plZeile(x, { verschachtelt: true })).join(''); }
+      return zeile;
+    }
+    return kopf + plZeile(e, {});
   }).join('');
 
   // Auf dem Handy dieselben Einsaetze als Karten (ENT-058). Die Optik stammt
@@ -7244,25 +7385,16 @@ function renderPlanung() {
         <span class="note">${amTag.length} ${amTag.length === 1 ? 'Einsatz' : 'Einsätze'}${offenTag ? ` · ${offenTag} offen` : ''}</span>
       </div>`;
     }
-    const zug = e.mitarbeiter || [];
-    const fehlt = fehlend(e);
-    const gesperrt = enGesperrt(e);
-    const st = enStatusMarke(e);
-    return kopf + `<div class="ag-karte click${serieStand(e) ? ' serie' : ''}${e.status === 'abgeschlossen' ? ' status-abgeschlossen' : ''}${gesperrt ? ' abgeglichen' : ''}" onclick="openEinsatz(${Number(e.id)})">
-      <div class="kopf">
-        <b>${esc(hm(e.von))}–${esc(hm(e.bis))}${ueberNacht(e) ? ' <span class="ag-plan">bis Folgetag</span>' : ''}</b>
-        <span class="chip ${e.status === 'abgesagt' ? 'chip-n' : (fehlt ? 'chip-w' : 'chip-p')}">${besetzt(e).length}/${nf(e.bedarf)}</span>
-      </div>
-      <div class="wer">${esc(e.kunde_name)}${e.titel ? ` · ${esc(e.titel)}` : ''}</div>
-      <div class="zeiten">${esc(e.ort)}${e.strasse ? ` · ${esc(e.strasse)}` : ''}</div>
-      <div class="marken">
-        <span class="chip ${st[1]}">${st[0]}${gesperrt ? SCHLOSS_ZU : ''}</span>${einsatzRapportWeichtAb(e) ? ` <span class="rap-abw" title="Rapport weicht vom Plan ab">⚠️</span>` : ''}
-        ${zug.slice(0, 3).map(m => nameChip(m, e)).join('')}
-        ${zug.length > 3 ? `<span class="nm">+${zug.length - 3}</span>` : ''}
-        ${fehlt ? `<span class="nm off">${fehlt} offen</span>` : ''}
-      </div>
-      ${serieMarke(e)}
-    </div>`;
+    const gk = serieSchluessel(e);
+    const gruppe = gk ? serieGruppen.get(gk) : null;
+    if (gruppe) {
+      if (gruppe[0] !== e) { return kopf + plFolgeKarte(e, gk); }
+      const offen = pSerieOffen.has(gk);
+      let karte = kopf + plKarte(e, { klappbar: gk, offen, ankerId: gk });
+      if (offen) { karte += gruppe.slice(1).map(x => plKarte(x, { verschachtelt: true })).join(''); }
+      return karte;
+    }
+    return kopf + plKarte(e, {});
   }).join('');
 
   $('plTable').innerHTML = `<div class="nur-schmal">${karten}</div>`
