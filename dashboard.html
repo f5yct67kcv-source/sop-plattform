@@ -533,9 +533,19 @@ tbody tr.status-abgeschlossen.zu.abgeglichen td { opacity: 1; }
    -- nimmt er die volle Breite ein, statt eine leere Spalte offenzulassen.
    Unter 320 px je Spalte bricht das Raster von selbst auf eine Spalte um; auf
    dem Handy steht damit weiterhin alles untereinander. */
-.ep-zone { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 4px 28px; align-items: start; padding: 0 16px 14px; }
-.ep-zone-teil { min-width: 0; }
+/* Nachgebessert (ENT-152): Mit zwei gleich breiten Rasterspalten landete
+   "Dokumente" auf einem breiten Schirm in der Bildschirmmitte -- eine halbe
+   Kartenbreite vom Rapport entfernt, obwohl es DIREKT daneben stehen soll.
+   Jetzt eine Flex-Reihe: jeder Teil so breit wie sein Inhalt (nach oben
+   begrenzt, damit eine lange Bemerkung die Reihe nicht sprengt), Dokumente
+   schliesst unmittelbar an den Rapport an. Umbruch auf schmalen Schirmen
+   uebernimmt flex-wrap. */
+.ep-zone { display: flex; flex-wrap: wrap; align-items: flex-start;
+  gap: 6px 36px; padding: 0 16px 14px; }
+.ep-zone-teil { flex: 0 1 auto; min-width: 240px; max-width: 460px; }
+/* Knopf und Groessenhinweis auf einer Zeile -- der Hinweis steht klein
+   rechts daneben, statt als eigene Zeile darunter (ENT-152). */
+.dok-anhang { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
 /* Der Rechnungs-Knopf steht rechts unter beiden Spalten -- die Abschluss-
    Handlung der Karte, nicht Teil einer der beiden Spalten. */
 .ep-rechnung { display: flex; justify-content: flex-end; padding: 0 16px 14px; }
@@ -548,7 +558,19 @@ tbody tr.status-abgeschlossen.zu.abgeglichen td { opacity: 1; }
 .ep-scroll { overflow-x: auto; }
 table.ep-gitter { border-collapse: collapse; font-size: 11.5px; }
 table.ep-gitter th, table.ep-gitter td { padding: 0; border: none; }
-table.ep-gitter .fest { padding: 3px 8px; white-space: nowrap; border-right: 1px solid var(--line); }
+/* width:1% zwingt jede feste Spalte auf ihre Inhaltsbreite (ENT-151).
+   Ohne das verteilt der Browser die ueberschuessige Breite der Tabelle
+   (table { width:100% }) anteilig auf ALLE Spalten -- auch auf die festen.
+   Gemessen bei 1920 px: "Zeit" war 180 px breit fuer 142 px Inhalt, die
+   leere Symbolspalte 116 px fuer drei kleine Zeichen. Je kuerzer der
+   Einsatz, desto schlimmer: bei drei Stunden bleiben der Zeitleiste nur
+   wenige schmale Spalten, waehrend links tote Flaeche steht. Der ganze Rest
+   geht jetzt an die Viertelstunden -- die Zeitleiste ist das, worum es in
+   dieser Ansicht geht. */
+table.ep-gitter .fest { width: 1%; padding: 3px 8px; white-space: nowrap; border-right: 1px solid var(--line); }
+/* Untergrenze fuer sehr lange Einsaetze (bis 96 Viertelstunden): dann traegt
+   .ep-scroll den Rest, statt die Spalten unlesbar schmal zu quetschen. */
+table.ep-gitter th.uhr { min-width: 14px; }
 table.ep-gitter thead .fest { font-size: 10px; letter-spacing: .4px; text-transform: uppercase; color: var(--ink-3); }
 /* Die Uhrzeit steht senkrecht: 96 Viertelstunden nebeneinander gehen sonst
    nur mit dreifacher Breite. */
@@ -8194,10 +8216,12 @@ function epDokBlock() {
     ${epDok.length ? '' : `<div class="note">Noch keine Unterlagen angehängt.</div>`}
     ${gesperrt ? '' : `<input type="file" id="epDokDatei" accept="application/pdf" style="display:none"
         onchange="epDokGewaehlt(this.files[0])">
-      <button type="button" class="btn btn-plain btn-sm" style="margin-top:8px"
-        onclick="$('epDokDatei').click()">PDF anhängen</button>
-      <div class="note" style="margin-top:6px">Nur PDF, höchstens 4 MB. Die Eingeteilten
-        öffnen es in ihrer App.</div>`}
+      <div class="dok-anhang">
+        <button type="button" class="btn btn-plain btn-sm"
+          title="Nur PDF, höchstens 4 MB. Die Eingeteilten öffnen es in ihrer App."
+          onclick="$('epDokDatei').click()">PDF anhängen</button>
+        <span class="note">höchstens 4 MB</span>
+      </div>`}
   </div>`;
 }
 
@@ -9572,6 +9596,11 @@ function epAuf(id) {
   // einer unsichtbaren Auswahl waere trotzdem nicht nachvollziehbar.
   epAngehakt.clear();
   go('einsatzplan');
+  // Die Nummer gehoert in die Adresse (ENT-152). go() schreibt nur "#einsatzplan";
+  // beim Neuladen wusste die Seite damit nicht, WELCHEN Einsatz sie wieder
+  // oeffnen soll, und warf den Planer aus der Ansicht. Nach go() gesetzt,
+  // weil go() den Verlaufseintrag selbst ueberschreibt.
+  history.replaceState(null, '', '#einsatzplan/' + epId);
   epLaden();
 }
 
@@ -14422,8 +14451,19 @@ $('sideWm').textContent = APP_NAME;
 
 if (token && me) {
   enter();
-  const v = location.hash.replace('#', '');
-  if (TITLES[v]) go(v);
+  // Die Ansicht aus der Adresse wiederherstellen -- samt Einsatz-Nummer
+  // (ENT-152). Ohne die Nummer landete ein Neuladen im Einsatzplan auf einer
+  // Ansicht ohne Einsatz; epLaden() fand nichts und warf den Planer zurueck
+  // in die Planungsliste. Die Einsaetze muessen dafuer geladen sein, bevor
+  // epAuf() den Einsatz sucht.
+  const [v, param] = location.hash.replace('#', '').split('/');
+  if (v === 'einsatzplan' && param) {
+    (einsaetze.length ? Promise.resolve() : loadEinsaetze())
+      .then(() => epAuf(Number(param)))
+      .catch(() => go('planung'));
+  } else if (TITLES[v]) {
+    go(v);
+  }
 }
 </script>
 <!-- skizze:start -->
