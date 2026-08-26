@@ -4657,6 +4657,93 @@ const nf = (n, d) => Number(n || 0).toLocaleString('de-CH', { minimumFractionDig
 // Datum gelesen werden -- unbekannt sieht sonst aus wie laengst vorbei.
 const leeresDatum = d => !d || String(d).slice(0, 10) === '0000-00-00';
 const dmy = d => leeresDatum(d) ? '–' : String(d).slice(0, 10).split('-').reverse().join('.');
+// Franken aus Rappen, immer mit zwei Nachkommastellen -- Geldbetraege
+// erscheinen nie als "42" oder "42.5", auch wenn sie glatt aufgehen.
+const chf = rappen => nf((Number(rappen) || 0) / 100, 2);
+// Prozentsatz aus Basispunkten: 810 -> "8.10", 700 -> "7". Nachkommastellen
+// nur, wo es welche gibt -- "7.00 % Rabatt" liest sich falsch genau.
+const bpText = bp => {
+  const p = (Number(bp) || 0) / 100;
+  return nf(p, Number.isInteger(p) ? 0 : 2);
+};
+
+// ── Summenrechnung fuer Belege (ENT-181) ──────────────────────────────────
+//
+// ZWILLING VON beleg_summen() IN backend/belege.php. Dort steht die
+// ausfuehrliche Begruendung der Rechenreihenfolge; hier steht dieselbe
+// Formel ein zweites Mal, weil das Formular die Summen beim Tippen zeigen
+// soll, ohne fuer jede Ziffer den Server zu fragen.
+//
+// MASSGEBLICH IST IMMER DER SERVER. Was hier gerechnet wird, ist eine
+// Vorschau -- gespeichert wird nur, was belege.php ausrechnet. Weichen beide
+// ab, ist der Fehler hier, nicht dort.
+//
+// Aendert jemand die Formel, gehoert sie an BEIDEN Stellen geaendert.
+// test_belege.mjs prueft beide gegen dieselben Faelle und wird rot, sobald
+// eine der beiden ausschert.
+const BELEG_MENGE_FAKTOR = 100;
+function belegRunden(wert) {
+  // PHP round() rundet halbe Werte weg von der Null, Math.round() zur
+  // groesseren Zahl hin. Fuer die positiven Betraege, die hier vorkommen,
+  // ist das dasselbe -- der Unterschied steht hier, damit niemand spaeter
+  // negative Werte durchschickt und sich ueber einen Rappen wundert.
+  return Math.round(wert);
+}
+function belegRappenRunden(rappen) { return Math.round(rappen / 5) * 5; }
+
+function belegSummen(positionen, rabattBp) {
+  rabattBp = Math.max(0, Number(rabattBp) || 0);
+  const zeilen = [];
+  let zwischensumme = 0;
+
+  for (const p of (positionen || [])) {
+    const mengeGanz   = belegRunden((Number(p.menge) || 0) * BELEG_MENGE_FAKTOR);
+    const einzelpreis = Number(p.einzelpreis_rappen) || 0;
+    const posRabattBp = Math.max(0, Number(p.rabatt_bp) || 0);
+    const satzBp      = Math.max(0, Number(p.mwst_satz_bp) || 0);
+
+    const brutto    = belegRunden(mengeGanz * einzelpreis / BELEG_MENGE_FAKTOR);
+    const posRabatt = belegRunden(brutto * posRabattBp / 10000);
+    const netto     = brutto - posRabatt;
+
+    zeilen.push({ brutto_rappen: brutto, pos_rabatt_rappen: posRabatt,
+                  zwischen_rappen: netto, mwst_satz_bp: satzBp });
+    zwischensumme += netto;
+  }
+
+  let rabattTotal = 0;
+  for (const z of zeilen) {
+    const anteil = belegRunden(z.zwischen_rappen * rabattBp / 10000);
+    z.gesamt_rabatt_rappen = anteil;
+    z.netto_rappen = z.zwischen_rappen - anteil;
+    rabattTotal += anteil;
+  }
+  const netto = zwischensumme - rabattTotal;
+
+  // MWST je SATZ, nicht je Position -- sonst wird mehrfach gerundet.
+  const grundlagen = new Map();
+  for (const z of zeilen) {
+    grundlagen.set(z.mwst_satz_bp, (grundlagen.get(z.mwst_satz_bp) || 0) + z.netto_rappen);
+  }
+  const mwst = [];
+  let mwstTotal = 0;
+  for (const satz of [...grundlagen.keys()].sort((a, b) => b - a)) {
+    if (satz === 0) { continue; }   // steuerfrei: keine Zeile, kein Betrag
+    const betrag = belegRunden(grundlagen.get(satz) * satz / 10000);
+    mwst.push({ satz_bp: satz, grundlage_rappen: grundlagen.get(satz), betrag_rappen: betrag });
+    mwstTotal += betrag;
+  }
+
+  const vorRundung = netto + mwstTotal;
+  const total = belegRappenRunden(vorRundung);
+  return {
+    zeilen, zwischensumme_rappen: zwischensumme, rabatt_bp: rabattBp,
+    rabatt_rappen: rabattTotal, netto_rappen: netto,
+    mwst, mwst_rappen: mwstTotal,
+    rundung_rappen: total - vorRundung, total_rappen: total,
+  };
+}
+
 // Sparte des Betriebs (ENT-037). Sicherheit ist der stille Normalfall und
 // bekommt darum keinen Chip -- sonst traegt jede Zeile eine Marke, die
 // nichts unterscheidet. Nur die Reinigung wird ausgezeichnet.

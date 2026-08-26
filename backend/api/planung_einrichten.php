@@ -620,6 +620,108 @@ CREATE TABLE IF NOT EXISTS kunden_kontaktweg (
   FOREIGN KEY (mitarbeiter_id) REFERENCES mitarbeiter(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+// ── Offerten und spaeter Rechnungen (ENT-181) ─────────────────────────────
+//
+// Produkte sind Stammdaten: die immer gleichen Leistungen (Verkehrsdienst,
+// Zulagen) samt Standardtext, Preis, Einheit und MWST-Satz. Sie starten
+// LEER -- erfundene Leistungen und Preise waeren Inhalte, die niemand
+// entschieden hat.
+//
+// einzelpreis_rappen und mwst_satz_bp hier sind VORSCHLAEGE. Sobald ein
+// Produkt in einen Beleg uebernommen wird, werden die Werte in die Position
+// kopiert (siehe beleg_positionen) -- eine spaetere Preisaenderung darf eine
+// bereits verschickte Offerte nicht rueckwirkend veraendern. Dieselbe Regel
+// wie beim versionierten GAV-Regelwerk in auslagen.php.
+'produkte' => "CREATE TABLE produkte (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(200) NOT NULL,
+  beschreibung TEXT NULL,
+  einzelpreis_rappen INT NOT NULL DEFAULT 0,
+  einheit VARCHAR(20) NOT NULL DEFAULT 'Std.',
+  -- Basispunkte (Hundertstel-Prozent): 8.10 % = 810, steuerfrei = 0.
+  -- Ganzzahlig, damit der Satz exakt ist -- als Fliesskommazahl waere er es
+  -- nicht.
+  mwst_satz_bp INT NOT NULL DEFAULT 810,
+  sortierung INT NOT NULL DEFAULT 0,
+  aktiv TINYINT(1) NOT NULL DEFAULT 1,
+  erstellt_am DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  geaendert_am DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY idx_produkt_aktiv (aktiv, sortierung)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+// EINE Tabelle fuer Offerte und Rechnung, unterschieden durch `art`.
+// Bewusst so, obwohl an anderer Stelle (ma_funktion/ma_abteilung) zwei
+// gleich gebaute Tabellen einer generischen vorgezogen wurden: Dort waren es
+// zwei getrennte Begriffe, die nur zufaellig dieselbe Form haben. Hier ist es
+// derselbe Beleg in zwei Rollen -- eine Rechnung entsteht aus einer Offerte,
+// traegt dieselben Positionen und dieselbe Summenrechnung. Zwei Tabellen
+// waeren zwei Rechenwege, die auseinanderlaufen koennen.
+//
+// Die Summen (zwischensumme/rabatt/mwst/rundung/total) sind ABGELEITETE
+// Werte: Sie werden bei jedem Speichern serverseitig aus den Positionen neu
+// gerechnet (beleg_summen() in belege.php) und hier abgelegt, damit die
+// Liste zweihundert Offerten anzeigen kann, ohne zweihundertmal zu rechnen.
+// Die Wahrheit sind die Positionen; diese Spalten sind ihr Abdruck.
+'belege' => "CREATE TABLE belege (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  art VARCHAR(20) NOT NULL DEFAULT 'offerte',
+  nummer VARCHAR(20) NOT NULL,
+  kunde_id INT NULL,
+  -- Ansprechperson beim Kunden, aus kunden_person. NULL heisst: keine
+  -- genannt, dann steht auf dem Beleg nur die Firma.
+  person_id INT NULL,
+  titel VARCHAR(200) NOT NULL DEFAULT '',
+  referenz VARCHAR(100) NULL,
+  datum DATE NOT NULL,
+  gueltig_bis DATE NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'entwurf',
+  -- Gesamtrabatt in Basispunkten, anteilig auf die Positionen verteilt.
+  rabatt_bp INT NOT NULL DEFAULT 0,
+  zwischensumme_rappen INT NOT NULL DEFAULT 0,
+  rabatt_rappen INT NOT NULL DEFAULT 0,
+  mwst_rappen INT NOT NULL DEFAULT 0,
+  rundung_rappen INT NOT NULL DEFAULT 0,
+  total_rappen INT NOT NULL DEFAULT 0,
+  -- Aus einer Offerte laesst sich eine Vorlage machen (Dreipunkt-Menue).
+  -- Eine Vorlage traegt keine Nummer im laufenden Kreis und erscheint nicht
+  -- in der Offertenliste.
+  ist_vorlage TINYINT(1) NOT NULL DEFAULT 0,
+  -- Archivieren heisst: aus der Liste, aber wiederherstellbar. Es gibt
+  -- bewusst kein Stornieren -- eine Offerte hat keine Buchhaltungswirkung,
+  -- die storniert werden muesste; 'abgelehnt' deckt den fachlichen Fall.
+  aktiv TINYINT(1) NOT NULL DEFAULT 1,
+  bemerkung TEXT NULL,
+  erstellt_am DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  geaendert_am DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_beleg_nummer (art, nummer),
+  KEY idx_beleg_liste (art, aktiv, ist_vorlage, datum),
+  KEY idx_beleg_kunde (kunde_id),
+  FOREIGN KEY (kunde_id) REFERENCES kunden(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+// produkt_id ist nur ein RUECKVERWEIS fuer Auswertungen ('wie oft haben wir
+// Verkehrsdienst offeriert') und darf ins Leere zeigen, wenn das Produkt
+// spaeter geloescht wird. Was auf dem Beleg steht, sind die Kopien daneben:
+// produkt_name, beschreibung, einzelpreis_rappen, einheit, mwst_satz_bp.
+'beleg_positionen' => "CREATE TABLE beleg_positionen (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  beleg_id INT NOT NULL,
+  sortierung INT NOT NULL DEFAULT 0,
+  produkt_id INT NULL,
+  produkt_name VARCHAR(200) NOT NULL DEFAULT '',
+  beschreibung TEXT NULL,
+  -- Menge mit zwei Nachkommastellen: 70.00 Std., 0.50 Std., 10.00 Stk.
+  menge DECIMAL(10,2) NOT NULL DEFAULT 1,
+  einheit VARCHAR(20) NOT NULL DEFAULT 'Std.',
+  einzelpreis_rappen INT NOT NULL DEFAULT 0,
+  -- Rabatt nur auf diese Position, zusaetzlich zum Gesamtrabatt des Belegs.
+  rabatt_bp INT NOT NULL DEFAULT 0,
+  mwst_satz_bp INT NOT NULL DEFAULT 810,
+  KEY idx_position_beleg (beleg_id, sortierung),
+  FOREIGN KEY (beleg_id) REFERENCES belege(id) ON DELETE CASCADE,
+  FOREIGN KEY (produkt_id) REFERENCES produkte(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
 ];
 
 foreach ($tabellen as $name => $sql) {

@@ -53,10 +53,10 @@ function rollen_katalog(): array
         ],
         ROLLE_VERWALTUNG => [
             'titel'    => 'Verwaltung',
-            'text'     => 'Alles, zusätzlich die Betriebseinstellungen, die Einrichtung und die Rollenvergabe selbst.',
+            'text'     => 'Alles, zusätzlich die Betriebseinstellungen, die Einrichtung, die Offerten und die Rollenvergabe selbst.',
             'rechte'   => ['plan', 'kunden', 'abgleich', 'personal_lesen',
                            'personal_schreiben', 'personal_vertraulich',
-                           'betrieb', 'rechte'],
+                           'betrieb', 'rechte', 'offerten'],
         ],
     ];
 }
@@ -75,6 +75,13 @@ function rechte_katalog(): array
         'personal_vertraulich' => 'AHV-Nummer, Bewilligungen, Register-, Herkunfts- und Familienangaben',
         'betrieb'              => 'Betriebseinstellungen, Listen, Einrichtung',
         'rechte'               => 'Rollen vergeben und das Logbuch lesen',
+        // Bewusst NICHT unter 'kunden' mitgefuehrt (ENT-181): Eine Offerte
+        // zeigt Preise, Rabatte und damit die Kalkulation. Wer Adressen
+        // pflegen darf, muss sie nicht sehen. Vorerst traegt nur die
+        // Verwaltung dieses Recht -- die Rolle 'Planung' bekaeme es sonst
+        // ueber ihren Kundenzugang mit, und genau das war der Grund, es
+        // getrennt zu fuehren.
+        'offerten'             => 'Offerten und Produkte ansehen und bearbeiten',
     ];
 }
 
