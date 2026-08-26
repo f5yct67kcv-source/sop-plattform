@@ -1086,8 +1086,28 @@ tbody tr.zu .i-schloss { color: var(--warn); }
    Die Flaeche allein sagt nur "gehoert zu irgendeiner Reihe". Welche, sagt der
    Text "Tag 2 von 3" -- an einem Tag koennen mehrere Reihen nebeneinander
    laufen, und dafuer waeren mehrere Farbtoene noetig, die es nicht gibt. */
-tbody tr.serie > td { background: var(--serie-soft); }
-.ag-karte.serie { background: var(--serie-soft); }
+/* Flaeche NUR fuer eine hier tatsaechlich zusammenhaengende Gruppe (ENT-144).
+   Frueher trug jede Zeile Flaeche, die irgendwo zu einer Reihe gehoerte --
+   damit sah ein Einzeltag, dessen Geschwister ausserhalb des Filters liegen,
+   genauso aus wie eine Gruppe, und zwei verschiedene Reihen untereinander
+   verschmolzen optisch zu einer. Die Marke "Tag X von N" sagt weiterhin an
+   jeder Zeile, dass sie zu einer Reihe gehoert -- dafuer braucht es keine
+   Flaeche. */
+tbody tr.serie-grp > td { background: var(--serie-soft); }
+.ag-karte.serie-grp { background: var(--serie-soft); }
+/* Klammer oben und unten: sie sagt, wo die Gruppe anfaengt und aufhoert.
+   Ohne sie laeuft die Flaeche in eine benachbarte, fremde Reihe hinein. */
+tbody tr.serie-anker > td { border-top: 2px solid var(--serie); }
+tbody tr.serie-grp-ende > td { border-bottom: 2px solid var(--serie); }
+.ag-karte.serie-anker { border-top: 2px solid var(--serie); }
+.ag-karte.serie-grp-ende { border-bottom: 2px solid var(--serie); }
+/* Zeitspalte: Pfeil und Uhrzeit sind eine Einheit und bleiben zusammen --
+   sonst schiebt der Pfeil die Uhrzeit aus der Zelle in die naechste Spalte. */
+.pl-zeit { display: inline-flex; align-items: center; gap: 5px; }
+/* Die Marke steht in der Tabelle immer auf einer eigenen Zeile unter der
+   Uhrzeit. Als inline-flex lag sie in derselben Zeile wie die Uhrzeit und
+   ragte -- die Zelle ist nowrap -- sichtbar in die Spalte "Kunde" hinein. */
+table.pl-tab td .serie-marke { display: flex; width: fit-content; margin-left: auto; margin-top: 5px; }
 .serie-marke {
   display: inline-flex; align-items: center; gap: 5px; margin-top: 3px;
   border: 1px solid var(--serie-line); background: var(--surface); color: var(--serie);
@@ -1124,17 +1144,30 @@ tbody tr.serie > td { background: var(--serie-soft); }
   color: var(--serie); font-size: 11px; line-height: 1; cursor: pointer; vertical-align: middle;
 }
 .serie-klapp:hover { background: var(--serie-soft); border-color: var(--serie); }
-tr.serie-folge, .ag-karte.serie-folge { cursor: pointer; background: var(--serie-soft); padding: 0; }
-tr.serie-folge:hover td, .ag-karte.serie-folge:hover { background: var(--serie-line); }
-.serie-folge-in { display: flex; align-items: center; gap: 7px; padding: 8px 4px; color: var(--serie); font-size: 12.5px; font-weight: 560; }
+/* Die Verweiszeile ist ein Hinweis, kein Eintrag -- sie traegt darum bewusst
+   KEINE Flaeche (sonst wiegt sie so schwer wie ein echter Einsatz und die
+   Tagesliste wirkt voller, als sie ist). Erkennbar bleibt sie an Farbe,
+   Schiene und Symbol; angefasst faerbt sie sich. */
+tr.serie-folge, .ag-karte.serie-folge { cursor: pointer; background: transparent; padding: 0; }
+tr.serie-folge > td { border-left: 3px solid var(--serie-line); }
+tr.serie-folge:hover > td, .ag-karte.serie-folge:hover { background: var(--serie-soft); }
+.serie-folge-in { display: flex; align-items: center; gap: 7px; padding: 7px 4px; color: var(--serie);
+  font-size: 12px; font-weight: 560; opacity: .92; }
+.ag-karte.serie-folge { border-left: 3px solid var(--serie-line); }
 .ag-karte.serie-folge .serie-folge-in { padding: 12px 14px; }
 .serie-folge-in svg { width: 13px; height: 13px; flex: none; stroke: currentColor;
   stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
 .serie-folge-mehr { white-space: nowrap; font-weight: 620; }
-tr.serie-kind > td { background: var(--serie-soft); border-left: 3px solid var(--serie-line); }
-.ag-karte.serie-kind { margin-left: 14px; border-left: 3px solid var(--serie-line); border-top-left-radius: 0; border-bottom-left-radius: 0; }
+/* Der eingeschobene Tag steht sichtbar INNERHALB der Gruppe: eingerueckt an
+   einer Schiene, mit eigenem Datum -- er steht ja ausserhalb seines
+   Tageskopfs und waere sonst ein Einsatz ohne Datum. */
+tr.serie-kind > td:first-child { border-left: 3px solid var(--serie); }
+.ag-karte.serie-kind { margin-left: 14px; border-left: 3px solid var(--serie); border-top-left-radius: 0; border-bottom-left-radius: 0; }
 .serie-kind-datum { display: inline-block; font-size: 10.5px; font-weight: 660; color: var(--serie);
   text-transform: uppercase; letter-spacing: .02em; margin-right: 6px; }
+/* In der Tabelle steht das Datum als Beschriftung ueber der Uhrzeit, nicht
+   daneben -- Ueberschrift oben, Wert darunter. */
+table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
 @media (max-width: 720px) {
   .serie-klapp { width: 44px; height: 44px; }
   .ag-karte.serie-folge .serie-folge-in { min-height: 44px; }
@@ -7213,6 +7246,13 @@ function serieFilterZeile() {
 // Normalfall, mit optionalem Auf/Zu-Pfeil fuer den ersten Tag einer Reihe und
 // optionalem Datumshinweis fuer einen ausgeklappten weiteren Tag, der ausserhalb
 // seines eigenen Tageskopfs steht.
+//
+// Rollen und ihre Klassen (ENT-144): `serie` sagt nur "gehoert zu einer Reihe"
+// und traegt allein KEINE Flaeche mehr -- sonst sieht ein Einzeltag, dessen
+// Geschwister ausserhalb des Filters liegen, genauso aus wie eine hier
+// tatsaechlich zusammenhaengende Gruppe. Die Flaeche haengt an `serie-grp`
+// (Anker + ausgeklappte Kinder), die Klammer oben/unten an `serie-anker` und
+// `serie-grp-ende`.
 function plZeile(e, opts) {
   opts = opts || {};
   const zug = e.mitarbeiter || [];
@@ -7224,13 +7264,14 @@ function plZeile(e, opts) {
   const st = enStatusMarke(e);
   const istHeute = tagVon(e) === isoTag();
   const ankerId = opts.ankerId ? ` id="serie-anker-${opts.ankerId}"` : '';
+  const gruppe = opts.klappbar ? ' serie-grp serie-anker' : (opts.verschachtelt ? ' serie-grp serie-kind' : '');
   const klapp = opts.klappbar
     ? `<button type="button" class="serie-klapp" onclick="event.stopPropagation();serieAufKlappen('${opts.klappbar}')"
         title="${opts.offen ? 'Reihe einklappen' : 'Weitere Tage der Reihe zeigen'}">${opts.offen ? '▾' : '▸'}</button>`
     : '';
   return `
-    <tr${ankerId} class="click${istHeute ? ' heute' : ''}${gesperrt ? ' zu abgeglichen' : ''}${serieStand(e) ? ' serie' : ''}${e.status === 'abgeschlossen' ? ' status-abgeschlossen' : ''}${opts.verschachtelt ? ' serie-kind' : ''}" onclick="openEinsatz(${Number(e.id)})">
-      <td class="nowrap num">${klapp}${opts.verschachtelt ? `<span class="serie-kind-datum">${dmy(tagVon(e))} · </span>` : ''}${hm(e.von)}–${hm(e.bis)}${ueberNacht(e) ? '<div class="sec">bis Folgetag</div>' : ''}${!opts.verschachtelt ? serieMarke(e) : ''}</td>
+    <tr${ankerId} class="click${istHeute ? ' heute' : ''}${gesperrt ? ' zu abgeglichen' : ''}${serieStand(e) ? ' serie' : ''}${e.status === 'abgeschlossen' ? ' status-abgeschlossen' : ''}${gruppe}${opts.ende ? ' serie-grp-ende' : ''}" onclick="openEinsatz(${Number(e.id)})">
+      <td class="nowrap num">${opts.verschachtelt ? `<span class="serie-kind-datum">${dmy(tagVon(e))}</span>` : ''}<span class="pl-zeit">${klapp}<span>${hm(e.von)}–${hm(e.bis)}</span></span>${ueberNacht(e) ? '<div class="sec">bis Folgetag</div>' : ''}${!opts.verschachtelt ? serieMarke(e) : ''}</td>
       <td class="strong">${esc(e.kunde_name)}${e.titel ? `<div class="sec">${esc(e.titel)}</div>` : ''}</td>
       <td>${esc(e.ort)}${e.strasse ? `<div class="sec">${esc(e.strasse)}</div>` : ''}</td>
       <td><span class="chip chip-n">${esc(e.einsatzart)}</span>${sparteChip(e)}</td>
@@ -7263,7 +7304,8 @@ function plKarte(e, opts) {
     ? `<button type="button" class="serie-klapp" onclick="event.stopPropagation();serieAufKlappen('${opts.klappbar}')"
         title="${opts.offen ? 'Reihe einklappen' : 'Weitere Tage der Reihe zeigen'}">${opts.offen ? '▾' : '▸'}</button>`
     : '';
-  return `<div${ankerId} class="ag-karte click${serieStand(e) ? ' serie' : ''}${e.status === 'abgeschlossen' ? ' status-abgeschlossen' : ''}${gesperrt ? ' abgeglichen' : ''}${opts.verschachtelt ? ' serie-kind' : ''}" onclick="openEinsatz(${Number(e.id)})">
+  const gruppe = opts.klappbar ? ' serie-grp serie-anker' : (opts.verschachtelt ? ' serie-grp serie-kind' : '');
+  return `<div${ankerId} class="ag-karte click${serieStand(e) ? ' serie' : ''}${e.status === 'abgeschlossen' ? ' status-abgeschlossen' : ''}${gesperrt ? ' abgeglichen' : ''}${gruppe}${opts.ende ? ' serie-grp-ende' : ''}" onclick="openEinsatz(${Number(e.id)})">
     <div class="kopf">
       ${opts.verschachtelt ? `<span class="serie-kind-datum">${dmy(tagVon(e))}</span>` : ''}
       <b>${esc(hm(e.von))}–${esc(hm(e.bis))}${ueberNacht(e) ? ' <span class="ag-plan">bis Folgetag</span>' : ''}</b>
@@ -7359,8 +7401,14 @@ function renderPlanung() {
     if (gruppe) {
       if (gruppe[0] !== e) { return kopf + plFolgeZeile(e, gk); }
       const offen = pSerieOffen.has(gk);
-      let zeile = kopf + plZeile(e, { klappbar: gk, offen, ankerId: gk });
-      if (offen) { zeile += gruppe.slice(1).map(x => plZeile(x, { verschachtelt: true })).join(''); }
+      // Die Gruppe bekommt oben und unten eine Klammer. Eingeklappt ist der
+      // Anker zugleich das Ende, ausgeklappt der letzte eingeschobene Tag --
+      // sonst liefe die Klammer mitten durch eine fremde Zeile.
+      let zeile = kopf + plZeile(e, { klappbar: gk, offen, ankerId: gk, ende: !offen });
+      if (offen) {
+        const kinder = gruppe.slice(1);
+        zeile += kinder.map((x, i) => plZeile(x, { verschachtelt: true, ende: i === kinder.length - 1 })).join('');
+      }
       return zeile;
     }
     return kopf + plZeile(e, {});
@@ -7392,17 +7440,25 @@ function renderPlanung() {
     if (gruppe) {
       if (gruppe[0] !== e) { return kopf + plFolgeKarte(e, gk); }
       const offen = pSerieOffen.has(gk);
-      let karte = kopf + plKarte(e, { klappbar: gk, offen, ankerId: gk });
-      if (offen) { karte += gruppe.slice(1).map(x => plKarte(x, { verschachtelt: true })).join(''); }
+      let karte = kopf + plKarte(e, { klappbar: gk, offen, ankerId: gk, ende: !offen });
+      if (offen) {
+        const kinder = gruppe.slice(1);
+        karte += kinder.map((x, i) => plKarte(x, { verschachtelt: true, ende: i === kinder.length - 1 })).join('');
+      }
       return karte;
     }
     return kopf + plKarte(e, {});
   }).join('');
 
   $('plTable').innerHTML = `<div class="nur-schmal">${karten}</div>`
+    // Zeit ist seit ENT-144 breiter (10 -> 13 %): die Spalte traegt jetzt
+    // Auf/Zu-Pfeil, Uhrzeit und Reihen-Marke. Bei 10 % ragten Pfeil und
+    // Uhrzeit zusammen ueber die Zelle hinaus und ueberlagerten den
+    // Kundennamen. Die 3 Punkte kommen von "Zugeteilt" (24 -> 21 %), das am
+    // meisten Luft hatte und dessen Namen-Chips ohnehin umbrechen.
     + `<table class="nur-breit pl-tab"><colgroup>
-      <col style="width:10%"><col style="width:18%"><col style="width:15%"><col style="width:13%">
-      <col style="width:8%"><col style="width:24%"><col style="width:12%">
+      <col style="width:13%"><col style="width:18%"><col style="width:15%"><col style="width:13%">
+      <col style="width:8%"><col style="width:21%"><col style="width:12%">
     </colgroup><thead><tr>
       <th>Zeit</th><th>Kunde</th><th>Arbeitsort</th><th>Einsatzart</th>
       <th class="num">Besetzung</th><th>Zugeteilt</th><th>Status</th>
