@@ -1,5 +1,6 @@
 import { WURZEL, HIER, OUT, browserPfad } from './pfade.mjs';
 import { chromium } from 'playwright';
+import { readFileSync } from 'fs';
 
 const EXE = browserPfad();
 const iso = d => new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
@@ -17,11 +18,30 @@ const beginn = new Date(jetzt.getTime() - 3600e3), ende = new Date(jetzt.getTime
 const hm = d => String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0') + ':00';
 const LAUF_DATUM = iso(beginn);
 
+// ENT-134: ein Tag, der eindeutig VOR heute liegt, aber noch im laufenden
+// Monat -- gibt es ihn nicht (heute ist der Monatserste), entfaellt der
+// betroffene Testfall weiter unten, statt einen falschen Tag zu erfinden.
+const gesternDatum = new Date(jetzt.getTime() - 864e5);
+const frueherImMonat = gesternDatum.getMonth() === jetzt.getMonth() ? GESTERN : null;
+
+// Ein Tag sicher im VORHERGEHENDEN Kalendermonat -- der 15. reicht, unabhaengig
+// von der Laenge des laufenden Monats.
+const VORMONAT = iso(new Date(jetzt.getFullYear(), jetzt.getMonth() - 1, 15));
+
+// Fuer die Zwei-Stunden-Schwelle der Ueberfaellig-Warnung: vor ueber 2 Std.
+// zu Ende ist ueberfaellig, vor weniger als 2 Std. noch nicht.
+const vorEinerStunde = new Date(jetzt.getTime() - 3600e3);
+const vorZweiStunden = new Date(jetzt.getTime() - 2 * 3600e3);
+
 const SCHICHTEN = () => ({ status: 'ok', von: GESTERN, bis: tag(90), schichten: [
   { id: 41, kunde_name: 'Einwohnergemeinde Niedergösgen', titel: 'Revierdienst Nacht',
     strasse: 'Sehr Lange Hauptstrasse 44', ort: '4632 Trimbach', einsatzart: 'Revierdienst',
     datum: LAUF_DATUM, von: hm(beginn), bis: hm(ende), status: 'geplant', bemerkung: 'Schluessel beim Hauswart',
-    zusage: 'offen', objekt_name: 'Einkaufszentrum Nord West', im_team: 2,
+    zusage: 'offen', objekt_name: 'Einkaufszentrum Nord West', im_team: 3,
+    // ENT-121: die Namen der Eingeteilten -- und NUR die Namen.
+    team: [{ name: 'Daniele Ciardo', bin_ich: true },
+           { name: 'Berta Beispiel', bin_ich: false },
+           { name: 'Carlo Muster', bin_ich: false }],
     // ENT-115: Angaben, die vor Ort gebraucht werden.
     kanton: 'SO', treffpunkt: 'Haupteingang Nord', taetigkeit: 'Rundgang alle zwei Stunden',
     qualifikation: 'Revierdienstausweis',
@@ -29,7 +49,8 @@ const SCHICHTEN = () => ({ status: 'ok', von: GESTERN, bis: tag(90), schichten: 
   { id: 42, kunde_name: 'Einwohnergemeinde Niedergösgen', titel: 'Baustelle Kreiselumfahrung',
     strasse: 'Dorfstrasse 1', ort: '5013 Niedergösgen', einsatzart: 'Verkehrsdienst',
     datum: MORGEN, von: '07:30:00', bis: '16:30:00', status: 'bestaetigt', bemerkung: null,
-    zusage: 'zugesagt', objekt_name: null, im_team: 1 },
+    zusage: 'zugesagt', objekt_name: null, im_team: 1,
+    team: [{ name: 'Daniele Ciardo', bin_ich: true }] },
   { id: 43, kunde_name: 'Einwohnergemeinde Niedergösgen', titel: 'Schliessrunde',
     strasse: null, ort: '4632 Trimbach', einsatzart: 'Revierdienst',
     datum: tag(2), von: '22:00:00', bis: '05:30:00', status: 'provisorisch', bemerkung: null,
@@ -37,7 +58,23 @@ const SCHICHTEN = () => ({ status: 'ok', von: GESTERN, bis: tag(90), schichten: 
   { id: 44, kunde_name: 'Einwohnergemeinde Niedergösgen', titel: 'Abgesagter Einsatz',
     strasse: null, ort: '5013 Niedergösgen', einsatzart: 'Verkehrsdienst',
     datum: tag(3), von: '08:00:00', bis: '12:00:00', status: 'abgesagt', bemerkung: null,
-    zusage: 'offen', objekt_name: null, im_team: 1 }]});
+    zusage: 'offen', objekt_name: null, im_team: 1 },
+  // Anzahl sagt 2, aber es kommt keine Namensliste -- so antwortet ein Server,
+  // der die Erweiterung aus ENT-121 noch nicht hat. Die App darf dann KEINEN
+  // Aufklapper zeigen, der nichts aufklappt. Bewusst zuunterst angehaengt:
+  // Weiter oben eingefuegt verschiebt es die Reihenfolge, an der andere
+  // Pruefungen dieser Suite haengen.
+  { id: 45, kunde_name: 'Einwohnergemeinde Niedergösgen', titel: 'Ohne Namensliste',
+    strasse: null, ort: '4632 Trimbach', einsatzart: 'Revierdienst',
+    datum: tag(6), von: '06:00:00', bis: '10:00:00', status: 'geplant', bemerkung: null,
+    zusage: 'offen', objekt_name: null, im_team: 2, team: [] },
+  // ENT-128/130: vom Server gesetzt, sobald alle zugesagten Personen
+  // rapportiert haben -- app.html fuehrt seine eigene STATUS_MARKE-Kopie und
+  // hatte "abgeschlossen" zunaechst vergessen (fiel still auf "Geplant" zurueck).
+  { id: 46, kunde_name: 'Cupi24 GmbH', titel: 'Bereits rapportiert',
+    strasse: null, ort: '4632 Trimbach', einsatzart: 'Verkehrsdienst',
+    datum: HEUTE, von: '08:00:00', bis: '10:00:00', status: 'abgeschlossen', bemerkung: null,
+    zusage: 'zugesagt', objekt_name: null, im_team: 1 }]});
 
 const PROFIL = { status: 'ok', monat: { anzahl: 3, stunden: 22.5 }, profil: {
   name: 'daniele.ciardo', ist_admin: false, personalnummer: 'P-014', anrede: 'Herr',
@@ -49,13 +86,33 @@ const RAP = { status: 'ok', rapporte: [{ id: 1, datum: GESTERN, mitarbeiter: 'da
   kunde: 'Einwohnergemeinde Niedergösgen', strasse: 'Dorfstrasse 1', ort: '5013 Niedergösgen',
   auftrag_nr: 'A-118', einsatzart: 'Verkehrsdienst', von: '07:00:00', bis: '16:00:00',
   pause_min: 30, netto_h: '8.50', unterzeichner: 'R. Muster', unterschrift: null,
-  bemerkung: null, erfasst_am: GESTERN + ' 16:12:00' }]};
+  bemerkung: null, erfasst_am: GESTERN + ' 16:12:00' },
+  // Zu Schicht 46 (status 'abgeschlossen'), fuer die Kartenanzeige (ENT-133).
+  { id: 2, einsatz_id: 46, datum: GESTERN, mitarbeiter: 'daniele.ciardo',
+    kunde: 'Cupi24 GmbH', strasse: null, ort: '4632 Trimbach',
+    auftrag_nr: null, einsatzart: 'Verkehrsdienst', von: '08:00:00', bis: '10:00:00',
+    pause_min: 0, netto_h: '2.00', unterzeichner: null, unterschrift: null,
+    bemerkung: null, erfasst_am: GESTERN + ' 15:30:00' }]};
 
 const browser = await chromium.launch({ executablePath: EXE });
 const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
 page.on('pageerror', e => bad.push('JS-Fehler: ' + e.message));
 
 let schichtenDaten = SCHICHTEN();
+// ENT-134: eine bereits vergangene Schicht des laufenden Monats -- lange
+// genug her, dass sie zugleich als "ueberfaellig, nie rapportiert" dient.
+if (frueherImMonat) {
+  schichtenDaten.schichten.push({ id: 47, kunde_name: 'Cupi24 GmbH', titel: 'Frueher im Monat, nie rapportiert',
+    strasse: null, ort: '4632 Trimbach', einsatzart: 'Verkehrsdienst',
+    datum: frueherImMonat, von: '08:00:00', bis: '10:00:00', status: 'bestaetigt', bemerkung: null,
+    zusage: 'zugesagt', objekt_name: null, im_team: 1 });
+}
+// Gegenprobe zur Monatsansicht: liegt ausserhalb des laufenden Monats und
+// darf im Plan nicht auftauchen.
+schichtenDaten.schichten.push({ id: 48, kunde_name: 'Cupi24 GmbH', titel: 'Schicht aus dem Vormonat',
+  strasse: null, ort: '4632 Trimbach', einsatzart: 'Verkehrsdienst',
+  datum: VORMONAT, von: '08:00:00', bis: '10:00:00', status: 'bestaetigt', bemerkung: null,
+  zusage: 'zugesagt', objekt_name: null, im_team: 1 });
 const rufe = [];           // welche Endpunkte mit welchem Rumpf aufgerufen wurden
 let zusageAntwort = null;  // erlaubt es, eine Fehlerantwort zu erzwingen
 let passwortAntwort = null;
@@ -117,7 +174,40 @@ check('Heute zeigt den Arbeitsort', heuteText.includes('4632 Trimbach'));
 check('Heute zeigt die Teamgroesse', /2\s/.test(heuteText) && heuteText.includes('Team'));
 check('Morgen gehoert nicht zu Heute', !heuteText.includes('Baustelle Kreiselumfahrung'));
 const karten = await page.evaluate(() => document.querySelectorAll('#v-heute .schicht').length);
-check('Genau eine Schichtkarte unter Heute', karten === 1);
+// Zwei statt einer, seit Schicht 46 (status 'abgeschlossen', ENT-133) HEUTE
+// datiert ist -- absichtlich derselbe Tag wie die laufende Schicht, genau
+// das Bild aus der gemeldeten Situation (zwei Karten unter Heute, eine davon
+// abgeschlossen).
+check('Zwei Schichtkarten unter Heute (die laufende und die abgeschlossene)', karten === 2);
+
+// ══════════════ ABGESCHLOSSENE KARTE (ENT-133)
+// Auf einen Blick erkennbar: eigene Kartenfarbe, Haken-Abzeichen, und der
+// eigene Rapport samt Zeitpunkt -- ohne erst in die Schicht hineinklicken zu
+// muessen.
+check('KRITISCH: die Karte traegt die Abgeschlossen-Kennzeichnung',
+  await page.evaluate(() => !!document.querySelector('#v-heute .karte.abgeschlossen')));
+check('KRITISCH: sie zeigt einen Haken',
+  await page.evaluate(() => !!document.querySelector('#v-heute .karte.abgeschlossen .karte-haken svg polyline')));
+check('KRITISCH: der eigene Rapport samt Zeitpunkt steht auf der Karte',
+  await page.evaluate(() => {
+    const k = document.querySelector('#v-heute .karte.abgeschlossen');
+    return !!k && /Bereits rapportiert am.*15:30/.test(k.textContent);
+  }));
+check('Eine nicht abgeschlossene Karte traegt die Kennzeichnung NICHT',
+  await page.evaluate(() => {
+    const alle = [...document.querySelectorAll('#v-heute .karte')];
+    return alle.length === 2 && alle.filter(k => k.classList.contains('abgeschlossen')).length === 1;
+  }));
+// Am gerenderten Zustand gemessen (CLAUDE.md, Gestaltung): Rahmenfarbe und
+// Hintergrund muessen sich tatsaechlich vom Regelfall unterscheiden.
+check('Die Karte hebt sich farblich vom Regelfall ab',
+  await page.evaluate(() => {
+    const normal = [...document.querySelectorAll('#v-heute .karte')].find(k => !k.classList.contains('abgeschlossen'));
+    const fertig = document.querySelector('#v-heute .karte.abgeschlossen');
+    if (!normal || !fertig) return false;
+    const a = getComputedStyle(normal), b = getComputedStyle(fertig);
+    return a.borderColor !== b.borderColor || a.backgroundColor !== b.backgroundColor;
+  }));
 
 // ══════════════ PLAN
 await page.click('#t-plan');
@@ -130,8 +220,93 @@ check('Plan zeigt die Schicht auf Abruf', planText.includes('Auf Abruf'));
 check('Plan zeigt die abgesagte Schicht', planText.includes('Abgesagter Einsatz'));
 const koepfe = await page.evaluate(() => [...document.querySelectorAll('#v-plan .tag-kopf')].length);
 check('Plan gruppiert nach Tagen', koepfe >= 3);
+// Ueber die Struktur pruefen, nicht ueber einen Vorwaertsblick im Text: Der
+// alte Ausdruck suchte ab "Abgesagter Einsatz" beliebig weit nach "1 Schicht"
+// und wurde rot, sobald IRGENDEIN spaeterer Tag eine Schicht hatte. Gemeint
+// ist die Tagesueberschrift, zu der die abgesagte Schicht gehoert.
 check('Abgesagte Schicht zaehlt nicht als Schicht des Tages',
-  !/Abgesagter Einsatz[\s\S]*?1 Schicht/.test(planText));
+  await page.evaluate(() => {
+    // Auf der Ebene der direkten Kinder von #v-plan suchen: Dort stehen
+    // Tagesueberschrift und Karte als Geschwister. Die Schaltflaeche .schicht
+    // liegt eine Ebene tiefer -- von ihr aus gibt es keinen Geschwisterweg
+    // zur Ueberschrift.
+    const kinder = [...document.getElementById('v-plan').children];
+    const i = kinder.findIndex(x => x.textContent.includes('Abgesagter Einsatz')
+      && !x.classList.contains('tag-kopf'));
+    if (i < 1) { return false; }
+    let j = i - 1;
+    while (j >= 0 && !kinder[j].classList.contains('tag-kopf')) { j--; }
+    return j >= 0 && !/1 Schicht/.test(kinder[j].textContent);
+  }));
+
+// ══════════════ MONATSANSICHT + UEBERFAELLIG (ENT-134)
+// Bisher zeigte "Plan" nur Schichten ab heute -- eine bereits vergangene
+// Schicht des laufenden Monats verschwand daraus, sobald der Tag um war.
+if (frueherImMonat) {
+  check('Plan zeigt eine bereits vergangene Schicht des laufenden Monats',
+    planText.includes('Frueher im Monat, nie rapportiert'));
+} else {
+  check('Kein Testfall fuer "frueher im Monat" moeglich, weil heute der Monatserste ist', true);
+}
+check('Plan zeigt KEINE Schicht aus dem Vormonat',
+  !planText.includes('Schicht aus dem Vormonat'));
+
+if (frueherImMonat) {
+  check('KRITISCH: die ueberfaellige Karte traegt die Ueberfaellig-Kennzeichnung',
+    await page.evaluate(() => {
+      const k = [...document.querySelectorAll('#v-plan .karte')]
+        .find(x => x.textContent.includes('Frueher im Monat, nie rapportiert'));
+      return !!k && k.classList.contains('ueberfaellig');
+    }));
+  check('KRITISCH: sie zeigt das Warnzeichen',
+    await page.evaluate(() => {
+      const k = [...document.querySelectorAll('#v-plan .karte')]
+        .find(x => x.textContent.includes('Frueher im Monat, nie rapportiert'));
+      return !!k && !!k.querySelector('.karte-warn');
+    }));
+  // ENT-135: das Warnzeichen allein sagt nicht, WAS zu tun ist -- ohne Text
+  // dazu weiss die eingeteilte Person nicht, worum es geht.
+  check('KRITISCH: sie erklaert in Textform, was zu tun ist',
+    await page.evaluate(() => {
+      const k = [...document.querySelectorAll('#v-plan .karte')]
+        .find(x => x.textContent.includes('Frueher im Monat, nie rapportiert'));
+      return !!k && k.textContent.includes('Rapport noch ausfüllen');
+    }));
+  // Am gerenderten Zustand gemessen (CLAUDE.md, Gestaltung).
+  check('Die ueberfaellige Karte hebt sich farblich vom Regelfall ab',
+    await page.evaluate(() => {
+      const alle = [...document.querySelectorAll('#v-plan .karte')];
+      const normal = alle.find(k => !k.classList.contains('ueberfaellig') && !k.classList.contains('abgeschlossen'));
+      const spaet = alle.find(k => k.classList.contains('ueberfaellig'));
+      if (!normal || !spaet) return false;
+      const a = getComputedStyle(normal), b = getComputedStyle(spaet);
+      return a.borderColor !== b.borderColor || a.backgroundColor !== b.backgroundColor;
+    }));
+}
+
+// Die Zwei-Stunden-Schwelle selbst, direkt an der Funktion gemessen -- ein
+// DOM-Test dafuer haenge von der Testlaufzeit ab (jetzt +/- Sekunden), die
+// Funktion selbst nicht.
+const zp = await page.evaluate(({ gestern, geradeEbenDatum, geradeEbenVon, geradeEbenBis }) => {
+  const laengstVorbei = { id: 9001, einsatzart: 'Verkehrsdienst', zusage: 'zugesagt', status: 'bestaetigt',
+    datum: gestern, von: '08:00:00', bis: '10:00:00' };
+  const geradeEbenVorbei = { id: 9002, einsatzart: 'Verkehrsdienst', zusage: 'zugesagt', status: 'bestaetigt',
+    datum: geradeEbenDatum, von: geradeEbenVon, bis: geradeEbenBis };
+  return {
+    laengstUeberfaellig: schichtUeberfaellig(laengstVorbei),
+    geradeEbenNochNicht: schichtUeberfaellig(geradeEbenVorbei),
+    keinVerkehrsdienst: schichtUeberfaellig({ ...laengstVorbei, id: 9003, einsatzart: 'Revierdienst' }),
+    nichtZugesagt: schichtUeberfaellig({ ...laengstVorbei, id: 9004, zusage: 'offen' }),
+    abgesagt: schichtUeberfaellig({ ...laengstVorbei, id: 9005, status: 'abgesagt' }),
+    schonRapportiertFall: schichtUeberfaellig({ ...laengstVorbei, id: 46 }),
+  };
+}, { gestern: GESTERN, geradeEbenDatum: iso(vorZweiStunden), geradeEbenVon: hm(vorZweiStunden), geradeEbenBis: hm(vorEinerStunde) });
+check('KRITISCH: ueberfaellig, wenn seit ueber 2 Std. zu Ende und nicht rapportiert', zp.laengstUeberfaellig);
+check('Noch NICHT ueberfaellig, wenn erst vor 1 Std. zu Ende (< 2 Std.)', !zp.geradeEbenNochNicht);
+check('Kein Verkehrsdienst -- keine Ueberfaellig-Warnung', !zp.keinVerkehrsdienst);
+check('Nicht zugesagt -- keine Ueberfaellig-Warnung', !zp.nichtZugesagt);
+check('Abgesagte Schicht -- keine Ueberfaellig-Warnung', !zp.abgesagt);
+check('Bereits eigener Rapport vorhanden (Schicht 46) -- keine Ueberfaellig-Warnung', !zp.schonRapportiertFall);
 
 // ══════════════ BLATT + ZUSAGE
 await page.click('#v-plan .schicht[onclick="blattAuf(42)"]');
@@ -142,22 +317,219 @@ const blText = await T('#blBody');
 check('Blatt zeigt Kunde und Ort', blText.includes('Niedergösgen'));
 check('Blatt zeigt die Einsatzart', blText.includes('Verkehrsdienst'));
 
+// ══════════════ WER SONST EINGETEILT IST (ENT-121)
+//
+// Bis dahin gab es ausdruecklich nur die Anzahl, keinen Namen -- so stand es
+// in ENT-023 und so stand es im Endpunkt. Der Projektinhaber hat das fuer die
+// Absprache vor Ort revidiert, und zwar eng: NUR die Namen.
+//
+// Diese Suite haelt genau diese Grenze. Waechst sie je zu "und die
+// Telefonnummer", ist das keine Pruefung, die angepasst werden muss, sondern
+// eine Entscheidung, die getroffen werden muss.
+const MS = readFileSync(`${WURZEL}/backend/api/meine_schichten.php`, 'utf8');
+const teamAbfrage = (MS.match(/SELECT z\.einsatz_id[\s\S]*?ORDER BY[^"]*/) || [''])[0];
+check('KRITISCH: der Endpunkt gibt Namen der Eingeteilten heraus',
+  /m\.vorname, m\.nachname/.test(teamAbfrage));
+check('KRITISCH: aber keine Telefonnummer und keine E-Mail',
+  !/telefon|mobil|email/i.test(teamAbfrage));
+check('KRITISCH: und keine Personalnummer und keinen Anmeldenamen als Schluessel',
+  !/personalnummer/i.test(teamAbfrage));
+check('KRITISCH: die mitarbeiter_id fremder Personen geht nicht mit',
+  !/'mitarbeiter_id'|\bmitarbeiter_id\b\s*=>/.test(MS.split('$team[$eid][] =')[1] || ''));
+check('KRITISCH: der Rueckmeldestand der anderen geht nicht mit',
+  !/z\.zusage/.test(teamAbfrage));
+check('KRITISCH: die Abfrage laeuft nur ueber die eigenen Einsatznummern',
+  /WHERE z\.einsatz_id IN \(\$marken\)/.test(teamAbfrage));
+check('Die eigene Person ist als solche gekennzeichnet',
+  /z\.mitarbeiter_id = \?\) AS bin_ich/.test(MS));
+
+await page.evaluate(() => blattZu());
+await page.waitForTimeout(150);
+await page.evaluate(() => blattAuf(41));
+await page.waitForTimeout(300);
+check('KRITISCH: die Anzahl im Team steht weiterhin da',
+  /3 im Team/.test(await T('#blBody')));
+check('KRITISCH: die Namen sind zunaechst eingeklappt',
+  !(await page.isVisible('#blBody .team-liste')));
+check('Aber im Blatt vorhanden',
+  await page.evaluate(() => !!document.querySelector('#blBody .team-liste')));
+check('KRITISCH: der Aufklapper haelt die Trefferflaeche von 44 px ein',
+  await page.evaluate(() => {
+    const b = document.querySelector('#blBody .team-auf');
+    return !!b && b.getBoundingClientRect().height >= 44;
+  }));
+// Ein fehlender Aufklapper muss eine ROTE PRUEFUNG geben, nicht die Suite
+// abbrechen -- ein Abbruch sieht im Sammellauf aus wie ein Fehler im
+// Pruefwerkzeug, nicht wie einer im Produkt.
+check('Der Aufklapper ist da und laesst sich druecken',
+  await page.evaluate(() => {
+    const b = document.querySelector('#blBody .team-auf');
+    if (!b) { return false; }
+    b.click();
+    return true;
+  }));
+await page.waitForTimeout(250);
+check('KRITISCH: aufgeklappt stehen die Namen da',
+  await page.isVisible('#blBody .team-liste'));
+// Nicht ueber page.textContent holen: Fehlt die Liste, wirft das und bricht
+// die ganze Suite ab, statt die Pruefungen darunter rot werden zu lassen.
+const teamTxt = await page.evaluate(() => {
+  const l = document.querySelector('#blBody .team-liste');
+  return l ? l.textContent : '';
+});
+check('KRITISCH: und zwar alle drei',
+  /Daniele Ciardo/.test(teamTxt) && /Berta Beispiel/.test(teamTxt) && /Carlo Muster/.test(teamTxt));
+check('Die eigene Person ist erkennbar',
+  await page.evaluate(() => {
+    const ich = document.querySelector('#blBody .team-liste li.ich');
+    return !!ich && /Daniele Ciardo/.test(ich.textContent) && /du/.test(ich.textContent);
+  }));
+check('KRITISCH: keine Telefonnummer in der Liste', !/\+41|07\d/.test(teamTxt));
+check('Nochmaliges Tippen klappt wieder zu',
+  await page.evaluate(() => {
+    const b = document.querySelector('#blBody .team-auf');
+    const l = document.querySelector('#blBody .team-liste');
+    if (!b || !l) { return false; }
+    b.click();
+    return !l.classList.contains('auf');
+  }));
+
+// Allein auf der Schicht: kein Aufklapper, der nichts aufklappt
+await page.evaluate(() => blattZu());
+await page.waitForTimeout(150);
+await page.evaluate(() => blattAuf(42));
+await page.waitForTimeout(300);
+check('KRITISCH: wer allein eingeteilt ist, bekommt keinen Aufklapper',
+  await page.evaluate(() => !document.querySelector('#blBody .team-auf')));
+
+// Anzahl da, Namensliste nicht -- der Fall, den ein Server ohne die
+// Erweiterung liefert. Das ist der Fall, der die Absicherung im Code wirklich
+// prueft: Bei "allein eingeteilt" faellt die ganze Zeile schon vorher weg,
+// dort waere die Pruefung leer erfuellt.
+await page.evaluate(() => blattZu());
+await page.waitForTimeout(150);
+await page.evaluate(() => blattAuf(45));
+await page.waitForTimeout(300);
+check('KRITISCH: ohne Namensliste steht nur die Anzahl da',
+  /2 im Team/.test(await T('#blBody')));
+check('KRITISCH: und kein Aufklapper, der nichts aufklappt',
+  await page.evaluate(() => !document.querySelector('#blBody .team-auf')
+    && !document.querySelector('#blBody .team-liste')));
+
+// ══════════════ DAS BLATT NUTZT DIE VOLLE HOEHE (ENT-121)
+const hoehe = await page.evaluate(() => {
+  const b = document.getElementById('blatt').getBoundingClientRect();
+  const fuss = document.getElementById('blFuss').getBoundingClientRect();
+  return { blatt: Math.round(b.height), fenster: window.innerHeight,
+           oben: Math.round(b.top), fussUnten: Math.round(fuss.bottom),
+           ueberlauf: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+});
+check('KRITISCH: das Blatt nutzt die volle Fensterhoehe',
+  hoehe.blatt >= hoehe.fenster - 2);
+check('Oben bleibt kein Platz mehr liegen', hoehe.oben <= 1);
+check('KRITISCH: der Fussbereich bleibt trotzdem im Bild — die Knoepfe duerfen nicht unter den Rand rutschen',
+  hoehe.fussUnten <= hoehe.fenster + 1);
+check('Kein Querlauf durch das volle Blatt', hoehe.ueberlauf <= 1);
+await page.evaluate(() => blattZu());
+await page.waitForTimeout(200);
+// Zurueck zu Schicht 42: Die Pruefungen zum Antwortzustand darunter setzen
+// voraus, dass genau diese Schicht offen ist.
+await page.click('#v-plan .schicht[onclick="blattAuf(42)"]');
+await page.waitForTimeout(250);
+
+// Knoepfe im Fussbereich ueber ihre Beschriftung treffen, nicht ueber eine
+// Klasse: Nach ENT-120 ist ".btn-plain" mal "Ablehnen" und mal "Antwort
+// ändern". Und ein fehlender Knopf muss eine ROTE PRUEFUNG geben statt die
+// Suite abzubrechen -- ein Abbruch sieht im Sammellauf aus wie ein Fehler im
+// Pruefwerkzeug, nicht wie einer im Produkt. Genau das ist in einer
+// Gegenprobe passiert.
+const fussKlick = (name, beschriftung) => page.evaluate(t => {
+  const b = [...document.querySelectorAll('#blFuss button')]
+    .find(x => x.textContent.trim().includes(t));
+  if (!b) { return false; }
+  b.click();
+  return true;
+}, beschriftung).then(g => { check(name, g); return g; });
+
+// ── Eine bereits beantwortete Schicht verlangt die Antwort nicht noch einmal
+//    (ENT-120). Schicht 42 steht in den Testdaten auf "zugesagt".
+const fussJa = await T('#blFuss');
+check('KRITISCH: eine beantwortete Schicht zeigt keine Zusagen/Ablehnen-Knoepfe mehr',
+  !/Zusagen|Ablehnen/.test(fussJa));
+check('KRITISCH: stattdessen steht da, was beantwortet wurde', /Du hast zugesagt/.test(fussJa));
+check('Die Marke sagt es auch kurz',
+  await page.evaluate(() => !!document.querySelector('#blFuss .ft-stand .m-p')));
+check('KRITISCH: die Antwort laesst sich aendern — ein Fehlgriff auf dem Telefon darf nicht endgueltig sein',
+  /Antwort ändern/.test(fussJa));
+check('Der Knopf zum Aendern wird nicht ueber die volle Breite gezogen',
+  await page.evaluate(() => {
+    const b = [...document.querySelectorAll('#blFuss .btn')].find(x => /ändern/.test(x.textContent));
+    return !!b && b.getBoundingClientRect().width
+      < document.getElementById('blFuss').getBoundingClientRect().width * 0.8;
+  }));
+check('Beide Knoepfe halten die Trefferflaeche von 44 px ein',
+  await page.evaluate(() => [...document.querySelectorAll('#blFuss .btn')]
+    .every(b => b.getBoundingClientRect().height >= 44)));
+
+// Eine noch nicht beantwortete Schicht bekommt sehr wohl beide Knoepfe.
+await page.evaluate(() => blattZu());
+await page.evaluate(() => blattAuf(43));
+await page.waitForTimeout(250);
+const fussOffen = await T('#blFuss');
+check('KRITISCH: eine unbeantwortete Schicht fragt weiterhin',
+  /Zusagen/.test(fussOffen) && /Ablehnen/.test(fussOffen) && !/Antwort ändern/.test(fussOffen));
+await page.evaluate(() => blattZu());
+
+// Blatt vorsichtshalber schliessen: Liegt es noch offen, faengt es den Klick
+// auf die Liste ab, und aus einer roten Pruefung wird eine
+// Zeitueberschreitung, die die ganze Suite abbricht.
+await page.evaluate(() => blattZu());
+await page.waitForTimeout(150);
+await page.click('#v-plan .schicht[onclick="blattAuf(42)"]');
+await page.waitForTimeout(250);
 const vorher = rufe.filter(r => r.p.includes('meine_zusage')).length;
-await page.click('#blFuss .btn-plain');   // Ablehnen
+// Nicht "es wurde nichts gesendet" pruefen -- das waere hier leer erfuellbar,
+// weil niemand geklickt hat. Gemeint ist: Es gibt gar keinen Knopf, der eine
+// Rueckmeldung ausloesen koennte, solange die Antwort nicht geoeffnet wurde.
+check('KRITISCH: solange die Antwort steht, gibt es keinen Knopf, der sie ueberschreibt',
+  await page.evaluate(() => [...document.querySelectorAll('#blFuss button')]
+    .every(b => !/melden\(/.test(b.getAttribute('onclick') || ''))));
+await page.evaluate(() => antwortAendern());
+await page.waitForTimeout(200);
+check('KRITISCH: nach "Antwort ändern" stehen beide Knoepfe wieder da',
+  /Zusagen/.test(await T('#blFuss')) && /Ablehnen/.test(await T('#blFuss')));
+await fussKlick('Der Ablehnen-Knopf ist da und lässt sich drücken', 'Ablehnen');
 await page.waitForTimeout(300);
 const zRufe = rufe.filter(r => r.p.includes('meine_zusage'));
+// Ueber einen leeren Ruf stolpern statt ihn zu pruefen waere ein Abbruch der
+// ganzen Suite -- und ein Abbruch sieht im Sammellauf aus wie ein Fehler im
+// Pruefwerkzeug, nicht wie einer im Produkt.
+const letzterZ = (zRufe.at(-1) || {}).body || {};
 check('Rueckmeldung wird genau einmal gesendet', zRufe.length === vorher + 1);
-check('Rueckmeldung sendet die richtige Schicht', zRufe.at(-1).body.einsatz_id === 42);
-check('Rueckmeldung sendet den richtigen Wert', zRufe.at(-1).body.zusage === 'abgelehnt');
+check('Rueckmeldung sendet die richtige Schicht', letzterZ.einsatz_id === 42);
+check('Rueckmeldung sendet den richtigen Wert', letzterZ.zusage === 'abgelehnt');
 check('Blatt schliesst nach der Rueckmeldung',
   !(await page.evaluate(() => document.getElementById('blatt').classList.contains('on'))));
 check('Liste zeigt die Ablehnung sofort', (await T('#v-plan')).includes('Abgelehnt'));
 
+// Beim naechsten Oeffnen ist der geaenderte Stand da -- und wieder zugeklappt.
+await page.evaluate(() => blattZu());
+await page.waitForTimeout(150);
+await page.click('#v-plan .schicht[onclick="blattAuf(42)"]');
+await page.waitForTimeout(250);
+const fussNein = await T('#blFuss');
+check('KRITISCH: die geaenderte Antwort steht beim naechsten Oeffnen da',
+  /Du hast abgelehnt/.test(fussNein));
+check('KRITISCH: "Antwort ändern" wirkt nur fuer dieses eine Oeffnen',
+  !/Zusagen|Ablehnen/.test(fussNein));
+check('Die Marke der Ablehnung ist die negative',
+  await page.evaluate(() => !!document.querySelector('#blFuss .ft-stand .m-x')));
+
 // Ein Fehler der Schnittstelle darf die Anzeige nicht faelschen
 zusageAntwort = [{ status: 'error', message: 'Diese Schicht gehoert nicht zu dir' }, 404];
-await page.click('#v-plan .schicht[onclick="blattAuf(42)"]');
+await page.evaluate(() => antwortAendern());
 await page.waitForTimeout(200);
-await page.click('#blFuss .btn-primary, #blFuss .btn-pos');
+await fussKlick('Der Zusagen-Knopf ist da und lässt sich drücken', 'Zusagen');
 await page.waitForTimeout(300);
 check('Fehler der Schnittstelle wird gemeldet',
   await page.evaluate(() => document.getElementById('toast').classList.contains('on')));
@@ -335,6 +707,19 @@ const klein = await page.evaluate(() => {
 });
 check('Alle Schaltflaechen sind mit dem Daumen bedienbar', klein.length === 0);
 if (klein.length) bad.push('   ↳ zu klein: ' + klein.join(' | '));
+
+// ══════════════ STATUS "ABGESCHLOSSEN" (ENT-128/130)
+// app.html fuehrt STATUS_MARKE unabhaengig vom Dashboard -- der Fehler
+// (Rueckfall auf "Geplant") war nur hier, nicht im Rechenkern selbst.
+await page.evaluate(() => blattAuf(46));
+await page.waitForTimeout(300);
+check('KRITISCH: das Schichtblatt zeigt "Abgeschlossen", faellt nicht auf "Geplant" zurueck',
+  (await T('#blBody')).includes('Abgeschlossen'));
+check('Kein Rueckfall auf "Geplant" fuer einen abgeschlossenen Einsatz',
+  !(await page.evaluate(() =>
+    [...document.querySelectorAll('#blBody .marke')].some(m => /^Geplant$/i.test(m.textContent.trim())))));
+await page.evaluate(() => blattZu());
+await page.waitForTimeout(200);
 
 // ══════════════ ABMELDEN
 await page.click('#t-profil'); await page.waitForTimeout(200);

@@ -48,6 +48,15 @@
   --neg:      #C2382A;  --neg-soft:  #FCEDEB;
   --warn:     #9A6B08;  --warn-soft: #FBF3E0;
 
+  /* Reihe (ENT-119). Violett, weil es der einzige Farbton in dieser
+     Oberflaeche ist, der noch keine Bedeutung traegt: Blau heisst Auswahl und
+     KI, Gruen heisst zugesagt, Gelb heisst Warnung und festgeschrieben, Rot
+     heisst gesperrt. Eine davon noch einmal zu vergeben hiesse, zwei
+     verschiedene Dinge gleich einzufaerben.
+     Nur als Flaeche, NICHT als linker Streifen an der Zeile: Der Streifen ist
+     bereits doppelt belegt (blau = heute, gelb = festgeschrieben). */
+  --serie:      #6B4FA8;  --serie-soft: #F5F2FC;  --serie-line: #DED4F2;
+
   /* Abstufungen der Arbeitsflaeche -- bisher hart im Regelwerk verstreut */
   --surface-2:  #FBFCFD;   /* Tabellenkoepfe, ruhige Flaechen */
   --surface-3:  #FAFBFD;   /* Zeile unter dem Zeiger */
@@ -120,6 +129,7 @@ html[data-thema="dunkel"] {
   --glas:     rgba(23,26,32,.86);
   --neg-hi:   #FF9A8C;  --neg-line:  #4A2823;  --neg-flaeche: #241715;
   --warn:     #E2B156;  --warn-soft: #2B2314;  --warn-line:   #4A3C1C;
+  --serie:    #B6A0EA;  --serie-soft: #241E36;  --serie-line:  #3D3357;
 
   /* Auf dunklem Grund traegt der Rand, nicht der Schatten. */
   --sh-1: 0 1px 2px rgba(0,0,0,.4);
@@ -184,6 +194,10 @@ select.inp { padding-right: 30px; background-image: linear-gradient(45deg, trans
 .btn-primary { background: var(--accent); color: #fff; }
 .btn-primary:hover { background: var(--accent-hi); }
 .btn-primary:disabled { opacity: .55; cursor: default; }
+/* Bislang nur fuer btn-primary -- ein ausgegrauter btn-plain/btn-quiet ohne
+   Deckkraftverlust sieht aus wie ein blosser Text, nicht wie ein (derzeit
+   nicht verfuegbarer) Knopf. Gleiche Staerke wie oben, fuer jeden Knopf. */
+.btn:disabled { opacity: .55; cursor: default; }
 /* Bewusst kein .btn-plain/.btn-quiet: die Spracherkennung ist ein
    Hauptmerkmal, kein Nebenwerkzeug -- der Knopf hebt sich in Form und Farbe
    von den übrigen Kopfzeilen-Knöpfen ab (ENT-038). */
@@ -374,6 +388,25 @@ a.nav-item { text-decoration: none; }
 /* Tabellen */
 .tw { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
+/* Planung/Tagesplan (ENT-137): feste statt automatische Spaltenbreiten.
+   Ohne table-layout:fixed bestimmt die Zeile mit dem meisten Inhalt die
+   Spaltenbreite -- typischerweise "Zugeteilt" bei mehreren Namen. Das
+   verschob "Status" unvorhersehbar weit nach rechts und liess die Abstaende
+   zwischen den Spalten von Zeile zu Zeile ungleichmaessig wirken, obwohl das
+   Padding je Zelle die ganze Zeit gleich war (11px 18px). Mit festen
+   Prozentbreiten je Spalte (per <colgroup>) bleibt jede Spaltengrenze ueber
+   alle Zeilen hinweg gleich; viele Namen in "Zugeteilt" wickeln um (.crew
+   hat ohnehin flex-wrap), statt die Spalte aufzublaehen. */
+table.pl-tab { table-layout: fixed; }
+/* Sichtbare Spaltengrenzen (ENT-140): die Breiten selbst sind seit ENT-137
+   bereits fest und exakt -- gemeldet wurde trotzdem, die Spalten wirkten
+   nicht "sauber ausgerichtet". Eine duenne, durchgehende Trennlinie macht
+   die Spaltengrenze objektiv sichtbar, statt sie nur aus Textabstaenden zu
+   erraten -- dieselbe Idee wie die Spaltentrennung im Einsatzplan-Raster
+   (table.ep-gitter .fest { border-right }), hier nur dezenter (line-soft
+   statt line), weil die Planungsliste dichter mit Inhalt gefuellt ist. */
+table.pl-tab th, table.pl-tab td { border-right: 1px solid var(--line-soft); }
+table.pl-tab th:last-child, table.pl-tab td:last-child { border-right: none; }
 thead th {
   text-align: left; font-size: 10.5px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase;
   color: var(--ink-3); padding: 10px 18px; background: var(--surface-2);
@@ -388,6 +421,39 @@ td.num, th.num { text-align: right; }
 td.num.leer { color: var(--ink-3); }
 tbody tr.summe td { background: var(--surface-2); font-weight: 650; border-top: 1px solid var(--line); }
 tbody tr.aus td { opacity: .55; }
+/* Abgeschlossene Einsaetze treten in der Liste zurueck (ENT-128) -- erledigt,
+   nicht mehr handlungsbeduerftig. Gleiche Staerke wie tr.aus, eigener Name:
+   "aus" heisst anderswo deaktiviert, nicht erledigt. Gilt fuer Einsaetze UND
+   Tagesplan -- dieselbe Liste, nur nach einem Tag gefiltert. */
+tbody tr.status-abgeschlossen td { opacity: .55; }
+.ag-karte.status-abgeschlossen { opacity: .55; }
+/* Abgeglichene Zeile in Planung/Tagesplan (ENT-136): eigene, kraeftigere
+   Kennzeichnung als das allgemeine ".zu" (das anderswo "gesperrt/blockiert"
+   bedeutet, z. B. bei Sperrtagen, und darum Warnfarbe traegt). Hier ist Gruen
+   richtig -- dieselbe Aussage wie das Haekchen in der App (ENT-133): fertig,
+   nichts mehr zu tun. Selektor bewusst ".zu.abgeglichen" (beide Klassen
+   stehen immer gemeinsam an der Zeile) statt nur ".abgeglichen" allein: so
+   gewinnt die Regel ueber tr.zu unabhaengig von der Reihenfolge im
+   Stylesheet, nicht nur zufaellig durch die Position hier. Ueberschreibt
+   bewusst auch die Abschlossen-Blaessung: eine abgeglichene Schicht ist der
+   spaeteste Stand und soll auffallen, nicht verblassen. */
+tbody tr.zu.abgeglichen > td:first-child { box-shadow: inset 2px 0 0 var(--pos); }
+tbody tr.zu.abgeglichen > td { background: var(--pos-soft); }
+tbody tr.status-abgeschlossen.zu.abgeglichen td { opacity: 1; }
+.ag-karte.abgeglichen { border: 1px solid var(--pos); background: var(--pos-soft); }
+.ag-karte.status-abgeschlossen.abgeglichen { opacity: 1; }
+/* Das Schloss-Symbol im gruenen Status-Chip uebernimmt die Chipfarbe, nicht
+   die Zeilenfarbe -- sonst wuerde tr.zu .i-schloss (Zeilenregel weiter unten,
+   hoehere Spezifitaet als ".chip .i-schloss" allein) es grundsaetzlich orange
+   einfaerben, auch im gruenen "Abgeglichen"-Chip. Drei Klassen statt zwei,
+   damit die Regel unabhaengig von der Position im Stylesheet gewinnt. */
+.chip.chip-p .i-schloss { color: inherit; }
+/* Rapport weicht vom Plan ab (ENT-138): ein eigenstaendiges Zeichen neben dem
+   Status-Chip, nicht Teil davon -- es sagt etwas ueber die Datenqualitaet
+   (stimmt der Rapport mit dem Plan ueberein?), nicht ueber den Status selbst
+   (geplant/abgeschlossen/abgeglichen). Beide Aussagen sollen unabhaengig
+   voneinander lesbar bleiben, darum getrennt statt ineinander verschachtelt. */
+.rap-abw { margin-left: 4px; font-size: 12px; }
 #msSeiteTabelle td:last-child .btn { margin-left: 6px; }
 
 /* ── Einsatzplan (ENT-076) ──────────────────────────────────────────────
@@ -437,6 +503,23 @@ tbody tr.aus td { opacity: .55; }
 .ep-sammel select { height: 32px; font-size: 12.5px; width: auto; }
 .ep-sammel .zahl { color: var(--ink-3); }
 
+/* Angehaengte Dokumente (ENT-117). */
+.dok-liste { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.dok-liste:empty { display: none; }
+.dok-zeile { display: flex; align-items: center; gap: 9px; padding: 7px 10px;
+  background: var(--surface-3); border-radius: var(--r-xs); font-size: 12.5px; }
+.dok-zeile .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dok-zeile .gr { color: var(--ink-3); font-size: 11.5px; flex: none; }
+.dok-zeile button { border: none; background: none; cursor: pointer; color: var(--ink-3);
+  padding: 2px 5px; border-radius: var(--r-xs); }
+.dok-zeile button:hover { background: var(--neg-soft); color: var(--neg); }
+/* Dieselbe feine Versalbeschriftung wie ueber den Kopffeldern -- der Block
+   haengt an derselben Karte und soll nicht wie ein Fremdkoerper wirken. */
+.ep-dok-kopf { font-size: 10px; letter-spacing: .5px; text-transform: uppercase;
+  color: var(--ink-3); margin-bottom: 7px; }
+.dok-zeile a.nm { color: var(--ink); text-decoration: none; }
+.dok-zeile a.nm:hover { text-decoration: underline; }
+
 .ep-plan { overflow: hidden; }
 .ep-plan-kopf { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-bottom: 1px solid var(--line-soft); font-size: 12.5px; }
 .ep-hinweis { font-size: 11.5px; color: var(--ink-3); }
@@ -482,6 +565,21 @@ table.ep-gitter td.raster { position: relative; padding: 0; }
   width: 15px; height: 15px; line-height: 13px; font-size: 12px; padding: 0; flex: none; }
 .ep-schloss { background: none; border: none; cursor: pointer; color: var(--ink-3); padding: 0 4px; font-size: 12px; }
 .ep-schloss.zu { color: var(--warn); }
+
+/* Legende unter dem Schichten-Raster (ENT-139): erklaert Farben und Symbole
+   der Balken auf einen Blick -- gedacht fuer den (neuen) Planer, der die
+   Bedeutung noch nicht auswendig kennt. Eine horizontale Reihe statt einer
+   Liste, weil sie unter der letzten Zeile steht und nicht wie ein weiterer
+   Tabellenblock wirken soll. */
+.ep-legende { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px;
+  padding: 10px 8px 4px; font-size: 11px; color: var(--ink-3); }
+.ep-lg-item { display: inline-flex; align-items: center; gap: 6px; }
+.ep-lg-swatch { width: 12px; height: 12px; border-radius: 3px; flex: none; }
+.ep-lg-swatch.offen { background: var(--line-soft); border: 1px dashed var(--line); }
+.ep-lg-swatch.besetzt { background: var(--warn); }
+.ep-lg-swatch.zugesagt { background: var(--pos); }
+.ep-lg-swatch.abgelehnt { background: var(--neg); }
+.ep-lg-item .ep-auge { opacity: 1; }
 @media (max-width: 1180px) { .ep-raum { grid-template-columns: 1fr; } #epListe { max-height: 240px; } }
 td .sec { font-size: 11.5px; color: var(--ink-3); }
 .strong { font-weight: 620; }
@@ -698,7 +796,41 @@ th.sortbar.aktiv .pf { opacity: 1; color: var(--accent); }
 /* Anlegen-Ansicht (ENT-115): eine Seite, kein Dialog -- also nutzt sie die
    Breite. Die Spalten wachsen mit dem Fenster, statt bei zwei zu bleiben und
    die halbe Flaeche leer zu lassen. */
-.form-breit { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 0 18px; }
+/* Die Mindestbreite gilt fuer die SPALTE, nicht fuer das Feld -- und von der
+   Spalte geht erst die Beschriftung ab. Bei 230 px blieben in der Zeilenform
+   rund 50 px Eingabefeld uebrig: ein Datumsfeld, in dem das Datum nicht mehr
+   steht. 400 px ergeben auf 1440 px drei Spalten mit rund 255 px Feld, auf
+   1920 px vier. (ENT-118)
+   min(...) statt der nackten Zahl, damit auf einem schmalen Schirm keine
+   Spalte breiter wird als der Platz -- sonst schiebt das Raster die Seite
+   seitlich hinaus, statt umzubrechen. */
+.form-breit { grid-template-columns: repeat(auto-fit, minmax(min(400px, 100%), 1fr)); gap: 0 18px; }
+/* Kompakte Zeilenform (ENT-117): Beschriftung links, Feld rechts. Spart rund
+   die Haelfte der Hoehe -- ein Anlegeformular mit zwanzig Feldern ist sonst
+   zwei Bildschirme hoch, und was zusammengehoert, sieht man nicht mehr
+   gleichzeitig.
+   Das steht NICHT im Widerspruch zu ENT-070: Die Regel "Ueberschrift oben,
+   Wert darunter" gilt fuer ANZEIGEN -- eine Kennzahl, ein Kopfbereich, wo
+   die Beschriftung ueber der grossen Zahl steht. Ein Eingabeformular liest
+   sich anders: Dort fuehrt die Beschriftung zum Feld, das man ausfuellt. */
+.form-zeilen .f { display: grid; grid-template-columns: minmax(110px, 168px) minmax(0, 1fr);
+  align-items: center; gap: 0 14px; margin-bottom: 9px; }
+.form-zeilen .f > label { margin: 0; text-align: left; }
+.form-zeilen .f.wide { grid-column: 1 / -1; }
+.form-zeilen .f.hoch { align-items: start; }
+.form-zeilen .f.hoch > label { padding-top: 9px; }
+/* Die Anlegen-Ansicht laeuft seit ENT-118 ueber die volle Fensterbreite. Fuer
+   Auswahl- und Zahlenfelder ist das ein Gewinn, fuer Fliesstext nicht: Eine
+   Zeile ueber 2000 px verliert beim Zurueckspringen die Zeile. Der Deckel
+   gilt darum nur fuer die Textfelder, nicht fuer das Raster. */
+.form-zeilen textarea.inp { max-width: 820px; }
+
+/* Auf schmalem Schirm zurueck untereinander -- nebeneinander bliebe fuer das
+   Feld zu wenig uebrig, und die Beschriftung braecke um. */
+@media (max-width: 720px) {
+  .form-zeilen .f { grid-template-columns: 1fr; gap: 0; }
+  .form-zeilen .f > label { margin-bottom: 5px; }
+}
 /* Abschnitte in der Reihenfolge, in der geplant wird: erst wer und was,
    dann wann und wo, dann wer vor Ort, dann wer arbeitet, zuletzt was die
    Eingeteilten wissen muessen. */
@@ -934,7 +1066,46 @@ tbody tr.heute td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
    die Daempfung nur den Hinweis -- ausgegraut allein wuerde man mit
    "abgesagt" verwechseln. */
 tbody tr.zu > td:first-child { box-shadow: inset 2px 0 0 var(--warn); }
+/* Auslagenersatz-Zeile ohne bestimmbaren Betrag (ENT-125) -- dieselbe Familie
+   wie tr.zu: dezent markiert, nicht rot, weil nichts verboten ist, sondern
+   etwas noch fehlt (Verkehrsmittel, GAV-AUS-010-Klaerung). */
+tbody tr.au-gesperrt > td:first-child { box-shadow: inset 2px 0 0 var(--warn); }
+tbody tr.au-gesperrt { background: var(--warn-soft); }
 tbody tr.zu .i-schloss { color: var(--warn); }
+
+/* ══════════════════════════════════════════════ REIHE / GRUPPE (ENT-119)
+   Ein Einsatz, der nicht allein steht: entweder zusammen mit anderen angelegt
+   (serie_id) oder aus einer Masterschicht entstanden (masterschicht_id). Fuer
+   den Planer ist das dasselbe, darum dieselbe Darstellung.
+   Die Flaeche allein sagt nur "gehoert zu irgendeiner Reihe". Welche, sagt der
+   Text "Tag 2 von 3" -- an einem Tag koennen mehrere Reihen nebeneinander
+   laufen, und dafuer waeren mehrere Farbtoene noetig, die es nicht gibt. */
+tbody tr.serie > td { background: var(--serie-soft); }
+.ag-karte.serie { background: var(--serie-soft); }
+.serie-marke {
+  display: inline-flex; align-items: center; gap: 5px; margin-top: 3px;
+  border: 1px solid var(--serie-line); background: var(--surface); color: var(--serie);
+  border-radius: 999px; padding: 2px 8px 2px 6px; font-size: 11px; font-weight: 620;
+  line-height: 1.6; white-space: nowrap; cursor: pointer; font-family: inherit;
+}
+.serie-marke:hover { background: var(--serie-soft); border-color: var(--serie); }
+.serie-marke svg { width: 12px; height: 12px; flex: none; stroke: currentColor;
+  stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+/* Auf dem Handy ist die Marke ein echtes Bedienelement und haelt die
+   Trefferflaeche von 44 px ein. Sie steht dort auf einer eigenen Zeile unter
+   den Marken-Chips und nicht zwischen ihnen: Ein 44 px hohes Element neben
+   20 px hohen Chips zieht die Zeile auseinander und wiegt schwerer, als es
+   soll. Am Schreibtisch waere dieselbe Hoehe in einer Tabellenzeile
+   unverhaeltnismaessig -- dort bleibt sie klein. */
+@media (max-width: 720px) {
+  .serie-marke { min-height: 44px; padding: 4px 14px 4px 11px; margin-top: 8px; font-size: 12px; }
+}
+/* Der Hinweis, dass gerade nur eine Reihe gezeigt wird. Ohne ihn sieht eine
+   gefilterte Liste aus wie die ganze Planung. */
+.serie-filter { display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
+  border: 1px solid var(--serie-line); background: var(--serie-soft);
+  border-radius: var(--r-sm); padding: 9px 12px; margin-bottom: 12px; font-size: 12.5px; }
+.serie-filter b { color: var(--serie); font-weight: 660; }
 .inp[readonly] { background: var(--surface-2); color: var(--ink-3); cursor: default; }
 .wahl-reihe { display: flex; gap: 18px; align-items: center; min-height: 38px; }
 .wahl-reihe label { display: flex; align-items: center; gap: 7px; cursor: pointer; font-size: 13.5px; font-weight: 500; }
@@ -1154,6 +1325,80 @@ tbody tr.zu .i-schloss { color: var(--warn); }
    übrig war. Die Hülle flext, die Felder darin nicht. */
 .zeitpaar .zp > .inp, .zeitpaar .zp > .zeitwahl { flex: 1; min-width: 130px; }
 .zeitpaar .zp .tr { color: var(--ink-3); flex: none; }
+
+/* Zeitraum: Datum von-bis und Zeit von-bis auf EINER waagerechten Ebene
+   (ENT-118). Vier Felder mit zwei gleich aussehenden Gedankenstrichen lassen
+   sonst nicht erkennen, welcher Strich welches Paar verbindet -- getrennt wird
+   darum durch ABSTAND: 8 px innerhalb eines Paares, 28 px zwischen den Paaren.
+   Erst stand hier ein senkrechter Strich. Der war gemessen schaedlich: Er
+   belegt selbst rund 11 px und drueckte die vier Felder dadurch genau in dem
+   Bereich in den Umbruch, in dem sie sonst noch nebeneinander gepasst haetten.
+   Abstand hat diese Rueckwirkung nicht und braucht keine Bildschirmschwelle:
+   Bricht die Zeile um, verschwindet er von selbst.
+   Die Beschriftung sitzt oben statt mittig, weil unter der Zeile die Vorschau
+   ("Es entstehen 3 Einsaetze") auftauchen kann: Waere sie mittig, spraenge
+   sie beim Tippen eine halbe Zeile nach unten.
+   9 px Polsterung oben = die Polsterung von .inp, damit die Beschriftung auf
+   der Grundlinie der Felder steht und nicht darueber schwebt. */
+.form-zeilen .f.zeitraum { align-items: start; }
+/* Der Rasterplatz eines Gitterkindes waechst standardmaessig auf die
+   Mindestbreite seines Inhalts (min-width: auto). Ohne diese Zeile schiebt die
+   Zeitraum-Zeile auf dem Handy die Karte 29 px nach rechts hinaus, statt
+   umzubrechen -- gemessen bei 390 px. Dass die Kinder darin schon min-width: 0
+   tragen, genuegt NICHT: Massgeblich ist das Gitterkind selbst. */
+.form-zeilen .f.zeitraum > div { min-width: 0; }
+.form-zeilen .f.zeitraum > label { padding-top: 10px; }
+/* Deckel, damit vier Felder auf einem sehr breiten Schirm nicht zu je 500 px
+   auseinanderlaufen: Ein Datumsfeld wird von zusaetzlicher Breite nicht
+   lesbarer, nur leerer. Bis 1440 px greift der Deckel gar nicht. */
+.zeitraum .zr { display: flex; align-items: center; flex-wrap: wrap;
+  row-gap: 9px; column-gap: 28px; max-width: 1100px; }
+.zeitraum .zr-gr { display: flex; align-items: center; gap: 8px; flex: 1 1 300px; min-width: 0; }
+/* Auch .zeitwahl: Das Zeitfeld ist seit ENT-110 kein Eingabefeld mehr,
+   sondern zwei Auswahlfelder in einer Huelle -- das <input> liegt versteckt
+   DARIN. Wer hier nur .inp anspricht, trifft das Zeitfeld nicht, und es faellt
+   auf null Breite zusammen. Genau das ist beim ersten Bau passiert und erst
+   am gemessenen Zustand aufgefallen.
+   min-width haelt Datum und Zeit lesbar: Darunter schneidet der Browser die
+   Jahreszahl ab, statt die Zeile umbrechen zu lassen. */
+.zeitraum .zr-gr > .inp, .zeitraum .zr-gr > .zeitwahl { flex: 1 1 0; min-width: 118px; }
+/* Die Huelle traegt zwei Auswahlfelder nebeneinander und braucht mehr. */
+.zeitraum .zr-gr > .zeitwahl { min-width: 148px; }
+.zeitraum .zr .tr { color: var(--ink-3); flex: none; }
+/* Auf dem Handy die Mindestbreiten aufgeben: Sonst ist die Gruppe breiter als
+   die Spalte und schiebt sich aus der Karte hinaus -- gemessen bei 390 px,
+   nicht im Quelltext vermutet. Die Auswahlfelder der Zeitwahl bringen ihre
+   eigene Mindestbreite mit, es geht also nichts verloren. */
+@media (max-width: 720px) {
+  .zeitraum .zr-gr > .inp, .zeitraum .zr-gr > .zeitwahl { min-width: 0; }
+}
+/* Erst auf dem Telefon untereinander. Auf dem Tablet passen Datum und Zeit
+   nebeneinander, und genau darum ging es. */
+@media (max-width: 560px) { .zeitraum .zr-gr { flex: 1 1 100%; } }
+.zeitraum .zr-note { font-size: 12px; color: var(--ink-3); line-height: 1.5; margin-top: 7px; }
+.zeitraum .zr-note b { color: var(--ink); font-weight: 650; }
+.zeitraum .zr-note.warn { color: var(--warn); }
+.zeitraum .zr-note.warn b { color: var(--warn); }
+
+/* Wegstrecke, Fahrzeit und Route auf einer Ebene (ENT-118). Die Zahlenfelder
+   bleiben schmal -- eine Kilometerangabe braucht keine 300 px -- und der
+   Knopf bekommt, was uebrig bleibt, statt sich mitzudehnen. */
+.wegzeile .wz { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.wegzeile .wz-f { display: flex; align-items: center; gap: 7px; flex: 0 1 178px; min-width: 128px; }
+.wegzeile .wz-f > .inp { flex: 1 1 0; min-width: 74px; }
+.wegzeile .wz-f .eh { font-size: 12px; color: var(--ink-3); white-space: nowrap; flex: none; }
+.wegzeile .wz > .btn { flex: none; }
+
+/* Knopfzeile am Formularende. Rechtsbuendig wie die Werkzeugleiste oben,
+   damit der Blick den Speichern-Knopf an derselben Kante findet. */
+.form-fuss { display: flex; justify-content: flex-end; align-items: center; gap: 9px;
+  border-top: 1px solid var(--line-soft); margin-top: 20px; padding-top: 18px; }
+/* Auf dem Handy die Trefferflaeche einhalten -- 44 px, wie jede andere
+   Bedienung auch. Nebeneinander bleiben sie trotzdem: Zwei gestreckte Knoepfe
+   untereinander sehen aus wie zwei gleich wichtige Wege. */
+@media (max-width: 720px) {
+  .form-fuss .btn { min-height: 44px; padding-left: 18px; padding-right: 18px; }
+}
 
 /* ── Begrüssungs-Container mit Diktat-Router (ENT-032) */
 .begr-karte .card-bd { padding: 22px 24px; }
@@ -2175,6 +2420,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
         </button>
         <div class="nav-kinder">
           <button class="nav-kind" id="nav-kontrolle-pensen" onclick="go('pensen')">Pensen</button>
+          <button class="nav-kind" id="nav-kontrolle-auslagen" onclick="go('auslagen')">Auslagenersatz</button>
         </div>
       </div>
 
@@ -2512,6 +2758,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
             <option value="bestaetigt">Nur bestätigt</option>
             <option value="offen">Nur unterbesetzt</option>
             <option value="abgesagt">Nur abgesagt</option>
+            <option value="abgeschlossen">Nur abgeschlossen</option>
           </select>
           <!-- Suche hinter den Filtern, Abstandhalter davor dem Knopf:
                so stehen die Filter links beisammen und "Neuer Einsatz"
@@ -2560,6 +2807,9 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
           </div>
         </div>
 
+        <!-- Sichtbarer Hinweis, wenn gerade nur eine Reihe gezeigt wird (ENT-119).
+             Eine gefilterte Liste ohne Hinweis sieht aus wie die ganze Planung. -->
+        <div class="serie-filter" id="pSerieFilter" style="display:none"></div>
         <div class="card"><div class="card-bd flush"><div class="tw" id="plTable"></div></div></div>
         </div>
 
@@ -2644,6 +2894,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
               <option value="bestaetigt">Nur bestätigt</option>
               <option value="offen">Nur unterbesetzt</option>
               <option value="abgesagt">Nur abgesagt</option>
+              <option value="abgeschlossen">Nur abgeschlossen</option>
             </select>
             <!-- Der schnelle Weg (ENT-057). Auf dem Handy ist der Tagesplan die
                  Startseite der Planung -- wer dort eine Lücke sieht, soll den
@@ -2982,6 +3233,28 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
         <div id="pnHinweis"></div>
       </section>
 
+      <!-- ══════════════════════ AUSLAGENERSATZ (ENT-125) ══════════════════════
+           Chronologisches Protokoll je Mitarbeitendem nach Art. 18 Ziff. 10.
+           Zeigt NUR, was beim Abgleich bereits einen Schnappschuss bekommen
+           hat (einsatz_auslagen) -- keine Live-Berechnung hier, die Rechnung
+           steht ausschliesslich in backend/auslagen.php. -->
+      <section class="view" id="view-auslagen">
+        <div class="bar-tools">
+          <div class="tool-gruppe">
+            <input class="inp" type="date" id="auVon" style="width:auto" onchange="ladeAuslagen()" aria-label="Zeitraum von">
+            <span class="tool-bis">bis</span>
+            <input class="inp" type="date" id="auBis" style="width:auto" onchange="ladeAuslagen()" aria-label="Zeitraum bis">
+          </div>
+          <select class="inp" id="auMa" style="width:auto" onchange="zeichneAuslagen()" aria-label="Mitarbeitende auswählen">
+            <option value="">Alle Mitarbeitenden</option>
+          </select>
+          <div class="sp" style="flex:1"></div>
+          <button class="btn btn-quiet btn-sm" onclick="auslagenCsv()">CSV</button>
+        </div>
+        <div id="auKopf"></div>
+        <div id="auListe"></div>
+      </section>
+
       <!-- ══════════════════════════ MASTERSCHICHTEN ══════════════════════════
            Eigene Ansicht statt der Schublade (Skizze 21.08.2026). Die Vorlagen
            eines Objekts sind Stammdatenpflege mit vielen Feldern nebeneinander;
@@ -3047,7 +3320,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
      Diktat-Weg arbeiten damit weiter, nur die Anordnung wechselt. -->
 <div class="abschnitt">
   <h3>Stammdaten</h3>
-  <div class="form-grid form-breit">
+  <div class="form-grid form-breit form-zeilen">
         <div class="f wide">
           <label for="enNKunde_name">Kunde *</label>
           <input class="inp" id="enNKunde_name" list="dlKunden" autocomplete="off" placeholder="Firma aus der Kundendatei oder frei eingeben">
@@ -3085,18 +3358,52 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 
 <div class="abschnitt">
   <h3>Zeit und Arbeitsort</h3>
-  <div class="form-grid form-breit">
-        <!-- Datum und Zeit stehen beieinander: Sie werden zusammen gelesen
-             und zusammen eingegeben. Ein Enddatum gibt es bewusst nicht --
-             ist die Endzeit kleiner als die Startzeit, liegt sie am Folgetag,
-             so rechnet das ganze System (ENT-115). -->
-        <div class="f"><label for="enNDatum">Datum *</label><input class="inp" id="enNDatum" type="date" onchange="pickRefresh('enN')"></div>
-        <div class="f zeitpaar">
-          <label>Zeit *</label>
-          <div class="zp">
-            <input class="inp" id="enNVon" type="time" aria-label="Von" onchange="pickRefresh('enN')">
-            <span class="tr">–</span>
-            <input class="inp" id="enNBis" type="time" aria-label="Bis" onchange="pickRefresh('enN')">
+  <!-- Kein zweites Serienwerkzeug (ENT-117): Rhythmus, Wochentage,
+       Intervall, Feiertage und die Vorschau gibt es an den Objekten schon
+       und sind dort geprueft. Zwei Serienlogiken nebeneinander driften
+       auseinander -- dieselbe Lehre wie bei ENT-107. Hier steht darum nur
+       der Weg dorthin. -->
+  <div class="note" id="enNSerieHinweis" style="margin-bottom:12px">
+    Ein Einsatz, ein Tag. Läuft er über Wochen oder wiederholt sich er regelmässig,
+    gehört er als <b>Objekt mit Masterschicht</b> angelegt — dort gibt es Wochentage,
+    Rhythmus, Feiertagsregeln und eine Vorschau, bevor etwas entsteht.
+    <a href="#" onclick="return enZuObjekten()">Zur Objektplanung</a>
+  </div>
+  <div class="form-grid form-breit form-zeilen">
+        <!-- Datum von-bis und Zeit von-bis auf einer waagerechten Ebene
+             (ENT-118).
+             Das Bis-Datum erzeugt KEINEN Einsatz ueber mehrere Tage, sondern
+             einen Einsatz JE TAG. Grund: Die 24-Stunden-Annahme ("ist Bis
+             kleiner als Von, liegt es am Folgetag") steckt in gavRohMin(),
+             gavBonusMin(), gavRuheLuecke(), im Raster, in einsatz_save.php,
+             einsatz_position.php und einsatz_abgleich.php. Ein Datensatz ueber
+             drei Tage haette Nacht- und Sonntagszuschlag, Ruhezeitpruefung und
+             Tagesrapport gleichzeitig ausgehebelt -- und ein Fehler dort
+             trifft echte Loehne.
+             Wochentage, Rhythmus und Feiertage gibt es hier bewusst NICHT: Die
+             stehen an der Masterschicht des Objekts. Hier sind es schlicht
+             aufeinanderfolgende Tage, damit nicht zwei Serienlogiken
+             nebeneinander auseinanderdriften (dieselbe Lehre wie ENT-107). -->
+        <div class="f wide zeitraum">
+          <label for="enNDatum">Zeitraum *</label>
+          <div>
+            <div class="zr">
+              <span class="zr-gr">
+                <input class="inp" id="enNDatum" type="date" aria-label="Datum von"
+                       onchange="enZeitraum();pickRefresh('enN');enWegZone()">
+                <span class="tr">–</span>
+                <input class="inp" id="enNDatumBis" type="date" aria-label="Datum bis"
+                       onchange="enZeitraum()">
+              </span>
+              <span class="zr-gr">
+                <input class="inp" id="enNVon" type="time" aria-label="Zeit von"
+                       onchange="enZeitraum();pickRefresh('enN')">
+                <span class="tr">–</span>
+                <input class="inp" id="enNBis" type="time" aria-label="Zeit bis"
+                       onchange="enZeitraum();pickRefresh('enN')">
+              </span>
+            </div>
+            <div id="enNZeitraumNote"></div>
           </div>
         </div>
         <div class="f wide">
@@ -3128,47 +3435,59 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
        GAV-AUS-011 offen — dessen Sperrwirkung verlangt ausdrücklich „eine
        Einzelfallbestätigung durch einen Menschen". Der Link öffnet die
        Route; abgelesen und eingetragen wird von Hand. -->
-  <div class="form-grid form-breit">
-        <div class="f wide">
-          <div id="enNWegHinweis" class="note" style="margin-bottom:8px"></div>
-          <a class="btn btn-quiet btn-sm" id="enNWegLink" target="_blank" rel="noopener"
-             href="#" onclick="return enWegLinkKlick()">Route in Google Maps öffnen</a>
+  <div id="enNWegHinweis" class="note" style="margin-bottom:12px"></div>
+  <div class="form-grid form-breit form-zeilen">
+        <!-- Strecke, Fahrzeit und der Weg zur Route auf EINER Ebene (ENT-118):
+             Die drei gehoeren zu einem Handgriff -- Route oeffnen, kuerzeste
+             Strecke ablesen, beides eintragen. Untereinander sah es aus wie
+             drei getrennte Angaben.
+             Die Einheit steht am Feld, nicht in der Beschriftung: Zwei Zahlen
+             nebeneinander ohne Einheit liest man als dieselbe Groesse. -->
+        <div class="f wide wegzeile">
+          <label for="enNWeg_km">Wegstrecke ab HAO</label>
+          <div class="wz">
+            <span class="wz-f">
+              <input class="inp" id="enNWeg_km" type="number" step="0.1" min="0" max="9999"
+                     placeholder="—" oninput="enWegZone()">
+              <span class="eh">km, einfach</span>
+            </span>
+            <span class="wz-f">
+              <input class="inp" id="enNWeg_minuten" type="number" step="5" min="0" max="1440"
+                     placeholder="—" oninput="enWegZone()" aria-label="Fahrzeit je Weg in Minuten">
+              <span class="eh">Min. je Weg</span>
+            </span>
+            <a class="btn btn-quiet btn-sm" id="enNWegLink" target="_blank" rel="noopener"
+               href="#" onclick="return enWegLinkKlick()">Route in Google Maps öffnen</a>
+          </div>
         </div>
-        <div class="f"><label for="enNWeg_km">Wegstrecke ab HAO (km, einfach)</label>
-          <input class="inp" id="enNWeg_km" type="number" step="0.1" min="0" max="9999"
-                 placeholder="—" oninput="enWegZone()"></div>
-        <div class="f"><label for="enNWeg_minuten">Fahrzeit je Weg (Minuten)</label>
-          <input class="inp" id="enNWeg_minuten" type="number" step="5" min="0" max="1440"
-                 placeholder="—" oninput="enWegZone()"></div>
         <div class="f wide"><div id="enNZone"></div></div>
-        <div class="f wide" id="enNFzWahl" style="display:none">
-          <label style="display:flex;align-items:center;gap:9px;cursor:pointer">
-            <input type="checkbox" id="enNFahrzeit" style="margin:0"
-                   onchange="this.dataset.beruehrt='1'">
-            <span>Fahrzeit-Schichten mit anlegen (Hin- und Rückfahrt)</span>
-          </label>
-          <div class="note" style="margin-top:6px">Sie erscheinen im Raster, zählen aber
-            <b>nicht</b> in die Arbeitszeit — der Fahrzeitersatz ist nach Art. 18 Ziff. 2
-            keine Arbeitszeit und gehört in die getrennte Spesenabrechnung.</div>
-        </div>
   </div>
 </div>
 
 <div class="abschnitt">
   <h3>Kontaktperson vor Ort<span class="note">wird den Eingeteilten in der App angezeigt</span></h3>
-  <div class="form-grid form-breit">
+  <div class="form-grid form-breit form-zeilen">
         <div class="f"><label for="enNKontakt_vorname">Vorname</label><input class="inp" id="enNKontakt_vorname"></div>
         <div class="f"><label for="enNKontakt_nachname">Nachname</label><input class="inp" id="enNKontakt_nachname"></div>
         <!-- Eigenes Feld statt im Fliesstext: Auf dem Handy soll die Nummer
              waehlbar sein, und dafuer muss sie fuer sich stehen. -->
+        <!-- Immer international (ENT-118). In der App steht die Nummer als
+             tel:-Link; ohne Landesvorwahl waehlt sie aus dem Ausland nicht,
+             und Eingeteilte stehen auch mal jenseits der Grenze. Beim
+             Hineinklicken steht +41 schon da, beim Verlassen wird 079... auf
+             +41 79... umgeschrieben. Bleibt nur die Vorwahl stehen, wird das
+             Feld wieder leer -- eine gespeicherte Nummer "+41 " waere
+             schlimmer als gar keine. -->
         <div class="f"><label for="enNKontakt_telefon">Telefon</label>
-          <input class="inp" id="enNKontakt_telefon" type="tel" inputmode="tel" placeholder="079 000 00 00"></div>
+          <input class="inp" id="enNKontakt_telefon" type="tel" inputmode="tel"
+                 placeholder="+41 79 000 00 00"
+                 onfocus="enTelFokus(this)" onblur="enTelWeg(this)"></div>
   </div>
 </div>
 
 <div class="abschnitt">
   <h3>Zuteilung</h3>
-  <div class="form-grid form-breit">
+  <div class="form-grid form-breit form-zeilen">
         <div class="f wide">
           <label>Zugeteilte Mitarbeitende</label>
           <div class="ma-pick" id="enNMa"></div>
@@ -3179,15 +3498,38 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 
 <div class="abschnitt">
   <h3>Angaben für die Eingeteilten<span class="note">steht in der App bei der Schicht</span></h3>
-  <div class="form-grid form-breit">
+  <div class="form-grid form-breit form-zeilen">
         <div class="f"><label for="enNTreffpunkt">Treffpunkt</label>
           <input class="inp" id="enNTreffpunkt" placeholder="z. B. Haupteingang, Réception"></div>
         <div class="f"><label for="enNQualifikation">Qualifikation</label>
           <input class="inp" id="enNQualifikation" placeholder="z. B. Verkehrsdienstausweis"></div>
         <div class="f wide"><label for="enNTaetigkeit">Durchzuführende Tätigkeit</label>
           <textarea class="inp" id="enNTaetigkeit" rows="2" style="min-height:64px"></textarea></div>
-        <div class="f wide"><label for="enNBemerkung">Bemerkung</label><textarea class="inp" id="enNBemerkung" rows="3" style="min-height:84px"></textarea></div>
+        <div class="f wide hoch"><label for="enNBemerkung">Bemerkung</label><textarea class="inp" id="enNBemerkung" rows="3" style="min-height:84px"></textarea></div>
+        <div class="f wide hoch">
+          <label>Dokumente</label>
+          <div>
+            <div id="enNDokListe" class="dok-liste"></div>
+            <input type="file" id="enNDokDatei" accept="application/pdf" style="display:none"
+                   onchange="enDokGewaehlt(this.files[0])">
+            <button type="button" class="btn btn-quiet btn-sm" onclick="$('enNDokDatei').click()">PDF anhängen</button>
+            <div class="note" style="margin-top:6px">Nur PDF, höchstens 4 MB. Die Eingeteilten
+              öffnen es in ihrer App — Objektplan, Verkehrsanordnung, Sicherheitskonzept.</div>
+            <div class="msg-err" id="enNDokErr" style="display:none;margin-top:8px"></div>
+          </div>
+        </div>
   </div>
+</div>
+
+<!-- Zweiter Speichern-Knopf am Formularende (ENT-118): Das Formular ist
+     laenger als ein Bildschirm. Wer unten das letzte Feld ausfuellt, musste
+     bisher zum Speichern wieder ganz hinauf -- und der Knopf in der
+     Werkzeugleiste war beim Ausfuellen gar nicht zu sehen.
+     Rechtsbuendig und nicht ueber die volle Breite gezogen: Ein Knopf wird
+     nicht breiter, nur weil er allein in seiner Zeile steht. -->
+<div class="form-fuss">
+  <button class="btn btn-plain" onclick="enNeuAbbrechen()">Abbrechen</button>
+  <button class="btn btn-primary" id="enNeuBtn2" onclick="createEinsatz()">Einsatz anlegen</button>
 </div>
         </div></div>
       </section>
@@ -4229,6 +4571,7 @@ const TITLES = {
   kunden:      ['Kunden', 'Stammdaten'],
   betrieb:     ['Betrieb', 'Einstellungen zum eigenen Unternehmen'],
   pensen:      ['Pensen', 'Jahresstunden gegen die Anstellungskategorie'],
+  auslagen:    ['Auslagenersatz', 'Chronologisches Protokoll je Mitarbeitendem — Art. 18 Ziff. 10'],
   masterschichten: ['Masterschichten', 'Vorlagen, aus denen die Schichten entstehen'],
   einsatzneu:  ['Neuer Einsatz', 'Kunde, Ort, Zeit und Zuteilung'],
   einsatzplan: ['Einsatz planen', 'Positionen und Zeiten im Detail']
@@ -4916,7 +5259,12 @@ function themaUm() {
 // aber keine Fliesstexte, sondern nebeneinanderstehende Container. Auf einem
 // breiten Bildschirm wurde der gewonnene Platz zu Rand statt zu Inhalt, und
 // genau dagegen war der Huellenumbau aus ENT-086 gedacht.
-const ANSICHT_WEIT   = ['uebersicht', 'planung', 'abgleich', 'pensen', 'einsatzplan', 'masterschichten'];
+// 'einsatzneu' seit ENT-118: Die Anlegen-Ansicht ist kein Fliesstext, sondern
+// ein Raster nebeneinanderstehender Felder. Unter dem 1440-px-Deckel blieb auf
+// einem breiten Schirm Rand statt Inhalt, waehrend die Felder selbst zu schmal
+// waren. Die Fliesstext-Felder darin behalten ihren eigenen Deckel (siehe
+// .form-zeilen textarea.inp).
+const ANSICHT_WEIT   = ['uebersicht', 'planung', 'abgleich', 'pensen', 'auslagen', 'einsatzplan', 'masterschichten', 'einsatzneu'];
 const PLANUNG_WEIT   = ['uebersicht', 'einsaetze', 'objektplan', 'tag'];
 
 function weiteAnsicht(an) {
@@ -4971,10 +5319,12 @@ function go(view) {
   document.querySelectorAll('#navg-admin .nav-kind').forEach(k => k.classList.remove('on'));
   if (view === 'mitarbeiter') { $('nav-admin-mitarbeiter').classList.add('on'); }
   if (view === 'betrieb') { $('nav-admin-betrieb').classList.add('on'); }
-  $('navg-kontrolle').classList.toggle('offen', view === 'pensen');
-  if (view === 'pensen') { $('nav-kontrolle').classList.add('on'); $('nav-kontrolle-pensen').classList.add('on'); }
-  else { $('nav-kontrolle-pensen').classList.remove('on'); }
+  $('navg-kontrolle').classList.toggle('offen', view === 'pensen' || view === 'auslagen');
+  if (view === 'pensen' || view === 'auslagen') { $('nav-kontrolle').classList.add('on'); }
+  $('nav-kontrolle-pensen').classList.toggle('on', view === 'pensen');
+  $('nav-kontrolle-auslagen').classList.toggle('on', view === 'auslagen');
   if (view === 'pensen') { ladePensen(); }
+  if (view === 'auslagen') { auslagenVorgabe(); ladeAuslagen(); }
   if (view === 'abgleich') {
     // Vorgabe: der zurückliegende Monat bis heute. Wer weiter zurück will,
     // stellt den Zeitraum um.
@@ -6419,6 +6769,11 @@ const EN_STATUS = {
   geplant: ['Geplant', 'chip-n'], bestaetigt: ['Bestätigt', 'chip-p'],
   provisorisch: ['Provisorisch', 'chip-a'], abgesagt: ['Abgesagt', 'chip-x']
 };
+// Nur fuer die ANZEIGE (Badges/Listen) -- EN_STATUS selbst bleibt unveraendert,
+// weil das Bearbeiten-Formular seine Auswahloptionen direkt aus dessen
+// Schluesseln baut. "Abgeschlossen" darf dort NICHT waehlbar sein: es wird
+// ausschliesslich vom Server gesetzt, sobald alle Rapporte vorliegen (ENT-128).
+const EN_STATUS_ANZEIGE = Object.assign({ abgeschlossen: ['Abgeschlossen', 'chip-p'] }, EN_STATUS);
 // Vorgegebene Einsatzarten (ENT-060). Vom Projektinhaber festgelegt.
 // Mit 'Reinigung' (ENT-062, auf Wunsch des Projektinhabers). Damit sagen zwei
 // Felder dasselbe -- das ist gewollt, aber es braucht eine Klammer:
@@ -6615,12 +6970,30 @@ function planHerkunftPasst(e, herkunft) {
   return true;
 }
 
+// "Abgeschlossen" (ENT-128, revidiert ENT-126): ein echter, vom Server
+// gesetzter Status -- nicht mehr das Kalenderdatum. Ein heutiger, bereits
+// vollstaendig rapportierter Einsatz zaehlt so schon jetzt, nicht erst morgen;
+// ein vergangener, aber noch nicht rapportierter Einsatz zaehlt weiterhin
+// NICHT (dafuer bleibt der Abgleich-Bereich zustaendig, siehe agGefiltert()).
+// Eine einzige Stelle, damit der Statusfilter und der Rechnung-Platzhalter
+// (ENT-127) nie auseinanderlaufen koennen.
+function einsatzAbgeschlossen(e) { return e.status === 'abgeschlossen'; }
+
 function planStatusPasst(e, st) {
   if (st === 'offen') { return fehlend(e) > 0; }
+  if (st === 'abgeschlossen') { return einsatzAbgeschlossen(e); }
   return !st || e.status === st;
 }
 
 function pFiltered() {
+  // Eine gewaehlte Reihe schlaegt jeden anderen Filter (ENT-119). Wer auf
+  // "Tag 2 von 3" klickt, will die drei Tage sehen -- nicht die drei Tage
+  // geschnitten mit Zeitraum, Herkunft, Status und Suchbegriff. Der Hinweis
+  // ueber der Liste sagt ausdruecklich, dass gerade nur eine Reihe dasteht.
+  if (pSerie) {
+    return (serieVerzeichnis().get(pSerie) || [])
+      .slice().sort((a, b) => (tagVon(a) + ' ' + a.von).localeCompare(tagVon(b) + ' ' + b.von));
+  }
   const q = ($('pQ').value || '').toLowerCase().trim();
   const { von, bis } = pZeitraum();
   const st = $('pStatus').value;
@@ -6675,6 +7048,94 @@ function renderPlKpi() {
     </div>`).join('');
 }
 
+// ═════════════════════════════════════════════════ REIHE / GRUPPE (ENT-119)
+//
+// Zwei Herkuenfte, eine Darstellung: Zusammen angelegte Einsaetze tragen
+// serie_id (ENT-118), aus einer Masterschicht erzeugte tragen
+// masterschicht_id (ENT-058). Fuer den Planer ist beides dieselbe Aussage --
+// "dieser Einsatz steht nicht allein". Sie getrennt darzustellen hiesse, dass
+// nur eine der beiden Sorten Reihe sichtbar waere.
+function serieSchluessel(e) {
+  if (!e) { return null; }
+  if (e.serie_id) { return 's' + Number(e.serie_id); }
+  if (e.masterschicht_id) { return 'm' + Number(e.masterschicht_id); }
+  return null;
+}
+
+// Verzeichnis aller Reihen, einmal je geladener Einsatzliste gebaut.
+// Ohne den Zwischenspeicher liefe fuer jede Zeile ein Durchlauf ueber alle
+// Einsaetze -- bei einem Jahresplan ist das quadratisch.
+let serieIdxFuer = null, serieIdx = new Map();
+function serieVerzeichnis() {
+  if (serieIdxFuer === einsaetze) { return serieIdx; }
+  serieIdx = new Map();
+  einsaetze.forEach(e => {
+    const k = serieSchluessel(e);
+    if (!k) { return; }
+    if (!serieIdx.has(k)) { serieIdx.set(k, []); }
+    serieIdx.get(k).push(e);
+  });
+  serieIdx.forEach(liste => liste.sort((a, b) =>
+    (tagVon(a) + ' ' + a.von).localeCompare(tagVon(b) + ' ' + b.von)));
+  serieIdxFuer = einsaetze;
+  return serieIdx;
+}
+
+// Nummer und Anzahl beziehen sich auf die GANZE Reihe, nie auf die gerade
+// gefilterte Liste: "Tag 2 von 3" waere sonst je nach Filter etwas anderes,
+// und eine Zahl, die vom Filter abhaengt, ohne das zu sagen, ist eine falsche
+// Zahl.
+function serieStand(e) {
+  const k = serieSchluessel(e);
+  if (!k) { return null; }
+  const alle = serieVerzeichnis().get(k) || [];
+  // Ein einzelner Einsatz ist keine Reihe. Eine Masterschicht, aus der bisher
+  // ein Tag entstanden ist, darf nicht als Gruppe erscheinen.
+  if (alle.length < 2) { return null; }
+  const nr = alle.findIndex(x => Number(x.id) === Number(e.id)) + 1;
+  if (!nr) { return null; }
+  return { schluessel: k, nr, anzahl: alle.length, alle };
+}
+
+const SERIE_IKONE = '<svg viewBox="0 0 24 24" aria-hidden="true">'
+  + '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/>'
+  + '<path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>';
+
+function serieMarke(e) {
+  const st = serieStand(e);
+  if (!st) { return ''; }
+  // stopPropagation: Die Zeile selbst oeffnet den Einsatz. Ohne das oeffnete
+  // ein Klick auf die Marke beides zugleich.
+  return `<button type="button" class="serie-marke" onclick="event.stopPropagation();serieZeigen('${st.schluessel}')"
+    title="Gehört zu einer Reihe von ${st.anzahl} Einsätzen — anzeigen">${SERIE_IKONE}Tag ${st.nr} von ${st.anzahl}</button>`;
+}
+
+// Nur die Geschwister zeigen. Bewusst OHNE die uebrigen Filter: Die Vorgabe
+// der Liste ist "Nur Einsätze" (ENT-106), eine Reihe aus einer Masterschicht
+// waere damit sofort wieder unsichtbar -- ein Klick, der nichts zeigt, sieht
+// aus wie "gibt es nicht".
+let pSerie = null;
+function serieZeigen(k) {
+  pSerie = k;
+  go('planung'); goTab('einsaetze');
+  renderPlanung();
+  const el = $('plTable'); if (el && el.scrollIntoView) { el.scrollIntoView({ block: 'start' }); }
+}
+function serieFilterWeg() { pSerie = null; renderPlanung(); }
+
+function serieFilterZeile() {
+  const el = $('pSerieFilter');
+  if (!el) { return; }
+  if (!pSerie) { el.innerHTML = ''; el.style.display = 'none'; return; }
+  const liste = serieVerzeichnis().get(pSerie) || [];
+  const art = pSerie.charAt(0) === 'm' ? 'Objektschichten aus einer Masterschicht' : 'zusammen angelegte Einsätze';
+  el.style.display = '';
+  el.innerHTML = `${SERIE_IKONE}<span>Es wird nur <b>eine Reihe</b> gezeigt —
+      ${liste.length} ${art}${liste.length ? `, ${esc(dmy(tagVon(liste[0])))} bis ${esc(dmy(tagVon(liste[liste.length - 1])))}` : ''}.</span>
+    <span class="sp" style="flex:1"></span>
+    <button class="btn btn-quiet btn-sm" onclick="serieFilterWeg()">Ganze Planung zeigen</button>`;
+}
+
 function renderPlanung() {
   // Die Schnellauswahl darf nie etwas anderes behaupten als von/bis zeigen --
   // "Alle" erkennt man daran, dass beide Felder leer sind.
@@ -6683,6 +7144,7 @@ function renderPlanung() {
   renderPlKpi();
 
   const d = pFiltered();
+  serieFilterZeile();
   // Die Kopfzeile gehört dem gerade offenen Reiter — sie darf nicht von der
   // Einsatzliste überschrieben werden, während die Übersicht sichtbar ist.
   if ($('view-planung').classList.contains('on') && $('pv-einsaetze').classList.contains('on')) {
@@ -6691,7 +7153,11 @@ function renderPlanung() {
       + (offen ? ` · ${nf(offen)} offene ${offen === 1 ? 'Schicht' : 'Schichten'}` : '');
   }
   if (!d.length) {
-    $('plTable').innerHTML = einsaetze.length
+    // Drei verschiedene Aussagen, nicht eine: „nichts geplant", „der Filter
+    // trifft nichts" und „die Reihe gibt es nicht mehr" sind nicht dasselbe.
+    $('plTable').innerHTML = pSerie
+      ? EMPTY('Diese Reihe gibt es nicht mehr', 'Die Einsätze dieser Reihe wurden gelöscht oder umgehängt.')
+      : einsaetze.length
       ? EMPTY('Keine Treffer', 'Für diesen Filter gibt es keine Einsätze. Zeitraum auf „Alle“ stellen oder Suche leeren.')
       : EMPTY('Noch nichts geplant', 'Mit „Neuer Einsatz“ den ersten Einsatz anlegen — oder ihn diktieren.');
     return;
@@ -6720,17 +7186,18 @@ function renderPlanung() {
     const teile = zug.slice(0, 3).map(nameChip);
     if (zug.length > 3) teile.push(`<span class="nm">+${zug.length - 3}</span>`);
     if (fehlt) teile.push(`<span class="nm off">${fehlt} offen</span>`);
-    const st = EN_STATUS[e.status] || EN_STATUS.geplant;
+    const gesperrt = enGesperrt(e);
+    const st = enStatusMarke(e);
 
     return kopf + `
-      <tr class="click${tag === heute ? ' heute' : ''}${enGesperrt(e) ? ' zu' : ''}" onclick="openEinsatz(${Number(e.id)})">
-        <td class="nowrap num">${enSchloss(e)}${hm(e.von)}–${hm(e.bis)}${ueberNacht(e) ? '<div class="sec">bis Folgetag</div>' : ''}</td>
+      <tr class="click${tag === heute ? ' heute' : ''}${gesperrt ? ' zu abgeglichen' : ''}${serieStand(e) ? ' serie' : ''}${e.status === 'abgeschlossen' ? ' status-abgeschlossen' : ''}" onclick="openEinsatz(${Number(e.id)})">
+        <td class="nowrap num">${hm(e.von)}–${hm(e.bis)}${ueberNacht(e) ? '<div class="sec">bis Folgetag</div>' : ''}${serieMarke(e)}</td>
         <td class="strong">${esc(e.kunde_name)}${e.titel ? `<div class="sec">${esc(e.titel)}</div>` : ''}</td>
         <td>${esc(e.ort)}${e.strasse ? `<div class="sec">${esc(e.strasse)}</div>` : ''}</td>
         <td><span class="chip chip-n">${esc(e.einsatzart)}</span>${sparteChip(e)}</td>
         <td class="num"><span class="chip ${e.status === 'abgesagt' ? 'chip-n' : (fehlt ? 'chip-w' : 'chip-p')}">${besetzt(e).length}/${nf(e.bedarf)}</span></td>
         <td>${teile.length ? `<div class="crew">${teile.join('')}</div>` : '<span style="color:var(--ink-3)">–</span>'}</td>
-        <td><span class="chip ${st[1]}">${st[0]}</span></td>
+        <td><span class="chip ${st[1]}">${st[0]}${gesperrt ? SCHLOSS_ZU : ''}</span>${einsatzRapportWeichtAb(e) ? ` <span class="rap-abw" title="Rapport weicht vom Plan ab">⚠️</span>` : ''}</td>
       </tr>`;
   }).join('');
 
@@ -6757,25 +7224,30 @@ function renderPlanung() {
     }
     const zug = e.mitarbeiter || [];
     const fehlt = fehlend(e);
-    const st = EN_STATUS[e.status] || EN_STATUS.geplant;
-    return kopf + `<div class="ag-karte click" onclick="openEinsatz(${Number(e.id)})">
+    const gesperrt = enGesperrt(e);
+    const st = enStatusMarke(e);
+    return kopf + `<div class="ag-karte click${serieStand(e) ? ' serie' : ''}${e.status === 'abgeschlossen' ? ' status-abgeschlossen' : ''}${gesperrt ? ' abgeglichen' : ''}" onclick="openEinsatz(${Number(e.id)})">
       <div class="kopf">
-        <b>${enSchloss(e)}${esc(hm(e.von))}–${esc(hm(e.bis))}${ueberNacht(e) ? ' <span class="ag-plan">bis Folgetag</span>' : ''}</b>
+        <b>${esc(hm(e.von))}–${esc(hm(e.bis))}${ueberNacht(e) ? ' <span class="ag-plan">bis Folgetag</span>' : ''}</b>
         <span class="chip ${e.status === 'abgesagt' ? 'chip-n' : (fehlt ? 'chip-w' : 'chip-p')}">${besetzt(e).length}/${nf(e.bedarf)}</span>
       </div>
       <div class="wer">${esc(e.kunde_name)}${e.titel ? ` · ${esc(e.titel)}` : ''}</div>
       <div class="zeiten">${esc(e.ort)}${e.strasse ? ` · ${esc(e.strasse)}` : ''}</div>
       <div class="marken">
-        <span class="chip ${st[1]}">${st[0]}</span>
+        <span class="chip ${st[1]}">${st[0]}${gesperrt ? SCHLOSS_ZU : ''}</span>${einsatzRapportWeichtAb(e) ? ` <span class="rap-abw" title="Rapport weicht vom Plan ab">⚠️</span>` : ''}
         ${zug.slice(0, 3).map(nameChip).join('')}
         ${zug.length > 3 ? `<span class="nm">+${zug.length - 3}</span>` : ''}
         ${fehlt ? `<span class="nm off">${fehlt} offen</span>` : ''}
       </div>
+      ${serieMarke(e)}
     </div>`;
   }).join('');
 
   $('plTable').innerHTML = `<div class="nur-schmal">${karten}</div>`
-    + `<table class="nur-breit"><thead><tr>
+    + `<table class="nur-breit pl-tab"><colgroup>
+      <col style="width:10%"><col style="width:18%"><col style="width:15%"><col style="width:13%">
+      <col style="width:8%"><col style="width:24%"><col style="width:12%">
+    </colgroup><thead><tr>
       <th>Zeit</th><th>Kunde</th><th>Arbeitsort</th><th>Einsatzart</th>
       <th class="num">Besetzung</th><th>Zugeteilt</th><th>Status</th>
     </tr></thead><tbody>${zeilen}</tbody></table>`;
@@ -6855,6 +7327,10 @@ function pickWahl(prefix, el) {
     menge.delete(id);
   }
   pickFoot(prefix);
+  // Die Namensliste in der GAV-AUS-010-Warnung haengt an der Auswahl --
+  // aendert sie sich, muss die Warnung mitziehen (ENT-124). Nur fuer 'enN':
+  // enWegZone() kennt keinen anderen Prefix.
+  if (prefix === 'enN' && typeof enWegZone === 'function') { enWegZone(); }
 }
 
 function pickRefresh(prefix) {
@@ -6895,7 +7371,14 @@ function openEinsatzNeu(felder, maNamen) {
   $('enNStatus').value = 'geplant';
   // Beim zweiten Oeffnen duerfen keine Reste des vorigen Einsatzes stehen.
   EN_FELDER_ANSICHT.forEach(f => { const el = $(enId('enN', f)); if (el) el.value = ''; });
-  if ($('enNFahrzeit')) { $('enNFahrzeit').checked = false; delete $('enNFahrzeit').dataset.beruehrt; }
+  // Angehaengte, aber nie gespeicherte Dateien duerfen nicht am naechsten
+  // Einsatz kleben (ENT-117).
+  enNDok = []; enDokZeichnen(); $('enNDokErr').style.display = 'none';
+  // Das Bis-Datum steht nicht in EN_FELDER (es ist kein Feld des Einsatzes,
+  // sondern eine Anweisung an das Formular) -- es muss darum von Hand geleert
+  // werden, sonst legt der naechste Einsatz stillschweigend eine Reihe an.
+  if ($('enNDatumBis')) $('enNDatumBis').value = '';
+  enZeitraum();
   enWegZone();
 
   const ids = maNamen.map(n => (mitarbeiter.find(m => m.name === n) || {}).id).filter(Boolean);
@@ -7009,6 +7492,29 @@ function enWegLinkKlick() {
 
 // Zone und Auslagenersatz aus der eingetragenen Distanz. Rechnet nichts
 // selbst: gavZone() traegt die Regel, hier wird sie nur angezeigt.
+// GAV-AUS-010 ist offen (OP-104): "Pro Tag kann nur ein Hin- und Rueckweg zum
+// Einsatzort mit Pauschalen abgerechnet werden" -- WELCHER von mehreren
+// Einsaetzen am selben Tag das ist, ist nicht geklaert.
+//
+// Anders als konflikte(): Dort geht es um ZEITLICHE UEBERLAPPUNG (niemand ist
+// an zwei Orten zugleich). Hier geht es um denselben KALENDERTAG, auch wenn
+// die Einsaetze zeitlich getrennt sind -- genau das ist ein
+// Revierdienst-Morgen mit mehreren Runden an verschiedenen Objekten.
+function gavAus010SelbeTag(datum, ids, ausserId) {
+  if (!datum || !ids || !ids.length) { return []; }
+  const treffer = [];
+  (ids || []).forEach(id => {
+    const andere = einsaetze.filter(e =>
+      Number(e.id) !== Number(ausserId) && e.status !== 'abgesagt' &&
+      tagVon(e) === datum && (e.mitarbeiter || []).some(m => Number(m.id) === Number(id)));
+    if (andere.length) {
+      const m = mitarbeiter.find(x => Number(x.id) === Number(id));
+      treffer.push({ id, name: (m && (fullName(m) || m.name)) || ('#' + id), andere });
+    }
+  });
+  return treffer;
+}
+
 function enWegZone() {
   const feld = $('enNZone');
   if (!feld) return;
@@ -7020,7 +7526,6 @@ function enWegZone() {
   if (typeof gavGilt === 'function' && !gavGilt(sparte)) {
     feld.innerHTML = `<div class="msg-warn">Für die Sparte Reinigung gilt der GAV Sicherheit nicht
       (ENT-061) — kein Auslagenersatz nach Art. 18.</div>`;
-    $('enNFzWahl').style.display = 'none';
     return;
   }
   if (km === '') {
@@ -7028,7 +7533,6 @@ function enWegZone() {
     // der teuerste Fehler in diesem ganzen Bereich.
     feld.innerHTML = `<div class="note">Ohne Wegstrecke lässt sich die Zone <b>nicht bestimmen</b>.
       Das ist etwas anderes als „keine Entschädigung".</div>`;
-    $('enNFzWahl').style.display = 'none';
     return;
   }
   const nao = typeof aoNao === 'function' ? aoNao() : null;
@@ -7036,17 +7540,128 @@ function enWegZone() {
     ? gavZone(km, null, nao ? nao.km_zum_anderen : null) : null;
   if (!z) {
     feld.innerHTML = `<div class="msg-warn">Die Zone lässt sich mit dieser Angabe nicht bestimmen.</div>`;
-    $('enNFzWahl').style.display = 'none';
     return;
   }
-  feld.innerHTML = z.entschaedigung
-    ? `<div class="msg-warn"><b>${esc(z.name)} — Auslagenersatz geschuldet.</b>
-        Fahrzeit- und Fahrkostenersatz nach ${esc(z.quelle)}. Die Zoneneinteilung beruht auf
-        einer noch offenen Auslegung (GAV-AUS-011) und gilt als deine Bestätigung.</div>`
-    : `<div class="note"><b>${esc(z.name)}</b> — nach ${esc(z.quelle)} kein Auslagenersatz.</div>`;
-  $('enNFzWahl').style.display = z.entschaedigung ? '' : 'none';
-  // Vorbelegt nach Zone, aber aenderbar: Der Planer entscheidet je Einsatz.
-  if (z.entschaedigung && !$('enNFahrzeit').dataset.beruehrt) $('enNFahrzeit').checked = true;
+  if (!z.entschaedigung) {
+    feld.innerHTML = `<div class="note"><b>${esc(z.name)}</b> — nach ${esc(z.quelle)} kein Auslagenersatz.</div>`;
+    return;
+  }
+  const datum = ($('enNDatum') || {}).value || '';
+  const traeger = gavAus010SelbeTag(datum, pickIds('enN'), null);
+  feld.innerHTML = `<div class="msg-warn"><b>${esc(z.name)} — Auslagenersatz geschuldet.</b>
+      Fahrzeit- und Fahrkostenersatz nach ${esc(z.quelle)}. Die Zoneneinteilung beruht auf
+      einer noch offenen Auslegung (GAV-AUS-011) und gilt als deine Bestätigung.</div>
+    <div class="zone danger" style="margin-top:8px">
+      <div class="zone-hd">GAV-AUS-010 ist offen</div>
+      <div class="zone-note">${esc(typeof GAV_AUS010_HINWEIS === 'string' ? GAV_AUS010_HINWEIS : '')}${
+        traeger.length
+          ? `<br><br><b>Betrifft bereits: ${traeger.map(t => esc(t.name)).join(', ')}.</b>
+             ${traeger.length === 1 ? 'Diese Person ist' : 'Diese Personen sind'} an diesem Tag
+             bereits auf einem anderen Einsatz eingeteilt.`
+          : ''}</div>
+    </div>`;
+}
+
+// ══════════════════════════════════════════════════════ TELEFON (ENT-118)
+//
+// Schweizer Nummern einheitlich international: +41 79 123 45 67.
+// Grund ist nicht Schoenheit, sondern der tel:-Link in der App -- eine Nummer
+// ohne Landesvorwahl waehlt aus dem Ausland nicht, und ein Einsatz an der
+// Grenze bucht sich schnell ins falsche Netz ein.
+
+// Gibt '' zurueck, wenn nach der Vorwahl nichts uebrig bleibt. Sonst waere
+// "+41 " eine gespeicherte Telefonnummer, die niemanden erreicht.
+function telCh(wert) {
+  let z = String(wert || '').replace(/\D/g, '');
+  if (z.startsWith('0041')) { z = z.slice(2); }          // 0041 79 ... → 41 79 ...
+  else if (z.startsWith('41')) { /* steht schon international */ }
+  else if (z.startsWith('0')) { z = '41' + z.slice(1); } // 079 ...     → 41 79 ...
+  else if (z) { z = '41' + z; }                          // 79 ...      → 41 79 ...
+  let rest = z.slice(2);
+  // Die fuehrende Null der nationalen Schreibweise faellt weg. Das ist NICHT
+  // Kosmetik: Im Feld steht bereits "+41 ", und wer dahinter gewohnheitsmaessig
+  // "079 ..." tippt, erzeugt sonst "+41 07 911 ...". Gemessen aufgefallen, als
+  // die Pruefung genau diese Eingabe machte -- ein Planer haette es genauso
+  // getippt. Eine Schweizer Nummer beginnt nach der Landesvorwahl nie mit 0.
+  if (rest.startsWith('0')) { rest = rest.slice(1); }
+  if (!rest) { return ''; }
+  // 79 123 45 67 -- die uebliche Schweizer Gruppierung. Was darueber
+  // hinausgeht, bleibt unveraendert hinten dran, statt abgeschnitten zu
+  // werden: Eine Durchwahl ist keine falsche Eingabe.
+  const teile = [rest.slice(0, 2), rest.slice(2, 5), rest.slice(5, 7), rest.slice(7, 9)]
+    .filter(Boolean);
+  return '+41 ' + teile.join(' ') + (rest.length > 9 ? ' ' + rest.slice(9) : '');
+}
+
+function enTelFokus(el) { if (!el.value.trim()) { el.value = '+41 '; } }
+function enTelWeg(el) { el.value = telCh(el.value); }
+
+// ═══════════════════════════════════════════════════════ ZEITRAUM (ENT-118)
+//
+// Ein spaeteres Bis-Datum erzeugt EINEN EINSATZ JE TAG -- warum nicht einen
+// Einsatz ueber mehrere Tage, steht am Markup der Zeitraum-Zeile.
+// Hier steht, was daraus folgt: Der Planer muss VOR dem Speichern sehen, wie
+// viele Einsaetze entstehen. Sonst legt ein Vertipper im Jahresfeld
+// dreihundert Schichten an, und niemand merkt es bis zur Lohnrunde.
+const EN_TAGE_MAX = 31;
+
+// Alle Tage von einschliesslich a bis einschliesslich b, als ISO-Datum.
+// Ueber die UTC-Zeitachse gerechnet und NICHT mit setDate() auf einem lokalen
+// Date: An der Zeitumstellung faellt sonst ein Tag aus oder kommt doppelt.
+// Gibt eine leere Liste zurueck, wenn b vor a liegt -- der Aufrufer
+// unterscheidet das an der Laenge, nicht an einem zweiten Ausgang.
+// Zaehlt bis EN_TAGE_MAX + 1, damit "zu viele" erkennbar bleibt, ohne dass
+// bei einem Vertipper Jahre durchlaufen werden.
+function enTage(a, b) {
+  if (!a) { return []; }
+  if (!b || b === a) { return [a]; }
+  const t0 = Date.parse(a + 'T00:00:00Z'), t1 = Date.parse(b + 'T00:00:00Z');
+  if (!isFinite(t0) || !isFinite(t1) || t1 < t0) { return []; }
+  const tage = [];
+  for (let t = t0; t <= t1 && tage.length <= EN_TAGE_MAX; t += 864e5) {
+    tage.push(new Date(t).toISOString().slice(0, 10));
+  }
+  return tage;
+}
+
+// Vorschau unter der Zeitraum-Zeile.
+function enZeitraum() {
+  const el = $('enNZeitraumNote');
+  if (!el) { return; }
+  const von = $('enNDatum').value;
+  const bis = $('enNDatumBis') ? $('enNDatumBis').value : '';
+  const zVon = $('enNVon').value, zBis = $('enNBis').value;
+  el.className = 'zr-note';
+  if (!von) { el.innerHTML = ''; return; }
+
+  if (bis && bis < von) {
+    el.className = 'zr-note warn';
+    el.innerHTML = '<b>Das Bis-Datum liegt vor dem Von-Datum.</b>';
+    return;
+  }
+  const tage = enTage(von, bis);
+  if (tage.length > EN_TAGE_MAX) {
+    el.className = 'zr-note warn';
+    el.innerHTML = `<b>Mehr als ${EN_TAGE_MAX} Tage auf einmal.</b> Ein so langer Zeitraum
+      gehört als Objekt mit Masterschicht angelegt — dort gibt es Wochentage,
+      Rhythmus und Feiertagsregeln, und eine Vorschau, bevor etwas entsteht.`;
+    return;
+  }
+  // Die Endzeit vor der Startzeit heisst Folgemorgen -- so rechnet das ganze
+  // System (ENT-115). Nur sieht man es dem Formular nicht an, darum hier.
+  const nacht = (zVon && zBis && zBis <= zVon) ? ' Die Schicht endet am Folgemorgen.' : '';
+  if (tage.length <= 1) { el.innerHTML = nacht.trim(); return; }
+
+  const anhang = enNDok.length
+    ? ` ${enNDok.length === 1 ? 'Die angehängte Unterlage wird' : 'Die angehängten Unterlagen werden'} an jeden Tag gehängt.`
+    : '';
+  el.innerHTML = `Es entstehen <b>${tage.length} Einsätze</b> — ${esc(dmy(tage[0]))} bis `
+    + `${esc(dmy(tage[tage.length - 1]))}, jeden Tag zur gleichen Zeit.${nacht}${anhang}`
+    // Ehrlich bleiben, statt eine Pruefung vorzutaeuschen, die nicht laeuft:
+    // Konflikt- und Ruhezeitpruefung in der Zuteilung unten kennen nur den
+    // ersten Tag. Wer das nicht weiss, haelt ein leeres Warnfeld fuer ein
+    // geprueftes "keine Konflikte".
+    + ` <b>Die Verfügbarkeitsprüfung unten gilt nur für den ersten Tag.</b>`;
 }
 
 function createEinsatz() {
@@ -7069,46 +7684,277 @@ function createEinsatz() {
   // sich spaeter nicht erkennen, dass jemand den Arbeitsort geaendert hat und
   // die gespeicherte Strecke nicht mehr passt (ENT-116).
   if (body.weg_km) body.weg_adresse = enWegAdresse();
-  const fahrzeit = $('enNFahrzeit') && $('enNFahrzeit').checked && Number(body.weg_minuten) > 0;
-  const b = $('enNeuBtn'); b.disabled = true;
-  api('einsatz_save.php', { method: 'POST', body }).then(({ ok, data }) => {
-    if (!ok || data.status !== 'ok') {
-      b.disabled = false;
-      err.textContent = data.message || 'Anlegen fehlgeschlagen.'; err.style.display = ''; return;
+  // Auch hier normalisieren, nicht nur beim Verlassen des Feldes: Der
+  // Diktat-Weg schreibt den Wert direkt hinein und loest kein blur aus.
+  if (body.kontakt_telefon) { body.kontakt_telefon = telCh(body.kontakt_telefon); }
+  // Ein Tag oder eine Reihe aufeinanderfolgender Tage (ENT-118).
+  const tage = enTage(body.datum, $('enNDatumBis') ? $('enNDatumBis').value : '');
+  if (!tage.length) {
+    err.textContent = 'Das Bis-Datum liegt vor dem Von-Datum.'; err.style.display = ''; return;
+  }
+  if (tage.length > EN_TAGE_MAX) {
+    err.textContent = `Höchstens ${EN_TAGE_MAX} Tage auf einmal. Für einen längeren Zeitraum `
+      + `gehört der Einsatz als Objekt mit Masterschicht angelegt — dort gibt es Wochentage, `
+      + `Rhythmus und Feiertagsregeln.`;
+    err.style.display = ''; return;
+  }
+
+  enNeuSperre(true);
+
+  // Nacheinander, nicht gleichzeitig: Bei einer Reihe mit Anhang waeren das
+  // sonst dreissig gleichzeitige Anfragen mit je mehreren Megabyte (ENT-116).
+  const angelegt = [], ohne = [];
+  let anhangFehler = [];
+  // Zusammengehoerigkeit der Reihe (ENT-119). Die Kennung vergibt der Server:
+  // Der erste Tag bekommt seine eigene Nummer als Serienkennung zurueck, die
+  // uebrigen bekommen sie mit. Eine im Browser gewuerfelte Zahl koennte sich
+  // mit einer anderen Sitzung ueberschneiden.
+  // Scheitert der erste Tag, uebernimmt der naechste die Rolle -- serieId ist
+  // dann noch leer, und serie_neu geht erneut mit.
+  const reihe = tage.length > 1;
+  let serieId = null;
+  const naechster = i => {
+    if (i >= tage.length) { return Promise.resolve(); }
+    const tagBody = Object.assign({}, body, { datum: tage[i] });
+    if (reihe) {
+      if (serieId) { tagBody.serie_id = serieId; } else { tagBody.serie_neu = true; }
     }
-    const weiter = fahrzeit ? enFahrzeitAnlegen(data.id, body) : Promise.resolve();
-    return weiter.then(() => {
-      b.disabled = false;
-      loadEinsaetze().then(() => {
-        go(enNeuHer || 'planung');
-        if ((enNeuHer || 'planung') === 'planung') renderPlanung();
-        toast(fahrzeit ? 'Einsatz angelegt — mit Hin- und Rückfahrt.' : 'Einsatz angelegt.');
-      });
+    return api('einsatz_save.php', { method: 'POST', body: tagBody })
+      .then(({ ok, data }) => {
+        if (!ok || data.status !== 'ok') { ohne.push(dmy(tage[i])); return; }
+        angelegt.push(data.id);
+        if (reihe && !serieId && data.serie_id) { serieId = Number(data.serie_id); }
+        // Dokumente erst jetzt: Vorher gab es keine Nummer, an der sie haengen
+        // koennten (ENT-117). Und an JEDEM Tag: Der Objektplan gilt am
+        // Sonntag so wie am Freitag, nicht nur am ersten Tag der Reihe.
+        return enDokHochladen(data.id).then(f => {
+          if (f && f.length) { anhangFehler = anhangFehler.concat(f); }
+        });
+      }, () => { ohne.push(dmy(tage[i])); })
+      // Ein misslungener Tag darf die uebrigen nicht abbrechen -- sonst steht
+      // die Reihe halb da, und niemand sieht, wo sie aufgehoert hat.
+      .catch(() => { ohne.push(dmy(tage[i])); })
+      .then(() => naechster(i + 1));
+  };
+
+  naechster(0).then(() => {
+    enNeuSperre(false);
+    if (!angelegt.length) {
+      err.textContent = 'Anlegen fehlgeschlagen.'; err.style.display = ''; return;
+    }
+    enNDok = [];
+    return loadEinsaetze().then(() => {
+      const teile = [angelegt.length === 1
+        ? 'Einsatz angelegt' : `${angelegt.length} Einsätze angelegt`];
+      // Ein misslungener Tag oder Anhang darf nicht unter „angelegt“
+      // verschwinden — der Einsatz steht, das Dokument fehlt.
+      if (ohne.length) { teile.push(`nicht angelegt: ${ohne.join(', ')}`); }
+      if (anhangFehler.length) {
+        teile.push(`nicht angehängt: ${[...new Set(anhangFehler)].join(', ')}`);
+      }
+      const text = teile.join(' — ') + '.';
+      renderPlanung();
+      // Direkt in den Einsatzplan des neuen Einsatzes (ENT-118): Dort werden
+      // die Mitarbeitenden auf die Schichten gesetzt, und das ist der
+      // naechste Handgriff -- nicht die Uebersicht, von der man kam. Bei
+      // einer Reihe in den ersten Tag; die uebrigen stehen in der Planung.
+      epAuf(angelegt[0]);
+      toast(text);
     });
-  }).catch(() => { b.disabled = false; err.textContent = 'Netzwerkfehler.'; err.style.display = ''; });
+  }).catch(() => {
+    enNeuSperre(false);
+    err.textContent = 'Netzwerkfehler.'; err.style.display = '';
+  });
 }
 
-// Hin- und Rueckfahrt als eigene Positionen. Sie tragen ist_fahrzeit und
-// zaehlen darum NICHT in die Stundensummen -- der Fahrzeitersatz ist nach
-// Art. 18 Ziff. 2 keine Arbeitszeit (Sperrwirkung im Auslegungsregister).
-function enFahrzeitAnlegen(einsatzId, body) {
-  const min = Number(body.weg_minuten) || 0;
-  if (!einsatzId || min <= 0) return Promise.resolve();
-  const verschoben = (zeit, delta) => {
-    const [h, m] = String(zeit).slice(0, 5).split(':').map(Number);
-    const t = ((h * 60 + m + delta) % 1440 + 1440) % 1440;
-    return String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0');
-  };
-  const wege = [
-    { funktion: 'Fahrzeit Hinweg', von: verschoben(body.von, -min), bis: hm(body.von) },
-    { funktion: 'Fahrzeit Rückweg', von: hm(body.bis), bis: verschoben(body.bis, min) },
-  ];
-  // Nacheinander: Jede Antwort bringt den vollstaendigen neuen Stand mit.
-  return wege.reduce((kette, w) => kette.then(() => api('einsatz_position.php', {
+// Beide Speichern-Knoepfe zugleich (ENT-118): Der obere in der Werkzeugleiste
+// und der untere am Formularende loesen dieselbe Aktion aus. Waere nur einer
+// gesperrt, liesse sich ueber den anderen ein zweites Mal anlegen, waehrend
+// die erste Reihe noch laeuft.
+function enNeuSperre(an) {
+  ['enNeuBtn', 'enNeuBtn2'].forEach(id => { const b = $(id); if (b) { b.disabled = !!an; } });
+}
+
+// FAHRZEIT-SCHICHTEN WERDEN NICHT MEHR ANGELEGT (ENT-122).
+//
+// Bis ENT-116 entstanden zum Einsatz zwei zusaetzliche Positionen "Fahrzeit
+// Hinweg" und "Fahrzeit Rueckweg". Sie waren reine Darstellung: Aus der
+// Arbeitszeit waren sie ohnehin ausgenommen (Art. 18 Ziff. 2), berechnet
+// wurde nie etwas daraus. Fuer die Planung waren sie damit Aufwand ohne
+// Gegenwert -- zwei Zeilen mehr im Raster pro Einsatz.
+//
+// WAS BLEIBT UND WARUM: Die Behandlung BESTEHENDER Fahrzeit-Positionen ist
+// unveraendert. Sie liegen in der Datenbank, und wuerde man ihre Ausnahme
+// aus den Stundensummen entfernen, liefen sie ab sofort als Arbeitszeit mit
+// -- genau das verbietet die Sperrwirkung zu GAV-AUS-009. Auch der Vorlauf
+// der Zeitachse und die Marke "keine Arbeitszeit" bleiben deshalb bestehen.
+// Was in der Datenbank steht, wird nicht angefasst.
+//
+// Der Anspruch selbst ist davon nicht beruehrt: Fahrzeit- und
+// Fahrkostenersatz folgen aus der Zone (Art. 18 Ziff. 3) und nicht aus
+// diesen Zeilen.
+
+// ── Dokumente zum Einsatz (ENT-117) ─────────────────────────────
+
+// Serien gehören an die Objekte, nicht hierher — der Hinweis führt dorthin,
+// statt ein zweites Serienwerkzeug aufzumachen.
+function enZuObjekten() {
+  go('kunden');
+  kuGoTab('objekte');
+  return false;
+}
+
+// Dieselbe Grenze wie im Endpunkt (DOK_MAX). Hier nur, damit eine zu grosse
+// Datei sofort auffällt und nicht erst nach dem Hochladen von Megabytes —
+// die verbindliche Prüfung bleibt der Server.
+const DOK_MAX_JS = 4 * 1024 * 1024;
+const dokGr = b => b >= 1048576 ? nf(b / 1048576, 1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB';
+
+// Datei → base64, ohne den "data:...;base64," davor.
+function dokLesen(datei) {
+  return new Promise((ja, nein) => {
+    const r = new FileReader();
+    r.onerror = () => nein(new Error('lesen'));
+    r.onload = () => ja(String(r.result).split(',')[1] || '');
+    r.readAsDataURL(datei);
+  });
+}
+
+// Der Endpunkt verlangt den Anmelde-Kopf, ein einfaches <a href> trägt ihn
+// nicht mit. Also holen und als Blob öffnen. Das Fenster wird VOR dem Holen
+// aufgemacht — nach einem await gilt der Klick nicht mehr als Nutzeraktion
+// und der Browser blockiert es.
+function dokOeffnen(id, name) {
+  const w = window.open('', '_blank');
+  const kopf = token ? { 'X-Auth-Token': token } : {};
+  fetch(API + 'einsatz_dokument.php?id=' + encodeURIComponent(id), { headers: kopf })
+    .then(r => { if (!r.ok) throw new Error('http'); return r.blob(); })
+    .then(b => {
+      if (!w) {
+        // NICHT ersatzweise dieses Fenster umleiten: Wer gerade ein Formular
+        // ausfüllt, verliert dabei alles Eingetippte. Lieber sagen, woran es
+        // liegt -- der Blockierer sitzt im Browser des Planers.
+        return toast('Der Browser hat das Fenster blockiert — Pop-ups für diese Seite erlauben.');
+      }
+      const url = URL.createObjectURL(b);
+      w.location = url;
+      // Erst freigeben, wenn das Fenster es geladen hat.
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    })
+    .catch(() => { if (w) w.close(); toast('Das Dokument liess sich nicht öffnen.'); });
+}
+
+// Eine Zeile in der Dokumentliste. loeschen = null heißt: nur ansehen.
+function dokZeile(d, oeffnen, loeschen) {
+  return `<div class="dok-zeile">
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7"
+         aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+    ${oeffnen ? `<a class="nm" href="#" onclick="${oeffnen}">${esc(d.dateiname)}</a>`
+              : `<span class="nm">${esc(d.dateiname)}</span>`}
+    <span class="gr">${dokGr(Number(d.groesse) || 0)}</span>
+    ${loeschen ? `<button type="button" title="Entfernen" onclick="${loeschen}">×</button>` : ''}
+  </div>`;
+}
+
+// ── Auf der Seite "Neue Schicht": Der Einsatz hat noch keine Nummer, an der
+// ein Dokument hängen könnte. Die Dateien werden darum gehalten und erst nach
+// erfolgreichem Speichern hochgeladen — dieselbe Reihenfolge wie bei der
+// Fahrzeit. Wer abbricht, lädt nichts hoch.
+let enNDok = [];
+
+function enDokZeichnen() {
+  const el = $('enNDokListe'); if (!el) return;
+  el.innerHTML = enNDok.map((d, i) => dokZeile(d, null, `enDokWeg(${i})`)).join('');
+  // Die Vorschau der Zeitraum-Zeile sagt bei einer Reihe mit, dass die
+  // Unterlagen an JEDEN Tag gehen (ENT-118). Sie muss darum mitziehen, wenn
+  // sich die Anhaenge aendern -- sonst steht dort eine Aussage von vorhin.
+  if (typeof enZeitraum === 'function') { enZeitraum(); }
+}
+
+function enDokWeg(i) { enNDok.splice(i, 1); enDokZeichnen(); }
+
+function enDokGewaehlt(datei) {
+  const err = $('enNDokErr'); err.style.display = 'none';
+  const zeigen = t => { err.textContent = t; err.style.display = ''; };
+  $('enNDokDatei').value = '';
+  if (!datei) return;
+  // Auf den Typ UND die Endung zu schauen ist hier nur Bequemlichkeit —
+  // verbindlich prüft der Server am Inhalt (%PDF-).
+  if (datei.type !== 'application/pdf' && !/\.pdf$/i.test(datei.name)) {
+    return zeigen('Nur PDF-Dateien.');
+  }
+  if (datei.size > DOK_MAX_JS) {
+    return zeigen(`„${datei.name}“ ist ${dokGr(datei.size)} gross — höchstens 4 MB pro Dokument.`);
+  }
+  if (enNDok.some(d => d.dateiname === datei.name)) {
+    return zeigen(`„${datei.name}“ ist schon angehängt.`);
+  }
+  dokLesen(datei)
+    .then(inhalt => { enNDok.push({ dateiname: datei.name, groesse: datei.size, inhalt }); enDokZeichnen(); })
+    .catch(() => zeigen('Die Datei liess sich nicht lesen.'));
+}
+
+// Nacheinander, nicht parallel: Bei vier Anhängen wären das sonst vier
+// Megabyte-Anfragen gleichzeitig. Schlägt eines fehl, wird es benannt — der
+// Einsatz selbst ist da schon gespeichert und darf nicht verloren gehen.
+function enDokHochladen(einsatzId) {
+  if (!einsatzId || !enNDok.length) return Promise.resolve([]);
+  const fehler = [];
+  return enNDok.reduce((kette, d) => kette.then(() => api('einsatz_dokument.php', {
     method: 'POST',
-    body: { einsatz_id: einsatzId, aktion: 'speichern', ist_fahrzeit: 1,
-            funktion: w.funktion, von: w.von, bis: w.bis },
-  })), Promise.resolve());
+    body: { aktion: 'hochladen', einsatz_id: einsatzId, dateiname: d.dateiname, inhalt: d.inhalt },
+  }).then(({ ok, data }) => { if (!ok || data.status !== 'ok') fehler.push(d.dateiname); })
+    .catch(() => fehler.push(d.dateiname))), Promise.resolve()).then(() => fehler);
+}
+
+// ── Im Einsatzplan: Hier gibt es die Nummer, also wird sofort hochgeladen.
+let epDok = [];
+
+function epDokLaden() {
+  if (!epEinsatz) { epDok = []; return Promise.resolve(); }
+  return api('einsatz_dokument.php?einsatz_id=' + epEinsatz.id).then(({ ok, data }) => {
+    epDok = (ok && data.status === 'ok') ? (data.dokumente || []) : [];
+  }).catch(() => { epDok = []; });
+}
+
+function epDokBlock() {
+  const gesperrt = enGesperrt(epEinsatz);
+  return `<div class="card-bd" style="padding:0 16px 14px">
+    <div class="ep-dok-kopf">Dokumente</div>
+    <div class="dok-liste">${epDok.map(d =>
+      dokZeile(d, `dokOeffnen(${d.id});return false`, gesperrt ? null : `epDokWeg(${d.id})`)).join('')}</div>
+    ${epDok.length ? '' : `<div class="note">Noch keine Unterlagen angehängt.</div>`}
+    ${gesperrt ? '' : `<input type="file" id="epDokDatei" accept="application/pdf" style="display:none"
+        onchange="epDokGewaehlt(this.files[0])">
+      <button type="button" class="btn btn-quiet btn-sm" style="margin-top:8px"
+        onclick="$('epDokDatei').click()">PDF anhängen</button>
+      <div class="note" style="margin-top:6px">Nur PDF, höchstens 4 MB. Die Eingeteilten
+        öffnen es in ihrer App.</div>`}
+  </div>`;
+}
+
+function epDokGewaehlt(datei) {
+  const el = $('epDokDatei'); if (el) el.value = '';
+  if (!datei) return;
+  if (datei.type !== 'application/pdf' && !/\.pdf$/i.test(datei.name)) return toast('Nur PDF-Dateien.');
+  if (datei.size > DOK_MAX_JS) return toast(`„${datei.name}“ ist ${dokGr(datei.size)} gross — höchstens 4 MB.`);
+  dokLesen(datei).then(inhalt => api('einsatz_dokument.php', {
+    method: 'POST',
+    body: { aktion: 'hochladen', einsatz_id: epEinsatz.id, dateiname: datei.name, inhalt },
+  })).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') return toast(data.message || 'Hochladen fehlgeschlagen.');
+    return epDokLaden().then(() => { epKopfZeichnen(); toast('Dokument angehängt.'); });
+  }).catch(() => toast('Hochladen fehlgeschlagen.'));
+}
+
+function epDokWeg(id) {
+  const d = epDok.find(x => Number(x.id) === Number(id));
+  if (!confirm(`„${d ? d.dateiname : 'Dokument'}“ entfernen?`)) return;
+  api('einsatz_dokument.php', { method: 'POST', body: { aktion: 'entfernen', id } })
+    .then(({ ok, data }) => {
+      if (!ok || data.status !== 'ok') return toast(data.message || 'Entfernen fehlgeschlagen.');
+      return epDokLaden().then(() => { epKopfZeichnen(); toast('Dokument entfernt.'); });
+    }).catch(() => toast('Entfernen fehlgeschlagen.'));
 }
 
 // ── Bearbeiten
@@ -7126,8 +7972,29 @@ function enGesperrt(e) {
   if ((e.ist_status || 'offen') !== 'offen') return true;
   return (e.mitarbeiter || []).some(m => (m.ist_status || 'offen') !== 'offen');
 }
-// Kleines Schloss vor dem Zeitfeld einer Listenzeile.
-const enSchloss = e => enGesperrt(e) ? `<span title="Abgeglichen und festgeschrieben">${SCHLOSS_ZU}</span>` : '';
+// Abgeglichen (ENT-045) hat in der Statusanzeige Vorrang vor dem Rohstatus:
+// eine festgeschriebene Schicht ist der spaeteste, endgueltigste Stand -- der
+// Planer soll das auf einen Blick sehen, nicht "Geplant" oder "Abgeschlossen"
+// lesen und denken, hier fehle noch etwas. Dasselbe Muster wie im Abgleich
+// (agZeilen weiter unten): das Schloss steht HINTER dem Wort im Chip, nicht
+// mehr davor im Zeitfeld -- ein Wunsch des Projektinhabers, weil das Schloss
+// dort wie ein Rand-Detail wirkte statt wie eine Aussage ueber den Status.
+function enStatusMarke(e) {
+  return enGesperrt(e) ? ['Abgeglichen', 'chip-p'] : (EN_STATUS_ANZEIGE[e.status] || EN_STATUS.geplant);
+}
+
+// Schnellcheck fuer die Liste (Planung/Tagesplan, ENT-138): weicht IRGENDEIN
+// eingegangener Rapport dieses Einsatzes vom Plan ab? Dieselbe Pruefung wie
+// im Abgleich (agRapportAbweichung, weiter unten definiert -- Funktionsdekla-
+// rationen sind gehoisted, die Reihenfolge im Quelltext spielt hier keine
+// Rolle), nur ohne agZeilen: die Liste zeigt Einsaetze, nicht einzelne
+// Zuteilungen, und braucht darum bloss ein Ja/Nein pro Einsatz.
+function einsatzRapportWeichtAb(e) {
+  return (e.mitarbeiter || []).some(m => {
+    const r = agRapport({ einsatz_id: e.id, mitarbeiter_id: m.id });
+    return !!r && !!agRapportAbweichung({ von: e.von, bis: e.bis, ist_pause_min: m.ist_pause_min }, r);
+  });
+}
 
 function openEinsatz(id) { epAuf(id); }
 
@@ -7143,9 +8010,18 @@ function openEinsatzDrawer(id) {
   // wechseln, nur um nachzusehen, was geplant war.
   const zu = enGesperrt(e);
   const sperr = zu ? ' disabled' : '';
-
-  const opt = Object.keys(EN_STATUS)
-    .map(s => `<option value="${s}"${e.status === s ? ' selected' : ''}>${EN_STATUS[s][0]}</option>`).join('');
+  // "Abgeschlossen" (ENT-128) ist kein waehlbarer Wert von EN_STATUS -- er
+  // wird ausschliesslich vom Server gesetzt. Steht er trotzdem am Einsatz,
+  // muss die Liste ihn als eigene, aber gesperrte Option zeigen: sonst waere
+  // beim Oeffnen der Schublade keine Option vorausgewaehlt, der Browser zeigt
+  // dann die erste (geplant) als selektiert an, und ein Speichern ohne
+  // Beruehren des Feldes wuerde den Status still zurueckstufen (dasselbe
+  // Muster wie einsatzartOptionen() fuer einen unbekannten Wert).
+  const statusSperr = zu || e.status === 'abgeschlossen' ? ' disabled' : '';
+  const statusSchluessel = e.status === 'abgeschlossen'
+    ? Object.keys(EN_STATUS).concat('abgeschlossen') : Object.keys(EN_STATUS);
+  const opt = statusSchluessel
+    .map(s => `<option value="${s}"${e.status === s ? ' selected' : ''}>${EN_STATUS_ANZEIGE[s][0]}</option>`).join('');
 
   $('drTitle').textContent = e.kunde_name;
   $('drBody').innerHTML = `
@@ -7187,7 +8063,7 @@ function openEinsatzDrawer(id) {
         <div id="enESparteHint"></div>
       </div>
       <div class="f"><label for="enEBedarf">Benötigte Mitarbeitende</label><input class="inp" id="enEBedarf"${sperr} type="number" min="0" max="99" value="${Number(e.bedarf)}" oninput="pickFoot('enE')"></div>
-      <div class="f"><label for="enEStatus">Status</label><select class="inp" id="enEStatus"${sperr}>${opt}</select></div>
+      <div class="f"><label for="enEStatus">Status</label><select class="inp" id="enEStatus"${statusSperr}>${opt}</select></div>
       <div class="f wide">
         <label>Zugeteilte Mitarbeitende</label>
         <div class="ma-pick" id="enEMa"></div>
@@ -7433,8 +8309,28 @@ function zoneChip(o) {
   }
   if (!z) { return '<span class="chip chip-w" title="Wegstrecke nicht hinterlegt — nicht beurteilbar">? offen</span>'; }
   return z.entschaedigung
-    ? `<span class="chip chip-w" title="${esc(z.name)}, ${esc(z.quelle)}">${esc(z.name)}</span>`
+    ? `<span class="chip chip-w" title="${esc(z.name)}, ${esc(z.quelle)} — ${esc(typeof GAV_AUS010_HINWEIS === 'string' ? GAV_AUS010_HINWEIS : '')}">${esc(z.name)}</span>`
     : `<span class="chip chip-p" title="${esc(z.name)}, ${esc(z.quelle)}">keine</span>`;
+}
+
+// Balken ueber der Objektliste, sobald mindestens EIN Objekt in eine
+// entschaedigungspflichtige Zone faellt (OP-104). Bewusst kein blosser
+// Tooltip: Der Moment, in dem ein Objekt ueber 10 km liegt, ist der Ausloeser
+// dafuer, dass GAV-AUS-010 scharf wird -- das darf nicht an der Maus haengen,
+// die zufaellig ueber der richtigen Zeile schwebt.
+function gavAus010Balken(liste) {
+  if (!anstellungsorte.length) { return ''; }
+  const betroffen = liste.filter(o => o.aktiv).filter(o => {
+    const z = objektZone(o);
+    return z && z.entschaedigung;
+  });
+  if (!betroffen.length) { return ''; }
+  const namen = betroffen.map(o => esc(o.name)).join(', ');
+  return `<div class="zone danger" style="margin:0 0 16px">
+    <div class="zone-hd">Auslagenersatz betrifft ${betroffen.length} ${betroffen.length === 1 ? 'Objekt' : 'Objekte'}</div>
+    <div class="zone-note">${esc(typeof GAV_AUS010_HINWEIS === 'string' ? GAV_AUS010_HINWEIS : '')}<br>
+    <b>Betroffen:</b> ${namen}.</div>
+  </div>`;
 }
 
 function renderObjekte() {
@@ -7442,13 +8338,17 @@ function renderObjekte() {
   const mitInaktiv = $('oInaktiv').checked;
   const d = objekte.filter(o => (mitInaktiv || o.aktiv) &&
     (!q || [o.name, o.kunde_name, o.ort, o.strasse].some(f => String(f || '').toLowerCase().includes(q))));
+  // Ueber der GANZEN Liste, nicht nur der gefilterten Ansicht (OP-104): Sonst
+  // verschwindet der Hinweis, sobald jemand einen Suchbegriff eintippt, und
+  // genau das darf bei einer Auslagenpflicht nicht passieren.
+  const balken = gavAus010Balken(objekte);
   if (!d.length) {
-    $('oTable').innerHTML = objekte.length
+    $('oTable').innerHTML = balken + (objekte.length
       ? EMPTY('Keine Treffer', 'Für diese Suche gibt es keine Objekte.')
-      : EMPTY('Noch keine Objekte', 'Ein Objekt ist der feste Einsatzort eines Dauerauftrags. Mit „Neues Objekt“ das erste anlegen.');
+      : EMPTY('Noch keine Objekte', 'Ein Objekt ist der feste Einsatzort eines Dauerauftrags. Mit „Neues Objekt“ das erste anlegen.'));
     return;
   }
-  $('oTable').innerHTML = `<table><thead><tr>
+  $('oTable').innerHTML = balken + `<table><thead><tr>
       <th>Objekt</th><th>Kunde</th><th>Ort</th><th>Kanton</th><th>Einsatzart</th>
       <th>Auslagen</th>
       <th class="num">Masterschichten</th><th class="num">Std. je Durchgang</th><th>Zustand</th>
@@ -7560,11 +8460,11 @@ function obZoneAktualisieren() {
     return;
   }
   hint.innerHTML = z.entschaedigung
-    ? `<div class="ki-hint on" style="color:var(--warn);background:var(--warn-soft)">
-        <span><b>${esc(z.name)} — Auslagenersatz faellt an.</b> Fuer Einsaetze an diesem Objekt
-        sind Fahrzeit- und Fahrkostenersatz nach ${esc(z.quelle)} geschuldet. Der Betrag wird hier
-        bewusst nicht gerechnet, solange offen ist, wie mehrere Einsaetze am selben Tag zu
-        behandeln sind (Art. 18 Ziff. 8).</span></div>`
+    ? `<div class="zone danger" style="margin-top:12px">
+        <div class="zone-hd">${esc(z.name)} — Auslagenersatz fällt an</div>
+        <div class="zone-note">Für Einsätze an diesem Objekt sind Fahrzeit- und Fahrkostenersatz
+        nach ${esc(z.quelle)} geschuldet.<br><br>${esc(typeof GAV_AUS010_HINWEIS === 'string' ? GAV_AUS010_HINWEIS : '')}</div>
+      </div>`
     : `<div class="ki-hint web on">
         <span><b>${esc(z.name)} — kein Auslagenersatz.</b> Bis 10 km ab Anstellungsort ist
         nach ${esc(z.quelle)} nichts geschuldet.</span></div>`;
@@ -7781,6 +8681,152 @@ function pnMeldung(st) {
       bewerteten Zeit.</span>`);
   }
   return teile.length ? `<div class="sub" style="margin-top:6px;line-height:1.5">${teile.join(' ')}</div>` : '';
+}
+
+// ══════════════════════════════ AUSLAGENERSATZ (ENT-125) ══════════════════
+//
+// Zeigt NUR den Schnappschuss aus einsatz_auslagen -- keine Live-Berechnung
+// im Browser. Der Betrag entsteht ausschliesslich beim Abgleich
+// (backend/auslagen.php), hier wird er nur gelesen und dargestellt.
+let auslagenDaten = null;
+
+const auRp = rp => rp == null ? null : 'CHF ' + nf(rp / 100, 2);
+
+// Was hinter einem gesperrten Betrag steckt -- ausformuliert, nicht als Code.
+// "Unbekannt darf nie wie keine aussehen": eine Luecke ohne Grund sieht wie
+// ein Programmfehler aus, mit Grund ist sie eine offene Aufgabe.
+const AUSLAGEN_GRUND = {
+  gav_aus_010: 'Mehrere Einsätze am selben Tag — welcher als „der eine Hin- und Rückweg" gilt, ist offen (GAV-AUS-010). Vor einer Abrechnung muss das die PaKo klären.',
+  verkehrsmittel_unbekannt: 'Kein Verkehrsmittel hinterlegt — im Stammblatt der Person nachtragen.',
+  oev_preis_unbekannt: 'Öffentlicher Verkehr, aber kein Billettpreis erfasst.',
+  wegstrecke_unbekannt: 'Keine Wegstrecke zum Einsatz hinterlegt.',
+  sparte_reinigung: 'Sparte Reinigung — der GAV Sicherheit gilt hier nicht, ein anderer ist nicht geprüft (OP-32).',
+  regelwerk_unbekannt: 'Kein gültiges Regelwerk für dieses Datum.',
+};
+
+// Vorgabe wie beim Abgleich (ENT-045): der zurückliegende Monat bis heute.
+// Auslagenersatz gibt es nur zu bereits abgeglichenen Schichten -- ein
+// Zeitraum, der ausschliesslich in der Zukunft liegt, waere immer leer.
+function auslagenVorgabe() {
+  if ($('auVon').value) { return; }
+  const h = new Date();
+  $('auVon').value = isoTag(new Date(h.getFullYear(), h.getMonth() - 1, h.getDate()));
+  $('auBis').value = isoTag(h);
+}
+
+function ladeAuslagen() {
+  const von = $('auVon').value, bis = $('auBis').value;
+  if (!von || !bis) { return; }
+  $('auListe').innerHTML = '<div class="leer">…</div>';
+  return api(`auslagen_list.php?von=${encodeURIComponent(von)}&bis=${encodeURIComponent(bis)}`).then(({ ok, data }) => {
+    auslagenDaten = (ok && data.status === 'ok') ? data : null;
+    // Auswahl fuellen, aber eine bereits getroffene Wahl nicht verwerfen --
+    // sonst spraenge der Filter beim Nachladen unbemerkt auf "alle" zurueck.
+    const sel = $('auMa'), bisher = sel.value;
+    const leute = mitarbeiter.slice().sort((a, b) => (a.nachname || a.name).localeCompare(b.nachname || b.name));
+    sel.innerHTML = '<option value="">Alle Mitarbeitenden</option>'
+      + leute.map(m => `<option value="${Number(m.id)}">${esc(fullName(m) || m.name)}</option>`).join('');
+    sel.value = leute.some(m => String(m.id) === bisher) ? bisher : '';
+    zeichneAuslagen();
+  });
+}
+
+function zeichneAuslagen() {
+  if (!auslagenDaten) {
+    $('auKopf').innerHTML = '';
+    $('auListe').innerHTML = EMPTY('Auslagenersatz nicht verfügbar',
+      'Das Protokoll konnte nicht geladen werden. Über „Einrichtung" prüfen, ob die Tabelle besteht.');
+    return;
+  }
+  const maFilter = $('auMa').value;
+  const zeilen = auslagenDaten.zeilen.filter(z => !maFilter || String(z.mitarbeiter_id) === maFilter);
+
+  $('auKopf').innerHTML = `<div class="pn-kopf">
+    <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap">
+      <b style="font-size:16px">${esc(dmy(auslagenDaten.von))} – ${esc(dmy(auslagenDaten.bis))}</b>
+      <span class="sp" style="flex:1"></span>
+      <span class="note">${nf(zeilen.length)} ${zeilen.length === 1 ? 'Eintrag' : 'Einträge'}</span>
+    </div>
+    <p class="zone-note" style="margin-top:10px">Art. 18 Ziff. 10 GAV verlangt eine eigene,
+      nachvollziehbare Spesenabrechnung mit Einsatzdatum, -ort und Zone — <b>getrennt von der
+      Arbeitszeitabrechnung</b>. Gezeigt wird ausschließlich, was beim Abgleich bereits
+      festgeschrieben wurde; noch nicht abgeglichene Schichten erscheinen erst danach.</p>
+  </div>`;
+
+  if (!zeilen.length) {
+    $('auListe').innerHTML = EMPTY('Nichts zu zeigen',
+      'Für diesen Zeitraum ist noch kein Auslagenersatz festgeschrieben — Schichten erst abgleichen.');
+    return;
+  }
+
+  // Gruppiert je Person, chronologisch je Gruppe -- die Reihenfolge kommt
+  // bereits so aus auslagen_list.php (ORDER BY Name, Datum).
+  const gruppen = [];
+  let letzte = null;
+  zeilen.forEach(z => {
+    if (!letzte || letzte.mitarbeiter_id !== z.mitarbeiter_id) {
+      letzte = { mitarbeiter_id: z.mitarbeiter_id, name: z.mitarbeiter, zeilen: [] };
+      gruppen.push(letzte);
+    }
+    letzte.zeilen.push(z);
+  });
+
+  $('auListe').innerHTML = gruppen.map(g => {
+    // Nur tatsaechlich bestimmte Betraege summieren -- ein NULL darf nie als
+    // 0 in die Summe einfliessen, sonst verschwaende eine offene Zeile
+    // stillschweigend in einer zu niedrigen Summe.
+    const summeFz = g.zeilen.reduce((s, z) => s + (z.fahrzeitersatz_rappen ?? 0), 0);
+    const summeFk = g.zeilen.reduce((s, z) => s + (z.fahrkostenersatz_rappen ?? 0), 0);
+    const gesperrt = g.zeilen.filter(z => z.gesperrt_grund).length;
+    return `<div class="card" style="margin-bottom:14px"><div class="card-hd">
+        <h2>${esc(g.name)}</h2>
+        <span class="note">${auRp(summeFz)} Fahrzeit · ${auRp(summeFk)} Fahrkosten${
+          gesperrt ? ` · <span style="color:var(--warn)">${nf(gesperrt)} ohne Betrag</span>` : ''}</span>
+      </div>
+      <div class="card-bd flush"><table class="tbl">
+        <thead><tr><th>Datum</th><th>Kunde / Ort</th><th>Zone</th><th>Verkehrsmittel</th>
+          <th class="num">Fahrzeit</th><th class="num">Fahrkosten</th></tr></thead>
+        <tbody>${g.zeilen.map(z => `<tr${z.gesperrt_grund ? ' class="au-gesperrt"' : ''}>
+            <td class="nowrap">${esc(dmy(z.datum))}</td>
+            <td>${esc(z.kunde_name || '')}${z.ort ? `<div class="sec">${esc(z.ort)}</div>` : ''}</td>
+            <td>${z.zone_name ? esc(z.zone_name) : '<span style="color:var(--ink-3)">–</span>'}</td>
+            <td>${z.verkehrsmittel ? esc(z.verkehrsmittel) : '<span style="color:var(--ink-3)">–</span>'}</td>
+            <td class="num">${z.gesperrt_grund && z.fahrzeitersatz_rappen == null
+              ? `<span class="chip chip-w" title="${esc(AUSLAGEN_GRUND[z.gesperrt_grund] || z.gesperrt_grund)}">offen</span>`
+              : (auRp(z.fahrzeitersatz_rappen) || '–')}</td>
+            <td class="num">${z.gesperrt_grund && z.fahrkostenersatz_rappen == null
+              ? `<span class="chip chip-w" title="${esc(AUSLAGEN_GRUND[z.gesperrt_grund] || z.gesperrt_grund)}">offen</span>`
+              : (auRp(z.fahrkostenersatz_rappen) || '–')}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div>
+    </div>`;
+  }).join('');
+}
+
+function auslagenCsv() {
+  if (!auslagenDaten || !auslagenDaten.zeilen.length) { toast('Nichts zu exportieren.'); return; }
+  const maFilter = $('auMa').value;
+  const zeilen = auslagenDaten.zeilen.filter(z => !maFilter || String(z.mitarbeiter_id) === maFilter);
+  if (!zeilen.length) { toast('Nichts zu exportieren.'); return; }
+  const kopf = ['Mitarbeitende', 'Datum', 'Kunde', 'Ort', 'Zone', 'Wegstrecke km', 'Verkehrsmittel',
+    'Fahrzeitersatz CHF', 'Fahrkostenersatz CHF', 'Nicht bestimmbar', 'Regelwerk'];
+  const feld = w => `"${String(w == null ? '' : w).replace(/"/g, '""')}"`;
+  const csvZeilen = zeilen.map(z => [z.mitarbeiter, z.datum, z.kunde_name, z.ort, z.zone_name || '',
+    z.weg_km ?? '', z.verkehrsmittel || '',
+    z.fahrzeitersatz_rappen == null ? '' : (z.fahrzeitersatz_rappen / 100).toFixed(2),
+    z.fahrkostenersatz_rappen == null ? '' : (z.fahrkostenersatz_rappen / 100).toFixed(2),
+    z.gesperrt_grund ? (AUSLAGEN_GRUND[z.gesperrt_grund] || z.gesperrt_grund) : '',
+    z.regelwerk].map(feld).join(';'));
+  // Semikolon und BOM, damit Excel die Datei ohne Zutun richtig oeffnet --
+  // dasselbe Muster wie beim Masterschichten-Export (msSeiteCsv).
+  const blob = new Blob(['﻿' + [kopf.map(feld).join(';'), ...csvZeilen].join('\r\n')],
+    { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `auslagenersatz-${auslagenDaten.von}-${auslagenDaten.bis}.csv`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
 function kontrolleNavKlick() {
@@ -8262,6 +9308,14 @@ function epLaden() {
   if (!e) { toast('Einsatz nicht gefunden.'); go('planung'); return; }
   epEinsatz = e;
   $('pgCrumb').textContent = `${dmy(e.datum)} · ${hm(e.von)}–${hm(e.bis)} · ${e.kunde_name || ''}`;
+  // Die Dokumente des vorigen Einsatzes duerfen nicht stehen bleiben, bis die
+  // neue Liste da ist -- sonst zeigt der Kopf kurz fremde Unterlagen (ENT-117).
+  epDok = [];
+  epDokLaden().then(() => epKopfZeichnen());
+  // Fuer die GAV-AUS-010-Warnung im Kopf wird die Zone gebraucht, und die
+  // braucht die Anstellungsorte -- geladen werden sie nur einmal, nicht bei
+  // jedem Oeffnen (OP-104).
+  if (!anstellungsorte.length) { ladeAnstellungsorte().then(() => epKopfZeichnen()); }
   return api('einsatz_position.php?einsatz_id=' + epId).then(({ ok, data }) => {
     epPos = (ok && data.status === 'ok') ? (data.positionen || []) : [];
     // Beim ersten Oeffnen entstehen die Positionen aus dem Bedarf des
@@ -8333,6 +9387,31 @@ function epZeichnen() {
 // Wird der Arbeitsort spaeter geaendert, bleibt die Zahl stehen -- absichtlich,
 // denn eine stille Neuberechnung koennte eine bereits abgerechnete Zone
 // veraendern (GAV-AUS-011). Sichtbar sein muss es trotzdem.
+// GAV-AUS-010 im Einsatzplan (OP-104): Anders als beim Anlegen ist hier auch
+// bekannt, wer TATSAECHLICH zugeteilt ist -- nicht nur, wer im Formular
+// angehakt wurde. Der Hinweis nennt darum die eingeteilten Personen, die an
+// diesem Tag bereits einen anderen Einsatz haben.
+function epGavAus010Warnung(e) {
+  if (!e || !e.weg_km || !anstellungsorte.length) { return ''; }
+  const nao = typeof aoNao === 'function' ? aoNao() : null;
+  const z = typeof gavZone === 'function'
+    ? gavZone(e.weg_km, null, nao ? nao.km_zum_anderen : null) : null;
+  if (!z || !z.entschaedigung) { return ''; }
+  const ids = [...new Set((epPos || []).filter(epBesetzt).map(p => Number(p.mitarbeiter_id)))];
+  const traeger = typeof gavAus010SelbeTag === 'function'
+    ? gavAus010SelbeTag(e.datum, ids, Number(e.id)) : [];
+  return `<div class="card-bd" style="padding:0 16px 14px">
+    <div class="zone danger">
+      <div class="zone-hd">${esc(z.name)} — Auslagenersatz geschuldet</div>
+      <div class="zone-note">${esc(typeof GAV_AUS010_HINWEIS === 'string' ? GAV_AUS010_HINWEIS : '')}${
+        traeger.length
+          ? `<br><br><b>Betrifft: ${traeger.map(t => esc(t.name)).join(', ')}.</b>
+             ${traeger.length === 1 ? 'Diese Person ist' : 'Diese Personen sind'} an diesem Tag
+             bereits auf einem anderen Einsatz eingeteilt.`
+          : ''}</div>
+    </div></div>`;
+}
+
 function epWegWarnung(e) {
   if (!e || !e.weg_km || !e.weg_adresse) return '';
   const jetzt = [e.strasse, e.ort, e.kanton].map(t => (t || '').trim()).filter(Boolean).join(', ');
@@ -8379,7 +9458,164 @@ function epKopfZeichnen() {
       ${feld('Qualifikation', esc(e.qualifikation || ''))}
       ${feld('Bemerkung', esc(e.bemerkung || ''))}
     </div>
-    ${epWegWarnung(e)}`;
+    ${epWegWarnung(e)}
+    ${epGavAus010Warnung(e)}
+    ${epVerkehrsmittelBlock(e)}
+    ${epRapportBlock(e)}
+    ${epRechnungBlock(e)}
+    ${epDokBlock()}`;
+}
+
+// ── Rapport-Übersicht am abgeschlossenen Einsatz (ENT-128, erweitert ENT-138) ──
+//
+// Nur sichtbar bei abgeschlossenen Einsaetzen, und nur was tatsaechlich
+// eingegangen ist -- kein Platzhalter fuer Fehlendes, das erledigt der
+// Abgleich-Bereich. Massgeblich ist je Person der ZULETZT erfasste Rapport
+// (agRapport(), dieselbe "neueste zaehlt"-Regel wie im Abgleich, ENT-082) --
+// nicht jede eingegangene Korrektur einzeln, sonst erschiene dieselbe Person
+// mehrfach.
+//
+// Drei Handlungen je Zeile, alle ausdruecklich einen Klick entfernt:
+//   - "Rapport ansehen" oeffnet den bestehenden Rapport-Betrachter
+//     (openDrawer(), dieselbe Ansicht wie unter "Rapporte").
+//   - Eine Abweichungswarnung, wenn der Rapport vom Plan abweicht
+//     (agRapportAbweichung(), dieselbe Pruefung wie im Abgleich).
+//   - "Direkt abgleichen" (epDirektAbgleichen()) oeffnet den vorbefuellten
+//     Abgleich fuer GENAU diese Person -- Planer prueft und speichert dort
+//     wie gewohnt selbst (agdSpeichern()). Kein automatisches Schreiben:
+//     der Rapport bleibt Beleg, keine Festschreibung (ENT-082). Nur sichtbar,
+//     wenn diese Zuteilung nicht schon abgeglichen ist -- danach gibt es
+//     nichts mehr zu uebernehmen.
+function epRapportBlock(e) {
+  if (!e || !einsatzAbgeschlossen(e)) { return ''; }
+  const personen = (e.mitarbeiter || [])
+    .map(m => ({ m, r: agRapport({ einsatz_id: e.id, mitarbeiter_id: m.id }) }))
+    .filter(x => x.r);
+  if (!personen.length) { return ''; }
+  const zeile = ({ m, r }) => {
+    const name = fullName(m) || m.name || ('#' + m.id);
+    const abweichung = agRapportAbweichung({ von: e.von, bis: e.bis, ist_pause_min: m.ist_pause_min }, r);
+    const gesperrt = agGesperrt(m);
+    return `<div class="f" style="margin-bottom:9px">
+      <label>${esc(name)}</label>
+      <div class="zone-note">${hm(r.von)}–${hm(r.bis)}${r.pause_min ? `, ${nf(r.pause_min)}′ Pause` : ''} · Netto ${nf(r.netto_h)} h
+        ${r.bemerkung ? `<br>${esc(r.bemerkung)}` : ''}</div>
+      ${abweichung ? `<div class="zone-note" style="color:var(--warn)">⚠️ Rapport weicht ab: ${esc(abweichung.join(', '))}</div>` : ''}
+      <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">
+        <button type="button" class="btn btn-quiet btn-sm" onclick="openDrawer(${Number(r.id)})">Rapport ansehen</button>
+        ${gesperrt ? '' : `<button type="button" class="btn btn-plain btn-sm" onclick="epDirektAbgleichen(${Number(e.id)},${Number(m.id)})">Direkt abgleichen</button>`}
+      </div>
+    </div>`;
+  };
+  return `<div class="card-bd" style="padding:0 16px 14px">
+    <div class="ep-dok-kopf">Rapport${personen.length > 1 ? 'e' : ''}</div>
+    ${personen.map(zeile).join('')}
+  </div>`;
+}
+
+// Direkter Weg vom Einsatzplan in den vorbefuellten Abgleich (ENT-138).
+// agZeilen wird hier bewusst frisch gebaut (nicht die evtl. veraltete oder
+// gefilterte Fassung aus einem vorherigen Besuch des Abgleich-Tabs
+// wiederverwendet) -- sonst faende openAbgleich() die Zeile nicht, wenn der
+// Abgleich-Tab in dieser Sitzung noch nie geoeffnet wurde oder sein Filter
+// diese Zeile gerade ausblendet.
+function epDirektAbgleichen(einsatzId, mitarbeiterId) {
+  agZeilen = agZeilenBauen();
+  const k = `${Number(einsatzId)}:${Number(mitarbeiterId)}`;
+  openAbgleich(k);
+  agdRapportUebernehmen(k);
+}
+
+// ── Rechnung-Platzhalter (ENT-127) ──────────────────────────────────────
+//
+// Nur sichtbar bei abgeschlossenen Einsaetzen -- eine kuenftige Schicht laesst
+// sich nicht abrechnen. Ausdruecklich noch ohne Funktion: "Rechnung
+// erstellen" gibt es im System noch nirgends (ENT-040 hat das bewusst
+// zurueckgestellt), ein eigenes, deutlich groesseres Vorhaben.
+//
+// btn-plain statt btn-quiet (ENT-130): Im Kunden-Zeilenmenue steht derselbe
+// Platzhalter als schmucklose Menuezeile -- dort gibt der umgebende
+// Popover-Kontext die Form vor. Hier steht der Knopf frei in der Karte;
+// btn-quiet hat weder Rahmen noch Hintergrund und blieb dadurch nicht als
+// Knopf erkennbar, sondern sah wie normaler Fliesstext aus (am gerenderten
+// Zustand gemessen, nicht im Quelltext vermutet).
+function epRechnungBlock(e) {
+  if (!e || !einsatzAbgeschlossen(e)) { return ''; }
+  return `<div class="card-bd" style="padding:0 16px 14px">
+    <button type="button" class="btn btn-plain btn-sm" disabled title="Noch nicht verfügbar">Rechnung erstellen</button>
+  </div>`;
+}
+
+// ── Verkehrsmittel je Zuteilung (ENT-125) ───────────────────────────────
+//
+// Nur sichtbar, wenn die Zone ueberhaupt Auslagenersatz ausloest -- in einer
+// Zone ohne Entschaedigung waere die Frage "womit reist du an" fuer den
+// Anspruch folgenlos, und ein Auswahlfeld ohne Wirkung ist Ballast.
+function epVerkehrsmittelBlock(e) {
+  if (!e || !e.weg_km || enGesperrt(e)) { return ''; }
+  const nao = typeof aoNao === 'function' ? aoNao() : null;
+  const z = typeof gavZone === 'function'
+    ? gavZone(e.weg_km, null, nao ? nao.km_zum_anderen : null) : null;
+  if (!z || !z.entschaedigung) { return ''; }
+
+  const leute = (epPos || []).filter(epBesetzt);
+  if (!leute.length) { return ''; }
+
+  const optionen = ['Privatfahrzeug', 'Oeffentlicher Verkehr', 'Mitfahrer', 'Geschaeftsfahrzeug'];
+  const zeile = p => {
+    const ma = mitarbeiter.find(m => Number(m.id) === Number(p.mitarbeiter_id));
+    const vorgabe = ma ? ma.verkehrsmittel : null;
+    const wert = p.verkehrsmittel || '';   // '' heisst: die Vorgabe gilt
+    const name = (ma && (fullName(ma) || ma.name)) || p.mitarbeiter || ('#' + p.mitarbeiter_id);
+    return `<div class="f" style="margin-bottom:9px">
+      <label>${esc(name)}${vorgabe ? '' : ' <span class="note" style="font-weight:500">— keine Vorgabe hinterlegt</span>'}</label>
+      <div class="inp-row">
+        <select class="inp" data-vm-ma="${Number(p.mitarbeiter_id)}" onchange="epVerkehrsmittelGeaendert(this)">
+          <option value="">${vorgabe ? 'Vorgabe: ' + esc(vorgabe) : '– kein Verkehrsmittel gewählt –'}</option>
+          ${optionen.map(o => `<option value="${esc(o)}"${wert === o ? ' selected' : ''}>${esc(o)}</option>`).join('')}
+        </select>
+        <input class="inp" type="number" min="0" max="999.99" step="0.05" data-vm-oev="${Number(p.mitarbeiter_id)}"
+               style="max-width:130px;display:${wert === 'Oeffentlicher Verkehr' ? '' : 'none'}"
+               placeholder="Billett CHF" value="${p.oev_rappen != null ? (p.oev_rappen / 100).toFixed(2) : ''}"
+               onchange="epVerkehrsmittelSpeichern(${Number(p.mitarbeiter_id)})">
+      </div>
+    </div>`;
+  };
+
+  return `<div class="card-bd" style="padding:0 16px 14px">
+    <div class="zone">
+      <div class="zone-hd">Verkehrsmittel zum Einsatz</div>
+      <div class="zone-note">Massgeblich für den Fahrkostenersatz (Art. 18 Ziff. 4/5) — der
+        Fahrzeitersatz ist davon unabhängig. Ohne Angabe wird beim Abgleich die im Stammblatt
+        hinterlegte Vorgabe verwendet; hier lässt sie sich nur für diesen einen Einsatz
+        überschreiben, etwa für eine Fahrgemeinschaft.</div>
+      ${leute.map(zeile).join('')}
+    </div></div>`;
+}
+
+function epVerkehrsmittelGeaendert(sel) {
+  const maId = Number(sel.dataset.vmMa);
+  const oevFeld = document.querySelector(`[data-vm-oev="${maId}"]`);
+  if (oevFeld) { oevFeld.style.display = sel.value === 'Oeffentlicher Verkehr' ? '' : 'none'; }
+  epVerkehrsmittelSpeichern(maId);
+}
+
+function epVerkehrsmittelSpeichern(maId) {
+  const sel = document.querySelector(`[data-vm-ma="${maId}"]`);
+  const oevFeld = document.querySelector(`[data-vm-oev="${maId}"]`);
+  if (!sel || !epEinsatz) { return; }
+  const verkehrsmittel = sel.value;
+  const oevRappen = (verkehrsmittel === 'Oeffentlicher Verkehr' && oevFeld && oevFeld.value !== '')
+    ? Math.round(Number(oevFeld.value.replace(',', '.')) * 100) : '';
+  api('einsatz_verkehrsmittel.php', { method: 'POST', body: {
+    einsatz_id: epEinsatz.id, mitarbeiter_id: maId, verkehrsmittel, oev_rappen: oevRappen,
+  } }).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') { toast(data.message || 'Verkehrsmittel liess sich nicht speichern.'); return; }
+    const p = epPos.find(x => Number(x.mitarbeiter_id) === maId);
+    if (p) { p.verkehrsmittel = verkehrsmittel || null;
+      p.oev_rappen = oevRappen === '' ? null : oevRappen; }
+    toast('Verkehrsmittel gespeichert.');
+  });
 }
 
 // Der Balken sagt jetzt, woran man ist (ENT-113): gelb = eingeteilt, aber
@@ -8454,9 +9690,7 @@ function epRasterZeichnen() {
       <td class="fest">${p.nr}. ${esc(p.funktion || (epEinsatz && epEinsatz.einsatzart) || 'Position')}${
         p.ist_fahrzeit ? ' <span class="chip chip-n" title="Fahrzeit zählt nach Art. 18 Ziff. 2 nicht als Arbeitszeit">keine Arbeitszeit</span>' : ''}</td>
       <td class="fest">${esc(p.position || '—')}</td>
-      <td class="fest" style="text-align:right">${p.pauschal != null ? nf(p.pauschal, 2) + ' pausch.'
-        : (p.std_verrechnung != null ? nf(p.std_verrechnung, 2) + ' CHF' : '—')}</td>
-      <td class="fest">${hm(p.von)}–${hm(p.bis)} <span style="color:var(--ink-3)">(${std(b - a)}h)</span></td>
+      <td class="fest"><b style="font-size:13px">${hm(p.von)}–${hm(p.bis)}</b> <span style="color:var(--ink-3)">(${std(b - a)}h)</span></td>
       <td class="fest"><div class="ep-werk">
         <button class="ep-schloss${p.gesperrt ? ' zu' : ''}" title="${p.gesperrt ? 'Einteilung steht' : 'Nicht gesperrt'}"
           onclick="event.stopPropagation();epSperren(${p.id},${p.gesperrt ? 0 : 1})">${p.gesperrt ? '🔒' : '🔓'}</button>
@@ -8481,19 +9715,30 @@ function epRasterZeichnen() {
     </tr>`;
   };
 
-  // Sechs feste Spalten seit dem Auswahlkaestchen -- die Soll-/Ist-Zeile
-  // muss sie alle ueberspannen, sonst rutscht das Zeitraster um eine Spalte.
+  // Fuenf feste Spalten seit dem Auswahlkaestchen (ENT-139: "Verrechnung"
+  // entfernt, mehr Platz fuer die Schichtzeiten) -- die Soll-/Ist-Zeile muss
+  // sie alle ueberspannen, sonst rutscht das Zeitraster um eine Spalte.
   const alleDrin = epPos.length > 0 && epPos.every(p => epAngehakt.has(p.id));
+  // Legende unter dem Raster (ENT-139): erklaert Farbe und Symbol der
+  // Balken fuer den (neuen) Planer -- dieselben Klassen/Woerter wie im
+  // Balken selbst (epZusageKlasse/epZusageWort), keine zweite Wahrheit.
+  const legende = `<div class="ep-legende">
+      <span class="ep-lg-item"><i class="ep-lg-swatch offen"></i>Offen</span>
+      <span class="ep-lg-item"><i class="ep-lg-swatch besetzt"></i>Eingeteilt, keine Rückmeldung</span>
+      <span class="ep-lg-item"><i class="ep-lg-swatch zugesagt"></i>Zugesagt</span>
+      <span class="ep-lg-item"><i class="ep-lg-swatch abgelehnt"></i>Abgelehnt</span>
+      <span class="ep-lg-item">${EP_AUGE}Schicht in der App angesehen</span>
+    </div>`;
   $('epRaster').innerHTML = `<table class="ep-gitter"><thead>
       <tr><th class="fest ep-wahl"><input type="checkbox" ${alleDrin ? 'checked' : ''}
             aria-label="Alle Schichten auswählen" onclick="epAlleHaken(this.checked)"></th>
-          <th class="fest">Funktion</th><th class="fest">Position</th><th class="fest">Verrechnung</th>
+          <th class="fest">Funktion</th><th class="fest">Position</th>
           <th class="fest">Zeit</th><th class="fest"></th>${kopfUhr}</tr>
-      <tr><th class="fest" colspan="6" style="text-align:right">Soll</th>
+      <tr><th class="fest" colspan="5" style="text-align:right">Soll</th>
           ${soll.map(n => `<th class="zahl">${n || ''}</th>`).join('')}</tr>
-      <tr><th class="fest" colspan="6" style="text-align:right">Ist</th>
+      <tr><th class="fest" colspan="5" style="text-align:right">Ist</th>
           ${ist.map((n, i) => `<th class="zahl${n < soll[i] ? ' fehlt' : ''}">${n || ''}</th>`).join('')}</tr>
-    </thead><tbody>${epPos.map(zeile).join('')}</tbody></table>`;
+    </thead><tbody>${epPos.map(zeile).join('')}</tbody></table>${legende}`;
   epSammelZeichnen();
 }
 
@@ -10748,16 +11993,17 @@ function renderTagesplan() {
   const tgKarten = `<div class="card nur-schmal"><div class="card-bd flush">` + liste.map(e => {
     const zug = e.mitarbeiter || [];
     const fehlt = fehlend(e);
-    const st = EN_STATUS[e.status] || EN_STATUS.geplant;
-    return `<div class="ag-karte click" onclick="openEinsatz(${Number(e.id)})">
+    const gesperrt = enGesperrt(e);
+    const st = enStatusMarke(e);
+    return `<div class="ag-karte click${gesperrt ? ' abgeglichen' : ''}" onclick="openEinsatz(${Number(e.id)})">
       <div class="kopf">
-        <b>${enSchloss(e)}${esc(hm(e.von))}–${esc(hm(e.bis))}${ueberNacht(e) ? ' <span class="ag-plan">bis Folgetag</span>' : ''}</b>
+        <b>${esc(hm(e.von))}–${esc(hm(e.bis))}${ueberNacht(e) ? ' <span class="ag-plan">bis Folgetag</span>' : ''}</b>
         <span class="chip ${e.status === 'abgesagt' ? 'chip-n' : (fehlt ? 'chip-w' : 'chip-p')}">${besetzt(e).length}/${nf(e.bedarf)}</span>
       </div>
       <div class="wer">${esc(e.kunde_name)}${e.titel ? ` · ${esc(e.titel)}` : ''}</div>
       <div class="zeiten">${esc(e.ort)}${e.strasse ? ` · ${esc(e.strasse)}` : ''}</div>
       <div class="marken">
-        <span class="chip ${st[1]}">${st[0]}</span>
+        <span class="chip ${st[1]}">${st[0]}${gesperrt ? SCHLOSS_ZU : ''}</span>${einsatzRapportWeichtAb(e) ? ` <span class="rap-abw" title="Rapport weicht vom Plan ab">⚠️</span>` : ''}
         ${zug.length ? zug.map(nameChip).join('') : ''}
         ${fehlt ? `<span class="nm off">${fehlt} offen</span>` : ''}
       </div>
@@ -10765,21 +12011,25 @@ function renderTagesplan() {
   }).join('') + `</div></div>`;
 
   $('tgBody').innerHTML = tgKarten + `<div class="card nur-breit"><div class="card-bd flush"><div class="tw">
-    <table><thead><tr>
+    <table class="pl-tab"><colgroup>
+      <col style="width:11%"><col style="width:22%"><col style="width:18%">
+      <col style="width:9%"><col style="width:26%"><col style="width:14%">
+    </colgroup><thead><tr>
       <th>Zeit</th><th>Kunde / Objekt</th><th>Arbeitsort</th><th class="num">Besetzung</th><th>Zugeteilt</th><th>Status</th>
     </tr></thead><tbody>` + liste.map(e => {
       const zug = e.mitarbeiter || [];
       const fehlt = fehlend(e);
-      const st = EN_STATUS[e.status] || EN_STATUS.geplant;
+      const gesperrt = enGesperrt(e);
+      const st = enStatusMarke(e);
       const teile = zug.map(nameChip);
       if (fehlt) teile.push(`<span class="nm off">${fehlt} offen</span>`);
-      return `<tr class="click${enGesperrt(e) ? ' zu' : ''}" onclick="openEinsatz(${Number(e.id)})">
-        <td class="nowrap num">${enSchloss(e)}${hm(e.von)}–${hm(e.bis)}${ueberNacht(e) ? '<div class="sec">bis Folgetag</div>' : ''}</td>
+      return `<tr class="click${gesperrt ? ' zu abgeglichen' : ''}${e.status === 'abgeschlossen' ? ' status-abgeschlossen' : ''}" onclick="openEinsatz(${Number(e.id)})">
+        <td class="nowrap num">${hm(e.von)}–${hm(e.bis)}${ueberNacht(e) ? '<div class="sec">bis Folgetag</div>' : ''}</td>
         <td class="strong">${esc(e.kunde_name)}${e.titel ? `<div class="sec">${esc(e.titel)}</div>` : ''}</td>
         <td>${esc(e.ort)}${e.strasse ? `<div class="sec">${esc(e.strasse)}</div>` : ''}</td>
         <td class="num"><span class="chip ${e.status === 'abgesagt' ? 'chip-n' : (fehlt ? 'chip-w' : 'chip-p')}">${besetzt(e).length}/${nf(e.bedarf)}</span></td>
         <td>${teile.length ? `<div class="crew">${teile.join('')}</div>` : '<span style="color:var(--ink-3)">–</span>'}</td>
-        <td><span class="chip ${st[1]}">${st[0]}</span></td>
+        <td><span class="chip ${st[1]}">${st[0]}${gesperrt ? SCHLOSS_ZU : ''}</span>${einsatzRapportWeichtAb(e) ? ` <span class="rap-abw" title="Rapport weicht vom Plan ab">⚠️</span>` : ''}</td>
       </tr>`;
     }).join('') + `</tbody></table></div></div></div>`;
 }
@@ -11736,6 +12986,14 @@ const MB_ABSCHNITTE = [
     ['beruf',             'Beruf',          'f'],
     ['eintritt',          'Eintritt',       'd'],
     ['austritt',          'Austritt',       'd'],
+    // Auslagenersatz nach Art. 18 GAV (ENT-123/ENT-125): womit die Person
+    // UEBLICHERWEISE anreist. Massgeblich fuer den Fahrkostenersatz -- der
+    // Fahrzeitersatz ist davon unabhaengig und immer geschuldet. Je Einsatz
+    // ueberschreibbar in der Zuteilung, fuer die Fahrgemeinschaft, die es
+    // nur diesmal gibt.
+    ['verkehrsmittel',    'Verkehrsmittel zum Einsatz', 'a',
+      ['Privatfahrzeug', 'Oeffentlicher Verkehr', 'Mitfahrer', 'Geschaeftsfahrzeug'],
+      'Für den Fahrkostenersatz nach Art. 18 GAV — ohne Angabe wird er nicht berechnet'],
   ]},
   // Personenstand, Herkunft, Bewilligungen und Registerauszüge in EINEM
   // Block -- so wie es die Referenz des Projektinhabers unter
@@ -11988,7 +13246,12 @@ function mbZeichnen() {
     const id = 'mb_' + f;
     let steuer;
     if (typ === 'a') {
-      steuer = `<select class="inp${mark(f)}" id="${id}">${mbAuswahl(f, quelle, wert(f))}</select>`;
+      // Ein Hinweistext war bislang nur fuer Text/Zahl/Datum vorgesehen
+      // (als Platzhalter) -- eine Auswahl kann keinen Platzhalter tragen.
+      // Fuers Verkehrsmittel (ENT-125) ist der Hinweis aber wichtig: bleibt
+      // das Feld leer, wird schweigend nichts berechnet.
+      steuer = `<select class="inp${mark(f)}" id="${id}">${mbAuswahl(f, quelle, wert(f))}</select>`
+        + (hinweis ? `<div class="note" style="margin-top:4px">${esc(hinweis)}</div>` : '');
     } else {
       const t = typ === 'd' ? 'date' : typ === 'z' ? 'number' : 'text';
       const horcher = (f === 'vorname' || f === 'nachname') ? ' oninput="mbNameVorschlag()"' : '';

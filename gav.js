@@ -172,6 +172,28 @@ const GAV_WEGSTRECKE_HINWEIS =
   + '(Art. 18 Ziff. 2 GAV) — nicht die schnellste. Google sortiert die Routen '
   + 'nach Fahrzeit; massgebend ist die Route mit den wenigsten Kilometern.';
 
+/* GAV-AUS-010 ist offen (Auslegungsregister): "Pro Tag kann nur ein Hin- und
+   Rueckweg zum Einsatzort mit Pauschalen abgerechnet werden" (Art. 18
+   Ziff. 8) -- WELCHER von mehreren Einsaetzen am selben Tag das ist, ist
+   nicht geklaert. Die Sperrwirkung dazu ist woertlich: "Solange offen, wird
+   fuer Tage mit mehr als einem Einsatz kein Auslagenersatz berechnet -- weder
+   als Vorschlag noch als Anzeige."
+
+   Diese Konstante ist trotzdem KEINE Verletzung der Sperre: Es wird nichts
+   BERECHNET, nur GEMELDET, dass der Fall eintreten kann. Eine Zone, die
+   Entschaedigung ausloest, und eine Person mit zwei Einsaetzen am selben Tag
+   sind beobachtbare Tatsachen -- die Sperre verbietet, daraus einen Betrag zu
+   machen, nicht, den Zustand zu zeigen.
+
+   Eine einzige Quelle (wie GAV_WEGSTRECKE_HINWEIS oben), weil der Text an
+   mehreren Stellen gebraucht wird: Objektliste, Objektdialog, Neue-Schicht,
+   Einsatzplan (siehe OP-104). */
+const GAV_AUS010_HINWEIS =
+  'GAV-AUS-010 ist offen: Für Tage mit mehr als einem Einsatz je Person darf '
+  + 'nach heutigem Stand kein Auslagenersatz berechnet oder angezeigt werden — '
+  + 'es ist nicht geklärt, welcher Einsatz als „der eine Hin- und Rückweg" gilt '
+  + '(Art. 18 Ziff. 8). Vor einer Abrechnung muss das die PaKo klären (OP-104).';
+
 const GAV_ZONEN = [
   { schluessel: 'anstellungsgebiet', name: 'Anstellungsgebiet',
     bis: 10, entschaedigung: false, quelle: 'Art. 18 Ziff. 3.1.1' },

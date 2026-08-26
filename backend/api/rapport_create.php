@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require __DIR__ . '/../db.php';
+require_once __DIR__ . '/../planung.php';   // einsatz_vollstaendig_rapportiert()
 
 $user = require_session();
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -73,5 +74,17 @@ $stmt->execute([
     $d['von'], $d['bis'], $pause, $nettoH,
     $d['sigName'] ?? null, $sig, $d['bemerkung'] ?? null,
 ]);
+
+// Sobald ALLE zugesagten Zuteilungen dieses Einsatzes rapportiert haben, gilt
+// er als abgeschlossen (ENT-128) -- nicht schon bei diesem einen Rapport.
+// 'abgesagt' wird nie ueberschrieben: ein abgesagter Einsatz bleibt abgesagt,
+// selbst wenn einzelne Rapporte trotzdem noch nachgetragen werden.
+// Eine bereits abgeglichene Schicht ist festgeschrieben (ENT-045) -- auch ihr
+// Status wird dann nicht mehr angefasst, selbst wenn nachtraeglich noch ein
+// Rapport eingeht. Der Rapport selbst darf trotzdem entstehen, wie bisher.
+if ($einsatzId > 0 && !einsatz_abgeglichen(db(), $einsatzId) && einsatz_vollstaendig_rapportiert(db(), $einsatzId)) {
+    db()->prepare("UPDATE einsaetze SET status = 'abgeschlossen' WHERE id = ? AND status != 'abgesagt'")
+        ->execute([$einsatzId]);
+}
 
 json_response(['status' => 'ok', 'netto_h' => $nettoH]);

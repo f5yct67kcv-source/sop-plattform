@@ -214,6 +214,7 @@ if (zfBeanstandet.length) { zfBeanstandet.forEach(z => bad.push('PHP-Zweifaktor:
 for (const [datei, titel] of [
   ['pruef_rechte.php',  'KRITISCH: die Rollen geben genau die entschiedenen Rechte'],
   ['pruef_logbuch.php', 'KRITISCH: das Logbuch haelt fest, wer was geaendert hat'],
+  ['pruef_einsatz_abgeschlossen.php', 'KRITISCH: "abgeschlossen" verlangt ALLE zugesagten Rapporte (ENT-128)'],
 ]) {
   let aus = '', code = 0;
   try {
@@ -294,6 +295,58 @@ if (ohneEinbindung.length) { bad.push('ohne rechte.php: ' + ohneEinbindung.join(
   const toteAusnahmen = Object.keys(OHNE_SPERRE).filter(f => !apiDateien.includes(f));
   check('Die Ausnahmeliste der Sperre nennt nur Endpunkte, die es gibt', toteAusnahmen.length === 0);
   if (toteAusnahmen.length) { bad.push('Ausnahme ohne Datei: ' + toteAusnahmen.join(', ')); }
+}
+
+// "Abgeschlossen" (ENT-128): der eigentliche Rechenkern
+// (einsatz_vollstaendig_rapportiert) laeuft echt gegen SQLite in
+// pruef_einsatz_abgeschlossen.php -- hier nur, dass rapport_create.php und
+// rapport_delete.php ihn ueberhaupt aufrufen. Ohne diese Quelltext-Pruefung
+// wuerde kein Test bemerken, wenn die Verdrahtung verschwindet: Die
+// Playwright-Suiten taeuschen die Serverantwort vor und fuehren die
+// eigentliche PHP-Datei nie aus.
+{
+  const create = ohneKommentar('rapport_create.php');
+  const del = ohneKommentar('rapport_delete.php');
+  check('KRITISCH: rapport_create.php prueft auf Vollstaendigkeit, bevor es den Status setzt',
+    /einsatz_vollstaendig_rapportiert\(db\(\), \$einsatzId\)/.test(create)
+    && /UPDATE einsaetze SET status = 'abgeschlossen'/.test(create));
+  check('KRITISCH: die Festschreibung (ENT-045) schuetzt auch diesen neuen Schreibweg',
+    /!einsatz_abgeglichen\(db\(\), \$einsatzId\)/.test(create)
+    && /!einsatz_abgeglichen\(db\(\), \$einsatzId\)/.test(del));
+  check('Ein abgesagter Einsatz wird nie auf abgeschlossen ueberschrieben',
+    /status != 'abgesagt'/.test(create));
+  check('KRITISCH: rapport_delete.php macht "abgeschlossen" rueckgaengig, wenn es wieder unvollstaendig wird',
+    /!einsatz_vollstaendig_rapportiert\(db\(\), \$einsatzId\)/.test(del)
+    && /UPDATE einsaetze SET status = 'bestaetigt' WHERE id = \? AND status = 'abgeschlossen'/.test(del));
+}
+
+// einsatz_save.php muss 'abgeschlossen' beim Speichern anderer Felder
+// akzeptieren (Bemerkung, Zeitverschiebung schicken status: e.status mit) --
+// sonst waere ein Speichern an einem abgeschlossenen Einsatz ein Fehler.
+check('KRITISCH: einsatz_save.php lehnt einen bereits abgeschlossenen Einsatz beim Speichern nicht ab',
+  /in_array\(\$status, \[[^\]]*'abgeschlossen'[^\]]*\], true\)/.test(ohneKommentar('einsatz_save.php')));
+
+// Monatsansicht in der App (ENT-134): ohne von/bis-Parameter fehlten bereits
+// vergangene Schichten des laufenden Monats, sobald sie mehr als einen Tag
+// zurueckliegen -- der Standardzeitraum muss beim Monatsanfang beginnen, mit
+// dem Vortag als zusaetzlicher unterer Schranke (Nachtschicht ueber den
+// Monatswechsel).
+check('KRITISCH: meine_schichten.php laedt ohne Parameter ab Monatsanfang, nicht erst ab gestern',
+  /\$von = min\(\$monatsanfang, \$vortag\)/.test(ohneKommentar('meine_schichten.php'))
+  && /\$monatsanfang = date\('Y-m-01'\)/.test(ohneKommentar('meine_schichten.php')));
+
+// Backfill fuer laengst vollstaendig rapportierte Einsaetze (ENT-128): der
+// Uebergang wird sonst nur im Moment eines NEUEN Rapports ausgeloest -- ohne
+// diesen Nachtrag bliebe jeder Einsatz, dessen Rapport(e) schon vor diesem
+// Deploy bestanden, fuer immer auf dem alten Status stehen.
+{
+  const einrichten = execFileSync('cat', [`${WURZEL}/backend/api/planung_einrichten.php`], { encoding: 'utf8' });
+  check('KRITISCH: die Einrichtung traegt "abgeschlossen" nach fuer Einsaetze, die es laengst waeren',
+    /einsatz_vollstaendig_rapportiert\(\$pdo, \(int\)\$eid\)/.test(einrichten)
+    && /!einsatz_abgeglichen\(\$pdo, \(int\)\$eid\)/.test(einrichten)
+    && /UPDATE einsaetze SET status = 'abgeschlossen' WHERE id = \?/.test(einrichten));
+  check('Ausgenommen sind abgesagte und bereits abgeschlossene Einsaetze -- keine unnoetige Arbeit',
+    /status NOT IN \('abgesagt', 'abgeschlossen'\)/.test(einrichten));
 }
 
 

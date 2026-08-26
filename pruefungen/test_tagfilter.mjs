@@ -333,7 +333,18 @@ check('KRITISCH: die Filterregel steht genau einmal',
   && (dash.match(/function planStatusPasst/g) || []).length === 1);
 check('KRITISCH: der Tagesplan baut sie nicht nach, sondern ruft sie auf',
   /renderTagesplan[\s\S]{0,900}planHerkunftPasst\(e, herkunft\) && planStatusPasst\(e, status\)/.test(dash));
-check('Die Einsatzliste ebenso', /pFiltered[\s\S]{0,700}planHerkunftPasst\(e, herkunft\)/.test(dash));
+// Nicht ueber einen Zeichenabstand pruefen, sondern im Rumpf der Funktion:
+// Ein Abstandsmass wird rot, sobald jemand einen Kommentar davorsetzt --
+// genau das ist bei ENT-119 passiert, obwohl der Aufruf unveraendert dastand.
+// Eine Pruefung, die auf Formatierung reagiert statt auf Verhalten, wird
+// irgendwann weggeklickt statt gelesen.
+const rumpf = name => {
+  const i = dash.indexOf(`function ${name}(`);
+  if (i < 0) { return ''; }
+  const j = dash.indexOf('\n}', i);
+  return j < 0 ? dash.slice(i) : dash.slice(i, j);
+};
+check('Die Einsatzliste ebenso', rumpf('pFiltered').includes('planHerkunftPasst(e, herkunft)'));
 check('KRITISCH: die Herkunftsprüfung kennt objekt_id als Merkmal, nicht die Einsatzart',
   /planHerkunftPasst[\s\S]{0,400}e\.objekt_id/.test(dash));
 check('KRITISCH: die Spartenprüfung nutzt sparteVon, nicht einen eigenen Vergleich',

@@ -130,8 +130,22 @@ svg.i-sm { width: 17px; height: 17px; }
 .tabs button .punkt { width: 5px; height: 5px; border-radius: 50%; background: var(--neg); position: absolute; margin: -16px 0 0 18px; }
 
 /* ── Karten */
-.karte { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--sh-1); margin-bottom: 12px; overflow: hidden; }
+.karte { position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--sh-1); margin-bottom: 12px; overflow: hidden; }
 .karte-bd { padding: 16px; }
+/* Abgeschlossene Schicht (ENT-133): auf einen Blick erkennbar, ohne den
+   Rapport-Korrekturweg zu sperren -- die Karte bleibt anklickbar. */
+.karte.abgeschlossen { border-color: var(--pos); background: var(--pos-soft); }
+.karte-haken { position: absolute; top: 10px; right: 10px; width: 24px; height: 24px; border-radius: 50%;
+  background: var(--pos); color: #fff; display: flex; align-items: center; justify-content: center; }
+.karte-haken svg { width: 14px; height: 14px; stroke-width: 2.6; }
+/* Ueberfaelliger Rapport (ENT-134): Schicht seit ueber 2 Std. zu Ende, kein
+   eigener Rapport hinterlegt. Warnfarbe statt Fehlerfarbe -- es ist noch kein
+   Fehlschlag, nur eine Erinnerung, und die Karte bleibt so anklickbar wie jede
+   andere auch. */
+.karte.ueberfaellig { border-color: var(--warn); background: var(--warn-soft); }
+.karte-warn { position: absolute; top: 10px; right: 10px; width: 24px; height: 24px; border-radius: 50%;
+  background: var(--warn); color: #fff; display: flex; align-items: center; justify-content: center;
+  font-size: 14px; line-height: 1; }
 
 /* ── Schichtkarte: die Zeit ist die wichtigste Angabe */
 .schicht { display: block; width: 100%; text-align: left; border: none; background: transparent; font: inherit; color: inherit; cursor: pointer; padding: 0; }
@@ -226,6 +240,47 @@ svg.i-sm { width: 17px; height: 17px; }
 .dl dd { font-size: 15px; font-weight: 550; padding: 11px 0; border-bottom: 1px solid var(--line-soft); word-break: break-word; }
 .dl dt:last-of-type, .dl dd:last-of-type { border-bottom: none; }
 
+/* Unterlagen zur Schicht (ENT-117). Ganze Zeile als Trefferfläche und
+   mindestens 44 px hoch -- am Bauzaun wird das mit Handschuhen getippt. */
+/* Wer sonst eingeteilt ist (ENT-121). Der Aufklapper ist ein Bedienelement
+   auf einem Telefon und haelt die Trefferflaeche von 44 px ein. */
+.team-auf { display: inline-flex; align-items: center; gap: 7px; min-height: 44px;
+  padding: 0; border: none; background: none; color: var(--ink); font: inherit;
+  font-size: 13.5px; font-weight: 550; cursor: pointer; text-align: left; }
+.team-pfeil { width: 15px; height: 15px; flex: none; stroke: currentColor; stroke-width: 2;
+  fill: none; stroke-linecap: round; stroke-linejoin: round; transition: transform .15s; }
+.team-auf[aria-expanded="true"] .team-pfeil { transform: rotate(180deg); }
+.team-liste { display: none; margin: 0 0 6px; padding: 0; list-style: none; }
+.team-liste.auf { display: block; }
+.team-liste li { font-size: 13.5px; padding: 5px 0 5px 13px; position: relative; color: var(--ink); }
+/* Punkt statt Aufzaehlungszeichen -- die Liste steht in einer Datenzeile und
+   soll nicht wie ein eigener Absatz wirken. */
+.team-liste li::before { content: ''; position: absolute; left: 0; top: 12px;
+  width: 4px; height: 4px; border-radius: 50%; background: var(--ink-3); }
+.team-liste li.ich { font-weight: 650; }
+.team-du { font-size: 11.5px; color: var(--ink-3); font-weight: 500; }
+
+/* Der Routenknopf steht in der Adresszeile und ist ein echtes Bedienelement
+   auf einem Telefon -- 44 px Trefferflaeche wie jedes andere auch. */
+.route-knopf { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px;
+  min-height: 44px; padding: 0 14px; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--surface); color: var(--ink); font-size: 13.5px; font-weight: 620;
+  text-decoration: none; }
+.route-knopf:active { background: var(--flaeche-2, rgba(127,127,127,.12)); }
+.route-i { width: 15px; height: 15px; flex: none; stroke: currentColor; stroke-width: 1.9;
+  fill: none; stroke-linecap: round; stroke-linejoin: round; }
+
+.dok-kopf { font-size: 12px; font-weight: 650; letter-spacing: .3px; text-transform: uppercase;
+  color: var(--ink-3); margin: 18px 0 8px; }
+.dok-liste { display: flex; flex-direction: column; gap: 8px; }
+.dok-zeile { display: flex; align-items: center; gap: 11px; width: 100%; min-height: 48px;
+  padding: 11px 13px; text-align: left; font: inherit; font-size: 15px; font-weight: 550;
+  color: var(--ink); background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r-sm); cursor: pointer; }
+.dok-zeile:active { background: var(--accent-soft); border-color: var(--accent-line); }
+.dok-zeile .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dok-zeile .gr { flex: none; font-size: 12.5px; font-weight: 550; color: var(--ink-3); }
+
 /* Antippbare Zeile, die eine Unterseite oeffnet (ENT-051). Sieht aus wie ein
    Eintrag, verhaelt sich wie ein Knopf -- darum ein <button>, kein <div> mit
    onclick: nur so ist sie mit der Tastatur und mit Vorlesehilfen erreichbar. */
@@ -245,9 +300,18 @@ svg.i-sm { width: 17px; height: 17px; }
 /* ── Blatt von unten (Schichtdetail, Passwort) */
 .abdunkeln { position: fixed; inset: 0; z-index: 60; background: rgba(16,18,22,.45); opacity: 0; pointer-events: none; transition: opacity .2s; }
 .abdunkeln.on { opacity: 1; pointer-events: auto; }
+/* Volle Hoehe seit ENT-121. Vorher standen oben rund 12 vh ungenutzt --
+   ausgerechnet in der Ansicht, in der am meisten steht (Zeit, Kunde, Ort,
+   Route, Unterlagen, Team, Rapport, Rueckmeldung).
+   top/bottom statt einer vh-Angabe: Auf dem Telefon wandert die Adressleiste
+   beim Scrollen, und 100vh ist dann groesser als das, was man sieht -- der
+   Fussbereich mit den Knoepfen rutscht unter den Rand. Mit top: 0 und
+   bottom: 0 rechnet der Browser selbst.
+   Die Polsterung oben haelt den Griff aus der Statusleiste und der Kamera. */
 .blatt {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 61; max-height: 88vh;
-  background: var(--surface); border-radius: var(--r-lg) var(--r-lg) 0 0; box-shadow: var(--sh-3);
+  position: fixed; left: 0; right: 0; top: 0; bottom: 0; z-index: 61;
+  padding-top: env(safe-area-inset-top);
+  background: var(--surface); box-shadow: var(--sh-3);
   transform: translateY(100%); transition: transform .24s cubic-bezier(.32,.72,0,1);
   display: flex; flex-direction: column;
 }
@@ -259,6 +323,13 @@ svg.i-sm { width: 17px; height: 17px; }
 .blatt-bd { padding: 18px 20px; overflow-y: auto; flex: 1; }
 .blatt-ft { padding: 14px 20px calc(14px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line-soft); display: flex; gap: 10px; flex: none; }
 .blatt-ft .btn { flex: 1; }
+/* Beantworteter Zustand (ENT-120): erst die Aussage, darunter die Knoepfe.
+   Ueberschrift oben, Wert darunter -- und die Knoepfe stehen nebeneinander,
+   damit keiner allein ueber die volle Breite gezogen wird. */
+.blatt-ft.gestapelt { flex-direction: column; align-items: stretch; gap: 12px; }
+.blatt-ft .ft-stand { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.blatt-ft .ft-txt { font-size: 12.5px; color: var(--ink-3); line-height: 1.5; flex: 1 1 160px; }
+.blatt-ft .ft-reihe { display: flex; gap: 10px; }
 
 /* ── Hinweis */
 .toast { position: fixed; left: 16px; right: 16px; bottom: calc(var(--tab-h) + 18px + env(safe-area-inset-bottom)); background: var(--shell); color: #fff; padding: 13px 18px; border-radius: var(--r-sm); font-size: 14.5px; font-weight: 560; box-shadow: var(--sh-2); z-index: 200; opacity: 0; pointer-events: none; transform: translateY(8px); transition: opacity .18s, transform .18s; text-align: center; }
@@ -384,10 +455,18 @@ const W = {
     kunde: 'Kunde', arbeitsort: 'Arbeitsort', zeit: 'Zeit', einsatzart: 'Einsatzart',
     bemerkung: 'Bemerkung', objekt: 'Objekt', imTeam: 'im Team',
     treffpunkt: 'Treffpunkt', kontaktVorOrt: 'Kontakt vor Ort',
+    route: 'Route öffnen', routeFehlt: 'Für diese Schicht ist keine Adresse hinterlegt.',
+    dokumente: 'Unterlagen', dokumenteLaden: 'wird geladen …',
+    dokumentFehler: 'Die Unterlage liess sich nicht öffnen.',
     taetigkeit: 'Tätigkeit', qualifikation: 'Qualifikation',
     zusagen: 'Zusagen', ablehnen: 'Ablehnen', zugesagt: 'Zugesagt', abgelehnt: 'Abgelehnt',
+    duSelbst: 'du', teamZeigen: 'Wer sonst eingeteilt ist',
+    hastZugesagt: 'Du hast zugesagt.', hastAbgelehnt: 'Du hast abgelehnt.',
+    planungSiehtEs: 'Die Planung sieht deine Rückmeldung.',
+    antwortAendern: 'Antwort ändern',
     offen: 'Noch offen', gemeldet: 'Rückmeldung gespeichert.',
     geplant: 'Geplant', bestaetigt: 'Bestätigt', provisorisch: 'Auf Abruf', abgesagt: 'Abgesagt',
+    abgeschlossen: 'Abgeschlossen',
     abgesagtHinweis: 'Dieser Einsatz wurde abgesagt.',
     provisorischHinweis: 'Auf Abruf — ob der Einsatz stattfindet, entscheidet sich kurzfristig.',
     neuerRapport: 'Neuer Rapport', meineRapporte: 'Meine Rapporte',
@@ -395,6 +474,7 @@ const W = {
     zurErfassung: 'Zur Rapporterfassung',
     schichtRapportieren: 'Schicht rapportieren', schichtRapportTitel: 'Schicht rapportieren',
     schonRapportiert: 'Bereits rapportiert am', erneutSendenKorrigiert: 'Erneutes Senden korrigiert diese Angaben.',
+    rapportUeberfaellig: 'Rapport noch ausfüllen',
     strasse: 'Strasse', ort: 'Ort', arbeitsbeginn: 'Arbeitsbeginn', arbeitsende: 'Arbeitsende',
     pauseMinuten: 'Pause (Minuten)', unterzeichnerName: 'Name Unterzeichner', vorUndNachname: 'Vor- und Nachname',
     unterschriftKunde: 'Unterschrift Kunde', hierUnterschreiben: '✍ Hier unterschreiben', loeschen: 'Löschen',
@@ -601,17 +681,31 @@ const LEER = (t, p, ic) => `<div class="karte"><div class="leer">
 
 const STATUS_MARKE = {
   geplant: ['geplant', 'm-n'], bestaetigt: ['bestaetigt', 'm-p'],
-  provisorisch: ['provisorisch', 'm-w'], abgesagt: ['abgesagt', 'm-x']
+  provisorisch: ['provisorisch', 'm-w'], abgesagt: ['abgesagt', 'm-x'],
+  // ENT-128: vom Server gesetzt, sobald alle zugesagten Personen rapportiert
+  // haben -- dieselbe Bedeutung wie im Dashboard, eigene Kopie, weil app.html
+  // seine Markierungen unabhaengig fuehrt.
+  abgeschlossen: ['abgeschlossen', 'm-p'],
 };
 const ZUSAGE_MARKE = { zugesagt: ['zugesagt', 'm-p'], abgelehnt: ['abgelehnt', 'm-x'], offen: ['offen', 'm-n'] };
 
 // Eine Schichtkarte. Die Zeit steht vorne und gross -- danach wird draussen
 // zuerst gesucht.
 function schichtKarte(e, mitDatum) {
-  const bal = e.status === 'abgesagt' ? 'ab' : (e.status === 'provisorisch' ? 'prov' : (e.status === 'bestaetigt' ? 'best' : ''));
+  const abgeschlossen = e.status === 'abgeschlossen';
+  const ueberfaellig = !abgeschlossen && schichtUeberfaellig(e);
+  const bal = e.status === 'abgesagt' ? 'ab' : (e.status === 'provisorisch' ? 'prov' : (e.status === 'bestaetigt' || abgeschlossen ? 'best' : ''));
   const st = STATUS_MARKE[e.status] || STATUS_MARKE.geplant;
   const zu = ZUSAGE_MARKE[e.zusage] || ZUSAGE_MARKE.offen;
-  return `<div class="karte">
+  // Der eigene Rapport, sofern schon eingereicht (ENT-133) -- derselbe
+  // Abgleich wie im Schichtblatt, nur zusaetzlich schon auf der Karte
+  // sichtbar, ohne dafuer erst hineinklicken zu muessen.
+  const rap = abgeschlossen ? rapportFuerSchicht(e.id) : null;
+  return `<div class="karte${abgeschlossen ? ' abgeschlossen' : ''}${ueberfaellig ? ' ueberfaellig' : ''}">
+    ${abgeschlossen ? `<div class="karte-haken" aria-hidden="true" title="${esc(w(st[0]))}">
+      <svg class="i" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+    </div>` : ''}
+    ${ueberfaellig ? `<div class="karte-warn" aria-hidden="true" title="${esc(w('rapportUeberfaellig'))}">⚠️</div>` : ''}
     <button class="schicht" onclick="blattAuf(${Number(e.id)})">
       <div class="oben">
         <span class="balken ${bal}"></span>
@@ -627,6 +721,8 @@ function schichtKarte(e, mitDatum) {
       <span class="marke ${st[1]}">${esc(w(st[0]))}</span>
       ${e.status !== 'abgesagt' ? `<span class="marke ${zu[1]}">${esc(w(zu[0]))}</span>` : ''}
       ${Number(e.im_team) > 1 ? `<span class="marke m-n">${Number(e.im_team)} ${esc(w('imTeam'))}</span>` : ''}
+      ${rap ? `<span class="marke m-n">${esc(w('schonRapportiert'))} ${dmy(rap.erfasst_am)}, ${String(rap.erfasst_am).slice(11, 16)}</span>` : ''}
+      ${ueberfaellig ? `<span class="marke m-w">${esc(w('rapportUeberfaellig'))}</span>` : ''}
     </div>
   </div>`;
 }
@@ -667,7 +763,11 @@ function zeichneHeute() {
 // ══════════════════════════════════════════ PLAN
 function zeichnePlan() {
   const heute = isoTag();
-  const kommend = schichten.filter(e => tagVon(e) >= heute)
+  // ENT-134: der ganze laufende Monat, nicht nur ab heute -- sonst
+  // verschwindet eine bereits abgeschlossene Schicht von vorhin aus dem Plan,
+  // noch bevor der Monat vorbei ist.
+  const monatsanfang = heute.slice(0, 8) + '01';
+  const kommend = schichten.filter(e => tagVon(e) >= monatsanfang)
     .sort((a, b) => tagVon(a).localeCompare(tagVon(b)) || String(a.von).localeCompare(String(b.von)));
   if (!kommend.length) {
     $('v-plan').innerHTML = LEER(w('keinePlan'), w('keinePlanText'),
@@ -1083,7 +1183,10 @@ function blattAuf(id) {
       <dt>${esc(w('zeit'))}</dt><dd>${esc(wd)}, ${dmy(e.datum)}</dd>
       <dt>${esc(w('kunde'))}</dt><dd>${esc(e.kunde_name)}</dd>
       ${e.objekt_name ? `<dt>${esc(w('objekt'))}</dt><dd>${esc(e.objekt_name)}</dd>` : ''}
-      <dt>${esc(w('arbeitsort'))}</dt><dd>${e.strasse ? esc(e.strasse) + '<br>' : ''}${esc(e.ort)}${e.kanton ? ' ' + esc(e.kanton) : ''}</dd>
+      <dt>${esc(w('arbeitsort'))}</dt><dd>${e.strasse ? esc(e.strasse) + '<br>' : ''}${esc(e.ort)}${e.kanton ? ' ' + esc(e.kanton) : ''}${
+        schichtAdresse(e) ? `<br><a class="route-knopf" target="_blank" rel="noopener"
+          href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(schichtAdresse(e))}"
+          >${ROUTE_IKONE}${esc(w('route'))}</a>` : ''}</dd>
       ${e.treffpunkt ? `<dt>${esc(w('treffpunkt'))}</dt><dd>${esc(e.treffpunkt)}</dd>` : ''}
       ${e.kontakt_vorname || e.kontakt_nachname || e.kontakt_telefon ? `<dt>${esc(w('kontaktVorOrt'))}</dt><dd>${
         esc([e.kontakt_vorname, e.kontakt_nachname].filter(Boolean).join(' '))
@@ -1093,20 +1196,172 @@ function blattAuf(id) {
       ${e.qualifikation ? `<dt>${esc(w('qualifikation'))}</dt><dd>${esc(e.qualifikation)}</dd>` : ''}
       <dt>${esc(w('einsatzart'))}</dt><dd>${esc(e.einsatzart)}</dd>
       <dt>Status</dt><dd><span class="marke ${st[1]}">${esc(w(st[0]))}</span> <span class="marke ${zu[1]}">${esc(w(zu[0]))}</span></dd>
-      ${Number(e.im_team) > 1 ? `<dt>${esc(w('schicht'))}</dt><dd>${Number(e.im_team)} ${esc(w('imTeam'))}</dd>` : ''}
+      ${Number(e.im_team) > 1 ? `<dt>${esc(w('schicht'))}</dt><dd>${teamBlock(e)}</dd>` : ''}
       ${e.bemerkung ? `<dt>${esc(w('bemerkung'))}</dt><dd>${esc(e.bemerkung)}</dd>` : ''}
     </dl>
+    <!-- Unterlagen des Planers (ENT-117). Der Platz steht schon, der Inhalt
+         kommt nach: Die Liste ist eine eigene Abfrage und darf das Öffnen der
+         Schicht nicht aufhalten. Ohne Unterlagen bleibt hier nichts stehen. -->
+    <div id="blDok"></div>
     ${darfSchichtRapportieren(e) ? `<button class="btn btn-primary btn-wide" style="margin-top:4px" onclick="schichtRapportBlatt(${Number(e.id)})">${esc(w('schichtRapportieren'))}</button>` : ''}
     ${(() => { const r = rapportFuerSchicht(e.id); return r
       ? `<p style="font-size:12.5px;color:var(--ink-3);text-align:center;margin-top:8px">${esc(w('schonRapportiert'))} ${dmy(r.erfasst_am)}, ${String(r.erfasst_am).slice(11, 16)}</p>`
       : ''; })()}`;
 
-  // Rückmeldung ist freiwillig -- die Einteilung bleibt so oder so bestehen.
-  $('blFuss').innerHTML = e.status === 'abgesagt' ? `
-    <button class="btn btn-plain" onclick="blattZu()">${esc(w('schliessen'))}</button>` : `
-    <button class="btn ${e.zusage === 'abgelehnt' ? 'btn-neg' : 'btn-plain'}" onclick="melden('abgelehnt')">${esc(w('ablehnen'))}</button>
-    <button class="btn ${e.zusage === 'zugesagt' ? 'btn-pos' : 'btn-primary'}" onclick="melden('zugesagt')">${esc(w('zusagen'))}</button>`;
+  blattDokLaden(Number(e.id));
+
+  // Eine bereits gegebene Antwort wird nicht noch einmal verlangt (ENT-120).
+  antwortOffen = false;
+  blattFussZeichnen(e);
   blattZeigen();
+}
+
+// ── Fussbereich der Schichtansicht (ENT-120)
+//
+// Wer zu- oder abgesagt hat, bekommt beim naechsten Oeffnen nicht wieder zwei
+// gleich grosse Knoepfe vorgesetzt, die eine Entscheidung verlangen, die
+// laengst gefallen ist. Stattdessen steht da, WAS beantwortet wurde.
+//
+// Die Knoepfe verschwinden aber nicht ersatzlos, sondern hinter „Antwort
+// ändern": Auf einem Telefon liegen „Ablehnen" und „Zusagen" nebeneinander,
+// und ein Fehlgriff ist schnell passiert. Waere die Antwort danach
+// unwiderruflich, plante die Einsatzleitung mit einer Zusage, die niemand so
+// gemeint hat -- und wer nach der Zusage krank wird, haette in der App
+// ueberhaupt keinen Weg mehr. Eine Rueckmeldung, die sich nicht berichtigen
+// laesst, ist schlechter als gar keine.
+let antwortOffen = false;
+
+function antwortAendern() {
+  antwortOffen = true;
+  const e = schichten.find(x => Number(x.id) === blattId);
+  if (e) { blattFussZeichnen(e); }
+}
+
+function blattFussZeichnen(e) {
+  const el = $('blFuss');
+  if (!el) { return; }
+  const schliessen = `<button class="btn btn-plain" onclick="blattZu()">${esc(w('schliessen'))}</button>`;
+  if (e.status === 'abgesagt') { el.className = 'blatt-ft'; el.innerHTML = schliessen; return; }
+
+  // Rückmeldung ist freiwillig -- die Einteilung bleibt so oder so bestehen.
+  const beantwortet = e.zusage === 'zugesagt' || e.zusage === 'abgelehnt';
+  if (!beantwortet || antwortOffen) {
+    el.className = 'blatt-ft';
+    el.innerHTML = `
+      <button class="btn ${e.zusage === 'abgelehnt' ? 'btn-neg' : 'btn-plain'}" onclick="melden('abgelehnt')">${esc(w('ablehnen'))}</button>
+      <button class="btn ${e.zusage === 'zugesagt' ? 'btn-pos' : 'btn-primary'}" onclick="melden('zugesagt')">${esc(w('zusagen'))}</button>`;
+    return;
+  }
+  const ja = e.zusage === 'zugesagt';
+  el.className = 'blatt-ft gestapelt';
+  el.innerHTML = `
+    <div class="ft-stand">
+      <span class="marke ${ja ? 'm-p' : 'm-x'}">${esc(w(ja ? 'zugesagt' : 'abgelehnt'))}</span>
+      <span class="ft-txt">${esc(w(ja ? 'hastZugesagt' : 'hastAbgelehnt'))} ${esc(w('planungSiehtEs'))}</span>
+    </div>
+    <div class="ft-reihe">
+      <button class="btn btn-plain" onclick="antwortAendern()">${esc(w('antwortAendern'))}</button>
+      ${schliessen}
+    </div>`;
+}
+
+// ── Unterlagen zur Schicht (ENT-117) ────────────────────────────────────
+// Was der Planer angehängt hat: Objektplan, Verkehrsanordnung,
+// Sicherheitskonzept. Der Endpunkt gibt sie nur an Eingeteilte dieses
+// Einsatzes heraus -- hier wird nichts zusätzlich geprüft, weil eine Prüfung
+// in der Oberfläche keine ist.
+// ── Wer sonst auf der Schicht steht (ENT-121) ───────────────────────────
+//
+// Bis dahin gab es nur die Anzahl. Der Projektinhaber hat das fuer die
+// Absprache vor Ort revidiert (ENT-023 Ziff. „nur die Anzahl" ist damit
+// ueberholt) -- ausdruecklich NUR die Namen: keine Telefonnummer, keine
+// Personalnummer, kein Rueckmeldestand der anderen. Der Endpunkt gibt auch
+// nicht mehr heraus; hier wird nur angezeigt, was ankommt.
+//
+// Eingeklappt, weil die Zahl in den meisten Faellen genuegt. Wer wissen will,
+// wen er vor Ort sucht, klappt auf.
+const TEAM_PFEIL = '<svg viewBox="0 0 24 24" aria-hidden="true" class="team-pfeil">'
+  + '<polyline points="6 9 12 15 18 9"/></svg>';
+
+function teamBlock(e) {
+  const liste = Array.isArray(e.team) ? e.team : [];
+  const zahl = `${Number(e.im_team)} ${esc(w('imTeam'))}`;
+  // Ohne Namensliste bleibt es bei der Zahl -- ein Knopf, der nichts
+  // aufklappt, ist schlimmer als kein Knopf.
+  if (liste.length < 2) { return zahl; }
+  return `<button type="button" class="team-auf" aria-expanded="false"
+      title="${esc(w('teamZeigen'))}" onclick="teamUm(this)"><span>${zahl}</span>${TEAM_PFEIL}</button>
+    <ul class="team-liste">${liste.map(m => `<li${m.bin_ich ? ' class="ich"' : ''}>${esc(m.name)}${
+      m.bin_ich ? ` <span class="team-du">${esc(w('duSelbst'))}</span>` : ''}</li>`).join('')}</ul>`;
+}
+
+function teamUm(b) {
+  const auf = b.getAttribute('aria-expanded') === 'true';
+  b.setAttribute('aria-expanded', auf ? 'false' : 'true');
+  const l = b.nextElementSibling;
+  if (l) { l.classList.toggle('auf', !auf); }
+}
+
+// Adresse der Schicht als Zieladresse fuer die Navigation (ENT-119).
+//
+// ABGRENZUNG: Das hat NICHTS mit der Wegstrecke nach Art. 18 GAV zu tun
+// (ENT-116). Dort geht es um die KUERZESTE Strecke ab Hauptanstellungsort als
+// Grundlage fuer den Auslagenersatz, sie wird von einem Menschen abgelesen und
+// gespeichert, und die Zoneneinteilung ist als GAV-AUS-011 offen. Hier geht es
+// nur darum, dass die eingeteilte Person den Ort findet -- eine Navigation vom
+// jeweiligen Standort aus, ohne origin, ohne gespeicherte Zahl, ohne jede
+// Wirkung auf Lohn oder Rechnung. Diese beiden Wege duerfen nie zusammenlaufen.
+//
+// Kein origin: Der Startpunkt ist der Standort der Person, den kennt ihr Geraet
+// -- und wir wollen ihn nicht wissen.
+function schichtAdresse(e) {
+  if (!e) { return ''; }
+  return [e.strasse, e.ort, e.kanton].map(t => String(t || '').trim()).filter(Boolean).join(', ');
+}
+
+const ROUTE_IKONE = '<svg viewBox="0 0 24 24" aria-hidden="true" class="route-i">'
+  + '<path d="M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 0 1 18 0z"/>'
+  + '<circle cx="12" cy="10" r="3"/></svg>';
+
+function blattDokLaden(einsatzId) {
+  const el = $('blDok'); if (!el) return;
+  el.innerHTML = '';
+  api('einsatz_dokument.php?einsatz_id=' + einsatzId).then(({ ok, data }) => {
+    // Blatt inzwischen gewechselt? Dann gehört diese Antwort nicht mehr hierher.
+    if (blattId !== einsatzId) return;
+    const dok = (ok && data.status === 'ok') ? (data.dokumente || []) : [];
+    if (!dok.length) return;
+    el.innerHTML = `<div class="dok-kopf">${esc(w('dokumente'))}</div>
+      <div class="dok-liste">${dok.map(d => `
+        <button type="button" class="dok-zeile" onclick="dokOeffnen(${Number(d.id)})">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+               stroke-width="1.7" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+          <span class="nm">${esc(d.dateiname)}</span>
+          <span class="gr">${dokGr(Number(d.groesse) || 0)}</span>
+        </button>`).join('')}</div>`;
+  }).catch(() => {});
+}
+
+const dokGr = b => b >= 1048576 ? nf(b / 1048576, 1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB';
+
+// Der Endpunkt verlangt den Anmelde-Kopf, ein <a href> trägt ihn nicht mit.
+// Das Fenster wird VOR dem Holen geöffnet: nach einem await gilt der Tipp
+// nicht mehr als Nutzeraktion und der Browser blockiert es.
+function dokOeffnen(id) {
+  const f = window.open('', '_blank');
+  fetch(API + 'einsatz_dokument.php?id=' + encodeURIComponent(id),
+        { headers: token ? { 'X-Auth-Token': token } : {} })
+    .then(r => { if (!r.ok) throw new Error('http'); return r.blob(); })
+    .then(b => {
+      const url = URL.createObjectURL(b);
+      // Hier ist das Umleiten der richtige Rückfall, anders als im Dashboard:
+      // In der installierten App gibt es oft gar kein zweites Fenster, und es
+      // steht kein Formular offen, das dabei verloren ginge -- die Schicht ist
+      // nach dem Zurückgehen einen Fingertipp entfernt.
+      if (f) { f.location = url; } else { location.href = url; }
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    })
+    .catch(() => { if (f) f.close(); toast(w('dokumentFehler')); });
 }
 
 // Nur bei zugesagtem Verkehrsdienst, und erst sobald die Schicht begonnen hat
@@ -1115,6 +1370,19 @@ function darfSchichtRapportieren(e) {
   if (e.status === 'abgesagt' || e.zusage !== 'zugesagt' || e.einsatzart !== 'Verkehrsdienst') return false;
   const sp = spanne(e.datum, e.von, e.bis);
   return !!sp && sp[0] <= Date.now();
+}
+
+// Erinnerung, kein Fehler (ENT-134): mehr als zwei Stunden nach Schichtende
+// noch kein eigener Rapport. Nur dort sinnvoll, wo ueberhaupt rapportiert
+// werden darf -- sonst waere die Warnung ein Versprechen ohne Knopf dazu.
+// Ist die Schicht bereits als "abgeschlossen" markiert, hat diese Person
+// zwangslaeufig schon rapportiert (ENT-128 verlangt das von allen
+// Zugeteilten), darum reicht die Pruefung ueber rapportFuerSchicht allein.
+function schichtUeberfaellig(e) {
+  if (!darfSchichtRapportieren(e)) return false;
+  const sp = spanne(e.datum, e.von, e.bis);
+  if (!sp || Date.now() < sp[1] + 2 * 3600e3) return false;
+  return !rapportFuerSchicht(e.id);
 }
 
 // "Korrektur, neueste zaehlt": mehrere Schicht-Rapporte zur selben Zuteilung

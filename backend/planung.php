@@ -405,6 +405,26 @@ function einsatz_abgeglichen(PDO $pdo, int $einsatzId): bool
     return (bool)$s->fetchColumn();
 }
 
+// "Abgeschlossen" (ENT-128): ein Einsatz gilt als fertig rapportiert, sobald
+// JEDE Person mit einer zugesagten Zuteilung ihren Rapport eingereicht hat --
+// nicht schon, wenn irgendeine das tut, und nicht schon, weil das Kalenderdatum
+// vorbei ist. Ohne mindestens eine zugesagte Zuteilung ist der Einsatz NIE
+// abgeschlossen (sonst waere ein Einsatz ohne echte Zusage sofort "fertig",
+// bevor ueberhaupt jemand haette rapportieren koennen).
+function einsatz_vollstaendig_rapportiert(PDO $pdo, int $einsatzId): bool
+{
+    $s = $pdo->prepare(
+        "SELECT COUNT(*) AS zugesagt,
+                SUM(CASE WHEN EXISTS (
+                    SELECT 1 FROM rapporte r WHERE r.einsatz_id = z.einsatz_id AND r.mitarbeiter_id = z.mitarbeiter_id
+                ) THEN 1 ELSE 0 END) AS rapportiert
+         FROM einsatz_zuteilung z WHERE z.einsatz_id = ? AND z.zusage = 'zugesagt'"
+    );
+    $s->execute([$einsatzId]);
+    $row = $s->fetch();
+    return $row && (int)$row['zugesagt'] > 0 && (int)$row['zugesagt'] === (int)$row['rapportiert'];
+}
+
 // Umplanung: eine Person aus den Schichten nehmen, in denen sie zur selben
 // Zeit schon steht (ENT-060).
 //

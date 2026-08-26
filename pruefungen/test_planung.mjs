@@ -1,9 +1,11 @@
 import { WURZEL, HIER, OUT, browserPfad } from './pfade.mjs';
 import { chromium } from 'playwright';
 import { zeitSetzen } from './zeitfeld.mjs';
+import { readFileSync } from 'fs';
 
 
 const URL = `file://${WURZEL}/dashboard.html`;
+const dash = readFileSync(`${WURZEL}/dashboard.html`, 'utf8');
 const EXE = browserPfad();
 
 // Datum lokal, gleiche Rechnung wie im Dashboard
@@ -16,7 +18,17 @@ const STATS = { status: 'ok',
   verlauf: Array.from({ length: 8 }, (_, i) => ({ kw: 26 + i, stunden: 80, anzahl: 10 })),
   angemeldet: [], pro_mitarbeiter: [], letzte_rapporte: [] };
 
-const RAPPORTE = { status: 'ok', rapporte: [] };
+// ENT-138: 14 traegt einen Rapport mit vom Plan abweichenden Zeiten (Warnung
+// erwartet), 12 einen deckungsgleichen (keine Warnung erwartet) -- Plan und
+// Rapport nebeneinander in den jeweiligen Fixturen unten geprueft.
+const RAPPORTE = { status: 'ok', rapporte: [
+  { id: 500, einsatz_id: 14, mitarbeiter_id: 2, mitarbeiter: 'daniele.ciardo',
+    von: '08:15:00', bis: '12:00:00', pause_min: 0, netto_h: 3.75,
+    bemerkung: null, erfasst_am: null },
+  { id: 501, einsatz_id: 12, mitarbeiter_id: 1, mitarbeiter: 'adrian',
+    von: '12:00:00', bis: '18:00:00', pause_min: 0, netto_h: 6,
+    bemerkung: null, erfasst_am: null },
+] };
 
 const MA = { status: 'ok', mitarbeiter: [
   { id: 1, name: 'adrian', ist_admin: 1, vorname: 'Adrian', nachname: 'Von Arb', ort: '4632 Trimbach' },
@@ -45,10 +57,12 @@ const EINSAETZE = { status: 'ok', einsaetze: [
   { id: 13, kunde_id: 1, kunde_name: 'Studer Immobilien AG', titel: 'Nachtdienst', strasse: null,
     ort: '4600 Olten', einsatzart: 'Sicherheitsdienst', datum: MORGEN, von: '22:00:00', bis: '06:00:00',
     bedarf: 1, status: 'geplant', bemerkung: null, mitarbeiter: [] },
-  // vergangen
+  // vergangen, abgeschlossen (ENT-128: der Status entscheidet, nicht mehr das
+  // Kalenderdatum -- ein FRUEHER-Einsatz mit status 'bestaetigt' waere seit
+  // ENT-128 NICHT mehr "abgeschlossen", siehe test_einsatzplan.mjs)
   { id: 14, kunde_id: 2, kunde_name: 'Einwohnergemeinde Niedergösgen', titel: null, strasse: null,
     ort: '5013 Niedergösgen', einsatzart: 'Verkehrsdienst', datum: FRUEHER, von: '08:00:00', bis: '12:00:00',
-    bedarf: 1, status: 'bestaetigt', bemerkung: null, mitarbeiter: [D] },
+    bedarf: 1, status: 'abgeschlossen', bemerkung: null, mitarbeiter: [D] },
   // abgesagt, in der Zukunft -- zaehlt nirgends als offen
   { id: 15, kunde_id: 1, kunde_name: 'Studer Immobilien AG', titel: null, strasse: null,
     ort: '4632 Trimbach', einsatzart: 'Verkehrsdienst', datum: SPAETER, von: '08:00:00', bis: '12:00:00',
@@ -151,6 +165,13 @@ await page.selectOption('#pStatus', 'offen');
 await page.waitForTimeout(200);
 z = await zeilen();
 check('Filter „unterbesetzt“ zeigt nur Luecken', z.filter(r => !r.grp).length === 2);
+await page.selectOption('#pStatus', 'abgeschlossen');
+await page.waitForTimeout(200);
+z = await zeilen();
+check('KRITISCH: Filter „abgeschlossen“ zeigt nur Einsaetze mit diesem Status (ENT-128)',
+  z.filter(r => !r.grp).length === 1 && z.some(r => r.t.includes(dmy(FRUEHER))));
+check('Ein anderer Status zaehlt NICHT als abgeschlossen, auch wenn er in der Vergangenheit liegt',
+  !z.some(r => r.t.includes(dmy(HEUTE)) || r.t.includes(dmy(SPAETER))));
 await page.selectOption('#pStatus', '');
 await page.selectOption('#pSchnell', 'monat');
 await page.waitForTimeout(200);
@@ -399,8 +420,12 @@ await page.waitForTimeout(400);
 const cr = calls.find(c => c.path.includes('einsatz_save'));
 check('KRITISCH: der Kanton geht mit an den Server', cr && cr.body.kanton === 'SO');
 check('KRITISCH: die Kontaktperson geht getrennt mit',
-  cr && cr.body.kontakt_vorname === 'Petra' && cr.body.kontakt_nachname === 'Muster'
-  && cr.body.kontakt_telefon === '079 111 22 33');
+  cr && cr.body.kontakt_vorname === 'Petra' && cr.body.kontakt_nachname === 'Muster');
+// Seit ENT-118 international. Eingetippt wurde '079 111 22 33'; gespeichert
+// wird '+41 79 111 22 33', damit der tel:-Link in der App auch aus dem
+// Ausland waehlt. Die eigenen Grenzfaelle stehen in test_zeitraum.mjs.
+check('KRITISCH: die Telefonnummer geht mit Landesvorwahl an den Server',
+  cr && cr.body.kontakt_telefon === '+41 79 111 22 33');
 check('Der Treffpunkt geht mit', cr && cr.body.treffpunkt === 'Haupteingang');
 
 // ══════════ WEG, ZONE UND FAHRZEIT (ENT-116)
@@ -416,7 +441,8 @@ check('Der Messhinweis nennt die kürzeste Strecke — nicht die schnellste',
   && /nicht die schnellste/i.test(await page.textContent('#enNWegHinweis')));
 check('KRITISCH: ohne Wegstrecke steht „nicht bestimmbar", nicht „keine Entschädigung"',
   (await page.textContent('#enNZone')).includes('nicht bestimmen'));
-check('Und das Fahrzeit-Häkchen ist dann gar nicht da', !(await page.isVisible('#enNFzWahl')));
+check('Kein Fahrzeit-Häkchen mehr (ENT-122)',
+  await page.evaluate(() => !document.getElementById('enNFzWahl') && !document.getElementById('enNFahrzeit')));
 
 // Anstellungsgebiet: unter 10 km, keine Entschädigung.
 await page.fill('#enNWeg_km', '8');
@@ -425,7 +451,8 @@ check('8 km ergeben das Anstellungsgebiet',
   (await page.textContent('#enNZone')).includes('Anstellungsgebiet'));
 check('KRITISCH: dort wird kein Auslagenersatz gemeldet',
   !(await page.textContent('#enNZone')).includes('geschuldet'));
-check('Und kein Fahrzeit-Häkchen angeboten', !(await page.isVisible('#enNFzWahl')));
+check('Auch im Anstellungsgebiet kein Fahrzeit-Häkchen',
+  await page.evaluate(() => !document.getElementById('enNFzWahl')));
 
 // Pauschalzone 1: über 10 km, Entschädigung geschuldet.
 await page.fill('#enNWeg_km', '15');
@@ -435,15 +462,19 @@ check('KRITISCH: 15 km ergeben Pauschalzone 1 mit Auslagenersatz',
   zoneTxt.includes('Pauschalzone 1') && zoneTxt.includes('geschuldet'));
 check('Die Fundstelle wird genannt', zoneTxt.includes('Art. 18'));
 check('KRITISCH: der Hinweis nennt die offene Auslegung', zoneTxt.includes('GAV-AUS-011'));
-check('Das Fahrzeit-Häkchen erscheint und ist vorbelegt',
-  (await page.isVisible('#enNFzWahl')) && (await page.isChecked('#enNFahrzeit')));
+// ENT-122: Auch wenn Auslagenersatz geschuldet ist, entstehen keine
+// Fahrzeit-Zeilen mehr. Der Anspruch folgt aus der Zone (Art. 18 Ziff. 3),
+// nicht aus zwei Zeilen im Raster.
+check('KRITISCH: auch bei geschuldetem Auslagenersatz kein Fahrzeit-Häkchen',
+  await page.evaluate(() => !document.getElementById('enNFzWahl')));
 
 // Reinigung: der GAV Sicherheit gilt nicht (ENT-061).
 await page.selectOption('#enNSparte', 'reinigung');
 await page.waitForTimeout(250);
 check('KRITISCH: für Reinigung gilt Art. 18 nicht',
   (await page.textContent('#enNZone')).includes('Reinigung'));
-check('Und es wird keine Fahrzeit angeboten', !(await page.isVisible('#enNFzWahl')));
+check('Bei Reinigung erst recht keine Fahrzeit-Zeilen',
+  await page.evaluate(() => !document.getElementById('enNFzWahl')));
 await page.selectOption('#enNSparte', 'sicherheit');
 await page.waitForTimeout(250);
 
@@ -464,7 +495,7 @@ check('KRITISCH: der Link führt von der HAO-Adresse zum Arbeitsort',
 check('Er öffnet die Routenliste, nicht eine einzelne Route',
   linkZiel && linkZiel.includes('/maps/dir/?api=1'));
 
-// Anlegen mit Fahrzeit: zwei zusätzliche Positionen, als Nicht-Arbeitszeit.
+// Anlegen mit eingetragener Fahrzeit: es entstehen KEINE Positionen (ENT-122).
 await page.fill('#enNKunde_name', 'Studer Immobilien AG');
 await zeitSetzen(page, '#enNVon', '08:00');
 await zeitSetzen(page, '#enNBis', '12:00');
@@ -477,13 +508,22 @@ const gespeichert = calls.find(c => c.path.includes('einsatz_save'));
 check('KRITISCH: die Wegstrecke geht mit an den Server', gespeichert && Number(gespeichert.body.weg_km) === 15);
 check('KRITISCH: die Adresse zur Wegstrecke wird mitgeschrieben',
   gespeichert && (gespeichert.body.weg_adresse || '').includes('Kantonsstrasse 2'));
+// ENT-122: Die Minuten werden weiterhin gespeichert -- sie sind die
+// Grundlage des Fahrzeitersatzes -- aber es entstehen keine Positionen mehr.
+check('KRITISCH: die Fahrzeit-Minuten gehen weiterhin an den Server',
+  gespeichert && Number(gespeichert.body.weg_minuten) === 30);
 const fz = calls.filter(c => c.path.includes('einsatz_position') && c.body && c.body.ist_fahrzeit);
-check('KRITISCH: Hin- und Rückfahrt werden angelegt', fz.length === 2);
-check('KRITISCH: beide sind als Fahrzeit gekennzeichnet', fz.every(c => c.body.ist_fahrzeit === 1));
-check('KRITISCH: die Hinfahrt endet, wenn der Einsatz beginnt',
-  fz.some(c => c.body.von === '07:30' && c.body.bis === '08:00'));
-check('KRITISCH: die Rückfahrt beginnt, wenn der Einsatz endet',
-  fz.some(c => c.body.von === '12:00' && c.body.bis === '12:30'));
+check('KRITISCH: es entstehen keine Fahrzeit-Positionen mehr', fz.length === 0);
+check('KRITISCH: ueberhaupt keine Position wird beim Anlegen erzeugt',
+  calls.filter(c => c.path.includes('einsatz_position') && c.body
+    && c.body.aktion === 'speichern').length === 0);
+// Die Behandlung BESTEHENDER Fahrzeit-Positionen bleibt unangetastet und
+// wird in test_einsatzplan.mjs geprueft: Sie stehen im Raster, tragen die
+// Marke "keine Arbeitszeit" und zaehlen nicht in die Stundensummen
+// (Sperrwirkung GAV-AUS-009). Wuerde das wegfallen, liefen die in der
+// Datenbank liegenden Zeilen ab sofort als Arbeitszeit mit.
+check('KRITISCH: die Ausnahme bestehender Fahrzeit-Positionen ist nicht entfernt worden',
+  /if \(p\.ist_fahrzeit\) return;/.test(dash));
 
 // ══════════ GESTALTUNG DER ANLEGEN-ANSICHT (ENT-115)
 // Gemessen, nicht im Quelltext nachgelesen.
@@ -494,15 +534,27 @@ try {
     const ab = [...document.querySelectorAll('#view-einsatzneu .abschnitt h3')].map(h => h.textContent.trim());
     const raster = document.querySelector('#view-einsatzneu .form-breit');
     const spalten = getComputedStyle(raster).gridTemplateColumns.split(' ').length;
+    const rasterBreite = Math.round(raster.getBoundingClientRect().width);
     const karte = document.querySelector('#view-einsatzneu .card').getBoundingClientRect();
-    return { ab, spalten, breite: Math.round(karte.width), fenster: window.innerWidth };
+    return { ab, spalten, raster: rasterBreite, breite: Math.round(karte.width),
+             fenster: window.innerWidth };
   });
   check('KRITISCH: die Abschnitte stehen in der Reihenfolge der Vorlage',
     m.ab[0].startsWith('Stammdaten') && m.ab[1].startsWith('Zeit und Arbeitsort')
     && m.ab[2].startsWith('Weg und Auslagenersatz') && m.ab[3].startsWith('Kontaktperson')
     && m.ab[4].startsWith('Zuteilung') && m.ab[5].startsWith('Angaben für die Eingeteilten'));
   check('KRITISCH: die Angaben für die Eingeteilten stehen zuunterst', m.ab.length === 6);
-  check('KRITISCH: auf breitem Schirm mehr als zwei Spalten — der Platz wird genutzt', m.spalten > 2);
+  // ENT-115 wollte: Die Spalten wachsen mit dem Fenster, statt bei zwei zu
+  // bleiben und die halbe Flaeche leer zu lassen. Die Zahl "mehr als zwei bei
+  // 1440 px" war dafuer nur ein Stellvertreter -- und er stimmt seit ENT-117
+  // (Beschriftung links statt oben) nicht mehr: Von einer Spalte geht jetzt
+  // erst die Beschriftung ab. Vier Spalten bei 1440 px hiessen 58 px
+  // Eingabefeld, gemessen. Geprueft wird darum, was ENT-115 wirklich meinte:
+  // Der Platz wird genutzt (das Raster fuellt die Karte) UND die Spalten
+  // wachsen mit dem Fenster (unten bei 1920 px). Dass die Felder dabei
+  // benutzbar breit bleiben, prueft test_zeitraum.mjs.
+  check('KRITISCH: das Raster fuellt die Kartenbreite — kein Rand statt Inhalt',
+    m.breite - m.raster < 45);
   check('Die Karte nutzt die Breite der Ansicht', m.breite > m.fenster * 0.7);
 } catch (e) { bad.push('Gestaltung Anlegen: ' + String(e).split('\n')[0].slice(0, 110)); }
 
@@ -667,6 +719,99 @@ check('Offene Schichten tragen kein Schloss',
 check('KRITISCH: eine Zuteilung mit Ist-Stand sperrt die ganze Schicht',
   await page.evaluate(() => enGesperrt(einsaetze.find(x => Number(x.id) === 14))));
 
+// ══════════ STATUS-CHIP "ABGEGLICHEN" STATT ROHSTATUS, SCHLOSS IM CHIP (ENT-136)
+// Der Projektinhaber, per Screenshot der Planung: dieselbe abgeglichene
+// Schicht wie oben zeigte im STATUS-Feld weiterhin "Geplant" -- das Schloss
+// stand nur separat vor der Zeit, sagte aber nichts ueber den Status selbst.
+// Ausserdem: "Das Schloss Symbol daneben, nicht am Anfang" -- es gehoert in
+// den Chip, hinter das Wort, nicht mehr vor die Uhrzeit.
+check('KRITISCH: der Status-Chip zeigt "Abgeglichen" statt des Rohstatus',
+  await page.evaluate(() => {
+    const tr = [...document.querySelectorAll('#plTable tbody tr')]
+      .find(r => r.getAttribute('onclick') === 'openEinsatz(14)');
+    const chip = tr && tr.querySelector('td:last-child .chip');
+    return !!chip && chip.textContent.includes('Abgeglichen') && chip.classList.contains('chip-p');
+  }));
+check('KRITISCH: das Schloss steht im Status-Chip, hinter dem Wort',
+  await page.evaluate(() => {
+    const tr = [...document.querySelectorAll('#plTable tbody tr')]
+      .find(r => r.getAttribute('onclick') === 'openEinsatz(14)');
+    const chip = tr && tr.querySelector('td:last-child .chip');
+    return !!chip && !!chip.querySelector('.i-schloss');
+  }));
+check('Das Schloss steht NICHT mehr am Anfang des Zeitfelds',
+  await page.evaluate(() => {
+    const tr = [...document.querySelectorAll('#plTable tbody tr')]
+      .find(r => r.getAttribute('onclick') === 'openEinsatz(14)');
+    const zeit = tr && tr.querySelector('td:first-child');
+    return !!zeit && !zeit.querySelector('.i-schloss');
+  }));
+check('Eine offene Schicht zeigt weiterhin ihren echten Status, nicht "Abgeglichen"',
+  await page.evaluate(() => {
+    const tr = [...document.querySelectorAll('#plTable tbody tr')]
+      .find(r => r.getAttribute('onclick') === 'openEinsatz(11)');
+    const chip = tr && tr.querySelector('td:last-child .chip');
+    return !!chip && !chip.textContent.includes('Abgeglichen');
+  }));
+// Diese Fixtur traegt zugleich status:'abgeschlossen' UND ist jetzt
+// abgeglichen -- genau der Fall, in dem beides zusammentrifft. Abgeglichen
+// muss dabei sichtbar gewinnen: nicht verblassen, sondern staerker auffallen
+// (Wunsch des Projektinhabers), und nicht die Warnfarbe von "gesperrt"
+// anderswo (Sperrtage) tragen, sondern dieselbe gruene Aussage wie das
+// Haekchen in der App (ENT-133). Am gerenderten Zustand gemessen (CLAUDE.md).
+check('KRITISCH: eine zugleich abgeschlossene UND abgeglichene Zeile verblasst NICHT',
+  await page.evaluate(() => {
+    const tr = [...document.querySelectorAll('#plTable tbody tr')]
+      .find(r => r.getAttribute('onclick') === 'openEinsatz(14)');
+    const td = tr && tr.querySelector('td');
+    return !!tr && tr.classList.contains('status-abgeschlossen') && tr.classList.contains('abgeglichen')
+      && !!td && parseFloat(getComputedStyle(td).opacity) === 1;
+  }));
+check('KRITISCH: das Schloss im Chip ist gruen eingefaerbt wie der Chip selbst, nicht die Warnfarbe der Zeile',
+  await page.evaluate(() => {
+    const tr = [...document.querySelectorAll('#plTable tbody tr')]
+      .find(r => r.getAttribute('onclick') === 'openEinsatz(14)');
+    const chip = tr && tr.querySelector('td:last-child .chip');
+    const icon = chip && chip.querySelector('.i-schloss');
+    if (!chip || !icon) return false;
+    return getComputedStyle(icon).color === getComputedStyle(chip).color;
+  }));
+// Nicht nur "irgendein Rahmenakzent", sondern nachweislich GRUEN (--pos) --
+// tr.zu allein traegt anderswo bereits einen Rahmenakzent in der Warnfarbe
+// (--warn, "gesperrt"); ein Vergleich gegen eine gewoehnliche Zeile allein
+// haette diesen Fall nicht von der Warnfarbe unterschieden. Die Sonde
+// rendert denselben CSS-Ausdruck einmal isoliert und vergleicht das Ergebnis
+// wortgleich -- die einzig verlaessliche Art, eine CSS-Custom-Property am
+// gerenderten Zustand zu pruefen, statt Text- oder Hex-Werte zu vergleichen.
+check('KRITISCH: der Rahmenakzent der abgeglichenen Zeile ist gruen (--pos), nicht die Warnfarbe von "gesperrt" anderswo',
+  await page.evaluate(() => {
+    const tr = [...document.querySelectorAll('#plTable tbody tr')].find(r => r.getAttribute('onclick') === 'openEinsatz(14)');
+    const td = tr && tr.querySelector('td:first-child');
+    if (!td) return false;
+    const sonde = document.createElement('div');
+    sonde.style.boxShadow = 'inset 2px 0 0 var(--pos)';
+    document.body.appendChild(sonde);
+    const erwartet = getComputedStyle(sonde).boxShadow;
+    sonde.remove();
+    return getComputedStyle(td).boxShadow === erwartet;
+  }));
+
+// ══════════ ABWEICHUNGSWARNUNG IN DER LISTE (ENT-138)
+// Der Projektinhaber wollte die Abweichung nicht erst beim Hineinklicken
+// sehen, sondern schon in der Liste -- eigene Kennzeichnung neben dem
+// Status-Chip, unabhaengig davon, ob die Zeile ausserdem gesperrt/abgeglichen
+// ist (beides sind unabhaengige Aussagen).
+check('KRITISCH: eine Schicht mit vom Plan abweichendem Rapport traegt das Warnzeichen in der Liste',
+  await page.evaluate(() => {
+    const tr = [...document.querySelectorAll('#plTable tbody tr')].find(r => r.getAttribute('onclick') === 'openEinsatz(14)');
+    return !!tr && !!tr.querySelector('.rap-abw');
+  }));
+check('Eine Schicht mit deckungsgleichem Rapport traegt KEIN Warnzeichen',
+  await page.evaluate(() => {
+    const tr = [...document.querySelectorAll('#plTable tbody tr')].find(r => r.getAttribute('onclick') === 'openEinsatz(12)');
+    return !!tr && !tr.querySelector('.rap-abw');
+  }));
+
 // openEinsatz() fuehrt seit 3392470 in die Einsatzplan-Ansicht. Die
 // Schublade -- und mit ihr der Schreibschutz, den die folgenden Pruefungen
 // belegen -- haengt dort hinter "Einsatz bearbeiten"; direkt aufgerufen ist
@@ -708,6 +853,51 @@ await page.evaluate(() => {
   const e = einsaetze.find(x => Number(x.id) === 14);
   e.mitarbeiter[0].ist_status = 'offen';
 });
+
+// ══════════ STATUS "ABGESCHLOSSEN" SPERRT NUR SICH SELBST, NICHT DIE GANZE SCHUBLADE (ENT-128)
+// Anders als die ENT-045-Sperre (enGesperrt, oben): "abgeschlossen" kommt vom
+// Server und darf hier nicht von Hand zurueckgedreht werden -- aber die
+// UEBRIGEN Felder (Kunde, Bemerkung, ...) bleiben bearbeitbar, weil dieser
+// Einsatz nicht zwingend auch abgeglichen ist.
+await page.evaluate(() => { einsaetze.find(x => Number(x.id) === 11).status = 'abgeschlossen'; renderPlanung(); });
+await page.waitForTimeout(200);
+check('KRITISCH: die Liste zeigt "Abgeschlossen" als Status-Badge',
+  await page.evaluate(() => {
+    const tr = [...document.querySelectorAll('#plTable tbody tr')]
+      .find(r => r.getAttribute('onclick') === 'openEinsatz(11)');
+    return !!tr && /Abgeschlossen/.test(tr.textContent);
+  }));
+// Gemessen am gerenderten Zustand, nicht im Quelltext nachgelesen (CLAUDE.md):
+// eine CSS-Regel kann wirkungslos bleiben, ohne dass etwas kaputtgeht.
+check('Die Zeile eines abgeschlossenen Einsatzes tritt sichtbar zurueck (Opacity < 1)',
+  await page.evaluate(() => {
+    const tr = [...document.querySelectorAll('#plTable tbody tr')]
+      .find(r => r.getAttribute('onclick') === 'openEinsatz(11)');
+    const td = tr && tr.querySelector('td');
+    return !!td && parseFloat(getComputedStyle(td).opacity) < 1;
+  }));
+check('Eine geplante Zeile bleibt dagegen voll sichtbar (Opacity 1) -- kein pauschales Ausgrauen',
+  await page.evaluate(() => {
+    const tr = [...document.querySelectorAll('#plTable tbody tr')]
+      .find(r => r.getAttribute('onclick') === 'openEinsatz(12)');
+    const td = tr && tr.querySelector('td');
+    return !!td && parseFloat(getComputedStyle(td).opacity) === 1;
+  }));
+await page.evaluate(() => openEinsatzDrawer(11));
+await page.waitForSelector('#drawer.on');
+await page.waitForTimeout(250);
+check('KRITISCH: das Statusfeld ist gesperrt, sobald der Status "abgeschlossen" ist',
+  await page.evaluate(() => document.getElementById('enEStatus').disabled));
+check('KRITISCH: andere Felder bleiben trotzdem bedienbar -- keine Vollsperre',
+  await page.evaluate(() => !document.getElementById('enEKunde_name').disabled
+    && !document.getElementById('enEBemerkung').disabled));
+check('Speichern steht weiterhin bereit -- nur der Status selbst ist geschuetzt',
+  await page.isVisible('#drFoot .btn-primary'));
+check('Der Statuswert zeigt "Abgeschlossen" an, nicht die erste Option',
+  (await page.$eval('#enEStatus', el => el.options[el.selectedIndex].value)) === 'abgeschlossen');
+await page.evaluate(() => closeDrawer());
+await page.waitForTimeout(200);
+await page.evaluate(() => { einsaetze.find(x => Number(x.id) === 11).status = 'geplant'; });
 
 // ══════════ FEHLENDE TABELLE
 await page.evaluate(() => { einsaetze = []; });
@@ -784,6 +974,114 @@ check('KRITISCH: "Offene Stellen" kommt nirgends mehr vor',
 const krume = await page.textContent('#pgCrumb');
 check('Auch die Kopfzeile sagt Schichten, nicht Stellen',
   !/Stelle/.test(krume));
+
+// ══════════════ SPALTENBREITEN (ENT-137)
+// Der Projektinhaber, mit einer markierten Planungs-Tabelle: die Spalten
+// wirkten ungleichmaessig -- Zwischenraeume unterschiedlich breit, "Status"
+// weit nach rechts verschoben, obwohl das Padding je Zelle die ganze Zeit
+// gleich war. Grund: table-layout:auto orientierte die Breite jeder Spalte
+// am breitesten Inhalt ueber ALLE Zeilen hinweg -- eine einzelne Zeile mit
+// vielen Namen in "Zugeteilt" blaehte diese eine Spalte auf und verdraengte
+// die uebrigen. Feste Prozentbreiten (table-layout:fixed + colgroup) beheben
+// das strukturell, nicht durch Zufall der zufaellig groessten Zeile.
+await page.evaluate(() => { go('planung'); goTab('einsaetze'); });
+await page.selectOption('#pSchnell', 'alle');
+await page.waitForTimeout(300);
+// Absichtlich viel Inhalt in EINER Zelle -- genau der Fall, der table-layout:
+// auto zuvor aus der Fassung brachte. Datum weit in der Vergangenheit (2000):
+// harmlos fuer test_datumsfest.mjs, das nur Daten NAHE bei heute verbietet.
+await page.evaluate(() => {
+  einsaetze.push({ id: 900, kunde_id: 1, kunde_name: 'Eine sehr sehr lange Kundenbezeichnung AG',
+    titel: 'Und ein ebenso langer Titel dazu', strasse: null, ort: '4632 Trimbach',
+    einsatzart: 'Verkehrsdienst', datum: '2000-01-01', von: '07:00:00', bis: '16:00:00',
+    bedarf: 5, status: 'geplant', bemerkung: null,
+    mitarbeiter: [{ id: 101, name: 'x1', vorname: 'Adrian', nachname: 'Von Arb' },
+      { id: 102, name: 'x2', vorname: 'Daniele', nachname: 'Ciardo' },
+      { id: 103, name: 'x3', vorname: 'Hans', nachname: 'Meier' }] });
+  renderPlanung();
+});
+await page.waitForTimeout(200);
+const spalten = await page.evaluate(() => {
+  const table = document.querySelector('#plTable table.pl-tab');
+  if (!table) return null;
+  const breite = table.getBoundingClientRect().width;
+  return [...table.querySelectorAll('thead th')].map(th => (th.getBoundingClientRect().width / breite) * 100);
+});
+check('KRITISCH: die Planung-Tabelle traegt feste Spaltenbreiten (table-layout:fixed)', !!spalten);
+// Enge Toleranz mit Bedacht gewaehlt: table-layout:fixed haelt die Breite auf
+// 0.01 Prozentpunkte genau ein. Ohne fixed (nur colgroup, table-layout:auto)
+// wich "Besetzung" bereits um über 1 Prozentpunkt ab (9.2 statt 8 -- der
+// Browser respektiert col-Breiten als Hinweis, nicht als Vorgabe, sobald
+// Inhalt umbricht). 0.5 trennt beide Faelle sauber; 2 (die erste Fassung
+// dieser Pruefung) haette den Regressionsfall durchgelassen -- beim Schreiben
+// der Gegenprobe selbst bemerkt und korrigiert.
+const ERWARTET_SPALTEN = [10, 18, 15, 13, 8, 24, 12];
+check('KRITISCH: jede Spalte behaelt ihre vorgesehene Breite, auch mit ueberlangem Inhalt in einer einzelnen Zeile',
+  !!spalten && spalten.length === ERWARTET_SPALTEN.length
+  && spalten.every((p, i) => Math.abs(p - ERWARTET_SPALTEN[i]) < 0.5));
+await page.evaluate(() => { einsaetze.splice(einsaetze.findIndex(e => Number(e.id) === 900), 1); });
+
+// Dasselbe Muster gilt fuer den Tagesplan -- dieselbe Liste, nur nach einem
+// Tag gefiltert, mit denselben zwei Fallstricken (table-layout, viele Namen).
+await page.evaluate(() => goTab('tag'));
+await page.waitForTimeout(300);
+const spaltenTag = await page.evaluate(() => {
+  const table = document.querySelector('#tgBody table.pl-tab');
+  if (!table) return null;
+  const breite = table.getBoundingClientRect().width;
+  return [...table.querySelectorAll('thead th')].map(th => (th.getBoundingClientRect().width / breite) * 100);
+});
+check('KRITISCH: die Tagesplan-Tabelle traegt ebenfalls feste Spaltenbreiten', !!spaltenTag);
+const ERWARTET_TAG = [11, 22, 18, 9, 26, 14];
+check('Die Tagesplan-Spalten entsprechen den vorgesehenen Breiten',
+  !!spaltenTag && spaltenTag.length === ERWARTET_TAG.length
+  && spaltenTag.every((p, i) => Math.abs(p - ERWARTET_TAG[i]) < 0.5));
+
+// ══════════════ SICHTBARE SPALTENGRENZEN (ENT-140)
+// Der Projektinhaber meldete trotz ENT-137 (Breiten bereits exakt, siehe
+// oben) weiterhin "nicht sauber ausgerichtete" Spalten. Eine duenne, aber
+// durchgehende Trennlinie macht die Spaltengrenze objektiv sichtbar, statt
+// sie nur aus Textabstaenden zu erraten -- dasselbe Prinzip wie im
+// Einsatzplan-Raster (table.ep-gitter .fest { border-right }).
+check('KRITISCH: jede Spalte ausser der letzten traegt eine sichtbare Trennlinie (Planung)',
+  await page.evaluate(() => {
+    const zellen = [...document.querySelectorAll('#plTable table.pl-tab thead th')];
+    if (zellen.length < 2) return false;
+    const transparent = c => c === 'transparent' || c === 'rgba(0, 0, 0, 0)';
+    return zellen.slice(0, -1).every(z => !transparent(getComputedStyle(z).borderRightColor)
+      && getComputedStyle(z).borderRightWidth !== '0px');
+  }));
+check('Die letzte Spalte (Status) traegt KEINE Trennlinie danach -- kein Rand ins Leere',
+  await page.evaluate(() => {
+    const letzte = document.querySelector('#plTable table.pl-tab thead th:last-child');
+    return !!letzte && getComputedStyle(letzte).borderRightWidth === '0px';
+  }));
+check('Die Tagesueberschrift-Zeile (eine einzige, spannende Zelle) bleibt ohne Trennlinie',
+  await page.evaluate(() => {
+    const grpTd = document.querySelector('#plTable table.pl-tab tbody tr.grp td');
+    return !!grpTd && getComputedStyle(grpTd).borderRightWidth === '0px';
+  }));
+// Am gerenderten Zustand gemessen: dieselbe Farbe wie eine isolierte Sonde
+// mit der erwarteten CSS-Custom-Property, nicht nur "irgendeine" Farbe.
+check('KRITISCH: die Trennlinie hat die vorgesehene, dezente Farbe (--line-soft)',
+  await page.evaluate(() => {
+    const zelle = document.querySelector('#plTable table.pl-tab thead th');
+    const sonde = document.createElement('div');
+    sonde.style.borderRight = '1px solid var(--line-soft)';
+    document.body.appendChild(sonde);
+    const erwartet = getComputedStyle(sonde).borderRightColor;
+    sonde.remove();
+    return !!zelle && getComputedStyle(zelle).borderRightColor === erwartet;
+  }));
+check('Dieselbe Trennlinie gilt auch fuer den Tagesplan',
+  await page.evaluate(() => {
+    const zellen = [...document.querySelectorAll('#tgBody table.pl-tab thead th')];
+    if (zellen.length < 2) return false;
+    const transparent = c => c === 'transparent' || c === 'rgba(0, 0, 0, 0)';
+    return zellen.slice(0, -1).every(z => !transparent(getComputedStyle(z).borderRightColor)
+        && getComputedStyle(z).borderRightWidth !== '0px')
+      && getComputedStyle(zellen[zellen.length - 1]).borderRightWidth === '0px';
+  }));
 
 await browser.close();
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);

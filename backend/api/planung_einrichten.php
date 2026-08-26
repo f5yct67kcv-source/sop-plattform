@@ -240,6 +240,14 @@ CREATE TABLE IF NOT EXISTS einsaetze (
   kunde_name VARCHAR(200) NOT NULL,
   objekt_id INT NULL,
   masterschicht_id INT NULL,
+  -- Zusammen angelegte Einsaetze einer Reihe (ENT-119). Alle Tage einer
+  -- Reihe tragen dieselbe Kennung; sie ist die id des ERSTEN Tages, damit
+  -- sie ohne eigene Tabelle und ohne Kollisionsrisiko entsteht.
+  -- Bewusst NUR eine Zugehoerigkeit, keine eigene Serientabelle: Die
+  -- Einsaetze bleiben eigenstaendig, es gibt keine gemeinsamen Daten, die
+  -- ueber sie hinausgingen. Rhythmus und Wochentage liegen weiterhin an
+  -- der Masterschicht des Objekts (ENT-118).
+  serie_id INT NULL,
   titel VARCHAR(200),
   strasse VARCHAR(200),
   ort VARCHAR(200) NOT NULL,
@@ -297,6 +305,24 @@ CREATE TABLE IF NOT EXISTS einsaetze (
 // alle, und "bedarf" sagt, wie viele gebraucht werden. So laufen alle
 // bestehenden Einsaetze unveraendert weiter.
 'einsatz_position' => "
+CREATE TABLE IF NOT EXISTS einsatz_dokument (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  einsatz_id INT NOT NULL,
+  dateiname VARCHAR(255) NOT NULL,
+  mime VARCHAR(100) NOT NULL,
+  groesse INT NOT NULL,
+  -- Der Inhalt liegt in der Datenbank, nicht im Dateisystem (ENT-117).
+  -- Kein Pfad, kein Verzeichnis, keine .htaccess, die versehentlich nicht
+  -- greift: Ein PDF mit Objektplaenen oder Kundenangaben darf nie ueber eine
+  -- geratene Adresse abrufbar sein. Der einzige Weg heraus fuehrt ueber den
+  -- Endpunkt, der die Rechte prueft.
+  inhalt LONGBLOB NOT NULL,
+  hochgeladen_von INT NULL,
+  hochgeladen_am DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_einsatz (einsatz_id),
+  FOREIGN KEY (einsatz_id) REFERENCES einsaetze(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS einsatz_position (
   id INT AUTO_INCREMENT PRIMARY KEY,
   einsatz_id INT NOT NULL,
@@ -518,6 +544,46 @@ CREATE TABLE IF NOT EXISTS kunden_kontaktweg (
 //
 // mitarbeiter_id kommt IMMER aus der Sitzung, nie aus der Anfrage. Sonst
 // koennte jemand die Ansicht eines anderen umstellen.
+// ═══════════════════════════════════════════════ AUSLAGENERSATZ (ENT-125)
+//
+// Der Snapshot je Einsatz und Person, geschrieben beim Abgleich (ENT-045) --
+// derselbe Moment, in dem Ist-Zeiten fest werden. Vorher kann sich noch
+// alles aendern (Verkehrsmittel, Zuteilung selbst); danach ist es die
+// Grundlage der Spesenabrechnung nach Art. 18 Ziff. 10 und darf nicht mehr
+// stillschweigend abweichen, wenn sich spaeter ein Kilometerwert oder eine
+// GAV-Ausgabe aendert (CLAUDE.md Teil B: "Eine spaetere GAV- oder
+// Lohnrevision darf alte Abrechnungen nie rueckwirkend veraendern").
+//
+// Rohkomponenten getrennt, nicht nur ein fertiger Betrag (CLAUDE.md Teil B,
+// GAV-Logik): Zone, Wegstrecke, Verkehrsmittel und Regelwerk-Quelle bleiben
+// je fuer sich nachvollziehbar.
+//
+// NULL bei fahrzeitersatz_rappen/fahrkostenersatz_rappen heisst NICHT "0
+// geschuldet" -- es heisst "nicht bestimmbar", mit dem Grund in
+// gesperrt_grund (GAV-AUS-004-Muster). Eine 0 wird nur geschrieben, wenn sie
+// tatsaechlich der Anspruch ist (z.B. Anstellungsgebiet, oder Mitfahrer beim
+// Fahrkostenersatz).
+'einsatz_auslagen' => "CREATE TABLE einsatz_auslagen (
+  einsatz_id INT NOT NULL,
+  mitarbeiter_id INT NOT NULL,
+  zone_schluessel VARCHAR(30) NULL,
+  zone_name VARCHAR(60) NULL,
+  zone_quelle VARCHAR(60) NULL,
+  weg_km DECIMAL(6,2) NULL,
+  verkehrsmittel VARCHAR(20) NULL,
+  fahrzeitersatz_rappen INT NULL,
+  fahrkostenersatz_rappen INT NULL,
+  -- z.B. 'gav_aus_010', 'verkehrsmittel_unbekannt', 'sparte_reinigung',
+  -- 'wegstrecke_unbekannt' -- der Grund, warum ein Betrag oben NULL ist.
+  -- NULL, wenn nichts davon zutrifft.
+  gesperrt_grund VARCHAR(40) NULL,
+  regelwerk VARCHAR(120) NOT NULL,
+  erzeugt_am DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (einsatz_id, mitarbeiter_id),
+  FOREIGN KEY (einsatz_id) REFERENCES einsaetze(id) ON DELETE CASCADE,
+  FOREIGN KEY (mitarbeiter_id) REFERENCES mitarbeiter(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
 'benutzer_layout' => "CREATE TABLE benutzer_layout (
   id INT AUTO_INCREMENT PRIMARY KEY,
   mitarbeiter_id INT NOT NULL,
@@ -548,6 +614,9 @@ foreach ($tabellen as $name => $sql) {
 $spalten = [
     ['einsaetze', 'objekt_id',        'ALTER TABLE einsaetze ADD COLUMN objekt_id INT NULL AFTER kunde_name'],
     ['einsaetze', 'masterschicht_id', 'ALTER TABLE einsaetze ADD COLUMN masterschicht_id INT NULL AFTER objekt_id'],
+    // ENT-119: Zugehoerigkeit zu einer zusammen angelegten Reihe. NULL heisst
+    // "gehoert zu keiner" -- bestehende Einsaetze bleiben unberuehrt.
+    ['einsaetze', 'serie_id', 'ALTER TABLE einsaetze ADD COLUMN serie_id INT NULL AFTER masterschicht_id'],
     ['einsatz_zuteilung', 'zusage',   "ALTER TABLE einsatz_zuteilung ADD COLUMN zusage VARCHAR(20) NOT NULL DEFAULT 'offen' AFTER mitarbeiter_id"],
     ['objekte', 'einsatzart',         "ALTER TABLE objekte ADD COLUMN einsatzart VARCHAR(100) NOT NULL DEFAULT 'Revierdienst' AFTER kanton"],
     ['verfuegbarkeiten', 'gesehen_am', 'ALTER TABLE verfuegbarkeiten ADD COLUMN gesehen_am DATETIME NULL AFTER erfasst_am'],
@@ -783,6 +852,20 @@ $spalten = [
     // NULL bleibt der Normalfall fuer den bestehenden manuellen Rapport --
     // nur wer ueber "Schicht rapportieren" kommt, traegt hier einen Wert ein.
     ['rapporte', 'einsatz_id', 'ALTER TABLE rapporte ADD COLUMN einsatz_id INT NULL AFTER mitarbeiter_id'],
+
+    // Auslagenersatz (ENT-123/ENT-125). Die Vorgabe haengt an der Person --
+    // sie steht am haeufigsten fest ueber viele Einsaetze hinweg, nicht an
+    // jedem einzelnen. Werte siehe MA_VERKEHRSMITTEL in mitarbeiter.php
+    // ('Privatfahrzeug', 'Oeffentlicher Verkehr', 'Mitfahrer', 'Geschaeftsfahrzeug').
+    ['mitarbeiter', 'verkehrsmittel', "ALTER TABLE mitarbeiter ADD COLUMN verkehrsmittel VARCHAR(20) NULL"],
+    // Ausnahme je Einsatz -- fuer die Fahrgemeinschaft, die es nur diesmal
+    // gibt. NULL heisst: die Vorgabe der Person gilt.
+    ['einsatz_zuteilung', 'verkehrsmittel', 'ALTER TABLE einsatz_zuteilung ADD COLUMN verkehrsmittel VARCHAR(20) NULL AFTER position_id'],
+    // Nur bei oeffentlichem Verkehr gebraucht: Art. 18 Ziff. 4 verlangt den
+    // TATSAECHLICHEN Billettpreis, 2. Klasse -- keine Pauschale, die sich aus
+    // der Zone herleiten liesse. In Rappen, ganzzahlig, wie alle Geldwerte
+    // dieses Ausbaus (siehe backend/auslagen.php).
+    ['einsatz_zuteilung', 'oev_rappen', 'ALTER TABLE einsatz_zuteilung ADD COLUMN oev_rappen INT NULL AFTER verkehrsmittel'],
 ];
 foreach ($spalten as [$tabelle, $spalte, $sql]) {
     if (!hat_tabelle_jetzt($pdo, $tabelle) || hat_spalte($pdo, $tabelle, $spalte)) {
@@ -955,6 +1038,30 @@ if (hat_spalte($pdo, 'kunden', 'plz')) {
                 $s->execute([$plz, $ort, (int)$k['id']]);
             }
             $getan[] = count($ungetrennt) . ' Adresse(n) in PLZ und Ort getrennt';
+        }
+    }
+}
+
+// ── 2c2. "Abgeschlossen" nachtragen fuer laengst vollstaendig rapportierte
+// Einsaetze (ENT-128). Noetig, weil der Uebergang nur im Moment eines NEUEN
+// Rapports ausgeloest wird (rapport_create.php) -- ein Rapport, der schon
+// vor dieser Aenderung bestand, hat ihn nie durchlaufen. Ausgenommen bleiben
+// abgesagte und bereits abgeglichene Einsaetze (ENT-045), genau wie beim
+// laufenden Uebergang. Beliebig oft wiederholbar.
+if (hat_tabelle_jetzt($pdo, 'einsaetze') && hat_tabelle_jetzt($pdo, 'einsatz_zuteilung')
+    && hat_tabelle_jetzt($pdo, 'rapporte') && hat_spalte($pdo, 'einsaetze', 'status')) {
+    $kandidaten = $pdo->query(
+        "SELECT id FROM einsaetze WHERE status NOT IN ('abgesagt', 'abgeschlossen') ORDER BY id"
+    )->fetchAll(PDO::FETCH_COLUMN);
+    $nachzutragen = array_values(array_filter($kandidaten, fn($eid) =>
+        !einsatz_abgeglichen($pdo, (int)$eid) && einsatz_vollstaendig_rapportiert($pdo, (int)$eid)));
+    if ($nachzutragen) {
+        if ($nurPruefen) {
+            $getan[] = count($nachzutragen) . ' Einsatz/Einsaetze bereits vollständig rapportiert, aber noch nicht als abgeschlossen markiert';
+        } else {
+            $s = $pdo->prepare("UPDATE einsaetze SET status = 'abgeschlossen' WHERE id = ?");
+            foreach ($nachzutragen as $eid) { $s->execute([$eid]); }
+            $getan[] = count($nachzutragen) . ' Einsatz/Einsaetze auf "abgeschlossen" nachgetragen';
         }
     }
 }

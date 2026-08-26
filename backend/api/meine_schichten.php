@@ -12,8 +12,14 @@ $heute = date('Y-m-d');
 $von = trim((string)($_GET['von'] ?? ''));
 $bis = trim((string)($_GET['bis'] ?? ''));
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $von)) {
-    // Der Vortag muss mit: eine Nachtschicht von gestern laeuft heute noch.
-    $von = date('Y-m-d', strtotime('-1 day'));
+    // Der ganze laufende Monat gehoert dazu (ENT-134) -- sonst verschwinden
+    // bereits vergangene Schichten des Monats aus der App, sobald sie mehr
+    // als einen Tag zurueckliegen. Der Vortag muss zusaetzlich mit: am
+    // Monatsersten reicht der Monatsanfang allein nicht zurueck genug, eine
+    // Nachtschicht von gestern (noch im Vormonat) laeuft heute noch.
+    $monatsanfang = date('Y-m-01');
+    $vortag = date('Y-m-d', strtotime('-1 day'));
+    $von = min($monatsanfang, $vortag);
 }
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $bis)) {
     $bis = date('Y-m-d', strtotime('+90 days'));
@@ -57,21 +63,50 @@ $schichten = array_map(function ($e) {
 }, $stmt->fetchAll());
 
 // Wie viele Kolleginnen und Kollegen sind sonst noch auf derselben Schicht?
-// Nur die Anzahl, keine Namen -- das ist Planungsinformation, keine
-// Personalauskunft.
-$anzahl = [];
+// Wer ist sonst noch auf derselben Schicht?
+//
+// Bis ENT-121 gab es hier ausdruecklich nur die ANZAHL, keinen Namen. Der
+// Projektinhaber hat das fuer die Absprache vor Ort revidiert: Wer zusammen
+// arbeitet, soll wissen, wen er sucht.
+//
+// WAS HERAUSGEHT UND WAS NICHT -- das ist bewusst eng gefasst:
+//   ja:    Vor- und Nachname
+//   nein:  Telefonnummer, E-Mail, Personalnummer, Anmeldename
+//   nein:  die mitarbeiter_id (sie wird fuer nichts gebraucht, was die App
+//          tut, und waere ein Schluessel auf eine Person)
+//   nein:  der Rueckmeldestand der anderen (zugesagt/abgelehnt) -- das
+//          Antwortverhalten einzelner geht die Kollegen nichts an
+//   nein:  fremde Ist-Zeiten, unveraendert wie bisher
+//
+// Die Abfrage laeuft ausschliesslich ueber die Einsatznummern, die weiter
+// oben bereits fuer DIESE Person ermittelt wurden. Ein fremder Einsatz kann
+// darum gar nicht dabei sein -- die Rechtepruefung liegt in der Herkunft der
+// Liste, nicht in einer zusaetzlichen Bedingung, die man vergessen koennte.
+$team = [];
 if ($schichten) {
     $ids = array_column($schichten, 'id');
     $marken = implode(',', array_fill(0, count($ids), '?'));
-    $z = db()->prepare("SELECT einsatz_id, COUNT(*) AS n FROM einsatz_zuteilung
-                        WHERE einsatz_id IN ($marken) GROUP BY einsatz_id");
-    $z->execute($ids);
+    $z = db()->prepare("SELECT z.einsatz_id, m.vorname, m.nachname, m.name,
+                               (z.mitarbeiter_id = ?) AS bin_ich
+                        FROM einsatz_zuteilung z
+                        JOIN mitarbeiter m ON m.id = z.mitarbeiter_id
+                        WHERE z.einsatz_id IN ($marken)
+                        ORDER BY m.nachname, m.vorname, m.name");
+    $z->execute(array_merge([(int)$user['id']], $ids));
     foreach ($z->fetchAll() as $r) {
-        $anzahl[(int)$r['einsatz_id']] = (int)$r['n'];
+        $eid = (int)$r['einsatz_id'];
+        // Fallback auf den Anmeldenamen: Ein Datensatz ohne Vor- und
+        // Nachnamen darf nicht als leere Zeile erscheinen.
+        $name = trim(($r['vorname'] ?? '') . ' ' . ($r['nachname'] ?? ''));
+        if ($name === '') { $name = (string)($r['name'] ?? ''); }
+        $team[$eid][] = ['name' => $name, 'bin_ich' => (int)$r['bin_ich'] === 1];
     }
 }
 foreach ($schichten as &$s) {
-    $s['im_team'] = $anzahl[$s['id']] ?? 1;
+    $s['team'] = $team[$s['id']] ?? [];
+    // Die Anzahl bleibt, was sie war -- die Oberflaeche zeigt sie an vielen
+    // Stellen, an denen die Namensliste nicht hingehoert.
+    $s['im_team'] = count($s['team']) ?: 1;
 }
 unset($s);
 

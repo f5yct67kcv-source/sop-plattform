@@ -47,6 +47,20 @@ $kTelefon   = trim((string)($input['kontakt_telefon'] ?? '')) ?: null;
 $wegKm = ($input['weg_km'] ?? '') === '' ? null : round((float)$input['weg_km'], 2);
 $wegMin = ($input['weg_minuten'] ?? '') === '' ? null : (int)$input['weg_minuten'];
 $wegAdr = trim((string)($input['weg_adresse'] ?? '')) ?: null;
+// ENT-119. Zugehoerigkeit zu einer zusammen angelegten Reihe.
+//
+// Die Kennung wird HIER vergeben und nicht im Browser: Eine im Browser
+// gewuerfelte Zahl kann sich mit einer anderen Sitzung ueberschneiden, und
+// zwei fremde Reihen sind danach nicht mehr auseinanderzuhalten. Der erste
+// Tag setzt serie_neu, bekommt seine eigene id als Serienkennung zurueck und
+// gibt sie den uebrigen Tagen mit.
+//
+// serie_id wird beim AENDERN bewusst nicht angefasst: Die UPDATE-Anweisung
+// unten fuehrt die Spalte nicht. Wer einen Tag einer Reihe bearbeitet, loest
+// ihn damit nicht heraus.
+$serieId  = isset($input['serie_id']) && $input['serie_id'] !== '' ? (int)$input['serie_id'] : null;
+$serieNeu = !empty($input['serie_neu']);
+if ($serieId !== null && $serieId <= 0) { $serieId = null; }
 if ($wegKm !== null && ($wegKm < 0 || $wegKm > 9999)) {
     json_response(['status' => 'error', 'message' => 'Wegstrecke zwischen 0 und 9999 km'], 400);
 }
@@ -72,8 +86,12 @@ if (!preg_match('/^\d{2}:\d{2}(:\d{2})?$/', $von) || !preg_match('/^\d{2}:\d{2}(
     json_response(['status' => 'error', 'message' => 'Zeiten im Format HH:MM erforderlich'], 400);
 }
 // provisorisch: aus einer Masterschicht "auf Abruf" entstanden, zaehlt nicht
-// als offene Stelle (ENT-021).
-if (!in_array($status, ['geplant', 'bestaetigt', 'abgesagt', 'provisorisch'], true)) {
+// als offene Stelle (ENT-021). 'abgeschlossen' steht hier nur, damit ein
+// Speichern anderer Felder (Bemerkung, Zeitverschiebung) einen bereits
+// abgeschlossenen Einsatz nicht ablehnt oder zurueckstuft -- der Wert selbst
+// wird ausschliesslich vom Server gesetzt, sobald alle Rapporte vorliegen
+// (ENT-128, rapport_create.php), nie ueber das Auswahlfeld in der Oberflaeche.
+if (!in_array($status, ['geplant', 'bestaetigt', 'abgesagt', 'provisorisch', 'abgeschlossen'], true)) {
     json_response(['status' => 'error', 'message' => 'unbekannter Status'], 400);
 }
 if ($bedarf < 0 || $bedarf > 99) {
@@ -183,13 +201,21 @@ try {
                                     datum, von, bis, bedarf, status, bemerkung, veranstaltung,
                                     treffpunkt, taetigkeit, qualifikation,
                                     kontakt_vorname, kontakt_nachname, kontakt_telefon,
-                                    weg_km, weg_minuten, weg_adresse, erstellt_von)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                                    weg_km, weg_minuten, weg_adresse, serie_id, erstellt_von)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
         $stmt->execute([$kundeId, $kundeName, $titel, $strasse, $ort, $kanton, $einsatzart, $sparte,
             $datum, $von, $bis, $bedarf, $status, $bemerkung, $veranst, $treffpunkt, $taetigkeit,
-            $qualifik, $kVorname, $kNachname, $kTelefon, $wegKm, $wegMin, $wegAdr, (int)$user['id']]);
+            $qualifik, $kVorname, $kNachname, $kTelefon, $wegKm, $wegMin, $wegAdr, $serieId,
+            (int)$user['id']]);
         $id = (int)$pdo->lastInsertId();
+        // Der erste Tag einer Reihe wird zu ihrer Kennung. Innerhalb derselben
+        // Transaktion, damit kein Einsatz einer Reihe ohne Zugehoerigkeit
+        // liegen bleibt, wenn danach etwas schiefgeht.
+        if ($serieNeu && $serieId === null) {
+            $pdo->prepare('UPDATE einsaetze SET serie_id = id WHERE id = ?')->execute([$id]);
+            $serieId = $id;
+        }
     }
 
     if ($zuteilung) {
@@ -206,4 +232,5 @@ try {
     throw $e;
 }
 
-json_response(['status' => 'ok', 'id' => $id, 'zugeteilt' => count($zuteilung)]);
+json_response(['status' => 'ok', 'id' => $id, 'zugeteilt' => count($zuteilung),
+               'serie_id' => $serieId]);
