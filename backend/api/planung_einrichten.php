@@ -620,6 +620,75 @@ CREATE TABLE IF NOT EXISTS kunden_kontaktweg (
   FOREIGN KEY (mitarbeiter_id) REFERENCES mitarbeiter(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+// Revierdienst-Tool / V3 (ENT-008-Ausnahme, Kontrollpunkt-Datenmodell
+// ENT-132/ENT-132-N1/ENT-145). Die Vorlage (welche Punkte gehoeren zu einem
+// Objekt) und die Durchfuehrung (wer hat wann welchen Rundgang gemacht)
+// stehen bewusst in getrennten Tabellen -- eine spaetere Aenderung an der
+// Vorlage darf bereits gelaufene Rundgaenge nicht rueckwirkend veraendern,
+// gleiches Prinzip wie bei masterschichten/einsaetze.
+'kontrollpunkt' => "CREATE TABLE kontrollpunkt (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  objekt_id INT NOT NULL,
+  bezeichnung VARCHAR(200) NOT NULL,
+  reihenfolge INT NOT NULL DEFAULT 0,
+  -- VARCHAR statt ENUM wie bei objekte.sparte -- ein dritter Kontrollpunkt-
+  -- Typ soll keine Tabellenaenderung brauchen.
+  typ VARCHAR(20) NOT NULL,
+  chip_id VARCHAR(100) NULL,
+  lat DECIMAL(10,7) NULL,
+  lng DECIMAL(10,7) NULL,
+  -- Default 20m, je Punkt uebersteuerbar (ENT-132-N1) -- kein globaler Wert,
+  -- da Innen- und Aussenpunkte sich in der Flaeche stark unterscheiden.
+  geofence_radius_m INT NOT NULL DEFAULT 20,
+  aktiv TINYINT(1) NOT NULL DEFAULT 1,
+  erstellt_am DATETIME DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_objekt (objekt_id, reihenfolge),
+  FOREIGN KEY (objekt_id) REFERENCES objekte(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+// objekt_id liegt hier zusaetzlich zu einsatz_id, obwohl ueber einsaetze
+// erreichbar: einsaetze.objekt_id darf NULL sein (freier Einsatz ohne
+// Dauerauftrag), ein Rundgang braucht aber immer ein konkretes Objekt, da
+// die Kontrollpunkte daran haengen. Die Kopie vermeidet diese Ambiguitaet,
+// gleiches Prinzip wie die Kunde-/Objekt-Kopien auf einsaetze selbst.
+'rundgang' => "CREATE TABLE rundgang (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  einsatz_id INT NOT NULL,
+  mitarbeiter_id INT NOT NULL,
+  objekt_id INT NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'vorbereitet',
+  vorbereitet_am DATETIME NULL,
+  -- Rohzeit beginnt erst mit dem ersten bestaetigten Kontrollpunkt, nicht
+  -- mit dem Start-Knopf (ENT-145) -- deshalb getrennt von vorbereitet_am.
+  rohzeit_start DATETIME NULL,
+  rohzeit_ende DATETIME NULL,
+  erstellt_am DATETIME DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_einsatz (einsatz_id),
+  KEY idx_mitarbeiter (mitarbeiter_id),
+  FOREIGN KEY (einsatz_id) REFERENCES einsaetze(id) ON DELETE CASCADE,
+  FOREIGN KEY (mitarbeiter_id) REFERENCES mitarbeiter(id) ON DELETE CASCADE,
+  FOREIGN KEY (objekt_id) REFERENCES objekte(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+// erfasst_am wird GERAETESEITIG gesetzt (Offline-Prinzip, ENT-132 Punkt 5):
+// ohne Netz zwischengespeichert und erst spaeter uebermittelt, teils Stunden
+// oder Tage danach. uebermittelt_am haelt den tatsaechlichen Server-Empfang
+// separat fest, sonst liesse sich eine lange Offline-Phase nicht erkennen.
+// kontrollpunkt_id bleibt NULLable fuer den Fall, dass der Punkt spaeter aus
+// der Vorlage entfernt wird -- die Durchfuehrung als Nachweis bleibt stehen.
+'rundgang_scan' => "CREATE TABLE rundgang_scan (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  rundgang_id INT NOT NULL,
+  kontrollpunkt_id INT NULL,
+  status VARCHAR(20) NOT NULL,
+  erfasst_am DATETIME NOT NULL,
+  uebermittelt_am DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  beschreibung TEXT NULL,
+  KEY idx_rundgang (rundgang_id),
+  FOREIGN KEY (rundgang_id) REFERENCES rundgang(id) ON DELETE CASCADE,
+  FOREIGN KEY (kontrollpunkt_id) REFERENCES kontrollpunkt(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
 ];
 
 foreach ($tabellen as $name => $sql) {

@@ -8,11 +8,14 @@
 //
 // Zwei Festlegungen des Projektinhabers tragen diese Datei:
 //
-//  1. VIER FESTE ROLLEN, nicht frei zusammenklickbar. Was eine Rolle darf,
+//  1. FESTE ROLLEN, nicht frei zusammenklickbar. Was eine Rolle darf,
 //     steht hier im Code und im Entscheidungsprotokoll -- nicht in einer
 //     Kreuzchen-Maske. Ein falsch gesetztes Haekchen oeffnet sonst
 //     Personendaten, ohne dass es jemand merkt, und die Projektregel sagt:
-//     Konfigurierbarkeit ist kein Qualitaetsmerkmal.
+//     Konfigurierbarkeit ist kein Qualitaetsmerkmal. Urspruenglich vier
+//     (ENT-077); seit ENT-180 eine fuenfte fuer den Revierdienst dazu --
+//     die Anzahl ist kein Selbstzweck, jede weitere braucht aber wie diese
+//     eine eigene Entscheidung, kein stillschweigendes Dazuklicken.
 //  2. MEHRERE ROLLEN JE PERSON. Planung und Personal sind zwei verschiedene
 //     Arbeiten, keine Stufen uebereinander. Bei genau einer Rolle muesste
 //     jemand, der beides macht, "Verwaltung" bekommen -- also gleich alles,
@@ -24,11 +27,18 @@
 // Wahrheiten sind keine Rechte.
 declare(strict_types=1);
 
-// ── Die vier Rollen ───────────────────────────────────────────────────
+// ── Die Rollen ────────────────────────────────────────────────────────
 const ROLLE_MITARBEITEND = 'mitarbeitend';
 const ROLLE_PLANUNG      = 'planung';
 const ROLLE_PERSONAL     = 'personal';
 const ROLLE_VERWALTUNG   = 'verwaltung';
+// Fuenfte Rolle, quer zu den vier oben (ENT-169/ENT-180): Wer am
+// Revierdienst teilnimmt, ist unabhaengig davon, ob dieselbe Person auch
+// Planung oder Personal macht -- deshalb ergaenzt sie eine bestehende
+// Rolle, statt eine davon zu erweitern (sonst haette z.B. jede
+// Planungs-Person automatisch Waechtersystem-Zugriff, was ENT-169
+// ausdruecklich nicht will: "nur ausgewaehlte Benutzer").
+const ROLLE_WAECHTER = 'waechter';
 
 // Reihenfolge = Anzeigereihenfolge in der Oberflaeche, vom kleinsten zum
 // groessten Zugriff. Die Beschreibung steht hier und nicht in der
@@ -58,6 +68,15 @@ function rollen_katalog(): array
                            'personal_schreiben', 'personal_vertraulich',
                            'betrieb', 'rechte'],
         ],
+        // Bewusst NICHT in "Alles" bei Verwaltung enthalten (ENT-169: "nur
+        // ausgewählte Benutzer") -- wer im Revierdienst-Wächtersystem
+        // mitarbeitet, braucht diese Rolle zusätzlich, unabhängig davon,
+        // welche der vier Rollen oben sie/er sonst hat.
+        ROLLE_WAECHTER => [
+            'titel'    => 'Wächtersystem',
+            'text'     => 'Revierdienst: Kontrollpunkte und Rundgang-Vorlagen pro Objekt pflegen, laufende und abgeschlossene Rundgänge einsehen, als Kontaktperson für den Alleinarbeiterschutz hinterlegbar. Unabhängig von den anderen Rollen — wird zusätzlich vergeben.',
+            'rechte'   => ['rundgang_verwalten', 'rundgang_einsehen', 'alarmempfaenger'],
+        ],
     ];
 }
 
@@ -75,6 +94,12 @@ function rechte_katalog(): array
         'personal_vertraulich' => 'AHV-Nummer, Bewilligungen, Register-, Herkunfts- und Familienangaben',
         'betrieb'              => 'Betriebseinstellungen, Listen, Einrichtung',
         'rechte'               => 'Rollen vergeben und das Logbuch lesen',
+        // Revierdienst-Tool / V3 (ENT-169/ENT-180) -- eigene Rechte statt
+        // Mitbenutzung von 'plan', damit sie unabhaengig von der
+        // Einsatzplanung vergeben werden koennen (siehe ROLLE_WAECHTER).
+        'rundgang_verwalten'   => 'Kontrollpunkte und Rundgang-Vorlagen pro Objekt anlegen und ändern',
+        'rundgang_einsehen'    => 'Laufende und abgeschlossene Rundgänge einsehen',
+        'alarmempfaenger'      => 'Als Kontaktperson für den Alleinarbeiterschutz hinterlegbar',
     ];
 }
 
