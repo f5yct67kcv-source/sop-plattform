@@ -478,6 +478,11 @@ const W = {
     strasse: 'Strasse', ort: 'Ort', arbeitsbeginn: 'Arbeitsbeginn', arbeitsende: 'Arbeitsende',
     pauseMinuten: 'Pause (Minuten)', unterzeichnerName: 'Name Unterzeichner', vorUndNachname: 'Vor- und Nachname',
     unterschriftKunde: 'Unterschrift Kunde', hierUnterschreiben: '✍ Hier unterschreiben', loeschen: 'Löschen',
+    // ENT-160: Die Unterschrift gehoert zum Auftrag. Hat sie jemand fuer
+    // diesen Einsatz schon eingeholt, wird hier nicht erneut danach gefragt --
+    // sonst unterschreibt der Kunde bei zwei Eingeteilten zweimal.
+    schonUnterschrieben: 'Der Kunde hat für diesen Einsatz bereits unterschrieben',
+    eingeholtVon: 'eingeholt von', deineZeitenTrotzdem: 'Deine Zeiten trägst du trotzdem selbst ein.',
     senden: 'Senden', beideZeitenNoetig: 'Bitte Arbeitsbeginn und Arbeitsende angeben.',
     rapportGesendet: 'Rapport gesendet.',
     diesenMonat: 'Diesen Monat', stunden: 'Stunden', einsaetze: 'Einsätze',
@@ -1437,6 +1442,12 @@ function schichtRapportBlatt(id) {
     <div class="f"><label for="srBis">${esc(w('arbeitsende'))}</label><input class="inp" id="srBis" type="time" data-zeit="fein" value="${esc(hm(q.bis))}"></div>
     <div class="f"><label for="srPause">${esc(w('pauseMinuten'))}</label><input class="inp" id="srPause" type="number" min="0" max="600" step="5" value="${esc(String(bisher ? bisher.pause_min : 0))}"></div>
     <div class="f"><label for="srBemerkung">${esc(w('bemerkung'))}</label><textarea class="inp" id="srBemerkung" rows="2">${esc(q.bemerkung || '')}</textarea></div>
+    ${e.schon_unterschrieben ? `
+    <div class="hinweis" id="srSigDa">
+      ✓ ${esc(w('schonUnterschrieben'))}${e.unterschrift_holte
+        ? ' — ' + esc(w('eingeholtVon')) + ' ' + esc(e.unterschrift_holte) : ''}.
+      ${esc(w('deineZeitenTrotzdem'))}
+    </div>` : `
     <div class="f"><label for="srSigName">${esc(w('unterzeichnerName'))}</label><input class="inp" id="srSigName" placeholder="${esc(w('vorUndNachname'))}" value="${esc(q.unterzeichner || '')}"></div>
     <div class="f"><label>${esc(w('unterschriftKunde'))}</label>
       <div class="sig-wrap">
@@ -1444,7 +1455,7 @@ function schichtRapportBlatt(id) {
         <div class="sig-placeholder" id="sigPlaceholder">${esc(w('hierUnterschreiben'))}</div>
         <div class="sig-actions"><button type="button" class="sig-clear" onclick="clearSig()">${esc(w('loeschen'))}</button></div>
       </div>
-    </div>
+    </div>`}
     <div id="srErr" class="msg-err" style="display:none"></div>`;
   $('blFuss').innerHTML = `
     <button class="btn btn-plain" onclick="blattZu()">${esc(w('abbrechen'))}</button>
@@ -1467,7 +1478,7 @@ function schichtRapportSenden(einsatzId) {
     einsatzart: $('srEinsatzart').value.trim(),
     von, bis, pause: $('srPause').value,
     bemerkung: $('srBemerkung').value.trim(),
-    sigName: $('srSigName').value.trim(),
+    sigName: $('srSigName') ? $('srSigName').value.trim() : null,
     sig: getSigData(),
   } }).then(({ ok, data }) => {
     b.disabled = false;
@@ -1483,6 +1494,9 @@ function schichtRapportSenden(einsatzId) {
 // aus der Schicht statt aus einem leeren Formular.
 function initSig() {
   const canvas = $('sigCanvas');
+  // Fehlt das Feld, hat fuer diesen Einsatz schon jemand unterschreiben
+  // lassen (ENT-160) -- dann gibt es hier nichts einzurichten.
+  if (!canvas) { sigCtx = null; sigDirty = false; return; }
   const dpr = window.devicePixelRatio || 1;
   canvas.width = canvas.parentElement.clientWidth * dpr;
   canvas.height = 160 * dpr;
@@ -1506,7 +1520,10 @@ function clearSig() {
   sigCtx.clearRect(0, 0, c.width, c.height); sigDirty = false;
   $('sigPlaceholder').style.display = '';
 }
-const getSigData = () => sigDirty ? $('sigCanvas').toDataURL('image/png') : null;
+const getSigData = () => {
+  const c = $('sigCanvas');
+  return (sigDirty && c) ? c.toDataURL('image/png') : null;
+};
 
 // ══════════════════════════════════════════ ZEITBONUS ERKLAERT (ENT-052)
 // Der Zeitbonus steht als Zahl auf der Kachel, aber die wenigsten kennen den

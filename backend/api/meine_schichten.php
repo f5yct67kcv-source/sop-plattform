@@ -43,10 +43,18 @@ $stmt = db()->prepare(
             -- so wenig sichtbar wie fremde Namen.
             z.ist_status, z.ist_von, z.ist_bis,
             z.ist_pause_von, z.ist_pause_min,
-            z.ist_pause_bezahlt_ma, z.abgeglichen_am
+            z.ist_pause_bezahlt_ma, z.abgeglichen_am,
+            -- Ob am EINSATZ bereits eine Kundenunterschrift liegt (ENT-160)
+            -- und wer sie eingeholt hat. Bewusst NICHT die Unterschrift
+            -- selbst: Sie ist ein grosses Bild, hier nur als Ja/Nein
+            -- gebraucht, und ein fremdes Unterschriftsbild geht die zweite
+            -- eingeteilte Person nichts an.
+            (e.unterschrift IS NOT NULL) AS schon_unterschrieben,
+            us.name AS unterschrift_holte, e.unterzeichner AS unterschrift_name
      FROM einsatz_zuteilung z
      JOIN einsaetze e ON e.id = z.einsatz_id
      LEFT JOIN objekte o ON o.id = e.objekt_id
+     LEFT JOIN mitarbeiter us ON us.id = e.unterschrift_von
      WHERE z.mitarbeiter_id = ? AND e.datum BETWEEN ? AND ?
      ORDER BY e.datum, e.von'
 );
@@ -59,6 +67,9 @@ $schichten = array_map(function ($e) {
     // (GAV-AUS-004). Ein Cast auf int wuerde beides zu 0 machen.
     $e['ist_pause_bezahlt_ma'] = $e['ist_pause_bezahlt_ma'] === null
         ? null : (int)$e['ist_pause_bezahlt_ma'];
+    // Als echtes Ja/Nein herausgeben, nicht als "1"/"0" aus der Datenbank --
+    // die Oberflaeche prueft darauf, und "0" ist als Zeichenkette wahr.
+    $e['schon_unterschrieben'] = (bool)$e['schon_unterschrieben'];
     return $e;
 }, $stmt->fetchAll());
 

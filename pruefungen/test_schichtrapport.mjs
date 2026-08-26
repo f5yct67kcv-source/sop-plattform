@@ -445,9 +445,31 @@ check('KRITISCH: der Rapport schreibt nicht an einsatz_zuteilung/einsatz_positio
 const einsaetzeUpdates = q.match(/UPDATE\s+einsaetze\s+SET\s+[^;]*?(?=\s+WHERE)/g) || [];
 check('Es gibt ueberhaupt eine UPDATE-Anweisung an einsaetze, sonst prueft das Folgende nichts',
   einsaetzeUpdates.length > 0);
-check('KRITISCH: an einsaetze schreibt er ausschliesslich den Status, sonst nichts (ENT-128)',
+// Seit ENT-160 gibt es eine ZWEITE, ebenso eng gefasste Ausnahme: die
+// Kundenunterschrift. Sie gehoert zum Auftrag, nicht zur einzelnen Person --
+// sonst unterschreibt der Kunde bei zwei Eingeteilten zweimal. Sie ist keine
+// Zeit und keine Zuteilung, veraendert also nichts, woran Lohn oder GAV
+// haengen.
+//
+// Die Liste bleibt ABSCHLIESSEND: erlaubt sind genau diese beiden Muster,
+// alles andere faellt weiterhin durch. Eine Wache, die man bei jeder neuen
+// Spalte aufweicht, bewacht am Ende nichts mehr.
+const ERLAUBTE_EINSATZ_UPDATES = [
+  /^UPDATE einsaetze SET status = '[a-z]+'$/,
+  /^UPDATE einsaetze SET unterschrift = \?, unterzeichner = \?, unterschrift_von = \?, unterschrift_am = NOW\(\)$/,
+];
+check('KRITISCH: an einsaetze schreibt er nur Status und Kundenunterschrift, sonst nichts (ENT-128/156)',
   !/(DELETE FROM|INSERT INTO)\s+einsaetze\b/.test(q)
-  && einsaetzeUpdates.every(u => /^UPDATE\s+einsaetze\s+SET\s+status\s*=\s*'[a-z]+'$/.test(u.trim())));
+  && einsaetzeUpdates.every(u =>
+    ERLAUBTE_EINSATZ_UPDATES.some(m => m.test(u.trim().replace(/\s+/g, ' ')))));
+// Beide Ausnahmen muessen dieselbe Sperre respektieren. Beim Bauen von
+// ENT-160 zuerst vergessen: die Unterschrift wurde auch in einen bereits
+// abgeglichenen, festgeschriebenen Einsatz geschrieben. Diese Pruefung haelt
+// den Fehler dauerhaft fern.
+check('KRITISCH: auch die Unterschrift respektiert die Sperre einer abgeglichenen Schicht (ENT-045)',
+  /\$sig !== null && !einsatz_abgeglichen\(db\(\), \$einsatzId\)/.test(q));
+check('KRITISCH: die Unterschrift wird nur EINMAL gesetzt und nie ueberschrieben',
+  /WHERE id = \? AND unterschrift IS NULL/.test(q));
 
 // Die Spalte muss auch tatsaechlich angelegt werden -- eine Abfrage auf eine
 // Spalte, die die Einrichtung nie ergaenzt, faellt erst im Betrieb auf.

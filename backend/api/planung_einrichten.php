@@ -823,6 +823,20 @@ $spalten = [
     // Das Ende ergibt sich rechnerisch und wird nicht gespeichert.
     ['einsaetze', 'ist_pause_von',   'ALTER TABLE einsaetze ADD COLUMN ist_pause_von TIME NULL AFTER ist_bis'],
     ['einsaetze', 'ist_pause_min',   'ALTER TABLE einsaetze ADD COLUMN ist_pause_min INT NULL AFTER ist_pause_von'],
+    // Kundenunterschrift am EINSATZ (ENT-160), nicht mehr nur am einzelnen
+    // Rapport. Sind zwei Leute am selben Auftrag, unterschreibt der Kunde
+    // sonst zweimal auf zwei Telefonen -- und der gemeinsame Kundenbericht
+    // haette zwei Unterschriften fuer einen Auftrag.
+    //
+    // Der Zeitstempel und die einholende Person sind KEIN Beiwerk: Wer zuerst
+    // fertig ist, laesst unterschreiben; wer laenger bleibt, rapportiert
+    // danach. Die Unterschrift deckt dann eine Zeit, die es beim
+    // Unterschreiben noch nicht gab. Steht sie datiert auf dem Blatt, ist das
+    // sichtbar statt stillschweigend behauptet.
+    ['einsaetze', 'unterschrift',     'ALTER TABLE einsaetze ADD COLUMN unterschrift MEDIUMTEXT NULL'],
+    ['einsaetze', 'unterzeichner',    'ALTER TABLE einsaetze ADD COLUMN unterzeichner VARCHAR(200) NULL AFTER unterschrift'],
+    ['einsaetze', 'unterschrift_von', 'ALTER TABLE einsaetze ADD COLUMN unterschrift_von INT NULL AFTER unterzeichner'],
+    ['einsaetze', 'unterschrift_am',  'ALTER TABLE einsaetze ADD COLUMN unterschrift_am DATETIME NULL AFTER unterschrift_von'],
     // TINYINT NULL, nicht NOT NULL DEFAULT 0: NULL heisst 'noch nicht
     // entschieden', 0 heisst 'geprueft und nein'. Der Unterschied ist bei
     // GAV-AUS-004 wesentlich -- eine Vorbelegung waere eine Auslegung.

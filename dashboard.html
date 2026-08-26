@@ -348,6 +348,21 @@ a.nav-item { text-decoration: none; }
 .card-hd h2 { font-size: 13.5px; font-weight: 650; letter-spacing: -.1px; }
 .card-hd .note { font-size: 11.5px; color: var(--ink-3); }
 .card-hd .sp { flex: 1; }
+/* Icon-Abzeichen vor einem Karten-Titel (ENT-161, zunaechst nur im
+   Betriebsbereich) -- dieselbe Bauart wie ".empty .ic", nur kleiner fuer die
+   Kopfzeile. Bewusst eine eigene Klasse statt ".card-hd h2/.ic" global zu
+   aendern: mehrere Karten im Haus tragen ein rohes <h3> im Kopf, ohne eigene
+   Schriftregel (siehe CLAUDE.md-Warnung zu CSS-Spezifitaet) -- eine globale
+   Aenderung haette dort ungeprueft mitgewirkt. */
+.card-hd .card-ic { width: 32px; height: 32px; border-radius: 9px; background: var(--accent-soft);
+  color: var(--accent); display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.card-hd .card-ic svg.i { width: 16px; height: 16px; }
+.card-hd .card-ic.gedaempft { background: var(--line-soft); color: var(--ink-3); }
+/* Nur im Betriebsbereich: dort tragen die Kartentitel ein rohes <h3> ohne
+   eigene Schriftregel (Browser-Vorgabe). Andere Stellen mit ".card-hd h3"
+   im Haus bleiben bewusst unberuehrt -- ungeprueft globaler wirken hiesse,
+   Layouts anzufassen, die niemand gemessen hat. */
+#view-betrieb .card-hd h3 { font-size: 13.5px; font-weight: 650; letter-spacing: -.1px; }
 .card-bd { padding: 18px; }
 /* flush = randlos, z.B. fuer Tabellen. Breite Inhalte scrollen in der Karte,
    nie die ganze Seite. */
@@ -3722,6 +3737,16 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
            falsche Ort: Sie beschreiben nicht ein Objekt, sondern den Betrieb,
            und sie sind die Messgrundlage fuer den gesamten Auslagenersatz. -->
       <section class="view" id="view-betrieb">
+        <!-- Bis ENT-161 lagen alle fuenf Karten unbeschriftet und randlos
+             untereinander -- eine einzige lange Spalte ohne jede optische
+             Gliederung (Ruecksprache des Projektinhabers: "im Moment ist
+             alles druntergestapelt"). Jetzt: ein Icon je Karte (dieselbe
+             Bauart wie ".empty .ic", siehe CSS), fester Kartenabstand ueber
+             ".grid" statt einzelner Inline-Margins, und die beiden kurzen
+             Karten (Zugang, Rollen) stehen ab Desktop-Breite nebeneinander
+             statt hintereinander -- ".g-1-1" existierte schon fuer genau
+             diesen Fall, wurde bisher aber nirgends eingesetzt. -->
+        <div class="grid">
         <!-- Zwei-Faktor-Anmeldung (ENT-076). Steht hier und nicht bei den
              Mitarbeitenden: Es geht um den EIGENEN Zugang, nicht um fremde.
              Nur fuer Verwaltungszugaenge -- so entschieden, weil daran die
@@ -3729,8 +3754,11 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
         <!-- Briefkopf fuer den Rapport-Ausdruck (ENT-155). Steht bewusst weit
              oben: Was hier gepflegt wird, geht an Kunden heraus, und solange
              es leer ist, druckt der Rapport einen unbeschrifteten Kopf. -->
-        <div class="card" style="margin-bottom:16px" id="bkKarte">
-          <div class="card-hd"><h3>Briefkopf für Rapporte</h3></div>
+        <div class="card" id="bkKarte">
+          <div class="card-hd">
+            <span class="card-ic"><svg class="i" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg></span>
+            <h3>Briefkopf für Rapporte</h3>
+          </div>
           <div class="card-bd">
             <div class="msg-err" id="bkErr" style="display:none"></div>
             <div class="ki-hint web on" style="margin:0 0 14px">
@@ -3765,8 +3793,15 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
           </div>
         </div>
 
-        <div class="card" style="margin-bottom:16px" id="zfKarte">
-          <div class="card-hd"><h3>Mein Zugang: Zwei-Faktor-Anmeldung</h3></div>
+        <!-- Nebeneinander statt hintereinander: beide Karten sind kurz, und
+             gerade der Groessenunterschied zu den grossen Formularen daneben
+             ist Teil der Struktur, um die es hier geht (siehe Hinweis oben). -->
+        <div class="grid g-1-1">
+        <div class="card" id="zfKarte">
+          <div class="card-hd">
+            <span class="card-ic"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+            <h3>Mein Zugang: Zwei-Faktor-Anmeldung</h3>
+          </div>
           <div class="card-bd">
             <div class="msg-err" id="zfErr" style="display:none"></div>
             <div id="zfInhalt"><div style="color:var(--ink-3)">Wird geladen …</div></div>
@@ -3778,15 +3813,22 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
              ohnehin ist, wenn man jemanden anlegt. Ohne diese Uebersicht
              waeren die Rechte ueber alle Akten verstreut, und niemand koennte
              die Frage beantworten, wer eigentlich an die AHV-Nummern kommt. -->
-        <div class="card" style="margin-bottom:16px" id="rvKarte">
-          <div class="card-hd"><h3>Rollen im Betrieb</h3></div>
+        <div class="card" id="rvKarte">
+          <div class="card-hd">
+            <span class="card-ic"><svg class="i" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+            <h3>Rollen im Betrieb</h3>
+          </div>
           <div class="card-bd">
             <div id="rvInhalt"><div style="color:var(--ink-3)">Wird geladen …</div></div>
           </div>
         </div>
+        </div>
 
-        <div class="card" style="margin-bottom:16px">
-          <div class="card-hd"><h3>Anstellungsorte</h3></div>
+        <div class="card">
+          <div class="card-hd">
+            <span class="card-ic"><svg class="i" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
+            <h3>Anstellungsorte</h3>
+          </div>
           <div class="card-bd">
             <div class="msg-err" id="anErr" style="display:none"></div>
             <div class="ki-hint web on" style="margin-bottom:14px">
@@ -3823,12 +3865,19 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
         </div>
 
         <div class="card">
-          <div class="card-hd"><h3>Was hier noch fehlt</h3></div>
+          <div class="card-hd">
+            <span class="card-ic gedaempft"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
+            <h3>Was hier noch fehlt</h3>
+          </div>
           <div class="card-bd">
-            <p class="zone-note">Weitere betriebliche Angaben — Firmenname, Rechnungsadresse, MWST-Nummer,
+            <!-- Firmenname stand hier bis ENT-161 noch mit in der Liste --
+                 seit ENT-155 erfasst ihn der Briefkopf oben, die Zeile war
+                 seither schlicht falsch. -->
+            <p class="zone-note">Weitere betriebliche Angaben — Rechnungsadresse, MWST-Nummer,
                Zahlungskonditionen — sind noch nicht erfasst. Sie werden gebraucht, sobald aus dem Werkzeug
                Offerten oder Rechnungen entstehen, und werden dann hier ergänzt.</p>
           </div>
+        </div>
         </div>
       </section>
 
@@ -9999,9 +10048,126 @@ function epDirektAbgleichen(einsatzId, mitarbeiterId) {
 // nichts tut.
 function epRechnungBlock(e) {
   if (!e || !einsatzAbgeschlossen(e)) { return ''; }
+  // Der gemeinsame Kundenbericht steht neben dem Rechnungs-Platzhalter, weil
+  // beides Abschluss-Handlungen des Einsatzes sind. Er ist der Knopf, der
+  // etwas TUT -- darum umrissener Akzent, waehrend das gefuellte Blau beim
+  // (noch funktionslosen) Rechnungs-Knopf bleibt.
   return `<div class="card-bd ep-rechnung">
+    <button type="button" class="btn btn-akzent btn-sm" onclick="epBerichtDrucken(${Number(e.id)})">Kundenbericht drucken</button>
     <button type="button" class="btn btn-primary btn-sm" disabled title="Noch nicht verfügbar">Rechnung erstellen</button>
   </div>`;
+}
+
+// ── Gemeinsamer Kundenbericht fuer den Einsatz (ENT-160) ────────────────────
+//
+// Ein Blatt je Einsatz, mit ALLEN Personen und ihren jeweils eigenen Zeiten.
+// Ausdruecklich keine Zusammenlegung der Rapporte: die bleiben je Person
+// getrennt, weil an ihnen Lohn und die GAV-Abrechnung haengen. Zusammengefuegt
+// wird nur das Dokument.
+//
+// Die Daten kommen frisch vom Server (einsatz_bericht.php) statt aus den
+// geladenen Listen -- dieselbe Lehre wie bei ENT-155: `rapporte` ist im
+// Dashboard nicht zwingend geladen, und ein Blatt, das je nach zuvor
+// besuchter Ansicht anders aussieht, ist schlimmer als eines, das kurz laedt.
+function epBerichtDrucken(einsatzId) {
+  api('einsatz_bericht.php?einsatz_id=' + Number(einsatzId)).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok' || !data.bericht) {
+      return toast(data.message || 'Der Kundenbericht liess sich nicht laden.');
+    }
+    const b = data.bericht;
+    if (!b.personen.length) {
+      return toast('Für diesen Einsatz liegt noch kein Rapport vor.');
+    }
+    $('printArea').innerHTML = epBerichtBlatt(b);
+    window.print();
+  }).catch(() => toast('Der Kundenbericht liess sich nicht laden.'));
+}
+
+// Erzeugt das Blatt. Getrennt von epBerichtDrucken(), damit es sich ohne
+// Drucken pruefen laesst.
+function epBerichtBlatt(b) {
+  const e = b.einsatz, k = b.kunde, u = b.unterschrift || {};
+  const re = rapportRechnungsadresse({
+    kunde_id: k.kunde_id, k_name: k.k_name, k_strasse: k.k_strasse,
+    k_hausnummer: k.k_hausnummer, k_adresszusatz: k.k_adresszusatz,
+    k_plz: k.k_plz, k_ort: k.k_ort,
+    re_name: k.re_name, re_zusatz: k.re_zusatz, re_strasse: k.re_strasse,
+    re_hausnummer: k.re_hausnummer, re_plz: k.re_plz, re_ort: k.re_ort,
+  });
+  const bkLogo = briefkopf.logo
+    ? `<img src="${esc(briefkopf.logo)}" alt="" style="max-height:56px;max-width:210px;display:block;margin-bottom:6px">` : '';
+  const bkText = [
+    briefkopf.firma ? `<div style="font-weight:700;color:#14161A;font-size:13px">${esc(briefkopf.firma)}</div>` : '',
+    briefkopf.zusatz ? esc(briefkopf.zusatz) : '',
+  ].filter(Boolean).join('');
+
+  const kopfZeile = (a, v) => `<tr><td style="padding:7px 0;color:#6B7280;width:170px;border-bottom:1px solid #E5E8EC">${a}</td><td style="padding:7px 0;font-weight:600;border-bottom:1px solid #E5E8EC">${v}</td></tr>`;
+  const kopf = [
+    ['Datum', dmy(e.datum)],
+    ...(k.kunde_nr ? [['Kunden-Nr.', esc(k.kunde_nr)]] : []),
+    ['Einsatzort', esc(e.strasse || '') + (e.strasse && e.ort ? ', ' : '') + esc(e.ort || '')],
+    ['Einsatzart', esc(e.einsatzart || '')],
+    ...(e.veranstaltung ? [['Veranstaltung', esc(e.veranstaltung)]] : []),
+  ].map(([a, v]) => kopfZeile(a, v)).join('');
+
+  // Eine Zeile je Person mit IHREN Zeiten. Genau das ist der Punkt: Die
+  // Zeiten muessen nicht uebereinstimmen, und wo sie es nicht tun, sieht der
+  // Kunde die Wahrheit statt eines geglaetteten Durchschnitts.
+  const th = 'padding:6px 8px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:#6B7280;border-bottom:1.5px solid #16181D';
+  const td = 'padding:7px 8px;border-bottom:1px solid #E5E8EC;font-size:13.5px';
+  const zeilen = b.personen.map(p => `<tr>
+      <td style="${td}">${esc(p.name)}</td>
+      <td style="${td}">${esc(hm(p.von))} – ${esc(hm(p.bis))}</td>
+      <td style="${td};text-align:right">${nf(p.pause_min)}′</td>
+      <td style="${td};text-align:right;font-weight:600">${nf(p.netto_h, 2)} h</td>
+    </tr>`).join('');
+  const summe = b.personen.reduce((s, p) => s + (Number(p.netto_h) || 0), 0);
+  const bemerkungen = b.personen.filter(p => p.bemerkung);
+
+  return `
+    <div style="font-family:-apple-system,Segoe UI,Arial,sans-serif;color:#14161A;max-width:700px;margin:0 auto">
+      <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:24px;border-bottom:2px solid #16181D;padding-bottom:14px;margin-bottom:22px">
+        <div>
+          <div style="font-size:21px;font-weight:800;letter-spacing:-.4px">Kundenbericht</div>
+          <div style="font-size:12px;color:#6B7280;margin-top:3px">Einsatz-Nr. ${esc(e.id)} · ${esc(dmy(e.datum))}</div>
+        </div>
+        <div style="text-align:right;font-size:12px;color:#6B7280;line-height:1.5">${bkLogo}${bkText}</div>
+      </div>
+      ${re ? `<div style="margin-bottom:20px">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#6B7280;font-weight:700;margin-bottom:4px">${re.abweichend ? 'Rechnungsadresse' : 'Kunde'}</div>
+        <div style="font-size:14px;line-height:1.5">${re.zeilen.map(z => esc(z)).join('<br>')}</div>
+      </div>` : ''}
+      <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:24px">${kopf}</table>
+
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#6B7280;font-weight:700;margin-bottom:6px">Geleistete Einsatzzeit</div>
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr>
+          <th style="${th}">Mitarbeitende</th><th style="${th}">Arbeitszeit</th>
+          <th style="${th};text-align:right">Pause</th><th style="${th};text-align:right">Netto</th>
+        </tr></thead>
+        <tbody>${zeilen}</tbody>
+        <tfoot><tr>
+          <td colspan="3" style="padding:9px 8px;text-align:right;font-size:13px;color:#6B7280">Total</td>
+          <td style="padding:9px 8px;text-align:right;font-weight:800;font-size:14.5px">${nf(summe, 2)} h</td>
+        </tr></tfoot>
+      </table>
+
+      ${bemerkungen.length ? `<div style="margin-top:20px">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#6B7280;font-weight:700;margin-bottom:5px">Bemerkungen</div>
+        ${bemerkungen.map(p => `<div style="font-size:13.5px;margin-bottom:4px"><b>${esc(p.name)}:</b> ${esc(p.bemerkung)}</div>`).join('')}
+      </div>` : ''}
+
+      <div style="margin-top:38px;padding-top:16px;border-top:1px solid #E5E8EC">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#6B7280;font-weight:700;margin-bottom:8px">Unterschrift Kunde</div>
+        ${u.bild
+          ? `<img src="${esc(u.bild)}" style="max-height:100px;max-width:280px;display:block">`
+          : '<div style="height:58px;border-bottom:1px solid #14161A;max-width:280px"></div>'}
+        ${u.name ? `<div style="font-size:13px;margin-top:7px">${esc(u.name)}</div>
+          <div style="font-size:10.5px;color:#6B7280;margin-top:1px">Name in Blockschrift</div>` : ''}
+        ${u.am ? `<div style="font-size:10.5px;color:#6B7280;margin-top:6px">Unterschrift erfasst am ${esc(dmyZeit(u.am))}${u.holte ? ' durch ' + esc(u.holte) : ''}</div>` : ''}
+      </div>
+      ${briefkopf.fusszeile ? `<div style="margin-top:30px;padding-top:10px;border-top:1px solid #E5E8EC;font-size:10.5px;color:#6B7280;line-height:1.5;white-space:pre-line">${esc(briefkopf.fusszeile)}</div>` : ''}
+    </div>`;
 }
 
 // ── Verkehrsmittel je Zuteilung (ENT-125) ───────────────────────────────
