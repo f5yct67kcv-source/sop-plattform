@@ -980,9 +980,15 @@ textarea.inp { resize: vertical; min-height: 92px; font-family: inherit; line-he
 /* Druck */
 #printArea { display: none; }
 @media print {
+  /* @page erzwingt einen festen Seitenrand -- ohne das legt jeder Browser
+     (Safari, Chrome, ...) zusaetzlich zum eigenen Standardrand noch das
+     CSS-Padding von #printArea obendrauf. Diese doppelte Randbreite hat
+     ein knapp einseitiges Blatt (z.B. Kundenrapport mit zwei Personen und
+     zweiblockiger Fusszeile) auf eine fast leere zweite Seite gedraengt. */
+  @page { size: A4; margin: 12mm; }
   body * { visibility: hidden; }
   #printArea, #printArea * { visibility: visible; }
-  #printArea { display: block !important; position: absolute; top: 0; left: 0; width: 100%; padding: 24px; }
+  #printArea { display: block !important; position: absolute; top: 0; left: 0; width: 100%; padding: 0; }
 }
 
 /* ══════════════════════════════════════════ PLANUNG */
