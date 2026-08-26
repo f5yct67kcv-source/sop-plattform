@@ -10048,9 +10048,126 @@ function epDirektAbgleichen(einsatzId, mitarbeiterId) {
 // nichts tut.
 function epRechnungBlock(e) {
   if (!e || !einsatzAbgeschlossen(e)) { return ''; }
+  // Der gemeinsame Kundenbericht steht neben dem Rechnungs-Platzhalter, weil
+  // beides Abschluss-Handlungen des Einsatzes sind. Er ist der Knopf, der
+  // etwas TUT -- darum umrissener Akzent, waehrend das gefuellte Blau beim
+  // (noch funktionslosen) Rechnungs-Knopf bleibt.
   return `<div class="card-bd ep-rechnung">
+    <button type="button" class="btn btn-akzent btn-sm" onclick="epBerichtDrucken(${Number(e.id)})">Kundenbericht drucken</button>
     <button type="button" class="btn btn-primary btn-sm" disabled title="Noch nicht verfügbar">Rechnung erstellen</button>
   </div>`;
+}
+
+// ── Gemeinsamer Kundenbericht fuer den Einsatz (ENT-160) ────────────────────
+//
+// Ein Blatt je Einsatz, mit ALLEN Personen und ihren jeweils eigenen Zeiten.
+// Ausdruecklich keine Zusammenlegung der Rapporte: die bleiben je Person
+// getrennt, weil an ihnen Lohn und die GAV-Abrechnung haengen. Zusammengefuegt
+// wird nur das Dokument.
+//
+// Die Daten kommen frisch vom Server (einsatz_bericht.php) statt aus den
+// geladenen Listen -- dieselbe Lehre wie bei ENT-155: `rapporte` ist im
+// Dashboard nicht zwingend geladen, und ein Blatt, das je nach zuvor
+// besuchter Ansicht anders aussieht, ist schlimmer als eines, das kurz laedt.
+function epBerichtDrucken(einsatzId) {
+  api('einsatz_bericht.php?einsatz_id=' + Number(einsatzId)).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok' || !data.bericht) {
+      return toast(data.message || 'Der Kundenbericht liess sich nicht laden.');
+    }
+    const b = data.bericht;
+    if (!b.personen.length) {
+      return toast('Für diesen Einsatz liegt noch kein Rapport vor.');
+    }
+    $('printArea').innerHTML = epBerichtBlatt(b);
+    window.print();
+  }).catch(() => toast('Der Kundenbericht liess sich nicht laden.'));
+}
+
+// Erzeugt das Blatt. Getrennt von epBerichtDrucken(), damit es sich ohne
+// Drucken pruefen laesst.
+function epBerichtBlatt(b) {
+  const e = b.einsatz, k = b.kunde, u = b.unterschrift || {};
+  const re = rapportRechnungsadresse({
+    kunde_id: k.kunde_id, k_name: k.k_name, k_strasse: k.k_strasse,
+    k_hausnummer: k.k_hausnummer, k_adresszusatz: k.k_adresszusatz,
+    k_plz: k.k_plz, k_ort: k.k_ort,
+    re_name: k.re_name, re_zusatz: k.re_zusatz, re_strasse: k.re_strasse,
+    re_hausnummer: k.re_hausnummer, re_plz: k.re_plz, re_ort: k.re_ort,
+  });
+  const bkLogo = briefkopf.logo
+    ? `<img src="${esc(briefkopf.logo)}" alt="" style="max-height:56px;max-width:210px;display:block;margin-bottom:6px">` : '';
+  const bkText = [
+    briefkopf.firma ? `<div style="font-weight:700;color:#14161A;font-size:13px">${esc(briefkopf.firma)}</div>` : '',
+    briefkopf.zusatz ? esc(briefkopf.zusatz) : '',
+  ].filter(Boolean).join('');
+
+  const kopfZeile = (a, v) => `<tr><td style="padding:7px 0;color:#6B7280;width:170px;border-bottom:1px solid #E5E8EC">${a}</td><td style="padding:7px 0;font-weight:600;border-bottom:1px solid #E5E8EC">${v}</td></tr>`;
+  const kopf = [
+    ['Datum', dmy(e.datum)],
+    ...(k.kunde_nr ? [['Kunden-Nr.', esc(k.kunde_nr)]] : []),
+    ['Einsatzort', esc(e.strasse || '') + (e.strasse && e.ort ? ', ' : '') + esc(e.ort || '')],
+    ['Einsatzart', esc(e.einsatzart || '')],
+    ...(e.veranstaltung ? [['Veranstaltung', esc(e.veranstaltung)]] : []),
+  ].map(([a, v]) => kopfZeile(a, v)).join('');
+
+  // Eine Zeile je Person mit IHREN Zeiten. Genau das ist der Punkt: Die
+  // Zeiten muessen nicht uebereinstimmen, und wo sie es nicht tun, sieht der
+  // Kunde die Wahrheit statt eines geglaetteten Durchschnitts.
+  const th = 'padding:6px 8px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:#6B7280;border-bottom:1.5px solid #16181D';
+  const td = 'padding:7px 8px;border-bottom:1px solid #E5E8EC;font-size:13.5px';
+  const zeilen = b.personen.map(p => `<tr>
+      <td style="${td}">${esc(p.name)}</td>
+      <td style="${td}">${esc(hm(p.von))} – ${esc(hm(p.bis))}</td>
+      <td style="${td};text-align:right">${nf(p.pause_min)}′</td>
+      <td style="${td};text-align:right;font-weight:600">${nf(p.netto_h, 2)} h</td>
+    </tr>`).join('');
+  const summe = b.personen.reduce((s, p) => s + (Number(p.netto_h) || 0), 0);
+  const bemerkungen = b.personen.filter(p => p.bemerkung);
+
+  return `
+    <div style="font-family:-apple-system,Segoe UI,Arial,sans-serif;color:#14161A;max-width:700px;margin:0 auto">
+      <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:24px;border-bottom:2px solid #16181D;padding-bottom:14px;margin-bottom:22px">
+        <div>
+          <div style="font-size:21px;font-weight:800;letter-spacing:-.4px">Kundenbericht</div>
+          <div style="font-size:12px;color:#6B7280;margin-top:3px">Einsatz-Nr. ${esc(e.id)} · ${esc(dmy(e.datum))}</div>
+        </div>
+        <div style="text-align:right;font-size:12px;color:#6B7280;line-height:1.5">${bkLogo}${bkText}</div>
+      </div>
+      ${re ? `<div style="margin-bottom:20px">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#6B7280;font-weight:700;margin-bottom:4px">${re.abweichend ? 'Rechnungsadresse' : 'Kunde'}</div>
+        <div style="font-size:14px;line-height:1.5">${re.zeilen.map(z => esc(z)).join('<br>')}</div>
+      </div>` : ''}
+      <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:24px">${kopf}</table>
+
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#6B7280;font-weight:700;margin-bottom:6px">Geleistete Einsatzzeit</div>
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr>
+          <th style="${th}">Mitarbeitende</th><th style="${th}">Arbeitszeit</th>
+          <th style="${th};text-align:right">Pause</th><th style="${th};text-align:right">Netto</th>
+        </tr></thead>
+        <tbody>${zeilen}</tbody>
+        <tfoot><tr>
+          <td colspan="3" style="padding:9px 8px;text-align:right;font-size:13px;color:#6B7280">Total</td>
+          <td style="padding:9px 8px;text-align:right;font-weight:800;font-size:14.5px">${nf(summe, 2)} h</td>
+        </tr></tfoot>
+      </table>
+
+      ${bemerkungen.length ? `<div style="margin-top:20px">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#6B7280;font-weight:700;margin-bottom:5px">Bemerkungen</div>
+        ${bemerkungen.map(p => `<div style="font-size:13.5px;margin-bottom:4px"><b>${esc(p.name)}:</b> ${esc(p.bemerkung)}</div>`).join('')}
+      </div>` : ''}
+
+      <div style="margin-top:38px;padding-top:16px;border-top:1px solid #E5E8EC">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#6B7280;font-weight:700;margin-bottom:8px">Unterschrift Kunde</div>
+        ${u.bild
+          ? `<img src="${esc(u.bild)}" style="max-height:100px;max-width:280px;display:block">`
+          : '<div style="height:58px;border-bottom:1px solid #14161A;max-width:280px"></div>'}
+        ${u.name ? `<div style="font-size:13px;margin-top:7px">${esc(u.name)}</div>
+          <div style="font-size:10.5px;color:#6B7280;margin-top:1px">Name in Blockschrift</div>` : ''}
+        ${u.am ? `<div style="font-size:10.5px;color:#6B7280;margin-top:6px">Unterschrift erfasst am ${esc(dmyZeit(u.am))}${u.holte ? ' durch ' + esc(u.holte) : ''}</div>` : ''}
+      </div>
+      ${briefkopf.fusszeile ? `<div style="margin-top:30px;padding-top:10px;border-top:1px solid #E5E8EC;font-size:10.5px;color:#6B7280;line-height:1.5;white-space:pre-line">${esc(briefkopf.fusszeile)}</div>` : ''}
+    </div>`;
 }
 
 // ── Verkehrsmittel je Zuteilung (ENT-125) ───────────────────────────────

@@ -75,6 +75,30 @@ $stmt->execute([
     $d['sigName'] ?? null, $sig, $d['bemerkung'] ?? null,
 ]);
 
+// Die Unterschrift gehoert zum EINSATZ, nicht nur zu diesem einen Rapport
+// (ENT-160). Sind zwei Leute am selben Auftrag, unterschreibt der Kunde sonst
+// zweimal auf zwei Telefonen.
+//
+// Nur die ERSTE wird uebernommen -- `unterschrift IS NULL` in der Bedingung.
+// Ohne das ueberschriebe der zweite Rapport die Unterschrift des ersten, und
+// der Zeitstempel auf dem Kundenbericht wuerde wandern, obwohl der Kunde nur
+// einmal unterschrieben hat. Am Rapport bleibt sie zusaetzlich stehen: Sie ist
+// dort tatsaechlich erfasst worden, und ein Einzelrapport muss weiterhin fuer
+// sich allein gueltig sein.
+// `!einsatz_abgeglichen()` wie beim Status darunter: Eine abgeglichene Schicht
+// ist festgeschrieben (ENT-045). Ohne diese Bedingung schriebe ein nachtraeglich
+// eingehender Rapport noch eine Unterschrift in einen bereits geprueften und
+// gesperrten Einsatz. Beim ersten Bauen genau das vergessen -- die
+// ENT-128-Wache in test_schichtrapport.mjs hat es aufgedeckt.
+if ($einsatzId > 0 && $sig !== null && !einsatz_abgeglichen(db(), $einsatzId)) {
+    $st = db()->prepare(
+        'UPDATE einsaetze
+            SET unterschrift = ?, unterzeichner = ?, unterschrift_von = ?, unterschrift_am = NOW()
+          WHERE id = ? AND unterschrift IS NULL'
+    );
+    $st->execute([$sig, $d['sigName'] ?? null, (int)$user['id'], $einsatzId]);
+}
+
 // Sobald ALLE zugesagten Zuteilungen dieses Einsatzes rapportiert haben, gilt
 // er als abgeschlossen (ENT-128) -- nicht schon bei diesem einen Rapport.
 // 'abgesagt' wird nie ueberschrieben: ein abgesagter Einsatz bleibt abgesagt,
