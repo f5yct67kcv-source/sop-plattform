@@ -189,3 +189,102 @@ function beleg_summen(array $positionen, int $rabattBp = 0): array
         'total_rappen'         => $total,
     ];
 }
+
+// ══════════════════════════════════════════════════════════════════════════
+// Datenbankteil
+// ══════════════════════════════════════════════════════════════════════════
+
+// Eine Positionszeile aus fremder Eingabe in einen sauberen Datensatz.
+// ALLES wird hier begrenzt und ganzzahlig gemacht -- was von aussen kommt,
+// darf nirgends ungeprueft in die Rechnung.
+//
+// produkt_id ist nur ein Rueckverweis. Name, Preis, Einheit und Satz kommen
+// als KOPIE mit: Sie sind der Stand zum Zeitpunkt des Erfassens, nicht der
+// heutige Stand des Produkts (siehe Snapshot-Regel im Kopf dieser Datei).
+function beleg_position_lesen(array $p): array
+{
+    $ganz = static function ($wert, int $min, int $max): int {
+        $n = (int)round((float)$wert);
+        return max($min, min($max, $n));
+    };
+    // Menge auf zwei Nachkommastellen, nie negativ. Die Obergrenze ist
+    // grosszuegig, aber vorhanden -- eine Million Stunden auf einer Offerte
+    // ist ein Tippfehler, kein Auftrag.
+    $menge = max(0, min(99999999, (float)($p['menge'] ?? 1)));
+    return [
+        'produkt_id'         => ($p['produkt_id'] ?? null) ? (int)$p['produkt_id'] : null,
+        'produkt_name'       => mb_substr(trim((string)($p['produkt_name'] ?? '')), 0, 200),
+        'beschreibung'       => trim((string)($p['beschreibung'] ?? '')),
+        'menge'              => round($menge, 2),
+        'einheit'            => mb_substr(trim((string)($p['einheit'] ?? 'Std.')), 0, 20),
+        'einzelpreis_rappen' => $ganz($p['einzelpreis_rappen'] ?? 0, -99999999, 99999999),
+        // 10000 Basispunkte = 100 %. Mehr waere ein negativer Preis auf
+        // Umwegen; weniger als 0 ein Zuschlag, der so nicht heissen darf.
+        'rabatt_bp'          => $ganz($p['rabatt_bp'] ?? 0, 0, 10000),
+        'mwst_satz_bp'       => $ganz($p['mwst_satz_bp'] ?? 0, 0, 10000),
+    ];
+}
+
+function beleg_positionen_lesen(PDO $pdo, int $belegId): array
+{
+    $s = $pdo->prepare(
+        'SELECT id, sortierung, produkt_id, produkt_name, beschreibung, menge,
+                einheit, einzelpreis_rappen, rabatt_bp, mwst_satz_bp
+           FROM beleg_positionen WHERE beleg_id = ? ORDER BY sortierung, id'
+    );
+    $s->execute([$belegId]);
+    return $s->fetchAll();
+}
+
+// Positionen ersetzen: erst alle weg, dann neu schreiben. Ein Abgleich Zeile
+// fuer Zeile waere aufwendiger und braechte nichts -- eine Position hat
+// ausserhalb ihres Belegs keine Identitaet, auf die etwas verweist.
+// Gehoert IMMER in dieselbe Transaktion wie beleg_summen_schreiben(), sonst
+// stuenden Positionen und Summen fuer einen Moment im Widerspruch.
+function beleg_positionen_schreiben(PDO $pdo, int $belegId, array $positionen): void
+{
+    $pdo->prepare('DELETE FROM beleg_positionen WHERE beleg_id = ?')->execute([$belegId]);
+    $ein = $pdo->prepare(
+        'INSERT INTO beleg_positionen
+            (beleg_id, sortierung, produkt_id, produkt_name, beschreibung, menge,
+             einheit, einzelpreis_rappen, rabatt_bp, mwst_satz_bp)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    );
+    foreach (array_values($positionen) as $i => $p) {
+        $ein->execute([$belegId, $i, $p['produkt_id'], $p['produkt_name'], $p['beschreibung'],
+                       $p['menge'], $p['einheit'], $p['einzelpreis_rappen'],
+                       $p['rabatt_bp'], $p['mwst_satz_bp']]);
+    }
+}
+
+// Rechnet die Summen aus den GESPEICHERTEN Positionen neu und legt sie am
+// Beleg ab.
+//
+// Bewusst aus der Datenbank gelesen statt aus der Eingabe gerechnet: Was der
+// Browser mitschickt, ist eine Vorschau. Massgeblich ist, was tatsaechlich
+// gespeichert wurde -- sonst koennte ein Beleg Summen tragen, die zu seinen
+// eigenen Positionen nicht passen.
+function beleg_summen_schreiben(PDO $pdo, int $belegId, int $rabattBp): array
+{
+    $s = beleg_summen(beleg_positionen_lesen($pdo, $belegId), $rabattBp);
+    $pdo->prepare(
+        'UPDATE belege SET rabatt_bp = ?, zwischensumme_rappen = ?, rabatt_rappen = ?,
+                mwst_rappen = ?, rundung_rappen = ?, total_rappen = ? WHERE id = ?'
+    )->execute([$rabattBp, $s['zwischensumme_rappen'], $s['rabatt_rappen'],
+                $s['mwst_rappen'], $s['rundung_rappen'], $s['total_rappen'], $belegId]);
+    return $s;
+}
+
+// Ein Beleg mit allem, was das Formular und die Druckvorlage brauchen.
+// Der Kunde kommt mit -- die Adresse wird LIVE gelesen, nicht als
+// Schnappschuss gehalten (siehe OP-108).
+function beleg_lesen(PDO $pdo, int $id): ?array
+{
+    $s = $pdo->prepare('SELECT * FROM belege WHERE id = ?');
+    $s->execute([$id]);
+    $b = $s->fetch();
+    if (!$b) { return null; }
+    $b['positionen'] = beleg_positionen_lesen($pdo, $id);
+    $b['summen'] = beleg_summen($b['positionen'], (int)$b['rabatt_bp']);
+    return $b;
+}

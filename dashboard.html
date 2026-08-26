@@ -464,6 +464,48 @@ tr.rapp-gruppe > td { background: var(--line-soft); }
    selbst bleibt ausgenommen: sie ist per rowspan ohnehin eine einzige Zelle,
    ihre eigene untere Kante liegt schon richtig am Gruppenende. */
 tr.rapp-gruppe-offen td:not(.rapp-klammer) { border-bottom: none; }
+
+/* ── Offert-Formular (ENT-181) ────────────────────────────────────────────
+   Bemerkung links, Summenblock rechts. Der Summenblock ist die Zahl, auf die
+   es ankommt -- er steht darum rechts unten, wo er auch auf dem gedruckten
+   Blatt steht, und nicht irgendwo im Formularfluss. */
+.of-abschluss { display: grid; grid-template-columns: 1fr 380px; gap: 14px; align-items: start; }
+@media (max-width: 900px) { .of-abschluss { grid-template-columns: 1fr; } }
+/* Eine Positionszeile. Raster statt Tabelle: Die Beschreibung ist mehrzeilig
+   und braucht die volle Breite unter den schmalen Zahlenfeldern -- in einer
+   Tabellenzelle muesste sie sich die Hoehe mit Feldern teilen, die nur eine
+   Zeile hoch sind. */
+.of-pos { padding: 12px 18px; border-bottom: 1px solid var(--line-soft); }
+.of-pos:last-child { border-bottom: none; }
+.of-pos-kopf {
+  display: grid; gap: 8px; align-items: end;
+  grid-template-columns: minmax(140px, 1.6fr) 90px 88px 110px 92px 120px 36px;
+}
+.of-pos-kopf .f { margin: 0; }
+/* Die Beschriftungen stehen nur ueber der ERSTEN Zeile -- ab der zweiten
+   waeren sie eine Wiederholung, die den Blick von den Werten abzieht.
+   Ausgeblendet statt weggelassen, damit Screenreader sie weiter vorlesen. */
+.of-pos:not(:first-child) .of-pos-kopf label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.of-pos-summe { align-self: end; padding-bottom: 9px; font-weight: 650; text-align: right; white-space: nowrap; }
+.of-pos-weg { align-self: end; }
+.of-pos textarea { min-height: 54px; margin-top: 8px; }
+@media (max-width: 900px) {
+  .of-pos-kopf { grid-template-columns: 1fr 1fr 1fr; }
+  /* Auf dem Handy stehen die Beschriftungen in JEDER Zeile: Ohne die
+     Kopfzeile daneben waere sonst nicht erkennbar, was "70" und was "42.00"
+     ist. Die Ersparnis oben gilt nur, wo die erste Zeile sichtbar bleibt. */
+  .of-pos:not(:first-child) .of-pos-kopf label { position: static; width: auto; height: auto; clip: auto; }
+}
+/* Summenblock. Beschriftung links, Betrag rechts, Total abgesetzt --
+   dieselbe Ordnung wie auf dem gedruckten Beleg. */
+.of-summe-z { display: flex; justify-content: space-between; gap: 16px; padding: 5px 0; font-size: 13px; }
+.of-summe-z .wert { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.of-summe-z.matt { color: var(--ink-3); }
+.of-summe-z.total {
+  margin-top: 8px; padding-top: 10px; border-top: 1.5px solid var(--ink);
+  font-size: 15px; font-weight: 750;
+}
+
 tbody tr.aus td { opacity: .55; }
 /* Abgeschlossene Einsaetze treten in der Liste zurueck (ENT-128) -- erledigt,
    nicht mehr handlungsbeduerftig. Gleiche Staerke wie tr.aus, eigener Name:
@@ -2575,6 +2617,11 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
           <button class="nav-kind" id="nav-kunden-uebersicht" onclick="go('kunden'); kuGoTab('uebersicht')">Adressen</button>
           <button class="nav-kind" id="nav-kunden-objekte" onclick="go('kunden'); kuGoTab('objekte')">Objekte</button>
           <button class="nav-kind" id="nav-kunden-rapporte" onclick="go('kunden'); kuGoTab('rapporte')">Rapporte</button>
+          <!-- Offerten stehen hier und nicht in einer eigenen Rubrik: Sie
+               gehoeren zum Kunden, so wie seine Objekte und seine Rapporte
+               (ENT-181). Die Produkte dagegen sind Preis-Stammdaten und
+               liegen unter Administration -- sie gehoeren zu keinem Kunden. -->
+          <button class="nav-kind" id="nav-kunden-offerten" onclick="go('kunden'); kuGoTab('offerten')">Offerten</button>
         </div>
       </div>
 
@@ -2591,6 +2638,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
         </button>
         <div class="nav-kinder">
           <button class="nav-kind" id="nav-admin-mitarbeiter" onclick="go('mitarbeiter')">Mitarbeitende</button>
+          <button class="nav-kind" id="nav-admin-produkte" onclick="go('produkte')">Produkte</button>
           <button class="nav-kind" id="nav-admin-betrieb" onclick="go('betrieb')">Betrieb</button>
         </div>
       </div>
@@ -3382,6 +3430,33 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
           <div class="card"><div class="card-bd flush"><div class="tw" id="rapporteTable"></div></div></div>
         </div>
 
+        <!-- ── Reiter: Offerten (ENT-181) ──────────────────────────────────
+             Aufbau 1:1 wie im bisherigen Fremdsystem: Status, Nr., Referenz,
+             Titel, Empfaenger, Offertendatum, Offertensumme, Gueltig bis,
+             Aktion. Jede Spalte sortierbar, Suchfeld links, der Knopf
+             "Offerte erstellen" rechts oben. ── -->
+        <div class="ku-tab" id="kv-offerten">
+          <div class="tabs" id="ofArchivTabs" style="margin-bottom:10px">
+            <button class="tab on" id="ofatab-alle" onclick="ofArchivGo('alle')">Alle</button>
+            <button class="tab" id="ofatab-archiv" onclick="ofArchivGo('archiv')">Archiviert</button>
+          </div>
+          <div class="bar-tools">
+            <div class="search">
+              <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input class="inp" type="search" id="ofQ" placeholder="Nummer, Titel, Empfänger oder Referenz …" oninput="renderOfferten()">
+            </div>
+            <select class="inp" id="ofStatus" style="width:auto" onchange="renderOfferten()">
+              <option value="">Alle Status</option>
+            </select>
+            <div class="sp" style="flex:1"></div>
+            <button class="btn btn-primary" onclick="ofNeuStarten()">
+              <svg class="i" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Offerte erstellen
+            </button>
+          </div>
+          <div class="card"><div class="card-bd flush"><div class="tw" id="ofTable"></div></div></div>
+        </div>
+
         <!-- ── Detailseite eines einzelnen Kunden (ENT-040), nur per Klick auf
              eine Zeile erreichbar -- kein eigener Reiter oben, kein eigener
              Seitenleisten-Eintrag. ── -->
@@ -3418,6 +3493,104 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
            Jahresstunden je Person gegen die Grenze ihrer Anstellungs-
            kategorie (ENT-065, Art. 8 GAV). Die Seite visualisiert, was
            sonst niemand im Kopf behaelt: zwoelf Monate mal zwanzig Leute. -->
+      <!-- ══════════════════════ OFFERTE ERFASSEN (ENT-181) ══════════════
+           Eigene Ansicht statt eines Dialogs: Eine Offerte hat beliebig
+           viele Positionszeilen mit mehrzeiligen Beschreibungen -- das ist
+           kein Formular, das in ein Fenster passt, ohne dass man darin
+           scrollt und dabei den Summenblock verliert. Gleiche Entscheidung
+           wie beim Einsatzplan (ENT-150). -->
+      <section class="view" id="view-offerte">
+        <div class="ku-detail-hd">
+          <button class="ku-zurueck" onclick="go('kunden'); kuGoTab('offerten')" aria-label="Zurück zur Offertenliste">
+            <svg class="i" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <div style="flex:1">
+            <h2 id="ofFormNummer">–</h2>
+            <div class="sub" id="ofFormSub">–</div>
+          </div>
+          <button class="btn btn-plain btn-sm" id="ofFormDruckBtn" onclick="ofDrucken(ofFormId)">
+            <svg class="i i-sm" viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            Drucken
+          </button>
+          <button class="btn btn-primary btn-sm" id="ofFormSaveBtn" onclick="ofSpeichern()">Speichern</button>
+        </div>
+
+        <div class="msg-err" id="ofFormErr" style="display:none;margin-bottom:12px"></div>
+
+        <div class="card" style="margin-bottom:14px"><div class="card-bd">
+          <div class="form-grid">
+            <div class="f"><label for="of_kunde">Empfänger *</label>
+              <input class="inp" id="of_kunde" list="dlKunden" autocomplete="off"
+                     placeholder="Kunde suchen …" oninput="ofKundeGewaehlt()"></div>
+            <div class="f"><label for="of_person">Ansprechperson</label>
+              <select class="inp" id="of_person"></select></div>
+            <div class="f wide"><label for="of_titel">Titel</label>
+              <input class="inp" id="of_titel" placeholder="z. B. Verkehrsdienst"></div>
+            <div class="f"><label for="of_referenz">Referenz</label>
+              <input class="inp" id="of_referenz" placeholder="Ihre Bestellnummer o. Ä."></div>
+            <div class="f"><label for="of_status">Status</label>
+              <select class="inp" id="of_status"></select></div>
+            <div class="f"><label for="of_datum">Offertendatum *</label>
+              <input class="inp" type="date" id="of_datum" onchange="ofGueltigNachziehen()"></div>
+            <div class="f"><label for="of_gueltig">Gültig bis</label>
+              <input class="inp" type="date" id="of_gueltig"></div>
+          </div>
+        </div></div>
+
+        <div class="card" style="margin-bottom:14px">
+          <div class="card-hd">
+            <h2>Positionen</h2>
+            <div class="sp" style="flex:1"></div>
+            <button class="btn btn-plain btn-sm" onclick="ofZeileHinzu()">
+              <svg class="i i-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Position hinzufügen
+            </button>
+          </div>
+          <div class="card-bd flush"><div class="tw"><div id="ofPositionen"></div></div></div>
+        </div>
+
+        <div class="of-abschluss">
+          <div class="card"><div class="card-bd">
+            <div class="f"><label for="of_bemerkung">Interne Bemerkung</label>
+              <textarea class="inp" id="of_bemerkung" rows="3" style="min-height:70px"
+                placeholder="Steht nicht auf dem Dokument — nur für den eigenen Gebrauch."></textarea></div>
+          </div></div>
+          <div class="card"><div class="card-bd">
+            <div class="f" style="margin-bottom:10px">
+              <label for="of_rabatt">Gesamtrabatt auf alle Positionen (%)</label>
+              <input class="inp" id="of_rabatt" inputmode="decimal" value="0" oninput="ofSummenZeichnen()">
+            </div>
+            <div id="ofSummen"></div>
+          </div></div>
+        </div>
+      </section>
+
+      <!-- ══════════════════════ PRODUKTE (ENT-181) ══════════════════════
+           Preis-Stammdaten fuer Offerten und spaeter Rechnungen. Was hier
+           steht, sind VORSCHLAEGE: Sobald ein Produkt in einen Beleg
+           uebernommen wird, werden Name, Preis, Einheit und MWST-Satz in die
+           Position kopiert. Eine Preisaenderung hier veraendert darum keine
+           bereits verschickte Offerte -- dieselbe Regel wie beim
+           versionierten GAV-Regelwerk. -->
+      <section class="view" id="view-produkte">
+        <div class="tabs" id="prodArchivTabs" style="margin-bottom:10px">
+          <button class="tab on" id="prodatab-alle" onclick="pdArchivGo('alle')">Alle</button>
+          <button class="tab" id="prodatab-archiv" onclick="pdArchivGo('archiv')">Archiviert</button>
+        </div>
+        <div class="bar-tools">
+          <div class="search">
+            <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input class="inp" type="search" id="prodQ" placeholder="Produkt oder Beschreibung …" oninput="renderProdukte()">
+          </div>
+          <div class="sp" style="flex:1"></div>
+          <button class="btn btn-primary btn-sm" onclick="pdNeu()">
+            <svg class="i i-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Neues Produkt
+          </button>
+        </div>
+        <div class="card"><div class="card-bd flush"><div class="tw" id="prodTable"></div></div></div>
+      </section>
+
       <section class="view" id="view-pensen">
         <div class="bar-tools">
           <select class="inp" id="pnJahr" style="width:auto" onchange="ladePensen()" aria-label="Kalenderjahr"></select>
@@ -4237,6 +4410,45 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
   </div>
 </div>
 
+<!-- Produkt anlegen oder ändern (ENT-181). Preis-Stammdaten für Offerten.
+     Was hier steht, sind Vorschläge: Beim Übernehmen in einen Beleg werden
+     die Werte in die Position kopiert, spätere Änderungen hier wirken nur
+     auf künftige Belege. -->
+<div class="dlg-scrim" id="dlgProdukt">
+  <div class="dlg">
+    <div class="dlg-hd">
+      <h2 id="prodTitel">Neues Produkt</h2>
+      <p>Vorschlagswerte für Offerten. Eine Änderung wirkt nur auf künftige Belege — bereits erfasste behalten ihre Werte.</p>
+    </div>
+    <div class="dlg-bd">
+      <div class="msg-err" id="prodErr" style="display:none"></div>
+      <div class="form-grid">
+        <div class="f wide"><label for="prod_name">Bezeichnung *</label>
+          <input class="inp" id="prod_name" placeholder="z. B. Verkehrsdienst"></div>
+        <div class="f wide"><label for="prod_beschreibung">Standardbeschreibung</label>
+          <textarea class="inp" id="prod_beschreibung" rows="4" style="min-height:88px"
+            placeholder="Erscheint als Vorschlag in der Offerte und lässt sich dort je Position anpassen."></textarea></div>
+        <div class="f"><label for="prod_preis">Einzelpreis (CHF)</label>
+          <input class="inp" id="prod_preis" inputmode="decimal" placeholder="42.00"></div>
+        <div class="f"><label for="prod_einheit">Einheit</label>
+          <input class="inp" id="prod_einheit" list="dlEinheiten" placeholder="Std."></div>
+        <div class="f"><label for="prod_mwst">MWST-Satz</label>
+          <select class="inp" id="prod_mwst"></select></div>
+        <div class="f"><label for="prod_sortierung">Reihenfolge</label>
+          <input class="inp" id="prod_sortierung" inputmode="numeric" value="0"></div>
+      </div>
+    </div>
+    <div class="dlg-ft">
+      <button class="btn btn-plain" onclick="closeDlg('dlgProdukt')">Abbrechen</button>
+      <button class="btn btn-primary" id="prodSaveBtn" onclick="pdSpeichern()">Speichern</button>
+    </div>
+  </div>
+</div>
+<datalist id="dlEinheiten">
+  <option>Std.</option><option>Stk.</option><option>Pauschal</option>
+  <option>km</option><option>Tag</option><option>Monat</option><option>m²</option>
+</datalist>
+
 <!-- Kundenstamm aus einer CSV-Datei einlesen (ENT-066). Drei Schritte in
      einem Fenster: Datei waehlen, Spalten zuordnen, Bericht. Die Datei wird
      im Browser gelesen und verlaesst ihn erst, wenn zugeordnet ist. -->
@@ -4539,6 +4751,10 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 
 <!-- Kundennamen für die Eingabehilfe in der Planung -->
 <datalist id="dlKunden"></datalist>
+<!-- Produktvorschlaege fuer die Positionszeilen einer Offerte (ENT-181).
+     Wird von loadProdukte() gefuellt; archivierte Produkte stehen bewusst
+     nicht drin -- sie sollen sich nicht in neue Belege zurueckschleichen. -->
+<datalist id="dlProdukte"></datalist>
 <datalist id="dlEinsatzarten"><option>Verkehrsdienst</option><option>Revierdienst</option><option>Sicherheitsdienst</option><option>Reinigung</option></datalist>
 
 <!-- Einrichtung: Tabellen der Planung und Verfügbarkeit anlegen -->
@@ -4592,6 +4808,13 @@ let kunden = [];
 let einsaetze = [];
 let objekte = [];
 let masterschichten = [];   // die des offenen Objekts
+// Offerten und ihre Preis-Stammdaten (ENT-181). belege[] traegt nur die
+// Kopfdaten der Liste -- die Positionen holt das Formular einzeln beim
+// Oeffnen, sonst laege bei zweihundert Offerten die zehnfache Datenmenge
+// im Speicher, von der nichts auf den Bildschirm kommt.
+let belege = [];
+let produkte = [];
+let ofNaechsteNummer = '';
 let feiertage = {};         // Datum -> Feiertag, für Matrix und Tagesplan
 let drawerId = null;   // offener Rapport in der Schublade
 let maEingerichtet = true;  // stehen die Felder aus ENT-072 in der Datenbank?
@@ -4617,6 +4840,16 @@ let kuArchivTab = 'alle';   // Kundenliste: aktive oder archivierte Kunden (ENT-
 let kuSortFeld = 'kundennummer';
 let kuSortRichtung = 'auf'; // 'auf' oder 'ab'
 let kuNaechsteNummer = '';  // Vorschau der nächsten freien Kundennummer (ENT-044)
+// Offerten-Liste (ENT-181). Vorgabe ist Datum absteigend -- die neueste
+// Offerte oben, wie im bisherigen Fremdsystem und wie bei den Rapporten.
+let ofSortFeld = 'datum';
+let ofSortRichtung = 'ab';
+let ofArchivTab = 'alle';
+// Produkte-Liste
+let pdSortFeld = 'sortierung';
+let pdSortRichtung = 'auf';
+let pdArchivTab = 'alle';
+let pdDlgId = null;         // im Produktdialog bearbeitetes Produkt, null = anlegen
 let kuDlgId = null;         // im Kundendialog bearbeiteter Kunde, null = anlegen
 let kuDlgTabAktiv = 'kommunikation';
 let kuWege = [];            // Kommunikationszeilen der Firma im offenen Dialog
@@ -4930,9 +5163,16 @@ const NAV_RECHTE = {
   'nav-abgleich':           'abgleich',
   'navg-kunden':            'kunden',
   'nav-admin-mitarbeiter':  'personal_lesen',
+  'nav-admin-produkte':     'offerten',
   'nav-admin-betrieb':      'betrieb',
   'navg-kontrolle':         'plan',
   'nav-einrichtung':        'betrieb',
+  // Offerten haengen am eigenen Recht, nicht an 'kunden' (ENT-181): Wer
+  // Adressen pflegt, sieht darum noch keine Preise. Die Elterngruppe
+  // "Kunden" bleibt an 'kunden' -- wer nur 'offerten' haette und keine
+  // Kunden, saehe eine leere Rubrik; diese Kombination gibt es aber nicht,
+  // weil beide Rechte heute nur zusammen (bei der Verwaltung) vorkommen.
+  'nav-kunden-offerten':    'offerten',
 };
 
 function rechteAnwenden() {
@@ -4940,12 +5180,13 @@ function rechteAnwenden() {
     const el = $(id);
     if (el) { el.style.display = darf(recht) ? '' : 'none'; }
   });
-  // Die Elterngruppe "Administration" verschwindet, wenn beide Kinder weg
+  // Die Elterngruppe "Administration" verschwindet, wenn ALLE Kinder weg
   // sind -- eine aufklappbare Rubrik ohne Inhalt ist schlimmer als keine.
+  // Seit ENT-181 sind es drei Kinder, nicht zwei.
   const admGruppe = $('navg-admin');
   if (admGruppe) {
     admGruppe.style.display =
-      (darf('personal_lesen') || darf('betrieb')) ? '' : 'none';
+      (darf('personal_lesen') || darf('betrieb') || darf('offerten')) ? '' : 'none';
   }
   mdReiterPruefen();
   // Der Schnellzugriff haengt an denselben Rechten wie die Navigation und
@@ -4961,6 +5202,8 @@ const TITLES = {
   abgleich:    ['Schichten abgleichen', 'Was tatsächlich stattgefunden hat'],
   mitarbeiter: ['Mitarbeitende', 'Stammdaten'],
   kunden:      ['Kunden', 'Stammdaten'],
+  produkte:    ['Produkte', 'Preise und Standardtexte für Offerten'],
+  offerte:     ['Offerte', 'Positionen, Preise und Summen'],
   betrieb:     ['Betrieb', 'Einstellungen zum eigenen Unternehmen'],
   pensen:      ['Pensen', 'Jahresstunden gegen die Anstellungskategorie'],
   auslagen:    ['Auslagenersatz', 'Chronologisches Protokoll je Mitarbeitendem — Art. 18 Ziff. 10'],
@@ -5656,7 +5899,11 @@ function themaUm() {
 // einem breiten Schirm Rand statt Inhalt, waehrend die Felder selbst zu schmal
 // waren. Die Fliesstext-Felder darin behalten ihren eigenen Deckel (siehe
 // .form-zeilen textarea.inp).
-const ANSICHT_WEIT   = ['uebersicht', 'planung', 'abgleich', 'pensen', 'auslagen', 'einsatzplan', 'masterschichten', 'einsatzneu'];
+// 'offerte' ist dabei: Die Positionszeilen tragen sieben Felder nebeneinander
+// plus die Beschreibung darunter -- auf Lesebreite gedraengt wuerde jedes
+// Zahlenfeld zu schmal, um seinen Inhalt zu zeigen. 'produkte' bleibt
+// draussen: eine sechsspaltige Liste braucht die Extrabreite nicht.
+const ANSICHT_WEIT   = ['uebersicht', 'planung', 'abgleich', 'pensen', 'auslagen', 'einsatzplan', 'masterschichten', 'einsatzneu', 'offerte'];
 const PLANUNG_WEIT   = ['uebersicht', 'einsaetze', 'objektplan', 'tag'];
 
 function weiteAnsicht(an) {
@@ -5705,12 +5952,14 @@ function go(view) {
   // Die Administrationsgruppe klappt auf, wenn eine ihrer Seiten offen ist --
   // und der Elternpunkt wird mitmarkiert, sonst sieht die Seitenleiste aus,
   // als waere man nirgends (dasselbe Muster wie bei den Kunden, ENT-039).
-  const imAdmin = view === 'mitarbeiter' || view === 'betrieb';
+  const imAdmin = view === 'mitarbeiter' || view === 'betrieb' || view === 'produkte';
   $('navg-admin').classList.toggle('offen', imAdmin);
   if (imAdmin) { $('nav-admin').classList.add('on'); }
   document.querySelectorAll('#navg-admin .nav-kind').forEach(k => k.classList.remove('on'));
   if (view === 'mitarbeiter') { $('nav-admin-mitarbeiter').classList.add('on'); }
+  if (view === 'produkte') { $('nav-admin-produkte').classList.add('on'); }
   if (view === 'betrieb') { $('nav-admin-betrieb').classList.add('on'); }
+  if (view === 'produkte') { produkte.length ? renderProdukte() : loadProdukte(); }
   $('navg-kontrolle').classList.toggle('offen', view === 'pensen' || view === 'auslagen');
   if (view === 'pensen' || view === 'auslagen') { $('nav-kontrolle').classList.add('on'); }
   $('nav-kontrolle-pensen').classList.toggle('on', view === 'pensen');
@@ -6408,6 +6657,897 @@ function exportCSV() {
   a.download = 'rapporte_' + new Date().toISOString().slice(0, 10) + '.csv';
   a.click();
   toast(d.length + ' Rapporte exportiert.');
+}
+
+// ══════════════════════════════════════════ PRODUKTE UND OFFERTEN (ENT-181)
+//
+// Beide Listen sind nach demselben Muster gebaut wie die Kundenliste
+// (ENT-040): sortierbare Spalten mit Pfeil, Suchfeld, Alle/Archiviert und
+// ein Zeilenmenue. Bewusst dasselbe Muster und keine neue Bauart -- wer die
+// Kundenliste bedienen kann, kann diese auch.
+
+// Die MWST-Saetze, die es in der Schweiz gibt. Als Liste und nicht als
+// Freitextfeld: Ein selbst eingetippter Satz waere ein Zahlendreher, den
+// niemand bemerkt, bis die Abrechnung nicht stimmt. Wird ein Satz revidiert,
+// kommt hier ein Eintrag DAZU -- der alte bleibt, weil bereits erfasste
+// Positionen ihn tragen (Snapshot-Regel).
+const MWST_SAETZE = [
+  { bp: 810, text: '8.10 % (Normalsatz)' },
+  { bp: 260, text: '2.60 % (reduziert)' },
+  { bp: 380, text: '3.80 % (Beherbergung)' },
+  { bp: 0,   text: 'steuerfrei / ohne MWST' },
+];
+
+// Die Status einer Offerte. Reihenfolge = Ablauf, Farbe = Bedeutung:
+// Entwurf ist neutral, Versendet und Angeschaut sind unterwegs, Bestaetigt
+// ist gewonnen, Abgelehnt verloren.
+const OF_STATUS = [
+  { wert: 'entwurf',    text: 'Entwurf',    chip: 'chip-n' },
+  { wert: 'versendet',  text: 'Versendet',  chip: 'chip-a' },
+  { wert: 'angeschaut', text: 'Angeschaut', chip: 'chip-w' },
+  { wert: 'bestaetigt', text: 'Bestätigt',  chip: 'chip-p' },
+  // chip-x ist die im Haus bereits vergebene Marke fuer "negativ/abgesagt"
+  // (Einsatzstatus, abgelaufene Bewilligungen) -- keine neue Klasse fuer
+  // dieselbe Aussage.
+  { wert: 'abgelehnt',  text: 'Abgelehnt',  chip: 'chip-x' },
+];
+const ofStatusInfo = w => OF_STATUS.find(s => s.wert === w) || OF_STATUS[0];
+
+// CHF-Eingabe zu Rappen. Akzeptiert Komma wie Punkt -- auf einer Schweizer
+// Tastatur tippt man das eine so schnell wie das andere, und ein Betrag, der
+// wegen des Trennzeichens als 0 gelesen wird, faellt erst auf dem Papier auf.
+function chfZuRappen(text) {
+  const n = parseFloat(String(text == null ? '' : text).replace(/'/g, '').replace(',', '.'));
+  return Number.isFinite(n) ? Math.round(n * 100) : 0;
+}
+// Rappen zurueck ins Eingabefeld: ohne Tausendertrennung, mit Punkt --
+// so, wie es wieder eingetippt werden koennte.
+const rappenZuChf = r => ((Number(r) || 0) / 100).toFixed(2);
+
+// ── Produkte ──────────────────────────────────────────────────────────────
+function loadProdukte() {
+  return api('produkt_list.php').then(({ ok, status, data }) => {
+    if (status === 401) return doLogout();
+    // 403 heisst: angemeldet, aber ohne das Recht 'offerten'. Kein Fehler,
+    // der jemanden beunruhigen muesste -- die Ansicht ist dann ohnehin nicht
+    // in der Navigation.
+    if (status === 403) return;
+    if (!ok || data.status !== 'ok') { toast(data.message || 'Produkte konnten nicht geladen werden.'); return; }
+    produkte = data.produkte || [];
+    // Eingabehilfe der Positionszeilen mitfuehren -- archivierte Produkte
+    // schlagen sich nicht mehr vor, sonst kaeme ein stillgelegter Preis ueber
+    // die Vervollstaendigung in eine neue Offerte zurueck.
+    $('dlProdukte').innerHTML = produkte.filter(p => Number(p.aktiv ?? 1))
+      .map(p => `<option value="${esc(p.name)}"></option>`).join('');
+    // Nur zeichnen, wenn die Ansicht ueberhaupt offen ist: loadProdukte()
+    // laeuft auch als Vorlauf des Offert-Formulars, und dort gibt es die
+    // Tabelle nicht.
+    if ($('view-produkte').classList.contains('on')) { renderProdukte(); }
+  });
+}
+
+function pdTh(feld, label, num) {
+  const aktiv = pdSortFeld === feld;
+  const pfeil = aktiv && pdSortRichtung === 'ab' ? '▼' : '▲';
+  return `<th class="sortbar${aktiv ? ' aktiv' : ''}${num ? ' num' : ''}" onclick="pdSort('${feld}')">${esc(label)}<span class="pf">${pfeil}</span></th>`;
+}
+function pdSort(feld) {
+  pdSortRichtung = (pdSortFeld === feld && pdSortRichtung === 'auf') ? 'ab' : 'auf';
+  pdSortFeld = feld;
+  renderProdukte();
+}
+function pdArchivGo(t) {
+  pdArchivTab = t;
+  document.querySelectorAll('#prodArchivTabs .tab').forEach(b => b.classList.remove('on'));
+  $('prodatab-' + t).classList.add('on');
+  renderProdukte();
+}
+
+function renderProdukte() {
+  const q = ($('prodQ').value || '').toLowerCase().trim();
+  const wollAktiv = pdArchivTab === 'alle' ? 1 : 0;
+  const d = produkte.filter(p => Number(p.aktiv ?? 1) === wollAktiv
+    && (!q || [p.name, p.beschreibung, p.einheit].some(f => String(f || '').toLowerCase().includes(q))));
+  // Zahlen numerisch, Text alphabetisch -- localeCompare mit numeric:true
+  // erledigt beides in einem Vergleich (gleiches Muster wie kuSort).
+  d.sort((a, b) => {
+    const c = String(a[pdSortFeld] ?? '').localeCompare(String(b[pdSortFeld] ?? ''), 'de', { numeric: true, sensitivity: 'base' });
+    return pdSortRichtung === 'auf' ? c : -c;
+  });
+  if (!d.length) {
+    $('prodTable').innerHTML = produkte.length
+      ? EMPTY('Keine Treffer', pdArchivTab === 'alle'
+          ? 'Für diese Suche gibt es kein Produkt.' : 'Für diese Suche gibt es kein archiviertes Produkt.')
+      : EMPTY('Noch keine Produkte', 'Über „Neues Produkt“ oben rechts anlegen. Sie erscheinen danach als Vorschlag in jeder Offerte.');
+    return;
+  }
+  $('prodTable').innerHTML = `<table><thead><tr>
+      ${pdTh('sortierung', 'Nr.', true)}${pdTh('name', 'Bezeichnung')}
+      <th>Standardbeschreibung</th>
+      ${pdTh('einzelpreis_rappen', 'Einzelpreis', true)}${pdTh('einheit', 'Einheit')}
+      ${pdTh('mwst_satz_bp', 'MWST', true)}<th class="num">Aktion</th>
+    </tr></thead><tbody>` + d.map(p => {
+      const satz = MWST_SAETZE.find(s => Number(s.bp) === Number(p.mwst_satz_bp));
+      // Die Standardbeschreibung ist oft mehrzeilig und lang. In der Liste
+      // steht nur die erste Zeile plus Hinweis -- der ganze Text gehoert ins
+      // Formular, nicht in eine Tabellenzelle.
+      const ersteZeile = String(p.beschreibung || '').split('\n')[0];
+      const mehr = String(p.beschreibung || '').includes('\n') || ersteZeile.length > 70;
+      return `
+      <tr class="click" onclick="pdBearbeiten(${Number(p.id)})">
+        <td class="num nowrap">${nf(p.sortierung)}</td>
+        <td class="strong">${esc(p.name)}</td>
+        <td>${ersteZeile ? esc(ersteZeile.slice(0, 70)) + (mehr ? '…' : '')
+              : '<span style="color:var(--ink-3)">–</span>'}</td>
+        <td class="num nowrap">${chf(p.einzelpreis_rappen)}</td>
+        <td class="nowrap">${esc(p.einheit)}</td>
+        <td class="num nowrap">${Number(p.mwst_satz_bp) === 0
+          ? '<span class="chip chip-n">steuerfrei</span>'
+          : bpText(p.mwst_satz_bp) + ' %'}</td>
+        <td class="num" onclick="event.stopPropagation()">
+          <button class="btn btn-quiet btn-sm" onclick="pdArchivKlick(${Number(p.id)}, ${Number(p.aktiv) ? 0 : 1})">
+            ${Number(p.aktiv) ? 'Archivieren' : 'Zurückholen'}
+          </button>
+        </td>
+      </tr>`;
+    }).join('') + `</tbody></table>`;
+}
+
+function pdMwstFuellen(gewaehlt) {
+  $('prod_mwst').innerHTML = MWST_SAETZE.map(s =>
+    `<option value="${s.bp}"${Number(s.bp) === Number(gewaehlt) ? ' selected' : ''}>${esc(s.text)}</option>`).join('');
+}
+
+function pdNeu() {
+  pdDlgId = null;
+  $('prodTitel').textContent = 'Neues Produkt';
+  $('prodErr').style.display = 'none';
+  $('prod_name').value = '';
+  $('prod_beschreibung').value = '';
+  $('prod_preis').value = '';
+  $('prod_einheit').value = 'Std.';
+  // Naechste freie Reihenfolge vorschlagen, damit ein neues Produkt hinten
+  // landet statt sich vor die bestehenden zu setzen.
+  $('prod_sortierung').value = String(produkte.reduce((m, p) => Math.max(m, Number(p.sortierung) || 0), 0) + 10);
+  pdMwstFuellen(810);
+  openDlg('dlgProdukt');
+  setTimeout(() => $('prod_name').focus(), 60);
+}
+
+function pdBearbeiten(id) {
+  const p = produkte.find(x => Number(x.id) === Number(id));
+  if (!p) { return; }
+  pdDlgId = Number(id);
+  $('prodTitel').textContent = 'Produkt bearbeiten';
+  $('prodErr').style.display = 'none';
+  $('prod_name').value = p.name || '';
+  $('prod_beschreibung').value = p.beschreibung || '';
+  $('prod_preis').value = rappenZuChf(p.einzelpreis_rappen);
+  $('prod_einheit').value = p.einheit || 'Std.';
+  $('prod_sortierung').value = String(Number(p.sortierung) || 0);
+  pdMwstFuellen(p.mwst_satz_bp);
+  openDlg('dlgProdukt');
+}
+
+function pdSpeichern() {
+  const name = ($('prod_name').value || '').trim();
+  if (!name) {
+    $('prodErr').textContent = 'Eine Bezeichnung ist erforderlich.';
+    $('prodErr').style.display = '';
+    $('prod_name').focus();
+    return;
+  }
+  const koerper = {
+    id: pdDlgId || 0,
+    name,
+    beschreibung: ($('prod_beschreibung').value || '').trim(),
+    einzelpreis_rappen: chfZuRappen($('prod_preis').value),
+    einheit: ($('prod_einheit').value || 'Std.').trim() || 'Std.',
+    mwst_satz_bp: Number($('prod_mwst').value) || 0,
+    sortierung: Number($('prod_sortierung').value) || 0,
+  };
+  $('prodSaveBtn').disabled = true;
+  api('produkt_speichern.php', { method: 'POST', body: koerper }).then(({ ok, data }) => {
+    $('prodSaveBtn').disabled = false;
+    if (!ok || data.status !== 'ok') {
+      $('prodErr').textContent = data.message || 'Speichern fehlgeschlagen.';
+      $('prodErr').style.display = '';
+      return;
+    }
+    closeDlg('dlgProdukt');
+    toast(pdDlgId ? 'Produkt geändert.' : 'Produkt angelegt.');
+    loadProdukte();
+  }).catch(() => {
+    $('prodSaveBtn').disabled = false;
+    $('prodErr').textContent = 'Speichern fehlgeschlagen.';
+    $('prodErr').style.display = '';
+  });
+}
+
+function pdArchivKlick(id, aktiv) {
+  api('produkt_archivieren.php', { method: 'POST', body: { id, aktiv } }).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') { toast(data.message || 'Fehlgeschlagen.'); return; }
+    toast(aktiv ? 'Produkt zurückgeholt.' : 'Produkt archiviert.');
+    loadProdukte();
+  });
+}
+
+// ── Offerten ──────────────────────────────────────────────────────────────
+function loadBelege() {
+  return api('beleg_list.php?art=offerte').then(({ ok, status, data }) => {
+    if (status === 401) return doLogout();
+    if (status === 403) return;
+    if (!ok || data.status !== 'ok') { toast(data.message || 'Offerten konnten nicht geladen werden.'); return; }
+    belege = data.belege || [];
+    ofNaechsteNummer = data.naechste_nummer || '';
+    renderOfferten();
+  });
+}
+
+function ofTh(feld, label, num) {
+  const aktiv = ofSortFeld === feld;
+  const pfeil = aktiv && ofSortRichtung === 'ab' ? '▼' : '▲';
+  return `<th class="sortbar${aktiv ? ' aktiv' : ''}${num ? ' num' : ''}" onclick="ofSort('${feld}')">${esc(label)}<span class="pf">${pfeil}</span></th>`;
+}
+function ofSort(feld) {
+  ofSortRichtung = (ofSortFeld === feld && ofSortRichtung === 'auf') ? 'ab' : 'auf';
+  ofSortFeld = feld;
+  renderOfferten();
+}
+function ofArchivGo(t) {
+  ofArchivTab = t;
+  document.querySelectorAll('#ofArchivTabs .tab').forEach(b => b.classList.remove('on'));
+  $('ofatab-' + t).classList.add('on');
+  renderOfferten();
+}
+
+// Der Empfaenger steht nicht am Beleg, sondern kommt aus dem Kundenstamm --
+// die Liste zeigt darum den heutigen Namen. Faellt der Kunde weg, bleibt die
+// Offerte bestehen (kunde_id wird NULL), und hier steht ein Strich statt
+// eines leeren Feldes, das wie ein Fehler aussaehe.
+function ofEmpfaenger(b) {
+  if (b.kunde_name) { return String(b.kunde_name); }
+  return b.kunde_id ? '(Kunde entfernt)' : '';
+}
+
+function renderOfferten() {
+  const q = ($('ofQ').value || '').toLowerCase().trim();
+  const statusFilter = $('ofStatus').value || '';
+  const wollAktiv = ofArchivTab === 'alle' ? 1 : 0;
+  const d = belege.filter(b => Number(b.aktiv ?? 1) === wollAktiv
+    && (!statusFilter || b.status === statusFilter)
+    && (!q || [b.nummer, b.titel, b.referenz, ofEmpfaenger(b), b.kundennummer]
+        .some(f => String(f || '').toLowerCase().includes(q))));
+
+  // Betraege numerisch vergleichen, nicht als Text: "1'048.55" gegen "952.00"
+  // als Zeichenkette sortiert falsch, und zwar unauffaellig falsch.
+  d.sort((a, b) => {
+    let c;
+    if (ofSortFeld === 'total_rappen') {
+      c = (Number(a.total_rappen) || 0) - (Number(b.total_rappen) || 0);
+    } else if (ofSortFeld === 'empfaenger') {
+      c = ofEmpfaenger(a).localeCompare(ofEmpfaenger(b), 'de', { sensitivity: 'base' });
+    } else {
+      c = String(a[ofSortFeld] ?? '').localeCompare(String(b[ofSortFeld] ?? ''), 'de', { numeric: true, sensitivity: 'base' });
+    }
+    return ofSortRichtung === 'auf' ? c : -c;
+  });
+
+  // Der Status-Filter wird aus den TATSAECHLICH vorhandenen Status gefuellt,
+  // nicht aus der vollen Liste: Ein Filter, der auf nichts zeigt, ist eine
+  // Sackgasse mit Ankuendigung.
+  const vorhanden = new Set(belege.map(b => b.status));
+  const gewaehlt = $('ofStatus').value;
+  $('ofStatus').innerHTML = '<option value="">Alle Status</option>'
+    + OF_STATUS.filter(s => vorhanden.has(s.wert)).map(s =>
+        `<option value="${s.wert}"${s.wert === gewaehlt ? ' selected' : ''}>${esc(s.text)}</option>`).join('');
+
+  if (!d.length) {
+    // "Kein Treffer" und "nichts vorhanden" sind verschiedene Aussagen --
+    // ein Filter, der alles ausblendet, darf nie wie ein leerer Bestand
+    // aussehen (Gestaltungsregel aus CLAUDE.md).
+    const gefiltert = q || statusFilter;
+    $('ofTable').innerHTML = belege.length
+      ? EMPTY('Keine Treffer', gefiltert
+          ? 'Für diese Suche gibt es keine Offerte. Suchbegriff oder Status zurücksetzen.'
+          : 'Hier stehen keine archivierten Offerten.')
+      : EMPTY('Noch keine Offerten', 'Über „Offerte erstellen“ oben rechts die erste anlegen.');
+    return;
+  }
+
+  const heute = new Date().toISOString().slice(0, 10);
+  $('ofTable').innerHTML = `<table><thead><tr>
+      ${ofTh('status', 'Status')}${ofTh('nummer', 'Nr.')}${ofTh('referenz', 'Referenz')}
+      ${ofTh('titel', 'Titel')}${ofTh('empfaenger', 'Empfänger')}
+      ${ofTh('datum', 'Offertendatum', true)}${ofTh('total_rappen', 'Offertensumme', true)}
+      ${ofTh('gueltig_bis', 'Gültig bis', true)}<th class="num">Aktion</th>
+    </tr></thead><tbody>` + d.map(b => {
+      const si = ofStatusInfo(b.status);
+      // Abgelaufen heisst nicht abgelehnt -- die Offerte bleibt gueltig
+      // sichtbar, das Datum bekommt nur einen stillen Hinweis. Ein
+      // abgelaufenes Datum bei einer bereits bestaetigten Offerte ist
+      // ausserdem belanglos und wird darum nicht gekennzeichnet.
+      const abgelaufen = b.gueltig_bis && String(b.gueltig_bis) < heute
+        && b.status !== 'bestaetigt' && b.status !== 'abgelehnt';
+      return `
+      <tr class="click" onclick="ofOeffnen(${Number(b.id)})">
+        <td><span class="chip ${si.chip}">${esc(si.text)}</span></td>
+        <td class="strong nowrap">${esc(b.nummer)}</td>
+        <td class="nowrap">${dash(b.referenz)}</td>
+        <td>${b.titel ? esc(b.titel) : '<span style="color:var(--ink-3)">ohne Titel</span>'}</td>
+        <td>${ofEmpfaenger(b) ? esc(ofEmpfaenger(b)) : '<span style="color:var(--ink-3)">–</span>'}
+            ${b.kundennummer ? `<div class="sec">${esc(b.kundennummer)}</div>` : ''}</td>
+        <td class="nowrap num">${dmy(b.datum)}</td>
+        <td class="num nowrap strong">CHF ${chf(b.total_rappen)}</td>
+        <td class="nowrap num">${dmy(b.gueltig_bis)}
+            ${abgelaufen ? '<div class="sec" style="color:var(--warn)">abgelaufen</div>' : ''}</td>
+        <td class="num" onclick="event.stopPropagation()">
+          <button class="btn btn-quiet btn-sm rowmenu-btn" onclick="ofMenuOeffnen(event, ${Number(b.id)})" aria-label="Aktionen">
+            <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
+          </button>
+        </td>
+      </tr>`;
+    }).join('') + `</tbody></table>`;
+}
+
+// Zeilenmenue der Offerte. Nutzt dasselbe schwebende Element wie die
+// Kundenliste (ENT-040) -- ein zweites waere ein zweiter Zustand, der offen
+// stehenbleiben koennte, waehrend das erste schon zu ist.
+function ofMenuOeffnen(ev, id) {
+  ev.stopPropagation();
+  const b = belege.find(x => Number(x.id) === Number(id));
+  if (!b) { return; }
+  const pop = $('rowmenuPop');
+  if (pop.classList.contains('on') && pop.dataset.belegId === String(id)) { ofMenuSchliessen(); return; }
+  // Statuswechsel: der aktuelle Status steht nicht als Knopf da -- ihn auf
+  // sich selbst zu setzen ist keine Handlung.
+  const statusKnoepfe = OF_STATUS.filter(s => s.wert !== b.status).map(s =>
+    `<button onclick="ofMenuSchliessen(); ofStatusSetzen(${id}, '${s.wert}')">Als „${esc(s.text)}" markieren</button>`).join('');
+  pop.innerHTML = `
+    <button onclick="ofMenuSchliessen(); ofOeffnen(${id})">Bearbeiten</button>
+    <button onclick="ofMenuSchliessen(); ofDrucken(${id})">Drucken</button>
+    <hr>
+    ${statusKnoepfe}
+    <hr>
+    <button onclick="ofMenuSchliessen(); ofDuplizieren(${id}, 0)">Duplizieren</button>
+    <button onclick="ofMenuSchliessen(); ofDuplizieren(${id}, 1)">In Vorlage umwandeln</button>
+    <hr>
+    <button onclick="ofMenuSchliessen(); ofArchivKlick(${id}, ${Number(b.aktiv) ? 0 : 1})">${Number(b.aktiv) ? 'Archivieren' : 'Zurückholen'}</button>`;
+  pop.dataset.belegId = String(id);
+  pop.classList.add('on');
+  const r = ev.currentTarget.getBoundingClientRect();
+  const breite = 230;
+  pop.style.left = Math.max(8, r.right - breite) + 'px';
+  // Nach unten oeffnen, ausser es waere unten kein Platz -- ein Menue, das
+  // aus dem Fenster ragt, laesst sich nicht bedienen. Sieben Eintraege sind
+  // hoeher als das Kundenmenue mit vieren, darum faellt es hier auf.
+  const hoeheGeschaetzt = 300;
+  const nachOben = r.bottom + hoeheGeschaetzt > window.innerHeight && r.top > hoeheGeschaetzt;
+  pop.style.top = (nachOben ? Math.max(8, r.top - hoeheGeschaetzt) : r.bottom + 4) + 'px';
+}
+function ofMenuSchliessen() {
+  $('rowmenuPop').classList.remove('on');
+  delete $('rowmenuPop').dataset.belegId;
+}
+
+function ofStatusSetzen(id, neu) {
+  api('beleg_status.php', { method: 'POST', body: { id, neuer_status: neu } }).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') { toast(data.message || 'Fehlgeschlagen.'); return; }
+    toast('Status: ' + ofStatusInfo(neu).text);
+    loadBelege();
+  });
+}
+
+function ofArchivKlick(id, aktiv) {
+  api('beleg_archivieren.php', { method: 'POST', body: { id, aktiv } }).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') { toast(data.message || 'Fehlgeschlagen.'); return; }
+    toast(aktiv ? 'Offerte zurückgeholt.' : 'Offerte archiviert.');
+    loadBelege();
+  });
+}
+
+function ofDuplizieren(id, alsVorlage) {
+  api('beleg_duplizieren.php', { method: 'POST', body: { id, als_vorlage: alsVorlage } })
+    .then(({ ok, data }) => {
+      if (!ok || data.status !== 'ok') { toast(data.message || 'Fehlgeschlagen.'); return; }
+      toast(alsVorlage ? 'Als Vorlage gespeichert.' : 'Kopie angelegt: ' + (data.nummer || ''));
+      loadBelege();
+    });
+}
+
+// ── Offert-Formular ───────────────────────────────────────────────────────
+//
+// ofPos[] ist der Arbeitsstand der Positionen. Bewusst NICHT direkt aus den
+// Eingabefeldern gelesen, wenn gerechnet wird: Ein Feld, in dem gerade
+// getippt wird, kann "4," enthalten -- gueltig als Zwischenschritt, unbrauchbar
+// als Zahl. Darum schreibt jede Eingabe erst in ofPos[], und gerechnet wird
+// aus dem Array.
+let ofFormId = null;      // null = neue Offerte
+let ofPos = [];
+let ofFormKundeId = null;
+// Wie viele Tage eine Offerte standardmaessig gilt. 30 wie im bisherigen
+// Fremdsystem (OF-0093: 25.02. bis 27.03.).
+const OF_GUELTIG_TAGE = 30;
+
+function ofLeereZeile() {
+  return { produkt_id: null, produkt_name: '', beschreibung: '', menge: 1,
+           einheit: 'Std.', einzelpreis_rappen: 0, rabatt_bp: 0, mwst_satz_bp: 810 };
+}
+
+function ofNeu() {
+  ofFormId = null;
+  ofPos = [ofLeereZeile()];
+  ofFormKundeId = null;
+  const heute = isoTag();
+  $('ofFormNummer').textContent = ofNaechsteNummer || 'Neue Offerte';
+  $('ofFormSub').textContent = 'Entwurf · noch nicht gespeichert';
+  $('ofFormErr').style.display = 'none';
+  $('of_kunde').value = '';
+  $('of_titel').value = '';
+  $('of_referenz').value = '';
+  $('of_bemerkung').value = '';
+  $('of_rabatt').value = '0';
+  $('of_datum').value = heute;
+  $('of_gueltig').value = ofTagePlus(heute, OF_GUELTIG_TAGE);
+  ofStatusFuellen('entwurf');
+  ofPersonenFuellen(null);
+  // Drucken ergibt vor dem ersten Speichern keinen Sinn -- es gibt noch
+  // keinen Beleg, den der Server ausliefern koennte.
+  $('ofFormDruckBtn').style.display = 'none';
+  ofZeilenZeichnen();
+  go('offerte');
+  setTimeout(() => $('of_kunde').focus(), 60);
+}
+
+// Aus der Offertenliste heraus. Die Produkte muessen da sein, bevor das
+// Formular erscheint -- sonst steht die Vervollstaendigung der ersten
+// Positionszeile leer da, und man haelt sie fuer ein Freitextfeld.
+function ofNeuStarten() {
+  const vorlauf = produkte.length ? Promise.resolve() : loadProdukte();
+  const kundenDa = kunden.length ? Promise.resolve() : loadKunden();
+  Promise.all([vorlauf, kundenDa]).then(() => ofNeu());
+}
+
+// Eine neue Offerte mit bereits gesetztem Empfaenger -- aus dem Zeilenmenue
+// der Kundenliste. Spart den Schritt, den Kunden noch einmal zu suchen, den
+// man gerade angeklickt hat.
+function ofNeuFuerKunde(kundeId) {
+  const vorlauf = produkte.length ? Promise.resolve() : loadProdukte();
+  const listeDa = belege.length || ofNaechsteNummer ? Promise.resolve() : loadBelege();
+  Promise.all([vorlauf, listeDa]).then(() => {
+    ofNeu();
+    const k = kunden.find(x => Number(x.id) === Number(kundeId));
+    if (k) {
+      $('of_kunde').value = k.name;
+      ofFormKundeId = Number(k.id);
+      ofPersonenFuellen(null);
+      setTimeout(() => $('of_titel').focus(), 60);
+    }
+  });
+}
+
+// Ein Datum um n Tage verschieben, ohne Bibliothek und ohne Zeitzonenfalle:
+// ueber den Mittag gerechnet, damit die Sommerzeitumstellung nicht einen Tag
+// verschluckt (gleiches Muster wie anderswo in dieser Datei).
+function ofTagePlus(iso, tage) {
+  const d = new Date(iso + 'T12:00:00');
+  d.setDate(d.getDate() + tage);
+  return d.toISOString().slice(0, 10);
+}
+
+// Verschiebt "gueltig bis" mit, solange der bisherige Abstand dem Standard
+// entspricht. Wer das Feld von Hand gesetzt hat, behaelt seinen Wert -- ein
+// Datum, das sich unter der Hand aendert, ist schlimmer als eines, das
+// stehenbleibt.
+function ofGueltigNachziehen() {
+  const datum = $('of_datum').value;
+  const bis = $('of_gueltig').value;
+  if (!datum) { return; }
+  if (!bis) { $('of_gueltig').value = ofTagePlus(datum, OF_GUELTIG_TAGE); return; }
+  const alt = $('of_datum').dataset.vorher;
+  if (alt && bis === ofTagePlus(alt, OF_GUELTIG_TAGE)) {
+    $('of_gueltig').value = ofTagePlus(datum, OF_GUELTIG_TAGE);
+  }
+  $('of_datum').dataset.vorher = datum;
+}
+
+function ofStatusFuellen(gewaehlt) {
+  $('of_status').innerHTML = OF_STATUS.map(s =>
+    `<option value="${s.wert}"${s.wert === gewaehlt ? ' selected' : ''}>${esc(s.text)}</option>`).join('');
+}
+
+// Die Ansprechpersonen des gewaehlten Kunden. Wechselt der Kunde, wird die
+// Auswahl geleert -- eine Person, die zu einem anderen Kunden gehoert, waere
+// auf dem Beleg schlicht falsch.
+function ofPersonenFuellen(personId) {
+  const k = kunden.find(x => Number(x.id) === Number(ofFormKundeId));
+  const personen = (k && k.personen) || [];
+  $('of_person').innerHTML = '<option value="">– keine –</option>' + personen.map(p => {
+    const name = [p.anrede, p.vorname, p.nachname].filter(Boolean).join(' ');
+    return `<option value="${Number(p.id)}"${Number(p.id) === Number(personId) ? ' selected' : ''}>${esc(name)}</option>`;
+  }).join('');
+  $('of_person').disabled = personen.length === 0;
+}
+
+function ofKundeGewaehlt() {
+  const name = ($('of_kunde').value || '').trim();
+  const k = kunden.find(x => String(x.name) === name);
+  const vorher = ofFormKundeId;
+  ofFormKundeId = k ? Number(k.id) : null;
+  if (ofFormKundeId !== vorher) { ofPersonenFuellen(null); }
+}
+
+// ── Positionszeilen ───────────────────────────────────────────────────────
+function ofZeilenZeichnen() {
+  const produktListe = produkte.filter(p => Number(p.aktiv ?? 1) === 1);
+  $('ofPositionen').innerHTML = ofPos.length
+    ? ofPos.map((p, i) => ofZeileHtml(p, i, produktListe)).join('')
+    : `<div style="padding:22px 18px;color:var(--ink-3);font-size:13px">
+         Noch keine Position. Über „Position hinzufügen“ die erste anlegen.</div>`;
+  ofSummenZeichnen();
+}
+
+function ofZeileHtml(p, i, produktListe) {
+  const s = belegSummen([p], 0);
+  return `<div class="of-pos">
+    <div class="of-pos-kopf">
+      <div class="f"><label for="ofp_name${i}">Produkt</label>
+        <input class="inp" id="ofp_name${i}" list="dlProdukte" value="${esc(p.produkt_name)}"
+               oninput="ofZeileFeld(${i}, 'produkt_name', this.value)"
+               onchange="ofProduktUebernehmen(${i}, this.value)"></div>
+      <div class="f"><label for="ofp_menge${i}">Menge</label>
+        <input class="inp num" id="ofp_menge${i}" inputmode="decimal" value="${esc(String(p.menge))}"
+               oninput="ofZeileFeld(${i}, 'menge', this.value)"></div>
+      <div class="f"><label for="ofp_einheit${i}">Einheit</label>
+        <input class="inp" id="ofp_einheit${i}" list="dlEinheiten" value="${esc(p.einheit)}"
+               oninput="ofZeileFeld(${i}, 'einheit', this.value)"></div>
+      <div class="f"><label for="ofp_preis${i}">Einzelpreis</label>
+        <input class="inp num" id="ofp_preis${i}" inputmode="decimal" value="${rappenZuChf(p.einzelpreis_rappen)}"
+               oninput="ofZeileFeld(${i}, 'einzelpreis_rappen', this.value)"></div>
+      <div class="f"><label for="ofp_rabatt${i}">Rabatt %</label>
+        <input class="inp num" id="ofp_rabatt${i}" inputmode="decimal" value="${bpText(p.rabatt_bp)}"
+               oninput="ofZeileFeld(${i}, 'rabatt_bp', this.value)"></div>
+      <div class="f"><label for="ofp_mwst${i}">MWST</label>
+        <select class="inp" id="ofp_mwst${i}" onchange="ofZeileFeld(${i}, 'mwst_satz_bp', this.value)">
+          ${MWST_SAETZE.map(m => `<option value="${m.bp}"${Number(m.bp) === Number(p.mwst_satz_bp) ? ' selected' : ''}>${esc(m.text.split(' ')[0])}</option>`).join('')}
+        </select></div>
+      <div class="of-pos-weg">
+        <button class="btn btn-quiet btn-sm" onclick="ofZeileWeg(${i})" title="Position entfernen" aria-label="Position entfernen">
+          <svg class="i i-sm" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+    </div>
+    <textarea class="inp" id="ofp_text${i}" rows="2" placeholder="Beschreibung — erscheint so auf dem Dokument"
+              oninput="ofZeileFeld(${i}, 'beschreibung', this.value)">${esc(p.beschreibung)}</textarea>
+    <div class="of-pos-summe" id="ofp_summe${i}">CHF ${chf(s.zwischensumme_rappen)}</div>
+  </div>`;
+}
+
+// Ein Feld hat sich geaendert. Nur der Wert wandert ins Array, die Zeile
+// wird NICHT neu gezeichnet -- ein Neuzeichnen waehrend des Tippens setzte
+// den Cursor an den Anfang zurueck. Nachgefuehrt werden nur die Zahlen,
+// die sich daraus ergeben.
+function ofZeileFeld(i, feld, wert) {
+  if (!ofPos[i]) { return; }
+  if (feld === 'einzelpreis_rappen') { ofPos[i][feld] = chfZuRappen(wert); }
+  else if (feld === 'menge') {
+    const n = parseFloat(String(wert).replace(',', '.'));
+    ofPos[i][feld] = Number.isFinite(n) ? n : 0;
+  }
+  else if (feld === 'rabatt_bp' || feld === 'mwst_satz_bp') {
+    const n = parseFloat(String(wert).replace(',', '.'));
+    // Prozent zu Basispunkten -- beim MWST-Satz kommt der Wert schon als
+    // Basispunkt aus dem Auswahlfeld, beim Rabatt als Prozentzahl.
+    ofPos[i][feld] = feld === 'mwst_satz_bp'
+      ? (Number.isFinite(n) ? Math.round(n) : 0)
+      : (Number.isFinite(n) ? Math.max(0, Math.min(10000, Math.round(n * 100))) : 0);
+  }
+  else { ofPos[i][feld] = wert; }
+
+  const z = belegSummen([ofPos[i]], 0);
+  const zelle = $('ofp_summe' + i);
+  if (zelle) { zelle.textContent = 'CHF ' + chf(z.zwischensumme_rappen); }
+  ofSummenZeichnen();
+}
+
+// Ein Produkt aus den Stammdaten in die Zeile uebernehmen. Nur bei GENAUER
+// Namensuebereinstimmung, und nur Felder, die noch leer sind bzw. auf dem
+// Standard stehen -- wer den Preis schon von Hand gesetzt hat, soll ihn nicht
+// durch die Produktauswahl verlieren.
+function ofProduktUebernehmen(i, name) {
+  const p = produkte.find(x => Number(x.aktiv ?? 1) === 1 && String(x.name) === String(name).trim());
+  if (!p || !ofPos[i]) { return; }
+  const z = ofPos[i];
+  z.produkt_id = Number(p.id);
+  z.produkt_name = p.name;
+  if (!z.beschreibung) { z.beschreibung = p.beschreibung || ''; }
+  if (!z.einzelpreis_rappen) { z.einzelpreis_rappen = Number(p.einzelpreis_rappen) || 0; }
+  if (!z.einheit || z.einheit === 'Std.') { z.einheit = p.einheit || 'Std.'; }
+  z.mwst_satz_bp = Number(p.mwst_satz_bp) || 0;
+  // Die Felder DIESER Zeile einzeln nachziehen statt die ganze Liste neu zu
+  // zeichnen. Das Ereignis kommt aus 'change', also beim Verlassen des
+  // Feldes -- ein Neuzeichnen loeschte genau das Element, das den Wechsel
+  // gerade ausloest, und der Browser bricht mit einem NotFoundError ab.
+  const setz = (id, wert) => { const f = $(id); if (f) { f.value = wert; } };
+  setz('ofp_name' + i, z.produkt_name);
+  setz('ofp_text' + i, z.beschreibung);
+  setz('ofp_preis' + i, rappenZuChf(z.einzelpreis_rappen));
+  setz('ofp_einheit' + i, z.einheit);
+  setz('ofp_mwst' + i, String(z.mwst_satz_bp));
+  const zs = belegSummen([z], 0);
+  const zelle = $('ofp_summe' + i);
+  if (zelle) { zelle.textContent = 'CHF ' + chf(zs.zwischensumme_rappen); }
+  ofSummenZeichnen();
+}
+
+function ofZeileHinzu() {
+  ofPos.push(ofLeereZeile());
+  ofZeilenZeichnen();
+  setTimeout(() => { const f = $('ofp_name' + (ofPos.length - 1)); if (f) { f.focus(); } }, 40);
+}
+
+function ofZeileWeg(i) {
+  ofPos.splice(i, 1);
+  ofZeilenZeichnen();
+}
+
+// ── Summenblock ───────────────────────────────────────────────────────────
+// Rechnet mit belegSummen(), dem Zwilling des serverseitigen Rechenkerns.
+// Was hier steht, ist eine VORSCHAU -- gespeichert wird, was der Server aus
+// den tatsaechlich abgelegten Positionen ermittelt.
+function ofSummenZeichnen() {
+  const rabattProzent = parseFloat(String($('of_rabatt').value || '0').replace(',', '.'));
+  const rabattBp = Number.isFinite(rabattProzent)
+    ? Math.max(0, Math.min(10000, Math.round(rabattProzent * 100))) : 0;
+  const s = belegSummen(ofPos, rabattBp);
+  const zeile = (label, wert, klasse) =>
+    `<div class="of-summe-z${klasse ? ' ' + klasse : ''}"><span>${label}</span><span class="wert">${wert}</span></div>`;
+
+  let html = zeile('Zwischensumme', 'CHF ' + chf(s.zwischensumme_rappen));
+  if (s.rabatt_rappen > 0) {
+    html += zeile(`${esc(bpText(rabattBp))} % Rabatt`, '−CHF ' + chf(s.rabatt_rappen));
+  }
+  // Die MWST-Grundlage steht mit dabei, nicht nur der Betrag: Bei gemischten
+  // Saetzen ist "8.10 % = 221.47" ohne die Grundlage nicht nachvollziehbar,
+  // und genau daran ist am Ausgangsbeleg zuerst etwas unklar geblieben.
+  s.mwst.forEach(m => {
+    html += zeile(`MWST ${esc(bpText(m.satz_bp))} % auf CHF ${chf(m.grundlage_rappen)}`,
+                  'CHF ' + chf(m.betrag_rappen));
+  });
+  if (!s.mwst.length && s.zwischensumme_rappen > 0) {
+    html += zeile('Ohne MWST', 'CHF 0.00', 'matt');
+  }
+  if (s.rundung_rappen !== 0) {
+    html += zeile('Rundungsdifferenz',
+      (s.rundung_rappen > 0 ? '+' : '−') + 'CHF ' + chf(Math.abs(s.rundung_rappen)), 'matt');
+  }
+  html += zeile('Total', 'CHF ' + chf(s.total_rappen), 'total');
+  $('ofSummen').innerHTML = html;
+}
+
+// ── Laden und Speichern ───────────────────────────────────────────────────
+function ofOeffnen(id) {
+  // Produkte kommen mit, weil die Positionszeilen sie zur Auswahl anbieten.
+  const vorlauf = produkte.length ? Promise.resolve() : loadProdukte();
+  const kundenDa = kunden.length ? Promise.resolve() : loadKunden();
+  Promise.all([vorlauf, kundenDa])
+    .then(() => api('beleg_lesen.php?id=' + Number(id)))
+    .then(({ ok, status, data }) => {
+      if (status === 401) return doLogout();
+      if (!ok || data.status !== 'ok') { toast(data.message || 'Offerte konnte nicht geladen werden.'); return; }
+      const b = data.beleg;
+      ofFormId = Number(b.id);
+      ofFormKundeId = b.kunde_id ? Number(b.kunde_id) : null;
+      ofPos = (b.positionen || []).map(p => ({
+        produkt_id: p.produkt_id ? Number(p.produkt_id) : null,
+        produkt_name: p.produkt_name || '',
+        beschreibung: p.beschreibung || '',
+        menge: Number(p.menge) || 0,
+        einheit: p.einheit || 'Std.',
+        einzelpreis_rappen: Number(p.einzelpreis_rappen) || 0,
+        rabatt_bp: Number(p.rabatt_bp) || 0,
+        mwst_satz_bp: Number(p.mwst_satz_bp) || 0,
+      }));
+      $('ofFormNummer').textContent = b.nummer || '–';
+      $('ofFormSub').textContent = ofStatusInfo(b.status).text
+        + (Number(b.aktiv) ? '' : ' · archiviert');
+      $('ofFormErr').style.display = 'none';
+      $('of_kunde').value = (data.kunde && data.kunde.name) || '';
+      $('of_titel').value = b.titel || '';
+      $('of_referenz').value = b.referenz || '';
+      $('of_bemerkung').value = b.bemerkung || '';
+      $('of_rabatt').value = bpText(b.rabatt_bp);
+      $('of_datum').value = leeresDatum(b.datum) ? '' : String(b.datum).slice(0, 10);
+      $('of_datum').dataset.vorher = $('of_datum').value;
+      $('of_gueltig').value = leeresDatum(b.gueltig_bis) ? '' : String(b.gueltig_bis).slice(0, 10);
+      ofStatusFuellen(b.status);
+      ofPersonenFuellen(b.person_id);
+      $('ofFormDruckBtn').style.display = '';
+      ofZeilenZeichnen();
+      go('offerte');
+    });
+}
+
+function ofSpeichern() {
+  const datum = $('of_datum').value;
+  const zeigeFehler = text => {
+    $('ofFormErr').textContent = text;
+    $('ofFormErr').style.display = '';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  if (!datum) { zeigeFehler('Ein Offertendatum ist erforderlich.'); return; }
+  if (!ofFormKundeId) { zeigeFehler('Bitte einen Empfänger aus dem Kundenstamm wählen.'); return; }
+  const gueltig = $('of_gueltig').value;
+  if (gueltig && gueltig < datum) {
+    zeigeFehler('„Gültig bis" liegt vor dem Offertendatum.'); return;
+  }
+
+  const rabattProzent = parseFloat(String($('of_rabatt').value || '0').replace(',', '.'));
+  const koerper = {
+    id: ofFormId || 0,
+    art: 'offerte',
+    kunde_id: ofFormKundeId,
+    person_id: Number($('of_person').value) || null,
+    titel: ($('of_titel').value || '').trim(),
+    referenz: ($('of_referenz').value || '').trim(),
+    datum,
+    gueltig_bis: gueltig || null,
+    status: $('of_status').value,
+    bemerkung: ($('of_bemerkung').value || '').trim(),
+    rabatt_bp: Number.isFinite(rabattProzent)
+      ? Math.max(0, Math.min(10000, Math.round(rabattProzent * 100))) : 0,
+    positionen: ofPos,
+  };
+  $('ofFormSaveBtn').disabled = true;
+  api('beleg_speichern.php', { method: 'POST', body: koerper }).then(({ ok, data }) => {
+    $('ofFormSaveBtn').disabled = false;
+    if (!ok || data.status !== 'ok') { zeigeFehler(data.message || 'Speichern fehlgeschlagen.'); return; }
+    $('ofFormErr').style.display = 'none';
+    const warNeu = !ofFormId;
+    ofFormId = Number(data.id);
+    if (data.nummer) { $('ofFormNummer').textContent = data.nummer; }
+    $('ofFormSub').textContent = ofStatusInfo($('of_status').value).text;
+    $('ofFormDruckBtn').style.display = '';
+    // Die Summen aus der SERVERANTWORT uebernehmen, nicht die eigene
+    // Vorschau stehenlassen: Weichen beide ab, soll sofort sichtbar sein,
+    // was tatsaechlich gespeichert wurde.
+    if (data.summen) { ofSummenAusServer(data.summen); }
+    toast(warNeu ? 'Offerte angelegt.' : 'Offerte gespeichert.');
+    loadBelege();
+  }).catch(() => {
+    $('ofFormSaveBtn').disabled = false;
+    zeigeFehler('Speichern fehlgeschlagen.');
+  });
+}
+
+// ── Offerte drucken (ENT-181) ─────────────────────────────────────────────
+//
+// Aufbau nach dem Vorbild der bisher verschickten Offerten: Absender oben
+// links, Logo rechts, dann Offertennummer/-datum/Gueltig bis links und der
+// Empfaenger rechts, darunter Titel, Positionstabelle und Summenblock.
+//
+// Die Zahlen kommen vom SERVER (beleg_lesen.php rechnet sie frisch), nicht
+// aus dem Formular -- was gedruckt wird, soll das sein, was gespeichert ist.
+function ofDrucken(id) {
+  if (!id) { toast('Die Offerte muss zuerst gespeichert werden.'); return; }
+  api('beleg_lesen.php?id=' + Number(id)).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') {
+      toast(data.message || 'Die Offerte liess sich nicht laden.'); return;
+    }
+    $('printArea').innerHTML = ofBlatt(data.beleg, data.kunde, data.person);
+    window.print();
+  }).catch(() => toast('Die Offerte liess sich nicht laden.'));
+}
+
+// Erzeugt das Blatt. Getrennt von ofDrucken(), damit es sich ohne Drucken
+// pruefen laesst -- gleiches Muster wie epBerichtBlatt() (ENT-160).
+function ofBlatt(b, kunde, person) {
+  const s = b.summen || belegSummen(b.positionen || [], Number(b.rabatt_bp) || 0);
+
+  // Absender oben links, aus dem Briefkopf des Betriebs. Bewusst die erste
+  // Fusszeile als Quelle: Dort steht die vollstaendige Anschrift bereits, und
+  // ein zweites Feld dafuer waere ein zweiter Ort, an dem dieselbe Adresse
+  // veralten kann.
+  const absender = String(briefkopf.fusszeile || '')
+    .split('\n').map(z => z.trim()).filter(Boolean).slice(0, 4);
+  const bkLogo = briefkopf.logo
+    ? `<img src="${esc(briefkopf.logo)}" alt="" style="max-height:96px;max-width:200px;display:block;margin-left:auto">`
+    : '';
+
+  const empfaenger = [
+    kunde ? (kunde.name || '') : '',
+    person ? [person.anrede, person.vorname, person.nachname].filter(Boolean).join(' ') : '',
+    kunde ? [kunde.strasse, kunde.hausnummer].filter(Boolean).join(' ') : '',
+    kunde ? kunde.adresszusatz : '',
+    kunde ? [kunde.plz, kunde.ort].filter(Boolean).join(' ') : '',
+  ].filter(Boolean);
+
+  const kopfZeile = (a, v) =>
+    `<tr><td style="padding:2px 0;color:#14161A;width:150px">${a}</td>
+         <td style="padding:2px 0">${v}</td></tr>`;
+
+  const th = 'padding:7px 8px;text-align:left;font-size:11px;font-weight:700;background:#EDEFF2';
+  const td = 'padding:9px 8px;border-bottom:1px solid #14161A;font-size:12px;vertical-align:top';
+  const zeilen = (b.positionen || []).map((p, i) => {
+    const z = s.zeilen[i] || {};
+    return `<tr>
+      <td style="${td}">${esc(p.produkt_name)}</td>
+      <td style="${td};white-space:pre-line">${esc(p.beschreibung || '')}</td>
+      <td style="${td};text-align:right;white-space:nowrap">${chf(p.einzelpreis_rappen)}</td>
+      <td style="${td};text-align:right;white-space:nowrap">${nf(Number(p.menge), Number.isInteger(Number(p.menge)) ? 0 : 2)} ${esc(p.einheit)}</td>
+      <td style="${td};text-align:right;white-space:nowrap">${chf(z.zwischen_rappen != null ? z.zwischen_rappen : 0)} CHF</td>
+    </tr>`;
+  }).join('');
+
+  const sz = (label, wert, stark) =>
+    `<tr><td style="padding:4px 8px;text-align:right;font-size:12px${stark ? ';font-weight:700' : ''}">${label}</td>
+         <td style="padding:4px 8px;text-align:right;font-size:${stark ? '13px' : '12px'};white-space:nowrap${stark ? ';font-weight:700' : ''}">${wert}</td></tr>`;
+  let summen = sz('Zwischensumme', chf(s.zwischensumme_rappen) + ' CHF');
+  if (s.rabatt_rappen > 0) {
+    summen += sz(esc(bpText(s.rabatt_bp)) + '% Rabatt', '-' + chf(s.rabatt_rappen) + ' CHF');
+  }
+  s.mwst.forEach(m => {
+    summen += sz(chf(m.grundlage_rappen) + ' CHF ' + esc(bpText(m.satz_bp)) + '% MWST',
+                 chf(m.betrag_rappen) + ' CHF');
+  });
+  if (s.rundung_rappen !== 0) {
+    summen += sz('Rundungsdifferenz',
+      (s.rundung_rappen > 0 ? '' : '-') + chf(Math.abs(s.rundung_rappen)) + ' CHF');
+  }
+  summen += sz('Total', chf(s.total_rappen) + ' CHF', true);
+
+  return `
+    <div style="font-family:-apple-system,Segoe UI,Arial,sans-serif;color:#14161A;max-width:700px;margin:0 auto;font-size:12px">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:24px;margin-bottom:56px">
+        <div style="line-height:1.45">${absender.map(z => esc(z)).join('<br>')}</div>
+        <div>${bkLogo}</div>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;gap:40px;margin-bottom:52px">
+        <table style="border-collapse:collapse;line-height:1.5">
+          ${kopfZeile(BELEG_TITEL_FELD[b.art] || 'Offertennummer', esc(b.nummer))}
+          ${kopfZeile('Offertendatum', dmy(b.datum))}
+          ${b.gueltig_bis ? kopfZeile('Gültig bis', dmy(b.gueltig_bis)) : ''}
+          ${b.referenz ? kopfZeile('Referenz', esc(b.referenz)) : ''}
+        </table>
+        <div style="line-height:1.5;min-width:230px">${empfaenger.map(z => esc(z)).join('<br>')}</div>
+      </div>
+
+      <div style="font-size:19px;font-weight:700;margin-bottom:14px">
+        ${esc(b.titel || '')} ${esc(b.nummer)}
+      </div>
+
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr>
+          <th style="${th}">Produkt</th><th style="${th}">Beschreibung</th>
+          <th style="${th};text-align:right">Einzelpreis</th>
+          <th style="${th};text-align:right">Menge</th>
+          <th style="${th};text-align:right">Summe</th>
+        </tr></thead>
+        <tbody>${zeilen}</tbody>
+      </table>
+
+      <table style="margin-left:auto;margin-top:14px;border-collapse:collapse">${summen}</table>
+      ${bkFusszeile()}
+    </div>`;
+}
+
+// Wie die Nummer auf dem Blatt heisst. Je Belegart eigener Wortlaut --
+// "Offertennummer" auf einer Rechnung waere schlicht falsch.
+const BELEG_TITEL_FELD = { offerte: 'Offertennummer', rechnung: 'Rechnungsnummer' };
+
+// Zeigt die vom Server gerechneten Summen an. Getrennt von
+// ofSummenZeichnen(), damit die Vorschau beim Tippen nicht versehentlich
+// serverfremde Zahlen ueberschreibt -- und damit eine Abweichung auffaellt.
+function ofSummenAusServer(s) {
+  const vorschau = belegSummen(ofPos, s.rabatt_bp);
+  if (vorschau.total_rappen !== s.total_rappen) {
+    // Sollte nie vorkommen: test_belege.mjs prueft beide Rechenwege gegen
+    // dieselben Faelle. Wenn doch, gilt der Server -- und es steht ein
+    // Hinweis da, statt dass zwei Zahlen stumm nebeneinander leben.
+    toast('Hinweis: Der Server hat CHF ' + chf(s.total_rappen) + ' gerechnet.');
+  }
+  ofSummenZeichnen();
 }
 
 // ══════════════════════════════════════════ MITARBEITENDE
@@ -7118,8 +8258,8 @@ function renderKunden() {
 }
 
 // Zeilen-Aktionsmenü: ein einzelnes schwebendes Element statt eines je Zeile
-// (erstes Kontextmenü der App). "Offerte/Rechnung erstellen" sind bewusst
-// ausgegraut -- diese Funktionen gibt es im System noch nicht (ENT-040).
+// (erstes Kontextmenü der App). "Offerte erstellen" ist seit ENT-181 kein
+// Platzhalter mehr; "Rechnung erstellen" bleibt ausgegraut, bis es sie gibt.
 function kuMenuOeffnen(ev, id) {
   ev.stopPropagation();
   const k = kunden.find(x => Number(x.id) === id);
@@ -7128,7 +8268,9 @@ function kuMenuOeffnen(ev, id) {
   if (pop.classList.contains('on') && pop.dataset.kundeId === String(id)) { kuMenuSchliessen(); return; }
   pop.innerHTML = `
     <button onclick="kuMenuSchliessen(); openKundeBearbeiten(${id})">Bearbeiten</button>
-    <button disabled title="Noch nicht verfügbar">Offerte erstellen</button>
+    ${darf('offerten')
+      ? `<button onclick="kuMenuSchliessen(); ofNeuFuerKunde(${id})">Offerte erstellen</button>`
+      : ''}
     <button disabled title="Noch nicht verfügbar">Rechnung erstellen</button>
     <hr>
     <button onclick="kuMenuSchliessen(); toggleArchivKunde(${id}, ${k.aktiv ? 0 : 1})">${k.aktiv ? 'Archivieren' : 'Wiederherstellen'}</button>`;
@@ -8762,10 +9904,18 @@ function kuGoTab(t) {
   topSubZeichnen();
   $('pgCrumb').textContent = t === 'objekte' ? 'Daueraufträge und ihre Masterschichten'
     : t === 'rapporte' ? 'Alle erfassten Einsätze'
+    : t === 'offerten' ? 'Angebote an Kunden'
     : t === 'detail' ? 'Kundendetails' : 'Stammdaten';
   if (t === 'uebersicht') { kunden.length ? renderKunden() : loadKunden(); }
   if (t === 'objekte') { objekte.length ? renderObjekte() : loadObjekte(); }
   if (t === 'rapporte') { rapporte.length ? renderRapporte() : loadRapporte(); }
+  // Kunden kommen mit, weil die Liste den Empfaenger je Zeile zeigt -- ohne
+  // sie stuende dort eine Kundennummer statt eines Namens. Beide Ladevorgaenge
+  // laufen nebeneinander, nicht nacheinander.
+  if (t === 'offerten') {
+    if (!kunden.length) { loadKunden(); }
+    belege.length ? renderOfferten() : loadBelege();
+  }
 }
 
 // ── Kunden-Detailseite (ENT-040) ──────────────────────────────────────────
@@ -8826,7 +9976,27 @@ function renderKundeDetail() {
       : EMPTY('Keine Rapporte', 'Für diesen Kunden liegt noch kein Rapport vor.');
   }
   if (kdTab === 'offerten') {
-    $('kdOfferten').innerHTML = EMPTY('Noch nicht verfügbar', 'Offerten gibt es in diesem System noch nicht als eigene Funktion.');
+    // Anders als die Rapporte haengen Offerten ueber kunde_id am Kunden,
+    // nicht ueber den Namen (ENT-181) -- der Abgleich ist hier also echt und
+    // nicht die Namensverknuepfung mit ihrem Risiko aus ENT-040.
+    if (!belege.length) {
+      loadBelege().then(() => { if (kdTab === 'offerten') { renderKundeDetail(); } });
+    }
+    const treffer = belege.filter(b => Number(b.kunde_id) === Number(kdId) && Number(b.aktiv ?? 1) === 1);
+    $('kdOfferten').innerHTML = treffer.length
+      ? `<table><thead><tr><th>Status</th><th>Nr.</th><th>Titel</th>
+           <th class="num">Datum</th><th class="num">Summe</th><th class="num">Gültig bis</th></tr></thead>
+         <tbody>${treffer.map(b => {
+           const si = ofStatusInfo(b.status);
+           return `<tr class="click" onclick="ofOeffnen(${Number(b.id)})">
+             <td><span class="chip ${si.chip}">${esc(si.text)}</span></td>
+             <td class="strong nowrap">${esc(b.nummer)}</td>
+             <td>${b.titel ? esc(b.titel) : '<span style="color:var(--ink-3)">ohne Titel</span>'}</td>
+             <td class="nowrap num">${dmy(b.datum)}</td>
+             <td class="num nowrap">CHF ${chf(b.total_rappen)}</td>
+             <td class="nowrap num">${dmy(b.gueltig_bis)}</td></tr>`;
+         }).join('')}</tbody></table>`
+      : EMPTY('Keine Offerten', 'Für diesen Kunden liegt noch keine Offerte vor.');
   }
 }
 
