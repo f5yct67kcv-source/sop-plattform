@@ -134,9 +134,14 @@ try {
   // ersten Fassung dieser Pruefung passiert.
   const rumpf = (php.match(/function rechte_katalog\(\): array\s*\{[\s\S]*?\n\}/) || [''])[0];
   const phpRechte = [...rumpf.matchAll(/'(\w+)' *=> '[^']+',/g)].map(m => m[1]);
-  check('Der Server kennt genau die acht urspruenglichen plus drei Waechtersystem-Rechte (ENT-169/ENT-180)',
-    phpRechte.length === 11 && phpRechte.includes('personal_vertraulich')
-    && phpRechte.includes('rundgang_verwalten'));
+  // Zwoelf seit ENT-180 (drei Waechtersystem-Rechte) und ENT-181 ('offerten').
+  // Die feste Zahl ist Absicht und keine Bequemlichkeit: Sie zwingt jeden,
+  // der ein Recht ergaenzt, hier vorbeizukommen und es bewusst zu tun -- die
+  // Regel aus ENT-077 lautet "grob geschnitten, nicht sechzig", und ein
+  // stillschweigend wachsender Katalog waere genau der Weg dorthin.
+  check('Der Server kennt genau die acht urspruenglichen plus drei Waechtersystem- plus ein Offerten-Recht (ENT-169/ENT-180/ENT-181)',
+    phpRechte.length === 12 && phpRechte.includes('personal_vertraulich')
+    && phpRechte.includes('rundgang_verwalten') && phpRechte.includes('offerten'));
 } catch (e) { check('Katalogvergleich lief durch: ' + e.message, false); }
 
 // ══════════════ VOLLE RECHTE: ALLES DA
