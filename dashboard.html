@@ -3726,6 +3726,45 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
              Mitarbeitenden: Es geht um den EIGENEN Zugang, nicht um fremde.
              Nur fuer Verwaltungszugaenge -- so entschieden, weil daran die
              ganze Personalakte haengt. -->
+        <!-- Briefkopf fuer den Rapport-Ausdruck (ENT-155). Steht bewusst weit
+             oben: Was hier gepflegt wird, geht an Kunden heraus, und solange
+             es leer ist, druckt der Rapport einen unbeschrifteten Kopf. -->
+        <div class="card" style="margin-bottom:16px" id="bkKarte">
+          <div class="card-hd"><h3>Briefkopf für Rapporte</h3></div>
+          <div class="card-bd">
+            <div class="msg-err" id="bkErr" style="display:none"></div>
+            <div class="ki-hint web on" style="margin:0 0 14px">
+              <span>Diese Angaben stehen auf jedem gedruckten Arbeitsrapport, den
+                Kunden zu sehen bekommen.</span></div>
+            <div class="form-zeile">
+              <div class="f"><label for="bkFirma">Firma</label>
+                <input class="inp" id="bkFirma" maxlength="200" placeholder="z. B. CUPI 24 GmbH"></div>
+              <div class="f"><label for="bkZusatz">Zusatz unter der Firma</label>
+                <input class="inp" id="bkZusatz" maxlength="200" placeholder="z. B. Sicherheits- und Verkehrsdienst"></div>
+            </div>
+            <div class="f"><label for="bkFuss">Fusszeile</label>
+              <textarea class="inp" id="bkFuss" rows="2"
+                placeholder="z. B. Adresse · Telefon · E-Mail · UID"></textarea>
+              <div class="note" style="margin-top:5px">Steht klein am Seitenende. Leer lassen, wenn keine gewünscht ist.</div></div>
+            <div class="f" style="margin-top:4px">
+              <label>Logo</label>
+              <div id="bkLogoStand" class="note">Kein Logo hinterlegt.</div>
+              <input type="file" id="bkLogoDatei" accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                style="display:none" onchange="bkLogoGewaehlt(this.files[0])">
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">
+                <button type="button" class="btn btn-plain btn-sm" onclick="$('bkLogoDatei').click()"
+                  title="PNG, JPEG, SVG oder WebP, höchstens 512 KB">Logo wählen</button>
+                <button type="button" class="btn btn-plain btn-sm" id="bkLogoWeg"
+                  style="display:none" onclick="bkLogoWeg()">Logo entfernen</button>
+                <span class="note">höchstens 512 KB</span>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:16px">
+              <button type="button" class="btn btn-primary" onclick="bkSpeichern()">Briefkopf speichern</button>
+            </div>
+          </div>
+        </div>
+
         <div class="card" style="margin-bottom:16px" id="zfKarte">
           <div class="card-hd"><h3>Mein Zugang: Zwei-Faktor-Anmeldung</h3></div>
           <div class="card-bd">
@@ -3984,6 +4023,24 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
       <div class="form-grid" id="kuUidFelder">
         <div class="f"><label for="ku_uid">CHE- Unternehmens-Id</label><input class="inp" id="ku_uid" placeholder="CHE-123.456.789"></div>
         <div class="f"><label for="ku_mwst_nr">CHE- MWST-Nr.</label><input class="inp" id="ku_mwst_nr"></div>
+      </div>
+
+      <!-- Abweichende Rechnungsadresse (ENT-155). Ohne Schalter „abweichend
+           ja/nein": leer heisst gleich wie oben, gefuellt heisst abweichend.
+           Ein Schalter koennte auf „ja" stehen, waehrend die Felder leer
+           sind -- und dann stuende auf dem Beleg eine leere Adresse. -->
+      <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--line-soft)">
+        <div class="ep-dok-kopf">Rechnungsadresse</div>
+        <div class="note" style="margin:-2px 0 10px">Nur ausfüllen, wenn die Rechnung an eine
+          andere Adresse geht als oben. Leer lassen heisst: gleiche Adresse.</div>
+        <div class="form-grid">
+          <div class="f wide"><label for="ku_re_name">Firma / Name</label><input class="inp" id="ku_re_name"></div>
+          <div class="f wide"><label for="ku_re_zusatz">Zusatz</label><input class="inp" id="ku_re_zusatz" placeholder="z. B. Buchhaltung, Postfach"></div>
+          <div class="f"><label for="ku_re_strasse">Strasse</label><input class="inp" id="ku_re_strasse"></div>
+          <div class="f"><label for="ku_re_hausnummer">Nr.</label><input class="inp" id="ku_re_hausnummer"></div>
+          <div class="f"><label for="ku_re_plz">PLZ</label><input class="inp" id="ku_re_plz"></div>
+          <div class="f"><label for="ku_re_ort">Ort</label><input class="inp" id="ku_re_ort"></div>
+        </div>
       </div>
 
       <div class="tabs" id="kuDlgTabs" style="margin-top:22px">
@@ -4650,6 +4707,10 @@ function enter() {
   }).catch(() => {});
   ordLaden('uebersicht');
   sprachBereit('rt');
+  // Der Briefkopf wird schon hier geholt, nicht erst beim Drucken (ENT-155):
+  // window.print() wartet nicht auf einen noch laufenden Abruf, und dann
+  // faende sich der Kopf genau auf dem Blatt nicht wieder.
+  briefkopfLaden();
   reloadAll();
   pruefeUpdate();
 }
@@ -9142,7 +9203,95 @@ let anTarget = null;
 function ladeBetrieb() {
   anTarget = null;
   $('anErr').style.display = 'none';
+  bkLaden();
   return ladeAnstellungsorte().then(() => { anListeZeichnen(); anFormularLeeren(); });
+}
+
+// ══════════════════════════════════════════ BRIEFKOPF (ENT-155)
+// Firmenname, Zusatz, Fusszeile und Logo standen bis dahin als Text im
+// Quelltext von printReport(). Sie gehoeren dem Betrieb, nicht dem Programm --
+// wer sie aendern will, soll nicht den Code anfassen muessen.
+//
+// Der Stand wird beim Anmelden mitgeladen (briefkopfLaden()), damit der
+// Ausdruck ihn ohne zweiten Abruf hat: window.print() wartet nicht auf einen
+// noch laufenden Abruf, und dann fehlte der Briefkopf genau auf dem Blatt.
+let briefkopf = { firma: '', zusatz: '', fusszeile: null, logo: null, logo_groesse: null };
+
+function briefkopfLaden() {
+  return api('betrieb.php').then(({ ok, data }) => {
+    if (ok && data.status === 'ok' && data.betrieb) { briefkopf = data.betrieb; }
+  }).catch(() => {});
+}
+
+function bkLaden() {
+  return briefkopfLaden().then(() => {
+    if (!$('bkFirma')) { return; }
+    $('bkFirma').value = briefkopf.firma || '';
+    $('bkZusatz').value = briefkopf.zusatz || '';
+    $('bkFuss').value = briefkopf.fusszeile || '';
+    bkLogoStand();
+  });
+}
+
+function bkLogoStand() {
+  const el = $('bkLogoStand'), weg = $('bkLogoWeg');
+  if (!el) { return; }
+  if (briefkopf.logo) {
+    // Das Logo selbst zeigen, nicht nur "vorhanden" behaupten: Wer es
+    // hochgeladen hat, will sehen, was auf dem Rapport landet.
+    el.innerHTML = `<img src="${esc(briefkopf.logo)}" alt="Logo"
+      style="max-height:52px;max-width:220px;display:block;margin-bottom:4px">
+      <span class="note">${briefkopf.logo_groesse ? dokGr(briefkopf.logo_groesse) : ''}</span>`;
+    if (weg) weg.style.display = '';
+  } else {
+    el.textContent = 'Kein Logo hinterlegt.';
+    if (weg) weg.style.display = 'none';
+  }
+}
+
+function bkFehler(text) {
+  const el = $('bkErr'); if (!el) { return; }
+  if (!text) { el.style.display = 'none'; return; }
+  el.textContent = text; el.style.display = '';
+}
+
+function bkSpeichern() {
+  bkFehler('');
+  api('betrieb.php', { method: 'POST', body: {
+    firma: $('bkFirma').value, zusatz: $('bkZusatz').value, fusszeile: $('bkFuss').value,
+  } }).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') { return bkFehler(data.message || 'Speichern fehlgeschlagen.'); }
+    briefkopf = data.betrieb; bkLogoStand(); toast('Briefkopf gespeichert.');
+  }).catch(() => bkFehler('Speichern fehlgeschlagen.'));
+}
+
+// 512 KB gegen die ROHE Datei geprueft, nicht gegen die base64-Fassung: der
+// Server prueft ebenfalls roh (LOGO_MAX), und zwei verschiedene Massstaebe
+// waeren eine Datei, die hier durchgeht und dort abgelehnt wird.
+const LOGO_MAX_JS = 512 * 1024;
+function bkLogoGewaehlt(datei) {
+  const el = $('bkLogoDatei'); if (el) el.value = '';
+  if (!datei) { return; }
+  const erlaubt = ['image/png', 'image/jpeg', 'image/svg+xml', 'image/webp'];
+  if (!erlaubt.includes(datei.type)) { return bkFehler('Nur PNG, JPEG, SVG oder WebP.'); }
+  if (datei.size > LOGO_MAX_JS) {
+    return bkFehler(`„${datei.name}“ ist ${dokGr(datei.size)} gross — höchstens 512 KB.`);
+  }
+  bkFehler('');
+  dokLesen(datei).then(inhalt => api('betrieb.php', { method: 'POST',
+    body: { logo: inhalt, logo_mime: datei.type } }))
+    .then(({ ok, data }) => {
+      if (!ok || data.status !== 'ok') { return bkFehler(data.message || 'Hochladen fehlgeschlagen.'); }
+      briefkopf = data.betrieb; bkLogoStand(); toast('Logo gespeichert.');
+    }).catch(() => bkFehler('Hochladen fehlgeschlagen.'));
+}
+
+function bkLogoWeg() {
+  bkFehler('');
+  api('betrieb.php', { method: 'POST', body: { logo_weg: true } }).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') { return bkFehler(data.message || 'Entfernen fehlgeschlagen.'); }
+    briefkopf = data.betrieb; bkLogoStand(); toast('Logo entfernt.');
+  }).catch(() => bkFehler('Entfernen fehlgeschlagen.'));
 }
 
 // ══════════════════════════════════════════ ZWEI-FAKTOR-ANMELDUNG (ENT-076)
@@ -13225,12 +13374,19 @@ function agCsv() {
 // Die einfachen Textfelder. Genau diese kann der Diktat-Router bzw. die
 // Web-Recherche vorbefüllen. Kommunikationswege und Ansprechpersonen laufen
 // getrennt, weil sie Listen sind und keine Felder.
+// re_* (ENT-155) stehen bewusst MIT in dieser Liste: dadurch werden sie beim
+// Oeffnen gefuellt, beim Speichern gelesen und beim Leeren zurueckgesetzt,
+// ohne dass es an drei Stellen einzeln nachgezogen werden muss -- genau der
+// Fehler, vor dem der Kommentar oben warnt.
 const KU_FELDER = ['name', 'anrede', 'vorname', 'nachname', 'zusatzfeld', 'strasse',
-  'hausnummer', 'adresszusatz', 'plz', 'ort', 'uid', 'mwst_nr', 'notiz'];
+  'hausnummer', 'adresszusatz', 'plz', 'ort', 'uid', 'mwst_nr', 'notiz',
+  're_name', 're_zusatz', 're_strasse', 're_hausnummer', 're_plz', 're_ort'];
 const KU_LABEL = { name: 'Name', anrede: 'Anrede', vorname: 'Vorname', nachname: 'Nachname',
   zusatzfeld: 'Zusatzfeld', strasse: 'Strasse', hausnummer: 'Nr.', adresszusatz: 'Adresszusatz',
   plz: 'PLZ', ort: 'Ort', uid: 'Unternehmens-Id', mwst_nr: 'MWST-Nr.', notiz: 'Notiz',
-  email: 'E-Mail', telefon: 'Telefon', mobil: 'Mobiltelefon', webseite: 'Webseite', fax: 'Fax' };
+  email: 'E-Mail', telefon: 'Telefon', mobil: 'Mobiltelefon', webseite: 'Webseite', fax: 'Fax',
+  re_name: 'Rechnung: Firma/Name', re_zusatz: 'Rechnung: Zusatz', re_strasse: 'Rechnung: Strasse',
+  re_hausnummer: 'Rechnung: Nr.', re_plz: 'Rechnung: PLZ', re_ort: 'Rechnung: Ort' };
 // Feste Arten statt Freitext -- sonst stehen „Mobil", „mobile" und „Natel"
 // nebeneinander und nichts lässt sich mehr auswerten. Gleiche Liste wie
 // KONTAKT_ARTEN in backend/kunden.php.
@@ -14381,34 +14537,79 @@ function kuSpeichern() {
 // oben. Die Recherche fuer Kunden lebt jetzt in kuRecherche(), direkt im
 // Anlegen-Dialog.
 
+// Die Rechnungsadresse zu einem Rapport -- oder ehrlich nichts (ENT-155).
+//
+// Die Kundenstammdaten liegen am Rapport selbst, weil der Server sie ueber
+// r.einsatz_id -> einsaetze.kunde_id mitliefert (rapport_list.php). Bewusst
+// NICHT aus den Listen `einsaetze`/`kunden` zusammengesucht: die werden erst
+// beim Oeffnen ihrer Ansicht geladen, und dann stuende die Kundennummer je
+// nach zuvor besuchter Ansicht mal auf dem Blatt und mal nicht.
+//
+// Fehlt kunde_id, ist der Rapport von Hand erfasst und haengt an keinem
+// Kundenstamm. Dann bleiben die Zeilen weg -- ueber den Kundennamen zu raten
+// waere bequem und falsch.
+//
+// Abweichende Rechnungsadresse ohne Schalter "abweichend ja/nein": Ein
+// Schalter kann auf "ja" stehen, waehrend die Felder leer sind -- dann
+// druckte das Blatt eine leere Adresse. Gefuellt heisst abweichend.
+function rapportRechnungsadresse(r) {
+  if (!r || !r.kunde_id) { return null; }
+  const abw = [r.re_name, r.re_strasse, r.re_plz, r.re_ort].some(v => String(v || '').trim());
+  const zeilen = abw
+    ? [r.re_name || r.k_name, r.re_zusatz, [r.re_strasse, r.re_hausnummer].filter(Boolean).join(' '),
+       [r.re_plz, r.re_ort].filter(Boolean).join(' ')]
+    : [r.k_name, r.k_adresszusatz, [r.k_strasse, r.k_hausnummer].filter(Boolean).join(' '),
+       [r.k_plz, r.k_ort].filter(Boolean).join(' ')];
+  const sauber = zeilen.map(z => String(z || '').trim()).filter(Boolean);
+  return sauber.length ? { zeilen: sauber, abweichend: abw } : null;
+}
+
 function printReport() {
   const r = rapporte.find(x => Number(x.id) === drawerId);
   if (!r) return;
-  const line = (k, v) => `<tr><td style="padding:7px 0;color:#6B7280;width:170px;border-bottom:1px solid #E5E8EC">${k}</td><td style="padding:7px 0;font-weight:600;border-bottom:1px solid #E5E8EC">${v}</td></tr>`;
+  const re = rapportRechnungsadresse(r);
+  const line = (k2, v) => `<tr><td style="padding:7px 0;color:#6B7280;width:170px;border-bottom:1px solid #E5E8EC">${k2}</td><td style="padding:7px 0;font-weight:600;border-bottom:1px solid #E5E8EC">${v}</td></tr>`;
   const rows = [
     ['Datum', dmy(r.datum)],
     ['Mitarbeitende', esc(r.mitarbeiter)],
     ['Kunde', esc(r.kunde)],
-    ['Adresse', esc(r.strasse) + ', ' + esc(r.ort)],
+    // Nur wenn der Rapport ueber eine Schicht sauber am Kunden haengt.
+    ...(r.kunde_nr ? [['Kunden-Nr.', esc(r.kunde_nr)]] : []),
+    // "Einsatzort", nicht mehr "Adresse": Seit die Rechnungsadresse daneben
+    // stehen kann, waeren zwei Adressen ohne Unterscheidung eine Einladung
+    // zum Verwechseln.
+    ['Einsatzort', esc(r.strasse) + ', ' + esc(r.ort)],
     ['Auftrags-Nr.', r.auftrag_nr ? esc(r.auftrag_nr) : '–'],
     ['Einsatzart', esc(r.einsatzart)],
     ['Arbeitszeit', hm(r.von) + ' – ' + hm(r.bis)],
     ['Pause', nf(r.pause_min) + ' Min.'],
     ['Nettostunden', nf(r.netto_h, 2) + ' h']
-  ].map(([k, v]) => line(k, v)).join('');
+  ].map(([a, v]) => line(a, v)).join('');
+
+  // Briefkopf aus den Betriebseinstellungen (ENT-155). Solange dort nichts
+  // gepflegt ist, bleibt der Kopf leer -- ein erfundener Firmenname auf einem
+  // Beleg, der an Kunden geht, waere schlimmer als eine leere Ecke.
+  const bkLogo = briefkopf.logo
+    ? `<img src="${esc(briefkopf.logo)}" alt="" style="max-height:56px;max-width:210px;display:block;margin-bottom:6px">`
+    : '';
+  const bkText = [
+    briefkopf.firma ? `<div style="font-weight:700;color:#14161A;font-size:13px">${esc(briefkopf.firma)}</div>` : '',
+    briefkopf.zusatz ? esc(briefkopf.zusatz) : '',
+  ].filter(Boolean).join('');
 
   $('printArea').innerHTML = `
     <div style="font-family:-apple-system,Segoe UI,Arial,sans-serif;color:#14161A;max-width:700px;margin:0 auto">
-      <div style="display:flex;align-items:flex-end;justify-content:space-between;border-bottom:2px solid #16181D;padding-bottom:14px;margin-bottom:22px">
+      <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:24px;border-bottom:2px solid #16181D;padding-bottom:14px;margin-bottom:22px">
         <div>
           <div style="font-size:21px;font-weight:800;letter-spacing:-.4px">Arbeitsrapport</div>
           <div style="font-size:12px;color:#6B7280;margin-top:3px">Rapport-Nr. ${esc(r.id)}${r.erfasst_am ? ' · erfasst am ' + dmy(r.erfasst_am) : ''}</div>
         </div>
-        <div style="text-align:right;font-size:12px;color:#6B7280;line-height:1.5">
-          <div style="font-weight:700;color:#14161A;font-size:13px">CUPI 24 GmbH</div>
-          Sicherheits- und Verkehrsdienst
-        </div>
+        <div style="text-align:right;font-size:12px;color:#6B7280;line-height:1.5">${bkLogo}${bkText}</div>
       </div>
+      ${re ? `<div style="margin-bottom:20px">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#6B7280;font-weight:700;margin-bottom:4px">${re.abweichend ? 'Rechnungsadresse' : 'Kunde'}</div>
+        <div style="font-size:14px;line-height:1.5">${re.zeilen.map(z => esc(z)).join('<br>')}</div>
+      </div>` : ''}
       <table style="width:100%;border-collapse:collapse;font-size:14px">${rows}</table>
       ${r.bemerkung ? `<div style="margin-top:20px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#6B7280;font-weight:700;margin-bottom:5px">Bemerkung</div><div style="font-size:14px">${esc(r.bemerkung)}</div></div>` : ''}
       <div style="margin-top:38px;padding-top:16px;border-top:1px solid #E5E8EC">
@@ -14416,8 +14617,12 @@ function printReport() {
         ${r.unterschrift
           ? `<img src="${esc(r.unterschrift)}" style="max-height:100px;max-width:280px;display:block">`
           : '<div style="height:58px;border-bottom:1px solid #14161A;max-width:280px"></div>'}
-        <div style="font-size:13px;margin-top:7px">${r.unterzeichner ? esc(r.unterzeichner) : ''}</div>
+        ${r.unterzeichner
+          ? `<div style="font-size:13px;margin-top:7px">${esc(r.unterzeichner)}</div>
+             <div style="font-size:10.5px;color:#6B7280;margin-top:1px">Name in Blockschrift</div>`
+          : ''}
       </div>
+      ${briefkopf.fusszeile ? `<div style="margin-top:30px;padding-top:10px;border-top:1px solid #E5E8EC;font-size:10.5px;color:#6B7280;line-height:1.5;white-space:pre-line">${esc(briefkopf.fusszeile)}</div>` : ''}
     </div>`;
   window.print();
 }
