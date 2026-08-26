@@ -58,9 +58,16 @@ const reiter = await m.evaluate(() => [...document.querySelectorAll('.tabs .tab'
   .sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left)
   .map(b => b.textContent.trim()));
 check('KRITISCH: Tagesplan steht mobil ganz links', reiter[0] === 'Tagesplan');
-check('Einsätze und Objektplanung folgen dahinter', reiter[1] === 'Einsätze' && reiter[2] === 'Objektplanung');
+// Objektplanung ist mobil seit ENT-165 durch Rapporte ersetzt: eine
+// 31-Spalten-Matrix ist dort ohnehin nur als Tagesliste nutzbar (ENT-024),
+// unterwegs wird eher auf Rapporte zugegriffen. Andere Wege zur
+// Objektplanung (Objektname anklicken, Kurzwahl, Diktat) bleiben bestehen --
+// nur der Reiter selbst verschwindet auf schmalen Schirmen (siehe unten).
+check('Einsätze und Rapporte folgen dahinter', reiter[1] === 'Einsätze' && reiter[2] === 'Rapporte');
 check('KRITISCH: der Reiter fuehrt weiterhin zur richtigen Ansicht',
   await m.evaluate(() => document.getElementById('pv-tag').classList.contains('on')));
+check('KRITISCH: "Objektplanung" ist auf dem Handy kein Reiter mehr, nicht nur umsortiert',
+  !reiter.includes('Objektplanung'));
 
 // ── 2) Kopfzeile dominanter, mehr Luft
 const kopf = await m.evaluate(() => {
@@ -201,6 +208,17 @@ await m.evaluate(() => goTab('tag'));
 await m.waitForTimeout(400);
 
 await m.screenshot({ path: `${OUT}/tgm-01-handy.png` });
+
+// ── Der neue "Rapporte"-Reiter fuehrt tatsaechlich zur bereits bestehenden,
+// global gepflegten Rapporte-Ansicht (ENT-165). Zuletzt in diesem Abschnitt,
+// weil der Klick aus der Planung heraus navigiert -- alles danach wuerde
+// sonst faelschlich annehmen, weiterhin im Tagesplan zu sein.
+await m.click('#ptab-rapporte');
+await m.waitForTimeout(400);
+check('KRITISCH: "Rapporte" springt in die bereits bestehende, global gepflegte Rapporte-Ansicht',
+  await m.evaluate(() => document.getElementById('view-kunden').classList.contains('on')
+    && document.getElementById('kv-rapporte').classList.contains('on')));
+
 check('KRITISCH: keine JavaScript-Fehler', jsFehler.length === 0);
 await m.close();
 

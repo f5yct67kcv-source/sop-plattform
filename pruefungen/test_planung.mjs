@@ -125,6 +125,17 @@ check('"Diktat: Einsatz" ist weg -- reine Dopplung zum globalen Sprechen-Knopf',
 check('Planung oeffnet ohne Schreibaufruf', writes().length === 0);
 check('Seitentitel ist Planung', (await page.textContent('#pgTitle')) === 'Planung');
 
+// Auf dem Desktop bleibt die Objektplanung unveraendert Teil der Reiterleiste
+// -- nur auf dem Handy weicht sie den Rapporten (ENT-165, siehe
+// test_tagesplan_mobil.mjs fuer die mobile Gegenprobe).
+check('KRITISCH: "Objektplanung" bleibt auf dem Desktop ein sichtbarer Reiter',
+  await page.isVisible('#ptab-objektplan'));
+// isVisible() allein wuerde auch bestehen, wenn der Reiter komplett fehlte
+// statt nur per CSS versteckt zu sein -- deshalb zusaetzlich pruefen, dass
+// er im DOM tatsaechlich existiert (Gegenprobe zeigte genau diese Luecke).
+check('KRITISCH: der mobile "Rapporte"-Reiter existiert, ist auf dem Desktop aber unsichtbar',
+  (await page.locator('#ptab-rapporte').count()) === 1 && !(await page.isVisible('#ptab-rapporte')));
+
 // KPI
 const kpiWerte = await page.$$eval('#plKpi .kpi-val', els => els.map(e => e.textContent.trim()));
 check('Vier Kennzahlen', kpiWerte.length === 4);

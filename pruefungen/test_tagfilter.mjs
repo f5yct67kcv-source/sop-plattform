@@ -187,8 +187,11 @@ const tabs = await m.evaluate(() => {
   return { t, leiste: { l: leiste.left, r: leiste.right } };
 });
 check('KRITISCH: Tagesplan steht links aussen', tabs.t[0].t === 'Tagesplan');
-check('KRITISCH: Objektplanung steht rechts aussen', tabs.t[tabs.t.length - 1].t === 'Objektplanung');
-check('KRITISCH: Objektplanung reicht bis an den rechten Rand',
+// Objektplanung ist mobil seit ENT-165 durch Rapporte ersetzt (siehe
+// test_tagesplan_mobil.mjs fuer die Pruefungen dazu) -- sie nimmt deren
+// Platz ganz aussen rechts ein, dieselbe Ausrichtung gilt unveraendert.
+check('KRITISCH: Rapporte steht rechts aussen', tabs.t[tabs.t.length - 1].t === 'Rapporte');
+check('KRITISCH: Rapporte reicht bis an den rechten Rand',
   Math.abs(tabs.t[tabs.t.length - 1].r - tabs.leiste.r) <= 2);
 check('Tagesplan sitzt am linken Rand', Math.abs(tabs.t[0].l - tabs.leiste.l) <= 2);
 const breiten = tabs.t.map(x => x.w);
