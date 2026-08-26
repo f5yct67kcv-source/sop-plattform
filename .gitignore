@@ -25,3 +25,10 @@ pruefungen/bilder/
 # eines -- gepflegt wird package.json. Wer die Playwright-Fassung doch
 # festnageln will, entscheidet das bewusst und nimmt die Zeile wieder raus.
 pruefungen/package-lock.json
+
+# Capacitor-Geruest fuer V3 (ENT-141): Abhaengigkeiten entstehen bei jedem
+# "npm install" neu, wie bei pruefungen/ oben. android/ und ios/ bringen
+# eigene .gitignore-Dateien mit (Build-Ordner, xcuserdata etc.) und werden
+# bewusst versioniert -- das sind die nativen Projekte selbst, kein
+# Build-Output.
+mobile/node_modules/
