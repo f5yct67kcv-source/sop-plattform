@@ -441,17 +441,29 @@ td.num, th.num { text-align: right; }
 /* Masterschichten-Ansicht: Nullwerte treten zurueck, Summen heben sich ab. */
 td.num.leer { color: var(--ink-3); }
 tbody tr.summe td { background: var(--surface-2); font-weight: 650; border-top: 1px solid var(--line); }
-/* Klammer-Spalte fuer zusammengehoerige Rapporte am selben Einsatz (ENT-173,
-   Kunden-Detail). width:1% erzwingt die schmalstmoegliche Breite, dieselbe
+/* Klammer-Spalte fuer zusammengehoerige Rapporte am selben Einsatz (ENT-173
+   Kunden-Detail, ENT-178 globale Liste -- ein gemeinsamer Baustein statt
+   zwei Kopien). width:1% erzwingt die schmalstmoegliche Breite, dieselbe
    Technik wie table.ep-gitter .fest -- table { width:100% } verteilte den
-   Rest sonst gleichmaessig auch auf diese schmale Symbolspalte. */
-.kd-rapp-klammer { width: 1%; padding: 4px 8px !important; text-align: center; border-left: 3px solid var(--line-hi); }
+   Rest sonst gleichmaessig auch auf diese schmale Symbolspalte. Der Knopf
+   darin traegt seit ENT-178 wieder eine sichtbare Beschriftung statt nur
+   eines Symbols (siehe Begruendung dort) und darf die Spalte dafuer breiter
+   ziehen. */
+.rapp-klammer { width: 1%; padding: 4px 8px !important; text-align: center; border-left: 3px solid var(--line-hi); }
+/* Die ganze Gruppe traegt eine zurueckhaltende Flaeche (ENT-178) -- die
+   Randlinie allein an der Klammer-Zelle war nachweislich nicht selbsterklaerend
+   genug. Bewusst NICHT --serie-soft: dieselbe Begruendung wie beim Verzicht
+   auf Violett in ENT-173 -- Serie/Reihe ist in diesem Haus bereits eine
+   eigene, feste Bedeutung, eine zweite Gruppierung in derselben Farbe wuerde
+   zwei verschiedene Dinge gleich einfaerben. --line-soft ist rein neutral
+   (bislang nur ein Hover-Ton), keine doppelte Bedeutung im Weg. */
+tr.rapp-gruppe > td { background: var(--line-soft); }
 /* Innerhalb einer Gruppe entfaellt die Trennlinie zwischen den Zeilen -- sie
    sollen als EIN zusammengehoeriger Block lesbar sein, nicht als lauter
    Einzelzeilen mit zufaellig derselben Randfarbe. Nur die Klammer-Zelle
    selbst bleibt ausgenommen: sie ist per rowspan ohnehin eine einzige Zelle,
    ihre eigene untere Kante liegt schon richtig am Gruppenende. */
-tr.kd-rapp-gruppe-offen td:not(.kd-rapp-klammer) { border-bottom: none; }
+tr.rapp-gruppe-offen td:not(.rapp-klammer) { border-bottom: none; }
 tbody tr.aus td { opacity: .55; }
 /* Abgeschlossene Einsaetze treten in der Liste zurueck (ENT-128) -- erledigt,
    nicht mehr handlungsbeduerftig. Gleiche Staerke wie tr.aus, eigener Name:
@@ -6269,11 +6281,13 @@ function renderRapporte() {
       : EMPTY('Noch keine Rapporte', 'Sobald Einsätze in der Erfassung gespeichert werden, erscheinen sie hier.');
     return;
   }
-  $('rapporteTable').innerHTML = `<table><thead><tr>
-      <th>Datum</th><th>Mitarbeitende</th><th>Kunde</th><th>Ort</th>
-      <th>Einsatzart</th><th>Zeit</th><th class="num">Pause</th><th class="num">Netto</th><th>Unterzeichner</th>
-    </tr></thead><tbody>` + d.map(r => `
-      <tr class="click" onclick="openDrawer(${Number(r.id)})">
+  // Klammer und Knopf wie im Kunden-Detail (ENT-173), hier seit ENT-178
+  // ebenfalls -- Zeilen desselben Einsatzes koennen auch kundenuebergreifend
+  // benachbart stehen (gleiches Datum, gleiche Sortierung), rapporteGruppieren()
+  // fasst sie dann genauso zusammen. Steht eine fremde Zeile eines anderen
+  // Einsatzes dazwischen, entsteht keine Gruppe -- bewusste Rueckfallwirkung,
+  // siehe Begruendung bei rapporteGruppieren().
+  const zelle = r => `
         <td class="nowrap num">${dmy(r.datum)}</td>
         <td class="strong nowrap">${esc(r.mitarbeiter)}</td>
         <td>${esc(r.kunde)}<div class="sec">${esc(r.strasse)}</div></td>
@@ -6282,8 +6296,11 @@ function renderRapporte() {
         <td class="nowrap num">${hm(r.von)}–${hm(r.bis)}</td>
         <td class="num nowrap" style="color:var(--ink-3)">${nf(r.pause_min)} min</td>
         <td class="num nowrap"><span class="chip chip-p">${nf(r.netto_h, 2)} h</span></td>
-        <td>${r.unterzeichner ? esc(r.unterzeichner) : '<span style="color:var(--ink-3)">–</span>'}</td>
-      </tr>`).join('') + `</tbody></table>`;
+        <td>${r.unterzeichner ? esc(r.unterzeichner) : '<span style="color:var(--ink-3)">–</span>'}</td>`;
+  $('rapporteTable').innerHTML = `<table><thead><tr>
+      <th></th><th>Datum</th><th>Mitarbeitende</th><th>Kunde</th><th>Ort</th>
+      <th>Einsatzart</th><th>Zeit</th><th class="num">Pause</th><th class="num">Netto</th><th>Unterzeichner</th>
+    </tr></thead><tbody>${rapporteZeilenMitKlammer(d, zelle)}</tbody></table>`;
 }
 
 function exportCSV() {
@@ -8720,20 +8737,20 @@ function renderKundeDetail() {
   }
 }
 
-// ── Zusammengehoerige Rapporte in der Kunden-Detailansicht (ENT-173) ───────
-//
-// Zwei Rapporte am selben Einsatz stehen hier -- anders als in der globalen
-// Liste -- bereits garantiert nur fuer DIESEN Kunden nebeneinander, darum ist
-// die Klammer hier am unproblematischsten (siehe Abwaegung im Gespraech mit
-// dem Projektinhaber): keine fremde Zeile kann dazwischenrutschen ausser
-// durch die Sortierung selbst.
+// ── Zusammengehoerige Rapporte am selben Einsatz -- Klammer + Knopf ────────
+// (ENT-173, Kunden-Detail; ENT-178, globale Liste unter Kunden)
 //
 // Gruppiert wird ausschliesslich BENACHBART, nicht per Sortierung nach
 // einsatz_id -- die Liste bleibt in ihrer bestehenden Reihenfolge (Datum),
 // eine Gruppe entsteht nur, wenn zwei oder mehr direkt aufeinanderfolgende
 // Zeilen dieselbe einsatz_id tragen. Alles andere waere eine stille
-// Umsortierung, die niemand angefragt hat.
-function kdRapporteGruppieren(zeilen) {
+// Umsortierung, die niemand angefragt hat. In der Kunden-Detailansicht sind
+// alle Zeilen ohnehin schon auf einen Kunden gefiltert, keine fremde Zeile
+// kann dazwischenrutschen. In der globalen, kundenuebergreifenden Liste ist
+// das nicht ausgeschlossen -- trifft es ein, bleibt es bei Einzelzeilen ohne
+// Klammer, genau das ist die bewusste Rueckfallwirkung dieser Regel, keine
+// gesonderte Fallunterscheidung noetig.
+function rapporteGruppieren(zeilen) {
   const gruppen = [];
   for (const r of zeilen) {
     const letzte = gruppen[gruppen.length - 1];
@@ -8746,40 +8763,58 @@ function kdRapporteGruppieren(zeilen) {
   return gruppen;
 }
 
-function kdRapporteTabelle(treffer) {
-  const gruppen = kdRapporteGruppieren(treffer);
-  const zelle = r => `<td class="nowrap num">${dmy(r.datum)}</td><td>${esc(r.mitarbeiter)}</td>
-      <td class="nowrap">${hm(r.von)}–${hm(r.bis)}</td><td class="num">${nf(Number(r.netto_h), 2)} h</td>
-      <td>${dash(r.auftrag_nr)}</td>`;
-  // Der Knopf haengt an der Klammer, nicht an jeder einzelnen Zeile -- ein
-  // Kundenrapport gehoert zum Einsatz, nicht zur einzelnen Person. Zwei
-  // gleichlautende Knoepfe je Gruppe waeren die Frage wert, welchen man
-  // klicken soll. Ruft dieselbe, bereits bestehende Funktion wie im
-  // Einsatzplan (ENT-160) -- kein zweiter Weg, nur ein zweiter Zugang.
-  const klammerKnopf = (einsatzId, anzahl) => darf('abgleich')
-    ? `<td class="kd-rapp-klammer" rowspan="${anzahl}">
-        <button type="button" class="btn btn-quiet btn-sm" title="Kundenrapport drucken"
-          onclick="event.stopPropagation(); epBerichtDrucken(${Number(einsatzId)})">
-          <svg class="i i-sm" viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-        </button>
-      </td>`
-    // Fehlt das Recht "abgleich", entfaellt der Knopf, aber die Zellenzahl
-    // der Zeile muss trotzdem stimmen -- eine leere Zelle statt gar keiner.
-    : '<td class="kd-rapp-klammer"></td>';
-  const zeilen = gruppen.map(g => {
+// Der Knopf haengt an der Klammer, nicht an jeder einzelnen Zeile -- ein
+// Kundenrapport gehoert zum Einsatz, nicht zur einzelnen Person. Zwei
+// gleichlautende Knoepfe je Gruppe waeren die Frage wert, welchen man
+// klicken soll. Ruft dieselbe, bereits bestehende Funktion auf wie im
+// Einsatzplan (ENT-160) -- kein zweiter Weg, nur ein zweiter Zugang, und
+// mit demselben Wortlaut "Kundenrapport drucken" statt nur einem Symbol
+// (ENT-178): Ein Symbol ohne sichtbare Schrift war fuer alle, die die
+// Funktion noch nicht kennen, nicht selbsterklaerend -- ein Tooltip hilft
+// nur, wer die Maus darueber haelt, auf dem Handy gar niemandem.
+function rapporteKlammerZelle(einsatzId, anzahl) {
+  if (!darf('abgleich')) {
+    // Fehlt das Recht, entfaellt der Knopf, aber die Zellenzahl der Zeile
+    // muss trotzdem stimmen -- eine leere Zelle statt gar keiner.
+    return anzahl > 1 ? `<td class="rapp-klammer" rowspan="${anzahl}"></td>` : '<td class="rapp-klammer"></td>';
+  }
+  const knopf = `<button type="button" class="btn btn-quiet btn-sm" title="Kundenrapport drucken"
+      onclick="event.stopPropagation(); epBerichtDrucken(${Number(einsatzId)})">
+      <svg class="i i-sm" viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      <span>Kundenrapport</span>
+    </button>`;
+  return anzahl > 1
+    ? `<td class="rapp-klammer" rowspan="${anzahl}">${knopf}</td>`
+    : '<td class="rapp-klammer"></td>';
+}
+
+// Baut aus einer flachen Zeilenliste die <tr>-Zeilen samt Klammer-Spalte.
+// `zelle(r)` liefert die uebrigen <td> einer Zeile -- pro Aufrufer
+// unterschiedlich (Kunden-Detail zeigt keine Kunden-Spalte, die globale
+// Liste schon), die Klammer- und Gruppierungslogik ist an beiden Stellen
+// exakt dieselbe.
+function rapporteZeilenMitKlammer(treffer, zelle) {
+  const gruppen = rapporteGruppieren(treffer);
+  return gruppen.map(g => {
     if (g.zeilen.length > 1 && g.einsatzId) {
-      const knopf = klammerKnopf(g.einsatzId, g.zeilen.length);
+      const knopf = rapporteKlammerZelle(g.einsatzId, g.zeilen.length);
       return g.zeilen.map((r, i) => {
         const letzte = i === g.zeilen.length - 1;
-        const klasse = 'click kd-rapp-gruppe' + (letzte ? '' : ' kd-rapp-gruppe-offen');
+        const klasse = 'click rapp-gruppe' + (letzte ? '' : ' rapp-gruppe-offen');
         return `<tr class="${klasse}" onclick="openDrawer(${Number(r.id)})">${i === 0 ? knopf : ''}${zelle(r)}</tr>`;
       }).join('');
     }
     const r = g.zeilen[0];
-    return `<tr class="click" onclick="openDrawer(${Number(r.id)})"><td class="kd-rapp-klammer"></td>${zelle(r)}</tr>`;
+    return `<tr class="click" onclick="openDrawer(${Number(r.id)})">${rapporteKlammerZelle(null, 1)}${zelle(r)}</tr>`;
   }).join('');
+}
+
+function kdRapporteTabelle(treffer) {
+  const zelle = r => `<td class="nowrap num">${dmy(r.datum)}</td><td>${esc(r.mitarbeiter)}</td>
+      <td class="nowrap">${hm(r.von)}–${hm(r.bis)}</td><td class="num">${nf(Number(r.netto_h), 2)} h</td>
+      <td>${dash(r.auftrag_nr)}</td>`;
   return `<table><thead><tr><th></th><th>Datum</th><th>Mitarbeitende</th><th>Zeit</th><th class="num">Netto</th><th>Auftrag-Nr.</th></tr></thead>
-    <tbody>${zeilen}</tbody></table>`;
+    <tbody>${rapporteZeilenMitKlammer(treffer, zelle)}</tbody></table>`;
 }
 
 function kdBearbeiten() { openKundeBearbeiten(kdId); }
