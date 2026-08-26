@@ -40,9 +40,9 @@ const SIG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAAAyCAYAAACqNX6+A
 const RAPPORTE = {
   status: 'ok',
   rapporte: [
-    { id: 284, datum: '2026-08-17', mitarbeiter: 'daniele.ciardo', kunde: 'Studer Immobilien AG', strasse: 'Gerolagstrasse 12', ort: '4632 Trimbach', auftrag_nr: 'A-2026-118', einsatzart: 'Verkehrsdienst', von: '07:00:00', bis: '16:00:00', pause_min: 30, netto_h: '8.50', unterzeichner: 'R. Studer', unterschrift: SIG, bemerkung: 'Baustellenverkehr wie vereinbart geregelt.', erfasst_am: '2026-08-17 16:12:00' },
-    { id: 283, datum: '2026-08-16', mitarbeiter: 'adrian', kunde: 'Einwohnergemeinde Niedergösgen', strasse: 'Dorfstrasse 4', ort: '5013 Niedergösgen', auftrag_nr: null, einsatzart: 'Revierdienst', von: '22:00:00', bis: '04:00:00', pause_min: 0, netto_h: '6.00', unterzeichner: null, unterschrift: null, bemerkung: null, erfasst_am: '2026-08-16 04:20:00' },
-    { id: 282, datum: '2026-08-15', mitarbeiter: 'm.keller', kunde: 'Studer Immobilien AG', strasse: 'Gerolagstrasse 12', ort: '4632 Trimbach', auftrag_nr: 'A-2026-117', einsatzart: 'Verkehrsdienst', von: '08:00:00', bis: '15:45:00', pause_min: 30, netto_h: '7.25', unterzeichner: 'M. Frei', unterschrift: null, bemerkung: null, erfasst_am: '2026-08-15 16:02:00' }
+    { id: 284, einsatz_id: 501, datum: '2026-08-17', mitarbeiter: 'daniele.ciardo', kunde: 'Studer Immobilien AG', strasse: 'Gerolagstrasse 12', ort: '4632 Trimbach', auftrag_nr: 'A-2026-118', einsatzart: 'Verkehrsdienst', von: '07:00:00', bis: '16:00:00', pause_min: 30, netto_h: '8.50', unterzeichner: 'R. Studer', unterschrift: SIG, bemerkung: 'Baustellenverkehr wie vereinbart geregelt.', erfasst_am: '2026-08-17 16:12:00' },
+    { id: 283, einsatz_id: 502, datum: '2026-08-16', mitarbeiter: 'adrian', kunde: 'Einwohnergemeinde Niedergösgen', strasse: 'Dorfstrasse 4', ort: '5013 Niedergösgen', auftrag_nr: null, einsatzart: 'Revierdienst', von: '22:00:00', bis: '04:00:00', pause_min: 0, netto_h: '6.00', unterzeichner: null, unterschrift: null, bemerkung: null, erfasst_am: '2026-08-16 04:20:00' },
+    { id: 282, einsatz_id: 503, datum: '2026-08-15', mitarbeiter: 'm.keller', kunde: 'Studer Immobilien AG', strasse: 'Gerolagstrasse 12', ort: '4632 Trimbach', auftrag_nr: 'A-2026-117', einsatzart: 'Verkehrsdienst', von: '08:00:00', bis: '15:45:00', pause_min: 30, netto_h: '7.25', unterzeichner: 'M. Frei', unterschrift: null, bemerkung: null, erfasst_am: '2026-08-15 16:02:00' }
   ]
 };
 
@@ -58,6 +58,7 @@ const KU = { status: 'ok', kunden: [
 ]};
 
 const calls = [];
+let berichtRufe = [];
 
 async function setup(page, { admin = true } = {}) {
   await page.route('**/api/**', async route => {
@@ -65,11 +66,23 @@ async function setup(page, { admin = true } = {}) {
     calls.push(url.split('/api/')[1]);
     const send = b => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) });
     if (url.includes('login.php'))            return send({ status: 'ok', token: 'tok', name: 'adrian', ist_admin: admin });
+    // Volle Rechteliste eines echten Admin-Kontos (NAV_RECHTE-Werte) -- sonst
+    // sperrt rechteAnwenden() nach dieser Antwort die Admin-Navigation, die
+    // Abschnitt 8 weiter unten noch braucht. Vor ENT-178 blieb me.php hier
+    // unbeantwortet (me === null), rechteAnwenden() lief darum nie und die
+    // Navigation stand offen -- der Mock muss das jetzt aktiv nachbilden.
+    if (url.includes('me.php'))               return send({ status: 'ok', name: 'adrian', ist_admin: admin, rollen: [],
+      rechte: admin ? ['kunden', 'abgleich', 'personal_lesen', 'betrieb', 'plan'] : [] });
     if (url.includes('dashboard_stats.php'))  return send(STATS);
     if (url.includes('rapport_list.php'))     return send(RAPPORTE);
     if (url.includes('mitarbeiter_list.php')) return send(MA);
     if (url.includes('kunden_list.php'))      return send(KU);
     if (url.includes('logout.php'))           return send({ status: 'ok' });
+    if (url.includes('einsatz_bericht')) {
+      berichtRufe.push((url.split('einsatz_id=')[1] || '').split('&')[0]);
+      return send({ status: 'ok', bericht: { einsatz: { id: 500, kunde_name: 'Studer Immobilien AG', datum: '2026-08-17' },
+        kunde: {}, unterschrift: {}, personen: [{ name: 'Hans Meier', von: '07:00', bis: '16:00', pause_min: 0, netto_h: 8 }] } });
+    }
     return send({ status: 'ok' });
   });
 }
@@ -160,6 +173,57 @@ await page.waitForSelector('#drawer.on');
 check('Ohne Unterschrift: Hinweistext statt Bild', (await page.$$('#drBody .sig-box img')).length === 0);
 await page.click('#drawer .drawer-hd button');
 await page.waitForTimeout(250);
+// ── 7b. Klammer und Kundenrapport-Knopf in der GLOBALEN, kundenuebergreifenden
+// Liste (ENT-178 -- dieselbe Logik wie im Kunden-Detail seit ENT-173, hier
+// zusaetzlich mit der dort zurueckgestellten Frage: bleibt die Gruppierung
+// stumm, wenn eine fremde Zeile eines anderen Einsatzes dazwischenrutscht?
+// window.rapporte bleibt absichtlich auf diesem 5-Zeilen-Stand: der spaetere
+// Seiten-Scroll-Test (Abschnitt weiter unten, mehrere Breiten inkl. 360px)
+// prueft dadurch genau das Layout mit Klammer, Knopf und Gruppen-Flaeche --
+// nicht mehr die urspruengliche, schmalere 3-Zeilen-Tabelle ohne beides.
+await page.evaluate(() => {
+  // Zwei Zeilen desselben Einsatzes (500), direkt benachbart -- muss klammern.
+  // Danach eine Zeile eines ANDEREN Einsatzes (900) zwischen zwei weiteren
+  // Zeilen von Einsatz 501, um zu pruefen, dass keine Gruppe ueber die
+  // fremde Zeile hinweg entsteht.
+  // Bewusst OHNE "window."-Praefix: rapporte ist ein Top-Level "let" im
+  // eingebetteten Skript, kein window-Property -- window.rapporte waere
+  // eine zweite, fuer renderRapporte() unsichtbare Variable.
+  rapporte = [
+    { id: 601, einsatz_id: 500, datum: '2026-08-18', mitarbeiter: 'Hans Meier', kunde: 'Studer Immobilien AG', strasse: 'Gerolagstrasse 12', ort: '4632 Trimbach', auftrag_nr: 'A-500', einsatzart: 'Verkehrsdienst', von: '07:00:00', bis: '16:00:00', pause_min: 30, netto_h: 8, unterzeichner: null },
+    { id: 602, einsatz_id: 500, datum: '2026-08-18', mitarbeiter: 'Anna Muster', kunde: 'Studer Immobilien AG', strasse: 'Gerolagstrasse 12', ort: '4632 Trimbach', auftrag_nr: 'A-500', einsatzart: 'Verkehrsdienst', von: '07:00:00', bis: '15:30:00', pause_min: 30, netto_h: 7.5, unterzeichner: null },
+    { id: 603, einsatz_id: 501, datum: '2026-08-17', mitarbeiter: 'Hans Meier', kunde: 'Studer Immobilien AG', strasse: 'Gerolagstrasse 12', ort: '4632 Trimbach', auftrag_nr: 'A-501', einsatzart: 'Verkehrsdienst', von: '07:00:00', bis: '16:00:00', pause_min: 30, netto_h: 8, unterzeichner: null },
+    { id: 900, einsatz_id: 999, datum: '2026-08-17', mitarbeiter: 'Fremd', kunde: 'Einwohnergemeinde Niedergösgen', strasse: 'Dorfstrasse 4', ort: '5013 Niedergösgen', auftrag_nr: null, einsatzart: 'Revierdienst', von: '22:00:00', bis: '04:00:00', pause_min: 0, netto_h: 6, unterzeichner: null },
+    { id: 604, einsatz_id: 501, datum: '2026-08-17', mitarbeiter: 'Anna Muster', kunde: 'Studer Immobilien AG', strasse: 'Gerolagstrasse 12', ort: '4632 Trimbach', auftrag_nr: 'A-501', einsatzart: 'Verkehrsdienst', von: '07:00:00', bis: '15:30:00', pause_min: 30, netto_h: 7.5, unterzeichner: null },
+  ];
+  go('kunden'); kuGoTab('rapporte'); renderRapporte();
+});
+await page.waitForTimeout(150);
+const globZeilen = await page.evaluate(() => [...document.querySelectorAll('#rapporteTable tbody tr')].map(r => ({
+  zellen: r.children.length, klasse: r.className,
+  hatKlammer: !!r.querySelector('.rapp-klammer'), hatKnopf: !!r.querySelector('.rapp-klammer button'),
+})));
+check('KRITISCH: fuenf Zeilen in der globalen Liste', globZeilen.length === 5);
+check('KRITISCH: die erste Zeile (Einsatz 500) traegt Klammer und Knopf, Gruppe offen',
+  globZeilen[0].hatKlammer && globZeilen[0].hatKnopf && globZeilen[0].klasse.includes('rapp-gruppe-offen'));
+check('KRITISCH: die zweite Zeile derselben Gruppe hat keine eigene Klammer-Zelle mehr',
+  !globZeilen[1].hatKlammer && !globZeilen[1].klasse.includes('rapp-gruppe-offen'));
+check('KRITISCH: Einsatz 501 klammert NICHT ueber die fremde Zwischenzeile (Einsatz 999) hinweg -- '
+  + 'Zeile 3 (erste Haelfte 501) bleibt ohne Knopf', globZeilen[2].hatKlammer && !globZeilen[2].hatKnopf);
+check('Die fremde Zwischenzeile (Einsatz 999) ist ebenfalls nur eine stumme Einzelzeile',
+  globZeilen[3].hatKlammer && !globZeilen[3].hatKnopf);
+check('Die zweite Haelfte von Einsatz 501 (nach der fremden Zeile) ist ebenso eine Einzelzeile ohne Gruppe',
+  globZeilen[4].hatKlammer && !globZeilen[4].hatKnopf);
+check('Kopfzeile hat eine Spalte mehr fuer die Klammer (10 statt 9)',
+  (await page.$$eval('#rapporteTable thead th', th => th.length)) === 10);
+
+await page.evaluate(() => { window.__gedruckt = 0; window.print = () => window.__gedruckt++; });
+await page.click('#rapporteTable .rapp-klammer button');
+await page.waitForTimeout(400);
+check('KRITISCH: der Knopf in der globalen Liste ruft denselben Endpunkt mit der richtigen einsatz_id auf',
+  berichtRufe.includes('500'));
+check('KRITISCH: und loest das Drucken aus', await page.evaluate(() => window.__gedruckt > 0));
+
 // Zurueck auf Adressen -- sonst haengt kuTab auf 'rapporte' und der spaetere
 // Klick auf #nav-kunden zeigt nicht die erwartete Standardansicht.
 await page.evaluate(() => kuGoTab('uebersicht'));

@@ -205,25 +205,40 @@ await page.click('#kdtab-rapporte');
 await page.waitForTimeout(150);
 check('Rapporte-Reiter zeigt den passenden Rapport (Namensabgleich)', (await page.textContent('#kdRapporte')).includes('A-123'));
 
-// ── Klammer fuer zusammengehoerige Rapporte am selben Einsatz (ENT-173)
+// ── Klammer fuer zusammengehoerige Rapporte am selben Einsatz (ENT-173,
+// seit ENT-178 mit sichtbarer Beschriftung statt nur Symbol und Flaeche
+// ueber der ganzen Gruppe statt nur der Randlinie)
 const kdZeilen = await page.evaluate(() => [...document.querySelectorAll('#kdRapporte tbody tr')].map(r => ({
   klasse: r.className, zellen: r.children.length,
-  hatKlammer: !!r.querySelector('.kd-rapp-klammer'), hatKnopf: !!r.querySelector('.kd-rapp-klammer button'),
+  hatKlammer: !!r.querySelector('.rapp-klammer'), hatKnopf: !!r.querySelector('.rapp-klammer button'),
+  knopfText: r.querySelector('.rapp-klammer button span')?.textContent.trim() || null,
+  // Letzte Spalte (Auftrag-Nr.) ist in jeder Zeile vorhanden, mit oder ohne
+  // eigene Klammer-Zelle -- ein verlaesslicher Vergleichspunkt ueber alle drei.
+  hintergrund: getComputedStyle(r.children[r.children.length - 1]).backgroundColor,
 })));
 check('KRITISCH: drei Zeilen, zwei davon am selben Einsatz', kdZeilen.length === 3);
 check('KRITISCH: die erste Zeile der Gruppe traegt die Klammer mit Knopf',
-  kdZeilen[0].hatKlammer && kdZeilen[0].hatKnopf && kdZeilen[0].klasse.includes('kd-rapp-gruppe-offen'));
+  kdZeilen[0].hatKlammer && kdZeilen[0].hatKnopf && kdZeilen[0].klasse.includes('rapp-gruppe-offen'));
+check('Der Knopf traegt eine sichtbare Beschriftung, nicht nur ein Symbol (ENT-178)',
+  kdZeilen[0].knopfText === 'Kundenrapport');
 check('KRITISCH: die zweite Zeile der Gruppe hat keine eigene Klammer-Zelle mehr -- rowspan uebernimmt das',
-  kdZeilen[1].zellen === 5 && !kdZeilen[1].hatKlammer && !kdZeilen[1].klasse.includes('kd-rapp-gruppe-offen'));
+  kdZeilen[1].zellen === 5 && !kdZeilen[1].hatKlammer && !kdZeilen[1].klasse.includes('rapp-gruppe-offen'));
 check('KRITISCH: die dritte, alleinstehende Zeile hat eine leere Klammer-Zelle, aber keinen Knopf',
   kdZeilen[2].hatKlammer && !kdZeilen[2].hatKnopf);
 check('Alle Zeilen haben gleich viele sichtbare Spalten (die Klammer zaehlt nur einmal je Gruppe)',
   kdZeilen[0].zellen === 6 && kdZeilen[2].zellen === 6);
+check('Gruppierte Zeilen tragen eine Hintergrundflaeche, die alleinstehende Zeile nicht (ENT-178)',
+  kdZeilen[0].hintergrund === kdZeilen[1].hintergrund && kdZeilen[0].hintergrund !== kdZeilen[2].hintergrund);
 
 // ── Der Knopf ruft tatsaechlich den Kundenrapport DES EINSATZES ab, nicht
 // nur irgendeinen -- und druckt ihn.
+// Gezielt in #kdRapporte geklickt, nicht ".rapp-klammer button" pauschal --
+// dieselbe Klasse traegt seit ENT-178 auch die globale, kundenuebergreifende
+// Rapporte-Liste (#rapporteTable), die im Hintergrund immer mitgeladen wird
+// (loadRapporte() laeuft unabhaengig vom aktiven Reiter) und mit derselben
+// Fixture ebenfalls eine (unsichtbare) Klammer samt Knopf traegt.
 await page.evaluate(() => { window.__gedruckt = 0; window.print = () => window.__gedruckt++; });
-await page.click('.kd-rapp-klammer button');
+await page.click('#kdRapporte .rapp-klammer button');
 await page.waitForTimeout(400);
 check('KRITISCH: der Klammer-Knopf ruft denselben Endpunkt wie im Einsatzplan (ENT-160) mit der richtigen einsatz_id auf',
   berichtRufe.includes('90'));
@@ -234,8 +249,8 @@ check('KRITISCH: und loest das Drucken aus', await page.evaluate(() => window.__
 await page.evaluate(() => { me.rechte = ['kunden']; renderKundeDetail(); });
 await page.waitForTimeout(150);
 check('KRITISCH: ohne das Recht "abgleich" gibt es keinen Knopf, nur die stumme Klammer',
-  await page.evaluate(() => !document.querySelector('.kd-rapp-klammer button')
-    && !!document.querySelector('.kd-rapp-klammer')));
+  await page.evaluate(() => !document.querySelector('#kdRapporte .rapp-klammer button')
+    && !!document.querySelector('#kdRapporte .rapp-klammer')));
 await page.evaluate(() => { me.rechte = ['kunden', 'abgleich']; renderKundeDetail(); });
 
 await page.click('#kdtab-offerten');
