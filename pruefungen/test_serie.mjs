@@ -287,6 +287,16 @@ check('KRITISCH: der Klick öffnet NICHT zugleich den Einsatz',
   await page.isVisible('#view-planung') && !(await page.isVisible('#view-einsatzplan')));
 check('KRITISCH: es steht sichtbar da, dass gerade nur eine Reihe gezeigt wird',
   await page.isVisible('#pSerieFilter'));
+// Der Projektinhaber meldete das Icon riesig auf dem Bildschirm -- gemessen
+// statt angenommen (CLAUDE.md „Gestaltung"): das rohe SVG steht ohne
+// Grössenvorgabe direkt im Banner, ohne umschliessendes .serie-marke.
+check('KRITISCH: das Reihen-Icon im Banner ist klein, nicht bildschirmfüllend',
+  await page.evaluate(() => {
+    const svg = document.querySelector('#pSerieFilter > svg');
+    if (!svg) { return false; }
+    const r = svg.getBoundingClientRect();
+    return r.width > 0 && r.width <= 24 && r.height > 0 && r.height <= 24;
+  }));
 const hinweis = await page.textContent('#pSerieFilter');
 check('Der Hinweis nennt die Anzahl', /3\s/.test(hinweis));
 check('KRITISCH: die Kopfzeile nennt den Bezug — nicht nur eine nackte Zahl',
