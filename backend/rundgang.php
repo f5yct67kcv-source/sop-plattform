@@ -63,3 +63,27 @@ function rundgang_scan_pruefen(array $kontrollpunkt, ?string $chipId, ?float $la
     }
     return null;
 }
+
+// Fortschritt eines Rundgangs fuer die Uebersicht der Einsatzleitung
+// (ENT-183): wie viele aktuell aktive Kontrollpunkte das Objekt hat, und wie
+// viele davon in DIESEM Rundgang bestaetigt bzw. als nicht verfuegbar
+// gemeldet wurden. "Aktuell aktive" heisst bewusst: wird ein Punkt spaeter
+// aus der Vorlage entfernt, sinkt "gesamt" nachtraeglich fuer alte
+// Rundgaenge -- das ist die gleiche Abwaegung wie bei kontrollpunkt_id
+// ON DELETE SET NULL in rundgang_scan: die Vorlage von heute, nicht die von
+// damals.
+function rundgang_fortschritt(PDO $pdo, int $rundgangId, int $objektId): array
+{
+    $gesamtStmt = $pdo->prepare('SELECT COUNT(*) FROM kontrollpunkt WHERE objekt_id = ? AND aktiv = 1');
+    $gesamtStmt->execute([$objektId]);
+    $gesamt = (int)$gesamtStmt->fetchColumn();
+
+    $s = $pdo->prepare('SELECT status, COUNT(*) AS n FROM rundgang_scan WHERE rundgang_id = ? GROUP BY status');
+    $s->execute([$rundgangId]);
+    $bestaetigt = 0; $nichtVerfuegbar = 0;
+    foreach ($s->fetchAll(PDO::FETCH_ASSOC) as $z) {
+        if ($z['status'] === 'bestaetigt') { $bestaetigt = (int)$z['n']; }
+        if ($z['status'] === 'nicht_verfuegbar') { $nichtVerfuegbar = (int)$z['n']; }
+    }
+    return ['gesamt' => $gesamt, 'bestaetigt' => $bestaetigt, 'nicht_verfuegbar' => $nichtVerfuegbar];
+}

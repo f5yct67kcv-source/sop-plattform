@@ -89,5 +89,23 @@ $uebrigAnders = rundgang_kontrollpunkte_uebrig($pdo, 200, 1);
 pruef('KRITISCH: ein anderer Rundgang am selben Objekt startet mit einer eigenen, vollen Liste',
     count($uebrigAnders) === 3);
 
+// ══════════════ RUNDGANG_FORTSCHRITT -- FUER DIE UEBERSICHT (ENT-183)
+$fortschritt = rundgang_fortschritt($pdo, 100, 1);
+pruef('KRITISCH: Fortschritt zaehlt bestaetigte und nicht-verfuegbare Punkte getrennt',
+    $fortschritt === ['gesamt' => 3, 'bestaetigt' => 1, 'nicht_verfuegbar' => 1]);
+
+$fortschrittAnders = rundgang_fortschritt($pdo, 200, 1);
+pruef('KRITISCH: ein anderer Rundgang hat einen eigenen, unbeeinflussten Fortschritt',
+    $fortschrittAnders === ['gesamt' => 3, 'bestaetigt' => 0, 'nicht_verfuegbar' => 0]);
+
+// Alle drei Punkte des Rundgangs 100 erledigen -> "gesamt" bleibt korrekt,
+// auch wenn nichts mehr offen ist (kein Verwechseln mit "es gibt keine
+// Kontrollpunkte").
+$pdo->exec("INSERT INTO rundgang_scan (rundgang_id, kontrollpunkt_id, status, erfasst_am)
+            VALUES (100, 3, 'bestaetigt', '2026-01-01 08:10:00')");
+$fortschritt = rundgang_fortschritt($pdo, 100, 1);
+pruef('KRITISCH: vollstaendig erledigt zeigt trotzdem die richtige Gesamtzahl, nicht 0',
+    $fortschritt === ['gesamt' => 3, 'bestaetigt' => 2, 'nicht_verfuegbar' => 1]);
+
 echo $ok . " Pruefungen bestanden\n";
 if ($bad) { echo count($bad) . " FEHLGESCHLAGEN:\n - " . implode("\n - ", $bad) . "\n"; exit(1); }
