@@ -119,15 +119,24 @@ try {
   // auseinander, verspricht ein Kaestchen etwas anderes, als der Server tut.
   const phpRollen = [...php.matchAll(/^const ROLLE_\w+\s*=\s*'([a-z]+)';/gm)].map(m => m[1]);
   const jsRollen  = [...html.matchAll(/^  \['([a-z]+)', '[^']+',$/gm)].map(m => m[1]);
-  check('KRITISCH: die Oberflaeche kennt genau die Rollen des Servers',
-    phpRollen.length === 4 && JSON.stringify(phpRollen) === JSON.stringify(jsRollen));
+  // Waechtersystem (ENT-169/ENT-180): serverseitig entschieden und
+  // geschuetzt, aber absichtlich noch ohne Rollenvergabe-Kaestchen -- die
+  // von ENT-169 verlangte visuelle Abgrenzung ("eigener Reiter") ist noch
+  // nicht gestaltet. Benannte Ausnahme statt stillem Auseinanderlaufen,
+  // gleiches Muster wie OHNE_SPERRE in test_php.mjs.
+  const NOCH_OHNE_KAESTCHEN = ['waechter'];
+  check('Die Ausnahmeliste "noch ohne Kaestchen" nennt nur Rollen, die es beim Server gibt',
+    NOCH_OHNE_KAESTCHEN.every(r => phpRollen.includes(r)));
+  check('KRITISCH: die Oberflaeche kennt genau die Rollen des Servers, ausser den namentlich vermerkten Ausnahmen',
+    JSON.stringify(phpRollen.filter(r => !NOCH_OHNE_KAESTCHEN.includes(r))) === JSON.stringify(jsRollen));
   // Nur aus dem Rumpf von rechte_katalog() lesen -- sonst zaehlen die
   // Meldungstexte weiter unten mit, die genauso aussehen. Genau das ist der
   // ersten Fassung dieser Pruefung passiert.
   const rumpf = (php.match(/function rechte_katalog\(\): array\s*\{[\s\S]*?\n\}/) || [''])[0];
   const phpRechte = [...rumpf.matchAll(/'(\w+)' *=> '[^']+',/g)].map(m => m[1]);
-  check('Der Server kennt genau die acht entschiedenen Rechte',
-    phpRechte.length === 8 && phpRechte.includes('personal_vertraulich'));
+  check('Der Server kennt genau die acht urspruenglichen plus drei Waechtersystem-Rechte (ENT-169/ENT-180)',
+    phpRechte.length === 11 && phpRechte.includes('personal_vertraulich')
+    && phpRechte.includes('rundgang_verwalten'));
 } catch (e) { check('Katalogvergleich lief durch: ' + e.message, false); }
 
 // ══════════════ VOLLE RECHTE: ALLES DA
