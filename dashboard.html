@@ -2167,6 +2167,17 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
   /* Container verschieben ist eine Zeigergeraet-Aufgabe -- auf dem Telefon
      bleibt die zuletzt gespeicherte Anordnung einfach stehen (ENT-031). */
   #btnDashBearbeiten, .dash-editleiste, .dash-werk { display: none !important; }
+  /* Startseite mobil schlanker (ENT-166): Stundenverlauf und Angemeldete
+     Benutzer sind Auswertungen fuer den Schreibtisch, kein Blick unterwegs
+     -- auf dem Desktop bleiben beide unveraendert bestehen. */
+  .dash-item[data-widget="verlauf"], .dash-item[data-widget="angemeldet"] { display: none !important; }
+  /* Von den vier KPI-Kacheln bleiben nur Rapporte und Nettostunden: Bestand
+     (Mitarbeitende, Kunden) ist eine Zahl fuers Buero, kein Tagesgeschaeft.
+     #kpiGrid statt .kpi, weil dieselbe Kachel-Klasse auch im Planungs-KPI
+     (#plKpi) und anderswo vorkommt -- nur diese eine Kachelreihe soll sich
+     aendern. Reihenfolge aus renderKpi() (dashboard.html): 1 Rapporte,
+     2 Nettostunden, 3 Mitarbeitende, 4 Kunden. */
+  #kpiGrid .kpi:nth-child(3), #kpiGrid .kpi:nth-child(4) { display: none !important; }
   /* Tagesplan ganz nach aussen links (ENT-068). Ab hier ist "Übersicht"
      bereits ausgeblendet (.nur-desktop); von den drei verbleibenden Reitern
      ist der Tagesplan der, den die Startseite und die Ereignis-Kacheln
