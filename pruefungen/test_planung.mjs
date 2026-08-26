@@ -1051,7 +1051,9 @@ check('KRITISCH: die Planung-Tabelle traegt feste Spaltenbreiten (table-layout:f
 // Inhalt umbricht). 0.5 trennt beide Faelle sauber; 2 (die erste Fassung
 // dieser Pruefung) haette den Regressionsfall durchgelassen -- beim Schreiben
 // der Gegenprobe selbst bemerkt und korrigiert.
-const ERWARTET_SPALTEN = [10, 18, 15, 13, 8, 24, 12];
+// Zeit 10 -> 13 % und Zugeteilt 24 -> 21 % seit ENT-144: die Zeitspalte traegt
+// jetzt Pfeil, Uhrzeit und Reihen-Marke und lief bei 10 % sichtbar ueber.
+const ERWARTET_SPALTEN = [13, 18, 15, 13, 8, 21, 12];
 check('KRITISCH: jede Spalte behaelt ihre vorgesehene Breite, auch mit ueberlangem Inhalt in einer einzelnen Zeile',
   !!spalten && spalten.length === ERWARTET_SPALTEN.length
   && spalten.every((p, i) => Math.abs(p - ERWARTET_SPALTEN[i]) < 0.5));
@@ -1126,7 +1128,7 @@ check('Dieselbe Trennlinie gilt auch fuer den Tagesplan',
 // übrigen Tage stehen standardmässig als schlanke Verweiszeile in ihrem
 // eigenen Tagesblock -- nie einfach weg (ENT-069: "nichts vorhanden" darf nie
 // etwas anderes bedeuten als nichts vorhanden).
-await page.evaluate(({ a, b, c, d }) => {
+await page.evaluate(({ a, b, c, d, nah, fern }) => {
   einsaetze = [
     { id: 201, kunde_id: 1, kunde_name: 'Strabag AG', titel: 'Belagseinbau', strasse: 'Kantonsstrasse 3',
       ort: '6000 Luzern', einsatzart: 'Verkehrsdienst', datum: a, von: '06:00:00', bis: '18:00:00',
@@ -1140,12 +1142,21 @@ await page.evaluate(({ a, b, c, d }) => {
     { id: 204, kunde_id: 2, kunde_name: 'Einzelkunde AG', titel: null, strasse: null,
       ort: '4600 Olten', einsatzart: 'Revierdienst', datum: d, von: '08:00:00', bis: '12:00:00',
       bedarf: 1, status: 'geplant', bemerkung: null, mitarbeiter: [], serie_id: null, objekt_id: null, masterschicht_id: null },
+    // Eine ZWEITE Reihe, deren Geschwistertag weit ausserhalb liegt (ENT-144):
+    // in einem engen Zeitraum ist hier nur EIN Tag sichtbar -- dann ist es
+    // keine Gruppe, und die Zeile darf nicht aussehen wie eine.
+    { id: 205, kunde_id: 2, kunde_name: 'Fremdreihe GmbH', titel: null, strasse: null,
+      ort: '3000 Bern', einsatzart: 'Verkehrsdienst', datum: nah, von: '19:00:00', bis: '23:00:00',
+      bedarf: 1, status: 'geplant', bemerkung: null, mitarbeiter: [], serie_id: 205, objekt_id: null, masterschicht_id: null },
+    { id: 206, kunde_id: 2, kunde_name: 'Fremdreihe GmbH', titel: null, strasse: null,
+      ort: '3000 Bern', einsatzart: 'Verkehrsdienst', datum: fern, von: '19:00:00', bis: '23:00:00',
+      bedarf: 1, status: 'geplant', bemerkung: null, mitarbeiter: [], serie_id: 205, objekt_id: null, masterschicht_id: null },
   ];
   pSerie = null; pSerieOffen = new Set();
   $('pHerkunft').value = ''; $('pQ').value = '';
   $('pSchnell').value = 'alle'; pSchnellSetzen();
   renderPlanung();
-}, { a: tage(2), b: tage(3), c: tage(4), d: tage(5) });
+}, { a: tage(2), b: tage(3), c: tage(4), d: tage(5), nah: tage(6), fern: tage(60) });
 await page.waitForTimeout(300);
 
 const stand1 = await page.evaluate(() => {
@@ -1273,6 +1284,125 @@ check('KRITISCH: auch auf dem Handy erscheinen die weiteren Tage nach dem Aufkla
   }));
 await page.setViewportSize({ width: 1440, height: 1000 });
 await page.evaluate(() => { pSerieOffen = new Set(); renderPlanung(); });
+await page.waitForTimeout(300);
+
+// ══════════════ GESTALTUNG DER GRUPPE (ENT-144) ════════════════════════════
+// Der Projektinhaber meldete am gelieferten Stand zwei Dinge: Schrift und
+// Knopf überlagerten sich in der Zeitspalte, und weitere verlinkte Aufträge
+// trugen dieselbe Farbe wie die Gruppe. Beides war mit den ENT-142-Prüfungen
+// NICHT zu finden — die prüften Vorhandensein und Struktur, aber keine
+// Geometrie und keine Flächen. Genau das wird hier nachgeholt (CLAUDE.md:
+// „Gestaltung wird gemessen, nicht im Quelltext nachgelesen").
+const geo = await page.evaluate(() => {
+  const anker = document.querySelector('#plTable table.pl-tab tr[onclick="openEinsatz(201)"]');
+  if (!anker) { return null; }
+  const zelle = anker.querySelector('td');
+  const marke = anker.querySelector('.serie-marke');
+  const zeit = anker.querySelector('.pl-zeit');
+  const nachbar = anker.querySelectorAll('td')[1];
+  const r = el => el.getBoundingClientRect();
+  return {
+    zelleRechts: r(zelle).right, zelleLinks: r(zelle).left,
+    markeRechts: r(marke).right, markeLinks: r(marke).left, markeOben: r(marke).top,
+    zeitRechts: r(zeit).right, zeitUnten: r(zeit).bottom,
+    nachbarLinks: r(nachbar).left,
+  };
+});
+check('KRITISCH: die Marke ragt nicht aus der Zeitspalte in die Spalte „Kunde" — sie überlagerte dort den Kundennamen',
+  !!geo && geo.markeRechts <= geo.zelleRechts + 1 && geo.markeLinks >= geo.zelleLinks - 1);
+check('KRITISCH: auch Pfeil und Uhrzeit bleiben in ihrer Spalte',
+  !!geo && geo.zeitRechts <= geo.zelleRechts + 1);
+check('KRITISCH: die Marke steht UNTER der Uhrzeit, nicht daneben — sonst reicht die Spaltenbreite nie',
+  !!geo && geo.markeOben >= geo.zeitUnten - 1);
+check('Nichts überlappt die Nachbarspalte',
+  !!geo && geo.markeRechts <= geo.nachbarLinks + 1 && geo.zeitRechts <= geo.nachbarLinks + 1);
+
+// ── Fläche trennt Gruppe von Nicht-Gruppe
+// Eine Reihe, von der hier nur EIN Tag sichtbar ist, ist keine Gruppe. Trüge
+// sie dieselbe Fläche, verschmölze sie optisch mit der Gruppe daneben — genau
+// die Rückmeldung des Projektinhabers.
+await page.evaluate(({ von, bis }) => {
+  $('pVon').value = von; $('pBis').value = bis;
+  pSerieOffen = new Set(); renderPlanung();
+}, { von: tage(1), bis: tage(6) });
+await page.waitForTimeout(300);
+const flaechen = await page.evaluate(() => {
+  const q = id => document.querySelector(`#plTable table.pl-tab tr[onclick="openEinsatz(${id})"]`);
+  const bg = tr => tr ? getComputedStyle(tr.querySelector('td')).backgroundColor : null;
+  const anker = q(201), einzelReihe = q(205), normal = q(204);
+  const folge = [...document.querySelectorAll('#plTable table.pl-tab tr.serie-folge')][0];
+  return {
+    ankerBg: bg(anker), einzelBg: bg(einzelReihe), normalBg: bg(normal),
+    folgeBg: folge ? getComputedStyle(folge.querySelector('td')).backgroundColor : null,
+    einzelIstSerie: !!(einzelReihe && einzelReihe.classList.contains('serie')),
+    einzelIstGruppe: !!(einzelReihe && einzelReihe.classList.contains('serie-grp')),
+    einzelHatMarke: !!(einzelReihe && einzelReihe.querySelector('.serie-marke')),
+    ankerIstGruppe: !!(anker && anker.classList.contains('serie-grp')),
+  };
+});
+check('KRITISCH: die Gruppe trägt Fläche', !!flaechen.ankerBg && flaechen.ankerIstGruppe
+  && flaechen.ankerBg !== flaechen.normalBg);
+check('KRITISCH: eine Reihe, von der nur ein Tag sichtbar ist, trägt KEINE Gruppenfläche — sie verschmolz sonst optisch mit der Gruppe daneben',
+  flaechen.einzelIstSerie && !flaechen.einzelIstGruppe && flaechen.einzelBg === flaechen.normalBg);
+check('Sie sagt trotzdem weiterhin, dass sie zu einer Reihe gehört — die Marke bleibt',
+  flaechen.einzelHatMarke);
+check('KRITISCH: die Verweiszeile trägt ebenfalls keine Fläche — sie ist ein Hinweis, kein Einsatz',
+  flaechen.folgeBg === flaechen.normalBg);
+
+// ── Die Klammer sagt, wo die Gruppe anfängt und aufhört
+const klammer = await page.evaluate(() => {
+  const anker = document.querySelector('#plTable table.pl-tab tr[onclick="openEinsatz(201)"]');
+  const td = anker && anker.querySelector('td');
+  const breit = s => parseFloat(s) || 0;
+  return td ? {
+    zuOben: breit(getComputedStyle(td).borderTopWidth),
+    zuUnten: breit(getComputedStyle(td).borderBottomWidth),
+    ende: anker.classList.contains('serie-grp-ende'),
+  } : null;
+});
+check('KRITISCH: eingeklappt klammert die Gruppe oben UND unten — sie ist genau eine Zeile lang',
+  !!klammer && klammer.ende && klammer.zuOben >= 2 && klammer.zuUnten >= 2);
+await page.evaluate(() => { document.querySelector('tr[onclick="openEinsatz(201)"] .serie-klapp').click(); });
+await page.waitForTimeout(250);
+const klammerAuf = await page.evaluate(() => {
+  const rows = [...document.querySelectorAll('#plTable table.pl-tab tbody tr')];
+  const anker = rows.find(r => r.getAttribute('onclick') === 'openEinsatz(201)');
+  const letzterKind = rows.filter(r => r.classList.contains('serie-kind')).pop();
+  const breit = (el, s) => parseFloat(getComputedStyle(el.querySelector('td'))[s]) || 0;
+  return {
+    ankerNichtMehrEnde: !!anker && !anker.classList.contains('serie-grp-ende'),
+    ankerOben: anker ? breit(anker, 'borderTopWidth') : 0,
+    letzterIstEnde: !!letzterKind && letzterKind.classList.contains('serie-grp-ende'),
+    letzterUnten: letzterKind ? breit(letzterKind, 'borderBottomWidth') : 0,
+    kindHatSchiene: letzterKind ? (parseFloat(getComputedStyle(letzterKind.querySelector('td')).borderLeftWidth) || 0) : 0,
+  };
+});
+check('KRITISCH: ausgeklappt wandert die untere Klammer an den letzten Tag der Gruppe — sonst liefe sie mitten hindurch',
+  klammerAuf.ankerNichtMehrEnde && klammerAuf.ankerOben >= 2
+  && klammerAuf.letzterIstEnde && klammerAuf.letzterUnten >= 2);
+check('Der eingeschobene Tag steht an einer sichtbaren Schiene — er gehört erkennbar nach innen',
+  klammerAuf.kindHatSchiene >= 2);
+// Der Projektinhaber hat die Spaltenausrichtung schon zweimal beanstandet
+// (ENT-137, ENT-140). Der eingeschobene Tag traegt eine Schiene links und ein
+// Datum darueber -- beides darf die Uhrzeit NICHT gegenueber dem ersten Tag
+// verschieben. Am gerenderten Text gemessen, nicht an der Zelle.
+check('KRITISCH: die Uhrzeit des eingeschobenen Tages steht exakt unter der des ersten Tages — die Schiene verschiebt nichts',
+  await page.evaluate(() => {
+    const kante = sel => {
+      const el = document.querySelector(sel);
+      if (!el) { return null; }
+      const r = document.createRange(); r.selectNodeContents(el);
+      return r.getBoundingClientRect().right;
+    };
+    const a = kante('tr[onclick="openEinsatz(201)"] .pl-zeit span');
+    const k = kante('tr[onclick="openEinsatz(202)"] .pl-zeit span');
+    const d = kante('tr[onclick="openEinsatz(202)"] .serie-kind-datum');
+    return a !== null && k !== null && d !== null
+      && Math.abs(a - k) < 0.5 && Math.abs(k - d) < 0.5;
+  }));
+await page.evaluate(() => {
+  pSerieOffen = new Set(); $('pSchnell').value = 'alle'; pSchnellSetzen();
+});
 await page.waitForTimeout(300);
 
 await browser.close();
