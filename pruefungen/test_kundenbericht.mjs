@@ -107,7 +107,8 @@ await page.route('**/api/**', route => {
   if (u.includes('me.php')) return s({ status: 'ok', name: 'adrian', ist_admin: true, rollen: [], rechte: ['abgleich', 'betrieb'] });
   if (u.includes('einsatz_bericht')) { berichtRufe++; return s({ status: 'ok', bericht: BERICHT }); }
   if (u.includes('betrieb.php')) return s({ status: 'ok', betrieb: { firma: 'CUPI 24 GmbH',
-    zusatz: 'Sicherheits- und Verkehrsdienst', fusszeile: 'Musterweg 1 · 4600 Olten', logo: null,
+    zusatz: 'Sicherheits- und Verkehrsdienst', fusszeile: 'Musterweg 1 · 4600 Olten',
+    fusszeile2: 'Zweitsitz · Bahnhofstrasse 3', logo: null,
     logo_mime: null, logo_groesse: null } });
   if (u.includes('mitarbeiter_list')) return s({ status: 'ok', mitarbeiter: MA });
   if (u.includes('einsatz_list')) return s({ status: 'ok', einsaetze: EINSAETZE });
@@ -123,7 +124,7 @@ await page.waitForSelector('#shell.on'); await page.waitForTimeout(600);
 await page.evaluate(() => { window.__gedruckt = 0; window.print = () => { window.__gedruckt++; }; });
 
 const blatt = await page.evaluate(b => epBerichtBlatt(b), BERICHT);
-check('KRITISCH: das Blatt heisst Kundenbericht und nennt den Einsatz', /Kundenbericht/.test(blatt) && /Einsatz-Nr\. 79/.test(blatt));
+check('KRITISCH: das Blatt heisst Kundenrapport und nennt den Einsatz', /Kundenrapport/.test(blatt) && /Einsatz-Nr\. 79/.test(blatt));
 check('KRITISCH: BEIDE Personen stehen darauf', /Adrian Von Arb/.test(blatt) && /Daniele Ciardo/.test(blatt));
 check('KRITISCH: jede mit IHREN eigenen Zeiten — verschiedene Zeiten werden nicht geglättet',
   /15:15/.test(blatt) && /16:15/.test(blatt));
@@ -133,6 +134,7 @@ check('KRITISCH: die Summe der Nettostunden stimmt (7.50 + 8.25 = 15.75)', /15\.
 check('Die Kunden-Nr. steht auf dem Blatt', /K0001/.test(blatt));
 check('Der Briefkopf aus den Betriebseinstellungen ist da', /CUPI 24 GmbH/.test(blatt));
 check('Die Fusszeile ebenfalls', /Musterweg 1/.test(blatt));
+check('KRITISCH: der zweite Fusszeilen-Block (Zweitsitz, ENT-169) steht daneben', /Bahnhofstrasse 3/.test(blatt));
 check('KRITISCH: eine Bemerkung wird der Person zugeordnet, nicht anonym angehängt',
   /Daniele Ciardo:<\/b> Verlängerung/.test(blatt));
 check('Eine Person ohne Bemerkung erscheint dort nicht',
@@ -146,16 +148,16 @@ await page.evaluate(() => { go('planung'); goTab('einsaetze'); });
 await page.waitForTimeout(400);
 await page.evaluate(() => epAuf(79));
 await page.waitForTimeout(700);
-check('KRITISCH: der abgeschlossene Einsatz bietet "Kundenbericht drucken"',
+check('KRITISCH: der abgeschlossene Einsatz bietet "Kundenrapport drucken"',
   await page.evaluate(() => !!([...document.querySelectorAll('#epKopf button')]
-    .find(b => b.textContent.includes('Kundenbericht drucken')))));
+    .find(b => b.textContent.includes('Kundenrapport drucken')))));
 await page.evaluate(() => [...document.querySelectorAll('#epKopf button')]
-  .find(b => b.textContent.includes('Kundenbericht drucken')).click());
+  .find(b => b.textContent.includes('Kundenrapport drucken')).click());
 await page.waitForTimeout(600);
 check('KRITISCH: der Knopf holt den Bericht frisch vom Server', berichtRufe > 0);
 check('KRITISCH: und loest das Drucken aus', await page.evaluate(() => window.__gedruckt > 0));
 check('Das Gedruckte ist der gemeinsame Bericht, nicht der Einzelrapport',
-  await page.evaluate(() => /Kundenbericht/.test($('printArea').innerHTML)
+  await page.evaluate(() => /Kundenrapport/.test($('printArea').innerHTML)
     && /Daniele Ciardo/.test($('printArea').innerHTML)));
 
 await browser.close();

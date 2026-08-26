@@ -563,7 +563,7 @@ tbody tr.status-abgeschlossen.zu.abgeglichen td { opacity: 1; }
 .dok-anhang { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
 /* Der Rechnungs-Knopf steht rechts unter beiden Spalten -- die Abschluss-
    Handlung der Karte, nicht Teil einer der beiden Spalten. */
-.ep-rechnung { display: flex; justify-content: flex-end; padding: 0 16px 14px; }
+.ep-rechnung { display: flex; justify-content: flex-end; gap: 10px; padding: 0 16px 14px; }
 
 .ep-plan { overflow: hidden; }
 .ep-plan-kopf { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-bottom: 1px solid var(--line-soft); font-size: 12.5px; }
@@ -3797,10 +3797,18 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
               <div class="f"><label for="bkZusatz">Zusatz unter der Firma</label>
                 <input class="inp" id="bkZusatz" maxlength="200" placeholder="z. B. Sicherheits- und Verkehrsdienst"></div>
             </div>
-            <div class="f"><label for="bkFuss">Fusszeile</label>
-              <textarea class="inp" id="bkFuss" rows="2"
-                placeholder="z. B. Adresse · Telefon · E-Mail · UID"></textarea>
-              <div class="note" style="margin-top:5px">Steht klein am Seitenende. Leer lassen, wenn keine gewünscht ist.</div></div>
+            <div class="form-zeile">
+              <div class="f"><label for="bkFuss">Fusszeile</label>
+                <textarea class="inp" id="bkFuss" rows="2"
+                  placeholder="z. B. Adresse · Telefon · E-Mail · UID"></textarea>
+                <div class="note" style="margin-top:5px">Steht klein am Seitenende. Leer lassen, wenn keine gewünscht ist.</div></div>
+              <!-- Zweiter Block fuer einen Zweitsitz (ENT-169) -- rein optional,
+                   erscheint auf dem Ausdruck nur, wenn hier etwas steht. -->
+              <div class="f"><label for="bkFuss2">Fusszeile 2 (Zweitsitz)</label>
+                <textarea class="inp" id="bkFuss2" rows="2"
+                  placeholder="z. B. zweiter Standort mit eigener Adresse"></textarea>
+                <div class="note" style="margin-top:5px">Nur wenn ein zweiter Standort ausgewiesen werden soll.</div></div>
+            </div>
             <div class="f" style="margin-top:4px">
               <label>Logo</label>
               <div id="bkLogoStand" class="note">Kein Logo hinterlegt.</div>
@@ -9291,12 +9299,29 @@ function ladeBetrieb() {
 // Der Stand wird beim Anmelden mitgeladen (briefkopfLaden()), damit der
 // Ausdruck ihn ohne zweiten Abruf hat: window.print() wartet nicht auf einen
 // noch laufenden Abruf, und dann fehlte der Briefkopf genau auf dem Blatt.
-let briefkopf = { firma: '', zusatz: '', fusszeile: null, logo: null, logo_groesse: null };
+let briefkopf = { firma: '', zusatz: '', fusszeile: null, fusszeile2: null, logo: null, logo_groesse: null };
 
 function briefkopfLaden() {
   return api('betrieb.php').then(({ ok, data }) => {
     if (ok && data.status === 'ok' && data.betrieb) { briefkopf = data.betrieb; }
   }).catch(() => {});
+}
+
+// Fusszeile beider Ausdrucke (Kundenrapport und Arbeitsrapport, ENT-155 und
+// ENT-169) -- eine gemeinsame Funktion statt zweimal derselbe Zeile, seit ein
+// zweiter Block fuer einen Zweitsitz dazukam. Nebeneinander statt
+// untereinander, mit align-items:center vertikal zueinander ausgemittelt --
+// hat ein Block mehr Zeilen als der andere, sackt der kuerzere sonst nach
+// oben statt in der Mitte des gemeinsamen Blocks zu stehen. Fehlt einer der
+// beiden, faellt einfach nur die eine Spalte weg statt einer Luecke.
+function bkFusszeile() {
+  if (!briefkopf.fusszeile && !briefkopf.fusszeile2) { return ''; }
+  return `<div style="margin-top:30px;padding-top:10px;border-top:1px solid #E5E8EC;
+      display:flex;align-items:center;justify-content:space-between;gap:32px;
+      font-size:10.5px;color:#6B7280;line-height:1.5">
+    ${briefkopf.fusszeile ? `<div style="white-space:pre-line">${esc(briefkopf.fusszeile)}</div>` : ''}
+    ${briefkopf.fusszeile2 ? `<div style="white-space:pre-line">${esc(briefkopf.fusszeile2)}</div>` : ''}
+  </div>`;
 }
 
 function bkLaden() {
@@ -9305,6 +9330,7 @@ function bkLaden() {
     $('bkFirma').value = briefkopf.firma || '';
     $('bkZusatz').value = briefkopf.zusatz || '';
     $('bkFuss').value = briefkopf.fusszeile || '';
+    $('bkFuss2').value = briefkopf.fusszeile2 || '';
     bkLogoStand();
   });
 }
@@ -9335,6 +9361,7 @@ function bkSpeichern() {
   bkFehler('');
   api('betrieb.php', { method: 'POST', body: {
     firma: $('bkFirma').value, zusatz: $('bkZusatz').value, fusszeile: $('bkFuss').value,
+    fusszeile2: $('bkFuss2').value,
   } }).then(({ ok, data }) => {
     if (!ok || data.status !== 'ok') { return bkFehler(data.message || 'Speichern fehlgeschlagen.'); }
     briefkopf = data.betrieb; bkLogoStand(); toast('Briefkopf gespeichert.');
@@ -10080,7 +10107,7 @@ function epRechnungBlock(e) {
   // etwas TUT -- darum umrissener Akzent, waehrend das gefuellte Blau beim
   // (noch funktionslosen) Rechnungs-Knopf bleibt.
   return `<div class="card-bd ep-rechnung">
-    <button type="button" class="btn btn-akzent btn-sm" onclick="epBerichtDrucken(${Number(e.id)})">Kundenbericht drucken</button>
+    <button type="button" class="btn btn-akzent btn-sm" onclick="epBerichtDrucken(${Number(e.id)})">Kundenrapport drucken</button>
     <button type="button" class="btn btn-primary btn-sm" disabled title="Noch nicht verfügbar">Rechnung erstellen</button>
   </div>`;
 }
@@ -10099,7 +10126,7 @@ function epRechnungBlock(e) {
 function epBerichtDrucken(einsatzId) {
   api('einsatz_bericht.php?einsatz_id=' + Number(einsatzId)).then(({ ok, data }) => {
     if (!ok || data.status !== 'ok' || !data.bericht) {
-      return toast(data.message || 'Der Kundenbericht liess sich nicht laden.');
+      return toast(data.message || 'Der Kundenrapport liess sich nicht laden.');
     }
     const b = data.bericht;
     if (!b.personen.length) {
@@ -10107,7 +10134,7 @@ function epBerichtDrucken(einsatzId) {
     }
     $('printArea').innerHTML = epBerichtBlatt(b);
     window.print();
-  }).catch(() => toast('Der Kundenbericht liess sich nicht laden.'));
+  }).catch(() => toast('Der Kundenrapport liess sich nicht laden.'));
 }
 
 // Erzeugt das Blatt. Getrennt von epBerichtDrucken(), damit es sich ohne
@@ -10121,8 +10148,11 @@ function epBerichtBlatt(b) {
     re_name: k.re_name, re_zusatz: k.re_zusatz, re_strasse: k.re_strasse,
     re_hausnummer: k.re_hausnummer, re_plz: k.re_plz, re_ort: k.re_ort,
   });
+  // Logo ueber Firma/Zusatz, beide zentriert (ENT-169) -- vorher rechts-
+  // buendig und kleiner. margin:0 auto statt text-align allein: ein Block-
+  // Element folgt dem text-align des Elters nicht von selbst.
   const bkLogo = briefkopf.logo
-    ? `<img src="${esc(briefkopf.logo)}" alt="" style="max-height:56px;max-width:210px;display:block;margin-bottom:6px">` : '';
+    ? `<img src="${esc(briefkopf.logo)}" alt="" style="max-height:88px;max-width:260px;display:block;margin:0 auto 8px">` : '';
   const bkText = [
     briefkopf.firma ? `<div style="font-weight:700;color:#14161A;font-size:13px">${esc(briefkopf.firma)}</div>` : '',
     briefkopf.zusatz ? esc(briefkopf.zusatz) : '',
@@ -10153,12 +10183,12 @@ function epBerichtBlatt(b) {
 
   return `
     <div style="font-family:-apple-system,Segoe UI,Arial,sans-serif;color:#14161A;max-width:700px;margin:0 auto">
-      <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:24px;border-bottom:2px solid #16181D;padding-bottom:14px;margin-bottom:22px">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:24px;border-bottom:2px solid #16181D;padding-bottom:14px;margin-bottom:22px">
         <div>
-          <div style="font-size:21px;font-weight:800;letter-spacing:-.4px">Kundenbericht</div>
+          <div style="font-size:21px;font-weight:800;letter-spacing:-.4px">Kundenrapport</div>
           <div style="font-size:12px;color:#6B7280;margin-top:3px">Einsatz-Nr. ${esc(e.id)} · ${esc(dmy(e.datum))}</div>
         </div>
-        <div style="text-align:right;font-size:12px;color:#6B7280;line-height:1.5">${bkLogo}${bkText}</div>
+        <div style="text-align:center;font-size:12px;color:#6B7280;line-height:1.5">${bkLogo}${bkText}</div>
       </div>
       ${re ? `<div style="margin-bottom:20px">
         <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#6B7280;font-weight:700;margin-bottom:4px">${re.abweichend ? 'Rechnungsadresse' : 'Kunde'}</div>
@@ -10193,7 +10223,7 @@ function epBerichtBlatt(b) {
           <div style="font-size:10.5px;color:#6B7280;margin-top:1px">Name in Blockschrift</div>` : ''}
         ${u.am ? `<div style="font-size:10.5px;color:#6B7280;margin-top:6px">Unterschrift erfasst am ${esc(dmyZeit(u.am))}${u.holte ? ' durch ' + esc(u.holte) : ''}</div>` : ''}
       </div>
-      ${briefkopf.fusszeile ? `<div style="margin-top:30px;padding-top:10px;border-top:1px solid #E5E8EC;font-size:10.5px;color:#6B7280;line-height:1.5;white-space:pre-line">${esc(briefkopf.fusszeile)}</div>` : ''}
+      ${bkFusszeile()}
     </div>`;
 }
 
@@ -14782,8 +14812,10 @@ function printReport() {
   // Briefkopf aus den Betriebseinstellungen (ENT-155). Solange dort nichts
   // gepflegt ist, bleibt der Kopf leer -- ein erfundener Firmenname auf einem
   // Beleg, der an Kunden geht, waere schlimmer als eine leere Ecke.
+  // Logo ueber Firma/Zusatz, beide zentriert (ENT-169) -- vorher rechts-
+  // buendig und kleiner, siehe dieselbe Aenderung am Kundenrapport.
   const bkLogo = briefkopf.logo
-    ? `<img src="${esc(briefkopf.logo)}" alt="" style="max-height:56px;max-width:210px;display:block;margin-bottom:6px">`
+    ? `<img src="${esc(briefkopf.logo)}" alt="" style="max-height:88px;max-width:260px;display:block;margin:0 auto 8px">`
     : '';
   const bkText = [
     briefkopf.firma ? `<div style="font-weight:700;color:#14161A;font-size:13px">${esc(briefkopf.firma)}</div>` : '',
@@ -14792,12 +14824,12 @@ function printReport() {
 
   $('printArea').innerHTML = `
     <div style="font-family:-apple-system,Segoe UI,Arial,sans-serif;color:#14161A;max-width:700px;margin:0 auto">
-      <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:24px;border-bottom:2px solid #16181D;padding-bottom:14px;margin-bottom:22px">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:24px;border-bottom:2px solid #16181D;padding-bottom:14px;margin-bottom:22px">
         <div>
           <div style="font-size:21px;font-weight:800;letter-spacing:-.4px">Arbeitsrapport</div>
           <div style="font-size:12px;color:#6B7280;margin-top:3px">Rapport-Nr. ${esc(r.id)}${r.erfasst_am ? ' · erfasst am ' + dmy(r.erfasst_am) : ''}</div>
         </div>
-        <div style="text-align:right;font-size:12px;color:#6B7280;line-height:1.5">${bkLogo}${bkText}</div>
+        <div style="text-align:center;font-size:12px;color:#6B7280;line-height:1.5">${bkLogo}${bkText}</div>
       </div>
       ${re ? `<div style="margin-bottom:20px">
         <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#6B7280;font-weight:700;margin-bottom:4px">${re.abweichend ? 'Rechnungsadresse' : 'Kunde'}</div>
@@ -14815,7 +14847,7 @@ function printReport() {
              <div style="font-size:10.5px;color:#6B7280;margin-top:1px">Name in Blockschrift</div>`
           : ''}
       </div>
-      ${briefkopf.fusszeile ? `<div style="margin-top:30px;padding-top:10px;border-top:1px solid #E5E8EC;font-size:10.5px;color:#6B7280;line-height:1.5;white-space:pre-line">${esc(briefkopf.fusszeile)}</div>` : ''}
+      ${bkFusszeile()}
     </div>`;
   window.print();
 }
