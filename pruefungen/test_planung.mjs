@@ -812,6 +812,42 @@ check('Eine Schicht mit deckungsgleichem Rapport traegt KEIN Warnzeichen',
     return !!tr && !tr.querySelector('.rap-abw');
   }));
 
+// ══════════ RAPPORT-SYMBOL JE PERSON (ENT-141)
+// Der Projektinhaber, nach Rueckfrage zum Geltungsbereich ausdruecklich
+// bestaetigt: JEDE Schicht in der Liste, nicht nur innerhalb einer Serie.
+// Ein kleines Symbol am Namen-Chip, sobald fuer genau diese Person ein
+// Rapport vorliegt -- oeffnet ihn direkt (openDrawer), ohne den Umweg ueber
+// den Einsatzplan.
+check('KRITISCH: der Name-Chip einer Person mit Rapport traegt das Rapport-Symbol',
+  await page.evaluate(() => {
+    const tr = [...document.querySelectorAll('#plTable tbody tr')].find(r => r.getAttribute('onclick') === 'openEinsatz(14)');
+    const chip = tr && [...tr.querySelectorAll('.crew .nm')].find(n => n.textContent.includes('Daniele Ciardo'));
+    return !!chip && !!chip.querySelector('.nm-rap');
+  }));
+check('Eine Person ohne Rapport zu dieser Schicht traegt KEIN Symbol',
+  await page.evaluate(() => {
+    const tr = [...document.querySelectorAll('#plTable tbody tr')].find(r => r.getAttribute('onclick') === 'openEinsatz(11)');
+    const chip = tr && [...tr.querySelectorAll('.crew .nm')].find(n => n.textContent.includes('Adrian'));
+    return !!chip && !chip.querySelector('.nm-rap');
+  }));
+check('KRITISCH: das Symbol zielt auf den richtigen Rapport (openDrawer mit der passenden ID)',
+  await page.evaluate(() => {
+    const tr = [...document.querySelectorAll('#plTable tbody tr')].find(r => r.getAttribute('onclick') === 'openEinsatz(14)');
+    const btn = tr && tr.querySelector('.crew .nm-rap');
+    return !!btn && btn.getAttribute('onclick') === 'event.stopPropagation();openDrawer(500)';
+  }));
+check('KRITISCH: ein Klick oeffnet den Rapport-Betrachter, ohne die Zeile selbst zu oeffnen',
+  await page.evaluate(() => {
+    const tr = [...document.querySelectorAll('#plTable tbody tr')].find(r => r.getAttribute('onclick') === 'openEinsatz(14)');
+    tr.querySelector('.crew .nm-rap').click();
+    return !document.getElementById('view-einsatzplan').classList.contains('on');
+  }));
+await page.waitForTimeout(300);
+check('Der geoeffnete Rapport ist tatsaechlich der richtige',
+  (await page.textContent('#drTitle')).includes('500'));
+await page.evaluate(() => closeDrawer());
+await page.waitForTimeout(200);
+
 // openEinsatz() fuehrt seit 3392470 in die Einsatzplan-Ansicht. Die
 // Schublade -- und mit ihr der Schreibschutz, den die folgenden Pruefungen
 // belegen -- haengt dort hinter "Einsatz bearbeiten"; direkt aufgerufen ist
