@@ -140,7 +140,12 @@ await page.waitForSelector('#mxTable table');
 await page.waitForTimeout(400);
 // Vier Planungsreiter seit ENT-039 (Objekte zu Kunden gezogen), seit ENT-045
 // kommt der Abgleich als fuenfter dazu. Kein Objekte-Reiter mehr.
-check('Vier Reiter, keiner davon Objekte', (await page.$$('#view-planung .tab')).length === 4
+// Sichtbar zaehlen, nicht nur im DOM: seit ENT-165 liegt zusaetzlich ein
+// mobiler "Rapporte"-Reiter im Markup, auf dem Desktop aber unsichtbar
+// (".nur-schmal") -- ein blosses $$() zaehlte ihn faelschlich mit.
+const sichtbareReiter = await page.$$eval('#view-planung .tab',
+  els => els.filter(e => e.getClientRects().length));
+check('Vier Reiter, keiner davon Objekte', sichtbareReiter.length === 4
   && !(await page.textContent('#view-planung .tabs')).includes('Objekte'));
 check('Uebersicht ist der Standardreiter', await page.isVisible('#pv-uebersicht') && !(await page.isVisible('#pv-einsaetze')));
 check('Reiter oeffnen schreibt nichts', writes().length === 0);

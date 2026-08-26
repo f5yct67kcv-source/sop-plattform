@@ -21,7 +21,14 @@ $sql = 'SELECT id, kunde_id, kunde_name, objekt_id, masterschicht_id, serie_id, 
                kontakt_vorname, kontakt_nachname, kontakt_telefon,
                weg_km, weg_minuten, weg_adresse,
                ist_status, ist_von, ist_bis, ist_pause_von, ist_pause_min,
-               ist_pause_bezahlt_ma, ist_pause_bezahlt_kunde, ist_bemerkung, abgeglichen_am
+               ist_pause_bezahlt_ma, ist_pause_bezahlt_kunde, ist_bemerkung, abgeglichen_am,
+               -- Kundenunterschrift am Einsatz (ENT-160). Das Bild selbst bleibt
+               -- hier draussen: Es waere in jeder Einsatzliste mitgeschleppt,
+               -- obwohl es nur der eine Kundenbericht braucht. Was die Liste
+               -- braucht, ist die Auskunft OB und von wem -- das Bild holt der
+               -- Bericht einzeln (einsatz_bericht.php).
+               (unterschrift IS NOT NULL) AS hat_unterschrift,
+               unterzeichner, unterschrift_am
         FROM einsaetze';
 $args = [];
 if ($eingegrenzt) {

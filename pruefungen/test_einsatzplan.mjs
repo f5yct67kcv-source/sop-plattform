@@ -55,6 +55,11 @@ let EINSAETZE = [
   // nicht mehr angeboten werden -- nichts mehr zu uebernehmen.
   bau(79, { kunde_name: 'Bereits abgeglichen', datum: HEUTE, status: 'abgeschlossen',
             mitarbeiter: [{ id: 2, name: 'daniele', vorname: 'Daniele', nachname: 'Ciardo', ist_status: 'anwesend' }] }),
+  // 80 — kurzer Einsatz (3 h = 12 Viertelstunden), genau der Fall aus der
+  //      Rückmeldung des Projektinhabers zu ENT-151: je kürzer der Einsatz,
+  //      desto mehr Breite blieb bei den festen Spalten liegen statt bei der
+  //      Zeitleiste. Ein langer Einsatz allein deckt das nicht auf.
+  bau(80, { kunde_name: 'Kurzeinsatz', bedarf: 1, von: '09:00:00', bis: '12:00:00' }),
   // 76 — drei Rückmeldungen nebeneinander: zugesagt, abgelehnt, offen aber
   //      angesehen. Genau die drei Zustände, die der Balken zeigen soll.
   bau(76, { kunde_name: 'Rückmeldungen', bedarf: 3, mitarbeiter: [
@@ -386,6 +391,76 @@ check('Und zusaetzlich sichtbar gedaempft (Opacity < 1), nicht nur per cursor',
     const btn = [...document.querySelectorAll('#epKopf button')].find(b => b.textContent.includes('Rechnung erstellen'));
     return !!btn && parseFloat(getComputedStyle(btn).opacity) < 1;
   }));
+
+// ══════════ ANORDNUNG UND FARBE DES ABSCHLUSS-BEREICHS (ENT-150)
+// Der Projektinhaber: Dokumente sollen neben den Rapport, damit der
+// Abschnitt schmaler wird; der Rechnungs-Knopf blau und nach rechts; die
+// beiden Rapport-Knoepfe sollen sich farblich besser abheben. Alles am
+// gerenderten Zustand gemessen (CLAUDE.md „Gestaltung“) -- eine Rasterregel
+// kann wirkungslos bleiben, ohne dass etwas kaputtgeht.
+const zone = await page.evaluate(() => {
+  const rap = document.querySelector('#epKopf .ep-zone .ep-zone-teil:first-child');
+  const dok = document.querySelector('#epKopf .ep-zone .ep-zone-teil:last-child');
+  const rBtn = [...document.querySelectorAll('#epKopf button')].find(b => b.textContent.includes('Rechnung erstellen'));
+  const zoneEl = document.querySelector('#epKopf .ep-zone');
+  if (!rap || !dok || !rBtn || !zoneEl) { return null; }
+  const r = el => el.getBoundingClientRect();
+  return {
+    zweiTeile: rap !== dok,
+    rapRechts: r(rap).right, dokLinks: r(dok).left,
+    rapOben: r(rap).top, dokOben: r(dok).top,
+    zoneRechts: r(zoneEl).right, zoneLinks: r(zoneEl).left,
+    rBtnRechts: r(rBtn).right, rBtnUnten: r(rBtn).bottom,
+    zoneUnten: r(zoneEl).bottom,
+    dokText: dok.textContent, rapText: rap.textContent,
+  };
+});
+check('KRITISCH: Rapport und Dokumente stehen NEBENEINANDER, nicht mehr untereinander',
+  !!zone && zone.zweiTeile && zone.dokLinks >= zone.rapRechts - 1);
+check('Und zwar auf gleicher Hoehe beginnend — nicht versetzt',
+  !!zone && Math.abs(zone.rapOben - zone.dokOben) < 2);
+check('Die linke Spalte traegt den Rapport, die rechte die Dokumente',
+  !!zone && /Rapport/.test(zone.rapText) && /Dokumente/.test(zone.dokText));
+check('KRITISCH: der Rechnungs-Knopf steht rechts, nicht links am Spaltenanfang',
+  !!zone && (zone.rBtnRechts > zone.zoneLinks + (zone.zoneRechts - zone.zoneLinks) / 2));
+check('KRITISCH: und unterhalb beider Spalten, nicht in einer davon',
+  !!zone && zone.rBtnUnten > zone.zoneUnten);
+// Blau heisst hier: dieselbe Farbe, die eine isolierte Sonde mit
+// var(--accent) liefert -- nicht "irgendeine" Farbe.
+check('KRITISCH: der Rechnungs-Knopf ist blau (--accent), wie ausdruecklich verlangt',
+  await page.evaluate(() => {
+    const btn = [...document.querySelectorAll('#epKopf button')].find(b => b.textContent.includes('Rechnung erstellen'));
+    const sonde = document.createElement('div');
+    sonde.style.background = 'var(--accent)';
+    document.body.appendChild(sonde);
+    const erwartet = getComputedStyle(sonde).backgroundColor;
+    sonde.remove();
+    return !!btn && getComputedStyle(btn).backgroundColor === erwartet;
+  }));
+check('KRITISCH: er bleibt trotz Blau ausgegraut — er hat weiterhin keine Funktion (ENT-040/127)',
+  await page.evaluate(() => {
+    const btn = [...document.querySelectorAll('#epKopf button')].find(b => b.textContent.includes('Rechnung erstellen'));
+    return !!btn && btn.disabled && parseFloat(getComputedStyle(btn).opacity) < 1;
+  }));
+// Die beiden Rapport-Knoepfe: beide muessen als Knopf erkennbar sein (Rahmen
+// ODER Flaeche) und sich VONEINANDER unterscheiden -- vorher war einer davon
+// btn-quiet, also ganz ohne beides.
+const rapKnoepfe = await page.evaluate(() => {
+  const btn = t => [...document.querySelectorAll('#epKopf button')].find(b => b.textContent.includes(t));
+  const a = btn('Rapport ansehen'), d = btn('Direkt abgleichen');
+  if (!a || !d) { return null; }
+  const transparent = c => c === 'transparent' || c === 'rgba(0, 0, 0, 0)';
+  const lies = el => { const s = getComputedStyle(el);
+    return { bg: s.backgroundColor, rand: s.borderColor, farbe: s.color,
+      sichtbar: !transparent(s.backgroundColor) || !transparent(s.borderColor) }; };
+  return { a: lies(a), d: lies(d) };
+});
+check('KRITISCH: "Rapport ansehen" ist als Knopf erkennbar (Rahmen oder Fläche), nicht wie Fliesstext',
+  !!rapKnoepfe && rapKnoepfe.a.sichtbar);
+check('KRITISCH: "Direkt abgleichen" ebenfalls', !!rapKnoepfe && rapKnoepfe.d.sichtbar);
+check('KRITISCH: die beiden unterscheiden sich sichtbar voneinander — sie sind nicht dieselbe Handlung',
+  !!rapKnoepfe && (rapKnoepfe.a.bg !== rapKnoepfe.d.bg
+    || rapKnoepfe.a.rand !== rapKnoepfe.d.rand || rapKnoepfe.a.farbe !== rapKnoepfe.d.farbe));
 
 // ══════════ RAPPORT-ÜBERSICHT AM ABGESCHLOSSENEN EINSATZ (ENT-128)
 const kopf77 = await page.textContent('#epKopf');
@@ -894,6 +969,115 @@ check('KRITISCH: die Planungsliste zeigt 2 von 3 statt 3 von 3',
 check('KRITISCH: sie meldet den offenen Platz', zeile76 && zeile76.txt.includes('1 offen'));
 check('KRITISCH: der Name der abgelehnten Person bleibt sichtbar, aber gekennzeichnet',
   zeile76 && zeile76.durch && zeile76.txt.includes('Daniele'));
+
+// ══════════ TOTE FLÄCHE IM RASTER (ENT-151)
+// Der Projektinhaber, mit markiertem Bildschirmfoto: „auch hier im markierten
+// Bereich ist zuviel tote Fläche, bitte Abstände reduzieren, dass vor allem
+// der Zeitleisten-Bereich wieder besser im Fokus ist."
+//
+// Ursache: table { width:100% } verteilt die überschüssige Breite anteilig auf
+// ALLE Spalten -- auch auf die festen. Je kürzer der Einsatz, desto weniger
+// Spalten hat die Zeitleiste und desto mehr Breite blieb links liegen.
+// Darum wird hier ausdrücklich ein KURZER Einsatz (80, drei Stunden) neben
+// einem langen (71, neun Stunden) gemessen: an einem langen allein fällt der
+// Fehler kaum auf -- gemessen vorher 30 % Zeitleiste beim kurzen gegenüber
+// 60 % beim langen.
+await page.setViewportSize({ width: 1920, height: 1080 });
+const rasterMass = async id => { await oeffne(id); return page.evaluate(() => {
+  const t = document.querySelector('#epRaster table.ep-gitter');
+  if (!t) { return null; }
+  const kopf = [...t.querySelectorAll('thead tr:first-child th')];
+  const br = el => el.getBoundingClientRect().width;
+  const fest = kopf.filter(h => h.classList.contains('fest'));
+  const uhr = kopf.filter(h => h.classList.contains('uhr'));
+  // Was die Zeit-Zelle an Text WIRKLICH braucht -- gegen eine unsichtbare
+  // Sonde mit derselben Schrift gemessen, nicht geschätzt.
+  const zeitZelle = document.querySelector('#epRaster tbody tr td:nth-child(4)');
+  const sonde = document.createElement('span');
+  sonde.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;font:'
+    + getComputedStyle(zeitZelle).font;
+  sonde.textContent = zeitZelle.textContent.trim();
+  document.body.appendChild(sonde);
+  const noetig = sonde.getBoundingClientRect().width;
+  sonde.remove();
+  return { tabelle: br(t), festGesamt: fest.reduce((s, h) => s + br(h), 0),
+    festBreiten: fest.map(br), slots: uhr.length,
+    uhrGesamt: uhr.reduce((s, h) => s + br(h), 0),
+    zeitSpalte: br(fest[3]), zeitNoetig: noetig,
+    ueberlauf: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+}); };
+const lang = await rasterMass(71);   // 07:30–16:30, 42 Viertelstunden
+const kurz = await rasterMass(80);   // 09:00–12:00, 12 Viertelstunden
+check('KRITISCH: die Zeitleiste bekommt den Grossteil der Breite — auch bei einem KURZEN Einsatz',
+  !!kurz && kurz.uhrGesamt / kurz.tabelle >= 0.6);
+check('KRITISCH: dasselbe gilt beim langen Einsatz', !!lang && lang.uhrGesamt / lang.tabelle >= 0.6);
+// Der eigentliche Beweis, dass die festen Spalten nicht mehr gedehnt werden:
+// sie sind bei kurzem und langem Einsatz GLEICH breit. Werden sie gedehnt,
+// haengt ihre Breite von der Zahl der Zeitspalten ab.
+check('KRITISCH: die festen Spalten sind inhaltsbreit, nicht gedehnt — gleiche Breite bei 3 h wie bei 9 h',
+  !!lang && !!kurz && Math.abs(lang.festGesamt - kurz.festGesamt) < 2);
+check('KRITISCH: die Spalte „Zeit" ist nicht mehr deutlich breiter als ihr Inhalt braucht',
+  !!kurz && kurz.zeitSpalte - kurz.zeitNoetig < 40);
+check('Die leere Symbolspalte bläht sich nicht auf', !!kurz && kurz.festBreiten[4] < 120);
+check('Kein Querlauf der Seite durch das Raster',
+  !!kurz && kurz.ueberlauf <= 1 && lang.ueberlauf <= 1);
+await page.setViewportSize({ width: 1500, height: 1000 });
+
+// ══════════ DOKUMENTE NEBEN DEM RAPPORT, GRÖSSENHINWEIS, NEULADEN (ENT-152)
+// Drei Rückmeldungen des Projektinhabers zum selben Bereich:
+//  1. „Dokumente liegt jetzt mit dem im Feld. Ich habe gesagt, bitte direkt
+//     neben dem Report anordnen." -- zwei gleich breite Rasterspalten legten
+//     die Dokumente auf einem breiten Schirm in die Bildschirmmitte.
+//  2. Der lange Hinweis unter dem Knopf soll ein kleiner Text rechts daneben
+//     sein, nur noch mit der Grössenangabe.
+//  3. „wen ich die seite aktualisiere, fliegt er direkt aus der Bereich
+//     hinaus" -- in der Adresse stand nur "#einsatzplan" ohne Nummer.
+await page.setViewportSize({ width: 1920, height: 1080 });
+await oeffne(77);
+const nebeneinander = await page.evaluate(() => {
+  const teile = [...document.querySelectorAll('#epKopf .ep-zone .ep-zone-teil')];
+  if (teile.length < 2) { return null; }
+  const r = el => el.getBoundingClientRect();
+  const zone = r(document.querySelector('#epKopf .ep-zone'));
+  return { luecke: r(teile[1]).left - r(teile[0]).right,
+    zoneBreite: zone.width, dokLinks: r(teile[1]).left - zone.left };
+});
+check('KRITISCH: die Dokumente schliessen direkt an den Rapport an — nicht eine halbe Kartenbreite entfernt',
+  !!nebeneinander && nebeneinander.luecke < 60);
+check('KRITISCH: sie stehen nicht erst in der Bildschirmmitte',
+  !!nebeneinander && nebeneinander.dokLinks < nebeneinander.zoneBreite * 0.45);
+const hinweis = await page.evaluate(() => {
+  const zeile = document.querySelector('#epKopf .dok-anhang');
+  if (!zeile) { return null; }
+  const btn = zeile.querySelector('button');
+  const note = zeile.querySelector('.note');
+  if (!btn || !note) { return null; }
+  const rb = btn.getBoundingClientRect(), rn = note.getBoundingClientRect();
+  return { text: note.textContent.trim(), rechtsDaneben: rn.left >= rb.right - 1,
+    gleicheZeile: Math.abs((rn.top + rn.height / 2) - (rb.top + rb.height / 2)) < 8,
+    titel: btn.getAttribute('title') || '' };
+});
+check('KRITISCH: der Grössenhinweis steht rechts NEBEN dem Knopf, nicht darunter',
+  !!hinweis && hinweis.rechtsDaneben && hinweis.gleicheZeile);
+check('KRITISCH: er nennt nur noch die Grösse', !!hinweis && /^höchstens 4 MB$/.test(hinweis.text));
+// Die weggekuerzte Auskunft ist nicht verloren, sie steckt jetzt im Titel des
+// Knopfs -- sonst waere mit dem Satz auch die Information verschwunden, dass
+// die Eingeteilten das Dokument in ihrer App sehen.
+check('Die ausführliche Auskunft bleibt als Titel des Knopfs erhalten',
+  !!hinweis && /Nur PDF/.test(hinweis.titel) && /App/.test(hinweis.titel));
+
+// ── Neuladen: die Ansicht muss stehen bleiben
+check('KRITISCH: die Adresse trägt die Einsatz-Nummer, sonst weiss ein Neuladen nicht, wohin',
+  await page.evaluate(() => location.hash) === '#einsatzplan/77');
+await page.reload({ waitUntil: 'load' });
+await page.waitForTimeout(1400);
+check('KRITISCH: nach dem Neuladen steht der Einsatzplan noch offen — der Planer fliegt nicht mehr heraus',
+  await page.isVisible('#view-einsatzplan'));
+check('KRITISCH: und zwar DERSELBE Einsatz, nicht irgendeiner',
+  (await page.textContent('#epKopf')).includes('Abgeschlossen'));
+check('Das Raster ist nach dem Neuladen ebenfalls wieder da',
+  await page.evaluate(() => !!document.querySelector('#epRaster table.ep-gitter tbody tr')));
+await page.setViewportSize({ width: 1500, height: 1000 });
 
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }

@@ -30,10 +30,15 @@ let kunden = [
     kontaktwege: [], personen: [] },
 ];
 const RAPPORTE = { status: 'ok', rapporte: [
-  { id: 50, datum: '2026-08-01', mitarbeiter: 'Hans Meier', kunde: 'Studer Immobilien AG', von: '07:00:00', bis: '16:00:00', netto_h: 8, auftrag_nr: 'A-123' }
+  // Zwei Zeilen desselben Einsatzes (ENT-173) -- gehoeren zusammengeklammert,
+  // die dritte Zeile eines anderen Einsatzes bleibt fuer sich allein.
+  { id: 50, datum: '2026-08-01', mitarbeiter: 'Hans Meier', kunde: 'Studer Immobilien AG', einsatz_id: 90, von: '07:00:00', bis: '16:00:00', netto_h: 8, auftrag_nr: 'A-123' },
+  { id: 51, datum: '2026-08-01', mitarbeiter: 'Anna Muster', kunde: 'Studer Immobilien AG', einsatz_id: 90, von: '07:00:00', bis: '15:30:00', netto_h: 7.5, auftrag_nr: 'A-123' },
+  { id: 52, datum: '2026-07-20', mitarbeiter: 'Hans Meier', kunde: 'Studer Immobilien AG', einsatz_id: 70, von: '08:00:00', bis: '12:00:00', netto_h: 4, auftrag_nr: null },
 ]};
 
 let calls = [];
+let berichtRufe = [];
 const writes = () => calls.filter(c => /create|update|delete|deactivate|reset|archivieren/.test(c.p));
 
 async function setup(page) {
@@ -45,6 +50,12 @@ async function setup(page) {
     calls.push({ p, body });
     const send = b => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) });
     if (p.includes('login')) return send({ status: 'ok', token: 't', name: 'adrian', ist_admin: true });
+    if (p.includes('me.php')) return send({ status: 'ok', name: 'adrian', ist_admin: true, rollen: [], rechte: ['kunden', 'abgleich'] });
+    if (p.includes('einsatz_bericht')) {
+      berichtRufe.push((req.url().split('einsatz_id=')[1] || '').split('&')[0]);
+      return send({ status: 'ok', bericht: { einsatz: { id: 90, kunde_name: 'Studer Immobilien AG', datum: '2026-08-01' },
+        kunde: {}, unterschrift: {}, personen: [{ name: 'Hans Meier', von: '07:00', bis: '16:00', pause_min: 0, netto_h: 8 }] } });
+    }
     if (p.includes('kunden_list')) {
       const naechste = 'K' + String(Math.max(...kunden.map(k => k.id)) + 1).padStart(4, '0');
       return send({ status: 'ok', kunden, naechste_kundennummer: naechste });
@@ -193,6 +204,54 @@ await page.screenshot({ path: `${OUT}/k-03-detail.png` });
 await page.click('#kdtab-rapporte');
 await page.waitForTimeout(150);
 check('Rapporte-Reiter zeigt den passenden Rapport (Namensabgleich)', (await page.textContent('#kdRapporte')).includes('A-123'));
+
+// ── Klammer fuer zusammengehoerige Rapporte am selben Einsatz (ENT-173,
+// seit ENT-178 mit sichtbarer Beschriftung statt nur Symbol und Flaeche
+// ueber der ganzen Gruppe statt nur der Randlinie)
+const kdZeilen = await page.evaluate(() => [...document.querySelectorAll('#kdRapporte tbody tr')].map(r => ({
+  klasse: r.className, zellen: r.children.length,
+  hatKlammer: !!r.querySelector('.rapp-klammer'), hatKnopf: !!r.querySelector('.rapp-klammer button'),
+  knopfText: r.querySelector('.rapp-klammer button span')?.textContent.trim() || null,
+  // Letzte Spalte (Auftrag-Nr.) ist in jeder Zeile vorhanden, mit oder ohne
+  // eigene Klammer-Zelle -- ein verlaesslicher Vergleichspunkt ueber alle drei.
+  hintergrund: getComputedStyle(r.children[r.children.length - 1]).backgroundColor,
+})));
+check('KRITISCH: drei Zeilen, zwei davon am selben Einsatz', kdZeilen.length === 3);
+check('KRITISCH: die erste Zeile der Gruppe traegt die Klammer mit Knopf',
+  kdZeilen[0].hatKlammer && kdZeilen[0].hatKnopf && kdZeilen[0].klasse.includes('rapp-gruppe-offen'));
+check('Der Knopf traegt eine sichtbare Beschriftung, nicht nur ein Symbol (ENT-178)',
+  kdZeilen[0].knopfText === 'Kundenrapport');
+check('KRITISCH: die zweite Zeile der Gruppe hat keine eigene Klammer-Zelle mehr -- rowspan uebernimmt das',
+  kdZeilen[1].zellen === 5 && !kdZeilen[1].hatKlammer && !kdZeilen[1].klasse.includes('rapp-gruppe-offen'));
+check('KRITISCH: die dritte, alleinstehende Zeile hat eine leere Klammer-Zelle, aber keinen Knopf',
+  kdZeilen[2].hatKlammer && !kdZeilen[2].hatKnopf);
+check('Alle Zeilen haben gleich viele sichtbare Spalten (die Klammer zaehlt nur einmal je Gruppe)',
+  kdZeilen[0].zellen === 6 && kdZeilen[2].zellen === 6);
+check('Gruppierte Zeilen tragen eine Hintergrundflaeche, die alleinstehende Zeile nicht (ENT-178)',
+  kdZeilen[0].hintergrund === kdZeilen[1].hintergrund && kdZeilen[0].hintergrund !== kdZeilen[2].hintergrund);
+
+// ── Der Knopf ruft tatsaechlich den Kundenrapport DES EINSATZES ab, nicht
+// nur irgendeinen -- und druckt ihn.
+// Gezielt in #kdRapporte geklickt, nicht ".rapp-klammer button" pauschal --
+// dieselbe Klasse traegt seit ENT-178 auch die globale, kundenuebergreifende
+// Rapporte-Liste (#rapporteTable), die im Hintergrund immer mitgeladen wird
+// (loadRapporte() laeuft unabhaengig vom aktiven Reiter) und mit derselben
+// Fixture ebenfalls eine (unsichtbare) Klammer samt Knopf traegt.
+await page.evaluate(() => { window.__gedruckt = 0; window.print = () => window.__gedruckt++; });
+await page.click('#kdRapporte .rapp-klammer button');
+await page.waitForTimeout(400);
+check('KRITISCH: der Klammer-Knopf ruft denselben Endpunkt wie im Einsatzplan (ENT-160) mit der richtigen einsatz_id auf',
+  berichtRufe.includes('90'));
+check('KRITISCH: und loest das Drucken aus', await page.evaluate(() => window.__gedruckt > 0));
+
+// Gegenprobe fuer die Rechtegrenze: ohne "abgleich" gibt es weder Knopf noch
+// einen Aufruf des Endpunkts -- nur die leere Klammer-Zelle bleibt.
+await page.evaluate(() => { me.rechte = ['kunden']; renderKundeDetail(); });
+await page.waitForTimeout(150);
+check('KRITISCH: ohne das Recht "abgleich" gibt es keinen Knopf, nur die stumme Klammer',
+  await page.evaluate(() => !document.querySelector('#kdRapporte .rapp-klammer button')
+    && !!document.querySelector('#kdRapporte .rapp-klammer')));
+await page.evaluate(() => { me.rechte = ['kunden', 'abgleich']; renderKundeDetail(); });
 
 await page.click('#kdtab-offerten');
 await page.waitForTimeout(150);

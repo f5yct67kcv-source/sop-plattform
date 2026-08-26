@@ -13,7 +13,8 @@ $pdo = db();
 $rows = $pdo->query(
     'SELECT id, kundennummer, art, anrede, vorname, nachname, name, zusatzfeld,
             strasse, hausnummer, adresszusatz, plz, ort, uid, mwst_nr,
-            telefon, kontaktperson, email, notiz, aktiv
+            telefon, kontaktperson, email, notiz, aktiv,
+            re_name, re_zusatz, re_strasse, re_hausnummer, re_plz, re_ort
      FROM kunden ORDER BY name'
 )->fetchAll();
 

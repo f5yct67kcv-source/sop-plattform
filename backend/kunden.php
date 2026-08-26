@@ -237,6 +237,16 @@ function kunden_eingabe_lesen(array $input, array $bestand = []): array
         'email' => $wert('email'),
         'kontaktperson' => $wert('kontaktperson'),
         'notiz' => $wert('notiz'),
+        // Abweichende Rechnungsadresse (ENT-155). Bewusst OHNE Schalter
+        // "abweichend ja/nein": Ein Schalter kann auf "ja" stehen, waehrend
+        // die Felder leer sind -- dann stuende auf dem Beleg eine leere
+        // Adresse. Gefuellt heisst abweichend, leer heisst gleich wie oben.
+        're_name' => $wert('re_name'),
+        're_zusatz' => $wert('re_zusatz'),
+        're_strasse' => $wert('re_strasse'),
+        're_hausnummer' => $wert('re_hausnummer'),
+        're_plz' => $wert('re_plz'),
+        're_ort' => $wert('re_ort'),
     ];
 
     $kinder = null;

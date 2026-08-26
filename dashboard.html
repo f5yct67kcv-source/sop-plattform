@@ -213,6 +213,12 @@ select.inp { padding-right: 30px; background-image: linear-gradient(45deg, trans
 .btn-plain:hover { background: var(--bg); border-color: var(--line-hi); }
 .btn-quiet { background: transparent; color: var(--ink-2); }
 .btn-quiet:hover { background: var(--line-soft); color: var(--ink); }
+/* Umrissener Akzent-Knopf (ENT-150): fuer die Handlung, die einen Vorgang
+   weitertraegt, wo daneben schon ein gefuellter Akzent-Knopf steht. Zwei
+   gefuellte blaue Flaechen nebeneinander waeren zwei Hauptknoepfe, und dann
+   ist keiner mehr der Hauptknopf. */
+.btn-akzent { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.btn-akzent:hover { background: var(--accent); color: #fff; }
 .btn-wide { width: 100%; }
 .btn-sm { padding: 6px 11px; font-size: 12px; }
 
@@ -342,6 +348,21 @@ a.nav-item { text-decoration: none; }
 .card-hd h2 { font-size: 13.5px; font-weight: 650; letter-spacing: -.1px; }
 .card-hd .note { font-size: 11.5px; color: var(--ink-3); }
 .card-hd .sp { flex: 1; }
+/* Icon-Abzeichen vor einem Karten-Titel (ENT-161, zunaechst nur im
+   Betriebsbereich) -- dieselbe Bauart wie ".empty .ic", nur kleiner fuer die
+   Kopfzeile. Bewusst eine eigene Klasse statt ".card-hd h2/.ic" global zu
+   aendern: mehrere Karten im Haus tragen ein rohes <h3> im Kopf, ohne eigene
+   Schriftregel (siehe CLAUDE.md-Warnung zu CSS-Spezifitaet) -- eine globale
+   Aenderung haette dort ungeprueft mitgewirkt. */
+.card-hd .card-ic { width: 32px; height: 32px; border-radius: 9px; background: var(--accent-soft);
+  color: var(--accent); display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.card-hd .card-ic svg.i { width: 16px; height: 16px; }
+.card-hd .card-ic.gedaempft { background: var(--line-soft); color: var(--ink-3); }
+/* Nur im Betriebsbereich: dort tragen die Kartentitel ein rohes <h3> ohne
+   eigene Schriftregel (Browser-Vorgabe). Andere Stellen mit ".card-hd h3"
+   im Haus bleiben bewusst unberuehrt -- ungeprueft globaler wirken hiesse,
+   Layouts anzufassen, die niemand gemessen hat. */
+#view-betrieb .card-hd h3 { font-size: 13.5px; font-weight: 650; letter-spacing: -.1px; }
 .card-bd { padding: 18px; }
 /* flush = randlos, z.B. fuer Tabellen. Breite Inhalte scrollen in der Karte,
    nie die ganze Seite. */
@@ -420,6 +441,29 @@ td.num, th.num { text-align: right; }
 /* Masterschichten-Ansicht: Nullwerte treten zurueck, Summen heben sich ab. */
 td.num.leer { color: var(--ink-3); }
 tbody tr.summe td { background: var(--surface-2); font-weight: 650; border-top: 1px solid var(--line); }
+/* Klammer-Spalte fuer zusammengehoerige Rapporte am selben Einsatz (ENT-173
+   Kunden-Detail, ENT-178 globale Liste -- ein gemeinsamer Baustein statt
+   zwei Kopien). width:1% erzwingt die schmalstmoegliche Breite, dieselbe
+   Technik wie table.ep-gitter .fest -- table { width:100% } verteilte den
+   Rest sonst gleichmaessig auch auf diese schmale Symbolspalte. Der Knopf
+   darin traegt seit ENT-178 wieder eine sichtbare Beschriftung statt nur
+   eines Symbols (siehe Begruendung dort) und darf die Spalte dafuer breiter
+   ziehen. */
+.rapp-klammer { width: 1%; padding: 4px 8px !important; text-align: center; border-left: 3px solid var(--line-hi); }
+/* Die ganze Gruppe traegt eine zurueckhaltende Flaeche (ENT-178) -- die
+   Randlinie allein an der Klammer-Zelle war nachweislich nicht selbsterklaerend
+   genug. Bewusst NICHT --serie-soft: dieselbe Begruendung wie beim Verzicht
+   auf Violett in ENT-173 -- Serie/Reihe ist in diesem Haus bereits eine
+   eigene, feste Bedeutung, eine zweite Gruppierung in derselben Farbe wuerde
+   zwei verschiedene Dinge gleich einfaerben. --line-soft ist rein neutral
+   (bislang nur ein Hover-Ton), keine doppelte Bedeutung im Weg. */
+tr.rapp-gruppe > td { background: var(--line-soft); }
+/* Innerhalb einer Gruppe entfaellt die Trennlinie zwischen den Zeilen -- sie
+   sollen als EIN zusammengehoeriger Block lesbar sein, nicht als lauter
+   Einzelzeilen mit zufaellig derselben Randfarbe. Nur die Klammer-Zelle
+   selbst bleibt ausgenommen: sie ist per rowspan ohnehin eine einzige Zelle,
+   ihre eigene untere Kante liegt schon richtig am Gruppenende. */
+tr.rapp-gruppe-offen td:not(.rapp-klammer) { border-bottom: none; }
 tbody tr.aus td { opacity: .55; }
 /* Abgeschlossene Einsaetze treten in der Liste zurueck (ENT-128) -- erledigt,
    nicht mehr handlungsbeduerftig. Gleiche Staerke wie tr.aus, eigener Name:
@@ -519,6 +563,30 @@ tbody tr.status-abgeschlossen.zu.abgeglichen td { opacity: 1; }
   color: var(--ink-3); margin-bottom: 7px; }
 .dok-zeile a.nm { color: var(--ink); text-decoration: none; }
 .dok-zeile a.nm:hover { text-decoration: underline; }
+/* Rapport und Dokumente stehen nebeneinander, sobald Platz dafuer da ist
+   (ENT-150). Untereinander wuchs der Abschnitt in die Hoehe, waehrend rechts
+   daneben die halbe Karte leer blieb.
+   auto-fit statt zwei fester Spalten: steht nur einer der beiden Bloecke da
+   -- kein Rapport erfasst, oder der Einsatz ist noch gar nicht abgeschlossen
+   -- nimmt er die volle Breite ein, statt eine leere Spalte offenzulassen.
+   Unter 320 px je Spalte bricht das Raster von selbst auf eine Spalte um; auf
+   dem Handy steht damit weiterhin alles untereinander. */
+/* Nachgebessert (ENT-152): Mit zwei gleich breiten Rasterspalten landete
+   "Dokumente" auf einem breiten Schirm in der Bildschirmmitte -- eine halbe
+   Kartenbreite vom Rapport entfernt, obwohl es DIREKT daneben stehen soll.
+   Jetzt eine Flex-Reihe: jeder Teil so breit wie sein Inhalt (nach oben
+   begrenzt, damit eine lange Bemerkung die Reihe nicht sprengt), Dokumente
+   schliesst unmittelbar an den Rapport an. Umbruch auf schmalen Schirmen
+   uebernimmt flex-wrap. */
+.ep-zone { display: flex; flex-wrap: wrap; align-items: flex-start;
+  gap: 6px 36px; padding: 0 16px 14px; }
+.ep-zone-teil { flex: 0 1 auto; min-width: 240px; max-width: 460px; }
+/* Knopf und Groessenhinweis auf einer Zeile -- der Hinweis steht klein
+   rechts daneben, statt als eigene Zeile darunter (ENT-152). */
+.dok-anhang { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
+/* Der Rechnungs-Knopf steht rechts unter beiden Spalten -- die Abschluss-
+   Handlung der Karte, nicht Teil einer der beiden Spalten. */
+.ep-rechnung { display: flex; justify-content: flex-end; gap: 10px; padding: 0 16px 14px; }
 
 .ep-plan { overflow: hidden; }
 .ep-plan-kopf { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-bottom: 1px solid var(--line-soft); font-size: 12.5px; }
@@ -528,7 +596,19 @@ tbody tr.status-abgeschlossen.zu.abgeglichen td { opacity: 1; }
 .ep-scroll { overflow-x: auto; }
 table.ep-gitter { border-collapse: collapse; font-size: 11.5px; }
 table.ep-gitter th, table.ep-gitter td { padding: 0; border: none; }
-table.ep-gitter .fest { padding: 3px 8px; white-space: nowrap; border-right: 1px solid var(--line); }
+/* width:1% zwingt jede feste Spalte auf ihre Inhaltsbreite (ENT-151).
+   Ohne das verteilt der Browser die ueberschuessige Breite der Tabelle
+   (table { width:100% }) anteilig auf ALLE Spalten -- auch auf die festen.
+   Gemessen bei 1920 px: "Zeit" war 180 px breit fuer 142 px Inhalt, die
+   leere Symbolspalte 116 px fuer drei kleine Zeichen. Je kuerzer der
+   Einsatz, desto schlimmer: bei drei Stunden bleiben der Zeitleiste nur
+   wenige schmale Spalten, waehrend links tote Flaeche steht. Der ganze Rest
+   geht jetzt an die Viertelstunden -- die Zeitleiste ist das, worum es in
+   dieser Ansicht geht. */
+table.ep-gitter .fest { width: 1%; padding: 3px 8px; white-space: nowrap; border-right: 1px solid var(--line); }
+/* Untergrenze fuer sehr lange Einsaetze (bis 96 Viertelstunden): dann traegt
+   .ep-scroll den Rest, statt die Spalten unlesbar schmal zu quetschen. */
+table.ep-gitter th.uhr { min-width: 14px; }
 table.ep-gitter thead .fest { font-size: 10px; letter-spacing: .4px; text-transform: uppercase; color: var(--ink-3); }
 /* Die Uhrzeit steht senkrecht: 96 Viertelstunden nebeneinander gehen sonst
    nur mit dreifacher Breite. */
@@ -900,9 +980,15 @@ textarea.inp { resize: vertical; min-height: 92px; font-family: inherit; line-he
 /* Druck */
 #printArea { display: none; }
 @media print {
+  /* @page erzwingt einen festen Seitenrand -- ohne das legt jeder Browser
+     (Safari, Chrome, ...) zusaetzlich zum eigenen Standardrand noch das
+     CSS-Padding von #printArea obendrauf. Diese doppelte Randbreite hat
+     ein knapp einseitiges Blatt (z.B. Kundenrapport mit zwei Personen und
+     zweiblockiger Fusszeile) auf eine fast leere zweite Seite gedraengt. */
+  @page { size: A4; margin: 12mm; }
   body * { visibility: hidden; }
   #printArea, #printArea * { visibility: visible; }
-  #printArea { display: block !important; position: absolute; top: 0; left: 0; width: 100%; padding: 24px; }
+  #printArea { display: block !important; position: absolute; top: 0; left: 0; width: 100%; padding: 0; }
 }
 
 /* ══════════════════════════════════════════ PLANUNG */
@@ -925,6 +1011,12 @@ tbody tr.heute td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
 .crew { display: flex; flex-wrap: wrap; gap: 4px; }
 .crew .nm { font-size: 11.5px; font-weight: 600; background: var(--line-soft); color: var(--ink-2); border-radius: var(--r-xs); padding: 2px 7px; white-space: nowrap; }
 .crew .off { background: var(--warn-soft); color: var(--warn); }
+/* Rapport-Symbol im Name-Chip (ENT-141): eigene Farbe (--pos, "vorhanden"),
+   nicht die Chip-Farbe -- die Aussage "hat rapportiert" ist unabhaengig
+   davon, ob der Platz besetzt/offen ist. */
+.nm-rap { display: inline-flex; align-items: center; border: none; background: none; padding: 0;
+  margin-left: 4px; cursor: pointer; color: var(--pos); vertical-align: -1px; }
+.nm-rap-ikone { width: 11px; height: 11px; fill: none; stroke: currentColor; stroke-width: 2.4; }
 
 /* Zuteilung: Mehrfachauswahl mit Hinweis auf zeitliche Ueberschneidungen. */
 .ma-pick { border: 1px solid var(--line); border-radius: var(--r-sm); max-height: 236px; overflow-y: auto; }
@@ -1080,8 +1172,28 @@ tbody tr.zu .i-schloss { color: var(--warn); }
    Die Flaeche allein sagt nur "gehoert zu irgendeiner Reihe". Welche, sagt der
    Text "Tag 2 von 3" -- an einem Tag koennen mehrere Reihen nebeneinander
    laufen, und dafuer waeren mehrere Farbtoene noetig, die es nicht gibt. */
-tbody tr.serie > td { background: var(--serie-soft); }
-.ag-karte.serie { background: var(--serie-soft); }
+/* Flaeche NUR fuer eine hier tatsaechlich zusammenhaengende Gruppe (ENT-144).
+   Frueher trug jede Zeile Flaeche, die irgendwo zu einer Reihe gehoerte --
+   damit sah ein Einzeltag, dessen Geschwister ausserhalb des Filters liegen,
+   genauso aus wie eine Gruppe, und zwei verschiedene Reihen untereinander
+   verschmolzen optisch zu einer. Die Marke "Tag X von N" sagt weiterhin an
+   jeder Zeile, dass sie zu einer Reihe gehoert -- dafuer braucht es keine
+   Flaeche. */
+tbody tr.serie-grp > td { background: var(--serie-soft); }
+.ag-karte.serie-grp { background: var(--serie-soft); }
+/* Klammer oben und unten: sie sagt, wo die Gruppe anfaengt und aufhoert.
+   Ohne sie laeuft die Flaeche in eine benachbarte, fremde Reihe hinein. */
+tbody tr.serie-anker > td { border-top: 2px solid var(--serie); }
+tbody tr.serie-grp-ende > td { border-bottom: 2px solid var(--serie); }
+.ag-karte.serie-anker { border-top: 2px solid var(--serie); }
+.ag-karte.serie-grp-ende { border-bottom: 2px solid var(--serie); }
+/* Zeitspalte: Pfeil und Uhrzeit sind eine Einheit und bleiben zusammen --
+   sonst schiebt der Pfeil die Uhrzeit aus der Zelle in die naechste Spalte. */
+.pl-zeit { display: inline-flex; align-items: center; gap: 5px; }
+/* Die Marke steht in der Tabelle immer auf einer eigenen Zeile unter der
+   Uhrzeit. Als inline-flex lag sie in derselben Zeile wie die Uhrzeit und
+   ragte -- die Zelle ist nowrap -- sichtbar in die Spalte "Kunde" hinein. */
+table.pl-tab td .serie-marke { display: flex; width: fit-content; margin-left: auto; margin-top: 5px; }
 .serie-marke {
   display: inline-flex; align-items: center; gap: 5px; margin-top: 3px;
   border: 1px solid var(--serie-line); background: var(--surface); color: var(--serie);
@@ -1102,10 +1214,73 @@ tbody tr.serie > td { background: var(--serie-soft); }
 }
 /* Der Hinweis, dass gerade nur eine Reihe gezeigt wird. Ohne ihn sieht eine
    gefilterte Liste aus wie die ganze Planung. */
-.serie-filter { display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
+.serie-filter { display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
   border: 1px solid var(--serie-line); background: var(--serie-soft);
-  border-radius: var(--r-sm); padding: 9px 12px; margin-bottom: 12px; font-size: 12.5px; }
+  border-radius: var(--r-sm); padding: 9px 12px; margin-bottom: 12px; font-size: 12.5px;
+  scroll-margin-top: var(--top-h); }
 .serie-filter b { color: var(--serie); font-weight: 660; }
+/* Der Rueckweg: ein echter, klar erkennbarer Zurueck-Knopf, keine kleine
+   Randnotiz. Steht darum zuerst im Markup und trägt eigene Farbe (--serie
+   voll, nicht nur der Rahmen) statt der zurueckhaltenden .btn-quiet-Optik --
+   das ist die Aktion, die diese Zeile ueberhaupt anbietet. */
+.serie-zurueck {
+  display: inline-flex; align-items: center; gap: 5px; flex: none;
+  border: 1px solid var(--serie); background: var(--surface); color: var(--serie);
+  border-radius: 999px; padding: 6px 12px 6px 8px; font-size: 12.5px; font-weight: 620;
+  font-family: inherit; cursor: pointer; white-space: nowrap;
+}
+.serie-zurueck:hover { background: var(--serie); color: var(--surface); }
+.serie-zurueck svg { width: 15px; height: 15px; flex: none; stroke: currentColor;
+  stroke-width: 2.4; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.serie-filter-text { display: flex; align-items: center; gap: 9px; flex: 1 1 260px; min-width: 0; }
+.serie-filter-text > svg { width: 16px; height: 16px; flex: none; stroke: currentColor; color: var(--serie);
+  stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+@media (max-width: 720px) {
+  .serie-filter { flex-direction: column; align-items: stretch; }
+  .serie-zurueck { justify-content: center; min-height: 44px; padding: 4px 12px; }
+  /* flex-basis wirkt in flex-direction:column auf die HOEHE, nicht die
+     Breite -- die fuer die Zeilen-Anordnung gedachten 260px rissen hier
+     sonst eine 260px hohe Luecke zwischen Knopf und Text auf. */
+  .serie-filter-text { flex: none; }
+}
+/* Serien-Gruppierung (ENT-142): der Auf/Zu-Pfeil beim ersten Tag, die
+   schlanke Verweis-Zeile bei den uebrigen Tagen, der eingerueckte Rahmen
+   fuer die ausgeklappten Tage darunter. */
+.serie-klapp {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; margin-right: 4px; padding: 0; flex: none;
+  border: 1px solid var(--serie-line); border-radius: 5px; background: var(--surface);
+  color: var(--serie); font-size: 11px; line-height: 1; cursor: pointer; vertical-align: middle;
+}
+.serie-klapp:hover { background: var(--serie-soft); border-color: var(--serie); }
+/* Die Verweiszeile ist ein Hinweis, kein Eintrag -- sie traegt darum bewusst
+   KEINE Flaeche (sonst wiegt sie so schwer wie ein echter Einsatz und die
+   Tagesliste wirkt voller, als sie ist). Erkennbar bleibt sie an Farbe,
+   Schiene und Symbol; angefasst faerbt sie sich. */
+tr.serie-folge, .ag-karte.serie-folge { cursor: pointer; background: transparent; padding: 0; }
+tr.serie-folge > td { border-left: 3px solid var(--serie-line); }
+tr.serie-folge:hover > td, .ag-karte.serie-folge:hover { background: var(--serie-soft); }
+.serie-folge-in { display: flex; align-items: center; gap: 7px; padding: 7px 4px; color: var(--serie);
+  font-size: 12px; font-weight: 560; opacity: .92; }
+.ag-karte.serie-folge { border-left: 3px solid var(--serie-line); }
+.ag-karte.serie-folge .serie-folge-in { padding: 12px 14px; }
+.serie-folge-in svg { width: 13px; height: 13px; flex: none; stroke: currentColor;
+  stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.serie-folge-mehr { white-space: nowrap; font-weight: 620; }
+/* Der eingeschobene Tag steht sichtbar INNERHALB der Gruppe: eingerueckt an
+   einer Schiene, mit eigenem Datum -- er steht ja ausserhalb seines
+   Tageskopfs und waere sonst ein Einsatz ohne Datum. */
+tr.serie-kind > td:first-child { border-left: 3px solid var(--serie); }
+.ag-karte.serie-kind { margin-left: 14px; border-left: 3px solid var(--serie); border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.serie-kind-datum { display: inline-block; font-size: 10.5px; font-weight: 660; color: var(--serie);
+  text-transform: uppercase; letter-spacing: .02em; margin-right: 6px; }
+/* In der Tabelle steht das Datum als Beschriftung ueber der Uhrzeit, nicht
+   daneben -- Ueberschrift oben, Wert darunter. */
+table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
+@media (max-width: 720px) {
+  .serie-klapp { width: 44px; height: 44px; }
+  .ag-karte.serie-folge .serie-folge-in { min-height: 44px; }
+}
 .inp[readonly] { background: var(--surface-2); color: var(--ink-3); cursor: default; }
 .wahl-reihe { display: flex; gap: 18px; align-items: center; min-height: 38px; }
 .wahl-reihe label { display: flex; align-items: center; gap: 7px; cursor: pointer; font-size: 13.5px; font-weight: 500; }
@@ -2021,6 +2196,17 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
   /* Container verschieben ist eine Zeigergeraet-Aufgabe -- auf dem Telefon
      bleibt die zuletzt gespeicherte Anordnung einfach stehen (ENT-031). */
   #btnDashBearbeiten, .dash-editleiste, .dash-werk { display: none !important; }
+  /* Startseite mobil schlanker (ENT-166): Stundenverlauf und Angemeldete
+     Benutzer sind Auswertungen fuer den Schreibtisch, kein Blick unterwegs
+     -- auf dem Desktop bleiben beide unveraendert bestehen. */
+  .dash-item[data-widget="verlauf"], .dash-item[data-widget="angemeldet"] { display: none !important; }
+  /* Von den vier KPI-Kacheln bleiben nur Rapporte und Nettostunden: Bestand
+     (Mitarbeitende, Kunden) ist eine Zahl fuers Buero, kein Tagesgeschaeft.
+     #kpiGrid statt .kpi, weil dieselbe Kachel-Klasse auch im Planungs-KPI
+     (#plKpi) und anderswo vorkommt -- nur diese eine Kachelreihe soll sich
+     aendern. Reihenfolge aus renderKpi() (dashboard.html): 1 Rapporte,
+     2 Nettostunden, 3 Mitarbeitende, 4 Kunden. */
+  #kpiGrid .kpi:nth-child(3), #kpiGrid .kpi:nth-child(4) { display: none !important; }
   /* Tagesplan ganz nach aussen links (ENT-068). Ab hier ist "Übersicht"
      bereits ausgeblendet (.nur-desktop); von den drei verbleibenden Reitern
      ist der Tagesplan der, den die Startseite und die Ereignis-Kacheln
@@ -2053,7 +2239,9 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
      geholt. :first-of-type träfe damit den ausgeblendeten Übersichts-Reiter
      und :last-of-type ausgerechnet den Tagesplan -- also genau verkehrt. */
   #ptab-tag { text-align: left; }
-  #ptab-objektplan { text-align: right; }
+  /* Objektplanung ist hier (ENT-165) durch Rapporte ersetzt -- sie nimmt
+     jetzt deren Platz ganz aussen rechts ein, die Regel zieht mit um. */
+  #ptab-rapporte { text-align: right; }
 }
 
 @media (max-width: 620px) {
@@ -2633,8 +2821,22 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
         <div class="tabs">
           <button class="tab on nur-desktop" id="ptab-uebersicht" onclick="goTab('uebersicht')">Übersicht</button>
           <button class="tab" id="ptab-einsaetze" onclick="goTab('einsaetze')">Einsätze</button>
-          <button class="tab" id="ptab-objektplan" onclick="goTab('objektplan')">Objektplanung</button>
+          <!-- Auf dem Handy nicht mehr Teil der Reiterleiste (ENT-165):
+               eine 31-Spalten-Matrix ist dort ohnehin nur als Tagesliste
+               nutzbar (ENT-024), und der Projektinhaber greift von hier aus
+               unterwegs eher auf Rapporte zu als auf die Objektdetailplanung.
+               Andere Wege dorthin -- Klick auf einen Objektnamen, Kurzwahl,
+               Diktat -- bleiben unveraendert bestehen, nur der Reiter selbst
+               verschwindet auf schmalen Schirmen. -->
+          <button class="tab nur-desktop" id="ptab-objektplan" onclick="goTab('objektplan')">Objektplanung</button>
           <button class="tab" id="ptab-tag" onclick="goTab('tag')">Tagesplan</button>
+          <!-- Ersetzt die Objektplanung an ihrem Platz in der mobilen
+               Reiterleiste. Kein eigener Reiter innerhalb der Planung --
+               das wuerde die bereits bestehende, global gepflegte
+               Rapporte-Ansicht unter Kunden ein zweites Mal nachbauen.
+               Stattdessen derselbe Sprung wie aus der Kurzwahl
+               ("Rapporte ansehen") und der Seitenleiste. -->
+          <button class="tab nur-schmal" id="ptab-rapporte" onclick="go('kunden'); kuGoTab('rapporte')">Rapporte</button>
           <div class="sp" style="flex:1"></div>
           <!-- Auf der Trennlinie statt in einer eigenen Werkzeugleiste (ENT-038)
                -- gilt reiterübergreifend, spart aber Platz in jeder Leiste. -->
@@ -3591,12 +3793,79 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
            falsche Ort: Sie beschreiben nicht ein Objekt, sondern den Betrieb,
            und sie sind die Messgrundlage fuer den gesamten Auslagenersatz. -->
       <section class="view" id="view-betrieb">
+        <!-- Bis ENT-161 lagen alle fuenf Karten unbeschriftet und randlos
+             untereinander -- eine einzige lange Spalte ohne jede optische
+             Gliederung (Ruecksprache des Projektinhabers: "im Moment ist
+             alles druntergestapelt"). Jetzt: ein Icon je Karte (dieselbe
+             Bauart wie ".empty .ic", siehe CSS), fester Kartenabstand ueber
+             ".grid" statt einzelner Inline-Margins, und die beiden kurzen
+             Karten (Zugang, Rollen) stehen ab Desktop-Breite nebeneinander
+             statt hintereinander -- ".g-1-1" existierte schon fuer genau
+             diesen Fall, wurde bisher aber nirgends eingesetzt. -->
+        <div class="grid">
         <!-- Zwei-Faktor-Anmeldung (ENT-076). Steht hier und nicht bei den
              Mitarbeitenden: Es geht um den EIGENEN Zugang, nicht um fremde.
              Nur fuer Verwaltungszugaenge -- so entschieden, weil daran die
              ganze Personalakte haengt. -->
-        <div class="card" style="margin-bottom:16px" id="zfKarte">
-          <div class="card-hd"><h3>Mein Zugang: Zwei-Faktor-Anmeldung</h3></div>
+        <!-- Briefkopf fuer den Rapport-Ausdruck (ENT-155). Steht bewusst weit
+             oben: Was hier gepflegt wird, geht an Kunden heraus, und solange
+             es leer ist, druckt der Rapport einen unbeschrifteten Kopf. -->
+        <div class="card" id="bkKarte">
+          <div class="card-hd">
+            <span class="card-ic"><svg class="i" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg></span>
+            <h3>Briefkopf für Rapporte</h3>
+          </div>
+          <div class="card-bd">
+            <div class="msg-err" id="bkErr" style="display:none"></div>
+            <div class="ki-hint web on" style="margin:0 0 14px">
+              <span>Diese Angaben stehen auf jedem gedruckten Arbeitsrapport, den
+                Kunden zu sehen bekommen.</span></div>
+            <div class="form-zeile">
+              <div class="f"><label for="bkFirma">Firma</label>
+                <input class="inp" id="bkFirma" maxlength="200" placeholder="z. B. CUPI 24 GmbH"></div>
+              <div class="f"><label for="bkZusatz">Zusatz unter der Firma</label>
+                <input class="inp" id="bkZusatz" maxlength="200" placeholder="z. B. Sicherheits- und Verkehrsdienst"></div>
+            </div>
+            <div class="form-zeile">
+              <div class="f"><label for="bkFuss">Fusszeile</label>
+                <textarea class="inp" id="bkFuss" rows="2"
+                  placeholder="z. B. Adresse · Telefon · E-Mail · UID"></textarea>
+                <div class="note" style="margin-top:5px">Steht klein am Seitenende. Leer lassen, wenn keine gewünscht ist.</div></div>
+              <!-- Zweiter Block fuer einen Zweitsitz (ENT-169) -- rein optional,
+                   erscheint auf dem Ausdruck nur, wenn hier etwas steht. -->
+              <div class="f"><label for="bkFuss2">Fusszeile 2 (Zweitsitz)</label>
+                <textarea class="inp" id="bkFuss2" rows="2"
+                  placeholder="z. B. zweiter Standort mit eigener Adresse"></textarea>
+                <div class="note" style="margin-top:5px">Nur wenn ein zweiter Standort ausgewiesen werden soll.</div></div>
+            </div>
+            <div class="f" style="margin-top:4px">
+              <label>Logo</label>
+              <div id="bkLogoStand" class="note">Kein Logo hinterlegt.</div>
+              <input type="file" id="bkLogoDatei" accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                style="display:none" onchange="bkLogoGewaehlt(this.files[0])">
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">
+                <button type="button" class="btn btn-plain btn-sm" onclick="$('bkLogoDatei').click()"
+                  title="PNG, JPEG, SVG oder WebP, höchstens 512 KB">Logo wählen</button>
+                <button type="button" class="btn btn-plain btn-sm" id="bkLogoWeg"
+                  style="display:none" onclick="bkLogoWeg()">Logo entfernen</button>
+                <span class="note">höchstens 512 KB</span>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:16px">
+              <button type="button" class="btn btn-primary" onclick="bkSpeichern()">Briefkopf speichern</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Nebeneinander statt hintereinander: beide Karten sind kurz, und
+             gerade der Groessenunterschied zu den grossen Formularen daneben
+             ist Teil der Struktur, um die es hier geht (siehe Hinweis oben). -->
+        <div class="grid g-1-1">
+        <div class="card" id="zfKarte">
+          <div class="card-hd">
+            <span class="card-ic"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+            <h3>Mein Zugang: Zwei-Faktor-Anmeldung</h3>
+          </div>
           <div class="card-bd">
             <div class="msg-err" id="zfErr" style="display:none"></div>
             <div id="zfInhalt"><div style="color:var(--ink-3)">Wird geladen …</div></div>
@@ -3608,15 +3877,22 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
              ohnehin ist, wenn man jemanden anlegt. Ohne diese Uebersicht
              waeren die Rechte ueber alle Akten verstreut, und niemand koennte
              die Frage beantworten, wer eigentlich an die AHV-Nummern kommt. -->
-        <div class="card" style="margin-bottom:16px" id="rvKarte">
-          <div class="card-hd"><h3>Rollen im Betrieb</h3></div>
+        <div class="card" id="rvKarte">
+          <div class="card-hd">
+            <span class="card-ic"><svg class="i" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+            <h3>Rollen im Betrieb</h3>
+          </div>
           <div class="card-bd">
             <div id="rvInhalt"><div style="color:var(--ink-3)">Wird geladen …</div></div>
           </div>
         </div>
+        </div>
 
-        <div class="card" style="margin-bottom:16px">
-          <div class="card-hd"><h3>Anstellungsorte</h3></div>
+        <div class="card">
+          <div class="card-hd">
+            <span class="card-ic"><svg class="i" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
+            <h3>Anstellungsorte</h3>
+          </div>
           <div class="card-bd">
             <div class="msg-err" id="anErr" style="display:none"></div>
             <div class="ki-hint web on" style="margin-bottom:14px">
@@ -3653,12 +3929,19 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
         </div>
 
         <div class="card">
-          <div class="card-hd"><h3>Was hier noch fehlt</h3></div>
+          <div class="card-hd">
+            <span class="card-ic gedaempft"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
+            <h3>Was hier noch fehlt</h3>
+          </div>
           <div class="card-bd">
-            <p class="zone-note">Weitere betriebliche Angaben — Firmenname, Rechnungsadresse, MWST-Nummer,
+            <!-- Firmenname stand hier bis ENT-161 noch mit in der Liste --
+                 seit ENT-155 erfasst ihn der Briefkopf oben, die Zeile war
+                 seither schlicht falsch. -->
+            <p class="zone-note">Weitere betriebliche Angaben — Rechnungsadresse, MWST-Nummer,
                Zahlungskonditionen — sind noch nicht erfasst. Sie werden gebraucht, sobald aus dem Werkzeug
                Offerten oder Rechnungen entstehen, und werden dann hier ergänzt.</p>
           </div>
+        </div>
         </div>
       </section>
 
@@ -3853,6 +4136,24 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
       <div class="form-grid" id="kuUidFelder">
         <div class="f"><label for="ku_uid">CHE- Unternehmens-Id</label><input class="inp" id="ku_uid" placeholder="CHE-123.456.789"></div>
         <div class="f"><label for="ku_mwst_nr">CHE- MWST-Nr.</label><input class="inp" id="ku_mwst_nr"></div>
+      </div>
+
+      <!-- Abweichende Rechnungsadresse (ENT-155). Ohne Schalter „abweichend
+           ja/nein": leer heisst gleich wie oben, gefuellt heisst abweichend.
+           Ein Schalter koennte auf „ja" stehen, waehrend die Felder leer
+           sind -- und dann stuende auf dem Beleg eine leere Adresse. -->
+      <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--line-soft)">
+        <div class="ep-dok-kopf">Rechnungsadresse</div>
+        <div class="note" style="margin:-2px 0 10px">Nur ausfüllen, wenn die Rechnung an eine
+          andere Adresse geht als oben. Leer lassen heisst: gleiche Adresse.</div>
+        <div class="form-grid">
+          <div class="f wide"><label for="ku_re_name">Firma / Name</label><input class="inp" id="ku_re_name"></div>
+          <div class="f wide"><label for="ku_re_zusatz">Zusatz</label><input class="inp" id="ku_re_zusatz" placeholder="z. B. Buchhaltung, Postfach"></div>
+          <div class="f"><label for="ku_re_strasse">Strasse</label><input class="inp" id="ku_re_strasse"></div>
+          <div class="f"><label for="ku_re_hausnummer">Nr.</label><input class="inp" id="ku_re_hausnummer"></div>
+          <div class="f"><label for="ku_re_plz">PLZ</label><input class="inp" id="ku_re_plz"></div>
+          <div class="f"><label for="ku_re_ort">Ort</label><input class="inp" id="ku_re_ort"></div>
+        </div>
       </div>
 
       <div class="tabs" id="kuDlgTabs" style="margin-top:22px">
@@ -4519,6 +4820,10 @@ function enter() {
   }).catch(() => {});
   ordLaden('uebersicht');
   sprachBereit('rt');
+  // Der Briefkopf wird schon hier geholt, nicht erst beim Drucken (ENT-155):
+  // window.print() wartet nicht auf einen noch laufenden Abruf, und dann
+  // faende sich der Kopf genau auf dem Blatt nicht wieder.
+  briefkopfLaden();
   reloadAll();
   pruefeUpdate();
 }
@@ -5982,11 +6287,13 @@ function renderRapporte() {
       : EMPTY('Noch keine Rapporte', 'Sobald Einsätze in der Erfassung gespeichert werden, erscheinen sie hier.');
     return;
   }
-  $('rapporteTable').innerHTML = `<table><thead><tr>
-      <th>Datum</th><th>Mitarbeitende</th><th>Kunde</th><th>Ort</th>
-      <th>Einsatzart</th><th>Zeit</th><th class="num">Pause</th><th class="num">Netto</th><th>Unterzeichner</th>
-    </tr></thead><tbody>` + d.map(r => `
-      <tr class="click" onclick="openDrawer(${Number(r.id)})">
+  // Klammer und Knopf wie im Kunden-Detail (ENT-173), hier seit ENT-178
+  // ebenfalls -- Zeilen desselben Einsatzes koennen auch kundenuebergreifend
+  // benachbart stehen (gleiches Datum, gleiche Sortierung), rapporteGruppieren()
+  // fasst sie dann genauso zusammen. Steht eine fremde Zeile eines anderen
+  // Einsatzes dazwischen, entsteht keine Gruppe -- bewusste Rueckfallwirkung,
+  // siehe Begruendung bei rapporteGruppieren().
+  const zelle = r => `
         <td class="nowrap num">${dmy(r.datum)}</td>
         <td class="strong nowrap">${esc(r.mitarbeiter)}</td>
         <td>${esc(r.kunde)}<div class="sec">${esc(r.strasse)}</div></td>
@@ -5995,8 +6302,11 @@ function renderRapporte() {
         <td class="nowrap num">${hm(r.von)}–${hm(r.bis)}</td>
         <td class="num nowrap" style="color:var(--ink-3)">${nf(r.pause_min)} min</td>
         <td class="num nowrap"><span class="chip chip-p">${nf(r.netto_h, 2)} h</span></td>
-        <td>${r.unterzeichner ? esc(r.unterzeichner) : '<span style="color:var(--ink-3)">–</span>'}</td>
-      </tr>`).join('') + `</tbody></table>`;
+        <td>${r.unterzeichner ? esc(r.unterzeichner) : '<span style="color:var(--ink-3)">–</span>'}</td>`;
+  $('rapporteTable').innerHTML = `<table><thead><tr>
+      <th></th><th>Datum</th><th>Mitarbeitende</th><th>Kunde</th><th>Ort</th>
+      <th>Einsatzart</th><th>Zeit</th><th class="num">Pause</th><th class="num">Netto</th><th>Unterzeichner</th>
+    </tr></thead><tbody>${rapporteZeilenMitKlammer(d, zelle)}</tbody></table>`;
 }
 
 function exportCSV() {
@@ -6927,9 +7237,25 @@ const zusageVon = m => String((m && m.zusage) || 'offen');
 // Ein Name in der Liste sagt jetzt auch, ob die Person abgesagt hat.
 // Ohne das stuende sie unauffaellig zwischen den anderen, obwohl ihr Platz
 // wieder offen ist (ENT-113).
-const nameChip = m => zusageVon(m) === 'abgelehnt'
-  ? `<span class="nm nm-abgelehnt" title="Hat abgelehnt — der Platz ist wieder offen">${esc(fullName(m) || m.name)}</span>`
-  : `<span class="nm">${esc(fullName(m) || m.name)}</span>`;
+//
+// ENT-141: liegt fuer diese Person ein Rapport zu genau diesem Einsatz vor
+// (agRapport, dieselbe "neueste zaehlt"-Regel wie im Abgleich/Einsatzplan),
+// bekommt ihr Name-Chip ein kleines, anklickbares Symbol -- oeffnet den
+// bestehenden Rapport-Betrachter direkt (openDrawer, ENT-138), ohne den Weg
+// ueber den Einsatzplan. Der Projektinhaber wollte das ausdruecklich fuer
+// JEDE Schicht in der Liste, nicht nur innerhalb einer Serie. Zweiter
+// Parameter `e` optional: ohne Einsatzkontext (falls nameChip je an anderer
+// Stelle ohne Rapportbezug gebraucht wird) bleibt das Verhalten unveraendert.
+const nameChip = (m, e) => {
+  const name = esc(fullName(m) || m.name);
+  if (zusageVon(m) === 'abgelehnt') {
+    return `<span class="nm nm-abgelehnt" title="Hat abgelehnt — der Platz ist wieder offen">${name}</span>`;
+  }
+  const r = e ? agRapport({ einsatz_id: e.id, mitarbeiter_id: m.id }) : null;
+  const rapIkone = r ? `<button type="button" class="nm-rap" title="Rapport von ${name}, ${dmy(r.datum)} — ansehen"
+      onclick="event.stopPropagation();openDrawer(${Number(r.id)})">${RAP_IKONE}</button>` : '';
+  return `<span class="nm">${name}${rapIkone}</span>`;
+};
 const besetzt = e => (e.mitarbeiter || []).filter(m => zusageVon(m) !== 'abgelehnt');
 const hatAbgelehnt = e => (e.mitarbeiter || []).some(m => zusageVon(m) === 'abgelehnt');
 const fehlend = e => (e.status === 'abgesagt' ? 0 : Math.max(0, Number(e.bedarf) - besetzt(e).length));
@@ -7119,9 +7445,37 @@ function serieZeigen(k) {
   pSerie = k;
   go('planung'); goTab('einsaetze');
   renderPlanung();
-  const el = $('plTable'); if (el && el.scrollIntoView) { el.scrollIntoView({ block: 'start' }); }
+  // Der Banner mit dem Rueckweg wird angesprungen, nicht die Tabelle darunter
+  // -- sonst rutscht der Banner beim Scrollen an den obersten Rand und damit
+  // teilweise hinter die feste Kopfzeile (60 px, .topbar). scroll-margin-top
+  // auf .serie-filter haelt denselben Abstand ein.
+  const el = $('pSerieFilter'); if (el && el.scrollIntoView) { el.scrollIntoView({ block: 'start' }); }
 }
 function serieFilterWeg() { pSerie = null; renderPlanung(); }
+
+// ── Serien-Gruppierung in der Planungsliste (ENT-142) ──────────────────────
+// Der erste Tag einer Reihe traegt die ganze Gruppe zusammengeklappt. Jeder
+// weitere Tag bleibt in seinem eigenen Tagesblock stehen -- nicht als volle
+// Zeile, sondern als schlanker Verweis zurueck zum ersten Tag. Ohne diesen
+// Verweis wuerde ein Tagesblock, dessen einziger Einsatz Teil einer
+// eingeklappten Reihe ist, mit "0 Einsaetze" oder gar nicht erscheinen --
+// genau die falsche Aussage, die ENT-069 verbietet ("nichts vorhanden" darf
+// nie etwas anderes bedeuten als nichts vorhanden). Ausgeklappt erscheinen
+// die uebrigen Tage zusaetzlich als volle Zeilen direkt unter dem ersten Tag,
+// mit eigenem Datum -- dort fehlt der Tageskopf ja.
+let pSerieOffen = new Set();
+function serieAufKlappen(schluessel) {
+  if (pSerieOffen.has(schluessel)) { pSerieOffen.delete(schluessel); } else { pSerieOffen.add(schluessel); }
+  renderPlanung();
+}
+function serieZuAnker(schluessel) {
+  pSerieOffen.add(schluessel);
+  renderPlanung();
+  ['serie-anker-' + schluessel, 'serie-anker-k-' + schluessel].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.scrollIntoView) { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+  });
+}
 
 function serieFilterZeile() {
   const el = $('pSerieFilter');
@@ -7129,11 +7483,106 @@ function serieFilterZeile() {
   if (!pSerie) { el.innerHTML = ''; el.style.display = 'none'; return; }
   const liste = serieVerzeichnis().get(pSerie) || [];
   const art = pSerie.charAt(0) === 'm' ? 'Objektschichten aus einer Masterschicht' : 'zusammen angelegte Einsätze';
+  // Der Rueckweg steht zuerst, nicht am Ende eines Fliesstexts hinter einem
+  // Abstandhalter: als eigenes, immer gleich grosses Element ist er nie davon
+  // abhaengig, wie lang der Beschreibungssatz gerade ausfaellt oder wie die
+  // Zeile umbricht -- er kann nicht "verschwinden", weil kein Platz mehr da
+  // ist. Das ist der Rueckweg aus der ganzen isolierten Ansicht, kein Detail
+  // dieser einen Zeile -- er verdient die Prominenz eines echten Zurueck.
   el.style.display = '';
-  el.innerHTML = `${SERIE_IKONE}<span>Es wird nur <b>eine Reihe</b> gezeigt —
-      ${liste.length} ${art}${liste.length ? `, ${esc(dmy(tagVon(liste[0])))} bis ${esc(dmy(tagVon(liste[liste.length - 1])))}` : ''}.</span>
-    <span class="sp" style="flex:1"></span>
-    <button class="btn btn-quiet btn-sm" onclick="serieFilterWeg()">Ganze Planung zeigen</button>`;
+  el.innerHTML = `<button type="button" class="serie-zurueck" onclick="serieFilterWeg()">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+      Zurück zu allen Einsätzen</button>
+    <span class="serie-filter-text">${SERIE_IKONE}<span>Es wird nur <b>eine Reihe</b> gezeigt —
+      ${liste.length} ${art}${liste.length ? `, ${esc(dmy(tagVon(liste[0])))} bis ${esc(dmy(tagVon(liste[liste.length - 1])))}` : ''}.</span></span>`;
+}
+
+// Eine volle Tabellenzeile fuer genau einen Einsatz -- unveraendert fuer den
+// Normalfall, mit optionalem Auf/Zu-Pfeil fuer den ersten Tag einer Reihe und
+// optionalem Datumshinweis fuer einen ausgeklappten weiteren Tag, der ausserhalb
+// seines eigenen Tageskopfs steht.
+//
+// Rollen und ihre Klassen (ENT-144): `serie` sagt nur "gehoert zu einer Reihe"
+// und traegt allein KEINE Flaeche mehr -- sonst sieht ein Einzeltag, dessen
+// Geschwister ausserhalb des Filters liegen, genauso aus wie eine hier
+// tatsaechlich zusammenhaengende Gruppe. Die Flaeche haengt an `serie-grp`
+// (Anker + ausgeklappte Kinder), die Klammer oben/unten an `serie-anker` und
+// `serie-grp-ende`.
+function plZeile(e, opts) {
+  opts = opts || {};
+  const zug = e.mitarbeiter || [];
+  const fehlt = fehlend(e);
+  const teile = zug.slice(0, 3).map(m => nameChip(m, e));
+  if (zug.length > 3) teile.push(`<span class="nm">+${zug.length - 3}</span>`);
+  if (fehlt) teile.push(`<span class="nm off">${fehlt} offen</span>`);
+  const gesperrt = enGesperrt(e);
+  const st = enStatusMarke(e);
+  const istHeute = tagVon(e) === isoTag();
+  const ankerId = opts.ankerId ? ` id="serie-anker-${opts.ankerId}"` : '';
+  const gruppe = opts.klappbar ? ' serie-grp serie-anker' : (opts.verschachtelt ? ' serie-grp serie-kind' : '');
+  const klapp = opts.klappbar
+    ? `<button type="button" class="serie-klapp" onclick="event.stopPropagation();serieAufKlappen('${opts.klappbar}')"
+        title="${opts.offen ? 'Reihe einklappen' : 'Weitere Tage der Reihe zeigen'}">${opts.offen ? '▾' : '▸'}</button>`
+    : '';
+  return `
+    <tr${ankerId} class="click${istHeute ? ' heute' : ''}${gesperrt ? ' zu abgeglichen' : ''}${serieStand(e) ? ' serie' : ''}${e.status === 'abgeschlossen' ? ' status-abgeschlossen' : ''}${gruppe}${opts.ende ? ' serie-grp-ende' : ''}" onclick="openEinsatz(${Number(e.id)})">
+      <td class="nowrap num">${opts.verschachtelt ? `<span class="serie-kind-datum">${dmy(tagVon(e))}</span>` : ''}<span class="pl-zeit">${klapp}<span>${hm(e.von)}–${hm(e.bis)}</span></span>${ueberNacht(e) ? '<div class="sec">bis Folgetag</div>' : ''}${!opts.verschachtelt ? serieMarke(e) : ''}</td>
+      <td class="strong">${esc(e.kunde_name)}${e.titel ? `<div class="sec">${esc(e.titel)}</div>` : ''}</td>
+      <td>${esc(e.ort)}${e.strasse ? `<div class="sec">${esc(e.strasse)}</div>` : ''}</td>
+      <td><span class="chip chip-n">${esc(e.einsatzart)}</span>${sparteChip(e)}</td>
+      <td class="num"><span class="chip ${e.status === 'abgesagt' ? 'chip-n' : (fehlt ? 'chip-w' : 'chip-p')}">${besetzt(e).length}/${nf(e.bedarf)}</span></td>
+      <td>${teile.length ? `<div class="crew">${teile.join('')}</div>` : '<span style="color:var(--ink-3)">–</span>'}</td>
+      <td><span class="chip ${st[1]}">${st[0]}${gesperrt ? SCHLOSS_ZU : ''}</span>${einsatzRapportWeichtAb(e) ? ` <span class="rap-abw" title="Rapport weicht vom Plan ab">⚠️</span>` : ''}</td>
+    </tr>`;
+}
+
+// Die schlanke Verweis-Zeile eines weiteren Reihentags in seinem eigenen
+// Tagesblock -- ersetzt die volle Zeile, solange die Reihe eingeklappt ist
+// oder nachdem sie ausgeklappt wurde (die volle Zeile steht dann beim ersten
+// Tag). Ein Klick klappt auf und springt dorthin.
+function plFolgeZeile(e, gk) {
+  const st = serieStand(e);
+  return `<tr class="click serie-folge" onclick="serieZuAnker('${gk}')">
+    <td colspan="7"><div class="serie-folge-in">${SERIE_IKONE}<span>Teil der Reihe · ${esc(e.kunde_name)} — Tag ${st.nr} von ${st.anzahl}</span><span class="sp" style="flex:1"></span><span class="serie-folge-mehr">zur Reihe ›</span></div></td>
+  </tr>`;
+}
+
+// Dieselbe Zeile als Handy-Karte.
+function plKarte(e, opts) {
+  opts = opts || {};
+  const zug = e.mitarbeiter || [];
+  const fehlt = fehlend(e);
+  const gesperrt = enGesperrt(e);
+  const st = enStatusMarke(e);
+  const ankerId = opts.ankerId ? ` id="serie-anker-k-${opts.ankerId}"` : '';
+  const klapp = opts.klappbar
+    ? `<button type="button" class="serie-klapp" onclick="event.stopPropagation();serieAufKlappen('${opts.klappbar}')"
+        title="${opts.offen ? 'Reihe einklappen' : 'Weitere Tage der Reihe zeigen'}">${opts.offen ? '▾' : '▸'}</button>`
+    : '';
+  const gruppe = opts.klappbar ? ' serie-grp serie-anker' : (opts.verschachtelt ? ' serie-grp serie-kind' : '');
+  return `<div${ankerId} class="ag-karte click${serieStand(e) ? ' serie' : ''}${e.status === 'abgeschlossen' ? ' status-abgeschlossen' : ''}${gesperrt ? ' abgeglichen' : ''}${gruppe}${opts.ende ? ' serie-grp-ende' : ''}" onclick="openEinsatz(${Number(e.id)})">
+    <div class="kopf">
+      ${opts.verschachtelt ? `<span class="serie-kind-datum">${dmy(tagVon(e))}</span>` : ''}
+      <b>${esc(hm(e.von))}–${esc(hm(e.bis))}${ueberNacht(e) ? ' <span class="ag-plan">bis Folgetag</span>' : ''}</b>
+      <span class="chip ${e.status === 'abgesagt' ? 'chip-n' : (fehlt ? 'chip-w' : 'chip-p')}">${besetzt(e).length}/${nf(e.bedarf)}</span>
+      ${klapp}
+    </div>
+    <div class="wer">${esc(e.kunde_name)}${e.titel ? ` · ${esc(e.titel)}` : ''}</div>
+    <div class="zeiten">${esc(e.ort)}${e.strasse ? ` · ${esc(e.strasse)}` : ''}</div>
+    <div class="marken">
+      <span class="chip ${st[1]}">${st[0]}${gesperrt ? SCHLOSS_ZU : ''}</span>${einsatzRapportWeichtAb(e) ? ` <span class="rap-abw" title="Rapport weicht vom Plan ab">⚠️</span>` : ''}
+      ${zug.slice(0, 3).map(m => nameChip(m, e)).join('')}
+      ${zug.length > 3 ? `<span class="nm">+${zug.length - 3}</span>` : ''}
+      ${fehlt ? `<span class="nm off">${fehlt} offen</span>` : ''}
+    </div>
+    ${!opts.verschachtelt ? serieMarke(e) : ''}
+  </div>`;
+}
+function plFolgeKarte(e, gk) {
+  const st = serieStand(e);
+  return `<div class="ag-karte click serie-folge" onclick="serieZuAnker('${gk}')">
+    <div class="serie-folge-in">${SERIE_IKONE}<span>Teil der Reihe · ${esc(e.kunde_name)} — Tag ${st.nr} von ${st.anzahl}</span><span class="sp" style="flex:1"></span><span class="serie-folge-mehr">zur Reihe ›</span></div>
+  </div>`;
 }
 
 function renderPlanung() {
@@ -7163,6 +7612,27 @@ function renderPlanung() {
     return;
   }
 
+  // Gruppierung nur in der ungefilterten Reihenansicht (ENT-142) -- steht
+  // pSerie schon fest, zeigt pFiltered() ohnehin nur die eine Reihe komplett,
+  // dort waere ein Zusammenklappen sinnlos. Bewusst ueber die gerade
+  // sichtbare Liste `d` gebildet, nicht ueber alle Einsaetze: Ein Zeitfilter
+  // kann eine Reihe auf einen einzelnen sichtbaren Tag zusammenschrumpfen,
+  // dann ist es keine Gruppe mehr.
+  const serieGruppen = new Map();
+  if (!pSerie) {
+    d.forEach(e => {
+      const k = serieSchluessel(e);
+      if (!k) { return; }
+      if (!serieGruppen.has(k)) { serieGruppen.set(k, []); }
+      serieGruppen.get(k).push(e);
+    });
+    // Der erste Tag ist immer der chronologisch erste, nie der erste in der
+    // gerade angezeigten Reihenfolge -- bei "Alle" steht das Neueste zuoberst,
+    // sonst waere je nach Sortierung ein anderer Tag der "erste".
+    serieGruppen.forEach(liste => liste.sort((a, b) => (tagVon(a) + ' ' + a.von).localeCompare(tagVon(b) + ' ' + b.von)));
+    Array.from(serieGruppen.keys()).forEach(k => { if (serieGruppen.get(k).length < 2) { serieGruppen.delete(k); } });
+  }
+
   const heute = isoTag();
   let letzterTag = '';
   const zeilen = d.map(e => {
@@ -7181,24 +7651,22 @@ function renderPlanung() {
         </div></td></tr>`;
     }
 
-    const zug = e.mitarbeiter || [];
-    const fehlt = fehlend(e);
-    const teile = zug.slice(0, 3).map(nameChip);
-    if (zug.length > 3) teile.push(`<span class="nm">+${zug.length - 3}</span>`);
-    if (fehlt) teile.push(`<span class="nm off">${fehlt} offen</span>`);
-    const gesperrt = enGesperrt(e);
-    const st = enStatusMarke(e);
-
-    return kopf + `
-      <tr class="click${tag === heute ? ' heute' : ''}${gesperrt ? ' zu abgeglichen' : ''}${serieStand(e) ? ' serie' : ''}${e.status === 'abgeschlossen' ? ' status-abgeschlossen' : ''}" onclick="openEinsatz(${Number(e.id)})">
-        <td class="nowrap num">${hm(e.von)}–${hm(e.bis)}${ueberNacht(e) ? '<div class="sec">bis Folgetag</div>' : ''}${serieMarke(e)}</td>
-        <td class="strong">${esc(e.kunde_name)}${e.titel ? `<div class="sec">${esc(e.titel)}</div>` : ''}</td>
-        <td>${esc(e.ort)}${e.strasse ? `<div class="sec">${esc(e.strasse)}</div>` : ''}</td>
-        <td><span class="chip chip-n">${esc(e.einsatzart)}</span>${sparteChip(e)}</td>
-        <td class="num"><span class="chip ${e.status === 'abgesagt' ? 'chip-n' : (fehlt ? 'chip-w' : 'chip-p')}">${besetzt(e).length}/${nf(e.bedarf)}</span></td>
-        <td>${teile.length ? `<div class="crew">${teile.join('')}</div>` : '<span style="color:var(--ink-3)">–</span>'}</td>
-        <td><span class="chip ${st[1]}">${st[0]}${gesperrt ? SCHLOSS_ZU : ''}</span>${einsatzRapportWeichtAb(e) ? ` <span class="rap-abw" title="Rapport weicht vom Plan ab">⚠️</span>` : ''}</td>
-      </tr>`;
+    const gk = serieSchluessel(e);
+    const gruppe = gk ? serieGruppen.get(gk) : null;
+    if (gruppe) {
+      if (gruppe[0] !== e) { return kopf + plFolgeZeile(e, gk); }
+      const offen = pSerieOffen.has(gk);
+      // Die Gruppe bekommt oben und unten eine Klammer. Eingeklappt ist der
+      // Anker zugleich das Ende, ausgeklappt der letzte eingeschobene Tag --
+      // sonst liefe die Klammer mitten durch eine fremde Zeile.
+      let zeile = kopf + plZeile(e, { klappbar: gk, offen, ankerId: gk, ende: !offen });
+      if (offen) {
+        const kinder = gruppe.slice(1);
+        zeile += kinder.map((x, i) => plZeile(x, { verschachtelt: true, ende: i === kinder.length - 1 })).join('');
+      }
+      return zeile;
+    }
+    return kopf + plZeile(e, {});
   }).join('');
 
   // Auf dem Handy dieselben Einsaetze als Karten (ENT-058). Die Optik stammt
@@ -7222,31 +7690,30 @@ function renderPlanung() {
         <span class="note">${amTag.length} ${amTag.length === 1 ? 'Einsatz' : 'Einsätze'}${offenTag ? ` · ${offenTag} offen` : ''}</span>
       </div>`;
     }
-    const zug = e.mitarbeiter || [];
-    const fehlt = fehlend(e);
-    const gesperrt = enGesperrt(e);
-    const st = enStatusMarke(e);
-    return kopf + `<div class="ag-karte click${serieStand(e) ? ' serie' : ''}${e.status === 'abgeschlossen' ? ' status-abgeschlossen' : ''}${gesperrt ? ' abgeglichen' : ''}" onclick="openEinsatz(${Number(e.id)})">
-      <div class="kopf">
-        <b>${esc(hm(e.von))}–${esc(hm(e.bis))}${ueberNacht(e) ? ' <span class="ag-plan">bis Folgetag</span>' : ''}</b>
-        <span class="chip ${e.status === 'abgesagt' ? 'chip-n' : (fehlt ? 'chip-w' : 'chip-p')}">${besetzt(e).length}/${nf(e.bedarf)}</span>
-      </div>
-      <div class="wer">${esc(e.kunde_name)}${e.titel ? ` · ${esc(e.titel)}` : ''}</div>
-      <div class="zeiten">${esc(e.ort)}${e.strasse ? ` · ${esc(e.strasse)}` : ''}</div>
-      <div class="marken">
-        <span class="chip ${st[1]}">${st[0]}${gesperrt ? SCHLOSS_ZU : ''}</span>${einsatzRapportWeichtAb(e) ? ` <span class="rap-abw" title="Rapport weicht vom Plan ab">⚠️</span>` : ''}
-        ${zug.slice(0, 3).map(nameChip).join('')}
-        ${zug.length > 3 ? `<span class="nm">+${zug.length - 3}</span>` : ''}
-        ${fehlt ? `<span class="nm off">${fehlt} offen</span>` : ''}
-      </div>
-      ${serieMarke(e)}
-    </div>`;
+    const gk = serieSchluessel(e);
+    const gruppe = gk ? serieGruppen.get(gk) : null;
+    if (gruppe) {
+      if (gruppe[0] !== e) { return kopf + plFolgeKarte(e, gk); }
+      const offen = pSerieOffen.has(gk);
+      let karte = kopf + plKarte(e, { klappbar: gk, offen, ankerId: gk, ende: !offen });
+      if (offen) {
+        const kinder = gruppe.slice(1);
+        karte += kinder.map((x, i) => plKarte(x, { verschachtelt: true, ende: i === kinder.length - 1 })).join('');
+      }
+      return karte;
+    }
+    return kopf + plKarte(e, {});
   }).join('');
 
   $('plTable').innerHTML = `<div class="nur-schmal">${karten}</div>`
+    // Zeit ist seit ENT-144 breiter (10 -> 13 %): die Spalte traegt jetzt
+    // Auf/Zu-Pfeil, Uhrzeit und Reihen-Marke. Bei 10 % ragten Pfeil und
+    // Uhrzeit zusammen ueber die Zelle hinaus und ueberlagerten den
+    // Kundennamen. Die 3 Punkte kommen von "Zugeteilt" (24 -> 21 %), das am
+    // meisten Luft hatte und dessen Namen-Chips ohnehin umbrechen.
     + `<table class="nur-breit pl-tab"><colgroup>
-      <col style="width:10%"><col style="width:18%"><col style="width:15%"><col style="width:13%">
-      <col style="width:8%"><col style="width:24%"><col style="width:12%">
+      <col style="width:13%"><col style="width:18%"><col style="width:15%"><col style="width:13%">
+      <col style="width:8%"><col style="width:21%"><col style="width:12%">
     </colgroup><thead><tr>
       <th>Zeit</th><th>Kunde</th><th>Arbeitsort</th><th>Einsatzart</th>
       <th class="num">Besetzung</th><th>Zugeteilt</th><th>Status</th>
@@ -7919,17 +8386,21 @@ function epDokLaden() {
 
 function epDokBlock() {
   const gesperrt = enGesperrt(epEinsatz);
-  return `<div class="card-bd" style="padding:0 16px 14px">
+  // Kein eigenes .card-bd mehr: der Block ist seit ENT-150 eine Spalte
+  // neben dem Rapport, die Aussenabstaende gehoeren dem Raster (.ep-zone).
+  return `<div class="ep-zone-teil">
     <div class="ep-dok-kopf">Dokumente</div>
     <div class="dok-liste">${epDok.map(d =>
       dokZeile(d, `dokOeffnen(${d.id});return false`, gesperrt ? null : `epDokWeg(${d.id})`)).join('')}</div>
     ${epDok.length ? '' : `<div class="note">Noch keine Unterlagen angehängt.</div>`}
     ${gesperrt ? '' : `<input type="file" id="epDokDatei" accept="application/pdf" style="display:none"
         onchange="epDokGewaehlt(this.files[0])">
-      <button type="button" class="btn btn-quiet btn-sm" style="margin-top:8px"
-        onclick="$('epDokDatei').click()">PDF anhängen</button>
-      <div class="note" style="margin-top:6px">Nur PDF, höchstens 4 MB. Die Eingeteilten
-        öffnen es in ihrer App.</div>`}
+      <div class="dok-anhang">
+        <button type="button" class="btn btn-plain btn-sm"
+          title="Nur PDF, höchstens 4 MB. Die Eingeteilten öffnen es in ihrer App."
+          onclick="$('epDokDatei').click()">PDF anhängen</button>
+        <span class="note">höchstens 4 MB</span>
+      </div>`}
   </div>`;
 }
 
@@ -7961,6 +8432,11 @@ function epDokWeg(id) {
 // Geschlossenes Vorhaengeschloss. Steht ueberall dort, wo eine festgeschriebene
 // Schicht auftaucht -- im Abgleich wie in der Planung.
 const SCHLOSS_ZU = '<svg class="i-schloss" viewBox="0 0 24 24"><rect x="3.5" y="11" width="17" height="10" rx="2"/><path d="M7.5 11V7a4.5 4.5 0 0 1 9 0v4"/></svg>';
+// Dasselbe Blatt-Symbol wie ueberall sonst fuer "Rapport" im Programm
+// (KW_IKONEN.blatt, App-Leerzustand) -- keine zweite Bildsprache fuer
+// dieselbe Sache (ENT-141).
+const RAP_IKONE = '<svg class="nm-rap-ikone" viewBox="0 0 24 24" aria-hidden="true">'
+  + '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
 
 // Eine Schicht ist festgeschrieben, sobald irgendwo ein Ist-Stand erfasst ist --
 // an der Schicht selbst oder an einer ihrer Zuteilungen (ENT-045). Danach ist
@@ -8259,17 +8735,94 @@ function renderKundeDetail() {
     // Verweis, siehe Risiko in ENT-040.
     const treffer = rapporte.filter(r => r.kunde === k.name);
     $('kdRapporte').innerHTML = treffer.length
-      ? `<table><thead><tr><th>Datum</th><th>Mitarbeitende</th><th>Zeit</th><th class="num">Netto</th><th>Auftrag-Nr.</th></tr></thead><tbody>` +
-        treffer.map(r => `<tr class="click" onclick="openDrawer(${Number(r.id)})">
-          <td class="nowrap num">${dmy(r.datum)}</td><td>${esc(r.mitarbeiter)}</td>
-          <td class="nowrap">${hm(r.von)}–${hm(r.bis)}</td><td class="num">${nf(Number(r.netto_h), 2)} h</td>
-          <td>${dash(r.auftrag_nr)}</td></tr>`).join('') + `</tbody></table>`
+      ? kdRapporteTabelle(treffer)
       : EMPTY('Keine Rapporte', 'Für diesen Kunden liegt noch kein Rapport vor.');
   }
   if (kdTab === 'offerten') {
     $('kdOfferten').innerHTML = EMPTY('Noch nicht verfügbar', 'Offerten gibt es in diesem System noch nicht als eigene Funktion.');
   }
 }
+
+// ── Zusammengehoerige Rapporte am selben Einsatz -- Klammer + Knopf ────────
+// (ENT-173, Kunden-Detail; ENT-178, globale Liste unter Kunden)
+//
+// Gruppiert wird ausschliesslich BENACHBART, nicht per Sortierung nach
+// einsatz_id -- die Liste bleibt in ihrer bestehenden Reihenfolge (Datum),
+// eine Gruppe entsteht nur, wenn zwei oder mehr direkt aufeinanderfolgende
+// Zeilen dieselbe einsatz_id tragen. Alles andere waere eine stille
+// Umsortierung, die niemand angefragt hat. In der Kunden-Detailansicht sind
+// alle Zeilen ohnehin schon auf einen Kunden gefiltert, keine fremde Zeile
+// kann dazwischenrutschen. In der globalen, kundenuebergreifenden Liste ist
+// das nicht ausgeschlossen -- trifft es ein, bleibt es bei Einzelzeilen ohne
+// Klammer, genau das ist die bewusste Rueckfallwirkung dieser Regel, keine
+// gesonderte Fallunterscheidung noetig.
+function rapporteGruppieren(zeilen) {
+  const gruppen = [];
+  for (const r of zeilen) {
+    const letzte = gruppen[gruppen.length - 1];
+    if (letzte && r.einsatz_id && letzte.einsatzId === r.einsatz_id) {
+      letzte.zeilen.push(r);
+    } else {
+      gruppen.push({ einsatzId: r.einsatz_id || null, zeilen: [r] });
+    }
+  }
+  return gruppen;
+}
+
+// Der Knopf haengt an der Klammer, nicht an jeder einzelnen Zeile -- ein
+// Kundenrapport gehoert zum Einsatz, nicht zur einzelnen Person. Zwei
+// gleichlautende Knoepfe je Gruppe waeren die Frage wert, welchen man
+// klicken soll. Ruft dieselbe, bereits bestehende Funktion auf wie im
+// Einsatzplan (ENT-160) -- kein zweiter Weg, nur ein zweiter Zugang, und
+// mit demselben Wortlaut "Kundenrapport drucken" statt nur einem Symbol
+// (ENT-178): Ein Symbol ohne sichtbare Schrift war fuer alle, die die
+// Funktion noch nicht kennen, nicht selbsterklaerend -- ein Tooltip hilft
+// nur, wer die Maus darueber haelt, auf dem Handy gar niemandem.
+function rapporteKlammerZelle(einsatzId, anzahl) {
+  if (!darf('abgleich')) {
+    // Fehlt das Recht, entfaellt der Knopf, aber die Zellenzahl der Zeile
+    // muss trotzdem stimmen -- eine leere Zelle statt gar keiner.
+    return anzahl > 1 ? `<td class="rapp-klammer" rowspan="${anzahl}"></td>` : '<td class="rapp-klammer"></td>';
+  }
+  const knopf = `<button type="button" class="btn btn-quiet btn-sm" title="Kundenrapport drucken"
+      onclick="event.stopPropagation(); epBerichtDrucken(${Number(einsatzId)})">
+      <svg class="i i-sm" viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      <span>Kundenrapport</span>
+    </button>`;
+  return anzahl > 1
+    ? `<td class="rapp-klammer" rowspan="${anzahl}">${knopf}</td>`
+    : '<td class="rapp-klammer"></td>';
+}
+
+// Baut aus einer flachen Zeilenliste die <tr>-Zeilen samt Klammer-Spalte.
+// `zelle(r)` liefert die uebrigen <td> einer Zeile -- pro Aufrufer
+// unterschiedlich (Kunden-Detail zeigt keine Kunden-Spalte, die globale
+// Liste schon), die Klammer- und Gruppierungslogik ist an beiden Stellen
+// exakt dieselbe.
+function rapporteZeilenMitKlammer(treffer, zelle) {
+  const gruppen = rapporteGruppieren(treffer);
+  return gruppen.map(g => {
+    if (g.zeilen.length > 1 && g.einsatzId) {
+      const knopf = rapporteKlammerZelle(g.einsatzId, g.zeilen.length);
+      return g.zeilen.map((r, i) => {
+        const letzte = i === g.zeilen.length - 1;
+        const klasse = 'click rapp-gruppe' + (letzte ? '' : ' rapp-gruppe-offen');
+        return `<tr class="${klasse}" onclick="openDrawer(${Number(r.id)})">${i === 0 ? knopf : ''}${zelle(r)}</tr>`;
+      }).join('');
+    }
+    const r = g.zeilen[0];
+    return `<tr class="click" onclick="openDrawer(${Number(r.id)})">${rapporteKlammerZelle(null, 1)}${zelle(r)}</tr>`;
+  }).join('');
+}
+
+function kdRapporteTabelle(treffer) {
+  const zelle = r => `<td class="nowrap num">${dmy(r.datum)}</td><td>${esc(r.mitarbeiter)}</td>
+      <td class="nowrap">${hm(r.von)}–${hm(r.bis)}</td><td class="num">${nf(Number(r.netto_h), 2)} h</td>
+      <td>${dash(r.auftrag_nr)}</td>`;
+  return `<table><thead><tr><th></th><th>Datum</th><th>Mitarbeitende</th><th>Zeit</th><th class="num">Netto</th><th>Auftrag-Nr.</th></tr></thead>
+    <tbody>${rapporteZeilenMitKlammer(treffer, zelle)}</tbody></table>`;
+}
+
 function kdBearbeiten() { openKundeBearbeiten(kdId); }
 function kdArchivKlick() {
   const k = kunden.find(x => Number(x.id) === Number(kdId));
@@ -8845,7 +9398,114 @@ let anTarget = null;
 function ladeBetrieb() {
   anTarget = null;
   $('anErr').style.display = 'none';
+  bkLaden();
   return ladeAnstellungsorte().then(() => { anListeZeichnen(); anFormularLeeren(); });
+}
+
+// ══════════════════════════════════════════ BRIEFKOPF (ENT-155)
+// Firmenname, Zusatz, Fusszeile und Logo standen bis dahin als Text im
+// Quelltext von printReport(). Sie gehoeren dem Betrieb, nicht dem Programm --
+// wer sie aendern will, soll nicht den Code anfassen muessen.
+//
+// Der Stand wird beim Anmelden mitgeladen (briefkopfLaden()), damit der
+// Ausdruck ihn ohne zweiten Abruf hat: window.print() wartet nicht auf einen
+// noch laufenden Abruf, und dann fehlte der Briefkopf genau auf dem Blatt.
+let briefkopf = { firma: '', zusatz: '', fusszeile: null, fusszeile2: null, logo: null, logo_groesse: null };
+
+function briefkopfLaden() {
+  return api('betrieb.php').then(({ ok, data }) => {
+    if (ok && data.status === 'ok' && data.betrieb) { briefkopf = data.betrieb; }
+  }).catch(() => {});
+}
+
+// Fusszeile beider Ausdrucke (Kundenrapport und Arbeitsrapport, ENT-155 und
+// ENT-169) -- eine gemeinsame Funktion statt zweimal derselbe Zeile, seit ein
+// zweiter Block fuer einen Zweitsitz dazukam. Nebeneinander statt
+// untereinander, mit align-items:center vertikal zueinander ausgemittelt --
+// hat ein Block mehr Zeilen als der andere, sackt der kuerzere sonst nach
+// oben statt in der Mitte des gemeinsamen Blocks zu stehen. Fehlt einer der
+// beiden, faellt einfach nur die eine Spalte weg statt einer Luecke.
+function bkFusszeile() {
+  if (!briefkopf.fusszeile && !briefkopf.fusszeile2) { return ''; }
+  return `<div style="margin-top:30px;padding-top:10px;border-top:1px solid #E5E8EC;
+      display:flex;align-items:center;justify-content:space-between;gap:32px;
+      font-size:10.5px;color:#6B7280;line-height:1.5">
+    ${briefkopf.fusszeile ? `<div style="white-space:pre-line">${esc(briefkopf.fusszeile)}</div>` : ''}
+    ${briefkopf.fusszeile2 ? `<div style="white-space:pre-line">${esc(briefkopf.fusszeile2)}</div>` : ''}
+  </div>`;
+}
+
+function bkLaden() {
+  return briefkopfLaden().then(() => {
+    if (!$('bkFirma')) { return; }
+    $('bkFirma').value = briefkopf.firma || '';
+    $('bkZusatz').value = briefkopf.zusatz || '';
+    $('bkFuss').value = briefkopf.fusszeile || '';
+    $('bkFuss2').value = briefkopf.fusszeile2 || '';
+    bkLogoStand();
+  });
+}
+
+function bkLogoStand() {
+  const el = $('bkLogoStand'), weg = $('bkLogoWeg');
+  if (!el) { return; }
+  if (briefkopf.logo) {
+    // Das Logo selbst zeigen, nicht nur "vorhanden" behaupten: Wer es
+    // hochgeladen hat, will sehen, was auf dem Rapport landet.
+    el.innerHTML = `<img src="${esc(briefkopf.logo)}" alt="Logo"
+      style="max-height:52px;max-width:220px;display:block;margin-bottom:4px">
+      <span class="note">${briefkopf.logo_groesse ? dokGr(briefkopf.logo_groesse) : ''}</span>`;
+    if (weg) weg.style.display = '';
+  } else {
+    el.textContent = 'Kein Logo hinterlegt.';
+    if (weg) weg.style.display = 'none';
+  }
+}
+
+function bkFehler(text) {
+  const el = $('bkErr'); if (!el) { return; }
+  if (!text) { el.style.display = 'none'; return; }
+  el.textContent = text; el.style.display = '';
+}
+
+function bkSpeichern() {
+  bkFehler('');
+  api('betrieb.php', { method: 'POST', body: {
+    firma: $('bkFirma').value, zusatz: $('bkZusatz').value, fusszeile: $('bkFuss').value,
+    fusszeile2: $('bkFuss2').value,
+  } }).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') { return bkFehler(data.message || 'Speichern fehlgeschlagen.'); }
+    briefkopf = data.betrieb; bkLogoStand(); toast('Briefkopf gespeichert.');
+  }).catch(() => bkFehler('Speichern fehlgeschlagen.'));
+}
+
+// 512 KB gegen die ROHE Datei geprueft, nicht gegen die base64-Fassung: der
+// Server prueft ebenfalls roh (LOGO_MAX), und zwei verschiedene Massstaebe
+// waeren eine Datei, die hier durchgeht und dort abgelehnt wird.
+const LOGO_MAX_JS = 512 * 1024;
+function bkLogoGewaehlt(datei) {
+  const el = $('bkLogoDatei'); if (el) el.value = '';
+  if (!datei) { return; }
+  const erlaubt = ['image/png', 'image/jpeg', 'image/svg+xml', 'image/webp'];
+  if (!erlaubt.includes(datei.type)) { return bkFehler('Nur PNG, JPEG, SVG oder WebP.'); }
+  if (datei.size > LOGO_MAX_JS) {
+    return bkFehler(`„${datei.name}“ ist ${dokGr(datei.size)} gross — höchstens 512 KB.`);
+  }
+  bkFehler('');
+  dokLesen(datei).then(inhalt => api('betrieb.php', { method: 'POST',
+    body: { logo: inhalt, logo_mime: datei.type } }))
+    .then(({ ok, data }) => {
+      if (!ok || data.status !== 'ok') { return bkFehler(data.message || 'Hochladen fehlgeschlagen.'); }
+      briefkopf = data.betrieb; bkLogoStand(); toast('Logo gespeichert.');
+    }).catch(() => bkFehler('Hochladen fehlgeschlagen.'));
+}
+
+function bkLogoWeg() {
+  bkFehler('');
+  api('betrieb.php', { method: 'POST', body: { logo_weg: true } }).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') { return bkFehler(data.message || 'Entfernen fehlgeschlagen.'); }
+    briefkopf = data.betrieb; bkLogoStand(); toast('Logo entfernt.');
+  }).catch(() => bkFehler('Entfernen fehlgeschlagen.'));
 }
 
 // ══════════════════════════════════════════ ZWEI-FAKTOR-ANMELDUNG (ENT-076)
@@ -9299,6 +9959,11 @@ function epAuf(id) {
   // einer unsichtbaren Auswahl waere trotzdem nicht nachvollziehbar.
   epAngehakt.clear();
   go('einsatzplan');
+  // Die Nummer gehoert in die Adresse (ENT-152). go() schreibt nur "#einsatzplan";
+  // beim Neuladen wusste die Seite damit nicht, WELCHEN Einsatz sie wieder
+  // oeffnen soll, und warf den Planer aus der Ansicht. Nach go() gesetzt,
+  // weil go() den Verlaufseintrag selbst ueberschreibt.
+  history.replaceState(null, '', '#einsatzplan/' + epId);
   epLaden();
 }
 
@@ -9461,9 +10126,8 @@ function epKopfZeichnen() {
     ${epWegWarnung(e)}
     ${epGavAus010Warnung(e)}
     ${epVerkehrsmittelBlock(e)}
-    ${epRapportBlock(e)}
-    ${epRechnungBlock(e)}
-    ${epDokBlock()}`;
+    <div class="card-bd ep-zone">${epRapportBlock(e)}${epDokBlock()}</div>
+    ${epRechnungBlock(e)}`;
 }
 
 // ── Rapport-Übersicht am abgeschlossenen Einsatz (ENT-128, erweitert ENT-138) ──
@@ -9502,12 +10166,13 @@ function epRapportBlock(e) {
         ${r.bemerkung ? `<br>${esc(r.bemerkung)}` : ''}</div>
       ${abweichung ? `<div class="zone-note" style="color:var(--warn)">⚠️ Rapport weicht ab: ${esc(abweichung.join(', '))}</div>` : ''}
       <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">
-        <button type="button" class="btn btn-quiet btn-sm" onclick="openDrawer(${Number(r.id)})">Rapport ansehen</button>
-        ${gesperrt ? '' : `<button type="button" class="btn btn-plain btn-sm" onclick="epDirektAbgleichen(${Number(e.id)},${Number(m.id)})">Direkt abgleichen</button>`}
+        <button type="button" class="btn btn-plain btn-sm" onclick="openDrawer(${Number(r.id)})">Rapport ansehen</button>
+        ${gesperrt ? '' : `<button type="button" class="btn btn-akzent btn-sm" onclick="epDirektAbgleichen(${Number(e.id)},${Number(m.id)})">Direkt abgleichen</button>`}
       </div>
     </div>`;
   };
-  return `<div class="card-bd" style="padding:0 16px 14px">
+  // Kein eigenes .card-bd mehr: seit ENT-150 eine Spalte im Raster .ep-zone.
+  return `<div class="ep-zone-teil">
     <div class="ep-dok-kopf">Rapport${personen.length > 1 ? 'e' : ''}</div>
     ${personen.map(zeile).join('')}
   </div>`;
@@ -9539,11 +10204,138 @@ function epDirektAbgleichen(einsatzId, mitarbeiterId) {
 // btn-quiet hat weder Rahmen noch Hintergrund und blieb dadurch nicht als
 // Knopf erkennbar, sondern sah wie normaler Fliesstext aus (am gerenderten
 // Zustand gemessen, nicht im Quelltext vermutet).
+//
+// Seit ENT-150 auf ausdrueckliche Ansage des Projektinhabers blau (btn-primary)
+// und rechts unter den beiden Spalten. `disabled` bleibt: der Knopf hat
+// weiterhin KEINE Funktion (ENT-040/ENT-127 haben die Rechnungsstellung
+// bewusst zurueckgestellt) -- die Deckkraft aus .btn:disabled sagt das auch
+// in Blau, und ohne sie waere der auffaelligste Knopf der Karte einer, der
+// nichts tut.
 function epRechnungBlock(e) {
   if (!e || !einsatzAbgeschlossen(e)) { return ''; }
-  return `<div class="card-bd" style="padding:0 16px 14px">
-    <button type="button" class="btn btn-plain btn-sm" disabled title="Noch nicht verfügbar">Rechnung erstellen</button>
+  // Der gemeinsame Kundenbericht steht neben dem Rechnungs-Platzhalter, weil
+  // beides Abschluss-Handlungen des Einsatzes sind. Er ist der Knopf, der
+  // etwas TUT -- darum umrissener Akzent, waehrend das gefuellte Blau beim
+  // (noch funktionslosen) Rechnungs-Knopf bleibt.
+  return `<div class="card-bd ep-rechnung">
+    <button type="button" class="btn btn-akzent btn-sm" onclick="epBerichtDrucken(${Number(e.id)})">Kundenrapport drucken</button>
+    <button type="button" class="btn btn-primary btn-sm" disabled title="Noch nicht verfügbar">Rechnung erstellen</button>
   </div>`;
+}
+
+// ── Gemeinsamer Kundenbericht fuer den Einsatz (ENT-160) ────────────────────
+//
+// Ein Blatt je Einsatz, mit ALLEN Personen und ihren jeweils eigenen Zeiten.
+// Ausdruecklich keine Zusammenlegung der Rapporte: die bleiben je Person
+// getrennt, weil an ihnen Lohn und die GAV-Abrechnung haengen. Zusammengefuegt
+// wird nur das Dokument.
+//
+// Die Daten kommen frisch vom Server (einsatz_bericht.php) statt aus den
+// geladenen Listen -- dieselbe Lehre wie bei ENT-155: `rapporte` ist im
+// Dashboard nicht zwingend geladen, und ein Blatt, das je nach zuvor
+// besuchter Ansicht anders aussieht, ist schlimmer als eines, das kurz laedt.
+function epBerichtDrucken(einsatzId) {
+  api('einsatz_bericht.php?einsatz_id=' + Number(einsatzId)).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok' || !data.bericht) {
+      return toast(data.message || 'Der Kundenrapport liess sich nicht laden.');
+    }
+    const b = data.bericht;
+    if (!b.personen.length) {
+      return toast('Für diesen Einsatz liegt noch kein Rapport vor.');
+    }
+    $('printArea').innerHTML = epBerichtBlatt(b);
+    window.print();
+  }).catch(() => toast('Der Kundenrapport liess sich nicht laden.'));
+}
+
+// Erzeugt das Blatt. Getrennt von epBerichtDrucken(), damit es sich ohne
+// Drucken pruefen laesst.
+function epBerichtBlatt(b) {
+  const e = b.einsatz, k = b.kunde, u = b.unterschrift || {};
+  const re = rapportRechnungsadresse({
+    kunde_id: k.kunde_id, k_name: k.k_name, k_strasse: k.k_strasse,
+    k_hausnummer: k.k_hausnummer, k_adresszusatz: k.k_adresszusatz,
+    k_plz: k.k_plz, k_ort: k.k_ort,
+    re_name: k.re_name, re_zusatz: k.re_zusatz, re_strasse: k.re_strasse,
+    re_hausnummer: k.re_hausnummer, re_plz: k.re_plz, re_ort: k.re_ort,
+  });
+  // Logo ueber Firma/Zusatz, beide zentriert (ENT-169) -- vorher rechts-
+  // buendig und kleiner. margin:0 auto statt text-align allein: ein Block-
+  // Element folgt dem text-align des Elters nicht von selbst.
+  const bkLogo = briefkopf.logo
+    ? `<img src="${esc(briefkopf.logo)}" alt="" style="max-height:88px;max-width:260px;display:block;margin:0 auto 8px">` : '';
+  const bkText = [
+    briefkopf.firma ? `<div style="font-weight:700;color:#14161A;font-size:13px">${esc(briefkopf.firma)}</div>` : '',
+    briefkopf.zusatz ? esc(briefkopf.zusatz) : '',
+  ].filter(Boolean).join('');
+
+  const kopfZeile = (a, v) => `<tr><td style="padding:7px 0;color:#6B7280;width:170px;border-bottom:1px solid #E5E8EC">${a}</td><td style="padding:7px 0;font-weight:600;border-bottom:1px solid #E5E8EC">${v}</td></tr>`;
+  const kopf = [
+    ['Datum', dmy(e.datum)],
+    ...(k.kunde_nr ? [['Kunden-Nr.', esc(k.kunde_nr)]] : []),
+    ['Einsatzort', esc(e.strasse || '') + (e.strasse && e.ort ? ', ' : '') + esc(e.ort || '')],
+    ['Einsatzart', esc(e.einsatzart || '')],
+    ...(e.veranstaltung ? [['Veranstaltung', esc(e.veranstaltung)]] : []),
+  ].map(([a, v]) => kopfZeile(a, v)).join('');
+
+  // Eine Zeile je Person mit IHREN Zeiten. Genau das ist der Punkt: Die
+  // Zeiten muessen nicht uebereinstimmen, und wo sie es nicht tun, sieht der
+  // Kunde die Wahrheit statt eines geglaetteten Durchschnitts.
+  const th = 'padding:6px 8px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:#6B7280;border-bottom:1.5px solid #16181D';
+  const td = 'padding:7px 8px;border-bottom:1px solid #E5E8EC;font-size:13.5px';
+  const zeilen = b.personen.map(p => `<tr>
+      <td style="${td}">${esc(p.name)}</td>
+      <td style="${td}">${esc(hm(p.von))} – ${esc(hm(p.bis))}</td>
+      <td style="${td};text-align:right">${nf(p.pause_min)}′</td>
+      <td style="${td};text-align:right;font-weight:600">${nf(p.netto_h, 2)} h</td>
+    </tr>`).join('');
+  const summe = b.personen.reduce((s, p) => s + (Number(p.netto_h) || 0), 0);
+  const bemerkungen = b.personen.filter(p => p.bemerkung);
+
+  return `
+    <div style="font-family:-apple-system,Segoe UI,Arial,sans-serif;color:#14161A;max-width:700px;margin:0 auto">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:24px;border-bottom:2px solid #16181D;padding-bottom:14px;margin-bottom:22px">
+        <div>
+          <div style="font-size:21px;font-weight:800;letter-spacing:-.4px">Kundenrapport</div>
+          <div style="font-size:12px;color:#6B7280;margin-top:3px">Einsatz-Nr. ${esc(e.id)} · ${esc(dmy(e.datum))}</div>
+        </div>
+        <div style="text-align:center;font-size:12px;color:#6B7280;line-height:1.5">${bkLogo}${bkText}</div>
+      </div>
+      ${re ? `<div style="margin-bottom:20px">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#6B7280;font-weight:700;margin-bottom:4px">${re.abweichend ? 'Rechnungsadresse' : 'Kunde'}</div>
+        <div style="font-size:14px;line-height:1.5">${re.zeilen.map(z => esc(z)).join('<br>')}</div>
+      </div>` : ''}
+      <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:24px">${kopf}</table>
+
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#6B7280;font-weight:700;margin-bottom:6px">Geleistete Einsatzzeit</div>
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr>
+          <th style="${th}">Mitarbeitende</th><th style="${th}">Arbeitszeit</th>
+          <th style="${th};text-align:right">Pause</th><th style="${th};text-align:right">Netto</th>
+        </tr></thead>
+        <tbody>${zeilen}</tbody>
+        <tfoot><tr>
+          <td colspan="3" style="padding:9px 8px;text-align:right;font-size:13px;color:#6B7280">Total</td>
+          <td style="padding:9px 8px;text-align:right;font-weight:800;font-size:14.5px">${nf(summe, 2)} h</td>
+        </tr></tfoot>
+      </table>
+
+      ${bemerkungen.length ? `<div style="margin-top:20px">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#6B7280;font-weight:700;margin-bottom:5px">Bemerkungen</div>
+        ${bemerkungen.map(p => `<div style="font-size:13.5px;margin-bottom:4px"><b>${esc(p.name)}:</b> ${esc(p.bemerkung)}</div>`).join('')}
+      </div>` : ''}
+
+      <div style="margin-top:38px;padding-top:16px;border-top:1px solid #E5E8EC">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#6B7280;font-weight:700;margin-bottom:8px">Unterschrift Kunde</div>
+        ${u.bild
+          ? `<img src="${esc(u.bild)}" style="max-height:100px;max-width:280px;display:block">`
+          : '<div style="height:58px;border-bottom:1px solid #14161A;max-width:280px"></div>'}
+        ${u.name ? `<div style="font-size:13px;margin-top:7px">${esc(u.name)}</div>
+          <div style="font-size:10.5px;color:#6B7280;margin-top:1px">Name in Blockschrift</div>` : ''}
+        ${u.am ? `<div style="font-size:10.5px;color:#6B7280;margin-top:6px">Unterschrift erfasst am ${esc(dmyZeit(u.am))}${u.holte ? ' durch ' + esc(u.holte) : ''}</div>` : ''}
+      </div>
+      ${bkFusszeile()}
+    </div>`;
 }
 
 // ── Verkehrsmittel je Zuteilung (ENT-125) ───────────────────────────────
@@ -12004,7 +12796,7 @@ function renderTagesplan() {
       <div class="zeiten">${esc(e.ort)}${e.strasse ? ` · ${esc(e.strasse)}` : ''}</div>
       <div class="marken">
         <span class="chip ${st[1]}">${st[0]}${gesperrt ? SCHLOSS_ZU : ''}</span>${einsatzRapportWeichtAb(e) ? ` <span class="rap-abw" title="Rapport weicht vom Plan ab">⚠️</span>` : ''}
-        ${zug.length ? zug.map(nameChip).join('') : ''}
+        ${zug.length ? zug.map(m => nameChip(m, e)).join('') : ''}
         ${fehlt ? `<span class="nm off">${fehlt} offen</span>` : ''}
       </div>
     </div>`;
@@ -12021,7 +12813,7 @@ function renderTagesplan() {
       const fehlt = fehlend(e);
       const gesperrt = enGesperrt(e);
       const st = enStatusMarke(e);
-      const teile = zug.map(nameChip);
+      const teile = zug.map(m => nameChip(m, e));
       if (fehlt) teile.push(`<span class="nm off">${fehlt} offen</span>`);
       return `<tr class="click${gesperrt ? ' zu abgeglichen' : ''}${e.status === 'abgeschlossen' ? ' status-abgeschlossen' : ''}" onclick="openEinsatz(${Number(e.id)})">
         <td class="nowrap num">${hm(e.von)}–${hm(e.bis)}${ueberNacht(e) ? '<div class="sec">bis Folgetag</div>' : ''}</td>
@@ -12916,12 +13708,19 @@ function agCsv() {
 // Die einfachen Textfelder. Genau diese kann der Diktat-Router bzw. die
 // Web-Recherche vorbefüllen. Kommunikationswege und Ansprechpersonen laufen
 // getrennt, weil sie Listen sind und keine Felder.
+// re_* (ENT-155) stehen bewusst MIT in dieser Liste: dadurch werden sie beim
+// Oeffnen gefuellt, beim Speichern gelesen und beim Leeren zurueckgesetzt,
+// ohne dass es an drei Stellen einzeln nachgezogen werden muss -- genau der
+// Fehler, vor dem der Kommentar oben warnt.
 const KU_FELDER = ['name', 'anrede', 'vorname', 'nachname', 'zusatzfeld', 'strasse',
-  'hausnummer', 'adresszusatz', 'plz', 'ort', 'uid', 'mwst_nr', 'notiz'];
+  'hausnummer', 'adresszusatz', 'plz', 'ort', 'uid', 'mwst_nr', 'notiz',
+  're_name', 're_zusatz', 're_strasse', 're_hausnummer', 're_plz', 're_ort'];
 const KU_LABEL = { name: 'Name', anrede: 'Anrede', vorname: 'Vorname', nachname: 'Nachname',
   zusatzfeld: 'Zusatzfeld', strasse: 'Strasse', hausnummer: 'Nr.', adresszusatz: 'Adresszusatz',
   plz: 'PLZ', ort: 'Ort', uid: 'Unternehmens-Id', mwst_nr: 'MWST-Nr.', notiz: 'Notiz',
-  email: 'E-Mail', telefon: 'Telefon', mobil: 'Mobiltelefon', webseite: 'Webseite', fax: 'Fax' };
+  email: 'E-Mail', telefon: 'Telefon', mobil: 'Mobiltelefon', webseite: 'Webseite', fax: 'Fax',
+  re_name: 'Rechnung: Firma/Name', re_zusatz: 'Rechnung: Zusatz', re_strasse: 'Rechnung: Strasse',
+  re_hausnummer: 'Rechnung: Nr.', re_plz: 'Rechnung: PLZ', re_ort: 'Rechnung: Ort' };
 // Feste Arten statt Freitext -- sonst stehen „Mobil", „mobile" und „Natel"
 // nebeneinander und nichts lässt sich mehr auswerten. Gleiche Liste wie
 // KONTAKT_ARTEN in backend/kunden.php.
@@ -14072,34 +14871,81 @@ function kuSpeichern() {
 // oben. Die Recherche fuer Kunden lebt jetzt in kuRecherche(), direkt im
 // Anlegen-Dialog.
 
+// Die Rechnungsadresse zu einem Rapport -- oder ehrlich nichts (ENT-155).
+//
+// Die Kundenstammdaten liegen am Rapport selbst, weil der Server sie ueber
+// r.einsatz_id -> einsaetze.kunde_id mitliefert (rapport_list.php). Bewusst
+// NICHT aus den Listen `einsaetze`/`kunden` zusammengesucht: die werden erst
+// beim Oeffnen ihrer Ansicht geladen, und dann stuende die Kundennummer je
+// nach zuvor besuchter Ansicht mal auf dem Blatt und mal nicht.
+//
+// Fehlt kunde_id, ist der Rapport von Hand erfasst und haengt an keinem
+// Kundenstamm. Dann bleiben die Zeilen weg -- ueber den Kundennamen zu raten
+// waere bequem und falsch.
+//
+// Abweichende Rechnungsadresse ohne Schalter "abweichend ja/nein": Ein
+// Schalter kann auf "ja" stehen, waehrend die Felder leer sind -- dann
+// druckte das Blatt eine leere Adresse. Gefuellt heisst abweichend.
+function rapportRechnungsadresse(r) {
+  if (!r || !r.kunde_id) { return null; }
+  const abw = [r.re_name, r.re_strasse, r.re_plz, r.re_ort].some(v => String(v || '').trim());
+  const zeilen = abw
+    ? [r.re_name || r.k_name, r.re_zusatz, [r.re_strasse, r.re_hausnummer].filter(Boolean).join(' '),
+       [r.re_plz, r.re_ort].filter(Boolean).join(' ')]
+    : [r.k_name, r.k_adresszusatz, [r.k_strasse, r.k_hausnummer].filter(Boolean).join(' '),
+       [r.k_plz, r.k_ort].filter(Boolean).join(' ')];
+  const sauber = zeilen.map(z => String(z || '').trim()).filter(Boolean);
+  return sauber.length ? { zeilen: sauber, abweichend: abw } : null;
+}
+
 function printReport() {
   const r = rapporte.find(x => Number(x.id) === drawerId);
   if (!r) return;
-  const line = (k, v) => `<tr><td style="padding:7px 0;color:#6B7280;width:170px;border-bottom:1px solid #E5E8EC">${k}</td><td style="padding:7px 0;font-weight:600;border-bottom:1px solid #E5E8EC">${v}</td></tr>`;
+  const re = rapportRechnungsadresse(r);
+  const line = (k2, v) => `<tr><td style="padding:7px 0;color:#6B7280;width:170px;border-bottom:1px solid #E5E8EC">${k2}</td><td style="padding:7px 0;font-weight:600;border-bottom:1px solid #E5E8EC">${v}</td></tr>`;
   const rows = [
     ['Datum', dmy(r.datum)],
     ['Mitarbeitende', esc(r.mitarbeiter)],
     ['Kunde', esc(r.kunde)],
-    ['Adresse', esc(r.strasse) + ', ' + esc(r.ort)],
+    // Nur wenn der Rapport ueber eine Schicht sauber am Kunden haengt.
+    ...(r.kunde_nr ? [['Kunden-Nr.', esc(r.kunde_nr)]] : []),
+    // "Einsatzort", nicht mehr "Adresse": Seit die Rechnungsadresse daneben
+    // stehen kann, waeren zwei Adressen ohne Unterscheidung eine Einladung
+    // zum Verwechseln.
+    ['Einsatzort', esc(r.strasse) + ', ' + esc(r.ort)],
     ['Auftrags-Nr.', r.auftrag_nr ? esc(r.auftrag_nr) : '–'],
     ['Einsatzart', esc(r.einsatzart)],
     ['Arbeitszeit', hm(r.von) + ' – ' + hm(r.bis)],
     ['Pause', nf(r.pause_min) + ' Min.'],
     ['Nettostunden', nf(r.netto_h, 2) + ' h']
-  ].map(([k, v]) => line(k, v)).join('');
+  ].map(([a, v]) => line(a, v)).join('');
+
+  // Briefkopf aus den Betriebseinstellungen (ENT-155). Solange dort nichts
+  // gepflegt ist, bleibt der Kopf leer -- ein erfundener Firmenname auf einem
+  // Beleg, der an Kunden geht, waere schlimmer als eine leere Ecke.
+  // Logo ueber Firma/Zusatz, beide zentriert (ENT-169) -- vorher rechts-
+  // buendig und kleiner, siehe dieselbe Aenderung am Kundenrapport.
+  const bkLogo = briefkopf.logo
+    ? `<img src="${esc(briefkopf.logo)}" alt="" style="max-height:88px;max-width:260px;display:block;margin:0 auto 8px">`
+    : '';
+  const bkText = [
+    briefkopf.firma ? `<div style="font-weight:700;color:#14161A;font-size:13px">${esc(briefkopf.firma)}</div>` : '',
+    briefkopf.zusatz ? esc(briefkopf.zusatz) : '',
+  ].filter(Boolean).join('');
 
   $('printArea').innerHTML = `
     <div style="font-family:-apple-system,Segoe UI,Arial,sans-serif;color:#14161A;max-width:700px;margin:0 auto">
-      <div style="display:flex;align-items:flex-end;justify-content:space-between;border-bottom:2px solid #16181D;padding-bottom:14px;margin-bottom:22px">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:24px;border-bottom:2px solid #16181D;padding-bottom:14px;margin-bottom:22px">
         <div>
           <div style="font-size:21px;font-weight:800;letter-spacing:-.4px">Arbeitsrapport</div>
           <div style="font-size:12px;color:#6B7280;margin-top:3px">Rapport-Nr. ${esc(r.id)}${r.erfasst_am ? ' · erfasst am ' + dmy(r.erfasst_am) : ''}</div>
         </div>
-        <div style="text-align:right;font-size:12px;color:#6B7280;line-height:1.5">
-          <div style="font-weight:700;color:#14161A;font-size:13px">CUPI 24 GmbH</div>
-          Sicherheits- und Verkehrsdienst
-        </div>
+        <div style="text-align:center;font-size:12px;color:#6B7280;line-height:1.5">${bkLogo}${bkText}</div>
       </div>
+      ${re ? `<div style="margin-bottom:20px">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#6B7280;font-weight:700;margin-bottom:4px">${re.abweichend ? 'Rechnungsadresse' : 'Kunde'}</div>
+        <div style="font-size:14px;line-height:1.5">${re.zeilen.map(z => esc(z)).join('<br>')}</div>
+      </div>` : ''}
       <table style="width:100%;border-collapse:collapse;font-size:14px">${rows}</table>
       ${r.bemerkung ? `<div style="margin-top:20px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#6B7280;font-weight:700;margin-bottom:5px">Bemerkung</div><div style="font-size:14px">${esc(r.bemerkung)}</div></div>` : ''}
       <div style="margin-top:38px;padding-top:16px;border-top:1px solid #E5E8EC">
@@ -14107,8 +14953,12 @@ function printReport() {
         ${r.unterschrift
           ? `<img src="${esc(r.unterschrift)}" style="max-height:100px;max-width:280px;display:block">`
           : '<div style="height:58px;border-bottom:1px solid #14161A;max-width:280px"></div>'}
-        <div style="font-size:13px;margin-top:7px">${r.unterzeichner ? esc(r.unterzeichner) : ''}</div>
+        ${r.unterzeichner
+          ? `<div style="font-size:13px;margin-top:7px">${esc(r.unterzeichner)}</div>
+             <div style="font-size:10.5px;color:#6B7280;margin-top:1px">Name in Blockschrift</div>`
+          : ''}
       </div>
+      ${bkFusszeile()}
     </div>`;
   window.print();
 }
@@ -14142,8 +14992,19 @@ $('sideWm').textContent = APP_NAME;
 
 if (token && me) {
   enter();
-  const v = location.hash.replace('#', '');
-  if (TITLES[v]) go(v);
+  // Die Ansicht aus der Adresse wiederherstellen -- samt Einsatz-Nummer
+  // (ENT-152). Ohne die Nummer landete ein Neuladen im Einsatzplan auf einer
+  // Ansicht ohne Einsatz; epLaden() fand nichts und warf den Planer zurueck
+  // in die Planungsliste. Die Einsaetze muessen dafuer geladen sein, bevor
+  // epAuf() den Einsatz sucht.
+  const [v, param] = location.hash.replace('#', '').split('/');
+  if (v === 'einsatzplan' && param) {
+    (einsaetze.length ? Promise.resolve() : loadEinsaetze())
+      .then(() => epAuf(Number(param)))
+      .catch(() => go('planung'));
+  } else if (TITLES[v]) {
+    go(v);
+  }
 }
 </script>
 <!-- skizze:start -->

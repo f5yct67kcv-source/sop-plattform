@@ -119,6 +119,32 @@ CREATE TABLE IF NOT EXISTS ma_abteilung (
   UNIQUE KEY uniq_abteilung (bezeichnung)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+// Briefkopf des eigenen Betriebs (ENT-155). Bis dahin standen Firmenname und
+// Zusatz als Text im Quelltext des Rapport-Ausdrucks -- wer sie aendern
+// wollte, musste den Code anfassen.
+//
+// GENAU EINE Zeile, erzwungen ueber id mit CHECK-Ersatz: Ein Betrieb hat
+// einen Briefkopf. Eine Tabelle, die mehrere zulaesst, wirft sofort die
+// Frage auf, welche Zeile denn gilt -- und irgendwann steht die falsche im
+// Ausdruck. Die Zeile wird beim Einrichten leer angelegt, nicht mit
+// erfundenen Angaben: Was hier steht, geht an Kunden heraus.
+//
+// Das Logo liegt als LONGBLOB in der Datenbank, nicht im Dateisystem --
+// dieselbe Entscheidung und derselbe Grund wie bei den Einsatz-Dokumenten
+// (ENT-117): kein Pfad, der ueber eine geratene Adresse abrufbar waere.
+'betrieb' => "
+CREATE TABLE IF NOT EXISTS betrieb (
+  id TINYINT UNSIGNED NOT NULL PRIMARY KEY DEFAULT 1,
+  firma VARCHAR(200) NOT NULL DEFAULT '',
+  zusatz VARCHAR(200) NOT NULL DEFAULT '',
+  fusszeile TEXT NULL,
+  logo_mime VARCHAR(100) NULL,
+  logo_groesse INT NULL,
+  logo LONGBLOB NULL,
+  geaendert_am DATETIME NULL,
+  geaendert_von INT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
 'anstellungsorte' => "
 CREATE TABLE IF NOT EXISTS anstellungsorte (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -757,6 +783,17 @@ $spalten = [
     ['kunden', 'vorname',     'ALTER TABLE kunden ADD COLUMN vorname VARCHAR(100) NULL AFTER anrede'],
     ['kunden', 'nachname',    'ALTER TABLE kunden ADD COLUMN nachname VARCHAR(100) NULL AFTER vorname'],
     ['kunden', 'zusatzfeld',  'ALTER TABLE kunden ADD COLUMN zusatzfeld VARCHAR(200) NULL AFTER name'],
+    // Abweichende Rechnungsadresse (ENT-155). Alle sechs Felder NULL-bar und
+    // ohne Schalter: gefuellt heisst abweichend, leer heisst gleich wie die
+    // gewoehnliche Adresse. Ein zusaetzliches Ja/Nein-Feld koennte auf "ja"
+    // stehen, waehrend die Felder leer sind -- und dann stuende auf dem
+    // Beleg eine leere Adresse.
+    ['kunden', 're_name',       'ALTER TABLE kunden ADD COLUMN re_name VARCHAR(200) NULL AFTER notiz'],
+    ['kunden', 're_zusatz',     'ALTER TABLE kunden ADD COLUMN re_zusatz VARCHAR(200) NULL AFTER re_name'],
+    ['kunden', 're_strasse',    'ALTER TABLE kunden ADD COLUMN re_strasse VARCHAR(200) NULL AFTER re_zusatz'],
+    ['kunden', 're_hausnummer', 'ALTER TABLE kunden ADD COLUMN re_hausnummer VARCHAR(20) NULL AFTER re_strasse'],
+    ['kunden', 're_plz',        'ALTER TABLE kunden ADD COLUMN re_plz VARCHAR(20) NULL AFTER re_hausnummer'],
+    ['kunden', 're_ort',        'ALTER TABLE kunden ADD COLUMN re_ort VARCHAR(200) NULL AFTER re_plz'],
     ['kunden', 'hausnummer',  'ALTER TABLE kunden ADD COLUMN hausnummer VARCHAR(20) NULL AFTER strasse'],
     ['kunden', 'adresszusatz','ALTER TABLE kunden ADD COLUMN adresszusatz VARCHAR(200) NULL AFTER hausnummer'],
     ['kunden', 'plz',         'ALTER TABLE kunden ADD COLUMN plz VARCHAR(10) NULL AFTER adresszusatz'],
@@ -786,6 +823,24 @@ $spalten = [
     // Das Ende ergibt sich rechnerisch und wird nicht gespeichert.
     ['einsaetze', 'ist_pause_von',   'ALTER TABLE einsaetze ADD COLUMN ist_pause_von TIME NULL AFTER ist_bis'],
     ['einsaetze', 'ist_pause_min',   'ALTER TABLE einsaetze ADD COLUMN ist_pause_min INT NULL AFTER ist_pause_von'],
+    // Kundenunterschrift am EINSATZ (ENT-160), nicht mehr nur am einzelnen
+    // Rapport. Sind zwei Leute am selben Auftrag, unterschreibt der Kunde
+    // sonst zweimal auf zwei Telefonen -- und der gemeinsame Kundenbericht
+    // haette zwei Unterschriften fuer einen Auftrag.
+    //
+    // Der Zeitstempel und die einholende Person sind KEIN Beiwerk: Wer zuerst
+    // fertig ist, laesst unterschreiben; wer laenger bleibt, rapportiert
+    // danach. Die Unterschrift deckt dann eine Zeit, die es beim
+    // Unterschreiben noch nicht gab. Steht sie datiert auf dem Blatt, ist das
+    // sichtbar statt stillschweigend behauptet.
+    ['einsaetze', 'unterschrift',     'ALTER TABLE einsaetze ADD COLUMN unterschrift MEDIUMTEXT NULL'],
+    ['einsaetze', 'unterzeichner',    'ALTER TABLE einsaetze ADD COLUMN unterzeichner VARCHAR(200) NULL AFTER unterschrift'],
+    ['einsaetze', 'unterschrift_von', 'ALTER TABLE einsaetze ADD COLUMN unterschrift_von INT NULL AFTER unterzeichner'],
+    ['einsaetze', 'unterschrift_am',  'ALTER TABLE einsaetze ADD COLUMN unterschrift_am DATETIME NULL AFTER unterschrift_von'],
+    // Zweiter Fusszeilen-Block auf dem Ausdruck, fuer einen Zweitsitz
+    // (ENT-169) -- derselbe Umgang wie die erste Fusszeile aus ENT-155:
+    // freier Text, leer erlaubt, keine erfundenen Angaben.
+    ['betrieb', 'fusszeile2', 'ALTER TABLE betrieb ADD COLUMN fusszeile2 TEXT NULL AFTER fusszeile'],
     // TINYINT NULL, nicht NOT NULL DEFAULT 0: NULL heisst 'noch nicht
     // entschieden', 0 heisst 'geprueft und nein'. Der Unterschied ist bei
     // GAV-AUS-004 wesentlich -- eine Vorbelegung waere eine Auslegung.
@@ -873,6 +928,20 @@ foreach ($spalten as [$tabelle, $spalte, $sql]) {
     }
     if ($nurPruefen) { $getan[] = "Spalte $tabelle.$spalte fehlt noch"; continue; }
     schritt($pdo, $sql, "Spalte $tabelle.$spalte", $getan, $fehler);
+}
+
+// ── 2a2. Die eine Betriebszeile anlegen, falls sie fehlt (ENT-155).
+// Bewusst LEER: Firmenname und Zusatz standen bis dahin im Quelltext, aber sie
+// hier als Vorgabe einzusetzen hiesse, erfundene Angaben in ein Dokument zu
+// schreiben, das an Kunden herausgeht. Die Oberflaeche sagt statt dessen, dass
+// der Briefkopf noch gepflegt werden muss.
+if (hat_tabelle_jetzt($pdo, 'betrieb')) {
+    $hat = (int)$pdo->query('SELECT COUNT(*) FROM betrieb')->fetchColumn();
+    if (!$hat) {
+        if ($nurPruefen) { $getan[] = 'Betriebszeile fehlt noch'; }
+        else { schritt($pdo, "INSERT INTO betrieb (id, firma, zusatz) VALUES (1, '', '')",
+            'Betriebszeile', $getan, $fehler); }
+    }
 }
 
 // ── 2b. Kundennummern nachtragen, wenn Kunden ohne eigene Nummer bestehen --
