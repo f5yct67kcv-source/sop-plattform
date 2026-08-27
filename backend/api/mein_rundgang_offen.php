@@ -37,7 +37,8 @@ if (!$chk->fetch()) {
 }
 
 $r = $pdo->prepare(
-    "SELECT * FROM rundgang WHERE einsatz_id = ? AND mitarbeiter_id = ? AND status IN ('vorbereitet','laeuft')
+    "SELECT * FROM rundgang WHERE einsatz_id = ? AND mitarbeiter_id = ?
+      AND status IN ('vorbereitet','laeuft','pausiert')
       ORDER BY id DESC LIMIT 1"
 );
 $r->execute([$einsatzId, (int)$user['id']]);

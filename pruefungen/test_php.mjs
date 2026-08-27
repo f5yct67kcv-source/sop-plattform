@@ -435,6 +435,9 @@ const NUR_EIGENE_DATEN = [
   'mein_rundgang_starten.php', // eigenen Rundgang fuer eigenen Einsatz starten (ENT-180)
   'mein_rundgang_scan.php',    // Kontrollpunkt-Scans am eigenen, laufenden Rundgang (ENT-180)
   'mein_rundgang_offen.php',   // eigenen offenen Rundgang zu einem Einsatz abfragen (Wiedereinstieg)
+  'mein_rundgang_pausieren.php',  // eigenen Rundgang pausieren (ENT-146)
+  'mein_rundgang_fortsetzen.php', // eigenen pausierten Rundgang fortsetzen (ENT-146)
+  'mein_rundgang_abbrechen.php',  // eigenen Rundgang endgueltig abbrechen (ENT-146)
 ];
 const ohnePruefung = apiDateien.filter(f => {
   const q = ohneKommentar(f);

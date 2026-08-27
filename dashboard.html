@@ -11301,7 +11301,18 @@ function rundgaengeVorgabe() {
 const RUNDGANG_STATUS = {
   vorbereitet:   ['Vorbereitet', 'chip-n'],
   laeuft:        ['Läuft', 'chip-w'],
+  pausiert:      ['Pausiert', 'chip-w'],
   abgeschlossen: ['Abgeschlossen', 'chip-n'],
+  abgebrochen:   ['Abgebrochen', 'chip-w'],
+};
+// Dieselben vier Kategorien wie RUNDGANG_ABBRUCH_GRUENDE in
+// backend/rundgang.php und app.html -- keine gemeinsame Quelle fuer vier
+// feste Texte zwischen PHP und JS.
+const RUNDGANG_ABBRUCH_GRUENDE = {
+  stelle_nicht_gefunden: 'Stelle nicht gefunden',
+  nicht_genug_zeit: 'Nicht genug Zeit',
+  notfall_gebunden: 'Durch Notfall anderweitig gebunden',
+  sonstige: 'Sonstige Gründe',
 };
 
 function ladeRundgaenge() {
@@ -11358,6 +11369,7 @@ function zeichneRundgaenge() {
     const name = [r.vorname, r.nachname].filter(Boolean).join(' ') || '–';
     const start = r.rohzeit_start ? String(r.rohzeit_start).slice(11, 16) : null;
     const ende = r.rohzeit_ende ? String(r.rohzeit_ende).slice(11, 16) : null;
+    const laeuftNoch = !ende && r.status !== 'abgebrochen';
     return `<div class="pn-zeile">
       <div class="kopf">
         <b>${esc(r.objekt_name)}</b>
@@ -11365,7 +11377,9 @@ function zeichneRundgaenge() {
       </div>
       <div class="sub">${esc(dmy(r.datum))} · ${esc(r.kunde_name)} · ${esc(name)}</div>
       <div class="sub">${nf(f.bestaetigt)} bestätigt, ${nf(f.nicht_verfuegbar)} nicht verfügbar von ${nf(f.gesamt)}
-        ${start ? `· Rohzeit ${esc(start)}${ende ? '–' + esc(ende) : ' – läuft noch'}` : '· Rohzeit noch nicht gestartet'}</div>
+        ${start ? `· Rohzeit ${esc(start)}${ende ? '–' + esc(ende) : laeuftNoch ? ' – läuft noch' : ''}` : '· Rohzeit noch nicht gestartet'}
+        ${Number(r.pause_minuten) > 0 ? `· ${nf(r.pause_minuten)} Min. pausiert` : ''}</div>
+      ${r.status === 'abgebrochen' ? `<div class="sub">${esc(RUNDGANG_ABBRUCH_GRUENDE[r.abbruch_grund] || 'Abgebrochen')}${r.abbruch_freitext ? ' — ' + esc(r.abbruch_freitext) : ''}</div>` : ''}
     </div>`;
   }).join('');
 }

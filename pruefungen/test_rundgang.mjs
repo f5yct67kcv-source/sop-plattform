@@ -121,23 +121,60 @@ await page.route('**/api/**', route => {
   if (p.includes('rapport_list')) return send({ status: 'ok', rapporte: [] });
 
   if (p.includes('mein_rundgang_starten')) {
-    if (serverRundgang && serverRundgang.status !== 'abgeschlossen') {
+    if (serverRundgang && !['abgeschlossen', 'abgebrochen'].includes(serverRundgang.status)) {
       return send({ status: 'error', message: 'Es laeuft bereits ein Rundgang fuer diesen Einsatz' });
     }
-    serverRundgang = { id: ++naechsteRundgangId, einsatz_id: Number(body.einsatz_id), status: 'vorbereitet', scans: {} };
+    serverRundgang = { id: ++naechsteRundgangId, einsatz_id: Number(body.einsatz_id), status: 'vorbereitet', scans: {},
+      pause_minuten: 0, pausiert_seit: null, abbruch_grund: null, abbruch_freitext: null };
     return send({ status: 'ok', rundgang_id: serverRundgang.id, kontrollpunkte: KP });
   }
   if (p.includes('mein_rundgang_offen')) {
     const einsatzId = Number(url.searchParams.get('einsatz_id'));
-    if (!serverRundgang || serverRundgang.einsatz_id !== einsatzId || serverRundgang.status === 'abgeschlossen') {
+    if (!serverRundgang || serverRundgang.einsatz_id !== einsatzId
+      || ['abgeschlossen', 'abgebrochen'].includes(serverRundgang.status)) {
       return send({ status: 'ok', rundgang: null });
     }
     const kontrollpunkte = KP.map(k => ({ ...k, erledigt: serverRundgang.scans[k.id] || null }));
-    return send({ status: 'ok', rundgang: { id: serverRundgang.id, einsatz_id: einsatzId, status: serverRundgang.status, kontrollpunkte } });
+    return send({ status: 'ok', rundgang: { id: serverRundgang.id, einsatz_id: einsatzId, status: serverRundgang.status,
+      pausiert_seit: serverRundgang.pausiert_seit, kontrollpunkte } });
+  }
+  if (p.includes('mein_rundgang_pausieren')) {
+    if (!serverRundgang || serverRundgang.id !== Number(body.rundgang_id)) { return send({ status: 'error', message: 'unbekannt' }); }
+    if (!['vorbereitet', 'laeuft'].includes(serverRundgang.status)) {
+      return send({ status: 'error', message: 'Dieser Rundgang laesst sich jetzt nicht pausieren' });
+    }
+    serverRundgang.status = 'pausiert';
+    serverRundgang.pausiert_seit = tag(0) + ' 21:10:00';
+    return send({ status: 'ok' });
+  }
+  if (p.includes('mein_rundgang_fortsetzen')) {
+    if (!serverRundgang || serverRundgang.id !== Number(body.rundgang_id)) { return send({ status: 'error', message: 'unbekannt' }); }
+    if (serverRundgang.status !== 'pausiert') {
+      return send({ status: 'error', message: 'Dieser Rundgang ist nicht pausiert' });
+    }
+    serverRundgang.status = serverRundgang.rohzeitGestartet ? 'laeuft' : 'vorbereitet';
+    serverRundgang.pause_minuten += 5;
+    serverRundgang.pausiert_seit = null;
+    return send({ status: 'ok', rundgang_status: serverRundgang.status });
+  }
+  if (p.includes('mein_rundgang_abbrechen')) {
+    if (!serverRundgang || serverRundgang.id !== Number(body.rundgang_id)) { return send({ status: 'error', message: 'unbekannt' }); }
+    if (['abgeschlossen', 'abgebrochen'].includes(serverRundgang.status)) {
+      return send({ status: 'error', message: 'Dieser Rundgang ist bereits beendet' });
+    }
+    if (!body.grund) { return send({ status: 'error', message: 'Grund erforderlich' }); }
+    serverRundgang.status = 'abgebrochen';
+    serverRundgang.abbruch_grund = body.grund;
+    serverRundgang.abbruch_freitext = body.freitext || null;
+    serverRundgang.pausiert_seit = null;
+    return send({ status: 'ok' });
   }
   if (p.includes('mein_rundgang_scan')) {
     if (!serverRundgang || serverRundgang.id !== Number(body.rundgang_id)) {
       return send({ status: 'error', message: 'Dieser Rundgang gehoert nicht zu dir' });
+    }
+    if (serverRundgang.status === 'pausiert') {
+      return send({ status: 'error', message: 'Dieser Rundgang ist pausiert -- erst fortsetzen' });
     }
     const ergebnisse = body.scans.map(s => {
       if (s.status === 'bestaetigt' && geofenceAblehnen) {
@@ -149,6 +186,10 @@ await page.route('**/api/**', route => {
         return { kontrollpunkt_id: s.kontrollpunkt_id, status: 'bereits_erfasst' };
       }
       serverRundgang.scans[s.kontrollpunkt_id] = { status: s.status, erfasst_am: s.erfasst_am, beschreibung: s.beschreibung || null };
+      // Wie im echten Backend (mein_rundgang_scan.php): die Rohzeit -- hier
+      // vereinfacht als Merker -- beginnt erst mit dem ERSTEN BESTAETIGTEN
+      // Punkt, nicht mit "nicht verfuegbar" (ENT-145).
+      if (s.status === 'bestaetigt') { serverRundgang.rohzeitGestartet = true; }
       return { kontrollpunkt_id: s.kontrollpunkt_id, status: 'ok' };
     });
     const alleErledigt = KP.every(k => serverRundgang.scans[k.id]);
@@ -231,6 +272,60 @@ check('KRITISCH: der Zeitstempel ist geraeteseitig im MySQL-Format (Offline-Prin
   /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(
     rufe.find(r => r.p.includes('mein_rundgang_scan')).body.scans[0].erfasst_am));
 
+// ══════════════════════════════ PAUSIEREN / FORTSETZEN (ENT-146) ══════════
+check('Der "Beenden"-Knopf ist da, solange der Rundgang laeuft',
+  await page.isVisible('#blFuss button:has-text("Beenden")'));
+await page.click('#blFuss button:has-text("Beenden")');
+await page.waitForTimeout(200);
+check('KRITISCH: der Beenden-Dialog zeigt drei Optionen (Pausieren/Abbrechen/Schliessen)',
+  (await page.textContent('#blBody')).includes('Pausieren') && (await page.textContent('#blBody')).includes('Abbrechen')
+  && (await page.textContent('#blFuss')).includes('Schliessen'));
+
+// "Schliessen" ist der sichere Default -- ein Fehlklick darf nichts ausloesen.
+rufe = [];
+await page.click('#blFuss button:has-text("Schliessen")');
+await page.waitForTimeout(200);
+check('KRITISCH: "Schliessen" sendet nichts und kehrt unveraendert zur Checkliste zurueck',
+  rufe.length === 0 && (await page.textContent('#blTitel')) === 'Rundgang'
+  && (await page.textContent('#rdFortschritt')).includes('1 von 3'));
+
+// Jetzt tatsaechlich pausieren.
+await page.click('#blFuss button:has-text("Beenden")');
+await page.waitForTimeout(150);
+rufe = [];
+await page.click('#blBody button:has-text("Pausieren")');
+await page.waitForTimeout(300);
+check('KRITISCH: Pausieren ruft mein_rundgang_pausieren.php mit der richtigen rundgang_id',
+  !!rufe.find(r => r.p.includes('mein_rundgang_pausieren') && r.body.rundgang_id === serverRundgang.id));
+check('KRITISCH: der Pausiert-Hinweis erscheint', (await page.textContent('#rdBanner')).includes('pausiert'));
+check('KRITISCH: waehrend der Pause gibt es keine Kontrollpunkt-Aktionen mehr',
+  await page.evaluate(() => !document.querySelector('#rdListe button')));
+check('Statt "Beenden" steht jetzt "Fortsetzen" im Fuss',
+  (await page.textContent('#blFuss')).includes('Fortsetzen') && !(await page.textContent('#blFuss')).includes('Beenden'));
+
+// Sperre gehoert in den Server, nicht nur in die Oberflaeche: direkt gegen
+// den Endpunkt geprueft, nicht nur ueber die (ohnehin fehlenden) Knoepfe.
+const scanWaehrendPause = await page.evaluate(async (id) => {
+  const r = await fetch('api/mein_rundgang_scan.php', { method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Auth-Token': 't' },
+    body: JSON.stringify({ rundgang_id: id, scans: [{ kontrollpunkt_id: 3, status: 'bestaetigt',
+      erfasst_am: '2026-01-01 00:00:00', lat: 47.2, lng: 7.8 }] }) });
+  return r.json();
+}, serverRundgang.id);
+check('KRITISCH: der Server lehnt einen Scan waehrend der Pause ab, nicht nur die Oberflaeche',
+  scanWaehrendPause.status === 'error');
+
+// Fortsetzen.
+rufe = [];
+await page.click('#blFuss button:has-text("Fortsetzen")');
+await page.waitForTimeout(300);
+check('KRITISCH: Fortsetzen ruft mein_rundgang_fortsetzen.php',
+  !!rufe.find(r => r.p.includes('mein_rundgang_fortsetzen') && r.body.rundgang_id === serverRundgang.id));
+check('KRITISCH: nach dem Fortsetzen ist "Beenden" wieder da, kein Pausiert-Hinweis mehr',
+  (await page.textContent('#blFuss')).includes('Beenden') && !(await page.textContent('#rdBanner')).includes('pausiert'));
+check('KRITISCH: die Kontrollpunkt-Aktionen sind nach dem Fortsetzen wieder da',
+  await page.evaluate(() => !!document.getElementById('rdBtn3')));
+
 // ══════════════════════════════ NICHT VERFUEGBAR (NFC-Punkt) ══════════════
 check('Die Beschreibung ist zunaechst eingeklappt',
   await page.evaluate(() => document.getElementById('rdNv2').style.display === 'none'));
@@ -271,6 +366,8 @@ check('KRITISCH: die Meldung liegt lokal in der Warteschlange, solange sie nicht
   wartend.length === 1 && wartend[0].kontrollpunkt_id === 3);
 check('KRITISCH: kein Rundgang-Scan-Aufruf hat den Server tatsaechlich erreicht (Verbindung war unterbrochen)',
   !serverRundgang.scans[3]);
+check('KRITISCH: ein bereits vollstaendig erledigter Rundgang bietet kein "Beenden" mehr an -- nichts mehr zu pausieren/abbrechen',
+  !(await page.textContent('#blFuss')).includes('Beenden'));
 
 // ── Netz kommt zurueck: automatisches Nachsenden ohne Nutzerzutun
 scanOffline = false;
@@ -282,6 +379,8 @@ check('Der Hinweis "wird uebermittelt" verschwindet nach erfolgreicher Uebermitt
   !(await page.textContent('#rdListe')).includes('wird übermittelt'));
 const wartendDanach = await page.evaluate(() => JSON.parse(localStorage.getItem('sop_rundgang_warteschlange') || '[]'));
 check('KRITISCH: die Warteschlange ist danach leer', wartendDanach.length === 0);
+check('KRITISCH: der Status wird nach der Uebermittlung serverseitig auf abgeschlossen nachgezogen',
+  await page.evaluate(() => rundgangAktiv.status === 'abgeschlossen'));
 
 check('KRITISCH: kein Seiten-Scroll bei 390px', await page.evaluate(() =>
   document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1));
@@ -319,18 +418,60 @@ await page.click('#blRundgang button:has-text("Rundgang fortsetzen")');
 await page.waitForTimeout(300);
 check('KRITISCH: Fortsetzen zeigt den tatsaechlichen Serverstand -- der bereits bestaetigte Punkt bleibt erledigt',
   (await page.textContent('#rdFortschritt')).includes('1 von 3'));
+
+// ══════════════════════════════ ABBRECHEN (ENT-146) ══════════════════════
+await page.click('#blFuss button:has-text("Beenden")');
+await page.waitForTimeout(150);
+await page.click('#blBody button:has-text("Abbrechen")');
+await page.waitForTimeout(200);
+check('KRITISCH: der Hinweis nennt den Abbruch als endgueltig', (await page.textContent('#blBody')).includes('endgültig'));
+rufe = [];
+await page.click('#blFuss button:has-text("Abbrechen bestätigen")');
+await page.waitForTimeout(200);
+check('KRITISCH: ohne ausgewaehlten Grund wird nichts gesendet',
+  rufe.length === 0 && (await page.textContent('#raErr')).length > 0);
+await page.selectOption('#raGrund', 'notfall_gebunden');
+await page.fill('#raFreitext', 'Kollege krank, musste einspringen');
+rufe = [];
+await page.click('#blFuss button:has-text("Abbrechen bestätigen")');
+await page.waitForTimeout(300);
+const abbruchRuf = rufe.find(r => r.p.includes('mein_rundgang_abbrechen'));
+check('KRITISCH: Abbrechen sendet Grund und Freitext an den Server',
+  !!abbruchRuf && abbruchRuf.body.grund === 'notfall_gebunden' && abbruchRuf.body.freitext.includes('Kollege krank'));
+check('KRITISCH: die Checkliste zeigt danach "Abgebrochen", nicht mehr den Fortschritt',
+  (await page.textContent('#rdFortschritt')).includes('Abgebrochen'));
+check('KRITISCH: der Abbruchgrund wird angezeigt', (await page.textContent('#rdBanner')).includes('Durch Notfall anderweitig gebunden'));
+check('KRITISCH: bereits bestaetigte Kontrollpunkte bleiben nach dem Abbruch sichtbar (ENT-146 Punkt 3)',
+  (await page.textContent('#rdListe')).includes('Bestätigt'));
+check('KRITISCH: nach einem Abbruch gibt es keine Aktions-Knoepfe mehr in der Liste',
+  await page.evaluate(() => !document.querySelector('#rdListe button')));
+check('KRITISCH: im Fuss steht nur noch "Zurück", kein Beenden/Fortsetzen mehr',
+  (await page.textContent('#blFuss')).includes('Zurück') && !(await page.textContent('#blFuss')).includes('Beenden')
+  && !(await page.textContent('#blFuss')).includes('Fortsetzen'));
+await page.click('#blFuss button:has-text("Zurück")');
+await page.waitForTimeout(250);
+check('KRITISCH: nach einem Abbruch bietet die Schicht wieder "Rundgang starten" an',
+  await page.evaluate(() =>
+    [...document.querySelectorAll('#blRundgang button')].some(b => b.textContent.includes('Rundgang starten'))));
 await page.evaluate(() => blattZu());
 
 // Desktop: dieselbe Aenderung zusaetzlich am Desktop pruefen (CLAUDE.md).
+// Der vorige Rundgang wurde soeben abgebrochen -- ein dritter, frischer
+// Rundgang ist erwartungsgemaess wieder ueber "Rundgang starten" erreichbar.
 await page.setViewportSize({ width: 1440, height: 900 });
 await page.evaluate(() => { blattAuf(61); });
 await page.waitForTimeout(250);
-await page.click('#blRundgang button:has-text("Rundgang fortsetzen")');
+await page.click('#blRundgang button:has-text("Rundgang starten")');
 await page.waitForTimeout(300);
 check('Am Desktop bleibt die Checkliste vollstaendig bedienbar',
   await page.isVisible('#rdListe') && await page.isVisible('#rdBtn3'));
 check('KRITISCH: am Desktop kein Seiten-Scroll', await page.evaluate(() =>
   document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1));
+await page.click('#blFuss button:has-text("Beenden")');
+await page.waitForTimeout(200);
+check('Der Beenden-Dialog ist auch am Desktop vollstaendig bedienbar, kein Seiten-Scroll',
+  await page.isVisible('#blBody button:has-text("Pausieren")')
+  && await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1));
 await page.screenshot({ path: `${OUT}/rd-03-desktop.png` });
 
 await browser.close();

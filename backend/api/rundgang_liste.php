@@ -22,6 +22,7 @@ $objektId = isset($_GET['objekt_id']) && $_GET['objekt_id'] !== '' ? (int)$_GET[
 $pdo = db();
 $sql = "SELECT r.id, r.einsatz_id, r.objekt_id, r.mitarbeiter_id, r.status,
                r.vorbereitet_am, r.rohzeit_start, r.rohzeit_ende,
+               r.pause_minuten, r.abbruch_grund, r.abbruch_freitext,
                e.datum, e.kunde_name, o.name AS objekt_name,
                m.vorname, m.nachname
           FROM rundgang r
