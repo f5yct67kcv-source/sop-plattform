@@ -46,7 +46,7 @@ try {
     $nummer = beleg_naechste_nummer($pdo, (string)$quelle['art']);
     // Unterschriftsseite, oeffentliche Notizen, Bedingungen und Fusszeile
     // wandern 1:1 mit -- gleiche Begruendung wie bei den Positionen: der
-    // Doppelgaenger soll zeigen, was das Original zeigte (ENT-186).
+    // Doppelgaenger soll zeigen, was das Original zeigte (ENT-187).
     $pdo->prepare(
         'INSERT INTO belege (art, nummer, kunde_id, person_id, titel, referenz,
                              datum, gueltig_bis, status, rabatt_bp, bemerkung, ist_vorlage,

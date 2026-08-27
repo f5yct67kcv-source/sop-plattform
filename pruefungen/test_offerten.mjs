@@ -49,7 +49,7 @@ const KU = { status: 'ok', kunden: [
   { id: 2, name: 'Rieder Wittwer Immobilien', kundennummer: 'A0220', strasse: 'Weg', hausnummer: '1', plz: '4600', ort: 'Olten', aktiv: 1, personen: [], kontaktwege: [] },
 ]};
 
-// Ein bereits VERSENDETER Beleg mit gesetzten ENT-186-Feldern, fuer das
+// Ein bereits VERSENDETER Beleg mit gesetzten ENT-187-Feldern, fuer das
 // Oeffnen eines bestehenden Belegs (ofOeffnen) -- ein Fall, den diese Suite
 // bislang nie geprueft hat (siehe TEIL 7). Status bewusst NICHT 'entwurf':
 // genau das Zuruecksetzen auf 'entwurf' beim blossen Bearbeiten waere der
@@ -69,7 +69,7 @@ const BELEG_OFFEN = {
   ],
 };
 
-// "Neue Adresse erstellen" (ENT-186) laeuft am Ende ueber
+// "Neue Adresse erstellen" (ENT-187) laeuft am Ende ueber
 // Promise.all([loadKunden(), loadStats()]) -- ohne ein Kennzahlen-Fixture,
 // das die render*()-Funktionen nicht zum Werfen bringt, wuerde dieses
 // Promise.all NIE aufloesen (eine wirft, das ganze Promise.all faellt durch),
@@ -82,16 +82,20 @@ const STATS = { status: 'ok',
   verlauf: [], angemeldet: [], letzte_rapporte: [], ereignisse: [], ereignisse_unvollstaendig: [],
   pro_mitarbeiter: [] };
 
-let gespeichert = null, statusRufe = [], archivRufe = [], dupRufe = [];
+let gespeichert = null, statusRufe = [], archivRufe = [], dupRufe = [], versendenRufe = [];
+// ENT-192: Standardmaessig ein Erfolg. Ein einzelner Testfall (TEIL 8) stellt
+// hierauf einen Fehler um, um zu pruefen, dass ein fehlgeschlagener Versand
+// den Status NICHT trotzdem auf "versendet" umstellt.
+let versendenAntwort = { status: 'ok', link: 'https://beispiel.test/api/beleg_oeffentlich.php?token=x' };
 // Veraenderlich statt eine feste Konstante, seit "Neue Adresse erstellen"
-// (ENT-186) einen Kunden waehrend des Laufs tatsaechlich anlegen koennen
+// (ENT-187) einen Kunden waehrend des Laufs tatsaechlich anlegen koennen
 // muss -- kunden_list liefert danach die erweiterte Liste, sonst faende der
 // Rueckkehr-Rueckruf den gerade angelegten Kunden nicht wieder.
 let kuListe = KU.kunden.map(k => ({ ...k }));
 
 const browser = await chromium.launch({ executablePath: browserPfad() });
 const page = await browser.newPage({ viewport: { width: 1500, height: 1000 } });
-// Bis ENT-186 stand hier ein Filter fuer einen als "bekannt und harmlos"
+// Bis ENT-187 stand hier ein Filter fuer einen als "bekannt und harmlos"
 // hingenommenen Fehler aus unvollstaendigen Kennzahlen-Fixtures
 // ("rapporte_monat"). Mit dem STATS-Fixture oben (noetig, damit
 // Promise.all([loadKunden(), loadStats()]) beim Anlegen einer neuen Adresse
@@ -122,6 +126,7 @@ await page.route('**/api/**', async route => {
   if (url.includes('beleg_status')) { statusRufe.push(JSON.parse(route.request().postData() || '{}')); return send({ status: 'ok' }); }
   if (url.includes('beleg_archivieren')) { archivRufe.push(JSON.parse(route.request().postData() || '{}')); return send({ status: 'ok' }); }
   if (url.includes('beleg_duplizieren')) { dupRufe.push(JSON.parse(route.request().postData() || '{}')); return send({ status: 'ok', id: 77, nummer: 'OF-0127' }); }
+  if (url.includes('beleg_versenden')) { versendenRufe.push(JSON.parse(route.request().postData() || '{}')); return send(versendenAntwort); }
   if (url.includes('beleg_speichern')) {
     gespeichert = JSON.parse(route.request().postData() || '{}');
     // Die mitgeschickte Id wird ECHOOT statt fest auf 99 zu antworten: TEIL 7
@@ -566,11 +571,11 @@ check('Am Desktop bleiben die Beschriftungen ab der zweiten Zeile ausgeblendet',
 // ══════════════════════════════════════════════════════════════════════════
 // TEIL 7 — Layout-Angleichung ans Fremdsystem: bestehenden Beleg öffnen,
 // Dreipunkt-Menü im Formular, Rabatt-Einheiten, Schnellwahl, neue Adresse
-// (ENT-186)
+// (ENT-187)
 // ══════════════════════════════════════════════════════════════════════════
 //
 // Bislang öffnete diese Suite nie einen BESTEHENDEN Beleg (ofOeffnen) --
-// TEIL 2 baut nur einen neuen. Genau dieser Pfad ist es, den ENT-186
+// TEIL 2 baut nur einen neuen. Genau dieser Pfad ist es, den ENT-187
 // verändert hat: Status steht nicht mehr in einem Auswahlfeld, sondern im
 // Dreipunkt-Menü -- speichert man einfach weiter, darf er nicht still auf
 // "entwurf" zurückfallen.
@@ -637,7 +642,7 @@ check('Archivieren aus dem Formular ruft beleg_archivieren.php mit aktiv=0 auf',
 check('Die Unterzeile zeigt "archiviert" an, ohne dass man das Formular verlassen musste',
   (await page.textContent('#ofFormSub')).includes('archiviert'));
 
-// ── Gesamtrabatt: Umschalten zwischen % und CHF (ENT-186) ────────────────
+// ── Gesamtrabatt: Umschalten zwischen % und CHF (ENT-187) ────────────────
 // Die einzige Position des Belegs: 10 x 42.00 = 420.00 CHF Zwischensumme.
 await page.fill('#of_rabatt', '10');
 await page.click('#of_rabatt_chf');
@@ -668,7 +673,7 @@ await page.click('.of-schnell:has-text("+30")');
 check('"+30" setzt auf 30 Tage nach dem Offertendatum',
   (await page.inputValue('#of_gueltig')) === '2026-07-01');
 
-// ── "Neue Adresse erstellen" (ENT-186) ────────────────────────────────────
+// ── "Neue Adresse erstellen" (ENT-187) ────────────────────────────────────
 const kundenVorher = await page.evaluate(() => kunden.length);
 await page.click('button:has-text("Neue Adresse erstellen")');
 await page.waitForTimeout(200);
@@ -722,6 +727,84 @@ const blattOhne = await page.evaluate(() => {
 check('Ohne den Haken bleibt die Unterschriftsseite ganz weg', !blattOhne.includes('page-break-before'));
 check('Ohne Notizen/Bedingungen/Fusszeile steht auch nichts Leeres auf dem Blatt',
   !blattOhne.includes('Notizen') && !blattOhne.includes('Bedingungen'));
+
+// ══════════════════════════════════════════════════════════════════════════
+// TEIL 8 — Kopf-Icons, Vorschau und E-Mail-Versand mit Kundenportal (ENT-192)
+// ══════════════════════════════════════════════════════════════════════════
+//
+// Frischer Aufruf von ofOeffnen(21): TEIL 7 hat denselben Beleg bereits auf
+// "bestaetigt" gesetzt und archiviert -- das war Zustand der TESTVORRICHTUNG
+// (statusRufe/archivRufe), nicht des Fixtures BELEG_OFFEN selbst, darum
+// liefert ein erneutes Oeffnen wieder den sauberen Ausgangszustand
+// ("versendet", aktiv).
+await page.evaluate(() => ofOeffnen(21));
+await page.waitForTimeout(300);
+
+check('KRITISCH: der Speichern-Knopf traegt keinen sichtbaren Text mehr, nur ein Symbol',
+  (await page.evaluate(() => document.getElementById('ofFormSaveBtn').textContent.trim())) === ''
+  && (await page.evaluate(() => document.getElementById('ofFormSaveBtn').getAttribute('aria-label'))) === 'Speichern');
+check('Der Vorschau-Knopf ist sichtbar, sobald der Beleg gespeichert ist',
+  (await page.evaluate(() => document.getElementById('ofFormVorschauBtn').style.display)) !== 'none');
+
+await page.click('#ofFormVorschauBtn');
+await page.waitForTimeout(200);
+check('KRITISCH: die Vorschau oeffnet einen Dialog statt den Druckdialog auszuloesen',
+  await page.evaluate(() => document.getElementById('dlgOfVorschau').classList.contains('on')));
+const vorschauText = await page.textContent('#ofVorschauInhalt');
+check('Die Vorschau zeigt dasselbe Blatt wie der Ausdruck (Nummer und Position)',
+  vorschauText.includes('OF-0130') && vorschauText.includes('Verkehrsdienst'));
+await page.click('#dlgOfVorschau button:has-text("Schliessen")');
+await page.waitForTimeout(100);
+
+// ── Menü: "Per E-Mail versenden" ─────────────────────────────────────────
+await page.click('#ofFormMenuBtn');
+await page.waitForTimeout(200);
+check('Das Dreipunkt-Menü bietet "Per E-Mail versenden" an',
+  (await page.textContent('#rowmenuPop')).includes('Per E-Mail versenden'));
+
+// Erst auf "Entwurf" zurueckstellen, damit der folgende Versand-Test
+// tatsaechlich zeigt, dass er den Status aendert, statt zufaellig denselben
+// Wert wiederherzustellen, der ohnehin schon dastand.
+await page.click('#rowmenuPop button:has-text("Entwurf")');
+await page.waitForTimeout(200);
+check('Status steht jetzt auf "Entwurf" -- Ausgangslage fuer die naechste Prüfung',
+  (await page.textContent('#ofFormSub')).includes('Entwurf'));
+
+versendenRufe.length = 0;
+await page.click('#ofFormMenuBtn');
+await page.waitForTimeout(200);
+await page.click('#rowmenuPop button:has-text("Per E-Mail versenden")');
+await page.waitForTimeout(150);
+check('KRITISCH: der Versand fragt erst nach, statt sofort eine Mail zu verschicken',
+  await page.evaluate(() => document.getElementById('dlgConfirm').classList.contains('on'))
+  && versendenRufe.length === 0);
+await page.click('#cfBtn');
+await page.waitForTimeout(300);
+check('KRITISCH: die Bestätigung ruft beleg_versenden.php mit der richtigen Id auf',
+  versendenRufe.length === 1 && versendenRufe[0].id === 21);
+check('KRITISCH: nach erfolgreichem Versand steht der Status auf "Versendet"',
+  (await page.textContent('#ofFormSub')).includes('Versendet'));
+
+// ── Gegenprobe: schlägt der Versand fehl, bleibt der Status unverändert ──
+await page.evaluate(() => ofOeffnen(21));
+await page.waitForTimeout(300);
+await page.click('#ofFormMenuBtn');
+await page.waitForTimeout(200);
+await page.click('#rowmenuPop button:has-text("Entwurf")');
+await page.waitForTimeout(200);
+versendenAntwort = { status: 'error', message: 'Für diesen Kunden ist keine Haupt-E-Mail hinterlegt.' };
+versendenRufe.length = 0;
+await page.click('#ofFormMenuBtn');
+await page.waitForTimeout(200);
+await page.click('#rowmenuPop button:has-text("Per E-Mail versenden")');
+await page.waitForTimeout(150);
+await page.click('#cfBtn');
+await page.waitForTimeout(300);
+check('KRITISCH: ein fehlgeschlagener Versand wirft den Status NICHT auf "Versendet"',
+  !(await page.textContent('#ofFormSub')).includes('Versendet'));
+check('Die Fehlermeldung des Servers erscheint als Hinweis',
+  (await page.textContent('#toast')).includes('Haupt-E-Mail'));
+versendenAntwort = { status: 'ok', link: 'https://beispiel.test/api/beleg_oeffentlich.php?token=x' };
 
 await browser.close();
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
