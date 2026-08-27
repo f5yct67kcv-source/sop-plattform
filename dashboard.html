@@ -1368,6 +1368,13 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
 .ms-tage span.hat { background: var(--accent-soft); color: var(--accent); }
 .ms-tage span.fei { background: var(--warn-soft); color: var(--warn); }
 
+/* Kontrollpunkte in der Objekt-Schublade (ENT-180/ENT-183) */
+.kp-zeile { border: 1px solid var(--line); border-radius: var(--r-sm); padding: 11px 13px; margin-bottom: 8px; }
+.kp-zeile.aus { opacity: .55; }
+.kp-kopf { display: flex; align-items: center; gap: 8px; }
+.kp-kopf b { font-size: 13.5px; font-weight: 620; flex: 1; min-width: 0; }
+.kp-meta { font-size: 11.5px; color: var(--ink-3); margin-top: 3px; line-height: 1.55; }
+
 /* Vorschau vor Massenbefehlen */
 .vs-kopf { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
 .vs-liste { border: 1px solid var(--line); border-radius: var(--r-sm); max-height: 260px; overflow-y: auto; }
@@ -4361,6 +4368,49 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
   </div>
 </div>
 
+<!-- Kontrollpunkt anlegen/ändern (ENT-180/ENT-183) -->
+<div class="dlg-scrim" id="dlgKp">
+  <div class="dlg">
+    <div class="dlg-hd">
+      <h2 id="kpTitel">Neuer Kontrollpunkt</h2>
+      <p>Ein Punkt, den ein Rundgang per NFC-Chip oder Geofence bestätigt.</p>
+    </div>
+    <div class="dlg-bd">
+      <div class="msg-err" id="kpErr" style="display:none"></div>
+      <div class="form-grid">
+        <div class="f wide"><label for="kpBezeichnung">Bezeichnung *</label><input class="inp" id="kpBezeichnung" placeholder="z. B. Hintereingang"></div>
+        <div class="f"><label for="kpReihenfolge">Reihenfolge</label><input class="inp" id="kpReihenfolge" type="number" min="0" max="999" value="0"></div>
+        <div class="f"><label class="check" style="margin-top:26px"><input type="checkbox" id="kpAktiv" checked> Aktiv</label></div>
+        <div class="f wide"><label for="kpTyp">Typ</label>
+          <select class="inp" id="kpTyp" onchange="kpTypUm()">
+            <option value="nfc">NFC-Chip</option>
+            <option value="geofence">Geofence (GPS-Radius)</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="kpNfcFelder">
+        <div class="form-grid">
+          <div class="f wide"><label for="kpChipId">Chip-ID</label><input class="inp" id="kpChipId" placeholder="ID des eingelernten NFC-Chips"></div>
+        </div>
+      </div>
+
+      <div id="kpGeofenceFelder" style="display:none">
+        <div class="form-grid">
+          <div class="f"><label for="kpLat">Breitengrad</label><input class="inp" id="kpLat" type="number" step="0.0000001" placeholder="z. B. 47.3769000"></div>
+          <div class="f"><label for="kpLng">Längengrad</label><input class="inp" id="kpLng" type="number" step="0.0000001" placeholder="z. B. 8.5417000"></div>
+          <div class="f"><label for="kpRadius">Radius (Meter)</label><input class="inp" id="kpRadius" type="number" min="1" max="1000" value="20"></div>
+        </div>
+        <p class="zone-note">Default 20 m — bei einer grossen Fläche (z. B. Parkplatz) übersteuerbar.</p>
+      </div>
+    </div>
+    <div class="dlg-ft">
+      <button class="btn btn-plain" onclick="closeDlg('dlgKp')">Abbrechen</button>
+      <button class="btn btn-primary" id="kpBtn" onclick="saveKp()">Speichern</button>
+    </div>
+  </div>
+</div>
+
 <!-- Globaler Diktat-Router (ENT-038) -- derselbe Router wie im
      Begrüssungs-Container (ENT-032), nur von jeder Seite aus erreichbar. -->
 <div class="dlg-scrim" id="dlgSprechen">
@@ -4600,6 +4650,8 @@ let obTarget = null;   // offenes Objekt (id)
 let msTarget = null;   // offene Masterschicht (id)
 let msModus = 'neu';
 let msAlle = false;    // auch abgelaufene Fassungen zeigen
+let kontrollpunkte = [];   // die des offenen Objekts (ENT-180/ENT-183)
+let kpTarget = null;       // offener Kontrollpunkt (id)
 let vsObjekt = null;   // Objekt der offenen Vorschau
 let oplId = null;      // Objekt der Objektplanung
 let oplMs = [];        // dessen Masterschichten
@@ -9942,6 +9994,16 @@ function openObjekt(id) {
       </div>
     </div>
 
+    ${darf('rundgang_verwalten') ? `
+    <div class="zone" style="margin-top:20px">
+      <div class="zone-hd">Kontrollpunkte</div>
+      <div class="zone-note">NFC- oder Geofence-Punkte für Wachrundgänge an diesem Objekt. Eine spätere Änderung wirkt nur auf künftige Rundgänge — bereits durchgeführte bleiben als Nachweis unverändert.</div>
+      <div id="kpListe"><div class="sk" style="height:52px"></div></div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn btn-primary btn-sm" onclick="openKp('neu')">Kontrollpunkt hinzufügen</button>
+      </div>
+    </div>` : ''}
+
     <div class="zone danger">
       <div class="zone-hd">Objekt entfernen</div>
       <div class="zone-note">Sind bereits Schichten daraus entstanden, wird das Objekt nur stillgelegt — geplante und vergangene Einsätze bleiben unverändert erhalten.</div>
@@ -9950,6 +10012,7 @@ function openObjekt(id) {
   $('drFoot').innerHTML = `<button class="btn btn-plain" onclick="closeDrawer()">Schliessen</button>`;
   msAlle = false;
   loadMasterschichten();
+  if (darf('rundgang_verwalten')) { loadKontrollpunkte(); }
   showDrawer();
 }
 
@@ -10007,6 +10070,45 @@ function renderMsListe() {
         <button class="btn btn-quiet btn-sm" onclick="openMs('korrektur',${m.id})">Beschriftung</button>
         <div style="flex:1"></div>
         <button class="btn btn-quiet btn-sm" onclick="askDeleteMs(${m.id})">Entfernen</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function loadKontrollpunkte() {
+  if (!obTarget) return;
+  return api('kontrollpunkt_liste.php?objekt_id=' + obTarget).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') {
+      const ziel = $('kpListe');
+      if (ziel) ziel.innerHTML = `<p class="zone-note">${esc(data.message || 'Nicht ladbar.')}</p>`;
+      return;
+    }
+    kontrollpunkte = data.kontrollpunkte || [];
+    if ($('kpListe')) renderKpListe();
+  });
+}
+
+function renderKpListe() {
+  if (!kontrollpunkte.length) {
+    $('kpListe').innerHTML = `<p class="zone-note" style="margin:0">Noch kein Kontrollpunkt. Ohne Kontrollpunkte lässt sich an diesem Objekt kein Rundgang durchführen.</p>`;
+    return;
+  }
+  $('kpListe').innerHTML = kontrollpunkte.map(k => {
+    const meta = k.typ === 'nfc'
+      ? `NFC-Chip ${esc(k.chip_id || '–')}`
+      : `Geofence · ${nf(k.lat, 5)}, ${nf(k.lng, 5)} · Radius ${nf(k.geofence_radius_m)} m`;
+    return `<div class="kp-zeile${Number(k.aktiv) ? '' : ' aus'}">
+      <div class="kp-kopf">
+        <span class="chip chip-n">${Number(k.reihenfolge)}</span>
+        <b>${esc(k.bezeichnung)}</b>
+        <span class="chip ${k.typ === 'nfc' ? 'chip-a' : 'chip-w'}">${k.typ === 'nfc' ? 'NFC' : 'Geofence'}</span>
+        ${Number(k.aktiv) ? '' : '<span class="chip chip-n">nicht aktiv</span>'}
+      </div>
+      <div class="kp-meta">${meta}</div>
+      <div style="display:flex;gap:7px;margin-top:9px">
+        <button class="btn btn-plain btn-sm" onclick="openKp('aendern',${Number(k.id)})">Bearbeiten</button>
+        <div style="flex:1"></div>
+        <button class="btn btn-quiet btn-sm" onclick="askDeleteKp(${Number(k.id)})">Entfernen</button>
       </div>
     </div>`;
   }).join('');
@@ -11319,6 +11421,73 @@ function askDeleteMs(id) {
       Promise.all([loadMasterschichten(), loadObjekte()]).then(() => toast(data.art === 'beendet'
         ? `Gültigkeit auf ${dmy(data.gueltig_bis)} begrenzt — ${nf(data.einsaetze)} Einsätze bleiben erhalten.`
         : 'Masterschicht gelöscht.'));
+    }));
+}
+
+// ── Kontrollpunkte (ENT-180/ENT-183) ─────────────────────────────────────
+function openKp(modus, id) {
+  kpTarget = id ? Number(id) : null;
+  const k = kpTarget ? kontrollpunkte.find(x => Number(x.id) === kpTarget) : null;
+
+  $('kpTitel').textContent = modus === 'neu' ? 'Neuer Kontrollpunkt' : 'Kontrollpunkt ändern';
+  $('kpBezeichnung').value = k ? k.bezeichnung : '';
+  $('kpReihenfolge').value = k ? k.reihenfolge : (kontrollpunkte.length ? Math.max(...kontrollpunkte.map(x => Number(x.reihenfolge))) + 1 : 0);
+  $('kpAktiv').checked = k ? !!Number(k.aktiv) : true;
+  $('kpTyp').value = k ? k.typ : 'nfc';
+  $('kpChipId').value = k ? (k.chip_id || '') : '';
+  $('kpLat').value = k && k.lat !== null ? k.lat : '';
+  $('kpLng').value = k && k.lng !== null ? k.lng : '';
+  $('kpRadius').value = k ? k.geofence_radius_m : 20;
+
+  kpTypUm();
+  $('kpErr').style.display = 'none';
+  openDlg('dlgKp');
+  $('kpBezeichnung').focus();
+}
+
+function kpTypUm() {
+  const ist = $('kpTyp').value;
+  $('kpNfcFelder').style.display = ist === 'nfc' ? '' : 'none';
+  $('kpGeofenceFelder').style.display = ist === 'geofence' ? '' : 'none';
+}
+
+function saveKp() {
+  const err = $('kpErr'); err.style.display = 'none';
+  const body = { objekt_id: obTarget };
+  if (kpTarget) body.id = kpTarget;
+
+  body.bezeichnung = $('kpBezeichnung').value.trim();
+  body.reihenfolge = parseInt($('kpReihenfolge').value, 10) || 0;
+  body.aktiv = $('kpAktiv').checked ? 1 : 0;
+  body.typ = $('kpTyp').value;
+  if (!body.bezeichnung) { err.textContent = 'Bezeichnung erforderlich.'; err.style.display = ''; return; }
+
+  if (body.typ === 'nfc') {
+    body.chip_id = $('kpChipId').value.trim();
+    if (!body.chip_id) { err.textContent = 'Chip-ID erforderlich bei Typ NFC.'; err.style.display = ''; return; }
+  } else {
+    body.lat = $('kpLat').value.trim();
+    body.lng = $('kpLng').value.trim();
+    body.geofence_radius_m = parseInt($('kpRadius').value, 10) || 20;
+    if (!body.lat || !body.lng) { err.textContent = 'Breiten- und Längengrad erforderlich bei Typ Geofence.'; err.style.display = ''; return; }
+  }
+
+  const b = $('kpBtn'); b.disabled = true;
+  api('kontrollpunkt_save.php', { method: 'POST', body }).then(({ ok, data }) => {
+    b.disabled = false;
+    if (!ok || data.status !== 'ok') { err.textContent = data.message || 'Speichern fehlgeschlagen.'; err.style.display = ''; return; }
+    closeDlg('dlgKp');
+    loadKontrollpunkte().then(() => toast('Kontrollpunkt gespeichert.'));
+  });
+}
+
+function askDeleteKp(id) {
+  askConfirm('Kontrollpunkt entfernen?',
+    'Bereits durchgeführte Rundgänge bleiben als Nachweis erhalten — nur die Vorlage für künftige Rundgänge verschwindet.',
+    'Entfernen',
+    () => api('kontrollpunkt_loeschen.php', { method: 'POST', body: { id } }).then(({ ok, data }) => {
+      if (!ok || data.status !== 'ok') { toast(data.message || 'Fehlgeschlagen.'); return; }
+      loadKontrollpunkte().then(() => toast('Kontrollpunkt gelöscht.'));
     }));
 }
 
