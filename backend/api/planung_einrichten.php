@@ -686,11 +686,21 @@ CREATE TABLE IF NOT EXISTS kunden_kontaktweg (
   -- Eine Vorlage traegt keine Nummer im laufenden Kreis und erscheint nicht
   -- in der Offertenliste.
   ist_vorlage TINYINT(1) NOT NULL DEFAULT 0,
+  -- Ob eine zusaetzliche Unterschriftsseite mitgedruckt wird (ENT-186).
+  unterschriftsseite TINYINT(1) NOT NULL DEFAULT 0,
   -- Archivieren heisst: aus der Liste, aber wiederherstellbar. Es gibt
   -- bewusst kein Stornieren -- eine Offerte hat keine Buchhaltungswirkung,
   -- die storniert werden muesste; 'abgelehnt' deckt den fachlichen Fall.
   aktiv TINYINT(1) NOT NULL DEFAULT 1,
   bemerkung TEXT NULL,
+  -- Die folgenden drei erscheinen auf dem gedruckten Dokument, im Unterschied
+  -- zu bemerkung (nur fuer den eigenen Gebrauch). Getrennte Spalten statt
+  -- eines Freitextblocks, weil jede an einer anderen Stelle des Blattes
+  -- steht: Notizen nahe an den Positionen, Bedingungen darunter, Fusszeile
+  -- ganz unten (ENT-186).
+  oeffentliche_notizen TEXT NULL,
+  bedingungen TEXT NULL,
+  fusszeile_text TEXT NULL,
   erstellt_am DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   geaendert_am DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uq_beleg_nummer (art, nummer),
@@ -1023,6 +1033,16 @@ $spalten = [
     // der Zone herleiten liesse. In Rappen, ganzzahlig, wie alle Geldwerte
     // dieses Ausbaus (siehe backend/auslagen.php).
     ['einsatz_zuteilung', 'oev_rappen', 'ALTER TABLE einsatz_zuteilung ADD COLUMN oev_rappen INT NULL AFTER verkehrsmittel'],
+
+    // Offert-Formular an das Vorbild angeglichen (ENT-186). belege stand zum
+    // Zeitpunkt dieser Aenderung bereits produktiv (ENT-184) -- die neuen
+    // Spalten kommen darum ueber ALTER TABLE nach, nicht nur in der
+    // CREATE-TABLE-Fassung oben.
+    ['belege', 'unterschriftsseite',
+     'ALTER TABLE belege ADD COLUMN unterschriftsseite TINYINT(1) NOT NULL DEFAULT 0 AFTER ist_vorlage'],
+    ['belege', 'oeffentliche_notizen', 'ALTER TABLE belege ADD COLUMN oeffentliche_notizen TEXT NULL AFTER bemerkung'],
+    ['belege', 'bedingungen', 'ALTER TABLE belege ADD COLUMN bedingungen TEXT NULL AFTER oeffentliche_notizen'],
+    ['belege', 'fusszeile_text', 'ALTER TABLE belege ADD COLUMN fusszeile_text TEXT NULL AFTER bedingungen'],
 ];
 foreach ($spalten as [$tabelle, $spalte, $sql]) {
     if (!hat_tabelle_jetzt($pdo, $tabelle) || hat_spalte($pdo, $tabelle, $spalte)) {

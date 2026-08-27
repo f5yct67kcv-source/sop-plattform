@@ -58,6 +58,10 @@ $kopf = [
     'status'      => $status,
     'bemerkung'   => trim((string)($in['bemerkung'] ?? '')),
     'ist_vorlage' => !empty($in['ist_vorlage']) ? 1 : 0,
+    'unterschriftsseite'   => !empty($in['unterschriftsseite']) ? 1 : 0,
+    'oeffentliche_notizen' => trim((string)($in['oeffentliche_notizen'] ?? '')),
+    'bedingungen'          => trim((string)($in['bedingungen'] ?? '')),
+    'fusszeile_text'       => trim((string)($in['fusszeile_text'] ?? '')),
 ];
 $rabattBp = max(0, min(10000, (int)round((float)($in['rabatt_bp'] ?? 0))));
 

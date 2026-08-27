@@ -49,17 +49,57 @@ const KU = { status: 'ok', kunden: [
   { id: 2, name: 'Rieder Wittwer Immobilien', kundennummer: 'A0220', strasse: 'Weg', hausnummer: '1', plz: '4600', ort: 'Olten', aktiv: 1, personen: [], kontaktwege: [] },
 ]};
 
+// Ein bereits VERSENDETER Beleg mit gesetzten ENT-186-Feldern, fuer das
+// Oeffnen eines bestehenden Belegs (ofOeffnen) -- ein Fall, den diese Suite
+// bislang nie geprueft hat (siehe TEIL 7). Status bewusst NICHT 'entwurf':
+// genau das Zuruecksetzen auf 'entwurf' beim blossen Bearbeiten waere der
+// Fehler, den ofFormStatus verhindern soll.
+const BELEG_OFFEN = {
+  id: 21, art: 'offerte', nummer: 'OF-0130', kunde_id: 1, person_id: null,
+  titel: 'Nachtwache', referenz: 'NW-3', datum: '2026-04-01', gueltig_bis: '2026-05-01',
+  status: 'versendet', rabatt_bp: 500, aktiv: 1, ist_vorlage: 0,
+  unterschriftsseite: 1,
+  oeffentliche_notizen: 'Zutritt nur nach Voranmeldung.',
+  bedingungen: 'Zahlbar innert 30 Tagen netto.',
+  fusszeile_text: 'Wir schätzen Ihr Vertrauen.',
+  bemerkung: 'interner Vermerk',
+  positionen: [
+    { produkt_id: 1, produkt_name: 'Verkehrsdienst', beschreibung: '', menge: 10, einheit: 'Std.',
+      einzelpreis_rappen: 4200, rabatt_bp: 0, mwst_satz_bp: 810 },
+  ],
+};
+
+// "Neue Adresse erstellen" (ENT-186) laeuft am Ende ueber
+// Promise.all([loadKunden(), loadStats()]) -- ohne ein Kennzahlen-Fixture,
+// das die render*()-Funktionen nicht zum Werfen bringt, wuerde dieses
+// Promise.all NIE aufloesen (eine wirft, das ganze Promise.all faellt durch),
+// und der Rueckruf an das Offert-Formular faende nie statt. Der bislang
+// gefilterte Fehler ("rapporte_monat") war genau das -- bloss hat es bislang
+// niemand gebraucht, DASS die Kette tatsaechlich durchlaeuft.
+const STATS = { status: 'ok',
+  kpi: { rapporte_monat: 0, rapporte_vormonat: 0, stunden_monat: 0, stunden_vormonat: 0,
+         mitarbeiter: 0, kunden: 0, rapporte_total: 0 },
+  verlauf: [], angemeldet: [], letzte_rapporte: [], ereignisse: [], ereignisse_unvollstaendig: [],
+  pro_mitarbeiter: [] };
+
 let gespeichert = null, statusRufe = [], archivRufe = [], dupRufe = [];
+// Veraenderlich statt eine feste Konstante, seit "Neue Adresse erstellen"
+// (ENT-186) einen Kunden waehrend des Laufs tatsaechlich anlegen koennen
+// muss -- kunden_list liefert danach die erweiterte Liste, sonst faende der
+// Rueckkehr-Rueckruf den gerade angelegten Kunden nicht wieder.
+let kuListe = KU.kunden.map(k => ({ ...k }));
 
 const browser = await chromium.launch({ executablePath: browserPfad() });
 const page = await browser.newPage({ viewport: { width: 1500, height: 1000 } });
-// Der bekannte, harmlose Fehler aus unvollstaendigen Kennzahlen-Fixtures wird
-// ausgeblendet -- er gehoert nicht zu dieser Suite und stammt aus der
-// Uebersicht, die hier gar nicht geprueft wird.
-page.on('pageerror', e => {
-  if (/rapporte_monat/.test(e.message)) { return; }
-  bad.push('JS-Fehler: ' + e.message);
-});
+// Bis ENT-186 stand hier ein Filter fuer einen als "bekannt und harmlos"
+// hingenommenen Fehler aus unvollstaendigen Kennzahlen-Fixtures
+// ("rapporte_monat"). Mit dem STATS-Fixture oben (noetig, damit
+// Promise.all([loadKunden(), loadStats()]) beim Anlegen einer neuen Adresse
+// ueberhaupt durchlaeuft) tritt er nicht mehr auf -- nachgemessen, nicht nur
+// angenommen. Ein Filter, der nichts mehr filtert, ist eine Behauptung, die
+// nicht mehr stimmt; besser ein echter Fehler faellt hier laut auf, als
+// dass ein neuer stumm durchrutscht, weil das Muster zufaellig passt.
+page.on('pageerror', e => bad.push('JS-Fehler: ' + e.message));
 await page.route('**/api/**', async route => {
   const url = route.request().url();
   const send = b => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) });
@@ -68,16 +108,36 @@ await page.route('**/api/**', async route => {
     rechte: ['kunden', 'abgleich', 'personal_lesen', 'betrieb', 'plan', 'offerten', 'rechte'] });
   if (url.includes('produkt_list')) return send(PRODUKTE);
   if (url.includes('beleg_list')) return send(BELEGE);
-  if (url.includes('kunden_list')) return send(KU);
+  if (url.includes('kunden_list')) return send({ status: 'ok', kunden: kuListe });
+  if (url.includes('dashboard_stats')) return send(STATS);
+  if (url.includes('kunden_create')) {
+    const body = JSON.parse(route.request().postData() || '{}');
+    const neuId = 901 + kuListe.length;
+    kuListe.push({ id: neuId, name: body.name, kundennummer: 'A0' + neuId, aktiv: 1, personen: [], kontaktwege: [] });
+    return send({ status: 'ok', id: neuId, kundennummer: 'A0' + neuId });
+  }
+  if (url.includes('beleg_lesen')) {
+    return send({ status: 'ok', beleg: BELEG_OFFEN, kunde: KU.kunden[0], person: null });
+  }
   if (url.includes('beleg_status')) { statusRufe.push(JSON.parse(route.request().postData() || '{}')); return send({ status: 'ok' }); }
   if (url.includes('beleg_archivieren')) { archivRufe.push(JSON.parse(route.request().postData() || '{}')); return send({ status: 'ok' }); }
   if (url.includes('beleg_duplizieren')) { dupRufe.push(JSON.parse(route.request().postData() || '{}')); return send({ status: 'ok', id: 77, nummer: 'OF-0127' }); }
   if (url.includes('beleg_speichern')) {
     gespeichert = JSON.parse(route.request().postData() || '{}');
-    return send({ status: 'ok', id: 99, nummer: 'OF-0126',
+    // Die mitgeschickte Id wird ECHOOT statt fest auf 99 zu antworten: TEIL 7
+    // speichert einen bereits BESTEHENDEN Beleg (21) weiter, und eine fest
+    // verdrahtete Antwort-Id haette ofFormId dabei still auf 99 zurueckgesetzt
+    // -- ein Fehler der Testvorrichtung, nicht der Anwendung, aber einer, der
+    // die naechsten Pruefungen (Statuswechsel, Archivieren) auf den falschen
+    // Beleg hätte zielen lassen. Neuanlage (Id 0) bekommt weiterhin 99/OF-0126,
+    // wie es TEIL 2 erwartet.
+    const istNeu = !gespeichert.id;
+    const antwort = { status: 'ok', id: istNeu ? 99 : gespeichert.id,
       summen: { zwischensumme_rappen: 310800, rabatt_bp: 700, rabatt_rappen: 21756, netto_rappen: 289044,
         mwst: [{ satz_bp: 810, grundlage_rappen: 273420, betrag_rappen: 22147 }],
-        mwst_rappen: 22147, rundung_rappen: -1, total_rappen: 311190, zeilen: [] } });
+        mwst_rappen: 22147, rundung_rappen: -1, total_rappen: 311190, zeilen: [] } };
+    if (istNeu) { antwort.nummer = 'OF-0126'; }
+    return send(antwort);
   }
   return send({ status: 'ok' });
 });
@@ -502,6 +562,166 @@ check('Am Desktop bleiben die Beschriftungen ab der zweiten Zeile ausgeblendet',
     const l = zeilen[1] && zeilen[1].querySelector('label');
     return !!l && l.getBoundingClientRect().height <= 4;
   }));
+
+// ══════════════════════════════════════════════════════════════════════════
+// TEIL 7 — Layout-Angleichung ans Fremdsystem: bestehenden Beleg öffnen,
+// Dreipunkt-Menü im Formular, Rabatt-Einheiten, Schnellwahl, neue Adresse
+// (ENT-186)
+// ══════════════════════════════════════════════════════════════════════════
+//
+// Bislang öffnete diese Suite nie einen BESTEHENDEN Beleg (ofOeffnen) --
+// TEIL 2 baut nur einen neuen. Genau dieser Pfad ist es, den ENT-186
+// verändert hat: Status steht nicht mehr in einem Auswahlfeld, sondern im
+// Dreipunkt-Menü -- speichert man einfach weiter, darf er nicht still auf
+// "entwurf" zurückfallen.
+await page.evaluate(() => ofOeffnen(21));
+await page.waitForTimeout(300);
+
+check('KRITISCH: das Statusfeld gibt es nicht mehr als eigenes Auswahlfeld',
+  await page.evaluate(() => document.getElementById('of_status') === null));
+check('Der Status steht stattdessen in der Unterzeile',
+  (await page.textContent('#ofFormSub')).includes('Versendet'));
+check('Die Offertennummer steht auch als eigenes Feld im Kopf',
+  (await page.inputValue('#of_nummer')) === 'OF-0130');
+check('Die Unterschriftsseite ist angehakt, weil der Beleg sie hat',
+  await page.isChecked('#of_unterschriftsseite'));
+check('Öffentliche Notizen werden geladen',
+  (await page.inputValue('#of_notizen')) === 'Zutritt nur nach Voranmeldung.');
+check('Bedingungen werden geladen',
+  (await page.inputValue('#of_bedingungen')) === 'Zahlbar innert 30 Tagen netto.');
+check('Die Fusszeile wird geladen',
+  (await page.inputValue('#of_fusszeile')) === 'Wir schätzen Ihr Vertrauen.');
+
+gespeichert = null;
+await page.click('#ofFormSaveBtn');
+await page.waitForTimeout(300);
+check('KRITISCH: blosses Weiterspeichern wirft "versendet" nicht auf "entwurf" zurück',
+  gespeichert && gespeichert.status === 'versendet');
+check('Die neuen Felder gehen unverändert mit an den Server',
+  gespeichert && gespeichert.unterschriftsseite === 1
+  && gespeichert.oeffentliche_notizen === 'Zutritt nur nach Voranmeldung.'
+  && gespeichert.bedingungen === 'Zahlbar innert 30 Tagen netto.'
+  && gespeichert.fusszeile_text === 'Wir schätzen Ihr Vertrauen.');
+
+// ── Dreipunkt-Menü IM Formular, nicht erst über den Umweg der Liste ─────
+// Zurueckgesetzt: TEIL 1 hat bereits einen Statuswechsel ausgeloest, sonst
+// zaehlte die folgende Pruefung den GESAMTEN Lauf statt nur diesen Klick.
+statusRufe.length = 0;
+await page.click('#ofFormMenuBtn');
+await page.waitForTimeout(200);
+const formMenuText = await page.textContent('#rowmenuPop');
+check('Bietet Duplizieren, Vorlage und Archivieren wie die Liste',
+  ['Duplizieren', 'In Vorlage umwandeln', 'Archivieren'].every(w => formMenuText.includes(w)));
+check('KRITISCH: "Bearbeiten" und "Drucken" fehlen -- das Formular ist schon offen bzw. hat einen eigenen Knopf',
+  !formMenuText.includes('Bearbeiten') && !formMenuText.includes('Drucken'));
+check('KRITISCH: der aktuelle Status ("Versendet") steht nicht als Wechselziel da',
+  !formMenuText.includes('Als „Versendet" markieren') && formMenuText.includes('Als „Bestätigt" markieren'));
+await page.click('#rowmenuPop button:has-text("Bestätigt")');
+await page.waitForTimeout(300);
+
+// ofStatusSetzen()/ofArchivKlick() sind dieselben Funktionen, die auch die
+// Liste aufruft (siehe TEIL 1) -- hier zaehlt zusaetzlich, dass sich die
+// OFFENE Ansicht sofort mitaendert, ohne dass man sie neu laden muesste.
+check('KRITISCH: der Klick ruft beleg_status.php mit der richtigen Id und dem richtigen Wert auf',
+  statusRufe.length === 1 && statusRufe[0].id === 21 && statusRufe[0].neuer_status === 'bestaetigt');
+check('Die Unterzeile im Formular zieht sofort nach, ohne Neuladen',
+  (await page.textContent('#ofFormSub')).includes('Bestätigt'));
+
+archivRufe.length = 0;
+await page.click('#ofFormMenuBtn');
+await page.waitForTimeout(200);
+await page.click('#rowmenuPop button:has-text("Archivieren")');
+await page.waitForTimeout(300);
+check('Archivieren aus dem Formular ruft beleg_archivieren.php mit aktiv=0 auf',
+  archivRufe.length === 1 && archivRufe[0].id === 21 && Number(archivRufe[0].aktiv) === 0);
+check('Die Unterzeile zeigt "archiviert" an, ohne dass man das Formular verlassen musste',
+  (await page.textContent('#ofFormSub')).includes('archiviert'));
+
+// ── Gesamtrabatt: Umschalten zwischen % und CHF (ENT-186) ────────────────
+// Die einzige Position des Belegs: 10 x 42.00 = 420.00 CHF Zwischensumme.
+await page.fill('#of_rabatt', '10');
+await page.click('#of_rabatt_chf');
+await page.waitForTimeout(50);
+check('KRITISCH: 10 % von CHF 420.00 zeigen sich nach dem Umschalten als 42.00',
+  (await page.inputValue('#of_rabatt')) === '42.00');
+await page.click('#of_rabatt_pct');
+await page.waitForTimeout(50);
+check('Zurück in Prozent steht wieder 10 da -- nichts ging beim Umschalten verloren',
+  (await page.inputValue('#of_rabatt')) === '10');
+
+await page.click('#of_rabatt_chf');
+await page.fill('#of_rabatt', '21');
+gespeichert = null;
+await page.click('#ofFormSaveBtn');
+await page.waitForTimeout(300);
+// 21 CHF von CHF 420.00 = 5 % = 500 Basispunkte.
+check('KRITISCH: eine CHF-Eingabe wird beim Speichern korrekt in Basispunkte umgerechnet',
+  gespeichert && gespeichert.rabatt_bp === 500);
+await page.click('#of_rabatt_pct');
+
+// ── Schnellwahl "Gültig bis" ──────────────────────────────────────────────
+await page.fill('#of_datum', '2026-06-01');
+await page.click('.of-schnell:has-text("+10")');
+check('KRITISCH: "+10" setzt Gültig bis auf 10 Tage nach dem Offertendatum',
+  (await page.inputValue('#of_gueltig')) === '2026-06-11');
+await page.click('.of-schnell:has-text("+30")');
+check('"+30" setzt auf 30 Tage nach dem Offertendatum',
+  (await page.inputValue('#of_gueltig')) === '2026-07-01');
+
+// ── "Neue Adresse erstellen" (ENT-186) ────────────────────────────────────
+const kundenVorher = await page.evaluate(() => kunden.length);
+await page.click('button:has-text("Neue Adresse erstellen")');
+await page.waitForTimeout(200);
+check('Der Kunden-Dialog öffnet sich direkt aus dem Offert-Formular',
+  await page.evaluate(() => document.getElementById('dlgKunde').classList.contains('on')));
+await page.fill('#ku_name', 'Frisch AG');
+await page.fill('#ku_plz', '4000');
+await page.fill('#ku_ort', 'Basel');
+await page.click('#kuBtn');
+await page.waitForTimeout(400);
+check('KRITISCH: der neu angelegte Kunde wird sofort als Empfänger übernommen',
+  (await page.inputValue('#of_kunde')) === 'Frisch AG');
+check('kunden[] ist tatsächlich gewachsen -- der Rückruf griff auf echte, neu geladene Daten zu',
+  (await page.evaluate(() => kunden.length)) === kundenVorher + 1);
+
+// Ein ABGEBROCHENER Dialog darf keinen Rückruf hinterlassen, der später bei
+// einer völlig unabhängigen Kundenanlage ungefragt feuert (siehe closeDlg()
+// in dashboard.html). Direkt am Zustand geprüft, nicht über einen zweiten,
+// mehrstufigen Klickpfad simuliert.
+await page.evaluate(() => ofNeueAdresse());
+await page.waitForTimeout(100);
+await page.click('#dlgKunde button:has-text("Abbrechen")');
+await page.waitForTimeout(100);
+check('KRITISCH: ein abgebrochener "Neue Adresse"-Dialog löscht den Rückruf wieder',
+  await page.evaluate(() => kuNeuRueckkehr === null));
+
+// ── Druckvorlage: Unterschriftsseite und die drei neuen Textfelder ───────
+const blattMit = await page.evaluate(() => {
+  const b = { art: 'offerte', nummer: 'OF-0130', titel: 'Nachtwache', referenz: null,
+    datum: '2026-04-01', gueltig_bis: '2026-05-01', rabatt_bp: 0, unterschriftsseite: 1,
+    oeffentliche_notizen: 'Zutritt nur nach Voranmeldung.',
+    bedingungen: 'Zahlbar innert 30 Tagen netto.',
+    fusszeile_text: 'Wir schätzen Ihr Vertrauen.',
+    positionen: [{ produkt_name: 'Verkehrsdienst', beschreibung: '', menge: 10, einheit: 'Std.',
+                   einzelpreis_rappen: 4200, rabatt_bp: 0, mwst_satz_bp: 810 }] };
+  b.summen = belegSummen(b.positionen, 0);
+  return ofBlatt(b, { name: 'Gemeinde Läufelfingen' }, null);
+});
+check('Öffentliche Notizen erscheinen auf dem Ausdruck', blattMit.includes('Zutritt nur nach Voranmeldung.'));
+check('Bedingungen erscheinen auf dem Ausdruck', blattMit.includes('Zahlbar innert 30 Tagen netto.'));
+check('Die Fusszeile erscheint auf dem Ausdruck', blattMit.includes('Wir schätzen Ihr Vertrauen.'));
+check('KRITISCH: die Unterschriftsseite hängt mit erzwungenem Seitenumbruch an',
+  blattMit.includes('page-break-before:always') && blattMit.includes('Unterschrift Gemeinde Läufelfingen'));
+
+const blattOhne = await page.evaluate(() => {
+  const b = { art: 'offerte', nummer: 'OF-0131', titel: 'x', datum: '2026-04-01', rabatt_bp: 0,
+    unterschriftsseite: 0, positionen: [] };
+  b.summen = belegSummen(b.positionen, 0);
+  return ofBlatt(b, null, null);
+});
+check('Ohne den Haken bleibt die Unterschriftsseite ganz weg', !blattOhne.includes('page-break-before'));
+check('Ohne Notizen/Bedingungen/Fusszeile steht auch nichts Leeres auf dem Blatt',
+  !blattOhne.includes('Notizen') && !blattOhne.includes('Bedingungen'));
 
 await browser.close();
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
