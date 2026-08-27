@@ -755,7 +755,7 @@ CREATE TABLE IF NOT EXISTS kunden_kontaktweg (
   -- Eine Vorlage traegt keine Nummer im laufenden Kreis und erscheint nicht
   -- in der Offertenliste.
   ist_vorlage TINYINT(1) NOT NULL DEFAULT 0,
-  -- Ob eine zusaetzliche Unterschriftsseite mitgedruckt wird (ENT-186).
+  -- Ob eine zusaetzliche Unterschriftsseite mitgedruckt wird (ENT-187).
   unterschriftsseite TINYINT(1) NOT NULL DEFAULT 0,
   -- Archivieren heisst: aus der Liste, aber wiederherstellbar. Es gibt
   -- bewusst kein Stornieren -- eine Offerte hat keine Buchhaltungswirkung,
@@ -766,7 +766,7 @@ CREATE TABLE IF NOT EXISTS kunden_kontaktweg (
   -- zu bemerkung (nur fuer den eigenen Gebrauch). Getrennte Spalten statt
   -- eines Freitextblocks, weil jede an einer anderen Stelle des Blattes
   -- steht: Notizen nahe an den Positionen, Bedingungen darunter, Fusszeile
-  -- ganz unten (ENT-186).
+  -- ganz unten (ENT-187).
   oeffentliche_notizen TEXT NULL,
   bedingungen TEXT NULL,
   fusszeile_text TEXT NULL,
@@ -1103,7 +1103,7 @@ $spalten = [
     // dieses Ausbaus (siehe backend/auslagen.php).
     ['einsatz_zuteilung', 'oev_rappen', 'ALTER TABLE einsatz_zuteilung ADD COLUMN oev_rappen INT NULL AFTER verkehrsmittel'],
 
-    // Offert-Formular an das Vorbild angeglichen (ENT-186). belege stand zum
+    // Offert-Formular an das Vorbild angeglichen (ENT-187). belege stand zum
     // Zeitpunkt dieser Aenderung bereits produktiv (ENT-184) -- die neuen
     // Spalten kommen darum ueber ALTER TABLE nach, nicht nur in der
     // CREATE-TABLE-Fassung oben.

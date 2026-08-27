@@ -472,7 +472,7 @@ tr.rapp-gruppe-offen td:not(.rapp-klammer) { border-bottom: none; }
 .of-abschluss { display: grid; grid-template-columns: 1fr 380px; gap: 14px; align-items: start; }
 @media (max-width: 900px) { .of-abschluss { grid-template-columns: 1fr; } }
 /* Kopfzeile in drei gleich behandelten Boxen -- Empfaenger, Unterschriften,
-   Termine/Nummer (ENT-186). Alle drei denselben Stellenwert: keine breiter
+   Termine/Nummer (ENT-187). Alle drei denselben Stellenwert: keine breiter
    als die andere, wie es "gleiches Muster auf beiden/allen Seiten" verlangt. */
 .of-kopf-drei { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; align-items: start; margin-bottom: 14px; }
 @media (max-width: 900px) { .of-kopf-drei { grid-template-columns: 1fr; } }
@@ -3579,7 +3579,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
         <div class="msg-err" id="ofFormErr" style="display:none;margin-bottom:12px"></div>
 
         <!-- Drei Boxen -- Empfaenger, Unterschriften, Termine/Nummer -- nach
-             dem Vorbild des bisherigen Fremdsystems (ENT-186). Status ist
+             dem Vorbild des bisherigen Fremdsystems (ENT-187). Status ist
              bewusst keine eigene Box mehr: er aendert sich seit hier ueber
              das Dreipunkt-Menue oben, wie in der Liste, statt ueber ein
              frei einstellbares Auswahlfeld mitten im Formular. -->
@@ -5015,7 +5015,7 @@ let kuDlgTabAktiv = 'kommunikation';
 let kuWege = [];            // Kommunikationszeilen der Firma im offenen Dialog
 let kuPersonen = [];        // Ansprechpersonen im offenen Dialog
 // Rueckruf fuer "Neue Adresse erstellen" aus einem anderen Formular heraus
-// (ENT-186, siehe ofNeueAdresse()). null = normal aus der Kundenliste
+// (ENT-187, siehe ofNeueAdresse()). null = normal aus der Kundenliste
 // geoeffnet, kein Rueckruf noetig.
 let kuNeuRueckkehr = null;
 let kdId = null;            // id des Kunden auf der Detailseite
@@ -7158,7 +7158,7 @@ function renderOfferten() {
 // Kundenliste (ENT-040) -- ein zweites waere ein zweiter Zustand, der offen
 // stehenbleiben koennte, waehrend das erste schon zu ist.
 // Positioniert das schwebende Menue relativ zum anklickenden Knopf -- von
-// ofMenuOeffnen() (Liste) UND ofFormMenuOeffnen() (Formular, ENT-186)
+// ofMenuOeffnen() (Liste) UND ofFormMenuOeffnen() (Formular, ENT-187)
 // gleichermassen genutzt, damit beide dieselbe Kante-oben/Kante-unten-Logik
 // haben und nicht zwei leicht auseinanderlaufende Kopien davon.
 function ofMenuPositionieren(ev, hoeheGeschaetzt) {
@@ -7203,7 +7203,7 @@ function ofMenuSchliessen() {
   delete $('rowmenuPop').dataset.belegId;
 }
 
-// Dasselbe Menue, aber IM Formular selbst statt aus der Liste (ENT-186) --
+// Dasselbe Menue, aber IM Formular selbst statt aus der Liste (ENT-187) --
 // spart den Umweg ueber "zurueck zur Liste", nur um den Status zu aendern
 // oder zu archivieren. "Bearbeiten" entfaellt (das Formular ist bereits
 // offen), "Drucken" hat hier einen eigenen sichtbaren Knopf.
@@ -7266,14 +7266,14 @@ function ofDuplizieren(id, alsVorlage) {
 let ofFormId = null;      // null = neue Offerte
 let ofPos = [];
 let ofFormKundeId = null;
-// Status und Aktiv-Flag stehen seit ENT-186 nicht mehr als sichtbares Feld im
+// Status und Aktiv-Flag stehen seit ENT-187 nicht mehr als sichtbares Feld im
 // Formular (der Wortlaut wird ueber das Dreipunkt-Menue geaendert, wie in der
 // Liste), muessen aber beim Speichern weiterhin mitgeschickt werden -- sonst
 // wuerde jedes Bearbeiten und Speichern eine "versendet"-Offerte still auf
 // "entwurf" zuruecksetzen.
 let ofFormStatus = 'entwurf';
 let ofFormAktiv = 1;
-// Nur die EINGABE-Einheit des Gesamtrabatts (ENT-186). Gespeichert wird immer
+// Nur die EINGABE-Einheit des Gesamtrabatts (ENT-187). Gespeichert wird immer
 // in Basispunkten -- siehe ofRabattBp().
 let ofRabattEinheit = 'pct';
 // Wie viele Tage eine Offerte standardmaessig gilt. 30 wie im bisherigen
@@ -7377,7 +7377,7 @@ function ofGueltigNachziehen() {
 }
 
 // Setzt "Gültig bis" auf Offertendatum + n Tage -- die Schnellwahl neben dem
-// Feld (ENT-186). Ausgehend vom Offertendatum, nicht von heute: eine Offerte
+// Feld (ENT-187). Ausgehend vom Offertendatum, nicht von heute: eine Offerte
 // mit rueckdatiertem Erstelldatum soll trotzdem die richtige Frist bekommen.
 function ofGueltigSetzen(tage) {
   $('of_gueltig').value = ofTagePlus($('of_datum').value || isoTag(), tage);
@@ -7385,7 +7385,7 @@ function ofGueltigSetzen(tage) {
 
 // Text unter dem Formulartitel: Status plus, falls zutreffend, "archiviert".
 // Eigene Funktion, weil beides -- Statuswechsel UND Archivieren -- seit
-// ENT-186 ueber das Dreipunkt-Menue laeuft und die Anzeige von zwei Stellen
+// ENT-187 ueber das Dreipunkt-Menue laeuft und die Anzeige von zwei Stellen
 // aus aktuell gehalten werden muss (ofOeffnen und dem Menue selbst).
 function ofFormSubZeichnen() {
   $('ofFormSub').textContent = ofStatusInfo(ofFormStatus).text
@@ -7413,7 +7413,7 @@ function ofKundeGewaehlt() {
   if (ofFormKundeId !== vorher) { ofPersonenFuellen(null); }
 }
 
-// "Neue Adresse erstellen" direkt aus dem Offert-Formular (ENT-186): oeffnet
+// "Neue Adresse erstellen" direkt aus dem Offert-Formular (ENT-187): oeffnet
 // denselben Kunden-Dialog wie die Kundenliste, waehlt den neu angelegten
 // Kunden aber sofort als Empfaenger, statt ihn erneut suchen zu lassen.
 // kuNeuRueckkehr wird von kuSpeichern() nach dem Anlegen genau einmal
@@ -7543,13 +7543,13 @@ function ofZeileWeg(i) {
   ofZeilenZeichnen();
 }
 
-// ── Gesamtrabatt: Eingabeeinheit %/CHF (ENT-186) ───────────────────────────
+// ── Gesamtrabatt: Eingabeeinheit %/CHF (ENT-187) ───────────────────────────
 // Gespeichert wird IMMER in Basispunkten -- eine CHF-Eingabe ist nur ein
 // zweiter Weg, denselben %-Wert zu treffen, umgerechnet gegen die aktuelle
 // Zwischensumme. Aendern sich die Positionen spaeter, bleibt der einmal
 // gespeicherte %-Wert stehen; er weicht dann von der urspruenglich
 // eingegebenen CHF-Zahl ab. Bewusst so entschieden statt einer eigenen
-// CHF-Spalte im Schema -- siehe ENT-186.
+// CHF-Spalte im Schema -- siehe ENT-187.
 function ofRabattBp() {
   const roh = parseFloat(String($('of_rabatt').value || '0').replace(',', '.'));
   if (!Number.isFinite(roh) || roh <= 0) { return 0; }
@@ -7799,7 +7799,7 @@ function ofBlatt(b, kunde, person) {
 
   // Oeffentliche Notizen, Bedingungen und Fusszeile erscheinen auf dem
   // Dokument, im Unterschied zur internen Bemerkung -- gleiche Reihenfolge
-  // wie im Formular (ENT-186).
+  // wie im Formular (ENT-187).
   const abschnitt = (label, text) => text ? `
       <div style="margin-top:22px">
         <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#6B7280;margin-bottom:4px">${label}</div>
@@ -14706,7 +14706,7 @@ function closeDlg(id) {
   if (sprach && id === 'dlgPlanDiktat') sprachStop();
   // Ein abgebrochener "Neue Adresse"-Dialog darf keinen Rueckruf hinterlassen,
   // der spaeter bei einer voellig unabhaengigen Kundenanlage ungefragt feuert
-  // (ENT-186). Der Erfolgsfall in kuSpeichern() sichert sich den Rueckruf in
+  // (ENT-187). Der Erfolgsfall in kuSpeichern() sichert sich den Rueckruf in
   // eine eigene lokale Variable, BEVOR er closeDlg() aufruft -- das Loeschen
   // hier trifft also nur den abgebrochenen Fall.
   if (id === 'dlgKunde') { kuNeuRueckkehr = null; }
@@ -16624,7 +16624,7 @@ function kuSpeichern() {
       return;
     }
     // Vor closeDlg() sichern: das raeumt kuNeuRueckkehr fuer den
-    // Abbruch-Fall weg (ENT-186), der Erfolgsfall braucht ihn aber noch.
+    // Abbruch-Fall weg (ENT-187), der Erfolgsfall braucht ihn aber noch.
     const rueckkehr = neu ? kuNeuRueckkehr : null;
     closeDlg('dlgKunde');
     Promise.all([loadKunden(), loadStats()]).then(() => {

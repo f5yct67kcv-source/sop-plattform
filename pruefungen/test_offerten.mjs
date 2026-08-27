@@ -49,7 +49,7 @@ const KU = { status: 'ok', kunden: [
   { id: 2, name: 'Rieder Wittwer Immobilien', kundennummer: 'A0220', strasse: 'Weg', hausnummer: '1', plz: '4600', ort: 'Olten', aktiv: 1, personen: [], kontaktwege: [] },
 ]};
 
-// Ein bereits VERSENDETER Beleg mit gesetzten ENT-186-Feldern, fuer das
+// Ein bereits VERSENDETER Beleg mit gesetzten ENT-187-Feldern, fuer das
 // Oeffnen eines bestehenden Belegs (ofOeffnen) -- ein Fall, den diese Suite
 // bislang nie geprueft hat (siehe TEIL 7). Status bewusst NICHT 'entwurf':
 // genau das Zuruecksetzen auf 'entwurf' beim blossen Bearbeiten waere der
@@ -69,7 +69,7 @@ const BELEG_OFFEN = {
   ],
 };
 
-// "Neue Adresse erstellen" (ENT-186) laeuft am Ende ueber
+// "Neue Adresse erstellen" (ENT-187) laeuft am Ende ueber
 // Promise.all([loadKunden(), loadStats()]) -- ohne ein Kennzahlen-Fixture,
 // das die render*()-Funktionen nicht zum Werfen bringt, wuerde dieses
 // Promise.all NIE aufloesen (eine wirft, das ganze Promise.all faellt durch),
@@ -84,14 +84,14 @@ const STATS = { status: 'ok',
 
 let gespeichert = null, statusRufe = [], archivRufe = [], dupRufe = [];
 // Veraenderlich statt eine feste Konstante, seit "Neue Adresse erstellen"
-// (ENT-186) einen Kunden waehrend des Laufs tatsaechlich anlegen koennen
+// (ENT-187) einen Kunden waehrend des Laufs tatsaechlich anlegen koennen
 // muss -- kunden_list liefert danach die erweiterte Liste, sonst faende der
 // Rueckkehr-Rueckruf den gerade angelegten Kunden nicht wieder.
 let kuListe = KU.kunden.map(k => ({ ...k }));
 
 const browser = await chromium.launch({ executablePath: browserPfad() });
 const page = await browser.newPage({ viewport: { width: 1500, height: 1000 } });
-// Bis ENT-186 stand hier ein Filter fuer einen als "bekannt und harmlos"
+// Bis ENT-187 stand hier ein Filter fuer einen als "bekannt und harmlos"
 // hingenommenen Fehler aus unvollstaendigen Kennzahlen-Fixtures
 // ("rapporte_monat"). Mit dem STATS-Fixture oben (noetig, damit
 // Promise.all([loadKunden(), loadStats()]) beim Anlegen einer neuen Adresse
@@ -566,11 +566,11 @@ check('Am Desktop bleiben die Beschriftungen ab der zweiten Zeile ausgeblendet',
 // ══════════════════════════════════════════════════════════════════════════
 // TEIL 7 — Layout-Angleichung ans Fremdsystem: bestehenden Beleg öffnen,
 // Dreipunkt-Menü im Formular, Rabatt-Einheiten, Schnellwahl, neue Adresse
-// (ENT-186)
+// (ENT-187)
 // ══════════════════════════════════════════════════════════════════════════
 //
 // Bislang öffnete diese Suite nie einen BESTEHENDEN Beleg (ofOeffnen) --
-// TEIL 2 baut nur einen neuen. Genau dieser Pfad ist es, den ENT-186
+// TEIL 2 baut nur einen neuen. Genau dieser Pfad ist es, den ENT-187
 // verändert hat: Status steht nicht mehr in einem Auswahlfeld, sondern im
 // Dreipunkt-Menü -- speichert man einfach weiter, darf er nicht still auf
 // "entwurf" zurückfallen.
@@ -637,7 +637,7 @@ check('Archivieren aus dem Formular ruft beleg_archivieren.php mit aktiv=0 auf',
 check('Die Unterzeile zeigt "archiviert" an, ohne dass man das Formular verlassen musste',
   (await page.textContent('#ofFormSub')).includes('archiviert'));
 
-// ── Gesamtrabatt: Umschalten zwischen % und CHF (ENT-186) ────────────────
+// ── Gesamtrabatt: Umschalten zwischen % und CHF (ENT-187) ────────────────
 // Die einzige Position des Belegs: 10 x 42.00 = 420.00 CHF Zwischensumme.
 await page.fill('#of_rabatt', '10');
 await page.click('#of_rabatt_chf');
@@ -668,7 +668,7 @@ await page.click('.of-schnell:has-text("+30")');
 check('"+30" setzt auf 30 Tage nach dem Offertendatum',
   (await page.inputValue('#of_gueltig')) === '2026-07-01');
 
-// ── "Neue Adresse erstellen" (ENT-186) ────────────────────────────────────
+// ── "Neue Adresse erstellen" (ENT-187) ────────────────────────────────────
 const kundenVorher = await page.evaluate(() => kunden.length);
 await page.click('button:has-text("Neue Adresse erstellen")');
 await page.waitForTimeout(200);
