@@ -1866,12 +1866,19 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
   .dash-item.dw-breit, .dash-item.dw-schmal, .dash-item.dw-halb { flex-basis: 100%; }
 }
 
-/* ── Glocke (ENT-197) */
+/* ── Glocke (ENT-197)
+   Groesse und Abstand des Zaehlers nach Mass, nicht nach Auge: eine erste
+   Fassung liess den Zaehler so breit werden, dass er die Glocke darunter
+   fast vollstaendig verdeckte -- am gerenderten Zustand gemessen, nicht im
+   Quelltext vermutet. Das Vorbild vom 2026-08-27 zeigt einen kleinen, klar
+   abgesetzten Punkt an der ausseren Ecke, nicht auf dem Symbol selbst. */
 .glocke-wrap { position: relative; }
 .btn-glocke { position: relative; }
-.glocke-badge { position: absolute; top: 2px; right: 2px; min-width: 16px; height: 16px;
-  padding: 0 4px; border-radius: 999px; background: var(--neg); color: #fff;
-  font-size: 10px; font-weight: 700; line-height: 16px; text-align: center; }
+svg.i-glocke { width: 19px; height: 19px; }
+.glocke-badge { position: absolute; top: -3px; right: -3px; min-width: 15px; height: 15px;
+  padding: 0 3px; border-radius: 999px; background: var(--neg); color: #fff;
+  font-size: 9px; font-weight: 700; line-height: 15px; text-align: center;
+  box-shadow: 0 0 0 2px var(--glas); }
 .glocke-panel { position: absolute; top: calc(100% + 8px); right: 0; width: 340px; max-width: calc(100vw - 24px);
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--r);
   box-shadow: var(--sh-2); z-index: 40; overflow: hidden; }
@@ -2777,6 +2784,23 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
       </div>
       <nav class="top-sub" id="topSub"></nav>
       <div class="tb-rechts">
+      <!-- Glocke (ENT-197): dieselben Ereignisse wie die Uebersicht, kompakt
+           und von jeder Seite aus erreichbar -- eine Annahme/Ablehnung im
+           Kundenportal soll dem Planer nicht erst auffallen, wenn er zufaellig
+           auf der Uebersicht landet. Ganz vorne in der Werkzeugleiste, nicht
+           zwischen Sprechen und Thema versteckt -- eine Benachrichtigung mit
+           Zaehler soll als Erstes ins Auge fallen (Vorbild: Screenshot vom
+           2026-08-27, dort steht die Glocke gleich als zweites Symbol). -->
+      <div class="glocke-wrap">
+        <button class="btn btn-quiet btn-sm btn-glocke" id="btnGlocke" onclick="glockeUmschalten(event)" title="Benachrichtigungen" aria-label="Benachrichtigungen" aria-haspopup="true" aria-expanded="false">
+          <svg class="i i-glocke" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span class="glocke-badge" id="glockeBadge" style="display:none">0</span>
+        </button>
+        <div class="glocke-panel" id="glockePanel" style="display:none">
+          <div class="glocke-kopf"><b>Benachrichtigungen</b></div>
+          <div class="glocke-liste" id="glockeListe"></div>
+        </div>
+      </div>
       <!-- Prominent statt ein Standard-Knopf: die Spracherkennung ist ein
            Hauptmerkmal des Werkzeugs, kein Nebenwerkzeug (ENT-038). Auf der
            Übersicht versteckt, weil der Router dort schon im Begrüssungs-
@@ -2785,20 +2809,6 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
         <svg class="i i-sm" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
         <span class="lbl">Sprechen</span>
       </button>
-      <!-- Glocke (ENT-197): dieselben Ereignisse wie die Uebersicht, kompakt
-           und von jeder Seite aus erreichbar -- eine Annahme/Ablehnung im
-           Kundenportal soll dem Planer nicht erst auffallen, wenn er zufaellig
-           auf der Uebersicht landet. -->
-      <div class="glocke-wrap">
-        <button class="btn btn-quiet btn-sm btn-glocke" id="btnGlocke" onclick="glockeUmschalten(event)" title="Benachrichtigungen" aria-label="Benachrichtigungen" aria-haspopup="true" aria-expanded="false">
-          <svg class="i i-sm" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-          <span class="glocke-badge" id="glockeBadge" style="display:none">0</span>
-        </button>
-        <div class="glocke-panel" id="glockePanel" style="display:none">
-          <div class="glocke-kopf"><b>Benachrichtigungen</b></div>
-          <div class="glocke-liste" id="glockeListe"></div>
-        </div>
-      </div>
       <button class="thema-schalter ohne-schublade" id="btnThema" onclick="themaUm()" role="switch" aria-checked="false" title="Hell oder dunkel" aria-label="Zwischen heller und dunkler Darstellung wechseln">
         <span class="knopf">
           <svg class="i-sonne" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><line x1="12" y1="1.5" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22.5"/><line x1="4.2" y1="4.2" x2="5.9" y2="5.9"/><line x1="18.1" y1="18.1" x2="19.8" y2="19.8"/><line x1="1.5" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22.5" y2="12"/><line x1="4.2" y1="19.8" x2="5.9" y2="18.1"/><line x1="18.1" y1="5.9" x2="19.8" y2="4.2"/></svg>
@@ -6972,7 +6982,12 @@ function glockeZeileGeklickt(i) {
   glockeSchliessen();
   go('uebersicht');
   const zeile = document.querySelectorAll('#ereignisFeed .rank.erg')[i];
-  if (zeile) { ereignisAufklappen(i, zeile); }
+  if (!zeile) { return; }
+  ereignisAufklappen(i, zeile);
+  // Das Ereignis-Widget steht je nach eigener Anordnung der Uebersicht weit
+  // unten, unterhalb der Kennzahlen -- ohne Hinscrollen sieht man das
+  // aufgeklappte Detail nie und der Klick wirkt wirkungslos.
+  zeile.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 function renderProMa() {

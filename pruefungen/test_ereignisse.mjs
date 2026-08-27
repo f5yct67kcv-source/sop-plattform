@@ -464,6 +464,21 @@ try {
   check('Das Dropdown ist danach zu',
     (await p.evaluate(() => getComputedStyle(document.getElementById('glockePanel')).display)) === 'none');
 
+  // Das Ereignis-Widget steht je nach eigener Anordnung der Uebersicht weit
+  // unten -- ohne Hinscrollen sieht man das aufgeklappte Detail nie und der
+  // Klick wirkt wirkungslos. Erst weit runterscrollen, dann pruefen, dass
+  // die Zeile danach wieder im sichtbaren Bereich steht.
+  await p.click('#ereignisFeed .rank >> nth=0'); await p.waitForTimeout(200); // wieder zuklappen
+  await p.evaluate(() => window.scrollTo(0, 5000));
+  await p.click('#btnGlocke'); await p.waitForTimeout(150);
+  await p.click('#glockeListe .glocke-row >> nth=0'); await p.waitForTimeout(500);
+  const imBild = await p.evaluate(() => {
+    const r = document.querySelector('#ereignisFeed .rank.erg').getBoundingClientRect();
+    return r.top >= 0 && r.top < window.innerHeight;
+  });
+  check('KRITISCH: nach dem Klick steht die Zeile im sichtbaren Bereich, auch wenn zuvor weit runtergescrollt war',
+    imBild);
+
   // Abhaken direkt aus dem Dropdown, ohne es vorher zu verlassen.
   await p.click('#btnGlocke'); await p.waitForTimeout(150);
   gesendet.length = 0;
