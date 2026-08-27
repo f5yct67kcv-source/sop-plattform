@@ -215,6 +215,7 @@ for (const [datei, titel] of [
   ['pruef_rechte.php',  'KRITISCH: die Rollen geben genau die entschiedenen Rechte'],
   ['pruef_logbuch.php', 'KRITISCH: das Logbuch haelt fest, wer was geaendert hat'],
   ['pruef_einsatz_abgeschlossen.php', 'KRITISCH: "abgeschlossen" verlangt ALLE zugesagten Rapporte (ENT-128)'],
+  ['pruef_rundgang.php', 'KRITISCH: Geofence-Pruefung und Restliste der Kontrollpunkte stimmen (ENT-132/ENT-145/ENT-180)'],
 ]) {
   let aus = '', code = 0;
   try {
@@ -430,6 +431,8 @@ const NUR_EIGENE_DATEN = [
   'zweifaktor_status.php',     // eigene Zwei-Faktor-Anmeldung
   'zweifaktor_aus.php',
   'zweifaktor_geraet_weg.php',
+  'mein_rundgang_starten.php', // eigenen Rundgang fuer eigenen Einsatz starten (ENT-180)
+  'mein_rundgang_scan.php',    // Kontrollpunkt-Scans am eigenen, laufenden Rundgang (ENT-180)
 ];
 const ohnePruefung = apiDateien.filter(f => {
   const q = ohneKommentar(f);

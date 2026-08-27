@@ -1,0 +1,16 @@
+{
+  "name": "cupi24-mobile",
+  "version": "0.1.0",
+  "description": "Capacitor-Huelle um die bestehende Mitarbeiter-App (app.html) fuer den offiziellen App-Store-Vertrieb (ENT-079, ENT-141). Noch ohne echten App-Code -- reines Geruest.",
+  "private": true,
+  "scripts": {
+    "sync": "npx cap sync"
+  },
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@capacitor/android": "^8.5.0",
+    "@capacitor/cli": "^8.5.0",
+    "@capacitor/core": "^8.5.0",
+    "@capacitor/ios": "^8.5.0"
+  }
+}
