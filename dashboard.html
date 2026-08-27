@@ -2555,6 +2555,19 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
   .bar-val { display: none; }
   .drawer-ft span { display: none; }
 }
+
+/* Trefferflaeche auf dem Handy (OP-111, Gestaltungsregel: mindestens 44 px).
+   Bewusst ganz am Ende der Kaskade platziert wie schon bei ENT-068 weiter
+   oben: .btn und .check treten dutzendfach auf, jede spaetere Regel
+   gleicher Eigenspezifitaet wuerde sonst gewinnen. Engere Selektoren mit
+   hoeherer Eigenspezifitaet (z. B. .ep-leute-kopf .inp, .bar-eng .inp) sind
+   davon unberuehrt und bleiben bewusst kompakt fuer dichte Tabellen.
+   .inp bekommt hier keine neue Regel: font-size:16px gilt fuer .inp, input,
+   select, textarea bereits ab 900px weiter oben in diesem Block. */
+@media (max-width: 720px) {
+  .btn { min-height: 44px; }
+  .check { min-height: 44px; }
+}
 </style>
 <script src="gav.js"></script>
 <script src="zeitwahl.js"></script>
