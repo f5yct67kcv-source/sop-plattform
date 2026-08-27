@@ -472,7 +472,7 @@ tr.rapp-gruppe-offen td:not(.rapp-klammer) { border-bottom: none; }
 .of-abschluss { display: grid; grid-template-columns: 1fr 380px; gap: 14px; align-items: start; }
 @media (max-width: 900px) { .of-abschluss { grid-template-columns: 1fr; } }
 /* Kopfzeile in drei gleich behandelten Boxen -- Empfaenger, Unterschriften,
-   Termine/Nummer (ENT-186). Alle drei denselben Stellenwert: keine breiter
+   Termine/Nummer (ENT-187). Alle drei denselben Stellenwert: keine breiter
    als die andere, wie es "gleiches Muster auf beiden/allen Seiten" verlangt. */
 .of-kopf-drei { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; align-items: start; margin-bottom: 14px; }
 @media (max-width: 900px) { .of-kopf-drei { grid-template-columns: 1fr; } }
@@ -3569,17 +3569,31 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
                   aria-label="Aktionen" style="display:none">
             <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
           </button>
+          <!-- Vorschau (ENT-192): zeigt dasselbe Blatt wie ofDrucken(), nur in
+               einem Dialog statt im Druckdialog. Es gibt keine PDF-Bibliothek in
+               diesem Projekt -- die Vorschau IST das Dokument, kein separat
+               erzeugtes PDF. -->
+          <button class="btn btn-plain btn-sm" id="ofFormVorschauBtn" onclick="ofVorschau(ofFormId)"
+                  aria-label="Vorschau" title="Vorschau" style="display:none">
+            <svg class="i i-sm" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
           <button class="btn btn-plain btn-sm" id="ofFormDruckBtn" onclick="ofDrucken(ofFormId)">
             <svg class="i i-sm" viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
             Drucken
           </button>
-          <button class="btn btn-primary btn-sm" id="ofFormSaveBtn" onclick="ofSpeichern()">Speichern</button>
+          <!-- Nur Icon statt "Speichern" (ENT-192, auf Wunsch des
+               Projektinhabers) -- der Zwischenstand-Knopf soll in der
+               Kopfzeile keinen Text mehr tragen. -->
+          <button class="btn btn-primary btn-sm" id="ofFormSaveBtn" onclick="ofSpeichern()"
+                  aria-label="Speichern" title="Speichern">
+            <svg class="i i-sm" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          </button>
         </div>
 
         <div class="msg-err" id="ofFormErr" style="display:none;margin-bottom:12px"></div>
 
         <!-- Drei Boxen -- Empfaenger, Unterschriften, Termine/Nummer -- nach
-             dem Vorbild des bisherigen Fremdsystems (ENT-186). Status ist
+             dem Vorbild des bisherigen Fremdsystems (ENT-187). Status ist
              bewusst keine eigene Box mehr: er aendert sich seit hier ueber
              das Dreipunkt-Menue oben, wie in der Liste, statt ueber ein
              frei einstellbares Auswahlfeld mitten im Formular. -->
@@ -4361,6 +4375,25 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
   </div>
 </div>
 
+<!-- ══════════ VORSCHAU DER OFFERTE (ENT-192) ══════════
+     Zeigt dasselbe Blatt wie ofDrucken() (ofBlatt()), nur ohne den
+     Druckdialog auszuloesen. Kein PDF-Export -- diese Ansicht ist bereits
+     das Dokument, das der Kunde auch im Kundenportal sieht. -->
+<div class="dlg-scrim" id="dlgOfVorschau">
+  <div class="dlg breit">
+    <div class="dlg-hd">
+      <h2>Vorschau</h2>
+      <p>So sieht die Offerte für den Kunden aus.</p>
+    </div>
+    <div class="dlg-bd" style="background:#F4F5F7">
+      <div id="ofVorschauInhalt" style="background:#fff;padding:32px;border-radius:8px"></div>
+    </div>
+    <div class="dlg-ft">
+      <button class="btn btn-plain" onclick="closeDlg('dlgOfVorschau')">Schliessen</button>
+    </div>
+  </div>
+</div>
+
 <div class="dlg-scrim" id="dlgKunde">
   <div class="dlg breit">
     <div class="dlg-hd">
@@ -5015,7 +5048,7 @@ let kuDlgTabAktiv = 'kommunikation';
 let kuWege = [];            // Kommunikationszeilen der Firma im offenen Dialog
 let kuPersonen = [];        // Ansprechpersonen im offenen Dialog
 // Rueckruf fuer "Neue Adresse erstellen" aus einem anderen Formular heraus
-// (ENT-186, siehe ofNeueAdresse()). null = normal aus der Kundenliste
+// (ENT-187, siehe ofNeueAdresse()). null = normal aus der Kundenliste
 // geoeffnet, kein Rueckruf noetig.
 let kuNeuRueckkehr = null;
 let kdId = null;            // id des Kunden auf der Detailseite
@@ -7158,7 +7191,7 @@ function renderOfferten() {
 // Kundenliste (ENT-040) -- ein zweites waere ein zweiter Zustand, der offen
 // stehenbleiben koennte, waehrend das erste schon zu ist.
 // Positioniert das schwebende Menue relativ zum anklickenden Knopf -- von
-// ofMenuOeffnen() (Liste) UND ofFormMenuOeffnen() (Formular, ENT-186)
+// ofMenuOeffnen() (Liste) UND ofFormMenuOeffnen() (Formular, ENT-187)
 // gleichermassen genutzt, damit beide dieselbe Kante-oben/Kante-unten-Logik
 // haben und nicht zwei leicht auseinanderlaufende Kopien davon.
 function ofMenuPositionieren(ev, hoeheGeschaetzt) {
@@ -7203,7 +7236,7 @@ function ofMenuSchliessen() {
   delete $('rowmenuPop').dataset.belegId;
 }
 
-// Dasselbe Menue, aber IM Formular selbst statt aus der Liste (ENT-186) --
+// Dasselbe Menue, aber IM Formular selbst statt aus der Liste (ENT-187) --
 // spart den Umweg ueber "zurueck zur Liste", nur um den Status zu aendern
 // oder zu archivieren. "Bearbeiten" entfaellt (das Formular ist bereits
 // offen), "Drucken" hat hier einen eigenen sichtbaren Knopf.
@@ -7215,6 +7248,8 @@ function ofFormMenuOeffnen(ev) {
   const statusKnoepfe = OF_STATUS.filter(s => s.wert !== ofFormStatus).map(s =>
     `<button onclick="ofMenuSchliessen(); ofStatusSetzen(${id}, '${s.wert}')">Als „${esc(s.text)}" markieren</button>`).join('');
   pop.innerHTML = `
+    <button onclick="ofMenuSchliessen(); ofVersenden(${id})">Per E-Mail versenden</button>
+    <hr>
     ${statusKnoepfe}
     <hr>
     <button onclick="ofMenuSchliessen(); ofDuplizieren(${id}, 0)">Duplizieren</button>
@@ -7223,7 +7258,7 @@ function ofFormMenuOeffnen(ev) {
     <button onclick="ofMenuSchliessen(); ofArchivKlick(${id}, ${ofFormAktiv ? 0 : 1})">${ofFormAktiv ? 'Archivieren' : 'Zurückholen'}</button>`;
   pop.dataset.belegId = 'form';
   pop.classList.add('on');
-  ofMenuPositionieren(ev, 260);
+  ofMenuPositionieren(ev, 300);
 }
 
 function ofStatusSetzen(id, neu) {
@@ -7266,14 +7301,14 @@ function ofDuplizieren(id, alsVorlage) {
 let ofFormId = null;      // null = neue Offerte
 let ofPos = [];
 let ofFormKundeId = null;
-// Status und Aktiv-Flag stehen seit ENT-186 nicht mehr als sichtbares Feld im
+// Status und Aktiv-Flag stehen seit ENT-187 nicht mehr als sichtbares Feld im
 // Formular (der Wortlaut wird ueber das Dreipunkt-Menue geaendert, wie in der
 // Liste), muessen aber beim Speichern weiterhin mitgeschickt werden -- sonst
 // wuerde jedes Bearbeiten und Speichern eine "versendet"-Offerte still auf
 // "entwurf" zuruecksetzen.
 let ofFormStatus = 'entwurf';
 let ofFormAktiv = 1;
-// Nur die EINGABE-Einheit des Gesamtrabatts (ENT-186). Gespeichert wird immer
+// Nur die EINGABE-Einheit des Gesamtrabatts (ENT-187). Gespeichert wird immer
 // in Basispunkten -- siehe ofRabattBp().
 let ofRabattEinheit = 'pct';
 // Wie viele Tage eine Offerte standardmaessig gilt. 30 wie im bisherigen
@@ -7317,6 +7352,7 @@ function ofNeu() {
   // Drucken und das Dreipunkt-Menue ergeben vor dem ersten Speichern keinen
   // Sinn -- es gibt noch keinen Beleg, den der Server ausliefern oder dessen
   // Status es aendern koennte.
+  $('ofFormVorschauBtn').style.display = 'none';
   $('ofFormDruckBtn').style.display = 'none';
   $('ofFormMenuBtn').style.display = 'none';
   ofZeilenZeichnen();
@@ -7377,7 +7413,7 @@ function ofGueltigNachziehen() {
 }
 
 // Setzt "Gültig bis" auf Offertendatum + n Tage -- die Schnellwahl neben dem
-// Feld (ENT-186). Ausgehend vom Offertendatum, nicht von heute: eine Offerte
+// Feld (ENT-187). Ausgehend vom Offertendatum, nicht von heute: eine Offerte
 // mit rueckdatiertem Erstelldatum soll trotzdem die richtige Frist bekommen.
 function ofGueltigSetzen(tage) {
   $('of_gueltig').value = ofTagePlus($('of_datum').value || isoTag(), tage);
@@ -7385,7 +7421,7 @@ function ofGueltigSetzen(tage) {
 
 // Text unter dem Formulartitel: Status plus, falls zutreffend, "archiviert".
 // Eigene Funktion, weil beides -- Statuswechsel UND Archivieren -- seit
-// ENT-186 ueber das Dreipunkt-Menue laeuft und die Anzeige von zwei Stellen
+// ENT-187 ueber das Dreipunkt-Menue laeuft und die Anzeige von zwei Stellen
 // aus aktuell gehalten werden muss (ofOeffnen und dem Menue selbst).
 function ofFormSubZeichnen() {
   $('ofFormSub').textContent = ofStatusInfo(ofFormStatus).text
@@ -7413,7 +7449,7 @@ function ofKundeGewaehlt() {
   if (ofFormKundeId !== vorher) { ofPersonenFuellen(null); }
 }
 
-// "Neue Adresse erstellen" direkt aus dem Offert-Formular (ENT-186): oeffnet
+// "Neue Adresse erstellen" direkt aus dem Offert-Formular (ENT-187): oeffnet
 // denselben Kunden-Dialog wie die Kundenliste, waehlt den neu angelegten
 // Kunden aber sofort als Empfaenger, statt ihn erneut suchen zu lassen.
 // kuNeuRueckkehr wird von kuSpeichern() nach dem Anlegen genau einmal
@@ -7543,13 +7579,13 @@ function ofZeileWeg(i) {
   ofZeilenZeichnen();
 }
 
-// ── Gesamtrabatt: Eingabeeinheit %/CHF (ENT-186) ───────────────────────────
+// ── Gesamtrabatt: Eingabeeinheit %/CHF (ENT-187) ───────────────────────────
 // Gespeichert wird IMMER in Basispunkten -- eine CHF-Eingabe ist nur ein
 // zweiter Weg, denselben %-Wert zu treffen, umgerechnet gegen die aktuelle
 // Zwischensumme. Aendern sich die Positionen spaeter, bleibt der einmal
 // gespeicherte %-Wert stehen; er weicht dann von der urspruenglich
 // eingegebenen CHF-Zahl ab. Bewusst so entschieden statt einer eigenen
-// CHF-Spalte im Schema -- siehe ENT-186.
+// CHF-Spalte im Schema -- siehe ENT-187.
 function ofRabattBp() {
   const roh = parseFloat(String($('of_rabatt').value || '0').replace(',', '.'));
   if (!Number.isFinite(roh) || roh <= 0) { return 0; }
@@ -7657,6 +7693,7 @@ function ofOeffnen(id) {
       $('of_datum').dataset.vorher = $('of_datum').value;
       $('of_gueltig').value = leeresDatum(b.gueltig_bis) ? '' : String(b.gueltig_bis).slice(0, 10);
       ofPersonenFuellen(b.person_id);
+      $('ofFormVorschauBtn').style.display = '';
       $('ofFormDruckBtn').style.display = '';
       $('ofFormMenuBtn').style.display = '';
       ofZeilenZeichnen();
@@ -7707,6 +7744,7 @@ function ofSpeichern() {
     ofFormId = Number(data.id);
     if (data.nummer) { $('ofFormNummer').textContent = data.nummer; $('of_nummer').value = data.nummer; }
     ofFormSubZeichnen();
+    $('ofFormVorschauBtn').style.display = '';
     $('ofFormDruckBtn').style.display = '';
     $('ofFormMenuBtn').style.display = '';
     // Die Summen aus der SERVERANTWORT uebernehmen, nicht die eigene
@@ -7738,6 +7776,41 @@ function ofDrucken(id) {
     $('printArea').innerHTML = ofBlatt(data.beleg, data.kunde, data.person);
     window.print();
   }).catch(() => toast('Die Offerte liess sich nicht laden.'));
+}
+
+// Vorschau (ENT-192): dasselbe Blatt wie ofDrucken(), aber in einem Dialog
+// statt im Druckdialog -- "wie sieht es aus", ohne einen Druckvorgang
+// auszuloesen. Es gibt in diesem Projekt keine PDF-Bibliothek: Diese
+// Ansicht IST das Dokument (siehe ofBlatt()), kein separat erzeugtes PDF.
+function ofVorschau(id) {
+  if (!id) { toast('Die Offerte muss zuerst gespeichert werden.'); return; }
+  api('beleg_lesen.php?id=' + Number(id)).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') {
+      toast(data.message || 'Die Offerte liess sich nicht laden.'); return;
+    }
+    $('ofVorschauInhalt').innerHTML = ofBlatt(data.beleg, data.kunde, data.person);
+    openDlg('dlgOfVorschau');
+  }).catch(() => toast('Die Offerte liess sich nicht laden.'));
+}
+
+// Per E-Mail versenden (ENT-192): verschickt keinen PDF-Anhang, sondern einen
+// Link auf eine unangemeldete Web-Ansicht (backend/api/beleg_oeffentlich.php),
+// auf der der Kunde annehmen oder ablehnen kann. Der eigentliche Versand
+// laeuft ueber den Hostpoint-SMTP-Server (backend/mailer.php) -- eine
+// Sicherheitsabfrage vorher, weil eine einmal verschickte Mail sich nicht
+// zurueckholen laesst.
+function ofVersenden(id) {
+  if (!id) { toast('Die Offerte muss zuerst gespeichert werden.'); return; }
+  askConfirm('Offerte per E-Mail versenden?',
+    'Der Kunde erhält eine E-Mail mit einem Link zur Offerte. Dort kann er sie direkt annehmen oder ablehnen.',
+    'Versenden', () => {
+      api('beleg_versenden.php', { method: 'POST', body: { id: Number(id) } }).then(({ ok, data }) => {
+        if (!ok || data.status !== 'ok') { toast(data.message || 'Versand fehlgeschlagen.'); return; }
+        toast('Offerte per E-Mail verschickt.');
+        if (ofFormId === Number(id)) { ofFormStatus = 'versendet'; ofFormSubZeichnen(); }
+        loadBelege();
+      }).catch(() => toast('Versand fehlgeschlagen.'));
+    });
 }
 
 // Erzeugt das Blatt. Getrennt von ofDrucken(), damit es sich ohne Drucken
@@ -7799,7 +7872,7 @@ function ofBlatt(b, kunde, person) {
 
   // Oeffentliche Notizen, Bedingungen und Fusszeile erscheinen auf dem
   // Dokument, im Unterschied zur internen Bemerkung -- gleiche Reihenfolge
-  // wie im Formular (ENT-186).
+  // wie im Formular (ENT-187).
   const abschnitt = (label, text) => text ? `
       <div style="margin-top:22px">
         <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#6B7280;margin-bottom:4px">${label}</div>
@@ -14706,7 +14779,7 @@ function closeDlg(id) {
   if (sprach && id === 'dlgPlanDiktat') sprachStop();
   // Ein abgebrochener "Neue Adresse"-Dialog darf keinen Rueckruf hinterlassen,
   // der spaeter bei einer voellig unabhaengigen Kundenanlage ungefragt feuert
-  // (ENT-186). Der Erfolgsfall in kuSpeichern() sichert sich den Rueckruf in
+  // (ENT-187). Der Erfolgsfall in kuSpeichern() sichert sich den Rueckruf in
   // eine eigene lokale Variable, BEVOR er closeDlg() aufruft -- das Loeschen
   // hier trifft also nur den abgebrochenen Fall.
   if (id === 'dlgKunde') { kuNeuRueckkehr = null; }
@@ -16624,7 +16697,7 @@ function kuSpeichern() {
       return;
     }
     // Vor closeDlg() sichern: das raeumt kuNeuRueckkehr fuer den
-    // Abbruch-Fall weg (ENT-186), der Erfolgsfall braucht ihn aber noch.
+    // Abbruch-Fall weg (ENT-187), der Erfolgsfall braucht ihn aber noch.
     const rueckkehr = neu ? kuNeuRueckkehr : null;
     closeDlg('dlgKunde');
     Promise.all([loadKunden(), loadStats()]).then(() => {

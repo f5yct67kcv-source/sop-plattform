@@ -13,14 +13,15 @@
 # dastehen.
 
 # ── 1. Hilfsdateien nicht direkt abrufbar ────────────────────────────────
-# db.php traegt das Datenbankpasswort, ai.php den Schluessel zur KI. Beide
-# liegen im Web-Verzeichnis, weil der Deploy per FTP nicht darueber hinaus
-# schreiben kann. PHP wird zwar ausgefuehrt statt angezeigt -- aber wenn PHP
-# einmal ausfaellt oder falsch eingestellt ist, liefert der Server den
-# Quelltext im Klartext aus. Dann waeren die Zugangsdaten oeffentlich.
+# db.php traegt das Datenbankpasswort, ai.php den Schluessel zur KI, mailer.php
+# das SMTP-Passwort fuer den Offert-Versand (ENT-192). Alle liegen im
+# Web-Verzeichnis, weil der Deploy per FTP nicht darueber hinaus schreiben
+# kann. PHP wird zwar ausgefuehrt statt angezeigt -- aber wenn PHP einmal
+# ausfaellt oder falsch eingestellt ist, liefert der Server den Quelltext im
+# Klartext aus. Dann waeren die Zugangsdaten oeffentlich.
 # Diese Dateien werden nur von den Endpunkten unter /api eingebunden und nie
 # direkt aufgerufen; ein direkter Abruf ist also immer verkehrt.
-<FilesMatch "^(db|ai|planung|kunden|mitarbeiter|layout|anmeldung|zweifaktor|rechte|logbuch|ereignisse|auslagen|rundgang|belege|setup)\.php$">
+<FilesMatch "^(db|ai|planung|kunden|mitarbeiter|layout|anmeldung|zweifaktor|rechte|logbuch|ereignisse|auslagen|rundgang|belege|mailer|setup)\.php$">
   <IfModule mod_authz_core.c>
     Require all denied
   </IfModule>

@@ -42,6 +42,7 @@ jobs:
           cp backend/auslagen.php dist/auslagen.php
           cp backend/rundgang.php dist/rundgang.php
           cp backend/belege.php dist/belege.php
+          cp backend/mailer.php dist/mailer.php
           # Schutzeinstellungen (ENT-075). Im Repository heisst die Datei
           # bewusst ohne fuehrenden Punkt -- sonst uebersieht man sie.
           cp htaccess-hostpoint dist/.htaccess
@@ -54,6 +55,17 @@ jobs:
           sed -i "s|__DB_USER__|${{ secrets.DB_USER }}|g" dist/db.php
           sed -i "s|__DB_PASS__|${{ secrets.DB_PASSWORD }}|g" dist/db.php
           sed -i "s|__ANTHROPIC_API_KEY__|${{ secrets.ANTHROPIC_API_KEY }}|g" dist/ai.php
+          # SMTP fuer den Offert-Versand (ENT-192). Bleiben die Secrets ungesetzt,
+          # steht weiterhin woertlich "__SMTP_HOST__" usw. in dist/mailer.php --
+          # smtp_konfiguriert() erkennt das und meldet "nicht eingerichtet",
+          # statt mit einem Platzhalter als Hostnamen zu verbinden.
+          sed -i "s|__SMTP_HOST__|${{ secrets.SMTP_HOST }}|g" dist/mailer.php
+          sed -i "s|__SMTP_PORT__|${{ secrets.SMTP_PORT }}|g" dist/mailer.php
+          sed -i "s|__SMTP_VERSCHLUESSELUNG__|${{ secrets.SMTP_VERSCHLUESSELUNG }}|g" dist/mailer.php
+          sed -i "s|__SMTP_USER__|${{ secrets.SMTP_USER }}|g" dist/mailer.php
+          sed -i "s|__SMTP_PASSWORD__|${{ secrets.SMTP_PASSWORD }}|g" dist/mailer.php
+          sed -i "s|__SMTP_ABSENDER__|${{ secrets.SMTP_ABSENDER }}|g" dist/mailer.php
+          sed -i "s|__SMTP_ABSENDER_NAME__|${{ secrets.SMTP_ABSENDER_NAME }}|g" dist/mailer.php
 
       - name: Nach Hostpoint hochladen (FTPS)
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5

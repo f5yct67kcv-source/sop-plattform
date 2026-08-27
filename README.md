@@ -91,6 +91,17 @@ auslesen** — das ist kein Mangel, sondern der Sinn eines Secrets.
 | `HOSTPOINT_FTP_HOST` | Ziel des Deploys | Hostpoint-Kundencenter → FTP |
 | `HOSTPOINT_FTP_USER` | FTP-Benutzer | Hostpoint-Kundencenter → FTP |
 | `HOSTPOINT_FTP_PASSWORD` | Passwort dazu | Hostpoint-Kundencenter → FTP |
+| `SMTP_HOST` | Mailserver fuer den Offert-Versand (ENT-192) | Hostpoint-Kundencenter → E-Mail → SMTP-Einstellungen der Domain |
+| `SMTP_PORT` | Port dazu (meist 587 mit `tls`, oder 465 mit `ssl`) | dieselbe Stelle |
+| `SMTP_VERSCHLUESSELUNG` | `tls`, `ssl` oder leer | dieselbe Stelle, je nach Port |
+| `SMTP_USER` | Postfach-Login | Hostpoint-Kundencenter → E-Mail |
+| `SMTP_PASSWORD` | Passwort dazu | Hostpoint-Kundencenter → E-Mail; bei Verlust dort neu setzen |
+| `SMTP_ABSENDER` | Absenderadresse der Offert-Mails (muss zum Postfach passen) | dieselbe Stelle |
+| `SMTP_ABSENDER_NAME` | Angezeigter Absendername (optional, sonst nur die Adresse) | frei waehlbar |
+
+Fehlen die SMTP-Secrets, meldet „Per E-Mail versenden" im Dashboard „noch
+nicht eingerichtet" — es wird nie versucht, mit einem Platzhalter als Hostnamen
+zu verbinden.
 
 **Wenn ein Wert je an eine falsche Stelle geraten ist** — in einen Commit, einen
 Chat, ein Bildschirmfoto: **neu erzeugen, nicht loeschen.** Loeschen hilft nicht,
