@@ -36,7 +36,15 @@ $stmt = db()->prepare(
             -- Verwaltung -- also genau dort, wo sie niemandem nuetzen.
             e.kanton, e.veranstaltung, e.treffpunkt, e.taetigkeit, e.qualifikation,
             e.kontakt_vorname, e.kontakt_nachname, e.kontakt_telefon,
-            z.zusage, z.gesehen_am, o.name AS objekt_name,
+            z.zusage, z.gesehen_am, o.name AS objekt_name, e.objekt_id,
+            -- Ob es fuer diesen Einsatz ueberhaupt einen Rundgang geben kann
+            -- (Revierdienst-Tool V3, ENT-180/182): die App bietet "Rundgang
+            -- starten" nur an, wenn am Objekt aktive Kontrollpunkte gepflegt
+            -- sind. Ohne diese Zahl muesste die App das Starten blind
+            -- versuchen und liefe bei jedem Objekt ohne Kontrollpunkte auf
+            -- einen fachlich sinnlosen Rundgang ohne einzigen Punkt.
+            (SELECT COUNT(*) FROM kontrollpunkt k WHERE k.objekt_id = e.objekt_id AND k.aktiv = 1)
+              AS kontrollpunkte_anzahl,
             -- Der eigene Ist-Stand (ENT-049): damit die Person ihre
             -- geleistete Zeit selbst nachschlagen kann. Weiterhin strikt auf
             -- die eigene Zuteilung gefiltert -- fremde Ist-Zeiten sind hier
@@ -62,6 +70,9 @@ $stmt->execute([(int)$user['id'], $von, $bis]);
 
 $schichten = array_map(function ($e) {
     $e['id'] = (int)$e['id'];
+    $e['objekt_id'] = $e['objekt_id'] !== null ? (int)$e['objekt_id'] : null;
+    $e['hat_kontrollpunkte'] = ((int)$e['kontrollpunkte_anzahl']) > 0;
+    unset($e['kontrollpunkte_anzahl']);
     $e['ist_pause_min'] = $e['ist_pause_min'] === null ? null : (int)$e['ist_pause_min'];
     // null bleibt null: 'noch nicht festgestellt' ist etwas anderes als 'nein'
     // (GAV-AUS-004). Ein Cast auf int wuerde beides zu 0 machen.
