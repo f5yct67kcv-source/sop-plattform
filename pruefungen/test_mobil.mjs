@@ -103,6 +103,20 @@ async function pruefe(wo) {
   if (m.ueber.length) bad.push(`   ↳ ${wo}: ${m.ueber.join(' | ')}`);
 }
 
+// OP-111: Bedienelemente auf dem Handy mindestens 44px hoch -- .btn und
+// .check, ueberall, nicht nur an den Stellen, die schon vorher eine eigene
+// Regel hatten. Gemessen am gerenderten Zustand: eine Hoehen-Angabe in einem
+// spaeteren Selektor gleicher Eigenspezifitaet koennte die Basisregel sonst
+// unbemerkt aushebeln.
+async function pruefeTrefferflaeche(wo) {
+  const klein = await page.evaluate(() =>
+    [...document.querySelectorAll('.btn, .check')]
+      .filter(el => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.height < 44; })
+      .map(el => (el.id ? '#' + el.id : el.className) + ' ' + Math.round(el.getBoundingClientRect().height) + 'px'));
+  check(`Trefferflaeche mindestens 44px – ${wo}`, klein.length === 0);
+  if (klein.length) bad.push(`   ↳ ${wo}: ${klein.slice(0, 6).join(' | ')}`);
+}
+
 const ansichten = [
   ['Übersicht', async () => { await page.evaluate(() => go('uebersicht')); }],
   ['Mitarbeitende', async () => { await page.evaluate(() => go('mitarbeiter')); }],
@@ -121,6 +135,7 @@ for (const breite of [320, 360, 390, 414]) {
     await hin();
     await page.waitForTimeout(160);
     await pruefe(`${name} @${breite}`);
+    await pruefeTrefferflaeche(`${name} @${breite}`);
   }
 }
 
