@@ -433,6 +433,7 @@ const NUR_EIGENE_DATEN = [
   'zweifaktor_geraet_weg.php',
   'mein_rundgang_starten.php', // eigenen Rundgang fuer eigenen Einsatz starten (ENT-180)
   'mein_rundgang_scan.php',    // Kontrollpunkt-Scans am eigenen, laufenden Rundgang (ENT-180)
+  'mein_rundgang_offen.php',   // eigenen offenen Rundgang zu einem Einsatz abfragen (Wiedereinstieg)
 ];
 const ohnePruefung = apiDateien.filter(f => {
   const q = ohneKommentar(f);

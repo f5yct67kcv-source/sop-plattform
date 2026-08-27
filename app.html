@@ -281,6 +281,31 @@ svg.i-sm { width: 17px; height: 17px; }
 .dok-zeile .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dok-zeile .gr { flex: none; font-size: 12.5px; font-weight: 550; color: var(--ink-3); }
 
+/* Rundgang-Checkliste (Revierdienst-Tool V3, ENT-180/182/145). Die Knoepfe
+   nutzen bewusst die bestehende .btn-Klasse, nicht eine eigene Groesse -- sie
+   erben damit dieselbe, bereits als OP-111 festgehaltene 44px-Luecke wie der
+   Rest der App, statt einer neuen Inkonsistenz (dieser eine Bildschirm
+   44px, alle anderen nicht). Die Korrektur ist app-weit, keine Sache dieses
+   Bildschirms allein. */
+.rd-zeile { padding: 14px 0; border-bottom: 1px solid var(--line-soft); }
+.rd-zeile:last-child { border-bottom: none; }
+.rd-kopf { display: flex; align-items: flex-start; gap: 11px; }
+.rd-nr { flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--line-soft);
+  color: var(--ink-2); font-size: 12.5px; font-weight: 700; display: flex;
+  align-items: center; justify-content: center; }
+.rd-fertig .rd-nr { background: var(--pos-soft); color: var(--pos); }
+.rd-txt { flex: 1; min-width: 0; }
+.rd-bez { font-size: 15px; font-weight: 620; }
+.rd-meta { font-size: 12.5px; color: var(--ink-3); margin-top: 2px; }
+.rd-fertig { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.rd-haken { flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--pos-soft);
+  color: var(--pos); display: flex; align-items: center; justify-content: center; font-weight: 700; }
+.rd-haken-nv { background: var(--warn-soft); color: var(--warn); }
+.rd-hinweis { font-size: 12.5px; color: var(--ink-3); margin: 8px 0 0 37px; }
+.rd-akt { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 0 37px; }
+.rd-nv { margin: 10px 0 0 37px; display: flex; flex-direction: column; gap: 8px; }
+.rd-nv .inp { margin: 0; }
+
 /* Antippbare Zeile, die eine Unterseite oeffnet (ENT-051). Sieht aus wie ein
    Eintrag, verhaelt sich wie ein Knopf -- darum ein <button>, kein <div> mit
    onclick: nur so ist sie mit der Tastatur und mit Vorlesehilfen erreichbar. */
@@ -528,6 +553,18 @@ const W = {
     datenHinweis: 'Änderungen an deinen Daten macht die Verwaltung.',
     netzfehler: 'Keine Verbindung. Bitte nochmals versuchen.',
     folgetag: 'bis Folgetag',
+    // ══ Rundgang (Revierdienst-Tool V3, ENT-180/182/145) ══
+    rundgangStarten: 'Rundgang starten', rundgangFortsetzen: 'Rundgang fortsetzen',
+    rundgangTitel: 'Rundgang', rundgangAbgeschlossen: 'Rundgang abgeschlossen',
+    von: 'von', erledigt: 'erledigt', zurueck: 'Zurück',
+    kpTypNfc: 'NFC', kpTypGeofence: 'Geofence',
+    kpNfcNichtVerfuegbarGeraet: 'NFC wird auf diesem Gerät nicht unterstützt.',
+    kpBestaetigt: 'Bestätigt', kpBestaetigen: 'Bestätigen',
+    kpNichtVerfuegbar: 'Nicht verfügbar', kpNichtVerfuegbarMelden: 'Melden',
+    kpBeschreibungPflicht: 'Grund erforderlich',
+    kpStandortFehler: 'Standort konnte nicht ermittelt werden. Standortzugriff erlaubt?',
+    kpWirdGesendet: 'wird übermittelt, sobald wieder Netz da ist',
+    rundgangAbgelehntSpaeter: 'Ein Kontrollpunkt wurde vom Server abgelehnt und ist wieder offen.',
 };
 const w = k => W[k] || k;
 
@@ -549,6 +586,10 @@ let stdMonat = '';          // JJJJ-MM des angezeigten Monats
 let stdSchichten = null;    // null = noch nicht geladen
 let reiter = 'heute';
 let blattId = null;
+// Rundgang-Durchfuehrung (ENT-180/182/145): der aktuell in der Checkliste
+// gezeigte Rundgang, oder null ausserhalb dieses Bildschirms.
+let rundgangAktiv = null;
+const RD_WARTESCHLANGE = 'sop_rundgang_warteschlange';
 // Unterschrift-Canvas fuer "Schicht rapportieren" (ENT-082).
 let sigCtx = null, isDrawing = false, lastX = 0, lastY = 0, sigDirty = false;
 
@@ -634,6 +675,11 @@ function starten() {
   $('kName').textContent = ich.name;
   $('kKreis').textContent = initialen(ich.name);
   allesLaden();
+  // Ueberlebt einen Geraeteneustart oder App-Neuinstallation zwischen den
+  // Sitzungen: liegen aus einer frueheren, offline gebliebenen Rundgang-
+  // Meldung noch Eintraege in localStorage, wird jetzt ein Sendeversuch
+  // unternommen (ENT-132 Punkt 5).
+  rdWarteschlangeSenden();
 }
 
 // ══════════════════════════════════════════ LADEN
@@ -1208,12 +1254,14 @@ function blattAuf(id) {
          kommt nach: Die Liste ist eine eigene Abfrage und darf das Öffnen der
          Schicht nicht aufhalten. Ohne Unterlagen bleibt hier nichts stehen. -->
     <div id="blDok"></div>
+    <div id="blRundgang"></div>
     ${darfSchichtRapportieren(e) ? `<button class="btn btn-primary btn-wide" style="margin-top:4px" onclick="schichtRapportBlatt(${Number(e.id)})">${esc(w('schichtRapportieren'))}</button>` : ''}
     ${(() => { const r = rapportFuerSchicht(e.id); return r
       ? `<p style="font-size:12.5px;color:var(--ink-3);text-align:center;margin-top:8px">${esc(w('schonRapportiert'))} ${dmy(r.erfasst_am)}, ${String(r.erfasst_am).slice(11, 16)}</p>`
       : ''; })()}`;
 
   blattDokLaden(Number(e.id));
+  rundgangAbschnittZeichnen(e);
 
   // Eine bereits gegebene Antwort wird nicht noch einmal verlangt (ENT-120).
   antwortOffen = false;
@@ -1414,6 +1462,267 @@ function melden(zusage) {
     zeichne();
     toast(w('gemeldet'));
   });
+}
+
+// ══════════════════════════════════════════ RUNDGANG (ENT-180/182/145)
+//
+// Start und Fortsetzen leben in der bestehenden Schicht-Schublade (#blatt),
+// gleiches Muster wie schichtRapportBlatt: derselbe Rahmen wird umgebaut statt
+// einer eigenen zweiten Oberflaeche. Kein eigener Reiter in der Bodenleiste --
+// ein Rundgang gehoert zu genau einem Einsatz, und genau dort wird er auch
+// begonnen.
+//
+// Voraussetzung wie beim Rapport: zugesagt, nicht abgesagt, Schicht bereits
+// begonnen (sp[0] <= jetzt) -- zusaetzlich hier: das Objekt hat ueberhaupt
+// aktive Kontrollpunkte (e.hat_kontrollpunkte, aus meine_schichten.php).
+// Bewusst KEINE Einschraenkung auf eine bestimmte Einsatzart: anders als beim
+// Rapport (nur Verkehrsdienst) haengt ein Rundgang einzig am Objekt, nicht an
+// der Einsatzart -- so in ENT-132/180/182 nirgends eingeschraenkt.
+function darfRundgang(e) {
+  if (e.status === 'abgesagt' || e.zusage !== 'zugesagt' || !e.hat_kontrollpunkte) return false;
+  const sp = spanne(e.datum, e.von, e.bis);
+  return !!sp && sp[0] <= Date.now();
+}
+
+// Geraeteseitiger Zeitstempel im Moment der Erfassung (ENT-132 Punkt 5,
+// Offline-Prinzip) -- lokale Zeit wie ueberall sonst im Datenmodell (datum/
+// von/bis kennen ebenfalls keine Zeitzone), keine UTC-Umrechnung.
+function jetztDatetime() {
+  const d = new Date(), p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
+// ── Warteschlange fuer die Offline-Uebermittlung (ENT-132 Punkt 5) ──────
+// Ein Kontrollpunkt-Ereignis wird sofort lokal festgehalten, unabhaengig vom
+// Netzstatus, und erst danach an den Server gemeldet -- der Zeitstempel zaehlt
+// den Moment der Erfassung, nicht den der Uebermittlung.
+function rdWarteschlangeLesen() {
+  try { return JSON.parse(localStorage.getItem(RD_WARTESCHLANGE) || '[]'); } catch { return []; }
+}
+function rdWarteschlangeSchreiben(liste) {
+  try { localStorage.setItem(RD_WARTESCHLANGE, JSON.stringify(liste)); } catch {}
+}
+function rdWarteschlangeHinzufuegen(eintrag) {
+  const liste = rdWarteschlangeLesen();
+  liste.push(eintrag);
+  rdWarteschlangeSchreiben(liste);
+}
+
+// Sendet alle wartenden Meldungen, gruppiert nach Rundgang (der Endpunkt
+// verarbeitet mehrere Scans auf einmal -- genau dafuer ist er gebaut). Ohne
+// Netz bleibt ein Eintrag einfach stehen und wird beim naechsten Aufruf
+// (online-Ereignis, erneutes Oeffnen des Rundgangs) wieder versucht. Lehnt der
+// Server einen Punkt inhaltlich ab (z.B. ausserhalb des Geofence-Radius --
+// moeglich, wenn offline erfasst und die Position tatsaechlich nicht passte),
+// wird er wieder als offen gezeigt, nicht stillschweigend als erledigt
+// behauptet (ENT-182: Fehlermeldung + erneuter Versuch, alternativ "nicht
+// verfuegbar").
+function rdWarteschlangeSenden() {
+  const liste = rdWarteschlangeLesen();
+  if (!liste.length) return Promise.resolve();
+  const gruppen = {};
+  liste.forEach(e => { (gruppen[e.rundgang_id] = gruppen[e.rundgang_id] || []).push(e); });
+  return Promise.all(Object.keys(gruppen).map(rid => {
+    const scans = gruppen[rid];
+    return api('mein_rundgang_scan.php', { method: 'POST', body: {
+      rundgang_id: Number(rid),
+      scans: scans.map(({ rundgang_id, ...rest }) => rest),
+    } }).then(({ ok, data }) => {
+      if (!ok || data.status !== 'ok') { return; } // bleibt in der Warteschlange
+      // Nur die in DIESER Anfrage tatsaechlich uebermittelten Punkte entfernen
+      // -- nicht die gesamte Gruppe. Kommt zwischen Abschicken und Antwort ein
+      // weiterer Punkt fuer denselben Rundgang dazu, darf der nicht mit
+      // verschwinden, ohne je gesendet worden zu sein.
+      const gesendeteIds = new Set(scans.map(s => Number(s.kontrollpunkt_id)));
+      rdWarteschlangeSchreiben(rdWarteschlangeLesen().filter(e =>
+        !(Number(e.rundgang_id) === Number(rid) && gesendeteIds.has(Number(e.kontrollpunkt_id)))));
+      const ergebnisse = data.ergebnisse || [];
+      let abgelehnt = false;
+      if (rundgangAktiv && Number(rundgangAktiv.id) === Number(rid)) {
+        scans.forEach(s => {
+          const k = rundgangAktiv.kontrollpunkte.find(x => Number(x.id) === Number(s.kontrollpunkt_id));
+          if (!k) return;
+          const r = ergebnisse.find(x => Number(x.kontrollpunkt_id) === Number(s.kontrollpunkt_id));
+          if (r && r.status === 'fehler') { k.erledigt = null; k.wartend = false; k.fehler = r.message; abgelehnt = true; }
+          else { k.wartend = false; }
+        });
+        rundgangListeZeichnen();
+      }
+      if (abgelehnt) { toast(w('rundgangAbgelehntSpaeter')); }
+    }).catch(() => {});
+  }));
+}
+window.addEventListener('online', rdWarteschlangeSenden);
+
+// ── Abschnitt in der Schicht-Schublade: Start- bzw. Fortsetzen-Knopf ────
+// Eigener Platzhalter (#blRundgang, analog #blDok): eine eigene Abfrage darf
+// das Oeffnen der Schicht nicht aufhalten, und ohne Berechtigung bleibt der
+// Platz schlicht leer.
+function rundgangAbschnittZeichnen(e) {
+  const el = $('blRundgang'); if (!el) return;
+  el.innerHTML = '';
+  if (!darfRundgang(e)) return;
+  const einsatzId = Number(e.id);
+  api('mein_rundgang_offen.php?einsatz_id=' + einsatzId).then(({ ok, data }) => {
+    if (blattId !== einsatzId) return; // Schublade inzwischen gewechselt
+    const el2 = $('blRundgang'); if (!el2) return;
+    const laeuft = ok && data.status === 'ok' && data.rundgang;
+    el2.innerHTML = laeuft
+      ? `<button class="btn btn-primary btn-wide" style="margin-top:4px" onclick="rundgangFortsetzen(${einsatzId})">${esc(w('rundgangFortsetzen'))}</button>`
+      : `<button class="btn btn-primary btn-wide" style="margin-top:4px" onclick="rundgangStarten(${einsatzId})">${esc(w('rundgangStarten'))}</button>`;
+  });
+}
+
+function rundgangStarten(einsatzId) {
+  const btn = document.querySelector('#blRundgang button');
+  if (btn) btn.disabled = true;
+  api('mein_rundgang_starten.php', { method: 'POST', body: { einsatz_id: einsatzId } }).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') {
+      if (btn) btn.disabled = false;
+      toast(data.message || w('netzfehler'));
+      return;
+    }
+    rundgangAktiv = { id: data.rundgang_id, einsatz_id: einsatzId,
+      kontrollpunkte: (data.kontrollpunkte || []).map(k => ({ ...k, erledigt: null })) };
+    rundgangAnzeigen(einsatzId);
+  });
+}
+
+function rundgangFortsetzen(einsatzId) {
+  const btn = document.querySelector('#blRundgang button');
+  if (btn) btn.disabled = true;
+  api('mein_rundgang_offen.php?einsatz_id=' + einsatzId).then(({ ok, data }) => {
+    if (btn) btn.disabled = false;
+    if (!ok || data.status !== 'ok' || !data.rundgang) {
+      toast(data.message || w('netzfehler'));
+      rundgangAbschnittZeichnen(schichten.find(x => Number(x.id) === einsatzId));
+      return;
+    }
+    const r = data.rundgang;
+    rundgangAktiv = { id: r.id, einsatz_id: einsatzId, kontrollpunkte: r.kontrollpunkte };
+    rundgangAnzeigen(einsatzId);
+  });
+}
+
+// ── Screen 2: die Checkliste, im selben #blatt wie die Schicht selbst ──
+function rundgangAnzeigen(einsatzId) {
+  const e = schichten.find(x => Number(x.id) === Number(einsatzId));
+  if (!e || !rundgangAktiv) return;
+  $('blTitel').textContent = w('rundgangTitel');
+  $('blBody').innerHTML = `
+    <div style="font-size:13px;color:var(--ink-3);font-weight:620;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px">${esc(e.objekt_name || e.kunde_name)}</div>
+    <div id="rdFortschritt" style="font-size:15px;font-weight:600;margin-bottom:16px"></div>
+    <div id="rdListe"></div>`;
+  $('blFuss').innerHTML = `<button class="btn btn-plain" onclick="blattAuf(${Number(einsatzId)})">${esc(w('zurueck'))}</button>`;
+  blattZeigen();
+  rdWarteschlangeSenden();
+  rundgangListeZeichnen();
+}
+
+function rundgangListeZeichnen() {
+  if (!rundgangAktiv) return;
+  const kps = rundgangAktiv.kontrollpunkte;
+  const erledigt = kps.filter(k => k.erledigt).length;
+  const fEl = $('rdFortschritt');
+  if (fEl) {
+    fEl.textContent = (kps.length > 0 && erledigt === kps.length)
+      ? w('rundgangAbgeschlossen')
+      : `${erledigt} ${w('von')} ${kps.length} ${w('erledigt')}`;
+  }
+  const lEl = $('rdListe');
+  if (lEl) { lEl.innerHTML = kps.map((k, i) => rdZeile(k, i + 1)).join(''); }
+}
+
+function rdZeile(k, nr) {
+  const typLabel = k.typ === 'nfc' ? w('kpTypNfc') : w('kpTypGeofence');
+  if (k.erledigt) {
+    const istNv = k.erledigt.status === 'nicht_verfuegbar';
+    const zeit = String(k.erledigt.erfasst_am || '').slice(11, 16);
+    return `<div class="rd-zeile rd-fertig">
+      <div class="rd-kopf">
+        <span class="rd-nr">${nr}</span>
+        <div class="rd-txt">
+          <div class="rd-bez">${esc(k.bezeichnung)}</div>
+          <div class="rd-meta">${esc(typLabel)} · ${istNv ? esc(w('kpNichtVerfuegbar')) : esc(w('kpBestaetigt')) + ' ' + esc(zeit)}${k.wartend ? ' · ' + esc(w('kpWirdGesendet')) : ''}</div>
+        </div>
+      </div>
+      <span class="rd-haken ${istNv ? 'rd-haken-nv' : ''}">${istNv ? '!' : '✓'}</span>
+    </div>`;
+  }
+  // NFC ist auf diesem Geraet ehrlich als nicht verfuegbar ausgewiesen, statt
+  // eine Scan-Funktion vorzutaeuschen, die auf dem Wachpersonal-Handy (fast
+  // ausschliesslich iPhone) technisch gar nicht laufen kann -- Web-NFC gibt es
+  // auf iOS/Safari plattformbedingt nicht, unabhaengig von der Browserwahl.
+  const kannScannen = k.typ === 'geofence';
+  return `<div class="rd-zeile">
+    <div class="rd-kopf">
+      <span class="rd-nr">${nr}</span>
+      <div class="rd-txt">
+        <div class="rd-bez">${esc(k.bezeichnung)}</div>
+        <div class="rd-meta">${esc(typLabel)}</div>
+      </div>
+    </div>
+    ${!kannScannen ? `<div class="rd-hinweis">${esc(w('kpNfcNichtVerfuegbarGeraet'))}</div>` : ''}
+    ${k.fehler ? `<div class="msg-err" style="margin:10px 0 0 37px">${esc(k.fehler)}</div>` : ''}
+    <div class="rd-akt">
+      ${kannScannen ? `<button class="btn btn-primary" id="rdBtn${k.id}" onclick="rdBestaetigen(${k.id})">${esc(w('kpBestaetigen'))}</button>` : ''}
+      <button class="btn btn-plain" onclick="rdNvUm(${k.id})">${esc(w('kpNichtVerfuegbar'))}</button>
+    </div>
+    <div class="rd-nv" id="rdNv${k.id}" style="display:none">
+      <textarea class="inp" id="rdNvText${k.id}" rows="2" placeholder="${esc(w('kpBeschreibungPflicht'))}"></textarea>
+      <button class="btn btn-neg" onclick="rdNvSenden(${k.id})">${esc(w('kpNichtVerfuegbarMelden'))}</button>
+    </div>
+    <div class="msg-err" id="rdFehler${k.id}" style="display:none;margin:10px 0 0 37px"></div>
+  </div>`;
+}
+
+function rdZeigeFehler(kontrollpunktId, message) {
+  const el = $('rdFehler' + kontrollpunktId);
+  if (el) { el.textContent = message; el.style.display = ''; }
+}
+
+// Geofence-Bestaetigung: ein einzelner Standortabruf im Moment des Antippens,
+// kein watchPosition() -- die Live-Sicht bildet ausdruecklich nur diskrete
+// Kontrollpunkt-Ereignisse ab, keine kontinuierliche Positionsverfolgung
+// (ENT-131).
+function rdBestaetigen(kontrollpunktId) {
+  const k = rundgangAktiv.kontrollpunkte.find(x => Number(x.id) === kontrollpunktId);
+  if (!k) return;
+  if (!navigator.geolocation) { rdZeigeFehler(kontrollpunktId, w('kpStandortFehler')); return; }
+  const btn = $('rdBtn' + kontrollpunktId);
+  if (btn) btn.disabled = true;
+  navigator.geolocation.getCurrentPosition(
+    pos => rdScanEintragen(k, 'bestaetigt', { lat: pos.coords.latitude, lng: pos.coords.longitude }),
+    () => { if (btn) btn.disabled = false; rdZeigeFehler(kontrollpunktId, w('kpStandortFehler')); },
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+  );
+}
+
+function rdNvUm(kontrollpunktId) {
+  const el = $('rdNv' + kontrollpunktId);
+  if (el) { el.style.display = el.style.display === 'none' ? '' : 'none'; }
+}
+function rdNvSenden(kontrollpunktId) {
+  const k = rundgangAktiv.kontrollpunkte.find(x => Number(x.id) === kontrollpunktId);
+  if (!k) return;
+  const feld = $('rdNvText' + kontrollpunktId);
+  const text = feld ? feld.value.trim() : '';
+  if (!text) { rdZeigeFehler(kontrollpunktId, w('kpBeschreibungPflicht')); return; }
+  rdScanEintragen(k, 'nicht_verfuegbar', {}, text);
+}
+
+function rdScanEintragen(k, status, ort, beschreibung) {
+  const erfasst_am = jetztDatetime();
+  k.fehler = null;
+  k.erledigt = { status, erfasst_am, beschreibung: beschreibung || null };
+  k.wartend = true;
+  rdWarteschlangeHinzufuegen({
+    rundgang_id: rundgangAktiv.id, kontrollpunkt_id: k.id, status, erfasst_am,
+    lat: (ort && ort.lat != null) ? ort.lat : null, lng: (ort && ort.lng != null) ? ort.lng : null,
+    beschreibung: beschreibung || null,
+  });
+  rundgangListeZeichnen();
+  rdWarteschlangeSenden();
 }
 
 // ══════════════════════════════════════════ SCHICHT RAPPORTIEREN (ENT-082)
