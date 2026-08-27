@@ -7,7 +7,7 @@ declare(strict_types=1);
 $ok = 0; $bad = [];
 function pruef(string $name, bool $c) { global $ok, $bad; if ($c) { $ok++; } else { $bad[] = $name; } }
 
-require '/workspace/rapport_cupi24/backend/ereignisse.php';
+require __DIR__ . '/../backend/ereignisse.php';
 
 // ══════════════ WAS SICH ABHAKEN LAESST
 pruef('Ein Rapport laesst sich abhaken',            ereignis_abhakbar('rapport'));
