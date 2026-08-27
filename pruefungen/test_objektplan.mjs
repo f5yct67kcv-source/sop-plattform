@@ -395,8 +395,13 @@ const kopfMobil = await page.evaluate(() =>
 // Werkzeugleiste bekamen application-weit auf dem Handy mehr Luft (groessere
 // Ueberschrift, mehr Abstand) -- das schiebt auch diesen Kopf ein Stueck
 // weiter runter. Der alte Wert von 410px liess kaum noch Spielraum (409px
-// gemessen ohne die neuen Abstaende); 440px laesst wieder eine Reserve.
-check(`Kopf auf dem Handy unter 440px (ist ${kopfMobil}, vorher 410)`, kopfMobil <= 440);
+// gemessen ohne die neuen Abstaende); 440px liess wieder eine Reserve.
+// Seit OP-111 erneut angehoben: ‹, › und Diktat in der Werkzeugleiste sind
+// .btn-quiet .btn-sm ohne eigene Hoehe und hatten bisher keine 44px --
+// jetzt gilt die neue app-weite Mindest-Trefferflaeche auch fuer sie, das
+// ist der Zweck von OP-111 und keine Nebenwirkung, die es zu vermeiden
+// gaelte. Gemessen 449px auf dem Handy; 470px laesst wieder eine Reserve.
+check(`Kopf auf dem Handy unter 470px (ist ${kopfMobil}, vorher 410, dann 440)`, kopfMobil <= 470);
 // Und der Dialog funktioniert auch hier
 await page.click('.opl-posten');
 await page.waitForTimeout(350);
