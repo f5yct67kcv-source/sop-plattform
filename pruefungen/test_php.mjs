@@ -216,6 +216,7 @@ for (const [datei, titel] of [
   ['pruef_logbuch.php', 'KRITISCH: das Logbuch haelt fest, wer was geaendert hat'],
   ['pruef_einsatz_abgeschlossen.php', 'KRITISCH: "abgeschlossen" verlangt ALLE zugesagten Rapporte (ENT-128)'],
   ['pruef_rundgang.php', 'KRITISCH: Geofence-Pruefung und Restliste der Kontrollpunkte stimmen (ENT-132/ENT-145/ENT-180)'],
+  ['pruef_ereignisse.php', 'KRITISCH: die Ereignis-Arten und ihre Abhakbarkeit stimmen (ENT-090/ENT-197)'],
 ]) {
   let aus = '', code = 0;
   try {
