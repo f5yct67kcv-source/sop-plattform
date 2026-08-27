@@ -3719,39 +3719,42 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
               <textarea class="inp" id="of_fusszeile" rows="2"
                 placeholder="Abschliessender Text auf dem Dokument."></textarea></div>
           </div></div>
-          <div class="card"><div class="card-bd">
-            <div class="f" style="margin-bottom:10px">
-              <label for="of_rabatt">Gesamtrabatt auf alle Positionen</label>
-              <div style="display:flex;gap:8px">
-                <input class="inp" id="of_rabatt" inputmode="decimal" value="0" oninput="ofSummenZeichnen()" style="flex:1">
-                <div class="seg2">
-                  <button type="button" id="of_rabatt_pct" class="on" onclick="ofRabattEinheitSetzen('pct')">%</button>
-                  <button type="button" id="of_rabatt_chf" onclick="ofRabattEinheitSetzen('chf')">CHF</button>
+          <!-- Rabatt/Summen und Unterschriften stehen zusammen in der
+               rechten Spalte, statt Unterschriften als eigene volle Zeile
+               darunter zu haengen (ENT-192): Die linke Spalte ist durch vier
+               Textfelder deutlich hoeher, eine eigene Zeile fuer eine
+               einzelne Checkbox liesse darunter sichtbaren Leerraum stehen.
+               Gestapelt in derselben Spalte fuellt die zweite Karte genau
+               diesen Platz, statt ihn frei zu lassen. -->
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <div class="card"><div class="card-bd">
+              <div class="f" style="margin-bottom:10px">
+                <label for="of_rabatt">Gesamtrabatt auf alle Positionen</label>
+                <div style="display:flex;gap:8px">
+                  <input class="inp" id="of_rabatt" inputmode="decimal" value="0" oninput="ofSummenZeichnen()" style="flex:1">
+                  <div class="seg2">
+                    <button type="button" id="of_rabatt_pct" class="on" onclick="ofRabattEinheitSetzen('pct')">%</button>
+                    <button type="button" id="of_rabatt_chf" onclick="ofRabattEinheitSetzen('chf')">CHF</button>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div id="ofSummen"></div>
-          </div></div>
+              <div id="ofSummen"></div>
+            </div></div>
+            <div class="card"><div class="card-bd">
+              <div style="font-size:11px;font-weight:650;letter-spacing:.4px;text-transform:uppercase;color:var(--ink-2);margin-bottom:12px">
+                Unterschriften
+              </div>
+              <label class="check">
+                <input type="checkbox" id="of_unterschriftsseite">
+                Unterschriftsseite hinzufügen
+              </label>
+              <div class="sec" style="margin-top:8px">
+                Fügt dem Ausdruck eine zusätzliche Seite mit Feldern für Ort, Datum und
+                Unterschrift an.
+              </div>
+            </div></div>
+          </div>
         </div>
-
-        <!-- Ganz unten statt in der Kopfzeile (ENT-192, urspruenglich in
-             of-kopf-zwei) -- auf Wunsch des Projektinhaber, mit
-             Referenz-Screenshot: das Unterschriften-Werkzeug gehoert zu den
-             uebrigen Steuerungen fuers gedruckte Blatt, nicht zu den
-             Kopfdaten. -->
-        <div class="card" style="margin-top:14px"><div class="card-bd">
-          <div style="font-size:11px;font-weight:650;letter-spacing:.4px;text-transform:uppercase;color:var(--ink-2);margin-bottom:12px">
-            Unterschriften
-          </div>
-          <label class="check">
-            <input type="checkbox" id="of_unterschriftsseite">
-            Unterschriftsseite hinzufügen
-          </label>
-          <div class="sec" style="margin-top:8px">
-            Fügt dem Ausdruck eine zusätzliche Seite mit Feldern für Ort, Datum und
-            Unterschrift an.
-          </div>
-        </div></div>
       </section>
 
       <!-- ══════════════════════ PRODUKTE (ENT-181) ══════════════════════
