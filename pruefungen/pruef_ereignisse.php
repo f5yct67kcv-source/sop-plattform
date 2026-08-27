@@ -13,6 +13,7 @@ require '/workspace/rapport_cupi24/backend/ereignisse.php';
 pruef('Ein Rapport laesst sich abhaken',            ereignis_abhakbar('rapport'));
 pruef('Ein Sperrtag ebenfalls',                     ereignis_abhakbar('sperrtag'));
 pruef('Eine Zusage ebenfalls',                      ereignis_abhakbar('zusage'));
+pruef('Eine Offerten-Entscheidung ebenfalls (ENT-197)', ereignis_abhakbar('offerte'));
 // Eine offene, noch nicht abgeglichene Schicht ist KEIN Ereignis, sondern ein
 // andauernder Zustand. Sie war bis zum 23.08.2026 eine eigene Art und wurde
 // auf ausdrueckliche Ansage des Projektinhabers entfernt: "fehlende, noch
@@ -21,13 +22,13 @@ pruef('Eine Zusage ebenfalls',                      ereignis_abhakbar('zusage'))
 // kaeme die Art beim naechsten Ausbau geraeuschlos zurueck.
 pruef('KRITISCH: der offene Abgleich ist gar keine Art mehr',
     !array_key_exists('abgleich', EREIGNIS_ARTEN) && ereignis_abhakbar('abgleich') === false);
-pruef('KRITISCH: es gibt genau drei Arten -- Rapport, Sperrtag, Zusage',
-    count(EREIGNIS_ARTEN) === 3);
+pruef('KRITISCH: es gibt genau vier Arten -- Rapport, Sperrtag, Zusage, Offerte',
+    count(EREIGNIS_ARTEN) === 4);
 pruef('Eine erfundene Art auch nicht',              ereignis_abhakbar('irgendwas') === false);
 pruef('Und eine leere erst recht nicht',            ereignis_abhakbar('') === false);
 
 // ══════════════ JEDE ABHAKBARE ART KENNT IHREN SPEICHERORT
-foreach (['rapport', 'sperrtag', 'zusage'] as $t) {
+foreach (['rapport', 'sperrtag', 'zusage', 'offerte'] as $t) {
     pruef("Die Art $t nennt Tabelle und Spalte",
         !empty(EREIGNIS_ARTEN[$t]['tabelle']) && !empty(EREIGNIS_ARTEN[$t]['spalte']));
 }
