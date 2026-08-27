@@ -144,7 +144,7 @@ await page.route('**/api/**', route => {
       return send({ status: 'error', message: 'Dieser Rundgang laesst sich jetzt nicht pausieren' });
     }
     serverRundgang.status = 'pausiert';
-    serverRundgang.pausiert_seit = '2026-08-27 21:10:00';
+    serverRundgang.pausiert_seit = tag(0) + ' 21:10:00';
     return send({ status: 'ok' });
   }
   if (p.includes('mein_rundgang_fortsetzen')) {
