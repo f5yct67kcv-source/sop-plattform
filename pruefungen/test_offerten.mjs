@@ -82,7 +82,7 @@ const STATS = { status: 'ok',
   verlauf: [], angemeldet: [], letzte_rapporte: [], ereignisse: [], ereignisse_unvollstaendig: [],
   pro_mitarbeiter: [] };
 
-let gespeichert = null, statusRufe = [], archivRufe = [], dupRufe = [], versendenRufe = [];
+let gespeichert = null, statusRufe = [], archivRufe = [], dupRufe = [], versendenRufe = [], belegListRufe = 0;
 // ENT-192: Standardmaessig ein Erfolg. Ein einzelner Testfall (TEIL 8) stellt
 // hierauf einen Fehler um, um zu pruefen, dass ein fehlgeschlagener Versand
 // den Status NICHT trotzdem auf "versendet" umstellt.
@@ -111,7 +111,7 @@ await page.route('**/api/**', async route => {
   if (url.includes('me.php')) return send({ status: 'ok', name: 'adrian', ist_admin: true, rollen: [],
     rechte: ['kunden', 'abgleich', 'personal_lesen', 'betrieb', 'plan', 'offerten', 'rechte'] });
   if (url.includes('produkt_list')) return send(PRODUKTE);
-  if (url.includes('beleg_list')) return send(BELEGE);
+  if (url.includes('beleg_list')) { belegListRufe++; return send(BELEGE); }
   if (url.includes('kunden_list')) return send({ status: 'ok', kunden: kuListe });
   if (url.includes('dashboard_stats')) return send(STATS);
   if (url.includes('kunden_create')) {
@@ -805,6 +805,44 @@ check('KRITISCH: ein fehlgeschlagener Versand wirft den Status NICHT auf "Versen
 check('Die Fehlermeldung des Servers erscheint als Hinweis',
   (await page.textContent('#toast')).includes('Haupt-E-Mail'));
 versendenAntwort = { status: 'ok', link: 'https://beispiel.test/api/beleg_oeffentlich.php?token=x' };
+
+// ══════════════════════════════════════════════════════════════════════════
+// TEIL 9 — Liste aktualisiert sich beim Zurueckkommen in den Tab (ENT-196)
+// ══════════════════════════════════════════════════════════════════════════
+// Eine Annahme/Ablehnung im Kundenportal aendert den Status sofort in der
+// Datenbank, aber ohne Rueckruf zeigt das Dashboard eine zuvor geladene
+// Kopie. Statt eines Dauerintervalls laedt die Liste einmal neu, sobald der
+// Tab wieder sichtbar wird -- und nur dann, wenn man gerade auf dem
+// Offerten-Reiter steht.
+await page.evaluate(() => { go('kunden'); kuGoTab('offerten'); });
+await page.waitForTimeout(200);
+belegListRufe = 0;
+await page.evaluate(() => {
+  Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+  document.dispatchEvent(new Event('visibilitychange'));
+});
+await page.waitForTimeout(100);
+check('Ein Wechsel auf "hidden" laedt NICHT neu', belegListRufe === 0);
+await page.evaluate(() => {
+  Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+  document.dispatchEvent(new Event('visibilitychange'));
+});
+await page.waitForTimeout(200);
+check('KRITISCH: die Rueckkehr in den sichtbaren Tab laedt die Offertenliste neu, solange man auf dem Reiter steht',
+  belegListRufe === 1);
+
+await page.evaluate(() => { kuGoTab('uebersicht'); });
+await page.waitForTimeout(200);
+belegListRufe = 0;
+await page.evaluate(() => {
+  Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+  document.dispatchEvent(new Event('visibilitychange'));
+  Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+  document.dispatchEvent(new Event('visibilitychange'));
+});
+await page.waitForTimeout(200);
+check('Auf einem anderen Kunden-Reiter loest die Rueckkehr KEINEN Offerten-Ladevorgang aus',
+  belegListRufe === 0);
 
 await browser.close();
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);

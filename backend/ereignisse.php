@@ -38,6 +38,8 @@ const EREIGNIS_ARTEN = [
     'rapport'  => ['tabelle' => 'rapporte',          'spalte' => 'gesehen_am'],
     'sperrtag' => ['tabelle' => 'verfuegbarkeiten',  'spalte' => 'gesehen_am'],
     'zusage'   => ['tabelle' => 'einsatz_zuteilung', 'spalte' => 'zusage_gesehen_am'],
+    // Kundenentscheidung zu einer Offerte (ENT-192/ENT-197).
+    'offerte'  => ['tabelle' => 'belege',            'spalte' => 'entscheidung_gesehen_am'],
     // Mehr nicht. Ein andauernder Zustand ist kein Ereignis -- Festlegung 3.
 ];
 
@@ -124,6 +126,22 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12): array
             'zusage' => $z['zusage'], 'datum' => $z['datum'],
             'von' => $z['von'], 'bis' => $z['bis'],
             'kunde' => $z['kunde_name'], 'einsatz_titel' => $z['einsatz_titel'], 'ort' => $z['ort'],
+        ];
+    }
+
+    // ── Kunde hat im Portal ueber eine Offerte entschieden (ENT-192). Ohne
+    // Rueckruf vom Portal ins Dashboard war das bislang leicht zu uebersehen
+    // (ENT-197) -- derselbe Grund, aus dem der Rapport-Fall oben existiert.
+    foreach (ereignis_lesen($pdo,
+        "SELECT b.id, b.nummer, b.status, b.entscheidung_am,
+                k.name AS kunde_name
+           FROM belege b LEFT JOIN kunden k ON k.id = b.kunde_id
+          WHERE b.entscheidung_am IS NOT NULL AND b.entscheidung_gesehen_am IS NULL
+          ORDER BY b.entscheidung_am DESC LIMIT 20", $fehler, 'offerte') as $o) {
+        $liste[] = [
+            'typ' => 'offerte', 'id' => (int)$o['id'], 'zeit' => $o['entscheidung_am'],
+            'titel' => $o['status'] === 'abgelehnt' ? 'Offerte abgelehnt' : 'Offerte angenommen',
+            'nummer' => $o['nummer'], 'kunde' => $o['kunde_name'], 'status' => $o['status'],
         ];
     }
 

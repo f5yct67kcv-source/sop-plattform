@@ -47,6 +47,14 @@ const ABLEHNUNG = { typ: 'zusage', id: 12, mitarbeiter_id: 4, zeit: vorMin(20),
   titel: 'Schicht abgelehnt', zusage: 'abgelehnt', datum: MORGEN,
   von: '07:00', bis: '16:00', kunde: 'Borner AG', ort: 'Olten' };
 
+// Vierte Art (ENT-192/ENT-197): eine Kundenentscheidung im Portal, ohne
+// eigenen Login. Kein 'person' -- der Kunde ist keine Mitarbeiterin, der
+// Absender kommt aus 'kunde'.
+const OFFERTE_ANGENOMMEN = { typ: 'offerte', id: 55, zeit: vorMin(8),
+  titel: 'Offerte angenommen', nummer: 'OF-0055', kunde: 'pzu Consulting GmbH', status: 'bestaetigt' };
+const OFFERTE_ABGELEHNT  = { typ: 'offerte', id: 56, zeit: vorMin(9),
+  titel: 'Offerte abgelehnt', nummer: 'OF-0056', kunde: 'Gemeinde Läufelfingen', status: 'abgelehnt' };
+
 const browser = await chromium.launch({ executablePath: EXE });
 const gesendet = [];
 
@@ -62,6 +70,15 @@ async function seite(daten = {}) {
       gesendet.push(JSON.parse(r.request().postData() || '{}'));
       return send({ status: 'ok' });
     }
+    // Fuer den Weg "Zur Offerte" aus dem Ereignis-Detail (ENT-197): eine
+    // minimale, aber vollstaendige Antwort, damit ofOeffnen() nicht an einem
+    // fehlenden Feld scheitert und einen echten Fehler ins Protokoll wirft.
+    if (pf.includes('beleg_lesen')) return send({ status: 'ok', kunde: null, person: null, beleg: {
+      id: 55, art: 'offerte', nummer: 'OF-0055', kunde_id: null, person_id: null,
+      titel: 'Testeinsatz', referenz: '', datum: GESTERN, gueltig_bis: MORGEN,
+      status: 'bestaetigt', rabatt_bp: 0, aktiv: 1, ist_vorlage: 0, unterschriftsseite: 0,
+      oeffentliche_notizen: '', bedingungen: '', fusszeile_text: '', bemerkung: '', positionen: [],
+    }});
     if (pf.includes('dashboard_stats')) return send({
       status: 'ok', kpi: {}, verlauf: [], angemeldet: [], pro_mitarbeiter: [], letzte_rapporte: [],
       ereignisse: EREIGNISSE, ereignisse_gesamt: EREIGNISSE.length,
@@ -375,6 +392,102 @@ const anna = await seiteAbl.evaluate(() => {
 check('Die Zusage daneben bleibt unverändert',
   anna && anna.txt.includes('hat zugesagt') && !anna.klasse.includes('erg-abgelehnt'));
 await seiteAbl.close();
+
+// ══════════════ VIERTE ART: KUNDENENTSCHEIDUNG ZU EINER OFFERTE (ENT-192/ENT-197)
+try {
+  const p = await seite({ ereignisse: [OFFERTE_ANGENOMMEN, OFFERTE_ABGELEHNT],
+                          ereignisse_gesamt: 2 });
+  const zeilen = await p.$$eval('#ereignisFeed .erg', els => els.map(e =>
+    ({ txt: e.textContent.replace(/\s+/g, ' '), klasse: e.className,
+       punkt: (e.querySelector('.dot') || {}).className || '' })));
+  check('KRITISCH: eine angenommene Offerte nennt Nummer und "hat angenommen"',
+    /hat angenommen.*OF-0055/.test(zeilen[0]?.txt || ''));
+  check('Ihr Punkt ist grün', !zeilen[0]?.punkt.includes('neg') && !zeilen[0]?.punkt.includes('warn'));
+  check('KRITISCH: eine abgelehnte Offerte steht als Ablehnung da, nicht als Annahme',
+    /HAT ABGELEHNT.*OF-0056/.test(zeilen[1]?.txt || '') && !/hat angenommen/.test(zeilen[1]?.txt || ''));
+  check('KRITISCH: die Ablehnung ist hervorgehoben wie eine abgelehnte Schicht',
+    zeilen[1]?.klasse.includes('erg-abgelehnt') && zeilen[1]?.punkt.includes('neg'));
+
+  const haken = await p.$$eval('#ereignisFeed .rank', els => els.map(e => !!e.querySelector('.rank-erledigt')));
+  check('KRITISCH: auch die Offerten-Art laesst sich abhaken', haken.every(Boolean));
+
+  // Abhaken zuerst -- der Weg "Zur Offerte" verlaesst die Uebersicht danach,
+  // und #ereignisFeed ist ab dann nicht mehr sichtbar.
+  gesendet.length = 0;
+  await p.click('#ereignisFeed .rank >> nth=1 >> .rank-erledigt'); await p.waitForTimeout(300);
+  check('KRITISCH: das Abhaken einer Offerte schickt typ und id',
+    gesendet.length === 1 && gesendet[0].typ === 'offerte' && gesendet[0].id === 56);
+
+  await p.click('#ereignisFeed .rank >> nth=0'); await p.waitForTimeout(250);
+  const detail = (await p.textContent('#ergDetail0')).replace(/\s+/g, ' ');
+  check('Das Aufklappen nennt die Offertennummer', /Offerte.*OF-0055/.test(detail));
+  const wege = await p.$$eval('#ergDetail0 .erg-wege .btn', b => b.map(x => x.textContent.trim()));
+  check('KRITISCH: der Weg "Zur Offerte" ist da', wege.includes('Zur Offerte'));
+  await p.click('#ergDetail0 .erg-wege .btn:has-text("Zur Offerte")'); await p.waitForTimeout(400);
+  check('KRITISCH: er fuehrt wirklich zur richtigen Offerte',
+    (await p.inputValue('#of_nummer')) === 'OF-0055');
+  await p.close();
+} catch (e) { bad.push('Offerte-Ereignis: ' + String(e).split('\n')[0].slice(0, 120)); }
+
+// ══════════════ GLOCKE (ENT-197)
+try {
+  const p = await seite();
+  check('Die Glocke zeigt die Gesamtzahl als Zaehler',
+    (await p.textContent('#glockeBadge')).trim() === '3');
+  check('Das Dropdown ist zu Beginn geschlossen',
+    (await p.evaluate(() => getComputedStyle(document.getElementById('glockePanel')).display)) === 'none');
+
+  await p.click('#btnGlocke'); await p.waitForTimeout(200);
+  check('KRITISCH: ein Klick oeffnet das Dropdown',
+    (await p.evaluate(() => getComputedStyle(document.getElementById('glockePanel')).display)) !== 'none');
+  check('KRITISCH: es zeigt dieselbe Anzahl Zeilen wie die Uebersicht',
+    (await p.$$('#glockeListe .glocke-row')).length === 3);
+
+  // Daneben klicken schliesst es wieder (dasselbe Muster wie die Seitenleiste).
+  await p.click('#pgTitle'); await p.waitForTimeout(200);
+  check('KRITISCH: ein Klick daneben schliesst das Dropdown',
+    (await p.evaluate(() => getComputedStyle(document.getElementById('glockePanel')).display)) === 'none');
+
+  await p.click('#btnGlocke'); await p.waitForTimeout(200);
+  await p.keyboard.press('Escape'); await p.waitForTimeout(200);
+  check('Escape schliesst es ebenfalls',
+    (await p.evaluate(() => getComputedStyle(document.getElementById('glockePanel')).display)) === 'none');
+
+  // Ein Klick auf eine Zeile springt zur Uebersicht und klappt sie dort auf --
+  // dieselbe Liste, zwei Ansichten, keine zweite Detailanzeige.
+  await p.click('#nav-planung'); await p.waitForTimeout(200);
+  await p.click('#btnGlocke'); await p.waitForTimeout(150);
+  await p.click('#glockeListe .glocke-row >> nth=0'); await p.waitForTimeout(300);
+  check('KRITISCH: ein Klick auf eine Zeile fuehrt zur Uebersicht',
+    (await p.textContent('#pgTitle')) === 'Übersicht');
+  check('Und klappt dort dieselbe Zeile auf', await p.isVisible('#ergDetail0'));
+  check('Das Dropdown ist danach zu',
+    (await p.evaluate(() => getComputedStyle(document.getElementById('glockePanel')).display)) === 'none');
+
+  // Abhaken direkt aus dem Dropdown, ohne es vorher zu verlassen.
+  await p.click('#btnGlocke'); await p.waitForTimeout(150);
+  gesendet.length = 0;
+  await p.click('#glockeListe .glocke-row >> nth=0 >> .rank-erledigt'); await p.waitForTimeout(300);
+  check('KRITISCH: das Abhaken aus dem Dropdown sendet Art und Nummer',
+    gesendet.length === 1 && gesendet[0].typ === 'rapport' && gesendet[0].id === 7);
+  check('KRITISCH: der Zaehler sinkt sofort mit',
+    (await p.textContent('#glockeBadge')).trim() === '2');
+  check('Und die Zeile verschwindet auch aus dem Dropdown',
+    (await p.$$('#glockeListe .glocke-row')).length === 2);
+  await p.close();
+} catch (e) { bad.push('Glocke: ' + String(e).split('\n')[0].slice(0, 120)); }
+
+// Ohne Ereignisse bleibt der Zaehler versteckt -- eine "0" waere eine Zahl
+// ohne Aussage, kein Hinweis auf etwas Ungesehenes.
+try {
+  const p = await seite({ ereignisse: [], ereignisse_gesamt: 0 });
+  check('KRITISCH: der Zaehler ist ohne Ereignisse unsichtbar',
+    (await p.evaluate(() => getComputedStyle(document.getElementById('glockeBadge')).display)) === 'none');
+  await p.click('#btnGlocke'); await p.waitForTimeout(150);
+  check('Das Dropdown sagt, dass nichts Neues da ist',
+    (await p.textContent('#glockeListe')).includes('Nichts Neues'));
+  await p.close();
+} catch (e) { bad.push('Glocke leer: ' + String(e).split('\n')[0].slice(0, 120)); }
 
 await browser.close();
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
