@@ -109,9 +109,13 @@ async function pruefe(wo) {
 // spaeteren Selektor gleicher Eigenspezifitaet koennte die Basisregel sonst
 // unbemerkt aushebeln.
 async function pruefeTrefferflaeche(wo) {
+  // 0.1px Toleranz: In einer umbrechenden Flex-Zeile verteilt der Browser
+  // den Rest-Platz mit Fliesskomma-Arithmetik -- gemessen wurden dabei
+  // schon 43.99998... statt 44 (reproduziert, aber nicht bei jedem Lauf).
+  // Kein reales Trefferflaechen-Problem, nur Subpixel-Rauschen.
   const klein = await page.evaluate(() =>
     [...document.querySelectorAll('.btn, .check')]
-      .filter(el => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.height < 44; })
+      .filter(el => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.height < 43.9; })
       .map(el => (el.id ? '#' + el.id : el.className) + ' ' + Math.round(el.getBoundingClientRect().height) + 'px'));
   check(`Trefferflaeche mindestens 44px – ${wo}`, klein.length === 0);
   if (klein.length) bad.push(`   ↳ ${wo}: ${klein.slice(0, 6).join(' | ')}`);
