@@ -16046,7 +16046,11 @@ const IMP_ZIELE = [
 // Sonderzeichen. Die Liste muss nicht vollstaendig sein -- was sie nicht
 // trifft, ordnet man im Dialog von Hand zu.
 const IMP_SYNONYME = {
-  name:          ['name', 'firma', 'firmenname', 'kunde', 'kundenname', 'bezeichnung', 'company'],
+  // "unternehmensname" ergaenzt nach einem echten AbaNinja-Export: Ohne
+  // diesen Treffer blieb die Spalte unbelegt, und ohne Namen lehnt
+  // kunden_import.php JEDE Zeile mit "Name fehlt" ab -- der Import wirkte
+  // dadurch komplett wirkungslos, nicht bloss luckenhaft.
+  name:          ['name', 'firma', 'firmenname', 'unternehmensname', 'kunde', 'kundenname', 'bezeichnung', 'company'],
   art:           ['art', 'kundenart', 'typ', 'kundentyp'],
   anrede:        ['anrede', 'titel', 'salutation'],
   vorname:       ['vorname', 'firstname'],
@@ -16062,7 +16066,9 @@ const IMP_SYNONYME = {
   kontaktperson: ['kontaktperson', 'ansprechpartner', 'ansprechperson', 'kontakt'],
   uid:           ['uid', 'uidnummer', 'unternehmensid', 'che'],
   mwst_nr:       ['mwst', 'mwstnr', 'mwstnummer', 'ustid', 'vat'],
-  notiz:         ['notiz', 'bemerkung', 'bemerkungen', 'hinweis', 'kommentar', 'info'],
+  // "notizen" (Mehrzahl) ebenfalls aus demselben Export -- die Einzahl allein
+  // traf die Spalte nicht, siehe Begruendung bei "name" oben.
+  notiz:         ['notiz', 'notizen', 'bemerkung', 'bemerkungen', 'hinweis', 'kommentar', 'info'],
 };
 
 let impKopf = [], impRohZeilen = [], impLetzterBericht = null;

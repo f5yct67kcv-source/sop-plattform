@@ -104,6 +104,15 @@ z = await raten(['Telefon', 'Mobil', 'Natel']);
 check('KRITISCH: ein Ziel wird hoechstens einmal vergeben',
   z.filter(x => x === 'telefon').length === 1 && z[1] === '' && z[2] === '');
 
+// Echter AbaNinja-Export (2026-08-27): "Unternehmensname" traf keinen
+// Treffer in IMP_SYNONYME.name. Ohne Namen lehnt kunden_import.php JEDE
+// Zeile mit "Name fehlt" ab -- der Import wirkte dadurch komplett
+// wirkungslos, nicht bloss luckenhaft. Notizen (Mehrzahl) hatte dieselbe
+// Luecke bei "notiz" (Einzahl).
+z = await raten(['Unternehmensname', 'Notizen']);
+check('KRITISCH: "Unternehmensname" wird als Name erkannt (AbaNinja-Export)', z[0] === 'name');
+check('"Notizen" (Mehrzahl) wird erkannt', z[1] === 'notiz');
+
 // ══════════════ DIALOG: DATEI -> ZUORDNUNG -> BERICHT
 const DATEI = `Firma;Strasse;PLZ;Ort;Telefon;Kundennummer
 Muster AG;Weg 1;4600;Olten;062 000 00 00;A-100
@@ -182,6 +191,31 @@ await page.selectOption('#impZ4', 'notiz');
 const gebaut = await page.evaluate(() => impZeilenBauen());
 check('KRITISCH: zwei Spalten auf dasselbe Ziel haengen aneinander statt zu ueberschreiben',
   gebaut[0].notiz === 'alpha beta');
+
+// ══════════════ ABANINJA-EXPORT DURCHGEHEND, OHNE VON HAND NACHZUBESSERN
+//
+// Der eigentliche Fehlerfall: Ein Anwender laedt die Datei, sieht eine
+// bereits ausgefuellte Zuordnung und klickt durch, ohne jede Zeile zu
+// pruefen. Traf "Unternehmensname" damals keinen Treffer, blieb die
+// Spalte leer -- ohne Namen lehnt der Server (kunden_import.php) die
+// Zeile ab, und zwar ausnahmslos jede, weil KEINE Zeile dieses Exports
+// Vorname/Nachname traegt. Der Import wirkte dadurch komplett
+// wirkungslos, nicht bloss luckenhaft, wie zunaechst vermutet.
+await page.evaluate(() => impOeffnen());
+await page.setInputFiles('#impDatei', { name: 'abaninja.csv', mimeType: 'text/csv',
+  buffer: Buffer.from(
+    'Unternehmensname;Strasse;Hausnummer;PLZ;Stadt;Notizen\n'
+    + 'Beispiel Treuhand AG;Musterweg;12;4600;Olten;Bevorzugt Rechnung per Post\n',
+    'utf-8') });
+await page.waitForTimeout(300);
+check('KRITISCH: "Unternehmensname" ist OHNE Nachbessern schon auf Name vorbelegt',
+  (await page.inputValue('#impZ0')) === 'name');
+check('"Notizen" ist ebenso vorbelegt', (await page.inputValue('#impZ5')) === 'notiz');
+check('"Stadt" faellt weiterhin auf Ort (bereits bekannter Fall)',
+  (await page.inputValue('#impZ4')) === 'ort');
+const abaZeile = (await page.evaluate(() => impZeilenBauen()))[0];
+check('KRITISCH: die gebaute Zeile hat einen Namen -- sonst weist der Server sie zurueck',
+  abaZeile.name === 'Beispiel Treuhand AG');
 
 // ══════════════ SERVERSEITIGE ZUSICHERUNGEN
 const php = readFileSync(`${WURZEL}/backend/api/kunden_import.php`, 'utf8');
