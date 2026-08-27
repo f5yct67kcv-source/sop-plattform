@@ -2695,6 +2695,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
         <div class="nav-kinder">
           <button class="nav-kind" id="nav-kontrolle-pensen" onclick="go('pensen')">Pensen</button>
           <button class="nav-kind" id="nav-kontrolle-auslagen" onclick="go('auslagen')">Auslagenersatz</button>
+          <button class="nav-kind" id="nav-kontrolle-rundgaenge" onclick="go('rundgaenge')">Rundgänge</button>
         </div>
       </div>
 
@@ -3735,6 +3736,26 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
         <div id="pnKopf"></div>
         <div id="pnListe"></div>
         <div id="pnHinweis"></div>
+      </section>
+
+      <!-- ══════════════════════ RUNDGÄNGE (ENT-183/193) ══════════════════════
+           Reine Übersicht für die Einsatzleitung über rundgang_liste.php
+           (Recht rundgang_einsehen, seit ENT-180 vorhanden, bisher ohne
+           Bildschirm dahinter). Kein Export, keine Bearbeitung -- wer einen
+           Rundgang durchführt, tut das ausschliesslich in app.html. -->
+      <section class="view" id="view-rundgaenge">
+        <div class="bar-tools">
+          <div class="tool-gruppe">
+            <input class="inp" type="date" id="rgVon" style="width:auto" onchange="ladeRundgaenge()" aria-label="Zeitraum von">
+            <span class="tool-bis">bis</span>
+            <input class="inp" type="date" id="rgBis" style="width:auto" onchange="ladeRundgaenge()" aria-label="Zeitraum bis">
+          </div>
+          <select class="inp" id="rgObjekt" style="width:auto" onchange="zeichneRundgaenge()" aria-label="Objekt auswählen">
+            <option value="">Alle Objekte</option>
+          </select>
+        </div>
+        <div id="rgKopf"></div>
+        <div id="rgListe"></div>
       </section>
 
       <!-- ══════════════════════ AUSLAGENERSATZ (ENT-125) ══════════════════════
@@ -5362,7 +5383,15 @@ const NAV_RECHTE = {
   'nav-admin-mitarbeiter':  'personal_lesen',
   'nav-admin-produkte':     'offerten',
   'nav-admin-betrieb':      'betrieb',
-  'navg-kontrolle':         'plan',
+  // Die Elterngruppe 'navg-kontrolle' hängt NICHT hier drin, sondern an einer
+  // ODER-Verknüpfung weiter unten (wie 'navg-admin') -- seit ENT-193 kann sie
+  // auch mit nur 'rundgang_einsehen' (ohne 'plan') sichtbar sein. Die beiden
+  // bestehenden Kinder bleiben trotzdem einzeln an 'plan' gebunden, sonst
+  // sähe ein Wächtersystem-Konto ohne Planungsrecht plötzlich Pensen und
+  // Auslagenersatz mit.
+  'nav-kontrolle-pensen':      'plan',
+  'nav-kontrolle-auslagen':    'plan',
+  'nav-kontrolle-rundgaenge':  'rundgang_einsehen',
   'nav-einrichtung':        'betrieb',
   // Offerten haengen am eigenen Recht, nicht an 'kunden' (ENT-181): Wer
   // Adressen pflegt, sieht darum noch keine Preise. Die Elterngruppe
@@ -5385,6 +5414,12 @@ function rechteAnwenden() {
     admGruppe.style.display =
       (darf('personal_lesen') || darf('betrieb') || darf('offerten')) ? '' : 'none';
   }
+  // Gleiches Prinzip für "Kontrolle": seit ENT-193 kann sie auch mit nur
+  // 'rundgang_einsehen' sichtbar sein, ohne 'plan'.
+  const kontrGruppe = $('navg-kontrolle');
+  if (kontrGruppe) {
+    kontrGruppe.style.display = (darf('plan') || darf('rundgang_einsehen')) ? '' : 'none';
+  }
   mdReiterPruefen();
   // Der Schnellzugriff haengt an denselben Rechten wie die Navigation und
   // wird darum hier mitgezeichnet -- nicht beim Laden der Kennzahlen: Er
@@ -5404,6 +5439,7 @@ const TITLES = {
   betrieb:     ['Betrieb', 'Einstellungen zum eigenen Unternehmen'],
   pensen:      ['Pensen', 'Jahresstunden gegen die Anstellungskategorie'],
   auslagen:    ['Auslagenersatz', 'Chronologisches Protokoll je Mitarbeitendem — Art. 18 Ziff. 10'],
+  rundgaenge:  ['Rundgänge', 'Laufende und abgeschlossene Kontrollgänge'],
   masterschichten: ['Masterschichten', 'Vorlagen, aus denen die Schichten entstehen'],
   einsatzneu:  ['Neuer Einsatz', 'Kunde, Ort, Zeit und Zuteilung'],
   einsatzplan: ['Einsatz planen', 'Positionen und Zeiten im Detail']
@@ -6100,7 +6136,7 @@ function themaUm() {
 // plus die Beschreibung darunter -- auf Lesebreite gedraengt wuerde jedes
 // Zahlenfeld zu schmal, um seinen Inhalt zu zeigen. 'produkte' bleibt
 // draussen: eine sechsspaltige Liste braucht die Extrabreite nicht.
-const ANSICHT_WEIT   = ['uebersicht', 'planung', 'abgleich', 'pensen', 'auslagen', 'einsatzplan', 'masterschichten', 'einsatzneu', 'offerte'];
+const ANSICHT_WEIT   = ['uebersicht', 'planung', 'abgleich', 'pensen', 'auslagen', 'rundgaenge', 'einsatzplan', 'masterschichten', 'einsatzneu', 'offerte'];
 const PLANUNG_WEIT   = ['uebersicht', 'einsaetze', 'objektplan', 'tag'];
 
 function weiteAnsicht(an) {
@@ -6157,12 +6193,15 @@ function go(view) {
   if (view === 'produkte') { $('nav-admin-produkte').classList.add('on'); }
   if (view === 'betrieb') { $('nav-admin-betrieb').classList.add('on'); }
   if (view === 'produkte') { produkte.length ? renderProdukte() : loadProdukte(); }
-  $('navg-kontrolle').classList.toggle('offen', view === 'pensen' || view === 'auslagen');
-  if (view === 'pensen' || view === 'auslagen') { $('nav-kontrolle').classList.add('on'); }
+  const kontrView = view === 'pensen' || view === 'auslagen' || view === 'rundgaenge';
+  $('navg-kontrolle').classList.toggle('offen', kontrView);
+  if (kontrView) { $('nav-kontrolle').classList.add('on'); }
   $('nav-kontrolle-pensen').classList.toggle('on', view === 'pensen');
   $('nav-kontrolle-auslagen').classList.toggle('on', view === 'auslagen');
+  $('nav-kontrolle-rundgaenge').classList.toggle('on', view === 'rundgaenge');
   if (view === 'pensen') { ladePensen(); }
   if (view === 'auslagen') { auslagenVorgabe(); ladeAuslagen(); }
+  if (view === 'rundgaenge') { rundgaengeVorgabe(); ladeRundgaenge(); }
   if (view === 'abgleich') {
     // Vorgabe: der zurückliegende Monat bis heute. Wer weiter zurück will,
     // stellt den Zeitraum um.
@@ -11092,14 +11131,102 @@ function auslagenCsv() {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
+// ══════════════════════ RUNDGÄNGE (ENT-183/193) ══════════════════════
+// Reine Übersicht -- rundgang_liste.php macht die ganze Fachlogik
+// (Fortschritt je Rundgang), hier wird nur gefiltert und angezeigt.
+let rundgaengeDaten = null;
+
+function rundgaengeVorgabe() {
+  if ($('rgVon').value) { return; }
+  const h = new Date();
+  $('rgVon').value = isoTag(h);
+  $('rgBis').value = isoTag(h);
+}
+
+const RUNDGANG_STATUS = {
+  vorbereitet:   ['Vorbereitet', 'chip-n'],
+  laeuft:        ['Läuft', 'chip-w'],
+  abgeschlossen: ['Abgeschlossen', 'chip-n'],
+};
+
+function ladeRundgaenge() {
+  const von = $('rgVon').value, bis = $('rgBis').value;
+  if (!von || !bis) { return; }
+  $('rgListe').innerHTML = '<div class="leer">…</div>';
+  const objVorlauf = objekte.length ? Promise.resolve() : loadObjekte();
+  objVorlauf.then(rgObjektFuellen);
+  return api(`rundgang_liste.php?von=${encodeURIComponent(von)}&bis=${encodeURIComponent(bis)}`)
+    .then(({ ok, status, data }) => {
+      if (status === 401) return doLogout();
+      rundgaengeDaten = (ok && data.status === 'ok') ? data.rundgaenge : null;
+      zeichneRundgaenge();
+    });
+}
+
+function rgObjektFuellen() {
+  const sel = $('rgObjekt'); if (!sel) return;
+  const bisher = sel.value;
+  const liste = objekte.slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  sel.innerHTML = '<option value="">Alle Objekte</option>'
+    + liste.map(o => `<option value="${Number(o.id)}">${esc(o.name)}</option>`).join('');
+  sel.value = liste.some(o => String(o.id) === bisher) ? bisher : '';
+}
+
+function zeichneRundgaenge() {
+  if (!rundgaengeDaten) {
+    $('rgKopf').innerHTML = '';
+    $('rgListe').innerHTML = EMPTY('Rundgänge nicht verfügbar',
+      'Die Liste konnte nicht geladen werden.');
+    return;
+  }
+  const objFilter = $('rgObjekt').value;
+  const zeilen = rundgaengeDaten.filter(r => !objFilter || String(r.objekt_id) === objFilter);
+
+  $('rgKopf').innerHTML = `<div class="pn-kopf">
+    <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap">
+      <b style="font-size:16px">${esc(dmy($('rgVon').value))} – ${esc(dmy($('rgBis').value))}</b>
+      <span class="sp" style="flex:1"></span>
+      <span class="note">${nf(zeilen.length)} ${zeilen.length === 1 ? 'Rundgang' : 'Rundgänge'}</span>
+    </div>
+  </div>`;
+
+  if (!zeilen.length) {
+    $('rgListe').innerHTML = EMPTY('Nichts zu zeigen',
+      objFilter ? 'Für dieses Objekt liegt in diesem Zeitraum kein Rundgang vor.'
+                : 'Für diesen Zeitraum liegt kein Rundgang vor.');
+    return;
+  }
+
+  $('rgListe').innerHTML = zeilen.map(r => {
+    const st = RUNDGANG_STATUS[r.status] || ['Unbekannt', 'chip-n'];
+    const f = r.fortschritt || { gesamt: 0, bestaetigt: 0, nicht_verfuegbar: 0 };
+    const name = [r.vorname, r.nachname].filter(Boolean).join(' ') || '–';
+    const start = r.rohzeit_start ? String(r.rohzeit_start).slice(11, 16) : null;
+    const ende = r.rohzeit_ende ? String(r.rohzeit_ende).slice(11, 16) : null;
+    return `<div class="pn-zeile">
+      <div class="kopf">
+        <b>${esc(r.objekt_name)}</b>
+        <span class="chip ${st[1]}">${esc(st[0])}</span>
+      </div>
+      <div class="sub">${esc(dmy(r.datum))} · ${esc(r.kunde_name)} · ${esc(name)}</div>
+      <div class="sub">${nf(f.bestaetigt)} bestätigt, ${nf(f.nicht_verfuegbar)} nicht verfügbar von ${nf(f.gesamt)}
+        ${start ? `· Rohzeit ${esc(start)}${ende ? '–' + esc(ende) : ' – läuft noch'}` : '· Rohzeit noch nicht gestartet'}</div>
+    </div>`;
+  }).join('');
+}
+
 function kontrolleNavKlick() {
-  if (navGruppeKompakt('pensen')) { return; }
+  // Landet auf der ersten Kachel, die diese Person tatsächlich sehen darf --
+  // seit ENT-193 kann die Gruppe auch mit nur 'rundgang_einsehen' (ohne
+  // 'plan') sichtbar sein, dann wären Pensen/Auslagenersatz die falsche Wahl.
+  const ziel = darf('plan') ? 'pensen' : 'rundgaenge';
+  if (navGruppeKompakt(ziel)) { return; }
   const offen = $('navg-kontrolle').classList.contains('offen');
-  if (offen && $('view-pensen').classList.contains('on')) {
+  if (offen && $('view-' + ziel).classList.contains('on')) {
     $('navg-kontrolle').classList.toggle('offen');
     return;
   }
-  go('pensen');
+  go(ziel);
 }
 
 // ── Verwaltung der Anstellungsorte
