@@ -3569,11 +3569,25 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
                   aria-label="Aktionen" style="display:none">
             <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
           </button>
+          <!-- Vorschau (ENT-192): zeigt dasselbe Blatt wie ofDrucken(), nur in
+               einem Dialog statt im Druckdialog. Es gibt keine PDF-Bibliothek in
+               diesem Projekt -- die Vorschau IST das Dokument, kein separat
+               erzeugtes PDF. -->
+          <button class="btn btn-plain btn-sm" id="ofFormVorschauBtn" onclick="ofVorschau(ofFormId)"
+                  aria-label="Vorschau" title="Vorschau" style="display:none">
+            <svg class="i i-sm" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
           <button class="btn btn-plain btn-sm" id="ofFormDruckBtn" onclick="ofDrucken(ofFormId)">
             <svg class="i i-sm" viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
             Drucken
           </button>
-          <button class="btn btn-primary btn-sm" id="ofFormSaveBtn" onclick="ofSpeichern()">Speichern</button>
+          <!-- Nur Icon statt "Speichern" (ENT-192, auf Wunsch des
+               Projektinhabers) -- der Zwischenstand-Knopf soll in der
+               Kopfzeile keinen Text mehr tragen. -->
+          <button class="btn btn-primary btn-sm" id="ofFormSaveBtn" onclick="ofSpeichern()"
+                  aria-label="Speichern" title="Speichern">
+            <svg class="i i-sm" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          </button>
         </div>
 
         <div class="msg-err" id="ofFormErr" style="display:none;margin-bottom:12px"></div>
@@ -4357,6 +4371,25 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
       <button class="btn btn-plain" onclick="closeDlg('dlgEpBemerkung')">Abbrechen</button>
       <div style="flex:1"></div>
       <button class="btn btn-primary" id="epbBtn" onclick="epBemerkungSpeichern()">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ VORSCHAU DER OFFERTE (ENT-192) ══════════
+     Zeigt dasselbe Blatt wie ofDrucken() (ofBlatt()), nur ohne den
+     Druckdialog auszuloesen. Kein PDF-Export -- diese Ansicht ist bereits
+     das Dokument, das der Kunde auch im Kundenportal sieht. -->
+<div class="dlg-scrim" id="dlgOfVorschau">
+  <div class="dlg breit">
+    <div class="dlg-hd">
+      <h2>Vorschau</h2>
+      <p>So sieht die Offerte für den Kunden aus.</p>
+    </div>
+    <div class="dlg-bd" style="background:#F4F5F7">
+      <div id="ofVorschauInhalt" style="background:#fff;padding:32px;border-radius:8px"></div>
+    </div>
+    <div class="dlg-ft">
+      <button class="btn btn-plain" onclick="closeDlg('dlgOfVorschau')">Schliessen</button>
     </div>
   </div>
 </div>
@@ -7215,6 +7248,8 @@ function ofFormMenuOeffnen(ev) {
   const statusKnoepfe = OF_STATUS.filter(s => s.wert !== ofFormStatus).map(s =>
     `<button onclick="ofMenuSchliessen(); ofStatusSetzen(${id}, '${s.wert}')">Als „${esc(s.text)}" markieren</button>`).join('');
   pop.innerHTML = `
+    <button onclick="ofMenuSchliessen(); ofVersenden(${id})">Per E-Mail versenden</button>
+    <hr>
     ${statusKnoepfe}
     <hr>
     <button onclick="ofMenuSchliessen(); ofDuplizieren(${id}, 0)">Duplizieren</button>
@@ -7223,7 +7258,7 @@ function ofFormMenuOeffnen(ev) {
     <button onclick="ofMenuSchliessen(); ofArchivKlick(${id}, ${ofFormAktiv ? 0 : 1})">${ofFormAktiv ? 'Archivieren' : 'Zurückholen'}</button>`;
   pop.dataset.belegId = 'form';
   pop.classList.add('on');
-  ofMenuPositionieren(ev, 260);
+  ofMenuPositionieren(ev, 300);
 }
 
 function ofStatusSetzen(id, neu) {
@@ -7317,6 +7352,7 @@ function ofNeu() {
   // Drucken und das Dreipunkt-Menue ergeben vor dem ersten Speichern keinen
   // Sinn -- es gibt noch keinen Beleg, den der Server ausliefern oder dessen
   // Status es aendern koennte.
+  $('ofFormVorschauBtn').style.display = 'none';
   $('ofFormDruckBtn').style.display = 'none';
   $('ofFormMenuBtn').style.display = 'none';
   ofZeilenZeichnen();
@@ -7657,6 +7693,7 @@ function ofOeffnen(id) {
       $('of_datum').dataset.vorher = $('of_datum').value;
       $('of_gueltig').value = leeresDatum(b.gueltig_bis) ? '' : String(b.gueltig_bis).slice(0, 10);
       ofPersonenFuellen(b.person_id);
+      $('ofFormVorschauBtn').style.display = '';
       $('ofFormDruckBtn').style.display = '';
       $('ofFormMenuBtn').style.display = '';
       ofZeilenZeichnen();
@@ -7707,6 +7744,7 @@ function ofSpeichern() {
     ofFormId = Number(data.id);
     if (data.nummer) { $('ofFormNummer').textContent = data.nummer; $('of_nummer').value = data.nummer; }
     ofFormSubZeichnen();
+    $('ofFormVorschauBtn').style.display = '';
     $('ofFormDruckBtn').style.display = '';
     $('ofFormMenuBtn').style.display = '';
     // Die Summen aus der SERVERANTWORT uebernehmen, nicht die eigene
@@ -7738,6 +7776,41 @@ function ofDrucken(id) {
     $('printArea').innerHTML = ofBlatt(data.beleg, data.kunde, data.person);
     window.print();
   }).catch(() => toast('Die Offerte liess sich nicht laden.'));
+}
+
+// Vorschau (ENT-192): dasselbe Blatt wie ofDrucken(), aber in einem Dialog
+// statt im Druckdialog -- "wie sieht es aus", ohne einen Druckvorgang
+// auszuloesen. Es gibt in diesem Projekt keine PDF-Bibliothek: Diese
+// Ansicht IST das Dokument (siehe ofBlatt()), kein separat erzeugtes PDF.
+function ofVorschau(id) {
+  if (!id) { toast('Die Offerte muss zuerst gespeichert werden.'); return; }
+  api('beleg_lesen.php?id=' + Number(id)).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') {
+      toast(data.message || 'Die Offerte liess sich nicht laden.'); return;
+    }
+    $('ofVorschauInhalt').innerHTML = ofBlatt(data.beleg, data.kunde, data.person);
+    openDlg('dlgOfVorschau');
+  }).catch(() => toast('Die Offerte liess sich nicht laden.'));
+}
+
+// Per E-Mail versenden (ENT-192): verschickt keinen PDF-Anhang, sondern einen
+// Link auf eine unangemeldete Web-Ansicht (backend/api/beleg_oeffentlich.php),
+// auf der der Kunde annehmen oder ablehnen kann. Der eigentliche Versand
+// laeuft ueber den Hostpoint-SMTP-Server (backend/mailer.php) -- eine
+// Sicherheitsabfrage vorher, weil eine einmal verschickte Mail sich nicht
+// zurueckholen laesst.
+function ofVersenden(id) {
+  if (!id) { toast('Die Offerte muss zuerst gespeichert werden.'); return; }
+  askConfirm('Offerte per E-Mail versenden?',
+    'Der Kunde erhält eine E-Mail mit einem Link zur Offerte. Dort kann er sie direkt annehmen oder ablehnen.',
+    'Versenden', () => {
+      api('beleg_versenden.php', { method: 'POST', body: { id: Number(id) } }).then(({ ok, data }) => {
+        if (!ok || data.status !== 'ok') { toast(data.message || 'Versand fehlgeschlagen.'); return; }
+        toast('Offerte per E-Mail verschickt.');
+        if (ofFormId === Number(id)) { ofFormStatus = 'versendet'; ofFormSubZeichnen(); }
+        loadBelege();
+      }).catch(() => toast('Versand fehlgeschlagen.'));
+    });
 }
 
 // Erzeugt das Blatt. Getrennt von ofDrucken(), damit es sich ohne Drucken

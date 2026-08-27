@@ -770,9 +770,19 @@ CREATE TABLE IF NOT EXISTS kunden_kontaktweg (
   oeffentliche_notizen TEXT NULL,
   bedingungen TEXT NULL,
   fusszeile_text TEXT NULL,
+  -- Kundenportal (ENT-192): ein unrateberer Zufallswert statt der id, damit
+  -- der Link selbst kein Login ersetzt, aber auch nicht einfach durchgezaehlt
+  -- werden kann. NULL heisst: noch nie versendet, es gibt keinen Link.
+  versand_token VARCHAR(64) NULL,
+  -- Wann und von welcher Adresse aus der Kunde entschieden hat -- ohne
+  -- Login ist das der einzige Beleg, falls eine Entscheidung spaeter
+  -- bestritten wird. Bleibt NULL, solange keine Entscheidung vorliegt.
+  entscheidung_am DATETIME NULL,
+  entscheidung_ip VARCHAR(45) NULL,
   erstellt_am DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   geaendert_am DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uq_beleg_nummer (art, nummer),
+  UNIQUE KEY uq_beleg_versand_token (versand_token),
   KEY idx_beleg_liste (art, aktiv, ist_vorlage, datum),
   KEY idx_beleg_kunde (kunde_id),
   FOREIGN KEY (kunde_id) REFERENCES kunden(id) ON DELETE SET NULL
@@ -1112,6 +1122,19 @@ $spalten = [
     ['belege', 'oeffentliche_notizen', 'ALTER TABLE belege ADD COLUMN oeffentliche_notizen TEXT NULL AFTER bemerkung'],
     ['belege', 'bedingungen', 'ALTER TABLE belege ADD COLUMN bedingungen TEXT NULL AFTER oeffentliche_notizen'],
     ['belege', 'fusszeile_text', 'ALTER TABLE belege ADD COLUMN fusszeile_text TEXT NULL AFTER bedingungen'],
+
+    // Kundenportal per E-Mail-Versand (ENT-192). belege stand bereits
+    // produktiv -- die Spalten kommen wie oben ueber ALTER TABLE nach. Der
+    // eindeutige Schluessel haengt am selben ALTER TABLE wie die Spalte
+    // selbst, nicht an einem eigenen Nachtrag-Mechanismus: Existiert die
+    // Spalte schon, wird der ganze Befehl uebersprungen (siehe hat_spalte
+    // unten) -- der Schluessel entsteht also immer zusammen mit der Spalte,
+    // nie getrennt davon.
+    ['belege', 'versand_token',
+     'ALTER TABLE belege ADD COLUMN versand_token VARCHAR(64) NULL AFTER fusszeile_text, '
+     . 'ADD UNIQUE KEY uq_beleg_versand_token (versand_token)'],
+    ['belege', 'entscheidung_am', 'ALTER TABLE belege ADD COLUMN entscheidung_am DATETIME NULL AFTER versand_token'],
+    ['belege', 'entscheidung_ip', 'ALTER TABLE belege ADD COLUMN entscheidung_ip VARCHAR(45) NULL AFTER entscheidung_am'],
 ];
 foreach ($spalten as [$tabelle, $spalte, $sql]) {
     if (!hat_tabelle_jetzt($pdo, $tabelle) || hat_spalte($pdo, $tabelle, $spalte)) {
