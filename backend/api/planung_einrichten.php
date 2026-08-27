@@ -779,6 +779,12 @@ CREATE TABLE IF NOT EXISTS kunden_kontaktweg (
   -- bestritten wird. Bleibt NULL, solange keine Entscheidung vorliegt.
   entscheidung_am DATETIME NULL,
   entscheidung_ip VARCHAR(45) NULL,
+  -- Getrennt von entscheidung_am, nach demselben Muster wie
+  -- verfuegbarkeiten.gesehen_am (ENT-033): entscheidung_am ist der Beleg der
+  -- Kundenentscheidung selbst und bleibt unberuehrt, dieser Zeitstempel
+  -- steuert nur, ob sie noch im Ereignis-Feed der Uebersicht auftaucht
+  -- (ENT-197).
+  entscheidung_gesehen_am DATETIME NULL,
   erstellt_am DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   geaendert_am DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uq_beleg_nummer (art, nummer),
@@ -1148,6 +1154,11 @@ $spalten = [
     ['rundgang', 'abbruch_grund',    'ALTER TABLE rundgang ADD COLUMN abbruch_grund VARCHAR(30) NULL AFTER pause_minuten'],
     ['rundgang', 'abbruch_freitext', 'ALTER TABLE rundgang ADD COLUMN abbruch_freitext TEXT NULL AFTER abbruch_grund'],
     ['rundgang', 'abgebrochen_am',   'ALTER TABLE rundgang ADD COLUMN abgebrochen_am DATETIME NULL AFTER abbruch_freitext'],
+
+    // Ereignis-Feed und Glocke (ENT-197): eigener Zeitstempel, getrennt von
+    // entscheidung_am -- siehe Kommentar am CREATE TABLE oben.
+    ['belege', 'entscheidung_gesehen_am',
+     'ALTER TABLE belege ADD COLUMN entscheidung_gesehen_am DATETIME NULL AFTER entscheidung_ip'],
 ];
 foreach ($spalten as [$tabelle, $spalte, $sql]) {
     if (!hat_tabelle_jetzt($pdo, $tabelle) || hat_spalte($pdo, $tabelle, $spalte)) {

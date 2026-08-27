@@ -1866,6 +1866,32 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
   .dash-item.dw-breit, .dash-item.dw-schmal, .dash-item.dw-halb { flex-basis: 100%; }
 }
 
+/* ── Glocke (ENT-197) */
+.glocke-wrap { position: relative; }
+.btn-glocke { position: relative; }
+.glocke-badge { position: absolute; top: 2px; right: 2px; min-width: 16px; height: 16px;
+  padding: 0 4px; border-radius: 999px; background: var(--neg); color: #fff;
+  font-size: 10px; font-weight: 700; line-height: 16px; text-align: center; }
+.glocke-panel { position: absolute; top: calc(100% + 8px); right: 0; width: 340px; max-width: calc(100vw - 24px);
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r);
+  box-shadow: var(--sh-2); z-index: 40; overflow: hidden; }
+.glocke-kopf { padding: 12px 16px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.glocke-liste { max-height: 360px; overflow-y: auto; }
+.glocke-row { display: flex; align-items: flex-start; gap: 10px; padding: 10px 16px; cursor: pointer; }
+.glocke-row .dot { margin-top: 6px; }
+.glocke-txt { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.glocke-txt b { font-size: 12.5px; font-weight: 620; }
+.glocke-txt span { font-size: 12px; color: var(--ink-2); white-space: normal; }
+.glocke-leer { padding: 18px 16px; font-size: 12.5px; color: var(--ink-3); text-align: center; }
+/* Handy: volle Breite statt eines schmalen Streifens am rechten Rand, und
+   Trefferflaeche fuer den Haken statt der 27px-Fassung aus der Uebersicht. */
+@media (max-width: 620px) {
+  .glocke-panel { position: fixed; top: auto; bottom: 0; left: 0; right: 0; width: auto; max-width: none;
+    border-radius: var(--r) var(--r) 0 0; max-height: 70vh; }
+  .glocke-liste { max-height: calc(70vh - 45px); }
+  .glocke-row .rank-erledigt { width: 44px; height: 44px; }
+}
+
 /* ── Umschalter hell/dunkel (ENT-029) */
 .thema-schalter { flex: none; width: 52px; height: 30px; border-radius: 999px; padding: 0;
   border: 1px solid var(--line); background: var(--bg); cursor: pointer; position: relative;
@@ -2759,6 +2785,20 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
         <svg class="i i-sm" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
         <span class="lbl">Sprechen</span>
       </button>
+      <!-- Glocke (ENT-197): dieselben Ereignisse wie die Uebersicht, kompakt
+           und von jeder Seite aus erreichbar -- eine Annahme/Ablehnung im
+           Kundenportal soll dem Planer nicht erst auffallen, wenn er zufaellig
+           auf der Uebersicht landet. -->
+      <div class="glocke-wrap">
+        <button class="btn btn-quiet btn-sm btn-glocke" id="btnGlocke" onclick="glockeUmschalten(event)" title="Benachrichtigungen" aria-label="Benachrichtigungen" aria-haspopup="true" aria-expanded="false">
+          <svg class="i i-sm" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span class="glocke-badge" id="glockeBadge" style="display:none">0</span>
+        </button>
+        <div class="glocke-panel" id="glockePanel" style="display:none">
+          <div class="glocke-kopf"><b>Benachrichtigungen</b></div>
+          <div class="glocke-liste" id="glockeListe"></div>
+        </div>
+      </div>
       <button class="thema-schalter ohne-schublade" id="btnThema" onclick="themaUm()" role="switch" aria-checked="false" title="Hell oder dunkel" aria-label="Zwischen heller und dunkler Darstellung wechseln">
         <span class="knopf">
           <svg class="i-sonne" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><line x1="12" y1="1.5" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22.5"/><line x1="4.2" y1="4.2" x2="5.9" y2="5.9"/><line x1="18.1" y1="18.1" x2="19.8" y2="19.8"/><line x1="1.5" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22.5" y2="12"/><line x1="4.2" y1="19.8" x2="5.9" y2="18.1"/><line x1="18.1" y1="5.9" x2="19.8" y2="4.2"/></svg>
@@ -6289,6 +6329,17 @@ document.addEventListener('click', e => {
   toggleSide(false);
 });
 
+// Dieselbe Regel fuer die Glocke (ENT-197): daneben tippen schliesst sie.
+document.addEventListener('click', e => {
+  const panel = $('glockePanel');
+  if (!panel || panel.style.display === 'none') { return; }
+  if (panel.contains(e.target) || e.target.closest('#btnGlocke')) { return; }
+  glockeSchliessen();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { glockeSchliessen(); }
+});
+
 // Schmale Seitenleiste: mehr Platz für die breiten Raster. Die Wahl bleibt
 // erhalten, damit sie nicht bei jedem Laden neu getroffen werden muss.
 // ══════════════════════════════════════════ HUELLE (ENT-086)
@@ -6390,6 +6441,19 @@ function topSubZeichnen() {
 }
 
 window.addEventListener('resize', () => { if (huelleKompakt()) { navGruppenZu(); } topSubZeichnen(); });
+
+// Offerten haben keinen Rueckruf vom Kundenportal (ENT-192): eine
+// Annahme/Ablehnung dort aendert den Status sofort in der Datenbank, aber
+// die Liste hier zeigt eine zuvor geladene Kopie. Beim Zurueckkommen in den
+// Tab -- der ueblichste Moment, in dem das relevant wird -- einmal neu
+// laden, statt auf ein staendiges Intervall zu setzen (ENT-196).
+// loadStats() dabei IMMER, nicht nur auf dem Offerten-Reiter: die Glocke
+// (ENT-197) soll unabhaengig von der gerade offenen Seite aktuell sein.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') { return; }
+  loadStats();
+  if ($('view-kunden').classList.contains('on') && kuTab === 'offerten') { loadBelege(); }
+});
 
 // ══════════════════════════════════════════ LADEN
 function reloadAll() {
@@ -6597,6 +6661,7 @@ const EREIGNIS_ART = {
   rapport:  { punkt: 'ok',   wort: 'hat einen Rapport gesendet' },
   sperrtag: { punkt: 'warn', wort: 'hat sich einen Tag gesperrt' },
   zusage:   { punkt: 'ok',   wort: 'hat eine Schicht beantwortet' },
+  offerte:  { punkt: 'ok',   wort: 'hat eine Offerte beantwortet' },
 };
 
 // ══════════════════════════════════════════ SCHNELLZUGRIFF (ENT-096)
@@ -6707,7 +6772,8 @@ function renderEreignisse() {
   if (!f.length) {
     $('ereignisFeed').innerHTML = fehlt.length
       ? hinweis
-      : EMPTY('Nichts Neues', 'Hier erscheinen eingegangene Rapporte, Sperrtage und Rückmeldungen zu Schichten.');
+      : EMPTY('Nichts Neues', 'Hier erscheinen eingegangene Rapporte, Sperrtage, Rückmeldungen zu Schichten und Entscheidungen zu Offerten.');
+    glockeAktualisieren([], fehlt);
     return;
   }
 
@@ -6721,13 +6787,7 @@ function renderEreignisse() {
     </div>`;
 
   $('ereignisFeed').innerHTML = hinweis + kopf + f.map((x, i) => {
-    let art  = EREIGNIS_ART[x.typ] || { punkt: 'warn', wort: '' };
-    // Eine Ablehnung ist kein gruener Punkt. Sie bedeutet, dass eine Schicht
-    // wieder offen ist -- und das ist die Zeile, die der Planer als Erstes
-    // finden muss (ENT-113).
-    const abgelehnt = x.typ === 'zusage' && x.zusage === 'abgelehnt';
-    if (abgelehnt) art = { punkt: 'neg', wort: 'hat eine Schicht abgelehnt' };
-    const wer  = x.person ? (fullName(x.person) || x.person.name) : (x.kunde || '—');
+    const { art, abgelehnt, wer } = ereignisArt(x);
     return `
     <div class="rank click erg erg-spalten${abgelehnt ? ' erg-abgelehnt' : ''}" onclick="ereignisAufklappen(${i}, this)">
       <span class="dot ${art.punkt}"></span>
@@ -6740,13 +6800,33 @@ function renderEreignisse() {
     </div>
     <div class="erg-detail" id="ergDetail${i}" style="display:none"></div>`;
   }).join('');
+  // Die Glocke (ENT-197) zeigt dieselben Zeilen kompakt im Dropdown -- eine
+  // Quelle, zwei Ziele, damit beide immer denselben Stand haben.
+  glockeAktualisieren(f, fehlt);
+}
+
+// Punkt-Farbe, Ablehnung-Kennzeichnung und Absenderzeile — von der vollen
+// Liste UND der Glocke gebraucht, darum ein gemeinsamer Ort statt zweimal
+// derselben Fallunterscheidung.
+function ereignisArt(x) {
+  let art = EREIGNIS_ART[x.typ] || { punkt: 'warn', wort: '' };
+  // Eine Ablehnung ist kein gruener Punkt. Sie bedeutet, dass eine Schicht
+  // wieder offen ist, bzw. dass eine Offerte nicht zustande kam -- und das
+  // ist die Zeile, die der Planer als Erstes finden muss (ENT-113/ENT-197).
+  const abgelehnt = (x.typ === 'zusage' && x.zusage === 'abgelehnt')
+    || (x.typ === 'offerte' && x.status === 'abgelehnt');
+  if (abgelehnt) {
+    art = { punkt: 'neg', wort: x.typ === 'offerte' ? 'hat eine Offerte abgelehnt' : 'hat eine Schicht abgelehnt' };
+  }
+  const wer = x.person ? (fullName(x.person) || x.person.name) : (x.kunde || '—');
+  return { art, abgelehnt, wer };
 }
 
 // Dieselbe Liste wie im Endpunkt, hier bloss zum Ausblenden des Knopfes.
-// Alle drei Arten lassen sich abhaken: Jede von ihnen ist etwas Geschehenes,
+// Alle vier Arten lassen sich abhaken: Jede von ihnen ist etwas Geschehenes,
 // das man zur Kenntnis nimmt.
 function ereignisAbhakbar(typ) {
-  return typ === 'rapport' || typ === 'sperrtag' || typ === 'zusage';
+  return typ === 'rapport' || typ === 'sperrtag' || typ === 'zusage' || typ === 'offerte';
 }
 
 function ereignisZeile(x) {
@@ -6756,6 +6836,7 @@ function ereignisZeile(x) {
   // abgelehnt. Der Vergleich traf nie zu, und JEDE Ablehnung stand hier als
   // Zusage: das Gegenteil dessen, was passiert war (ENT-113).
   if (x.typ === 'zusage')   { return `${x.zusage === 'abgelehnt' ? 'HAT ABGELEHNT' : 'hat zugesagt'} — ${x.kunde || x.einsatz_titel || '?'}, ${dmy(x.datum)}`; }
+  if (x.typ === 'offerte')  { return `${x.status === 'abgelehnt' ? 'HAT ABGELEHNT' : 'hat angenommen'} — ${x.nummer || '?'}`; }
   return x.titel || '';
 }
 
@@ -6772,10 +6853,14 @@ function ereignisAufklappen(i, zeile) {
   if (x.typ === 'rapport') {
     wege.push(`<button class="btn btn-plain btn-sm" onclick="event.stopPropagation(); go('kunden'); kuGoTab('rapporte')">Zu den Rapporten</button>`);
   }
+  if (x.typ === 'offerte') {
+    wege.push(`<button class="btn btn-plain btn-sm" onclick="event.stopPropagation(); go('kunden'); kuGoTab('offerten'); ofOeffnen(${x.id})">Zur Offerte</button>`);
+  }
   if (x.datum) {
     wege.push(`<button class="btn btn-plain btn-sm" onclick="event.stopPropagation(); ereignisZumTag('${esc(String(x.datum).slice(0, 10))}')">Zum Tagesplan</button>`);
   }
   const zeilen = [];
+  if (x.typ === 'offerte' && x.nummer) { zeilen.push(['Offerte', x.nummer]); }
   if (x.datum)      { zeilen.push(['Datum', dmy(x.datum)]); }
   if (x.von)        { zeilen.push(['Zeit', `${x.von} – ${x.bis}`]); }
   if (x.kunde)      { zeilen.push(['Kunde', x.kunde]); }
@@ -6811,6 +6896,12 @@ function ereignisErledigt(i) {
   const x = (stats.ereignisse || [])[i];
   if (!x) { return; }
   stats.ereignisse = (stats.ereignisse || []).filter((y, k) => k !== i);
+  // Ohne das haette die "X von Y"-Notiz (bei gekuerzter Liste) und seit
+  // ENT-197 auch der Glocke-Zaehler nach dem Abhaken weiter die alte,
+  // servergelieferte Gesamtzahl gezeigt -- eine Zahl, die nicht mehr stimmt.
+  if (typeof stats.ereignisse_gesamt === 'number' && stats.ereignisse_gesamt > 0) {
+    stats.ereignisse_gesamt--;
+  }
   // NEU ZEICHNEN, nicht bloss die Zeile entfernen. Die Zeilen verweisen ueber
   // ihren Platz in der Liste auf das Ereignis; faellt einer weg, zeigen alle
   // dahinter auf das jeweils naechste. Ein Haken haette dann das falsche
@@ -6818,6 +6909,70 @@ function ereignisErledigt(i) {
   renderEreignisse();
   api('ereignis_erledigt.php', { method: 'POST',
     body: { typ: x.typ, id: x.id, mitarbeiter_id: x.mitarbeiter_id || 0 } }).catch(() => {});
+}
+
+// ══════════════════════════════════════════ GLOCKE (ENT-197)
+// Kompakte, von jeder Seite aus erreichbare Voransicht derselben Liste, die
+// renderEreignisse() fuer die Uebersicht aufbaut -- siehe ereignisArt() fuer
+// die geteilte Punkt-/Ablehnungslogik. Keine eigene Datenquelle, kein
+// eigener "gesehen"-Mechanismus: Abhaken laeuft ueber denselben Endpunkt und
+// denselben Zeitstempel wie in der vollen Liste (Festlegung 2 in
+// ereignisse.php).
+function glockeAktualisieren(f, fehlt) {
+  const badge = $('glockeBadge');
+  const anzahl = stats.ereignisse_gesamt || f.length;
+  if (badge) {
+    badge.style.display = anzahl ? '' : 'none';
+    badge.textContent = anzahl > 99 ? '99+' : String(anzahl);
+  }
+  const liste = $('glockeListe');
+  if (!liste) { return; }
+  if (fehlt && fehlt.length) {
+    liste.innerHTML = `<div class="glocke-leer">Unvollständig — ${esc(fehlt.join(', '))} ${fehlt.length > 1 ? 'lassen' : 'lässt'} sich nicht abfragen.</div>`;
+    return;
+  }
+  if (!f.length) {
+    liste.innerHTML = `<div class="glocke-leer">Nichts Neues.</div>`;
+    return;
+  }
+  liste.innerHTML = f.map((x, i) => {
+    const { art, wer } = ereignisArt(x);
+    return `
+    <div class="rank click glocke-row" onclick="glockeZeileGeklickt(${i})">
+      <span class="dot ${art.punkt}"></span>
+      <div class="glocke-txt">
+        <b>${esc(wer)}</b>
+        <span>${esc(ereignisZeile(x))}</span>
+      </div>
+      ${ereignisAbhakbar(x.typ) ? `<button class="rank-erledigt" title="Als erledigt markieren" aria-label="Als erledigt markieren" onclick="event.stopPropagation(); ereignisErledigt(${i})">
+        <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+      </button>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function glockeUmschalten(ev) {
+  ev.stopPropagation();
+  const panel = $('glockePanel');
+  const offen = panel.style.display !== 'none';
+  panel.style.display = offen ? 'none' : '';
+  $('btnGlocke').setAttribute('aria-expanded', String(!offen));
+}
+
+function glockeSchliessen() {
+  const panel = $('glockePanel');
+  if (panel) { panel.style.display = 'none'; }
+  const btn = $('btnGlocke');
+  if (btn) { btn.setAttribute('aria-expanded', 'false'); }
+}
+
+// Springt zur Uebersicht und klappt dort dieselbe Zeile auf -- eine Liste,
+// zwei Ansichten, keine zweite Detailanzeige noetig.
+function glockeZeileGeklickt(i) {
+  glockeSchliessen();
+  go('uebersicht');
+  const zeile = document.querySelectorAll('#ereignisFeed .rank.erg')[i];
+  if (zeile) { ereignisAufklappen(i, zeile); }
 }
 
 function renderProMa() {

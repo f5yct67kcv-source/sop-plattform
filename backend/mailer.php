@@ -14,10 +14,19 @@ declare(strict_types=1);
 // ersetzt (gleiches Muster wie db.php/ai.php) -- diese Datei enthaelt nie
 // echte Zugangsdaten.
 
+// Bewusst nur auf leeren String pruefen (wie bei __ANTHROPIC_API_KEY__ in
+// ai.php), NICHT zusaetzlich per str_contains() gegen den Platzhaltertext
+// selbst. Der Deploy-sed ersetzt JEDES Vorkommen von z.B. "__SMTP_HOST__" in
+// der Datei -- auch eines, das nur als Vergleichstext dienen sollte. Ein
+// frueherer Versuch genau das zu tun verglich den echten Wert am Ende mit
+// sich selbst (ein String enthaelt sich immer selbst) und loeste dadurch
+// dieselbe Stelle immer falsch aus, egal welcher Wert im Secret stand
+// (ENT-192, gefunden beim ersten echten Testversand). Betraf drei Stellen in
+// dieser Datei -- deshalb hier zentral dokumentiert.
 function smtp_konfiguriert(): bool
 {
     $host = '__SMTP_HOST__';
-    return $host !== '' && !str_contains($host, '__SMTP_HOST__');
+    return $host !== '';
 }
 
 function smtp_absender_adresse(): string
@@ -76,7 +85,6 @@ function smtp_senden(string $anEmail, string $anName, string $betreff, string $h
     $pass = '__SMTP_PASSWORD__';
     $absenderEmail = smtp_absender_adresse();
     $absenderName = '__SMTP_ABSENDER_NAME__';
-    if (str_contains($absenderName, '__SMTP_ABSENDER_NAME__')) { $absenderName = ''; }
 
     $transport = $verschluesselung === 'ssl' ? 'ssl://' : '';
     $ctx = stream_context_create(['ssl' => ['verify_peer' => true, 'verify_peer_name' => true]]);
@@ -101,7 +109,7 @@ function smtp_senden(string $anEmail, string $anName, string $betreff, string $h
             smtp_befehl($fp, 'EHLO ' . $ehloName, [250]);
         }
 
-        if ($user !== '' && !str_contains($user, '__SMTP_USER__')) {
+        if ($user !== '') {
             smtp_befehl($fp, 'AUTH LOGIN', [334]);
             smtp_befehl($fp, base64_encode($user), [334]);
             smtp_befehl($fp, base64_encode($pass), [235]);
