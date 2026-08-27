@@ -1135,6 +1135,19 @@ $spalten = [
      . 'ADD UNIQUE KEY uq_beleg_versand_token (versand_token)'],
     ['belege', 'entscheidung_am', 'ALTER TABLE belege ADD COLUMN entscheidung_am DATETIME NULL AFTER versand_token'],
     ['belege', 'entscheidung_ip', 'ALTER TABLE belege ADD COLUMN entscheidung_ip VARCHAR(45) NULL AFTER entscheidung_am'],
+
+    // Rundgang pausieren/abbrechen (ENT-146). pausiert_seit haelt den Beginn
+    // der AKTUELLEN Pause fest -- pause_minuten ist die kumulierte Summe ueber
+    // alle bisherigen Pausen dieses Rundgangs (Projektinhaber-Entscheid
+    // 2026-08-27: ein Zaehler statt einer eigenen Tabelle je Pause-Intervall,
+    // reicht fuer beliebig viele Pause/Fortsetzen-Zyklen). Ein Abbruch ist
+    // endgueltig (kein Gegenstueck zu pausiert_seit noetig) und verlangt
+    // zwingend einen Grund (ENT-146 Punkt 2).
+    ['rundgang', 'pausiert_seit',    'ALTER TABLE rundgang ADD COLUMN pausiert_seit DATETIME NULL AFTER rohzeit_ende'],
+    ['rundgang', 'pause_minuten',    'ALTER TABLE rundgang ADD COLUMN pause_minuten INT NOT NULL DEFAULT 0 AFTER pausiert_seit'],
+    ['rundgang', 'abbruch_grund',    'ALTER TABLE rundgang ADD COLUMN abbruch_grund VARCHAR(30) NULL AFTER pause_minuten'],
+    ['rundgang', 'abbruch_freitext', 'ALTER TABLE rundgang ADD COLUMN abbruch_freitext TEXT NULL AFTER abbruch_grund'],
+    ['rundgang', 'abgebrochen_am',   'ALTER TABLE rundgang ADD COLUMN abgebrochen_am DATETIME NULL AFTER abbruch_freitext'],
 ];
 foreach ($spalten as [$tabelle, $spalte, $sql]) {
     if (!hat_tabelle_jetzt($pdo, $tabelle) || hat_spalte($pdo, $tabelle, $spalte)) {

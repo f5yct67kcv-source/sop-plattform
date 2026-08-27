@@ -565,6 +565,18 @@ const W = {
     kpStandortFehler: 'Standort konnte nicht ermittelt werden. Standortzugriff erlaubt?',
     kpWirdGesendet: 'wird übermittelt, sobald wieder Netz da ist',
     rundgangAbgelehntSpaeter: 'Ein Kontrollpunkt wurde vom Server abgelehnt und ist wieder offen.',
+    rundgangBeenden: 'Beenden', rundgangBeendenTitel: 'Rundgang beenden',
+    rundgangBeendenFrage: 'Wie möchtest du fortfahren?',
+    rundgangPausierenKnopf: 'Pausieren', rundgangAbbrechenKnopf: 'Abbrechen',
+    rundgangPauseWiederaufnehmen: 'Fortsetzen',
+    rundgangPausiertHinweis: 'Der Rundgang ist pausiert. Kontrollpunkte lassen sich erst nach dem Fortsetzen wieder melden.',
+    rundgangPausiertSeit: 'pausiert seit',
+    rundgangAbbrechenTitel: 'Rundgang abbrechen',
+    rundgangAbbrechenHinweis: 'Ein Abbruch ist endgültig und lässt sich nicht rückgängig machen. Bereits erfasste Kontrollpunkte bleiben erhalten.',
+    rundgangAbbrechenGrund: 'Grund', rundgangAbbrechenGrundPflicht: 'Bitte einen Grund auswählen.',
+    rundgangAbbrechenFreitext: 'Zusätzliche Angaben (optional)',
+    rundgangAbbrechenBestaetigen: 'Abbrechen bestätigen',
+    rundgangAbgebrochen: 'Abgebrochen',
 };
 const w = k => W[k] || k;
 
@@ -1546,6 +1558,11 @@ function rdWarteschlangeSenden() {
           if (r && r.status === 'fehler') { k.erledigt = null; k.wartend = false; k.fehler = r.message; abgelehnt = true; }
           else { k.wartend = false; }
         });
+        // Schliesst der letzte offene Kontrollpunkt den Rundgang automatisch
+        // ab (server-seitig, ENT-182), muss das auch hier ankommen -- sonst
+        // bietet der Fuss weiterhin "Beenden" auf einem bereits fertigen
+        // Rundgang an.
+        if (data.rundgang_status) { rundgangAktiv.status = data.rundgang_status; }
         rundgangListeZeichnen();
       }
       if (abgelehnt) { toast(w('rundgangAbgelehntSpaeter')); }
@@ -1582,7 +1599,7 @@ function rundgangStarten(einsatzId) {
       toast(data.message || w('netzfehler'));
       return;
     }
-    rundgangAktiv = { id: data.rundgang_id, einsatz_id: einsatzId,
+    rundgangAktiv = { id: data.rundgang_id, einsatz_id: einsatzId, status: 'vorbereitet', pausiert_seit: null,
       kontrollpunkte: (data.kontrollpunkte || []).map(k => ({ ...k, erledigt: null })) };
     rundgangAnzeigen(einsatzId);
   });
@@ -1599,7 +1616,8 @@ function rundgangFortsetzen(einsatzId) {
       return;
     }
     const r = data.rundgang;
-    rundgangAktiv = { id: r.id, einsatz_id: einsatzId, kontrollpunkte: r.kontrollpunkte };
+    rundgangAktiv = { id: r.id, einsatz_id: einsatzId, kontrollpunkte: r.kontrollpunkte,
+      status: r.status, pausiert_seit: r.pausiert_seit };
     rundgangAnzeigen(einsatzId);
   });
 }
@@ -1612,28 +1630,58 @@ function rundgangAnzeigen(einsatzId) {
   $('blBody').innerHTML = `
     <div style="font-size:13px;color:var(--ink-3);font-weight:620;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px">${esc(e.objekt_name || e.kunde_name)}</div>
     <div id="rdFortschritt" style="font-size:15px;font-weight:600;margin-bottom:16px"></div>
+    <div id="rdBanner"></div>
     <div id="rdListe"></div>`;
-  $('blFuss').innerHTML = `<button class="btn btn-plain" onclick="blattAuf(${Number(einsatzId)})">${esc(w('zurueck'))}</button>`;
+  rundgangFussZeichnen();
   blattZeigen();
   rdWarteschlangeSenden();
   rundgangListeZeichnen();
 }
 
+// Eigene Funktion statt Teil von rundgangAnzeigen(): der Fuss muss sich auch
+// OHNE Neuaufbau des ganzen Bildschirms aktualisieren, sobald sich der Status
+// aendert -- z.B. wenn der letzte Kontrollpunkt bestaetigt wird und der
+// Rundgang dadurch automatisch abschliesst (kein "Beenden" mehr auf einem
+// bereits fertigen Rundgang).
+function rundgangFussZeichnen() {
+  if (!rundgangAktiv) return;
+  const einsatzId = rundgangAktiv.einsatz_id;
+  const fertig = rundgangAktiv.kontrollpunkte.length > 0 && rundgangAktiv.kontrollpunkte.every(k => k.erledigt);
+  const zurueck = `<button class="btn btn-plain" onclick="blattAuf(${Number(einsatzId)})">${esc(w('zurueck'))}</button>`;
+  let aktion = '';
+  if (rundgangAktiv.status === 'pausiert') {
+    aktion = `<button class="btn btn-primary" onclick="rundgangWiederAufnehmen(${Number(einsatzId)})">${esc(w('rundgangPauseWiederaufnehmen'))}</button>`;
+  } else if (rundgangAktiv.status !== 'abgebrochen' && rundgangAktiv.status !== 'abgeschlossen' && !fertig) {
+    aktion = `<button class="btn btn-neg" onclick="rundgangBeendenAnzeigen(${Number(einsatzId)})">${esc(w('rundgangBeenden'))}</button>`;
+  }
+  $('blFuss').innerHTML = zurueck + aktion;
+}
+
 function rundgangListeZeichnen() {
   if (!rundgangAktiv) return;
+  rundgangFussZeichnen();
   const kps = rundgangAktiv.kontrollpunkte;
   const erledigt = kps.filter(k => k.erledigt).length;
   const fEl = $('rdFortschritt');
   if (fEl) {
-    fEl.textContent = (kps.length > 0 && erledigt === kps.length)
-      ? w('rundgangAbgeschlossen')
+    fEl.textContent = rundgangAktiv.status === 'abgebrochen' ? w('rundgangAbgebrochen')
+      : (kps.length > 0 && erledigt === kps.length) ? w('rundgangAbgeschlossen')
       : `${erledigt} ${w('von')} ${kps.length} ${w('erledigt')}`;
   }
+  const bEl = $('rdBanner');
+  if (bEl) {
+    bEl.innerHTML = rundgangAktiv.status === 'pausiert'
+      ? `<div class="msg-err" style="color:var(--ink-2);background:var(--line-soft)">${esc(w('rundgangPausiertHinweis'))}${rundgangAktiv.pausiert_seit ? ' (' + esc(w('rundgangPausiertSeit')) + ' ' + esc(String(rundgangAktiv.pausiert_seit).slice(11, 16)) + ')' : ''}</div>`
+      : rundgangAktiv.status === 'abgebrochen'
+      ? `<div class="msg-err">${esc(RUNDGANG_ABBRUCH_GRUENDE[rundgangAktiv.abbruch_grund] || w('rundgangAbgebrochen'))}${rundgangAktiv.abbruch_freitext ? ' — ' + esc(rundgangAktiv.abbruch_freitext) : ''}</div>`
+      : '';
+  }
+  const gesperrt = rundgangAktiv.status === 'pausiert' || rundgangAktiv.status === 'abgebrochen';
   const lEl = $('rdListe');
-  if (lEl) { lEl.innerHTML = kps.map((k, i) => rdZeile(k, i + 1)).join(''); }
+  if (lEl) { lEl.innerHTML = kps.map((k, i) => rdZeile(k, i + 1, gesperrt)).join(''); }
 }
 
-function rdZeile(k, nr) {
+function rdZeile(k, nr, gesperrt) {
   const typLabel = k.typ === 'nfc' ? w('kpTypNfc') : w('kpTypGeofence');
   if (k.erledigt) {
     const istNv = k.erledigt.status === 'nicht_verfuegbar';
@@ -1662,8 +1710,9 @@ function rdZeile(k, nr) {
         <div class="rd-meta">${esc(typLabel)}</div>
       </div>
     </div>
-    ${!kannScannen ? `<div class="rd-hinweis">${esc(w('kpNfcNichtVerfuegbarGeraet'))}</div>` : ''}
+    ${!kannScannen && !gesperrt ? `<div class="rd-hinweis">${esc(w('kpNfcNichtVerfuegbarGeraet'))}</div>` : ''}
     ${k.fehler ? `<div class="msg-err" style="margin:10px 0 0 37px">${esc(k.fehler)}</div>` : ''}
+    ${gesperrt ? '' : `
     <div class="rd-akt">
       ${kannScannen ? `<button class="btn btn-primary" id="rdBtn${k.id}" onclick="rdBestaetigen(${k.id})">${esc(w('kpBestaetigen'))}</button>` : ''}
       <button class="btn btn-plain" onclick="rdNvUm(${k.id})">${esc(w('kpNichtVerfuegbar'))}</button>
@@ -1672,7 +1721,7 @@ function rdZeile(k, nr) {
       <textarea class="inp" id="rdNvText${k.id}" rows="2" placeholder="${esc(w('kpBeschreibungPflicht'))}"></textarea>
       <button class="btn btn-neg" onclick="rdNvSenden(${k.id})">${esc(w('kpNichtVerfuegbarMelden'))}</button>
     </div>
-    <div class="msg-err" id="rdFehler${k.id}" style="display:none;margin:10px 0 0 37px"></div>
+    <div class="msg-err" id="rdFehler${k.id}" style="display:none;margin:10px 0 0 37px"></div>`}
   </div>`;
 }
 
@@ -1723,6 +1772,89 @@ function rdScanEintragen(k, status, ort, beschreibung) {
   });
   rundgangListeZeichnen();
   rdWarteschlangeSenden();
+}
+
+// ── Pausieren/Abbrechen (ENT-146) ────────────────────────────────────
+// Dieselben vier bei Coredinate beobachteten Kategorien wie
+// RUNDGANG_ABBRUCH_GRUENDE in backend/rundgang.php -- eine Aenderung dort
+// muss auch hier nachgezogen werden, es gibt keine gemeinsame Quelle fuer
+// vier feste Texte zwischen PHP und JS.
+const RUNDGANG_ABBRUCH_GRUENDE = {
+  stelle_nicht_gefunden: 'Stelle nicht gefunden',
+  nicht_genug_zeit: 'Nicht genug Zeit',
+  notfall_gebunden: 'Durch Notfall anderweitig gebunden',
+  sonstige: 'Sonstige Gründe',
+};
+
+// UX-Sicherheitsmuster aus ENT-146: "Beenden" fuehrt NIE direkt zu einer
+// Aenderung, sondern erst zu diesem Dialog mit drei Optionen. "Schliessen"
+// ist der sichere Default und tut nichts weiter, als zur Checkliste
+// zurueckzukehren.
+function rundgangBeendenAnzeigen(einsatzId) {
+  $('blTitel').textContent = w('rundgangBeendenTitel');
+  $('blBody').innerHTML = `
+    <p style="font-size:15px;margin-bottom:20px">${esc(w('rundgangBeendenFrage'))}</p>
+    <button class="btn btn-plain btn-wide" style="margin-bottom:10px" onclick="rundgangPausieren(${Number(einsatzId)})">${esc(w('rundgangPausierenKnopf'))}</button>
+    <button class="btn btn-neg btn-wide" onclick="rundgangAbbrechenAnzeigen(${Number(einsatzId)})">${esc(w('rundgangAbbrechenKnopf'))}</button>`;
+  $('blFuss').innerHTML = `<button class="btn btn-primary btn-wide" onclick="rundgangAnzeigen(${Number(einsatzId)})">${esc(w('schliessen'))}</button>`;
+}
+
+function rundgangPausieren(einsatzId) {
+  api('mein_rundgang_pausieren.php', { method: 'POST', body: { rundgang_id: rundgangAktiv.id } }).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') { toast(data.message || w('netzfehler')); return; }
+    rundgangAktiv.status = 'pausiert';
+    rundgangAktiv.pausiert_seit = jetztDatetime();
+    rundgangAnzeigen(einsatzId);
+  });
+}
+
+function rundgangWiederAufnehmen(einsatzId) {
+  const btn = document.querySelector('#blFuss .btn-primary');
+  if (btn) btn.disabled = true;
+  api('mein_rundgang_fortsetzen.php', { method: 'POST', body: { rundgang_id: rundgangAktiv.id } }).then(({ ok, data }) => {
+    if (btn) btn.disabled = false;
+    if (!ok || data.status !== 'ok') { toast(data.message || w('netzfehler')); return; }
+    rundgangAktiv.status = data.rundgang_status;
+    rundgangAktiv.pausiert_seit = null;
+    rundgangAnzeigen(einsatzId);
+  });
+}
+
+function rundgangAbbrechenAnzeigen(einsatzId) {
+  $('blTitel').textContent = w('rundgangAbbrechenTitel');
+  $('blBody').innerHTML = `
+    <div class="msg-err" style="color:var(--warn);background:var(--warn-soft)">${esc(w('rundgangAbbrechenHinweis'))}</div>
+    <div class="f"><label for="raGrund">${esc(w('rundgangAbbrechenGrund'))}</label>
+      <select class="inp" id="raGrund">
+        <option value="">–</option>
+        ${Object.entries(RUNDGANG_ABBRUCH_GRUENDE).map(([code, txt]) =>
+          `<option value="${esc(code)}">${esc(txt)}</option>`).join('')}
+      </select>
+    </div>
+    <div class="f"><label for="raFreitext">${esc(w('rundgangAbbrechenFreitext'))}</label>
+      <textarea class="inp" id="raFreitext" rows="3"></textarea>
+    </div>
+    <div id="raErr" class="msg-err" style="display:none"></div>`;
+  $('blFuss').innerHTML = `
+    <button class="btn btn-plain" onclick="rundgangBeendenAnzeigen(${Number(einsatzId)})">${esc(w('zurueck'))}</button>
+    <button class="btn btn-neg" id="raBtn" onclick="rundgangAbbrechenSenden(${Number(einsatzId)})">${esc(w('rundgangAbbrechenBestaetigen'))}</button>`;
+}
+
+function rundgangAbbrechenSenden(einsatzId) {
+  const err = $('raErr'); err.style.display = 'none';
+  const grund = $('raGrund').value;
+  if (!grund) { err.textContent = w('rundgangAbbrechenGrundPflicht'); err.style.display = ''; return; }
+  const freitext = $('raFreitext').value.trim();
+  const btn = $('raBtn'); btn.disabled = true;
+  api('mein_rundgang_abbrechen.php', { method: 'POST', body: { rundgang_id: rundgangAktiv.id, grund, freitext } })
+    .then(({ ok, data }) => {
+      btn.disabled = false;
+      if (!ok || data.status !== 'ok') { err.textContent = data.message || w('netzfehler'); err.style.display = ''; return; }
+      rundgangAktiv.status = 'abgebrochen';
+      rundgangAktiv.abbruch_grund = grund;
+      rundgangAktiv.abbruch_freitext = freitext || null;
+      rundgangAnzeigen(einsatzId);
+    });
 }
 
 // ══════════════════════════════════════════ SCHICHT RAPPORTIEREN (ENT-082)

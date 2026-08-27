@@ -29,8 +29,11 @@ $rundgang = $rChk->fetch();
 if (!$rundgang) {
     json_response(['status' => 'error', 'message' => 'Dieser Rundgang gehoert nicht zu dir'], 404);
 }
-if ($rundgang['status'] === 'abgeschlossen') {
-    json_response(['status' => 'error', 'message' => 'Dieser Rundgang ist bereits abgeschlossen'], 409);
+if (in_array($rundgang['status'], ['abgeschlossen', 'abgebrochen'], true)) {
+    json_response(['status' => 'error', 'message' => 'Dieser Rundgang ist bereits beendet'], 409);
+}
+if ($rundgang['status'] === 'pausiert') {
+    json_response(['status' => 'error', 'message' => 'Dieser Rundgang ist pausiert -- erst fortsetzen'], 409);
 }
 
 $ergebnisse = [];

@@ -27,7 +27,21 @@ const RUNDGAENGE = { status: 'ok', rundgaenge: [
     vorbereitet_am: `${HEUTE} 21:00:00`, rohzeit_start: `${HEUTE} 21:02:00`,
     rohzeit_ende: null, datum: HEUTE, kunde_name: 'Beispiel Immobilien GmbH',
     objekt_name: 'Testliegenschaft Süd', vorname: 'Hans', nachname: 'Beispiel',
-    fortschritt: { gesamt: 4, bestaetigt: 1, nicht_verfuegbar: 0 } },
+    fortschritt: { gesamt: 4, bestaetigt: 1, nicht_verfuegbar: 0 }, pause_minuten: 0 },
+  // Pausiert (ENT-146) -- die Rohzeit "laeuft nicht noch", sie steht still.
+  { id: 3, einsatz_id: 12, objekt_id: 1, mitarbeiter_id: 5, status: 'pausiert',
+    vorbereitet_am: `${HEUTE} 22:00:00`, rohzeit_start: `${HEUTE} 22:05:00`,
+    rohzeit_ende: null, datum: HEUTE, kunde_name: 'Muster Liegenschaften AG',
+    objekt_name: 'Testliegenschaft Nord', vorname: 'Erika', nachname: 'Muster',
+    fortschritt: { gesamt: 3, bestaetigt: 1, nicht_verfuegbar: 0 }, pause_minuten: 12 },
+  // Abgebrochen (ENT-146) -- Grund und Freitext muessen erscheinen, "laeuft
+  // noch" darf trotz fehlendem rohzeit_ende nicht angezeigt werden.
+  { id: 4, einsatz_id: 13, objekt_id: 2, mitarbeiter_id: 6, status: 'abgebrochen',
+    vorbereitet_am: `${HEUTE} 23:00:00`, rohzeit_start: `${HEUTE} 23:03:00`,
+    rohzeit_ende: null, datum: HEUTE, kunde_name: 'Beispiel Immobilien GmbH',
+    objekt_name: 'Testliegenschaft Süd', vorname: 'Hans', nachname: 'Beispiel',
+    fortschritt: { gesamt: 4, bestaetigt: 2, nicht_verfuegbar: 0 }, pause_minuten: 0,
+    abbruch_grund: 'notfall_gebunden', abbruch_freitext: 'Kollege krank, musste einspringen' },
 ]};
 
 const OBJEKTE = { status: 'ok', objekte: [
@@ -107,7 +121,7 @@ check('Der Zeitraum steht standardmässig auf heute (von = bis)',
   gerufen && gerufen.query.von === gerufen.query.bis);
 
 const kopf = await page.textContent('#rgKopf');
-check('Der Kopf nennt die Anzahl Rundgänge', kopf.includes('2 Rundgänge'));
+check('Der Kopf nennt die Anzahl Rundgänge', kopf.includes('4 Rundgänge'));
 
 const liste = await page.textContent('#rgListe');
 check('KRITISCH: Objekt, Kunde und Person je Rundgang erscheinen',
@@ -118,6 +132,16 @@ check('KRITISCH: Fortschritt trennt bestätigt und nicht verfügbar, nicht nur e
 check('KRITISCH: Rohzeit-Start und -Ende werden angezeigt', liste.includes('20:04–20:41'));
 check('KRITISCH: ein noch laufender Rundgang zeigt "läuft noch" statt eines leeren Endes',
   liste.includes('21:02') && liste.includes('läuft noch'));
+
+// ── Pausiert/Abgebrochen (ENT-146)
+check('KRITISCH: der Status "Pausiert" wird angezeigt', liste.includes('Pausiert'));
+check('KRITISCH: pausierte Minuten werden angezeigt', liste.includes('12 Min. pausiert'));
+check('KRITISCH: der Status "Abgebrochen" wird angezeigt', liste.includes('Abgebrochen'));
+check('KRITISCH: der Abbruchgrund erscheint ausgeschrieben, nicht als Code',
+  liste.includes('Durch Notfall anderweitig gebunden') && !liste.includes('notfall_gebunden'));
+check('KRITISCH: der Freitext des Abbruchs erscheint', liste.includes('Kollege krank, musste einspringen'));
+check('KRITISCH: ein abgebrochener Rundgang ohne Ende zeigt NICHT "läuft noch" (waere irrefuehrend)',
+  !liste.includes('23:03 – läuft noch') && !liste.includes('23:03– läuft noch'));
 
 // ── Objekt-Filter
 await page.selectOption('#rgObjekt', '2');

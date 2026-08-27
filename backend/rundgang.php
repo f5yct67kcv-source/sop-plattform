@@ -64,6 +64,18 @@ function rundgang_scan_pruefen(array $kontrollpunkt, ?string $chipId, ?float $la
     return null;
 }
 
+// Pflichtgruende beim Abbruch (ENT-146 Punkt 2) -- die vier bei Coredinate
+// beobachteten Kategorien, vom Projektinhaber am 2026-08-27 als ausreichend
+// bestaetigt (keine eigenen CUPI24-Kategorien noetig). Eine Stelle fuer den
+// Endpunkt UND jede Pruefung, damit sich die Liste nie an zwei Orten
+// auseinanderentwickelt.
+const RUNDGANG_ABBRUCH_GRUENDE = [
+    'stelle_nicht_gefunden' => 'Stelle nicht gefunden',
+    'nicht_genug_zeit'      => 'Nicht genug Zeit',
+    'notfall_gebunden'      => 'Durch Notfall anderweitig gebunden',
+    'sonstige'              => 'Sonstige Gruende',
+];
+
 // Fortschritt eines Rundgangs fuer die Uebersicht der Einsatzleitung
 // (ENT-183): wie viele aktuell aktive Kontrollpunkte das Objekt hat, und wie
 // viele davon in DIESEM Rundgang bestaetigt bzw. als nicht verfuegbar

@@ -40,7 +40,8 @@ if ($objektId <= 0) {
 // mehrere Rundgaenge NACHEINANDER pro Schicht sind vorgesehen (z.B.
 // stuendliche Kontrollen), aber nicht parallel.
 $offen = $pdo->prepare(
-    "SELECT id FROM rundgang WHERE einsatz_id = ? AND mitarbeiter_id = ? AND status IN ('vorbereitet','laeuft')"
+    "SELECT id FROM rundgang WHERE einsatz_id = ? AND mitarbeiter_id = ?
+      AND status IN ('vorbereitet','laeuft','pausiert')"
 );
 $offen->execute([$einsatzId, (int)$user['id']]);
 if ($offen->fetch()) {
