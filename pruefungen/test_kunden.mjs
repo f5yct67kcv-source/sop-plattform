@@ -161,8 +161,24 @@ await page.click('#kuTable tbody tr:first-child .rowmenu-btn');
 await page.waitForTimeout(150);
 check('Menü öffnet sich', await page.isVisible('#rowmenuPop.on'));
 check('Bearbeiten ist da', await page.isVisible('#rowmenuPop button:has-text("Bearbeiten")'));
-check('Offerte erstellen ist ausgegraut (noch nicht definiert)', await page.isDisabled('#rowmenuPop button:has-text("Offerte erstellen")'));
-check('Rechnung erstellen ist ausgegraut (noch nicht definiert)', await page.isDisabled('#rowmenuPop button:has-text("Rechnung erstellen")'));
+// Seit ENT-181 ist "Offerte erstellen" kein Platzhalter mehr, sondern haengt
+// am Recht 'offerten'. Diese Suite meldet sich OHNE dieses Recht an (siehe
+// me.php-Antwort oben) -- der Eintrag fehlt darum ganz. Bewusst geprueft,
+// dass er FEHLT und nicht bloss ausgegraut ist: Ein ausgegrauter Eintrag
+// verspricht eine Funktion, die es fuer diese Person nie geben wird.
+check('KRITISCH: ohne das Recht "offerten" gibt es keinen Offerten-Eintrag im Menü',
+  (await page.$$('#rowmenuPop button:has-text("Offerte erstellen")')).length === 0);
+check('Rechnung erstellen ist weiterhin ausgegraut (gibt es noch nicht)', await page.isDisabled('#rowmenuPop button:has-text("Rechnung erstellen")'));
+// Und mit dem Recht ist er da und nutzbar.
+await page.evaluate(() => { me.rechte = ['kunden', 'abgleich', 'offerten']; kuMenuSchliessen(); });
+await page.click('#kuTable tbody tr:first-child .rowmenu-btn');
+await page.waitForTimeout(150);
+check('KRITISCH: mit dem Recht ist "Offerte erstellen" da und nicht ausgegraut',
+  (await page.$$('#rowmenuPop button:has-text("Offerte erstellen")')).length === 1
+  && !(await page.isDisabled('#rowmenuPop button:has-text("Offerte erstellen")')));
+await page.evaluate(() => { me.rechte = ['kunden', 'abgleich']; kuMenuSchliessen(); });
+await page.click('#kuTable tbody tr:first-child .rowmenu-btn');
+await page.waitForTimeout(150);
 check('Archivieren ist da', await page.isVisible('#rowmenuPop button:has-text("Archivieren")'));
 await page.screenshot({ path: `${OUT}/k-02-menue.png` });
 await page.keyboard.press('Escape');
@@ -255,8 +271,14 @@ await page.evaluate(() => { me.rechte = ['kunden', 'abgleich']; renderKundeDetai
 
 await page.click('#kdtab-offerten');
 await page.waitForTimeout(150);
-check('Offerten-Reiter ist ein Platzhalter -- die Funktion existiert noch nicht',
-  (await page.textContent('#kdOfferten')).toLowerCase().includes('noch nicht verfügbar'));
+// Seit ENT-181 kein Platzhalter mehr. In dieser Suite liefert beleg_list.php
+// nichts (der Mock kennt den Endpunkt nicht), darum steht hier der
+// Leerzustand -- und der sagt jetzt "keine Offerten", nicht mehr "gibt es
+// nicht". Der Unterschied ist der Punkt: "noch nichts erfasst" und "gibt es
+// in diesem System nicht" sind verschiedene Aussagen.
+check('KRITISCH: der Offerten-Reiter zeigt den Leerzustand, nicht mehr "nicht verfügbar"',
+  (await page.textContent('#kdOfferten')).includes('Keine Offerten')
+  && !(await page.textContent('#kdOfferten')).toLowerCase().includes('noch nicht verfügbar'));
 await page.screenshot({ path: `${OUT}/k-04-offerten.png` });
 
 // Bearbeiten von der Detailseite aus

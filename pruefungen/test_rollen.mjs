@@ -121,7 +121,7 @@ try {
   const jsRollen  = [...html.matchAll(/^  \['([a-z]+)', '[^']+',$/gm)].map(m => m[1]);
   // Waechtersystem (ENT-169/ENT-180): serverseitig entschieden und
   // geschuetzt, aber bewusst NICHT im selben Kaestchen-Block wie die vier
-  // Rollen -- ein eigener Reiter (mdtab-waechter, ENT-186) haelt sie
+  // Rollen -- ein eigener Reiter (mdtab-waechter, ENT-186/ENT-189) haelt sie
   // getrennt. Die Ausnahmeliste hier bleibt darum bestehen (der Regex
   // erfasst nur den ROLLEN-Array-Block der vier Rollen); ausfuehrlich
   // geprueft wird der eigene Reiter weiter unten unter "WAECHTERSYSTEM".

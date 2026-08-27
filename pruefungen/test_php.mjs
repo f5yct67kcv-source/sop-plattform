@@ -527,6 +527,33 @@ check('KRITISCH: jede Backend-Datei der obersten Ebene wird auch deployt',
   fehltImDeploy.length === 0);
 if (fehltImDeploy.length) { console.log('   fehlt im Deploy: ' + fehltImDeploy.join(', ')); }
 
+// ── Spaltennamen in SQL gegen das Schema (ENT-185).
+// Wird WIRKLICH ausgefuehrt, wie die uebrigen pruef_*.php. Diese Luecke hat
+// beim ersten Lauf sofort einen echten, produktiven Fehler gefunden:
+// einsatz_position.php las `SELECT id FROM einsatz_zuteilung`, eine Tabelle
+// mit zusammengesetztem Schluessel und ohne id-Spalte -- zur Laufzeit eine
+// Ausnahme, die das Oeffnen des Einsatzplans abbrach.
+let sqlAus = '', sqlCode = 0;
+try {
+  sqlAus = execFileSync('php', [`${HIER}/pruef_sql.php`], { encoding: 'utf8' });
+} catch (e) {
+  sqlAus = String(e.stdout || '') + String(e.stderr || '');
+  sqlCode = e.status || 1;
+}
+const sqlBeanstandet = sqlAus.split('\n').filter(z => z.trim().startsWith('X '));
+check('KRITISCH: jeder Spaltenname in SQL steht auch im Schema',
+  sqlCode === 0 && sqlBeanstandet.length === 0);
+check('Die SQL-Pruefung liest ueberhaupt ein Schema',
+  Number((sqlAus.match(/^(\d+) Tabellen im Schema/m) || [0, 0])[1]) >= 15);
+// Ist-Stand 312. Die Schwelle liegt bei 280, nicht bei einem bequemen
+// Rundwert: Faellt schema.sql als Quelle weg, sinkt die Zahl auf 230
+// (nachgemessen) -- das faengt sie. Die 32 Abfragen Spielraum sind Absicht,
+// damit ein gewoehnlicher Umbau, der ein paar Abfragen zusammenlegt, nicht
+// jedes Mal diese Schwelle nachziehen muss.
+check('Sie prueft mindestens 280 Abfragen',
+  Number((sqlAus.match(/(\d+) Abfragen geprueft/) || [0, 0])[1]) >= 280);
+sqlBeanstandet.forEach(z => bad.push('SQL: ' + z.trim().slice(2)));
+
 if (beanstandet.length) { beanstandet.forEach(z => console.log('   ' + z.trim())); }
 if (syntaxFehler.length) { console.log('   Syntax: ' + syntaxFehler.join(', ')); }
 
