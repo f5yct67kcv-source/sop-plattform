@@ -120,10 +120,12 @@ try {
   const phpRollen = [...php.matchAll(/^const ROLLE_\w+\s*=\s*'([a-z]+)';/gm)].map(m => m[1]);
   const jsRollen  = [...html.matchAll(/^  \['([a-z]+)', '[^']+',$/gm)].map(m => m[1]);
   // Waechtersystem (ENT-169/ENT-180): serverseitig entschieden und
-  // geschuetzt, aber absichtlich noch ohne Rollenvergabe-Kaestchen -- die
-  // von ENT-169 verlangte visuelle Abgrenzung ("eigener Reiter") ist noch
-  // nicht gestaltet. Benannte Ausnahme statt stillem Auseinanderlaufen,
-  // gleiches Muster wie OHNE_SPERRE in test_php.mjs.
+  // geschuetzt, aber bewusst NICHT im selben Kaestchen-Block wie die vier
+  // Rollen -- ein eigener Reiter (mdtab-waechter, ENT-186) haelt sie
+  // getrennt. Die Ausnahmeliste hier bleibt darum bestehen (der Regex
+  // erfasst nur den ROLLEN-Array-Block der vier Rollen); ausfuehrlich
+  // geprueft wird der eigene Reiter weiter unten unter "WAECHTERSYSTEM".
+  // Gleiches Ausnahme-Muster wie OHNE_SPERRE in test_php.mjs.
   const NOCH_OHNE_KAESTCHEN = ['waechter'];
   check('Die Ausnahmeliste "noch ohne Kaestchen" nennt nur Rollen, die es beim Server gibt',
     NOCH_OHNE_KAESTCHEN.every(r => phpRollen.includes(r)));
@@ -242,6 +244,64 @@ try {
   check('KRITISCH: gar keine Rolle wird nicht gespeichert, sondern beanstandet',
     gesendet === null);
 } catch (e) { check('Abschnitt Rollenvergabe ohne Abbruch: ' + e.message, false); }
+
+// ══════════════ WAECHTERSYSTEM: EIGENER REITER (ENT-169/ENT-186)
+try {
+  meineRechte = ALLE_RECHTE; meineRollen = ['verwaltung']; dossierRollen = ['planung'];
+  await anmelden();
+  await page.evaluate(() => { go('mitarbeiter'); openMaDetail('planer'); });
+  await page.waitForTimeout(800);
+
+  check('Die Verwaltung sieht den Waechtersystem-Reiter', await sichtbar('mdtab-waechter'));
+  await page.evaluate(() => mdGoTab('waechter'));
+  await page.waitForTimeout(300);
+  check('KRITISCH: der Reiter liegt getrennt von den vier Rollen, nicht in derselben Liste',
+    await page.evaluate(() => !document.getElementById('md-waechter').contains(document.getElementById('maRolle_planung'))
+      || !document.getElementById('maRolle_planung')));
+  check('Ohne die Rolle ist das Kaestchen leer', !(await page.isChecked('#mdWaechterCheck')));
+  await page.screenshot({ path: `${OUT}/rollen-01-waechter-reiter.png` });
+
+  gesendet = null;
+  await page.check('#mdWaechterCheck');
+  await page.click('#md-waechter button:has-text("Speichern")');
+  await page.waitForTimeout(400);
+  check('KRITISCH: Vergeben sendet die BISHERIGEN Rollen plus waechter, nicht nur waechter allein',
+    gesendet && Array.isArray(gesendet.rollen)
+    && gesendet.rollen.includes('planung') && gesendet.rollen.includes('waechter'));
+
+  // Jetzt hat die Person die Rolle bereits (dossierRollen entsprechend
+  // nachgezogen) -- das Kaestchen muss das beim erneuten Oeffnen zeigen.
+  dossierRollen = ['planung', 'waechter'];
+  await page.evaluate(() => { go('mitarbeiter'); openMaDetail('planer'); });
+  await page.waitForTimeout(700);
+  await page.evaluate(() => mdGoTab('waechter'));
+  await page.waitForTimeout(300);
+  check('Mit der Rolle ist das Kaestchen angehakt', await page.isChecked('#mdWaechterCheck'));
+
+  // Ohne Aenderung wird nichts geschickt -- kein unnoetiger Schreibzugriff.
+  gesendet = null;
+  await page.click('#md-waechter button:has-text("Speichern")');
+  await page.waitForTimeout(300);
+  check('Speichern ohne Aenderung schreibt nichts', gesendet === null);
+
+  gesendet = null;
+  await page.uncheck('#mdWaechterCheck');
+  await page.click('#md-waechter button:has-text("Speichern")');
+  await page.waitForTimeout(400);
+  check('KRITISCH: Entziehen sendet die verbleibenden Rollen ohne waechter, nicht leer',
+    gesendet && Array.isArray(gesendet.rollen)
+    && gesendet.rollen.includes('planung') && !gesendet.rollen.includes('waechter'));
+
+  // Ohne das Recht 'rechte' erscheint der Reiter gar nicht -- dieselbe
+  // Abschottung wie beim Verlaufs-Reiter.
+  meineRechte = ['plan']; meineRollen = ['planung'];
+  await anmelden();
+  await page.evaluate(() => { go('mitarbeiter'); openMaDetail('planer'); });
+  await page.waitForTimeout(700);
+  check('KRITISCH: ohne das Recht "rechte" bleibt der Waechtersystem-Reiter versteckt',
+    !(await sichtbar('mdtab-waechter')));
+  dossierRollen = ['planung'];
+} catch (e) { check('Abschnitt Waechtersystem-Reiter ohne Abbruch: ' + e.message, false); }
 
 // ══════════════ DER VERLAUF
 try {
