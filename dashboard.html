@@ -474,8 +474,8 @@ tr.rapp-gruppe-offen td:not(.rapp-klammer) { border-bottom: none; }
 /* Kopfzeile in drei gleich behandelten Boxen -- Empfaenger, Unterschriften,
    Termine/Nummer (ENT-187). Alle drei denselben Stellenwert: keine breiter
    als die andere, wie es "gleiches Muster auf beiden/allen Seiten" verlangt. */
-.of-kopf-drei { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; align-items: start; margin-bottom: 14px; }
-@media (max-width: 900px) { .of-kopf-drei { grid-template-columns: 1fr; } }
+.of-kopf-zwei { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; align-items: start; margin-bottom: 14px; }
+@media (max-width: 900px) { .of-kopf-zwei { grid-template-columns: 1fr; } }
 /* Eine Zeile aus Beschriftung links und Schnellwahl-Knoepfen rechts, fuer
    Faelle, in denen neben einem Feldnamen noch eine Handlung Platz braucht
    (hier: "Gültig bis" mit +10/+30). Eigene Klasse statt der Knoepfe direkt
@@ -3643,12 +3643,16 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 
         <div class="msg-err" id="ofFormErr" style="display:none;margin-bottom:12px"></div>
 
-        <!-- Drei Boxen -- Empfaenger, Unterschriften, Termine/Nummer -- nach
-             dem Vorbild des bisherigen Fremdsystems (ENT-187). Status ist
-             bewusst keine eigene Box mehr: er aendert sich seit hier ueber
+        <!-- Zwei Boxen -- Empfaenger, Termine/Nummer -- nach dem Vorbild des
+             bisherigen Fremdsystems (ENT-187), urspruenglich mit einer
+             dritten Box "Unterschriften" dazwischen. Die steht jetzt ganz
+             unten im Formular, direkt bei den uebrigen Drucksteuerungen
+             (Bemerkung/Notizen/Bedingungen/Fusszeile) statt ganz oben --
+             auf Wunsch des Projektinhaber, mit Referenz-Screenshot. Status
+             ist bewusst keine eigene Box: er aendert sich seit hier ueber
              das Dreipunkt-Menue oben, wie in der Liste, statt ueber ein
              frei einstellbares Auswahlfeld mitten im Formular. -->
-        <div class="of-kopf-drei">
+        <div class="of-kopf-zwei">
           <div class="card"><div class="card-bd">
             <div class="f"><label for="of_kunde">Empfänger *</label>
               <input class="inp" id="of_kunde" list="dlKunden" autocomplete="off"
@@ -3659,20 +3663,6 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
               <svg class="i i-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               Neue Adresse erstellen
             </button>
-          </div></div>
-
-          <div class="card"><div class="card-bd">
-            <div style="font-size:11px;font-weight:650;letter-spacing:.4px;text-transform:uppercase;color:var(--ink-2);margin-bottom:12px">
-              Unterschriften
-            </div>
-            <label class="check">
-              <input type="checkbox" id="of_unterschriftsseite">
-              Unterschriftsseite hinzufügen
-            </label>
-            <div class="sec" style="margin-top:8px">
-              Fügt dem Ausdruck eine zusätzliche Seite mit Feldern für Ort, Datum und
-              Unterschrift an.
-            </div>
           </div></div>
 
           <div class="card"><div class="card-bd">
@@ -3743,6 +3733,25 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
             <div id="ofSummen"></div>
           </div></div>
         </div>
+
+        <!-- Ganz unten statt in der Kopfzeile (ENT-192, urspruenglich in
+             of-kopf-zwei) -- auf Wunsch des Projektinhaber, mit
+             Referenz-Screenshot: das Unterschriften-Werkzeug gehoert zu den
+             uebrigen Steuerungen fuers gedruckte Blatt, nicht zu den
+             Kopfdaten. -->
+        <div class="card" style="margin-top:14px"><div class="card-bd">
+          <div style="font-size:11px;font-weight:650;letter-spacing:.4px;text-transform:uppercase;color:var(--ink-2);margin-bottom:12px">
+            Unterschriften
+          </div>
+          <label class="check">
+            <input type="checkbox" id="of_unterschriftsseite">
+            Unterschriftsseite hinzufügen
+          </label>
+          <div class="sec" style="margin-top:8px">
+            Fügt dem Ausdruck eine zusätzliche Seite mit Feldern für Ort, Datum und
+            Unterschrift an.
+          </div>
+        </div></div>
       </section>
 
       <!-- ══════════════════════ PRODUKTE (ENT-181) ══════════════════════
