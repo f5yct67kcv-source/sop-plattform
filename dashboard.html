@@ -579,7 +579,6 @@ tbody tr.status-abgeschlossen.zu.abgeglichen td { opacity: 1; }
    (geplant/abgeschlossen/abgeglichen). Beide Aussagen sollen unabhaengig
    voneinander lesbar bleiben, darum getrennt statt ineinander verschachtelt. */
 .rap-abw { margin-left: 4px; font-size: 12px; }
-#msSeiteTabelle td:last-child .btn { margin-left: 6px; }
 
 /* ── Einsatzplan (ENT-076) ──────────────────────────────────────────────
    Dicht gebaut: bei acht Positionen ueber zwoelf Stunden entscheidet jede
@@ -3222,7 +3221,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
             </div>
           </div>
           <div id="oplBody"></div>
-          <button class="btn btn-master" onclick="msSeiteAuf()" title="Zeiten, Namen und Gültigkeit der Vorlagen">
+          <button class="btn btn-master" onclick="oplStammdaten()" title="Zeiten, Namen und Gültigkeit der Vorlagen">
               <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.2.5.66.86 1.19.91H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
               <span class="lbl">Masterschichten bearbeiten</span>
             </button>
@@ -3925,35 +3924,6 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
            Geaendert wird weiterhin ueber "Aendern ab ..." -- eine Vorlage laesst
            sich nicht einfach ueberschreiben, sonst wuerde sich rueckwirkend
            aendern, was in vergangenen Monaten galt. -->
-      <section class="view" id="view-masterschichten">
-        <div class="bar-tools">
-          <button class="btn btn-plain btn-sm" onclick="go('planung')">Zurück zur Planung</button>
-          <select class="inp" id="msSeiteObjekt" style="width:auto;max-width:260px" onchange="msSeiteObjektWechsel()" aria-label="Objekt"></select>
-          <span class="wo" id="msSeiteWo"></span>
-          <div class="sp" style="flex:1"></div>
-          <input class="inp search" id="msSeiteSuche" placeholder="Name oder Kürzel" oninput="msSeiteZeichnen()" style="max-width:220px">
-          <button class="btn btn-quiet btn-sm" id="msSeiteAlleBtn" onclick="msSeiteAlleUm()">Auch abgelaufene zeigen</button>
-          <button class="btn btn-quiet btn-sm" onclick="msSeiteCsv()">CSV</button>
-          <button class="btn btn-primary btn-sm" onclick="openMs('neu')">Masterschicht hinzufügen</button>
-        </div>
-
-        <div class="card">
-          <div class="card-hd">
-            <h2>Masterschichten</h2>
-            <span class="note" id="msSeiteAnzahl"></span>
-          </div>
-          <div class="card-bd flush"><div id="msSeiteTabelle"></div></div>
-        </div>
-
-        <div class="card" style="margin-top:16px">
-          <div class="card-hd">
-            <h2>Benötigte Schichten je Wochentag</h2>
-            <span class="note">Zu ändern über „Ändern ab …“ in der Zeile darüber</span>
-          </div>
-          <div class="card-bd flush"><div id="msSeiteBedarf"></div></div>
-        </div>
-      </section>
-
       <!-- ══════════════════════════ NEUER EINSATZ ══════════════════════════
            Eine eigene Ansicht statt eines Dialogs (ENT-114). Beim Anlegen
            stehen Kunde, Ort, Zeit, Sparte und die Zuteilung samt Konflikt-
@@ -5603,7 +5573,6 @@ const TITLES = {
   pensen:      ['Pensen', 'Jahresstunden gegen die Anstellungskategorie'],
   auslagen:    ['Auslagenersatz', 'Chronologisches Protokoll je Mitarbeitendem — Art. 18 Ziff. 10'],
   rundgaenge:  ['Rundgänge', 'Laufende und abgeschlossene Kontrollgänge'],
-  masterschichten: ['Masterschichten', 'Vorlagen, aus denen die Schichten entstehen'],
   einsatzneu:  ['Neuer Einsatz', 'Kunde, Ort, Zeit und Zuteilung'],
   einsatzplan: ['Einsatz planen', 'Positionen und Zeiten im Detail'],
   objekt:      ['Objekt', 'Stammdaten, Masterschichten und Kontrollpunkte']
@@ -6303,7 +6272,7 @@ function themaUm() {
 // 'objekt' seit ENT-200: eigene Ansicht statt Schublade, aus demselben Grund
 // wie 'offerte' -- Masterschichten und Kontrollpunkte (ENT-186) sind
 // Listen unbestimmter Laenge, keine 440px-Schublade haelt das auf Dauer.
-const ANSICHT_WEIT   = ['uebersicht', 'planung', 'abgleich', 'pensen', 'auslagen', 'rundgaenge', 'einsatzplan', 'masterschichten', 'einsatzneu', 'offerte', 'objekt'];
+const ANSICHT_WEIT   = ['uebersicht', 'planung', 'abgleich', 'pensen', 'auslagen', 'rundgaenge', 'einsatzplan', 'einsatzneu', 'offerte', 'objekt'];
 const PLANUNG_WEIT   = ['uebersicht', 'einsaetze', 'objektplan', 'tag'];
 
 function weiteAnsicht(an) {
@@ -12313,7 +12282,21 @@ function openObjekt(id) {
       <div style="display:flex;gap:8px;margin-top:10px">
         <button class="btn btn-primary btn-sm" onclick="openMs('neu')">Masterschicht hinzufügen</button>
         <button class="btn btn-quiet btn-sm" id="msAlleBtn" onclick="msAlleUm()">Auch abgelaufene zeigen</button>
+        <button class="btn btn-quiet btn-sm" onclick="msSeiteCsv()">CSV</button>
       </div>
+    </div>
+
+    <!-- Vormals eigene Seite (#masterschichten), hierher verschoben: dieselbe
+         Objekt-Detailseite zeigt die Vorlagen bereits, ein zweiter, separat
+         gepflegter Ort dafuer war reine Doppelung. -->
+    <div class="zone" style="margin-top:20px">
+      <div class="zone-hd">Benötigte Schichten je Wochentag</div>
+      <div class="zone-note">Zu ändern über „Ändern ab …“ bei der jeweiligen Masterschicht oben.</div>
+      <!-- overflow-x: die Tabelle traegt Name + 7 Wochentage + Woche + Feiertag
+           und lief auf dem Handy ueber den Rand hinaus (gemessen bei 390px,
+           nicht im Quelltext vermutet) -- die alte Seite fing das ueber
+           .card-bd.flush ab, das fehlt einem blossen .zone. -->
+      <div id="msSeiteBedarf" style="margin-top:10px;overflow-x:auto"></div>
     </div>
 
     ${darf('rundgang_verwalten') ? `
@@ -12349,10 +12332,7 @@ function loadMasterschichten() {
     masterschichten = data.masterschichten || [];
     const btn = $('msAlleBtn');
     if (btn) btn.textContent = msAlle ? 'Nur laufende zeigen' : 'Auch abgelaufene zeigen';
-    // Beide Orte zeigen dieselbe Liste: die Schublade am Objekt und die eigene
-    // Ansicht. Welcher davon offen ist, entscheidet die jeweilige Funktion.
     if ($('msListe')) renderMsListe();
-    msSeiteZeichnen();
   });
 }
 
@@ -12361,6 +12341,7 @@ const WD_KURZ = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 function renderMsListe() {
   if (!masterschichten.length) {
     $('msListe').innerHTML = `<p class="zone-note" style="margin:0">Noch keine Masterschicht. Ohne Vorlage entsteht an diesem Objekt keine Schicht.</p>`;
+    if ($('msSeiteBedarf')) { $('msSeiteBedarf').innerHTML = ''; }
     return;
   }
   $('msListe').innerHTML = masterschichten.map(m => {
@@ -12393,6 +12374,7 @@ function renderMsListe() {
       </div>
     </div>`;
   }).join('');
+  if ($('msSeiteBedarf')) { msSeiteBedarfZeichnen(masterschichten); }
 }
 
 function loadKontrollpunkte() {
@@ -13440,41 +13422,10 @@ function epEinsatzOeffnen() { if (epId) openEinsatzDrawer(epId); }
 // Dieselben Daten wie in der Schublade, nur breit genug zum Arbeiten.
 // obTarget wird mitgesetzt, damit die vorhandenen Dialoge (openMs, askDeleteMs)
 // unveraendert weiterlaufen.
-let msSeiteAlle = false;
-
-function msSeiteAuf(id) {
-  const objekt = Number(id || oplId || 0);
-  if (!objekt) { toast('Kein Objekt gewählt.'); return; }
-  obTarget = objekt;
-  msSeiteAlle = false;
-  go('masterschichten');
-  msSeiteObjektAuswahl();
-  loadMasterschichten();
-}
-
-function msSeiteObjektAuswahl() {
-  const sel = $('msSeiteObjekt');
-  if (!sel) return;
-  const liste = objekte.filter(o => o.aktiv || Number(o.id) === Number(obTarget));
-  sel.innerHTML = liste.map(o =>
-    `<option value="${Number(o.id)}"${Number(o.id) === Number(obTarget) ? ' selected' : ''}>${esc(o.name)}</option>`).join('');
-  const o = objekte.find(x => Number(x.id) === Number(obTarget));
-  $('msSeiteWo').textContent = o ? [o.kunde_name, [o.plz, o.ort].filter(Boolean).join(' ')].filter(Boolean).join(' · ') : '';
-  $('pgCrumb').textContent = o ? 'Vorlagen von ' + o.name : TITLES.masterschichten[1];
-}
-
-function msSeiteObjektWechsel() {
-  obTarget = Number($('msSeiteObjekt').value);
-  msSeiteObjektAuswahl();
-  loadMasterschichten();
-}
-
-function msSeiteAlleUm() {
-  msSeiteAlle = !msSeiteAlle;
-  msAlle = msSeiteAlle;
-  loadMasterschichten();
-}
-
+// Nur noch fuer den CSV-Export (msSeiteCsv) gebraucht -- ohne Suchfeld auf
+// der Objekt-Detailseite (ENT-200-Nachtrag) liefert sie stets die volle
+// Liste, verhaelt sich also wie eine einfache Weiterreichung von
+// "masterschichten".
 function msSeiteGefiltert() {
   const q = (($('msSeiteSuche') || {}).value || '').trim().toLowerCase();
   if (!q) return masterschichten;
@@ -13482,45 +13433,8 @@ function msSeiteGefiltert() {
     (m.name || '').toLowerCase().includes(q) || (m.kuerzel || '').toLowerCase().includes(q));
 }
 
-function msSeiteZeichnen() {
-  if (!$('msSeiteTabelle') || !$('view-masterschichten').classList.contains('on')) return;
-  const btn = $('msSeiteAlleBtn');
-  if (btn) btn.textContent = msSeiteAlle ? 'Nur laufende zeigen' : 'Auch abgelaufene zeigen';
-  const liste = msSeiteGefiltert();
-  $('msSeiteAnzahl').textContent = liste.length === masterschichten.length
-    ? `${nf(liste.length)} ${liste.length === 1 ? 'Vorlage' : 'Vorlagen'}`
-    : `${nf(liste.length)} von ${nf(masterschichten.length)}`;
-
-  if (!liste.length) {
-    $('msSeiteTabelle').innerHTML = `<div class="empty"><h3>Keine Vorlage</h3>
-      <p>Ohne Masterschicht entsteht an diesem Objekt keine Schicht.</p></div>`;
-    $('msSeiteBedarf').innerHTML = '';
-    return;
-  }
-
-  $('msSeiteTabelle').innerHTML = `<table><thead><tr>
-      <th>Kürzel</th><th>Bezeichnung</th><th>Art</th><th>Zeit</th>
-      <th class="num">Pause</th><th class="num">Stunden</th><th>Gültig</th><th>Zustand</th><th></th>
-    </tr></thead><tbody>` + liste.map(m => `<tr${m.laeuft ? '' : ' class="aus"'}>
-      <td>${m.kuerzel ? `<span class="chip chip-a">${esc(m.kuerzel)}</span>` : '<span class="sec">—</span>'}</td>
-      <td class="strong">${esc(m.name)}</td>
-      <td>${m.art === 'fahrtzeit' ? 'Fahrtzeit' : 'Revierdienst'}${m.auf_abruf ? '<div class="sec">auf Abruf</div>' : ''}</td>
-      <td>${hm(m.von)}–${hm(m.bis)}${hm(m.bis) <= hm(m.von) ? '<div class="sec">Folgetag</div>' : ''}</td>
-      <td class="num">${m.pause_min ? nf(m.pause_min) + ' Min.' : '—'}</td>
-      <td class="num strong">${nf(m.arbeitszeit_h, 2)} h</td>
-      <td>ab ${dmy(m.gueltig_ab)}${m.gueltig_bis ? `<div class="sec">bis ${dmy(m.gueltig_bis)}</div>` : ''}</td>
-      <td>${m.laeuft ? '<span class="chip chip-p">läuft</span>' : '<span class="chip chip-n">nicht aktiv</span>'}</td>
-      <td style="text-align:right;white-space:nowrap">
-        <button class="btn btn-plain btn-sm" onclick="openMs('aenderung',${m.id})">Ändern ab …</button>
-        <button class="btn btn-quiet btn-sm" onclick="openMs('korrektur',${m.id})">Beschriftung</button>
-        <button class="btn btn-quiet btn-sm" onclick="askDeleteMs(${m.id})">Entfernen</button>
-      </td>
-    </tr>`).join('') + '</tbody></table>';
-
-  msSeiteBedarfZeichnen(liste);
-}
-
-// Untere Tabelle: was jede Vorlage an welchem Tag verlangt, mit Summen.
+// Bedarfstabelle auf der Objekt-Detailseite: was jede Vorlage an welchem Tag
+// verlangt, mit Summen. Vormals Teil der eigenen Masterschichten-Seite.
 function msSeiteBedarfZeichnen(liste) {
   const tage = ['mo', 'di', 'mi', 'do', 'fr', 'sa', 'so'];
   const namen = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];

@@ -230,7 +230,7 @@ try {
   // Projektinhaber hat die volle Breite fuer die Startseite ausdruecklich
   // verlangt (ENT-098). Der Deckel schuetzt lange Textzeilen -- die
   // Uebersicht traegt keine, sondern nebeneinanderstehende Container.
-  for (const v of ['uebersicht', 'abgleich', 'pensen', 'einsatzplan', 'masterschichten']) {
+  for (const v of ['uebersicht', 'abgleich', 'pensen', 'einsatzplan', 'objekt']) {
     await p.evaluate(x => go(x), v); await p.waitForTimeout(250);
     check(`${v} nutzt die volle Breite`, await weit());
   }
