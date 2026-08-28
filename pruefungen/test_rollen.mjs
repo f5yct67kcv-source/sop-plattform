@@ -353,7 +353,7 @@ try {
 try {
   meineRechte = ALLE_RECHTE; meineRollen = ['verwaltung'];
   await anmelden();
-  await page.evaluate(() => go('betrieb'));
+  await page.evaluate(() => { go('betrieb'); bkAbschnittZeigen('rv'); });
   await page.waitForTimeout(900);
   const r = (await page.textContent('#rvInhalt')).replace(/\s+/g, ' ');
   check('Die Übersicht zeigt alle vier Rollen',
@@ -374,7 +374,7 @@ try {
   meineRechte = ALLE_RECHTE; meineRollen = ['verwaltung'];
   rollenEingerichtet = false;
   await anmelden();
-  await page.evaluate(() => go('betrieb'));
+  await page.evaluate(() => { go('betrieb'); bkAbschnittZeigen('rv'); });
   await page.waitForTimeout(900);
   const r = (await page.textContent('#rvInhalt')).replace(/\s+/g, ' ');
   check('KRITISCH: ohne Einrichtung sagt die Rollenkarte genau das',
@@ -392,6 +392,10 @@ try {
   await anmelden();
   await page.evaluate(() => go('betrieb'));
   await page.waitForTimeout(900);
+  check('KRITISCH: ohne Recht zur Rollenvergabe fehlt schon die Kachel dafuer (ENT-210)',
+    !(await sichtbar('bkKachelRv')));
+  await page.evaluate(() => bkAbschnittZeigen('rv'));
+  await page.waitForTimeout(200);
   check('KRITISCH: ohne Recht zur Rollenvergabe fehlt die Rollenübersicht',
     !(await sichtbar('rvKarte')));
 } catch (e) { check('Abschnitt ohne Recht ohne Abbruch: ' + e.message, false); }

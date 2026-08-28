@@ -363,6 +363,29 @@ a.nav-item { text-decoration: none; }
    im Haus bleiben bewusst unberuehrt -- ungeprueft globaler wirken hiesse,
    Layouts anzufassen, die niemand gemessen hat. */
 #view-betrieb .card-hd h3 { font-size: 13.5px; font-weight: 650; letter-spacing: -.1px; }
+/* Betrieb: Kachel-Uebersicht mit groesseren Icons statt einer langen
+   Kartenspalte (Projektinhaber-Vorgabe, 2026-08-28, nach Vorbild eines
+   gezeigten Fremdsystems -- nicht 1:1 nachgebaut, sondern in der
+   bestehenden Bildsprache dieses Hauses: derselbe farbige Icon-Kreis wie
+   ".card-ic"/".empty .ic", nur deutlich groesser). Jede bereits bestehende
+   Sektion (ENT-161) bekommt eine Kachel und fuehrt auf ihre eigene
+   Unteransicht; "Was hier noch fehlt" bleibt bewusst ohne Kachel, weil es
+   keine Sektion mit eigenem Inhalt ist, nur ein Hinweis. */
+.bk-kachel-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 14px; margin-bottom: 20px; }
+.bk-kachel { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--sh-1);
+  padding: 22px 14px; min-height: 132px; cursor: pointer; font: inherit; color: inherit; }
+.bk-kachel:hover { border-color: var(--accent-line); box-shadow: var(--sh-2); }
+.bk-kachel:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.bk-kachel-ic { width: 56px; height: 56px; border-radius: 14px; background: var(--accent-soft);
+  color: var(--accent); display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.bk-kachel-ic svg.i { width: 28px; height: 28px; }
+.bk-kachel-lbl { font-size: 13.5px; font-weight: 600; line-height: 1.35; }
+/* Zurueck-Knopf oberhalb einer einzelnen Sektion -- gleiche, leichte Bauart
+   wie "Zurueck zur Planung" an anderer Stelle im Haus, keine eigene
+   Detailkopfzeile: Es bleibt dieselbe view-betrieb, nur eine andere
+   Sektion ist sichtbar (kein Sprung in eine neue Hauptansicht). */
+.bk-zurueck { margin-bottom: 16px; }
 .card-bd { padding: 18px; }
 /* flush = randlos, z.B. fuer Tabellen. Breite Inhalte scrollen in der Karte,
    nie die ganze Seite. */
@@ -4257,13 +4280,49 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
         <!-- Bis ENT-161 lagen alle fuenf Karten unbeschriftet und randlos
              untereinander -- eine einzige lange Spalte ohne jede optische
              Gliederung (Ruecksprache des Projektinhabers: "im Moment ist
-             alles druntergestapelt"). Jetzt: ein Icon je Karte (dieselbe
-             Bauart wie ".empty .ic", siehe CSS), fester Kartenabstand ueber
-             ".grid" statt einzelner Inline-Margins, und die beiden kurzen
-             Karten (Zugang, Rollen) stehen ab Desktop-Breite nebeneinander
-             statt hintereinander -- ".g-1-1" existierte schon fuer genau
-             diesen Fall, wurde bisher aber nirgends eingesetzt. -->
-        <div class="grid">
+             alles druntergestapelt"). ENT-161 gab jeder Karte ein Icon,
+             blieb aber EINE lange Spalte. Jetzt (Projektinhaber-Vorgabe,
+             2026-08-28): eine Kachel-Uebersicht mit denselben Icons, nur
+             groesser, jede Kachel fuehrt auf ihre eigene Unteransicht --
+             "Was hier noch fehlt" bleibt ohne Kachel, weil es keine Sektion
+             mit eigenem Inhalt ist. Siehe bkAbschnittZeigen()/
+             bkUebersichtZeigen() weiter unten im Skript. -->
+        <div class="bk-uebersicht" id="bkUebersicht">
+          <div class="bk-kachel-grid">
+            <button type="button" class="bk-kachel" onclick="bkAbschnittZeigen('bk')">
+              <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg></span>
+              <span class="bk-kachel-lbl">Briefkopf für Rapporte</span>
+            </button>
+            <button type="button" class="bk-kachel" onclick="bkAbschnittZeigen('zf')">
+              <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+              <span class="bk-kachel-lbl">Mein Zugang: Zwei-Faktor-Anmeldung</span>
+            </button>
+            <button type="button" class="bk-kachel" id="bkKachelRv" onclick="bkAbschnittZeigen('rv')">
+              <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+              <span class="bk-kachel-lbl">Rollen im Betrieb</span>
+            </button>
+            <button type="button" class="bk-kachel" onclick="bkAbschnittZeigen('an')">
+              <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
+              <span class="bk-kachel-lbl">Anstellungsorte</span>
+            </button>
+          </div>
+
+          <div class="card">
+            <div class="card-hd">
+              <span class="card-ic gedaempft"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
+              <h3>Was hier noch fehlt</h3>
+            </div>
+            <div class="card-bd">
+              <!-- Firmenname stand hier bis ENT-161 noch mit in der Liste --
+                   seit ENT-155 erfasst ihn der Briefkopf oben, die Zeile war
+                   seither schlicht falsch. -->
+              <p class="zone-note">Weitere betriebliche Angaben — Rechnungsadresse, MWST-Nummer,
+                 Zahlungskonditionen — sind noch nicht erfasst. Sie werden gebraucht, sobald aus dem Werkzeug
+                 Offerten oder Rechnungen entstehen, und werden dann hier ergänzt.</p>
+            </div>
+          </div>
+        </div>
+
         <!-- Zwei-Faktor-Anmeldung (ENT-076). Steht hier und nicht bei den
              Mitarbeitenden: Es geht um den EIGENEN Zugang, nicht um fremde.
              Nur fuer Verwaltungszugaenge -- so entschieden, weil daran die
@@ -4271,6 +4330,9 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
         <!-- Briefkopf fuer den Rapport-Ausdruck (ENT-155). Steht bewusst weit
              oben: Was hier gepflegt wird, geht an Kunden heraus, und solange
              es leer ist, druckt der Rapport einen unbeschrifteten Kopf. -->
+        <div class="bk-abschnitt" id="bkAb-bk" style="display:none">
+        <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="bkUebersichtZeigen()">Zurück</button>
+        <div class="grid">
         <div class="card" id="bkKarte">
           <div class="card-hd">
             <span class="card-ic"><svg class="i" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg></span>
@@ -4340,11 +4402,17 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
             </div>
           </div>
         </div>
+        </div>
+        </div>
 
-        <!-- Nebeneinander statt hintereinander: beide Karten sind kurz, und
-             gerade der Groessenunterschied zu den grossen Formularen daneben
-             ist Teil der Struktur, um die es hier geht (siehe Hinweis oben). -->
-        <div class="grid g-1-1">
+        <!-- Zwei-Faktor-Anmeldung (ENT-076). Eigene Unteransicht statt neben
+             Rollen zu stehen (ENT-161 hatte beide ueber ".g-1-1" gepaart,
+             weil beide kurz sind) -- die Paarung ergab nur Sinn, solange
+             beide Karten Teil derselben langen Spalte waren. Fuehrt jetzt
+             je eine eigene Kachel zu ihrer eigenen Unteransicht. -->
+        <div class="bk-abschnitt" id="bkAb-zf" style="display:none">
+        <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="bkUebersichtZeigen()">Zurück</button>
+        <div class="grid">
         <div class="card" id="zfKarte">
           <div class="card-hd">
             <span class="card-ic"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
@@ -4355,12 +4423,17 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
             <div id="zfInhalt"><div style="color:var(--ink-3)">Wird geladen …</div></div>
           </div>
         </div>
+        </div>
+        </div>
 
         <!-- Wer hat welche Rolle (ENT-077). Steht hier zum NACHSEHEN, nicht
              zum Zuweisen -- die Zuweisung gehoert in die Personalakte, wo man
              ohnehin ist, wenn man jemanden anlegt. Ohne diese Uebersicht
              waeren die Rechte ueber alle Akten verstreut, und niemand koennte
              die Frage beantworten, wer eigentlich an die AHV-Nummern kommt. -->
+        <div class="bk-abschnitt" id="bkAb-rv" style="display:none">
+        <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="bkUebersichtZeigen()">Zurück</button>
+        <div class="grid">
         <div class="card" id="rvKarte">
           <div class="card-hd">
             <span class="card-ic"><svg class="i" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
@@ -4371,8 +4444,12 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
           </div>
         </div>
         </div>
+        </div>
 
-        <div class="card">
+        <div class="bk-abschnitt" id="bkAb-an" style="display:none">
+        <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="bkUebersichtZeigen()">Zurück</button>
+        <div class="grid">
+        <div class="card" id="anKarte">
           <div class="card-hd">
             <span class="card-ic"><svg class="i" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
             <h3>Anstellungsorte</h3>
@@ -4411,20 +4488,6 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
                unter 40 km nichts, ab 40 km eine Pauschale nach Formel.</p>
           </div>
         </div>
-
-        <div class="card">
-          <div class="card-hd">
-            <span class="card-ic gedaempft"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
-            <h3>Was hier noch fehlt</h3>
-          </div>
-          <div class="card-bd">
-            <!-- Firmenname stand hier bis ENT-161 noch mit in der Liste --
-                 seit ENT-155 erfasst ihn der Briefkopf oben, die Zeile war
-                 seither schlicht falsch. -->
-            <p class="zone-note">Weitere betriebliche Angaben — Rechnungsadresse, MWST-Nummer,
-               Zahlungskonditionen — sind noch nicht erfasst. Sie werden gebraucht, sobald aus dem Werkzeug
-               Offerten oder Rechnungen entstehen, und werden dann hier ergänzt.</p>
-          </div>
         </div>
         </div>
       </section>
@@ -6389,6 +6452,10 @@ function go(view) {
     $('pgTitle').textContent = TITLES[view][0];
     $('pgCrumb').textContent = TITLES[view][1];
   }
+  // Immer auf der Kachel-Uebersicht beginnen, nicht in der zuletzt
+  // besuchten Sektion stehenbleiben -- wer ueber die Navigation erneut auf
+  // "Betrieb" klickt, erwartet dieselbe Startseite wie beim ersten Mal.
+  if (view === 'betrieb') { bkUebersichtZeigen(); }
   // Ueber toggleSide schliessen, nicht die Klasse von Hand entfernen: seit
   // ENT-067 haengt die Scroll-Sperre des Hintergrunds daran. Wer hier abkuerzt,
   // laesst eine Seite zurueck, die sich nicht mehr scrollen laesst.
@@ -11964,6 +12031,23 @@ function ibanIstQrJs(iban) {
   return { gueltig, istQr: gueltig && iid >= 30000 && iid <= 31999 };
 }
 
+// Kachel-Uebersicht des Betriebsbereichs (Projektinhaber-Vorgabe, 2026-08-26):
+// vier Sektionen (Briefkopf, Zugang, Rollen, Anstellungsorte) stehen als
+// Kacheln nebeneinander, jede fuehrt auf ihre eigene Unteransicht statt
+// alle vier in einer langen Spalte zu zeigen. Bleibt innerhalb derselben
+// view-betrieb -- kein Sprung in eine neue Hauptansicht, kein Eintrag im
+// go()-Ansichtsregister noetig, dieselbe Bauart wie obGoTab()/kuGoTab() fuer
+// Reiter innerhalb einer Ansicht.
+function bkUebersichtZeigen() {
+  $('bkUebersicht').style.display = '';
+  document.querySelectorAll('#view-betrieb .bk-abschnitt').forEach(a => { a.style.display = 'none'; });
+}
+function bkAbschnittZeigen(id) {
+  $('bkUebersicht').style.display = 'none';
+  document.querySelectorAll('#view-betrieb .bk-abschnitt').forEach(a => { a.style.display = 'none'; });
+  $('bkAb-' + id).style.display = '';
+}
+
 function bkQrIbanPruefen() {
   const el = $('bkQrIbanHinweis'); if (!el) { return; }
   const wert = $('bkQrIban').value.trim();
@@ -12096,7 +12180,12 @@ function rvLaden() {
   const karte = $('rvKarte'), ziel = $('rvInhalt');
   if (!karte || !ziel) { return; }
   // Wer keine Rollen vergeben darf, braucht die Liste nicht -- sie sagt,
-  // wer an welche Personendaten kommt.
+  // wer an welche Personendaten kommt. Seit der Kachel-Uebersicht (ENT-210)
+  // steckt die Karte selbst erst hinter einem Klick -- ohne dieses Recht
+  // darf schon die KACHEL nicht erscheinen, sonst fuehrt sie auf eine leere
+  // Unteransicht statt schlicht zu fehlen.
+  const kachel = $('bkKachelRv');
+  if (kachel) { kachel.style.display = darf('rechte') ? '' : 'none'; }
   karte.style.display = darf('rechte') ? '' : 'none';
   if (!darf('rechte')) { return; }
 

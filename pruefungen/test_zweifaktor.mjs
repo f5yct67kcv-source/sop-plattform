@@ -106,7 +106,7 @@ try {
 
 // ══════════════ EINRICHTEN
 try {
-  await page.evaluate(() => { try { go('betrieb'); } catch (e) {} });
+  await page.evaluate(() => { try { go('betrieb'); bkAbschnittZeigen('zf'); } catch (e) {} });
   await page.waitForTimeout(500);
   check('Der Einschalter steht im Bereich Betrieb',
     (await page.textContent('#zfInhalt')).includes('Einrichten'));
@@ -237,7 +237,7 @@ try {
   await page.click('#gBtn'); await page.waitForTimeout(400);
   await page.fill('#gCode', '123456');
   await page.click('#gBtn'); await warteDrin();
-  await page.evaluate(() => { try { go('betrieb'); } catch (e) {} });
+  await page.evaluate(() => { try { go('betrieb'); bkAbschnittZeigen('zf'); } catch (e) {} });
   await page.waitForTimeout(500);
   const v = await page.textContent('#zfInhalt');
   check('Die gemerkten Geräte stehen in der Liste', /Windows-Rechner/.test(v));

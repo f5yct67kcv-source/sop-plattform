@@ -209,7 +209,7 @@ check('Auch die Mitarbeitenden markieren die Gruppe',
   await page.evaluate(() => document.getElementById('nav-admin-mitarbeiter').classList.contains('on')
     && document.getElementById('navg-admin').classList.contains('offen')));
 check('Die Mitarbeiterliste funktioniert unveraendert', await page.isVisible('#view-mitarbeiter.on'));
-await page.evaluate(() => go('betrieb'));
+await page.evaluate(() => { go('betrieb'); bkAbschnittZeigen('an'); });
 await page.waitForTimeout(500);
 const anTxt = await page.textContent('#view-betrieb');
 check('Er sagt, dass es hoechstens zwei Orte gibt', /höchstens.{0,10}zwei/i.test(anTxt));
@@ -229,9 +229,9 @@ check('KRITISCH: der Satz steht in gav.js, nicht doppelt im Dashboard',
   /GAV_WEGSTRECKE_HINWEIS/.test(gavQ)
   && (dashQ.match(/nicht die schnellste/g) || []).length === 0);
 
-check('KRITISCH: der GAV-Hinweis im Betriebsbereich ist sichtbar',
+check('KRITISCH: der GAV-Hinweis bei den Anstellungsorten ist sichtbar',
   await page.evaluate(() => {
-    const e = document.querySelector('#view-betrieb .ki-hint');
+    const e = document.querySelector('#anKarte .ki-hint');
     return !!e && getComputedStyle(e).display !== 'none' && e.getClientRects().length > 0;
   }));
 
