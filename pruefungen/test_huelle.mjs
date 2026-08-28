@@ -335,9 +335,9 @@ try {
   ts = await mass(p, '#topSub');
   const namen = await p.evaluate(() => [...document.querySelectorAll('#topSub button')].map(b => b.textContent));
   check('KRITISCH: kompakt erscheinen die Unterkategorien oben', ts.display === 'flex');
-  // Seit ENT-181 sind es vier: Offerten kam dazu.
+  // Seit ENT-181 sind es fuenf: Offerten, dann Rechnungen (Grundgeruest) kamen dazu.
   check('KRITISCH: mit den richtigen Namen',
-    JSON.stringify(namen) === JSON.stringify(['Adressen', 'Objekte', 'Rapporte', 'Offerten']));
+    JSON.stringify(namen) === JSON.stringify(['Adressen', 'Objekte', 'Rapporte', 'Offerten', 'Rechnungen']));
   const markiert = await p.evaluate(() => {
     const b = document.querySelector('#topSub button.on'); return b ? b.textContent : null; });
   check('Die aktuelle ist hervorgehoben', markiert === 'Adressen');
@@ -379,9 +379,9 @@ try {
   };
   const mKunden = await mitteVon(() => go('kunden'));
   const mAdmin  = await mitteVon(() => go('mitarbeiter'));
-  check('Bei den Kunden stehen vier Unterkategorien (ENT-181)', mKunden.anzahl === 4);
+  check('Bei den Kunden stehen fuenf Unterkategorien (ENT-181)', mKunden.anzahl === 5);
   check('Bei der Administration drei (ENT-181)', mAdmin.anzahl === 3);
-  check('KRITISCH: vier Unterkategorien stehen in der Fenstermitte',
+  check('KRITISCH: fuenf Unterkategorien stehen in der Fenstermitte',
     Math.abs(mKunden.mitte - 800) <= 4);
   check('KRITISCH: drei ebenfalls -- die Zahl aendert die Mitte nicht',
     Math.abs(mAdmin.mitte - 800) <= 4);
