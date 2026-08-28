@@ -125,6 +125,26 @@ await page.route('**/api/**', route => {
   if (p.includes('mitarbeiter_list')) return send({ status: 'ok', mitarbeiter: MA });
   if (p.includes('kunden_list')) return send({ status: 'ok', kunden: KU });
   if (p.includes('einsatz_list')) return send({ status: 'ok', einsaetze: EINSAETZE });
+  if (p.includes('einsatz_bericht')) {
+    const id = Number(req.url().split('einsatz_id=')[1] || 0);
+    const e = einsatzVon(id);
+    if (!e) return send({ status: 'error', message: 'Diesen Einsatz gibt es nicht.' });
+    const k = KU.find(x => Number(x.id) === Number(e.kunde_id));
+    const personen = RAPPORTE.filter(r => Number(r.einsatz_id) === id).map(r => {
+      const m = MA.find(x => Number(x.id) === Number(r.mitarbeiter_id));
+      return { id: r.id, name: m ? `${m.vorname} ${m.nachname}` : r.mitarbeiter,
+        von: r.von, bis: r.bis, pause_min: r.pause_min, netto_h: r.netto_h,
+        bemerkung: r.bemerkung, erfasst_am: r.erfasst_am };
+    });
+    return send({ status: 'ok', bericht: {
+      einsatz: { id: e.id, kunde_name: e.kunde_name, titel: e.titel, veranstaltung: null,
+        strasse: e.strasse, ort: e.ort, einsatzart: e.einsatzart, datum: e.datum,
+        von: e.von, bis: e.bis, bemerkung: e.bemerkung },
+      kunde: { kunde_id: e.kunde_id || null, kunde_nr: null, k_name: k ? k.name : null },
+      unterschrift: { bild: null, name: null, am: null, holte: null },
+      personen,
+    }});
+  }
   if (p.includes('einsatz_position')) {
     const id = Number((body && body.einsatz_id) || req.url().split('einsatz_id=')[1] || 0);
     const e = einsatzVon(id);
@@ -353,8 +373,8 @@ check('Das Raster erklärt den Leerzustand statt einen Knopf anzubieten',
   (await page.textContent('#epRaster')).includes('festgeschrieben')
   && !(await page.isVisible('#epRaster button')));
 
-// ══════════ RECHNUNG-PLATZHALTER NUR BEI STATUS "ABGESCHLOSSEN" (ENT-127/128)
-// Ausdruecklich noch ohne Funktion (ENT-040) -- nur der Knopf, ausgegraut.
+// ══════════ RECHNUNG-KNOPF NUR BEI STATUS "ABGESCHLOSSEN" (ENT-127/128)
+// Seit der ENT-181-Ausbaustufe eine echte Funktion (epRechnungErstellen).
 // Massgeblich ist seit ENT-128 der STATUS, nicht mehr das Kalenderdatum.
 await oeffne(71);   // MORGEN, status 'geplant'
 check('KRITISCH: kein Rechnung-Knopf bei einem kuenftigen Einsatz',
@@ -365,10 +385,10 @@ check('KRITISCH: kein Rechnung-Knopf bei einem vergangenen, aber nicht abgeschlo
 await oeffne(77);   // HEUTE, aber status 'abgeschlossen'
 check('KRITISCH: bei status "abgeschlossen" erscheint der Rechnung-Knopf, auch am selben Tag',
   (await page.textContent('#epKopf')).includes('Rechnung erstellen'));
-check('KRITISCH: er ist ausgegraut, keine echte Funktion',
+check('KRITISCH: er ist eine echte Funktion, nicht mehr ausgegraut',
   await page.evaluate(() => {
     const btn = [...document.querySelectorAll('#epKopf button')].find(b => b.textContent.includes('Rechnung erstellen'));
-    return !!btn && btn.disabled && /noch nicht verfügbar/i.test(btn.title);
+    return !!btn && !btn.disabled;
   }));
 // Am gerenderten Zustand gemessen (ENT-130, CLAUDE.md "Gestaltung"): ein
 // Knopf ohne Rahmen und ohne Hintergrund ist nicht als Knopf zu erkennen --
@@ -386,10 +406,10 @@ check('Der Knopf ist optisch als Knopf erkennbar (Rahmen oder Hintergrund), nich
     const transparent = c => c === 'transparent' || c === 'rgba(0, 0, 0, 0)';
     return !transparent(s.borderColor) || !transparent(s.backgroundColor);
   }));
-check('Und zusaetzlich sichtbar gedaempft (Opacity < 1), nicht nur per cursor',
+check('KRITISCH: und nicht mehr sichtbar gedaempft (Opacity 1) -- er hat jetzt eine Funktion',
   await page.evaluate(() => {
     const btn = [...document.querySelectorAll('#epKopf button')].find(b => b.textContent.includes('Rechnung erstellen'));
-    return !!btn && parseFloat(getComputedStyle(btn).opacity) < 1;
+    return !!btn && parseFloat(getComputedStyle(btn).opacity) === 1;
   }));
 
 // ══════════ ANORDNUNG UND FARBE DES ABSCHLUSS-BEREICHS (ENT-150)
@@ -437,11 +457,6 @@ check('KRITISCH: der Rechnungs-Knopf ist blau (--accent), wie ausdruecklich verl
     sonde.remove();
     return !!btn && getComputedStyle(btn).backgroundColor === erwartet;
   }));
-check('KRITISCH: er bleibt trotz Blau ausgegraut — er hat weiterhin keine Funktion (ENT-040/127)',
-  await page.evaluate(() => {
-    const btn = [...document.querySelectorAll('#epKopf button')].find(b => b.textContent.includes('Rechnung erstellen'));
-    return !!btn && btn.disabled && parseFloat(getComputedStyle(btn).opacity) < 1;
-  }));
 // Die beiden Rapport-Knoepfe: beide muessen als Knopf erkennbar sein (Rahmen
 // ODER Flaeche) und sich VONEINANDER unterscheiden -- vorher war einer davon
 // btn-quiet, also ganz ohne beides.
@@ -461,6 +476,34 @@ check('KRITISCH: "Direkt abgleichen" ebenfalls', !!rapKnoepfe && rapKnoepfe.d.si
 check('KRITISCH: die beiden unterscheiden sich sichtbar voneinander — sie sind nicht dieselbe Handlung',
   !!rapKnoepfe && (rapKnoepfe.a.bg !== rapKnoepfe.d.bg
     || rapKnoepfe.a.rand !== rapKnoepfe.d.rand || rapKnoepfe.a.farbe !== rapKnoepfe.d.farbe));
+
+// ══════════ DER KNOPF UEBERTRAEGT KUNDE, EINSATZART UND RAPPORT-STUNDEN ═══
+// (ENT-181-Ausbaustufe, Wunsch des Projektinhabers 28.08.2026)
+await page.click('#epKopf button:has-text("Rechnung erstellen")');
+await page.waitForTimeout(400);
+check('KRITISCH: das Formular oeffnet sich als Rechnung, nicht als Offerte',
+  (await page.textContent('#pgTitle')) === 'Rechnung');
+check('KRITISCH: der Kunde des Einsatzes wird uebernommen',
+  (await page.inputValue('#of_kunde')) === 'Stranag');
+check('KRITISCH: der Titel wird aus der Einsatzart gesetzt',
+  (await page.inputValue('#of_titel')) === 'Verkehrsdienst');
+const posZeilen = await page.$$eval('#ofPositionen .of-pos', els => els.map(el => ({
+  produkt: el.querySelector('input[id^="ofp_name"]').value,
+  menge: el.querySelector('input[id^="ofp_menge"]').value,
+  preis: el.querySelector('input[id^="ofp_preis"]').value,
+  text: el.querySelector('textarea').value,
+})));
+check('KRITISCH: es entsteht genau eine Position -- eine je Mitarbeiter-Rapport (hier: einer)',
+  posZeilen.length === 1);
+check('KRITISCH: die Menge kommt aus den Netto-Stunden des Rapports, nicht aus dem Plan',
+  posZeilen[0] && posZeilen[0].menge === '7.5');
+check('KRITISCH: der Preis bleibt leer -- kein erfundener, ungeprueften Produktabgleich',
+  posZeilen[0] && (posZeilen[0].preis === '0.00' || posZeilen[0].preis === '0'));
+check('Die Beschreibung nennt Datum, Zeit und Person',
+  posZeilen[0] && /07:00.*15:00.*Daniele Ciardo/.test(posZeilen[0].text));
+// Zurueck zum Einsatzplan -- die folgenden Pruefungen brauchen wieder #epKopf
+// von Einsatz 77.
+await oeffne(77);
 
 // ══════════ RAPPORT-ÜBERSICHT AM ABGESCHLOSSENEN EINSATZ (ENT-128)
 const kopf77 = await page.textContent('#epKopf');
