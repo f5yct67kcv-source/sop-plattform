@@ -3618,6 +3618,23 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
         </div>
       </section>
 
+      <!-- ══════════════════ OBJEKT-DETAIL (ENT-200) ══════════════════
+           Eigene Ansicht statt Schublade: Masterschichten und Kontrollpunkte
+           (ENT-186) sind Listen unbestimmter Laenge, dieselbe Entscheidung
+           wie beim Einsatzplan (ENT-150) und der Offerte (ENT-181). -->
+      <section class="view" id="view-objekt">
+        <div class="ku-detail-hd">
+          <button class="ku-zurueck" onclick="go('kunden'); kuGoTab('objekte')" aria-label="Zurück zur Objektliste">
+            <svg class="i" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <div style="flex:1">
+            <h2 id="obDetName">–</h2>
+            <div class="sub" id="obDetSub">–</div>
+          </div>
+        </div>
+        <div id="obDetBody"></div>
+      </section>
+
       <!-- ══════════════════════════ PENSEN ══════════════════════════
            Jahresstunden je Person gegen die Grenze ihrer Anstellungs-
            kategorie (ENT-065, Art. 8 GAV). Die Seite visualisiert, was
@@ -5525,7 +5542,8 @@ const TITLES = {
   rundgaenge:  ['Rundgänge', 'Laufende und abgeschlossene Kontrollgänge'],
   masterschichten: ['Masterschichten', 'Vorlagen, aus denen die Schichten entstehen'],
   einsatzneu:  ['Neuer Einsatz', 'Kunde, Ort, Zeit und Zuteilung'],
-  einsatzplan: ['Einsatz planen', 'Positionen und Zeiten im Detail']
+  einsatzplan: ['Einsatz planen', 'Positionen und Zeiten im Detail'],
+  objekt:      ['Objekt', 'Stammdaten, Masterschichten und Kontrollpunkte']
 };
 
 // Monatsraster brauchen die volle Fensterbreite, alles andere bleibt auf
@@ -6219,7 +6237,10 @@ function themaUm() {
 // plus die Beschreibung darunter -- auf Lesebreite gedraengt wuerde jedes
 // Zahlenfeld zu schmal, um seinen Inhalt zu zeigen. 'produkte' bleibt
 // draussen: eine sechsspaltige Liste braucht die Extrabreite nicht.
-const ANSICHT_WEIT   = ['uebersicht', 'planung', 'abgleich', 'pensen', 'auslagen', 'rundgaenge', 'einsatzplan', 'masterschichten', 'einsatzneu', 'offerte'];
+// 'objekt' seit ENT-200: eigene Ansicht statt Schublade, aus demselben Grund
+// wie 'offerte' -- Masterschichten und Kontrollpunkte (ENT-186) sind
+// Listen unbestimmter Laenge, keine 440px-Schublade haelt das auf Dauer.
+const ANSICHT_WEIT   = ['uebersicht', 'planung', 'abgleich', 'pensen', 'auslagen', 'rundgaenge', 'einsatzplan', 'masterschichten', 'einsatzneu', 'offerte', 'objekt'];
 const PLANUNG_WEIT   = ['uebersicht', 'einsaetze', 'objektplan', 'tag'];
 
 function weiteAnsicht(an) {
@@ -11876,28 +11897,34 @@ function obDistanzenSpeichern(objektId) {
   })).catch(() => {});
 }
 
-// ── Schublade: Objekt mit seinen Masterschichten
+// ── Objekt-Detailseite mit seinen Masterschichten (ENT-200)
 function openObjekt(id) {
   const o = objekte.find(x => Number(x.id) === Number(id));
-  if (!o) { toast('Objekt nicht gefunden — bitte aktualisieren.'); return; }
-  drawerId = null; enTarget = null;
+  if (!o) { toast('Objekt nicht gefunden — bitte aktualisieren.'); go('kunden'); kuGoTab('objekte'); return; }
   obTarget = Number(id);
+  go('objekt');
+  // Die id gehoert in die Adresse (gleiches Muster wie Einsatzplan, ENT-152):
+  // go() schreibt nur "#objekt", ein Neuladen wuesste sonst nicht, welches.
+  history.replaceState(null, '', '#objekt/' + obTarget);
 
-  $('drTitle').textContent = o.name;
-  $('drBody').innerHTML = `
-    <dl class="dl">
-      <dt>Kunde</dt><dd>${esc(o.kunde_name)}</dd>
-      <dt>Adresse</dt><dd>${o.strasse ? esc(o.strasse) + ', ' : ''}${esc(o.ort)}</dd>
-      <dt>Kanton</dt><dd>${esc(o.kanton)} <span style="color:var(--ink-3);font-weight:400">— bestimmt die Feiertage</span></dd>
-      <dt>Einsatzart</dt><dd>${esc(o.einsatzart)}</dd>
-      <dt>Sparte</dt><dd>${esc(SPARTE_NAME[sparteVon(o)])}</dd>
-      <dt>Zustand</dt><dd>${o.aktiv ? 'in Betrieb' : 'stillgelegt'}</dd>
-      ${o.bemerkung ? `<dt>Bemerkung</dt><dd>${esc(o.bemerkung)}</dd>` : ''}
-    </dl>
-    <div style="display:flex;gap:8px;margin-top:14px">
-      <button class="btn btn-plain btn-sm" onclick="openObjektNeu(objekte.find(x=>Number(x.id)===${Number(id)}))">Stammdaten ändern</button>
-      <button class="btn btn-plain btn-sm" onclick="openVorschau(${Number(id)})">Schichten erzeugen …</button>
-    </div>
+  $('obDetName').textContent = o.name;
+  $('obDetSub').textContent = o.kunde_name + (o.aktiv ? '' : ' · stillgelegt');
+  $('pgCrumb').textContent = o.kunde_name;
+  $('obDetBody').innerHTML = `
+    <div class="card"><div class="card-bd">
+      <dl class="dl">
+        <dt>Adresse</dt><dd>${o.strasse ? esc(o.strasse) + ', ' : ''}${esc(o.ort)}</dd>
+        <dt>Kanton</dt><dd>${esc(o.kanton)} <span style="color:var(--ink-3);font-weight:400">— bestimmt die Feiertage</span></dd>
+        <dt>Einsatzart</dt><dd>${esc(o.einsatzart)}</dd>
+        <dt>Sparte</dt><dd>${esc(SPARTE_NAME[sparteVon(o)])}</dd>
+        <dt>Zustand</dt><dd>${o.aktiv ? 'in Betrieb' : 'stillgelegt'}</dd>
+        ${o.bemerkung ? `<dt>Bemerkung</dt><dd>${esc(o.bemerkung)}</dd>` : ''}
+      </dl>
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button class="btn btn-plain btn-sm" onclick="openObjektNeu(objekte.find(x=>Number(x.id)===${Number(id)}))">Stammdaten ändern</button>
+        <button class="btn btn-plain btn-sm" onclick="openVorschau(${Number(id)})">Schichten erzeugen …</button>
+      </div>
+    </div></div>
 
     <div class="zone" style="margin-top:20px">
       <div class="zone-hd">Masterschichten</div>
@@ -11924,11 +11951,9 @@ function openObjekt(id) {
       <div class="zone-note">Sind bereits Schichten daraus entstanden, wird das Objekt nur stillgelegt — geplante und vergangene Einsätze bleiben unverändert erhalten.</div>
       <button class="btn btn-danger btn-sm" onclick="askDeleteObjekt()">Entfernen</button>
     </div>`;
-  $('drFoot').innerHTML = `<button class="btn btn-plain" onclick="closeDrawer()">Schliessen</button>`;
   msAlle = false;
   loadMasterschichten();
   if (darf('rundgang_verwalten')) { loadKontrollpunkte(); }
-  showDrawer();
 }
 
 function msAlleUm() { msAlle = !msAlle; loadMasterschichten(); }
@@ -12037,7 +12062,7 @@ function askDeleteObjekt() {
     'Entfernen',
     () => api('objekt_delete.php', { method: 'POST', body: { id } }).then(({ ok, data }) => {
       if (!ok || data.status !== 'ok') { toast(data.message || 'Fehlgeschlagen.'); return; }
-      closeDrawer();
+      go('kunden'); kuGoTab('objekte');
       loadObjekte().then(() => toast(data.art === 'deaktiviert'
         ? `Objekt stillgelegt — ${nf(data.einsaetze)} Einsätze bleiben erhalten.`
         : 'Objekt gelöscht.'));
@@ -17189,6 +17214,12 @@ if (token && me) {
     (einsaetze.length ? Promise.resolve() : loadEinsaetze())
       .then(() => epAuf(Number(param)))
       .catch(() => go('planung'));
+  } else if (v === 'objekt' && param) {
+    // Gleiches Muster wie beim Einsatzplan (ENT-152/ENT-200): ohne die id in
+    // der Adresse waere ein Neuladen aus der Objekt-Detailseite geworfen.
+    (objekte.length ? Promise.resolve() : loadObjekte())
+      .then(() => openObjekt(Number(param)))
+      .catch(() => { go('kunden'); kuGoTab('objekte'); });
   } else if (TITLES[v]) {
     go(v);
   }

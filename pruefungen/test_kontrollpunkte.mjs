@@ -79,7 +79,7 @@ const zurObjekt = async () => {
   await page.waitForTimeout(150);
   calls = [];
   await page.click('#oTable tbody tr:first-child');
-  await page.waitForSelector('#drawer.on');
+  await page.waitForSelector('#view-objekt.on');
   await page.waitForTimeout(300);
 };
 
@@ -89,7 +89,7 @@ await anmelden();
 await zurObjekt();
 
 check('Kontrollpunkte geladen', calls.some(c => c.path.includes('kontrollpunkt_liste')));
-check('Oeffnen der Schublade schreibt nichts', writes().length === 0);
+check('Oeffnen der Objekt-Detailseite schreibt nichts', writes().length === 0);
 check('Alle drei Kontrollpunkte stehen da', (await page.$$('#kpListe .kp-zeile')).length === 3);
 const kpText = await page.textContent('#kpListe');
 check('NFC-Chip wird angezeigt', kpText.includes('AB12'));
@@ -157,7 +157,7 @@ await page.waitForTimeout(300);
 const geloescht = calls.find(c => c.path.includes('kontrollpunkt_loeschen'));
 check('Loeschen sendet die richtige id', geloescht && geloescht.body.id === 1);
 
-await page.evaluate(() => closeDrawer());
+await page.click('#view-objekt .ku-zurueck');
 await page.waitForTimeout(200);
 
 // ══════════ OHNE DAS RECHT: DIE ZONE ERSCHEINT GAR NICHT (ENT-169)

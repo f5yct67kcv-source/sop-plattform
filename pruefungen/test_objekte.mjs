@@ -252,19 +252,21 @@ check('Objekt wird gespeichert', os && os.body.name === 'Testobjekt');
 check('Bekannter Kunde wird verknuepft', os && os.body.kunde_id === 1);
 check('Kanton wird mitgesendet', os && os.body.kanton === 'SO');
 // Nach dem Anlegen geht es direkt weiter zu den Masterschichten -- ohne
-// Vorlage entstuende an dem Objekt nie eine Schicht.
-await page.waitForSelector('#drawer.on');
-check('Neues Objekt oeffnet sich gleich', await page.isVisible('#drawer.on'));
+// Vorlage entstuende an dem Objekt nie eine Schicht. Seit ENT-200 eine
+// eigene Ansicht statt einer Schublade.
+await page.waitForSelector('#view-objekt.on');
+check('Neues Objekt oeffnet sich gleich', await page.isVisible('#view-objekt.on'));
+check('Adresse traegt die Objekt-id (ENT-200, wie der Einsatzplan)', (await page.evaluate(() => location.hash)).startsWith('#objekt/'));
 await page.waitForTimeout(600);              // alle Nachladevorgaenge abwarten
-await page.evaluate(() => closeDrawer());
+await page.click('#view-objekt .ku-zurueck');
 await page.waitForTimeout(300);
 
-// ══════════ SCHUBLADE MIT MASTERSCHICHTEN
+// ══════════ OBJEKT-DETAILSEITE MIT MASTERSCHICHTEN
 calls = [];
 await page.click('#oTable tbody tr:first-child');
-await page.waitForSelector('#drawer.on');
+await page.waitForSelector('#view-objekt.on');
 await page.waitForTimeout(400);
-check('Objekt-Schublade zeigt den Kanton-Hinweis', (await page.textContent('#drBody')).includes('bestimmt die Feiertage'));
+check('Objekt-Detailseite zeigt den Kanton-Hinweis', (await page.textContent('#obDetBody')).includes('bestimmt die Feiertage'));
 check('Masterschichten geladen', (await page.$$('#msListe .ms-zeile')).length === 2);
 const msText = await page.textContent('#msListe');
 check('Wochenmuster wird gezeigt', msText.includes('Mo 1') && msText.includes('Fei 2'));
@@ -359,7 +361,7 @@ check('Neu sendet keine id', neuMs && !('id' in neuMs.body));
 // ══════════ VORSCHAU VOR DEM MASSENBEFEHL
 await page.waitForTimeout(300);
 calls = [];
-await page.click('#drBody button:has-text("Schichten erzeugen")');
+await page.click('#obDetBody button:has-text("Schichten erzeugen")');
 await page.waitForSelector('#dlgVorschau.on');
 await page.waitForTimeout(500);
 check('Vorschau ruft den Vorschau-Endpunkt', calls.some(c => c.path.includes('schichten_vorschau')));
@@ -387,8 +389,8 @@ check('Vorschau schliesst nach dem Erzeugen', !(await page.isVisible('#dlgVorsch
 
 // ══════════ FEIERTAGE
 await page.waitForTimeout(300);
-check('Objekt-Schublade bleibt nach dem Erzeugen offen', await page.isVisible('#drawer.on'));
-await page.evaluate(() => closeDrawer());
+check('Objekt-Detailseite bleibt nach dem Erzeugen offen', await page.isVisible('#view-objekt.on'));
+await page.click('#view-objekt .ku-zurueck');
 await page.waitForTimeout(300);
 // Feiertage haengen an der Planung, nicht an Kunden -- zurueck navigieren.
 await page.click('#nav-planung');
