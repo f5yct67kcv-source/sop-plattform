@@ -266,7 +266,17 @@ calls = [];
 await page.click('#oTable tbody tr:first-child');
 await page.waitForSelector('#view-objekt.on');
 await page.waitForTimeout(400);
-check('Objekt-Detailseite zeigt den Kanton-Hinweis', (await page.textContent('#obDetBody')).includes('bestimmt die Feiertage'));
+check('Objekt-Detailseite zeigt den Kanton-Hinweis', (await page.textContent('#ob-uebersicht')).includes('bestimmt die Feiertage'));
+
+// Reiter statt einer langen Seite (Wunsch des Projektinhabers, 2026-08-28):
+// beim Oeffnen ist immer die Uebersicht aktiv, die anderen unsichtbar.
+check('Uebersicht ist beim Oeffnen aktiv', await page.isVisible('#ob-uebersicht'));
+check('Masterschichten sind zunaechst unsichtbar', !(await page.isVisible('#ob-masterschichten')));
+check('Kontrollpunkte sind zunaechst unsichtbar', !(await page.isVisible('#ob-kontrollpunkte')));
+await page.click('#obtab-masterschichten');
+await page.waitForTimeout(150);
+check('Wechsel zeigt Masterschichten', await page.isVisible('#ob-masterschichten'));
+check('Wechsel verbirgt die Uebersicht wieder', !(await page.isVisible('#ob-uebersicht')));
 check('Masterschichten geladen', (await page.$$('#msListe .ms-zeile')).length === 2);
 const msText = await page.textContent('#msListe');
 check('Wochenmuster wird gezeigt', msText.includes('Mo 1') && msText.includes('Fei 2'));
@@ -297,7 +307,7 @@ const patrouilleInTabelle = await page.evaluate(() =>
 check('Intervall-Vorlage steht nicht in der Wochentabelle', !patrouilleInTabelle);
 check('Intervall-Vorlage wird stattdessen im Hinweis genannt',
   bedarfText.includes('Patrouille Sommer') && bedarfText.includes('keinem Wochenrhythmus'));
-check('CSV-Export ist auf der Objekt-Detailseite erreichbar', await page.isVisible('#obDetBody button:has-text("CSV")'));
+check('CSV-Export ist auf der Objekt-Detailseite erreichbar', await page.isVisible('#ob-masterschichten button:has-text("CSV")'));
 
 // Ändern ab Stichtag
 await page.click('#msListe .ms-zeile:first-child button:has-text("Ändern ab")');
@@ -381,9 +391,12 @@ check('Neu sendet die Objekt-id', neuMs && neuMs.body.objekt_id === 1);
 check('Neu sendet keine id', neuMs && !('id' in neuMs.body));
 
 // ══════════ VORSCHAU VOR DEM MASSENBEFEHL
-await page.waitForTimeout(300);
+// "Schichten erzeugen" sitzt im Uebersicht-Reiter, nicht im gerade aktiven
+// Masterschichten-Reiter -- zurueckwechseln.
+await page.click('#obtab-uebersicht');
+await page.waitForTimeout(150);
 calls = [];
-await page.click('#obDetBody button:has-text("Schichten erzeugen")');
+await page.click('#ob-uebersicht button:has-text("Schichten erzeugen")');
 await page.waitForSelector('#dlgVorschau.on');
 await page.waitForTimeout(500);
 check('Vorschau ruft den Vorschau-Endpunkt', calls.some(c => c.path.includes('schichten_vorschau')));
@@ -456,6 +469,12 @@ await page.evaluate(() => { go('kunden'); kuGoTab('objekte'); });
 await page.waitForTimeout(200);
 await page.click('#oTable tbody tr:first-child');
 await page.waitForTimeout(400);
+// Bedarfstabelle sitzt im Masterschichten-Reiter, nicht im vorbelegten
+// Uebersicht-Reiter -- ohne den Wechsel waere die Box unsichtbar
+// (display:none) und getBoundingClientRect() haette unten nur Nullen
+// verglichen, die Probe also unbeabsichtigt immer bestanden.
+await page.click('#obtab-masterschichten');
+await page.waitForTimeout(200);
 const scrollXObjekt = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 check('Kein Seiten-Scroll auf 390px trotz Wochentag-Bedarfstabelle', scrollXObjekt <= 1);
 // Die eigentliche Gefahr ist nicht Seiten-Scroll, sondern unsichtbares
