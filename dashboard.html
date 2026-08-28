@@ -11882,7 +11882,7 @@ function zeichneRundgaenge() {
 
   $('rgListe').innerHTML = zeilen.map(r => {
     const st = RUNDGANG_STATUS[r.status] || ['Unbekannt', 'chip-n'];
-    const f = r.fortschritt || { gesamt: 0, bestaetigt: 0, nicht_verfuegbar: 0 };
+    const f = r.fortschritt || { gesamt: 0, bestaetigt: 0, nicht_verfuegbar: 0, ersatzscan: 0 };
     const name = [r.vorname, r.nachname].filter(Boolean).join(' ') || '–';
     const start = r.rohzeit_start ? String(r.rohzeit_start).slice(11, 16) : null;
     const ende = r.rohzeit_ende ? String(r.rohzeit_ende).slice(11, 16) : null;
@@ -11893,7 +11893,7 @@ function zeichneRundgaenge() {
         <span class="chip ${st[1]}">${esc(st[0])}</span>
       </div>
       <div class="sub">${esc(dmy(r.datum))} · ${esc(r.kunde_name)} · ${esc(name)}</div>
-      <div class="sub">${nf(f.bestaetigt)} bestätigt, ${nf(f.nicht_verfuegbar)} nicht verfügbar von ${nf(f.gesamt)}
+      <div class="sub">${nf(f.bestaetigt)} bestätigt, ${nf(f.nicht_verfuegbar)} nicht verfügbar${Number(f.ersatzscan) ? `, ${nf(f.ersatzscan)} Ersatzscan${Number(f.ersatzscan) === 1 ? '' : 's'}` : ''} von ${nf(f.gesamt)}
         ${start ? `· Rohzeit ${esc(start)}${ende ? '–' + esc(ende) : laeuftNoch ? ' – läuft noch' : ''}` : '· Rohzeit noch nicht gestartet'}
         ${Number(r.pause_minuten) > 0 ? `· ${nf(r.pause_minuten)} Min. pausiert` : ''}</div>
       ${r.status === 'abgebrochen' ? `<div class="sub">${esc(RUNDGANG_ABBRUCH_GRUENDE[r.abbruch_grund] || 'Abgebrochen')}${r.abbruch_freitext ? ' — ' + esc(r.abbruch_freitext) : ''}</div>` : ''}

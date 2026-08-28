@@ -301,6 +301,8 @@ svg.i-sm { width: 17px; height: 17px; }
 .rd-haken { flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--pos-soft);
   color: var(--pos); display: flex; align-items: center; justify-content: center; font-weight: 700; }
 .rd-haken-nv { background: var(--warn-soft); color: var(--warn); }
+.rd-haken-es { background: var(--accent-soft); color: var(--accent); font-size: 13px; }
+.rd-es-vorschau { max-width: 140px; border-radius: 8px; align-self: flex-start; }
 .rd-hinweis { font-size: 12.5px; color: var(--ink-3); margin: 8px 0 0 37px; }
 .rd-akt { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 0 37px; }
 .rd-nv { margin: 10px 0 0 37px; display: flex; flex-direction: column; gap: 8px; }
@@ -579,6 +581,11 @@ const W = {
     rundgangAbgebrochen: 'Abgebrochen',
     rundgangVorlageWahlTitel: 'Kontrollrunde wählen',
     rundgangVorlageWahlHinweis: 'Für dieses Objekt gibt es mehrere Kontrollrunden. Welche machst du jetzt?',
+    kpErsatzscan: 'Ersatzscan',
+    kpEsFotoAufnehmen: 'Foto aufnehmen',
+    kpEsMelden: 'Ersatzscan melden',
+    kpEsFotoPflicht: 'Foto erforderlich',
+    kpEsFotoFehler: 'Foto liess sich nicht verarbeiten.',
 };
 const w = k => W[k] || k;
 
@@ -1721,16 +1728,20 @@ function rdZeile(k, nr, gesperrt) {
   const typLabel = k.typ === 'nfc' ? w('kpTypNfc') : w('kpTypGeofence');
   if (k.erledigt) {
     const istNv = k.erledigt.status === 'nicht_verfuegbar';
+    const istEs = k.erledigt.status === 'ersatzscan';
     const zeit = String(k.erledigt.erfasst_am || '').slice(11, 16);
+    const statusTxt = istNv ? w('kpNichtVerfuegbar') : istEs ? w('kpErsatzscan') : w('kpBestaetigt') + ' ' + zeit;
+    const hakenKlasse = istNv ? 'rd-haken-nv' : istEs ? 'rd-haken-es' : '';
+    const hakenZeichen = istNv ? '!' : istEs ? '📷' : '✓';
     return `<div class="rd-zeile rd-fertig">
       <div class="rd-kopf">
         <span class="rd-nr">${nr}</span>
         <div class="rd-txt">
           <div class="rd-bez">${esc(k.bezeichnung)}</div>
-          <div class="rd-meta">${esc(typLabel)} · ${istNv ? esc(w('kpNichtVerfuegbar')) : esc(w('kpBestaetigt')) + ' ' + esc(zeit)}${k.wartend ? ' · ' + esc(w('kpWirdGesendet')) : ''}</div>
+          <div class="rd-meta">${esc(typLabel)} · ${esc(statusTxt)}${k.wartend ? ' · ' + esc(w('kpWirdGesendet')) : ''}</div>
         </div>
       </div>
-      <span class="rd-haken ${istNv ? 'rd-haken-nv' : ''}">${istNv ? '!' : '✓'}</span>
+      <span class="rd-haken ${hakenKlasse}">${hakenZeichen}</span>
     </div>`;
   }
   // NFC ist auf diesem Geraet ehrlich als nicht verfuegbar ausgewiesen, statt
@@ -1751,7 +1762,15 @@ function rdZeile(k, nr, gesperrt) {
     ${gesperrt ? '' : `
     <div class="rd-akt">
       ${kannScannen ? `<button class="btn btn-primary" id="rdBtn${k.id}" onclick="rdBestaetigen(${k.id})">${esc(w('kpBestaetigen'))}</button>` : ''}
+      <button class="btn btn-plain" onclick="rdEsUm(${k.id})">${esc(w('kpErsatzscan'))}</button>
       <button class="btn btn-plain" onclick="rdNvUm(${k.id})">${esc(w('kpNichtVerfuegbar'))}</button>
+    </div>
+    <div class="rd-nv" id="rdEs${k.id}" style="display:none">
+      <input type="file" accept="image/*" capture="environment" id="rdEsInput${k.id}" onchange="rdEsFotoGewaehlt(${k.id})" style="display:none">
+      <button class="btn btn-plain" onclick="document.getElementById('rdEsInput${k.id}').click()">${esc(w('kpEsFotoAufnehmen'))}</button>
+      <img class="rd-es-vorschau" id="rdEsVorschau${k.id}" style="display:none" alt="">
+      <textarea class="inp" id="rdEsText${k.id}" rows="2" placeholder="${esc(w('kpBeschreibungPflicht'))}"></textarea>
+      <button class="btn btn-neg" onclick="rdEsSenden(${k.id})">${esc(w('kpEsMelden'))}</button>
     </div>
     <div class="rd-nv" id="rdNv${k.id}" style="display:none">
       <textarea class="inp" id="rdNvText${k.id}" rows="2" placeholder="${esc(w('kpBeschreibungPflicht'))}"></textarea>
@@ -1796,7 +1815,7 @@ function rdNvSenden(kontrollpunktId) {
   rdScanEintragen(k, 'nicht_verfuegbar', {}, text);
 }
 
-function rdScanEintragen(k, status, ort, beschreibung) {
+function rdScanEintragen(k, status, ort, beschreibung, foto) {
   const erfasst_am = jetztDatetime();
   k.fehler = null;
   k.erledigt = { status, erfasst_am, beschreibung: beschreibung || null };
@@ -1805,9 +1824,75 @@ function rdScanEintragen(k, status, ort, beschreibung) {
     rundgang_id: rundgangAktiv.id, kontrollpunkt_id: k.id, status, erfasst_am,
     lat: (ort && ort.lat != null) ? ort.lat : null, lng: (ort && ort.lng != null) ? ort.lng : null,
     beschreibung: beschreibung || null,
+    foto: foto || null,
   });
   rundgangListeZeichnen();
   rdWarteschlangeSenden();
+}
+
+// ── Ersatzscan (Q-22 in sop-projekt): Fotobeleg statt technischer Pruefung,
+// wenn NFC/Geofence nicht moeglich ist (Chip zerstoert, Punkt nicht
+// auffindbar). Weder NFC- noch Geofence-Verifikation, dafuer Foto UND
+// Begruendung zwingend -- sonst waere ein Ersatzscan ein unbelegter Klick.
+// Startet bewusst NICHT die Rohzeit (Projektinhaber-Entscheid 2026-08-28,
+// gleiche Begruendung wie bei "nicht verfuegbar" in ENT-145): ein Foto ist
+// kein technischer Vor-Ort-Nachweis wie NFC/Geofence.
+const rdEsFotos = {};   // Kontrollpunkt-Id -> komprimiertes Foto (data: URL), bis "Melden" gedrueckt wird
+
+function rdEsUm(kontrollpunktId) {
+  const el = $('rdEs' + kontrollpunktId);
+  if (el) { el.style.display = el.style.display === 'none' ? '' : 'none'; }
+}
+
+// Verkleinert das Kamerafoto vor dem Versand: ein unkomprimiertes Handyfoto
+// (haeufig mehrere MB) wuerde sowohl das Server-Limit als auch den Platz der
+// Offline-Warteschlange (localStorage) sprengen. Ein Fotobeleg fuer "war ich
+// vor Ort" braucht keine Druckaufloesung -- 1280px Kantenlaenge und JPEG-
+// Qualitaet 0.7 ergeben typischerweise 100-400 KB.
+function rdEsKomprimieren(datei) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('lesen fehlgeschlagen'));
+    reader.onload = () => {
+      const bild = new Image();
+      bild.onerror = () => reject(new Error('dekodieren fehlgeschlagen'));
+      bild.onload = () => {
+        const MAX_KANTE = 1280;
+        const skala = Math.min(1, MAX_KANTE / Math.max(bild.width, bild.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(bild.width * skala);
+        canvas.height = Math.round(bild.height * skala);
+        canvas.getContext('2d').drawImage(bild, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.7));
+      };
+      bild.src = reader.result;
+    };
+    reader.readAsDataURL(datei);
+  });
+}
+
+function rdEsFotoGewaehlt(kontrollpunktId) {
+  const input = $('rdEsInput' + kontrollpunktId);
+  const datei = input && input.files && input.files[0];
+  if (!datei) return;
+  rdEsKomprimieren(datei).then(dataUrl => {
+    rdEsFotos[kontrollpunktId] = dataUrl;
+    const vorschau = $('rdEsVorschau' + kontrollpunktId);
+    if (vorschau) { vorschau.src = dataUrl; vorschau.style.display = ''; }
+  }).catch(() => rdZeigeFehler(kontrollpunktId, w('kpEsFotoFehler')));
+}
+
+function rdEsSenden(kontrollpunktId) {
+  const k = rundgangAktiv.kontrollpunkte.find(x => Number(x.id) === kontrollpunktId);
+  if (!k) return;
+  const dataUrl = rdEsFotos[kontrollpunktId];
+  if (!dataUrl) { rdZeigeFehler(kontrollpunktId, w('kpEsFotoPflicht')); return; }
+  const feld = $('rdEsText' + kontrollpunktId);
+  const text = feld ? feld.value.trim() : '';
+  if (!text) { rdZeigeFehler(kontrollpunktId, w('kpBeschreibungPflicht')); return; }
+  const foto = dataUrl.slice(dataUrl.indexOf(',') + 1);   // "data:image/jpeg;base64," abtrennen
+  delete rdEsFotos[kontrollpunktId];
+  rdScanEintragen(k, 'ersatzscan', {}, text, foto);
 }
 
 // ── Pausieren/Abbrechen (ENT-146) ────────────────────────────────────

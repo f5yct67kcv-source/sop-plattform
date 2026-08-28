@@ -20,9 +20,9 @@ function geo_distanz_meter(float $lat1, float $lng1, float $lat2, float $lng2): 
 
 // Welche Kontrollpunkte eines Objekts sind in diesem Rundgang noch offen?
 // "Offen" heisst: aktiv UND noch kein rundgang_scan-Eintrag dafuer (ENT-145:
-// ein Punkt verschwindet aus der Restliste, sobald er bestaetigt ODER als
-// nicht verfuegbar gemeldet wurde -- beides ist "erledigt", nicht nur die
-// Bestaetigung).
+// ein Punkt verschwindet aus der Restliste, sobald er bestaetigt, als nicht
+// verfuegbar gemeldet ODER per Ersatzscan bestaetigt wurde -- alle drei sind
+// "erledigt", nicht nur die reguläre Bestaetigung).
 //
 // $vorlageId (ENT-204): null bedeutet "keine Kontrollrunde gewaehlt" -- dann
 // unveraendertes Verhalten von vor ENT-204 (alle aktiven Punkte des
@@ -126,12 +126,28 @@ function rundgang_fortschritt(PDO $pdo, int $rundgangId, int $objektId, ?int $vo
 
     $s = $pdo->prepare('SELECT status, COUNT(*) AS n FROM rundgang_scan WHERE rundgang_id = ? GROUP BY status');
     $s->execute([$rundgangId]);
-    $bestaetigt = 0; $nichtVerfuegbar = 0;
+    $bestaetigt = 0; $nichtVerfuegbar = 0; $ersatzscan = 0;
     foreach ($s->fetchAll(PDO::FETCH_ASSOC) as $z) {
         if ($z['status'] === 'bestaetigt') { $bestaetigt = (int)$z['n']; }
         if ($z['status'] === 'nicht_verfuegbar') { $nichtVerfuegbar = (int)$z['n']; }
+        // Ersatzscan (Q-22): zaehlt separat, nicht einfach zu "bestaetigt"
+        // dazu -- sonst waere ein Foto-Beleg von einem echten NFC-/Geofence-
+        // Scan nicht mehr unterscheidbar (Einheiten nie vermischen).
+        if ($z['status'] === 'ersatzscan') { $ersatzscan = (int)$z['n']; }
     }
-    return ['gesamt' => $gesamt, 'bestaetigt' => $bestaetigt, 'nicht_verfuegbar' => $nichtVerfuegbar];
+    return ['gesamt' => $gesamt, 'bestaetigt' => $bestaetigt, 'nicht_verfuegbar' => $nichtVerfuegbar,
+            'ersatzscan' => $ersatzscan];
+}
+
+// Erkennt JPEG/PNG anhand der Magic Bytes, nicht anhand einer vom Client
+// gemeldeten Endung oder eines MIME-Typs -- beides laesst sich frei setzen
+// (gleiches Prinzip wie bei einsatz_dokument.php, dort fuer PDF). Gibt den
+// tatsaechlichen MIME-Typ zurueck, oder null wenn keins von beiden passt.
+function ersatzscan_foto_mime(string $roh): ?string
+{
+    if (str_starts_with($roh, "\xFF\xD8\xFF")) { return 'image/jpeg'; }
+    if (str_starts_with($roh, "\x89PNG\r\n\x1a\n")) { return 'image/png'; }
+    return null;
 }
 
 // Ersetzt die komplette Punktzuordnung einer Kontrollrunden-Vorlage in einem
