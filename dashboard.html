@@ -5334,6 +5334,12 @@ let oplNurTeil = false;// nur eingeteilte Personen zeigen
 let oplZelleZiel = null;   // { msId, datum } des offenen Zuteilungsdialogs
 let sperren = {};      // "mitarbeiterId|datum" -> Bemerkung (ENT-028)
 let pTab = 'uebersicht';
+// Nur beim allerersten Aufruf der Planung greift die Voreinstellung (ENT-222)
+// -- serieZeigen() ruft go('planung') auch intern auf, um "ohne die uebrigen
+// Filter" in die isolierte Reihenansicht zu wechseln; ohne diese Sperre wuerde
+// dieser interne Sprung faelschlich einen bereits geleerten Zeitraum (z. B.
+// nach "Alle") wieder auf "Diese Woche" zuruecksetzen.
+let pStandardGesetzt = false;
 let kuTab = 'uebersicht';   // Kunden: Übersicht, Objekte oder Detail (ENT-039/040)
 let kuArchivTab = 'alle';   // Kundenliste: aktive oder archivierte Kunden (ENT-040)
 let kuSortFeld = 'kundennummer';
@@ -6555,9 +6561,18 @@ function go(view) {
       $('mxVon').value = mxMonatsErster(m);
       $('mxBis').value = mxMonatsLetzter(m);
     }
-    // Voreinstellung "ab heute, offenes Ende" -- kein Preset der Schnellauswahl,
-    // sondern der bisherige Ausgangspunkt der Liste: was als Nächstes ansteht.
-    if (!$('pVon').value && !$('pBis').value) { $('pVon').value = isoTag(); }
+    // Voreinstellung "Diese Woche" (Projektinhaber-Wunsch, ENT-222) -- vorher
+    // "ab heute, offenes Ende". Dasselbe Preset wie die Schnellauswahl selbst,
+    // damit sie sich beim Öffnen sofort korrekt als "Diese Woche" zeigt.
+    // NUR beim allerersten Aufruf (pStandardGesetzt): serieZeigen() ruft
+    // go('planung') auch intern auf, bewusst "ohne die uebrigen Filter" --
+    // ohne diese Sperre wuerde dieser interne Sprung einen zwischenzeitlich
+    // geleerten Zeitraum (z. B. "Alle") faelschlich wieder einengen.
+    if (!pStandardGesetzt && !$('pVon').value && !$('pBis').value) {
+      const [von, bis] = zrPreset('woche');
+      $('pVon').value = von; $('pBis').value = bis;
+    }
+    pStandardGesetzt = true;
     if (!$('tgD').value) $('tgD').value = isoTag();
     einsaetze.length ? goTab(pTab) : loadEinsaetze().then(() => goTab(pTab));
     if (!objekte.length) loadObjekte();

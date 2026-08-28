@@ -150,10 +150,21 @@ const zeilen = () => page.$$eval('#plTable tbody tr', rs => rs.map(r => ({
 })));
 let z = await zeilen();
 const dmy = d => d.split('-').reverse().join('.');
-check('Standardfilter blendet Vergangenes aus', !z.some(r => r.t.includes(dmy(FRUEHER))));
-check('Abgesagter Zukunftseinsatz bleibt sichtbar', z.some(r => r.t.includes(dmy(SPAETER))));
-check('Vier Einsaetze ab heute', z.filter(r => !r.grp).length === 4);
-check('Drei Tagesueberschriften', z.filter(r => r.grp).length === 3);
+// Voreinstellung "Diese Woche" (ENT-222, vorher "ab heute, offenes Ende") --
+// die Schnellauswahl zeigt das beim Oeffnen sofort korrekt an.
+check('KRITISCH: die Schnellauswahl steht beim Oeffnen der Planung auf "Diese Woche" (ENT-222)',
+  (await page.inputValue('#pSchnell')) === 'woche');
+check('Standardfilter (Diese Woche) blendet Vergangenes aus', !z.some(r => r.t.includes(dmy(FRUEHER))));
+// Weit in der Zukunft (20 Tage) liegt ausserhalb dieser Woche -- anders als
+// beim frueheren offenen Ende blendet der Standardfilter das jetzt aus. Dass
+// ein abgesagter Zukunftseinsatz grundsaetzlich nicht verschwindet, sobald
+// man den Zeitraum weitet, prueft "Alle zeigt auch Vergangenes und
+// Abgesagtes" weiter unten.
+check('Standardfilter (Diese Woche) blendet auch weit Zukuenftiges aus',
+  !z.some(r => r.t.includes(dmy(SPAETER))));
+check('Drei Einsaetze in dieser Woche (heute und morgen, nicht der weit entfernte)',
+  z.filter(r => !r.grp).length === 3);
+check('Zwei Tagesueberschriften (heute und morgen)', z.filter(r => r.grp).length === 2);
 check('Wochentag in der Ueberschrift', /MONTAG|DIENSTAG|MITTWOCH|DONNERSTAG|FREITAG|SAMSTAG|SONNTAG/i.test(z[0].t));
 check('Heute ist markiert', z.some(r => r.grp && r.t.toLowerCase().includes('heute')));
 check('Heutige Zeilen tragen die Markierung', z.filter(r => r.heute && !r.grp).length === 2);
