@@ -1,12 +1,22 @@
-// Rechnungen-Reiter: Grundgeruest (ENT-181).
+// Rechnungen-Reiter (ENT-181), Ausbaustufe nach dem Grundgeruest.
 //
-// Bewusst schlank: es gibt noch keine Erfassungsmaske, nur die Liste --
-// derselbe Aufbau wie bei den Offerten (Alle/Archiviert, Suche, Statusfilter,
-// sortierbare Tabelle), aber mit eigenem Bestand. Das Wichtigste, was diese
-// Suite absichern muss: die Rechnungen-Liste ruft wirklich art=rechnung ab
-// und zeigt NICHT versehentlich die Offerten-Daten, weil beide durch dieselbe
-// belege-Tabelle bedient werden und ein falscher oder fehlender Art-Filter
-// im Server sich hier zuerst zeigen wuerde.
+// Drei Dinge haelt diese Suite scharf:
+//
+// 1. DIE LISTE ZEIGT WIRKLICH RECHNUNGEN, NICHT OFFERTEN. Beide laufen durch
+//    dieselbe belege-Tabelle -- ein falscher oder fehlender Art-Filter im
+//    Server oder in der Liste selbst wuerde sich hier zuerst zeigen.
+//
+// 2. STATUS/FAELLIG/OFFENER BETRAG SIND ABGELEITET, NICHT ROH GESPEICHERT.
+//    "Bezahlt" und "Ueberfaellig" ueberschreiben den rohen status-Wert in der
+//    Anzeige; Offener Betrag ist entweder 0 oder der volle Betrag (einfache
+//    bezahlt/nicht-bezahlt-Markierung, keine Teilzahlungen -- Entscheid des
+//    Projektinhabers, 28.08.2026).
+//
+// 3. DAS GETEILTE FORMULAR VERWECHSELT DIE BEIDEN ARTEN NICHT. Offerten und
+//    Rechnungen nutzen dieselbe Erfassungsmaske (Positionen, Rabatt, Summen,
+//    Druck) -- eine neue Rechnung darf niemals als 'offerte' gespeichert
+//    werden und umgekehrt, und die Beschriftungen (Rechnungsdatum/Faellig am
+//    vs. Offertendatum/Gueltig bis) muessen zur gerade offenen Art passen.
 import { WURZEL, browserPfad } from './pfade.mjs';
 import { chromium } from 'playwright';
 
@@ -23,20 +33,30 @@ const OFFERTEN = { status: 'ok', naechste_nummer: 'OF-0002', belege: [
     status: 'versendet', total_rappen: 100000, aktiv: 1, ist_vorlage: 0 },
 ]};
 const RECHNUNGEN = { status: 'ok', naechste_nummer: 'RE-0951', belege: [
+  // Noch nicht faellig, unbezahlt.
   { id: 101, art: 'rechnung', nummer: 'RE0950', kunde_id: 2, kunde_name: 'Klinik Arlesheim', kundennummer: 'A0071',
-    titel: 'Baustelle Klinik Arlesheim', referenz: null, datum: tag(-1), status: 'versendet',
-    total_rappen: 333645, aktiv: 1, ist_vorlage: 0 },
+    titel: 'Baustelle Klinik Arlesheim', referenz: null, datum: tag(-1), faellig_bis: tag(5),
+    status: 'versendet', bezahlt: 0, bezahlt_am: null, total_rappen: 333645, aktiv: 1, ist_vorlage: 0 },
+  // Ueberfaellig, unbezahlt.
   { id: 102, art: 'rechnung', nummer: 'RE0948', kunde_id: 3, kunde_name: 'pzu consulting gmbh', kundennummer: 'A0228',
-    titel: 'test', referenz: 'REF-9', datum: tag(-1), status: 'entwurf',
-    total_rappen: 45400, aktiv: 1, ist_vorlage: 0 },
-  { id: 103, art: 'rechnung', nummer: 'RE0900', kunde_id: 2, kunde_name: 'Klinik Arlesheim', kundennummer: 'A0071',
-    titel: 'Archiviertes', referenz: null, datum: '2026-06-01', status: 'bestaetigt',
-    total_rappen: 12000, aktiv: 0, ist_vorlage: 0 },
+    titel: 'test', referenz: 'REF-9', datum: tag(-30), faellig_bis: tag(-3),
+    status: 'versendet', bezahlt: 0, bezahlt_am: null, total_rappen: 45400, aktiv: 1, ist_vorlage: 0 },
+  // Bezahlt -- "erledigt".
+  { id: 103, art: 'rechnung', nummer: 'RE0940', kunde_id: 2, kunde_name: 'Klinik Arlesheim', kundennummer: 'A0071',
+    titel: 'Erledigte Rechnung', referenz: null, datum: tag(-20), faellig_bis: tag(-10),
+    status: 'versendet', bezahlt: 1, bezahlt_am: tag(-2), total_rappen: 89000, aktiv: 1, ist_vorlage: 0 },
+  // Archiviert.
+  { id: 104, art: 'rechnung', nummer: 'RE0900', kunde_id: 2, kunde_name: 'Klinik Arlesheim', kundennummer: 'A0071',
+    titel: 'Archiviertes', referenz: null, datum: '2026-06-01', faellig_bis: '2026-06-15',
+    status: 'entwurf', bezahlt: 0, bezahlt_am: null, total_rappen: 12000, aktiv: 0, ist_vorlage: 0 },
 ]};
 const KU = { status: 'ok', kunden: [
   { id: 1, name: 'Muster AG', kundennummer: 'A0001', aktiv: 1, personen: [], kontaktwege: [] },
   { id: 2, name: 'Klinik Arlesheim', kundennummer: 'A0071', aktiv: 1, personen: [], kontaktwege: [] },
   { id: 3, name: 'pzu consulting gmbh', kundennummer: 'A0228', aktiv: 1, personen: [], kontaktwege: [] },
+]};
+const PRODUKTE = { status: 'ok', produkte: [
+  { id: 1, name: 'Verkehrsdienst', beschreibung: '', einzelpreis_rappen: 4200, einheit: 'Std.', mwst_satz_bp: 810, sortierung: 10, aktiv: 1 },
 ]};
 const STATS = { status: 'ok',
   kpi: { rapporte_monat: 0, rapporte_vormonat: 0, stunden_monat: 0, stunden_vormonat: 0,
@@ -45,6 +65,8 @@ const STATS = { status: 'ok',
   pro_mitarbeiter: [] };
 
 let belegListArten = [];
+let gespeichert = null;
+let bezahltRufe = [];
 
 const browser = await chromium.launch({ executablePath: browserPfad() });
 const page = await browser.newPage({ viewport: { width: 1500, height: 1000 } });
@@ -55,10 +77,31 @@ await page.route('**/api/**', async route => {
   if (url.includes('login.php')) return send({ status: 'ok', token: 't', name: 'adrian', ist_admin: true });
   if (url.includes('me.php')) return send({ status: 'ok', name: 'adrian', ist_admin: true, rollen: [],
     rechte: ['kunden', 'abgleich', 'personal_lesen', 'betrieb', 'plan', 'offerten', 'rechte'] });
+  if (url.includes('produkt_list')) return send(PRODUKTE);
   if (url.includes('beleg_list')) {
     const art = new URLSearchParams(url.split('?')[1] || '').get('art') || 'offerte';
     belegListArten.push(art);
     return send(art === 'rechnung' ? RECHNUNGEN : OFFERTEN);
+  }
+  if (url.includes('beleg_bezahlt')) {
+    const body = JSON.parse(route.request().postData() || '{}');
+    bezahltRufe.push(body);
+    return send({ status: 'ok', bezahlt: body.bezahlt ? 1 : 0, bezahlt_am: body.bezahlt ? tag(0) : null });
+  }
+  if (url.includes('beleg_lesen')) {
+    const id = Number(new URLSearchParams(url.split('?')[1] || '').get('id'));
+    const quelle = [...OFFERTEN.belege, ...RECHNUNGEN.belege].find(b => Number(b.id) === id);
+    if (!quelle) { return send({ status: 'error', message: 'nicht gefunden' }); }
+    return send({ status: 'ok', beleg: { ...quelle, positionen: [] },
+      kunde: KU.kunden.find(k => Number(k.id) === Number(quelle.kunde_id)) || null, person: null });
+  }
+  if (url.includes('beleg_speichern')) {
+    gespeichert = JSON.parse(route.request().postData() || '{}');
+    const istNeu = !gespeichert.id;
+    return send({ status: 'ok', id: istNeu ? 999 : gespeichert.id, nummer: istNeu ? 'RE-0951' : undefined,
+      summen: { zwischensumme_rappen: 4200, rabatt_bp: 0, rabatt_rappen: 0, netto_rappen: 4200,
+        mwst: [{ satz_bp: 810, grundlage_rappen: 4200, betrag_rappen: 340 }],
+        mwst_rappen: 340, rundung_rappen: 0, total_rappen: 4540, zeilen: [] } });
   }
   if (url.includes('kunden_list')) return send(KU);
   if (url.includes('dashboard_stats')) return send(STATS);
@@ -83,57 +126,128 @@ try {
     (await page.getAttribute('#kv-rechnungen', 'class') || '').includes('on'));
   check('Der Reiter ist als aktiv markiert', (await page.getAttribute('#nav-kunden-rechnungen', 'class') || '').includes('on'));
   check('Die Kopfzeile nennt "Rechnungen"', (await page.textContent('#pgCrumb')) === 'Rechnungen an Kunden');
-
   check('KRITISCH: die Liste ruft wirklich art=rechnung ab, nicht art=offerte',
     belegListArten.includes('rechnung'));
 
+  // ── "Alle" zeigt die drei aktiven, nicht die archivierte ──────────────────
   const zeilen = await page.$$eval('#reTable tbody tr', tr => tr.map(r => r.textContent.replace(/\s+/g, ' ').trim()));
-  check('KRITISCH: es stehen nur die aktiven Rechnungen da, nicht die Offerten',
-    zeilen.length === 2 && zeilen.every(z => !/Sollte hier NIE erscheinen/.test(z)));
+  check('KRITISCH: "Alle" zeigt die drei aktiven Rechnungen, nicht die archivierte oder die Offerte',
+    zeilen.length === 3 && zeilen.every(z => !/Sollte hier NIE erscheinen/.test(z) && !/RE0900/.test(z)));
   check('Nummer und Empfaenger stehen wie geliefert da',
     zeilen.some(z => /RE0950/.test(z) && /Klinik Arlesheim/.test(z)));
   check('Der Betrag steht als CHF mit Tausendertrennzeichen da',
     zeilen.some(z => /CHF 3['’]336\.45/.test(z)));
 
-  // Archiviert
+  // ── Status/Faellig/Offener Betrag sind abgeleitet ─────────────────────────
+  const werte = await page.evaluate(() => {
+    const zeile = [...document.querySelectorAll('#reTable tbody tr')]
+      .find(tr => tr.textContent.includes('RE0948'));
+    return zeile ? zeile.textContent.replace(/\s+/g, ' ') : null;
+  });
+  check('KRITISCH: eine ueberfaellige, unbezahlte Rechnung zeigt "Überfällig", nicht "Versendet"',
+    werte && /Überfällig/.test(werte));
+  check('KRITISCH: und die Anzahl Tage darueber', werte && /3 Tage überfällig/.test(werte));
+  const bezahlteZeile = await page.evaluate(() => {
+    const zeile = [...document.querySelectorAll('#reTable tbody tr')]
+      .find(tr => tr.textContent.includes('RE0940'));
+    return zeile ? zeile.textContent.replace(/\s+/g, ' ') : null;
+  });
+  check('KRITISCH: eine bezahlte Rechnung zeigt "Bezahlt" statt des rohen Status',
+    bezahlteZeile && /Bezahlt/.test(bezahlteZeile));
+  check('KRITISCH: ihr Offener Betrag ist 0, nicht der volle Betrag',
+    bezahlteZeile && /CHF 0\.00/.test(bezahlteZeile));
+  const nichtFaelligeZeile = await page.evaluate(() => {
+    const zeile = [...document.querySelectorAll('#reTable tbody tr')]
+      .find(tr => tr.textContent.includes('RE0950'));
+    return zeile ? zeile.textContent.replace(/\s+/g, ' ') : null;
+  });
+  check('KRITISCH: eine noch nicht faellige, unbezahlte Rechnung zeigt ihren offenen Betrag voll (Betrag und Offener Betrag gleich)',
+    nichtFaelligeZeile && (nichtFaelligeZeile.match(/CHF 3['’]336\.45/g) || []).length === 2);
+  check('Und "Fällig" zeigt die verbleibenden Tage bis zur Frist',
+    nichtFaelligeZeile && /5 Tage/.test(nichtFaelligeZeile));
+
+  // ── Reiter "Erledigt" ──────────────────────────────────────────────────────
+  await page.click('#reatab-erledigt'); await page.waitForTimeout(150);
+  const erledigtZeilen = await page.$$eval('#reTable tbody tr', tr => tr.map(r => r.textContent.replace(/\s+/g, ' ').trim()));
+  check('KRITISCH: "Erledigt" zeigt nur die bezahlte, aktive Rechnung',
+    erledigtZeilen.length === 1 && /RE0940/.test(erledigtZeilen[0]));
+
+  // ── Reiter "Archiviert" ────────────────────────────────────────────────────
   await page.click('#reatab-archiv'); await page.waitForTimeout(150);
   const archivZeilen = await page.$$eval('#reTable tbody tr', tr => tr.map(r => r.textContent.replace(/\s+/g, ' ').trim()));
   check('KRITISCH: "Archiviert" zeigt die inaktive Rechnung, nicht die aktiven',
     archivZeilen.length === 1 && /RE0900/.test(archivZeilen[0]));
   await page.click('#reatab-alle'); await page.waitForTimeout(150);
 
-  // Suche
+  // ── Suche ──────────────────────────────────────────────────────────────────
   await page.fill('#reQ', 'test'); await page.waitForTimeout(150);
   const suchZeilen = await page.$$eval('#reTable tbody tr', tr => tr.map(r => r.textContent.replace(/\s+/g, ' ').trim()));
   check('KRITISCH: die Suche filtert auf Titel/Nummer/Empfaenger',
     suchZeilen.length === 1 && /RE0948/.test(suchZeilen[0]));
   await page.fill('#reQ', ''); await page.waitForTimeout(150);
 
-  // Statusfilter nur mit tatsaechlich vorhandenen Werten befuellt
+  // ── Statusfilter zeigt die ANGEZEIGTEN Werte (inkl. Bezahlt/Ueberfaellig) ──
   const statusOptionen = await page.$$eval('#reStatus option', o => o.map(x => x.value));
-  check('Der Statusfilter zeigt nur vorkommende Status, keinen erfundenen',
-    statusOptionen.includes('versendet') && statusOptionen.includes('entwurf') && !statusOptionen.includes('abgelehnt'));
+  check('KRITISCH: der Statusfilter kennt "Bezahlt" und "Überfällig", nicht nur den rohen Status',
+    statusOptionen.includes('Bezahlt') && statusOptionen.includes('Überfällig'));
+  check('Und den normalen Status der dritten, unauffaelligen Rechnung',
+    statusOptionen.includes('Versendet'));
 
-  // Sortierung
-  await page.click('#reTable th:has-text("Betrag")'); await page.waitForTimeout(150);
-  const nachBetrag = await page.$$eval('#reTable tbody tr', tr => tr.map(r => r.textContent));
-  check('Ein Klick auf "Betrag" sortiert die Liste um',
-    /RE0948/.test(nachBetrag[0]) || /RE0950/.test(nachBetrag[0]));
+  // ── Sortierung ───────────────────────────────────────────────────────────
+  await page.click('#reTable th:has-text("Offener Betrag")'); await page.waitForTimeout(150);
+  const nachOffen = await page.$$eval('#reTable tbody tr', tr => tr.map(r => r.textContent));
+  check('Ein Klick auf "Offener Betrag" sortiert die Liste um (aufsteigend zuerst 0)',
+    /RE0940/.test(nachOffen[0]));
 
-  check('KEIN "Rechnung erstellen"-Knopf ohne Erfassungsmaske dahinter -- Grundgeruest, kein Vorgriff',
-    (await page.$$('#kv-rechnungen button:has-text("Rechnung erstellen")')).length === 0);
+  // ── "Rechnung erstellen" oeffnet die geteilte Erfassungsmaske ─────────────
+  check('KRITISCH: der Knopf "Rechnung erstellen" ist da', await page.isVisible('#kv-rechnungen button:has-text("Rechnung erstellen")'));
+  await page.click('#kv-rechnungen button:has-text("Rechnung erstellen")'); await page.waitForTimeout(300);
+  check('KRITISCH: das Formular zeigt "Rechnungsdatum", nicht "Offertendatum"',
+    (await page.textContent('#ofLblDatum')).includes('Rechnungsdatum'));
+  check('KRITISCH: das zweite Datumsfeld heisst "Fällig am", nicht "Gültig bis"',
+    (await page.textContent('#ofLblGueltig')) === 'Fällig am');
+  check('Die Nummer-Beschriftung heisst "Rechnungsnummer"',
+    (await page.textContent('#ofLblNummer')) === 'Rechnungsnummer');
+  check('Der Zurueck-Knopf verweist auf die Rechnungsliste',
+    (await page.getAttribute('#ofBtnZurueck', 'aria-label') || '').includes('Rechnungsliste'));
 
-  // Die beiden Listen (Offerten/Rechnungen) duerfen sich nicht gegenseitig
-  // ueberschreiben -- Grund fuer eigene Variablen (rechnungen vs. belege).
+  await page.fill('#of_kunde', 'Klinik Arlesheim'); await page.dispatchEvent('#of_kunde', 'input');
+  await page.fill('#of_titel', 'Testrechnung');
+  await page.click('#ofFormSaveBtn'); await page.waitForTimeout(300);
+  check('KRITISCH: beim Speichern geht art:"rechnung" an den Server, nicht "offerte"',
+    gespeichert && gespeichert.art === 'rechnung');
+  check('KRITISCH: das zweite Datum landet in faellig_bis, nicht in gueltig_bis',
+    gespeichert && 'faellig_bis' in gespeichert && !('gueltig_bis' in gespeichert));
+  check('Toast/Titel bestaetigen eine Rechnung, nicht eine Offerte',
+    (await page.textContent('#ofFormNummer')) === 'RE-0951');
+
+  // Zurueck fuehrt wirklich in die Rechnungsliste, nicht in die Offertenliste.
+  await page.click('#ofBtnZurueck'); await page.waitForTimeout(200);
+  check('KRITISCH: "Zurück" fuehrt zur Rechnungsliste',
+    (await page.getAttribute('#kv-rechnungen', 'class') || '').includes('on'));
+
+  // ── Als bezahlt markieren ueber das Zeilenmenue ───────────────────────────
+  // Gezielt die Zeile von RE0950 (unbezahlt) statt nth=0: die vorherige
+  // Sortierung nach "Offener Betrag" haette sonst die bereits bezahlte
+  // Rechnung (RE0940, 0 offen) an die erste Stelle sortiert.
+  await page.click('#reTable tr:has-text("RE0950") .rowmenu-btn'); await page.waitForTimeout(150);
+  check('KRITISCH: das Zeilenmenue bietet "Als bezahlt markieren" fuer eine unbezahlte Rechnung',
+    (await page.textContent('#rowmenuPop')).includes('Als bezahlt markieren'));
+  await page.click('#rowmenuPop >> text=Als bezahlt markieren'); await page.waitForTimeout(300);
+  check('KRITISCH: das sendet id und bezahlt:1 an beleg_bezahlt.php',
+    bezahltRufe.length === 1 && Number(bezahltRufe[0].bezahlt) === 1 && Number(bezahltRufe[0].id) === 101);
+
+  // ── Offerten- und Rechnungen-Liste ueberschreiben sich nicht ──────────────
   await page.click('#nav-kunden-offerten'); await page.waitForTimeout(200);
   const ofZeilen = await page.$$eval('#ofTable tbody tr', tr => tr.map(r => r.textContent.replace(/\s+/g, ' ').trim()));
   check('KRITISCH: die Offerten-Liste bleibt unveraendert, nachdem Rechnungen geladen wurden',
     ofZeilen.length === 1 && /Sollte hier NIE erscheinen/.test(ofZeilen[0]));
-  await page.click('#nav-kunden-rechnungen'); await page.waitForTimeout(200);
-  const zurueck = await page.$$eval('#reTable tbody tr', tr => tr.map(r => r.textContent.replace(/\s+/g, ' ').trim()));
-  check('Und umgekehrt bleibt die Rechnungen-Liste unveraendert',
-    zurueck.length === 2);
-} catch (e) { bad.push('Rechnungen-Grundgeruest: ' + String(e).split('\n')[0].slice(0, 160)); }
+  await page.click('#ofTable tbody tr >> nth=0'); await page.waitForTimeout(300);
+  check('KRITISCH: das Oeffnen einer Offerte zeigt wieder "Offertendatum", die ofArt-Umschaltung leckt nicht',
+    (await page.textContent('#ofLblDatum')).includes('Offertendatum'));
+  check('Und "Gültig bis", nicht "Fällig am"',
+    (await page.textContent('#ofLblGueltig')) === 'Gültig bis');
+} catch (e) { bad.push('Rechnungen: ' + String(e).split('\n')[0].slice(0, 160)); }
 
 // Leerzustand: eine echte, aber leere Liste sagt "Noch keine Rechnungen",
 // nicht "Keine Treffer" -- dieselbe Unterscheidung wie bei den Offerten.

@@ -25,7 +25,7 @@ $pdo = db();
 // den jemand verschickt, sondern ein Muster.
 $s = $pdo->prepare(
     'SELECT b.id, b.art, b.nummer, b.kunde_id, b.person_id, b.titel, b.referenz,
-            b.datum, b.gueltig_bis, b.status, b.rabatt_bp,
+            b.datum, b.gueltig_bis, b.faellig_bis, b.bezahlt, b.bezahlt_am, b.status, b.rabatt_bp,
             b.zwischensumme_rappen, b.rabatt_rappen, b.mwst_rappen,
             b.rundung_rappen, b.total_rappen, b.ist_vorlage, b.aktiv,
             b.erstellt_am, b.geaendert_am,
