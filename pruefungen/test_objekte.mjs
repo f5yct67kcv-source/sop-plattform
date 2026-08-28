@@ -274,8 +274,30 @@ check('Intervall wird als Text gezeigt', msText.includes('Jeden 2. Tag'));
 check('Auf Abruf ist gekennzeichnet', msText.includes('auf Abruf'));
 check('Nachtschicht als Folgetag erkannt', msText.includes('Folgetag'));
 check('Saisonfenster sichtbar', msText.includes('bis 31.10.2026'));
-check('Oeffnen der Schublade schreibt nichts', writes().length === 0);
+check('Oeffnen der Objekt-Detailseite schreibt nichts', writes().length === 0);
 await page.screenshot({ path: `${OUT}/32-objekt-masterschichten.png` });
+
+// Wochentag-Bedarfstabelle (ENT-200-Nachtrag): vormals eigene Seite
+// (#masterschichten), hierher verschoben, um die Doppelung mit der neuen
+// Objekt-Detailseite aufzuloesen.
+const bedarfText = await page.textContent('#msSeiteBedarf');
+check('Bedarfstabelle nennt die Wochentage', bedarfText.includes('Montag') && bedarfText.includes('Freitag'));
+check('Bedarfstabelle nennt die Feiertags-Spalte', bedarfText.includes('Feiertag'));
+// Gezielte Zellabfrage statt Text-Regex: der flache textContent haengt Ziffern
+// benachbarter Zellen ohne Trennzeichen aneinander (z.B. "...1005 2..."),
+// ein "5" per Regex zu suchen waere darum unzuverlaessig.
+const wocheSumme = await page.evaluate(() => {
+  const zeile = [...document.querySelectorAll('#msSeiteBedarf tr')]
+    .find(tr => tr.textContent.includes('Schliessrunde'));
+  return zeile ? zeile.querySelectorAll('td.num')[7]?.textContent.trim() : null;
+});
+check('Bedarfstabelle zeigt den Wochenbedarf der Wochenschicht (Mo-Fr je 1 = 5)', wocheSumme === '5');
+const patrouilleInTabelle = await page.evaluate(() =>
+  [...document.querySelectorAll('#msSeiteBedarf tr')].some(tr => tr.textContent.includes('Patrouille Sommer')));
+check('Intervall-Vorlage steht nicht in der Wochentabelle', !patrouilleInTabelle);
+check('Intervall-Vorlage wird stattdessen im Hinweis genannt',
+  bedarfText.includes('Patrouille Sommer') && bedarfText.includes('keinem Wochenrhythmus'));
+check('CSV-Export ist auf der Objekt-Detailseite erreichbar', await page.isVisible('#obDetBody button:has-text("CSV")'));
 
 // Ändern ab Stichtag
 await page.click('#msListe .ms-zeile:first-child button:has-text("Ändern ab")');
@@ -424,6 +446,36 @@ await page.waitForTimeout(400);
 const scrollX = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 check('Kein Seiten-Scroll auf 390px trotz Matrix', scrollX <= 1);
 await page.screenshot({ path: `${OUT}/34-matrix-mobil.png` });
+
+// Die Wochentag-Bedarfstabelle (ENT-200-Nachtrag, vormals eigene Seite) traegt
+// Name + 7 Wochentage + Woche + Feiertag -- deutlich breiter als 390px.
+// Klick auf #nav-kunden statt JS-Navigation: Bei 390px sitzt der Knopf im
+// eingeklappten Aufklappmenue und ist ohne dessen Oeffnen nicht sichtbar --
+// dasselbe Muster wie in test_mobil.mjs, direkt ueber go()/kuGoTab().
+await page.evaluate(() => { go('kunden'); kuGoTab('objekte'); });
+await page.waitForTimeout(200);
+await page.click('#oTable tbody tr:first-child');
+await page.waitForTimeout(400);
+const scrollXObjekt = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+check('Kein Seiten-Scroll auf 390px trotz Wochentag-Bedarfstabelle', scrollXObjekt <= 1);
+// Die eigentliche Gefahr ist nicht Seiten-Scroll, sondern unsichtbares
+// Abschneiden: Ohne einen eigenen scrollenden Container (#msSeiteBedarf)
+// wird die letzte Spalte ("Feiertag") von einem Vorfahren mit knapperer
+// Breite abgeschnitten, ohne dass die Seite selbst zu scrollen beginnt --
+// gemessen, nicht angenommen (ein reiner Seiten-Scroll-Check haette das
+// nicht gefunden, siehe ENT-200-Nachtrag). Die Probe: den Container ganz
+// nach rechts scrollen und pruefen, dass die letzte Spalte danach wirklich
+// im sichtbaren Bereich der Box liegt, statt weiterhin ausserhalb.
+const bedarfErreichbar = await page.evaluate(() => {
+  const box = document.getElementById('msSeiteBedarf');
+  box.scrollLeft = box.scrollWidth;
+  const feiertagSpalte = [...box.querySelectorAll('th')].find(th => th.textContent.trim() === 'Feiertag');
+  if (!feiertagSpalte) return false;
+  const boxR = box.getBoundingClientRect(), spalteR = feiertagSpalte.getBoundingClientRect();
+  return spalteR.right <= boxR.right + 1 && spalteR.left >= boxR.left - 1;
+});
+check('Letzte Spalte der Bedarfstabelle ist auf dem Handy erreichbar, nicht abgeschnitten', bedarfErreichbar);
+await page.screenshot({ path: `${OUT}/35-objekt-bedarf-mobil.png` });
 await page.setViewportSize({ width: 1440, height: 1000 });
 
 await browser.close();
