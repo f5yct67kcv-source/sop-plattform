@@ -84,18 +84,28 @@ $text = "Guten Tag\n\n"
     . "$ansehenText\n$link\n\n"
     . "Freundliche Grüsse\n$absenderName";
 
-$html = '<div style="font-family:-apple-system,Segoe UI,Arial,sans-serif;color:#14161A;max-width:520px">'
-    . '<p>Guten Tag</p>'
-    . '<p><strong>' . htmlspecialchars($absenderName, ENT_QUOTES, 'UTF-8') . '</strong> hat Ihnen eine neue '
+// Jedes textfuehrende Element bekommt sein EIGENES font-family (nicht nur
+// der aeusserste Rahmen): Outlook Desktop (Word-Rendermotor) vererbt
+// font-family in HTML-Mails nicht zuverlaessig an verschachtelte Elemente
+// und faellt sonst auf eine Serifenschrift zurueck -- genau die
+// uneinheitliche Schrift, die der Projektinhaber am 28.08.2026 bemaengelt
+// hat. Der CTA-Knopf traegt jetzt denselben Blauton wie der primaere
+// Aktions-Knopf im Dashboard (--accent, #2F5BD7), statt eines schwarzen
+// Knopfs ohne Bezug zum Erscheinungsbild.
+$schrift = "font-family:-apple-system,'Segoe UI',Arial,sans-serif";
+$html = '<div style="' . $schrift . ';color:#14161A;max-width:520px">'
+    . '<p style="' . $schrift . ';margin:0 0 16px">Guten Tag</p>'
+    . '<p style="' . $schrift . ';margin:0 0 16px"><strong>' . htmlspecialchars($absenderName, ENT_QUOTES, 'UTF-8') . '</strong> hat Ihnen eine neue '
     . htmlspecialchars(mb_strtolower($titel), ENT_QUOTES, 'UTF-8') . ' erstellt: <strong>'
     . htmlspecialchars($beleg['nummer'], ENT_QUOTES, 'UTF-8') . '</strong>.</p>'
-    . '<p style="margin:28px 0">'
+    . '<p style="' . $schrift . ';margin:28px 0">'
     . '<a href="' . htmlspecialchars($link, ENT_QUOTES, 'UTF-8') . '" '
-    . 'style="background:#14161A;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block">'
+    . 'style="' . $schrift . ';background:#2F5BD7;color:#fff;padding:12px 24px;border-radius:8px;'
+    . 'font-weight:700;text-decoration:none;display:inline-block">'
     . htmlspecialchars("$titel anschauen", ENT_QUOTES, 'UTF-8') . '</a></p>'
-    . '<p style="color:#6B7280;font-size:12px">Funktioniert der Knopf nicht? Diesen Link in den Browser kopieren:<br>'
+    . '<p style="' . $schrift . ';color:#6B7280;font-size:12px;margin:0 0 16px">Funktioniert der Knopf nicht? Diesen Link in den Browser kopieren:<br>'
     . htmlspecialchars($link, ENT_QUOTES, 'UTF-8') . '</p>'
-    . '<p>Freundliche Grüsse<br>' . htmlspecialchars($absenderName, ENT_QUOTES, 'UTF-8') . '</p>'
+    . '<p style="' . $schrift . ';margin:0">Freundliche Grüsse<br>' . htmlspecialchars($absenderName, ENT_QUOTES, 'UTF-8') . '</p>'
     . '</div>';
 
 try {

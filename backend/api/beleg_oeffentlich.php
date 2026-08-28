@@ -6,10 +6,13 @@
 // dadurch, dass er praktisch nicht zu erraten ist (siehe versand_token in
 // planung_einrichten.php).
 //
-// Web-Ansicht statt PDF: Dieses Projekt bindet keine PDF-Bibliothek ein (kein
-// Composer im Deploy, siehe backend/mailer.php). Der Kunde druckt sich die
-// Seite ueber die Browser-Funktion "Drucken -> Als PDF speichern" selbst,
-// falls er eine Datei braucht.
+// Zwei Wege zu einer Datei (ENT-206): "Drucken" nutzt weiterhin nur den
+// Browser-Druckdialog (kein neues Gewicht). "Herunterladen" laedt bei Klick
+// -- nicht beim Seitenaufbau -- die vendorte Bibliothek html2pdf.js
+// (Kazuhiko Arase... nein: eKoopmans/html2pdf.js, MIT) nach und rastert
+// GENAU das bereits gerenderte Dokument-Element in eine PDF-Datei. Damit
+// gibt es nur EINE Layout-Wahrheit (dieses HTML/CSS) statt einer zweiten,
+// separat gepflegten PDF-Vorlage, die sich vom Bildschirm entkoppeln koennte.
 //
 // Liefert IMMER HTML, nie JSON -- auch im Fehlerfall. db.php's globaler
 // Exception-Handler wuerde sonst rohes JSON an einen Kunden ausliefern, der
@@ -65,7 +68,10 @@ function portal_seite(string $titel, string $inhalt): void
         . '<style>
             body{font-family:-apple-system,Segoe UI,Arial,sans-serif;color:#14161A;
                  background:#F4F5F7;margin:0;padding:32px 16px}
-            .karte{max-width:700px;margin:0 auto;background:#fff;border-radius:12px;
+            .buehne{max-width:1040px;margin:0 auto;display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap}
+            .zusammenfassung{flex:0 0 300px;background:#fff;border-radius:12px;
+                   padding:28px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+            .karte{flex:1 1 480px;min-width:0;background:#fff;border-radius:12px;
                    padding:32px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
             table{border-collapse:collapse;width:100%}
             .knopf{display:inline-block;padding:12px 24px;border-radius:8px;font-size:14px;
@@ -77,16 +83,23 @@ function portal_seite(string $titel, string $inhalt): void
             .hinweis-versendet{background:#EFF3FF;color:#1F3A8A}
             .hinweis-an{background:#E8F5E9;color:#1C7C3E}
             .hinweis-ab{background:#FDECEA;color:#B3261E}
-            @media print{body{background:#fff;padding:0}.karte{box-shadow:none;padding:0}
+            .zf-titel{font-size:19px;font-weight:700;margin-bottom:14px}
+            .zf-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;
+                      color:#6B7280;margin:18px 0 6px}
+            .zf-label:first-of-type{margin-top:0}
+            @media print{body{background:#fff;padding:0}.buehne{display:block}
+                         .zusammenfassung{display:none}.karte{box-shadow:none;padding:0}
                          .keindruck{display:none}}
-          </style></head><body><div class="karte">' . $inhalt . '</div></body></html>';
+            @media (max-width:720px){.buehne{display:block}.zusammenfassung{margin-bottom:20px}}
+          </style></head><body><div class="buehne">' . $inhalt . '</div></body></html>';
     exit;
 }
 
 function portal_fehler(string $titel, string $text, int $code = 404): void
 {
     http_response_code($code);
-    portal_seite($titel, '<h1 style="font-size:18px">' . portal_esc($titel) . '</h1><p>' . portal_esc($text) . '</p>');
+    portal_seite($titel, '<div class="karte" style="flex:1 1 auto;margin:0 auto;max-width:520px">'
+        . '<h1 style="font-size:18px">' . portal_esc($titel) . '</h1><p>' . portal_esc($text) . '</p></div>');
 }
 
 try {
@@ -120,9 +133,37 @@ try {
         $person = $s->fetch() ?: null;
     }
     $betrieb = $pdo->query(
-        'SELECT firma, qr_iban, qr_strasse, qr_hausnummer, qr_plz, qr_ort FROM betrieb WHERE id = 1'
+        'SELECT firma, fusszeile, fusszeile2, logo_mime, logo, qr_iban, qr_strasse, qr_hausnummer, qr_plz, qr_ort
+           FROM betrieb WHERE id = 1'
     )->fetch();
     $firma = trim((string)($betrieb['firma'] ?? ''));
+    // Dieselbe Quelle und dasselbe Bild wie im internen Ausdruck (ofBlatt()
+    // in dashboard.html, ENT-192) -- ein Kunde, der dieselbe Rechnung einmal
+    // von innen und einmal ueber den Portal-Link sieht, soll nicht zwei
+    // verschiedene Kopfzeilen bekommen (ENT-206).
+    $absenderZeilen = array_values(array_filter(array_map('trim',
+        explode("\n", (string)($betrieb['fusszeile'] ?? '')))));
+    $logoDatenUrl = ($betrieb['logo'] !== null && $betrieb['logo_mime'])
+        ? 'data:' . $betrieb['logo_mime'] . ';base64,' . base64_encode($betrieb['logo'])
+        : null;
+    // Betriebs-Fusszeile am unteren Blattrand (Adresse/Bankverbindung/UID) --
+    // dasselbe Muster wie bkFusszeile() in dashboard.html: zwei Bloecke
+    // nebeneinander, nur wenn wenigstens einer gefuellt ist (ENT-206). Das
+    // ist NICHT dasselbe Feld wie b.fusszeile_text (die freie Fusszeile
+    // dieses einen Belegs) -- beide koennen nebeneinander bestehen.
+    // white-space:pre-line rendert einen rohen Zeilenumbruch bereits selbst
+    // -- KEIN zusaetzliches nl2br() hier, sonst kommt (br-Element + der noch
+    // vorhandene rohe Umbruch danach) zu zwei sichtbaren Umbruechen je Zeile.
+    // Genau das Muster aus bkFusszeile() in dashboard.html.
+    $betriebFusszeile = '';
+    if ($betrieb['fusszeile'] || $betrieb['fusszeile2']) {
+        $betriebFusszeile = '<div style="margin-top:30px;padding-top:10px;border-top:1px solid #E5E8EC;'
+            . 'display:flex;align-items:center;justify-content:space-between;gap:32px;'
+            . 'font-size:10.5px;color:#6B7280;line-height:1.5">'
+            . ($betrieb['fusszeile'] ? '<div style="white-space:pre-line">' . portal_esc($betrieb['fusszeile']) . '</div>' : '')
+            . ($betrieb['fusszeile2'] ? '<div style="white-space:pre-line">' . portal_esc($betrieb['fusszeile2']) . '</div>' : '')
+            . '</div>';
+    }
 
     $b['positionen'] = beleg_positionen_lesen($pdo, (int)$b['id']);
     $summen = beleg_summen($b['positionen'], (int)$b['rabatt_bp']);
@@ -259,10 +300,78 @@ try {
             . 'el.innerHTML=q.createSvgTag({cellSize:4,margin:8});})();</script>';
     }
 
-    $inhalt = $hinweis
+    // Links eine kompakte Zusammenfassung (Absender, Details, Total) neben
+    // dem eigentlichen Dokument rechts -- Vorbild eines vom Projektinhaber
+    // gezeigten Fremdsystems, nicht 1:1 nachgebaut, aber demselben Aufbau
+    // folgend (ENT-206). Wichtig: JEDES Detail, das rechtsverbindlich zum
+    // Dokument gehoert (Datum, Adresse, Positionen, Summen), bleibt
+    // vollstaendig im rechten "Dokument"-Bereich -- links stehen dieselben
+    // Kernangaben nur ZUSAETZLICH, zum schnellen Ueberblick.
+    $zusammenfassung = '<div class="zf-titel">' . portal_esc($titel) . ' ' . portal_esc($b['nummer']) . '</div>'
+        . $hinweis
+        . '<div class="zf-label">Absender</div>'
+        . '<div style="line-height:1.5;font-size:13px">' . portal_esc($firma !== '' ? $firma : 'Absender') . '</div>'
+        . '<div class="zf-label">Details</div>'
+        . '<div style="line-height:1.7;font-size:13px">'
+        . portal_esc($titel) . 'datum<br><span style="color:#6B7280">' . portal_dmy($b['datum']) . '</span>'
+        . (!portal_leeres_datum($b['gueltig_bis']) ? '<br><br>Gültig bis<br><span style="color:#6B7280">' . portal_dmy($b['gueltig_bis']) . '</span>' : '')
+        . (!portal_leeres_datum($b['faellig_bis'] ?? null) ? '<br><br>Fällig bis<br><span style="color:#6B7280">' . portal_dmy($b['faellig_bis']) . '</span>' : '')
+        . '</div>'
+        . '<div class="zf-label">' . ($bezahlt ? 'Bezahlt' : ($b['art'] === 'rechnung' ? 'Offener Betrag' : 'Total')) . '</div>'
+        . '<div style="font-size:20px;font-weight:700">' . portal_chf($bezahlt ? 0 : $summen['total_rappen']) . ' CHF</div>'
+        . $knoepfe;
+
+    // Immer eine ganze Seite, kein Ausschnitt: die Buehne bekommt eine
+    // A4-aehnliche Mindesthoehe und ordnet ihren Inhalt in einer Spalte an,
+    // damit die Fusszeile am UNTEREN Rand steht -- auch wenn ein Beleg nur
+    // eine einzige, kurze Position hat (Projektinhaber-Vorgabe, ENT-206).
+    $logoHtml = $logoDatenUrl
+        ? '<img src="' . portal_esc($logoDatenUrl) . '" alt="" style="max-height:96px;max-width:200px;display:block;margin-left:auto">'
+        : '';
+
+    // Unterschriftsseite (ENT-187 intern, ENT-207 hier nachgezogen): der
+    // Haken "Unterschriftsseite hinzufügen" im Formular (of_unterschriftsseite)
+    // wurde bisher nur im internen Ausdruck (ofBlatt() in dashboard.html)
+    // beruecksichtigt -- auf der oeffentlichen Kundenseite, ueber die der
+    // Kunde die Datei tatsaechlich druckt/herunterlaedt, hatte er GAR KEINE
+    // Wirkung. Gleiche Feldnamen/Aufbau wie im internen Ausdruck, damit ein
+    // Beleg von innen und ueber den Portal-Link dieselbe Unterschriftsseite
+    // zeigt.
+    $unterschriftsseite = '';
+    if (!empty($b['unterschriftsseite'])) {
+        $auftraggeber = trim((string)($kunde['name'] ?? ''));
+        $auftraggeber = $auftraggeber !== '' ? $auftraggeber : 'Auftraggeber';
+        $auftragnehmer = $firma !== '' ? $firma : 'Auftragnehmer';
+        $unterschriftsseite = '<div style="page-break-before:always;break-before:page;padding-top:60px;'
+            . 'font-family:-apple-system,Segoe UI,Arial,sans-serif;color:#14161A;'
+            . 'max-width:700px;margin:0 auto;font-size:12px">'
+            . '<div style="font-size:15px;font-weight:700;margin-bottom:40px">'
+            . portal_esc($titel . 'nummer') . ' ' . portal_esc($b['nummer'])
+            . '</div>'
+            . '<div style="color:#6B7280;margin-bottom:60px">Ort, Datum</div>'
+            . '<div style="border-bottom:1px solid #14161A;width:260px;margin-bottom:60px"></div>'
+            . '<div style="display:flex;gap:60px">'
+            . '<div style="flex:1">'
+            . '<div style="border-bottom:1px solid #14161A;height:60px"></div>'
+            . '<div style="margin-top:8px;font-size:11px;color:#6B7280">Unterschrift ' . portal_esc($auftraggeber) . '</div>'
+            . '</div>'
+            . '<div style="flex:1">'
+            . '<div style="border-bottom:1px solid #14161A;height:60px"></div>'
+            . '<div style="margin-top:8px;font-size:11px;color:#6B7280">Unterschrift ' . portal_esc($auftragnehmer) . '</div>'
+            . '</div>'
+            . '</div>'
+            . '</div>';
+    }
+
+    $dokument = '<div class="keindruck" style="display:flex;justify-content:flex-end;gap:10px;margin-bottom:24px">'
+        . '<button type="button" class="knopf knopf-plain" onclick="window.print()">Drucken</button>'
+        . '<button type="button" class="knopf knopf-plain" id="btnHerunterladen" onclick="portalHerunterladen()">Herunterladen</button>'
+        . '</div>'
+        . '<div id="dokumentGanz">'
+        . '<div id="dokumentSeite" style="display:flex;flex-direction:column;min-height:960px">'
         . '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:24px;margin-bottom:40px">'
-        . '<div style="line-height:1.45;font-size:13px;color:#6B7280">' . portal_esc($firma !== '' ? $firma : 'Absender') . '</div>'
-        . '<button type="button" class="knopf knopf-plain keindruck" onclick="window.print()">Drucken</button>'
+        . '<div style="line-height:1.45;font-size:12px">' . implode('<br>', array_map('portal_esc', $absenderZeilen)) . '</div>'
+        . '<div>' . $logoHtml . '</div>'
         . '</div>'
         . '<div style="display:flex;justify-content:space-between;gap:40px;margin-bottom:40px;flex-wrap:wrap">'
         . '<table style="line-height:1.5;width:auto"><tr><td style="padding:2px 24px 2px 0;color:#6B7280;font-size:12px">' . portal_esc($titel) . 'nummer</td><td style="padding:2px 0;font-size:12px">' . portal_esc($b['nummer']) . '</td></tr>'
@@ -270,7 +379,7 @@ try {
         . (!portal_leeres_datum($b['gueltig_bis']) ? '<tr><td style="padding:2px 24px 2px 0;color:#6B7280;font-size:12px">Gültig bis</td><td style="padding:2px 0;font-size:12px">' . portal_dmy($b['gueltig_bis']) . '</td></tr>' : '')
         . (!portal_leeres_datum($b['faellig_bis'] ?? null) ? '<tr><td style="padding:2px 24px 2px 0;color:#6B7280;font-size:12px">Fällig bis</td><td style="padding:2px 0;font-size:12px">' . portal_dmy($b['faellig_bis']) . '</td></tr>' : '')
         . '</table>'
-        . '<div style="line-height:1.5;font-size:12px;min-width:200px">' . implode('<br>', array_map('portal_esc', $empfaenger)) . '</div>'
+        . '<div style="line-height:1.5;font-size:12px;min-width:200px;text-align:right;margin-left:auto">' . implode('<br>', array_map('portal_esc', $empfaenger)) . '</div>'
         . '</div>'
         . '<div style="font-size:19px;font-weight:700;margin-bottom:14px">' . portal_esc($b['titel'] ?: $titel) . ' ' . portal_esc($b['nummer']) . '</div>'
         . '<table><thead><tr>'
@@ -284,8 +393,36 @@ try {
         . $qrZahlteil
         . $abschnitt('Notizen', $b['oeffentliche_notizen'])
         . $abschnitt('Bedingungen', $b['bedingungen'])
-        . ($b['fusszeile_text'] ? '<div style="margin-top:26px;padding-top:14px;border-top:1px solid #E5E8EC;white-space:pre-line;line-height:1.5;font-size:12px">' . nl2br(portal_esc($b['fusszeile_text'])) . '</div>' : '')
-        . $knoepfe;
+        // margin-top:auto auf dem LETZTEN Flex-Kind schiebt es an den
+        // unteren Rand der Seite, egal wie wenig Inhalt darueber steht --
+        // auch wenn die Beleg-Fusszeile selbst leer ist, bleibt so die
+        // Mindesthoehe der Seite gewahrt.
+        . '<div style="margin-top:auto;padding-top:14px">'
+        . ($b['fusszeile_text'] ? '<div style="border-top:1px solid #E5E8EC;padding-top:14px;white-space:pre-line;line-height:1.5;font-size:12px">' . nl2br(portal_esc($b['fusszeile_text'])) . '</div>' : '')
+        . $betriebFusszeile
+        . '</div>'
+        . '</div>'
+        . $unterschriftsseite
+        . '</div>';
+
+    // Herunterladen laedt html2pdf.js erst BEIM KLICK nach (946 KB, fast
+    // eine ganze QR-Bibliothek schwerer) -- wer nie herunterlaedt, zahlt das
+    // Gewicht nicht beim blossen Ansehen der Seite.
+    $dateiname = preg_replace('/[^A-Za-z0-9 _.-]/', '', $titel . ' ' . $b['nummer']) . '.pdf';
+    $dokument .= '<script>function portalHerunterladen(){'
+        . 'var btn=document.getElementById("btnHerunterladen");var alt=btn.textContent;'
+        . 'function starten(){btn.textContent=alt;'
+        . 'html2pdf().set({filename:' . json_encode($dateiname, JSON_UNESCAPED_UNICODE) . ',margin:10,'
+        . 'html2canvas:{scale:2},jsPDF:{unit:"mm",format:"a4",orientation:"portrait"}})'
+        . '.from(document.getElementById("dokumentGanz")).save();}'
+        . 'if(typeof html2pdf!=="undefined"){starten();return;}'
+        . 'btn.textContent="Lädt …";var s=document.createElement("script");'
+        . 's.src="/html2pdf.bundle.min.js";s.onload=starten;'
+        . 's.onerror=function(){btn.textContent=alt;alert("Herunterladen ist gerade nicht möglich.");};'
+        . 'document.head.appendChild(s);}</script>';
+
+    $inhalt = '<div class="zusammenfassung">' . $zusammenfassung . '</div>'
+        . '<div class="karte">' . $dokument . '</div>';
 
     portal_seite($titel . ' ' . $b['nummer'], $inhalt);
 } catch (Throwable $e) {
