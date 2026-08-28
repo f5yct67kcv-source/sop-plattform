@@ -99,3 +99,54 @@ function rundgang_fortschritt(PDO $pdo, int $rundgangId, int $objektId): array
     }
     return ['gesamt' => $gesamt, 'bestaetigt' => $bestaetigt, 'nicht_verfuegbar' => $nichtVerfuegbar];
 }
+
+// Ersetzt die komplette Punktzuordnung einer Kontrollrunden-Vorlage in einem
+// Zug (ENT-204) -- der Aufrufer schickt die vollstaendige, geordnete Liste,
+// kein einzelnes Hinzufuegen/Entfernen. Einfacher und weniger fehleranfaellig
+// als inkrementelle Endpunkte, gleiches Vorgehen wie an anderen Stellen des
+// Hauses (z.B. zuteilung_masse.php).
+//
+// Prueft serverseitig, dass jeder Punkt tatsaechlich zum Objekt der Vorlage
+// gehoert -- sonst liesse sich ueber die API ein Punkt eines fremden Objekts
+// in eine Runde mischen (Sperren gehoeren in den Server, nicht nur in die
+// Oberflaeche). Gibt eine Fehlermeldung zurueck, oder null bei Erfolg.
+function rundgang_vorlage_punkte_setzen(PDO $pdo, int $vorlageId, array $kontrollpunktIds): ?string
+{
+    $vorlageStmt = $pdo->prepare('SELECT objekt_id FROM rundgang_vorlage WHERE id = ?');
+    $vorlageStmt->execute([$vorlageId]);
+    $objektId = $vorlageStmt->fetchColumn();
+    if ($objektId === false) {
+        return 'Vorlage nicht gefunden.';
+    }
+
+    $ids = array_map('intval', $kontrollpunktIds);
+    if (count(array_unique($ids)) !== count($ids)) {
+        return 'Ein Kontrollpunkt wurde mehrfach angegeben.';
+    }
+
+    if ($ids) {
+        $platzhalter = implode(',', array_fill(0, count($ids), '?'));
+        $chk = $pdo->prepare("SELECT COUNT(*) FROM kontrollpunkt WHERE id IN ($platzhalter) AND objekt_id = ?");
+        $chk->execute([...$ids, $objektId]);
+        if ((int)$chk->fetchColumn() !== count($ids)) {
+            return 'Mindestens ein Kontrollpunkt gehoert nicht zu diesem Objekt.';
+        }
+    }
+
+    $pdo->beginTransaction();
+    try {
+        $pdo->prepare('DELETE FROM rundgang_vorlage_punkt WHERE vorlage_id = ?')->execute([$vorlageId]);
+        $ins = $pdo->prepare(
+            'INSERT INTO rundgang_vorlage_punkt (vorlage_id, kontrollpunkt_id, reihenfolge) VALUES (?, ?, ?)'
+        );
+        foreach ($ids as $i => $kpId) {
+            $ins->execute([$vorlageId, $kpId, $i]);
+        }
+        $pdo->commit();
+    } catch (Throwable $e) {
+        $pdo->rollBack();
+        throw $e;
+    }
+
+    return null;
+}
