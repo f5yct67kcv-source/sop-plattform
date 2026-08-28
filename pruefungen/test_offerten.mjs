@@ -92,6 +92,12 @@ let versendenAntwort = { status: 'ok', link: 'https://beispiel.test/api/beleg_oe
 // muss -- kunden_list liefert danach die erweiterte Liste, sonst faende der
 // Rueckkehr-Rueckruf den gerade angelegten Kunden nicht wieder.
 let kuListe = KU.kunden.map(k => ({ ...k }));
+// Ebenso veraenderlich (ENT-215): "Neues Produkt" aus der Offerte heraus muss
+// ein tatsaechlich gespeichertes Produkt zurueckbekommen, das produkt_list
+// danach auch wieder ausliefert -- sonst faende ofProduktUebernehmen() das
+// eben angelegte Produkt nie wieder, und der ganze Witz der Vorgabe waere
+// bloss vorgetaeuscht.
+let produkteAktuell = PRODUKTE.produkte.map(p => ({ ...p }));
 
 const browser = await chromium.launch({ executablePath: browserPfad() });
 const page = await browser.newPage({ viewport: { width: 1500, height: 1000 } });
@@ -110,7 +116,20 @@ await page.route('**/api/**', async route => {
   if (url.includes('login.php')) return send({ status: 'ok', token: 't', name: 'adrian', ist_admin: true });
   if (url.includes('me.php')) return send({ status: 'ok', name: 'adrian', ist_admin: true, rollen: [],
     rechte: ['kunden', 'abgleich', 'personal_lesen', 'betrieb', 'plan', 'offerten', 'rechte'] });
-  if (url.includes('produkt_list')) return send(PRODUKTE);
+  if (url.includes('produkt_list')) return send({ status: 'ok', produkte: produkteAktuell });
+  if (url.includes('produkt_speichern')) {
+    const body = JSON.parse(route.request().postData() || '{}');
+    if (!body.id) {
+      const neuId = produkteAktuell.reduce((m, p) => Math.max(m, p.id), 0) + 1;
+      produkteAktuell.push({ id: neuId, name: body.name, beschreibung: body.beschreibung || '',
+        einzelpreis_rappen: body.einzelpreis_rappen || 0, einheit: body.einheit || 'Std.',
+        mwst_satz_bp: body.mwst_satz_bp || 0, sortierung: body.sortierung || 0, aktiv: 1 });
+      return send({ status: 'ok', id: neuId });
+    }
+    const i = produkteAktuell.findIndex(p => p.id === body.id);
+    if (i >= 0) { produkteAktuell[i] = { ...produkteAktuell[i], ...body, aktiv: produkteAktuell[i].aktiv }; }
+    return send({ status: 'ok', id: body.id });
+  }
   if (url.includes('beleg_list')) { belegListRufe++; return send(BELEGE); }
   if (url.includes('kunden_list')) return send({ status: 'ok', kunden: kuListe });
   if (url.includes('dashboard_stats')) return send(STATS);
@@ -443,6 +462,57 @@ check('KRITISCH: ein Preis mit Komma wird richtig gelesen',
   await page.evaluate(() => chfZuRappen('42,50') === 4250 && chfZuRappen('42.50') === 4250));
 check('Ein Betrag mit Hochkomma als Tausendertrennung wird gelesen',
   await page.evaluate(() => chfZuRappen("1'234.50") === 123450));
+
+// ══════════════════════════════════════════════════════════════════════════
+// TEIL 3b — Neues Produkt direkt aus der Offerte heraus (ENT-215)
+// ══════════════════════════════════════════════════════════════════════════
+// Der Projektinhaber wollte ein Produkt anlegen koennen, OHNE dafuer den
+// Bereich zu wechseln -- bisher ging das nur ueber Administration/Produkte.
+await page.evaluate(() => ofNeuStarten());
+await page.waitForTimeout(400);
+check('KRITISCH: der Knopf "Neues Produkt" steht neben "Position hinzufügen"',
+  await page.isVisible('button:has-text("Neues Produkt")'));
+const vorherPositionen = await page.evaluate(() => document.querySelectorAll('#ofPositionen .of-pos').length);
+await page.evaluate(() => ofNeuesProduktAnlegen());
+await page.waitForTimeout(200);
+check('KRITISCH: eine neue Position entsteht sofort',
+  (await page.evaluate(() => document.querySelectorAll('#ofPositionen .of-pos').length)) === vorherPositionen + 1);
+check('KRITISCH: derselbe Produktdialog wie im Bereich Produkte öffnet sich',
+  await page.isVisible('#dlgProdukt') && (await page.textContent('#prodTitel')).trim() === 'Neues Produkt');
+await page.fill('#prod_name', 'Objektschutz');
+await page.fill('#prod_beschreibung', 'Nächtliche Kontrolle des Objekts');
+await page.fill('#prod_preis', '55');
+await page.evaluate(() => pdSpeichern());
+await page.waitForTimeout(300);
+check('KRITISCH: der Dialog schliesst nach dem Speichern', !(await page.isVisible('#dlgProdukt')));
+const neueZeile = await page.evaluate(() => {
+  const i = ofPos.length - 1;
+  return { produktId: ofPos[i].produkt_id, name: ofPos[i].produkt_name,
+    preis: document.getElementById('ofp_preis' + i).value,
+    feldName: document.getElementById('ofp_name' + i).value };
+});
+check('KRITISCH: das neu angelegte Produkt landet automatisch in genau dieser Position',
+  neueZeile.name === 'Objektschutz' && neueZeile.feldName === 'Objektschutz'
+  && neueZeile.preis === '55.00' && neueZeile.produktId != null);
+check('KRITISCH: das Produkt steht danach auch im Katalog, nicht nur in der Zeile',
+  (await page.$$eval('#dlProdukte option', o => o.map(x => x.value))).includes('Objektschutz'));
+
+// Bricht der Dialog ab, bleibt die leere Position stehen -- entfernbar wie
+// jede andere Zeile, kein stiller Doppel- oder Fehlzustand.
+await page.evaluate(() => ofNeuesProduktAnlegen());
+await page.waitForTimeout(150);
+const vorAbbruch = await page.evaluate(() => document.querySelectorAll('#ofPositionen .of-pos').length);
+await page.evaluate(() => closeDlg('dlgProdukt'));
+check('Bricht der Dialog ab, bleibt genau die eine leere Position stehen',
+  (await page.evaluate(() => document.querySelectorAll('#ofPositionen .of-pos').length)) === vorAbbruch);
+
+// Zurueck auf eine schlanke Ansicht, wie es vor diesem Abschnitt schon war
+// (TEIL 3 endete auf 'produkte'): Ein offen gelassenes, unvollstaendiges
+// Offert-Formular ist mit @media print (visibility:hidden statt display:none,
+// ENT-179) trotzdem raumgreifend und haette den Seitenzahl-Test weiter unten
+// verfaelscht -- ein Fehler der Testvorrichtung, keiner der Anwendung.
+await page.evaluate(() => go('produkte'));
+await page.waitForTimeout(200);
 
 // ══════════════════════════════════════════════════════════════════════════
 // TEIL 4 — Das gedruckte Blatt
