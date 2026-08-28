@@ -56,9 +56,15 @@ if ($id > 0) {
     }
 } else {
     $spalten = array_keys($felder);
+    // Ein Platzhalter je Spalte -- NICHT "(?" plus count($spalten) weitere
+    // (das waeren einer zuviel: "aktiv" dahinter ist ein fester Literal,
+    // kein eigener Platzhalter). Genau dieser Ueberschuss liess jede
+    // Neuanlage seit ENT-181 mit PDOException HY093 "Invalid parameter
+    // number" scheitern -- am Server nie sichtbar, weil PDO die Anfrage
+    // schon vor dem Versand als fehlerhaft verwirft (ENT-217).
+    $platzhalter = implode(', ', array_fill(0, count($spalten), '?'));
     $pdo->prepare(
-        'INSERT INTO produkte (' . implode(', ', $spalten) . ', aktiv) VALUES (?'
-        . str_repeat(', ?', count($spalten)) . ', 1)'
+        'INSERT INTO produkte (' . implode(', ', $spalten) . ', aktiv) VALUES (' . $platzhalter . ', 1)'
     )->execute(array_values($felder));
     $id = (int)$pdo->lastInsertId();
 }
