@@ -128,6 +128,15 @@ try {
     $abgelaufen = !$entschieden && !empty($b['gueltig_bis']) && !portal_leeres_datum($b['gueltig_bis'])
         && substr((string)$b['gueltig_bis'], 0, 10) < $heute;
 
+    // Rechnungen haben kein Gueltig-bis/Annehmen-Ablehnen, dafuer Bezahlt und
+    // ein Faellig-bis, dessen Ueberschreiten dem Kunden ebenso deutlich
+    // angezeigt wird wie ein abgelaufener Offerten-Link (Projektinhaber-
+    // Entscheidung 2026-08-28).
+    $bezahlt = $b['art'] === 'rechnung' && !empty($b['bezahlt']);
+    $ueberfaellig = $b['art'] === 'rechnung' && !$bezahlt
+        && !empty($b['faellig_bis']) && !portal_leeres_datum($b['faellig_bis'])
+        && substr((string)$b['faellig_bis'], 0, 10) < $heute;
+
     // 'angeschaut' ist ohne Kundenportal von Hand gesetzt worden (siehe
     // belege.php) -- jetzt WEISS das System es, wenn diese Seite zum ersten
     // Mal aufgerufen wird. Eine bereits getroffene Entscheidung oder ein
@@ -196,8 +205,12 @@ try {
         $hinweis = '<div class="hinweis hinweis-an">Angenommen am ' . portal_dmy(substr((string)$b['entscheidung_am'], 0, 10)) . '.</div>';
     } elseif ($b['status'] === 'abgelehnt' && $entschieden) {
         $hinweis = '<div class="hinweis hinweis-ab">Abgelehnt am ' . portal_dmy(substr((string)$b['entscheidung_am'], 0, 10)) . '.</div>';
+    } elseif ($bezahlt) {
+        $hinweis = '<div class="hinweis hinweis-an">Bezahlt am ' . portal_dmy($b['bezahlt_am']) . '.</div>';
     } elseif ($abgelaufen) {
         $hinweis = '<div class="hinweis hinweis-versendet">Dieser Link ist abgelaufen. Bitte wenden Sie sich an den Absender.</div>';
+    } elseif ($ueberfaellig) {
+        $hinweis = '<div class="hinweis hinweis-ab">Diese Rechnung ist seit dem ' . portal_dmy($b['faellig_bis']) . ' überfällig.</div>';
     } elseif ($b['art'] === 'offerte') {
         $hinweis = '<div class="hinweis hinweis-versendet">Bitte prüfen Sie die Offerte und teilen Sie uns Ihre Entscheidung mit.</div>';
         $knoepfe = '<form method="post" action="beleg_entscheidung.php" class="keindruck" style="margin-top:24px;display:flex;gap:12px;flex-wrap:wrap">'
@@ -215,6 +228,7 @@ try {
         . '<table style="line-height:1.5;width:auto"><tr><td style="padding:2px 24px 2px 0;color:#6B7280;font-size:12px">' . portal_esc($titel) . 'nummer</td><td style="padding:2px 0;font-size:12px">' . portal_esc($b['nummer']) . '</td></tr>'
         . '<tr><td style="padding:2px 24px 2px 0;color:#6B7280;font-size:12px">Datum</td><td style="padding:2px 0;font-size:12px">' . portal_dmy($b['datum']) . '</td></tr>'
         . (!portal_leeres_datum($b['gueltig_bis']) ? '<tr><td style="padding:2px 24px 2px 0;color:#6B7280;font-size:12px">Gültig bis</td><td style="padding:2px 0;font-size:12px">' . portal_dmy($b['gueltig_bis']) . '</td></tr>' : '')
+        . (!portal_leeres_datum($b['faellig_bis'] ?? null) ? '<tr><td style="padding:2px 24px 2px 0;color:#6B7280;font-size:12px">Fällig bis</td><td style="padding:2px 0;font-size:12px">' . portal_dmy($b['faellig_bis']) . '</td></tr>' : '')
         . '</table>'
         . '<div style="line-height:1.5;font-size:12px;min-width:200px">' . implode('<br>', array_map('portal_esc', $empfaenger)) . '</div>'
         . '</div>'
