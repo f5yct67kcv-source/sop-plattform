@@ -30,9 +30,17 @@ const phpDateien = readdirSync(`${WURZEL}/backend/api`)
 
 for (const seite of [...seiten, ...phpDateien]) {
   const html = readFileSync(`${WURZEL}/${seite}`, 'utf8');
-  // Nur eigene Dateien, keine fremden Adressen.
-  const skripte = [...html.matchAll(/<script\s+src="([^"]+)"/g)]
-    .map(m => m[1].replace(/^\//, ''))
+  // Nur eigene Dateien, keine fremden Adressen. Zwei Muster: ein literales
+  // <script src="…"> UND ein per JS nachgeladenes Skript (s.src = "…js"),
+  // wie beleg_oeffentlich.php es fuer html2pdf.bundle.min.js macht (ENT-206)
+  // -- ein Skript, das erst bei Klick nachgeladen wird, steht nie als
+  // literales <script>-Tag im HTML.
+  const skripte = [
+    ...[...html.matchAll(/<script\s+src="([^"]+)"/g)].map(m => m[1]),
+    ...[...html.matchAll(/\.src\s*=\s*"([^"]+\.js)"/g)].map(m => m[1]),
+  ]
+    .map(q => q.replace(/^\//, ''))
+    .filter((q, i, arr) => arr.indexOf(q) === i)
     .filter(q => !/^https?:\/\//.test(q));
   for (const q of skripte) {
     check(`${seite} lädt ${q} — die Datei gibt es`, existsSync(`${WURZEL}/${q}`));

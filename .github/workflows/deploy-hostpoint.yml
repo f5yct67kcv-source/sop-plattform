@@ -30,6 +30,10 @@ jobs:
           # scannt nur diese beiden auf lokale Skripte, darum hier von Hand
           # eingetragen wie gav.js/zeitwahl.js oben.
           cp qrcode.js dist/qrcode.js
+          # html2pdf.bundle.min.js (ENT-206): erst bei Klick auf "Herunter-
+          # laden" per JS nachgeladen, deshalb kein literales <script>-Tag im
+          # HTML -- test_deploy.mjs prueft trotzdem, dass sie hier steht.
+          cp html2pdf.bundle.min.js dist/html2pdf.bundle.min.js
           cp manifest.json dist/manifest.json
           cp sw.js dist/sw.js
           cp icons/*.png dist/icons/
