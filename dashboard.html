@@ -7743,10 +7743,10 @@ function ofMenuSchliessen() {
 }
 
 // Dasselbe Zeilenmenue, aber fuer die Rechnungen-Liste (ENT-181-Ausbaustufe):
-// statt Statuswechsel zu "bestaetigt"/"abgelehnt" steht hier die bezahlt/
-// unbezahlt-Markierung, statt "Per E-Mail versenden" (noch keine
-// Kundenportal-Anbindung fuer Rechnungen) "Bearbeiten"/"Drucken" wie im
-// Offerten-Zeilenmenue.
+// statt Statuswechsel zu "bestaetigt"/"abgelehnt" steht hier zusaetzlich die
+// bezahlt/unbezahlt-Markierung. "Per E-Mail versenden" gibt es -- wie beim
+// Offerten-Zeilenmenue auch -- hier bewusst nicht: der Versand haengt am
+// gerade offenen Formular (ofFormMenuOeffnen), nicht an der Listenzeile.
 function reMenuOeffnen(ev, id) {
   ev.stopPropagation();
   const b = rechnungen.find(x => Number(x.id) === Number(id));
@@ -7781,13 +7781,16 @@ function ofFormMenuOeffnen(ev) {
   const id = ofFormId;
   const statusKnoepfe = belegStatusOptionen(ofArt, ofFormStatus).map(s =>
     `<button onclick="ofMenuSchliessen(); ofStatusSetzen(${id}, '${s.wert}', '${ofArt}')">Als „${esc(s.text)}" markieren</button>`).join('');
-  // "Per E-Mail versenden" gibt es nur fuer Offerten -- die Rechnung hat noch
-  // keine eigene Kundenportal-Seite, dafuer die bezahlt/unbezahlt-Markierung.
-  const versandOderBezahlt = ofArt === 'rechnung'
+  // "Per E-Mail versenden" gibt es fuer beide Belegarten (ENT-192/ENT-203) --
+  // die Rechnung hat zusaetzlich die bezahlt/unbezahlt-Markierung, die eine
+  // Offerte nicht braucht.
+  const versandKnopf = `<button onclick="ofMenuSchliessen(); ofVersenden(${id})">Per E-Mail versenden</button>`;
+  const bezahltKnopf = ofArt === 'rechnung'
     ? `<button onclick="ofMenuSchliessen(); reBezahltKlick(${id}, ${ofFormBezahlt ? 0 : 1})">${ofFormBezahlt ? 'Als unbezahlt markieren' : 'Als bezahlt markieren'}</button>`
-    : `<button onclick="ofMenuSchliessen(); ofVersenden(${id})">Per E-Mail versenden</button>`;
+    : '';
   pop.innerHTML = `
-    ${versandOderBezahlt}
+    ${versandKnopf}
+    ${bezahltKnopf}
     <hr>
     ${statusKnoepfe}
     <hr>
@@ -7894,6 +7897,9 @@ const OF_ART_TEXT = {
     fehlerDatum: 'Ein Offertendatum ist erforderlich.',
     fehlerZweit: '„Gültig bis" liegt vor dem Offertendatum.',
     angelegt: 'Offerte angelegt.', gespeichert: 'Offerte gespeichert.',
+    versandFrage: 'Offerte per E-Mail versenden?',
+    versandText: 'Der Kunde erhält eine E-Mail mit einem Link zur Offerte. Dort kann er sie direkt annehmen oder ablehnen.',
+    versandErfolg: 'Offerte per E-Mail verschickt.',
   },
   rechnung: {
     dokument: 'Rechnung', neu: 'Neue Rechnung', liste: 'Rechnungsliste',
@@ -7902,6 +7908,9 @@ const OF_ART_TEXT = {
     fehlerDatum: 'Ein Rechnungsdatum ist erforderlich.',
     fehlerZweit: '„Fällig am" liegt vor dem Rechnungsdatum.',
     angelegt: 'Rechnung angelegt.', gespeichert: 'Rechnung gespeichert.',
+    versandFrage: 'Rechnung per E-Mail versenden?',
+    versandText: 'Der Kunde erhält eine E-Mail mit einem Link zur Rechnung.',
+    versandErfolg: 'Rechnung per E-Mail verschickt.',
   },
 };
 
@@ -8436,15 +8445,14 @@ function ofVorschau(id) {
 // Sicherheitsabfrage vorher, weil eine einmal verschickte Mail sich nicht
 // zurueckholen laesst.
 function ofVersenden(id) {
-  if (!id) { toast('Die Offerte muss zuerst gespeichert werden.'); return; }
-  askConfirm('Offerte per E-Mail versenden?',
-    'Der Kunde erhält eine E-Mail mit einem Link zur Offerte. Dort kann er sie direkt annehmen oder ablehnen.',
-    'Versenden', () => {
+  const t = OF_ART_TEXT[ofArt];
+  if (!id) { toast('Die ' + t.dokument + ' muss zuerst gespeichert werden.'); return; }
+  askConfirm(t.versandFrage, t.versandText, 'Versenden', () => {
       api('beleg_versenden.php', { method: 'POST', body: { id: Number(id) } }).then(({ ok, data }) => {
         if (!ok || data.status !== 'ok') { toast(data.message || 'Versand fehlgeschlagen.'); return; }
-        toast('Offerte per E-Mail verschickt.');
+        toast(t.versandErfolg);
         if (ofFormId === Number(id)) { ofFormStatus = 'versendet'; ofFormSubZeichnen(); }
-        loadBelege();
+        belegListeAktualisieren(ofArt);
       }).catch(() => toast('Versand fehlgeschlagen.'));
     });
 }

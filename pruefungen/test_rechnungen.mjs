@@ -67,6 +67,8 @@ const STATS = { status: 'ok',
 let belegListArten = [];
 let gespeichert = null;
 let bezahltRufe = [];
+let versendenRufe = [];
+let versendenAntwort = { status: 'ok' };
 
 const browser = await chromium.launch({ executablePath: browserPfad() });
 const page = await browser.newPage({ viewport: { width: 1500, height: 1000 } });
@@ -87,6 +89,10 @@ await page.route('**/api/**', async route => {
     const body = JSON.parse(route.request().postData() || '{}');
     bezahltRufe.push(body);
     return send({ status: 'ok', bezahlt: body.bezahlt ? 1 : 0, bezahlt_am: body.bezahlt ? tag(0) : null });
+  }
+  if (url.includes('beleg_versenden')) {
+    versendenRufe.push(JSON.parse(route.request().postData() || '{}'));
+    return send(versendenAntwort);
   }
   if (url.includes('beleg_lesen')) {
     const id = Number(new URLSearchParams(url.split('?')[1] || '').get('id'));
@@ -236,6 +242,53 @@ try {
   await page.click('#rowmenuPop >> text=Als bezahlt markieren'); await page.waitForTimeout(300);
   check('KRITISCH: das sendet id und bezahlt:1 an beleg_bezahlt.php',
     bezahltRufe.length === 1 && Number(bezahltRufe[0].bezahlt) === 1 && Number(bezahltRufe[0].id) === 101);
+
+  // ── Dieselbe Architektur wie bei Offerten: Vorschau/Versand/Angeschaut ────
+  // (ENT-192-Erweiterung auf Rechnungen, 28.08.2026)
+  await page.evaluate(() => ofOeffnen(101));
+  await page.waitForTimeout(300);
+  check('Der Vorschau-Knopf ist auch bei einer Rechnung sichtbar',
+    (await page.evaluate(() => document.getElementById('ofFormVorschauBtn').style.display)) !== 'none');
+
+  await page.click('#ofFormMenuBtn'); await page.waitForTimeout(200);
+  check('KRITISCH: das Dreipunkt-Menue bietet bei einer Rechnung BEIDE Knoepfe an, nicht nur einen',
+    (await page.textContent('#rowmenuPop')).includes('Per E-Mail versenden')
+    && (await page.textContent('#rowmenuPop')).includes('Als bezahlt markieren'));
+
+  // Erst auf "Entwurf" zurueckstellen, damit der Versand-Test zeigt, dass er
+  // den Status tatsaechlich aendert (gleiches Muster wie bei den Offerten).
+  await page.click('#rowmenuPop button:has-text("Entwurf")'); await page.waitForTimeout(200);
+  check('Status steht jetzt auf "Entwurf" -- Ausgangslage fuer die naechste Pruefung',
+    (await page.textContent('#ofFormSub')).includes('Entwurf'));
+
+  versendenRufe.length = 0;
+  await page.click('#ofFormMenuBtn'); await page.waitForTimeout(200);
+  await page.click('#rowmenuPop button:has-text("Per E-Mail versenden")'); await page.waitForTimeout(150);
+  check('KRITISCH: der Versand fragt erst nach, statt sofort eine Mail zu verschicken',
+    await page.evaluate(() => document.getElementById('dlgConfirm').classList.contains('on'))
+    && versendenRufe.length === 0);
+  check('KRITISCH: die Nachfrage spricht von "Rechnung", nicht von "Offerte"',
+    (await page.textContent('#cfTitel')).includes('Rechnung per E-Mail versenden'));
+  check('Und erwaehnt kein Annehmen/Ablehnen -- das gibt es bei Rechnungen nicht',
+    !(await page.textContent('#cfText')).includes('annehmen'));
+  // Nach dem Versand aktualisiert sich die RECHNUNGEN-Liste, nicht die
+  // Offerten-Liste -- ofVersenden() muss den Refresh auf ofArt verzweigen,
+  // nicht blind loadBelege() rufen. Direkt vor dem Bestaetigen zuruecksetzen,
+  // damit nur dieser eine Refresh gezaehlt wird.
+  belegListArten.length = 0;
+  await page.click('#cfBtn'); await page.waitForTimeout(300);
+  check('KRITISCH: die Bestaetigung ruft beleg_versenden.php mit der richtigen Id auf',
+    versendenRufe.length === 1 && versendenRufe[0].id === 101);
+  check('KRITISCH: nach erfolgreichem Versand steht der Status auf "Versendet"',
+    (await page.textContent('#ofFormSub')).includes('Versendet'));
+  check('KRITISCH: der Listen-Refresh nach dem Versand ruft art=rechnung ab, nicht art=offerte',
+    belegListArten.length === 1 && belegListArten[0] === 'rechnung');
+
+  // Zurueck in die Kunden-Ansicht, bevor der naechste Abschnitt Kunden-Reiter
+  // anklickt -- die Nav-Knoepfe dort sind nur sichtbar, waehrend man auf der
+  // Kunden-Seite steht, nicht mitten im offenen Beleg-Formular.
+  await page.evaluate(() => { go('kunden'); kuGoTab('rechnungen'); });
+  await page.waitForTimeout(200);
 
   // ── Offerten- und Rechnungen-Liste ueberschreiben sich nicht ──────────────
   await page.click('#nav-kunden-offerten'); await page.waitForTimeout(200);

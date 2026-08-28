@@ -73,9 +73,15 @@ $titel = BELEG_ARTEN[$beleg['art']]['titel'] ?? 'Beleg';
 $absenderName = $firma !== '' ? $firma : 'Ihr Ansprechpartner';
 $betreff = "Neue $titel {$beleg['nummer']}" . ($firma !== '' ? " von $firma" : '');
 
+// Annehmen/Ablehnen gibt es nur bei der Offerte (siehe beleg_oeffentlich.php)
+// -- die Rechnung hat auf der Kundenseite keine Entscheidung, nur die Ansicht.
+$ansehenText = $beleg['art'] === 'offerte'
+    ? "Sie können die $titel hier ansehen und direkt beantworten:"
+    : "Sie können die $titel hier ansehen:";
+
 $text = "Guten Tag\n\n"
     . "$absenderName hat Ihnen eine neue $titel erstellt: {$beleg['nummer']}.\n\n"
-    . "Sie können die $titel hier ansehen und direkt beantworten:\n$link\n\n"
+    . "$ansehenText\n$link\n\n"
     . "Freundliche Grüsse\n$absenderName";
 
 $html = '<div style="font-family:-apple-system,Segoe UI,Arial,sans-serif;color:#14161A;max-width:520px">'
