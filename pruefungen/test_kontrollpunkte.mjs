@@ -87,6 +87,10 @@ const zurObjekt = async () => {
 await setup(page, null);
 await anmelden();
 await zurObjekt();
+// Kontrollpunkte sitzen seit der Reiter-Umstellung (Wunsch des Projekt-
+// inhabers, 2026-08-28) in einem eigenen, zunaechst inaktiven Reiter.
+await page.click('#obtab-kontrollpunkte');
+await page.waitForTimeout(150);
 
 check('Kontrollpunkte geladen', calls.some(c => c.path.includes('kontrollpunkt_liste')));
 check('Oeffnen der Objekt-Detailseite schreibt nichts', writes().length === 0);
@@ -164,6 +168,7 @@ await page.waitForTimeout(200);
 await setup(page, ['plan', 'kunden']);
 await anmelden();
 await zurObjekt();
+check('KRITISCH: ohne rundgang_verwalten erscheint der Reiter selbst nicht', !(await page.isVisible('#obtab-kontrollpunkte')));
 check('KRITISCH: ohne rundgang_verwalten erscheint die Zone nicht', !(await page.isVisible('#kpListe')));
 check('KRITISCH: ohne das Recht wird kontrollpunkt_liste gar nicht erst aufgerufen',
   !calls.some(c => c.path.includes('kontrollpunkt_liste')));
@@ -172,6 +177,8 @@ check('KRITISCH: ohne das Recht wird kontrollpunkt_liste gar nicht erst aufgeruf
 await setup(page, null);
 await anmelden();
 await zurObjekt();
+await page.click('#obtab-kontrollpunkte');
+await page.waitForTimeout(150);
 await page.click('#kpListe ~ div button:has-text("Kontrollpunkt hinzufügen")');
 await page.waitForSelector('#dlgKp.on');
 await page.setViewportSize({ width: 390, height: 844 });

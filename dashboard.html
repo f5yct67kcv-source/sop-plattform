@@ -1153,6 +1153,8 @@ tbody tr.heute td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
 .ku-tab.on { display: block; }
 .kd-tab { display: none; }
 .kd-tab.on { display: block; }
+.ob-tab { display: none; }
+.ob-tab.on { display: block; }
 
 /* Kundendialog (ENT-044): ein Formular fuer Anlegen und Bearbeiten, mit
    wiederholbaren Kommunikationszeilen und Ansprechpersonen. */
@@ -3669,7 +3671,18 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
             <div class="sub" id="obDetSub">–</div>
           </div>
         </div>
-        <div id="obDetBody"></div>
+        <!-- Reiter statt einer langen Seite (Wunsch des Projektinhabers,
+             2026-08-28): Masterschichten und Kontrollpunkte sind eigene
+             Themen, kein Fliesstext einer einzigen Übersicht. Gleiches
+             Muster wie die Kunden-Detailseite (kd-tab, ENT-040). -->
+        <div class="tabs" id="obTabs" style="margin-bottom:14px">
+          <button class="tab on" id="obtab-uebersicht" onclick="obGoTab('uebersicht')">Übersicht</button>
+          <button class="tab" id="obtab-masterschichten" onclick="obGoTab('masterschichten')">Masterschichten</button>
+          <button class="tab" id="obtab-kontrollpunkte" onclick="obGoTab('kontrollpunkte')">Kontrollpunkte</button>
+        </div>
+        <div class="ob-tab on" id="ob-uebersicht"></div>
+        <div class="ob-tab" id="ob-masterschichten"></div>
+        <div class="ob-tab" id="ob-kontrollpunkte"></div>
       </section>
 
       <!-- ══════════════════════════ PENSEN ══════════════════════════
@@ -12259,7 +12272,8 @@ function openObjekt(id) {
   $('obDetName').textContent = o.name;
   $('obDetSub').textContent = o.kunde_name + (o.aktiv ? '' : ' · stillgelegt');
   $('pgCrumb').textContent = o.kunde_name;
-  $('obDetBody').innerHTML = `
+
+  $('ob-uebersicht').innerHTML = `
     <div class="card"><div class="card-bd">
       <dl class="dl">
         <dt>Adresse</dt><dd>${o.strasse ? esc(o.strasse) + ', ' : ''}${esc(o.ort)}</dd>
@@ -12275,7 +12289,14 @@ function openObjekt(id) {
       </div>
     </div></div>
 
-    <div class="zone" style="margin-top:20px">
+    <div class="zone danger" style="margin-top:20px">
+      <div class="zone-hd">Objekt entfernen</div>
+      <div class="zone-note">Sind bereits Schichten daraus entstanden, wird das Objekt nur stillgelegt — geplante und vergangene Einsätze bleiben unverändert erhalten.</div>
+      <button class="btn btn-danger btn-sm" onclick="askDeleteObjekt()">Entfernen</button>
+    </div>`;
+
+  $('ob-masterschichten').innerHTML = `
+    <div class="zone">
       <div class="zone-hd">Masterschichten</div>
       <div class="zone-note">Vorlagen, aus denen die einzelnen Schichten entstehen. Eine Änderung gilt immer <b>ab einem Stichtag</b> — bereits erzeugte Schichten bleiben unverändert.</div>
       <div id="msListe"><div class="sk" style="height:52px"></div></div>
@@ -12297,26 +12318,34 @@ function openObjekt(id) {
            nicht im Quelltext vermutet) -- die alte Seite fing das ueber
            .card-bd.flush ab, das fehlt einem blossen .zone. -->
       <div id="msSeiteBedarf" style="margin-top:10px;overflow-x:auto"></div>
-    </div>
-
-    ${darf('rundgang_verwalten') ? `
-    <div class="zone" style="margin-top:20px">
-      <div class="zone-hd">Kontrollpunkte</div>
-      <div class="zone-note">NFC- oder Geofence-Punkte für Wachrundgänge an diesem Objekt. Eine spätere Änderung wirkt nur auf künftige Rundgänge — bereits durchgeführte bleiben als Nachweis unverändert.</div>
-      <div id="kpListe"><div class="sk" style="height:52px"></div></div>
-      <div style="display:flex;gap:8px;margin-top:10px">
-        <button class="btn btn-primary btn-sm" onclick="openKp('neu')">Kontrollpunkt hinzufügen</button>
-      </div>
-    </div>` : ''}
-
-    <div class="zone danger">
-      <div class="zone-hd">Objekt entfernen</div>
-      <div class="zone-note">Sind bereits Schichten daraus entstanden, wird das Objekt nur stillgelegt — geplante und vergangene Einsätze bleiben unverändert erhalten.</div>
-      <button class="btn btn-danger btn-sm" onclick="askDeleteObjekt()">Entfernen</button>
     </div>`;
+
+  // Reiter selbst ist immer da, sein Inhalt nur mit dem Recht -- ohne das
+  // Recht wird kontrollpunkt_liste gar nicht erst aufgerufen (ENT-169).
+  $('obtab-kontrollpunkte').style.display = darf('rundgang_verwalten') ? '' : 'none';
+  if (darf('rundgang_verwalten')) {
+    $('ob-kontrollpunkte').innerHTML = `
+      <div class="zone">
+        <div class="zone-hd">Kontrollpunkte</div>
+        <div class="zone-note">NFC- oder Geofence-Punkte für Wachrundgänge an diesem Objekt. Eine spätere Änderung wirkt nur auf künftige Rundgänge — bereits durchgeführte bleiben als Nachweis unverändert.</div>
+        <div id="kpListe"><div class="sk" style="height:52px"></div></div>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button class="btn btn-primary btn-sm" onclick="openKp('neu')">Kontrollpunkt hinzufügen</button>
+        </div>
+      </div>`;
+  }
+
+  obGoTab('uebersicht');
   msAlle = false;
   loadMasterschichten();
   if (darf('rundgang_verwalten')) { loadKontrollpunkte(); }
+}
+
+function obGoTab(t) {
+  document.querySelectorAll('#obTabs .tab').forEach(b => b.classList.remove('on'));
+  document.querySelectorAll('#view-objekt .ob-tab').forEach(v => v.classList.remove('on'));
+  $('obtab-' + t).classList.add('on');
+  $('ob-' + t).classList.add('on');
 }
 
 function msAlleUm() { msAlle = !msAlle; loadMasterschichten(); }
