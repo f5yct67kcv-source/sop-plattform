@@ -210,13 +210,33 @@ check('Der Ausdruck entsteht trotzdem — ein fehlender Briefkopf blockiert nich
 check('Ohne Fusszeile steht keine leere Fusszeile da',
   !/border-top:1px solid #E5E8EC;font-size:10.5px/.test(html));
 
-// ── Briefkopf pflegen
+// ── Betrieb: Kachel-Uebersicht statt einer langen Kartenspalte (ENT-210) ──
 await page.evaluate(() => { go('betrieb'); });
 await page.waitForTimeout(500);
-check('KRITISCH: die Karte "Briefkopf für Rapporte" steht im Betriebsbereich',
-  await page.isVisible('#bkKarte'));
+check('KRITISCH: der Betriebsbereich startet auf der Kachel-Uebersicht, nicht mitten in einer Sektion',
+  await page.isVisible('#bkUebersicht') && !(await page.isVisible('#bkKarte')));
+// Nicht auf "4 Kacheln" pruefen: "Rollen im Betrieb" bleibt ohne das Recht
+// "rechte" absichtlich weg (siehe rvLaden(), ENT-210) -- dieser Mock-Nutzer
+// hat nur "betrieb". Stattdessen: mindestens die Briefkopf-Kachel steht da,
+// mit einem deutlich groesseren Icon als frueher in der Kartenkopfzeile
+// (dort 16px, siehe ".card-ic svg.i").
+check('KRITISCH: die Briefkopf-Kachel hat ein deutlich groesseres Icon als das alte Karten-Icon',
+  await page.evaluate(() => {
+    const svg = document.querySelector('#bkUebersicht .bk-kachel .bk-kachel-ic svg.i');
+    return !!svg && svg.getBoundingClientRect().width >= 24;
+  }));
+await page.click('.bk-kachel:has-text("Briefkopf für Rapporte")');
+await page.waitForTimeout(200);
+check('KRITISCH: die Kachel fuehrt auf die Karte "Briefkopf für Rapporte"',
+  await page.isVisible('#bkKarte') && !(await page.isVisible('#bkUebersicht')));
 check('Sie sagt, dass diese Angaben an Kunden herausgehen',
   /Kunden zu sehen/.test(await page.textContent('#bkKarte')));
+await page.click('.bk-zurueck');
+await page.waitForTimeout(150);
+check('KRITISCH: "Zurück" fuehrt wieder auf die Kachel-Uebersicht',
+  await page.isVisible('#bkUebersicht') && !(await page.isVisible('#bkKarte')));
+await page.click('.bk-kachel:has-text("Briefkopf für Rapporte")');
+await page.waitForTimeout(200);
 await page.fill('#bkFirma', 'CUPI 24 GmbH');
 await page.fill('#bkZusatz', 'Sicherheits- und Verkehrsdienst');
 await page.fill('#bkFuss', 'Musterweg 1 · 4600 Olten · 062 000 00 00');
@@ -269,7 +289,7 @@ check('KRITISCH: die QR-Rechnungsangaben werden mitgespeichert',
 // Erneutes Oeffnen der Ansicht laedt die gespeicherten Werte wieder ein.
 await page.evaluate(() => { go('kunden'); });
 await page.waitForTimeout(200);
-await page.evaluate(() => { go('betrieb'); });
+await page.evaluate(() => { go('betrieb'); bkAbschnittZeigen('bk'); });
 await page.waitForTimeout(400);
 check('KRITISCH: die QR-IBAN steht nach dem Neuladen wieder im Feld',
   (await page.inputValue('#bkQrIban')) === 'CH44 3199 9123 0008 8901 2');
@@ -327,7 +347,7 @@ check('Ohne Unterzeichner steht dort keine leere Zeile mit Beschriftung',
   !/Name in Blockschrift/.test(htmlOhne));
 
 // ── Logo
-await page.evaluate(() => { go('betrieb'); });
+await page.evaluate(() => { go('betrieb'); bkAbschnittZeigen('bk'); });
 await page.waitForTimeout(400);
 check('Ohne Logo sagt die Karte das ausdruecklich',
   /Kein Logo hinterlegt/.test(await page.textContent('#bkLogoStand')));
@@ -356,7 +376,7 @@ check('KRITISCH: das Logo steht ueber Firma/Zusatz zentriert statt daneben recht
     return Math.abs((lr.left + lr.width / 2) - (fr.left + fr.width / 2)) < 1;
   }));
 
-await page.evaluate(() => { go('betrieb'); });
+await page.evaluate(() => { go('betrieb'); bkAbschnittZeigen('bk'); });
 await page.waitForTimeout(300);
 await page.click('#bkLogoWeg');
 await page.waitForTimeout(400);
