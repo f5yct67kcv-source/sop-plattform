@@ -40,6 +40,16 @@ if (!empty($quelle['gueltig_bis']) && !empty($quelle['datum'])) {
                  - strtotime((string)$quelle['datum'])) / 86400);
     if ($tage > 0) { $gueltigBis = date('Y-m-d', strtotime("$heute +$tage days")); }
 }
+// faellig_bis (Rechnungen, ENT-181-Ausbaustufe) nach demselben Muster wie
+// gueltig_bis -- derselbe Abstand zum neuen Datum, nicht das alte Datum
+// selbst. bezahlt/bezahlt_am wandern bewusst NICHT mit: der Doppelgaenger
+// faengt als unbezahlt an, wie jeder neue Entwurf.
+$faelligBis = null;
+if (!empty($quelle['faellig_bis']) && !empty($quelle['datum'])) {
+    $tage = (int)((strtotime((string)$quelle['faellig_bis'])
+                 - strtotime((string)$quelle['datum'])) / 86400);
+    if ($tage > 0) { $faelligBis = date('Y-m-d', strtotime("$heute +$tage days")); }
+}
 
 $pdo->beginTransaction();
 try {
@@ -49,12 +59,12 @@ try {
     // Doppelgaenger soll zeigen, was das Original zeigte (ENT-187).
     $pdo->prepare(
         'INSERT INTO belege (art, nummer, kunde_id, person_id, titel, referenz,
-                             datum, gueltig_bis, status, rabatt_bp, bemerkung, ist_vorlage,
+                             datum, gueltig_bis, faellig_bis, status, rabatt_bp, bemerkung, ist_vorlage,
                              unterschriftsseite, oeffentliche_notizen, bedingungen, fusszeile_text)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     )->execute([
         $quelle['art'], $nummer, $quelle['kunde_id'], $quelle['person_id'],
-        $quelle['titel'], $quelle['referenz'], $heute, $gueltigBis,
+        $quelle['titel'], $quelle['referenz'], $heute, $gueltigBis, $faelligBis,
         'entwurf', $quelle['rabatt_bp'], $quelle['bemerkung'], $alsVorlage,
         $quelle['unterschriftsseite'], $quelle['oeffentliche_notizen'],
         $quelle['bedingungen'], $quelle['fusszeile_text'],
