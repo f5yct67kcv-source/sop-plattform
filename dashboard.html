@@ -3824,6 +3824,13 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
           <div class="card-hd">
             <h2>Positionen</h2>
             <div class="sp" style="flex:1"></div>
+            <!-- Neues Produkt direkt hier anlegen, ohne in den Bereich
+                 Produkte zu wechseln (ENT-215) -- oeffnet denselben Dialog
+                 wie dort und uebernimmt das Ergebnis in eine neue Position. -->
+            <button class="btn btn-plain btn-sm" onclick="ofNeuesProduktAnlegen()">
+              <svg class="i i-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Neues Produkt
+            </button>
             <button class="btn btn-plain btn-sm" onclick="ofZeileHinzu()">
               <svg class="i i-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               Position hinzufügen
@@ -5340,6 +5347,13 @@ let pdSortFeld = 'sortierung';
 let pdSortRichtung = 'auf';
 let pdArchivTab = 'alle';
 let pdDlgId = null;         // im Produktdialog bearbeitetes Produkt, null = anlegen
+// Woher der Produktdialog geoeffnet wurde (ENT-215): aus dem Bereich
+// Produkte selbst, oder aus einer Offert-/Rechnungsposition heraus. Im
+// zweiten Fall bekommt die aktuelle Position das neu angelegte Produkt
+// direkt zugewiesen, statt nur den Katalog zu ergaenzen -- der ganze Sinn
+// der Vorgabe war, dafuer NICHT den Bereich wechseln zu muessen.
+let pdOfferteKontext = false;
+let pdOfferteZeile = null;  // Index der Position, die das neue Produkt uebernimmt
 let kuDlgId = null;         // im Kundendialog bearbeiteter Kunde, null = anlegen
 let kuDlgTabAktiv = 'kommunikation';
 let kuWege = [];            // Kommunikationszeilen der Firma im offenen Dialog
@@ -7466,6 +7480,7 @@ function pdMwstFuellen(gewaehlt) {
 
 function pdNeu() {
   pdDlgId = null;
+  pdOfferteKontext = false;
   $('prodTitel').textContent = 'Neues Produkt';
   $('prodErr').style.display = 'none';
   $('prod_name').value = '';
@@ -7480,10 +7495,24 @@ function pdNeu() {
   setTimeout(() => $('prod_name').focus(), 60);
 }
 
+// Denselben Produktdialog aus einer Offert-/Rechnungsposition heraus oeffnen
+// (ENT-215) -- Vorbild eines vom Projektinhaber gezeigten Fremdsystems, aber
+// ohne dessen eigenen Produktkatalog-Dialog nachzubauen: der bestehende
+// Aufploppen-Dialog aus dem Bereich Produkte reicht, wie ausdruecklich
+// gewuenscht ("das Aufploppen von Fenster genügt"). Uebernimmt danach das
+// eben angelegte Produkt automatisch in GENAU die Zeile, aus der heraus
+// angelegt wurde -- kein Wechsel in den Admin-Bereich und zurueck noetig.
+function pdNeuAusOffer(zeile) {
+  pdNeu();
+  pdOfferteKontext = true;
+  pdOfferteZeile = zeile;
+}
+
 function pdBearbeiten(id) {
   const p = produkte.find(x => Number(x.id) === Number(id));
   if (!p) { return; }
   pdDlgId = Number(id);
+  pdOfferteKontext = false;
   $('prodTitel').textContent = 'Produkt bearbeiten';
   $('prodErr').style.display = 'none';
   $('prod_name').value = p.name || '';
@@ -7522,7 +7551,16 @@ function pdSpeichern() {
     }
     closeDlg('dlgProdukt');
     toast(pdDlgId ? 'Produkt geändert.' : 'Produkt angelegt.');
-    loadProdukte();
+    // Aus einer Offertposition heraus angelegt (ENT-215, pdNeuAusOffer):
+    // das neue Produkt in GENAU diese Zeile uebernehmen, sobald der Katalog
+    // es kennt -- dieselbe Namensuebereinstimmung wie beim Waehlen aus der
+    // Eingabehilfe (ofProduktUebernehmen), nur ausgeloest statt getippt.
+    const ziel = pdOfferteKontext ? pdOfferteZeile : null;
+    pdOfferteKontext = false;
+    pdOfferteZeile = null;
+    loadProdukte().then(() => {
+      if (ziel !== null && ofPos[ziel]) { ofProduktUebernehmen(ziel, name); }
+    });
   }).catch(() => {
     $('prodSaveBtn').disabled = false;
     $('prodErr').textContent = 'Speichern fehlgeschlagen.';
@@ -8345,6 +8383,18 @@ function ofZeileHinzu() {
   ofPos.push(ofLeereZeile());
   ofZeilenZeichnen();
   setTimeout(() => { const f = $('ofp_name' + (ofPos.length - 1)); if (f) { f.focus(); } }, 40);
+}
+
+// "Neues Produkt" im Offert-/Rechnungsformular (ENT-215): eine neue,
+// zunaechst leere Position anlegen -- wie ofZeileHinzu() -- und sofort den
+// Produktdialog dafuer oeffnen, statt in den Bereich Produkte wechseln zu
+// muessen. Bricht der Dialog ab, bleibt eine leere Position stehen, genau
+// wie nach einem normalen "Position hinzufügen" ohne Eingabe -- entfernbar
+// über denselben Papierkorb-Knopf wie jede andere Zeile.
+function ofNeuesProduktAnlegen() {
+  ofPos.push(ofLeereZeile());
+  ofZeilenZeichnen();
+  pdNeuAusOffer(ofPos.length - 1);
 }
 
 function ofZeileWeg(i) {
