@@ -129,41 +129,55 @@ function require_session(): array {
     return $row;
 }
 
+// Bildet einen unbehandelten Fehler auf eine fuer den Browser sichere
+// Meldung ab. Eigene, benannte Funktion statt eine anonyme Funktion direkt
+// in set_exception_handler() -- nur so laesst sich die Zuordnung fuer sich
+// pruefen (siehe pruefungen/pruef_db_fehler.php), ohne einen echten
+// Datenbankfehler herbeifuehren zu muessen.
+function db_fehlermeldung(Throwable $e): string {
+    if (!($e instanceof PDOException)) {
+        return 'Unerwarteter Serverfehler';
+    }
+    switch ((string)$e->getCode()) {
+        // Beide Meldungen nennen den Weg, den es HEUTE gibt. Bis hierher
+        // verwiesen sie auf schema_planung.sql in phpMyAdmin -- seit
+        // ENT-033 traegt die Einrichtung fehlende Tabellen und Spalten
+        // selbst nach, und der alte Text schickte zu einer Datei, die
+        // niemand mehr von Hand ausfuehrt. Eine Fehlermeldung, die den
+        // falschen Ausweg nennt, kostet mehr Zeit als gar keine.
+        case '42S02':   // Tabelle fehlt
+            return 'Eine benoetigte Tabelle fehlt in der Datenbank. '
+                . 'Im Dashboard unten links „Einrichtung" oeffnen und '
+                . '„Pruefen und einrichten" ausfuehren.';
+        case '42S22':   // Spalte fehlt
+            return 'Eine benoetigte Spalte fehlt in der Datenbank. '
+                . 'Das passiert nach einer Neuerung, deren Einrichtung noch nicht gelaufen ist: '
+                . 'im Dashboard unten links „Einrichtung" oeffnen und '
+                . '„Pruefen und einrichten" ausfuehren.';
+        case '23000':   // Fremdschluessel oder Eindeutigkeit verletzt
+            return 'Der Datensatz verletzt eine Regel der Datenbank '
+                . '(Verweis auf einen fehlenden Eintrag oder doppelter Wert).';
+        default:
+            // Der SQLSTATE-Code allein (z. B. "HY000", "22001") verraet
+            // weder Tabellen- noch Spaltennamen -- er laesst sich aber bei
+            // einem sonst nicht eingeordneten Fehler nachschlagen, statt im
+            // Dunkeln zu suchen (ENT-216 -- ausgeloest durch einen echten
+            // Fehlschlag beim Produktanlegen, der bis dahin nur "Datenbank-
+            // fehler" ohne jede weitere Spur zeigte). Der native Treiber-
+            // code dahinter (errorInfo[1], z. B. 1364 "Field doesn't have a
+            // default value") grenzt es weiter ein, ohne Klartext preiszugeben.
+            $treiber = $e->errorInfo[1] ?? null;
+            return 'Datenbankfehler (' . $e->getCode() . ($treiber !== null ? '/' . $treiber : '') . ')';
+    }
+}
+
 // Ein unbehandelter Fehler darf nie als HTML-Seite herauskommen: die
 // Oberflaeche erwartet JSON und zeigt sonst nur "fehlgeschlagen" ohne Grund.
 // Haeufigster Fall im Alltag ist eine noch nicht ausgefuehrte Schemadatei --
 // darauf wird ausdruecklich hingewiesen, statt den Fehler zu verschlucken.
 set_exception_handler(function (Throwable $e): void {
-    $meldung = 'Unerwarteter Serverfehler';
-    if ($e instanceof PDOException) {
-        switch ((string)$e->getCode()) {
-            // Beide Meldungen nennen den Weg, den es HEUTE gibt. Bis hierher
-            // verwiesen sie auf schema_planung.sql in phpMyAdmin -- seit
-            // ENT-033 traegt die Einrichtung fehlende Tabellen und Spalten
-            // selbst nach, und der alte Text schickte zu einer Datei, die
-            // niemand mehr von Hand ausfuehrt. Eine Fehlermeldung, die den
-            // falschen Ausweg nennt, kostet mehr Zeit als gar keine.
-            case '42S02':   // Tabelle fehlt
-                $meldung = 'Eine benoetigte Tabelle fehlt in der Datenbank. '
-                    . 'Im Dashboard unten links „Einrichtung" oeffnen und '
-                    . '„Pruefen und einrichten" ausfuehren.';
-                break;
-            case '42S22':   // Spalte fehlt
-                $meldung = 'Eine benoetigte Spalte fehlt in der Datenbank. '
-                    . 'Das passiert nach einer Neuerung, deren Einrichtung noch nicht gelaufen ist: '
-                    . 'im Dashboard unten links „Einrichtung" oeffnen und '
-                    . '„Pruefen und einrichten" ausfuehren.';
-                break;
-            case '23000':   // Fremdschluessel oder Eindeutigkeit verletzt
-                $meldung = 'Der Datensatz verletzt eine Regel der Datenbank '
-                    . '(Verweis auf einen fehlenden Eintrag oder doppelter Wert).';
-                break;
-            default:
-                $meldung = 'Datenbankfehler';
-        }
-    }
     // Bewusst ohne technische Einzelheiten: die Meldung geht an den Browser.
-    json_response(['status' => 'error', 'message' => $meldung], 500);
+    json_response(['status' => 'error', 'message' => db_fehlermeldung($e)], 500);
 });
 
 // Ein schwerer Fehler laeuft NICHT durch den Handler oben: Zeitueberschreitung
