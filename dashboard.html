@@ -2718,6 +2718,13 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
                (ENT-181). Die Produkte dagegen sind Preis-Stammdaten und
                liegen unter Administration -- sie gehoeren zu keinem Kunden. -->
           <button class="nav-kind" id="nav-kunden-offerten" onclick="go('kunden'); kuGoTab('offerten')">Offerten</button>
+          <!-- Rechnungen (ENT-181): Grundgeruest, gleicher Aufbau wie die
+               Offerten-Liste (Reiter Alle/Archiviert, Suche, Statusfilter,
+               sortierbare Tabelle) -- noch OHNE eigene Erfassung. belege.art
+               'rechnung' ist serverseitig bereits vorgesehen (Nummernkreis
+               RE-, Summenrechnung), nur die Erfassungsmaske selbst fehlt noch
+               (naechster Schritt, eigene Entscheidung). -->
+          <button class="nav-kind" id="nav-kunden-rechnungen" onclick="go('kunden'); kuGoTab('rechnungen')">Rechnungen</button>
         </div>
       </div>
 
@@ -3584,6 +3591,28 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
             </button>
           </div>
           <div class="card"><div class="card-bd flush"><div class="tw" id="ofTable"></div></div></div>
+        </div>
+
+        <!-- ── Reiter: Rechnungen (ENT-181) ─────────────────────────────────
+             Grundgeruest, identisch zum Offerten-Reiter oben (Alle/Archiviert,
+             Suche, Statusfilter, sortierbare Tabelle) -- ohne "Rechnung
+             erstellen": Es gibt noch keine Erfassungsmaske dafuer, ein Knopf
+             ohne Wirkung waere eine halbfertige Umsetzung, kein Grundgeruest. ── -->
+        <div class="ku-tab" id="kv-rechnungen">
+          <div class="tabs" id="reArchivTabs" style="margin-bottom:10px">
+            <button class="tab on" id="reatab-alle" onclick="reArchivGo('alle')">Alle</button>
+            <button class="tab" id="reatab-archiv" onclick="reArchivGo('archiv')">Archiviert</button>
+          </div>
+          <div class="bar-tools">
+            <div class="search">
+              <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input class="inp" type="search" id="reQ" placeholder="Nummer, Titel, Empfänger oder Referenz …" oninput="renderRechnungen()">
+            </div>
+            <select class="inp" id="reStatus" style="width:auto" onchange="renderRechnungen()">
+              <option value="">Alle Status</option>
+            </select>
+          </div>
+          <div class="card"><div class="card-bd flush"><div class="tw" id="reTable"></div></div></div>
         </div>
 
         <!-- ── Detailseite eines einzelnen Kunden (ENT-040), nur per Klick auf
@@ -5158,6 +5187,15 @@ let kuNaechsteNummer = '';  // Vorschau der nächsten freien Kundennummer (ENT-0
 let ofSortFeld = 'datum';
 let ofSortRichtung = 'ab';
 let ofArchivTab = 'alle';
+// Rechnungen-Liste (ENT-181, Grundgeruest) -- eigener Bestand statt
+// Wiederverwendung von "belege": beide Listen sollen gleichzeitig unabhaengig
+// geladen und sortiert sein koennen, ohne dass die eine Liste die Daten der
+// anderen ueberschreibt.
+let rechnungen = [];
+let reNaechsteNummer = '';
+let reSortFeld = 'datum';
+let reSortRichtung = 'ab';
+let reArchivTab = 'alle';
 // Produkte-Liste
 let pdSortFeld = 'sortierung';
 let pdSortRichtung = 'auf';
@@ -7459,6 +7497,103 @@ function renderOfferten() {
             <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
           </button>
         </td>
+      </tr>`;
+    }).join('') + `</tbody></table>`;
+}
+
+// ── Rechnungen (ENT-181, Grundgeruest) ─────────────────────────────────────
+// Bewusst eigene Funktionen statt renderOfferten() mit einem Art-Parameter
+// wiederzuverwenden: Sobald die Erfassung dazukommt, werden Rechnungen eigene
+// Spalten brauchen (Faellig, Offener Betrag), die auf eine Offerte nicht
+// zutreffen -- eine gemeinsame Funktion mit Verzweigungen fuer beides waere
+// von Anfang an auf Trennung angelegt gewesen, nur unsichtbar in einer Datei.
+function loadRechnungen() {
+  return api('beleg_list.php?art=rechnung').then(({ ok, status, data }) => {
+    if (status === 401) return doLogout();
+    if (status === 403) return;
+    if (!ok || data.status !== 'ok') { toast(data.message || 'Rechnungen konnten nicht geladen werden.'); return; }
+    rechnungen = data.belege || [];
+    reNaechsteNummer = data.naechste_nummer || '';
+    renderRechnungen();
+  });
+}
+
+function reTh(feld, label, num) {
+  const aktiv = reSortFeld === feld;
+  const pfeil = aktiv && reSortRichtung === 'ab' ? '▼' : '▲';
+  return `<th class="sortbar${aktiv ? ' aktiv' : ''}${num ? ' num' : ''}" onclick="reSort('${feld}')">${esc(label)}<span class="pf">${pfeil}</span></th>`;
+}
+function reSort(feld) {
+  reSortRichtung = (reSortFeld === feld && reSortRichtung === 'auf') ? 'ab' : 'auf';
+  reSortFeld = feld;
+  renderRechnungen();
+}
+function reArchivGo(t) {
+  reArchivTab = t;
+  document.querySelectorAll('#reArchivTabs .tab').forEach(b => b.classList.remove('on'));
+  $('reatab-' + t).classList.add('on');
+  renderRechnungen();
+}
+function reEmpfaenger(b) {
+  if (b.kunde_name) { return String(b.kunde_name); }
+  return b.kunde_id ? '(Kunde entfernt)' : '';
+}
+
+function renderRechnungen() {
+  const q = ($('reQ').value || '').toLowerCase().trim();
+  const statusFilter = $('reStatus').value || '';
+  const wollAktiv = reArchivTab === 'alle' ? 1 : 0;
+  const d = rechnungen.filter(b => Number(b.aktiv ?? 1) === wollAktiv
+    && (!statusFilter || b.status === statusFilter)
+    && (!q || [b.nummer, b.titel, b.referenz, reEmpfaenger(b), b.kundennummer]
+        .some(f => String(f || '').toLowerCase().includes(q))));
+
+  d.sort((a, b) => {
+    let c;
+    if (reSortFeld === 'total_rappen') {
+      c = (Number(a.total_rappen) || 0) - (Number(b.total_rappen) || 0);
+    } else if (reSortFeld === 'empfaenger') {
+      c = reEmpfaenger(a).localeCompare(reEmpfaenger(b), 'de', { sensitivity: 'base' });
+    } else {
+      c = String(a[reSortFeld] ?? '').localeCompare(String(b[reSortFeld] ?? ''), 'de', { numeric: true, sensitivity: 'base' });
+    }
+    return reSortRichtung === 'auf' ? c : -c;
+  });
+
+  // Statusfilter ebenfalls nur aus vorhandenen Werten -- dieselbe Regel wie
+  // bei den Offerten (CLAUDE.md: kein Filter, der auf nichts zeigt).
+  const vorhanden = new Set(rechnungen.map(b => b.status));
+  const gewaehlt = $('reStatus').value;
+  $('reStatus').innerHTML = '<option value="">Alle Status</option>'
+    + OF_STATUS.filter(s => vorhanden.has(s.wert)).map(s =>
+        `<option value="${s.wert}"${s.wert === gewaehlt ? ' selected' : ''}>${esc(s.text)}</option>`).join('');
+
+  if (!d.length) {
+    const gefiltert = q || statusFilter;
+    $('reTable').innerHTML = rechnungen.length
+      ? EMPTY('Keine Treffer', gefiltert
+          ? 'Für diese Suche gibt es keine Rechnung. Suchbegriff oder Status zurücksetzen.'
+          : 'Hier stehen keine archivierten Rechnungen.')
+      : EMPTY('Noch keine Rechnungen', 'Die Erfassung folgt in einem eigenen Schritt.');
+    return;
+  }
+
+  $('reTable').innerHTML = `<table><thead><tr>
+      ${reTh('status', 'Status')}${reTh('nummer', 'Nr.')}${reTh('referenz', 'Referenz')}
+      ${reTh('titel', 'Titel')}${reTh('empfaenger', 'Empfänger')}
+      ${reTh('datum', 'Rechnungsdatum', true)}${reTh('total_rappen', 'Betrag', true)}
+    </tr></thead><tbody>` + d.map(b => {
+      const si = ofStatusInfo(b.status);
+      return `
+      <tr>
+        <td><span class="chip ${si.chip}">${esc(si.text)}</span></td>
+        <td class="strong nowrap">${esc(b.nummer)}</td>
+        <td class="nowrap">${dash(b.referenz)}</td>
+        <td>${b.titel ? esc(b.titel) : '<span style="color:var(--ink-3)">ohne Titel</span>'}</td>
+        <td>${reEmpfaenger(b) ? esc(reEmpfaenger(b)) : '<span style="color:var(--ink-3)">–</span>'}
+            ${b.kundennummer ? `<div class="sec">${esc(b.kundennummer)}</div>` : ''}</td>
+        <td class="nowrap num">${dmy(b.datum)}</td>
+        <td class="num nowrap strong">CHF ${chf(b.total_rappen)}</td>
       </tr>`;
     }).join('') + `</tbody></table>`;
 }
@@ -10634,6 +10769,7 @@ function kuGoTab(t) {
   $('pgCrumb').textContent = t === 'objekte' ? 'Daueraufträge und ihre Masterschichten'
     : t === 'rapporte' ? 'Alle erfassten Einsätze'
     : t === 'offerten' ? 'Angebote an Kunden'
+    : t === 'rechnungen' ? 'Rechnungen an Kunden'
     : t === 'detail' ? 'Kundendetails' : 'Stammdaten';
   if (t === 'uebersicht') { kunden.length ? renderKunden() : loadKunden(); }
   if (t === 'objekte') { objekte.length ? renderObjekte() : loadObjekte(); }
@@ -10644,6 +10780,10 @@ function kuGoTab(t) {
   if (t === 'offerten') {
     if (!kunden.length) { loadKunden(); }
     belege.length ? renderOfferten() : loadBelege();
+  }
+  if (t === 'rechnungen') {
+    if (!kunden.length) { loadKunden(); }
+    rechnungen.length ? renderRechnungen() : loadRechnungen();
   }
 }
 
