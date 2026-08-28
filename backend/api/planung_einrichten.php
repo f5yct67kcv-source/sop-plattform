@@ -1072,6 +1072,18 @@ $spalten = [
     // (ENT-169) -- derselbe Umgang wie die erste Fusszeile aus ENT-155:
     // freier Text, leer erlaubt, keine erfundenen Angaben.
     ['betrieb', 'fusszeile2', 'ALTER TABLE betrieb ADD COLUMN fusszeile2 TEXT NULL AFTER fusszeile'],
+    // Strukturierte Absenderadresse fuer die QR-Rechnung (ENT-205) -- die
+    // freie Fusszeile taugt dafuer nicht, der SIX-Standard verlangt Strasse/
+    // Hausnummer/PLZ/Ort als getrennte Felder. Land bewusst NICHT als
+    // eigenes Feld: CUPI 24 GmbH ist ein Schweizer Betrieb, ein fest "CH" im
+    // Code ist keine Auslegung, sondern schlicht Tatsache -- ein Wahlfeld
+    // dafuer waere Konfigurierbarkeit ohne Anlass (CLAUDE.md, "Nach der
+    // Freigabe / Scope").
+    ['betrieb', 'qr_iban',       'ALTER TABLE betrieb ADD COLUMN qr_iban VARCHAR(34) NULL AFTER fusszeile2'],
+    ['betrieb', 'qr_strasse',    'ALTER TABLE betrieb ADD COLUMN qr_strasse VARCHAR(200) NULL AFTER qr_iban'],
+    ['betrieb', 'qr_hausnummer', 'ALTER TABLE betrieb ADD COLUMN qr_hausnummer VARCHAR(20) NULL AFTER qr_strasse'],
+    ['betrieb', 'qr_plz',        'ALTER TABLE betrieb ADD COLUMN qr_plz VARCHAR(10) NULL AFTER qr_hausnummer'],
+    ['betrieb', 'qr_ort',        'ALTER TABLE betrieb ADD COLUMN qr_ort VARCHAR(100) NULL AFTER qr_plz'],
     // TINYINT NULL, nicht NOT NULL DEFAULT 0: NULL heisst 'noch nicht
     // entschieden', 0 heisst 'geprueft und nein'. Der Unterschied ist bei
     // GAV-AUS-004 wesentlich -- eine Vorbelegung waere eine Auslegung.

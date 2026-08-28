@@ -16,6 +16,7 @@
 declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../rechte.php';
+require_once __DIR__ . '/../qrrechnung.php';
 
 $user = require_session();
 
@@ -33,11 +34,14 @@ const LOGO_MIME_ERLAUBT = ['image/png', 'image/jpeg', 'image/svg+xml', 'image/we
 
 function betrieb_lesen(bool $mitLogo): array {
     $r = db()->query(
-        'SELECT firma, zusatz, fusszeile, fusszeile2, logo_mime, logo_groesse, logo
+        'SELECT firma, zusatz, fusszeile, fusszeile2, qr_iban, qr_strasse, qr_hausnummer,
+                qr_plz, qr_ort, logo_mime, logo_groesse, logo
          FROM betrieb WHERE id = 1'
     )->fetch();
     if (!$r) {
         return ['firma' => '', 'zusatz' => '', 'fusszeile' => null, 'fusszeile2' => null,
+                'qr_iban' => null, 'qr_strasse' => null, 'qr_hausnummer' => null,
+                'qr_plz' => null, 'qr_ort' => null, 'qr_iban_gueltig' => false,
                 'logo_mime' => null, 'logo_groesse' => null, 'logo' => null];
     }
     $roh = $r['logo'];
@@ -46,6 +50,16 @@ function betrieb_lesen(bool $mitLogo): array {
         'zusatz'       => (string)$r['zusatz'],
         'fusszeile'    => $r['fusszeile'],
         'fusszeile2'   => $r['fusszeile2'],
+        'qr_iban'      => $r['qr_iban'],
+        'qr_strasse'   => $r['qr_strasse'],
+        'qr_hausnummer' => $r['qr_hausnummer'],
+        'qr_plz'       => $r['qr_plz'],
+        'qr_ort'       => $r['qr_ort'],
+        // Massgeblich ist diese, serverseitig gerechnete Pruefung -- nicht
+        // eine zweite in dashboard.html, die aus dem Takt geraten koennte.
+        // Das QR-Zahlteil auf der Kundenseite (beleg_oeffentlich.php) prueft
+        // eigenstaendig noch einmal nach, verlaesst sich hier nicht drauf.
+        'qr_iban_gueltig' => $r['qr_iban'] ? iban_ist_qr((string)$r['qr_iban']) : false,
         'logo_mime'    => $r['logo_mime'],
         'logo_groesse' => $r['logo_groesse'] === null ? null : (int)$r['logo_groesse'],
         // Als Daten-URL, damit der Ausdruck es ohne zweiten Abruf einbauen
@@ -117,8 +131,38 @@ if (mb_strlen($firma) > 200 || mb_strlen($zusatz) > 200) {
     json_response(['status' => 'error',
         'message' => 'Firma und Zusatz dürfen höchstens 200 Zeichen haben.'], 400);
 }
+
+// QR-Rechnung (ENT-205): alles optional, leer erlaubt -- aber eine
+// EINGETRAGENE IBAN wird geprueft, nicht ungesehen gespeichert. Eine QR-
+// Rechnung mit ungueltiger IBAN wuerde in einer Banking-App gar nicht oder
+// falsch lesen; das faellt hier auf, statt erst beim Kunden.
+$qrIban = trim((string)($in['qr_iban'] ?? ''));
+$qrStrasse = trim((string)($in['qr_strasse'] ?? ''));
+$qrHausnummer = trim((string)($in['qr_hausnummer'] ?? ''));
+$qrPlz = trim((string)($in['qr_plz'] ?? ''));
+$qrOrt = trim((string)($in['qr_ort'] ?? ''));
+if ($qrIban !== '') {
+    $qrIban = iban_normalisieren($qrIban);
+    if (!iban_ch_li_gueltig($qrIban)) {
+        json_response(['status' => 'error',
+            'message' => 'Diese IBAN ist ungültig (Schweizer/liechtensteinische IBAN mit korrekter Prüfziffer erwartet).'], 400);
+    }
+    if (!iban_ist_qr($qrIban)) {
+        json_response(['status' => 'error',
+            'message' => 'Das ist eine gültige IBAN, aber keine QR-IBAN (die Bank weist QR-IBANs eigens zu). Ohne QR-IBAN kann keine QR-Rechnung erzeugt werden.'], 400);
+    }
+}
+if (mb_strlen($qrStrasse) > 200 || mb_strlen($qrOrt) > 100) {
+    json_response(['status' => 'error',
+        'message' => 'Strasse/Ort für die QR-Rechnung sind zu lang.'], 400);
+}
+
 $pdo->prepare('UPDATE betrieb SET firma = ?, zusatz = ?, fusszeile = ?, fusszeile2 = ?,
+               qr_iban = ?, qr_strasse = ?, qr_hausnummer = ?, qr_plz = ?, qr_ort = ?,
                geaendert_am = NOW(), geaendert_von = ? WHERE id = 1')
-    ->execute([$firma, $zusatz, $fuss === '' ? null : $fuss, $fuss2 === '' ? null : $fuss2, (int)$user['id']]);
+    ->execute([$firma, $zusatz, $fuss === '' ? null : $fuss, $fuss2 === '' ? null : $fuss2,
+               $qrIban === '' ? null : $qrIban, $qrStrasse === '' ? null : $qrStrasse,
+               $qrHausnummer === '' ? null : $qrHausnummer, $qrPlz === '' ? null : $qrPlz,
+               $qrOrt === '' ? null : $qrOrt, (int)$user['id']]);
 
 json_response(['status' => 'ok', 'betrieb' => betrieb_lesen(true)]);

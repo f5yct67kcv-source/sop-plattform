@@ -10,7 +10,7 @@
 // Der Fallstrick ist bekannt und im Deploy zweimal auskommentiert (ENT-040,
 // ENT-049). Ein Kommentar ist aber keine Prüfung.
 import { WURZEL } from './pfade.mjs';
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, existsSync, readdirSync } from 'fs';
 
 const ok = [], bad = [];
 const check = (n, c) => (c ? ok : bad).push(n);
@@ -18,11 +18,21 @@ const check = (n, c) => (c ? ok : bad).push(n);
 const workflow = readFileSync(`${WURZEL}/.github/workflows/deploy-hostpoint.yml`, 'utf8');
 const seiten = ['index.html', 'dashboard.html', 'app.html'];
 
-for (const seite of seiten) {
+// Nicht nur die drei bekannten HTML-Huellen: eine oeffentliche PHP-Seite
+// (z. B. beleg_oeffentlich.php, ENT-205) kann ein eigenes <script src>
+// einbinden, ohne dass dashboard.html/app.html davon etwas wissen -- genau
+// diese Luecke liess qrcode.js beim ersten Mal aus dem Deploy fallen, bis
+// test_php.mjs es ueber die separate "jede Backend-Datei"-Pruefung fing.
+// Hier wird derselbe Fallstrick fuer STATISCHE Dateien (root-Ebene, per
+// <script src> geladen) direkt geschlossen, nicht nur fuer PHP-Dateien.
+const phpDateien = readdirSync(`${WURZEL}/backend/api`)
+  .filter(f => f.endsWith('.php')).map(f => `backend/api/${f}`);
+
+for (const seite of [...seiten, ...phpDateien]) {
   const html = readFileSync(`${WURZEL}/${seite}`, 'utf8');
   // Nur eigene Dateien, keine fremden Adressen.
   const skripte = [...html.matchAll(/<script\s+src="([^"]+)"/g)]
-    .map(m => m[1])
+    .map(m => m[1].replace(/^\//, ''))
     .filter(q => !/^https?:\/\//.test(q));
   for (const q of skripte) {
     check(`${seite} lädt ${q} — die Datei gibt es`, existsSync(`${WURZEL}/${q}`));
