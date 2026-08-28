@@ -90,6 +90,25 @@ try {
     check('Absender-Adresse (Fusszeile des Betriebs) steht oben im Dokument',
       /Musterweg 1/.test(await page.textContent('#dokumentSeite')));
 
+    // ── Betriebs-Fusszeile am unteren Blattrand (Projektinhaber-Vorgabe,
+    // 28.08.2026) -- dieselben Angaben wie oben im Absender-Block stehen
+    // NOCH EINMAL unten, wie im internen Ausdruck (bkFusszeile()).
+    check('KRITISCH: die zweite Betriebs-Fusszeile steht am unteren Blattrand',
+      /info@cupi24\.ch/.test(await page.textContent('#dokumentSeite'))
+      && /CHE-255\.301\.179/.test(await page.textContent('#dokumentSeite')));
+    check('KRITISCH: kein doppelter Zeilenumbruch in der Fusszeile (nl2br + white-space:pre-line)',
+      await page.evaluate(() => {
+        const bloecke = [...document.querySelectorAll('#dokumentSeite div[style*="white-space:pre-line"]')];
+        const fuss = bloecke.find(b => b.textContent.includes('info@cupi24.ch'));
+        return !!fuss && !fuss.innerHTML.includes('<br>');
+      }));
+
+    // ── Empfaenger-Adresse ganz aussen rechts (Projektinhaber-Vorgabe) ────
+    const empfaengerBox = await page.locator('#dokumentSeite').getByText('pzu consulting gmbh').boundingBox();
+    const toolbarBox = await page.locator('#btnHerunterladen').boundingBox();
+    check('KRITISCH: die Empfaenger-Adresse reicht bis an denselben rechten Rand wie die Werkzeugleiste',
+      Math.abs((empfaengerBox.x + empfaengerBox.width) - (toolbarBox.x + toolbarBox.width)) < 5);
+
     let druckAufgerufen = false;
     await page.exposeFunction('__druckMarker', () => { druckAufgerufen = true; });
     await page.evaluate(() => { window.print = () => window.__druckMarker(); });

@@ -133,6 +133,22 @@ if (ohneRegel.length) { bad.push('ohne Passwortregel: ' + ohneRegel.join(', '));
 check('KRITISCH: beim Anmelden wird die Laenge NICHT geprueft',
   !/passwort_pruefen\s*\(/.test(ohneKommentar('login.php')));
 
+// ── Versand-Mail: einheitliche Schrift je Element, CTA im Firmenblau
+// (ENT-206) -- Outlook Desktop vererbt font-family in HTML-Mails nicht
+// zuverlaessig an verschachtelte Elemente, darum muss JEDES <p>/<a> sein
+// eigenes font-family tragen, nicht nur der aeusserste Rahmen.
+// Quelltext-Pruefung, kein gerendertes HTML: das style-Attribut entsteht aus
+// PHP-Verkettung (u. a. der gemeinsamen $schrift-Variable), darum wird pro
+// p/a-Tag auf den Bezug zu dieser Variable geprueft, nicht auf einen fertig
+// zusammengesetzten style-Text.
+const versendenQuelle = ohneKommentar('beleg_versenden.php');
+const mailTags = [...versendenQuelle.matchAll(/<(p|a)\s[^>]*>/g)].map(m => m[0]);
+check('KRITISCH: die Versand-Mail hat ueberhaupt gestaltete p/a-Elemente', mailTags.length >= 4);
+check('KRITISCH: JEDES p/a-Element im Mailtext traegt sein eigenes font-family',
+  mailTags.every(t => /\$schrift|font-family/.test(t)));
+check('KRITISCH: der CTA-Knopf ist im Firmenblau, nicht schwarz',
+  /background:#2F5BD7/.test(versendenQuelle) && !/background:#14161A/.test(versendenQuelle));
+
 // ── Schutzeinstellungen des Web-Verzeichnisses (ENT-075) ────────────────
 // Eine .htaccess laesst sich hier nicht ausfuehren -- geprueft wird darum,
 // dass sie das Richtige abdeckt und dass sie ueberhaupt ausgeliefert wird.

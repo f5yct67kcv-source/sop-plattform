@@ -133,7 +133,7 @@ try {
         $person = $s->fetch() ?: null;
     }
     $betrieb = $pdo->query(
-        'SELECT firma, fusszeile, logo_mime, logo, qr_iban, qr_strasse, qr_hausnummer, qr_plz, qr_ort
+        'SELECT firma, fusszeile, fusszeile2, logo_mime, logo, qr_iban, qr_strasse, qr_hausnummer, qr_plz, qr_ort
            FROM betrieb WHERE id = 1'
     )->fetch();
     $firma = trim((string)($betrieb['firma'] ?? ''));
@@ -146,6 +146,24 @@ try {
     $logoDatenUrl = ($betrieb['logo'] !== null && $betrieb['logo_mime'])
         ? 'data:' . $betrieb['logo_mime'] . ';base64,' . base64_encode($betrieb['logo'])
         : null;
+    // Betriebs-Fusszeile am unteren Blattrand (Adresse/Bankverbindung/UID) --
+    // dasselbe Muster wie bkFusszeile() in dashboard.html: zwei Bloecke
+    // nebeneinander, nur wenn wenigstens einer gefuellt ist (ENT-206). Das
+    // ist NICHT dasselbe Feld wie b.fusszeile_text (die freie Fusszeile
+    // dieses einen Belegs) -- beide koennen nebeneinander bestehen.
+    // white-space:pre-line rendert einen rohen Zeilenumbruch bereits selbst
+    // -- KEIN zusaetzliches nl2br() hier, sonst kommt (br-Element + der noch
+    // vorhandene rohe Umbruch danach) zu zwei sichtbaren Umbruechen je Zeile.
+    // Genau das Muster aus bkFusszeile() in dashboard.html.
+    $betriebFusszeile = '';
+    if ($betrieb['fusszeile'] || $betrieb['fusszeile2']) {
+        $betriebFusszeile = '<div style="margin-top:30px;padding-top:10px;border-top:1px solid #E5E8EC;'
+            . 'display:flex;align-items:center;justify-content:space-between;gap:32px;'
+            . 'font-size:10.5px;color:#6B7280;line-height:1.5">'
+            . ($betrieb['fusszeile'] ? '<div style="white-space:pre-line">' . portal_esc($betrieb['fusszeile']) . '</div>' : '')
+            . ($betrieb['fusszeile2'] ? '<div style="white-space:pre-line">' . portal_esc($betrieb['fusszeile2']) . '</div>' : '')
+            . '</div>';
+    }
 
     $b['positionen'] = beleg_positionen_lesen($pdo, (int)$b['id']);
     $summen = beleg_summen($b['positionen'], (int)$b['rabatt_bp']);
@@ -325,7 +343,7 @@ try {
         . (!portal_leeres_datum($b['gueltig_bis']) ? '<tr><td style="padding:2px 24px 2px 0;color:#6B7280;font-size:12px">Gültig bis</td><td style="padding:2px 0;font-size:12px">' . portal_dmy($b['gueltig_bis']) . '</td></tr>' : '')
         . (!portal_leeres_datum($b['faellig_bis'] ?? null) ? '<tr><td style="padding:2px 24px 2px 0;color:#6B7280;font-size:12px">Fällig bis</td><td style="padding:2px 0;font-size:12px">' . portal_dmy($b['faellig_bis']) . '</td></tr>' : '')
         . '</table>'
-        . '<div style="line-height:1.5;font-size:12px;min-width:200px">' . implode('<br>', array_map('portal_esc', $empfaenger)) . '</div>'
+        . '<div style="line-height:1.5;font-size:12px;min-width:200px;text-align:right;margin-left:auto">' . implode('<br>', array_map('portal_esc', $empfaenger)) . '</div>'
         . '</div>'
         . '<div style="font-size:19px;font-weight:700;margin-bottom:14px">' . portal_esc($b['titel'] ?: $titel) . ' ' . portal_esc($b['nummer']) . '</div>'
         . '<table><thead><tr>'
@@ -345,6 +363,7 @@ try {
         // Mindesthoehe der Seite gewahrt.
         . '<div style="margin-top:auto;padding-top:14px">'
         . ($b['fusszeile_text'] ? '<div style="border-top:1px solid #E5E8EC;padding-top:14px;white-space:pre-line;line-height:1.5;font-size:12px">' . nl2br(portal_esc($b['fusszeile_text'])) . '</div>' : '')
+        . $betriebFusszeile
         . '</div>'
         . '</div>';
 
