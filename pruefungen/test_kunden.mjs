@@ -168,14 +168,21 @@ check('Bearbeiten ist da', await page.isVisible('#rowmenuPop button:has-text("Be
 // verspricht eine Funktion, die es fuer diese Person nie geben wird.
 check('KRITISCH: ohne das Recht "offerten" gibt es keinen Offerten-Eintrag im Menü',
   (await page.$$('#rowmenuPop button:has-text("Offerte erstellen")')).length === 0);
-check('Rechnung erstellen ist weiterhin ausgegraut (gibt es noch nicht)', await page.isDisabled('#rowmenuPop button:has-text("Rechnung erstellen")'));
-// Und mit dem Recht ist er da und nutzbar.
+// Seit der ENT-181-Ausbaustufe gilt fuer "Rechnung erstellen" dieselbe Regel
+// wie fuer "Offerte erstellen": kein ausgegrauter Platzhalter mehr, sondern
+// ganz abwesend ohne das Recht.
+check('KRITISCH: ohne das Recht "offerten" gibt es auch keinen Rechnungen-Eintrag im Menü',
+  (await page.$$('#rowmenuPop button:has-text("Rechnung erstellen")')).length === 0);
+// Und mit dem Recht sind beide da und nutzbar.
 await page.evaluate(() => { me.rechte = ['kunden', 'abgleich', 'offerten']; kuMenuSchliessen(); });
 await page.click('#kuTable tbody tr:first-child .rowmenu-btn');
 await page.waitForTimeout(150);
 check('KRITISCH: mit dem Recht ist "Offerte erstellen" da und nicht ausgegraut',
   (await page.$$('#rowmenuPop button:has-text("Offerte erstellen")')).length === 1
   && !(await page.isDisabled('#rowmenuPop button:has-text("Offerte erstellen")')));
+check('KRITISCH: und "Rechnung erstellen" ebenfalls',
+  (await page.$$('#rowmenuPop button:has-text("Rechnung erstellen")')).length === 1
+  && !(await page.isDisabled('#rowmenuPop button:has-text("Rechnung erstellen")')));
 await page.evaluate(() => { me.rechte = ['kunden', 'abgleich']; kuMenuSchliessen(); });
 await page.click('#kuTable tbody tr:first-child .rowmenu-btn');
 await page.waitForTimeout(150);

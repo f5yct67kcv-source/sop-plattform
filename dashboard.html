@@ -7986,6 +7986,24 @@ function ofNeuFuerKunde(kundeId) {
   });
 }
 
+// Dasselbe fuer Rechnungen (ENT-181-Ausbaustufe) -- war bis dahin ein
+// ausgegrauter Platzhalter im Kundenmenue, weil es die Erfassungsmaske noch
+// nicht gab.
+function reNeuFuerKunde(kundeId) {
+  const vorlauf = produkte.length ? Promise.resolve() : loadProdukte();
+  const listeDa = rechnungen.length || reNaechsteNummer ? Promise.resolve() : loadRechnungen();
+  Promise.all([vorlauf, listeDa]).then(() => {
+    ofNeu('rechnung');
+    const k = kunden.find(x => Number(x.id) === Number(kundeId));
+    if (k) {
+      $('of_kunde').value = k.name;
+      ofFormKundeId = Number(k.id);
+      ofPersonenFuellen(null);
+      setTimeout(() => $('of_titel').focus(), 60);
+    }
+  });
+}
+
 // Ein Datum um n Tage verschieben, ohne Bibliothek und ohne Zeitzonenfalle:
 // ueber den Mittag gerechnet, damit die Sommerzeitumstellung nicht einen Tag
 // verschluckt (gleiches Muster wie anderswo in dieser Datei).
@@ -9318,8 +9336,8 @@ function renderKunden() {
 }
 
 // Zeilen-Aktionsmenü: ein einzelnes schwebendes Element statt eines je Zeile
-// (erstes Kontextmenü der App). "Offerte erstellen" ist seit ENT-181 kein
-// Platzhalter mehr; "Rechnung erstellen" bleibt ausgegraut, bis es sie gibt.
+// (erstes Kontextmenü der App). Weder "Offerte erstellen" noch "Rechnung
+// erstellen" sind seit ENT-181 Platzhalter.
 function kuMenuOeffnen(ev, id) {
   ev.stopPropagation();
   const k = kunden.find(x => Number(x.id) === id);
@@ -9329,9 +9347,9 @@ function kuMenuOeffnen(ev, id) {
   pop.innerHTML = `
     <button onclick="kuMenuSchliessen(); openKundeBearbeiten(${id})">Bearbeiten</button>
     ${darf('offerten')
-      ? `<button onclick="kuMenuSchliessen(); ofNeuFuerKunde(${id})">Offerte erstellen</button>`
+      ? `<button onclick="kuMenuSchliessen(); ofNeuFuerKunde(${id})">Offerte erstellen</button>
+         <button onclick="kuMenuSchliessen(); reNeuFuerKunde(${id})">Rechnung erstellen</button>`
       : ''}
-    <button disabled title="Noch nicht verfügbar">Rechnung erstellen</button>
     <hr>
     <button onclick="kuMenuSchliessen(); toggleArchivKunde(${id}, ${k.aktiv ? 0 : 1})">${k.aktiv ? 'Archivieren' : 'Wiederherstellen'}</button>`;
   pop.dataset.kundeId = String(id);
@@ -12682,35 +12700,30 @@ function epDirektAbgleichen(einsatzId, mitarbeiterId) {
   agdRapportUebernehmen(k);
 }
 
-// ── Rechnung-Platzhalter (ENT-127) ──────────────────────────────────────
+// ── Rechnung ab dem Einsatz (ENT-127, verdrahtet seit ENT-181-Ausbaustufe) ──
 //
 // Nur sichtbar bei abgeschlossenen Einsaetzen -- eine kuenftige Schicht laesst
-// sich nicht abrechnen. Ausdruecklich noch ohne Funktion: "Rechnung
-// erstellen" gibt es im System noch nirgends (ENT-040 hat das bewusst
-// zurueckgestellt), ein eigenes, deutlich groesseres Vorhaben.
+// sich nicht abrechnen. War lange ein Platzhalter (ENT-040 hat die
+// Rechnungsstellung bewusst zurueckgestellt); jetzt oeffnet er die geteilte
+// Erfassungsmaske mit Kunde, Einsatzart und den Rapport-Stunden vorbefuellt
+// (epRechnungErstellen).
 //
 // btn-plain statt btn-quiet (ENT-130): Im Kunden-Zeilenmenue steht derselbe
-// Platzhalter als schmucklose Menuezeile -- dort gibt der umgebende
-// Popover-Kontext die Form vor. Hier steht der Knopf frei in der Karte;
-// btn-quiet hat weder Rahmen noch Hintergrund und blieb dadurch nicht als
-// Knopf erkennbar, sondern sah wie normaler Fliesstext aus (am gerenderten
-// Zustand gemessen, nicht im Quelltext vermutet).
+// Weg als schmucklose Menuezeile -- dort gibt der umgebende Popover-Kontext
+// die Form vor. Hier steht der Knopf frei in der Karte; btn-quiet hat weder
+// Rahmen noch Hintergrund und blieb dadurch nicht als Knopf erkennbar,
+// sondern sah wie normaler Fliesstext aus (am gerenderten Zustand gemessen,
+// nicht im Quelltext vermutet).
 //
 // Seit ENT-150 auf ausdrueckliche Ansage des Projektinhabers blau (btn-primary)
-// und rechts unter den beiden Spalten. `disabled` bleibt: der Knopf hat
-// weiterhin KEINE Funktion (ENT-040/ENT-127 haben die Rechnungsstellung
-// bewusst zurueckgestellt) -- die Deckkraft aus .btn:disabled sagt das auch
-// in Blau, und ohne sie waere der auffaelligste Knopf der Karte einer, der
-// nichts tut.
+// und rechts unter den beiden Spalten.
 function epRechnungBlock(e) {
   if (!e || !einsatzAbgeschlossen(e)) { return ''; }
-  // Der gemeinsame Kundenbericht steht neben dem Rechnungs-Platzhalter, weil
-  // beides Abschluss-Handlungen des Einsatzes sind. Er ist der Knopf, der
-  // etwas TUT -- darum umrissener Akzent, waehrend das gefuellte Blau beim
-  // (noch funktionslosen) Rechnungs-Knopf bleibt.
+  // Der gemeinsame Kundenbericht steht neben dem Rechnungs-Knopf, weil beide
+  // Abschluss-Handlungen des Einsatzes sind.
   return `<div class="card-bd ep-rechnung">
     <button type="button" class="btn btn-akzent btn-sm" onclick="epBerichtDrucken(${Number(e.id)})">Kundenrapport drucken</button>
-    <button type="button" class="btn btn-primary btn-sm" disabled title="Noch nicht verfügbar">Rechnung erstellen</button>
+    <button type="button" class="btn btn-primary btn-sm" onclick="epRechnungErstellen(${Number(e.id)})">Rechnung erstellen</button>
   </div>`;
 }
 
@@ -12737,6 +12750,53 @@ function epBerichtDrucken(einsatzId) {
     $('printArea').innerHTML = epBerichtBlatt(b);
     window.print();
   }).catch(() => toast('Der Kundenrapport liess sich nicht laden.'));
+}
+
+// Uebernimmt Kunde, Einsatzart und die geleisteten Rapport-Stunden in die
+// geteilte Rechnungs-/Offert-Erfassungsmaske (ENT-181-Ausbaustufe). Nutzt
+// denselben Endpunkt wie der Kundenbericht (einsatz_bericht.php) statt
+// clientseitigen Zustand -- der liefert bereits die massgeblichen,
+// serverseitig ermittelten Zeiten je Person, dieselbe Quelle, die auch das
+// gedruckte Blatt zeigt.
+//
+// Eine Position je Mitarbeiter-Rapport, nicht zusammengefasst (Projektinhaber-
+// Entscheid 28.08.2026) -- nachvollziehbar, wer wie lange gearbeitet hat,
+// gleiche Haltung wie beim Kundenbericht selbst (siehe Kommentar oben an
+// einsatz_bericht.php: die Rapporte werden nie zusammengelegt). Der Preis
+// bleibt bewusst auf 0: kein automatischer Produktabgleich, der einen
+// ungeprueften Preis auf eine Rechnung schreiben wuerde.
+function epRechnungErstellen(einsatzId) {
+  api('einsatz_bericht.php?einsatz_id=' + Number(einsatzId)).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok' || !data.bericht) {
+      return toast(data.message || 'Die Einsatzdaten liessen sich nicht laden.');
+    }
+    const b = data.bericht;
+    if (!b.personen.length) {
+      return toast('Für diesen Einsatz liegt noch kein Rapport vor.');
+    }
+    const vorlauf = produkte.length ? Promise.resolve() : loadProdukte();
+    const kundenDa = kunden.length ? Promise.resolve() : loadKunden();
+    Promise.all([vorlauf, kundenDa]).then(() => {
+      ofNeu('rechnung');
+      if (b.kunde.kunde_id) {
+        const k = kunden.find(x => Number(x.id) === Number(b.kunde.kunde_id));
+        if (k) {
+          $('of_kunde').value = k.name;
+          ofFormKundeId = Number(k.id);
+          ofPersonenFuellen(null);
+        }
+      }
+      $('of_titel').value = b.einsatz.einsatzart || b.einsatz.titel || '';
+      ofPos = b.personen.map(p => ({
+        produkt_id: null, produkt_name: b.einsatz.einsatzart || '',
+        beschreibung: `${dmy(b.einsatz.datum)}, ${hm(p.von)}–${hm(p.bis)} – ${p.name}`,
+        menge: Number(p.netto_h) || 0, einheit: 'Std.',
+        einzelpreis_rappen: 0, rabatt_bp: 0, mwst_satz_bp: 810,
+      }));
+      ofZeilenZeichnen();
+      setTimeout(() => $('of_titel').focus(), 60);
+    });
+  }).catch(() => toast('Die Einsatzdaten liessen sich nicht laden.'));
 }
 
 // Erzeugt das Blatt. Getrennt von epBerichtDrucken(), damit es sich ohne
