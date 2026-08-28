@@ -75,6 +75,16 @@ check('Offene Schichten werden genannt', naechstesTxt.includes('1 Schicht offen'
 check('KRITISCH: die alte Benennung taucht nicht wieder auf', !/Stelle/.test(naechstesTxt));
 check('Sperrtage werden genannt', naechstesTxt.includes('2 neue Sperrtage'));
 check('Offene Rückmeldungen werden genannt', naechstesTxt.includes('3 offene Rückmeldungen'));
+
+// ── Kurzes Platzhalter-Beispiel im Diktatfeld (Projektinhaber-Vorgabe,
+// 2026-08-28: der volle Beispielsatz inkl. "Bild einfügen"/"Screenshot"
+// wirkte auf dem Handy ueberladen, das sagt bereits der "Bild"-Knopf
+// darunter) -- kurz, aber weiterhin mit einem konkreten Beispiel.
+const platzhalter = await page.getAttribute('#rtText', 'placeholder');
+check('Der Platzhaltertext im Diktatfeld ist kurz gehalten', platzhalter.length < 100);
+check('KRITISCH: kein doppelt genannter Hinweis auf Bild/Screenshot im Platzhalter (steht schon im Bild-Knopf)',
+  !/Screenshot/i.test(platzhalter));
+
 await page.screenshot({ path: OUT + '/80-begruessung.png' });
 
 // Wechselnde Formulierung: neu laden, Text darf sich unterscheiden koennen
@@ -334,8 +344,18 @@ try {
   check('KRITISCH: kein Querscrollen auf dem Handy', m.quer === false);
   check('Sie füllen die schmale Zeile aus, statt bei 140 px zu bleiben',
     m.sprechen.w !== 140 || m.erkennen.w !== 140);
+
+  // ── Kurzueberblick ("naechster Einsatz, Sperrtage, Rueckmeldungen") macht
+  // die Uebersicht auf dem Handy ueberladen -- bis zu den eigentlichen
+  // Kennzahlen musste weit gescrollt werden (Projektinhaber-Vorgabe,
+  // 2026-08-28). Auf dem Handy weg, der DATENSATZ bleibt aber unveraendert
+  // (kein Feature entfernt, siehe naechstesTxt-Pruefungen oben bei 1500px).
+  check('KRITISCH: der Kurzueberblick unter der Grussformel ist auf dem Handy ausgeblendet',
+    !(await page.isVisible('#begrNaechstes')));
   await page.setViewportSize({ width: 1500, height: 1100 });
   await page.waitForTimeout(250);
+  check('KRITISCH: auf dem Desktop bleibt der Kurzueberblick sichtbar',
+    await page.isVisible('#begrNaechstes'));
 } catch (e) { bad.push('Handy: ' + String(e).split('\n')[0].slice(0, 120)); }
 
 // ══════════ DER CONTAINER GEHÖRT ZUM KONFIGURIERBAREN DASHBOARD (ENT-031)
