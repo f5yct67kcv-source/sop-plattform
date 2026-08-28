@@ -11,6 +11,9 @@
 //    tatsaechlich eine PDF-Datei -- kein Knopf, der nur so aussieht.
 // 4. DER QR-ZAHLTEIL ERSCHEINT NUR MIT GUELTIGER QR-IBAN (ENT-205) -- eine
 //    Rechnung ohne QR-IBAN zeigt keinen kaputten/nicht scannbaren Code.
+// 5. DIE UNTERSCHRIFTSSEITE (of_unterschriftsseite, ENT-187) WIRKT AUCH HIER
+//    (ENT-207) -- vorher nur im internen Ausdruck beruecksichtigt, auf der
+//    Seite, die der Kunde tatsaechlich druckt/herunterlaedt, ohne Wirkung.
 import { WURZEL, HIER, browserPfad } from './pfade.mjs';
 import { execFileSync } from 'child_process';
 import { chromium } from 'playwright';
@@ -21,7 +24,7 @@ const ok = [], bad = [];
 const check = (n, c) => (c ? ok : bad).push(n);
 
 // ── Vier Varianten wirklich durch PHP rendern ─────────────────────────────
-const VARIANTEN = ['rechnung_offen', 'rechnung_qr', 'offerte_offen', 'offerte_entschieden'];
+const VARIANTEN = ['rechnung_offen', 'rechnung_qr', 'offerte_offen', 'offerte_entschieden', 'offerte_unterschrift'];
 const html = {};
 for (const v of VARIANTEN) {
   let aus = '', code = 0;
@@ -156,6 +159,31 @@ try {
       /Ablehnen/.test(await page.textContent('.zusammenfassung'))
       && /Annehmen/.test(await page.textContent('.zusammenfassung')));
     check('KRITISCH: kein QR-Zahlteil bei einer Offerte', !(await page.isVisible('text=Zahlung per QR-Rechnung')));
+    check('KRITISCH: ohne angehakte Unterschriftsseite steht kein Unterschriftsblock im Dokument',
+      !(await page.isVisible('text=Ort, Datum')));
+    await page.close();
+  }
+
+  // ── offerte_unterschrift: Unterschriftsseite (ENT-207) ──────────────────
+  {
+    const page = await browser.newPage({ viewport: { width: 1200, height: 1000 } });
+    const fehler = [];
+    page.on('pageerror', e => fehler.push(e.message));
+    await page.goto(url('offerte_unterschrift'), { waitUntil: 'load' });
+    check('KRITISCH: keine JS-Fehler mit angehakter Unterschriftsseite', fehler.length === 0);
+    check('KRITISCH: die Unterschriftsseite steht im Dokument (Ort, Datum, zwei Unterschriftsfelder)',
+      /Ort, Datum/.test(await page.textContent('#dokumentGanz'))
+      && /Unterschrift pzu consulting gmbh/.test(await page.textContent('#dokumentGanz'))
+      && /Unterschrift Cupi 24 GmbH/.test(await page.textContent('#dokumentGanz')));
+    check('KRITISCH: die Unterschriftsseite erzwingt einen Seitenumbruch (page-break-before)',
+      await page.evaluate(() => {
+        const bloecke = [...document.querySelectorAll('#dokumentGanz > div')];
+        const letzte = bloecke[bloecke.length - 1];
+        return !!letzte && letzte.getAttribute('style').includes('page-break-before:always')
+          && letzte.textContent.includes('Ort, Datum');
+      }));
+    check('KRITISCH: "Herunterladen" fasst Dokument UND Unterschriftsseite in einer PDF zusammen',
+      await page.evaluate(() => document.getElementById('dokumentGanz').contains(document.getElementById('dokumentSeite'))));
     await page.close();
   }
 

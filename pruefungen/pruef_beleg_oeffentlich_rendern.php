@@ -12,6 +12,7 @@
 //   rechnung_qr           Rechnung MIT gueltiger QR-IBAN -> QR-Zahlteil sichtbar
 //   offerte_offen         Offerte, noch keine Entscheidung -> Annehmen/Ablehnen
 //   offerte_entschieden   Offerte, bereits angenommen
+//   offerte_unterschrift  Offerte MIT angehaktem of_unterschriftsseite (ENT-207)
 //
 // Gibt das fertige HTML auf stdout aus; test_beleg_oeffentlich.mjs liest es
 // ueber einen lokalen HTTP-Server in einen echten Browser ein.
@@ -21,7 +22,7 @@ $pdo = new PDO('sqlite::memory:');
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
 $pdo->exec("CREATE TABLE betrieb (id INTEGER PRIMARY KEY, firma TEXT, fusszeile TEXT, fusszeile2 TEXT, logo_mime TEXT, logo BLOB, qr_iban TEXT, qr_strasse TEXT, qr_hausnummer TEXT, qr_plz TEXT, qr_ort TEXT)");
-$pdo->exec("CREATE TABLE belege (id INTEGER PRIMARY KEY, versand_token TEXT, art TEXT, nummer TEXT, kunde_id INTEGER, person_id INTEGER, titel TEXT, referenz TEXT, datum TEXT, gueltig_bis TEXT, faellig_bis TEXT, rabatt_bp INTEGER, status TEXT, bezahlt INTEGER, bezahlt_am TEXT, entscheidung_am TEXT, oeffentliche_notizen TEXT, bedingungen TEXT, fusszeile_text TEXT)");
+$pdo->exec("CREATE TABLE belege (id INTEGER PRIMARY KEY, versand_token TEXT, art TEXT, nummer TEXT, kunde_id INTEGER, person_id INTEGER, titel TEXT, referenz TEXT, datum TEXT, gueltig_bis TEXT, faellig_bis TEXT, rabatt_bp INTEGER, status TEXT, bezahlt INTEGER, bezahlt_am TEXT, entscheidung_am TEXT, oeffentliche_notizen TEXT, bedingungen TEXT, fusszeile_text TEXT, unterschriftsseite INTEGER)");
 $pdo->exec("CREATE TABLE kunden (id INTEGER PRIMARY KEY, name TEXT, zusatzfeld TEXT, strasse TEXT, hausnummer TEXT, adresszusatz TEXT, plz TEXT, ort TEXT)");
 $pdo->exec("CREATE TABLE kunden_person (id INTEGER PRIMARY KEY, anrede TEXT, vorname TEXT, nachname TEXT)");
 $pdo->exec("CREATE TABLE beleg_positionen (id INTEGER PRIMARY KEY, beleg_id INTEGER, sortierung INTEGER, produkt_id INTEGER, produkt_name TEXT, beschreibung TEXT, menge REAL, einheit TEXT, einzelpreis_rappen INTEGER, rabatt_bp INTEGER, mwst_satz_bp INTEGER)");
@@ -49,11 +50,12 @@ $stmt->execute();
 $art = str_starts_with($argVariante, 'offerte') ? 'offerte' : 'rechnung';
 $status = $argVariante === 'offerte_entschieden' ? 'bestaetigt' : 'versendet';
 $entscheidung = $argVariante === 'offerte_entschieden' ? date('Y-m-d H:i:s') : null;
+$unterschriftsseite = $argVariante === 'offerte_unterschrift' ? 1 : 0;
 $pdo->exec("INSERT INTO belege VALUES (1,'tok123','$art','" . ($art === 'offerte' ? 'OF-0127' : 'RE-0002')
     . "',1,1,'Ladenüberwachung RE-0002',NULL,'2026-08-28',"
     . ($art === 'offerte' ? "'2026-09-27'" : 'NULL') . ","
     . ($art === 'rechnung' ? "'2026-09-27'" : 'NULL')
-    . ",0,'$status',0,NULL," . ($entscheidung ? "'$entscheidung'" : 'NULL') . ",NULL,NULL,NULL)");
+    . ",0,'$status',0,NULL," . ($entscheidung ? "'$entscheidung'" : 'NULL') . ",NULL,NULL,NULL,$unterschriftsseite)");
 $pdo->exec("INSERT INTO kunden VALUES (1,'pzu consulting gmbh',NULL,'Hochgasse','7',NULL,'4632','Trimbach')");
 $pdo->exec("INSERT INTO kunden_person VALUES (1,'Herr','Adrian','von Arb')");
 $pdo->exec("INSERT INTO beleg_positionen VALUES (1,1,1,NULL,'Filiale Oerlikon','',40,'Std.',4500,0,810)");
