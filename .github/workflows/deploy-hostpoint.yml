@@ -25,6 +25,11 @@ jobs:
           # (ENT-110). Fehlt sie hier, sind alle Zeitfelder unsichtbar und es
           # laesst sich keine Zeit mehr eintragen -- derselbe Fallstrick.
           cp zeitwahl.js dist/zeitwahl.js
+          # qrcode.js wird von beleg_oeffentlich.php per <script src> geladen
+          # (ENT-205), nicht von dashboard.html/app.html -- test_deploy.mjs
+          # scannt nur diese beiden auf lokale Skripte, darum hier von Hand
+          # eingetragen wie gav.js/zeitwahl.js oben.
+          cp qrcode.js dist/qrcode.js
           cp manifest.json dist/manifest.json
           cp sw.js dist/sw.js
           cp icons/*.png dist/icons/
@@ -42,6 +47,7 @@ jobs:
           cp backend/auslagen.php dist/auslagen.php
           cp backend/rundgang.php dist/rundgang.php
           cp backend/belege.php dist/belege.php
+          cp backend/qrrechnung.php dist/qrrechnung.php
           cp backend/mailer.php dist/mailer.php
           # Schutzeinstellungen (ENT-075). Im Repository heisst die Datei
           # bewusst ohne fuehrenden Punkt -- sonst uebersieht man sie.
