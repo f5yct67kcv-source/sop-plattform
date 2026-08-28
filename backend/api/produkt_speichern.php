@@ -12,6 +12,7 @@
 declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../rechte.php';
+require_once __DIR__ . '/../produkte.php';
 
 $user = require_session();
 require_recht($user, 'offerten');
@@ -55,6 +56,10 @@ if ($id > 0) {
         }
     }
 } else {
+    // Produktnummer wird vergeben, nicht eingegeben (ENT-219,
+    // Projektinhaber-Entscheidung 2026-08-28) -- automatisch fortlaufend,
+    // damit keine Doppel- oder Luecken-Nummern von Hand entstehen.
+    $felder = ['nummer' => naechste_produktnummer($pdo)] + $felder;
     $spalten = array_keys($felder);
     // Ein Platzhalter je Spalte -- NICHT "(?" plus count($spalten) weitere
     // (das waeren einer zuviel: "aktiv" dahinter ist ein fester Literal,

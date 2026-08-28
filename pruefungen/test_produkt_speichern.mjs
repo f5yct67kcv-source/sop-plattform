@@ -29,6 +29,8 @@ check('KRITISCH: die Anfrage laeuft ohne PHP-Fehler durch',
   neu.code === 0 && neu.antwort && !neu.stderr);
 check('KRITISCH: ein neues Produkt wird wirklich angelegt (status ok, echte neue Id)',
   neu.antwort && neu.antwort.status === 'ok' && Number(neu.antwort.id) > 1);
+check('KRITISCH: das neue Produkt bekommt automatisch eine Produktnummer (ENT-219), aufbauend auf der bestehenden P0001',
+  neu.antwort && neu.antwort.nummer_zur_pruefung === 'P0002');
 
 // ── Bestehendes Produkt aendern (id > 0) -- lief schon vorher korrekt,
 // darf es durch die Korrektur nicht verlieren.

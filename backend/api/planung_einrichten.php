@@ -24,6 +24,7 @@ require_once __DIR__ . '/../mitarbeiter.php';
 // daran ist dieser Endpunkt am 22.08.2026 vollstaendig gestorben, ohne dass
 // eine lesbare Meldung herauskam.
 require_once __DIR__ . '/../kunden.php';
+require_once __DIR__ . '/../produkte.php';
 
 $user = require_session();
 require_recht($user, 'betrieb');
@@ -737,6 +738,10 @@ CREATE TABLE IF NOT EXISTS kunden_kontaktweg (
 // wie beim versionierten GAV-Regelwerk in auslagen.php.
 'produkte' => "CREATE TABLE produkte (
   id INT AUTO_INCREMENT PRIMARY KEY,
+  -- Format P0001 aufwaerts, automatisch vergeben (ENT-219) -- siehe
+  -- naechste_produktnummer() in produkte.php. NULL bei Datensaetzen aus der
+  -- Zeit davor, bis der Nachtrag unten sie ergaenzt.
+  nummer VARCHAR(20) NULL,
   name VARCHAR(200) NOT NULL,
   beschreibung TEXT NULL,
   einzelpreis_rappen INT NOT NULL DEFAULT 0,
@@ -1079,6 +1084,10 @@ $spalten = [
     // Code ist keine Auslegung, sondern schlicht Tatsache -- ein Wahlfeld
     // dafuer waere Konfigurierbarkeit ohne Anlass (CLAUDE.md, "Nach der
     // Freigabe / Scope").
+    // Produktnummer (ENT-219) -- automatisch vergeben, siehe
+    // naechste_produktnummer() in produkte.php und den Nachtrag fuer
+    // bestehende Produkte ohne Nummer weiter unten.
+    ['produkte', 'nummer',       'ALTER TABLE produkte ADD COLUMN nummer VARCHAR(20) NULL AFTER id'],
     ['betrieb', 'qr_iban',       'ALTER TABLE betrieb ADD COLUMN qr_iban VARCHAR(34) NULL AFTER fusszeile2'],
     ['betrieb', 'qr_strasse',    'ALTER TABLE betrieb ADD COLUMN qr_strasse VARCHAR(200) NULL AFTER qr_iban'],
     ['betrieb', 'qr_hausnummer', 'ALTER TABLE betrieb ADD COLUMN qr_hausnummer VARCHAR(20) NULL AFTER qr_strasse'],
@@ -1390,6 +1399,27 @@ if (hat_tabelle_jetzt($pdo, 'mitarbeiter_rollen')) {
             }
             $getan[] = count($ohneRolle) . ' Person(en) eine Rolle zugewiesen ('
                 . $admins . ' × Verwaltung, ' . (count($ohneRolle) - $admins) . ' × Mitarbeitend)';
+        }
+    }
+}
+
+// ── 2b6. Produktnummern nachtragen, wenn Produkte ohne eigene Nummer
+// bestehen (ENT-219) -- entweder aus der Zeit vor dieser Entscheidung oder
+// weil die Spalte gerade erst oben dazukam. Reihenfolge nach id, damit die
+// Vergabe nachvollziehbar bleibt. Gleiches Muster wie 2b (Kundennummern).
+if (hat_spalte($pdo, 'produkte', 'nummer')) {
+    $ohneProduktnummer = $pdo->query(
+        'SELECT id FROM produkte WHERE nummer IS NULL ORDER BY id'
+    )->fetchAll(PDO::FETCH_COLUMN);
+    if ($ohneProduktnummer) {
+        if ($nurPruefen) {
+            $getan[] = count($ohneProduktnummer) . ' Produkt(e) ohne Produktnummer';
+        } else {
+            foreach ($ohneProduktnummer as $pid) {
+                $nr = naechste_produktnummer($pdo);
+                $pdo->prepare('UPDATE produkte SET nummer = ? WHERE id = ?')->execute([$nr, $pid]);
+            }
+            $getan[] = count($ohneProduktnummer) . ' Produktnummer(n) vergeben';
         }
     }
 }

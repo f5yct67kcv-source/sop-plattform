@@ -52,6 +52,7 @@ jobs:
           cp backend/rundgang.php dist/rundgang.php
           cp backend/belege.php dist/belege.php
           cp backend/qrrechnung.php dist/qrrechnung.php
+          cp backend/produkte.php dist/produkte.php
           cp backend/mailer.php dist/mailer.php
           # Schutzeinstellungen (ENT-075). Im Repository heisst die Datei
           # bewusst ohne fuehrenden Punkt -- sonst uebersieht man sie.
