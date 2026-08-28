@@ -11,7 +11,7 @@ $user = require_session();
 require_recht($user, 'offerten');
 
 $rows = db()->query(
-    'SELECT id, name, beschreibung, einzelpreis_rappen, einheit, mwst_satz_bp,
+    'SELECT id, nummer, name, beschreibung, einzelpreis_rappen, einheit, mwst_satz_bp,
             sortierung, aktiv
        FROM produkte ORDER BY sortierung, name'
 )->fetchAll();

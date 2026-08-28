@@ -2767,24 +2767,6 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
         </div>
       </div>
 
-      <!-- Administration (ENT-056). Die Mitarbeitenden sind hierher gezogen:
-           Sie sind zwar auch Stammdaten, aber der Bereich verwaltet Personen
-           und nicht Auftraggeber -- und er teilt sich die Rubrik jetzt mit den
-           betrieblichen Einstellungen, an denen dieselben Leute arbeiten. -->
-      <div class="nav-lbl nur-desktop" style="margin-top:16px">Administration</div>
-      <div class="nav-gruppe nur-desktop" id="navg-admin">
-        <button class="nav-item nav-eltern" id="nav-admin" title="Administration" onclick="adminNavKlick()">
-          <svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.2.5.66.86 1.19.91H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-          <span class="lbl">Administration</span>
-          <svg class="i chev" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
-        </button>
-        <div class="nav-kinder">
-          <button class="nav-kind" id="nav-admin-mitarbeiter" onclick="go('mitarbeiter')">Mitarbeitende</button>
-          <button class="nav-kind" id="nav-admin-produkte" onclick="go('produkte')">Produkte</button>
-          <button class="nav-kind" id="nav-admin-betrieb" onclick="go('betrieb')">Betrieb</button>
-        </div>
-      </div>
-
       <!-- Kontrolle (ENT-065). Eigene Rubrik und nicht ein Reiter unter
            Administration: Hier wachsen die Kontrollinstanzen zusammen --
            Pensen heute, freie Tage und Ruhezeit-Uebersicht spaeter. Sie
@@ -2800,6 +2782,26 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
           <button class="nav-kind" id="nav-kontrolle-pensen" onclick="go('pensen')">Pensen</button>
           <button class="nav-kind" id="nav-kontrolle-auslagen" onclick="go('auslagen')">Auslagenersatz</button>
           <button class="nav-kind" id="nav-kontrolle-rundgaenge" onclick="go('rundgaenge')">Rundgänge</button>
+        </div>
+      </div>
+
+      <!-- Administration (ENT-056, Reihenfolge ENT-221). Die Mitarbeitenden
+           sind hierher gezogen: Sie sind zwar auch Stammdaten, aber der
+           Bereich verwaltet Personen und nicht Auftraggeber -- und er teilt
+           sich die Rubrik jetzt mit den betrieblichen Einstellungen, an denen
+           dieselben Leute arbeiten. Steht als letzte Rubrik (Projektinhaber-
+           Wunsch, ganz rechts neben Kontrolle) -- inhaltlich unveraendert. -->
+      <div class="nav-lbl nur-desktop" style="margin-top:16px">Administration</div>
+      <div class="nav-gruppe nur-desktop" id="navg-admin">
+        <button class="nav-item nav-eltern" id="nav-admin" title="Administration" onclick="adminNavKlick()">
+          <svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.2.5.66.86 1.19.91H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span class="lbl">Administration</span>
+          <svg class="i chev" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="nav-kinder">
+          <button class="nav-kind" id="nav-admin-mitarbeiter" onclick="go('mitarbeiter')">Mitarbeitende</button>
+          <button class="nav-kind" id="nav-admin-produkte" onclick="go('produkte')">Produkte</button>
+          <button class="nav-kind" id="nav-admin-betrieb" onclick="go('betrieb')">Betrieb</button>
         </div>
       </div>
 
@@ -3823,20 +3825,25 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
         <div class="card" style="margin-bottom:14px">
           <div class="card-hd">
             <h2>Positionen</h2>
-            <div class="sp" style="flex:1"></div>
-            <!-- Neues Produkt direkt hier anlegen, ohne in den Bereich
-                 Produkte zu wechseln (ENT-215) -- oeffnet denselben Dialog
-                 wie dort und uebernimmt das Ergebnis in eine neue Position. -->
-            <button class="btn btn-plain btn-sm" onclick="ofNeuesProduktAnlegen()">
-              <svg class="i i-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              Neues Produkt
-            </button>
+          </div>
+          <div class="card-bd flush"><div class="tw"><div id="ofPositionen"></div></div></div>
+          <!-- Knoepfe unterhalb der Liste statt oben in der Kopfzeile
+               (ENT-220, Projektinhaber-Vorgabe 2026-08-28, nach gezeigtem
+               Vorbild): "Position hinzufügen" fuegt eine leere Zeile an,
+               "Neues Produkt" oeffnet direkt hier den Produktdialog
+               (ENT-215/ENT-217) -- beide stehen dort, wo als naechstes im
+               Blick ist, direkt nach der letzten Zeile, statt weit oben
+               ueber der ganzen Liste. -->
+          <div class="card-bd" style="display:flex;gap:8px;border-top:1px solid var(--line-soft)">
             <button class="btn btn-plain btn-sm" onclick="ofZeileHinzu()">
               <svg class="i i-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               Position hinzufügen
             </button>
+            <button class="btn btn-plain btn-sm" onclick="ofNeuesProduktAnlegen()">
+              <svg class="i i-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Neues Produkt
+            </button>
           </div>
-          <div class="card-bd flush"><div class="tw"><div id="ofPositionen"></div></div></div>
         </div>
 
         <div class="of-abschluss">
@@ -4819,6 +4826,10 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
     <div class="dlg-hd">
       <h2 id="prodTitel">Neues Produkt</h2>
       <p>Vorschlagswerte für Offerten. Eine Änderung wirkt nur auf künftige Belege — bereits erfasste behalten ihre Werte.</p>
+      <!-- Produktnummer wird vergeben, nicht eingegeben (ENT-219) -- deshalb
+           hier nur angezeigt, kein Formularfeld. Bei der Neuanlage gibt es
+           noch keine, sie entsteht erst beim Speichern. -->
+      <p class="note" id="prodNummerZeile" style="display:none"></p>
     </div>
     <div class="dlg-bd">
       <div class="msg-err" id="prodErr" style="display:none"></div>
@@ -7442,10 +7453,10 @@ function renderProdukte() {
     return;
   }
   $('prodTable').innerHTML = `<table><thead><tr>
-      ${pdTh('sortierung', 'Nr.', true)}${pdTh('name', 'Bezeichnung')}
+      ${pdTh('nummer', 'Nr.')}${pdTh('name', 'Bezeichnung')}
       <th>Standardbeschreibung</th>
       ${pdTh('einzelpreis_rappen', 'Einzelpreis', true)}${pdTh('einheit', 'Einheit')}
-      ${pdTh('mwst_satz_bp', 'MWST', true)}<th class="num">Aktion</th>
+      ${pdTh('mwst_satz_bp', 'MWST', true)}${pdTh('sortierung', 'Reihenfolge', true)}<th class="num">Aktion</th>
     </tr></thead><tbody>` + d.map(p => {
       const satz = MWST_SAETZE.find(s => Number(s.bp) === Number(p.mwst_satz_bp));
       // Die Standardbeschreibung ist oft mehrzeilig und lang. In der Liste
@@ -7455,7 +7466,7 @@ function renderProdukte() {
       const mehr = String(p.beschreibung || '').includes('\n') || ersteZeile.length > 70;
       return `
       <tr class="click" onclick="pdBearbeiten(${Number(p.id)})">
-        <td class="num nowrap">${nf(p.sortierung)}</td>
+        <td class="nowrap">${p.nummer ? esc(p.nummer) : '<span style="color:var(--ink-3)">–</span>'}</td>
         <td class="strong">${esc(p.name)}</td>
         <td>${ersteZeile ? esc(ersteZeile.slice(0, 70)) + (mehr ? '…' : '')
               : '<span style="color:var(--ink-3)">–</span>'}</td>
@@ -7464,6 +7475,7 @@ function renderProdukte() {
         <td class="num nowrap">${Number(p.mwst_satz_bp) === 0
           ? '<span class="chip chip-n">steuerfrei</span>'
           : bpText(p.mwst_satz_bp) + ' %'}</td>
+        <td class="num nowrap">${nf(p.sortierung)}</td>
         <td class="num" onclick="event.stopPropagation()">
           <button class="btn btn-quiet btn-sm" onclick="pdArchivKlick(${Number(p.id)}, ${Number(p.aktiv) ? 0 : 1})">
             ${Number(p.aktiv) ? 'Archivieren' : 'Zurückholen'}
@@ -7482,6 +7494,9 @@ function pdNeu() {
   pdDlgId = null;
   pdOfferteKontext = false;
   $('prodTitel').textContent = 'Neues Produkt';
+  // Die Nummer entsteht erst beim Speichern (ENT-219) -- vor der Neuanlage
+  // gibt es noch keine zu zeigen.
+  $('prodNummerZeile').style.display = 'none';
   $('prodErr').style.display = 'none';
   $('prod_name').value = '';
   $('prod_beschreibung').value = '';
@@ -7514,6 +7529,11 @@ function pdBearbeiten(id) {
   pdDlgId = Number(id);
   pdOfferteKontext = false;
   $('prodTitel').textContent = 'Produkt bearbeiten';
+  // Nummer nur anzeigen, wenn sie schon vergeben ist -- ein Datensatz von
+  // vor ENT-219 hat sie erst nach dem naechsten "Einrichtung pruefen".
+  const nummerZeile = $('prodNummerZeile');
+  nummerZeile.style.display = p.nummer ? '' : 'none';
+  nummerZeile.textContent = p.nummer ? 'Produktnummer ' + p.nummer : '';
   $('prodErr').style.display = 'none';
   $('prod_name').value = p.name || '';
   $('prod_beschreibung').value = p.beschreibung || '';

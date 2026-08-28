@@ -14,9 +14,16 @@ declare(strict_types=1);
 $pdo = new PDO('sqlite::memory:');
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+// SQLite kennt REGEXP nicht von sich aus (anders als MySQL) -- ohne diese
+// Registrierung wirft naechste_produktnummer() "no such function: REGEXP".
+// Reine Testvorrichtung; die geprüfte Abfrage selbst bleibt unveraendert.
+$pdo->sqliteCreateFunction('REGEXP', function (string $muster, ?string $wert): int {
+    return preg_match('/' . str_replace('/', '\/', $muster) . '/', (string)$wert) === 1 ? 1 : 0;
+}, 2);
 $pdo->exec(
     'CREATE TABLE produkte (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nummer TEXT NULL,
         name TEXT NOT NULL,
         beschreibung TEXT,
         einzelpreis_rappen INTEGER NOT NULL DEFAULT 0,
@@ -28,16 +35,36 @@ $pdo->exec(
 );
 // Ein bereits bestehendes Produkt, um auch den UPDATE-Zweig (id > 0) wirklich
 // zu durchlaufen -- der lief schon vorher korrekt, soll es aber bleiben.
-$pdo->exec("INSERT INTO produkte (id, name, beschreibung, einzelpreis_rappen, einheit, mwst_satz_bp, sortierung, aktiv)
-    VALUES (1, 'Bestehend', 'alt', 1000, 'Std.', 810, 10, 1)");
+// Mit eigener Nummer, um zu pruefen, dass naechste_produktnummer() darauf
+// aufbaut statt bei P0001 neu zu beginnen (ENT-219).
+$pdo->exec("INSERT INTO produkte (id, nummer, name, beschreibung, einzelpreis_rappen, einheit, mwst_satz_bp, sortierung, aktiv)
+    VALUES (1, 'P0001', 'Bestehend', 'alt', 1000, 'Std.', 810, 10, 1)");
 
 function db(): PDO { global $pdo; return $pdo; }
-function json_response($data, int $status = 200): void { http_response_code($status); echo json_encode($data); exit; }
+// Reichert eine Erfolgsantwort testhalber um die tatsaechlich gespeicherte
+// Nummer an (produkt_speichern.php selbst liefert nur die Id zurueck) --
+// sonst liesse sich von aussen nicht pruefen, ob naechste_produktnummer()
+// wirklich etwas Sinnvolles in die Zeile geschrieben hat (ENT-219).
+function json_response($data, int $status = 200): void {
+    global $pdo;
+    if (($data['status'] ?? null) === 'ok' && isset($data['id'])) {
+        $s = $pdo->prepare('SELECT nummer FROM produkte WHERE id = ?');
+        $s->execute([$data['id']]);
+        $data['nummer_zur_pruefung'] = $s->fetchColumn();
+    }
+    http_response_code($status);
+    echo json_encode($data);
+    exit;
+}
 // Authentisierung und Rechteprüfung sind nicht Gegenstand dieser Prüfung
 // (siehe test_zweifaktor.mjs/test_rollen.mjs dafür) -- hier zaehlt allein,
 // ob die SQL-Anweisung selbst gegen eine echte Datenbank durchlaeuft.
 function require_session(): array { return ['name' => 'test', 'ist_admin' => true]; }
 function require_recht(array $user, string $recht): void {}
+
+// naechste_produktnummer() WIRKLICH mitlaufen lassen (ENT-219), nicht
+// stubben -- sonst prueft dieser Harness die Nummernvergabe gar nicht.
+require __DIR__ . '/../backend/produkte.php';
 
 $quelle = file_get_contents(__DIR__ . '/../backend/api/produkt_speichern.php');
 $quelle = preg_replace('/^<\?php\s*/', '', $quelle, 1);
