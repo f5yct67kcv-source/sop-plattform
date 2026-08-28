@@ -4292,6 +4292,29 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
                   placeholder="z. B. zweiter Standort mit eigener Adresse"></textarea>
                 <div class="note" style="margin-top:5px">Nur wenn ein zweiter Standort ausgewiesen werden soll.</div></div>
             </div>
+            <div class="ki-hint web on" style="margin:18px 0 14px">
+              <span>QR-Rechnung: Bankangaben für Rechnungen (ENT-205). Bleibt die
+                QR-IBAN leer, zeigt die Kundenseite einer Rechnung wie bisher keinen
+                Zahlteil.</span></div>
+            <div class="form-zeile">
+              <div class="f"><label for="bkQrStrasse">Strasse (für die QR-Rechnung)</label>
+                <input class="inp" id="bkQrStrasse" maxlength="200" placeholder="z. B. Baslerstrasse"></div>
+              <div class="f"><label for="bkQrHausnummer">Hausnummer</label>
+                <input class="inp" id="bkQrHausnummer" maxlength="20" placeholder="z. B. 67"></div>
+            </div>
+            <div class="form-zeile">
+              <div class="f"><label for="bkQrPlz">PLZ</label>
+                <input class="inp" id="bkQrPlz" maxlength="10" placeholder="z. B. 4632"></div>
+              <div class="f"><label for="bkQrOrt">Ort</label>
+                <input class="inp" id="bkQrOrt" maxlength="100" placeholder="z. B. Trimbach"></div>
+            </div>
+            <div class="f" style="margin-top:4px">
+              <label for="bkQrIban">QR-IBAN</label>
+              <input class="inp" id="bkQrIban" maxlength="34" placeholder="CH.. .... .... .... ...."
+                oninput="bkQrIbanPruefen()">
+              <div class="note" id="bkQrIbanHinweis" style="margin-top:5px">Von der Bank eigens zugewiesene
+                QR-IBAN — nicht dieselbe wie die normale Geschäfts-IBAN.</div>
+            </div>
             <div class="f" style="margin-top:4px">
               <label>Logo</label>
               <div id="bkLogoStand" class="note">Kein Logo hinterlegt.</div>
@@ -11910,7 +11933,42 @@ function ladeBetrieb() {
 // Der Stand wird beim Anmelden mitgeladen (briefkopfLaden()), damit der
 // Ausdruck ihn ohne zweiten Abruf hat: window.print() wartet nicht auf einen
 // noch laufenden Abruf, und dann fehlte der Briefkopf genau auf dem Blatt.
-let briefkopf = { firma: '', zusatz: '', fusszeile: null, fusszeile2: null, logo: null, logo_groesse: null };
+let briefkopf = { firma: '', zusatz: '', fusszeile: null, fusszeile2: null,
+  qr_iban: null, qr_strasse: null, qr_hausnummer: null, qr_plz: null, qr_ort: null,
+  qr_iban_gueltig: false, logo: null, logo_groesse: null };
+
+// Nur fuer die sofortige Rueckmeldung beim Tippen (ENT-205) -- massgeblich
+// ist immer die serverseitige Pruefung in betrieb.php/qrrechnung.php, die
+// beim Speichern eine ungueltige oder nicht-QR-IBAN ohnehin abweist. Diese
+// JS-Fassung rechnet dieselben zwei Schritte (Mod-97, dann IID-Bereich
+// 30000-31999), damit der Nutzer nicht erst nach dem Speichern erfaehrt,
+// dass die eingetippte IBAN keine QR-IBAN ist.
+function ibanIstQrJs(iban) {
+  const n = String(iban || '').toUpperCase().replace(/\s+/g, '');
+  if (n.length !== 21 || !/^(CH|LI)[0-9A-Z]+$/.test(n)) { return { gueltig: false, istQr: false }; }
+  const verschoben = n.slice(4) + n.slice(0, 4);
+  let rest = 0;
+  for (const z of verschoben) {
+    const wert = /[A-Z]/.test(z) ? String(z.charCodeAt(0) - 55) : z;
+    for (const ziffer of wert) { rest = (rest * 10 + Number(ziffer)) % 97; }
+  }
+  const gueltig = rest === 1;
+  const iid = Number(n.slice(4, 9));
+  return { gueltig, istQr: gueltig && iid >= 30000 && iid <= 31999 };
+}
+
+function bkQrIbanPruefen() {
+  const el = $('bkQrIbanHinweis'); if (!el) { return; }
+  const wert = $('bkQrIban').value.trim();
+  if (!wert) {
+    el.textContent = 'Von der Bank eigens zugewiesene QR-IBAN — nicht dieselbe wie die normale Geschäfts-IBAN.';
+    el.style.color = ''; return;
+  }
+  const { gueltig, istQr } = ibanIstQrJs(wert);
+  if (istQr) { el.textContent = '✓ Gültige QR-IBAN erkannt.'; el.style.color = 'var(--gruen, #1C7C3E)'; }
+  else if (gueltig) { el.textContent = 'Gültige IBAN, aber keine QR-IBAN — die Bank weist QR-IBANs eigens zu.'; el.style.color = 'var(--rot, #B3261E)'; }
+  else { el.textContent = 'Das sieht noch nicht nach einer vollständigen, gültigen IBAN aus.'; el.style.color = 'var(--rot, #B3261E)'; }
+}
 
 function briefkopfLaden() {
   return api('betrieb.php').then(({ ok, data }) => {
@@ -11942,6 +12000,12 @@ function bkLaden() {
     $('bkZusatz').value = briefkopf.zusatz || '';
     $('bkFuss').value = briefkopf.fusszeile || '';
     $('bkFuss2').value = briefkopf.fusszeile2 || '';
+    $('bkQrStrasse').value = briefkopf.qr_strasse || '';
+    $('bkQrHausnummer').value = briefkopf.qr_hausnummer || '';
+    $('bkQrPlz').value = briefkopf.qr_plz || '';
+    $('bkQrOrt').value = briefkopf.qr_ort || '';
+    $('bkQrIban').value = briefkopf.qr_iban || '';
+    bkQrIbanPruefen();
     bkLogoStand();
   });
 }
@@ -11973,9 +12037,11 @@ function bkSpeichern() {
   api('betrieb.php', { method: 'POST', body: {
     firma: $('bkFirma').value, zusatz: $('bkZusatz').value, fusszeile: $('bkFuss').value,
     fusszeile2: $('bkFuss2').value,
+    qr_iban: $('bkQrIban').value, qr_strasse: $('bkQrStrasse').value,
+    qr_hausnummer: $('bkQrHausnummer').value, qr_plz: $('bkQrPlz').value, qr_ort: $('bkQrOrt').value,
   } }).then(({ ok, data }) => {
     if (!ok || data.status !== 'ok') { return bkFehler(data.message || 'Speichern fehlgeschlagen.'); }
-    briefkopf = data.betrieb; bkLogoStand(); toast('Briefkopf gespeichert.');
+    briefkopf = data.betrieb; bkQrIbanPruefen(); bkLogoStand(); toast('Briefkopf gespeichert.');
   }).catch(() => bkFehler('Speichern fehlgeschlagen.'));
 }
 

@@ -18,6 +18,7 @@
 declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require __DIR__ . '/../belege.php';
+require __DIR__ . '/../qrrechnung.php';
 
 function portal_esc(?string $s): string
 {
@@ -71,6 +72,7 @@ function portal_seite(string $titel, string $inhalt): void
                    font-weight:700;text-decoration:none;border:none;cursor:pointer;min-height:44px}
             .knopf-an{background:#1C7C3E;color:#fff}
             .knopf-ab{background:#fff;color:#B3261E;border:1px solid #B3261E}
+            .knopf-plain{background:#fff;color:#14161A;border:1px solid #D6DAE0;min-height:36px;padding:8px 16px}
             .hinweis{padding:14px 18px;border-radius:8px;margin-bottom:24px;font-size:14px}
             .hinweis-versendet{background:#EFF3FF;color:#1F3A8A}
             .hinweis-an{background:#E8F5E9;color:#1C7C3E}
@@ -117,7 +119,9 @@ try {
         $s->execute([(int)$b['person_id']]);
         $person = $s->fetch() ?: null;
     }
-    $betrieb = $pdo->query('SELECT firma FROM betrieb WHERE id = 1')->fetch();
+    $betrieb = $pdo->query(
+        'SELECT firma, qr_iban, qr_strasse, qr_hausnummer, qr_plz, qr_ort FROM betrieb WHERE id = 1'
+    )->fetch();
     $firma = trim((string)($betrieb['firma'] ?? ''));
 
     $b['positionen'] = beleg_positionen_lesen($pdo, (int)$b['id']);
@@ -220,9 +224,45 @@ try {
             . '</form>';
     }
 
+    // QR-Zahlteil (ENT-205): nur bei einer offenen, unbezahlten Rechnung MIT
+    // gueltig hinterlegter QR-IBAN -- solange die Bank noch keine zugewiesen
+    // hat oder die Absenderadresse unvollstaendig ist, bleibt dieser Block
+    // schlicht weg (kein kaputter/nicht scannbarer Code, siehe ENT-205).
+    // NICHT "keindruck": das ist genau der Teil, der auf dem Papier landen
+    // soll, wenn der Kunde die Seite ausdruckt.
+    $qrZahlteil = '';
+    if ($b['art'] === 'rechnung' && !$bezahlt && $summen['total_rappen'] > 0
+        && !empty($betrieb['qr_iban']) && iban_ist_qr((string)$betrieb['qr_iban'])
+        && !empty($betrieb['qr_strasse']) && !empty($betrieb['qr_plz']) && !empty($betrieb['qr_ort'])
+    ) {
+        $referenz = qrr_referenz((string)$b['nummer']);
+        $referenzGruppiert = trim((string)preg_replace('/(.{5})/', '$1 ', $referenz));
+        $debitor = $kunde ? [
+            'name' => (string)($kunde['name'] ?? ''), 'strasse' => (string)($kunde['strasse'] ?? ''),
+            'hausnummer' => (string)($kunde['hausnummer'] ?? ''), 'plz' => (string)($kunde['plz'] ?? ''),
+            'ort' => (string)($kunde['ort'] ?? ''),
+        ] : null;
+        $spc = qr_spc_payload($betrieb, $summen['total_rappen'] / 100, (string)$b['nummer'], $debitor);
+        $qrZahlteil = '<div style="margin-top:32px;padding-top:20px;border-top:1px solid #E5E8EC">'
+            . '<div style="font-size:15px;font-weight:700;margin-bottom:14px">Zahlung per QR-Rechnung</div>'
+            . '<div style="display:flex;gap:32px;flex-wrap:wrap;align-items:flex-start">'
+            . '<div id="qrRechnungCode" data-spc="' . portal_esc($spc) . '" style="flex:0 0 auto"></div>'
+            . '<table style="line-height:1.7;width:auto;font-size:12px">'
+            . '<tr><td style="padding:2px 24px 2px 0;color:#6B7280">IBAN</td><td>' . portal_esc(iban_gruppiert((string)$betrieb['qr_iban'])) . '</td></tr>'
+            . '<tr><td style="padding:2px 24px 2px 0;color:#6B7280">Referenz</td><td>' . portal_esc($referenzGruppiert) . '</td></tr>'
+            . '<tr><td style="padding:2px 24px 2px 0;color:#6B7280">Betrag</td><td>' . portal_chf($summen['total_rappen']) . ' CHF</td></tr>'
+            . '</table></div></div>'
+            . '<script src="/qrcode.js"></script>'
+            . '<script>(function(){var el=document.getElementById("qrRechnungCode");'
+            . 'if(!el||typeof qrcode==="undefined"){return;}'
+            . 'var q=qrcode(0,"M");q.addData(el.getAttribute("data-spc"));q.make();'
+            . 'el.innerHTML=q.createSvgTag({cellSize:4,margin:8});})();</script>';
+    }
+
     $inhalt = $hinweis
         . '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:24px;margin-bottom:40px">'
         . '<div style="line-height:1.45;font-size:13px;color:#6B7280">' . portal_esc($firma !== '' ? $firma : 'Absender') . '</div>'
+        . '<button type="button" class="knopf knopf-plain keindruck" onclick="window.print()">Drucken</button>'
         . '</div>'
         . '<div style="display:flex;justify-content:space-between;gap:40px;margin-bottom:40px;flex-wrap:wrap">'
         . '<table style="line-height:1.5;width:auto"><tr><td style="padding:2px 24px 2px 0;color:#6B7280;font-size:12px">' . portal_esc($titel) . 'nummer</td><td style="padding:2px 0;font-size:12px">' . portal_esc($b['nummer']) . '</td></tr>'
@@ -241,6 +281,7 @@ try {
         . '<th style="padding:7px 8px;text-align:right;font-size:11px;font-weight:700;background:#EDEFF2">Summe</th>'
         . '</tr></thead><tbody>' . $zeilen . '</tbody></table>'
         . '<table style="margin-left:auto;margin-top:14px;width:auto">' . $summenHtml . '</table>'
+        . $qrZahlteil
         . $abschnitt('Notizen', $b['oeffentliche_notizen'])
         . $abschnitt('Bedingungen', $b['bedingungen'])
         . ($b['fusszeile_text'] ? '<div style="margin-top:26px;padding-top:14px;border-top:1px solid #E5E8EC;white-space:pre-line;line-height:1.5;font-size:12px">' . nl2br(portal_esc($b['fusszeile_text'])) . '</div>' : '')

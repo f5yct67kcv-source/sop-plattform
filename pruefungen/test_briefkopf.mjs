@@ -153,7 +153,9 @@ const RAPPORTE = [
     bemerkung: null, erfasst_am: HEUTE + ' 11:05:00' },
 ];
 
-let BETRIEB = { firma: '', zusatz: '', fusszeile: null, fusszeile2: null, logo: null, logo_mime: null, logo_groesse: null };
+let BETRIEB = { firma: '', zusatz: '', fusszeile: null, fusszeile2: null,
+  qr_iban: null, qr_strasse: null, qr_hausnummer: null, qr_plz: null, qr_ort: null, qr_iban_gueltig: false,
+  logo: null, logo_mime: null, logo_groesse: null };
 const gesendet = [];
 
 const browser = await chromium.launch({ executablePath: EXE });
@@ -173,7 +175,10 @@ await page.route('**/api/**', route => {
       if (body.logo_weg) { BETRIEB = { ...BETRIEB, logo: null, logo_mime: null, logo_groesse: null }; }
       else if (body.logo) { BETRIEB = { ...BETRIEB, logo: 'data:' + body.logo_mime + ';base64,' + body.logo, logo_mime: body.logo_mime, logo_groesse: 120 }; }
       else { BETRIEB = { ...BETRIEB, firma: body.firma, zusatz: body.zusatz,
-        fusszeile: body.fusszeile || null, fusszeile2: body.fusszeile2 || null }; }
+        fusszeile: body.fusszeile || null, fusszeile2: body.fusszeile2 || null,
+        qr_iban: body.qr_iban || null, qr_strasse: body.qr_strasse || null,
+        qr_hausnummer: body.qr_hausnummer || null, qr_plz: body.qr_plz || null,
+        qr_ort: body.qr_ort || null }; }
     }
     return s({ status: 'ok', betrieb: BETRIEB });
   }
@@ -222,6 +227,54 @@ check('KRITISCH: der Briefkopf wird gespeichert',
   gesendet.some(b => b.firma === 'CUPI 24 GmbH' && b.zusatz === 'Sicherheits- und Verkehrsdienst'));
 check('Die zweite Fusszeile wird mitgeschickt',
   gesendet.some(b => b.fusszeile2 === 'Zweigstelle · Bahnhofstrasse 3 · 8200 Schaffhausen'));
+
+// ── QR-Rechnung: Absenderadresse und IBAN (ENT-205) ───────────────────────
+check('KRITISCH: die Karte hat Felder fuer die QR-Rechnungs-Absenderadresse und -IBAN',
+  await page.isVisible('#bkQrStrasse') && await page.isVisible('#bkQrHausnummer')
+  && await page.isVisible('#bkQrPlz') && await page.isVisible('#bkQrOrt') && await page.isVisible('#bkQrIban'));
+
+// Ohne Eingabe: neutraler Hinweistext, keine Bewertung.
+check('Ohne IBAN steht dort kein Urteil ("gueltig"/"ungueltig")',
+  !/gültig|ungültig/i.test(await page.textContent('#bkQrIbanHinweis')));
+
+// Offensichtlich unvollstaendige IBAN.
+await page.fill('#bkQrIban', 'CH93');
+await page.dispatchEvent('#bkQrIban', 'input');
+check('KRITISCH: eine erkennbar unvollstaendige IBAN wird sofort als ungueltig markiert',
+  /nicht.*gültig|noch nicht/i.test(await page.textContent('#bkQrIbanHinweis')));
+
+// Gueltige IBAN, aber KEINE QR-IBAN (bekanntes Wikipedia-Beispiel, IID 00762).
+await page.fill('#bkQrIban', 'CH93 0076 2011 6238 5295 7');
+await page.dispatchEvent('#bkQrIban', 'input');
+check('KRITISCH: eine gueltige, aber normale IBAN wird als "keine QR-IBAN" erkannt, nicht stillschweigend akzeptiert',
+  /keine QR-IBAN/i.test(await page.textContent('#bkQrIbanHinweis')));
+
+// Echte QR-IBAN (oeffentliches Beispiel, IID 31999).
+await page.fill('#bkQrIban', 'CH44 3199 9123 0008 8901 2');
+await page.dispatchEvent('#bkQrIban', 'input');
+check('KRITISCH: eine echte QR-IBAN wird als gueltig erkannt',
+  /Gültige QR-IBAN erkannt/.test(await page.textContent('#bkQrIbanHinweis')));
+
+await page.fill('#bkQrStrasse', 'Baslerstrasse');
+await page.fill('#bkQrHausnummer', '67');
+await page.fill('#bkQrPlz', '4632');
+await page.fill('#bkQrOrt', 'Trimbach');
+gesendet.length = 0;
+await page.click('#bkKarte .btn-primary');
+await page.waitForTimeout(300);
+check('KRITISCH: die QR-Rechnungsangaben werden mitgespeichert',
+  gesendet.some(b => b.qr_iban === 'CH44 3199 9123 0008 8901 2' && b.qr_strasse === 'Baslerstrasse'
+    && b.qr_hausnummer === '67' && b.qr_plz === '4632' && b.qr_ort === 'Trimbach'));
+
+// Erneutes Oeffnen der Ansicht laedt die gespeicherten Werte wieder ein.
+await page.evaluate(() => { go('kunden'); });
+await page.waitForTimeout(200);
+await page.evaluate(() => { go('betrieb'); });
+await page.waitForTimeout(400);
+check('KRITISCH: die QR-IBAN steht nach dem Neuladen wieder im Feld',
+  (await page.inputValue('#bkQrIban')) === 'CH44 3199 9123 0008 8901 2');
+check('Und der Hinweis zeigt sofort wieder "gueltig", ohne erneute Eingabe',
+  /Gültige QR-IBAN erkannt/.test(await page.textContent('#bkQrIbanHinweis')));
 
 html = await drucken(10);
 check('KRITISCH: der gepflegte Firmenname steht jetzt im Kopf', /CUPI 24 GmbH/.test(html));
