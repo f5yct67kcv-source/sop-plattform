@@ -689,6 +689,40 @@ CREATE TABLE IF NOT EXISTS kunden_kontaktweg (
   FOREIGN KEY (kontrollpunkt_id) REFERENCES kontrollpunkt(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+// Kontrollrunden (ENT-204): eine benannte Vorlage buendelt eine Teilmenge der
+// Kontrollpunkte eines Objekts (z.B. "Oeffnungsrunde", "Schlusskontrolle").
+// Bewusst eine eigene Tabelle statt eines Feldes an kontrollpunkt selbst --
+// ein Punkt kann in mehreren Runden vorkommen (vom Projektinhaber am
+// Beispiel eines eigenen Objekts bestaetigt), eine einfache Zuordnung
+// waere dafuer zu eng.
+'rundgang_vorlage' => "CREATE TABLE rundgang_vorlage (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  objekt_id INT NOT NULL,
+  name VARCHAR(200) NOT NULL,
+  aktiv TINYINT(1) NOT NULL DEFAULT 1,
+  erstellt_am DATETIME DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_objekt (objekt_id),
+  FOREIGN KEY (objekt_id) REFERENCES objekte(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+// Reine Zuordnungstabelle, echte Mehrfachbeziehung (ENT-204): dieselbe
+// kontrollpunkt_id darf in mehreren Vorlagen auftauchen, aber nicht zweimal
+// in derselben. reihenfolge gilt je Vorlage, nicht die globale
+// kontrollpunkt.reihenfolge -- dieselbe Startreihenfolge in zwei Runden
+// darf unterschiedlich sein. Anders als rundgang_scan ist das kein
+// Nachweis: ON DELETE CASCADE auf beiden Seiten, die Zuordnung verschwindet
+// mit, wenn Vorlage oder Punkt geloescht werden.
+'rundgang_vorlage_punkt' => "CREATE TABLE rundgang_vorlage_punkt (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  vorlage_id INT NOT NULL,
+  kontrollpunkt_id INT NOT NULL,
+  reihenfolge INT NOT NULL DEFAULT 0,
+  UNIQUE KEY uniq_vorlage_punkt (vorlage_id, kontrollpunkt_id),
+  KEY idx_vorlage (vorlage_id, reihenfolge),
+  FOREIGN KEY (vorlage_id) REFERENCES rundgang_vorlage(id) ON DELETE CASCADE,
+  FOREIGN KEY (kontrollpunkt_id) REFERENCES kontrollpunkt(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
 // ── Offerten und spaeter Rechnungen (ENT-181) ─────────────────────────────
 //
 // Produkte sind Stammdaten: die immer gleichen Leistungen (Verkehrsdienst,
@@ -1155,6 +1189,12 @@ $spalten = [
     ['rundgang', 'abbruch_freitext', 'ALTER TABLE rundgang ADD COLUMN abbruch_freitext TEXT NULL AFTER abbruch_grund'],
     ['rundgang', 'abgebrochen_am',   'ALTER TABLE rundgang ADD COLUMN abgebrochen_am DATETIME NULL AFTER abbruch_freitext'],
 
+    // Kontrollrunden (ENT-204): welche Vorlage dieser Durchfuehrung zugrunde
+    // liegt. NULLable und ON DELETE SET NULL (siehe Verweis weiter unten) --
+    // massgeblich ist die Vorlage von heute, nicht die von damals, gleiches
+    // Prinzip wie bei rundgang_scan.kontrollpunkt_id.
+    ['rundgang', 'rundgang_vorlage_id', 'ALTER TABLE rundgang ADD COLUMN rundgang_vorlage_id INT NULL AFTER objekt_id'],
+
     // Ereignis-Feed und Glocke (ENT-197): eigener Zeitstempel, getrennt von
     // entscheidung_am -- siehe Kommentar am CREATE TABLE oben.
     ['belege', 'entscheidung_gesehen_am',
@@ -1393,6 +1433,8 @@ $verweise = [
     // Beleg stehen -- er ist ein Dokument ueber einen bestimmten Tag, kein
     // Verweis, der mit der Schicht sterben darf (ENT-082).
     ['rapporte', 'einsatz_id', 'ALTER TABLE rapporte ADD FOREIGN KEY (einsatz_id) REFERENCES einsaetze(id) ON DELETE SET NULL'],
+    // Kontrollrunden (ENT-204).
+    ['rundgang', 'rundgang_vorlage_id', 'ALTER TABLE rundgang ADD FOREIGN KEY (rundgang_vorlage_id) REFERENCES rundgang_vorlage(id) ON DELETE SET NULL'],
 ];
 foreach ($verweise as [$tabelle, $spalte, $sql]) {
     if (!hat_spalte($pdo, $tabelle, $spalte) || hat_fremdschluessel($pdo, $tabelle, $spalte)) {
