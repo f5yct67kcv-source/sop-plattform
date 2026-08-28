@@ -492,6 +492,39 @@ try {
   await p.close();
 } catch (e) { bad.push('Glocke: ' + String(e).split('\n')[0].slice(0, 120)); }
 
+// ══════════════ GLOCKE AUF DEM HANDY: DAS PANEL STEHT WIRKLICH IM BILD
+//
+// Gefunden vom Projektinhaber am 28.08.2026: auf dem Handy zeigte das
+// Dropdown nur eine abgeschnittene erste Zeile direkt unter der Statusleiste,
+// ohne Kopf ("Benachrichtigungen") und ohne Kartenhintergrund. Ursache: die
+// Topbar hat backdrop-filter, und backdrop-filter auf einem Vorfahren macht
+// dessen Box zum containing block fuer jedes position:fixed-Kind -- das
+// Bodenblatt-CSS "bottom:0" meinte darum den unteren Rand der 60px hohen
+// Topbar, nicht den Bildschirmrand. Playwright zeigte panel.top bei -51px
+// statt irgendwo im sichtbaren Bereich. Diese Pruefung waere vorher gruen
+// geblieben: die bisherige Pruefung oben lief nur am 1440px-Desktop-Viewport,
+// nie an der mobilen Bodenblatt-Variante -- genau die Luecke, durch die der
+// Fehler ungesehen blieb.
+try {
+  const p = await seite();
+  await p.setViewportSize({ width: 390, height: 844 });
+  await p.waitForTimeout(200);
+  await p.click('#btnGlocke'); await p.waitForTimeout(200);
+  const m = await p.evaluate(() => {
+    const panel = document.getElementById('glockePanel').getBoundingClientRect();
+    const kopf = document.querySelector('#glockePanel .glocke-kopf').getBoundingClientRect();
+    const zeile = document.querySelector('#glockeListe .glocke-row').getBoundingClientRect();
+    return { panel, kopf, zeile, innenHoehe: window.innerHeight };
+  });
+  check('KRITISCH: das Panel steht auf dem Handy vollstaendig im Bildschirm, nicht darueber hinaus',
+    m.panel.top >= 0 && m.panel.bottom <= m.innenHoehe + 1);
+  check('KRITISCH: die Kopfzeile "Benachrichtigungen" ist sichtbar, nicht ueber den Bildrand hinausgeschoben',
+    m.kopf.top >= 0 && m.kopf.height > 0);
+  check('KRITISCH: die erste Zeile steht vollstaendig im Bild, nicht nur mit dem unteren Rest',
+    m.zeile.top >= 0 && m.zeile.bottom <= m.innenHoehe + 1);
+  await p.close();
+} catch (e) { bad.push('Glocke Handy-Panel: ' + String(e).split('\n')[0].slice(0, 120)); }
+
 // Ohne Ereignisse bleibt der Zaehler versteckt -- eine "0" waere eine Zahl
 // ohne Aussage, kein Hinweis auf etwas Ungesehenes.
 try {
