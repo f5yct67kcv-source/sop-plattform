@@ -328,10 +328,46 @@ try {
     $logoHtml = $logoDatenUrl
         ? '<img src="' . portal_esc($logoDatenUrl) . '" alt="" style="max-height:96px;max-width:200px;display:block;margin-left:auto">'
         : '';
+
+    // Unterschriftsseite (ENT-187 intern, ENT-207 hier nachgezogen): der
+    // Haken "Unterschriftsseite hinzufügen" im Formular (of_unterschriftsseite)
+    // wurde bisher nur im internen Ausdruck (ofBlatt() in dashboard.html)
+    // beruecksichtigt -- auf der oeffentlichen Kundenseite, ueber die der
+    // Kunde die Datei tatsaechlich druckt/herunterlaedt, hatte er GAR KEINE
+    // Wirkung. Gleiche Feldnamen/Aufbau wie im internen Ausdruck, damit ein
+    // Beleg von innen und ueber den Portal-Link dieselbe Unterschriftsseite
+    // zeigt.
+    $unterschriftsseite = '';
+    if (!empty($b['unterschriftsseite'])) {
+        $auftraggeber = trim((string)($kunde['name'] ?? ''));
+        $auftraggeber = $auftraggeber !== '' ? $auftraggeber : 'Auftraggeber';
+        $auftragnehmer = $firma !== '' ? $firma : 'Auftragnehmer';
+        $unterschriftsseite = '<div style="page-break-before:always;break-before:page;padding-top:60px;'
+            . 'font-family:-apple-system,Segoe UI,Arial,sans-serif;color:#14161A;'
+            . 'max-width:700px;margin:0 auto;font-size:12px">'
+            . '<div style="font-size:15px;font-weight:700;margin-bottom:40px">'
+            . portal_esc($titel . 'nummer') . ' ' . portal_esc($b['nummer'])
+            . '</div>'
+            . '<div style="color:#6B7280;margin-bottom:60px">Ort, Datum</div>'
+            . '<div style="border-bottom:1px solid #14161A;width:260px;margin-bottom:60px"></div>'
+            . '<div style="display:flex;gap:60px">'
+            . '<div style="flex:1">'
+            . '<div style="border-bottom:1px solid #14161A;height:60px"></div>'
+            . '<div style="margin-top:8px;font-size:11px;color:#6B7280">Unterschrift ' . portal_esc($auftraggeber) . '</div>'
+            . '</div>'
+            . '<div style="flex:1">'
+            . '<div style="border-bottom:1px solid #14161A;height:60px"></div>'
+            . '<div style="margin-top:8px;font-size:11px;color:#6B7280">Unterschrift ' . portal_esc($auftragnehmer) . '</div>'
+            . '</div>'
+            . '</div>'
+            . '</div>';
+    }
+
     $dokument = '<div class="keindruck" style="display:flex;justify-content:flex-end;gap:10px;margin-bottom:24px">'
         . '<button type="button" class="knopf knopf-plain" onclick="window.print()">Drucken</button>'
         . '<button type="button" class="knopf knopf-plain" id="btnHerunterladen" onclick="portalHerunterladen()">Herunterladen</button>'
         . '</div>'
+        . '<div id="dokumentGanz">'
         . '<div id="dokumentSeite" style="display:flex;flex-direction:column;min-height:960px">'
         . '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:24px;margin-bottom:40px">'
         . '<div style="line-height:1.45;font-size:12px">' . implode('<br>', array_map('portal_esc', $absenderZeilen)) . '</div>'
@@ -365,6 +401,8 @@ try {
         . ($b['fusszeile_text'] ? '<div style="border-top:1px solid #E5E8EC;padding-top:14px;white-space:pre-line;line-height:1.5;font-size:12px">' . nl2br(portal_esc($b['fusszeile_text'])) . '</div>' : '')
         . $betriebFusszeile
         . '</div>'
+        . '</div>'
+        . $unterschriftsseite
         . '</div>';
 
     // Herunterladen laedt html2pdf.js erst BEIM KLICK nach (946 KB, fast
@@ -376,7 +414,7 @@ try {
         . 'function starten(){btn.textContent=alt;'
         . 'html2pdf().set({filename:' . json_encode($dateiname, JSON_UNESCAPED_UNICODE) . ',margin:10,'
         . 'html2canvas:{scale:2},jsPDF:{unit:"mm",format:"a4",orientation:"portrait"}})'
-        . '.from(document.getElementById("dokumentSeite")).save();}'
+        . '.from(document.getElementById("dokumentGanz")).save();}'
         . 'if(typeof html2pdf!=="undefined"){starten();return;}'
         . 'btn.textContent="Lädt …";var s=document.createElement("script");'
         . 's.src="/html2pdf.bundle.min.js";s.onload=starten;'
