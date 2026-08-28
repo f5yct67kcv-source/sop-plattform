@@ -36,6 +36,14 @@ if ($rundgang['status'] === 'pausiert') {
     json_response(['status' => 'error', 'message' => 'Dieser Rundgang ist pausiert -- erst fortsetzen'], 409);
 }
 
+// Ersatzscan (Q-22 in sop-projekt): Fotobeleg statt technischer Pruefung,
+// wenn NFC/Geofence nicht moeglich ist (Chip zerstoert, Punkt nicht
+// auffindbar). Bewusst klein gehalten -- ein Fotobeleg fuer "war ich vor
+// Ort" braucht keine Druckaufloesung, und die App komprimiert vor dem
+// Versand (siehe rdEsKomprimieren in app.html). Gleiche Grössenordnung wie
+// DOK_MAX/2 in einsatz_dokument.php, dort fuer PDF-Dokumente statt Fotos.
+const ERSATZSCAN_FOTO_MAX = 2 * 1024 * 1024;
+
 $ergebnisse = [];
 foreach ($scans as $eintrag) {
     if (!is_array($eintrag)) { continue; }
@@ -47,7 +55,7 @@ foreach ($scans as $eintrag) {
     $lng = isset($eintrag['lng']) && $eintrag['lng'] !== '' ? (float)$eintrag['lng'] : null;
     $beschreibung = isset($eintrag['beschreibung']) ? trim((string)$eintrag['beschreibung']) : null;
 
-    if ($kontrollpunktId <= 0 || !in_array($status, ['bestaetigt', 'nicht_verfuegbar'], true) || $erfasstAm === '') {
+    if ($kontrollpunktId <= 0 || !in_array($status, ['bestaetigt', 'nicht_verfuegbar', 'ersatzscan'], true) || $erfasstAm === '') {
         $ergebnisse[] = ['kontrollpunkt_id' => $kontrollpunktId, 'status' => 'fehler', 'message' => 'ungueltige Meldung'];
         continue;
     }
@@ -70,12 +78,40 @@ foreach ($scans as $eintrag) {
         continue;
     }
 
+    $foto = null; $fotoMime = null;
     if ($status === 'bestaetigt') {
         $fehler = rundgang_scan_pruefen($kontrollpunkt, $chipId, $lat, $lng);
         if ($fehler !== null) {
             $ergebnisse[] = ['kontrollpunkt_id' => $kontrollpunktId, 'status' => 'fehler', 'message' => $fehler];
             continue;
         }
+    } elseif ($status === 'ersatzscan') {
+        // Keine NFC-/Geofence-Pruefung -- das ist der ganze Sinn eines
+        // Ersatzscans (Q-22). Dafuer Foto UND Begruendung zwingend, sonst
+        // waere ein Ersatzscan ein unbelegter Klick ohne jeden Nachweis.
+        if ($beschreibung === null || $beschreibung === '') {
+            $ergebnisse[] = ['kontrollpunkt_id' => $kontrollpunktId, 'status' => 'fehler',
+                'message' => 'Begründung erforderlich bei Ersatzscan'];
+            continue;
+        }
+        $fotoRoh = isset($eintrag['foto']) ? base64_decode((string)$eintrag['foto'], true) : false;
+        if ($fotoRoh === false || $fotoRoh === '') {
+            $ergebnisse[] = ['kontrollpunkt_id' => $kontrollpunktId, 'status' => 'fehler',
+                'message' => 'Foto erforderlich bei Ersatzscan'];
+            continue;
+        }
+        if (strlen($fotoRoh) > ERSATZSCAN_FOTO_MAX) {
+            $ergebnisse[] = ['kontrollpunkt_id' => $kontrollpunktId, 'status' => 'fehler',
+                'message' => 'Foto zu gross (höchstens 2 MB)'];
+            continue;
+        }
+        $fotoMime = ersatzscan_foto_mime($fotoRoh);
+        if ($fotoMime === null) {
+            $ergebnisse[] = ['kontrollpunkt_id' => $kontrollpunktId, 'status' => 'fehler',
+                'message' => 'Nur JPEG- oder PNG-Fotos'];
+            continue;
+        }
+        $foto = $fotoRoh;
     } elseif ($beschreibung === null || $beschreibung === '') {
         $ergebnisse[] = ['kontrollpunkt_id' => $kontrollpunktId, 'status' => 'fehler',
             'message' => 'Beschreibung erforderlich bei nicht verfuegbar'];
@@ -83,14 +119,16 @@ foreach ($scans as $eintrag) {
     }
 
     $ins = $pdo->prepare(
-        'INSERT INTO rundgang_scan (rundgang_id, kontrollpunkt_id, status, erfasst_am, beschreibung)
-         VALUES (?, ?, ?, ?, ?)'
+        'INSERT INTO rundgang_scan (rundgang_id, kontrollpunkt_id, status, erfasst_am, beschreibung, foto, foto_mime)
+         VALUES (?, ?, ?, ?, ?, ?, ?)'
     );
-    $ins->execute([$rundgangId, $kontrollpunktId, $status, $erfasstAm, $beschreibung]);
+    $ins->execute([$rundgangId, $kontrollpunktId, $status, $erfasstAm, $beschreibung, $foto, $fotoMime]);
 
-    // Rohzeit beginnt erst mit dem ersten BESTAETIGTEN Punkt, nicht mit
-    // "nicht verfuegbar" (ENT-145) -- sonst liesse sich der Start ohne
-    // echten Vor-Ort-Nachweis ausloesen.
+    // Rohzeit beginnt erst mit dem ersten BESTAETIGTEN Punkt -- weder "nicht
+    // verfuegbar" (ENT-145) noch "ersatzscan" (Q-22, Projektinhaber-Entscheid
+    // 2026-08-28) loesen sie aus. Beides hat keinen technischen Vor-Ort-
+    // Nachweis wie NFC/Geofence, nur ein Foto ist schwaecher als das -- sonst
+    // liesse sich der Start ohne echte Ortspruefung ausloesen.
     if ($status === 'bestaetigt' && $rundgang['rohzeit_start'] === null) {
         $pdo->prepare("UPDATE rundgang SET status = 'laeuft', rohzeit_start = ? WHERE id = ?")
             ->execute([$erfasstAm, $rundgangId]);

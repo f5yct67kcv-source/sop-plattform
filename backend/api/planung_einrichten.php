@@ -1207,6 +1207,13 @@ $spalten = [
     // Prinzip wie bei rundgang_scan.kontrollpunkt_id.
     ['rundgang', 'rundgang_vorlage_id', 'ALTER TABLE rundgang ADD COLUMN rundgang_vorlage_id INT NULL AFTER objekt_id'],
 
+    // Ersatzscan (Q-22 in sop-projekt): manuelle Bestaetigung eines
+    // Kontrollpunkts mit Fotobeleg, wenn der reguläre NFC-/Geofence-Scan
+    // nicht moeglich ist. Nullable -- nur ein 'ersatzscan'-Eintrag traegt
+    // ein Foto, 'bestaetigt'/'nicht_verfuegbar' bleiben ohne.
+    ['rundgang_scan', 'foto',      'ALTER TABLE rundgang_scan ADD COLUMN foto LONGBLOB NULL AFTER beschreibung'],
+    ['rundgang_scan', 'foto_mime', 'ALTER TABLE rundgang_scan ADD COLUMN foto_mime VARCHAR(50) NULL AFTER foto'],
+
     // Ereignis-Feed und Glocke (ENT-197): eigener Zeitstempel, getrennt von
     // entscheidung_am -- siehe Kommentar am CREATE TABLE oben.
     ['belege', 'entscheidung_gesehen_am',

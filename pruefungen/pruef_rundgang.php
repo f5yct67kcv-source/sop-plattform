@@ -51,7 +51,8 @@ $pdo->exec('CREATE TABLE kontrollpunkt (id INTEGER PRIMARY KEY AUTOINCREMENT, ob
             bezeichnung TEXT, reihenfolge INT, typ TEXT, chip_id TEXT, lat REAL, lng REAL,
             geofence_radius_m INT, aktiv INT)');
 $pdo->exec('CREATE TABLE rundgang_scan (id INTEGER PRIMARY KEY AUTOINCREMENT, rundgang_id INT,
-            kontrollpunkt_id INT, status TEXT, erfasst_am TEXT, beschreibung TEXT)');
+            kontrollpunkt_id INT, status TEXT, erfasst_am TEXT, beschreibung TEXT,
+            foto TEXT, foto_mime TEXT)');
 
 $pdo->exec("INSERT INTO kontrollpunkt (objekt_id, bezeichnung, reihenfolge, typ, chip_id, aktiv)
             VALUES (1, 'Eingang', 1, 'nfc', 'A1', 1)");
@@ -92,11 +93,11 @@ pruef('KRITISCH: ein anderer Rundgang am selben Objekt startet mit einer eigenen
 // ══════════════ RUNDGANG_FORTSCHRITT -- FUER DIE UEBERSICHT (ENT-183)
 $fortschritt = rundgang_fortschritt($pdo, 100, 1);
 pruef('KRITISCH: Fortschritt zaehlt bestaetigte und nicht-verfuegbare Punkte getrennt',
-    $fortschritt === ['gesamt' => 3, 'bestaetigt' => 1, 'nicht_verfuegbar' => 1]);
+    $fortschritt === ['gesamt' => 3, 'bestaetigt' => 1, 'nicht_verfuegbar' => 1, 'ersatzscan' => 0]);
 
 $fortschrittAnders = rundgang_fortschritt($pdo, 200, 1);
 pruef('KRITISCH: ein anderer Rundgang hat einen eigenen, unbeeinflussten Fortschritt',
-    $fortschrittAnders === ['gesamt' => 3, 'bestaetigt' => 0, 'nicht_verfuegbar' => 0]);
+    $fortschrittAnders === ['gesamt' => 3, 'bestaetigt' => 0, 'nicht_verfuegbar' => 0, 'ersatzscan' => 0]);
 
 // Alle drei Punkte des Rundgangs 100 erledigen -> "gesamt" bleibt korrekt,
 // auch wenn nichts mehr offen ist (kein Verwechseln mit "es gibt keine
@@ -105,7 +106,7 @@ $pdo->exec("INSERT INTO rundgang_scan (rundgang_id, kontrollpunkt_id, status, er
             VALUES (100, 3, 'bestaetigt', '2026-01-01 08:10:00')");
 $fortschritt = rundgang_fortschritt($pdo, 100, 1);
 pruef('KRITISCH: vollstaendig erledigt zeigt trotzdem die richtige Gesamtzahl, nicht 0',
-    $fortschritt === ['gesamt' => 3, 'bestaetigt' => 2, 'nicht_verfuegbar' => 1]);
+    $fortschritt === ['gesamt' => 3, 'bestaetigt' => 2, 'nicht_verfuegbar' => 1, 'ersatzscan' => 0]);
 
 // ══════════════ RUNDGANG_VORLAGE_PUNKTE_SETZEN -- KONTROLLRUNDEN (ENT-204)
 $pdo->exec('CREATE TABLE rundgang_vorlage (id INTEGER PRIMARY KEY AUTOINCREMENT, objekt_id INT, name TEXT, aktiv INT)');
@@ -167,7 +168,7 @@ pruef('KRITISCH: die Reihenfolge folgt der Vorlage, nicht kontrollpunkt.reihenfo
 
 $fortschrittVorlage = rundgang_fortschritt($pdo, 300, 1, $kurzrundeId);
 pruef('KRITISCH: "gesamt" zaehlt bei gewaehlter Vorlage nur deren Punkte (2, nicht 3)',
-    $fortschrittVorlage === ['gesamt' => 2, 'bestaetigt' => 0, 'nicht_verfuegbar' => 0]);
+    $fortschrittVorlage === ['gesamt' => 2, 'bestaetigt' => 0, 'nicht_verfuegbar' => 0, 'ersatzscan' => 0]);
 
 $pdo->exec("INSERT INTO rundgang_scan (rundgang_id, kontrollpunkt_id, status, erfasst_am)
             VALUES (300, 1, 'bestaetigt', '2026-01-01 09:00:00')");
@@ -176,11 +177,33 @@ pruef('Ein bestaetigter Vorlagen-Punkt verschwindet auch hier aus der Restliste'
     count($uebrigVorlage) === 1 && $uebrigVorlage[0]['bezeichnung'] === 'Parkplatz');
 $fortschrittVorlage = rundgang_fortschritt($pdo, 300, 1, $kurzrundeId);
 pruef('Fortschritt zaehlt den bestaetigten Vorlagen-Punkt, "gesamt" bleibt bei 2',
-    $fortschrittVorlage === ['gesamt' => 2, 'bestaetigt' => 1, 'nicht_verfuegbar' => 0]);
+    $fortschrittVorlage === ['gesamt' => 2, 'bestaetigt' => 1, 'nicht_verfuegbar' => 0, 'ersatzscan' => 0]);
 
 pruef('KRITISCH: ohne Vorlage (null) bleibt das alte Verhalten -- alle drei Punkte zaehlen weiterhin',
     count(rundgang_kontrollpunkte_uebrig($pdo, 300, 1)) === 2 // Eingang schon bestaetigt, 2 von 3 offen
     && rundgang_fortschritt($pdo, 300, 1)['gesamt'] === 3);
+
+// ══════════════ ERSATZSCAN -- FOTOBELEG STATT TECHNISCHER PRUEFUNG (Q-22)
+pruef('KRITISCH: ein JPEG wird an den Magic Bytes erkannt',
+    ersatzscan_foto_mime("\xFF\xD8\xFF\xE0Rest eines Fotos") === 'image/jpeg');
+pruef('KRITISCH: ein PNG wird an den Magic Bytes erkannt',
+    ersatzscan_foto_mime("\x89PNG\r\n\x1a\nRest eines Fotos") === 'image/png');
+pruef('KRITISCH: beliebiger Inhalt (kein Bild) wird abgelehnt, nicht stillschweigend akzeptiert',
+    ersatzscan_foto_mime('<html>kein Foto</html>') === null);
+pruef('Ein leerer String ist kein gueltiges Foto',
+    ersatzscan_foto_mime('') === null);
+
+// Eigener, frischer Rundgang (400): ein Ersatzscan muss wie eine
+// Bestaetigung aus der Restliste verschwinden (Kontrollpunkt 2 = Keller),
+// aber getrennt von "bestaetigt" gezaehlt werden.
+$pdo->exec("INSERT INTO rundgang_scan (rundgang_id, kontrollpunkt_id, status, erfasst_am, beschreibung, foto, foto_mime)
+            VALUES (400, 2, 'ersatzscan', '2026-01-01 10:00:00', 'Chip zerstoert', 'FOTOINHALT', 'image/jpeg')");
+$uebrigErsatzscan = rundgang_kontrollpunkte_uebrig($pdo, 400, 1);
+pruef('KRITISCH: ein per Ersatzscan erledigter Punkt verschwindet aus der Restliste',
+    !in_array('Keller', array_column($uebrigErsatzscan, 'bezeichnung'), true));
+$fortschrittErsatzscan = rundgang_fortschritt($pdo, 400, 1);
+pruef('KRITISCH: Ersatzscan zaehlt separat, nicht als "bestaetigt" mit',
+    $fortschrittErsatzscan === ['gesamt' => 3, 'bestaetigt' => 0, 'nicht_verfuegbar' => 0, 'ersatzscan' => 1]);
 
 echo $ok . " Pruefungen bestanden\n";
 if ($bad) { echo count($bad) . " FEHLGESCHLAGEN:\n - " . implode("\n - ", $bad) . "\n"; exit(1); }

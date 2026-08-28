@@ -333,14 +333,14 @@ await page.click('#rdListe .rd-zeile:nth-child(2) button:has-text("Nicht verfüg
 await page.waitForTimeout(150);
 check('Der Knopf klappt das Beschreibungsfeld auf',
   await page.evaluate(() => document.getElementById('rdNv2').style.display !== 'none'));
-await page.click('#rdListe .rd-zeile:nth-child(2) button:has-text("Melden")');
+await page.click('#rdNv2 button:has-text("Melden")');
 await page.waitForTimeout(200);
 check('KRITISCH: ohne Beschreibung wird nichts gesendet', (await page.textContent('#rdFehler2')).length > 0);
 check('Das Beschreibungsfeld ist mindestens 16px -- sonst zoomt iOS hinein',
   await page.evaluate(() => parseFloat(getComputedStyle(document.getElementById('rdNvText2')).fontSize) >= 16));
 await page.fill('#rdNvText2', 'Chip abgerissen');
 rufe = [];
-await page.click('#rdListe .rd-zeile:nth-child(2) button:has-text("Melden")');
+await page.click('#rdNv2 button:has-text("Melden")');
 await page.waitForTimeout(300);
 const nvGesendet = rufe.find(r => r.p.includes('mein_rundgang_scan'));
 check('KRITISCH: "nicht verfuegbar" sendet Status und Beschreibung',
