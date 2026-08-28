@@ -36,7 +36,7 @@ if (!beleg_status_gueltig($status)) {
 
 $datum = (string)($in['datum'] ?? '');
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $datum)) {
-    json_response(['status' => 'error', 'message' => 'Ein Offertendatum ist erforderlich.'], 400);
+    json_response(['status' => 'error', 'message' => 'Ein Datum ist erforderlich.'], 400);
 }
 $gueltigBis = (string)($in['gueltig_bis'] ?? '');
 $gueltigBis = preg_match('/^\d{4}-\d{2}-\d{2}$/', $gueltigBis) ? $gueltigBis : null;
@@ -47,6 +47,14 @@ if ($gueltigBis !== null && $gueltigBis < $datum) {
     json_response(['status' => 'error',
         'message' => '„Gültig bis" liegt vor dem Offertendatum.'], 400);
 }
+// faellig_bis ist das Pendant zu gueltig_bis bei Rechnungen (ENT-181,
+// Ausbaustufe 28.08.2026) -- dieselbe Pruefung, nur fuer die andere Belegart.
+$faelligBis = (string)($in['faellig_bis'] ?? '');
+$faelligBis = preg_match('/^\d{4}-\d{2}-\d{2}$/', $faelligBis) ? $faelligBis : null;
+if ($faelligBis !== null && $faelligBis < $datum) {
+    json_response(['status' => 'error',
+        'message' => '„Fällig am" liegt vor dem Rechnungsdatum.'], 400);
+}
 
 $kopf = [
     'kunde_id'    => ($in['kunde_id'] ?? null) ? (int)$in['kunde_id'] : null,
@@ -55,6 +63,7 @@ $kopf = [
     'referenz'    => mb_substr(trim((string)($in['referenz'] ?? '')), 0, 100),
     'datum'       => $datum,
     'gueltig_bis' => $gueltigBis,
+    'faellig_bis' => $faelligBis,
     'status'      => $status,
     'bemerkung'   => trim((string)($in['bemerkung'] ?? '')),
     'ist_vorlage' => !empty($in['ist_vorlage']) ? 1 : 0,

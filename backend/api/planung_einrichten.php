@@ -1159,6 +1159,17 @@ $spalten = [
     // entscheidung_am -- siehe Kommentar am CREATE TABLE oben.
     ['belege', 'entscheidung_gesehen_am',
      'ALTER TABLE belege ADD COLUMN entscheidung_gesehen_am DATETIME NULL AFTER entscheidung_ip'],
+
+    // Rechnungen-Reiter, Ausbaustufe nach dem Grundgeruest (ENT-181,
+    // Projektinhaber-Entscheid 28.08.2026): faellig_bis ist das Pendant zu
+    // gueltig_bis bei Offerten -- manuell erfasst, keine automatisch
+    // berechnete Zahlungsfrist. bezahlt/bezahlt_am sind bewusst eine einfache
+    // Ja/Nein-Markierung statt einer Teilzahlungsbuchhaltung: "Offener
+    // Betrag" in der Liste ist damit entweder 0 oder der volle Betrag, keine
+    // eigene Zahlungs-Tabelle noetig.
+    ['belege', 'faellig_bis', 'ALTER TABLE belege ADD COLUMN faellig_bis DATE NULL AFTER gueltig_bis'],
+    ['belege', 'bezahlt',     'ALTER TABLE belege ADD COLUMN bezahlt TINYINT(1) NOT NULL DEFAULT 0 AFTER faellig_bis'],
+    ['belege', 'bezahlt_am',  'ALTER TABLE belege ADD COLUMN bezahlt_am DATE NULL AFTER bezahlt'],
 ];
 foreach ($spalten as [$tabelle, $spalte, $sql]) {
     if (!hat_tabelle_jetzt($pdo, $tabelle) || hat_spalte($pdo, $tabelle, $spalte)) {
