@@ -107,5 +107,45 @@ $fortschritt = rundgang_fortschritt($pdo, 100, 1);
 pruef('KRITISCH: vollstaendig erledigt zeigt trotzdem die richtige Gesamtzahl, nicht 0',
     $fortschritt === ['gesamt' => 3, 'bestaetigt' => 2, 'nicht_verfuegbar' => 1]);
 
+// ══════════════ RUNDGANG_VORLAGE_PUNKTE_SETZEN -- KONTROLLRUNDEN (ENT-204)
+$pdo->exec('CREATE TABLE rundgang_vorlage (id INTEGER PRIMARY KEY AUTOINCREMENT, objekt_id INT, name TEXT, aktiv INT)');
+$pdo->exec('CREATE TABLE rundgang_vorlage_punkt (id INTEGER PRIMARY KEY AUTOINCREMENT, vorlage_id INT,
+            kontrollpunkt_id INT, reihenfolge INT)');
+// Ein zweites Objekt mit eigenem Kontrollpunkt, um die Fremdobjekt-Pruefung
+// unten ueberhaupt herausfordern zu koennen.
+$pdo->exec("INSERT INTO kontrollpunkt (objekt_id, bezeichnung, reihenfolge, typ, chip_id, aktiv)
+            VALUES (2, 'Fremdes Objekt', 1, 'nfc', 'F1', 1)");
+
+$pdo->exec("INSERT INTO rundgang_vorlage (objekt_id, name, aktiv) VALUES (1, 'Oeffnungsrunde', 1)");
+$vorlageId = (int)$pdo->lastInsertId();
+
+pruef('Unbekannte Vorlage liefert eine Fehlermeldung',
+    rundgang_vorlage_punkte_setzen($pdo, 999999, [1, 2]) !== null);
+
+pruef('KRITISCH: ein Punkt eines fremden Objekts wird abgelehnt',
+    rundgang_vorlage_punkte_setzen($pdo, $vorlageId, [1, 99]) !== null);
+$leer = $pdo->query("SELECT COUNT(*) FROM rundgang_vorlage_punkt WHERE vorlage_id = $vorlageId")->fetchColumn();
+pruef('Eine abgelehnte Zuordnung aendert nichts (kein Teilerfolg)', (int)$leer === 0);
+
+pruef('Eine doppelt angegebene Kontrollpunkt-Id wird abgelehnt',
+    rundgang_vorlage_punkte_setzen($pdo, $vorlageId, [1, 1]) !== null);
+
+pruef('KRITISCH: eine gueltige Zuordnung wird angenommen',
+    rundgang_vorlage_punkte_setzen($pdo, $vorlageId, [2, 1]) === null);
+$gesetzt = $pdo->query("SELECT kontrollpunkt_id, reihenfolge FROM rundgang_vorlage_punkt
+                         WHERE vorlage_id = $vorlageId ORDER BY reihenfolge")->fetchAll();
+pruef('Die Reihenfolge folgt der uebergebenen Liste, nicht der Kontrollpunkt-Id',
+    $gesetzt === [['kontrollpunkt_id' => 2, 'reihenfolge' => 0], ['kontrollpunkt_id' => 1, 'reihenfolge' => 1]]);
+
+pruef('KRITISCH: ein zweiter Aufruf ERSETZT die Zuordnung, statt sie zu ergaenzen',
+    rundgang_vorlage_punkte_setzen($pdo, $vorlageId, [1]) === null);
+$nachher = $pdo->query("SELECT COUNT(*) FROM rundgang_vorlage_punkt WHERE vorlage_id = $vorlageId")->fetchColumn();
+pruef('Nach dem Ersetzen steht nur noch der neue Punkt da', (int)$nachher === 1);
+
+pruef('Eine leere Liste entfernt alle Punkte (Runde ohne Zuordnung ist erlaubt)',
+    rundgang_vorlage_punkte_setzen($pdo, $vorlageId, []) === null);
+$leerNachher = $pdo->query("SELECT COUNT(*) FROM rundgang_vorlage_punkt WHERE vorlage_id = $vorlageId")->fetchColumn();
+pruef('KRITISCH: die leere Liste wurde tatsaechlich angewendet', (int)$leerNachher === 0);
+
 echo $ok . " Pruefungen bestanden\n";
 if ($bad) { echo count($bad) . " FEHLGESCHLAGEN:\n - " . implode("\n - ", $bad) . "\n"; exit(1); }
