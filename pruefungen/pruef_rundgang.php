@@ -147,5 +147,40 @@ pruef('Eine leere Liste entfernt alle Punkte (Runde ohne Zuordnung ist erlaubt)'
 $leerNachher = $pdo->query("SELECT COUNT(*) FROM rundgang_vorlage_punkt WHERE vorlage_id = $vorlageId")->fetchColumn();
 pruef('KRITISCH: die leere Liste wurde tatsaechlich angewendet', (int)$leerNachher === 0);
 
+// ══════════════ VORLAGE-FILTER BEI UEBRIG/FORTSCHRITT (ENT-204, App-Auswahl
+// beim Rundgang-Start). Eigener, unbenutzter Rundgang (300), damit die
+// bereits oben verbrauchten Scans an Rundgang 100 hier nicht mitzaehlen.
+$pdo->exec("INSERT INTO rundgang_vorlage (objekt_id, name, aktiv) VALUES (1, 'Kurzrunde', 1)");
+$kurzrundeId = (int)$pdo->lastInsertId();
+// Bewusst in umgekehrter Reihenfolge zu kontrollpunkt.reihenfolge gesetzt
+// (Parkplatz=3 vor Eingang=1), um zu pruefen, dass tatsaechlich die
+// Vorlagen-eigene Reihenfolge zaehlt, nicht die globale.
+rundgang_vorlage_punkte_setzen($pdo, $kurzrundeId, [3, 1]);
+
+$uebrigVorlage = rundgang_kontrollpunkte_uebrig($pdo, 300, 1, $kurzrundeId);
+pruef('KRITISCH: mit Vorlage zaehlen nur deren Punkte, nicht alle Objekt-Punkte',
+    count($uebrigVorlage) === 2);
+pruef('Der nicht zugeordnete Kontrollpunkt (Keller) fehlt in der Vorlagen-Restliste',
+    !in_array('Keller', array_column($uebrigVorlage, 'bezeichnung'), true));
+pruef('KRITISCH: die Reihenfolge folgt der Vorlage, nicht kontrollpunkt.reihenfolge',
+    array_column($uebrigVorlage, 'bezeichnung') === ['Parkplatz', 'Eingang']);
+
+$fortschrittVorlage = rundgang_fortschritt($pdo, 300, 1, $kurzrundeId);
+pruef('KRITISCH: "gesamt" zaehlt bei gewaehlter Vorlage nur deren Punkte (2, nicht 3)',
+    $fortschrittVorlage === ['gesamt' => 2, 'bestaetigt' => 0, 'nicht_verfuegbar' => 0]);
+
+$pdo->exec("INSERT INTO rundgang_scan (rundgang_id, kontrollpunkt_id, status, erfasst_am)
+            VALUES (300, 1, 'bestaetigt', '2026-01-01 09:00:00')");
+$uebrigVorlage = rundgang_kontrollpunkte_uebrig($pdo, 300, 1, $kurzrundeId);
+pruef('Ein bestaetigter Vorlagen-Punkt verschwindet auch hier aus der Restliste',
+    count($uebrigVorlage) === 1 && $uebrigVorlage[0]['bezeichnung'] === 'Parkplatz');
+$fortschrittVorlage = rundgang_fortschritt($pdo, 300, 1, $kurzrundeId);
+pruef('Fortschritt zaehlt den bestaetigten Vorlagen-Punkt, "gesamt" bleibt bei 2',
+    $fortschrittVorlage === ['gesamt' => 2, 'bestaetigt' => 1, 'nicht_verfuegbar' => 0]);
+
+pruef('KRITISCH: ohne Vorlage (null) bleibt das alte Verhalten -- alle drei Punkte zaehlen weiterhin',
+    count(rundgang_kontrollpunkte_uebrig($pdo, 300, 1)) === 2 // Eingang schon bestaetigt, 2 von 3 offen
+    && rundgang_fortschritt($pdo, 300, 1)['gesamt'] === 3);
+
 echo $ok . " Pruefungen bestanden\n";
 if ($bad) { echo count($bad) . " FEHLGESCHLAGEN:\n - " . implode("\n - ", $bad) . "\n"; exit(1); }

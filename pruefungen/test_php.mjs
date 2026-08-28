@@ -438,6 +438,7 @@ const NUR_EIGENE_DATEN = [
   'mein_rundgang_pausieren.php',  // eigenen Rundgang pausieren (ENT-146)
   'mein_rundgang_fortsetzen.php', // eigenen pausierten Rundgang fortsetzen (ENT-146)
   'mein_rundgang_abbrechen.php',  // eigenen Rundgang endgueltig abbrechen (ENT-146)
+  'mein_rundgang_vorlagen.php',   // aktive Kontrollrunden des eigenen Einsatz-Objekts (ENT-204)
 ];
 const ohnePruefung = apiDateien.filter(f => {
   const q = ohneKommentar(f);

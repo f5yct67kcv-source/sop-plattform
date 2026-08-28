@@ -577,6 +577,8 @@ const W = {
     rundgangAbbrechenFreitext: 'Zusätzliche Angaben (optional)',
     rundgangAbbrechenBestaetigen: 'Abbrechen bestätigen',
     rundgangAbgebrochen: 'Abgebrochen',
+    rundgangVorlageWahlTitel: 'Kontrollrunde wählen',
+    rundgangVorlageWahlHinweis: 'Für dieses Objekt gibt es mehrere Kontrollrunden. Welche machst du jetzt?',
 };
 const w = k => W[k] || k;
 
@@ -1590,12 +1592,46 @@ function rundgangAbschnittZeichnen(e) {
   });
 }
 
+// Gibt es fuer das Objekt mehrere Kontrollrunden (ENT-204), fragt ein
+// Zwischenschritt, welche gemacht wird -- bei keiner oder genau einer
+// Vorlage entfaellt die Frage: ohne Vorlage unveraendertes Verhalten von vor
+// ENT-204 (alle aktiven Kontrollpunkte), mit genau einer ist die Auswahl
+// keine echte Entscheidung.
 function rundgangStarten(einsatzId) {
   const btn = document.querySelector('#blRundgang button');
   if (btn) btn.disabled = true;
-  api('mein_rundgang_starten.php', { method: 'POST', body: { einsatz_id: einsatzId } }).then(({ ok, data }) => {
-    if (!ok || data.status !== 'ok') {
+  api('mein_rundgang_vorlagen.php?einsatz_id=' + einsatzId).then(({ ok, data }) => {
+    const vorlagen = (ok && data.status === 'ok') ? (data.vorlagen || []) : [];
+    if (vorlagen.length > 1) {
       if (btn) btn.disabled = false;
+      rundgangVorlageWahl(einsatzId, vorlagen);
+      return;
+    }
+    rundgangStartenMitVorlage(einsatzId, vorlagen[0] ? vorlagen[0].id : null);
+  });
+}
+
+function rundgangVorlageWahl(einsatzId, vorlagen) {
+  const e = schichten.find(x => Number(x.id) === Number(einsatzId));
+  if (!e) return;
+  $('blTitel').textContent = w('rundgangVorlageWahlTitel');
+  $('blBody').innerHTML = `
+    <div style="font-size:13px;color:var(--ink-3);font-weight:620;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px">${esc(e.objekt_name || e.kunde_name)}</div>
+    <p style="margin:0 0 14px">${esc(w('rundgangVorlageWahlHinweis'))}</p>
+    <div id="rdVorlageListe" style="display:flex;flex-direction:column;gap:8px">
+      ${vorlagen.map(v => `<button class="btn btn-primary btn-wide" onclick="rundgangStartenMitVorlage(${Number(einsatzId)},${Number(v.id)})">${esc(v.name)}</button>`).join('')}
+    </div>`;
+  $('blFuss').innerHTML = `<button class="btn btn-plain" onclick="blattAuf(${Number(einsatzId)})">${esc(w('zurueck'))}</button>`;
+  blattZeigen();
+}
+
+function rundgangStartenMitVorlage(einsatzId, vorlageId) {
+  document.querySelectorAll('#blRundgang button, #rdVorlageListe button').forEach(b => b.disabled = true);
+  const body = { einsatz_id: einsatzId };
+  if (vorlageId) body.vorlage_id = vorlageId;
+  api('mein_rundgang_starten.php', { method: 'POST', body }).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') {
+      document.querySelectorAll('#blRundgang button, #rdVorlageListe button').forEach(b => b.disabled = false);
       toast(data.message || w('netzfehler'));
       return;
     }
