@@ -1457,6 +1457,14 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
 .kp-kopf b { font-size: 13.5px; font-weight: 620; flex: 1; min-width: 0; }
 .kp-meta { font-size: 11.5px; color: var(--ink-3); margin-top: 3px; line-height: 1.55; }
 
+/* Kontrollrunden-Vorlagen (ENT-204) */
+.kr-zeile { border: 1px solid var(--line); border-radius: var(--r-sm); padding: 11px 13px; margin-bottom: 8px; }
+.kr-zeile.aus { opacity: .55; }
+.kr-kopf { display: flex; align-items: center; gap: 8px; }
+.kr-kopf b { font-size: 13.5px; font-weight: 620; flex: 1; min-width: 0; }
+.kr-meta { font-size: 11.5px; color: var(--ink-3); margin-top: 3px; line-height: 1.55; }
+.kr-punkte-liste { display: flex; flex-direction: column; gap: 2px; max-height: 260px; overflow-y: auto; border: 1px solid var(--line); border-radius: var(--r-sm); padding: 6px 10px; }
+
 /* Vorschau vor Massenbefehlen */
 .vs-kopf { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
 .vs-liste { border: 1px solid var(--line); border-radius: var(--r-sm); max-height: 260px; overflow-y: auto; }
@@ -3679,10 +3687,12 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
           <button class="tab on" id="obtab-uebersicht" onclick="obGoTab('uebersicht')">Übersicht</button>
           <button class="tab" id="obtab-masterschichten" onclick="obGoTab('masterschichten')">Masterschichten</button>
           <button class="tab" id="obtab-kontrollpunkte" onclick="obGoTab('kontrollpunkte')">Kontrollpunkte</button>
+          <button class="tab" id="obtab-kontrollrunden" onclick="obGoTab('kontrollrunden')">Kontrollrunden</button>
         </div>
         <div class="ob-tab on" id="ob-uebersicht"></div>
         <div class="ob-tab" id="ob-masterschichten"></div>
         <div class="ob-tab" id="ob-kontrollpunkte"></div>
+        <div class="ob-tab" id="ob-kontrollrunden"></div>
       </section>
 
       <!-- ══════════════════════════ PENSEN ══════════════════════════
@@ -4906,6 +4916,31 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
   </div>
 </div>
 
+<!-- Kontrollrunde anlegen/ändern (ENT-204) -->
+<div class="dlg-scrim" id="dlgKr">
+  <div class="dlg">
+    <div class="dlg-hd">
+      <h2 id="krTitel">Neue Kontrollrunde</h2>
+      <p>Eine benannte Runde aus mehreren Kontrollpunkten dieses Objekts, z. B. Öffnungsrunde oder Schlusskontrolle.</p>
+    </div>
+    <div class="dlg-bd">
+      <div class="msg-err" id="krErr" style="display:none"></div>
+      <div class="form-grid">
+        <div class="f wide"><label for="krName">Name *</label><input class="inp" id="krName" placeholder="z. B. Öffnungsrunde"></div>
+        <div class="f"><label class="check" style="margin-top:26px"><input type="checkbox" id="krAktiv" checked> Aktiv</label></div>
+      </div>
+      <div class="f wide" style="margin-top:10px">
+        <label>Kontrollpunkte in dieser Runde</label>
+        <div class="kr-punkte-liste" id="krPunkteListe"></div>
+      </div>
+    </div>
+    <div class="dlg-ft">
+      <button class="btn btn-plain" onclick="closeDlg('dlgKr')">Abbrechen</button>
+      <button class="btn btn-primary" id="krBtn" onclick="saveKr()">Speichern</button>
+    </div>
+  </div>
+</div>
+
 <!-- Globaler Diktat-Router (ENT-038) -- derselbe Router wie im
      Begrüssungs-Container (ENT-032), nur von jeder Seite aus erreichbar. -->
 <div class="dlg-scrim" id="dlgSprechen">
@@ -5174,6 +5209,8 @@ let msModus = 'neu';
 let msAlle = false;    // auch abgelaufene Fassungen zeigen
 let kontrollpunkte = [];   // die des offenen Objekts (ENT-180/ENT-183)
 let kpTarget = null;       // offener Kontrollpunkt (id)
+let rundgangVorlagen = []; // Kontrollrunden des offenen Objekts (ENT-204)
+let krTarget = null;       // offene Kontrollrunde (id)
 let vsObjekt = null;   // Objekt der offenen Vorschau
 let oplId = null;      // Objekt der Objektplanung
 let oplMs = [];        // dessen Masterschichten
@@ -12361,10 +12398,25 @@ function openObjekt(id) {
       </div>`;
   }
 
+  // Gleiches Prinzip wie beim Kontrollpunkte-Reiter: Reiter selbst immer da,
+  // Inhalt und Datenabruf nur mit dem Recht (ENT-169).
+  $('obtab-kontrollrunden').style.display = darf('rundgang_verwalten') ? '' : 'none';
+  if (darf('rundgang_verwalten')) {
+    $('ob-kontrollrunden').innerHTML = `
+      <div class="zone">
+        <div class="zone-hd">Kontrollrunden</div>
+        <div class="zone-note">Benannte Runden, die mehrere Kontrollpunkte dieses Objekts bündeln (z. B. Öffnungsrunde, Schlusskontrolle). Ein Kontrollpunkt darf in mehreren Runden vorkommen (ENT-204).</div>
+        <div id="krListe"><div class="sk" style="height:52px"></div></div>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button class="btn btn-primary btn-sm" onclick="openKr('neu')">Kontrollrunde hinzufügen</button>
+        </div>
+      </div>`;
+  }
+
   obGoTab('uebersicht');
   msAlle = false;
   loadMasterschichten();
-  if (darf('rundgang_verwalten')) { loadKontrollpunkte(); }
+  if (darf('rundgang_verwalten')) { loadKontrollpunkte(); loadRundgangVorlagen(); }
 }
 
 function obGoTab(t) {
@@ -12466,6 +12518,43 @@ function renderKpListe() {
         <button class="btn btn-plain btn-sm" onclick="openKp('aendern',${Number(k.id)})">Bearbeiten</button>
         <div style="flex:1"></div>
         <button class="btn btn-quiet btn-sm" onclick="askDeleteKp(${Number(k.id)})">Entfernen</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function loadRundgangVorlagen() {
+  if (!obTarget) return;
+  return api('rundgang_vorlage_liste.php?objekt_id=' + obTarget).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') {
+      const ziel = $('krListe');
+      if (ziel) ziel.innerHTML = `<p class="zone-note">${esc(data.message || 'Nicht ladbar.')}</p>`;
+      return;
+    }
+    rundgangVorlagen = data.vorlagen || [];
+    if ($('krListe')) renderKrListe();
+  });
+}
+
+function renderKrListe() {
+  if (!rundgangVorlagen.length) {
+    $('krListe').innerHTML = `<p class="zone-note" style="margin:0">Noch keine Kontrollrunde. Ohne Runde lassen sich Kontrollpunkte nicht zu einem benannten Rundgang bündeln.</p>`;
+    return;
+  }
+  $('krListe').innerHTML = rundgangVorlagen.map(v => {
+    const punkte = v.punkte.length
+      ? `${v.punkte.length} ${v.punkte.length === 1 ? 'Kontrollpunkt' : 'Kontrollpunkte'}: ${v.punkte.map(p => esc(p.bezeichnung)).join(', ')}`
+      : 'Noch kein Kontrollpunkt zugeordnet';
+    return `<div class="kr-zeile${Number(v.aktiv) ? '' : ' aus'}">
+      <div class="kr-kopf">
+        <b>${esc(v.name)}</b>
+        ${Number(v.aktiv) ? '' : '<span class="chip chip-n">nicht aktiv</span>'}
+      </div>
+      <div class="kr-meta">${punkte}</div>
+      <div style="display:flex;gap:7px;margin-top:9px">
+        <button class="btn btn-plain btn-sm" onclick="openKr('aendern',${Number(v.id)})">Bearbeiten</button>
+        <div style="flex:1"></div>
+        <button class="btn btn-quiet btn-sm" onclick="askDeleteKr(${Number(v.id)})">Entfernen</button>
       </div>
     </div>`;
   }).join('');
@@ -13819,6 +13908,62 @@ function askDeleteKp(id) {
     () => api('kontrollpunkt_loeschen.php', { method: 'POST', body: { id } }).then(({ ok, data }) => {
       if (!ok || data.status !== 'ok') { toast(data.message || 'Fehlgeschlagen.'); return; }
       loadKontrollpunkte().then(() => toast('Kontrollpunkt gelöscht.'));
+    }));
+}
+
+// ── Kontrollrunden (ENT-204) ──────────────────────────────────────────────
+function openKr(modus, id) {
+  krTarget = id ? Number(id) : null;
+  const v = krTarget ? rundgangVorlagen.find(x => Number(x.id) === krTarget) : null;
+
+  $('krTitel').textContent = modus === 'neu' ? 'Neue Kontrollrunde' : 'Kontrollrunde ändern';
+  $('krName').value = v ? v.name : '';
+  $('krAktiv').checked = v ? !!Number(v.aktiv) : true;
+
+  // Reihenfolge der Checkboxen = Reihenfolge der Kontrollpunkte des Objekts --
+  // beim Speichern wird genau diese Reihenfolge als Reihenfolge der Runde
+  // uebernommen (kein eigener Sortier-Dialog, ENT-204 erlaubt das, verlangt
+  // es aber nicht).
+  const gewaehlt = v ? new Set(v.punkte.map(p => Number(p.id))) : new Set();
+  $('krPunkteListe').innerHTML = kontrollpunkte.length
+    ? kontrollpunkte.map(k => `<label class="check"><input type="checkbox" class="kr-punkt" value="${Number(k.id)}"${gewaehlt.has(Number(k.id)) ? ' checked' : ''}> ${esc(k.bezeichnung)}${Number(k.aktiv) ? '' : ' <span class="chip chip-n">nicht aktiv</span>'}</label>`).join('')
+    : '<p class="zone-note" style="margin:0">Dieses Objekt hat noch keinen Kontrollpunkt.</p>';
+
+  $('krErr').style.display = 'none';
+  openDlg('dlgKr');
+  $('krName').focus();
+}
+
+function saveKr() {
+  const err = $('krErr'); err.style.display = 'none';
+  const name = $('krName').value.trim();
+  if (!name) { err.textContent = 'Name erforderlich.'; err.style.display = ''; return; }
+
+  const body = { objekt_id: obTarget, name, aktiv: $('krAktiv').checked ? 1 : 0 };
+  if (krTarget) body.id = krTarget;
+  const kontrollpunktIds = Array.from(document.querySelectorAll('#krPunkteListe .kr-punkt:checked')).map(c => Number(c.value));
+
+  const b = $('krBtn'); b.disabled = true;
+  api('rundgang_vorlage_save.php', { method: 'POST', body }).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') { b.disabled = false; err.textContent = data.message || 'Speichern fehlgeschlagen.'; err.style.display = ''; return; }
+    return api('rundgang_vorlage_punkte_setzen.php',
+      { method: 'POST', body: { vorlage_id: data.id, kontrollpunkt_ids: kontrollpunktIds } }
+    ).then(({ ok: ok2, data: data2 }) => {
+      b.disabled = false;
+      if (!ok2 || data2.status !== 'ok') { err.textContent = data2.message || 'Punktzuordnung fehlgeschlagen.'; err.style.display = ''; return; }
+      closeDlg('dlgKr');
+      loadRundgangVorlagen().then(() => toast('Kontrollrunde gespeichert.'));
+    });
+  });
+}
+
+function askDeleteKr(id) {
+  askConfirm('Kontrollrunde entfernen?',
+    'Bereits durchgeführte Rundgänge bleiben als Nachweis erhalten — nur die Vorlage für künftige Rundgänge verschwindet.',
+    'Entfernen',
+    () => api('rundgang_vorlage_loeschen.php', { method: 'POST', body: { id } }).then(({ ok, data }) => {
+      if (!ok || data.status !== 'ok') { toast(data.message || 'Fehlgeschlagen.'); return; }
+      loadRundgangVorlagen().then(() => toast('Kontrollrunde gelöscht.'));
     }));
 }
 
