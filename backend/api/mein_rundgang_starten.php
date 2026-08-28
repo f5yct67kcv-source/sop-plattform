@@ -36,6 +36,19 @@ if ($objektId <= 0) {
     json_response(['status' => 'error', 'message' => 'Dieser Einsatz hat kein Objekt -- kein Rundgang moeglich'], 422);
 }
 
+// Optionale Kontrollrunde (ENT-204). Ohne Angabe: unveraendertes Verhalten
+// von vor ENT-204 (alle aktiven Kontrollpunkte des Objekts). Serverseitig
+// geprueft, nicht nur in der App -- sonst liesse sich eine Vorlage eines
+// fremden Objekts unterschieben (Sperren gehoeren in den Server).
+$vorlageId = isset($input['vorlage_id']) && $input['vorlage_id'] !== '' ? (int)$input['vorlage_id'] : null;
+if ($vorlageId !== null) {
+    $vChk = $pdo->prepare('SELECT id FROM rundgang_vorlage WHERE id = ? AND objekt_id = ? AND aktiv = 1');
+    $vChk->execute([$vorlageId, $objektId]);
+    if (!$vChk->fetch()) {
+        json_response(['status' => 'error', 'message' => 'Diese Kontrollrunde gibt es an diesem Objekt nicht (mehr)'], 404);
+    }
+}
+
 // Kein zweiter offener Rundgang fuer denselben Einsatz gleichzeitig --
 // mehrere Rundgaenge NACHEINANDER pro Schicht sind vorgesehen (z.B.
 // stuendliche Kontrollen), aber nicht parallel.
@@ -49,12 +62,12 @@ if ($offen->fetch()) {
 }
 
 $ins = $pdo->prepare(
-    "INSERT INTO rundgang (einsatz_id, mitarbeiter_id, objekt_id, status, vorbereitet_am)
-     VALUES (?, ?, ?, 'vorbereitet', NOW())"
+    "INSERT INTO rundgang (einsatz_id, mitarbeiter_id, objekt_id, rundgang_vorlage_id, status, vorbereitet_am)
+     VALUES (?, ?, ?, ?, 'vorbereitet', NOW())"
 );
-$ins->execute([$einsatzId, (int)$user['id'], $objektId]);
+$ins->execute([$einsatzId, (int)$user['id'], $objektId, $vorlageId]);
 $rundgangId = (int)$pdo->lastInsertId();
 
-$kontrollpunkte = rundgang_kontrollpunkte_uebrig($pdo, $rundgangId, $objektId);
+$kontrollpunkte = rundgang_kontrollpunkte_uebrig($pdo, $rundgangId, $objektId, $vorlageId);
 
 json_response(['status' => 'ok', 'rundgang_id' => $rundgangId, 'kontrollpunkte' => $kontrollpunkte]);

@@ -103,7 +103,8 @@ foreach ($scans as $eintrag) {
     // Letzter offener Punkt erreicht -> der Rundgang schliesst automatisch
     // (ENT-132 Punkt 3, in diesem Teil unveraendert durch ENT-145 -- nur
     // der Start wurde dort revidiert, das Ende bleibt automatisch).
-    $uebrig = rundgang_kontrollpunkte_uebrig($pdo, $rundgangId, (int)$rundgang['objekt_id']);
+    $vorlageId = $rundgang['rundgang_vorlage_id'] !== null ? (int)$rundgang['rundgang_vorlage_id'] : null;
+    $uebrig = rundgang_kontrollpunkte_uebrig($pdo, $rundgangId, (int)$rundgang['objekt_id'], $vorlageId);
     if (!$uebrig && $rundgang['status'] !== 'abgeschlossen') {
         $pdo->prepare("UPDATE rundgang SET status = 'abgeschlossen', rohzeit_ende = ? WHERE id = ?")
             ->execute([$erfasstAm, $rundgangId]);

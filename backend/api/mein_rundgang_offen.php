@@ -48,11 +48,25 @@ if (!$rundgang) {
 }
 
 $objektId = (int)$rundgang['objekt_id'];
-$alle = $pdo->prepare(
-    'SELECT id, bezeichnung, reihenfolge, typ FROM kontrollpunkt
-      WHERE objekt_id = ? AND aktiv = 1 ORDER BY reihenfolge, id'
-);
-$alle->execute([$objektId]);
+$vorlageId = $rundgang['rundgang_vorlage_id'] !== null ? (int)$rundgang['rundgang_vorlage_id'] : null;
+// Wurde beim Start eine Kontrollrunde gewaehlt (ENT-204), zeigt der
+// Wiedereinstieg nur deren Punkte, in ihrer eigenen Reihenfolge -- sonst
+// saehe der Wiedereinstieg nach dem Reload wieder alle Objekt-Punkte, obwohl
+// nur die Runde begonnen wurde.
+if ($vorlageId !== null) {
+    $alle = $pdo->prepare(
+        'SELECT k.id, k.bezeichnung, p.reihenfolge, k.typ FROM kontrollpunkt k
+          JOIN rundgang_vorlage_punkt p ON p.kontrollpunkt_id = k.id AND p.vorlage_id = ?
+          WHERE k.objekt_id = ? AND k.aktiv = 1 ORDER BY p.reihenfolge, k.id'
+    );
+    $alle->execute([$vorlageId, $objektId]);
+} else {
+    $alle = $pdo->prepare(
+        'SELECT id, bezeichnung, reihenfolge, typ FROM kontrollpunkt
+          WHERE objekt_id = ? AND aktiv = 1 ORDER BY reihenfolge, id'
+    );
+    $alle->execute([$objektId]);
+}
 
 $scans = $pdo->prepare(
     'SELECT kontrollpunkt_id, status, erfasst_am, beschreibung FROM rundgang_scan WHERE rundgang_id = ?'

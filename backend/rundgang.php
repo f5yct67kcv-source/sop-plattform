@@ -23,8 +23,27 @@ function geo_distanz_meter(float $lat1, float $lng1, float $lat2, float $lng2): 
 // ein Punkt verschwindet aus der Restliste, sobald er bestaetigt ODER als
 // nicht verfuegbar gemeldet wurde -- beides ist "erledigt", nicht nur die
 // Bestaetigung).
-function rundgang_kontrollpunkte_uebrig(PDO $pdo, int $rundgangId, int $objektId): array
+//
+// $vorlageId (ENT-204): null bedeutet "keine Kontrollrunde gewaehlt" -- dann
+// unveraendertes Verhalten von vor ENT-204 (alle aktiven Punkte des
+// Objekts). Ist eine Vorlage gesetzt, zaehlen nur deren Punkte, in ihrer
+// eigenen Reihenfolge statt der globalen kontrollpunkt.reihenfolge.
+function rundgang_kontrollpunkte_uebrig(PDO $pdo, int $rundgangId, int $objektId, ?int $vorlageId = null): array
 {
+    if ($vorlageId !== null) {
+        $s = $pdo->prepare(
+            'SELECT k.* FROM kontrollpunkt k
+              JOIN rundgang_vorlage_punkt p ON p.kontrollpunkt_id = k.id AND p.vorlage_id = ?
+              WHERE k.objekt_id = ? AND k.aktiv = 1
+                AND NOT EXISTS (
+                  SELECT 1 FROM rundgang_scan s
+                   WHERE s.rundgang_id = ? AND s.kontrollpunkt_id = k.id
+                )
+              ORDER BY p.reihenfolge, k.id'
+        );
+        $s->execute([$vorlageId, $objektId, $rundgangId]);
+        return $s->fetchAll(PDO::FETCH_ASSOC);
+    }
     $s = $pdo->prepare(
         'SELECT k.* FROM kontrollpunkt k
           WHERE k.objekt_id = ? AND k.aktiv = 1
@@ -84,10 +103,25 @@ const RUNDGANG_ABBRUCH_GRUENDE = [
 // Rundgaenge -- das ist die gleiche Abwaegung wie bei kontrollpunkt_id
 // ON DELETE SET NULL in rundgang_scan: die Vorlage von heute, nicht die von
 // damals.
-function rundgang_fortschritt(PDO $pdo, int $rundgangId, int $objektId): array
+//
+// $vorlageId (ENT-204): wurde beim Rundgang eine Kontrollrunde gewaehlt,
+// zaehlt "gesamt" nur deren Punkte -- sonst wuerde ein Rundgang ueber eine
+// kleine Runde (z.B. "Oeffnungsrunde", 1 Punkt) faelschlich gegen ALLE
+// Punkte des Objekts gezaehlt und saehe nach einer unvollstaendigen Runde
+// aus, obwohl er vollstaendig war.
+function rundgang_fortschritt(PDO $pdo, int $rundgangId, int $objektId, ?int $vorlageId = null): array
 {
-    $gesamtStmt = $pdo->prepare('SELECT COUNT(*) FROM kontrollpunkt WHERE objekt_id = ? AND aktiv = 1');
-    $gesamtStmt->execute([$objektId]);
+    if ($vorlageId !== null) {
+        $gesamtStmt = $pdo->prepare(
+            'SELECT COUNT(*) FROM kontrollpunkt k
+              JOIN rundgang_vorlage_punkt p ON p.kontrollpunkt_id = k.id AND p.vorlage_id = ?
+              WHERE k.objekt_id = ? AND k.aktiv = 1'
+        );
+        $gesamtStmt->execute([$vorlageId, $objektId]);
+    } else {
+        $gesamtStmt = $pdo->prepare('SELECT COUNT(*) FROM kontrollpunkt WHERE objekt_id = ? AND aktiv = 1');
+        $gesamtStmt->execute([$objektId]);
+    }
     $gesamt = (int)$gesamtStmt->fetchColumn();
 
     $s = $pdo->prepare('SELECT status, COUNT(*) AS n FROM rundgang_scan WHERE rundgang_id = ? GROUP BY status');
