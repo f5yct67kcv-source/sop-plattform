@@ -1738,6 +1738,13 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
      zuverlaessig trifft. */
   .diktat-router .sprach .cta { width: auto; flex: 1 1 132px; height: auto; min-height: 44px; }
   .diktat-router .sprach .viz { flex-basis: 100%; }
+  /* Der Kurzueberblick unter der Grussformel (naechster Einsatz, Sperrtage,
+     Rueckmeldungen) macht die Uebersicht auf dem Handy ueberladen: bis der
+     eigentliche Inhalt (Kennzahlen, Rapporte) sichtbar wird, muss dort weit
+     gescrollt werden. Auf breiteren Bildschirmen bleibt er stehen -- da
+     nimmt derselbe Satz nur eine statt mehrerer Zeilen ein und stoert nicht
+     (Projektinhaber-Vorgabe, 2026-08-28). */
+  #begrNaechstes { display: none; }
 }
 
 /* ── Konfigurierbares Dashboard (ENT-031)
@@ -2891,7 +2898,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
                 </div>
                 <div class="diktat-router">
                   <div class="diktat-eingabe" id="rtDropzone" ondragover="rtDragUeber(event,'rt')" ondragleave="rtDragWeg('rt')" ondrop="rtDrop(event,'rt')">
-                    <textarea class="inp" id="rtText" rows="2" placeholder="Diktieren, tippen oder ein Bild einfügen (Strg+V) — z. B. „Neuer Einsatz für die Borner AG morgen 7 bis 16 Uhr“ oder ein Screenshot einer Auftrags-E-Mail." onpaste="rtEinfuegen(event,'rt')"></textarea>
+                    <textarea class="inp" id="rtText" rows="2" placeholder="Diktieren oder tippen — z. B. „Neuer Einsatz für die Borner AG morgen 7 bis 16 Uhr“" onpaste="rtEinfuegen(event,'rt')"></textarea>
                     <div id="rtBildVorschau" class="rt-bild" style="display:none">
                       <img id="rtBildImg" alt="">
                       <button type="button" onclick="rtBildEntfernen('rt')" title="Bild entfernen" aria-label="Bild entfernen">
