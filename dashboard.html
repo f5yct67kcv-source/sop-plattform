@@ -1887,7 +1887,11 @@ svg.i-glocke { width: 19px; height: 19px; }
   padding: 0 3px; border-radius: 999px; background: var(--neg); color: #fff;
   font-size: 9px; font-weight: 700; line-height: 15px; text-align: center;
   box-shadow: 0 0 0 2px var(--glas); }
-.glocke-panel { position: absolute; top: calc(100% + 8px); right: 0; width: 340px; max-width: calc(100vw - 24px);
+/* position:fixed statt :absolute, seit das Panel als eigenes Element auf
+   Koerperebene steht (siehe HTML-Kommentar bei #glockePanel) -- top/right
+   werden von glockeUmschalten() beim Oeffnen in Pixeln gesetzt, denn ohne
+   .glocke-wrap als Bezugsrahmen kennt CSS allein die Knopfposition nicht. */
+.glocke-panel { position: fixed; width: 340px; max-width: calc(100vw - 24px);
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--r);
   box-shadow: var(--sh-2); z-index: 40; overflow: hidden; }
 .glocke-kopf { padding: 12px 16px; border-bottom: 1px solid var(--line); font-size: 13px; }
@@ -2817,10 +2821,6 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
           <svg class="i i-glocke" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
           <span class="glocke-badge" id="glockeBadge" style="display:none">0</span>
         </button>
-        <div class="glocke-panel" id="glockePanel" style="display:none">
-          <div class="glocke-kopf"><b>Benachrichtigungen</b></div>
-          <div class="glocke-liste" id="glockeListe"></div>
-        </div>
       </div>
       <!-- Prominent statt ein Standard-Knopf: die Spracherkennung ist ein
            Hauptmerkmal des Werkzeugs, kein Nebenwerkzeug (ENT-038). Auf der
@@ -5086,6 +5086,22 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 <div class="toast" id="toast"></div>
 <div id="printArea"></div>
 
+<!-- Glocke (ENT-197): das Dropdown steht hier auf Ebene von toast/dlgConfirm,
+     ausserhalb der Werkzeugleiste, statt als Kind von .glocke-wrap in der
+     Topbar. Grund: .topbar hat backdrop-filter, und backdrop-filter auf einem
+     Vorfahren macht dessen Box zum containing block fuer alle position:fixed-
+     Nachfahren -- genau das braucht die mobile Variante hier (bottom:0 soll
+     den Bildschirmrand meinen, nicht den 60px hohen Rand der Topbar). Ohne
+     den Umzug haengt das Panel auf dem Handy fast vollstaendig ueber dem
+     oberen Bildschirmrand, mit nur einer abgeschnittenen Zeile sichtbar --
+     gemessen per Playwright, nicht vermutet: panel.top lag bei -51px statt 0.
+     glockeUmschalten() setzt die Position bei jedem Oeffnen selbst, weil das
+     Panel nicht mehr automatisch unter dem Knopf sitzt. -->
+<div class="glocke-panel" id="glockePanel" style="display:none">
+  <div class="glocke-kopf"><b>Benachrichtigungen</b></div>
+  <div class="glocke-liste" id="glockeListe"></div>
+</div>
+
 <script>
 /* ══════════════════════════════════════════════════════════════════
    PRODUKTNAME — sobald der endgültige Name feststeht, nur hier ändern.
@@ -6998,8 +7014,26 @@ function glockeUmschalten(ev) {
   ev.stopPropagation();
   const panel = $('glockePanel');
   const offen = panel.style.display !== 'none';
+  if (!offen) { glockePositionieren(panel); }
   panel.style.display = offen ? 'none' : '';
   $('btnGlocke').setAttribute('aria-expanded', String(!offen));
+}
+
+// Das Panel haengt seit ENT-197/Korrektur nicht mehr in .glocke-wrap, sondern
+// auf Koerperebene (siehe HTML-Kommentar bei #glockePanel) -- darum kennt CSS
+// allein die Knopfposition nicht mehr, und die Koordinaten kommen von hier.
+// Auf dem Handy (Bodenblatt, siehe Media Query) werden sie bewusst wieder
+// geleert: bottom:0/left:0/right:0 aus dem Stylesheet sollen den Bildschirm-
+// rand meinen, keine hier stehen gebliebene Desktop-Koordinate von vorher.
+function glockePositionieren(panel) {
+  if (window.matchMedia('(max-width: 620px)').matches) {
+    panel.style.top = ''; panel.style.right = ''; panel.style.left = '';
+    return;
+  }
+  const r = $('btnGlocke').getBoundingClientRect();
+  panel.style.top = Math.round(r.bottom + 8) + 'px';
+  panel.style.right = Math.round(window.innerWidth - r.right) + 'px';
+  panel.style.left = '';
 }
 
 function glockeSchliessen() {
