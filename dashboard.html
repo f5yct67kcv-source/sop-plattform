@@ -15,6 +15,37 @@
 <meta name="theme-color" content="#16181D">
 <style>
 /* ══════════════════════════════════════════════════════════════════
+   INTER, SELBST AUSGELIEFERT (ENT-223/ENT-227)
+   Kein Verweis auf Google Fonts: Der wuerde bei jedem Oeffnen des
+   Cockpits die IP-Adresse der bedienenden Person an Google schicken
+   (OP-224). Die Dateien liegen unter fonts/ und MUESSEN im Deploy
+   stehen (.github/workflows/deploy-hostpoint.yml) -- fehlen sie dort,
+   faellt die Schrift live still auf den System-Stapel zurueck, ohne
+   dass es lokal auffiele. test_deploy.mjs prueft das seither, auch
+   fuer CSS-url() und nicht mehr nur fuer <script src>.
+   Variable Fassung: ein Schnitt traegt alle Gewichte 400-700, darum
+   zwei Dateien statt acht. Nach unicode-range getrennt -- bei reinem
+   Deutsch bleibt latin-ext ungeladen.
+   Die SIL Open Font License 1.1 verlangt, dass die Lizenz die Schrift
+   begleitet: fonts/inter-LICENSE.txt wird mitdeployt.
+   ══════════════════════════════════════════════════════════════════ */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url(fonts/inter-latin-ext.woff2) format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url(fonts/inter-latin.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* ══════════════════════════════════════════════════════════════════
    DESIGN-TOKENS — einzige Stelle fuer Farben, Radien, Schatten.
    Akzent aendern = eine Zeile.
    ══════════════════════════════════════════════════════════════════ */
@@ -74,7 +105,10 @@
   --neg-line:   #F3C8C2;   --neg-flaeche: #FEF8F7;
   --warn-line:  #EFDCAE;
 
-  --r-xs: 5px; --r-sm: 7px; --r: 10px; --r-lg: 14px;
+  /* Radien angehoben (ENT-227): Karten 12, grosse Flaechen 16. Die Stufung
+     bleibt dieselbe, nur weicher -- damit zieht jede Ansicht mit, ohne dass
+     irgendwo eine Zahl im Regelwerk steht. */
+  --r-xs: 6px; --r-sm: 8px; --r: 12px; --r-lg: 16px;
   --sh-1: 0 1px 2px rgba(16,18,22,.06);
   --sh-2: 0 8px 28px -8px rgba(16,18,22,.18);
   --sh-3: 0 24px 64px -16px rgba(16,18,22,.30);
@@ -100,16 +134,16 @@ html[data-thema="dunkel"] {
   --shell-txt:    #8A919E;
   --shell-txt-hi: #F2F4F8;
 
-  --bg:           #101318;
-  --surface:      #171A20;
-  --surface-2:    #1C1F26;
-  --surface-3:    #20242C;
-  --line:         #2A2E37;
-  --line-soft:    #23262E;
-  --line-hi:      #3A3F4A;
-  --sk-hi:        #2E323B;
-  --nix:          #3A3F4A;
-  --we-bg:        #1A1D24;
+  --bg:           #0F1117;
+  --surface:      #161B27;
+  --surface-2:    #1E2535;
+  --surface-3:    #242C3E;
+  --line:         #2A3147;
+  --line-soft:    #232A3B;
+  --line-hi:      #3B4560;
+  --sk-hi:        #2E3750;
+  --nix:          #3B4560;
+  --we-bg:        #1A2030;
   --fei-bg:       #241F14;
   /* Im Dunkeln hellt die Linie auf, statt abzudunkeln -- eine dunkle Linie
      waere auf den ohnehin dunklen Farbfeldern unsichtbar (ENT-036). */
@@ -126,13 +160,15 @@ html[data-thema="dunkel"] {
 
   --pos:      #4FCE96;  --pos-soft:  #10281E;
   --neg:      #F27F70;  --neg-soft:  #2E1A18;
-  --glas:     rgba(23,26,32,.86);
+  --glas:     rgba(22,27,39,.86);
   --neg-hi:   #FF9A8C;  --neg-line:  #4A2823;  --neg-flaeche: #241715;
   --warn:     #E2B156;  --warn-soft: #2B2314;  --warn-line:   #4A3C1C;
   --serie:    #B6A0EA;  --serie-soft: #241E36;  --serie-line:  #3D3357;
 
-  /* Auf dunklem Grund traegt der Rand, nicht der Schatten. */
-  --sh-1: 0 1px 2px rgba(0,0,0,.4);
+  /* Auf dunklem Grund traegt der Rand, nicht der Schatten. Das stand hier seit
+     ENT-029 als Absicht, war aber nie umgesetzt -- --sh-1 warf weiter einen
+     Schatten unter jede Karte. Im Mockup hat keine Flaeche einen (ENT-227). */
+  --sh-1: none;
   --sh-2: 0 8px 28px -8px rgba(0,0,0,.6);
   --sh-3: 0 24px 64px -16px rgba(0,0,0,.7);
 
@@ -152,7 +188,13 @@ html[data-thema="dunkel"] .gr .s-soll { border-color: var(--line-hi); }
 
 html, body { height: 100%; }
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  /* Inter statt des System-Stapels (ENT-227). Der System-Stapel bleibt als
+     Rueckfall dahinter: Faellt die selbst ausgelieferte Datei aus, sieht die
+     Seite gewoehnlich aus statt kaputt. Inter ist bewusst gewaehlt und nicht
+     bloss "eine Schrift" -- gleich breite Ziffern (font-variant-numeric wird
+     an mehreren Stellen genutzt) und lesbare kleine Versalbeschriftungen,
+     wovon .kpi-top lebt. */
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   background: var(--bg);
   color: var(--ink);
   font-size: 14px;
@@ -343,9 +385,9 @@ a.nav-item { text-decoration: none; }
 @keyframes fade { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
 
 /* ══════════════════════════════════════════ KARTEN */
-.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--sh-1); }
-.card-hd { display: flex; align-items: center; gap: 12px; padding: 15px 18px; border-bottom: 1px solid var(--line-soft); }
-.card-hd h2 { font-size: 13.5px; font-weight: 650; letter-spacing: -.1px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--sh-1); }
+.card-hd { display: flex; align-items: center; gap: 12px; padding: 18px 20px 14px; border-bottom: 1px solid var(--line-soft); }
+.card-hd h2 { font-size: 14px; font-weight: 600; letter-spacing: -.15px; }
 .card-hd .note { font-size: 11.5px; color: var(--ink-3); }
 .card-hd .sp { flex: 1; }
 /* Icon-Abzeichen vor einem Karten-Titel (ENT-161, zunaechst nur im
@@ -386,7 +428,7 @@ a.nav-item { text-decoration: none; }
    Detailkopfzeile: Es bleibt dieselbe view-betrieb, nur eine andere
    Sektion ist sichtbar (kein Sprung in eine neue Hauptansicht). */
 .bk-zurueck { margin-bottom: 16px; }
-.card-bd { padding: 18px; }
+.card-bd { padding: 20px; }
 /* flush = randlos, z.B. fuer Tabellen. Breite Inhalte scrollen in der Karte,
    nie die ganze Seite. */
 .card-bd.flush { padding: 0; overflow-x: auto; }
@@ -400,7 +442,7 @@ a.nav-item { text-decoration: none; }
 .g-1-1 { grid-template-columns: 1fr 1fr; align-items: start; }
 
 /* KPI */
-.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px 18px; box-shadow: var(--sh-1); }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 18px 20px; box-shadow: var(--sh-1); }
 .kpi-top { display: flex; align-items: center; gap: 8px; color: var(--ink-3); margin-bottom: 11px; }
 .kpi-top span { font-size: 11px; font-weight: 650; letter-spacing: .6px; text-transform: uppercase; }
 .kpi-val { font-size: 28px; font-weight: 700; letter-spacing: -.9px; line-height: 1.1; }
@@ -2438,12 +2480,25 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
   .bar-tools .check { flex: 1 1 100%; }
   /* Eine Gruppe bleibt eine Zeile und teilt sie unter sich auf -- „von bis“
      auseinanderzureissen wäre schlechter lesbar als ein enges Paar. */
-  .tool-gruppe { flex: 1 1 100%; }
+  .tool-gruppe { flex: 1 1 100%; gap: 4px; }
   .tool-gruppe .inp { flex: 1 1 0; width: auto !important; min-width: 0; }
   /* Höhere Eigenspezifität als ein moeglicher "input[type=date] { min-width: … }"
      an anderer Stelle -- sonst gewinnt dessen Mindestbreite trotz !important
      und zwei Datumsfelder nebeneinander sprengen die schmale Leiste. */
   .tool-gruppe .inp[type="date"] { min-width: 0 !important; }
+  /* Inter ist bei 16px spuerbar breiter als der System-Stapel (gemessen:
+     zwei Datumsfelder 165 -> 169px, ENT-227). Ein <input type="date"> laesst
+     sich nicht unter die innere Mindestbreite seiner Teilfelder stauchen --
+     min-width:0 greift dort nicht, das Feld ragt einfach aus der Leiste.
+     Es holt sich die fehlenden Pixel darum aus dem eigenen Seitenpolster
+     und die Gruppe aus ihrem Abstand. NICHT aus der Schriftgroesse: unter
+     16px zoomt iOS ins Feld hinein und bleibt dort.
+     KEIN flex-wrap als "Sicherung": mit flex-basis 0 bricht Chromium die
+     Gruppe dann sofort in drei volle Zeilen um -- die Pruefung wird gruen
+     und die Gestaltung kaputt. Gemessen, nicht vermutet.
+     Es bleibt eng: bei 390px liegen zwei 16px-Datumsfelder nahe an der
+     Grenze dessen, was die Leiste hergibt (siehe OP-228). */
+  .tool-gruppe .inp[type="date"] { padding-left: 6px; padding-right: 6px; }
   .tool-bis { flex: none; }
   /* Auch auf dem Handy gilt: der Kopf darf den Plan nicht verdrängen. Monat und
      Navigation teilen sich eine Zeile, Filter und Schalter ebenso. */
@@ -12263,11 +12318,39 @@ function revierdienstEinrichtungOeffnen() {
   // Recht erreichbar, das ist die zusaetzliche Absicherung aus der Zeit, als
   // dasselbe schon fuer die Objekt-Reiter galt.
   if (!darf('rundgang_verwalten')) { $('rdEinrichtungInhalt').innerHTML = ''; return; }
-  const vorlauf = objekte.length ? Promise.resolve() : loadObjekte();
+  // NICHT loadObjekte(): Das holt objekt_list.php, und der verlangt 'plan'.
+  // Die Rolle "Waechtersystem" hat ausdruecklich nur 'rundgang_verwalten',
+  // 'rundgang_einsehen' und 'alarmempfaenger' -- ohne 'plan'. Sie kommt
+  // ueber das Menue bis hierher (nav-revierdienst-einrichtung haengt an
+  // 'rundgang_verwalten'), bekam aber einen leeren Objekt-Waehler: ein
+  // stiller Fehler, der aussah wie "es gibt keine Objekte". Darum ein
+  // eigener Endpunkt an eigenem Recht (ENT-227).
+  const vorlauf = objekte.length ? Promise.resolve() : ladeObjekteFuerRevierdienst();
   vorlauf.then(() => {
     rdObjektFuellen();
     renderRevierdienstEinrichtung();
     if (rdEinObjekt) { loadKontrollpunkte(); loadRundgangVorlagen(); }
+  });
+}
+
+// Objekte fuer die Revierdienst-Einrichtung. Ergaenzt die geteilte Liste,
+// statt sie zu ersetzen: Wer vorher schon unter Kunden -> Objekte war, hat
+// dort Objekte geladen, die hier nicht verloren gehen duerfen -- und
+// umgekehrt behaelt openObjekt() dieselbe Datenform, egal welcher der
+// beiden Endpunkte zuerst gefuellt hat.
+function ladeObjekteFuerRevierdienst() {
+  return api('objekte_revierdienst.php').then(({ ok, status, data }) => {
+    if (status === 401) return doLogout();
+    if (!ok || data.status !== 'ok') {
+      // "Nicht verfuegbar" ist etwas anderes als "keine vorhanden" -- der
+      // Waehler darf den Unterschied nicht verwischen (Hausregel).
+      const sel = $('rdObjektWahl');
+      if (sel) sel.innerHTML = '<option value="">Objekte nicht verfügbar</option>';
+      return;
+    }
+    const vorhanden = new Map(objekte.map(o => [Number(o.id), o]));
+    (data.objekte || []).forEach(o => vorhanden.set(Number(o.id), { ...vorhanden.get(Number(o.id)), ...o }));
+    objekte = Array.from(vorhanden.values());
   });
 }
 

@@ -13,7 +13,7 @@ jobs:
 
       - name: Platzhalter durch echte Werte ersetzen
         run: |
-          mkdir -p dist/api dist/icons
+          mkdir -p dist/api dist/icons dist/fonts
           cp index.html dist/index.html
           cp dashboard.html dist/dashboard.html
           cp app.html dist/app.html
@@ -37,6 +37,17 @@ jobs:
           cp manifest.json dist/manifest.json
           cp sw.js dist/sw.js
           cp icons/*.png dist/icons/
+          # Inter wird seit ENT-223/OP-224 selbst ausgeliefert statt von
+          # Google geladen -- dashboard.html verweist per @font-face auf
+          # fonts/. Fehlen diese Zeilen, faellt die Schrift live auf den
+          # System-Stapel zurueck, und lokal faellt es NICHT auf, weil die
+          # Dateien im Arbeitsverzeichnis ja liegen: derselbe Fallstrick wie
+          # bei gav.js/zeitwahl.js oben. test_deploy.mjs prueft es seither
+          # auch fuer CSS-url(), nicht nur fuer <script src>.
+          # inter-LICENSE.txt gehoert mit: Die SIL Open Font License 1.1
+          # verlangt, dass die Lizenz die Schrift begleitet.
+          cp fonts/*.woff2 dist/fonts/
+          cp fonts/inter-LICENSE.txt dist/fonts/inter-LICENSE.txt
           cp backend/db.php dist/db.php
           cp backend/ai.php dist/ai.php
           cp backend/planung.php dist/planung.php
