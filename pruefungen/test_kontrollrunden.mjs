@@ -52,7 +52,11 @@ async function setup(page, rechte) {
     if (path.includes('mitarbeiter_list')) return send({ status: 'ok', mitarbeiter: [] });
     if (path.includes('kunden_list')) return send({ status: 'ok', kunden: [] });
     if (path.includes('einsatz_list')) return send({ status: 'ok', einsaetze: [] });
-    if (path.includes('objekt_list')) return send(OBJEKTE);
+    // Seit ENT-227 holt die Revierdienst-Einrichtung ihre Objekte ueber
+    // objekte_revierdienst.php statt objekt_list.php -- der alte Endpunkt
+    // verlangt 'plan', das die Rolle "Waechtersystem" nicht hat. Beide
+    // liefern dieselbe Menge, darum hier dieselbe Antwort.
+    if (path.includes('objekt_list') || path.includes('objekte_revierdienst')) return send(OBJEKTE);
     if (path.includes('masterschicht_list')) return send({ status: 'ok', masterschichten: [] });
     if (path.includes('kontrollpunkt_liste')) return send(KONTROLLPUNKTE);
     if (path.includes('rundgang_vorlage_liste')) return send(VORLAGEN);
