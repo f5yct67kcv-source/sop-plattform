@@ -3993,24 +3993,56 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
         <div id="pnHinweis"></div>
       </section>
 
-      <!-- ══════════════════════ RUNDGÄNGE (ENT-183/193) ══════════════════════
-           Reine Übersicht für die Einsatzleitung über rundgang_liste.php
-           (Recht rundgang_einsehen, seit ENT-180 vorhanden, bisher ohne
-           Bildschirm dahinter). Kein Export, keine Bearbeitung -- wer einen
-           Rundgang durchführt, tut das ausschliesslich in app.html. -->
+      <!-- ══════════════════════ REVIERDIENST-ÜBERSICHT (ENT-225) ══════════
+           Kachel-Landingpage nach dem Vorbild von Betrieb (ENT-211): vier
+           Kacheln fuehren kuenftig auf ihre eigene Unteransicht, bleiben
+           aber vorerst ohne Funktion (Ruecksprache Projektinhaber
+           2026-08-29) -- nur das Grundgeruest. Darunter eine kompakte Liste
+           der letzten Rundgaenge (rundgang_liste.php, Recht
+           rundgang_einsehen, seit ENT-180 vorhanden). -->
       <section class="view" id="view-rundgaenge">
-        <div class="bar-tools">
-          <div class="tool-gruppe">
-            <input class="inp" type="date" id="rgVon" style="width:auto" onchange="ladeRundgaenge()" aria-label="Zeitraum von">
-            <span class="tool-bis">bis</span>
-            <input class="inp" type="date" id="rgBis" style="width:auto" onchange="ladeRundgaenge()" aria-label="Zeitraum bis">
-          </div>
-          <select class="inp" id="rgObjekt" style="width:auto" onchange="zeichneRundgaenge()" aria-label="Objekt auswählen">
-            <option value="">Alle Objekte</option>
-          </select>
+        <div class="bk-kachel-grid">
+          <button type="button" class="bk-kachel" onclick="toast('Folgt in einem späteren Schritt.')">
+            <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M12 19h4a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2H8a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h4"/></svg></span>
+            <span class="bk-kachel-lbl">Rundgänge</span>
+          </button>
+          <button type="button" class="bk-kachel" onclick="toast('Folgt in einem späteren Schritt.')">
+            <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="1.5"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg></span>
+            <span class="bk-kachel-lbl">GPS</span>
+          </button>
+          <button type="button" class="bk-kachel" onclick="toast('Folgt in einem späteren Schritt.')">
+            <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><polyline points="4 6 5 7 7 5"/><polyline points="4 12 5 13 7 11"/><polyline points="4 18 5 19 7 17"/></svg></span>
+            <span class="bk-kachel-lbl">Aufgaben</span>
+          </button>
+          <button type="button" class="bk-kachel" onclick="toast('Folgt in einem späteren Schritt.')">
+            <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><line x1="6" y1="20" x2="6" y2="14"/><line x1="12" y1="20" x2="12" y2="8"/><line x1="18" y1="20" x2="18" y2="4"/></svg></span>
+            <span class="bk-kachel-lbl">Auswertungen</span>
+          </button>
         </div>
-        <div id="rgKopf"></div>
-        <div id="rgListe"></div>
+
+        <div class="card" style="margin-top:20px">
+          <div class="card-hd"><h3>Letzte Rundgänge</h3></div>
+          <div class="card-bd flush"><div class="tw" id="rdLetzteListe"></div></div>
+        </div>
+
+        <!-- Bisherige filterbare Liste (ENT-183/193): bleibt im Code
+             erhalten, vorerst nicht verlinkt -- wandert kuenftig hinter die
+             Kachel "Rundgänge", sobald diese verdrahtet wird (ENT-225,
+             Ruecksprache Projektinhaber 2026-08-29). -->
+        <div id="rgAlt" style="display:none">
+          <div class="bar-tools">
+            <div class="tool-gruppe">
+              <input class="inp" type="date" id="rgVon" style="width:auto" onchange="ladeRundgaenge()" aria-label="Zeitraum von">
+              <span class="tool-bis">bis</span>
+              <input class="inp" type="date" id="rgBis" style="width:auto" onchange="ladeRundgaenge()" aria-label="Zeitraum bis">
+            </div>
+            <select class="inp" id="rgObjekt" style="width:auto" onchange="zeichneRundgaenge()" aria-label="Objekt auswählen">
+              <option value="">Alle Objekte</option>
+            </select>
+          </div>
+          <div id="rgKopf"></div>
+          <div id="rgListe"></div>
+        </div>
       </section>
 
       <!-- ══════════════════════ AUSLAGENERSATZ (ENT-125) ══════════════════════
@@ -5810,7 +5842,7 @@ const TITLES = {
   betrieb:     ['Betrieb', 'Einstellungen zum eigenen Unternehmen'],
   pensen:      ['Pensen', 'Jahresstunden gegen die Anstellungskategorie'],
   auslagen:    ['Auslagenersatz', 'Chronologisches Protokoll je Mitarbeitendem — Art. 18 Ziff. 10'],
-  rundgaenge:  ['Rundgänge', 'Laufende und abgeschlossene Kontrollgänge'],
+  rundgaenge:  ['Übersicht', 'Rundgänge, GPS, Aufgaben und Auswertungen auf einen Blick'],
   revierdienst: ['Revierdienst', 'Kontrollpunkte und Kontrollrunden je Objekt einrichten'],
   einsatzneu:  ['Neuer Einsatz', 'Kunde, Ort, Zeit und Zuteilung'],
   einsatzplan: ['Einsatz planen', 'Positionen und Zeiten im Detail'],
@@ -6596,7 +6628,7 @@ function go(view) {
   if (revView) { $('nav-revierdienst').classList.add('on'); }
   $('nav-revierdienst-uebersicht').classList.toggle('on', view === 'rundgaenge');
   $('nav-revierdienst-einrichtung').classList.toggle('on', view === 'revierdienst');
-  if (view === 'rundgaenge') { rundgaengeVorgabe(); ladeRundgaenge(); }
+  if (view === 'rundgaenge') { revierdienstUebersichtOeffnen(); }
   if (view === 'revierdienst') { revierdienstEinrichtungOeffnen(); }
   if (view === 'abgleich') {
     // Vorgabe: der zurückliegende Monat bis heute. Wer weiter zurück will,
@@ -12039,6 +12071,11 @@ function auslagenCsv() {
 // ══════════════════════ RUNDGÄNGE (ENT-183/193) ══════════════════════
 // Reine Übersicht -- rundgang_liste.php macht die ganze Fachlogik
 // (Fortschritt je Rundgang), hier wird nur gefiltert und angezeigt.
+//
+// Seit ENT-225 vorerst nicht mehr direkt verlinkt (siehe #rgAlt in der
+// Ansicht) -- der Code bleibt bestehen, weil genau diese filterbare Liste
+// kuenftig hinter der Kachel "Rundgänge" wieder auftaucht, sobald die
+// Kacheln der neuen Revierdienst-Uebersicht verdrahtet werden.
 let rundgaengeDaten = null;
 
 function rundgaengeVorgabe() {
@@ -12132,6 +12169,59 @@ function zeichneRundgaenge() {
       ${r.status === 'abgebrochen' ? `<div class="sub">${esc(RUNDGANG_ABBRUCH_GRUENDE[r.abbruch_grund] || 'Abgebrochen')}${r.abbruch_freitext ? ' — ' + esc(r.abbruch_freitext) : ''}</div>` : ''}
     </div>`;
   }).join('');
+}
+
+// ══════════════════════ REVIERDIENST-ÜBERSICHT (ENT-225) ══════════════════
+// Kachel-Landingpage nach dem Vorbild von Betrieb (ENT-211). Die vier
+// Kacheln sind vorerst ohne Funktion (siehe Markup) -- hier nur die
+// kompakte Liste der letzten Rundgänge, aus demselben Endpunkt wie die
+// bisherige, jetzt dormante Detailliste (#rgAlt) oben.
+const REVIERDIENST_LETZTE_TAGE = 14;
+function revierdienstUebersichtOeffnen() {
+  const bis = isoTag();
+  const von = plusTage(bis, -REVIERDIENST_LETZTE_TAGE);
+  const ziel = $('rdLetzteListe');
+  if (ziel) { ziel.innerHTML = '<div class="sk" style="height:52px"></div>'; }
+  api(`rundgang_liste.php?von=${von}&bis=${bis}`).then(({ ok, data }) => {
+    renderLetzteRundgaenge(ok && data.status === 'ok' ? data.rundgaenge : null);
+  });
+}
+
+function renderLetzteRundgaenge(rundgaenge) {
+  const ziel = $('rdLetzteListe');
+  if (!ziel) { return; }
+  if (!rundgaenge) {
+    ziel.innerHTML = EMPTY('Rundgänge nicht verfügbar', 'Die Liste konnte nicht geladen werden.');
+    return;
+  }
+  if (!rundgaenge.length) {
+    ziel.innerHTML = EMPTY('Noch nichts vorhanden', `In den letzten ${REVIERDIENST_LETZTE_TAGE} Tagen liegt kein Rundgang vor.`);
+    return;
+  }
+  ziel.innerHTML = `<table><thead><tr>
+      <th>Kunde</th><th>Bereich</th><th>Name</th><th>Datum</th><th>Zeit</th><th>Mitarbeiter</th><th>Status</th>
+    </tr></thead><tbody>` + rundgaenge.map(r => {
+    const f = r.fortschritt || { gesamt: 0, bestaetigt: 0 };
+    const gesamt = Number(f.gesamt), bestaetigt = Number(f.bestaetigt);
+    const start = r.rohzeit_start ? String(r.rohzeit_start).slice(11, 16) : '–';
+    const person = [r.nachname, r.vorname].filter(Boolean).join(', ') || '–';
+    const voll = gesamt > 0 && bestaetigt >= gesamt;
+    const pct = gesamt > 0 ? Math.round((bestaetigt / gesamt) * 100) : 0;
+    const balkenKlasse = r.status === 'abgebrochen' ? 'pn-ueber_toleranz' : (voll ? 'pn-ok' : 'pn-nahe');
+    return `<tr>
+        <td class="nowrap">${esc(r.kunde_name)}</td>
+        <td class="nowrap">${esc(r.objekt_name)}</td>
+        <td>${r.titel ? esc(r.titel) : '<span style="color:var(--ink-3)">–</span>'}</td>
+        <td class="nowrap">${dmy(r.datum)}</td>
+        <td class="nowrap num">${esc(start)}</td>
+        <td class="nowrap">${esc(person)}</td>
+        <td style="min-width:110px">
+          ${r.status === 'abgebrochen' ? '<span class="chip chip-n">Abgebrochen</span>' : ''}
+          <div class="pn-bar ${balkenKlasse}"><div class="fuell" style="width:${pct}%"></div></div>
+          <div class="sec">${nf(bestaetigt)}/${nf(gesamt)}</div>
+        </td>
+      </tr>`;
+  }).join('') + `</tbody></table>`;
 }
 
 function kontrolleNavKlick() {

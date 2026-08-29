@@ -24,7 +24,7 @@ $sql = "SELECT r.id, r.einsatz_id, r.objekt_id, r.mitarbeiter_id, r.status,
                r.rundgang_vorlage_id,
                r.vorbereitet_am, r.rohzeit_start, r.rohzeit_ende,
                r.pause_minuten, r.abbruch_grund, r.abbruch_freitext,
-               e.datum, e.kunde_name, o.name AS objekt_name,
+               e.datum, e.kunde_name, e.titel, o.name AS objekt_name,
                m.vorname, m.nachname
           FROM rundgang r
           JOIN einsaetze e ON e.id = r.einsatz_id
