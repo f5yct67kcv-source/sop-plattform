@@ -1,4 +1,5 @@
-// Kontrollpunkt-Pflege in der Objekt-Schublade (ENT-180/ENT-183).
+// Kontrollpunkt-Pflege unter Revierdienst > Einrichtung (ENT-180/ENT-183,
+// Umzug aus der Objekt-Detailseite seit ENT-224).
 //
 // Der Rechenkern (Geofence-Pruefung, Restliste) laeuft echt gegen SQLite in
 // pruef_rundgang.php -- hier nur, dass die Oberflaeche die drei Endpunkte
@@ -71,29 +72,31 @@ const anmelden = async () => {
   await page.waitForSelector('#kpiGrid .kpi-val');
 };
 
-const zurObjekt = async () => {
-  await page.click('#nav-kunden');
+// Revierdienst > Einrichtung (ENT-224): eigene Rubrik statt Objekt-Reiter,
+// mit einem Objekt-Waehler, weil Kontrollpunkte/-runden weiterhin an genau
+// ein Objekt gebunden sind.
+const zurEinrichtung = async () => {
+  await page.evaluate(() => {
+    if (!document.getElementById('navg-revierdienst').classList.contains('offen')) {
+      document.getElementById('nav-revierdienst').click();
+    }
+  });
   await page.waitForTimeout(150);
-  await page.click('#nav-kunden-objekte');
-  await page.waitForSelector('#oTable table');
+  await page.click('#nav-revierdienst-einrichtung');
+  await page.waitForSelector('#view-revierdienst.on');
   await page.waitForTimeout(150);
   calls = [];
-  await page.click('#oTable tbody tr:first-child');
-  await page.waitForSelector('#view-objekt.on');
+  await page.selectOption('#rdObjektWahl', '1');
   await page.waitForTimeout(300);
 };
 
 // ══════════ MIT DEM RECHT: DIE ZONE ERSCHEINT UND LAEDT
 await setup(page, null);
 await anmelden();
-await zurObjekt();
-// Kontrollpunkte sitzen seit der Reiter-Umstellung (Wunsch des Projekt-
-// inhabers, 2026-08-28) in einem eigenen, zunaechst inaktiven Reiter.
-await page.click('#obtab-kontrollpunkte');
-await page.waitForTimeout(150);
+await zurEinrichtung();
 
 check('Kontrollpunkte geladen', calls.some(c => c.path.includes('kontrollpunkt_liste')));
-check('Oeffnen der Objekt-Detailseite schreibt nichts', writes().length === 0);
+check('Oeffnen der Einrichtung ohne Objektwahl schreibt nichts', writes().length === 0);
 check('Alle drei Kontrollpunkte stehen da', (await page.$$('#kpListe .kp-zeile')).length === 3);
 const kpText = await page.textContent('#kpListe');
 check('NFC-Chip wird angezeigt', kpText.includes('AB12'));
@@ -161,24 +164,21 @@ await page.waitForTimeout(300);
 const geloescht = calls.find(c => c.path.includes('kontrollpunkt_loeschen'));
 check('Loeschen sendet die richtige id', geloescht && geloescht.body.id === 1);
 
-await page.click('#view-objekt .ku-zurueck');
-await page.waitForTimeout(200);
-
-// ══════════ OHNE DAS RECHT: DIE ZONE ERSCHEINT GAR NICHT (ENT-169)
+// ══════════ OHNE DAS RECHT: DIE RUBRIK ERSCHEINT GAR NICHT (ENT-169/ENT-224)
 await setup(page, ['plan', 'kunden']);
 await anmelden();
-await zurObjekt();
-check('KRITISCH: ohne rundgang_verwalten erscheint der Reiter selbst nicht', !(await page.isVisible('#obtab-kontrollpunkte')));
-check('KRITISCH: ohne rundgang_verwalten erscheint die Zone nicht', !(await page.isVisible('#kpListe')));
-check('KRITISCH: ohne das Recht wird kontrollpunkt_liste gar nicht erst aufgerufen',
+check('KRITISCH: ohne rundgang_verwalten/-einsehen erscheint die Rubrik Revierdienst selbst nicht',
+  !(await page.isVisible('#nav-revierdienst')));
+calls = [];
+await page.evaluate(() => go('revierdienst'));
+await page.waitForTimeout(200);
+check('KRITISCH: ohne das Recht wird kontrollpunkt_liste gar nicht erst aufgerufen, auch bei direktem Aufruf',
   !calls.some(c => c.path.includes('kontrollpunkt_liste')));
 
 // ══════════ MOBIL: DIALOG WIRD ZUM VOLLBILD
 await setup(page, null);
 await anmelden();
-await zurObjekt();
-await page.click('#obtab-kontrollpunkte');
-await page.waitForTimeout(150);
+await zurEinrichtung();
 await page.click('#kpListe ~ div button:has-text("Kontrollpunkt hinzufügen")');
 await page.waitForSelector('#dlgKp.on');
 await page.setViewportSize({ width: 390, height: 844 });

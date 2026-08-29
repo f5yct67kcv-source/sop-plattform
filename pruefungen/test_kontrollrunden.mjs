@@ -1,10 +1,11 @@
-// Kontrollrunden-Vorlagen in der Objekt-Detailseite (ENT-204).
+// Kontrollrunden-Vorlagen unter Revierdienst > Einrichtung (ENT-204, Umzug
+// aus der Objekt-Detailseite seit ENT-224).
 //
 // Die eigentliche Pruef- und Ersetzungslogik der Punktzuordnung laeuft echt
 // gegen SQLite in pruef_rundgang.php -- hier nur, dass die Oberflaeche die
 // drei Endpunkte richtig bedient, die Punkteliste des Objekts korrekt in
 // Checkboxen uebersetzt und das Recht 'rundgang_verwalten' tatsaechlich
-// entscheidet, ob der Reiter ueberhaupt erscheint (gleiches Muster wie
+// entscheidet, ob die Rubrik ueberhaupt erscheint (gleiches Muster wie
 // test_kontrollpunkte.mjs).
 import { WURZEL, HIER, OUT, browserPfad } from './pfade.mjs';
 import { chromium } from 'playwright';
@@ -77,27 +78,31 @@ const anmelden = async () => {
   await page.waitForSelector('#kpiGrid .kpi-val');
 };
 
-const zurObjekt = async () => {
-  await page.click('#nav-kunden');
+// Revierdienst > Einrichtung (ENT-224): eigene Rubrik statt Objekt-Reiter,
+// mit einem Objekt-Waehler, weil Kontrollpunkte/-runden weiterhin an genau
+// ein Objekt gebunden sind.
+const zurEinrichtung = async () => {
+  await page.evaluate(() => {
+    if (!document.getElementById('navg-revierdienst').classList.contains('offen')) {
+      document.getElementById('nav-revierdienst').click();
+    }
+  });
   await page.waitForTimeout(150);
-  await page.click('#nav-kunden-objekte');
-  await page.waitForSelector('#oTable table');
+  await page.click('#nav-revierdienst-einrichtung');
+  await page.waitForSelector('#view-revierdienst.on');
   await page.waitForTimeout(150);
   calls = [];
-  await page.click('#oTable tbody tr:first-child');
-  await page.waitForSelector('#view-objekt.on');
+  await page.selectOption('#rdObjektWahl', '1');
   await page.waitForTimeout(300);
 };
 
 // ══════════ MIT DEM RECHT: DIE ZONE ERSCHEINT UND LAEDT
 await setup(page, null);
 await anmelden();
-await zurObjekt();
-await page.click('#obtab-kontrollrunden');
-await page.waitForTimeout(150);
+await zurEinrichtung();
 
 check('Kontrollrunden geladen', calls.some(c => c.path.includes('rundgang_vorlage_liste')));
-check('Oeffnen der Objekt-Detailseite schreibt nichts', writes().length === 0);
+check('Oeffnen der Einrichtung ohne Objektwahl schreibt nichts', writes().length === 0);
 check('Beide Kontrollrunden stehen da', (await page.$$('#krListe .kr-zeile')).length === 2);
 const krText = await page.textContent('#krListe');
 check('Name der aktiven Runde erscheint', krText.includes('Öffnungsrunde'));
@@ -172,24 +177,21 @@ await page.waitForTimeout(300);
 const geloescht = calls.find(c => c.path.includes('rundgang_vorlage_loeschen'));
 check('Loeschen sendet die richtige id', geloescht && geloescht.body.id === 10);
 
-await page.click('#view-objekt .ku-zurueck');
-await page.waitForTimeout(200);
-
-// ══════════ OHNE DAS RECHT: DIE ZONE ERSCHEINT GAR NICHT (ENT-169)
+// ══════════ OHNE DAS RECHT: DIE RUBRIK ERSCHEINT GAR NICHT (ENT-169/ENT-224)
 await setup(page, ['plan', 'kunden']);
 await anmelden();
-await zurObjekt();
-check('KRITISCH: ohne rundgang_verwalten erscheint der Reiter selbst nicht', !(await page.isVisible('#obtab-kontrollrunden')));
-check('KRITISCH: ohne rundgang_verwalten erscheint die Zone nicht', !(await page.isVisible('#krListe')));
-check('KRITISCH: ohne das Recht wird rundgang_vorlage_liste gar nicht erst aufgerufen',
+check('KRITISCH: ohne rundgang_verwalten/-einsehen erscheint die Rubrik Revierdienst selbst nicht',
+  !(await page.isVisible('#nav-revierdienst')));
+calls = [];
+await page.evaluate(() => go('revierdienst'));
+await page.waitForTimeout(200);
+check('KRITISCH: ohne das Recht wird rundgang_vorlage_liste gar nicht erst aufgerufen, auch bei direktem Aufruf',
   !calls.some(c => c.path.includes('rundgang_vorlage_liste')));
 
 // ══════════ MOBIL: DIALOG WIRD ZUM VOLLBILD, TREFFERFLAECHE STIMMT
 await setup(page, null);
 await anmelden();
-await zurObjekt();
-await page.click('#obtab-kontrollrunden');
-await page.waitForTimeout(150);
+await zurEinrichtung();
 await page.click('#krListe ~ div button:has-text("Kontrollrunde hinzufügen")');
 await page.waitForSelector('#dlgKr.on');
 await page.setViewportSize({ width: 390, height: 844 });

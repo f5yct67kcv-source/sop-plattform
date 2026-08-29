@@ -2781,10 +2781,34 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
         </div>
       </div>
 
-      <!-- Kontrolle (ENT-065). Eigene Rubrik und nicht ein Reiter unter
-           Administration: Hier wachsen die Kontrollinstanzen zusammen --
-           Pensen heute, freie Tage und Ruhezeit-Uebersicht spaeter. Sie
-           beantworten alle dieselbe Frage: Wo weicht der Betrieb ab? -->
+      <!-- Revierdienst (ENT-224). Eigene, gleichberechtigte Rubrik statt
+           verschachtelt unter Kunden -> Objekt -> Reiter: Kontrollrunden,
+           Kontrollpunkte und die Rundgang-Uebersicht sind ein eigenstaendiges
+           Thema (das "Waechtersystem"), kein Anhaengsel der Objektverwaltung
+           -- Projektinhaber-Wunsch nach sichtbarer Praesenz statt "erst im
+           zweiten Blick". Die Uebersicht (vorher unter Kontrolle) und die
+           Einrichtung (vorher Objekt-Reiter) leben jetzt beide hier, mit
+           eigenem Objekt-Waehler in der Einrichtung -- Kontrollpunkte und
+           -runden haengen fachlich weiterhin an genau einem Objekt. -->
+      <div class="nav-lbl nur-desktop" style="margin-top:16px">Revierdienst</div>
+      <div class="nav-gruppe nur-desktop" id="navg-revierdienst">
+        <button class="nav-item nav-eltern" id="nav-revierdienst" title="Revierdienst" onclick="revierdienstNavKlick()">
+          <svg class="i" viewBox="0 0 24 24"><path d="M12 21s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>
+          <span class="lbl">Revierdienst</span>
+          <svg class="i chev" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="nav-kinder">
+          <button class="nav-kind" id="nav-revierdienst-uebersicht" onclick="go('rundgaenge')">Übersicht</button>
+          <button class="nav-kind" id="nav-revierdienst-einrichtung" onclick="go('revierdienst')">Einrichtung</button>
+        </div>
+      </div>
+
+      <!-- Kontrolle (ENT-065, seit ENT-224 ohne Rundgaenge -- die sind jetzt
+           Teil der eigenen Rubrik "Revierdienst"). Eigene Rubrik und nicht
+           ein Reiter unter Administration: Hier wachsen die
+           Kontrollinstanzen zusammen -- Pensen heute, freie Tage und
+           Ruhezeit-Uebersicht spaeter. Sie beantworten alle dieselbe Frage:
+           Wo weicht der Betrieb ab? -->
       <div class="nav-lbl nur-desktop" style="margin-top:16px">Kontrolle</div>
       <div class="nav-gruppe nur-desktop" id="navg-kontrolle">
         <button class="nav-item nav-eltern" id="nav-kontrolle" title="Kontrolle" onclick="kontrolleNavKlick()">
@@ -2795,7 +2819,6 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
         <div class="nav-kinder">
           <button class="nav-kind" id="nav-kontrolle-pensen" onclick="go('pensen')">Pensen</button>
           <button class="nav-kind" id="nav-kontrolle-auslagen" onclick="go('auslagen')">Auslagenersatz</button>
-          <button class="nav-kind" id="nav-kontrolle-rundgaenge" onclick="go('rundgaenge')">Rundgänge</button>
         </div>
       </div>
 
@@ -3726,19 +3749,33 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
           </div>
         </div>
         <!-- Reiter statt einer langen Seite (Wunsch des Projektinhabers,
-             2026-08-28): Masterschichten und Kontrollpunkte sind eigene
-             Themen, kein Fliesstext einer einzigen Übersicht. Gleiches
-             Muster wie die Kunden-Detailseite (kd-tab, ENT-040). -->
+             2026-08-28): Masterschichten sind ein eigenes Thema, kein
+             Fliesstext einer einzigen Übersicht. Gleiches Muster wie die
+             Kunden-Detailseite (kd-tab, ENT-040). Kontrollpunkte und
+             Kontrollrunden standen hier ebenfalls als Reiter (ENT-186/204),
+             sind seit ENT-224 nach "Revierdienst" umgezogen -- eigenstaendige
+             Rubrik statt Objekt-Anhaengsel. -->
         <div class="tabs" id="obTabs" style="margin-bottom:14px">
           <button class="tab on" id="obtab-uebersicht" onclick="obGoTab('uebersicht')">Übersicht</button>
           <button class="tab" id="obtab-masterschichten" onclick="obGoTab('masterschichten')">Masterschichten</button>
-          <button class="tab" id="obtab-kontrollpunkte" onclick="obGoTab('kontrollpunkte')">Kontrollpunkte</button>
-          <button class="tab" id="obtab-kontrollrunden" onclick="obGoTab('kontrollrunden')">Kontrollrunden</button>
         </div>
         <div class="ob-tab on" id="ob-uebersicht"></div>
         <div class="ob-tab" id="ob-masterschichten"></div>
-        <div class="ob-tab" id="ob-kontrollpunkte"></div>
-        <div class="ob-tab" id="ob-kontrollrunden"></div>
+      </section>
+
+      <!-- ══════════════════ REVIERDIENST: EINRICHTUNG (ENT-224) ══════════
+           Kontrollpunkte und Kontrollrunden -- vorher Reiter der
+           Objekt-Detailseite (ENT-186/204), jetzt eigenstaendige Rubrik.
+           Fachlich haengen beide weiterhin an genau einem Objekt (objekt_id),
+           darum der Objekt-Waehler oben -- dasselbe Muster wie rgObjekt in
+           der Rundgang-Uebersicht. -->
+      <section class="view" id="view-revierdienst">
+        <div class="bar-tools">
+          <select class="inp" id="rdObjektWahl" style="width:auto" onchange="rdObjektGewaehlt()" aria-label="Objekt auswählen">
+            <option value="">Objekt wählen …</option>
+          </select>
+        </div>
+        <div id="rdEinrichtungInhalt"></div>
       </section>
 
       <!-- ══════════════════════════ PENSEN ══════════════════════════
@@ -5332,10 +5369,14 @@ let obTarget = null;   // offenes Objekt (id)
 let msTarget = null;   // offene Masterschicht (id)
 let msModus = 'neu';
 let msAlle = false;    // auch abgelaufene Fassungen zeigen
-let kontrollpunkte = [];   // die des offenen Objekts (ENT-180/ENT-183)
+let kontrollpunkte = [];   // die des gewaehlten Objekts (ENT-180/ENT-183)
 let kpTarget = null;       // offener Kontrollpunkt (id)
-let rundgangVorlagen = []; // Kontrollrunden des offenen Objekts (ENT-204)
+let rundgangVorlagen = []; // Kontrollrunden des gewaehlten Objekts (ENT-204)
 let krTarget = null;       // offene Kontrollrunde (id)
+// Im Revierdienst > Einrichtung gewaehltes Objekt (ENT-224) -- eigenes Feld
+// statt obTarget, weil Kontrollpunkte/-runden nicht mehr Teil der
+// Objekt-Detailseite sind, aber fachlich weiterhin an ein Objekt gebunden.
+let rdEinObjekt = null;
 let vsObjekt = null;   // Objekt der offenen Vorschau
 let oplId = null;      // Objekt der Objektplanung
 let oplMs = [];        // dessen Masterschichten
@@ -5704,15 +5745,17 @@ const NAV_RECHTE = {
   'nav-admin-mitarbeiter':  'personal_lesen',
   'nav-admin-produkte':     'offerten',
   'nav-admin-betrieb':      'betrieb',
-  // Die Elterngruppe 'navg-kontrolle' hängt NICHT hier drin, sondern an einer
-  // ODER-Verknüpfung weiter unten (wie 'navg-admin') -- seit ENT-193 kann sie
-  // auch mit nur 'rundgang_einsehen' (ohne 'plan') sichtbar sein. Die beiden
-  // bestehenden Kinder bleiben trotzdem einzeln an 'plan' gebunden, sonst
-  // sähe ein Wächtersystem-Konto ohne Planungsrecht plötzlich Pensen und
-  // Auslagenersatz mit.
+  // Seit ENT-224 haengen beide Kinder von Kontrolle am selben Recht 'plan' --
+  // Rundgaenge (das fruehere 'rundgang_einsehen'-Kind) lebt jetzt unter der
+  // eigenen Rubrik "Revierdienst", siehe deren beide Eintraege weiter unten.
   'nav-kontrolle-pensen':      'plan',
   'nav-kontrolle-auslagen':    'plan',
-  'nav-kontrolle-rundgaenge':  'rundgang_einsehen',
+  // Die Elterngruppe 'navg-revierdienst' hängt NICHT hier drin, sondern an
+  // einer ODER-Verknüpfung weiter unten (wie 'navg-admin') -- 'Einrichtung'
+  // braucht 'rundgang_verwalten', 'Übersicht' genügt bereits mit
+  // 'rundgang_einsehen' (ENT-193/ENT-224).
+  'nav-revierdienst-uebersicht':   'rundgang_einsehen',
+  'nav-revierdienst-einrichtung':  'rundgang_verwalten',
   'nav-einrichtung':        'betrieb',
   // Offerten haengen am eigenen Recht, nicht an 'kunden' (ENT-181): Wer
   // Adressen pflegt, sieht darum noch keine Preise. Die Elterngruppe
@@ -5735,11 +5778,18 @@ function rechteAnwenden() {
     admGruppe.style.display =
       (darf('personal_lesen') || darf('betrieb') || darf('offerten')) ? '' : 'none';
   }
-  // Gleiches Prinzip für "Kontrolle": seit ENT-193 kann sie auch mit nur
-  // 'rundgang_einsehen' sichtbar sein, ohne 'plan'.
+  // Seit ENT-224 haengt "Kontrolle" nur noch an 'plan' -- Rundgaenge (das
+  // fruehere 'rundgang_einsehen'-Kind) lebt jetzt unter "Revierdienst".
   const kontrGruppe = $('navg-kontrolle');
   if (kontrGruppe) {
-    kontrGruppe.style.display = (darf('plan') || darf('rundgang_einsehen')) ? '' : 'none';
+    kontrGruppe.style.display = darf('plan') ? '' : 'none';
+  }
+  // "Revierdienst" (ENT-224): sichtbar mit 'rundgang_verwalten' ODER
+  // 'rundgang_einsehen' -- seit ENT-193 kann sie auch mit nur
+  // 'rundgang_einsehen' sichtbar sein (dann nur die Übersicht).
+  const revGruppe = $('navg-revierdienst');
+  if (revGruppe) {
+    revGruppe.style.display = (darf('rundgang_verwalten') || darf('rundgang_einsehen')) ? '' : 'none';
   }
   mdReiterPruefen();
   // Der Schnellzugriff haengt an denselben Rechten wie die Navigation und
@@ -5761,6 +5811,7 @@ const TITLES = {
   pensen:      ['Pensen', 'Jahresstunden gegen die Anstellungskategorie'],
   auslagen:    ['Auslagenersatz', 'Chronologisches Protokoll je Mitarbeitendem — Art. 18 Ziff. 10'],
   rundgaenge:  ['Rundgänge', 'Laufende und abgeschlossene Kontrollgänge'],
+  revierdienst: ['Revierdienst', 'Kontrollpunkte und Kontrollrunden je Objekt einrichten'],
   einsatzneu:  ['Neuer Einsatz', 'Kunde, Ort, Zeit und Zuteilung'],
   einsatzplan: ['Einsatz planen', 'Positionen und Zeiten im Detail'],
   objekt:      ['Objekt', 'Stammdaten, Masterschichten und Kontrollpunkte']
@@ -6460,7 +6511,7 @@ function themaUm() {
 // 'objekt' seit ENT-200: eigene Ansicht statt Schublade, aus demselben Grund
 // wie 'offerte' -- Masterschichten und Kontrollpunkte (ENT-186) sind
 // Listen unbestimmter Laenge, keine 440px-Schublade haelt das auf Dauer.
-const ANSICHT_WEIT   = ['uebersicht', 'planung', 'abgleich', 'pensen', 'auslagen', 'rundgaenge', 'einsatzplan', 'einsatzneu', 'offerte', 'objekt'];
+const ANSICHT_WEIT   = ['uebersicht', 'planung', 'abgleich', 'pensen', 'auslagen', 'rundgaenge', 'revierdienst', 'einsatzplan', 'einsatzneu', 'offerte', 'objekt'];
 const PLANUNG_WEIT   = ['uebersicht', 'einsaetze', 'objektplan', 'tag'];
 
 function weiteAnsicht(an) {
@@ -6530,15 +6581,23 @@ function go(view) {
   if (view === 'produkte') { $('nav-admin-produkte').classList.add('on'); }
   if (view === 'betrieb') { $('nav-admin-betrieb').classList.add('on'); }
   if (view === 'produkte') { produkte.length ? renderProdukte() : loadProdukte(); }
-  const kontrView = view === 'pensen' || view === 'auslagen' || view === 'rundgaenge';
+  const kontrView = view === 'pensen' || view === 'auslagen';
   $('navg-kontrolle').classList.toggle('offen', kontrView);
   if (kontrView) { $('nav-kontrolle').classList.add('on'); }
   $('nav-kontrolle-pensen').classList.toggle('on', view === 'pensen');
   $('nav-kontrolle-auslagen').classList.toggle('on', view === 'auslagen');
-  $('nav-kontrolle-rundgaenge').classList.toggle('on', view === 'rundgaenge');
   if (view === 'pensen') { ladePensen(); }
   if (view === 'auslagen') { auslagenVorgabe(); ladeAuslagen(); }
+  // Revierdienst (ENT-224): Uebersicht (Rundgaenge, Durchfuehrung) und
+  // Einrichtung (Kontrollpunkte/-runden) sind zwei Seiten derselben Rubrik,
+  // gleiches Elterngruppen-Muster wie bei Kontrolle/Administration oben.
+  const revView = view === 'rundgaenge' || view === 'revierdienst';
+  $('navg-revierdienst').classList.toggle('offen', revView);
+  if (revView) { $('nav-revierdienst').classList.add('on'); }
+  $('nav-revierdienst-uebersicht').classList.toggle('on', view === 'rundgaenge');
+  $('nav-revierdienst-einrichtung').classList.toggle('on', view === 'revierdienst');
   if (view === 'rundgaenge') { rundgaengeVorgabe(); ladeRundgaenge(); }
+  if (view === 'revierdienst') { revierdienstEinrichtungOeffnen(); }
   if (view === 'abgleich') {
     // Vorgabe: der zurückliegende Monat bis heute. Wer weiter zurück will,
     // stellt den Zeitraum um.
@@ -12076,10 +12135,11 @@ function zeichneRundgaenge() {
 }
 
 function kontrolleNavKlick() {
-  // Landet auf der ersten Kachel, die diese Person tatsächlich sehen darf --
-  // seit ENT-193 kann die Gruppe auch mit nur 'rundgang_einsehen' (ohne
-  // 'plan') sichtbar sein, dann wären Pensen/Auslagenersatz die falsche Wahl.
-  const ziel = darf('plan') ? 'pensen' : 'rundgaenge';
+  // Seit ENT-224 haengen beide Kinder (Pensen, Auslagenersatz) am selben
+  // Recht 'plan' -- die Gruppe ist ueberhaupt nur sichtbar, wenn 'plan'
+  // vorhanden ist. Der frühere Ausweich-Fall auf 'rundgaenge' (ENT-193, ohne
+  // 'plan') entfaellt damit: Rundgaenge lebt jetzt unter "Revierdienst".
+  const ziel = 'pensen';
   if (navGruppeKompakt(ziel)) { return; }
   const offen = $('navg-kontrolle').classList.contains('offen');
   if (offen && $('view-' + ziel).classList.contains('on')) {
@@ -12087,6 +12147,80 @@ function kontrolleNavKlick() {
     return;
   }
   go(ziel);
+}
+
+// ══════════════════════ REVIERDIENST (ENT-224) ══════════════════════
+// Eigene Rubrik fuer alles, was am Waechtersystem haengt: die Rundgang-
+// Uebersicht (Durchfuehrung, vorher unter Kontrolle) und die Einrichtung
+// von Kontrollpunkten/Kontrollrunden (vorher Objekt-Reiter, ENT-186/204).
+function revierdienstNavKlick() {
+  // Landet auf der ersten Kachel, die diese Person tatsaechlich sehen darf --
+  // 'rundgang_verwalten' zeigt beide Unterseiten, 'rundgang_einsehen' allein
+  // nur die Uebersicht (gleiches Prinzip wie zuvor bei kontrolleNavKlick).
+  const ziel = darf('rundgang_verwalten') ? 'revierdienst' : 'rundgaenge';
+  if (navGruppeKompakt(ziel)) { return; }
+  const offen = $('navg-revierdienst').classList.contains('offen');
+  if (offen && $('view-' + ziel).classList.contains('on')) {
+    $('navg-revierdienst').classList.toggle('offen');
+    return;
+  }
+  go(ziel);
+}
+
+function revierdienstEinrichtungOeffnen() {
+  // Ohne das Recht wird kontrollpunkt_liste/rundgang_vorlage_liste gar nicht
+  // erst aufgerufen (ENT-169) -- der Reiter selbst ist ohnehin nur mit dem
+  // Recht erreichbar, das ist die zusaetzliche Absicherung aus der Zeit, als
+  // dasselbe schon fuer die Objekt-Reiter galt.
+  if (!darf('rundgang_verwalten')) { $('rdEinrichtungInhalt').innerHTML = ''; return; }
+  const vorlauf = objekte.length ? Promise.resolve() : loadObjekte();
+  vorlauf.then(() => {
+    rdObjektFuellen();
+    renderRevierdienstEinrichtung();
+    if (rdEinObjekt) { loadKontrollpunkte(); loadRundgangVorlagen(); }
+  });
+}
+
+function rdObjektFuellen() {
+  const sel = $('rdObjektWahl'); if (!sel) return;
+  const bisher = rdEinObjekt;
+  const liste = objekte.slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  sel.innerHTML = '<option value="">Objekt wählen …</option>'
+    + liste.map(o => `<option value="${Number(o.id)}">${esc(o.name)}</option>`).join('');
+  sel.value = liste.some(o => Number(o.id) === Number(bisher)) ? String(bisher) : '';
+  rdEinObjekt = sel.value ? Number(sel.value) : null;
+}
+
+function rdObjektGewaehlt() {
+  rdEinObjekt = $('rdObjektWahl').value ? Number($('rdObjektWahl').value) : null;
+  renderRevierdienstEinrichtung();
+  if (rdEinObjekt) { loadKontrollpunkte(); loadRundgangVorlagen(); }
+}
+
+function renderRevierdienstEinrichtung() {
+  const inhalt = $('rdEinrichtungInhalt');
+  if (!inhalt) return;
+  if (!rdEinObjekt) {
+    inhalt.innerHTML = EMPTY('Kein Objekt gewählt', 'Objekt oben wählen, um seine Kontrollpunkte und Kontrollrunden zu bearbeiten.');
+    return;
+  }
+  inhalt.innerHTML = `
+    <div class="zone">
+      <div class="zone-hd">Kontrollpunkte</div>
+      <div class="zone-note">NFC- oder Geofence-Punkte für Wachrundgänge an diesem Objekt. Eine spätere Änderung wirkt nur auf künftige Rundgänge — bereits durchgeführte bleiben als Nachweis unverändert.</div>
+      <div id="kpListe"><div class="sk" style="height:52px"></div></div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn btn-primary btn-sm" onclick="openKp('neu')">Kontrollpunkt hinzufügen</button>
+      </div>
+    </div>
+    <div class="zone" style="margin-top:20px">
+      <div class="zone-hd">Kontrollrunden</div>
+      <div class="zone-note">Benannte Runden, die mehrere Kontrollpunkte dieses Objekts bündeln (z. B. Öffnungsrunde, Schlusskontrolle). Ein Kontrollpunkt darf in mehreren Runden vorkommen (ENT-204).</div>
+      <div id="krListe"><div class="sk" style="height:52px"></div></div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn btn-primary btn-sm" onclick="openKr('neu')">Kontrollrunde hinzufügen</button>
+      </div>
+    </div>`;
 }
 
 // ── Verwaltung der Anstellungsorte
@@ -12645,40 +12779,9 @@ function openObjekt(id) {
       <div id="msSeiteBedarf" style="margin-top:10px;overflow-x:auto"></div>
     </div>`;
 
-  // Reiter selbst ist immer da, sein Inhalt nur mit dem Recht -- ohne das
-  // Recht wird kontrollpunkt_liste gar nicht erst aufgerufen (ENT-169).
-  $('obtab-kontrollpunkte').style.display = darf('rundgang_verwalten') ? '' : 'none';
-  if (darf('rundgang_verwalten')) {
-    $('ob-kontrollpunkte').innerHTML = `
-      <div class="zone">
-        <div class="zone-hd">Kontrollpunkte</div>
-        <div class="zone-note">NFC- oder Geofence-Punkte für Wachrundgänge an diesem Objekt. Eine spätere Änderung wirkt nur auf künftige Rundgänge — bereits durchgeführte bleiben als Nachweis unverändert.</div>
-        <div id="kpListe"><div class="sk" style="height:52px"></div></div>
-        <div style="display:flex;gap:8px;margin-top:10px">
-          <button class="btn btn-primary btn-sm" onclick="openKp('neu')">Kontrollpunkt hinzufügen</button>
-        </div>
-      </div>`;
-  }
-
-  // Gleiches Prinzip wie beim Kontrollpunkte-Reiter: Reiter selbst immer da,
-  // Inhalt und Datenabruf nur mit dem Recht (ENT-169).
-  $('obtab-kontrollrunden').style.display = darf('rundgang_verwalten') ? '' : 'none';
-  if (darf('rundgang_verwalten')) {
-    $('ob-kontrollrunden').innerHTML = `
-      <div class="zone">
-        <div class="zone-hd">Kontrollrunden</div>
-        <div class="zone-note">Benannte Runden, die mehrere Kontrollpunkte dieses Objekts bündeln (z. B. Öffnungsrunde, Schlusskontrolle). Ein Kontrollpunkt darf in mehreren Runden vorkommen (ENT-204).</div>
-        <div id="krListe"><div class="sk" style="height:52px"></div></div>
-        <div style="display:flex;gap:8px;margin-top:10px">
-          <button class="btn btn-primary btn-sm" onclick="openKr('neu')">Kontrollrunde hinzufügen</button>
-        </div>
-      </div>`;
-  }
-
   obGoTab('uebersicht');
   msAlle = false;
   loadMasterschichten();
-  if (darf('rundgang_verwalten')) { loadKontrollpunkte(); loadRundgangVorlagen(); }
 }
 
 function obGoTab(t) {
@@ -12747,8 +12850,8 @@ function renderMsListe() {
 }
 
 function loadKontrollpunkte() {
-  if (!obTarget) return;
-  return api('kontrollpunkt_liste.php?objekt_id=' + obTarget).then(({ ok, data }) => {
+  if (!rdEinObjekt) return;
+  return api('kontrollpunkt_liste.php?objekt_id=' + rdEinObjekt).then(({ ok, data }) => {
     if (!ok || data.status !== 'ok') {
       const ziel = $('kpListe');
       if (ziel) ziel.innerHTML = `<p class="zone-note">${esc(data.message || 'Nicht ladbar.')}</p>`;
@@ -12786,8 +12889,8 @@ function renderKpListe() {
 }
 
 function loadRundgangVorlagen() {
-  if (!obTarget) return;
-  return api('rundgang_vorlage_liste.php?objekt_id=' + obTarget).then(({ ok, data }) => {
+  if (!rdEinObjekt) return;
+  return api('rundgang_vorlage_liste.php?objekt_id=' + rdEinObjekt).then(({ ok, data }) => {
     if (!ok || data.status !== 'ok') {
       const ziel = $('krListe');
       if (ziel) ziel.innerHTML = `<p class="zone-note">${esc(data.message || 'Nicht ladbar.')}</p>`;
@@ -14135,7 +14238,7 @@ function kpTypUm() {
 
 function saveKp() {
   const err = $('kpErr'); err.style.display = 'none';
-  const body = { objekt_id: obTarget };
+  const body = { objekt_id: rdEinObjekt };
   if (kpTarget) body.id = kpTarget;
 
   body.bezeichnung = $('kpBezeichnung').value.trim();
@@ -14201,7 +14304,7 @@ function saveKr() {
   const name = $('krName').value.trim();
   if (!name) { err.textContent = 'Name erforderlich.'; err.style.display = ''; return; }
 
-  const body = { objekt_id: obTarget, name, aktiv: $('krAktiv').checked ? 1 : 0 };
+  const body = { objekt_id: rdEinObjekt, name, aktiv: $('krAktiv').checked ? 1 : 0 };
   if (krTarget) body.id = krTarget;
   const kontrollpunktIds = Array.from(document.querySelectorAll('#krPunkteListe .kr-punkt:checked')).map(c => Number(c.value));
 
