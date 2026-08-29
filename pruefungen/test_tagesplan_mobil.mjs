@@ -229,7 +229,12 @@ await d.waitForTimeout(500);
 await d.evaluate(() => { $('tgD').value = '2026-08-21'; goTab('tag'); });
 await d.waitForTimeout(500);
 
-const reiterD = await d.evaluate(() => [...document.querySelectorAll('.tabs .tab')]
+// Die Reiter stehen seit ENT-233 auf dem Desktop in der Kopfzeile
+// (navg-planung .nav-kind), nicht mehr im Seiteninhalt (.tabs .tab, das
+// gibt es fuer Uebersicht/Objektplanung dort gar nicht mehr) -- die
+// mobile Reihenfolge (#ptab-tag { order: -1 }) betrifft eine andere,
+// eigene Elementgruppe und kann hier gar nicht mehr hineinwirken.
+const reiterD = await d.evaluate(() => [...document.querySelectorAll('#navg-planung .nav-kind')]
   .filter(b => b.getClientRects().length)
   .sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left)
   .map(b => b.textContent.trim()));

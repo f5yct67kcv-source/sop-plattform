@@ -310,13 +310,24 @@ check('Die Herkunft funktioniert dort weiterhin',
 await d.selectOption('#pHerkunft', '');
 await d.waitForTimeout(300);
 
-const tabsD = await d.evaluate(() => [...document.querySelectorAll('#view-planung .tabs .tab')]
+// Die Reiter stehen seit ENT-233 auf dem Desktop in der Kopfzeile
+// (navg-planung .nav-kind) statt im Seiteninhalt -- diese Suite ruft
+// goTab() direkt auf, ohne den ueblichen Weg ueber go('planung'), darum
+// hier das Aufklappen der Gruppe nachholen, um die Knoepfe ueberhaupt
+// messen zu koennen (gleiche Sichtbarkeitsregel wie bei einem echten Klick
+// auf "Planung").
+await d.evaluate(() => { document.getElementById('navg-planung').classList.add('offen'); });
+const tabsD = await d.evaluate(() => [...document.querySelectorAll('#navg-planung .nav-kind')]
   .filter(x => x.getClientRects().length)
   .map(x => { const r = x.getBoundingClientRect(); return { t: x.textContent.trim(), l: r.left, w: r.width }; })
   .sort((a, b) => a.l - b.l));
 check('Desktop: Reiterreihenfolge unverändert', tabsD[0].t === 'Übersicht' && tabsD[3].t === 'Tagesplan');
-check('KRITISCH: Desktop-Reiter werden NICHT über die Breite gestreckt',
-  tabsD.reduce((s, x) => s + x.w, 0) < 700);
+// Die "nicht gestreckt"-Pruefung (ENT-069) galt der frueheren .tabs-Zeile im
+// Seiteninhalt, die per flex ueber die volle Breite verteilte. Die neuen
+// .nav-kind-Knoepfe (ENT-233) sind Sidebar-/Kopfzeilen-Elemente ohne
+// flex-Verteilung -- dasselbe Fehlerbild kann dort strukturell nicht mehr
+// auftreten (siehe stattdessen test_huelle.mjs fuer die Kopfzeilen-Breite
+// dieser Knopfart, an Kunden/Administration bereits geprueft).
 check('Desktop: das Kästchen ist auch dort ersetzt, nicht nur mobil versteckt',
   await d.evaluate(() => !document.getElementById('tgNurOffen')));
 // Zurueck auf den Tagesplan: zuletzt stand die Einsatzliste offen, und ein
