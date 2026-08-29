@@ -354,9 +354,10 @@ try {
   // Administration: bis hierher war dort gar nichts markiert
   await p.evaluate(() => go('mitarbeiter')); await p.waitForTimeout(300);
   const n2 = await p.evaluate(() => [...document.querySelectorAll('#topSub button')].map(b => b.textContent));
-  // Seit ENT-181 drei: Produkte steht zwischen Mitarbeitenden und Betrieb.
+  // Seit ENT-181 drei: Leistungen steht zwischen Mitarbeitenden und den
+  // Einstellungen (Namen seit ENT-229/ENT-230, vorher Produkte/Betrieb).
   check('KRITISCH: auch die Administration zeigt ihre Unterkategorien',
-    JSON.stringify(n2) === JSON.stringify(['Mitarbeitende', 'Produkte', 'Betrieb']));
+    JSON.stringify(n2) === JSON.stringify(['Mitarbeitende', 'Leistungen', 'Einstellungen']));
 
   // Ein Bereich ohne Untergruppen zeigt keine leere Leiste
   await p.evaluate(() => go('abgleich')); await p.waitForTimeout(300);

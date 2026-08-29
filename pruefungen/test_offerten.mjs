@@ -470,15 +470,15 @@ check('Ein Betrag mit Hochkomma als Tausendertrennung wird gelesen',
 // Bereich zu wechseln -- bisher ging das nur ueber Administration/Produkte.
 await page.evaluate(() => ofNeuStarten());
 await page.waitForTimeout(400);
-check('KRITISCH: der Knopf "Neues Produkt" steht neben "Position hinzufügen"',
-  await page.isVisible('button:has-text("Neues Produkt")'));
+check('KRITISCH: der Knopf "Neue Leistung" steht neben "Position hinzufügen"',
+  await page.isVisible('button:has-text("Neue Leistung")'));
 const vorherPositionen = await page.evaluate(() => document.querySelectorAll('#ofPositionen .of-pos').length);
 await page.evaluate(() => ofNeuesProduktAnlegen());
 await page.waitForTimeout(200);
 check('KRITISCH: eine neue Position entsteht sofort',
   (await page.evaluate(() => document.querySelectorAll('#ofPositionen .of-pos').length)) === vorherPositionen + 1);
 check('KRITISCH: derselbe Produktdialog wie im Bereich Produkte öffnet sich',
-  await page.isVisible('#dlgProdukt') && (await page.textContent('#prodTitel')).trim() === 'Neues Produkt');
+  await page.isVisible('#dlgProdukt') && (await page.textContent('#prodTitel')).trim() === 'Neue Leistung');
 await page.fill('#prod_name', 'Objektschutz');
 await page.fill('#prod_beschreibung', 'Nächtliche Kontrolle des Objekts');
 await page.fill('#prod_preis', '55');
