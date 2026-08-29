@@ -1,11 +1,15 @@
-// Rundgang-Übersicht für die Einsatzleitung im Dashboard (ENT-183/ENT-193),
-// seit ENT-224 unter der eigenen Rubrik "Revierdienst" statt "Kontrolle".
+// Revierdienst-Übersicht: Kachel-Landingpage (ENT-225, Vorbild Betrieb
+// ENT-211) mit einer Liste der letzten Rundgänge darunter. Ersetzt seit
+// ENT-225 die vormals direkt verlinkte filterbare Rundgang-Liste
+// (ENT-183/193) als Standardinhalt von "Übersicht" -- diese lebt jetzt
+// dormant im Code (#rgAlt), bis sie hinter der Kachel "Rundgänge" wieder
+// auftaucht.
 //
 // Reine Anzeige über den seit ENT-180/183 bestehenden Endpunkt
 // rundgang_liste.php (Recht rundgang_einsehen) -- die Fachlogik
 // (rundgang_fortschritt) läuft bereits echt gegen SQLite in
-// pruef_rundgang.php, hier nur, dass die Oberfläche Zeitraum/Objekt-Filter
-// richtig bedient und das Recht tatsächlich entscheidet, ob "Revierdienst"
+// pruef_rundgang.php, hier nur, dass die Oberfläche die letzten Rundgänge
+// richtig anzeigt und das Recht tatsächlich entscheidet, ob "Revierdienst"
 // bzw. die Kachel "Übersicht" überhaupt erscheint.
 import { WURZEL, OUT, browserPfad } from './pfade.mjs';
 import { chromium } from 'playwright';
@@ -22,12 +26,12 @@ const RUNDGAENGE = { status: 'ok', rundgaenge: [
   { id: 1, einsatz_id: 10, objekt_id: 1, mitarbeiter_id: 5, status: 'abgeschlossen',
     vorbereitet_am: `${HEUTE} 20:00:00`, rohzeit_start: `${HEUTE} 20:04:00`,
     rohzeit_ende: `${HEUTE} 20:41:00`, datum: HEUTE, kunde_name: 'Muster Liegenschaften AG',
-    objekt_name: 'Testliegenschaft Nord', vorname: 'Erika', nachname: 'Muster',
+    objekt_name: 'Testliegenschaft Nord', titel: 'Öffnungsrunde', vorname: 'Erika', nachname: 'Muster',
     fortschritt: { gesamt: 3, bestaetigt: 2, nicht_verfuegbar: 1 } },
   { id: 2, einsatz_id: 11, objekt_id: 2, mitarbeiter_id: 6, status: 'laeuft',
     vorbereitet_am: `${HEUTE} 21:00:00`, rohzeit_start: `${HEUTE} 21:02:00`,
     rohzeit_ende: null, datum: HEUTE, kunde_name: 'Beispiel Immobilien GmbH',
-    objekt_name: 'Testliegenschaft Süd', vorname: 'Hans', nachname: 'Beispiel',
+    objekt_name: 'Testliegenschaft Süd', titel: null, vorname: 'Hans', nachname: 'Beispiel',
     fortschritt: { gesamt: 4, bestaetigt: 1, nicht_verfuegbar: 0 }, pause_minuten: 0 },
   // Pausiert (ENT-146) -- die Rohzeit "laeuft nicht noch", sie steht still.
   { id: 3, einsatz_id: 12, objekt_id: 1, mitarbeiter_id: 5, status: 'pausiert',
@@ -113,56 +117,45 @@ await page.click('#nav-revierdienst');
 await page.waitForTimeout(150);
 check('Die Kachel "Übersicht" ist unter Revierdienst sichtbar', await page.isVisible('#nav-revierdienst-uebersicht'));
 await page.click('#nav-revierdienst-uebersicht');
-await page.waitForSelector('#rgListe .pn-zeile');
+await page.waitForSelector('#rdLetzteListe table');
 await page.waitForTimeout(150);
 
+// ── Kachel-Grid (ENT-225, Vorbild Betrieb ENT-211)
+const kachelLabels = await page.$$eval('#view-rundgaenge .bk-kachel-lbl', els => els.map(e => e.textContent.trim()));
+check('KRITISCH: alle vier Kacheln stehen da, in der vorgegebenen Reihenfolge',
+  JSON.stringify(kachelLabels) === JSON.stringify(['Rundgänge', 'GPS', 'Aufgaben', 'Auswertungen']));
+await page.click('#view-rundgaenge .bk-kachel:has-text("GPS")');
+await page.waitForTimeout(100);
+check('KRITISCH: eine Kachel ist noch ohne Funktion, sagt das aber statt nichts zu tun',
+  await page.evaluate(() => document.getElementById('toast').classList.contains('on')));
+
+// ── Letzte Rundgänge: derselbe Endpunkt wie zuvor, jetzt ohne Zeitraum-/
+// Objekt-Filter durch die Person -- ein fester Rueckblick.
 const gerufen = calls.find(c => c.path.includes('rundgang_liste'));
 check('KRITISCH: rundgang_liste.php wird mit einem Zeitraum aufgerufen', !!gerufen && !!gerufen.query.von && !!gerufen.query.bis);
-check('Der Zeitraum steht standardmässig auf heute (von = bis)',
-  gerufen && gerufen.query.von === gerufen.query.bis);
+check('Der Zeitraum reicht mehrere Tage zurueck, nicht nur auf heute (ENT-225)',
+  gerufen && gerufen.query.von !== gerufen.query.bis);
 
-const kopf = await page.textContent('#rgKopf');
-check('Der Kopf nennt die Anzahl Rundgänge', kopf.includes('4 Rundgänge'));
+const liste = await page.textContent('#rdLetzteListe');
+check('KRITISCH: Kunde, Bereich (Objekt) und Mitarbeiter je Rundgang erscheinen',
+  liste.includes('Muster Liegenschaften AG') && liste.includes('Testliegenschaft Nord') && liste.includes('Muster, Erika'));
+check('KRITISCH: der Name (Einsatztitel) erscheint, wenn vorhanden', liste.includes('Öffnungsrunde'));
+check('Ein Rundgang ohne Einsatztitel zeigt einen Strich statt einer Luecke',
+  (await page.$$eval('#rdLetzteListe tbody tr', rs =>
+    rs.some(r => r.children[2].textContent.trim() === '–'))));
+check('KRITISCH: die Startzeit erscheint', liste.includes('20:04') && liste.includes('21:02'));
+check('KRITISCH: der Fortschritt steht als Zahlenverhaeltnis da, nicht nur ein Balken (ENT-145)',
+  liste.includes('2/3') && liste.includes('1/4'));
+check('KRITISCH: ein abgebrochener Rundgang ist als solcher gekennzeichnet', liste.includes('Abgebrochen'));
 
-const liste = await page.textContent('#rgListe');
-check('KRITISCH: Objekt, Kunde und Person je Rundgang erscheinen',
-  liste.includes('Testliegenschaft Nord') && liste.includes('Muster Liegenschaften AG') && liste.includes('Erika Muster'));
-check('KRITISCH: der Status wird angezeigt', liste.includes('Abgeschlossen') && liste.includes('Läuft'));
-check('KRITISCH: Fortschritt trennt bestätigt und nicht verfügbar, nicht nur eine Summe (ENT-145)',
-  liste.includes('2 bestätigt, 1 nicht verfügbar von 3') && liste.includes('1 bestätigt, 0 nicht verfügbar von 4'));
-check('KRITISCH: Rohzeit-Start und -Ende werden angezeigt', liste.includes('20:04–20:41'));
-check('KRITISCH: ein noch laufender Rundgang zeigt "läuft noch" statt eines leeren Endes',
-  liste.includes('21:02') && liste.includes('läuft noch'));
-
-// ── Pausiert/Abgebrochen (ENT-146)
-check('KRITISCH: der Status "Pausiert" wird angezeigt', liste.includes('Pausiert'));
-check('KRITISCH: pausierte Minuten werden angezeigt', liste.includes('12 Min. pausiert'));
-check('KRITISCH: der Status "Abgebrochen" wird angezeigt', liste.includes('Abgebrochen'));
-check('KRITISCH: der Abbruchgrund erscheint ausgeschrieben, nicht als Code',
-  liste.includes('Durch Notfall anderweitig gebunden') && !liste.includes('notfall_gebunden'));
-check('KRITISCH: der Freitext des Abbruchs erscheint', liste.includes('Kollege krank, musste einspringen'));
-check('KRITISCH: ein abgebrochener Rundgang ohne Ende zeigt NICHT "läuft noch" (waere irrefuehrend)',
-  !liste.includes('23:03 – läuft noch') && !liste.includes('23:03– läuft noch'));
-
-// ── Objekt-Filter
-await page.selectOption('#rgObjekt', '2');
-await page.waitForTimeout(150);
-const gefiltert = await page.textContent('#rgListe');
-check('KRITISCH: der Objekt-Filter blendet das andere Objekt aus',
-  gefiltert.includes('Testliegenschaft Süd') && !gefiltert.includes('Testliegenschaft Nord'));
-check('Ein Filter, der alles ausblendet, meldet nichts an einen Netzfehler',
-  !(await page.textContent('#rgKopf')).includes('undefined'));
-await page.selectOption('#rgObjekt', '');
-
-// ── Leerer Zeitraum: "kein Treffer" statt "nichts vorhanden"
+// ── Leerer Zeitraum: "nichts vorhanden" statt einer leeren Flaeche
 calls = [];
 await page.route('**/api/rundgang_liste.php**', route =>
   route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'ok', rundgaenge: [] }) }));
-await page.fill('#rgVon', '2020-01-01');
-await page.fill('#rgBis', '2020-01-02');
+await page.evaluate(() => revierdienstUebersichtOeffnen());
 await page.waitForTimeout(200);
-check('KRITISCH: ein leerer Zeitraum sagt "kein Rundgang", nicht "keine Zone"/leer',
-  (await page.textContent('#rgListe')).includes('liegt kein Rundgang vor'));
+check('KRITISCH: keine Rundgaenge im Rueckblick sagt das explizit, nicht "leere Zone"',
+  (await page.textContent('#rdLetzteListe')).toLowerCase().includes('nichts vorhanden'));
 
 check('KRITISCH: kein Seiten-Scroll am Desktop',
   await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1));
@@ -199,7 +192,7 @@ check('KRITISCH: mit nur rundgang_einsehen erscheint die Gruppe "Revierdienst" (
 // UND waehlt gleich die richtige Ziel-Kachel (revierdienstNavKlick()).
 calls = [];
 await page.click('#nav-revierdienst');
-await page.waitForSelector('#rgListe .pn-zeile');
+await page.waitForSelector('#rdLetzteListe table');
 check('KRITISCH: ein Klick auf "Revierdienst" landet bei nur rundgang_einsehen auf Übersicht, nicht auf Einrichtung',
   await page.evaluate(() => document.getElementById('view-rundgaenge').classList.contains('on')));
 check('Die Kachel "Übersicht" ist sichtbar', await page.isVisible('#nav-revierdienst-uebersicht'));
