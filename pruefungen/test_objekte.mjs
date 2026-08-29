@@ -269,10 +269,11 @@ await page.waitForTimeout(400);
 check('Objekt-Detailseite zeigt den Kanton-Hinweis', (await page.textContent('#ob-uebersicht')).includes('bestimmt die Feiertage'));
 
 // Reiter statt einer langen Seite (Wunsch des Projektinhabers, 2026-08-28):
-// beim Oeffnen ist immer die Uebersicht aktiv, die anderen unsichtbar.
+// beim Oeffnen ist immer die Uebersicht aktiv, die andere unsichtbar.
+// Kontrollpunkte/Kontrollrunden waren hier ebenfalls ein Reiter, sind seit
+// ENT-224 nach "Revierdienst" umgezogen -- siehe test_kontrollpunkte.mjs.
 check('Uebersicht ist beim Oeffnen aktiv', await page.isVisible('#ob-uebersicht'));
 check('Masterschichten sind zunaechst unsichtbar', !(await page.isVisible('#ob-masterschichten')));
-check('Kontrollpunkte sind zunaechst unsichtbar', !(await page.isVisible('#ob-kontrollpunkte')));
 await page.click('#obtab-masterschichten');
 await page.waitForTimeout(150);
 check('Wechsel zeigt Masterschichten', await page.isVisible('#ob-masterschichten'));

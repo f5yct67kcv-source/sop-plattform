@@ -1,11 +1,12 @@
-// Rundgang-Übersicht für die Einsatzleitung im Dashboard (ENT-183/ENT-193).
+// Rundgang-Übersicht für die Einsatzleitung im Dashboard (ENT-183/ENT-193),
+// seit ENT-224 unter der eigenen Rubrik "Revierdienst" statt "Kontrolle".
 //
 // Reine Anzeige über den seit ENT-180/183 bestehenden Endpunkt
 // rundgang_liste.php (Recht rundgang_einsehen) -- die Fachlogik
 // (rundgang_fortschritt) läuft bereits echt gegen SQLite in
 // pruef_rundgang.php, hier nur, dass die Oberfläche Zeitraum/Objekt-Filter
-// richtig bedient und das Recht tatsächlich entscheidet, ob "Kontrolle"
-// bzw. die Kachel "Rundgänge" überhaupt erscheint.
+// richtig bedient und das Recht tatsächlich entscheidet, ob "Revierdienst"
+// bzw. die Kachel "Übersicht" überhaupt erscheint.
 import { WURZEL, OUT, browserPfad } from './pfade.mjs';
 import { chromium } from 'playwright';
 
@@ -100,18 +101,18 @@ const anmelden = async () => {
 };
 
 // ══════════ MIT DEM RECHT: DIE KACHEL ERSCHEINT UND LÄDT
-// Die Kinder der Gruppe "Kontrolle" sind per CSS erst sichtbar, sobald die
+// Die Kinder der Gruppe "Revierdienst" sind per CSS erst sichtbar, sobald die
 // Gruppe aufgeklappt ist (.nav-gruppe.offen .nav-kinder) -- die Sichtbarkeit
 // einer Kachel lässt sich darum erst NACH dem Öffnen sinnvoll prüfen, nicht
-// direkt nach der Anmeldung (gleiches Muster wie zurObjekt() in
+// direkt nach der Anmeldung (gleiches Muster wie zurEinrichtung() in
 // test_kontrollpunkte.mjs, das ebenfalls erst öffnet und dann prüft).
 await setup(page, null);
 await anmelden();
 calls = [];
-await page.click('#nav-kontrolle');
+await page.click('#nav-revierdienst');
 await page.waitForTimeout(150);
-check('Die Kachel "Rundgänge" ist unter Kontrolle sichtbar', await page.isVisible('#nav-kontrolle-rundgaenge'));
-await page.click('#nav-kontrolle-rundgaenge');
+check('Die Kachel "Übersicht" ist unter Revierdienst sichtbar', await page.isVisible('#nav-revierdienst-uebersicht'));
+await page.click('#nav-revierdienst-uebersicht');
 await page.waitForSelector('#rgListe .pn-zeile');
 await page.waitForTimeout(150);
 
@@ -175,42 +176,48 @@ check('KRITISCH: kein Seiten-Scroll bei 390px', await page.evaluate(() =>
 await page.screenshot({ path: `${OUT}/rg-uebersicht-02-mobil.png` });
 await page.setViewportSize({ width: 1440, height: 1000 });
 
-// ══════════ OHNE JEDES RECHT: WEDER "KONTROLLE" NOCH DIE KACHEL
+// ══════════ OHNE JEDES RECHT: WEDER "KONTROLLE" NOCH "REVIERDIENST"
 await setup(page, ['kunden']);
 await anmelden();
-check('KRITISCH: ohne plan/rundgang_einsehen erscheint die Gruppe "Kontrolle" gar nicht',
+check('KRITISCH: ohne plan erscheint die Gruppe "Kontrolle" gar nicht',
   !(await page.isVisible('#navg-kontrolle')));
+check('KRITISCH: ohne rundgang_verwalten/-einsehen erscheint die Gruppe "Revierdienst" gar nicht (ENT-224)',
+  !(await page.isVisible('#navg-revierdienst')));
 
-// ══════════ NUR rundgang_einsehen (KEIN plan): "KONTROLLE" ERSCHEINT,
-// ABER NUR MIT DER KACHEL "RUNDGÄNGE" -- PENSEN/AUSLAGENERSATZ BLEIBEN VERBORGEN
+// ══════════ NUR rundgang_einsehen (KEIN plan): "REVIERDIENST" ERSCHEINT,
+// ABER NUR MIT DER KACHEL "ÜBERSICHT" -- "EINRICHTUNG" BLEIBT VERBORGEN,
+// UND "KONTROLLE" BLEIBT OHNE "PLAN" WEITERHIN GANZ VERBORGEN (ENT-224: das
+// war vorher anders, als Rundgaenge noch zu "Kontrolle" gehoerte, ENT-193).
 await setup(page, ['kunden', 'rundgang_einsehen']);
 await anmelden();
-check('KRITISCH: mit nur rundgang_einsehen erscheint die Gruppe "Kontrolle" trotzdem (ENT-193)',
-  await page.isVisible('#navg-kontrolle'));
+check('KRITISCH: ohne plan bleibt die Gruppe "Kontrolle" verborgen (seit ENT-224 kein Sonderfall mehr)',
+  !(await page.isVisible('#navg-kontrolle')));
+check('KRITISCH: mit nur rundgang_einsehen erscheint die Gruppe "Revierdienst" (ENT-193/ENT-224)',
+  await page.isVisible('#navg-revierdienst'));
 // Der Klick auf die Elterngruppe selbst darf nicht auf einer fuer diese
-// Person unsichtbaren Kachel (Pensen) landen -- er oeffnet die Gruppe UND
-// waehlt gleich die richtige Ziel-Kachel (kontrolleNavKlick()).
+// Person unsichtbaren Kachel (Einrichtung) landen -- er oeffnet die Gruppe
+// UND waehlt gleich die richtige Ziel-Kachel (revierdienstNavKlick()).
 calls = [];
-await page.click('#nav-kontrolle');
+await page.click('#nav-revierdienst');
 await page.waitForSelector('#rgListe .pn-zeile');
-check('KRITISCH: ein Klick auf "Kontrolle" landet bei nur rundgang_einsehen auf Rundgänge, nicht auf Pensen',
+check('KRITISCH: ein Klick auf "Revierdienst" landet bei nur rundgang_einsehen auf Übersicht, nicht auf Einrichtung',
   await page.evaluate(() => document.getElementById('view-rundgaenge').classList.contains('on')));
-check('Die Kachel "Rundgänge" ist sichtbar', await page.isVisible('#nav-kontrolle-rundgaenge'));
-check('KRITISCH: "Pensen" bleibt ohne das Recht "plan" verborgen',
-  !(await page.isVisible('#nav-kontrolle-pensen')));
-check('KRITISCH: "Auslagenersatz" bleibt ohne das Recht "plan" verborgen',
-  !(await page.isVisible('#nav-kontrolle-auslagen')));
+check('Die Kachel "Übersicht" ist sichtbar', await page.isVisible('#nav-revierdienst-uebersicht'));
+check('KRITISCH: "Einrichtung" bleibt ohne das Recht "rundgang_verwalten" verborgen',
+  !(await page.isVisible('#nav-revierdienst-einrichtung')));
 
-// ══════════ OHNE rundgang_einsehen, ABER MIT plan: WIE VORHER, KEINE REGRESSION
+// ══════════ MIT plan, ABER OHNE rundgang_einsehen/-verwalten: WIE VORHER,
+// KEINE REGRESSION AN "KONTROLLE"; "REVIERDIENST" BLEIBT VERBORGEN
 await setup(page, ['plan', 'kunden']);
 await anmelden();
 check('Mit plan bleibt "Kontrolle" sichtbar (bestehendes Verhalten unveraendert)',
   await page.isVisible('#navg-kontrolle'));
 await page.click('#nav-kontrolle');
 await page.waitForTimeout(150);
-check('KRITISCH: ohne rundgang_einsehen bleibt "Rundgänge" verborgen',
-  !(await page.isVisible('#nav-kontrolle-rundgaenge')));
 check('"Pensen" bleibt wie bisher sichtbar', await page.isVisible('#nav-kontrolle-pensen'));
+check('"Auslagenersatz" bleibt wie bisher sichtbar', await page.isVisible('#nav-kontrolle-auslagen'));
+check('KRITISCH: ohne rundgang_verwalten/-einsehen bleibt "Revierdienst" verborgen',
+  !(await page.isVisible('#navg-revierdienst')));
 
 await browser.close();
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
