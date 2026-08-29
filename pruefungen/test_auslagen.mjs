@@ -202,7 +202,8 @@ check('Die Gruppe klappt dabei auf',
   await page.evaluate(() => document.getElementById('navg-admin').classList.contains('offen')));
 check('Der Unterpunkt Betrieb ist markiert',
   await page.evaluate(() => document.getElementById('nav-admin-betrieb').classList.contains('on')));
-check('Die Kopfzeile nennt den Betrieb', (await page.textContent('#pgTitle')) === 'Betrieb');
+check('Die Kopfzeile nennt die Einstellungen (bis ENT-229 "Betrieb")',
+  (await page.textContent('#pgTitle')) === 'Einstellungen');
 await page.evaluate(() => go('mitarbeiter'));
 await page.waitForTimeout(400);
 check('Auch die Mitarbeitenden markieren die Gruppe',
