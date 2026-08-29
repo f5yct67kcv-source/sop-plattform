@@ -226,11 +226,12 @@ check('Plan gruppiert nach Tagen', koepfe >= 3);
 // ist die Tagesueberschrift, zu der die abgesagte Schicht gehoert.
 check('Abgesagte Schicht zaehlt nicht als Schicht des Tages',
   await page.evaluate(() => {
-    // Auf der Ebene der direkten Kinder von #v-plan suchen: Dort stehen
-    // Tagesueberschrift und Karte als Geschwister. Die Schaltflaeche .schicht
-    // liegt eine Ebene tiefer -- von ihr aus gibt es keinen Geschwisterweg
-    // zur Ueberschrift.
-    const kinder = [...document.getElementById('v-plan').children];
+    // Auf der Ebene der direkten Kinder von #plan-inhalt-plan suchen (seit
+    // ENT-234 eine Ebene unter #v-plan, wegen des Plan/Sperren-Unterreiters):
+    // Dort stehen Tagesueberschrift und Karte als Geschwister. Die
+    // Schaltflaeche .schicht liegt eine Ebene tiefer -- von ihr aus gibt es
+    // keinen Geschwisterweg zur Ueberschrift.
+    const kinder = [...document.getElementById('plan-inhalt-plan').children];
     const i = kinder.findIndex(x => x.textContent.includes('Abgesagter Einsatz')
       && !x.classList.contains('tag-kopf'));
     if (i < 1) { return false; }
@@ -559,22 +560,29 @@ check('Rapport verweist auf die Erfassung',
   await page.evaluate(() => !!document.querySelector('#v-rapport a[href="index.html"]')));
 check('Kein Diktat im Rapport-Bereich', !/[Dd]iktat|[Mm]ikrofon/.test(await page.innerHTML('#v-rapport')));
 
-// ══════════════ PROFIL
-await page.click('#t-profil');
+// ══════════════ MENÜ (ENT-234, vormals PROFIL)
+await page.click('#t-menu');
 await page.waitForTimeout(200);
-const proText = await T('#v-profil');
-check('Profil zeigt den vollen Namen', proText.includes('Daniele Ciardo'));
-check('Profil zeigt die Personalnummer', proText.includes('P-014'));
-check('Profil zeigt die Adresse', proText.includes('4600 Olten'));
-check('Profil zeigt leere Felder nicht an', !proText.includes('Telefon'));
-check('Profil ist nur lesend',
-  await page.evaluate(() => document.querySelectorAll('#v-profil input, #v-profil textarea').length === 0));
-check('Profil erklaert, wie Daten geaendert werden', proText.length > 100);
+const menuText = await T('#v-menu');
+check('Menü zeigt den vollen Namen', menuText.includes('Daniele Ciardo'));
+check('Menü zeigt die Kacheln Meine Daten/Meine Stunden',
+  await page.evaluate(() => document.querySelectorAll('#v-menu .mk-kachel').length === 2));
+await page.evaluate(() => datenSeiteAuf());
+await page.waitForTimeout(150);
+const datenText = await T('#pr-daten');
+check('Meine Daten zeigt die Personalnummer', datenText.includes('P-014'));
+check('Meine Daten zeigt die Adresse', datenText.includes('4600 Olten'));
+check('Meine Daten zeigt leere Felder nicht an', !datenText.includes('Telefon'));
+check('Meine Daten ist nur lesend',
+  await page.evaluate(() => document.querySelectorAll('#pr-daten input, #pr-daten textarea').length === 0));
+check('Meine Daten erklaert, wie Daten geaendert werden', datenText.length > 100);
+await page.evaluate(() => datenSeiteZu());
+await page.waitForTimeout(150);
 check('Nicht-Admin sieht keinen Cockpit-Verweis',
-  await page.evaluate(() => !document.querySelector('#v-profil a[href="dashboard.html"]')));
+  await page.evaluate(() => !document.querySelector('#v-menu a[href="dashboard.html"]')));
 
 // ══════════════ PASSWORT
-await page.click('#v-profil button[onclick="passwortBlatt()"]');
+await page.click('#v-menu button[onclick="passwortBlatt()"]');
 await page.waitForTimeout(250);
 check('Passwortblatt geht auf', await page.isVisible('#pwAlt'));
 check('Passwortblatt fragt das bisherige Passwort', await page.isVisible('#pwAlt'));
@@ -596,7 +604,7 @@ check('Blatt schliesst nach dem Passwortwechsel',
 
 // Falsches altes Passwort: Meldung bleibt im Blatt stehen
 passwortAntwort = [{ status: 'error', message: 'Das bisherige Passwort stimmt nicht' }, 401];
-await page.click('#v-profil button[onclick="passwortBlatt()"]');
+await page.click('#v-menu button[onclick="passwortBlatt()"]');
 await page.waitForTimeout(200);
 await page.fill('#pwAlt', 'falsch');
 await page.fill('#pwNeu', 'neuesGeheim');
@@ -612,10 +620,11 @@ await page.evaluate(() => blattZu());
 // ══════════════ KEINE SPRACHUMSCHALTUNG MEHR
 check('Kein albanischer Text mehr in der App',
   await page.evaluate(() => !/Shqip|Punonjës|Raporti|Turni|Klienti/.test(document.body.innerHTML)));
-check('Das Profil hat keinen Sprachbereich mehr',
-  !(await T('#v-profil')).includes('Sprache'));
-check('Fünf Reiter unten',
-  await page.evaluate(() => document.querySelectorAll('.tabs button').length === 5));
+check('Das Menü hat keinen Sprachbereich mehr',
+  !(await T('#v-menu')).includes('Sprache'));
+check('Vier sichtbare Reiter unten (kein Revierdienst-Bezug in dieser Suite, ENT-234)',
+  await page.evaluate(() => [...document.querySelectorAll('.tabs button')]
+    .filter(b => getComputedStyle(b).display !== 'none').length === 4));
 
 // ══════════════ LEERER ZUSTAND
 schichtenDaten = { status: 'ok', von: GESTERN, bis: tag(90), schichten: [] };
@@ -659,7 +668,7 @@ const messen = () => page.evaluate(() => {
 });
 for (const breite of [320, 360, 390, 414]) {
   await page.setViewportSize({ width: breite, height: 844 });
-  for (const [name, id] of [['Heute', 't-heute'], ['Plan', 't-plan'], ['Rapport', 't-rapport'], ['Profil', 't-profil']]) {
+  for (const [name, id] of [['Heute', 't-heute'], ['Plan', 't-plan'], ['Rapport', 't-rapport'], ['Menü', 't-menu']]) {
     await page.click('#' + id);
     await page.waitForTimeout(160);
     const m = await messen();
@@ -722,13 +731,13 @@ await page.evaluate(() => blattZu());
 await page.waitForTimeout(200);
 
 // ══════════════ ABMELDEN
-await page.click('#t-profil'); await page.waitForTimeout(200);
+await page.click('#t-menu'); await page.waitForTimeout(200);
 await page.evaluate(() => { localStorage.setItem('rv3_token', 'x'); });
 await page.evaluate(() => { window.__reload = false; });
 check('Abmelden ist erreichbar',
-  await page.evaluate(() => [...document.querySelectorAll('#v-profil button')].some(b => /Abmelden/.test(b.textContent))));
+  await page.evaluate(() => [...document.querySelectorAll('#v-menu button')].some(b => /Abmelden/.test(b.textContent))));
 
-await page.screenshot({ path: OUT + '/40-app-profil.png' });
+await page.screenshot({ path: OUT + '/40-app-menu.png' });
 await page.click('#t-heute'); await page.waitForTimeout(250);
 await page.screenshot({ path: OUT + '/41-app-heute.png' });
 await page.click('#t-plan'); await page.waitForTimeout(250);
