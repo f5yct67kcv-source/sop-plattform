@@ -176,6 +176,57 @@ const kopfHell = await echterGrund('.topbar h1');
 check('Die Kopfzeile ist im Hellen hell', !LUMTEST(kopfHell.grund.replace(/[\d.]+\)$/, '1)')));
 check('Titel auf heller Kopfzeile lesbar',
   kontrast(kopfHell.text, kopfHell.grund.replace(/[\d.]+\)$/, '1)')) >= 7);
+
+// ══════════════ DIE AUFWERTUNG HAENGT NICHT AM THEMA (ENT-227)
+//
+// Der Projektinhaber hat ausdruecklich entschieden, BEIDE Themen anzuheben.
+// Die Gefahr ist konkret und hat einen Namen: Die uebergebene Anleitung
+// (ENT-223) legte ein zweites Farbsystem an, das nur im Dunkeln galt --
+// waere das so eingebaut worden, saehe das helle Thema unveraendert alt aus,
+// ohne dass irgendetwas kaputtgeht oder auffaellt.
+//
+// Darum wird hier nicht geprueft, WELCHE Werte gesetzt sind (das waere der
+// Quelltext, abgeschrieben), sondern die Aussage: Form und Schrift sind in
+// beiden Themen dieselben. Nur die Farben duerfen sich unterscheiden.
+const formJeThema = async () => page.evaluate(() => {
+  const k = getComputedStyle(document.querySelector('.kpi'));
+  const c = getComputedStyle(document.querySelector('.card'));
+  return { kpiRadius: k.borderRadius, kpiPolster: k.padding, cardRadius: c.borderRadius,
+           schrift: getComputedStyle(document.body).fontFamily, kpiGrund: k.backgroundColor };
+});
+const formHell = await formJeThema();
+await page.click('#btnThema'); await page.waitForTimeout(350);
+const formDunkel = await formJeThema();
+
+check('KRITISCH: die Radien gelten in beiden Themen gleich (ENT-227)',
+  formHell.kpiRadius === formDunkel.kpiRadius && formHell.cardRadius === formDunkel.cardRadius);
+check('KRITISCH: die Luft gilt in beiden Themen gleich',
+  formHell.kpiPolster === formDunkel.kpiPolster);
+check('KRITISCH: dieselbe Grundschrift in beiden Themen',
+  formHell.schrift === formDunkel.schrift);
+check('Die Farbe unterscheidet sich sehr wohl -- sonst haette der Umschalter keine Wirkung',
+  formHell.kpiGrund !== formDunkel.kpiGrund);
+
+// Im Dunkeln traegt der Rand, nicht der Schatten (ENT-029 als Absicht, seit
+// ENT-227 auch tatsaechlich so). Das stand jahrelang nur als Kommentar da,
+// waehrend --sh-1 weiter einen Schatten unter jede Karte warf -- niemandem
+// aufgefallen, weil ein ueberfluessiger Schatten nichts kaputtmacht, er
+// macht die Flaeche nur schmutzig. Genau darum eine Pruefung: Eine Absicht
+// ohne Pruefung ist eine Behauptung.
+const schatten = async () => page.evaluate(() => ({
+  karte: getComputedStyle(document.querySelector('.card')).boxShadow,
+  rand: getComputedStyle(document.querySelector('.card')).borderTopWidth,
+}));
+const schattenDunkel = await schatten();
+await page.click('#btnThema'); await page.waitForTimeout(350);
+const schattenHell = await schatten();
+
+check('KRITISCH: im Dunkeln wirft keine Karte einen Schatten (ENT-227)',
+  schattenDunkel.karte === 'none');
+check('Im Dunkeln traegt stattdessen der Rand', schattenDunkel.rand !== '0px');
+check('Im Hellen bleibt der Schatten -- dort gibt es keinen Randkontrast, der ihn ersetzt',
+  schattenHell.karte !== 'none');
+
 await browser.close();
 
 // ══════════════ GESPEICHERTE WAHL GILT BEIM NÄCHSTEN MAL
