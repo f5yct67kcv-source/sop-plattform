@@ -3839,6 +3839,17 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
             <option value="">Objekt wählen …</option>
           </select>
         </div>
+        <!-- Hinweis auf die Rechtevergabe (ENT-231, Empfehlung der
+             Navigationsanalyse vom 2026-08-29): WER am Waechtersystem
+             arbeiten darf, wird nicht hier bestimmt, sondern ueber die
+             Waechtersystem-Berechtigung in der Personalakte. Der Text nennt
+             den Ort fuer alle; der Sprung-Knopf haengt an 'personal_lesen'
+             (NAV_RECHTE) -- wer die Mitarbeitenden nicht oeffnen darf,
+             bekommt keinen toten Link. -->
+        <p class="zone-note" style="margin:2px 0 14px">
+          Wer Kontrollpunkte und Rundgang-Vorlagen pflegen oder Rundgänge einsehen darf, bestimmt die Berechtigung „Wächtersystem" in der Personalakte (Administration → Mitarbeitende).
+          <button class="btn btn-plain btn-sm" id="rdZuMitarbeitende" onclick="go('mitarbeiter')" style="margin-left:6px">Zu den Mitarbeitenden</button>
+        </p>
         <div id="rdEinrichtungInhalt"></div>
       </section>
 
@@ -5852,6 +5863,9 @@ const NAV_RECHTE = {
   // 'rundgang_einsehen' (ENT-193/ENT-224).
   'nav-revierdienst-uebersicht':   'rundgang_einsehen',
   'nav-revierdienst-einrichtung':  'rundgang_verwalten',
+  // Sprung-Knopf im Rechte-Hinweis der Revierdienst-Einrichtung (ENT-231):
+  // fuehrt zu den Mitarbeitenden und braucht darum deren Recht.
+  'rdZuMitarbeitende':      'personal_lesen',
   'nav-einrichtung':        'betrieb',
   // Offerten haengen am eigenen Recht, nicht an 'kunden' (ENT-181): Wer
   // Adressen pflegt, sieht darum noch keine Preise. Die Elterngruppe

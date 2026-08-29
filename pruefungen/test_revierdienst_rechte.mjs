@@ -107,6 +107,19 @@ check('Der Waehler zeigt dieselbe Menge wie bisher, nicht auf Revierdienst gekue
 check('Er sagt nicht "nicht verfuegbar", wenn Objekte da sind',
   !waehler.text.includes('nicht verfügbar'));
 
+// Rechte-Hinweis (ENT-231): Der Text nennt den Ort der Waechtersystem-
+// Berechtigung fuer alle; der Sprung-Knopf zu den Mitarbeitenden haengt an
+// 'personal_lesen' und muss fuer die reine Waechter-Rolle verborgen sein --
+// ein Knopf, dessen Ziel man nicht oeffnen darf, waere ein toter Link.
+const hinweis = await page.evaluate(() => ({
+  text: document.querySelector('#view-revierdienst .zone-note')?.textContent || '',
+  knopf: getComputedStyle(document.getElementById('rdZuMitarbeitende')).display,
+}));
+check('Der Rechte-Hinweis nennt Waechtersystem und die Personalakte',
+  hinweis.text.includes('Wächtersystem') && hinweis.text.includes('Mitarbeitende'));
+check('KRITISCH: ohne personal_lesen bleibt der Sprung-Knopf verborgen',
+  hinweis.knopf === 'none');
+
 await page.close();
 
 // ══════════ GEGENSTUECK: VOLLE RECHTE VERHALTEN SICH UNVERAENDERT
@@ -120,6 +133,9 @@ const waehler2 = await page2.evaluate(() => {
   return sel.querySelectorAll('option[value]:not([value=""])').length;
 });
 check('Mit vollen Rechten steht derselbe Waehler mit denselben Objekten', waehler2 === 2);
+check('Mit vollen Rechten fuehrt der Sprung-Knopf zu den Mitarbeitenden',
+  await page2.evaluate(() =>
+    getComputedStyle(document.getElementById('rdZuMitarbeitende')).display !== 'none'));
 await page2.close();
 
 await browser.close();
