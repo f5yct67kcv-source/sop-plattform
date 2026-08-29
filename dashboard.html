@@ -2797,10 +2797,31 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
         <svg class="i" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg>
         <span class="lbl">Übersicht</span>
       </button>
-      <button class="nav-item" id="nav-planung" title="Planung" onclick="go('planung')">
-        <svg class="i" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="17" rx="2"/><line x1="3" y1="9.5" x2="21" y2="9.5"/><line x1="8" y1="2.5" x2="8" y2="6.5"/><line x1="16" y1="2.5" x2="16" y2="6.5"/><line x1="7.5" y1="14" x2="12" y2="14"/><line x1="7.5" y1="17.5" x2="15" y2="17.5"/></svg>
-        <span class="lbl">Planung</span>
-      </button>
+      <!-- Reiter fest in der Kopfzeile statt im Seiteninhalt (ENT-233,
+           Projektinhaber-Wunsch: identisch wie bei Kunden/Administration).
+           NUR auf dem Desktop -- anders als bei Kunden bleibt der Knopf
+           "Planung" selbst (nicht nur die Gruppe) auch auf dem Handy
+           erreichbar, weil Planung dort einer der drei Hauptpunkte ist.
+           Die Unterpunkte (".nav-kinder") sind dagegen bewusst zusaetzlich
+           "nur-desktop": auf dem Handy bleibt die bisherige, extra darauf
+           zugeschnittene Reiterleiste im Seiteninhalt (#view-planung .tabs,
+           jetzt "nur-schmal") unveraendert die einzige Bedienung -- sie
+           kennt bereits eigene Handy-Regeln (Uebersicht/Objektplanung
+           versteckt, dafuer ein Rapporte-Sprung zu Kunden), die eine
+           Kopfzeilen-Reiterleiste nicht kennt. -->
+      <div class="nav-gruppe" id="navg-planung">
+        <button class="nav-item nav-eltern" id="nav-planung" title="Planung" onclick="planungNavKlick()">
+          <svg class="i" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="17" rx="2"/><line x1="3" y1="9.5" x2="21" y2="9.5"/><line x1="8" y1="2.5" x2="8" y2="6.5"/><line x1="16" y1="2.5" x2="16" y2="6.5"/><line x1="7.5" y1="14" x2="12" y2="14"/><line x1="7.5" y1="17.5" x2="15" y2="17.5"/></svg>
+          <span class="lbl">Planung</span>
+          <svg class="i chev nur-desktop" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="nav-kinder nur-desktop">
+          <button class="nav-kind on" id="nav-planung-uebersicht" onclick="go('planung'); goTab('uebersicht')">Übersicht</button>
+          <button class="nav-kind" id="nav-planung-einsaetze" onclick="go('planung'); goTab('einsaetze')">Einsätze</button>
+          <button class="nav-kind" id="nav-planung-objektplan" onclick="go('planung'); goTab('objektplan')">Objektplanung</button>
+          <button class="nav-kind" id="nav-planung-tag" onclick="go('planung'); goTab('tag')">Tagesplan</button>
+        </div>
+      </div>
       <!-- Eigener Punkt statt eines Reiters unter Planung: der Abgleich ist ein
            zentraler Arbeitsschritt der Plattform und soll mit einem Klick
            erreichbar sein. Bewusst OHNE Zahl offener Abgleiche -- die steht auf
@@ -3125,18 +3146,20 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 
       <!-- ─────────── PLANUNG ─────────── -->
       <section class="view" id="view-planung">
+        <!-- Diese Reiterleiste bediente frueher Uebersicht/Einsaetze/
+             Objektplanung/Tagesplan auf Desktop UND Handy. Seit ENT-233
+             stehen die Reiter auf dem Desktop fest in der Kopfzeile (wie bei
+             Kunden/Administration, siehe navg-planung in der Seitenleiste) --
+             hier bleibt nur noch die Handy-Bedienung uebrig, bewusst
+             unveraendert (Ruecksprache Projektinhaber): "Uebersicht" und
+             "Objektplanung" waren dort schon vorher nicht Teil der Leiste
+             (ENT-165, eine 31-Spalten-Matrix ist auf dem Handy ohnehin nur
+             als Tagesliste nutzbar, ENT-024) und sind darum ganz entfallen,
+             "Einsaetze"/"Tagesplan" bleiben "nur-schmal" fuer das Handy.
+             "Feiertage" bleibt der einzige Desktop-Inhalt dieser Zeile. -->
         <div class="tabs">
-          <button class="tab on nur-desktop" id="ptab-uebersicht" onclick="goTab('uebersicht')">Übersicht</button>
-          <button class="tab" id="ptab-einsaetze" onclick="goTab('einsaetze')">Einsätze</button>
-          <!-- Auf dem Handy nicht mehr Teil der Reiterleiste (ENT-165):
-               eine 31-Spalten-Matrix ist dort ohnehin nur als Tagesliste
-               nutzbar (ENT-024), und der Projektinhaber greift von hier aus
-               unterwegs eher auf Rapporte zu als auf die Objektdetailplanung.
-               Andere Wege dorthin -- Klick auf einen Objektnamen, Kurzwahl,
-               Diktat -- bleiben unveraendert bestehen, nur der Reiter selbst
-               verschwindet auf schmalen Schirmen. -->
-          <button class="tab nur-desktop" id="ptab-objektplan" onclick="goTab('objektplan')">Objektplanung</button>
-          <button class="tab" id="ptab-tag" onclick="goTab('tag')">Tagesplan</button>
+          <button class="tab on nur-schmal" id="ptab-einsaetze" onclick="goTab('einsaetze')">Einsätze</button>
+          <button class="tab nur-schmal" id="ptab-tag" onclick="goTab('tag')">Tagesplan</button>
           <!-- Ersetzt die Objektplanung an ihrem Platz in der mobilen
                Reiterleiste. Kein eigener Reiter innerhalb der Planung --
                das wuerde die bereits bestehende, global gepflegte
@@ -5835,7 +5858,9 @@ function enter() {
 // Anfrage von Hand stellt, umgeht jedes ausgeblendete Element. Entschieden
 // wird auf dem Server, in jedem einzelnen Endpunkt.
 const NAV_RECHTE = {
-  'nav-planung':            'plan',
+  // Seit ENT-233 die ganze Gruppe (mit den neuen Reiter-Kindern), nicht mehr
+  // nur der Knopf selbst -- gleiches Prinzip wie bei 'navg-kunden'.
+  'navg-planung':           'plan',
   'nav-abgleich':           'abgleich',
   'navg-kunden':            'kunden',
   'nav-admin-mitarbeiter':  'personal_lesen',
@@ -6709,6 +6734,13 @@ function go(view) {
       rapporte.length ? Promise.resolve() : loadRapporte(),
     ]).then(renderAbgleich);
   }
+  // Gleiches Prinzip fuer Planung (ENT-233): das Untermenue bleibt nur
+  // aufgeklappt, solange Planung der aktive Bereich ist. Anders als bei
+  // Kunden faellt hier kein "goTab(pTab)"-Nachladen an -- die eigenen
+  // Reiter-Klassen (auf den .ptab-Panels wie auf den neuen .nav-kind-
+  // Knoepfen) bleiben beim Verlassen unveraendert stehen und muessen beim
+  // Wiederkommen nicht erneut gesetzt werden.
+  $('navg-planung').classList.toggle('offen', view === 'planung');
   // Das Untermenü ist nur aufgeklappt, solange Kunden der aktive Bereich ist
   // -- kein Zustand, der beim Verlassen hängen bleibt (ENT-039).
   $('navg-kunden').classList.toggle('offen', view === 'kunden');
@@ -11334,7 +11366,14 @@ function goTab(t) {
   document.querySelectorAll('#view-planung .ptab').forEach(v => v.classList.remove('on'));
   document.querySelectorAll('#view-planung .tab').forEach(b => b.classList.remove('on'));
   $('pv-' + t).classList.add('on');
-  $('ptab-' + t).classList.add('on');
+  // Nur noch auf dem Handy sichtbar (ENT-233) -- "uebersicht"/"objektplan"
+  // haben dort gar keinen Knopf mehr, darum das Absichern mit "if".
+  const ptabBtn = $('ptab-' + t); if (ptabBtn) { ptabBtn.classList.add('on'); }
+  // Auf dem Desktop steht dieselbe Auswahl jetzt in der Kopfzeile (ENT-233,
+  // identisches Muster zu kuGoTab()).
+  document.querySelectorAll('.nav-kind').forEach(b => b.classList.remove('on'));
+  ($('nav-planung-' + t) || $('nav-planung-uebersicht')).classList.add('on');
+  topSubZeichnen();
   $('pgCrumb').textContent = TAB_CRUMB[t] || '';
   weiteAnsicht(PLANUNG_WEIT.includes(t));
   // Einsaetze traegt seit ENT-107 den Diktat-Router eingebettet -- derselbe
@@ -11378,6 +11417,18 @@ function kuNavKlick() {
     $('navg-kunden').classList.toggle('offen');
   } else {
     go('kunden');
+  }
+}
+
+// Gleiches Muster wie kuNavKlick() (ENT-233). navGruppeKompakt() greift auf
+// dem Handy ohnehin nicht (huelleKompakt() gilt erst ab 901px) -- der Knopf
+// "Planung" navigiert dort also wie bisher immer direkt, nie als Aufklapper.
+function planungNavKlick() {
+  if (navGruppeKompakt('planung')) { return; }
+  if ($('view-planung').classList.contains('on')) {
+    $('navg-planung').classList.toggle('offen');
+  } else {
+    go('planung');
   }
 }
 

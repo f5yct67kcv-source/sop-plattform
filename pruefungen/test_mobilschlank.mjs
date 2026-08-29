@@ -100,8 +100,8 @@ for (const [v, name] of [['uebersicht', 'Übersicht'], ['planung', 'Planung'], [
 // Planung oeffnet mobil den Tagesplan statt der Monatsmatrix.
 await m.evaluate(() => go('planung'));
 await m.waitForTimeout(700);
-check('Der Matrix-Reiter ist mobil gar nicht erst da',
-  await m.evaluate(() => !document.getElementById('ptab-uebersicht').getClientRects().length));
+check('Der Matrix-Reiter ist mobil gar nicht erst da (ENT-233: existiert nur noch als Kopfzeilen-Eintrag auf dem Desktop)',
+  await m.evaluate(() => !document.getElementById('ptab-uebersicht')));
 // Seit ENT-058 traegt die Einsatzliste die Kartenoptik und den
 // Herkunftsfilter -- sie ist die mobile Startseite, nicht mehr der Tagesplan.
 check('KRITISCH: ein direkter Aufruf der Matrix landet mobil in der Einsatzliste',
