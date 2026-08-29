@@ -124,6 +124,22 @@ check('KRITISCH: "nicht abrufbar" wird von "niemand eingeteilt" unterschieden',
   kaputt.includes('nicht verfügbar') && !kaputt.includes('niemand eingeteilt'));
 await browser.close();
 
+// ══════════ ANTWORT OHNE LISTE -- kaputt, nicht leer
+//
+// Nicht ausgedacht: Die volle Regression hat diesen Fall gefunden. Eine
+// andere Suite beantwortet unbekannte Endpunkte pauschal mit {status:'ok'},
+// und die Zeichnung stuerzte an daten.leute.length ab -- "Cannot read
+// properties of undefined". Ein Server, der dasselbe liefert (Teilausfall,
+// alte Fassung, Zwischenspeicher), haette die ganze Ansicht zerlegt, nicht
+// nur diese eine Karte.
+({ browser, page } = await starte({ status: 'ok' }));
+const ohneListe = await page.textContent('#wsListe');
+check('KRITISCH: eine Antwort ohne Liste zerlegt die Ansicht nicht',
+  ohneListe.includes('nicht verfügbar'));
+check('Sie wird als kaputt behandelt, nicht als "niemand eingeteilt"',
+  !ohneListe.includes('niemand eingeteilt'));
+await browser.close();
+
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden`);
 if (bad.length) { bad.forEach(n => console.log('  ✗ ' + n)); process.exit(1); }
 console.log('\nAlle Pruefungen bestanden.');

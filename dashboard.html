@@ -12332,12 +12332,18 @@ function zeichneWaechterStatus(daten) {
   if (!ziel) { return; }
   // Vier verschiedene Aussagen, vier verschiedene Texte (Hausregel):
   // nicht abrufbar ist etwas anderes als niemand eingeteilt.
-  if (!daten) {
+  // Eine Antwort ohne Liste ist etwas anderes als eine leere Liste: Sie ist
+  // kaputt, nicht leer. Ohne diese Unterscheidung stuerzt die Zeichnung mit
+  // "Cannot read properties of undefined" ab -- die Regression hat genau das
+  // gefangen, weil eine andere Suite den Endpunkt nur mit {status:'ok'}
+  // beantwortet. Ein Server, der dasselbe tut, haette die Seite zerlegt.
+  const leute = daten && Array.isArray(daten.leute) ? daten.leute : null;
+  if (!leute) {
     zaehler.textContent = '';
     ziel.innerHTML = EMPTY('Status nicht verfügbar', 'Die Wächter-Übersicht konnte nicht geladen werden.');
     return;
   }
-  if (!daten.leute.length) {
+  if (!leute.length) {
     zaehler.textContent = '';
     ziel.innerHTML = EMPTY('Heute niemand eingeteilt', 'Sobald für heute ein Revierdienst-Einsatz besetzt ist, erscheint er hier.');
     return;
@@ -12345,7 +12351,7 @@ function zeichneWaechterStatus(daten) {
   // Zwei Einheiten, darum ausgeschrieben statt einer nackten Zahl: "aktiv"
   // zaehlt laufende Rundgaenge, "eingeteilt" zaehlt Personen.
   zaehler.textContent = `${daten.aktiv} von ${daten.eingeteilt} auf Rundgang`;
-  ziel.innerHTML = daten.leute.map(l => {
+  ziel.innerHTML = leute.map(l => {
     const initialen = ((l.vorname || '').charAt(0) + (l.nachname || '').charAt(0)).toUpperCase() || '?';
     const name = [l.vorname, l.nachname].filter(Boolean).join(' ') || 'Ohne Namen';
     // "Nicht hinterlegt" statt einer leeren Zeile -- unbekannt darf nie wie
