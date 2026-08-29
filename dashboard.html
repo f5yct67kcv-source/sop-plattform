@@ -391,8 +391,17 @@ a.nav-item { text-decoration: none; }
 /* Pille statt nacktem Text (ENT-235, Mockup "Heute, 14:32"): Die Notiz
    gehoert zum Kopf, steht aber neben der Ueberschrift -- mit eigener
    Flaeche liest sie sich als Angabe und nicht als angehaengter Satz. */
-.card-hd .note { font-size: 11px; color: var(--ink-3); background: var(--surface-2);
-  border: 1px solid var(--line-soft); border-radius: 999px; padding: 3px 10px; white-space: nowrap; }
+/* Die Pille darf den Kartenkopf NICHT hoeher machen. Gemessen: Mit
+   padding 3px wuchs die Notiz von 17 auf 25px und der Kopf von 54 auf
+   58px. In einer Karte mit fest eingestellter Hoehe nimmt das dem
+   Balkenbild darunter genau die Pixel weg, die test_containergroesse
+   einfordert ("das Balkenbild fuellt den Rumpf") -- die Pruefung hat
+   recht, nicht die Pille. Darum enge Zeilenhoehe statt mehr Polster:
+   10.5px * 1.25 + 2*2 Polster + 2*1 Rand = 19px, genau die Zeilenhoehe
+   der Ueberschrift daneben. */
+.card-hd .note { font-size: 10.5px; line-height: 1.25; color: var(--ink-3);
+  background: var(--surface-2); border: 1px solid var(--line-soft); border-radius: 999px;
+  padding: 2px 9px; white-space: nowrap; }
 .card-hd .sp { flex: 1; }
 /* Icon-Abzeichen vor einem Karten-Titel (ENT-161, zunaechst nur im
    Betriebsbereich) -- dieselbe Bauart wie ".empty .ic", nur kleiner fuer die
