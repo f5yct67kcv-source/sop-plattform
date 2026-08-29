@@ -417,16 +417,23 @@ a.nav-item { text-decoration: none; }
    vorher rechnete renderChart() fest 108 px und blieb bei jeder Kartenhoehe
    gleich gross. 71 % ist der bisherige Wert (108 von 152) -- die Standardhoehe
    sieht damit unveraendert aus. */
-.bars { display: flex; align-items: flex-end; gap: 8px; height: 152px; padding-top: 6px; }
+/* ── Chart (Design-Eingriff 2026-08-28): Gitterlinien, Opazität, leere Wochen, KW-Farbe */
+.bars { display: flex; align-items: flex-end; gap: 8px; height: 152px; padding-top: 6px;
+  background-image: repeating-linear-gradient(
+    to top,
+    rgba(255,255,255,0.05) 0px, rgba(255,255,255,0.05) 1px,
+    transparent 1px, transparent 25%
+  ); }
 .dash-item.dh .bars { height: 100%; }
 .bar { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
   gap: 7px; min-width: 0; height: 100%; }
-.bar-val { font-size: 11px; font-weight: 650; color: var(--ink-2); }
-.bar-fill { width: 100%; max-width: 46px; flex: 0 0 auto; background: var(--accent-soft); border: 1px solid var(--accent-line); border-bottom: none; border-radius: var(--r-xs) var(--r-xs) 0 0; min-height: 3px; transition: background .13s; }
-.bar:hover .bar-fill { background: var(--accent-line); }
-.bar.now .bar-fill { background: var(--accent); border-color: var(--accent); }
+.bar-val { font-size: 10px; font-weight: 650; color: #94a3b8; }
+.bar-fill { width: 100%; max-width: 46px; flex: 0 0 auto; background: var(--accent-soft); border: 1px solid var(--accent-line); border-bottom: none; border-radius: var(--r-xs) var(--r-xs) 0 0; min-height: 4px; opacity: 0.85; transition: background .13s, opacity .13s; }
+.bar-fill.leer { height: 4px; flex-basis: 4px !important; background: #1e293b; border-color: #1e293b; opacity: 1; }
+.bar:hover .bar-fill { background: var(--accent-line); opacity: 1; }
+.bar.now .bar-fill { background: var(--accent); border-color: var(--accent); opacity: 1; }
 .bar-lbl { font-size: 10.5px; color: var(--ink-3); white-space: nowrap; letter-spacing: .2px; }
-.bar.now .bar-lbl { color: var(--ink); font-weight: 650; }
+.bar.now .bar-lbl { color: #60a5fa; font-weight: 650; }
 .bars-axis { border-top: 1px solid var(--line); margin-top: -25px; }
 
 /* Tabellen */
@@ -1790,7 +1797,7 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
    demselben Grund wie bei den Kennzahlen: Acht Wege gehen durch zwei und
    durch vier glatt auf, durch fuenf oder sechs nicht -- dann steht die letzte
    Zeile halb leer und sieht aus wie ein Rest. */
-.kw-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 2px 18px; }
+.kw-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
 .dash-item.dw-voll .kw-grid { grid-template-columns: repeat(4, 1fr); }
 /* Hier stand bis zum 23.08.2026 eine eigene Regel, die dem Raster Hoehe geben
    sollte. Die Gegenprobe zeigte: Sie tat nichts. Das Raster ist der letzte
@@ -1804,13 +1811,17 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
 @media (max-width: 760px) {
   .kw-grid, .dash-item.dw-voll .kw-grid { grid-template-columns: 1fr; }
 }
-.kw { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px;
-  padding: 10px 8px; border: none; border-radius: var(--r-sm); background: none;
-  font: inherit; font-size: 13.5px; color: var(--accent); text-align: left; cursor: pointer; }
-.kw:hover { background: var(--bg); }
+/* ── Schnellzugriff Card-Style (Design-Eingriff 2026-08-28) */
+.kw { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px;
+  padding: 11px 14px; border: 1px solid #2d3a4f; border-radius: 8px;
+  background: #1e293b; font: inherit; font-size: 13.5px; color: var(--accent);
+  text-align: left; cursor: pointer; transition: background .13s, border-color .13s; box-sizing: border-box; }
+.kw:hover { background: #263348; }
 .kw:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .kw svg { width: 19px; height: 19px; flex: none; color: var(--ink-3);
-  stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
+  background: #1a2a3f; border: 1px solid #2d3a4f; border-radius: 6px;
+  padding: 5px; box-sizing: border-box; width: 30px; height: 30px; }
 .kw b { min-width: 0; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .dash-item { position: relative; min-width: 0; }
@@ -2052,18 +2063,21 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
 .pn-zeile .zahl { font-size: 15px; font-weight: 700; white-space: nowrap; }
 .pn-zeile .sub { font-size: 12px; color: var(--ink-3); margin-top: 3px; }
 
-.pn-bar { position: relative; height: 14px; border-radius: 8px; background: var(--line-soft);
-  margin: 9px 0 4px; overflow: hidden; }
-.pn-bar .fuell { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 8px; }
+/* ── Pensen-Balken (Design-Eingriff 2026-08-28): Höhe auf 7 px, sichtbarer
+   Track mit Rahmen, Gradient-Fill für grün/amber. */
+.pn-bar { position: relative; height: 7px; border-radius: 4px;
+  background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.05);
+  margin: 9px 0 4px; }
+.pn-bar .fuell { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; }
 /* Was noch nicht abgeglichen ist, wird schraffiert angedeutet statt
    weggelassen -- die Luecke gehoert ins Bild (ENT-053). */
 .pn-bar .offen { position: absolute; top: 0; bottom: 0; opacity: .5;
   background: repeating-linear-gradient(45deg, var(--ink-3) 0 4px, transparent 4px 8px); }
-.pn-bar .grenze { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--ink-1); }
-.pn-bar .tol { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--warn); }
-.pn-ok  .fuell { background: var(--pos); }
-.pn-nahe .fuell { background: var(--warn); }
-.pn-ueber_grenze .fuell { background: var(--warn); }
+.pn-bar .grenze { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--ink-1); }
+.pn-bar .tol { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--warn); }
+.pn-ok  .fuell { background: linear-gradient(90deg, #22c55e, #4ade80); }
+.pn-nahe .fuell { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+.pn-ueber_grenze .fuell { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
 .pn-ueber_toleranz .fuell { background: var(--neg); }
 .pn-ohne .fuell { background: var(--ink-3); }
 
@@ -6899,9 +6913,10 @@ function renderChart() {
       // Stunden sichtbar bleibt. Zwei Untergrenzen fuer dieselbe Sache waeren
       // eine zu viel -- und die eine wuerde spaeter geaendert, die andere nicht.
       const h = Math.round((x.stunden / max) * 710) / 10;
+      const leer = !x.stunden;
       return `<div class="bar ${i === v.length - 1 ? 'now' : ''}" title="KW ${x.kw} · ${nf(x.stunden,1)} h aus ${x.anzahl} Rapporten">
         <div class="bar-val">${x.stunden ? nf(x.stunden, 0) : ''}</div>
-        <div class="bar-fill" style="flex-basis:${h}%"></div>
+        <div class="bar-fill${leer ? ' leer' : ''}" style="flex-basis:${leer ? '4px' : h + '%'}"></div>
         <div class="bar-lbl">KW&nbsp;${x.kw}</div>
       </div>`;
     }).join('') + `</div><div class="bars-axis"></div>`;
