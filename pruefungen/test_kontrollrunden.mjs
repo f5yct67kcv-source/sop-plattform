@@ -156,7 +156,7 @@ check('KRITISCH: die Reihenfolge der Checkboxen wird als Reihenfolge uebernommen
 check('Schublade schliesst nach Speichern', !(await page.isVisible('#drawer.on')));
 
 // ══════════ KRITISCH: DIE GANZE ZEILE OEFFNET, NICHT NUR DER "BEARBEITEN"-KNOPF
-// (ENT-253, Bug-Meldung des Projektinhabers nach dem Ausliefern von ENT-248:
+// (ENT-256, Bug-Meldung des Projektinhabers nach dem Ausliefern von ENT-248:
 // "bei mir öffnet sich noch nichts" -- Klick auf die Karte ausserhalb des
 // Knopfes tat bis dahin buchstaeblich nichts.)
 await page.waitForTimeout(300);
@@ -187,7 +187,7 @@ check('Ein nicht zugeordneter Punkt ist nicht vorausgewaehlt',
 // UND DIE LISTE IN DER SCHUBLADE ZIEHT SOFORT NACH (ENT-248,
 // krPunkteAktualisieren()) -- ohne die Kontrollrunden-Schublade neu oeffnen
 // zu muessen.
-// Selektor auf die Schublade eingeschraenzt: seit ENT-254 gibt es denselben
+// Selektor auf die Schublade eingeschraenzt: seit ENT-257 gibt es denselben
 // Knopftext auch, unsichtbar, in der statischen Rundgaenge-Unterseite
 // (#rdAb-kr) -- ein ungescopter Selektor traf sonst den falschen (ENT-246
 // hatte dasselbe Problem schon einmal mit .bk-zurueck).
@@ -226,7 +226,7 @@ check('Erweiterte Auswahl (beide Punkte) wird gesendet',
 calls = [];
 await page.click('#krListe .kr-zeile:first-child button:has-text("Entfernen")');
 await page.waitForSelector('#dlgConfirm.on');
-check('KRITISCH: "Entfernen" oeffnet NICHT zusaetzlich die Bearbeiten-Schublade (event.stopPropagation, ENT-253)',
+check('KRITISCH: "Entfernen" oeffnet NICHT zusaetzlich die Bearbeiten-Schublade (event.stopPropagation, ENT-256)',
   !(await page.isVisible('#drawer.on')));
 await page.click('#cfBtn');
 await page.waitForTimeout(300);

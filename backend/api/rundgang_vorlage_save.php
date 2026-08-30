@@ -19,7 +19,7 @@ $id          = isset($input['id']) ? (int)$input['id'] : 0;
 $objektId    = isset($input['objekt_id']) ? (int)$input['objekt_id'] : 0;
 $name        = trim((string)($input['name'] ?? ''));
 $aktiv       = !empty($input['aktiv']) ? 1 : 0;
-// Optionale Notiz (ENT-255) -- leerer String wird als NULL gespeichert,
+// Optionale Notiz (ENT-258) -- leerer String wird als NULL gespeichert,
 // nicht als leere Zeichenkette, damit "keine Beschreibung" eindeutig bleibt.
 $beschreibung = trim((string)($input['beschreibung'] ?? ''));
 $beschreibung = $beschreibung === '' ? null : $beschreibung;
