@@ -4815,10 +4815,15 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
           <div class="card-bd">
             <div class="msg-err" id="bdErr" style="display:none"></div>
             <div class="ki-hint web on" style="margin-bottom:14px">
-              <span>Die allgemeine Geschäftsadresse des Betriebs — unabhängig von den
-              Anstellungsorten (GAV-Auslagenersatz) und der Absenderadresse der QR-Rechnung
-              unter „Briefkopf für Rapporte". Wird heute an keiner Stelle automatisch
-              verwendet, sondern hier festgehalten.</span>
+              <span>Die betrieblichen Grunddaten — Firma/Name, Geschäftsadresse und Kontakt —
+              unabhängig von den Anstellungsorten (GAV-Auslagenersatz) und der Absenderadresse
+              der QR-Rechnung unter „Briefkopf für Rapporte". Wird heute an keiner Stelle
+              automatisch verwendet, sondern hier festgehalten. Firma/Name ist dasselbe Feld
+              wie unter „Briefkopf für Rapporte" — eine Änderung hier wirkt sich auch dort aus.</span>
+            </div>
+            <div class="form-zeile">
+              <div class="f wide"><label for="bdFirma">Firma / Name *</label>
+                <input class="inp" id="bdFirma" maxlength="200" placeholder="z. B. Muster AG"></div>
             </div>
             <div class="form-zeile">
               <div class="f wide"><label for="bdStrasse">Strasse und Nummer</label>
@@ -4827,6 +4832,12 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
             <div class="form-zeile">
               <div class="f"><label for="bdPlz">PLZ</label><input class="inp" id="bdPlz" maxlength="10"></div>
               <div class="f"><label for="bdOrt">Ort</label><input class="inp" id="bdOrt" maxlength="200"></div>
+            </div>
+            <div class="form-zeile">
+              <div class="f"><label for="bdTelefon">Telefon</label>
+                <input class="inp" id="bdTelefon" maxlength="50" placeholder="z. B. 044 123 45 67"></div>
+              <div class="f"><label for="bdEmail">E-Mail</label>
+                <input class="inp" id="bdEmail" type="email" maxlength="200" placeholder="z. B. info@beispiel.ch"></div>
             </div>
             <div style="display:flex;gap:8px;margin-top:16px">
               <button type="button" class="btn btn-primary" onclick="bdSpeichern()">Hauptdomizil speichern</button>
@@ -12942,7 +12953,8 @@ function ladeBetrieb() {
 let briefkopf = { firma: '', zusatz: '', fusszeile: null, fusszeile2: null,
   qr_iban: null, qr_strasse: null, qr_hausnummer: null, qr_plz: null, qr_ort: null,
   qr_iban_gueltig: false, logo: null, logo_groesse: null,
-  domizil_strasse: null, domizil_plz: null, domizil_ort: null };
+  domizil_strasse: null, domizil_plz: null, domizil_ort: null,
+  telefon: null, email: null };
 
 // Nur fuer die sofortige Rueckmeldung beim Tippen (ENT-205) -- massgeblich
 // ist immer die serverseitige Pruefung in betrieb.php/qrrechnung.php, die
@@ -13032,9 +13044,12 @@ function bkLaden() {
     bkQrIbanPruefen();
     bkLogoStand();
     if ($('bdStrasse')) {
+      $('bdFirma').value = briefkopf.firma || '';
       $('bdStrasse').value = briefkopf.domizil_strasse || '';
       $('bdPlz').value = briefkopf.domizil_plz || '';
       $('bdOrt').value = briefkopf.domizil_ort || '';
+      $('bdTelefon').value = briefkopf.telefon || '';
+      $('bdEmail').value = briefkopf.email || '';
     }
   });
 }
@@ -13045,18 +13060,30 @@ function bdFehler(text) {
   el.textContent = text; el.style.display = '';
 }
 
-// Eigener Speicherweg fuer das Hauptdomizil (ENT-245) -- ein einziger
-// gemeinsamer Aufruf mit bkSpeichern() waere hier falsch: Diese Karte kennt
-// Firma/Zusatz/Fusszeile/QR-Felder nicht, und bkSpeichern() kennt bdStrasse
-// nicht. Ein gemeinsamer Aufruf wuerde beim Speichern der jeweils anderen
-// Karte die hier fehlenden Felder mit einem leeren Wert ueberschreiben.
+// Eigener Speicherweg fuer das Hauptdomizil (ENT-245, um Firma/Telefon/E-Mail
+// erweitert in ENT-247) -- ein einziger gemeinsamer Aufruf mit bkSpeichern()
+// waere hier falsch: Diese Karte kennt Zusatz/Fusszeile/QR-Felder nicht, und
+// bkSpeichern() kennt bdStrasse/bdTelefon/bdEmail nicht. Ein gemeinsamer
+// Aufruf wuerde beim Speichern der jeweils anderen Karte die hier fehlenden
+// Felder mit einem leeren Wert ueberschreiben.
+//
+// "firma" wird hier MIT geschickt, obwohl diese Karte sonst nichts vom
+// Briefkopf weiss: Firma/Name ist dieselbe Spalte wie #bkFirma (siehe
+// betrieb.php), keine zweite. Nach dem Speichern wird darum auch das Feld in
+// der Briefkopf-Karte nachgezogen, falls sie schon geladen ist -- sonst
+// zeigte sie bis zum naechsten Neuladen der ganzen Ansicht einen veralteten
+// Namen.
 function bdSpeichern() {
   bdFehler('');
   api('betrieb.php', { method: 'POST', body: {
+    firma: $('bdFirma').value,
     domizil_strasse: $('bdStrasse').value, domizil_plz: $('bdPlz').value, domizil_ort: $('bdOrt').value,
+    telefon: $('bdTelefon').value, email: $('bdEmail').value,
   } }).then(({ ok, data }) => {
     if (!ok || data.status !== 'ok') { return bdFehler(data.message || 'Speichern fehlgeschlagen.'); }
-    briefkopf = data.betrieb; toast('Hauptdomizil gespeichert.');
+    briefkopf = data.betrieb;
+    if ($('bkFirma')) { $('bkFirma').value = briefkopf.firma || ''; }
+    toast('Hauptdomizil gespeichert.');
   }).catch(() => bdFehler('Speichern fehlgeschlagen.'));
 }
 
@@ -13065,9 +13092,17 @@ function bkLogoStand() {
   if (!el) { return; }
   if (briefkopf.logo) {
     // Das Logo selbst zeigen, nicht nur "vorhanden" behaupten: Wer es
-    // hochgeladen hat, will sehen, was auf dem Rapport landet.
-    el.innerHTML = `<img src="${esc(briefkopf.logo)}" alt="Logo"
-      style="max-height:52px;max-width:220px;display:block;margin-bottom:4px">
+    // hochgeladen hat, will sehen, was auf dem Rapport landet. Deutlich
+    // groesser als der Ausdruck es je braucht (52px sah man kaum) und in
+    // einem gerahmten Feld, damit es auch bei einem Logo mit hellem oder
+    // transparentem Hintergrund sichtbar bleibt. max-width:100% auf dem Bild
+    // selbst statt auf dem Rahmen, weil der Rahmen (block, volle Kartenbreite)
+    // ein festes Bezugsmass hat und das Bild so auf schmalen Handy-Karten
+    // nicht ueberstehen kann.
+    el.innerHTML = `<div style="display:block;padding:20px;border:1px solid var(--line);
+        border-radius:10px;background:var(--surface-2);text-align:center;margin-bottom:8px">
+        <img src="${esc(briefkopf.logo)}" alt="Logo" style="max-height:160px;max-width:100%">
+      </div>
       <span class="note">${briefkopf.logo_groesse ? dokGr(briefkopf.logo_groesse) : ''}</span>`;
     if (weg) weg.style.display = '';
   } else {
@@ -13091,7 +13126,9 @@ function bkSpeichern() {
     qr_hausnummer: $('bkQrHausnummer').value, qr_plz: $('bkQrPlz').value, qr_ort: $('bkQrOrt').value,
   } }).then(({ ok, data }) => {
     if (!ok || data.status !== 'ok') { return bkFehler(data.message || 'Speichern fehlgeschlagen.'); }
-    briefkopf = data.betrieb; bkQrIbanPruefen(); bkLogoStand(); toast('Briefkopf gespeichert.');
+    briefkopf = data.betrieb; bkQrIbanPruefen(); bkLogoStand();
+    if ($('bdFirma')) { $('bdFirma').value = briefkopf.firma || ''; }
+    toast('Briefkopf gespeichert.');
   }).catch(() => bkFehler('Speichern fehlgeschlagen.'));
 }
 

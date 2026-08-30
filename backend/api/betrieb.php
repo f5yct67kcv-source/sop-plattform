@@ -2,14 +2,19 @@
 // Briefkopf des eigenen Betriebs fuer den Rapport-Ausdruck (ENT-155).
 //
 // GET  -> { status, betrieb: {firma, zusatz, fusszeile, fusszeile2, logo_mime,
-//           logo_groesse, logo(dataURL|null), domizil_strasse, domizil_plz, domizil_ort} }
+//           logo_groesse, logo(dataURL|null), domizil_strasse, domizil_plz, domizil_ort,
+//           telefon, email} }
 // POST -> speichern {firma, zusatz, fusszeile, fusszeile2, qr_*}
 //         Logo setzen     {logo: base64, logo_mime, logo_dateiname?}
 //         Logo weg        {logo_weg: true}
-//         Hauptdomizil    {domizil_strasse, domizil_plz, domizil_ort} -- ENT-245,
-//         eigener Zweig wie beim Logo: Ein Speichern aus der neuen
-//         "Betrieb"-Kachel darf Firma/Zusatz/Fusszeile/QR-Felder NICHT
-//         stillschweigend leeren, weil das Formular dort sie gar nicht kennt.
+//         Hauptdomizil    {domizil_strasse, domizil_plz, domizil_ort, firma, telefon, email}
+//         -- ENT-247, eigener Zweig wie beim Logo: Ein Speichern aus der neuen
+//         "Betrieb"-Kachel darf Zusatz/Fusszeile/QR-Felder NICHT stillschweigend
+//         leeren, weil das Formular dort sie gar nicht kennt. "firma" ist dieselbe
+//         Spalte wie im Briefkopf-Formular (#bkFirma) -- eine Firma hat einen
+//         Namen, nicht zwei parallele Felder dafuer -- darum schreiben beide
+//         Formulare in dieselbe Spalte, und dashboard.html haelt beide Anzeigen
+//         nach jedem Speichern synchron.
 //
 // Warum das Logo in der Datenbank und nicht im Dateisystem liegt: dieselbe
 // Entscheidung wie bei den Einsatz-Dokumenten (ENT-117). Ein Verzeichnis mit
@@ -40,7 +45,7 @@ function betrieb_lesen(bool $mitLogo): array {
     $r = db()->query(
         'SELECT firma, zusatz, fusszeile, fusszeile2, qr_iban, qr_strasse, qr_hausnummer,
                 qr_plz, qr_ort, logo_mime, logo_groesse, logo,
-                domizil_strasse, domizil_plz, domizil_ort
+                domizil_strasse, domizil_plz, domizil_ort, telefon, email
          FROM betrieb WHERE id = 1'
     )->fetch();
     if (!$r) {
@@ -48,7 +53,8 @@ function betrieb_lesen(bool $mitLogo): array {
                 'qr_iban' => null, 'qr_strasse' => null, 'qr_hausnummer' => null,
                 'qr_plz' => null, 'qr_ort' => null, 'qr_iban_gueltig' => false,
                 'logo_mime' => null, 'logo_groesse' => null, 'logo' => null,
-                'domizil_strasse' => null, 'domizil_plz' => null, 'domizil_ort' => null];
+                'domizil_strasse' => null, 'domizil_plz' => null, 'domizil_ort' => null,
+                'telefon' => null, 'email' => null];
     }
     $roh = $r['logo'];
     return [
@@ -78,6 +84,8 @@ function betrieb_lesen(bool $mitLogo): array {
         'domizil_strasse' => $r['domizil_strasse'],
         'domizil_plz'     => $r['domizil_plz'],
         'domizil_ort'     => $r['domizil_ort'],
+        'telefon'         => $r['telefon'],
+        'email'           => $r['email'],
     ];
 }
 
@@ -128,18 +136,34 @@ if (isset($in['logo'])) {
     json_response(['status' => 'ok', 'betrieb' => betrieb_lesen(true)]);
 }
 
-// Hauptdomizil (ENT-245): eigener, frueh zurueckkehrender Zweig wie beim
-// Logo -- ausgeloest durch array_key_exists statt isset, weil ein geleertes
-// Feld absichtlich als leerer String ankommt und trotzdem gespeichert werden
-// muss. Ein einziger kombinierter Speicher-Aufruf mit den Textfeldern unten
-// waere hier FALSCH: Die neue "Betrieb"-Kachel kennt Firma/Zusatz/Fusszeile/
-// QR-Felder gar nicht, und deren Formular kennt Hauptdomizil nicht -- ein
-// gemeinsamer Zweig wuerde beim Speichern des jeweils anderen Formulars die
-// hier nicht mitgeschickten Felder mit einem leeren String ueberschreiben.
+// Hauptdomizil (ENT-245, um Firma/Telefon/E-Mail erweitert in ENT-247):
+// eigener, frueh zurueckkehrender Zweig wie beim Logo -- ausgeloest durch
+// array_key_exists statt isset, weil ein geleertes Feld absichtlich als
+// leerer String ankommt und trotzdem gespeichert werden muss. Ein einziger
+// kombinierter Speicher-Aufruf mit den Textfeldern unten waere hier FALSCH:
+// Die neue "Betrieb"-Kachel kennt Zusatz/Fusszeile/QR-Felder gar nicht, und
+// deren Formular kennt Hauptdomizil nicht -- ein gemeinsamer Zweig wuerde
+// beim Speichern des jeweils anderen Formulars die hier nicht mitgeschickten
+// Felder mit einem leeren String ueberschreiben.
+//
+// "firma" ist absichtlich dieselbe Spalte wie im Briefkopf-Formular weiter
+// unten: eine Firma hat einen Namen, keine zwei unabhaengigen Spalten dafuer,
+// die auseinanderlaufen koennten. Anders als bei den Adressen (Anstellungsort,
+// QR-Rechnungsadresse, Hauptdomizil sind drei tatsaechlich verschiedene
+// Adressen) gibt es hier nur eine reale Tatsache.
 if (array_key_exists('domizil_strasse', $in)) {
     $dStrasse = trim((string)($in['domizil_strasse'] ?? ''));
     $dPlz     = trim((string)($in['domizil_plz'] ?? ''));
     $dOrt     = trim((string)($in['domizil_ort'] ?? ''));
+    $dFirma   = trim((string)($in['firma'] ?? ''));
+    $dTelefon = trim((string)($in['telefon'] ?? ''));
+    $dEmail   = trim((string)($in['email'] ?? ''));
+    if ($dFirma === '') {
+        json_response(['status' => 'error', 'message' => 'Firma/Name ist ein Pflichtfeld.'], 400);
+    }
+    if (mb_strlen($dFirma) > 200) {
+        json_response(['status' => 'error', 'message' => 'Firma/Name ist zu lang.'], 400);
+    }
     if (mb_strlen($dStrasse) > 200 || mb_strlen($dOrt) > 200) {
         json_response(['status' => 'error',
             'message' => 'Strasse/Ort des Hauptdomizils sind zu lang.'], 400);
@@ -147,10 +171,18 @@ if (array_key_exists('domizil_strasse', $in)) {
     if (mb_strlen($dPlz) > 10) {
         json_response(['status' => 'error', 'message' => 'Die PLZ ist zu lang.'], 400);
     }
+    if (mb_strlen($dTelefon) > 50) {
+        json_response(['status' => 'error', 'message' => 'Die Telefonnummer ist zu lang.'], 400);
+    }
+    if ($dEmail !== '' && (mb_strlen($dEmail) > 200 || !filter_var($dEmail, FILTER_VALIDATE_EMAIL))) {
+        json_response(['status' => 'error', 'message' => 'Die E-Mail-Adresse ist ungueltig.'], 400);
+    }
     $pdo->prepare('UPDATE betrieb SET domizil_strasse = ?, domizil_plz = ?, domizil_ort = ?,
+                   firma = ?, telefon = ?, email = ?,
                    geaendert_am = NOW(), geaendert_von = ? WHERE id = 1')
         ->execute([$dStrasse === '' ? null : $dStrasse, $dPlz === '' ? null : $dPlz,
-                   $dOrt === '' ? null : $dOrt, (int)$user['id']]);
+                   $dOrt === '' ? null : $dOrt, $dFirma, $dTelefon === '' ? null : $dTelefon,
+                   $dEmail === '' ? null : $dEmail, (int)$user['id']]);
     json_response(['status' => 'ok', 'betrieb' => betrieb_lesen(true)]);
 }
 

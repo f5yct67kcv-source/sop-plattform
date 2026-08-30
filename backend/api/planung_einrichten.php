@@ -1106,6 +1106,11 @@ $spalten = [
     ['betrieb', 'domizil_strasse', 'ALTER TABLE betrieb ADD COLUMN domizil_strasse VARCHAR(200) NULL AFTER qr_ort'],
     ['betrieb', 'domizil_plz',     'ALTER TABLE betrieb ADD COLUMN domizil_plz VARCHAR(10) NULL AFTER domizil_strasse'],
     ['betrieb', 'domizil_ort',     'ALTER TABLE betrieb ADD COLUMN domizil_ort VARCHAR(200) NULL AFTER domizil_plz'],
+    // Kontaktangaben des Betriebs (ENT-247) -- eigene Spalten, weil bisher
+    // nirgends im Datenmodell eine Telefonnummer oder E-Mail-Adresse fuer den
+    // Betrieb selbst existierte (nur fuer Mitarbeitende und Kunden).
+    ['betrieb', 'telefon', 'ALTER TABLE betrieb ADD COLUMN telefon VARCHAR(50) NULL AFTER domizil_ort'],
+    ['betrieb', 'email',   'ALTER TABLE betrieb ADD COLUMN email VARCHAR(200) NULL AFTER telefon'],
     // TINYINT NULL, nicht NOT NULL DEFAULT 0: NULL heisst 'noch nicht
     // entschieden', 0 heisst 'geprueft und nein'. Der Unterschied ist bei
     // GAV-AUS-004 wesentlich -- eine Vorbelegung waere eine Auslegung.
