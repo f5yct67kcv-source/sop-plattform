@@ -1,11 +1,12 @@
-// Kachel "Rundgänge" (ENT-242): Schublade mit allen aktiven Kontrollrunden
-// objektübergreifend, plus Einstieg zum Anlegen. Bisher zeigte die Kachel nur
-// "Folgt in einem späteren Schritt." -- diese Suite prüft die erste
-// verdrahtete Funktion der vier Kacheln aus ENT-225.
+// Kachel "Rundgänge" (ENT-246, vorher Schublade ENT-242): volle Unterseite
+// mit allen aktiven Kontrollrunden objektübergreifend, plus Einstieg zum
+// Anlegen. Von der Schublade auf eine Unterseite umgestellt, weil eine
+// mehrspaltige Tabelle in einer 420 px schmalen Schublade nicht passte
+// (Rueckmeldung Projektinhaber, Referenz-Screenshot einer vollen Seite).
 //
 // Bearbeiten/Anlegen nutzen denselben Dialog (dlgKr) wie die bestehende,
 // objektgebundene Verwaltung unter Einrichtung -- hier wird nur geprüft, dass
-// die Schublade ihn mit dem richtigen Objekt und den richtigen Werten öffnet,
+// die Seite ihn mit dem richtigen Objekt und den richtigen Werten öffnet,
 // nicht das Speichern selbst (das deckt bereits die Einrichtung ab).
 import { WURZEL, OUT, browserPfad } from './pfade.mjs';
 import { chromium } from 'playwright';
@@ -24,7 +25,7 @@ const OBJEKTE = { status: 'ok', objekte: [
     aktiv: 1, bemerkung: null, masterschichten: 0, stunden_je_einsatz: 0 },
 ]};
 
-// Zwei Vorlagen an ZWEI verschiedenen Objekten -- beweist, dass die Schublade
+// Zwei Vorlagen an ZWEI verschiedenen Objekten -- beweist, dass die Seite
 // wirklich objektuebergreifend aggregiert, nicht nur das zuletzt gewaehlte
 // Objekt aus der Einrichtung zeigt.
 const VORLAGEN_ALLE = { status: 'ok', vorlagen: [
@@ -54,6 +55,7 @@ function setup(page) {
     if (path.includes('objekte_revierdienst')) return send(OBJEKTE);
     if (path.includes('rundgang_vorlage_liste_alle')) return send(VORLAGEN_ALLE);
     if (path.includes('rundgang_liste')) return send({ status: 'ok', rundgaenge: [] });
+    if (path.includes('revierdienst_status')) return send({ status: 'ok', leute: [] });
     if (path.includes('kontrollpunkt_liste')) return send(KONTROLLPUNKTE_OBJ1);
     // Respektiert objekt_id -- sonst faende "Bearbeiten" fuer Objekt 2 dessen
     // eigene Vorlage nie (openKr() sucht in genau dieser Liste per id).
@@ -80,50 +82,49 @@ await page.evaluate(() => go('rundgaenge'));
 await page.waitForSelector('#view-rundgaenge.on');
 await page.waitForTimeout(150);
 
-// ══════════ KLICK AUF DIE KACHEL OEFFNET DIE SCHUBLADE
+// ══════════ KLICK AUF DIE KACHEL OEFFNET DIE UNTERSEITE, KEINE SCHUBLADE
 calls = [];
 await page.click('#view-rundgaenge .bk-kachel:has-text("Rundgänge")');
-await page.waitForSelector('#drawer.on');
+await page.waitForSelector('#rdAb-liste table');
 check('KRITISCH: die Kachel "Rundgänge" ruft rundgang_vorlage_liste_alle.php statt eines Platzhalter-Toasts',
   calls.some(c => c.includes('rundgang_vorlage_liste_alle')));
-check('Der Schubladentitel lautet "Rundgänge"', await page.textContent('#drTitle') === 'Rundgänge');
+check('KRITISCH: es öffnet sich KEINE Schublade (ENT-246 hat sie ersetzt)', !(await page.isVisible('#drawer.on')));
+check('Die Kachel-Übersicht ist ausgeblendet, solange die Unterseite offen ist', !(await page.isVisible('#rdUebersicht')));
+check('Ein "Zurück"-Knopf führt zur Übersicht zurück', await page.isVisible('#rdAb-liste .bk-zurueck'));
 
 // ══════════ BEIDE OBJEKTE STEHEN OBJEKTUEBERGREIFEND DA
-const inhalt = await page.textContent('#drBody');
+const inhalt = await page.textContent('#rdAb-liste');
 check('KRITISCH: eine Kontrollrunde vom ersten Objekt erscheint', inhalt.includes('Öffnungsrunde') && inhalt.includes('Testliegenschaft Nord'));
 check('KRITISCH: eine Kontrollrunde vom ZWEITEN Objekt erscheint (objektübergreifend, nicht nur das zuletzt gewählte)',
   inhalt.includes('Schliessrunde') && inhalt.includes('Testliegenschaft Süd'));
 check('Die Anzahl Kontrollpunkte steht dabei', inhalt.includes('2 Kontrollpunkte'));
-check('Eine Runde ohne Kontrollpunkt sagt das explizit', inhalt.includes('Noch kein Kontrollpunkt zugeordnet'));
+check('Eine Runde ohne Kontrollpunkt sagt das explizit', inhalt.includes('Noch keiner zugeordnet'));
 
 // ══════════ ANLEGEN OHNE OBJEKT: HINWEIS STATT STILLEM NICHTSTUN
-await page.click('#drBody button:has-text("Rundgang anlegen")');
+await page.click('#rdAb-liste button:has-text("Rundgang anlegen")');
 await page.waitForTimeout(150);
 check('KRITISCH: "Rundgang anlegen" ohne gewähltes Objekt zeigt einen Hinweis statt nichts zu tun',
   await page.evaluate(() => document.getElementById('toast').classList.contains('on')
     && document.getElementById('toast').textContent.includes('Objekt')));
-check('Die Schublade bleibt dabei offen', await page.isVisible('#drawer.on'));
+check('Die Unterseite bleibt dabei offen', await page.isVisible('#rdAb-liste'));
 
-// ══════════ ANLEGEN MIT OBJEKT: SCHUBLADE ZU, DIALOG AUF, RICHTIGES OBJEKT
+// ══════════ ANLEGEN MIT OBJEKT: DIALOG AUF, RICHTIGES OBJEKT, SEITE BLEIBT DAHINTER
 calls = [];
 await page.selectOption('#rdNeuObjekt', '1');
-await page.click('#drBody button:has-text("Rundgang anlegen")');
+await page.click('#rdAb-liste button:has-text("Rundgang anlegen")');
 await page.waitForSelector('#dlgKr.on');
-check('KRITISCH: die Schublade schliesst sich beim Öffnen des Anlege-Dialogs', !(await page.isVisible('#drawer.on')));
 check('Der Dialog trägt den Anlege-Titel', (await page.textContent('#krTitel')).includes('Neue Kontrollrunde'));
 check('Das Namensfeld ist leer', await page.inputValue('#krName') === '');
 check('KRITISCH: die Kontrollpunkte des GEWÄHLTEN Objekts (1) werden geladen, nicht irgendwelche',
   calls.some(c => c.includes('kontrollpunkt_liste')) && await page.evaluate(() => rdEinObjekt === 1));
-await page.click('#dlgKr .btn-quiet, #dlgKr button:has-text("Abbrechen")').catch(() => {});
+check('Die Unterseite bleibt hinter dem Dialog erreichbar (keine Schublade schliesst sich)',
+  await page.isVisible('#rdAb-liste'));
 await page.evaluate(() => closeDlg('dlgKr'));
 
-// ══════════ BEARBEITEN: SCHUBLADE ZU, DIALOG MIT VORBEFUELLTEM NAMEN, ZWEITES OBJEKT
-await page.evaluate(() => rundgaengeVerwaltungOeffnen());
-await page.waitForSelector('#drawer.on');
+// ══════════ BEARBEITEN: DIALOG MIT VORBEFUELLTEM NAMEN, ZWEITES OBJEKT
 calls = [];
-await page.click('#drBody .kr-zeile:has-text("Schliessrunde") button:has-text("Bearbeiten")');
+await page.click('#rdAb-liste tr:has-text("Schliessrunde") button:has-text("Bearbeiten")');
 await page.waitForSelector('#dlgKr.on');
-check('KRITISCH: "Bearbeiten" schliesst die Schublade', !(await page.isVisible('#drawer.on')));
 check('Der Dialog trägt den Änderungs-Titel', (await page.textContent('#krTitel')).includes('Kontrollrunde ändern'));
 check('KRITISCH: der Name ist vorbefüllt', await page.inputValue('#krName') === 'Schliessrunde');
 check('KRITISCH: rdEinObjekt zeigt auf das Objekt DIESER Zeile (2), nicht das vorherige (1)',
@@ -133,16 +134,22 @@ check('KRITISCH: kein Seiten-Scroll am Desktop',
   await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1));
 await page.screenshot({ path: `${OUT}/rg-verwaltung-01-desktop.png` });
 
-// ══════════ LEERER ZUSTAND: "NICHTS VORHANDEN" STATT LEERER FLAECHE
+// ══════════ "ZURUECK" FUEHRT WIEDER ZUR KACHEL-UEBERSICHT
 await page.evaluate(() => closeDlg('dlgKr'));
+await page.click('#rdAb-liste .bk-zurueck');
+await page.waitForTimeout(150);
+check('KRITISCH: "Zurück" zeigt wieder die Kachel-Übersicht', await page.isVisible('#rdUebersicht'));
+check('Die Unterseite ist wieder ausgeblendet', !(await page.isVisible('#rdAb-liste')));
+
+// ══════════ LEERER ZUSTAND: "NICHTS VORHANDEN" STATT LEERER FLAECHE
 await page.route('**/api/rundgang_vorlage_liste_alle.php**', route =>
   route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'ok', vorlagen: [] }) }));
-await page.evaluate(() => rundgaengeVerwaltungOeffnen());
+await page.click('#view-rundgaenge .bk-kachel:has-text("Rundgänge")');
 await page.waitForTimeout(200);
 check('KRITISCH: keine aktive Kontrollrunde sagt das explizit, nicht "leere Zone"',
-  (await page.textContent('#drBody')).includes('Keine aktive Kontrollrunde vorhanden'));
+  (await page.textContent('#rdAb-liste')).includes('Keine aktive Kontrollrunde vorhanden'));
 
-// ══════════ HANDY: dieselbe Schublade zusätzlich am Handy prüfen (CLAUDE.md)
+// ══════════ HANDY: dieselbe Unterseite zusätzlich am Handy prüfen (CLAUDE.md)
 await page.setViewportSize({ width: 390, height: 844 });
 await page.waitForTimeout(200);
 check('KRITISCH: kein Seiten-Scroll bei 390px', await page.evaluate(() =>
