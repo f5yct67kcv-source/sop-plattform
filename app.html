@@ -520,6 +520,18 @@ const W = {
     sperreGesetzt: 'Tag gesperrt.', sperreWeg: 'Sperre aufgehoben.',
     sperreEingeteilt: 'An diesem Tag bist du bereits eingeteilt.',
     sperreVergangen: 'vorbei',
+    // Abwesenheiten (ENT-252): Ferien/Krankheit/Unfall/Militaer-,
+    // Zivildienst/Schwangerschaft, mit Antrags-/Genehmigungsworkflow.
+    abwesenheit: 'Abwesenheit', neuerAntrag: 'Neuer Antrag',
+    abwesenheitTitel: 'Abwesenheit beantragen',
+    abwesenheitArt: 'Art', abwesenheitVon: 'Von', abwesenheitBis: 'Bis',
+    typFerien: 'Ferien', typKrankheit: 'Krankheit', typUnfall: 'Unfall',
+    typMilitaer: 'Militär-/Zivildienst', typSchwangerschaft: 'Schwangerschaft',
+    statusBeantragt: 'Beantragt', statusGenehmigt: 'Genehmigt', statusAbgelehnt: 'Abgelehnt',
+    keineAbwesenheiten: 'Noch keine Abwesenheiten', keineAbwesenheitenText: 'Gestellte Anträge erscheinen hier.',
+    antragGesendet: 'Antrag gesendet.', antragZurueckgezogen: 'Antrag zurückgezogen.',
+    zurueckziehen: 'Zurückziehen', vonBisFalsch: 'Bis liegt vor Von.',
+    ferienNichtRueckwirkend: 'Ferien lassen sich nicht rückwirkend beantragen.',
     schicht: 'Schicht', schichten: 'Schichten', keineHeute: 'Heute kein Einsatz',
     keineHeuteText: 'Für heute bist du nicht eingeteilt. Der Plan zeigt deine nächsten Schichten.',
     keinePlan: 'Keine Schichten geplant', keinePlanText: 'Sobald du eingeteilt wirst, erscheint es hier.',
@@ -643,6 +655,7 @@ let ich = JSON.parse(localStorage.getItem('rv3_user') || 'null');
 let schichten = [];
 let rapporte = [];
 let sperrtage = {};   // Datum -> Bemerkung (ENT-028)
+let meineAbwesenheiten = [];   // eigene Abwesenheitsantraege (ENT-252)
 let profil = null;
 // Die frühere Monatssumme aus den Rapporten ist entfallen (ENT-049): der
 // Rapport kennt die tatsächliche Pausenabrechnung noch nicht, die entsteht
@@ -753,7 +766,7 @@ function allesLaden() {
   const b = $('kLaden'); b.disabled = true;
   const heute = new Date();
   $('kDatum').textContent = WOCHENTAG[heute.getDay()] + ', ' + dmy(isoTag(heute));
-  return Promise.all([ladeSchichten(), ladeProfil(), ladeRapporte(), ladeSperren()])
+  return Promise.all([ladeSchichten(), ladeProfil(), ladeRapporte(), ladeSperren(), ladeAbwesenheiten()])
     .then(() => { b.disabled = false; waechterTabAktualisieren(); zeichne(); });
 }
 
@@ -921,19 +934,24 @@ function planUnterWahl(u) {
   planUnter = u;
   $('pu-plan').classList.toggle('on', u === 'plan');
   $('pu-sperren').classList.toggle('on', u === 'sperren');
+  $('pu-abwesenheit').classList.toggle('on', u === 'abwesenheit');
   $('plan-inhalt-plan').style.display = u === 'plan' ? '' : 'none';
   $('plan-inhalt-sperren').style.display = u === 'sperren' ? '' : 'none';
+  $('plan-inhalt-abwesenheit').style.display = u === 'abwesenheit' ? '' : 'none';
 }
 function zeichnePlan() {
   $('v-plan').innerHTML = `
     <div class="unterreiter">
       <button id="pu-plan" class="${planUnter === 'plan' ? 'on' : ''}" onclick="planUnterWahl('plan')">${esc(w('plan'))}</button>
       <button id="pu-sperren" class="${planUnter === 'sperren' ? 'on' : ''}" onclick="planUnterWahl('sperren')">${esc(w('sperren'))}</button>
+      <button id="pu-abwesenheit" class="${planUnter === 'abwesenheit' ? 'on' : ''}" onclick="planUnterWahl('abwesenheit')">${esc(w('abwesenheit'))}</button>
     </div>
     <div id="plan-inhalt-plan" style="${planUnter === 'plan' ? '' : 'display:none'}"></div>
-    <div id="plan-inhalt-sperren" style="${planUnter === 'sperren' ? '' : 'display:none'}"></div>`;
+    <div id="plan-inhalt-sperren" style="${planUnter === 'sperren' ? '' : 'display:none'}"></div>
+    <div id="plan-inhalt-abwesenheit" style="${planUnter === 'abwesenheit' ? '' : 'display:none'}"></div>`;
   zeichnePlanListe();
   zeichneSperren();
+  zeichneAbwesenheiten();
 }
 function zeichnePlanListe() {
   const heute = isoTag();
@@ -1041,6 +1059,92 @@ function kalenderwoche(d) {
   t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));
   const jahresStart = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
   return String(Math.ceil(((t - jahresStart) / 864e5 + 1) / 7));
+}
+
+// ══════════════════════════════════════════ ABWESENHEITEN (ENT-252)
+// Dritter Unterreiter neben Plan/Sperren -- eigene Antraege stellen,
+// ansehen und (solange unentschieden) zurueckziehen. Der Feriensaldo steht
+// hier bewusst NICHT: das ist eine Auswertung fuer die Verwaltung
+// (Dashboard), keine Selbstbedienungsfunktion, und die Kuerzungsregel bei
+// langer Krankheit laeuft mit einer ausdruecklich als ANNAHME markierten
+// Auslegung (siehe GAV-AUS-012) -- die gehoert nicht ungefragt aufs Handy.
+const AW_TYP_TEXT = { ferien: 'typFerien', krankheit: 'typKrankheit', unfall: 'typUnfall',
+  militaer: 'typMilitaer', schwangerschaft: 'typSchwangerschaft' };
+const AW_STATUS_MARKE = { beantragt: 'm-w', genehmigt: 'm-p', abgelehnt: 'm-x' };
+const AW_STATUS_TEXT = { beantragt: 'statusBeantragt', genehmigt: 'statusGenehmigt', abgelehnt: 'statusAbgelehnt' };
+
+function ladeAbwesenheiten() {
+  return api('meine_abwesenheit.php').then(({ ok, data }) => {
+    meineAbwesenheiten = ok && data.status === 'ok' ? (data.abwesenheiten || []) : [];
+  });
+}
+
+function zeichneAbwesenheiten() {
+  const el = $('plan-inhalt-abwesenheit');
+  if (!el) { return; }
+  let html = `<div style="padding:14px 16px 6px">
+    <button class="btn btn-primary" style="width:100%" onclick="awNeuerAntrag()">${esc(w('neuerAntrag'))}</button>
+  </div>`;
+  if (!meineAbwesenheiten.length) {
+    html += LEER(w('keineAbwesenheiten'), w('keineAbwesenheitenText'),
+      '<rect x="3" y="4.5" width="18" height="17" rx="2"/><line x1="3" y1="9.5" x2="21" y2="9.5"/>');
+    el.innerHTML = html;
+    return;
+  }
+  const sortiert = [...meineAbwesenheiten].sort((a, b) => String(b.von).localeCompare(String(a.von)));
+  html += sortiert.map(a => `
+    <div class="karte">
+      <div class="karte-bd">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <b style="font-size:14.5px">${esc(w(AW_TYP_TEXT[a.typ] || a.typ))}</b>
+          <span class="marke ${AW_STATUS_MARKE[a.status] || 'm-n'}">${esc(w(AW_STATUS_TEXT[a.status] || a.status))}</span>
+        </div>
+        <div style="font-size:13px;color:var(--ink-2);margin-top:4px">${dmy(a.von)} – ${dmy(a.bis)}</div>
+        ${a.bemerkung ? `<div style="font-size:13px;color:var(--ink-2);margin-top:2px">${esc(a.bemerkung)}</div>` : ''}
+        ${a.status === 'abgelehnt' && a.ablehnung_grund ? `<div style="font-size:13px;color:var(--neg);margin-top:6px">${esc(a.ablehnung_grund)}</div>` : ''}
+        ${a.status === 'beantragt' ? `<button class="btn btn-plain" style="margin-top:10px" onclick="awStornieren(${a.id})">${esc(w('zurueckziehen'))}</button>` : ''}
+      </div>
+    </div>`).join('');
+  el.innerHTML = html;
+}
+
+function awNeuerAntrag() {
+  blattId = null;
+  $('blTitel').textContent = w('abwesenheitTitel');
+  $('blBody').innerHTML = `
+    <div class="f"><label for="awTyp">${esc(w('abwesenheitArt'))}</label>
+      <select class="inp" id="awTyp">
+        ${Object.entries(AW_TYP_TEXT).map(([k, txt]) => `<option value="${k}">${esc(w(txt))}</option>`).join('')}
+      </select></div>
+    <div class="f"><label for="awVon">${esc(w('abwesenheitVon'))}</label><input class="inp" type="date" id="awVon" value="${isoTag()}"></div>
+    <div class="f"><label for="awBis">${esc(w('abwesenheitBis'))}</label><input class="inp" type="date" id="awBis" value="${isoTag()}"></div>
+    <div class="f"><label for="awBemerkung">${esc(w('bemerkung'))}</label><input class="inp" id="awBemerkung" maxlength="500"></div>`;
+  $('blFuss').innerHTML = `
+    <button class="btn btn-plain" onclick="blattZu()">${esc(w('abbrechen'))}</button>
+    <button class="btn btn-primary" onclick="awAntragSpeichern()">${esc(w('senden'))}</button>`;
+  blattZeigen();
+}
+
+function awAntragSpeichern() {
+  const typ = $('awTyp').value, von = $('awVon').value, bis = $('awBis').value;
+  const bemerkung = $('awBemerkung').value.trim();
+  if (!von || !bis) { toast(w('beideZeitenNoetig')); return; }
+  if (bis < von) { toast(w('vonBisFalsch')); return; }
+  if (typ === 'ferien' && von < isoTag()) { toast(w('ferienNichtRueckwirkend')); return; }
+  api('meine_abwesenheit.php', { method: 'POST', body: { typ, von, bis, bemerkung } }).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') { toast(data.message || w('netzfehler')); return; }
+    toast(w('antragGesendet'));
+    blattZu();
+    ladeAbwesenheiten().then(zeichneAbwesenheiten);
+  });
+}
+
+function awStornieren(id) {
+  api('meine_abwesenheit.php', { method: 'POST', body: { id, stornieren: true } }).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') { toast(data.message || w('netzfehler')); return; }
+    toast(w('antragZurueckgezogen'));
+    ladeAbwesenheiten().then(zeichneAbwesenheiten);
+  });
 }
 
 function sperreUm(t) {
