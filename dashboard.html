@@ -1220,6 +1220,21 @@ tbody tr.heute td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
 .tab-nebenan:hover { color: var(--ink); }
 .tab-nebenan svg.i { width: 15px; height: 15px; }
 .ptab { display: none; }
+/* Senkrechte Reiterliste in einer schmalen Schublade (ENT-243): ".tabs" ist
+   fuer eine Handvoll kurzer Woerter in voller Seitenbreite gedacht -- sieben
+   lange zusammengesetzte Begriffe ("Rundgangerledigung") in einer 420 px
+   breiten Schublade waren am gerenderten Zustand gemessen grossteils
+   abgeschnitten, mit keinem sichtbaren Hinweis auf das noetige seitliche
+   Scrollen. Dieselben Werte wie ".top-sub button" (Kopfzeilen-Unterreiter),
+   nur untereinander statt nebeneinander -- passend zur schmalen Flaeche. */
+.ae-menu { display: flex; flex-direction: column; gap: 2px; margin-bottom: 18px; }
+.ae-menu button {
+  border: none; background: transparent; color: var(--ink-2); font: inherit;
+  font-size: 14px; font-weight: 600; padding: 12px; border-radius: var(--r-sm);
+  cursor: pointer; text-align: left;
+}
+.ae-menu button:hover { background: var(--hover); color: var(--ink); }
+.ae-menu button.on { color: var(--accent); background: var(--accent-soft); }
 .ptab.on { display: block; }
 .ku-tab { display: none; }
 .ma-tab, .md-tab { display: none; }
@@ -2537,6 +2552,13 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
   .bar-tools select.inp, .bar-tools input.inp { flex: 1 1 100%; width: 100% !important; min-width: 0; }
   .bar-tools .btn { flex: 1 1 auto; justify-content: center; }
   .bar-tools .check { flex: 1 1 100%; }
+  /* "+ Rundgang anlegen" (ENT-246) steht allein in seiner Werkzeugleiste,
+     weil das Auswahlfeld daneben auf die volle Breite umbricht -- ohne diese
+     Ausnahme wuerde die Regel oben ihn ueber die volle Breite strecken, nur
+     weil er allein in seiner Zeile steht (CLAUDE.md-Hausregel, am
+     gerenderten Zustand bei 390 px gemessen). Gleiches Muster wie
+     ".wegzeile .wz > .btn" oben. */
+  #rdAb-liste .bar-tools .btn { flex: none; }
   /* Eine Gruppe bleibt eine Zeile und teilt sie unter sich auf -- „von bis“
      auseinanderzureissen wäre schlechter lesbar als ein enges Paar. */
   .tool-gruppe { flex: 1 1 100%; gap: 4px; }
@@ -3014,6 +3036,10 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
         <div class="nav-kinder">
           <button class="nav-kind" id="nav-kontrolle-pensen" onclick="go('pensen')">Pensen</button>
           <button class="nav-kind" id="nav-kontrolle-auslagen" onclick="go('auslagen')">Auslagenersatz</button>
+          <!-- Oeffnet eine Schublade statt einer eigenen Ansicht (ENT-243) --
+               anders als Pensen/Auslagenersatz gibt es dafuer keine "on"-
+               Markierung, dasselbe Muster wie die Kachel "Rundgaenge" (ENT-242). -->
+          <button class="nav-kind" id="nav-kontrolle-arbeitsergebnisse" onclick="arbeitsergebnisseOeffnen()">Arbeitsergebnisse</button>
         </div>
       </div>
 
@@ -4203,8 +4229,15 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
            der letzten Rundgaenge (rundgang_liste.php, Recht
            rundgang_einsehen, seit ENT-180 vorhanden). -->
       <section class="view" id="view-rundgaenge">
+        <!-- Uebersicht/Abschnitt-Umschaltung wie bei Betrieb (ENT-211): die
+             Kachel "Rundgaenge" fuehrt zu einer vollen Unterseite statt einer
+             Schublade (ENT-246, Ruecksprache Projektinhaber -- eine Tabelle
+             mit mehreren Spalten passte nicht in eine 420 px schmale
+             Schublade). Bleibt innerhalb derselben view-rundgaenge, kein
+             Eintrag im go()-Ansichtsregister noetig. -->
+        <div class="bk-uebersicht" id="rdUebersicht">
         <div class="bk-kachel-grid">
-          <button type="button" class="bk-kachel" onclick="rundgaengeVerwaltungOeffnen()">
+          <button type="button" class="bk-kachel" onclick="rdAbschnittZeigen('liste')">
             <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M12 19h4a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2H8a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h4"/></svg></span>
             <span class="bk-kachel-lbl">Rundgänge</span>
           </button>
@@ -4238,6 +4271,23 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
         <div class="card" style="margin-top:20px">
           <div class="card-hd"><h3>Letzte Rundgänge</h3></div>
           <div class="card-bd flush"><div class="tw" id="rdLetzteListe"></div></div>
+        </div>
+        </div>
+
+        <!-- Unterseite "Rundgaenge" (ENT-246): objektuebergreifende Liste
+             aller aktiven Kontrollrunden, volle Seitenbreite statt Schublade
+             -- Vorbild Referenz-Screenshot des Projektinhabers. -->
+        <div class="bk-abschnitt" id="rdAb-liste" style="display:none">
+        <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="rdUebersichtZeigen()">Zurück</button>
+        <div class="bar-tools">
+          <select class="inp" id="rdNeuObjekt" style="width:auto" aria-label="Objekt für neue Kontrollrunde auswählen">
+            <option value="">Objekt wählen …</option>
+          </select>
+          <button class="btn btn-primary btn-sm" onclick="rdAlleAnlegen()">+ Rundgang anlegen</button>
+        </div>
+        <div class="card">
+          <div class="card-bd flush"><div class="tw" id="rdAlleListe"><div class="sk" style="height:52px"></div></div></div>
+        </div>
         </div>
 
         <!-- Bisherige filterbare Liste (ENT-183/193): bleibt im Code
@@ -6043,11 +6093,16 @@ const NAV_RECHTE = {
   'nav-admin-mitarbeiter':  'personal_lesen',
   'nav-admin-produkte':     'offerten',
   'nav-admin-betrieb':      'betrieb',
-  // Seit ENT-224 haengen beide Kinder von Kontrolle am selben Recht 'plan' --
-  // Rundgaenge (das fruehere 'rundgang_einsehen'-Kind) lebt jetzt unter der
-  // eigenen Rubrik "Revierdienst", siehe deren beide Eintraege weiter unten.
+  // Seit ENT-224 haengen die Kinder von Kontrolle (jetzt "Auswertung") am
+  // selben Recht 'plan' -- Rundgaenge als operativer Ablauf (das fruehere
+  // 'rundgang_einsehen'-Kind) lebt unter der eigenen Rubrik "Revierdienst",
+  // siehe deren beide Eintraege weiter unten. "Arbeitsergebnisse" (ENT-243)
+  // zeigt zwar teilweise Rundgang-Daten, aber als Fuehrungs-Auswertung fuer
+  // dieselbe Zielgruppe wie Pensen/Auslagenersatz -- bewusst am selben Recht,
+  // nicht an 'rundgang_einsehen'.
   'nav-kontrolle-pensen':      'plan',
   'nav-kontrolle-auslagen':    'plan',
+  'nav-kontrolle-arbeitsergebnisse': 'plan',
   // Die Elterngruppe 'navg-revierdienst' hängt NICHT hier drin, sondern an
   // einer ODER-Verknüpfung weiter unten (wie 'navg-admin') -- 'Einrichtung'
   // braucht 'rundgang_verwalten', 'Übersicht' genügt bereits mit
@@ -12599,6 +12654,165 @@ function kontrolleNavKlick() {
   go(ziel);
 }
 
+// ══════════════════════ AUSWERTUNG: ARBEITSERGEBNISSE (ENT-243) ══════════
+// Schublade mit sieben Reitern unter "Auswertung", analog zur Kachel
+// "Rundgaenge" (ENT-242): erst das volle Geruest, aber nur verdrahtet, was
+// bereits eine Datengrundlage hat. Fuenf der sieben Reiter (Wachbuch,
+// Ereignisse, Aufgabenerledigung, Alarme, Schluesselprotokoll) haben noch
+// kein Datenmodell -- sie zeigen einen Hinweis statt nichts zu tun, bis eine
+// eigene Entscheidung sie verdrahtet.
+const AE_REITER = [
+  ['wachbuch', 'Wachbuch'],
+  ['scans', 'Kontrollpunktscans'],
+  ['ereignisse', 'Ereignisse'],
+  ['erledigung', 'Rundgangerledigung'],
+  ['aufgaben', 'Aufgabenerledigung'],
+  ['alarme', 'Alarme'],
+  ['schluessel', 'Schlüsselprotokoll'],
+];
+const AE_VERDRAHTET = ['scans', 'erledigung'];
+let aeTab = 'wachbuch';
+
+function arbeitsergebnisseOeffnen() {
+  $('drTitle').textContent = 'Arbeitsergebnisse';
+  $('drBody').innerHTML = `
+    <div class="ae-menu" id="aeTabs">
+      ${AE_REITER.map(([t, lbl]) => `<button class="${t === aeTab ? 'on' : ''}" id="ae-tab-${t}" onclick="aeGoTab('${t}')">${lbl}</button>`).join('')}
+    </div>
+    <div id="aeInhalt"></div>`;
+  $('drFoot').innerHTML = '';
+  aeRenderTab();
+  showDrawer();
+}
+
+function aeGoTab(t) {
+  aeTab = t;
+  document.querySelectorAll('#aeTabs button').forEach(b => b.classList.remove('on'));
+  $('ae-tab-' + t).classList.add('on');
+  aeRenderTab();
+}
+
+function aeRenderTab() {
+  const inhalt = $('aeInhalt');
+  if (!inhalt) { return; }
+  if (!AE_VERDRAHTET.includes(aeTab)) {
+    inhalt.innerHTML = `<p class="zone-note">Folgt in einem späteren Schritt.</p>`;
+    return;
+  }
+  if (aeTab === 'scans') { aeRenderScans(); return; }
+  if (aeTab === 'erledigung') { aeRenderErledigung(); return; }
+}
+
+// Beide verdrahteten Reiter teilen dieselbe Vorgabe wie Auslagenersatz/Pensen
+// (ENT-045: der zurueckliegende Monat bis heute) -- eine Auswertung ist ein
+// Analysewerkzeug, kein Schnellueberblick wie die Kachel "Rundgaenge"
+// (dort bewusst ein fester 14-Tage-Rueckblick, ENT-225).
+function aeVormonatBisHeute() {
+  const h = new Date();
+  return [isoTag(new Date(h.getFullYear(), h.getMonth() - 1, h.getDate())), isoTag(h)];
+}
+
+function aeRenderScans() {
+  const [von, bis] = aeVormonatBisHeute();
+  $('aeInhalt').innerHTML = `
+    <div class="bar-tools">
+      <div class="tool-gruppe">
+        <input class="inp" type="date" id="aeScanVon" style="width:auto" value="${von}" onchange="aeLadeScans()" aria-label="Zeitraum von">
+        <span class="tool-bis">bis</span>
+        <input class="inp" type="date" id="aeScanBis" style="width:auto" value="${bis}" onchange="aeLadeScans()" aria-label="Zeitraum bis">
+      </div>
+    </div>
+    <div id="aeScanListe"><div class="sk" style="height:52px"></div></div>`;
+  aeLadeScans();
+}
+
+function aeLadeScans() {
+  const von = $('aeScanVon').value, bis = $('aeScanBis').value;
+  if (!von || !bis) { return; }
+  api(`rundgang_scan_liste.php?von=${encodeURIComponent(von)}&bis=${encodeURIComponent(bis)}`).then(({ ok, data }) => {
+    aeZeichneScans(ok && data.status === 'ok' ? data.scans : null);
+  });
+}
+
+const AE_SCAN_STATUS = {
+  bestaetigt: ['chip-a', 'Bestätigt'],
+  nicht_verfuegbar: ['chip-n', 'Nicht verfügbar'],
+  ersatzscan: ['chip-w', 'Ersatzscan'],
+};
+
+// Karten statt Tabelle (ENT-243): eine Tabelle mit acht Spalten passte in der
+// hoechstens 420 px schmalen Schublade nicht -- am gerenderten Zustand
+// gemessen blieben fuenf Spalten ohne jeden Hinweis auf noetiges seitliches
+// Scrollen unsichtbar. Gleiches Kartenmuster (".ag-karte") wie im Abgleich
+// und in der Einsatzliste, dort aus demselben Grund fuer schmale Flaechen.
+function aeZeichneScans(scans) {
+  const ziel = $('aeScanListe');
+  if (!ziel) { return; }
+  if (!scans) { ziel.innerHTML = EMPTY('Scans nicht verfügbar', 'Die Liste konnte nicht geladen werden.'); return; }
+  if (!scans.length) { ziel.innerHTML = EMPTY('Nichts vorhanden', 'Im gewählten Zeitraum liegt kein Kontrollpunkt-Scan vor.'); return; }
+  ziel.innerHTML = scans.map(s => {
+    const datum = String(s.erfasst_am).slice(0, 10);
+    const zeit = String(s.erfasst_am).slice(11, 16);
+    const person = [s.nachname, s.vorname].filter(Boolean).join(', ') || '–';
+    const [klasse, txt] = AE_SCAN_STATUS[s.status] || ['chip-n', s.status];
+    return `<div class="ag-karte">
+        <div class="kopf"><b>${esc(s.kunde_name)}</b><span class="chip ${klasse}">${esc(txt)}</span></div>
+        <div class="wer">${esc(s.objekt_name)}${s.kontrollpunkt_name ? ' · ' + esc(s.kontrollpunkt_name) : ''}</div>
+        <div class="zeiten">${dmy(datum)}, <b>${esc(zeit)}</b> · ${esc(person)}</div>
+        ${s.beschreibung ? `<div class="zeiten">${esc(s.beschreibung)}</div>` : ''}
+      </div>`;
+  }).join('');
+}
+
+function aeRenderErledigung() {
+  const [von, bis] = aeVormonatBisHeute();
+  $('aeInhalt').innerHTML = `
+    <div class="bar-tools">
+      <div class="tool-gruppe">
+        <input class="inp" type="date" id="aeErlVon" style="width:auto" value="${von}" onchange="aeLadeErledigung()" aria-label="Zeitraum von">
+        <span class="tool-bis">bis</span>
+        <input class="inp" type="date" id="aeErlBis" style="width:auto" value="${bis}" onchange="aeLadeErledigung()" aria-label="Zeitraum bis">
+      </div>
+    </div>
+    <div id="aeErlListe"><div class="sk" style="height:52px"></div></div>`;
+  aeLadeErledigung();
+}
+
+function aeLadeErledigung() {
+  const von = $('aeErlVon').value, bis = $('aeErlBis').value;
+  if (!von || !bis) { return; }
+  api(`rundgang_liste.php?von=${encodeURIComponent(von)}&bis=${encodeURIComponent(bis)}`).then(({ ok, data }) => {
+    aeZeichneErledigung(ok && data.status === 'ok' ? data.rundgaenge : null);
+  });
+}
+
+// Karten statt der Tabelle aus renderLetzteRundgaenge() (ENT-243) -- aus
+// demselben Grund wie bei den Kontrollpunktscans oben: sieben Spalten passen
+// nicht in die schmale Schublade. renderLetzteRundgaenge() selbst bleibt
+// unveraendert fuer die volle Seitenbreite der Uebersicht (ENT-225).
+function aeZeichneErledigung(rundgaenge) {
+  const ziel = $('aeErlListe');
+  if (!ziel) { return; }
+  if (!rundgaenge) { ziel.innerHTML = EMPTY('Rundgänge nicht verfügbar', 'Die Liste konnte nicht geladen werden.'); return; }
+  if (!rundgaenge.length) { ziel.innerHTML = EMPTY('Noch nichts vorhanden', 'Im gewählten Zeitraum liegt kein Rundgang vor.'); return; }
+  ziel.innerHTML = rundgaenge.map(r => {
+    const f = r.fortschritt || { gesamt: 0, bestaetigt: 0 };
+    const gesamt = Number(f.gesamt), bestaetigt = Number(f.bestaetigt);
+    const start = r.rohzeit_start ? String(r.rohzeit_start).slice(11, 16) : '–';
+    const person = [r.nachname, r.vorname].filter(Boolean).join(', ') || '–';
+    const voll = gesamt > 0 && bestaetigt >= gesamt;
+    const pct = gesamt > 0 ? Math.round((bestaetigt / gesamt) * 100) : 0;
+    const balkenKlasse = r.status === 'abgebrochen' ? 'pn-ueber_toleranz' : (voll ? 'pn-ok' : 'pn-nahe');
+    return `<div class="ag-karte">
+        <div class="kopf"><b>${esc(r.kunde_name)}</b>${r.status === 'abgebrochen' ? '<span class="chip chip-n">Abgebrochen</span>' : ''}</div>
+        <div class="wer">${esc(r.objekt_name)}${r.titel ? ' · ' + esc(r.titel) : ''}</div>
+        <div class="zeiten">${dmy(r.datum)}, <b>${esc(start)}</b> · ${esc(person)}</div>
+        <div class="pn-bar ${balkenKlasse}" style="margin-top:6px"><div class="fuell" style="width:${pct}%"></div></div>
+        <div class="sec">${nf(bestaetigt)}/${nf(gesamt)}</div>
+      </div>`;
+  }).join('');
+}
+
 // ══════════════════════ REVIERDIENST (ENT-224) ══════════════════════
 // Eigene Rubrik fuer alles, was am Waechtersystem haengt: die Rundgang-
 // Uebersicht (Durchfuehrung, vorher unter Kontrolle) und die Einrichtung
@@ -14829,6 +15043,11 @@ function saveKr() {
       if (!ok2 || data2.status !== 'ok') { err.textContent = data2.message || 'Punktzuordnung fehlgeschlagen.'; err.style.display = ''; return; }
       closeDlg('dlgKr');
       loadRundgangVorlagen().then(() => toast('Kontrollrunde gespeichert.'));
+      // Die objektuebergreifende Seite (ENT-246) fuehrt ihre eigene Kopie
+      // der Liste -- ohne diesen Aufruf zeigte sie nach dem Speichern noch
+      // den alten Namen/die alte Punktzahl, bis man sie neu oeffnet.
+      const rdAb = $('rdAb-liste');
+      if (rdAb && rdAb.style.display !== 'none') { rdLadeAlle(); }
     });
   });
 }
@@ -14843,53 +15062,71 @@ function askDeleteKr(id) {
     }));
 }
 
-// ══════════ KACHEL "RUNDGAENGE": SCHUBLADE MIT ALLEN AKTIVEN KONTROLL-
-// RUNDEN OBJEKTUEBERGREIFEND (ENT-242) ══════════
+// ══════════ KACHEL "RUNDGAENGE": VOLLE UNTERSEITE MIT ALLEN AKTIVEN
+// KONTROLLRUNDEN OBJEKTUEBERGREIFEND (ENT-246, vorher Schublade ENT-242 --
+// eine Tabelle mit mehreren Spalten passte nicht in eine 420 px schmale
+// Schublade, siehe Docs-Eintrag) ══════════
 // Die volle Verwaltung (auch inaktive Runden, Kontrollpunkte zuordnen)
-// bleibt Objekt fuer Objekt unter Einrichtung -- diese Schublade ist ein
-// schneller Ueberblick plus Einstieg zum Anlegen, kein Ersatz dafuer.
-// Bearbeiten/Anlegen nutzen denselben Dialog (dlgKr) wie die Einrichtung:
-// dafuer wird rdEinObjekt vorher gesetzt und kontrollpunkte (bzw.
-// rundgangVorlagen fuers Vorbefuellen) fuer genau dieses Objekt geladen.
-function rundgaengeVerwaltungOeffnen() {
+// bleibt Objekt fuer Objekt unter Einrichtung -- diese Seite ist ein
+// schneller, objektuebergreifender Ueberblick plus Einstieg zum Anlegen,
+// kein Ersatz dafuer. Bearbeiten/Anlegen nutzen denselben Dialog (dlgKr) wie
+// die Einrichtung: dafuer wird rdEinObjekt vorher gesetzt und kontrollpunkte
+// (bzw. rundgangVorlagen fuers Vorbefuellen) fuer genau dieses Objekt
+// geladen. Gleiches Umschalt-Muster wie Betrieb (ENT-211): bleibt innerhalb
+// derselben view-rundgaenge, kein Eintrag im go()-Ansichtsregister noetig.
+function rdUebersichtZeigen() {
+  $('rdUebersicht').style.display = '';
+  document.querySelectorAll('#view-rundgaenge .bk-abschnitt').forEach(a => { a.style.display = 'none'; });
+}
+
+function rdAbschnittZeigen(id) {
+  $('rdUebersicht').style.display = 'none';
+  document.querySelectorAll('#view-rundgaenge .bk-abschnitt').forEach(a => { a.style.display = 'none'; });
+  $('rdAb-' + id).style.display = '';
+  if (id === 'liste') { rdLadeAlle(); }
+}
+
+function rdLadeAlle() {
   const vorlauf = objekte.length ? Promise.resolve() : ladeObjekteFuerRevierdienst();
   Promise.all([vorlauf, api('rundgang_vorlage_liste_alle.php')]).then(([, { ok, data }]) => {
     rdAlleVorlagen = ok && data.status === 'ok' ? (data.vorlagen || []) : [];
-    renderRdAlleDrawer();
+    rdObjektWahlFuellen();
+    rdZeichneAlleTabelle();
   });
 }
 
-function renderRdAlleDrawer() {
-  $('drTitle').textContent = 'Rundgänge';
-  const objektListe = objekte.slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-  const objektOptionen = '<option value="">Objekt wählen …</option>'
-    + objektListe.map(o => `<option value="${Number(o.id)}">${esc(o.name)}</option>`).join('');
-  const zeilen = rdAlleVorlagen.length
-    ? rdAlleVorlagen.map(v => {
-        const punkte = v.punkte.length
-          ? `${v.punkte.length} ${v.punkte.length === 1 ? 'Kontrollpunkt' : 'Kontrollpunkte'}`
-          : 'Noch kein Kontrollpunkt zugeordnet';
-        return `<div class="kr-zeile">
-          <div class="kr-kopf"><b>${esc(v.name)}</b></div>
-          <div class="kr-meta">${esc(v.kunde_name)} · ${esc(v.objekt_name)} · ${punkte}</div>
-          <div style="display:flex;gap:7px;margin-top:9px">
-            <button class="btn btn-plain btn-sm" onclick="rdAlleBearbeiten(${Number(v.id)},${Number(v.objekt_id)})">Bearbeiten</button>
-          </div>
-        </div>`;
-      }).join('')
-    : '<p class="zone-note" style="margin:0">Keine aktive Kontrollrunde vorhanden.</p>';
-  $('drBody').innerHTML = `
-    <div class="bar-tools">
-      <select class="inp" id="rdNeuObjekt" style="width:auto" aria-label="Objekt für neue Kontrollrunde auswählen">${objektOptionen}</select>
-      <button class="btn btn-primary btn-sm" onclick="rdAlleAnlegen()">+ Rundgang anlegen</button>
-    </div>
-    ${zeilen}`;
-  $('drFoot').innerHTML = '';
-  showDrawer();
+function rdObjektWahlFuellen() {
+  const sel = $('rdNeuObjekt');
+  if (!sel) { return; }
+  const liste = objekte.slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  sel.innerHTML = '<option value="">Objekt wählen …</option>'
+    + liste.map(o => `<option value="${Number(o.id)}">${esc(o.name)}</option>`).join('');
+}
+
+function rdZeichneAlleTabelle() {
+  const ziel = $('rdAlleListe');
+  if (!ziel) { return; }
+  if (!rdAlleVorlagen.length) {
+    ziel.innerHTML = EMPTY('Keine aktive Kontrollrunde vorhanden', 'Über "Rundgang anlegen" oben ein Objekt wählen und die erste Kontrollrunde anlegen.');
+    return;
+  }
+  ziel.innerHTML = `<table><thead><tr>
+      <th>Name</th><th>Kunde</th><th>Objekt</th><th>Kontrollpunkte</th><th></th>
+    </tr></thead><tbody>` + rdAlleVorlagen.map(v => {
+    const punkte = v.punkte.length
+      ? `${v.punkte.length} ${v.punkte.length === 1 ? 'Kontrollpunkt' : 'Kontrollpunkte'}`
+      : '<span style="color:var(--ink-3)">Noch keiner zugeordnet</span>';
+    return `<tr>
+        <td><b>${esc(v.name)}</b></td>
+        <td class="nowrap">${esc(v.kunde_name)}</td>
+        <td class="nowrap">${esc(v.objekt_name)}</td>
+        <td>${punkte}</td>
+        <td class="nowrap"><button class="btn btn-plain btn-sm" onclick="rdAlleBearbeiten(${Number(v.id)},${Number(v.objekt_id)})">Bearbeiten</button></td>
+      </tr>`;
+  }).join('') + `</tbody></table>`;
 }
 
 function rdAlleBearbeiten(vorlageId, objektId) {
-  closeDrawer();
   rdEinObjekt = objektId;
   Promise.all([loadKontrollpunkte(), loadRundgangVorlagen()]).then(() => openKr('aendern', vorlageId));
 }
@@ -14897,7 +15134,6 @@ function rdAlleBearbeiten(vorlageId, objektId) {
 function rdAlleAnlegen() {
   const objektId = $('rdNeuObjekt').value ? Number($('rdNeuObjekt').value) : null;
   if (!objektId) { toast('Bitte zuerst ein Objekt wählen.'); return; }
-  closeDrawer();
   rdEinObjekt = objektId;
   loadKontrollpunkte().then(() => openKr('neu'));
 }

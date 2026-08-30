@@ -257,7 +257,10 @@ check('KRITISCH: die Kachel fuehrt auf die Karte "Briefkopf für Rapporte"',
   await page.isVisible('#bkKarte') && !(await page.isVisible('#bkUebersicht')));
 check('Sie sagt, dass diese Angaben an Kunden herausgehen',
   /Kunden zu sehen/.test(await page.textContent('#bkKarte')));
-await page.click('.bk-zurueck');
+// Seit ENT-246 gibt es das Kachel/Abschnitt-Muster (und damit ".bk-zurueck")
+// auch ausserhalb von Betrieb (Revierdienst > Rundgaenge) -- ohne Eingrenzung
+// traf page.click() das erste, aber unsichtbare Exemplar und blieb haengen.
+await page.click('#view-betrieb .bk-zurueck');
 await page.waitForTimeout(150);
 check('KRITISCH: "Zurück" fuehrt wieder auf die Kachel-Uebersicht',
   await page.isVisible('#bkUebersicht') && !(await page.isVisible('#bkKarte')));
