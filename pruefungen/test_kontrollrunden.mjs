@@ -130,7 +130,7 @@ check('Der inaktive Kontrollpunkt ist trotzdem waehlbar, aber gekennzeichnet',
   (await page.textContent('#krPunkteListe')).includes('Alter Punkt') &&
   (await page.textContent('#krPunkteListe')).includes('nicht aktiv'));
 check('"+ Kontrollpunkt" fuehrt direkt zum Kontrollpunkt-Dialog (ENT-248)',
-  await page.isVisible('button:has-text("+ Kontrollpunkt")'));
+  await page.isVisible('#drawer button:has-text("+ Kontrollpunkt")'));
 
 calls = [];
 await page.click('#krBtn');
@@ -187,7 +187,11 @@ check('Ein nicht zugeordneter Punkt ist nicht vorausgewaehlt',
 // UND DIE LISTE IN DER SCHUBLADE ZIEHT SOFORT NACH (ENT-248,
 // krPunkteAktualisieren()) -- ohne die Kontrollrunden-Schublade neu oeffnen
 // zu muessen.
-await page.click('button:has-text("+ Kontrollpunkt")');
+// Selektor auf die Schublade eingeschraenzt: seit ENT-251 gibt es denselben
+// Knopftext auch, unsichtbar, in der statischen Rundgaenge-Unterseite
+// (#rdAb-kr) -- ein ungescopter Selektor traf sonst den falschen (ENT-246
+// hatte dasselbe Problem schon einmal mit .bk-zurueck).
+await page.click('#drawer button:has-text("+ Kontrollpunkt")');
 await page.waitForSelector('#dlgKp.on');
 check('Die Kontrollrunden-Schublade bleibt hinter dem Kontrollpunkt-Dialog sichtbar (Dialog stapelt, statt zu ersetzen)',
   await page.isVisible('#drawer.on'));
