@@ -190,6 +190,7 @@ const browser = await chromium.launch({ executablePath: EXE });
       status: 'abgelehnt', bemerkung: 'Grippe', ablehnung_grund: 'Bereits durch Ferien gedeckt' },
   ];
   const gesendet = [];
+  let naechsteId = 98;
   await page.route('**/api/**', route => {
     const req = route.request(), u = req.url();
     let body = null;
@@ -206,9 +207,9 @@ const browser = await chromium.launch({ executablePath: EXE });
       }
       if (body && body.typ) {
         gesendet.push(body);
-        const neu = { id: 99, ...body, status: 'beantragt' };
-        meine.push(neu);
-        return s({ status: 'ok', id: 99 });
+        naechsteId++;
+        meine.push({ id: naechsteId, ...body, status: 'beantragt' });
+        return s({ status: 'ok', id: naechsteId });
       }
       return s({ status: 'ok', abwesenheiten: meine });
     }
@@ -260,7 +261,17 @@ const browser = await chromium.launch({ executablePath: EXE });
   await page.waitForTimeout(300);
   check('KRITISCH: eine rueckwirkende Ferien-Anfrage wird VOR dem Senden abgefangen',
     gesendet.length === vorAnzahl);
-  await page.click('button:has-text("Abbrechen")');
+  // Faengt der Client die Anfrage nicht ab, schickt awAntragSpeichern() sie
+  // durch und schliesst das Blatt von selbst (mit Schliess-Animation) --
+  // "Abbrechen" gibt es dann nicht mehr zu klicken. Auf die Animation warten
+  // und ueber die Sichtbarkeits-Klasse pruefen, nicht ueber Playwrights
+  // Geometrie-Check: waehrend der Animation liegt der Knopf ausserhalb des
+  // sichtbaren Bereichs, obwohl isVisible() ihn noch als sichtbar meldet --
+  // ein Klick darauf haengt sich dann bis zum Timeout auf und reisst die
+  // ganze Suite mit ab, statt dass nur diese eine Pruefung rot wird.
+  await page.waitForTimeout(400);
+  const blattOffen = await page.evaluate(() => $('blatt').classList.contains('on'));
+  if (blattOffen) { await page.click('button:has-text("Abbrechen")'); await page.waitForTimeout(400); }
 
   // Zurueckziehen eines noch offenen Antrags (des eben gestellten Ferien-Antrags).
   await page.click('#plan-inhalt-abwesenheit button:has-text("Zurückziehen")');
