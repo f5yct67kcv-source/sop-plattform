@@ -1,5 +1,5 @@
 <?php
-// Rechenkern des Ferienanspruchs (ENT-252) wirklich ausfuehren, nicht nur
+// Rechenkern des Ferienanspruchs (ENT-254) wirklich ausfuehren, nicht nur
 // den Quelltext lesen -- dieselbe Haltung wie pruef_auslagen.php: Playwright
 // bildet nur die Oberflaeche nach, PHP laeuft dabei nie. Bei einer
 // Geldrechnung (Ferientage sind Lohnaequivalent) ist das der falsche Ort,

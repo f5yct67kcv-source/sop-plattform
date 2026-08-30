@@ -152,7 +152,7 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12): array
         ];
     }
 
-    // ── Abwesenheitsantrag wartet auf Entscheidung (ENT-252). Nicht
+    // ── Abwesenheitsantrag wartet auf Entscheidung (ENT-254). Nicht
     // abhakbar wie die Faelle oben (siehe EREIGNIS_ARTEN) -- verschwindet
     // erst, wenn abwesenheit_entscheiden.php tatsaechlich entschieden hat.
     foreach (ereignis_lesen($pdo,

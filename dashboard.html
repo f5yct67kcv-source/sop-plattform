@@ -94,7 +94,7 @@
      bereits doppelt belegt (blau = heute, gelb = festgeschrieben). */
   --serie:      #6B4FA8;  --serie-soft: #F5F2FC;  --serie-line: #DED4F2;
 
-  /* Abwesenheiten (ENT-252). Zwei weitere, bisher unbelegte Farbtoene --
+  /* Abwesenheiten (ENT-254). Zwei weitere, bisher unbelegte Farbtoene --
      Blau/Gruen/Gelb/Rot/Violett tragen oben bereits eine andere Bedeutung.
      Ferien (Teal) getrennt von allen anderen Abwesenheitsarten zusammen
      (Indigo-Grau): die genaue Art steht ohnehin als Text in der Offene-
@@ -1557,7 +1557,7 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
 .legende { display: flex; flex-wrap: wrap; gap: 14px; padding: 12px 18px; border-top: 1px solid var(--line-soft); font-size: 11.5px; color: var(--ink-3); }
 .legende i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
 
-/* Abwesenheiten-Gesamtansicht (ENT-252). Volle Zellflaeche wie .mx td.d.z-*
+/* Abwesenheiten-Gesamtansicht (ENT-254). Volle Zellflaeche wie .mx td.d.z-*
    oben, nicht nur ein Plaettchen darin -- dieselbe Begruendung: die
    Trefferflaeche und die Farbflaeche sollen dasselbe Feld sein. */
 .gr td.d.aw-ferien { background: var(--aw-ferien-soft); }
@@ -4276,7 +4276,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
         <div id="pnHinweis"></div>
       </section>
 
-      <!-- ══════════════════════ ABWESENHEITEN (ENT-252) ══════════════════
+      <!-- ══════════════════════ ABWESENHEITEN (ENT-254) ══════════════════
            Uebersichtsraster (Ferien/Krankheit/Unfall/Militaer-/Zivildienst/
            Schwangerschaft) mit Monatsnavigation, darunter die Warteschlange
            der noch unentschiedenen Antraege -- getrennt von den farbigen
@@ -12387,7 +12387,7 @@ function pnMeldung(st) {
   return teile.length ? `<div class="sub" style="margin-top:6px;line-height:1.5">${teile.join(' ')}</div>` : '';
 }
 
-// ══════════════════════════════════════════ ABWESENHEITEN (ENT-252)
+// ══════════════════════════════════════════ ABWESENHEITEN (ENT-254)
 // Gesamtansicht (Kalenderraster, ein Monat) und die Warteschlange der noch
 // unentschiedenen Antraege. Der Feriensaldo je Person (mit der als ANNAHME
 // markierten Kuerzung nach Art. 20 Ziff. 5) ist bewusst NICHT hier, sondern

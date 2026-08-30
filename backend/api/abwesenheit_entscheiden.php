@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-// Einen Abwesenheitsantrag genehmigen oder ablehnen (ENT-252).
+// Einen Abwesenheitsantrag genehmigen oder ablehnen (ENT-254).
 //
 // require_recht statt require_verwaltung: Genehmigen ist Teil der
 // Personalarbeit, kein Betriebseinstellungs-Vorgang (siehe rechte.php,

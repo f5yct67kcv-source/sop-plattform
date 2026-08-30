@@ -856,7 +856,7 @@ CREATE TABLE IF NOT EXISTS kunden_kontaktweg (
   FOREIGN KEY (produkt_id) REFERENCES produkte(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
-// Abwesenheitsplanung (ENT-252): Antrag/Genehmigung fuer Ferien, Krankheit,
+// Abwesenheitsplanung (ENT-254): Antrag/Genehmigung fuer Ferien, Krankheit,
 // Unfall, Militaer-/Zivildienst/Zivilschutz und Schwangerschaft. Eine Zeile
 // je Antrag, nicht je Tag -- der Zeitraum (von/bis) ist das, was
 // Mitarbeitende tatsaechlich beantragen, eine Tagestabelle waere hier eine

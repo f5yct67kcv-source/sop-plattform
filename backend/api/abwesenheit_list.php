@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-// Abwesenheiten aller Mitarbeitenden in einem Zeitraum (ENT-252) -- fuer die
+// Abwesenheiten aller Mitarbeitenden in einem Zeitraum (ENT-254) -- fuer die
 // Gesamtansicht im Dashboard. Nur lesend, nach demselben Muster wie
 // verfuegbarkeit_list.php: keine Namen/Listen doppelt mitgeschickt, die
 // Oberflaeche hat mitarbeiter_list.php (Name, Funktion, Abteilung,

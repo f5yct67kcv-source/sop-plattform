@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 // Die eigenen Abwesenheitsantraege lesen, stellen und (solange unentschieden)
-// zurueckziehen (ENT-252). Nach demselben Muster wie meine_verfuegbarkeit.php:
+// zurueckziehen (ENT-254). Nach demselben Muster wie meine_verfuegbarkeit.php:
 // nicht admin-only, aber strikt auf die eigene Person begrenzt -- steht darum
 // namentlich in der NUR_EIGENE_DATEN-Liste von test_php.mjs statt hinter
 // einem der acht Rechte.
