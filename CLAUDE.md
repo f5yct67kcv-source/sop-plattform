@@ -1,9 +1,15 @@
 # CLAUDE.md — Arbeitsregeln für dieses Repository
 
-Internes Werkzeug der CUPI 24 GmbH. Entwickelt unter der Ausnahme aus
-ENT-008/ENT-012 (rein interne Nutzung, kein Verkauf). Die Projektregeln,
-das Entscheidungsprotokoll und die offenen Punkte liegen im **Projekt-
-Repository** (`sop-projekt`), nicht hier.
+Werkzeug der CUPI 24 GmbH, entwickelt unter der Ausnahme aus ENT-008/
+ENT-012. **Seit 2026-08-30 (ENT-237, sop-projekt) nicht mehr „kein
+Verkauf":** Der Projektinhaber hat die Verkaufsabsicht aktiv erklärt —
+dieser Prototyp wird künftig das an Kunden ausgelieferte Produkt. Kein
+Baustopp (ausdrücklich so entschieden), aber grössere künftige
+Investitionen (neue Module, Architektur-/Scope-Entscheidungen) brauchen vor
+der Umsetzung eine erneute ausdrückliche Bestätigung des Projektinhabers —
+sie laufen nicht mehr automatisch unter dieser Ausnahme mit. Die
+Projektregeln, das Entscheidungsprotokoll und die offenen Punkte liegen im
+**Projekt-Repository** (`sop-projekt`), nicht hier.
 
 **Am Projekt arbeiten mehrere Sitzungen gleichzeitig.** Alles unten folgt
 daraus.
@@ -65,6 +71,17 @@ Diese sind schon einmal gebrochen worden, jedes Mal beim Bauen von etwas
   erspart nur den Umweg.
 
 ## Gestaltung
+
+**Seit 2026-08-30, vom Projektinhaber ausdrücklich angeordnet:** Design hat
+bei jedem Umbau — klein wie gross — hohe Priorität, nicht erst wenn er
+fertig ist oder beanstandet wird. Die Software soll sich nicht nur
+funktional und intuitiv von der Konkurrenz abheben, sondern auch visuell.
+Massstab für die Verarbeitungsqualität ist Apple — nicht als Stilvorlage
+zum Abkupfern, sondern als Anspruch an Sorgfalt, Ruhe und Konsistenz im
+Detail. Hintergrund: geänderte Verkaufsabsicht (siehe oben, ENT-237) — das
+hier ist kein internes Detail mehr, sondern das künftige Verkaufsprodukt.
+Die Regeln unten bleiben unverändert gültig, dieser Satz hebt nur ihre
+Verbindlichkeit.
 
 - **Gemessen, nicht nachgelesen.** Grössen, Positionen und Abstände am
   gerenderten Zustand prüfen. Eine CSS-Regel kann wirkungslos bleiben, ohne
