@@ -68,6 +68,23 @@ check('KRITISCH: eine fehlende Betriebszeile wird angelegt — ein UPDATE ins Le
 check('Das Logo geht als Daten-URL heraus — der Ausdruck braucht keinen zweiten Abruf',
   /'data:' \. \$r\['logo_mime'\] \. ';base64,' \. base64_encode\(\$roh\)/.test(BET));
 
+// KRITISCH (ENT-245): der echte Server speichert Hauptdomizil in einem
+// EIGENEN, frueh zurueckkehrenden Zweig -- nicht im generischen
+// Textfelder-Zweig, der firma/zusatz/fusszeile/qr_* mitschreibt. Ohne diese
+// Trennung wuerde ein Speichern des Hauptdomizils (das Firma/Zusatz gar
+// nicht kennt) den bestehenden Briefkopf mit leeren Werten ueberschreiben --
+// derselbe Fehler, den der Mock-Server unten fuer die Playwright-Ebene
+// nachstellt. Die Reihenfolge im Quelltext MUSS stimmen: array_key_exists
+// vor der ersten Verwendung von $firma.
+check('KRITISCH: betrieb.php hat einen eigenen Speicherzweig fuer domizil_strasse',
+  /array_key_exists\('domizil_strasse', \$in\)/.test(BET));
+check('KRITISCH: dieser Zweig kehrt frueh zurueck (json_response vor dem generischen UPDATE)',
+  (() => {
+    const posZweig = BET.indexOf("array_key_exists('domizil_strasse'");
+    const posFirma = BET.indexOf('$firma  = trim');
+    return posZweig > -1 && posFirma > -1 && posZweig < posFirma;
+  })());
+
 check('KRITISCH: der Server verknuepft den Kunden ueber die SCHICHT, nicht ueber den Namen',
   /LEFT JOIN einsaetze e ON e\.id = r\.einsatz_id/.test(RLIST)
   && /LEFT JOIN kunden k ON k\.id = e\.kunde_id/.test(RLIST));
@@ -155,7 +172,8 @@ const RAPPORTE = [
 
 let BETRIEB = { firma: '', zusatz: '', fusszeile: null, fusszeile2: null,
   qr_iban: null, qr_strasse: null, qr_hausnummer: null, qr_plz: null, qr_ort: null, qr_iban_gueltig: false,
-  logo: null, logo_mime: null, logo_groesse: null };
+  logo: null, logo_mime: null, logo_groesse: null,
+  domizil_strasse: null, domizil_plz: null, domizil_ort: null };
 const gesendet = [];
 
 const browser = await chromium.launch({ executablePath: EXE });
@@ -174,6 +192,14 @@ await page.route('**/api/**', route => {
       gesendet.push(body);
       if (body.logo_weg) { BETRIEB = { ...BETRIEB, logo: null, logo_mime: null, logo_groesse: null }; }
       else if (body.logo) { BETRIEB = { ...BETRIEB, logo: 'data:' + body.logo_mime + ';base64,' + body.logo, logo_mime: body.logo_mime, logo_groesse: 120 }; }
+      // Eigener Zweig wie beim echten Server (betrieb.php, ENT-245): ein
+      // Speichern des Hauptdomizils darf NICHT im generischen Textfelder-Zweig
+      // landen, sonst ueberschreiben die dort fehlenden firma/zusatz-Schluessel
+      // (undefined) den bestehenden Stand -- genau der Fehler, den die
+      // Gegenprobe beim Bauen nachgestellt hat.
+      else if ('domizil_strasse' in body) { BETRIEB = { ...BETRIEB,
+        domizil_strasse: body.domizil_strasse || null, domizil_plz: body.domizil_plz || null,
+        domizil_ort: body.domizil_ort || null }; }
       else { BETRIEB = { ...BETRIEB, firma: body.firma, zusatz: body.zusatz,
         fusszeile: body.fusszeile || null, fusszeile2: body.fusszeile2 || null,
         qr_iban: body.qr_iban || null, qr_strasse: body.qr_strasse || null,
@@ -347,7 +373,7 @@ check('Ohne Unterzeichner steht dort keine leere Zeile mit Beschriftung',
   !/Name in Blockschrift/.test(htmlOhne));
 
 // ── Logo
-await page.evaluate(() => { go('betrieb'); bkAbschnittZeigen('bk'); });
+await page.evaluate(() => { go('betrieb'); bkAbschnittZeigen('be'); });
 await page.waitForTimeout(400);
 check('Ohne Logo sagt die Karte das ausdruecklich',
   /Kein Logo hinterlegt/.test(await page.textContent('#bkLogoStand')));
@@ -376,13 +402,50 @@ check('KRITISCH: das Logo steht ueber Firma/Zusatz zentriert statt daneben recht
     return Math.abs((lr.left + lr.width / 2) - (fr.left + fr.width / 2)) < 1;
   }));
 
-await page.evaluate(() => { go('betrieb'); bkAbschnittZeigen('bk'); });
+await page.evaluate(() => { go('betrieb'); bkAbschnittZeigen('be'); });
 await page.waitForTimeout(300);
 await page.click('#bkLogoWeg');
 await page.waitForTimeout(400);
 check('KRITISCH: das Logo laesst sich wieder entfernen', gesendet.some(b => b.logo_weg === true));
 check('Danach sagt die Karte wieder, dass keines hinterlegt ist',
   /Kein Logo hinterlegt/.test(await page.textContent('#bkLogoStand')));
+
+// ── Hauptdomizil (ENT-245): eigene Kachel "Betrieb", eigener Speicherweg.
+check('KRITISCH: die Betrieb-Kachel steht vorne, nicht die alte Anstellungsorte-Kachel',
+  await page.evaluate(() => {
+    const erste = document.querySelector('#bkUebersicht .bk-kachel');
+    return !!erste && erste.textContent.includes('Betrieb') && !erste.textContent.includes('Anstellungsorte');
+  }));
+await page.evaluate(() => { go('betrieb'); bkAbschnittZeigen('be'); });
+await page.waitForTimeout(300);
+check('Die Kachel fuehrt auf eine Karte "Hauptdomizil"', await page.isVisible('#bdKarte'));
+check('KRITISCH: die Anstellungsorte stehen in derselben Unteransicht, nicht separat',
+  await page.isVisible('#anKarte'));
+check('KRITISCH: das Logo steht ebenfalls hier, nicht mehr bei Briefkopf für Rapporte',
+  await page.isVisible('#btLogoKarte') && await page.isVisible('#bkLogoStand'));
+
+await page.fill('#bdStrasse', 'Musterweg 1');
+await page.fill('#bdPlz', '4600');
+await page.fill('#bdOrt', 'Olten');
+await page.click('#bdKarte .btn-primary');
+await page.waitForTimeout(400);
+check('KRITISCH: das Hauptdomizil wird eigenstaendig gespeichert',
+  gesendet.some(b => b.domizil_strasse === 'Musterweg 1' && b.domizil_plz === '4600' && b.domizil_ort === 'Olten'));
+check('KRITISCH: dabei werden Firma/Zusatz aus dem Briefkopf NICHT mitgeschickt',
+  !gesendet.some(b => 'domizil_strasse' in b && 'firma' in b));
+check('KRITISCH: der zuvor gespeicherte Briefkopf bleibt dabei unveraendert stehen',
+  BETRIEB.firma === 'CUPI 24 GmbH' && BETRIEB.zusatz === 'Sicherheits- und Verkehrsdienst');
+
+await page.evaluate(() => { go('kunden'); });
+await page.waitForTimeout(150);
+await page.evaluate(() => { go('betrieb'); bkAbschnittZeigen('be'); });
+await page.waitForTimeout(400);
+check('Nach dem Neuladen steht das Hauptdomizil wieder im Formular',
+  (await page.inputValue('#bdStrasse')) === 'Musterweg 1'
+  && (await page.inputValue('#bdPlz')) === '4600'
+  && (await page.inputValue('#bdOrt')) === 'Olten');
+check('Und der Briefkopf ist beim erneuten Oeffnen ebenfalls noch da',
+  BETRIEB.firma === 'CUPI 24 GmbH');
 
 // ── Der Ausdruck loest tatsaechlich das Drucken aus
 check('KRITISCH: printReport() ruft window.print() auf',
