@@ -66,13 +66,32 @@
   /* Text */
   --ink:          #14161A;
   --ink-2:        #545B67;
-  --ink-3:        #8B919D;
+  /* Abgedunkelt (ENT-239 Etappe 1): #8B919D mass auf Weiss nur 3.17:1 --
+     zu wenig fuer 10-12px-Beschriftungen (WCAG AA verlangt 4.5:1). */
+  --ink-3:        #667080;
 
   /* Akzent */
   --accent:       #2F5BD7;
   --accent-hi:    #2549B0;
   --accent-soft:  #EDF2FE;
   --accent-line:  #CBD9F9;
+  /* Mittlere Akzentstufe (ENT-239 Etappe 1): Diagrammbalken vergangener
+     Zeitraeume. --accent-soft mass auf der Karte nur 1.12:1 -- praktisch
+     unsichtbar; diese Stufe erreicht >=3:1 (WCAG fuer Grafikelemente). */
+  --accent-mid:   #6C8CE0;
+  /* Text AUF Akzent- bzw. Negativflaechen (ENT-239 Etappe 1). Im hellen
+     Thema weiss; im dunklen sind Akzent und Negativ HELL, dort braucht es
+     dunklen Text -- hartes #fff fiel dort unter 3:1. */
+  --auf-akzent:   #FFFFFF;
+  --auf-neg:      #FFFFFF;
+  /* Gruppenbeschriftungen der Seitenleiste (ENT-239 Etappe 1): die harten
+     #5C626E/#656B78 massen auf dem Shell-Grund unter 3:1. */
+  --shell-label:  #848D9D;
+  /* Masterschichten-Knopf (ENT-239 Etappe 1): vorher hartes #D85A30 mit
+     weissem Text (3.5:1). Der Ton hier traegt weissen Text mit >=4.5:1;
+     die Farbe selbst bleibt bewusst orange (eingefuehrte Bedeutung). */
+  --master:       #BE4A26;
+  --master-hi:    #A84021;
 
   /* Semantik */
   --pos:      #0E7C55;  --pos-soft:  #E6F6EF;
@@ -157,6 +176,12 @@ html[data-thema="dunkel"] {
   --accent-hi:    #8DAEFA;
   --accent-soft:  #1A2440;
   --accent-line:  #2D3D63;
+  --accent-mid:   #5B76BC;
+  --auf-akzent:   #0F1A33;
+  --auf-neg:      #2E1210;
+  --shell-label:  #8A93A2;
+  --master:       #C9582F;
+  --master-hi:    #D96C42;
 
   --pos:      #4FCE96;  --pos-soft:  #10281E;
   --neg:      #F27F70;  --neg-soft:  #2E1A18;
@@ -233,7 +258,7 @@ svg.i-sm { width: 15px; height: 15px; }
 select.inp { padding-right: 30px; background-image: linear-gradient(45deg, transparent 50%, var(--ink-3) 50%), linear-gradient(135deg, var(--ink-3) 50%, transparent 50%); background-position: right 14px center, right 9px center; background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; }
 
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 1px solid transparent; border-radius: var(--r-sm); padding: 9px 15px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; transition: background .13s, border-color .13s, color .13s; white-space: nowrap; text-decoration: none; }
-.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary { background: var(--accent); color: var(--auf-akzent); }
 .btn-primary:hover { background: var(--accent-hi); }
 .btn-primary:disabled { opacity: .55; cursor: default; }
 /* Bislang nur fuer btn-primary -- ein ausgegrauter btn-plain/btn-quiet ohne
@@ -246,7 +271,7 @@ select.inp { padding-right: 30px; background-image: linear-gradient(45deg, trans
 .btn-sprechen {
   display: inline-flex; align-items: center; gap: 7px; border: none; border-radius: 999px;
   padding: 8px 16px 8px 14px; font: inherit; font-size: 13px; font-weight: 650; cursor: pointer;
-  background: linear-gradient(135deg, var(--accent), var(--accent-hi)); color: #fff;
+  background: linear-gradient(135deg, var(--accent), var(--accent-hi)); color: var(--auf-akzent);
   box-shadow: 0 1px 2px rgba(0,0,0,.08); transition: transform .1s, box-shadow .13s;
 }
 .btn-sprechen:hover { box-shadow: 0 2px 8px var(--accent-soft); transform: translateY(-1px); }
@@ -260,7 +285,7 @@ select.inp { padding-right: 30px; background-image: linear-gradient(45deg, trans
    gefuellte blaue Flaechen nebeneinander waeren zwei Hauptknoepfe, und dann
    ist keiner mehr der Hauptknopf. */
 .btn-akzent { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
-.btn-akzent:hover { background: var(--accent); color: #fff; }
+.btn-akzent:hover { background: var(--accent); color: var(--auf-akzent); }
 .btn-wide { width: 100%; }
 .btn-sm { padding: 6px 11px; font-size: 12px; }
 
@@ -281,14 +306,14 @@ select.inp { padding-right: 30px; background-image: linear-gradient(45deg, trans
 .side-brand { display: flex; align-items: center; gap: 11px; padding: 0 18px; height: var(--top-h); border-bottom: 1px solid var(--shell-line); flex: none; }
 .side-brand img { width: 30px; height: 30px; border-radius: 8px; object-fit: contain; background: #fff; padding: 2px; }
 .side-brand .wm { color: var(--shell-txt-hi); font-size: 15px; font-weight: 700; letter-spacing: -.2px; line-height: 1.15; }
-.side-brand .sub { color: #656B78; font-size: 10px; letter-spacing: .8px; text-transform: uppercase; }
+.side-brand .sub { color: var(--shell-label); font-size: 10px; letter-spacing: .8px; text-transform: uppercase; }
 
 .side-kopf { display: none; align-items: center; justify-content: space-between;
   gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--shell-line); flex: none; }
 .side-kopf .titel { font-size: 11px; font-weight: 700; letter-spacing: 1.2px;
-  text-transform: uppercase; color: #5C626E; }
+  text-transform: uppercase; color: var(--shell-label); }
 .side-nav { padding: 14px 12px; flex: 1; overflow-y: auto; }
-.nav-lbl { font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #5C626E; padding: 0 8px; margin: 4px 0 8px; }
+.nav-lbl { font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--shell-label); padding: 0 8px; margin: 4px 0 8px; }
 .nav-item {
   display: flex; align-items: center; gap: 11px; width: 100%;
   padding: 9px 10px; margin-bottom: 2px; border: none; background: transparent;
@@ -324,7 +349,7 @@ select.inp { padding-right: 30px; background-image: linear-gradient(45deg, trans
 
 .side-foot { padding: 12px; border-top: 1px solid var(--shell-line); flex: none; }
 .side-user { display: flex; align-items: center; gap: 10px; padding: 7px 8px; }
-.avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 11.5px; font-weight: 700; letter-spacing: .3px; flex: none; }
+.avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: var(--auf-akzent); display: flex; align-items: center; justify-content: center; font-size: 11.5px; font-weight: 700; letter-spacing: .3px; flex: none; }
 .side-user .who { min-width: 0; }
 .side-user .who b { display: block; color: var(--shell-txt-hi); font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .side-user .who span { font-size: 11px; color: var(--shell-txt); }
@@ -461,21 +486,26 @@ a.nav-item { text-decoration: none; }
    sieht damit unveraendert aus. */
 /* ── Chart (Design-Eingriff 2026-08-28): Gitterlinien, Opazität, leere Wochen, KW-Farbe */
 .bars { display: flex; align-items: flex-end; gap: 8px; height: 152px; padding-top: 6px;
+  /* Rasterlinien in Token-Farbe (ENT-239 Etappe 1): das weisse rgba(.05)
+     war auf der weissen Karte unsichtbar -- eine Regel ohne Wirkung. */
   background-image: repeating-linear-gradient(
     to top,
-    rgba(255,255,255,0.05) 0px, rgba(255,255,255,0.05) 1px,
+    var(--line-soft) 0px, var(--line-soft) 1px,
     transparent 1px, transparent 25%
   ); }
 .dash-item.dh .bars { height: 100%; }
 .bar { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
   gap: 7px; min-width: 0; height: 100%; }
-.bar-val { font-size: 10px; font-weight: 650; color: #94a3b8; }
-.bar-fill { width: 100%; max-width: 46px; flex: 0 0 auto; background: var(--accent-soft); border: 1px solid var(--accent-line); border-bottom: none; border-radius: var(--r-xs) var(--r-xs) 0 0; min-height: 4px; opacity: 0.85; transition: background .13s, opacity .13s; }
-.bar-fill.leer { height: 4px; flex-basis: 4px !important; background: #1e293b; border-color: #1e293b; opacity: 1; }
-.bar:hover .bar-fill { background: var(--accent-line); opacity: 1; }
+.bar-val { font-size: 10px; font-weight: 650; color: var(--ink-3); }
+/* Vergangene Wochen in --accent-mid (ENT-239 Etappe 1): --accent-soft mass
+   auf der Karte 1.12:1 -- die Balken waren praktisch unsichtbar, nur die
+   aktuelle Woche trug Farbe. Kein Rand mehr: Der Balken traegt sich selbst. */
+.bar-fill { width: 100%; max-width: 46px; flex: 0 0 auto; background: var(--accent-mid); border: 1px solid var(--accent-mid); border-bottom: none; border-radius: var(--r-xs) var(--r-xs) 0 0; min-height: 4px; transition: background .13s; }
+.bar-fill.leer { height: 4px; flex-basis: 4px !important; background: var(--nix); border-color: var(--nix); }
+.bar:hover .bar-fill { background: var(--accent-hi); border-color: var(--accent-hi); }
 .bar.now .bar-fill { background: var(--accent); border-color: var(--accent); opacity: 1; }
 .bar-lbl { font-size: 10.5px; color: var(--ink-3); white-space: nowrap; letter-spacing: .2px; }
-.bar.now .bar-lbl { color: #60a5fa; font-weight: 650; }
+.bar.now .bar-lbl { color: var(--accent); font-weight: 650; }
 .bars-axis { border-top: 1px solid var(--line); margin-top: -25px; }
 
 /* Tabellen */
@@ -574,7 +604,7 @@ tr.rapp-gruppe-offen td:not(.rapp-klammer) { border-bottom: none; }
 .seg2 { display: inline-flex; border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; flex-shrink: 0; }
 .seg2 button { border: none; background: var(--surface); padding: 9px 14px; font: inherit; font-size: 13px; font-weight: 600; color: var(--ink-3); cursor: pointer; }
 .seg2 button + button { border-left: 1px solid var(--line); }
-.seg2 button.on { background: var(--accent); color: #fff; }
+.seg2 button.on { background: var(--accent); color: var(--auf-akzent); }
 /* Trefferflaeche auf dem Handy mindestens 44px (Gestaltung). Am Desktop
    bleiben beide kompakt -- .of-schnell ist dort bewusst eine kleine Pille
    neben einer Beschriftung, kein Hauptknopf. */
@@ -784,7 +814,7 @@ table.ep-gitter td.raster { position: relative; padding: 0; }
 
 /* Rueckmeldung der eingeteilten Person (ENT-113). */
 .ep-balken.zugesagt { background: var(--pos); color: #06210f; }
-.ep-balken.abgelehnt { background: var(--neg); color: #fff; font-weight: 700;
+.ep-balken.abgelehnt { background: var(--neg); color: var(--auf-neg); font-weight: 700;
   box-shadow: 0 0 0 2px var(--neg-soft); }
 .ep-auge { width: 13px; height: 13px; flex: none; fill: none; stroke: currentColor;
   stroke-width: 2; opacity: .75; }
@@ -1076,8 +1106,8 @@ th.sortbar.aktiv .pf { opacity: 1; color: var(--accent); }
 .zone-note { font-size: 12px; color: var(--ink-3); line-height: 1.5; margin-bottom: 11px; }
 .zone.danger { border-color: var(--neg-line); background: var(--neg-flaeche); }
 .zone.danger .zone-hd { color: var(--neg); }
-.btn-danger { background: var(--neg); color: #fff; }
-.btn-danger:hover { background: #A82E22; }
+.btn-danger { background: var(--neg); color: var(--auf-neg); }
+.btn-danger:hover { background: var(--neg-hi); }
 .inp-row { display: flex; gap: 8px; }
 .inp-row .inp { flex: 1; min-width: 0; }
 /* Vom Diktat erkannte Felder sichtbar markieren, damit der Pruefschritt
@@ -1615,8 +1645,8 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
 .opl-knoepfe .btn { height: 45px; width: 148px; }
 /* Der Weg zu den Masterschichten steht unter der Tabelle, nicht in der Leiste:
    er aendert die Vorlagen, nicht den Ausschnitt. */
-.btn-master { background: #D85A30; color: #fff; height: 45px; padding: 0 18px; margin-top: 16px; }
-.btn-master:hover { background: #c14e28; }
+.btn-master { background: var(--master); color: #fff; height: 45px; padding: 0 18px; margin-top: 16px; }
+.btn-master:hover { background: var(--master-hi); }
 .opl-leiste .wo { font-size: 12px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 240px; }
 /* Objektplanung bleibt dicht (ENT-024): schmalere Felder als in der freieren
    Übersichts-Leiste, damit der Zeitraum keine zweite Zeile erzwingt. */
@@ -1656,7 +1686,7 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
 /* Verfuegbarkeit auf einen Blick (ENT-060). Gruen heisst: im gewaehlten
    Zeitraum frei. Warngelb heisst nicht "verboten", sondern "kostet eine
    Umplanung" -- die Person steht schon woanders. */
-.ma-pick label.frei { border-left: 3px solid var(--pos, #16a34a); }
+.ma-pick label.frei { border-left: 3px solid var(--pos); }
 .ma-pick label.umzuplanen { border-left: 3px solid var(--warn); }
 .ma-pick .who .frei-marke { display: block; font-size: 11.5px; font-weight: 620; color: var(--pos, #16a34a); margin-top: 2px; }
 .ma-pick .who .clash { display: block; font-size: 11.5px; font-weight: 620; color: var(--warn); margin-top: 2px; }
@@ -1793,13 +1823,13 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
 /* Sprechen blau. Die uebrigen bleiben neutral und holen ihre Farben aus den
    Themenwerten -- damit stimmen sie in Hell UND Dunkel, ohne zweite Regel. */
 .diktat-router .sprach .sprach-btn.cta {
-  background: var(--accent); border-color: var(--accent); color: #fff;
+  background: var(--accent); border-color: var(--accent); color: var(--auf-akzent);
 }
 .diktat-router .sprach .sprach-btn.cta:hover { background: var(--accent-hi); border-color: var(--accent-hi); }
 /* Waehrend der Aufnahme rot -- NACH der blauen Regel, sonst gewinnt bei
    gleicher Eigenspezifitaet die spaetere und der laufende Zustand waere
    nicht mehr zu sehen. */
-.diktat-router .sprach .sprach-btn.cta.laeuft { background: var(--neg); border-color: var(--neg); color: #fff; }
+.diktat-router .sprach .sprach-btn.cta.laeuft { background: var(--neg); border-color: var(--neg); color: var(--auf-neg); }
 .diktat-router .sprach .sprach-btn.cta.laeuft:hover { background: var(--neg-hi); border-color: var(--neg-hi); }
 /* Die Pegelanzeige steht hinter den Knoepfen und nimmt den Rest der Zeile --
    dafuer brauchte es bisher einen eigenen Abstandhalter. */
@@ -1854,17 +1884,22 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
   .kw-grid, .dash-item.dw-voll .kw-grid { grid-template-columns: 1fr; }
 }
 /* ── Schnellzugriff Card-Style (Design-Eingriff 2026-08-28) */
+/* Hell statt dunkler Kachelwand (ENT-239 Etappe 1, Zielbild «Ruhige
+   Praezision»): Die harten Navy-Werte (#1e293b/#2d3a4f) standen ausserhalb
+   des Token-Systems, dominierten die helle Seite als schwerstes Element und
+   trugen Akzenttext mit gemessenen 2.51:1. Jetzt Flaeche wie die Karte,
+   Symbol als einziger Farbtraeger -- beide Themen laufen ueber die Tokens. */
 .kw { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px;
-  padding: 11px 14px; border: 1px solid #2d3a4f; border-radius: 8px;
-  background: #1e293b; font: inherit; font-size: 13.5px; color: var(--accent);
+  padding: 11px 14px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--surface); font: inherit; font-size: 13.5px; color: var(--ink);
   text-align: left; cursor: pointer; transition: background .13s, border-color .13s; box-sizing: border-box; }
-.kw:hover { background: #263348; }
+.kw:hover { background: var(--accent-soft); border-color: var(--accent-line); }
 .kw:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.kw svg { width: 19px; height: 19px; flex: none; color: var(--ink-3);
+.kw svg { flex: none; color: var(--accent-hi);
   stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
-  background: #1a2a3f; border: 1px solid #2d3a4f; border-radius: 6px;
+  background: var(--accent-soft); border: 1px solid var(--accent-soft); border-radius: 6px;
   padding: 5px; box-sizing: border-box; width: 30px; height: 30px; }
-.kw b { min-width: 0; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kw b { min-width: 0; font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .dash-item { position: relative; min-width: 0; }
 .dash-item.dw-voll   { flex: 1 1 100%; }
@@ -1976,7 +2011,7 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
 .btn-glocke { position: relative; }
 svg.i-glocke { width: 19px; height: 19px; }
 .glocke-badge { position: absolute; top: -3px; right: -3px; min-width: 15px; height: 15px;
-  padding: 0 3px; border-radius: 999px; background: var(--neg); color: #fff;
+  padding: 0 3px; border-radius: 999px; background: var(--neg); color: var(--auf-neg);
   font-size: 9px; font-weight: 700; line-height: 15px; text-align: center;
   box-shadow: 0 0 0 2px var(--glas); }
 /* position:fixed statt :absolute, seit das Panel als eigenes Element auf
@@ -2039,7 +2074,7 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
   font-family: inherit; font-size: 13.5px; font-weight: 620; transition: background .15s, border-color .15s, color .15s;
 }
 .sprach-btn:hover { background: var(--bg); }
-.sprach-btn.laeuft { background: var(--neg); border-color: var(--neg); color: #fff; }
+.sprach-btn.laeuft { background: var(--neg); border-color: var(--neg); color: var(--auf-neg); }
 .sprach-btn.laeuft:hover { background: var(--neg-hi); }
 /* Der Ring pulsiert nur waehrend der Aufnahme und nur einmal -- keine Unruhe
    auf einem Bildschirm, an dem man laenger arbeitet. */
@@ -2117,9 +2152,11 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
   background: repeating-linear-gradient(45deg, var(--ink-3) 0 4px, transparent 4px 8px); }
 .pn-bar .grenze { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--ink-1); }
 .pn-bar .tol { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--warn); }
-.pn-ok  .fuell { background: linear-gradient(90deg, #22c55e, #4ade80); }
-.pn-nahe .fuell { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
-.pn-ueber_grenze .fuell { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+/* Systemfarben statt fremder Gruen-/Gelbtoene (ENT-239 Etappe 1): dieselbe
+   Aussage (im Rahmen / nahe der Grenze) traegt ueberall dieselbe Farbe. */
+.pn-ok  .fuell { background: var(--pos); }
+.pn-nahe .fuell { background: var(--warn); }
+.pn-ueber_grenze .fuell { background: var(--warn); }
 .pn-ueber_toleranz .fuell { background: var(--neg); }
 .pn-ohne .fuell { background: var(--ink-3); }
 
@@ -4818,7 +4855,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
       <h2>Vorschau</h2>
       <p>So sieht die Offerte für den Kunden aus.</p>
     </div>
-    <div class="dlg-bd" style="background:#F4F5F7">
+    <div class="dlg-bd" style="background:var(--bg)">
       <div id="ofVorschauInhalt" style="background:#fff;padding:32px;border-radius:8px"></div>
     </div>
     <div class="dlg-ft">
@@ -12527,7 +12564,7 @@ function bkQrIbanPruefen() {
     el.style.color = ''; return;
   }
   const { gueltig, istQr } = ibanIstQrJs(wert);
-  if (istQr) { el.textContent = '✓ Gültige QR-IBAN erkannt.'; el.style.color = 'var(--gruen, #1C7C3E)'; }
+  if (istQr) { el.textContent = '✓ Gültige QR-IBAN erkannt.'; el.style.color = 'var(--pos)'; }
   else if (gueltig) { el.textContent = 'Gültige IBAN, aber keine QR-IBAN — die Bank weist QR-IBANs eigens zu.'; el.style.color = 'var(--rot, #B3261E)'; }
   else { el.textContent = 'Das sieht noch nicht nach einer vollständigen, gültigen IBAN aus.'; el.style.color = 'var(--rot, #B3261E)'; }
 }
