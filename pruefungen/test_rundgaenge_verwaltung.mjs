@@ -122,6 +122,17 @@ check('Die Unterseite bleibt hinter der Schublade im DOM erreichbar (kein andere
   await page.isVisible('#rdAb-liste'));
 await page.evaluate(() => closeDrawer());
 
+// ══════════ KRITISCH: DIE GANZE ZEILE OEFFNET, NICHT NUR DER "BEARBEITEN"-KNOPF
+// (ENT-250, Bug-Meldung des Projektinhabers nach dem Ausliefern von ENT-248:
+// "bei mir öffnet sich noch nichts" -- Klick auf die Tabellenzeile ausserhalb
+// des Knopfes tat bis dahin buchstaeblich nichts.)
+await page.click('#rdAb-liste tr:has-text("Öffnungsrunde") td:has-text("Testliegenschaft Nord")');
+await page.waitForSelector('#drawer.on');
+check('KRITISCH: Klick auf die Tabellenzeile ausserhalb des Knopfes oeffnet die Schublade',
+  (await page.textContent('#drTitle')).includes('Kontrollrunde ändern'));
+check('Die richtige Zeile wird geladen', (await page.inputValue('#krName')) === 'Öffnungsrunde');
+await page.evaluate(() => closeDrawer());
+
 // ══════════ BEARBEITEN: SCHUBLADE MIT VORBEFUELLTEM NAMEN, ZWEITES OBJEKT
 calls = [];
 await page.click('#rdAb-liste tr:has-text("Schliessrunde") button:has-text("Bearbeiten")');
