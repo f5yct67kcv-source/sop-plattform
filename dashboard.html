@@ -4306,6 +4306,36 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
         </div>
         </div>
 
+        <!-- Kontrollrunde bearbeiten/anlegen als eigene volle Unterseite
+             (ENT-251, Revision von ENT-248): der Projektinhaber wollte hier
+             ausdruecklich keine Schublade, sondern eine vollwertige Seite --
+             siehe Docs-Eintrag. Die Einrichtung (openKr(), unveraendert)
+             bleibt bei der Schublade; nur dieser Einstieg von der
+             objektuebergreifenden Liste aus bekommt die volle Seite. -->
+        <div class="bk-abschnitt" id="rdAb-kr" style="display:none">
+        <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="rdAbschnittZeigen('liste')">Zurück</button>
+        <div class="card">
+          <div class="card-hd"><h2 id="rdKrTitel">Neue Kontrollrunde</h2></div>
+          <div class="card-bd">
+            <div class="msg-err" id="rdKrErr" style="display:none"></div>
+            <div class="form-grid">
+              <div class="f wide"><label for="rdKrName">Name *</label><input class="inp" id="rdKrName" placeholder="z. B. Öffnungsrunde"></div>
+              <div class="f"><label class="check" style="margin-top:26px"><input type="checkbox" id="rdKrAktiv" checked> Aktiv</label></div>
+            </div>
+            <div class="f wide" style="margin-top:14px">
+              <div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:8px">
+                <label style="margin:0">Kontrollpunkte in dieser Runde</label>
+                <button class="btn btn-plain btn-sm" style="margin-left:auto" onclick="openKp('neu')">+ Kontrollpunkt</button>
+              </div>
+              <div class="kr-punkte-liste" id="rdKrPunkteListe"></div>
+            </div>
+            <div style="margin-top:20px">
+              <button class="btn btn-primary" id="rdKrBtn" onclick="rdSaveKr()">Speichern</button>
+            </div>
+          </div>
+        </div>
+        </div>
+
         <!-- Bisherige filterbare Liste (ENT-183/193): bleibt im Code
              erhalten, vorerst nicht verlinkt -- wandert kuenftig hinter die
              Kachel "Rundgänge", sobald diese verdrahtet wird (ENT-225,
@@ -15139,12 +15169,14 @@ function openKr(modus, id) {
   $('krName').focus();
 }
 
-// Baut die Kontrollpunkte-Liste innerhalb der Kontrollrunden-Schublade --
-// eigene Funktion statt Inline-Code in openKr(), weil krPunkteAktualisieren()
-// (unten) dieselbe Zeichnung nach dem Speichern/Loeschen eines einzelnen
-// Kontrollpunkts erneut braucht, ohne die ganze Schublade neu zu oeffnen.
-function krPunkteZeichnen(gewaehlt) {
-  const ziel = $('krPunkteListe');
+// Baut die Kontrollpunkte-Liste innerhalb der Kontrollrunden-Schublade
+// (Einrichtung, openKr()) ODER der vollen Unterseite (rdKrZeigen(), ENT-251)
+// -- zielId waehlt das Ziel, weil beide Oberflaechen dieselbe Karten-Liste
+// brauchen, nur an verschiedenen Stellen im DOM. Eigene Funktion statt
+// Inline-Code, weil krPunkteAktualisieren() (unten) dieselbe Zeichnung nach
+// dem Speichern/Loeschen eines einzelnen Kontrollpunkts erneut braucht.
+function krPunkteZeichnen(gewaehlt, zielId) {
+  const ziel = $(zielId || 'krPunkteListe');
   if (!ziel) return;
   ziel.innerHTML = kontrollpunkte.length
     ? kontrollpunkte.map(k => {
@@ -15167,16 +15199,20 @@ function krPunkteZeichnen(gewaehlt) {
 }
 
 // Nach dem Speichern/Loeschen eines Kontrollpunkts (aus saveKp()/askDeleteKp()
-// unten) die Liste in der Kontrollrunden-Schublade nachziehen, falls sie
-// gerade offen ist -- sonst zeigte sie nach dem Bearbeiten eines Punktes
-// noch den alten Stand, bis man die Schublade neu oeffnet. Bereits
-// angehakte Punkte bleiben angehakt: die aktuelle Auswahl wird vor dem
-// Neuzeichnen eingesammelt.
+// unten) die Liste nachziehen, egal ob gerade die Kontrollrunden-Schublade
+// (Einrichtung) oder die volle Unterseite (ENT-251) offen ist -- sonst
+// zeigte sie nach dem Bearbeiten eines Punktes noch den alten Stand. Beide
+// moeglichen Ziele werden geprueft; wirkungslos fuer das jeweils nicht
+// betroffene (kein Element vorhanden bzw. leere Auswahl). Bereits angehakte
+// Punkte bleiben angehakt: die aktuelle Auswahl wird vor dem Neuzeichnen
+// eingesammelt.
 function krPunkteAktualisieren() {
-  const ziel = $('krPunkteListe');
-  if (!ziel) return;
-  const gewaehlt = new Set(Array.from(ziel.querySelectorAll('.kr-punkt:checked')).map(c => Number(c.value)));
-  krPunkteZeichnen(gewaehlt);
+  ['krPunkteListe', 'rdKrPunkteListe'].forEach(zielId => {
+    const ziel = $(zielId);
+    if (!ziel) return;
+    const gewaehlt = new Set(Array.from(ziel.querySelectorAll('.kr-punkt:checked')).map(c => Number(c.value)));
+    krPunkteZeichnen(gewaehlt, zielId);
+  });
 }
 
 function saveKr() {
@@ -15224,10 +15260,12 @@ function askDeleteKr(id) {
 // Die volle Verwaltung (auch inaktive Runden, Kontrollpunkte zuordnen)
 // bleibt Objekt fuer Objekt unter Einrichtung -- diese Seite ist ein
 // schneller, objektuebergreifender Ueberblick plus Einstieg zum Anlegen,
-// kein Ersatz dafuer. Bearbeiten/Anlegen nutzen dieselbe Schublade (openKr(),
-// ENT-248) wie die Einrichtung: dafuer wird rdEinObjekt vorher gesetzt und kontrollpunkte
-// (bzw. rundgangVorlagen fuers Vorbefuellen) fuer genau dieses Objekt
-// geladen. Gleiches Umschalt-Muster wie Betrieb (ENT-211): bleibt innerhalb
+// kein Ersatz dafuer. Bearbeiten/Anlegen oeffnen seit ENT-251 eine eigene
+// volle Unterseite (rdKrZeigen(), NICHT dieselbe Schublade wie die
+// Einrichtung -- das war ENT-248, per Ruecksprache wieder revidiert):
+// dafuer wird rdEinObjekt vorher gesetzt und kontrollpunkte (bzw.
+// rundgangVorlagen fuers Vorbefuellen) fuer genau dieses Objekt geladen.
+// Gleiches Umschalt-Muster wie Betrieb (ENT-211): bleibt innerhalb
 // derselben view-rundgaenge, kein Eintrag im go()-Ansichtsregister noetig.
 function rdUebersichtZeigen() {
   $('rdUebersicht').style.display = '';
@@ -15283,14 +15321,60 @@ function rdZeichneAlleTabelle() {
 
 function rdAlleBearbeiten(vorlageId, objektId) {
   rdEinObjekt = objektId;
-  Promise.all([loadKontrollpunkte(), loadRundgangVorlagen()]).then(() => openKr('aendern', vorlageId));
+  Promise.all([loadKontrollpunkte(), loadRundgangVorlagen()]).then(() => rdKrZeigen('aendern', vorlageId));
 }
 
 function rdAlleAnlegen() {
   const objektId = $('rdNeuObjekt').value ? Number($('rdNeuObjekt').value) : null;
   if (!objektId) { toast('Bitte zuerst ein Objekt wählen.'); return; }
   rdEinObjekt = objektId;
-  loadKontrollpunkte().then(() => openKr('neu'));
+  loadKontrollpunkte().then(() => rdKrZeigen('neu'));
+}
+
+// Kontrollrunde bearbeiten/anlegen als volle Unterseite (ENT-251, Revision
+// von ENT-248): der Projektinhaber wollte hier ausdruecklich keine
+// Schublade, sondern eine vollwertige Seite. Die Einrichtung (openKr(),
+// oben) bleibt unveraendert bei der Schublade -- eigene Funktion statt
+// Umbau von openKr(), weil beide unterschiedliche Ziel-Elemente fuellen
+// (drBody/drTitle/drFoot vs. die statischen Felder von #rdAb-kr).
+function rdKrZeigen(modus, id) {
+  krTarget = id ? Number(id) : null;
+  const v = krTarget ? rundgangVorlagen.find(x => Number(x.id) === krTarget) : null;
+
+  $('rdKrTitel').textContent = modus === 'neu' ? 'Neue Kontrollrunde' : 'Kontrollrunde ändern';
+  $('rdKrName').value = v ? v.name : '';
+  $('rdKrAktiv').checked = v ? !!Number(v.aktiv) : true;
+  $('rdKrErr').style.display = 'none';
+
+  krPunkteZeichnen(v ? new Set(v.punkte.map(p => Number(p.id))) : new Set(), 'rdKrPunkteListe');
+
+  rdAbschnittZeigen('kr');
+  $('rdKrName').focus();
+}
+
+function rdSaveKr() {
+  const err = $('rdKrErr'); err.style.display = 'none';
+  const name = $('rdKrName').value.trim();
+  if (!name) { err.textContent = 'Name erforderlich.'; err.style.display = ''; return; }
+
+  const body = { objekt_id: rdEinObjekt, name, aktiv: $('rdKrAktiv').checked ? 1 : 0 };
+  if (krTarget) body.id = krTarget;
+  const kontrollpunktIds = Array.from(document.querySelectorAll('#rdKrPunkteListe .kr-punkt:checked')).map(c => Number(c.value));
+
+  const b = $('rdKrBtn'); b.disabled = true;
+  api('rundgang_vorlage_save.php', { method: 'POST', body }).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') { b.disabled = false; err.textContent = data.message || 'Speichern fehlgeschlagen.'; err.style.display = ''; return; }
+    return api('rundgang_vorlage_punkte_setzen.php',
+      { method: 'POST', body: { vorlage_id: data.id, kontrollpunkt_ids: kontrollpunktIds } }
+    ).then(({ ok: ok2, data: data2 }) => {
+      b.disabled = false;
+      if (!ok2 || data2.status !== 'ok') { err.textContent = data2.message || 'Punktzuordnung fehlgeschlagen.'; err.style.display = ''; return; }
+      // rdAbschnittZeigen('liste') laedt rdLadeAlle() gleich selbst neu --
+      // kein zusaetzlicher Aufruf noetig, siehe dessen eigene Definition.
+      rdAbschnittZeigen('liste');
+      toast('Kontrollrunde gespeichert.');
+    });
+  });
 }
 
 // ══════════════════════════════════════════ SCHICHTEN ERZEUGEN (mit Vorschau)
