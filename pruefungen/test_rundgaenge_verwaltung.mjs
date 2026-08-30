@@ -4,10 +4,11 @@
 // mehrspaltige Tabelle in einer 420 px schmalen Schublade nicht passte
 // (Rueckmeldung Projektinhaber, Referenz-Screenshot einer vollen Seite).
 //
-// Bearbeiten/Anlegen nutzen denselben Dialog (dlgKr) wie die bestehende,
-// objektgebundene Verwaltung unter Einrichtung -- hier wird nur geprüft, dass
-// die Seite ihn mit dem richtigen Objekt und den richtigen Werten öffnet,
-// nicht das Speichern selbst (das deckt bereits die Einrichtung ab).
+// Bearbeiten/Anlegen nutzen dieselbe Schublade (openKr(), ENT-248) wie die
+// bestehende, objektgebundene Verwaltung unter Einrichtung -- hier wird nur
+// geprüft, dass die Seite sie mit dem richtigen Objekt und den richtigen
+// Werten öffnet, nicht das Speichern selbst (das deckt bereits die
+// Einrichtung ab, siehe test_kontrollrunden.mjs).
 import { WURZEL, OUT, browserPfad } from './pfade.mjs';
 import { chromium } from 'playwright';
 
@@ -108,24 +109,24 @@ check('KRITISCH: "Rundgang anlegen" ohne gewähltes Objekt zeigt einen Hinweis s
     && document.getElementById('toast').textContent.includes('Objekt')));
 check('Die Unterseite bleibt dabei offen', await page.isVisible('#rdAb-liste'));
 
-// ══════════ ANLEGEN MIT OBJEKT: DIALOG AUF, RICHTIGES OBJEKT, SEITE BLEIBT DAHINTER
+// ══════════ ANLEGEN MIT OBJEKT: SCHUBLADE AUF, RICHTIGES OBJEKT, SEITE BLEIBT DAHINTER
 calls = [];
 await page.selectOption('#rdNeuObjekt', '1');
 await page.click('#rdAb-liste button:has-text("Rundgang anlegen")');
-await page.waitForSelector('#dlgKr.on');
-check('Der Dialog trägt den Anlege-Titel', (await page.textContent('#krTitel')).includes('Neue Kontrollrunde'));
+await page.waitForSelector('#drawer.on');
+check('Die Schublade trägt den Anlege-Titel', (await page.textContent('#drTitle')).includes('Neue Kontrollrunde'));
 check('Das Namensfeld ist leer', await page.inputValue('#krName') === '');
 check('KRITISCH: die Kontrollpunkte des GEWÄHLTEN Objekts (1) werden geladen, nicht irgendwelche',
   calls.some(c => c.includes('kontrollpunkt_liste')) && await page.evaluate(() => rdEinObjekt === 1));
-check('Die Unterseite bleibt hinter dem Dialog erreichbar (keine Schublade schliesst sich)',
+check('Die Unterseite bleibt hinter der Schublade im DOM erreichbar (kein anderer Bereich wird versehentlich geschlossen)',
   await page.isVisible('#rdAb-liste'));
-await page.evaluate(() => closeDlg('dlgKr'));
+await page.evaluate(() => closeDrawer());
 
-// ══════════ BEARBEITEN: DIALOG MIT VORBEFUELLTEM NAMEN, ZWEITES OBJEKT
+// ══════════ BEARBEITEN: SCHUBLADE MIT VORBEFUELLTEM NAMEN, ZWEITES OBJEKT
 calls = [];
 await page.click('#rdAb-liste tr:has-text("Schliessrunde") button:has-text("Bearbeiten")');
-await page.waitForSelector('#dlgKr.on');
-check('Der Dialog trägt den Änderungs-Titel', (await page.textContent('#krTitel')).includes('Kontrollrunde ändern'));
+await page.waitForSelector('#drawer.on');
+check('Die Schublade trägt den Änderungs-Titel', (await page.textContent('#drTitle')).includes('Kontrollrunde ändern'));
 check('KRITISCH: der Name ist vorbefüllt', await page.inputValue('#krName') === 'Schliessrunde');
 check('KRITISCH: rdEinObjekt zeigt auf das Objekt DIESER Zeile (2), nicht das vorherige (1)',
   await page.evaluate(() => rdEinObjekt === 2));
@@ -135,7 +136,7 @@ check('KRITISCH: kein Seiten-Scroll am Desktop',
 await page.screenshot({ path: `${OUT}/rg-verwaltung-01-desktop.png` });
 
 // ══════════ "ZURUECK" FUEHRT WIEDER ZUR KACHEL-UEBERSICHT
-await page.evaluate(() => closeDlg('dlgKr'));
+await page.evaluate(() => closeDrawer());
 await page.click('#rdAb-liste .bk-zurueck');
 await page.waitForTimeout(150);
 check('KRITISCH: "Zurück" zeigt wieder die Kachel-Übersicht', await page.isVisible('#rdUebersicht'));

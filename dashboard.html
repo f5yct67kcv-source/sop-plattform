@@ -13,6 +13,12 @@
 <link rel="icon" href="icons/icon-32.png" type="image/png">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <meta name="theme-color" content="#16181D">
+<!-- Leaflet/OpenStreetMap fuer die GPS-Punktwahl der Kontrollpunkte (ENT-248)
+     -- selbst ausgeliefert statt von einem CDN geladen, wie schon
+     html2pdf.bundle.min.js: kein Zugangsdaten- oder Kostenkonto noetig
+     (anders als Google Maps), und keine neue externe Laufzeit-Abhaengigkeit
+     fuer ein Betriebswerkzeug, das sonst nichts von aussen laedt. -->
+<link rel="stylesheet" href="leaflet/leaflet.css">
 <style>
 /* ══════════════════════════════════════════════════════════════════
    INTER, SELBST AUSGELIEFERT (ENT-223/ENT-227)
@@ -1563,7 +1569,12 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
 .kr-kopf { display: flex; align-items: center; gap: 8px; }
 .kr-kopf b { font-size: 13.5px; font-weight: 620; flex: 1; min-width: 0; }
 .kr-meta { font-size: 11.5px; color: var(--ink-3); margin-top: 3px; line-height: 1.55; }
-.kr-punkte-liste { display: flex; flex-direction: column; gap: 2px; max-height: 260px; overflow-y: auto; border: 1px solid var(--line); border-radius: var(--r-sm); padding: 6px 10px; }
+/* Seit ENT-248 stehen hier .kp-zeile-Karten (eigener Rahmen) statt schlanker
+   Checkbox-Zeilen -- ein zusaetzlicher Rahmen samt eigenem Scroll-Bereich
+   waere Kasten-im-Kasten und eine zweite Bildlaufleiste neben der der
+   Schublade selbst (.drawer-bd scrollt bereits). Darum kein eigener Rahmen
+   und kein eigenes max-height/overflow mehr, gleiches Muster wie #kpListe. */
+.kr-punkte-liste { display: flex; flex-direction: column; }
 
 /* Vorschau vor Massenbefehlen */
 .vs-kopf { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
@@ -2831,6 +2842,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 </style>
 <script src="gav.js"></script>
 <script src="zeitwahl.js"></script>
+<script src="leaflet/leaflet.js"></script>
 <script>
 /* Muss VOR dem ersten Zeichnen laufen, sonst blitzt die helle Fassung
    kurz auf, bevor die dunkle greift (ENT-029). Ohne gespeicherte Wahl
@@ -5419,10 +5431,17 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
       </div>
 
       <div id="kpGeofenceFelder" style="display:none">
+        <!-- Karte statt blinder Zahleneingabe (ENT-248): ein Klick setzt den
+             Punkt, Ziehen korrigiert ihn, der Kreis zeigt den Radius gleich
+             mit. Die Zahlenfelder darunter bleiben bestehen -- sie fuellen
+             sich aus der Karte, lassen sich aber auch von Hand nachschaerfen
+             (z. B. aus einer bereits bekannten Koordinate). -->
+        <div id="kpKarte" style="height:240px;border-radius:var(--r-sm);margin-bottom:12px;overflow:hidden"></div>
+        <p class="zone-note" id="kpKarteHinweis" style="margin-top:0">Auf die Karte klicken, um den Punkt zu setzen.</p>
         <div class="form-grid">
-          <div class="f"><label for="kpLat">Breitengrad</label><input class="inp" id="kpLat" type="number" step="0.0000001" placeholder="z. B. 47.3769000"></div>
-          <div class="f"><label for="kpLng">Längengrad</label><input class="inp" id="kpLng" type="number" step="0.0000001" placeholder="z. B. 8.5417000"></div>
-          <div class="f"><label for="kpRadius">Radius (Meter)</label><input class="inp" id="kpRadius" type="number" min="1" max="1000" value="20"></div>
+          <div class="f"><label for="kpLat">Breitengrad</label><input class="inp" id="kpLat" type="number" step="0.0000001" placeholder="z. B. 47.3769000" onchange="kpFeldGeaendert()"></div>
+          <div class="f"><label for="kpLng">Längengrad</label><input class="inp" id="kpLng" type="number" step="0.0000001" placeholder="z. B. 8.5417000" onchange="kpFeldGeaendert()"></div>
+          <div class="f"><label for="kpRadius">Radius (Meter)</label><input class="inp" id="kpRadius" type="number" min="1" max="1000" value="20" onchange="kpFeldGeaendert()"></div>
         </div>
         <p class="zone-note">Default 20 m — bei einer grossen Fläche (z. B. Parkplatz) übersteuerbar.</p>
       </div>
@@ -5430,31 +5449,6 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
     <div class="dlg-ft">
       <button class="btn btn-plain" onclick="closeDlg('dlgKp')">Abbrechen</button>
       <button class="btn btn-primary" id="kpBtn" onclick="saveKp()">Speichern</button>
-    </div>
-  </div>
-</div>
-
-<!-- Kontrollrunde anlegen/ändern (ENT-204) -->
-<div class="dlg-scrim" id="dlgKr">
-  <div class="dlg">
-    <div class="dlg-hd">
-      <h2 id="krTitel">Neue Kontrollrunde</h2>
-      <p>Eine benannte Runde aus mehreren Kontrollpunkten dieses Objekts, z. B. Öffnungsrunde oder Schlusskontrolle.</p>
-    </div>
-    <div class="dlg-bd">
-      <div class="msg-err" id="krErr" style="display:none"></div>
-      <div class="form-grid">
-        <div class="f wide"><label for="krName">Name *</label><input class="inp" id="krName" placeholder="z. B. Öffnungsrunde"></div>
-        <div class="f"><label class="check" style="margin-top:26px"><input type="checkbox" id="krAktiv" checked> Aktiv</label></div>
-      </div>
-      <div class="f wide" style="margin-top:10px">
-        <label>Kontrollpunkte in dieser Runde</label>
-        <div class="kr-punkte-liste" id="krPunkteListe"></div>
-      </div>
-    </div>
-    <div class="dlg-ft">
-      <button class="btn btn-plain" onclick="closeDlg('dlgKr')">Abbrechen</button>
-      <button class="btn btn-primary" id="krBtn" onclick="saveKr()">Speichern</button>
     </div>
   </div>
 </div>
@@ -14996,6 +14990,70 @@ function kpTypUm() {
   const ist = $('kpTyp').value;
   $('kpNfcFelder').style.display = ist === 'nfc' ? '' : 'none';
   $('kpGeofenceFelder').style.display = ist === 'geofence' ? '' : 'none';
+  if (ist === 'geofence') { kpKarteInit(); }
+}
+
+// Karte fuer die GPS-Punktwahl der Kontrollpunkte (ENT-248). Leaflet/
+// OpenStreetMap statt Google Maps -- kein API-Key, kein Kostenkonto,
+// selbst ausgeliefert (siehe deploy-hostpoint.yml). Eine einzige Karten-
+// Instanz wird wiederverwendet, nicht bei jedem Oeffnen neu erzeugt --
+// Leaflet laesst sich nicht zweimal auf demselben Container initialisieren.
+let kpMapa = null, kpMarker = null, kpKreis = null;
+const KP_KARTE_STANDARD = [46.8, 8.33]; // geografische Mitte der Schweiz, ohne gesetzten Punkt
+
+function kpKarteInit() {
+  if (!$('kpKarte')) { return; }
+  const hatPunkt = $('kpLat').value.trim() !== '' && $('kpLng').value.trim() !== '';
+  const mitte = hatPunkt ? [parseFloat($('kpLat').value), parseFloat($('kpLng').value)] : KP_KARTE_STANDARD;
+  if (!kpMapa) {
+    kpMapa = L.map('kpKarte').setView(mitte, hatPunkt ? 17 : 8);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>',
+    }).addTo(kpMapa);
+    kpMapa.on('click', e => kpPunktSetzen(e.latlng.lat, e.latlng.lng));
+  } else {
+    kpMapa.setView(mitte, hatPunkt ? 17 : 8);
+  }
+  if (hatPunkt) { kpMarkerZeichnen(mitte[0], mitte[1]); } else { kpMarkerEntfernen(); }
+  // Die Karte wurde eben erst sichtbar (kpGeofenceFelder stand auf
+  // display:none) -- ohne invalidateSize() rendert Leaflet mit der Groesse
+  // von vorher (0x0) und bleibt grau.
+  setTimeout(() => { if (kpMapa) { kpMapa.invalidateSize(); } }, 30);
+}
+
+function kpPunktSetzen(lat, lng) {
+  $('kpLat').value = lat.toFixed(7);
+  $('kpLng').value = lng.toFixed(7);
+  kpMarkerZeichnen(lat, lng);
+}
+
+function kpMarkerZeichnen(lat, lng) {
+  const radius = parseInt($('kpRadius').value, 10) || 20;
+  if (kpMarker) {
+    kpMarker.setLatLng([lat, lng]);
+  } else {
+    kpMarker = L.marker([lat, lng], { draggable: true }).addTo(kpMapa)
+      .on('dragend', () => { const p = kpMarker.getLatLng(); kpPunktSetzen(p.lat, p.lng); });
+  }
+  if (kpKreis) { kpKreis.setLatLng([lat, lng]).setRadius(radius); }
+  else { kpKreis = L.circle([lat, lng], { radius, color: '#3b6fe0', weight: 2 }).addTo(kpMapa); }
+}
+
+function kpMarkerEntfernen() {
+  if (kpMarker) { kpMapa.removeLayer(kpMarker); kpMarker = null; }
+  if (kpKreis) { kpMapa.removeLayer(kpKreis); kpKreis = null; }
+}
+
+// Von Hand eingetragene/geaenderte Werte (Breitengrad, Laengengrad, Radius)
+// sollen die Karte ebenso nachziehen wie ein Klick darauf -- sonst zeigt
+// die Karte nach einer manuellen Korrektur einen veralteten Punkt.
+function kpFeldGeaendert() {
+  if (!kpMapa) { return; }
+  const lat = parseFloat($('kpLat').value), lng = parseFloat($('kpLng').value);
+  if (!isFinite(lat) || !isFinite(lng)) { kpMarkerEntfernen(); return; }
+  kpMarkerZeichnen(lat, lng);
+  kpMapa.setView([lat, lng], Math.max(kpMapa.getZoom(), 16));
 }
 
 function saveKp() {
@@ -15024,7 +15082,9 @@ function saveKp() {
     b.disabled = false;
     if (!ok || data.status !== 'ok') { err.textContent = data.message || 'Speichern fehlgeschlagen.'; err.style.display = ''; return; }
     closeDlg('dlgKp');
-    loadKontrollpunkte().then(() => toast('Kontrollpunkt gespeichert.'));
+    // krPunkteAktualisieren() ist ein No-Op, wenn keine Kontrollrunden-
+    // Schublade offen ist (ENT-248) -- gefahrlos hier immer aufzurufen.
+    loadKontrollpunkte().then(() => { toast('Kontrollpunkt gespeichert.'); krPunkteAktualisieren(); });
   });
 }
 
@@ -15034,31 +15094,85 @@ function askDeleteKp(id) {
     'Entfernen',
     () => api('kontrollpunkt_loeschen.php', { method: 'POST', body: { id } }).then(({ ok, data }) => {
       if (!ok || data.status !== 'ok') { toast(data.message || 'Fehlgeschlagen.'); return; }
-      loadKontrollpunkte().then(() => toast('Kontrollpunkt gelöscht.'));
+      loadKontrollpunkte().then(() => { toast('Kontrollpunkt gelöscht.'); krPunkteAktualisieren(); });
     }));
 }
 
-// ── Kontrollrunden (ENT-204) ──────────────────────────────────────────────
+// ── Kontrollrunden (ENT-204, Schublade statt kleinem Dialog seit ENT-248) ──
+// Der kleine dlgKr-Dialog reichte nicht mehr, sobald hier auch Kontrollpunkte
+// (NFC/Geofence, inkl. Kartenauswahl) direkt bearbeitbar sein sollen -- dafuer
+// braucht es die grosse, gemeinsame Schublade statt eines schmalen Dialogs.
 function openKr(modus, id) {
   krTarget = id ? Number(id) : null;
   const v = krTarget ? rundgangVorlagen.find(x => Number(x.id) === krTarget) : null;
 
-  $('krTitel').textContent = modus === 'neu' ? 'Neue Kontrollrunde' : 'Kontrollrunde ändern';
-  $('krName').value = v ? v.name : '';
-  $('krAktiv').checked = v ? !!Number(v.aktiv) : true;
+  $('drTitle').textContent = modus === 'neu' ? 'Neue Kontrollrunde' : 'Kontrollrunde ändern';
+  $('drBody').innerHTML = `
+    <p class="zone-note" style="margin-top:0">Eine benannte Runde aus mehreren Kontrollpunkten dieses Objekts, z. B. Öffnungsrunde oder Schlusskontrolle.</p>
+    <div class="msg-err" id="krErr" style="display:none"></div>
+    <div class="form-grid">
+      <div class="f wide"><label for="krName">Name *</label><input class="inp" id="krName" placeholder="z. B. Öffnungsrunde" value="${v ? esc(v.name) : ''}"></div>
+      <div class="f"><label class="check" style="margin-top:26px"><input type="checkbox" id="krAktiv"${(v ? !!Number(v.aktiv) : true) ? ' checked' : ''}> Aktiv</label></div>
+    </div>
+    <div class="f wide" style="margin-top:14px">
+      <div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:8px">
+        <label style="margin:0">Kontrollpunkte in dieser Runde</label>
+        <button class="btn btn-plain btn-sm" style="margin-left:auto" onclick="openKp('neu')">+ Kontrollpunkt</button>
+      </div>
+      <div class="kr-punkte-liste" id="krPunkteListe"></div>
+    </div>`;
+  $('drFoot').innerHTML = `
+    <button class="btn btn-plain" onclick="closeDrawer()">Abbrechen</button>
+    <button class="btn btn-primary" id="krBtn" onclick="saveKr()">Speichern</button>`;
 
   // Reihenfolge der Checkboxen = Reihenfolge der Kontrollpunkte des Objekts --
   // beim Speichern wird genau diese Reihenfolge als Reihenfolge der Runde
   // uebernommen (kein eigener Sortier-Dialog, ENT-204 erlaubt das, verlangt
   // es aber nicht).
-  const gewaehlt = v ? new Set(v.punkte.map(p => Number(p.id))) : new Set();
-  $('krPunkteListe').innerHTML = kontrollpunkte.length
-    ? kontrollpunkte.map(k => `<label class="check"><input type="checkbox" class="kr-punkt" value="${Number(k.id)}"${gewaehlt.has(Number(k.id)) ? ' checked' : ''}> ${esc(k.bezeichnung)}${Number(k.aktiv) ? '' : ' <span class="chip chip-n">nicht aktiv</span>'}</label>`).join('')
-    : '<p class="zone-note" style="margin:0">Dieses Objekt hat noch keinen Kontrollpunkt.</p>';
+  krPunkteZeichnen(v ? new Set(v.punkte.map(p => Number(p.id))) : new Set());
 
-  $('krErr').style.display = 'none';
-  openDlg('dlgKr');
+  showDrawer();
   $('krName').focus();
+}
+
+// Baut die Kontrollpunkte-Liste innerhalb der Kontrollrunden-Schublade --
+// eigene Funktion statt Inline-Code in openKr(), weil krPunkteAktualisieren()
+// (unten) dieselbe Zeichnung nach dem Speichern/Loeschen eines einzelnen
+// Kontrollpunkts erneut braucht, ohne die ganze Schublade neu zu oeffnen.
+function krPunkteZeichnen(gewaehlt) {
+  const ziel = $('krPunkteListe');
+  if (!ziel) return;
+  ziel.innerHTML = kontrollpunkte.length
+    ? kontrollpunkte.map(k => {
+        const meta = k.typ === 'nfc'
+          ? `NFC-Chip ${esc(k.chip_id || '–')}`
+          : `Geofence · ${nf(k.lat, 5)}, ${nf(k.lng, 5)} · Radius ${nf(k.geofence_radius_m)} m`;
+        return `<div class="kp-zeile${Number(k.aktiv) ? '' : ' aus'}">
+          <div class="kp-kopf">
+            <label class="check" style="margin:0"><input type="checkbox" class="kr-punkt" value="${Number(k.id)}"${gewaehlt.has(Number(k.id)) ? ' checked' : ''}> <b>${esc(k.bezeichnung)}</b></label>
+            <span class="chip ${k.typ === 'nfc' ? 'chip-a' : 'chip-w'}">${k.typ === 'nfc' ? 'NFC' : 'Geofence'}</span>
+            ${Number(k.aktiv) ? '' : '<span class="chip chip-n">nicht aktiv</span>'}
+          </div>
+          <div class="kp-meta">${meta}</div>
+          <div style="display:flex;gap:7px;margin-top:9px">
+            <button class="btn btn-plain btn-sm" onclick="openKp('aendern',${Number(k.id)})">Bearbeiten</button>
+          </div>
+        </div>`;
+      }).join('')
+    : '<p class="zone-note" style="margin:0">Dieses Objekt hat noch keinen Kontrollpunkt.</p>';
+}
+
+// Nach dem Speichern/Loeschen eines Kontrollpunkts (aus saveKp()/askDeleteKp()
+// unten) die Liste in der Kontrollrunden-Schublade nachziehen, falls sie
+// gerade offen ist -- sonst zeigte sie nach dem Bearbeiten eines Punktes
+// noch den alten Stand, bis man die Schublade neu oeffnet. Bereits
+// angehakte Punkte bleiben angehakt: die aktuelle Auswahl wird vor dem
+// Neuzeichnen eingesammelt.
+function krPunkteAktualisieren() {
+  const ziel = $('krPunkteListe');
+  if (!ziel) return;
+  const gewaehlt = new Set(Array.from(ziel.querySelectorAll('.kr-punkt:checked')).map(c => Number(c.value)));
+  krPunkteZeichnen(gewaehlt);
 }
 
 function saveKr() {
@@ -15078,7 +15192,7 @@ function saveKr() {
     ).then(({ ok: ok2, data: data2 }) => {
       b.disabled = false;
       if (!ok2 || data2.status !== 'ok') { err.textContent = data2.message || 'Punktzuordnung fehlgeschlagen.'; err.style.display = ''; return; }
-      closeDlg('dlgKr');
+      closeDrawer();
       loadRundgangVorlagen().then(() => toast('Kontrollrunde gespeichert.'));
       // Die objektuebergreifende Seite (ENT-246) fuehrt ihre eigene Kopie
       // der Liste -- ohne diesen Aufruf zeigte sie nach dem Speichern noch
@@ -15106,8 +15220,8 @@ function askDeleteKr(id) {
 // Die volle Verwaltung (auch inaktive Runden, Kontrollpunkte zuordnen)
 // bleibt Objekt fuer Objekt unter Einrichtung -- diese Seite ist ein
 // schneller, objektuebergreifender Ueberblick plus Einstieg zum Anlegen,
-// kein Ersatz dafuer. Bearbeiten/Anlegen nutzen denselben Dialog (dlgKr) wie
-// die Einrichtung: dafuer wird rdEinObjekt vorher gesetzt und kontrollpunkte
+// kein Ersatz dafuer. Bearbeiten/Anlegen nutzen dieselbe Schublade (openKr(),
+// ENT-248) wie die Einrichtung: dafuer wird rdEinObjekt vorher gesetzt und kontrollpunkte
 // (bzw. rundgangVorlagen fuers Vorbefuellen) fuer genau dieses Objekt
 // geladen. Gleiches Umschalt-Muster wie Betrieb (ENT-211): bleibt innerhalb
 // derselben view-rundgaenge, kein Eintrag im go()-Ansichtsregister noetig.

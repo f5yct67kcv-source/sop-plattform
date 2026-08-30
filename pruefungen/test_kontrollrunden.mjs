@@ -1,5 +1,7 @@
 // Kontrollrunden-Vorlagen unter Revierdienst > Einrichtung (ENT-204, Umzug
-// aus der Objekt-Detailseite seit ENT-224).
+// aus der Objekt-Detailseite seit ENT-224; Anlegen/Aendern seit ENT-248 in
+// der gemeinsamen Schublade statt im kleinen dlgKr-Dialog, weil dort jetzt
+// auch Kontrollpunkte inklusive Karten-Punktwahl direkt bearbeitbar sind).
 //
 // Die eigentliche Pruef- und Ersetzungslogik der Punktzuordnung laeuft echt
 // gegen SQLite in pruef_rundgang.php -- hier nur, dass die Oberflaeche die
@@ -117,8 +119,9 @@ await page.screenshot({ path: `${OUT}/kr-01-liste.png` });
 
 // ══════════ NEU ANLEGEN: PUNKTE-CHECKLISTE AUS DEN OBJEKT-KONTROLLPUNKTEN
 await page.click('#krListe ~ div button:has-text("Kontrollrunde hinzufügen")');
-await page.waitForSelector('#dlgKr.on');
+await page.waitForSelector('#drawer.on');
 await page.waitForTimeout(150);
+check('Titel der Schublade stimmt', (await page.textContent('#drTitle')) === 'Neue Kontrollrunde');
 check('Alle drei Kontrollpunkte des Objekts stehen zur Auswahl',
   (await page.$$('#krPunkteListe .kr-punkt')).length === 3);
 check('Neu: kein Punkt vorausgewaehlt',
@@ -126,6 +129,8 @@ check('Neu: kein Punkt vorausgewaehlt',
 check('Der inaktive Kontrollpunkt ist trotzdem waehlbar, aber gekennzeichnet',
   (await page.textContent('#krPunkteListe')).includes('Alter Punkt') &&
   (await page.textContent('#krPunkteListe')).includes('nicht aktiv'));
+check('"+ Kontrollpunkt" fuehrt direkt zum Kontrollpunkt-Dialog (ENT-248)',
+  await page.isVisible('button:has-text("+ Kontrollpunkt")'));
 
 calls = [];
 await page.click('#krBtn');
@@ -148,19 +153,45 @@ check('KRITISCH: die Punktzuordnung wird MIT der neuen id aus dem Speichern gese
   zugeordnet && zugeordnet.body.vorlage_id === 99);
 check('KRITISCH: die Reihenfolge der Checkboxen wird als Reihenfolge uebernommen (Hintereingang vor Parkplatz)',
   zugeordnet && JSON.stringify(zugeordnet.body.kontrollpunkt_ids) === JSON.stringify([1, 2]));
-check('Dialog schliesst nach Speichern', !(await page.isVisible('#dlgKr.on')));
+check('Schublade schliesst nach Speichern', !(await page.isVisible('#drawer.on')));
 
 // ══════════ BEARBEITEN: VORHANDENE WERTE UEBERNOMMEN
 await page.waitForTimeout(300);
 await page.click('#krListe .kr-zeile:first-child button:has-text("Bearbeiten")');
-await page.waitForSelector('#dlgKr.on');
+await page.waitForSelector('#drawer.on');
 await page.waitForTimeout(150);
+check('Titel der Schublade beim Aendern stimmt', (await page.textContent('#drTitle')) === 'Kontrollrunde ändern');
 check('Name uebernommen', (await page.inputValue('#krName')) === 'Öffnungsrunde');
 check('Aktiv-Status uebernommen', await page.isChecked('#krAktiv'));
 check('Der bereits zugeordnete Punkt ist vorausgewaehlt',
   await page.isChecked('#krPunkteListe .kr-punkt[value="1"]'));
 check('Ein nicht zugeordneter Punkt ist nicht vorausgewaehlt',
   !(await page.isChecked('#krPunkteListe .kr-punkt[value="2"]')));
+
+// ══════════ "+ KONTROLLPUNKT" OEFFNET DIREKT DEN KONTROLLPUNKT-DIALOG,
+// UND DIE LISTE IN DER SCHUBLADE ZIEHT SOFORT NACH (ENT-248,
+// krPunkteAktualisieren()) -- ohne die Kontrollrunden-Schublade neu oeffnen
+// zu muessen.
+await page.click('button:has-text("+ Kontrollpunkt")');
+await page.waitForSelector('#dlgKp.on');
+check('Die Kontrollrunden-Schublade bleibt hinter dem Kontrollpunkt-Dialog sichtbar (Dialog stapelt, statt zu ersetzen)',
+  await page.isVisible('#drawer.on'));
+await page.fill('#kpBezeichnung', 'Hintereingang unten');
+await page.fill('#kpChipId', 'NEU01');
+// Simuliert, was die echte API nach erfolgreichem Speichern zurueckgeben
+// wuerde -- der Test-Stub fuer kontrollpunkt_liste.php antwortet mit genau
+// diesem Array, darum hier von Hand ergaenzt statt echt in SQLite gespeichert.
+KONTROLLPUNKTE.kontrollpunkte.push(
+  { id: 4, objekt_id: 1, bezeichnung: 'Hintereingang unten', reihenfolge: 3, typ: 'nfc', chip_id: 'NEU01', lat: null, lng: null, geofence_radius_m: 20, aktiv: 1 });
+calls = [];
+await page.click('#kpBtn');
+await page.waitForTimeout(300);
+check('Kontrollpunkt wird gespeichert', calls.some(c => c.path.includes('kontrollpunkt_save')));
+check('KRITISCH: der neue Kontrollpunkt erscheint sofort in der Kontrollrunden-Liste, ohne die Schublade neu zu oeffnen',
+  (await page.textContent('#krPunkteListe')).includes('Hintereingang unten'));
+check('Bereits angehakte Punkte bleiben nach dem Nachziehen angehakt',
+  await page.isChecked('#krPunkteListe .kr-punkt[value="1"]'));
+KONTROLLPUNKTE.kontrollpunkte.pop();
 
 calls = [];
 await page.click('#krPunkteListe .kr-punkt[value="2"]');
@@ -192,16 +223,16 @@ await page.waitForTimeout(200);
 check('KRITISCH: ohne das Recht wird rundgang_vorlage_liste gar nicht erst aufgerufen, auch bei direktem Aufruf',
   !calls.some(c => c.path.includes('rundgang_vorlage_liste')));
 
-// ══════════ MOBIL: DIALOG WIRD ZUM VOLLBILD, TREFFERFLAECHE STIMMT
+// ══════════ MOBIL: SCHUBLADE WIRD ZUM VOLLBILD, TREFFERFLAECHE STIMMT
 await setup(page, null);
 await anmelden();
 await zurEinrichtung();
 await page.click('#krListe ~ div button:has-text("Kontrollrunde hinzufügen")');
-await page.waitForSelector('#dlgKr.on');
+await page.waitForSelector('#drawer.on');
 await page.setViewportSize({ width: 390, height: 844 });
 await page.waitForTimeout(300);
-const kastenBreite = await page.$eval('#dlgKr .dlg', el => el.getBoundingClientRect().width);
-check('Auf dem Handy nutzt der Dialog die volle Breite', Math.abs(kastenBreite - 390) < 2);
+const kastenBreite = await page.$eval('#drawer', el => el.getBoundingClientRect().width);
+check('Auf dem Handy nutzt die Schublade die volle Breite', Math.abs(kastenBreite - 390) < 2);
 // Gemessen, nicht angenommen (CLAUDE.md Gestaltung).
 const feldSchrift = await page.$eval('#krName', el => parseFloat(getComputedStyle(el).fontSize));
 check('KRITISCH: Eingabefeld hat mindestens 16px Schrift (kein iOS-Auto-Zoom)', feldSchrift >= 16);
