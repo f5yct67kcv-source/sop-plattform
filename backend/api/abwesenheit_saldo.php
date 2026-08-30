@@ -1,11 +1,11 @@
 <?php
 declare(strict_types=1);
 // Ferien-Anspruch und -Restsaldo einer Person fuer ein Kalenderjahr
-// (ENT-254). Rechenkern in ferien.php -- dieser Endpunkt liest nur die
+// (ENT-255). Rechenkern in ferien.php -- dieser Endpunkt liest nur die
 // Eingabedaten zusammen und liefert das Ergebnis aus.
 //
 // Selbstbedienung UND Fremdsicht im selben Endpunkt (Muster aus
-// rapport_list.php, siehe Recherche zu ENT-254): mit personal_lesen jede
+// rapport_list.php, siehe Recherche zu ENT-255): mit personal_lesen jede
 // Person, sonst nur die eigene -- everyone darf den eigenen Stand kennen,
 // unabhaengig von Rollen.
 require __DIR__ . '/../db.php';

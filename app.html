@@ -520,7 +520,7 @@ const W = {
     sperreGesetzt: 'Tag gesperrt.', sperreWeg: 'Sperre aufgehoben.',
     sperreEingeteilt: 'An diesem Tag bist du bereits eingeteilt.',
     sperreVergangen: 'vorbei',
-    // Abwesenheiten (ENT-254): Ferien/Krankheit/Unfall/Militaer-,
+    // Abwesenheiten (ENT-255): Ferien/Krankheit/Unfall/Militaer-,
     // Zivildienst/Schwangerschaft, mit Antrags-/Genehmigungsworkflow.
     abwesenheit: 'Abwesenheit', neuerAntrag: 'Neuer Antrag',
     abwesenheitTitel: 'Abwesenheit beantragen',
@@ -655,7 +655,7 @@ let ich = JSON.parse(localStorage.getItem('rv3_user') || 'null');
 let schichten = [];
 let rapporte = [];
 let sperrtage = {};   // Datum -> Bemerkung (ENT-028)
-let meineAbwesenheiten = [];   // eigene Abwesenheitsantraege (ENT-254)
+let meineAbwesenheiten = [];   // eigene Abwesenheitsantraege (ENT-255)
 let profil = null;
 // Die frühere Monatssumme aus den Rapporten ist entfallen (ENT-049): der
 // Rapport kennt die tatsächliche Pausenabrechnung noch nicht, die entsteht
@@ -1061,7 +1061,7 @@ function kalenderwoche(d) {
   return String(Math.ceil(((t - jahresStart) / 864e5 + 1) / 7));
 }
 
-// ══════════════════════════════════════════ ABWESENHEITEN (ENT-254)
+// ══════════════════════════════════════════ ABWESENHEITEN (ENT-255)
 // Dritter Unterreiter neben Plan/Sperren -- eigene Antraege stellen,
 // ansehen und (solange unentschieden) zurueckziehen. Der Feriensaldo steht
 // hier bewusst NICHT: das ist eine Auswertung fuer die Verwaltung

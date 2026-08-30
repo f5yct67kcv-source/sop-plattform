@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-// Ferienanspruch nach Art. 20 GAV (ENT-254).
+// Ferienanspruch nach Art. 20 GAV (ENT-255).
 //
 // Reiner Rechenkern, keine Datenbankzugriffe -- derselbe Grund wie bei
 // kategorie_pruefen()/pensum_pruefen() in planung.php: leichter fuer sich
