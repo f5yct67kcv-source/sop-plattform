@@ -158,7 +158,7 @@ quelle.forEach((l, i) => {
   const m = l.match(/#[0-9A-Fa-f]{6}\b|#[0-9A-Fa-f]{3}\b/g);
   if (m) anzahl += m.length;
 });
-const OBERGRENZE = 115;   // Bestand bei Einfuehrung (2026-08-30) -- darf sinken, nie steigen
+const OBERGRENZE = 115;   // Bestand bei Einfuehrung (ENT-239, Etappe 1) -- darf sinken, nie steigen
 check(`Keine neuen harten Farben ausserhalb des Token-Blocks (${anzahl} <= ${OBERGRENZE})`, anzahl <= OBERGRENZE);
 
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);

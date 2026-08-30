@@ -346,8 +346,17 @@ const inhaltHell = await helligkeit(dh, '.card');
 check('KRITISCH: am Desktop bleibt die Leiste im Hellmodus dunkel', leisteHell < 60);
 check('KRITISCH: ... und hebt sich damit weiterhin von der Arbeitsfläche ab',
   inhaltHell - leisteHell > 150);
-check('Am Desktop bleibt die Gruppenüberschrift unverändert',
-  (await textHelligkeit(dh, '.side-nav .nav-lbl')) === 98);
+// Frueher wurde hier der exakte Helligkeitswert festgenagelt ("bleibt
+// unveraendert"). Das prueft den Wortlaut, nicht die Aussage -- und fiel
+// rot aus, als die Gruppenueberschrift fuer besseren Kontrast bewusst
+// aufgehellt wurde (ENT-239, Etappe 1). Die Aussage ist: auch am Desktop
+// lesbar, aber zurueckhaltender als die Menuepunkte selbst.
+const kGruppeDesk = await kontrast(dh, '.side-nav .nav-lbl', '.side');
+check(`KRITISCH: die Gruppenüberschrift ist auch am Desktop lesbar (${kGruppeDesk}:1)`,
+  kGruppeDesk >= 4.5);
+check('Sie bleibt dabei zurückhaltender als die Menüpunkte',
+  (await textHelligkeit(dh, '.side-nav .nav-lbl')) <
+  (await textHelligkeit(dh, '.side-nav .nav-item')));
 await dh.close();
 
 await browser.close();
