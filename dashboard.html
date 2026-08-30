@@ -4601,7 +4601,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
              bkUebersichtZeigen() weiter unten im Skript. -->
         <div class="bk-uebersicht" id="bkUebersicht">
           <div class="bk-kachel-grid">
-            <!-- Betrieb (ENT-236): war "Anstellungsorte", jetzt vorne und
+            <!-- Betrieb (ENT-245): war "Anstellungsorte", jetzt vorne und
                  erweitert um Hauptdomizil und Logo -- der Projektinhaber
                  wollte die betrieblichen Angaben an einem Ort, nicht auf
                  drei Kacheln verteilt. Anstellungsorte bleiben inhaltlich
@@ -4751,7 +4751,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
         </div>
         </div>
 
-        <!-- Betrieb (ENT-236): Hauptdomizil, Anstellungsorte und Logo in
+        <!-- Betrieb (ENT-245): Hauptdomizil, Anstellungsorte und Logo in
              einer Unteransicht -- drei Karten in derselben .grid-Spalte,
              gleiche Bauart wie die uebrigen Unteransichten hier. -->
         <div class="bk-abschnitt" id="bkAb-be" style="display:none">
@@ -4822,7 +4822,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
                unter 40 km nichts, ab 40 km eine Pauschale nach Formel.</p>
           </div>
         </div>
-        <!-- Logo (ENT-155, ab ENT-236 hier statt bei Briefkopf für Rapporte):
+        <!-- Logo (ENT-155, ab ENT-245 hier statt bei Briefkopf für Rapporte):
              betriebsweites Feld, nicht an den Rapport-Ausdruck gebunden --
              wird bereits heute von mehreren Stellen gelesen (beleg_oeffentlich.php,
              beleg_versenden.php). Dieselben Element-IDs wie zuvor, darum
@@ -12831,7 +12831,7 @@ function bdFehler(text) {
   el.textContent = text; el.style.display = '';
 }
 
-// Eigener Speicherweg fuer das Hauptdomizil (ENT-236) -- ein einziger
+// Eigener Speicherweg fuer das Hauptdomizil (ENT-245) -- ein einziger
 // gemeinsamer Aufruf mit bkSpeichern() waere hier falsch: Diese Karte kennt
 // Firma/Zusatz/Fusszeile/QR-Felder nicht, und bkSpeichern() kennt bdStrasse
 // nicht. Ein gemeinsamer Aufruf wuerde beim Speichern der jeweils anderen

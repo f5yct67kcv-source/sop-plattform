@@ -1093,7 +1093,7 @@ $spalten = [
     ['betrieb', 'qr_hausnummer', 'ALTER TABLE betrieb ADD COLUMN qr_hausnummer VARCHAR(20) NULL AFTER qr_strasse'],
     ['betrieb', 'qr_plz',        'ALTER TABLE betrieb ADD COLUMN qr_plz VARCHAR(10) NULL AFTER qr_hausnummer'],
     ['betrieb', 'qr_ort',        'ALTER TABLE betrieb ADD COLUMN qr_ort VARCHAR(100) NULL AFTER qr_plz'],
-    // Hauptdomizil (ENT-236): die allgemeine Geschaeftsadresse des Betriebs,
+    // Hauptdomizil (ENT-245): die allgemeine Geschaeftsadresse des Betriebs,
     // fuer die neu zusammengefasste "Betrieb"-Kachel (vormals "Anstellungsorte").
     // BEWUSST eine dritte, eigene Adresse -- nicht dieselben Spalten wie
     // qr_strasse/qr_plz/qr_ort (das ist die Absenderadresse einer QR-Rechnung,

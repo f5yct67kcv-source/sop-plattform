@@ -68,7 +68,7 @@ check('KRITISCH: eine fehlende Betriebszeile wird angelegt — ein UPDATE ins Le
 check('Das Logo geht als Daten-URL heraus — der Ausdruck braucht keinen zweiten Abruf',
   /'data:' \. \$r\['logo_mime'\] \. ';base64,' \. base64_encode\(\$roh\)/.test(BET));
 
-// KRITISCH (ENT-236): der echte Server speichert Hauptdomizil in einem
+// KRITISCH (ENT-245): der echte Server speichert Hauptdomizil in einem
 // EIGENEN, frueh zurueckkehrenden Zweig -- nicht im generischen
 // Textfelder-Zweig, der firma/zusatz/fusszeile/qr_* mitschreibt. Ohne diese
 // Trennung wuerde ein Speichern des Hauptdomizils (das Firma/Zusatz gar
@@ -192,7 +192,7 @@ await page.route('**/api/**', route => {
       gesendet.push(body);
       if (body.logo_weg) { BETRIEB = { ...BETRIEB, logo: null, logo_mime: null, logo_groesse: null }; }
       else if (body.logo) { BETRIEB = { ...BETRIEB, logo: 'data:' + body.logo_mime + ';base64,' + body.logo, logo_mime: body.logo_mime, logo_groesse: 120 }; }
-      // Eigener Zweig wie beim echten Server (betrieb.php, ENT-236): ein
+      // Eigener Zweig wie beim echten Server (betrieb.php, ENT-245): ein
       // Speichern des Hauptdomizils darf NICHT im generischen Textfelder-Zweig
       // landen, sonst ueberschreiben die dort fehlenden firma/zusatz-Schluessel
       // (undefined) den bestehenden Stand -- genau der Fehler, den die
@@ -410,7 +410,7 @@ check('KRITISCH: das Logo laesst sich wieder entfernen', gesendet.some(b => b.lo
 check('Danach sagt die Karte wieder, dass keines hinterlegt ist',
   /Kein Logo hinterlegt/.test(await page.textContent('#bkLogoStand')));
 
-// ── Hauptdomizil (ENT-236): eigene Kachel "Betrieb", eigener Speicherweg.
+// ── Hauptdomizil (ENT-245): eigene Kachel "Betrieb", eigener Speicherweg.
 check('KRITISCH: die Betrieb-Kachel steht vorne, nicht die alte Anstellungsorte-Kachel',
   await page.evaluate(() => {
     const erste = document.querySelector('#bkUebersicht .bk-kachel');

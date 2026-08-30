@@ -6,7 +6,7 @@
 // POST -> speichern {firma, zusatz, fusszeile, fusszeile2, qr_*}
 //         Logo setzen     {logo: base64, logo_mime, logo_dateiname?}
 //         Logo weg        {logo_weg: true}
-//         Hauptdomizil    {domizil_strasse, domizil_plz, domizil_ort} -- ENT-236,
+//         Hauptdomizil    {domizil_strasse, domizil_plz, domizil_ort} -- ENT-245,
 //         eigener Zweig wie beim Logo: Ein Speichern aus der neuen
 //         "Betrieb"-Kachel darf Firma/Zusatz/Fusszeile/QR-Felder NICHT
 //         stillschweigend leeren, weil das Formular dort sie gar nicht kennt.
@@ -128,7 +128,7 @@ if (isset($in['logo'])) {
     json_response(['status' => 'ok', 'betrieb' => betrieb_lesen(true)]);
 }
 
-// Hauptdomizil (ENT-236): eigener, frueh zurueckkehrender Zweig wie beim
+// Hauptdomizil (ENT-245): eigener, frueh zurueckkehrender Zweig wie beim
 // Logo -- ausgeloest durch array_key_exists statt isset, weil ein geleertes
 // Feld absichtlich als leerer String ankommt und trotzdem gespeichert werden
 // muss. Ein einziger kombinierter Speicher-Aufruf mit den Textfeldern unten
