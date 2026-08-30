@@ -94,6 +94,16 @@
      bereits doppelt belegt (blau = heute, gelb = festgeschrieben). */
   --serie:      #6B4FA8;  --serie-soft: #F5F2FC;  --serie-line: #DED4F2;
 
+  /* Abwesenheiten (ENT-252). Zwei weitere, bisher unbelegte Farbtoene --
+     Blau/Gruen/Gelb/Rot/Violett tragen oben bereits eine andere Bedeutung.
+     Ferien (Teal) getrennt von allen anderen Abwesenheitsarten zusammen
+     (Indigo-Grau): die genaue Art steht ohnehin als Text in der Offene-
+     Antraege-Liste und im Titel der Kalenderzelle -- fuenf eigene Farbtoene
+     fuer eine Kalenderzelle waeren mehr Unterscheidung, als das Auge auf
+     einen Blick braucht. */
+  --aw-ferien:      #0F7A6B;  --aw-ferien-soft:  #E3F5F1;
+  --aw-andere:      #47517A;  --aw-andere-soft:  #ECEEF5;
+
   /* Abstufungen der Arbeitsflaeche -- bisher hart im Regelwerk verstreut */
   --surface-2:  #FBFCFD;   /* Tabellenkoepfe, ruhige Flaechen */
   --surface-3:  #FAFBFD;   /* Zeile unter dem Zeiger */
@@ -170,6 +180,8 @@ html[data-thema="dunkel"] {
   --neg-hi:   #FF9A8C;  --neg-line:  #4A2823;  --neg-flaeche: #241715;
   --warn:     #E2B156;  --warn-soft: #2B2314;  --warn-line:   #4A3C1C;
   --serie:    #B6A0EA;  --serie-soft: #241E36;  --serie-line:  #3D3357;
+  --aw-ferien: #4FD9C3;  --aw-ferien-soft: #122E29;
+  --aw-andere: #A7B0E0;  --aw-andere-soft: #242A42;
 
   /* Auf dunklem Grund traegt der Rand, nicht der Schatten. Das stand hier seit
      ENT-029 als Absicht, war aber nie umgesetzt -- --sh-1 warf weiter einen
@@ -1544,6 +1556,32 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
 .mx td.obj .chip { font-size: 10px; padding: 1px 6px; margin-left: 6px; vertical-align: middle; }
 .legende { display: flex; flex-wrap: wrap; gap: 14px; padding: 12px 18px; border-top: 1px solid var(--line-soft); font-size: 11.5px; color: var(--ink-3); }
 .legende i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+
+/* Abwesenheiten-Gesamtansicht (ENT-252). Volle Zellflaeche wie .mx td.d.z-*
+   oben, nicht nur ein Plaettchen darin -- dieselbe Begruendung: die
+   Trefferflaeche und die Farbflaeche sollen dasselbe Feld sein. */
+.gr td.d.aw-ferien { background: var(--aw-ferien-soft); }
+.gr td.d.aw-andere { background: var(--aw-andere-soft); }
+.gr .aw-blk { display: block; width: 100%; height: 100%; min-height: 26px; cursor: pointer; border: none; }
+.gr .aw-blk.aw-ferien { background: var(--aw-ferien); }
+.gr .aw-blk.aw-andere { background: var(--aw-andere); }
+/* Beantragt = noch nicht entschieden: schraffiert statt voll eingefaerbt,
+   damit ein offener Antrag nie wie eine bereits genehmigte Abwesenheit
+   aussieht (CLAUDE.md: "unbekannt darf nie wie keine aussehen" -- dieselbe
+   Familie von Fehler: eine Vermutung darf nie wie ein Beleg aussehen). */
+.gr .aw-blk.aw-offen {
+  background-image: repeating-linear-gradient(45deg, currentColor 0 3px, transparent 3px 7px);
+  background-color: transparent;
+  opacity: .65;
+}
+.gr .aw-blk.aw-offen.aw-ferien { color: var(--aw-ferien); }
+.gr .aw-blk.aw-offen.aw-andere { color: var(--aw-andere); }
+
+.aw-antrag { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 11px 0; border-bottom: 1px solid var(--line-soft); flex-wrap: wrap; }
+.aw-antrag:last-child { border-bottom: none; }
+.aw-antrag-info { min-width: 0; }
+.aw-antrag-aktionen { display: flex; gap: 8px; flex: none; }
 
 /* Masterschichten in der Objekt-Schublade */
 .ms-zeile { border: 1px solid var(--line); border-radius: var(--r-sm); padding: 11px 13px; margin-bottom: 8px; }
@@ -3052,6 +3090,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
         <div class="nav-kinder">
           <button class="nav-kind" id="nav-kontrolle-pensen" onclick="go('pensen')">Pensen</button>
           <button class="nav-kind" id="nav-kontrolle-auslagen" onclick="go('auslagen')">Auslagenersatz</button>
+          <button class="nav-kind" id="nav-kontrolle-abwesenheiten" onclick="go('abwesenheiten')">Abwesenheiten</button>
           <!-- Oeffnet eine Schublade statt einer eigenen Ansicht (ENT-243) --
                anders als Pensen/Auslagenersatz gibt es dafuer keine "on"-
                Markierung, dasselbe Muster wie die Kachel "Rundgaenge" (ENT-242). -->
@@ -4235,6 +4274,43 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
         <div id="pnKopf"></div>
         <div id="pnListe"></div>
         <div id="pnHinweis"></div>
+      </section>
+
+      <!-- ══════════════════════ ABWESENHEITEN (ENT-252) ══════════════════
+           Uebersichtsraster (Ferien/Krankheit/Unfall/Militaer-/Zivildienst/
+           Schwangerschaft) mit Monatsnavigation, darunter die Warteschlange
+           der noch unentschiedenen Antraege -- getrennt von den farbigen
+           Kalenderzellen, weil eine Aktion an eine bestimmte Zelle zu
+           knuepfen fehleranfaelliger waere als eine einfache Liste mit
+           Knoepfen. Reine Anzeige, kein Feriensaldo hier -- der Saldo (mit
+           der als ANNAHME markierten Kuerzung) steht in der Personalakte je
+           Person, nicht in dieser Gesamtansicht (siehe abwesenheit_saldo.php). -->
+      <section class="view" id="view-abwesenheiten">
+        <div class="bar-tools">
+          <select class="inp" id="awFunktion" style="width:auto" onchange="awFilterAendern()" aria-label="Funktion">
+            <option value="">Funktion: alle</option>
+          </select>
+          <select class="inp" id="awAbteilung" style="width:auto" onchange="awFilterAendern()" aria-label="Abteilung">
+            <option value="">Abteilung: alle</option>
+          </select>
+          <select class="inp" id="awStandort" style="width:auto" onchange="awFilterAendern()" aria-label="Anstellungsort">
+            <option value="">Anstellungsort: alle</option>
+          </select>
+          <div class="sp" style="flex:1"></div>
+          <button type="button" class="btn btn-plain btn-sm" onclick="awMonat(-1)" aria-label="Vorheriger Monat">◀</button>
+          <b id="awMonatLabel" style="min-width:130px;text-align:center"></b>
+          <button type="button" class="btn btn-plain btn-sm" onclick="awMonat(1)" aria-label="Nächster Monat">▶</button>
+        </div>
+        <div class="legende">
+          <span><i style="background:var(--aw-ferien)"></i>Ferien</span>
+          <span><i style="background:var(--aw-andere)"></i>Krankheit / Unfall / Militär-, Zivildienst / Schwangerschaft</span>
+          <span style="opacity:.7">schraffiert = noch nicht entschieden</span>
+        </div>
+        <div class="gr" id="awRaster"></div>
+        <div class="card" style="margin-top:20px">
+          <div class="card-hd"><h3>Offene Anträge</h3></div>
+          <div class="card-bd" id="awOffeneListe"></div>
+        </div>
       </section>
 
       <!-- ══════════════════════ REVIERDIENST-ÜBERSICHT (ENT-225) ══════════
@@ -6201,6 +6277,7 @@ const TITLES = {
   offerte:     ['Offerte', 'Positionen, Preise und Summen'],
   betrieb:     ['Einstellungen', 'Betrieb, Briefkopf, Zugang und Rollen'],
   pensen:      ['Pensen', 'Jahresstunden gegen die Anstellungskategorie'],
+  abwesenheiten: ['Abwesenheiten', 'Ferien, Krankheit und weitere Abwesenheiten im Überblick'],
   auslagen:    ['Auslagenersatz', 'Chronologisches Protokoll je Mitarbeitendem — Art. 18 Ziff. 10'],
   rundgaenge:  ['Übersicht', 'Rundgänge, GPS, Aufgaben und Auswertungen auf einen Blick'],
   revierdienst: ['Revierdienst', 'Kontrollpunkte und Kontrollrunden je Objekt einrichten'],
@@ -6973,13 +7050,15 @@ function go(view) {
   if (view === 'produkte') { $('nav-admin-produkte').classList.add('on'); }
   if (view === 'betrieb') { $('nav-admin-betrieb').classList.add('on'); }
   if (view === 'produkte') { produkte.length ? renderProdukte() : loadProdukte(); }
-  const kontrView = view === 'pensen' || view === 'auslagen';
+  const kontrView = view === 'pensen' || view === 'auslagen' || view === 'abwesenheiten';
   $('navg-kontrolle').classList.toggle('offen', kontrView);
   if (kontrView) { $('nav-kontrolle').classList.add('on'); }
   $('nav-kontrolle-pensen').classList.toggle('on', view === 'pensen');
   $('nav-kontrolle-auslagen').classList.toggle('on', view === 'auslagen');
+  $('nav-kontrolle-abwesenheiten').classList.toggle('on', view === 'abwesenheiten');
   if (view === 'pensen') { ladePensen(); }
   if (view === 'auslagen') { auslagenVorgabe(); ladeAuslagen(); }
+  if (view === 'abwesenheiten') { awLaden(); }
   // Revierdienst (ENT-224): Uebersicht (Rundgaenge, Durchfuehrung) und
   // Einrichtung (Kontrollpunkte/-runden) sind zwei Seiten derselben Rubrik,
   // gleiches Elterngruppen-Muster wie bei Kontrolle/Administration oben.
@@ -12306,6 +12385,201 @@ function pnMeldung(st) {
       bewerteten Zeit.</span>`);
   }
   return teile.length ? `<div class="sub" style="margin-top:6px;line-height:1.5">${teile.join(' ')}</div>` : '';
+}
+
+// ══════════════════════════════════════════ ABWESENHEITEN (ENT-252)
+// Gesamtansicht (Kalenderraster, ein Monat) und die Warteschlange der noch
+// unentschiedenen Antraege. Der Feriensaldo je Person (mit der als ANNAHME
+// markierten Kuerzung nach Art. 20 Ziff. 5) ist bewusst NICHT hier, sondern
+// in der Personalakte -- diese Ansicht zeigt nur, wer wann weg ist.
+
+// ISO-Kalenderwoche, identische Rechnung wie kalenderwoche() in app.html
+// (ENT-023) -- derselbe Algorithmus, nicht zweimal erfunden.
+function kalenderwoche(d) {
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));
+  const jahresStart = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+  return Math.ceil(((t - jahresStart) / 864e5 + 1) / 7);
+}
+
+const AW_TYP_TEXT = {
+  ferien: 'Ferien', krankheit: 'Krankheit', unfall: 'Unfall',
+  militaer: 'Militär-/Zivildienst', schwangerschaft: 'Schwangerschaft',
+};
+// Farblich nur zwei Gruppen (siehe --aw-ferien/--aw-andere) -- die genaue
+// Art steht als Text im Titel der Zelle und in der Offene-Antraege-Liste.
+const awFarbe = typ => typ === 'ferien' ? 'aw-ferien' : 'aw-andere';
+
+let awAbwesenheiten = [];
+let awDarfEntscheiden = false;
+let awMonatStart = null;
+let awFilterListenGefuellt = false;
+
+function awLaden() {
+  if (!awMonatStart) { const h = new Date(); awMonatStart = new Date(h.getFullYear(), h.getMonth(), 1); }
+  if ($('awMonatLabel')) {
+    $('awMonatLabel').textContent = awMonatStart.toLocaleDateString('de-CH', { month: 'long', year: 'numeric' });
+  }
+  const von = isoTag(awMonatStart);
+  const bis = isoTag(new Date(awMonatStart.getFullYear(), awMonatStart.getMonth() + 1, 0));
+  const warten = [];
+  if (!mitarbeiter.length) { warten.push(loadMitarbeiter()); }
+  if (!anstellungsorte.length) { warten.push(ladeAnstellungsorte()); }
+  if (!Object.keys(feiertage).length) { warten.push(ladeFeiertage()); }
+  return Promise.all(warten).then(() => {
+    awFilterListenFuellen();
+    return api(`abwesenheit_list.php?von=${von}&bis=${bis}`);
+  }).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') { toast(data.message || 'Abwesenheiten konnten nicht geladen werden.'); return; }
+    awAbwesenheiten = data.abwesenheiten || [];
+    awDarfEntscheiden = !!data.darf_entscheiden;
+    awZeichnen();
+  });
+}
+
+function awMonat(delta) {
+  awMonatStart = new Date(awMonatStart.getFullYear(), awMonatStart.getMonth() + delta, 1);
+  awLaden();
+}
+
+function awFilterListenFuellen() {
+  if (awFilterListenGefuellt) { return; }
+  awFilterListenGefuellt = true;
+  const opt = (sel, liste) => {
+    const el = $(sel); if (!el) { return; }
+    const erste = el.options[0];
+    el.innerHTML = '';
+    el.appendChild(erste);
+    liste.forEach(o => { el.insertAdjacentHTML('beforeend', `<option value="${o.id}">${esc(o.bezeichnung)}</option>`); });
+  };
+  opt('awFunktion', mbListen.funktion || []);
+  opt('awAbteilung', mbListen.abteilung || []);
+  opt('awStandort', anstellungsorte.filter(o => o.aktiv));
+}
+
+function awFilterAendern() { awZeichnen(); }
+
+function awPersonName(p) {
+  return p.vorname ? `${p.vorname} ${p.nachname}` : p.name;
+}
+
+function awZeichnen() {
+  const raster = $('awRaster'); if (!raster) { return; }
+  const jahr = awMonatStart.getFullYear(), monat = awMonatStart.getMonth();
+  const letzterTag = new Date(jahr, monat + 1, 0).getDate();
+  const tage = [];
+  for (let t = 1; t <= letzterTag; t++) { tage.push(new Date(jahr, monat, t)); }
+  const heute = isoTag();
+
+  const fFunktion = $('awFunktion').value, fAbteilung = $('awAbteilung').value, fStandort = $('awStandort').value;
+  const personen = mitarbeiter.filter(m => m.aktiv
+    && (!fFunktion || String(m.funktion_id) === fFunktion)
+    && (!fAbteilung || String(m.abteilung_id) === fAbteilung)
+    && (!fStandort || String(m.anstellungsort_id) === fStandort)
+  ).sort((a, b) => awPersonName(a).localeCompare(awPersonName(b), 'de'));
+
+  let kwKopf = '<th class="lb"></th>', tagKopf = '<th class="lb">Name</th>';
+  let i = 0;
+  while (i < tage.length) {
+    const kw = kalenderwoche(tage[i]);
+    let n = 0;
+    while (i + n < tage.length && kalenderwoche(tage[i + n]) === kw) { n++; }
+    kwKopf += `<th colspan="${n}">KW ${kw}</th>`;
+    i += n;
+  }
+  tage.forEach(d => {
+    const iso = isoTag(d), wd = d.getDay();
+    const kl = [iso === heute ? 'heute' : '', feiertage[iso] ? 'fei' : (wd === 0 || wd === 6 ? 'we' : '')]
+      .filter(Boolean).join(' ');
+    tagKopf += `<th class="${kl}">${String(d.getDate()).padStart(2, '0')}
+      <span class="wd">${['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'][wd]}</span></th>`;
+  });
+
+  const zeilen = personen.map(p => {
+    let zellen = '';
+    tage.forEach(d => {
+      const iso = isoTag(d), wd = d.getDay();
+      const kl = [feiertage[iso] ? 'fei' : (wd === 0 || wd === 6 ? 'we' : '')].filter(Boolean).join(' ');
+      // Ueberlappende Antraege derselben Person am selben Tag sind ein
+      // Datenfehler (siehe Pruefung), nicht ein Anzeigefall -- der erste
+      // Treffer genuegt.
+      const a = awAbwesenheiten.find(x => x.mitarbeiter_id === p.id && x.von <= iso && x.bis >= iso);
+      if (a) {
+        const titel = `${awPersonName(p)}: ${AW_TYP_TEXT[a.typ] || a.typ}${a.status === 'beantragt' ? ' (beantragt)' : ''}`;
+        zellen += `<td class="d ${kl} ${awFarbe(a.typ)}"><button type="button" class="aw-blk ${awFarbe(a.typ)}
+          ${a.status === 'beantragt' ? 'aw-offen' : ''}" title="${esc(titel)}" onclick="awDetail(${a.id})"></button></td>`;
+      } else {
+        zellen += `<td class="d ${kl}"></td>`;
+      }
+    });
+    return `<tr><td class="lb"><b>${esc(awPersonName(p))}</b></td>${zellen}</tr>`;
+  }).join('');
+
+  // Summenzeile: genehmigte Abwesenheiten je Tag, nur unter den aktuell
+  // gefilterten Personen -- eine eigene Einheit ("Personen abwesend"), nicht
+  // zu verwechseln mit der Zahl offener Antraege weiter unten.
+  let summe = '';
+  tage.forEach(d => {
+    const iso = isoTag(d);
+    const n = awAbwesenheiten.filter(a => a.status === 'genehmigt' && a.von <= iso && a.bis >= iso
+      && personen.some(p => p.id === a.mitarbeiter_id)).length;
+    summe += `<td class="d">${n || ''}</td>`;
+  });
+
+  raster.innerHTML = personen.length ? `<table>
+      <thead><tr>${kwKopf}</tr><tr>${tagKopf}</tr></thead>
+      <tbody>${zeilen}<tr class="leerzeile"><td class="lb"><b>Abwesend (genehmigt)</b></td>${summe}</tr></tbody>
+    </table>` : '<div class="leer">Kein Treffer für diese Filter.</div>';
+
+  awOffeneZeichnen();
+}
+
+function awDetail(id) {
+  const a = awAbwesenheiten.find(x => x.id === id);
+  if (!a) { return; }
+  const p = mitarbeiter.find(m => m.id === a.mitarbeiter_id);
+  toast(`${p ? awPersonName(p) : '#' + a.mitarbeiter_id}: ${AW_TYP_TEXT[a.typ] || a.typ},
+    ${dmy(a.von)}–${dmy(a.bis)}, ${a.status}${a.bemerkung ? ' — ' + a.bemerkung : ''}`);
+}
+
+function awOffeneZeichnen() {
+  const el = $('awOffeneListe'); if (!el) { return; }
+  const offene = awAbwesenheiten.filter(a => a.status === 'beantragt').sort((a, b) => a.von.localeCompare(b.von));
+  if (!offene.length) { el.innerHTML = '<div class="leer">Keine offenen Anträge in diesem Monat.</div>'; return; }
+  el.innerHTML = offene.map(a => {
+    const p = mitarbeiter.find(m => m.id === a.mitarbeiter_id);
+    const name = p ? awPersonName(p) : `#${a.mitarbeiter_id}`;
+    return `<div class="aw-antrag">
+      <div class="aw-antrag-info">
+        <b>${esc(name)}</b> — ${esc(AW_TYP_TEXT[a.typ] || a.typ)}<br>
+        <span class="note">${dmy(a.von)} – ${dmy(a.bis)}${a.bemerkung ? ' · ' + esc(a.bemerkung) : ''}</span>
+      </div>
+      ${awDarfEntscheiden ? `<div class="aw-antrag-aktionen">
+        <button type="button" class="btn btn-primary btn-sm" onclick="awEntscheiden(${a.id}, 'genehmigt')">Genehmigen</button>
+        <button type="button" class="btn btn-plain btn-sm" onclick="awAblehnenDialog(${a.id})">Ablehnen</button>
+      </div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function awEntscheiden(id, status, grund) {
+  api('abwesenheit_entscheiden.php', { method: 'POST', body: { id, status, ablehnung_grund: grund || '' } })
+    .then(({ ok, data }) => {
+      if (!ok || data.status !== 'ok') { toast(data.message || 'Entscheidung fehlgeschlagen.'); return; }
+      toast(status === 'genehmigt' ? 'Antrag genehmigt.' : 'Antrag abgelehnt.');
+      awLaden();
+    });
+}
+
+// Ein prompt() statt eines eigenen Dialogs -- eine Ablehnungsbegruendung ist
+// ein seltener, kurzer Text; ein eigenes Dialogfenster dafuer waere mehr
+// Bauaufwand, als der Fall rechtfertigt (Optimierungsziel: kleinstmoegliche
+// Software). Server validiert ohnehin, dass eine Begruendung vorhanden ist.
+function awAblehnenDialog(id) {
+  const grund = prompt('Grund für die Ablehnung:');
+  if (grund === null) { return; }
+  if (!grund.trim()) { toast('Eine Ablehnung braucht eine Begründung.'); return; }
+  awEntscheiden(id, 'abgelehnt', grund.trim());
 }
 
 // ══════════════════════════════ AUSLAGENERSATZ (ENT-125) ══════════════════
