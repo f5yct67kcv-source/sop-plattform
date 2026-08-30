@@ -4,12 +4,12 @@
 // mehrspaltige Tabelle in einer 420 px schmalen Schublade nicht passte
 // (Rueckmeldung Projektinhaber, Referenz-Screenshot einer vollen Seite).
 //
-// Bearbeiten/Anlegen öffnen seit ENT-254 eine eigene volle Unterseite
+// Bearbeiten/Anlegen öffnen seit ENT-257 eine eigene volle Unterseite
 // (rdKrZeigen(), NICHT dieselbe Schublade wie die Einrichtung) -- hier wird
 // nur geprüft, dass die Seite mit dem richtigen Objekt und den richtigen
 // Werten öffnet, nicht das Speichern der Punktzuordnung selbst im Detail
 // (das deckt bereits die Einrichtung ab, siehe test_kontrollrunden.mjs).
-// Seit ENT-255 ist diese Seite selbst eine kleine Übersicht (Name +
+// Seit ENT-258 ist diese Seite selbst eine kleine Übersicht (Name +
 // Beschreibung) mit einem Kachel-Raster zu sechs Unterbereichen darunter;
 // nur „Routenpunkte" ist verdrahtet (entspricht der bisherigen
 // Kontrollpunkte-Auswahl), die übrigen fünf zeigen einen bleibenden
@@ -114,7 +114,7 @@ check('KRITISCH: "Rundgang anlegen" ohne gewähltes Objekt zeigt einen Hinweis s
     && document.getElementById('toast').textContent.includes('Objekt')));
 check('Die Unterseite bleibt dabei offen', await page.isVisible('#rdAb-liste'));
 
-// ══════════ ANLEGEN MIT OBJEKT: VOLLE UNTERSEITE STATT SCHUBLADE (ENT-254,
+// ══════════ ANLEGEN MIT OBJEKT: VOLLE UNTERSEITE STATT SCHUBLADE (ENT-257,
 // Revision von ENT-248 -- der Projektinhaber wollte hier ausdrücklich
 // keine Schublade, sondern eine vollwertige Seite), RICHTIGES OBJEKT
 calls = [];
@@ -133,7 +133,7 @@ check('KRITISCH: "Zurück" von der Bearbeiten-Seite führt zur Liste zurück (ni
   await page.isVisible('#rdAb-liste') && !(await page.isVisible('#rdUebersicht')));
 
 // ══════════ KRITISCH: DIE GANZE ZEILE OEFFNET, NICHT NUR DER "BEARBEITEN"-KNOPF
-// (ENT-253, Bug-Meldung des Projektinhabers nach dem Ausliefern von ENT-248:
+// (ENT-256, Bug-Meldung des Projektinhabers nach dem Ausliefern von ENT-248:
 // "bei mir öffnet sich noch nichts" -- Klick auf die Tabellenzeile ausserhalb
 // des Knopfes tat bis dahin buchstaeblich nichts.)
 await page.click('#rdAb-liste tr:has-text("Öffnungsrunde") td:has-text("Testliegenschaft Nord")');
@@ -142,7 +142,7 @@ check('KRITISCH: Klick auf die Tabellenzeile ausserhalb des Knopfes öffnet die 
   (await page.textContent('#rdKrTitel')) === 'Kontrollrunde ändern');
 check('Die richtige Zeile wird geladen', (await page.inputValue('#rdKrName')) === 'Öffnungsrunde');
 
-// ══════════ ENT-255: KLEINE ÜBERSICHT (NAME + BESCHREIBUNG) MIT
+// ══════════ ENT-258: KLEINE ÜBERSICHT (NAME + BESCHREIBUNG) MIT
 // KACHEL-RASTER ZU SECHS UNTERBEREICHEN DARUNTER
 check('Die Übersicht (Name/Beschreibung + Kacheln) ist beim Öffnen zu sehen', await page.isVisible('#rdKrUebersicht'));
 check('KRITISCH: die Beschreibung wird vorbefüllt', (await page.inputValue('#rdKrBeschreibung')) === 'Erste Kontrolle nach Schichtbeginn');
@@ -218,7 +218,7 @@ check('KRITISCH: kein Seiten-Scroll bei 390px', await page.evaluate(() =>
   document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1));
 await page.screenshot({ path: `${OUT}/rg-verwaltung-02-mobil.png` });
 
-// ══════════ HANDY: die Kontrollrunde-Bearbeiten-Seite (ENT-254) ebenfalls --
+// ══════════ HANDY: die Kontrollrunde-Bearbeiten-Seite (ENT-257) ebenfalls --
 // eigene Seite statt Schublade heisst neue Massverhaeltnisse, die am
 // gerenderten Zustand geprueft werden muessen (CLAUDE.md "gemessen, nicht
 // angenommen"), nicht nur die Liste oben. Der Leerzustand-Mock von oben

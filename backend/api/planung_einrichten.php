@@ -1257,7 +1257,7 @@ $spalten = [
     ['belege', 'bezahlt',     'ALTER TABLE belege ADD COLUMN bezahlt TINYINT(1) NOT NULL DEFAULT 0 AFTER faellig_bis'],
     ['belege', 'bezahlt_am',  'ALTER TABLE belege ADD COLUMN bezahlt_am DATE NULL AFTER bezahlt'],
 
-    // Kontrollrunde als eigene volle Seite statt kurzem Dialogfeld (ENT-255):
+    // Kontrollrunde als eigene volle Seite statt kurzem Dialogfeld (ENT-258):
     // eine optionale Notiz zur Runde, z. B. was sie abdeckt oder Hinweise fuer
     // die Ausfuehrung. NULLable, weil die meisten bestehenden Runden keine
     // brauchen -- kein Pflichtfeld nachtraeglich erzwingen.

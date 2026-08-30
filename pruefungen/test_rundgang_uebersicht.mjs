@@ -122,7 +122,7 @@ check('Die Kachel "Übersicht" ist unter Revierdienst sichtbar', await page.isVi
 
 // ── Kachel-Grid (ENT-225, Vorbild Betrieb ENT-211)
 // Selektor auf #rdUebersicht eingeschraenkt, nicht die ganze view-rundgaenge:
-// seit ENT-255 hat die Kontrollrunden-Seite (#rdAb-kr) ihr eigenes,
+// seit ENT-258 hat die Kontrollrunden-Seite (#rdAb-kr) ihr eigenes,
 // verschachteltes Kachel-Raster mit teils gleichlautenden Beschriftungen
 // (u. a. "Aufgaben") -- ein ungescopter Selektor traf sonst beide Raster
 // zusammen, dieselbe Fehlerklasse wie schon bei .bk-zurueck (ENT-246).
