@@ -84,6 +84,12 @@ check('KRITISCH: dieser Zweig kehrt frueh zurueck (json_response vor dem generis
     const posFirma = BET.indexOf('$firma  = trim');
     return posZweig > -1 && posFirma > -1 && posZweig < posFirma;
   })());
+// ENT-247: Firma/Name ist im Hauptdomizil-Zweig Pflicht (im generischen
+// Briefkopf-Zweig weiterhin nicht -- das war nicht Teil dieser Aenderung).
+check('KRITISCH: ein leeres Firma/Name-Feld wird im Hauptdomizil-Zweig serverseitig abgewiesen',
+  /\$dFirma === ''\)[\s\S]{0,80}Pflichtfeld/.test(BET));
+check('KRITISCH: eine E-Mail-Adresse wird serverseitig auf Gueltigkeit geprueft, nicht nur durchgereicht',
+  /FILTER_VALIDATE_EMAIL/.test(BET));
 
 check('KRITISCH: der Server verknuepft den Kunden ueber die SCHICHT, nicht ueber den Namen',
   /LEFT JOIN einsaetze e ON e\.id = r\.einsatz_id/.test(RLIST)
@@ -173,7 +179,8 @@ const RAPPORTE = [
 let BETRIEB = { firma: '', zusatz: '', fusszeile: null, fusszeile2: null,
   qr_iban: null, qr_strasse: null, qr_hausnummer: null, qr_plz: null, qr_ort: null, qr_iban_gueltig: false,
   logo: null, logo_mime: null, logo_groesse: null,
-  domizil_strasse: null, domizil_plz: null, domizil_ort: null };
+  domizil_strasse: null, domizil_plz: null, domizil_ort: null,
+  telefon: null, email: null };
 const gesendet = [];
 
 const browser = await chromium.launch({ executablePath: EXE });
@@ -192,14 +199,24 @@ await page.route('**/api/**', route => {
       gesendet.push(body);
       if (body.logo_weg) { BETRIEB = { ...BETRIEB, logo: null, logo_mime: null, logo_groesse: null }; }
       else if (body.logo) { BETRIEB = { ...BETRIEB, logo: 'data:' + body.logo_mime + ';base64,' + body.logo, logo_mime: body.logo_mime, logo_groesse: 120 }; }
-      // Eigener Zweig wie beim echten Server (betrieb.php, ENT-245): ein
+      // Eigener Zweig wie beim echten Server (betrieb.php, ENT-245/ENT-247): ein
       // Speichern des Hauptdomizils darf NICHT im generischen Textfelder-Zweig
-      // landen, sonst ueberschreiben die dort fehlenden firma/zusatz-Schluessel
-      // (undefined) den bestehenden Stand -- genau der Fehler, den die
-      // Gegenprobe beim Bauen nachgestellt hat.
-      else if ('domizil_strasse' in body) { BETRIEB = { ...BETRIEB,
-        domizil_strasse: body.domizil_strasse || null, domizil_plz: body.domizil_plz || null,
-        domizil_ort: body.domizil_ort || null }; }
+      // landen, sonst ueberschreiben die dort fehlenden zusatz/fusszeile/qr_*-
+      // Schluessel (undefined) den bestehenden Stand -- genau der Fehler, den
+      // die Gegenprobe beim Bauen nachgestellt hat. "firma" gehoert seit
+      // ENT-247 mit hierher (dieselbe Spalte wie im Briefkopf-Zweig unten,
+      // kein Widerspruch), und ist -- wie im echten Server -- Pflicht.
+      else if ('domizil_strasse' in body) {
+        const dFirma = (body.firma || '').trim();
+        if (!dFirma) {
+          return route.fulfill({ status: 400, contentType: 'application/json',
+            body: JSON.stringify({ status: 'error', message: 'Firma/Name ist ein Pflichtfeld.' }) });
+        }
+        BETRIEB = { ...BETRIEB, firma: dFirma,
+          domizil_strasse: body.domizil_strasse || null, domizil_plz: body.domizil_plz || null,
+          domizil_ort: body.domizil_ort || null,
+          telefon: body.telefon || null, email: body.email || null };
+      }
       else { BETRIEB = { ...BETRIEB, firma: body.firma, zusatz: body.zusatz,
         fusszeile: body.fusszeile || null, fusszeile2: body.fusszeile2 || null,
         qr_iban: body.qr_iban || null, qr_strasse: body.qr_strasse || null,
@@ -389,6 +406,15 @@ check('KRITISCH: das Logo wird hochgeladen', gesendet.some(b => b.logo && b.logo
 check('Die Karte zeigt danach das Logo selbst, nicht nur "vorhanden"',
   await page.evaluate(() => !!document.querySelector('#bkLogoStand img')));
 check('Und bietet an, es wieder zu entfernen', await page.isVisible('#bkLogoWeg'));
+// Deutlich groesser als vor der Ueberarbeitung (ENT-247) -- vorher
+// max-height:52px, kaum sichtbar. In einem gerahmten Feld statt frei
+// schwebend, damit auch ein Logo mit hellem/transparentem Hintergrund zu
+// erkennen bleibt.
+check('KRITISCH: die Logo-Vorschau in der Betrieb-Kachel ist deutlich groesser als vor der Ueberarbeitung',
+  /max-height:160px/.test(await page.innerHTML('#bkLogoStand'))
+  && !/max-height:52px/.test(await page.innerHTML('#bkLogoStand')));
+check('Die Vorschau steht in einem gerahmten Feld',
+  /border:1px solid/.test(await page.innerHTML('#bkLogoStand')));
 
 html = await drucken(10);
 check('KRITISCH: das Logo steht im Kopf des Ausdrucks',
@@ -413,7 +439,8 @@ check('KRITISCH: das Logo laesst sich wieder entfernen', gesendet.some(b => b.lo
 check('Danach sagt die Karte wieder, dass keines hinterlegt ist',
   /Kein Logo hinterlegt/.test(await page.textContent('#bkLogoStand')));
 
-// ── Hauptdomizil (ENT-245): eigene Kachel "Betrieb", eigener Speicherweg.
+// ── Hauptdomizil (ENT-245, um Firma/Telefon/E-Mail erweitert in ENT-247):
+// eigene Kachel "Betrieb", eigener Speicherweg.
 check('KRITISCH: die Betrieb-Kachel steht vorne, nicht die alte Anstellungsorte-Kachel',
   await page.evaluate(() => {
     const erste = document.querySelector('#bkUebersicht .bk-kachel');
@@ -426,17 +453,25 @@ check('KRITISCH: die Anstellungsorte stehen in derselben Unteransicht, nicht sep
   await page.isVisible('#anKarte'));
 check('KRITISCH: das Logo steht ebenfalls hier, nicht mehr bei Briefkopf für Rapporte',
   await page.isVisible('#btLogoKarte') && await page.isVisible('#bkLogoStand'));
+check('Firma/Name, Telefon und E-Mail stehen als Felder auf der Karte',
+  await page.isVisible('#bdFirma') && await page.isVisible('#bdTelefon') && await page.isVisible('#bdEmail'));
+check('KRITISCH: Firma/Name kommt bereits aus dem Briefkopf vorausgefuellt — dieselbe Spalte',
+  (await page.inputValue('#bdFirma')) === 'CUPI 24 GmbH');
 
 await page.fill('#bdStrasse', 'Musterweg 1');
 await page.fill('#bdPlz', '4600');
 await page.fill('#bdOrt', 'Olten');
+await page.fill('#bdTelefon', '044 123 45 67');
+await page.fill('#bdEmail', 'info@beispiel.ch');
 await page.click('#bdKarte .btn-primary');
 await page.waitForTimeout(400);
 check('KRITISCH: das Hauptdomizil wird eigenstaendig gespeichert',
-  gesendet.some(b => b.domizil_strasse === 'Musterweg 1' && b.domizil_plz === '4600' && b.domizil_ort === 'Olten'));
-check('KRITISCH: dabei werden Firma/Zusatz aus dem Briefkopf NICHT mitgeschickt',
-  !gesendet.some(b => 'domizil_strasse' in b && 'firma' in b));
-check('KRITISCH: der zuvor gespeicherte Briefkopf bleibt dabei unveraendert stehen',
+  gesendet.some(b => b.domizil_strasse === 'Musterweg 1' && b.domizil_plz === '4600' && b.domizil_ort === 'Olten'
+    && b.telefon === '044 123 45 67' && b.email === 'info@beispiel.ch'));
+check('KRITISCH: Firma wird dabei mitgeschickt (dieselbe Spalte wie im Briefkopf) — Zusatz/QR-Felder aber nicht',
+  gesendet.some(b => 'domizil_strasse' in b && b.firma === 'CUPI 24 GmbH')
+  && !gesendet.some(b => 'domizil_strasse' in b && ('zusatz' in b || 'fusszeile' in b || 'qr_iban' in b)));
+check('KRITISCH: der zuvor gespeicherte Briefkopf (Zusatz) bleibt dabei unveraendert stehen',
   BETRIEB.firma === 'CUPI 24 GmbH' && BETRIEB.zusatz === 'Sicherheits- und Verkehrsdienst');
 
 await page.evaluate(() => { go('kunden'); });
@@ -446,9 +481,35 @@ await page.waitForTimeout(400);
 check('Nach dem Neuladen steht das Hauptdomizil wieder im Formular',
   (await page.inputValue('#bdStrasse')) === 'Musterweg 1'
   && (await page.inputValue('#bdPlz')) === '4600'
-  && (await page.inputValue('#bdOrt')) === 'Olten');
+  && (await page.inputValue('#bdOrt')) === 'Olten'
+  && (await page.inputValue('#bdTelefon')) === '044 123 45 67'
+  && (await page.inputValue('#bdEmail')) === 'info@beispiel.ch');
 check('Und der Briefkopf ist beim erneuten Oeffnen ebenfalls noch da',
   BETRIEB.firma === 'CUPI 24 GmbH');
+
+// KRITISCH: Firma/Name ist ein Pflichtfeld -- ein Speichern mit leerem Feld
+// muss abgewiesen werden, nicht heimlich einen leeren Firmennamen ablegen.
+await page.fill('#bdFirma', '');
+await page.click('#bdKarte .btn-primary');
+await page.waitForTimeout(400);
+check('KRITISCH: ein leeres Firma/Name-Feld wird beim Speichern abgewiesen',
+  /Pflichtfeld/.test(await page.textContent('#bdErr')));
+check('KRITISCH: der bestehende Firmenname bleibt dabei unangetastet',
+  BETRIEB.firma === 'CUPI 24 GmbH');
+
+// KRITISCH: die beiden Karten (Hauptdomizil, Briefkopf) zeigen dieselbe
+// Spalte -- ein Speichern in der einen muss die andere sofort nachziehen,
+// nicht erst nach einem vollstaendigen Neuladen der Ansicht.
+await page.fill('#bdFirma', 'Muster AG');
+await page.click('#bdKarte .btn-primary');
+await page.waitForTimeout(400);
+await page.evaluate(() => { bkAbschnittZeigen('bk'); });
+check('KRITISCH: die Briefkopf-Karte zieht den geaenderten Firmennamen ohne Neuladen nach',
+  (await page.inputValue('#bkFirma')) === 'Muster AG');
+await page.evaluate(() => { bkAbschnittZeigen('be'); });
+await page.fill('#bdFirma', 'CUPI 24 GmbH');
+await page.click('#bdKarte .btn-primary');
+await page.waitForTimeout(400);
 
 // ── Der Ausdruck loest tatsaechlich das Drucken aus
 check('KRITISCH: printReport() ruft window.print() auf',
