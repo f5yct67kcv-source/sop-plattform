@@ -856,6 +856,43 @@ CREATE TABLE IF NOT EXISTS kunden_kontaktweg (
   FOREIGN KEY (produkt_id) REFERENCES produkte(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+// Abwesenheitsplanung (ENT-255): Antrag/Genehmigung fuer Ferien, Krankheit,
+// Unfall, Militaer-/Zivildienst/Zivilschutz und Schwangerschaft. Eine Zeile
+// je Antrag, nicht je Tag -- der Zeitraum (von/bis) ist das, was
+// Mitarbeitende tatsaechlich beantragen, eine Tagestabelle waere hier eine
+// Verdoppelung ohne eigenen Nutzen.
+//
+// "beantragt_von" ist bewusst eigenstaendig neben mitarbeiter_id: normalerweise
+// identisch (jemand beantragt fuer sich selbst), aber bei einer spaeteren
+// Erfassung durch die Verwaltung im Namen einer Person waeren es zwei
+// verschiedene Personen. Ohne dieses Feld liesse sich das nicht mehr
+// unterscheiden.
+//
+// gesehen_am nach demselben Muster wie verfuegbarkeiten (ENT-033) und
+// belege.entscheidung_gesehen_am (ENT-197): steuert nur, ob ein offener
+// Antrag noch im Ereignis-Feed auftaucht -- entschieden_am bleibt der
+// eigentliche Beleg der Entscheidung und wird davon nicht beruehrt.
+'abwesenheiten' => "
+CREATE TABLE IF NOT EXISTS abwesenheiten (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  mitarbeiter_id INT NOT NULL,
+  typ VARCHAR(20) NOT NULL,
+  von DATE NOT NULL,
+  bis DATE NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'beantragt',
+  bemerkung TEXT NULL,
+  ablehnung_grund TEXT NULL,
+  beantragt_von INT NOT NULL,
+  beantragt_am DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  entschieden_von INT NULL,
+  entschieden_am DATETIME NULL,
+  gesehen_am DATETIME NULL,
+  geaendert_am DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY idx_person_zeitraum (mitarbeiter_id, von, bis),
+  KEY idx_status (status),
+  FOREIGN KEY (mitarbeiter_id) REFERENCES mitarbeiter(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
 ];
 
 foreach ($tabellen as $name => $sql) {

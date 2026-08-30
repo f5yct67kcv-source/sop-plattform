@@ -40,6 +40,13 @@ const EREIGNIS_ARTEN = [
     'zusage'   => ['tabelle' => 'einsatz_zuteilung', 'spalte' => 'zusage_gesehen_am'],
     // Kundenentscheidung zu einer Offerte (ENT-192/ENT-197).
     'offerte'  => ['tabelle' => 'belege',            'spalte' => 'entscheidung_gesehen_am'],
+    // "abwesenheit" bewusst NICHT hier eingetragen: ereignis_erledigt.php
+    // prueft nur das Recht 'plan', nicht 'personal_schreiben'. Eine
+    // Planungs-Person koennte einen unentschiedenen Antrag sonst aus dem
+    // Feed abhaken, ohne ihn entscheiden zu duerfen -- dasselbe Problem, vor
+    // dem der Kommentar zum offenen Abgleich weiter unten warnt. gesehen_am
+    // wird stattdessen ausschliesslich von abwesenheit_entscheiden.php
+    // gesetzt, zusammen mit der eigentlichen Entscheidung.
     // Mehr nicht. Ein andauernder Zustand ist kein Ereignis -- Festlegung 3.
 ];
 
@@ -142,6 +149,25 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12): array
             'typ' => 'offerte', 'id' => (int)$o['id'], 'zeit' => $o['entscheidung_am'],
             'titel' => $o['status'] === 'abgelehnt' ? 'Offerte abgelehnt' : 'Offerte angenommen',
             'nummer' => $o['nummer'], 'kunde' => $o['kunde_name'], 'status' => $o['status'],
+        ];
+    }
+
+    // ── Abwesenheitsantrag wartet auf Entscheidung (ENT-255). Nicht
+    // abhakbar wie die Faelle oben (siehe EREIGNIS_ARTEN) -- verschwindet
+    // erst, wenn abwesenheit_entscheiden.php tatsaechlich entschieden hat.
+    foreach (ereignis_lesen($pdo,
+        "SELECT a.id, a.typ, a.von, a.bis, a.bemerkung, a.beantragt_am,
+                m.id AS mitarbeiter_id, m.name, m.vorname, m.nachname
+           FROM abwesenheiten a JOIN mitarbeiter m ON m.id = a.mitarbeiter_id
+          WHERE a.status = 'beantragt' AND a.gesehen_am IS NULL
+          ORDER BY a.beantragt_am DESC LIMIT 20", $fehler, 'abwesenheit') as $a) {
+        $liste[] = [
+            'typ' => 'abwesenheit', 'id' => (int)$a['id'], 'zeit' => $a['beantragt_am'],
+            'person' => ['id' => (int)$a['mitarbeiter_id'], 'name' => $a['name'],
+                         'vorname' => $a['vorname'], 'nachname' => $a['nachname']],
+            'titel' => 'Abwesenheit beantragt',
+            'abwesenheitstyp' => $a['typ'], 'von' => $a['von'], 'bis' => $a['bis'],
+            'bemerkung' => $a['bemerkung'],
         ];
     }
 
