@@ -1566,6 +1566,10 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
 /* Kontrollrunden-Vorlagen (ENT-204) */
 .kr-zeile { border: 1px solid var(--line); border-radius: var(--r-sm); padding: 11px 13px; margin-bottom: 8px; }
 .kr-zeile.aus { opacity: .55; }
+/* Die ganze Karte oeffnet die Kontrollrunde (ENT-250) -- ohne cursor:pointer
+   sieht man ihr nicht an, dass sie anklickbar ist (anders als "Bearbeiten"). */
+.kr-zeile.click { cursor: pointer; }
+.kr-zeile.click:hover { border-color: var(--accent); }
 .kr-kopf { display: flex; align-items: center; gap: 8px; }
 .kr-kopf b { font-size: 13.5px; font-weight: 620; flex: 1; min-width: 0; }
 .kr-meta { font-size: 11.5px; color: var(--ink-3); margin-top: 3px; line-height: 1.55; }
@@ -13666,16 +13670,16 @@ function renderKrListe() {
     const punkte = v.punkte.length
       ? `${v.punkte.length} ${v.punkte.length === 1 ? 'Kontrollpunkt' : 'Kontrollpunkte'}: ${v.punkte.map(p => esc(p.bezeichnung)).join(', ')}`
       : 'Noch kein Kontrollpunkt zugeordnet';
-    return `<div class="kr-zeile${Number(v.aktiv) ? '' : ' aus'}">
+    return `<div class="kr-zeile click${Number(v.aktiv) ? '' : ' aus'}" onclick="openKr('aendern',${Number(v.id)})">
       <div class="kr-kopf">
         <b>${esc(v.name)}</b>
         ${Number(v.aktiv) ? '' : '<span class="chip chip-n">nicht aktiv</span>'}
       </div>
       <div class="kr-meta">${punkte}</div>
       <div style="display:flex;gap:7px;margin-top:9px">
-        <button class="btn btn-plain btn-sm" onclick="openKr('aendern',${Number(v.id)})">Bearbeiten</button>
+        <button class="btn btn-plain btn-sm" onclick="event.stopPropagation();openKr('aendern',${Number(v.id)})">Bearbeiten</button>
         <div style="flex:1"></div>
-        <button class="btn btn-quiet btn-sm" onclick="askDeleteKr(${Number(v.id)})">Entfernen</button>
+        <button class="btn btn-quiet btn-sm" onclick="event.stopPropagation();askDeleteKr(${Number(v.id)})">Entfernen</button>
       </div>
     </div>`;
   }).join('');
@@ -15267,12 +15271,12 @@ function rdZeichneAlleTabelle() {
     const punkte = v.punkte.length
       ? `${v.punkte.length} ${v.punkte.length === 1 ? 'Kontrollpunkt' : 'Kontrollpunkte'}`
       : '<span style="color:var(--ink-3)">Noch keiner zugeordnet</span>';
-    return `<tr>
+    return `<tr class="click" onclick="rdAlleBearbeiten(${Number(v.id)},${Number(v.objekt_id)})">
         <td><b>${esc(v.name)}</b></td>
         <td class="nowrap">${esc(v.kunde_name)}</td>
         <td class="nowrap">${esc(v.objekt_name)}</td>
         <td>${punkte}</td>
-        <td class="nowrap"><button class="btn btn-plain btn-sm" onclick="rdAlleBearbeiten(${Number(v.id)},${Number(v.objekt_id)})">Bearbeiten</button></td>
+        <td class="nowrap"><button class="btn btn-plain btn-sm" onclick="event.stopPropagation();rdAlleBearbeiten(${Number(v.id)},${Number(v.objekt_id)})">Bearbeiten</button></td>
       </tr>`;
   }).join('') + `</tbody></table>`;
 }

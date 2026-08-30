@@ -155,8 +155,23 @@ check('KRITISCH: die Reihenfolge der Checkboxen wird als Reihenfolge uebernommen
   zugeordnet && JSON.stringify(zugeordnet.body.kontrollpunkt_ids) === JSON.stringify([1, 2]));
 check('Schublade schliesst nach Speichern', !(await page.isVisible('#drawer.on')));
 
-// ══════════ BEARBEITEN: VORHANDENE WERTE UEBERNOMMEN
+// ══════════ KRITISCH: DIE GANZE ZEILE OEFFNET, NICHT NUR DER "BEARBEITEN"-KNOPF
+// (ENT-250, Bug-Meldung des Projektinhabers nach dem Ausliefern von ENT-248:
+// "bei mir öffnet sich noch nichts" -- Klick auf die Karte ausserhalb des
+// Knopfes tat bis dahin buchstaeblich nichts.)
 await page.waitForTimeout(300);
+await page.click('#krListe .kr-zeile:nth-child(2) .kr-meta');
+await page.waitForSelector('#drawer.on');
+await page.waitForTimeout(150);
+check('KRITISCH: Klick auf die Zeile ausserhalb des Knopfes oeffnet die Schublade',
+  (await page.textContent('#drTitle')) === 'Kontrollrunde ändern');
+check('Die richtige Runde wird geladen (zweite Zeile, nicht die erste)',
+  (await page.inputValue('#krName')) === 'Schlusskontrolle');
+await page.evaluate(() => closeDrawer());
+await page.waitForTimeout(150);
+
+// ══════════ BEARBEITEN: VORHANDENE WERTE UEBERNOMMEN
+await page.waitForTimeout(150);
 await page.click('#krListe .kr-zeile:first-child button:has-text("Bearbeiten")');
 await page.waitForSelector('#drawer.on');
 await page.waitForTimeout(150);
@@ -207,6 +222,8 @@ check('Erweiterte Auswahl (beide Punkte) wird gesendet',
 calls = [];
 await page.click('#krListe .kr-zeile:first-child button:has-text("Entfernen")');
 await page.waitForSelector('#dlgConfirm.on');
+check('KRITISCH: "Entfernen" oeffnet NICHT zusaetzlich die Bearbeiten-Schublade (event.stopPropagation, ENT-250)',
+  !(await page.isVisible('#drawer.on')));
 await page.click('#cfBtn');
 await page.waitForTimeout(300);
 const geloescht = calls.find(c => c.path.includes('rundgang_vorlage_loeschen'));
