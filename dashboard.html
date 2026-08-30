@@ -388,7 +388,20 @@ a.nav-item { text-decoration: none; }
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--sh-1); }
 .card-hd { display: flex; align-items: center; gap: 12px; padding: 18px 20px 14px; border-bottom: 1px solid var(--line-soft); }
 .card-hd h2 { font-size: 14px; font-weight: 600; letter-spacing: -.15px; }
-.card-hd .note { font-size: 11.5px; color: var(--ink-3); }
+/* Pille statt nacktem Text (ENT-235, Mockup "Heute, 14:32"): Die Notiz
+   gehoert zum Kopf, steht aber neben der Ueberschrift -- mit eigener
+   Flaeche liest sie sich als Angabe und nicht als angehaengter Satz. */
+/* Die Pille darf den Kartenkopf NICHT hoeher machen. Gemessen: Mit
+   padding 3px wuchs die Notiz von 17 auf 25px und der Kopf von 54 auf
+   58px. In einer Karte mit fest eingestellter Hoehe nimmt das dem
+   Balkenbild darunter genau die Pixel weg, die test_containergroesse
+   einfordert ("das Balkenbild fuellt den Rumpf") -- die Pruefung hat
+   recht, nicht die Pille. Darum enge Zeilenhoehe statt mehr Polster:
+   10.5px * 1.25 + 2*2 Polster + 2*1 Rand = 19px, genau die Zeilenhoehe
+   der Ueberschrift daneben. */
+.card-hd .note { font-size: 10.5px; line-height: 1.25; color: var(--ink-3);
+  background: var(--surface-2); border: 1px solid var(--line-soft); border-radius: 999px;
+  padding: 2px 9px; white-space: nowrap; }
 .card-hd .sp { flex: 1; }
 /* Icon-Abzeichen vor einem Karten-Titel (ENT-161, zunaechst nur im
    Betriebsbereich) -- dieselbe Bauart wie ".empty .ic", nur kleiner fuer die
@@ -469,13 +482,13 @@ a.nav-item { text-decoration: none; }
 .dash-item.dh .bars { height: 100%; }
 .bar { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
   gap: 7px; min-width: 0; height: 100%; }
-.bar-val { font-size: 10px; font-weight: 650; color: #94a3b8; }
+.bar-val { font-size: 10px; font-weight: 650; color: var(--ink-3); }
 .bar-fill { width: 100%; max-width: 46px; flex: 0 0 auto; background: var(--accent-soft); border: 1px solid var(--accent-line); border-bottom: none; border-radius: var(--r-xs) var(--r-xs) 0 0; min-height: 4px; opacity: 0.85; transition: background .13s, opacity .13s; }
-.bar-fill.leer { height: 4px; flex-basis: 4px !important; background: #1e293b; border-color: #1e293b; opacity: 1; }
+.bar-fill.leer { height: 4px; flex-basis: 4px !important; background: var(--nix); border-color: var(--nix); opacity: 1; }
 .bar:hover .bar-fill { background: var(--accent-line); opacity: 1; }
 .bar.now .bar-fill { background: var(--accent); border-color: var(--accent); opacity: 1; }
 .bar-lbl { font-size: 10.5px; color: var(--ink-3); white-space: nowrap; letter-spacing: .2px; }
-.bar.now .bar-lbl { color: #60a5fa; font-weight: 650; }
+.bar.now .bar-lbl { color: var(--accent); font-weight: 650; }
 .bars-axis { border-top: 1px solid var(--line); margin-top: -25px; }
 
 /* Tabellen */
@@ -1839,8 +1852,23 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
    demselben Grund wie bei den Kennzahlen: Acht Wege gehen durch zwei und
    durch vier glatt auf, durch fuenf oder sechs nicht -- dann steht die letzte
    Zeile halb leer und sieht aus wie ein Rest. */
-.kw-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
-.dash-item.dw-voll .kw-grid { grid-template-columns: repeat(4, 1fr); }
+/* Feste Spaltenzahl statt auto-fill: Mit auto-fill standen am Tablet sieben
+   Kacheln nebeneinander (gemessen, 109px) -- dicht gedraengt.
+   VIER und nicht drei, obwohl das Mockup drei zeigt: Dort stehen sechs
+   Kacheln, hier acht. Acht gehen durch zwei und vier glatt auf, durch drei
+   nicht -- bei drei Spalten bliebe in der letzten Zeile eine Luecke neben
+   zwei Kacheln. Dieselbe Familie wie die vierte Kennzahl allein in ihrer
+   Zeile; test_kurzwahl.mjs bewacht es seit ENT-096. Auf dem Handy zwei,
+   was ebenfalls glatt aufgeht. */
+/* minmax(0, 1fr) statt 1fr: Ein blosses 1fr ist minmax(AUTO, 1fr) -- die
+   Mindestbreite richtet sich dann nach dem Inhalt, und eine lange
+   Beschriftung blaeht ihre Spalte auf. Gemessen: mit nowrap waren die
+   Kacheln 129, 162 und 179px breit statt gleich. Es wird also nicht
+   gekuerzt, sondern das Raster franst aus -- schwerer zu bemerken und
+   haesslicher. Mit minmax(0,1fr) bestimmt das Raster die Breite, und die
+   Beschriftung fuegt sich (siehe .kw b, zwei Zeilen). */
+.kw-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.dash-item.dw-voll .kw-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 /* Hier stand bis zum 23.08.2026 eine eigene Regel, die dem Raster Hoehe geben
    sollte. Die Gegenprobe zeigte: Sie tat nichts. Das Raster ist der letzte
    Teil des Rumpfes und waechst schon ueber die Regel weiter oben; die Zeilen
@@ -1851,20 +1879,51 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
    wirkungslos: Bei gleicher Eigenspezifitaet gewinnt die spaetere Regel, und
    eine Gestaltungsregel kann wirkungslos bleiben, ohne dass etwas kaputtgeht. */
 @media (max-width: 760px) {
-  .kw-grid, .dash-item.dw-voll .kw-grid { grid-template-columns: 1fr; }
+  /* Frueher 1fr -- das galt fuer die alte Zeilenform. Eine Kachel ueber die
+     volle Breite ist keine Kachel mehr, darum bleibt das Raster auch hier
+     mehrspaltig, nur mit kleinerer Mindestbreite. */
+  /* 140px statt 96px: Bei drei Spalten auf 390px blieb "Mitarbeitenden
+     erfassen" gekuerzt (gemessen). Zwei breitere Kacheln lesen sich besser
+     als drei enge mit abgeschnittener Beschriftung -- und liegen naeher an
+     den Proportionen des Mockups, wo eine Kachel etwa 160px breit ist. */
+  /* Auf dem Handy zwei statt drei: Bei drei Spalten auf 390px blieb
+     "Mitarbeitenden erfassen" gekuerzt (gemessen). Zwei breitere Kacheln
+     lesen sich besser als drei enge mit abgeschnittener Beschriftung. */
+  .kw-grid, .dash-item.dw-voll .kw-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-/* ── Schnellzugriff Card-Style (Design-Eingriff 2026-08-28) */
-.kw { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px;
-  padding: 11px 14px; border: 1px solid #2d3a4f; border-radius: 8px;
-  background: #1e293b; font: inherit; font-size: 13.5px; color: var(--accent);
-  text-align: left; cursor: pointer; transition: background .13s, border-color .13s; box-sizing: border-box; }
-.kw:hover { background: #263348; }
+/* ── Schnellzugriff als Kacheln (ENT-235)
+   Vorher eine Zeile mit Symbol links und linksbuendigem Text. Jetzt eine
+   Kachel: Symbol oben, Beschriftung darunter, beides mittig -- dieselbe
+   Bauart wie .bk-kachel, damit es im Haus EINE Kachel gibt und nicht zwei.
+   Die Struktur im Erzeugten bleibt unveraendert (button > svg + b), nur die
+   Gestaltung wechselt.
+   WICHTIG: Die Farben kommen jetzt aus Tokens. Vorher standen hier feste
+   Hexwerte (#1e293b, #2d3a4f, #263348, #1a2a3f) -- die galten in BEIDEN
+   Themen und ergaben im hellen einen Block dunkler Knoepfe auf weissem
+   Grund. Gemessen: Seitengrund rgb(247,248,250), Knopfgrund rgb(30,41,59). */
+.kw { display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; width: 100%; min-height: 104px; text-align: center;
+  padding: 18px 12px; border: 1px solid var(--line); border-radius: var(--r);
+  background: var(--surface-2); font: inherit; font-size: 13px; color: var(--ink-2);
+  cursor: pointer; transition: background .13s, border-color .13s; box-sizing: border-box; }
+.kw:hover { background: var(--surface-3); border-color: var(--accent-line); color: var(--accent); }
 .kw:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.kw svg { width: 19px; height: 19px; flex: none; color: var(--ink-3);
-  stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
-  background: #1a2a3f; border: 1px solid #2d3a4f; border-radius: 6px;
-  padding: 5px; box-sizing: border-box; width: 30px; height: 30px; }
-.kw b { min-width: 0; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Das Symbol traegt keine eigene Flaeche mehr -- im Mockup steht es frei
+   ueber der Beschriftung. Eine Kachel mit Rahmen UND einem gerahmten Symbol
+   darin sind zwei Behaelter fuer einen Inhalt. */
+.kw svg { width: 22px; height: 22px; flex: none; color: var(--ink-3);
+  stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.kw:hover svg { color: var(--accent); }
+/* Die Beschriftung bricht um, statt abzuschneiden. Gemessen: Bei nowrap
+   waren 5 von 8 Beschriftungen am Desktop und 8 von 8 auf dem Handy
+   gekuerzt -- "Mitarbeitenden erfassen" wurde zu "Mitarbeitenden erfa...".
+   Im Mockup steht in jeder Kachel ein einzelnes Wort ("Dienstplan",
+   "Karte"); hier stehen zwei, also braucht die Kachel zwei Zeilen statt
+   einer Kuerzung. Zwei Zeilen sind die Grenze -- danach wird gekuerzt,
+   sonst wachsen die Kacheln ungleich hoch auseinander. */
+.kw b { min-width: 0; max-width: 100%; font-weight: 550; line-height: 1.3;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden; overflow-wrap: anywhere; }
 
 .dash-item { position: relative; min-width: 0; }
 .dash-item.dw-voll   { flex: 1 1 100%; }
@@ -2695,6 +2754,58 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
   .btn { min-height: 44px; }
   .check { min-height: 44px; }
 }
+/* ══════════════════════════════════════════════════════════════════════
+   WAECHTER-STATUS auf der Revierdienst-Hauptseite (ENT-232)
+   Bewusst mit den BESTEHENDEN Tokens gebaut, nicht mit einem zweiten
+   Farbsatz: So traegt die Karte in beiden Themen, ohne dass eine zweite
+   Palette gepflegt werden muss (die Lehre aus ENT-227).
+   ══════════════════════════════════════════════════════════════════════ */
+.ws-liste { display: flex; flex-direction: column; gap: 8px; }
+.ws-karte {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r);
+  background: var(--surface-2);
+}
+/* Der linke Streifen ist die einzige Stelle, an der eine Karte "schreit".
+   Er bleibt darum fuer den Ausnahmefall reserviert und wird heute nur bei
+   'abgebrochen' gesetzt -- fuer einen Alarm fehlt die Datenquelle (OP-233). */
+.ws-karte.betont { border-left: 3px solid var(--warn); }
+.ws-avatar {
+  width: 38px; height: 38px; flex: none; border-radius: var(--r-sm);
+  display: grid; place-items: center;
+  font-size: 12.5px; font-weight: 700; letter-spacing: .3px;
+  background: var(--accent-soft); color: var(--accent);
+}
+.ws-avatar.st-aktiv { background: var(--pos-soft); color: var(--pos); }
+.ws-avatar.st-pause { background: var(--warn-soft); color: var(--warn); }
+.ws-avatar.st-frei  { background: var(--surface-3); color: var(--ink-3); }
+.ws-info { flex: 1; min-width: 0; }
+.ws-name { font-size: 13.5px; font-weight: 650; letter-spacing: -.1px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ws-rolle { font-size: 11.5px; color: var(--ink-3); margin-top: 2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ws-rechts { text-align: right; flex: none; max-width: 42%; }
+.ws-status {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 9px; border-radius: 999px;
+  font-size: 11px; font-weight: 650; white-space: nowrap;
+}
+.ws-status.st-aktiv { background: var(--pos-soft);  color: var(--pos); }
+.ws-status.st-pause { background: var(--warn-soft); color: var(--warn); }
+.ws-status.st-frei  { background: var(--surface-3); color: var(--ink-3); }
+.ws-status .pkt { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.ws-ort { font-size: 11px; color: var(--ink-3); margin-top: 4px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Auf dem Handy braucht der Name die Breite; Ort und Status ruecken darunter,
+   statt beide Zeilen auf 40 Prozent zusammenzuquetschen (die Lehre aus den
+   Schicht-Zeilen im Entwurf, ENT-227). */
+@media (max-width: 620px) {
+  .ws-karte { flex-wrap: wrap; }
+  .ws-rechts { text-align: left; max-width: none; flex: 1 1 100%;
+    display: flex; align-items: center; gap: 10px; padding-left: 50px; }
+  .ws-ort { margin-top: 0; }
+}
+
 </style>
 <script src="gav.js"></script>
 <script src="zeitwahl.js"></script>
@@ -4109,6 +4220,19 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
             <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><line x1="6" y1="20" x2="6" y2="14"/><line x1="12" y1="20" x2="12" y2="8"/><line x1="18" y1="20" x2="18" y2="4"/></svg></span>
             <span class="bk-kachel-lbl">Auswertungen</span>
           </button>
+        </div>
+
+        <!-- Waechter-Status (ENT-232): die Frage, die die Einsatzleitung
+             beim Oeffnen dieser Seite tatsaechlich hat -- wer ist heute
+             draussen und was macht er gerade. Steht ueber "Letzte
+             Rundgaenge", weil das Jetzt vor dem Rueckblick kommt. -->
+        <div class="card" style="margin-top:20px">
+          <div class="card-hd">
+            <h2>Wächter-Status</h2>
+            <div class="sp"></div>
+            <span class="note" id="wsZaehler"></span>
+          </div>
+          <div class="card-bd"><div class="ws-liste" id="wsListe"></div></div>
         </div>
 
         <div class="card" style="margin-top:20px">
@@ -12305,6 +12429,74 @@ function revierdienstUebersichtOeffnen() {
   api(`rundgang_liste.php?von=${von}&bis=${bis}`).then(({ ok, data }) => {
     renderLetzteRundgaenge(ok && data.status === 'ok' ? data.rundgaenge : null);
   });
+  ladeWaechterStatus();
+}
+
+// ══════════════════════ WÄCHTER-STATUS (ENT-232) ═══════════════════════
+// Wer ist heute im Revierdienst eingeteilt und was macht er gerade.
+// Der Endpunkt liefert alle heute Eingeteilten, nicht nur die mit laufendem
+// Rundgang (Entscheid des Projektinhabers) -- sonst gaebe es den Zustand
+// "eingeteilt, aber noch nicht losgelaufen" gar nicht.
+function ladeWaechterStatus() {
+  const ziel = $('wsListe');
+  if (!ziel) { return; }
+  ziel.innerHTML = '<div class="sk" style="height:62px"></div>';
+  $('wsZaehler').textContent = '';
+  api('revierdienst_status.php').then(({ ok, data }) => {
+    zeichneWaechterStatus(ok && data.status === 'ok' ? data : null);
+  });
+}
+
+const WS_TEXT = {
+  aktiv: 'Aktiv', pause: 'Pause', frei: 'Frei',
+};
+
+function zeichneWaechterStatus(daten) {
+  const ziel = $('wsListe'), zaehler = $('wsZaehler');
+  if (!ziel) { return; }
+  // Vier verschiedene Aussagen, vier verschiedene Texte (Hausregel):
+  // nicht abrufbar ist etwas anderes als niemand eingeteilt.
+  // Eine Antwort ohne Liste ist etwas anderes als eine leere Liste: Sie ist
+  // kaputt, nicht leer. Ohne diese Unterscheidung stuerzt die Zeichnung mit
+  // "Cannot read properties of undefined" ab -- die Regression hat genau das
+  // gefangen, weil eine andere Suite den Endpunkt nur mit {status:'ok'}
+  // beantwortet. Ein Server, der dasselbe tut, haette die Seite zerlegt.
+  const leute = daten && Array.isArray(daten.leute) ? daten.leute : null;
+  if (!leute) {
+    zaehler.textContent = '';
+    ziel.innerHTML = EMPTY('Status nicht verfügbar', 'Die Wächter-Übersicht konnte nicht geladen werden.');
+    return;
+  }
+  if (!leute.length) {
+    zaehler.textContent = '';
+    ziel.innerHTML = EMPTY('Heute niemand eingeteilt', 'Sobald für heute ein Revierdienst-Einsatz besetzt ist, erscheint er hier.');
+    return;
+  }
+  // Zwei Einheiten, darum ausgeschrieben statt einer nackten Zahl: "aktiv"
+  // zaehlt laufende Rundgaenge, "eingeteilt" zaehlt Personen.
+  zaehler.textContent = `${daten.aktiv} von ${daten.eingeteilt} auf Rundgang`;
+  ziel.innerHTML = leute.map(l => {
+    const initialen = ((l.vorname || '').charAt(0) + (l.nachname || '').charAt(0)).toUpperCase() || '?';
+    const name = [l.vorname, l.nachname].filter(Boolean).join(' ') || 'Ohne Namen';
+    // "Nicht hinterlegt" statt einer leeren Zeile -- unbekannt darf nie wie
+    // keine aussehen. Die Schichtangabe kommt aus dem Einsatztitel.
+    const rolle = [l.funktion || 'Funktion nicht hinterlegt', l.titel].filter(Boolean).join(' · ');
+    const ort = l.objekt_name
+      ? esc(l.objekt_name) + (l.letzter_punkt ? ' · ' + esc(l.letzter_punkt) : '')
+      : 'Kein Objekt hinterlegt';
+    const st = l.status;
+    return `<div class="ws-karte">
+      <div class="ws-avatar st-${st}">${esc(initialen)}</div>
+      <div class="ws-info">
+        <div class="ws-name">${esc(name)}</div>
+        <div class="ws-rolle">${esc(rolle)}</div>
+      </div>
+      <div class="ws-rechts">
+        <span class="ws-status st-${st}"><span class="pkt"></span>${WS_TEXT[st] || st}</span>
+        <div class="ws-ort">${ort}</div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function renderLetzteRundgaenge(rundgaenge) {
