@@ -1256,6 +1256,12 @@ $spalten = [
     ['belege', 'faellig_bis', 'ALTER TABLE belege ADD COLUMN faellig_bis DATE NULL AFTER gueltig_bis'],
     ['belege', 'bezahlt',     'ALTER TABLE belege ADD COLUMN bezahlt TINYINT(1) NOT NULL DEFAULT 0 AFTER faellig_bis'],
     ['belege', 'bezahlt_am',  'ALTER TABLE belege ADD COLUMN bezahlt_am DATE NULL AFTER bezahlt'],
+
+    // Kontrollrunde als eigene volle Seite statt kurzem Dialogfeld (ENT-255):
+    // eine optionale Notiz zur Runde, z. B. was sie abdeckt oder Hinweise fuer
+    // die Ausfuehrung. NULLable, weil die meisten bestehenden Runden keine
+    // brauchen -- kein Pflichtfeld nachtraeglich erzwingen.
+    ['rundgang_vorlage', 'beschreibung', 'ALTER TABLE rundgang_vorlage ADD COLUMN beschreibung TEXT NULL AFTER name'],
 ];
 foreach ($spalten as [$tabelle, $spalte, $sql]) {
     if (!hat_tabelle_jetzt($pdo, $tabelle) || hat_spalte($pdo, $tabelle, $spalte)) {

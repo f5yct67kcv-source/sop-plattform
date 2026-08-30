@@ -15,10 +15,14 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 $input = json_decode(file_get_contents('php://input'), true) ?? [];
 
-$id       = isset($input['id']) ? (int)$input['id'] : 0;
-$objektId = isset($input['objekt_id']) ? (int)$input['objekt_id'] : 0;
-$name     = trim((string)($input['name'] ?? ''));
-$aktiv    = !empty($input['aktiv']) ? 1 : 0;
+$id          = isset($input['id']) ? (int)$input['id'] : 0;
+$objektId    = isset($input['objekt_id']) ? (int)$input['objekt_id'] : 0;
+$name        = trim((string)($input['name'] ?? ''));
+$aktiv       = !empty($input['aktiv']) ? 1 : 0;
+// Optionale Notiz (ENT-255) -- leerer String wird als NULL gespeichert,
+// nicht als leere Zeichenkette, damit "keine Beschreibung" eindeutig bleibt.
+$beschreibung = trim((string)($input['beschreibung'] ?? ''));
+$beschreibung = $beschreibung === '' ? null : $beschreibung;
 
 if ($objektId <= 0 || $name === '') {
     json_response(['status' => 'error', 'message' => 'Objekt und Name erforderlich'], 400);
@@ -31,16 +35,16 @@ if (!$objektChk->fetch()) {
 }
 
 if ($id > 0) {
-    $stmt = db()->prepare('UPDATE rundgang_vorlage SET objekt_id = ?, name = ?, aktiv = ? WHERE id = ?');
-    $stmt->execute([$objektId, $name, $aktiv, $id]);
+    $stmt = db()->prepare('UPDATE rundgang_vorlage SET objekt_id = ?, name = ?, aktiv = ?, beschreibung = ? WHERE id = ?');
+    $stmt->execute([$objektId, $name, $aktiv, $beschreibung, $id]);
     $chk = db()->prepare('SELECT id FROM rundgang_vorlage WHERE id = ?');
     $chk->execute([$id]);
     if (!$chk->fetch()) {
         json_response(['status' => 'error', 'message' => 'Vorlage nicht gefunden'], 404);
     }
 } else {
-    $stmt = db()->prepare('INSERT INTO rundgang_vorlage (objekt_id, name, aktiv) VALUES (?, ?, ?)');
-    $stmt->execute([$objektId, $name, $aktiv]);
+    $stmt = db()->prepare('INSERT INTO rundgang_vorlage (objekt_id, name, aktiv, beschreibung) VALUES (?, ?, ?, ?)');
+    $stmt->execute([$objektId, $name, $aktiv, $beschreibung]);
     $id = (int)db()->lastInsertId();
 }
 

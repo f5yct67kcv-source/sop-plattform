@@ -1566,7 +1566,7 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
 /* Kontrollrunden-Vorlagen (ENT-204) */
 .kr-zeile { border: 1px solid var(--line); border-radius: var(--r-sm); padding: 11px 13px; margin-bottom: 8px; }
 .kr-zeile.aus { opacity: .55; }
-/* Die ganze Karte oeffnet die Kontrollrunde (ENT-250) -- ohne cursor:pointer
+/* Die ganze Karte oeffnet die Kontrollrunde (ENT-253) -- ohne cursor:pointer
    sieht man ihr nicht an, dass sie anklickbar ist (anders als "Bearbeiten"). */
 .kr-zeile.click { cursor: pointer; }
 .kr-zeile.click:hover { border-color: var(--accent); }
@@ -4307,32 +4307,104 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
         </div>
 
         <!-- Kontrollrunde bearbeiten/anlegen als eigene volle Unterseite
-             (ENT-251, Revision von ENT-248): der Projektinhaber wollte hier
+             (ENT-254, Revision von ENT-248): der Projektinhaber wollte hier
              ausdruecklich keine Schublade, sondern eine vollwertige Seite --
              siehe Docs-Eintrag. Die Einrichtung (openKr(), unveraendert)
              bleibt bei der Schublade; nur dieser Einstieg von der
-             objektuebergreifenden Liste aus bekommt die volle Seite. -->
+             objektuebergreifenden Liste aus bekommt die volle Seite.
+
+             ENT-255: die Seite selbst ist eine kleine Uebersicht (Name +
+             Beschreibung) mit einem eigenen Kachel-Raster darunter --
+             gleiches Bauprinzip wie die aeussere Rundgaenge-Uebersicht
+             (bk-kachel-grid, ENT-211/246), nur eine Ebene tiefer und mit
+             eigenen Funktionen/Klassen (rdKr*, .rdkr-panel statt
+             .bk-abschnitt), damit rdAbschnittZeigen() der AEUSSEREN Ebene
+             diese inneren Bereiche nicht versehentlich mittoggelt (beide
+             fragen sonst dieselbe Klasse innerhalb view-rundgaenge ab). -->
         <div class="bk-abschnitt" id="rdAb-kr" style="display:none">
         <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="rdAbschnittZeigen('liste')">Zurück</button>
-        <div class="card">
-          <div class="card-hd"><h2 id="rdKrTitel">Neue Kontrollrunde</h2></div>
-          <div class="card-bd">
-            <div class="msg-err" id="rdKrErr" style="display:none"></div>
-            <div class="form-grid">
-              <div class="f wide"><label for="rdKrName">Name *</label><input class="inp" id="rdKrName" placeholder="z. B. Öffnungsrunde"></div>
-              <div class="f"><label class="check" style="margin-top:26px"><input type="checkbox" id="rdKrAktiv" checked> Aktiv</label></div>
-            </div>
-            <div class="f wide" style="margin-top:14px">
-              <div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:8px">
-                <label style="margin:0">Kontrollpunkte in dieser Runde</label>
-                <button class="btn btn-plain btn-sm" style="margin-left:auto" onclick="openKp('neu')">+ Kontrollpunkt</button>
+
+        <div id="rdKrUebersicht">
+          <div class="card">
+            <div class="card-hd"><h2 id="rdKrTitel">Neue Kontrollrunde</h2></div>
+            <div class="card-bd">
+              <div class="msg-err" id="rdKrErr" style="display:none"></div>
+              <div class="form-grid">
+                <div class="f wide"><label for="rdKrName">Name *</label><input class="inp" id="rdKrName" placeholder="z. B. Öffnungsrunde"></div>
+                <div class="f"><label class="check" style="margin-top:26px"><input type="checkbox" id="rdKrAktiv" checked> Aktiv</label></div>
+                <div class="f wide"><label for="rdKrBeschreibung">Beschreibung</label><textarea class="inp" id="rdKrBeschreibung" rows="2" placeholder="Optionale Notiz zu dieser Kontrollrunde"></textarea></div>
               </div>
-              <div class="kr-punkte-liste" id="rdKrPunkteListe"></div>
-            </div>
-            <div style="margin-top:20px">
-              <button class="btn btn-primary" id="rdKrBtn" onclick="rdSaveKr()">Speichern</button>
+              <div style="margin-top:16px">
+                <button class="btn btn-primary" id="rdKrBtn" onclick="rdSaveKr()">Speichern</button>
+              </div>
             </div>
           </div>
+
+          <div class="bk-kachel-grid" style="margin-top:20px">
+            <button type="button" class="bk-kachel" onclick="rdKrAbschnittZeigen('kontrollpunkte')">
+              <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
+              <span class="bk-kachel-lbl">Kontrollpunkte</span>
+            </button>
+            <button type="button" class="bk-kachel" onclick="rdKrAbschnittZeigen('routenpunkte')">
+              <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M12 19h4a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2H8a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h4"/></svg></span>
+              <span class="bk-kachel-lbl">Routenpunkte</span>
+              <span class="chip chip-n" id="rdKrRoutenBadge">0</span>
+            </button>
+            <button type="button" class="bk-kachel" onclick="rdKrAbschnittZeigen('karte')">
+              <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><polygon points="1 6 8 3 16 6 23 3 23 18 16 21 8 18 1 21"/><line x1="8" y1="3" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="21"/></svg></span>
+              <span class="bk-kachel-lbl">Kartenansicht</span>
+            </button>
+            <button type="button" class="bk-kachel" onclick="rdKrAbschnittZeigen('aufgaben')">
+              <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><polyline points="4 6 5 7 7 5"/><polyline points="4 12 5 13 7 11"/><polyline points="4 18 5 19 7 17"/></svg></span>
+              <span class="bk-kachel-lbl">Aufgaben</span>
+            </button>
+            <button type="button" class="bk-kachel" onclick="rdKrAbschnittZeigen('ansprechpartner')">
+              <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+              <span class="bk-kachel-lbl">Ansprechpartner</span>
+            </button>
+            <button type="button" class="bk-kachel" onclick="rdKrAbschnittZeigen('berichte')">
+              <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
+              <span class="bk-kachel-lbl">Berichte</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Routenpunkte: einzige verdrahtete Kachel -- entspricht der
+             bisherigen "Kontrollpunkte in dieser Runde"-Auswahl aus
+             ENT-248/251, nur umbenannt und in einen eigenen Bereich
+             verschoben. Die restlichen fuenf zeigen einen bleibenden
+             Hinweis statt erfundenem Inhalt (gleiches Vorgehen wie
+             ENT-225/ENT-243) -- ihr Inhalt wird einzeln besprochen. -->
+        <div class="rdkr-panel" id="rdKrAb-routenpunkte" style="display:none">
+          <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="rdKrUebersichtZeigen()">Zurück</button>
+          <div class="card">
+            <div class="card-hd">
+              <h3>Routenpunkte</h3>
+              <div class="sp"></div>
+              <button class="btn btn-plain btn-sm" onclick="openKp('neu')">+ Kontrollpunkt</button>
+            </div>
+            <div class="card-bd"><div class="kr-punkte-liste" id="rdKrPunkteListe"></div></div>
+          </div>
+        </div>
+        <div class="rdkr-panel" id="rdKrAb-kontrollpunkte" style="display:none">
+          <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="rdKrUebersichtZeigen()">Zurück</button>
+          <p class="zone-note">Folgt in einem späteren Schritt.</p>
+        </div>
+        <div class="rdkr-panel" id="rdKrAb-karte" style="display:none">
+          <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="rdKrUebersichtZeigen()">Zurück</button>
+          <p class="zone-note">Folgt in einem späteren Schritt.</p>
+        </div>
+        <div class="rdkr-panel" id="rdKrAb-aufgaben" style="display:none">
+          <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="rdKrUebersichtZeigen()">Zurück</button>
+          <p class="zone-note">Folgt in einem späteren Schritt.</p>
+        </div>
+        <div class="rdkr-panel" id="rdKrAb-ansprechpartner" style="display:none">
+          <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="rdKrUebersichtZeigen()">Zurück</button>
+          <p class="zone-note">Folgt in einem späteren Schritt.</p>
+        </div>
+        <div class="rdkr-panel" id="rdKrAb-berichte" style="display:none">
+          <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="rdKrUebersichtZeigen()">Zurück</button>
+          <p class="zone-note">Folgt in einem späteren Schritt.</p>
         </div>
         </div>
 
@@ -15170,7 +15242,7 @@ function openKr(modus, id) {
 }
 
 // Baut die Kontrollpunkte-Liste innerhalb der Kontrollrunden-Schublade
-// (Einrichtung, openKr()) ODER der vollen Unterseite (rdKrZeigen(), ENT-251)
+// (Einrichtung, openKr()) ODER der vollen Unterseite (rdKrZeigen(), ENT-254)
 // -- zielId waehlt das Ziel, weil beide Oberflaechen dieselbe Karten-Liste
 // brauchen, nur an verschiedenen Stellen im DOM. Eigene Funktion statt
 // Inline-Code, weil krPunkteAktualisieren() (unten) dieselbe Zeichnung nach
@@ -15200,7 +15272,7 @@ function krPunkteZeichnen(gewaehlt, zielId) {
 
 // Nach dem Speichern/Loeschen eines Kontrollpunkts (aus saveKp()/askDeleteKp()
 // unten) die Liste nachziehen, egal ob gerade die Kontrollrunden-Schublade
-// (Einrichtung) oder die volle Unterseite (ENT-251) offen ist -- sonst
+// (Einrichtung) oder die volle Unterseite (ENT-254) offen ist -- sonst
 // zeigte sie nach dem Bearbeiten eines Punktes noch den alten Stand. Beide
 // moeglichen Ziele werden geprueft; wirkungslos fuer das jeweils nicht
 // betroffene (kein Element vorhanden bzw. leere Auswahl). Bereits angehakte
@@ -15260,7 +15332,7 @@ function askDeleteKr(id) {
 // Die volle Verwaltung (auch inaktive Runden, Kontrollpunkte zuordnen)
 // bleibt Objekt fuer Objekt unter Einrichtung -- diese Seite ist ein
 // schneller, objektuebergreifender Ueberblick plus Einstieg zum Anlegen,
-// kein Ersatz dafuer. Bearbeiten/Anlegen oeffnen seit ENT-251 eine eigene
+// kein Ersatz dafuer. Bearbeiten/Anlegen oeffnen seit ENT-254 eine eigene
 // volle Unterseite (rdKrZeigen(), NICHT dieselbe Schublade wie die
 // Einrichtung -- das war ENT-248, per Ruecksprache wieder revidiert):
 // dafuer wird rdEinObjekt vorher gesetzt und kontrollpunkte (bzw.
@@ -15331,7 +15403,7 @@ function rdAlleAnlegen() {
   loadKontrollpunkte().then(() => rdKrZeigen('neu'));
 }
 
-// Kontrollrunde bearbeiten/anlegen als volle Unterseite (ENT-251, Revision
+// Kontrollrunde bearbeiten/anlegen als volle Unterseite (ENT-254, Revision
 // von ENT-248): der Projektinhaber wollte hier ausdruecklich keine
 // Schublade, sondern eine vollwertige Seite. Die Einrichtung (openKr(),
 // oben) bleibt unveraendert bei der Schublade -- eigene Funktion statt
@@ -15344,12 +15416,37 @@ function rdKrZeigen(modus, id) {
   $('rdKrTitel').textContent = modus === 'neu' ? 'Neue Kontrollrunde' : 'Kontrollrunde ändern';
   $('rdKrName').value = v ? v.name : '';
   $('rdKrAktiv').checked = v ? !!Number(v.aktiv) : true;
+  $('rdKrBeschreibung').value = v && v.beschreibung ? v.beschreibung : '';
   $('rdKrErr').style.display = 'none';
 
-  krPunkteZeichnen(v ? new Set(v.punkte.map(p => Number(p.id))) : new Set(), 'rdKrPunkteListe');
+  const gewaehlt = v ? new Set(v.punkte.map(p => Number(p.id))) : new Set();
+  krPunkteZeichnen(gewaehlt, 'rdKrPunkteListe');
+  $('rdKrRoutenBadge').textContent = String(gewaehlt.size);
 
   rdAbschnittZeigen('kr');
+  // Jede Kontrollrunde startet auf der Uebersicht (Name/Beschreibung +
+  // Kacheln), nie auf dem zuletzt betrachteten Unterbereich der VORHERIGEN
+  // Runde -- sonst laeg's Aussehen der Seite vom Zufall ab, welche Runde man
+  // zuvor geoeffnet hatte.
+  rdKrUebersichtZeigen();
   $('rdKrName').focus();
+}
+
+// Innerer Kachel/Bereich-Wechsel INNERHALB der Kontrollrunden-Seite
+// (ENT-255) -- eigene Funktionen und eigene Klasse (.rdkr-panel statt
+// .bk-abschnitt), damit die AEUSSERE rdAbschnittZeigen()/rdUebersichtZeigen()
+// (Kachel-Uebersicht -> Liste -> diese Seite) diese inneren Bereiche nicht
+// versehentlich mittoggelt: beide fragen sonst dieselbe Klasse innerhalb
+// derselben view-rundgaenge ab.
+function rdKrUebersichtZeigen() {
+  $('rdKrUebersicht').style.display = '';
+  document.querySelectorAll('#rdAb-kr .rdkr-panel').forEach(a => { a.style.display = 'none'; });
+}
+
+function rdKrAbschnittZeigen(id) {
+  $('rdKrUebersicht').style.display = 'none';
+  document.querySelectorAll('#rdAb-kr .rdkr-panel').forEach(a => { a.style.display = 'none'; });
+  $('rdKrAb-' + id).style.display = '';
 }
 
 function rdSaveKr() {
@@ -15357,7 +15454,7 @@ function rdSaveKr() {
   const name = $('rdKrName').value.trim();
   if (!name) { err.textContent = 'Name erforderlich.'; err.style.display = ''; return; }
 
-  const body = { objekt_id: rdEinObjekt, name, aktiv: $('rdKrAktiv').checked ? 1 : 0 };
+  const body = { objekt_id: rdEinObjekt, name, aktiv: $('rdKrAktiv').checked ? 1 : 0, beschreibung: $('rdKrBeschreibung').value.trim() };
   if (krTarget) body.id = krTarget;
   const kontrollpunktIds = Array.from(document.querySelectorAll('#rdKrPunkteListe .kr-punkt:checked')).map(c => Number(c.value));
 

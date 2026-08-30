@@ -14,7 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 }
 
 $stmt = db()->prepare(
-    'SELECT v.id AS vorlage_id, v.objekt_id, v.name, v.aktiv, v.erstellt_am,
+    'SELECT v.id AS vorlage_id, v.objekt_id, v.name, v.beschreibung, v.aktiv, v.erstellt_am,
             o.kunde_name, o.name AS objekt_name,
             p.kontrollpunkt_id, p.reihenfolge, k.bezeichnung
      FROM rundgang_vorlage v
@@ -39,6 +39,7 @@ foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $zeile) {
             'kunde_name' => $zeile['kunde_name'],
             'objekt_name' => $zeile['objekt_name'],
             'name' => $zeile['name'],
+            'beschreibung' => $zeile['beschreibung'],
             'aktiv' => (int)$zeile['aktiv'],
             'erstellt_am' => $zeile['erstellt_am'],
             'punkte' => [],
