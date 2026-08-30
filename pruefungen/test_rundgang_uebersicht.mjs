@@ -121,7 +121,12 @@ check('KRITISCH: ein Klick auf "Revierdienst" landet direkt auf Übersicht, nich
 check('Die Kachel "Übersicht" ist unter Revierdienst sichtbar', await page.isVisible('#nav-revierdienst-uebersicht'));
 
 // ── Kachel-Grid (ENT-225, Vorbild Betrieb ENT-211)
-const kachelLabels = await page.$$eval('#view-rundgaenge .bk-kachel-lbl', els => els.map(e => e.textContent.trim()));
+// Selektor auf #rdUebersicht eingeschraenkt, nicht die ganze view-rundgaenge:
+// seit ENT-255 hat die Kontrollrunden-Seite (#rdAb-kr) ihr eigenes,
+// verschachteltes Kachel-Raster mit teils gleichlautenden Beschriftungen
+// (u. a. "Aufgaben") -- ein ungescopter Selektor traf sonst beide Raster
+// zusammen, dieselbe Fehlerklasse wie schon bei .bk-zurueck (ENT-246).
+const kachelLabels = await page.$$eval('#rdUebersicht .bk-kachel-lbl', els => els.map(e => e.textContent.trim()));
 check('KRITISCH: alle vier Kacheln stehen da, in der vorgegebenen Reihenfolge',
   JSON.stringify(kachelLabels) === JSON.stringify(['Rundgänge', 'GPS', 'Aufgaben', 'Auswertungen']));
 await page.click('#view-rundgaenge .bk-kachel:has-text("GPS")');

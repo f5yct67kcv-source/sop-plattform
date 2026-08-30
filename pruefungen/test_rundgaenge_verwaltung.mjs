@@ -4,11 +4,16 @@
 // mehrspaltige Tabelle in einer 420 px schmalen Schublade nicht passte
 // (Rueckmeldung Projektinhaber, Referenz-Screenshot einer vollen Seite).
 //
-// Bearbeiten/Anlegen nutzen dieselbe Schublade (openKr(), ENT-248) wie die
-// bestehende, objektgebundene Verwaltung unter Einrichtung -- hier wird nur
-// geprüft, dass die Seite sie mit dem richtigen Objekt und den richtigen
-// Werten öffnet, nicht das Speichern selbst (das deckt bereits die
-// Einrichtung ab, siehe test_kontrollrunden.mjs).
+// Bearbeiten/Anlegen öffnen seit ENT-254 eine eigene volle Unterseite
+// (rdKrZeigen(), NICHT dieselbe Schublade wie die Einrichtung) -- hier wird
+// nur geprüft, dass die Seite mit dem richtigen Objekt und den richtigen
+// Werten öffnet, nicht das Speichern der Punktzuordnung selbst im Detail
+// (das deckt bereits die Einrichtung ab, siehe test_kontrollrunden.mjs).
+// Seit ENT-255 ist diese Seite selbst eine kleine Übersicht (Name +
+// Beschreibung) mit einem Kachel-Raster zu sechs Unterbereichen darunter;
+// nur „Routenpunkte" ist verdrahtet (entspricht der bisherigen
+// Kontrollpunkte-Auswahl), die übrigen fünf zeigen einen bleibenden
+// Hinweis.
 import { WURZEL, OUT, browserPfad } from './pfade.mjs';
 import { chromium } from 'playwright';
 
@@ -31,10 +36,10 @@ const OBJEKTE = { status: 'ok', objekte: [
 // Objekt aus der Einrichtung zeigt.
 const VORLAGEN_ALLE = { status: 'ok', vorlagen: [
   { id: 10, objekt_id: 1, kunde_name: 'Muster Liegenschaften AG', objekt_name: 'Testliegenschaft Nord',
-    name: 'Öffnungsrunde', aktiv: 1, erstellt_am: '2026-01-01 00:00:00',
+    name: 'Öffnungsrunde', beschreibung: 'Erste Kontrolle nach Schichtbeginn', aktiv: 1, erstellt_am: '2026-01-01 00:00:00',
     punkte: [{ id: 1, bezeichnung: 'Eingang', reihenfolge: 1 }, { id: 2, bezeichnung: 'Keller', reihenfolge: 2 }] },
   { id: 11, objekt_id: 2, kunde_name: 'Beispiel Immobilien GmbH', objekt_name: 'Testliegenschaft Süd',
-    name: 'Schliessrunde', aktiv: 1, erstellt_am: '2026-01-02 00:00:00', punkte: [] },
+    name: 'Schliessrunde', beschreibung: null, aktiv: 1, erstellt_am: '2026-01-02 00:00:00', punkte: [] },
 ]};
 
 const KONTROLLPUNKTE_OBJ1 = { status: 'ok', kontrollpunkte: [
@@ -109,7 +114,7 @@ check('KRITISCH: "Rundgang anlegen" ohne gewähltes Objekt zeigt einen Hinweis s
     && document.getElementById('toast').textContent.includes('Objekt')));
 check('Die Unterseite bleibt dabei offen', await page.isVisible('#rdAb-liste'));
 
-// ══════════ ANLEGEN MIT OBJEKT: VOLLE UNTERSEITE STATT SCHUBLADE (ENT-251,
+// ══════════ ANLEGEN MIT OBJEKT: VOLLE UNTERSEITE STATT SCHUBLADE (ENT-254,
 // Revision von ENT-248 -- der Projektinhaber wollte hier ausdrücklich
 // keine Schublade, sondern eine vollwertige Seite), RICHTIGES OBJEKT
 calls = [];
@@ -122,13 +127,13 @@ check('Die Seite trägt den Anlege-Titel', (await page.textContent('#rdKrTitel')
 check('Das Namensfeld ist leer', await page.inputValue('#rdKrName') === '');
 check('KRITISCH: die Kontrollpunkte des GEWÄHLTEN Objekts (1) werden geladen, nicht irgendwelche',
   calls.some(c => c.includes('kontrollpunkt_liste')) && await page.evaluate(() => rdEinObjekt === 1));
-await page.click('#rdAb-kr .bk-zurueck');
+await page.click('#rdAb-kr > .bk-zurueck');
 await page.waitForTimeout(150);
 check('KRITISCH: "Zurück" von der Bearbeiten-Seite führt zur Liste zurück (nicht bis zur Kachel-Übersicht)',
   await page.isVisible('#rdAb-liste') && !(await page.isVisible('#rdUebersicht')));
 
 // ══════════ KRITISCH: DIE GANZE ZEILE OEFFNET, NICHT NUR DER "BEARBEITEN"-KNOPF
-// (ENT-250, Bug-Meldung des Projektinhabers nach dem Ausliefern von ENT-248:
+// (ENT-253, Bug-Meldung des Projektinhabers nach dem Ausliefern von ENT-248:
 // "bei mir öffnet sich noch nichts" -- Klick auf die Tabellenzeile ausserhalb
 // des Knopfes tat bis dahin buchstaeblich nichts.)
 await page.click('#rdAb-liste tr:has-text("Öffnungsrunde") td:has-text("Testliegenschaft Nord")');
@@ -137,9 +142,35 @@ check('KRITISCH: Klick auf die Tabellenzeile ausserhalb des Knopfes öffnet die 
   (await page.textContent('#rdKrTitel')) === 'Kontrollrunde ändern');
 check('Die richtige Zeile wird geladen', (await page.inputValue('#rdKrName')) === 'Öffnungsrunde');
 
+// ══════════ ENT-255: KLEINE ÜBERSICHT (NAME + BESCHREIBUNG) MIT
+// KACHEL-RASTER ZU SECHS UNTERBEREICHEN DARUNTER
+check('Die Übersicht (Name/Beschreibung + Kacheln) ist beim Öffnen zu sehen', await page.isVisible('#rdKrUebersicht'));
+check('KRITISCH: die Beschreibung wird vorbefüllt', (await page.inputValue('#rdKrBeschreibung')) === 'Erste Kontrolle nach Schichtbeginn');
+check('KRITISCH: das Routenpunkte-Kachel zeigt die richtige Anzahl (2)', (await page.textContent('#rdKrRoutenBadge')).trim() === '2');
+
+// „Routenpunkte" ist die einzige verdrahtete Kachel -- entspricht der
+// bisherigen Kontrollpunkte-Auswahl aus ENT-248/251.
+await page.click('#rdKrUebersicht .bk-kachel:has-text("Routenpunkte")');
+check('KRITISCH: die Routenpunkte-Kachel öffnet den eigenen Bereich, die Übersicht wird ausgeblendet',
+  await page.isVisible('#rdKrAb-routenpunkte') && !(await page.isVisible('#rdKrUebersicht')));
+const routenInhalt = await page.textContent('#rdKrAb-routenpunkte');
+check('Die zugeordneten Punkte erscheinen dort (Eingang, Keller)', routenInhalt.includes('Eingang') && routenInhalt.includes('Keller'));
+await page.click('#rdKrAb-routenpunkte .bk-zurueck');
+check('KRITISCH: "Zurück" aus einer Kachel führt zur Übersicht dieser Seite zurück, nicht zur Liste',
+  await page.isVisible('#rdKrUebersicht') && await page.isVisible('#rdAb-kr'));
+
+// Eine der fünf noch unverdrahteten Kacheln stichprobenartig geprüft --
+// bleibender Hinweis statt erfundenem Inhalt (gleiches Vorgehen wie
+// ENT-225/ENT-243), Inhalt wird gemäss Projektinhaber einzeln besprochen.
+await page.click('#rdKrUebersicht .bk-kachel:has-text("Aufgaben")');
+check('Eine noch unverdrahtete Kachel zeigt einen bleibenden Hinweis statt erfundenem Inhalt',
+  (await page.textContent('#rdKrAb-aufgaben')).includes('Folgt in einem späteren Schritt.'));
+await page.click('#rdKrAb-aufgaben .bk-zurueck');
+check('Auch von dort führt "Zurück" zur Übersicht dieser Seite zurück', await page.isVisible('#rdKrUebersicht'));
+
 // ══════════ BEARBEITEN: VOLLE SEITE MIT VORBEFUELLTEM NAMEN, ZWEITES OBJEKT
 calls = [];
-await page.click('#rdAb-kr .bk-zurueck');
+await page.click('#rdAb-kr > .bk-zurueck');
 await page.click('#rdAb-liste tr:has-text("Schliessrunde") button:has-text("Bearbeiten")');
 await page.waitForFunction(() => document.getElementById('rdAb-kr').style.display !== 'none');
 check('Die Seite trägt den Änderungs-Titel', (await page.textContent('#rdKrTitel')) === 'Kontrollrunde ändern');
@@ -152,8 +183,15 @@ check('KRITISCH: kein Seiten-Scroll am Desktop',
 await page.screenshot({ path: `${OUT}/rg-verwaltung-01-desktop.png` });
 
 // ══════════ SPEICHERN FUEHRT ZURUECK ZUR LISTE, NICHT ZUR KACHEL-UEBERSICHT
+check('Die Beschreibung ist leer, weil "Schliessrunde" keine hat', await page.inputValue('#rdKrBeschreibung') === '');
+await page.fill('#rdKrBeschreibung', 'Schliesskontrolle nach Ladenschluss');
 calls = [];
-await page.click('#rdKrBtn');
+const [speicherAnfrage] = await Promise.all([
+  page.waitForRequest(r => r.url().includes('rundgang_vorlage_save') && r.method() === 'POST'),
+  page.click('#rdKrBtn'),
+]);
+check('KRITISCH: die Beschreibung wird beim Speichern mitgesendet',
+  speicherAnfrage.postDataJSON().beschreibung === 'Schliesskontrolle nach Ladenschluss');
 await page.waitForFunction(() => document.getElementById('rdAb-liste').style.display !== 'none');
 check('KRITISCH: nach dem Speichern steht wieder die Liste da, nicht die Kachel-Übersicht',
   await page.isVisible('#rdAb-liste') && !(await page.isVisible('#rdUebersicht')));
@@ -180,7 +218,7 @@ check('KRITISCH: kein Seiten-Scroll bei 390px', await page.evaluate(() =>
   document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1));
 await page.screenshot({ path: `${OUT}/rg-verwaltung-02-mobil.png` });
 
-// ══════════ HANDY: die Kontrollrunde-Bearbeiten-Seite (ENT-251) ebenfalls --
+// ══════════ HANDY: die Kontrollrunde-Bearbeiten-Seite (ENT-254) ebenfalls --
 // eigene Seite statt Schublade heisst neue Massverhaeltnisse, die am
 // gerenderten Zustand geprueft werden muessen (CLAUDE.md "gemessen, nicht
 // angenommen"), nicht nur die Liste oben. Der Leerzustand-Mock von oben
