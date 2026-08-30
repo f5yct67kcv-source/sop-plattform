@@ -13,7 +13,12 @@ import { zeitSetzen } from './zeitfeld.mjs';
 const EXE = browserPfad();
 const iso = d => new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
 const tag = n => iso(new Date(Date.now() + n * 864e5));
-const HEUTE = tag(0), MORGEN = tag(1), FRUEHER = tag(-5);
+const HEUTE = tag(0), FRUEHER = tag(-5);
+// MORGEN muss in derselben Kalenderwoche wie HEUTE liegen -- siehe
+// test_planung.mjs fuer die ausfuehrliche Begruendung (Sonntags-Fall: dort
+// beginnt "morgen" schon die naechste Woche, und der Standardfilter "Diese
+// Woche" blendet den Fixtureinsatz sonst versehentlich aus).
+const MORGEN = tag(new Date(HEUTE + 'T12:00:00').getDay() === 0 ? -1 : 1);
 const ok = [], bad = [];
 const check = (n, c) => (c ? ok : bad).push(n);
 

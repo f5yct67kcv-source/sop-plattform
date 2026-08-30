@@ -27,7 +27,7 @@ await p1.waitForTimeout(900);
 check('Mitarbeiter wird vom Dashboard in die App geleitet', p1.url().endsWith('/app.html'));
 check('Mitarbeiter muss sich nicht neu anmelden', await p1.isVisible('#v-heute'));
 check('Kein Cockpit-Verweis fuer Mitarbeitende',
-  await p1.evaluate(() => { zeige('profil'); return !document.querySelector('#v-profil a[href="dashboard.html"]'); }));
+  await p1.evaluate(() => { zeige('menu'); return !document.querySelector('#v-menu a[href="dashboard.html"]'); }));
 await p1.close();
 
 // ── Admin kommt weiterhin ins Dashboard
@@ -119,10 +119,10 @@ await p5.click('#nav-zurapp');
 await p5.waitForTimeout(900);
 check('Der Wechsel fuehrt in die App', p5.url().endsWith('/app.html'));
 check('Nach dem Wechsel keine neue Anmeldung noetig', await p5.isVisible('#app.on'));
-await p5.evaluate(() => zeige('profil'));
+await p5.evaluate(() => zeige('menu'));
 await p5.waitForTimeout(300);
 check('Und von dort geht es wieder zurueck ins Cockpit',
-  await p5.evaluate(() => !!document.querySelector('#v-profil a[href="dashboard.html"]')));
+  await p5.evaluate(() => !!document.querySelector('#v-menu a[href="dashboard.html"]')));
 }
 await p5.close();
 

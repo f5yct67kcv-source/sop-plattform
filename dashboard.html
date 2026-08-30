@@ -2825,8 +2825,12 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
       <!-- Eigener Punkt statt eines Reiters unter Planung: der Abgleich ist ein
            zentraler Arbeitsschritt der Plattform und soll mit einem Klick
            erreichbar sein. Bewusst OHNE Zahl offener Abgleiche -- die steht auf
-           der Seite selbst, das Menü bleibt ruhig. -->
-      <button class="nav-item" id="nav-abgleich" title="Schichten abgleichen" onclick="go('abgleich')">
+           der Seite selbst, das Menü bleibt ruhig.
+           "nur-desktop" (ENT-235, Projektinhaber-Wunsch): auf dem Handy wird
+           dieser Menüpunkt nicht gebraucht. Die Seite selbst und ihre gezielten
+           Einstiege (z.B. "Zum Abgleich" beim Aufheben einer Sperre, "Direkt
+           abgleichen" im Einsatzplan) bleiben unveraendert erreichbar. -->
+      <button class="nav-item nur-desktop" id="nav-abgleich" title="Schichten abgleichen" onclick="go('abgleich')">
         <svg class="i" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
         <span class="lbl">Abgleich</span>
       </button>

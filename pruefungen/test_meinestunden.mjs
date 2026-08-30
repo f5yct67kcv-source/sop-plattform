@@ -87,27 +87,27 @@ check('KRITISCH: dieselbe Rechnung wie in der Verwaltung -- 15 Min. Nacht = 1.5 
 check('KRITISCH: bezahlte Pause bleibt auch hier in der Nettozeit',
   await page.evaluate(() => gavNetto('08:00', '18:00', 60, 1) === '10:00'));
 
-// ══════════════ PROFIL
-await page.click('#t-profil');
+// ══════════════ MENÜ (ENT-234, vormals PROFIL)
+await page.click('#t-menu');
 await page.waitForTimeout(600);
-// Seit ENT-051 stehen die Personalien im Vordergrund, die Stunden liegen eine
-// Ebene tiefer. Das Profil zeigt nur die Zeile -- bewusst OHNE Zahl.
-check('Das Profil zeigt die Personalien zuerst',
-  await page.evaluate(() => {
-    const t = document.getElementById('v-profil').textContent;
-    return t.indexOf('Personalnummer') < t.indexOf('Meine Stunden');
-  }));
-check('Die Stunden liegen zunaechst nicht offen im Profil',
+// Seit ENT-234 stehen zwei Kacheln nebeneinander (Meine Daten/Meine Stunden),
+// beide Unterseiten liegen dahinter -- weiterhin bewusst OHNE Zahl auf der
+// Kachel selbst (ENT-051-Grundsatz unveraendert).
+check('Das Menü zeigt die Personalnummer nicht direkt, erst hinter der Kachel',
+  await page.evaluate(() => !document.getElementById('pr-haupt').textContent.includes('Personalnummer')));
+check('Die Stunden liegen zunaechst nicht offen im Menü',
   await page.evaluate(() => getComputedStyle(document.getElementById('pr-stunden')).display === 'none'));
-check('Es gibt eine Zeile, die zu den Stunden fuehrt', await page.isVisible('#zeileStunden'));
-check('KRITISCH: keine Stundenzahl im Profil ohne den Abrechnungs-Hinweis',
+check('Die Personalien liegen zunaechst nicht offen im Menü',
+  await page.evaluate(() => getComputedStyle(document.getElementById('pr-daten')).display === 'none'));
+check('Es gibt eine Kachel, die zu den Stunden fuehrt', await page.isVisible('#mk-stunden'));
+check('KRITISCH: keine Stundenzahl auf der Kachel ohne den Abrechnungs-Hinweis',
   await page.evaluate(() => !/\d+:\d\d|\d+[.,]\d+\s*h/.test(
-    document.getElementById('zeileStunden').textContent)));
-await page.click('#zeileStunden');
+    document.getElementById('mk-stunden').textContent)));
+await page.click('#mk-stunden');
 await page.waitForTimeout(600);
 check('Der Bereich "Meine Stunden" steht auf der Unterseite', await page.isVisible('#stdBereich'));
-check('Die Personalien treten dabei zurueck', !(await page.isVisible('#pr-haupt')));
-check('Ueberschrift vorhanden', (await page.textContent('#v-profil')).includes('Meine Stunden'));
+check('Die Kacheln treten dabei zurueck', !(await page.isVisible('#pr-haupt')));
+check('Ueberschrift vorhanden', (await page.textContent('#v-menu')).includes('Meine Stunden'));
 await page.evaluate(m => { stdMonat = m; stdSchichten = null; zeichneStunden(); }, M);
 await page.waitForTimeout(500);
 
@@ -222,17 +222,17 @@ check('KRITISCH: der Weg bei Abweichungen wird genannt -- nicht nur ein Vorbehal
   hinweis.includes('Einsatzleitung'));
 
 // ══════════════ KEINE ZWEITE STUNDENZAHL MEHR
-check('KRITISCH: die alte Rapport-Stundenzahl ist aus dem Profil verschwunden',
-  !(await page.textContent('#v-profil')).includes('Diesen Monat'));
+check('KRITISCH: die alte Rapport-Stundenzahl ist aus dem Menü verschwunden',
+  !(await page.textContent('#v-menu')).includes('Diesen Monat'));
 await page.click('#t-rapport');
 await page.waitForTimeout(400);
 check('KRITISCH: auch im Rapport-Reiter steht keine konkurrierende Stundensumme',
   (await page.$$('#v-rapport .zahlen')).length === 0);
 
 // ══════════════ BLAETTERN
-await page.click('#t-profil');
+await page.click('#t-menu');
 await page.waitForTimeout(400);
-await page.click('#zeileStunden');
+await page.click('#mk-stunden');
 await page.waitForTimeout(400);
 await page.evaluate(m => { stdMonat = m; stdSchichten = null; zeichneStunden(); }, M);
 await page.waitForTimeout(500);
@@ -271,30 +271,30 @@ check('Die Stunden sind danach wieder zugeklappt',
 // Kein Zustand, der beim Verlassen haengen bleibt: wer die Unterseite offen
 // laesst und den Reiter wechselt, kommt aufs Profil zurueck, nicht mitten in
 // die Stunden.
-await page.click('#zeileStunden');
+await page.click('#mk-stunden');
 await page.waitForTimeout(350);
 check('Unterseite laesst sich erneut oeffnen', await page.isVisible('#stdBereich'));
 await page.click('#t-heute');
 await page.waitForTimeout(300);
-await page.click('#t-profil');
+await page.click('#t-menu');
 await page.waitForTimeout(500);
-check('Nach dem Reiterwechsel steht wieder das Profil vorn', await page.isVisible('#pr-haupt'));
+check('Nach dem Reiterwechsel stehen wieder die Kacheln vorn', await page.isVisible('#pr-haupt'));
 check('Die Unterseite bleibt nicht offen haengen',
   await page.evaluate(() => getComputedStyle(document.getElementById('pr-stunden')).display === 'none'));
 
-// Die Zeile muss auf dem Handy zuverlaessig zu treffen sein.
+// Die Kachel muss auf dem Handy zuverlaessig zu treffen sein.
 const zl = await page.evaluate(() => {
-  const r = document.getElementById('zeileStunden').getBoundingClientRect();
+  const r = document.getElementById('mk-stunden').getBoundingClientRect();
   return { h: r.height, l: r.left, w: r.right, iw: innerWidth };
 });
-check('Die Zeile ist gross genug zum Antippen', zl.h >= 44);
-check('Die Zeile liegt vollstaendig im Bild', zl.l >= 0 && zl.w <= zl.iw + 1);
-check('Die Zeile ist ein Knopf, nicht ein angeklicktes Kaestchen',
-  await page.evaluate(() => document.getElementById('zeileStunden').tagName === 'BUTTON'));
-await page.screenshot({ path: `${OUT}/ms-02-profil.png`, fullPage: true });
+check('Die Kachel ist gross genug zum Antippen', zl.h >= 44);
+check('Die Kachel liegt vollstaendig im Bild', zl.l >= 0 && zl.w <= zl.iw + 1);
+check('Die Kachel ist ein Knopf, nicht ein angeklicktes Kaestchen',
+  await page.evaluate(() => document.getElementById('mk-stunden').tagName === 'BUTTON'));
+await page.screenshot({ path: `${OUT}/ms-02-menu.png`, fullPage: true });
 
 // ══════════════ ZEITBONUS ERKLAERT (ENT-052)
-await page.click('#zeileStunden');
+await page.click('#mk-stunden');
 await page.waitForTimeout(400);
 const daInfo = await page.evaluate(() => !!document.getElementById('bonusInfo'));
 check('Die Zeitbonus-Kachel hat ein Info-Zeichen', daInfo);

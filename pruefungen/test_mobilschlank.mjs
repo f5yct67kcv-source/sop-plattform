@@ -54,10 +54,10 @@ await mock(m); await anmelden(m);
 const menue = await m.evaluate(() => [...document.querySelectorAll('.side-nav .nav-item')]
   .filter(e => e.getClientRects().length)
   .map(e => (e.querySelector('.lbl') || e).textContent.trim()));
-check('Mobil bleiben genau drei Menuepunkte', menue.length === 3);
+check('Mobil bleiben genau zwei Menuepunkte', menue.length === 2);
 check('Uebersicht bleibt', menue.includes('Übersicht'));
 check('Planung bleibt', menue.includes('Planung'));
-check('Abgleich bleibt', menue.includes('Abgleich'));
+check('KRITISCH: Abgleich ist mobil aus dem Menü ausgeblendet (ENT-235) -- die Seite selbst und ihre gezielten Einstiege (z.B. "Zum Abgleich" beim Aufheben einer Sperre) bleiben erreichbar', !menue.includes('Abgleich'));
 check('KRITISCH: Kunden sind mobil ausgeblendet', !menue.includes('Kunden'));
 check('KRITISCH: die Administration ist mobil ausgeblendet', !menue.includes('Administration'));
 check('Die Einrichtung ist mobil ausgeblendet',

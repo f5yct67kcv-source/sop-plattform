@@ -11,7 +11,25 @@ const EXE = browserPfad();
 // Datum lokal, gleiche Rechnung wie im Dashboard
 const iso = d => new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
 const tage = n => { const d = new Date(); d.setDate(d.getDate() + n); return iso(d); };
-const HEUTE = tage(0), MORGEN = tage(1), FRUEHER = tage(-10), SPAETER = tage(20);
+const HEUTE = tage(0), FRUEHER = tage(-10), SPAETER = tage(20);
+// MORGEN muss in derselben Kalenderwoche wie HEUTE liegen (Montag-Sonntag,
+// siehe zrWoche() in dashboard.html) -- sonst faellt der Nachtdienst-
+// Fixtureinsatz aus dem Standardfilter "Diese Woche" heraus, sobald der
+// Testlauf an einem Sonntag stattfindet (dann beginnt "morgen" schon die
+// naechste Woche). An jedem anderen Wochentag bleibt "morgen" unveraendert;
+// nur am Sonntag weicht die Fixtur auf "gestern" aus, das liegt garantiert
+// noch in derselben Woche.
+const MORGEN = tage(new Date(HEUTE + 'T12:00:00').getDay() === 0 ? -1 : 1);
+// Die KPI-Kacheln (renderPlKpi() in dashboard.html) zaehlen "ab heute" in
+// einem rollenden 7-Tage-Fenster -- ein eigenes, von der Kalenderwoche der
+// Tabelle unabhaengiges Zeitfenster. Am Sonntag liegt MORGEN vor "heute"
+// (siehe oben) und zaehlt darum dort nicht mehr mit; die Erwartungswerte
+// werden deshalb aus derselben Bedingung abgeleitet statt als feste Zahl
+// angenommen, damit die Pruefung an jedem Wochentag stimmt.
+const MORGEN_KOMMEND = MORGEN >= HEUTE;
+const ERW_KOMMEND = MORGEN_KOMMEND ? '3' : '2';
+const ERW_OFFEN = MORGEN_KOMMEND ? '2' : '1';       // 1 bei 11, +1 bei 13 nur falls kommend
+const ERW_UNBESTAETIGT = MORGEN_KOMMEND ? '2' : '1'; // 11 und, falls kommend, 13
 
 const STATS = { status: 'ok',
   kpi: { rapporte_monat: 4, rapporte_vormonat: 3, stunden_monat: 30, stunden_vormonat: 25, mitarbeiter: 3, kunden: 2, rapporte_total: 40 },
@@ -141,10 +159,10 @@ check('KRITISCH: der mobile "Rapporte"-Reiter existiert, ist auf dem Desktop abe
 // KPI
 const kpiWerte = await page.$$eval('#plKpi .kpi-val', els => els.map(e => e.textContent.trim()));
 check('Vier Kennzahlen', kpiWerte.length === 4);
-check('Kommende Einsaetze ohne abgesagte und ohne vergangene', kpiWerte[0] === '3');
-check('Naechste 7 Tage', kpiWerte[1] === '3');
-check('Offene Stellen zaehlt nur Fehlende', kpiWerte[2] === '2');   // 1 bei 11, 1 bei 13
-check('Nicht bestaetigt', kpiWerte[3] === '2');                      // 11 und 13
+check('Kommende Einsaetze ohne abgesagte und ohne vergangene', kpiWerte[0] === ERW_KOMMEND);
+check('Naechste 7 Tage', kpiWerte[1] === ERW_KOMMEND);
+check('Offene Stellen zaehlt nur Fehlende', kpiWerte[2] === ERW_OFFEN);
+check('Nicht bestaetigt', kpiWerte[3] === ERW_UNBESTAETIGT);
 
 // ══════════ LISTE
 const zeilen = () => page.$$eval('#plTable tbody tr', rs => rs.map(r => ({
