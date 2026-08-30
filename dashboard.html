@@ -12363,10 +12363,16 @@ function kontrolleNavKlick() {
 // Uebersicht (Durchfuehrung, vorher unter Kontrolle) und die Einrichtung
 // von Kontrollpunkten/Kontrollrunden (vorher Objekt-Reiter, ENT-186/204).
 function revierdienstNavKlick() {
-  // Landet auf der ersten Kachel, die diese Person tatsaechlich sehen darf --
-  // 'rundgang_verwalten' zeigt beide Unterseiten, 'rundgang_einsehen' allein
-  // nur die Uebersicht (gleiches Prinzip wie zuvor bei kontrolleNavKlick).
-  const ziel = darf('rundgang_verwalten') ? 'revierdienst' : 'rundgaenge';
+  // Landet auf der Uebersicht (Kachel-Landingpage samt letzten Rundgaengen,
+  // ENT-225), sobald die Person sie sehen darf -- 'rundgang_einsehen' und
+  // 'rundgang_verwalten' werden stets zusammen vergeben (siehe Waechter-Rolle),
+  // die Unterscheidung faengt darum nur den theoretischen Fall ab, dass jemand
+  // ausschliesslich 'rundgang_verwalten' haette. Vor ENT-241 landete
+  // 'rundgang_verwalten' zuerst auf der Einrichtung -- das drehte diese
+  // Entscheidung um, weil die Uebersicht seit ENT-225 der eigentliche
+  // Informationsgehalt ist, nicht mehr die leere Einrichtung mit "Kein
+  // Objekt gewaehlt".
+  const ziel = darf('rundgang_einsehen') ? 'rundgaenge' : 'revierdienst';
   if (navGruppeKompakt(ziel)) { return; }
   const offen = $('navg-revierdienst').classList.contains('offen');
   if (offen && $('view-' + ziel).classList.contains('on')) {
