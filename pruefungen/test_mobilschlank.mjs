@@ -54,10 +54,10 @@ await mock(m); await anmelden(m);
 const menue = await m.evaluate(() => [...document.querySelectorAll('.side-nav .nav-item')]
   .filter(e => e.getClientRects().length)
   .map(e => (e.querySelector('.lbl') || e).textContent.trim()));
-check('Mobil bleiben genau drei Menuepunkte', menue.length === 3);
+check('Mobil bleiben genau zwei Menuepunkte', menue.length === 2);
 check('Uebersicht bleibt', menue.includes('Übersicht'));
 check('Planung bleibt', menue.includes('Planung'));
-check('Abgleich bleibt', menue.includes('Abgleich'));
+check('KRITISCH: Abgleich ist mobil aus dem Menü ausgeblendet (ENT-235) -- die Seite selbst und ihre gezielten Einstiege (z.B. "Zum Abgleich" beim Aufheben einer Sperre) bleiben erreichbar', !menue.includes('Abgleich'));
 check('KRITISCH: Kunden sind mobil ausgeblendet', !menue.includes('Kunden'));
 check('KRITISCH: die Administration ist mobil ausgeblendet', !menue.includes('Administration'));
 check('Die Einrichtung ist mobil ausgeblendet',
@@ -100,8 +100,8 @@ for (const [v, name] of [['uebersicht', 'Übersicht'], ['planung', 'Planung'], [
 // Planung oeffnet mobil den Tagesplan statt der Monatsmatrix.
 await m.evaluate(() => go('planung'));
 await m.waitForTimeout(700);
-check('Der Matrix-Reiter ist mobil gar nicht erst da',
-  await m.evaluate(() => !document.getElementById('ptab-uebersicht').getClientRects().length));
+check('Der Matrix-Reiter ist mobil gar nicht erst da (ENT-233: existiert nur noch als Kopfzeilen-Eintrag auf dem Desktop)',
+  await m.evaluate(() => !document.getElementById('ptab-uebersicht')));
 // Seit ENT-058 traegt die Einsatzliste die Kartenoptik und den
 // Herkunftsfilter -- sie ist die mobile Startseite, nicht mehr der Tagesplan.
 check('KRITISCH: ein direkter Aufruf der Matrix landet mobil in der Einsatzliste',

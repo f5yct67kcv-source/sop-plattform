@@ -180,8 +180,8 @@ await page.waitForTimeout(400);
 // Seit ENT-058 ist die Einsatzliste die mobile Startseite der Planung.
 check('KRITISCH: mobil fuehrt die Monatsuebersicht in die Einsatzliste',
   await page.evaluate(() => document.getElementById('pv-einsaetze').classList.contains('on')));
-check('Der Matrix-Reiter ist mobil ausgeblendet',
-  await page.evaluate(() => !document.getElementById('ptab-uebersicht').getClientRects().length));
+check('Der Matrix-Reiter existiert mobil gar nicht mehr (ENT-233 -- der Reiter steht jetzt nur noch als Kopfzeilen-Eintrag auf dem Desktop, vorher war er hier nur per CSS ausgeblendet)',
+  await page.evaluate(() => !document.getElementById('ptab-uebersicht')));
 check('Die Einsatzliste zeigt mobil Karten statt einer Tabelle',
   await page.evaluate(() => {
     const t = document.querySelector('#plTable table');
