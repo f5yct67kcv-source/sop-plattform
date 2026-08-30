@@ -325,12 +325,17 @@ check('Mobil: der frei gewordene Platz gehoert der Navigation',
     const letzte = [...n.querySelectorAll('.nav-item')].filter(e => e.getClientRects().length).pop();
     return !!letzte && n.getBoundingClientRect().bottom - letzte.getBoundingClientRect().bottom < 400;
   }));
+// Seit ENT-235 ist auch der Abgleich mobil nicht mehr im Menue -- die Seite
+// selbst und ihre gezielten Einstiege (z.B. "Zum Abgleich" beim Aufheben
+// einer Sperre) bleiben erreichbar, gehoeren aber nicht in die Hauptnavigation.
+check('Mobil: Abgleich steht nicht mehr im Menue',
+  await page.evaluate(() => !document.getElementById('nav-abgleich').getClientRects().length));
 // Was mobil bleibt, muss auch mobil funktionieren.
-await page.click('#nav-abgleich');
+await page.click('#nav-planung');
 await page.waitForTimeout(350);
 check('Auswahl schliesst das Menue wieder',
   await page.evaluate(() => !document.getElementById('side').classList.contains('on')));
-check('Mobil: der Abgleich laesst sich oeffnen', await page.isVisible('#view-abgleich.on'));
+check('Mobil: die Planung laesst sich oeffnen', await page.isVisible('#view-planung.on'));
 await page.screenshot({ path: `${OUT}/07b-mobil-rapporte.png` });
 
 await browser.close();

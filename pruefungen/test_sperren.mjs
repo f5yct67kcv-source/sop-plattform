@@ -35,7 +35,10 @@ await page.route('**/api/**', route => {
   if (p.includes('meine_schichten')) return send({ status: 'ok', schichten: [
     { id: 41, kunde_name: 'Borner AG', titel: 'Schliessrunde', strasse: null, ort: '4601 Olten',
       einsatzart: 'Revierdienst', datum: tag(5), von: '22:00:00', bis: '22:30:00', status: 'geplant',
-      bemerkung: null, zusage: 'offen', objekt_name: 'Gerolag Center', im_team: 1 }] });
+      bemerkung: null, zusage: 'offen', objekt_name: 'Gerolag Center', im_team: 1,
+      // ENT-234: ohne Kontrollpunkte kein Wächter-Reiter -- diese Suite prüft
+      // ausdrücklich den Fall ohne Revierdienst-Bezug.
+      hat_kontrollpunkte: false }] });
   if (p.includes('mein_profil')) return send({ status: 'ok', monat: { anzahl: 0, stunden: 0 },
     profil: { name: 'daniele.ciardo', ist_admin: false, vorname: 'Daniele', nachname: 'Ciardo' } });
   return send({ status: 'ok', rapporte: [] });
@@ -48,30 +51,33 @@ await page.waitForSelector('#app.on'); await page.waitForTimeout(500);
 // ── Albanisch ist weg
 check('Kein Sprachumschalter mehr auf der Anmeldung',
   await page.evaluate(() => !document.getElementById('spSq')));
-check('Fünf Reiter unten',
-  await page.evaluate(() => document.querySelectorAll('.tabs button').length === 5));
-check('Der Sperren-Reiter ist da', await page.isVisible('#t-sperren'));
-await page.click('#t-profil'); await page.waitForTimeout(250);
-const profil = await page.textContent('#v-profil');
-check('Kein Sprachbereich mehr im Profil', !profil.includes('Shqip') && !profil.includes('Sprache'));
+check('Vier sichtbare Reiter unten (kein Revierdienst-Bezug, ENT-234)',
+  await page.evaluate(() => [...document.querySelectorAll('.tabs button')]
+    .filter(b => getComputedStyle(b).display !== 'none').length === 4));
+check('Der Wächter-Reiter bleibt ohne Kontrollpunkte verborgen', !(await page.isVisible('#t-waechter')));
+await page.click('#t-menu'); await page.waitForTimeout(250);
+const menu = await page.textContent('#v-menu');
+check('Kein Sprachbereich mehr im Menü', !menu.includes('Shqip') && !menu.includes('Sprache'));
 check('Kein albanischer Text mehr in der App',
   await page.evaluate(() => !/Shqip|Punonjës|Raport[ei]|Klienti|Turni/.test(document.body.innerHTML)));
 
-// ── Sperrtage
-await page.click('#t-sperren'); await page.waitForTimeout(400);
-check('Der Sperren-Bereich erklärt sich', (await page.textContent('#v-sperren')).includes('Tage sperren'));
+// ── Sperrtage: seit ENT-234 Unterreiter von "Plan", kein eigener Hauptreiter mehr
+await page.click('#t-plan'); await page.waitForTimeout(300);
+check('Der Sperren-Unterreiter ist da', await page.isVisible('#pu-sperren'));
+await page.click('#pu-sperren'); await page.waitForTimeout(400);
+check('Der Sperren-Bereich erklärt sich', (await page.textContent('#plan-inhalt-sperren')).includes('Tage sperren'));
 check('Es wird gesagt, dass es keine Zusage ist',
-  (await page.textContent('#v-sperren')).includes('Zusage ist es nicht'));
+  (await page.textContent('#plan-inhalt-sperren')).includes('Zusage ist es nicht'));
 check('Sperrtage werden geladen', rufe.some(r => r.p.includes('meine_verfuegbarkeit')));
 const zeilen = await page.evaluate(() => document.querySelectorAll('.sperr-zeile').length);
 check(`Neun Wochen im Voraus (${zeilen} Tage)`, zeilen === 63);
 check('Der bestehende Sperrtag ist markiert',
   await page.evaluate(() => document.querySelectorAll('.sperr-karte.aus').length === 1));
-check('Die Bemerkung wird gezeigt', (await page.textContent('#v-sperren')).includes('Arzttermin'));
-check('Die Zahl der Sperrtage steht oben', (await page.textContent('#v-sperren')).includes('1 Tag gesperrt'));
-check('Wochen sind überschrieben', (await page.textContent('#v-sperren')).includes('Woche'));
+check('Die Bemerkung wird gezeigt', (await page.textContent('#plan-inhalt-sperren')).includes('Arzttermin'));
+check('Die Zahl der Sperrtage steht oben', (await page.textContent('#plan-inhalt-sperren')).includes('1 Tag gesperrt'));
+check('Wochen sind überschrieben', (await page.textContent('#plan-inhalt-sperren')).includes('Woche'));
 check('Ein Tag mit Einteilung wird als solcher benannt',
-  (await page.textContent('#v-sperren')).includes('bereits eingeteilt'));
+  (await page.textContent('#plan-inhalt-sperren')).includes('bereits eingeteilt'));
 await page.screenshot({ path: OUT + '/62-sperren.png' });
 
 // ── Einen Tag sperren
@@ -110,7 +116,7 @@ check('Die Notiz wird gesendet',
   rufe.filter(r => r.p.includes('meine_verfuegbarkeit') && r.body).at(-1).body.bemerkung === 'erst ab 18 Uhr');
 check('Das Blatt schliesst',
   await page.evaluate(() => !document.getElementById('blatt').classList.contains('on')));
-check('Die neue Notiz steht in der Liste', (await page.textContent('#v-sperren')).includes('erst ab 18 Uhr'));
+check('Die neue Notiz steht in der Liste', (await page.textContent('#plan-inhalt-sperren')).includes('erst ab 18 Uhr'));
 
 // ── Mobil
 for (const breite of [320, 360, 390]) {
@@ -118,7 +124,7 @@ for (const breite of [320, 360, 390]) {
   await page.waitForTimeout(200);
   const m = await page.evaluate(() => {
     const d = document.documentElement, ueber = [];
-    document.querySelectorAll('#v-sperren *, .tabs *').forEach(el => {
+    document.querySelectorAll('#v-plan *, .tabs *').forEach(el => {
       const r = el.getBoundingClientRect();
       if (r.width && r.height && r.right > window.innerWidth + 1) ueber.push(el.className);
     });

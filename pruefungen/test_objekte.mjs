@@ -139,14 +139,14 @@ await page.click('#nav-planung');
 await page.waitForSelector('#mxTable table');
 await page.waitForTimeout(400);
 // Vier Planungsreiter seit ENT-039 (Objekte zu Kunden gezogen), seit ENT-045
-// kommt der Abgleich als fuenfter dazu. Kein Objekte-Reiter mehr.
-// Sichtbar zaehlen, nicht nur im DOM: seit ENT-165 liegt zusaetzlich ein
-// mobiler "Rapporte"-Reiter im Markup, auf dem Desktop aber unsichtbar
-// (".nur-schmal") -- ein blosses $$() zaehlte ihn faelschlich mit.
-const sichtbareReiter = await page.$$eval('#view-planung .tab',
-  els => els.filter(e => e.getClientRects().length));
-check('Vier Reiter, keiner davon Objekte', sichtbareReiter.length === 4
-  && !(await page.textContent('#view-planung .tabs')).includes('Objekte'));
+// kommt der Abgleich als fuenfter dazu (eigener Hauptpunkt, kein Reiter hier).
+// Kein Objekte-Reiter mehr. Die Reiter stehen seit ENT-233 auf dem Desktop
+// als Kopfzeilen-Eintraege (navg-planung .nav-kind), nicht mehr im
+// Seiteninhalt -- die mobile Reiterleiste (mit "Rapporte" statt "Objekte")
+// ist eine eigene, gesondert zugeschnittene Ansicht (siehe test_mobil.mjs).
+const reiterLabels = await page.$$eval('#navg-planung .nav-kind', els => els.map(e => e.textContent.trim()));
+check('Vier Reiter in der Kopfzeile, keiner davon Objekte',
+  reiterLabels.length === 4 && !reiterLabels.includes('Objekte'));
 check('Uebersicht ist der Standardreiter', await page.isVisible('#pv-uebersicht') && !(await page.isVisible('#pv-einsaetze')));
 check('Reiter oeffnen schreibt nichts', writes().length === 0);
 check('Kein eigener Objekte-Punkt in der Seitenleiste -- er haengt als Kind unter Kunden', (await page.$$('#nav-objekte')).length === 0);
@@ -202,7 +202,7 @@ await page.waitForTimeout(200);
 await page.screenshot({ path: `${OUT}/31-tagesplan.png` });
 
 // ══════════ OBJEKTPLANUNG
-await page.click('#ptab-uebersicht');
+await page.click('#nav-planung-uebersicht');
 await page.waitForTimeout(300);
 calls = [];
 // Der Objektname in der Matrix fuehrt in die Objektplanung
@@ -431,7 +431,7 @@ await page.waitForTimeout(300);
 // Feiertage haengen an der Planung, nicht an Kunden -- zurueck navigieren.
 await page.click('#nav-planung');
 await page.waitForTimeout(200);
-await page.click('#ptab-uebersicht');
+await page.click('#nav-planung-uebersicht');
 await page.waitForTimeout(200);
 calls = [];
 // Seit ENT-038 auf der Reiter-Trennlinie, reiterübergreifend statt nur hier.

@@ -366,6 +366,44 @@ svg.i-sm { width: 17px; height: 17px; }
 .sk { background: linear-gradient(90deg, var(--line-soft) 25%, #E4E7EC 50%, var(--line-soft) 75%); background-size: 200% 100%; animation: sh 1.3s infinite; border-radius: var(--r-sm); }
 @keyframes sh { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 
+/* ── Kacheln fuer Menue/Waechter (ENT-234). Optisch identisch zum
+   .bk-kachel-Muster aus dashboard.html (Betrieb-Uebersicht, ENT-161) --
+   eigener Klassenpraefix, weil beide Dateien getrennte Stylesheets sind,
+   dieselben Farb-/Abstands-Werte wie dort. */
+.mk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 14px; margin-bottom: 20px; }
+.mk-kachel { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--sh-1);
+  padding: 22px 14px; min-height: 132px; width: 100%; cursor: pointer; font: inherit; color: inherit; }
+.mk-kachel:active { background: var(--accent-soft); border-color: var(--accent-line); }
+.mk-kachel:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mk-kachel-ic { width: 56px; height: 56px; border-radius: 14px; background: var(--accent-soft);
+  color: var(--accent); display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.mk-kachel-ic svg.i { width: 28px; height: 28px; }
+.mk-kachel-lbl { font-size: 13.5px; font-weight: 600; line-height: 1.35; }
+
+/* ── Unterreiter (ENT-234: Plan + Sperren in einem Reiter). Gleiche
+   Trefferflaeche wie ein Hauptreiter (44px), aber schmaler und ohne
+   Icon -- sichtbar nur unterhalb von "Plan", nicht Teil der globalen
+   Tab-Leiste. */
+.unterreiter { display: flex; gap: 6px; margin-bottom: 16px; background: var(--line-soft); border-radius: var(--r-sm); padding: 4px; }
+.unterreiter button { flex: 1; min-height: 40px; border: none; border-radius: calc(var(--r-sm) - 3px); background: none;
+  font: inherit; font-size: 14px; font-weight: 600; color: var(--ink-2); cursor: pointer; }
+.unterreiter button.on { background: var(--surface); color: var(--ink); box-shadow: var(--sh-1); }
+
+/* ── Hinweis-Chip bei aktivem/pausiertem Rundgang auf "Heute" (ENT-234).
+   Fuehrt mit einem Tipp direkt zurueck in die Checkliste, ohne den Weg
+   ueber "Wächter" -- waehrend eine Runde laeuft, zaehlt jeder Kontrollpunkt-
+   Scan, nicht die Navigation dorthin. */
+.rd-chip { display: flex; align-items: center; gap: 11px; width: 100%; min-height: 56px; padding: 12px 16px;
+  margin-bottom: 14px; background: var(--accent-soft); border: 1px solid var(--accent-line); border-radius: var(--r);
+  font: inherit; color: var(--ink); cursor: pointer; text-align: left; }
+.rd-chip-ic { flex: none; width: 32px; height: 32px; border-radius: 50%; background: var(--accent); color: #fff;
+  display: flex; align-items: center; justify-content: center; }
+.rd-chip-txt { flex: 1; min-width: 0; }
+.rd-chip-txt b { display: block; font-size: 14px; font-weight: 650; }
+.rd-chip-txt span { display: block; font-size: 12.5px; color: var(--ink-2); margin-top: 1px; }
+.rd-chip .chev { flex: none; width: 18px; height: 18px; stroke: var(--ink-3); fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+
 @media (min-width: 700px) {
   /* Auf grösseren Geräten mittig halten statt in die Breite ziehen */
   .app { max-width: 560px; margin: 0 auto; box-shadow: 0 0 0 1px var(--line); min-height: 100vh; }
@@ -410,9 +448,9 @@ svg.i-sm { width: 17px; height: 17px; }
   <main class="inhalt">
     <section class="v on" id="v-heute"></section>
     <section class="v" id="v-plan"></section>
-    <section class="v" id="v-sperren"></section>
     <section class="v" id="v-rapport"></section>
-    <section class="v" id="v-profil"></section>
+    <section class="v" id="v-waechter"></section>
+    <section class="v" id="v-menu"></section>
   </main>
 
   <nav class="tabs">
@@ -424,17 +462,17 @@ svg.i-sm { width: 17px; height: 17px; }
       <svg class="i" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="17" rx="2"/><line x1="3" y1="9.5" x2="21" y2="9.5"/><line x1="8" y1="2.5" x2="8" y2="6.5"/><line x1="16" y1="2.5" x2="16" y2="6.5"/></svg>
       <span id="lb-tab-plan">Plan</span>
     </button>
-    <button id="t-sperren" onclick="zeige('sperren')">
-      <svg class="i" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="17" rx="2"/><line x1="3" y1="9.5" x2="21" y2="9.5"/><line x1="9.5" y1="14" x2="14.5" y2="18.5"/><line x1="14.5" y1="14" x2="9.5" y2="18.5"/></svg>
-      <span id="lb-tab-sperren">Sperren</span>
-    </button>
     <button id="t-rapport" onclick="zeige('rapport')">
       <svg class="i" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
       <span id="lb-tab-rapport">Rapport</span>
     </button>
-    <button id="t-profil" onclick="zeige('profil')">
-      <svg class="i" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-      <span id="lb-tab-profil">Profil</span>
+    <button id="t-waechter" onclick="zeige('waechter')" style="display:none">
+      <svg class="i" viewBox="0 0 24 24"><path d="M12 3l7 3.5v5c0 4.8-3 8.9-7 10-4-1.1-7-5.2-7-10v-5z"/></svg>
+      <span id="lb-tab-waechter">Wächter</span>
+    </button>
+    <button id="t-menu" onclick="zeige('menu')">
+      <svg class="i" viewBox="0 0 24 24"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
+      <span id="lb-tab-menu">Menü</span>
     </button>
   </nav>
 </div>
@@ -469,6 +507,13 @@ const W = {
     anmelden: 'Anmelden', name: 'Name', passwort: 'Passwort',
     fehlerAnmeldung: 'Name oder Passwort falsch.', beidesNoetig: 'Name und Passwort erforderlich.',
     heute: 'Heute', plan: 'Plan', rapport: 'Rapport', profil: 'Profil', sperren: 'Sperren',
+    // ENT-234: neue Reiter Wächter/Menü, Plan+Sperren als Unterreiter verschmolzen.
+    waechter: 'Wächter', menu: 'Menü',
+    meineDaten: 'Meine Daten', zurueckZumMenue: 'Zurück zum Menü',
+    waechterRundgangLbl: 'Rundgang', waechterSchluesselLbl: 'Schlüsselverwaltung',
+    waechterKeinRundgang: 'Für keine deiner aktuellen Schichten ist gerade ein Rundgang möglich.',
+    waechterMehrereTitel: 'Für welche Schicht?',
+    rundgangChipLaeuft: 'Rundgang läuft', rundgangChipPausiert: 'Rundgang pausiert',
     sperrenTitel: 'Tage sperren', gesperrt: 'Gesperrt', frei: 'Frei',
     sperrenText: 'Tippe auf einen Tag, an dem du nicht kannst. Die Planung sieht das und berücksichtigt es — eine Zusage ist es nicht.',
     sperreNotiz: 'Notiz', sperreNotizText: 'Kurz sagen warum — die Planung sieht es (freiwillig).',
@@ -664,9 +709,9 @@ function beschriften() {
   $('gBtn').textContent = w('anmelden');
   $('lb-tab-heute').textContent = w('heute');
   $('lb-tab-plan').textContent = w('plan');
-  $('lb-tab-sperren').textContent = w('sperren');
   $('lb-tab-rapport').textContent = w('rapport');
-  $('lb-tab-profil').textContent = w('profil');
+  $('lb-tab-waechter').textContent = w('waechter');
+  $('lb-tab-menu').textContent = w('menu');
 }
 
 // ══════════════════════════════════════════ ZUGANG
@@ -709,7 +754,20 @@ function allesLaden() {
   const heute = new Date();
   $('kDatum').textContent = WOCHENTAG[heute.getDay()] + ', ' + dmy(isoTag(heute));
   return Promise.all([ladeSchichten(), ladeProfil(), ladeRapporte(), ladeSperren()])
-    .then(() => { b.disabled = false; zeichne(); });
+    .then(() => { b.disabled = false; waechterTabAktualisieren(); zeichne(); });
+}
+
+// ENT-234: "Wächter" erscheint nur, wer irgendeine Schicht an einem Objekt
+// mit Kontrollpunkten hat -- abgeleitet aus den ohnehin geladenen Schichten,
+// kein neues Recht, keine neue Rolle. Wer nie Revierdienst macht, sieht
+// diesen Reiter nie, statt einen leeren Platzhalter vorgesetzt zu bekommen.
+function waechterSichtbar() {
+  return schichten.some(e => e.hat_kontrollpunkte);
+}
+function waechterTabAktualisieren() {
+  const sichtbar = waechterSichtbar();
+  $('t-waechter').style.display = sichtbar ? '' : 'none';
+  if (!sichtbar && reiter === 'waechter') zeige('heute');
 }
 function ladeSchichten() {
   return api('meine_schichten.php').then(({ ok, status, data }) => {
@@ -742,9 +800,9 @@ function zeichne() {
   beschriften();
   if (reiter === 'heute') zeichneHeute();
   if (reiter === 'plan') zeichnePlan();
-  if (reiter === 'sperren') zeichneSperren();
   if (reiter === 'rapport') zeichneRapport();
-  if (reiter === 'profil') zeichneProfil();
+  if (reiter === 'waechter') zeichneWaechter();
+  if (reiter === 'menu') zeichneMenu();
 }
 
 const LEER = (t, p, ic) => `<div class="karte"><div class="leer">
@@ -799,6 +857,26 @@ function schichtKarte(e, mitDatum) {
   </div>`;
 }
 
+// Hinweis-Chip bei aktivem/pausiertem Rundgang (ENT-234) -- fuehrt direkt
+// zurueck in die Checkliste, ohne den Umweg ueber "Wächter". rundgangAktiv
+// existiert nur innerhalb der laufenden Sitzung (gesetzt beim Start/
+// Fortsetzen), das reicht fuer den Zweck: schneller Wiedereinstieg waehrend
+// desselben App-Aufenthalts, kein zusaetzlicher Serveraufruf bei jedem Laden.
+function rundgangChipHtml() {
+  if (!rundgangAktiv || rundgangAktiv.status === 'abgebrochen' || rundgangAktiv.status === 'abgeschlossen') return '';
+  const kps = rundgangAktiv.kontrollpunkte || [];
+  const erledigt = kps.filter(k => k.erledigt).length;
+  const pausiert = rundgangAktiv.status === 'pausiert';
+  return `<button type="button" class="rd-chip" onclick="rundgangAnzeigen(${Number(rundgangAktiv.einsatz_id)})">
+    <span class="rd-chip-ic"><svg class="i i-sm" viewBox="0 0 24 24"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M12 19h4a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2H8a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h4"/></svg></span>
+    <span class="rd-chip-txt">
+      <b>${esc(pausiert ? w('rundgangChipPausiert') : w('rundgangChipLaeuft'))}</b>
+      <span>${erledigt} ${esc(w('von'))} ${kps.length} ${esc(w('erledigt'))}</span>
+    </span>
+    <svg class="chev" viewBox="0 0 24 24"><polyline points="9 5 16 12 9 19"/></svg>
+  </button>`;
+}
+
 // ══════════════════════════════════════════ HEUTE
 function zeichneHeute() {
   const heute = isoTag();
@@ -812,9 +890,9 @@ function zeichneHeute() {
   const zeigen = [...new Set([...laufend, ...heutige])]
     .sort((a, b) => (spanne(a.datum, a.von, a.bis) || [0])[0] - (spanne(b.datum, b.von, b.bis) || [0])[0]);
 
-  let html = '';
+  let html = rundgangChipHtml();
   if (!zeigen.length) {
-    html = LEER(w('keineHeute'), w('keineHeuteText'), '<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/>');
+    html += LEER(w('keineHeute'), w('keineHeuteText'), '<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/>');
     const naechste = schichten
       .filter(e => e.status !== 'abgesagt' && (spanne(e.datum, e.von, e.bis) || [0])[0] > jetzt)
       .sort((a, b) => (spanne(a.datum, a.von, a.bis) || [0])[0] - (spanne(b.datum, b.von, b.bis) || [0])[0])[0];
@@ -833,7 +911,31 @@ function zeichneHeute() {
 }
 
 // ══════════════════════════════════════════ PLAN
+// ENT-234: Plan + Sperren in einem Reiter mit Unterreitern. zeichnePlan()
+// baut nur noch die Huelle (Unterreiter-Leiste + zwei Container); der
+// eigentliche Aufbau steht unveraendert in zeichnePlanListe() (frueher
+// zeichnePlan()) und in zeichneSperren() -- beide zielen jetzt auf die
+// beiden neuen Container statt auf eigene Hauptreiter.
+let planUnter = 'plan';
+function planUnterWahl(u) {
+  planUnter = u;
+  $('pu-plan').classList.toggle('on', u === 'plan');
+  $('pu-sperren').classList.toggle('on', u === 'sperren');
+  $('plan-inhalt-plan').style.display = u === 'plan' ? '' : 'none';
+  $('plan-inhalt-sperren').style.display = u === 'sperren' ? '' : 'none';
+}
 function zeichnePlan() {
+  $('v-plan').innerHTML = `
+    <div class="unterreiter">
+      <button id="pu-plan" class="${planUnter === 'plan' ? 'on' : ''}" onclick="planUnterWahl('plan')">${esc(w('plan'))}</button>
+      <button id="pu-sperren" class="${planUnter === 'sperren' ? 'on' : ''}" onclick="planUnterWahl('sperren')">${esc(w('sperren'))}</button>
+    </div>
+    <div id="plan-inhalt-plan" style="${planUnter === 'plan' ? '' : 'display:none'}"></div>
+    <div id="plan-inhalt-sperren" style="${planUnter === 'sperren' ? '' : 'display:none'}"></div>`;
+  zeichnePlanListe();
+  zeichneSperren();
+}
+function zeichnePlanListe() {
   const heute = isoTag();
   // ENT-134: der ganze laufende Monat, nicht nur ab heute -- sonst
   // verschwindet eine bereits abgeschlossene Schicht von vorhin aus dem Plan,
@@ -842,7 +944,7 @@ function zeichnePlan() {
   const kommend = schichten.filter(e => tagVon(e) >= monatsanfang)
     .sort((a, b) => tagVon(a).localeCompare(tagVon(b)) || String(a.von).localeCompare(String(b.von)));
   if (!kommend.length) {
-    $('v-plan').innerHTML = LEER(w('keinePlan'), w('keinePlanText'),
+    $('plan-inhalt-plan').innerHTML = LEER(w('keinePlan'), w('keinePlanText'),
       '<rect x="3" y="4.5" width="18" height="17" rx="2"/><line x1="3" y1="9.5" x2="21" y2="9.5"/>');
     return;
   }
@@ -862,7 +964,7 @@ function zeichnePlan() {
     }
     html += schichtKarte(e, false);
   });
-  $('v-plan').innerHTML = html;
+  $('plan-inhalt-plan').innerHTML = html;
 }
 
 // ══════════════════════════════════════════ SPERRTAGE (ENT-028)
@@ -930,7 +1032,7 @@ function zeichneSperren() {
       </button>` : ''}
     </div>`;
   });
-  $('v-sperren').innerHTML = html;
+  $('plan-inhalt-sperren').innerHTML = html;
 }
 
 // ISO-Kalenderwoche -- der Donnerstag der Woche entscheidet über das Jahr.
@@ -1004,11 +1106,55 @@ function zeichneRapport() {
   $('v-rapport').innerHTML = html;
 }
 
-// ══════════════════════════════════════════ PROFIL
-function zeichneProfil() {
+// ══════════════════════════════════════════ WÄCHTER (ENT-234)
+// Kachel-Uebersicht, nur sichtbar mit Revierdienst-Bezug (waechterSichtbar(),
+// gesetzt in waechterTabAktualisieren()). "Rundgang" fuehrt zur betroffenen
+// Schicht -- Start/Fortsetzen laeuft unveraendert ueber das bestehende
+// Schicht-Blatt (rundgangAbschnittZeichnen, ENT-180/182/145/146/153), keine
+// zweite Checkliste. "Schluesselverwaltung" ist inhaltlich entschieden
+// (ENT-149), aber noch nicht gebaut -- gleicher Platzhalter-Umgang wie bei
+// den Betrieb-Kacheln in dashboard.html (onclick -> toast).
+function zeichneWaechter() {
+  $('v-waechter').innerHTML = `
+    <div class="mk-grid">
+      <button type="button" id="mk-rundgang" class="mk-kachel" onclick="waechterRundgangWahl()">
+        <span class="mk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M12 19h4a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2H8a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h4"/></svg></span>
+        <span class="mk-kachel-lbl">${esc(w('waechterRundgangLbl'))}</span>
+      </button>
+      <button type="button" id="mk-schluessel" class="mk-kachel" onclick="toast('Folgt in einem späteren Schritt.')">
+        <span class="mk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><circle cx="7" cy="15" r="4"/><line x1="10" y1="12" x2="20" y2="2"/><line x1="15" y1="7" x2="18" y2="10"/><line x1="18" y1="4" x2="21" y2="7"/></svg></span>
+        <span class="mk-kachel-lbl">${esc(w('waechterSchluesselLbl'))}</span>
+      </button>
+    </div>`;
+}
+
+// Sucht die Schicht(en), fuer die JETZT ein Rundgang moeglich ist (gleiche
+// Regel wie darfRundgang() je Einsatz) und oeffnet direkt das Schicht-Blatt.
+// Bei mehreren Treffern (seltener Fall: mehrere ueberlappende, zugesagte
+// Revierdienst-Schichten) zuerst eine kleine Auswahl -- kein neuer
+// Auswahl-Mechanismus, dieselben Schichtkarten wie in "Plan".
+function waechterRundgangWahl() {
+  const kandidaten = schichten.filter(darfRundgang);
+  if (kandidaten.length === 1) { blattAuf(Number(kandidaten[0].id)); return; }
+  if (!kandidaten.length) { toast(w('waechterKeinRundgang')); return; }
+  blattId = null;
+  $('blTitel').textContent = w('waechterMehrereTitel');
+  $('blBody').innerHTML = kandidaten.map(e => schichtKarte(e, true)).join('');
+  $('blFuss').innerHTML = '';
+  blattZeigen();
+}
+
+// ══════════════════════════════════════════ MENÜ (ENT-234)
+// Ersetzt den frueheren, flachen Profil-Reiter. Identitaets-Kopf bleibt
+// sofort sichtbar; Personalien und Stunden liegen als Kacheln eine Ebene
+// tiefer -- gleiches Unterseiten-Muster wie bisher (ENT-051, pr-haupt/
+// pr-stunden unveraendert), nur um eine dritte Unterseite (pr-daten)
+// erweitert. Kuenftige Menue-Punkte (z.B. Abwesenheiten, Stufe 4) bekommen
+// hier eine weitere Kachel, kein neuer Reiter.
+function zeichneMenu() {
   const p = profil || {};
   const zeile = (k, v) => v ? `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>` : '';
-  $('v-profil').innerHTML = `
+  $('v-menu').innerHTML = `
     <div id="pr-haupt">
     <div class="karte"><div class="karte-bd" style="display:flex;align-items:center;gap:14px">
       <div class="kreis" style="width:52px;height:52px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700">${esc(initialen(vollerName(p) || (ich && ich.name)))}</div>
@@ -1018,35 +1164,46 @@ function zeichneProfil() {
       </div>
     </div></div>
 
-    <div class="karte"><div class="karte-bd"><dl class="dl">
-      ${zeile(w('persNr'), p.personalnummer)}
-      ${zeile(w('geburtsdatum'), p.geburtsdatum ? dmy(p.geburtsdatum) : '')}
-      ${zeile(w('adresse'), [p.strasse, p.ort].filter(Boolean).join(', '))}
-      ${zeile(w('telefon'), p.telefon)}
-      ${zeile(w('mobil'), p.mobil)}
-      ${zeile(w('email'), p.email)}
-    </dl>
-    <p style="font-size:13px;color:var(--ink-3);margin-top:14px">${esc(w('datenHinweis'))}</p>
-    </div></div>
+    <div class="mk-grid">
+      <button type="button" id="mk-daten" class="mk-kachel" onclick="datenSeiteAuf()">
+        <span class="mk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+        <span class="mk-kachel-lbl">${esc(w('meineDaten'))}</span>
+      </button>
+      <button type="button" id="mk-stunden" class="mk-kachel" onclick="stdSeiteAuf()">
+        <span class="mk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg></span>
+        <span class="mk-kachel-lbl">${esc(w('meineStunden'))}</span>
+      </button>
+    </div>
 
-    <div class="karte"><button class="nav-zeile" id="zeileStunden" onclick="stdSeiteAuf()">
-      <span class="txt">
-        <b>${esc(w('meineStunden'))}</b>
-        <span>${esc(w('stundenZeile'))}</span>
-      </span>
-      <svg class="chev" viewBox="0 0 24 24"><polyline points="9 5 16 12 9 19"/></svg>
-    </button></div>
-
-    <div style="display:flex;flex-direction:column;gap:10px;margin-top:20px">
+    <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">
       <button class="btn btn-plain btn-wide" onclick="passwortBlatt()">${esc(w('passwortAendern'))}</button>
       ${p.ist_admin ? `<a class="btn btn-plain btn-wide" href="dashboard.html" title="Zur Verwaltung">${esc(w('zumCockpit'))}</a>` : ''}
       <button class="btn btn-plain btn-wide" style="color:var(--neg)" onclick="abmelden()">${esc(w('abmelden'))}</button>
     </div>
     </div>
 
+    <div id="pr-daten" style="display:none">
+      <div class="seiten-kopf">
+        <button class="btn btn-plain" onclick="datenSeiteZu()" style="min-height:40px;padding:0 12px" aria-label="${esc(w('zurueckZumMenue'))}" title="${esc(w('zurueckZumMenue'))}">
+          <svg class="i i-sm" viewBox="0 0 24 24"><polyline points="15 5 8 12 15 19"/></svg>
+        </button>
+        <h2>${esc(w('meineDaten'))}</h2>
+      </div>
+      <div class="karte"><div class="karte-bd"><dl class="dl">
+        ${zeile(w('persNr'), p.personalnummer)}
+        ${zeile(w('geburtsdatum'), p.geburtsdatum ? dmy(p.geburtsdatum) : '')}
+        ${zeile(w('adresse'), [p.strasse, p.ort].filter(Boolean).join(', '))}
+        ${zeile(w('telefon'), p.telefon)}
+        ${zeile(w('mobil'), p.mobil)}
+        ${zeile(w('email'), p.email)}
+      </dl>
+      <p style="font-size:13px;color:var(--ink-3);margin-top:14px">${esc(w('datenHinweis'))}</p>
+      </div></div>
+    </div>
+
     <div id="pr-stunden" style="display:none">
       <div class="seiten-kopf">
-        <button class="btn btn-plain" onclick="stdSeiteZu()" style="min-height:40px;padding:0 12px" aria-label="${esc(w('zurueckZumProfil'))}" title="${esc(w('zurueckZumProfil'))}">
+        <button class="btn btn-plain" onclick="stdSeiteZu()" style="min-height:40px;padding:0 12px" aria-label="${esc(w('zurueckZumMenue'))}" title="${esc(w('zurueckZumMenue'))}">
           <svg class="i i-sm" viewBox="0 0 24 24"><polyline points="15 5 8 12 15 19"/></svg>
         </button>
         <h2>${esc(w('meineStunden'))}</h2>
@@ -1055,16 +1212,33 @@ function zeichneProfil() {
     </div>`;
 }
 
+// Meine-Daten-Unterseite (ENT-234) -- gleiches Muster wie stdSeiteAuf/
+// stdSeiteZu weiter unten, nur mit pr-daten statt pr-stunden.
+function datenSeiteAuf() {
+  const h = $('pr-haupt'), u = $('pr-daten');
+  if (!h || !u) return;
+  h.style.display = 'none';
+  u.style.display = '';
+  window.scrollTo(0, 0);
+}
+function datenSeiteZu() {
+  const h = $('pr-haupt'), u = $('pr-daten');
+  if (!h || !u) return;
+  u.style.display = 'none';
+  h.style.display = '';
+  window.scrollTo(0, 0);
+}
+
 // ══════════════════════════════════════════ UNTERSEITE MEINE STUNDEN (ENT-051)
-// Die Personalien stehen im Profil im Vordergrund, die Stunden liegen eine
-// Ebene tiefer. Zwei Gruende, warum das nicht nur Geschmack ist:
+// Im Menü (ENT-234) steht die Stunden-Kachel im Vordergrund, die Zahlen
+// liegen eine Ebene tiefer. Zwei Gruende, warum das nicht nur Geschmack ist:
 //
 // 1. Die Zahlen werden erst geladen, wenn jemand sie sehen will. Vorher steht
-//    im Profil nur die Zeile -- KEINE Zahl. Das ist Absicht: Seit ENT-049 darf
+//    im Menü nur die Kachel -- KEINE Zahl. Das ist Absicht: Seit ENT-049 darf
 //    eine Stundensumme nie ohne den Hinweis erscheinen, dass sie keine
-//    Lohnabrechnung ist. Eine "Vorschau" in der Zeile wuerde genau das tun.
-// 2. Beim Verlassen des Profils faellt die Unterseite von selbst zusammen,
-//    weil zeichneProfil() neu zeichnet. Kein Zustand, der haengen bleibt.
+//    Lohnabrechnung ist. Eine "Vorschau" auf der Kachel wuerde genau das tun.
+// 2. Beim Verlassen des Menüs faellt die Unterseite von selbst zusammen,
+//    weil zeichneMenu() neu zeichnet. Kein Zustand, der haengen bleibt.
 function stdSeiteAuf() {
   const h = $('pr-haupt'), u = $('pr-stunden');
   if (!h || !u) return;

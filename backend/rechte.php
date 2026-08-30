@@ -106,7 +106,7 @@ function rechte_katalog(): array
         // Verwaltung dieses Recht -- die Rolle 'Planung' bekaeme es sonst
         // ueber ihren Kundenzugang mit, und genau das war der Grund, es
         // getrennt zu fuehren.
-        'offerten'             => 'Offerten und Produkte ansehen und bearbeiten',
+        'offerten'             => 'Offerten und Leistungen ansehen und bearbeiten',
     ];
 }
 

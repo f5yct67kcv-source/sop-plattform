@@ -2908,15 +2908,40 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
         <svg class="i" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg>
         <span class="lbl">Übersicht</span>
       </button>
-      <button class="nav-item" id="nav-planung" title="Planung" onclick="go('planung')">
-        <svg class="i" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="17" rx="2"/><line x1="3" y1="9.5" x2="21" y2="9.5"/><line x1="8" y1="2.5" x2="8" y2="6.5"/><line x1="16" y1="2.5" x2="16" y2="6.5"/><line x1="7.5" y1="14" x2="12" y2="14"/><line x1="7.5" y1="17.5" x2="15" y2="17.5"/></svg>
-        <span class="lbl">Planung</span>
-      </button>
+      <!-- Reiter fest in der Kopfzeile statt im Seiteninhalt (ENT-233,
+           Projektinhaber-Wunsch: identisch wie bei Kunden/Administration).
+           NUR auf dem Desktop -- anders als bei Kunden bleibt der Knopf
+           "Planung" selbst (nicht nur die Gruppe) auch auf dem Handy
+           erreichbar, weil Planung dort einer der drei Hauptpunkte ist.
+           Die Unterpunkte (".nav-kinder") sind dagegen bewusst zusaetzlich
+           "nur-desktop": auf dem Handy bleibt die bisherige, extra darauf
+           zugeschnittene Reiterleiste im Seiteninhalt (#view-planung .tabs,
+           jetzt "nur-schmal") unveraendert die einzige Bedienung -- sie
+           kennt bereits eigene Handy-Regeln (Uebersicht/Objektplanung
+           versteckt, dafuer ein Rapporte-Sprung zu Kunden), die eine
+           Kopfzeilen-Reiterleiste nicht kennt. -->
+      <div class="nav-gruppe" id="navg-planung">
+        <button class="nav-item nav-eltern" id="nav-planung" title="Planung" onclick="planungNavKlick()">
+          <svg class="i" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="17" rx="2"/><line x1="3" y1="9.5" x2="21" y2="9.5"/><line x1="8" y1="2.5" x2="8" y2="6.5"/><line x1="16" y1="2.5" x2="16" y2="6.5"/><line x1="7.5" y1="14" x2="12" y2="14"/><line x1="7.5" y1="17.5" x2="15" y2="17.5"/></svg>
+          <span class="lbl">Planung</span>
+          <svg class="i chev nur-desktop" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="nav-kinder nur-desktop">
+          <button class="nav-kind on" id="nav-planung-uebersicht" onclick="go('planung'); goTab('uebersicht')">Übersicht</button>
+          <button class="nav-kind" id="nav-planung-einsaetze" onclick="go('planung'); goTab('einsaetze')">Einsätze</button>
+          <button class="nav-kind" id="nav-planung-objektplan" onclick="go('planung'); goTab('objektplan')">Objektplanung</button>
+          <button class="nav-kind" id="nav-planung-tag" onclick="go('planung'); goTab('tag')">Tagesplan</button>
+        </div>
+      </div>
       <!-- Eigener Punkt statt eines Reiters unter Planung: der Abgleich ist ein
            zentraler Arbeitsschritt der Plattform und soll mit einem Klick
            erreichbar sein. Bewusst OHNE Zahl offener Abgleiche -- die steht auf
-           der Seite selbst, das Menü bleibt ruhig. -->
-      <button class="nav-item" id="nav-abgleich" title="Schichten abgleichen" onclick="go('abgleich')">
+           der Seite selbst, das Menü bleibt ruhig.
+           "nur-desktop" (ENT-235, Projektinhaber-Wunsch): auf dem Handy wird
+           dieser Menüpunkt nicht gebraucht. Die Seite selbst und ihre gezielten
+           Einstiege (z.B. "Zum Abgleich" beim Aufheben einer Sperre, "Direkt
+           abgleichen" im Einsatzplan) bleiben unveraendert erreichbar. -->
+      <button class="nav-item nur-desktop" id="nav-abgleich" title="Schichten abgleichen" onclick="go('abgleich')">
         <svg class="i" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
         <span class="lbl">Abgleich</span>
       </button>
@@ -2969,17 +2994,21 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
         </div>
       </div>
 
-      <!-- Kontrolle (ENT-065, seit ENT-224 ohne Rundgaenge -- die sind jetzt
-           Teil der eigenen Rubrik "Revierdienst"). Eigene Rubrik und nicht
-           ein Reiter unter Administration: Hier wachsen die
+      <!-- Auswertung (ENT-065 als "Kontrolle", seit ENT-224 ohne Rundgaenge
+           -- die sind jetzt Teil der eigenen Rubrik "Revierdienst"). Eigene
+           Rubrik und nicht ein Reiter unter Administration: Hier wachsen die
            Kontrollinstanzen zusammen -- Pensen heute, freie Tage und
            Ruhezeit-Uebersicht spaeter. Sie beantworten alle dieselbe Frage:
-           Wo weicht der Betrieb ab? -->
-      <div class="nav-lbl nur-desktop" style="margin-top:16px">Kontrolle</div>
+           Wo weicht der Betrieb ab?
+           Umbenannt Kontrolle -> Auswertung (ENT-228): "Kontrolle" kollidierte
+           mit den Kontrollpunkten/Kontrollrunden des Revierdiensts. Die
+           Bezeichner (navg-kontrolle, nav-kontrolle, kontrolleNavKlick)
+           behalten den alten Namen. -->
+      <div class="nav-lbl nur-desktop" style="margin-top:16px">Auswertung</div>
       <div class="nav-gruppe nur-desktop" id="navg-kontrolle">
-        <button class="nav-item nav-eltern" id="nav-kontrolle" title="Kontrolle" onclick="kontrolleNavKlick()">
+        <button class="nav-item nav-eltern" id="nav-kontrolle" title="Auswertung" onclick="kontrolleNavKlick()">
           <svg class="i" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
-          <span class="lbl">Kontrolle</span>
+          <span class="lbl">Auswertung</span>
           <svg class="i chev" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
         </button>
         <div class="nav-kinder">
@@ -3003,8 +3032,13 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
         </button>
         <div class="nav-kinder">
           <button class="nav-kind" id="nav-admin-mitarbeiter" onclick="go('mitarbeiter')">Mitarbeitende</button>
-          <button class="nav-kind" id="nav-admin-produkte" onclick="go('produkte')">Produkte</button>
-          <button class="nav-kind" id="nav-admin-betrieb" onclick="go('betrieb')">Betrieb</button>
+          <!-- "Leistungen" hiess bis ENT-230 "Produkte" (Offerten-Positionen
+               sind Dienstleistungen), "Einstellungen" bis ENT-229 "Betrieb"
+               (Verwechslung mit der Sidebar-Gruppe "Betrieb"). Bezeichner,
+               Ansichtsnamen ('produkte', 'betrieb') und Endpunkte behalten
+               die alten Namen. -->
+          <button class="nav-kind" id="nav-admin-produkte" onclick="go('produkte')">Leistungen</button>
+          <button class="nav-kind" id="nav-admin-betrieb" onclick="go('betrieb')">Einstellungen</button>
         </div>
       </div>
 
@@ -3227,18 +3261,20 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 
       <!-- ─────────── PLANUNG ─────────── -->
       <section class="view" id="view-planung">
+        <!-- Diese Reiterleiste bediente frueher Uebersicht/Einsaetze/
+             Objektplanung/Tagesplan auf Desktop UND Handy. Seit ENT-233
+             stehen die Reiter auf dem Desktop fest in der Kopfzeile (wie bei
+             Kunden/Administration, siehe navg-planung in der Seitenleiste) --
+             hier bleibt nur noch die Handy-Bedienung uebrig, bewusst
+             unveraendert (Ruecksprache Projektinhaber): "Uebersicht" und
+             "Objektplanung" waren dort schon vorher nicht Teil der Leiste
+             (ENT-165, eine 31-Spalten-Matrix ist auf dem Handy ohnehin nur
+             als Tagesliste nutzbar, ENT-024) und sind darum ganz entfallen,
+             "Einsaetze"/"Tagesplan" bleiben "nur-schmal" fuer das Handy.
+             "Feiertage" bleibt der einzige Desktop-Inhalt dieser Zeile. -->
         <div class="tabs">
-          <button class="tab on nur-desktop" id="ptab-uebersicht" onclick="goTab('uebersicht')">Übersicht</button>
-          <button class="tab" id="ptab-einsaetze" onclick="goTab('einsaetze')">Einsätze</button>
-          <!-- Auf dem Handy nicht mehr Teil der Reiterleiste (ENT-165):
-               eine 31-Spalten-Matrix ist dort ohnehin nur als Tagesliste
-               nutzbar (ENT-024), und der Projektinhaber greift von hier aus
-               unterwegs eher auf Rapporte zu als auf die Objektdetailplanung.
-               Andere Wege dorthin -- Klick auf einen Objektnamen, Kurzwahl,
-               Diktat -- bleiben unveraendert bestehen, nur der Reiter selbst
-               verschwindet auf schmalen Schirmen. -->
-          <button class="tab nur-desktop" id="ptab-objektplan" onclick="goTab('objektplan')">Objektplanung</button>
-          <button class="tab" id="ptab-tag" onclick="goTab('tag')">Tagesplan</button>
+          <button class="tab on nur-schmal" id="ptab-einsaetze" onclick="goTab('einsaetze')">Einsätze</button>
+          <button class="tab nur-schmal" id="ptab-tag" onclick="goTab('tag')">Tagesplan</button>
           <!-- Ersetzt die Objektplanung an ihrem Platz in der mobilen
                Reiterleiste. Kein eigener Reiter innerhalb der Planung --
                das wuerde die bereits bestehende, global gepflegte
@@ -4047,7 +4083,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
           <!-- Knoepfe unterhalb der Liste statt oben in der Kopfzeile
                (ENT-220, Projektinhaber-Vorgabe 2026-08-28, nach gezeigtem
                Vorbild): "Position hinzufügen" fuegt eine leere Zeile an,
-               "Neues Produkt" oeffnet direkt hier den Produktdialog
+               "Neue Leistung" oeffnet direkt hier den Produktdialog
                (ENT-215/ENT-217) -- beide stehen dort, wo als naechstes im
                Blick ist, direkt nach der letzten Zeile, statt weit oben
                ueber der ganzen Liste. -->
@@ -4058,7 +4094,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
             </button>
             <button class="btn btn-plain btn-sm" onclick="ofNeuesProduktAnlegen()">
               <svg class="i i-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              Neues Produkt
+              Neue Leistung
             </button>
           </div>
         </div>
@@ -4131,12 +4167,12 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
         <div class="bar-tools">
           <div class="search">
             <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input class="inp" type="search" id="prodQ" placeholder="Produkt oder Beschreibung …" oninput="renderProdukte()">
+            <input class="inp" type="search" id="prodQ" placeholder="Leistung oder Beschreibung …" oninput="renderProdukte()">
           </div>
           <div class="sp" style="flex:1"></div>
           <button class="btn btn-primary btn-sm" onclick="pdNeu()">
             <svg class="i i-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            Neues Produkt
+            Neue Leistung
           </button>
         </div>
         <div class="card"><div class="card-bd flush"><div class="tw" id="prodTable"></div></div></div>
@@ -4168,7 +4204,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
            rundgang_einsehen, seit ENT-180 vorhanden). -->
       <section class="view" id="view-rundgaenge">
         <div class="bk-kachel-grid">
-          <button type="button" class="bk-kachel" onclick="toast('Folgt in einem späteren Schritt.')">
+          <button type="button" class="bk-kachel" onclick="rundgaengeVerwaltungOeffnen()">
             <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M12 19h4a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2H8a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h4"/></svg></span>
             <span class="bk-kachel-lbl">Rundgänge</span>
           </button>
@@ -5086,7 +5122,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 <div class="dlg-scrim" id="dlgProdukt">
   <div class="dlg">
     <div class="dlg-hd">
-      <h2 id="prodTitel">Neues Produkt</h2>
+      <h2 id="prodTitel">Neue Leistung</h2>
       <p>Vorschlagswerte für Offerten. Eine Änderung wirkt nur auf künftige Belege — bereits erfasste behalten ihre Werte.</p>
       <!-- Produktnummer wird vergeben, nicht eingegeben (ENT-219) -- deshalb
            hier nur angezeigt, kein Formularfeld. Bei der Neuanlage gibt es
@@ -5588,6 +5624,7 @@ let krTarget = null;       // offene Kontrollrunde (id)
 // statt obTarget, weil Kontrollpunkte/-runden nicht mehr Teil der
 // Objekt-Detailseite sind, aber fachlich weiterhin an ein Objekt gebunden.
 let rdEinObjekt = null;
+let rdAlleVorlagen = [];   // Kachel "Rundgaenge": aktive Kontrollrunden ueber alle Objekte (ENT-242)
 let vsObjekt = null;   // Objekt der offenen Vorschau
 let oplId = null;      // Objekt der Objektplanung
 let oplMs = [];        // dessen Masterschichten
@@ -5950,7 +5987,9 @@ function enter() {
 // Anfrage von Hand stellt, umgeht jedes ausgeblendete Element. Entschieden
 // wird auf dem Server, in jedem einzelnen Endpunkt.
 const NAV_RECHTE = {
-  'nav-planung':            'plan',
+  // Seit ENT-233 die ganze Gruppe (mit den neuen Reiter-Kindern), nicht mehr
+  // nur der Knopf selbst -- gleiches Prinzip wie bei 'navg-kunden'.
+  'navg-planung':           'plan',
   'nav-abgleich':           'abgleich',
   'navg-kunden':            'kunden',
   'nav-admin-mitarbeiter':  'personal_lesen',
@@ -6016,9 +6055,9 @@ const TITLES = {
   abgleich:    ['Schichten abgleichen', 'Was tatsächlich stattgefunden hat'],
   mitarbeiter: ['Mitarbeitende', 'Stammdaten'],
   kunden:      ['Kunden', 'Stammdaten'],
-  produkte:    ['Produkte', 'Preise und Standardtexte für Offerten'],
+  produkte:    ['Leistungen', 'Preise und Standardtexte für Offerten'],
   offerte:     ['Offerte', 'Positionen, Preise und Summen'],
-  betrieb:     ['Betrieb', 'Einstellungen zum eigenen Unternehmen'],
+  betrieb:     ['Einstellungen', 'Briefkopf, Zugang, Rollen und Anstellungsorte'],
   pensen:      ['Pensen', 'Jahresstunden gegen die Anstellungskategorie'],
   auslagen:    ['Auslagenersatz', 'Chronologisches Protokoll je Mitarbeitendem — Art. 18 Ziff. 10'],
   rundgaenge:  ['Übersicht', 'Rundgänge, GPS, Aufgaben und Auswertungen auf einen Blick'],
@@ -6824,6 +6863,13 @@ function go(view) {
       rapporte.length ? Promise.resolve() : loadRapporte(),
     ]).then(renderAbgleich);
   }
+  // Gleiches Prinzip fuer Planung (ENT-233): das Untermenue bleibt nur
+  // aufgeklappt, solange Planung der aktive Bereich ist. Anders als bei
+  // Kunden faellt hier kein "goTab(pTab)"-Nachladen an -- die eigenen
+  // Reiter-Klassen (auf den .ptab-Panels wie auf den neuen .nav-kind-
+  // Knoepfen) bleiben beim Verlassen unveraendert stehen und muessen beim
+  // Wiederkommen nicht erneut gesetzt werden.
+  $('navg-planung').classList.toggle('offen', view === 'planung');
   // Das Untermenü ist nur aufgeklappt, solange Kunden der aktive Bereich ist
   // -- kein Zustand, der beim Verlassen hängen bleibt (ENT-039).
   $('navg-kunden').classList.toggle('offen', view === 'kunden');
@@ -7703,7 +7749,7 @@ function loadProdukte() {
     // der jemanden beunruhigen muesste -- die Ansicht ist dann ohnehin nicht
     // in der Navigation.
     if (status === 403) return;
-    if (!ok || data.status !== 'ok') { toast(data.message || 'Produkte konnten nicht geladen werden.'); return; }
+    if (!ok || data.status !== 'ok') { toast(data.message || 'Leistungen konnten nicht geladen werden.'); return; }
     produkte = data.produkte || [];
     // Eingabehilfe der Positionszeilen mitfuehren -- archivierte Produkte
     // schlagen sich nicht mehr vor, sonst kaeme ein stillgelegter Preis ueber
@@ -7748,8 +7794,8 @@ function renderProdukte() {
   if (!d.length) {
     $('prodTable').innerHTML = produkte.length
       ? EMPTY('Keine Treffer', pdArchivTab === 'alle'
-          ? 'Für diese Suche gibt es kein Produkt.' : 'Für diese Suche gibt es kein archiviertes Produkt.')
-      : EMPTY('Noch keine Produkte', 'Über „Neues Produkt“ oben rechts anlegen. Sie erscheinen danach als Vorschlag in jeder Offerte.');
+          ? 'Für diese Suche gibt es keine Leistung.' : 'Für diese Suche gibt es keine archivierte Leistung.')
+      : EMPTY('Noch keine Leistungen', 'Über „Neue Leistung“ oben rechts anlegen. Sie erscheinen danach als Vorschlag in jeder Offerte.');
     return;
   }
   $('prodTable').innerHTML = `<table><thead><tr>
@@ -7793,7 +7839,7 @@ function pdMwstFuellen(gewaehlt) {
 function pdNeu() {
   pdDlgId = null;
   pdOfferteKontext = false;
-  $('prodTitel').textContent = 'Neues Produkt';
+  $('prodTitel').textContent = 'Neue Leistung';
   // Die Nummer entsteht erst beim Speichern (ENT-219) -- vor der Neuanlage
   // gibt es noch keine zu zeigen.
   $('prodNummerZeile').style.display = 'none';
@@ -7828,12 +7874,12 @@ function pdBearbeiten(id) {
   if (!p) { return; }
   pdDlgId = Number(id);
   pdOfferteKontext = false;
-  $('prodTitel').textContent = 'Produkt bearbeiten';
+  $('prodTitel').textContent = 'Leistung bearbeiten';
   // Nummer nur anzeigen, wenn sie schon vergeben ist -- ein Datensatz von
   // vor ENT-219 hat sie erst nach dem naechsten "Einrichtung pruefen".
   const nummerZeile = $('prodNummerZeile');
   nummerZeile.style.display = p.nummer ? '' : 'none';
-  nummerZeile.textContent = p.nummer ? 'Produktnummer ' + p.nummer : '';
+  nummerZeile.textContent = p.nummer ? 'Leistungsnummer ' + p.nummer : '';
   $('prodErr').style.display = 'none';
   $('prod_name').value = p.name || '';
   $('prod_beschreibung').value = p.beschreibung || '';
@@ -7870,7 +7916,7 @@ function pdSpeichern() {
       return;
     }
     closeDlg('dlgProdukt');
-    toast(pdDlgId ? 'Produkt geändert.' : 'Produkt angelegt.');
+    toast(pdDlgId ? 'Leistung geändert.' : 'Leistung angelegt.');
     // Aus einer Offertposition heraus angelegt (ENT-215, pdNeuAusOffer):
     // das neue Produkt in GENAU diese Zeile uebernehmen, sobald der Katalog
     // es kennt -- dieselbe Namensuebereinstimmung wie beim Waehlen aus der
@@ -7891,7 +7937,7 @@ function pdSpeichern() {
 function pdArchivKlick(id, aktiv) {
   api('produkt_archivieren.php', { method: 'POST', body: { id, aktiv } }).then(({ ok, data }) => {
     if (!ok || data.status !== 'ok') { toast(data.message || 'Fehlgeschlagen.'); return; }
-    toast(aktiv ? 'Produkt zurückgeholt.' : 'Produkt archiviert.');
+    toast(aktiv ? 'Leistung zurückgeholt.' : 'Leistung archiviert.');
     loadProdukte();
   });
 }
@@ -8610,7 +8656,7 @@ function ofZeileHtml(p, i, produktListe) {
   const s = belegSummen([p], 0);
   return `<div class="of-pos">
     <div class="of-pos-kopf">
-      <div class="f"><label for="ofp_name${i}">Produkt</label>
+      <div class="f"><label for="ofp_name${i}">Leistung</label>
         <input class="inp" id="ofp_name${i}" list="dlProdukte" value="${esc(p.produkt_name)}"
                oninput="ofZeileFeld(${i}, 'produkt_name', this.value)"
                onchange="ofProduktUebernehmen(${i}, this.value)"></div>
@@ -8705,7 +8751,7 @@ function ofZeileHinzu() {
   setTimeout(() => { const f = $('ofp_name' + (ofPos.length - 1)); if (f) { f.focus(); } }, 40);
 }
 
-// "Neues Produkt" im Offert-/Rechnungsformular (ENT-215): eine neue,
+// "Neue Leistung" im Offert-/Rechnungsformular (ENT-215): eine neue,
 // zunaechst leere Position anlegen -- wie ofZeileHinzu() -- und sofort den
 // Produktdialog dafuer oeffnen, statt in den Bereich Produkte wechseln zu
 // muessen. Bricht der Dialog ab, bleibt eine leere Position stehen, genau
@@ -9081,7 +9127,7 @@ function ofBlatt(b, kunde, person) {
 
       <table style="width:100%;border-collapse:collapse">
         <thead><tr>
-          <th style="${th}">Produkt</th><th style="${th}">Beschreibung</th>
+          <th style="${th}">Leistung</th><th style="${th}">Beschreibung</th>
           <th style="${th};text-align:right">Einzelpreis</th>
           <th style="${th};text-align:right">Menge</th>
           <th style="${th};text-align:right">Summe</th>
@@ -11449,7 +11495,14 @@ function goTab(t) {
   document.querySelectorAll('#view-planung .ptab').forEach(v => v.classList.remove('on'));
   document.querySelectorAll('#view-planung .tab').forEach(b => b.classList.remove('on'));
   $('pv-' + t).classList.add('on');
-  $('ptab-' + t).classList.add('on');
+  // Nur noch auf dem Handy sichtbar (ENT-233) -- "uebersicht"/"objektplan"
+  // haben dort gar keinen Knopf mehr, darum das Absichern mit "if".
+  const ptabBtn = $('ptab-' + t); if (ptabBtn) { ptabBtn.classList.add('on'); }
+  // Auf dem Desktop steht dieselbe Auswahl jetzt in der Kopfzeile (ENT-233,
+  // identisches Muster zu kuGoTab()).
+  document.querySelectorAll('.nav-kind').forEach(b => b.classList.remove('on'));
+  ($('nav-planung-' + t) || $('nav-planung-uebersicht')).classList.add('on');
+  topSubZeichnen();
   $('pgCrumb').textContent = TAB_CRUMB[t] || '';
   weiteAnsicht(PLANUNG_WEIT.includes(t));
   // Einsaetze traegt seit ENT-107 den Diktat-Router eingebettet -- derselbe
@@ -11493,6 +11546,18 @@ function kuNavKlick() {
     $('navg-kunden').classList.toggle('offen');
   } else {
     go('kunden');
+  }
+}
+
+// Gleiches Muster wie kuNavKlick() (ENT-233). navGruppeKompakt() greift auf
+// dem Handy ohnehin nicht (huelleKompakt() gilt erst ab 901px) -- der Knopf
+// "Planung" navigiert dort also wie bisher immer direkt, nie als Aufklapper.
+function planungNavKlick() {
+  if (navGruppeKompakt('planung')) { return; }
+  if ($('view-planung').classList.contains('on')) {
+    $('navg-planung').classList.toggle('offen');
+  } else {
+    go('planung');
   }
 }
 
@@ -12491,10 +12556,16 @@ function kontrolleNavKlick() {
 // Uebersicht (Durchfuehrung, vorher unter Kontrolle) und die Einrichtung
 // von Kontrollpunkten/Kontrollrunden (vorher Objekt-Reiter, ENT-186/204).
 function revierdienstNavKlick() {
-  // Landet auf der ersten Kachel, die diese Person tatsaechlich sehen darf --
-  // 'rundgang_verwalten' zeigt beide Unterseiten, 'rundgang_einsehen' allein
-  // nur die Uebersicht (gleiches Prinzip wie zuvor bei kontrolleNavKlick).
-  const ziel = darf('rundgang_verwalten') ? 'revierdienst' : 'rundgaenge';
+  // Landet auf der Uebersicht (Kachel-Landingpage samt letzten Rundgaengen,
+  // ENT-225), sobald die Person sie sehen darf -- 'rundgang_einsehen' und
+  // 'rundgang_verwalten' werden stets zusammen vergeben (siehe Waechter-Rolle),
+  // die Unterscheidung faengt darum nur den theoretischen Fall ab, dass jemand
+  // ausschliesslich 'rundgang_verwalten' haette. Vor ENT-241 landete
+  // 'rundgang_verwalten' zuerst auf der Einrichtung -- das drehte diese
+  // Entscheidung um, weil die Uebersicht seit ENT-225 der eigentliche
+  // Informationsgehalt ist, nicht mehr die leere Einrichtung mit "Kein
+  // Objekt gewaehlt".
+  const ziel = darf('rundgang_einsehen') ? 'rundgaenge' : 'revierdienst';
   if (navGruppeKompakt(ziel)) { return; }
   const offen = $('navg-revierdienst').classList.contains('offen');
   if (offen && $('view-' + ziel).classList.contains('on')) {
@@ -14695,6 +14766,65 @@ function askDeleteKr(id) {
       if (!ok || data.status !== 'ok') { toast(data.message || 'Fehlgeschlagen.'); return; }
       loadRundgangVorlagen().then(() => toast('Kontrollrunde gelöscht.'));
     }));
+}
+
+// ══════════ KACHEL "RUNDGAENGE": SCHUBLADE MIT ALLEN AKTIVEN KONTROLL-
+// RUNDEN OBJEKTUEBERGREIFEND (ENT-242) ══════════
+// Die volle Verwaltung (auch inaktive Runden, Kontrollpunkte zuordnen)
+// bleibt Objekt fuer Objekt unter Einrichtung -- diese Schublade ist ein
+// schneller Ueberblick plus Einstieg zum Anlegen, kein Ersatz dafuer.
+// Bearbeiten/Anlegen nutzen denselben Dialog (dlgKr) wie die Einrichtung:
+// dafuer wird rdEinObjekt vorher gesetzt und kontrollpunkte (bzw.
+// rundgangVorlagen fuers Vorbefuellen) fuer genau dieses Objekt geladen.
+function rundgaengeVerwaltungOeffnen() {
+  const vorlauf = objekte.length ? Promise.resolve() : ladeObjekteFuerRevierdienst();
+  Promise.all([vorlauf, api('rundgang_vorlage_liste_alle.php')]).then(([, { ok, data }]) => {
+    rdAlleVorlagen = ok && data.status === 'ok' ? (data.vorlagen || []) : [];
+    renderRdAlleDrawer();
+  });
+}
+
+function renderRdAlleDrawer() {
+  $('drTitle').textContent = 'Rundgänge';
+  const objektListe = objekte.slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  const objektOptionen = '<option value="">Objekt wählen …</option>'
+    + objektListe.map(o => `<option value="${Number(o.id)}">${esc(o.name)}</option>`).join('');
+  const zeilen = rdAlleVorlagen.length
+    ? rdAlleVorlagen.map(v => {
+        const punkte = v.punkte.length
+          ? `${v.punkte.length} ${v.punkte.length === 1 ? 'Kontrollpunkt' : 'Kontrollpunkte'}`
+          : 'Noch kein Kontrollpunkt zugeordnet';
+        return `<div class="kr-zeile">
+          <div class="kr-kopf"><b>${esc(v.name)}</b></div>
+          <div class="kr-meta">${esc(v.kunde_name)} · ${esc(v.objekt_name)} · ${punkte}</div>
+          <div style="display:flex;gap:7px;margin-top:9px">
+            <button class="btn btn-plain btn-sm" onclick="rdAlleBearbeiten(${Number(v.id)},${Number(v.objekt_id)})">Bearbeiten</button>
+          </div>
+        </div>`;
+      }).join('')
+    : '<p class="zone-note" style="margin:0">Keine aktive Kontrollrunde vorhanden.</p>';
+  $('drBody').innerHTML = `
+    <div class="bar-tools">
+      <select class="inp" id="rdNeuObjekt" style="width:auto" aria-label="Objekt für neue Kontrollrunde auswählen">${objektOptionen}</select>
+      <button class="btn btn-primary btn-sm" onclick="rdAlleAnlegen()">+ Rundgang anlegen</button>
+    </div>
+    ${zeilen}`;
+  $('drFoot').innerHTML = '';
+  showDrawer();
+}
+
+function rdAlleBearbeiten(vorlageId, objektId) {
+  closeDrawer();
+  rdEinObjekt = objektId;
+  Promise.all([loadKontrollpunkte(), loadRundgangVorlagen()]).then(() => openKr('aendern', vorlageId));
+}
+
+function rdAlleAnlegen() {
+  const objektId = $('rdNeuObjekt').value ? Number($('rdNeuObjekt').value) : null;
+  if (!objektId) { toast('Bitte zuerst ein Objekt wählen.'); return; }
+  closeDrawer();
+  rdEinObjekt = objektId;
+  loadKontrollpunkte().then(() => openKr('neu'));
 }
 
 // ══════════════════════════════════════════ SCHICHTEN ERZEUGEN (mit Vorschau)

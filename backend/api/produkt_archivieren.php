@@ -24,7 +24,7 @@ $pdo = db();
 $chk = $pdo->prepare('SELECT id FROM produkte WHERE id = ?');
 $chk->execute([$id]);
 if (!$chk->fetch()) {
-    json_response(['status' => 'error', 'message' => 'Produkt nicht gefunden'], 404);
+    json_response(['status' => 'error', 'message' => 'Leistung nicht gefunden'], 404);
 }
 $pdo->prepare('UPDATE produkte SET aktiv = ? WHERE id = ?')->execute([$aktiv, $id]);
 
