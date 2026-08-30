@@ -4093,7 +4093,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
            rundgang_einsehen, seit ENT-180 vorhanden). -->
       <section class="view" id="view-rundgaenge">
         <div class="bk-kachel-grid">
-          <button type="button" class="bk-kachel" onclick="toast('Folgt in einem späteren Schritt.')">
+          <button type="button" class="bk-kachel" onclick="rundgaengeVerwaltungOeffnen()">
             <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M12 19h4a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2H8a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h4"/></svg></span>
             <span class="bk-kachel-lbl">Rundgänge</span>
           </button>
@@ -5500,6 +5500,7 @@ let krTarget = null;       // offene Kontrollrunde (id)
 // statt obTarget, weil Kontrollpunkte/-runden nicht mehr Teil der
 // Objekt-Detailseite sind, aber fachlich weiterhin an ein Objekt gebunden.
 let rdEinObjekt = null;
+let rdAlleVorlagen = [];   // Kachel "Rundgaenge": aktive Kontrollrunden ueber alle Objekte (ENT-242)
 let vsObjekt = null;   // Objekt der offenen Vorschau
 let oplId = null;      // Objekt der Objektplanung
 let oplMs = [];        // dessen Masterschichten
@@ -14573,6 +14574,65 @@ function askDeleteKr(id) {
       if (!ok || data.status !== 'ok') { toast(data.message || 'Fehlgeschlagen.'); return; }
       loadRundgangVorlagen().then(() => toast('Kontrollrunde gelöscht.'));
     }));
+}
+
+// ══════════ KACHEL "RUNDGAENGE": SCHUBLADE MIT ALLEN AKTIVEN KONTROLL-
+// RUNDEN OBJEKTUEBERGREIFEND (ENT-242) ══════════
+// Die volle Verwaltung (auch inaktive Runden, Kontrollpunkte zuordnen)
+// bleibt Objekt fuer Objekt unter Einrichtung -- diese Schublade ist ein
+// schneller Ueberblick plus Einstieg zum Anlegen, kein Ersatz dafuer.
+// Bearbeiten/Anlegen nutzen denselben Dialog (dlgKr) wie die Einrichtung:
+// dafuer wird rdEinObjekt vorher gesetzt und kontrollpunkte (bzw.
+// rundgangVorlagen fuers Vorbefuellen) fuer genau dieses Objekt geladen.
+function rundgaengeVerwaltungOeffnen() {
+  const vorlauf = objekte.length ? Promise.resolve() : ladeObjekteFuerRevierdienst();
+  Promise.all([vorlauf, api('rundgang_vorlage_liste_alle.php')]).then(([, { ok, data }]) => {
+    rdAlleVorlagen = ok && data.status === 'ok' ? (data.vorlagen || []) : [];
+    renderRdAlleDrawer();
+  });
+}
+
+function renderRdAlleDrawer() {
+  $('drTitle').textContent = 'Rundgänge';
+  const objektListe = objekte.slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  const objektOptionen = '<option value="">Objekt wählen …</option>'
+    + objektListe.map(o => `<option value="${Number(o.id)}">${esc(o.name)}</option>`).join('');
+  const zeilen = rdAlleVorlagen.length
+    ? rdAlleVorlagen.map(v => {
+        const punkte = v.punkte.length
+          ? `${v.punkte.length} ${v.punkte.length === 1 ? 'Kontrollpunkt' : 'Kontrollpunkte'}`
+          : 'Noch kein Kontrollpunkt zugeordnet';
+        return `<div class="kr-zeile">
+          <div class="kr-kopf"><b>${esc(v.name)}</b></div>
+          <div class="kr-meta">${esc(v.kunde_name)} · ${esc(v.objekt_name)} · ${punkte}</div>
+          <div style="display:flex;gap:7px;margin-top:9px">
+            <button class="btn btn-plain btn-sm" onclick="rdAlleBearbeiten(${Number(v.id)},${Number(v.objekt_id)})">Bearbeiten</button>
+          </div>
+        </div>`;
+      }).join('')
+    : '<p class="zone-note" style="margin:0">Keine aktive Kontrollrunde vorhanden.</p>';
+  $('drBody').innerHTML = `
+    <div class="bar-tools">
+      <select class="inp" id="rdNeuObjekt" style="width:auto" aria-label="Objekt für neue Kontrollrunde auswählen">${objektOptionen}</select>
+      <button class="btn btn-primary btn-sm" onclick="rdAlleAnlegen()">+ Rundgang anlegen</button>
+    </div>
+    ${zeilen}`;
+  $('drFoot').innerHTML = '';
+  showDrawer();
+}
+
+function rdAlleBearbeiten(vorlageId, objektId) {
+  closeDrawer();
+  rdEinObjekt = objektId;
+  Promise.all([loadKontrollpunkte(), loadRundgangVorlagen()]).then(() => openKr('aendern', vorlageId));
+}
+
+function rdAlleAnlegen() {
+  const objektId = $('rdNeuObjekt').value ? Number($('rdNeuObjekt').value) : null;
+  if (!objektId) { toast('Bitte zuerst ein Objekt wählen.'); return; }
+  closeDrawer();
+  rdEinObjekt = objektId;
+  loadKontrollpunkte().then(() => openKr('neu'));
 }
 
 // ══════════════════════════════════════════ SCHICHTEN ERZEUGEN (mit Vorschau)
