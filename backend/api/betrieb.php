@@ -2,10 +2,14 @@
 // Briefkopf des eigenen Betriebs fuer den Rapport-Ausdruck (ENT-155).
 //
 // GET  -> { status, betrieb: {firma, zusatz, fusszeile, fusszeile2, logo_mime,
-//           logo_groesse, logo(dataURL|null)} }
-// POST -> speichern {firma, zusatz, fusszeile, fusszeile2}
-//         Logo setzen  {logo: base64, logo_mime, logo_dateiname?}
-//         Logo weg     {logo_weg: true}
+//           logo_groesse, logo(dataURL|null), domizil_strasse, domizil_plz, domizil_ort} }
+// POST -> speichern {firma, zusatz, fusszeile, fusszeile2, qr_*}
+//         Logo setzen     {logo: base64, logo_mime, logo_dateiname?}
+//         Logo weg        {logo_weg: true}
+//         Hauptdomizil    {domizil_strasse, domizil_plz, domizil_ort} -- ENT-236,
+//         eigener Zweig wie beim Logo: Ein Speichern aus der neuen
+//         "Betrieb"-Kachel darf Firma/Zusatz/Fusszeile/QR-Felder NICHT
+//         stillschweigend leeren, weil das Formular dort sie gar nicht kennt.
 //
 // Warum das Logo in der Datenbank und nicht im Dateisystem liegt: dieselbe
 // Entscheidung wie bei den Einsatz-Dokumenten (ENT-117). Ein Verzeichnis mit
@@ -35,14 +39,16 @@ const LOGO_MIME_ERLAUBT = ['image/png', 'image/jpeg', 'image/svg+xml', 'image/we
 function betrieb_lesen(bool $mitLogo): array {
     $r = db()->query(
         'SELECT firma, zusatz, fusszeile, fusszeile2, qr_iban, qr_strasse, qr_hausnummer,
-                qr_plz, qr_ort, logo_mime, logo_groesse, logo
+                qr_plz, qr_ort, logo_mime, logo_groesse, logo,
+                domizil_strasse, domizil_plz, domizil_ort
          FROM betrieb WHERE id = 1'
     )->fetch();
     if (!$r) {
         return ['firma' => '', 'zusatz' => '', 'fusszeile' => null, 'fusszeile2' => null,
                 'qr_iban' => null, 'qr_strasse' => null, 'qr_hausnummer' => null,
                 'qr_plz' => null, 'qr_ort' => null, 'qr_iban_gueltig' => false,
-                'logo_mime' => null, 'logo_groesse' => null, 'logo' => null];
+                'logo_mime' => null, 'logo_groesse' => null, 'logo' => null,
+                'domizil_strasse' => null, 'domizil_plz' => null, 'domizil_ort' => null];
     }
     $roh = $r['logo'];
     return [
@@ -69,6 +75,9 @@ function betrieb_lesen(bool $mitLogo): array {
         'logo' => ($mitLogo && $roh !== null && $r['logo_mime'])
             ? 'data:' . $r['logo_mime'] . ';base64,' . base64_encode($roh)
             : null,
+        'domizil_strasse' => $r['domizil_strasse'],
+        'domizil_plz'     => $r['domizil_plz'],
+        'domizil_ort'     => $r['domizil_ort'],
     ];
 }
 
@@ -116,6 +125,32 @@ if (isset($in['logo'])) {
     $st->bindValue(3, strlen($roh), PDO::PARAM_INT);
     $st->bindValue(4, (int)$user['id'], PDO::PARAM_INT);
     $st->execute();
+    json_response(['status' => 'ok', 'betrieb' => betrieb_lesen(true)]);
+}
+
+// Hauptdomizil (ENT-236): eigener, frueh zurueckkehrender Zweig wie beim
+// Logo -- ausgeloest durch array_key_exists statt isset, weil ein geleertes
+// Feld absichtlich als leerer String ankommt und trotzdem gespeichert werden
+// muss. Ein einziger kombinierter Speicher-Aufruf mit den Textfeldern unten
+// waere hier FALSCH: Die neue "Betrieb"-Kachel kennt Firma/Zusatz/Fusszeile/
+// QR-Felder gar nicht, und deren Formular kennt Hauptdomizil nicht -- ein
+// gemeinsamer Zweig wuerde beim Speichern des jeweils anderen Formulars die
+// hier nicht mitgeschickten Felder mit einem leeren String ueberschreiben.
+if (array_key_exists('domizil_strasse', $in)) {
+    $dStrasse = trim((string)($in['domizil_strasse'] ?? ''));
+    $dPlz     = trim((string)($in['domizil_plz'] ?? ''));
+    $dOrt     = trim((string)($in['domizil_ort'] ?? ''));
+    if (mb_strlen($dStrasse) > 200 || mb_strlen($dOrt) > 200) {
+        json_response(['status' => 'error',
+            'message' => 'Strasse/Ort des Hauptdomizils sind zu lang.'], 400);
+    }
+    if (mb_strlen($dPlz) > 10) {
+        json_response(['status' => 'error', 'message' => 'Die PLZ ist zu lang.'], 400);
+    }
+    $pdo->prepare('UPDATE betrieb SET domizil_strasse = ?, domizil_plz = ?, domizil_ort = ?,
+                   geaendert_am = NOW(), geaendert_von = ? WHERE id = 1')
+        ->execute([$dStrasse === '' ? null : $dStrasse, $dPlz === '' ? null : $dPlz,
+                   $dOrt === '' ? null : $dOrt, (int)$user['id']]);
     json_response(['status' => 'ok', 'betrieb' => betrieb_lesen(true)]);
 }
 

@@ -1093,6 +1093,19 @@ $spalten = [
     ['betrieb', 'qr_hausnummer', 'ALTER TABLE betrieb ADD COLUMN qr_hausnummer VARCHAR(20) NULL AFTER qr_strasse'],
     ['betrieb', 'qr_plz',        'ALTER TABLE betrieb ADD COLUMN qr_plz VARCHAR(10) NULL AFTER qr_hausnummer'],
     ['betrieb', 'qr_ort',        'ALTER TABLE betrieb ADD COLUMN qr_ort VARCHAR(100) NULL AFTER qr_plz'],
+    // Hauptdomizil (ENT-236): die allgemeine Geschaeftsadresse des Betriebs,
+    // fuer die neu zusammengefasste "Betrieb"-Kachel (vormals "Anstellungsorte").
+    // BEWUSST eine dritte, eigene Adresse -- nicht dieselben Spalten wie
+    // qr_strasse/qr_plz/qr_ort (das ist die Absenderadresse einer QR-Rechnung,
+    // fachlich an die Zahlungsabwicklung gebunden, nicht an die Frage "wo
+    // sitzt die Firma") und nicht dieselben wie anstellungsorte (das ist ein
+    // GAV-Begriff fuer den Auslagenersatz, keine Firmenadresse -- beide
+    // koennten in Wirklichkeit unterschiedliche Orte sein). Kein Land-Feld,
+    // aus demselben Grund wie bei den QR-Feldern oben: CUPI 24 GmbH ist ein
+    // Schweizer Betrieb, das ist Tatsache und keine Auslegung.
+    ['betrieb', 'domizil_strasse', 'ALTER TABLE betrieb ADD COLUMN domizil_strasse VARCHAR(200) NULL AFTER qr_ort'],
+    ['betrieb', 'domizil_plz',     'ALTER TABLE betrieb ADD COLUMN domizil_plz VARCHAR(10) NULL AFTER domizil_strasse'],
+    ['betrieb', 'domizil_ort',     'ALTER TABLE betrieb ADD COLUMN domizil_ort VARCHAR(200) NULL AFTER domizil_plz'],
     // TINYINT NULL, nicht NOT NULL DEFAULT 0: NULL heisst 'noch nicht
     // entschieden', 0 heisst 'geprueft und nein'. Der Unterschied ist bei
     // GAV-AUS-004 wesentlich -- eine Vorbelegung waere eine Auslegung.

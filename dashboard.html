@@ -4601,6 +4601,16 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
              bkUebersichtZeigen() weiter unten im Skript. -->
         <div class="bk-uebersicht" id="bkUebersicht">
           <div class="bk-kachel-grid">
+            <!-- Betrieb (ENT-236): war "Anstellungsorte", jetzt vorne und
+                 erweitert um Hauptdomizil und Logo -- der Projektinhaber
+                 wollte die betrieblichen Angaben an einem Ort, nicht auf
+                 drei Kacheln verteilt. Anstellungsorte bleiben inhaltlich
+                 unveraendert, nur als eine von drei Karten in dieser
+                 Unteransicht statt einer eigenen Kachel. -->
+            <button type="button" class="bk-kachel" id="bkKachelBe" onclick="bkAbschnittZeigen('be')">
+              <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/></svg></span>
+              <span class="bk-kachel-lbl">Betrieb</span>
+            </button>
             <button type="button" class="bk-kachel" onclick="bkAbschnittZeigen('bk')">
               <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg></span>
               <span class="bk-kachel-lbl">Briefkopf für Rapporte</span>
@@ -4612,10 +4622,6 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
             <button type="button" class="bk-kachel" id="bkKachelRv" onclick="bkAbschnittZeigen('rv')">
               <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
               <span class="bk-kachel-lbl">Rollen im Betrieb</span>
-            </button>
-            <button type="button" class="bk-kachel" onclick="bkAbschnittZeigen('an')">
-              <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
-              <span class="bk-kachel-lbl">Anstellungsorte</span>
             </button>
           </div>
 
@@ -4696,19 +4702,6 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
               <div class="note" id="bkQrIbanHinweis" style="margin-top:5px">Von der Bank eigens zugewiesene
                 QR-IBAN — nicht dieselbe wie die normale Geschäfts-IBAN.</div>
             </div>
-            <div class="f" style="margin-top:4px">
-              <label>Logo</label>
-              <div id="bkLogoStand" class="note">Kein Logo hinterlegt.</div>
-              <input type="file" id="bkLogoDatei" accept="image/png,image/jpeg,image/svg+xml,image/webp"
-                style="display:none" onchange="bkLogoGewaehlt(this.files[0])">
-              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">
-                <button type="button" class="btn btn-plain btn-sm" onclick="$('bkLogoDatei').click()"
-                  title="PNG, JPEG, SVG oder WebP, höchstens 512 KB">Logo wählen</button>
-                <button type="button" class="btn btn-plain btn-sm" id="bkLogoWeg"
-                  style="display:none" onclick="bkLogoWeg()">Logo entfernen</button>
-                <span class="note">höchstens 512 KB</span>
-              </div>
-            </div>
             <div style="display:flex;gap:8px;margin-top:16px">
               <button type="button" class="btn btn-primary" onclick="bkSpeichern()">Briefkopf speichern</button>
             </div>
@@ -4758,9 +4751,38 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
         </div>
         </div>
 
-        <div class="bk-abschnitt" id="bkAb-an" style="display:none">
+        <!-- Betrieb (ENT-236): Hauptdomizil, Anstellungsorte und Logo in
+             einer Unteransicht -- drei Karten in derselben .grid-Spalte,
+             gleiche Bauart wie die uebrigen Unteransichten hier. -->
+        <div class="bk-abschnitt" id="bkAb-be" style="display:none">
         <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="bkUebersichtZeigen()">Zurück</button>
         <div class="grid">
+        <div class="card" id="bdKarte">
+          <div class="card-hd">
+            <span class="card-ic"><svg class="i" viewBox="0 0 24 24"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/></svg></span>
+            <h3>Hauptdomizil</h3>
+          </div>
+          <div class="card-bd">
+            <div class="msg-err" id="bdErr" style="display:none"></div>
+            <div class="ki-hint web on" style="margin-bottom:14px">
+              <span>Die allgemeine Geschäftsadresse des Betriebs — unabhängig von den
+              Anstellungsorten (GAV-Auslagenersatz) und der Absenderadresse der QR-Rechnung
+              unter „Briefkopf für Rapporte". Wird heute an keiner Stelle automatisch
+              verwendet, sondern hier festgehalten.</span>
+            </div>
+            <div class="form-zeile">
+              <div class="f wide"><label for="bdStrasse">Strasse und Nummer</label>
+                <input class="inp" id="bdStrasse" maxlength="200" placeholder="z. B. Musterweg 1"></div>
+            </div>
+            <div class="form-zeile">
+              <div class="f"><label for="bdPlz">PLZ</label><input class="inp" id="bdPlz" maxlength="10"></div>
+              <div class="f"><label for="bdOrt">Ort</label><input class="inp" id="bdOrt" maxlength="200"></div>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:16px">
+              <button type="button" class="btn btn-primary" onclick="bdSpeichern()">Hauptdomizil speichern</button>
+            </div>
+          </div>
+        </div>
         <div class="card" id="anKarte">
           <div class="card-hd">
             <span class="card-ic"><svg class="i" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
@@ -4798,6 +4820,32 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
             <p class="zone-note" style="margin-top:12px">Die Wegstrecke zwischen den beiden Anstellungsorten entscheidet
                nach Art. 18 Ziff. 3.2 bzw. 3.3, ob im Nebenanstellungsgebiet überhaupt etwas geschuldet ist:
                unter 40 km nichts, ab 40 km eine Pauschale nach Formel.</p>
+          </div>
+        </div>
+        <!-- Logo (ENT-155, ab ENT-236 hier statt bei Briefkopf für Rapporte):
+             betriebsweites Feld, nicht an den Rapport-Ausdruck gebunden --
+             wird bereits heute von mehreren Stellen gelesen (beleg_oeffentlich.php,
+             beleg_versenden.php). Dieselben Element-IDs wie zuvor, darum
+             bleiben bkLogoStand()/bkLogoGewaehlt()/bkLogoWeg() unveraendert. -->
+        <div class="card" id="btLogoKarte">
+          <div class="card-hd">
+            <span class="card-ic"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></span>
+            <h3>Logo</h3>
+          </div>
+          <div class="card-bd">
+            <div class="ki-hint web on" style="margin-bottom:14px">
+              <span>Erscheint auf dem Kopf des gedruckten Arbeitsrapports.</span>
+            </div>
+            <div id="bkLogoStand" class="note">Kein Logo hinterlegt.</div>
+            <input type="file" id="bkLogoDatei" accept="image/png,image/jpeg,image/svg+xml,image/webp"
+              style="display:none" onchange="bkLogoGewaehlt(this.files[0])">
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">
+              <button type="button" class="btn btn-plain btn-sm" onclick="$('bkLogoDatei').click()"
+                title="PNG, JPEG, SVG oder WebP, höchstens 512 KB">Logo wählen</button>
+              <button type="button" class="btn btn-plain btn-sm" id="bkLogoWeg"
+                style="display:none" onclick="bkLogoWeg()">Logo entfernen</button>
+              <span class="note">höchstens 512 KB</span>
+            </div>
           </div>
         </div>
         </div>
@@ -6057,7 +6105,7 @@ const TITLES = {
   kunden:      ['Kunden', 'Stammdaten'],
   produkte:    ['Leistungen', 'Preise und Standardtexte für Offerten'],
   offerte:     ['Offerte', 'Positionen, Preise und Summen'],
-  betrieb:     ['Einstellungen', 'Briefkopf, Zugang, Rollen und Anstellungsorte'],
+  betrieb:     ['Einstellungen', 'Betrieb, Briefkopf, Zugang und Rollen'],
   pensen:      ['Pensen', 'Jahresstunden gegen die Anstellungskategorie'],
   auslagen:    ['Auslagenersatz', 'Chronologisches Protokoll je Mitarbeitendem — Art. 18 Ziff. 10'],
   rundgaenge:  ['Übersicht', 'Rundgänge, GPS, Aufgaben und Auswertungen auf einen Blick'],
@@ -12679,7 +12727,8 @@ function ladeBetrieb() {
 // noch laufenden Abruf, und dann fehlte der Briefkopf genau auf dem Blatt.
 let briefkopf = { firma: '', zusatz: '', fusszeile: null, fusszeile2: null,
   qr_iban: null, qr_strasse: null, qr_hausnummer: null, qr_plz: null, qr_ort: null,
-  qr_iban_gueltig: false, logo: null, logo_groesse: null };
+  qr_iban_gueltig: false, logo: null, logo_groesse: null,
+  domizil_strasse: null, domizil_plz: null, domizil_ort: null };
 
 // Nur fuer die sofortige Rueckmeldung beim Tippen (ENT-205) -- massgeblich
 // ist immer die serverseitige Pruefung in betrieb.php/qrrechnung.php, die
@@ -12768,7 +12817,33 @@ function bkLaden() {
     $('bkQrIban').value = briefkopf.qr_iban || '';
     bkQrIbanPruefen();
     bkLogoStand();
+    if ($('bdStrasse')) {
+      $('bdStrasse').value = briefkopf.domizil_strasse || '';
+      $('bdPlz').value = briefkopf.domizil_plz || '';
+      $('bdOrt').value = briefkopf.domizil_ort || '';
+    }
   });
+}
+
+function bdFehler(text) {
+  const el = $('bdErr'); if (!el) { return; }
+  if (!text) { el.style.display = 'none'; return; }
+  el.textContent = text; el.style.display = '';
+}
+
+// Eigener Speicherweg fuer das Hauptdomizil (ENT-236) -- ein einziger
+// gemeinsamer Aufruf mit bkSpeichern() waere hier falsch: Diese Karte kennt
+// Firma/Zusatz/Fusszeile/QR-Felder nicht, und bkSpeichern() kennt bdStrasse
+// nicht. Ein gemeinsamer Aufruf wuerde beim Speichern der jeweils anderen
+// Karte die hier fehlenden Felder mit einem leeren Wert ueberschreiben.
+function bdSpeichern() {
+  bdFehler('');
+  api('betrieb.php', { method: 'POST', body: {
+    domizil_strasse: $('bdStrasse').value, domizil_plz: $('bdPlz').value, domizil_ort: $('bdOrt').value,
+  } }).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') { return bdFehler(data.message || 'Speichern fehlgeschlagen.'); }
+    briefkopf = data.betrieb; toast('Hauptdomizil gespeichert.');
+  }).catch(() => bdFehler('Speichern fehlgeschlagen.'));
 }
 
 function bkLogoStand() {

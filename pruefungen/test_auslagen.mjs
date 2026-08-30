@@ -210,7 +210,7 @@ check('Auch die Mitarbeitenden markieren die Gruppe',
   await page.evaluate(() => document.getElementById('nav-admin-mitarbeiter').classList.contains('on')
     && document.getElementById('navg-admin').classList.contains('offen')));
 check('Die Mitarbeiterliste funktioniert unveraendert', await page.isVisible('#view-mitarbeiter.on'));
-await page.evaluate(() => { go('betrieb'); bkAbschnittZeigen('an'); });
+await page.evaluate(() => { go('betrieb'); bkAbschnittZeigen('be'); });
 await page.waitForTimeout(500);
 const anTxt = await page.textContent('#view-betrieb');
 check('Er sagt, dass es hoechstens zwei Orte gibt', /höchstens.{0,10}zwei/i.test(anTxt));
