@@ -114,11 +114,11 @@ await setup(page, null);
 await anmelden();
 calls = [];
 await page.click('#nav-revierdienst');
-await page.waitForTimeout(150);
-check('Die Kachel "Übersicht" ist unter Revierdienst sichtbar', await page.isVisible('#nav-revierdienst-uebersicht'));
-await page.click('#nav-revierdienst-uebersicht');
 await page.waitForSelector('#rdLetzteListe table');
 await page.waitForTimeout(150);
+check('KRITISCH: ein Klick auf "Revierdienst" landet direkt auf Übersicht, nicht auf Einrichtung (seit ENT-241)',
+  await page.evaluate(() => document.getElementById('view-rundgaenge').classList.contains('on')));
+check('Die Kachel "Übersicht" ist unter Revierdienst sichtbar', await page.isVisible('#nav-revierdienst-uebersicht'));
 
 // ── Kachel-Grid (ENT-225, Vorbild Betrieb ENT-211)
 const kachelLabels = await page.$$eval('#view-rundgaenge .bk-kachel-lbl', els => els.map(e => e.textContent.trim()));
