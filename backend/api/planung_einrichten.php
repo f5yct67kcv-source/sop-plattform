@@ -1300,10 +1300,10 @@ $spalten = [
     // brauchen -- kein Pflichtfeld nachtraeglich erzwingen.
     ['rundgang_vorlage', 'beschreibung', 'ALTER TABLE rundgang_vorlage ADD COLUMN beschreibung TEXT NULL AFTER name'],
 
-    // GPS-Punkt-Fenster auf der Kartenansicht (ENT-263): eine freie Notiz je
+    // GPS-Punkt-Fenster auf der Kartenansicht (ENT-265): eine freie Notiz je
     // Kontrollpunkt, wie sie das Referenzsystem dort fuehrt.
     ['kontrollpunkt', 'beschreibung', 'ALTER TABLE kontrollpunkt ADD COLUMN beschreibung TEXT NULL AFTER bezeichnung'],
-    // Bereichszeiterfassung (ENT-263, Vorgabe Projektinhaber nach Rueckfrage):
+    // Bereichszeiterfassung (ENT-265, Vorgabe Projektinhaber nach Rueckfrage):
     // markiert, an welchem Kontrollpunkt der Rundgang-Timer beginnen bzw.
     // enden soll. ACHTUNG -- die Einstellung wird vorerst nur GESPEICHERT; die
     // laufende Rundgang-Durchfuehrung wertet sie noch NICHT aus (sie startet

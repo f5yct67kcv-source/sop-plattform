@@ -479,7 +479,7 @@ a.nav-item { text-decoration: none; }
    Projektinhabers. */
 .rdkarte-raum { --rdkarte-h: clamp(420px, calc(100vh - 265px), 900px);
   display: grid; grid-template-columns: minmax(200px, 260px) minmax(0, 1fr); gap: 14px; align-items: stretch; }
-/* ENT-263: Das Fenster rechts ist keine reine Anzeige mehr, sondern das
+/* ENT-265: Das Fenster rechts ist keine reine Anzeige mehr, sondern das
    Bearbeitungsformular selbst -- es braucht deutlich mehr Breite (Vorgabe
    Projektinhaber, im Bildschirmfoto eingezeichnet). */
 .rdkarte-raum.mit-detail { grid-template-columns: minmax(200px, 260px) minmax(0, 1fr) minmax(340px, 420px); }
@@ -492,7 +492,7 @@ a.nav-item { text-decoration: none; }
    eine Karte, die unten hinausragt. Das Detailfenster rechts wird
    ausdruecklich NICHT mitgestreckt -- es soll ein kleines Fenster bleiben. */
 /* Der z-index:0 ist kein Schoenheitsfehler, sondern behebt einen echten
-   Fehler (ENT-263): Leaflet legt seine Ebenen intern auf z-index 400-1000.
+   Fehler (ENT-265): Leaflet legt seine Ebenen intern auf z-index 400-1000.
    Ohne eigenen Stapelkontext hier konkurrieren die direkt mit dem
    Dialog-Schleier (.dlg-scrim, z-index 70) -- ein Dialog oeffnete sich
    dadurch HINTER der Karte (vom Projektinhaber gemeldet, Bildschirmfoto).
@@ -503,7 +503,7 @@ a.nav-item { text-decoration: none; }
 .rdkarte-seite > .card:last-child { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 .rdkarte-seite > .card:last-child .rdkarte-liste { flex: 1 1 auto; max-height: none; }
 /* Das Fenster reicht bis zum unteren Kartenrand (Vorgabe Projektinhaber,
-   ENT-263) -- der Inhalt darin scrollt, damit ein langes Formular die Karte
+   ENT-265) -- der Inhalt darin scrollt, damit ein langes Formular die Karte
    nicht in die Laenge zieht. */
 /* Ohne die Deckelung zieht der Inhalt des Fensters die ganze Rasterzeile in
    die Laenge und das Fenster steht tiefer als die Karte -- verlangt ist
@@ -4659,7 +4659,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
               </div>
               <div id="rdKarteUebersicht" style="border-radius:var(--r);overflow:hidden;border:1px solid var(--line)"></div>
             </div>
-            <!-- Fenster rechts (ENT-263, Revision von ENT-260): jetzt das
+            <!-- Fenster rechts (ENT-265, Revision von ENT-260): jetzt das
                  Bearbeitungsformular SELBST, nicht mehr nur eine Anzeige mit
                  Sprung in den Dialog. Ausdrueckliche Vorgabe des
                  Projektinhabers: "Ich moechte kein eigenes Fenster fuer die
@@ -15922,7 +15922,7 @@ function rdKarteUebersichtInit() {
       maxZoom: 19,
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>',
     }).addTo(rdKarteMapa);
-    // Klick auf die Karte setzt die Lage eines NEUEN Punktes (ENT-263) --
+    // Klick auf die Karte setzt die Lage eines NEUEN Punktes (ENT-265) --
     // bewusst nur beim Anlegen: bei einem bestehenden Punkt wuerde ein
     // Fehlklick ihn sonst unbemerkt versetzen. Der wird per Ziehen am
     // Marker verschoben.
@@ -15945,7 +15945,7 @@ function rdKarteUebersichtZeichnen() {
   // wenn die Karte noch nie geoeffnet wurde.
   rdKarteSeiteZeichnen();
   // Ein zwischenzeitlich geloeschter Punkt darf nicht im Fenster stehen
-  // bleiben. Das Formular wird hier bewusst NICHT neu gefuellt (ENT-263):
+  // bleiben. Das Formular wird hier bewusst NICHT neu gefuellt (ENT-265):
   // diese Funktion laeuft bei jeder Aktualisierung, und ein Neufuellen
   // wuerde laufende, noch nicht gespeicherte Eingaben verwerfen.
   if (rdKarteAuswahl !== null && rdKarteAuswahl !== 'neu'
@@ -15977,7 +15977,7 @@ function rdKarteUebersichtZeichnen() {
   rdKarteVorschauZeichnen();
 }
 
-// Vorschau des gerade bearbeiteten Punktes (ENT-263): zeichnet Marker und
+// Vorschau des gerade bearbeiteten Punktes (ENT-265): zeichnet Marker und
 // Radius aus den FORMULARWERTEN, nicht aus dem gespeicherten Stand. Damit ist
 // ein neuer Punkt sichtbar, bevor er gespeichert ist, und eine Aenderung an
 // Radius oder Koordinaten wirkt sofort. Der Marker laesst sich ziehen -- so
@@ -16052,7 +16052,7 @@ function rdKarteWaehlen(id) {
   rdKarteUebersichtZeichnen();
 }
 
-// Fenster rechts (ENT-263): Bearbeitungsformular, nicht mehr nur Anzeige.
+// Fenster rechts (ENT-265): Bearbeitungsformular, nicht mehr nur Anzeige.
 // rdKarteAuswahl ist entweder die id eines bestehenden Punktes oder 'neu'.
 function rdKarteDetailZeichnen() {
   const fenster = $('rdKarteDetail');

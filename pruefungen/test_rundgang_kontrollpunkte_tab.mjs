@@ -41,7 +41,7 @@ const KONTROLLPUNKTE = { status: 'ok', kontrollpunkte: [
   { id: 2, objekt_id: 1, bezeichnung: 'Parkplatz', beschreibung: null, reihenfolge: 2, typ: 'geofence', chip_id: null,
     lat: 47.37690, lng: 8.54170, geofence_radius_m: 35, aktiv: 1, bereichszeit_beginn: 0, bereichszeit_ende: 0 },
   // "Tor Süd" traegt den Bereichszeit-Beginn -- damit prueft die Suite, dass
-  // der gespeicherte Stand der Schalter wirklich uebernommen wird (ENT-263).
+  // der gespeicherte Stand der Schalter wirklich uebernommen wird (ENT-265).
   { id: 3, objekt_id: 1, bezeichnung: 'Tor Süd', beschreibung: null, reihenfolge: 3, typ: 'geofence', chip_id: null,
     lat: 47.37820, lng: 8.54350, geofence_radius_m: 15, aktiv: 0, bereichszeit_beginn: 1, bereichszeit_ende: 0 },
 ]};
@@ -205,13 +205,13 @@ check('KRITISCH: der Klick auf einen GPS-Punkt öffnet rechts das Detailfenster'
 const detailBox = await page.$eval('#rdKarteDetail', el => el.getBoundingClientRect());
 const karteBox2 = await page.$eval('#rdKarteUebersicht', el => el.getBoundingClientRect());
 check('KRITISCH: das Detailfenster steht rechts NEBEN der Karte', detailBox.left >= karteBox2.right - 1);
-// ENT-263: "genügend breit und bis runtergezogen" (Vorgabe Projektinhaber) --
+// ENT-265: "genügend breit und bis runtergezogen" (Vorgabe Projektinhaber) --
 // am gerenderten Zustand gemessen, nicht im CSS nachgelesen.
 check('KRITISCH: das Fenster ist breit genug für ein Formular (mindestens 340px)', detailBox.width >= 340);
 check('KRITISCH: es reicht bis zur Kartenunterkante und steht nicht tiefer',
   Math.abs(detailBox.bottom - karteBox2.bottom) <= 2);
 check('Es zeigt den Namen des angeklickten Punktes', (await page.textContent('#rdKarteDetailTitel')) === 'Parkplatz');
-// ENT-263: Das Fenster ist das Formular selbst -- kein eigener Dialog mehr.
+// ENT-265: Das Fenster ist das Formular selbst -- kein eigener Dialog mehr.
 check('KRITISCH: das Fenster ist ein Formular, kein Dialog geht auf',
   await page.inputValue('#rdKdName') === 'Parkplatz' && !(await page.isVisible('#dlgKp.on')));
 check('KRITISCH: Breitengrad, Längengrad und Radius stehen als bearbeitbare Felder darin',
@@ -266,7 +266,7 @@ check('KRITISCH: der Punkt wird als Geofence mit seinen Koordinaten gespeichert,
   gesendet.typ === 'geofence' && Math.abs(gesendet.lat - 47.3782) < 0.001 && gesendet.id === 3);
 await page.waitForTimeout(300);
 
-// Gegenprobe zum gemeldeten Fehler (ENT-263): Ein Dialog oeffnete sich HINTER
+// Gegenprobe zum gemeldeten Fehler (ENT-265): Ein Dialog oeffnete sich HINTER
 // der Karte, weil Leaflet seine Ebenen auf z-index 400-1000 legt und der
 // Dialog-Schleier nur auf 70 liegt. Hier gemessen statt im CSS nachgelesen:
 // der Schleier muss im Stapel VOR der Karte liegen.
