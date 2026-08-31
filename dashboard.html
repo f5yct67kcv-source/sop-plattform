@@ -453,7 +453,9 @@ a.nav-item { text-decoration: none; }
    Anzahl-Chip dahinter -- gleiche Bildsprache wie ".bk-kachel", nur
    kompakt. Vorbild ist die Reiterleiste des vom Projektinhaber gezeigten
    Fremdsystems. */
-.rdkr-reiter { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+/* Mittig (ENT-261, Vorgabe Projektinhaber per Skizze) -- die Leiste steht
+   zentriert ueber dem Inhalt, nicht linksbuendig am Seitenrand. */
+.rdkr-reiter { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-bottom: 18px; }
 .rdkr-tab { display: inline-flex; align-items: center; gap: 9px; background: var(--surface);
   border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--sh-1);
   padding: 7px 12px; min-height: 40px; cursor: pointer; font: inherit; color: inherit; }
@@ -475,9 +477,22 @@ a.nav-item { text-decoration: none; }
    in der Mitte die Karte, rechts -- nur bei Bedarf -- das Detailfenster des
    angeklickten GPS-Punktes. Aufbau nach dem Referenzbild des
    Projektinhabers. */
-.rdkarte-raum { display: grid; grid-template-columns: minmax(200px, 260px) minmax(0, 1fr); gap: 14px; align-items: start; }
+.rdkarte-raum { display: grid; grid-template-columns: minmax(200px, 260px) minmax(0, 1fr); gap: 14px; align-items: stretch; }
 .rdkarte-raum.mit-detail { grid-template-columns: minmax(200px, 260px) minmax(0, 1fr) minmax(240px, 300px); }
 .rdkarte-buehne { position: relative; }
+/* ENT-261: Die Karte nutzt die Bildschirmhoehe aus, und die Listenspalte
+   links reicht genauso weit hinunter statt auf halber Hoehe aufzuhoeren
+   (Vorgabe Projektinhaber per Skizze: Karte 520px -> ~706px bei 971px
+   Fensterhoehe, Listen auf dieselbe Hoehe gezogen). Bewusst keine feste
+   Pixelhoehe: dieselbe Skizze auf einem flacheren Bildschirm haette sonst
+   eine Karte, die unten hinausragt. Das Detailfenster rechts wird
+   ausdruecklich NICHT mitgestreckt -- es soll ein kleines Fenster bleiben. */
+#rdKarteUebersicht { height: clamp(420px, calc(100vh - 265px), 900px); }
+.rdkarte-seite { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+.rdkarte-seite > .card:first-child { flex: none; min-height: 200px; }
+.rdkarte-seite > .card:last-child { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.rdkarte-seite > .card:last-child .rdkarte-liste { flex: 1 1 auto; max-height: none; }
+.rdkarte-raum > .rdkarte-detail { align-self: start; }
 /* Die beiden Anlegen-Knoepfe liegen oben rechts ueber der Karte (statt in
    einer eigenen Leiste darueber) -- so, wie es der Projektinhaber im
    Referenzbild markiert hat. z-index ueber Leaflets eigenen Bedienelementen
@@ -494,6 +509,11 @@ a.nav-item { text-decoration: none; }
   /* Auf dem Handy waere ein Ueberlagern der schmalen Karte unbrauchbar --
      dort stehen die Knoepfe wieder als eigene Zeile darueber. */
   .rdkarte-cta { position: static; margin-bottom: 10px; flex-wrap: wrap; }
+  /* Gestapelt gibt es nichts mehr auf gleiche Hoehe zu ziehen: feste,
+     handytaugliche Kartenhoehe, Listen so hoch wie ihr Inhalt. */
+  #rdKarteUebersicht { height: 420px; }
+  .rdkarte-seite > .card:first-child { min-height: 0; }
+  .rdkarte-seite > .card:last-child .rdkarte-liste { max-height: 260px; }
 }
 .bk-kachel { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center;
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--sh-1);
@@ -3232,6 +3252,13 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
         <div>
           <h1 id="pgTitle">Übersicht</h1>
           <div class="crumb" id="pgCrumb">Laufender Monat</div>
+          <!-- ENT-261: Die Kontrollrunden-Unterseite traegt ihren Titel hier
+               oben statt im Seiteninhalt (Vorgabe Projektinhaber per Skizze).
+               Ansichtstitel und Beschreibungszeile werden dafuer ausgeblendet
+               statt ueberschrieben -- sie gehoeren der ganzen Ansicht, nicht
+               dieser einen Unterseite, und werden beim Verlassen unveraendert
+               wieder gebraucht. -->
+          <h1 id="rdKrTitel" style="display:none">Kontrollrunde</h1>
         </div>
       </div>
       <nav class="top-sub" id="topSub"></nav>
@@ -4467,12 +4494,10 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
              Zurueck-Knopf hier oben (zurueck zur Rundgang-Liste) statt
              zusaetzlich einen je Bereich. -->
         <div class="bk-abschnitt" id="rdAb-kr" style="display:none">
-        <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="rdAbschnittZeigen('liste')">Zurück</button>
-
-        <!-- Bleibt in jedem Reiter stehen: sonst weiss man ausserhalb von
-             "Allgemeines" nicht mehr, welche Runde man gerade bearbeitet. -->
-        <h2 id="rdKrTitel" style="margin:0 0 14px">Neue Kontrollrunde</h2>
-
+        <!-- ENT-261: Kein eigener Zurueck-Knopf und keine Titelzeile mehr im
+             Seiteninhalt -- der Titel steht in der Kopfzeile (siehe dort),
+             die Reiterleiste beginnt direkt oben. Ausdrueckliche Vorgabe des
+             Projektinhabers per Skizze. -->
         <div class="rdkr-reiter" id="rdKrReiter">
           <button type="button" class="rdkr-tab" data-reiter="allgemeines" onclick="rdKrAbschnittZeigen('allgemeines')">
             <span class="rdkr-tab-ic"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
@@ -4577,8 +4602,8 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
              Docs-Eintrag folgt, wenn er umgesetzt wird. -->
         <div class="rdkr-panel" id="rdKrAb-karte" style="display:none">
           <div class="rdkarte-raum" id="rdKarteRaum">
-            <div>
-              <div class="card" style="margin-bottom:14px">
+            <div class="rdkarte-seite">
+              <div class="card">
                 <div class="card-hd"><h3>Geofence-Bereiche</h3></div>
                 <div class="card-bd flush rdkarte-liste" id="rdKarteBereiche"></div>
               </div>
@@ -4595,7 +4620,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
                 <button class="btn btn-plain btn-sm" onclick="toast('Folgt in einem späteren Schritt.')">Geofence-Bereich anlegen</button>
                 <button class="btn btn-primary btn-sm" onclick="openKp('neu',null,'geofence')">+ GPS-Punkt anlegen</button>
               </div>
-              <div id="rdKarteUebersicht" style="height:520px;border-radius:var(--r);overflow:hidden;border:1px solid var(--line)"></div>
+              <div id="rdKarteUebersicht" style="border-radius:var(--r);overflow:hidden;border:1px solid var(--line)"></div>
             </div>
             <!-- Detailfenster: oeffnet sich rechts, sobald ein GPS-Punkt auf
                  der Karte oder in der Liste links angeklickt wird (Vorgabe
@@ -7229,6 +7254,10 @@ function go(view) {
     $('pgTitle').textContent = TITLES[view][0];
     $('pgCrumb').textContent = TITLES[view][1];
   }
+  // Ein Sondertitel einer Unterseite (ENT-261) gilt nur dort -- wer ueber die
+  // Navigation irgendwohin wechselt, bekommt wieder den Ansichtstitel, sonst
+  // stuende in der Kopfzeile der Name einer Seite, die gar nicht offen ist.
+  kopfSondertitel(null);
   // Immer auf der Kachel-Uebersicht beginnen, nicht in der zuletzt
   // besuchten Sektion stehenbleiben -- wer ueber die Navigation erneut auf
   // "Betrieb" klickt, erwartet dieselbe Startseite wie beim ersten Mal.
@@ -15996,13 +16025,30 @@ function askDeleteKr(id) {
 function rdUebersichtZeigen() {
   $('rdUebersicht').style.display = '';
   document.querySelectorAll('#view-rundgaenge .bk-abschnitt').forEach(a => { a.style.display = 'none'; });
+  kopfSondertitel(null);
 }
 
 function rdAbschnittZeigen(id) {
   $('rdUebersicht').style.display = 'none';
   document.querySelectorAll('#view-rundgaenge .bk-abschnitt').forEach(a => { a.style.display = 'none'; });
   $('rdAb-' + id).style.display = '';
+  // Nur die Kontrollrunden-Unterseite traegt ihren eigenen Kopfzeilentitel
+  // (ENT-261) -- jeder andere Bereich gibt die Kopfzeile wieder frei.
+  if (id !== 'kr') { kopfSondertitel(null); }
   if (id === 'liste') { rdLadeAlle(); }
+}
+
+// ENT-261: Kopfzeilentitel einer einzelnen Unterseite. text = null gibt den
+// Ansichtstitel samt Beschreibungszeile wieder frei. Ausblenden statt
+// Ueberschreiben, weil beide der ganzen Ansicht gehoeren und nach dem
+// Verlassen unveraendert weitergebraucht werden.
+function kopfSondertitel(text) {
+  const eigen = $('rdKrTitel');
+  if (!eigen) { return; }
+  eigen.style.display = text === null ? 'none' : '';
+  if (text !== null) { eigen.textContent = text; }
+  $('pgTitle').style.display = text === null ? '' : 'none';
+  $('pgCrumb').style.display = text === null ? '' : 'none';
 }
 
 function rdLadeAlle() {
@@ -16067,7 +16113,7 @@ function rdKrZeigen(modus, id) {
   krTarget = id ? Number(id) : null;
   const v = krTarget ? rundgangVorlagen.find(x => Number(x.id) === krTarget) : null;
 
-  $('rdKrTitel').textContent = modus === 'neu' ? 'Neue Kontrollrunde' : 'Kontrollrunde ändern';
+  kopfSondertitel(modus === 'neu' ? 'Neue Kontrollrunde' : 'Kontrollrunde ändern');
   $('rdKrName').value = v ? v.name : '';
   $('rdKrAktiv').checked = v ? !!Number(v.aktiv) : true;
   $('rdKrBeschreibung').value = v && v.beschreibung ? v.beschreibung : '';

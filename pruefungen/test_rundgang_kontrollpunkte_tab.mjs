@@ -168,6 +168,13 @@ check('KRITISCH: die beiden Anlegen-Knöpfe liegen oben rechts ÜBER der Karte (
   && ctaBox.right <= karteBox.right + 1 && karteBox.right - ctaBox.right < 40);
 const listeBox = await page.$eval('#rdKartePunkteListe', el => el.getBoundingClientRect());
 check('KRITISCH: die Listen stehen links NEBEN der Karte, nicht darüber', listeBox.right <= karteBox.left + 1);
+// ENT-261: Karte nutzt die Bildschirmhoehe, Listenspalte reicht genauso weit
+// hinunter -- am gerenderten Zustand gemessen, nicht im CSS nachgelesen.
+const seiteBox = await page.$eval('.rdkarte-seite', el => el.getBoundingClientRect());
+check('KRITISCH: die Karte nutzt die Bildschirmhöhe aus (deutlich höher als die früheren 520px)',
+  karteBox.height > 600);
+check('KRITISCH: die Listenspalte links endet auf derselben Höhe wie die Karte, nicht auf halbem Weg',
+  Math.abs(seiteBox.bottom - karteBox.bottom) <= 2);
 
 // Suche in der GPS-Punkte-Liste
 await page.fill('#rdKarteSuche', 'Tor');
@@ -233,8 +240,8 @@ check('KRITISCH: statt eines nicht existierenden Zeichenwerkzeugs erscheint ein 
   await page.evaluate(() => document.getElementById('toast').classList.contains('on')));
 
 // ══════════ ENT-260: DER WECHSEL LAEUFT UEBER DIE REITER, NICHT UEBER ZURUECK
-check('KRITISCH: auf der Kartenansicht steht nur noch EIN Zurück-Knopf (der zur Liste)',
-  await page.evaluate(() => document.querySelectorAll('#rdAb-kr .bk-zurueck').length === 1));
+check('KRITISCH: auf der Seite steht gar kein Zurück-Knopf mehr (ENT-261)',
+  await page.evaluate(() => document.querySelectorAll('#rdAb-kr .bk-zurueck').length === 0));
 await page.click('#rdKrReiter .rdkr-tab:has-text("Allgemeines")');
 await page.waitForTimeout(150);
 check('KRITISCH: über den Reiter "Allgemeines" kommt man zum Formular, nicht zur Liste',
