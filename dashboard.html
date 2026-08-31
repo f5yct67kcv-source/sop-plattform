@@ -4515,10 +4515,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
         <div class="bk-abschnitt" id="rdAb-liste" style="display:none">
         <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="rdUebersichtZeigen()">Zurück</button>
         <div class="bar-tools">
-          <select class="inp" id="rdNeuObjekt" style="width:auto" aria-label="Objekt für neue Kontrollrunde auswählen">
-            <option value="">Objekt wählen …</option>
-          </select>
-          <button class="btn btn-primary btn-sm" onclick="rdAlleAnlegen()">+ Rundgang anlegen</button>
+          <button class="btn btn-primary btn-sm" onclick="rdNeuOeffnen()">+ Rundgang anlegen</button>
         </div>
         <div class="card">
           <div class="card-bd flush"><div class="tw" id="rdAlleListe"><div class="sk" style="height:52px"></div></div></div>
@@ -5915,6 +5912,42 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
     <div class="dlg-ft">
       <button class="btn btn-plain" onclick="closeDlg('dlgKp')">Abbrechen</button>
       <button class="btn btn-primary" id="kpBtn" onclick="saveKp()">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- Rundgang direkt anlegen (ENT-270): kleiner Dialog statt dem frueheren
+     Objekt-Waehler in der Werkzeugleiste der Rundgaenge-Uebersicht. Name,
+     Kunde und Objekt in einem Schritt -- nur aus bestehenden Kunden und
+     bereits erfassten Objekten waehlbar, keine freie Eingabe (ausdrueckliche
+     Vorgabe Projektinhaber). Legt hier noch nichts an: "Weiter" fuehrt auf
+     die volle Kontrollrunden-Seite (rdKrZeigen('neu')), wo Kontrollpunkte
+     usw. ergaenzt und erst dort gespeichert wird -- gleiches Muster wie
+     zuvor ueber die entfernte rdAlleAnlegen(). -->
+<div class="dlg-scrim" id="dlgRdNeu">
+  <div class="dlg">
+    <div class="dlg-hd">
+      <h2>Rundgang anlegen</h2>
+      <p>Nur für bestehende Kunden und bereits erfasste Objekte — eine neue Adresse zuerst unter Kunden anlegen.</p>
+    </div>
+    <div class="dlg-bd">
+      <div class="msg-err" id="rdNeuErr" style="display:none"></div>
+      <div class="form-grid">
+        <div class="f wide"><label for="rdNeuName">Name *</label><input class="inp" id="rdNeuName" placeholder="z. B. Öffnungsrunde"></div>
+        <div class="f wide"><label for="rdNeuKunde">Kunde *</label>
+          <select class="inp" id="rdNeuKunde" onchange="rdNeuKundeGewaehlt()">
+            <option value="">Kunde wählen …</option>
+          </select>
+        </div>
+        <div class="f wide" id="rdNeuObjektFeld" style="display:none">
+          <label for="rdNeuObjekt">Objekt *</label>
+          <select class="inp" id="rdNeuObjekt"></select>
+        </div>
+      </div>
+    </div>
+    <div class="dlg-ft">
+      <button class="btn btn-plain" onclick="closeDlg('dlgRdNeu')">Abbrechen</button>
+      <button class="btn btn-primary" onclick="rdNeuWeiter()">Weiter</button>
     </div>
   </div>
 </div>
@@ -16478,24 +16511,71 @@ function rdLadeAlle() {
   const vorlauf = objekte.length ? Promise.resolve() : ladeObjekteFuerRevierdienst();
   Promise.all([vorlauf, api('rundgang_vorlage_liste_alle.php')]).then(([, { ok, data }]) => {
     rdAlleVorlagen = ok && data.status === 'ok' ? (data.vorlagen || []) : [];
-    rdObjektWahlFuellen();
     rdZeichneAlleTabelle();
   });
 }
 
-function rdObjektWahlFuellen() {
-  const sel = $('rdNeuObjekt');
-  if (!sel) { return; }
-  const liste = objekte.slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-  sel.innerHTML = '<option value="">Objekt wählen …</option>'
-    + liste.map(o => `<option value="${Number(o.id)}">${esc(o.name)}</option>`).join('');
+// Rundgang-Anlegen-Dialog (ENT-270): Kunde und Objekt sind reine Auswahl,
+// keine freie Eingabe. Die Kunden-Liste entsteht aus den bereits geladenen
+// Objekten selbst (nicht aus der vollen Kundenliste) -- ein Kunde ohne
+// erfasstes Objekt kann ohnehin keinen Rundgang bekommen und taucht darum
+// erst gar nicht auf, statt in eine Sackgasse zu fuehren.
+function rdNeuOeffnen() {
+  $('rdNeuName').value = '';
+  $('rdNeuErr').style.display = 'none';
+  $('rdNeuObjektFeld').style.display = 'none';
+  $('rdNeuObjekt').innerHTML = '';
+  const kundenMitObjekt = new Map();
+  objekte.forEach(o => {
+    if (o.kunde_id === null || o.kunde_id === undefined) { return; }
+    if (!kundenMitObjekt.has(o.kunde_id)) { kundenMitObjekt.set(o.kunde_id, o.kunde_name); }
+  });
+  const liste = [...kundenMitObjekt.entries()].sort((a, b) => (a[1] || '').localeCompare(b[1] || ''));
+  $('rdNeuKunde').innerHTML = '<option value="">Kunde wählen …</option>'
+    + liste.map(([id, name]) => `<option value="${Number(id)}">${esc(name)}</option>`).join('');
+  openDlg('dlgRdNeu');
+  $('rdNeuName').focus();
+}
+
+// Das Objekt-Feld erscheint erst NACH der Kundenwahl -- vorher gibt es
+// nichts Sinnvolles darin zu waehlen. Hat der Kunde nur ein Objekt, steht es
+// trotzdem im Feld (vorausgewaehlt statt automatisch uebersprungen,
+// ausdrueckliche Vorgabe Projektinhaber): so ist beim Anlegen immer
+// sichtbar, welchem Objekt die Runde zugeordnet wird.
+function rdNeuKundeGewaehlt() {
+  const kundeId = $('rdNeuKunde').value ? Number($('rdNeuKunde').value) : null;
+  const feld = $('rdNeuObjektFeld');
+  if (!kundeId) { feld.style.display = 'none'; $('rdNeuObjekt').innerHTML = ''; return; }
+  const liste = objekte.filter(o => Number(o.kunde_id) === kundeId)
+    .slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  $('rdNeuObjekt').innerHTML = liste.map(o => `<option value="${Number(o.id)}">${esc(o.name)}</option>`).join('');
+  feld.style.display = '';
+}
+
+function rdNeuWeiter() {
+  const err = $('rdNeuErr'); err.style.display = 'none';
+  const name = $('rdNeuName').value.trim();
+  const objektId = $('rdNeuObjekt').value ? Number($('rdNeuObjekt').value) : null;
+  if (!name) { err.textContent = 'Bitte einen Namen eintragen.'; err.style.display = ''; return; }
+  if (!$('rdNeuKunde').value) { err.textContent = 'Bitte einen Kunden wählen.'; err.style.display = ''; return; }
+  if (!objektId) { err.textContent = 'Bitte ein Objekt wählen.'; err.style.display = ''; return; }
+  rdEinObjekt = objektId;
+  closeDlg('dlgRdNeu');
+  loadKontrollpunkte().then(() => {
+    rdKrZeigen('neu');
+    // rdKrZeigen('neu') setzt das Namensfeld leer (fuer den unveraenderten
+    // Bearbeiten-Fall) -- hier direkt danach mit dem im Dialog erfassten
+    // Namen ueberschreiben, damit er nicht ein zweites Mal eingetippt
+    // werden muss.
+    $('rdKrName').value = name;
+  });
 }
 
 function rdZeichneAlleTabelle() {
   const ziel = $('rdAlleListe');
   if (!ziel) { return; }
   if (!rdAlleVorlagen.length) {
-    ziel.innerHTML = EMPTY('Keine aktive Kontrollrunde vorhanden', 'Über "Rundgang anlegen" oben ein Objekt wählen und die erste Kontrollrunde anlegen.');
+    ziel.innerHTML = EMPTY('Keine aktive Kontrollrunde vorhanden', 'Über „+ Rundgang anlegen" oben die erste Kontrollrunde anlegen.');
     return;
   }
   ziel.innerHTML = `<table><thead><tr>
@@ -16517,13 +16597,6 @@ function rdZeichneAlleTabelle() {
 function rdAlleBearbeiten(vorlageId, objektId) {
   rdEinObjekt = objektId;
   Promise.all([loadKontrollpunkte(), loadRundgangVorlagen()]).then(() => rdKrZeigen('aendern', vorlageId));
-}
-
-function rdAlleAnlegen() {
-  const objektId = $('rdNeuObjekt').value ? Number($('rdNeuObjekt').value) : null;
-  if (!objektId) { toast('Bitte zuerst ein Objekt wählen.'); return; }
-  rdEinObjekt = objektId;
-  loadKontrollpunkte().then(() => rdKrZeigen('neu'));
 }
 
 // Kontrollrunde bearbeiten/anlegen als volle Unterseite (ENT-257, Revision

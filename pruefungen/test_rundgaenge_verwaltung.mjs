@@ -106,21 +106,42 @@ check('KRITISCH: eine Kontrollrunde vom ZWEITEN Objekt erscheint (objektübergre
 check('Die Anzahl Kontrollpunkte steht dabei', inhalt.includes('2 Kontrollpunkte'));
 check('Eine Runde ohne Kontrollpunkt sagt das explizit', inhalt.includes('Noch keiner zugeordnet'));
 
-// ══════════ ANLEGEN OHNE OBJEKT: HINWEIS STATT STILLEM NICHTSTUN
+// ══════════ RUNDGANG ANLEGEN (ENT-270): KLEINER DIALOG STATT VORHERIGEM
+// OBJEKT-WAEHLER IN DER WERKZEUGLEISTE -- NAME, KUNDE, OBJEKT IN EINEM SCHRITT
 await page.click('#rdAb-liste button:has-text("Rundgang anlegen")');
-await page.waitForTimeout(150);
-check('KRITISCH: "Rundgang anlegen" ohne gewähltes Objekt zeigt einen Hinweis statt nichts zu tun',
-  await page.evaluate(() => document.getElementById('toast').classList.contains('on')
-    && document.getElementById('toast').textContent.includes('Objekt')));
-check('Die Unterseite bleibt dabei offen', await page.isVisible('#rdAb-liste'));
+await page.waitForSelector('#dlgRdNeu.on');
+check('KRITISCH: Kunde ist eine geschlossene Auswahl, kein Freitextfeld (nur bestehende Kunden)',
+  await page.evaluate(() => document.getElementById('rdNeuKunde').tagName === 'SELECT'));
+check('Beide Testkunden stehen zur Wahl, alphabetisch geordnet',
+  (await page.$$eval('#rdNeuKunde option', o => o.map(x => x.textContent)))
+    .join('|') === 'Kunde wählen …|Beispiel Immobilien GmbH|Muster Liegenschaften AG');
+check('Das Objekt-Feld ist verborgen, solange kein Kunde gewählt ist', !(await page.isVisible('#rdNeuObjektFeld')));
 
-// ══════════ ANLEGEN MIT OBJEKT: VOLLE UNTERSEITE STATT SCHUBLADE (ENT-257,
-// Revision von ENT-248 -- der Projektinhaber wollte hier ausdrücklich
-// keine Schublade, sondern eine vollwertige Seite), RICHTIGES OBJEKT
+// ══════════ ANLEGEN OHNE AUSFUELLEN: HINWEIS STATT STILLEM NICHTSTUN
+await page.click('#dlgRdNeu button:has-text("Weiter")');
+await page.waitForTimeout(100);
+check('KRITISCH: "Weiter" ohne Namen zeigt einen Hinweis statt nichts zu tun', await page.isVisible('#rdNeuErr'));
+check('Der Dialog bleibt dabei offen', await page.isVisible('#dlgRdNeu.on'));
+
+// ══════════ KUNDE MIT NUR EINEM OBJEKT: DAS OBJEKT-FELD ERSCHEINT TROTZDEM
+// (ausdrückliche Vorgabe Projektinhaber -- kein automatisches Uebersehen)
+await page.selectOption('#rdNeuKunde', '1');
+await page.waitForTimeout(100);
+check('KRITISCH: das Objekt-Feld erscheint auch bei nur einem Objekt, vorausgewählt statt versteckt',
+  await page.isVisible('#rdNeuObjektFeld'));
+check('Genau das eine Objekt des gewählten Kunden steht zur Wahl',
+  (await page.$$eval('#rdNeuObjekt option', o => o.map(x => x.textContent))).join('|') === 'Testliegenschaft Nord');
+
+// ══════════ ANLEGEN MIT NAME/KUNDE/OBJEKT: VOLLE UNTERSEITE STATT SCHUBLADE
+// (ENT-257, Revision von ENT-248 -- der Projektinhaber wollte hier
+// ausdrücklich keine Schublade, sondern eine vollwertige Seite), RICHTIGES
+// OBJEKT, NAME AUS DEM DIALOG UEBERNOMMEN
 calls = [];
+await page.fill('#rdNeuName', 'Mittagsrunde');
 await page.selectOption('#rdNeuObjekt', '1');
-await page.click('#rdAb-liste button:has-text("Rundgang anlegen")');
+await page.click('#dlgRdNeu button:has-text("Weiter")');
 await page.waitForFunction(() => document.getElementById('rdAb-kr').style.display !== 'none');
+check('KRITISCH: der Dialog schliesst sich', !(await page.isVisible('#dlgRdNeu.on')));
 check('KRITISCH: es öffnet sich KEINE Schublade, sondern die volle Unterseite', !(await page.isVisible('#drawer.on')));
 check('Die Kontrollrunden-Liste ist ausgeblendet, solange die Bearbeiten-Seite offen ist', !(await page.isVisible('#rdAb-liste')));
 check('Die Seite trägt den Anlege-Titel', (await page.textContent('#rdKrTitel')) === 'Neue Kontrollrunde');
@@ -130,7 +151,8 @@ check('KRITISCH: der Titel steht in der Kopfzeile', await page.evaluate(() =>
   document.getElementById('rdKrTitel').closest('header.topbar') !== null));
 check('KRITISCH: Ansichtstitel und Beschreibungszeile weichen dafür',
   !(await page.isVisible('#pgTitle')) && !(await page.isVisible('#pgCrumb')));
-check('Das Namensfeld ist leer', await page.inputValue('#rdKrName') === '');
+check('KRITISCH: der im Dialog eingetragene Name wird übernommen, nicht ein zweites Mal verlangt',
+  await page.inputValue('#rdKrName') === 'Mittagsrunde');
 check('KRITISCH: die Kontrollpunkte des GEWÄHLTEN Objekts (1) werden geladen, nicht irgendwelche',
   calls.some(c => c.includes('kontrollpunkt_liste')) && await page.evaluate(() => rdEinObjekt === 1));
 // ENT-261: Der Projektinhaber hat den Zurück-Knopf dieser Seite per Skizze
