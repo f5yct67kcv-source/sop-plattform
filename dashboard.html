@@ -1610,6 +1610,17 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
 .kp-kopf { display: flex; align-items: center; gap: 8px; }
 .kp-kopf b { font-size: 13.5px; font-weight: 620; flex: 1; min-width: 0; }
 .kp-meta { font-size: 11.5px; color: var(--ink-3); margin-top: 3px; line-height: 1.55; }
+/* Kontrollpunkte-Reiter der Kontrollrunden-Seite (ENT-259): Tabelle auf dem
+   Desktop, Karten auf dem Handy -- eine reine Tabelle blieb auf 390px
+   seitlich unsichtbar ueberlaufend (vier Spalten passen nicht, ohne
+   sichtbare Bildlaufleiste faktisch unentdeckbar), gleicher Fehler wie
+   schon einmal bei den Arbeitsergebnissen (ENT-243). Beide Container werden
+   bei jedem Zeichnen gefuellt, CSS entscheidet, welcher sichtbar ist. */
+.rdkp-karten { display: none; }
+@media (max-width: 720px) {
+  .rdkp-tabelle-wrap { display: none; }
+  .rdkp-karten { display: block; }
+}
 
 /* Kontrollrunden-Vorlagen (ENT-204) */
 .kr-zeile { border: 1px solid var(--line); border-radius: var(--r-sm); padding: 11px 13px; margin-bottom: 8px; }
@@ -4472,13 +4483,47 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
             <div class="card-bd"><div class="kr-punkte-liste" id="rdKrPunkteListe"></div></div>
           </div>
         </div>
+        <!-- Kontrollpunkte (ENT-259): ALLE Kontrollpunkte des Objekts (NFC +
+             Geofence), nicht nur die dieser Runde zugeordneten -- anders als
+             "Routenpunkte" oben. Filterbar nach Typ/Name/Tag Identifikator.
+             "+ GPS-Punkt / Geofence anlegen" wechselt nur den Reiter zur
+             Kartenansicht, oeffnet keinen Dialog (Vorgabe Projektinhaber). -->
         <div class="rdkr-panel" id="rdKrAb-kontrollpunkte" style="display:none">
           <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="rdKrUebersichtZeigen()">Zurück</button>
-          <p class="zone-note">Folgt in einem späteren Schritt.</p>
+          <div class="bar-tools">
+            <select class="inp" id="rdKpFilterTyp" style="width:auto" onchange="rdKpTabelleZeichnen()" aria-label="Nach Typ filtern">
+              <option value="">Alle Typen</option>
+              <option value="nfc">NFC</option>
+              <option value="geofence">Geofence</option>
+            </select>
+            <input class="inp" type="search" id="rdKpFilterName" placeholder="Name…" oninput="rdKpTabelleZeichnen()" style="width:auto" aria-label="Nach Name filtern">
+            <input class="inp" type="search" id="rdKpFilterTag" placeholder="Tag Identifikator…" oninput="rdKpTabelleZeichnen()" style="width:auto" aria-label="Nach Tag Identifikator filtern">
+            <div class="sp"></div>
+            <button class="btn btn-primary btn-sm" onclick="rdKrAbschnittZeigen('karte')">+ GPS-Punkt / Geofence anlegen</button>
+          </div>
+          <div class="card">
+            <!-- Tabelle (Desktop) und Karten (Handy, ab 720px per CSS
+                 getauscht) -- eine reine Tabelle blieb auf 390px seitlich
+                 unsichtbar ueberlaufend (am gerenderten Zustand gemessen,
+                 gleicher Fehler wie ENT-243 bei den Arbeitsergebnissen). -->
+            <div class="card-bd flush rdkp-tabelle-wrap"><div class="tw" id="rdKpTabelle"></div></div>
+            <div class="card-bd rdkp-karten" id="rdKpKarten"></div>
+          </div>
         </div>
+        <!-- Kartenansicht (ENT-259): Uebersichtskarte aller GPS-Punkte
+             (Geofence-Kreise) des Objekts. "GPS-Punkt anlegen" nutzt den
+             bestehenden Kontrollpunkt-Dialog (ENT-248). Freie Vieleck-
+             Geofence-Bereiche (zweiter Knopf, Referenzbild Projektinhaber)
+             sind ein eigener, noch nicht gebauter Baustein -- eigener
+             Docs-Eintrag folgt, wenn er umgesetzt wird. -->
         <div class="rdkr-panel" id="rdKrAb-karte" style="display:none">
           <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="rdKrUebersichtZeigen()">Zurück</button>
-          <p class="zone-note">Folgt in einem späteren Schritt.</p>
+          <div class="bar-tools">
+            <div class="sp"></div>
+            <button class="btn btn-plain btn-sm" onclick="toast('Folgt in einem späteren Schritt.')">Geofence-Bereich anlegen</button>
+            <button class="btn btn-primary btn-sm" onclick="openKp('neu',null,'geofence')">+ GPS-Punkt anlegen</button>
+          </div>
+          <div id="rdKarteUebersicht" style="height:480px;border-radius:var(--r);overflow:hidden;border:1px solid var(--line)"></div>
         </div>
         <div class="rdkr-panel" id="rdKrAb-aufgaben" style="display:none">
           <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="rdKrUebersichtZeigen()">Zurück</button>
@@ -15356,7 +15401,7 @@ function askDeleteMs(id) {
 }
 
 // ── Kontrollpunkte (ENT-180/ENT-183) ─────────────────────────────────────
-function openKp(modus, id) {
+function openKp(modus, id, typVorgabe) {
   kpTarget = id ? Number(id) : null;
   const k = kpTarget ? kontrollpunkte.find(x => Number(x.id) === kpTarget) : null;
 
@@ -15364,7 +15409,11 @@ function openKp(modus, id) {
   $('kpBezeichnung').value = k ? k.bezeichnung : '';
   $('kpReihenfolge').value = k ? k.reihenfolge : (kontrollpunkte.length ? Math.max(...kontrollpunkte.map(x => Number(x.reihenfolge))) + 1 : 0);
   $('kpAktiv').checked = k ? !!Number(k.aktiv) : true;
-  $('kpTyp').value = k ? k.typ : 'nfc';
+  // typVorgabe (ENT-259): "+ GPS-Punkt anlegen" auf der Kartenansicht soll
+  // direkt mit Typ Geofence oeffnen, statt wie sonst ueberall mit NFC --
+  // optionaler dritter Parameter, alle bestehenden Aufrufstellen bleiben
+  // unveraendert (kein Vorgabewert = 'nfc' wie bisher).
+  $('kpTyp').value = k ? k.typ : (typVorgabe || 'nfc');
   $('kpChipId').value = k ? (k.chip_id || '') : '';
   $('kpLat').value = k && k.lat !== null ? k.lat : '';
   $('kpLng').value = k && k.lng !== null ? k.lng : '';
@@ -15569,6 +15618,127 @@ function krPunkteAktualisieren() {
     const gewaehlt = new Set(Array.from(ziel.querySelectorAll('.kr-punkt:checked')).map(c => Number(c.value)));
     krPunkteZeichnen(gewaehlt, zielId);
   });
+  // Dieselbe Aktualisierung wird seit ENT-259 auch fuer den Kontrollpunkte-
+  // Reiter (Tabelle) und die Kartenansicht gebraucht -- beide No-Ops, wenn
+  // ihr Ziel-Element gerade nicht existiert.
+  rdKpTabelleZeichnen();
+  rdKarteUebersichtZeichnen();
+}
+
+// Kontrollpunkte-Tabelle (ENT-259): ALLE Kontrollpunkte des Objekts (NFC +
+// Geofence), nicht nur die dieser Runde zugeordneten -- gefiltert nach
+// Typ/Name/Tag Identifikator. Eigene Funktion statt Wiederverwendung von
+// renderKpListe() (Einrichtung, Karten statt Tabelle) -- hier verlangt der
+// Projektinhaber ausdruecklich die tabellarische Filter-Darstellung des
+// Referenzsystems.
+function rdKpTabelleZeichnen() {
+  const zielTabelle = $('rdKpTabelle'), zielKarten = $('rdKpKarten');
+  if (!zielTabelle || !zielKarten) return;
+  const typFilter = $('rdKpFilterTyp').value;
+  const nameFilter = $('rdKpFilterName').value.trim().toLowerCase();
+  const tagFilter = $('rdKpFilterTag').value.trim().toLowerCase();
+  if (!kontrollpunkte.length) {
+    const leer = EMPTY('Noch kein Kontrollpunkt', 'Über „+ GPS-Punkt / Geofence anlegen" oben den ersten Punkt setzen.');
+    zielTabelle.innerHTML = leer; zielKarten.innerHTML = leer;
+    return;
+  }
+  const gefiltert = kontrollpunkte.filter(k => {
+    if (typFilter && k.typ !== typFilter) return false;
+    if (nameFilter && !(k.bezeichnung || '').toLowerCase().includes(nameFilter)) return false;
+    const tag = k.typ === 'nfc' ? (k.chip_id || '') : '';
+    if (tagFilter && !tag.toLowerCase().includes(tagFilter)) return false;
+    return true;
+  });
+  if (!gefiltert.length) {
+    const kein = EMPTY('Kein Treffer', 'Kein Kontrollpunkt entspricht den gewählten Filtern.');
+    zielTabelle.innerHTML = kein; zielKarten.innerHTML = kein;
+    return;
+  }
+
+  zielTabelle.innerHTML = `<table><thead><tr>
+      <th>Typ</th><th>Name</th><th>Tag Identifikator</th><th></th>
+    </tr></thead><tbody>` + gefiltert.map(k => {
+    const tag = k.typ === 'nfc' ? esc(k.chip_id || '–') : '–';
+    return `<tr>
+        <td><span class="chip ${k.typ === 'nfc' ? 'chip-a' : 'chip-w'}">${k.typ === 'nfc' ? 'NFC' : 'Geofence'}</span></td>
+        <td><b>${esc(k.bezeichnung)}</b>${Number(k.aktiv) ? '' : ' <span class="chip chip-n">nicht aktiv</span>'}</td>
+        <td class="nowrap">${tag}</td>
+        <td class="nowrap">
+          <button class="btn btn-plain btn-sm" onclick="openKp('aendern',${Number(k.id)})">Bearbeiten</button>
+          <button class="btn btn-quiet btn-sm" onclick="askDeleteKp(${Number(k.id)})">Entfernen</button>
+        </td>
+      </tr>`;
+  }).join('') + `</tbody></table>`;
+
+  // Karten (Handy, ab 720px per CSS eingeblendet): gleiche Bauart wie
+  // renderKpListe() (Einrichtung), damit es im Haus EIN Kontrollpunkt-
+  // Kartenmuster gibt statt zwei.
+  zielKarten.innerHTML = gefiltert.map(k => {
+    const meta = k.typ === 'nfc'
+      ? `NFC-Chip ${esc(k.chip_id || '–')}`
+      : `Geofence · ${nf(k.lat, 5)}, ${nf(k.lng, 5)} · Radius ${nf(k.geofence_radius_m)} m`;
+    return `<div class="kp-zeile${Number(k.aktiv) ? '' : ' aus'}">
+      <div class="kp-kopf">
+        <span class="chip ${k.typ === 'nfc' ? 'chip-a' : 'chip-w'}">${k.typ === 'nfc' ? 'NFC' : 'Geofence'}</span>
+        <b>${esc(k.bezeichnung)}</b>
+        ${Number(k.aktiv) ? '' : '<span class="chip chip-n">nicht aktiv</span>'}
+      </div>
+      <div class="kp-meta">${meta}</div>
+      <div style="display:flex;gap:7px;margin-top:9px">
+        <button class="btn btn-plain btn-sm" onclick="openKp('aendern',${Number(k.id)})">Bearbeiten</button>
+        <div style="flex:1"></div>
+        <button class="btn btn-quiet btn-sm" onclick="askDeleteKp(${Number(k.id)})">Entfernen</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// Kartenansicht (ENT-259): Uebersichtskarte aller GPS-Punkte (Geofence-
+// Kreise) des Objekts -- eigene, dauerhafte Leaflet-Instanz, nicht dieselbe
+// wie kpKarteInit() in dlgKp (die bearbeitet nur EINEN Punkt). Lazy
+// initialisiert beim ersten Besuch dieses Reiters, danach nur neu gezeichnet
+// -- Leaflet laesst sich nicht zweimal auf demselben Container erzeugen.
+// Freie Vieleck-Geofence-Bereiche (siehe Referenzbild Projektinhaber) sind
+// ein eigener, noch nicht gebauter Baustein -- der Knopf zeigt bewusst nur
+// einen Hinweis statt eines erfundenen Werkzeugs.
+let rdKarteMapa = null;
+let rdKarteLayer = [];
+
+function rdKarteUebersichtInit() {
+  if (!$('rdKarteUebersicht')) return;
+  if (!rdKarteMapa) {
+    rdKarteMapa = L.map('rdKarteUebersicht');
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>',
+    }).addTo(rdKarteMapa);
+  }
+  rdKarteUebersichtZeichnen();
+  // Der Reiter war eben noch unsichtbar (display:none) -- ohne
+  // invalidateSize() rendert Leaflet mit der Groesse von vorher (0x0) und
+  // bleibt grau, gleicher Fallstrick wie bei kpKarteInit().
+  setTimeout(() => { if (rdKarteMapa) { rdKarteMapa.invalidateSize(); rdKarteAnpassen(); } }, 30);
+}
+
+function rdKarteUebersichtZeichnen() {
+  if (!rdKarteMapa) return;
+  rdKarteLayer.forEach(l => rdKarteMapa.removeLayer(l));
+  rdKarteLayer = [];
+  kontrollpunkte
+    .filter(k => k.typ === 'geofence' && k.lat !== null && k.lng !== null)
+    .forEach(k => {
+      const punkt = [Number(k.lat), Number(k.lng)];
+      const marker = L.marker(punkt).addTo(rdKarteMapa).bindPopup(esc(k.bezeichnung));
+      const kreis = L.circle(punkt, { radius: Number(k.geofence_radius_m) || 20, color: '#7c3aed', weight: 2 }).addTo(rdKarteMapa);
+      rdKarteLayer.push(marker, kreis);
+    });
+}
+
+function rdKarteAnpassen() {
+  if (!rdKarteMapa) return;
+  const punkte = kontrollpunkte.filter(k => k.typ === 'geofence' && k.lat !== null && k.lng !== null);
+  if (!punkte.length) { rdKarteMapa.setView(KP_KARTE_STANDARD, 8); return; }
+  rdKarteMapa.fitBounds(L.latLngBounds(punkte.map(k => [Number(k.lat), Number(k.lng)])), { padding: [40, 40], maxZoom: 18 });
 }
 
 function saveKr() {
@@ -15731,6 +15901,8 @@ function rdKrAbschnittZeigen(id) {
   $('rdKrUebersicht').style.display = 'none';
   document.querySelectorAll('#rdAb-kr .rdkr-panel').forEach(a => { a.style.display = 'none'; });
   $('rdKrAb-' + id).style.display = '';
+  if (id === 'kontrollpunkte') { rdKpTabelleZeichnen(); }
+  if (id === 'karte') { rdKarteUebersichtInit(); }
 }
 
 function rdSaveKr() {
