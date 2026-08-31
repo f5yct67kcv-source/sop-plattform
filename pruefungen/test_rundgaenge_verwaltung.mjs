@@ -155,6 +155,29 @@ check('KRITISCH: der im Dialog eingetragene Name wird übernommen, nicht ein zwe
   await page.inputValue('#rdKrName') === 'Mittagsrunde');
 check('KRITISCH: die Kontrollpunkte des GEWÄHLTEN Objekts (1) werden geladen, nicht irgendwelche',
   calls.some(c => c.includes('kontrollpunkt_liste')) && await page.evaluate(() => rdEinObjekt === 1));
+
+// ══════════ ZURÜCK ZUR HAUPTSEITE PER NAVIGATION (gemeldeter Fehler): wer
+// aus der Kontrollrunden-Bearbeitung heraus ueber die Navigation (Klick auf
+// "Revierdienst"/"Übersicht", clientseitig go('rundgaenge')) zurueckwill,
+// landete bislang auf einer widerspruechlichen Seite: die Kopfzeile zeigte
+// wieder "Übersicht" (go() setzt kopfSondertitel(null) immer), aber
+// #rdAb-kr blieb sichtbar -- kein Weg zurueck ausser hartem Neuladen, weil
+// revierdienstUebersichtOeffnen() nur Daten nachlud, nie den Unterbereich
+// zuruecksetzte. Ohne die Behebung in revierdienstUebersichtOeffnen()
+// (rdUebersichtZeigen() zu Beginn) bleibt dieser Block rot.
+await page.evaluate(() => go('rundgaenge'));
+await page.waitForTimeout(150);
+check('KRITISCH: die Navigation aus der Kontrollrunden-Bearbeitung führt zurück zur Kachel-Übersicht, nicht zu einer hängenden Seite',
+  await page.isVisible('#rdUebersicht') && !(await page.isVisible('#rdAb-kr')) && !(await page.isVisible('#rdAb-liste')));
+check('Die Kopfzeile passt dazu wieder zum Ansichtstitel, nicht zum Rundennamen',
+  await page.isVisible('#pgTitle') && !(await page.isVisible('#rdKrTitel')));
+// Fuer den Rest der Suite wieder in die Kontrollrunden-Bearbeitung, damit
+// die folgenden Prüfungen unveraendert weiterlaufen -- rdEinObjekt ist
+// durch die Navigation eben nicht veraendert worden (bewusst geprueft:
+// nur der sichtbare Unterbereich wechselte), rdKrZeigen('neu') reicht.
+await page.evaluate(() => rdKrZeigen('neu'));
+await page.waitForFunction(() => document.getElementById('rdAb-kr').style.display !== 'none');
+
 // ENT-261: Der Projektinhaber hat den Zurück-Knopf dieser Seite per Skizze
 // ausdrücklich entfernt -- es gibt hier keinen sichtbaren Weg zurück zur
 // Liste mehr, darum wird der Wechsel hier direkt ausgelöst statt geklickt.

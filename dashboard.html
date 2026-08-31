@@ -13239,6 +13239,17 @@ function zeichneRundgaenge() {
 // bisherige, jetzt dormante Detailliste (#rgAlt) oben.
 const REVIERDIENST_LETZTE_TAGE = 14;
 function revierdienstUebersichtOeffnen() {
+  // Immer auf der Kachel-Uebersicht beginnen, nicht in der zuletzt
+  // besuchten Unterseite (Liste oder Kontrollrunde-Bearbeiten) stehenbleiben
+  // -- gleiches Muster wie bei "Betrieb" (bkUebersichtZeigen() in go()).
+  // Ohne diese Zeile blieb, wer ueber die Navigation aus der Kontrollrunden-
+  // Bearbeitung "zurueck" wollte, sichtbar auf genau dieser Unterseite
+  // haengen: go() setzt zwar per kopfSondertitel(null) wieder den
+  // Ansichtstitel, aber ohne rdUebersichtZeigen() blieb #rdAb-kr weiterhin
+  // display:'' -- Kopfzeile und Seiteninhalt widersprachen sich, und es gab
+  // keinen Weg mehr zurueck ausser einem harten Neuladen (gemeldet vom
+  // Projektinhaber).
+  rdUebersichtZeigen();
   const bis = isoTag();
   const von = plusTage(bis, -REVIERDIENST_LETZTE_TAGE);
   const ziel = $('rdLetzteListe');
