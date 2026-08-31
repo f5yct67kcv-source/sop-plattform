@@ -24,6 +24,14 @@ $aktiv       = !empty($input['aktiv']) ? 1 : 0;
 $beschreibung = trim((string)($input['beschreibung'] ?? ''));
 $beschreibung = $beschreibung === '' ? null : $beschreibung;
 
+// Ansprechpartner der Runde (ENT-277): ein freies Bezeichnungsfeld statt
+// Vorname/Nachname, weil es manchmal eine Person, manchmal eine
+// Pikett-Nummer ist. Gleiches NULL-statt-leer-Prinzip wie Beschreibung.
+$ansprechpartnerName = trim((string)($input['ansprechpartner_name'] ?? ''));
+$ansprechpartnerName = $ansprechpartnerName === '' ? null : $ansprechpartnerName;
+$ansprechpartnerTelefon = trim((string)($input['ansprechpartner_telefon'] ?? ''));
+$ansprechpartnerTelefon = $ansprechpartnerTelefon === '' ? null : $ansprechpartnerTelefon;
+
 if ($objektId <= 0 || $name === '') {
     json_response(['status' => 'error', 'message' => 'Objekt und Name erforderlich'], 400);
 }
@@ -35,16 +43,16 @@ if (!$objektChk->fetch()) {
 }
 
 if ($id > 0) {
-    $stmt = db()->prepare('UPDATE rundgang_vorlage SET objekt_id = ?, name = ?, aktiv = ?, beschreibung = ? WHERE id = ?');
-    $stmt->execute([$objektId, $name, $aktiv, $beschreibung, $id]);
+    $stmt = db()->prepare('UPDATE rundgang_vorlage SET objekt_id = ?, name = ?, aktiv = ?, beschreibung = ?, ansprechpartner_name = ?, ansprechpartner_telefon = ? WHERE id = ?');
+    $stmt->execute([$objektId, $name, $aktiv, $beschreibung, $ansprechpartnerName, $ansprechpartnerTelefon, $id]);
     $chk = db()->prepare('SELECT id FROM rundgang_vorlage WHERE id = ?');
     $chk->execute([$id]);
     if (!$chk->fetch()) {
         json_response(['status' => 'error', 'message' => 'Vorlage nicht gefunden'], 404);
     }
 } else {
-    $stmt = db()->prepare('INSERT INTO rundgang_vorlage (objekt_id, name, aktiv, beschreibung) VALUES (?, ?, ?, ?)');
-    $stmt->execute([$objektId, $name, $aktiv, $beschreibung]);
+    $stmt = db()->prepare('INSERT INTO rundgang_vorlage (objekt_id, name, aktiv, beschreibung, ansprechpartner_name, ansprechpartner_telefon) VALUES (?, ?, ?, ?, ?, ?)');
+    $stmt->execute([$objektId, $name, $aktiv, $beschreibung, $ansprechpartnerName, $ansprechpartnerTelefon]);
     $id = (int)db()->lastInsertId();
 }
 
