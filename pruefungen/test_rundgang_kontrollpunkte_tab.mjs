@@ -53,9 +53,19 @@ const VORLAGEN_ALLE = { status: 'ok', vorlagen: [
 
 let calls = [];
 
+const NOMINATIM_TREFFER = [
+  { display_name: 'Industriestrasse 44, 4600 Olten, Schweiz', lat: '47.37820', lon: '7.91270' },
+  { display_name: 'Industriestrasse 12, 8005 Zürich, Schweiz', lat: '47.39000', lon: '8.52000' },
+];
+
 function setup(page) {
   page.route('**/*.tile.openstreetmap.org/**', route =>
     route.fulfill({ status: 200, contentType: 'image/png', body: KACHEL_PNG }));
+  // Echte Netzwerkzugriffe auf den fremden Nominatim-Dienst waeren in einer
+  // automatisierten Pruefung weder zuverlaessig noch angemessen (ENT-267,
+  // gleiches Vorgehen wie bei den Kartenkacheln oben).
+  page.route('**/nominatim.openstreetmap.org/**', route =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(NOMINATIM_TREFFER) }));
   return page.route('**/api/**', async route => {
     const req = route.request();
     const u = new URL(req.url());
@@ -363,6 +373,64 @@ check('KRITISCH: die Karte überragt den Bildschirm auf dem Handy nicht (gemesse
   karteBreite <= 390 + 1);
 await page.screenshot({ path: `${OUT}/rg-kp-tab-03-karte-mobil.png` });
 await page.setViewportSize({ width: 1440, height: 1000 });
+
+// ══════════ ENT-267: ADRESSSUCHE (NOMINATIM) UND VOLLBILD
+// Von der vorigen Pruefung (Nordtor) steht rdKarteAuswahl noch auf einem
+// mittlerweile aus der Fixture entfernten Punkt -- dessen Vorschau wuerde
+// die folgenden Marker-Zaehlungen verfaelschen, darum hier sauber schliessen.
+await page.evaluate(() => rdKarteDetailSchliessen());
+await page.waitForTimeout(150);
+await page.fill('#rdKarteOrtSuche', 'Industriestrasse');
+await page.waitForTimeout(700);
+check('KRITISCH: die Trefferliste erscheint mit beiden gemockten Treffern',
+  (await page.$$('#rdKarteOrtTreffer button')).length === 2);
+check('Beide Treffer zeigen den vollen Anzeigenamen',
+  (await page.textContent('#rdKarteOrtTreffer')).includes('4600 Olten')
+  && (await page.textContent('#rdKarteOrtTreffer')).includes('8005 Zürich'));
+
+// Daneben klicken schliesst die Trefferliste, ohne etwas auszuwaehlen
+// (gleiches Muster wie Glocke/Seitenleiste, ENT-059/ENT-197).
+await page.click('#rdKarteDetail, body', { position: { x: 5, y: 5 } });
+await page.waitForTimeout(150);
+check('KRITISCH: ein Klick daneben schliesst die Trefferliste', !(await page.isVisible('#rdKarteOrtTreffer')));
+
+// Klick auf einen Treffer schwenkt die Karte zum gewaehlten Ort
+await page.fill('#rdKarteOrtSuche', 'Industriestrasse');
+await page.waitForTimeout(700);
+await page.click('#rdKarteOrtTreffer button:nth-child(1)');
+await page.waitForTimeout(200);
+const mitteNachSuche = await page.evaluate(() => rdKarteMapa.getCenter());
+check('KRITISCH: die Karte schwenkt zum gewählten Treffer (Olten, nicht Zürich)',
+  Math.abs(mitteNachSuche.lat - 47.3782) < 0.01 && Math.abs(mitteNachSuche.lng - 7.9127) < 0.01);
+// Drei statt zwei Marker: der zuvor angelegte "Nordtor"-Punkt (voriger
+// Abschnitt) bleibt im geladenen Bestand, auch nachdem ihn die Fixture oben
+// wieder aus der API-Antwort entfernt hat -- ohne erneuten Ladevorgang
+// aendert sich der bereits im Browser gehaltene Stand nicht, das ist hier
+// kein Fehler. Entscheidend ist nur: die Suche selbst legt nichts NEU an.
+check('KRITISCH: die Adresssuche legt KEINEN GPS-Punkt an — nur der Kartenklick tut das',
+  (await page.$$('#rdKarteUebersicht .leaflet-marker-icon')).length === 3);
+
+// "Kein Treffer" ist erkennbar, keine leere, wortlose Liste
+await page.route('**/nominatim.openstreetmap.org/**', route =>
+  route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+await page.fill('#rdKarteOrtSuche', 'gibtesnirgends');
+await page.waitForTimeout(700);
+check('"Kein Treffer" steht da, statt einer leeren Trefferliste',
+  (await page.textContent('#rdKarteOrtTreffer')).includes('Kein Treffer'));
+await page.fill('#rdKarteOrtSuche', '');
+await page.keyboard.press('Escape');
+await page.waitForTimeout(150);
+
+// Vollbild: schaltet die Kartenbuehne in den Browser-Vollbildmodus
+check('Vor dem Klick ist kein Vollbildmodus aktiv', !(await page.evaluate(() => !!document.fullscreenElement)));
+await page.click('.leaflet-control a[title="Vollbild"]');
+await page.waitForTimeout(200);
+check('KRITISCH: der Vollbild-Knopf schaltet den Browser-Vollbildmodus auf die Kartenbühne (nicht die ganze Seite)',
+  await page.evaluate(() => document.fullscreenElement === document.querySelector('#rdKrAb-karte .rdkarte-buehne')));
+await page.click('.leaflet-control a[title="Vollbild"]');
+await page.waitForTimeout(200);
+check('Ein zweiter Klick schaltet das Vollbild wieder aus',
+  await page.evaluate(() => !document.fullscreenElement));
 
 await browser.close();
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
