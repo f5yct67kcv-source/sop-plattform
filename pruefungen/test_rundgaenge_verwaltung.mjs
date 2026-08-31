@@ -15,6 +15,7 @@
 // Kontrollpunkte-Auswahl), die übrigen fünf zeigen einen bleibenden
 // Hinweis.
 import { WURZEL, OUT, browserPfad } from './pfade.mjs';
+import { GOOGLE_MAPS_MOCK } from './google_maps_mock.mjs';
 import { chromium } from 'playwright';
 
 const SEITE = `file://${WURZEL}/dashboard.html`;
@@ -50,7 +51,7 @@ const KONTROLLPUNKTE_OBJ1 = { status: 'ok', kontrollpunkte: [
 let calls = [];
 
 function setup(page) {
-  return page.route('**/api/**', async route => {
+  const p = page.route('**/api/**', async route => {
     const req = route.request();
     const u = new URL(req.url());
     const path = u.pathname.split('/api/')[1];
@@ -71,6 +72,13 @@ function setup(page) {
     }
     return send({ status: 'ok' });
   });
+  // Diese Suite oeffnet seit dem Navigations-Fehlertest (ENT-271-Fortsetzung)
+  // auch den Kartenansicht-Reiter der Kontrollrunde -- der laedt Google Maps
+  // nach (googleMapsLaden()). Muss NACH der allgemeinen "**/api/**"-Route
+  // registriert werden, sonst faengt diese "/maps/api/js" faelschlich ab
+  // (Playwright ruft bei mehreren Treffern die zuletzt registrierte zuerst).
+  return p.then(() => page.route('**/maps.googleapis.com/**', route =>
+    route.fulfill({ status: 200, contentType: 'application/javascript', body: GOOGLE_MAPS_MOCK })));
 }
 
 const browser = await chromium.launch({ executablePath: EXE });
@@ -171,6 +179,32 @@ check('KRITISCH: die Navigation aus der Kontrollrunden-Bearbeitung führt zurüc
   await page.isVisible('#rdUebersicht') && !(await page.isVisible('#rdAb-kr')) && !(await page.isVisible('#rdAb-liste')));
 check('Die Kopfzeile passt dazu wieder zum Ansichtstitel, nicht zum Rundennamen',
   await page.isVisible('#pgTitle') && !(await page.isVisible('#rdKrTitel')));
+// ══════════ DASSELBE UEBER DEN TATSAECHLICHEN KLICK AUF DAS "REVIERDIENST"-
+// ICON (ENT-271 behob nur den Weg ueber go('rundgaenge')/den Untermenuepunkt
+// "Übersicht" -- das Icon selbst hat einen EIGENEN Kurzschluss in
+// revierdienstNavKlick(): "die Ansicht ist schon offen" bleibt auch tief in
+// der Kontrollrunden-Bearbeitung wahr, ein Klick klappte darum nur die
+// Seitenleiste ein, ohne zurueckzufuehren -- vom Projektinhaber an genau
+// diesem Reiter (Kartenansicht) erneut gemeldet, nachdem ENT-271 schon
+// auslieferte. Ohne die Behebung dort bleibt dieser Block rot.)
+await page.evaluate(() => rdKrZeigen('neu'));
+await page.waitForFunction(() => document.getElementById('rdAb-kr').style.display !== 'none');
+await page.click('#rdKrReiter .rdkr-tab[data-reiter="karte"]');
+await page.waitForTimeout(150);
+await page.click('#nav-revierdienst');
+await page.waitForTimeout(150);
+check('KRITISCH: der Klick auf das "Revierdienst"-Icon selbst führt aus der Kontrollrunden-Bearbeitung (auch vom Kartenansicht-Reiter aus) zurück zur Kachel-Übersicht',
+  await page.isVisible('#rdUebersicht') && !(await page.isVisible('#rdAb-kr')));
+// Gegenprobe zum Einklapp-Verhalten (ENT-271-Kommentar in
+// revierdienstNavKlick()): auf der Landingpage selbst darf ein zweiter Klick
+// weiterhin nur die Seitenleiste einklappen, nicht wegnavigieren.
+const vorherOffen = await page.evaluate(() => document.getElementById('navg-revierdienst').classList.contains('offen'));
+await page.click('#nav-revierdienst');
+await page.waitForTimeout(150);
+check('Ein zweiter Klick auf der Landingpage selbst klappt weiterhin nur die Seitenleiste ein',
+  vorherOffen && !(await page.evaluate(() => document.getElementById('navg-revierdienst').classList.contains('offen')))
+  && await page.isVisible('#rdUebersicht'));
+
 // Fuer den Rest der Suite wieder in die Kontrollrunden-Bearbeitung, damit
 // die folgenden Prüfungen unveraendert weiterlaufen -- rdEinObjekt ist
 // durch die Navigation eben nicht veraendert worden (bewusst geprueft:
