@@ -124,13 +124,24 @@ await page.waitForFunction(() => document.getElementById('rdAb-kr').style.displa
 check('KRITISCH: es öffnet sich KEINE Schublade, sondern die volle Unterseite', !(await page.isVisible('#drawer.on')));
 check('Die Kontrollrunden-Liste ist ausgeblendet, solange die Bearbeiten-Seite offen ist', !(await page.isVisible('#rdAb-liste')));
 check('Die Seite trägt den Anlege-Titel', (await page.textContent('#rdKrTitel')) === 'Neue Kontrollrunde');
+// ENT-261: Der Titel steht in der Kopfzeile, nicht mehr im Seiteninhalt --
+// Ansichtstitel und Beschreibungszeile weichen dafuer.
+check('KRITISCH: der Titel steht in der Kopfzeile', await page.evaluate(() =>
+  document.getElementById('rdKrTitel').closest('header.topbar') !== null));
+check('KRITISCH: Ansichtstitel und Beschreibungszeile weichen dafür',
+  !(await page.isVisible('#pgTitle')) && !(await page.isVisible('#pgCrumb')));
 check('Das Namensfeld ist leer', await page.inputValue('#rdKrName') === '');
 check('KRITISCH: die Kontrollpunkte des GEWÄHLTEN Objekts (1) werden geladen, nicht irgendwelche',
   calls.some(c => c.includes('kontrollpunkt_liste')) && await page.evaluate(() => rdEinObjekt === 1));
-await page.click('#rdAb-kr > .bk-zurueck');
+// ENT-261: Der Projektinhaber hat den Zurück-Knopf dieser Seite per Skizze
+// ausdrücklich entfernt -- es gibt hier keinen sichtbaren Weg zurück zur
+// Liste mehr, darum wird der Wechsel hier direkt ausgelöst statt geklickt.
+await page.evaluate(() => rdAbschnittZeigen('liste'));
 await page.waitForTimeout(150);
-check('KRITISCH: "Zurück" von der Bearbeiten-Seite führt zur Liste zurück (nicht bis zur Kachel-Übersicht)',
+check('Der Wechsel zurück zur Liste zeigt wieder die Liste, nicht die Kachel-Übersicht',
   await page.isVisible('#rdAb-liste') && !(await page.isVisible('#rdUebersicht')));
+check('KRITISCH: dabei steht wieder der Ansichtstitel in der Kopfzeile, nicht der Rundenname',
+  await page.isVisible('#pgTitle') && !(await page.isVisible('#rdKrTitel')));
 
 // ══════════ KRITISCH: DIE GANZE ZEILE OEFFNET, NICHT NUR DER "BEARBEITEN"-KNOPF
 // (ENT-256, Bug-Meldung des Projektinhabers nach dem Ausliefern von ENT-248:
@@ -166,8 +177,8 @@ check('KRITISCH: jetzt ist der Routenpunkte-Reiter markiert',
   await page.evaluate(() => document.querySelector('#rdKrReiter .rdkr-tab.aktiv')?.dataset.reiter === 'routenpunkte'));
 const routenInhalt = await page.textContent('#rdKrAb-routenpunkte');
 check('Die zugeordneten Punkte erscheinen dort (Eingang, Keller)', routenInhalt.includes('Eingang') && routenInhalt.includes('Keller'));
-check('KRITISCH: in einem Reiter steht KEIN zweiter Zurück-Knopf mehr (vorher zwei übereinander)',
-  await page.evaluate(() => document.querySelectorAll('#rdAb-kr .bk-zurueck').length === 1));
+check('KRITISCH: auf der Seite steht gar kein Zurück-Knopf mehr (ENT-261, vorher zwei übereinander)',
+  await page.evaluate(() => document.querySelectorAll('#rdAb-kr .bk-zurueck').length === 0));
 
 // Eine der fünf noch unverdrahteten Kacheln stichprobenartig geprüft --
 // bleibender Hinweis statt erfundenem Inhalt (gleiches Vorgehen wie
@@ -183,7 +194,8 @@ check('Über den Reiter "Allgemeines" kommt man zum Formular zurück',
 
 // ══════════ BEARBEITEN: VOLLE SEITE MIT VORBEFUELLTEM NAMEN, ZWEITES OBJEKT
 calls = [];
-await page.click('#rdAb-kr > .bk-zurueck');
+await page.evaluate(() => rdAbschnittZeigen('liste'));
+await page.waitForTimeout(150);
 await page.click('#rdAb-liste tr:has-text("Schliessrunde") button:has-text("Bearbeiten")');
 await page.waitForFunction(() => document.getElementById('rdAb-kr').style.display !== 'none');
 check('Die Seite trägt den Änderungs-Titel', (await page.textContent('#rdKrTitel')) === 'Kontrollrunde ändern');
