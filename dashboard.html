@@ -4610,14 +4610,22 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
              verschoben. Die restlichen fuenf zeigen einen bleibenden
              Hinweis statt erfundenem Inhalt (gleiches Vorgehen wie
              ENT-225/ENT-243) -- ihr Inhalt wird einzeln besprochen. -->
+        <!-- Routenpunkte (ENT-273, Revision der bisherigen Checkbox-Auswahl):
+             die diesem Rundgang bereits zugeordneten Kontrollpunkte, in
+             Reihenfolge -- anders als der Reiter "Kontrollpunkte" daneben,
+             der ALLE Punkte des Objekts zeigt, unabhaengig von einer Runde.
+             Vorbild: Referenz-Bildschirmfotos eines Fremdsystems
+             (Tabellenaufbau, Hinzufuegen-Dialog). Sofort speichernd -- kein
+             eigener "Speichern"-Knopf hier, jede Aenderung wirkt direkt. -->
         <div class="rdkr-panel" id="rdKrAb-routenpunkte" style="display:none">
           <div class="card">
             <div class="card-hd">
               <h3>Routenpunkte</h3>
               <div class="sp"></div>
-              <button class="btn btn-plain btn-sm" onclick="openKp('neu')">+ Kontrollpunkt</button>
+              <button class="btn btn-primary btn-sm" id="rpHinzuOeffnenBtn" onclick="rpHinzufuegenOeffnen()">+ Routenpunkte hinzufügen</button>
             </div>
-            <div class="card-bd"><div class="kr-punkte-liste" id="rdKrPunkteListe"></div></div>
+            <div class="card-bd flush rdkp-tabelle-wrap"><div class="tw" id="rdKrRoutenTabelle"></div></div>
+            <div class="card-bd rdkp-karten" id="rdKrRoutenKarten"></div>
           </div>
         </div>
         <!-- Kontrollpunkte (ENT-259): ALLE Kontrollpunkte des Objekts (NFC +
@@ -5948,6 +5956,28 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
     <div class="dlg-ft">
       <button class="btn btn-plain" onclick="closeDlg('dlgRdNeu')">Abbrechen</button>
       <button class="btn btn-primary" onclick="rdNeuWeiter()">Weiter</button>
+    </div>
+  </div>
+</div>
+
+<!-- Routenpunkte hinzufügen (ENT-273): waehlt aus den Kontrollpunkten, die
+     bereits am Objekt erfasst UND noch nicht Teil dieser Runde sind -- keine
+     freie Eingabe, ein neuer Kontrollpunkt entsteht im Reiter
+     "Kontrollpunkte". Mehrfachauswahl moeglich (Vorbild: Referenzfoto). -->
+<div class="dlg-scrim" id="dlgRpHinzu">
+  <div class="dlg">
+    <div class="dlg-hd">
+      <h2>Routenpunkte hinzufügen</h2>
+      <p>Nur Kontrollpunkte, die bereits am Objekt erfasst sind und noch nicht Teil dieser Runde. Ein neuer Kontrollpunkt entsteht im Reiter „Kontrollpunkte".</p>
+    </div>
+    <div class="dlg-bd">
+      <div class="msg-err" id="rpHinzuErr" style="display:none"></div>
+      <input class="inp" type="search" id="rpHinzuSuche" placeholder="Suchen…" oninput="rpHinzuZeichnen()" aria-label="Kontrollpunkte durchsuchen" style="margin-bottom:12px">
+      <div id="rpHinzuListe" style="max-height:360px;overflow:auto"></div>
+    </div>
+    <div class="dlg-ft">
+      <button class="btn btn-plain" onclick="closeDlg('dlgRpHinzu')">Abbrechen</button>
+      <button class="btn btn-primary" id="rpHinzuBtn" onclick="rpHinzufuegen()">Hinzufügen</button>
     </div>
   </div>
 </div>
@@ -15950,18 +15980,199 @@ function krPunkteZeichnen(gewaehlt, zielId) {
 // Punkte bleiben angehakt: die aktuelle Auswahl wird vor dem Neuzeichnen
 // eingesammelt.
 function krPunkteAktualisieren() {
-  ['krPunkteListe', 'rdKrPunkteListe'].forEach(zielId => {
-    const ziel = $(zielId);
-    if (!ziel) return;
+  const ziel = $('krPunkteListe');
+  if (ziel) {
     const gewaehlt = new Set(Array.from(ziel.querySelectorAll('.kr-punkt:checked')).map(c => Number(c.value)));
-    krPunkteZeichnen(gewaehlt, zielId);
-  });
+    krPunkteZeichnen(gewaehlt, 'krPunkteListe');
+  }
   // Dieselbe Aktualisierung wird seit ENT-259 auch fuer den Kontrollpunkte-
-  // Reiter (Tabelle) und die Kartenansicht gebraucht -- beide No-Ops, wenn
-  // ihr Ziel-Element gerade nicht existiert.
+  // Reiter (Tabelle), die Kartenansicht und seit ENT-273 die Routenpunkte-
+  // Tabelle der vollen Unterseite gebraucht -- alle No-Ops, wenn ihr
+  // Ziel-Element gerade nicht existiert. Die Routenpunkte-Tabelle selbst
+  // braucht keine eingesammelte Auswahl wie oben: sie zeigt die tatsaechlich
+  // gespeicherte Zuordnung aus rundgangVorlagen, keine ungespeicherte
+  // Checkbox-Auswahl (ENT-273, sofort speichernd).
   rdKpTabelleZeichnen();
   rdKarteUebersichtZeichnen();
+  rdKrRoutenTabelleZeichnen();
   rdKrBadgesSetzen();
+}
+
+// ══════════════════════════ ROUTENPUNKTE (ENT-273) ═════════════════════════
+// Die diesem Rundgang bereits zugeordneten Kontrollpunkte, in Reihenfolge --
+// anders als krPunkteZeichnen() oben (ALLE Punkte des Objekts als
+// ungespeicherte Checkbox-Auswahl fuer die Einrichtung-Schublade). Sofort
+// speichernd: kein "Speichern"-Knopf, jede Aenderung (hinzufuegen, entfernen,
+// Reihenfolge) schreibt direkt an rundgang_vorlage_punkte_setzen.php.
+// Braucht darum eine bereits gespeicherte Vorlage (krTarget) -- eine neue,
+// noch nicht gespeicherte Kontrollrunde zeigt einen Hinweis statt einer
+// leeren Tabelle ("noch nicht gespeichert" ist etwas anderes als "keine
+// Routenpunkte", Hausregel: unbekannt darf nie wie keine aussehen).
+function rdKrRoutenTabelleZeichnen() {
+  const zielTabelle = $('rdKrRoutenTabelle'), zielKarten = $('rdKrRoutenKarten');
+  if (!zielTabelle || !zielKarten) return;
+  const btn = $('rpHinzuOeffnenBtn');
+  if (!krTarget) {
+    if (btn) btn.disabled = true;
+    const hinweis = EMPTY('Zuerst speichern', 'Diese Kontrollrunde muss zuerst unter „Allgemeines" gespeichert werden, bevor Routenpunkte hinzugefügt werden können.');
+    zielTabelle.innerHTML = hinweis; zielKarten.innerHTML = hinweis;
+    return;
+  }
+  if (btn) btn.disabled = false;
+  const v = rundgangVorlagen.find(x => Number(x.id) === krTarget);
+  // Ein zwischenzeitlich geloeschter Kontrollpunkt (askDeleteKp andernorts)
+  // faellt hier still heraus statt mit einem kaputten Eintrag zu erscheinen
+  // -- die Zuordnung selbst ist per ON DELETE CASCADE bereits serverseitig
+  // weg, rundgangVorlagen zieht das erst beim naechsten Neuladen nach.
+  const punkte = (v ? v.punkte : [])
+    .map(p => ({ ...p, voll: kontrollpunkte.find(k => Number(k.id) === Number(p.id)) }))
+    .filter(p => p.voll);
+  if (!punkte.length) {
+    const leer = EMPTY('Noch kein Routenpunkt', 'Über „+ Routenpunkte hinzufügen" oben die ersten Kontrollpunkte dieser Runde zuordnen.');
+    zielTabelle.innerHTML = leer; zielKarten.innerHTML = leer;
+    return;
+  }
+
+  const zeile = (p, i) => {
+    const k = p.voll;
+    return { k, info: k.beschreibung ? esc(k.beschreibung) : '–',
+      hoch: i > 0 ? `<button class="btn btn-plain btn-sm" title="Nach oben" aria-label="${esc(k.bezeichnung)} nach oben" onclick="rpVerschieben(${Number(k.id)},-1)">▲</button>` : '',
+      runter: i < punkte.length - 1 ? `<button class="btn btn-plain btn-sm" title="Nach unten" aria-label="${esc(k.bezeichnung)} nach unten" onclick="rpVerschieben(${Number(k.id)},1)">▼</button>` : '',
+    };
+  };
+
+  zielTabelle.innerHTML = `<table><thead><tr>
+      <th>Rang</th><th>Name</th><th>Kontrollpunkt</th><th>Informationen</th><th></th>
+    </tr></thead><tbody>` + punkte.map((p, i) => {
+    const { k, info, hoch, runter } = zeile(p, i);
+    return `<tr>
+        <td class="nowrap"><div style="display:flex;gap:2px;align-items:center">${i + 1}. ${hoch}${runter}</div></td>
+        <td><b>${esc(k.bezeichnung)}</b>${Number(k.aktiv) ? '' : ' <span class="chip chip-n">nicht aktiv</span>'}</td>
+        <td><span class="chip ${k.typ === 'nfc' ? 'chip-a' : 'chip-w'}">${k.typ === 'nfc' ? 'NFC' : 'Geofence'}</span></td>
+        <td>${info}</td>
+        <td class="nowrap">
+          <button class="btn btn-plain btn-sm" onclick="openKp('aendern',${Number(k.id)})">Bearbeiten</button>
+          <button class="btn btn-quiet btn-sm" onclick="rpEntfernen(${Number(k.id)})">Entfernen</button>
+        </td>
+      </tr>`;
+  }).join('') + `</tbody></table>`;
+
+  // Karten (Handy): gleiche Bauart wie rdKpTabelleZeichnen() daneben, damit
+  // es im Haus EIN Kontrollpunkt-Kartenmuster gibt statt zwei.
+  zielKarten.innerHTML = punkte.map((p, i) => {
+    const { k, info, hoch, runter } = zeile(p, i);
+    return `<div class="kp-zeile${Number(k.aktiv) ? '' : ' aus'}">
+      <div class="kp-kopf">
+        <span class="chip ${k.typ === 'nfc' ? 'chip-a' : 'chip-w'}">${k.typ === 'nfc' ? 'NFC' : 'Geofence'}</span>
+        <b>${esc(k.bezeichnung)}</b>
+        ${Number(k.aktiv) ? '' : '<span class="chip chip-n">nicht aktiv</span>'}
+      </div>
+      <div class="kp-meta">Rang ${i + 1} · ${info}</div>
+      <div style="display:flex;gap:7px;margin-top:9px;align-items:center">
+        ${hoch}${runter}
+        <button class="btn btn-plain btn-sm" onclick="openKp('aendern',${Number(k.id)})">Bearbeiten</button>
+        <div style="flex:1"></div>
+        <button class="btn btn-quiet btn-sm" onclick="rpEntfernen(${Number(k.id)})">Entfernen</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// Gemeinsamer Speicherpunkt fuer jede Routenpunkt-Aenderung (hinzufuegen,
+// entfernen, Reihenfolge) -- laedt nach dem Schreiben die Vorlage neu statt
+// den lokalen Stand von Hand nachzuziehen: die Reihenfolge-Nummern kommen so
+// garantiert vom Server (0..n-1 nach Array-Position, siehe
+// rundgang_vorlage_punkte_setzen() im Backend), nicht aus einer eigenen,
+// potenziell abweichenden Annahme.
+function rpListeSpeichern(neueIds) {
+  const btn = $('rpHinzuOeffnenBtn'); if (btn) btn.disabled = true;
+  return api('rundgang_vorlage_punkte_setzen.php',
+    { method: 'POST', body: { vorlage_id: krTarget, kontrollpunkt_ids: neueIds } }
+  ).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') { toast(data.message || 'Fehlgeschlagen.'); if (btn) btn.disabled = false; return false; }
+    return loadRundgangVorlagen().then(() => {
+      rdKrRoutenTabelleZeichnen();
+      const v = rundgangVorlagen.find(x => Number(x.id) === krTarget);
+      rdKrBadgesSetzen(v ? v.punkte.length : 0);
+      return true;
+    });
+  });
+}
+
+function rpVerschieben(kontrollpunktId, richtung) {
+  const v = rundgangVorlagen.find(x => Number(x.id) === krTarget);
+  if (!v) return;
+  const ids = v.punkte.map(p => Number(p.id));
+  const i = ids.indexOf(Number(kontrollpunktId));
+  const j = i + richtung;
+  if (i < 0 || j < 0 || j >= ids.length) return;
+  [ids[i], ids[j]] = [ids[j], ids[i]];
+  rpListeSpeichern(ids);
+}
+
+function rpEntfernen(kontrollpunktId) {
+  const v = rundgangVorlagen.find(x => Number(x.id) === krTarget);
+  if (!v) return;
+  const k = kontrollpunkte.find(x => Number(x.id) === Number(kontrollpunktId));
+  askConfirm(`„${k ? esc(k.bezeichnung) : 'Punkt'}" aus dieser Runde entfernen?`,
+    'Der Kontrollpunkt selbst bleibt bestehen und lässt sich jederzeit wieder hinzufügen — nur die Zuordnung zu DIESER Runde verschwindet.',
+    'Entfernen',
+    () => rpListeSpeichern(v.punkte.map(p => Number(p.id)).filter(id => id !== Number(kontrollpunktId)))
+      .then(ok => { if (ok) toast('Aus der Runde entfernt.'); }));
+}
+
+function rpHinzufuegenOeffnen() {
+  if (!krTarget) { toast('Zuerst unter „Allgemeines" speichern.'); return; }
+  $('rpHinzuSuche').value = '';
+  $('rpHinzuErr').style.display = 'none';
+  rpHinzuZeichnen();
+  openDlg('dlgRpHinzu');
+  $('rpHinzuSuche').focus();
+}
+
+function rpHinzuZeichnen() {
+  const v = rundgangVorlagen.find(x => Number(x.id) === krTarget);
+  const zugeordnet = new Set((v ? v.punkte : []).map(p => Number(p.id)));
+  const suche = $('rpHinzuSuche').value.trim().toLowerCase();
+  const auswaehlbar = kontrollpunkte.filter(k => !zugeordnet.has(Number(k.id)));
+  const liste = auswaehlbar
+    .filter(k => !suche || (k.bezeichnung || '').toLowerCase().includes(suche))
+    .sort((a, b) => (a.bezeichnung || '').localeCompare(b.bezeichnung || ''));
+  const ziel = $('rpHinzuListe');
+  if (!auswaehlbar.length) {
+    ziel.innerHTML = '<p class="zone-note" style="margin:0">Alle Kontrollpunkte dieses Objekts sind bereits Teil dieser Runde. Ein neuer entsteht im Reiter „Kontrollpunkte".</p>';
+    return;
+  }
+  if (!liste.length) {
+    ziel.innerHTML = '<p class="zone-note" style="margin:0">Kein Treffer.</p>';
+    return;
+  }
+  ziel.innerHTML = liste.map(k => {
+    const meta = k.typ === 'nfc' ? `NFC-Chip ${esc(k.chip_id || '–')}` : `Geofence · Radius ${nf(k.geofence_radius_m)} m`;
+    return `<div class="kp-zeile${Number(k.aktiv) ? '' : ' aus'}">
+      <div class="kp-kopf">
+        <label class="check" style="margin:0"><input type="checkbox" class="rp-hinzu-punkt" value="${Number(k.id)}"> <b>${esc(k.bezeichnung)}</b></label>
+        <span class="chip ${k.typ === 'nfc' ? 'chip-a' : 'chip-w'}">${k.typ === 'nfc' ? 'NFC' : 'Geofence'}</span>
+        ${Number(k.aktiv) ? '' : '<span class="chip chip-n">nicht aktiv</span>'}
+      </div>
+      <div class="kp-meta">${meta}</div>
+    </div>`;
+  }).join('');
+}
+
+function rpHinzufuegen() {
+  const err = $('rpHinzuErr'); err.style.display = 'none';
+  const neu = Array.from(document.querySelectorAll('#rpHinzuListe .rp-hinzu-punkt:checked')).map(c => Number(c.value));
+  if (!neu.length) { err.textContent = 'Bitte mindestens einen Kontrollpunkt wählen.'; err.style.display = ''; return; }
+  const v = rundgangVorlagen.find(x => Number(x.id) === krTarget);
+  const bestehend = (v ? v.punkte : []).map(p => Number(p.id));
+  const b = $('rpHinzuBtn'); b.disabled = true;
+  rpListeSpeichern([...bestehend, ...neu]).then(ok => {
+    b.disabled = false;
+    if (!ok) return;
+    closeDlg('dlgRpHinzu');
+    toast(neu.length === 1 ? 'Routenpunkt hinzugefügt.' : 'Routenpunkte hinzugefügt.');
+  });
 }
 
 // Kontrollpunkte-Tabelle (ENT-259): ALLE Kontrollpunkte des Objekts (NFC +
@@ -16430,7 +16641,7 @@ function rdKrBadgesSetzen(routenAnzahl) {
   if (!rp) return;
   rp.textContent = String(routenAnzahl !== undefined
     ? routenAnzahl
-    : document.querySelectorAll('#rdKrPunkteListe .kr-punkt:checked').length);
+    : (krTarget ? (rundgangVorlagen.find(x => Number(x.id) === krTarget)?.punkte.length ?? 0) : 0));
 }
 
 function rdKarteAnpassen() {
@@ -16638,9 +16849,8 @@ function rdKrZeigen(modus, id) {
   $('rdKrBeschreibung').value = v && v.beschreibung ? v.beschreibung : '';
   $('rdKrErr').style.display = 'none';
 
-  const gewaehlt = v ? new Set(v.punkte.map(p => Number(p.id))) : new Set();
-  krPunkteZeichnen(gewaehlt, 'rdKrPunkteListe');
-  rdKrBadgesSetzen(gewaehlt.size);
+  rdKrRoutenTabelleZeichnen();
+  rdKrBadgesSetzen(v ? v.punkte.length : 0);
   // Ein zuvor geoeffnetes Detailfenster gehoert zur vorherigen Runde und
   // darf nicht in die naechste hinueberstehen.
   rdKarteDetailSchliessen();
@@ -16679,6 +16889,7 @@ function rdKrAbschnittZeigen(id) {
   });
   if (id === 'kontrollpunkte') { rdKpTabelleZeichnen(); }
   if (id === 'karte') { rdKarteUebersichtInit(); }
+  if (id === 'routenpunkte') { rdKrRoutenTabelleZeichnen(); }
 }
 
 function rdSaveKr() {
@@ -16686,23 +16897,30 @@ function rdSaveKr() {
   const name = $('rdKrName').value.trim();
   if (!name) { err.textContent = 'Name erforderlich.'; err.style.display = ''; return; }
 
+  // Seit ENT-273 speichert dieser Knopf nur noch Name/Aktiv/Beschreibung --
+  // die Routenpunkte-Zuordnung schreibt seither sofort bei jeder einzelnen
+  // Aenderung (rpListeSpeichern()), nicht mehr gesammelt hier.
+  const warNeu = !krTarget;
   const body = { objekt_id: rdEinObjekt, name, aktiv: $('rdKrAktiv').checked ? 1 : 0, beschreibung: $('rdKrBeschreibung').value.trim() };
   if (krTarget) body.id = krTarget;
-  const kontrollpunktIds = Array.from(document.querySelectorAll('#rdKrPunkteListe .kr-punkt:checked')).map(c => Number(c.value));
 
   const b = $('rdKrBtn'); b.disabled = true;
   api('rundgang_vorlage_save.php', { method: 'POST', body }).then(({ ok, data }) => {
-    if (!ok || data.status !== 'ok') { b.disabled = false; err.textContent = data.message || 'Speichern fehlgeschlagen.'; err.style.display = ''; return; }
-    return api('rundgang_vorlage_punkte_setzen.php',
-      { method: 'POST', body: { vorlage_id: data.id, kontrollpunkt_ids: kontrollpunktIds } }
-    ).then(({ ok: ok2, data: data2 }) => {
-      b.disabled = false;
-      if (!ok2 || data2.status !== 'ok') { err.textContent = data2.message || 'Punktzuordnung fehlgeschlagen.'; err.style.display = ''; return; }
-      // rdAbschnittZeigen('liste') laedt rdLadeAlle() gleich selbst neu --
-      // kein zusaetzlicher Aufruf noetig, siehe dessen eigene Definition.
-      rdAbschnittZeigen('liste');
-      toast('Kontrollrunde gespeichert.');
-    });
+    b.disabled = false;
+    if (!ok || data.status !== 'ok') { err.textContent = data.message || 'Speichern fehlgeschlagen.'; err.style.display = ''; return; }
+    if (warNeu) {
+      // Neu angelegt: auf der Seite bleiben (jetzt im Bearbeiten-Modus mit
+      // echter vorlage_id) statt zur Liste zu springen -- sonst muesste man
+      // die eben erst angelegte Runde erst wieder anklicken, um im Reiter
+      // "Routenpunkte" ueberhaupt etwas hinzufuegen zu koennen (der braucht
+      // eine gespeicherte Vorlage, siehe rdKrRoutenTabelleZeichnen()).
+      loadRundgangVorlagen().then(() => { rdKrZeigen('aendern', data.id); toast('Kontrollrunde angelegt.'); });
+      return;
+    }
+    // rdAbschnittZeigen('liste') laedt rdLadeAlle() gleich selbst neu --
+    // kein zusaetzlicher Aufruf noetig, siehe dessen eigene Definition.
+    rdAbschnittZeigen('liste');
+    toast('Kontrollrunde gespeichert.');
   });
 }
 
