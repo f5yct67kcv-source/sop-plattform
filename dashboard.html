@@ -532,6 +532,21 @@ a.nav-item { text-decoration: none; }
    Referenzbild markiert hat. z-index ueber Leaflets eigenen Bedienelementen
    (die sitzen hier oben links, ueberschneiden sich also nicht). */
 .rdkarte-cta { position: absolute; top: 12px; right: 12px; z-index: 1001; display: flex; gap: 8px; }
+/* Adresssuche (ENT-267): oben links ueber der Karte, symmetrisch zu den
+   Anlegen-Knoepfen oben rechts. Eigenes Feld statt eines Leaflet-Steuerelements,
+   damit Trefferliste und Tastaturbedienung ganz normalem Formular-Markup
+   folgen. */
+.rdkarte-suche { position: absolute; top: 12px; left: 58px; z-index: 1001; width: min(340px, calc(100% - 220px)); }
+.rdkarte-suche input { width: 100%; background: var(--surface); box-shadow: var(--sh-1); }
+.rdkarte-suche-treffer { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: var(--surface);
+  border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--sh-2); overflow: hidden; z-index: 1002; }
+.rdkarte-suche-treffer button { display: block; width: 100%; text-align: left; background: none; border: 0;
+  border-bottom: 1px solid var(--line-soft); padding: 9px 12px; font: inherit; color: inherit; cursor: pointer; font-size: 13px; }
+.rdkarte-suche-treffer button:last-child { border-bottom: 0; }
+.rdkarte-suche-treffer button:hover, .rdkarte-suche-treffer button:focus-visible { background: var(--line-soft); }
+@media (max-width: 900px) {
+  .rdkarte-suche { position: static; width: 100%; margin-bottom: 10px; }
+}
 .rdkarte-liste { max-height: 260px; overflow-y: auto; }
 .rdkarte-eintrag { display: block; width: 100%; text-align: left; background: none; border: 0;
   border-bottom: 1px solid var(--line-soft); padding: 10px 12px; cursor: pointer; font: inherit; color: inherit; }
@@ -4653,6 +4668,18 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
               </div>
             </div>
             <div class="rdkarte-buehne">
+              <!-- Adresssuche (ENT-267): sucht ueber Nominatim (OSM-Geocoder,
+                   kostenlos, kein Schluessel) und schwenkt die Karte zum
+                   gewaehlten Treffer -- setzt bewusst KEINEN GPS-Punkt,
+                   dafuer bleibt der Klick auf die Karte zustaendig. Eigene
+                   id, nicht "rdKarteSuche" -- die traegt schon die
+                   GPS-Punkte-Listenfilterung links. -->
+              <div class="rdkarte-suche">
+                <input class="inp" type="search" id="rdKarteOrtSuche" placeholder="Nach Ort, Strasse oder Koordinaten suchen…"
+                  oninput="rdKarteOrtSucheEingabe()" onkeydown="rdKarteOrtSucheTaste(event)" aria-label="Adresse oder Ort suchen"
+                  autocomplete="off">
+                <div class="rdkarte-suche-treffer" id="rdKarteOrtTreffer" style="display:none"></div>
+              </div>
               <div class="rdkarte-cta">
                 <button class="btn btn-plain btn-sm" onclick="toast('Folgt in einem späteren Schritt.')">Geofence-Bereich anlegen</button>
                 <button class="btn btn-primary btn-sm" onclick="rdKdNeu()">+ GPS-Punkt anlegen</button>
@@ -7500,6 +7527,14 @@ document.addEventListener('click', e => {
   if (!s || !s.classList.contains('on')) { return; }
   if (s.contains(e.target) || e.target.closest('#btnBurger')) { return; }
   toggleSide(false);
+});
+
+// Dieselbe Regel fuer die Adresssuche der Kartenansicht (ENT-267).
+document.addEventListener('click', e => {
+  const ziel = $('rdKarteOrtTreffer');
+  if (!ziel || ziel.style.display === 'none') { return; }
+  if (ziel.contains(e.target) || e.target.closest('.rdkarte-suche')) { return; }
+  ziel.style.display = 'none';
 });
 
 // Dieselbe Regel fuer die Glocke (ENT-197): daneben tippen schliesst sie.
@@ -15932,12 +15967,110 @@ function rdKarteUebersichtInit() {
       $('rdKdLng').value = e.latlng.lng.toFixed(5);
       rdKarteVorschauZeichnen();
     });
+    // Vollbild (ENT-267): eigenes Leaflet-Steuerelement, stapelt sich unter
+    // den Zoom-Knoepfen (gleiche Ecke "topleft") -- kein Plugin noetig, die
+    // Browser-Fullscreen-API genuegt fuer diesen einen Knopf.
+    const VollbildKnopf = L.Control.extend({
+      options: { position: 'topleft' },
+      onAdd() {
+        const box = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+        const knopf = L.DomUtil.create('a', '', box);
+        knopf.href = '#'; knopf.title = 'Vollbild'; knopf.setAttribute('aria-label', 'Vollbild ein- oder ausschalten');
+        knopf.innerHTML = '<svg class="i" viewBox="0 0 24 24" style="width:16px;height:16px;display:block;margin:4px"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3m11-5v3a2 2 0 0 1-2 2h-3"/></svg>';
+        L.DomEvent.on(knopf, 'click', ev => { L.DomEvent.stop(ev); rdKarteVollbildUmschalten(); });
+        return box;
+      },
+    });
+    rdKarteMapa.addControl(new VollbildKnopf());
+    document.addEventListener('fullscreenchange', rdKarteVollbildGeaendert);
   }
   rdKarteUebersichtZeichnen();
   // Der Reiter war eben noch unsichtbar (display:none) -- ohne
   // invalidateSize() rendert Leaflet mit der Groesse von vorher (0x0) und
   // bleibt grau, gleicher Fallstrick wie bei kpKarteInit().
   setTimeout(() => { if (rdKarteMapa) { rdKarteMapa.invalidateSize(); rdKarteAnpassen(); } }, 30);
+}
+
+// Vollbild (ENT-267): schaltet NUR die Kartenbuehne (Suche, Anlegen-Knoepfe,
+// Karte) in den Browser-Vollbildmodus, nicht die ganze Seite -- Listen links
+// und das Bearbeitungsfenster rechts bleiben ausserhalb sichtbar erhalten,
+// wer sie braucht, verlaesst das Vollbild wieder.
+function rdKarteVollbildUmschalten() {
+  const buehne = document.querySelector('#rdKrAb-karte .rdkarte-buehne');
+  if (!buehne) return;
+  if (document.fullscreenElement) {
+    document.exitFullscreen();
+  } else {
+    buehne.requestFullscreen().catch(() => toast('Vollbild wird von diesem Browser nicht unterstützt.'));
+  }
+}
+
+function rdKarteVollbildGeaendert() {
+  // Der Kartenkasten aendert im Vollbild schlagartig seine Groesse --
+  // ohne invalidateSize() bleibt Leaflet bei der alten Groesse stehen und
+  // zeigt nur einen Ausschnitt oder graue Flaechen am Rand.
+  if (rdKarteMapa) { setTimeout(() => { if (rdKarteMapa) rdKarteMapa.invalidateSize(); }, 60); }
+}
+
+// Adresssuche (ENT-267): Nominatim (OSM-Geocoder, kostenlos, kein
+// Schluessel) -- schwenkt die Karte zum gewaehlten Treffer, setzt bewusst
+// KEINEN GPS-Punkt (dafuer bleibt der Kartenklick zustaendig, siehe
+// rdKarteUebersichtInit). Entkoppelt von rdKarteSeiteZeichnen()/
+// rdKpTabelleZeichnen() -- eigener, unabhaengiger Vorgang.
+let rdKarteOrtSucheTimer = null;
+let rdKarteOrtSucheLauf = 0;
+
+function rdKarteOrtSucheEingabe() {
+  clearTimeout(rdKarteOrtSucheTimer);
+  const text = $('rdKarteOrtSuche').value.trim();
+  if (text.length < 3) { $('rdKarteOrtTreffer').style.display = 'none'; return; }
+  // Nominatims Nutzungsbedingungen verlangen zurueckhaltende Anfragen (kein
+  // Anschlagen bei jedem Tastendruck) -- 500ms Wartezeit reicht dafuer.
+  rdKarteOrtSucheTimer = setTimeout(() => rdKarteOrtSucheLaden(text), 500);
+}
+
+function rdKarteOrtSucheLaden(text) {
+  const lauf = ++rdKarteOrtSucheLauf;
+  fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(text)}`)
+    .then(r => r.json())
+    .then(treffer => {
+      // Waehrenddessen wurde weitergetippt oder ein neuer Lauf gestartet --
+      // dieses veraltete Ergebnis darf die Liste nicht mehr ueberschreiben.
+      if (lauf !== rdKarteOrtSucheLauf) return;
+      rdKarteOrtSucheZeichnen(treffer || []);
+    })
+    .catch(() => { if (lauf === rdKarteOrtSucheLauf) { $('rdKarteOrtTreffer').style.display = 'none'; } });
+}
+
+function rdKarteOrtSucheZeichnen(treffer) {
+  const ziel = $('rdKarteOrtTreffer');
+  if (!treffer.length) {
+    ziel.innerHTML = '<button type="button" disabled style="color:var(--ink-3);cursor:default">Kein Treffer</button>';
+    ziel.style.display = '';
+    return;
+  }
+  ziel.innerHTML = treffer.map((t, i) =>
+    `<button type="button" onclick="rdKarteOrtWaehlen(${i})">${esc(t.display_name)}</button>`).join('');
+  rdKarteOrtSucheTreffer = treffer;
+  ziel.style.display = '';
+}
+
+let rdKarteOrtSucheTreffer = [];
+
+function rdKarteOrtWaehlen(i) {
+  const t = rdKarteOrtSucheTreffer[i];
+  if (!t || !rdKarteMapa) return;
+  $('rdKarteOrtSuche').value = t.display_name;
+  $('rdKarteOrtTreffer').style.display = 'none';
+  rdKarteMapa.setView([Number(t.lat), Number(t.lon)], 17);
+}
+
+function rdKarteOrtSucheTaste(ev) {
+  if (ev.key === 'Escape') { $('rdKarteOrtTreffer').style.display = 'none'; }
+  if (ev.key === 'Enter') {
+    ev.preventDefault();
+    if (rdKarteOrtSucheTreffer.length) { rdKarteOrtWaehlen(0); }
+  }
 }
 
 function rdKarteUebersichtZeichnen() {
