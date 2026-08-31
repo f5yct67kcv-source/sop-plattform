@@ -17,6 +17,13 @@ const HTML = readFileSync(`${WURZEL}/dashboard.html`, 'utf8');
 const ok = [], bad = [];
 const check = (n, c) => (c ? ok : bad).push(n);
 
+// Aus HEUTE berechnet statt fest hingeschrieben (test_datumsfest.mjs): ein
+// "bald ablaufender" Ausweis muss auch in einem Monat noch bald ablaufend
+// sein, nicht ploetzlich abgelaufen oder ploetzlich weit in der Zukunft.
+const bald = d => new Date(Date.now() + d * 864e5 - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
+const dmy = d => d.split('-').reverse().join('.');
+const DIENSTAUSWEIS_GUELTIG_BIS = bald(45);
+
 const MA = [{ id: 1, name: 'mitarbeiter-a', vorname: 'Vorname', nachname: 'Testperson',
   personalnummer: 'P-001', ist_admin: false, aktiv: 1, erstellt_am: '2025-03-04',
   funktion_id: 2, abteilung_id: 1, anstellungsort_id: 7,
@@ -36,7 +43,7 @@ const DOSSIER = {
   // Ein abgelaufener und ein bald ablaufender Ausweis: beides muss die
   // Leseansicht benennen, sonst plant jemand eine Person ein, die nicht darf.
   aufenthalt_gueltig_bis: '2020-01-01',
-  dienstausweis_nr: 'DA-9', dienstausweis_gueltig_bis: '2026-09-30',
+  dienstausweis_nr: 'DA-9', dienstausweis_gueltig_bis: DIENSTAUSWEIS_GUELTIG_BIS,
   strafregister_datum: '2024-12-01', heimatort: 'Testgemeinde', nationalitaet: 'CH',
   // So liefert MySQL ein Feld zurueck, in das einmal ein leerer Text geriet.
   // Es ist NICHT der 0.0.0000 und schon gar nicht "abgelaufen" -- es ist
@@ -352,7 +359,7 @@ check('Die AHV-Nummer steht nur hier, nicht in der Liste',
   check('Auswahlfelder zeigen den Namen, nicht die Id',
     d.funktion === 'Objektleiter' && d.standort === 'Standort Testort');
   check('Ausweis und Gueltigkeit stehen in EINER Zeile',
-    /C · gültig bis 01\.01\.2020/.test(d.ausweis) && /DA-9 · gültig bis 30\.09\.2026/.test(d.dienst));
+    /C · gültig bis 01\.01\.2020/.test(d.ausweis) && d.dienst.includes(`DA-9 · gültig bis ${dmy(DIENSTAUSWEIS_GUELTIG_BIS)}`));
   check('KRITISCH: ein abgelaufener Ausweis wird als abgelaufen benannt',
     d.abgelaufen.length === 1 && /abgelaufen/.test(d.abgelaufen[0]));
   check('Ein bald ablaufender Ausweis wird vorgewarnt',

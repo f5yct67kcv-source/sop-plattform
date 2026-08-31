@@ -18,6 +18,11 @@ const HTML = readFileSync(`${WURZEL}/dashboard.html`, 'utf8');
 const ok = [], bad = [];
 const check = (n, c) => (c ? ok : bad).push(n);
 
+// Aus HEUTE berechnet statt fest hingeschrieben (test_datumsfest.mjs): ein
+// "bald ablaufender" Ausweis muss auch in einem Monat noch bald ablaufend
+// sein, nicht ploetzlich abgelaufen oder ploetzlich weit in der Zukunft.
+const bald = d => new Date(Date.now() + d * 864e5 - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
+
 const MA = [{ id: 1, name: 'mitarbeiter-a', vorname: 'Vorname', nachname: 'Testperson',
   personalnummer: 'P-001', ist_admin: false, aktiv: 1, erstellt_am: '2025-03-04',
   strasse: 'Musterweg', hausnummer: '3', plz: '4600', ort: 'Testort',
@@ -30,7 +35,7 @@ const DOSSIER = { ...MA[0], geburtsdatum: '1990-05-05', land: 'CH', anrede: 'Her
   anstellungskategorie: 'C', pensum_stunden: 900, eintritt: '2025-01-01',
   fachausweis_am: '2022-09-01', basisausbildung_am: '', sprache: 'de',
   aufenthaltsbewilligung: 'C', aufenthalt_gueltig_bis: '2020-01-01',
-  dienstausweis_nr: 'DA-9', dienstausweis_gueltig_bis: '2026-09-30',
+  dienstausweis_nr: 'DA-9', dienstausweis_gueltig_bis: bald(45),
   strafregister_datum: '2024-12-01', notfallkontakt: 'Testin Testin' };
 const LISTEN = { funktion: [{ id: 1, bezeichnung: 'Sicherheitsmitarbeiter' },
   { id: 2, bezeichnung: 'Objektleiter' }], abteilung: [{ id: 1, bezeichnung: 'Bewachung' }] };

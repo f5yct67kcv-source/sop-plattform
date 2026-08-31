@@ -13,21 +13,22 @@
 // kuenftig per Smartphone-Scan erfasst, nicht ueber diese Karte -- "+
 // GPS-Punkt anlegen" oeffnet darum den bestehenden Kontrollpunkt-Dialog
 // direkt mit Typ Geofence vorbelegt, nicht mit dem sonst ueblichen NFC.
+//
+// ENT-269: Google Maps statt Leaflet/OpenStreetMap (Revision von ENT-248,
+// ausdruecklicher Wunsch des Projektinhabers). Das Testdouble aus
+// google_maps_mock.mjs ersetzt die echte Google-Maps-API -- der Testbrowser
+// in dieser Sandbox hat kein echtes Internet (auch nicht ueber den
+// Sitzungs-Proxy, geprueft), und selbst wenn: automatisierte Anfragen gegen
+// einen echten, kostenpflichtigen Google-Dienst waeren hier weder
+// zuverlaessig noch angemessen.
 import { WURZEL, OUT, browserPfad } from './pfade.mjs';
+import { GOOGLE_MAPS_MOCK } from './google_maps_mock.mjs';
 import { chromium } from 'playwright';
 
 const SEITE = `file://${WURZEL}/dashboard.html`;
 const EXE = browserPfad();
 const ok = [], bad = [];
 const check = (n, c) => (c ? ok : bad).push(n);
-
-// Kleinste gueltige PNG-Datei (1x1, transparent) als Kachel-Ersatz --
-// echte Netzwerkzugriffe auf OpenStreetMap waeren in einer automatisierten
-// Pruefung weder zuverlaessig noch angemessen (gleiches Vorgehen wie
-// test_kontrollpunkt_karte.mjs).
-const KACHEL_PNG = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
-  'base64');
 
 const OBJEKTE = { status: 'ok', objekte: [
   { id: 1, kunde_id: 1, kunde_name: 'Muster Liegenschaften AG', name: 'Testliegenschaft Nord', strasse: 'Testweg 1',
@@ -59,14 +60,11 @@ const NOMINATIM_TREFFER = [
 ];
 
 function setup(page) {
-  page.route('**/*.tile.openstreetmap.org/**', route =>
-    route.fulfill({ status: 200, contentType: 'image/png', body: KACHEL_PNG }));
   // Echte Netzwerkzugriffe auf den fremden Nominatim-Dienst waeren in einer
-  // automatisierten Pruefung weder zuverlaessig noch angemessen (ENT-267,
-  // gleiches Vorgehen wie bei den Kartenkacheln oben).
+  // automatisierten Pruefung weder zuverlaessig noch angemessen (ENT-267).
   page.route('**/nominatim.openstreetmap.org/**', route =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(NOMINATIM_TREFFER) }));
-  return page.route('**/api/**', async route => {
+  page.route('**/api/**', async route => {
     const req = route.request();
     const u = new URL(req.url());
     const path = u.pathname.split('/api/')[1];
@@ -92,6 +90,14 @@ function setup(page) {
     if (path.includes('rundgang_vorlage_liste')) return send({ status: 'ok', vorlagen: [] });
     return send({ status: 'ok' });
   });
+  // Reihenfolge wichtig (ENT-269): Playwright ruft bei mehreren passenden
+  // Routen die zuletzt registrierte zuerst auf. "**/api/**" trifft wegen des
+  // Pfadstuecks "/maps/api/js" auch auf Google Maps selbst zu -- die
+  // host-genaue Maps-Route muss darum NACH der allgemeinen "/api/"-Route
+  // registriert werden, sonst faengt Letztere die Maps-Anfrage faelschlich
+  // ab und liefert JSON statt JavaScript aus.
+  return page.route('**/maps.googleapis.com/**', route =>
+    route.fulfill({ status: 200, contentType: 'application/javascript', body: GOOGLE_MAPS_MOCK }));
 }
 
 const browser = await chromium.launch({ executablePath: EXE });
@@ -157,16 +163,11 @@ check('KRITISCH: der Klick öffnet KEINEN Dialog, sondern wechselt zur Kartenans
 check('Die Kontrollpunkte-Tabelle ist dabei ausgeblendet', !(await page.isVisible('#rdKrAb-kontrollpunkte')));
 
 // ══════════ KARTENANSICHT: ALLE GEOFENCE-PUNKTE ALS KREIS+MARKER
-await page.waitForSelector('#rdKarteUebersicht.leaflet-container');
+await page.waitForSelector('#rdKarteUebersicht.gm-mock-map');
 await page.waitForTimeout(200);
 check('KRITISCH: beide Geofence-Punkte erscheinen als Marker auf der Karte (der NFC-Punkt nicht, er hat keinen Ort)',
-  (await page.$$('#rdKarteUebersicht .leaflet-marker-icon')).length === 2);
-// .leaflet-interactive traegt sowohl die Kreise (SVG-<path>) als auch die
-// Marker-Symbole selbst (Leaflet-Standardmarker sind anklickbar) -- auf
-// <path> eingeschraenkt, um wirklich nur die Kreise zu zaehlen.
-check('Je ein Geofence-Kreis pro Punkt', (await page.$$('#rdKarteUebersicht path.leaflet-interactive')).length === 2);
-check('KRITISCH: der Marker nutzt das selbst ausgelieferte Symbol, kein kaputtes Bild (ENT-248)',
-  await page.$eval('#rdKarteUebersicht .leaflet-marker-icon', img => img.complete && img.naturalWidth > 0));
+  (await page.$$('#rdKarteUebersicht .gm-mock-marker')).length === 2);
+check('Je ein Geofence-Kreis pro Punkt', (await page.$$('#rdKarteUebersicht .gm-mock-circle')).length === 2);
 await page.screenshot({ path: `${OUT}/rg-kp-tab-01-kartenansicht.png` });
 
 // ══════════ ENT-260: LISTEN LINKS, CTA UEBER DER KARTE, DETAIL RECHTS
@@ -208,7 +209,7 @@ await page.waitForTimeout(100);
 
 // Klick auf einen Punkt AUF DER KARTE oeffnet das Detailfenster rechts
 check('Vor dem Klick ist das Detailfenster zu', !(await page.isVisible('#rdKarteDetail')));
-await page.click('#rdKarteUebersicht .leaflet-marker-icon');
+await page.click('#rdKarteUebersicht .gm-mock-marker');
 await page.waitForTimeout(250);
 check('KRITISCH: der Klick auf einen GPS-Punkt öffnet rechts das Detailfenster',
   await page.isVisible('#rdKarteDetail'));
@@ -229,7 +230,7 @@ check('KRITISCH: Breitengrad, Längengrad und Radius stehen als bearbeitbare Fel
   && (await page.inputValue('#rdKdLng')).startsWith('8.541')
   && (await page.inputValue('#rdKdRadius')) === '35');
 check('KRITISCH: im Fenster steht KEINE zweite Karte (Vorgabe Projektinhaber)',
-  await page.evaluate(() => !document.querySelector('#rdKarteDetail .leaflet-container')));
+  await page.evaluate(() => !document.querySelector('#rdKarteDetail .gm-mock-map')));
 check('Der Bereich wird als Anzeige geführt, nicht als Eingabefeld',
   (await page.textContent('#rdKdBereich')).includes('Testliegenschaft Nord'));
 check('Der zugehörige Listeneintrag links ist markiert',
@@ -298,7 +299,7 @@ await page.click('#rdKarteDetail button:has-text("Schliessen")');
 await page.waitForTimeout(250);
 check('Das Fenster lässt sich wieder schliessen', !(await page.isVisible('#rdKarteDetail')));
 check('KRITISCH: nach dem Schliessen stehen wieder ALLE Punkte auf der Karte',
-  (await page.$$('#rdKarteUebersicht .leaflet-marker-icon')).length === 2);
+  (await page.$$('#rdKarteUebersicht .gm-mock-marker')).length === 2);
 
 // ══════════ "+ GPS-PUNKT ANLEGEN": DASSELBE FENSTER, KEIN DIALOG
 await page.click('#rdKrAb-karte button:has-text("+ GPS-Punkt anlegen")');
@@ -310,7 +311,7 @@ check('Es öffnet leer und mit dem Anlege-Titel',
 check('KRITISCH: die Lage ist mit der Kartenmitte vorbelegt, es braucht keine zweite Karte im Fenster',
   (await page.inputValue('#rdKdLat')).length > 0 && (await page.inputValue('#rdKdLng')).length > 0);
 check('KRITISCH: die bestehenden Punkte bleiben dabei auf der Karte sichtbar',
-  (await page.$$('#rdKarteUebersicht .leaflet-marker-icon')).length === 3);
+  (await page.$$('#rdKarteUebersicht .gm-mock-marker')).length === 3);
 check('Ohne Namen wird nicht gespeichert, sondern begründet abgelehnt', await (async () => {
   await page.click('#rdKdSpeichern');
   await page.waitForTimeout(150);
@@ -350,7 +351,7 @@ KONTROLLPUNKTE.kontrollpunkte.push(
 await page.click('#rdKdSpeichern');
 await page.waitForTimeout(400);
 check('KRITISCH: die Karte zeigt den neuen Punkt sofort, ohne den Reiter neu zu öffnen',
-  (await page.$$('#rdKarteUebersicht .leaflet-marker-icon')).length === 3);
+  (await page.$$('#rdKarteUebersicht .gm-mock-marker')).length === 3);
 await page.click('#rdKrReiter .rdkr-tab:has-text("Kontrollpunkte")');
 await page.waitForTimeout(150);
 check('KRITISCH: auch die Tabelle zeigt den neuen Punkt sofort', (await page.$$('#rdKpTabelle tbody tr')).length === 4);
@@ -365,8 +366,8 @@ check('KRITISCH: kein Seiten-Scroll auf der Kontrollpunkte-Tabelle bei 390px', a
   document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1));
 await page.screenshot({ path: `${OUT}/rg-kp-tab-02-mobil.png` });
 await page.click('button:has-text("+ GPS-Punkt / Geofence anlegen")');
-await page.waitForSelector('#rdKarteUebersicht.leaflet-container');
-await page.evaluate(() => rdKarteMapa.invalidateSize());
+await page.waitForSelector('#rdKarteUebersicht.gm-mock-map');
+await page.evaluate(() => google.maps.event.trigger(rdKarteMapa, 'resize'));
 await page.waitForTimeout(200);
 const karteBreite = await page.$eval('#rdKarteUebersicht', el => el.getBoundingClientRect().width);
 check('KRITISCH: die Karte überragt den Bildschirm auf dem Handy nicht (gemessen, nicht angenommen)',
@@ -399,7 +400,9 @@ await page.fill('#rdKarteOrtSuche', 'Industriestrasse');
 await page.waitForTimeout(700);
 await page.click('#rdKarteOrtTreffer button:nth-child(1)');
 await page.waitForTimeout(200);
-const mitteNachSuche = await page.evaluate(() => rdKarteMapa.getCenter());
+// google.maps.Map#getCenter() liefert Funktions-Zugriffe (.lat()/.lng()),
+// keine einfachen Eigenschaften -- anders als zuvor bei Leaflet.
+const mitteNachSuche = await page.evaluate(() => { const c = rdKarteMapa.getCenter(); return { lat: c.lat(), lng: c.lng() }; });
 check('KRITISCH: die Karte schwenkt zum gewählten Treffer (Olten, nicht Zürich)',
   Math.abs(mitteNachSuche.lat - 47.3782) < 0.01 && Math.abs(mitteNachSuche.lng - 7.9127) < 0.01);
 // Drei statt zwei Marker: der zuvor angelegte "Nordtor"-Punkt (voriger
@@ -408,7 +411,7 @@ check('KRITISCH: die Karte schwenkt zum gewählten Treffer (Olten, nicht Zürich
 // aendert sich der bereits im Browser gehaltene Stand nicht, das ist hier
 // kein Fehler. Entscheidend ist nur: die Suche selbst legt nichts NEU an.
 check('KRITISCH: die Adresssuche legt KEINEN GPS-Punkt an — nur der Kartenklick tut das',
-  (await page.$$('#rdKarteUebersicht .leaflet-marker-icon')).length === 3);
+  (await page.$$('#rdKarteUebersicht .gm-mock-marker')).length === 3);
 
 // "Kein Treffer" ist erkennbar, keine leere, wortlose Liste
 await page.route('**/nominatim.openstreetmap.org/**', route =>
@@ -423,11 +426,11 @@ await page.waitForTimeout(150);
 
 // Vollbild: schaltet die Kartenbuehne in den Browser-Vollbildmodus
 check('Vor dem Klick ist kein Vollbildmodus aktiv', !(await page.evaluate(() => !!document.fullscreenElement)));
-await page.click('.leaflet-control a[title="Vollbild"]');
+await page.click('.rdkarte-vollbild-knopf');
 await page.waitForTimeout(200);
 check('KRITISCH: der Vollbild-Knopf schaltet den Browser-Vollbildmodus auf die Kartenbühne (nicht die ganze Seite)',
   await page.evaluate(() => document.fullscreenElement === document.querySelector('#rdKrAb-karte .rdkarte-buehne')));
-await page.click('.leaflet-control a[title="Vollbild"]');
+await page.click('.rdkarte-vollbild-knopf');
 await page.waitForTimeout(200);
 check('Ein zweiter Klick schaltet das Vollbild wieder aus',
   await page.evaluate(() => !document.fullscreenElement));

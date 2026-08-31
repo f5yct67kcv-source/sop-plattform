@@ -13,12 +13,6 @@
 <link rel="icon" href="icons/icon-32.png" type="image/png">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <meta name="theme-color" content="#16181D">
-<!-- Leaflet/OpenStreetMap fuer die GPS-Punktwahl der Kontrollpunkte (ENT-248)
-     -- selbst ausgeliefert statt von einem CDN geladen, wie schon
-     html2pdf.bundle.min.js: kein Zugangsdaten- oder Kostenkonto noetig
-     (anders als Google Maps), und keine neue externe Laufzeit-Abhaengigkeit
-     fuer ein Betriebswerkzeug, das sonst nichts von aussen laedt. -->
-<link rel="stylesheet" href="leaflet/leaflet.css">
 <style>
 /* ══════════════════════════════════════════════════════════════════
    INTER, SELBST AUSGELIEFERT (ENT-223/ENT-227)
@@ -492,11 +486,13 @@ a.nav-item { text-decoration: none; }
    eine Karte, die unten hinausragt. Das Detailfenster rechts wird
    ausdruecklich NICHT mitgestreckt -- es soll ein kleines Fenster bleiben. */
 /* Der z-index:0 ist kein Schoenheitsfehler, sondern behebt einen echten
-   Fehler (ENT-265): Leaflet legt seine Ebenen intern auf z-index 400-1000.
+   Fehler (ENT-265, urspruenglich mit Leaflet gefunden -- der eigene
+   Stapelkontext bleibt mit Google Maps aus demselben Grund noetig: auch
+   dessen interne Ebenen/Steuerelemente liegen auf hohen z-index-Werten).
    Ohne eigenen Stapelkontext hier konkurrieren die direkt mit dem
    Dialog-Schleier (.dlg-scrim, z-index 70) -- ein Dialog oeffnete sich
    dadurch HINTER der Karte (vom Projektinhaber gemeldet, Bildschirmfoto).
-   position:relative + z-index:0 sperrt Leaflets Ebenen in diesen Kasten. */
+   position:relative + z-index:0 sperrt die Kartenebenen in diesen Kasten. */
 #rdKarteUebersicht { height: var(--rdkarte-h); position: relative; z-index: 0; }
 .rdkarte-seite { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
 .rdkarte-seite > .card:first-child { flex: none; min-height: 200px; }
@@ -529,14 +525,22 @@ a.nav-item { text-decoration: none; }
 @media (max-width: 900px) { .rdkarte-detail .card-bd { overflow-y: visible; } }
 /* Die beiden Anlegen-Knoepfe liegen oben rechts ueber der Karte (statt in
    einer eigenen Leiste darueber) -- so, wie es der Projektinhaber im
-   Referenzbild markiert hat. z-index ueber Leaflets eigenen Bedienelementen
-   (die sitzen hier oben links, ueberschneiden sich also nicht). */
+   Referenzbild markiert hat. z-index ueber Google Maps' eigenen
+   Bedienelementen (Zoom/Vollbild sitzen hier oben links, ueberschneiden sich
+   also nicht). */
 .rdkarte-cta { position: absolute; top: 12px; right: 12px; z-index: 1001; display: flex; gap: 8px; }
 /* Adresssuche (ENT-267): oben links ueber der Karte, symmetrisch zu den
-   Anlegen-Knoepfen oben rechts. Eigenes Feld statt eines Leaflet-Steuerelements,
+   Anlegen-Knoepfen oben rechts. Eigenes Feld statt eines Kartensteuerelements,
    damit Trefferliste und Tastaturbedienung ganz normalem Formular-Markup
    folgen. */
 .rdkarte-suche { position: absolute; top: 12px; left: 58px; z-index: 1001; width: min(340px, calc(100% - 220px)); }
+/* Eigener Vollbild-Knopf als Google-Maps-Steuerelement (ENT-269): Google
+   liefert dafuer keine fertige CSS-Klasse wie Leaflets ".leaflet-bar" --
+   an die eigene Bildsprache von dessen Zoom-Knoepfen angelehnt (weisser
+   Kasten, Schatten, dieselbe Eckenrundung). */
+.rdkarte-vollbild-knopf { background: #fff; border: 0; border-radius: 2px; box-shadow: 0 1px 4px -1px rgba(0,0,0,.3);
+  margin: 10px 0 0 10px; cursor: pointer; color: #666; }
+.rdkarte-vollbild-knopf:hover { color: #222; }
 .rdkarte-suche input { width: 100%; background: var(--surface); box-shadow: var(--sh-1); }
 .rdkarte-suche-treffer { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: var(--surface);
   border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--sh-2); overflow: hidden; z-index: 1002; }
@@ -3017,7 +3021,6 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 </style>
 <script src="gav.js"></script>
 <script src="zeitwahl.js"></script>
-<script src="leaflet/leaflet.js"></script>
 <script>
 /* Muss VOR dem ersten Zeichnen laufen, sonst blitzt die helle Fassung
    kurz auf, bevor die dunkle greift (ENT-029). Ohne gespeicherte Wahl
@@ -15670,33 +15673,72 @@ function kpTypUm() {
   if (ist === 'geofence') { kpKarteInit(); }
 }
 
-// Karte fuer die GPS-Punktwahl der Kontrollpunkte (ENT-248). Leaflet/
-// OpenStreetMap statt Google Maps -- kein API-Key, kein Kostenkonto,
-// selbst ausgeliefert (siehe deploy-hostpoint.yml). Eine einzige Karten-
-// Instanz wird wiederverwendet, nicht bei jedem Oeffnen neu erzeugt --
-// Leaflet laesst sich nicht zweimal auf demselben Container initialisieren.
+// Google Maps JavaScript API wird ERST NACHTRAEGLICH geladen, beim ersten
+// tatsaechlichen Kartenaufruf -- nicht eager im Seitenkopf (ENT-269,
+// Nachbesserung in derselben Sitzung: ein eager geladenes <script> lief bei
+// JEDEM Seitenaufruf mit und kollidierte in praktisch jeder Pruefsuite mit
+// deren eigener "**/api/**"-Testroute, weil der Pfad "/maps/api/js" selbst
+// die Zeichenkette "/api/" enthaelt -- 52 von 78 Suiten liefen deshalb mit
+// einem Skriptfehler rot, gefunden bei der vollen Regression vor dem
+// Ausliefern, nicht angenommen). Alle Aufrufer teilen sich dasselbe
+// Versprechen, ein zweites <script>-Tag wuerde sonst doppelt laden.
+let googleMapsVersprechen = null;
+function googleMapsLaden() {
+  if (googleMapsVersprechen) { return googleMapsVersprechen; }
+  googleMapsVersprechen = new Promise((resolve, reject) => {
+    if (window.google && window.google.maps) { resolve(); return; }
+    const skript = document.createElement('script');
+    // Der Schluessel ist ein clientseitiger Maps-JS-Browserschluessel: das
+    // Sichtbarwerden im Quelltext ist bei diesem Schluesseltyp normal und
+    // unvermeidbar, der eigentliche Schutz laeuft ueber die
+    // HTTP-Referrer-Einschraenkung in der Google-Cloud-Konsole (auf
+    // https://rapport.itufeden.myhostpoint.ch/*) und die zusaetzliche
+    // API-Einschraenkung auf ausschliesslich die Maps JavaScript API --
+    // nicht ueber Geheimhaltung.
+    skript.src = 'https://maps.googleapis.com/maps/api/js?key=AIzaSyBdm5W2BwLAir3YHQusdpamrG1Mgx4AdzI';
+    skript.onload = resolve;
+    skript.onerror = () => reject(new Error('Google Maps konnte nicht geladen werden.'));
+    document.head.appendChild(skript);
+  });
+  return googleMapsVersprechen;
+}
+
+// Karte fuer die GPS-Punktwahl der Kontrollpunkte (ENT-269, Revision von
+// ENT-248 -- ausdruecklicher Wunsch des Projektinhabers: Google Maps statt
+// Leaflet/OpenStreetMap, siehe Docs-Eintrag). Eine einzige Karten-Instanz
+// wird wiederverwendet, nicht bei jedem Oeffnen neu erzeugt -- ein zweites
+// google.maps.Map auf demselben Container waere unnoetig teuer und
+// verwirrend, dieselbe Vorsichtsregel wie zuvor bei Leaflet.
 let kpMapa = null, kpMarker = null, kpKreis = null;
-const KP_KARTE_STANDARD = [46.8, 8.33]; // geografische Mitte der Schweiz, ohne gesetzten Punkt
+const KP_KARTE_STANDARD = { lat: 46.8, lng: 8.33 }; // geografische Mitte der Schweiz, ohne gesetzten Punkt
 
 function kpKarteInit() {
   if (!$('kpKarte')) { return; }
-  const hatPunkt = $('kpLat').value.trim() !== '' && $('kpLng').value.trim() !== '';
-  const mitte = hatPunkt ? [parseFloat($('kpLat').value), parseFloat($('kpLng').value)] : KP_KARTE_STANDARD;
-  if (!kpMapa) {
-    kpMapa = L.map('kpKarte').setView(mitte, hatPunkt ? 17 : 8);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>',
-    }).addTo(kpMapa);
-    kpMapa.on('click', e => kpPunktSetzen(e.latlng.lat, e.latlng.lng));
-  } else {
-    kpMapa.setView(mitte, hatPunkt ? 17 : 8);
-  }
-  if (hatPunkt) { kpMarkerZeichnen(mitte[0], mitte[1]); } else { kpMarkerEntfernen(); }
-  // Die Karte wurde eben erst sichtbar (kpGeofenceFelder stand auf
-  // display:none) -- ohne invalidateSize() rendert Leaflet mit der Groesse
-  // von vorher (0x0) und bleibt grau.
-  setTimeout(() => { if (kpMapa) { kpMapa.invalidateSize(); } }, 30);
+  googleMapsLaden().then(() => {
+    // Der Dialog kann waehrend des Ladens wieder geschlossen worden sein.
+    if (!$('kpKarte')) { return; }
+    const hatPunkt = $('kpLat').value.trim() !== '' && $('kpLng').value.trim() !== '';
+    const mitte = hatPunkt ? { lat: parseFloat($('kpLat').value), lng: parseFloat($('kpLng').value) } : KP_KARTE_STANDARD;
+    if (!kpMapa) {
+      kpMapa = new google.maps.Map($('kpKarte'), {
+        center: mitte, zoom: hatPunkt ? 17 : 8,
+        streetViewControl: false, mapTypeControl: false,
+      });
+      kpMapa.addListener('click', e => kpPunktSetzen(e.latLng.lat(), e.latLng.lng()));
+    } else {
+      kpMapa.setCenter(mitte); kpMapa.setZoom(hatPunkt ? 17 : 8);
+    }
+    if (hatPunkt) { kpMarkerZeichnen(mitte.lat, mitte.lng); } else { kpMarkerEntfernen(); }
+    // Die Karte wurde eben erst sichtbar (kpGeofenceFelder stand auf
+    // display:none) -- ohne den resize-Trigger rechnet Google Maps weiterhin
+    // mit der Groesse von vorher (0x0) und bleibt grau, gleicher Fallstrick
+    // wie zuvor Leaflets invalidateSize().
+    setTimeout(() => {
+      if (!kpMapa) { return; }
+      google.maps.event.trigger(kpMapa, 'resize');
+      kpMapa.setCenter(mitte);
+    }, 30);
+  });
 }
 
 function kpPunktSetzen(lat, lng) {
@@ -15707,19 +15749,20 @@ function kpPunktSetzen(lat, lng) {
 
 function kpMarkerZeichnen(lat, lng) {
   const radius = parseInt($('kpRadius').value, 10) || 20;
+  const punkt = { lat, lng };
   if (kpMarker) {
-    kpMarker.setLatLng([lat, lng]);
+    kpMarker.setPosition(punkt);
   } else {
-    kpMarker = L.marker([lat, lng], { draggable: true }).addTo(kpMapa)
-      .on('dragend', () => { const p = kpMarker.getLatLng(); kpPunktSetzen(p.lat, p.lng); });
+    kpMarker = new google.maps.Marker({ position: punkt, map: kpMapa, draggable: true });
+    kpMarker.addListener('dragend', () => { const p = kpMarker.getPosition(); kpPunktSetzen(p.lat(), p.lng()); });
   }
-  if (kpKreis) { kpKreis.setLatLng([lat, lng]).setRadius(radius); }
-  else { kpKreis = L.circle([lat, lng], { radius, color: '#3b6fe0', weight: 2 }).addTo(kpMapa); }
+  if (kpKreis) { kpKreis.setCenter(punkt); kpKreis.setRadius(radius); }
+  else { kpKreis = new google.maps.Circle({ center: punkt, radius, map: kpMapa, strokeColor: '#3b6fe0', strokeWeight: 2, fillColor: '#3b6fe0', fillOpacity: 0.2 }); }
 }
 
 function kpMarkerEntfernen() {
-  if (kpMarker) { kpMapa.removeLayer(kpMarker); kpMarker = null; }
-  if (kpKreis) { kpMapa.removeLayer(kpKreis); kpKreis = null; }
+  if (kpMarker) { kpMarker.setMap(null); kpMarker = null; }
+  if (kpKreis) { kpKreis.setMap(null); kpKreis = null; }
 }
 
 // Von Hand eingetragene/geaenderte Werte (Breitengrad, Laengengrad, Radius)
@@ -15730,7 +15773,8 @@ function kpFeldGeaendert() {
   const lat = parseFloat($('kpLat').value), lng = parseFloat($('kpLng').value);
   if (!isFinite(lat) || !isFinite(lng)) { kpMarkerEntfernen(); return; }
   kpMarkerZeichnen(lat, lng);
-  kpMapa.setView([lat, lng], Math.max(kpMapa.getZoom(), 16));
+  kpMapa.setCenter({ lat, lng });
+  if (kpMapa.getZoom() < 16) { kpMapa.setZoom(16); }
 }
 
 function saveKp() {
@@ -15933,10 +15977,12 @@ function rdKpTabelleZeichnen() {
 }
 
 // Kartenansicht (ENT-259): Uebersichtskarte aller GPS-Punkte (Geofence-
-// Kreise) des Objekts -- eigene, dauerhafte Leaflet-Instanz, nicht dieselbe
-// wie kpKarteInit() in dlgKp (die bearbeitet nur EINEN Punkt). Lazy
+// Kreise) des Objekts -- eigene, dauerhafte Google-Maps-Instanz (ENT-269,
+// Revision von ENT-248/259 -- Google Maps statt Leaflet/OpenStreetMap,
+// ausdruecklicher Wunsch des Projektinhabers), nicht dieselbe wie
+// kpKarteInit() in dlgKp (die bearbeitet nur EINEN Punkt). Lazy
 // initialisiert beim ersten Besuch dieses Reiters, danach nur neu gezeichnet
-// -- Leaflet laesst sich nicht zweimal auf demselben Container erzeugen.
+// -- ein zweites google.maps.Map auf demselben Container waere unnoetig.
 // Freie Vieleck-Geofence-Bereiche (siehe Referenzbild Projektinhaber) sind
 // ein eigener, noch nicht gebauter Baustein -- der Knopf zeigt bewusst nur
 // einen Hinweis statt eines erfundenen Werkzeugs.
@@ -15951,44 +15997,48 @@ function rdKarteGpsPunkte() {
 
 function rdKarteUebersichtInit() {
   if (!$('rdKarteUebersicht')) return;
-  if (!rdKarteMapa) {
-    rdKarteMapa = L.map('rdKarteUebersicht');
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>',
-    }).addTo(rdKarteMapa);
-    // Klick auf die Karte setzt die Lage eines NEUEN Punktes (ENT-265) --
-    // bewusst nur beim Anlegen: bei einem bestehenden Punkt wuerde ein
-    // Fehlklick ihn sonst unbemerkt versetzen. Der wird per Ziehen am
-    // Marker verschoben.
-    rdKarteMapa.on('click', e => {
-      if (rdKarteAuswahl !== 'neu') return;
-      $('rdKdLat').value = e.latlng.lat.toFixed(5);
-      $('rdKdLng').value = e.latlng.lng.toFixed(5);
-      rdKarteVorschauZeichnen();
-    });
-    // Vollbild (ENT-267): eigenes Leaflet-Steuerelement, stapelt sich unter
-    // den Zoom-Knoepfen (gleiche Ecke "topleft") -- kein Plugin noetig, die
-    // Browser-Fullscreen-API genuegt fuer diesen einen Knopf.
-    const VollbildKnopf = L.Control.extend({
-      options: { position: 'topleft' },
-      onAdd() {
-        const box = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
-        const knopf = L.DomUtil.create('a', '', box);
-        knopf.href = '#'; knopf.title = 'Vollbild'; knopf.setAttribute('aria-label', 'Vollbild ein- oder ausschalten');
-        knopf.innerHTML = '<svg class="i" viewBox="0 0 24 24" style="width:16px;height:16px;display:block;margin:4px"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3m11-5v3a2 2 0 0 1-2 2h-3"/></svg>';
-        L.DomEvent.on(knopf, 'click', ev => { L.DomEvent.stop(ev); rdKarteVollbildUmschalten(); });
-        return box;
-      },
-    });
-    rdKarteMapa.addControl(new VollbildKnopf());
-    document.addEventListener('fullscreenchange', rdKarteVollbildGeaendert);
-  }
-  rdKarteUebersichtZeichnen();
-  // Der Reiter war eben noch unsichtbar (display:none) -- ohne
-  // invalidateSize() rendert Leaflet mit der Groesse von vorher (0x0) und
-  // bleibt grau, gleicher Fallstrick wie bei kpKarteInit().
-  setTimeout(() => { if (rdKarteMapa) { rdKarteMapa.invalidateSize(); rdKarteAnpassen(); } }, 30);
+  googleMapsLaden().then(() => {
+    if (!$('rdKarteUebersicht')) return;
+    if (!rdKarteMapa) {
+      rdKarteMapa = new google.maps.Map($('rdKarteUebersicht'), {
+        center: KP_KARTE_STANDARD, zoom: 8,
+        streetViewControl: false, mapTypeControl: false,
+        // Eigener Vollbild-Knopf unten -- Googles eingebauter wuerde nur die
+        // Karte selbst fuellen, nicht Suche und Anlegen-Knoepfe mit (Vorgabe
+        // Projektinhaber aus ENT-267, unveraendert gueltig).
+        fullscreenControl: false,
+      });
+      // Klick auf die Karte setzt die Lage eines NEUEN Punktes (ENT-265) --
+      // bewusst nur beim Anlegen: bei einem bestehenden Punkt wuerde ein
+      // Fehlklick ihn sonst unbemerkt versetzen. Der wird per Ziehen am
+      // Marker verschoben.
+      rdKarteMapa.addListener('click', e => {
+        if (rdKarteAuswahl !== 'neu') return;
+        $('rdKdLat').value = e.latLng.lat().toFixed(5);
+        $('rdKdLng').value = e.latLng.lng().toFixed(5);
+        rdKarteVorschauZeichnen();
+      });
+      // Vollbild (ENT-267): eigenes Steuerelement, stapelt sich unter den
+      // Zoom-Knoepfen (gleiche Ecke LEFT_TOP) -- kein Plugin noetig, die
+      // Browser-Fullscreen-API genuegt fuer diesen einen Knopf.
+      const knopf = document.createElement('button');
+      knopf.type = 'button'; knopf.className = 'rdkarte-vollbild-knopf';
+      knopf.title = 'Vollbild'; knopf.setAttribute('aria-label', 'Vollbild ein- oder ausschalten');
+      knopf.innerHTML = '<svg class="i" viewBox="0 0 24 24" style="width:16px;height:16px;display:block;margin:6px"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3m11-5v3a2 2 0 0 1-2 2h-3"/></svg>';
+      knopf.addEventListener('click', () => rdKarteVollbildUmschalten());
+      rdKarteMapa.controls[google.maps.ControlPosition.LEFT_TOP].push(knopf);
+      document.addEventListener('fullscreenchange', rdKarteVollbildGeaendert);
+    }
+    rdKarteUebersichtZeichnen();
+    // Der Reiter war eben noch unsichtbar (display:none) -- ohne den
+    // resize-Trigger rechnet Google Maps weiterhin mit der Groesse von vorher
+    // (0x0) und bleibt grau, gleicher Fallstrick wie bei kpKarteInit().
+    setTimeout(() => {
+      if (!rdKarteMapa) return;
+      google.maps.event.trigger(rdKarteMapa, 'resize');
+      rdKarteAnpassen();
+    }, 30);
+  });
 }
 
 // Vollbild (ENT-267): schaltet NUR die Kartenbuehne (Suche, Anlegen-Knoepfe,
@@ -16006,10 +16056,10 @@ function rdKarteVollbildUmschalten() {
 }
 
 function rdKarteVollbildGeaendert() {
-  // Der Kartenkasten aendert im Vollbild schlagartig seine Groesse --
-  // ohne invalidateSize() bleibt Leaflet bei der alten Groesse stehen und
+  // Der Kartenkasten aendert im Vollbild schlagartig seine Groesse -- ohne
+  // den resize-Trigger bleibt Google Maps bei der alten Groesse stehen und
   // zeigt nur einen Ausschnitt oder graue Flaechen am Rand.
-  if (rdKarteMapa) { setTimeout(() => { if (rdKarteMapa) rdKarteMapa.invalidateSize(); }, 60); }
+  if (rdKarteMapa) { setTimeout(() => { if (rdKarteMapa) google.maps.event.trigger(rdKarteMapa, 'resize'); }, 60); }
 }
 
 // Adresssuche (ENT-267): Nominatim (OSM-Geocoder, kostenlos, kein
@@ -16062,7 +16112,8 @@ function rdKarteOrtWaehlen(i) {
   if (!t || !rdKarteMapa) return;
   $('rdKarteOrtSuche').value = t.display_name;
   $('rdKarteOrtTreffer').style.display = 'none';
-  rdKarteMapa.setView([Number(t.lat), Number(t.lon)], 17);
+  rdKarteMapa.setCenter({ lat: Number(t.lat), lng: Number(t.lon) });
+  rdKarteMapa.setZoom(17);
 }
 
 function rdKarteOrtSucheTaste(ev) {
@@ -16074,8 +16125,8 @@ function rdKarteOrtSucheTaste(ev) {
 }
 
 function rdKarteUebersichtZeichnen() {
-  // Die Listen links haengen nicht an Leaflet und werden auch gezeichnet,
-  // wenn die Karte noch nie geoeffnet wurde.
+  // Die Listen links haengen nicht an Google Maps und werden auch
+  // gezeichnet, wenn die Karte noch nie geoeffnet wurde.
   rdKarteSeiteZeichnen();
   // Ein zwischenzeitlich geloeschter Punkt darf nicht im Fenster stehen
   // bleiben. Das Formular wird hier bewusst NICHT neu gefuellt (ENT-265):
@@ -16086,7 +16137,7 @@ function rdKarteUebersichtZeichnen() {
     rdKarteDetailSchliessen();
   }
   if (!rdKarteMapa) return;
-  rdKarteLayer.forEach(l => rdKarteMapa.removeLayer(l));
+  rdKarteLayer.forEach(l => l.setMap(null));
   rdKarteLayer = [];
   rdKarteGpsPunkte().forEach(k => {
     const id = Number(k.id);
@@ -16094,17 +16145,17 @@ function rdKarteUebersichtZeichnen() {
     // Formularwerten, damit man Verschieben und Radius sofort sieht) -- sonst
     // laege er hier doppelt.
     if (id === rdKarteAuswahl) return;
-    const punkt = [Number(k.lat), Number(k.lng)];
-    const marker = L.marker(punkt).addTo(rdKarteMapa);
-    const kreis = L.circle(punkt, {
-      radius: Number(k.geofence_radius_m) || 20,
-      color: '#7c3aed', weight: 2, fillOpacity: 0.2,
-    }).addTo(rdKarteMapa);
+    const punkt = { lat: Number(k.lat), lng: Number(k.lng) };
+    const marker = new google.maps.Marker({ position: punkt, map: rdKarteMapa });
+    const kreis = new google.maps.Circle({
+      center: punkt, radius: Number(k.geofence_radius_m) || 20, map: rdKarteMapa,
+      strokeColor: '#7c3aed', strokeWeight: 2, fillColor: '#7c3aed', fillOpacity: 0.2,
+    });
     // Klick auf den Punkt oeffnet das Fenster rechts (Vorgabe
-    // Projektinhaber) -- bewusst kein Leaflet-Popup mehr: zwei Fenster
+    // Projektinhaber) -- bewusst kein Google-Infofenster mehr: zwei Fenster
     // fuer dieselbe Auskunft waeren einmal zu viel.
-    marker.on('click', () => rdKarteWaehlen(id));
-    kreis.on('click', () => rdKarteWaehlen(id));
+    marker.addListener('click', () => rdKarteWaehlen(id));
+    kreis.addListener('click', () => rdKarteWaehlen(id));
     rdKarteLayer.push(marker, kreis);
   });
   rdKarteVorschauZeichnen();
@@ -16119,22 +16170,23 @@ let rdKarteVorschau = [];
 
 function rdKarteVorschauZeichnen() {
   if (!rdKarteMapa) return;
-  rdKarteVorschau.forEach(l => rdKarteMapa.removeLayer(l));
+  rdKarteVorschau.forEach(l => l.setMap(null));
   rdKarteVorschau = [];
   if (rdKarteAuswahl === null || !$('rdKdLat')) return;
   const lat = parseFloat(String($('rdKdLat').value).replace(',', '.'));
   const lng = parseFloat(String($('rdKdLng').value).replace(',', '.'));
   if (!isFinite(lat) || !isFinite(lng)) return;
-  const marker = L.marker([lat, lng], { draggable: true }).addTo(rdKarteMapa);
-  const kreis = L.circle([lat, lng], {
-    radius: Number($('rdKdRadius').value) || 20,
-    color: '#7c3aed', weight: 4, fillOpacity: 0.35,
-  }).addTo(rdKarteMapa);
-  marker.on('drag', e => {
-    const p = e.target.getLatLng();
-    $('rdKdLat').value = p.lat.toFixed(5);
-    $('rdKdLng').value = p.lng.toFixed(5);
-    kreis.setLatLng(p);
+  const punkt = { lat, lng };
+  const marker = new google.maps.Marker({ position: punkt, map: rdKarteMapa, draggable: true });
+  const kreis = new google.maps.Circle({
+    center: punkt, radius: Number($('rdKdRadius').value) || 20, map: rdKarteMapa,
+    strokeColor: '#7c3aed', strokeWeight: 4, fillColor: '#7c3aed', fillOpacity: 0.35,
+  });
+  marker.addListener('drag', () => {
+    const p = marker.getPosition();
+    $('rdKdLat').value = p.lat().toFixed(5);
+    $('rdKdLng').value = p.lng().toFixed(5);
+    kreis.setCenter(p);
   });
   rdKarteVorschau.push(marker, kreis);
 }
@@ -16174,12 +16226,12 @@ function rdKarteWaehlen(id) {
   rdKarteAuswahl = Number(id);
   rdKarteDetailZeichnen();
   if (rdKarteMapa && k.lat !== null && k.lng !== null) {
-    // Das Fenster nimmt der Karte Breite weg -- erst invalidateSize(), dann
+    // Das Fenster nimmt der Karte Breite weg -- erst der resize-Trigger, dann
     // erneut schwenken, sonst liegt der Punkt danach halb unter dem Fenster.
     setTimeout(() => {
       if (!rdKarteMapa) return;
-      rdKarteMapa.invalidateSize();
-      rdKarteMapa.panTo([Number(k.lat), Number(k.lng)]);
+      google.maps.event.trigger(rdKarteMapa, 'resize');
+      rdKarteMapa.panTo({ lat: Number(k.lat), lng: Number(k.lng) });
     }, 30);
   }
   rdKarteUebersichtZeichnen();
@@ -16203,9 +16255,12 @@ function rdKarteDetailZeichnen() {
     // Ein neuer Punkt startet in der Mitte des sichtbaren Ausschnitts und
     // laesst sich per Klick auf die Karte versetzen -- im Fenster selbst
     // soll ausdruecklich keine zweite Karte stehen (Vorgabe Projektinhaber).
-    const mitte = rdKarteMapa ? rdKarteMapa.getCenter() : { lat: KP_KARTE_STANDARD[0], lng: KP_KARTE_STANDARD[1] };
-    $('rdKdLat').value = Number(mitte.lat).toFixed(5);
-    $('rdKdLng').value = Number(mitte.lng).toFixed(5);
+    // google.maps.Map#getCenter() liefert ein LatLng-Objekt mit
+    // Funktions-Zugriffen (.lat()/.lng()), keine einfachen Eigenschaften --
+    // anders als zuvor bei Leaflet.
+    const mitte = rdKarteMapa ? rdKarteMapa.getCenter() : null;
+    $('rdKdLat').value = (mitte ? mitte.lat() : KP_KARTE_STANDARD.lat).toFixed(5);
+    $('rdKdLng').value = (mitte ? mitte.lng() : KP_KARTE_STANDARD.lng).toFixed(5);
     $('rdKdRadius').value = 20;
     $('rdKdAktiv').checked = true;
     $('rdKdBzBeginn').checked = false;
@@ -16241,7 +16296,7 @@ function rdKdNeu() {
   // Vollstaendig neu zeichnen, nicht nur die Vorschau: der zuvor gewaehlte
   // Punkt war aus der Grundebene ausgenommen und muss jetzt wieder hinein.
   rdKarteUebersichtZeichnen();
-  setTimeout(() => { if (rdKarteMapa) rdKarteMapa.invalidateSize(); }, 30);
+  setTimeout(() => { if (rdKarteMapa) google.maps.event.trigger(rdKarteMapa, 'resize'); }, 30);
   $('rdKdName').focus();
 }
 
@@ -16305,7 +16360,7 @@ function rdKarteDetailSchliessen() {
   // Gleicher Grund wie in rdKdNeu(): der bisher gewaehlte Punkt gehoert
   // wieder in die Grundebene, sonst fehlt er auf der Karte.
   rdKarteUebersichtZeichnen();
-  if (rdKarteMapa) { setTimeout(() => { if (rdKarteMapa) rdKarteMapa.invalidateSize(); }, 30); }
+  if (rdKarteMapa) { setTimeout(() => { if (rdKarteMapa) google.maps.event.trigger(rdKarteMapa, 'resize'); }, 30); }
 }
 
 // Anzahl-Chips der Reiterleiste (ENT-260). Die noch nicht gebauten Reiter
@@ -16325,8 +16380,17 @@ function rdKrBadgesSetzen(routenAnzahl) {
 function rdKarteAnpassen() {
   if (!rdKarteMapa) return;
   const punkte = kontrollpunkte.filter(k => k.typ === 'geofence' && k.lat !== null && k.lng !== null);
-  if (!punkte.length) { rdKarteMapa.setView(KP_KARTE_STANDARD, 8); return; }
-  rdKarteMapa.fitBounds(L.latLngBounds(punkte.map(k => [Number(k.lat), Number(k.lng)])), { padding: [40, 40], maxZoom: 18 });
+  if (!punkte.length) { rdKarteMapa.setCenter(KP_KARTE_STANDARD); rdKarteMapa.setZoom(8); return; }
+  const grenzen = new google.maps.LatLngBounds();
+  punkte.forEach(k => grenzen.extend({ lat: Number(k.lat), lng: Number(k.lng) }));
+  // fitBounds() selbst kennt keine maxZoom-Grenze (anders als Leaflets
+  // dritter Parameter) -- bei einem einzelnen oder eng beieinander
+  // liegenden Punkten wuerde sie sonst viel zu nah heranzoomen. Einmaliger
+  // Nachtrag ueber "idle", danach sofort wieder abgemeldet.
+  const nachjustieren = google.maps.event.addListenerOnce(rdKarteMapa, 'idle', () => {
+    if (rdKarteMapa.getZoom() > 18) { rdKarteMapa.setZoom(18); }
+  });
+  rdKarteMapa.fitBounds(grenzen, 40);
 }
 
 function saveKr() {
