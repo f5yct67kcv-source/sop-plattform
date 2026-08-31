@@ -580,21 +580,14 @@ a.nav-item { text-decoration: none; }
   color: var(--accent); display: inline-flex; align-items: center; justify-content: center; flex: none; }
 .bk-kachel-ic svg.i { width: 28px; height: 28px; }
 .bk-kachel-lbl { font-size: 13.5px; font-weight: 600; line-height: 1.35; }
-/* Verkleinerte Kachel-Variante (ENT-274): fuer die Revierdienst-Uebersicht,
-   wo die vier Navigations-Kacheln unterhalb der echten Kennzahlen (.g-kpi)
-   nur noch zweitrangig sind -- kleiner und als Zeile (Symbol neben Text
-   statt darunter) statt der grossen, quadratischen Hauptkacheln. Eigene
-   Modifier-Klasse statt .bk-kachel selbst zu aendern: an anderer Stelle
-   (Betrieb, Kontrolle) bleiben die grossen Kacheln die einzige Landingpage-
-   Tuer, hier sind sie nur noch ein sekundaeres Sprungbrett neben den
-   Kennzahlen. Mindestens 44px Traffhoehe bleibt gewahrt (12px Polsterung +
-   34px Symbol = 58px), Hausregel fuer Bedienelemente am Handy.
+/* Verkleinerte Kachel-Variante -- Revision aus ENT-274, siehe ENT-275:
+   der Projektinhaber fand die kleine Variante nach dem Ausliefern zu klein
+   -- die Navigations-Kacheln sind die Hauptreiter dieser Seite und gingen
+   neben den Kennzahlen-Kacheln optisch unter. Eigenes Layout aus einer
+   Gegenprobe des Projektinhabers uebernommen (Kennzahlen und Navigation je
+   eigene Zeile in Originalgroesse) statt der hier zuvor stehenden
+   Modifier-Klasse -- siehe rdKpisZeichnen()/HTML fuer die neue Anordnung.
 */
-.bk-kachel-grid--klein { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; margin-bottom: 20px; }
-.bk-kachel-grid--klein .bk-kachel { flex-direction: row; justify-content: flex-start; gap: 10px; text-align: left; padding: 12px 14px; min-height: 0; }
-.bk-kachel-grid--klein .bk-kachel-ic { width: 34px; height: 34px; border-radius: 10px; }
-.bk-kachel-grid--klein .bk-kachel-ic svg.i { width: 18px; height: 18px; }
-.bk-kachel-grid--klein .bk-kachel-lbl { font-size: 12.5px; }
 /* Zurueck-Knopf oberhalb einer einzelnen Sektion -- gleiche, leichte Bauart
    wie "Zurueck zur Planung" an anderer Stelle im Haus, keine eigene
    Detailkopfzeile: Es bleibt dieselbe view-betrieb, nur eine andere
@@ -4496,7 +4489,11 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
              Haupt-Uebersicht (#kpiGrid/renderKpi()), damit es im Haus EIN
              KPI-Muster gibt statt zwei. -->
         <div class="grid g-kpi" id="rdKpiGrid"></div>
-        <div class="bk-kachel-grid bk-kachel-grid--klein">
+        <!-- Revision ENT-275: die Navigations-Kacheln sind die Hauptreiter
+             dieser Seite -- in Originalgroesse belassen (keine Verkleinerung
+             mehr), sonst gehen sie neben den Kennzahlen optisch unter
+             (Rueckmeldung Projektinhaber samt eigener Gegenprobe). -->
+        <div class="bk-kachel-grid">
           <button type="button" class="bk-kachel" onclick="rdAbschnittZeigen('liste')">
             <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M12 19h4a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2H8a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h4"/></svg></span>
             <span class="bk-kachel-lbl">Rundgänge</span>
