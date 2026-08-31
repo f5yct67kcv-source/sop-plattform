@@ -95,9 +95,10 @@ await page.waitForFunction(() => document.getElementById('rdAb-kr').style.displa
 await page.waitForTimeout(200);
 
 // ══════════ KONTROLLPUNKTE-KACHEL: TABELLE MIT ALLEN PUNKTEN DES OBJEKTS
-await page.click('#rdKrUebersicht .bk-kachel:has-text("Kontrollpunkte")');
+await page.click('#rdKrReiter .rdkr-tab:has-text("Kontrollpunkte")');
 await page.waitForTimeout(200);
-check('KRITISCH: die Übersicht (Kacheln) wird ausgeblendet', !(await page.isVisible('#rdKrUebersicht')));
+check('KRITISCH: das Formular (Reiter "Allgemeines") wird ausgeblendet', !(await page.isVisible('#rdKrAb-allgemeines')));
+check('KRITISCH (ENT-260): die Reiterleiste bleibt dabei stehen', await page.isVisible('#rdKrReiter'));
 check('KRITISCH: alle drei Kontrollpunkte des Objekts stehen da, nicht nur die dieser Runde',
   (await page.$$('#rdKpTabelle tbody tr')).length === 3);
 const tabelleText = await page.textContent('#rdKpTabelle');
@@ -150,6 +151,70 @@ check('KRITISCH: der Marker nutzt das selbst ausgelieferte Symbol, kein kaputtes
   await page.$eval('#rdKarteUebersicht .leaflet-marker-icon', img => img.complete && img.naturalWidth > 0));
 await page.screenshot({ path: `${OUT}/rg-kp-tab-01-kartenansicht.png` });
 
+// ══════════ ENT-260: LISTEN LINKS, CTA UEBER DER KARTE, DETAIL RECHTS
+// (Aufbau nach dem Referenzbild des Projektinhabers.)
+check('KRITISCH: links neben der Karte stehen beide GPS-Punkte namentlich',
+  (await page.textContent('#rdKartePunkteListe')).includes('Parkplatz')
+  && (await page.textContent('#rdKartePunkteListe')).includes('Tor Süd'));
+check('Der NFC-Punkt steht NICHT in der GPS-Punkte-Liste (er hat keinen Ort)',
+  !(await page.textContent('#rdKartePunkteListe')).includes('Hintereingang'));
+check('Die Geofence-Bereiche-Liste sagt ausdrücklich, dass es noch keine gibt',
+  (await page.textContent('#rdKarteBereiche')).includes('Keine Einträge vorhanden'));
+
+const ctaBox = await page.$eval('.rdkarte-cta', el => el.getBoundingClientRect());
+const karteBox = await page.$eval('#rdKarteUebersicht', el => el.getBoundingClientRect());
+check('KRITISCH: die beiden Anlegen-Knöpfe liegen oben rechts ÜBER der Karte (gemessen, nicht angenommen)',
+  ctaBox.top >= karteBox.top && ctaBox.top < karteBox.top + 60
+  && ctaBox.right <= karteBox.right + 1 && karteBox.right - ctaBox.right < 40);
+const listeBox = await page.$eval('#rdKartePunkteListe', el => el.getBoundingClientRect());
+check('KRITISCH: die Listen stehen links NEBEN der Karte, nicht darüber', listeBox.right <= karteBox.left + 1);
+
+// Suche in der GPS-Punkte-Liste
+await page.fill('#rdKarteSuche', 'Tor');
+await page.waitForTimeout(100);
+check('KRITISCH: die Suche engt die GPS-Punkte-Liste ein',
+  (await page.$$('#rdKartePunkteListe .rdkarte-eintrag')).length === 1);
+await page.fill('#rdKarteSuche', 'gibtesnicht');
+await page.waitForTimeout(100);
+check('"Kein Treffer" und "noch keiner angelegt" bleiben unterscheidbar',
+  (await page.textContent('#rdKartePunkteListe')).includes('Kein Treffer'));
+await page.fill('#rdKarteSuche', '');
+await page.waitForTimeout(100);
+
+// Klick auf einen Punkt AUF DER KARTE oeffnet das Detailfenster rechts
+check('Vor dem Klick ist das Detailfenster zu', !(await page.isVisible('#rdKarteDetail')));
+await page.click('#rdKarteUebersicht .leaflet-marker-icon');
+await page.waitForTimeout(250);
+check('KRITISCH: der Klick auf einen GPS-Punkt öffnet rechts das Detailfenster',
+  await page.isVisible('#rdKarteDetail'));
+const detailBox = await page.$eval('#rdKarteDetail', el => el.getBoundingClientRect());
+const karteBox2 = await page.$eval('#rdKarteUebersicht', el => el.getBoundingClientRect());
+check('KRITISCH: das Detailfenster steht rechts NEBEN der Karte', detailBox.left >= karteBox2.right - 1);
+check('Es zeigt den Namen des angeklickten Punktes', (await page.textContent('#rdKarteDetailTitel')) === 'Parkplatz');
+const detailText = await page.textContent('#rdKarteDetailInhalt');
+check('KRITISCH: es zeigt Koordinaten und Radius des Punktes',
+  detailText.includes('47.376') && detailText.includes('8.541') && detailText.includes('35'));
+check('Der zugehörige Listeneintrag links ist markiert',
+  await page.evaluate(() => document.querySelector('#rdKartePunkteListe .rdkarte-eintrag.aktiv')?.textContent.trim() === 'Parkplatz'));
+
+// Klick auf einen Listeneintrag links waehlt ebenso aus
+await page.click('#rdKartePunkteListe .rdkarte-eintrag:has-text("Tor Süd")');
+await page.waitForTimeout(250);
+check('KRITISCH: auch der Klick in der Liste links öffnet denselben Detailbereich',
+  (await page.textContent('#rdKarteDetailTitel')) === 'Tor Süd');
+
+// Bearbeiten fuehrt in den bestehenden, bereits geprueften Dialog
+await page.click('#rdKarteDetailInhalt button:has-text("Bearbeiten")');
+await page.waitForSelector('#dlgKp.on');
+check('KRITISCH: "Bearbeiten" öffnet den bestehenden Kontrollpunkt-Dialog mit DIESEM Punkt',
+  (await page.inputValue('#kpBezeichnung')) === 'Tor Süd');
+await page.click('#dlgKp .dlg-ft .btn-plain');
+await page.waitForTimeout(150);
+
+await page.click('#rdKarteDetail button:has-text("Schliessen")');
+await page.waitForTimeout(200);
+check('Das Detailfenster lässt sich wieder schliessen', !(await page.isVisible('#rdKarteDetail')));
+
 // ══════════ "+ GPS-PUNKT ANLEGEN": BESTEHENDER DIALOG, TYP GEOFENCE VORBELEGT
 await page.click('#rdKrAb-karte button:has-text("+ GPS-Punkt anlegen")');
 await page.waitForSelector('#dlgKp.on');
@@ -167,14 +232,16 @@ await page.waitForTimeout(150);
 check('KRITISCH: statt eines nicht existierenden Zeichenwerkzeugs erscheint ein Hinweis',
   await page.evaluate(() => document.getElementById('toast').classList.contains('on')));
 
-// ══════════ "ZURÜCK" AUS EINEM REITER FÜHRT ZUR KACHEL-ÜBERSICHT DIESER SEITE
-await page.click('#rdKrAb-karte .bk-zurueck');
+// ══════════ ENT-260: DER WECHSEL LAEUFT UEBER DIE REITER, NICHT UEBER ZURUECK
+check('KRITISCH: auf der Kartenansicht steht nur noch EIN Zurück-Knopf (der zur Liste)',
+  await page.evaluate(() => document.querySelectorAll('#rdAb-kr .bk-zurueck').length === 1));
+await page.click('#rdKrReiter .rdkr-tab:has-text("Allgemeines")');
 await page.waitForTimeout(150);
-check('KRITISCH: "Zurück" führt zur Kachel-Übersicht dieser Seite, nicht zur Liste',
-  await page.isVisible('#rdKrUebersicht') && await page.isVisible('#rdAb-kr') && !(await page.isVisible('#rdAb-liste')));
+check('KRITISCH: über den Reiter "Allgemeines" kommt man zum Formular, nicht zur Liste',
+  await page.isVisible('#rdKrAb-allgemeines') && await page.isVisible('#rdAb-kr') && !(await page.isVisible('#rdAb-liste')));
 
 // ══════════ NEUER PUNKT ZIEHT DIE TABELLE UND DIE KARTE SOFORT NACH
-await page.click('#rdKrUebersicht .bk-kachel:has-text("Kontrollpunkte")');
+await page.click('#rdKrReiter .rdkr-tab:has-text("Kontrollpunkte")');
 await page.waitForTimeout(150);
 await page.click('button:has-text("+ GPS-Punkt / Geofence anlegen")');
 await page.waitForTimeout(150);
@@ -189,11 +256,11 @@ await page.click('#kpBtn');
 await page.waitForTimeout(300);
 check('KRITISCH: die Karte zeigt den neuen Punkt sofort, ohne den Reiter neu zu öffnen',
   (await page.$$('#rdKarteUebersicht .leaflet-marker-icon')).length === 3);
-await page.click('#rdKrAb-karte .bk-zurueck');
-await page.waitForTimeout(150);
-await page.click('#rdKrUebersicht .bk-kachel:has-text("Kontrollpunkte")');
+await page.click('#rdKrReiter .rdkr-tab:has-text("Kontrollpunkte")');
 await page.waitForTimeout(150);
 check('KRITISCH: auch die Tabelle zeigt den neuen Punkt sofort', (await page.$$('#rdKpTabelle tbody tr')).length === 4);
+check('KRITISCH: der Anzahl-Chip am Reiter zieht ebenfalls nach (4)',
+  (await page.textContent('#rdKrKpBadge')).trim() === '4');
 KONTROLLPUNKTE.kontrollpunkte.pop();
 
 // ══════════ HANDY: BEIDE REITER ZUSAETZLICH GEPRUEFT (CLAUDE.md)

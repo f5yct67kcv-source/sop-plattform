@@ -142,31 +142,44 @@ check('KRITISCH: Klick auf die Tabellenzeile ausserhalb des Knopfes öffnet die 
   (await page.textContent('#rdKrTitel')) === 'Kontrollrunde ändern');
 check('Die richtige Zeile wird geladen', (await page.inputValue('#rdKrName')) === 'Öffnungsrunde');
 
-// ══════════ ENT-258: KLEINE ÜBERSICHT (NAME + BESCHREIBUNG) MIT
-// KACHEL-RASTER ZU SECHS UNTERBEREICHEN DARUNTER
-check('Die Übersicht (Name/Beschreibung + Kacheln) ist beim Öffnen zu sehen', await page.isVisible('#rdKrUebersicht'));
+// ══════════ ENT-260: DIE KACHELN SIND REITER -- SIE BLEIBEN STEHEN
+// (Revision der Anordnung aus ENT-258: vorher verschwand das Kachel-Raster,
+// sobald man einen Bereich öffnete. Der Projektinhaber wollte ausdrücklich,
+// dass die Kacheln "bestehen angezeigt bleiben bei Wechsel innerhalb der
+// versch. Reiter".)
+check('Beim Öffnen steht der Reiter "Allgemeines" mit Name/Beschreibung da', await page.isVisible('#rdKrAb-allgemeines'));
+check('KRITISCH: die Reiterleiste ist sichtbar', await page.isVisible('#rdKrReiter'));
 check('KRITISCH: die Beschreibung wird vorbefüllt', (await page.inputValue('#rdKrBeschreibung')) === 'Erste Kontrolle nach Schichtbeginn');
-check('KRITISCH: das Routenpunkte-Kachel zeigt die richtige Anzahl (2)', (await page.textContent('#rdKrRoutenBadge')).trim() === '2');
+check('KRITISCH: der Routenpunkte-Reiter zeigt die richtige Anzahl (2)', (await page.textContent('#rdKrRoutenBadge')).trim() === '2');
+check('KRITISCH: der Kontrollpunkte-Reiter zeigt die Anzahl aller Punkte des Objekts (2)',
+  (await page.textContent('#rdKrKpBadge')).trim() === '2');
+check('KRITISCH: der aktive Reiter ist als solcher markiert',
+  await page.evaluate(() => document.querySelector('#rdKrReiter .rdkr-tab.aktiv')?.dataset.reiter === 'allgemeines'));
 
 // „Routenpunkte" ist die einzige verdrahtete Kachel -- entspricht der
 // bisherigen Kontrollpunkte-Auswahl aus ENT-248/251.
-await page.click('#rdKrUebersicht .bk-kachel:has-text("Routenpunkte")');
-check('KRITISCH: die Routenpunkte-Kachel öffnet den eigenen Bereich, die Übersicht wird ausgeblendet',
-  await page.isVisible('#rdKrAb-routenpunkte') && !(await page.isVisible('#rdKrUebersicht')));
+await page.click('#rdKrReiter .rdkr-tab:has-text("Routenpunkte")');
+check('KRITISCH: der Routenpunkte-Reiter öffnet den eigenen Bereich, das Formular wird ausgeblendet',
+  await page.isVisible('#rdKrAb-routenpunkte') && !(await page.isVisible('#rdKrAb-allgemeines')));
+check('KRITISCH: die Reiterleiste bleibt dabei stehen', await page.isVisible('#rdKrReiter'));
+check('KRITISCH: jetzt ist der Routenpunkte-Reiter markiert',
+  await page.evaluate(() => document.querySelector('#rdKrReiter .rdkr-tab.aktiv')?.dataset.reiter === 'routenpunkte'));
 const routenInhalt = await page.textContent('#rdKrAb-routenpunkte');
 check('Die zugeordneten Punkte erscheinen dort (Eingang, Keller)', routenInhalt.includes('Eingang') && routenInhalt.includes('Keller'));
-await page.click('#rdKrAb-routenpunkte .bk-zurueck');
-check('KRITISCH: "Zurück" aus einer Kachel führt zur Übersicht dieser Seite zurück, nicht zur Liste',
-  await page.isVisible('#rdKrUebersicht') && await page.isVisible('#rdAb-kr'));
+check('KRITISCH: in einem Reiter steht KEIN zweiter Zurück-Knopf mehr (vorher zwei übereinander)',
+  await page.evaluate(() => document.querySelectorAll('#rdAb-kr .bk-zurueck').length === 1));
 
 // Eine der fünf noch unverdrahteten Kacheln stichprobenartig geprüft --
 // bleibender Hinweis statt erfundenem Inhalt (gleiches Vorgehen wie
 // ENT-225/ENT-243), Inhalt wird gemäss Projektinhaber einzeln besprochen.
-await page.click('#rdKrUebersicht .bk-kachel:has-text("Aufgaben")');
-check('Eine noch unverdrahtete Kachel zeigt einen bleibenden Hinweis statt erfundenem Inhalt',
+await page.click('#rdKrReiter .rdkr-tab:has-text("Aufgaben")');
+check('Ein noch unverdrahteter Reiter zeigt einen bleibenden Hinweis statt erfundenem Inhalt',
   (await page.textContent('#rdKrAb-aufgaben')).includes('Folgt in einem späteren Schritt.'));
-await page.click('#rdKrAb-aufgaben .bk-zurueck');
-check('Auch von dort führt "Zurück" zur Übersicht dieser Seite zurück', await page.isVisible('#rdKrUebersicht'));
+check('KRITISCH: ein unverdrahteter Reiter trägt bewusst KEINEN Anzahl-Chip ("0" hiesse fälschlich „keine")',
+  await page.evaluate(() => !document.querySelector('#rdKrReiter .rdkr-tab[data-reiter="aufgaben"] .chip')));
+await page.click('#rdKrReiter .rdkr-tab:has-text("Allgemeines")');
+check('Über den Reiter "Allgemeines" kommt man zum Formular zurück',
+  await page.isVisible('#rdKrAb-allgemeines') && await page.isVisible('#rdAb-kr'));
 
 // ══════════ BEARBEITEN: VOLLE SEITE MIT VORBEFUELLTEM NAMEN, ZWEITES OBJEKT
 calls = [];

@@ -445,16 +445,56 @@ a.nav-item { text-decoration: none; }
    Unteransicht; "Was hier noch fehlt" bleibt bewusst ohne Kachel, weil es
    keine Sektion mit eigenem Inhalt ist, nur ein Hinweis. */
 .bk-kachel-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 14px; margin-bottom: 20px; }
-/* Kontrollrunden-Seite (ENT-258, Nachbesserung derselben Entscheidung):
-   Name/Beschreibung links in fester Breite, das Kachel-Raster rechts
-   daneben auf gleicher Hoehe -- vorher stand das Formular ueber die volle
-   Seitenbreite und die Kacheln folgten erst weit darunter (Ruecksprache
-   Projektinhaber anhand Bildschirmfoto). Gleiches Fest-Breite/Flexibel-
-   Muster wie ".ep-raum" (Einsatzplanung) an anderer Stelle im Haus, hier
-   nur mit vertauschten Seiten. */
-.rdkr-uebersicht-raum { display: grid; grid-template-columns: minmax(280px, 420px) minmax(0, 1fr); gap: 20px; align-items: start; }
-.rdkr-uebersicht-raum .bk-kachel-grid { margin-bottom: 0; }
-@media (max-width: 900px) { .rdkr-uebersicht-raum { grid-template-columns: 1fr; } }
+/* Kontrollrunden-Seite (ENT-260, Revision der Anordnung aus ENT-258): die
+   Kacheln sind jetzt echte Reiter -- sie bleiben beim Wechsel zwischen den
+   Bereichen stehen, statt zu verschwinden. Damit sie in jedem Reiter Platz
+   lassen (namentlich der Kartenansicht), sind sie deutlich kleiner und
+   liegen waagrecht statt als Raster: Icon links, Beschriftung daneben,
+   Anzahl-Chip dahinter -- gleiche Bildsprache wie ".bk-kachel", nur
+   kompakt. Vorbild ist die Reiterleiste des vom Projektinhaber gezeigten
+   Fremdsystems. */
+.rdkr-reiter { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+.rdkr-tab { display: inline-flex; align-items: center; gap: 9px; background: var(--surface);
+  border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--sh-1);
+  padding: 7px 12px; min-height: 40px; cursor: pointer; font: inherit; color: inherit; }
+.rdkr-tab:hover { border-color: var(--accent-line); box-shadow: var(--sh-2); }
+.rdkr-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.rdkr-tab-ic { width: 26px; height: 26px; border-radius: 8px; background: var(--accent-soft);
+  color: var(--accent); display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.rdkr-tab-ic svg.i { width: 15px; height: 15px; }
+.rdkr-tab-lbl { font-size: 13px; font-weight: 600; line-height: 1.2; }
+.rdkr-tab.aktiv { border-color: var(--accent); background: var(--accent-soft); }
+.rdkr-tab.aktiv .rdkr-tab-ic { background: var(--accent); color: #fff; }
+/* Auf dem Handy bleiben es Bedienelemente, also mindestens 44px hoch. */
+@media (max-width: 720px) { .rdkr-tab { min-height: 44px; } }
+/* Der Reiter "Allgemeines" traegt das Formular -- weiterhin in begrenzter
+   Breite links (Vorgabe Projektinhaber aus ENT-258), nur steht jetzt die
+   Reiterleiste darueber statt das Kachel-Raster daneben. */
+.rdkr-formular { max-width: 520px; }
+/* Kartenansicht (ENT-260): links die Listen (Geofence-Bereiche, GPS-Punkte),
+   in der Mitte die Karte, rechts -- nur bei Bedarf -- das Detailfenster des
+   angeklickten GPS-Punktes. Aufbau nach dem Referenzbild des
+   Projektinhabers. */
+.rdkarte-raum { display: grid; grid-template-columns: minmax(200px, 260px) minmax(0, 1fr); gap: 14px; align-items: start; }
+.rdkarte-raum.mit-detail { grid-template-columns: minmax(200px, 260px) minmax(0, 1fr) minmax(240px, 300px); }
+.rdkarte-buehne { position: relative; }
+/* Die beiden Anlegen-Knoepfe liegen oben rechts ueber der Karte (statt in
+   einer eigenen Leiste darueber) -- so, wie es der Projektinhaber im
+   Referenzbild markiert hat. z-index ueber Leaflets eigenen Bedienelementen
+   (die sitzen hier oben links, ueberschneiden sich also nicht). */
+.rdkarte-cta { position: absolute; top: 12px; right: 12px; z-index: 1001; display: flex; gap: 8px; }
+.rdkarte-liste { max-height: 260px; overflow-y: auto; }
+.rdkarte-eintrag { display: block; width: 100%; text-align: left; background: none; border: 0;
+  border-bottom: 1px solid var(--line-soft); padding: 10px 12px; cursor: pointer; font: inherit; color: inherit; }
+.rdkarte-eintrag:last-child { border-bottom: 0; }
+.rdkarte-eintrag:hover { background: var(--line-soft); }
+.rdkarte-eintrag.aktiv { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+@media (max-width: 900px) {
+  .rdkarte-raum, .rdkarte-raum.mit-detail { grid-template-columns: 1fr; }
+  /* Auf dem Handy waere ein Ueberlagern der schmalen Karte unbrauchbar --
+     dort stehen die Knoepfe wieder als eigene Zeile darueber. */
+  .rdkarte-cta { position: static; margin-bottom: 10px; flex-wrap: wrap; }
+}
 .bk-kachel { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center;
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--sh-1);
   padding: 22px 14px; min-height: 132px; cursor: pointer; font: inherit; color: inherit; }
@@ -4417,52 +4457,73 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
              eigenen Funktionen/Klassen (rdKr*, .rdkr-panel statt
              .bk-abschnitt), damit rdAbschnittZeigen() der AEUSSEREN Ebene
              diese inneren Bereiche nicht versehentlich mittoggelt (beide
-             fragen sonst dieselbe Klasse innerhalb view-rundgaenge ab). -->
+             fragen sonst dieselbe Klasse innerhalb view-rundgaenge ab).
+
+             ENT-260: aus den Kacheln sind echte Reiter geworden -- sie
+             bleiben beim Wechsel stehen, statt zu verschwinden, und sind
+             dafuer deutlich kleiner. Das Formular ist kein eigener
+             "Startzustand" mehr, sondern der erste Reiter "Allgemeines"
+             (wie im Referenzsystem); es gibt darum nur noch EINEN
+             Zurueck-Knopf hier oben (zurueck zur Rundgang-Liste) statt
+             zusaetzlich einen je Bereich. -->
         <div class="bk-abschnitt" id="rdAb-kr" style="display:none">
         <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="rdAbschnittZeigen('liste')">Zurück</button>
 
-        <div id="rdKrUebersicht" class="rdkr-uebersicht-raum">
-          <div class="card">
-            <div class="card-hd"><h2 id="rdKrTitel">Neue Kontrollrunde</h2></div>
+        <!-- Bleibt in jedem Reiter stehen: sonst weiss man ausserhalb von
+             "Allgemeines" nicht mehr, welche Runde man gerade bearbeitet. -->
+        <h2 id="rdKrTitel" style="margin:0 0 14px">Neue Kontrollrunde</h2>
+
+        <div class="rdkr-reiter" id="rdKrReiter">
+          <button type="button" class="rdkr-tab" data-reiter="allgemeines" onclick="rdKrAbschnittZeigen('allgemeines')">
+            <span class="rdkr-tab-ic"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
+            <span class="rdkr-tab-lbl">Allgemeines</span>
+          </button>
+          <button type="button" class="rdkr-tab" data-reiter="kontrollpunkte" onclick="rdKrAbschnittZeigen('kontrollpunkte')">
+            <span class="rdkr-tab-ic"><svg class="i" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
+            <span class="rdkr-tab-lbl">Kontrollpunkte</span>
+            <span class="chip chip-n" id="rdKrKpBadge">0</span>
+          </button>
+          <button type="button" class="rdkr-tab" data-reiter="routenpunkte" onclick="rdKrAbschnittZeigen('routenpunkte')">
+            <span class="rdkr-tab-ic"><svg class="i" viewBox="0 0 24 24"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M12 19h4a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2H8a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h4"/></svg></span>
+            <span class="rdkr-tab-lbl">Routenpunkte</span>
+            <span class="chip chip-n" id="rdKrRoutenBadge">0</span>
+          </button>
+          <button type="button" class="rdkr-tab" data-reiter="karte" onclick="rdKrAbschnittZeigen('karte')">
+            <span class="rdkr-tab-ic"><svg class="i" viewBox="0 0 24 24"><polygon points="1 6 8 3 16 6 23 3 23 18 16 21 8 18 1 21"/><line x1="8" y1="3" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="21"/></svg></span>
+            <span class="rdkr-tab-lbl">Kartenansicht</span>
+          </button>
+          <button type="button" class="rdkr-tab" data-reiter="aufgaben" onclick="rdKrAbschnittZeigen('aufgaben')">
+            <span class="rdkr-tab-ic"><svg class="i" viewBox="0 0 24 24"><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><polyline points="4 6 5 7 7 5"/><polyline points="4 12 5 13 7 11"/><polyline points="4 18 5 19 7 17"/></svg></span>
+            <span class="rdkr-tab-lbl">Aufgaben</span>
+          </button>
+          <button type="button" class="rdkr-tab" data-reiter="ansprechpartner" onclick="rdKrAbschnittZeigen('ansprechpartner')">
+            <span class="rdkr-tab-ic"><svg class="i" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+            <span class="rdkr-tab-lbl">Ansprechpartner</span>
+          </button>
+          <button type="button" class="rdkr-tab" data-reiter="berichte" onclick="rdKrAbschnittZeigen('berichte')">
+            <span class="rdkr-tab-ic"><svg class="i" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
+            <span class="rdkr-tab-lbl">Berichte</span>
+          </button>
+        </div>
+
+        <div class="rdkr-panel" id="rdKrAb-allgemeines" style="display:none">
+          <div class="card rdkr-formular">
+            <div class="card-hd"><h3>Allgemeines</h3></div>
             <div class="card-bd">
               <div class="msg-err" id="rdKrErr" style="display:none"></div>
               <div class="form-grid">
                 <div class="f wide"><label for="rdKrName">Name *</label><input class="inp" id="rdKrName" placeholder="z. B. Öffnungsrunde"></div>
-                <div class="f"><label class="check" style="margin-top:26px"><input type="checkbox" id="rdKrAktiv" checked> Aktiv</label></div>
+                <!-- Das Formular steht seit ENT-260 einspaltig in begrenzter
+                     Breite -- der frueher noetige Versatz (margin-top) sollte
+                     die Beschriftung der NEBENSTEHENDEN Spalte ausgleichen und
+                     wuerde hier nur eine Luecke erzeugen. -->
+                <div class="f wide"><label class="check"><input type="checkbox" id="rdKrAktiv" checked> Aktiv</label></div>
                 <div class="f wide"><label for="rdKrBeschreibung">Beschreibung</label><textarea class="inp" id="rdKrBeschreibung" rows="2" placeholder="Optionale Notiz zu dieser Kontrollrunde"></textarea></div>
               </div>
               <div style="margin-top:16px">
                 <button class="btn btn-primary" id="rdKrBtn" onclick="rdSaveKr()">Speichern</button>
               </div>
             </div>
-          </div>
-
-          <div class="bk-kachel-grid">
-            <button type="button" class="bk-kachel" onclick="rdKrAbschnittZeigen('kontrollpunkte')">
-              <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
-              <span class="bk-kachel-lbl">Kontrollpunkte</span>
-            </button>
-            <button type="button" class="bk-kachel" onclick="rdKrAbschnittZeigen('routenpunkte')">
-              <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M12 19h4a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2H8a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h4"/></svg></span>
-              <span class="bk-kachel-lbl">Routenpunkte</span>
-              <span class="chip chip-n" id="rdKrRoutenBadge">0</span>
-            </button>
-            <button type="button" class="bk-kachel" onclick="rdKrAbschnittZeigen('karte')">
-              <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><polygon points="1 6 8 3 16 6 23 3 23 18 16 21 8 18 1 21"/><line x1="8" y1="3" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="21"/></svg></span>
-              <span class="bk-kachel-lbl">Kartenansicht</span>
-            </button>
-            <button type="button" class="bk-kachel" onclick="rdKrAbschnittZeigen('aufgaben')">
-              <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><polyline points="4 6 5 7 7 5"/><polyline points="4 12 5 13 7 11"/><polyline points="4 18 5 19 7 17"/></svg></span>
-              <span class="bk-kachel-lbl">Aufgaben</span>
-            </button>
-            <button type="button" class="bk-kachel" onclick="rdKrAbschnittZeigen('ansprechpartner')">
-              <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
-              <span class="bk-kachel-lbl">Ansprechpartner</span>
-            </button>
-            <button type="button" class="bk-kachel" onclick="rdKrAbschnittZeigen('berichte')">
-              <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
-              <span class="bk-kachel-lbl">Berichte</span>
-            </button>
           </div>
         </div>
 
@@ -4473,7 +4534,6 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
              Hinweis statt erfundenem Inhalt (gleiches Vorgehen wie
              ENT-225/ENT-243) -- ihr Inhalt wird einzeln besprochen. -->
         <div class="rdkr-panel" id="rdKrAb-routenpunkte" style="display:none">
-          <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="rdKrUebersichtZeigen()">Zurück</button>
           <div class="card">
             <div class="card-hd">
               <h3>Routenpunkte</h3>
@@ -4489,7 +4549,6 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
              "+ GPS-Punkt / Geofence anlegen" wechselt nur den Reiter zur
              Kartenansicht, oeffnet keinen Dialog (Vorgabe Projektinhaber). -->
         <div class="rdkr-panel" id="rdKrAb-kontrollpunkte" style="display:none">
-          <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="rdKrUebersichtZeigen()">Zurück</button>
           <div class="bar-tools">
             <select class="inp" id="rdKpFilterTyp" style="width:auto" onchange="rdKpTabelleZeichnen()" aria-label="Nach Typ filtern">
               <option value="">Alle Typen</option>
@@ -4517,24 +4576,50 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
              sind ein eigener, noch nicht gebauter Baustein -- eigener
              Docs-Eintrag folgt, wenn er umgesetzt wird. -->
         <div class="rdkr-panel" id="rdKrAb-karte" style="display:none">
-          <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="rdKrUebersichtZeigen()">Zurück</button>
-          <div class="bar-tools">
-            <div class="sp"></div>
-            <button class="btn btn-plain btn-sm" onclick="toast('Folgt in einem späteren Schritt.')">Geofence-Bereich anlegen</button>
-            <button class="btn btn-primary btn-sm" onclick="openKp('neu',null,'geofence')">+ GPS-Punkt anlegen</button>
+          <div class="rdkarte-raum" id="rdKarteRaum">
+            <div>
+              <div class="card" style="margin-bottom:14px">
+                <div class="card-hd"><h3>Geofence-Bereiche</h3></div>
+                <div class="card-bd flush rdkarte-liste" id="rdKarteBereiche"></div>
+              </div>
+              <div class="card">
+                <div class="card-hd"><h3>GPS-Punkte</h3></div>
+                <div class="card-bd" style="padding-bottom:0">
+                  <input class="inp" type="search" id="rdKarteSuche" placeholder="Suchen…" oninput="rdKarteSeiteZeichnen()" aria-label="GPS-Punkte durchsuchen">
+                </div>
+                <div class="card-bd flush rdkarte-liste" id="rdKartePunkteListe"></div>
+              </div>
+            </div>
+            <div class="rdkarte-buehne">
+              <div class="rdkarte-cta">
+                <button class="btn btn-plain btn-sm" onclick="toast('Folgt in einem späteren Schritt.')">Geofence-Bereich anlegen</button>
+                <button class="btn btn-primary btn-sm" onclick="openKp('neu',null,'geofence')">+ GPS-Punkt anlegen</button>
+              </div>
+              <div id="rdKarteUebersicht" style="height:520px;border-radius:var(--r);overflow:hidden;border:1px solid var(--line)"></div>
+            </div>
+            <!-- Detailfenster: oeffnet sich rechts, sobald ein GPS-Punkt auf
+                 der Karte oder in der Liste links angeklickt wird (Vorgabe
+                 Projektinhaber, Referenzbild). Bewusst nur Anzeige plus die
+                 beiden bestehenden Aktionen -- Bearbeiten fuehrt in den
+                 bereits geprueften Kontrollpunkt-Dialog (ENT-248), statt
+                 dieselben Felder ein zweites Mal zu bauen. -->
+            <aside class="card rdkarte-detail" id="rdKarteDetail" style="display:none">
+              <div class="card-hd">
+                <h3 id="rdKarteDetailTitel">GPS-Punkt</h3>
+                <div class="sp"></div>
+                <button class="btn btn-quiet btn-sm" onclick="rdKarteDetailSchliessen()" aria-label="Detailfenster schliessen">Schliessen</button>
+              </div>
+              <div class="card-bd" id="rdKarteDetailInhalt"></div>
+            </aside>
           </div>
-          <div id="rdKarteUebersicht" style="height:480px;border-radius:var(--r);overflow:hidden;border:1px solid var(--line)"></div>
         </div>
         <div class="rdkr-panel" id="rdKrAb-aufgaben" style="display:none">
-          <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="rdKrUebersichtZeigen()">Zurück</button>
           <p class="zone-note">Folgt in einem späteren Schritt.</p>
         </div>
         <div class="rdkr-panel" id="rdKrAb-ansprechpartner" style="display:none">
-          <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="rdKrUebersichtZeigen()">Zurück</button>
           <p class="zone-note">Folgt in einem späteren Schritt.</p>
         </div>
         <div class="rdkr-panel" id="rdKrAb-berichte" style="display:none">
-          <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="rdKrUebersichtZeigen()">Zurück</button>
           <p class="zone-note">Folgt in einem späteren Schritt.</p>
         </div>
         </div>
@@ -15623,6 +15708,7 @@ function krPunkteAktualisieren() {
   // ihr Ziel-Element gerade nicht existiert.
   rdKpTabelleZeichnen();
   rdKarteUebersichtZeichnen();
+  rdKrBadgesSetzen();
 }
 
 // Kontrollpunkte-Tabelle (ENT-259): ALLE Kontrollpunkte des Objekts (NFC +
@@ -15703,6 +15789,12 @@ function rdKpTabelleZeichnen() {
 // einen Hinweis statt eines erfundenen Werkzeugs.
 let rdKarteMapa = null;
 let rdKarteLayer = [];
+// Aktuell im Detailfenster gezeigter GPS-Punkt (ENT-260), oder null.
+let rdKarteAuswahl = null;
+
+function rdKarteGpsPunkte() {
+  return kontrollpunkte.filter(k => k.typ === 'geofence' && k.lat !== null && k.lng !== null);
+}
 
 function rdKarteUebersichtInit() {
   if (!$('rdKarteUebersicht')) return;
@@ -15721,17 +15813,125 @@ function rdKarteUebersichtInit() {
 }
 
 function rdKarteUebersichtZeichnen() {
+  // Die Listen links haengen nicht an Leaflet und werden auch gezeichnet,
+  // wenn die Karte noch nie geoeffnet wurde.
+  rdKarteSeiteZeichnen();
+  // Ein zwischenzeitlich geloeschter Punkt darf nicht als Detail stehen
+  // bleiben -- sonst zeigt das Fenster rechts einen Punkt, den es nicht
+  // mehr gibt.
+  if (rdKarteAuswahl !== null && !kontrollpunkte.some(k => Number(k.id) === rdKarteAuswahl)) {
+    rdKarteDetailSchliessen();
+  } else if (rdKarteAuswahl !== null) {
+    rdKarteDetailZeichnen();
+  }
   if (!rdKarteMapa) return;
   rdKarteLayer.forEach(l => rdKarteMapa.removeLayer(l));
   rdKarteLayer = [];
-  kontrollpunkte
-    .filter(k => k.typ === 'geofence' && k.lat !== null && k.lng !== null)
-    .forEach(k => {
-      const punkt = [Number(k.lat), Number(k.lng)];
-      const marker = L.marker(punkt).addTo(rdKarteMapa).bindPopup(esc(k.bezeichnung));
-      const kreis = L.circle(punkt, { radius: Number(k.geofence_radius_m) || 20, color: '#7c3aed', weight: 2 }).addTo(rdKarteMapa);
-      rdKarteLayer.push(marker, kreis);
-    });
+  rdKarteGpsPunkte().forEach(k => {
+    const id = Number(k.id);
+    const punkt = [Number(k.lat), Number(k.lng)];
+    const gewaehlt = id === rdKarteAuswahl;
+    const marker = L.marker(punkt).addTo(rdKarteMapa);
+    const kreis = L.circle(punkt, {
+      radius: Number(k.geofence_radius_m) || 20,
+      color: '#7c3aed', weight: gewaehlt ? 4 : 2, fillOpacity: gewaehlt ? 0.35 : 0.2,
+    }).addTo(rdKarteMapa);
+    // Klick auf den Punkt oeffnet das Detailfenster rechts (Vorgabe
+    // Projektinhaber) -- bewusst kein Leaflet-Popup mehr: zwei Fenster
+    // fuer dieselbe Auskunft waeren einmal zu viel.
+    marker.on('click', () => rdKarteWaehlen(id));
+    kreis.on('click', () => rdKarteWaehlen(id));
+    rdKarteLayer.push(marker, kreis);
+  });
+}
+
+// Listen links neben der Karte (ENT-260). Die Geofence-Bereiche (freie
+// Vielecke) sind noch nicht gebaut -- die Liste steht trotzdem schon da und
+// sagt ausdruecklich, dass es noch keine gibt, statt sie zu verschweigen.
+function rdKarteSeiteZeichnen() {
+  const bereiche = $('rdKarteBereiche'), liste = $('rdKartePunkteListe');
+  if (!bereiche || !liste) return;
+
+  bereiche.innerHTML = '<p class="zone-note" style="padding:12px;margin:0">Keine Einträge vorhanden. Das Werkzeug zum Zeichnen folgt in einem späteren Schritt.</p>';
+
+  const punkte = rdKarteGpsPunkte();
+  if (!punkte.length) {
+    liste.innerHTML = '<p class="zone-note" style="padding:12px;margin:0">Noch kein GPS-Punkt angelegt.</p>';
+    return;
+  }
+  const suche = ($('rdKarteSuche').value || '').trim().toLowerCase();
+  const gefiltert = suche ? punkte.filter(k => (k.bezeichnung || '').toLowerCase().includes(suche)) : punkte;
+  if (!gefiltert.length) {
+    // "Kein Treffer" und "nichts vorhanden" sind verschiedene Aussagen.
+    liste.innerHTML = '<p class="zone-note" style="padding:12px;margin:0">Kein Treffer für diese Suche.</p>';
+    return;
+  }
+  liste.innerHTML = gefiltert.map(k => {
+    const id = Number(k.id);
+    return `<button type="button" class="rdkarte-eintrag${id === rdKarteAuswahl ? ' aktiv' : ''}" onclick="rdKarteWaehlen(${id})">${esc(k.bezeichnung)}</button>`;
+  }).join('');
+}
+
+// Auswahl eines GPS-Punktes -- ausgeloest vom Klick auf der Karte oder auf
+// den Listeneintrag links. Beide Wege fuehren zum selben Ergebnis.
+function rdKarteWaehlen(id) {
+  const k = kontrollpunkte.find(x => Number(x.id) === Number(id));
+  if (!k) return;
+  rdKarteAuswahl = Number(id);
+  rdKarteDetailZeichnen();
+  if (rdKarteMapa && k.lat !== null && k.lng !== null) {
+    rdKarteMapa.panTo([Number(k.lat), Number(k.lng)]);
+    // Das Detailfenster nimmt der Karte Breite weg -- ohne invalidateSize()
+    // bleibt Leaflet bei der alten Groesse und zeichnet daneben.
+    setTimeout(() => { if (rdKarteMapa) rdKarteMapa.invalidateSize(); }, 30);
+  }
+  rdKarteUebersichtZeichnen();
+}
+
+function rdKarteDetailZeichnen() {
+  const fenster = $('rdKarteDetail'), inhalt = $('rdKarteDetailInhalt');
+  if (!fenster || !inhalt) return;
+  const k = kontrollpunkte.find(x => Number(x.id) === rdKarteAuswahl);
+  if (!k) { rdKarteDetailSchliessen(); return; }
+  $('rdKarteDetailTitel').textContent = k.bezeichnung;
+  inhalt.innerHTML = `
+    <div class="kp-meta" style="margin-bottom:4px">GPS-Punkt (Geofence)${Number(k.aktiv) ? '' : ' · <span class="chip chip-n">nicht aktiv</span>'}</div>
+    <div class="form-grid">
+      <div class="f wide"><label>Breitengrad</label><div>${nf(k.lat, 5)}</div></div>
+      <div class="f wide"><label>Längengrad</label><div>${nf(k.lng, 5)}</div></div>
+      <div class="f wide"><label>Radius</label><div>${nf(k.geofence_radius_m)} m</div></div>
+    </div>
+    <div style="display:flex;gap:7px;margin-top:14px">
+      <button class="btn btn-plain btn-sm" onclick="openKp('aendern',${Number(k.id)})">Bearbeiten</button>
+      <div style="flex:1"></div>
+      <button class="btn btn-quiet btn-sm" onclick="askDeleteKp(${Number(k.id)})">Entfernen</button>
+    </div>`;
+  fenster.style.display = '';
+  $('rdKarteRaum').classList.add('mit-detail');
+}
+
+function rdKarteDetailSchliessen() {
+  const fenster = $('rdKarteDetail');
+  if (!fenster) return;
+  rdKarteAuswahl = null;
+  fenster.style.display = 'none';
+  $('rdKarteRaum').classList.remove('mit-detail');
+  rdKarteSeiteZeichnen();
+  if (rdKarteMapa) { setTimeout(() => { if (rdKarteMapa) rdKarteMapa.invalidateSize(); }, 30); }
+}
+
+// Anzahl-Chips der Reiterleiste (ENT-260). Die noch nicht gebauten Reiter
+// bekommen bewusst KEINEN Chip: eine "0" dort hiesse "nichts vorhanden",
+// richtig waere "noch nicht erhoben" -- und "unbekannt" darf nie wie "keine"
+// aussehen.
+function rdKrBadgesSetzen(routenAnzahl) {
+  const kp = $('rdKrKpBadge');
+  if (kp) kp.textContent = String(kontrollpunkte.length);
+  const rp = $('rdKrRoutenBadge');
+  if (!rp) return;
+  rp.textContent = String(routenAnzahl !== undefined
+    ? routenAnzahl
+    : document.querySelectorAll('#rdKrPunkteListe .kr-punkt:checked').length);
 }
 
 function rdKarteAnpassen() {
@@ -15875,13 +16075,15 @@ function rdKrZeigen(modus, id) {
 
   const gewaehlt = v ? new Set(v.punkte.map(p => Number(p.id))) : new Set();
   krPunkteZeichnen(gewaehlt, 'rdKrPunkteListe');
-  $('rdKrRoutenBadge').textContent = String(gewaehlt.size);
+  rdKrBadgesSetzen(gewaehlt.size);
+  // Ein zuvor geoeffnetes Detailfenster gehoert zur vorherigen Runde und
+  // darf nicht in die naechste hinueberstehen.
+  rdKarteDetailSchliessen();
 
   rdAbschnittZeigen('kr');
-  // Jede Kontrollrunde startet auf der Uebersicht (Name/Beschreibung +
-  // Kacheln), nie auf dem zuletzt betrachteten Unterbereich der VORHERIGEN
-  // Runde -- sonst laeg's Aussehen der Seite vom Zufall ab, welche Runde man
-  // zuvor geoeffnet hatte.
+  // Jede Kontrollrunde startet auf "Allgemeines", nie auf dem zuletzt
+  // betrachteten Reiter der VORHERIGEN Runde -- sonst laege das Aussehen der
+  // Seite am Zufall, welche Runde man zuvor geoeffnet hatte.
   rdKrUebersichtZeigen();
   $('rdKrName').focus();
 }
@@ -15892,15 +16094,24 @@ function rdKrZeigen(modus, id) {
 // (Kachel-Uebersicht -> Liste -> diese Seite) diese inneren Bereiche nicht
 // versehentlich mittoggelt: beide fragen sonst dieselbe Klasse innerhalb
 // derselben view-rundgaenge ab.
+// ENT-260: Das Formular ist kein eigener "Startzustand" der Seite mehr,
+// sondern der erste Reiter "Allgemeines". Der Name bleibt, weil er an
+// mehreren Stellen als "zurueck an den Anfang dieser Seite" gemeint ist.
 function rdKrUebersichtZeigen() {
-  $('rdKrUebersicht').style.display = '';
-  document.querySelectorAll('#rdAb-kr .rdkr-panel').forEach(a => { a.style.display = 'none'; });
+  rdKrAbschnittZeigen('allgemeines');
 }
 
+// ENT-260: Die Reiterleiste bleibt in JEDEM Bereich stehen (Vorgabe
+// Projektinhaber) -- gewechselt wird nur der Inhalt darunter. Der aktive
+// Reiter wird markiert, sonst sieht man der Seite nicht mehr an, wo man ist.
 function rdKrAbschnittZeigen(id) {
-  $('rdKrUebersicht').style.display = 'none';
   document.querySelectorAll('#rdAb-kr .rdkr-panel').forEach(a => { a.style.display = 'none'; });
   $('rdKrAb-' + id).style.display = '';
+  document.querySelectorAll('#rdKrReiter .rdkr-tab').forEach(t => {
+    const ist = t.dataset.reiter === id;
+    t.classList.toggle('aktiv', ist);
+    t.setAttribute('aria-current', ist ? 'true' : 'false');
+  });
   if (id === 'kontrollpunkte') { rdKpTabelleZeichnen(); }
   if (id === 'karte') { rdKarteUebersichtInit(); }
 }
