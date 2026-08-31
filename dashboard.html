@@ -13555,7 +13555,19 @@ function revierdienstNavKlick() {
   const ziel = darf('rundgang_einsehen') ? 'rundgaenge' : 'revierdienst';
   if (navGruppeKompakt(ziel)) { return; }
   const offen = $('navg-revierdienst').classList.contains('offen');
-  if (offen && $('view-' + ziel).classList.contains('on')) {
+  // "view-<ziel> ist on" allein reicht bei "rundgaenge" NICHT, um zu pruefen,
+  // ob man schon auf dessen Landingpage steht: dieselbe Klasse bleibt auch
+  // gesetzt, waehrend man tief in einer Unterseite steckt (Rundgaenge-Liste
+  // oder eine einzelne Kontrollrunde mit ihren eigenen Reitern). Ohne diese
+  // Unterscheidung klappte ein Klick auf das Icon dort nur die Seitenleiste
+  // ein, statt zur Uebersicht zurueckzufuehren -- kein Weg mehr zurueck
+  // ausser hartem Neuladen (gemeldeter Fehler, Fortsetzung von ENT-271: dort
+  // war nur der Weg ueber den Untermenuepunkt "Uebersicht" behoben, nicht
+  // dieser hier ueber das Icon selbst).
+  const aufLandingpage = ziel === 'rundgaenge'
+    ? $('rdUebersicht').style.display !== 'none'
+    : $('view-' + ziel).classList.contains('on');
+  if (offen && aufLandingpage) {
     $('navg-revierdienst').classList.toggle('offen');
     return;
   }
