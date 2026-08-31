@@ -27,7 +27,7 @@ $lng         = isset($input['lng']) && $input['lng'] !== '' ? (float)$input['lng
 $radius      = isset($input['geofence_radius_m']) && $input['geofence_radius_m'] !== ''
     ? (int)$input['geofence_radius_m'] : 20;
 $aktiv       = !empty($input['aktiv']) ? 1 : 0;
-// GPS-Punkt-Fenster auf der Kartenansicht (ENT-263). Die beiden
+// GPS-Punkt-Fenster auf der Kartenansicht (ENT-265). Die beiden
 // Bereichszeit-Schalter werden nur GESPEICHERT -- die laufende
 // Rundgang-Durchfuehrung wertet sie noch nicht aus (ENT-182 unveraendert).
 $beschreibung = trim((string)($input['beschreibung'] ?? ''));
