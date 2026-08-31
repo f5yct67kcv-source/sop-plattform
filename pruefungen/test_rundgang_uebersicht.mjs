@@ -141,6 +141,23 @@ check('KRITISCH: rundgang_liste.php wird mit einem Zeitraum aufgerufen', !!geruf
 check('Der Zeitraum reicht mehrere Tage zurueck, nicht nur auf heute (ENT-225)',
   gerufen && gerufen.query.von !== gerufen.query.bis);
 
+// ── Kennzahlen-Kacheln (ENT-274): vier ECHTE, aus rundgang_liste.php
+// berechnete Werte -- kein erfundenes "Alarm"-Konzept, ausdrueckliche
+// Vorgabe Projektinhaber. Alle vier Testrundgaenge liegen auf HEUTE.
+const kpiTexte = await page.$$eval('#rdKpiGrid .kpi', els => els.map(e => e.textContent.replace(/\s+/g, ' ').trim()));
+check('KRITISCH: vier Kennzahlen-Kacheln stehen da, in dieser Reihenfolge',
+  kpiTexte.length === 4
+  && kpiTexte[0].includes('Aktive Wächter') && kpiTexte[1].includes('Rundgänge heute')
+  && kpiTexte[2].includes('Kontrollpunkte heute') && kpiTexte[3].includes('Abgebrochen'));
+check('KRITISCH: "Rundgänge heute" zaehlt nur die vier Testrundgaenge von HEUTE, nicht mehr',
+  kpiTexte[1].includes('4'));
+check('KRITISCH: "Kontrollpunkte heute" ist die echte Quote ueber alle Rundgaenge von heute (6 von 14 = 43 %), keine Scheinzahl',
+  kpiTexte[2].includes('43') && kpiTexte[2].includes('6 von 14 bestätigt'));
+check('KRITISCH: "Abgebrochen" zaehlt den einen Rundgang mit status=abgebrochen',
+  kpiTexte[3].includes('1'));
+check('KRITISCH: ohne Wächter-Status-Antwort zeigt "Aktive Wächter" einen Strich, keine erfundene Zahl',
+  kpiTexte[0].includes('–'));
+
 const liste = await page.textContent('#rdLetzteListe');
 check('KRITISCH: Kunde, Bereich (Objekt) und Mitarbeiter je Rundgang erscheinen',
   liste.includes('Muster Liegenschaften AG') && liste.includes('Testliegenschaft Nord') && liste.includes('Muster, Erika'));
