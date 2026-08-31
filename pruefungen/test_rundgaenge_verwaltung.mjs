@@ -43,9 +43,13 @@ const VORLAGEN_ALLE = { status: 'ok', vorlagen: [
     name: 'Schliessrunde', beschreibung: null, aktiv: 1, erstellt_am: '2026-01-02 00:00:00', punkte: [] },
 ]};
 
+// Drittes Objekt-1-Kontrollpunkt (Garage) bewusst NICHT in VORLAGEN_ALLE[10]
+// (Öffnungsrunde) enthalten -- steht fuer den Routenpunkte-Reiter als noch
+// nicht zugeordneter, hinzufuegbarer Punkt bereit (ENT-273).
 const KONTROLLPUNKTE_OBJ1 = { status: 'ok', kontrollpunkte: [
-  { id: 1, objekt_id: 1, bezeichnung: 'Eingang', typ: 'nfc', chip_id: 'A1', reihenfolge: 1, aktiv: 1 },
-  { id: 2, objekt_id: 1, bezeichnung: 'Keller', typ: 'nfc', chip_id: 'A2', reihenfolge: 2, aktiv: 1 },
+  { id: 1, objekt_id: 1, bezeichnung: 'Eingang', typ: 'nfc', chip_id: 'A1', reihenfolge: 1, aktiv: 1, beschreibung: 'Haupteingang Nord' },
+  { id: 2, objekt_id: 1, bezeichnung: 'Keller', typ: 'nfc', chip_id: 'A2', reihenfolge: 2, aktiv: 1, beschreibung: null },
+  { id: 3, objekt_id: 1, bezeichnung: 'Garage', typ: 'geofence', lat: 47.37, lng: 8.54, geofence_radius_m: 15, reihenfolge: 3, aktiv: 1, beschreibung: null },
 ]};
 
 let calls = [];
@@ -64,6 +68,41 @@ function setup(page) {
     if (path.includes('rundgang_liste')) return send({ status: 'ok', rundgaenge: [] });
     if (path.includes('revierdienst_status')) return send({ status: 'ok', leute: [] });
     if (path.includes('kontrollpunkt_liste')) return send(KONTROLLPUNKTE_OBJ1);
+    // Ebenfalls zustandsbehaftet (ENT-273): eine neu angelegte Kontrollrunde
+    // braucht eine ECHTE id, die loadRundgangVorlagen() danach auch findet --
+    // rdSaveKr() wechselt nach dem ersten Speichern direkt in den
+    // Bearbeiten-Modus derselben Runde (rdKrZeigen('aendern', data.id)),
+    // statt wie bisher immer zur Liste zu springen.
+    if (path.includes('rundgang_vorlage_save')) {
+      const body = JSON.parse(req.postData() || '{}');
+      if (body.id) {
+        const v = VORLAGEN_ALLE.vorlagen.find(x => x.id === Number(body.id));
+        if (v) { v.name = body.name; v.aktiv = body.aktiv; v.beschreibung = body.beschreibung; }
+        return send({ status: 'ok', id: Number(body.id) });
+      }
+      const neueId = Math.max(0, ...VORLAGEN_ALLE.vorlagen.map(v => v.id)) + 1;
+      VORLAGEN_ALLE.vorlagen.push({
+        id: neueId, objekt_id: body.objekt_id, name: body.name, beschreibung: body.beschreibung,
+        aktiv: body.aktiv, erstellt_am: '2026-01-03 00:00:00', punkte: [],
+      });
+      return send({ status: 'ok', id: neueId });
+    }
+    // Zustandsbehaftet (ENT-273): schreibt tatsaechlich in VORLAGEN_ALLE
+    // zurueck, statt nur "ok" zu antworten -- die Routenpunkte-Tabelle laedt
+    // nach jeder Aenderung per loadRundgangVorlagen() neu (sofort
+    // speichernd, kein Sammel-"Speichern" mehr), das muss hier also
+    // tatsaechlich wirken, sonst pruefte der Test nur sich selbst.
+    if (path.includes('rundgang_vorlage_punkte_setzen')) {
+      const body = JSON.parse(req.postData() || '{}');
+      const v = VORLAGEN_ALLE.vorlagen.find(x => x.id === Number(body.vorlage_id));
+      if (v) {
+        v.punkte = (body.kontrollpunkt_ids || []).map((id, i) => {
+          const k = KONTROLLPUNKTE_OBJ1.kontrollpunkte.find(x => x.id === Number(id));
+          return { id: Number(id), bezeichnung: k ? k.bezeichnung : '?', reihenfolge: i };
+        });
+      }
+      return send({ status: 'ok' });
+    }
     // Respektiert objekt_id -- sonst faende "Bearbeiten" fuer Objekt 2 dessen
     // eigene Vorlage nie (openKr() sucht in genau dieser Liste per id).
     if (path.includes('rundgang_vorlage_liste')) {
@@ -164,6 +203,21 @@ check('KRITISCH: der im Dialog eingetragene Name wird übernommen, nicht ein zwe
 check('KRITISCH: die Kontrollpunkte des GEWÄHLTEN Objekts (1) werden geladen, nicht irgendwelche',
   calls.some(c => c.includes('kontrollpunkt_liste')) && await page.evaluate(() => rdEinObjekt === 1));
 
+// ══════════ ROUTENPUNKTE (ENT-273): EINE NOCH NICHT GESPEICHERTE RUNDE HAT
+// KEINE vorlage_id -- rundgang_vorlage_punkte_setzen.php braucht aber genau
+// die. Der Reiter zeigt darum einen Hinweis statt einer leeren Tabelle
+// ("noch nicht gespeichert" ist etwas anderes als "keine Routenpunkte",
+// Hausregel: unbekannt darf nie wie keine aussehen) und der Hinzufuegen-
+// Knopf ist deaktiviert, statt bei Klick unklar zu scheitern.
+await page.click('#rdKrReiter .rdkr-tab[data-reiter="routenpunkte"]');
+await page.waitForTimeout(150);
+check('KRITISCH: eine noch nicht gespeicherte Runde zeigt einen Hinweis statt einer leeren Routenpunkte-Tabelle',
+  (await page.textContent('#rdKrAb-routenpunkte')).includes('Zuerst speichern'));
+check('KRITISCH: der Knopf "Routenpunkte hinzufügen" ist dabei deaktiviert',
+  await page.isDisabled('#rpHinzuOeffnenBtn'));
+await page.click('#rdKrReiter .rdkr-tab[data-reiter="allgemeines"]');
+await page.waitForTimeout(100);
+
 // ══════════ ZURÜCK ZUR HAUPTSEITE PER NAVIGATION (gemeldeter Fehler): wer
 // aus der Kontrollrunden-Bearbeitung heraus ueber die Navigation (Klick auf
 // "Revierdienst"/"Übersicht", clientseitig go('rundgaenge')) zurueckwill,
@@ -241,8 +295,8 @@ check('Beim Öffnen steht der Reiter "Allgemeines" mit Name/Beschreibung da', aw
 check('KRITISCH: die Reiterleiste ist sichtbar', await page.isVisible('#rdKrReiter'));
 check('KRITISCH: die Beschreibung wird vorbefüllt', (await page.inputValue('#rdKrBeschreibung')) === 'Erste Kontrolle nach Schichtbeginn');
 check('KRITISCH: der Routenpunkte-Reiter zeigt die richtige Anzahl (2)', (await page.textContent('#rdKrRoutenBadge')).trim() === '2');
-check('KRITISCH: der Kontrollpunkte-Reiter zeigt die Anzahl aller Punkte des Objekts (2)',
-  (await page.textContent('#rdKrKpBadge')).trim() === '2');
+check('KRITISCH: der Kontrollpunkte-Reiter zeigt die Anzahl aller Punkte des Objekts (3, inkl. dem noch nicht zugeordneten "Garage")',
+  (await page.textContent('#rdKrKpBadge')).trim() === '3');
 check('KRITISCH: der aktive Reiter ist als solcher markiert',
   await page.evaluate(() => document.querySelector('#rdKrReiter .rdkr-tab.aktiv')?.dataset.reiter === 'allgemeines'));
 
@@ -258,6 +312,72 @@ const routenInhalt = await page.textContent('#rdKrAb-routenpunkte');
 check('Die zugeordneten Punkte erscheinen dort (Eingang, Keller)', routenInhalt.includes('Eingang') && routenInhalt.includes('Keller'));
 check('KRITISCH: auf der Seite steht gar kein Zurück-Knopf mehr (ENT-261, vorher zwei übereinander)',
   await page.evaluate(() => document.querySelectorAll('#rdAb-kr .bk-zurueck').length === 0));
+
+// ══════════ ROUTENPUNKTE (ENT-273): TABELLE, HINZUFÜGEN, VERSCHIEBEN,
+// ENTFERNEN -- alles sofort speichernd, kein "Speichern"-Knopf in diesem
+// Reiter. Vorbild: Referenz-Bildschirmfotos eines Fremdsystems.
+check('KRITISCH: die Reihenfolge stimmt (Eingang vor Keller, wie in punkte[].reihenfolge)',
+  await page.evaluate(() => {
+    const namen = [...document.querySelectorAll('#rdKrRoutenTabelle tbody tr td:nth-child(2) b')].map(td => td.textContent);
+    return namen[0] === 'Eingang' && namen[1] === 'Keller';
+  }));
+check('Die Informationen-Spalte zeigt die Kontrollpunkt-Beschreibung, ein Strich wenn keine gepflegt ist',
+  routenInhalt.includes('Haupteingang Nord') && await page.evaluate(() =>
+    [...document.querySelectorAll('#rdKrRoutenTabelle tbody tr')][1].textContent.includes('–')));
+
+// ── Hinzufügen: nur der noch nicht zugeordnete Punkt (Garage) steht zur Wahl
+calls = [];
+await page.click('#rpHinzuOeffnenBtn');
+await page.waitForSelector('#dlgRpHinzu.on');
+const hinzuTexte = await page.textContent('#rpHinzuListe');
+check('KRITISCH: im Hinzufügen-Dialog steht nur der noch nicht zugeordnete Kontrollpunkt (Garage)',
+  hinzuTexte.includes('Garage') && !hinzuTexte.includes('Eingang') && !hinzuTexte.includes('Keller'));
+await page.check('#rpHinzuListe .rp-hinzu-punkt[value="3"]');
+const [hinzuAnfrage] = await Promise.all([
+  page.waitForRequest(r => r.url().includes('rundgang_vorlage_punkte_setzen') && r.method() === 'POST'),
+  page.click('#rpHinzuBtn'),
+]);
+check('KRITISCH: sofort gespeichert -- die Anfrage traegt Eingang/Keller UND das neue Garage in dieser Reihenfolge',
+  JSON.stringify(hinzuAnfrage.postDataJSON().kontrollpunkt_ids) === '[1,2,3]');
+await page.waitForFunction(() => !document.getElementById('dlgRpHinzu').classList.contains('on'));
+await page.waitForTimeout(150);
+check('Garage erscheint jetzt als dritter Routenpunkt in der Tabelle',
+  await page.evaluate(() => [...document.querySelectorAll('#rdKrRoutenTabelle tbody tr td:nth-child(2) b')]
+    .map(td => td.textContent).join('|') === 'Eingang|Keller|Garage'));
+check('KRITISCH: der Anzahl-Chip des Reiters zieht sofort nach (3)',
+  (await page.textContent('#rdKrRoutenBadge')).trim() === '3');
+
+// ── Verschieben: Garage (Rang 3) einen Platz nach oben, vor Keller
+calls = [];
+const [verschiebenAnfrage] = await Promise.all([
+  page.waitForRequest(r => r.url().includes('rundgang_vorlage_punkte_setzen') && r.method() === 'POST'),
+  page.click('#rdKrRoutenTabelle tr:has-text("Garage") button[title="Nach oben"]'),
+]);
+check('KRITISCH: Verschieben sendet die neue Reihenfolge sofort (Garage vor Keller)',
+  JSON.stringify(verschiebenAnfrage.postDataJSON().kontrollpunkt_ids) === '[1,3,2]');
+await page.waitForTimeout(150);
+check('Die Tabelle zeigt danach Eingang, Garage, Keller',
+  await page.evaluate(() => [...document.querySelectorAll('#rdKrRoutenTabelle tbody tr td:nth-child(2) b')]
+    .map(td => td.textContent).join('|') === 'Eingang|Garage|Keller'));
+
+// ── Entfernen: Keller aus dieser Runde (nicht der Kontrollpunkt selbst) --
+// mit Rueckfrage, gleiches Muster wie andere loeschende Aktionen im Haus.
+calls = [];
+await page.click('#rdKrRoutenTabelle tr:has-text("Keller") button:has-text("Entfernen")');
+await page.waitForSelector('#dlgConfirm.on');
+check('Die Rückfrage macht den Unterschied klar: nur die Zuordnung verschwindet, nicht der Kontrollpunkt',
+  (await page.textContent('#cfText')).includes('bleibt bestehen'));
+const [entfernenAnfrage] = await Promise.all([
+  page.waitForRequest(r => r.url().includes('rundgang_vorlage_punkte_setzen') && r.method() === 'POST'),
+  page.click('#cfBtn'),
+]);
+check('KRITISCH: Entfernen sendet die Liste ohne Keller (1, 3)',
+  JSON.stringify(entfernenAnfrage.postDataJSON().kontrollpunkt_ids) === '[1,3]');
+await page.waitForTimeout(150);
+check('Keller ist aus der Tabelle verschwunden, Eingang und Garage bleiben',
+  await page.evaluate(() => [...document.querySelectorAll('#rdKrRoutenTabelle tbody tr td:nth-child(2) b')]
+    .map(td => td.textContent).join('|') === 'Eingang|Garage'));
+check('Der Anzahl-Chip zeigt wieder 2', (await page.textContent('#rdKrRoutenBadge')).trim() === '2');
 
 // Eine der fünf noch unverdrahteten Kacheln stichprobenartig geprüft --
 // bleibender Hinweis statt erfundenem Inhalt (gleiches Vorgehen wie
