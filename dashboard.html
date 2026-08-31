@@ -580,6 +580,21 @@ a.nav-item { text-decoration: none; }
   color: var(--accent); display: inline-flex; align-items: center; justify-content: center; flex: none; }
 .bk-kachel-ic svg.i { width: 28px; height: 28px; }
 .bk-kachel-lbl { font-size: 13.5px; font-weight: 600; line-height: 1.35; }
+/* Verkleinerte Kachel-Variante (ENT-274): fuer die Revierdienst-Uebersicht,
+   wo die vier Navigations-Kacheln unterhalb der echten Kennzahlen (.g-kpi)
+   nur noch zweitrangig sind -- kleiner und als Zeile (Symbol neben Text
+   statt darunter) statt der grossen, quadratischen Hauptkacheln. Eigene
+   Modifier-Klasse statt .bk-kachel selbst zu aendern: an anderer Stelle
+   (Betrieb, Kontrolle) bleiben die grossen Kacheln die einzige Landingpage-
+   Tuer, hier sind sie nur noch ein sekundaeres Sprungbrett neben den
+   Kennzahlen. Mindestens 44px Traffhoehe bleibt gewahrt (12px Polsterung +
+   34px Symbol = 58px), Hausregel fuer Bedienelemente am Handy.
+*/
+.bk-kachel-grid--klein { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; margin-bottom: 20px; }
+.bk-kachel-grid--klein .bk-kachel { flex-direction: row; justify-content: flex-start; gap: 10px; text-align: left; padding: 12px 14px; min-height: 0; }
+.bk-kachel-grid--klein .bk-kachel-ic { width: 34px; height: 34px; border-radius: 10px; }
+.bk-kachel-grid--klein .bk-kachel-ic svg.i { width: 18px; height: 18px; }
+.bk-kachel-grid--klein .bk-kachel-lbl { font-size: 12.5px; }
 /* Zurueck-Knopf oberhalb einer einzelnen Sektion -- gleiche, leichte Bauart
    wie "Zurueck zur Planung" an anderer Stelle im Haus, keine eigene
    Detailkopfzeile: Es bleibt dieselbe view-betrieb, nur eine andere
@@ -4471,7 +4486,17 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
              Schublade). Bleibt innerhalb derselben view-rundgaenge, kein
              Eintrag im go()-Ansichtsregister noetig. -->
         <div class="bk-uebersicht" id="rdUebersicht">
-        <div class="bk-kachel-grid">
+        <!-- Kennzahlen (ENT-274): vier ECHTE, bereits geladene Werte -- kein
+             neues "Alarm"-Konzept erfunden, nur weil das Referenzfoto eines
+             Fremdsystems eines zeigte (ausdrueckliche Vorgabe Projektinhaber:
+             "nur interessante, reale Werte"). "Abgebrochen heute" ist der
+             naechstliegende bereits vorhandene Ersatz fuer ein Alarmsignal --
+             ein echter, schon im Datenmodell stehender Zustand (rundgang.
+             status), keine Erfindung. Dieselbe Kachel-Bauart wie die
+             Haupt-Uebersicht (#kpiGrid/renderKpi()), damit es im Haus EIN
+             KPI-Muster gibt statt zwei. -->
+        <div class="grid g-kpi" id="rdKpiGrid"></div>
+        <div class="bk-kachel-grid bk-kachel-grid--klein">
           <button type="button" class="bk-kachel" onclick="rdAbschnittZeigen('liste')">
             <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M12 19h4a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2H8a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h4"/></svg></span>
             <span class="bk-kachel-lbl">Rundgänge</span>
@@ -13280,14 +13305,77 @@ function revierdienstUebersichtOeffnen() {
   // keinen Weg mehr zurueck ausser einem harten Neuladen (gemeldet vom
   // Projektinhaber).
   rdUebersichtZeigen();
+  // Kennzahlen-Kacheln zeigen erst wieder etwas Sinnvolles, sobald neue
+  // Daten da sind -- alter Stand einer vorherigen Sitzung waere falsch.
+  rdKpiRundgaenge = null; rdKpiWaechter = null;
+  rdKpisZeichnen();
   const bis = isoTag();
   const von = plusTage(bis, -REVIERDIENST_LETZTE_TAGE);
   const ziel = $('rdLetzteListe');
   if (ziel) { ziel.innerHTML = '<div class="sk" style="height:52px"></div>'; }
   api(`rundgang_liste.php?von=${von}&bis=${bis}`).then(({ ok, data }) => {
-    renderLetzteRundgaenge(ok && data.status === 'ok' ? data.rundgaenge : null);
+    const rundgaenge = ok && data.status === 'ok' ? data.rundgaenge : null;
+    renderLetzteRundgaenge(rundgaenge);
+    rdKpiRundgaenge = rundgaenge;
+    rdKpisZeichnen();
   });
   ladeWaechterStatus();
+}
+
+// ══════════════════════ KENNZAHLEN-KACHELN (ENT-274) ═══════════════════
+// Vier ECHTE, aus den ohnehin schon geladenen Daten berechnete Werte --
+// kein neuer Endpunkt, keine Erfindung ("nur interessante, reale Werte",
+// ausdrueckliche Vorgabe Projektinhaber). Dieselbe Kachel-Bauart wie die
+// Haupt-Uebersicht (renderKpi()/.kpi), damit es im Haus EIN KPI-Muster
+// gibt statt zwei.
+let rdKpiRundgaenge = null, rdKpiWaechter = null;
+
+function rdKpisZeichnen() {
+  const ziel = $('rdKpiGrid');
+  if (!ziel) { return; }
+  const heute = isoTag();
+  const RD_IC = {
+    wache:  '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/>',
+    weg:    '<circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M12 19h4a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2H8a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h4"/>',
+    haken:  '<circle cx="12" cy="12" r="9"/><polyline points="7 12.5 10.5 16 17 8"/>',
+    warnung:'<path d="M12 3 2 20h20z"/><line x1="12" y1="9" x2="12" y2="14"/><circle cx="12" cy="17" r=".1"/>',
+  };
+  // "Skelett" nur solange BEIDE Quellen noch nie geladen haben -- danach
+  // rechnet jede Kachel unabhaengig mit dem, was sie hat (eine der beiden
+  // Anfragen kann frueher zurueckkommen als die andere).
+  if (rdKpiRundgaenge === null && rdKpiWaechter === null) {
+    ziel.innerHTML = Array(4).fill('<div class="kpi"><div class="sk" style="height:12px;width:52%"></div>'
+      + '<div class="sk" style="height:26px;width:38%;margin-top:11px"></div></div>').join('');
+    return;
+  }
+  const rgHeute = (rdKpiRundgaenge || []).filter(r => r.datum === heute);
+  const fortschrittHeute = rgHeute.reduce((s, r) => {
+    const f = r.fortschritt || { gesamt: 0, bestaetigt: 0 };
+    return { gesamt: s.gesamt + Number(f.gesamt), bestaetigt: s.bestaetigt + Number(f.bestaetigt) };
+  }, { gesamt: 0, bestaetigt: 0 });
+  const pct = fortschrittHeute.gesamt > 0 ? Math.round((fortschrittHeute.bestaetigt / fortschrittHeute.gesamt) * 100) : null;
+  const abgebrochenHeute = rgHeute.filter(r => r.status === 'abgebrochen').length;
+
+  const cards = [
+    { i: RD_IC.wache, l: 'Aktive Wächter',
+      v: rdKpiWaechter ? `${nf(rdKpiWaechter.aktiv)}<span class="unit"> / ${nf(rdKpiWaechter.eingeteilt)}</span>` : '–',
+      f: '<span>im Einsatz heute</span>' },
+    { i: RD_IC.weg, l: 'Rundgänge heute',
+      v: rdKpiRundgaenge !== null ? nf(rgHeute.length) : '–',
+      f: `<span>${nf((rdKpiRundgaenge || []).length)} in den letzten ${REVIERDIENST_LETZTE_TAGE} Tagen</span>` },
+    { i: RD_IC.haken, l: 'Kontrollpunkte heute',
+      v: pct !== null ? `${nf(pct)}<span class="unit">%</span>` : '–',
+      f: pct !== null ? `<span>${nf(fortschrittHeute.bestaetigt)} von ${nf(fortschrittHeute.gesamt)} bestätigt</span>` : '<span>Noch kein Rundgang heute</span>' },
+    { i: RD_IC.warnung, l: 'Abgebrochen',
+      v: rdKpiRundgaenge !== null ? nf(abgebrochenHeute) : '–',
+      f: '<span>Rundgänge heute</span>' },
+  ];
+  ziel.innerHTML = cards.map(c => `
+    <div class="kpi">
+      <div class="kpi-top"><svg class="i i-sm" viewBox="0 0 24 24">${c.i}</svg><span>${c.l}</span></div>
+      <div class="kpi-val">${c.v}</div>
+      <div class="kpi-foot">${c.f}</div>
+    </div>`).join('');
 }
 
 // ══════════════════════ WÄCHTER-STATUS (ENT-232) ═══════════════════════
@@ -13320,6 +13408,11 @@ function zeichneWaechterStatus(daten) {
   // gefangen, weil eine andere Suite den Endpunkt nur mit {status:'ok'}
   // beantwortet. Ein Server, der dasselbe tut, haette die Seite zerlegt.
   const leute = daten && Array.isArray(daten.leute) ? daten.leute : null;
+  // Kennzahlen-Kachel "Aktive Wächter" (ENT-274) braucht dieselbe
+  // Unterscheidung wie oben: "leute" als (auch leeres) Array bedeutet
+  // echte 0/0-Werte, null bedeutet "nicht abrufbar" -- nicht dasselbe.
+  rdKpiWaechter = leute ? daten : null;
+  rdKpisZeichnen();
   if (!leute) {
     zaehler.textContent = '';
     ziel.innerHTML = EMPTY('Status nicht verfügbar', 'Die Wächter-Übersicht konnte nicht geladen werden.');
