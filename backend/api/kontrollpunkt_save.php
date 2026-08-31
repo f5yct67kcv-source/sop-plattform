@@ -27,6 +27,13 @@ $lng         = isset($input['lng']) && $input['lng'] !== '' ? (float)$input['lng
 $radius      = isset($input['geofence_radius_m']) && $input['geofence_radius_m'] !== ''
     ? (int)$input['geofence_radius_m'] : 20;
 $aktiv       = !empty($input['aktiv']) ? 1 : 0;
+// GPS-Punkt-Fenster auf der Kartenansicht (ENT-263). Die beiden
+// Bereichszeit-Schalter werden nur GESPEICHERT -- die laufende
+// Rundgang-Durchfuehrung wertet sie noch nicht aus (ENT-182 unveraendert).
+$beschreibung = trim((string)($input['beschreibung'] ?? ''));
+$beschreibung = $beschreibung === '' ? null : $beschreibung;
+$bzBeginn    = !empty($input['bereichszeit_beginn']) ? 1 : 0;
+$bzEnde      = !empty($input['bereichszeit_ende']) ? 1 : 0;
 
 if ($objektId <= 0 || $bezeichnung === '') {
     json_response(['status' => 'error', 'message' => 'Objekt und Bezeichnung erforderlich'], 400);
@@ -49,10 +56,12 @@ if (!$objektChk->fetch()) {
 
 if ($id > 0) {
     $stmt = db()->prepare(
-        'UPDATE kontrollpunkt SET objekt_id = ?, bezeichnung = ?, reihenfolge = ?, typ = ?,
-                chip_id = ?, lat = ?, lng = ?, geofence_radius_m = ?, aktiv = ? WHERE id = ?'
+        'UPDATE kontrollpunkt SET objekt_id = ?, bezeichnung = ?, beschreibung = ?, reihenfolge = ?, typ = ?,
+                chip_id = ?, lat = ?, lng = ?, geofence_radius_m = ?, aktiv = ?,
+                bereichszeit_beginn = ?, bereichszeit_ende = ? WHERE id = ?'
     );
-    $stmt->execute([$objektId, $bezeichnung, $reihenfolge, $typ, $chipId, $lat, $lng, $radius, $aktiv, $id]);
+    $stmt->execute([$objektId, $bezeichnung, $beschreibung, $reihenfolge, $typ, $chipId, $lat, $lng, $radius, $aktiv,
+                    $bzBeginn, $bzEnde, $id]);
     $chk = db()->prepare('SELECT id FROM kontrollpunkt WHERE id = ?');
     $chk->execute([$id]);
     if (!$chk->fetch()) {
@@ -60,10 +69,12 @@ if ($id > 0) {
     }
 } else {
     $stmt = db()->prepare(
-        'INSERT INTO kontrollpunkt (objekt_id, bezeichnung, reihenfolge, typ, chip_id, lat, lng, geofence_radius_m, aktiv)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        'INSERT INTO kontrollpunkt (objekt_id, bezeichnung, beschreibung, reihenfolge, typ, chip_id, lat, lng,
+                                    geofence_radius_m, aktiv, bereichszeit_beginn, bereichszeit_ende)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     );
-    $stmt->execute([$objektId, $bezeichnung, $reihenfolge, $typ, $chipId, $lat, $lng, $radius, $aktiv]);
+    $stmt->execute([$objektId, $bezeichnung, $beschreibung, $reihenfolge, $typ, $chipId, $lat, $lng, $radius, $aktiv,
+                    $bzBeginn, $bzEnde]);
     $id = (int)db()->lastInsertId();
 }
 

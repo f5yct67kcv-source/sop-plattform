@@ -477,8 +477,12 @@ a.nav-item { text-decoration: none; }
    in der Mitte die Karte, rechts -- nur bei Bedarf -- das Detailfenster des
    angeklickten GPS-Punktes. Aufbau nach dem Referenzbild des
    Projektinhabers. */
-.rdkarte-raum { display: grid; grid-template-columns: minmax(200px, 260px) minmax(0, 1fr); gap: 14px; align-items: stretch; }
-.rdkarte-raum.mit-detail { grid-template-columns: minmax(200px, 260px) minmax(0, 1fr) minmax(240px, 300px); }
+.rdkarte-raum { --rdkarte-h: clamp(420px, calc(100vh - 265px), 900px);
+  display: grid; grid-template-columns: minmax(200px, 260px) minmax(0, 1fr); gap: 14px; align-items: stretch; }
+/* ENT-263: Das Fenster rechts ist keine reine Anzeige mehr, sondern das
+   Bearbeitungsformular selbst -- es braucht deutlich mehr Breite (Vorgabe
+   Projektinhaber, im Bildschirmfoto eingezeichnet). */
+.rdkarte-raum.mit-detail { grid-template-columns: minmax(200px, 260px) minmax(0, 1fr) minmax(340px, 420px); }
 .rdkarte-buehne { position: relative; }
 /* ENT-261: Die Karte nutzt die Bildschirmhoehe aus, und die Listenspalte
    links reicht genauso weit hinunter statt auf halber Hoehe aufzuhoeren
@@ -487,12 +491,42 @@ a.nav-item { text-decoration: none; }
    Pixelhoehe: dieselbe Skizze auf einem flacheren Bildschirm haette sonst
    eine Karte, die unten hinausragt. Das Detailfenster rechts wird
    ausdruecklich NICHT mitgestreckt -- es soll ein kleines Fenster bleiben. */
-#rdKarteUebersicht { height: clamp(420px, calc(100vh - 265px), 900px); }
+/* Der z-index:0 ist kein Schoenheitsfehler, sondern behebt einen echten
+   Fehler (ENT-263): Leaflet legt seine Ebenen intern auf z-index 400-1000.
+   Ohne eigenen Stapelkontext hier konkurrieren die direkt mit dem
+   Dialog-Schleier (.dlg-scrim, z-index 70) -- ein Dialog oeffnete sich
+   dadurch HINTER der Karte (vom Projektinhaber gemeldet, Bildschirmfoto).
+   position:relative + z-index:0 sperrt Leaflets Ebenen in diesen Kasten. */
+#rdKarteUebersicht { height: var(--rdkarte-h); position: relative; z-index: 0; }
 .rdkarte-seite { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
 .rdkarte-seite > .card:first-child { flex: none; min-height: 200px; }
 .rdkarte-seite > .card:last-child { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 .rdkarte-seite > .card:last-child .rdkarte-liste { flex: 1 1 auto; max-height: none; }
-.rdkarte-raum > .rdkarte-detail { align-self: start; }
+/* Das Fenster reicht bis zum unteren Kartenrand (Vorgabe Projektinhaber,
+   ENT-263) -- der Inhalt darin scrollt, damit ein langes Formular die Karte
+   nicht in die Laenge zieht. */
+/* Ohne die Deckelung zieht der Inhalt des Fensters die ganze Rasterzeile in
+   die Laenge und das Fenster steht tiefer als die Karte -- verlangt ist
+   "bis runtergezogen", also GENAU bis zur Kartenunterkante. */
+.rdkarte-raum > .rdkarte-detail { align-self: stretch; display: flex; flex-direction: column;
+  min-height: 0; max-height: var(--rdkarte-h); }
+.rdkarte-seite { max-height: var(--rdkarte-h); }
+.rdkarte-detail .card-bd { min-height: 0; overflow-y: auto; }
+.rdkd-reiter { display: flex; gap: 6px; padding: 0 16px 12px; flex: none; }
+.rdkd-reiter button { flex: none; }
+/* Funktionen-Tabelle im Fenster: Beschriftung links, Beginn/Ende rechts --
+   gleiche Ordnung wie im Referenzbild. */
+.rdkd-funktionen { width: 100%; border-collapse: collapse; margin-top: 6px; }
+.rdkd-funktionen th, .rdkd-funktionen td { padding: 9px 0; border-bottom: 1px solid var(--line-soft); text-align: left; }
+.rdkd-funktionen th:not(:first-child), .rdkd-funktionen td:not(:first-child) { text-align: center; width: 72px; }
+.rdkd-funktionen th { font-size: 11px; letter-spacing: .4px; text-transform: uppercase; color: var(--ink-3); }
+.rdkd-funktionen tr:last-child td { border-bottom: 0; }
+/* Fusszeile des Fensters -- eigene Klasse, weil ".card" im Haus bisher keine
+   hat (nur ".card-hd"/".card-bd"). */
+.rdkarte-detail .card-ft { display: flex; align-items: center; gap: 9px; flex: none;
+  padding: 14px 16px; border-top: 1px solid var(--line-soft); }
+.rdkarte-detail .card-ft .sp { flex: 1; }
+@media (max-width: 900px) { .rdkarte-detail .card-bd { overflow-y: visible; } }
 /* Die beiden Anlegen-Knoepfe liegen oben rechts ueber der Karte (statt in
    einer eigenen Leiste darueber) -- so, wie es der Projektinhaber im
    Referenzbild markiert hat. z-index ueber Leaflets eigenen Bedienelementen
@@ -511,7 +545,10 @@ a.nav-item { text-decoration: none; }
   .rdkarte-cta { position: static; margin-bottom: 10px; flex-wrap: wrap; }
   /* Gestapelt gibt es nichts mehr auf gleiche Hoehe zu ziehen: feste,
      handytaugliche Kartenhoehe, Listen so hoch wie ihr Inhalt. */
-  #rdKarteUebersicht { height: 420px; }
+  /* Gestapelt gibt es keine gemeinsame Zeilenhoehe mehr, an der zu decken
+     waere -- die Deckelung wuerde hier nur Inhalt abschneiden. */
+  .rdkarte-raum { --rdkarte-h: 420px; }
+  .rdkarte-raum > .rdkarte-detail, .rdkarte-seite { max-height: none; }
   .rdkarte-seite > .card:first-child { min-height: 0; }
   .rdkarte-seite > .card:last-child .rdkarte-liste { max-height: 260px; }
 }
@@ -4618,23 +4655,75 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
             <div class="rdkarte-buehne">
               <div class="rdkarte-cta">
                 <button class="btn btn-plain btn-sm" onclick="toast('Folgt in einem späteren Schritt.')">Geofence-Bereich anlegen</button>
-                <button class="btn btn-primary btn-sm" onclick="openKp('neu',null,'geofence')">+ GPS-Punkt anlegen</button>
+                <button class="btn btn-primary btn-sm" onclick="rdKdNeu()">+ GPS-Punkt anlegen</button>
               </div>
               <div id="rdKarteUebersicht" style="border-radius:var(--r);overflow:hidden;border:1px solid var(--line)"></div>
             </div>
-            <!-- Detailfenster: oeffnet sich rechts, sobald ein GPS-Punkt auf
-                 der Karte oder in der Liste links angeklickt wird (Vorgabe
-                 Projektinhaber, Referenzbild). Bewusst nur Anzeige plus die
-                 beiden bestehenden Aktionen -- Bearbeiten fuehrt in den
-                 bereits geprueften Kontrollpunkt-Dialog (ENT-248), statt
-                 dieselben Felder ein zweites Mal zu bauen. -->
+            <!-- Fenster rechts (ENT-263, Revision von ENT-260): jetzt das
+                 Bearbeitungsformular SELBST, nicht mehr nur eine Anzeige mit
+                 Sprung in den Dialog. Ausdrueckliche Vorgabe des
+                 Projektinhabers: "Ich moechte kein eigenes Fenster fuer die
+                 Bearbeitung." Es oeffnet sich beim Klick auf einen GPS-Punkt
+                 (Karte oder Liste links) und beim Anlegen eines neuen.
+                 Bewusst OHNE eigene Karte/Standortwahl darin -- die Lage ist
+                 links auf der grossen Karte zu sehen; hier stehen nur
+                 Breiten- und Laengengrad als Zahl (Vorgabe Projektinhaber).
+                 Der bestehende Dialog (ENT-248) bleibt fuer NFC-Punkte und
+                 die Einrichtung -- ein NFC-Punkt hat keine Koordinaten und
+                 gehoert darum nicht auf diese Karte. -->
             <aside class="card rdkarte-detail" id="rdKarteDetail" style="display:none">
               <div class="card-hd">
-                <h3 id="rdKarteDetailTitel">GPS-Punkt</h3>
+                <div style="min-width:0">
+                  <div class="kp-meta">GPS-Punkt</div>
+                  <h3 id="rdKarteDetailTitel">GPS-Punkt</h3>
+                </div>
                 <div class="sp"></div>
-                <button class="btn btn-quiet btn-sm" onclick="rdKarteDetailSchliessen()" aria-label="Detailfenster schliessen">Schliessen</button>
+                <button class="btn btn-quiet btn-sm" onclick="rdKarteDetailSchliessen()" aria-label="Fenster schliessen">Schliessen</button>
               </div>
-              <div class="card-bd" id="rdKarteDetailInhalt"></div>
+              <div class="bar-tools" style="padding:12px 16px 10px;margin-bottom:0">
+                <button class="btn btn-plain btn-sm" onclick="toast('Folgt in einem späteren Schritt.')">Übersicht</button>
+                <div class="sp"></div>
+                <button class="btn btn-quiet btn-sm" id="rdKdLoeschen" onclick="rdKdLoeschen()">Löschen</button>
+              </div>
+              <div class="rdkd-reiter">
+                <button type="button" class="btn btn-primary btn-sm" id="rdKdReiterAllg" onclick="rdKdReiter('allgemeines')">Allgemeines</button>
+                <button type="button" class="btn btn-plain btn-sm" id="rdKdReiterAufg" onclick="rdKdReiter('aufgaben')">Aufgaben</button>
+              </div>
+              <div class="card-bd" id="rdKdAllgemeines">
+                <div class="msg-err" id="rdKdErr" style="display:none"></div>
+                <div class="form-grid">
+                  <div class="f wide"><label for="rdKdName">Name *</label><input class="inp" id="rdKdName" placeholder="z. B. Parkplatz"></div>
+                  <div class="f wide"><label for="rdKdBeschreibung">Beschreibung</label><textarea class="inp" id="rdKdBeschreibung" rows="3" placeholder="Optionale Notiz zu diesem Punkt"></textarea></div>
+                  <div class="f wide"><label>Bereich</label><div id="rdKdBereich" class="kp-meta">–</div></div>
+                  <div class="f"><label for="rdKdLat">Breitengrad *</label><input class="inp" id="rdKdLat" inputmode="decimal" placeholder="47.3769" oninput="rdKarteVorschauZeichnen()"></div>
+                  <div class="f"><label for="rdKdLng">Längengrad *</label><input class="inp" id="rdKdLng" inputmode="decimal" placeholder="8.5417" oninput="rdKarteVorschauZeichnen()"></div>
+                  <div class="f wide"><label for="rdKdRadius">Radius (Meter)</label><input class="inp" id="rdKdRadius" type="number" min="5" step="1" value="20" oninput="rdKarteVorschauZeichnen()"></div>
+                  <div class="f wide"><label class="check"><input type="checkbox" id="rdKdAktiv" checked> Aktiv</label></div>
+                </div>
+                <table class="rdkd-funktionen">
+                  <thead><tr><th>Funktionen</th><th>Beginn</th><th>Ende</th></tr></thead>
+                  <tbody>
+                    <tr>
+                      <td>Bereichszeiterfassung</td>
+                      <td><input type="checkbox" id="rdKdBzBeginn" aria-label="Bereichszeiterfassung Beginn"></td>
+                      <td><input type="checkbox" id="rdKdBzEnde" aria-label="Bereichszeiterfassung Ende"></td>
+                    </tr>
+                  </tbody>
+                </table>
+                <!-- Kein Etikettenschwindel: die Einstellung wird gespeichert,
+                     die laufende Rundgang-Durchfuehrung wertet sie noch nicht
+                     aus (ENT-182 unveraendert). Wer das nicht weiss, haelt den
+                     Timer fuer eingerichtet. -->
+                <p class="zone-note" style="margin-top:8px">Wird gespeichert, wirkt aber noch nicht: Der Rundgang-Timer startet zurzeit weiterhin beim ersten bestätigten Scan.</p>
+              </div>
+              <div class="card-bd" id="rdKdAufgaben" style="display:none">
+                <p class="zone-note">Folgt in einem späteren Schritt.</p>
+              </div>
+              <div class="card-ft">
+                <button class="btn btn-plain btn-sm" onclick="rdKdZuruecksetzen()">Zurücksetzen</button>
+                <div class="sp"></div>
+                <button class="btn btn-primary btn-sm" id="rdKdSpeichern" onclick="rdKdSpeichern()">Speichern</button>
+              </div>
             </aside>
           </div>
         </div>
@@ -15833,6 +15922,16 @@ function rdKarteUebersichtInit() {
       maxZoom: 19,
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>',
     }).addTo(rdKarteMapa);
+    // Klick auf die Karte setzt die Lage eines NEUEN Punktes (ENT-263) --
+    // bewusst nur beim Anlegen: bei einem bestehenden Punkt wuerde ein
+    // Fehlklick ihn sonst unbemerkt versetzen. Der wird per Ziehen am
+    // Marker verschoben.
+    rdKarteMapa.on('click', e => {
+      if (rdKarteAuswahl !== 'neu') return;
+      $('rdKdLat').value = e.latlng.lat.toFixed(5);
+      $('rdKdLng').value = e.latlng.lng.toFixed(5);
+      rdKarteVorschauZeichnen();
+    });
   }
   rdKarteUebersichtZeichnen();
   // Der Reiter war eben noch unsichtbar (display:none) -- ohne
@@ -15845,33 +15944,66 @@ function rdKarteUebersichtZeichnen() {
   // Die Listen links haengen nicht an Leaflet und werden auch gezeichnet,
   // wenn die Karte noch nie geoeffnet wurde.
   rdKarteSeiteZeichnen();
-  // Ein zwischenzeitlich geloeschter Punkt darf nicht als Detail stehen
-  // bleiben -- sonst zeigt das Fenster rechts einen Punkt, den es nicht
-  // mehr gibt.
-  if (rdKarteAuswahl !== null && !kontrollpunkte.some(k => Number(k.id) === rdKarteAuswahl)) {
+  // Ein zwischenzeitlich geloeschter Punkt darf nicht im Fenster stehen
+  // bleiben. Das Formular wird hier bewusst NICHT neu gefuellt (ENT-263):
+  // diese Funktion laeuft bei jeder Aktualisierung, und ein Neufuellen
+  // wuerde laufende, noch nicht gespeicherte Eingaben verwerfen.
+  if (rdKarteAuswahl !== null && rdKarteAuswahl !== 'neu'
+      && !kontrollpunkte.some(k => Number(k.id) === rdKarteAuswahl)) {
     rdKarteDetailSchliessen();
-  } else if (rdKarteAuswahl !== null) {
-    rdKarteDetailZeichnen();
   }
   if (!rdKarteMapa) return;
   rdKarteLayer.forEach(l => rdKarteMapa.removeLayer(l));
   rdKarteLayer = [];
   rdKarteGpsPunkte().forEach(k => {
     const id = Number(k.id);
+    // Der gerade bearbeitete Punkt wird von der Vorschau gezeichnet (aus den
+    // Formularwerten, damit man Verschieben und Radius sofort sieht) -- sonst
+    // laege er hier doppelt.
+    if (id === rdKarteAuswahl) return;
     const punkt = [Number(k.lat), Number(k.lng)];
-    const gewaehlt = id === rdKarteAuswahl;
     const marker = L.marker(punkt).addTo(rdKarteMapa);
     const kreis = L.circle(punkt, {
       radius: Number(k.geofence_radius_m) || 20,
-      color: '#7c3aed', weight: gewaehlt ? 4 : 2, fillOpacity: gewaehlt ? 0.35 : 0.2,
+      color: '#7c3aed', weight: 2, fillOpacity: 0.2,
     }).addTo(rdKarteMapa);
-    // Klick auf den Punkt oeffnet das Detailfenster rechts (Vorgabe
+    // Klick auf den Punkt oeffnet das Fenster rechts (Vorgabe
     // Projektinhaber) -- bewusst kein Leaflet-Popup mehr: zwei Fenster
     // fuer dieselbe Auskunft waeren einmal zu viel.
     marker.on('click', () => rdKarteWaehlen(id));
     kreis.on('click', () => rdKarteWaehlen(id));
     rdKarteLayer.push(marker, kreis);
   });
+  rdKarteVorschauZeichnen();
+}
+
+// Vorschau des gerade bearbeiteten Punktes (ENT-263): zeichnet Marker und
+// Radius aus den FORMULARWERTEN, nicht aus dem gespeicherten Stand. Damit ist
+// ein neuer Punkt sichtbar, bevor er gespeichert ist, und eine Aenderung an
+// Radius oder Koordinaten wirkt sofort. Der Marker laesst sich ziehen -- so
+// braucht es im Fenster keine zweite Karte (Vorgabe Projektinhaber).
+let rdKarteVorschau = [];
+
+function rdKarteVorschauZeichnen() {
+  if (!rdKarteMapa) return;
+  rdKarteVorschau.forEach(l => rdKarteMapa.removeLayer(l));
+  rdKarteVorschau = [];
+  if (rdKarteAuswahl === null || !$('rdKdLat')) return;
+  const lat = parseFloat(String($('rdKdLat').value).replace(',', '.'));
+  const lng = parseFloat(String($('rdKdLng').value).replace(',', '.'));
+  if (!isFinite(lat) || !isFinite(lng)) return;
+  const marker = L.marker([lat, lng], { draggable: true }).addTo(rdKarteMapa);
+  const kreis = L.circle([lat, lng], {
+    radius: Number($('rdKdRadius').value) || 20,
+    color: '#7c3aed', weight: 4, fillOpacity: 0.35,
+  }).addTo(rdKarteMapa);
+  marker.on('drag', e => {
+    const p = e.target.getLatLng();
+    $('rdKdLat').value = p.lat.toFixed(5);
+    $('rdKdLng').value = p.lng.toFixed(5);
+    kreis.setLatLng(p);
+  });
+  rdKarteVorschau.push(marker, kreis);
 }
 
 // Listen links neben der Karte (ENT-260). Die Geofence-Bereiche (freie
@@ -15909,34 +16041,126 @@ function rdKarteWaehlen(id) {
   rdKarteAuswahl = Number(id);
   rdKarteDetailZeichnen();
   if (rdKarteMapa && k.lat !== null && k.lng !== null) {
-    rdKarteMapa.panTo([Number(k.lat), Number(k.lng)]);
-    // Das Detailfenster nimmt der Karte Breite weg -- ohne invalidateSize()
-    // bleibt Leaflet bei der alten Groesse und zeichnet daneben.
-    setTimeout(() => { if (rdKarteMapa) rdKarteMapa.invalidateSize(); }, 30);
+    // Das Fenster nimmt der Karte Breite weg -- erst invalidateSize(), dann
+    // erneut schwenken, sonst liegt der Punkt danach halb unter dem Fenster.
+    setTimeout(() => {
+      if (!rdKarteMapa) return;
+      rdKarteMapa.invalidateSize();
+      rdKarteMapa.panTo([Number(k.lat), Number(k.lng)]);
+    }, 30);
   }
   rdKarteUebersichtZeichnen();
 }
 
+// Fenster rechts (ENT-263): Bearbeitungsformular, nicht mehr nur Anzeige.
+// rdKarteAuswahl ist entweder die id eines bestehenden Punktes oder 'neu'.
 function rdKarteDetailZeichnen() {
-  const fenster = $('rdKarteDetail'), inhalt = $('rdKarteDetailInhalt');
-  if (!fenster || !inhalt) return;
-  const k = kontrollpunkte.find(x => Number(x.id) === rdKarteAuswahl);
-  if (!k) { rdKarteDetailSchliessen(); return; }
-  $('rdKarteDetailTitel').textContent = k.bezeichnung;
-  inhalt.innerHTML = `
-    <div class="kp-meta" style="margin-bottom:4px">GPS-Punkt (Geofence)${Number(k.aktiv) ? '' : ' · <span class="chip chip-n">nicht aktiv</span>'}</div>
-    <div class="form-grid">
-      <div class="f wide"><label>Breitengrad</label><div>${nf(k.lat, 5)}</div></div>
-      <div class="f wide"><label>Längengrad</label><div>${nf(k.lng, 5)}</div></div>
-      <div class="f wide"><label>Radius</label><div>${nf(k.geofence_radius_m)} m</div></div>
-    </div>
-    <div style="display:flex;gap:7px;margin-top:14px">
-      <button class="btn btn-plain btn-sm" onclick="openKp('aendern',${Number(k.id)})">Bearbeiten</button>
-      <div style="flex:1"></div>
-      <button class="btn btn-quiet btn-sm" onclick="askDeleteKp(${Number(k.id)})">Entfernen</button>
-    </div>`;
+  const fenster = $('rdKarteDetail');
+  if (!fenster) return;
+  const neu = rdKarteAuswahl === 'neu';
+  const k = neu ? null : kontrollpunkte.find(x => Number(x.id) === rdKarteAuswahl);
+  if (!neu && !k) { rdKarteDetailSchliessen(); return; }
+
+  $('rdKarteDetailTitel').textContent = neu ? 'Neuer GPS-Punkt' : k.bezeichnung;
+  $('rdKdName').value = neu ? '' : k.bezeichnung;
+  $('rdKdBeschreibung').value = !neu && k.beschreibung ? k.beschreibung : '';
+  const objekt = objekte.find(o => Number(o.id) === Number(rdEinObjekt));
+  $('rdKdBereich').textContent = objekt ? objekt.name : '–';
+  if (neu) {
+    // Ein neuer Punkt startet in der Mitte des sichtbaren Ausschnitts und
+    // laesst sich per Klick auf die Karte versetzen -- im Fenster selbst
+    // soll ausdruecklich keine zweite Karte stehen (Vorgabe Projektinhaber).
+    const mitte = rdKarteMapa ? rdKarteMapa.getCenter() : { lat: KP_KARTE_STANDARD[0], lng: KP_KARTE_STANDARD[1] };
+    $('rdKdLat').value = Number(mitte.lat).toFixed(5);
+    $('rdKdLng').value = Number(mitte.lng).toFixed(5);
+    $('rdKdRadius').value = 20;
+    $('rdKdAktiv').checked = true;
+    $('rdKdBzBeginn').checked = false;
+    $('rdKdBzEnde').checked = false;
+  } else {
+    $('rdKdLat').value = k.lat === null ? '' : k.lat;
+    $('rdKdLng').value = k.lng === null ? '' : k.lng;
+    $('rdKdRadius').value = k.geofence_radius_m;
+    $('rdKdAktiv').checked = !!Number(k.aktiv);
+    $('rdKdBzBeginn').checked = !!Number(k.bereichszeit_beginn);
+    $('rdKdBzEnde').checked = !!Number(k.bereichszeit_ende);
+  }
+  $('rdKdErr').style.display = 'none';
+  // Bei einem noch nicht gespeicherten Punkt gibt es nichts zu loeschen.
+  $('rdKdLoeschen').textContent = neu ? 'Verwerfen' : 'Löschen';
+  rdKdReiter('allgemeines');
   fenster.style.display = '';
   $('rdKarteRaum').classList.add('mit-detail');
+}
+
+function rdKdReiter(id) {
+  const allg = id === 'allgemeines';
+  $('rdKdAllgemeines').style.display = allg ? '' : 'none';
+  $('rdKdAufgaben').style.display = allg ? 'none' : '';
+  $('rdKdReiterAllg').className = 'btn btn-sm ' + (allg ? 'btn-primary' : 'btn-plain');
+  $('rdKdReiterAufg').className = 'btn btn-sm ' + (allg ? 'btn-plain' : 'btn-primary');
+}
+
+// "+ GPS-Punkt anlegen": oeffnet dasselbe Fenster leer, keinen Dialog mehr.
+function rdKdNeu() {
+  rdKarteAuswahl = 'neu';
+  rdKarteDetailZeichnen();
+  // Vollstaendig neu zeichnen, nicht nur die Vorschau: der zuvor gewaehlte
+  // Punkt war aus der Grundebene ausgenommen und muss jetzt wieder hinein.
+  rdKarteUebersichtZeichnen();
+  setTimeout(() => { if (rdKarteMapa) rdKarteMapa.invalidateSize(); }, 30);
+  $('rdKdName').focus();
+}
+
+function rdKdZuruecksetzen() {
+  rdKarteDetailZeichnen();
+  rdKarteVorschauZeichnen();
+}
+
+function rdKdLoeschen() {
+  if (rdKarteAuswahl === 'neu') { rdKarteDetailSchliessen(); return; }
+  askDeleteKp(rdKarteAuswahl);
+}
+
+function rdKdSpeichern() {
+  const err = $('rdKdErr'); err.style.display = 'none';
+  const name = $('rdKdName').value.trim();
+  const lat = parseFloat(String($('rdKdLat').value).replace(',', '.'));
+  const lng = parseFloat(String($('rdKdLng').value).replace(',', '.'));
+  if (!name) { err.textContent = 'Name erforderlich.'; err.style.display = ''; return; }
+  if (!isFinite(lat) || !isFinite(lng)) {
+    err.textContent = 'Breiten- und Längengrad erforderlich — Punkt auf der Karte anklicken oder Werte eintragen.';
+    err.style.display = ''; return;
+  }
+  const neu = rdKarteAuswahl === 'neu';
+  const body = {
+    objekt_id: rdEinObjekt,
+    bezeichnung: name,
+    beschreibung: $('rdKdBeschreibung').value.trim(),
+    typ: 'geofence',
+    lat, lng,
+    geofence_radius_m: Number($('rdKdRadius').value) || 20,
+    aktiv: $('rdKdAktiv').checked ? 1 : 0,
+    bereichszeit_beginn: $('rdKdBzBeginn').checked ? 1 : 0,
+    bereichszeit_ende: $('rdKdBzEnde').checked ? 1 : 0,
+    reihenfolge: neu
+      ? (kontrollpunkte.length ? Math.max(...kontrollpunkte.map(x => Number(x.reihenfolge))) + 1 : 0)
+      : Number(kontrollpunkte.find(x => Number(x.id) === rdKarteAuswahl).reihenfolge),
+  };
+  if (!neu) { body.id = rdKarteAuswahl; }
+
+  const b = $('rdKdSpeichern'); b.disabled = true;
+  api('kontrollpunkt_save.php', { method: 'POST', body }).then(({ ok, data }) => {
+    b.disabled = false;
+    if (!ok || data.status !== 'ok') { err.textContent = data.message || 'Speichern fehlgeschlagen.'; err.style.display = ''; return; }
+    const zielId = Number(data.id);
+    loadKontrollpunkte().then(() => {
+      rdKarteAuswahl = zielId;
+      krPunkteAktualisieren();
+      rdKarteVorschauZeichnen();
+      toast('GPS-Punkt gespeichert.');
+    });
+  });
 }
 
 function rdKarteDetailSchliessen() {
@@ -15945,7 +16169,9 @@ function rdKarteDetailSchliessen() {
   rdKarteAuswahl = null;
   fenster.style.display = 'none';
   $('rdKarteRaum').classList.remove('mit-detail');
-  rdKarteSeiteZeichnen();
+  // Gleicher Grund wie in rdKdNeu(): der bisher gewaehlte Punkt gehoert
+  // wieder in die Grundebene, sonst fehlt er auf der Karte.
+  rdKarteUebersichtZeichnen();
   if (rdKarteMapa) { setTimeout(() => { if (rdKarteMapa) rdKarteMapa.invalidateSize(); }, 30); }
 }
 

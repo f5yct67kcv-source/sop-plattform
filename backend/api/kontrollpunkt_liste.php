@@ -16,7 +16,8 @@ if ($objektId <= 0) {
 }
 
 $stmt = db()->prepare(
-    'SELECT id, objekt_id, bezeichnung, reihenfolge, typ, chip_id, lat, lng, geofence_radius_m, aktiv
+    'SELECT id, objekt_id, bezeichnung, beschreibung, reihenfolge, typ, chip_id, lat, lng, geofence_radius_m,
+            aktiv, bereichszeit_beginn, bereichszeit_ende
      FROM kontrollpunkt WHERE objekt_id = ? ORDER BY reihenfolge, id'
 );
 $stmt->execute([$objektId]);
