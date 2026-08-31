@@ -13,7 +13,7 @@ jobs:
 
       - name: Platzhalter durch echte Werte ersetzen
         run: |
-          mkdir -p dist/api dist/icons dist/fonts dist/leaflet/images
+          mkdir -p dist/api dist/icons dist/fonts
           cp index.html dist/index.html
           cp dashboard.html dist/dashboard.html
           cp app.html dist/app.html
@@ -34,14 +34,11 @@ jobs:
           # laden" per JS nachgeladen, deshalb kein literales <script>-Tag im
           # HTML -- test_deploy.mjs prueft trotzdem, dass sie hier steht.
           cp html2pdf.bundle.min.js dist/html2pdf.bundle.min.js
-          # Leaflet (ENT-248): selbst ausgeliefert wie html2pdf oben, damit
-          # die Kontrollpunkt-Karte kein CDN und keinen API-Key braucht.
-          # leaflet.css verweist per url(images/...) auf vier Bilddateien --
-          # fehlen sie hier, bleiben Markierung und Zoom-Regler unsichtbar,
-          # ohne dass irgendetwas abstuerzt.
-          cp leaflet/leaflet.js dist/leaflet/leaflet.js
-          cp leaflet/leaflet.css dist/leaflet/leaflet.css
-          cp leaflet/images/*.png dist/leaflet/images/
+          # Leaflet ist seit ENT-269 nicht mehr im Einsatz (Google Maps statt
+          # Leaflet/OpenStreetMap fuer die Kontrollpunkt-Kartenauswahl,
+          # Revision von ENT-248) -- kein Ordner mehr auszuliefern. Google
+          # Maps wird per <script src="https://maps.googleapis.com/..."> in
+          # dashboard.html selbst geladen, kein lokaler Kopiervorgang noetig.
           cp manifest.json dist/manifest.json
           cp sw.js dist/sw.js
           cp icons/*.png dist/icons/

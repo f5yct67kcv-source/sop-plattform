@@ -6,6 +6,7 @@
 // richtig bedient und das Recht 'rundgang_verwalten' tatsaechlich entscheidet,
 // ob die Zone ueberhaupt erscheint.
 import { WURZEL, HIER, OUT, browserPfad } from './pfade.mjs';
+import { GOOGLE_MAPS_MOCK } from './google_maps_mock.mjs';
 import { chromium } from 'playwright';
 
 const URL = `file://${WURZEL}/dashboard.html`;
@@ -59,6 +60,15 @@ async function setup(page, rechte) {
     if (path.includes('kontrollpunkt_loeschen')) return send({ status: 'ok' });
     return send({ status: 'ok' });
   });
+  // Diese Suite oeffnet den Kartendialog nicht selbst, aber der Kontrollpunkt
+  // "Parkplatz" hat bereits lat/lng gesetzt -- reicht, um beim Bearbeiten
+  // Google Maps ueber googleMapsLaden() nachzuladen (ENT-269). Ohne diese
+  // Route faengt die allgemeine "/api/"-Route oben die Maps-Anfrage
+  // faelschlich ab (Pfadstueck "/maps/api/js" trifft "**/api/**") und liefert
+  // JSON statt JavaScript aus -- muss deshalb NACH ihr registriert werden
+  // (Playwright ruft bei mehreren Treffern die zuletzt registrierte zuerst).
+  await page.route('**/maps.googleapis.com/**', route =>
+    route.fulfill({ status: 200, contentType: 'application/javascript', body: GOOGLE_MAPS_MOCK }));
 }
 
 const ok = [], bad = [];
