@@ -580,13 +580,14 @@ a.nav-item { text-decoration: none; }
   color: var(--accent); display: inline-flex; align-items: center; justify-content: center; flex: none; }
 .bk-kachel-ic svg.i { width: 28px; height: 28px; }
 .bk-kachel-lbl { font-size: 13.5px; font-weight: 600; line-height: 1.35; }
-/* Verkleinerte Kachel-Variante -- Revision aus ENT-274, siehe ENT-275:
+/* Verkleinerte Kachel-Variante -- Revision aus ENT-274, siehe ENT-275/276:
    der Projektinhaber fand die kleine Variante nach dem Ausliefern zu klein
    -- die Navigations-Kacheln sind die Hauptreiter dieser Seite und gingen
    neben den Kennzahlen-Kacheln optisch unter. Eigenes Layout aus einer
-   Gegenprobe des Projektinhabers uebernommen (Kennzahlen und Navigation je
-   eigene Zeile in Originalgroesse) statt der hier zuvor stehenden
-   Modifier-Klasse -- siehe rdKpisZeichnen()/HTML fuer die neue Anordnung.
+   Gegenprobe des Projektinhabers uebernommen (Navigations-Kacheln ganz
+   oben, Kennzahlen und "Waechter-Status" als zweite Zeile darunter statt
+   der hier zuvor stehenden Modifier-Klasse) -- siehe rdKpisZeichnen()/HTML
+   fuer die Anordnung.
 */
 /* Zurueck-Knopf oberhalb einer einzelnen Sektion -- gleiche, leichte Bauart
    wie "Zurueck zur Planung" an anderer Stelle im Haus, keine eigene
@@ -605,6 +606,16 @@ a.nav-item { text-decoration: none; }
 .g-kpi { grid-template-columns: repeat(4, 1fr); }
 .g-2-1 { grid-template-columns: 2fr 1fr; align-items: start; }
 .g-1-1 { grid-template-columns: 1fr 1fr; align-items: start; }
+/* Revierdienst-Kennzahlen (ENT-276): eigener 2x2-Block neben "Waechter-
+   Status" statt einer vollen 4er-Zeile -- eigene ID-Regel statt die
+   gemeinsame .g-kpi-Basis zu aendern, die auch die Haupt-Uebersicht nutzt.
+   Unter 560px (siehe rdUebersicht-Zeile weiter unten) faellt die Zeile
+   ohnehin auf eine Spalte zusammen; dort soll auch dieser Block ein-
+   spaltig werden, nicht zweispaltig-schmal bleiben. */
+#rdKpiGrid { grid-template-columns: repeat(2, 1fr); }
+@media (max-width: 560px) {
+  #rdKpiGrid { grid-template-columns: 1fr; }
+}
 
 /* KPI */
 .kpi { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 18px 20px; box-shadow: var(--sh-1); }
@@ -4479,20 +4490,10 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
              Schublade). Bleibt innerhalb derselben view-rundgaenge, kein
              Eintrag im go()-Ansichtsregister noetig. -->
         <div class="bk-uebersicht" id="rdUebersicht">
-        <!-- Kennzahlen (ENT-274): vier ECHTE, bereits geladene Werte -- kein
-             neues "Alarm"-Konzept erfunden, nur weil das Referenzfoto eines
-             Fremdsystems eines zeigte (ausdrueckliche Vorgabe Projektinhaber:
-             "nur interessante, reale Werte"). "Abgebrochen heute" ist der
-             naechstliegende bereits vorhandene Ersatz fuer ein Alarmsignal --
-             ein echter, schon im Datenmodell stehender Zustand (rundgang.
-             status), keine Erfindung. Dieselbe Kachel-Bauart wie die
-             Haupt-Uebersicht (#kpiGrid/renderKpi()), damit es im Haus EIN
-             KPI-Muster gibt statt zwei. -->
-        <div class="grid g-kpi" id="rdKpiGrid"></div>
-        <!-- Revision ENT-275: die Navigations-Kacheln sind die Hauptreiter
-             dieser Seite -- in Originalgroesse belassen (keine Verkleinerung
-             mehr), sonst gehen sie neben den Kennzahlen optisch unter
-             (Rueckmeldung Projektinhaber samt eigener Gegenprobe). -->
+        <!-- Revision ENT-276: die Navigations-Kacheln sind die Hauptreiter
+             dieser Seite und stehen deshalb ganz oben -- Rueckmeldung des
+             Projektinhabers anhand einer eigenen Skizze, nachdem ENT-275
+             die Reihenfolge (Kennzahlen zuerst) noch falsch hatte. -->
         <div class="bk-kachel-grid">
           <button type="button" class="bk-kachel" onclick="rdAbschnittZeigen('liste')">
             <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M12 19h4a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2H8a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h4"/></svg></span>
@@ -4512,17 +4513,31 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
           </button>
         </div>
 
-        <!-- Waechter-Status (ENT-232): die Frage, die die Einsatzleitung
-             beim Oeffnen dieser Seite tatsaechlich hat -- wer ist heute
-             draussen und was macht er gerade. Steht ueber "Letzte
-             Rundgaenge", weil das Jetzt vor dem Rueckblick kommt. -->
-        <div class="card" style="margin-top:20px">
-          <div class="card-hd">
-            <h2>Wächter-Status</h2>
-            <div class="sp"></div>
-            <span class="note" id="wsZaehler"></span>
+        <!-- Waechter-Status (ENT-232) und Kennzahlen (ENT-274) als zweite
+             Zeile: die Frage, die die Einsatzleitung beim Oeffnen dieser
+             Seite tatsaechlich hat (wer ist heute draussen), steht direkt
+             neben den Kennzahlen -- beide vor "Letzte Rundgaenge", weil das
+             Jetzt vor dem Rueckblick kommt. Kennzahlen als eigener
+             2x2-Block (#rdKpiGrid) statt voller 4er-Zeile, damit er neben
+             "Waechter-Status" passt -- kein neues "Alarm"-Konzept erfunden,
+             nur weil das Referenzfoto eines Fremdsystems eines zeigte
+             (ausdrueckliche Vorgabe Projektinhaber: "nur interessante,
+             reale Werte"). "Abgebrochen heute" ist der naechstliegende
+             bereits vorhandene Ersatz fuer ein Alarmsignal -- ein echter,
+             schon im Datenmodell stehender Zustand (rundgang.status), keine
+             Erfindung. Dieselbe Kachel-Bauart wie die Haupt-Uebersicht
+             (#kpiGrid/renderKpi()), damit es im Haus EIN KPI-Muster gibt
+             statt zwei. -->
+        <div class="grid g-1-1">
+          <div class="card">
+            <div class="card-hd">
+              <h2>Wächter-Status</h2>
+              <div class="sp"></div>
+              <span class="note" id="wsZaehler"></span>
+            </div>
+            <div class="card-bd"><div class="ws-liste" id="wsListe"></div></div>
           </div>
-          <div class="card-bd"><div class="ws-liste" id="wsListe"></div></div>
+          <div class="grid g-kpi" id="rdKpiGrid"></div>
         </div>
 
         <div class="card" style="margin-top:20px">
