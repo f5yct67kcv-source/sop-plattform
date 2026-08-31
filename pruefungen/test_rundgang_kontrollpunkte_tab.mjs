@@ -36,12 +36,14 @@ const OBJEKTE = { status: 'ok', objekte: [
 ]};
 
 const KONTROLLPUNKTE = { status: 'ok', kontrollpunkte: [
-  { id: 1, objekt_id: 1, bezeichnung: 'Hintereingang', reihenfolge: 1, typ: 'nfc', chip_id: 'AB12',
-    lat: null, lng: null, geofence_radius_m: 20, aktiv: 1 },
-  { id: 2, objekt_id: 1, bezeichnung: 'Parkplatz', reihenfolge: 2, typ: 'geofence', chip_id: null,
-    lat: 47.37690, lng: 8.54170, geofence_radius_m: 35, aktiv: 1 },
-  { id: 3, objekt_id: 1, bezeichnung: 'Tor Süd', reihenfolge: 3, typ: 'geofence', chip_id: null,
-    lat: 47.37820, lng: 8.54350, geofence_radius_m: 15, aktiv: 0 },
+  { id: 1, objekt_id: 1, bezeichnung: 'Hintereingang', beschreibung: null, reihenfolge: 1, typ: 'nfc', chip_id: 'AB12',
+    lat: null, lng: null, geofence_radius_m: 20, aktiv: 1, bereichszeit_beginn: 0, bereichszeit_ende: 0 },
+  { id: 2, objekt_id: 1, bezeichnung: 'Parkplatz', beschreibung: null, reihenfolge: 2, typ: 'geofence', chip_id: null,
+    lat: 47.37690, lng: 8.54170, geofence_radius_m: 35, aktiv: 1, bereichszeit_beginn: 0, bereichszeit_ende: 0 },
+  // "Tor Süd" traegt den Bereichszeit-Beginn -- damit prueft die Suite, dass
+  // der gespeicherte Stand der Schalter wirklich uebernommen wird (ENT-263).
+  { id: 3, objekt_id: 1, bezeichnung: 'Tor Süd', beschreibung: null, reihenfolge: 3, typ: 'geofence', chip_id: null,
+    lat: 47.37820, lng: 8.54350, geofence_radius_m: 15, aktiv: 0, bereichszeit_beginn: 1, bereichszeit_ende: 0 },
 ]};
 
 const VORLAGEN_ALLE = { status: 'ok', vorlagen: [
@@ -69,7 +71,13 @@ function setup(page) {
     if (path.includes('rundgang_liste')) return send({ status: 'ok', rundgaenge: [] });
     if (path.includes('revierdienst_status')) return send({ status: 'ok', leute: [] });
     if (path.includes('kontrollpunkt_liste')) return send(KONTROLLPUNKTE);
-    if (path.includes('kontrollpunkt_save')) return send({ status: 'ok', id: 99 });
+    // Echte Antwort nachstellen: Beim Aendern gibt der Server dieselbe id
+    // zurueck, beim Anlegen die neue. Eine feste Fantasie-id waehlt im
+    // Fenster sonst einen Punkt aus, den es nicht gibt.
+    if (path.includes('kontrollpunkt_save')) {
+      const letzte = KONTROLLPUNKTE.kontrollpunkte[KONTROLLPUNKTE.kontrollpunkte.length - 1];
+      return send({ status: 'ok', id: (body && body.id) ? body.id : letzte.id });
+    }
     if (path.includes('kontrollpunkt_loeschen')) return send({ status: 'ok' });
     if (path.includes('rundgang_vorlage_liste')) return send({ status: 'ok', vorlagen: [] });
     return send({ status: 'ok' });
@@ -197,40 +205,109 @@ check('KRITISCH: der Klick auf einen GPS-Punkt öffnet rechts das Detailfenster'
 const detailBox = await page.$eval('#rdKarteDetail', el => el.getBoundingClientRect());
 const karteBox2 = await page.$eval('#rdKarteUebersicht', el => el.getBoundingClientRect());
 check('KRITISCH: das Detailfenster steht rechts NEBEN der Karte', detailBox.left >= karteBox2.right - 1);
+// ENT-263: "genügend breit und bis runtergezogen" (Vorgabe Projektinhaber) --
+// am gerenderten Zustand gemessen, nicht im CSS nachgelesen.
+check('KRITISCH: das Fenster ist breit genug für ein Formular (mindestens 340px)', detailBox.width >= 340);
+check('KRITISCH: es reicht bis zur Kartenunterkante und steht nicht tiefer',
+  Math.abs(detailBox.bottom - karteBox2.bottom) <= 2);
 check('Es zeigt den Namen des angeklickten Punktes', (await page.textContent('#rdKarteDetailTitel')) === 'Parkplatz');
-const detailText = await page.textContent('#rdKarteDetailInhalt');
-check('KRITISCH: es zeigt Koordinaten und Radius des Punktes',
-  detailText.includes('47.376') && detailText.includes('8.541') && detailText.includes('35'));
+// ENT-263: Das Fenster ist das Formular selbst -- kein eigener Dialog mehr.
+check('KRITISCH: das Fenster ist ein Formular, kein Dialog geht auf',
+  await page.inputValue('#rdKdName') === 'Parkplatz' && !(await page.isVisible('#dlgKp.on')));
+check('KRITISCH: Breitengrad, Längengrad und Radius stehen als bearbeitbare Felder darin',
+  (await page.inputValue('#rdKdLat')).startsWith('47.376')
+  && (await page.inputValue('#rdKdLng')).startsWith('8.541')
+  && (await page.inputValue('#rdKdRadius')) === '35');
+check('KRITISCH: im Fenster steht KEINE zweite Karte (Vorgabe Projektinhaber)',
+  await page.evaluate(() => !document.querySelector('#rdKarteDetail .leaflet-container')));
+check('Der Bereich wird als Anzeige geführt, nicht als Eingabefeld',
+  (await page.textContent('#rdKdBereich')).includes('Testliegenschaft Nord'));
 check('Der zugehörige Listeneintrag links ist markiert',
   await page.evaluate(() => document.querySelector('#rdKartePunkteListe .rdkarte-eintrag.aktiv')?.textContent.trim() === 'Parkplatz'));
 
+// Funktionen: NUR Bereichszeiterfassung (Vorgabe Projektinhaber auf Rueckfrage)
+const funktionen = await page.textContent('.rdkd-funktionen');
+check('KRITISCH: die Funktionen-Tabelle führt Bereichszeiterfassung mit Beginn und Ende',
+  funktionen.includes('Bereichszeiterfassung') && funktionen.includes('Beginn') && funktionen.includes('Ende'));
+check('KRITISCH: Arbeitszeiterfassung und Auto-Abmelden stehen NICHT darin (bewusst nicht gebaut)',
+  !funktionen.includes('Arbeitszeiterfassung') && !funktionen.includes('automatisch abmelden'));
+check('KRITISCH: es steht ausdrücklich da, dass die Einstellung noch nicht wirkt (kein Etikettenschwindel)',
+  (await page.textContent('#rdKdAllgemeines')).includes('wirkt aber noch nicht'));
+
+// Aufgaben-Reiter und "Übersicht" als Platzhalter (Vorgabe Projektinhaber)
+await page.click('#rdKdReiterAufg');
+await page.waitForTimeout(100);
+check('Der Aufgaben-Reiter im Fenster zeigt einen Hinweis statt erfundenem Inhalt',
+  await page.isVisible('#rdKdAufgaben') && !(await page.isVisible('#rdKdAllgemeines')));
+await page.click('#rdKdReiterAllg');
+await page.waitForTimeout(100);
+check('Und zurück auf "Allgemeines"', await page.isVisible('#rdKdAllgemeines'));
+
 // Klick auf einen Listeneintrag links waehlt ebenso aus
 await page.click('#rdKartePunkteListe .rdkarte-eintrag:has-text("Tor Süd")');
-await page.waitForTimeout(250);
-check('KRITISCH: auch der Klick in der Liste links öffnet denselben Detailbereich',
-  (await page.textContent('#rdKarteDetailTitel')) === 'Tor Süd');
+await page.waitForTimeout(300);
+check('KRITISCH: auch der Klick in der Liste links öffnet denselben Bereich',
+  (await page.textContent('#rdKarteDetailTitel')) === 'Tor Süd'
+  && (await page.inputValue('#rdKdName')) === 'Tor Süd');
+check('Die Bereichszeit-Schalter übernehmen den gespeicherten Stand',
+  await page.isChecked('#rdKdBzBeginn') && !(await page.isChecked('#rdKdBzEnde')));
 
-// Bearbeiten fuehrt in den bestehenden, bereits geprueften Dialog
-await page.click('#rdKarteDetailInhalt button:has-text("Bearbeiten")');
-await page.waitForSelector('#dlgKp.on');
-check('KRITISCH: "Bearbeiten" öffnet den bestehenden Kontrollpunkt-Dialog mit DIESEM Punkt',
-  (await page.inputValue('#kpBezeichnung')) === 'Tor Süd');
-await page.click('#dlgKp .dlg-ft .btn-plain');
-await page.waitForTimeout(150);
+// Speichern schickt die neuen Felder wirklich mit
+await page.fill('#rdKdBeschreibung', 'Hintere Zufahrt');
+await page.check('#rdKdBzEnde');
+const [speichern] = await Promise.all([
+  page.waitForRequest(r => r.url().includes('kontrollpunkt_save') && r.method() === 'POST'),
+  page.click('#rdKdSpeichern'),
+]);
+const gesendet = speichern.postDataJSON();
+check('KRITISCH: Beschreibung und beide Bereichszeit-Schalter werden gespeichert',
+  gesendet.beschreibung === 'Hintere Zufahrt' && gesendet.bereichszeit_beginn === 1 && gesendet.bereichszeit_ende === 1);
+check('KRITISCH: der Punkt wird als Geofence mit seinen Koordinaten gespeichert, nicht als NFC',
+  gesendet.typ === 'geofence' && Math.abs(gesendet.lat - 47.3782) < 0.001 && gesendet.id === 3);
+await page.waitForTimeout(300);
+
+// Gegenprobe zum gemeldeten Fehler (ENT-263): Ein Dialog oeffnete sich HINTER
+// der Karte, weil Leaflet seine Ebenen auf z-index 400-1000 legt und der
+// Dialog-Schleier nur auf 70 liegt. Hier gemessen statt im CSS nachgelesen:
+// der Schleier muss im Stapel VOR der Karte liegen.
+await page.click('#rdKdLoeschen');
+await page.waitForTimeout(250);
+check('KRITISCH: das Bestätigungsfenster liegt VOR der sichtbaren Karte, nicht dahinter',
+  await page.evaluate(() => {
+    const karte = document.getElementById('rdKarteUebersicht');
+    const scrim = document.querySelector('.dlg-scrim.on');
+    if (!scrim || !karte.offsetParent) return false;
+    const r = scrim.getBoundingClientRect();
+    const oben = document.elementFromPoint(Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2));
+    return scrim.contains(oben);
+  }));
+await page.click('.dlg-scrim.on .dlg-ft .btn-plain');
+await page.waitForTimeout(200);
 
 await page.click('#rdKarteDetail button:has-text("Schliessen")');
-await page.waitForTimeout(200);
-check('Das Detailfenster lässt sich wieder schliessen', !(await page.isVisible('#rdKarteDetail')));
+await page.waitForTimeout(250);
+check('Das Fenster lässt sich wieder schliessen', !(await page.isVisible('#rdKarteDetail')));
+check('KRITISCH: nach dem Schliessen stehen wieder ALLE Punkte auf der Karte',
+  (await page.$$('#rdKarteUebersicht .leaflet-marker-icon')).length === 2);
 
-// ══════════ "+ GPS-PUNKT ANLEGEN": BESTEHENDER DIALOG, TYP GEOFENCE VORBELEGT
+// ══════════ "+ GPS-PUNKT ANLEGEN": DASSELBE FENSTER, KEIN DIALOG
 await page.click('#rdKrAb-karte button:has-text("+ GPS-Punkt anlegen")');
-await page.waitForSelector('#dlgKp.on');
-check('KRITISCH: der Dialog öffnet mit Typ Geofence vorbelegt, nicht mit dem sonst üblichen NFC',
-  (await page.inputValue('#kpTyp')) === 'geofence');
-check('Die Kartenauswahl (ENT-248) ist darin sichtbar', await page.isVisible('#kpKarte'));
-await page.click('#dlgKp .dlg-ft .btn-plain');
-await page.waitForTimeout(150);
-check('Der Dialog schliesst wieder, die Kartenansicht bleibt darunter', !(await page.isVisible('#dlgKp.on')) && await page.isVisible('#rdKrAb-karte'));
+await page.waitForTimeout(300);
+check('KRITISCH: "+ GPS-Punkt anlegen" öffnet das Fenster rechts, KEINEN Dialog',
+  await page.isVisible('#rdKarteDetail') && !(await page.isVisible('#dlgKp.on')));
+check('Es öffnet leer und mit dem Anlege-Titel',
+  (await page.textContent('#rdKarteDetailTitel')) === 'Neuer GPS-Punkt' && (await page.inputValue('#rdKdName')) === '');
+check('KRITISCH: die Lage ist mit der Kartenmitte vorbelegt, es braucht keine zweite Karte im Fenster',
+  (await page.inputValue('#rdKdLat')).length > 0 && (await page.inputValue('#rdKdLng')).length > 0);
+check('KRITISCH: die bestehenden Punkte bleiben dabei auf der Karte sichtbar',
+  (await page.$$('#rdKarteUebersicht .leaflet-marker-icon')).length === 3);
+check('Ohne Namen wird nicht gespeichert, sondern begründet abgelehnt', await (async () => {
+  await page.click('#rdKdSpeichern');
+  await page.waitForTimeout(150);
+  return await page.isVisible('#rdKdErr');
+})());
+await page.click('#rdKarteDetail button:has-text("Schliessen")');
+await page.waitForTimeout(200);
 
 // ══════════ "GEOFENCE-BEREICH ANLEGEN": HINWEIS STATT ERFUNDENEM WERKZEUG
 // (Vieleck-Zeichenwerkzeug ist noch nicht gebaut, siehe Kopfkommentar.)
@@ -253,14 +330,15 @@ await page.waitForTimeout(150);
 await page.click('button:has-text("+ GPS-Punkt / Geofence anlegen")');
 await page.waitForTimeout(150);
 await page.click('#rdKrAb-karte button:has-text("+ GPS-Punkt anlegen")');
-await page.waitForSelector('#dlgKp.on');
-await page.fill('#kpBezeichnung', 'Nordtor');
-await page.fill('#kpLat', '47.38');
-await page.fill('#kpLng', '8.55');
+await page.waitForTimeout(250);
+await page.fill('#rdKdName', 'Nordtor');
+await page.fill('#rdKdLat', '47.38');
+await page.fill('#rdKdLng', '8.55');
 KONTROLLPUNKTE.kontrollpunkte.push(
-  { id: 4, objekt_id: 1, bezeichnung: 'Nordtor', reihenfolge: 4, typ: 'geofence', chip_id: null, lat: 47.38, lng: 8.55, geofence_radius_m: 20, aktiv: 1 });
-await page.click('#kpBtn');
-await page.waitForTimeout(300);
+  { id: 4, objekt_id: 1, bezeichnung: 'Nordtor', beschreibung: null, reihenfolge: 4, typ: 'geofence', chip_id: null,
+    lat: 47.38, lng: 8.55, geofence_radius_m: 20, aktiv: 1, bereichszeit_beginn: 0, bereichszeit_ende: 0 });
+await page.click('#rdKdSpeichern');
+await page.waitForTimeout(400);
 check('KRITISCH: die Karte zeigt den neuen Punkt sofort, ohne den Reiter neu zu öffnen',
   (await page.$$('#rdKarteUebersicht .leaflet-marker-icon')).length === 3);
 await page.click('#rdKrReiter .rdkr-tab:has-text("Kontrollpunkte")');

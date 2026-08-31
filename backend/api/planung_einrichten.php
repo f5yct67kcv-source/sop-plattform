@@ -1299,6 +1299,22 @@ $spalten = [
     // die Ausfuehrung. NULLable, weil die meisten bestehenden Runden keine
     // brauchen -- kein Pflichtfeld nachtraeglich erzwingen.
     ['rundgang_vorlage', 'beschreibung', 'ALTER TABLE rundgang_vorlage ADD COLUMN beschreibung TEXT NULL AFTER name'],
+
+    // GPS-Punkt-Fenster auf der Kartenansicht (ENT-263): eine freie Notiz je
+    // Kontrollpunkt, wie sie das Referenzsystem dort fuehrt.
+    ['kontrollpunkt', 'beschreibung', 'ALTER TABLE kontrollpunkt ADD COLUMN beschreibung TEXT NULL AFTER bezeichnung'],
+    // Bereichszeiterfassung (ENT-263, Vorgabe Projektinhaber nach Rueckfrage):
+    // markiert, an welchem Kontrollpunkt der Rundgang-Timer beginnen bzw.
+    // enden soll. ACHTUNG -- die Einstellung wird vorerst nur GESPEICHERT; die
+    // laufende Rundgang-Durchfuehrung wertet sie noch NICHT aus (sie startet
+    // die Rohzeit weiterhin beim ersten bestaetigten Scan, ENT-182). Das
+    // Verdrahten ist ein eigener Schritt und aendert eine bereits
+    // entschiedene, lohnrelevante Regel -- siehe Docs-Eintrag.
+    // Ausdruecklich NICHT angelegt: "Arbeitszeiterfassung" und "Benutzer
+    // automatisch abmelden" aus dem Referenzsystem -- auf Nachfrage wollte der
+    // Projektinhaber nur die Bereichszeiterfassung.
+    ['kontrollpunkt', 'bereichszeit_beginn', 'ALTER TABLE kontrollpunkt ADD COLUMN bereichszeit_beginn TINYINT(1) NOT NULL DEFAULT 0'],
+    ['kontrollpunkt', 'bereichszeit_ende', 'ALTER TABLE kontrollpunkt ADD COLUMN bereichszeit_ende TINYINT(1) NOT NULL DEFAULT 0'],
 ];
 foreach ($spalten as [$tabelle, $spalte, $sql]) {
     if (!hat_tabelle_jetzt($pdo, $tabelle) || hat_spalte($pdo, $tabelle, $spalte)) {
