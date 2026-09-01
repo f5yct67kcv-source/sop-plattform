@@ -81,6 +81,13 @@ async function neueSeite(schichten, extraRoutes, profilUeberschreibung) {
     fenster_von: null, fenster_bis: null }];
   const { browser, page, rufe } = await neueSeite([schicht({ id: 55 })], (p, body, send) => {
     if (p.includes('mein_rundgang_vorlagen_alle')) return send({ status: 'ok', vorlagen: VORLAGEN });
+    // Vor der allgemeineren "spontan_starten"-Zeile: seit ENT-294 laedt das
+    // Antippen zuerst diese rein lesende Vorschau.
+    if (p.includes('mein_rundgang_uebersicht')) return send({ status: 'ok',
+      vorlage: { id: 900, name: 'Nachtrunde', fenster_von: null, fenster_bis: null },
+      objekt: { id: 7, name: 'Gerolag Center', strasse: 'Industriestrasse 4', ort: '4600 Olten', kanton: 'SO' },
+      kunde_name: 'Borner AG', kontrollpunkte: [{ id: 1, bezeichnung: 'Tor', typ: 'geofence' }],
+      ansprechpartner: [] });
     if (p.includes('mein_rundgang_spontan_starten')) return send({ status: 'ok', einsatz_id: 900, rundgang_id: 77, kontrollpunkte: [] });
   });
   await page.click('#t-waechter'); await page.waitForTimeout(250);
@@ -91,11 +98,21 @@ async function neueSeite(schichten, extraRoutes, profilUeberschreibung) {
   check('Die verfügbare Kontrollrunde steht mit Objekt und Kunde da',
     (await page.textContent('#blBody')).includes('Nachtrunde') && (await page.textContent('#blBody')).includes('Muster Center'));
 
+  // Seit ENT-294 liegt zwischen Auswahl und Start die Vorschau-Vollseite:
+  // Das blosse Antippen darf nichts mehr anlegen (sonst entstehen die
+  // gemeldeten "Spontaner Rundgang"-Karteileichen im Einsatzplan), erst der
+  // Knopf dort startet. Die Aussage bleibt dieselbe -- gestartet wird genau
+  // diese Vorlage, ohne Ausnahmegrund --, sie durchlaeuft nur beide Schritte.
   rufe.length = 0;
   await page.click('#blBody button');
+  await page.waitForTimeout(350);
+  check('KRITISCH: die Auswahl öffnet die Vorschau und startet noch NICHTS',
+    await page.isVisible('#rgSeite')
+    && !rufe.some(r => r.p.includes('mein_rundgang_spontan_starten')));
+  await page.click('#rgsStartBtn');
   await page.waitForTimeout(300);
   const start = rufe.find(r => r.p.includes('mein_rundgang_spontan_starten'));
-  check('KRITISCH: die Auswahl löst den spontanen Start für genau diese Vorlage aus',
+  check('KRITISCH: der Startknopf löst den spontanen Start für genau diese Vorlage aus',
     start && start.body.vorlage_id === 900 && !('ausnahme_grund' in start.body));
   check('Nach Erfolg werden die eigenen Schichten neu geladen (der spontane Einsatz muss dort auffindbar sein)',
     rufe.some(r => r.p.includes('meine_schichten')));
