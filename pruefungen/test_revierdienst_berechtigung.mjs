@@ -12,12 +12,18 @@ const EXE = browserPfad();
 const ok = [], bad = [];
 const check = (n, c) => (c ? ok : bad).push(n);
 
+// Aus HEUTE berechnet statt fest hingeschrieben (test_datumsfest.mjs): das
+// genaue Datum ist dem Einsatz hier egal, ein festes Datum waere trotzdem
+// eine Zeitbombe.
+const iso = d => new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
+const IN_10_TAGEN = iso(new Date(Date.now() + 10 * 864e5));
+
 const MA_BERECHTIGT   = { id: 1, name: 'wächter-a', vorname: 'Erste', nachname: 'Wächterin' };
 const MA_UNBERECHTIGT = { id: 2, name: 'waechter-b', vorname: 'Zweite', nachname: 'Wächterin' };
 
 const EINSATZ_REVIER = { id: 70, kunde_id: 1, kunde_name: 'Testkunde', objekt_id: null,
   titel: 'Nachtkontrolle', strasse: null, ort: 'Testort', kanton: null,
-  einsatzart: 'Revierdienst', sparte: 'sicherheit', datum: '2026-09-10',
+  einsatzart: 'Revierdienst', sparte: 'sicherheit', datum: IN_10_TAGEN,
   von: '20:00:00', bis: '22:00:00', bedarf: 2, status: 'geplant', bemerkung: null,
   mitarbeiter: [{ id: 2, name: 'waechter-b', vorname: 'Zweite', nachname: 'Wächterin', zusage: 'zugesagt' }] };
 // Dieselbe unberechtigte Person, aber Verkehrsdienst -- die Pruefung greift
