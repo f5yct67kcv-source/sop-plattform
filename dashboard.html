@@ -370,6 +370,11 @@ a.nav-item { text-decoration: none; }
 .top-sub   { grid-column: 2; justify-self: center; }
 .topbar h1 { font-size: 16px; font-weight: 680; letter-spacing: -.2px; }
 .topbar .crumb { font-size: 12px; color: var(--ink-3); margin-top: 1px; }
+/* Sondertitel einer Unterseite samt Zurueck-Pfeil (ENT-261/279): der Pfeil
+   sitzt auf gleicher Zeile wie der Titel, nicht darueber -- dieselbe
+   Bauart wie der Seitenleisten-Knopf (#btnSchmal) links daneben. */
+.kopf-sondertitel { display: flex; align-items: center; gap: 4px; }
+.btn-kopf-zurueck { padding: 5px; margin-left: -5px; }
 /* Unterkategorien des offenen Bereichs, in der Werkzeugleiste neben dem
    Titel (ENT-086). Nur wenn die Seitenleiste kompakt ist -- steht sie voll
    da, zeigt sie die Kinder ohnehin, und eine zweite Liste daneben waere
@@ -3361,8 +3366,18 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
                Ansichtstitel und Beschreibungszeile werden dafuer ausgeblendet
                statt ueberschrieben -- sie gehoeren der ganzen Ansicht, nicht
                dieser einen Unterseite, und werden beim Verlassen unveraendert
-               wieder gebraucht. -->
-          <h1 id="rdKrTitel" style="display:none">Kontrollrunde</h1>
+               wieder gebraucht.
+               ENT-282: der in ENT-261 ersatzlos entfernte Zurueck-Weg kommt
+               hier zurueck -- als kleiner Pfeil direkt vor dem Sondertitel,
+               genau die dort bereits angebotene, bis jetzt offene Loesung.
+               Fuehrt zur Rundgaenge-Liste, nicht zur Kachel-Uebersicht
+               (ausdrueckliche Vorgabe Projektinhaber). -->
+          <div class="kopf-sondertitel" id="rdKrTitelWrap" style="display:none">
+            <button type="button" class="btn btn-quiet btn-sm btn-kopf-zurueck" onclick="rdAbschnittZeigen('liste')" title="Zurück zur Rundgänge-Liste" aria-label="Zurück zur Rundgänge-Liste">
+              <svg class="i" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <h1 id="rdKrTitel">Kontrollrunde</h1>
+          </div>
         </div>
       </div>
       <nav class="top-sub" id="topSub"></nav>
@@ -16891,6 +16906,13 @@ function rdUebersichtZeigen() {
   $('rdUebersicht').style.display = '';
   document.querySelectorAll('#view-rundgaenge .bk-abschnitt').forEach(a => { a.style.display = 'none'; });
   kopfSondertitel(null);
+  // ENT-282: die Liste (rdAbschnittZeigen('liste')) ueberschreibt Titel und
+  // Unterzeile mit ihrem eigenen Text. Wer NICHT ueber go('rundgaenge') --
+  // das setzt TITLES selbst neu -- sondern direkt ueber den Zurueck-Knopf
+  // der Liste hierher kommt, sah bisher weiterhin deren Titel stehen, obwohl
+  // schon die Kachel-Uebersicht sichtbar war.
+  $('pgTitle').textContent = TITLES.rundgaenge[0];
+  $('pgCrumb').textContent = TITLES.rundgaenge[1];
 }
 
 function rdAbschnittZeigen(id) {
@@ -16900,17 +16922,30 @@ function rdAbschnittZeigen(id) {
   // Nur die Kontrollrunden-Unterseite traegt ihren eigenen Kopfzeilentitel
   // (ENT-261) -- jeder andere Bereich gibt die Kopfzeile wieder frei.
   if (id !== 'kr') { kopfSondertitel(null); }
-  if (id === 'liste') { rdLadeAlle(); }
+  // ENT-282: die objektuebergreifende Liste zeigte bisher weiterhin den
+  // Ansichtstitel "Uebersicht" der Kachel-Landingpage -- man sah der
+  // Kopfzeile nicht an, dass man tatsaechlich auf der Liste steht (gemeldet
+  // vom Projektinhaber). Eigener Titel wie bei jeder anderen Seite, TITLES
+  // bleibt dafuer unberuehrt: die Kachel-Landingpage traegt weiterhin
+  // TITLES.rundgaenge, das ist der Ansichtstitel der GANZEN Rubrik, nicht
+  // nur der Landingpage.
+  if (id === 'liste') {
+    $('pgTitle').textContent = 'Rundgänge';
+    $('pgCrumb').textContent = 'Alle Kontrollrunden über alle Objekte';
+    rdLadeAlle();
+  }
 }
 
 // ENT-261: Kopfzeilentitel einer einzelnen Unterseite. text = null gibt den
 // Ansichtstitel samt Beschreibungszeile wieder frei. Ausblenden statt
 // Ueberschreiben, weil beide der ganzen Ansicht gehoeren und nach dem
-// Verlassen unveraendert weitergebraucht werden.
+// Verlassen unveraendert weitergebraucht werden. ENT-282: geschaltet wird
+// die Wrapper-Zeile (Pfeil + Titel), nicht mehr nur der Titel selbst.
 function kopfSondertitel(text) {
   const eigen = $('rdKrTitel');
-  if (!eigen) { return; }
-  eigen.style.display = text === null ? 'none' : '';
+  const wrap = $('rdKrTitelWrap');
+  if (!eigen || !wrap) { return; }
+  wrap.style.display = text === null ? 'none' : '';
   if (text !== null) { eigen.textContent = text; }
   $('pgTitle').style.display = text === null ? '' : 'none';
   $('pgCrumb').style.display = text === null ? '' : 'none';
