@@ -32,7 +32,7 @@ await page.route('**/api/**', r => {
     { id: 2, name: 'beat', vorname: 'Beat', nachname: 'Beispiel', aktiv: 1, ist_admin: 0 }]});
   if (u.includes('einsatz_list')) return send({ status: 'ok', einsaetze: [
     // Anna: Nachtdienst, endet am Folgetag um 06:00
-    { id: 10, kunde_name: 'Borner AG', titel: 'Nachtdienst', ort: 'Olten', einsatzart: 'Revierdienst',
+    { id: 10, kunde_name: 'Beispiel AG', titel: 'Nachtdienst', ort: 'Olten', einsatzart: 'Revierdienst',
       sparte: 'sicherheit', datum: T(1), von: '22:00:00', bis: '06:00:00', bedarf: 1,
       status: 'geplant', mitarbeiter: [A] },
     // Beat: Tagdienst, endet um 16:00 -- danach ist reichlich Ruhezeit

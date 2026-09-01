@@ -79,14 +79,14 @@ function anthropic_recherche_kunde(string $text): ?array
         'input_schema' => [
             'type' => 'object',
             'properties' => [
-                'name'     => ['type' => 'string', 'description' => 'Offizieller Firmenname inkl. Rechtsform, z.B. "Borner AG"'],
+                'name'     => ['type' => 'string', 'description' => 'Offizieller Firmenname inkl. Rechtsform, z.B. "Beispiel AG"'],
                 'strasse'  => ['type' => 'string', 'description' => 'Nur der Strassenname des Firmensitzes, OHNE Hausnummer und ohne Ort'],
                 'hausnummer' => ['type' => 'string', 'description' => 'Nur die Hausnummer, z.B. "4" oder "12a"'],
-                'plz'      => ['type' => 'string', 'description' => 'Nur die vierstellige Postleitzahl, z.B. "4652"'],
-                'ort'      => ['type' => 'string', 'description' => 'Nur der Ortsname ohne Postleitzahl, z.B. "Winznau"'],
+                'plz'      => ['type' => 'string', 'description' => 'Nur die vierstellige Postleitzahl, z.B. "4600"'],
+                'ort'      => ['type' => 'string', 'description' => 'Nur der Ortsname ohne Postleitzahl, z.B. "Musterdorf"'],
                 'telefon'  => ['type' => 'string', 'description' => 'Allgemeine Telefonnummer der Firma'],
                 'email'    => ['type' => 'string', 'description' => 'Allgemeine E-Mail-Adresse der Firma'],
-                'webseite' => ['type' => 'string', 'description' => 'Adresse der Firmenwebseite, z.B. "https://www.borner.ch"'],
+                'webseite' => ['type' => 'string', 'description' => 'Adresse der Firmenwebseite, z.B. "https://www.beispiel.ch"'],
                 'uid'      => ['type' => 'string', 'description' => 'Schweizer Unternehmens-Identifikationsnummer in der Form CHE-123.456.789. Nur uebernehmen, wenn sie belegt im Handelsregister steht.'],
                 'recherchiert' => [
                     'type' => 'array',
@@ -240,7 +240,7 @@ function anthropic_extract_masterplan(string $text, array $vorlagen, string $heu
     return anthropic_tool_call($tool, $userContent);
 }
 
-// Zerlegt "setze Valbon vom 1. bis 15. August auf die Schliessrunde" (ENT-026).
+// Zerlegt "setze Vito vom 1. bis 15. August auf die Schliessrunde" (ENT-026).
 function anthropic_extract_zuteilung(string $text, array $vorlagen, array $mitarbeiter, string $heute, string $monat): ?array
 {
     $tool = [

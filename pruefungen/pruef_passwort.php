@@ -26,7 +26,7 @@ pruef('Eine merkbare Wortfolge taugt',
 pruef('Auch ohne Sonderzeichen und Grossbuchstaben',
     passwort_pruefen('velofahrenimregen', 'sarah.leisi') === null);
 pruef('Mit Sonderzeichen natuerlich auch',
-    passwort_pruefen('Tr3ppe!Haus?Dach', 'daniele.ciardo') === null);
+    passwort_pruefen('Tr3ppe!Haus?Dach', 'dario.beispiel') === null);
 
 // ── Was NICHT durchgehen darf
 pruef('KRITISCH: zu kurz wird abgewiesen', passwort_pruefen('kurz123', 'x') !== null);

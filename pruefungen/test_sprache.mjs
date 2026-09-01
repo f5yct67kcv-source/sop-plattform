@@ -55,14 +55,14 @@ async function sitzung(pegel, ohneSprache) {
     const send = b => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) });
     if (u.includes('login')) return send({ status: 'ok', token: 't', name: 'a', ist_admin: true });
     if (u.includes('objektplan')) return send({ status: 'ok',
-      objekt: { id: 1, name: 'Gerolag Center', kunde_name: 'Borner AG', ort: '4601 Olten', kanton: 'SO', einsatzart: 'Revierdienst' },
+      objekt: { id: 1, name: 'Muster Center', kunde_name: 'Beispiel AG', ort: '4601 Olten', kanton: 'SO', einsatzart: 'Revierdienst' },
       vorlagen: [{ id: 1, name: 'Schliessrunde', kuerzel: 'SR', art: 'arbeit', von: '22:00', bis: '22:30',
         arbeitszeit_h: 0.5, auf_abruf: 0, farbe: null, gueltig_ab: '2026-01-01', gueltig_bis: null }],
       bedarf: [], einsaetze: [], feiertage: {} });
     if (u.includes('objekt_list')) return send({ status: 'ok', objekte: [
-      { id: 1, name: 'Gerolag Center', kunde_name: 'Borner AG', ort: '4601 Olten', kanton: 'SO', aktiv: 1 }] });
+      { id: 1, name: 'Muster Center', kunde_name: 'Beispiel AG', ort: '4601 Olten', kanton: 'SO', aktiv: 1 }] });
     if (u.includes('mitarbeiter_list')) return send({ status: 'ok', mitarbeiter: [
-      { id: 1, name: 'adrian', vorname: 'Adrian', nachname: 'von Arb', aktiv: 1, ist_admin: 1 }] });
+      { id: 1, name: 'adrian', vorname: 'Adrian', nachname: 'Muster', aktiv: 1, ist_admin: 1 }] });
     return send({ status: 'ok', einsaetze: [], kunden: [], rapporte: [], feiertage: [], gepflegt: {},
       kpi: {}, verlauf: [], angemeldet: [], pro_mitarbeiter: [], letzte_rapporte: [] });
   });
@@ -206,10 +206,10 @@ check('Auch dort gibt es die Pegelanzeige',
   await page.evaluate(() => document.querySelectorAll('#gsViz i').length === 22));
 await page.click('#gsMik');
 await page.waitForTimeout(300);
-await page.evaluate(() => window.__sage('Neuer Mitarbeiter Hans Meier', true));
+await page.evaluate(() => window.__sage('Neuer Mitarbeiter Hans Muster', true));
 await page.waitForTimeout(150);
 check('Der Text landet im richtigen Feld',
-  (await page.inputValue('#gsText')) === 'Neuer Mitarbeiter Hans Meier');
+  (await page.inputValue('#gsText')) === 'Neuer Mitarbeiter Hans Muster');
 check('Das Planungsfeld bleibt unberührt', (await page.inputValue('#pdText2')).includes('Bereits getippt'));
 await page.evaluate(() => closeDlg('dlgSprechen'));
 await page.waitForTimeout(200);

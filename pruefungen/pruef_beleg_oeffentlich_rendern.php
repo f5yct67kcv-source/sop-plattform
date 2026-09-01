@@ -56,8 +56,8 @@ $pdo->exec("INSERT INTO belege VALUES (1,'tok123','$art','" . ($art === 'offerte
     . ($art === 'offerte' ? "'2026-09-27'" : 'NULL') . ","
     . ($art === 'rechnung' ? "'2026-09-27'" : 'NULL')
     . ",0,'$status',0,NULL," . ($entscheidung ? "'$entscheidung'" : 'NULL') . ",NULL,NULL,NULL,$unterschriftsseite)");
-$pdo->exec("INSERT INTO kunden VALUES (1,'pzu consulting gmbh',NULL,'Hochgasse','7',NULL,'4632','Trimbach')");
-$pdo->exec("INSERT INTO kunden_person VALUES (1,'Herr','Adrian','von Arb')");
+$pdo->exec("INSERT INTO kunden VALUES (1,'abc consulting gmbh',NULL,'Hochgasse','7',NULL,'4632','Trimbach')");
+$pdo->exec("INSERT INTO kunden_person VALUES (1,'Herr','Adrian','Muster')");
 $pdo->exec("INSERT INTO beleg_positionen VALUES (1,1,1,NULL,'Filiale Oerlikon','',40,'Std.',4500,0,810)");
 
 function db(): PDO { global $pdo; return $pdo; }

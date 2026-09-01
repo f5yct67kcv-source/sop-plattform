@@ -19,19 +19,19 @@ const STATS = {
     { kw: 33, von: '2026-08-10', stunden: 108.5, anzahl: 14 }
   ],
   angemeldet: [
-    { name: 'adrian', vorname: 'Adrian', nachname: 'Von Arb', letzte_anmeldung: '2026-08-17 17:53:00', sitzungen: 2 },
-    { name: 'daniele.ciardo', vorname: 'Daniele', nachname: 'Ciardo', letzte_anmeldung: '2026-08-17 06:12:00', sitzungen: 1 }
+    { name: 'adrian', vorname: 'Adrian', nachname: 'Muster', letzte_anmeldung: '2026-08-17 17:53:00', sitzungen: 2 },
+    { name: 'dario.beispiel', vorname: 'Dario', nachname: 'Beispiel', letzte_anmeldung: '2026-08-17 06:12:00', sitzungen: 1 }
   ],
   pro_mitarbeiter: [
-    { name: 'daniele.ciardo', vorname: 'Daniele', nachname: 'Ciardo', stunden: '142.50', anzahl: 18 },
-    { name: 'adrian', vorname: 'Adrian', nachname: 'Von Arb', stunden: '96.00', anzahl: 12 },
-    { name: 'm.keller', vorname: 'Marco', nachname: 'Keller', stunden: '88.75', anzahl: 11 },
-    { name: 'neu', vorname: 'Sara', nachname: 'Brunner', stunden: '0.00', anzahl: 0 }
+    { name: 'dario.beispiel', vorname: 'Dario', nachname: 'Beispiel', stunden: '142.50', anzahl: 18 },
+    { name: 'adrian', vorname: 'Adrian', nachname: 'Muster', stunden: '96.00', anzahl: 12 },
+    { name: 'm.muster', vorname: 'Marco', nachname: 'Muster', stunden: '88.75', anzahl: 11 },
+    { name: 'neu', vorname: 'Sara', nachname: 'Beispiel', stunden: '0.00', anzahl: 0 }
   ],
   letzte_rapporte: [
-    { id: 284, datum: '2026-08-17', mitarbeiter: 'daniele.ciardo', kunde: 'Studer Immobilien AG', ort: '4632 Trimbach', einsatzart: 'Verkehrsdienst', netto_h: '8.50' },
-    { id: 283, datum: '2026-08-16', mitarbeiter: 'adrian', kunde: 'Einwohnergemeinde Niedergösgen', ort: '5013 Niedergösgen', einsatzart: 'Revierdienst', netto_h: '6.00' },
-    { id: 282, datum: '2026-08-15', mitarbeiter: 'm.keller', kunde: 'Studer Immobilien AG', ort: '4632 Trimbach', einsatzart: 'Verkehrsdienst', netto_h: '7.25' }
+    { id: 284, datum: '2026-08-17', mitarbeiter: 'dario.beispiel', kunde: 'Muster Immobilien AG', ort: '4632 Trimbach', einsatzart: 'Verkehrsdienst', netto_h: '8.50' },
+    { id: 283, datum: '2026-08-16', mitarbeiter: 'adrian', kunde: 'Einwohnergemeinde Musterdorf', ort: '5013 Musterdorf', einsatzart: 'Revierdienst', netto_h: '6.00' },
+    { id: 282, datum: '2026-08-15', mitarbeiter: 'm.muster', kunde: 'Muster Immobilien AG', ort: '4632 Trimbach', einsatzart: 'Verkehrsdienst', netto_h: '7.25' }
   ]
 };
 
@@ -40,21 +40,21 @@ const SIG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAAAyCAYAAACqNX6+A
 const RAPPORTE = {
   status: 'ok',
   rapporte: [
-    { id: 284, einsatz_id: 501, datum: '2026-08-17', mitarbeiter: 'daniele.ciardo', kunde: 'Studer Immobilien AG', strasse: 'Gerolagstrasse 12', ort: '4632 Trimbach', auftrag_nr: 'A-2026-118', einsatzart: 'Verkehrsdienst', von: '07:00:00', bis: '16:00:00', pause_min: 30, netto_h: '8.50', unterzeichner: 'R. Studer', unterschrift: SIG, bemerkung: 'Baustellenverkehr wie vereinbart geregelt.', erfasst_am: '2026-08-17 16:12:00' },
-    { id: 283, einsatz_id: 502, datum: '2026-08-16', mitarbeiter: 'adrian', kunde: 'Einwohnergemeinde Niedergösgen', strasse: 'Dorfstrasse 4', ort: '5013 Niedergösgen', auftrag_nr: null, einsatzart: 'Revierdienst', von: '22:00:00', bis: '04:00:00', pause_min: 0, netto_h: '6.00', unterzeichner: null, unterschrift: null, bemerkung: null, erfasst_am: '2026-08-16 04:20:00' },
-    { id: 282, einsatz_id: 503, datum: '2026-08-15', mitarbeiter: 'm.keller', kunde: 'Studer Immobilien AG', strasse: 'Gerolagstrasse 12', ort: '4632 Trimbach', auftrag_nr: 'A-2026-117', einsatzart: 'Verkehrsdienst', von: '08:00:00', bis: '15:45:00', pause_min: 30, netto_h: '7.25', unterzeichner: 'M. Frei', unterschrift: null, bemerkung: null, erfasst_am: '2026-08-15 16:02:00' }
+    { id: 284, einsatz_id: 501, datum: '2026-08-17', mitarbeiter: 'dario.beispiel', kunde: 'Muster Immobilien AG', strasse: 'Musterstrasse 12', ort: '4632 Trimbach', auftrag_nr: 'A-2026-118', einsatzart: 'Verkehrsdienst', von: '07:00:00', bis: '16:00:00', pause_min: 30, netto_h: '8.50', unterzeichner: 'R. Muster', unterschrift: SIG, bemerkung: 'Baustellenverkehr wie vereinbart geregelt.', erfasst_am: '2026-08-17 16:12:00' },
+    { id: 283, einsatz_id: 502, datum: '2026-08-16', mitarbeiter: 'adrian', kunde: 'Einwohnergemeinde Musterdorf', strasse: 'Dorfstrasse 4', ort: '5013 Musterdorf', auftrag_nr: null, einsatzart: 'Revierdienst', von: '22:00:00', bis: '04:00:00', pause_min: 0, netto_h: '6.00', unterzeichner: null, unterschrift: null, bemerkung: null, erfasst_am: '2026-08-16 04:20:00' },
+    { id: 282, einsatz_id: 503, datum: '2026-08-15', mitarbeiter: 'm.muster', kunde: 'Muster Immobilien AG', strasse: 'Musterstrasse 12', ort: '4632 Trimbach', auftrag_nr: 'A-2026-117', einsatzart: 'Verkehrsdienst', von: '08:00:00', bis: '15:45:00', pause_min: 30, netto_h: '7.25', unterzeichner: 'M. Frei', unterschrift: null, bemerkung: null, erfasst_am: '2026-08-15 16:02:00' }
   ]
 };
 
 const MA = { status: 'ok', mitarbeiter: [
-  { name: 'adrian', ist_admin: 1, personalnummer: '1001', anrede: 'Herr', vorname: 'Adrian', nachname: 'Von Arb', geburtsdatum: '1988-04-12', strasse: 'Musterstrasse 1', ort: '4632 Trimbach', telefon: '062 555 11 22', mobil: '079 555 11 22', email: 'a.vonarb@cupi24.ch' },
-  { name: 'daniele.ciardo', ist_admin: 0, personalnummer: '1002', anrede: 'Herr', vorname: 'Daniele', nachname: 'Ciardo', geburtsdatum: null, strasse: 'Bahnhofstrasse 9', ort: '4600 Olten', telefon: null, mobil: '079 444 33 22', email: null },
+  { name: 'adrian', ist_admin: 1, personalnummer: '1001', anrede: 'Herr', vorname: 'Adrian', nachname: 'Muster', geburtsdatum: '1988-04-12', strasse: 'Musterstrasse 1', ort: '4632 Trimbach', telefon: '062 555 11 22', mobil: '079 555 11 22', email: 'a.vonarb@cupi24.ch' },
+  { name: 'dario.beispiel', ist_admin: 0, personalnummer: '1002', anrede: 'Herr', vorname: 'Dario', nachname: 'Beispiel', geburtsdatum: null, strasse: 'Bahnhofstrasse 9', ort: '4600 Olten', telefon: null, mobil: '079 444 33 22', email: null },
   { name: 'neu', ist_admin: 0, personalnummer: null, anrede: null, vorname: null, nachname: null, geburtsdatum: null, strasse: null, ort: null, telefon: null, mobil: null, email: null }
 ]};
 
 const KU = { status: 'ok', kunden: [
-  { id: 1, name: 'Studer Immobilien AG', strasse: 'Gerolagstrasse 12', ort: '4632 Trimbach', telefon: '062 111 22 33', email: 'info@studer-immo.ch' },
-  { id: 2, name: 'Einwohnergemeinde Niedergösgen', strasse: 'Dorfstrasse 4', ort: '5013 Niedergösgen', telefon: '062 849 00 00', email: null }
+  { id: 1, name: 'Muster Immobilien AG', strasse: 'Musterstrasse 12', ort: '4632 Trimbach', telefon: '062 111 22 33', email: 'info@muster-immo.ch' },
+  { id: 2, name: 'Einwohnergemeinde Musterdorf', strasse: 'Dorfstrasse 4', ort: '5013 Musterdorf', telefon: '062 849 00 00', email: null }
 ]};
 
 const calls = [];
@@ -80,8 +80,8 @@ async function setup(page, { admin = true } = {}) {
     if (url.includes('logout.php'))           return send({ status: 'ok' });
     if (url.includes('einsatz_bericht')) {
       berichtRufe.push((url.split('einsatz_id=')[1] || '').split('&')[0]);
-      return send({ status: 'ok', bericht: { einsatz: { id: 500, kunde_name: 'Studer Immobilien AG', datum: '2026-08-17' },
-        kunde: {}, unterschrift: {}, personen: [{ name: 'Hans Meier', von: '07:00', bis: '16:00', pause_min: 0, netto_h: 8 }] } });
+      return send({ status: 'ok', bericht: { einsatz: { id: 500, kunde_name: 'Muster Immobilien AG', datum: '2026-08-17' },
+        kunde: {}, unterschrift: {}, personen: [{ name: 'Hans Muster', von: '07:00', bis: '16:00', pause_min: 0, netto_h: 8 }] } });
     }
     return send({ status: 'ok' });
   });
@@ -132,7 +132,7 @@ check('Leere Woche hat Mindesthöhe', leerBar >= 2);
 
 // ── 5. Angemeldete + Ranking
 check('2 angemeldete Benutzer', (await page.$$('#angemeldet .rank')).length === 2);
-check('Voller Name statt Login', (await page.textContent('#angemeldet .rank:first-child b')).includes('Adrian Von Arb'));
+check('Voller Name statt Login', (await page.textContent('#angemeldet .rank:first-child b')).includes('Adrian Muster'));
 check('4 Zeilen Stunden/Mitarbeitende', (await page.$$('#proMa .rank')).length === 4);
 await page.screenshot({ path: `${OUT}/02-uebersicht.png`, fullPage: true });
 
@@ -141,7 +141,7 @@ await page.evaluate(() => { go('kunden'); kuGoTab('rapporte'); });
 await page.waitForSelector('#kv-rapporte.on');
 check('Rapporte-Tabelle 3 Zeilen', (await page.$$('#rapporteTable tbody tr')).length === 3);
 check('Krümel zeigt Summe', /3 von 3 Rapporten/.test(await page.textContent('#pgCrumb')));
-await page.fill('#rQ', 'niedergös');
+await page.fill('#rQ', 'einwohner');
 await page.waitForTimeout(120);
 check('Suche filtert auf 1 Treffer', (await page.$$('#rapporteTable tbody tr')).length === 1);
 await page.fill('#rQ', 'zzzz');
@@ -190,11 +190,11 @@ await page.evaluate(() => {
   // eingebetteten Skript, kein window-Property -- window.rapporte waere
   // eine zweite, fuer renderRapporte() unsichtbare Variable.
   rapporte = [
-    { id: 601, einsatz_id: 500, datum: '2026-08-18', mitarbeiter: 'Hans Meier', kunde: 'Studer Immobilien AG', strasse: 'Gerolagstrasse 12', ort: '4632 Trimbach', auftrag_nr: 'A-500', einsatzart: 'Verkehrsdienst', von: '07:00:00', bis: '16:00:00', pause_min: 30, netto_h: 8, unterzeichner: null },
-    { id: 602, einsatz_id: 500, datum: '2026-08-18', mitarbeiter: 'Anna Muster', kunde: 'Studer Immobilien AG', strasse: 'Gerolagstrasse 12', ort: '4632 Trimbach', auftrag_nr: 'A-500', einsatzart: 'Verkehrsdienst', von: '07:00:00', bis: '15:30:00', pause_min: 30, netto_h: 7.5, unterzeichner: null },
-    { id: 603, einsatz_id: 501, datum: '2026-08-17', mitarbeiter: 'Hans Meier', kunde: 'Studer Immobilien AG', strasse: 'Gerolagstrasse 12', ort: '4632 Trimbach', auftrag_nr: 'A-501', einsatzart: 'Verkehrsdienst', von: '07:00:00', bis: '16:00:00', pause_min: 30, netto_h: 8, unterzeichner: null },
-    { id: 900, einsatz_id: 999, datum: '2026-08-17', mitarbeiter: 'Fremd', kunde: 'Einwohnergemeinde Niedergösgen', strasse: 'Dorfstrasse 4', ort: '5013 Niedergösgen', auftrag_nr: null, einsatzart: 'Revierdienst', von: '22:00:00', bis: '04:00:00', pause_min: 0, netto_h: 6, unterzeichner: null },
-    { id: 604, einsatz_id: 501, datum: '2026-08-17', mitarbeiter: 'Anna Muster', kunde: 'Studer Immobilien AG', strasse: 'Gerolagstrasse 12', ort: '4632 Trimbach', auftrag_nr: 'A-501', einsatzart: 'Verkehrsdienst', von: '07:00:00', bis: '15:30:00', pause_min: 30, netto_h: 7.5, unterzeichner: null },
+    { id: 601, einsatz_id: 500, datum: '2026-08-18', mitarbeiter: 'Hans Muster', kunde: 'Muster Immobilien AG', strasse: 'Musterstrasse 12', ort: '4632 Trimbach', auftrag_nr: 'A-500', einsatzart: 'Verkehrsdienst', von: '07:00:00', bis: '16:00:00', pause_min: 30, netto_h: 8, unterzeichner: null },
+    { id: 602, einsatz_id: 500, datum: '2026-08-18', mitarbeiter: 'Anna Muster', kunde: 'Muster Immobilien AG', strasse: 'Musterstrasse 12', ort: '4632 Trimbach', auftrag_nr: 'A-500', einsatzart: 'Verkehrsdienst', von: '07:00:00', bis: '15:30:00', pause_min: 30, netto_h: 7.5, unterzeichner: null },
+    { id: 603, einsatz_id: 501, datum: '2026-08-17', mitarbeiter: 'Hans Muster', kunde: 'Muster Immobilien AG', strasse: 'Musterstrasse 12', ort: '4632 Trimbach', auftrag_nr: 'A-501', einsatzart: 'Verkehrsdienst', von: '07:00:00', bis: '16:00:00', pause_min: 30, netto_h: 8, unterzeichner: null },
+    { id: 900, einsatz_id: 999, datum: '2026-08-17', mitarbeiter: 'Fremd', kunde: 'Einwohnergemeinde Musterdorf', strasse: 'Dorfstrasse 4', ort: '5013 Musterdorf', auftrag_nr: null, einsatzart: 'Revierdienst', von: '22:00:00', bis: '04:00:00', pause_min: 0, netto_h: 6, unterzeichner: null },
+    { id: 604, einsatz_id: 501, datum: '2026-08-17', mitarbeiter: 'Anna Muster', kunde: 'Muster Immobilien AG', strasse: 'Musterstrasse 12', ort: '4632 Trimbach', auftrag_nr: 'A-501', einsatzart: 'Verkehrsdienst', von: '07:00:00', bis: '15:30:00', pause_min: 30, netto_h: 7.5, unterzeichner: null },
   ];
   go('kunden'); kuGoTab('rapporte'); renderRapporte();
 });
@@ -345,7 +345,7 @@ const b2 = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-11
 const p2 = await b2.newPage({ viewport: { width: 1280, height: 800 } });
 await setup(p2, { admin: false });
 await p2.goto(URL);
-await p2.fill('#gName', 'daniele.ciardo');
+await p2.fill('#gName', 'dario.beispiel');
 await p2.fill('#gPass', 'geheim');
 await p2.click('#gBtn');
 await p2.waitForTimeout(500);

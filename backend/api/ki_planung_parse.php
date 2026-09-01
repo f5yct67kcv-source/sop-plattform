@@ -5,7 +5,7 @@
 //
 // Zwei Befehlsarten, ueber "art" gewaehlt:
 //   masterplan  — "setze die Schliessrunde jeden Tag auf den August"
-//   zuteilung   — "setze Valbon vom 1. bis 15. auf die Schliessrunde"
+//   zuteilung   — "setze Vito vom 1. bis 15. auf die Schliessrunde"
 declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../rechte.php';

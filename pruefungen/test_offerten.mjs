@@ -38,15 +38,15 @@ const PRODUKTE = { status: 'ok', produkte: [
   { id: 3, name: 'Stillgelegt', beschreibung: '', einzelpreis_rappen: 100, einheit: 'Std.', mwst_satz_bp: 810, sortierung: 30, aktiv: 0 },
 ]};
 const BELEGE = { status: 'ok', naechste_nummer: 'OF-0126', belege: [
-  { id: 11, art: 'offerte', nummer: 'OF-0125', kunde_id: 1, kunde_name: 'Gemeinde Läufelfingen', kundennummer: 'A0025', titel: 'Grundreinigung', referenz: null, datum: tag(-12), gueltig_bis: tag(18), status: 'angeschaut', rabatt_bp: 0, total_rappen: 104855, aktiv: 1, ist_vorlage: 0 },
-  { id: 12, art: 'offerte', nummer: 'OF-0124', kunde_id: 2, kunde_name: 'Rieder Wittwer Immobilien', kundennummer: 'A0220', titel: 'Hauswartung', referenz: 'B-77', datum: tag(-16), gueltig_bis: tag(14), status: 'versendet', rabatt_bp: 0, total_rappen: 135125, aktiv: 1, ist_vorlage: 0 },
-  { id: 13, art: 'offerte', nummer: 'OF-0093', kunde_id: 1, kunde_name: 'Gemeinde Läufelfingen', kundennummer: 'A0025', titel: 'Verkehrsdienst', referenz: null, datum: '2026-02-25', gueltig_bis: '2026-03-27', status: 'bestaetigt', rabatt_bp: 700, total_rappen: 311190, aktiv: 1, ist_vorlage: 0 },
-  { id: 14, art: 'offerte', nummer: 'OF-0090', kunde_id: 2, kunde_name: 'Rieder Wittwer Immobilien', kundennummer: 'A0220', titel: 'Altes', referenz: null, datum: '2026-02-17', gueltig_bis: '2026-03-19', status: 'abgelehnt', rabatt_bp: 0, total_rappen: 55295, aktiv: 0, ist_vorlage: 0 },
+  { id: 11, art: 'offerte', nummer: 'OF-0125', kunde_id: 1, kunde_name: 'Gemeinde Beispieldorf', kundennummer: 'A0025', titel: 'Grundreinigung', referenz: null, datum: tag(-12), gueltig_bis: tag(18), status: 'angeschaut', rabatt_bp: 0, total_rappen: 104855, aktiv: 1, ist_vorlage: 0 },
+  { id: 12, art: 'offerte', nummer: 'OF-0124', kunde_id: 2, kunde_name: 'Beispielhof Immobilien', kundennummer: 'A0220', titel: 'Hauswartung', referenz: 'B-77', datum: tag(-16), gueltig_bis: tag(14), status: 'versendet', rabatt_bp: 0, total_rappen: 135125, aktiv: 1, ist_vorlage: 0 },
+  { id: 13, art: 'offerte', nummer: 'OF-0093', kunde_id: 1, kunde_name: 'Gemeinde Beispieldorf', kundennummer: 'A0025', titel: 'Verkehrsdienst', referenz: null, datum: '2026-02-25', gueltig_bis: '2026-03-27', status: 'bestaetigt', rabatt_bp: 700, total_rappen: 311190, aktiv: 1, ist_vorlage: 0 },
+  { id: 14, art: 'offerte', nummer: 'OF-0090', kunde_id: 2, kunde_name: 'Beispielhof Immobilien', kundennummer: 'A0220', titel: 'Altes', referenz: null, datum: '2026-02-17', gueltig_bis: '2026-03-19', status: 'abgelehnt', rabatt_bp: 0, total_rappen: 55295, aktiv: 0, ist_vorlage: 0 },
 ]};
 const KU = { status: 'ok', kunden: [
-  { id: 1, name: 'Gemeinde Läufelfingen', kundennummer: 'A0025', strasse: 'Dorfstrasse', hausnummer: '4', plz: '4448', ort: 'Läufelfingen', aktiv: 1,
-    personen: [{ id: 5, anrede: 'Herr', vorname: 'Patrick', nachname: 'Hufschmid' }], kontaktwege: [] },
-  { id: 2, name: 'Rieder Wittwer Immobilien', kundennummer: 'A0220', strasse: 'Weg', hausnummer: '1', plz: '4600', ort: 'Olten', aktiv: 1, personen: [], kontaktwege: [] },
+  { id: 1, name: 'Gemeinde Beispieldorf', kundennummer: 'A0025', strasse: 'Dorfstrasse', hausnummer: '4', plz: '4448', ort: 'Beispieldorf', aktiv: 1,
+    personen: [{ id: 5, anrede: 'Herr', vorname: 'Patrick', nachname: 'Beispiel' }], kontaktwege: [] },
+  { id: 2, name: 'Beispielhof Immobilien', kundennummer: 'A0220', strasse: 'Weg', hausnummer: '1', plz: '4600', ort: 'Olten', aktiv: 1, personen: [], kontaktwege: [] },
 ]};
 
 // Ein bereits VERSENDETER Beleg mit gesetzten ENT-187-Feldern, fuer das
@@ -288,18 +288,18 @@ const vorgabe = await page.evaluate(() => ({ d: document.getElementById('of_datu
 check('KRITISCH: "Gültig bis" wird mit 30 Tagen vorgeschlagen',
   vorgabe.g === new Date(new Date(vorgabe.d + 'T12:00:00').getTime() + 30 * 864e5).toISOString().slice(0, 10));
 
-await page.fill('#of_kunde', 'Gemeinde Läufelfingen');
+await page.fill('#of_kunde', 'Gemeinde Beispieldorf');
 await page.evaluate(() => ofKundeGewaehlt());
 await page.waitForTimeout(150);
 const personOpt = await page.$$eval('#of_person option', o => o.map(x => x.textContent.trim()));
 check('KRITISCH: die Ansprechpersonen des gewählten Kunden stehen zur Auswahl',
-  personOpt.some(t => t.includes('Patrick Hufschmid')));
-await page.fill('#of_kunde', 'Rieder Wittwer Immobilien');
+  personOpt.some(t => t.includes('Patrick Beispiel')));
+await page.fill('#of_kunde', 'Beispielhof Immobilien');
 await page.evaluate(() => ofKundeGewaehlt());
 await page.waitForTimeout(150);
 check('KRITISCH: beim Kundenwechsel verschwindet die fremde Ansprechperson',
   await page.evaluate(() => document.getElementById('of_person').disabled === true));
-await page.fill('#of_kunde', 'Gemeinde Läufelfingen');
+await page.fill('#of_kunde', 'Gemeinde Beispieldorf');
 await page.evaluate(() => ofKundeGewaehlt());
 await page.waitForTimeout(150);
 
@@ -530,14 +530,14 @@ const blatt = await page.evaluate(() => {
     ] };
   b.summen = belegSummen(b.positionen, 700);
   const html = ofBlatt(b, { name: 'Primeo Energie AG', strasse: 'Aarburgerstrasse', hausnummer: '39', plz: '4600', ort: 'Olten' },
-                          { vorname: 'Patrick', nachname: 'Hufschmid' });
+                          { vorname: 'Patrick', nachname: 'Beispiel' });
   document.getElementById('printArea').innerHTML = html;
   document.getElementById('printArea').style.display = 'block';
   return { html, hoehe: document.getElementById('printArea').firstElementChild.getBoundingClientRect().height };
 });
 check('KRITISCH: die Offertennummer steht auf dem Blatt', blatt.html.includes('OF-0093'));
 check('KRITISCH: der Empfänger steht darauf', blatt.html.includes('Primeo Energie AG'));
-check('Die Ansprechperson steht darunter', blatt.html.includes('Patrick Hufschmid'));
+check('Die Ansprechperson steht darunter', blatt.html.includes('Patrick Beispiel'));
 check('Die Referenz erscheint nur, wenn es eine gibt', blatt.html.includes('B-12'));
 check('KRITISCH: das Total steht darauf (3’111.90)', blatt.html.includes('3’111.90'));
 check('KRITISCH: die MWST-Grundlage steht darauf (2’734.20)', blatt.html.includes('2’734.20'));
@@ -780,13 +780,13 @@ const blattMit = await page.evaluate(() => {
     positionen: [{ produkt_name: 'Verkehrsdienst', beschreibung: '', menge: 10, einheit: 'Std.',
                    einzelpreis_rappen: 4200, rabatt_bp: 0, mwst_satz_bp: 810 }] };
   b.summen = belegSummen(b.positionen, 0);
-  return ofBlatt(b, { name: 'Gemeinde Läufelfingen' }, null);
+  return ofBlatt(b, { name: 'Gemeinde Beispieldorf' }, null);
 });
 check('Öffentliche Notizen erscheinen auf dem Ausdruck', blattMit.includes('Zutritt nur nach Voranmeldung.'));
 check('Bedingungen erscheinen auf dem Ausdruck', blattMit.includes('Zahlbar innert 30 Tagen netto.'));
 check('Die Fusszeile erscheint auf dem Ausdruck', blattMit.includes('Wir schätzen Ihr Vertrauen.'));
 check('KRITISCH: die Unterschriftsseite hängt mit erzwungenem Seitenumbruch an',
-  blattMit.includes('page-break-before:always') && blattMit.includes('Unterschrift Gemeinde Läufelfingen'));
+  blattMit.includes('page-break-before:always') && blattMit.includes('Unterschrift Gemeinde Beispieldorf'));
 
 const blattOhne = await page.evaluate(() => {
   const b = { art: 'offerte', nummer: 'OF-0131', titel: 'x', datum: '2026-04-01', rabatt_bp: 0,

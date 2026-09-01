@@ -23,11 +23,11 @@ const ok = [], bad = [];
 const check = (n, c) => (c ? ok : bad).push(n);
 
 const MA = [
-  { id: 1, name: 'adrian', vorname: 'Adrian', nachname: 'von Arb', aktiv: 1, ist_admin: 1 },
-  { id: 2, name: 'daniele', vorname: 'Daniele', nachname: 'Ciardo', aktiv: 1, ist_admin: 0 },
-  { id: 3, name: 'hans', vorname: 'Hans', nachname: 'Meier', aktiv: 1, ist_admin: 0 },
+  { id: 1, name: 'adrian', vorname: 'Adrian', nachname: 'Muster', aktiv: 1, ist_admin: 1 },
+  { id: 2, name: 'dario', vorname: 'Dario', nachname: 'Beispiel', aktiv: 1, ist_admin: 0 },
+  { id: 3, name: 'hans', vorname: 'Hans', nachname: 'Muster', aktiv: 1, ist_admin: 0 },
 ];
-const KU = [{ id: 1, name: 'Stranag', strasse: 'Kantonsstrasse', ort: '6000 Luzern' }];
+const KU = [{ id: 1, name: 'Nordbau', strasse: 'Kantonsstrasse', ort: '6000 Luzern' }];
 
 // 71 — zwei Plaetze, niemand eingeteilt. Der Regelfall.
 // 72 — zwei Plaetze, eine Person haengt schon dran (aus der Zeit vor den
@@ -40,26 +40,26 @@ const KU = [{ id: 1, name: 'Stranag', strasse: 'Kantonsstrasse', ort: '6000 Luze
 //      Rechnung-Platzhalter und die Rapport-Uebersicht (ENT-127/128).
 // 78 — in der Vergangenheit, aber NICHT abgeschlossen (status 'bestaetigt').
 //      Genau der Fall, den ENT-126 allein am Datum falsch entschieden hätte.
-const bau = (id, zus) => ({ id, kunde_id: 1, kunde_name: 'Stranag', titel: null,
+const bau = (id, zus) => ({ id, kunde_id: 1, kunde_name: 'Nordbau', titel: null,
   strasse: 'Kantonsstrasse', ort: '6000 Luzern', einsatzart: 'Verkehrsdienst',
   datum: MORGEN, von: '07:30:00', bis: '16:30:00', bedarf: 2, status: 'geplant',
   bemerkung: null, objekt_id: null, mitarbeiter: [], ...zus });
 
 let EINSAETZE = [
   bau(71),
-  bau(72, { mitarbeiter: [{ id: 2, name: 'daniele', vorname: 'Daniele', nachname: 'Ciardo' }] }),
+  bau(72, { mitarbeiter: [{ id: 2, name: 'dario', vorname: 'Dario', nachname: 'Beispiel' }] }),
   bau(73, { bedarf: 0 }),
   bau(74, { datum: HEUTE, ist_status: 'offen',
-            mitarbeiter: [{ id: 3, name: 'hans', vorname: 'Hans', nachname: 'Meier', ist_status: 'anwesend' }] }),
-  bau(75, { kunde_name: 'Axians', bedarf: 3 }),
+            mitarbeiter: [{ id: 3, name: 'hans', vorname: 'Hans', nachname: 'Muster', ist_status: 'anwesend' }] }),
+  bau(75, { kunde_name: 'Techmuster', bedarf: 3 }),
   bau(77, { kunde_name: 'Abgeschlossen', datum: HEUTE, status: 'abgeschlossen',
-            mitarbeiter: [{ id: 2, name: 'daniele', vorname: 'Daniele', nachname: 'Ciardo' }] }),
+            mitarbeiter: [{ id: 2, name: 'dario', vorname: 'Dario', nachname: 'Beispiel' }] }),
   bau(78, { kunde_name: 'Vergangen, nicht abgeschlossen', datum: FRUEHER, status: 'bestaetigt' }),
   // 79 — abgeschlossen, Rapport deckungsgleich mit dem Plan, UND diese eine
   // Zuteilung bereits abgeglichen (ENT-138): "Direkt abgleichen" darf hier
   // nicht mehr angeboten werden -- nichts mehr zu uebernehmen.
   bau(79, { kunde_name: 'Bereits abgeglichen', datum: HEUTE, status: 'abgeschlossen',
-            mitarbeiter: [{ id: 2, name: 'daniele', vorname: 'Daniele', nachname: 'Ciardo', ist_status: 'anwesend' }] }),
+            mitarbeiter: [{ id: 2, name: 'dario', vorname: 'Dario', nachname: 'Beispiel', ist_status: 'anwesend' }] }),
   // 80 — kurzer Einsatz (3 h = 12 Viertelstunden), genau der Fall aus der
   //      Rückmeldung des Projektinhabers zu ENT-151: je kürzer der Einsatz,
   //      desto mehr Breite blieb bei den festen Spalten liegen statt bei der
@@ -71,21 +71,21 @@ let EINSAETZE = [
     // Der Zeitpunkt selbst wird nirgends geprüft, nur ob überhaupt einer da
     // ist. Trotzdem relativ statt fest: Ein festes Datum nahe beim heutigen
     // Tag altert und macht die Suite mit der Zeit brüchig (test_datumsfest).
-    { id: 1, name: 'adrian', vorname: 'Adrian', nachname: 'von Arb', zusage: 'zugesagt', gesehen_am: tag(-1) + ' 08:00:00' },
-    { id: 2, name: 'daniele', vorname: 'Daniele', nachname: 'Ciardo', zusage: 'abgelehnt', gesehen_am: tag(-1) + ' 09:00:00' },
-    { id: 3, name: 'hans', vorname: 'Hans', nachname: 'Meier', zusage: 'offen', gesehen_am: null },
+    { id: 1, name: 'adrian', vorname: 'Adrian', nachname: 'Muster', zusage: 'zugesagt', gesehen_am: tag(-1) + ' 08:00:00' },
+    { id: 2, name: 'dario', vorname: 'Dario', nachname: 'Beispiel', zusage: 'abgelehnt', gesehen_am: tag(-1) + ' 09:00:00' },
+    { id: 3, name: 'hans', vorname: 'Hans', nachname: 'Muster', zusage: 'offen', gesehen_am: null },
   ] }),
 ];
 
 // Rapport zu Einsatz 77 -- fuer die Rapport-Uebersicht am abgeschlossenen
 // Einsatz (ENT-128).
 const RAPPORTE = [
-  { id: 900, einsatz_id: 77, mitarbeiter_id: 2, mitarbeiter: 'daniele',
+  { id: 900, einsatz_id: 77, mitarbeiter_id: 2, mitarbeiter: 'dario',
     von: '07:00:00', bis: '15:00:00', pause_min: 30, netto_h: 7.5,
     bemerkung: 'Alles ruhig, keine besonderen Vorkommnisse.', erfasst_am: HEUTE + ' 15:10:00' },
   // Zu Einsatz 79 (ENT-138): Zeiten decken sich exakt mit dem Plan (07:30–16:30) --
   // bewusst KEINE Abweichung, damit dieser Testfall nur die Sperre prueft.
-  { id: 901, einsatz_id: 79, mitarbeiter_id: 2, mitarbeiter: 'daniele',
+  { id: 901, einsatz_id: 79, mitarbeiter_id: 2, mitarbeiter: 'dario',
     von: '07:30:00', bis: '16:30:00', pause_min: 30, netto_h: 8.5,
     bemerkung: null, erfasst_am: HEUTE + ' 16:40:00' },
 ];
@@ -345,7 +345,7 @@ try {
 // Raster zwei leere Plaetze.
 await oeffne(72);
 check('KRITISCH: die schon eingeteilte Person steht im Raster',
-  (await page.textContent('#epRaster')).includes('Daniele'));
+  (await page.textContent('#epRaster')).includes('Dario'));
 check('KRITISCH: sie belegt eine Position, statt danebenzustehen',
   await page.evaluate(() => document.querySelectorAll('#epRaster .ep-balken.besetzt').length === 1));
 check('Der zweite Platz bleibt offen',
@@ -489,7 +489,7 @@ await page.waitForTimeout(400);
 check('KRITISCH: das Formular oeffnet sich als Rechnung, nicht als Offerte',
   (await page.textContent('#pgTitle')) === 'Rechnung');
 check('KRITISCH: der Kunde des Einsatzes wird uebernommen',
-  (await page.inputValue('#of_kunde')) === 'Stranag');
+  (await page.inputValue('#of_kunde')) === 'Nordbau');
 check('KRITISCH: der Titel wird aus der Einsatzart gesetzt',
   (await page.inputValue('#of_titel')) === 'Verkehrsdienst');
 const posZeilen = await page.$$eval('#ofPositionen .of-pos', els => els.map(el => ({
@@ -505,7 +505,7 @@ check('KRITISCH: die Menge kommt aus den Netto-Stunden des Rapports, nicht aus d
 check('KRITISCH: der Preis bleibt leer -- kein erfundener, ungeprueften Produktabgleich',
   posZeilen[0] && (posZeilen[0].preis === '0.00' || posZeilen[0].preis === '0'));
 check('Die Beschreibung nennt Datum, Zeit und Person',
-  posZeilen[0] && /07:00.*15:00.*Daniele Ciardo/.test(posZeilen[0].text));
+  posZeilen[0] && /07:00.*15:00.*Dario Beispiel/.test(posZeilen[0].text));
 // Zurueck zum Einsatzplan -- die folgenden Pruefungen brauchen wieder #epKopf
 // von Einsatz 77.
 await oeffne(77);
@@ -514,7 +514,7 @@ await oeffne(77);
 const kopf77 = await page.textContent('#epKopf');
 check('KRITISCH: der Rapport erscheint im Kopf des abgeschlossenen Einsatzes',
   kopf77.includes('07:00') && kopf77.includes('15:00'));
-check('Die Person steht dabei', kopf77.includes('Daniele Ciardo'));
+check('Die Person steht dabei', kopf77.includes('Dario Beispiel'));
 check('Die Bemerkung aus dem Rapport ist zu lesen', kopf77.includes('Alles ruhig'));
 check('Die Pause ist ausgewiesen', kopf77.includes('30'));
 
@@ -577,7 +577,7 @@ await oeffne(71);
 kaputt = 75;
 await oeffne(75);
 check('KRITISCH: nach fehlgeschlagenem Anlegen steht der geöffnete Einsatz im Kopf',
-  (await page.textContent('#epKopf')).includes('Axians'));
+  (await page.textContent('#epKopf')).includes('Techmuster'));
 check('KRITISCH: und nicht mehr das Raster des vorherigen Einsatzes',
   (await page.textContent('#epRaster')).includes('Noch keine Position'));
 kaputt = null;
@@ -922,7 +922,7 @@ await page.evaluate(() => {
   epPos.push({ id: 9001, nr: 99, funktion: 'Fahrzeit Hinweg', ist_fahrzeit: 1,
     position: null, von: '07:00:00', bis: '07:30:00', std_verrechnung: null,
     pauschal: null, qualifikation: null, gesperrt: 0, bemerkung: null,
-    mitarbeiter_id: 1, mitarbeiter: 'adrian', vorname: 'Adrian', nachname: 'von Arb',
+    mitarbeiter_id: 1, mitarbeiter: 'adrian', vorname: 'Adrian', nachname: 'Muster',
     zusage: 'zugesagt', gesehen_am: null });
   epEinsatz.weg_minuten = 30;
   epZeichnen();
@@ -989,7 +989,7 @@ const bs = await balken();
 check('KRITISCH: die zugesagte Schicht ist grün, nicht gelb',
   bs.some(b => b.txt.includes('Adrian') && b.k.includes('zugesagt') && !b.k.includes('besetzt')));
 check('KRITISCH: die abgelehnte Schicht ist hervorgehoben',
-  bs.some(b => b.txt.includes('Daniele') && b.k.includes('abgelehnt')));
+  bs.some(b => b.txt.includes('Dario') && b.k.includes('abgelehnt')));
 check('KRITISCH: ohne Rückmeldung bleibt es beim bisherigen Gelb',
   bs.some(b => b.txt.includes('Hans') && b.k.includes('besetzt')));
 check('KRITISCH: das Auge steht bei den angesehenen Schichten',
@@ -1016,7 +1016,7 @@ check('KRITISCH: die Planungsliste zeigt 2 von 3 statt 3 von 3',
   zeile76 && zeile76.txt.includes('2/3'));
 check('KRITISCH: sie meldet den offenen Platz', zeile76 && zeile76.txt.includes('1 offen'));
 check('KRITISCH: der Name der abgelehnten Person bleibt sichtbar, aber gekennzeichnet',
-  zeile76 && zeile76.durch && zeile76.txt.includes('Daniele'));
+  zeile76 && zeile76.durch && zeile76.txt.includes('Dario'));
 
 // ══════════ TOTE FLÄCHE IM RASTER (ENT-151)
 // Der Projektinhaber, mit markiertem Bildschirmfoto: „auch hier im markierten

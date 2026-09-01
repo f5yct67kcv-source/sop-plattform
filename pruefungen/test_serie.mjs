@@ -76,8 +76,8 @@ check('KRITISCH: die App vermengt den Routenlink nicht mit der GAV-Wegstrecke',
 // ══════════════════════════════════════════════════════════════════════════
 // TEIL 2 — Anlegen: wer bekommt welche Kennung
 // ══════════════════════════════════════════════════════════════════════════
-const MA = [{ id: 1, name: 'adrian', vorname: 'Adrian', nachname: 'von Arb', aktiv: 1, ist_admin: 1 }];
-const KU = [{ id: 1, name: 'Stranag', strasse: 'Kantonsstrasse 3', ort: '6000 Luzern' }];
+const MA = [{ id: 1, name: 'adrian', vorname: 'Adrian', nachname: 'Muster', aktiv: 1, ist_admin: 1 }];
+const KU = [{ id: 1, name: 'Nordbau', strasse: 'Kantonsstrasse 3', ort: '6000 Luzern' }];
 const EINSAETZE = [];
 let idSeq = 600;
 const rufe = [];
@@ -133,7 +133,7 @@ async function anlegen(von, bis) {
   await page.evaluate(() => openEinsatzNeu());
   await page.waitForTimeout(350);
   await page.evaluate(({ von }) => {
-    $('enNKunde_name').value = 'Stranag';
+    $('enNKunde_name').value = 'Nordbau';
     $('enNStrasse').value = 'Kantonsstrasse 3';
     $('enNOrt').value = '6000 Luzern';
     $('enNKanton').value = 'LU';
@@ -417,7 +417,7 @@ await page.close();
 // TEIL 4 — Routenlink in der App
 // ══════════════════════════════════════════════════════════════════════════
 const SCHICHTEN = [
-  { id: 501, kunde_name: 'Stranag', objekt_name: null, titel: null, strasse: 'Kantonsstrasse 3',
+  { id: 501, kunde_name: 'Nordbau', objekt_name: null, titel: null, strasse: 'Kantonsstrasse 3',
     ort: '6000 Luzern', kanton: 'LU', einsatzart: 'Verkehrsdienst', datum: tag(1),
     von: '07:30:00', bis: '16:30:00', status: 'geplant', zusage: 'offen', im_team: 1,
     treffpunkt: null, taetigkeit: null, qualifikation: null, bemerkung: null,
@@ -434,15 +434,15 @@ app.on('pageerror', e => bad.push('JS-Fehler (App): ' + e.message));
 await app.route('**/api/**', route => {
   const u = route.request().url();
   const send = b => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) });
-  if (u.includes('login')) return send({ status: 'ok', token: 't', name: 'daniele', ist_admin: false });
+  if (u.includes('login')) return send({ status: 'ok', token: 't', name: 'dario', ist_admin: false });
   if (u.includes('meine_schichten')) return send({ status: 'ok', schichten: SCHICHTEN });
   if (u.includes('mein_profil')) return send({ status: 'ok', monat: { anzahl: 0, stunden: 0 },
-    profil: { name: 'daniele', ist_admin: false } });
+    profil: { name: 'dario', ist_admin: false } });
   if (u.includes('einsatz_dokument')) return send({ status: 'ok', dokumente: [] });
   return send({ status: 'ok', schichten: [], rapporte: [], sperren: [] });
 });
 await app.goto(`file://${WURZEL}/app.html`);
-await app.fill('#gName', 'daniele'); await app.fill('#gPass', 'x'); await app.click('#gBtn');
+await app.fill('#gName', 'dario'); await app.fill('#gPass', 'x'); await app.click('#gBtn');
 await app.waitForTimeout(900);
 await app.evaluate(() => { zeige('plan'); });
 await app.waitForTimeout(400);

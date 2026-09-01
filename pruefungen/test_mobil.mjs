@@ -10,10 +10,10 @@ const ok = [], bad = [];
 const check = (n, c) => (c ? ok : bad).push(n);
 
 const MA = { status: 'ok', mitarbeiter: [
-  { id: 1, name: 'adrian', ist_admin: 1, vorname: 'Adrian', nachname: 'Von Arb' },
-  { id: 2, name: 'daniele.ciardo', ist_admin: 0, vorname: 'Daniele', nachname: 'Ciardo' }]};
-const KU = { status: 'ok', kunden: [{ id: 1, name: 'Einwohnergemeinde Niedergösgen', strasse: 'Dorfstrasse 4', ort: '5013 Niedergösgen', telefon: '062 849 00 00', email: null }]};
-const OB = { status: 'ok', objekte: [{ id: 1, kunde_id: 1, kunde_name: 'Einwohnergemeinde Niedergösgen',
+  { id: 1, name: 'adrian', ist_admin: 1, vorname: 'Adrian', nachname: 'Muster' },
+  { id: 2, name: 'dario.beispiel', ist_admin: 0, vorname: 'Dario', nachname: 'Beispiel' }]};
+const KU = { status: 'ok', kunden: [{ id: 1, name: 'Einwohnergemeinde Musterdorf', strasse: 'Dorfstrasse 4', ort: '5013 Musterdorf', telefon: '062 849 00 00', email: null }]};
+const OB = { status: 'ok', objekte: [{ id: 1, kunde_id: 1, kunde_name: 'Einwohnergemeinde Musterdorf',
   name: 'Einkaufszentrum Nord West', strasse: 'Sehr Lange Hauptstrasse 44', ort: '4632 Trimbach',
   kanton: 'SO', einsatzart: 'Revierdienst', aktiv: 1, bemerkung: null, masterschichten: 1, stunden_je_einsatz: 0.5 }]};
 const MS = { status: 'ok', masterschichten: [{ id: 10, objekt_id: 1, name: 'Revierdienst Schliessrunde',
@@ -22,18 +22,18 @@ const MS = { status: 'ok', masterschichten: [{ id: 10, objekt_id: 1, name: 'Revi
   bedarf_mi: 1, bedarf_do: 1, bedarf_fr: 1, bedarf_sa: 0, bedarf_so: 0, bedarf_feiertag: 2,
   intervall_tage: null, intervall_start: null, bedarf_intervall: 1, gueltig_ab: '2026-01-01',
   gueltig_bis: null, ersetzt_id: null, laeuft: true }]};
-const A = { id: 1, name: 'adrian', vorname: 'Adrian', nachname: 'Von Arb', zusage: 'offen' };
+const A = { id: 1, name: 'adrian', vorname: 'Adrian', nachname: 'Muster', zusage: 'offen' };
 const EIN = { status: 'ok', einsaetze: [
-  { id: 21, kunde_id: 1, kunde_name: 'Einwohnergemeinde Niedergösgen', objekt_id: 1, masterschicht_id: 10,
+  { id: 21, kunde_id: 1, kunde_name: 'Einwohnergemeinde Musterdorf', objekt_id: 1, masterschicht_id: 10,
     titel: 'Revierdienst Schliessrunde', strasse: 'Sehr Lange Hauptstrasse 44', ort: '4632 Trimbach',
     einsatzart: 'Revierdienst', datum: T(3), von: '22:00:00', bis: '22:30:00', bedarf: 2,
     status: 'geplant', bemerkung: null, mitarbeiter: [A] },
-  { id: 22, kunde_id: 1, kunde_name: 'Einwohnergemeinde Niedergösgen', objekt_id: null, masterschicht_id: null,
-    titel: 'Baustelle Kreiselumfahrung', strasse: 'Dorfstrasse 1', ort: '5013 Niedergösgen',
+  { id: 22, kunde_id: 1, kunde_name: 'Einwohnergemeinde Musterdorf', objekt_id: null, masterschicht_id: null,
+    titel: 'Baustelle Kreiselumfahrung', strasse: 'Dorfstrasse 1', ort: '5013 Musterdorf',
     einsatzart: 'Verkehrsdienst', datum: T(4), von: '07:30:00', bis: '16:30:00', bedarf: 1,
     status: 'bestaetigt', bemerkung: null, mitarbeiter: [A] }]};
-const RAP = { status: 'ok', rapporte: [{ id: 1, datum: T(3), mitarbeiter: 'daniele.ciardo',
-  kunde: 'Einwohnergemeinde Niedergösgen', strasse: 'Dorfstrasse 1', ort: '5013 Niedergösgen',
+const RAP = { status: 'ok', rapporte: [{ id: 1, datum: T(3), mitarbeiter: 'dario.beispiel',
+  kunde: 'Einwohnergemeinde Musterdorf', strasse: 'Dorfstrasse 1', ort: '5013 Musterdorf',
   auftrag_nr: 'A-118', einsatzart: 'Verkehrsdienst', von: '07:00:00', bis: '16:00:00', pause_min: 30,
   netto_h: '8.50', unterzeichner: 'R. Muster', unterschrift: null, bemerkung: null, erfasst_am: T(3) + ' 16:12:00' }]};
 
@@ -47,8 +47,8 @@ await page.route('**/api/**', route => {
   if (p.includes('dashboard_stats')) return send({ status: 'ok',
     kpi: { rapporte_monat: 1, rapporte_vormonat: 0, stunden_monat: 8.5, stunden_vormonat: 0, mitarbeiter: 2, kunden: 1, rapporte_total: 1 },
     verlauf: Array.from({ length: 8 }, (_, i) => ({ kw: 26 + i, stunden: 20, anzahl: 2 })),
-    angemeldet: [{ name: 'adrianvonarb', vorname: 'Adrian', nachname: 'Von Arb', letzte_anmeldung: T(3) + ' 08:00:00' }],
-    pro_mitarbeiter: [{ name: 'adrian', vorname: 'Adrian', nachname: 'Von Arb', stunden: '8.50', anzahl: 1 }],
+    angemeldet: [{ name: 'adrianvonarb', vorname: 'Adrian', nachname: 'Muster', letzte_anmeldung: T(3) + ' 08:00:00' }],
+    pro_mitarbeiter: [{ name: 'adrian', vorname: 'Adrian', nachname: 'Muster', stunden: '8.50', anzahl: 1 }],
     letzte_rapporte: RAP.rapporte.map(r => ({ ...r, mitarbeiter: r.mitarbeiter })) });
   if (p.includes('rapport_list')) return send(RAP);
   if (p.includes('mitarbeiter_list')) return send(MA);

@@ -88,9 +88,9 @@ check('KRITISCH: der Endpunkt weist ein unbekanntes Verkehrsmittel zurueck, stat
 // ══════════════════════════════════════════════════════════════════════════
 // TEIL 3 — Oberflaeche
 // ══════════════════════════════════════════════════════════════════════════
-const MA = [{ id: 1, name: 'daniele', vorname: 'Daniele', nachname: 'Ciardo', aktiv: 1, ist_admin: 0,
+const MA = [{ id: 1, name: 'dario', vorname: 'Dario', nachname: 'Beispiel', aktiv: 1, ist_admin: 0,
   verkehrsmittel: 'Privatfahrzeug' }];
-const EINSAETZE = [{ id: 81, kunde_id: 1, kunde_name: 'Stranag', titel: null, strasse: 'Kantonsstrasse 3',
+const EINSAETZE = [{ id: 81, kunde_id: 1, kunde_name: 'Nordbau', titel: null, strasse: 'Kantonsstrasse 3',
   ort: '6000 Luzern', kanton: 'LU', einsatzart: 'Verkehrsdienst', sparte: 'sicherheit',
   datum: tag(16), von: '07:30:00', bis: '16:30:00', bedarf: 1, status: 'geplant',
   weg_km: 15, weg_adresse: 'Kantonsstrasse 3, 6000 Luzern, LU',
@@ -105,20 +105,20 @@ const AO = [{ id: 1, bezeichnung: 'HAO', rolle: 'hao', strasse: 'Bahnhofstrasse 
   ort: 'Olten', km_zum_anderen: null, aktiv: 1 }];
 const POS = { 81: [{ id: 700, nr: 1, funktion: 'Verkehrsdienst', ist_fahrzeit: 0, position: null,
     von: '07:30:00', bis: '16:30:00', std_verrechnung: null, pauschal: null, qualifikation: null,
-    gesperrt: 0, bemerkung: null, mitarbeiter_id: 1, mitarbeiter: 'daniele', vorname: 'Daniele',
-    nachname: 'Ciardo', zusage: 'zugesagt', gesehen_am: null, verkehrsmittel: null, oev_rappen: null }],
+    gesperrt: 0, bemerkung: null, mitarbeiter_id: 1, mitarbeiter: 'dario', vorname: 'Dario',
+    nachname: 'Beispiel', zusage: 'zugesagt', gesehen_am: null, verkehrsmittel: null, oev_rappen: null }],
   82: [{ id: 701, nr: 1, funktion: 'Revierdienst', ist_fahrzeit: 0, position: null,
     von: '07:30:00', bis: '16:30:00', std_verrechnung: null, pauschal: null, qualifikation: null,
-    gesperrt: 0, bemerkung: null, mitarbeiter_id: 1, mitarbeiter: 'daniele', vorname: 'Daniele',
-    nachname: 'Ciardo', zusage: 'zugesagt', gesehen_am: null, verkehrsmittel: null, oev_rappen: null }] };
+    gesperrt: 0, bemerkung: null, mitarbeiter_id: 1, mitarbeiter: 'dario', vorname: 'Dario',
+    nachname: 'Beispiel', zusage: 'zugesagt', gesehen_am: null, verkehrsmittel: null, oev_rappen: null }] };
 const AUSLAGEN_ZEILEN = [
-  { einsatz_id: 1, mitarbeiter_id: 1, mitarbeiter: 'Daniele Ciardo', datum: tag(-20),
-    kunde_name: 'Stranag', ort: '6000 Luzern', titel: null,
+  { einsatz_id: 1, mitarbeiter_id: 1, mitarbeiter: 'Dario Beispiel', datum: tag(-20),
+    kunde_name: 'Nordbau', ort: '6000 Luzern', titel: null,
     zone_schluessel: 'pauschalzone1', zone_name: 'Pauschalzone 1', zone_quelle: 'Art. 18 Ziff. 3.1.2',
     weg_km: 15, verkehrsmittel: 'Privatfahrzeug', fahrzeitersatz_rappen: 560, fahrkostenersatz_rappen: 700,
     gesperrt_grund: null, regelwerk: 'GAV 2026', erzeugt_am: tag(-19) + ' 08:00:00' },
-  { einsatz_id: 2, mitarbeiter_id: 1, mitarbeiter: 'Daniele Ciardo', datum: tag(-19),
-    kunde_name: 'Stranag', ort: '6000 Luzern', titel: null,
+  { einsatz_id: 2, mitarbeiter_id: 1, mitarbeiter: 'Dario Beispiel', datum: tag(-19),
+    kunde_name: 'Nordbau', ort: '6000 Luzern', titel: null,
     zone_schluessel: 'pauschalzone1', zone_name: 'Pauschalzone 1', zone_quelle: 'Art. 18 Ziff. 3.1.2',
     weg_km: 15, verkehrsmittel: null, fahrzeitersatz_rappen: 560, fahrkostenersatz_rappen: null,
     gesperrt_grund: 'verkehrsmittel_unbekannt', regelwerk: 'GAV 2026', erzeugt_am: tag(-18) + ' 08:00:00' },
@@ -233,7 +233,7 @@ await page.waitForTimeout(500);
 check('KRITISCH: die Ansicht ist ueber die Navigation erreichbar', await page.isVisible('#view-auslagen'));
 check('KRITISCH: die Zeilen erscheinen gruppiert je Mitarbeitendem',
   await page.evaluate(() => document.querySelectorAll('#auListe .card-hd h2').length === 1
-    && document.querySelector('#auListe .card-hd h2').textContent.includes('Daniele Ciardo')));
+    && document.querySelector('#auListe .card-hd h2').textContent.includes('Dario Beispiel')));
 check('KRITISCH: eine Zeile ohne bestimmbaren Betrag ist als solche erkennbar, nicht als „0"',
   await page.evaluate(() => {
     const zeile = [...document.querySelectorAll('#auListe tbody tr')].find(t => t.classList.contains('au-gesperrt'));

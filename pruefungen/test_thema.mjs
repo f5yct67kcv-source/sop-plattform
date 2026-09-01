@@ -11,16 +11,16 @@ const T = n => `${M}-${String(n).padStart(2, '0')}`;
 const ok = [], bad = [];
 const check = (n, c) => (c ? ok : bad).push(n);
 
-const OBJ = { id: 1, kunde_id: 1, kunde_name: 'Borner AG', name: 'Gerolag Center',
+const OBJ = { id: 1, kunde_id: 1, kunde_name: 'Beispiel AG', name: 'Muster Center',
   strasse: 'Industriestrasse 78', ort: '4601 Olten', kanton: 'SO', einsatzart: 'Revierdienst', aktiv: 1 };
 const VOR = [{ id: 3, name: 'Schliessrunde', kuerzel: 'SR', art: 'arbeit', von: '22:00', bis: '22:30',
   arbeitszeit_h: 0.5, auf_abruf: 0, farbe: null, gueltig_ab: '2026-01-01', gueltig_bis: null }];
 const BED = [1,2,3,4].map(d => ({ datum: T(d), masterschicht_id: 3, name: 'Schliessrunde', kuerzel: 'SR',
   von: '22:00', bis: '22:30', bedarf: 2, status: 'geplant', feiertag: null, art: 'arbeit', arbeitszeit_h: 0.5 }));
-const EIN = [{ id: 101, kunde_id: 1, kunde_name: 'Borner AG', objekt_id: 1, masterschicht_id: 3,
+const EIN = [{ id: 101, kunde_id: 1, kunde_name: 'Beispiel AG', objekt_id: 1, masterschicht_id: 3,
   titel: 'SR · Schliessrunde', strasse: null, ort: '4601 Olten', einsatzart: 'Revierdienst',
   datum: T(2), von: '22:00:00', bis: '22:30:00', bedarf: 2, status: 'geplant', bemerkung: null,
-  mitarbeiter: [{ id: 2, name: 'valbon', vorname: 'Valbon', nachname: 'Redjepi', zusage: 'offen' }] }];
+  mitarbeiter: [{ id: 2, name: 'vito', vorname: 'Vito', nachname: 'Muster', zusage: 'offen' }] }];
 
 async function starte(vorbelegt) {
   const browser = await chromium.launch({ executablePath: EXE });
@@ -38,8 +38,8 @@ async function starte(vorbelegt) {
     if (u.includes('objekt_list')) return send({ status: 'ok', objekte: [OBJ] });
     if (u.includes('einsatz_list')) return send({ status: 'ok', einsaetze: EIN });
     if (u.includes('mitarbeiter_list')) return send({ status: 'ok', mitarbeiter: [
-      { id: 1, name: 'adrian', vorname: 'Adrian', nachname: 'von Arb', aktiv: 1, ist_admin: 1 },
-      { id: 2, name: 'valbon', vorname: 'Valbon', nachname: 'Redjepi', aktiv: 1, ist_admin: 0 }] });
+      { id: 1, name: 'adrian', vorname: 'Adrian', nachname: 'Muster', aktiv: 1, ist_admin: 1 },
+      { id: 2, name: 'vito', vorname: 'Vito', nachname: 'Muster', aktiv: 1, ist_admin: 0 }] });
     if (u.includes('dashboard_stats')) return send({ status: 'ok',
       kpi: { rapporte_monat: 3, rapporte_vormonat: 1, stunden_monat: 24, stunden_vormonat: 8, mitarbeiter: 2, kunden: 1, rapporte_total: 4 },
       verlauf: Array.from({ length: 8 }, (_, i) => ({ kw: 26 + i, stunden: 20, anzahl: 2 })),

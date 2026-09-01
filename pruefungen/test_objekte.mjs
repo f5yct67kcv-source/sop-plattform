@@ -17,18 +17,18 @@ const STATS = { status: 'ok',
   verlauf: [], angemeldet: [], pro_mitarbeiter: [], letzte_rapporte: [] };
 
 const MA = { status: 'ok', mitarbeiter: [
-  { id: 1, name: 'adrian', ist_admin: 1, vorname: 'Adrian', nachname: 'Von Arb' },
-  { id: 2, name: 'hans.meier', ist_admin: 0, vorname: 'Hans', nachname: 'Meier' }
+  { id: 1, name: 'adrian', ist_admin: 1, vorname: 'Adrian', nachname: 'Muster' },
+  { id: 2, name: 'hans.muster', ist_admin: 0, vorname: 'Hans', nachname: 'Muster' }
 ]};
 const KU = { status: 'ok', kunden: [
-  { id: 1, name: 'Studer Immobilien AG', strasse: 'Gerolagstrasse 12', ort: '4632 Trimbach', telefon: '062 111 22 33', email: null }
+  { id: 1, name: 'Muster Immobilien AG', strasse: 'Musterstrasse 12', ort: '4632 Trimbach', telefon: '062 111 22 33', email: null }
 ]};
 
 const OBJEKTE = { status: 'ok', objekte: [
-  { id: 1, kunde_id: 1, kunde_name: 'Studer Immobilien AG', name: 'Einkaufszentrum Nord', strasse: 'Hauptstrasse 4',
+  { id: 1, kunde_id: 1, kunde_name: 'Muster Immobilien AG', name: 'Einkaufszentrum Nord', strasse: 'Hauptstrasse 4',
     ort: '4632 Trimbach', kanton: 'SO', einsatzart: 'Revierdienst', aktiv: 1, bemerkung: null,
     masterschichten: 2, stunden_je_einsatz: 0.75 },
-  { id: 2, kunde_id: 1, kunde_name: 'Studer Immobilien AG', name: 'Kirche Wangen', strasse: null,
+  { id: 2, kunde_id: 1, kunde_name: 'Muster Immobilien AG', name: 'Kirche Wangen', strasse: null,
     ort: '4612 Wangen', kanton: 'SO', einsatzart: 'Revierdienst', aktiv: 0, bemerkung: null,
     masterschichten: 0, stunden_je_einsatz: 0 }
 ]};
@@ -51,23 +51,23 @@ const FEIERTAGE = { status: 'ok', kanton: 'SO', feiertage: [
   { id: 2, datum: T(3), kanton: 'SO', name: 'Testfeiertag', halbtags: 0, ab_zeit: null, quelle: 'Arbeitsinspektorat Kanton Solothurn' }
 ], gepflegt: { von: '2026-01-01', bis: '2026-12-25' } };
 
-const A = { id: 1, name: 'adrian', vorname: 'Adrian', nachname: 'Von Arb', zusage: 'offen' };
+const A = { id: 1, name: 'adrian', vorname: 'Adrian', nachname: 'Muster', zusage: 'offen' };
 
 const EINSAETZE = { status: 'ok', einsaetze: [
   // voll besetzt
-  { id: 21, kunde_id: 1, kunde_name: 'Studer Immobilien AG', objekt_id: 1, masterschicht_id: 10, titel: 'Schliessrunde',
+  { id: 21, kunde_id: 1, kunde_name: 'Muster Immobilien AG', objekt_id: 1, masterschicht_id: 10, titel: 'Schliessrunde',
     strasse: 'Hauptstrasse 4', ort: '4632 Trimbach', einsatzart: 'Revierdienst', datum: T(2), von: '22:00:00',
     bis: '22:30:00', bedarf: 1, status: 'geplant', bemerkung: null, mitarbeiter: [A] },
   // unterbesetzt
-  { id: 22, kunde_id: 1, kunde_name: 'Studer Immobilien AG', objekt_id: 1, masterschicht_id: 10, titel: 'Schliessrunde',
+  { id: 22, kunde_id: 1, kunde_name: 'Muster Immobilien AG', objekt_id: 1, masterschicht_id: 10, titel: 'Schliessrunde',
     strasse: 'Hauptstrasse 4', ort: '4632 Trimbach', einsatzart: 'Revierdienst', datum: T(3), von: '22:00:00',
     bis: '22:30:00', bedarf: 2, status: 'geplant', bemerkung: null, mitarbeiter: [A] },
   // gar nicht besetzt
-  { id: 23, kunde_id: 1, kunde_name: 'Studer Immobilien AG', objekt_id: 1, masterschicht_id: 10, titel: 'Schliessrunde',
+  { id: 23, kunde_id: 1, kunde_name: 'Muster Immobilien AG', objekt_id: 1, masterschicht_id: 10, titel: 'Schliessrunde',
     strasse: 'Hauptstrasse 4', ort: '4632 Trimbach', einsatzart: 'Revierdienst', datum: T(4), von: '22:00:00',
     bis: '22:30:00', bedarf: 1, status: 'geplant', bemerkung: null, mitarbeiter: [] },
   // provisorisch -- zaehlt nicht als Luecke
-  { id: 24, kunde_id: 1, kunde_name: 'Studer Immobilien AG', objekt_id: 1, masterschicht_id: 11, titel: 'Patrouille Sommer',
+  { id: 24, kunde_id: 1, kunde_name: 'Muster Immobilien AG', objekt_id: 1, masterschicht_id: 11, titel: 'Patrouille Sommer',
     strasse: null, ort: '4632 Trimbach', einsatzart: 'Revierdienst', datum: T(5), von: '20:00:00',
     bis: '02:00:00', bedarf: 2, status: 'provisorisch', bemerkung: null, mitarbeiter: [] },
   // Einzeleinsatz ohne Objekt
@@ -75,13 +75,13 @@ const EINSAETZE = { status: 'ok', einsaetze: [
     strasse: 'Dorfstrasse 1', ort: '4600 Olten', einsatzart: 'Verkehrsdienst', datum: T(6), von: '07:00:00',
     bis: '16:00:00', bedarf: 1, status: 'bestaetigt', bemerkung: null, mitarbeiter: [A] },
   // abgesagt
-  { id: 26, kunde_id: 1, kunde_name: 'Studer Immobilien AG', objekt_id: 1, masterschicht_id: 10, titel: 'Schliessrunde',
+  { id: 26, kunde_id: 1, kunde_name: 'Muster Immobilien AG', objekt_id: 1, masterschicht_id: 10, titel: 'Schliessrunde',
     strasse: null, ort: '4632 Trimbach', einsatzart: 'Revierdienst', datum: T(7), von: '22:00:00',
     bis: '22:30:00', bedarf: 1, status: 'abgesagt', bemerkung: null, mitarbeiter: [] }
 ]};
 
 const VORSCHAU = { status: 'ok',
-  objekt: { id: 1, name: 'Einkaufszentrum Nord', kunde_id: 1, kunde_name: 'Studer Immobilien AG',
+  objekt: { id: 1, name: 'Einkaufszentrum Nord', kunde_id: 1, kunde_name: 'Muster Immobilien AG',
             strasse: 'Hauptstrasse 4', ort: '4632 Trimbach', kanton: 'SO', einsatzart: 'Revierdienst' },
   von: MORGEN, bis: MORGEN, anzahl: 23, gezeigt: 2, uebersprungen: 4, vorlagen: 2, feiertage: 1,
   schichten: [
@@ -243,7 +243,7 @@ await page.click('#obNeuBtn');
 await page.waitForTimeout(200);
 check('Ohne Pflichtfelder kein Anlegen', writes().length === 0 && await page.isVisible('#obNeuErr'));
 await page.fill('#obName', 'Testobjekt');
-await page.fill('#obKunde_name', 'Studer Immobilien AG');
+await page.fill('#obKunde_name', 'Muster Immobilien AG');
 await page.fill('#obOrt', '4600 Olten');
 await page.click('#obNeuBtn');
 await page.waitForTimeout(400);

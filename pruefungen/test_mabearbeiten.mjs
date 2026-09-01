@@ -522,15 +522,15 @@ check('Die AHV-Nummer steht nur hier, nicht in der Liste',
   // selbst tippt. Ein Feld, das sich unter der Hand aendert, ist schlimmer
   // als gar kein Vorschlag.
   await page.fill('#mb_vorname', 'Hans');
-  await page.fill('#mb_nachname', 'Meier');
+  await page.fill('#mb_nachname', 'Muster');
   await page.waitForTimeout(150);
   check('Der Login-Name wird aus Vor- und Nachname vorgeschlagen',
-    (await page.inputValue('#mbNeuName')) === 'hans.meier');
-  await page.fill('#mbNeuName', 'h.meier');
+    (await page.inputValue('#mbNeuName')) === 'hans.muster');
+  await page.fill('#mbNeuName', 'h.muster');
   await page.fill('#mb_nachname', 'Mueller');
   await page.waitForTimeout(150);
   check('KRITISCH: ein selbst gesetzter Login-Name wird nicht mehr ueberschrieben',
-    (await page.inputValue('#mbNeuName')) === 'h.meier');
+    (await page.inputValue('#mbNeuName')) === 'h.muster');
 
   // Pflichtangaben
   await page.fill('#mbNeuName', '');

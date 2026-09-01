@@ -21,19 +21,19 @@ const sch = (n, sparte = 'sicherheit') => Array.from({ length: n }, (_, i) => ({
 }));
 const MA = [
   // 120 x 8 h = 960 h -> ueber 900, aber unter 945? Nein: 960 > 945 -> ueber_toleranz
-  { id: 1, name: 'anna', vorname: 'Anna', nachname: 'Ammann', personalnummer: '1',
+  { id: 1, name: 'anna', vorname: 'Anna', nachname: 'Muster', personalnummer: '1',
     kategorie: 'C', pensum: 900, schichten: sch(120), offen: 4 },
   // 60 x 8 = 480 h -> ok
-  { id: 2, name: 'beat', vorname: 'Beat', nachname: 'Berger', personalnummer: '2',
+  { id: 2, name: 'beat', vorname: 'Beat', nachname: 'Muster', personalnummer: '2',
     kategorie: 'C', pensum: 900, schichten: sch(60), offen: 0 },
   // 105 x 8 = 840 h -> 93 % von 900 -> nahe
-  { id: 3, name: 'cara', vorname: 'Cara', nachname: 'Corti', personalnummer: '3',
+  { id: 3, name: 'cara', vorname: 'Cara', nachname: 'Beispiel', personalnummer: '3',
     kategorie: 'C', pensum: 900, schichten: sch(105), offen: 1 },
   // ohne Kategorie -> keine Grenze
-  { id: 4, name: 'dino', vorname: 'Dino', nachname: 'Dutli', personalnummer: '4',
+  { id: 4, name: 'dino', vorname: 'Dino', nachname: 'Muster', personalnummer: '4',
     kategorie: null, pensum: null, schichten: sch(30), offen: 0 },
   // 40 Sicherheit + 50 Reinigung: nur 320 h zaehlen
-  { id: 5, name: 'eva', vorname: 'Eva', nachname: 'Egli', personalnummer: '5',
+  { id: 5, name: 'eva', vorname: 'Eva', nachname: 'Beispiel', personalnummer: '5',
     kategorie: 'C', pensum: 900, schichten: sch(40).concat(sch(50, 'reinigung')), offen: 1 },
 ];
 
@@ -95,28 +95,28 @@ const zeilen = await page.evaluate(() => [...document.querySelectorAll('.pn-zeil
 const nach = n => zeilen.find(z => z.name === n);
 
 check('Alle fuenf Personen erscheinen', zeilen.length === 5);
-check('KRITISCH: 960 h in Kategorie C sind rot markiert', nach('Anna Ammann').klasse === 'pn-ueber_toleranz');
-check('840 h gelten als nahe der Grenze', nach('Cara Corti').klasse === 'pn-nahe');
-check('480 h sind unauffaellig', nach('Beat Berger').klasse === 'pn-ok');
+check('KRITISCH: 960 h in Kategorie C sind rot markiert', nach('Anna Muster').klasse === 'pn-ueber_toleranz');
+check('840 h gelten als nahe der Grenze', nach('Cara Beispiel').klasse === 'pn-nahe');
+check('480 h sind unauffaellig', nach('Beat Muster').klasse === 'pn-ok');
 check('KRITISCH: ohne Kategorie kein Balken und keine Farbe',
-  nach('Dino Dutli').klasse === 'pn-ohne' && nach('Dino Dutli').bar === false);
+  nach('Dino Muster').klasse === 'pn-ohne' && nach('Dino Muster').bar === false);
 check('Ohne Kategorie steht da, warum nicht geprueft wird',
   /keine Grenze prüfen/.test(await page.textContent('#pnListe')));
 
-check('KRITISCH: die Zahl ist als Mindestwert gekennzeichnet', /mind\./.test(nach('Anna Ammann').zahl));
-check('Die Grenze steht neben der Zahl', /von 900/.test(nach('Anna Ammann').zahl));
+check('KRITISCH: die Zahl ist als Mindestwert gekennzeichnet', /mind\./.test(nach('Anna Muster').zahl));
+check('Die Grenze steht neben der Zahl', /von 900/.test(nach('Anna Muster').zahl));
 // 40 Schichten Sicherheit (320 h) + 50 Schichten Reinigung (400 h). Zaehlen
 // duerfen nur die 320 h plus deren Zeitbonus -- nie die 720 h zusammen.
-const evaStd = Number((nach('Eva Egli').zahl.match(/(\d+):\d\d h/) || [])[1] || 0);
+const evaStd = Number((nach('Eva Beispiel').zahl.match(/(\d+):\d\d h/) || [])[1] || 0);
 check('KRITISCH: Reinigungsstunden zaehlen nicht in die Grenze',
   evaStd >= 320 && evaStd < 340);
 check('KRITISCH: die 400 Reinigungsstunden sind nirgends mitaddiert', evaStd < 700);
 check('Sie werden aber ausgewiesen, nicht verschwiegen',
-  /Reinigung \(zählt nicht\)/.test(nach('Eva Egli').sub));
+  /Reinigung \(zählt nicht\)/.test(nach('Eva Beispiel').sub));
 check('Nicht abgeglichene Schichten werden benannt',
-  /4 Schichten noch nicht abgeglichen/.test(nach('Anna Ammann').sub));
+  /4 Schichten noch nicht abgeglichen/.test(nach('Anna Muster').sub));
 check('Bei einer einzelnen Schicht steht Einzahl',
-  /1 Schicht noch nicht abgeglichen/.test(nach('Cara Corti').sub));
+  /1 Schicht noch nicht abgeglichen/.test(nach('Cara Beispiel').sub));
 
 // Die Meldung darf keine Pflicht behaupten, die Art. 8 Ziff. 3 so nicht kennt.
 const meldung = await page.textContent('#pnListe');
@@ -145,11 +145,11 @@ else {
 await page.selectOption('#pnSort', 'std_auf');
 await page.waitForTimeout(300);
 const auf = await page.evaluate(() => [...document.querySelectorAll('.pn-zeile b')].map(b => b.textContent.trim()));
-check('Aufsteigend sortiert steht die kleinste Zahl zuoberst', auf[0] === 'Dino Dutli');
+check('Aufsteigend sortiert steht die kleinste Zahl zuoberst', auf[0] === 'Dino Muster');
 await page.selectOption('#pnSort', 'std_ab');
 await page.waitForTimeout(300);
 const ab = await page.evaluate(() => [...document.querySelectorAll('.pn-zeile b')].map(b => b.textContent.trim()));
-check('Absteigend sortiert steht die groesste Zahl zuoberst', ab[0] === 'Anna Ammann');
+check('Absteigend sortiert steht die groesste Zahl zuoberst', ab[0] === 'Anna Muster');
 check('Beide Richtungen kehren einander um', auf[0] === ab[ab.length - 1]);
 
 await page.check('#pnNurKat');

@@ -3466,7 +3466,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
                 </div>
                 <div class="diktat-router">
                   <div class="diktat-eingabe" id="rtDropzone" ondragover="rtDragUeber(event,'rt')" ondragleave="rtDragWeg('rt')" ondrop="rtDrop(event,'rt')">
-                    <textarea class="inp" id="rtText" rows="2" placeholder="Diktieren oder tippen — z. B. „Neuer Einsatz für die Borner AG morgen 7 bis 16 Uhr“" onpaste="rtEinfuegen(event,'rt')"></textarea>
+                    <textarea class="inp" id="rtText" rows="2" placeholder="Diktieren oder tippen — z. B. „Neuer Einsatz für die Beispiel AG morgen 7 bis 16 Uhr“" onpaste="rtEinfuegen(event,'rt')"></textarea>
                     <div id="rtBildVorschau" class="rt-bild" style="display:none">
                       <img id="rtBildImg" alt="">
                       <button type="button" onclick="rtBildEntfernen('rt')" title="Bild entfernen" aria-label="Bild entfernen">
@@ -3732,7 +3732,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
           <div class="card-bd">
             <div class="diktat-router">
               <div class="diktat-eingabe" id="peDropzone" ondragover="rtDragUeber(event,'pe')" ondragleave="rtDragWeg('pe')" ondrop="rtDrop(event,'pe')">
-                <textarea class="inp" id="peText" rows="2" placeholder="Diktieren, tippen oder ein Bild einfügen (Strg+V) — z. B. „Neuer Einsatz für die Borner AG morgen 7 bis 16 Uhr“ oder ein Screenshot einer Auftrags-E-Mail." onpaste="rtEinfuegen(event,'pe')"></textarea>
+                <textarea class="inp" id="peText" rows="2" placeholder="Diktieren, tippen oder ein Bild einfügen (Strg+V) — z. B. „Neuer Einsatz für die Beispiel AG morgen 7 bis 16 Uhr“ oder ein Screenshot einer Auftrags-E-Mail." onpaste="rtEinfuegen(event,'pe')"></textarea>
                 <div id="peBildVorschau" class="rt-bild" style="display:none">
                   <img id="peBildImg" alt="">
                   <button type="button" onclick="rtBildEntfernen('pe')" title="Bild entfernen" aria-label="Bild entfernen">
@@ -6152,7 +6152,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 <div class="dlg-scrim" id="dlgSprechen">
   <div class="dlg narrow">
     <div class="dlg-hd"><h2>Sprechen</h2>
-      <p>Diktiere oder tippe, z. B. „Neuer Einsatz für die Borner AG morgen 7 bis 16 Uhr“. Der richtige Bereich öffnet sich automatisch, vorbefüllt — gespeichert wird erst nach deiner Prüfung.</p>
+      <p>Diktiere oder tippe, z. B. „Neuer Einsatz für die Beispiel AG morgen 7 bis 16 Uhr“. Der richtige Bereich öffnet sich automatisch, vorbefüllt — gespeichert wird erst nach deiner Prüfung.</p>
     </div>
     <div class="dlg-bd">
       <div class="msg-err" id="gsErr" style="display:none"></div>
@@ -18492,7 +18492,7 @@ function planDiktat(art) {
   planDiktatArt = art === 'zuteilung' ? 'zuteilung' : 'masterplan';
   $('pdTitel').textContent = planDiktatArt === 'zuteilung' ? 'Einteilen per Diktat' : 'Schichten setzen per Diktat';
   $('pdText').textContent = planDiktatArt === 'zuteilung'
-    ? `Zum Beispiel: „Setze Valbon vom 1. bis 15. auf die Schliessrunde.“ Objekt und Monat kommen vom Bildschirm.`
+    ? `Zum Beispiel: „Setze Vito vom 1. bis 15. auf die Schliessrunde.“ Objekt und Monat kommen vom Bildschirm.`
     : `Zum Beispiel: „Setze die Schliessrunde jeden Tag auf den ganzen Monat.“ Objekt und Monat kommen vom Bildschirm.`;
   $('pdWo').textContent = `${oplDaten ? oplDaten.objekt.name : ''} · ${($('oplVon').value || isoTag()).slice(0, 7)}`;
   $('pdText2').value = '';

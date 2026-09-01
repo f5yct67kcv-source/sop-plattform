@@ -14,7 +14,7 @@ require __DIR__ . '/../backend/qrrechnung.php';
 if (in_array('--json', $argv ?? [], true)) {
     $betrieb = ['firma' => 'Cupi 24 GmbH', 'qr_iban' => 'CH44 3199 9123 0008 8901 2',
         'qr_strasse' => 'Baslerstrasse', 'qr_hausnummer' => '67', 'qr_plz' => '4632', 'qr_ort' => 'Trimbach'];
-    $debitor = ['name' => 'pzu consulting gmbh', 'strasse' => 'Hochgasse', 'hausnummer' => '7',
+    $debitor = ['name' => 'abc consulting gmbh', 'strasse' => 'Hochgasse', 'hausnummer' => '7',
         'plz' => '4632', 'ort' => 'Trimbach'];
     echo json_encode(['spc' => qr_spc_payload($betrieb, 48.65, 'RE0962', $debitor)], JSON_UNESCAPED_UNICODE), "\n";
     exit(0);
@@ -87,9 +87,9 @@ check('KRITISCH: letzte Zeile ist der Trailer EPD', end($zeilen) === 'EPD');
 check('Ohne bekannten Debitor bleibt dessen Adresstyp leer, nicht "S"', $zeilen[20] === '');
 
 $mitDebitor = qr_spc_zeilen($betrieb, 48.65, 'RE0962',
-    ['name' => 'pzu consulting gmbh', 'strasse' => 'Hochgasse', 'hausnummer' => '7', 'plz' => '4632', 'ort' => 'Trimbach']);
+    ['name' => 'abc consulting gmbh', 'strasse' => 'Hochgasse', 'hausnummer' => '7', 'plz' => '4632', 'ort' => 'Trimbach']);
 check('KRITISCH: mit bekanntem Debitor steht "S" als Adresstyp', $mitDebitor[20] === 'S');
-check('Und der Name des Debitors an der richtigen Stelle', $mitDebitor[21] === 'pzu consulting gmbh');
+check('Und der Name des Debitors an der richtigen Stelle', $mitDebitor[21] === 'abc consulting gmbh');
 
 echo count($bad) === 0 ? "$ok Pruefungen bestanden\n" : '';
 foreach ($bad as $b) { echo "X $b\n"; }

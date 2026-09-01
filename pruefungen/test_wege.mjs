@@ -10,9 +10,9 @@ const b = await chromium.launch({ executablePath: EXE });
 const mock = (page, admin) => page.route('**/api/**', r => {
   const u = r.request().url();
   const send = x => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(x) });
-  if (u.includes('login')) return send({ status: 'ok', token: 't', name: admin ? 'adrianvonarb' : 'daniele.ciardo', ist_admin: admin });
+  if (u.includes('login')) return send({ status: 'ok', token: 't', name: admin ? 'adrianvonarb' : 'dario.beispiel', ist_admin: admin });
   if (u.includes('meine_schichten')) return send({ status: 'ok', schichten: [] });
-  if (u.includes('mein_profil')) return send({ status: 'ok', monat: { anzahl: 0, stunden: 0 }, profil: { name: 'daniele.ciardo', ist_admin: admin } });
+  if (u.includes('mein_profil')) return send({ status: 'ok', monat: { anzahl: 0, stunden: 0 }, profil: { name: 'dario.beispiel', ist_admin: admin } });
   if (u.includes('rapport_list')) return send({ status: 'ok', rapporte: [] });
   return send({ status: 'ok', mitarbeiter: [], kunden: [], einsaetze: [], objekte: [],
     kpi: {}, verlauf: [], angemeldet: [], pro_mitarbeiter: [], letzte_rapporte: [] });
@@ -22,7 +22,7 @@ const mock = (page, admin) => page.route('**/api/**', r => {
 const p1 = await b.newPage({ viewport: { width: 390, height: 844 } });
 await mock(p1, false);
 await p1.goto(`file://${WURZEL}/dashboard.html`);
-await p1.fill('#gName', 'daniele.ciardo'); await p1.fill('#gPass', 'x'); await p1.click('#gBtn');
+await p1.fill('#gName', 'dario.beispiel'); await p1.fill('#gPass', 'x'); await p1.click('#gBtn');
 await p1.waitForTimeout(900);
 check('Mitarbeiter wird vom Dashboard in die App geleitet', p1.url().endsWith('/app.html'));
 check('Mitarbeiter muss sich nicht neu anmelden', await p1.isVisible('#v-heute'));
@@ -60,7 +60,7 @@ await p3.close();
 const p4 = await b.newPage({ viewport: { width: 390, height: 844 } });
 await mock(p4, false);
 await p4.goto(`file://${WURZEL}/app.html`);
-await p4.fill('#gName', 'daniele.ciardo'); await p4.fill('#gPass', 'x'); await p4.click('#gBtn');
+await p4.fill('#gName', 'dario.beispiel'); await p4.fill('#gPass', 'x'); await p4.click('#gBtn');
 await p4.waitForSelector('#app.on'); await p4.waitForTimeout(400);
 await p4.click('#t-rapport'); await p4.waitForTimeout(250);
 check('App verweist zurueck auf die Erfassung',

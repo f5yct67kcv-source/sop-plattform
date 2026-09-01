@@ -34,29 +34,29 @@ const vorEinerStunde = new Date(jetzt.getTime() - 3600e3);
 const vorZweiStunden = new Date(jetzt.getTime() - 2 * 3600e3);
 
 const SCHICHTEN = () => ({ status: 'ok', von: GESTERN, bis: tag(90), schichten: [
-  { id: 41, kunde_name: 'Einwohnergemeinde Niedergösgen', titel: 'Revierdienst Nacht',
+  { id: 41, kunde_name: 'Einwohnergemeinde Musterdorf', titel: 'Revierdienst Nacht',
     strasse: 'Sehr Lange Hauptstrasse 44', ort: '4632 Trimbach', einsatzart: 'Revierdienst',
     datum: LAUF_DATUM, von: hm(beginn), bis: hm(ende), status: 'geplant', bemerkung: 'Schluessel beim Hauswart',
     zusage: 'offen', objekt_name: 'Einkaufszentrum Nord West', im_team: 3,
     // ENT-121: die Namen der Eingeteilten -- und NUR die Namen.
-    team: [{ name: 'Daniele Ciardo', bin_ich: true },
+    team: [{ name: 'Dario Beispiel', bin_ich: true },
            { name: 'Berta Beispiel', bin_ich: false },
            { name: 'Carlo Muster', bin_ich: false }],
     // ENT-115: Angaben, die vor Ort gebraucht werden.
     kanton: 'SO', treffpunkt: 'Haupteingang Nord', taetigkeit: 'Rundgang alle zwei Stunden',
     qualifikation: 'Revierdienstausweis',
     kontakt_vorname: 'Petra', kontakt_nachname: 'Muster', kontakt_telefon: '079 111 22 33' },
-  { id: 42, kunde_name: 'Einwohnergemeinde Niedergösgen', titel: 'Baustelle Kreiselumfahrung',
-    strasse: 'Dorfstrasse 1', ort: '5013 Niedergösgen', einsatzart: 'Verkehrsdienst',
+  { id: 42, kunde_name: 'Einwohnergemeinde Musterdorf', titel: 'Baustelle Kreiselumfahrung',
+    strasse: 'Dorfstrasse 1', ort: '5013 Musterdorf', einsatzart: 'Verkehrsdienst',
     datum: MORGEN, von: '07:30:00', bis: '16:30:00', status: 'bestaetigt', bemerkung: null,
     zusage: 'zugesagt', objekt_name: null, im_team: 1,
-    team: [{ name: 'Daniele Ciardo', bin_ich: true }] },
-  { id: 43, kunde_name: 'Einwohnergemeinde Niedergösgen', titel: 'Schliessrunde',
+    team: [{ name: 'Dario Beispiel', bin_ich: true }] },
+  { id: 43, kunde_name: 'Einwohnergemeinde Musterdorf', titel: 'Schliessrunde',
     strasse: null, ort: '4632 Trimbach', einsatzart: 'Revierdienst',
     datum: tag(2), von: '22:00:00', bis: '05:30:00', status: 'provisorisch', bemerkung: null,
     zusage: 'offen', objekt_name: 'Einkaufszentrum Nord West', im_team: 1 },
-  { id: 44, kunde_name: 'Einwohnergemeinde Niedergösgen', titel: 'Abgesagter Einsatz',
-    strasse: null, ort: '5013 Niedergösgen', einsatzart: 'Verkehrsdienst',
+  { id: 44, kunde_name: 'Einwohnergemeinde Musterdorf', titel: 'Abgesagter Einsatz',
+    strasse: null, ort: '5013 Musterdorf', einsatzart: 'Verkehrsdienst',
     datum: tag(3), von: '08:00:00', bis: '12:00:00', status: 'abgesagt', bemerkung: null,
     zusage: 'offen', objekt_name: null, im_team: 1 },
   // Anzahl sagt 2, aber es kommt keine Namensliste -- so antwortet ein Server,
@@ -64,7 +64,7 @@ const SCHICHTEN = () => ({ status: 'ok', von: GESTERN, bis: tag(90), schichten: 
   // Aufklapper zeigen, der nichts aufklappt. Bewusst zuunterst angehaengt:
   // Weiter oben eingefuegt verschiebt es die Reihenfolge, an der andere
   // Pruefungen dieser Suite haengen.
-  { id: 45, kunde_name: 'Einwohnergemeinde Niedergösgen', titel: 'Ohne Namensliste',
+  { id: 45, kunde_name: 'Einwohnergemeinde Musterdorf', titel: 'Ohne Namensliste',
     strasse: null, ort: '4632 Trimbach', einsatzart: 'Revierdienst',
     datum: tag(6), von: '06:00:00', bis: '10:00:00', status: 'geplant', bemerkung: null,
     zusage: 'offen', objekt_name: null, im_team: 2, team: [] },
@@ -77,18 +77,18 @@ const SCHICHTEN = () => ({ status: 'ok', von: GESTERN, bis: tag(90), schichten: 
     zusage: 'zugesagt', objekt_name: null, im_team: 1 }]});
 
 const PROFIL = { status: 'ok', monat: { anzahl: 3, stunden: 22.5 }, profil: {
-  name: 'daniele.ciardo', ist_admin: false, personalnummer: 'P-014', anrede: 'Herr',
-  vorname: 'Daniele', nachname: 'Ciardo', geburtsdatum: '1988-04-12', strasse: 'Musterweg 3',
+  name: 'dario.beispiel', ist_admin: false, personalnummer: 'P-014', anrede: 'Herr',
+  vorname: 'Dario', nachname: 'Beispiel', geburtsdatum: '1988-04-12', strasse: 'Musterweg 3',
   ort: '4600 Olten', telefon: null, mobil: '079 000 00 00', email: 'd@example.ch',
   erstellt_am: '2026-01-04 10:00:00' }};
 
-const RAP = { status: 'ok', rapporte: [{ id: 1, datum: GESTERN, mitarbeiter: 'daniele.ciardo',
-  kunde: 'Einwohnergemeinde Niedergösgen', strasse: 'Dorfstrasse 1', ort: '5013 Niedergösgen',
+const RAP = { status: 'ok', rapporte: [{ id: 1, datum: GESTERN, mitarbeiter: 'dario.beispiel',
+  kunde: 'Einwohnergemeinde Musterdorf', strasse: 'Dorfstrasse 1', ort: '5013 Musterdorf',
   auftrag_nr: 'A-118', einsatzart: 'Verkehrsdienst', von: '07:00:00', bis: '16:00:00',
   pause_min: 30, netto_h: '8.50', unterzeichner: 'R. Muster', unterschrift: null,
   bemerkung: null, erfasst_am: GESTERN + ' 16:12:00' },
   // Zu Schicht 46 (status 'abgeschlossen'), fuer die Kartenanzeige (ENT-133).
-  { id: 2, einsatz_id: 46, datum: GESTERN, mitarbeiter: 'daniele.ciardo',
+  { id: 2, einsatz_id: 46, datum: GESTERN, mitarbeiter: 'dario.beispiel',
     kunde: 'Cupi24 GmbH', strasse: null, ort: '4632 Trimbach',
     auftrag_nr: null, einsatzart: 'Verkehrsdienst', von: '08:00:00', bis: '10:00:00',
     pause_min: 0, netto_h: '2.00', unterzeichner: null, unterschrift: null,
@@ -124,7 +124,7 @@ await page.route('**/api/**', route => {
   try { body = req.postData() ? JSON.parse(req.postData()) : null; } catch (e) { body = req.postData(); }
   rufe.push({ p, body });
   const send = (b, s) => route.fulfill({ status: s || 200, contentType: 'application/json', body: JSON.stringify(b) });
-  if (p.includes('login')) return send({ status: 'ok', token: 't', name: 'daniele.ciardo', ist_admin: false });
+  if (p.includes('login')) return send({ status: 'ok', token: 't', name: 'dario.beispiel', ist_admin: false });
   if (p.includes('meine_schichten')) return send(schichtenDaten);
   if (p.includes('mein_profil')) return send(PROFIL);
   if (p.includes('rapport_list')) return send(RAP);
@@ -155,14 +155,14 @@ await page.waitForTimeout(120);
 check('Leere Anmeldung meldet einen Fehler', await page.isVisible('#gErr'));
 check('Leere Anmeldung ruft die Schnittstelle nicht', !rufe.some(r => r.p.includes('login')));
 
-await page.fill('#gName', 'daniele.ciardo');
+await page.fill('#gName', 'dario.beispiel');
 await page.fill('#gPass', 'geheim');
 await page.click('#gBtn');
 await page.waitForSelector('#app.on');
 await page.waitForTimeout(400);
 check('Nach der Anmeldung ist die App sichtbar', await page.isVisible('#v-heute'));
 check('Anmeldemaske ist weg', !(await page.isVisible('#gate')));
-check('Name steht in der Kopfzeile', (await T('#kName')) === 'daniele.ciardo');
+check('Name steht in der Kopfzeile', (await T('#kName')) === 'dario.beispiel');
 check('Alle drei Datenquellen wurden geladen',
   ['meine_schichten', 'mein_profil', 'rapport_list'].every(e => rufe.some(r => r.p.includes(e))));
 
@@ -315,7 +315,7 @@ await page.waitForTimeout(250);
 check('Blatt geht auf', await page.evaluate(() => document.getElementById('blatt').classList.contains('on')));
 check('Blatt zeigt den Titel', (await T('#blTitel')) === 'Baustelle Kreiselumfahrung');
 const blText = await T('#blBody');
-check('Blatt zeigt Kunde und Ort', blText.includes('Niedergösgen'));
+check('Blatt zeigt Kunde und Ort', blText.includes('Musterdorf'));
 check('Blatt zeigt die Einsatzart', blText.includes('Verkehrsdienst'));
 
 // ══════════════ WER SONST EINGETEILT IST (ENT-121)
@@ -379,11 +379,11 @@ const teamTxt = await page.evaluate(() => {
   return l ? l.textContent : '';
 });
 check('KRITISCH: und zwar alle drei',
-  /Daniele Ciardo/.test(teamTxt) && /Berta Beispiel/.test(teamTxt) && /Carlo Muster/.test(teamTxt));
+  /Dario Beispiel/.test(teamTxt) && /Berta Beispiel/.test(teamTxt) && /Carlo Muster/.test(teamTxt));
 check('Die eigene Person ist erkennbar',
   await page.evaluate(() => {
     const ich = document.querySelector('#blBody .team-liste li.ich');
-    return !!ich && /Daniele Ciardo/.test(ich.textContent) && /du/.test(ich.textContent);
+    return !!ich && /Dario Beispiel/.test(ich.textContent) && /du/.test(ich.textContent);
   }));
 check('KRITISCH: keine Telefonnummer in der Liste', !/\+41|07\d/.test(teamTxt));
 check('Nochmaliges Tippen klappt wieder zu',
@@ -564,7 +564,7 @@ check('Kein Diktat im Rapport-Bereich', !/[Dd]iktat|[Mm]ikrofon/.test(await page
 await page.click('#t-menu');
 await page.waitForTimeout(200);
 const menuText = await T('#v-menu');
-check('Menü zeigt den vollen Namen', menuText.includes('Daniele Ciardo'));
+check('Menü zeigt den vollen Namen', menuText.includes('Dario Beispiel'));
 check('Menü zeigt die Kacheln Meine Daten/Meine Stunden',
   await page.evaluate(() => document.querySelectorAll('#v-menu .mk-kachel').length === 2));
 await page.evaluate(() => datenSeiteAuf());

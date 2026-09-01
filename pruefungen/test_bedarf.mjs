@@ -11,7 +11,7 @@ const M = iso(new Date()).slice(0, 7);
 const ok = [], bad = [];
 const check = (n, c) => (c ? ok : bad).push(n);
 
-const OBJ = { id: 1, kunde_id: 1, kunde_name: 'Borner AG', name: 'Gerolag Center',
+const OBJ = { id: 1, kunde_id: 1, kunde_name: 'Beispiel AG', name: 'Muster Center',
   strasse: 'Industriestrasse 78', ort: '4601 Olten', kanton: 'SO', einsatzart: 'Revierdienst',
   aktiv: 1, masterschichten: 5 };
 // Genau wie beim Projektinhaber: alle Bedarfsfelder auf 0.
@@ -26,7 +26,7 @@ const MSL = [
   mk(2, 'Revierdienst Öffnungsrunde', 'RÖ', '05:45', '06:00', 0.25),
   mk(3, 'Fahrtzeit', 'FZ', '06:00', '06:15', 0.25, 'fahrtzeit'),
   mk(4, 'Revierdienst Schliessrunde', null, '22:00', '22:30', 0.5),
-  mk(5, 'Fahrtzeit nach Niedergösgen', null, '22:30', '22:45', 0.25, 'fahrtzeit'),
+  mk(5, 'Fahrtzeit nach Musterdorf', null, '22:30', '22:45', 0.25, 'fahrtzeit'),
 ];
 const vorlagenFuerPlan = () => MSL.map(x => ({ id: x.id, name: x.name, kuerzel: x.kuerzel, art: x.art,
   von: x.von.slice(0, 5), bis: x.bis.slice(0, 5), arbeitszeit_h: x.arbeitszeit_h, auf_abruf: x.auf_abruf,
@@ -52,7 +52,7 @@ await page.route('**/api/**', route => {
   if (p.includes('masterschicht_list')) return send({ status: 'ok', masterschichten: MSL });
   if (p.includes('objekt_list')) return send({ status: 'ok', objekte: [OBJ] });
   if (p.includes('mitarbeiter_list')) return send({ status: 'ok', mitarbeiter: [
-    { id: 1, name: 'adrian', vorname: 'Adrian', nachname: 'von Arb', aktiv: 1, ist_admin: 1 }] });
+    { id: 1, name: 'adrian', vorname: 'Adrian', nachname: 'Muster', aktiv: 1, ist_admin: 1 }] });
   return send({ status: 'ok', einsaetze: [], kunden: [], rapporte: [], feiertage: [], gepflegt: {},
     kpi: {}, verlauf: [], angemeldet: [], pro_mitarbeiter: [], letzte_rapporte: [] });
 });

@@ -23,7 +23,7 @@ await page.route('**/api/**', route => {
   try { body = req.postData() ? JSON.parse(req.postData()) : null; } catch (e) {}
   rufe.push({ p, body });
   const send = (b, s) => route.fulfill({ status: s || 200, contentType: 'application/json', body: JSON.stringify(b) });
-  if (p.includes('login')) return send({ status: 'ok', token: 't', name: 'daniele.ciardo', ist_admin: false });
+  if (p.includes('login')) return send({ status: 'ok', token: 't', name: 'dario.beispiel', ist_admin: false });
   if (p.includes('meine_verfuegbarkeit')) {
     if (req.method() === 'POST') {
       SPERREN = SPERREN.filter(x => x.datum !== body.datum);
@@ -33,19 +33,19 @@ await page.route('**/api/**', route => {
     return send({ status: 'ok', tage: SPERREN });
   }
   if (p.includes('meine_schichten')) return send({ status: 'ok', schichten: [
-    { id: 41, kunde_name: 'Borner AG', titel: 'Schliessrunde', strasse: null, ort: '4601 Olten',
+    { id: 41, kunde_name: 'Beispiel AG', titel: 'Schliessrunde', strasse: null, ort: '4601 Olten',
       einsatzart: 'Revierdienst', datum: tag(5), von: '22:00:00', bis: '22:30:00', status: 'geplant',
-      bemerkung: null, zusage: 'offen', objekt_name: 'Gerolag Center', im_team: 1,
+      bemerkung: null, zusage: 'offen', objekt_name: 'Muster Center', im_team: 1,
       // ENT-234: ohne Kontrollpunkte kein Wächter-Reiter -- diese Suite prüft
       // ausdrücklich den Fall ohne Revierdienst-Bezug.
       hat_kontrollpunkte: false }] });
   if (p.includes('mein_profil')) return send({ status: 'ok', monat: { anzahl: 0, stunden: 0 },
-    profil: { name: 'daniele.ciardo', ist_admin: false, vorname: 'Daniele', nachname: 'Ciardo' } });
+    profil: { name: 'dario.beispiel', ist_admin: false, vorname: 'Dario', nachname: 'Beispiel' } });
   return send({ status: 'ok', rapporte: [] });
 });
 
 await page.goto(`file://${WURZEL}/app.html`);
-await page.fill('#gName', 'daniele.ciardo'); await page.fill('#gPass', 'x'); await page.click('#gBtn');
+await page.fill('#gName', 'dario.beispiel'); await page.fill('#gPass', 'x'); await page.click('#gBtn');
 await page.waitForSelector('#app.on'); await page.waitForTimeout(500);
 
 // ── Albanisch ist weg
@@ -144,7 +144,7 @@ page.on('pageerror', e => bad.push('JS-Fehler Erfassung: ' + e.message));
 await page.route('**/api/**', route => {
   const u = route.request().url();
   const send = b => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) });
-  if (u.includes('login')) return send({ status: 'ok', token: 't', name: 'daniele.ciardo', ist_admin: false });
+  if (u.includes('login')) return send({ status: 'ok', token: 't', name: 'dario.beispiel', ist_admin: false });
   return send({ status: 'ok', rapporte: [], mitarbeiter: [], kunden: [], objekte: [] });
 });
 await page.goto(`file://${WURZEL}/index.html`);
@@ -192,7 +192,7 @@ await browser.close();
 const M2 = HEUTE.slice(0, 7);
 const LETZTER = new Date(Number(M2.slice(0, 4)), Number(M2.slice(5, 7)), 0).getDate();
 const T2 = n => `${M2}-${String(n).padStart(2, '0')}`;
-const OBJ = { id: 1, kunde_id: 1, kunde_name: 'Borner AG', name: 'Gerolag Center',
+const OBJ = { id: 1, kunde_id: 1, kunde_name: 'Beispiel AG', name: 'Muster Center',
   strasse: 'Industriestrasse 78', ort: '4601 Olten', kanton: 'SO', einsatzart: 'Revierdienst', aktiv: 1 };
 const VOR = [{ id: 3, name: 'Schliessrunde', kuerzel: 'SR', art: 'arbeit', von: '22:00', bis: '22:30',
   arbeitszeit_h: 0.5, auf_abruf: 0, farbe: null, gueltig_ab: '2026-01-01', gueltig_bis: null }];
@@ -216,13 +216,13 @@ await page.route('**/api/**', route => {
     einsaetze: [], feiertage: {} });
   if (p.includes('zuteilung_masse')) return send({ status: 'ok', nur_pruefen: !!body.nur_pruefen,
     tage: 4, gesetzt: 4, schon_da: 0, neue_schichten: 4, konflikte: [], konflikte_gesamt: 0,
-    gesperrt: [{ datum: T2(4), name: 'Daniele Ciardo', bemerkung: 'Arzttermin' }], gesperrt_gesamt: 1,
-    schicht: 'SR · Schliessrunde', personen: ['Daniele Ciardo'], von: body.von, bis: body.bis });
+    gesperrt: [{ datum: T2(4), name: 'Dario Beispiel', bemerkung: 'Arzttermin' }], gesperrt_gesamt: 1,
+    schicht: 'SR · Schliessrunde', personen: ['Dario Beispiel'], von: body.von, bis: body.bis });
   if (p.includes('objekt_list')) return send({ status: 'ok', objekte: [OBJ] });
   if (p.includes('mitarbeiter_list')) return send({ status: 'ok', mitarbeiter: [
-    { id: 1, name: 'adrian', vorname: 'Adrian', nachname: 'von Arb', aktiv: 1, ist_admin: 1 },
-    { id: 2, name: 'daniele.ciardo', vorname: 'Daniele', nachname: 'Ciardo', aktiv: 1, ist_admin: 0 },
-    { id: 3, name: 'valbon', vorname: 'Valbon', nachname: 'Redjepi', aktiv: 1, ist_admin: 0 }] });
+    { id: 1, name: 'adrian', vorname: 'Adrian', nachname: 'Muster', aktiv: 1, ist_admin: 1 },
+    { id: 2, name: 'dario.beispiel', vorname: 'Dario', nachname: 'Beispiel', aktiv: 1, ist_admin: 0 },
+    { id: 3, name: 'vito', vorname: 'Vito', nachname: 'Muster', aktiv: 1, ist_admin: 0 }] });
   return send({ status: 'ok', einsaetze: [], kunden: [], rapporte: [], feiertage: [], gepflegt: {},
     kpi: {}, verlauf: [], angemeldet: [], pro_mitarbeiter: [], letzte_rapporte: [] });
 });
