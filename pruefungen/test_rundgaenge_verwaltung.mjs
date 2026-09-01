@@ -150,6 +150,12 @@ check('KRITISCH: die Kachel "Rundgänge" ruft rundgang_vorlage_liste_alle.php st
 check('KRITISCH: es öffnet sich KEINE Schublade (ENT-246 hat sie ersetzt)', !(await page.isVisible('#drawer.on')));
 check('Die Kachel-Übersicht ist ausgeblendet, solange die Unterseite offen ist', !(await page.isVisible('#rdUebersicht')));
 check('Ein "Zurück"-Knopf führt zur Übersicht zurück', await page.isVisible('#rdAb-liste .bk-zurueck'));
+// ENT-282: die Kopfzeile zeigte hier bisher weiterhin "Übersicht" -- den
+// Ansichtstitel der Kachel-Landingpage --, obwohl tatsächlich die
+// objektübergreifende Liste offen war (gemeldet vom Projektinhaber).
+check('KRITISCH: die Kopfzeile trägt hier einen eigenen Titel, nicht mehr "Übersicht"',
+  (await page.textContent('#pgTitle')) === 'Rundgänge');
+check('Die Unterzeile beschreibt die Liste selbst', (await page.textContent('#pgCrumb')) === 'Alle Kontrollrunden über alle Objekte');
 
 // ══════════ BEIDE OBJEKTE STEHEN OBJEKTUEBERGREIFEND DA
 const inhalt = await page.textContent('#rdAb-liste');
@@ -272,12 +278,17 @@ check('Ein zweiter Klick auf der Landingpage selbst klappt weiterhin nur die Sei
 await page.evaluate(() => rdKrZeigen('neu'));
 await page.waitForFunction(() => document.getElementById('rdAb-kr').style.display !== 'none');
 
-// ENT-261: Der Projektinhaber hat den Zurück-Knopf dieser Seite per Skizze
-// ausdrücklich entfernt -- es gibt hier keinen sichtbaren Weg zurück zur
-// Liste mehr, darum wird der Wechsel hier direkt ausgelöst statt geklickt.
-await page.evaluate(() => rdAbschnittZeigen('liste'));
+// ENT-261 hatte den Zurück-Knopf dieser Seite per Skizze ersatzlos entfernt
+// und dabei ausdrücklich den Rückweg als "echter Bedienweg weniger" benannt,
+// mit dem Angebot, stattdessen einen Zurück-Pfeil neben den Titel in die
+// Kopfzeile zu setzen. ENT-282 setzt genau das um, nachdem der
+// Projektinhaber den fehlenden Rückweg erneut gemeldet hat -- jetzt über
+// den echten Knopf-Klick geprüft, nicht mehr über einen direkten Aufruf.
+check('KRITISCH: ein Zurück-Pfeil steht neben dem Rundentitel in der Kopfzeile',
+  await page.isVisible('#rdKrTitelWrap .btn-kopf-zurueck'));
+await page.click('#rdKrTitelWrap .btn-kopf-zurueck');
 await page.waitForTimeout(150);
-check('Der Wechsel zurück zur Liste zeigt wieder die Liste, nicht die Kachel-Übersicht',
+check('KRITISCH: der Zurück-Pfeil führt zur Rundgänge-Liste, nicht zur Kachel-Übersicht',
   await page.isVisible('#rdAb-liste') && !(await page.isVisible('#rdUebersicht')));
 check('KRITISCH: dabei steht wieder der Ansichtstitel in der Kopfzeile, nicht der Rundenname',
   await page.isVisible('#pgTitle') && !(await page.isVisible('#rdKrTitel')));
@@ -448,6 +459,11 @@ await page.click('#rdAb-liste .bk-zurueck');
 await page.waitForTimeout(150);
 check('KRITISCH: "Zurück" zeigt wieder die Kachel-Übersicht', await page.isVisible('#rdUebersicht'));
 check('Die Unterseite ist wieder ausgeblendet', !(await page.isVisible('#rdAb-liste')));
+// ENT-282: rdUebersichtZeigen() wird hier NICHT ueber go() erreicht (das
+// wuerde TITLES ohnehin neu setzen) -- ohne eigene Rueckstellung bliebe der
+// Listentitel "Rundgänge" stehen, obwohl schon die Kachel-Uebersicht zeigt.
+check('KRITISCH: die Kopfzeile zeigt wieder "Übersicht", nicht mehr den Listentitel',
+  (await page.textContent('#pgTitle')) === 'Übersicht');
 
 // ══════════ LEERER ZUSTAND: "NICHTS VORHANDEN" STATT LEERER FLAECHE
 await page.route('**/api/rundgang_vorlage_liste_alle.php**', route =>
