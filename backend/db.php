@@ -39,20 +39,47 @@ function json_response($data, int $status = 200): void {
 //
 // Beide Werte stehen bewusst hier als Konstanten: Sie treffen den Alltag,
 // und wenn sie sich als unpraktisch erweisen, ist es eine Zeile.
-const SITZUNG_MAX_TAGE       = 30;   // Mitarbeitende: absolut
-const SITZUNG_RUHE_TAGE      = 14;   // Mitarbeitende: ohne Nutzung
-const SITZUNG_ADMIN_MAX_TAGE = 7;    // Verwaltung: absolut
-const SITZUNG_ADMIN_RUHE_STD = 12;   // Verwaltung: ohne Nutzung
+const SITZUNG_MAX_TAGE       = 30;   // ohne Rechte: absolut
+const SITZUNG_RUHE_TAGE      = 14;   // ohne Rechte: ohne Nutzung
+const SITZUNG_ADMIN_MAX_TAGE = 7;    // mit Rechten: absolut
+const SITZUNG_FELD_RUHE_STD  = 12;   // Rechte nur im Feld: ohne Nutzung
+const SITZUNG_BUERO_RUHE_MIN = 30;   // Bueroarbeitsplatz: ohne Nutzung (ENT-292)
+
+// Welche Rechte uebt man IM FELD aus und nicht an einem Bildschirm, vor dem
+// jemand anderes stehen kann? Eine Sitzung, deren Rechte vollstaendig in
+// dieser Liste liegen, behaelt die lange Untaetigkeitsfrist.
+//
+// Bewusst als Ausnahmeliste und nicht umgekehrt: Ein kuenftig neu
+// erfundenes Recht faellt damit von selbst unter die KURZE Frist. Wer eine
+// Ausnahme will, muss sie hinschreiben -- so faellt das Versehen auf die
+// sichere Seite.
+//
+// Wozu die Unterscheidung ueberhaupt: Bis ENT-292 galt "hat irgendein
+// Recht" als Mass. Ein Waechter im Revierdienst hat Rechte und wuerde mit
+// 30 Minuten nachts um drei mitten im Rundgang vor der Anmeldemaske
+// stehen -- eine Sicherheitsregel, die den Betrieb kaputtmacht, wird
+// umgangen und schuetzt danach gar nichts mehr.
+const SITZUNG_RECHTE_IM_FELD = ['rundgang_verwalten', 'rundgang_einsehen', 'alarmempfaenger'];
+
+// Gilt fuer diese Rechte die kurze Bueroschutzfrist?
+// Ohne Rechte: nein (App-Nutzung, lange Frist). Nur Feldrechte: nein.
+// Alles andere: ja -- diese Sitzung oeffnet fremde Personendaten.
+function sitzung_buero(array $rechte): bool
+{
+    return array_diff($rechte, SITZUNG_RECHTE_IM_FELD) !== [];
+}
 
 // Die Ablaufregel als eigene Funktion, damit sie sich OHNE Datenbank
 // pruefen laesst. Die Browser-Suiten taeuschen die Serverantwort vor und
 // kaemen an dieser Stelle nie vorbei -- und eine Regel, die niemand
 // ausfuehrt, ist eine Behauptung.
 // Alle Zeiten als Unix-Sekunden. Gibt zurueck, ob die Sitzung tot ist.
-function sitzung_abgelaufen(bool $admin, int $geboren, int $gesehen, int $jetzt): bool
+function sitzung_abgelaufen(array $rechte, int $geboren, int $gesehen, int $jetzt): bool
 {
-    $maxAlt  = ($admin ? SITZUNG_ADMIN_MAX_TAGE : SITZUNG_MAX_TAGE) * 86400;
-    $maxRuhe = $admin ? SITZUNG_ADMIN_RUHE_STD * 3600 : SITZUNG_RUHE_TAGE * 86400;
+    $hatRechte = $rechte !== [];
+    $maxAlt  = ($hatRechte ? SITZUNG_ADMIN_MAX_TAGE : SITZUNG_MAX_TAGE) * 86400;
+    $maxRuhe = sitzung_buero($rechte) ? SITZUNG_BUERO_RUHE_MIN * 60
+             : ($hatRechte ? SITZUNG_FELD_RUHE_STD * 3600 : SITZUNG_RUHE_TAGE * 86400);
     return ($jetzt - $geboren) > $maxAlt || ($jetzt - $gesehen) > $maxRuhe;
 }
 
@@ -95,7 +122,8 @@ function require_session(): array {
     // fuer sie gilt dieselbe Frist wie fuer die Verwaltung. Wer nur die
     // eigenen Schichten sieht, behaelt die lange Frist, sonst waere die
     // App im Einsatz eine Zumutung ohne Sicherheitsgewinn.
-    $admin   = $row['rechte'] !== [];
+    // Seit ENT-292 entscheiden die Rechte selbst, welche Frist gilt --
+    // siehe sitzung_buero() oben.
     $jetzt   = time();
     $geboren = strtotime((string)($row['erstellt_am'] ?? '')) ?: $jetzt;
     // Ohne Stempelspalte (Einrichtung noch nicht gelaufen) zaehlt nur das
@@ -104,7 +132,7 @@ function require_session(): array {
         ? (strtotime((string)($row['letzte_nutzung'] ?? '')) ?: $geboren)
         : $jetzt;
 
-    if (sitzung_abgelaufen($admin, $geboren, $gesehen, $jetzt)) {
+    if (sitzung_abgelaufen($row['rechte'], $geboren, $gesehen, $jetzt)) {
         // Die abgelaufene Sitzung wird gleich entfernt, nicht nur abgelehnt.
         $pdo->prepare('DELETE FROM sessions WHERE token = ?')->execute([$token]);
         json_response(['status' => 'error',
