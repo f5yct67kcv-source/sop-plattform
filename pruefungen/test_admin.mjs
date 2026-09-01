@@ -129,7 +129,18 @@ check('Felder vorbefuellt', (await page.inputValue('#mb_strasse')) === 'Bahnhofs
 check('Leeres Feld bleibt leer', (await page.inputValue('#mb_telefon')) === '');
 check('Anrede-Auswahl gesetzt', (await page.inputValue('#mb_anrede')) === 'Herr');
 check('Oeffnen schreibt nichts', writes().length === 0);
-check('Entfernen-Bereich vorhanden', await page.isVisible('#mbKarten .zone.danger'));
+// Seit ENT-287 steht das Entfernen beim "Zugang" und nicht bei den
+// Personalien -- ein Konto zu entfernen ist eine Zugangsfrage. Geprueft
+// wird beides: dass es NICHT bei den Personalien steht und dass es auf
+// dem Zugang-Reiter wirklich da ist. Nur "existiert irgendwo" waere seit
+// der Aufteilung keine Aussage mehr.
+check('Entfernen-Bereich steht nicht bei den Personalien',
+  !(await page.isVisible('#mbKarten .zone.danger')));
+await page.click('#mbtab-zugang');
+await page.waitForTimeout(250);
+check('Entfernen-Bereich vorhanden, beim Zugang', await page.isVisible('#mbKarten .zone.danger'));
+await page.click('#mbtab-person');
+await page.waitForTimeout(250);
 
 // Speichern
 await page.fill('#mb_telefon', '062 999 88 77');
@@ -145,11 +156,15 @@ check('Speichern sendet auch die neuen Felder (ENT-072)',
 check('Nach dem Speichern steht wieder die Detailseite offen',
   await page.isVisible('#mv-detail.on') && !(await page.isVisible('#mv-bearbeiten.on')));
 
-// Passwort -- seit ENT-072 in der Karte "Zugang" auf derselben Flaeche.
+// Passwort -- seit ENT-072 in der Karte "Zugang" auf derselben Flaeche,
+// seit ENT-287 auf deren eigenem Reiter. Passwort setzen und Konto
+// entfernen liegen beide dort; ein Klick fuehrt hin, wie beim Planer.
 calls = [];
 await page.click('#mv-detail .btn-primary');
 await page.waitForSelector('#mv-bearbeiten.on');
 await page.waitForTimeout(400);
+await page.click('#mbtab-zugang');
+await page.waitForTimeout(250);
 await page.fill('#maPw', 'kurz');
 await page.click('#mbKarten .zone .btn-plain');
 await page.waitForTimeout(250);
