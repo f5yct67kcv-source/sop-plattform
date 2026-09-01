@@ -65,13 +65,6 @@ select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
 .net-val { font-size: 32px; font-weight: 800; color: var(--green); line-height: 1; }
 .net-lbl { font-size: 11px; color: var(--green); font-weight: 600; margin-top: 3px; text-transform: uppercase; letter-spacing: .5px; }
 
-.sig-wrap { border: 1.5px solid var(--border); border-radius: 9px; overflow: hidden; background: #fff; position: relative; }
-.sig-wrap canvas { display: block; width: 100%; touch-action: none; cursor: crosshair; }
-.sig-actions { display: flex; justify-content: flex-end; padding: 8px 10px; border-top: 1px solid var(--border); }
-.sig-clear { font-size: 12px; color: var(--red); background: none; border: none; cursor: pointer; font-weight: 600; padding: 4px 8px; border-radius: 6px; }
-.sig-clear:hover { background: var(--red-bg); }
-.sig-placeholder { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); font-size: 13px; color: #C4C9D4; pointer-events: none; text-align: center; line-height: 1.5; }
-
 .confirm-box { display: flex; align-items: flex-start; gap: 12px; background: var(--accent-light); border: 1.5px solid #C7D7FA; border-radius: 10px; padding: 14px 16px; margin-bottom: 14px; cursor: pointer; }
 .confirm-box input[type=checkbox] { width: 20px; height: 20px; min-width: 20px; cursor: pointer; accent-color: var(--accent); margin-top: 2px; }
 .confirm-box label { font-size: 13px; color: var(--accent); font-weight: 500; line-height: 1.5; cursor: pointer; }
@@ -308,18 +301,14 @@ tr:hover td { background: var(--accent-light); }
         <span id="lbl-sec-sig">Kundenunterschrift</span>
         <span class="opt-badge" id="lbl-optional">Optional</span>
       </div>
-      <p style="font-size:13px;color:var(--sub);margin-bottom:12px" id="lbl-sig-hint">Unterschrift des Kunden mit Finger oder Stift einholen.</p>
+      <p style="font-size:13px;color:var(--sub);margin-bottom:12px" id="lbl-sig-hint">Der Kunde unterschreibt auf dem ganzen Bildschirm — Gerät dazu quer halten.</p>
       <div class="field" style="margin-bottom:12px">
         <label id="lbl-sig-name">Name Unterzeichner</label>
         <input type="text" id="sigName" placeholder="Vor- und Nachname">
       </div>
-      <div class="sig-wrap">
-        <canvas id="sigCanvas" height="160"></canvas>
-        <div class="sig-placeholder" id="sigPlaceholder">✍ Hier unterschreiben</div>
-        <div class="sig-actions">
-          <button class="sig-clear" onclick="clearSig()" id="btn-sig-clear">Löschen</button>
-        </div>
-      </div>
+      <!-- Knopf bzw. Vorschau kommen aus unterschrift.js (ENT-292) -- dieselbe
+           Datei traegt auch app.html, damit es nur EINE Unterschrift gibt. -->
+      <div id="sigFeld"></div>
     </div>
 
     <!-- BEMERKUNGEN -->
@@ -694,6 +683,7 @@ tr:hover td { background: var(--accent-light); }
 
 <div class="toast" id="toast"></div>
 
+<script src="unterschrift.js"></script>
 <script>
 // Muss zu PASSWORT_MIN in backend/anmeldung.php passen. Bis ENT-291 stand
 // hier dreimal die 12, waehrend der Server seit ENT-289 nur noch 6 verlangt
@@ -704,10 +694,8 @@ const PW_MIN = 6;
 
 // ── STATE
 let rapports       = [];
-let sigDirty       = false;
 let deleteTargetId = null;
 let detailTargetId = null;
-let sigCtx, isDrawing = false, lastX = 0, lastY = 0;
 
 // ── BACKEND API
 const API_BASE  = 'api/';
@@ -813,9 +801,8 @@ const T = {
     'lbl-bis':'Arbeitsende','err-bis':'Pflichtfeld',
     'lbl-pause':'Pause','netLbl':'Nettostunden',
     'lbl-sec-sig':'Kundenunterschrift','lbl-optional':'Optional',
-    'lbl-sig-hint':'Unterschrift des Kunden mit Finger oder Stift einholen.',
+    'lbl-sig-hint':'Der Kunde unterschreibt auf dem ganzen Bildschirm — Gerät dazu quer halten.',
     'lbl-sig-name':'Name Unterzeichner',
-    'sigPlaceholder':'✍ Hier unterschreiben','btn-sig-clear':'Löschen',
     'lbl-sec-bem':'Bemerkungen',
     'lbl-confirm':'Ich bestätige, dass alle Angaben in diesem Rapport korrekt und vollständig sind.',
     'btn-save':'✓ Rapport speichern',
@@ -860,7 +847,7 @@ function applyLang() {
     'lbl-strasse','err-strasse','lbl-ort','err-ort','lbl-datum','err-datum',
     'lbl-einsatzart','lbl-auftragNr','lbl-sec-zeiten','lbl-von','err-von',
     'lbl-bis','err-bis','lbl-pause','netLbl','lbl-sec-sig','lbl-optional',
-    'lbl-sig-hint','lbl-sig-name','sigPlaceholder','btn-sig-clear',
+    'lbl-sig-hint','lbl-sig-name',
     'lbl-sec-bem','lbl-confirm','btn-save','success-title','success-sub','btn-neuer',
     'btn-filter-clear','btn-csv','lbl-sec-mastats','lbl-pin-hint','lbl-pin-sub',
     'lbl-sec-adminma','btn-add-ma','lbl-sec-pin','lbl-new-pin','btn-change-pin',
@@ -903,32 +890,22 @@ function showAdminSub(name) {
   if (name==='kunden') renderKundenList();
 }
 
-// ── SIGNATURE
-function initSig() {
-  const canvas = document.getElementById('sigCanvas');
-  const dpr = window.devicePixelRatio || 1;
-  canvas.width  = canvas.parentElement.clientWidth * dpr;
-  canvas.height = 160 * dpr;
-  canvas.style.height = '160px';
-  sigCtx = canvas.getContext('2d');
-  sigCtx.scale(dpr, dpr);
-  sigCtx.strokeStyle = '#1A1D23'; sigCtx.lineWidth = 2.2; sigCtx.lineCap = 'round'; sigCtx.lineJoin = 'round';
-  const pos = e => { const r=canvas.getBoundingClientRect(), s=e.touches?e.touches[0]:e; return [s.clientX-r.left,s.clientY-r.top]; };
-  const start = e => { e.preventDefault(); isDrawing=true; [lastX,lastY]=pos(e); document.getElementById('sigPlaceholder').style.display='none'; };
-  const draw  = e => { e.preventDefault(); if(!isDrawing) return; const [x,y]=pos(e); sigCtx.beginPath(); sigCtx.moveTo(lastX,lastY); sigCtx.lineTo(x,y); sigCtx.stroke(); [lastX,lastY]=[x,y]; sigDirty=true; };
-  const stop  = e => { e.preventDefault(); isDrawing=false; };
-  canvas.addEventListener('mousedown',start); canvas.addEventListener('mousemove',draw);
-  canvas.addEventListener('mouseup',stop);    canvas.addEventListener('mouseleave',stop);
-  canvas.addEventListener('touchstart',start,{passive:false});
-  canvas.addEventListener('touchmove',draw,{passive:false});
-  canvas.addEventListener('touchend',stop,{passive:false});
+// ── UNTERSCHRIFT (ENT-292)
+// Gezeichnet wird in unterschrift.js auf dem ganzen Bildschirm; hier steht nur
+// noch der Knopf. Was der Kunde beim Unterschreiben sieht, wird erst beim
+// Oeffnen abgefragt -- Kunde, Datum und Stunden aendern sich im Formular noch,
+// nachdem die Seite geladen wurde.
+function sigEinrichten() {
+  Unterschrift.einrichten({
+    ziel: 'sigFeld',
+    kontext: () => ({
+      zeile: [document.getElementById('kunde').value.trim(),
+              fmtDate(document.getElementById('datum').value),
+              document.getElementById('netVal').textContent].filter(Boolean).join(' · '),
+      name: document.getElementById('sigName').value.trim(),
+    }),
+  });
 }
-function clearSig() {
-  const c=document.getElementById('sigCanvas');
-  sigCtx.clearRect(0,0,c.width,c.height); sigDirty=false;
-  document.getElementById('sigPlaceholder').style.display='';
-}
-const getSigData = () => sigDirty ? document.getElementById('sigCanvas').toDataURL('image/png') : null;
 
 // ── CALC NET
 function calcNet() {
@@ -984,7 +961,7 @@ function saveRapport() {
     pause:parseInt(document.getElementById('pause').value||0),
     bemerkung:document.getElementById('bemerkung').value.trim(),
     sigName:document.getElementById('sigName').value.trim(),
-    sig:getSigData()
+    sig:Unterschrift.daten()
   };
   const btn=document.getElementById('btn-save'); btn.disabled=true;
   apiCall('rapport_create.php',{method:'POST',body}).then(({ok,data})=>{
@@ -1009,7 +986,7 @@ function resetForm() {
   document.getElementById('confirmBox').classList.remove('box-error');
   document.querySelectorAll('.has-error').forEach(e=>e.classList.remove('has-error'));
   document.querySelectorAll('.error').forEach(e=>e.classList.remove('error'));
-  clearSig(); calcNet(); window.scrollTo(0,0);
+  Unterschrift.zuruecksetzen(); calcNet(); window.scrollTo(0,0);
 }
 
 // ── TABLE
@@ -1443,7 +1420,7 @@ function showToast(msg){const el=document.getElementById('toast');el.textContent
 // ── INIT
 document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('datum').value=today();
-  initSig();
+  sigEinrichten();
   applyLang();
   calcNet();
   if (authToken && currentUser) { afterLogin(); }
