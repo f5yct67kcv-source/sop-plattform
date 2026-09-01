@@ -23,7 +23,7 @@ const schicht = (overrides = {}) => ({
   im_team: 1, hat_kontrollpunkte: true, ...overrides,
 });
 
-async function neueSeite(schichten, extraRoutes) {
+async function neueSeite(schichten, extraRoutes, profilUeberschreibung) {
   const rufe = [];
   const browser = await chromium.launch({ executablePath: EXE });
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
@@ -36,7 +36,13 @@ async function neueSeite(schichten, extraRoutes) {
     const send = (b, s) => route.fulfill({ status: s || 200, contentType: 'application/json', body: JSON.stringify(b) });
     if (p.includes('login')) return send({ status: 'ok', token: 't', name: 'a', ist_admin: false });
     if (p.includes('meine_schichten')) return send({ status: 'ok', schichten });
-    if (p.includes('mein_profil')) return send({ status: 'ok', profil: { name: 'a', vorname: 'A', nachname: 'B' } });
+    // ENT-284: die Berechtigung steuert seit dann den Waechter-Reiter, nicht
+    // mehr hat_kontrollpunkte auf einer geladenen Schicht -- Vorgabe
+    // 'berechtigt', damit bestehende Faelle hier (Reiter sichtbar, Kacheln
+    // erreichbar) unveraendert bleiben; wer das Gegenteil pruefen will,
+    // uebergibt profilUeberschreibung.
+    if (p.includes('mein_profil')) return send({ status: 'ok', profil: {
+      name: 'a', vorname: 'A', nachname: 'B', revierdienst_berechtigt: true, ...profilUeberschreibung } });
     if (p.includes('meine_verfuegbarkeit')) return send({ status: 'ok', tage: [] });
     if (p.includes('rapport_list')) return send({ status: 'ok', rapporte: [] });
     if (extraRoutes) {
@@ -51,7 +57,7 @@ async function neueSeite(schichten, extraRoutes) {
   return { browser, page, rufe };
 }
 
-// ══════ TEIL 1: Wächter-Reiter erscheint mit Kontrollpunkten, mit zwei Kacheln
+// ══════ TEIL 1: Wächter-Reiter erscheint mit Berechtigung, mit zwei Kacheln
 {
   const { browser, page } = await neueSeite([schicht()]);
   check('Wächter-Reiter ist sichtbar', await page.isVisible('#t-waechter'));
@@ -114,13 +120,30 @@ async function neueSeite(schichten, extraRoutes) {
   await browser.close();
 }
 
-// ══════ TEIL 4: ohne Kontrollpunkte bleibt der Reiter weg
+// ══════ TEIL 4: ohne Berechtigung bleibt der Reiter weg (ENT-284) -- auch
+// wenn eine geladene Schicht Kontrollpunkte hat. Bis ENT-284 entschied genau
+// das (hat_kontrollpunkte auf der Schicht) allein -- jetzt entscheidet die
+// Berechtigung, die Schicht spielt fuer die Reiter-Sichtbarkeit keine Rolle
+// mehr.
 {
-  const { browser, page } = await neueSeite([schicht({ hat_kontrollpunkte: false })]);
-  check('Wächter-Reiter bleibt ohne Kontrollpunkte verborgen', !(await page.isVisible('#t-waechter')));
+  const { browser, page } = await neueSeite([schicht()], undefined, { revierdienst_berechtigt: false });
+  check('Wächter-Reiter bleibt ohne Berechtigung verborgen, obwohl die Schicht Kontrollpunkte hat',
+    !(await page.isVisible('#t-waechter')));
   check('Vier sichtbare Reiter ohne Revierdienst-Bezug',
     await page.evaluate(() => [...document.querySelectorAll('.tabs button')]
       .filter(b => getComputedStyle(b).display !== 'none').length === 4));
+  await browser.close();
+}
+
+// ══════ TEIL 4b: KRITISCH -- mit Berechtigung, aber OHNE jede Schicht bleibt
+// der Reiter sichtbar. Das ist der Konflikt, der ENT-284 ausgeloest hat: ein
+// Waechter, der spontan an einem Objekt eine Runde laufen will, dem er
+// (noch) nicht zugeteilt ist -- vorher blieb ihm der Reiter genau dann
+// verschlossen, wenn die spontane Uebersicht (ENT-282) ihn gebraucht haette.
+{
+  const { browser, page } = await neueSeite([], undefined, { revierdienst_berechtigt: true });
+  check('KRITISCH: Wächter-Reiter bleibt sichtbar, obwohl keine einzige Schicht geladen ist',
+    await page.isVisible('#t-waechter'));
   await browser.close();
 }
 

@@ -126,8 +126,23 @@ if ($gewuenscht) {
 // Namen einzeln nennen -- ein pauschales "mach schon" gibt es nicht, damit
 // niemand versehentlich eine ganze Mannschaft umdisponiert.
 $umplanen = array_values(array_unique(array_map('intval', (array)($input['umplanen'] ?? []))));
+// Warnung, keine Sperre (ENT-284) -- der Planer bestaetigt einmal, dann
+// gilt das fuer diese Anfrage.
+$trotzFehlenderBerechtigung = !empty($input['trotz_fehlender_berechtigung']);
 
 if ($zuteilung) {
+    if (!$trotzFehlenderBerechtigung) {
+        $unberechtigt = ohneRevierdienstBerechtigung($einsatzart, $zuteilung);
+        if ($unberechtigt) {
+            json_response([
+                'status' => 'error',
+                'unberechtigt' => true,
+                'message' => 'Ohne Revierdienst-Berechtigung: '
+                    . implode(', ', array_column($unberechtigt, 'name')),
+                'personen' => $unberechtigt,
+            ], 409);
+        }
+    }
     $doppelt = doppelbelegungen($id, $datum, $von, $bis, $zuteilung);
     if ($doppelt && $umplanen) {
         $pdoU = db();

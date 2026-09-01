@@ -82,8 +82,24 @@ if ($einsatz) {
 
 // Umplanung (ENT-060) -- dieselbe Regel wie in einsatz_save.php.
 $umplanen = array_values(array_unique(array_map('intval', (array)($in['umplanen'] ?? []))));
+// Warnung, keine Sperre (ENT-284) -- der Planer bestaetigt einmal, dann
+// gilt das fuer diese Anfrage.
+$trotzFehlenderBerechtigung = !empty($in['trotz_fehlender_berechtigung']);
 
 if ($zuteilung) {
+    $einsatzartFuerPruefung = $einsatz ? (string)$einsatz['einsatzart'] : (string)$objekt['einsatzart'];
+    if (!$trotzFehlenderBerechtigung) {
+        $unberechtigt = ohneRevierdienstBerechtigung($einsatzartFuerPruefung, $zuteilung);
+        if ($unberechtigt) {
+            json_response([
+                'status' => 'error',
+                'unberechtigt' => true,
+                'message' => 'Ohne Revierdienst-Berechtigung: '
+                    . implode(', ', array_column($unberechtigt, 'name')),
+                'personen' => $unberechtigt,
+            ], 409);
+        }
+    }
     $doppelt = doppelbelegungen($id, $datum, $von, $bis, $zuteilung);
     if ($doppelt && $umplanen) {
         $pdoU = db();

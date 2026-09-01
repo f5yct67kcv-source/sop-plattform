@@ -67,6 +67,22 @@ $b = planung_bedarf($objektId, $von, $bis);
 if (isset($b['fehler'])) {
     json_response(['status' => 'error', 'message' => $b['fehler']], 404);
 }
+// Warnung, keine Sperre (ENT-284): gepruefte Grundlage ist die Einsatzart
+// des OBJEKTS (nicht der einzelne Tag) -- dieselbe Grösse, die auch
+// einsatz_zuteilen.php fuer neu entstehende Einsaetze dieser Masterschicht
+// verwendet. "Fahrtzeit"-Tage sind davon ohnehin ausgenommen, die Pruefung
+// selbst greift nur bei einsatzart 'Revierdienst'.
+$trotzFehlenderBerechtigung = !empty($in['trotz_fehlender_berechtigung']);
+$unberechtigt = $trotzFehlenderBerechtigung ? [] : ohneRevierdienstBerechtigung($b['objekt']['einsatzart'], $gewuenscht);
+if ($unberechtigt && !$nurPruefen) {
+    json_response([
+        'status' => 'error',
+        'unberechtigt' => true,
+        'message' => 'Ohne Revierdienst-Berechtigung: '
+            . implode(', ', array_column($unberechtigt, 'name')),
+        'personen' => $unberechtigt,
+    ], 409);
+}
 $tage = array_values(array_filter($b['bedarf'], fn($s) => $s['masterschicht_id'] === $msId));
 if (!$tage) {
     json_response([
@@ -189,6 +205,10 @@ try {
         'gesperrt_gesamt' => count($gesperrt),
         'abgeglichen' => array_slice($abgeglichen, 0, 30),
         'abgeglichen_gesamt' => count($abgeglichen),
+        // Nur informativ in der Vorschau (ENT-284) -- ein echter Lauf mit
+        // fehlender Berechtigung und ohne Bestaetigung ist weiter oben schon
+        // mit 409 abgewiesen worden, diese Zeile wird dann nie erreicht.
+        'unberechtigt' => $unberechtigt,
         'schicht' => trim(($vorlage['kuerzel'] ? $vorlage['kuerzel'] . ' · ' : '') . $vorlage['name']),
         'personen' => array_values($namen),
         'von' => $von, 'bis' => $bis,

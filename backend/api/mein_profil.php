@@ -10,7 +10,7 @@ $user = require_session();
 
 $stmt = db()->prepare(
     'SELECT name, ist_admin, personalnummer, anrede, vorname, nachname, geburtsdatum,
-            strasse, ort, telefon, mobil, email, erstellt_am
+            strasse, ort, telefon, mobil, email, erstellt_am, revierdienst_berechtigt
      FROM mitarbeiter WHERE id = ?'
 );
 $stmt->execute([(int)$user['id']]);
@@ -19,6 +19,10 @@ if (!$m) {
     json_response(['status' => 'error', 'message' => 'Konto nicht gefunden'], 404);
 }
 $m['ist_admin'] = (bool)$m['ist_admin'];
+// Steuert seit ENT-284, ob der Waechter-Reiter in der App erscheint
+// (waechterSichtbar()) -- bewusst gesetzte Berechtigung statt Herleitung
+// aus der Schicht-Historie.
+$m['revierdienst_berechtigt'] = (bool)$m['revierdienst_berechtigt'];
 
 // Die frueher hier gerechnete Monatssumme aus den Rapporten ist mit ENT-049
 // entfallen. Grund (vom Projektinhaber): Der Rapport kennt die tatsaechliche

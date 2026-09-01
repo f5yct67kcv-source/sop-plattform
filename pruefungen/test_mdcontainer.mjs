@@ -165,8 +165,8 @@ await oeffnen();
   }));
   check('Der Bearbeitungsmodus zeigt seine Werkzeugleiste', b.leiste && b.knopf);
   check('KRITISCH: im Bearbeiten stehen ALLE Container da, auch die ausgeblendeten',
-    b.alle === 8 && b.ausgeblendeteSichtbar);
-  check('Jeder Container hat Griff, Pfeile und Auge', b.werkzeuge === 8 && b.griffe === 8);
+    b.alle === 9 && b.ausgeblendeteSichtbar);
+  check('Jeder Container hat Griff, Pfeile und Auge', b.werkzeuge === 9 && b.griffe === 9);
   check('Die Container folgen den Abschnitten von ENT-074',
     b.ids.includes('personendaten') && b.ids.includes('dienstausweis') && !b.ids.includes('ausweise'));
 

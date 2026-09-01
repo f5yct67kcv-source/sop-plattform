@@ -29,7 +29,7 @@ const MA = [{ id: 1, name: 'mitarbeiter-a', vorname: 'Vorname', nachname: 'Testp
   funktion_id: 2, abteilung_id: 1, anstellungsort_id: 7,
   strasse: 'Musterweg', hausnummer: '3', plz: '4600', ort: 'Testort',
   telefon: '062 000 00 00', mobil: '', email: 'a@b.ch',
-  fachausweis: 'Bewachung', diensthundefuehrer: 1, waffentragberechtigt: 0 }];
+  fachausweis: 'Bewachung', diensthundefuehrer: 1, waffentragberechtigt: 0, revierdienst_berechtigt: 1 }];
 const DOSSIER = {
   id: 1, name: 'mitarbeiter-a', ist_admin: false, aktiv: true, erstellt_am: '2025-03-04',
   personalnummer: 'P-001', vorname: 'Vorname', nachname: 'Testperson',
@@ -38,7 +38,7 @@ const DOSSIER = {
   funktion_id: 2, abteilung_id: 1, anstellungsort_id: 7,
   anstellungskategorie: 'C', pensum_stunden: 900, eintritt: '2025-01-01',
   fachausweis: 'Bewachung', fachausweis_am: '2022-09-01', basisausbildung_am: '',
-  diensthundefuehrer: 1, waffentragberechtigt: 0, sprache: 'de',
+  diensthundefuehrer: 1, waffentragberechtigt: 0, revierdienst_berechtigt: 1, sprache: 'de',
   ahv_nr: '756.1234.5678.97', aufenthaltsbewilligung: 'C', zemis_nr: '',
   // Ein abgelaufener und ein bald ablaufender Ausweis: beides muss die
   // Leseansicht benennen, sonst plant jemand eine Person ein, die nicht darf.
@@ -112,6 +112,8 @@ const oeffnen = async () => {
     !('strafregister_datum' in q) && !('betreibung_datum' in q));
   check('Die Berechtigungen stehen dagegen in der Liste -- die Planung braucht sie',
     'fachausweis' in q && 'diensthundefuehrer' in q && 'waffentragberechtigt' in q);
+  check('Die Revierdienst-Berechtigung ebenfalls (ENT-284, gleicher Grund)',
+    'revierdienst_berechtigt' in q);
   check('Das Dossier wird erst geholt, wenn jemand eine Person oeffnet', dossierRuf === 0);
 }
 
@@ -154,6 +156,8 @@ check('Der Standort kommt aus den Anstellungsorten',
 check('Ja/Nein steht als Haken, nicht als 1',
   await page.evaluate(() => document.getElementById('mb_diensthundefuehrer').checked === true
     && document.getElementById('mb_waffentragberechtigt').checked === false));
+check('Die Revierdienst-Berechtigung ebenso, im eigenen Abschnitt (ENT-284)',
+  await page.evaluate(() => document.getElementById('mb_revierdienst_berechtigt').checked === true));
 check('Die AHV-Nummer steht nur hier, nicht in der Liste',
   await page.inputValue('#mb_ahv_nr') === '756.1234.5678.97');
 
@@ -231,6 +235,8 @@ check('Die AHV-Nummer steht nur hier, nicht in der Liste',
   check('Ein abgehakter Haken geht als leer, nicht als "0"-Text verloren',
     gesendet && gesendet.diensthundefuehrer === '');
   check('Ein gesetzter Haken geht als 1', gesendet && gesendet.waffentragberechtigt === '');
+  check('KRITISCH: die unveraendert gesetzte Revierdienst-Berechtigung geht mit, nicht nur die getoggelten Felder',
+    gesendet && !!gesendet.revierdienst_berechtigt);
   check('KRITISCH: es gehen alle Felder mit, damit der Server nichts raten muss',
     gesendet && Object.keys(gesendet).length >= 50);
   check('Nach dem Speichern steht wieder die Detailseite offen',
@@ -445,7 +451,7 @@ check('Die AHV-Nummer steht nur hier, nicht in der Liste',
   check('Der Knopf sagt "anlegen", nicht "speichern"', /anlegen/.test(a.knopf));
   check('Die Brotkrume sagt es auch', a.crumb === 'Neuer Mitarbeitender');
   check('KRITISCH: es sind dieselben Abschnitte und Felder wie beim Bearbeiten',
-    a.karten === 8 && a.felder >= 49);
+    a.karten === 9 && a.felder >= 49);
   check('Beim Anlegen ist nichts vorbelegt', a.leer);
   check('Login-Name und Passwort stehen als Pflichtfelder da', a.band);
   check('Sie stehen OBEN, nicht in einer Karte zwischen neun anderen', a.bandOben);

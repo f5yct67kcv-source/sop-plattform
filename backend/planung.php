@@ -291,6 +291,35 @@ function doppelbelegungen(int $einsatzId, string $datum, string $von, string $bi
     return $treffer;
 }
 
+// Wer aus der gewuenschten Zuteilung KEINE Revierdienst-Berechtigung hat
+// (ENT-284) -- nur relevant, wenn die Schicht selbst Revierdienst ist. Eine
+// Warnung, keine Sperre: Der Planer wird informiert und kann trotzdem
+// zuteilen (z. B. beim erstmaligen Einteilen einer Person INS
+// Revierdienst) -- anders als bei doppelbelegungen() oben, wo eine
+// Ueberschneidung fachlich unmoeglich ist.
+function ohneRevierdienstBerechtigung(string $einsatzart, array $mitarbeiterIds): array
+{
+    if ($einsatzart !== 'Revierdienst' || !$mitarbeiterIds) {
+        return [];
+    }
+    $marken = implode(',', array_fill(0, count($mitarbeiterIds), '?'));
+    $stmt = db()->prepare(
+        "SELECT id, vorname, nachname, name FROM mitarbeiter
+          WHERE id IN ($marken) AND revierdienst_berechtigt = 0"
+    );
+    $stmt->execute($mitarbeiterIds);
+    return array_map(static function ($r) {
+        return [
+            'mitarbeiter_id' => (int)$r['id'],
+            'name' => trim(($r['vorname'] ?? '') . ' ' . ($r['nachname'] ?? '')) ?: $r['name'],
+            // Anmeldename, getrennt vom Anzeigenamen oben: mbOeffnen() in
+            // dashboard.html braucht genau diesen, nicht Vor-/Nachname, um
+            // direkt zur Mitarbeiter-Akte zu verlinken (ENT-284).
+            'login_name' => $r['name'],
+        ];
+    }, $stmt->fetchAll());
+}
+
 // Setzt den Bedarf einer Vorlage ab einem Datum (ENT-026).
 //
 // Liegt das Datum nicht nach dem Beginn der Fassung, hat diese nie fuer einen

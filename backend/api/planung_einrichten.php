@@ -1354,13 +1354,58 @@ $spalten = [
     // bei Rapport/Sperrtag/Zusage, hier am Rundgang selbst -- er ist das
     // konkrete, einmalige Geschehnis, nicht der Einsatz als Ganzes.
     ['rundgang', 'gesehen_am', 'ALTER TABLE rundgang ADD COLUMN gesehen_am DATETIME NULL'],
+
+    // Explizite Berechtigung "macht Revierdienst" (ENT-284) -- ersetzt die
+    // bisherige Herleitung aus der Schicht-Historie (ENT-234) als einzige
+    // Quelle dafuer, ob der Waechter-Reiter in der App erscheint. Vorschlag
+    // des Projektinhabers, gleiches Muster wie diensthundefuehrer/
+    // waffentragberechtigt: eine bewusst gesetzte Berechtigung statt einer
+    // Vermutung aus vergangenen Einsaetzen.
+    ['mitarbeiter', 'revierdienst_berechtigt', 'ALTER TABLE mitarbeiter ADD COLUMN revierdienst_berechtigt TINYINT(1) NOT NULL DEFAULT 0'],
 ];
+// Vor dem Loop merken, ob die neue Berechtigungs-Spalte schon da war -- nur
+// wenn sie JETZT, in diesem Lauf, neu entsteht, darf der Nachtrag weiter
+// unten einmalig laufen. Anders als die "beliebig oft wiederholbar"-
+// Nachtraege (Kundennummern, Produktnummern): Eine bereits von Personal/
+// Verwaltung bewusst auf 0 gesetzte Berechtigung darf ein spaeterer Lauf
+// NICHT wieder auf 1 zuruecksetzen -- das waere das genaue Gegenteil einer
+// bewusst gesetzten Berechtigung.
+$revierBerechtigungWarSchonDa = hat_spalte($pdo, 'mitarbeiter', 'revierdienst_berechtigt');
 foreach ($spalten as [$tabelle, $spalte, $sql]) {
     if (!hat_tabelle_jetzt($pdo, $tabelle) || hat_spalte($pdo, $tabelle, $spalte)) {
         continue;
     }
     if ($nurPruefen) { $getan[] = "Spalte $tabelle.$spalte fehlt noch"; continue; }
     schritt($pdo, $sql, "Spalte $tabelle.$spalte", $getan, $fehler);
+}
+
+// ── 2a1. Revierdienst-Berechtigung einmalig nachtragen (ENT-284): fuer
+// alle, die zum Zeitpunkt der Einfuehrung bereits eine Schicht an einem
+// Objekt mit Kontrollpunkten hatten -- dieselbe Bedingung, die bis dahin
+// waechterSichtbar() in app.html verwendet hat. Ohne diesen Nachtrag
+// verloeren alle aktiven Waechter am Tag des Rollouts den Reiter, bis
+// Personal/Verwaltung jede Person einzeln von Hand freischaltet.
+//
+// AUSDRUECKLICH NICHT wiederholbar (anders als die Nachtraege weiter unten):
+// $revierBerechtigungWarSchonDa wurde VOR dem Loop oben erfasst, also bevor
+// die Spalte in diesem Lauf ueberhaupt entstehen konnte. Ist sie jetzt da,
+// aber war vorher nicht da, ist das der einzige Moment, in dem dieser Block
+// laeuft -- bei jedem folgenden Aufruf ist die Spalte laengst vorhanden, der
+// Nachtrag bleibt aus, und eine spaeter bewusst gesetzte 0 bleibt stehen.
+if (!$revierBerechtigungWarSchonDa && hat_spalte($pdo, 'mitarbeiter', 'revierdienst_berechtigt')
+    && hat_tabelle_jetzt($pdo, 'einsatz_zuteilung') && hat_tabelle_jetzt($pdo, 'einsaetze')
+    && hat_tabelle_jetzt($pdo, 'kontrollpunkt')) {
+    if ($nurPruefen) {
+        $getan[] = 'Revierdienst-Berechtigung: Nachtrag fuer bestehende Waechter fehlt noch';
+    } else {
+        schritt($pdo,
+            'UPDATE mitarbeiter SET revierdienst_berechtigt = 1 WHERE id IN (
+                SELECT DISTINCT z.mitarbeiter_id FROM einsatz_zuteilung z
+                  JOIN einsaetze e ON e.id = z.einsatz_id
+                  JOIN kontrollpunkt k ON k.objekt_id = e.objekt_id AND k.aktiv = 1
+             )',
+            'Revierdienst-Berechtigung fuer bestehende Waechter nachgetragen', $getan, $fehler);
+    }
 }
 
 // ── 2a2. Die eine Betriebszeile anlegen, falls sie fehlt (ENT-155).

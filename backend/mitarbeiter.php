@@ -141,6 +141,12 @@ function ma_felder(): array
         'waffentragberechtigt'       => 'janein',
         'waffe_bewilligung_bis'      => 'datum',
         'basisausbildung_am'         => 'datum',
+        // Einsatzbereich-Berechtigung (ENT-284), KEINE Lohnfolge -- reine
+        // Zugriffssteuerung (Waechter-Reiter in der App, Warnung beim
+        // Zuteilen ohne Berechtigung), kein Zuschlag wie bei den beiden
+        // Feldern oben. Bewusst ein eigener Abschnitt statt hier
+        // hineingemischt, siehe MB_ABSCHNITTE in dashboard.html.
+        'revierdienst_berechtigt'    => 'janein',
         // Zugang
         'sprache'    => 'liste',
         'zugang_bis' => 'datum',
@@ -175,9 +181,10 @@ function ma_listenfelder(): array
         // Die Berechtigungen gehoeren in die Liste, die Ausbildungsdaten
         // nicht: Wer einteilt, muss sehen, wer Hund oder Waffe fuehren darf --
         // sonst plant man jemanden auf einen Einsatz, den er nicht leisten
-        // darf. Das WANN einer Ausbildung braucht dafuer niemand.
+        // darf. Das WANN einer Ausbildung braucht dafuer niemand. Dieselbe
+        // Begruendung gilt fuer revierdienst_berechtigt (ENT-284).
         'fachausweis', 'diensthundefuehrer', 'waffentragberechtigt',
-        'verkehrsmittel',
+        'revierdienst_berechtigt', 'verkehrsmittel',
     ];
 }
 

@@ -6309,6 +6309,22 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
   </div>
 </div>
 
+<!-- Warnung beim Zuteilen ohne Revierdienst-Berechtigung (ENT-284). Eine
+     Warnung, keine Sperre -- darum drei Wege statt zwei: zur Akte (das
+     eigentlich Richtige), trotzdem zuteilen (bewusste Ausnahme) oder
+     abbrechen. -->
+<div class="dlg-scrim" id="dlgRevierWarnung">
+  <div class="dlg narrow">
+    <div class="dlg-hd"><h2>Ohne Revierdienst-Berechtigung</h2><p id="rwText"></p></div>
+    <div class="dlg-bd" style="padding-top:0"></div>
+    <div class="dlg-ft">
+      <button class="btn btn-plain" onclick="closeDlg('dlgRevierWarnung')">Abbrechen</button>
+      <button class="btn btn-plain" id="rwZurAkte">Zur Mitarbeiter-Akte</button>
+      <button class="btn btn-primary" id="rwTrotzdem">Trotzdem zuteilen</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 <div id="printArea"></div>
 
@@ -10243,6 +10259,7 @@ const MD_CONTAINER = [
   { id: 'status', titel: 'Zu beachten', eigen: 'status' },
   { id: 'betrieb', titel: 'Betriebliches', abschnitte: ['betrieb'] },
   { id: 'qualifikation', titel: 'Qualifikationen mit Lohnfolge', abschnitte: ['qualifikation'], standard: false },
+  { id: 'einsatzbereich', titel: 'Einsatzbereiche', abschnitte: ['einsatzbereich'], standard: false },
   { id: 'anstellung', titel: 'Anstellung nach Art. 8 GAV', abschnitte: ['anstellung'], standard: false },
   { id: 'personendaten', titel: 'Personendaten und Bewilligungen', abschnitte: ['personendaten'], standard: false },
   { id: 'dienstausweis', titel: 'Dienstausweis', abschnitte: ['dienstausweis'], standard: false },
@@ -12229,12 +12246,17 @@ function openEinsatzDrawer(id) {
   showDrawer();
 }
 
-function saveEinsatz() {
+function saveEinsatz(trotzFehlenderBerechtigung) {
   if (!enTarget) return;
   const body = enSammeln('enE');
   if (!body) { toast('Kunde, Arbeitsort, Datum, Von und Bis sind Pflicht.'); return; }
   body.id = enTarget;
+  if (trotzFehlenderBerechtigung) { body.trotz_fehlender_berechtigung = true; }
   api('einsatz_save.php', { method: 'POST', body }).then(({ ok, data }) => {
+    if (!ok && data && data.unberechtigt) {
+      revierWarnungZeigen(data.personen, () => saveEinsatz(true));
+      return;
+    }
     if (!ok || data.status !== 'ok') { toast(data.message || 'Speichern fehlgeschlagen.'); return; }
     closeDrawer();
     loadEinsaetze().then(() => toast('Einsatz gespeichert.'));
@@ -18167,19 +18189,27 @@ function mzRechne() {
             <span class="nm">abgeglichen — wird ausgelassen</span>
             <span class="zt">—</span></div>`).join('')}
           ${data.abgeglichen_gesamt > ab.length ? `<p class="zone-note" style="margin-top:6px">… und ${nf(data.abgeglichen_gesamt - ab.length)} weitere.</p>` : ''}
-          </div>` : ''}`;
+          </div>` : ''}
+        ${(data.unberechtigt || []).length ? `<p class="zone-note" style="margin-top:10px;color:var(--warn)"><b>Ohne Revierdienst-Berechtigung:</b>
+            ${esc((data.unberechtigt || []).map(p => p.name).join(', '))}. „Einteilen“ fragt beim Speichern nochmal nach.</p>` : ''}`;
     });
   }, 350);
 }
 
-function mzSpeichern() {
+function mzSpeichern(trotzFehlenderBerechtigung) {
   const b = $('mzBtn'); b.disabled = true;
   $('mzErr').style.display = 'none';
-  api('zuteilung_masse.php', { method: 'POST', body: {
+  const body = {
     objekt_id: oplId, masterschicht_id: Number($('mzSchicht').value),
     von: $('mzVon').value, bis: $('mzBis').value, mitarbeiter: mzIds(),
-  } }).then(({ ok, data }) => {
+  };
+  if (trotzFehlenderBerechtigung) { body.trotz_fehlender_berechtigung = true; }
+  api('zuteilung_masse.php', { method: 'POST', body }).then(({ ok, data }) => {
     b.disabled = false;
+    if (!ok && data && data.unberechtigt) {
+      revierWarnungZeigen(data.personen, () => mzSpeichern(true));
+      return;
+    }
     if (!ok || data.status !== 'ok') {
       $('mzErr').textContent = data.message || 'Speichern fehlgeschlagen.';
       $('mzErr').style.display = '';
@@ -18329,15 +18359,19 @@ function oplZuFuss() {
     + (wider ? `<span class="chip chip-w">${wider} gegen eine Sperre</span>` : '');
 }
 
-function oplZuSpeichern() {
+function oplZuSpeichern(trotzFehlenderBerechtigung) {
   const z = oplZelleZiel;
   if (!z) return;
   const btn = $('zuBtn'); btn.disabled = true;
   $('zuErr').style.display = 'none';
-  api('einsatz_zuteilen.php', { method: 'POST', body: {
-    objekt_id: oplId, masterschicht_id: z.msId, datum: z.datum, mitarbeiter: oplZuIds(),
-  } }).then(({ ok, data }) => {
+  const body = { objekt_id: oplId, masterschicht_id: z.msId, datum: z.datum, mitarbeiter: oplZuIds() };
+  if (trotzFehlenderBerechtigung) { body.trotz_fehlender_berechtigung = true; }
+  api('einsatz_zuteilen.php', { method: 'POST', body }).then(({ ok, data }) => {
     btn.disabled = false;
+    if (!ok && data && data.unberechtigt) {
+      revierWarnungZeigen(data.personen, () => oplZuSpeichern(true));
+      return;
+    }
     if (!ok || data.status !== 'ok') {
       $('zuErr').textContent = data.message || 'Speichern fehlgeschlagen.';
       $('zuErr').style.display = '';
@@ -18895,6 +18929,24 @@ function askConfirm(titel, text, knopf, fn) {
   b.textContent = knopf;
   b.onclick = () => { closeDlg('dlgConfirm'); fn(); };
   openDlg('dlgConfirm');
+}
+
+// Warnung ohne Revierdienst-Berechtigung (ENT-284). `weiterMachenFn` sendet
+// dieselbe Anfrage nochmal, diesmal mit trotz_fehlender_berechtigung -- der
+// Aufrufer weiss, wie sein eigener Request-Body aussieht, diese Funktion
+// nicht (drei verschiedene Endpunkte, drei verschiedene Formen).
+function revierWarnungZeigen(personen, weiterMachenFn) {
+  if (!personen || !personen.length) { weiterMachenFn(); return; }
+  $('rwText').textContent = `${personen.map(p => p.name).join(', ')} `
+    + (personen.length === 1 ? 'hat' : 'haben') + ' keine Revierdienst-Berechtigung. Trotzdem zuteilen,'
+    + ' oder zuerst in der Mitarbeiter-Akte freischalten?';
+  $('rwTrotzdem').onclick = () => { closeDlg('dlgRevierWarnung'); weiterMachenFn(); };
+  $('rwZurAkte').onclick = () => {
+    closeDlg('dlgRevierWarnung');
+    go('mitarbeiter');
+    mbOeffnen(personen[0].login_name);
+  };
+  openDlg('dlgRevierWarnung');
 }
 
 // ══════════════════════════════════════════ MITARBEITENDE ANLEGEN
@@ -19778,6 +19830,15 @@ const MB_ABSCHNITTE = [
   ], janein: [
     ['diensthundefuehrer',   'Darf mit Diensthund eingesetzt werden',  'Diensthund'],
     ['waffentragberechtigt', 'Darf mit Schusswaffe eingesetzt werden', 'Schusswaffe'],
+  ]},
+  // Bewusst NICHT im Abschnitt oben: Dort steht, was Lohnfolge hat (Art. 19
+  // GAV), hier steht reine Zugriffssteuerung ohne Zuschlag -- Vorschlag des
+  // Projektinhabers (ENT-284), gleiches janein-Muster wie oben. Steuert den
+  // Wächter-Reiter in der App (app.html, waechterSichtbar()) und löst beim
+  // Zuteilen auf eine Revierdienst-Schicht ohne diese Berechtigung eine
+  // Warnung aus (siehe revierWarnungZeigen()).
+  { id: 'einsatzbereich', spalte: 3, titel: 'Einsatzbereiche', felder: [], janein: [
+    ['revierdienst_berechtigt', 'Darf für Revierdienst (Wächter-Funktionen) eingeteilt werden', 'Revierdienst'],
   ]},
   { id: 'anstellung', spalte: 3, titel: 'Anstellung nach Art. 8 GAV', felder: [
     ['anstellungskategorie', 'Kategorie',           'a', ['A', 'B', 'C']],

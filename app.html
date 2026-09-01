@@ -774,12 +774,16 @@ function allesLaden() {
     .then(() => { b.disabled = false; waechterTabAktualisieren(); zeichne(); });
 }
 
-// ENT-234: "Wächter" erscheint nur, wer irgendeine Schicht an einem Objekt
-// mit Kontrollpunkten hat -- abgeleitet aus den ohnehin geladenen Schichten,
-// kein neues Recht, keine neue Rolle. Wer nie Revierdienst macht, sieht
-// diesen Reiter nie, statt einen leeren Platzhalter vorgesetzt zu bekommen.
+// ENT-234, seit ENT-284 umgestellt: "Wächter" erscheint nur mit der
+// ausdrücklich gesetzten Berechtigung (Mitarbeiter-Akte, Personal/
+// Verwaltung) -- nicht mehr aus der Schicht-Historie hergeleitet. Der
+// alte Weg (irgendeine geladene Schicht mit Kontrollpunkten) brach genau
+// dann, wenn jemand spontan eine Runde an einem Objekt laufen wollte, dem
+// er (noch) nicht zugeteilt war (ENT-282 "unabhängig von den Schichten") --
+// ohne eine geladene Schicht blieb der Reiter unerreichbar, gerade im
+// Moment, in dem die spontane Übersicht ihn gebraucht hätte.
 function waechterSichtbar() {
-  return schichten.some(e => e.hat_kontrollpunkte);
+  return !!(profil && profil.revierdienst_berechtigt);
 }
 function waechterTabAktualisieren() {
   const sichtbar = waechterSichtbar();
