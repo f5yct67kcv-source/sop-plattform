@@ -134,13 +134,20 @@ check('Das Dossier wurde genau einmal geholt', dossierRuf === 1);
     const fehlend = felder.filter(f => !document.getElementById('mb_' + f));
     return { anzahl: felder.length, fehlend, doppelt: felder.length !== new Set(felder).size,
       bloecke: [...document.querySelectorAll('#mbKarten .ma-block > h3')].map(h => h.textContent),
-      spalten: document.querySelectorAll('#mbKarten > .ma-spalte').length };
+      bereiche: [...document.querySelectorAll('#mbKarten > .mb-bereich')].map(b => b.dataset.bereich),
+      spaltenJeBereich: [...document.querySelectorAll('#mbKarten > .mb-bereich')]
+        .map(b => b.querySelectorAll(':scope > .ma-spalten > .ma-spalte').length) };
   });
   check(`Alle ${d.anzahl} Felder stehen auch wirklich auf der Flaeche`, d.fehlend.length === 0);
   check('Kein Feld steht zweimal', !d.doppelt);
   check('Die Flaeche fuehrt mindestens 50 Felder', d.anzahl >= 50);
-  check('KRITISCH: die Flaeche steht in drei Spalten, nicht als Kachelfeld (ENT-074)',
-    d.spalten === 3);
+  // Seit ENT-287 vier Bereiche statt einer Flaeche mit drei Spalten. Die
+  // Felder muessen trotzdem ALLE im Dokument stehen (oben geprueft) -- sonst
+  // speicherte ein Speichern die ausgeblendeten Bereiche leer.
+  check('KRITISCH: die Flaeche ist in die vier Bereiche geteilt (ENT-287)',
+    JSON.stringify(d.bereiche) === JSON.stringify(['person', 'anstellung', 'einsatz', 'zugang']));
+  check('KRITISCH: jeder Bereich steht in Spalten, nicht als Kachelfeld (ENT-074)',
+    d.spaltenJeBereich.length === 4 && d.spaltenJeBereich.every(n => n >= 1));
   check('Person und Adresse sind ein Abschnitt, wie in der Referenz',
     d.bloecke.includes('Person und Adresse'));
   check('Herkunft, Ausweise und Nachweise sind ein Block "Personendaten und Bewilligungen"',
@@ -174,16 +181,30 @@ check('Die AHV-Nummer steht nur hier, nicht in der Liste',
 
 // ══════════════ AUSRICHTUNG: jedes "gueltig bis" neben SEINEM Ausweis
 {
-  const paare = await page.evaluate(() => {
-    const kasten = id => { const e = document.getElementById(id);
-      const r = e.closest('.f').getBoundingClientRect(); return { x: Math.round(r.x), y: Math.round(r.y) }; };
-    return {
-      auf: [kasten('mb_aufenthaltsbewilligung'), kasten('mb_aufenthalt_gueltig_bis')],
-      arb: [kasten('mb_arbeitsbewilligung'), kasten('mb_arbeit_gueltig_bis')],
-      die: [kasten('mb_dienstausweis_nr'), kasten('mb_dienstausweis_gueltig_bis')],
-      zemisY: kasten('mb_zemis_nr').y,
-    };
-  });
+  // Die drei Paare liegen seit ENT-287 in ZWEI Bereichen: Ausweise bei
+  // "Person", der Dienstausweis bei "Einsatz". Gemessen wird jedes dort, wo
+  // es sichtbar ist -- an einem ausgeblendeten Feld misst man nur Nullen,
+  // und die fluchten immer.
+  const kastenAuf = async (ids) => page.evaluate((liste) => liste.map(id => {
+    const r = document.getElementById(id).closest('.f').getBoundingClientRect();
+    return { x: Math.round(r.x), y: Math.round(r.y), breite: Math.round(r.width) };
+  }), ids);
+
+  await page.click('#mbtab-person');
+  await page.waitForTimeout(200);
+  const [aufA, aufB, arbA, arbB, zemis] = await kastenAuf([
+    'mb_aufenthaltsbewilligung', 'mb_aufenthalt_gueltig_bis',
+    'mb_arbeitsbewilligung', 'mb_arbeit_gueltig_bis', 'mb_zemis_nr']);
+  await page.click('#mbtab-einsatz');
+  await page.waitForTimeout(200);
+  const [dieA, dieB] = await kastenAuf(['mb_dienstausweis_nr', 'mb_dienstausweis_gueltig_bis']);
+  await page.click('#mbtab-person');
+  await page.waitForTimeout(200);
+  const paare = { auf: [aufA, aufB], arb: [arbA, arbB], die: [dieA, dieB], zemisY: zemis.y };
+  // Ein ausgeblendetes Feld misst 0 -- dann waere jede Aussage unten
+  // bedeutungslos. Darum zuerst: es wurde wirklich etwas gemessen.
+  check('KRITISCH: alle Paare wurden im sichtbaren Zustand gemessen, nicht als Nullen',
+    [aufA, aufB, arbA, arbB, dieA, dieB].every(k => k.breite > 0));
   const nebenan = ([a, b]) => a.y === b.y && b.x > a.x;
   check('KRITISCH: "gueltig bis" steht neben der Ausweiskategorie', nebenan(paare.auf));
   check('KRITISCH: "gueltig bis" steht neben der Arbeitsbewilligung', nebenan(paare.arb));
@@ -202,31 +223,53 @@ check('Die AHV-Nummer steht nur hier, nicht in der Liste',
 }
 
 // ══════════════ LAYOUT: keine Loecher, kein Ueberlauf
+//
+// Gemessen wird NUR am offenen Bereich: Ein ausgeblendeter liefert lauter
+// Nullen, und eine Pruefung, die Nullen vergleicht, ist immer gruen. Genau
+// so ist diese Pruefung beim Umbau auf Bereiche (ENT-287) kurzzeitig leer
+// gelaufen -- darum steht unten zusaetzlich, dass ueberhaupt etwas gemessen
+// wurde.
 {
-  const l = await page.evaluate(() => {
-    const sp = [...document.querySelectorAll('#mbKarten > .ma-spalte')];
-    const bloecke = sp.map(c => [...c.querySelectorAll('.ma-block')]
-      .map(b => ({ id: b.dataset.abschnitt, x: Math.round(b.getBoundingClientRect().x),
-                   y: Math.round(b.getBoundingClientRect().y) })));
-    // In einer Spalte muessen alle Bloecke denselben linken Rand haben und
-    // streng untereinander stehen -- das ist die Ordnung, die vorher fehlte.
-    const buendig = bloecke.every(b => new Set(b.map(x => x.x)).size === 1);
-    const untereinander = bloecke.every(b => b.every((x, i) => i === 0 || x.y > b[i - 1].y));
-    return { spalten: sp.length, buendig, untereinander,
-      erste: bloecke.map(b => b[0] && b[0].id),
-      ueberbreit: document.documentElement.scrollWidth > document.documentElement.clientWidth };
-  });
-  check('Auf 1600 px stehen drei Spalten nebeneinander', l.spalten === 3);
-  check('KRITISCH: in jeder Spalte fluchten alle Abschnitte am linken Rand', l.buendig);
-  check('KRITISCH: die Abschnitte stehen streng untereinander, nicht versetzt', l.untereinander);
+  const je = {};
+  for (const b of ['person', 'anstellung', 'einsatz', 'zugang']) {
+    await page.click('#mbtab-' + b);
+    await page.waitForTimeout(200);
+    je[b] = await page.evaluate(() => {
+      const sp = [...document.querySelectorAll('#mbKarten .mb-bereich.on > .ma-spalten > .ma-spalte')];
+      const bloecke = sp.map(c => [...c.querySelectorAll('.ma-block')]
+        .map(b => ({ id: b.dataset.abschnitt, x: Math.round(b.getBoundingClientRect().x),
+                     y: Math.round(b.getBoundingClientRect().y) })));
+      // In einer Spalte muessen alle Bloecke denselben linken Rand haben und
+      // streng untereinander stehen -- das ist die Ordnung, die vorher fehlte.
+      const buendig = bloecke.every(b => new Set(b.map(x => x.x)).size === 1);
+      const untereinander = bloecke.every(b => b.every((x, i) => i === 0 || x.y > b[i - 1].y));
+      return { spalten: sp.length, gemessen: bloecke.flat().length, buendig, untereinander,
+        erste: bloecke.map(b => b[0] && b[0].id),
+        ueberbreit: document.documentElement.scrollWidth > document.documentElement.clientWidth };
+    });
+  }
+  check('KRITISCH: es wurde ueberhaupt etwas gemessen -- keine leere Pruefung',
+    Object.values(je).every(x => x.gemessen > 0 && x.spalten >= 1));
+  check('KRITISCH: in jeder Spalte fluchten alle Abschnitte am linken Rand',
+    Object.values(je).every(x => x.buendig));
+  check('KRITISCH: die Abschnitte stehen streng untereinander, nicht versetzt',
+    Object.values(je).every(x => x.untereinander));
   check('Person und Adresse steht oben links -- der wichtigste Abschnitt zuerst',
-    l.erste[0] === 'person');
-  check('Nichts laeuft seitlich ueber', !l.ueberbreit);
+    je.person.erste[0] === 'person');
+  check('Auf 1600 px stehen in "Person" zwei Spalten nebeneinander', je.person.spalten === 2);
+  check('Nichts laeuft seitlich ueber', Object.values(je).every(x => !x.ueberbreit));
+  await page.click('#mbtab-person');
+  await page.waitForTimeout(200);
 }
 
 // ══════════════ SPEICHERN
 {
+  // Wie ein Planer es tut: Name auf "Person", Haken auf "Einsatz" (ENT-287),
+  // dann EINMAL speichern. Genau daran zeigt sich, ob ein Bereichswechsel
+  // die schon getippte Aenderung mitnimmt.
   await page.fill('#mb_nachname', 'Neuername');
+  await page.click('#mbtab-einsatz');
+  await page.waitForTimeout(200);
   await page.uncheck('#mb_diensthundefuehrer');
   await page.click('#mbSpeichern');
   await page.waitForTimeout(400);
@@ -334,26 +377,38 @@ check('Die AHV-Nummer steht nur hier, nicht in der Liste',
 
 // ══════════════ LESEANSICHT DER AKTE
 {
-  // Seit ENT-073 ist die vollstaendige Leseansicht der Reiter
-  // "Personaldossier"; die Uebersicht zeigt nur noch wenige Container.
+  // Seit ENT-287 ist die vollstaendige Leseansicht auf vier Reiter verteilt
+  // (Person, Anstellung, Einsatz, Zugang); die Uebersicht zeigt nur noch
+  // wenige Container. Erst alle vier oeffnen -- ein Bereich wird gezeichnet,
+  // wenn man ihn zum ersten Mal aufschlaegt, und bleibt danach im Dokument.
   await page.evaluate(() => { go('mitarbeiter'); openMaDetail('mitarbeiter-a'); });
   await page.waitForTimeout(700);
-  await page.click('#mdtab-dossier');
-  await page.waitForTimeout(400);
+  for (const b of ['person', 'anstellung', 'einsatz', 'zugang']) {
+    await page.click('#mdtab-' + b);
+    await page.waitForTimeout(300);
+  }
   const d = await page.evaluate(() => {
-    const zeile = t => { const dt = [...document.querySelectorAll('#mdDossier dt')].find(x => x.textContent === t);
+    // Ueber ALLE Bereiche hinweg: Die Angabe muss auffindbar sein, egal auf
+    // welchem Reiter sie steht -- verschiebt jemand einen Abschnitt in einen
+    // anderen Bereich, bleibt diese Pruefung zu Recht gruen, verschwindet
+    // die Angabe ganz, wird sie rot.
+    const q = s => [...document.querySelectorAll('[id^=mdBereich_] ' + s)];
+    const zeile = t => { const dt = q('dt').find(x => x.textContent === t);
       return dt ? dt.nextElementSibling.textContent.replace(/\s+/g, ' ').trim() : null; };
     return {
-      karten: [...document.querySelectorAll('#mdDossier .ma-block > h3')].map(h => h.textContent),
+      karten: [...document.querySelectorAll('#mdBereich_person .ma-block > h3')].map(h => h.textContent),
+      abschnitte: q('.ma-block').map(b => b.dataset.abschnitt),
       geburt: zeile('Geburtsdatum'), ahv: zeile('AHV-Nummer'),
       strasse: zeile('Strasse'), ort: zeile('PLZ und Ort'),
       funktion: zeile('Funktion'), standort: zeile('Standort'),
       fa: zeile('Eidg. Fachausweis'), berechtigt: zeile('Berechtigt für'),
       ausweis: zeile('Ausweiskategorie'), dienst: zeile('Dienstausweis'),
-      leerzeilen: [...document.querySelectorAll('#mdDossier dd')].filter(x => x.textContent.trim() === '–').length,
-      abgelaufen: [...document.querySelectorAll('#mdDossier .chip-x')].map(c => c.textContent),
-      bald: [...document.querySelectorAll('#mdDossier .chip-w')].map(c => c.textContent),
-      spalten: document.querySelectorAll('#mdDossier > .ma-spalten > .ma-spalte').length,
+      leerzeilen: q('dd').filter(x => x.textContent.trim() === '–').length,
+      abgelaufen: q('.chip-x').map(c => c.textContent),
+      bald: q('.chip-w').map(c => c.textContent),
+      buendig: [...document.querySelectorAll('[id^=mdBereich_] > .ma-spalten > .ma-spalte')]
+        .every(sp => new Set([...sp.querySelectorAll('.ma-block')]
+          .map(x => Math.round(x.getBoundingClientRect().x))).size <= 1),
     };
   });
   check('KRITISCH: die Detailseite zeigt das Geburtsdatum, statt "–" wie vor ENT-072',
@@ -375,8 +430,8 @@ check('Die AHV-Nummer steht nur hier, nicht in der Liste',
   check('KRITISCH: leere Felder stehen gar nicht da statt als Reihe von Strichen',
     d.leerzeilen === 0);
   check('Die Leseansicht folgt denselben Abschnitten wie die Bearbeitung',
-    d.karten.length >= 6 && d.karten[0] === 'Person und Adresse');
-  check('Auch die Leseansicht steht in drei Spalten', d.spalten === 3);
+    d.abschnitte.length >= 6 && d.karten[0] === 'Person und Adresse');
+  check('Auch die Leseansicht steht in buendigen Spalten', d.buendig);
 }
 
 // ══════════════ LISTE AUF DEN NEUEN FELDERN
@@ -503,6 +558,10 @@ check('Die AHV-Nummer steht nur hier, nicht in der Liste',
     // Seit ENT-077 Rollen statt Admin-Haekchen.
     await page.check('#mbNeuRolle_verwaltung');
     await page.fill('#mb_ahv_nr', '756.1234.5678.97');
+    // AHV steht bei "Person", der Fachausweis bei "Einsatz" (ENT-287) --
+    // auch beim ANLEGEN muss ein Bereichswechsel beides behalten.
+    await page.click('#mbtab-einsatz');
+    await page.waitForTimeout(200);
     await page.selectOption('#mb_fachausweis', 'Bewachung');
     await page.click('#mbSpeichern');
     await page.waitForTimeout(800);
@@ -581,12 +640,14 @@ check('Die AHV-Nummer steht nur hier, nicht in der Liste',
 {
   await page.evaluate(() => { go('mitarbeiter'); openMaDetail('mitarbeiter-a'); });
   await page.waitForTimeout(700);
-  await page.click('#mdtab-dossier');
-  await page.waitForTimeout(400);
+  for (const b of ['person', 'anstellung', 'einsatz', 'zugang']) {
+    await page.click('#mdtab-' + b);
+    await page.waitForTimeout(300);
+  }
   const n = await page.evaluate(() => ({
-    text: document.getElementById('mdDossier').textContent,
-    abgelaufen: [...document.querySelectorAll('#mdDossier .chip-x')].length,
-    zeilen: [...document.querySelectorAll('#mdDossier dt')].map(d => d.textContent),
+    text: [...document.querySelectorAll('[id^=mdBereich_]')].map(e => e.textContent).join(' '),
+    abgelaufen: document.querySelectorAll('[id^=mdBereich_] .chip-x').length,
+    zeilen: [...document.querySelectorAll('[id^=mdBereich_] dt')].map(d => d.textContent),
   }));
   check('KRITISCH: kein "00.00.0000" in der Leseansicht', !/00\.00\.0000/.test(n.text));
   check('KRITISCH: ein Nulldatum steht gar nicht da, statt als leeres Feld',
@@ -604,6 +665,12 @@ check('Die AHV-Nummer steht nur hier, nicht in der Liste',
   await page.waitForTimeout(400);
   check('KRITISCH: es wird auch kein Nulldatum zurueckgeschrieben',
     gesendet && gesendet.heiratsdatum === '' && gesendet.austritt === '');
+  // Seit der Aufteilung in Bereiche (ENT-287) steht "austritt" auf einem
+  // ANDEREN Reiter als der offene: Beim Speichern muss es trotzdem
+  // mitgehen. Ginge nur der sichtbare Bereich mit, leerte ein Speichern
+  // stillschweigend alle Felder der anderen drei.
+  check('KRITISCH: ein Speichern schickt auch die Felder der nicht offenen Bereiche mit (ENT-287)',
+    gesendet && 'austritt' in gesendet && 'fachausweis' in gesendet && 'sprache' in gesendet);
   await page.waitForTimeout(300);
 }
 

@@ -82,17 +82,24 @@ const oeffnen = async () => {
 };
 await oeffnen();
 
-// ══════════════ DER REITER
+// ══════════════ DIE REITER (ENT-287)
 {
   const t = await page.evaluate(() => [...document.querySelectorAll('#mdTabs .tab')].map(x => x.textContent));
-  check('Es gibt einen Reiter "Personaldossier" neben der Übersicht',
-    t[0] === 'Übersicht' && t[1] === 'Personaldossier');
+  check('KRITISCH: die Sachbereiche stehen flach in der Reiterleiste, nicht unter einem Sammelreiter',
+    t[0] === 'Übersicht' && ['Person', 'Anstellung', 'Einsatz', 'Zugang'].every(x => t.includes(x)));
+  check('KRITISCH: der alte Sammelreiter "Personaldossier" ist wirklich weg, nicht nur versteckt',
+    !t.includes('Personaldossier')
+    && await page.evaluate(() => document.getElementById('mdtab-dossier') === null
+      && document.getElementById('md-dossier') === null));
   // KEINE Pruefung auf den Kommentar im Quelltext: Eine Pruefung, die den
   // Quelltext abschreibt, prueft nichts -- sie friert ihn ein. Geprueft wird
-  // stattdessen, dass der Reiter existiert und seinen eigenen Inhalt hat.
-  check('Der Reiter hat einen eigenen Bereich, nicht denselben wie die Übersicht',
-    await page.evaluate(() => !!document.getElementById('md-dossier')
-      && document.getElementById('md-dossier') !== document.getElementById('md-uebersicht')));
+  // stattdessen, dass jeder Bereich seine eigene Flaeche hat.
+  check('Jeder Bereich hat eine eigene Flaeche, keine geteilte mit der Übersicht',
+    await page.evaluate(() => {
+      const ids = ['person', 'anstellung', 'einsatz', 'zugang'].map(b => document.getElementById('md-' + b));
+      return ids.every(Boolean) && new Set(ids).size === 4
+        && !ids.includes(document.getElementById('md-uebersicht'));
+    }));
 }
 
 // ══════════════ UEBERSICHT: WENIG, ABER NICHT ZU WENIG
@@ -120,31 +127,66 @@ await oeffnen();
     /Ausweiskategorie/.test(u.status) && /Dienstausweis/.test(u.status));
 }
 
-// ══════════════ DAS DOSSIER ZEIGT ALLES
+// ══════════════ DIE VIER BEREICHE ZEIGEN ZUSAMMEN ALLES (ENT-287)
+//
+// Die teuerste Art, eine Akte aufzuteilen, ist die, bei der ein Abschnitt
+// zwischen zwei Bereiche faellt: Er ist dann nirgends mehr zu sehen, und
+// niemandem faellt auf, WELCHER fehlt. Darum wird hier nicht "es steht viel
+// da" geprueft, sondern die Bilanz: jeder Abschnitt genau einmal.
 {
-  await page.click('#mdtab-dossier');
-  await page.waitForTimeout(400);
-  const d = await page.evaluate(() => ({
-    karten: [...document.querySelectorAll('#mdDossier .ma-block > h3')].map(h => h.textContent),
-    text: document.getElementById('mdDossier').textContent,
-    werkzeuge: document.querySelectorAll('#mdDossier .dash-werk').length,
-    anpassen: getComputedStyle(document.getElementById('btnMdBearbeiten')).display,
-    spalten: document.querySelectorAll('#mdDossier > .ma-spalten > .ma-spalte').length,
-    buendig: [...document.querySelectorAll('#mdDossier > .ma-spalten > .ma-spalte')]
-      .every(sp => new Set([...sp.querySelectorAll('.ma-block')]
-        .map(b => Math.round(b.getBoundingClientRect().x))).size <= 1),
+  const je = {};
+  for (const b of ['person', 'anstellung', 'einsatz', 'zugang']) {
+    await page.click('#mdtab-' + b);
+    await page.waitForTimeout(300);
+    je[b] = await page.evaluate((id) => {
+      const wurzel = document.getElementById('mdBereich_' + id);
+      return {
+        karten: [...wurzel.querySelectorAll('.ma-block > h3')].map(h => h.textContent),
+        abschnitte: [...wurzel.querySelectorAll('.ma-block')].map(b => b.dataset.abschnitt),
+        text: wurzel.textContent,
+        werkzeuge: wurzel.querySelectorAll('.dash-werk').length,
+        anpassen: getComputedStyle(document.getElementById('btnMdBearbeiten')).display,
+        spalten: wurzel.querySelectorAll(':scope > .ma-spalten > .ma-spalte').length,
+        buendig: [...wurzel.querySelectorAll(':scope > .ma-spalten > .ma-spalte')]
+          .every(sp => new Set([...sp.querySelectorAll('.ma-block')]
+            .map(x => Math.round(x.getBoundingClientRect().x))).size <= 1),
+      };
+    }, b);
+  }
+  const alle = Object.values(je).flatMap(x => x.abschnitte);
+  // Nicht "es sind genug" -- das bliebe gruen, wenn ein Abschnitt still
+  // verschwindet (genau das ist beim Bauen passiert, die erste Fassung
+  // dieser Pruefung zaehlte nur >= 6 und merkte nichts). Geprueft wird die
+  // Zuordnung selbst: JEDER Abschnitt gehoert zu einem der vier Bereiche.
+  const zuordnung = await page.evaluate(() => ({
+    bereiche: MB_BEREICHE.map(b => b[0]),
+    ohneBereich: MB_ABSCHNITTE.filter(a => !MB_BEREICHE.some(b => b[0] === a.bereich)).map(a => a.id),
   }));
-  check('KRITISCH: das Dossier zeigt alle erfassten Abschnitte', d.karten.length >= 6);
-  check('KRITISCH: es steht in drei buendigen Spalten, nicht als Kachelfeld (ENT-074)',
-    d.spalten === 3 && d.buendig);
-  check('Person und Adresse steht oben links', d.karten[0] === 'Person und Adresse');
-  check('KRITISCH: die AHV-Nummer steht im Dossier -- dort gehoert sie hin',
-    d.text.includes('756.1234.5678.97'));
-  check('Auch Kurzzeichen und Zivilstand stehen dort',
-    /Kurzzeichen/.test(d.text) && /Zivilstand/.test(d.text));
-  check('KRITISCH: im Dossier laesst sich NICHTS ausblenden', d.werkzeuge === 0);
-  check('Der Anpassen-Knopf verschwindet auf dem Dossier', d.anpassen === 'none');
-
+  check('KRITISCH: jeder Abschnitt der Akte ist einem der vier Bereiche zugeordnet -- keiner faellt zwischen zwei Reiter',
+    zuordnung.ohneBereich.length === 0);
+  if (zuordnung.ohneBereich.length) { bad.push('ohne Bereich: ' + zuordnung.ohneBereich.join(', ')); }
+  check('Die vier Bereiche sind die erwarteten',
+    JSON.stringify(zuordnung.bereiche) === JSON.stringify(['person', 'anstellung', 'einsatz', 'zugang']));
+  check('Zusammen zeigen die Bereiche die erfassten Abschnitte', alle.length >= 6);
+  check('KRITISCH: kein Abschnitt steht in zwei Bereichen gleichzeitig',
+    new Set(alle).size === alle.length);
+  check('KRITISCH: jeder Bereich steht in buendigen Spalten, nicht als Kachelfeld (ENT-074)',
+    Object.values(je).every(x => x.spalten >= 1 && x.buendig));
+  check('Person und Adresse steht oben links im Bereich "Person"',
+    je.person.karten[0] === 'Person und Adresse');
+  check('KRITISCH: die AHV-Nummer steht bei der Person -- dort gehoert sie hin, nicht auf der Übersicht',
+    je.person.text.includes('756.1234.5678.97'));
+  check('KRITISCH: was nichts mit Personalien zu tun hat, steht NICHT mehr bei der Person (ENT-287)',
+    !/Rollen/.test(je.person.text) && !/Login-Name/.test(je.person.text)
+    && !je.person.abschnitte.includes('einsatzbereich'));
+  check('Zivilstand steht bei der Person, Kurzzeichen bei der Anstellung',
+    /Zivilstand/.test(je.person.text) && /Kurzzeichen/.test(je.anstellung.text));
+  check('Rollen und Sprache stehen im Bereich "Zugang"',
+    /Rollen/.test(je.zugang.text) && /Sprache/.test(je.zugang.text));
+  check('KRITISCH: in keinem Bereich laesst sich etwas ausblenden',
+    Object.values(je).every(x => x.werkzeuge === 0));
+  check('Der Anpassen-Knopf verschwindet auf allen vier Bereichen',
+    Object.values(je).every(x => x.anpassen === 'none'));
 }
 
 // ══════════════ ANORDNEN
@@ -240,7 +282,7 @@ await oeffnen();
 {
   await page.click('#btnMdBearbeiten');
   await page.waitForTimeout(300);
-  await page.click('#mdtab-dossier');
+  await page.click('#mdtab-person');
   await page.waitForTimeout(400);
   check('KRITISCH: der Reiterwechsel beendet den Bearbeitungsmodus',
     await page.evaluate(() => ordAktiv === null

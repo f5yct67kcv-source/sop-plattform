@@ -203,10 +203,17 @@ try {
   await page.waitForTimeout(800);
   await page.evaluate(() => mdBearbeiten());
   await page.waitForTimeout(600);
+  // Seit ENT-287 liegen die Rollen im Bereich "Zugang" -- nicht mehr am Ende
+  // der Personalien. Der Weg dorthin ist ein Reiterklick, wie beim Planer.
+  await page.click('#mbtab-zugang');
+  await page.waitForTimeout(300);
 
   check('KRITISCH: die Rollen werden in der Personalakte vergeben, nicht in einem eigenen Bereich',
     await page.evaluate(() => !!document.getElementById('maRolle_verwaltung')
       && !!document.getElementById('mv-bearbeiten').contains(document.getElementById('maRolle_verwaltung'))));
+  check('KRITISCH: die Rollen stehen im Bereich "Zugang", nicht bei den Personalien (ENT-287)',
+    await page.evaluate(() => document.getElementById('maRolle_verwaltung')
+      .closest('.mb-bereich').dataset.bereich === 'zugang'));
   check('Alle fünf Rollen stehen zur Wahl, Wächtersystem eingeschlossen (ENT-285)',
     await page.evaluate(() => ['mitarbeitend', 'planung', 'personal', 'verwaltung', 'waechter']
       .every(r => !!document.getElementById('maRolle_' + r))));
@@ -230,6 +237,8 @@ try {
   await page.waitForTimeout(700);
   await page.evaluate(() => mdBearbeiten());
   await page.waitForTimeout(500);
+  await page.click('#mbtab-zugang');
+  await page.waitForTimeout(300);
   gesendet = null;
   await page.evaluate(() => {
     ['mitarbeitend', 'planung', 'personal', 'verwaltung', 'waechter'].forEach(r => {
@@ -262,6 +271,8 @@ try {
 
   await page.evaluate(() => mdBearbeiten());
   await page.waitForTimeout(600);
+  await page.click('#mbtab-zugang');
+  await page.waitForTimeout(300);
   check('KRITISCH: das Waechtersystem-Kaestchen steht in derselben Liste wie die anderen vier Rollen',
     await page.evaluate(() => document.getElementById('mv-bearbeiten')
       .contains(document.getElementById('maRolle_waechter'))));
@@ -283,6 +294,8 @@ try {
   await page.waitForTimeout(700);
   await page.evaluate(() => mdBearbeiten());
   await page.waitForTimeout(500);
+  await page.click('#mbtab-zugang');
+  await page.waitForTimeout(300);
   check('Mit der Rolle ist das Kaestchen angehakt', await page.isChecked('#maRolle_waechter'));
 
   gesendet = null;

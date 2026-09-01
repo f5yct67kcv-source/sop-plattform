@@ -2515,6 +2515,17 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 .ma-spalten { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
   gap: 0 40px; align-items: start; }
 .ma-spalte { min-width: 0; }
+/* Ein Bereich mit nur einem Abschnitt (heute "Zugang") ergibt eine einzige
+   Spalte -- die sonst ueber die volle Bildschirmbreite liefe und aus einer
+   Sprachauswahl ein 600 px breites Feld machte. Gemessen bei 1440 px, nicht
+   geschaetzt. Auf schmalen Geraeten greift die Grenze nie. */
+.ma-spalte:only-child { max-width: 760px; }
+/* Die vier Bereiche der Bearbeitung (ENT-287). Ausgeblendet, nicht entfernt:
+   Die Felder muessen im Dokument bleiben, damit ein Speichern weiterhin
+   ALLES speichert. `display:none` und nicht `visibility`, sonst bliebe der
+   Platz stehen. */
+.mb-bereich { display: none; }
+.mb-bereich.on { display: block; }
 .ma-block { margin-bottom: 28px; }
 .ma-block:last-child { margin-bottom: 0; }
 /* Ueberschrift plus Linie ueber die volle Spaltenbreite -- sie trennt die
@@ -3955,7 +3966,10 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
                Feiertags-Knopf in der Planung (ENT-038). -->
           <div class="tabs md-tabs" id="mdTabs" style="margin-bottom:14px">
             <button class="tab on" id="mdtab-uebersicht" onclick="mdGoTab('uebersicht')">Übersicht</button>
-            <button class="tab" id="mdtab-dossier" onclick="mdGoTab('dossier')">Personaldossier</button>
+            <button class="tab" id="mdtab-person" onclick="mdGoTab('person')">Person</button>
+            <button class="tab" id="mdtab-anstellung" onclick="mdGoTab('anstellung')">Anstellung</button>
+            <button class="tab" id="mdtab-einsatz" onclick="mdGoTab('einsatz')">Einsatz</button>
+            <button class="tab" id="mdtab-zugang" onclick="mdGoTab('zugang')">Zugang</button>
             <button class="tab" id="mdtab-dienstplaene" onclick="mdGoTab('dienstplaene')">Dienstpläne</button>
             <button class="tab" id="mdtab-verlauf" onclick="mdGoTab('verlauf')" style="display:none">Verlauf</button>
             <div style="flex:1"></div>
@@ -3979,13 +3993,18 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
             <div class="dash-flow" id="mdFlow" ondragover="ordDragUeber(event)" ondrop="ordDropFlaeche(event)"></div>
             <div id="mdLeer" style="display:none"></div>
           </div>
-          <!-- Personaldossier: alle Abschnitte, fest und vollstaendig. NICHT
-               konfigurierbar -- ein ausgeblendetes Feld waere hier nicht von
-               einem leeren zu unterscheiden, und genau das darf das Werkzeug
-               nirgends erzeugen. -->
-          <div class="md-tab" id="md-dossier">
-            <div id="mdDossier"></div>
-          </div>
+          <!-- Die vier Sachbereiche der Akte (ENT-287). Bis dahin lag alles
+               unter EINEM Reiter "Personaldossier" -- Login, Rollen und
+               Einsatzbereiche zuunterst in der dritten Spalte, also dort, wo
+               sie niemand sucht, der nicht schon weiss, dass sie dort sind.
+               Jeder Bereich ist fest und vollstaendig, NICHT konfigurierbar:
+               ein ausgeblendetes Feld waere hier nicht von einem leeren zu
+               unterscheiden, und genau das darf das Werkzeug nirgends
+               erzeugen. -->
+          <div class="md-tab" id="md-person"><div id="mdBereich_person"></div></div>
+          <div class="md-tab" id="md-anstellung"><div id="mdBereich_anstellung"></div></div>
+          <div class="md-tab" id="md-einsatz"><div id="mdBereich_einsatz"></div></div>
+          <div class="md-tab" id="md-zugang"><div id="mdBereich_zugang"></div></div>
           <!-- Verlauf: wer wann was geaendert hat (ENT-077). Nur lesend --
                ein Logbuch, aus dem sich Eintraege entfernen lassen, waere
                keines. -->
@@ -4042,7 +4061,14 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
                zu uebersehen. Beim Bearbeiten ist das Band leer -- der Login
                steht dann als Angabe in der Karte "Zugang". -->
           <div id="mbNeuKonto"></div>
-          <div class="ma-spalten" id="mbKarten"></div>
+          <!-- Dieselben vier Bereiche wie in der Leseansicht (ENT-287).
+               ALLE Felder bleiben im Dokument, auch die der ausgeblendeten
+               Bereiche -- nur so speichert der eine Speichern-Knopf weiterhin
+               alles auf einmal, und ein Reiterwechsel verliert nie eine
+               Eingabe. Das Raster `.ma-spalten` sitzt darum je Bereich innen,
+               nicht aussen um alle vier herum. -->
+          <div class="tabs" id="mbTabs" style="margin-bottom:14px"></div>
+          <div id="mbKarten"></div>
         </div>
       </section>
 
@@ -10050,7 +10076,9 @@ function openMaDetail(name) {
     .catch(e => {
       $('mdHinweis').innerHTML = `<div class="msg-err">${esc(e.message)}</div>`;
       $('mdFlow').innerHTML = '';
-      $('mdDossier').innerHTML = '';
+      // Alle vier Bereiche, nicht nur einen: Bliebe einer stehen, zeigte er
+      // die zuletzt geoeffnete Person unter dem Namen der gescheiterten.
+      MB_BEREICHE.forEach(([id]) => { const el = $('mdBereich_' + id); if (el) { el.innerHTML = ''; } });
     });
 }
 function mdGoTab(t) {
@@ -10143,7 +10171,7 @@ function renderMaDetail() {
     + (Number(p.ist_admin) ? ' · Verwaltung' : '');
 
   if (mdTab === 'uebersicht') { mdUebersicht(); return; }
-  if (mdTab === 'dossier') { mdDossier(); return; }
+  if (MB_BEREICHE.some(b => b[0] === mdTab)) { mdDossier(mdTab); return; }
   if (mdTab === 'verlauf') { mdVerlauf(); return; }
   mdDienstplaene();
 }
@@ -10344,9 +10372,11 @@ function mdUebersicht() {
 }
 
 // ── Personaldossier: alles, fest ─────────────────────────────────────────
-function mdDossier() {
+function mdDossier(bereich) {
+  const ziel = $('mdBereich_' + bereich);
+  if (!ziel) { return; }
   if (!maAkte) {
-    $('mdDossier').innerHTML = '<div style="color:var(--ink-3)">Wird geladen …</div>';
+    ziel.innerHTML = '<div style="color:var(--ink-3)">Wird geladen …</div>';
     return;
   }
   const m = maAkte;
@@ -10357,11 +10387,14 @@ function mdDossier() {
     if (!zeilen) { return ''; }              // Leere Abschnitte fallen weg
     return `<div class="ma-block" data-abschnitt="${esc(a.id)}">
       <h3>${esc(a.titel)}</h3><dl class="ku-detail-info">${zeilen}</dl></div>`;
-  });
+  }, bereich);
 
-  $('mdDossier').innerHTML = mdEinrichtungshinweis() + (spalten
+  // "In diesem Bereich nichts erfasst" ist etwas anderes als "zu dieser
+  // Person ist nichts erfasst" -- der Text nennt darum den Bereich.
+  ziel.innerHTML = mdEinrichtungshinweis() + (spalten
     ? `<div class="ma-spalten">${spalten}</div>`
-    : EMPTY('Noch nichts erfasst', 'Über „Bearbeiten“ lassen sich die Angaben zu dieser Person eintragen.'));
+    : EMPTY(`Unter „${bereichTitel(bereich)}“ noch nichts erfasst`,
+            'Über „Bearbeiten“ lassen sich die Angaben zu dieser Person eintragen.'));
 }
 
 // "Nichts erfasst" und "Felder fehlen in der Datenbank" sind zwei
@@ -18899,7 +18932,8 @@ function revierWarnungZeigen(personen, weiterMachenFn) {
   $('rwZurAkte').onclick = () => {
     closeDlg('dlgRevierWarnung');
     go('mitarbeiter');
-    mbOeffnen(personen[0].login_name);
+    // Direkt auf "Einsatz": Dort steht die Berechtigung, um die es hier geht.
+    mbOeffnen(personen[0].login_name, null, 'einsatz');
   };
   openDlg('dlgRevierWarnung');
 }
@@ -19690,9 +19724,23 @@ const kuId = f => 'ku_' + f;
 // aller Benutzer.
 // f  = einzeilig | d = Datum | z = Zahl | a = Auswahl | j = Ja/Nein
 // b  = breit (ganze Zeile)
+//
+// `bereich` (ENT-287) teilt die Akte in vier Reiter statt einer einzigen
+// langen Flaeche. Vorher stand alles untereinander, und die Angaben, die
+// NICHTS mit Personalien zu tun haben -- Login, Rollen, Einsatzbereiche --
+// lagen zuunterst in der dritten Spalte. `spalte` gilt jetzt INNERHALB
+// eines Bereichs, nicht mehr ueber die ganze Akte.
+const MB_BEREICHE = [
+  ['person',     'Person',     'Wer die Person ist, wie man sie erreicht, was amtlich über sie vorliegt.'],
+  ['anstellung', 'Anstellung', 'Was zwischen Betrieb und Person vereinbart ist.'],
+  ['einsatz',    'Einsatz',    'Was die Person auf Schicht darf — was beim Einteilen zählt.'],
+  ['zugang',     'Zugang',     'Wie die Person ins System kommt und was sie darin darf.'],
+];
+const bereichTitel = id => (MB_BEREICHE.find(b => b[0] === id) || [id, id])[1];
+
 const MB_ABSCHNITTE = [
-  // ── Spalte 1: wer die Person ist und wie man sie erreicht ────────────
-  { id: 'person', spalte: 1, titel: 'Person und Adresse', felder: [
+  // ── Person ───────────────────────────────────────────────────────────
+  { id: 'person', bereich: 'person', spalte: 1, titel: 'Person und Adresse', felder: [
     ['anrede',         'Anrede',         'a', ['Herr', 'Frau', 'Divers']],
     ['geschlecht',     'Geschlecht',     'a', ['weiblich', 'maennlich', 'unbestimmt']],
     ['vorname',        'Vorname',        'f'],
@@ -19706,7 +19754,7 @@ const MB_ABSCHNITTE = [
     ['ort',            'Ort',            'f'],
     ['land',           'Land',           'f'],
   ]},
-  { id: 'kontakt', spalte: 1, titel: 'Kontakt', felder: [
+  { id: 'kontakt', bereich: 'person', spalte: 1, titel: 'Kontakt', felder: [
     ['email',             'E-Mail Geschäft',  'f', null, null, true],
     ['email_privat',      'E-Mail privat',    'f', null, null, true],
     ['telefon',           'Telefon privat',   'f'],
@@ -19717,8 +19765,8 @@ const MB_ABSCHNITTE = [
       'Wen anrufen, wenn auf Schicht etwas passiert', true],
   ]},
 
-  // ── Spalte 2: was die Person im Betrieb ist und was hinterlegt ist ───
-  { id: 'betrieb', spalte: 2, titel: 'Betriebliches', felder: [
+  // ── Anstellung ───────────────────────────────────────────────────────
+  { id: 'betrieb', bereich: 'anstellung', spalte: 1, titel: 'Betriebliches', felder: [
     ['personalnummer',    'Personalnummer', 'f'],
     ['kurzzeichen',       'Kurzzeichen',    'f'],
     ['funktion_id',       'Funktion',       'a', 'funktion'],
@@ -19740,7 +19788,7 @@ const MB_ABSCHNITTE = [
   // Block -- so wie es die Referenz des Projektinhabers unter
   // "Versicherungsdaten" führt. Es ist dieselbe Frage: was liegt über
   // diese Person amtlich vor.
-  { id: 'personendaten', spalte: 2, titel: 'Personendaten und Bewilligungen', felder: [
+  { id: 'personendaten', bereich: 'person', spalte: 2, titel: 'Personendaten und Bewilligungen', felder: [
     ['ahv_nr',         'AHV-Nummer',     'f', null, '756.XXXX.XXXX.XX', true],
     ['geburtsdatum',   'Geburtsdatum',   'd'],
     ['nationalitaet',  'Nationalität',   'f'],
@@ -19762,20 +19810,24 @@ const MB_ABSCHNITTE = [
     ['strafregister_datum',    'Auszug Strafregister',   'd'],
     ['betreibung_datum',       'Auszug Betreibungsreg.', 'd'],
   ]},
-  { id: 'dienstausweis', spalte: 2, titel: 'Dienstausweis', felder: [
+  // Beim Einsatz und nicht bei der Person: Der Dienstausweis ist kein
+  // amtliches Dokument ueber die Person, sondern das, was sie auf Schicht
+  // bei sich traegt.
+  { id: 'dienstausweis', bereich: 'einsatz', spalte: 2, titel: 'Dienstausweis', felder: [
     ['dienstausweis_nr',          'Dienstausweis-Nr.', 'f'],
     ['dienstausweis_gueltig_bis', 'gültig bis',        'd'],
   ]},
 
-  // ── Spalte 3: Zugang und was Lohnfolge hat ───────────────────────────
-  { id: 'zugang', spalte: 3, konto: true, titel: 'Zugang', felder: [
+  // ── Zugang ───────────────────────────────────────────────────────────
+  { id: 'zugang', bereich: 'zugang', spalte: 1, konto: true, titel: 'Zugang', felder: [
     ['sprache',    'Sprache',                'a', ['de', 'fr', 'it', 'en']],
     ['zugang_bis', 'Zugang deaktivieren per', 'd'],
   ]},
   // Drittes Feld bei Ja/Nein = Kurzform. In der Eingabe braucht es den ganzen
   // Satz, damit ein Kaestchen eindeutig ist; in Liste und Leseansicht steht
   // dieselbe Berechtigung als Marke.
-  { id: 'qualifikation', spalte: 3, gav: true, titel: 'Qualifikationen mit Lohnfolge', felder: [
+  // ── Einsatz ──────────────────────────────────────────────────────────
+  { id: 'qualifikation', bereich: 'einsatz', spalte: 1, gav: true, titel: 'Qualifikationen mit Lohnfolge', felder: [
     ['fachausweis',    'Eidg. Fachausweis', 'a',
       ['Personenschutz', 'Bewachung', 'Anlaesse', 'Zentralendienste']],
     ['fachausweis_am', 'erworben am',       'd'],
@@ -19792,10 +19844,10 @@ const MB_ABSCHNITTE = [
   // Wächter-Reiter in der App (app.html, waechterSichtbar()) und löst beim
   // Zuteilen auf eine Revierdienst-Schicht ohne diese Berechtigung eine
   // Warnung aus (siehe revierWarnungZeigen()).
-  { id: 'einsatzbereich', spalte: 3, titel: 'Einsatzbereiche', felder: [], janein: [
+  { id: 'einsatzbereich', bereich: 'einsatz', spalte: 1, titel: 'Einsatzbereiche', felder: [], janein: [
     ['revierdienst_berechtigt', 'Darf für Revierdienst (Wächter-Funktionen) eingeteilt werden', 'Revierdienst'],
   ]},
-  { id: 'anstellung', spalte: 3, titel: 'Anstellung nach Art. 8 GAV', felder: [
+  { id: 'anstellung', bereich: 'anstellung', spalte: 2, titel: 'Anstellung nach Art. 8 GAV', felder: [
     ['anstellungskategorie', 'Kategorie',           'a', ['A', 'B', 'C']],
     ['pensum_stunden',       'Jahrespensum (Std.)', 'z'],
   ]},
@@ -19859,6 +19911,7 @@ function mbNeu(felder) {
 
   mbNeuModus = true;
   mbNameBeruehrt = false;
+  mbBereich = MB_BEREICHE[0][0];         // Ein neues Formular faengt vorne an
   mbAend = felder;                       // Diktiertes wird blau markiert
   maAkte = { name: '', ist_admin: false };
   mdName = null;
@@ -19914,8 +19967,13 @@ function mbNameVorschlag() {
 // arbeiten auf DEMSELBEN Datensatz. Zwei eigene Lader waeren zwei Staende
 // derselben Person, und einer zeigte dann noch den Wert, den der andere
 // gerade ueberschrieben hat.
-function mbOeffnen(name, aenderungen) {
+// `bereich` (ENT-287): Wer aus einem bestimmten Anlass hierher kommt, soll
+// auf dem zustaendigen Reiter landen -- etwa die Warnung "keine
+// Revierdienst-Berechtigung" (ENT-284) direkt bei "Einsatz", wo das
+// Haekchen sitzt. Ohne Angabe faengt die Akte vorne an.
+function mbOeffnen(name, aenderungen, bereich) {
   mbNeuModus = false;
+  mbBereich = bereich || MB_BEREICHE[0][0];
   mbAend = aenderungen || {};
   // Seit ENT-072 sind PLZ und Ort zwei Felder. Kommt aus dem Diktat ein
   // gemeinsames "3000 Bern", muss es hier getrennt werden -- sonst schickt
@@ -19974,6 +20032,27 @@ function mbAuswahl(feld, quelle, wert) {
   ).join('');
 }
 
+// Welcher Bereich in der Bearbeitung offen ist (ENT-287). Ueberlebt ein
+// Neuzeichnen -- wer in "Einsatz" ein Haekchen setzt und das Formular
+// zeichnet sich neu, will nicht wieder bei "Person" landen.
+let mbBereich = 'person';
+
+function mbGoBereich(id) {
+  mbBereich = id;
+  mbBereichZeigen();
+}
+
+// Trennt Anzeigen vom Zeichnen: Beim Reiterwechsel wird NICHT neu gezeichnet,
+// sonst gingen die noch nicht gespeicherten Eingaben des offenen Formulars
+// verloren.
+function mbBereichZeigen() {
+  if (!MB_BEREICHE.some(b => b[0] === mbBereich)) { mbBereich = MB_BEREICHE[0][0]; }
+  document.querySelectorAll('#mbTabs .tab').forEach(b =>
+    b.classList.toggle('on', b.id === 'mbtab-' + mbBereich));
+  document.querySelectorAll('#mbKarten .mb-bereich').forEach(d =>
+    d.classList.toggle('on', d.dataset.bereich === mbBereich));
+}
+
 function mbZeichnen() {
   const m = maAkte || {};
   $('mbName').textContent = mbNeuModus ? 'Neuer Mitarbeitender' : (fullName(m) || m.name || '–');
@@ -20023,7 +20102,16 @@ function mbZeichnen() {
       ).join('')}</div>` : ''}
       ${a.konto && !mbNeuModus ? mbKonto() : ''}
     </div>`;
-  $('mbKarten').innerHTML = mbSpalten(block);
+  // Alle vier Bereiche werden gezeichnet, nicht nur der offene: Der
+  // Speichern-Knopf liest die Felder aus dem Dokument, und was nicht da ist,
+  // wuerde beim Speichern als geleert gelten. Ausgeblendet wird per CSS.
+  $('mbKarten').innerHTML = MB_BEREICHE.map(([id]) =>
+    `<div class="mb-bereich" data-bereich="${esc(id)}"><div class="ma-spalten">${mbSpalten(block, id)}</div></div>`
+  ).join('');
+  $('mbTabs').innerHTML = MB_BEREICHE.map(([id, titel]) =>
+    `<button class="tab" id="mbtab-${esc(id)}" onclick="mbGoBereich('${esc(id)}')">${esc(titel)}</button>`
+  ).join('');
+  mbBereichZeigen();
 
   // Was aus dem Diktat kam, wird benannt -- eine blaue Umrandung allein sagt
   // nicht, wonach man suchen soll, wenn neun Karten offen sind.
@@ -20070,13 +20158,20 @@ function mbNeuKonto() {
     </div>`;
 }
 
-// Das Spaltengeruest. Die Zuordnung Abschnitt -> Spalte steht in
+// Das Spaltengeruest. Die Zuordnung Abschnitt -> Bereich -> Spalte steht in
 // MB_ABSCHNITTE und wird hier nur ausgefuehrt -- Erfassungs- und
 // Leseansicht ordnen darum garantiert gleich an. Eine Spalte, die
 // keinen einzigen Block traegt, faellt weg, statt als leere Luecke
 // dazustehen.
-function mbSpalten(bausteinFn) {
-  const spalten = [1, 2, 3].map(nr => MB_ABSCHNITTE.filter(a => (a.spalte || 1) === nr)
+//
+// Ohne `bereich` kommt die ganze Akte -- das braucht niemand mehr in der
+// Oberflaeche, aber eine Pruefung darf so weiterhin alle Abschnitte auf
+// einmal einsammeln, ohne die Bereichsliste nachzubilden.
+function mbSpalten(bausteinFn, bereich) {
+  const abschnitte = bereich
+    ? MB_ABSCHNITTE.filter(a => a.bereich === bereich)
+    : MB_ABSCHNITTE;
+  const spalten = [1, 2, 3].map(nr => abschnitte.filter(a => (a.spalte || 1) === nr)
     .map(bausteinFn).filter(Boolean).join(''));
   return spalten.filter(Boolean).map(inhalt => `<div class="ma-spalte">${inhalt}</div>`).join('');
 }
@@ -20200,7 +20295,13 @@ function mbSpeichern() {
 
   // Fehlerband statt Toast: Bei einer Pruefziffer oder einem Datum will man
   // den Text stehen sehen, waehrend man das Feld sucht.
-  const scheitern = text => {
+  //
+  // Seit die Akte in Bereiche geteilt ist (ENT-287), kann das beanstandete
+  // Feld in einem AUSGEBLENDETEN Bereich liegen. Eine Meldung ueber ein Feld,
+  // das man nicht sieht, ist eine Sackgasse -- darum wird der zustaendige
+  // Bereich mit aufgeschlagen.
+  const scheitern = (text, bereich) => {
+    if (bereich) { mbGoBereich(bereich); }
     mbFehler(text);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -20224,7 +20325,7 @@ function mbSpeichern() {
     if (darf('rechte') && $('maRolle_mitarbeitend')) {
       body.rollen = mbRollenLesen('maRolle_');
       if (!body.rollen.length) {
-        scheitern('Mindestens eine Rolle muss gesetzt sein.');
+        scheitern('Mindestens eine Rolle muss gesetzt sein.', 'zugang');
         return;
       }
     }
