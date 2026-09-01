@@ -55,6 +55,19 @@ const OFFERTE_ANGENOMMEN = { typ: 'offerte', id: 55, zeit: vorMin(8),
 const OFFERTE_ABGELEHNT  = { typ: 'offerte', id: 56, zeit: vorMin(9),
   titel: 'Offerte abgelehnt', nummer: 'OF-0056', kunde: 'Gemeinde Läufelfingen', status: 'abgelehnt' };
 
+// Fuenfte Art (ENT-283, Fortsetzung von ENT-282): eine spontan gestartete
+// Rundgang-Runde ohne vorherige Planung. IMMER ein Ereignis -- ausdrueckliche
+// Vorgabe des Projektinhabers "alle spontanen", nicht nur die mit Grund.
+const RUNDGANG_SPONTAN_MIT_GRUND = { typ: 'rundgang_spontan', id: 70, zeit: vorMin(3),
+  person: { id: 3, name: 'anna', vorname: 'Anna', nachname: 'Muster' },
+  titel: 'Spontaner Rundgang gestartet', datum: MORGEN, von: '08:15', bis: '12:00',
+  kunde: 'Muster AG', ort: 'Musterstadt', einsatzart: 'Revierdienst',
+  ausnahme_grund: 'planer_freigabe' };
+const RUNDGANG_SPONTAN_OHNE_GRUND = { typ: 'rundgang_spontan', id: 71, zeit: vorMin(50),
+  person: { id: 3, name: 'anna', vorname: 'Anna', nachname: 'Muster' },
+  titel: 'Spontaner Rundgang gestartet', datum: MORGEN, von: '12:00', bis: '12:30',
+  kunde: 'Muster AG', ort: 'Musterstadt', einsatzart: 'Revierdienst', ausnahme_grund: null };
+
 const browser = await chromium.launch({ executablePath: EXE });
 const gesendet = [];
 
@@ -428,6 +441,43 @@ try {
     (await p.inputValue('#of_nummer')) === 'OF-0055');
   await p.close();
 } catch (e) { bad.push('Offerte-Ereignis: ' + String(e).split('\n')[0].slice(0, 120)); }
+
+// ══════════════ FUENFTE ART: SPONTANER RUNDGANG-START (ENT-283)
+try {
+  const p = await seite({ ereignisse: [RUNDGANG_SPONTAN_MIT_GRUND, RUNDGANG_SPONTAN_OHNE_GRUND],
+                          ereignisse_gesamt: 2 });
+  const zeilen = await p.$$eval('#ereignisFeed .erg', els => els.map(e =>
+    ({ txt: e.textContent.replace(/\s+/g, ' '), punkt: (e.querySelector('.dot') || {}).className || '' })));
+  check('KRITISCH: die Zeile nennt Person, Kunde und Datum',
+    /Anna Muster.*hat spontan einen Rundgang gestartet.*Muster AG/.test(zeilen[0]?.txt || ''));
+  check('KRITISCH: mit Ausnahme-Grund steht der Grund ausgeschrieben dabei',
+    /Freigabe durch Planer/.test(zeilen[0]?.txt || ''));
+  check('Ohne Ausnahme-Grund bleibt die Zeile ohne Grund-Anhang',
+    /hat spontan einen Rundgang gestartet — Muster AG, \d{2}\.\d{2}\.\d{4}$/.test(zeilen[1]?.txt.replace(/vor.*$/, '').trim() || ''));
+  // 'warn', nicht 'ok': dieselbe Absicht wie die ⚡-Marke in der
+  // Einsatzuebersicht -- der Planer soll es sofort erkennen, nicht ueberlesen.
+  check('KRITISCH: der Punkt ist Warnfarbe, nicht die neutrale "erledigt"-Farbe',
+    zeilen[0]?.punkt.includes('warn') && zeilen[1]?.punkt.includes('warn'));
+
+  const haken = await p.$$eval('#ereignisFeed .rank', els => els.map(e => !!e.querySelector('.rank-erledigt')));
+  check('KRITISCH: auch der spontane Rundgang laesst sich abhaken', haken.every(Boolean));
+
+  gesendet.length = 0;
+  await p.click('#ereignisFeed .rank >> nth=1 >> .rank-erledigt'); await p.waitForTimeout(300);
+  check('KRITISCH: das Abhaken schickt Art und Nummer -- id 71, nicht id 70',
+    gesendet.length === 1 && gesendet[0].typ === 'rundgang_spontan' && gesendet[0].id === 71);
+
+  await p.click('#ereignisFeed .rank >> nth=0'); await p.waitForTimeout(250);
+  const detail = (await p.textContent('#ergDetail0')).replace(/\s+/g, ' ');
+  check('Das Aufklappen zeigt Zeit, Kunde, Ort und den Grund ausgeschrieben',
+    /08:15.*12:00/.test(detail) && /Muster AG/.test(detail) && /Musterstadt/.test(detail)
+    && /Grund.*Freigabe durch Planer/.test(detail));
+  const wege = await p.$$eval('#ergDetail0 .erg-wege .btn', b => b.map(x => x.textContent.trim()));
+  check('KRITISCH: der Weg zur Person ist da -- dieselbe Person wie beim Rapport',
+    wege.includes('Zur Person'));
+  check('Und zum Tagesplan', wege.includes('Zum Tagesplan'));
+  await p.close();
+} catch (e) { bad.push('Spontaner Rundgang-Ereignis: ' + String(e).split('\n')[0].slice(0, 120)); }
 
 // ══════════════ GLOCKE (ENT-197)
 try {

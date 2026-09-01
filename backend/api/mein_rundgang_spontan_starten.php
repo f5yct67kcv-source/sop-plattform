@@ -90,8 +90,8 @@ $pdo->beginTransaction();
 try {
     $ins = $pdo->prepare(
         'INSERT INTO einsaetze (kunde_id, kunde_name, titel, strasse, ort, kanton, einsatzart, sparte,
-                                datum, von, bis, bedarf, status, bemerkung, erstellt_von)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)'
+                                datum, von, bis, bedarf, status, bemerkung, erstellt_von, spontan_erzeugt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, 1)'
     );
     $ins->execute([
         $v['kunde_id'], $v['kunde_name'], 'Spontaner Rundgang: ' . $v['name'],

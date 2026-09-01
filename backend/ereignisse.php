@@ -40,6 +40,10 @@ const EREIGNIS_ARTEN = [
     'zusage'   => ['tabelle' => 'einsatz_zuteilung', 'spalte' => 'zusage_gesehen_am'],
     // Kundenentscheidung zu einer Offerte (ENT-192/ENT-197).
     'offerte'  => ['tabelle' => 'belege',            'spalte' => 'entscheidung_gesehen_am'],
+    // Spontaner Rundgang-Start (ENT-283, Fortsetzung von ENT-282): gesehen_am
+    // sitzt am rundgang-Datensatz, nicht am Einsatz -- er ist das konkrete,
+    // einmalige Geschehnis.
+    'rundgang_spontan' => ['tabelle' => 'rundgang',  'spalte' => 'gesehen_am'],
     // "abwesenheit" bewusst NICHT hier eingetragen: ereignis_erledigt.php
     // prueft nur das Recht 'plan', nicht 'personal_schreiben'. Eine
     // Planungs-Person koennte einen unentschiedenen Antrag sonst aus dem
@@ -168,6 +172,31 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12): array
             'titel' => 'Abwesenheit beantragt',
             'abwesenheitstyp' => $a['typ'], 'von' => $a['von'], 'bis' => $a['bis'],
             'bemerkung' => $a['bemerkung'],
+        ];
+    }
+
+    // ── Spontaner Rundgang gestartet (ENT-283, Fortsetzung von ENT-282): ein
+    // Einsatz, der nicht vom Planer angelegt wurde, sondern durch die eigene
+    // Wahl einer Person in der App entstanden ist. Immer ein Ereignis,
+    // unabhaengig davon, ob dabei ein Ausnahme-Grund noetig war (ausdrueckliche
+    // Vorgabe Projektinhaber: "alle spontanen", nicht nur die Grenzfaelle).
+    foreach (ereignis_lesen($pdo,
+        "SELECT r.id, r.ausnahme_grund, r.vorbereitet_am,
+                e.datum, e.von, e.bis, e.kunde_name, e.titel AS einsatz_titel, e.ort,
+                m.id AS mitarbeiter_id, m.name, m.vorname, m.nachname
+           FROM rundgang r
+           JOIN einsaetze e   ON e.id = r.einsatz_id
+           JOIN mitarbeiter m ON m.id = r.mitarbeiter_id
+          WHERE e.spontan_erzeugt = 1 AND r.gesehen_am IS NULL
+          ORDER BY r.vorbereitet_am DESC LIMIT 20", $fehler, 'rundgang_spontan') as $r) {
+        $liste[] = [
+            'typ' => 'rundgang_spontan', 'id' => (int)$r['id'], 'zeit' => $r['vorbereitet_am'],
+            'person' => ['id' => (int)$r['mitarbeiter_id'], 'name' => $r['name'],
+                         'vorname' => $r['vorname'], 'nachname' => $r['nachname']],
+            'titel' => 'Spontaner Rundgang gestartet',
+            'datum' => $r['datum'], 'von' => $r['von'], 'bis' => $r['bis'],
+            'kunde' => $r['kunde_name'], 'einsatz_titel' => $r['einsatz_titel'], 'ort' => $r['ort'],
+            'ausnahme_grund' => $r['ausnahme_grund'],
         ];
     }
 

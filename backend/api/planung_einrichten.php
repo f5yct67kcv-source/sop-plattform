@@ -1342,6 +1342,18 @@ $spalten = [
     // wurde (ENT-279). NULL heisst: innerhalb des Fensters/der Sollzeit
     // gestartet, kein Ausnahmefall -- gleiches Prinzip wie abbruch_grund.
     ['rundgang', 'ausnahme_grund', 'ALTER TABLE rundgang ADD COLUMN ausnahme_grund VARCHAR(40) NULL'],
+
+    // Spontan erzeugter Einsatz (ENT-283, Fortsetzung von ENT-282): markiert
+    // einen Einsatz, der nicht vom Planer angelegt wurde, sondern automatisch
+    // beim spontanen Rundgang-Start einer Person in der App entstanden ist.
+    // Ausdruecklicher Wunsch des Projektinhabers: ein solcher Einsatz darf in
+    // der Einsatzuebersicht nicht wie ein regulaer geplanter aussehen
+    // (CLAUDE.md: "Unbekannt darf nie wie keine aussehen").
+    ['einsaetze', 'spontan_erzeugt', 'ALTER TABLE einsaetze ADD COLUMN spontan_erzeugt TINYINT(1) NOT NULL DEFAULT 0'],
+    // Ereignis-Abhaken (ENT-090/ENT-283): derselbe "gesehen"-Mechanismus wie
+    // bei Rapport/Sperrtag/Zusage, hier am Rundgang selbst -- er ist das
+    // konkrete, einmalige Geschehnis, nicht der Einsatz als Ganzes.
+    ['rundgang', 'gesehen_am', 'ALTER TABLE rundgang ADD COLUMN gesehen_am DATETIME NULL'],
 ];
 foreach ($spalten as [$tabelle, $spalte, $sql]) {
     if (!hat_tabelle_jetzt($pdo, $tabelle) || hat_spalte($pdo, $tabelle, $spalte)) {

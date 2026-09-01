@@ -14,7 +14,7 @@ $bis = trim((string)($_GET['bis'] ?? ''));
 $eingegrenzt = preg_match('/^\d{4}-\d{2}-\d{2}$/', $von) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $bis);
 
 $sql = 'SELECT id, kunde_id, kunde_name, objekt_id, masterschicht_id, serie_id, titel, strasse, ort, kanton,
-               einsatzart, sparte, datum, von, bis, bedarf, status, bemerkung, erstellt_am,
+               einsatzart, sparte, datum, von, bis, bedarf, status, bemerkung, erstellt_am, spontan_erzeugt,
                -- ENT-115: Diese Spalten gab es laengst, geliefert wurden sie nie.
                -- Die Einsatzplan-Ansicht las e.treffpunkt und bekam immer undefined.
                veranstaltung, treffpunkt, taetigkeit, qualifikation,
@@ -88,6 +88,7 @@ $einsaetze = array_map(function ($e) use ($proEinsatz) {
     $e['objekt_id'] = $e['objekt_id'] === null ? null : (int)$e['objekt_id'];
     $e['masterschicht_id'] = $e['masterschicht_id'] === null ? null : (int)$e['masterschicht_id'];
     $e['bedarf'] = (int)$e['bedarf'];
+    $e['spontan_erzeugt'] = (bool)$e['spontan_erzeugt'];
     $e['mitarbeiter'] = $proEinsatz[$e['id']] ?? [];
     return $e;
 }, $einsaetze);

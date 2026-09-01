@@ -8049,6 +8049,10 @@ const EREIGNIS_ART = {
   sperrtag: { punkt: 'warn', wort: 'hat sich einen Tag gesperrt' },
   zusage:   { punkt: 'ok',   wort: 'hat eine Schicht beantwortet' },
   offerte:  { punkt: 'ok',   wort: 'hat eine Offerte beantwortet' },
+  // 'warn', nicht 'ok': genau das ist der Zweck dieses Ereignisses -- der
+  // Planer soll es sofort als aussergewoehnlich erkennen (siehe die ⚡-Marke
+  // in der Einsatzuebersicht), nicht als Routinemeldung ueberlesen.
+  rundgang_spontan: { punkt: 'warn', wort: 'hat spontan einen Rundgang gestartet' },
 };
 
 // ══════════════════════════════════════════ SCHNELLZUGRIFF (ENT-096)
@@ -8213,7 +8217,7 @@ function ereignisArt(x) {
 // Alle vier Arten lassen sich abhaken: Jede von ihnen ist etwas Geschehenes,
 // das man zur Kenntnis nimmt.
 function ereignisAbhakbar(typ) {
-  return typ === 'rapport' || typ === 'sperrtag' || typ === 'zusage' || typ === 'offerte';
+  return typ === 'rapport' || typ === 'sperrtag' || typ === 'zusage' || typ === 'offerte' || typ === 'rundgang_spontan';
 }
 
 function ereignisZeile(x) {
@@ -8224,6 +8228,10 @@ function ereignisZeile(x) {
   // Zusage: das Gegenteil dessen, was passiert war (ENT-113).
   if (x.typ === 'zusage')   { return `${x.zusage === 'abgelehnt' ? 'HAT ABGELEHNT' : 'hat zugesagt'} — ${x.kunde || x.einsatz_titel || '?'}, ${dmy(x.datum)}`; }
   if (x.typ === 'offerte')  { return `${x.status === 'abgelehnt' ? 'HAT ABGELEHNT' : 'hat angenommen'} — ${x.nummer || '?'}`; }
+  if (x.typ === 'rundgang_spontan') {
+    const grund = x.ausnahme_grund ? (RUNDGANG_AUSSERHALB_FENSTER_GRUENDE[x.ausnahme_grund] || x.ausnahme_grund) : null;
+    return `hat spontan einen Rundgang gestartet — ${x.kunde || x.einsatz_titel || '?'}, ${dmy(x.datum)}${grund ? ' — ' + grund : ''}`;
+  }
   return x.titel || '';
 }
 
@@ -8255,6 +8263,9 @@ function ereignisAufklappen(i, zeile) {
   if (x.einsatzart) { zeilen.push(['Einsatzart', x.einsatzart]); }
   if (x.netto_h)    { zeilen.push(['Netto', x.netto_h + ' h']); }
   if (x.bemerkung)  { zeilen.push(['Bemerkung', x.bemerkung]); }
+  if (x.typ === 'rundgang_spontan' && x.ausnahme_grund) {
+    zeilen.push(['Grund', RUNDGANG_AUSSERHALB_FENSTER_GRUENDE[x.ausnahme_grund] || x.ausnahme_grund]);
+  }
   box.innerHTML = `<div class="erg-in">
       <div class="dl">${zeilen.map(z => `<dt>${esc(z[0])}</dt><dd>${esc(String(z[1]))}</dd>`).join('')}</div>
       <div class="erg-wege">${wege.join('')}</div>
@@ -11174,7 +11185,7 @@ function plZeile(e, opts) {
       <td><span class="chip chip-n">${esc(e.einsatzart)}</span>${sparteChip(e)}</td>
       <td class="num"><span class="chip ${e.status === 'abgesagt' ? 'chip-n' : (fehlt ? 'chip-w' : 'chip-p')}">${besetzt(e).length}/${nf(e.bedarf)}</span></td>
       <td>${teile.length ? `<div class="crew">${teile.join('')}</div>` : '<span style="color:var(--ink-3)">–</span>'}</td>
-      <td><span class="chip ${st[1]}">${st[0]}${gesperrt ? SCHLOSS_ZU : ''}</span>${einsatzRapportWeichtAb(e) ? ` <span class="rap-abw" title="Rapport weicht vom Plan ab">⚠️</span>` : ''}</td>
+      <td><span class="chip ${st[1]}">${st[0]}${gesperrt ? SCHLOSS_ZU : ''}</span>${einsatzRapportWeichtAb(e) ? ` <span class="rap-abw" title="Rapport weicht vom Plan ab">⚠️</span>` : ''}${e.spontan_erzeugt ? ` <span class="rap-abw" title="Spontan gestartet, nicht vom Planer angelegt">⚡</span>` : ''}</td>
     </tr>`;
 }
 
@@ -11212,7 +11223,7 @@ function plKarte(e, opts) {
     <div class="wer">${esc(e.kunde_name)}${e.titel ? ` · ${esc(e.titel)}` : ''}</div>
     <div class="zeiten">${esc(e.ort)}${e.strasse ? ` · ${esc(e.strasse)}` : ''}</div>
     <div class="marken">
-      <span class="chip ${st[1]}">${st[0]}${gesperrt ? SCHLOSS_ZU : ''}</span>${einsatzRapportWeichtAb(e) ? ` <span class="rap-abw" title="Rapport weicht vom Plan ab">⚠️</span>` : ''}
+      <span class="chip ${st[1]}">${st[0]}${gesperrt ? SCHLOSS_ZU : ''}</span>${einsatzRapportWeichtAb(e) ? ` <span class="rap-abw" title="Rapport weicht vom Plan ab">⚠️</span>` : ''}${e.spontan_erzeugt ? ` <span class="rap-abw" title="Spontan gestartet, nicht vom Planer angelegt">⚡</span>` : ''}
       ${zug.slice(0, 3).map(m => nameChip(m, e)).join('')}
       ${zug.length > 3 ? `<span class="nm">+${zug.length - 3}</span>` : ''}
       ${fehlt ? `<span class="nm off">${fehlt} offen</span>` : ''}
@@ -18713,7 +18724,7 @@ function renderTagesplan() {
       <div class="wer">${esc(e.kunde_name)}${e.titel ? ` · ${esc(e.titel)}` : ''}</div>
       <div class="zeiten">${esc(e.ort)}${e.strasse ? ` · ${esc(e.strasse)}` : ''}</div>
       <div class="marken">
-        <span class="chip ${st[1]}">${st[0]}${gesperrt ? SCHLOSS_ZU : ''}</span>${einsatzRapportWeichtAb(e) ? ` <span class="rap-abw" title="Rapport weicht vom Plan ab">⚠️</span>` : ''}
+        <span class="chip ${st[1]}">${st[0]}${gesperrt ? SCHLOSS_ZU : ''}</span>${einsatzRapportWeichtAb(e) ? ` <span class="rap-abw" title="Rapport weicht vom Plan ab">⚠️</span>` : ''}${e.spontan_erzeugt ? ` <span class="rap-abw" title="Spontan gestartet, nicht vom Planer angelegt">⚡</span>` : ''}
         ${zug.length ? zug.map(m => nameChip(m, e)).join('') : ''}
         ${fehlt ? `<span class="nm off">${fehlt} offen</span>` : ''}
       </div>
@@ -18739,7 +18750,7 @@ function renderTagesplan() {
         <td>${esc(e.ort)}${e.strasse ? `<div class="sec">${esc(e.strasse)}</div>` : ''}</td>
         <td class="num"><span class="chip ${e.status === 'abgesagt' ? 'chip-n' : (fehlt ? 'chip-w' : 'chip-p')}">${besetzt(e).length}/${nf(e.bedarf)}</span></td>
         <td>${teile.length ? `<div class="crew">${teile.join('')}</div>` : '<span style="color:var(--ink-3)">–</span>'}</td>
-        <td><span class="chip ${st[1]}">${st[0]}${gesperrt ? SCHLOSS_ZU : ''}</span>${einsatzRapportWeichtAb(e) ? ` <span class="rap-abw" title="Rapport weicht vom Plan ab">⚠️</span>` : ''}</td>
+        <td><span class="chip ${st[1]}">${st[0]}${gesperrt ? SCHLOSS_ZU : ''}</span>${einsatzRapportWeichtAb(e) ? ` <span class="rap-abw" title="Rapport weicht vom Plan ab">⚠️</span>` : ''}${e.spontan_erzeugt ? ` <span class="rap-abw" title="Spontan gestartet, nicht vom Planer angelegt">⚡</span>` : ''}</td>
       </tr>`;
     }).join('') + `</tbody></table></div></div></div>`;
 }

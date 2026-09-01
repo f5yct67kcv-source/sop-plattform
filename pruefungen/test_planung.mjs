@@ -67,10 +67,11 @@ const EINSAETZE = { status: 'ok', einsaetze: [
   { id: 11, kunde_id: 1, kunde_name: 'Studer Immobilien AG', titel: 'Baustelle Kreisel', strasse: 'Hauptstrasse 4',
     ort: '4632 Trimbach', einsatzart: 'Verkehrsdienst', datum: HEUTE, von: '07:00:00', bis: '16:00:00',
     bedarf: 2, status: 'geplant', bemerkung: null, mitarbeiter: [A], objekt_id: null },
-  // heute, ueberschneidet sich zeitlich mit 11 -- selbe Person
+  // heute, ueberschneidet sich zeitlich mit 11 -- selbe Person. Spontan
+  // erzeugt (ENT-283), Rapport deckungsgleich -- NUR das Blitz-Symbol.
   { id: 12, kunde_id: 2, kunde_name: 'Einwohnergemeinde Niedergösgen', titel: null, strasse: null,
     ort: '5013 Niedergösgen', einsatzart: 'Verkehrsdienst', datum: HEUTE, von: '12:00:00', bis: '18:00:00',
-    bedarf: 1, status: 'bestaetigt', bemerkung: null, mitarbeiter: [A] },
+    bedarf: 1, status: 'bestaetigt', bemerkung: null, mitarbeiter: [A], spontan_erzeugt: true },
   // morgen, ueber Mitternacht, niemand zugeteilt
   { id: 13, kunde_id: 1, kunde_name: 'Studer Immobilien AG', titel: 'Nachtdienst', strasse: null,
     ort: '4600 Olten', einsatzart: 'Sicherheitsdienst', datum: MORGEN, von: '22:00:00', bis: '06:00:00',
@@ -78,9 +79,11 @@ const EINSAETZE = { status: 'ok', einsaetze: [
   // vergangen, abgeschlossen (ENT-128: der Status entscheidet, nicht mehr das
   // Kalenderdatum -- ein FRUEHER-Einsatz mit status 'bestaetigt' waere seit
   // ENT-128 NICHT mehr "abgeschlossen", siehe test_einsatzplan.mjs)
+  // Zusaetzlich spontan erzeugt (ENT-283) UND Rapport weicht ab -- BEIDE
+  // Symbole nebeneinander, damit eine Ueberlappung auffiele.
   { id: 14, kunde_id: 2, kunde_name: 'Einwohnergemeinde Niedergösgen', titel: null, strasse: null,
     ort: '5013 Niedergösgen', einsatzart: 'Verkehrsdienst', datum: FRUEHER, von: '08:00:00', bis: '12:00:00',
-    bedarf: 1, status: 'abgeschlossen', bemerkung: null, mitarbeiter: [D] },
+    bedarf: 1, status: 'abgeschlossen', bemerkung: null, mitarbeiter: [D], spontan_erzeugt: true },
   // abgesagt, in der Zukunft -- zaehlt nirgends als offen
   { id: 15, kunde_id: 1, kunde_name: 'Studer Immobilien AG', titel: null, strasse: null,
     ort: '4632 Trimbach', einsatzart: 'Verkehrsdienst', datum: SPAETER, von: '08:00:00', bis: '12:00:00',
@@ -730,6 +733,20 @@ await page.waitForTimeout(300);
 const scrollX = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 check('Kein Seiten-Scroll auf 390px', scrollX <= 1);
 await page.screenshot({ path: `${OUT}/22-planung-mobil.png` });
+
+// Dieselbe Blitz-Kennzeichnung (ENT-283) auch auf der Handy-Karte -- eigene
+// Zeichenfunktion (plKarte statt plZeile), also ein eigener Nachweis noetig
+// (CLAUDE.md: jede Aenderung am Handy-Layout zusaetzlich pruefen). Einsatz
+// 12 (heute, Filter bislang 'monat'): Einsatz 14 liegt im Vormonat und ist
+// hier noch ausgefiltert, siehe die Umschaltung auf 'alle' weiter unten.
+check('KRITISCH: das Blitz-Symbol steht auch auf der Handy-Karte, ohne die Marken-Zeile zu sprengen',
+  await page.evaluate(() => {
+    const k = [...document.querySelectorAll('.ag-karte')].find(el => el.getAttribute('onclick') === 'openEinsatz(12)');
+    if (!k) { return false; }
+    const blitz = k.querySelector('span[title="Spontan gestartet, nicht vom Planer angelegt"]');
+    const marken = k.querySelector('.marken');
+    return !!blitz && marken.getBoundingClientRect().width <= k.getBoundingClientRect().width;
+  }));
 await page.setViewportSize({ width: 1440, height: 1000 });
 
 // ══════════ ABGEGLICHENE SCHICHT IST IN DER PLANUNG FESTGESCHRIEBEN (ENT-045, OP-42)
@@ -846,12 +863,35 @@ check('KRITISCH: der Rahmenakzent der abgeglichenen Zeile ist gruen (--pos), nic
 check('KRITISCH: eine Schicht mit vom Plan abweichendem Rapport traegt das Warnzeichen in der Liste',
   await page.evaluate(() => {
     const tr = [...document.querySelectorAll('#plTable tbody tr')].find(r => r.getAttribute('onclick') === 'openEinsatz(14)');
-    return !!tr && !!tr.querySelector('.rap-abw');
+    return !!tr && !!tr.querySelector('span[title="Rapport weicht vom Plan ab"]');
   }));
 check('Eine Schicht mit deckungsgleichem Rapport traegt KEIN Warnzeichen',
   await page.evaluate(() => {
     const tr = [...document.querySelectorAll('#plTable tbody tr')].find(r => r.getAttribute('onclick') === 'openEinsatz(12)');
-    return !!tr && !tr.querySelector('.rap-abw');
+    return !!tr && !tr.querySelector('span[title="Rapport weicht vom Plan ab"]');
+  }));
+
+// ══════════ SPONTAN ERZEUGTE SCHICHT TRAEGT DAS BLITZ-SYMBOL (ENT-283)
+// Der Projektinhaber ausdruecklich: eine spontan gestartete Runde soll der
+// Planer "visuell sofort erkennen" -- nicht erst im Abgleich entdecken.
+// Dieselbe Stelle wie die Abweichungswarnung (neben dem Status-Chip), aber
+// ein eigenes Symbol mit eigenem Titel: die beiden Aussagen sind unabhaengig
+// voneinander (ENT-138 warnt vor Abweichung, das hier vor Herkunft).
+check('KRITISCH: eine spontan erzeugte Schicht traegt das Blitz-Symbol in der Liste',
+  await page.evaluate(() => {
+    const tr = [...document.querySelectorAll('#plTable tbody tr')].find(r => r.getAttribute('onclick') === 'openEinsatz(12)');
+    return !!tr && !!tr.querySelector('span[title="Spontan gestartet, nicht vom Planer angelegt"]');
+  }));
+check('Eine normal geplante Schicht traegt KEIN Blitz-Symbol',
+  await page.evaluate(() => {
+    const tr = [...document.querySelectorAll('#plTable tbody tr')].find(r => r.getAttribute('onclick') === 'openEinsatz(11)');
+    return !!tr && !tr.querySelector('span[title="Spontan gestartet, nicht vom Planer angelegt"]');
+  }));
+check('KRITISCH: Abweichung UND Spontan-Herkunft stehen nebeneinander, ohne einander zu verdraengen',
+  await page.evaluate(() => {
+    const tr = [...document.querySelectorAll('#plTable tbody tr')].find(r => r.getAttribute('onclick') === 'openEinsatz(14)');
+    return !!tr && !!tr.querySelector('span[title="Rapport weicht vom Plan ab"]')
+               && !!tr.querySelector('span[title="Spontan gestartet, nicht vom Planer angelegt"]');
   }));
 
 // ══════════ RAPPORT-SYMBOL JE PERSON (ENT-141)
