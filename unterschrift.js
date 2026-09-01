@@ -23,7 +23,7 @@
  * eine Media-Query, damit CSS und Zeichenlogik nicht auseinanderlaufen koennen:
  * die Umrechnung der Fingerposition haengt an derselben Antwort.
  *
- * BEDIENELEMENTE AN DEN RAND, NICHT UEBER UND UNTER DAS BLATT. Die erste
+ * BEDIENELEMENTE AN DEN RAND, NICHT UEBER UND UNTER DAS BLATT (ENT-296). Die erste
  * Fassung setzte Kopfzeile und Knoepfe ueber und unter das Blatt. Am echten
  * iPhone fiel auf, was in Chromium nicht auffaellt: Dreht das Geraet die Seite
  * mit, kommen Safaris Leisten zurueck, und von 390 px Hoehe bleiben rund 270.
