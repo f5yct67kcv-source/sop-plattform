@@ -365,6 +365,105 @@ svg.i-sm { width: 17px; height: 17px; }
 .blatt-ft .ft-txt { font-size: 12.5px; color: var(--ink-3); line-height: 1.5; flex: 1 1 160px; }
 .blatt-ft .ft-reihe { display: flex; gap: 10px; }
 
+/* ══ Einsatzmodus Rundgang (ENT-294) ══════════════════════════════════
+   Eigene Vollseite statt Schublade, und der einzige dunkle Bereich der
+   App. ENT-029 hat den Dunkelmodus ausdruecklich aufs Dashboard begrenzt,
+   weil "beide draussen bei Tageslicht benutzt werden" -- fuer den
+   Revierdienst-Rundgang trifft genau das nicht zu: Er laeuft abends und
+   nachts, wo ein weisser Vollbildschirm blendet und die Nachtsicht
+   zerstoert. Dieselbe Ueberlegung wie bei Navi-Apps.
+
+   Die Farbwerte sind NICHT neu erfunden, sondern Zeichen fuer Zeichen die
+   des Dashboard-Dunkelmodus (dashboard.html, html[data-thema="dunkel"]).
+   Sie stehen hier als lokale Ueberschreibung auf dem Container: Dadurch
+   werden .karte, .btn, .marke und alles andere in diesem Bereich von selbst
+   dunkel, ohne dass eine einzige bestehende Regel angefasst werden muss --
+   und keine andere Ansicht der App aendert sich.
+
+   z-index 55: ueber der Reiterleiste (50), aber UNTER Abdunkeln/Blatt
+   (60/61). Kurze Eingaben (Grund waehlen, Abbruch bestaetigen) erscheinen
+   damit weiterhin als Schublade darueber, statt hier nachgebaut zu werden. */
+.rgs {
+  position: fixed; left: 0; right: 0; top: 0; bottom: 0; z-index: 55;
+  display: none; flex-direction: column;
+  background: var(--bg); color: var(--ink);
+  padding-top: env(safe-area-inset-top);
+
+  --bg:           #0F1117;
+  --surface:      #161B27;
+  --surface-2:    #1E2535;
+  --line:         #2A3147;
+  --line-soft:    #232A3B;
+  --ink:          #F2F4F8;
+  --ink-2:        #B6BCC8;
+  --ink-3:        #868D9A;
+  --accent:       #7098F7;
+  --accent-hi:    #8DAEFA;
+  --accent-soft:  #1A2440;
+  --accent-line:  #2D3D63;
+  --pos: #4FCE96;  --pos-soft: #10281E;
+  --neg: #F27F70;  --neg-soft: #2E1A18;
+  --warn: #E2B156; --warn-soft: #2B2314;
+  /* Auf dunklem Grund traegt der Rand, nicht der Schatten (ENT-029/227). */
+  --sh-1: none;
+  --sh-2: 0 8px 28px -8px rgba(0,0,0,.6);
+  color-scheme: dark;
+}
+.rgs.on { display: flex; }
+.rgs-kopf { display: flex; align-items: center; gap: 6px; padding: 10px 14px 12px; border-bottom: 1px solid var(--line-soft); flex: none; background: var(--surface); }
+.rgs-kopf h2 { font-size: 17px; font-weight: 680; letter-spacing: -.3px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 44px Trefferflaeche (CLAUDE.md), der negative Rand haelt das Symbol
+   trotzdem buendig an der Kante -- sonst steht der Titel eingerueckt. */
+.rgs-zurueck { min-height: 44px; min-width: 44px; padding: 0; margin-left: -10px; display: flex; align-items: center; justify-content: center; background: none; border: 0; color: var(--ink); cursor: pointer; }
+.rgs-bd { padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 14px; }
+
+/* Kopfkarte: Objekt, Kunde, Adresse -- Reihenfolge vom Projektinhaber
+   vorgegeben. Das Routen-Symbol steht rechts daneben, nicht darunter:
+   es gehoert zur Adresse, nicht zum naechsten Block. */
+.rgs-objekt { display: flex; align-items: flex-start; gap: 12px; }
+.rgs-objekt-txt { flex: 1; min-width: 0; }
+.rgs-obj-name { font-size: 19px; font-weight: 700; letter-spacing: -.3px; line-height: 1.25; }
+.rgs-obj-kunde { font-size: 14.5px; color: var(--ink-2); margin-top: 2px; }
+/* Die Adresse traegt --ink-2, nicht die blasseste Stufe: Fuer jemanden, der
+   nachts erst hinfahren muss, ist sie Kerninformation, kein Beiwerk. */
+.rgs-obj-adr { font-size: 14.5px; color: var(--ink-2); margin-top: 10px; line-height: 1.45; }
+.rgs-route { flex: none; min-height: 44px; min-width: 44px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface-2); color: var(--accent); }
+
+/* Kennzahlen: Beschriftung OBEN, Wert darunter (CLAUDE.md), beide Seiten
+   nach demselben Muster und in derselben Schriftgroesse. */
+.rgs-fakten { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line-soft); border-radius: var(--r-sm); overflow: hidden; }
+.rgs-fakt { background: var(--surface); padding: 12px 14px; }
+.rgs-fakt-lb { font-size: 11px; font-weight: 640; letter-spacing: .6px; text-transform: uppercase; color: var(--ink-3); }
+.rgs-fakt-wert { font-size: 16px; font-weight: 650; margin-top: 4px; color: var(--ink); }
+
+/* Ausklappbarer Block (Coredinate-Muster: "> Ansprechpartner"). */
+.rgs-klapp { border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); overflow: hidden; }
+.rgs-klapp-kopf { width: 100%; min-height: 52px; display: flex; align-items: center; gap: 10px; padding: 0 16px; background: none; border: 0; color: var(--ink); font: inherit; font-size: 15.5px; font-weight: 620; cursor: pointer; text-align: left; }
+.rgs-klapp-pfeil { flex: none; transition: transform .18s; color: var(--ink-3); }
+.rgs-klapp.auf .rgs-klapp-pfeil { transform: rotate(90deg); }
+.rgs-klapp-zahl { margin-left: auto; font-size: 13px; color: var(--ink-3); font-weight: 600; }
+.rgs-klapp-bd { display: none; padding: 2px 16px 14px; border-top: 1px solid var(--line-soft); }
+.rgs-klapp.auf .rgs-klapp-bd { display: block; }
+.rgs-person { padding: 12px 0; border-bottom: 1px solid var(--line-soft); }
+.rgs-person:last-child { border-bottom: 0; padding-bottom: 2px; }
+.rgs-person-name { font-size: 15px; font-weight: 620; }
+/* Anrufen/Mailen sind echte Ziele mit dem Daumen -- 44px, nicht nur Text. */
+.rgs-weg { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; color: var(--accent); font-size: 14.5px; font-weight: 600; text-decoration: none; margin-right: 16px; }
+.rgs-leer { font-size: 14px; color: var(--ink-3); padding: 10px 0 2px; line-height: 1.5; }
+
+/* Module: Liste mit eigenstaendigen Unterseiten (vom Projektinhaber so
+   gewaehlt). Die Zahl rechts ist die Anzahl, nicht der Fortschritt. */
+/* Die Beschriftung gehoert zur Liste darunter, nicht zur Karte darueber --
+   deshalb oben mehr Luft als unten, statt gleichmaessigem Abstand
+   (CLAUDE.md: Luft ist Teil der Gestaltung, kein Rest). */
+.rgs-mod-lb { font-size: 11px; font-weight: 640; letter-spacing: .6px; text-transform: uppercase; color: var(--ink-3); padding: 6px 2px 7px; }
+.rgs-modul { width: 100%; min-height: 60px; display: flex; align-items: center; gap: 13px; padding: 0 16px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); color: var(--ink); font: inherit; font-size: 15.5px; font-weight: 620; cursor: pointer; text-align: left; }
+.rgs-modul-ic { flex: none; width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid var(--accent); color: var(--accent); display: flex; align-items: center; justify-content: center; }
+.rgs-modul-zahl { margin-left: auto; min-width: 26px; height: 26px; padding: 0 8px; border-radius: 13px; background: var(--accent); color: #0F1117; font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.rgs-modul-zahl.leer { background: var(--neg-soft); color: var(--neg); }
+.rgs-fuss { padding: 14px 16px calc(16px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line-soft); background: var(--surface); flex: none; }
+.rgs-warn { display: flex; gap: 9px; font-size: 13.5px; line-height: 1.5; color: var(--warn); background: var(--warn-soft); border: 1px solid var(--warn); border-radius: var(--r-sm); padding: 11px 13px; }
+
 /* ── Hinweis */
 .toast { position: fixed; left: 16px; right: 16px; bottom: calc(var(--tab-h) + 18px + env(safe-area-inset-bottom)); background: var(--shell); color: #fff; padding: 13px 18px; border-radius: var(--r-sm); font-size: 14.5px; font-weight: 560; box-shadow: var(--sh-2); z-index: 200; opacity: 0; pointer-events: none; transform: translateY(8px); transition: opacity .18s, transform .18s; text-align: center; }
 .toast.on { opacity: 1; transform: none; }
@@ -419,6 +518,10 @@ svg.i-sm { width: 17px; height: 17px; }
   .blatt.on { transform: translateX(-50%); }
   .toast { max-width: 528px; left: 50%; transform: translateX(-50%) translateY(8px); }
   .toast.on { transform: translateX(-50%); }
+  /* Der Einsatzmodus folgt demselben Muster wie alles andere (ENT-294) --
+     ohne diese Zeile lief er als einziger Bereich ueber die volle
+     Bildschirmbreite, mit einem 1400px breiten "Rundgang starten". */
+  .rgs { max-width: 560px; left: 50%; transform: translateX(-50%); box-shadow: 0 0 0 1px var(--line); }
 }
 </style>
 </head>
@@ -485,6 +588,19 @@ svg.i-sm { width: 17px; height: 17px; }
       <span id="lb-tab-menu">Menü</span>
     </button>
   </nav>
+</div>
+
+<!-- Einsatzmodus Rundgang (ENT-294): eigene Vollseite, liegt ueber der
+     Reiterleiste, aber unter der Schublade -- siehe .rgs im Stilteil. -->
+<div class="rgs" id="rgSeite" aria-hidden="true">
+  <header class="rgs-kopf">
+    <button class="rgs-zurueck" id="rgsZurueck" onclick="rgSeiteZurueck()" aria-label="Zurück">
+      <svg class="i" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+    <h2 id="rgsTitel">–</h2>
+  </header>
+  <div class="rgs-bd" id="rgsBody"></div>
+  <div class="rgs-fuss" id="rgsFuss"></div>
 </div>
 
 <div class="abdunkeln" id="abdunkeln" onclick="blattZu()"></div>
@@ -659,6 +775,36 @@ const W = {
     kpEsMelden: 'Ersatzscan melden',
     kpEsFotoPflicht: 'Foto erforderlich',
     kpEsFotoFehler: 'Foto liess sich nicht verarbeiten.',
+    // Einsatzmodus Rundgang (ENT-294)
+    rgsRoute: 'Route öffnen',
+    rgsAnsprechpartner: 'Ansprechpartner',
+    rgsKeineAnsprechpartner: 'Für diesen Kunden ist keine Ansprechperson hinterlegt.',
+    rgsModule: 'Module',
+    rgsKontrollpunkte: 'Kontrollpunkte',
+    rgsZeitfenster: 'Ausführbar',
+    rgsJederzeit: 'Jederzeit',
+    rgsAnzahlPunkte: 'Kontrollpunkte',
+    rgsStarten: 'Rundgang starten',
+    rgsKeinePunkte: 'Dieser Kontrollrunde ist kein Kontrollpunkt zugeordnet. Ein Start würde in einer leeren Liste enden — bitte zuerst in der Verwaltung Punkte zuordnen.',
+    // Ereignis erfassen (ENT-295)
+    evTitel: 'Ereignis erfassen',
+    evArt: 'Was ist vorgefallen?',
+    evArtWaehlen: '– auswählen –',
+    evArtPflicht: 'Bitte eine Ereignisart auswählen.',
+    evKeineArten: 'Es sind noch keine Ereignisarten hinterlegt. Die Verwaltung legt sie in den Stammdaten an.',
+    evBemerkung: 'Beschreibung',
+    evBemerkungHinweis: 'Was war zu sehen, wer war beteiligt, was hast du unternommen?',
+    evFoto: 'Foto',
+    evFotoAufnehmen: 'Foto aufnehmen',
+    evFotoEntfernen: 'Entfernen',
+    evErfasst: 'Festgehalten',
+    evErfasstHinweis: 'Der Erfassungszeitpunkt lässt sich nicht ändern — er ist Teil des Nachweises.',
+    evFrueher: 'Der Vorfall war früher',
+    evVorfallZeit: 'Zeitpunkt des Vorfalls',
+    evVorfallZukunft: 'Der Vorfall kann nicht nach der Erfassung liegen.',
+    evSpeichern: 'Ereignis melden',
+    evGemeldet: 'Ereignis gemeldet.',
+    evWartet: 'Gespeichert — wird übermittelt, sobald wieder Netz da ist.',
 };
 const w = k => W[k] || k;
 
@@ -1275,7 +1421,7 @@ function rundgangUebersichtOeffnen() {
     $('blTitel').textContent = w('waechterUebersichtTitel');
     $('blBody').innerHTML = vorlagen.length
       ? `<div style="display:flex;flex-direction:column;gap:8px">${vorlagen.map(v => `
-          <button type="button" class="btn btn-plain btn-wide" style="display:flex;flex-direction:column;align-items:flex-start;height:auto;min-height:44px;padding:12px 14px;white-space:normal;text-align:left;gap:2px" onclick="rundgangSpontanWaehlen(${Number(v.id)})">
+          <button type="button" class="btn btn-plain btn-wide" style="display:flex;flex-direction:column;align-items:flex-start;height:auto;min-height:44px;padding:12px 14px;white-space:normal;text-align:left;gap:2px" onclick="rgSeiteOeffnen(${Number(v.id)})">
             <div style="font-weight:650">${esc(v.name)}</div>
             <div style="font-size:13px;color:var(--ink-3)">${esc(v.objekt_name)} · ${esc(v.kunde_name)}</div>
             ${v.fenster_von && v.fenster_bis ? `<div style="font-size:13px;color:var(--ink-3)">${esc(hm(v.fenster_von))}–${esc(hm(v.fenster_bis))}</div>` : ''}
@@ -1299,6 +1445,384 @@ function rundgangSpontanWaehlen(vorlageId) {
     return;
   }
   rundgangSpontanStarten(vorlageId, null);
+}
+
+/* ══ EINSATZMODUS RUNDGANG (ENT-294) ═══════════════════════════════════
+   Vorschau einer Kontrollrunde als eigene, dunkle Vollseite -- der
+   Zwischenschritt zwischen "Runde angetippt" und "Runde gestartet", den es
+   bisher nicht gab: Ein Antippen startete sofort und legte serverseitig
+   Einsatz samt Zuteilung an, weshalb blosses Nachschauen Karteileichen
+   hinterliess. Diese Seite ist rein lesend (mein_rundgang_uebersicht.php);
+   erst der Knopf am Fuss loest den unveraenderten Startweg aus --
+   einschliesslich der Fenster-Weiche aus ENT-279, die weiterhin allein in
+   rundgangSpontanWaehlen() sitzt und hier NICHT nachgebaut wird. */
+let rgsVorlageId = null;
+let rgsAnsicht = 'uebersicht';   // 'uebersicht' | 'ereignis' -- welche Ebene der Seite offen ist
+let rgsDaten = null;             // zuletzt geladene Vorschau, damit der Rueckweg keinen neuen Abruf braucht
+
+function rgSeiteOeffnen(vorlageId) {
+  rgsVorlageId = Number(vorlageId);
+  $('rgsTitel').textContent = '–';
+  $('rgsBody').innerHTML = `<div class="sk" style="height:104px"></div><div class="sk" style="height:64px"></div>`;
+  $('rgsFuss').innerHTML = '';
+  $('rgSeite').classList.add('on');
+  $('rgSeite').setAttribute('aria-hidden', 'false');
+  // Die Schublade schliessen: Sie liegt ueber dieser Seite (z-index 61 vs.
+  // 55) und wuerde sie sonst verdecken.
+  blattZu();
+  api('mein_rundgang_uebersicht.php?vorlage_id=' + rgsVorlageId).then(({ ok, data }) => {
+    if (rgsVorlageId !== Number(vorlageId)) return;   // zwischenzeitlich weitergetippt
+    if (!ok || data.status !== 'ok') {
+      rgSeiteZu();
+      toast(data.message || w('netzfehler'));
+      return;
+    }
+    rgSeiteZeichnen(data);
+  });
+}
+
+function rgSeiteZu() {
+  rgsVorlageId = null;
+  rgsAnsicht = 'uebersicht';
+  rgsDaten = null;
+  $('rgSeite').classList.remove('on');
+  $('rgSeite').setAttribute('aria-hidden', 'true');
+}
+
+// Der Zurueck-Pfeil im Kopf fuehrt immer genau eine Ebene zurueck: von einer
+// Modul-Unterseite auf die Uebersicht, von der Uebersicht aus der Seite
+// heraus. Ein Pfeil, der aus einer Unterseite gleich alles schliesst, waere
+// derselbe Sackgassen-Fehler wie der fehlende Rueckweg aus ENT-289.
+function rgSeiteZurueck() {
+  if (rgsAnsicht !== 'uebersicht') { rgSeiteZurueckZurUebersicht(); return; }
+  rgSeiteZu();
+}
+
+function rgSeiteZurueckZurUebersicht() {
+  rgsAnsicht = 'uebersicht';
+  if (rgsDaten) { rgSeiteZeichnen(rgsDaten); return; }
+  rgSeiteZu();
+}
+
+function rgSeiteZeichnen(d) {
+  rgsDaten = d;
+  rgsAnsicht = 'uebersicht';
+  const o = d.objekt || {}, v = d.vorlage || {};
+  const punkte = d.kontrollpunkte || [];
+  const leute = d.ansprechpartner || [];
+  // Fuer die Ereignismeldung: zu welchem Objekt wird gemeldet (ENT-295).
+  evObjekt = o.id ? { id: o.id, name: o.name } : null;
+  $('rgsTitel').textContent = v.name || '';
+
+  const adresse = [o.strasse, [o.ort, o.kanton].filter(Boolean).join(' ')].filter(Boolean);
+  const ziel = encodeURIComponent([o.name, o.strasse, o.ort].filter(Boolean).join(', '));
+  const fenster = (v.fenster_von && v.fenster_bis)
+    ? `${hm(v.fenster_von)}–${hm(v.fenster_bis)}` : w('rgsJederzeit');
+
+  const wegZiel = we => we.art === 'email' ? 'mailto:' + we.wert
+    : (we.art === 'telefon' || we.art === 'mobil') ? 'tel:' + we.wert.replace(/\s/g, '')
+    : we.art === 'webseite' ? we.wert : null;
+
+  $('rgsBody').innerHTML = `
+    <div class="karte"><div class="karte-bd">
+      <div class="rgs-objekt">
+        <div class="rgs-objekt-txt">
+          <div class="rgs-obj-name">${esc(o.name || '')}</div>
+          <div class="rgs-obj-kunde">${esc(d.kunde_name || '')}</div>
+          ${adresse.length ? `<div class="rgs-obj-adr">${adresse.map(esc).join('<br>')}</div>` : ''}
+        </div>
+        ${adresse.length ? `<a class="rgs-route" href="https://www.google.com/maps/dir/?api=1&destination=${ziel}"
+             target="_blank" rel="noopener" aria-label="${esc(w('rgsRoute'))}">
+          <svg class="i" viewBox="0 0 24 24"><polygon points="1 6 8 3 16 6 23 3 23 18 16 21 8 18 1 21"/><line x1="8" y1="3" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="21"/></svg>
+        </a>` : ''}
+      </div>
+    </div></div>
+
+    <div class="rgs-fakten">
+      <div class="rgs-fakt">
+        <div class="rgs-fakt-lb">${esc(w('rgsZeitfenster'))}</div>
+        <div class="rgs-fakt-wert">${esc(fenster)}</div>
+      </div>
+      <div class="rgs-fakt">
+        <div class="rgs-fakt-lb">${esc(w('rgsAnzahlPunkte'))}</div>
+        <div class="rgs-fakt-wert">${punkte.length}</div>
+      </div>
+    </div>
+
+    <div class="rgs-klapp" id="rgsKlappAp">
+      <button type="button" class="rgs-klapp-kopf" onclick="rgSeiteKlapp('rgsKlappAp')" aria-expanded="false">
+        <svg class="i i-sm rgs-klapp-pfeil" viewBox="0 0 24 24"><polyline points="9 6 15 12 9 18"/></svg>
+        <span>${esc(w('rgsAnsprechpartner'))}</span>
+        ${leute.length ? `<span class="rgs-klapp-zahl">${leute.length}</span>` : ''}
+      </button>
+      <div class="rgs-klapp-bd">
+        ${leute.length ? leute.map(p => `
+          <div class="rgs-person">
+            <div class="rgs-person-name">${esc([p.anrede, p.name].filter(Boolean).join(' '))}</div>
+            <div>${(p.wege || []).map(we => {
+              const z = wegZiel(we);
+              return z ? `<a class="rgs-weg" href="${esc(z)}">${esc(we.wert)}</a>`
+                       : `<span class="rgs-weg" style="color:var(--ink-2)">${esc(we.wert)}</span>`;
+            }).join('')}</div>
+          </div>`).join('')
+        : `<div class="rgs-leer">${esc(w('rgsKeineAnsprechpartner'))}</div>`}
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div class="rgs-mod-lb">${esc(w('rgsModule'))}</div>
+      <button type="button" class="rgs-modul" id="rgsModKp" onclick="rgSeiteStarten()">
+        <span class="rgs-modul-ic">
+          <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="12" cy="10" r="3"/><path d="M12 21s-7-6.2-7-11a7 7 0 1 1 14 0c0 4.8-7 11-7 11z"/></svg>
+        </span>
+        <span>${esc(w('rgsKontrollpunkte'))}</span>
+        <span class="rgs-modul-zahl${punkte.length ? '' : ' leer'}">${punkte.length}</span>
+      </button>
+      <button type="button" class="rgs-modul" id="rgsModEreignis" onclick="evOeffnen()">
+        <span class="rgs-modul-ic">
+          <svg class="i i-sm" viewBox="0 0 24 24"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+        </span>
+        <span>${esc(w('evTitel'))}</span>
+      </button>
+    </div>
+
+    ${punkte.length ? '' : `<div class="rgs-warn" id="rgsWarnLeer">
+      <svg class="i i-sm" style="flex:none" viewBox="0 0 24 24"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      <span>${esc(w('rgsKeinePunkte'))}</span></div>`}`;
+
+  // Der Startknopf bleibt auch ohne Punkte bedienbar: Ob eine Runde
+  // ausfuehrbar ist, entscheidet der Server (Fenster, Doppelbelegung), nicht
+  // diese Vorschau. Die Warnung darueber sagt, was einen erwartet -- eine
+  // Sperre hier waere eine zweite, abweichende Regel.
+  $('rgsFuss').innerHTML =
+    `<button class="btn btn-primary btn-wide" id="rgsStartBtn" onclick="rgSeiteStarten()">${esc(w('rgsStarten'))}</button>`;
+}
+
+function rgSeiteKlapp(id) {
+  const el = $(id);
+  if (!el) return;
+  const auf = el.classList.toggle('auf');
+  const kopf = el.querySelector('.rgs-klapp-kopf');
+  if (kopf) kopf.setAttribute('aria-expanded', auf ? 'true' : 'false');
+}
+
+function rgSeiteStarten() {
+  if (rgsVorlageId === null) return;
+  rundgangSpontanWaehlen(rgsVorlageId);
+}
+
+/* ══ EREIGNIS ERFASSEN (ENT-295) ═══════════════════════════════════════
+   Vorfallmeldung als eigene Unterseite im Einsatzmodus -- die erste der
+   Modul-Unterseiten, die der Projektinhaber verlangt hat ("die anderen
+   bereiche haben alle eigenstaendige unterseiten").
+
+   Bewusst NICHT uebernommen aus dem Vorbild: ein "Anzahl"-Feld (steht bei
+   den meisten Arten dauerhaft auf 1 und traegt nichts bei) und die freie
+   Aenderbarkeit des Zeitstempels. Bei einer Vorfallmeldung ist der
+   Zeitpunkt Teil des Nachweises: erfasst_am steht fest, ein davon
+   abweichender Vorfallzeitpunkt wird daneben erfasst statt darueber --
+   dasselbe Prinzip wie Rohzeit/bewertete Zeit im GAV-Teil.
+
+   Die Arten kommen aus dem Stammdaten-Katalog (ENT-164), nicht aus einer
+   Liste im Quelltext -- die Verwaltung muss sie erweitern koennen. */
+const EV_WARTESCHLANGE = 'sop_ereignis_warteschlange';
+let evArten = [];
+let evFoto = null;      // komprimiertes Foto (data: URL), bis gemeldet wird
+let evObjekt = null;    // { id, name } des Objekts, zu dem gemeldet wird
+
+function evWarteschlangeLesen() {
+  try { return JSON.parse(localStorage.getItem(EV_WARTESCHLANGE) || '[]'); } catch { return []; }
+}
+function evWarteschlangeSchreiben(liste) {
+  try { localStorage.setItem(EV_WARTESCHLANGE, JSON.stringify(liste)); } catch {}
+}
+
+// Sendet alle wartenden Meldungen. Der Endpunkt nimmt mehrere auf einmal --
+// wie bei den Kontrollpunkt-Scans. Eine inhaltlich abgelehnte Meldung (z.B.
+// zwischenzeitlich entfernte Ereignisart) wird NICHT ewig wiederholt: Sie
+// verschwindet aus der Warteschlange, sonst blockiert sie alle spaeteren.
+function evWarteschlangeSenden() {
+  const liste = evWarteschlangeLesen();
+  if (!liste.length) return Promise.resolve();
+  return api('mein_ereignis_melden.php', { method: 'POST', body: { meldungen: liste } })
+    .then(({ ok, data }) => {
+      if (!ok || data.status !== 'ok') return;   // bleibt liegen, naechster Versuch
+      const erledigt = new Set((data.ergebnisse || []).map(e => String(e.lokal_id)));
+      evWarteschlangeSchreiben(evWarteschlangeLesen().filter(m => !erledigt.has(String(m.lokal_id))));
+    })
+    .catch(() => {});
+}
+
+function evOeffnen() {
+  if (!$('rgSeite').classList.contains('on')) return;
+  rgsAnsicht = 'ereignis';
+  evFoto = null;
+  $('rgsTitel').textContent = w('evTitel');
+  $('rgsBody').innerHTML = `<div class="sk" style="height:120px"></div>`;
+  $('rgsFuss').innerHTML = '';
+  api('ereignisart_liste.php').then(({ ok, data }) => {
+    if (rgsAnsicht !== 'ereignis') return;
+    evArten = (ok && data.status === 'ok') ? (data.arten || []) : [];
+    evFormularZeichnen();
+  });
+}
+
+function evFormularZeichnen() {
+  const jetzt = jetztDatetime();
+  $('rgsBody').innerHTML = `
+    <div class="f">
+      <label for="evArt">${esc(w('evArt'))}</label>
+      ${evArten.length ? `<select class="inp" id="evArt">
+        <option value="">${esc(w('evArtWaehlen'))}</option>
+        ${evArten.map(a => `<option value="${Number(a.id)}">${esc(a.bezeichnung)}</option>`).join('')}
+      </select>` : `<div class="rgs-warn">${esc(w('evKeineArten'))}</div>`}
+    </div>
+
+    <div class="f">
+      <label for="evText">${esc(w('evBemerkung'))}</label>
+      <textarea class="inp" id="evText" rows="4" placeholder="${esc(w('evBemerkungHinweis'))}"></textarea>
+    </div>
+
+    <div class="f">
+      <label>${esc(w('evFoto'))}</label>
+      <div id="evFotoBereich">
+        <button type="button" class="btn btn-plain" style="min-height:44px" onclick="document.getElementById('evFotoInput').click()">
+          <svg class="i i-sm" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          ${esc(w('evFotoAufnehmen'))}
+        </button>
+        <input type="file" accept="image/*" capture="environment" id="evFotoInput" onchange="evFotoGewaehlt()" style="display:none">
+      </div>
+    </div>
+
+    <!-- Bewusst KEIN zweispaltiges Kennzahlen-Raster: Der Hinweis ist
+         Fliesstext ohne eigene Beschriftung und stuende neben einer
+         Kennzahl mit Beschriftung -- zwei verschiedene Muster nebeneinander,
+         genau das, was CLAUDE.md untersagt. Untereinander gehoert beides
+         zusammen und liest sich als eine Aussage. -->
+    <div class="rgs-fakt" id="evErfasstKarte" style="border:1px solid var(--line);border-radius:var(--r-sm)">
+      <div class="rgs-fakt-lb">${esc(w('evErfasst'))}</div>
+      <div class="rgs-fakt-wert" id="evErfasstWert">${esc(jetzt.slice(8, 10) + '.' + jetzt.slice(5, 7) + '. ' + jetzt.slice(11, 16))}</div>
+      <div class="rgs-leer" style="padding:7px 0 0;font-size:12.5px">${esc(w('evErfasstHinweis'))}</div>
+    </div>
+
+    <div class="rgs-klapp" id="evKlappZeit">
+      <button type="button" class="rgs-klapp-kopf" onclick="rgSeiteKlapp('evKlappZeit')" aria-expanded="false">
+        <svg class="i i-sm rgs-klapp-pfeil" viewBox="0 0 24 24"><polyline points="9 6 15 12 9 18"/></svg>
+        <span>${esc(w('evFrueher'))}</span>
+      </button>
+      <div class="rgs-klapp-bd">
+        <div class="f" style="margin-bottom:0">
+          <label for="evVorfall">${esc(w('evVorfallZeit'))}</label>
+          <input class="inp" type="datetime-local" id="evVorfall" max="${esc(jetzt.slice(0, 16).replace(' ', 'T'))}">
+        </div>
+      </div>
+    </div>
+
+    <div id="evErr" class="msg-err" style="display:none"></div>`;
+  $('rgsFuss').innerHTML =
+    `<button class="btn btn-primary btn-wide" id="evSpeichern" onclick="evSenden()">${esc(w('evSpeichern'))}</button>`;
+}
+
+function evFotoGewaehlt() {
+  const input = $('evFotoInput');
+  const datei = input && input.files && input.files[0];
+  if (!datei) return;
+  // Dieselbe Komprimierung wie beim Ersatzscan: ein rohes Handyfoto wuerde
+  // die Warteschlange im localStorage sprengen.
+  rdEsKomprimieren(datei).then(dataUrl => {
+    evFoto = dataUrl;
+    const bereich = $('evFotoBereich');
+    if (!bereich) return;
+    bereich.innerHTML = `
+      <div style="display:flex;align-items:center;gap:12px">
+        <img src="${dataUrl}" alt="" class="rd-es-vorschau">
+        <button type="button" class="btn btn-plain" style="min-height:44px" onclick="evFotoEntfernen()">${esc(w('evFotoEntfernen'))}</button>
+      </div>`;
+  }).catch(() => toast(w('kpEsFotoFehler')));
+}
+
+function evFotoEntfernen() {
+  evFoto = null;
+  evFormularZeichnen();
+}
+
+function evSenden() {
+  const err = $('evErr');
+  err.style.display = 'none';
+  const artEl = $('evArt');
+  const artId = artEl ? Number(artEl.value) : 0;
+  if (!artId) { err.textContent = w('evArtPflicht'); err.style.display = ''; return; }
+
+  const erfasstAm = jetztDatetime();
+  let vorfallAm = null;
+  const vEl = $('evVorfall');
+  if (vEl && vEl.value) {
+    vorfallAm = vEl.value.replace('T', ' ') + ':00';
+    if (vorfallAm > erfasstAm) { err.textContent = w('evVorfallZukunft'); err.style.display = ''; return; }
+  }
+
+  const btn = $('evSpeichern');
+  if (btn) btn.disabled = true;
+
+  // Standort einmalig im Moment des Meldens -- macht die Meldung als
+  // Nachweis brauchbar. Ausdruecklich keine Verfolgung (ENT-131): kein
+  // watchPosition, und ohne Standortfreigabe wird trotzdem gemeldet.
+  const standort = new Promise(fertig => {
+    if (!navigator.geolocation) { fertig({}); return; }
+    let erledigt = false;
+    const einmal = wert => { if (!erledigt) { erledigt = true; fertig(wert); } };
+    navigator.geolocation.getCurrentPosition(
+      p => einmal({ lat: p.coords.latitude, lng: p.coords.longitude }), () => einmal({}));
+    setTimeout(() => einmal({}), 4000);
+  });
+
+  standort.then(ort => {
+    const meldung = {
+      lokal_id: 'ev' + Date.now() + Math.random().toString(36).slice(2, 7),
+      objekt_id: evObjekt ? Number(evObjekt.id) : 0,
+      rundgang_id: (rundgangAktiv && rundgangAktiv.id) || null,
+      einsatz_id: (rundgangAktiv && rundgangAktiv.einsatz_id) || null,
+      ereignisart_id: artId,
+      erfasst_am: erfasstAm,
+      vorfall_am: vorfallAm,
+      bemerkung: ($('evText') && $('evText').value.trim()) || '',
+      foto: evFoto ? evFoto.split(',')[1] : null,
+      lat: ort.lat !== undefined ? ort.lat : null,
+      lng: ort.lng !== undefined ? ort.lng : null,
+    };
+    // Erst lokal festhalten, dann senden -- der Erfassungszeitpunkt zaehlt,
+    // nicht die Uebermittlung (ENT-132). Bricht das Netz weg, steht die
+    // Meldung trotzdem und geht beim naechsten Netzkontakt raus.
+    const liste = evWarteschlangeLesen();
+    liste.push(meldung);
+    evWarteschlangeSchreiben(liste);
+
+    return api('mein_ereignis_melden.php', { method: 'POST', body: { meldungen: [meldung] } })
+      .then(({ ok, data }) => {
+        if (btn) btn.disabled = false;
+        const erg = ok && data.status === 'ok' ? (data.ergebnisse || [])[0] : null;
+        if (erg && erg.status === 'fehler') {
+          // Inhaltlich abgelehnt: nicht in der Warteschlange liegen lassen,
+          // sie wuerde sonst bei jedem Netzkontakt erneut scheitern.
+          evWarteschlangeSchreiben(evWarteschlangeLesen().filter(m => m.lokal_id !== meldung.lokal_id));
+          err.textContent = erg.message || w('netzfehler');
+          err.style.display = '';
+          return;
+        }
+        if (erg && erg.status === 'ok') {
+          evWarteschlangeSchreiben(evWarteschlangeLesen().filter(m => m.lokal_id !== meldung.lokal_id));
+          toast(w('evGemeldet'));
+        } else {
+          toast(w('evWartet'));   // bleibt in der Warteschlange
+        }
+        rgSeiteZurueckZurUebersicht();
+      })
+      .catch(() => {
+        if (btn) btn.disabled = false;
+        toast(w('evWartet'));
+        rgSeiteZurueckZurUebersicht();
+      });
+  });
 }
 
 function rundgangSpontanAusnahmeGrundWahl(vorlageId) {
@@ -1994,6 +2518,9 @@ function rdWarteschlangeSenden() {
   }));
 }
 window.addEventListener('online', rdWarteschlangeSenden);
+// Ereignismeldungen ziehen beim selben Anlass nach (ENT-295) -- eigene
+// Warteschlange, weil sie an einen anderen Endpunkt geht.
+window.addEventListener('online', evWarteschlangeSenden);
 
 // ── Abschnitt in der Schicht-Schublade: Start- bzw. Fortsetzen-Knopf ────
 // Eigener Platzhalter (#blRundgang, analog #blDok): eine eigene Abfrage darf
@@ -2628,7 +3155,15 @@ function blattZu() {
 }
 
 // ══════════════════════════════════════════ START
-document.addEventListener('keydown', e => { if (e.key === 'Escape') blattZu(); });
+// Escape schliesst immer nur die OBERSTE Ebene: liegt die Schublade ueber
+// dem Einsatzmodus (ENT-294), geht sie zuerst zu -- sonst bliebe ein Dialog
+// ueber einer bereits geschlossenen Seite stehen.
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if ($('blatt').classList.contains('on')) { blattZu(); return; }
+  if ($('rgSeite').classList.contains('on')) { rgSeiteZurueck(); return; }
+  blattZu();
+});
 $('gPass').addEventListener('keydown', e => { if (e.key === 'Enter') anmelden(); });
 $('gName').addEventListener('keydown', e => { if (e.key === 'Enter') $('gPass').focus(); });
 

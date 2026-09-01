@@ -116,6 +116,15 @@ await page.route('**/api/**', route => {
   // Vor der allgemeineren "mein_rundgang_vorlagen"-Pruefung unten, sonst
   // faengt die den Aufruf faelschlich als Teilstring ab.
   if (p.includes('mein_rundgang_vorlagen_alle')) return send({ status: 'ok', vorlagen: VORLAGEN_ALLE });
+  // Vorschau vor dem Start (ENT-294) -- rein lesend, legt nichts an.
+  if (p.includes('mein_rundgang_uebersicht')) {
+    const vid = Number(url.searchParams.get('vorlage_id'));
+    const v = VORLAGEN_ALLE.find(x => x.id === vid) || VORLAGEN_ALLE[0];
+    return send({ status: 'ok',
+      vorlage: { id: v.id, name: v.name, fenster_von: v.fenster_von, fenster_bis: v.fenster_bis },
+      objekt: { id: 22, name: 'Objekt Mit', strasse: null, ort: '4600 Musterdorf', kanton: 'SO' },
+      kunde_name: 'Kunde Mit', kontrollpunkte: KP, ansprechpartner: [] });
+  }
   if (p.includes('mein_rundgang_spontan_starten')) {
     // Gemeldeter Fehler: dieselbe, bereits laufende Vorlage noch einmal
     // antippen darf nicht an der eigenen Doppelbelegung scheitern, sondern
@@ -212,11 +221,19 @@ await page.waitForTimeout(300);
 check('Beide Vorlagen erscheinen in der Übersicht, objektübergreifend',
   (await page.textContent('#blBody')).includes('Nachtrunde') && (await page.textContent('#blBody')).includes('Frührunde'));
 
+// Seit ENT-294 liegt zwischen Antippen und Start die Vorschau-Vollseite --
+// das Antippen allein legt nichts mehr an. Die Fenster-Weiche selbst ist
+// unveraendert und sitzt weiterhin in rundgangSpontanWaehlen(); sie wird
+// jetzt vom Startknopf dort ausgeloest statt vom Listeneintrag.
 rufe = [];
 await page.click('#blBody button:has-text("Nachtrunde")');
+await page.waitForTimeout(350);
+check('KRITISCH: das Antippen öffnet nur die Vorschau und startet nichts (ENT-294)',
+  await page.isVisible('#rgSeite') && !rufe.some(r => r.p.includes('mein_rundgang_spontan_starten')));
+await page.click('#rgsStartBtn');
 await page.waitForTimeout(300);
 const spontanInnerhalb = rufe.find(r => r.p.includes('mein_rundgang_spontan_starten'));
-check('KRITISCH: eine Vorlage INNERHALB ihres Fensters startet über die Übersicht sofort, ohne Grundabfrage',
+check('KRITISCH: eine Vorlage INNERHALB ihres Fensters startet ohne Grundabfrage',
   spontanInnerhalb && !('ausnahme_grund' in spontanInnerhalb.body) && spontanInnerhalb.body.vorlage_id === 901);
 check('KRITISCH: nach erfolgreichem spontanem Start erscheint die echte Checkliste (Einsatz wurde gefunden)',
   await page.isVisible('#rdListe'));
@@ -232,8 +249,10 @@ await page.evaluate(() => rundgangUebersichtOeffnen());
 await page.waitForTimeout(300);
 rufe = [];
 await page.click('#blBody button:has-text("Nachtrunde")');
-await page.waitForTimeout(300);
-check('KRITISCH: ein zweites Antippen derselben, schon laufenden Vorlage zeigt keine Doppelbelegungs-Fehlermeldung',
+await page.waitForTimeout(350);
+await page.click('#rgsStartBtn');
+await page.waitForTimeout(350);
+check('KRITISCH: ein zweiter Startversuch derselben, schon laufenden Vorlage zeigt keine Doppelbelegungs-Fehlermeldung',
   !(await page.textContent('body')).includes('bereits andernorts eingeteilt'));
 check('KRITISCH: stattdessen wird die bereits laufende Runde fortgesetzt (dieselbe Checkliste, kein neuer Start)',
   await page.isVisible('#rdListe') && (await page.textContent('#rdFortschritt')).includes('von'));
@@ -246,6 +265,8 @@ await page.evaluate(() => rundgangUebersichtOeffnen());
 await page.waitForTimeout(300);
 rufe = [];
 await page.click('#blBody button:has-text("Frührunde")');
+await page.waitForTimeout(350);
+await page.click('#rgsStartBtn');
 await page.waitForTimeout(300);
 check('KRITISCH: eine Vorlage AUSSERHALB ihres Fensters fragt auch über die Übersicht zuerst einen Grund ab',
   await page.isVisible('#rfsGrund') && !rufe.some(r => r.p.includes('mein_rundgang_spontan_starten')));
