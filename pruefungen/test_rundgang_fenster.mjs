@@ -79,6 +79,12 @@ let naechsteRundgangId = 950;
 // diesen neu entstandenen Einsatz mit -- genau wie serverseitig, wo der
 // Endpunkt ihn wirklich anlegt. Ohne das faende rundgangAnzeigen() ihn nicht.
 let spontanerEinsatz = null;
+// Gemeldeter Fehler: dieselbe Vorlage ein zweites Mal antippen, waehrend die
+// erste spontane Runde noch laeuft. Spiegelt den serverseitigen Selbst-
+// Kollisions-Fall in mein_rundgang_spontan_starten.php -- hier vereinfacht
+// als ein einzelner Merker, weil dieser Mock ohnehin nur eine spontane Runde
+// gleichzeitig kennt.
+let aktiverSpontanRundgang = null;
 
 const browser = await chromium.launch({ executablePath: EXE });
 const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
@@ -98,17 +104,33 @@ await page.route('**/api/**', route => {
   if (p.includes('meine_schichten')) return send(SCHICHTEN());
   if (p.includes('mein_profil')) return send(PROFIL);
   if (p.includes('rapport_list')) return send({ status: 'ok', rapporte: [] });
-  if (p.includes('mein_rundgang_offen')) return send({ status: 'ok', rundgang: null });
+  if (p.includes('mein_rundgang_offen')) {
+    const einsatzId = Number(url.searchParams.get('einsatz_id'));
+    if (aktiverSpontanRundgang && aktiverSpontanRundgang.einsatzId === einsatzId) {
+      return send({ status: 'ok', rundgang: { id: aktiverSpontanRundgang.rundgangId, einsatz_id: einsatzId,
+        status: 'vorbereitet', pausiert_seit: null, kontrollpunkte: KP.map(k => ({ ...k, erledigt: null })) } });
+    }
+    return send({ status: 'ok', rundgang: null });
+  }
 
   // Vor der allgemeineren "mein_rundgang_vorlagen"-Pruefung unten, sonst
   // faengt die den Aufruf faelschlich als Teilstring ab.
   if (p.includes('mein_rundgang_vorlagen_alle')) return send({ status: 'ok', vorlagen: VORLAGEN_ALLE });
   if (p.includes('mein_rundgang_spontan_starten')) {
+    // Gemeldeter Fehler: dieselbe, bereits laufende Vorlage noch einmal
+    // antippen darf nicht an der eigenen Doppelbelegung scheitern, sondern
+    // muss die bestehende Runde fortsetzen (mein_rundgang_spontan_starten.php).
+    if (aktiverSpontanRundgang && aktiverSpontanRundgang.vorlageId === body.vorlage_id) {
+      return send({ status: 'laeuft_bereits', einsatz_id: aktiverSpontanRundgang.einsatzId,
+        rundgang_id: aktiverSpontanRundgang.rundgangId });
+    }
     spontanerEinsatz = { id: 999, kunde_name: 'Kunde Mit', titel: 'Spontaner Rundgang', strasse: null,
       ort: '4600 Musterdorf', einsatzart: 'Revierdienst', sparte: 'sicherheit', datum: HEUTE,
       von: '22:00:00', bis: '22:30:00', status: 'bestaetigt', bemerkung: null, zusage: 'zugesagt',
       objekt_name: 'Objekt Mit', objekt_id: 22, hat_kontrollpunkte: true, hat_zeitfenster: true, im_team: 1 };
-    return send({ status: 'ok', einsatz_id: 999, rundgang_id: ++naechsteRundgangId, kontrollpunkte: KP });
+    const rundgangId = ++naechsteRundgangId;
+    aktiverSpontanRundgang = { vorlageId: body.vorlage_id, einsatzId: 999, rundgangId };
+    return send({ status: 'ok', einsatz_id: 999, rundgang_id: rundgangId, kontrollpunkte: KP });
   }
   if (p.includes('mein_rundgang_vorlagen')) {
     const einsatzId = Number(url.searchParams.get('einsatz_id'));
@@ -199,7 +221,27 @@ check('KRITISCH: eine Vorlage INNERHALB ihres Fensters startet über die Übersi
 check('KRITISCH: nach erfolgreichem spontanem Start erscheint die echte Checkliste (Einsatz wurde gefunden)',
   await page.isVisible('#rdListe'));
 
+// ══════════ GEMELDETER FEHLER: DIESELBE, SCHON LAUFENDE VORLAGE ERNEUT
+// ANTIPPEN -- fuehrt zum Fortsetzen der bestehenden Runde, nicht zu "Du bist
+// zu dieser Zeit bereits andernorts eingeteilt" (die eigene Runde ist keine
+// echte Doppelbelegung). Simuliert: Uebersicht schliessen, erneut oeffnen,
+// dieselbe Kachel nochmal antippen.
+await page.evaluate(() => blattZu());
+await page.waitForTimeout(200);
+await page.evaluate(() => rundgangUebersichtOeffnen());
+await page.waitForTimeout(300);
+rufe = [];
+await page.click('#blBody button:has-text("Nachtrunde")');
+await page.waitForTimeout(300);
+check('KRITISCH: ein zweites Antippen derselben, schon laufenden Vorlage zeigt keine Doppelbelegungs-Fehlermeldung',
+  !(await page.textContent('body')).includes('bereits andernorts eingeteilt'));
+check('KRITISCH: stattdessen wird die bereits laufende Runde fortgesetzt (dieselbe Checkliste, kein neuer Start)',
+  await page.isVisible('#rdListe') && (await page.textContent('#rdFortschritt')).includes('von'));
+
 spontanerEinsatz = null;
+aktiverSpontanRundgang = null;
+await page.evaluate(() => blattZu());
+await page.waitForTimeout(200);
 await page.evaluate(() => rundgangUebersichtOeffnen());
 await page.waitForTimeout(300);
 rufe = [];

@@ -82,6 +82,25 @@ $bis = date('H:i:s', strtotime('+30 minutes'));
 // bereits anderswo eingeteilt ist.
 $doppelt = doppelbelegungen(0, $heute, $jetzt, $bis, [(int)$user['id']]);
 if ($doppelt) {
+    // Ist die Kollision ausgerechnet mit der eigenen, noch offenen Runde
+    // DERSELBEN Vorlage (ENT-290, gemeldeter Fehler: zweimal auf dieselbe
+    // Kachel der objektuebergreifenden Uebersicht getippt, z.B. weil der
+    // erste Versuch nur "vorbereitet" blieb)? Dann ist das kein echter
+    // Konflikt, sondern dieselbe Runde, die schon laeuft -- die Oberflaeche
+    // soll sie fortsetzen, statt an der eigenen Sperre zu scheitern und
+    // keinen Weg mehr zurueck zu haben.
+    $konfliktEinsatzId = (int)$doppelt[0]['einsatz_id'];
+    $bestehendStmt = $pdo->prepare(
+        "SELECT id FROM rundgang
+          WHERE einsatz_id = ? AND mitarbeiter_id = ? AND rundgang_vorlage_id = ?
+            AND status NOT IN ('abgeschlossen', 'abgebrochen')"
+    );
+    $bestehendStmt->execute([$konfliktEinsatzId, (int)$user['id'], $vorlageId]);
+    $bestehendeRundgangId = $bestehendStmt->fetchColumn();
+    if ($bestehendeRundgangId !== false) {
+        json_response(['status' => 'laeuft_bereits',
+            'einsatz_id' => $konfliktEinsatzId, 'rundgang_id' => (int)$bestehendeRundgangId]);
+    }
     json_response(['status' => 'error',
         'message' => 'Du bist zu dieser Zeit bereits andernorts eingeteilt: ' . $doppelt[0]['was']], 409);
 }
