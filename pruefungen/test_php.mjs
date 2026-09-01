@@ -290,6 +290,7 @@ if (ohneEinbindung.length) { bad.push('ohne rechte.php: ' + ohneEinbindung.join(
   const OHNE_SPERRE = {
     'einsatz_abgleich.php':   'setzt die Sperre selbst -- muss schreiben duerfen',
     'schichten_erzeugen.php': 'legt nur neue Schichten an; eine neue kann nicht abgeglichen sein',
+    'mein_rundgang_spontan_starten.php': 'legt nur einen neuen Einsatz samt eigener Zuteilung an (ENT-282) -- gleicher Grund wie schichten_erzeugen.php',
     'meine_zusage.php':       'aendert nur die eigene Zu-/Absage, nicht den Plan',
     // Setzt nur einen Zeitstempel "gesehen" auf der Zuteilung. Der Plan, die
     // Zeiten und der Abgleich bleiben unberuehrt -- eine gelesene Meldung
