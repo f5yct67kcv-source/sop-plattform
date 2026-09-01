@@ -6380,6 +6380,26 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 </div>
 
 <!-- Rückfrage vor folgenreichen Schritten -->
+<!-- Vorwarnung vor der automatischen Abmeldung (ENT-293).
+     Die Sperre selbst steht im Server; dieser Dialog sorgt nur dafuer, dass
+     sie niemanden mitten im Satz erwischt. Jede Bedienung -- auch ausserhalb
+     des Dialogs -- schliesst ihn wieder: Wer etwas tut, ist da. Der Knopf ist
+     darum kein Sonderweg, sondern nur das Naheliegendste zum Anklicken. -->
+<div class="dlg-scrim" id="utWarnung">
+  <div class="dlg narrow">
+    <div class="dlg-hd">
+      <h2>Gleich abgemeldet</h2>
+      <p>Auf diesem Bildschirm stehen Personaldaten. Eine unbenutzte Sitzung
+         endet darum nach <b id="utMin">30</b> Minuten — noch
+         <b id="utRest">60</b> Sekunden.</p>
+    </div>
+    <div class="dlg-bd" style="padding-top:0"></div>
+    <div class="dlg-ft">
+      <button class="btn btn-primary" onclick="utBeruehrt()">Angemeldet bleiben</button>
+    </div>
+  </div>
+</div>
+
 <div class="dlg-scrim" id="dlgConfirm">
   <div class="dlg narrow">
     <div class="dlg-hd"><h2 id="cfTitel">Sicher?</h2><p id="cfText"></p></div>
@@ -6747,6 +6767,87 @@ function doLogin() {
   });
 }
 
+// ══════════════════════════════════════════ UNTAETIGKEIT (ENT-293)
+//
+// Die SPERRE steht im Server: SITZUNG_BUERO_RUHE_MIN in backend/db.php.
+// Was hier steht, ist ausdruecklich nicht die Sperre, sondern zweierlei
+// drumherum:
+//
+// 1. Eine Vorwarnung mit Countdown. Ohne sie steht jemand mitten in einem
+//    halb ausgefuellten Dossier wortlos vor der Anmeldemaske, und die
+//    Eingaben sind weg. Die Sperre ist richtig -- sie darf nur nicht
+//    hinterruecks zuschlagen.
+// 2. Ein Lebenszeichen, solange jemand TATSAECHLICH arbeitet. Der Server
+//    stempelt die Nutzung nur, wenn eine Anfrage kommt. Wer zwanzig
+//    Minuten in ein Formular tippt, ohne zu speichern, erzeugt keine
+//    einzige -- und bekaeme beim Speichern eine abgelaufene Sitzung um die
+//    Ohren, obwohl er die ganze Zeit da war.
+//
+// Was hier NICHT passiert: eine Sitzung am Leben halten, ohne dass jemand
+// da ist. Getaktet wird auf Tastendruck, Klick, Wischen und Mausrad --
+// nicht auf Mausbewegung und nicht auf einen Zeitgeber allein. Kein
+// Mensch, kein Lebenszeichen, und der Server laesst die Sitzung ablaufen.
+const UT_FRIST_MS   = 30 * 60 * 1000;   // muss zu SITZUNG_BUERO_RUHE_MIN passen
+const UT_WARNUNG_MS = 60 * 1000;        // so lange vorher wird gewarnt
+const UT_PING_MS    = 5 * 60 * 1000;    // Lebenszeichen hoechstens so oft
+const UT_TAKT_MS    = 5 * 1000;         // so oft wird nachgesehen
+
+// Spiegel von SITZUNG_RECHTE_IM_FELD in backend/db.php. Laufen die beiden
+// Listen auseinander, warnt die Oberflaeche vor einer Abmeldung, die gar
+// nicht kommt -- oder schweigt vor einer, die kommt. pruef_sitzung.php
+// haelt sie zusammen.
+const UT_RECHTE_IM_FELD = ['rundgang_verwalten', 'rundgang_einsehen', 'alarmempfaenger'];
+
+let utLetzte = 0, utGepingt = 0, utAktiv = false, utTakt = null;
+
+// Trifft die kurze Frist diese Sitzung? Wer nur Feldrechte hat -- ein
+// Waechter im Revierdienst --, faellt nicht darunter; fuer ihn gilt im
+// Server die lange Frist, und die Oberflaeche darf ihn nicht frueher
+// hinauswerfen als der Server es tut.
+function utBueroSitzung() {
+  const r = (me && Array.isArray(me.rechte)) ? me.rechte : [];
+  return r.some(x => !UT_RECHTE_IM_FELD.includes(x));
+}
+
+function utBeruehrt() {
+  utLetzte = Date.now();
+  utAktiv  = true;
+  if ($('utWarnung').classList.contains('on')) { closeDlg('utWarnung'); }
+}
+
+function utStarten() {
+  if (utTakt || !utBueroSitzung()) { return; }
+  utLetzte = utGepingt = Date.now();
+  ['pointerdown', 'keydown', 'wheel', 'touchstart'].forEach(
+    e => document.addEventListener(e, utBeruehrt, { passive: true, capture: true }));
+  utTakt = setInterval(utNachsehen, UT_TAKT_MS);
+}
+
+function utNachsehen() {
+  const ruhe = Date.now() - utLetzte;
+  if (ruhe >= UT_FRIST_MS) { utAbmelden(); return; }
+  if (ruhe >= UT_FRIST_MS - UT_WARNUNG_MS) {
+    $('utMin').textContent  = Math.round(UT_FRIST_MS / 60000);
+    $('utRest').textContent = Math.ceil((UT_FRIST_MS - ruhe) / 1000);
+    if (!$('utWarnung').classList.contains('on')) { openDlg('utWarnung'); }
+    return;
+  }
+  // Lebenszeichen nur, wenn seit dem letzten wirklich jemand etwas getan hat.
+  if (utAktiv && Date.now() - utGepingt >= UT_PING_MS) {
+    utAktiv = false; utGepingt = Date.now();
+    api('me.php').then(a => { if (a && a.status === 401) { utAbmelden(); } }).catch(() => {});
+  }
+}
+
+function utAbmelden() {
+  clearInterval(utTakt); utTakt = null;
+  // Ohne diesen Vermerk steht man vor einer leeren Anmeldemaske und haelt
+  // die Abmeldung fuer einen Fehler. "Abgelaufen" und "kaputt" sind zwei
+  // verschiedene Aussagen.
+  try { sessionStorage.setItem('rv3_ende', 'untaetig'); } catch (e) {}
+  doLogout();
+}
+
 function doLogout() {
   api('logout.php', { method: 'POST' }).catch(() => {});
   localStorage.removeItem('rv3_token'); localStorage.removeItem('rv3_user');
@@ -6816,6 +6917,7 @@ function enter() {
   briefkopfLaden();
   reloadAll();
   pruefeUpdate();
+  utStarten();
 }
 
 // ══════════════════════════════════════════ RECHTE IN DER OBERFLAECHE
@@ -21458,6 +21560,19 @@ $('gName').addEventListener('keydown', e => { if (e.key === 'Enter') $('gPass').
 document.title = APP_NAME;
 $('gateWm').textContent = APP_NAME;
 $('sideWm').textContent = APP_NAME;
+
+// Wer automatisch abgemeldet wurde, steht sonst vor einer leeren
+// Anmeldemaske und haelt es fuer einen Fehler (ENT-293). "Abgelaufen" und
+// "kaputt" sind zwei verschiedene Aussagen und brauchen zwei Texte.
+try {
+  if (sessionStorage.getItem('rv3_ende') === 'untaetig') {
+    sessionStorage.removeItem('rv3_ende');
+    $('gateErr').textContent = `Nach ${Math.round(UT_FRIST_MS / 60000)} Minuten ohne Bedienung `
+      + 'automatisch abgemeldet — auf diesem Bildschirm stehen Personaldaten. '
+      + 'Bitte erneut anmelden.';
+    $('gateErr').style.display = '';
+  }
+} catch (e) { /* privater Modus ohne sessionStorage */ }
 
 if (token && me) {
   enter();
