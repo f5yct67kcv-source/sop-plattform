@@ -1,10 +1,10 @@
 <?php
 declare(strict_types=1);
-// Echte Ausfuehrung der Sitzungs-Ablaufregel (ENT-075, verschaerft in ENT-292).
+// Echte Ausfuehrung der Sitzungs-Ablaufregel (ENT-075, verschaerft in ENT-293).
 //
 // Bis ENT-075 lief eine Sitzung nie ab. Diese Pruefung stellt sicher, dass
 // beide Grenzen wirklich greifen -- das absolute Alter UND die Untaetigkeit --
-// und seit ENT-292, dass die kurze Bueroschutzfrist die Richtigen trifft:
+// und seit ENT-293, dass die kurze Bueroschutzfrist die Richtigen trifft:
 // den Bildschirm mit der Personalakte, nicht das Handy im Nachtdienst.
 //
 // db.php laesst sich nicht einbinden (es baut beim Laden nichts auf, aber
@@ -90,7 +90,7 @@ pruef('KRITISCH: die absolute Frist gilt auch am Buerobildschirm',
 // ── Die Grenzen sind alltagstauglich, nicht nur sicher ───────────────
 pruef('Mitarbeitende muessen sich nicht taeglich neu anmelden', SITZUNG_RUHE_TAGE >= 7);
 // Die alte Aussage hiess "ein Arbeitstag laeuft der Verwaltung nicht davon"
-// (>= 8 Stunden). Sie ist mit ENT-292 bewusst aufgehoben worden -- ersetzt,
+// (>= 8 Stunden). Sie ist mit ENT-293 bewusst aufgehoben worden -- ersetzt,
 // nicht geloescht: Was sie schuetzte, war eine unbrauchbar kurze Frist.
 // Diese Untergrenze bleibt, sie liegt nur tiefer.
 pruef('KRITISCH: die Bueroschutzfrist ist nicht unbrauchbar kurz gesetzt',

@@ -43,7 +43,7 @@ const SITZUNG_MAX_TAGE       = 30;   // ohne Rechte: absolut
 const SITZUNG_RUHE_TAGE      = 14;   // ohne Rechte: ohne Nutzung
 const SITZUNG_ADMIN_MAX_TAGE = 7;    // mit Rechten: absolut
 const SITZUNG_FELD_RUHE_STD  = 12;   // Rechte nur im Feld: ohne Nutzung
-const SITZUNG_BUERO_RUHE_MIN = 30;   // Bueroarbeitsplatz: ohne Nutzung (ENT-292)
+const SITZUNG_BUERO_RUHE_MIN = 30;   // Bueroarbeitsplatz: ohne Nutzung (ENT-293)
 
 // Welche Rechte uebt man IM FELD aus und nicht an einem Bildschirm, vor dem
 // jemand anderes stehen kann? Eine Sitzung, deren Rechte vollstaendig in
@@ -54,7 +54,7 @@ const SITZUNG_BUERO_RUHE_MIN = 30;   // Bueroarbeitsplatz: ohne Nutzung (ENT-292
 // Ausnahme will, muss sie hinschreiben -- so faellt das Versehen auf die
 // sichere Seite.
 //
-// Wozu die Unterscheidung ueberhaupt: Bis ENT-292 galt "hat irgendein
+// Wozu die Unterscheidung ueberhaupt: Bis ENT-293 galt "hat irgendein
 // Recht" als Mass. Ein Waechter im Revierdienst hat Rechte und wuerde mit
 // 30 Minuten nachts um drei mitten im Rundgang vor der Anmeldemaske
 // stehen -- eine Sicherheitsregel, die den Betrieb kaputtmacht, wird
@@ -122,7 +122,7 @@ function require_session(): array {
     // fuer sie gilt dieselbe Frist wie fuer die Verwaltung. Wer nur die
     // eigenen Schichten sieht, behaelt die lange Frist, sonst waere die
     // App im Einsatz eine Zumutung ohne Sicherheitsgewinn.
-    // Seit ENT-292 entscheiden die Rechte selbst, welche Frist gilt --
+    // Seit ENT-293 entscheiden die Rechte selbst, welche Frist gilt --
     // siehe sitzung_buero() oben.
     $jetzt   = time();
     $geboren = strtotime((string)($row['erstellt_am'] ?? '')) ?: $jetzt;

@@ -6380,7 +6380,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 </div>
 
 <!-- Rückfrage vor folgenreichen Schritten -->
-<!-- Vorwarnung vor der automatischen Abmeldung (ENT-292).
+<!-- Vorwarnung vor der automatischen Abmeldung (ENT-293).
      Die Sperre selbst steht im Server; dieser Dialog sorgt nur dafuer, dass
      sie niemanden mitten im Satz erwischt. Jede Bedienung -- auch ausserhalb
      des Dialogs -- schliesst ihn wieder: Wer etwas tut, ist da. Der Knopf ist
@@ -6767,7 +6767,7 @@ function doLogin() {
   });
 }
 
-// ══════════════════════════════════════════ UNTAETIGKEIT (ENT-292)
+// ══════════════════════════════════════════ UNTAETIGKEIT (ENT-293)
 //
 // Die SPERRE steht im Server: SITZUNG_BUERO_RUHE_MIN in backend/db.php.
 // Was hier steht, ist ausdruecklich nicht die Sperre, sondern zweierlei
@@ -21562,7 +21562,7 @@ $('gateWm').textContent = APP_NAME;
 $('sideWm').textContent = APP_NAME;
 
 // Wer automatisch abgemeldet wurde, steht sonst vor einer leeren
-// Anmeldemaske und haelt es fuer einen Fehler (ENT-292). "Abgelaufen" und
+// Anmeldemaske und haelt es fuer einen Fehler (ENT-293). "Abgelaufen" und
 // "kaputt" sind zwei verschiedene Aussagen und brauchen zwei Texte.
 try {
   if (sessionStorage.getItem('rv3_ende') === 'untaetig') {

@@ -1,4 +1,4 @@
-// Automatische Abmeldung bei Untaetigkeit (ENT-292), am laufenden Zustand.
+// Automatische Abmeldung bei Untaetigkeit (ENT-293), am laufenden Zustand.
 //
 // Geprueft wird mit gestellter Uhr (page.clock), NICHT mit verkuerzten
 // Konstanten: Ein Test, der die Frist auf drei Sekunden setzt, prueft eine
