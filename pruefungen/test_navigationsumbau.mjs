@@ -17,9 +17,9 @@ const ok = [], bad = [];
 const check = (n, c) => (c ? ok : bad).push(n);
 
 const schicht = (overrides = {}) => ({
-  id: 41, kunde_name: 'Borner AG', titel: 'Schliessrunde', strasse: 'Industriestrasse 1',
+  id: 41, kunde_name: 'Beispiel AG', titel: 'Schliessrunde', strasse: 'Industriestrasse 1',
   ort: '4601 Olten', einsatzart: 'Revierdienst', datum: GESTERN, von: '22:00:00', bis: '22:30:00',
-  status: 'geplant', bemerkung: null, zusage: 'zugesagt', objekt_name: 'Gerolag Center',
+  status: 'geplant', bemerkung: null, zusage: 'zugesagt', objekt_name: 'Muster Center',
   im_team: 1, hat_kontrollpunkte: true, ...overrides,
 });
 
@@ -77,7 +77,7 @@ async function neueSeite(schichten, extraRoutes, profilUeberschreibung) {
 // unabhängig von der eigenen, heutigen Zuteilung (ENT-279-Fortsetzung) --
 // Auswahl startet spontan über mein_rundgang_spontan_starten.php.
 {
-  const VORLAGEN = [{ id: 900, name: 'Nachtrunde', objekt_name: 'Gerolag Center', kunde_name: 'Borner AG',
+  const VORLAGEN = [{ id: 900, name: 'Nachtrunde', objekt_name: 'Muster Center', kunde_name: 'Beispiel AG',
     fenster_von: null, fenster_bis: null }];
   const { browser, page, rufe } = await neueSeite([schicht({ id: 55 })], (p, body, send) => {
     if (p.includes('mein_rundgang_vorlagen_alle')) return send({ status: 'ok', vorlagen: VORLAGEN });
@@ -89,7 +89,7 @@ async function neueSeite(schichten, extraRoutes, profilUeberschreibung) {
     await page.evaluate(() => document.getElementById('blatt').classList.contains('on'))
     && (await page.textContent('#blTitel')) === 'Rundgänge');
   check('Die verfügbare Kontrollrunde steht mit Objekt und Kunde da',
-    (await page.textContent('#blBody')).includes('Nachtrunde') && (await page.textContent('#blBody')).includes('Gerolag Center'));
+    (await page.textContent('#blBody')).includes('Nachtrunde') && (await page.textContent('#blBody')).includes('Muster Center'));
 
   rufe.length = 0;
   await page.click('#blBody button');

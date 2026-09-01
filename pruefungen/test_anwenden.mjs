@@ -12,7 +12,7 @@ const T = n => `${M}-${String(n).padStart(2, '0')}`;
 const ok = [], bad = [];
 const check = (n, c) => (c ? ok : bad).push(n);
 
-const OBJ = { id: 1, kunde_id: 1, kunde_name: 'Borner AG', name: 'Gerolag Center',
+const OBJ = { id: 1, kunde_id: 1, kunde_name: 'Beispiel AG', name: 'Muster Center',
   strasse: 'Industriestrasse 78', ort: '4601 Olten', kanton: 'SO', einsatzart: 'Revierdienst', aktiv: 1 };
 const V = (id, name, kuerzel, von, bis, h) => ({ id, name, kuerzel, art: 'arbeit', von, bis,
   arbeitszeit_h: h, auf_abruf: 0, farbe: null, gueltig_ab: '2026-08-01', gueltig_bis: null });
@@ -27,9 +27,9 @@ const MSL = VORLAGEN.map(v => ({ ...v, objekt_id: 1, von: v.von + ':00', bis: v.
   bedarf_so: 0, bedarf_feiertag: 0, intervall_tage: null, intervall_start: null,
   bedarf_intervall: 0, ersetzt_id: null, laeuft: true }));
 const MA = [
-  { id: 1, name: 'adrian', vorname: 'Adrian', nachname: 'von Arb', aktiv: 1, ist_admin: 1 },
-  { id: 2, name: 'valbon', vorname: 'Valbon', nachname: 'Redjepi', aktiv: 1, ist_admin: 0 },
-  { id: 3, name: 'daniele.ciardo', vorname: 'Daniele', nachname: 'Ciardo', aktiv: 1, ist_admin: 0 },
+  { id: 1, name: 'adrian', vorname: 'Adrian', nachname: 'Muster', aktiv: 1, ist_admin: 1 },
+  { id: 2, name: 'vito', vorname: 'Vito', nachname: 'Muster', aktiv: 1, ist_admin: 0 },
+  { id: 3, name: 'dario.beispiel', vorname: 'Dario', nachname: 'Beispiel', aktiv: 1, ist_admin: 0 },
 ];
 
 const rufe = [];
@@ -60,10 +60,10 @@ await page.route('**/api/**', route => {
     const n = (body.mitarbeiter || []).length;
     return send({ status: 'ok', nur_pruefen: !!body.nur_pruefen, tage: 31, gesetzt: n * 29,
       schon_da: 0, neue_schichten: 29, konflikte: [
-        { datum: T(3), name: 'Valbon Redjepi', was: 'Nachtdienst anderswo 22:00–23:00' },
-        { datum: T(9), name: 'Valbon Redjepi', was: 'Baustelle 21:30–23:30' }],
+        { datum: T(3), name: 'Vito Muster', was: 'Nachtdienst anderswo 22:00–23:00' },
+        { datum: T(9), name: 'Vito Muster', was: 'Baustelle 21:30–23:30' }],
       konflikte_gesamt: 2, schicht: 'SR · Revierdienst Schliessrunde',
-      personen: ['Valbon Redjepi'], von: body.von, bis: body.bis });
+      personen: ['Vito Muster'], von: body.von, bis: body.bis });
   }
   if (p.includes('ki_planung_parse')) return kiAntwort ? send(kiAntwort[0], kiAntwort[1])
     : send({ status: 'error', message: 'kein Mock' }, 502);
@@ -106,7 +106,7 @@ check('Vorlagenpflege bleibt erreichbar', await page.evaluate(() => {
 await page.evaluate(() => awAuf());
 await page.waitForTimeout(800);
 check('Fenster geht auf', await page.isVisible('#dlgAnwenden .dlg'));
-check('Fenster nennt das Objekt', (await page.textContent('#awText')).includes('Gerolag Center'));
+check('Fenster nennt das Objekt', (await page.textContent('#awText')).includes('Muster Center'));
 check('Eine Zeile je Vorlage',
   await page.evaluate(() => document.querySelectorAll('#awTabelle tbody tr').length === 2));
 check('Acht Zahlenfelder je Zeile',
@@ -183,7 +183,7 @@ const vor = await page.textContent('#mzVorschau');
 check('Vorschau nennt die Zahl der Einteilungen', /\d+ neu/.test(vor));
 check('Vorschau nennt entstehende Schichten', vor.includes('Schichten entstehen'));
 check('Vorschau benennt, was nicht geht', vor.includes('nicht möglich'));
-check('Die Konflikttage werden einzeln aufgezählt', vor.includes('Valbon Redjepi') && vor.includes('schon eingeteilt'));
+check('Die Konflikttage werden einzeln aufgezählt', vor.includes('Vito Muster') && vor.includes('schon eingeteilt'));
 check('Es wird gesagt, dass nichts gespeichert ist', vor.includes('noch nichts gespeichert'));
 await page.screenshot({ path: OUT + '/57-einteilen.png' });
 const vorMz = rufe.filter(r => r.p.includes('zuteilung_masse') && !r.body.nur_pruefen).length;
@@ -200,7 +200,7 @@ check('Fenster schliesst nach dem Einteilen', !(await page.isVisible('#dlgMasse 
 await page.evaluate(() => planDiktat('masterplan'));
 await page.waitForTimeout(400);
 check('Diktatfenster geht auf', await page.isVisible('#dlgPlanDiktat .dlg'));
-check('Es sagt, worauf es sich bezieht', (await page.textContent('#pdWo')).includes('Gerolag Center'));
+check('Es sagt, worauf es sich bezieht', (await page.textContent('#pdWo')).includes('Muster Center'));
 check('Es gibt ein Beispiel', (await page.textContent('#pdText')).includes('Schliessrunde'));
 await page.click('#pdBtn');
 await page.waitForTimeout(300);
@@ -238,8 +238,8 @@ kiAntwort = [{ status: 'ok', art: 'zuteilung', masterschicht_id: 3, mitarbeiter:
   von: T(1), bis: T(15) }, 200];
 await page.evaluate(() => planDiktat('zuteilung'));
 await page.waitForTimeout(300);
-check('Das Beispiel passt zur Befehlsart', (await page.textContent('#pdText')).includes('Valbon'));
-await page.fill('#pdText2', 'Setze Valbon vom 1. bis 15. auf die Schliessrunde');
+check('Das Beispiel passt zur Befehlsart', (await page.textContent('#pdText')).includes('Vito'));
+await page.fill('#pdText2', 'Setze Vito vom 1. bis 15. auf die Schliessrunde');
 await page.click('#pdBtn');
 await page.waitForTimeout(900);
 check('Die Art des Befehls wird mitgegeben',

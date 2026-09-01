@@ -14,10 +14,10 @@ const ok = [], bad = [];
 const check = (n, c) => (c ? ok : bad).push(n);
 
 const MA = { status: 'ok', mitarbeiter: [
-  { id: 1, name: 'adrian', ist_admin: 1, vorname: 'Adrian', nachname: 'Von Arb', aktiv: 1 },
-  { id: 2, name: 'daniele.ciardo', ist_admin: 0, vorname: 'Daniele', nachname: 'Ciardo', aktiv: 1 },
-  { id: 3, name: 'valbon', ist_admin: 0, vorname: 'Valbon', nachname: 'Redjepi', aktiv: 1 }]};
-const OBJEKT = { id: 1, kunde_id: 1, kunde_name: 'Borner AG', name: 'Gerolag Center',
+  { id: 1, name: 'adrian', ist_admin: 1, vorname: 'Adrian', nachname: 'Muster', aktiv: 1 },
+  { id: 2, name: 'dario.beispiel', ist_admin: 0, vorname: 'Dario', nachname: 'Beispiel', aktiv: 1 },
+  { id: 3, name: 'vito', ist_admin: 0, vorname: 'Vito', nachname: 'Muster', aktiv: 1 }]};
+const OBJEKT = { id: 1, kunde_id: 1, kunde_name: 'Beispiel AG', name: 'Muster Center',
   strasse: 'Industriestrasse 78', ort: '4601 Olten', kanton: 'SO', einsatzart: 'Revierdienst', aktiv: 1 };
 const OB = { status: 'ok', objekte: [OBJEKT, { ...OBJEKT, id: 2, name: 'Kirche Wangen', masterschichten: 0 }] };
 const V = (id, name, kuerzel, von, bis, h, art, abruf) => ({ id, name, kuerzel, art: art || 'arbeit',
@@ -41,22 +41,22 @@ BEDARF.push({ datum: T(5), masterschicht_id: 4, name: 'Patrouille auf Abruf', ku
 const P = (id, vn, nn) => ({ id, name: vn.toLowerCase(), vorname: vn, nachname: nn, zusage: 'offen' });
 let EINSAETZE = [
   // 3. — Schliessrunde voll besetzt (2 von 2)
-  { id: 101, kunde_id: 1, kunde_name: 'Borner AG', objekt_id: 1, masterschicht_id: 3,
+  { id: 101, kunde_id: 1, kunde_name: 'Beispiel AG', objekt_id: 1, masterschicht_id: 3,
     titel: 'SR · Revierdienst Schliessrunde', strasse: 'Industriestrasse 78', ort: '4601 Olten',
     einsatzart: 'Revierdienst', datum: T(3), von: '22:00:00', bis: '22:30:00', bedarf: 2,
-    status: 'geplant', bemerkung: null, mitarbeiter: [P(2, 'Daniele', 'Ciardo'), P(3, 'Valbon', 'Redjepi')] },
+    status: 'geplant', bemerkung: null, mitarbeiter: [P(2, 'Dario', 'Beispiel'), P(3, 'Vito', 'Muster')] },
   // 4. — Schliessrunde nur halb besetzt
-  { id: 102, kunde_id: 1, kunde_name: 'Borner AG', objekt_id: 1, masterschicht_id: 3,
+  { id: 102, kunde_id: 1, kunde_name: 'Beispiel AG', objekt_id: 1, masterschicht_id: 3,
     titel: 'SR · Revierdienst Schliessrunde', strasse: 'Industriestrasse 78', ort: '4601 Olten',
     einsatzart: 'Revierdienst', datum: T(4), von: '22:00:00', bis: '22:30:00', bedarf: 2,
-    status: 'geplant', bemerkung: null, mitarbeiter: [P(3, 'Valbon', 'Redjepi')] },
+    status: 'geplant', bemerkung: null, mitarbeiter: [P(3, 'Vito', 'Muster')] },
   // 5. — auf Abruf, niemand drauf
-  { id: 103, kunde_id: 1, kunde_name: 'Borner AG', objekt_id: 1, masterschicht_id: 4,
+  { id: 103, kunde_id: 1, kunde_name: 'Beispiel AG', objekt_id: 1, masterschicht_id: 4,
     titel: 'PA · Patrouille auf Abruf', strasse: 'Industriestrasse 78', ort: '4601 Olten',
     einsatzart: 'Revierdienst', datum: T(5), von: '14:00:00', bis: '16:00:00', bedarf: 1,
     status: 'provisorisch', bemerkung: null, mitarbeiter: [] },
   // 6. — abgesagt
-  { id: 104, kunde_id: 1, kunde_name: 'Borner AG', objekt_id: 1, masterschicht_id: 1,
+  { id: 104, kunde_id: 1, kunde_name: 'Beispiel AG', objekt_id: 1, masterschicht_id: 1,
     titel: 'ÖF · Revierdienst Öffnungsrunde', strasse: 'Industriestrasse 78', ort: '4601 Olten',
     einsatzart: 'Revierdienst', datum: T(6), von: '05:15:00', bis: '05:30:00', bedarf: 1,
     status: 'abgesagt', bemerkung: null, mitarbeiter: [] },
@@ -89,7 +89,7 @@ await page.route('**/api/**', route => {
   try { body = req.postData() ? JSON.parse(req.postData()) : null; } catch (e) { body = req.postData(); }
   rufe.push({ p, body, u });
   const send = (b, s) => route.fulfill({ status: s || 200, contentType: 'application/json', body: JSON.stringify(b) });
-  if (p.includes('login')) return send({ status: 'ok', token: 't', name: 'adrianvonarb', ist_admin: true });
+  if (p.includes('login')) return send({ status: 'ok', token: 't', name: 'hansmuster', ist_admin: true });
   if (p.includes('objektplan')) return send(plan());
   if (p.includes('einsatz_zuteilen')) return zuAntwort ? send(zuAntwort[0], zuAntwort[1])
     : send({ status: 'ok', id: 999, zugeteilt: (body.mitarbeiter || []).length, angelegt: true });
@@ -103,7 +103,7 @@ await page.route('**/api/**', route => {
 });
 
 await page.goto(`file://${WURZEL}/dashboard.html`);
-await page.fill('#gName', 'adrianvonarb'); await page.fill('#gPass', 'x'); await page.click('#gBtn');
+await page.fill('#gName', 'hansmuster'); await page.fill('#gPass', 'x'); await page.click('#gBtn');
 await page.waitForSelector('#shell.on'); await page.waitForTimeout(400);
 await page.evaluate(() => { if (!document.querySelector('.shell').classList.contains('schmal')) seiteUm(); });
 await page.evaluate(() => go('planung'));
@@ -198,7 +198,7 @@ check('Objektplan wird danach neu geladen',
   rufe.filter(r => r.p.includes('objektplan')).length >= 2);
 
 // ══════════════ DOPPELBELEGUNG BLEIBT GESPERRT (ENT-022)
-// Valbon ist am 3. um 22:00 eingeteilt — auf der Schliessrunde desselben Tages
+// Vito ist am 3. um 22:00 eingeteilt — auf der Schliessrunde desselben Tages
 // muss er wählbar sein (er ist ja drauf), auf einer anderen Schicht nicht.
 await page.evaluate(d => oplZelleAuf(3, d), T(3));
 await page.waitForTimeout(300);
@@ -213,7 +213,7 @@ await page.evaluate(() => closeDlg('dlgZuteilen'));
 EINSAETZE = EINSAETZE.concat([{ id: 105, kunde_id: 1, kunde_name: 'Fremdkunde', objekt_id: 9,
   masterschicht_id: null, titel: 'Nachtdienst anderswo', strasse: null, ort: '4600 Olten',
   einsatzart: 'Verkehrsdienst', datum: T(8), von: '05:00:00', bis: '06:00:00', bedarf: 1,
-  status: 'geplant', bemerkung: null, mitarbeiter: [P(3, 'Valbon', 'Redjepi')] }]);
+  status: 'geplant', bemerkung: null, mitarbeiter: [P(3, 'Vito', 'Muster')] }]);
 await page.evaluate(() => loadEinsaetze());
 await page.waitForTimeout(600);
 await page.evaluate(d => oplZelleAuf(1, d), T(8));
@@ -227,7 +227,7 @@ check('Freie Personen bleiben wählbar',
   await page.evaluate(() => !document.querySelector('#zuMa input[value="2"]').disabled));
 
 // Fehler vom Server wird angezeigt, nicht verschluckt
-zuAntwort = [{ status: 'error', message: 'Doppelbelegung: Daniele Ciardo ist bereits eingeteilt' }, 409];
+zuAntwort = [{ status: 'error', message: 'Doppelbelegung: Dario Beispiel ist bereits eingeteilt' }, 409];
 await page.check('#zuMa input[value="2"]');
 await page.click('#zuBtn');
 await page.waitForTimeout(400);
@@ -326,8 +326,8 @@ if (nurTeilDa) {
   await page.check('#oplNurTeil');
   await page.waitForTimeout(300);
   const nurTeil = await page.textContent('#pv-objektplan .gr.dicht');
-  check('„nur Eingeteilte" blendet Adrian aus', !nurTeil.includes('Adrian Von Arb'));
-  check('„nur Eingeteilte" behält Valbon', nurTeil.includes('Valbon Redjepi'));
+  check('„nur Eingeteilte" blendet Adrian aus', !nurTeil.includes('Adrian Muster'));
+  check('„nur Eingeteilte" behält Vito', nurTeil.includes('Vito Muster'));
   await page.uncheck('#oplNurTeil');
   await page.waitForTimeout(300);
 }
@@ -381,7 +381,7 @@ await page.setViewportSize({ width: 390, height: 844 });
 await page.waitForTimeout(300);
 const listeTxt = await page.textContent('#oplTage');
 check('Tagesliste nennt die Schicht', listeTxt.includes('Schliessrunde'));
-check('Tagesliste nennt die eingeteilten Namen', listeTxt.includes('Valbon Redjepi'));
+check('Tagesliste nennt die eingeteilten Namen', listeTxt.includes('Vito Muster'));
 check('Tagesliste benennt Unbesetztes', listeTxt.includes('niemand eingeteilt'));
 check('Tagesliste zeigt den Stand je Posten', listeTxt.includes('2/2'));
 // Tippflächen

@@ -40,7 +40,7 @@ const STATS = { status: 'ok',
 // erwartet), 12 einen deckungsgleichen (keine Warnung erwartet) -- Plan und
 // Rapport nebeneinander in den jeweiligen Fixturen unten geprueft.
 const RAPPORTE = { status: 'ok', rapporte: [
-  { id: 500, einsatz_id: 14, mitarbeiter_id: 2, mitarbeiter: 'daniele.ciardo',
+  { id: 500, einsatz_id: 14, mitarbeiter_id: 2, mitarbeiter: 'dario.beispiel',
     von: '08:15:00', bis: '12:00:00', pause_min: 0, netto_h: 3.75,
     bemerkung: null, erfasst_am: null },
   { id: 501, einsatz_id: 12, mitarbeiter_id: 1, mitarbeiter: 'adrian',
@@ -49,31 +49,31 @@ const RAPPORTE = { status: 'ok', rapporte: [
 ] };
 
 const MA = { status: 'ok', mitarbeiter: [
-  { id: 1, name: 'adrian', ist_admin: 1, vorname: 'Adrian', nachname: 'Von Arb', ort: '4632 Trimbach' },
-  { id: 2, name: 'daniele.ciardo', ist_admin: 0, vorname: 'Daniele', nachname: 'Ciardo', ort: '4600 Olten' },
-  { id: 3, name: 'hans.meier', ist_admin: 0, vorname: 'Hans', nachname: 'Meier', ort: '3000 Bern' }
+  { id: 1, name: 'adrian', ist_admin: 1, vorname: 'Adrian', nachname: 'Muster', ort: '4632 Trimbach' },
+  { id: 2, name: 'dario.beispiel', ist_admin: 0, vorname: 'Dario', nachname: 'Beispiel', ort: '4600 Olten' },
+  { id: 3, name: 'hans.muster', ist_admin: 0, vorname: 'Hans', nachname: 'Muster', ort: '3000 Bern' }
 ]};
 
 const KU = { status: 'ok', kunden: [
-  { id: 1, name: 'Studer Immobilien AG', strasse: 'Gerolagstrasse 12', ort: '4632 Trimbach', telefon: '062 111 22 33', email: null },
-  { id: 2, name: 'Einwohnergemeinde Niedergösgen', strasse: 'Dorfstrasse 4', ort: '5013 Niedergösgen', telefon: '062 849 00 00', email: null }
+  { id: 1, name: 'Muster Immobilien AG', strasse: 'Musterstrasse 12', ort: '4632 Trimbach', telefon: '062 111 22 33', email: null },
+  { id: 2, name: 'Einwohnergemeinde Musterdorf', strasse: 'Dorfstrasse 4', ort: '5013 Musterdorf', telefon: '062 849 00 00', email: null }
 ]};
 
-const A = { id: 1, name: 'adrian', vorname: 'Adrian', nachname: 'Von Arb' };
-const D = { id: 2, name: 'daniele.ciardo', vorname: 'Daniele', nachname: 'Ciardo' };
+const A = { id: 1, name: 'adrian', vorname: 'Adrian', nachname: 'Muster' };
+const D = { id: 2, name: 'dario.beispiel', vorname: 'Dario', nachname: 'Beispiel' };
 
 const EINSAETZE = { status: 'ok', einsaetze: [
   // heute, unterbesetzt (1 von 2)
-  { id: 11, kunde_id: 1, kunde_name: 'Studer Immobilien AG', titel: 'Baustelle Kreisel', strasse: 'Hauptstrasse 4',
+  { id: 11, kunde_id: 1, kunde_name: 'Muster Immobilien AG', titel: 'Baustelle Kreisel', strasse: 'Hauptstrasse 4',
     ort: '4632 Trimbach', einsatzart: 'Verkehrsdienst', datum: HEUTE, von: '07:00:00', bis: '16:00:00',
     bedarf: 2, status: 'geplant', bemerkung: null, mitarbeiter: [A], objekt_id: null },
   // heute, ueberschneidet sich zeitlich mit 11 -- selbe Person. Spontan
   // erzeugt (ENT-283), Rapport deckungsgleich -- NUR das Blitz-Symbol.
-  { id: 12, kunde_id: 2, kunde_name: 'Einwohnergemeinde Niedergösgen', titel: null, strasse: null,
-    ort: '5013 Niedergösgen', einsatzart: 'Verkehrsdienst', datum: HEUTE, von: '12:00:00', bis: '18:00:00',
+  { id: 12, kunde_id: 2, kunde_name: 'Einwohnergemeinde Musterdorf', titel: null, strasse: null,
+    ort: '5013 Musterdorf', einsatzart: 'Verkehrsdienst', datum: HEUTE, von: '12:00:00', bis: '18:00:00',
     bedarf: 1, status: 'bestaetigt', bemerkung: null, mitarbeiter: [A], spontan_erzeugt: true },
   // morgen, ueber Mitternacht, niemand zugeteilt
-  { id: 13, kunde_id: 1, kunde_name: 'Studer Immobilien AG', titel: 'Nachtdienst', strasse: null,
+  { id: 13, kunde_id: 1, kunde_name: 'Muster Immobilien AG', titel: 'Nachtdienst', strasse: null,
     ort: '4600 Olten', einsatzart: 'Sicherheitsdienst', datum: MORGEN, von: '22:00:00', bis: '06:00:00',
     bedarf: 1, status: 'geplant', bemerkung: null, mitarbeiter: [] },
   // vergangen, abgeschlossen (ENT-128: der Status entscheidet, nicht mehr das
@@ -81,11 +81,11 @@ const EINSAETZE = { status: 'ok', einsaetze: [
   // ENT-128 NICHT mehr "abgeschlossen", siehe test_einsatzplan.mjs)
   // Zusaetzlich spontan erzeugt (ENT-283) UND Rapport weicht ab -- BEIDE
   // Symbole nebeneinander, damit eine Ueberlappung auffiele.
-  { id: 14, kunde_id: 2, kunde_name: 'Einwohnergemeinde Niedergösgen', titel: null, strasse: null,
-    ort: '5013 Niedergösgen', einsatzart: 'Verkehrsdienst', datum: FRUEHER, von: '08:00:00', bis: '12:00:00',
+  { id: 14, kunde_id: 2, kunde_name: 'Einwohnergemeinde Musterdorf', titel: null, strasse: null,
+    ort: '5013 Musterdorf', einsatzart: 'Verkehrsdienst', datum: FRUEHER, von: '08:00:00', bis: '12:00:00',
     bedarf: 1, status: 'abgeschlossen', bemerkung: null, mitarbeiter: [D], spontan_erzeugt: true },
   // abgesagt, in der Zukunft -- zaehlt nirgends als offen
-  { id: 15, kunde_id: 1, kunde_name: 'Studer Immobilien AG', titel: null, strasse: null,
+  { id: 15, kunde_id: 1, kunde_name: 'Muster Immobilien AG', titel: null, strasse: null,
     ort: '4632 Trimbach', einsatzart: 'Verkehrsdienst', datum: SPAETER, von: '08:00:00', bis: '12:00:00',
     bedarf: 4, status: 'abgesagt', bemerkung: null, mitarbeiter: [] }
 ]};
@@ -116,9 +116,9 @@ async function setup(page) {
     if (path.includes('masterschicht_list')) return send({ status: 'ok', masterschichten: [] });
     if (path.includes('feiertage_list')) return send({ status: 'ok', feiertage: [], gepflegt: {} });
     if (path.includes('ki_router_parse')) return send({ status: 'ok', bereich: 'einsatz', aktion: 'neu',
-      felder: { kunde_name: 'Studer Immobilien AG', titel: 'Fasnachtsumzug', strasse: 'Hauptstrasse 4',
+      felder: { kunde_name: 'Muster Immobilien AG', titel: 'Fasnachtsumzug', strasse: 'Hauptstrasse 4',
                 ort: '4632 Trimbach', datum: MORGEN, von: '07:00', bis: '17:00', bedarf: 2 },
-      mitarbeiter_login_namen: ['hans.meier', 'daniele.ciardo', 'gibtsnicht'] });
+      mitarbeiter_login_namen: ['hans.muster', 'dario.beispiel', 'gibtsnicht'] });
     return send({ status: 'ok', id: 99 });
   });
 }
@@ -227,11 +227,11 @@ await page.fill('#pBis', '');
 await page.waitForTimeout(200);
 check('Ein offenes Ende zeigt die Schnellauswahl als „Zeitraum“ (kein Preset)',
   (await page.inputValue('#pSchnell')) === '');
-await page.fill('#pQ', 'niedergösgen');
+await page.fill('#pQ', 'musterdorf');
 await page.waitForTimeout(200);
 z = await zeilen();
 check('Suche filtert auf den Kunden', z.filter(r => !r.grp).length === 1);
-await page.fill('#pQ', 'Von Arb');
+await page.fill('#pQ', 'Adrian');
 await page.waitForTimeout(200);
 z = await zeilen();
 check('Suche findet ueber zugeteilte Person', z.filter(r => !r.grp).length === 2);
@@ -262,8 +262,8 @@ await page.waitForSelector('#drawer.on');
 await page.waitForTimeout(300);
 check('Einsatz oeffnet die Schublade', await page.isVisible('#drawer.on'));
 check('Oeffnen schreibt nichts', writes().length === 0);
-check('Kunde vorbefuellt', (await page.inputValue('#enEKunde_name')) === 'Einwohnergemeinde Niedergösgen');
-check('Arbeitsort vorbefuellt', (await page.inputValue('#enEOrt')) === '5013 Niedergösgen');
+check('Kunde vorbefuellt', (await page.inputValue('#enEKunde_name')) === 'Einwohnergemeinde Musterdorf');
+check('Arbeitsort vorbefuellt', (await page.inputValue('#enEOrt')) === '5013 Musterdorf');
 check('Zeiten vorbefuellt', (await page.inputValue('#enEVon')) === '12:00' && (await page.inputValue('#enEBis')) === '18:00');
 // Im Anlegen-Dialog waren die Zeitfelder gestaucht, bis von "07" nur noch
 // "0" zu sehen war: `.zeitpaar .zp .inp` griff seit ENT-110 auf VIER
@@ -303,7 +303,7 @@ check('Besetzungsstand unter der Auswahl', (await page.textContent('#enEMaFoot')
 await page.screenshot({ path: `${OUT}/23-planung-schublade.png` });
 
 // ── Sperre gegen Doppelbelegung
-// Daniele ist am selben Tag 08:00-12:00 bei einem vergangenen Einsatz -- kein
+// Dario ist am selben Tag 08:00-12:00 bei einem vergangenen Einsatz -- kein
 // Konflikt. Wir pruefen mit Adrian: er ist 07:00-16:00 eingeteilt (Einsatz 11).
 // Ein neuer Einsatz zur selben Zeit darf ihn nicht mehr anbieten.
 await zeitSetzen(page, '#enEVon', '08:00');
@@ -389,7 +389,7 @@ await page.fill('#enEOrt', '');
 await page.click('#drFoot .btn-primary');
 await page.waitForTimeout(250);
 check('Ohne Arbeitsort wird nicht gespeichert', writes().length === 0);
-await page.fill('#enEOrt', '5013 Niedergösgen');
+await page.fill('#enEOrt', '5013 Musterdorf');
 await page.click('#drFoot .btn-primary');
 await page.waitForTimeout(400);
 const sv = calls.find(c => c.path.includes('einsatz_save'));
@@ -541,7 +541,7 @@ check('Er öffnet die Routenliste, nicht eine einzelne Route',
   linkZiel && linkZiel.includes('/maps/dir/?api=1'));
 
 // Anlegen mit eingetragener Fahrzeit: es entstehen KEINE Positionen (ENT-122).
-await page.fill('#enNKunde_name', 'Studer Immobilien AG');
+await page.fill('#enNKunde_name', 'Muster Immobilien AG');
 await zeitSetzen(page, '#enNVon', '08:00');
 await zeitSetzen(page, '#enNBis', '12:00');
 await page.fill('#enNWeg_minuten', '30');
@@ -629,7 +629,7 @@ await page.waitForSelector('#dlgSprechen.on');
 await page.click('#gsBtn');
 await page.waitForTimeout(200);
 check('Leeres Diktat wird abgewiesen', !calls.some(c => c.path.includes('ki_router_parse')));
-await page.fill('#gsText', 'Neuer Einsatz für die Studer Immobilien AG morgen von 7 bis 17 Uhr');
+await page.fill('#gsText', 'Neuer Einsatz für die Muster Immobilien AG morgen von 7 bis 17 Uhr');
 await page.click('#gsBtn');
 await page.waitForSelector('#view-einsatzneu.on');
 await page.waitForTimeout(300);
@@ -639,7 +639,7 @@ check('Diktat sendet das heutige Datum mit', parse && parse.body.heute === HEUTE
 check('KRITISCH: Diktat speichert nichts', writes().length === 0);
 check('Titel weist auf Pruefung hin', (await page.textContent('#enNeuTitel')).includes('prüfen'));
 check('Hinweis sichtbar', await page.isVisible('#enNeuKiHint'));
-check('Kunde uebernommen', (await page.inputValue('#enNKunde_name')) === 'Studer Immobilien AG');
+check('Kunde uebernommen', (await page.inputValue('#enNKunde_name')) === 'Muster Immobilien AG');
 check('Bezeichnung uebernommen', (await page.inputValue('#enNTitel')) === 'Fasnachtsumzug');
 check('Arbeitsort uebernommen', (await page.inputValue('#enNOrt')) === '4632 Trimbach');
 check('Datum uebernommen', (await page.inputValue('#enNDatum')) === MORGEN);
@@ -653,7 +653,7 @@ check('Genannte Personen vorgehakt', await page.isChecked('#enNMa input[value="3
 check('Nicht genannte Person nicht vorgehakt', !(await page.isChecked('#enNMa input[value="1"]')));
 const hint = await page.textContent('#enNeuKiText');
 check('Hinweis nennt Beschriftungen statt Feldnamen', hint.includes('Kunde, Bezeichnung'));
-check('Hinweis nennt die vorgeschlagene Zuteilung', hint.includes('Daniele Ciardo') && hint.includes('Hans Meier'));
+check('Hinweis nennt die vorgeschlagene Zuteilung', hint.includes('Dario Beispiel') && hint.includes('Hans Muster'));
 check('Erfundener Name taucht nicht auf', !hint.includes('gibtsnicht'));
 check('Besetzung im Diktat berechnet', (await page.textContent('#enNMaFoot')).includes('2/2'));
 await page.screenshot({ path: `${OUT}/21-planung-diktat.png` });
@@ -903,7 +903,7 @@ check('KRITISCH: Abweichung UND Spontan-Herkunft stehen nebeneinander, ohne eina
 check('KRITISCH: der Name-Chip einer Person mit Rapport traegt das Rapport-Symbol',
   await page.evaluate(() => {
     const tr = [...document.querySelectorAll('#plTable tbody tr')].find(r => r.getAttribute('onclick') === 'openEinsatz(14)');
-    const chip = tr && [...tr.querySelectorAll('.crew .nm')].find(n => n.textContent.includes('Daniele Ciardo'));
+    const chip = tr && [...tr.querySelectorAll('.crew .nm')].find(n => n.textContent.includes('Dario Beispiel'));
     return !!chip && !!chip.querySelector('.nm-rap');
   }));
 check('Eine Person ohne Rapport zu dieser Schicht traegt KEIN Symbol',
@@ -1051,7 +1051,7 @@ await page.evaluate(tag => {
   // Bewusst gesetzt statt aus dem Bestand abgeleitet: Der Bestand ist an
   // dieser Stelle je nach vorherigem Schritt leer, und ein Test, der auf
   // leeren Daten "besteht", prueft nichts.
-  const mk = (id, objId) => ({ id, kunde_id: 1, kunde_name: 'Studer Immobilien AG',
+  const mk = (id, objId) => ({ id, kunde_id: 1, kunde_name: 'Muster Immobilien AG',
     titel: 'Zeile ' + id, strasse: 'Weg 1', ort: '4632 Trimbach',
     einsatzart: 'Verkehrsdienst', datum: tag, von: '08:00:00', bis: '12:00:00',
     bedarf: 1, status: 'geplant', bemerkung: null, mitarbeiter: [], objekt_id: objId });
@@ -1113,9 +1113,9 @@ await page.evaluate(() => {
     titel: 'Und ein ebenso langer Titel dazu', strasse: null, ort: '4632 Trimbach',
     einsatzart: 'Verkehrsdienst', datum: '2000-01-01', von: '07:00:00', bis: '16:00:00',
     bedarf: 5, status: 'geplant', bemerkung: null,
-    mitarbeiter: [{ id: 101, name: 'x1', vorname: 'Adrian', nachname: 'Von Arb' },
-      { id: 102, name: 'x2', vorname: 'Daniele', nachname: 'Ciardo' },
-      { id: 103, name: 'x3', vorname: 'Hans', nachname: 'Meier' }] });
+    mitarbeiter: [{ id: 101, name: 'x1', vorname: 'Adrian', nachname: 'Muster' },
+      { id: 102, name: 'x2', vorname: 'Dario', nachname: 'Beispiel' },
+      { id: 103, name: 'x3', vorname: 'Hans', nachname: 'Muster' }] });
   renderPlanung();
 });
 await page.waitForTimeout(200);
@@ -1212,13 +1212,13 @@ check('Dieselbe Trennlinie gilt auch fuer den Tagesplan',
 // etwas anderes bedeuten als nichts vorhanden).
 await page.evaluate(({ a, b, c, d, nah, fern }) => {
   einsaetze = [
-    { id: 201, kunde_id: 1, kunde_name: 'Strabag AG', titel: 'Belagseinbau', strasse: 'Kantonsstrasse 3',
+    { id: 201, kunde_id: 1, kunde_name: 'Grossbau AG', titel: 'Belagseinbau', strasse: 'Kantonsstrasse 3',
       ort: '6000 Luzern', einsatzart: 'Verkehrsdienst', datum: a, von: '06:00:00', bis: '18:00:00',
       bedarf: 1, status: 'geplant', bemerkung: null, mitarbeiter: [], serie_id: 201, objekt_id: null, masterschicht_id: null },
-    { id: 202, kunde_id: 1, kunde_name: 'Strabag AG', titel: 'Belagseinbau', strasse: 'Kantonsstrasse 3',
+    { id: 202, kunde_id: 1, kunde_name: 'Grossbau AG', titel: 'Belagseinbau', strasse: 'Kantonsstrasse 3',
       ort: '6000 Luzern', einsatzart: 'Verkehrsdienst', datum: b, von: '06:00:00', bis: '18:00:00',
       bedarf: 1, status: 'geplant', bemerkung: null, mitarbeiter: [], serie_id: 201, objekt_id: null, masterschicht_id: null },
-    { id: 203, kunde_id: 1, kunde_name: 'Strabag AG', titel: 'Belagseinbau', strasse: 'Kantonsstrasse 3',
+    { id: 203, kunde_id: 1, kunde_name: 'Grossbau AG', titel: 'Belagseinbau', strasse: 'Kantonsstrasse 3',
       ort: '6000 Luzern', einsatzart: 'Verkehrsdienst', datum: c, von: '06:00:00', bis: '18:00:00',
       bedarf: 1, status: 'geplant', bemerkung: null, mitarbeiter: [], serie_id: 201, objekt_id: null, masterschicht_id: null },
     { id: 204, kunde_id: 2, kunde_name: 'Einzelkunde AG', titel: null, strasse: null,

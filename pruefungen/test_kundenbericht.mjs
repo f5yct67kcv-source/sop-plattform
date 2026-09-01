@@ -69,28 +69,28 @@ check('KRITISCH: die App erfaehrt, ob schon unterschrieben wurde — aber NICHT 
 // ══════════════════════════════════════════════════════════════════════════
 // TEIL 2 — Das Blatt
 // ══════════════════════════════════════════════════════════════════════════
-const MA = [{ id: 1, name: 'adrian', vorname: 'Adrian', nachname: 'Von Arb', aktiv: 1, ist_admin: 1 }];
+const MA = [{ id: 1, name: 'adrian', vorname: 'Adrian', nachname: 'Muster', aktiv: 1, ist_admin: 1 }];
 const EINSAETZE = [
-  { id: 79, kunde_id: 1, kunde_name: 'pzu Consulting GmbH', titel: null, strasse: 'Mustergasse 2',
+  { id: 79, kunde_id: 1, kunde_name: 'abc Consulting GmbH', titel: null, strasse: 'Mustergasse 2',
     ort: '8200 Schaffhausen', einsatzart: 'Verkehrsdienst', datum: HEUTE, von: '07:15:00',
     bis: '15:30:00', bedarf: 2, status: 'abgeschlossen', bemerkung: null, objekt_id: null,
-    mitarbeiter: [{ id: 1, name: 'adrian', vorname: 'Adrian', nachname: 'Von Arb' },
-                  { id: 2, name: 'daniele', vorname: 'Daniele', nachname: 'Ciardo' }],
+    mitarbeiter: [{ id: 1, name: 'adrian', vorname: 'Adrian', nachname: 'Muster' },
+                  { id: 2, name: 'dario', vorname: 'Dario', nachname: 'Beispiel' }],
     hat_unterschrift: 1, unterzeichner: 'M. Bauleiter', unterschrift_am: HEUTE + ' 15:20:00' },
 ];
 // Genau der Fall aus dem Bildschirmfoto: gleicher Einsatz, VERSCHIEDENE Zeiten.
 const BERICHT = {
-  einsatz: { id: 79, kunde_name: 'pzu Consulting GmbH', titel: null, veranstaltung: null,
+  einsatz: { id: 79, kunde_name: 'abc Consulting GmbH', titel: null, veranstaltung: null,
     strasse: 'Mustergasse 2', ort: '8200 Schaffhausen', einsatzart: 'Verkehrsdienst',
     datum: HEUTE, von: '07:15:00', bis: '15:30:00', bemerkung: null },
-  kunde: { kunde_id: 1, kunde_nr: 'K0001', k_name: 'pzu Consulting GmbH', k_strasse: 'Mustergasse',
+  kunde: { kunde_id: 1, kunde_nr: 'K0001', k_name: 'abc Consulting GmbH', k_strasse: 'Mustergasse',
     k_hausnummer: '2', k_adresszusatz: null, k_plz: '8200', k_ort: 'Schaffhausen',
     re_name: null, re_zusatz: null, re_strasse: null, re_hausnummer: null, re_plz: null, re_ort: null },
   unterschrift: { bild: null, name: 'M. Bauleiter', am: HEUTE + ' 15:20:00', holte: 'adrian' },
   personen: [
-    { id: 10, name: 'Adrian Von Arb', von: '07:15:00', bis: '15:15:00', pause_min: 30,
+    { id: 10, name: 'Adrian Muster', von: '07:15:00', bis: '15:15:00', pause_min: 30,
       netto_h: 7.5, bemerkung: null, erfasst_am: HEUTE + ' 15:17:00' },
-    { id: 11, name: 'Daniele Ciardo', von: '07:15:00', bis: '16:15:00', pause_min: 45,
+    { id: 11, name: 'Dario Beispiel', von: '07:15:00', bis: '16:15:00', pause_min: 45,
       netto_h: 8.25, bemerkung: 'Verlängerung durch Bauleitung angeordnet.', erfasst_am: HEUTE + ' 16:20:00' },
   ],
 };
@@ -125,7 +125,7 @@ await page.evaluate(() => { window.__gedruckt = 0; window.print = () => { window
 
 const blatt = await page.evaluate(b => epBerichtBlatt(b), BERICHT);
 check('KRITISCH: das Blatt heisst Kundenrapport und nennt den Einsatz', /Kundenrapport/.test(blatt) && /Einsatz-Nr\. 79/.test(blatt));
-check('KRITISCH: BEIDE Personen stehen darauf', /Adrian Von Arb/.test(blatt) && /Daniele Ciardo/.test(blatt));
+check('KRITISCH: BEIDE Personen stehen darauf', /Adrian Muster/.test(blatt) && /Dario Beispiel/.test(blatt));
 check('KRITISCH: jede mit IHREN eigenen Zeiten — verschiedene Zeiten werden nicht geglättet',
   /15:15/.test(blatt) && /16:15/.test(blatt));
 check('KRITISCH: auch die unterschiedlichen Pausen stehen einzeln da',
@@ -136,9 +136,9 @@ check('Der Briefkopf aus den Betriebseinstellungen ist da', /CUPI 24 GmbH/.test(
 check('Die Fusszeile ebenfalls', /Musterweg 1/.test(blatt));
 check('KRITISCH: der zweite Fusszeilen-Block (Zweitsitz, ENT-169) steht daneben', /Bahnhofstrasse 3/.test(blatt));
 check('KRITISCH: eine Bemerkung wird der Person zugeordnet, nicht anonym angehängt',
-  /Daniele Ciardo:<\/b> Verlängerung/.test(blatt));
+  /Dario Beispiel:<\/b> Verlängerung/.test(blatt));
 check('Eine Person ohne Bemerkung erscheint dort nicht',
-  !/Adrian Von Arb:<\/b>/.test(blatt));
+  !/Adrian Muster:<\/b>/.test(blatt));
 check('KRITISCH: der Zeitpunkt der Unterschrift steht auf dem Blatt — sie deckt nicht mehr, als sie deckt',
   /Unterschrift erfasst am/.test(blatt) && /durch adrian/.test(blatt));
 check('Der Name des Unterzeichners steht da', /M\. Bauleiter/.test(blatt));
@@ -158,7 +158,7 @@ check('KRITISCH: der Knopf holt den Bericht frisch vom Server', berichtRufe > 0)
 check('KRITISCH: und loest das Drucken aus', await page.evaluate(() => window.__gedruckt > 0));
 check('Das Gedruckte ist der gemeinsame Bericht, nicht der Einzelrapport',
   await page.evaluate(() => /Kundenrapport/.test($('printArea').innerHTML)
-    && /Daniele Ciardo/.test($('printArea').innerHTML)));
+    && /Dario Beispiel/.test($('printArea').innerHTML)));
 
 // ── Kein leeres zweites Blatt beim Drucken (ENT-179): @page setzt einen
 // festen Rand, statt ihn dem Browser-Standard plus dem eigenen CSS-Padding

@@ -143,8 +143,8 @@ tr:hover td { background: var(--accent-light); }
 .detail-row .v { text-align: right; font-weight: 600; }
 .detail-sig-img { max-width: 100%; max-height: 100px; border: 1px solid var(--border); border-radius: 6px; margin-top: 6px; background: #fff; }
 
-.pw-wrap { position: relative; }
-.pw-wrap input { padding-right: 42px; }
+.pw-feld { position: relative; }
+.pw-feld input { padding-right: 42px; }
 .pw-toggle { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 17px; padding: 6px; color: var(--sub); line-height: 1; }
 
 #printArea { display: none; }
@@ -171,9 +171,9 @@ tr:hover td { background: var(--accent-light); }
     </div>
     <div class="field">
       <label>Passwort</label>
-      <div class="pw-wrap">
+      <div class="pw-feld">
         <input type="password" id="loginPassword" autocomplete="current-password" onkeydown="if(event.key==='Enter')submitLogin()">
-        <button type="button" class="pw-toggle" onclick="togglePw('loginPassword',this)">👁</button>
+        <button type="button" class="pw-toggle" onclick="togglePw('loginPassword',this)" aria-label="Passwort anzeigen">👁</button>
       </div>
     </div>
     <div style="text-align:right;margin:-4px 0 12px">
@@ -370,7 +370,10 @@ tr:hover td { background: var(--accent-light); }
       <div id="maChipList"></div>
       <div class="new-ma-row" style="flex-wrap:wrap">
         <input type="text" id="newMaInput" placeholder="Name..." style="min-width:120px">
-        <input type="password" id="newMaPassword" placeholder="Passwort (mind. 12 Zeichen)" style="min-width:120px" onkeydown="if(event.key==='Enter')addMa()">
+        <div class="pw-feld" style="min-width:120px">
+          <input type="password" id="newMaPassword" placeholder="Passwort (mind. 6 Zeichen)" style="width:100%" onkeydown="if(event.key==='Enter')addMa()">
+          <button type="button" class="pw-toggle" onclick="togglePw('newMaPassword',this)" aria-label="Passwort anzeigen">👁</button>
+        </div>
         <button class="btn btn-green btn-sm" onclick="addMa()" id="btn-add-ma">+ Hinzufügen</button>
       </div>
       <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
@@ -461,9 +464,9 @@ tr:hover td { background: var(--accent-light); }
     </div>
     <div class="field">
       <label>Passwort</label>
-      <div class="pw-wrap">
-        <input type="password" id="kiReviewPassword" placeholder="mind. 12 Zeichen">
-        <button type="button" class="pw-toggle" onclick="togglePw('kiReviewPassword',this)">👁</button>
+      <div class="pw-feld">
+        <input type="password" id="kiReviewPassword" placeholder="mind. 6 Zeichen">
+        <button type="button" class="pw-toggle" onclick="togglePw('kiReviewPassword',this)" aria-label="Passwort anzeigen">👁</button>
       </div>
     </div>
     <hr class="divider">
@@ -585,9 +588,9 @@ tr:hover td { background: var(--accent-light); }
     <hr class="divider">
     <div class="field" style="margin-bottom:10px">
       <label>Neues Passwort setzen</label>
-      <div class="pw-wrap">
-        <input type="password" id="maResetPassword" placeholder="mind. 12 Zeichen">
-        <button type="button" class="pw-toggle" onclick="togglePw('maResetPassword',this)">👁</button>
+      <div class="pw-feld">
+        <input type="password" id="maResetPassword" placeholder="mind. 6 Zeichen">
+        <button type="button" class="pw-toggle" onclick="togglePw('maResetPassword',this)" aria-label="Passwort anzeigen">👁</button>
       </div>
     </div>
     <button class="btn btn-ghost btn-sm" style="width:100%" onclick="resetMaPassword()">Passwort setzen</button>
@@ -682,6 +685,13 @@ tr:hover td { background: var(--accent-light); }
 
 <script src="unterschrift.js"></script>
 <script>
+// Muss zu PASSWORT_MIN in backend/anmeldung.php passen. Bis ENT-291 stand
+// hier dreimal die 12, waehrend der Server seit ENT-289 nur noch 6 verlangt
+// -- diese Maske versprach damit eine Strenge, die es nicht gab, und liess
+// gleichzeitig kein kuerzeres Passwort mehr zu, obwohl der Server es
+// annimmt. test_passwortfelder.mjs vergleicht die beiden Zahlen.
+const PW_MIN = 6;
+
 // ── STATE
 let rapports       = [];
 let deleteTargetId = null;
@@ -739,6 +749,9 @@ function togglePw(id, btn) {
   const show = inp.type === 'password';
   inp.type = show ? 'text' : 'password';
   btn.textContent = show ? '🙈' : '👁';
+  // Ohne das sagt eine Vorlesesoftware weiterhin "Passwort anzeigen",
+  // waehrend das Passwort schon offen dasteht (ENT-291).
+  btn.setAttribute('aria-label', show ? 'Passwort verbergen' : 'Passwort anzeigen');
 }
 
 function showForgotPw() {
@@ -1155,7 +1168,7 @@ function confirmKiMaCreate(){
   const name = document.getElementById('kiReviewLoginName').value.trim();
   const password = document.getElementById('kiReviewPassword').value;
   if (!name) { errEl.textContent = 'Login-Name erforderlich.'; errEl.style.display = ''; return; }
-  if (password.length < 12) { errEl.textContent = 'Passwort mindestens 12 Zeichen.'; errEl.style.display = ''; return; }
+  if (password.length < PW_MIN) { errEl.textContent = `Passwort mindestens ${PW_MIN} Zeichen.`; errEl.style.display = ''; return; }
   const body = {
     name, password,
     personalnummer: document.getElementById('kiReviewPersonalnummer').value.trim(),
@@ -1231,7 +1244,7 @@ function addMa(){
   const nameInp=document.getElementById('newMaInput'), passInp=document.getElementById('newMaPassword');
   const name=nameInp.value.trim(), password=passInp.value;
   if(!name){showToast(t('tName'));return;}
-  if(password.length<12){showToast('Passwort mindestens 12 Zeichen.');return;}
+  if(password.length<PW_MIN){showToast(`Passwort mindestens ${PW_MIN} Zeichen.`);return;}
   apiCall('mitarbeiter_create.php',{method:'POST',body:{name,password}}).then(({ok,data})=>{
     if(!ok||data.status!=='ok'){showToast(data.message||'Fehler.');return;}
     nameInp.value='';passInp.value='';
@@ -1287,7 +1300,7 @@ function saveMaEdit(){
 function resetMaPassword(){
   if(!maDetailTarget) return;
   const password = document.getElementById('maResetPassword').value;
-  if(password.length<12){showToast('Passwort mindestens 12 Zeichen.');return;}
+  if(password.length<PW_MIN){showToast(`Passwort mindestens ${PW_MIN} Zeichen.`);return;}
   apiCall('mitarbeiter_reset_password.php',{method:'POST',body:{name:maDetailTarget,password}}).then(({ok,data})=>{
     if(!ok||data.status!=='ok'){showToast(data.message||'Fehler.');return;}
     document.getElementById('maResetPassword').value='';

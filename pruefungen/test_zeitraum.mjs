@@ -35,8 +35,8 @@ const check = (n, c) => (c ? ok : bad).push(n);
 const PDF = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n');
 const datei = name => ({ name, mimeType: 'application/pdf', buffer: PDF });
 
-const MA = [{ id: 1, name: 'adrian', vorname: 'Adrian', nachname: 'von Arb', aktiv: 1, ist_admin: 1 }];
-const KU = [{ id: 1, name: 'Stranag', strasse: 'Kantonsstrasse 3', ort: '6000 Luzern' }];
+const MA = [{ id: 1, name: 'adrian', vorname: 'Adrian', nachname: 'Muster', aktiv: 1, ist_admin: 1 }];
+const KU = [{ id: 1, name: 'Nordbau', strasse: 'Kantonsstrasse 3', ort: '6000 Luzern' }];
 const EINSAETZE = [];
 let idSeq = 500;
 const rufe = [];
@@ -99,7 +99,7 @@ async function formular(von, bis, zVon, zBis) {
   await page.evaluate(() => openEinsatzNeu());
   await page.waitForTimeout(350);
   await page.evaluate(({ von, zVon, zBis }) => {
-    $('enNKunde_name').value = 'Stranag';
+    $('enNKunde_name').value = 'Nordbau';
     $('enNStrasse').value = 'Kantonsstrasse 3';
     $('enNOrt').value = '6000 Luzern';
     $('enNKanton').value = 'LU';
@@ -199,7 +199,7 @@ check('KRITISCH: mit den drei aufeinanderfolgenden Daten',
 check('KRITISCH: jeder Tag traegt dieselbe Zeit',
   reihe.every(r => r.body.von === '20:00' && r.body.bis === '04:00'));
 check('Kunde und Arbeitsort gehen an jeden Tag mit',
-  reihe.every(r => r.body.kunde_name === 'Stranag' && r.body.ort === '6000 Luzern'));
+  reihe.every(r => r.body.kunde_name === 'Nordbau' && r.body.ort === '6000 Luzern'));
 
 // ── Rueckwaerts laufender Zeitraum: gar nichts
 vor = speicherRufe().length;

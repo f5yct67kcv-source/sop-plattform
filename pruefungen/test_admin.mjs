@@ -10,28 +10,28 @@ const STATS = {
   kpi: { rapporte_monat: 47, rapporte_vormonat: 39, stunden_monat: 386.25, stunden_vormonat: 341,
          mitarbeiter: 3, kunden: 2, rapporte_total: 284 },
   verlauf: Array.from({ length: 8 }, (_, i) => ({ kw: 26 + i, von: '2026-06-22', stunden: 80 + i * 6, anzahl: 10 })),
-  angemeldet: [{ name: 'adrian', vorname: 'Adrian', nachname: 'Von Arb', letzte_anmeldung: '2026-08-17 17:53:00' }],
-  pro_mitarbeiter: [{ name: 'adrian', vorname: 'Adrian', nachname: 'Von Arb', stunden: '96.00', anzahl: 12 }],
-  letzte_rapporte: [{ id: 284, datum: '2026-08-17', mitarbeiter: 'adrian', kunde: 'Studer Immobilien AG', ort: '4632 Trimbach', einsatzart: 'Verkehrsdienst', netto_h: '8.50' }]
+  angemeldet: [{ name: 'adrian', vorname: 'Adrian', nachname: 'Muster', letzte_anmeldung: '2026-08-17 17:53:00' }],
+  pro_mitarbeiter: [{ name: 'adrian', vorname: 'Adrian', nachname: 'Muster', stunden: '96.00', anzahl: 12 }],
+  letzte_rapporte: [{ id: 284, datum: '2026-08-17', mitarbeiter: 'adrian', kunde: 'Muster Immobilien AG', ort: '4632 Trimbach', einsatzart: 'Verkehrsdienst', netto_h: '8.50' }]
 };
 
 const RAPPORTE = { status: 'ok', rapporte: [
-  { id: 284, datum: '2026-08-17', mitarbeiter: 'daniele.ciardo', kunde: 'Studer Immobilien AG', strasse: 'Gerolagstrasse 12', ort: '4632 Trimbach', auftrag_nr: 'A-118', einsatzart: 'Verkehrsdienst', von: '07:00:00', bis: '16:00:00', pause_min: 30, netto_h: '8.50', unterzeichner: 'R. Studer', unterschrift: null, bemerkung: null, erfasst_am: '2026-08-17 16:12:00' }
+  { id: 284, datum: '2026-08-17', mitarbeiter: 'dario.beispiel', kunde: 'Muster Immobilien AG', strasse: 'Musterstrasse 12', ort: '4632 Trimbach', auftrag_nr: 'A-118', einsatzart: 'Verkehrsdienst', von: '07:00:00', bis: '16:00:00', pause_min: 30, netto_h: '8.50', unterzeichner: 'R. Muster', unterschrift: null, bemerkung: null, erfasst_am: '2026-08-17 16:12:00' }
 ]};
 
 const MA = { status: 'ok', mitarbeiter: [
-  { name: 'adrian', ist_admin: 1, personalnummer: '1001', anrede: 'Herr', vorname: 'Adrian', nachname: 'Von Arb', geburtsdatum: '1988-04-12', strasse: 'Hochgasse 7', ort: '4632 Trimbach', telefon: '062 555 11 22', mobil: '079 555 11 22', email: 'a@cupi24.ch', erstellt_am: '2026-01-05 10:00:00' },
-  { name: 'daniele.ciardo', ist_admin: 0, personalnummer: '1002', anrede: 'Herr', vorname: 'Daniele', nachname: 'Ciardo', geburtsdatum: null, strasse: 'Bahnhofstrasse 9', ort: '4600 Olten', telefon: null, mobil: '079 444 33 22', email: null, erstellt_am: '2026-02-01 09:00:00' }
+  { name: 'adrian', ist_admin: 1, personalnummer: '1001', anrede: 'Herr', vorname: 'Adrian', nachname: 'Muster', geburtsdatum: '1988-04-12', strasse: 'Hochgasse 7', ort: '4632 Trimbach', telefon: '062 555 11 22', mobil: '079 555 11 22', email: 'a@cupi24.ch', erstellt_am: '2026-01-05 10:00:00' },
+  { name: 'dario.beispiel', ist_admin: 0, personalnummer: '1002', anrede: 'Herr', vorname: 'Dario', nachname: 'Beispiel', geburtsdatum: null, strasse: 'Bahnhofstrasse 9', ort: '4600 Olten', telefon: null, mobil: '079 444 33 22', email: null, erstellt_am: '2026-02-01 09:00:00' }
 ]};
 
 const KU = { status: 'ok', naechste_kundennummer: 'K0003', kunden: [
-  { id: 1, kundennummer: 'K0001', art: 'unternehmen', name: 'Studer Immobilien AG', strasse: 'Gerolagstrasse',
+  { id: 1, kundennummer: 'K0001', art: 'unternehmen', name: 'Muster Immobilien AG', strasse: 'Musterstrasse',
     hausnummer: '12', plz: '4632', ort: 'Trimbach', uid: 'CHE-100.200.300', telefon: '062 111 22 33',
-    kontaktperson: null, email: 'info@studer.ch', notiz: null, aktiv: 1,
-    kontaktwege: [{ art: 'telefon', wert: '062 111 22 33' }, { art: 'email', wert: 'info@studer.ch' }],
+    kontaktperson: null, email: 'info@muster.ch', notiz: null, aktiv: 1,
+    kontaktwege: [{ art: 'telefon', wert: '062 111 22 33' }, { art: 'email', wert: 'info@muster.ch' }],
     personen: [] },
-  { id: 2, kundennummer: 'K0002', art: 'unternehmen', name: 'Einwohnergemeinde Niedergösgen', strasse: 'Dorfstrasse',
-    hausnummer: '4', plz: '5013', ort: 'Niedergösgen', telefon: '062 849 00 00', kontaktperson: null,
+  { id: 2, kundennummer: 'K0002', art: 'unternehmen', name: 'Einwohnergemeinde Musterdorf', strasse: 'Dorfstrasse',
+    hausnummer: '4', plz: '5013', ort: 'Musterdorf', telefon: '062 849 00 00', kontaktperson: null,
     email: null, notiz: null, aktiv: 1, kontaktwege: [{ art: 'telefon', wert: '062 849 00 00' }], personen: [] }
 ]};
 
@@ -72,19 +72,19 @@ async function setup(page) {
     if (path.includes('ki_router_parse')) {
       const t = (body.text || '').toLowerCase();
       if (t.includes('ändere')) return send({ status: 'ok', bereich: 'mitarbeiter', aktion: 'aendern',
-        mitarbeiter_login_name: 'daniele.ciardo', aenderungen: { strasse: 'Musterstrasse 1', ort: '3000 Bern' } });
+        mitarbeiter_login_name: 'dario.beispiel', aenderungen: { strasse: 'Musterstrasse 1', ort: '3000 Bern' } });
       if (t.includes('neuer mitarbeiter')) return send({ status: 'ok', bereich: 'mitarbeiter', aktion: 'neu', felder: {
-        vorname: 'Hans', nachname: 'Meier', personalnummer: '2530', anrede: 'Herr',
+        vorname: 'Hans', nachname: 'Muster', personalnummer: '2530', anrede: 'Herr',
         geburtsdatum: '1990-05-03', strasse: 'Musterweg 1', ort: '3000 Bern', mobil: '079 123 45 67' } });
       // Telefon absichtlich nicht erkannt -- prueft Hinweis auf offene Pflichtfelder
       if (t.includes('neuer kunde')) return send({ status: 'ok', bereich: 'kunde', aktion: 'neu', felder: {
-        name: 'Studer Immobilien AG', strasse: 'Gerolagstrasse 12', ort: '4632 Trimbach', email: 'info@studer-immo.ch' } });
+        name: 'Muster Immobilien AG', strasse: 'Musterstrasse 12', ort: '4632 Trimbach', email: 'info@muster-immo.ch' } });
       return send({ status: 'error', message: 'nicht erkannt' });
     }
     // Recherche im Anlegen-Dialog selbst (ENT-042) -- unabhaengig vom Router.
     if (path.includes('ki_kunden_recherche')) return send({
       status: 'ok',
-      felder: { name: 'Borner AG', strasse: 'Industriestrasse 4', ort: '4652 Winznau', telefon: '062 285 20 20' },
+      felder: { name: 'Beispiel AG', strasse: 'Industriestrasse 4', ort: '4652 Musterdorf', telefon: '062 285 20 20' },
       recherchiert: ['strasse', 'ort', 'telefon'],
       quellen: ['https://www.zefix.ch/de/search/entity/list/firm/1234567'],
     });
@@ -115,7 +115,7 @@ calls = [];
 // Seit ENT-048 fuehrt der Zeilenklick auf die Detailseite (Muster wie bei
 // Kunden); Bearbeiten liegt dort als Knopf. Der Weg ist laenger, die
 // Schublade dahinter unveraendert -- genau das pruefen die Zeilen unten.
-await page.click('#maTable tbody tr:nth-child(2)');   // daniele.ciardo
+await page.click('#maTable tbody tr:nth-child(2)');   // dario.beispiel
 await page.waitForTimeout(300);
 check('Zeile oeffnet die Detailseite (ENT-048)',
   await page.isVisible('#mv-detail') && !(await page.isVisible('#drawer.on')));
@@ -124,7 +124,7 @@ await page.waitForSelector('#mv-bearbeiten.on');
 await page.waitForTimeout(400);
 check('Bearbeiten oeffnet die volle Flaeche statt einer Schublade (ENT-072)',
   await page.isVisible('#mv-bearbeiten.on') && !(await page.isVisible('#drawer.on')));
-check('Titel = voller Name', (await page.textContent('#mbName')).includes('Daniele Ciardo'));
+check('Titel = voller Name', (await page.textContent('#mbName')).includes('Dario Beispiel'));
 check('Felder vorbefuellt', (await page.inputValue('#mb_strasse')) === 'Bahnhofstrasse 9');
 check('Leeres Feld bleibt leer', (await page.inputValue('#mb_telefon')) === '');
 check('Anrede-Auswahl gesetzt', (await page.inputValue('#mb_anrede')) === 'Herr');
@@ -148,7 +148,7 @@ await page.click('#mbSpeichern');
 await page.waitForTimeout(400);
 const upd = calls.find(c => c.path.includes('mitarbeiter_update'));
 check('Speichern ruft mitarbeiter_update', !!upd);
-check('Speichern sendet richtigen Login-Namen', upd && upd.body.name === 'daniele.ciardo');
+check('Speichern sendet richtigen Login-Namen', upd && upd.body.name === 'dario.beispiel');
 check('Speichern sendet geaenderte Nummer', upd && upd.body.telefon === '062 999 88 77');
 check('Speichern sendet die alten zehn Felder weiterhin', upd && ['personalnummer','anrede','vorname','nachname','geburtsdatum','strasse','ort','telefon','mobil','email'].every(f => f in upd.body));
 check('Speichern sendet auch die neuen Felder (ENT-072)',
@@ -165,16 +165,113 @@ await page.waitForSelector('#mv-bearbeiten.on');
 await page.waitForTimeout(400);
 await page.click('#mbtab-zugang');
 await page.waitForTimeout(250);
-await page.fill('#maPw', 'kurz');
-await page.click('#mbKarten .zone .btn-plain');
+const setzen = () => page.click('#mbKarten .mb-bereich.on .zone button:has-text("Setzen")');
+
+// Maskierung und Auge (ENT-291), am gerenderten Zustand gemessen.
+// Bis hierher standen beide Felder auf type="text" -- wer jemandem ueber
+// die Schulter sah, las das neue Passwort im Klartext mit, und bei einer
+// Gegenbestaetigung stand es sogar zweimal offen da.
+{
+  const typ = id => page.getAttribute('#' + id, 'type');
+  check('KRITISCH: beide Passwortfelder sind im Ausgangszustand maskiert',
+    (await typ('maPw')) === 'password' && (await typ('maPw2')) === 'password');
+
+  await page.fill('#maPw', 'geheimniskraemerei');
+  await page.click('.pw-feld:has(#maPw) .pw-toggle');
+  check('Das Auge deckt genau EIN Feld auf, nicht beide',
+    (await typ('maPw')) === 'text' && (await typ('maPw2')) === 'password');
+  check('Der eingegebene Wert ueberlebt das Umschalten',
+    (await page.inputValue('#maPw')) === 'geheimniskraemerei');
+  check('Die Beschriftung sagt jetzt das Gegenteil -- sonst liest eine Vorlesesoftware das Falsche',
+    (await page.getAttribute('.pw-feld:has(#maPw) .pw-toggle', 'aria-label')) === 'Passwort verbergen');
+  await page.click('.pw-feld:has(#maPw) .pw-toggle');
+  check('Nochmals tippen verdeckt wieder', (await typ('maPw')) === 'password');
+
+  // Das Auge darf nicht auf dem Text liegen: Der rechte Innenabstand des
+  // Feldes muss mindestens so breit sein wie der Knopf.
+  const mass = await page.evaluate(() => {
+    const inp = document.getElementById('maPw');
+    const btn = inp.parentElement.querySelector('.pw-toggle');
+    const ri = inp.getBoundingClientRect(), rb = btn.getBoundingClientRect();
+    return { polster: parseFloat(getComputedStyle(inp).paddingRight),
+             breite: rb.width, hoehe: rb.height,
+             innerhalb: rb.right <= ri.right + 1 && rb.top >= ri.top - 1 };
+  });
+  check('Der Knopf sitzt im Feld und nicht daneben', mass.innerhalb);
+  check(`Das Auge verdeckt den Text nicht (Polster ${Math.round(mass.polster)} px >= Knopf ${Math.round(mass.breite)} px)`,
+    mass.polster >= mass.breite);
+
+  // Handy: mindestens 44 px Trefferflaeche (CLAUDE.md). Auf dem Handy ist
+  // das Auge der einzige Weg, einen Vertipper zu finden -- ein Knopf, den
+  // man nicht trifft, ist keiner.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForTimeout(200);
+  const handy = await page.evaluate(() => {
+    const b = document.getElementById('maPw').parentElement.querySelector('.pw-toggle')
+      .getBoundingClientRect();
+    return { w: b.width, h: b.height };
+  });
+  check(`KRITISCH: Auge auf dem Handy mindestens 44 px (gemessen ${Math.round(handy.w)}x${Math.round(handy.h)})`,
+    handy.w >= 44 && handy.h >= 44);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.waitForTimeout(200);
+  await page.fill('#maPw', '');
+}
+
+await page.fill('#maPw', 'ab');
+await page.fill('#maPw2', 'ab');
+await setzen();
 await page.waitForTimeout(250);
 check('Zu kurzes Passwort wird abgewiesen', !calls.some(c => c.path.includes('reset_password')));
-await page.fill('#maPw', 'blauerstuhlamsee');
-await page.click('#mbKarten .zone .btn-plain');
+
+// Gegenbestaetigung (ENT-289): Ein vertipptes Passwort sperrt die Person aus
+// ihrem eigenen Konto aus, und gemerkt wird es erst beim naechsten Anmelden.
+await page.fill('#maPw', 'blauerstuhl');
+await page.fill('#maPw2', 'blauerstuhI');   // grosses i statt l -- der klassische Vertipper
+await page.waitForTimeout(150);
+check('KRITISCH: eine Abweichung wird schon beim Tippen benannt, nicht erst beim Setzen',
+  await page.isVisible('#maPwErr')
+  && /nicht überein/.test(await page.textContent('#maPwErr')));
+await setzen();
+await page.waitForTimeout(250);
+check('KRITISCH: bei Abweichung wird NICHTS gesendet -- sonst haette die Person ein Passwort, das sie nicht kennt',
+  !calls.some(c => c.path.includes('reset_password')));
+
+await page.fill('#maPw2', 'blauerstuhl');
+await page.waitForTimeout(150);
+check('Stimmen beide ueberein, verschwindet die Meldung wieder',
+  !(await page.isVisible('#maPwErr')));
+await setzen();
 await page.waitForTimeout(300);
 const pw = calls.find(c => c.path.includes('reset_password'));
-check('Gueltiges Passwort wird gesendet', pw && pw.body.password === 'blauerstuhlamsee' && pw.body.name === 'daniele.ciardo');
-check('Passwortfeld danach geleert', (await page.inputValue('#maPw')) === '');
+check('Gueltiges Passwort wird gesendet', pw && pw.body.password === 'blauerstuhl' && pw.body.name === 'dario.beispiel');
+check('Beide Passwortfelder danach geleert',
+  (await page.inputValue('#maPw')) === '' && (await page.inputValue('#maPw2')) === '');
+
+// Oberflaeche und Server muessen dieselbe Mindestlaenge kennen (ENT-289).
+// Laufen sie auseinander, laesst die Maske etwas zu, das der Server abweist
+// -- oder schlimmer: sie verspricht eine Strenge, die es nicht gibt. Genau
+// so ein Fall lag in app.html: Der Text sagte "mindestens 12 Zeichen",
+// geprueft wurden 6.
+{
+  const { readFileSync } = await import('fs');
+  const html = readFileSync(`${WURZEL}/dashboard.html`, 'utf8');
+  const php  = readFileSync(`${WURZEL}/backend/anmeldung.php`, 'utf8');
+  const zahl = (text, muster) => { const m = text.match(muster); return m ? Number(m[1]) : null; };
+  const jsMin    = zahl(html, /const PW_MIN\s*=\s*(\d+)/);
+  const jsAdmin  = zahl(html, /PW_MIN_ADMIN\s*=\s*(\d+)/);
+  const phpMin   = zahl(php,  /const PASSWORT_MIN\s*=\s*(\d+)/);
+  const phpAdmin = zahl(php,  /const PASSWORT_MIN_ADMIN\s*=\s*(\d+)/);
+  check('KRITISCH: Oberflaeche und Server verlangen dieselbe Passwortlaenge',
+    jsMin !== null && jsMin === phpMin && jsAdmin !== null && jsAdmin === phpAdmin);
+  // Die Platzhalter selbst stehen nicht mehr hier: Seit ENT-291 setzen sie
+  // die Zahl aus PW_MIN ein, statt sie abzuschreiben. Eine Suche nach
+  // Ziffern faende hier also gar nichts mehr und waere still gruen. Wer
+  // NENNT welche Zahl, prueft darum test_passwortfelder.mjs ueber alle vier
+  // Oberflaechen -- inklusive index.html, die genau hier durchgerutscht ist.
+  check('Die Mindestlaenge steht nicht mehrfach abgeschrieben in der Maske',
+    !/placeholder="mind\.? \d+ Zeichen"/.test(html));
+}
 
 // Entfernen mit Rueckfrage
 calls = [];
@@ -190,7 +287,7 @@ await page.waitForSelector('#dlgConfirm.on');
 await page.click('#cfBtn');
 await page.waitForTimeout(500);
 const deact = calls.find(c => c.path.includes('deactivate'));
-check('Bestaetigen deaktiviert den richtigen Namen', deact && deact.body.name === 'daniele.ciardo');
+check('Bestaetigen deaktiviert den richtigen Namen', deact && deact.body.name === 'dario.beispiel');
 check('KRITISCH: nach dem Entfernen steht die Liste offen, keine leere Detailseite',
   await page.isVisible('#mv-liste.on'));
 
@@ -224,7 +321,7 @@ check('Der Knopf sagt "anlegen", nicht "speichern"',
 await page.click('#mbSpeichern');
 await page.waitForTimeout(200);
 check('Ohne Login-Name kein Anlegen', writes().length === 0 && await page.isVisible('#mbErr'));
-await page.fill('#mbNeuName', 'hans.meier');
+await page.fill('#mbNeuName', 'hans.muster');
 await page.fill('#mbNeuPass', '123');
 await page.click('#mbSpeichern');
 await page.waitForTimeout(200);
@@ -236,7 +333,7 @@ await page.check('#mbNeuRolle_verwaltung');
 await page.click('#mbSpeichern');
 await page.waitForTimeout(600);
 const cr = calls.find(c => c.path.includes('mitarbeiter_create'));
-check('Anlegen sendet Name und Passwort', cr && cr.body.name === 'hans.meier' && cr.body.password === 'blauerstuhlamsee');
+check('Anlegen sendet Name und Passwort', cr && cr.body.name === 'hans.muster' && cr.body.password === 'blauerstuhlamsee');
 check('Die gewählte Rolle geht mit (ENT-077)',
   cr && Array.isArray(cr.body.rollen) && cr.body.rollen.includes('verwaltung'));
 check('Detailfeld wird mitgesendet', cr && cr.body.vorname === 'Hans');
@@ -253,7 +350,7 @@ await page.waitForSelector('#dlgSprechen.on');
 await page.click('#gsBtn');
 await page.waitForTimeout(200);
 check('Leeres Diktat wird abgewiesen', !calls.some(c => c.path.includes('ki_router_parse')));
-await page.fill('#gsText', 'Neuer Mitarbeiter Hans Meier, Personalnummer 2530');
+await page.fill('#gsText', 'Neuer Mitarbeiter Hans Muster, Personalnummer 2530');
 await page.click('#gsBtn');
 await page.waitForSelector('#mv-bearbeiten.on');
 await page.waitForTimeout(500);
@@ -266,7 +363,7 @@ check('Der Hinweis sagt, dass das Passwort selbst zu setzen ist',
 check('Vorname uebernommen', (await page.inputValue('#mb_vorname')) === 'Hans');
 check('Personalnummer uebernommen', (await page.inputValue('#mb_personalnummer')) === '2530');
 check('Geburtsdatum uebernommen', (await page.inputValue('#mb_geburtsdatum')) === '1990-05-03');
-check('Login-Name vorgeschlagen', (await page.inputValue('#mbNeuName')) === 'hans.meier');
+check('Login-Name vorgeschlagen', (await page.inputValue('#mbNeuName')) === 'hans.muster');
 check('Passwort NICHT vorbelegt', (await page.inputValue('#mbNeuPass')) === '');
 check('Erkannte Felder blau markiert', (await page.$$('#mbKarten .inp.ki')).length >= 6);
 check('Nicht erkanntes Feld unmarkiert', !(await page.getAttribute('#mb_telefon', 'class')).includes('ki'));
@@ -291,7 +388,7 @@ await page.screenshot({ path: `${OUT}/10-diktat-pruefen.png` });
 calls = [];
 await page.click('#btnSprechen');
 await page.waitForSelector('#dlgSprechen.on');
-await page.fill('#gsText', 'Ändere die Adresse von Daniele Ciardo zu Musterstrasse 1');
+await page.fill('#gsText', 'Ändere die Adresse von Dario Beispiel zu Musterstrasse 1');
 await page.click('#gsBtn');
 await page.waitForSelector('#mv-bearbeiten.on');
 await page.waitForTimeout(400);
@@ -303,7 +400,7 @@ check('Neue Strasse eingesetzt', (await page.inputValue('#mb_strasse')) === 'Mus
 // PLZ neben einem neuen Ort.
 check('KRITISCH: "3000 Bern" wird in PLZ und Ort getrennt',
   (await page.inputValue('#mb_plz')) === '3000' && (await page.inputValue('#mb_ort')) === 'Bern');
-check('Unveraenderte Felder bleiben', (await page.inputValue('#mb_vorname')) === 'Daniele');
+check('Unveraenderte Felder bleiben', (await page.inputValue('#mb_vorname')) === 'Dario');
 check('Geaenderte Felder markiert', (await page.$$('#mbKarten .inp.ki')).length === 3);
 check('Diktat-Hinweis steht ueber der Flaeche', await page.isVisible('#mbKi .ki-hint.on'));
 check('Hinweis nennt Beschriftungen statt Feldnamen',
@@ -351,7 +448,7 @@ check('Leere Kontaktperson geht gar nicht erst mit',
 await page.click('#kuTable tbody tr:first-child');
 await page.waitForTimeout(250);
 check('Zeile oeffnet die Detailseite statt der Schublade', await page.evaluate(() => document.getElementById('kv-detail').classList.contains('on')));
-check('Detailseite zeigt den Kundennamen', (await page.textContent('#kdName')) === 'Studer Immobilien AG');
+check('Detailseite zeigt den Kundennamen', (await page.textContent('#kdName')) === 'Muster Immobilien AG');
 check('Detailseite zeigt die Kundennummer', (await page.textContent('#kdSub')).includes('K0001'));
 
 // Bearbeiten läuft seit ENT-044 durch denselben Dialog wie das Anlegen --
@@ -360,7 +457,7 @@ calls = [];
 await page.click('#kv-detail button:has-text("Bearbeiten")');
 await page.waitForSelector('#dlgKunde.on');
 await page.waitForTimeout(250);
-check('Bearbeiten oeffnet denselben Dialog mit den Kundendaten', (await page.inputValue('#ku_name')) === 'Studer Immobilien AG');
+check('Bearbeiten oeffnet denselben Dialog mit den Kundendaten', (await page.inputValue('#ku_name')) === 'Muster Immobilien AG');
 check('Bearbeiten zeigt die vergebene Kundennummer', (await page.inputValue('#ku_kundennummer')) === 'K0001');
 check('Kundennummer bleibt auch beim Bearbeiten unveraenderlich',
   (await page.getAttribute('#ku_kundennummer', 'readonly')) !== null);
@@ -400,21 +497,21 @@ await page.waitForSelector('#kuTable table');
 calls = [];
 await page.click('#btnSprechen');
 await page.waitForSelector('#dlgSprechen.on');
-await page.fill('#gsText', 'Neuer Kunde Studer Immobilien AG, Gerolagstrasse 12, 4632 Trimbach');
+await page.fill('#gsText', 'Neuer Kunde Muster Immobilien AG, Musterstrasse 12, 4632 Trimbach');
 await page.click('#gsBtn');
 await page.waitForSelector('#dlgKunde.on');
 await page.waitForTimeout(300);
 check('Kunden-Diktat oeffnet das Pruef-Formular', await page.isVisible('#dlgKunde.on'));
 check('KRITISCH: Kunden-Diktat speichert nichts', writes().length === 0);
 check('Kunden-Titel weist auf Pruefung hin', (await page.textContent('#kuTitel')).includes('prüfen'));
-check('Kundenname uebernommen', (await page.inputValue('#ku_name')) === 'Studer Immobilien AG');
-check('Strasse uebernommen', (await page.inputValue('#ku_strasse')) === 'Gerolagstrasse 12');
+check('Kundenname uebernommen', (await page.inputValue('#ku_name')) === 'Muster Immobilien AG');
+check('Strasse uebernommen', (await page.inputValue('#ku_strasse')) === 'Musterstrasse 12');
 // Das Diktat liefert "4632 Trimbach" in einem Stück -- der Dialog trennt es
 // selbst, weil der Kundenstamm seit ENT-044 zwei Felder führt.
 check('PLZ aus dem Diktat herausgeloest', (await page.inputValue('#ku_plz')) === '4632');
 check('Ort ohne PLZ uebernommen', (await page.inputValue('#ku_ort')) === 'Trimbach');
 check('E-Mail landet in einer Kommunikationszeile',
-  (await page.inputValue('#kuWegeListe .kw-reihe:nth-child(1) [data-kw="wert"]')) === 'info@studer-immo.ch');
+  (await page.inputValue('#kuWegeListe .kw-reihe:nth-child(1) [data-kw="wert"]')) === 'info@muster-immo.ch');
 check('Nicht erkanntes Telefon bleibt leer',
   (await page.inputValue('#kuWegeListe .kw-reihe:nth-child(2) [data-kw="wert"]')) === '');
 check('Erkannte Kundenfelder blau markiert',
@@ -431,11 +528,11 @@ await page.fill('#kuWegeListe .kw-reihe:nth-child(2) [data-kw="wert"]', '062 111
 await page.click('#kuBtn');
 await page.waitForTimeout(400);
 const kcd = calls.find(c => c.path.includes('kunden_create'));
-check('Kunde erst nach Klick angelegt', kcd && kcd.body.name === 'Studer Immobilien AG');
+check('Kunde erst nach Klick angelegt', kcd && kcd.body.name === 'Muster Immobilien AG');
 check('Genau ein Schreibaufruf beim Kunden-Diktat', writes().length === 1);
 check('Diktat- und Handeingabe zusammen gesendet', kcd
   && kcd.body.kontaktwege.some(w => w.art === 'telefon' && w.wert === '062 111 22 33')
-  && kcd.body.kontaktwege.some(w => w.art === 'email' && w.wert === 'info@studer-immo.ch'));
+  && kcd.body.kontaktwege.some(w => w.art === 'email' && w.wert === 'info@muster-immo.ch'));
 await page.screenshot({ path: `${OUT}/13-diktat-kunde.png` });
 // Ohne Diktat bleibt der Dialog sauber
 await page.click('#view-kunden button:has-text("Neuer Kunde")');
@@ -456,16 +553,16 @@ check('Kein Diktat-Hinweis vor jeder Eingabe', !(await page.isVisible('#kuKiHint
 await page.click('#kuRechercheBtn');
 await page.waitForTimeout(200);
 check('Ohne Namen keine Recherche', !calls.some(c => c.path.includes('ki_kunden_recherche')));
-await page.fill('#ku_name', 'Borner AG');
+await page.fill('#ku_name', 'Beispiel AG');
 await page.click('#kuRechercheBtn');
 await page.waitForSelector('#kuKiHint.on');
 await page.waitForTimeout(300);
 check('Recherche ruft den Recherche-Endpunkt', calls.some(c => c.path.includes('ki_kunden_recherche')));
 check('KRITISCH: Recherche speichert nichts', writes().length === 0);
-check('Von Hand eingegebener Name bleibt unangetastet', (await page.inputValue('#ku_name')) === 'Borner AG');
+check('Von Hand eingegebener Name bleibt unangetastet', (await page.inputValue('#ku_name')) === 'Beispiel AG');
 check('Recherchierte Adresse uebernommen', (await page.inputValue('#ku_strasse')) === 'Industriestrasse 4');
 check('Recherchierte PLZ herausgeloest', (await page.inputValue('#ku_plz')) === '4652');
-check('Recherchierter Ort ohne PLZ', (await page.inputValue('#ku_ort')) === 'Winznau');
+check('Recherchierter Ort ohne PLZ', (await page.inputValue('#ku_ort')) === 'Musterdorf');
 check('Recherchiertes Telefon landet in einer Kommunikationszeile',
   (await page.inputValue('#kuWegeListe .kw-reihe:nth-child(2) [data-kw="wert"]')) === '062 285 20 20');
 check('Name bleibt unmarkiert -- eingegeben, nicht recherchiert', !(await page.getAttribute('#ku_name', 'class') || '').includes('web'));

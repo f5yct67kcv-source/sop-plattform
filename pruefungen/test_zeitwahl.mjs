@@ -13,9 +13,9 @@ const MORGEN = iso(new Date(Date.now() + 864e5));
 const ok = [], bad = [];
 const check = (n, c) => (c ? ok : bad).push(n);
 
-const MA = [{ id: 1, name: 'adrian', vorname: 'Adrian', nachname: 'von Arb', aktiv: 1, ist_admin: 1 }];
-const KU = [{ id: 1, name: 'Stranag', strasse: 'Kantonsstrasse', ort: '6000 Luzern' }];
-const EINSAETZE = [{ id: 81, kunde_id: 1, kunde_name: 'Stranag', titel: null,
+const MA = [{ id: 1, name: 'adrian', vorname: 'Adrian', nachname: 'Muster', aktiv: 1, ist_admin: 1 }];
+const KU = [{ id: 1, name: 'Nordbau', strasse: 'Kantonsstrasse', ort: '6000 Luzern' }];
+const EINSAETZE = [{ id: 81, kunde_id: 1, kunde_name: 'Nordbau', titel: null,
   strasse: 'Kantonsstrasse', ort: '6000 Luzern', einsatzart: 'Verkehrsdienst',
   datum: MORGEN, von: '07:30:00', bis: '16:30:00', bedarf: 1, status: 'geplant',
   bemerkung: null, objekt_id: null, mitarbeiter: [] }];

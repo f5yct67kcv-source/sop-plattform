@@ -22,11 +22,11 @@ await page.route('**/api/**', route => {
   if (p.includes('ki_router_parse')) {
     const t = (body && body.text || '').toLowerCase();
     if (t.includes('ändere')) return send({ status: 'ok', bereich: 'mitarbeiter', aktion: 'aendern',
-      mitarbeiter_login_name: 'hans.meier', aenderungen: { ort: '3000 Bern' } });
+      mitarbeiter_login_name: 'hans.muster', aenderungen: { ort: '3000 Bern' } });
     if (t.includes('kunde')) return send({ status: 'ok', bereich: 'kunde', aktion: 'neu',
       felder: { name: 'Neue Firma AG', ort: '4600 Olten' }, mitarbeiter_login_namen: [] });
     if (t.includes('einsatz')) return send({ status: 'ok', bereich: 'einsatz', aktion: 'neu',
-      felder: { kunde_name: 'Borner AG', ort: 'Olten', datum: '2026-09-01', von: '07:00', bis: '16:00' },
+      felder: { kunde_name: 'Beispiel AG', ort: 'Olten', datum: '2026-09-01', von: '07:00', bis: '16:00' },
       mitarbeiter_login_namen: [] });
     return send({ status: 'ok', bereich: 'mitarbeiter', aktion: 'neu',
       felder: { vorname: 'Neu', nachname: 'Person' }, mitarbeiter_login_namen: [] });
@@ -34,12 +34,12 @@ await page.route('**/api/**', route => {
   // Seit ENT-072 kommt das volle Dossier einzeln; die Liste traegt nur noch
   // die Listenfelder.
   if (p.includes('mitarbeiter_dossier')) return send({ status: 'ok', eingerichtet: true,
-    mitarbeiter: { name: 'hans.meier', ist_admin: 0, vorname: 'Hans', nachname: 'Meier',
+    mitarbeiter: { name: 'hans.muster', ist_admin: 0, vorname: 'Hans', nachname: 'Muster',
       plz: '4600', ort: 'Olten' } });
   if (p.includes('anstellungsorte')) return send({ status: 'ok', orte: [] });
   if (p.includes('mitarbeiter_list')) return send({ status: 'ok', eingerichtet: true,
     listen: { funktion: [], abteilung: [] }, mitarbeiter: [
-    { name: 'hans.meier', ist_admin: 0, vorname: 'Hans', nachname: 'Meier', ort: 'Olten' },
+    { name: 'hans.muster', ist_admin: 0, vorname: 'Hans', nachname: 'Muster', ort: 'Olten' },
   ]});
   return send({ status: 'ok', einsaetze: [], kunden: [], rapporte: [], objekte: [], mitarbeiter: [],
     feiertage: [], gepflegt: {}, sperren: [], kpi: {}, verlauf: [], angemeldet: [],
@@ -167,7 +167,7 @@ await page.click('#gsBtn');
 await page.waitForTimeout(400);
 check('„einsatz“ öffnet den Einsatz-Neu-Dialog, auch von einer fachfremden Seite aus',
   await page.evaluate(() => document.getElementById('view-einsatzneu').classList.contains('on')));
-check('Einsatzfelder vorbefüllt', (await page.inputValue('#enNKunde_name')) === 'Borner AG');
+check('Einsatzfelder vorbefüllt', (await page.inputValue('#enNKunde_name')) === 'Beispiel AG');
 await page.screenshot({ path: OUT + '/96-sprechen-dispatch.png' });
 await page.keyboard.press('Escape');
 await page.waitForTimeout(200);
@@ -179,7 +179,7 @@ await page.waitForTimeout(200);
 // das weiterhin nicht.
 rufe.length = 0;
 await page.click('#btnSprechen');
-await page.fill('#gsText', 'Ändere den Wohnort von Hans Meier');
+await page.fill('#gsText', 'Ändere den Wohnort von Hans Muster');
 await page.click('#gsBtn');
 await page.waitForTimeout(700);
 check('„aendern“ öffnet die Bearbeitungsflaeche statt eines Neu-Dialogs',

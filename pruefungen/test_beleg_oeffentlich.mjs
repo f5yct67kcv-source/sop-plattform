@@ -107,7 +107,7 @@ try {
       }));
 
     // ── Empfaenger-Adresse ganz aussen rechts (Projektinhaber-Vorgabe) ────
-    const empfaengerBox = await page.locator('#dokumentSeite').getByText('pzu consulting gmbh').boundingBox();
+    const empfaengerBox = await page.locator('#dokumentSeite').getByText('abc consulting gmbh').boundingBox();
     const toolbarBox = await page.locator('#btnHerunterladen').boundingBox();
     check('KRITISCH: die Empfaenger-Adresse reicht bis an denselben rechten Rand wie die Werkzeugleiste',
       Math.abs((empfaengerBox.x + empfaengerBox.width) - (toolbarBox.x + toolbarBox.width)) < 5);
@@ -173,7 +173,7 @@ try {
     check('KRITISCH: keine JS-Fehler mit angehakter Unterschriftsseite', fehler.length === 0);
     check('KRITISCH: die Unterschriftsseite steht im Dokument (Ort, Datum, zwei Unterschriftsfelder)',
       /Ort, Datum/.test(await page.textContent('#dokumentGanz'))
-      && /Unterschrift pzu consulting gmbh/.test(await page.textContent('#dokumentGanz'))
+      && /Unterschrift abc consulting gmbh/.test(await page.textContent('#dokumentGanz'))
       && /Unterschrift Cupi 24 GmbH/.test(await page.textContent('#dokumentGanz')));
     check('KRITISCH: die Unterschriftsseite erzwingt einen Seitenumbruch (page-break-before)',
       await page.evaluate(() => {

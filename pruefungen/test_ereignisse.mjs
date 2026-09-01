@@ -45,15 +45,15 @@ const EREIGNISSE = [
 const ABLEHNUNG = { typ: 'zusage', id: 12, mitarbeiter_id: 4, zeit: vorMin(20),
   person: { id: 4, name: 'urs', vorname: 'Urs', nachname: 'Beispiel' },
   titel: 'Schicht abgelehnt', zusage: 'abgelehnt', datum: MORGEN,
-  von: '07:00', bis: '16:00', kunde: 'Borner AG', ort: 'Olten' };
+  von: '07:00', bis: '16:00', kunde: 'Beispiel AG', ort: 'Olten' };
 
 // Vierte Art (ENT-192/ENT-197): eine Kundenentscheidung im Portal, ohne
 // eigenen Login. Kein 'person' -- der Kunde ist keine Mitarbeiterin, der
 // Absender kommt aus 'kunde'.
 const OFFERTE_ANGENOMMEN = { typ: 'offerte', id: 55, zeit: vorMin(8),
-  titel: 'Offerte angenommen', nummer: 'OF-0055', kunde: 'pzu Consulting GmbH', status: 'bestaetigt' };
+  titel: 'Offerte angenommen', nummer: 'OF-0055', kunde: 'abc Consulting GmbH', status: 'bestaetigt' };
 const OFFERTE_ABGELEHNT  = { typ: 'offerte', id: 56, zeit: vorMin(9),
-  titel: 'Offerte abgelehnt', nummer: 'OF-0056', kunde: 'Gemeinde Läufelfingen', status: 'abgelehnt' };
+  titel: 'Offerte abgelehnt', nummer: 'OF-0056', kunde: 'Gemeinde Beispieldorf', status: 'abgelehnt' };
 
 // Fuenfte Art (ENT-283, Fortsetzung von ENT-282): eine spontan gestartete
 // Rundgang-Runde ohne vorherige Planung. IMMER ein Ereignis -- ausdrueckliche

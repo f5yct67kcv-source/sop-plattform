@@ -14,22 +14,22 @@ const check = (n, c) => (c ? ok : bad).push(n);
 const M = '2026-03';
 const SO = '2026-03-01', MO = '2026-03-02', SA = '2026-03-07';
 
-const P = (ist) => ({ id: 2, name: 'daniele.ciardo', vorname: 'Daniele', nachname: 'Ciardo',
+const P = (ist) => ({ id: 2, name: 'dario.beispiel', vorname: 'Dario', nachname: 'Beispiel',
   personalnummer: '2506', zusage: 'zugesagt', ist_pause_bezahlt_kunde: null, ...ist });
 
 const einsaetze = [
   // Montag 22:00–23:30 -> 30 Min. im Nachtfenster (ab 23:00) -> 3.0 Min. Bonus
-  { id: 1, kunde_name: 'Borner AG', titel: 'Schliessrunde', ort: '4601 Olten', einsatzart: 'Revierdienst',
+  { id: 1, kunde_name: 'Beispiel AG', titel: 'Schliessrunde', ort: '4601 Olten', einsatzart: 'Revierdienst',
     sparte: 'sicherheit', datum: MO, von: '22:00:00', bis: '23:30:00', bedarf: 1, status: 'geplant',
     ist_status: 'offen', mitarbeiter: [P({ ist_status: 'anwesend', ist_von: '22:00:00', ist_bis: '23:30:00',
       ist_pause_von: null, ist_pause_min: null, ist_pause_bezahlt_ma: null })] },
   // Montag 05:15–05:30 -> 15 Min. voll in der Nacht -> 1.5 Min. Bonus (anteilig!)
-  { id: 2, kunde_name: 'Borner AG', titel: 'Öffnungsrunde', ort: '4601 Olten', einsatzart: 'Revierdienst',
+  { id: 2, kunde_name: 'Beispiel AG', titel: 'Öffnungsrunde', ort: '4601 Olten', einsatzart: 'Revierdienst',
     sparte: 'sicherheit', datum: MO, von: '05:15:00', bis: '05:30:00', bedarf: 1, status: 'geplant',
     ist_status: 'offen', mitarbeiter: [P({ ist_status: 'anwesend', ist_von: '05:15:00', ist_bis: '05:30:00',
       ist_pause_von: null, ist_pause_min: null, ist_pause_bezahlt_ma: null })] },
   // Sonntag 08:00–12:00 -> 4 h voll im Sonntagsfenster -> 24 Min. Bonus
-  { id: 3, kunde_name: 'Strabag AG', titel: 'Verkehrsdienst', ort: '4622 Egerkingen', einsatzart: 'Verkehrsdienst',
+  { id: 3, kunde_name: 'Grossbau AG', titel: 'Verkehrsdienst', ort: '4622 Egerkingen', einsatzart: 'Verkehrsdienst',
     sparte: 'sicherheit', datum: SO, von: '08:00:00', bis: '12:00:00', bedarf: 1, status: 'geplant',
     ist_status: 'offen', mitarbeiter: [P({ ist_status: 'anwesend', ist_von: '08:00:00', ist_bis: '12:00:00',
       ist_pause_von: null, ist_pause_min: null, ist_pause_bezahlt_ma: null })] },
@@ -46,20 +46,20 @@ const einsaetze = [
     mitarbeiter: [P({ ist_status: 'anwesend', ist_von: '13:00:00', ist_bis: '17:00:00',
       ist_pause_von: null, ist_pause_min: null, ist_pause_bezahlt_ma: null })] },
   // NICHT abgeglichen -> darf nirgends auftauchen
-  { id: 5, kunde_name: 'Borner AG', titel: 'Nicht geprüft', ort: '4601 Olten', einsatzart: 'Revierdienst',
+  { id: 5, kunde_name: 'Beispiel AG', titel: 'Nicht geprüft', ort: '4601 Olten', einsatzart: 'Revierdienst',
     sparte: 'sicherheit', datum: MO, von: '14:00:00', bis: '18:00:00', bedarf: 1, status: 'geplant',
     ist_status: 'offen', mitarbeiter: [P({ ist_status: 'offen', ist_von: null, ist_bis: null,
       ist_pause_von: null, ist_pause_min: null, ist_pause_bezahlt_ma: null })] },
   // Anderer Monat -> darf nicht mitzaehlen
-  { id: 6, kunde_name: 'Borner AG', titel: 'Vormonat', ort: '4601 Olten', einsatzart: 'Revierdienst',
+  { id: 6, kunde_name: 'Beispiel AG', titel: 'Vormonat', ort: '4601 Olten', einsatzart: 'Revierdienst',
     sparte: 'sicherheit', datum: '2026-02-10', von: '08:00:00', bis: '16:00:00', bedarf: 1, status: 'geplant',
     ist_status: 'offen', mitarbeiter: [P({ ist_status: 'anwesend', ist_von: '08:00:00', ist_bis: '16:00:00',
       ist_pause_von: null, ist_pause_min: null, ist_pause_bezahlt_ma: null })] },
 ];
 
 const MA = [
-  { id: 1, name: 'adrianvonarb', vorname: 'Adrian', nachname: 'von Arb', personalnummer: '1', ist_admin: 1 },
-  { id: 2, name: 'daniele.ciardo', vorname: 'Daniele', nachname: 'Ciardo', personalnummer: '2506',
+  { id: 1, name: 'hansmuster', vorname: 'Adrian', nachname: 'Muster', personalnummer: '1', ist_admin: 1 },
+  { id: 2, name: 'dario.beispiel', vorname: 'Dario', nachname: 'Beispiel', personalnummer: '2506',
     ist_admin: 0, strasse: 'Weg 1', ort: '4600 Olten', telefon: '062 000 00 00', email: 'd@example.ch' },
 ];
 
@@ -129,7 +129,7 @@ check('Detailseite ist zu', !(await page.isVisible('#mv-detail')));
 await page.click('#maTable tbody tr:nth-child(2)');
 await page.waitForTimeout(400);
 check('Klick auf die Zeile oeffnet die Detailseite', await page.isVisible('#mv-detail'));
-check('Der Name steht im Kopf', (await page.textContent('#mdName')) === 'Daniele Ciardo');
+check('Der Name steht im Kopf', (await page.textContent('#mdName')) === 'Dario Beispiel');
 check('Personalnummer im Untertitel', (await page.textContent('#mdSub')).includes('2506'));
 check('KRITISCH: der Klick oeffnet NICHT mehr die Bearbeiten-Schublade',
   !(await page.evaluate(() => document.getElementById('drawer').classList.contains('on'))));
@@ -227,7 +227,7 @@ await page.click('#mv-detail .ku-zurueck');
 await page.waitForTimeout(300);
 check('Zurueck fuehrt auf die Liste', await page.isVisible('#mv-liste') && !(await page.isVisible('#mv-detail')));
 await page.screenshot({ path: `${OUT}/dp-01-liste.png` });
-await page.evaluate(m => { openMaDetail('daniele.ciardo'); mdGoTab('dienstplaene');
+await page.evaluate(m => { openMaDetail('dario.beispiel'); mdGoTab('dienstplaene');
   document.getElementById('mdMonat').value = m; renderMaDetail(); }, M);
 await page.waitForTimeout(400);
 await page.screenshot({ path: `${OUT}/dp-02-dienstplaene.png` });

@@ -148,6 +148,26 @@ check('Das Dossier wurde genau einmal geholt', dossierRuf === 1);
     JSON.stringify(d.bereiche) === JSON.stringify(['person', 'anstellung', 'einsatz', 'zugang']));
   check('KRITISCH: jeder Bereich steht in Spalten, nicht als Kachelfeld (ENT-074)',
     d.spaltenJeBereich.length === 4 && d.spaltenJeBereich.every(n => n >= 1));
+
+  // ENT-289: Im Zugang stehen ringsum gerahmte Zonen (Rollen, Passwort,
+  // Entfernen). Ein blankes Feldraster dazwischen sieht aus, als gehoerte es
+  // nirgends hin -- geprueft wird darum, dass das Feld in einer Zone sitzt,
+  // nicht bloss, dass es existiert.
+  const rahmen = await page.evaluate(() => {
+    const e = document.getElementById('mb_zugang_bis');
+    if (!e) { return null; }
+    const zone = e.closest('.zone');
+    const passwort = document.getElementById('maPw')?.closest('.zone');
+    return { inZone: !!zone,
+      // Sitzt die Befristung NACH dem Passwort? (Erst wer, dann was darf er,
+      // dann das Passwort -- und erst dann, bis wann.)
+      nachPasswort: !!(zone && passwort
+        && (passwort.compareDocumentPosition(zone) & Node.DOCUMENT_POSITION_FOLLOWING)) };
+  });
+  check('KRITISCH: das Befristungsfeld steht in einer gerahmten Zone wie seine Nachbarn (ENT-289)',
+    rahmen && rahmen.inZone);
+  check('Die Befristung steht nach dem Passwort, nicht vor Login-Name und Rollen',
+    rahmen && rahmen.nachPasswort);
   check('Person und Adresse sind ein Abschnitt, wie in der Referenz',
     d.bloecke.includes('Person und Adresse'));
   check('Herkunft, Ausweise und Nachweise sind ein Block "Personendaten und Bewilligungen"',
@@ -362,7 +382,10 @@ check('Die AHV-Nummer steht nur hier, nicht in der Liste',
     return { pw: !!block.querySelector('#maPw'), weg: !!block.querySelector('.btn-danger'),
       sprache: !!block.querySelector('#mb_sprache') };
   });
-  check('Passwort, Abmeldung und Sprache stehen in EINEM Abschnitt "Zugang"', z.pw && z.weg && z.sprache);
+  // Seit ENT-289 gehoert die Sprache zur Person, nicht zum Zugang -- sie
+  // sagt, wie man mit jemandem spricht, nicht was er darf.
+  check('Passwort und Abmeldung stehen in EINEM Abschnitt "Zugang"', z.pw && z.weg);
+  check('KRITISCH: die Sprache steht NICHT mehr beim Zugang (ENT-289)', !z.sprache);
 }
 
 // ══════════════ SICH SELBST KANN MAN NICHT ENTFERNEN
@@ -522,15 +545,15 @@ check('Die AHV-Nummer steht nur hier, nicht in der Liste',
   // selbst tippt. Ein Feld, das sich unter der Hand aendert, ist schlimmer
   // als gar kein Vorschlag.
   await page.fill('#mb_vorname', 'Hans');
-  await page.fill('#mb_nachname', 'Meier');
+  await page.fill('#mb_nachname', 'Muster');
   await page.waitForTimeout(150);
   check('Der Login-Name wird aus Vor- und Nachname vorgeschlagen',
-    (await page.inputValue('#mbNeuName')) === 'hans.meier');
-  await page.fill('#mbNeuName', 'h.meier');
+    (await page.inputValue('#mbNeuName')) === 'hans.muster');
+  await page.fill('#mbNeuName', 'h.muster');
   await page.fill('#mb_nachname', 'Mueller');
   await page.waitForTimeout(150);
   check('KRITISCH: ein selbst gesetzter Login-Name wird nicht mehr ueberschrieben',
-    (await page.inputValue('#mbNeuName')) === 'h.meier');
+    (await page.inputValue('#mbNeuName')) === 'h.muster');
 
   // Pflichtangaben
   await page.fill('#mbNeuName', '');
@@ -549,8 +572,13 @@ check('Die AHV-Nummer steht nur hier, nicht in der Liste',
     err: (document.getElementById('mbErr') || {}).textContent || '',
     offen: document.getElementById('mv-bearbeiten').classList.contains('on'),
   }));
+  // Die Zahl NICHT festschreiben: Die Mindestlaenge ist eine Einstellung
+  // (ENT-289 hat sie fuer die Erprobung gesenkt). Geprueft wird, dass die
+  // Meldung die GELTENDE Zahl nennt -- nicht, dass es gerade zwoelf sind.
+  const geltendesMin = await page.evaluate(() => PW_MIN);
   check('KRITISCH: ein zu kurzes Passwort legt nichts an',
-    gesendet === null && /mindestens 12 Zeichen/.test(kurz.err) && kurz.offen);
+    gesendet === null && kurz.offen
+    && new RegExp(`mindestens ${geltendesMin} Zeichen`).test(kurz.err));
 
   // Anlegen
   if (kurz.offen) {

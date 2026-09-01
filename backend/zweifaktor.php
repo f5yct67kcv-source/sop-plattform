@@ -102,7 +102,7 @@ function zf_geheimnis_erzeugen(): string
 }
 
 // Die Adresse, die eine Authenticator-App erwartet. Der Betriebsname steht
-// darin, damit im Handy nicht nur "adrianvonarb" ohne Zusammenhang steht.
+// darin, damit im Handy nicht nur "hansmuster" ohne Zusammenhang steht.
 function zf_adresse(string $loginName, string $geheimBase32, string $betrieb = 'CUPI 24'): string
 {
     return 'otpauth://totp/' . rawurlencode($betrieb . ':' . $loginName)

@@ -38,9 +38,9 @@ check('Und den Verweis auf OP-104', /OP-104/.test(hinweisText));
 check('Eine einzige Quelle für den Text (wie beim Wegstrecken-Hinweis)',
   (DASH.match(/GAV_AUS010_HINWEIS/g) || []).length >= 3);
 
-const MA = [{ id: 1, name: 'adrian', vorname: 'Adrian', nachname: 'von Arb', aktiv: 1, ist_admin: 1 },
+const MA = [{ id: 1, name: 'adrian', vorname: 'Adrian', nachname: 'Muster', aktiv: 1, ist_admin: 1 },
             { id: 2, name: 'berta', vorname: 'Berta', nachname: 'Beispiel', aktiv: 1, ist_admin: 0 }];
-const KU = [{ id: 1, name: 'Stranag', strasse: 'Kantonsstrasse 3', ort: '6000 Luzern' }];
+const KU = [{ id: 1, name: 'Nordbau', strasse: 'Kantonsstrasse 3', ort: '6000 Luzern' }];
 const HAO = { id: 10, bezeichnung: 'Hauptsitz', rolle: 'hao', strasse: 'Bahnhofstrasse 1',
               plz: '4600', ort: 'Olten', km_zum_anderen: null, aktiv: 1, bemerkung: null };
 let EINSAETZE = [];
@@ -63,10 +63,10 @@ await page.route('**/api/**', route => {
   if (p.includes('anstellungsorte')) return send({ status: 'ok', orte: [HAO] });
   if (p.includes('einsatz_list')) return send({ status: 'ok', einsaetze: EINSAETZE });
   if (p.includes('objekt_list')) return send({ status: 'ok', objekte: [
-    { id: 1, name: 'Nahes Objekt', kunde_name: 'Stranag', ort: '4600 Olten', strasse: 'Ringstrasse 2',
+    { id: 1, name: 'Nahes Objekt', kunde_name: 'Nordbau', ort: '4600 Olten', strasse: 'Ringstrasse 2',
       kanton: 'SO', einsatzart: 'Revierdienst', sparte: 'sicherheit', aktiv: 1,
       masterschichten: 1, stunden_je_einsatz: 4, distanzen: { 10: { km: 6 } } },
-    { id: 2, name: 'Fernes Objekt', kunde_name: 'Stranag', ort: '6000 Luzern', strasse: 'Kantonsstrasse 3',
+    { id: 2, name: 'Fernes Objekt', kunde_name: 'Nordbau', ort: '6000 Luzern', strasse: 'Kantonsstrasse 3',
       kanton: 'LU', einsatzart: 'Revierdienst', sparte: 'sicherheit', aktiv: 1,
       masterschichten: 1, stunden_je_einsatz: 4, distanzen: { 10: { km: 18 } } },
   ] });
@@ -148,7 +148,7 @@ const heuteImTest = tag(5);
 await page.evaluate(() => openEinsatzNeu());
 await page.waitForTimeout(300);
 await page.evaluate(({ datum }) => {
-  $('enNKunde_name').value = 'Stranag';
+  $('enNKunde_name').value = 'Nordbau';
   $('enNStrasse').value = 'Kantonsstrasse 3'; $('enNOrt').value = '6000 Luzern'; $('enNKanton').value = 'LU';
   $('enNDatum').value = datum; $('enNVon').value = '06:00'; $('enNBis').value = '10:00';
 }, { datum: heuteImTest });
@@ -163,7 +163,7 @@ await page.waitForTimeout(300);
 await page.evaluate(() => openEinsatzNeu());
 await page.waitForTimeout(300);
 await page.evaluate(({ datum }) => {
-  $('enNKunde_name').value = 'Stranag';
+  $('enNKunde_name').value = 'Nordbau';
   $('enNStrasse').value = 'Kantonsstrasse 3'; $('enNOrt').value = '6000 Luzern'; $('enNKanton').value = 'LU';
   $('enNDatum').value = datum; $('enNVon').value = '14:00'; $('enNBis').value = '18:00';
 }, { datum: heuteImTest });
@@ -186,7 +186,7 @@ zoneTxt = await page.textContent('#enNZone');
 check('KRITISCH: nach der Zuteilung wird die betroffene Person konkret genannt',
   /Betrifft bereits/.test(zoneTxt) && /Berta Beispiel/.test(zoneTxt));
 check('Adrian, der heute noch keinen zweiten Einsatz hat, wird nicht genannt',
-  !zoneTxt.includes('Adrian von Arb'));
+  !zoneTxt.includes('Adrian Muster'));
 
 // Unter 10 km: kein GAV-AUS-010-Hinweis, auch mit zugeteilter Person.
 await page.fill('#enNWeg_km', '6');
@@ -221,7 +221,7 @@ await page.waitForTimeout(300);
 await page.evaluate(() => openEinsatzNeu());
 await page.waitForTimeout(300);
 await page.evaluate(({ datum }) => {
-  $('enNKunde_name').value = 'Stranag';
+  $('enNKunde_name').value = 'Nordbau';
   $('enNStrasse').value = 'Kantonsstrasse 3'; $('enNOrt').value = '6000 Luzern'; $('enNKanton').value = 'LU';
   $('enNDatum').value = datum; $('enNVon').value = '07:00'; $('enNBis').value = '11:00';
 }, { datum: tag(10) });
@@ -242,7 +242,7 @@ await page.waitForTimeout(300);
 await page.evaluate(() => openEinsatzNeu());
 await page.waitForTimeout(300);
 await page.evaluate(({ datum }) => {
-  $('enNKunde_name').value = 'Stranag';
+  $('enNKunde_name').value = 'Nordbau';
   $('enNStrasse').value = 'Ringstrasse 2'; $('enNOrt').value = '4600 Olten'; $('enNKanton').value = 'SO';
   $('enNDatum').value = datum; $('enNVon').value = '07:00'; $('enNBis').value = '11:00';
 }, { datum: tag(11) });
@@ -262,7 +262,7 @@ await page.waitForTimeout(300);
 await page.evaluate(() => openEinsatzNeu());
 await page.waitForTimeout(300);
 await page.evaluate(({ datum }) => {
-  $('enNKunde_name').value = 'Stranag';
+  $('enNKunde_name').value = 'Nordbau';
   $('enNStrasse').value = 'Weg 9'; $('enNOrt').value = '3000 Bern'; $('enNKanton').value = 'BE';
   $('enNDatum').value = datum; $('enNVon').value = '07:00'; $('enNBis').value = '11:00';
 }, { datum: tag(12) });
@@ -298,7 +298,7 @@ await seite2.route('**/api/**', route => {
   // erst im Formular angelegt. So oeffnet sich der Einsatzplan als allererste
   // Handlung der Sitzung.
   if (p.includes('einsatz_list')) return send({ status: 'ok', einsaetze: [
-    { id: 9001, kunde_id: 1, kunde_name: 'Stranag', titel: null, strasse: 'Kantonsstrasse 3',
+    { id: 9001, kunde_id: 1, kunde_name: 'Nordbau', titel: null, strasse: 'Kantonsstrasse 3',
       ort: '6000 Luzern', kanton: 'LU', einsatzart: 'Verkehrsdienst', sparte: 'sicherheit',
       datum: tag(20), von: '07:00:00', bis: '11:00:00', bedarf: 1, status: 'geplant',
       bemerkung: null, objekt_id: null, mitarbeiter: [], weg_km: 18 } ] });
@@ -321,7 +321,7 @@ check('KRITISCH: bei frischer Sitzung sind die Anstellungsorte noch nicht gelade
 // den Wettlauf-Fall: Ein Klick auf eine Schicht kommt schneller, als der
 // Nebeneffekt der Planungsansicht die Anstellungsorte mitgebracht hat.
 await seite2.evaluate(() => {
-  einsaetze = [{ id: 9001, kunde_id: 1, kunde_name: 'Stranag', titel: null,
+  einsaetze = [{ id: 9001, kunde_id: 1, kunde_name: 'Nordbau', titel: null,
     strasse: 'Kantonsstrasse 3', ort: '6000 Luzern', kanton: 'LU',
     einsatzart: 'Verkehrsdienst', sparte: 'sicherheit', datum: '2028-06-10',
     von: '07:00:00', bis: '11:00:00', bedarf: 1, status: 'geplant', bemerkung: null,

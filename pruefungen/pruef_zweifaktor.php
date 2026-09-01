@@ -59,7 +59,7 @@ $g = zf_geheimnis_erzeugen();
 pruef('Das Geheimnis ist lang genug (160 Bit)', strlen($g) === 32);
 pruef('Zwei Geheimnisse sind nicht gleich', zf_geheimnis_erzeugen() !== zf_geheimnis_erzeugen());
 pruef('Das Geheimnis besteht nur aus Base32-Zeichen', strspn($g, ZF_B32) === strlen($g));
-$adr = zf_adresse('adrianvonarb', $g);
+$adr = zf_adresse('hansmuster', $g);
 pruef('Die Adresse fuer die App hat die richtige Form',
     str_starts_with($adr, 'otpauth://totp/') && str_contains($adr, 'secret=' . $g)
     && str_contains($adr, 'digits=6') && str_contains($adr, 'period=30'));

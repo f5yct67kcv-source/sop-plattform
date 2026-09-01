@@ -114,51 +114,51 @@ check('KRITISCH: das Speichern des Kunden kennt die Felder ebenfalls',
 // ══════════════════════════════════════════════════════════════════════════
 // TEIL 2 — Oberflaeche und Ausdruck
 // ══════════════════════════════════════════════════════════════════════════
-const MA = [{ id: 1, name: 'adrian', vorname: 'Adrian', nachname: 'Von Arb', aktiv: 1, ist_admin: 1 }];
+const MA = [{ id: 1, name: 'adrian', vorname: 'Adrian', nachname: 'Muster', aktiv: 1, ist_admin: 1 }];
 const KUNDEN = [
   // 1 — gewoehnliche Adresse, KEINE abweichende Rechnungsadresse
-  { id: 1, kundennummer: 'K-0001', name: 'pzu Consulting GmbH', strasse: 'Mustergasse',
+  { id: 1, kundennummer: 'K-0001', name: 'abc Consulting GmbH', strasse: 'Mustergasse',
     hausnummer: '2', adresszusatz: null, plz: '8200', ort: 'Schaffhausen', aktiv: 1,
     re_name: null, re_zusatz: null, re_strasse: null, re_hausnummer: null, re_plz: null, re_ort: null },
   // 2 — mit abweichender Rechnungsadresse
-  { id: 2, kundennummer: 'K-0002', name: 'Strabag AG', strasse: 'Kantonsstrasse',
+  { id: 2, kundennummer: 'K-0002', name: 'Grossbau AG', strasse: 'Kantonsstrasse',
     hausnummer: '3', adresszusatz: null, plz: '6000', ort: 'Luzern', aktiv: 1,
-    re_name: 'Strabag AG, Buchhaltung', re_zusatz: 'Postfach 44', re_strasse: 'Finanzweg',
+    re_name: 'Grossbau AG, Buchhaltung', re_zusatz: 'Postfach 44', re_strasse: 'Finanzweg',
     re_hausnummer: '9', re_plz: '8005', re_ort: 'Zürich' },
 ];
 const EINSAETZE = [
-  { id: 500, kunde_id: 1, kunde_name: 'pzu Consulting GmbH', titel: null, strasse: 'Mustergasse 2',
+  { id: 500, kunde_id: 1, kunde_name: 'abc Consulting GmbH', titel: null, strasse: 'Mustergasse 2',
     ort: '8200 Schaffhausen', einsatzart: 'Verkehrsdienst', datum: HEUTE, von: '07:15:00',
     bis: '15:30:00', bedarf: 1, status: 'abgeschlossen', mitarbeiter: [], objekt_id: null },
-  { id: 501, kunde_id: 2, kunde_name: 'Strabag AG', titel: null, strasse: 'Kantonsstrasse 3',
+  { id: 501, kunde_id: 2, kunde_name: 'Grossbau AG', titel: null, strasse: 'Kantonsstrasse 3',
     ort: '6000 Luzern', einsatzart: 'Verkehrsdienst', datum: HEUTE, von: '08:00:00',
     bis: '12:00:00', bedarf: 1, status: 'abgeschlossen', mitarbeiter: [], objekt_id: null },
 ];
 const RAPPORTE = [
   // 10 — haengt ueber einsatz_id sauber am Kunden 1
-  { id: 10, datum: HEUTE, mitarbeiter_id: 1, einsatz_id: 500, mitarbeiter: 'adrianvonarb',
-    kunde_id: 1, kunde_nr: 'K-0001', k_name: 'pzu Consulting GmbH', k_strasse: 'Mustergasse',
+  { id: 10, datum: HEUTE, mitarbeiter_id: 1, einsatz_id: 500, mitarbeiter: 'hansmuster',
+    kunde_id: 1, kunde_nr: 'K-0001', k_name: 'abc Consulting GmbH', k_strasse: 'Mustergasse',
     k_hausnummer: '2', k_adresszusatz: null, k_plz: '8200', k_ort: 'Schaffhausen',
     re_name: null, re_zusatz: null, re_strasse: null, re_hausnummer: null, re_plz: null, re_ort: null,
-    kunde: 'pzu Consulting GmbH', strasse: 'Mustergasse 2', ort: '8200 Schaffhausen',
+    kunde: 'abc Consulting GmbH', strasse: 'Mustergasse 2', ort: '8200 Schaffhausen',
     auftrag_nr: null, einsatzart: 'Verkehrsdienst', von: '07:15:00', bis: '15:15:00',
     pause_min: 30, netto_h: 7.5, unterzeichner: 'M. Beispiel', unterschrift: null,
     bemerkung: null, erfasst_am: HEUTE + ' 15:17:00' },
   // 11 — von Hand erfasst, OHNE einsatz_id: nur der Kundenname als Text.
   //      Hier darf NICHT ueber den Namen auf Kunde 1 geschlossen werden.
-  { id: 11, datum: HEUTE, mitarbeiter_id: 1, einsatz_id: null, mitarbeiter: 'adrianvonarb',
+  { id: 11, datum: HEUTE, mitarbeiter_id: 1, einsatz_id: null, mitarbeiter: 'hansmuster',
     kunde_id: null, kunde_nr: null,
-    kunde: 'pzu Consulting GmbH', strasse: 'Mustergasse 2', ort: '8200 Schaffhausen',
+    kunde: 'abc Consulting GmbH', strasse: 'Mustergasse 2', ort: '8200 Schaffhausen',
     auftrag_nr: null, einsatzart: 'Verkehrsdienst', von: '09:00:00', bis: '12:00:00',
     pause_min: 0, netto_h: 3, unterzeichner: null, unterschrift: null,
     bemerkung: null, erfasst_am: HEUTE + ' 12:05:00' },
   // 12 — haengt am Kunden MIT abweichender Rechnungsadresse
-  { id: 12, datum: HEUTE, mitarbeiter_id: 1, einsatz_id: 501, mitarbeiter: 'adrianvonarb',
-    kunde_id: 2, kunde_nr: 'K-0002', k_name: 'Strabag AG', k_strasse: 'Kantonsstrasse',
+  { id: 12, datum: HEUTE, mitarbeiter_id: 1, einsatz_id: 501, mitarbeiter: 'hansmuster',
+    kunde_id: 2, kunde_nr: 'K-0002', k_name: 'Grossbau AG', k_strasse: 'Kantonsstrasse',
     k_hausnummer: '3', k_adresszusatz: null, k_plz: '6000', k_ort: 'Luzern',
-    re_name: 'Strabag AG, Buchhaltung', re_zusatz: 'Postfach 44', re_strasse: 'Finanzweg',
+    re_name: 'Grossbau AG, Buchhaltung', re_zusatz: 'Postfach 44', re_strasse: 'Finanzweg',
     re_hausnummer: '9', re_plz: '8005', re_ort: 'Zürich',
-    kunde: 'Strabag AG', strasse: 'Kantonsstrasse 3', ort: '6000 Luzern',
+    kunde: 'Grossbau AG', strasse: 'Kantonsstrasse 3', ort: '6000 Luzern',
     auftrag_nr: 'A-77', einsatzart: 'Verkehrsdienst', von: '08:00:00', bis: '12:00:00',
     pause_min: 0, netto_h: 4, unterzeichner: null, unterschrift: null,
     bemerkung: null, erfasst_am: HEUTE + ' 12:10:00' },
@@ -166,7 +166,7 @@ const RAPPORTE = [
   //      heute nicht liefern; die Fixtur haelt den Riegel in
   //      rapportRechnungsadresse() pruefbar. Ohne sie bliebe eine Gegenprobe,
   //      die den Riegel entfernt, gruen -- beim Schreiben genau so passiert.
-  { id: 13, datum: HEUTE, mitarbeiter_id: 1, einsatz_id: null, mitarbeiter: 'adrianvonarb',
+  { id: 13, datum: HEUTE, mitarbeiter_id: 1, einsatz_id: null, mitarbeiter: 'hansmuster',
     kunde_id: null, kunde_nr: null, k_name: 'Fremd AG', k_strasse: 'Irrweg',
     k_hausnummer: '1', k_adresszusatz: null, k_plz: '9999', k_ort: 'Nirgendwo',
     re_name: null, re_zusatz: null, re_strasse: null, re_hausnummer: null, re_plz: null, re_ort: null,

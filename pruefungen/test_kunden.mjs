@@ -14,13 +14,13 @@ const ok = [], bad = [];
 const check = (n, c) => (c ? ok : bad).push(n);
 
 let kunden = [
-  { id: 1, kundennummer: 'K0001', art: 'unternehmen', name: 'Studer Immobilien AG', strasse: 'Gerolagstrasse',
+  { id: 1, kundennummer: 'K0001', art: 'unternehmen', name: 'Muster Immobilien AG', strasse: 'Musterstrasse',
     hausnummer: '12', plz: '4632', ort: 'Trimbach', uid: 'CHE-100.200.300',
-    telefon: '062 111 22 33', kontaktperson: 'Herr Studer', email: 'info@studer.ch', notiz: 'Zahlt immer pünktlich', aktiv: 1,
-    kontaktwege: [{ art: 'telefon', wert: '062 111 22 33' }, { art: 'email', wert: 'info@studer.ch' }],
-    personen: [{ anrede: 'Herr', vorname: 'Rolf', nachname: 'Studer',
+    telefon: '062 111 22 33', kontaktperson: 'Herr Muster', email: 'info@muster.ch', notiz: 'Zahlt immer pünktlich', aktiv: 1,
+    kontaktwege: [{ art: 'telefon', wert: '062 111 22 33' }, { art: 'email', wert: 'info@muster.ch' }],
+    personen: [{ anrede: 'Herr', vorname: 'Rolf', nachname: 'Muster',
       kontaktwege: [{ art: 'mobil', wert: '079 500 40 30' }] }] },
-  { id: 2, kundennummer: 'K0002', art: 'unternehmen', name: 'Borner AG', strasse: 'Bahnhofstrasse',
+  { id: 2, kundennummer: 'K0002', art: 'unternehmen', name: 'Beispiel AG', strasse: 'Bahnhofstrasse',
     hausnummer: '1', plz: '4600', ort: 'Olten',
     telefon: '062 999 00 11', kontaktperson: '', email: '', notiz: 'Ansprechpartnerin mag keine Anrufe vor 9 Uhr', aktiv: 1,
     kontaktwege: [{ art: 'telefon', wert: '062 999 00 11' }], personen: [] },
@@ -32,9 +32,9 @@ let kunden = [
 const RAPPORTE = { status: 'ok', rapporte: [
   // Zwei Zeilen desselben Einsatzes (ENT-173) -- gehoeren zusammengeklammert,
   // die dritte Zeile eines anderen Einsatzes bleibt fuer sich allein.
-  { id: 50, datum: '2026-08-01', mitarbeiter: 'Hans Meier', kunde: 'Studer Immobilien AG', einsatz_id: 90, von: '07:00:00', bis: '16:00:00', netto_h: 8, auftrag_nr: 'A-123' },
-  { id: 51, datum: '2026-08-01', mitarbeiter: 'Anna Muster', kunde: 'Studer Immobilien AG', einsatz_id: 90, von: '07:00:00', bis: '15:30:00', netto_h: 7.5, auftrag_nr: 'A-123' },
-  { id: 52, datum: '2026-07-20', mitarbeiter: 'Hans Meier', kunde: 'Studer Immobilien AG', einsatz_id: 70, von: '08:00:00', bis: '12:00:00', netto_h: 4, auftrag_nr: null },
+  { id: 50, datum: '2026-08-01', mitarbeiter: 'Hans Muster', kunde: 'Muster Immobilien AG', einsatz_id: 90, von: '07:00:00', bis: '16:00:00', netto_h: 8, auftrag_nr: 'A-123' },
+  { id: 51, datum: '2026-08-01', mitarbeiter: 'Anna Muster', kunde: 'Muster Immobilien AG', einsatz_id: 90, von: '07:00:00', bis: '15:30:00', netto_h: 7.5, auftrag_nr: 'A-123' },
+  { id: 52, datum: '2026-07-20', mitarbeiter: 'Hans Muster', kunde: 'Muster Immobilien AG', einsatz_id: 70, von: '08:00:00', bis: '12:00:00', netto_h: 4, auftrag_nr: null },
 ]};
 
 let calls = [];
@@ -53,8 +53,8 @@ async function setup(page) {
     if (p.includes('me.php')) return send({ status: 'ok', name: 'adrian', ist_admin: true, rollen: [], rechte: ['kunden', 'abgleich'] });
     if (p.includes('einsatz_bericht')) {
       berichtRufe.push((req.url().split('einsatz_id=')[1] || '').split('&')[0]);
-      return send({ status: 'ok', bericht: { einsatz: { id: 90, kunde_name: 'Studer Immobilien AG', datum: '2026-08-01' },
-        kunde: {}, unterschrift: {}, personen: [{ name: 'Hans Meier', von: '07:00', bis: '16:00', pause_min: 0, netto_h: 8 }] } });
+      return send({ status: 'ok', bericht: { einsatz: { id: 90, kunde_name: 'Muster Immobilien AG', datum: '2026-08-01' },
+        kunde: {}, unterschrift: {}, personen: [{ name: 'Hans Muster', von: '07:00', bis: '16:00', pause_min: 0, netto_h: 8 }] } });
     }
     if (p.includes('kunden_list')) {
       const naechste = 'K' + String(Math.max(...kunden.map(k => k.id)) + 1).padStart(4, '0');
@@ -121,10 +121,10 @@ await page.screenshot({ path: `${OUT}/k-01-liste.png` });
 // ══════════════════════════════════════════ SORTIERUNG
 await page.click('#kuTable thead th:nth-child(2)'); // Kunde, aufsteigend
 await page.waitForTimeout(150);
-check('Sortiert aufsteigend nach Kunde', (await page.textContent('#kuTable tbody tr:first-child')).includes('Borner AG'));
+check('Sortiert aufsteigend nach Kunde', (await page.textContent('#kuTable tbody tr:first-child')).includes('Beispiel AG'));
 await page.click('#kuTable thead th:nth-child(2)'); // Kunde, absteigend
 await page.waitForTimeout(150);
-check('Zweiter Klick kehrt die Richtung um', (await page.textContent('#kuTable tbody tr:first-child')).includes('Studer'));
+check('Zweiter Klick kehrt die Richtung um', (await page.textContent('#kuTable tbody tr:first-child')).includes('Muster'));
 await page.click('#kuTable thead th:nth-child(1)'); // zurueck auf Nr., Standard
 await page.waitForTimeout(150);
 check('Andere Spalte klicken setzt wieder aufsteigend', (await page.textContent('#kuTable tbody tr:first-child')).includes('K0001'));
@@ -133,13 +133,13 @@ check('Andere Spalte klicken setzt wieder aufsteigend', (await page.textContent(
 await page.fill('#kQ', 'Anrufe vor 9');
 await page.waitForTimeout(150);
 check('Suche findet Treffer in der Notiz, nicht nur in sichtbaren Spalten', (await page.$$('#kuTable tbody tr')).length === 1);
-check('Richtiger Treffer bei Notiz-Suche', (await page.textContent('#kuTable')).includes('Borner AG'));
-await page.fill('#kQ', 'Herr Studer');
+check('Richtiger Treffer bei Notiz-Suche', (await page.textContent('#kuTable')).includes('Beispiel AG'));
+await page.fill('#kQ', 'Herr Muster');
 await page.waitForTimeout(150);
-check('Suche findet Treffer in der Kontaktperson', (await page.textContent('#kuTable')).includes('Studer Immobilien AG'));
+check('Suche findet Treffer in der Kontaktperson', (await page.textContent('#kuTable')).includes('Muster Immobilien AG'));
 await page.fill('#kQ', 'K0002');
 await page.waitForTimeout(150);
-check('Suche findet Treffer über die Kundennummer', (await page.textContent('#kuTable')).includes('Borner AG'));
+check('Suche findet Treffer über die Kundennummer', (await page.textContent('#kuTable')).includes('Beispiel AG'));
 await page.fill('#kQ', 'nichts-passt-hier');
 await page.waitForTimeout(150);
 check('Ohne Treffer erscheint der Leerzustand', (await page.textContent('#kuTable')).includes('Keine Treffer'));
@@ -151,7 +151,7 @@ await page.click('#kuatab-archiv');
 await page.waitForTimeout(150);
 check('Archiviert-Reiter zeigt nur archivierte Kunden', (await page.$$('#kuTable tbody tr')).length === 1);
 check('Archivierte Firma sichtbar', (await page.textContent('#kuTable')).includes('Alte Firma GmbH'));
-check('Aktive Kunden nicht im Archiv-Reiter', !(await page.textContent('#kuTable')).includes('Studer Immobilien AG'));
+check('Aktive Kunden nicht im Archiv-Reiter', !(await page.textContent('#kuTable')).includes('Muster Immobilien AG'));
 await page.click('#kuatab-alle');
 await page.waitForTimeout(150);
 check('Zurück auf Alle sind wieder die aktiven da', (await page.$$('#kuTable tbody tr')).length === 2);
@@ -198,28 +198,28 @@ await page.waitForTimeout(150);
 check('Klick ausserhalb schliesst das Menü', !(await page.isVisible('#rowmenuPop.on')));
 
 // Archivieren direkt aus dem Menü
-await page.click('#kuTable tbody tr:nth-child(2) .rowmenu-btn'); // Borner AG
+await page.click('#kuTable tbody tr:nth-child(2) .rowmenu-btn'); // Beispiel AG
 await page.waitForTimeout(150);
 calls = [];
 await page.click('#rowmenuPop button:has-text("Archivieren")');
 await page.waitForTimeout(300);
 const arch1 = calls.find(c => c.p.includes('kunden_archivieren'));
 check('Archivieren aus dem Menü ruft den Endpunkt mit aktiv=0', arch1 && arch1.body.aktiv === 0);
-check('Borner AG danach nicht mehr in Alle', !(await page.textContent('#kuTable')).includes('Borner AG'));
+check('Beispiel AG danach nicht mehr in Alle', !(await page.textContent('#kuTable')).includes('Beispiel AG'));
 
 // ══════════════════════════════════════════ DETAILSEITE
-await page.click('#kuTable tbody tr:first-child'); // Studer
+await page.click('#kuTable tbody tr:first-child'); // Muster
 await page.waitForTimeout(200);
 check('Klick auf eine Zeile öffnet die Detailseite', await page.evaluate(() => document.getElementById('kv-detail').classList.contains('on')));
-check('Kopf zeigt den Namen', (await page.textContent('#kdName')) === 'Studer Immobilien AG');
+check('Kopf zeigt den Namen', (await page.textContent('#kdName')) === 'Muster Immobilien AG');
 check('Kopf zeigt die Kundennummer', (await page.textContent('#kdSub')).includes('K0001'));
 check('Sidebar markiert weiterhin Übersicht (kein eigener Menüpunkt für die Detailseite)',
   await page.evaluate(() => document.getElementById('nav-kunden-uebersicht').classList.contains('on')));
 const info = await page.textContent('#kdInfo');
 check('Detail-Übersicht zeigt Adresse, Ansprechperson und Notiz',
-  info.includes('Gerolagstrasse 12') && info.includes('4632 Trimbach')
-  && info.includes('Herr Rolf Studer') && info.includes('pünktlich'));
-check('Detail-Übersicht zeigt die Kommunikationswege', info.includes('062 111 22 33') && info.includes('info@studer.ch'));
+  info.includes('Musterstrasse 12') && info.includes('4632 Trimbach')
+  && info.includes('Herr Rolf Muster') && info.includes('pünktlich'));
+check('Detail-Übersicht zeigt die Kommunikationswege', info.includes('062 111 22 33') && info.includes('info@muster.ch'));
 check('Detail-Übersicht zeigt den Kommunikationsweg der Ansprechperson', info.includes('079 500 40 30'));
 check('Detail-Übersicht nennt die Art und die UID', info.includes('Unternehmen') && info.includes('CHE-100.200.300'));
 await page.screenshot({ path: `${OUT}/k-03-detail.png` });
@@ -295,10 +295,10 @@ await page.click('#kv-detail button:has-text("Bearbeiten")');
 await page.waitForSelector('#dlgKunde.on');
 check('Bearbeiten nutzt denselben Dialog wie das Anlegen (ENT-044)',
   await page.evaluate(() => document.getElementById('dlgKunde').classList.contains('on')));
-check('Dialog zeigt die aktuellen Werte', (await page.inputValue('#ku_name')) === 'Studer Immobilien AG');
+check('Dialog zeigt die aktuellen Werte', (await page.inputValue('#ku_name')) === 'Muster Immobilien AG');
 await page.click('#kudtab-personen');
 await page.waitForTimeout(150);
-check('Bestehende Ansprechperson geladen', (await page.inputValue('#kup_nachname_0')) === 'Studer');
+check('Bestehende Ansprechperson geladen', (await page.inputValue('#kup_nachname_0')) === 'Muster');
 check('Ihr Kommunikationsweg geladen',
   (await page.inputValue('#kuPersonenListe .ku-person .kw-reihe:nth-child(2) [data-kpw="wert"]')) === '079 500 40 30');
 await page.click('#kudtab-kommunikation');
@@ -309,7 +309,7 @@ await page.waitForTimeout(300);
 const upd = calls.find(c => c.p.includes('kunden_update'));
 check('Speichern sendet Notiz mit', upd && upd.body.notiz === 'Notiz nach dem Bearbeiten');
 check('Speichern sendet die Ansprechperson unverändert mit', upd && upd.body.personen.length === 1
-  && upd.body.personen[0].nachname === 'Studer'
+  && upd.body.personen[0].nachname === 'Muster'
   && upd.body.personen[0].kontaktwege.some(w => w.wert === '079 500 40 30'));
 check('Kundennummer ist kein Bestandteil des Speicherns (unveränderlich)', upd && !('kundennummer' in upd.body));
 check('Detailseite zeigt die neue Notiz sofort', (await page.textContent('#kdInfo')).includes('Notiz nach dem Bearbeiten'));

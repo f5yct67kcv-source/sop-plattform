@@ -21,31 +21,31 @@ const t = n => `${M}-${String(n).padStart(2, '0')}`;
 const relTag = n => iso(new Date(Date.now() + n * 86400000));
 
 const OBJEKTE = [
-  { id: 1, kunde_id: 1, kunde_name: 'Borner AG', name: 'Gerolag Center', ort: '4601 Olten', kanton: 'SO', aktiv: 1 },
-  { id: 2, kunde_id: 1, kunde_name: 'Borner AG', name: 'Werkhof Nord', ort: '4600 Olten', kanton: 'SO', aktiv: 1 },
-  { id: 3, kunde_id: 2, kunde_name: 'Studiotools', name: 'Lagerhalle Sued', ort: '4632 Trimbach', kanton: 'SO', aktiv: 1 },
+  { id: 1, kunde_id: 1, kunde_name: 'Beispiel AG', name: 'Muster Center', ort: '4601 Olten', kanton: 'SO', aktiv: 1 },
+  { id: 2, kunde_id: 1, kunde_name: 'Beispiel AG', name: 'Werkhof Nord', ort: '4600 Olten', kanton: 'SO', aktiv: 1 },
+  { id: 3, kunde_id: 2, kunde_name: 'Werkmuster', name: 'Lagerhalle Sued', ort: '4632 Trimbach', kanton: 'SO', aktiv: 1 },
 ];
 const ma = n => Array.from({ length: n }, (_, i) => ({ id: i + 1, name: 'p' + i, vorname: 'P', nachname: String(i), zusage: 'ja' }));
-// Gerolag: durchgehend voll besetzt.  Werkhof: eine Luecke.  Lagerhalle: gar
+// Muster: durchgehend voll besetzt.  Werkhof: eine Luecke.  Lagerhalle: gar
 // nichts -- damit ist jeder der drei Belegungszustaende genau einmal vertreten.
 const EINS = [
-  { id: 1, objekt_id: 1, kunde_name: 'Borner AG', titel: 'Revier', ort: 'Olten', datum: t(3),
+  { id: 1, objekt_id: 1, kunde_name: 'Beispiel AG', titel: 'Revier', ort: 'Olten', datum: t(3),
     von: '18:00:00', bis: '22:00:00', bedarf: 1, status: 'geplant', mitarbeiter: ma(1) },
-  { id: 2, objekt_id: 1, kunde_name: 'Borner AG', titel: 'Revier', ort: 'Olten', datum: t(4),
+  { id: 2, objekt_id: 1, kunde_name: 'Beispiel AG', titel: 'Revier', ort: 'Olten', datum: t(4),
     von: '18:00:00', bis: '22:00:00', bedarf: 2, status: 'geplant', mitarbeiter: ma(2) },
-  { id: 3, objekt_id: 2, kunde_name: 'Borner AG', titel: 'Werkhof', ort: 'Olten', datum: t(5),
+  { id: 3, objekt_id: 2, kunde_name: 'Beispiel AG', titel: 'Werkhof', ort: 'Olten', datum: t(5),
     von: '20:00:00', bis: '23:00:00', bedarf: 3, status: 'geplant', mitarbeiter: ma(1) },
   // Alle uebrigen Zellenzustaende, damit die Rasterlinie auf jeder Feldfarbe
   // gemessen werden kann. Alle auf Werkhof, der ohnehin schon "luecke" ist --
   // so aendert sich an den Erwartungen der Zeilenfilter nichts.
-  { id: 5, objekt_id: 2, kunde_name: 'Borner AG', titel: 'Werkhof', ort: 'Olten', datum: t(6),
+  { id: 5, objekt_id: 2, kunde_name: 'Beispiel AG', titel: 'Werkhof', ort: 'Olten', datum: t(6),
     von: '20:00:00', bis: '23:00:00', bedarf: 2, status: 'geplant', mitarbeiter: [] },
-  { id: 6, objekt_id: 2, kunde_name: 'Borner AG', titel: 'Werkhof', ort: 'Olten', datum: t(7),
+  { id: 6, objekt_id: 2, kunde_name: 'Beispiel AG', titel: 'Werkhof', ort: 'Olten', datum: t(7),
     von: '20:00:00', bis: '23:00:00', bedarf: 2, status: 'provisorisch', mitarbeiter: ma(1) },
-  { id: 7, objekt_id: 2, kunde_name: 'Borner AG', titel: 'Werkhof', ort: 'Olten', datum: t(8),
+  { id: 7, objekt_id: 2, kunde_name: 'Beispiel AG', titel: 'Werkhof', ort: 'Olten', datum: t(8),
     von: '20:00:00', bis: '23:00:00', bedarf: 2, status: 'abgesagt', mitarbeiter: [] },
   // Liegt ausserhalb des Standardmonats -- prueft, dass der Zeitraum wirklich schneidet.
-  { id: 4, objekt_id: 3, kunde_name: 'Studiotools', titel: 'Lager', ort: 'Trimbach', datum: '2027-03-09',
+  { id: 4, objekt_id: 3, kunde_name: 'Werkmuster', titel: 'Lager', ort: 'Trimbach', datum: '2027-03-09',
     von: '08:00:00', bis: '12:00:00', bedarf: 1, status: 'geplant', mitarbeiter: [] },
 ];
 
@@ -201,7 +201,7 @@ await page.selectOption('#mxBeleg', 'voll');
 await page.waitForTimeout(400);
 z = await zeilen();
 check('„Nur vollständig besetzte“ zeigt genau das volle Objekt',
-  z.length === 1 && z[0].includes('Gerolag Center'));
+  z.length === 1 && z[0].includes('Muster Center'));
 
 await page.selectOption('#mxBeleg', 'ohne');
 await page.waitForTimeout(400);
@@ -255,13 +255,13 @@ z = await zeilen();
 check('Die Suche findet auch über den Ort (Gross-/Kleinschreibung egal)',
   z.length === 1 && z[0].includes('Lagerhalle Sued'));
 check('Der Hinweis nennt die Suche', (await info()).includes('trimbach'));
-// "p0" steckt sowohl bei Gerolag als auch bei Werkhof in der Zuteilung --
-// "p1" kommt nur bei Gerolag vor (Einsatz 2, zwei Personen).
+// "p0" steckt sowohl bei Muster als auch bei Werkhof in der Zuteilung --
+// "p1" kommt nur bei Muster vor (Einsatz 2, zwei Personen).
 await page.fill('#mxSuche', 'p1');
 await page.waitForTimeout(400);
 z = await zeilen();
 check('Die Suche findet auch über eine zugeteilte Person',
-  z.length === 1 && z[0].includes('Gerolag Center'));
+  z.length === 1 && z[0].includes('Muster Center'));
 await page.fill('#mxSuche', 'niemand-passt-hier');
 await page.waitForTimeout(400);
 check('Eine erfolglose Suche erklärt sich, statt leer zu wirken',
@@ -390,13 +390,13 @@ await page.evaluate(() => {
   const M = new Date(heute.getTime() - heute.getTimezoneOffset() * 6e4).toISOString().slice(0, 7);
   const t = n => `${M}-${String(n).padStart(2, '0')}`;
   const ma = n => Array.from({ length: n }, (_, i) => ({ id: 90 + i, name: 'r' + i, vorname: 'R', nachname: String(i), zusage: 'ja' }));
-  // Gerolag (Objekt 1) bekommt zusätzlich Reinigung -- am 3. sogar parallel
+  // Muster (Objekt 1) bekommt zusätzlich Reinigung -- am 3. sogar parallel
   // zur bereits vorhandenen Sicherheitsschicht.
   einsaetze.push(
-    { id: 201, objekt_id: 1, kunde_name: 'Borner AG', titel: 'Endreinigung', ort: 'Olten',
+    { id: 201, objekt_id: 1, kunde_name: 'Beispiel AG', titel: 'Endreinigung', ort: 'Olten',
       datum: t(3), von: '07:00:00', bis: '11:00:00', bedarf: 2, status: 'geplant',
       sparte: 'reinigung', mitarbeiter: ma(2) },
-    { id: 202, objekt_id: 1, kunde_name: 'Borner AG', titel: 'Endreinigung', ort: 'Olten',
+    { id: 202, objekt_id: 1, kunde_name: 'Beispiel AG', titel: 'Endreinigung', ort: 'Olten',
       datum: t(10), von: '07:00:00', bis: '11:00:00', bedarf: 3, status: 'geplant',
       sparte: 'reinigung', mitarbeiter: ma(1) });
   renderMatrix();
@@ -409,11 +409,11 @@ check('Er bietet beide Sparten und „beide“ an',
 
 let zz = await zeilen();
 check('Das Objekt mit beiden Sparten bekommt zwei getrennte Zeilen',
-  zz.filter(x => x.includes('Gerolag Center')).length === 2);
+  zz.filter(x => x.includes('Muster Center')).length === 2);
 check('Die Reinigungsspur ist als solche gekennzeichnet',
-  zz.some(x => x.includes('Gerolag Center') && x.includes('Reinigung')));
+  zz.some(x => x.includes('Muster Center') && x.includes('Reinigung')));
 check('Die Sicherheitsspur ist ebenfalls gekennzeichnet, wenn beide da sind',
-  zz.some(x => x.includes('Gerolag Center') && x.includes('Sicherheit')));
+  zz.some(x => x.includes('Muster Center') && x.includes('Sicherheit')));
 check('Objekte mit nur einer Sparte tragen keine überflüssige Marke',
   zz.some(x => x.includes('Werkhof Nord') && !x.includes('Sicherheit')));
 
@@ -426,16 +426,16 @@ const spurZahlen = async (name, sparte) => page.evaluate(([n, sp]) => {
   return tr ? [...tr.querySelectorAll('td.d .zelle')].map(z => z.textContent.trim()).filter(x => x !== '·').join(',') : null;
 }, [name, sparte]);
 check('Die Sicherheitsspur zeigt nur ihre eigenen Zahlen',
-  (await spurZahlen('Gerolag Center', 'Sicherheit')) === '1,2');
+  (await spurZahlen('Muster Center', 'Sicherheit')) === '1,2');
 check('Die Reinigungsspur zeigt nur ihre eigenen Zahlen',
-  (await spurZahlen('Gerolag Center', 'Reinigung')) === '2,1');
+  (await spurZahlen('Muster Center', 'Reinigung')) === '2,1');
 
 // ── Filter auf eine Sparte
 await page.selectOption('#mxSparte', 'reinigung');
 await page.waitForTimeout(400);
 zz = await zeilen();
 check('„Nur Reinigung“ zeigt genau die eine Reinigungsspur', zz.length === 1);
-check('… und zwar die von Gerolag', zz[0].includes('Gerolag Center'));
+check('… und zwar die von Muster', zz[0].includes('Muster Center'));
 check('Der Hinweis nennt die gewählte Sparte', (await info()).includes('nur'));
 check('Reine Sicherheitsobjekte fallen weg',
   !(await page.textContent('#mxTable')).includes('Werkhof Nord'));
@@ -444,9 +444,9 @@ await page.selectOption('#mxSparte', 'sicherheit');
 await page.waitForTimeout(400);
 zz = await zeilen();
 check('„Nur Sicherheit“ blendet die Reinigungsspur aus',
-  zz.filter(x => x.includes('Gerolag Center')).length === 1);
-check('… und die verbleibende Gerolag-Zeile ist die Sicherheitsspur',
-  (await spurZahlen('Gerolag Center', null)) === '1,2');
+  zz.filter(x => x.includes('Muster Center')).length === 1);
+check('… und die verbleibende Muster-Zeile ist die Sicherheitsspur',
+  (await spurZahlen('Muster Center', null)) === '1,2');
 check('Die reinen Sicherheitsobjekte sind wieder da',
   (await page.textContent('#mxTable')).includes('Werkhof Nord'));
 

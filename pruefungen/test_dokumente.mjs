@@ -83,10 +83,10 @@ check('KRITISCH: der Endpunkt wird deployt',
 // ══════════════════════════════════════════════════════════════════════════
 // TEIL 2 — Die Planungsoberfläche
 // ══════════════════════════════════════════════════════════════════════════
-const MA = [{ id: 1, name: 'adrian', vorname: 'Adrian', nachname: 'von Arb', aktiv: 1, ist_admin: 1 }];
-const KU = [{ id: 1, name: 'Stranag', strasse: 'Kantonsstrasse 3', ort: '6000 Luzern' }];
+const MA = [{ id: 1, name: 'adrian', vorname: 'Adrian', nachname: 'Muster', aktiv: 1, ist_admin: 1 }];
+const KU = [{ id: 1, name: 'Nordbau', strasse: 'Kantonsstrasse 3', ort: '6000 Luzern' }];
 const EINSAETZE = [
-  { id: 81, kunde_id: 1, kunde_name: 'Stranag', titel: null, strasse: 'Kantonsstrasse 3',
+  { id: 81, kunde_id: 1, kunde_name: 'Nordbau', titel: null, strasse: 'Kantonsstrasse 3',
     ort: '6000 Luzern', kanton: 'LU', einsatzart: 'Verkehrsdienst', sparte: 'sicherheit',
     datum: MORGEN, von: '07:30:00', bis: '16:30:00', bedarf: 1, status: 'geplant',
     bemerkung: null, objekt_id: null, mitarbeiter: [] },
@@ -237,7 +237,7 @@ check('Die Fehlermeldung ist beim Neuöffnen weg', !(await page.isVisible('#enND
 await page.setInputFiles('#enNDokDatei', datei('Objektplan.pdf'));
 await page.waitForTimeout(300);
 await page.evaluate(() => {
-  $('enNKunde_name').value = 'Stranag';
+  $('enNKunde_name').value = 'Nordbau';
   $('enNStrasse').value = 'Kantonsstrasse 3';
   $('enNOrt').value = '6000 Luzern';
   $('enNKanton').value = 'LU';
@@ -265,7 +265,7 @@ await page.waitForTimeout(400);
 await page.setInputFiles('#enNDokDatei', datei('Konzept.pdf'));
 await page.waitForTimeout(300);
 await page.evaluate(() => {
-  $('enNKunde_name').value = 'Stranag';
+  $('enNKunde_name').value = 'Nordbau';
   $('enNStrasse').value = 'Kantonsstrasse 3';
   $('enNOrt').value = '6000 Luzern';
   $('enNKanton').value = 'LU';
@@ -424,29 +424,29 @@ await p2.route('**/api/**', route => {
   try { body = req.postData() ? JSON.parse(req.postData()) : null; } catch (e) {}
   appRufe.push({ p, body, url });
   const send = b => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) });
-  if (p.includes('login')) return send({ status: 'ok', token: 't', name: 'daniele', ist_admin: false });
+  if (p.includes('login')) return send({ status: 'ok', token: 't', name: 'dario', ist_admin: false });
   if (p.includes('einsatz_dokument')) {
     if (/[?&]id=/.test(url)) return route.fulfill({ status: 200, contentType: 'application/pdf', body: PDF });
     const eid = Number(url.split('einsatz_id=')[1]);
     return send({ status: 'ok', dokumente: eid === 51 ? APP_DOK : [] });
   }
   if (p.includes('meine_schichten')) return send({ status: 'ok', schichten: [
-    { id: 51, kunde_name: 'Stranag', titel: 'Mit Unterlagen', strasse: 'Kantonsstrasse 3',
+    { id: 51, kunde_name: 'Nordbau', titel: 'Mit Unterlagen', strasse: 'Kantonsstrasse 3',
       ort: '6000 Luzern', kanton: 'LU', einsatzart: 'Verkehrsdienst', datum: MORGEN,
       von: '07:30:00', bis: '16:30:00', status: 'bestaetigt', bemerkung: null,
       zusage: 'zugesagt', objekt_name: null, im_team: 1 },
-    { id: 52, kunde_name: 'Stranag', titel: 'Ohne Unterlagen', strasse: 'Kantonsstrasse 3',
+    { id: 52, kunde_name: 'Nordbau', titel: 'Ohne Unterlagen', strasse: 'Kantonsstrasse 3',
       ort: '6000 Luzern', kanton: 'LU', einsatzart: 'Verkehrsdienst', datum: tag(2),
       von: '07:30:00', bis: '16:30:00', status: 'bestaetigt', bemerkung: null,
       zusage: 'zugesagt', objekt_name: null, im_team: 1 }] });
   if (p.includes('mein_profil')) return send({ status: 'ok', monat: { anzahl: 0, stunden: 0 },
-    profil: { name: 'daniele', ist_admin: false, vorname: 'Daniele', nachname: 'Ciardo' } });
+    profil: { name: 'dario', ist_admin: false, vorname: 'Dario', nachname: 'Beispiel' } });
   if (p.includes('rapport_list')) return send({ status: 'ok', rapporte: [] });
   return send({ status: 'ok' });
 });
 
 await p2.goto(`file://${WURZEL}/app.html`);
-await p2.fill('#gName', 'daniele'); await p2.fill('#gPass', 'x'); await p2.click('#gBtn');
+await p2.fill('#gName', 'dario'); await p2.fill('#gPass', 'x'); await p2.click('#gBtn');
 await p2.waitForSelector('#app.on'); await p2.waitForTimeout(500);
 
 await p2.evaluate(() => blattAuf(51));

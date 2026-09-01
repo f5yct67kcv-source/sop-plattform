@@ -242,6 +242,31 @@ svg.i-sm { width: 15px; height: 15px; }
 }
 .inp::placeholder { color: var(--ink-3); }
 .inp:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+/* Passwortfeld mit Auge (ENT-291).
+   Maskiert ist der Normalzustand; das Auge ist die Ausnahme auf Knopfdruck.
+   Es faellt beim naechsten Aufbau der Maske wieder auf "verdeckt" zurueck --
+   ein Feld, das sichtbar bleibt, weil vor einer Stunde jemand geschaut hat,
+   waere schlimmer als gar keine Maskierung.
+   Die Trefferflaeche ist absichtlich so hoch wie das Feld selbst, nicht so
+   gross wie das Zeichen. Gemessen wird sie in test_admin.mjs am gerenderten
+   Zustand -- hier steht nur die Absicht. */
+.pw-feld { position: relative; }
+.pw-feld .inp { padding-right: 46px; }
+.pw-toggle {
+  /* Bewusst ueber die volle Feldhoehe (top/bottom 0) statt eingerueckt:
+     Eingerueckt mass der Knopf auf dem Handy 42 px und blieb damit unter
+     den 44 px aus CLAUDE.md -- aufgefallen ist das erst beim Messen am
+     gerenderten Zustand, nicht beim Lesen dieser Regel. */
+  position: absolute; right: 0; top: 0; bottom: 0; width: 44px;
+  display: flex; align-items: center; justify-content: center;
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font-size: 16px; line-height: 1; opacity: .55;
+}
+/* Kein Hintergrund beim Ueberfahren: Der Knopf liegt genau auf dem rechten
+   Rand des Feldes, eine Flaeche wuerde den Rahmen dort durchschneiden. */
+.pw-toggle:hover { opacity: 1; }
+.pw-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 select.inp { padding-right: 30px; background-image: linear-gradient(45deg, transparent 50%, var(--ink-3) 50%), linear-gradient(135deg, var(--ink-3) 50%, transparent 50%); background-position: right 14px center, right 9px center; background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; }
 
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 1px solid transparent; border-radius: var(--r-sm); padding: 9px 15px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; transition: background .13s, border-color .13s, color .13s; white-space: nowrap; text-decoration: none; }
@@ -3128,8 +3153,12 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
       </div>
       <div class="f">
         <label for="gPass">Passwort</label>
-        <input class="inp" type="password" id="gPass" autocomplete="current-password"
-               onkeydown="if(event.key==='Enter')doLogin()">
+        <div class="pw-feld">
+          <input class="inp" type="password" id="gPass" autocomplete="current-password"
+                 onkeydown="if(event.key==='Enter')doLogin()">
+          <button type="button" class="pw-toggle" aria-label="Passwort anzeigen"
+                  onclick="togglePw('gPass', this)">👁</button>
+        </div>
       </div>
       <!-- Zweiter Faktor (ENT-076). Erscheint erst, wenn der Server ihn
            verlangt -- wer keine Zwei-Faktor-Anmeldung eingeschaltet hat,
@@ -3466,7 +3495,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
                 </div>
                 <div class="diktat-router">
                   <div class="diktat-eingabe" id="rtDropzone" ondragover="rtDragUeber(event,'rt')" ondragleave="rtDragWeg('rt')" ondrop="rtDrop(event,'rt')">
-                    <textarea class="inp" id="rtText" rows="2" placeholder="Diktieren oder tippen — z. B. „Neuer Einsatz für die Borner AG morgen 7 bis 16 Uhr“" onpaste="rtEinfuegen(event,'rt')"></textarea>
+                    <textarea class="inp" id="rtText" rows="2" placeholder="Diktieren oder tippen — z. B. „Neuer Einsatz für die Beispiel AG morgen 7 bis 16 Uhr“" onpaste="rtEinfuegen(event,'rt')"></textarea>
                     <div id="rtBildVorschau" class="rt-bild" style="display:none">
                       <img id="rtBildImg" alt="">
                       <button type="button" onclick="rtBildEntfernen('rt')" title="Bild entfernen" aria-label="Bild entfernen">
@@ -3732,7 +3761,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
           <div class="card-bd">
             <div class="diktat-router">
               <div class="diktat-eingabe" id="peDropzone" ondragover="rtDragUeber(event,'pe')" ondragleave="rtDragWeg('pe')" ondrop="rtDrop(event,'pe')">
-                <textarea class="inp" id="peText" rows="2" placeholder="Diktieren, tippen oder ein Bild einfügen (Strg+V) — z. B. „Neuer Einsatz für die Borner AG morgen 7 bis 16 Uhr“ oder ein Screenshot einer Auftrags-E-Mail." onpaste="rtEinfuegen(event,'pe')"></textarea>
+                <textarea class="inp" id="peText" rows="2" placeholder="Diktieren, tippen oder ein Bild einfügen (Strg+V) — z. B. „Neuer Einsatz für die Beispiel AG morgen 7 bis 16 Uhr“ oder ein Screenshot einer Auftrags-E-Mail." onpaste="rtEinfuegen(event,'pe')"></textarea>
                 <div id="peBildVorschau" class="rt-bild" style="display:none">
                   <img id="peBildImg" alt="">
                   <button type="button" onclick="rtBildEntfernen('pe')" title="Bild entfernen" aria-label="Bild entfernen">
@@ -6152,7 +6181,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 <div class="dlg-scrim" id="dlgSprechen">
   <div class="dlg narrow">
     <div class="dlg-hd"><h2>Sprechen</h2>
-      <p>Diktiere oder tippe, z. B. „Neuer Einsatz für die Borner AG morgen 7 bis 16 Uhr“. Der richtige Bereich öffnet sich automatisch, vorbefüllt — gespeichert wird erst nach deiner Prüfung.</p>
+      <p>Diktiere oder tippe, z. B. „Neuer Einsatz für die Beispiel AG morgen 7 bis 16 Uhr“. Der richtige Bereich öffnet sich automatisch, vorbefüllt — gespeichert wird erst nach deiner Prüfung.</p>
     </div>
     <div class="dlg-bd">
       <div class="msg-err" id="gsErr" style="display:none"></div>
@@ -7331,7 +7360,7 @@ function renderBegruessung() {
   const formen = BEGR_GRUSS[zeit];
   const gruss = formen[Math.floor(Math.random() * formen.length)];
   // Erst die echte Personalliste fragen -- der Login-Name ist nicht
-  // zuverlaessig in Vor-/Nachname zerlegbar (z.B. "adrianvonarb").
+  // zuverlaessig in Vor-/Nachname zerlegbar (z.B. "hansmuster").
   const eintrag = mitarbeiter.find(m => m.name === (me && me.name));
   const vorname = (eintrag && eintrag.vorname) || ((me && me.name) || '').split(/[.\s]/)[0];
   $('begrGruss').textContent = vorname ? `${gruss}, ${esc(vorname)}` : gruss;
@@ -14316,7 +14345,11 @@ function zfZeichnen(zusatz) {
       <div class="zone-note">Danach genügt wieder das Passwort allein. Zur Sicherheit
         wird dein Passwort verlangt — nicht nur diese offene Sitzung.</div>
       <div class="inp-row">
-        <input class="inp" id="zfAusPw" type="password" placeholder="dein Passwort" autocomplete="current-password">
+        <div class="pw-feld" style="flex:1;min-width:0">
+          <input class="inp" id="zfAusPw" type="password" placeholder="dein Passwort" autocomplete="current-password">
+          <button type="button" class="pw-toggle" aria-label="Passwort anzeigen"
+                  onclick="togglePw('zfAusPw', this)">👁</button>
+        </div>
         <button class="btn btn-danger" onclick="zfAus()">Abschalten</button>
       </div>
     </div>`;
@@ -18492,7 +18525,7 @@ function planDiktat(art) {
   planDiktatArt = art === 'zuteilung' ? 'zuteilung' : 'masterplan';
   $('pdTitel').textContent = planDiktatArt === 'zuteilung' ? 'Einteilen per Diktat' : 'Schichten setzen per Diktat';
   $('pdText').textContent = planDiktatArt === 'zuteilung'
-    ? `Zum Beispiel: „Setze Valbon vom 1. bis 15. auf die Schliessrunde.“ Objekt und Monat kommen vom Bildschirm.`
+    ? `Zum Beispiel: „Setze Vito vom 1. bis 15. auf die Schliessrunde.“ Objekt und Monat kommen vom Bildschirm.`
     : `Zum Beispiel: „Setze die Schliessrunde jeden Tag auf den ganzen Monat.“ Objekt und Monat kommen vom Bildschirm.`;
   $('pdWo').textContent = `${oplDaten ? oplDaten.objekt.name : ''} · ${($('oplVon').value || isoTag()).slice(0, 7)}`;
   $('pdText2').value = '';
@@ -19216,6 +19249,47 @@ function revierWarnungZeigen(personen, weiterMachenFn) {
 // wird auf der vollen Flaeche (mbOeffnen weiter unten). Passwort und
 // Deaktivierung sind mitgezogen und stehen dort in der Karte "Zugang".
 
+// Gegenbestaetigung (ENT-289): Ein vertipptes Passwort sperrt die Person aus
+// ihrem eigenen Konto aus, und gemerkt wird es erst beim naechsten Anmelden
+// -- moeglicherweise Tage spaeter und weit weg vom Bildschirm, an dem es
+// entstand. Darum die Wiederholung, und die Meldung erscheint waehrend des
+// Tippens statt erst beim Druck auf "Setzen".
+// Auge am Passwortfeld (ENT-291). Maskiert ist der Normalzustand -- ein
+// Passwort im Klartext steht sonst auch dann noch offen da, wenn jemand
+// anderes vor dem Bildschirm steht. Wer kontrollieren will, was er getippt
+// hat, schaltet EIN Feld um, und nur bis die Maske neu aufgebaut wird: Der
+// Ausgangszustand steht im Markup, nirgends wird eine Vorliebe gemerkt.
+//
+// Gleicher Name und gleiche Zeichen wie in index.html -- ein Bedienelement,
+// nicht zwei, die verschieden aussehen.
+function togglePw(id, btn) {
+  const inp = document.getElementById(id);
+  if (!inp) { return; }
+  const zeigen = inp.type === 'password';
+  inp.type = zeigen ? 'text' : 'password';
+  btn.textContent = zeigen ? '🙈' : '👁';
+  btn.setAttribute('aria-label', zeigen ? 'Passwort verbergen' : 'Passwort anzeigen');
+  // Zurueck ins Feld, Schreibmarke ans Ende: Der Wechsel des Typs setzt sie
+  // in manchen Browsern an den Anfang, und dann tippt man mitten hinein.
+  const ende = inp.value.length;
+  inp.focus();
+  try { inp.setSelectionRange(ende, ende); } catch (e) { /* nicht jedes Feld kann das */ }
+}
+
+function maPwPruefen() {
+  const a = $('maPw'), b = $('maPw2'), err = $('maPwErr');
+  if (!a || !b || !err) { return true; }
+  const min = (maAkte && Number(maAkte.ist_admin)) ? PW_MIN_ADMIN : PW_MIN;
+  let text = '';
+  if (a.value && a.value.length < min) { text = `Mindestens ${min} Zeichen.`; }
+  // Erst beanstanden, wenn ueberhaupt etwas Zweites dasteht -- sonst stuende
+  // die Meldung schon beim ersten Tastendruck da.
+  else if (b.value && a.value !== b.value) { text = 'Die beiden Eingaben stimmen nicht überein.'; }
+  err.textContent = text;
+  err.style.display = text ? '' : 'none';
+  return !text && !!a.value && a.value === b.value;
+}
+
 function resetMaPw() {
   const name = maAkte && maAkte.name;
   if (!name) return;
@@ -19223,9 +19297,16 @@ function resetMaPw() {
   // Fuer einen Verwaltungszugang gilt die laengere Grenze (ENT-075).
   const min = (maAkte && Number(maAkte.ist_admin)) ? PW_MIN_ADMIN : PW_MIN;
   if (password.length < min) { toast(`Passwort mindestens ${min} Zeichen.`); return; }
+  if (password !== $('maPw2').value) {
+    maPwPruefen();
+    toast('Die beiden Eingaben stimmen nicht überein.');
+    return;
+  }
   api('mitarbeiter_reset_password.php', { method: 'POST', body: { name, password } }).then(({ ok, data }) => {
     if (!ok || data.status !== 'ok') { toast(data.message || 'Fehlgeschlagen.'); return; }
     $('maPw').value = '';
+    $('maPw2').value = '';
+    maPwPruefen();
     toast('Neues Passwort gesetzt.');
   });
 }
@@ -20032,6 +20113,11 @@ const MB_ABSCHNITTE = [
     ['mobil_geschaeft',   'Mobil Geschäft',   'f'],
     ['notfallkontakt',    'Notfallkontakt',   'f', null,
       'Wen anrufen, wenn auf Schicht etwas passiert', true],
+    // Seit ENT-289 hier und nicht mehr beim Zugang: Die Sprache sagt, WIE
+    // man mit dieser Person spricht -- eine Frage der Verstaendigung, keine
+    // des Zugriffs. Sie steuert die App-Oberflaeche, aber das tut die
+    // Anrede auch, und die stand nie beim Zugang.
+    ['sprache',           'Sprache',          'a', ['de', 'fr', 'it', 'en']],
   ]},
 
   // ── Anstellung ───────────────────────────────────────────────────────
@@ -20088,10 +20174,16 @@ const MB_ABSCHNITTE = [
   ]},
 
   // ── Zugang ───────────────────────────────────────────────────────────
-  { id: 'zugang', bereich: 'zugang', spalte: 1, konto: true, titel: 'Zugang', felder: [
-    ['sprache',    'Sprache',                'a', ['de', 'fr', 'it', 'en']],
-    ['zugang_bis', 'Zugang deaktivieren per', 'd'],
-  ]},
+  // `feldRahmen` (ENT-289): Die uebrigen Karten dieses Bereichs -- Rollen,
+  // Passwort, Entfernen -- stehen in gerahmten Zonen. Ein blankes Feldraster
+  // daneben sieht aus, als gehoerte es nirgends hin. Der Rahmen ist darum
+  // keine Verzierung, sondern die Gleichbehandlung mit den Nachbarn.
+  { id: 'zugang', bereich: 'zugang', spalte: 1, konto: true, titel: 'Zugang',
+    feldRahmen: { titel: 'Befristung',
+      note: 'Ab diesem Tag kommt die Person nicht mehr hinein. Leer heisst unbefristet.' },
+    felder: [
+      ['zugang_bis', 'Zugang deaktivieren per', 'd'],
+    ]},
   // Drittes Feld bei Ja/Nein = Kurzform. In der Eingabe braucht es den ganzen
   // Satz, damit ein Kaestchen eindeutig ist; in Liste und Leseansicht steht
   // dieselbe Berechtigung als Marke.
@@ -20201,7 +20293,12 @@ function mbNeu(felder) {
 // Ein Verwaltungszugang braucht ein laengeres Passwort (ENT-075). Das muss
 // man sehen, BEVOR man abgewiesen wird -- eine Regel, die erst beim Klick
 // auftaucht, wirkt wie ein Fehler.
-const PW_MIN = 12, PW_MIN_ADMIN = 16;
+// VORUEBERGEHEND HERABGESETZT (ENT-289, 2026-09-01): Spiegel der Werte in
+// backend/anmeldung.php -- dort steht der Kasten mit der Begruendung und
+// der Auflage, vor der ersten produktiven Nutzung auf 12/16 zurueckzudrehen.
+// Aendert jemand nur hier, laesst die Oberflaeche etwas zu, das der Server
+// abweist; darum immer beide Stellen zusammen.
+const PW_MIN = 6, PW_MIN_ADMIN = 6;
 function mbPwMin() {
   // Massgeblich ist jetzt die Rolle, nicht mehr ein Admin-Haekchen. Auch
   // Planung und Personal sehen fremde Personendaten und brauchen darum das
@@ -20362,14 +20459,31 @@ function mbZeichnen() {
     return `<div class="f${breit ? ' wide' : ''}"><label for="${id}">${esc(label)}</label>${steuer}</div>`;
   };
 
+  // Ein Abschnitt mit `feldRahmen` stellt seine Felder in eine gerahmte Zone
+  // statt in ein blankes Raster (ENT-289) -- gebraucht dort, wo daneben
+  // ohnehin gerahmte Zonen stehen.
+  const raster = a => {
+    const felder = `<div class="form-grid">${(a.felder || []).map(feld).join('')}</div>`;
+    if (!a.feldRahmen || !(a.felder || []).length) { return felder; }
+    return `<div class="zone">
+      <div class="zone-hd">${esc(a.feldRahmen.titel)}</div>
+      ${a.feldRahmen.note ? `<div class="zone-note">${esc(a.feldRahmen.note)}</div>` : ''}
+      ${felder}
+    </div>`;
+  };
+
+  // Bei der Zugang-Karte gibt das Konto die Reihenfolge vor: erst WER (Login,
+  // angelegt am), dann WAS DARF ER (Rollen), dann das Passwort -- und erst
+  // danach die Befristung, kurz vor dem Entfernen. Das Feldraster wandert
+  // deshalb in mbKonto() hinein statt davor (ENT-289).
   const block = a => `
     <div class="ma-block" data-abschnitt="${esc(a.id)}">
       <h3>${esc(a.titel)}</h3>
-      <div class="form-grid">${(a.felder || []).map(feld).join('')}</div>
+      ${a.konto && !mbNeuModus ? '' : raster(a)}
       ${(a.janein || []).length ? `<div class="ma-janein">${a.janein.map(([f, label]) =>
         `<label><input type="checkbox" id="mb_${f}"${Number(wert(f)) ? ' checked' : ''}> ${esc(label)}</label>`
       ).join('')}</div>` : ''}
-      ${a.konto && !mbNeuModus ? mbKonto() : ''}
+      ${a.konto && !mbNeuModus ? mbKonto(raster(a)) : ''}
     </div>`;
   // Alle vier Bereiche werden gezeichnet, nicht nur der offene: Der
   // Speichern-Knopf liest die Felder aus dem Dokument, und was nicht da ist,
@@ -20414,7 +20528,11 @@ function mbNeuKonto() {
           <div class="f"><label for="mbNeuName">Login-Name *</label>
             <input class="inp" id="mbNeuName" autocomplete="off" oninput="mbNameBeruehrt = true"></div>
           <div class="f"><label for="mbNeuPass">Passwort *</label>
-            <input class="inp" id="mbNeuPass" type="text" placeholder="mind. 12 Zeichen" autocomplete="new-password"></div>
+            <div class="pw-feld">
+              <input class="inp" id="mbNeuPass" type="password" placeholder="mind. ${PW_MIN} Zeichen" autocomplete="new-password">
+              <button type="button" class="pw-toggle" aria-label="Passwort anzeigen"
+                      onclick="togglePw('mbNeuPass', this)">👁</button>
+            </div></div>
         </div>
         ${darf('rechte') ? `
         <div class="zone">
@@ -20480,7 +20598,9 @@ function mbRollenLesen(idVorsatz) {
 // Die Verwaltungsrolle entscheidet ueber die Mindestlaenge des Passworts.
 function mbRollenGeaendert() { mbPwLaenge(); }
 
-function mbKonto() {
+// `nachPasswort` nimmt das Feldraster des Abschnitts auf (ENT-289) -- es
+// steht zwischen Passwort und Entfernen, nicht davor.
+function mbKonto(nachPasswort) {
   const m = maAkte || {};
   const selbst = m.name === (me && me.name);
   const rollen = Array.isArray(m.rollen) && m.rollen.length
@@ -20502,11 +20622,26 @@ function mbKonto() {
     <div class="zone">
       <div class="zone-hd">Passwort</div>
       <div class="zone-note">Setzt ein neues Passwort und meldet die Person auf allen Geräten ab.</div>
-      <div class="inp-row">
-        <input class="inp" id="maPw" type="text" placeholder="mind. 12 Zeichen" autocomplete="off">
-        <button class="btn btn-plain" onclick="resetMaPw()">Setzen</button>
+      <div class="form-grid">
+        <div class="f"><label for="maPw">Neues Passwort</label>
+          <div class="pw-feld">
+            <input class="inp" id="maPw" type="password" placeholder="mind. ${PW_MIN} Zeichen"
+                   autocomplete="new-password" oninput="maPwPruefen()">
+            <button type="button" class="pw-toggle" aria-label="Passwort anzeigen"
+                    onclick="togglePw('maPw', this)">👁</button>
+          </div></div>
+        <div class="f"><label for="maPw2">Zur Bestätigung wiederholen</label>
+          <div class="pw-feld">
+            <input class="inp" id="maPw2" type="password" placeholder="nochmals dasselbe"
+                   autocomplete="new-password" oninput="maPwPruefen()">
+            <button type="button" class="pw-toggle" aria-label="Passwort anzeigen"
+                    onclick="togglePw('maPw2', this)">👁</button>
+          </div></div>
       </div>
+      <div class="msg-err" id="maPwErr" style="display:none;margin-top:10px"></div>
+      <button class="btn btn-plain btn-sm" style="margin-top:12px" onclick="resetMaPw()">Setzen</button>
     </div>
+    ${nachPasswort || ''}
     ${selbst ? '' : `
     <div class="zone danger">
       <div class="zone-hd">Mitarbeitenden entfernen</div>

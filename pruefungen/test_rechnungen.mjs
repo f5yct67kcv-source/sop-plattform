@@ -34,26 +34,26 @@ const OFFERTEN = { status: 'ok', naechste_nummer: 'OF-0002', belege: [
 ]};
 const RECHNUNGEN = { status: 'ok', naechste_nummer: 'RE-0951', belege: [
   // Noch nicht faellig, unbezahlt.
-  { id: 101, art: 'rechnung', nummer: 'RE0950', kunde_id: 2, kunde_name: 'Klinik Arlesheim', kundennummer: 'A0071',
-    titel: 'Baustelle Klinik Arlesheim', referenz: null, datum: tag(-1), faellig_bis: tag(5),
+  { id: 101, art: 'rechnung', nummer: 'RE0950', kunde_id: 2, kunde_name: 'Klinik Musterberg', kundennummer: 'A0071',
+    titel: 'Baustelle Klinik Musterberg', referenz: null, datum: tag(-1), faellig_bis: tag(5),
     status: 'versendet', bezahlt: 0, bezahlt_am: null, total_rappen: 333645, aktiv: 1, ist_vorlage: 0 },
   // Ueberfaellig, unbezahlt.
-  { id: 102, art: 'rechnung', nummer: 'RE0948', kunde_id: 3, kunde_name: 'pzu consulting gmbh', kundennummer: 'A0228',
+  { id: 102, art: 'rechnung', nummer: 'RE0948', kunde_id: 3, kunde_name: 'abc consulting gmbh', kundennummer: 'A0228',
     titel: 'test', referenz: 'REF-9', datum: tag(-30), faellig_bis: tag(-3),
     status: 'versendet', bezahlt: 0, bezahlt_am: null, total_rappen: 45400, aktiv: 1, ist_vorlage: 0 },
   // Bezahlt -- "erledigt".
-  { id: 103, art: 'rechnung', nummer: 'RE0940', kunde_id: 2, kunde_name: 'Klinik Arlesheim', kundennummer: 'A0071',
+  { id: 103, art: 'rechnung', nummer: 'RE0940', kunde_id: 2, kunde_name: 'Klinik Musterberg', kundennummer: 'A0071',
     titel: 'Erledigte Rechnung', referenz: null, datum: tag(-20), faellig_bis: tag(-10),
     status: 'versendet', bezahlt: 1, bezahlt_am: tag(-2), total_rappen: 89000, aktiv: 1, ist_vorlage: 0 },
   // Archiviert.
-  { id: 104, art: 'rechnung', nummer: 'RE0900', kunde_id: 2, kunde_name: 'Klinik Arlesheim', kundennummer: 'A0071',
+  { id: 104, art: 'rechnung', nummer: 'RE0900', kunde_id: 2, kunde_name: 'Klinik Musterberg', kundennummer: 'A0071',
     titel: 'Archiviertes', referenz: null, datum: '2026-06-01', faellig_bis: '2026-06-15',
     status: 'entwurf', bezahlt: 0, bezahlt_am: null, total_rappen: 12000, aktiv: 0, ist_vorlage: 0 },
 ]};
 const KU = { status: 'ok', kunden: [
   { id: 1, name: 'Muster AG', kundennummer: 'A0001', aktiv: 1, personen: [], kontaktwege: [] },
-  { id: 2, name: 'Klinik Arlesheim', kundennummer: 'A0071', aktiv: 1, personen: [], kontaktwege: [] },
-  { id: 3, name: 'pzu consulting gmbh', kundennummer: 'A0228', aktiv: 1, personen: [], kontaktwege: [] },
+  { id: 2, name: 'Klinik Musterberg', kundennummer: 'A0071', aktiv: 1, personen: [], kontaktwege: [] },
+  { id: 3, name: 'abc consulting gmbh', kundennummer: 'A0228', aktiv: 1, personen: [], kontaktwege: [] },
 ]};
 const PRODUKTE = { status: 'ok', produkte: [
   { id: 1, name: 'Verkehrsdienst', beschreibung: '', einzelpreis_rappen: 4200, einheit: 'Std.', mwst_satz_bp: 810, sortierung: 10, aktiv: 1 },
@@ -140,7 +140,7 @@ try {
   check('KRITISCH: "Alle" zeigt die drei aktiven Rechnungen, nicht die archivierte oder die Offerte',
     zeilen.length === 3 && zeilen.every(z => !/Sollte hier NIE erscheinen/.test(z) && !/RE0900/.test(z)));
   check('Nummer und Empfaenger stehen wie geliefert da',
-    zeilen.some(z => /RE0950/.test(z) && /Klinik Arlesheim/.test(z)));
+    zeilen.some(z => /RE0950/.test(z) && /Klinik Musterberg/.test(z)));
   check('Der Betrag steht als CHF mit Tausendertrennzeichen da',
     zeilen.some(z => /CHF 3['’]336\.45/.test(z)));
 
@@ -217,7 +217,7 @@ try {
   check('Der Zurueck-Knopf verweist auf die Rechnungsliste',
     (await page.getAttribute('#ofBtnZurueck', 'aria-label') || '').includes('Rechnungsliste'));
 
-  await page.fill('#of_kunde', 'Klinik Arlesheim'); await page.dispatchEvent('#of_kunde', 'input');
+  await page.fill('#of_kunde', 'Klinik Musterberg'); await page.dispatchEvent('#of_kunde', 'input');
   await page.fill('#of_titel', 'Testrechnung');
   await page.click('#ofFormSaveBtn'); await page.waitForTimeout(300);
   check('KRITISCH: beim Speichern geht art:"rechnung" an den Server, nicht "offerte"',

@@ -26,9 +26,9 @@ const M = '2026-03';
 const SO = '2026-03-01', MO = '2026-03-02';   // Sonntag / Montag, nachgerechnet
 
 const S = (id, datum, von, bis, ist) => ({
-  id, kunde_name: 'Borner AG', titel: 'Revierdienst', strasse: '', ort: '4601 Olten',
+  id, kunde_name: 'Beispiel AG', titel: 'Revierdienst', strasse: '', ort: '4601 Olten',
   einsatzart: 'Revierdienst', datum, von, bis, status: 'geplant', bemerkung: null,
-  zusage: 'zugesagt', objekt_name: 'Gerolag', im_team: 1, ...ist,
+  zusage: 'zugesagt', objekt_name: 'Muster', im_team: 1, ...ist,
 });
 const SCHICHTEN = [
   // Sonntag 08:00-12:00 -> 4 h, Bonus 24 Min
@@ -64,7 +64,7 @@ await page.route('**/api/**', route => {
   const send = b => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) });
   if (p.includes('login')) return send({ status: 'ok', token: 't', name: 'd', ist_admin: false });
   if (p.includes('mein_profil')) return send({ status: 'ok', profil: {
-    name: 'daniele.ciardo', vorname: 'Daniele', nachname: 'Ciardo', personalnummer: '2506',
+    name: 'dario.beispiel', vorname: 'Dario', nachname: 'Beispiel', personalnummer: '2506',
     strasse: 'Weg 1', ort: '4600 Olten', telefon: '', mobil: '', email: 'd@example.ch', ist_admin: false } });
   if (p.includes('meine_schichten')) {
     // Wie der Server: auf den angefragten Zeitraum filtern.

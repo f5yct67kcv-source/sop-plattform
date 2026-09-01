@@ -25,13 +25,13 @@ const check = (n, c) => (c ? ok : bad).push(n);
 const jetzt = new Date();
 const hm = d => String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0') + ':00';
 const NAECHSTES = { status: 'ok',
-  naechster_einsatz: { id: 41, kunde_name: 'Borner AG', titel: 'Schliessrunde', ort: '4601 Olten',
+  naechster_einsatz: { id: 41, kunde_name: 'Beispiel AG', titel: 'Schliessrunde', ort: '4601 Olten',
     datum: tag(0), von: hm(new Date(jetzt.getTime() + 3600e3)), bis: '23:00:00', bedarf: 2, zugeteilt: 1,
-    objekt_name: 'Gerolag Center' },
+    objekt_name: 'Muster Center' },
   offene_zusagen: 3, neue_sperrtage: 2 };
 
-const MA = [{ id: 1, name: 'adrianvonarb', vorname: 'Adrian', nachname: 'von Arb', aktiv: 1, ist_admin: 1 }];
-const KU = [{ id: 1, name: 'Borner AG', strasse: 'Bahnhofstrasse 1', ort: '4600 Olten', telefon: null, email: null }];
+const MA = [{ id: 1, name: 'hansmuster', vorname: 'Adrian', nachname: 'Muster', aktiv: 1, ist_admin: 1 }];
+const KU = [{ id: 1, name: 'Beispiel AG', strasse: 'Bahnhofstrasse 1', ort: '4600 Olten', telefon: null, email: null }];
 
 const rufe = [];
 let routerAntwort = null, bildAntwort = null;
@@ -45,7 +45,7 @@ await page.route('**/api/**', route => {
   try { body = req.postData() ? JSON.parse(req.postData()) : null; } catch (e) {}
   rufe.push({ p, body });
   const send = (b, s) => route.fulfill({ status: s || 200, contentType: 'application/json', body: JSON.stringify(b) });
-  if (p.includes('login')) return send({ status: 'ok', token: 't', name: 'adrianvonarb', ist_admin: true });
+  if (p.includes('login')) return send({ status: 'ok', token: 't', name: 'hansmuster', ist_admin: true });
   if (p.includes('naechstes')) return send(NAECHSTES);
   if (p.includes('ki_router_parse')) return routerAntwort ? send(routerAntwort[0], routerAntwort[1])
     : send({ status: 'error', message: 'kein Mock' }, 502);
@@ -59,7 +59,7 @@ await page.route('**/api/**', route => {
   return send({ status: 'ok', einsaetze: [], rapporte: [], objekte: [], feiertage: [], gepflegt: {}, sperren: [] });
 });
 await page.goto(`file://${WURZEL}/dashboard.html`);
-await page.fill('#gName', 'adrianvonarb'); await page.fill('#gPass', 'x'); await page.click('#gBtn');
+await page.fill('#gName', 'hansmuster'); await page.fill('#gPass', 'x'); await page.click('#gBtn');
 await page.waitForSelector('#shell.on'); await page.waitForTimeout(500);
 
 // ══════════ BEGRÜSSUNG
@@ -68,7 +68,7 @@ check('Der Container ist als erster da',
 check('Die Begrüssung nennt den Vornamen', (await page.textContent('#begrGruss')).includes('Adrian'));
 check('„Was steht an" wird geladen', rufe.some(r => r.p.includes('naechstes')));
 const naechstesTxt = await page.textContent('#begrNaechstes');
-check('Der nächste Einsatz wird genannt', naechstesTxt.includes('Gerolag Center'));
+check('Der nächste Einsatz wird genannt', naechstesTxt.includes('Muster Center'));
 check('Heute wird als „heute" erkannt', /heute/i.test(naechstesTxt));
 // Seit ENT-058 heisst es Schichten, nicht Stellen.
 check('Offene Schichten werden genannt', naechstesTxt.includes('1 Schicht offen'));
@@ -120,8 +120,8 @@ check('Leere Eingabe geht nicht ans Modell', !rufe.some(r => r.p.includes('ki_ro
 
 // ══════════ ROUTER: MITARBEITER
 routerAntwort = [{ status: 'ok', bereich: 'mitarbeiter',
-  felder: { vorname: 'Hans', nachname: 'Meier', mobil: '079 111 22 33' } }, 200];
-await page.fill('#rtText', 'Neuer Mitarbeiter Hans Meier, Mobil 079 111 22 33');
+  felder: { vorname: 'Hans', nachname: 'Muster', mobil: '079 111 22 33' } }, 200];
+await page.fill('#rtText', 'Neuer Mitarbeiter Hans Muster, Mobil 079 111 22 33');
 await page.click('#rtBtn');
 await page.waitForTimeout(500);
 // Seit ENT-072 fuehrt der Router auf die volle Anlegen-Flaeche statt in
@@ -138,24 +138,24 @@ await page.waitForTimeout(300);
 routerAntwort = null;
 
 // ══════════ ROUTER: KUNDE
-routerAntwort = [{ status: 'ok', bereich: 'kunde', felder: { name: 'Studer Immobilien AG', ort: '4632 Trimbach' } }, 200];
-await page.fill('#rtText', 'Neuer Kunde Studer Immobilien AG in Trimbach');
+routerAntwort = [{ status: 'ok', bereich: 'kunde', felder: { name: 'Muster Immobilien AG', ort: '4632 Trimbach' } }, 200];
+await page.fill('#rtText', 'Neuer Kunde Muster Immobilien AG in Trimbach');
 await page.click('#rtBtn');
 await page.waitForTimeout(500);
 check('Kunden-Dialog geht auf', await page.isVisible('#dlgKunde.on'));
-check('Firmenname ist vorbefüllt', (await page.inputValue('#ku_name')) === 'Studer Immobilien AG');
+check('Firmenname ist vorbefüllt', (await page.inputValue('#ku_name')) === 'Muster Immobilien AG');
 await page.evaluate(() => closeDlg('dlgKunde'));
 routerAntwort = null;
 
 // ══════════ ROUTER: EINSATZ
 routerAntwort = [{ status: 'ok', bereich: 'einsatz',
-  felder: { kunde_name: 'Borner AG', datum: tag(1), von: '07:00', bis: '16:00', bedarf: 1 },
-  mitarbeiter_login_namen: ['adrianvonarb'] }, 200];
-await page.fill('#rtText', 'Neuer Einsatz für die Borner AG morgen 7 bis 16 Uhr');
+  felder: { kunde_name: 'Beispiel AG', datum: tag(1), von: '07:00', bis: '16:00', bedarf: 1 },
+  mitarbeiter_login_namen: ['hansmuster'] }, 200];
+await page.fill('#rtText', 'Neuer Einsatz für die Beispiel AG morgen 7 bis 16 Uhr');
 await page.click('#rtBtn');
 await page.waitForTimeout(500);
 check('Die Anlegen-Ansicht geht auf', await page.isVisible('#view-einsatzneu.on'));
-check('Kunde ist vorbefüllt', (await page.inputValue('#enNKunde_name')) === 'Borner AG');
+check('Kunde ist vorbefüllt', (await page.inputValue('#enNKunde_name')) === 'Beispiel AG');
 check('Zugeteilte Person ist angehakt',
   await page.evaluate(() => document.querySelector('#enNMa input[value="1"]').checked));
 await page.screenshot({ path: OUT + '/81-router-einsatz.png' });
@@ -182,7 +182,7 @@ check('Ein Vorschaubild ist gesetzt',
   (await page.getAttribute('#rtBildImg', 'src') || '').startsWith('data:image/jpeg'));
 await page.screenshot({ path: OUT + '/82-bild-vorschau.png' });
 
-bildAntwort = [{ status: 'ok', felder: { kunde_name: 'Borner AG', titel: 'Baustelle Kreisel',
+bildAntwort = [{ status: 'ok', felder: { kunde_name: 'Beispiel AG', titel: 'Baustelle Kreisel',
   datum: tag(2), von: '08:00', bis: '17:00', bedarf: 1 }, mitarbeiter_login_namen: [], unsicher: false }, 200];
 await page.click('#rtBtn');
 await page.waitForTimeout(500);

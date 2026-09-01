@@ -95,14 +95,35 @@ function anmeld_fehlversuch(PDO $pdo, string $name, string $adresse): void
 // kuerzeres Passwort hat, kommt weiterhin rein; er wird nur beim naechsten
 // Wechsel auf die neue Laenge verpflichtet. Sonst waeren mit dem Deploy
 // schlagartig alle Konten ausgesperrt.
-const PASSWORT_MIN = 12;
+// ┌──────────────────────────────────────────────────────────────────────┐
+// │ VORUEBERGEHEND HERABGESETZT -- ENT-289, 2026-09-01.                  │
+// │ Auf Anordnung des Projektinhabers fuer die Erprobungsphase auf 6     │
+// │ gesenkt ("die software laeuft noch nicht in einem echten betrieb").  │
+// │ VOR DER ERSTEN PRODUKTIVEN NUTZUNG mit echten Mitarbeitenden auf     │
+// │ 12 bzw. 16 zurueckdrehen -- die Begruendung oben gilt unveraendert   │
+// │ und ist mit 6 Zeichen nicht erfuellt.                                │
+// │ Die uebrigen Sperren (Login-Name, Wortliste, Tastaturreihen) bleiben │
+// │ aktiv; "123456" und "abcdef" werden weiterhin abgewiesen.            │
+// └──────────────────────────────────────────────────────────────────────┘
+//
+// Diese Marke ist die Anmeldung der Ausnahme, nicht bloss ein Kommentar:
+// pruef_passwort.php laesst die verkuerzten Laengen NUR durch, solange sie
+// hier auf true steht. Wer sie entfernt, bekommt von der Pruefung die
+// produktiven Werte zurueckverlangt -- und wer die Laengen senkt, ohne sie
+// zu setzen, wird rot. Damit kann die Absenkung nicht stillschweigend
+// bestehen bleiben, wenn der Betrieb aufgenommen wird.
+const PASSWORT_ERPROBUNG = true;
+
+const PASSWORT_MIN = 6;
 
 // Fuer Verwaltungszugaenge mehr. Dieselbe Ueberlegung wie bei den
 // Sitzungsfristen: Ein Admin-Zugang oeffnet die ganze Personalakte, ein
 // Mitarbeitenden-Zugang die eigenen Schichten. Unterschiedliches Risiko,
 // unterschiedliche Anforderung. Solange es kein Rollenmodell gibt (OP-59),
 // haengt am Admin-Passwort buchstaeblich alles.
-const PASSWORT_MIN_ADMIN = 16;
+// Ebenfalls voruebergehend herabgesetzt, siehe Kasten oben (ENT-289).
+// Urspruenglich 16.
+const PASSWORT_MIN_ADMIN = 6;
 
 // Wie aufwendig das Verschluesseln des Passworts ist. Jede Stufe verdoppelt
 // den Aufwand -- fuer das Anmelden ein paar Hundertstelsekunden, fuer

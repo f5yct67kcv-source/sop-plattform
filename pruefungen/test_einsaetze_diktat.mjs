@@ -20,9 +20,9 @@ const tag = n => iso(new Date(Date.now() + n * 864e5));
 const ok = [], bad = [];
 const check = (n, c) => (c ? ok : bad).push(n);
 
-const MA = [{ id: 1, name: 'adrianvonarb', vorname: 'Adrian', nachname: 'von Arb', aktiv: 1, ist_admin: 1 }];
-const KU = [{ id: 1, name: 'Borner AG', strasse: 'Bahnhofstrasse 1', ort: '4600 Olten', telefon: null, email: null }];
-const EINSAETZE = [{ id: 21, kunde_id: 1, kunde_name: 'Borner AG', titel: 'Baustelle Kreisel', strasse: 'Weg 1',
+const MA = [{ id: 1, name: 'hansmuster', vorname: 'Adrian', nachname: 'Muster', aktiv: 1, ist_admin: 1 }];
+const KU = [{ id: 1, name: 'Beispiel AG', strasse: 'Bahnhofstrasse 1', ort: '4600 Olten', telefon: null, email: null }];
+const EINSAETZE = [{ id: 21, kunde_id: 1, kunde_name: 'Beispiel AG', titel: 'Baustelle Kreisel', strasse: 'Weg 1',
   ort: '4600 Olten', einsatzart: 'Verkehrsdienst', datum: tag(0), von: '07:00:00', bis: '16:00:00',
   bedarf: 1, status: 'geplant', bemerkung: null, mitarbeiter: [], objekt_id: null }];
 
@@ -38,7 +38,7 @@ await page.route('**/api/**', route => {
   try { body = req.postData() ? JSON.parse(req.postData()) : null; } catch (e) {}
   rufe.push({ p, body });
   const send = (b, s) => route.fulfill({ status: s || 200, contentType: 'application/json', body: JSON.stringify(b) });
-  if (p.includes('login')) return send({ status: 'ok', token: 't', name: 'adrianvonarb', ist_admin: true });
+  if (p.includes('login')) return send({ status: 'ok', token: 't', name: 'hansmuster', ist_admin: true });
   if (p.includes('ki_router_parse')) return routerAntwort ? send(routerAntwort[0], routerAntwort[1])
     : send({ status: 'error', message: 'kein Mock' }, 502);
   if (p.includes('ki_einsatz_bild')) return bildAntwort ? send(bildAntwort[0], bildAntwort[1])
@@ -56,7 +56,7 @@ await page.route('**/api/**', route => {
   return send({ status: 'ok', einsaetze: [], rapporte: [], objekte: [], feiertage: [], gepflegt: {}, sperren: [] });
 });
 await page.goto(`file://${WURZEL}/dashboard.html`);
-await page.fill('#gName', 'adrianvonarb'); await page.fill('#gPass', 'x'); await page.click('#gBtn');
+await page.fill('#gName', 'hansmuster'); await page.fill('#gPass', 'x'); await page.click('#gBtn');
 await page.waitForSelector('#shell.on'); await page.waitForTimeout(500);
 
 await page.evaluate(() => { go('planung'); goTab('einsaetze'); });
@@ -81,13 +81,13 @@ check('Der globale Sprechen-Knopf ist auf Einsätze ausgeblendet', !(await page.
 
 // ══════════ TEXT-ROUTER: FÜHRT ZUM SELBEN EINSATZ-DIALOG WIE AUF DER ÜBERSICHT
 routerAntwort = [{ status: 'ok', bereich: 'einsatz',
-  felder: { kunde_name: 'Borner AG', datum: tag(1), von: '07:00', bis: '16:00', bedarf: 1 },
-  mitarbeiter_login_namen: ['adrianvonarb'] }, 200];
-await page.fill('#peText', 'Neuer Einsatz für die Borner AG morgen 7 bis 16 Uhr');
+  felder: { kunde_name: 'Beispiel AG', datum: tag(1), von: '07:00', bis: '16:00', bedarf: 1 },
+  mitarbeiter_login_namen: ['hansmuster'] }, 200];
+await page.fill('#peText', 'Neuer Einsatz für die Beispiel AG morgen 7 bis 16 Uhr');
 await page.click('#peBtn');
 await page.waitForTimeout(500);
 check('Die Anlegen-Ansicht geht auf', await page.isVisible('#view-einsatzneu.on'));
-check('Kunde ist vorbefüllt', (await page.inputValue('#enNKunde_name')) === 'Borner AG');
+check('Kunde ist vorbefüllt', (await page.inputValue('#enNKunde_name')) === 'Beispiel AG');
 await page.evaluate(() => enNeuAbbrechen());
 routerAntwort = null;
 await page.fill('#peText', '');
@@ -103,7 +103,7 @@ check('Leere Eingabe geht nicht ans Modell', rufe.filter(r => r.p.includes('ki_r
 await page.setInputFiles('#peDatei', BILD);
 await page.waitForTimeout(400);
 check('Die Vorschau erscheint', await page.isVisible('#peBildVorschau'));
-bildAntwort = [{ status: 'ok', felder: { kunde_name: 'Borner AG', titel: 'Baustelle Kreisel',
+bildAntwort = [{ status: 'ok', felder: { kunde_name: 'Beispiel AG', titel: 'Baustelle Kreisel',
   datum: tag(2), von: '08:00', bis: '17:00', bedarf: 1 }, mitarbeiter_login_namen: [], unsicher: false }, 200];
 await page.click('#peBtn');
 await page.waitForTimeout(500);
