@@ -7331,7 +7331,7 @@ function renderBegruessung() {
   const formen = BEGR_GRUSS[zeit];
   const gruss = formen[Math.floor(Math.random() * formen.length)];
   // Erst die echte Personalliste fragen -- der Login-Name ist nicht
-  // zuverlaessig in Vor-/Nachname zerlegbar (z.B. "adrianvonarb").
+  // zuverlaessig in Vor-/Nachname zerlegbar (z.B. "hansmuster").
   const eintrag = mitarbeiter.find(m => m.name === (me && me.name));
   const vorname = (eintrag && eintrag.vorname) || ((me && me.name) || '').split(/[.\s]/)[0];
   $('begrGruss').textContent = vorname ? `${gruss}, ${esc(vorname)}` : gruss;
@@ -19216,6 +19216,25 @@ function revierWarnungZeigen(personen, weiterMachenFn) {
 // wird auf der vollen Flaeche (mbOeffnen weiter unten). Passwort und
 // Deaktivierung sind mitgezogen und stehen dort in der Karte "Zugang".
 
+// Gegenbestaetigung (ENT-289): Ein vertipptes Passwort sperrt die Person aus
+// ihrem eigenen Konto aus, und gemerkt wird es erst beim naechsten Anmelden
+// -- moeglicherweise Tage spaeter und weit weg vom Bildschirm, an dem es
+// entstand. Darum die Wiederholung, und die Meldung erscheint waehrend des
+// Tippens statt erst beim Druck auf "Setzen".
+function maPwPruefen() {
+  const a = $('maPw'), b = $('maPw2'), err = $('maPwErr');
+  if (!a || !b || !err) { return true; }
+  const min = (maAkte && Number(maAkte.ist_admin)) ? PW_MIN_ADMIN : PW_MIN;
+  let text = '';
+  if (a.value && a.value.length < min) { text = `Mindestens ${min} Zeichen.`; }
+  // Erst beanstanden, wenn ueberhaupt etwas Zweites dasteht -- sonst stuende
+  // die Meldung schon beim ersten Tastendruck da.
+  else if (b.value && a.value !== b.value) { text = 'Die beiden Eingaben stimmen nicht überein.'; }
+  err.textContent = text;
+  err.style.display = text ? '' : 'none';
+  return !text && !!a.value && a.value === b.value;
+}
+
 function resetMaPw() {
   const name = maAkte && maAkte.name;
   if (!name) return;
@@ -19223,9 +19242,16 @@ function resetMaPw() {
   // Fuer einen Verwaltungszugang gilt die laengere Grenze (ENT-075).
   const min = (maAkte && Number(maAkte.ist_admin)) ? PW_MIN_ADMIN : PW_MIN;
   if (password.length < min) { toast(`Passwort mindestens ${min} Zeichen.`); return; }
+  if (password !== $('maPw2').value) {
+    maPwPruefen();
+    toast('Die beiden Eingaben stimmen nicht überein.');
+    return;
+  }
   api('mitarbeiter_reset_password.php', { method: 'POST', body: { name, password } }).then(({ ok, data }) => {
     if (!ok || data.status !== 'ok') { toast(data.message || 'Fehlgeschlagen.'); return; }
     $('maPw').value = '';
+    $('maPw2').value = '';
+    maPwPruefen();
     toast('Neues Passwort gesetzt.');
   });
 }
@@ -20032,6 +20058,11 @@ const MB_ABSCHNITTE = [
     ['mobil_geschaeft',   'Mobil Geschäft',   'f'],
     ['notfallkontakt',    'Notfallkontakt',   'f', null,
       'Wen anrufen, wenn auf Schicht etwas passiert', true],
+    // Seit ENT-289 hier und nicht mehr beim Zugang: Die Sprache sagt, WIE
+    // man mit dieser Person spricht -- eine Frage der Verstaendigung, keine
+    // des Zugriffs. Sie steuert die App-Oberflaeche, aber das tut die
+    // Anrede auch, und die stand nie beim Zugang.
+    ['sprache',           'Sprache',          'a', ['de', 'fr', 'it', 'en']],
   ]},
 
   // ── Anstellung ───────────────────────────────────────────────────────
@@ -20088,10 +20119,16 @@ const MB_ABSCHNITTE = [
   ]},
 
   // ── Zugang ───────────────────────────────────────────────────────────
-  { id: 'zugang', bereich: 'zugang', spalte: 1, konto: true, titel: 'Zugang', felder: [
-    ['sprache',    'Sprache',                'a', ['de', 'fr', 'it', 'en']],
-    ['zugang_bis', 'Zugang deaktivieren per', 'd'],
-  ]},
+  // `feldRahmen` (ENT-289): Die uebrigen Karten dieses Bereichs -- Rollen,
+  // Passwort, Entfernen -- stehen in gerahmten Zonen. Ein blankes Feldraster
+  // daneben sieht aus, als gehoerte es nirgends hin. Der Rahmen ist darum
+  // keine Verzierung, sondern die Gleichbehandlung mit den Nachbarn.
+  { id: 'zugang', bereich: 'zugang', spalte: 1, konto: true, titel: 'Zugang',
+    feldRahmen: { titel: 'Befristung',
+      note: 'Ab diesem Tag kommt die Person nicht mehr hinein. Leer heisst unbefristet.' },
+    felder: [
+      ['zugang_bis', 'Zugang deaktivieren per', 'd'],
+    ]},
   // Drittes Feld bei Ja/Nein = Kurzform. In der Eingabe braucht es den ganzen
   // Satz, damit ein Kaestchen eindeutig ist; in Liste und Leseansicht steht
   // dieselbe Berechtigung als Marke.
@@ -20201,7 +20238,12 @@ function mbNeu(felder) {
 // Ein Verwaltungszugang braucht ein laengeres Passwort (ENT-075). Das muss
 // man sehen, BEVOR man abgewiesen wird -- eine Regel, die erst beim Klick
 // auftaucht, wirkt wie ein Fehler.
-const PW_MIN = 12, PW_MIN_ADMIN = 16;
+// VORUEBERGEHEND HERABGESETZT (ENT-289, 2026-09-01): Spiegel der Werte in
+// backend/anmeldung.php -- dort steht der Kasten mit der Begruendung und
+// der Auflage, vor der ersten produktiven Nutzung auf 12/16 zurueckzudrehen.
+// Aendert jemand nur hier, laesst die Oberflaeche etwas zu, das der Server
+// abweist; darum immer beide Stellen zusammen.
+const PW_MIN = 6, PW_MIN_ADMIN = 6;
 function mbPwMin() {
   // Massgeblich ist jetzt die Rolle, nicht mehr ein Admin-Haekchen. Auch
   // Planung und Personal sehen fremde Personendaten und brauchen darum das
@@ -20362,14 +20404,31 @@ function mbZeichnen() {
     return `<div class="f${breit ? ' wide' : ''}"><label for="${id}">${esc(label)}</label>${steuer}</div>`;
   };
 
+  // Ein Abschnitt mit `feldRahmen` stellt seine Felder in eine gerahmte Zone
+  // statt in ein blankes Raster (ENT-289) -- gebraucht dort, wo daneben
+  // ohnehin gerahmte Zonen stehen.
+  const raster = a => {
+    const felder = `<div class="form-grid">${(a.felder || []).map(feld).join('')}</div>`;
+    if (!a.feldRahmen || !(a.felder || []).length) { return felder; }
+    return `<div class="zone">
+      <div class="zone-hd">${esc(a.feldRahmen.titel)}</div>
+      ${a.feldRahmen.note ? `<div class="zone-note">${esc(a.feldRahmen.note)}</div>` : ''}
+      ${felder}
+    </div>`;
+  };
+
+  // Bei der Zugang-Karte gibt das Konto die Reihenfolge vor: erst WER (Login,
+  // angelegt am), dann WAS DARF ER (Rollen), dann das Passwort -- und erst
+  // danach die Befristung, kurz vor dem Entfernen. Das Feldraster wandert
+  // deshalb in mbKonto() hinein statt davor (ENT-289).
   const block = a => `
     <div class="ma-block" data-abschnitt="${esc(a.id)}">
       <h3>${esc(a.titel)}</h3>
-      <div class="form-grid">${(a.felder || []).map(feld).join('')}</div>
+      ${a.konto && !mbNeuModus ? '' : raster(a)}
       ${(a.janein || []).length ? `<div class="ma-janein">${a.janein.map(([f, label]) =>
         `<label><input type="checkbox" id="mb_${f}"${Number(wert(f)) ? ' checked' : ''}> ${esc(label)}</label>`
       ).join('')}</div>` : ''}
-      ${a.konto && !mbNeuModus ? mbKonto() : ''}
+      ${a.konto && !mbNeuModus ? mbKonto(raster(a)) : ''}
     </div>`;
   // Alle vier Bereiche werden gezeichnet, nicht nur der offene: Der
   // Speichern-Knopf liest die Felder aus dem Dokument, und was nicht da ist,
@@ -20414,7 +20473,7 @@ function mbNeuKonto() {
           <div class="f"><label for="mbNeuName">Login-Name *</label>
             <input class="inp" id="mbNeuName" autocomplete="off" oninput="mbNameBeruehrt = true"></div>
           <div class="f"><label for="mbNeuPass">Passwort *</label>
-            <input class="inp" id="mbNeuPass" type="text" placeholder="mind. 12 Zeichen" autocomplete="new-password"></div>
+            <input class="inp" id="mbNeuPass" type="text" placeholder="mind. 6 Zeichen" autocomplete="new-password"></div>
         </div>
         ${darf('rechte') ? `
         <div class="zone">
@@ -20480,7 +20539,9 @@ function mbRollenLesen(idVorsatz) {
 // Die Verwaltungsrolle entscheidet ueber die Mindestlaenge des Passworts.
 function mbRollenGeaendert() { mbPwLaenge(); }
 
-function mbKonto() {
+// `nachPasswort` nimmt das Feldraster des Abschnitts auf (ENT-289) -- es
+// steht zwischen Passwort und Entfernen, nicht davor.
+function mbKonto(nachPasswort) {
   const m = maAkte || {};
   const selbst = m.name === (me && me.name);
   const rollen = Array.isArray(m.rollen) && m.rollen.length
@@ -20502,11 +20563,18 @@ function mbKonto() {
     <div class="zone">
       <div class="zone-hd">Passwort</div>
       <div class="zone-note">Setzt ein neues Passwort und meldet die Person auf allen Geräten ab.</div>
-      <div class="inp-row">
-        <input class="inp" id="maPw" type="text" placeholder="mind. 12 Zeichen" autocomplete="off">
-        <button class="btn btn-plain" onclick="resetMaPw()">Setzen</button>
+      <div class="form-grid">
+        <div class="f"><label for="maPw">Neues Passwort</label>
+          <input class="inp" id="maPw" type="text" placeholder="mind. ${PW_MIN} Zeichen"
+                 autocomplete="off" oninput="maPwPruefen()"></div>
+        <div class="f"><label for="maPw2">Zur Bestätigung wiederholen</label>
+          <input class="inp" id="maPw2" type="text" placeholder="nochmals dasselbe"
+                 autocomplete="off" oninput="maPwPruefen()"></div>
       </div>
+      <div class="msg-err" id="maPwErr" style="display:none;margin-top:10px"></div>
+      <button class="btn btn-plain btn-sm" style="margin-top:12px" onclick="resetMaPw()">Setzen</button>
     </div>
+    ${nachPasswort || ''}
     ${selbst ? '' : `
     <div class="zone danger">
       <div class="zone-hd">Mitarbeitenden entfernen</div>

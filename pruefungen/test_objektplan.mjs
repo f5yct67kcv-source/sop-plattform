@@ -89,7 +89,7 @@ await page.route('**/api/**', route => {
   try { body = req.postData() ? JSON.parse(req.postData()) : null; } catch (e) { body = req.postData(); }
   rufe.push({ p, body, u });
   const send = (b, s) => route.fulfill({ status: s || 200, contentType: 'application/json', body: JSON.stringify(b) });
-  if (p.includes('login')) return send({ status: 'ok', token: 't', name: 'adrianvonarb', ist_admin: true });
+  if (p.includes('login')) return send({ status: 'ok', token: 't', name: 'hansmuster', ist_admin: true });
   if (p.includes('objektplan')) return send(plan());
   if (p.includes('einsatz_zuteilen')) return zuAntwort ? send(zuAntwort[0], zuAntwort[1])
     : send({ status: 'ok', id: 999, zugeteilt: (body.mitarbeiter || []).length, angelegt: true });
@@ -103,7 +103,7 @@ await page.route('**/api/**', route => {
 });
 
 await page.goto(`file://${WURZEL}/dashboard.html`);
-await page.fill('#gName', 'adrianvonarb'); await page.fill('#gPass', 'x'); await page.click('#gBtn');
+await page.fill('#gName', 'hansmuster'); await page.fill('#gPass', 'x'); await page.click('#gBtn');
 await page.waitForSelector('#shell.on'); await page.waitForTimeout(400);
 await page.evaluate(() => { if (!document.querySelector('.shell').classList.contains('schmal')) seiteUm(); });
 await page.evaluate(() => go('planung'));

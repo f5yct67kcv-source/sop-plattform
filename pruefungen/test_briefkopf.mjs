@@ -136,7 +136,7 @@ const EINSAETZE = [
 ];
 const RAPPORTE = [
   // 10 — haengt ueber einsatz_id sauber am Kunden 1
-  { id: 10, datum: HEUTE, mitarbeiter_id: 1, einsatz_id: 500, mitarbeiter: 'adrianvonarb',
+  { id: 10, datum: HEUTE, mitarbeiter_id: 1, einsatz_id: 500, mitarbeiter: 'hansmuster',
     kunde_id: 1, kunde_nr: 'K-0001', k_name: 'abc Consulting GmbH', k_strasse: 'Mustergasse',
     k_hausnummer: '2', k_adresszusatz: null, k_plz: '8200', k_ort: 'Schaffhausen',
     re_name: null, re_zusatz: null, re_strasse: null, re_hausnummer: null, re_plz: null, re_ort: null,
@@ -146,14 +146,14 @@ const RAPPORTE = [
     bemerkung: null, erfasst_am: HEUTE + ' 15:17:00' },
   // 11 — von Hand erfasst, OHNE einsatz_id: nur der Kundenname als Text.
   //      Hier darf NICHT ueber den Namen auf Kunde 1 geschlossen werden.
-  { id: 11, datum: HEUTE, mitarbeiter_id: 1, einsatz_id: null, mitarbeiter: 'adrianvonarb',
+  { id: 11, datum: HEUTE, mitarbeiter_id: 1, einsatz_id: null, mitarbeiter: 'hansmuster',
     kunde_id: null, kunde_nr: null,
     kunde: 'abc Consulting GmbH', strasse: 'Mustergasse 2', ort: '8200 Schaffhausen',
     auftrag_nr: null, einsatzart: 'Verkehrsdienst', von: '09:00:00', bis: '12:00:00',
     pause_min: 0, netto_h: 3, unterzeichner: null, unterschrift: null,
     bemerkung: null, erfasst_am: HEUTE + ' 12:05:00' },
   // 12 — haengt am Kunden MIT abweichender Rechnungsadresse
-  { id: 12, datum: HEUTE, mitarbeiter_id: 1, einsatz_id: 501, mitarbeiter: 'adrianvonarb',
+  { id: 12, datum: HEUTE, mitarbeiter_id: 1, einsatz_id: 501, mitarbeiter: 'hansmuster',
     kunde_id: 2, kunde_nr: 'K-0002', k_name: 'Grossbau AG', k_strasse: 'Kantonsstrasse',
     k_hausnummer: '3', k_adresszusatz: null, k_plz: '6000', k_ort: 'Luzern',
     re_name: 'Grossbau AG, Buchhaltung', re_zusatz: 'Postfach 44', re_strasse: 'Finanzweg',
@@ -166,7 +166,7 @@ const RAPPORTE = [
   //      heute nicht liefern; die Fixtur haelt den Riegel in
   //      rapportRechnungsadresse() pruefbar. Ohne sie bliebe eine Gegenprobe,
   //      die den Riegel entfernt, gruen -- beim Schreiben genau so passiert.
-  { id: 13, datum: HEUTE, mitarbeiter_id: 1, einsatz_id: null, mitarbeiter: 'adrianvonarb',
+  { id: 13, datum: HEUTE, mitarbeiter_id: 1, einsatz_id: null, mitarbeiter: 'hansmuster',
     kunde_id: null, kunde_nr: null, k_name: 'Fremd AG', k_strasse: 'Irrweg',
     k_hausnummer: '1', k_adresszusatz: null, k_plz: '9999', k_ort: 'Nirgendwo',
     re_name: null, re_zusatz: null, re_strasse: null, re_hausnummer: null, re_plz: null, re_ort: null,

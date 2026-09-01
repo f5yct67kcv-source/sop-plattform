@@ -30,7 +30,7 @@ const NAECHSTES = { status: 'ok',
     objekt_name: 'Muster Center' },
   offene_zusagen: 3, neue_sperrtage: 2 };
 
-const MA = [{ id: 1, name: 'adrianvonarb', vorname: 'Adrian', nachname: 'Muster', aktiv: 1, ist_admin: 1 }];
+const MA = [{ id: 1, name: 'hansmuster', vorname: 'Adrian', nachname: 'Muster', aktiv: 1, ist_admin: 1 }];
 const KU = [{ id: 1, name: 'Beispiel AG', strasse: 'Bahnhofstrasse 1', ort: '4600 Olten', telefon: null, email: null }];
 
 const rufe = [];
@@ -45,7 +45,7 @@ await page.route('**/api/**', route => {
   try { body = req.postData() ? JSON.parse(req.postData()) : null; } catch (e) {}
   rufe.push({ p, body });
   const send = (b, s) => route.fulfill({ status: s || 200, contentType: 'application/json', body: JSON.stringify(b) });
-  if (p.includes('login')) return send({ status: 'ok', token: 't', name: 'adrianvonarb', ist_admin: true });
+  if (p.includes('login')) return send({ status: 'ok', token: 't', name: 'hansmuster', ist_admin: true });
   if (p.includes('naechstes')) return send(NAECHSTES);
   if (p.includes('ki_router_parse')) return routerAntwort ? send(routerAntwort[0], routerAntwort[1])
     : send({ status: 'error', message: 'kein Mock' }, 502);
@@ -59,7 +59,7 @@ await page.route('**/api/**', route => {
   return send({ status: 'ok', einsaetze: [], rapporte: [], objekte: [], feiertage: [], gepflegt: {}, sperren: [] });
 });
 await page.goto(`file://${WURZEL}/dashboard.html`);
-await page.fill('#gName', 'adrianvonarb'); await page.fill('#gPass', 'x'); await page.click('#gBtn');
+await page.fill('#gName', 'hansmuster'); await page.fill('#gPass', 'x'); await page.click('#gBtn');
 await page.waitForSelector('#shell.on'); await page.waitForTimeout(500);
 
 // ══════════ BEGRÜSSUNG
@@ -150,7 +150,7 @@ routerAntwort = null;
 // ══════════ ROUTER: EINSATZ
 routerAntwort = [{ status: 'ok', bereich: 'einsatz',
   felder: { kunde_name: 'Beispiel AG', datum: tag(1), von: '07:00', bis: '16:00', bedarf: 1 },
-  mitarbeiter_login_namen: ['adrianvonarb'] }, 200];
+  mitarbeiter_login_namen: ['hansmuster'] }, 200];
 await page.fill('#rtText', 'Neuer Einsatz für die Beispiel AG morgen 7 bis 16 Uhr');
 await page.click('#rtBtn');
 await page.waitForTimeout(500);

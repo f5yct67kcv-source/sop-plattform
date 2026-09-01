@@ -58,7 +58,7 @@ const einsaetze = [
 ];
 
 const MA = [
-  { id: 1, name: 'adrianvonarb', vorname: 'Adrian', nachname: 'Muster', personalnummer: '1', ist_admin: 1 },
+  { id: 1, name: 'hansmuster', vorname: 'Adrian', nachname: 'Muster', personalnummer: '1', ist_admin: 1 },
   { id: 2, name: 'dario.beispiel', vorname: 'Dario', nachname: 'Beispiel', personalnummer: '2506',
     ist_admin: 0, strasse: 'Weg 1', ort: '4600 Olten', telefon: '062 000 00 00', email: 'd@example.ch' },
 ];

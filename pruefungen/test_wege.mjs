@@ -10,7 +10,7 @@ const b = await chromium.launch({ executablePath: EXE });
 const mock = (page, admin) => page.route('**/api/**', r => {
   const u = r.request().url();
   const send = x => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(x) });
-  if (u.includes('login')) return send({ status: 'ok', token: 't', name: admin ? 'adrianvonarb' : 'dario.beispiel', ist_admin: admin });
+  if (u.includes('login')) return send({ status: 'ok', token: 't', name: admin ? 'hansmuster' : 'dario.beispiel', ist_admin: admin });
   if (u.includes('meine_schichten')) return send({ status: 'ok', schichten: [] });
   if (u.includes('mein_profil')) return send({ status: 'ok', monat: { anzahl: 0, stunden: 0 }, profil: { name: 'dario.beispiel', ist_admin: admin } });
   if (u.includes('rapport_list')) return send({ status: 'ok', rapporte: [] });
@@ -34,7 +34,7 @@ await p1.close();
 const p2 = await b.newPage({ viewport: { width: 1280, height: 800 } });
 await mock(p2, true);
 await p2.goto(`file://${WURZEL}/dashboard.html`);
-await p2.fill('#gName', 'adrianvonarb'); await p2.fill('#gPass', 'x'); await p2.click('#gBtn');
+await p2.fill('#gName', 'hansmuster'); await p2.fill('#gPass', 'x'); await p2.click('#gBtn');
 await p2.waitForTimeout(700);
 check('Admin bleibt im Dashboard', p2.url().endsWith('/dashboard.html'));
 check('Admin sieht die Verwaltung', await p2.isVisible('#shell.on'));
@@ -75,7 +75,7 @@ const p5 = await b.newPage({ viewport: { width: 390, height: 844 } });
 p5.setDefaultTimeout(4000);
 await mock(p5, true);
 await p5.goto(`file://${WURZEL}/dashboard.html`);
-await p5.fill('#gName', 'adrianvonarb'); await p5.fill('#gPass', 'x'); await p5.click('#gBtn');
+await p5.fill('#gName', 'hansmuster'); await p5.fill('#gPass', 'x'); await p5.click('#gBtn');
 await p5.waitForSelector('#shell.on'); await p5.waitForTimeout(500);
 
 const daKnopf = await p5.evaluate(() => !!document.getElementById('nav-zurapp'));
@@ -131,7 +131,7 @@ const p6 = await b.newPage({ viewport: { width: 1280, height: 800 } });
 p6.setDefaultTimeout(4000);
 await mock(p6, true);
 await p6.goto(`file://${WURZEL}/dashboard.html`);
-await p6.fill('#gName', 'adrianvonarb'); await p6.fill('#gPass', 'x'); await p6.click('#gBtn');
+await p6.fill('#gName', 'hansmuster'); await p6.fill('#gPass', 'x'); await p6.click('#gBtn');
 await p6.waitForSelector('#shell.on'); await p6.waitForTimeout(500);
 const daKnopf6 = await p6.evaluate(() => !!document.getElementById('nav-zurapp'));
 if (!daKnopf6) { bad.push('Wechsel-Knopf fehlt auch auf dem Desktop'); }

@@ -181,8 +181,12 @@ await oeffnen();
     && !je.person.abschnitte.includes('einsatzbereich'));
   check('Zivilstand steht bei der Person, Kurzzeichen bei der Anstellung',
     /Zivilstand/.test(je.person.text) && /Kurzzeichen/.test(je.anstellung.text));
-  check('Rollen und Sprache stehen im Bereich "Zugang"',
-    /Rollen/.test(je.zugang.text) && /Sprache/.test(je.zugang.text));
+  check('Rollen stehen im Bereich "Zugang"', /Rollen/.test(je.zugang.text));
+  // ENT-289: Die Sprache sagt, WIE man mit jemandem spricht -- das ist eine
+  // Frage der Verstaendigung, keine des Zugriffs. Sie gehoert darum zur
+  // Person und nicht mehr zum Zugang.
+  check('KRITISCH: die Sprache steht bei der Person, nicht beim Zugang (ENT-289)',
+    /Sprache/.test(je.person.text) && !/Sprache/.test(je.zugang.text));
   check('KRITISCH: in keinem Bereich laesst sich etwas ausblenden',
     Object.values(je).every(x => x.werkzeuge === 0));
   check('Der Anpassen-Knopf verschwindet auf allen vier Bereichen',

@@ -165,16 +165,58 @@ await page.waitForSelector('#mv-bearbeiten.on');
 await page.waitForTimeout(400);
 await page.click('#mbtab-zugang');
 await page.waitForTimeout(250);
-await page.fill('#maPw', 'kurz');
-await page.click('#mbKarten .zone .btn-plain');
+const setzen = () => page.click('#mbKarten .mb-bereich.on .zone button:has-text("Setzen")');
+await page.fill('#maPw', 'ab');
+await page.fill('#maPw2', 'ab');
+await setzen();
 await page.waitForTimeout(250);
 check('Zu kurzes Passwort wird abgewiesen', !calls.some(c => c.path.includes('reset_password')));
-await page.fill('#maPw', 'blauerstuhlamsee');
-await page.click('#mbKarten .zone .btn-plain');
+
+// Gegenbestaetigung (ENT-289): Ein vertipptes Passwort sperrt die Person aus
+// ihrem eigenen Konto aus, und gemerkt wird es erst beim naechsten Anmelden.
+await page.fill('#maPw', 'blauerstuhl');
+await page.fill('#maPw2', 'blauerstuhI');   // grosses i statt l -- der klassische Vertipper
+await page.waitForTimeout(150);
+check('KRITISCH: eine Abweichung wird schon beim Tippen benannt, nicht erst beim Setzen',
+  await page.isVisible('#maPwErr')
+  && /nicht überein/.test(await page.textContent('#maPwErr')));
+await setzen();
+await page.waitForTimeout(250);
+check('KRITISCH: bei Abweichung wird NICHTS gesendet -- sonst haette die Person ein Passwort, das sie nicht kennt',
+  !calls.some(c => c.path.includes('reset_password')));
+
+await page.fill('#maPw2', 'blauerstuhl');
+await page.waitForTimeout(150);
+check('Stimmen beide ueberein, verschwindet die Meldung wieder',
+  !(await page.isVisible('#maPwErr')));
+await setzen();
 await page.waitForTimeout(300);
 const pw = calls.find(c => c.path.includes('reset_password'));
-check('Gueltiges Passwort wird gesendet', pw && pw.body.password === 'blauerstuhlamsee' && pw.body.name === 'dario.beispiel');
-check('Passwortfeld danach geleert', (await page.inputValue('#maPw')) === '');
+check('Gueltiges Passwort wird gesendet', pw && pw.body.password === 'blauerstuhl' && pw.body.name === 'dario.beispiel');
+check('Beide Passwortfelder danach geleert',
+  (await page.inputValue('#maPw')) === '' && (await page.inputValue('#maPw2')) === '');
+
+// Oberflaeche und Server muessen dieselbe Mindestlaenge kennen (ENT-289).
+// Laufen sie auseinander, laesst die Maske etwas zu, das der Server abweist
+// -- oder schlimmer: sie verspricht eine Strenge, die es nicht gibt. Genau
+// so ein Fall lag in app.html: Der Text sagte "mindestens 12 Zeichen",
+// geprueft wurden 6.
+{
+  const { readFileSync } = await import('fs');
+  const html = readFileSync(`${WURZEL}/dashboard.html`, 'utf8');
+  const php  = readFileSync(`${WURZEL}/backend/anmeldung.php`, 'utf8');
+  const zahl = (text, muster) => { const m = text.match(muster); return m ? Number(m[1]) : null; };
+  const jsMin    = zahl(html, /const PW_MIN\s*=\s*(\d+)/);
+  const jsAdmin  = zahl(html, /PW_MIN_ADMIN\s*=\s*(\d+)/);
+  const phpMin   = zahl(php,  /const PASSWORT_MIN\s*=\s*(\d+)/);
+  const phpAdmin = zahl(php,  /const PASSWORT_MIN_ADMIN\s*=\s*(\d+)/);
+  check('KRITISCH: Oberflaeche und Server verlangen dieselbe Passwortlaenge',
+    jsMin !== null && jsMin === phpMin && jsAdmin !== null && jsAdmin === phpAdmin);
+  // Der Platzhalter im Feld darf keine andere Zahl nennen als die geltende.
+  const platzhalter = [...html.matchAll(/placeholder="mind\.? (\d+) Zeichen"/g)].map(m => Number(m[1]));
+  check('Kein Feld verspricht eine andere Mindestlaenge, als tatsaechlich gilt',
+    platzhalter.every(n => n === jsMin));
+}
 
 // Entfernen mit Rueckfrage
 calls = [];

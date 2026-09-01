@@ -43,11 +43,11 @@ page.on('pageerror', e => bad.push('JS-Fehler: ' + e.message));
 await page.route('**/api/**', route => {
   const p = route.request().url().split('/api/')[1].split('?')[0];
   const send = b => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) });
-  if (p.includes('login')) return send({ status: 'ok', token: 't', name: 'adrianvonarb', ist_admin: true });
+  if (p.includes('login')) return send({ status: 'ok', token: 't', name: 'hansmuster', ist_admin: true });
   if (p.includes('dashboard_stats')) return send({ status: 'ok',
     kpi: { rapporte_monat: 1, rapporte_vormonat: 0, stunden_monat: 8.5, stunden_vormonat: 0, mitarbeiter: 2, kunden: 1, rapporte_total: 1 },
     verlauf: Array.from({ length: 8 }, (_, i) => ({ kw: 26 + i, stunden: 20, anzahl: 2 })),
-    angemeldet: [{ name: 'adrianvonarb', vorname: 'Adrian', nachname: 'Muster', letzte_anmeldung: T(3) + ' 08:00:00' }],
+    angemeldet: [{ name: 'hansmuster', vorname: 'Adrian', nachname: 'Muster', letzte_anmeldung: T(3) + ' 08:00:00' }],
     pro_mitarbeiter: [{ name: 'adrian', vorname: 'Adrian', nachname: 'Muster', stunden: '8.50', anzahl: 1 }],
     letzte_rapporte: RAP.rapporte.map(r => ({ ...r, mitarbeiter: r.mitarbeiter })) });
   if (p.includes('rapport_list')) return send(RAP);
@@ -70,7 +70,7 @@ await page.route('**/api/**', route => {
 });
 
 await page.goto(`file://${WURZEL}/dashboard.html`);
-await page.fill('#gName', 'adrianvonarb'); await page.fill('#gPass', 'x'); await page.click('#gBtn');
+await page.fill('#gName', 'hansmuster'); await page.fill('#gPass', 'x'); await page.click('#gBtn');
 await page.waitForSelector('#shell.on');
 await page.waitForTimeout(400);
 
