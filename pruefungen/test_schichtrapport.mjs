@@ -126,7 +126,7 @@ check('Die Pausendauer ist anpassbar -- Planzeiten sind Richtwerte',
   await page.isEnabled('#srPause'));
 check('KRITISCH: die Pause ist NICHT vorbelegt -- aus 9 Std. wird nichts gerechnet (ENT-082 Sperre)',
   (await page.inputValue('#srPause')) === '0');
-check('Unterschrift des Kunden bleibt moeglich', await page.isVisible('#sigCanvas'));
+check('Unterschrift des Kunden bleibt moeglich', await page.isVisible('#usigCta'));
 check('Eingabefelder mindestens 16px -- sonst zoomt iOS hinein',
   await page.evaluate(() => ['srKunde', 'srVon', 'srPause']
     .every(i => parseFloat(getComputedStyle(document.getElementById(i)).fontSize) >= 16)));
@@ -143,13 +143,22 @@ check('Auch die Eingabefelder sind mindestens 44px hoch',
     .every(i => document.getElementById(i).getBoundingClientRect().height >= 44)
     && [...document.querySelectorAll('[data-zeitwahl-fuer="srVon"] select')]
       .every(s => s.getBoundingClientRect().height >= 44)));
-check('KRITISCH: auch "Loeschen" unter der Unterschrift ist 44px -- danebengetippt kostet die Unterschrift',
+// Seit ENT-291 steht im Formular nur der Knopf; unterschrieben wird auf dem
+// ganzen Bildschirm. Der Knopf ist damit das Bedienelement, das getroffen
+// werden muss -- danebengetippt heisst hier nur "nichts passiert", nicht mehr
+// "Unterschrift weg", weil es kein Loeschen mehr direkt daneben gibt.
+check('KRITISCH: der Unterschrift-Knopf ist mindestens 44px hoch',
   await page.evaluate(() =>
-    document.querySelector('.sig-clear').getBoundingClientRect().height >= 44));
-check('Das Unterschriftfeld laeuft nicht aus seinem Rahmen',
+    document.getElementById('usigCta').getBoundingClientRect().height >= 44));
+check('Der Unterschrift-Knopf laeuft nicht aus seinem Rahmen',
   await page.evaluate(() => {
-    const c = document.getElementById('sigCanvas');
+    const c = document.getElementById('usigCta');
     return c.getBoundingClientRect().right <= c.parentElement.getBoundingClientRect().right + 1;
+  }));
+check('KRITISCH: der Knopf ist nicht ueber die volle Breite gestreckt',
+  await page.evaluate(() => {
+    const c = document.getElementById('usigCta');
+    return c.getBoundingClientRect().width < c.parentElement.getBoundingClientRect().width - 8;
   }));
 check('KRITISCH: kein Seiten-Scroll bei 390px',
   await page.evaluate(() =>
@@ -234,13 +243,13 @@ await page.waitForTimeout(250);
 await page.click('#blatt button:has-text("Schicht rapportieren")');
 await page.waitForTimeout(350);
 check('Am Desktop bleibt das Formular vollstaendig bedienbar',
-  await page.isVisible('#srKunde') && await page.isVisible('#sigCanvas'));
+  await page.isVisible('#srKunde') && await page.isVisible('#usigCta'));
 check('KRITISCH: am Desktop kein Seiten-Scroll',
   await page.evaluate(() =>
     document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1));
-check('Das Unterschriftfeld bleibt auch am Desktop im Rahmen',
+check('Der Unterschrift-Knopf bleibt auch am Desktop im Rahmen',
   await page.evaluate(() => {
-    const c = document.getElementById('sigCanvas');
+    const c = document.getElementById('usigCta');
     return c.getBoundingClientRect().right <= c.parentElement.getBoundingClientRect().right + 1;
   }));
 await browser.close();
