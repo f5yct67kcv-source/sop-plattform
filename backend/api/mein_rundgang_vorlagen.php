@@ -32,6 +32,10 @@ if (!$einsatz) {
 }
 $objektId = $einsatz['objekt_id'] !== null ? (int)$einsatz['objekt_id'] : 0;
 
-$stmt = $pdo->prepare('SELECT id, name FROM rundgang_vorlage WHERE objekt_id = ? AND aktiv = 1 ORDER BY name, id');
+// fenster_von/fenster_bis (ENT-279): die App braucht sie hier, um vor dem
+// Start zu wissen, ob "jetzt" innerhalb des Fensters liegt oder ein Grund
+// abgefragt werden muss -- die eigentliche Sperre bleibt in
+// mein_rundgang_starten.php (Sperren gehoeren in den Server).
+$stmt = $pdo->prepare('SELECT id, name, fenster_von, fenster_bis FROM rundgang_vorlage WHERE objekt_id = ? AND aktiv = 1 ORDER BY name, id');
 $stmt->execute([$objektId]);
 json_response(['status' => 'ok', 'vorlagen' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);

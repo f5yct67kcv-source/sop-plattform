@@ -19,6 +19,7 @@ if ($objektId <= 0) {
 $stmt = db()->prepare(
     'SELECT v.id AS vorlage_id, v.name, v.beschreibung, v.aktiv, v.erstellt_am,
             v.ansprechpartner_name, v.ansprechpartner_telefon,
+            v.fenster_von, v.fenster_bis,
             p.kontrollpunkt_id, p.reihenfolge, k.bezeichnung
      FROM rundgang_vorlage v
      LEFT JOIN rundgang_vorlage_punkt p ON p.vorlage_id = v.id
@@ -41,6 +42,8 @@ foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $zeile) {
             'beschreibung' => $zeile['beschreibung'],
             'ansprechpartner_name' => $zeile['ansprechpartner_name'],
             'ansprechpartner_telefon' => $zeile['ansprechpartner_telefon'],
+            'fenster_von' => $zeile['fenster_von'],
+            'fenster_bis' => $zeile['fenster_bis'],
             'aktiv' => (int)$zeile['aktiv'],
             'erstellt_am' => $zeile['erstellt_am'],
             'punkte' => [],

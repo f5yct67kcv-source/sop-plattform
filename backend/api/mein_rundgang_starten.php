@@ -41,12 +41,42 @@ if ($objektId <= 0) {
 // geprueft, nicht nur in der App -- sonst liesse sich eine Vorlage eines
 // fremden Objekts unterschieben (Sperren gehoeren in den Server).
 $vorlageId = isset($input['vorlage_id']) && $input['vorlage_id'] !== '' ? (int)$input['vorlage_id'] : null;
+$fensterVon = null; $fensterBis = null;
 if ($vorlageId !== null) {
-    $vChk = $pdo->prepare('SELECT id FROM rundgang_vorlage WHERE id = ? AND objekt_id = ? AND aktiv = 1');
+    $vChk = $pdo->prepare('SELECT fenster_von, fenster_bis FROM rundgang_vorlage WHERE id = ? AND objekt_id = ? AND aktiv = 1');
     $vChk->execute([$vorlageId, $objektId]);
-    if (!$vChk->fetch()) {
+    $vRow = $vChk->fetch();
+    if (!$vRow) {
         json_response(['status' => 'error', 'message' => 'Diese Kontrollrunde gibt es an diesem Objekt nicht (mehr)'], 404);
     }
+    $fensterVon = $vRow['fenster_von'];
+    $fensterBis = $vRow['fenster_bis'];
+}
+
+// Zeitgate (ENT-279), serverseitig -- bisher stand die Zeitpruefung nur in
+// der App (darfRundgang()), hier nachgezogen (Sperren gehoeren in den
+// Server, nicht nur in die Oberflaeche). Mit einer Vorlage, die ein Fenster
+// hat, gilt das Fenster (+Toleranz) statt der Einsatz-Sollzeit; sonst gilt
+// unveraendert die Einsatz-Sollzeit wie vor ENT-279.
+$ausnahmeGrund = isset($input['ausnahme_grund']) && $input['ausnahme_grund'] !== '' ? (string)$input['ausnahme_grund'] : null;
+if ($fensterVon !== null && $fensterBis !== null) {
+    if (!rundgang_im_fenster(date('H:i'), $fensterVon, $fensterBis, RUNDGANG_FENSTER_TOLERANZ_MIN)) {
+        if ($ausnahmeGrund === null || !array_key_exists($ausnahmeGrund, RUNDGANG_AUSSERHALB_FENSTER_GRUENDE)) {
+            json_response(['status' => 'error', 'message' => 'Ausserhalb des Zeitfensters dieser Kontrollrunde -- bitte einen Grund angeben.'], 422);
+        }
+    } else {
+        // Innerhalb des Fensters: kein Ausnahmefall, ein trotzdem
+        // mitgeschickter Grund wird nicht gespeichert -- er waere irrefuehrend.
+        $ausnahmeGrund = null;
+    }
+} else {
+    $eZeit = $pdo->prepare('SELECT datum, von FROM einsaetze WHERE id = ?');
+    $eZeit->execute([$einsatzId]);
+    $ez = $eZeit->fetch();
+    if ($ez && strtotime($ez['datum'] . ' ' . $ez['von']) > time()) {
+        json_response(['status' => 'error', 'message' => 'Dieser Einsatz hat noch nicht begonnen.'], 422);
+    }
+    $ausnahmeGrund = null;
 }
 
 // Kein zweiter offener Rundgang fuer denselben Einsatz gleichzeitig --
@@ -62,10 +92,10 @@ if ($offen->fetch()) {
 }
 
 $ins = $pdo->prepare(
-    "INSERT INTO rundgang (einsatz_id, mitarbeiter_id, objekt_id, rundgang_vorlage_id, status, vorbereitet_am)
-     VALUES (?, ?, ?, ?, 'vorbereitet', NOW())"
+    "INSERT INTO rundgang (einsatz_id, mitarbeiter_id, objekt_id, rundgang_vorlage_id, status, vorbereitet_am, ausnahme_grund)
+     VALUES (?, ?, ?, ?, 'vorbereitet', NOW(), ?)"
 );
-$ins->execute([$einsatzId, (int)$user['id'], $objektId, $vorlageId]);
+$ins->execute([$einsatzId, (int)$user['id'], $objektId, $vorlageId, $ausnahmeGrund]);
 $rundgangId = (int)$pdo->lastInsertId();
 
 $kontrollpunkte = rundgang_kontrollpunkte_uebrig($pdo, $rundgangId, $objektId, $vorlageId);

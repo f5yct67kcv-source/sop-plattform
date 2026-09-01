@@ -636,6 +636,9 @@ const W = {
     rundgangAbbrechenFreitext: 'Zusätzliche Angaben (optional)',
     rundgangAbbrechenBestaetigen: 'Abbrechen bestätigen',
     rundgangAbgebrochen: 'Abgebrochen',
+    rundgangAusserhalbFensterTitel: 'Ausserhalb der üblichen Zeit',
+    rundgangAusserhalbFensterHinweis: 'Diese Kontrollrunde hat ein festgelegtes Ausführungsfenster. Der Start jetzt liegt ausserhalb davon — bitte einen Grund angeben.',
+    rundgangAusserhalbFensterGrund: 'Grund',
     rundgangVorlageWahlTitel: 'Kontrollrunde wählen',
     rundgangVorlageWahlHinweis: 'Für dieses Objekt gibt es mehrere Kontrollrunden. Welche machst du jetzt?',
     kpErsatzscan: 'Ersatzscan',
@@ -1777,11 +1780,41 @@ function melden(zusage) {
 // Bewusst KEINE Einschraenkung auf eine bestimmte Einsatzart: anders als beim
 // Rapport (nur Verkehrsdienst) haengt ein Rundgang einzig am Objekt, nicht an
 // der Einsatzart -- so in ENT-132/180/182 nirgends eingeschraenkt.
+//
+// ENT-279: hat das Objekt mindestens eine Kontrollrunden-Vorlage mit eigenem
+// Ausfuehrungsfenster, gilt die Einsatz-Sollzeit hier NICHT mehr als Gate --
+// welches Fenster (und ob "jetzt" darin liegt) klaert sich erst bei der
+// Vorlage-Auswahl (rundgangVorlageWaehlen()). Ohne Fenster an keiner Vorlage
+// bleibt das Verhalten von vor ENT-279 unveraendert: Start erst ab Sollzeit.
 function darfRundgang(e) {
   if (e.status === 'abgesagt' || e.zusage !== 'zugesagt' || !e.hat_kontrollpunkte) return false;
+  if (e.hat_zeitfenster) return true;
   const sp = spanne(e.datum, e.von, e.bis);
   return !!sp && sp[0] <= Date.now();
 }
+
+// Serverseitiges Gegenstueck: rundgang_im_fenster() in backend/rundgang.php --
+// eine Aenderung dort muss auch hier nachgezogen werden, es gibt keine
+// gemeinsame Quelle zwischen PHP und JS (gleiches Prinzip wie
+// RUNDGANG_ABBRUCH_GRUENDE). Nur fuer die Anzeige/UX: die echte Sperre liegt
+// serverseitig in mein_rundgang_starten.php.
+function rundgangImFenster(jetztHm, fensterVonHm, fensterBisHm, toleranzMin) {
+  if (!fensterVonHm || !fensterBisHm) return true;
+  const min = hm => Number(hm.slice(0, 2)) * 60 + Number(hm.slice(3, 5));
+  let jetzt = min(jetztHm);
+  let von = min(fensterVonHm) - toleranzMin;
+  let bis = min(fensterBisHm) + toleranzMin;
+  if (bis <= von) bis += 1440;
+  if (jetzt < von) jetzt += 1440;
+  return jetzt >= von && jetzt <= bis;
+}
+const RUNDGANG_FENSTER_TOLERANZ_MIN = 5;
+const RUNDGANG_AUSSERHALB_FENSTER_GRUENDE = {
+  planer_freigabe: 'Freigabe durch Planer',
+  kurzfristige_umdisposition: 'Kurzfristige Umdisposition',
+  kundenwunsch: 'Wunsch des Kunden',
+  sonstige: 'Sonstige Gründe',
+};
 
 // Geraeteseitiger Zeitstempel im Moment der Erfassung (ENT-132 Punkt 5,
 // Offline-Prinzip) -- lokale Zeit wie ueberall sonst im Datenmodell (datum/
@@ -1882,17 +1915,20 @@ function rundgangAbschnittZeichnen(e) {
 // Vorlage entfaellt die Frage: ohne Vorlage unveraendertes Verhalten von vor
 // ENT-204 (alle aktiven Kontrollpunkte), mit genau einer ist die Auswahl
 // keine echte Entscheidung.
+let rdVorlagenGeladen = [];
+
 function rundgangStarten(einsatzId) {
   const btn = document.querySelector('#blRundgang button');
   if (btn) btn.disabled = true;
   api('mein_rundgang_vorlagen.php?einsatz_id=' + einsatzId).then(({ ok, data }) => {
     const vorlagen = (ok && data.status === 'ok') ? (data.vorlagen || []) : [];
+    rdVorlagenGeladen = vorlagen;
     if (vorlagen.length > 1) {
       if (btn) btn.disabled = false;
       rundgangVorlageWahl(einsatzId, vorlagen);
       return;
     }
-    rundgangStartenMitVorlage(einsatzId, vorlagen[0] ? vorlagen[0].id : null);
+    rundgangVorlageWaehlen(einsatzId, vorlagen[0] ? vorlagen[0].id : null);
   });
 }
 
@@ -1904,19 +1940,64 @@ function rundgangVorlageWahl(einsatzId, vorlagen) {
     <div style="font-size:13px;color:var(--ink-3);font-weight:620;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px">${esc(e.objekt_name || e.kunde_name)}</div>
     <p style="margin:0 0 14px">${esc(w('rundgangVorlageWahlHinweis'))}</p>
     <div id="rdVorlageListe" style="display:flex;flex-direction:column;gap:8px">
-      ${vorlagen.map(v => `<button class="btn btn-primary btn-wide" onclick="rundgangStartenMitVorlage(${Number(einsatzId)},${Number(v.id)})">${esc(v.name)}</button>`).join('')}
+      ${vorlagen.map(v => `<button class="btn btn-primary btn-wide" onclick="rundgangVorlageWaehlen(${Number(einsatzId)},${Number(v.id)})">${esc(v.name)}</button>`).join('')}
     </div>`;
   $('blFuss').innerHTML = `<button class="btn btn-plain" onclick="blattAuf(${Number(einsatzId)})">${esc(w('zurueck'))}</button>`;
   blattZeigen();
 }
 
-function rundgangStartenMitVorlage(einsatzId, vorlageId) {
-  document.querySelectorAll('#blRundgang button, #rdVorlageListe button').forEach(b => b.disabled = true);
+// Neu (ENT-279): Weiche zwischen sofortigem Start und Grundauswahl. Liegt
+// "jetzt" ausserhalb des Fensters der gewaehlten Vorlage (Toleranz
+// eingerechnet), fragt zuerst einen Pflichtgrund ab, statt sofort zu
+// starten. Die eigentliche Sperre bleibt serverseitig
+// (mein_rundgang_starten.php) -- hier nur die UX-Weiche.
+function rundgangVorlageWaehlen(einsatzId, vorlageId) {
+  const v = vorlageId ? rdVorlagenGeladen.find(x => Number(x.id) === Number(vorlageId)) : null;
+  if (v && v.fenster_von && v.fenster_bis &&
+      !rundgangImFenster(jetztDatetime().slice(11, 16), v.fenster_von, v.fenster_bis, RUNDGANG_FENSTER_TOLERANZ_MIN)) {
+    rundgangAusnahmeGrundWahl(einsatzId, vorlageId);
+    return;
+  }
+  rundgangStartenMitVorlage(einsatzId, vorlageId, null);
+}
+
+// Gleiches UX-Muster wie rundgangAbbrechenAnzeigen() (Grund-Auswahl,
+// Pflichtfeld, eigene Fehleranzeige) -- eigene, kleinere Grundliste
+// (RUNDGANG_AUSSERHALB_FENSTER_GRUENDE), weil die Situation eine andere ist
+// (Start ausserhalb des Fensters, kein Abbruch).
+function rundgangAusnahmeGrundWahl(einsatzId, vorlageId) {
+  $('blTitel').textContent = w('rundgangAusserhalbFensterTitel');
+  $('blBody').innerHTML = `
+    <div class="msg-err" style="color:var(--warn);background:var(--warn-soft)">${esc(w('rundgangAusserhalbFensterHinweis'))}</div>
+    <div class="f"><label for="rfGrund">${esc(w('rundgangAusserhalbFensterGrund'))}</label>
+      <select class="inp" id="rfGrund">
+        <option value="">–</option>
+        ${Object.entries(RUNDGANG_AUSSERHALB_FENSTER_GRUENDE).map(([code, txt]) =>
+          `<option value="${esc(code)}">${esc(txt)}</option>`).join('')}
+      </select>
+    </div>
+    <div id="rfErr" class="msg-err" style="display:none"></div>`;
+  $('blFuss').innerHTML = `
+    <button class="btn btn-plain" onclick="blattAuf(${Number(einsatzId)})">${esc(w('zurueck'))}</button>
+    <button class="btn btn-primary" id="rfBtn" onclick="rundgangAusnahmeGrundSenden(${Number(einsatzId)},${vorlageId ? Number(vorlageId) : 'null'})">${esc(w('rundgangStarten'))}</button>`;
+  blattZeigen();
+}
+
+function rundgangAusnahmeGrundSenden(einsatzId, vorlageId) {
+  const err = $('rfErr'); err.style.display = 'none';
+  const grund = $('rfGrund').value;
+  if (!grund) { err.textContent = w('rundgangAbbrechenGrundPflicht'); err.style.display = ''; return; }
+  rundgangStartenMitVorlage(einsatzId, vorlageId, grund);
+}
+
+function rundgangStartenMitVorlage(einsatzId, vorlageId, ausnahmeGrund) {
+  document.querySelectorAll('#blRundgang button, #rdVorlageListe button, #rfBtn').forEach(b => b.disabled = true);
   const body = { einsatz_id: einsatzId };
   if (vorlageId) body.vorlage_id = vorlageId;
+  if (ausnahmeGrund) body.ausnahme_grund = ausnahmeGrund;
   api('mein_rundgang_starten.php', { method: 'POST', body }).then(({ ok, data }) => {
     if (!ok || data.status !== 'ok') {
-      document.querySelectorAll('#blRundgang button, #rdVorlageListe button').forEach(b => b.disabled = false);
+      document.querySelectorAll('#blRundgang button, #rdVorlageListe button, #rfBtn').forEach(b => b.disabled = false);
       toast(data.message || w('netzfehler'));
       return;
     }

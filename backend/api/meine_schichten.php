@@ -45,6 +45,17 @@ $stmt = db()->prepare(
             -- einen fachlich sinnlosen Rundgang ohne einzigen Punkt.
             (SELECT COUNT(*) FROM kontrollpunkt k WHERE k.objekt_id = e.objekt_id AND k.aktiv = 1)
               AS kontrollpunkte_anzahl,
+            -- Hat das Objekt mindestens eine aktive Kontrollrunden-Vorlage
+            -- mit konfiguriertem Ausfuehrungsfenster (ENT-279)? Wenn ja, darf
+            -- die App "Rundgang starten" schon vor der Einsatz-Sollzeit
+            -- anbieten -- welches Fenster/welche Toleranz genau gilt, klaert
+            -- sich erst bei der Vorlage-Auswahl (mein_rundgang_vorlagen.php).
+            -- Ohne diese Zahl muesste die App raten, ob ein frueherer Start
+            -- ueberhaupt sinnvoll sein koennte.
+            (SELECT COUNT(*) FROM rundgang_vorlage v
+              WHERE v.objekt_id = e.objekt_id AND v.aktiv = 1
+                AND v.fenster_von IS NOT NULL AND v.fenster_bis IS NOT NULL)
+              AS zeitfenster_vorlagen_anzahl,
             -- Der eigene Ist-Stand (ENT-049): damit die Person ihre
             -- geleistete Zeit selbst nachschlagen kann. Weiterhin strikt auf
             -- die eigene Zuteilung gefiltert -- fremde Ist-Zeiten sind hier
@@ -73,6 +84,8 @@ $schichten = array_map(function ($e) {
     $e['objekt_id'] = $e['objekt_id'] !== null ? (int)$e['objekt_id'] : null;
     $e['hat_kontrollpunkte'] = ((int)$e['kontrollpunkte_anzahl']) > 0;
     unset($e['kontrollpunkte_anzahl']);
+    $e['hat_zeitfenster'] = ((int)$e['zeitfenster_vorlagen_anzahl']) > 0;
+    unset($e['zeitfenster_vorlagen_anzahl']);
     $e['ist_pause_min'] = $e['ist_pause_min'] === null ? null : (int)$e['ist_pause_min'];
     // null bleibt null: 'noch nicht festgestellt' ist etwas anderes als 'nein'
     // (GAV-AUS-004). Ein Cast auf int wuerde beides zu 0 machen.

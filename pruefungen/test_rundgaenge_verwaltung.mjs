@@ -19,6 +19,7 @@
 // Pikett-Nummer, nie beides -- das rechtfertigt keinen eigenen Reiter).
 import { WURZEL, OUT, browserPfad } from './pfade.mjs';
 import { GOOGLE_MAPS_MOCK } from './google_maps_mock.mjs';
+import { zeitSetzen } from './zeitfeld.mjs';
 import { chromium } from 'playwright';
 
 const SEITE = `file://${WURZEL}/dashboard.html`;
@@ -42,10 +43,12 @@ const VORLAGEN_ALLE = { status: 'ok', vorlagen: [
   { id: 10, objekt_id: 1, kunde_name: 'Muster Liegenschaften AG', objekt_name: 'Testliegenschaft Nord',
     name: 'Öffnungsrunde', beschreibung: 'Erste Kontrolle nach Schichtbeginn',
     ansprechpartner_name: 'Pikett Sicherheit', ansprechpartner_telefon: '+41 79 111 22 33',
+    fenster_von: '21:00:00', fenster_bis: '23:00:00',
     aktiv: 1, erstellt_am: '2026-01-01 00:00:00',
     punkte: [{ id: 1, bezeichnung: 'Eingang', reihenfolge: 1 }, { id: 2, bezeichnung: 'Keller', reihenfolge: 2 }] },
   { id: 11, objekt_id: 2, kunde_name: 'Beispiel Immobilien GmbH', objekt_name: 'Testliegenschaft Süd',
     name: 'Schliessrunde', beschreibung: null, ansprechpartner_name: null, ansprechpartner_telefon: null,
+    fenster_von: null, fenster_bis: null,
     aktiv: 1, erstellt_am: '2026-01-02 00:00:00', punkte: [] },
 ]};
 
@@ -83,7 +86,10 @@ function setup(page) {
       const body = JSON.parse(req.postData() || '{}');
       if (body.id) {
         const v = VORLAGEN_ALLE.vorlagen.find(x => x.id === Number(body.id));
-        if (v) { v.name = body.name; v.aktiv = body.aktiv; v.beschreibung = body.beschreibung; }
+        if (v) {
+          v.name = body.name; v.aktiv = body.aktiv; v.beschreibung = body.beschreibung;
+          v.fenster_von = body.fenster_von || null; v.fenster_bis = body.fenster_bis || null;
+        }
         return send({ status: 'ok', id: Number(body.id) });
       }
       const neueId = Math.max(0, ...VORLAGEN_ALLE.vorlagen.map(v => v.id)) + 1;
@@ -314,6 +320,12 @@ check('KRITISCH: Bezeichnung des Ansprechpartners wird vorbefüllt (kann eine Pi
 check('KRITISCH: Telefonnummer des Ansprechpartners wird vorbefüllt',
   (await page.inputValue('#rdKrAnsprechpartnerTelefon')) === '+41 79 111 22 33');
 
+// ══════════ ENT-279: AUSFUEHRUNGSFENSTER
+check('KRITISCH: das Ausführungsfenster wird vorbefüllt (Von)',
+  (await page.inputValue('#rdKrFensterVon')) === '21:00');
+check('KRITISCH: das Ausführungsfenster wird vorbefüllt (Bis)',
+  (await page.inputValue('#rdKrFensterBis')) === '23:00');
+
 // „Routenpunkte" ist die einzige verdrahtete Kachel -- entspricht der
 // bisherigen Kontrollpunkte-Auswahl aus ENT-248/251.
 await page.click('#rdKrReiter .rdkr-tab:has-text("Routenpunkte")');
@@ -424,9 +436,26 @@ await page.screenshot({ path: `${OUT}/rg-verwaltung-01-desktop.png` });
 check('Die Beschreibung ist leer, weil "Schliessrunde" keine hat', await page.inputValue('#rdKrBeschreibung') === '');
 check('KRITISCH: der Ansprechpartner ist leer, weil "Schliessrunde" keinen hat (kein "null" als Text)',
   await page.inputValue('#rdKrAnsprechpartnerName') === '' && await page.inputValue('#rdKrAnsprechpartnerTelefon') === '');
+check('KRITISCH: das Ausführungsfenster ist leer, weil "Schliessrunde" keines hat',
+  await page.inputValue('#rdKrFensterVon') === '' && await page.inputValue('#rdKrFensterBis') === '');
+
+// ENT-279: nur EINE der beiden Fensterzeiten füllen -- muss abgewiesen werden,
+// statt ein halbes Fenster stillschweigend zu speichern. Wie jedes Zeitfeld
+// (ENT-110) ueber die Auswahlfelder gesetzt, nicht per page.fill() -- das
+// urspruengliche <input type="time"> ist seit zeitwahl.js unsichtbar.
+await zeitSetzen(page, '#rdKrFensterVon', '21:00');
+calls = [];
+await page.click('#rdKrBtn');
+await page.waitForTimeout(150);
+check('KRITISCH: nur "Von" gefüllt zeigt einen Hinweis statt zu speichern',
+  await page.isVisible('#rdKrErr') && !calls.some(c => c.includes('rundgang_vorlage_save')));
+await zeitSetzen(page, '#rdKrFensterVon', '');
+
 await page.fill('#rdKrBeschreibung', 'Schliesskontrolle nach Ladenschluss');
 await page.fill('#rdKrAnsprechpartnerName', 'Herr Meier');
 await page.fill('#rdKrAnsprechpartnerTelefon', '079 123 45 67');
+await zeitSetzen(page, '#rdKrFensterVon', '22:30');
+await zeitSetzen(page, '#rdKrFensterBis', '00:30');
 calls = [];
 const [speicherAnfrage] = await Promise.all([
   page.waitForRequest(r => r.url().includes('rundgang_vorlage_save') && r.method() === 'POST'),
@@ -438,6 +467,8 @@ check('KRITISCH: die Bezeichnung des Ansprechpartners wird beim Speichern mitges
   speicherAnfrage.postDataJSON().ansprechpartner_name === 'Herr Meier');
 check('KRITISCH: die Telefonnummer wird beim Speichern auf die internationale Schreibweise gebracht (ENT-118)',
   speicherAnfrage.postDataJSON().ansprechpartner_telefon === '+41 79 123 45 67');
+check('KRITISCH: ein über Mitternacht gehendes Ausführungsfenster wird unverändert mitgesendet',
+  speicherAnfrage.postDataJSON().fenster_von === '22:30' && speicherAnfrage.postDataJSON().fenster_bis === '00:30');
 await page.waitForFunction(() => document.getElementById('rdAb-liste').style.display !== 'none');
 check('KRITISCH: nach dem Speichern steht wieder die Liste da, nicht die Kachel-Übersicht',
   await page.isVisible('#rdAb-liste') && !(await page.isVisible('#rdUebersicht')));

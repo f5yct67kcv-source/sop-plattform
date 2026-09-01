@@ -32,6 +32,22 @@ $ansprechpartnerName = $ansprechpartnerName === '' ? null : $ansprechpartnerName
 $ansprechpartnerTelefon = trim((string)($input['ansprechpartner_telefon'] ?? ''));
 $ansprechpartnerTelefon = $ansprechpartnerTelefon === '' ? null : $ansprechpartnerTelefon;
 
+// Ausfuehrungsfenster (ENT-279): beide leer heisst "kein Fenster", gleiches
+// NULL-statt-leer-Prinzip wie Beschreibung/Ansprechpartner. Nur EINES gesetzt
+// waere ein halbes Fenster ohne Bedeutung -- serverseitig abgewiesen, nicht
+// stillschweigend geraten (Sperren gehoeren in den Server).
+$fensterVon = trim((string)($input['fenster_von'] ?? ''));
+$fensterVon = $fensterVon === '' ? null : $fensterVon;
+$fensterBis = trim((string)($input['fenster_bis'] ?? ''));
+$fensterBis = $fensterBis === '' ? null : $fensterBis;
+$zeitMuster = '/^([01]\d|2[0-3]):[0-5]\d$/';
+if (($fensterVon !== null) !== ($fensterBis !== null)) {
+    json_response(['status' => 'error', 'message' => 'Zeitfenster: von und bis nur zusammen oder beide leer'], 400);
+}
+if ($fensterVon !== null && (!preg_match($zeitMuster, $fensterVon) || !preg_match($zeitMuster, $fensterBis))) {
+    json_response(['status' => 'error', 'message' => 'Zeitfenster: ungueltige Uhrzeit (Format HH:MM)'], 400);
+}
+
 if ($objektId <= 0 || $name === '') {
     json_response(['status' => 'error', 'message' => 'Objekt und Name erforderlich'], 400);
 }
@@ -43,16 +59,16 @@ if (!$objektChk->fetch()) {
 }
 
 if ($id > 0) {
-    $stmt = db()->prepare('UPDATE rundgang_vorlage SET objekt_id = ?, name = ?, aktiv = ?, beschreibung = ?, ansprechpartner_name = ?, ansprechpartner_telefon = ? WHERE id = ?');
-    $stmt->execute([$objektId, $name, $aktiv, $beschreibung, $ansprechpartnerName, $ansprechpartnerTelefon, $id]);
+    $stmt = db()->prepare('UPDATE rundgang_vorlage SET objekt_id = ?, name = ?, aktiv = ?, beschreibung = ?, ansprechpartner_name = ?, ansprechpartner_telefon = ?, fenster_von = ?, fenster_bis = ? WHERE id = ?');
+    $stmt->execute([$objektId, $name, $aktiv, $beschreibung, $ansprechpartnerName, $ansprechpartnerTelefon, $fensterVon, $fensterBis, $id]);
     $chk = db()->prepare('SELECT id FROM rundgang_vorlage WHERE id = ?');
     $chk->execute([$id]);
     if (!$chk->fetch()) {
         json_response(['status' => 'error', 'message' => 'Vorlage nicht gefunden'], 404);
     }
 } else {
-    $stmt = db()->prepare('INSERT INTO rundgang_vorlage (objekt_id, name, aktiv, beschreibung, ansprechpartner_name, ansprechpartner_telefon) VALUES (?, ?, ?, ?, ?, ?)');
-    $stmt->execute([$objektId, $name, $aktiv, $beschreibung, $ansprechpartnerName, $ansprechpartnerTelefon]);
+    $stmt = db()->prepare('INSERT INTO rundgang_vorlage (objekt_id, name, aktiv, beschreibung, ansprechpartner_name, ansprechpartner_telefon, fenster_von, fenster_bis) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+    $stmt->execute([$objektId, $name, $aktiv, $beschreibung, $ansprechpartnerName, $ansprechpartnerTelefon, $fensterVon, $fensterBis]);
     $id = (int)db()->lastInsertId();
 }
 

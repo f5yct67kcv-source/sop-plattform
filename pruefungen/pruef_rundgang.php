@@ -205,5 +205,36 @@ $fortschrittErsatzscan = rundgang_fortschritt($pdo, 400, 1);
 pruef('KRITISCH: Ersatzscan zaehlt separat, nicht als "bestaetigt" mit',
     $fortschrittErsatzscan === ['gesamt' => 3, 'bestaetigt' => 0, 'nicht_verfuegbar' => 0, 'ersatzscan' => 1]);
 
+// ══════════════ RUNDGANG_IM_FENSTER -- AUSFUEHRUNGSFENSTER (ENT-279)
+pruef('Ohne konfiguriertes Fenster (beide NULL) schraenkt die Funktion nichts ein',
+    rundgang_im_fenster('12:00', null, null, 5) === true);
+
+pruef('KRITISCH: eine Uhrzeit innerhalb des Fensters ist erlaubt',
+    rundgang_im_fenster('22:00', '21:00', '23:00', 5) === true);
+pruef('KRITISCH: eine Uhrzeit deutlich ausserhalb des Fensters ist nicht erlaubt',
+    rundgang_im_fenster('12:00', '21:00', '23:00', 5) === false);
+
+pruef('KRITISCH: 5 Minuten vor Fensterbeginn liegt noch innerhalb der Toleranz',
+    rundgang_im_fenster('20:55', '21:00', '23:00', 5) === true);
+pruef('KRITISCH: 6 Minuten vor Fensterbeginn liegt bereits ausserhalb der Toleranz',
+    rundgang_im_fenster('20:54', '21:00', '23:00', 5) === false);
+pruef('KRITISCH: 5 Minuten nach Fensterende liegt noch innerhalb der Toleranz',
+    rundgang_im_fenster('23:05', '21:00', '23:00', 5) === true);
+pruef('KRITISCH: 6 Minuten nach Fensterende liegt bereits ausserhalb der Toleranz',
+    rundgang_im_fenster('23:06', '21:00', '23:00', 5) === false);
+
+// Ein Fenster kann ueber Mitternacht gehen (z. B. eine Nachtrunde 23:00-01:00).
+pruef('KRITISCH: ein Fenster ueber Mitternacht erlaubt eine Uhrzeit kurz nach 00:00',
+    rundgang_im_fenster('00:30', '23:00', '01:00', 5) === true);
+pruef('KRITISCH: ein Fenster ueber Mitternacht erlaubt eine Uhrzeit kurz vor Fensterbeginn',
+    rundgang_im_fenster('22:56', '23:00', '01:00', 5) === true);
+pruef('KRITISCH: ein Fenster ueber Mitternacht lehnt eine Uhrzeit weit ausserhalb (Mittag) ab',
+    rundgang_im_fenster('12:00', '23:00', '01:00', 5) === false);
+pruef('Ein Fenster ueber Mitternacht lehnt eine Uhrzeit kurz nach Fensterende ab',
+    rundgang_im_fenster('01:06', '23:00', '01:00', 5) === false);
+
+pruef('Eine Uhrzeit mit Sekunden (HH:MM:SS, wie sie MySQL TIME liefert) wird gleich ausgewertet wie ohne',
+    rundgang_im_fenster('22:00:30', '21:00', '23:00', 5) === true);
+
 echo $ok . " Pruefungen bestanden\n";
 if ($bad) { echo count($bad) . " FEHLGESCHLAGEN:\n - " . implode("\n - ", $bad) . "\n"; exit(1); }

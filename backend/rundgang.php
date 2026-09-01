@@ -95,6 +95,48 @@ const RUNDGANG_ABBRUCH_GRUENDE = [
     'sonstige'              => 'Sonstige Gruende',
 ];
 
+// Toleranz am Rand des Ausfuehrungsfensters (ENT-279, Vorgabe Projektinhaber
+// nach Rueckfrage): eine Abweichung bis zu 5 Minuten ist noch kein
+// Ausnahmefall und verlangt keinen Grund.
+const RUNDGANG_FENSTER_TOLERANZ_MIN = 5;
+
+// Gruende fuer einen Rundgang-Start ausserhalb des konfigurierten Fensters
+// (ENT-279) -- eigene, kleinere Liste als RUNDGANG_ABBRUCH_GRUENDE oben:
+// andere Situation (Start vorverlegt/verspaetet wegen Umdisposition, nicht
+// abgebrochen). Erster Eintrag ist das eigene Beispiel des Projektinhabers.
+const RUNDGANG_AUSSERHALB_FENSTER_GRUENDE = [
+    'planer_freigabe'            => 'Freigabe durch Planer',
+    'kurzfristige_umdisposition' => 'Kurzfristige Umdisposition',
+    'kundenwunsch'               => 'Wunsch des Kunden',
+    'sonstige'                   => 'Sonstige Gruende',
+];
+
+// Liegt eine Uhrzeit (HH:MM oder HH:MM:SS) innerhalb eines Fensters, das auch
+// ueber Mitternacht gehen kann (ENT-279)? $toleranzMin gilt auf BEIDEN Seiten
+// des Fensters -- eine minimale Verspaetung oder ein minimaler Vorlauf soll
+// keinen Grund verlangen. Kein Fenster konfiguriert (eines der beiden Felder
+// NULL) heisst: diese Funktion schraenkt nichts ein, gibt also true zurueck.
+function rundgang_im_fenster(string $jetztHm, ?string $fensterVonHm, ?string $fensterBisHm, int $toleranzMin): bool
+{
+    if ($fensterVonHm === null || $fensterBisHm === null) {
+        return true;
+    }
+    $min = static function (string $hm): int {
+        return ((int)substr($hm, 0, 2)) * 60 + ((int)substr($hm, 3, 2));
+    };
+    $jetzt = $min($jetztHm);
+    $von = $min($fensterVonHm) - $toleranzMin;
+    $bis = $min($fensterBisHm) + $toleranzMin;
+    // Fenster geht ueber Mitternacht (z. B. 23:00-01:00): $bis liegt nach der
+    // Toleranz-Korrektur rechnerisch VOR $von -- dann gehoert es zum
+    // naechsten Tag.
+    if ($bis <= $von) { $bis += 1440; }
+    // "jetzt" liegt vor Mitternacht, das Fenster reicht aber in den
+    // naechsten Tag hinein (z. B. jetzt = 00:30, Fenster 23:00-01:00).
+    if ($jetzt < $von) { $jetzt += 1440; }
+    return $jetzt >= $von && $jetzt <= $bis;
+}
+
 // Fortschritt eines Rundgangs fuer die Uebersicht der Einsatzleitung
 // (ENT-183): wie viele aktuell aktive Kontrollpunkte das Objekt hat, und wie
 // viele davon in DIESEM Rundgang bestaetigt bzw. als nicht verfuegbar

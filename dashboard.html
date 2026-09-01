@@ -4683,6 +4683,20 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
                 </div>
               </div>
 
+              <!-- ENT-279: Ausfuehrungsfenster einer Kontrollrunde, unabhaengig
+                   von der Sollzeit des einzelnen Einsatzes. Beide Felder leer
+                   heisst: kein Fenster, Start bleibt an die Einsatz-Sollzeit
+                   gebunden wie bisher. -->
+              <div class="abschnitt">
+                <h3>Ausführungsfenster<span class="note">Optional: Zeitspanne, in der diese Runde unabhängig von der Einsatzzeit gestartet werden darf</span></h3>
+                <div class="form-grid">
+                  <div class="f"><label for="rdKrFensterVon">Von</label>
+                    <input class="inp" id="rdKrFensterVon" type="time"></div>
+                  <div class="f"><label for="rdKrFensterBis">Bis</label>
+                    <input class="inp" id="rdKrFensterBis" type="time"></div>
+                </div>
+              </div>
+
               <div style="margin-top:16px">
                 <button class="btn btn-primary" id="rdKrBtn" onclick="rdSaveKr()">Speichern</button>
               </div>
@@ -13276,6 +13290,15 @@ const RUNDGANG_ABBRUCH_GRUENDE = {
   sonstige: 'Sonstige Gründe',
 };
 
+// Dieselben vier Kategorien wie RUNDGANG_AUSSERHALB_FENSTER_GRUENDE in
+// backend/rundgang.php und app.html (ENT-279).
+const RUNDGANG_AUSSERHALB_FENSTER_GRUENDE = {
+  planer_freigabe: 'Freigabe durch Planer',
+  kurzfristige_umdisposition: 'Kurzfristige Umdisposition',
+  kundenwunsch: 'Wunsch des Kunden',
+  sonstige: 'Sonstige Gründe',
+};
+
 function ladeRundgaenge() {
   const von = $('rgVon').value, bis = $('rgBis').value;
   if (!von || !bis) { return; }
@@ -13341,6 +13364,7 @@ function zeichneRundgaenge() {
         ${start ? `· Rohzeit ${esc(start)}${ende ? '–' + esc(ende) : laeuftNoch ? ' – läuft noch' : ''}` : '· Rohzeit noch nicht gestartet'}
         ${Number(r.pause_minuten) > 0 ? `· ${nf(r.pause_minuten)} Min. pausiert` : ''}</div>
       ${r.status === 'abgebrochen' ? `<div class="sub">${esc(RUNDGANG_ABBRUCH_GRUENDE[r.abbruch_grund] || 'Abgebrochen')}${r.abbruch_freitext ? ' — ' + esc(r.abbruch_freitext) : ''}</div>` : ''}
+      ${r.ausnahme_grund ? `<div class="sub">Ausserhalb des Zeitfensters gestartet: ${esc(RUNDGANG_AUSSERHALB_FENSTER_GRUENDE[r.ausnahme_grund] || r.ausnahme_grund)}</div>` : ''}
     </div>`;
   }).join('');
 }
@@ -17000,6 +17024,10 @@ function rdKrZeigen(modus, id) {
   $('rdKrBeschreibung').value = v && v.beschreibung ? v.beschreibung : '';
   $('rdKrAnsprechpartnerName').value = v && v.ansprechpartner_name ? v.ansprechpartner_name : '';
   $('rdKrAnsprechpartnerTelefon').value = v && v.ansprechpartner_telefon ? v.ansprechpartner_telefon : '';
+  // ENT-279: TIME kommt vom Server als "HH:MM:SS" -- <input type="time">
+  // erwartet "HH:MM", daher auf 5 Zeichen kuerzen.
+  $('rdKrFensterVon').value = v && v.fenster_von ? String(v.fenster_von).slice(0, 5) : '';
+  $('rdKrFensterBis').value = v && v.fenster_bis ? String(v.fenster_bis).slice(0, 5) : '';
   $('rdKrErr').style.display = 'none';
 
   rdKrRoutenTabelleZeichnen();
@@ -17054,11 +17082,19 @@ function rdSaveKr() {
   // die Routenpunkte-Zuordnung schreibt seither sofort bei jeder einzelnen
   // Aenderung (rpListeSpeichern()), nicht mehr gesammelt hier.
   const warNeu = !krTarget;
+  const fensterVon = $('rdKrFensterVon').value.trim();
+  const fensterBis = $('rdKrFensterBis').value.trim();
+  if (!!fensterVon !== !!fensterBis) {
+    err.textContent = 'Ausführungsfenster: von und bis nur zusammen oder beide leer.';
+    err.style.display = '';
+    return;
+  }
   const body = {
     objekt_id: rdEinObjekt, name, aktiv: $('rdKrAktiv').checked ? 1 : 0,
     beschreibung: $('rdKrBeschreibung').value.trim(),
     ansprechpartner_name: $('rdKrAnsprechpartnerName').value.trim(),
     ansprechpartner_telefon: $('rdKrAnsprechpartnerTelefon').value.trim(),
+    fenster_von: fensterVon, fenster_bis: fensterBis,
   };
   if (krTarget) body.id = krTarget;
 

@@ -1326,6 +1326,22 @@ $spalten = [
     // strukturiert.
     ['rundgang_vorlage', 'ansprechpartner_name',    'ALTER TABLE rundgang_vorlage ADD COLUMN ansprechpartner_name VARCHAR(120) NULL AFTER beschreibung'],
     ['rundgang_vorlage', 'ansprechpartner_telefon', 'ALTER TABLE rundgang_vorlage ADD COLUMN ansprechpartner_telefon VARCHAR(50) NULL AFTER ansprechpartner_name'],
+
+    // Ausfuehrungsfenster einer Kontrollrunde (ENT-279): erlaubt eine von der
+    // Einsatz-Sollzeit unabhaengige Zeitspanne, in der ein Rundgang dieser
+    // Vorlage begonnen werden darf (z. B. eine Nachtrunde 21:00-23:00,
+    // unabhaengig davon, wie der einzelne Einsatz an diesem Tag eingetragen
+    // ist). Beide Felder NULL (Default fuer alle bestehenden Vorlagen) heisst
+    // ausdruecklich: kein Fenster konfiguriert, unveraendertes Verhalten von
+    // vor ENT-279 (Start erst ab Einsatz-Sollzeit, siehe rundgang_im_fenster()
+    // in rundgang.php).
+    ['rundgang_vorlage', 'fenster_von', 'ALTER TABLE rundgang_vorlage ADD COLUMN fenster_von TIME NULL AFTER ansprechpartner_telefon'],
+    ['rundgang_vorlage', 'fenster_bis', 'ALTER TABLE rundgang_vorlage ADD COLUMN fenster_bis TIME NULL AFTER fenster_von'],
+    // Grund, wenn ein Rundgang ausserhalb des oben konfigurierten Fensters
+    // (bzw. vor der Einsatz-Sollzeit, wenn kein Fenster gesetzt ist) gestartet
+    // wurde (ENT-279). NULL heisst: innerhalb des Fensters/der Sollzeit
+    // gestartet, kein Ausnahmefall -- gleiches Prinzip wie abbruch_grund.
+    ['rundgang', 'ausnahme_grund', 'ALTER TABLE rundgang ADD COLUMN ausnahme_grund VARCHAR(40) NULL'],
 ];
 foreach ($spalten as [$tabelle, $spalte, $sql]) {
     if (!hat_tabelle_jetzt($pdo, $tabelle) || hat_spalte($pdo, $tabelle, $spalte)) {
