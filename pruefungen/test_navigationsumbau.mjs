@@ -86,7 +86,7 @@ async function neueSeite(schichten, extraRoutes, profilUeberschreibung) {
     if (p.includes('mein_rundgang_uebersicht')) return send({ status: 'ok',
       vorlage: { id: 900, name: 'Nachtrunde', fenster_von: null, fenster_bis: null },
       objekt: { id: 7, name: 'Gerolag Center', strasse: 'Industriestrasse 4', ort: '4600 Olten', kanton: 'SO' },
-      kunde_name: 'Borner AG', kontrollpunkte: [{ id: 1, bezeichnung: 'Tor', typ: 'geofence' }],
+      kunde_name: 'Musterkunde AG', kontrollpunkte: [{ id: 1, bezeichnung: 'Tor', typ: 'geofence' }],
       ansprechpartner: [] });
     if (p.includes('mein_rundgang_spontan_starten')) return send({ status: 'ok', einsatz_id: 900, rundgang_id: 77, kontrollpunkte: [] });
   });

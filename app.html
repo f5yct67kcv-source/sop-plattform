@@ -3028,8 +3028,8 @@ function schichtRapportBlatt(id) {
     Unterschrift.einrichten({
       ziel: 'sigFeld',
       kontext: () => ({
-        zeile: [$('srKunde').value.trim(), dmy(e.datum),
-                `${$('srVon').value}–${$('srBis').value}`].filter(Boolean).join(' · '),
+        zeilen: [$('srKunde').value.trim(),
+                 `${dmy(e.datum)} · ${$('srVon').value}–${$('srBis').value}`],
         name: $('srSigName') ? $('srSigName').value.trim() : '',
       }),
     });
