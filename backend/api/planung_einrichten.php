@@ -1462,6 +1462,9 @@ $spalten = [
     // bei Rapport/Sperrtag/Zusage, hier am Rundgang selbst -- er ist das
     // konkrete, einmalige Geschehnis, nicht der Einsatz als Ganzes.
     ['rundgang', 'gesehen_am', 'ALTER TABLE rundgang ADD COLUMN gesehen_am DATETIME NULL'],
+    // Dasselbe fuer Vorfallmeldungen (ENT-297): Sie erscheinen im Feed und
+    // muessen sich dort abhaken lassen wie alles andere auch.
+    ['ereignis_meldung', 'gesehen_am', 'ALTER TABLE ereignis_meldung ADD COLUMN gesehen_am DATETIME NULL'],
 
     // Explizite Berechtigung "macht Revierdienst" (ENT-284) -- ersetzt die
     // bisherige Herleitung aus der Schicht-Historie (ENT-234) als einzige
