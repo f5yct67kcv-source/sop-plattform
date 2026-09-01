@@ -30,6 +30,11 @@ jobs:
           # scannt nur diese beiden auf lokale Skripte, darum hier von Hand
           # eingetragen wie gav.js/zeitwahl.js oben.
           cp qrcode.js dist/qrcode.js
+          # unterschrift.js traegt das Unterschriftsfeld fuer BEIDE Oberflaechen
+          # (ENT-292) -- derselbe Fallstrick wie bei gav.js/zeitwahl.js oben:
+          # fehlt die Zeile, laesst der Kunde live nirgends mehr
+          # unterschreiben, und lokal faellt es NICHT auf.
+          cp unterschrift.js dist/unterschrift.js
           # html2pdf.bundle.min.js (ENT-206): erst bei Klick auf "Herunter-
           # laden" per JS nachgeladen, deshalb kein literales <script>-Tag im
           # HTML -- test_deploy.mjs prueft trotzdem, dass sie hier steht.
