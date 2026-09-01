@@ -1318,6 +1318,15 @@ function rundgangSpontanStarten(vorlageId, ausnahmeGrund) {
   const body = { vorlage_id: vorlageId };
   if (ausnahmeGrund) body.ausnahme_grund = ausnahmeGrund;
   api('mein_rundgang_spontan_starten.php', { method: 'POST', body }).then(({ ok, data }) => {
+    // Dieselbe Vorlage laeuft fuer diese Person schon (ENT-290, gemeldeter
+    // Fehler: zweimal angetippt landete bisher in der Doppelbelegungs-Sperre
+    // ohne Weg zurueck, siehe Kommentar im Endpunkt) -- die bestehende Runde
+    // fortsetzen, genau wie ueber "Plan"/"Heute", statt eine zweite zu
+    // versuchen.
+    if (ok && data.status === 'laeuft_bereits') {
+      ladeSchichten().then(() => rundgangFortsetzen(data.einsatz_id));
+      return;
+    }
     if (!ok || data.status !== 'ok') {
       document.querySelectorAll('#blBody button, #rfsBtn').forEach(b => b.disabled = false);
       toast(data.message || w('netzfehler'));
@@ -2129,11 +2138,24 @@ function rundgangFussZeichnen() {
   const fertig = rundgangAktiv.kontrollpunkte.length > 0 && rundgangAktiv.kontrollpunkte.every(k => k.erledigt);
   const zurueck = `<button class="btn btn-plain" onclick="blattAuf(${Number(einsatzId)})">${esc(w('zurueck'))}</button>`;
   let aktion = '';
+  let gestapelt = false;
   if (rundgangAktiv.status === 'pausiert') {
-    aktion = `<button class="btn btn-primary" onclick="rundgangWiederAufnehmen(${Number(einsatzId)})">${esc(w('rundgangPauseWiederaufnehmen'))}</button>`;
+    // "Abbrechen" fehlte hier bisher komplett (ENT-290, gemeldeter Fehler)
+    // -- ein pausierter Rundgang liess sich nur fortsetzen, nie beenden.
+    // Fuehrt ueber denselben Pflichtgrund-Dialog wie aus dem aktiven Zustand
+    // (rundgangAbbrechenAnzeigen, ENT-146) -- keine zweite, schwaechere
+    // Abbruch-Variante nur fuer diesen Fall.
+    aktion = `<button class="btn btn-neg" onclick="rundgangAbbrechenAnzeigen(${Number(einsatzId)})">${esc(w('rundgangAbbrechenKnopf'))}</button>`
+      + `<button class="btn btn-primary" onclick="rundgangWiederAufnehmen(${Number(einsatzId)})">${esc(w('rundgangPauseWiederaufnehmen'))}</button>`;
+    gestapelt = true;
   } else if (rundgangAktiv.status !== 'abgebrochen' && rundgangAktiv.status !== 'abgeschlossen' && !fertig) {
     aktion = `<button class="btn btn-neg" onclick="rundgangBeendenAnzeigen(${Number(einsatzId)})">${esc(w('rundgangBeenden'))}</button>`;
   }
+  const fussEl = $('blFuss');
+  // Drei Knoepfe nebeneinander (Zurueck/Abbrechen/Fortsetzen) waeren auf einem
+  // Telefon zu schmal -- gestapelt statt nebeneinander, nur fuer diesen Fall
+  // (bestehendes Muster .gestapelt).
+  if (fussEl) { fussEl.classList.toggle('gestapelt', gestapelt); }
   $('blFuss').innerHTML = zurueck + aktion;
 }
 
