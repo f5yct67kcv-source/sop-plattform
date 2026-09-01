@@ -534,6 +534,13 @@ a.nav-item { text-decoration: none; }
    Bedienelementen (Zoom/Vollbild sitzen hier oben links, ueberschneiden sich
    also nicht). */
 .rdkarte-cta { position: absolute; top: 12px; right: 12px; z-index: 1001; display: flex; gap: 8px; }
+/* Zeichnen-Leiste (ENT-286): teilt die Position mit .rdkarte-cta (nur eine
+   der beiden ist je sichtbar), braucht aber zusaetzlich eine Hinweiszeile
+   vor den Knoepfen -- eigene Karte-Optik, damit sie sich vom Kartenhintergrund
+   abhebt, statt frei auf der Karte zu schweben. */
+.rdgeo-zeichnen-leiste { align-items: center; background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r); padding: 6px 10px; box-shadow: var(--sh-2); }
+.rdgeo-zeichnen-leiste .note { white-space: nowrap; }
 /* Adresssuche (ENT-267): oben links ueber der Karte, symmetrisch zu den
    Anlegen-Knoepfen oben rechts. Eigenes Feld statt eines Kartensteuerelements,
    damit Trefferliste und Tastaturbedienung ganz normalem Formular-Markup
@@ -4773,8 +4780,8 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
              (Geofence-Kreise) des Objekts. "GPS-Punkt anlegen" nutzt den
              bestehenden Kontrollpunkt-Dialog (ENT-248). Freie Vieleck-
              Geofence-Bereiche (zweiter Knopf, Referenzbild Projektinhaber)
-             sind ein eigener, noch nicht gebauter Baustein -- eigener
-             Docs-Eintrag folgt, wenn er umgesetzt wird. -->
+             sind seit ENT-286 gebaut -- eigenstaendig von den Kontrollpunkten,
+             bewusst ohne Wirkung auf Rundgang-Bestaetigungen (siehe Docs). -->
         <div class="rdkr-panel" id="rdKrAb-karte" style="display:none">
           <div class="rdkarte-raum" id="rdKarteRaum">
             <div class="rdkarte-seite">
@@ -4803,9 +4810,21 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
                   autocomplete="off">
                 <div class="rdkarte-suche-treffer" id="rdKarteOrtTreffer" style="display:none"></div>
               </div>
-              <div class="rdkarte-cta">
-                <button class="btn btn-plain btn-sm" onclick="toast('Folgt in einem späteren Schritt.')">Geofence-Bereich anlegen</button>
+              <div class="rdkarte-cta" id="rdGeoCta">
+                <button class="btn btn-plain btn-sm" id="rdGeoStartenBtn" onclick="rdGeoZeichnenStarten()">Geofence-Bereich anlegen</button>
                 <button class="btn btn-primary btn-sm" onclick="rdKdNeu()">+ GPS-Punkt anlegen</button>
+              </div>
+              <!-- Zeichnen-Leiste (ENT-286): erscheint nur waehrend des
+                   Zeichnens, ersetzt die normale CTA-Zeile (beide teilen
+                   dieselbe Position, siehe .rdkarte-cta). Knoepfe UND
+                   Tastenkuerzel (Enter/Rueck/Esc, siehe rdGeoTaste())
+                   fuehren zum selben Ergebnis -- ein Knopf ist auffindbar,
+                   eine Taste ist schnell, beides soll gehen. -->
+              <div class="rdkarte-cta rdgeo-zeichnen-leiste" id="rdGeoZeichnenLeiste" style="display:none">
+                <span class="note">Klick auf die Karte setzt eine Ecke.</span>
+                <button class="btn btn-quiet btn-sm" onclick="rdGeoPunktEntfernen()">Letzte Ecke entfernen</button>
+                <button class="btn btn-quiet btn-sm" onclick="rdGeoZeichnenAbbrechen()">Abbrechen</button>
+                <button class="btn btn-primary btn-sm" onclick="rdGeoZeichnenFertig()">Fertig</button>
               </div>
               <div id="rdKarteUebersicht" style="border-radius:var(--r);overflow:hidden;border:1px solid var(--line)"></div>
             </div>
@@ -6068,6 +6087,33 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
     <div class="dlg-ft">
       <button class="btn btn-plain" onclick="closeDlg('dlgRdNeu')">Abbrechen</button>
       <button class="btn btn-primary" onclick="rdNeuWeiter()">Weiter</button>
+    </div>
+  </div>
+</div>
+
+<!-- Geofence-Bereich benennen (ENT-286): erscheint, nachdem das Vieleck auf
+     der Karte fertig gezeichnet ist (Speichern eines neuen Bereichs), oder
+     beim Klick auf einen bestehenden Eintrag der Liste links (Umbenennen +
+     Loeschen). Bewusst EIN kleiner Dialog fuer beide Faelle statt eines
+     eigenen Bearbeitungsfensters wie bei GPS-Punkten (ENT-265) -- ein
+     Geofence-Bereich hat bisher nur ein Feld (Name), ein ganzes Fenster
+     dafuer waere groesser als der Inhalt. -->
+<div class="dlg-scrim" id="dlgGeoName">
+  <div class="dlg">
+    <div class="dlg-hd">
+      <h2 id="dlgGeoNameTitel">Geofence-Bereich benennen</h2>
+    </div>
+    <div class="dlg-bd">
+      <div class="msg-err" id="geoNameErr" style="display:none"></div>
+      <div class="form-grid">
+        <div class="f wide"><label for="geoName">Name *</label><input class="inp" id="geoName" placeholder="z. B. Betriebsgelände Nord"></div>
+      </div>
+    </div>
+    <div class="dlg-ft">
+      <button class="btn btn-quiet" id="geoNameLoeschenBtn" onclick="rdGeoLoeschen()" style="display:none">Löschen</button>
+      <div class="sp"></div>
+      <button class="btn btn-plain" onclick="rdGeoNameAbbrechen()">Abbrechen</button>
+      <button class="btn btn-primary" onclick="rdGeoNameSpeichern()">Speichern</button>
     </div>
   </div>
 </div>
@@ -16454,7 +16500,13 @@ function rdKarteGpsPunkte() {
 
 function rdKarteUebersichtInit() {
   if (!$('rdKarteUebersicht')) return;
-  googleMapsLaden().then(() => {
+  // Geofence-Bereiche zuerst laden (ENT-286) -- die Liste links haengt nicht
+  // an Google Maps und soll auch dann korrekt dastehen, waehrend die Karte
+  // noch laedt, gleiches Muster wie rdKarteSeiteZeichnen() fuer GPS-Punkte.
+  rdGeofenceListeLaden().then(() => {
+    if ($('rdKarteBereiche')) { rdGeoListeZeichnen(); }
+    return googleMapsLaden();
+  }).then(() => {
     if (!$('rdKarteUebersicht')) return;
     if (!rdKarteMapa) {
       rdKarteMapa = new google.maps.Map($('rdKarteUebersicht'), {
@@ -16474,6 +16526,18 @@ function rdKarteUebersichtInit() {
         $('rdKdLat').value = e.latLng.lat().toFixed(5);
         $('rdKdLng').value = e.latLng.lng().toFixed(5);
         rdKarteVorschauZeichnen();
+      });
+      // Geofence-Bereich zeichnen (ENT-286): eigene, unabhaengige Klick-
+      // Behandlung -- beide Listener auf demselben 'click'-Ereignis stoeren
+      // sich nicht, weil sich Zeichnen-Modus und "neuer GPS-Punkt" gegenseitig
+      // ausschliessen (siehe rdGeoZeichnenStarten()/rdKdNeu()).
+      rdKarteMapa.addListener('click', e => {
+        if (!rdGeoZeichnenAktiv) return;
+        rdGeoPunktHinzufuegen(e.latLng.lat(), e.latLng.lng());
+      });
+      rdKarteMapa.addListener('rightclick', () => {
+        if (!rdGeoZeichnenAktiv) return;
+        rdGeoPunktEntfernen();
       });
       // Vollbild (ENT-267): eigenes Steuerelement, stapelt sich unter den
       // Zoom-Knoepfen (gleiche Ecke LEFT_TOP) -- kein Plugin noetig, die
@@ -16594,6 +16658,7 @@ function rdKarteUebersichtZeichnen() {
     rdKarteDetailSchliessen();
   }
   if (!rdKarteMapa) return;
+  rdGeoPolygoneZeichnen();
   rdKarteLayer.forEach(l => l.setMap(null));
   rdKarteLayer = [];
   rdKarteGpsPunkte().forEach(k => {
@@ -16648,14 +16713,12 @@ function rdKarteVorschauZeichnen() {
   rdKarteVorschau.push(marker, kreis);
 }
 
-// Listen links neben der Karte (ENT-260). Die Geofence-Bereiche (freie
-// Vielecke) sind noch nicht gebaut -- die Liste steht trotzdem schon da und
-// sagt ausdruecklich, dass es noch keine gibt, statt sie zu verschweigen.
+// Listen links neben der Karte (ENT-260, Geofence-Bereiche seit ENT-286).
 function rdKarteSeiteZeichnen() {
   const bereiche = $('rdKarteBereiche'), liste = $('rdKartePunkteListe');
   if (!bereiche || !liste) return;
 
-  bereiche.innerHTML = '<p class="zone-note" style="padding:12px;margin:0">Keine Einträge vorhanden. Das Werkzeug zum Zeichnen folgt in einem späteren Schritt.</p>';
+  rdGeoListeZeichnen();
 
   const punkte = rdKarteGpsPunkte();
   if (!punkte.length) {
@@ -16675,11 +16738,212 @@ function rdKarteSeiteZeichnen() {
   }).join('');
 }
 
+// ══════════════════════ GEOFENCE-BEREICHE (ENT-286) ══════════════════════
+// Freies Vieleck auf der Objekt-Karte, eigenstaendig von den Kontrollpunkten
+// (die bleiben bei Kreis-Geofences fuer die Rundgang-Bestaetigung). Bewusst
+// OHNE jede Wirkung auf Rundgang-Scans oder Alarme -- eine rein darstellende
+// Referenzflaeche, ausdrueckliche Vorgabe des Projektinhabers fuer diesen
+// ersten Schritt: "kann man einzeln bauen ... Geofence kann man spaeter die
+// Funktion dazu bauen [z.B. Rundgang-Start nur innerhalb des Bereichs]" --
+// das Datenmodell (eigene Tabelle statt Erweiterung an kontrollpunkt)
+// erlaubt genau diese spaetere Verknuepfung, ohne sie hier vorwegzunehmen.
+let rdGeofenceBereiche = [];
+// Waehrend des Zeichnens gesammelte Ecken, plus die Vorschau-Elemente
+// (Vieleck + Eckpunkt-Marker) und die Klick-Handler-Referenz zum Entfernen.
+let rdGeoZeichnenAktiv = false;
+let rdGeoZeichnenPunkte = [];
+let rdGeoZeichnenVorschau = null;
+let rdGeoZeichnenMarker = [];
+// id des Bereichs, der gerade im Namens-Dialog umbenannt wird -- null heisst
+// Neuanlage (die eben fertig gezeichneten Punkte werden dann gespeichert).
+let rdGeoBearbeitenId = null;
+let rdGeoLayer = [];
+
+function rdGeofenceListeLaden() {
+  if (!rdEinObjekt) { rdGeofenceBereiche = []; return Promise.resolve(); }
+  return api(`geofence_bereich_liste.php?objekt_id=${rdEinObjekt}`).then(({ ok, data }) => {
+    rdGeofenceBereiche = (ok && data.status === 'ok' && data.bereiche) ? data.bereiche : [];
+  });
+}
+
+function rdGeoListeZeichnen() {
+  const ziel = $('rdKarteBereiche');
+  if (!ziel) return;
+  if (!rdGeofenceBereiche.length) {
+    ziel.innerHTML = '<p class="zone-note" style="padding:12px;margin:0">Noch kein Geofence-Bereich angelegt.</p>';
+    return;
+  }
+  ziel.innerHTML = rdGeofenceBereiche.map(b =>
+    `<button type="button" class="rdkarte-eintrag" onclick="rdGeoBearbeiten(${Number(b.id)})">${esc(b.name)}</button>`
+  ).join('');
+}
+
+// Zeichnen starten -- Ecken sammeln sich beim Klick auf die Karte (siehe
+// rdKarteMapa.addListener('click', ...) in rdKarteUebersichtInit()), nicht
+// hier: diese Funktion richtet nur den Zustand und die Bedienleiste ein.
+function rdGeoZeichnenStarten() {
+  if (!rdKarteMapa) { toast('Die Karte lädt noch — kurz warten und erneut versuchen.'); return; }
+  // Beide Modi schliessen sich aus (siehe rdKdNeu()/rdKarteWaehlen()).
+  if (rdKarteAuswahl !== null) { rdKarteDetailSchliessen(); }
+  rdGeoZeichnenAktiv = true;
+  rdGeoZeichnenPunkte = [];
+  rdGeoZeichnenVorschauZeichnen();
+  $('rdGeoCta').style.display = 'none';
+  $('rdGeoZeichnenLeiste').style.display = '';
+  document.addEventListener('keydown', rdGeoZeichnenTaste);
+}
+
+function rdGeoPunktHinzufuegen(lat, lng) {
+  rdGeoZeichnenPunkte.push({ lat, lng });
+  rdGeoZeichnenVorschauZeichnen();
+}
+
+function rdGeoPunktEntfernen() {
+  rdGeoZeichnenPunkte.pop();
+  rdGeoZeichnenVorschauZeichnen();
+}
+
+function rdGeoZeichnenVorschauZeichnen() {
+  if (rdGeoZeichnenVorschau) { rdGeoZeichnenVorschau.setMap(null); rdGeoZeichnenVorschau = null; }
+  rdGeoZeichnenMarker.forEach(m => m.setMap(null));
+  rdGeoZeichnenMarker = [];
+  if (!rdKarteMapa) return;
+  rdGeoZeichnenMarker = rdGeoZeichnenPunkte.map(p => new google.maps.Marker({ position: p, map: rdKarteMapa }));
+  if (rdGeoZeichnenPunkte.length >= 2) {
+    rdGeoZeichnenVorschau = new google.maps.Polygon({
+      paths: rdGeoZeichnenPunkte, map: rdKarteMapa,
+      fillColor: '#22c55e', fillOpacity: 0.3, strokeColor: '#16a34a', strokeWeight: 2,
+      // clickable:false -- sonst wuerde ein Klick auf die bereits umschlossene
+      // Flaeche (z.B. um eine Ecke nach innen zu setzen und ein konkaves
+      // Vieleck zu zeichnen) von der Vorschau abgefangen, statt eine neue
+      // Ecke beim Kartencontainer auszuloesen.
+      clickable: false,
+    });
+  }
+}
+
+// Tastenkuerzel waehrend des Zeichnens (Vorbild Projektinhaber): Enter
+// schliesst ab, Rueck/Entf entfernt die letzte Ecke, Esc bricht ab. Nur
+// aktiv, waehrend rdGeoZeichnenAktiv ist -- sonst wuerde z.B. Enter in einem
+// ganz anderen Formular ploetzlich diese Funktion auslösen.
+function rdGeoZeichnenTaste(ev) {
+  if (!rdGeoZeichnenAktiv) return;
+  if (ev.key === 'Enter') { ev.preventDefault(); rdGeoZeichnenFertig(); }
+  else if (ev.key === 'Backspace' || ev.key === 'Delete') { ev.preventDefault(); rdGeoPunktEntfernen(); }
+  else if (ev.key === 'Escape') { ev.preventDefault(); rdGeoZeichnenAbbrechen(); }
+}
+
+function rdGeoZeichnenBeenden() {
+  rdGeoZeichnenAktiv = false;
+  document.removeEventListener('keydown', rdGeoZeichnenTaste);
+  if ($('rdGeoCta')) { $('rdGeoCta').style.display = ''; }
+  if ($('rdGeoZeichnenLeiste')) { $('rdGeoZeichnenLeiste').style.display = 'none'; }
+  if (rdGeoZeichnenVorschau) { rdGeoZeichnenVorschau.setMap(null); rdGeoZeichnenVorschau = null; }
+  rdGeoZeichnenMarker.forEach(m => m.setMap(null));
+  rdGeoZeichnenMarker = [];
+  rdGeoZeichnenPunkte = [];
+}
+
+function rdGeoZeichnenAbbrechen() {
+  rdGeoZeichnenBeenden();
+}
+
+// Weniger als drei Ecken sind kein Vieleck (gleiche Grenze wie am Server,
+// geofence_koordinaten_pruefen()) -- lieber hier abfangen als eine
+// Fehlermeldung vom Server abwarten.
+function rdGeoZeichnenFertig() {
+  if (rdGeoZeichnenPunkte.length < 3) {
+    toast('Mindestens drei Ecken setzen, bevor der Bereich gespeichert werden kann.');
+    return;
+  }
+  rdGeoBearbeitenId = null;
+  $('dlgGeoNameTitel').textContent = 'Geofence-Bereich benennen';
+  $('geoName').value = '';
+  $('geoNameErr').style.display = 'none';
+  $('geoNameLoeschenBtn').style.display = 'none';
+  openDlg('dlgGeoName');
+}
+
+function rdGeoBearbeiten(id) {
+  const b = rdGeofenceBereiche.find(x => Number(x.id) === Number(id));
+  if (!b) return;
+  rdGeoBearbeitenId = Number(id);
+  $('dlgGeoNameTitel').textContent = 'Geofence-Bereich umbenennen';
+  $('geoName').value = b.name;
+  $('geoNameErr').style.display = 'none';
+  $('geoNameLoeschenBtn').style.display = '';
+  openDlg('dlgGeoName');
+  if (rdKarteMapa) {
+    const bounds = new google.maps.LatLngBounds();
+    b.koordinaten.forEach(p => bounds.extend(p));
+    rdKarteMapa.fitBounds(bounds);
+  }
+}
+
+// Abbruch des Namens-Dialogs: bei einer NEUEN Flaeche bleiben die gerade
+// gezeichneten Ecken auf der Karte stehen (nichts ist verloren, nur der
+// Name fehlt noch) -- ausdruecklich kein Zeichnen-Abbruch, das waere ein
+// zweiter Klick zu viel fuer "ich tippe den Namen doch spaeter".
+function rdGeoNameAbbrechen() {
+  closeDlg('dlgGeoName');
+}
+
+function rdGeoNameSpeichern() {
+  const err = $('geoNameErr'); err.style.display = 'none';
+  const name = $('geoName').value.trim();
+  if (!name) { err.textContent = 'Name erforderlich.'; err.style.display = ''; return; }
+  const koordinaten = rdGeoBearbeitenId === null
+    ? rdGeoZeichnenPunkte
+    : rdGeofenceBereiche.find(x => Number(x.id) === rdGeoBearbeitenId).koordinaten;
+  const body = { id: rdGeoBearbeitenId || undefined, objekt_id: rdEinObjekt, name, koordinaten };
+  api('geofence_bereich_save.php', { method: 'POST', body }).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') {
+      err.textContent = (data && data.message) || 'Speichern fehlgeschlagen.';
+      err.style.display = '';
+      return;
+    }
+    closeDlg('dlgGeoName');
+    if (rdGeoBearbeitenId === null) { rdGeoZeichnenBeenden(); }
+    rdGeofenceListeLaden().then(() => { rdGeoListeZeichnen(); rdGeoPolygoneZeichnen(); });
+  });
+}
+
+function rdGeoLoeschen() {
+  if (rdGeoBearbeitenId === null) return;
+  const id = rdGeoBearbeitenId;
+  const b = rdGeofenceBereiche.find(x => Number(x.id) === id);
+  askConfirm('Geofence-Bereich löschen?', `„${b ? b.name : ''}“ wird entfernt.`, 'Löschen', () => {
+    api('geofence_bereich_loeschen.php', { method: 'POST', body: { id } }).then(({ ok, data }) => {
+      if (!ok || data.status !== 'ok') { toast((data && data.message) || 'Löschen fehlgeschlagen.'); return; }
+      closeDlg('dlgGeoName');
+      rdGeofenceListeLaden().then(() => { rdGeoListeZeichnen(); rdGeoPolygoneZeichnen(); });
+    });
+  });
+}
+
+// Gespeicherte Bereiche auf der Karte -- getrennt von der Zeichnen-Vorschau
+// (rdGeoZeichnenVorschau), damit ein laufender Zeichenvorgang die bereits
+// bestehenden Flaechen nicht verdeckt oder mitloescht.
+function rdGeoPolygoneZeichnen() {
+  rdGeoLayer.forEach(p => p.setMap(null));
+  rdGeoLayer = [];
+  if (!rdKarteMapa) return;
+  rdGeofenceBereiche.forEach(b => {
+    const poly = new google.maps.Polygon({
+      paths: b.koordinaten || [], map: rdKarteMapa,
+      fillColor: '#22c55e', fillOpacity: 0.25, strokeColor: '#16a34a', strokeWeight: 2,
+    });
+    poly.addListener('click', () => rdGeoBearbeiten(Number(b.id)));
+    rdGeoLayer.push(poly);
+  });
+}
+
 // Auswahl eines GPS-Punktes -- ausgeloest vom Klick auf der Karte oder auf
 // den Listeneintrag links. Beide Wege fuehren zum selben Ergebnis.
 function rdKarteWaehlen(id) {
   const k = kontrollpunkte.find(x => Number(x.id) === Number(id));
   if (!k) return;
+  if (rdGeoZeichnenAktiv) { rdGeoZeichnenAbbrechen(); }
   rdKarteAuswahl = Number(id);
   rdKarteDetailZeichnen();
   if (rdKarteMapa && k.lat !== null && k.lng !== null) {
@@ -16748,6 +17012,11 @@ function rdKdReiter(id) {
 
 // "+ GPS-Punkt anlegen": oeffnet dasselbe Fenster leer, keinen Dialog mehr.
 function rdKdNeu() {
+  // Beide Modi -- neuer GPS-Punkt und Geofence-Bereich zeichnen -- werten
+  // denselben Kartenklick aus (ENT-286); ohne diesen Abbruch wuerde ein Klick
+  // waehrend des Zeichnens gleichzeitig einen GPS-Punkt UND eine Vieleck-Ecke
+  // setzen.
+  if (rdGeoZeichnenAktiv) { rdGeoZeichnenAbbrechen(); }
   rdKarteAuswahl = 'neu';
   rdKarteDetailZeichnen();
   // Vollstaendig neu zeichnen, nicht nur die Vorschau: der zuvor gewaehlte
