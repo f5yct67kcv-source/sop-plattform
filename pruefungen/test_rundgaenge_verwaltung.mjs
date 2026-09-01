@@ -156,7 +156,7 @@ check('KRITISCH: die Kachel "Rundgänge" ruft rundgang_vorlage_liste_alle.php st
 check('KRITISCH: es öffnet sich KEINE Schublade (ENT-246 hat sie ersetzt)', !(await page.isVisible('#drawer.on')));
 check('Die Kachel-Übersicht ist ausgeblendet, solange die Unterseite offen ist', !(await page.isVisible('#rdUebersicht')));
 check('Ein "Zurück"-Knopf führt zur Übersicht zurück', await page.isVisible('#rdAb-liste .bk-zurueck'));
-// ENT-282: die Kopfzeile zeigte hier bisher weiterhin "Übersicht" -- den
+// ENT-289: die Kopfzeile zeigte hier bisher weiterhin "Übersicht" -- den
 // Ansichtstitel der Kachel-Landingpage --, obwohl tatsächlich die
 // objektübergreifende Liste offen war (gemeldet vom Projektinhaber).
 check('KRITISCH: die Kopfzeile trägt hier einen eigenen Titel, nicht mehr "Übersicht"',
@@ -287,7 +287,7 @@ await page.waitForFunction(() => document.getElementById('rdAb-kr').style.displa
 // ENT-261 hatte den Zurück-Knopf dieser Seite per Skizze ersatzlos entfernt
 // und dabei ausdrücklich den Rückweg als "echter Bedienweg weniger" benannt,
 // mit dem Angebot, stattdessen einen Zurück-Pfeil neben den Titel in die
-// Kopfzeile zu setzen. ENT-282 setzt genau das um, nachdem der
+// Kopfzeile zu setzen. ENT-289 setzt genau das um, nachdem der
 // Projektinhaber den fehlenden Rückweg erneut gemeldet hat -- jetzt über
 // den echten Knopf-Klick geprüft, nicht mehr über einen direkten Aufruf.
 check('KRITISCH: ein Zurück-Pfeil steht neben dem Rundentitel in der Kopfzeile',
@@ -490,7 +490,7 @@ await page.click('#rdAb-liste .bk-zurueck');
 await page.waitForTimeout(150);
 check('KRITISCH: "Zurück" zeigt wieder die Kachel-Übersicht', await page.isVisible('#rdUebersicht'));
 check('Die Unterseite ist wieder ausgeblendet', !(await page.isVisible('#rdAb-liste')));
-// ENT-282: rdUebersichtZeigen() wird hier NICHT ueber go() erreicht (das
+// ENT-289: rdUebersichtZeigen() wird hier NICHT ueber go() erreicht (das
 // wuerde TITLES ohnehin neu setzen) -- ohne eigene Rueckstellung bliebe der
 // Listentitel "Rundgänge" stehen, obwohl schon die Kachel-Uebersicht zeigt.
 check('KRITISCH: die Kopfzeile zeigt wieder "Übersicht", nicht mehr den Listentitel',

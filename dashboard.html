@@ -3385,7 +3385,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
                statt ueberschrieben -- sie gehoeren der ganzen Ansicht, nicht
                dieser einen Unterseite, und werden beim Verlassen unveraendert
                wieder gebraucht.
-               ENT-282: der in ENT-261 ersatzlos entfernte Zurueck-Weg kommt
+               ENT-289: der in ENT-261 ersatzlos entfernte Zurueck-Weg kommt
                hier zurueck -- als kleiner Pfeil direkt vor dem Sondertitel,
                genau die dort bereits angebotene, bis jetzt offene Loesung.
                Fuehrt zur Rundgaenge-Liste, nicht zur Kachel-Uebersicht
@@ -17196,7 +17196,7 @@ function rdUebersichtZeigen() {
   $('rdUebersicht').style.display = '';
   document.querySelectorAll('#view-rundgaenge .bk-abschnitt').forEach(a => { a.style.display = 'none'; });
   kopfSondertitel(null);
-  // ENT-282: die Liste (rdAbschnittZeigen('liste')) ueberschreibt Titel und
+  // ENT-289: die Liste (rdAbschnittZeigen('liste')) ueberschreibt Titel und
   // Unterzeile mit ihrem eigenen Text. Wer NICHT ueber go('rundgaenge') --
   // das setzt TITLES selbst neu -- sondern direkt ueber den Zurueck-Knopf
   // der Liste hierher kommt, sah bisher weiterhin deren Titel stehen, obwohl
@@ -17212,7 +17212,7 @@ function rdAbschnittZeigen(id) {
   // Nur die Kontrollrunden-Unterseite traegt ihren eigenen Kopfzeilentitel
   // (ENT-261) -- jeder andere Bereich gibt die Kopfzeile wieder frei.
   if (id !== 'kr') { kopfSondertitel(null); }
-  // ENT-282: die objektuebergreifende Liste zeigte bisher weiterhin den
+  // ENT-289: die objektuebergreifende Liste zeigte bisher weiterhin den
   // Ansichtstitel "Uebersicht" der Kachel-Landingpage -- man sah der
   // Kopfzeile nicht an, dass man tatsaechlich auf der Liste steht (gemeldet
   // vom Projektinhaber). Eigener Titel wie bei jeder anderen Seite, TITLES
@@ -17229,7 +17229,7 @@ function rdAbschnittZeigen(id) {
 // ENT-261: Kopfzeilentitel einer einzelnen Unterseite. text = null gibt den
 // Ansichtstitel samt Beschreibungszeile wieder frei. Ausblenden statt
 // Ueberschreiben, weil beide der ganzen Ansicht gehoeren und nach dem
-// Verlassen unveraendert weitergebraucht werden. ENT-282: geschaltet wird
+// Verlassen unveraendert weitergebraucht werden. ENT-289: geschaltet wird
 // die Wrapper-Zeile (Pfeil + Titel), nicht mehr nur der Titel selbst.
 function kopfSondertitel(text) {
   const eigen = $('rdKrTitel');

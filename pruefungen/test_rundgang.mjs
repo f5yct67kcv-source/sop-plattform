@@ -455,6 +455,43 @@ check('KRITISCH: nach einem Abbruch bietet die Schicht wieder "Rundgang starten"
     [...document.querySelectorAll('#blRundgang button')].some(b => b.textContent.includes('Rundgang starten'))));
 await page.evaluate(() => blattZu());
 
+// ══════════════════════ ABBRECHEN WAEHREND DER PAUSE (gemeldeter Fehler) ══
+// Bisher liess sich ein pausierter Rundgang zwar wieder aufnehmen, aber nie
+// abbrechen -- der Fuss zeigte in "pausiert" nur "Fortsetzen" an, keinen Weg
+// zum (bereits bestehenden) Pflichtgrund-Dialog. Ein vierter, frischer
+// Rundgang: starten, pausieren, aus der Pause heraus abbrechen.
+await page.evaluate(() => blattAuf(61));
+await page.waitForTimeout(250);
+await page.click('#blRundgang button:has-text("Rundgang starten")');
+await page.waitForTimeout(300);
+await page.click('#blFuss button:has-text("Beenden")');
+await page.waitForTimeout(150);
+await page.click('#blBody button:has-text("Pausieren")');
+await page.waitForTimeout(300);
+check('KRITISCH: waehrend der Pause bietet der Fuss sowohl Abbrechen als auch Fortsetzen an',
+  (await page.textContent('#blFuss')).includes('Abbrechen') && (await page.textContent('#blFuss')).includes('Fortsetzen'));
+check('Die beiden Knoepfe stehen bei pausiertem Rundgang gestapelt untereinander, nicht nebeneinander',
+  await page.evaluate(() => document.getElementById('blFuss').classList.contains('gestapelt')));
+rufe = [];
+await page.click('#blFuss button:has-text("Abbrechen")');
+await page.waitForTimeout(200);
+check('KRITISCH: Abbrechen aus der Pause heraus oeffnet denselben Pflichtgrund-Dialog wie im laufenden Rundgang',
+  (await page.textContent('#blBody')).includes('endgültig'));
+await page.selectOption('#raGrund', 'notfall_gebunden');
+await page.fill('#raFreitext', 'Pausiert und danach doch abgebrochen');
+await page.click('#blFuss button:has-text("Abbrechen bestätigen")');
+await page.waitForTimeout(300);
+const abbruchAusPause = rufe.find(r => r.p.includes('mein_rundgang_abbrechen'));
+check('KRITISCH: der Abbruch aus der Pause heraus erreicht tatsaechlich den Server',
+  !!abbruchAusPause && abbruchAusPause.body.grund === 'notfall_gebunden');
+check('KRITISCH: die Checkliste zeigt danach "Abgebrochen"',
+  (await page.textContent('#rdFortschritt')).includes('Abgebrochen'));
+check('KRITISCH: nach dem Abbruch ist der Fuss nicht mehr gestapelt (nur noch "Zurück")',
+  !(await page.evaluate(() => document.getElementById('blFuss').classList.contains('gestapelt'))));
+await page.click('#blFuss button:has-text("Zurück")');
+await page.waitForTimeout(250);
+await page.evaluate(() => blattZu());
+
 // Desktop: dieselbe Aenderung zusaetzlich am Desktop pruefen (CLAUDE.md).
 // Der vorige Rundgang wurde soeben abgebrochen -- ein dritter, frischer
 // Rundgang ist erwartungsgemaess wieder ueber "Rundgang starten" erreichbar.
