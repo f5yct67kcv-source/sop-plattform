@@ -647,6 +647,26 @@ CREATE TABLE IF NOT EXISTS kunden_kontaktweg (
   FOREIGN KEY (objekt_id) REFERENCES objekte(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+// Geofence-Bereich (ENT-286, Ausnahme aus ENT-008): freies Vieleck auf der
+// Karte eines Objekts -- eigenstaendig von kontrollpunkt, das bei
+// Kreis-Geofences fuer die Rundgang-Bestaetigung bleibt. Bewusst OHNE
+// jede Wirkung auf Rundgang-Scans oder Alarme: eine rein darstellende
+// Referenzflaeche, ausdrueckliche Vorgabe des Projektinhabers fuer diesen
+// ersten Schritt ("kann man einzeln bauen ... Geofence kann man spaeter
+// die Funktion dazu bauen"). Koordinaten als JSON-Array von {lat,lng} in
+// TEXT -- gleiches Muster wie benutzer_layout.layout, siehe
+// geofence_bereich.php fuer die Pruef-/Kodierfunktion.
+'geofence_bereich' => "CREATE TABLE geofence_bereich (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  objekt_id INT NOT NULL,
+  name VARCHAR(200) NOT NULL,
+  koordinaten TEXT NOT NULL,
+  aktiv TINYINT(1) NOT NULL DEFAULT 1,
+  erstellt_am DATETIME DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_objekt (objekt_id),
+  FOREIGN KEY (objekt_id) REFERENCES objekte(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
 // objekt_id liegt hier zusaetzlich zu einsatz_id, obwohl ueber einsaetze
 // erreichbar: einsaetze.objekt_id darf NULL sein (freier Einsatz ohne
 // Dauerauftrag), ein Rundgang braucht aber immer ein konkretes Objekt, da

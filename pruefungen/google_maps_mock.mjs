@@ -75,6 +75,15 @@ export const GOOGLE_MAPS_MOCK = `
         const p = this._pixelZuLatLng(e.offsetX, e.offsetY);
         this._feuern('click', { latLng: machLatLng(p.lat, p.lng) });
       });
+      // Rechtsklick (ENT-286, Geofence-Bereich zeichnen): echtes Kontextmenue
+      // unterdrueckt, stattdessen dasselbe 'rightclick'-Ereignis wie bei der
+      // echten Maps-API.
+      container.addEventListener('contextmenu', e => {
+        e.preventDefault();
+        if (e.target !== container) return;
+        const p = this._pixelZuLatLng(e.offsetX, e.offsetY);
+        this._feuern('rightclick', { latLng: machLatLng(p.lat, p.lng) });
+      });
     }
     setCenter(c) { this._center = alsLiteral(c); this._neuPositionieren(); }
     getCenter() { return machLatLng(this._center.lat, this._center.lng); }
@@ -196,6 +205,59 @@ export const GOOGLE_MAPS_MOCK = `
     }
   }
 
+  // Vieleck (ENT-286, Geofence-Bereiche): eigenes SVG-Overlay statt eines
+  // einzelnen div wie bei Circle -- ein Vieleck braucht eine variable Anzahl
+  // Ecken, dafuer reicht ein div mit fester Form nicht. Reales, sichtbares
+  // DOM-Element mit eigener Klasse (".gm-mock-polygon"), gleiches Prinzip
+  // wie Marker/Circle.
+  class Polygon extends Kartending {
+    constructor(opts) {
+      super();
+      this._path = (opts.paths || opts.path || []).map(alsLiteral);
+      this.el = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      this.el.setAttribute('class', 'gm-mock-polygon');
+      this.el.style.cssText = 'position:absolute;left:0;top:0;overflow:visible;pointer-events:none;z-index:2;';
+      this._poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+      // clickable:false (wie in der echten API) laesst Klicks durch --
+      // sonst wuerde eine im Entstehen befindliche Zeichen-Vorschau, sobald
+      // sie schon eine Flaeche hat, jeden weiteren Kartenklick abfangen, der
+      // zufaellig innerhalb dieser Flaeche liegt (z.B. eine Ecke nach innen
+      // setzen, um ein konkaves Vieleck zu zeichnen) -- der Klick kaeme dann
+      // nie beim Map-Container an.
+      this._poly.style.pointerEvents = opts.clickable === false ? 'none' : 'auto';
+      this._poly.style.cursor = 'pointer';
+      this._poly.setAttribute('fill', opts.fillColor || '#22c55e');
+      this._poly.setAttribute('fill-opacity', opts.fillOpacity != null ? opts.fillOpacity : 0.35);
+      this._poly.setAttribute('stroke', opts.strokeColor || opts.fillColor || '#22c55e');
+      this._poly.setAttribute('stroke-width', String(opts.strokeWeight || 2));
+      this._poly.addEventListener('click', e => { e.stopPropagation(); this._feuern('click'); });
+      this.el.appendChild(this._poly);
+      this.setMap(opts.map || null);
+    }
+    setPath(path) { this._path = (path.getArray ? path.getArray() : path).map(alsLiteral); this._neuZeichnen(); }
+    getPath() {
+      const arr = this._path.map(p => machLatLng(p.lat, p.lng));
+      arr.getArray = () => arr;
+      return arr;
+    }
+    setMap(map) {
+      if (this._map) { this._map._entfernen(this); this.el.remove(); }
+      this._map = map;
+      if (map) { map.container.appendChild(this.el); map._registrieren(this); }
+    }
+    _neuZeichnen() {
+      if (!this._map) return;
+      const r = this._map.container.getBoundingClientRect();
+      this.el.setAttribute('width', String(r.width));
+      this.el.setAttribute('height', String(r.height));
+      const pts = this._path.map(p => {
+        const px = this._map._latLngZuPixel(p.lat, p.lng);
+        return px.x + ',' + px.y;
+      }).join(' ');
+      this._poly.setAttribute('points', pts);
+    }
+  }
+
   const ereignis = {
     trigger(ziel, ev, ...args) { ziel._feuern(ev, ...args); },
     addListener(ziel, ev, cb) { return ziel.addListener(ev, cb); },
@@ -207,7 +269,7 @@ export const GOOGLE_MAPS_MOCK = `
 
   window.google = window.google || {};
   window.google.maps = {
-    Map, Marker, Circle, LatLngBounds,
+    Map, Marker, Circle, Polygon, LatLngBounds,
     ControlPosition: { LEFT_TOP: 'LEFT_TOP', TOP_LEFT: 'TOP_LEFT', RIGHT_TOP: 'RIGHT_TOP' },
     event: ereignis,
   };

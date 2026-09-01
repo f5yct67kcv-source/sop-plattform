@@ -7,9 +7,14 @@
 // und eine Kartenansicht mit "GPS-Punkt anlegen"/"Geofence anlegen").
 // Klaerung mit dem Projektinhaber: "GPS-Punkt" = unser bestehender Typ
 // "geofence" (Kreis mit Radius, kein neues Datenmodell). "Geofence-Bereich"
-// (freies Vieleck, mehrere Ecken) ist ein NEUER, hier noch nicht gebauter
-// Kontrollpunkt-Typ -- der Knopf dafuer zeigt bewusst nur einen Hinweis,
-// kein erfundenes Zeichenwerkzeug. NFC-Punkte werden laut Projektinhaber
+// (freies Vieleck, mehrere Ecken) ist eine EIGENSTAENDIGE Tabelle, keine
+// Erweiterung des Kontrollpunkt-Typs -- der Knopf dafuer zeigte bis ENT-286
+// nur einen Hinweis statt eines erfundenen Zeichenwerkzeugs; das eigentliche
+// Zeichnen/Anlegen/Umbenennen/Loeschen wird seither in der eigenen Suite
+// test_geofence_bereich.mjs geprueft, nicht hier -- diese Datei prueft nur
+// noch, dass der Knopf den Zeichnen-Modus ueberhaupt startet, ohne die
+// GPS-Punkte-Bedienung dieser Suite zu stoeren. NFC-Punkte werden laut
+// Projektinhaber
 // kuenftig per Smartphone-Scan erfasst, nicht ueber diese Karte -- "+
 // GPS-Punkt anlegen" oeffnet darum den bestehenden Kontrollpunkt-Dialog
 // direkt mit Typ Geofence vorbelegt, nicht mit dem sonst ueblichen NFC.
@@ -178,7 +183,7 @@ check('KRITISCH: links neben der Karte stehen beide GPS-Punkte namentlich',
 check('Der NFC-Punkt steht NICHT in der GPS-Punkte-Liste (er hat keinen Ort)',
   !(await page.textContent('#rdKartePunkteListe')).includes('Hintereingang'));
 check('Die Geofence-Bereiche-Liste sagt ausdrücklich, dass es noch keine gibt',
-  (await page.textContent('#rdKarteBereiche')).includes('Keine Einträge vorhanden'));
+  (await page.textContent('#rdKarteBereiche')).includes('Noch kein Geofence-Bereich angelegt'));
 
 const ctaBox = await page.$eval('.rdkarte-cta', el => el.getBoundingClientRect());
 const karteBox = await page.$eval('#rdKarteUebersicht', el => el.getBoundingClientRect());
@@ -320,12 +325,18 @@ check('Ohne Namen wird nicht gespeichert, sondern begründet abgelehnt', await (
 await page.click('#rdKarteDetail button:has-text("Schliessen")');
 await page.waitForTimeout(200);
 
-// ══════════ "GEOFENCE-BEREICH ANLEGEN": HINWEIS STATT ERFUNDENEM WERKZEUG
-// (Vieleck-Zeichenwerkzeug ist noch nicht gebaut, siehe Kopfkommentar.)
+// ══════════ "GEOFENCE-BEREICH ANLEGEN" STARTET DEN ZEICHNEN-MODUS (ENT-286)
+// Nur ein Rauchtest, dass der Knopf ueberhaupt den Modus startet und sich
+// wieder sauber abbrechen laesst, ohne die GPS-Punkte-Bedienung dieser Suite
+// zu stoeren -- das eigentliche Zeichnen/Speichern/Loeschen steht in der
+// eigenen Suite test_geofence_bereich.mjs.
 await page.click('#rdKrAb-karte button:has-text("Geofence-Bereich anlegen")');
 await page.waitForTimeout(150);
-check('KRITISCH: statt eines nicht existierenden Zeichenwerkzeugs erscheint ein Hinweis',
-  await page.evaluate(() => document.getElementById('toast').classList.contains('on')));
+check('KRITISCH: der Zeichnen-Modus startet, statt eines ungebauten Werkzeugs',
+  await page.isVisible('#rdGeoZeichnenLeiste') && !(await page.isVisible('#rdGeoCta')));
+await page.keyboard.press('Escape');
+await page.waitForTimeout(150);
+check('Abbrechen stellt die normale Knopfzeile wieder her', await page.isVisible('#rdGeoCta'));
 
 // ══════════ ENT-260: DER WECHSEL LAEUFT UEBER DIE REITER, NICHT UEBER ZURUECK
 check('KRITISCH: auf der Seite steht gar kein Zurück-Knopf mehr (ENT-261)',
