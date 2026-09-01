@@ -4610,10 +4610,6 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
             <span class="rdkr-tab-ic"><svg class="i" viewBox="0 0 24 24"><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><polyline points="4 6 5 7 7 5"/><polyline points="4 12 5 13 7 11"/><polyline points="4 18 5 19 7 17"/></svg></span>
             <span class="rdkr-tab-lbl">Aufgaben</span>
           </button>
-          <button type="button" class="rdkr-tab" data-reiter="ansprechpartner" onclick="rdKrAbschnittZeigen('ansprechpartner')">
-            <span class="rdkr-tab-ic"><svg class="i" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
-            <span class="rdkr-tab-lbl">Ansprechpartner</span>
-          </button>
           <button type="button" class="rdkr-tab" data-reiter="berichte" onclick="rdKrAbschnittZeigen('berichte')">
             <span class="rdkr-tab-ic"><svg class="i" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
             <span class="rdkr-tab-lbl">Berichte</span>
@@ -4634,6 +4630,29 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
                 <div class="f wide"><label class="check"><input type="checkbox" id="rdKrAktiv" checked> Aktiv</label></div>
                 <div class="f wide"><label for="rdKrBeschreibung">Beschreibung</label><textarea class="inp" id="rdKrBeschreibung" rows="2" placeholder="Optionale Notiz zu dieser Kontrollrunde"></textarea></div>
               </div>
+
+              <!-- ENT-277: eigenes Feld statt eigenem Reiter (Revision von
+                   ENT-258/261) -- Ruecksprache Projektinhaber: pro
+                   Kontrollrunde gibt es genau EINEN Ansprechpartner, und der
+                   ist manchmal eine Person (Vorname/Nachname wie bei
+                   "Kontaktperson vor Ort" am Einsatz), manchmal eine
+                   Pikett-Nummer ohne festen Namen. Deshalb ein freies
+                   Bezeichnungsfeld statt Vorname/Nachname -- unabhaengig vom
+                   Kontakt am Einsatz (dort meist Hauswart/technischer Dienst
+                   des Objekts, hier der Kontakt fuer Rueckfragen zu genau
+                   dieser Runde). -->
+              <div class="abschnitt">
+                <h3>Ansprechpartner<span class="note">Person oder Pikett-Nummer für Rückfragen zu dieser Runde</span></h3>
+                <div class="form-grid">
+                  <div class="f"><label for="rdKrAnsprechpartnerName">Bezeichnung</label>
+                    <input class="inp" id="rdKrAnsprechpartnerName" placeholder="z. B. Herr Meier oder Pikett Sicherheit"></div>
+                  <div class="f"><label for="rdKrAnsprechpartnerTelefon">Telefon</label>
+                    <input class="inp" id="rdKrAnsprechpartnerTelefon" type="tel" inputmode="tel"
+                           placeholder="+41 79 000 00 00"
+                           onfocus="enTelFokus(this)" onblur="enTelWeg(this)"></div>
+                </div>
+              </div>
+
               <div style="margin-top:16px">
                 <button class="btn btn-primary" id="rdKrBtn" onclick="rdSaveKr()">Speichern</button>
               </div>
@@ -4800,9 +4819,6 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
           </div>
         </div>
         <div class="rdkr-panel" id="rdKrAb-aufgaben" style="display:none">
-          <p class="zone-note">Folgt in einem späteren Schritt.</p>
-        </div>
-        <div class="rdkr-panel" id="rdKrAb-ansprechpartner" style="display:none">
           <p class="zone-note">Folgt in einem späteren Schritt.</p>
         </div>
         <div class="rdkr-panel" id="rdKrAb-berichte" style="display:none">
@@ -16952,6 +16968,8 @@ function rdKrZeigen(modus, id) {
   $('rdKrName').value = v ? v.name : '';
   $('rdKrAktiv').checked = v ? !!Number(v.aktiv) : true;
   $('rdKrBeschreibung').value = v && v.beschreibung ? v.beschreibung : '';
+  $('rdKrAnsprechpartnerName').value = v && v.ansprechpartner_name ? v.ansprechpartner_name : '';
+  $('rdKrAnsprechpartnerTelefon').value = v && v.ansprechpartner_telefon ? v.ansprechpartner_telefon : '';
   $('rdKrErr').style.display = 'none';
 
   rdKrRoutenTabelleZeichnen();
@@ -17006,7 +17024,12 @@ function rdSaveKr() {
   // die Routenpunkte-Zuordnung schreibt seither sofort bei jeder einzelnen
   // Aenderung (rpListeSpeichern()), nicht mehr gesammelt hier.
   const warNeu = !krTarget;
-  const body = { objekt_id: rdEinObjekt, name, aktiv: $('rdKrAktiv').checked ? 1 : 0, beschreibung: $('rdKrBeschreibung').value.trim() };
+  const body = {
+    objekt_id: rdEinObjekt, name, aktiv: $('rdKrAktiv').checked ? 1 : 0,
+    beschreibung: $('rdKrBeschreibung').value.trim(),
+    ansprechpartner_name: $('rdKrAnsprechpartnerName').value.trim(),
+    ansprechpartner_telefon: $('rdKrAnsprechpartnerTelefon').value.trim(),
+  };
   if (krTarget) body.id = krTarget;
 
   const b = $('rdKrBtn'); b.disabled = true;

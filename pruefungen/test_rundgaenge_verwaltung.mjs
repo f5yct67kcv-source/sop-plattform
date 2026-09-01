@@ -9,11 +9,14 @@
 // nur geprüft, dass die Seite mit dem richtigen Objekt und den richtigen
 // Werten öffnet, nicht das Speichern der Punktzuordnung selbst im Detail
 // (das deckt bereits die Einrichtung ab, siehe test_kontrollrunden.mjs).
-// Seit ENT-258 ist diese Seite selbst eine kleine Übersicht (Name +
-// Beschreibung) mit einem Kachel-Raster zu sechs Unterbereichen darunter;
-// nur „Routenpunkte" ist verdrahtet (entspricht der bisherigen
-// Kontrollpunkte-Auswahl), die übrigen fünf zeigen einen bleibenden
-// Hinweis.
+// Seit ENT-258/260 ist diese Seite ein Formular "Allgemeines" mit einer
+// bleibenden Reiterleiste zu weiteren Unterbereichen; ein Teil davon ist
+// inzwischen verdrahtet (siehe die einzelnen ENT-Verweise unten), der Rest
+// zeigt weiterhin einen bleibenden Hinweis.
+// Seit ENT-277 ist „Ansprechpartner" keiner dieser Reiter mehr, sondern ein
+// Paar Felder direkt im Formular "Allgemeines" (Rücksprache Projektinhaber:
+// pro Kontrollrunde gibt es immer nur EINEN Ansprechpartner -- Person oder
+// Pikett-Nummer, nie beides -- das rechtfertigt keinen eigenen Reiter).
 import { WURZEL, OUT, browserPfad } from './pfade.mjs';
 import { GOOGLE_MAPS_MOCK } from './google_maps_mock.mjs';
 import { chromium } from 'playwright';
@@ -37,10 +40,13 @@ const OBJEKTE = { status: 'ok', objekte: [
 // Objekt aus der Einrichtung zeigt.
 const VORLAGEN_ALLE = { status: 'ok', vorlagen: [
   { id: 10, objekt_id: 1, kunde_name: 'Muster Liegenschaften AG', objekt_name: 'Testliegenschaft Nord',
-    name: 'Öffnungsrunde', beschreibung: 'Erste Kontrolle nach Schichtbeginn', aktiv: 1, erstellt_am: '2026-01-01 00:00:00',
+    name: 'Öffnungsrunde', beschreibung: 'Erste Kontrolle nach Schichtbeginn',
+    ansprechpartner_name: 'Pikett Sicherheit', ansprechpartner_telefon: '+41 79 111 22 33',
+    aktiv: 1, erstellt_am: '2026-01-01 00:00:00',
     punkte: [{ id: 1, bezeichnung: 'Eingang', reihenfolge: 1 }, { id: 2, bezeichnung: 'Keller', reihenfolge: 2 }] },
   { id: 11, objekt_id: 2, kunde_name: 'Beispiel Immobilien GmbH', objekt_name: 'Testliegenschaft Süd',
-    name: 'Schliessrunde', beschreibung: null, aktiv: 1, erstellt_am: '2026-01-02 00:00:00', punkte: [] },
+    name: 'Schliessrunde', beschreibung: null, ansprechpartner_name: null, ansprechpartner_telefon: null,
+    aktiv: 1, erstellt_am: '2026-01-02 00:00:00', punkte: [] },
 ]};
 
 // Drittes Objekt-1-Kontrollpunkt (Garage) bewusst NICHT in VORLAGEN_ALLE[10]
@@ -300,6 +306,14 @@ check('KRITISCH: der Kontrollpunkte-Reiter zeigt die Anzahl aller Punkte des Obj
 check('KRITISCH: der aktive Reiter ist als solcher markiert',
   await page.evaluate(() => document.querySelector('#rdKrReiter .rdkr-tab.aktiv')?.dataset.reiter === 'allgemeines'));
 
+// ══════════ ENT-277: ANSPRECHPARTNER ALS FELD STATT EIGENEM REITER
+check('KRITISCH: "Ansprechpartner" ist kein Reiter mehr in der Leiste',
+  await page.evaluate(() => !document.querySelector('#rdKrReiter .rdkr-tab[data-reiter="ansprechpartner"]')));
+check('KRITISCH: Bezeichnung des Ansprechpartners wird vorbefüllt (kann eine Pikett-Nummer sein, kein Personenname)',
+  (await page.inputValue('#rdKrAnsprechpartnerName')) === 'Pikett Sicherheit');
+check('KRITISCH: Telefonnummer des Ansprechpartners wird vorbefüllt',
+  (await page.inputValue('#rdKrAnsprechpartnerTelefon')) === '+41 79 111 22 33');
+
 // „Routenpunkte" ist die einzige verdrahtete Kachel -- entspricht der
 // bisherigen Kontrollpunkte-Auswahl aus ENT-248/251.
 await page.click('#rdKrReiter .rdkr-tab:has-text("Routenpunkte")');
@@ -379,7 +393,7 @@ check('Keller ist aus der Tabelle verschwunden, Eingang und Garage bleiben',
     .map(td => td.textContent).join('|') === 'Eingang|Garage'));
 check('Der Anzahl-Chip zeigt wieder 2', (await page.textContent('#rdKrRoutenBadge')).trim() === '2');
 
-// Eine der fünf noch unverdrahteten Kacheln stichprobenartig geprüft --
+// Einer der noch unverdrahteten Reiter stichprobenartig geprüft --
 // bleibender Hinweis statt erfundenem Inhalt (gleiches Vorgehen wie
 // ENT-225/ENT-243), Inhalt wird gemäss Projektinhaber einzeln besprochen.
 await page.click('#rdKrReiter .rdkr-tab:has-text("Aufgaben")');
@@ -408,7 +422,11 @@ await page.screenshot({ path: `${OUT}/rg-verwaltung-01-desktop.png` });
 
 // ══════════ SPEICHERN FUEHRT ZURUECK ZUR LISTE, NICHT ZUR KACHEL-UEBERSICHT
 check('Die Beschreibung ist leer, weil "Schliessrunde" keine hat', await page.inputValue('#rdKrBeschreibung') === '');
+check('KRITISCH: der Ansprechpartner ist leer, weil "Schliessrunde" keinen hat (kein "null" als Text)',
+  await page.inputValue('#rdKrAnsprechpartnerName') === '' && await page.inputValue('#rdKrAnsprechpartnerTelefon') === '');
 await page.fill('#rdKrBeschreibung', 'Schliesskontrolle nach Ladenschluss');
+await page.fill('#rdKrAnsprechpartnerName', 'Herr Meier');
+await page.fill('#rdKrAnsprechpartnerTelefon', '079 123 45 67');
 calls = [];
 const [speicherAnfrage] = await Promise.all([
   page.waitForRequest(r => r.url().includes('rundgang_vorlage_save') && r.method() === 'POST'),
@@ -416,6 +434,10 @@ const [speicherAnfrage] = await Promise.all([
 ]);
 check('KRITISCH: die Beschreibung wird beim Speichern mitgesendet',
   speicherAnfrage.postDataJSON().beschreibung === 'Schliesskontrolle nach Ladenschluss');
+check('KRITISCH: die Bezeichnung des Ansprechpartners wird beim Speichern mitgesendet',
+  speicherAnfrage.postDataJSON().ansprechpartner_name === 'Herr Meier');
+check('KRITISCH: die Telefonnummer wird beim Speichern auf die internationale Schreibweise gebracht (ENT-118)',
+  speicherAnfrage.postDataJSON().ansprechpartner_telefon === '+41 79 123 45 67');
 await page.waitForFunction(() => document.getElementById('rdAb-liste').style.display !== 'none');
 check('KRITISCH: nach dem Speichern steht wieder die Liste da, nicht die Kachel-Übersicht',
   await page.isVisible('#rdAb-liste') && !(await page.isVisible('#rdUebersicht')));

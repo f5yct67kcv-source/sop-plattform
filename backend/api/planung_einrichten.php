@@ -1315,6 +1315,17 @@ $spalten = [
     // Projektinhaber nur die Bereichszeiterfassung.
     ['kontrollpunkt', 'bereichszeit_beginn', 'ALTER TABLE kontrollpunkt ADD COLUMN bereichszeit_beginn TINYINT(1) NOT NULL DEFAULT 0'],
     ['kontrollpunkt', 'bereichszeit_ende', 'ALTER TABLE kontrollpunkt ADD COLUMN bereichszeit_ende TINYINT(1) NOT NULL DEFAULT 0'],
+
+    // Ansprechpartner der Kontrollrunde (ENT-277, Revision von ENT-258/261:
+    // urspruenglich als eigener Reiter/eigene Kachel "Folgt in einem
+    // spaeteren Schritt" angelegt, dann per Ruecksprache Projektinhaber auf
+    // ein Feldpaar reduziert). Freies Bezeichnungsfeld statt Vorname/
+    // Nachname wie bei "Kontaktperson vor Ort" am Einsatz: hier ist es
+    // manchmal eine Person, manchmal eine Pikett-Nummer ohne festen Namen --
+    // beides in ein Vorname/Nachname-Schema zu zwingen waere falsch
+    // strukturiert.
+    ['rundgang_vorlage', 'ansprechpartner_name',    'ALTER TABLE rundgang_vorlage ADD COLUMN ansprechpartner_name VARCHAR(120) NULL AFTER beschreibung'],
+    ['rundgang_vorlage', 'ansprechpartner_telefon', 'ALTER TABLE rundgang_vorlage ADD COLUMN ansprechpartner_telefon VARCHAR(50) NULL AFTER ansprechpartner_name'],
 ];
 foreach ($spalten as [$tabelle, $spalte, $sql]) {
     if (!hat_tabelle_jetzt($pdo, $tabelle) || hat_spalte($pdo, $tabelle, $spalte)) {
