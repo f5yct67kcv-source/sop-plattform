@@ -586,6 +586,37 @@ await page.click('#v-menu button[onclick="passwortBlatt()"]');
 await page.waitForTimeout(250);
 check('Passwortblatt geht auf', await page.isVisible('#pwAlt'));
 check('Passwortblatt fragt das bisherige Passwort', await page.isVisible('#pwAlt'));
+
+// Maskierung und Auge (ENT-291), am gerenderten Zustand gemessen. Die App
+// laeuft auf dem Handy im Einsatz -- da steht oft jemand daneben.
+{
+  check('KRITISCH: beide Passwortfelder sind maskiert',
+    (await page.getAttribute('#pwAlt', 'type')) === 'password'
+    && (await page.getAttribute('#pwNeu', 'type')) === 'password');
+  await page.fill('#pwNeu', 'probeweise');
+  await page.click('.pw-feld:has(#pwNeu) .pw-toggle');
+  check('Das Auge deckt genau EIN Feld auf',
+    (await page.getAttribute('#pwNeu', 'type')) === 'text'
+    && (await page.getAttribute('#pwAlt', 'type')) === 'password');
+  check('Der eingegebene Wert ueberlebt das Umschalten',
+    (await page.inputValue('#pwNeu')) === 'probeweise');
+  await page.click('.pw-feld:has(#pwNeu) .pw-toggle');
+  check('Nochmals tippen verdeckt wieder',
+    (await page.getAttribute('#pwNeu', 'type')) === 'password');
+  const mass = await page.evaluate(() => {
+    const inp = document.getElementById('pwNeu');
+    const b = inp.parentElement.querySelector('.pw-toggle').getBoundingClientRect();
+    const ri = inp.getBoundingClientRect();
+    return { w: b.width, h: b.height,
+             polster: parseFloat(getComputedStyle(inp).paddingRight),
+             innerhalb: b.right <= ri.right + 1 };
+  });
+  check(`KRITISCH: Auge mindestens 44 px (gemessen ${Math.round(mass.w)}x${Math.round(mass.h)})`,
+    mass.w >= 44 && mass.h >= 44);
+  check(`Das Auge verdeckt den Text nicht (Polster ${Math.round(mass.polster)} px >= Knopf ${Math.round(mass.w)} px)`,
+    mass.polster >= mass.w && mass.innerhalb);
+  await page.fill('#pwNeu', '');
+}
 await page.fill('#pwNeu', '123');
 await page.click('#pwBtn');
 await page.waitForTimeout(200);

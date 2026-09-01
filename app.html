@@ -71,6 +71,20 @@ svg.i-sm { width: 17px; height: 17px; }
   padding: 12px 14px; font: inherit; font-size: 16px; color: var(--ink);
   background: var(--surface); -webkit-appearance: none; appearance: none;
 }
+/* Passwortfeld mit Auge (ENT-291). Gleiche Bedienung wie im Cockpit:
+   maskiert als Normalzustand, sichtbar nur auf Knopfdruck und nur bis die
+   Maske neu aufgebaut wird. Auf dem Handy ist das Auge die volle Feldhoehe
+   hoch (48 px), damit es mit dem Daumen zu treffen ist. */
+.pw-feld { position: relative; }
+.pw-feld .inp { padding-right: 50px; }
+.pw-toggle {
+  position: absolute; right: 0; top: 0; bottom: 0; width: 46px;
+  display: flex; align-items: center; justify-content: center;
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font-size: 18px; line-height: 1; opacity: .55;
+}
+.pw-toggle:hover { opacity: 1; }
+.pw-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .inp:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .msg-err { font-size: 14px; color: var(--neg); background: var(--neg-soft); border-radius: var(--r-sm); padding: 11px 13px; margin-bottom: 16px; }
 
@@ -427,7 +441,10 @@ svg.i-sm { width: 17px; height: 17px; }
   <div class="gate-form">
     <div id="gErr" class="msg-err" style="display:none"></div>
     <div class="f"><label for="gName" id="lb-name">Name</label><input class="inp" id="gName" autocomplete="username" autocapitalize="none"></div>
-    <div class="f"><label for="gPass" id="lb-pass">Passwort</label><input class="inp" id="gPass" type="password" autocomplete="current-password"></div>
+    <div class="f"><label for="gPass" id="lb-pass">Passwort</label>
+      <div class="pw-feld"><input class="inp" id="gPass" type="password" autocomplete="current-password">
+        <button type="button" class="pw-toggle" aria-label="Passwort anzeigen"
+                onclick="togglePw('gPass', this)">👁</button></div></div>
     <button class="btn btn-primary btn-wide" id="gBtn" onclick="anmelden()">Anmelden</button>
   </div>
 </div>
@@ -591,6 +608,7 @@ const W = {
     telefon: 'Telefon', mobil: 'Mobil', email: 'E-Mail', anmeldename: 'Anmeldename',
     passwortAendern: 'Passwort ändern', altesPasswort: 'Bisheriges Passwort',
     neuesPasswort: 'Neues Passwort', mind6: 'mindestens 6 Zeichen',
+    pwZeigen: 'Passwort anzeigen', pwVerbergen: 'Passwort verbergen',
     passwortOk: 'Passwort geändert.', abmelden: 'Abmelden',
     zumCockpit: 'Zum Cockpit',
     stundenZeile: 'Abgeglichene Schichten, Monat für Monat',
@@ -649,6 +667,13 @@ const W = {
     kpEsFotoFehler: 'Foto liess sich nicht verarbeiten.',
 };
 const w = k => W[k] || k;
+
+// Muss zu PASSWORT_MIN in backend/anmeldung.php passen -- und zu der Zahl,
+// die W.mind6 dem Nutzer nennt. test_passwortfelder.mjs vergleicht alle
+// drei. Die Zahl steht in dashboard.html, index.html und hier je einmal;
+// eine gemeinsame Datei gaebe es nur fuer zwei der drei Oberflaechen,
+// darum haelt die Pruefung sie zusammen statt der Ladereihenfolge.
+const PW_MIN = 6;
 
 const WOCHENTAG = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
 
@@ -2578,13 +2603,35 @@ function bonusInfoBlatt() {
   blattZeigen();
 }
 
+// Auge am Passwortfeld (ENT-291). Wortgleich mit dem Cockpit und mit
+// index.html -- dieselbe Geste, dieselben Zeichen, egal wo man gerade ist.
+// Maskiert bleibt der Ausgangszustand: Er steht im Markup und wird nie
+// gemerkt, damit ein einmal aufgedecktes Feld nicht offen stehen bleibt.
+function togglePw(id, btn) {
+  const inp = $(id);
+  if (!inp) { return; }
+  const zeigen = inp.type === 'password';
+  inp.type = zeigen ? 'text' : 'password';
+  btn.textContent = zeigen ? '🙈' : '👁';
+  btn.setAttribute('aria-label', zeigen ? w('pwVerbergen') : w('pwZeigen'));
+  const ende = inp.value.length;
+  inp.focus();
+  try { inp.setSelectionRange(ende, ende); } catch (e) { /* nicht jedes Feld kann das */ }
+}
+
 function passwortBlatt() {
   blattId = null;
   $('blTitel').textContent = w('passwortAendern');
   $('blBody').innerHTML = `
     <div class="msg-err" id="pwErr" style="display:none"></div>
-    <div class="f"><label for="pwAlt">${esc(w('altesPasswort'))}</label><input class="inp" id="pwAlt" type="password" autocomplete="current-password"></div>
-    <div class="f"><label for="pwNeu">${esc(w('neuesPasswort'))}</label><input class="inp" id="pwNeu" type="password" placeholder="${esc(w('mind6'))}" autocomplete="new-password"></div>`;
+    <div class="f"><label for="pwAlt">${esc(w('altesPasswort'))}</label>
+      <div class="pw-feld"><input class="inp" id="pwAlt" type="password" autocomplete="current-password">
+        <button type="button" class="pw-toggle" aria-label="${esc(w('pwZeigen'))}"
+                onclick="togglePw('pwAlt', this)">👁</button></div></div>
+    <div class="f"><label for="pwNeu">${esc(w('neuesPasswort'))}</label>
+      <div class="pw-feld"><input class="inp" id="pwNeu" type="password" placeholder="${esc(w('mind6'))}" autocomplete="new-password">
+        <button type="button" class="pw-toggle" aria-label="${esc(w('pwZeigen'))}"
+                onclick="togglePw('pwNeu', this)">👁</button></div></div>`;
   $('blFuss').innerHTML = `
     <button class="btn btn-plain" onclick="blattZu()">${esc(w('abbrechen'))}</button>
     <button class="btn btn-primary" id="pwBtn" onclick="passwortSpeichern()">${esc(w('speichern'))}</button>`;
@@ -2593,7 +2640,7 @@ function passwortBlatt() {
 function passwortSpeichern() {
   const err = $('pwErr'); err.style.display = 'none';
   const alt = $('pwAlt').value, neu = $('pwNeu').value;
-  if (neu.length < 6) { err.textContent = w('mind6'); err.style.display = ''; return; }
+  if (neu.length < PW_MIN) { err.textContent = w('mind6'); err.style.display = ''; return; }
   const b = $('pwBtn'); b.disabled = true;
   api('mein_passwort.php', { method: 'POST', body: { alt, neu } }).then(({ ok, data }) => {
     b.disabled = false;

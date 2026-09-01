@@ -166,6 +166,58 @@ await page.waitForTimeout(400);
 await page.click('#mbtab-zugang');
 await page.waitForTimeout(250);
 const setzen = () => page.click('#mbKarten .mb-bereich.on .zone button:has-text("Setzen")');
+
+// Maskierung und Auge (ENT-291), am gerenderten Zustand gemessen.
+// Bis hierher standen beide Felder auf type="text" -- wer jemandem ueber
+// die Schulter sah, las das neue Passwort im Klartext mit, und bei einer
+// Gegenbestaetigung stand es sogar zweimal offen da.
+{
+  const typ = id => page.getAttribute('#' + id, 'type');
+  check('KRITISCH: beide Passwortfelder sind im Ausgangszustand maskiert',
+    (await typ('maPw')) === 'password' && (await typ('maPw2')) === 'password');
+
+  await page.fill('#maPw', 'geheimniskraemerei');
+  await page.click('.pw-feld:has(#maPw) .pw-toggle');
+  check('Das Auge deckt genau EIN Feld auf, nicht beide',
+    (await typ('maPw')) === 'text' && (await typ('maPw2')) === 'password');
+  check('Der eingegebene Wert ueberlebt das Umschalten',
+    (await page.inputValue('#maPw')) === 'geheimniskraemerei');
+  check('Die Beschriftung sagt jetzt das Gegenteil -- sonst liest eine Vorlesesoftware das Falsche',
+    (await page.getAttribute('.pw-feld:has(#maPw) .pw-toggle', 'aria-label')) === 'Passwort verbergen');
+  await page.click('.pw-feld:has(#maPw) .pw-toggle');
+  check('Nochmals tippen verdeckt wieder', (await typ('maPw')) === 'password');
+
+  // Das Auge darf nicht auf dem Text liegen: Der rechte Innenabstand des
+  // Feldes muss mindestens so breit sein wie der Knopf.
+  const mass = await page.evaluate(() => {
+    const inp = document.getElementById('maPw');
+    const btn = inp.parentElement.querySelector('.pw-toggle');
+    const ri = inp.getBoundingClientRect(), rb = btn.getBoundingClientRect();
+    return { polster: parseFloat(getComputedStyle(inp).paddingRight),
+             breite: rb.width, hoehe: rb.height,
+             innerhalb: rb.right <= ri.right + 1 && rb.top >= ri.top - 1 };
+  });
+  check('Der Knopf sitzt im Feld und nicht daneben', mass.innerhalb);
+  check(`Das Auge verdeckt den Text nicht (Polster ${Math.round(mass.polster)} px >= Knopf ${Math.round(mass.breite)} px)`,
+    mass.polster >= mass.breite);
+
+  // Handy: mindestens 44 px Trefferflaeche (CLAUDE.md). Auf dem Handy ist
+  // das Auge der einzige Weg, einen Vertipper zu finden -- ein Knopf, den
+  // man nicht trifft, ist keiner.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForTimeout(200);
+  const handy = await page.evaluate(() => {
+    const b = document.getElementById('maPw').parentElement.querySelector('.pw-toggle')
+      .getBoundingClientRect();
+    return { w: b.width, h: b.height };
+  });
+  check(`KRITISCH: Auge auf dem Handy mindestens 44 px (gemessen ${Math.round(handy.w)}x${Math.round(handy.h)})`,
+    handy.w >= 44 && handy.h >= 44);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.waitForTimeout(200);
+  await page.fill('#maPw', '');
+}
+
 await page.fill('#maPw', 'ab');
 await page.fill('#maPw2', 'ab');
 await setzen();
@@ -212,10 +264,13 @@ check('Beide Passwortfelder danach geleert',
   const phpAdmin = zahl(php,  /const PASSWORT_MIN_ADMIN\s*=\s*(\d+)/);
   check('KRITISCH: Oberflaeche und Server verlangen dieselbe Passwortlaenge',
     jsMin !== null && jsMin === phpMin && jsAdmin !== null && jsAdmin === phpAdmin);
-  // Der Platzhalter im Feld darf keine andere Zahl nennen als die geltende.
-  const platzhalter = [...html.matchAll(/placeholder="mind\.? (\d+) Zeichen"/g)].map(m => Number(m[1]));
-  check('Kein Feld verspricht eine andere Mindestlaenge, als tatsaechlich gilt',
-    platzhalter.every(n => n === jsMin));
+  // Die Platzhalter selbst stehen nicht mehr hier: Seit ENT-291 setzen sie
+  // die Zahl aus PW_MIN ein, statt sie abzuschreiben. Eine Suche nach
+  // Ziffern faende hier also gar nichts mehr und waere still gruen. Wer
+  // NENNT welche Zahl, prueft darum test_passwortfelder.mjs ueber alle vier
+  // Oberflaechen -- inklusive index.html, die genau hier durchgerutscht ist.
+  check('Die Mindestlaenge steht nicht mehrfach abgeschrieben in der Maske',
+    !/placeholder="mind\.? \d+ Zeichen"/.test(html));
 }
 
 // Entfernen mit Rueckfrage
