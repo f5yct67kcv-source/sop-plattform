@@ -26,9 +26,9 @@ const iso = d => new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString
 const tag = n => iso(new Date(Date.now() + n * 864e5));
 
 const SCHICHTEN = { status: 'ok', von: tag(-30), bis: tag(90), schichten: [
-  { id: 71, kunde_name: 'Musterkunde AG', titel: 'Nachtwache', strasse: 'Industriestrasse 4', ort: '4600 Olten',
+  { id: 71, kunde_name: 'Musterliegenschaften AG', titel: 'Nachtwache', strasse: 'Musterweg 4', ort: '9999 Musterdorf',
     einsatzart: 'Revierdienst', sparte: 'sicherheit', datum: tag(-1), von: '20:00:00', bis: '06:00:00',
-    status: 'bestaetigt', bemerkung: null, zusage: 'zugesagt', objekt_name: 'Gerolag Center', objekt_id: 7,
+    status: 'bestaetigt', bemerkung: null, zusage: 'zugesagt', objekt_name: 'Musterobjekt Industrie', objekt_id: 7,
     hat_kontrollpunkte: true, im_team: 1 },
 ]};
 
@@ -37,25 +37,25 @@ const PROFIL = { status: 'ok', monat: { anzahl: 0, stunden: 0 }, profil: {
   vorname: 'Max', nachname: 'Muster', erstellt_am: tag(-30) + ' 10:00:00' } };
 
 const VORLAGEN_ALLE = [
-  { id: 501, name: 'Gerolag Schliessrunde', objekt_id: 7, objekt_name: 'Gerolag Center',
-    kunde_name: 'Musterkunde AG', fenster_von: null, fenster_bis: null },
+  { id: 501, name: 'Schliessrunde Musterobjekt', objekt_id: 7, objekt_name: 'Musterobjekt Industrie',
+    kunde_name: 'Musterliegenschaften AG', fenster_von: null, fenster_bis: null },
   // Zweite Runde OHNE zugeordnete Kontrollpunkte -- genau der gemeldete Fall
   // ("0 von 0 erledigt"), der bisher erst nach dem Start sichtbar wurde.
-  { id: 502, name: 'Leere Runde', objekt_id: 7, objekt_name: 'Gerolag Center',
-    kunde_name: 'Musterkunde AG', fenster_von: '06:00:00', fenster_bis: '07:00:00' },
+  { id: 502, name: 'Leere Runde', objekt_id: 7, objekt_name: 'Musterobjekt Industrie',
+    kunde_name: 'Musterliegenschaften AG', fenster_von: '06:00:00', fenster_bis: '07:00:00' },
 ];
 
 const UEBERSICHT = {
   501: { status: 'ok',
-    vorlage: { id: 501, name: 'Gerolag Schliessrunde', fenster_von: null, fenster_bis: null },
-    objekt: { id: 7, name: 'Gerolag Center', strasse: 'Industriestrasse 4', ort: '4600 Olten',
+    vorlage: { id: 501, name: 'Schliessrunde Musterobjekt', fenster_von: null, fenster_bis: null },
+    objekt: { id: 7, name: 'Musterobjekt Industrie', strasse: 'Musterweg 4', ort: '9999 Musterdorf',
       kanton: 'SO', bemerkung: null },
-    kunde_name: 'Musterkunde AG',
+    kunde_name: 'Musterliegenschaften AG',
     kontrollpunkte: [
-      { id: 1, bezeichnung: 'Gerolag Start', typ: 'geofence' },
-      { id: 2, bezeichnung: 'Gerolag Tor 3', typ: 'geofence' },
-      { id: 3, bezeichnung: 'Parkplatz Gerolag', typ: 'nfc' },
-      { id: 4, bezeichnung: 'Parkhaus Gerolag', typ: 'geofence' },
+      { id: 1, bezeichnung: 'Eingang Nord', typ: 'geofence' },
+      { id: 2, bezeichnung: 'Tor 3', typ: 'geofence' },
+      { id: 3, bezeichnung: 'Parkplatz', typ: 'nfc' },
+      { id: 4, bezeichnung: 'Parkhaus', typ: 'geofence' },
     ],
     ansprechpartner: [
       { name: 'Vreni Beispiel', anrede: 'Frau', wege: [
@@ -63,9 +63,9 @@ const UEBERSICHT = {
     ] },
   502: { status: 'ok',
     vorlage: { id: 502, name: 'Leere Runde', fenster_von: '06:00:00', fenster_bis: '07:00:00' },
-    objekt: { id: 7, name: 'Gerolag Center', strasse: 'Industriestrasse 4', ort: '4600 Olten',
+    objekt: { id: 7, name: 'Musterobjekt Industrie', strasse: 'Musterweg 4', ort: '9999 Musterdorf',
       kanton: 'SO', bemerkung: null },
-    kunde_name: 'Musterkunde AG',
+    kunde_name: 'Musterliegenschaften AG',
     kontrollpunkte: [],
     ansprechpartner: [] },
 };
@@ -109,7 +109,7 @@ await page.waitForTimeout(400);
 await page.evaluate(() => rundgangUebersichtOeffnen());
 await page.waitForTimeout(300);
 rufe = [];
-await page.click('#blBody button:has-text("Gerolag Schliessrunde")');
+await page.click('#blBody button:has-text("Schliessrunde Musterobjekt")');
 await page.waitForTimeout(400);
 
 check('KRITISCH: das Öffnen einer Runde startet sie NICHT (kein Aufruf von mein_rundgang_spontan_starten)',
@@ -120,13 +120,13 @@ check('KRITISCH: die Vollseite ist offen', await page.isVisible('#rgSeite'));
 check('Die Schublade ist dabei geschlossen -- sie läge sonst darüber',
   !(await page.isVisible('#blatt.on')));
 check('Die Kopfzeile trägt den Namen der Runde',
-  (await page.textContent('#rgsTitel')) === 'Gerolag Schliessrunde');
+  (await page.textContent('#rgsTitel')) === 'Schliessrunde Musterobjekt');
 
 // ══════════ KOPF: OBJEKT, KUNDE, ADRESSE -- IN DIESER REIHENFOLGE ══════
 check('KRITISCH: Objekt, Kunde und Adresse stehen alle im Kopf',
-  (await page.textContent('#rgsBody')).includes('Gerolag Center')
-  && (await page.textContent('#rgsBody')).includes('Musterkunde AG')
-  && (await page.textContent('#rgsBody')).includes('Industriestrasse 4'));
+  (await page.textContent('#rgsBody')).includes('Musterobjekt Industrie')
+  && (await page.textContent('#rgsBody')).includes('Musterliegenschaften AG')
+  && (await page.textContent('#rgsBody')).includes('Musterweg 4'));
 // Nicht nur "steht drin", sondern in der vom Projektinhaber verlangten
 // Reihenfolge -- am gerenderten Zustand gemessen, nicht im Quelltext gelesen.
 const reihenfolge = await page.evaluate(() => {

@@ -667,7 +667,12 @@ a.nav-item { text-decoration: none; }
       stehender Block zusammen. Unter 560px (siehe #rdKpiGrid oben) wieder
       volle Breite in zwei Spalten, wie zuvor bei "auto-fill". */
 #rdUebersicht .g-1-1 { align-items: stretch; }
-#rdUebersicht .bk-kachel-grid { grid-template-columns: repeat(4, minmax(148px, 220px)); justify-content: center; }
+/* auto-fit statt einer festen Spaltenzahl (ENT-297): Mit der fuenften Kachel
+   ("Ereignisse") stuende bei "repeat(4, ...)" genau eine Kachel allein in
+   einer zweiten Zeile. auto-fit verteilt so viele nebeneinander, wie
+   hineinpassen, und bleibt mittig -- die naechste Kachel braucht dann keine
+   erneute Zahlenaenderung. */
+#rdUebersicht .bk-kachel-grid { grid-template-columns: repeat(auto-fit, minmax(148px, 220px)); justify-content: center; }
 @media (max-width: 560px) {
   #rdUebersicht .bk-kachel-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); justify-content: stretch; }
 }
@@ -4595,6 +4600,10 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
             <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><polyline points="4 6 5 7 7 5"/><polyline points="4 12 5 13 7 11"/><polyline points="4 18 5 19 7 17"/></svg></span>
             <span class="bk-kachel-lbl">Aufgaben</span>
           </button>
+          <button type="button" class="bk-kachel" id="rdKachelEreignisse" onclick="rdAbschnittZeigen('ereignisse')">
+            <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg></span>
+            <span class="bk-kachel-lbl">Ereignisse</span>
+          </button>
           <button type="button" class="bk-kachel" onclick="toast('Folgt in einem späteren Schritt.')">
             <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><line x1="6" y1="20" x2="6" y2="14"/><line x1="12" y1="20" x2="12" y2="8"/><line x1="18" y1="20" x2="18" y2="4"/></svg></span>
             <span class="bk-kachel-lbl">Auswertungen</span>
@@ -4644,6 +4653,35 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
         </div>
         <div class="card">
           <div class="card-bd flush"><div class="tw" id="rdAlleListe"><div class="sk" style="height:52px"></div></div></div>
+        </div>
+        </div>
+
+        <!-- Unterseite "Ereignisse" (ENT-297): die aus der App gemeldeten
+             Vorfaelle (ENT-295). Bis hierher landeten sie in der Datenbank,
+             ohne dass ein Planer sie je zu Gesicht bekam. Bewusst eine
+             eigene Unterseite und NICHT unter "Berichte" der einzelnen
+             Kontrollrunde (Ueberlegung des Projektinhabers): Eine Meldung
+             haengt am Objekt und darf ohne laufende Runde entstehen -- unter
+             einer Vorlage waeren genau diese unauffindbar. -->
+        <div class="bk-abschnitt" id="rdAb-ereignisse" style="display:none">
+        <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="rdUebersichtZeigen()">Zurück</button>
+        <!-- Filterleiste nach dem bestehenden Muster der Auswertungen
+             (.bar-tools/.tool-gruppe/.inp), nicht mit eigenen Klassen. -->
+        <div class="bar-tools">
+          <div class="tool-gruppe">
+            <input class="inp" type="date" id="evfVon" style="width:auto" onchange="evfLaden()" aria-label="Zeitraum von">
+            <span class="tool-bis">bis</span>
+            <input class="inp" type="date" id="evfBis" style="width:auto" onchange="evfLaden()" aria-label="Zeitraum bis">
+          </div>
+          <div class="tool-gruppe">
+            <select class="inp" id="evfObjekt" style="width:auto" onchange="evfLaden()" aria-label="Objekt"><option value="">Alle Objekte</option></select>
+            <select class="inp" id="evfArt" style="width:auto" onchange="evfLaden()" aria-label="Ereignisart"><option value="">Alle Arten</option></select>
+          </div>
+          <span style="flex:1"></span>
+          <span class="mut" id="evfAnzahl" style="align-self:center"></span>
+        </div>
+        <div class="card">
+          <div class="card-bd flush"><div class="tw" id="evfListe"><div class="sk" style="height:52px"></div></div></div>
         </div>
         </div>
 
@@ -8253,6 +8291,10 @@ const EREIGNIS_ART = {
   // Planer soll es sofort als aussergewoehnlich erkennen (siehe die ⚡-Marke
   // in der Einsatzuebersicht), nicht als Routinemeldung ueberlesen.
   rundgang_spontan: { punkt: 'warn', wort: 'hat spontan einen Rundgang gestartet' },
+  // Vorfallmeldung aus dem Revierdienst (ENT-297). 'warn' aus demselben
+  // Grund wie oben: Ein gemeldeter Vorfall ist nie Routine -- er soll
+  // auffallen, nicht im Strom der Bestaetigungen untergehen.
+  vorfall:  { punkt: 'warn', wort: 'hat ein Ereignis gemeldet' },
 };
 
 // ══════════════════════════════════════════ SCHNELLZUGRIFF (ENT-096)
@@ -8428,6 +8470,12 @@ function ereignisZeile(x) {
   // Zusage: das Gegenteil dessen, was passiert war (ENT-113).
   if (x.typ === 'zusage')   { return `${x.zusage === 'abgelehnt' ? 'HAT ABGELEHNT' : 'hat zugesagt'} — ${x.kunde || x.einsatz_titel || '?'}, ${dmy(x.datum)}`; }
   if (x.typ === 'offerte')  { return `${x.status === 'abgelehnt' ? 'HAT ABGELEHNT' : 'hat angenommen'} — ${x.nummer || '?'}`; }
+  if (x.typ === 'vorfall') {
+    // Die Art zuerst: "Brandgefahr" ist die Information, die zaehlt --
+    // Objekt und Zeit stehen dahinter.
+    return `${x.art || 'Ereignis'} — ${x.objekt || '?'}${x.kunde ? ', ' + x.kunde : ''}`
+      + `${x.bemerkung ? ' — ' + x.bemerkung : ''}`;
+  }
   if (x.typ === 'rundgang_spontan') {
     const grund = x.ausnahme_grund ? (RUNDGANG_AUSSERHALB_FENSTER_GRUENDE[x.ausnahme_grund] || x.ausnahme_grund) : null;
     return `hat spontan einen Rundgang gestartet — ${x.kunde || x.einsatz_titel || '?'}, ${dmy(x.datum)}${grund ? ' — ' + grund : ''}`;
@@ -17359,6 +17407,155 @@ function rdAbschnittZeigen(id) {
     $('pgCrumb').textContent = 'Alle Kontrollrunden über alle Objekte';
     rdLadeAlle();
   }
+  if (id === 'ereignisse') {
+    $('pgTitle').textContent = 'Ereignisse';
+    $('pgCrumb').textContent = 'Gemeldete Vorfälle aus dem Revierdienst';
+    evfOeffnen();
+  }
+}
+
+/* ══ EREIGNISSE IN DER VERWALTUNG (ENT-297) ════════════════════════════
+   Die aus der App gemeldeten Vorfaelle (ENT-295) sichtbar machen. Zwei
+   Orte, mit verschiedenen Aufgaben: hier die Liste zum NACHSCHLAGEN, im
+   Feed der Uebersicht das BEMERKEN. Eine Liste allein oeffnet niemand von
+   selbst, ein Feed allein laesst nichts wiederfinden. */
+let evfObjekteGeladen = false;
+
+function evfOeffnen() {
+  // Zeitraum vorbelegen wie bei den Auswertungen: Vormonat bis heute --
+  // eine ungefilterte Gesamtliste ist beim Oeffnen selten das, was man
+  // sucht, und waechst mit den Jahren.
+  if (!$('evfVon').value) {
+    const [von, bis] = aeVormonatBisHeute();
+    $('evfVon').value = von;
+    $('evfBis').value = bis;
+  }
+  if (!evfObjekteGeladen) {
+    evfObjekteGeladen = true;
+    // Beide Auswahllisten aus den echten Stammdaten, nicht aus dem, was
+    // zufaellig in der aktuellen Trefferliste vorkommt: Sonst kann man
+    // ausgerechnet nach dem Objekt nicht filtern, das im gewaehlten
+    // Zeitraum noch keine Meldung hat.
+    api('objekt_list.php').then(({ ok, data }) => {
+      if (!ok || data.status !== 'ok') return;
+      const sel = $('evfObjekt');
+      (data.objekte || []).forEach(o => {
+        const opt = document.createElement('option');
+        opt.value = o.id; opt.textContent = o.name + (o.kunde_name ? ' · ' + o.kunde_name : '');
+        sel.appendChild(opt);
+      });
+    });
+    api('ereignisart_liste.php').then(({ ok, data }) => {
+      if (!ok || data.status !== 'ok') return;
+      const sel = $('evfArt');
+      (data.arten || []).forEach(a => {
+        const opt = document.createElement('option');
+        opt.value = a.id; opt.textContent = a.bezeichnung;
+        sel.appendChild(opt);
+      });
+    });
+  }
+  evfLaden();
+}
+
+function evfLaden() {
+  const p = new URLSearchParams();
+  if ($('evfVon').value) p.set('von', $('evfVon').value);
+  if ($('evfBis').value) p.set('bis', $('evfBis').value);
+  if ($('evfObjekt').value) p.set('objekt_id', $('evfObjekt').value);
+  if ($('evfArt').value) p.set('ereignisart_id', $('evfArt').value);
+  $('evfListe').innerHTML = '<div class="sk" style="height:52px"></div>';
+  api('ereignis_liste.php?' + p.toString()).then(({ ok, data }) => {
+    evfZeichnen(ok && data.status === 'ok' ? data.ereignisse : null);
+  });
+}
+
+function evfZeichnen(liste) {
+  const zaehler = $('evfAnzahl');
+  if (!liste) {
+    zaehler.textContent = '';
+    $('evfListe').innerHTML = '<div class="leer">Die Ereignisse liessen sich nicht laden.</div>';
+    return;
+  }
+  // Ein Filter, der alles ausblendet, darf nie wie "nichts vorhanden"
+  // aussehen (CLAUDE.md) -- deshalb nennt der Leertext den Filter.
+  const gefiltert = !!($('evfObjekt').value || $('evfArt').value);
+  if (!liste.length) {
+    zaehler.textContent = '';
+    $('evfListe').innerHTML = '<div class="leer">' + (gefiltert
+      ? 'Kein Ereignis passt zu diesem Filter.'
+      : 'In diesem Zeitraum wurde kein Ereignis gemeldet.') + '</div>';
+    return;
+  }
+  zaehler.textContent = liste.length + (liste.length === 1 ? ' Ereignis' : ' Ereignisse');
+
+  $('evfListe').innerHTML = `<table><thead><tr>
+      <th>Gemeldet</th><th>Art</th><th>Objekt</th><th>Person</th><th></th>
+    </tr></thead><tbody>${liste.map(e => `
+      <tr class="click" onclick="evfDetail(${Number(e.id)})">
+        <td>${esc(dmyZeit(e.erfasst_am))}${e.gesehen_am ? '' : ' <span class="chip chip-a">neu</span>'}</td>
+        <td>${esc(e.art || '—')}</td>
+        <td>${esc(e.objekt || '')}${e.kunde ? `<div class="mut">${esc(e.kunde)}</div>` : ''}</td>
+        <td>${esc(e.person || '')}</td>
+        <td style="text-align:right">${e.hat_foto
+          ? '<svg class="i i-sm" viewBox="0 0 24 24" aria-label="mit Foto"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'
+          : ''}</td>
+      </tr>`).join('')}</tbody></table>`;
+  evfListeDaten = liste;
+}
+
+let evfListeDaten = [];
+
+// Detailansicht in der bestehenden Schublade (#drTitle/#drBody/#drFoot mit
+// showDrawer()) und im bestehenden .dl-Muster -- keine zweite Bauart nur
+// fuer diesen Bereich.
+function evfDetail(id) {
+  const e = evfListeDaten.find(x => Number(x.id) === Number(id));
+  if (!e) return;
+  $('drTitle').textContent = e.art || 'Ereignis';
+  const zeilen = [
+    ['Gemeldet', dmyZeit(e.erfasst_am)],
+    // Nur zeigen, wenn tatsaechlich abweichend erfasst -- eine Zeile
+    // "Vorfall war: –" bei jeder Meldung waere Rauschen.
+    ...(e.vorfall_am ? [['Vorfall war', dmyZeit(e.vorfall_am)]] : []),
+    ['Objekt', esc(e.objekt || '–')],
+    ['Kunde', esc(e.kunde || '–')],
+    ['Gemeldet von', esc(e.person || '–')],
+    ['Beschreibung', e.bemerkung ? `<span style="white-space:pre-wrap">${esc(e.bemerkung)}</span>` : '–'],
+    ['Standort', (e.lat !== null && e.lng !== null)
+      ? `<a href="https://www.google.com/maps/search/?api=1&query=${Number(e.lat)},${Number(e.lng)}" target="_blank" rel="noopener">Auf der Karte zeigen</a>`
+      : 'nicht erfasst'],
+  ];
+  $('drBody').innerHTML =
+    '<dl class="dl">' + zeilen.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('') + '</dl>'
+    + (e.hat_foto
+      ? '<div class="sig-box"><div class="lb">Foto</div><div id="evfFoto"><span class="zone-note">wird geladen …</span></div></div>'
+      : '');
+  $('drFoot').innerHTML = e.gesehen_am
+    ? `<div class="zone-note">Als gesehen vermerkt am ${esc(dmyZeit(e.gesehen_am))}</div>`
+    : '';
+  showDrawer();
+  if (e.hat_foto) { evfFotoLaden(id); }
+}
+
+// Das Bild wird per fetch() samt Token geholt und als Objekt-URL gesetzt.
+// Ein schlichtes <img src="ereignis_foto.php?id=..."> ginge nicht: Der
+// Browser schickt dabei keine eigenen Kopfzeilen mit, und der Token darf
+// nicht in die URL (er landete sonst in Server-Protokollen und im
+// Browserverlauf -- eine ausdruecklich geprueefte Regel, test_php.mjs).
+function evfFotoLaden(id) {
+  fetch(API + 'ereignis_foto.php?id=' + Number(id), { headers: { 'X-Auth-Token': token } })
+    .then(r => r.ok ? r.blob() : Promise.reject(new Error('foto')))
+    .then(b => {
+      const ziel = $('evfFoto');
+      if (!ziel) return;   // Schublade zwischenzeitlich geschlossen
+      const url = URL.createObjectURL(b);
+      ziel.innerHTML = `<a href="${url}" target="_blank" rel="noopener"><img src="${url}" alt="Foto zur Ereignismeldung" style="max-width:100%;border-radius:var(--r-sm);border:1px solid var(--line)"></a>`;
+    })
+    .catch(() => {
+      const ziel = $('evfFoto');
+      if (ziel) { ziel.innerHTML = '<span class="mut">Das Foto liess sich nicht laden.</span>'; }
+    });
 }
 
 // ENT-261: Kopfzeilentitel einer einzelnen Unterseite. text = null gibt den
