@@ -249,6 +249,44 @@ await page.waitForTimeout(200);
 check('"Entfernen" nimmt die Unterschrift zurueck und stellt den Knopf wieder her',
   await page.evaluate(() => Unterschrift.daten() === null) && await page.isVisible('#usigCta'));
 
+// ── Quer mit Browserleisten: der Fall, der am echten iPhone auffiel ─────
+// Dreht das Geraet die Seite mit (Drehsperre aus), hoert die Flaeche
+// richtigerweise auf, selbst zu drehen -- aber Safaris Leisten kommen zurueck,
+// und von 390 px Hoehe bleiben rund 270. Kopf- und Fussleiste UEBER und UNTER
+// dem Blatt nahmen sich davon 123 px feste Hoehe: dem Blatt blieben 147 px,
+// weniger als das kleine Feld, das hier abgeschafft wurde. Seither stehen sie
+// in einer Spalte NEBEN dem Blatt. Gemessen wird die Aussage -- wie viel Hoehe
+// beim Papier ankommt -- nicht, wo im Quelltext welche Regel steht.
+await page.setViewportSize({ width: 844, height: 270 });
+await page.waitForTimeout(200);
+await page.click('#usigCta');
+await page.waitForTimeout(250);
+const flach = await page.evaluate(() => {
+  const bu = document.getElementById('usigBuehne');
+  const bl = document.getElementById('usigBlatt');
+  const seite = document.querySelector('.usig-seite');
+  const rb = bl.getBoundingClientRect(), rs = seite.getBoundingClientRect();
+  return {
+    gedreht: bu.dataset.gedreht,
+    anteilHoehe: bl.clientHeight / bu.clientHeight,
+    blatt: [bl.clientWidth, bl.clientHeight],
+    // Ueberlappen die Bedienelemente das Papier? Ein Knopf dort, wo
+    // unterschrieben wird, kostet danebengetippt die Unterschrift.
+    ueberlappt: !(rs.right <= rb.left + 1 || rs.left >= rb.right - 1
+               || rs.bottom <= rb.top + 1 || rs.top >= rb.bottom - 1),
+    knoepfe44: [...document.querySelectorAll('.usig-btn')].every(x => x.offsetHeight >= 44),
+  };
+});
+check('Quer wird nicht gedreht -- die Seite ist schon quer', flach.gedreht === '0');
+check(`KRITISCH: quer mit Browserleisten bleibt dem Blatt fast die ganze Höhe `
+  + `(${flach.blatt[0]}×${flach.blatt[1]}, ${Math.round(flach.anteilHoehe * 100)}%)`,
+  flach.anteilHoehe >= 0.85);
+check('KRITISCH: kein Bedienelement liegt auf dem Papier', !flach.ueberlappt);
+check('Auch in der flachen Ansicht sind die Knöpfe 44px hoch', flach.knoepfe44);
+await page.screenshot({ path: `${OUT}/us-05-quer-mit-browserleisten.png` });
+await page.click('#usigAbbruch');
+await page.waitForTimeout(150);
+
 // ── Dasselbe am Desktop nachgemessen (CLAUDE.md: nie nur eine Seite) ─────
 await page.setViewportSize({ width: 1440, height: 900 });
 await page.waitForTimeout(200);

@@ -899,9 +899,9 @@ function sigEinrichten() {
   Unterschrift.einrichten({
     ziel: 'sigFeld',
     kontext: () => ({
-      zeile: [document.getElementById('kunde').value.trim(),
-              fmtDate(document.getElementById('datum').value),
-              document.getElementById('netVal').textContent].filter(Boolean).join(' · '),
+      zeilen: [document.getElementById('kunde').value.trim(),
+               fmtDate(document.getElementById('datum').value) + ' · '
+                 + document.getElementById('netVal').textContent],
       name: document.getElementById('sigName').value.trim(),
     }),
   });

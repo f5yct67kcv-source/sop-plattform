@@ -23,6 +23,17 @@
  * eine Media-Query, damit CSS und Zeichenlogik nicht auseinanderlaufen koennen:
  * die Umrechnung der Fingerposition haengt an derselben Antwort.
  *
+ * BEDIENELEMENTE AN DEN RAND, NICHT UEBER UND UNTER DAS BLATT. Die erste
+ * Fassung setzte Kopfzeile und Knoepfe ueber und unter das Blatt. Am echten
+ * iPhone fiel auf, was in Chromium nicht auffaellt: Dreht das Geraet die Seite
+ * mit, kommen Safaris Leisten zurueck, und von 390 px Hoehe bleiben rund 270.
+ * Kopf und Fuss nahmen sich davon 123 px feste Hoehe -- fuer das Blatt blieben
+ * 147 px, weniger als das kleine Feld, das hier abgeschafft wurde. Jetzt steht
+ * beides in einer schmalen Spalte NEBEN dem Blatt: Die Hoehe gehoert ganz dem
+ * Papier, in jeder Lage. Nicht ueber dem Blatt schwebend, obwohl das noch mehr
+ * Platz gaebe -- ein Knopf dort, wo der Kunde schreibt, heisst danebengetippt
+ * die Unterschrift verlieren.
+ *
  * EINE DATEI FUER BEIDE OBERFLAECHEN (index.html, app.html), wie gav.js und
  * zeitwahl.js (ENT-110). Zwei Kopien waeren zwei verschiedene Unterschriften,
  * je nachdem, ueber welchen Weg der Kunde unterschreibt -- und beim naechsten
@@ -83,14 +94,21 @@ window.Unterschrift = (function () {
   overflow: hidden; overscroll-behavior: contain; }
 .usig-voll.usig-auf { display: block; }
 .usig-buehne { position: absolute; top: 0; left: 0; transform-origin: top left; box-sizing: border-box;
-  display: flex; flex-direction: column; gap: 10px; padding: 12px 16px;
+  display: flex; flex-direction: row; gap: 12px; padding: 12px 14px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #F3F5F8; }
 
-.usig-kopf { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px;
-  flex: 0 0 auto; }
+/* Die Bedienspalte hat feste Breite; die HOEHE gehoert ganz dem Blatt. Quer
+   mit Safari-Leisten bleiben nur rund 270 px -- eine Kopf- und eine
+   Fussleiste haetten davon fast die Haelfte genommen. */
+.usig-seite { flex: 0 0 auto; width: 136px; display: flex; flex-direction: column; gap: 8px;
+  min-height: 0; }
+.usig-kopf { flex: 0 0 auto; }
 .usig-kopf .usig-etikett { color: #9298A5; }
-.usig-kopf-wert { font-size: 15px; font-weight: 650; color: #F3F5F8; margin-top: 2px; }
-.usig-dreh { font-size: 12.5px; font-weight: 600; color: #9298A5; display: none; }
+.usig-kopf-wert { font-size: 14px; font-weight: 650; color: #F3F5F8; margin-top: 3px; }
+.usig-kopf-wert div { line-height: 1.4; }
+.usig-kopf-wert div + div { color: #C6CBD4; font-weight: 600; font-size: 13.5px; }
+.usig-dreh { font-size: 12.5px; font-weight: 600; color: #9298A5; margin-top: 6px; display: none;
+  line-height: 1.3; }
 .usig-buehne[data-gedreht="1"] .usig-dreh { display: block; }
 
 /* Das Blatt: weisses Papier mit Abrisskante oben und Unterschriftslinie
@@ -111,11 +129,12 @@ window.Unterschrift = (function () {
   font-size: 15px; font-weight: 600; color: #C4C9D4; }
 .usig-blatt canvas { position: absolute; inset: 0; touch-action: none; cursor: crosshair; }
 
-.usig-fuss { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
-.usig-btn { min-height: 48px; padding: 0 20px; border-radius: 10px; border: 1px solid #2C313A;
-  background: #1E2128; color: #F3F5F8; font: inherit; font-size: 15px; font-weight: 650;
-  cursor: pointer; -webkit-tap-highlight-color: transparent; }
-.usig-btn-ok { margin-left: auto; background: #0E7C55; border-color: #0E7C55; }
+/* Unten in der Spalte, damit "Bestaetigen" dort liegt, wo der Daumen ist. */
+.usig-fuss { display: flex; flex-direction: column; gap: 8px; flex: 0 0 auto; margin-top: auto; }
+.usig-btn { min-height: 46px; padding: 0 12px; border-radius: 10px; border: 1px solid #2C313A;
+  background: #1E2128; color: #F3F5F8; font: inherit; font-size: 14.5px; font-weight: 650;
+  cursor: pointer; -webkit-tap-highlight-color: transparent; white-space: nowrap; }
+.usig-btn-ok { background: #0E7C55; border-color: #0E7C55; }
 .usig-btn-ok[disabled] { opacity: .4; cursor: default; }
 `;
 
@@ -131,23 +150,23 @@ window.Unterschrift = (function () {
     voll.id = 'usigVoll';
     voll.innerHTML = `
       <div class="usig-buehne" id="usigBuehne">
-        <div class="usig-kopf">
-          <div>
+        <div class="usig-seite">
+          <div class="usig-kopf">
             <div class="usig-etikett">Unterschrift Kunde</div>
             <div class="usig-kopf-wert" id="usigKontext"></div>
+            <div class="usig-dreh">Gerät quer halten</div>
           </div>
-          <div class="usig-dreh">Gerät quer halten</div>
+          <div class="usig-fuss">
+            <button type="button" class="usig-btn" id="usigAbbruch">Abbrechen</button>
+            <button type="button" class="usig-btn" id="usigLoeschen">Löschen</button>
+            <button type="button" class="usig-btn usig-btn-ok" id="usigOk" disabled>✓ Bestätigen</button>
+          </div>
         </div>
         <div class="usig-blatt" id="usigBlatt">
           <div class="usig-hinweis" id="usigHinweis">✍ Hier unterschreiben</div>
           <div class="usig-linie"><span class="usig-kreuz">✕</span></div>
           <div class="usig-unterzeile" id="usigName"></div>
           <canvas id="usigCanvas"></canvas>
-        </div>
-        <div class="usig-fuss">
-          <button type="button" class="usig-btn" id="usigAbbruch">Abbrechen</button>
-          <button type="button" class="usig-btn" id="usigLoeschen">Löschen</button>
-          <button type="button" class="usig-btn usig-btn-ok" id="usigOk" disabled>✓ Bestätigen</button>
         </div>
       </div>`;
     document.body.appendChild(voll);
@@ -272,7 +291,8 @@ window.Unterschrift = (function () {
   function oeffnen() {
     huelleBauen();
     const k = kontext() || {};
-    kopfWert.textContent = k.zeile || '';
+    kopfWert.innerHTML = (k.zeilen || []).filter(Boolean)
+      .map(z => `<div>${esc(z)}</div>`).join('');
     nameZeile.textContent = k.name || '';
     voll.classList.add('usig-auf');
     document.body.style.overflow = 'hidden';
@@ -358,9 +378,9 @@ window.Unterschrift = (function () {
 
   return {
     // ziel: Kennung oder Element, in das Knopf bzw. Vorschau kommen.
-    // kontext: () => ({ zeile, name }) -- was der Kunde beim Unterschreiben
-    // sieht. Als Funktion, weil Kunde und Name sich im Formular noch aendern,
-    // nachdem eingerichtet wurde.
+    // kontext: () => ({ zeilen: [...], name }) -- was der Kunde beim
+    // Unterschreiben sieht, eine Angabe je Zeile. Als Funktion, weil Kunde und
+    // Name sich im Formular noch aendern, nachdem eingerichtet wurde.
     einrichten(o) {
       huelleBauen();
       ziel = typeof o.ziel === 'string' ? document.getElementById(o.ziel) : o.ziel;
