@@ -14,6 +14,11 @@ const check = (n, c) => (c ? ok : bad).push(n);
 const iso = d => new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
 const M = iso(new Date()).slice(0, 7);
 const t = n => `${M}-${String(n).padStart(2, '0')}`;
+// Tage relativ zu heute, nicht auf den Testmonat beschraenkt wie t() --
+// fuer einen Zeitraum, der zuverlaessig ueber die Kappung (MX_MAX_TAGE)
+// hinausreicht, egal an welchem Tag/Monat der Test laeuft (CLAUDE.md,
+// gleiches Prinzip wie test_datumsfest.mjs).
+const relTag = n => iso(new Date(Date.now() + n * 86400000));
 
 const OBJEKTE = [
   { id: 1, kunde_id: 1, kunde_name: 'Borner AG', name: 'Gerolag Center', ort: '4601 Olten', kanton: 'SO', aktiv: 1 },
@@ -103,10 +108,17 @@ await page.waitForTimeout(400);
 check('Ein freier Zeitraum ist möglich, nicht nur ganze Monate', (await spalten()) === 7);
 check('Der Hinweis zeigt die gewählte Länge', (await info()).includes('7 Tage'));
 
-// Ein Zeitraum über eine Monatsgrenze hinweg -- das ging mit dem alten
-// Monatsfeld ueberhaupt nicht.
+// Ein Zeitraum über eine Monats- und Jahresgrenze hinweg -- das ging mit
+// dem alten Monatsfeld ueberhaupt nicht. "bis" bewusst relativ zu heute
+// (relTag), nicht als festes Kalenderdatum: ein fest eingetragenes Datum
+// (z. B. "2027-03-10") wird mit jedem Monat, der seit dem Schreiben
+// dieses Tests vergeht, kuerzer zum "von" hin -- irgendwann unter die
+// MX_MAX_TAGE-Schwelle und die Kappung greift nicht mehr (am 2026-09-01
+// beobachtet: Pruefung faelschlich rot). +400 Tage liegt so weit ueber
+// MX_MAX_TAGE (186), dass die Kappung unabhaengig vom Testtag greift, und
+// jedes 366-Tage-Fenster enthaelt zwangslaeufig einen Jahreswechsel.
 await page.fill('#mxVon', t(25));
-await page.fill('#mxBis', '2027-03-10');
+await page.fill('#mxBis', relTag(400));
 await page.waitForTimeout(400);
 const langeSpalten = await spalten();
 check('Ein Zeitraum über Monats- und Jahresgrenzen wird angezeigt', langeSpalten > 31);

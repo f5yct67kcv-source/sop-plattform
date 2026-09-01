@@ -612,9 +612,27 @@ a.nav-item { text-decoration: none; }
    Unter 560px (siehe rdUebersicht-Zeile weiter unten) faellt die Zeile
    ohnehin auf eine Spalte zusammen; dort soll auch dieser Block ein-
    spaltig werden, nicht zweispaltig-schmal bleiben. */
-#rdKpiGrid { grid-template-columns: repeat(2, 1fr); }
+#rdKpiGrid { grid-template-columns: repeat(2, 1fr); align-content: center; }
 @media (max-width: 560px) {
   #rdKpiGrid { grid-template-columns: 1fr; }
+}
+/* Rueckmeldung Projektinhaber, Skizzenmodus 2026-09-01 (ENT-277):
+   1) "Waechter-Status" und die Kennzahlen-Zeile sollen gleich hoch stehen
+      -- die Basis-.g-1-1 (align-items:start) laesst den kuerzeren Block
+      sonst oben abgeschnitten wirken, wenn "Waechter-Status" durch viele
+      oder wenige Eintraege unterschiedlich hoch wird. Nur fuer diese Seite
+      gesetzt (Selektor mit #rdUebersicht), die gemeinsame .g-1-1-Klasse an
+      anderer Stelle im Haus bleibt unveraendert.
+   2) Die Navigations-Kacheln standen dank "auto-fill" linksbuendig in
+      einem Raster mit leeren, unsichtbaren Spalten rechts -- optisch nicht
+      als eigener Block erkennbar. Feste Spaltenzahl (es sind immer genau
+      vier) plus justify-content:center ruecken sie als kompakter, mittig
+      stehender Block zusammen. Unter 560px (siehe #rdKpiGrid oben) wieder
+      volle Breite in zwei Spalten, wie zuvor bei "auto-fill". */
+#rdUebersicht .g-1-1 { align-items: stretch; }
+#rdUebersicht .bk-kachel-grid { grid-template-columns: repeat(4, minmax(148px, 220px)); justify-content: center; }
+@media (max-width: 560px) {
+  #rdUebersicht .bk-kachel-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); justify-content: stretch; }
 }
 
 /* KPI */
@@ -1689,6 +1707,18 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
 .mx td.d.z-leer { background: var(--neg-soft); }
 .mx td.d.z-prov { background: var(--accent-soft); }
 .mx td.d.z-ab   { background: var(--line-soft); }
+/* "nix" (kein Auftrag hinterlegt, ENT-278) trug bisher keine eigene
+   Hintergrundfarbe -- sie schien nur implizit durch, weil kein Vorfahre
+   bis zur Karte (.card, var(--surface)) selbst eine setzt. Optisch macht
+   das im Hellmodus praktisch keinen Unterschied, aber es ist die einzige
+   Zellart ohne eigenen, messbaren Hintergrund: eine Prüfung, die den
+   tatsächlich sichtbaren Kontrast der Trennlinie misst (var(--mx-linie)
+   gegen den Zellhintergrund), bekam dadurch "transparent" statt der
+   wirklich gerenderten Fläche und maass faelschlich zu wenig Kontrast.
+   Explizit dieselbe Fläche wie die Karte darunter, konsistent mit allen
+   anderen .z-*-Zellarten, die ebenfalls je einen eigenen Hintergrund
+   tragen. */
+.mx td.d.z-nix  { background: var(--surface); }
 .mx .zelle { display: flex; width: 100%; height: 100%; min-height: 30px; border-radius: 0; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; border: none; padding: 0; font-family: inherit; cursor: pointer; }
 .mx .z-voll { background: var(--pos-soft); color: var(--pos); }
 .mx .z-teil { background: var(--warn-soft); color: var(--warn); }
