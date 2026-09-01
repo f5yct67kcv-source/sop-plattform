@@ -20,8 +20,11 @@ const ALLE_RECHTE = ['plan', 'kunden', 'abgleich', 'personal_lesen',
   'personal_schreiben', 'personal_vertraulich', 'betrieb', 'rechte'];
 
 const MA = [
+  // diensthundefuehrer testet die neue zweite Liste in "Rollen & Berechtigungen"
+  // (ENT-285) -- eine Person, die sowohl bei einer Rolle als auch bei einem
+  // Faehigkeitsmerkmal auftaucht, nicht zwei unabhaengige Fixtures.
   { id: 1, name: 'chefin', vorname: 'Eine', nachname: 'Leitung', personalnummer: 'P-001',
-    ist_admin: true, aktiv: 1, erstellt_am: '2025-01-02', rollen: ['verwaltung'] },
+    ist_admin: true, aktiv: 1, erstellt_am: '2025-01-02', rollen: ['verwaltung'], diensthundefuehrer: 1 },
   { id: 2, name: 'planer', vorname: 'Zwei', nachname: 'Planung', personalnummer: 'P-002',
     ist_admin: false, aktiv: 1, erstellt_am: '2025-02-03', rollen: ['planung'] },
   { id: 3, name: 'hilfe', vorname: 'Drei', nachname: 'Mitarbeit', personalnummer: 'P-003',
@@ -119,18 +122,13 @@ try {
   // auseinander, verspricht ein Kaestchen etwas anderes, als der Server tut.
   const phpRollen = [...php.matchAll(/^const ROLLE_\w+\s*=\s*'([a-z]+)';/gm)].map(m => m[1]);
   const jsRollen  = [...html.matchAll(/^  \['([a-z]+)', '[^']+',$/gm)].map(m => m[1]);
-  // Waechtersystem (ENT-169/ENT-180): serverseitig entschieden und
-  // geschuetzt, aber bewusst NICHT im selben Kaestchen-Block wie die vier
-  // Rollen -- ein eigener Reiter (mdtab-waechter, ENT-186/ENT-189) haelt sie
-  // getrennt. Die Ausnahmeliste hier bleibt darum bestehen (der Regex
-  // erfasst nur den ROLLEN-Array-Block der vier Rollen); ausfuehrlich
-  // geprueft wird der eigene Reiter weiter unten unter "WAECHTERSYSTEM".
-  // Gleiches Ausnahme-Muster wie OHNE_SPERRE in test_php.mjs.
-  const NOCH_OHNE_KAESTCHEN = ['waechter'];
-  check('Die Ausnahmeliste "noch ohne Kaestchen" nennt nur Rollen, die es beim Server gibt',
-    NOCH_OHNE_KAESTCHEN.every(r => phpRollen.includes(r)));
-  check('KRITISCH: die Oberflaeche kennt genau die Rollen des Servers, ausser den namentlich vermerkten Ausnahmen',
-    JSON.stringify(phpRollen.filter(r => !NOCH_OHNE_KAESTCHEN.includes(r))) === JSON.stringify(jsRollen));
+  // Waechtersystem (ENT-169/ENT-180) steckt serverseitig schon immer im
+  // selben Rollen-Katalog wie die anderen vier. Bis ENT-285 stand sie in
+  // der Oberflaeche trotzdem in einem eigenen Reiter (mdtab-waechter,
+  // ENT-186/ENT-189) statt im selben Kaestchen-Block -- seit ENT-285 nicht
+  // mehr, darum jetzt ein direkter Abgleich ohne Ausnahmeliste.
+  check('KRITISCH: die Oberflaeche kennt genau die Rollen des Servers',
+    JSON.stringify(phpRollen) === JSON.stringify(jsRollen));
   // Nur aus dem Rumpf von rechte_katalog() lesen -- sonst zaehlen die
   // Meldungstexte weiter unten mit, die genauso aussehen. Genau das ist der
   // ersten Fassung dieser Pruefung passiert.
@@ -209,8 +207,8 @@ try {
   check('KRITISCH: die Rollen werden in der Personalakte vergeben, nicht in einem eigenen Bereich',
     await page.evaluate(() => !!document.getElementById('maRolle_verwaltung')
       && !!document.getElementById('mv-bearbeiten').contains(document.getElementById('maRolle_verwaltung'))));
-  check('Alle vier Rollen stehen zur Wahl',
-    await page.evaluate(() => ['mitarbeitend', 'planung', 'personal', 'verwaltung']
+  check('Alle fünf Rollen stehen zur Wahl, Wächtersystem eingeschlossen (ENT-285)',
+    await page.evaluate(() => ['mitarbeitend', 'planung', 'personal', 'verwaltung', 'waechter']
       .every(r => !!document.getElementById('maRolle_' + r))));
   check('Die bestehende Rolle ist angehakt, die anderen nicht',
     await page.evaluate(() => document.getElementById('maRolle_planung').checked
@@ -234,7 +232,7 @@ try {
   await page.waitForTimeout(500);
   gesendet = null;
   await page.evaluate(() => {
-    ['mitarbeitend', 'planung', 'personal', 'verwaltung'].forEach(r => {
+    ['mitarbeitend', 'planung', 'personal', 'verwaltung', 'waechter'].forEach(r => {
       const k = document.getElementById('maRolle_' + r);
       if (k) { k.checked = false; }
     });
@@ -245,27 +243,36 @@ try {
     gesendet === null);
 } catch (e) { check('Abschnitt Rollenvergabe ohne Abbruch: ' + e.message, false); }
 
-// ══════════════ WAECHTERSYSTEM: EIGENER REITER (ENT-169/ENT-186)
+// ══════════════ WAECHTERSYSTEM: FUENFTE ROLLE STATT EIGENER REITER (ENT-285)
+// Bis ENT-285 hatte diese Rolle einen eigenen Reiter (ENT-169/ENT-186) --
+// hier wird geprueft, dass sie jetzt genau denselben Kaestchen-Weg nimmt
+// wie die anderen vier, und dass vom alten Reiter nichts liegen blieb.
 try {
   meineRechte = ALLE_RECHTE; meineRollen = ['verwaltung']; dossierRollen = ['planung'];
   await anmelden();
   await page.evaluate(() => { go('mitarbeiter'); openMaDetail('planer'); });
   await page.waitForTimeout(800);
 
-  check('Die Verwaltung sieht den Waechtersystem-Reiter', await sichtbar('mdtab-waechter'));
-  await page.evaluate(() => mdGoTab('waechter'));
-  await page.waitForTimeout(300);
-  check('KRITISCH: der Reiter liegt getrennt von den vier Rollen, nicht in derselben Liste',
-    await page.evaluate(() => !document.getElementById('md-waechter').contains(document.getElementById('maRolle_planung'))
-      || !document.getElementById('maRolle_planung')));
-  check('Ohne die Rolle ist das Kaestchen leer', !(await page.isChecked('#mdWaechterCheck')));
-  await page.screenshot({ path: `${OUT}/rollen-01-waechter-reiter.png` });
+  check('KRITISCH: der eigene Waechtersystem-Reiter ist wirklich weg, nicht nur versteckt',
+    await page.evaluate(() => document.getElementById('mdtab-waechter') === null
+      && document.getElementById('md-waechter') === null));
+  check('KRITISCH: die alten Funktionen dafuer sind nicht mehr da (kein still liegen gebliebener Pfad)',
+    await page.evaluate(() => typeof window.mdWaechter === 'undefined'
+      && typeof window.mdWaechterSpeichern === 'undefined'));
+
+  await page.evaluate(() => mdBearbeiten());
+  await page.waitForTimeout(600);
+  check('KRITISCH: das Waechtersystem-Kaestchen steht in derselben Liste wie die anderen vier Rollen',
+    await page.evaluate(() => document.getElementById('mv-bearbeiten')
+      .contains(document.getElementById('maRolle_waechter'))));
+  check('Ohne die Rolle ist das Kaestchen leer', !(await page.isChecked('#maRolle_waechter')));
+  await page.screenshot({ path: `${OUT}/rollen-01-waechter-kaestchen.png` });
 
   gesendet = null;
-  await page.check('#mdWaechterCheck');
-  await page.click('#md-waechter button:has-text("Speichern")');
-  await page.waitForTimeout(400);
-  check('KRITISCH: Vergeben sendet die BISHERIGEN Rollen plus waechter, nicht nur waechter allein',
+  await page.check('#maRolle_waechter');
+  await page.evaluate(() => mbSpeichern());
+  await page.waitForTimeout(500);
+  check('KRITISCH: Vergeben sendet die BISHERIGEN Rollen plus waechter, ueber denselben Speichern-Weg wie alle anderen Rollen',
     gesendet && Array.isArray(gesendet.rollen)
     && gesendet.rollen.includes('planung') && gesendet.rollen.includes('waechter'));
 
@@ -274,34 +281,19 @@ try {
   dossierRollen = ['planung', 'waechter'];
   await page.evaluate(() => { go('mitarbeiter'); openMaDetail('planer'); });
   await page.waitForTimeout(700);
-  await page.evaluate(() => mdGoTab('waechter'));
-  await page.waitForTimeout(300);
-  check('Mit der Rolle ist das Kaestchen angehakt', await page.isChecked('#mdWaechterCheck'));
-
-  // Ohne Aenderung wird nichts geschickt -- kein unnoetiger Schreibzugriff.
-  gesendet = null;
-  await page.click('#md-waechter button:has-text("Speichern")');
-  await page.waitForTimeout(300);
-  check('Speichern ohne Aenderung schreibt nichts', gesendet === null);
+  await page.evaluate(() => mdBearbeiten());
+  await page.waitForTimeout(500);
+  check('Mit der Rolle ist das Kaestchen angehakt', await page.isChecked('#maRolle_waechter'));
 
   gesendet = null;
-  await page.uncheck('#mdWaechterCheck');
-  await page.click('#md-waechter button:has-text("Speichern")');
-  await page.waitForTimeout(400);
+  await page.uncheck('#maRolle_waechter');
+  await page.evaluate(() => mbSpeichern());
+  await page.waitForTimeout(500);
   check('KRITISCH: Entziehen sendet die verbleibenden Rollen ohne waechter, nicht leer',
     gesendet && Array.isArray(gesendet.rollen)
     && gesendet.rollen.includes('planung') && !gesendet.rollen.includes('waechter'));
-
-  // Ohne das Recht 'rechte' erscheint der Reiter gar nicht -- dieselbe
-  // Abschottung wie beim Verlaufs-Reiter.
-  meineRechte = ['plan']; meineRollen = ['planung'];
-  await anmelden();
-  await page.evaluate(() => { go('mitarbeiter'); openMaDetail('planer'); });
-  await page.waitForTimeout(700);
-  check('KRITISCH: ohne das Recht "rechte" bleibt der Waechtersystem-Reiter versteckt',
-    !(await sichtbar('mdtab-waechter')));
   dossierRollen = ['planung'];
-} catch (e) { check('Abschnitt Waechtersystem-Reiter ohne Abbruch: ' + e.message, false); }
+} catch (e) { check('Abschnitt Waechtersystem als fuenfte Rolle ohne Abbruch: ' + e.message, false); }
 
 // ══════════════ DER VERLAUF
 try {
@@ -355,14 +347,22 @@ try {
   await anmelden();
   await page.evaluate(() => { go('betrieb'); bkAbschnittZeigen('rv'); });
   await page.waitForTimeout(900);
+  check('KRITISCH: die Karte heisst jetzt breiter, weil sie mehr als nur Rollen zeigt (ENT-285)',
+    /Berechtigungen/.test(await page.textContent('#rvKarte h3')));
   const r = (await page.textContent('#rvInhalt')).replace(/\s+/g, ' ');
-  check('Die Übersicht zeigt alle vier Rollen',
-    /Mitarbeitend/.test(r) && /Planung/.test(r) && /Personal/.test(r) && /Verwaltung/.test(r));
+  check('Die Übersicht zeigt alle fünf Rollen, Wächtersystem eingeschlossen (ENT-285)',
+    /Mitarbeitend/.test(r) && /Planung/.test(r) && /Personal/.test(r) && /Verwaltung/.test(r)
+    && /Wächtersystem/.test(r));
   check('Und wer sie hat', /Eine Leitung/.test(r) && /Zwei Planung/.test(r));
   check('KRITISCH: eine Rolle ohne Personen sagt "niemand" statt leer zu bleiben',
     /niemand/.test(r));
   check('Sie verweist auf die Personalakte zum Vergeben — nicht auf einen zweiten Bereich',
     /Personalakte/.test(r) && /Zugang/.test(r));
+  check('KRITISCH: dieselbe Karte zeigt jetzt auch die Ja/Nein-Fähigkeitsmerkmale, nicht nur Rollen (ENT-285)',
+    /Diensthund/.test(r) && /Schusswaffe/.test(r) && /Revierdienst/.test(r));
+  const eineLeitungTreffer = (r.match(/Eine Leitung/g) || []).length;
+  check('KRITISCH: dieselbe Person erscheint sowohl bei ihrer Rolle (Verwaltung) als auch beim Merkmal (Diensthund) — zwei Zeilen, eine Person',
+    eineLeitungTreffer >= 2);
 } catch (e) { check('Abschnitt Rollenübersicht ohne Abbruch: ' + e.message, false); }
 
 // ══════════════ NICHT EINGERICHTET SIEHT NICHT WIE EINGERICHTET AUS
