@@ -47,6 +47,7 @@ const SCHICHTEN = () => ({ status: 'ok', von: HEUTE, bis: BIS_ANFRAGE.toISOStrin
     einsatzart: 'Revierdienst', sparte: 'sicherheit', datum: HEUTE, von: '23:30:00', bis: '23:45:00',
     status: 'bestaetigt', bemerkung: null, zusage: 'zugesagt', objekt_name: 'Objekt Mit', objekt_id: 22,
     hat_kontrollpunkte: true, hat_zeitfenster: true, im_team: 1 },
+  ...(spontanerEinsatz ? [spontanerEinsatz] : []),
 ]});
 
 const PROFIL = { status: 'ok', monat: { anzahl: 0, stunden: 0 }, profil: {
@@ -62,9 +63,22 @@ const VORLAGEN = {
     { id: 902, name: 'Frührunde (ausserhalb)', fenster_von: '06:00:00', fenster_bis: '07:00:00' },
   ],
 };
+// Dieselben zwei Vorlagen, wie sie die objektuebergreifende Uebersicht
+// liefert (mein_rundgang_vorlagen_alle.php) -- dort zusaetzlich mit
+// Objekt-/Kundename, ohne Bindung an einen bestimmten Einsatz.
+const VORLAGEN_ALLE = [
+  { id: 901, name: 'Nachtrunde (im Fenster)', objekt_id: 22, objekt_name: 'Objekt Mit', kunde_name: 'Kunde Mit',
+    fenster_von: '21:00:00', fenster_bis: '23:00:00' },
+  { id: 902, name: 'Frührunde (ausserhalb)', objekt_id: 22, objekt_name: 'Objekt Mit', kunde_name: 'Kunde Mit',
+    fenster_von: '06:00:00', fenster_bis: '07:00:00' },
+];
 
 let rufe = [];
 let naechsteRundgangId = 950;
+// Nach einem erfolgreichen spontanen Start liefert meine_schichten.php auch
+// diesen neu entstandenen Einsatz mit -- genau wie serverseitig, wo der
+// Endpunkt ihn wirklich anlegt. Ohne das faende rundgangAnzeigen() ihn nicht.
+let spontanerEinsatz = null;
 
 const browser = await chromium.launch({ executablePath: EXE });
 const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
@@ -86,6 +100,16 @@ await page.route('**/api/**', route => {
   if (p.includes('rapport_list')) return send({ status: 'ok', rapporte: [] });
   if (p.includes('mein_rundgang_offen')) return send({ status: 'ok', rundgang: null });
 
+  // Vor der allgemeineren "mein_rundgang_vorlagen"-Pruefung unten, sonst
+  // faengt die den Aufruf faelschlich als Teilstring ab.
+  if (p.includes('mein_rundgang_vorlagen_alle')) return send({ status: 'ok', vorlagen: VORLAGEN_ALLE });
+  if (p.includes('mein_rundgang_spontan_starten')) {
+    spontanerEinsatz = { id: 999, kunde_name: 'Kunde Mit', titel: 'Spontaner Rundgang', strasse: null,
+      ort: '4600 Musterdorf', einsatzart: 'Revierdienst', sparte: 'sicherheit', datum: HEUTE,
+      von: '22:00:00', bis: '22:30:00', status: 'bestaetigt', bemerkung: null, zusage: 'zugesagt',
+      objekt_name: 'Objekt Mit', objekt_id: 22, hat_kontrollpunkte: true, hat_zeitfenster: true, im_team: 1 };
+    return send({ status: 'ok', einsatz_id: 999, rundgang_id: ++naechsteRundgangId, kontrollpunkte: KP });
+  }
   if (p.includes('mein_rundgang_vorlagen')) {
     const einsatzId = Number(url.searchParams.get('einsatz_id'));
     const e = SCHICHTEN().schichten.find(x => x.id === einsatzId);
@@ -157,6 +181,42 @@ const startAussen = rufe.find(r => r.p.includes('mein_rundgang_starten'));
 check('KRITISCH: der gewaehlte Grund wird mitgeschickt',
   startAussen && startAussen.body.ausnahme_grund === 'kurzfristige_umdisposition' && startAussen.body.vorlage_id === 902);
 check('Nach dem Senden erscheint die Checkliste', await page.isVisible('#rdListe'));
+
+// ══════════ SPONTANER START ÜBER DIE OBJEKTÜBERGREIFENDE ÜBERSICHT
+// (ENT-279-Fortsetzung): dieselbe Fenster-Weiche wie beim schichtgebundenen
+// Start, hier ohne bestehenden Einsatz -- der entsteht erst serverseitig.
+await page.evaluate(() => rundgangUebersichtOeffnen());
+await page.waitForTimeout(300);
+check('Beide Vorlagen erscheinen in der Übersicht, objektübergreifend',
+  (await page.textContent('#blBody')).includes('Nachtrunde') && (await page.textContent('#blBody')).includes('Frührunde'));
+
+rufe = [];
+await page.click('#blBody button:has-text("Nachtrunde")');
+await page.waitForTimeout(300);
+const spontanInnerhalb = rufe.find(r => r.p.includes('mein_rundgang_spontan_starten'));
+check('KRITISCH: eine Vorlage INNERHALB ihres Fensters startet über die Übersicht sofort, ohne Grundabfrage',
+  spontanInnerhalb && !('ausnahme_grund' in spontanInnerhalb.body) && spontanInnerhalb.body.vorlage_id === 901);
+check('KRITISCH: nach erfolgreichem spontanem Start erscheint die echte Checkliste (Einsatz wurde gefunden)',
+  await page.isVisible('#rdListe'));
+
+spontanerEinsatz = null;
+await page.evaluate(() => rundgangUebersichtOeffnen());
+await page.waitForTimeout(300);
+rufe = [];
+await page.click('#blBody button:has-text("Frührunde")');
+await page.waitForTimeout(300);
+check('KRITISCH: eine Vorlage AUSSERHALB ihres Fensters fragt auch über die Übersicht zuerst einen Grund ab',
+  await page.isVisible('#rfsGrund') && !rufe.some(r => r.p.includes('mein_rundgang_spontan_starten')));
+await page.click('#rfsBtn');
+await page.waitForTimeout(200);
+check('Ohne gewählten Grund erscheint auch hier eine Fehlermeldung statt eines Aufrufs',
+  await page.isVisible('#rfsErr') && !rufe.some(r => r.p.includes('mein_rundgang_spontan_starten')));
+await page.selectOption('#rfsGrund', 'kurzfristige_umdisposition');
+await page.click('#rfsBtn');
+await page.waitForTimeout(300);
+const spontanAussen = rufe.find(r => r.p.includes('mein_rundgang_spontan_starten'));
+check('KRITISCH: der gewählte Grund wird beim spontanen Start mitgeschickt',
+  spontanAussen && spontanAussen.body.ausnahme_grund === 'kurzfristige_umdisposition' && spontanAussen.body.vorlage_id === 902);
 
 await browser.close();
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);

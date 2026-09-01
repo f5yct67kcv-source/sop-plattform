@@ -510,9 +510,10 @@ const W = {
     // ENT-234: neue Reiter Wächter/Menü, Plan+Sperren als Unterreiter verschmolzen.
     waechter: 'Wächter', menu: 'Menü',
     meineDaten: 'Meine Daten', zurueckZumMenue: 'Zurück zum Menü',
-    waechterRundgangLbl: 'Rundgang', waechterSchluesselLbl: 'Schlüsselverwaltung',
-    waechterKeinRundgang: 'Für keine deiner aktuellen Schichten ist gerade ein Rundgang möglich.',
-    waechterMehrereTitel: 'Für welche Schicht?',
+    waechterRundgangLbl: 'Rundgänge', waechterSchluesselLbl: 'Schlüsselverwaltung',
+    waechterUebersichtTitel: 'Rundgänge',
+    waechterUebersichtLeer: 'Keine Rundgänge verfügbar',
+    waechterUebersichtLeerText: 'Es sind aktuell keine Kontrollrunden hinterlegt.',
     rundgangChipLaeuft: 'Rundgang läuft', rundgangChipPausiert: 'Rundgang pausiert',
     sperrenTitel: 'Tage sperren', gesperrt: 'Gesperrt', frei: 'Frei',
     sperrenText: 'Tippe auf einen Tag, an dem du nicht kannst. Die Planung sieht das und berücksichtigt es — eine Zusage ist es nicht.',
@@ -1215,16 +1216,18 @@ function zeichneRapport() {
 
 // ══════════════════════════════════════════ WÄCHTER (ENT-234)
 // Kachel-Uebersicht, nur sichtbar mit Revierdienst-Bezug (waechterSichtbar(),
-// gesetzt in waechterTabAktualisieren()). "Rundgang" fuehrt zur betroffenen
-// Schicht -- Start/Fortsetzen laeuft unveraendert ueber das bestehende
-// Schicht-Blatt (rundgangAbschnittZeichnen, ENT-180/182/145/146/153), keine
-// zweite Checkliste. "Schluesselverwaltung" ist inhaltlich entschieden
-// (ENT-149), aber noch nicht gebaut -- gleicher Platzhalter-Umgang wie bei
-// den Betrieb-Kacheln in dashboard.html (onclick -> toast).
+// gesetzt in waechterTabAktualisieren()). "Rundgänge" oeffnet die
+// objektuebergreifende Uebersicht (rundgangUebersichtOeffnen(), ENT-279-
+// Fortsetzung) -- die eigene, bereits zugeteilte Schicht bleibt daneben
+// weiterhin ueber "Heute"/"Plan" erreichbar (rundgangAbschnittZeichnen,
+// ENT-180/182/145/146/153), keine zweite Checkliste fuer denselben Fall.
+// "Schluesselverwaltung" ist inhaltlich entschieden (ENT-149), aber noch
+// nicht gebaut -- gleicher Platzhalter-Umgang wie bei den Betrieb-Kacheln
+// in dashboard.html (onclick -> toast).
 function zeichneWaechter() {
   $('v-waechter').innerHTML = `
     <div class="mk-grid">
-      <button type="button" id="mk-rundgang" class="mk-kachel" onclick="waechterRundgangWahl()">
+      <button type="button" id="mk-rundgang" class="mk-kachel" onclick="rundgangUebersichtOeffnen()">
         <span class="mk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M12 19h4a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2H8a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h4"/></svg></span>
         <span class="mk-kachel-lbl">${esc(w('waechterRundgangLbl'))}</span>
       </button>
@@ -1235,20 +1238,91 @@ function zeichneWaechter() {
     </div>`;
 }
 
-// Sucht die Schicht(en), fuer die JETZT ein Rundgang moeglich ist (gleiche
-// Regel wie darfRundgang() je Einsatz) und oeffnet direkt das Schicht-Blatt.
-// Bei mehreren Treffern (seltener Fall: mehrere ueberlappende, zugesagte
-// Revierdienst-Schichten) zuerst eine kleine Auswahl -- kein neuer
-// Auswahl-Mechanismus, dieselben Schichtkarten wie in "Plan".
-function waechterRundgangWahl() {
-  const kandidaten = schichten.filter(darfRundgang);
-  if (kandidaten.length === 1) { blattAuf(Number(kandidaten[0].id)); return; }
-  if (!kandidaten.length) { toast(w('waechterKeinRundgang')); return; }
-  blattId = null;
-  $('blTitel').textContent = w('waechterMehrereTitel');
-  $('blBody').innerHTML = kandidaten.map(e => schichtKarte(e, true)).join('');
-  $('blFuss').innerHTML = '';
+// ── Rundgänge-Übersicht, objektübergreifend (ENT-279-Fortsetzung) ──────
+// Zeigt alle aktiven Kontrollrunden-Vorlagen, unabhängig von der eigenen
+// Zuteilung des Tages -- fuer den Fall einer spontanen Umdisposition, bei
+// der die Person ein Objekt gezielt waehlen muss statt an ihre geplante
+// Schicht gebunden zu bleiben. Serverseitig zusaetzlich gegen einen
+// generellen Revierdienst-Bezug geprueft (mein_rundgang_vorlagen_alle.php),
+// hier keine weitere Bedingung noetig.
+let rdSpontanVorlagen = [];
+function rundgangUebersichtOeffnen() {
+  api('mein_rundgang_vorlagen_alle.php').then(({ ok, data }) => {
+    const vorlagen = (ok && data.status === 'ok') ? (data.vorlagen || []) : [];
+    rdSpontanVorlagen = vorlagen;
+    blattId = null;
+    $('blTitel').textContent = w('waechterUebersichtTitel');
+    $('blBody').innerHTML = vorlagen.length
+      ? `<div style="display:flex;flex-direction:column;gap:8px">${vorlagen.map(v => `
+          <button type="button" class="btn btn-plain btn-wide" style="display:flex;flex-direction:column;align-items:flex-start;height:auto;min-height:44px;padding:12px 14px;white-space:normal;text-align:left;gap:2px" onclick="rundgangSpontanWaehlen(${Number(v.id)})">
+            <div style="font-weight:650">${esc(v.name)}</div>
+            <div style="font-size:13px;color:var(--ink-3)">${esc(v.objekt_name)} · ${esc(v.kunde_name)}</div>
+            ${v.fenster_von && v.fenster_bis ? `<div style="font-size:13px;color:var(--ink-3)">${esc(hm(v.fenster_von))}–${esc(hm(v.fenster_bis))}</div>` : ''}
+          </button>`).join('')}</div>`
+      : LEER(w('waechterUebersichtLeer'), w('waechterUebersichtLeerText'),
+          '<circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M12 19h4a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2H8a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h4"/>');
+    $('blFuss').innerHTML = `<button class="btn btn-plain" onclick="zeige('waechter')">${esc(w('zurueck'))}</button>`;
+    blattZeigen();
+  });
+}
+
+// Gleiche Fenster-Weiche wie rundgangVorlageWaehlen() (ENT-279): innerhalb
+// des Fensters sofortiger Start, ausserhalb zuerst ein Pflichtgrund. Ohne
+// bestehenden Einsatz -- der entsteht erst serverseitig beim Start.
+function rundgangSpontanWaehlen(vorlageId) {
+  const v = rdSpontanVorlagen.find(x => Number(x.id) === Number(vorlageId));
+  if (!v) return;
+  if (v.fenster_von && v.fenster_bis &&
+      !rundgangImFenster(jetztDatetime().slice(11, 16), v.fenster_von, v.fenster_bis, RUNDGANG_FENSTER_TOLERANZ_MIN)) {
+    rundgangSpontanAusnahmeGrundWahl(vorlageId);
+    return;
+  }
+  rundgangSpontanStarten(vorlageId, null);
+}
+
+function rundgangSpontanAusnahmeGrundWahl(vorlageId) {
+  $('blTitel').textContent = w('rundgangAusserhalbFensterTitel');
+  $('blBody').innerHTML = `
+    <div class="msg-err" style="color:var(--warn);background:var(--warn-soft)">${esc(w('rundgangAusserhalbFensterHinweis'))}</div>
+    <div class="f"><label for="rfsGrund">${esc(w('rundgangAusserhalbFensterGrund'))}</label>
+      <select class="inp" id="rfsGrund">
+        <option value="">–</option>
+        ${Object.entries(RUNDGANG_AUSSERHALB_FENSTER_GRUENDE).map(([code, txt]) =>
+          `<option value="${esc(code)}">${esc(txt)}</option>`).join('')}
+      </select>
+    </div>
+    <div id="rfsErr" class="msg-err" style="display:none"></div>`;
+  $('blFuss').innerHTML = `
+    <button class="btn btn-plain" onclick="rundgangUebersichtOeffnen()">${esc(w('zurueck'))}</button>
+    <button class="btn btn-primary" id="rfsBtn" onclick="rundgangSpontanAusnahmeGrundSenden(${Number(vorlageId)})">${esc(w('rundgangStarten'))}</button>`;
   blattZeigen();
+}
+
+function rundgangSpontanAusnahmeGrundSenden(vorlageId) {
+  const err = $('rfsErr'); err.style.display = 'none';
+  const grund = $('rfsGrund').value;
+  if (!grund) { err.textContent = w('rundgangAbbrechenGrundPflicht'); err.style.display = ''; return; }
+  rundgangSpontanStarten(vorlageId, grund);
+}
+
+// Nach Erfolg wird ladeSchichten() neu geladen: der spontan angelegte
+// Einsatz muss im lokalen schichten-Array stehen, bevor rundgangAnzeigen()
+// ihn dort findet (gleiches Prinzip wie ueberall sonst -- schichten kommt
+// ausschliesslich vom Server, nie lokal erfunden).
+function rundgangSpontanStarten(vorlageId, ausnahmeGrund) {
+  document.querySelectorAll('#blBody button, #rfsBtn').forEach(b => b.disabled = true);
+  const body = { vorlage_id: vorlageId };
+  if (ausnahmeGrund) body.ausnahme_grund = ausnahmeGrund;
+  api('mein_rundgang_spontan_starten.php', { method: 'POST', body }).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') {
+      document.querySelectorAll('#blBody button, #rfsBtn').forEach(b => b.disabled = false);
+      toast(data.message || w('netzfehler'));
+      return;
+    }
+    rundgangAktiv = { id: data.rundgang_id, einsatz_id: data.einsatz_id, status: 'vorbereitet', pausiert_seit: null,
+      kontrollpunkte: (data.kontrollpunkte || []).map(k => ({ ...k, erledigt: null })) };
+    ladeSchichten().then(() => rundgangAnzeigen(data.einsatz_id));
+  });
 }
 
 // ══════════════════════════════════════════ MENÜ (ENT-234)

@@ -67,31 +67,50 @@ async function neueSeite(schichten, extraRoutes) {
   await browser.close();
 }
 
-// ══════ TEIL 2: Rundgang-Kachel öffnet die richtige Schicht direkt
+// ══════ TEIL 2: Rundgänge-Kachel öffnet die objektübergreifende Übersicht,
+// unabhängig von der eigenen, heutigen Zuteilung (ENT-279-Fortsetzung) --
+// Auswahl startet spontan über mein_rundgang_spontan_starten.php.
 {
-  const { browser, page } = await neueSeite([schicht({ id: 55 })]);
+  const VORLAGEN = [{ id: 900, name: 'Nachtrunde', objekt_name: 'Gerolag Center', kunde_name: 'Borner AG',
+    fenster_von: null, fenster_bis: null }];
+  const { browser, page, rufe } = await neueSeite([schicht({ id: 55 })], (p, body, send) => {
+    if (p.includes('mein_rundgang_vorlagen_alle')) return send({ status: 'ok', vorlagen: VORLAGEN });
+    if (p.includes('mein_rundgang_spontan_starten')) return send({ status: 'ok', einsatz_id: 900, rundgang_id: 77, kontrollpunkte: [] });
+  });
   await page.click('#t-waechter'); await page.waitForTimeout(250);
   await page.click('#mk-rundgang'); await page.waitForTimeout(350);
-  check('Ein startbarer Rundgang öffnet direkt das Schicht-Blatt',
-    await page.evaluate(() => document.getElementById('blatt').classList.contains('on')));
-  check('Der Start-Knopf für genau diese Schicht steht bereit',
-    await page.evaluate(() => !!document.querySelector('#blRundgang button[onclick="rundgangStarten(55)"]')));
+  check('KRITISCH: die Kachel öffnet die Übersicht (Blatt-Titel „Rundgänge"), nicht direkt eine Schicht',
+    await page.evaluate(() => document.getElementById('blatt').classList.contains('on'))
+    && (await page.textContent('#blTitel')) === 'Rundgänge');
+  check('Die verfügbare Kontrollrunde steht mit Objekt und Kunde da',
+    (await page.textContent('#blBody')).includes('Nachtrunde') && (await page.textContent('#blBody')).includes('Gerolag Center'));
+
+  rufe.length = 0;
+  await page.click('#blBody button');
+  await page.waitForTimeout(300);
+  const start = rufe.find(r => r.p.includes('mein_rundgang_spontan_starten'));
+  check('KRITISCH: die Auswahl löst den spontanen Start für genau diese Vorlage aus',
+    start && start.body.vorlage_id === 900 && !('ausnahme_grund' in start.body));
+  check('Nach Erfolg werden die eigenen Schichten neu geladen (der spontane Einsatz muss dort auffindbar sein)',
+    rufe.some(r => r.p.includes('meine_schichten')));
   await browser.close();
 }
 
-// ══════ TEIL 3: kein startbarer Rundgang -> ehrliche Meldung statt stiller Leere
-// (hat_kontrollpunkte true, Reiter also sichtbar -- aber ohne Zusage lehnt
-// darfRundgang() ab, siehe app.html)
+// ══════ TEIL 3: keine verfügbaren Rundgänge -> ehrlicher Leerzustand statt
+// stiller Leere in der Übersicht selbst (nicht mehr ein Toast, seit die
+// Kachel immer die Übersicht öffnet statt eine Schicht zu suchen)
 {
-  const { browser, page } = await neueSeite([schicht({ zusage: 'offen' })]);
+  const { browser, page } = await neueSeite([schicht({ zusage: 'offen' })], (p, body, send) => {
+    if (p.includes('mein_rundgang_vorlagen_alle')) return send({ status: 'ok', vorlagen: [] });
+  });
   check('Wächter-Reiter bleibt trotz fehlender Zusage sichtbar (Kontrollpunkte allein entscheiden)',
     await page.isVisible('#t-waechter'));
   await page.click('#t-waechter'); await page.waitForTimeout(250);
   await page.click('#mk-rundgang'); await page.waitForTimeout(300);
-  check('Kein Blatt öffnet sich ohne startbaren Rundgang',
-    !(await page.evaluate(() => document.getElementById('blatt').classList.contains('on'))));
-  check('Stattdessen ein Hinweis, kein stilles Nichts',
-    await page.evaluate(() => document.getElementById('toast').classList.contains('on')));
+  check('KRITISCH: die Übersicht öffnet sich trotzdem (sie ist von der eigenen Zuteilung unabhängig)',
+    await page.evaluate(() => document.getElementById('blatt').classList.contains('on')));
+  check('Ohne verfügbare Vorlagen zeigt sie einen ehrlichen Leerzustand, keine leere Fläche',
+    (await page.textContent('#blBody')).includes('Keine Rundgänge verfügbar'));
   await browser.close();
 }
 

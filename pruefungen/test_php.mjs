@@ -455,6 +455,8 @@ const NUR_EIGENE_DATEN = [
   'mein_rundgang_fortsetzen.php', // eigenen pausierten Rundgang fortsetzen (ENT-146)
   'mein_rundgang_abbrechen.php',  // eigenen Rundgang endgueltig abbrechen (ENT-146)
   'mein_rundgang_vorlagen.php',   // aktive Kontrollrunden des eigenen Einsatz-Objekts (ENT-204)
+  'mein_rundgang_vorlagen_alle.php', // objektuebergreifende Liste, aber serverseitig auf eigene Zuteilungshistorie gegatet (ENT-279-Fortsetzung)
+  'mein_rundgang_spontan_starten.php', // legt Einsatz+Zuteilung nur fuer die eigene Person an (ENT-279-Fortsetzung)
   'meine_abwesenheit.php',        // eigene Abwesenheitsantraege (ENT-255)
   'abwesenheit_saldo.php',        // eigener Ferien-Saldo -- mehr nur mit Recht "personal_lesen" (ENT-255)
 ];
