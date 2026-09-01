@@ -656,6 +656,24 @@ CREATE TABLE IF NOT EXISTS kunden_kontaktweg (
 // die Funktion dazu bauen"). Koordinaten als JSON-Array von {lat,lng} in
 // TEXT -- gleiches Muster wie benutzer_layout.layout, siehe
 // geofence_bereich.php fuer die Pruef-/Kodierfunktion.
+// ── Ereignisse: Vorfallmeldungen aus dem Revierdienst (ENT-295) ────────
+// NICHT zu verwechseln mit EREIGNIS_ARTEN in backend/ereignisse.php: das
+// ist der Systemfeed des Dashboards ("Rapport eingereicht", "Zusage
+// erhalten") und rein hergeleitet, ohne eigene Tabelle. Hier geht es um
+// das, was eine Wache vor Ort tatsaechlich beobachtet und meldet.
+//
+// Eigene Stammdatentabelle statt einer festen Liste im Code, weil ENT-164
+// die Erweiterbarkeit durch die Verwaltung ausdruecklich verlangt: "Katalog
+// bleibt manuell erweiterbar, kein starres Set". bezeichnung ist eindeutig
+// -- gleiches Muster wie ma_funktion/ma_abteilung.
+'ereignisart' => "CREATE TABLE ereignisart (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  bezeichnung VARCHAR(120) NOT NULL,
+  sortierung INT NOT NULL DEFAULT 0,
+  aktiv TINYINT(1) NOT NULL DEFAULT 1,
+  UNIQUE KEY uniq_ereignisart (bezeichnung)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
 'geofence_bereich' => "CREATE TABLE geofence_bereich (
   id INT AUTO_INCREMENT PRIMARY KEY,
   objekt_id INT NOT NULL,
@@ -708,6 +726,48 @@ CREATE TABLE IF NOT EXISTS kunden_kontaktweg (
   KEY idx_rundgang (rundgang_id),
   FOREIGN KEY (rundgang_id) REFERENCES rundgang(id) ON DELETE CASCADE,
   FOREIGN KEY (kontrollpunkt_id) REFERENCES kontrollpunkt(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+// Die Meldung selbst. Drei Zeitangaben, die bewusst getrennt bleiben
+// (gleiches Prinzip wie Rohzeit/bewertete Zeit im GAV-Teil und wie
+// erfasst_am/uebermittelt_am bei rundgang_scan):
+//   erfasst_am      -- wann die Person gemeldet hat. Geraeteseitig gesetzt,
+//                      weil offline erfasst werden koennen muss (ENT-132),
+//                      und danach unveraenderlich: der Nachweiswert einer
+//                      Vorfallmeldung haengt genau daran.
+//   vorfall_am      -- optional, falls der Vorfall frueher war als die
+//                      Meldung ("beim Rundgang um 2 Uhr gesehen, erst um 4
+//                      erfasst"). Ergaenzt erfasst_am, ersetzt es nie.
+//   uebermittelt_am -- wann der Server sie bekommen hat. Zeigt eine lange
+//                      Offline-Phase, die sonst unsichtbar bliebe.
+// rundgang_id/einsatz_id sind NULLable: Eine Beobachtung kann auch ohne
+// laufende Runde entstehen. objekt_id ist dagegen Pflicht -- eine Meldung
+// ohne Ort ist als Nachweis wertlos.
+// lat/lng werden im Moment des Speicherns einmalig erfasst, nicht laufend
+// verfolgt (ENT-131 bleibt unberuehrt).
+'ereignis_meldung' => "CREATE TABLE ereignis_meldung (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  objekt_id INT NOT NULL,
+  rundgang_id INT NULL,
+  einsatz_id INT NULL,
+  mitarbeiter_id INT NOT NULL,
+  ereignisart_id INT NULL,
+  erfasst_am DATETIME NOT NULL,
+  vorfall_am DATETIME NULL,
+  uebermittelt_am DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  bemerkung TEXT NULL,
+  foto LONGBLOB NULL,
+  foto_mime VARCHAR(50) NULL,
+  lat DECIMAL(10,7) NULL,
+  lng DECIMAL(10,7) NULL,
+  KEY idx_objekt (objekt_id, erfasst_am),
+  KEY idx_rundgang (rundgang_id),
+  KEY idx_mitarbeiter (mitarbeiter_id),
+  FOREIGN KEY (objekt_id) REFERENCES objekte(id) ON DELETE CASCADE,
+  FOREIGN KEY (rundgang_id) REFERENCES rundgang(id) ON DELETE SET NULL,
+  FOREIGN KEY (einsatz_id) REFERENCES einsaetze(id) ON DELETE SET NULL,
+  FOREIGN KEY (mitarbeiter_id) REFERENCES mitarbeiter(id) ON DELETE CASCADE,
+  FOREIGN KEY (ereignisart_id) REFERENCES ereignisart(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
 // Kontrollrunden (ENT-204): eine benannte Vorlage buendelt eine Teilmenge der
@@ -926,6 +986,34 @@ foreach ($tabellen as $name => $sql) {
         $getan[] = "Tabelle $name angelegt";
     } catch (Throwable $e) {
         $fehler[] = "Tabelle $name — " . $e->getMessage();
+    }
+}
+
+// ── 1b. Startbestand der Ereignisarten (ENT-295; bestaetigt den Katalog,
+// den ENT-164 als Vorschlag offen gelassen hatte). Nur wenn die Tabelle
+// LEER ist -- sonst kaeme eine bewusst geloeschte Art beim naechsten
+// Einrichten wieder zurueck. Die Verwaltung darf den Katalog danach frei
+// erweitern und kuerzen (ENT-164: "manuell erweiterbar, kein starres Set").
+if (!$nurPruefen && hat_tabelle_jetzt($pdo, 'ereignisart')) {
+    try {
+        if ((int)$pdo->query('SELECT COUNT(*) FROM ereignisart')->fetchColumn() === 0) {
+            $arten = [
+                'Diebstahl / Einbruch(-versuch)',
+                'Vandalismus / Sachbeschädigung',
+                'Brandgefahr',
+                'Wasseraustritt',
+                'Fenster / Tür nicht verschlossen',
+                'Alarmanlage ausgelöst',
+                'Verdächtige Person / verdächtiges Fahrzeug',
+                'Technischer Defekt',
+                'Sonstiges',
+            ];
+            $ein = $pdo->prepare('INSERT INTO ereignisart (bezeichnung, sortierung) VALUES (?, ?)');
+            foreach ($arten as $i => $bez) { $ein->execute([$bez, ($i + 1) * 10]); }
+            $getan[] = 'Ereignisarten: Startbestand angelegt (' . count($arten) . ')';
+        }
+    } catch (Throwable $e) {
+        $fehler[] = 'Ereignisarten-Startbestand — ' . $e->getMessage();
     }
 }
 

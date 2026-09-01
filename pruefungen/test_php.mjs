@@ -459,6 +459,9 @@ const NUR_EIGENE_DATEN = [
   'mein_rundgang_vorlagen.php',   // aktive Kontrollrunden des eigenen Einsatz-Objekts (ENT-204)
   'mein_rundgang_vorlagen_alle.php', // objektuebergreifende Liste, aber serverseitig auf eigene Zuteilungshistorie gegatet (ENT-279-Fortsetzung)
   'mein_rundgang_spontan_starten.php', // legt Einsatz+Zuteilung nur fuer die eigene Person an (ENT-279-Fortsetzung)
+  'mein_rundgang_uebersicht.php', // rein lesende Vorschau einer Kontrollrunde vor dem Start; dasselbe Gate wie mein_rundgang_vorlagen_alle.php -- nur wer ueberhaupt Revierdienst macht (ENT-294)
+  'mein_ereignis_melden.php',    // meldet Vorfaelle als die eigene Person, mit demselben Revierdienst-Gate (ENT-295)
+  'ereignisart_liste.php',       // reiner Stammdaten-Katalog fuer die Auswahl beim Melden, keine personenbezogenen Daten (ENT-295)
   'meine_abwesenheit.php',        // eigene Abwesenheitsantraege (ENT-255)
   'abwesenheit_saldo.php',        // eigener Ferien-Saldo -- mehr nur mit Recht "personal_lesen" (ENT-255)
 ];
