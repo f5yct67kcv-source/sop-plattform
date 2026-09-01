@@ -143,7 +143,7 @@ check('Auch die Eingabefelder sind mindestens 44px hoch',
     .every(i => document.getElementById(i).getBoundingClientRect().height >= 44)
     && [...document.querySelectorAll('[data-zeitwahl-fuer="srVon"] select')]
       .every(s => s.getBoundingClientRect().height >= 44)));
-// Seit ENT-291 steht im Formular nur der Knopf; unterschrieben wird auf dem
+// Seit ENT-292 steht im Formular nur der Knopf; unterschrieben wird auf dem
 // ganzen Bildschirm. Der Knopf ist damit das Bedienelement, das getroffen
 // werden muss -- danebengetippt heisst hier nur "nichts passiert", nicht mehr
 // "Unterschrift weg", weil es kein Loeschen mehr direkt daneben gibt.

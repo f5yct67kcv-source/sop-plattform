@@ -1,4 +1,4 @@
-// Unterschrift des Kunden auf dem ganzen Bildschirm (ENT-291).
+// Unterschrift des Kunden auf dem ganzen Bildschirm (ENT-292).
 //
 // Geprueft wird die Aussage, nicht der Wortlaut: dass im Formular kein
 // Zeichenfeld mehr steht, dass das Blatt den Bildschirm deckt und quer liegt,
@@ -29,13 +29,13 @@ await page.route('**/api/**', route => {
   try { body = req.postData() ? JSON.parse(req.postData()) : null; } catch (e) { /* egal */ }
   rufe.push({ p, body });
   const send = b => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) });
-  if (p.includes('login')) return send({ status: 'ok', token: 't', name: 'daniele.ciardo', ist_admin: false });
+  if (p.includes('login')) return send({ status: 'ok', token: 't', name: 'm.muster', ist_admin: false });
   if (p.includes('rapport_create')) return send({ status: 'ok', id: 7 });
   return send({ status: 'ok', rapporte: [], mitarbeiter: [], kunden: [], objekte: [], stats: [] });
 });
 
 await page.goto(`file://${WURZEL}/index.html`);
-await page.fill('#loginName', 'daniele.ciardo');
+await page.fill('#loginName', 'm.muster');
 await page.fill('#loginPassword', 'egal');
 await page.click('#btn-login');
 await page.waitForTimeout(400);

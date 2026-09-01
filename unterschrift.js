@@ -1,4 +1,4 @@
-/* Unterschrift des Kunden -- ein Knopf, dann der ganze Bildschirm (ENT-291).
+/* Unterschrift des Kunden -- ein Knopf, dann der ganze Bildschirm (ENT-292).
  *
  * VORHER: ein 160 px hohes Feld mitten im Formular. Zwei Dinge stimmten daran
  * nicht. Erstens die Groesse -- wer darin unterschreibt, schreibt auf

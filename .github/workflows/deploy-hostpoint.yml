@@ -31,7 +31,7 @@ jobs:
           # eingetragen wie gav.js/zeitwahl.js oben.
           cp qrcode.js dist/qrcode.js
           # unterschrift.js traegt das Unterschriftsfeld fuer BEIDE Oberflaechen
-          # (ENT-291) -- derselbe Fallstrick wie bei gav.js/zeitwahl.js oben:
+          # (ENT-292) -- derselbe Fallstrick wie bei gav.js/zeitwahl.js oben:
           # fehlt die Zeile, laesst der Kunde live nirgends mehr
           # unterschreiben, und lokal faellt es NICHT auf.
           cp unterschrift.js dist/unterschrift.js
