@@ -7,7 +7,8 @@
 // POST -> speichern {firma, zusatz, fusszeile, fusszeile2, qr_*}
 //         Logo setzen     {logo: base64, logo_mime, logo_dateiname?}
 //         Logo weg        {logo_weg: true}
-//         Hauptdomizil    {domizil_strasse, domizil_plz, domizil_ort, firma, telefon, email}
+//         Hauptdomizil    {domizil_strasse, domizil_plz, domizil_ort, firma, telefon,
+//                          email, pikett_telefon}
 //         -- ENT-247, eigener Zweig wie beim Logo: Ein Speichern aus der neuen
 //         "Betrieb"-Kachel darf Zusatz/Fusszeile/QR-Felder NICHT stillschweigend
 //         leeren, weil das Formular dort sie gar nicht kennt. "firma" ist dieselbe
@@ -45,7 +46,7 @@ function betrieb_lesen(bool $mitLogo): array {
     $r = db()->query(
         'SELECT firma, zusatz, fusszeile, fusszeile2, qr_iban, qr_strasse, qr_hausnummer,
                 qr_plz, qr_ort, logo_mime, logo_groesse, logo,
-                domizil_strasse, domizil_plz, domizil_ort, telefon, email
+                domizil_strasse, domizil_plz, domizil_ort, telefon, email, pikett_telefon
          FROM betrieb WHERE id = 1'
     )->fetch();
     if (!$r) {
@@ -54,7 +55,7 @@ function betrieb_lesen(bool $mitLogo): array {
                 'qr_plz' => null, 'qr_ort' => null, 'qr_iban_gueltig' => false,
                 'logo_mime' => null, 'logo_groesse' => null, 'logo' => null,
                 'domizil_strasse' => null, 'domizil_plz' => null, 'domizil_ort' => null,
-                'telefon' => null, 'email' => null];
+                'telefon' => null, 'email' => null, 'pikett_telefon' => null];
     }
     $roh = $r['logo'];
     return [
@@ -86,6 +87,7 @@ function betrieb_lesen(bool $mitLogo): array {
         'domizil_ort'     => $r['domizil_ort'],
         'telefon'         => $r['telefon'],
         'email'           => $r['email'],
+        'pikett_telefon'  => $r['pikett_telefon'],
     ];
 }
 
@@ -158,6 +160,10 @@ if (array_key_exists('domizil_strasse', $in)) {
     $dFirma   = trim((string)($in['firma'] ?? ''));
     $dTelefon = trim((string)($in['telefon'] ?? ''));
     $dEmail   = trim((string)($in['email'] ?? ''));
+    // Pikett-/Zentralnummer (ENT-299) -- die Nummer, die der Waechter im
+    // Rundgang sieht. Optional: Wer keine hat, laesst das Feld leer, dann
+    // zeigt die App nur die oeffentlichen Notrufnummern.
+    $dPikett  = trim((string)($in['pikett_telefon'] ?? ''));
     if ($dFirma === '') {
         json_response(['status' => 'error', 'message' => 'Firma/Name ist ein Pflichtfeld.'], 400);
     }
@@ -174,15 +180,19 @@ if (array_key_exists('domizil_strasse', $in)) {
     if (mb_strlen($dTelefon) > 50) {
         json_response(['status' => 'error', 'message' => 'Die Telefonnummer ist zu lang.'], 400);
     }
+    if (mb_strlen($dPikett) > 50) {
+        json_response(['status' => 'error', 'message' => 'Die Pikettnummer ist zu lang.'], 400);
+    }
     if ($dEmail !== '' && (mb_strlen($dEmail) > 200 || !filter_var($dEmail, FILTER_VALIDATE_EMAIL))) {
         json_response(['status' => 'error', 'message' => 'Die E-Mail-Adresse ist ungueltig.'], 400);
     }
     $pdo->prepare('UPDATE betrieb SET domizil_strasse = ?, domizil_plz = ?, domizil_ort = ?,
-                   firma = ?, telefon = ?, email = ?,
+                   firma = ?, telefon = ?, email = ?, pikett_telefon = ?,
                    geaendert_am = NOW(), geaendert_von = ? WHERE id = 1')
         ->execute([$dStrasse === '' ? null : $dStrasse, $dPlz === '' ? null : $dPlz,
                    $dOrt === '' ? null : $dOrt, $dFirma, $dTelefon === '' ? null : $dTelefon,
-                   $dEmail === '' ? null : $dEmail, (int)$user['id']]);
+                   $dEmail === '' ? null : $dEmail, $dPikett === '' ? null : $dPikett,
+                   (int)$user['id']]);
     json_response(['status' => 'ok', 'betrieb' => betrieb_lesen(true)]);
 }
 

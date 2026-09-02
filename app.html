@@ -429,6 +429,17 @@ svg.i-sm { width: 17px; height: 17px; }
 .rgs-obj-adr { font-size: 14.5px; color: var(--ink-2); margin-top: 10px; line-height: 1.45; }
 .rgs-route { flex: none; min-height: 44px; min-width: 44px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface-2); color: var(--accent); }
 
+/* Zustandsstreifen: nur sichtbar, solange auf dieser Runde tatsaechlich eine
+   eigene Runde offen ist (ENT-298). Er steht ganz oben, weil er die Seite
+   umdeutet -- aus "was erwartet mich" wird "was laeuft gerade". Der Punkt
+   links ist Farbe UND Form derselben Aussage, damit sie nicht allein an der
+   Farbe haengt: gefuellt = laeuft, hohl = pausiert. */
+.rgs-status { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 10px 14px; border: 1px solid var(--accent-line); border-radius: var(--r-sm); background: var(--accent-soft); font-size: 14.5px; font-weight: 620; color: var(--ink); }
+.rgs-status-pkt { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
+.rgs-status.pause { border-color: var(--warn); background: var(--warn-soft); }
+.rgs-status.pause .rgs-status-pkt { background: none; border: 2px solid var(--warn); }
+.rgs-status-zeit { margin-left: auto; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+
 /* Kennzahlen: Beschriftung OBEN, Wert darunter (CLAUDE.md), beide Seiten
    nach demselben Muster und in derselben Schriftgroesse. */
 .rgs-fakten { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line-soft); border-radius: var(--r-sm); overflow: hidden; }
@@ -447,6 +458,14 @@ svg.i-sm { width: 17px; height: 17px; }
 .rgs-person { padding: 12px 0; border-bottom: 1px solid var(--line-soft); }
 .rgs-person:last-child { border-bottom: 0; padding-bottom: 2px; }
 .rgs-person-name { font-size: 15px; font-weight: 620; }
+/* Herkunft und Funktion der Person (ENT-300). Wer nachts anruft, muss wissen,
+   wen er weckt: der Hauswart vor Ort ist ein anderer Anruf als die
+   Kontaktperson beim Kunden. Das Kennzeichen traegt Farbe UND Wort -- nicht
+   nur Farbe, sonst waere die Unterscheidung fuer manche gar keine. */
+.rgs-person-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 3px; }
+.rgs-quelle { font-size: 10.5px; font-weight: 680; letter-spacing: .5px; text-transform: uppercase; padding: 2px 7px; border-radius: 9px; background: var(--line-soft); color: var(--ink-2); border: 1px solid var(--line); }
+.rgs-quelle.vorort { background: var(--accent-soft); color: var(--accent); border-color: var(--accent-line); }
+.rgs-person-fkt { font-size: 13px; color: var(--ink-2); }
 /* Anrufen/Mailen sind echte Ziele mit dem Daumen -- 44px, nicht nur Text. */
 .rgs-weg { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; color: var(--accent); font-size: 14.5px; font-weight: 600; text-decoration: none; margin-right: 16px; }
 .rgs-leer { font-size: 14px; color: var(--ink-3); padding: 10px 0 2px; line-height: 1.5; }
@@ -463,6 +482,54 @@ svg.i-sm { width: 17px; height: 17px; }
 .rgs-modul-zahl.leer { background: var(--neg-soft); color: var(--neg); }
 .rgs-fuss { padding: 14px 16px calc(16px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line-soft); background: var(--surface); flex: none; }
 .rgs-warn { display: flex; gap: 9px; font-size: 13.5px; line-height: 1.5; color: var(--warn); background: var(--warn-soft); border: 1px solid var(--warn); border-radius: var(--r-sm); padding: 11px 13px; }
+
+/* Zentrale und Notruf (ENT-299). Nicht ausklappbar, anders als der
+   Ansprechpartner-Block darueber: Wer diese Nummern braucht, hat keine Hand
+   frei zum Aufklappen. Reihenfolge vom Projektinhaber vorgegeben -- eigene
+   Zentrale zuoberst, oeffentlicher Notruf darunter.
+
+   Die Zentrale traegt die Akzentfarbe (unser Weg), die Notrufnummern das
+   Rot der Negativ-Farbe (fremder Weg, letzte Stufe). Der Unterschied haengt
+   nicht allein an der Farbe: Die Zentrale ist eine breite Zeile mit Namen,
+   der Notruf sind drei gleich grosse Kacheln. */
+.rgs-hilfe { display: flex; flex-direction: column; gap: 8px; }
+.rgs-zentrale { display: flex; align-items: center; gap: 13px; min-height: 60px; padding: 0 16px; border: 1px solid var(--accent-line); border-radius: var(--r); background: var(--accent-soft); color: var(--ink); text-decoration: none; }
+.rgs-zentrale-ic { flex: none; width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid var(--accent); color: var(--accent); display: flex; align-items: center; justify-content: center; }
+/* Als Spalte, nicht als Zeile: Die drei Angaben sind <span> (in einem <a>
+   ist kein <div> erlaubt) und laegen sonst nebeneinander -- die
+   Beschriftung stuende dann NEBEN der Nummer statt darueber. */
+.rgs-zentrale-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+/* Beschriftung oben, Nummer darunter (CLAUDE.md) -- gleiches Muster wie die
+   Kennzahlen weiter oben, damit die Seite eine Ordnung hat. */
+.rgs-zentrale-lb { font-size: 11px; font-weight: 640; letter-spacing: .6px; text-transform: uppercase; color: var(--ink-3); }
+.rgs-zentrale-nr { font-size: 16px; font-weight: 660; color: var(--accent); margin-top: 2px; }
+.rgs-zentrale-name { font-size: 13px; color: var(--ink-2); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rgs-notruf { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+/* 60px wie die Funktionen darunter -- eine Notrufkachel darf nicht das
+   kleinste Ziel des Bildschirms sein. */
+.rgs-notruf a { min-height: 60px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; border: 1px solid var(--neg); border-radius: var(--r); background: var(--neg-soft); color: var(--neg); text-decoration: none; }
+.rgs-notruf-nr { font-size: 19px; font-weight: 720; letter-spacing: -.3px; }
+.rgs-notruf-wort { font-size: 11.5px; font-weight: 600; color: var(--ink-2); }
+
+/* Rueckfrage vor einer Zustandsaenderung (ENT-298). Liegt INNERHALB der
+   Seite (position:absolute), nicht im Schublade-System: Die Schublade
+   (z-index 61) wuerde die Seite dahinter verdecken und faehrt von unten ein
+   -- fuer eine Ja/Nein-Frage ist das der falsche Weg und die falsche
+   Bewegung. Der Dialog bleibt ueber der Seite und laesst sehen, worauf er
+   sich bezieht. */
+.rgs-dlg { position: absolute; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(8,10,16,.62); }
+/* Ohne diese Zeile bliebe der Dialog sichtbar: display:flex aus der Regel
+   darueber schlaegt die Browser-Vorgabe fuer [hidden] (Autorenregeln gehen
+   Browserregeln vor, unabhaengig von der Spezifitaet). */
+.rgs-dlg[hidden] { display: none; }
+.rgs-dlg-box { width: 100%; max-width: 340px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--sh-2); padding: 20px 20px 16px; }
+/* Beschriftung oben, Aussage darunter -- dasselbe Muster wie ueberall sonst. */
+.rgs-dlg-lb { font-size: 11px; font-weight: 640; letter-spacing: .6px; text-transform: uppercase; color: var(--warn); }
+.rgs-dlg-frage { font-size: 17px; font-weight: 660; line-height: 1.3; margin-top: 6px; }
+.rgs-dlg-txt { font-size: 14px; color: var(--ink-2); line-height: 1.5; margin-top: 10px; }
+/* "Nein" links und zuerst: der harmlose Ausgang ist der leicht erreichbare. */
+.rgs-dlg-fuss { display: flex; gap: 10px; margin-top: 20px; }
+.rgs-dlg-fuss .btn { flex: 1; }
 
 /* ── Hinweis */
 .toast { position: fixed; left: 16px; right: 16px; bottom: calc(var(--tab-h) + 18px + env(safe-area-inset-bottom)); background: var(--shell); color: #fff; padding: 13px 18px; border-radius: var(--r-sm); font-size: 14.5px; font-weight: 560; box-shadow: var(--sh-2); z-index: 200; opacity: 0; pointer-events: none; transform: translateY(8px); transition: opacity .18s, transform .18s; text-align: center; }
@@ -601,6 +668,17 @@ svg.i-sm { width: 17px; height: 17px; }
   </header>
   <div class="rgs-bd" id="rgsBody"></div>
   <div class="rgs-fuss" id="rgsFuss"></div>
+  <div class="rgs-dlg" id="rgsDlg" role="dialog" aria-modal="true" aria-labelledby="rgsDlgFrage" hidden>
+    <div class="rgs-dlg-box">
+      <div class="rgs-dlg-lb" id="rgsDlgLb">–</div>
+      <div class="rgs-dlg-frage" id="rgsDlgFrage">–</div>
+      <div class="rgs-dlg-txt" id="rgsDlgTxt"></div>
+      <div class="rgs-dlg-fuss">
+        <button class="btn btn-plain" id="rgsDlgNein" onclick="rgsFrageZu()">Nein</button>
+        <button class="btn btn-primary" id="rgsDlgJa">Ja</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="abdunkeln" id="abdunkeln" onclick="blattZu()"></div>
@@ -778,13 +856,38 @@ const W = {
     // Einsatzmodus Rundgang (ENT-294)
     rgsRoute: 'Route öffnen',
     rgsAnsprechpartner: 'Ansprechpartner',
-    rgsKeineAnsprechpartner: 'Für diesen Kunden ist keine Ansprechperson hinterlegt.',
-    rgsModule: 'Module',
+    // Bezieht sich seit ENT-300 auf beide Quellen, nicht mehr nur auf den Kunden.
+    rgsKeineAnsprechpartner: 'Für dieses Objekt und diesen Kunden ist keine Ansprechperson hinterlegt.',
+    // Herkunft der Ansprechperson (ENT-300)
+    rgsVorOrt: 'Vor Ort',
+    rgsBeimKunden: 'Beim Kunden',
+    // "Funktionen" statt des frueheren "Module" (ENT-298): Der Projektinhaber
+    // nennt diesen Bereich durchgehend so, "Module" war eine Erfindung von mir.
+    rgsFunktionen: 'Funktionen',
+    // Zentrale und Notruf (ENT-299)
+    rgsHilfe: 'Zentrale und Notruf',
+    rgsZentrale: 'Zentrale',
+    rgsPolizei: 'Polizei',
+    rgsFeuerwehr: 'Feuerwehr',
+    rgsSanitaet: 'Sanität',
+    rgsKeineZentrale: 'Keine Pikettnummer hinterlegt — die Verwaltung trägt sie in den Betriebsdaten ein.',
     rgsKontrollpunkte: 'Kontrollpunkte',
     rgsZeitfenster: 'Ausführbar',
     rgsJederzeit: 'Jederzeit',
     rgsAnzahlPunkte: 'Kontrollpunkte',
     rgsStarten: 'Rundgang starten',
+    // Rundgang pausieren als Funktion (ENT-298)
+    rgsLaeuft: 'Rundgang läuft',
+    rgsIstPausiert: 'Rundgang pausiert',
+    rgsSeit: 'seit',
+    rgsZumRundgang: 'Zum Rundgang',
+    rgsPausieren: 'Rundgang pausieren',
+    rgsFortsetzen: 'Rundgang fortsetzen',
+    rgsWarnung: 'Warnung',
+    rgsPausierenFrage: 'Rundgang pausieren?',
+    rgsPausierenTxt: 'Solange der Rundgang pausiert ist, lassen sich keine Kontrollpunkte melden. Die Pausendauer wird mitgezählt.',
+    rgsJa: 'Ja',
+    rgsNein: 'Nein',
     rgsKeinePunkte: 'Dieser Kontrollrunde ist kein Kontrollpunkt zugeordnet. Ein Start würde in einer leeren Liste enden — bitte zuerst in der Verwaltung Punkte zuordnen.',
     // Ereignis erfassen (ENT-295)
     evTitel: 'Ereignis erfassen',
@@ -1456,6 +1559,19 @@ function rundgangSpontanWaehlen(vorlageId) {
    erst der Knopf am Fuss loest den unveraenderten Startweg aus --
    einschliesslich der Fenster-Weiche aus ENT-279, die weiterhin allein in
    rundgangSpontanWaehlen() sitzt und hier NICHT nachgebaut wird. */
+// Oeffentliche Notrufnummern der Schweiz (ENT-299). Fest, nicht pflegbar:
+// Sie sind gesetzlich vorgegeben und fuer jeden Betrieb dieselben -- ein
+// Einstellungsfeld dafuer waere eine Fehlerquelle ohne Nutzen (CLAUDE.md:
+// gesetzlich Verbindliches wird korrekt standardisiert, nicht frei
+// veraenderbar gemacht). 1414 (Rega) und 145 (Tox) bewusst NICHT dabei: Drei
+// Kacheln bleiben im Blick, sechs nicht -- und wer die Rega braucht, erreicht
+// sie ueber 144.
+const RGS_NOTRUF = [
+  { nr: '117', wort: 'rgsPolizei' },
+  { nr: '118', wort: 'rgsFeuerwehr' },
+  { nr: '144', wort: 'rgsSanitaet' },
+];
+
 let rgsVorlageId = null;
 let rgsAnsicht = 'uebersicht';   // 'uebersicht' | 'ereignis' -- welche Ebene der Seite offen ist
 let rgsDaten = null;             // zuletzt geladene Vorschau, damit der Rueckweg keinen neuen Abruf braucht
@@ -1465,6 +1581,7 @@ function rgSeiteOeffnen(vorlageId) {
   $('rgsTitel').textContent = '–';
   $('rgsBody').innerHTML = `<div class="sk" style="height:104px"></div><div class="sk" style="height:64px"></div>`;
   $('rgsFuss').innerHTML = '';
+  rgsFrageZu();
   $('rgSeite').classList.add('on');
   $('rgSeite').setAttribute('aria-hidden', 'false');
   // Die Schublade schliessen: Sie liegt ueber dieser Seite (z-index 61 vs.
@@ -1485,6 +1602,7 @@ function rgSeiteZu() {
   rgsVorlageId = null;
   rgsAnsicht = 'uebersicht';
   rgsDaten = null;
+  rgsFrageZu();   // eine offene Rueckfrage darf die naechste Seite nicht erben
   $('rgSeite').classList.remove('on');
   $('rgSeite').setAttribute('aria-hidden', 'true');
 }
@@ -1510,6 +1628,13 @@ function rgSeiteZeichnen(d) {
   const o = d.objekt || {}, v = d.vorlage || {};
   const punkte = d.kontrollpunkte || [];
   const leute = d.ansprechpartner || [];
+  // Offene eigene Runde auf dieser Vorlage (ENT-298). Solange sie besteht,
+  // ist diese Seite nicht mehr Vorschau, sondern der Ort, an den man
+  // waehrend der Runde zurueckkommt.
+  const lf = d.laufend || null;
+  // Eigene Zentrale (ENT-299) -- null, solange keine Pikettnummer gepflegt ist.
+  const z = d.zentrale && d.zentrale.telefon ? d.zentrale : null;
+  const pausiert = !!lf && lf.status === 'pausiert';
   // Fuer die Ereignismeldung: zu welchem Objekt wird gemeldet (ENT-295).
   evObjekt = o.id ? { id: o.id, name: o.name } : null;
   $('rgsTitel').textContent = v.name || '';
@@ -1523,7 +1648,15 @@ function rgSeiteZeichnen(d) {
     : (we.art === 'telefon' || we.art === 'mobil') ? 'tel:' + we.wert.replace(/\s/g, '')
     : we.art === 'webseite' ? we.wert : null;
 
+  const statusZeit = pausiert ? lf.pausiert_seit : (lf ? lf.vorbereitet_am : null);
+
   $('rgsBody').innerHTML = `
+    ${lf ? `<div class="rgs-status${pausiert ? ' pause' : ''}" id="rgsStatus">
+      <span class="rgs-status-pkt"></span>
+      <span>${esc(pausiert ? w('rgsIstPausiert') : w('rgsLaeuft'))}</span>
+      ${statusZeit ? `<span class="rgs-status-zeit">${esc(w('rgsSeit'))} ${esc(String(statusZeit).slice(11, 16))}</span>` : ''}
+    </div>` : ''}
+
     <div class="karte"><div class="karte-bd">
       <div class="rgs-objekt">
         <div class="rgs-objekt-txt">
@@ -1559,6 +1692,10 @@ function rgSeiteZeichnen(d) {
         ${leute.length ? leute.map(p => `
           <div class="rgs-person">
             <div class="rgs-person-name">${esc([p.anrede, p.name].filter(Boolean).join(' '))}</div>
+            <div class="rgs-person-meta">
+              <span class="rgs-quelle${p.quelle === 'objekt' ? ' vorort' : ''}">${esc(w(p.quelle === 'objekt' ? 'rgsVorOrt' : 'rgsBeimKunden'))}</span>
+              ${p.funktion ? `<span class="rgs-person-fkt">${esc(p.funktion)}</span>` : ''}
+            </div>
             <div>${(p.wege || []).map(we => {
               const z = wegZiel(we);
               return z ? `<a class="rgs-weg" href="${esc(z)}">${esc(we.wert)}</a>`
@@ -1569,8 +1706,28 @@ function rgSeiteZeichnen(d) {
       </div>
     </div>
 
+    <div class="rgs-hilfe">
+      <div class="rgs-mod-lb" id="rgsHilfeLb">${esc(w('rgsHilfe'))}</div>
+      ${z ? `<a class="rgs-zentrale" id="rgsZentrale" href="tel:${esc(String(z.telefon).replace(/\s/g, ''))}">
+        <span class="rgs-zentrale-ic">
+          <svg class="i i-sm" viewBox="0 0 24 24"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.4-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/></svg>
+        </span>
+        <span class="rgs-zentrale-txt">
+          <span class="rgs-zentrale-lb">${esc(w('rgsZentrale'))}</span>
+          <span class="rgs-zentrale-nr">${esc(z.telefon)}</span>
+          ${z.name ? `<span class="rgs-zentrale-name">${esc(z.name)}</span>` : ''}
+        </span>
+      </a>` : `<div class="rgs-leer" id="rgsKeineZentrale" style="padding:2px 2px 6px">${esc(w('rgsKeineZentrale'))}</div>`}
+      <div class="rgs-notruf" id="rgsNotruf">
+        ${RGS_NOTRUF.map(n => `<a href="tel:${n.nr}" aria-label="${esc(w(n.wort))} ${n.nr}">
+          <span class="rgs-notruf-nr">${n.nr}</span>
+          <span class="rgs-notruf-wort">${esc(w(n.wort))}</span>
+        </a>`).join('')}
+      </div>
+    </div>
+
     <div style="display:flex;flex-direction:column;gap:10px">
-      <div class="rgs-mod-lb">${esc(w('rgsModule'))}</div>
+      <div class="rgs-mod-lb" id="rgsFunktionenLb">${esc(w('rgsFunktionen'))}</div>
       <button type="button" class="rgs-modul" id="rgsModKp" onclick="rgSeiteStarten()">
         <span class="rgs-modul-ic">
           <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="12" cy="10" r="3"/><path d="M12 21s-7-6.2-7-11a7 7 0 1 1 14 0c0 4.8-7 11-7 11z"/></svg>
@@ -1584,6 +1741,15 @@ function rgSeiteZeichnen(d) {
         </span>
         <span>${esc(w('evTitel'))}</span>
       </button>
+      ${lf ? `<button type="button" class="rgs-modul" id="rgsModPause"
+              onclick="${pausiert ? 'rgSeiteFortsetzen()' : 'rgSeitePauseFragen()'}">
+        <span class="rgs-modul-ic">
+          ${pausiert
+            ? '<svg class="i i-sm" viewBox="0 0 24 24"><polygon points="6 4 20 12 6 20 6 4"/></svg>'
+            : '<svg class="i i-sm" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>'}
+        </span>
+        <span>${esc(pausiert ? w('rgsFortsetzen') : w('rgsPausieren'))}</span>
+      </button>` : ''}
     </div>
 
     ${punkte.length ? '' : `<div class="rgs-warn" id="rgsWarnLeer">
@@ -1594,8 +1760,14 @@ function rgSeiteZeichnen(d) {
   // ausfuehrbar ist, entscheidet der Server (Fenster, Doppelbelegung), nicht
   // diese Vorschau. Die Warnung darueber sagt, was einen erwartet -- eine
   // Sperre hier waere eine zweite, abweichende Regel.
-  $('rgsFuss').innerHTML =
-    `<button class="btn btn-primary btn-wide" id="rgsStartBtn" onclick="rgSeiteStarten()">${esc(w('rgsStarten'))}</button>`;
+  // Laeuft die Runde bereits, heisst der Knopf nicht mehr "starten" (ENT-298):
+  // Er fuehrt in die offene Checkliste. Der Weg dorthin geht bewusst NICHT
+  // ueber rgSeiteStarten() -- das laeuft in rundgangSpontanWaehlen() und
+  // wuerde bei einer Runde ausserhalb des Zeitfensters erneut nach einem
+  // Ausnahmegrund fragen, obwohl es nichts mehr zu starten gibt.
+  $('rgsFuss').innerHTML = lf
+    ? `<button class="btn btn-primary btn-wide" id="rgsStartBtn" onclick="rgSeiteZumRundgang()">${esc(w('rgsZumRundgang'))}</button>`
+    : `<button class="btn btn-primary btn-wide" id="rgsStartBtn" onclick="rgSeiteStarten()">${esc(w('rgsStarten'))}</button>`;
 }
 
 function rgSeiteKlapp(id) {
@@ -1609,6 +1781,98 @@ function rgSeiteKlapp(id) {
 function rgSeiteStarten() {
   if (rgsVorlageId === null) return;
   rundgangSpontanWaehlen(rgsVorlageId);
+}
+
+function rgSeiteZumRundgang() {
+  const lf = rgsDaten && rgsDaten.laufend;
+  if (!lf) return;
+  // ladeSchichten() zuerst: rundgangAnzeigen() sucht den Einsatz im lokalen
+  // schichten-Array. Wer diese Seite direkt ueber die objektuebergreifende
+  // Uebersicht geoeffnet hat, hat den spontan angelegten Einsatz dort noch
+  // nicht -- gleiches Prinzip wie in rundgangSpontanStarten().
+  ladeSchichten().then(() => rundgangFortsetzen(lf.einsatz_id));
+}
+
+/* ── Rundgang pausieren als Funktion (ENT-298) ─────────────────────────
+   Pausieren gab es seit ENT-146, aber nur hinter dem roten "Beenden" in der
+   Schublade -- wer nur kurz unterbrechen wollte, musste erst auf einen Knopf
+   tippen, der nach Abbruch aussieht. Hier steht es als eigene Funktion.
+
+   Die Rueckfrage ist kein Zierrat: Ein pausierter Rundgang sperrt die
+   Kontrollpunkte (rundgangListeZeichnen), und die Pausendauer laeuft in
+   pause_minuten mit. Ein Fehlgriff kostet also echte Zeit in einer echten
+   Abrechnung. "Nein" ist der Default und tut nichts.
+
+   Es bleiben zwei Wege zum Pausieren (hier und in der Schublade), aber nur
+   ein Verhalten: Beide rufen denselben Endpunkt. Der Weg in der Schublade
+   bleibt unangetastet -- dort ist die Schublade selbst schon die Rueckfrage,
+   eine zweite waere eine Frage auf eine Frage. */
+let rgsFrageJa = null;
+
+function rgsFrage(frage, text, jaWort, jaFn) {
+  rgsFrageJa = jaFn;
+  $('rgsDlgLb').textContent = w('rgsWarnung');
+  $('rgsDlgFrage').textContent = frage;
+  $('rgsDlgTxt').textContent = text || '';
+  $('rgsDlgTxt').style.display = text ? '' : 'none';
+  $('rgsDlgNein').textContent = w('rgsNein');
+  const ja = $('rgsDlgJa');
+  ja.textContent = jaWort;
+  ja.disabled = false;
+  ja.onclick = () => { if (rgsFrageJa) rgsFrageJa(); };
+  $('rgsDlg').hidden = false;
+  // Der harmlose Ausgang bekommt den Fokus, nicht der folgenreiche.
+  $('rgsDlgNein').focus();
+}
+
+function rgsFrageZu() {
+  rgsFrageJa = null;
+  $('rgsDlg').hidden = true;
+}
+
+function rgSeitePauseFragen() {
+  if (!rgsDaten || !rgsDaten.laufend) return;
+  rgsFrage(w('rgsPausierenFrage'), w('rgsPausierenTxt'), w('rgsJa'), rgSeitePausieren);
+}
+
+function rgSeitePausieren() {
+  const lf = rgsDaten && rgsDaten.laufend;
+  if (!lf) return;
+  const ja = $('rgsDlgJa'); ja.disabled = true;
+  api('mein_rundgang_pausieren.php', { method: 'POST', body: { rundgang_id: lf.id } }).then(({ ok, data }) => {
+    ja.disabled = false;
+    if (!ok || data.status !== 'ok') { toast(data.message || w('netzfehler')); return; }
+    rgsFrageZu();
+    lf.status = 'pausiert';
+    lf.pausiert_seit = jetztDatetime();
+    rgsLaufendUebernehmen(lf);
+    rgSeiteZeichnen(rgsDaten);
+  });
+}
+
+// Fortsetzen ohne Rueckfrage: Es macht die Sperre auf, statt sie zu setzen --
+// ein Fehlgriff hier ist folgenlos und sofort umkehrbar.
+function rgSeiteFortsetzen() {
+  const lf = rgsDaten && rgsDaten.laufend;
+  if (!lf) return;
+  const btn = $('rgsModPause'); if (btn) btn.disabled = true;
+  api('mein_rundgang_fortsetzen.php', { method: 'POST', body: { rundgang_id: lf.id } }).then(({ ok, data }) => {
+    if (btn) btn.disabled = false;
+    if (!ok || data.status !== 'ok') { toast(data.message || w('netzfehler')); return; }
+    lf.status = data.rundgang_status;
+    lf.pausiert_seit = null;
+    rgsLaufendUebernehmen(lf);
+    rgSeiteZeichnen(rgsDaten);
+  });
+}
+
+// Ist dieselbe Runde auch in der Schublade offen, muss sie denselben Status
+// tragen -- sonst zeigt die Checkliste nach dem Zurueckgehen noch den alten
+// Zustand und liesse Kontrollpunkte melden, die der Server bereits sperrt.
+function rgsLaufendUebernehmen(lf) {
+  if (!rundgangAktiv || Number(rundgangAktiv.id) !== Number(lf.id)) return;
+  rundgangAktiv.status = lf.status;
+  rundgangAktiv.pausiert_seit = lf.pausiert_seit;
 }
 
 /* ══ EREIGNIS ERFASSEN (ENT-295) ═══════════════════════════════════════
@@ -3028,8 +3292,8 @@ function schichtRapportBlatt(id) {
     Unterschrift.einrichten({
       ziel: 'sigFeld',
       kontext: () => ({
-        zeile: [$('srKunde').value.trim(), dmy(e.datum),
-                `${$('srVon').value}–${$('srBis').value}`].filter(Boolean).join(' · '),
+        zeilen: [$('srKunde').value.trim(),
+                 `${dmy(e.datum)} · ${$('srVon').value}–${$('srBis').value}`],
         name: $('srSigName') ? $('srSigName').value.trim() : '',
       }),
     });
@@ -3161,6 +3425,9 @@ function blattZu() {
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
   if ($('blatt').classList.contains('on')) { blattZu(); return; }
+  // Die Rueckfrage (ENT-298) liegt innerhalb der Seite und ist damit die
+  // oberste Ebene, solange sie offen ist. Escape heisst hier "Nein".
+  if (!$('rgsDlg').hidden) { rgsFrageZu(); return; }
   if ($('rgSeite').classList.contains('on')) { rgSeiteZurueck(); return; }
   blattZu();
 });

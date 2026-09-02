@@ -15,6 +15,7 @@ pruef('Ein Sperrtag ebenfalls',                     ereignis_abhakbar('sperrtag'
 pruef('Eine Zusage ebenfalls',                      ereignis_abhakbar('zusage'));
 pruef('Eine Offerten-Entscheidung ebenfalls (ENT-197)', ereignis_abhakbar('offerte'));
 pruef('Ein spontaner Rundgang-Start ebenfalls (ENT-283)', ereignis_abhakbar('rundgang_spontan'));
+pruef('Eine Vorfallmeldung ebenfalls (ENT-297)',    ereignis_abhakbar('vorfall'));
 // Eine offene, noch nicht abgeglichene Schicht ist KEIN Ereignis, sondern ein
 // andauernder Zustand. Sie war bis zum 23.08.2026 eine eigene Art und wurde
 // auf ausdrueckliche Ansage des Projektinhabers entfernt: "fehlende, noch
@@ -23,8 +24,11 @@ pruef('Ein spontaner Rundgang-Start ebenfalls (ENT-283)', ereignis_abhakbar('run
 // kaeme die Art beim naechsten Ausbau geraeuschlos zurueck.
 pruef('KRITISCH: der offene Abgleich ist gar keine Art mehr',
     !array_key_exists('abgleich', EREIGNIS_ARTEN) && ereignis_abhakbar('abgleich') === false);
-pruef('KRITISCH: es gibt genau fuenf Arten -- Rapport, Sperrtag, Zusage, Offerte, spontaner Rundgang',
-    count(EREIGNIS_ARTEN) === 5);
+// Die feste Zahl ist Absicht: Eine neue Art soll nicht geraeuschlos
+// dazukommen, sondern hier bewusst eingetragen werden -- zusammen mit der
+// Frage, ob das Recht 'plan' fuer ihr Abhaken wirklich passt.
+pruef('KRITISCH: es gibt genau sechs Arten -- Rapport, Sperrtag, Zusage, Offerte, spontaner Rundgang, Vorfallmeldung',
+    count(EREIGNIS_ARTEN) === 6);
 pruef('Eine erfundene Art auch nicht',              ereignis_abhakbar('irgendwas') === false);
 pruef('Und eine leere erst recht nicht',            ereignis_abhakbar('') === false);
 

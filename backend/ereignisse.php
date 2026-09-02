@@ -44,6 +44,13 @@ const EREIGNIS_ARTEN = [
     // sitzt am rundgang-Datensatz, nicht am Einsatz -- er ist das konkrete,
     // einmalige Geschehnis.
     'rundgang_spontan' => ['tabelle' => 'rundgang',  'spalte' => 'gesehen_am'],
+    // Vorfallmeldung aus dem Revierdienst (ENT-297, Fortsetzung von
+    // ENT-295). Gehoert in den Feed und nicht nur in die eigene Liste: Eine
+    // Brandgefahr-Meldung darf nicht darauf warten, dass jemand zufaellig
+    // eine Liste oeffnet. Abhakbar wie die uebrigen -- der Feed sagt "habe
+    // ich gesehen", nicht "ist erledigt"; was daraus folgt, entscheidet der
+    // Planer ausserhalb.
+    'vorfall'  => ['tabelle' => 'ereignis_meldung', 'spalte' => 'gesehen_am'],
     // "abwesenheit" bewusst NICHT hier eingetragen: ereignis_erledigt.php
     // prueft nur das Recht 'plan', nicht 'personal_schreiben'. Eine
     // Planungs-Person koennte einen unentschiedenen Antrag sonst aus dem
@@ -197,6 +204,43 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12): array
             'datum' => $r['datum'], 'von' => $r['von'], 'bis' => $r['bis'],
             'kunde' => $r['kunde_name'], 'einsatz_titel' => $r['einsatz_titel'], 'ort' => $r['ort'],
             'ausnahme_grund' => $r['ausnahme_grund'],
+        ];
+    }
+
+    // ── Vorfallmeldung aus dem Revierdienst (ENT-297). Anders als die
+    // uebrigen Arten haengt sie an einem OBJEKT, nicht an einem Einsatz:
+    // Gemeldet werden kann auch ohne laufende Runde. Die Ereignisart kommt
+    // aus den Stammdaten und kann geloescht worden sein (ON DELETE SET
+    // NULL), darum LEFT JOIN -- ein INNER JOIN wuerde die Meldung samt
+    // ihrem Inhalt aus dem Feed verschwinden lassen, nur weil jemand eine
+    // Art aus dem Katalog genommen hat.
+    // Kein eigener hat_tabelle()-Vorabtest: Der lebt in db.php, das diese
+    // Datei bewusst NICHT einbindet (sie laeuft in pruef_ereignisse.php
+    // isoliert gegen SQLite). ereignis_lesen() faengt eine fehlende Tabelle
+    // ohnehin ab und meldet die Art als unvollstaendig -- genau derselbe
+    // Weg wie bei allen anderen Bloecken hier.
+    foreach (ereignis_lesen($pdo,
+        "SELECT v.id, v.erfasst_am, v.vorfall_am, v.bemerkung, v.foto_mime,
+                v.objekt_id, o.name AS objekt_name, o.kunde_name,
+                a.bezeichnung AS art,
+                m.id AS mitarbeiter_id, m.name, m.vorname, m.nachname
+           FROM ereignis_meldung v
+           JOIN objekte o     ON o.id = v.objekt_id
+           JOIN mitarbeiter m ON m.id = v.mitarbeiter_id
+           LEFT JOIN ereignisart a ON a.id = v.ereignisart_id
+          WHERE v.gesehen_am IS NULL
+          ORDER BY v.erfasst_am DESC LIMIT 20", $fehler, 'vorfall') as $r) {
+        $liste[] = [
+            'typ' => 'vorfall', 'id' => (int)$r['id'], 'zeit' => $r['erfasst_am'],
+            'person' => ['id' => (int)$r['mitarbeiter_id'], 'name' => $r['name'],
+                         'vorname' => $r['vorname'], 'nachname' => $r['nachname']],
+            'titel' => 'Ereignis gemeldet',
+            'art' => $r['art'],
+            'objekt_id' => (int)$r['objekt_id'], 'objekt' => $r['objekt_name'],
+            'kunde' => $r['kunde_name'],
+            'bemerkung' => $r['bemerkung'],
+            'vorfall_am' => $r['vorfall_am'],
+            'hat_foto' => $r['foto_mime'] !== null,
         ];
     }
 

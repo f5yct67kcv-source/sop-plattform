@@ -127,8 +127,11 @@ check('Die Kachel "Übersicht" ist unter Revierdienst sichtbar', await page.isVi
 // (u. a. "Aufgaben") -- ein ungescopter Selektor traf sonst beide Raster
 // zusammen, dieselbe Fehlerklasse wie schon bei .bk-zurueck (ENT-246).
 const kachelLabels = await page.$$eval('#rdUebersicht .bk-kachel-lbl', els => els.map(e => e.textContent.trim()));
-check('KRITISCH: alle vier Kacheln stehen da, in der vorgegebenen Reihenfolge',
-  JSON.stringify(kachelLabels) === JSON.stringify(['Rundgänge', 'GPS', 'Aufgaben', 'Auswertungen']));
+// "Ereignisse" ist seit ENT-297 die fuenfte Kachel und steht bewusst VOR
+// "Auswertungen": Sie fuehrt auf echte, gemeldete Vorfaelle, waehrend
+// "Auswertungen" noch ohne Funktion ist.
+check('KRITISCH: alle fünf Kacheln stehen da, in der vorgegebenen Reihenfolge',
+  JSON.stringify(kachelLabels) === JSON.stringify(['Rundgänge', 'GPS', 'Aufgaben', 'Ereignisse', 'Auswertungen']));
 await page.click('#view-rundgaenge .bk-kachel:has-text("GPS")');
 await page.waitForTimeout(100);
 check('KRITISCH: eine Kachel ist noch ohne Funktion, sagt das aber statt nichts zu tun',

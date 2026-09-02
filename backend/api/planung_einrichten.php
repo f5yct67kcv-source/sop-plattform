@@ -208,6 +208,50 @@ CREATE TABLE IF NOT EXISTS objekte (
   FOREIGN KEY (kunde_id) REFERENCES kunden(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+// Ansprechpartner AM OBJEKT (ENT-300) -- nicht am Kunden. Vom Projektinhaber
+// ausdruecklich unterschieden: "der hinterlegte Ansprechpartner (Objekt nicht
+// Verwaltung)". Der Hauswart im Bahnhof ist nachts erreichbar und vor Ort;
+// die Kontaktperson beim Kunden sitzt in der Zentrale und weiss nicht, welche
+// Tuer klemmt. Beide gelten NEBENEINANDER (Entscheid des Projektinhabers:
+// ergaenzen, nicht ersetzen) -- die App zeigt zuerst die Leute vor Ort.
+//
+// Bewusst nach demselben Muster wie kunden_person/kunden_kontaktweg gebaut,
+// bis hin zu person_id NULL fuer einen Weg, der zum Objekt selbst gehoert
+// (Loge, Portier) und an keiner Person haengt. Zwei gleich gebaute
+// Tabellenpaare statt eines generischen "Kontakt"-Modells mit Typspalte:
+// Dieselbe Ueberlegung wie bei ma_funktion/ma_abteilung weiter oben, und ein
+// Fremdschluessel greift nur, wenn er auf genau eine Tabelle zeigt.
+//
+// funktion: Die Angabe, die einen Objektkontakt ueberhaupt brauchbar macht.
+// Um drei Uhr nachts ist "Hauswart" die Information, nicht der Nachname.
+// Beim Kunden gibt es dieses Feld nicht -- dort ist die Firma der Bezug.
+'objekt_person' => "
+CREATE TABLE IF NOT EXISTS objekt_person (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  objekt_id INT NOT NULL,
+  anrede VARCHAR(20) NULL,
+  vorname VARCHAR(100) NULL,
+  nachname VARCHAR(100) NULL,
+  funktion VARCHAR(100) NULL,
+  sortierung INT NOT NULL DEFAULT 0,
+  KEY idx_objekt (objekt_id, sortierung),
+  FOREIGN KEY (objekt_id) REFERENCES objekte(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+'objekt_kontaktweg' => "
+CREATE TABLE IF NOT EXISTS objekt_kontaktweg (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  objekt_id INT NOT NULL,
+  person_id INT NULL,
+  art VARCHAR(20) NOT NULL,
+  wert VARCHAR(255) NOT NULL,
+  sortierung INT NOT NULL DEFAULT 0,
+  KEY idx_objekt (objekt_id, sortierung),
+  KEY idx_person (person_id),
+  FOREIGN KEY (objekt_id) REFERENCES objekte(id) ON DELETE CASCADE,
+  FOREIGN KEY (person_id) REFERENCES objekt_person(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
 'masterschichten' => "
 CREATE TABLE IF NOT EXISTS masterschichten (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -1301,6 +1345,16 @@ $spalten = [
     // Betrieb selbst existierte (nur fuer Mitarbeitende und Kunden).
     ['betrieb', 'telefon', 'ALTER TABLE betrieb ADD COLUMN telefon VARCHAR(50) NULL AFTER domizil_ort'],
     ['betrieb', 'email',   'ALTER TABLE betrieb ADD COLUMN email VARCHAR(200) NULL AFTER telefon'],
+    // Pikett-/Zentralnummer (ENT-299). BEWUSST eine eigene Spalte neben
+    // 'telefon': Das ist nicht dieselbe Nummer. 'telefon' steht auf dem
+    // Briefkopf und geht an Kunden -- die Buero-Nummer, die tagsueber
+    // klingelt. Diese hier sieht der Waechter nachts um drei im Rundgang und
+    // waehlt sie im Ereignisfall. Waeren es dieselbe Spalte, wuerde ein
+    // Aendern des Briefkopfs stillschweigend die Notfallnummer mitaendern.
+    // Kein stiller Rueckfall auf 'telefon', wenn diese Spalte leer ist: Dann
+    // erscheint in der App gar keine Zentrale, statt einer Nummer, an der
+    // nachts niemand abnimmt.
+    ['betrieb', 'pikett_telefon', 'ALTER TABLE betrieb ADD COLUMN pikett_telefon VARCHAR(50) NULL AFTER email'],
     // TINYINT NULL, nicht NOT NULL DEFAULT 0: NULL heisst 'noch nicht
     // entschieden', 0 heisst 'geprueft und nein'. Der Unterschied ist bei
     // GAV-AUS-004 wesentlich -- eine Vorbelegung waere eine Auslegung.
@@ -1507,6 +1561,9 @@ $spalten = [
     // bei Rapport/Sperrtag/Zusage, hier am Rundgang selbst -- er ist das
     // konkrete, einmalige Geschehnis, nicht der Einsatz als Ganzes.
     ['rundgang', 'gesehen_am', 'ALTER TABLE rundgang ADD COLUMN gesehen_am DATETIME NULL'],
+    // Dasselbe fuer Vorfallmeldungen (ENT-297): Sie erscheinen im Feed und
+    // muessen sich dort abhaken lassen wie alles andere auch.
+    ['ereignis_meldung', 'gesehen_am', 'ALTER TABLE ereignis_meldung ADD COLUMN gesehen_am DATETIME NULL'],
 
     // Explizite Berechtigung "macht Revierdienst" (ENT-284) -- ersetzt die
     // bisherige Herleitung aus der Schicht-Historie (ENT-234) als einzige

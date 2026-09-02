@@ -26,9 +26,9 @@ const iso = d => new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString
 const tag = n => iso(new Date(Date.now() + n * 864e5));
 
 const SCHICHTEN = { status: 'ok', von: tag(-30), bis: tag(90), schichten: [
-  { id: 71, kunde_name: 'Beispiel AG', titel: 'Nachtwache', strasse: 'Industriestrasse 4', ort: '4600 Olten',
+  { id: 71, kunde_name: 'Musterliegenschaften AG', titel: 'Nachtwache', strasse: 'Musterweg 4', ort: '9999 Musterdorf',
     einsatzart: 'Revierdienst', sparte: 'sicherheit', datum: tag(-1), von: '20:00:00', bis: '06:00:00',
-    status: 'bestaetigt', bemerkung: null, zusage: 'zugesagt', objekt_name: 'Muster Center', objekt_id: 7,
+    status: 'bestaetigt', bemerkung: null, zusage: 'zugesagt', objekt_name: 'Musterobjekt Industrie', objekt_id: 7,
     hat_kontrollpunkte: true, im_team: 1 },
 ]};
 
@@ -36,36 +36,50 @@ const PROFIL = { status: 'ok', monat: { anzahl: 0, stunden: 0 }, profil: {
   name: 'm.muster', ist_admin: false, personalnummer: 'P-001',
   vorname: 'Max', nachname: 'Muster', erstellt_am: tag(-30) + ' 10:00:00' } };
 
+// Zeitfenster der zweiten Runde: 06:00-07:00, und die Uhr wird weiter unten
+// fest auf 22:00 eingefroren. Beides gehoert zusammen -- weiter unten wird
+// geprueft, dass die Grundabfrage aus ENT-279 erscheint, und die erscheint
+// nur AUSSERHALB des Fensters.
+//
+// Ohne das eingefrorene "jetzt" war diese Suite taeglich zwischen 05:55 und
+// 07:05 rot (Toleranz RUNDGANG_FENSTER_TOLERANZ_MIN = 5), ohne dass
+// irgendetwas kaputt war -- aufgefallen in einem Lauf um 06:56 am
+// 2026-09-02 (ENT-298). test_rundgang_fenster.mjs macht es seit ENT-279
+// richtig; hier fehlte es schlicht.
+const FENSTER = ['06:00:00', '07:00:00'];
+const FENSTER_HM = FENSTER[0].slice(0, 5);
+const JETZT = new Date(`${tag(0)}T22:00:00`);
+
 const VORLAGEN_ALLE = [
-  { id: 501, name: 'Muster Schliessrunde', objekt_id: 7, objekt_name: 'Muster Center',
-    kunde_name: 'Beispiel AG', fenster_von: null, fenster_bis: null },
+  { id: 501, name: 'Schliessrunde Musterobjekt', objekt_id: 7, objekt_name: 'Musterobjekt Industrie',
+    kunde_name: 'Musterliegenschaften AG', fenster_von: null, fenster_bis: null },
   // Zweite Runde OHNE zugeordnete Kontrollpunkte -- genau der gemeldete Fall
   // ("0 von 0 erledigt"), der bisher erst nach dem Start sichtbar wurde.
-  { id: 502, name: 'Leere Runde', objekt_id: 7, objekt_name: 'Muster Center',
-    kunde_name: 'Beispiel AG', fenster_von: '06:00:00', fenster_bis: '07:00:00' },
+  { id: 502, name: 'Leere Runde', objekt_id: 7, objekt_name: 'Musterobjekt Industrie',
+    kunde_name: 'Musterliegenschaften AG', fenster_von: FENSTER[0], fenster_bis: FENSTER[1] },
 ];
 
 const UEBERSICHT = {
   501: { status: 'ok',
-    vorlage: { id: 501, name: 'Muster Schliessrunde', fenster_von: null, fenster_bis: null },
-    objekt: { id: 7, name: 'Muster Center', strasse: 'Industriestrasse 4', ort: '4600 Olten',
+    vorlage: { id: 501, name: 'Schliessrunde Musterobjekt', fenster_von: null, fenster_bis: null },
+    objekt: { id: 7, name: 'Musterobjekt Industrie', strasse: 'Musterweg 4', ort: '9999 Musterdorf',
       kanton: 'SO', bemerkung: null },
-    kunde_name: 'Beispiel AG',
+    kunde_name: 'Musterliegenschaften AG',
     kontrollpunkte: [
-      { id: 1, bezeichnung: 'Muster Start', typ: 'geofence' },
-      { id: 2, bezeichnung: 'Muster Tor 3', typ: 'geofence' },
-      { id: 3, bezeichnung: 'Parkplatz Muster', typ: 'nfc' },
-      { id: 4, bezeichnung: 'Parkhaus Muster', typ: 'geofence' },
+      { id: 1, bezeichnung: 'Eingang Nord', typ: 'geofence' },
+      { id: 2, bezeichnung: 'Tor 3', typ: 'geofence' },
+      { id: 3, bezeichnung: 'Parkplatz', typ: 'nfc' },
+      { id: 4, bezeichnung: 'Parkhaus', typ: 'geofence' },
     ],
     ansprechpartner: [
       { name: 'Vreni Beispiel', anrede: 'Frau', wege: [
         { art: 'telefon', wert: '062 000 00 00' }, { art: 'email', wert: 'kontakt@example.invalid' }] },
     ] },
   502: { status: 'ok',
-    vorlage: { id: 502, name: 'Leere Runde', fenster_von: '06:00:00', fenster_bis: '07:00:00' },
-    objekt: { id: 7, name: 'Muster Center', strasse: 'Industriestrasse 4', ort: '4600 Olten',
+    vorlage: { id: 502, name: 'Leere Runde', fenster_von: FENSTER[0], fenster_bis: FENSTER[1] },
+    objekt: { id: 7, name: 'Musterobjekt Industrie', strasse: 'Musterweg 4', ort: '9999 Musterdorf',
       kanton: 'SO', bemerkung: null },
-    kunde_name: 'Beispiel AG',
+    kunde_name: 'Musterliegenschaften AG',
     kontrollpunkte: [],
     ansprechpartner: [] },
 };
@@ -75,6 +89,9 @@ let rufe = [];
 const browser = await chromium.launch({ executablePath: EXE });
 const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
 page.on('pageerror', e => bad.push('JS-Fehler: ' + e.message));
+// Uhr einfrieren, damit die Fenster-Weiche unabhaengig von der tatsaechlichen
+// Tageszeit immer dasselbe Ergebnis liefert (siehe Kommentar bei FENSTER).
+await page.clock.install({ time: JETZT });
 
 await page.route('**/api/**', route => {
   const req = route.request();
@@ -109,7 +126,7 @@ await page.waitForTimeout(400);
 await page.evaluate(() => rundgangUebersichtOeffnen());
 await page.waitForTimeout(300);
 rufe = [];
-await page.click('#blBody button:has-text("Muster Schliessrunde")');
+await page.click('#blBody button:has-text("Schliessrunde Musterobjekt")');
 await page.waitForTimeout(400);
 
 check('KRITISCH: das Öffnen einer Runde startet sie NICHT (kein Aufruf von mein_rundgang_spontan_starten)',
@@ -120,13 +137,13 @@ check('KRITISCH: die Vollseite ist offen', await page.isVisible('#rgSeite'));
 check('Die Schublade ist dabei geschlossen -- sie läge sonst darüber',
   !(await page.isVisible('#blatt.on')));
 check('Die Kopfzeile trägt den Namen der Runde',
-  (await page.textContent('#rgsTitel')) === 'Muster Schliessrunde');
+  (await page.textContent('#rgsTitel')) === 'Schliessrunde Musterobjekt');
 
 // ══════════ KOPF: OBJEKT, KUNDE, ADRESSE -- IN DIESER REIHENFOLGE ══════
 check('KRITISCH: Objekt, Kunde und Adresse stehen alle im Kopf',
-  (await page.textContent('#rgsBody')).includes('Muster Center')
-  && (await page.textContent('#rgsBody')).includes('Beispiel AG')
-  && (await page.textContent('#rgsBody')).includes('Industriestrasse 4'));
+  (await page.textContent('#rgsBody')).includes('Musterobjekt Industrie')
+  && (await page.textContent('#rgsBody')).includes('Musterliegenschaften AG')
+  && (await page.textContent('#rgsBody')).includes('Musterweg 4'));
 // Nicht nur "steht drin", sondern in der vom Projektinhaber verlangten
 // Reihenfolge -- am gerenderten Zustand gemessen, nicht im Quelltext gelesen.
 const reihenfolge = await page.evaluate(() => {
@@ -219,7 +236,7 @@ check('Die Warnung nennt die Ursache (fehlende Zuordnung), nicht nur "keine Date
 check('Die Anzahl 0 wird als solche ausgewiesen, nicht verschwiegen',
   (await page.textContent('.rgs-fakten')).includes('0'));
 check('Das Zeitfenster dieser Runde steht als Uhrzeit da',
-  (await page.textContent('.rgs-fakten')).includes('06:00'));
+  (await page.textContent('.rgs-fakten')).includes(FENSTER_HM));
 check('Ohne Ansprechpartner erscheint ein erklärender Satz statt einer leeren Fläche',
   (await page.textContent('#rgsKlappAp .rgs-klapp-bd')).includes('keine Ansprechperson'));
 
