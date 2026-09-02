@@ -90,12 +90,59 @@ $laufend = $lf ? [
     'pausiert_seit'  => $lf['pausiert_seit'],
 ] : null;
 
-// Ansprechpartner: am Objekt selbst gibt es keine (die objekte-Tabelle
-// kennt nur Adressfelder) -- die Personen haengen am Kunden, mit ihren
-// Kontaktwegen in einer eigenen Tabelle. Firmen-Kontaktwege (person_id
-// NULL) kommen als eigener Eintrag ohne Namen mit: eine allgemeine
-// Zentralnummer ist nachts oft der einzige erreichbare Weg.
+// Ansprechpartner aus ZWEI Quellen (ENT-300). Der Projektinhaber hat
+// entschieden: die Leute am Objekt ERGAENZEN die des Kunden, sie ersetzen
+// sie nicht. Reihenfolge darum Objekt zuerst -- der Hauswart ist vor Ort und
+// weiss, welche Tuer klemmt; die Kontaktperson des Kunden sitzt in der
+// Zentrale. Jeder Eintrag traegt 'quelle', damit in der App zu sehen ist,
+// wen man da anruft: Wer den Falschen weckt, ruft beim naechsten Mal
+// niemanden mehr an.
+//
+// Firmen-/objektweite Kontaktwege (person_id NULL) kommen je als eigener
+// Eintrag ohne Namen mit: eine allgemeine Nummer (Loge, Zentrale) ist nachts
+// oft der einzige erreichbare Weg.
 $ansprechpartner = [];
+
+if (hat_tabelle($pdo, 'objekt_person')) {
+    $opStmt = $pdo->prepare(
+        'SELECT id, anrede, vorname, nachname, funktion FROM objekt_person
+          WHERE objekt_id = ? ORDER BY sortierung, id'
+    );
+    $opStmt->execute([(int)$v['objekt_id']]);
+    $objektPersonen = $opStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $oWege = [];
+    if (hat_tabelle($pdo, 'objekt_kontaktweg')) {
+        $owStmt = $pdo->prepare(
+            'SELECT person_id, art, wert FROM objekt_kontaktweg
+              WHERE objekt_id = ? ORDER BY sortierung, id'
+        );
+        $owStmt->execute([(int)$v['objekt_id']]);
+        foreach ($owStmt->fetchAll(PDO::FETCH_ASSOC) as $w) {
+            $schluessel = $w['person_id'] === null ? 'objekt' : (string)(int)$w['person_id'];
+            $oWege[$schluessel][] = ['art' => $w['art'], 'wert' => $w['wert']];
+        }
+    }
+
+    foreach ($objektPersonen as $p) {
+        $name = trim(($p['vorname'] ?? '') . ' ' . ($p['nachname'] ?? ''));
+        $funktion = trim((string)($p['funktion'] ?? ''));
+        // Eine Person ohne Namen, aber mit Funktion ("Hauswart") ist gueltig
+        // -- brauchbar ist sie, sobald eines von beidem dasteht.
+        if ($name === '' && $funktion === '') { continue; }
+        $ansprechpartner[] = [
+            'name'     => $name !== '' ? $name : $funktion,
+            'anrede'   => $p['anrede'] ?: null,
+            'funktion' => ($name !== '' && $funktion !== '') ? $funktion : null,
+            'quelle'   => 'objekt',
+            'wege'     => $oWege[(string)(int)$p['id']] ?? [],
+        ];
+    }
+    if (!empty($oWege['objekt'])) {
+        $ansprechpartner[] = ['name' => $v['objekt_name'], 'anrede' => null,
+            'funktion' => null, 'quelle' => 'objekt', 'wege' => $oWege['objekt']];
+    }
+}
 if ($v['kunde_id'] !== null && hat_tabelle($pdo, 'kunden_person')) {
     $pStmt = $pdo->prepare(
         'SELECT id, anrede, vorname, nachname FROM kunden_person
@@ -121,13 +168,16 @@ if ($v['kunde_id'] !== null && hat_tabelle($pdo, 'kunden_person')) {
         $name = trim(($p['vorname'] ?? '') . ' ' . ($p['nachname'] ?? ''));
         if ($name === '') { continue; }
         $ansprechpartner[] = [
-            'name'   => $name,
-            'anrede' => $p['anrede'] ?: null,
-            'wege'   => $wege[(string)(int)$p['id']] ?? [],
+            'name'     => $name,
+            'anrede'   => $p['anrede'] ?: null,
+            'funktion' => null,
+            'quelle'   => 'kunde',
+            'wege'     => $wege[(string)(int)$p['id']] ?? [],
         ];
     }
     if (!empty($wege['firma'])) {
-        $ansprechpartner[] = ['name' => $v['kunde_name'], 'anrede' => null, 'wege' => $wege['firma']];
+        $ansprechpartner[] = ['name' => $v['kunde_name'], 'anrede' => null,
+            'funktion' => null, 'quelle' => 'kunde', 'wege' => $wege['firma']];
     }
 }
 

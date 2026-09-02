@@ -208,6 +208,50 @@ CREATE TABLE IF NOT EXISTS objekte (
   FOREIGN KEY (kunde_id) REFERENCES kunden(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+// Ansprechpartner AM OBJEKT (ENT-300) -- nicht am Kunden. Vom Projektinhaber
+// ausdruecklich unterschieden: "der hinterlegte Ansprechpartner (Objekt nicht
+// Verwaltung)". Der Hauswart im Bahnhof ist nachts erreichbar und vor Ort;
+// die Kontaktperson beim Kunden sitzt in der Zentrale und weiss nicht, welche
+// Tuer klemmt. Beide gelten NEBENEINANDER (Entscheid des Projektinhabers:
+// ergaenzen, nicht ersetzen) -- die App zeigt zuerst die Leute vor Ort.
+//
+// Bewusst nach demselben Muster wie kunden_person/kunden_kontaktweg gebaut,
+// bis hin zu person_id NULL fuer einen Weg, der zum Objekt selbst gehoert
+// (Loge, Portier) und an keiner Person haengt. Zwei gleich gebaute
+// Tabellenpaare statt eines generischen "Kontakt"-Modells mit Typspalte:
+// Dieselbe Ueberlegung wie bei ma_funktion/ma_abteilung weiter oben, und ein
+// Fremdschluessel greift nur, wenn er auf genau eine Tabelle zeigt.
+//
+// funktion: Die Angabe, die einen Objektkontakt ueberhaupt brauchbar macht.
+// Um drei Uhr nachts ist "Hauswart" die Information, nicht der Nachname.
+// Beim Kunden gibt es dieses Feld nicht -- dort ist die Firma der Bezug.
+'objekt_person' => "
+CREATE TABLE IF NOT EXISTS objekt_person (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  objekt_id INT NOT NULL,
+  anrede VARCHAR(20) NULL,
+  vorname VARCHAR(100) NULL,
+  nachname VARCHAR(100) NULL,
+  funktion VARCHAR(100) NULL,
+  sortierung INT NOT NULL DEFAULT 0,
+  KEY idx_objekt (objekt_id, sortierung),
+  FOREIGN KEY (objekt_id) REFERENCES objekte(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+'objekt_kontaktweg' => "
+CREATE TABLE IF NOT EXISTS objekt_kontaktweg (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  objekt_id INT NOT NULL,
+  person_id INT NULL,
+  art VARCHAR(20) NOT NULL,
+  wert VARCHAR(255) NOT NULL,
+  sortierung INT NOT NULL DEFAULT 0,
+  KEY idx_objekt (objekt_id, sortierung),
+  KEY idx_person (person_id),
+  FOREIGN KEY (objekt_id) REFERENCES objekte(id) ON DELETE CASCADE,
+  FOREIGN KEY (person_id) REFERENCES objekt_person(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
 'masterschichten' => "
 CREATE TABLE IF NOT EXISTS masterschichten (
   id INT AUTO_INCREMENT PRIMARY KEY,
