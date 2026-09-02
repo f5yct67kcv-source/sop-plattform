@@ -952,6 +952,7 @@ const W = {
     rgsReiterPunkte: 'Kontrollpunkte',
     rgsKarteLaedt: 'Karte wird geladen …',
     rgsKarteFehler: 'Die Karte liess sich nicht laden — ohne Netz geht das nicht. Die Kontrollpunkte stehen im Reiter daneben.',
+    rgsKarteGesperrt: 'Die Karte ist für diese Seite nicht freigegeben. Das ist eine Einstellung beim Kartenanbieter, kein Fehler an deinem Gerät — bitte der Verwaltung melden. Die Kontrollpunkte stehen im Reiter daneben, die Runde läuft normal weiter.',
     rgsKarteLeer: 'Für diese Runde ist kein Kontrollpunkt auf der Karte darstellbar.',
     rgsKarteOhneOrt: 'ohne Koordinaten — nur in der Liste',
     rgsZentrieren: 'Zentrieren',
@@ -3381,6 +3382,48 @@ function rgLaufFunktionen() {
 const RGS_MAPS_SCHLUESSEL = 'AIzaSyBdm5W2BwLAir3YHQusdpamrG1Mgx4AdzI';
 let rgsMapsVersprechen = null;
 let rgsKarte = null, rgsKartenMarken = [], rgsKartenKreise = [], rgsStandortMarke = null;
+// Der Schluessel wurde vom Kartenanbieter abgelehnt (ENT-309). Eigener
+// Zustand, weil dieser Fall NICHT ueber das Versprechen laeuft: Das Skript
+// laedt, google.maps ist da, `new google.maps.Map` gelingt -- und erst
+// danach meldet der Anbieter asynchron, dass der Schluessel fuer diese
+// Seite nicht gilt. Bis hierher fiel das durch beide Netze und der
+// Waechter sah die graue Tafel des Anbieters mit dem Rat, die
+// JavaScript-Konsole zu oeffnen. Auf einem Diensthandy nachts ist das
+// keine Auskunft.
+let rgsMapsAbgelehnt = false;
+
+/* Der Kartenanbieter ruft diese Funktion beim Namen auf, wenn er den
+   Schluessel ablehnt -- falscher Schluessel, nicht freigegebene Adresse,
+   abgeschaltete Abrechnung. Sie ist die einzige Stelle, an der sich das
+   ueberhaupt abfangen laesst; einen Fehlercode uebergibt er dabei nicht,
+   der steht nur in der Konsole. Darum sagt der Text, WAS zu tun ist
+   (melden, weiterarbeiten), und nicht, was schiefging. */
+window.gm_authFailure = function () {
+  rgsMapsAbgelehnt = true;
+  rgsMapsVersprechen = null;
+  rgKarteGesperrtZeigen();
+};
+
+/* Die Tafel des Anbieters ueberschreiben, nicht danebenstellen: Er schreibt
+   sie in unseren Container hinein. */
+function rgKarteGesperrtZeigen() {
+  const karte = $('rgsKarte');
+  if (!karte) { return; }
+  karte.innerHTML = '';
+  rgsKarte = null; rgsKartenMarken = []; rgsKartenKreise = []; rgsStandortMarke = null;
+  let stand = $('rgsKarteStand');
+  if (!stand) {
+    stand = document.createElement('div');
+    stand.className = 'rgs-karte-stand';
+    stand.id = 'rgsKarteStand';
+    karte.parentNode.appendChild(stand);
+  }
+  stand.textContent = w('rgsKarteGesperrt');
+  stand.classList.add('fehler');
+  // Der Zentrieren-Knopf zentriert nichts mehr -- ein Knopf, der nichts tut,
+  // ist schlimmer als keiner.
+  const btn = $('rgsZentrieren'); if (btn) { btn.remove(); }
+}
 
 function rgsMapsLaden() {
   if (rgsMapsVersprechen) { return rgsMapsVersprechen; }
@@ -3446,6 +3489,10 @@ function rgKarteZeichnen() {
         <span>${esc(w('rgsZentrieren'))}</span>
       </button>
     </div>${hinweis}`;
+
+  // Wurde der Schluessel schon einmal abgelehnt, gar nicht erst bauen: Der
+  // zweite Versuch endet genauso, zeigt aber vorher wieder die fremde Tafel.
+  if (rgsMapsAbgelehnt) { rgKarteGesperrtZeigen(); return; }
 
   rgsMapsLaden().then(() => {
     // Der Reiter kann waehrend des Ladens gewechselt worden sein.
