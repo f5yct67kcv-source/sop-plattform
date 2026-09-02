@@ -1106,6 +1106,69 @@ CREATE TABLE IF NOT EXISTS abwesenheiten (
   FOREIGN KEY (mitarbeiter_id) REFERENCES mitarbeiter(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+// Dienstfahrzeuge (ENT-313). Reine STAMMDATEN -- der Fahrzeugbestand des
+// Betriebs, so wie anstellungsorte die Anstellungsorte haelt. Hier wird
+// nichts kontrolliert und nichts gerechnet: Das Fahrtenbuch (Tachostand bei
+// Uebernahme und Rueckgabe) ist ein eigener, spaeterer Schritt und bekommt
+// eine eigene Tabelle. Diese hier wuerde sonst zwei Dinge zugleich sein --
+// was ein Fahrzeug IST und was mit ihm GESCHAH.
+//
+// kennzeichen ist eindeutig. Zwei Zeilen mit demselben Kontrollschild waeren
+// zwei Wahrheiten ueber dasselbe Auto; spaetestens wenn eine Fahrt daran
+// haengt, weiss niemand mehr, an welcher.
+//
+// status statt "aktiv TINYINT": "in Betrieb", "ausser Betrieb" (Werkstatt,
+// stillgelegt) und "verkauft" sind drei verschiedene Aussagen, und ein
+// Ja/Nein-Feld wuerde die letzten beiden zu derselben machen. Dieselbe Regel
+// wie ueberall hier: Was verschieden ist, muss verschieden heissen.
+//
+// tacho_km/tacho_am halten den ZULETZT BEKANNTEN Kilometerstand samt dem Tag,
+// an dem er abgelesen wurde -- niemals eine Hochrechnung. Ohne das Datum
+// waere die Zahl wertlos: 41 200 km sagt nichts, solange offen ist, ob sie
+// von gestern oder vom letzten Sommer stammt. NULL heisst "nie abgelesen"
+// und ist ausdruecklich etwas anderes als 0.
+//
+// standort_id zeigt auf anstellungsorte -- bewusst dorthin und nicht auf ein
+// freies Textfeld: Von dort aus sind die Wegstrecken zu den Objekten bereits
+// gepflegt (objekt_distanz), und genau die braucht ein spaeterer Soll-Ist-
+// Vergleich als Erwartungswert. NULL heisst "keinem Standort zugeordnet".
+'fahrzeuge' => "
+CREATE TABLE IF NOT EXISTS fahrzeuge (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  kennzeichen VARCHAR(20) NOT NULL,
+  bezeichnung VARCHAR(200) NULL,
+  marke VARCHAR(100) NULL,
+  modell VARCHAR(100) NULL,
+  art VARCHAR(30) NOT NULL DEFAULT 'personenwagen',
+  treibstoff VARCHAR(20) NULL,
+  farbe VARCHAR(50) NULL,
+  -- Stamm- und Fahrgestellnummer stehen im Fahrzeugausweis. Sie werden bei
+  -- jeder Meldung an Strassenverkehrsamt oder Versicherung verlangt.
+  stammnummer VARCHAR(30) NULL,
+  fahrgestellnummer VARCHAR(30) NULL,
+  erstzulassung DATE NULL,
+  -- eigentum | leasing | miete, mit dem Vertragsende bei den letzten beiden.
+  besitzart VARCHAR(20) NOT NULL DEFAULT 'eigentum',
+  besitz_bis DATE NULL,
+  standort_id INT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'aktiv',
+  ausser_betrieb_grund VARCHAR(200) NULL,
+  mfk_naechste DATE NULL,
+  vignette_jahr SMALLINT NULL,
+  versicherung VARCHAR(200) NULL,
+  police_nr VARCHAR(50) NULL,
+  service_naechster DATE NULL,
+  service_naechste_km INT NULL,
+  tacho_km INT NULL,
+  tacho_am DATE NULL,
+  bemerkung TEXT NULL,
+  erstellt_am DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  geaendert_am DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_kennzeichen (kennzeichen),
+  KEY idx_status (status),
+  FOREIGN KEY (standort_id) REFERENCES anstellungsorte(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
 ];
 
 foreach ($tabellen as $name => $sql) {
