@@ -257,31 +257,35 @@ check('KRITISCH: bei laufender Runde wird kein zweiter Start versucht',
   !rufe.some(r => r.p.includes('mein_rundgang_spontan_starten')));
 check('KRITISCH: und es wird kein Ausnahmegrund für etwas verlangt, das schon läuft',
   !(await page.isVisible('#rfsGrund')));
-check('Stattdessen öffnet sich die laufende Checkliste',
-  await page.isVisible('#blatt.on') && (await page.textContent('#blBody')).includes('Eingang Nord'));
+// Seit ENT-306 fuehrt "Zum Rundgang" in die laufende Runde als Vollseite --
+// dieselbe Seite, andere Betriebsart: Reiterleiste statt Vorschau-Fuss.
+check('Stattdessen öffnet sich die laufende Runde als Vollseite mit Checkliste',
+  await page.isVisible('#rgsReiter') && (await page.textContent('#rdListe')).includes('Eingang Nord'));
+check('Die Vorschau-Module sind dabei weg -- die Runde laeuft, sie wird nicht mehr angekuendigt',
+  !(await page.isVisible('#rgsModPause')));
 
-// ══════════ SCHUBLADE UND SEITE BLEIBEN EINIG ═════════════════════════
-// Ist dieselbe Runde in der Schublade offen und wird auf der Seite pausiert,
-// muss die Checkliste denselben Zustand tragen -- sonst liesse sie
-// Kontrollpunkte melden, die der Server bereits sperrt.
-await page.evaluate(() => blattZu());
+// ══════════ PAUSIEREN AUS DEM FUNKTIONEN-REITER ═══════════════════════
+await page.click('#rgsRt-funktionen');
 await page.waitForTimeout(200);
-await page.click('#rgsModPause');
+await page.click('#rgsLaufPause');
 await page.waitForTimeout(200);
+check('KRITISCH: auch aus dem Funktionen-Reiter kommt dieselbe Rueckfrage, nicht eine zweite Pause',
+  await page.isVisible('#rgsDlg')
+  && (await page.textContent('#rgsDlgFrage')) === 'Rundgang pausieren?');
 await page.click('#rgsDlgJa');
 await page.waitForTimeout(400);
-check('KRITISCH: der in der Schublade offene Rundgang übernimmt den pausierten Zustand',
+check('KRITISCH: der laufende Rundgang übernimmt den pausierten Zustand',
   await page.evaluate(() => rundgangAktiv && rundgangAktiv.status === 'pausiert'));
 
 // ══════════ KEIN SEITEN-SCROLL, DESKTOP MITGEPRÜFT ════════════════════
 check('KRITISCH: kein waagrechter Seiten-Scroll bei 390px', await page.evaluate(() =>
   document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1));
 
-await page.click('#rgsModPause');           // wieder fortsetzen, Ausgangslage
+await page.click('#rgsLaufPause');           // wieder fortsetzen, Ausgangslage
 await page.waitForTimeout(400);
 await page.setViewportSize({ width: 1440, height: 900 });
 await page.waitForTimeout(250);
-await page.click('#rgsModPause');
+await page.click('#rgsLaufPause');
 await page.waitForTimeout(250);
 check('Am Desktop erscheint dieselbe Rückfrage', await page.isVisible('#rgsDlg'));
 check('KRITISCH: sie bleibt am Desktop innerhalb der App-Breite und wird nicht in die Breite gezogen',

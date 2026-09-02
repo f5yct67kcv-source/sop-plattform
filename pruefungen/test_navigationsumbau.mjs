@@ -193,7 +193,17 @@ async function neueSeite(schichten, extraRoutes, profilUeberschreibung) {
   await page.click('#blRundgang button');
   await page.waitForTimeout(350);
   check('Die Checkliste öffnet sich nach dem Start', await page.isVisible('#rdListe'));
-  await page.evaluate(() => blattZu());
+  // Seit ENT-306 ist die laufende Runde eine Vollseite ueber der Reiterleiste
+  // der App (z-index 55 gegen 50). Man verlaesst sie mit dem Zurueck-Pfeil,
+  // nicht indem man an ihr vorbeitippt -- genau das prueft die naechste
+  // Zeile mit.
+  check('KRITISCH: die Reiterleiste der App ist waehrend der laufenden Runde verdeckt',
+    await page.evaluate(() => {
+      const t = document.querySelector('.tabs').getBoundingClientRect();
+      const oben = document.elementFromPoint(t.left + t.width / 2, t.top + t.height / 2);
+      return !!oben && !oben.closest('.tabs');
+    }));
+  await page.click('#rgsZurueck');
   await page.waitForTimeout(250);
   await page.click('#t-heute'); await page.waitForTimeout(250);
   check('Auf Heute erscheint der Rundgang-Chip', await page.isVisible('.rd-chip'));
