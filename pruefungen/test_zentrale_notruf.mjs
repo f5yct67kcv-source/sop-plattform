@@ -128,6 +128,17 @@ check('Der ganze Block steht über den Funktionen, nicht darunter (gemessen)',
     < document.getElementById('rgsModKp').getBoundingClientRect().top));
 check('Der Block braucht kein Aufklappen -- die Nummern sind sofort sichtbar',
   await page.isVisible('#rgsNotruf a'));
+// Die beiden Beschriftungen teilen sich die Klasse .rgs-mod-lb. Beim Bauen
+// hat genau das test_rundgang_pausieren.mjs rot gemacht: Dort griff ein
+// Zugriff ueber die Klasse plötzlich die neue, weiter oben stehende
+// Beschriftung. Beide tragen darum eine eigene ID -- und das wird hier
+// festgehalten, damit die naechste Aenderung nicht denselben Weg geht.
+check('KRITISCH: die beiden Beschriftungen sind eindeutig ansprechbar, nicht nur über die gemeinsame Klasse',
+  (await page.textContent('#rgsHilfeLb')) === 'Zentrale und Notruf'
+  && (await page.textContent('#rgsFunktionenLb')) === 'Funktionen');
+check('Und "Zentrale und Notruf" steht dabei über "Funktionen" (gemessen)',
+  await page.evaluate(() => document.getElementById('rgsHilfeLb').getBoundingClientRect().top
+    < document.getElementById('rgsFunktionenLb').getBoundingClientRect().top));
 check('Der Ansprechpartner-Block bleibt daneben zugeklappt -- er ist etwas anderes',
   await page.evaluate(() => getComputedStyle(document.querySelector('#rgsKlappAp .rgs-klapp-bd')).display === 'none'));
 check('Zentrale und Notruf sind auch ohne Farbe unterscheidbar (eine breite Zeile gegen drei Kacheln)',
