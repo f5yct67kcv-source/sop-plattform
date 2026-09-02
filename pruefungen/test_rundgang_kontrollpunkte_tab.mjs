@@ -3,7 +3,7 @@
 // GPS-Punkte, ENT-259).
 //
 // Anlass: Referenz-Screenshots eines Fremdsystems (Filterliste mit Typ/
-// Name/Tag-Identifikator-Spalten samt "+ GPS-Punkt / Geofence anlegen",
+// Name/Tag-Identifikator-Spalten samt "+ Kontrollpunkt anlegen",
 // und eine Kartenansicht mit "GPS-Punkt anlegen"/"Geofence anlegen").
 // Klaerung mit dem Projektinhaber: "GPS-Punkt" = unser bestehender Typ
 // "geofence" (Kreis mit Radius, kein neues Datenmodell). "Geofence-Bereich"
@@ -59,6 +59,20 @@ const VORLAGEN_ALLE = { status: 'ok', vorlagen: [
 
 let calls = [];
 
+// Aufgabenkatalog des Objekts (ENT-302). Bewusst veraenderlich: Legt die
+// Oberflaeche eine Aufgabe an, muss sie danach auch in der Liste stehen --
+// eine feste Antwort haette das nie gezeigt.
+const AUFGABEN = {
+  status: 'ok', eingerichtet: true,
+  aufgaben: [
+    { id: 11, objekt_id: 1, bezeichnung: 'Türe verschliessen', information: 'Panikschloss beachten', aktiv: 1 },
+    { id: 12, objekt_id: 1, bezeichnung: 'Sichtkontrolle Fenster', information: null, aktiv: 1 },
+  ],
+  zuordnung: { 2: [11] },
+};
+let aufgabeNaechsteId = 13;
+let gesetzt = null;   // letzter Aufruf von kontrollpunkt_aufgaben_setzen
+
 const NOMINATIM_TREFFER = [
   { display_name: 'Industriestrasse 44, 4600 Olten, Schweiz', lat: '47.37820', lon: '7.91270' },
   { display_name: 'Industriestrasse 12, 8005 Zürich, Schweiz', lat: '47.39000', lon: '8.52000' },
@@ -92,6 +106,17 @@ function setup(page) {
       return send({ status: 'ok', id: (body && body.id) ? body.id : letzte.id });
     }
     if (path.includes('kontrollpunkt_loeschen')) return send({ status: 'ok' });
+    if (path.includes('aufgabe_liste')) return send(AUFGABEN);
+    if (path.includes('aufgabe_save')) {
+      const id = aufgabeNaechsteId++;
+      AUFGABEN.aufgaben.push({ id, objekt_id: 1, bezeichnung: body.bezeichnung,
+        information: body.information || null, aktiv: 1 });
+      return send({ status: 'ok', id });
+    }
+    if (path.includes('kontrollpunkt_aufgaben_setzen')) {
+      gesetzt = body;
+      return send({ status: 'ok', gesetzt: body.aufgabe_ids, abgewiesen: [] });
+    }
     if (path.includes('rundgang_vorlage_liste')) return send({ status: 'ok', vorlagen: [] });
     return send({ status: 'ok' });
   });
@@ -160,14 +185,181 @@ check('KRITISCH: kein Treffer sagt das explizit, nicht wie eine leere Tabelle', 
 await page.fill('#rdKpFilterTag', '');
 await page.waitForTimeout(100);
 
-// ══════════ CTA: "+ GPS-PUNKT / GEOFENCE ANLEGEN" WECHSELT NUR DEN REITER
-await page.click('button:has-text("+ GPS-Punkt / Geofence anlegen")');
+// ══════════ CTA: "+ KONTROLLPUNKT ANLEGEN" ÖFFNET DAS FENSTER AN ORT UND STELLE
+// Bis ENT-302 wechselte dieser Knopf zur Kartenansicht -- dort lag das
+// einzige Bearbeitungsfenster. Jetzt steht dasselbe Fenster auch neben der
+// Liste, also gibt es keinen Grund mehr, den Reiter zu verlassen.
+await page.click('button:has-text("+ Kontrollpunkt anlegen")');
 await page.waitForTimeout(300);
-check('KRITISCH: der Klick öffnet KEINEN Dialog, sondern wechselt zur Kartenansicht',
-  await page.isVisible('#rdKrAb-karte') && !(await page.isVisible('#dlgKp.on')));
-check('Die Kontrollpunkte-Tabelle ist dabei ausgeblendet', !(await page.isVisible('#rdKrAb-kontrollpunkte')));
+check('KRITISCH: der Klick öffnet KEINEN Dialog', !(await page.isVisible('#dlgKp.on')));
+check('KRITISCH: das Kontrollpunkt-Fenster steht offen', await page.isVisible('#rdKarteDetail'));
+check('KRITISCH: es steht neben der LISTE, nicht in der Kartenansicht',
+  await page.evaluate(() => !!document.getElementById('rdKpRaum')
+    .contains(document.getElementById('rdKarteDetail'))));
+check('Die Kontrollpunkte-Liste bleibt dabei sichtbar', await page.isVisible('#rdKrAb-kontrollpunkte'));
+check('Die Liste bekommt daneben eine zweite Spalte',
+  await page.evaluate(() => document.getElementById('rdKpRaum').classList.contains('mit-detail')));
+await page.click('#rdKarteDetail .card-hd button:has-text("Schliessen")');
+await page.waitForTimeout(200);
+check('Schliessen räumt die zweite Spalte wieder weg -- eine leere Spalte sieht aus wie ein Ladefehler',
+  await page.evaluate(() => !document.getElementById('rdKpRaum').classList.contains('mit-detail')));
+
+// Alles Folgende haengt daran, dass sich das Fenster ueberhaupt oeffnet.
+// Ohne dieses Netz endete die Suite beim Gegenproben mit einem
+// Playwright-Stapelauszug: Man sah, DASS etwas kaputt ist, aber nicht,
+// welche Aussage nicht mehr gilt.
+try {
+  // ══════════ ENT-302: JEDE ZEILE ÖFFNET DAS FENSTER, AUCH DER NFC-PUNKT
+  // Bis hierher fuehrte ein Knopf "Bearbeiten" in einen modalen Dialog, und
+  // das Fenster gab es nur fuer GPS-Punkte. Verlangt ist: jeder Punkt
+  // anklickbar, dasselbe Fenster, an beiden Orten.
+  await page.click('#rdKpTabelle tbody tr:has-text("Hintereingang")');
+  await page.waitForTimeout(300);
+  // Bleibt das Fenster zu, hat das Tippen in seine Felder keinen Sinn -- und
+  // eine Suite, die daran abstuerzt, sagt nur DASS etwas kaputt ist, nicht
+  // welche Aussage nicht mehr gilt. Beim Gegenprobieren genau so aufgefallen.
+  const fensterAuf = await page.isVisible('#rdKarteDetail');
+  check('KRITISCH: ein Klick auf die Zeile öffnet das Fenster', fensterAuf);
+  check('KRITISCH: kein modaler Dialog mehr', !(await page.isVisible('#dlgKp.on')));
+  check('KRITISCH: auch ein NFC-Punkt lässt sich hier öffnen — nicht nur GPS-Punkte',
+    (await page.inputValue('#rdKdTyp')) === 'nfc');
+  check('Die Chip-ID steht im Fenster', (await page.inputValue('#rdKdChipId')) === 'AB12');
+  check('Beim NFC-Punkt ist das Chip-Feld sichtbar', await page.isVisible('#rdKdNfcFeld'));
+  check('KRITISCH: und die Koordinatenfelder sind es NICHT — ein Chip hat keinen Ort',
+    !(await page.isVisible('#rdKdLat')));
+  check('Name und Beschreibung sind bearbeitbar',
+    (await page.inputValue('#rdKdName')) === 'Hintereingang' && await page.isVisible('#rdKdBeschreibung'));
+  check('Die offene Zeile ist in der Liste hervorgehoben',
+    await page.evaluate(() => !!document.querySelector('#rdKpTabelle tr.gewaehlt')));
+
+  // Umbenennen und beschreiben geht jetzt aus der Liste heraus.
+  calls.length = 0;
+  if (fensterAuf) {
+    await page.fill('#rdKdName', 'Hintereingang Nord');
+    await page.fill('#rdKdBeschreibung', 'Chip klebt innen am Rahmen');
+    await page.click('#rdKdSpeichern');
+    await page.waitForTimeout(400);
+  }
+  const gespeichert = calls.find(c => c.path.includes('kontrollpunkt_save'));
+  check('KRITISCH: Umbenennen aus der Liste heraus wird gesendet',
+    gespeichert && gespeichert.body.bezeichnung === 'Hintereingang Nord');
+  check('KRITISCH: die Beschreibung ebenfalls — sie war im alten Dialog gar nicht erfassbar',
+    gespeichert && gespeichert.body.beschreibung === 'Chip klebt innen am Rahmen');
+  check('Der Typ bleibt NFC und wird nicht stillschweigend zu Geofence',
+    gespeichert && gespeichert.body.typ === 'nfc');
+
+  // ══════════ ENT-302: AUFGABEN AM KONTROLLPUNKT
+  await page.click('#rdKpTabelle tbody tr:has-text("Parkplatz")');
+  await page.waitForTimeout(300);
+  await page.click('#rdKdReiterAufg');
+  await page.waitForTimeout(300);
+  check('KRITISCH: der Reiter "Aufgaben" ist kein Platzhalter mehr',
+    !(await page.textContent('#rdKdAufgaben')).includes('Folgt in einem späteren Schritt'));
+  check('KRITISCH: der Katalog des Objekts steht da',
+    (await page.textContent('#rdKdAufListe')).includes('Türe verschliessen')
+    && (await page.textContent('#rdKdAufListe')).includes('Sichtkontrolle Fenster'));
+  check('KRITISCH: die bereits verknüpfte Aufgabe ist angehakt, die andere nicht',
+    await page.evaluate(() => {
+      const k = [...document.querySelectorAll('#rdKdAufListe .rdkd-auf')];
+      const tuere = k.find(e => e.textContent.includes('Türe verschliessen'));
+      const fenster = k.find(e => e.textContent.includes('Sichtkontrolle'));
+      return tuere.querySelector('input').checked && !fenster.querySelector('input').checked;
+    }));
+  check('Die Zahl nennt beide Einheiten getrennt — Katalog und Verknüpfungen',
+    /2 Aufgaben im Katalog/.test(await page.textContent('#rdKdAufZahl'))
+    && /1 an diesem Punkt verknüpft/.test(await page.textContent('#rdKdAufZahl')));
+
+  // Filter: greift, und ein leeres Ergebnis sagt etwas anderes als ein leerer Katalog.
+  await page.fill('#rdKdAufFilter', 'Fenster');
+  await page.waitForTimeout(150);
+  check('Der Filter engt den Katalog ein',
+    (await page.$$('#rdKdAufListe .rdkd-auf')).length === 1);
+  check('KRITISCH: bei gefilterter Liste steht die Bezugsgrösse dabei',
+    /1 von 2/.test(await page.textContent('#rdKdAufZahl')));
+  await page.fill('#rdKdAufFilter', 'gibtesnicht');
+  await page.waitForTimeout(150);
+  check('KRITISCH: "Kein Treffer" sagt ausdrücklich, dass der Katalog nicht leer ist',
+    (await page.textContent('#rdKdAufListe')).includes('Kein Treffer')
+    && (await page.textContent('#rdKdAufListe')).includes('nicht leer'));
+  await page.fill('#rdKdAufFilter', '');
+  await page.waitForTimeout(150);
+
+  // Neue Aufgabe anlegen: inline, ohne weiteren Dialog.
+  await page.click('#rdKdAufgaben button:has-text("+ Aufgabe anlegen")');
+  await page.waitForTimeout(150);
+  check('Anlegen geschieht inline, nicht in einem weiteren Dialog',
+    await page.isVisible('#rdKdAufNeu') && !(await page.isVisible('#dlgConfirm.on')));
+  await page.fill('#rdKdAufName', 'Licht löschen');
+  await page.fill('#rdKdAufInfo', 'Nur im Treppenhaus');
+  await page.click('#rdKdAufNeu button:has-text("Anlegen")');
+  await page.waitForTimeout(400);
+  check('KRITISCH: die neue Aufgabe steht sofort in der Liste',
+    (await page.textContent('#rdKdAufListe')).includes('Licht löschen'));
+  check('KRITISCH: und ist gleich angehakt — man legt sie an, WEIL sie hierher gehört',
+    await page.evaluate(() => [...document.querySelectorAll('#rdKdAufListe .rdkd-auf')]
+      .find(e => e.textContent.includes('Licht löschen')).querySelector('input').checked));
+
+  // Haken setzen und speichern -- die Verknüpfungen gehen mit dem Punkt weg.
+  await page.evaluate(() => [...document.querySelectorAll('#rdKdAufListe .rdkd-auf')]
+    .find(e => e.textContent.includes('Sichtkontrolle')).querySelector('input').click());
+  await page.waitForTimeout(150);
+  calls.length = 0;
+  await page.click('#rdKdSpeichern');
+  await page.waitForTimeout(500);
+  const setzen = calls.find(c => c.path.includes('kontrollpunkt_aufgaben_setzen'));
+  check('KRITISCH: beim Speichern gehen die Verknüpfungen an den Server', !!setzen);
+  check('KRITISCH: und zwar alle drei angehakten, nicht nur die zuletzt geklickte',
+    setzen && setzen.body.aufgabe_ids.length === 3
+    && setzen.body.aufgabe_ids.includes(11) && setzen.body.aufgabe_ids.includes(12));
+  check('Die Verknüpfung nennt den richtigen Kontrollpunkt — Parkplatz, nicht den zuletzt offenen',
+    setzen && Number(setzen.body.kontrollpunkt_id) === 2);
+
+  // ══════════ ENT-302: DAS FENSTER IST GROSS GENUG (gemessen, nicht angenommen)
+  // Ausdrueckliche Vorgabe des Projektinhabers ("achte auf genug Grösse").
+  // Vorher war die Spalte auf 340-420px gedeckelt; im Referenzbild nimmt das
+  // Fenster rund die Haelfte des Fensters ein.
+  {
+    const mass = await page.evaluate(() => {
+      const f = document.getElementById('rdKarteDetail').getBoundingClientRect();
+      return { breite: f.width, seite: innerWidth,
+               scroll: document.documentElement.scrollWidth > document.documentElement.clientWidth };
+    });
+    check(`KRITISCH: das Fenster ist mindestens 420 px breit (gemessen ${Math.round(mass.breite)} px)`,
+      mass.breite >= 420);
+    check('Es überragt den Bildschirm nicht', mass.breite <= mass.seite);
+    check('Kein Seiten-Scroll durch das offene Fenster (1440px)', !mass.scroll);
+  }
+
+  // Auf dem Handy stapeln Liste und Fenster, statt in zwei zu schmale Spalten
+  // zu zerfallen.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForTimeout(250);
+  {
+    const handy = await page.evaluate(() => {
+      const f = document.getElementById('rdKarteDetail').getBoundingClientRect();
+      return { breite: f.width,
+               spalten: getComputedStyle(document.getElementById('rdKpRaum')).gridTemplateColumns,
+               scroll: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1 };
+    });
+    check('KRITISCH: kein Seiten-Scroll auf dem Handy bei offenem Fenster', !handy.scroll);
+    check(`Auf dem Handy steht das Fenster einspaltig (gemessen ${handy.spalten})`,
+      handy.spalten.trim().split(/\s+/).length === 1);
+    check(`Und nutzt dort die Breite (gemessen ${Math.round(handy.breite)} px von 390)`,
+      handy.breite >= 320);
+  }
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.waitForTimeout(250);
+
+  await page.click('#rdKarteDetail .card-hd button:has-text("Schliessen")');
+  await page.waitForTimeout(200);
+} catch (e) {
+  bad.push('ENT-302 (Fenster und Aufgaben): abgebrochen -- '
+    + String(e.message || e).split('\n')[0]);
+}
 
 // ══════════ KARTENANSICHT: ALLE GEOFENCE-PUNKTE ALS KREIS+MARKER
+await page.click('#rdKrReiter .rdkr-tab:has-text("Kartenansicht")');
+await page.waitForTimeout(300);
 await page.waitForSelector('#rdKarteUebersicht.gm-mock-map');
 await page.waitForTimeout(200);
 check('KRITISCH: beide Geofence-Punkte erscheinen als Marker auf der Karte (der NFC-Punkt nicht, er hat keinen Ort)',
@@ -349,8 +541,8 @@ check('KRITISCH: über den Reiter "Allgemeines" kommt man zum Formular, nicht zu
 // ══════════ NEUER PUNKT ZIEHT DIE TABELLE UND DIE KARTE SOFORT NACH
 await page.click('#rdKrReiter .rdkr-tab:has-text("Kontrollpunkte")');
 await page.waitForTimeout(150);
-await page.click('button:has-text("+ GPS-Punkt / Geofence anlegen")');
-await page.waitForTimeout(150);
+await page.click('#rdKrReiter .rdkr-tab:has-text("Kartenansicht")');
+await page.waitForTimeout(200);
 await page.click('#rdKrAb-karte button:has-text("+ GPS-Punkt anlegen")');
 await page.waitForTimeout(250);
 await page.fill('#rdKdName', 'Nordtor');
@@ -376,7 +568,7 @@ await page.waitForTimeout(200);
 check('KRITISCH: kein Seiten-Scroll auf der Kontrollpunkte-Tabelle bei 390px', await page.evaluate(() =>
   document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1));
 await page.screenshot({ path: `${OUT}/rg-kp-tab-02-mobil.png` });
-await page.click('button:has-text("+ GPS-Punkt / Geofence anlegen")');
+await page.click('#rdKrReiter .rdkr-tab:has-text("Kartenansicht")');
 await page.waitForSelector('#rdKarteUebersicht.gm-mock-map');
 await page.evaluate(() => google.maps.event.trigger(rdKarteMapa, 'resize'));
 await page.waitForTimeout(200);
