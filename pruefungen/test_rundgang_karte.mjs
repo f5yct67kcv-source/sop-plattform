@@ -288,29 +288,52 @@ check('KRITISCH: es gibt überhaupt einen Rückruf für den abgelehnten Schlüss
 if (rueckrufDa) {
 await page.evaluate(() => window.gm_authFailure());
 await page.waitForTimeout(300);
-check('KRITISCH: ein abgelehnter Schlüssel wird in EIGENEN Worten erklärt, nicht mit der Tafel des Anbieters',
-  await page.isVisible('#rgsKarteStand')
-  && (await page.textContent('#rgsKarteStand')).includes('nicht freigegeben'));
-check('KRITISCH: der Text sagt, dass es nicht am Gerät liegt und die Runde weiterläuft',
-  await page.evaluate(() => {
-    const t = document.getElementById('rgsKarteStand').textContent;
-    return t.includes('kein Fehler an deinem Gerät') && t.includes('läuft normal weiter');
+// STEHT die Karte, wird sie NICHT zugedeckt (ENT-312). Vom Projektinhaber
+// gemeldet: "Die Karte laedt nun kurz und danach kommt deine Meldung, die
+// die Karte wieder ueberdeckt." Der Anbieter ruft gm_authFailure auch dann,
+// wenn die Kacheln schon gezeichnet sind -- die erste Fassung nahm dem
+// Waechter damit genau das weg, wofuer die Meldung warnt.
+check('KRITISCH: eine STEHENDE Karte wird nicht zugedeckt',
+  await page.isVisible('#rgsKarte')
+  && await page.$('#rgsKarteStand') === null
+  && (await page.$$('#rgsKarte .gm-mock-marker')).length === 2);
+// Erst pruefen, DASS es den Streifen gibt -- sonst stuerzt die Suite bei den
+// Messungen darunter ab, statt eine Aussage rot zu melden. Fuenftes Mal
+// derselbe Mangel (ENT-302, ENT-304, ENT-305, ENT-309); die Gegenprobe
+// "wieder zudecken" hat ihn hier zum Vorschein gebracht.
+const streifenDa = await page.$('#rgsKarteWarnung') !== null;
+check('KRITISCH: die Warnung steht trotzdem da, als schmaler Streifen',
+  streifenDa && await page.isVisible('#rgsKarteWarnung')
+  && (await page.textContent('#rgsKarteWarnung')).includes('nicht freigegeben'));
+// Ein Streifen, der die halbe Karte einnimmt, waere dasselbe Problem in
+// kleiner. Gemessen, nicht angenommen.
+check('KRITISCH: der Streifen nimmt höchstens ein Fünftel der Kartenhöhe ein',
+  streifenDa && await page.evaluate(() => {
+    const k = document.querySelector('.rgs-karte-huelle').getBoundingClientRect().height;
+    const wn = document.getElementById('rgsKarteWarnung').getBoundingClientRect().height;
+    return k > 100 && wn > 0 && wn < k / 5;
   }));
-// "Gesperrt" und "ohne Netz" sind verschiedene Aussagen -- der eine Fall
-// vergeht von selbst, der andere braucht jemanden in der Verwaltung.
-check('KRITISCH: "gesperrt" sieht nicht aus wie "ohne Netz"',
-  await page.evaluate(() => !document.getElementById('rgsKarteStand').textContent.includes('ohne Netz')));
-check('Ein Knopf, der nichts mehr tun kann, verschwindet',
-  await page.$('#rgsZentrieren') === null);
-// Beim naechsten Oeffnen nicht erneut bauen: Der zweite Versuch endet
-// genauso, zeigt aber vorher wieder die fremde Tafel.
+check('KRITISCH: der Streifen liegt UNTER der Karte, nicht darüber',
+  streifenDa && await page.evaluate(() => {
+    const k = document.querySelector('.rgs-karte-huelle').getBoundingClientRect();
+    const wn = document.getElementById('rgsKarteWarnung').getBoundingClientRect();
+    return wn.top >= k.bottom - 1;
+  }));
+// Eine CSS-Klasse, die es nicht gibt, bleibt wirkungslos, ohne dass etwas
+// kaputtgeht -- beim Bauen von ENT-311 ist mir genau das passiert.
+check('Die Warnfarbe ist auch wirklich definiert, nicht nur angehängt',
+  /\.rgs-karte-hinweis\.fehler\s*\{/.test(APP));
+check('Der Zentrieren-Knopf bleibt, weil es weiterhin etwas zu zentrieren gibt',
+  await page.isVisible('#rgsZentrieren'));
+// Wird die Freigabe beim Anbieter in Ordnung gebracht -- was bis zu fuenf
+// Minuten dauert --, muss die Karte in derselben Sitzung wiederkommen.
 await page.click('#rgsRt-punkte');
 await page.waitForTimeout(200);
 await page.click('#rgsRt-karte');
-await page.waitForTimeout(600);
-check('KRITISCH: beim erneuten Öffnen steht sofort die eigene Erklärung da',
-  await page.isVisible('#rgsKarteStand')
-  && (await page.textContent('#rgsKarteStand')).includes('nicht freigegeben'));
+await page.waitForTimeout(700);
+check('KRITISCH: beim erneuten Öffnen wird wieder gebaut, nicht dauerhaft gesperrt',
+  await page.isVisible('#rgsKarte')
+  && (await page.$$('#rgsKarte .gm-mock-marker')).length === 2);
 check('Die Kontrollpunkt-Liste bleibt auch dann vollständig erreichbar',
   await page.evaluate(async () => {
     document.getElementById('rgsRt-punkte').click();
@@ -320,11 +343,13 @@ check('Die Kontrollpunkt-Liste bleibt auch dann vollständig erreichbar',
 await page.screenshot({ path: `${OUT}/karte-04-gesperrt.png` });
 await page.evaluate(() => { rgsMapsAbgelehnt = false; });
 } else {
-  ['KRITISCH: ein abgelehnter Schlüssel wird in EIGENEN Worten erklärt, nicht mit der Tafel des Anbieters',
-   'KRITISCH: der Text sagt, dass es nicht am Gerät liegt und die Runde weiterläuft',
-   'KRITISCH: "gesperrt" sieht nicht aus wie "ohne Netz"',
-   'Ein Knopf, der nichts mehr tun kann, verschwindet',
-   'KRITISCH: beim erneuten Öffnen steht sofort die eigene Erklärung da',
+  ['KRITISCH: eine STEHENDE Karte wird nicht zugedeckt',
+   'KRITISCH: die Warnung steht trotzdem da, als schmaler Streifen',
+   'KRITISCH: der Streifen nimmt höchstens ein Fünftel der Kartenhöhe ein',
+   'KRITISCH: der Streifen liegt UNTER der Karte, nicht darüber',
+   'Die Warnfarbe ist auch wirklich definiert, nicht nur angehängt',
+   'Der Zentrieren-Knopf bleibt, weil es weiterhin etwas zu zentrieren gibt',
+   'KRITISCH: beim erneuten Öffnen wird wieder gebaut, nicht dauerhaft gesperrt',
    'Die Kontrollpunkt-Liste bleibt auch dann vollständig erreichbar',
   ].forEach(n => check(n + ' (nicht prüfbar: kein gm_authFailure)', false));
 }
@@ -376,6 +401,27 @@ check('Am Desktop bleibt die Karte innerhalb der App-Breite',
   }));
 check('KRITISCH: am Desktop kein waagrechter Seiten-Scroll', await page.evaluate(() =>
   document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1));
+
+// ══════════ GESPERRT UND GAR KEINE KARTE ══════════════════════════════
+// Der andere Halbfall zu ENT-312: Steht KEINE Karte, muss weiterhin die
+// volle Erklaerung erscheinen -- sonst bliebe genau das graue Rechteck
+// ohne Auskunft zurueck, gegen das ENT-309 gebaut wurde. Der Streifen
+// waere hier zu wenig: Es gibt nichts, worunter er stehen koennte.
+// Hier ist die Maps-Attrappe abgewiesen, es existiert also keine Karte.
+if (rueckrufDa) {
+  await page.evaluate(() => { rgsKarte = null; window.gm_authFailure(); });
+  await page.waitForTimeout(250);
+  check('KRITISCH: ohne stehende Karte erscheint weiterhin die volle Erklärung (ENT-309)',
+    await page.isVisible('#rgsKarteStand')
+    && (await page.textContent('#rgsKarteStand')).includes('kein Fehler an deinem Gerät')
+    && (await page.textContent('#rgsKarteStand')).includes('läuft normal weiter'));
+  check('Und der Zentrieren-Knopf verschwindet, weil es nichts zu zentrieren gibt',
+    await page.$('#rgsZentrieren') === null);
+} else {
+  ['KRITISCH: ohne stehende Karte erscheint weiterhin die volle Erklärung (ENT-309)',
+   'Und der Zentrieren-Knopf verschwindet, weil es nichts zu zentrieren gibt',
+  ].forEach(n => check(n + ' (nicht prüfbar: kein gm_authFailure)', false));
+}
 
 await browser.close();
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);

@@ -542,6 +542,11 @@ svg.i-sm { width: 17px; height: 17px; }
 /* "Nicht darstellbar" darf nie wie "nicht vorhanden" aussehen (CLAUDE.md) --
    darum steht dieser Satz unter der Karte, nicht nur in der Liste. */
 .rgs-karte-hinweis { flex: none; font-size: 13px; color: var(--ink-3); line-height: 1.5; padding: 2px; }
+/* Die Warnung des Kartenanbieters als schmaler Streifen unter der Karte
+   (ENT-312) -- sie darf eine funktionierende Karte nicht zudecken. Eigene
+   Regel, weil .fehler bisher nur fuer .rgs-karte-stand galt: Ohne sie
+   bliebe die Klasse wirkungslos, ohne dass etwas kaputtgeht. */
+.rgs-karte-hinweis.fehler { color: var(--warn); font-weight: 560; }
 
 .rd-zustand { font-size: 15px; font-weight: 640; margin-bottom: 12px; }
 .rgs-kopf-zahlen { display: flex; align-items: center; gap: 8px; flex: none; }
@@ -953,6 +958,7 @@ const W = {
     rgsKarteLaedt: 'Karte wird geladen …',
     rgsKarteFehler: 'Die Karte liess sich nicht laden — ohne Netz geht das nicht. Die Kontrollpunkte stehen im Reiter daneben.',
     rgsKarteGesperrt: 'Die Karte ist für diese Seite nicht freigegeben. Das ist eine Einstellung beim Kartenanbieter, kein Fehler an deinem Gerät — bitte der Verwaltung melden. Die Kontrollpunkte stehen im Reiter daneben, die Runde läuft normal weiter.',
+    rgsKarteGesperrtKurz: 'Der Kartenanbieter meldet, dass diese Seite nicht freigegeben ist — bitte der Verwaltung melden.',
     rgsKarteLeer: 'Für diese Runde ist kein Kontrollpunkt auf der Karte darstellbar.',
     rgsKarteOhneOrt: 'ohne Koordinaten — nur in der Liste',
     rgsZentrieren: 'Zentrieren',
@@ -3400,17 +3406,41 @@ let rgsMapsAbgelehnt = false;
    (melden, weiterarbeiten), und nicht, was schiefging. */
 window.gm_authFailure = function () {
   rgsMapsAbgelehnt = true;
-  rgsMapsVersprechen = null;
   rgKarteGesperrtZeigen();
 };
 
-/* Die Tafel des Anbieters ueberschreiben, nicht danebenstellen: Er schreibt
-   sie in unseren Container hinein. */
+/* Eine Karte, die STEHT, wird nicht zugedeckt (ENT-312).
+   Vom Projektinhaber gemeldet: "Die Karte laedt nun kurz und danach kommt
+   deine Meldung, die die Karte wieder ueberdeckt."
+
+   Der Anbieter ruft gm_authFailure auch dann, wenn die Kacheln bereits
+   gezeichnet sind. Die erste Fassung (ENT-309) raeumte daraufhin den
+   Container leer und legte den Text ueber die ganze Flaeche -- richtig
+   gegen ein graues Rechteck, falsch gegen eine benutzbare Karte. Sie nahm
+   dem Waechter genau das weg, wofuer die Meldung eigentlich warnt.
+
+   Darum zwei Faelle statt einem:
+   - Karte steht  -> schmaler Streifen UNTER der Karte, sie bleibt bedienbar.
+   - Karte fehlt  -> weiterhin die ganze Flaeche, sonst bliebe ein graues
+                     Rechteck ohne Erklaerung (der Fall aus ENT-309). */
 function rgKarteGesperrtZeigen() {
   const karte = $('rgsKarte');
   if (!karte) { return; }
+
+  if (rgsKarte) {
+    const huelle = karte.closest('.rgs-karte-huelle');
+    if (huelle && !$('rgsKarteWarnung')) {
+      const streifen = document.createElement('div');
+      streifen.className = 'rgs-karte-hinweis fehler';
+      streifen.id = 'rgsKarteWarnung';
+      streifen.textContent = w('rgsKarteGesperrtKurz');
+      huelle.parentNode.insertBefore(streifen, huelle.nextSibling);
+    }
+    return;
+  }
+
   karte.innerHTML = '';
-  rgsKarte = null; rgsKartenMarken = []; rgsKartenKreise = []; rgsStandortMarke = null;
+  rgsKartenMarken = []; rgsKartenKreise = []; rgsStandortMarke = null;
   let stand = $('rgsKarteStand');
   if (!stand) {
     stand = document.createElement('div');
@@ -3490,9 +3520,12 @@ function rgKarteZeichnen() {
       </button>
     </div>${hinweis}`;
 
-  // Wurde der Schluessel schon einmal abgelehnt, gar nicht erst bauen: Der
-  // zweite Versuch endet genauso, zeigt aber vorher wieder die fremde Tafel.
-  if (rgsMapsAbgelehnt) { rgKarteGesperrtZeigen(); return; }
+  // Frueher wurde hier abgebrochen, sobald der Schluessel einmal abgelehnt
+  // war. Das war falsch (ENT-312): Wird die Freigabe beim Anbieter in
+  // Ordnung gebracht -- was bis zu fuenf Minuten dauert --, bekaeme der
+  // Waechter fuer den Rest der Sitzung trotzdem keine Karte mehr, obwohl
+  // sie laengst wieder ginge. Es wird jetzt jedes Mal gebaut; scheitert es
+  // erneut, meldet sich der Anbieter von selbst wieder.
 
   rgsMapsLaden().then(() => {
     // Der Reiter kann waehrend des Ladens gewechselt worden sein.
