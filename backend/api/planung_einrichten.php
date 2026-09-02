@@ -25,6 +25,7 @@ require_once __DIR__ . '/../mitarbeiter.php';
 // eine lesbare Meldung herauskam.
 require_once __DIR__ . '/../kunden.php';
 require_once __DIR__ . '/../produkte.php';
+require_once __DIR__ . '/../rundgang.php';
 
 $user = require_session();
 require_recht($user, 'betrieb');
@@ -1144,6 +1145,16 @@ if (!$nurPruefen && hat_tabelle_jetzt($pdo, 'ereignisart')) {
             $ein = $pdo->prepare('INSERT INTO ereignisart (bezeichnung, sortierung) VALUES (?, ?)');
             foreach ($arten as $i => $bez) { $ein->execute([$bez, ($i + 1) * 10]); }
             $getan[] = 'Ereignisarten: Startbestand angelegt (' . count($arten) . ')';
+        }
+        // Ausserhalb der Startbestands-Bedingung (ENT-311): Der Startbestand
+        // entsteht nur, solange die Tabelle LEER ist -- bei jedem Betrieb,
+        // der schon Ereignisse erfasst hat, liefe diese Zeile sonst nie.
+        // Die eindeutige Bezeichnung macht den Aufruf beliebig oft
+        // wiederholbar.
+        $ein2 = $pdo->prepare('INSERT IGNORE INTO ereignisart (bezeichnung, sortierung) VALUES (?, ?)');
+        $ein2->execute([EREIGNISART_AUFGABE, 95]);
+        if ($ein2->rowCount() === 1) {
+            $getan[] = 'Ereignisart „' . EREIGNISART_AUFGABE . '" angelegt (ENT-311)';
         }
     } catch (Throwable $e) {
         $fehler[] = 'Ereignisarten-Startbestand — ' . $e->getMessage();

@@ -6,6 +6,13 @@
 // gleiches Prinzip wie planung.php/einsatz_sperre_pruefen().
 declare(strict_types=1);
 
+/* Die Ereignisart, unter der eine nicht ausfuehrbare Aufgabe im Meldeweg
+   erscheint (ENT-311). Als Konstante und nicht zweimal als Zeichenkette:
+   Der Endpunkt SUCHT sie, die Einrichtung LEGT sie an -- laufen die beiden
+   Schreibweisen auseinander, entstehen Ereignisse ohne Art, und niemand
+   merkt es, weil sie trotzdem im Feed stehen. */
+const EREIGNISART_AUFGABE = 'Aufgabe nicht ausführbar';
+
 // Haversine-Distanz in Metern zwischen zwei Koordinaten.
 function geo_distanz_meter(float $lat1, float $lng1, float $lat2, float $lng2): float
 {

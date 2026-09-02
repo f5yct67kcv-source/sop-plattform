@@ -33,11 +33,30 @@ $rundgang = $rChk->fetch();
 if (!$rundgang) {
     json_response(['status' => 'error', 'message' => 'Dieser Rundgang gehoert nicht zu dir'], 404);
 }
-if (in_array($rundgang['status'], ['abgeschlossen', 'abgebrochen'], true)) {
-    json_response(['status' => 'error', 'message' => 'Dieser Rundgang ist bereits beendet'], 409);
-}
-if ($rundgang['status'] === 'pausiert') {
-    json_response(['status' => 'error', 'message' => 'Dieser Rundgang ist pausiert -- erst fortsetzen'], 409);
+// Die Zustandssperre gilt fuer neue SCANS, nicht fuer Aufgaben-Antworten
+// (ENT-311). Der Unterschied ist kein Feinschliff, sondern behebt einen
+// stillen Datenverlust aus ENT-305:
+//
+// Die Runde schliesst sich selbst, sobald kein Punkt mehr uebrig ist -- das
+// geschieht im selben Aufruf, der den LETZTEN Scan bringt. Die Aufgaben
+// dieses Punktes poppen erst danach auf; die Antwort kommt Sekunden spaeter
+// und traf auf eine bereits abgeschlossene Runde. Der Server wies die ganze
+// Anfrage mit 409 ab, und die App laesst abgewiesene Eintraege ausdruecklich
+// "in der Warteschlange" -- sie waeren dort bei jedem Netzwechsel erneut
+// gescheitert und nie angekommen. Betroffen war der letzte Kontrollpunkt
+// JEDER Runde, also der Normalfall, nicht ein Randfall.
+//
+// Eine Antwort nachtraeglich anzunehmen ist auch fachlich richtig: Die
+// Arbeit wurde WAEHREND der Runde getan; dass die Runde in der Zwischenzeit
+// zu Ende ging, aendert daran nichts. Ein neuer Scan dagegen bliebe
+// verboten -- er behauptete Anwesenheit nach Rundenende.
+if ($scans) {
+    if (in_array($rundgang['status'], ['abgeschlossen', 'abgebrochen'], true)) {
+        json_response(['status' => 'error', 'message' => 'Dieser Rundgang ist bereits beendet'], 409);
+    }
+    if ($rundgang['status'] === 'pausiert') {
+        json_response(['status' => 'error', 'message' => 'Dieser Rundgang ist pausiert -- erst fortsetzen'], 409);
+    }
 }
 
 // Ersatzscan (Q-22 in sop-projekt): Fotobeleg statt technischer Pruefung,
@@ -194,16 +213,18 @@ foreach ($aufgaben as $eintrag) {
     // Die Aufgabe muss an DIESEM Punkt haengen und aktiv sein. Im Formular
     // ist nichts anderes anklickbar -- ueber die Anfrage schon.
     $kat = $pdo->prepare(
-        'SELECT a.bezeichnung FROM kontrollpunkt_aufgabe ka
+        'SELECT a.bezeichnung, k.bezeichnung AS punkt FROM kontrollpunkt_aufgabe ka
            JOIN objekt_aufgabe a ON a.id = ka.aufgabe_id AND a.aktiv = 1
+           JOIN kontrollpunkt k ON k.id = ka.kontrollpunkt_id
           WHERE ka.kontrollpunkt_id = ? AND ka.aufgabe_id = ?'
     );
     $kat->execute([$kpId, $aufgabeId]);
-    $bezeichnung = $kat->fetchColumn();
-    if ($bezeichnung === false) {
+    $katZeile = $kat->fetch(PDO::FETCH_ASSOC);
+    if (!$katZeile) {
         $melde('Diese Aufgabe gehoert nicht zu diesem Kontrollpunkt');
         continue;
     }
+    $bezeichnung = $katZeile['bezeichnung'];
 
     // Doppelt gesendete Warteschlangen-Eintraege duerfen keinen zweiten
     // Nachweis anlegen; die erste Antwort zaehlt und bleibt unveraendert.
@@ -214,6 +235,59 @@ foreach ($aufgaben as $eintrag) {
     );
     $ein->execute([$rundgangId, $kpId, $aufgabeId, (string)$bezeichnung, $aStatus,
         $grund === '' ? null : $grund, $aErfasst]);
+
+    // "Nicht moeglich" ist eine MELDUNG, kein blosser Nachweis (ENT-311).
+    // Der Waechter hat etwas vorgefunden -- eine klemmende Tuer, einen
+    // versperrten Bereich -- und jemand muss das lesen. Bis hierher stand
+    // es nur in der Auswertung, die niemand von sich aus aufschlaegt.
+    //
+    // Bewusst eine eigene Zeile in ereignis_meldung statt eines Verweises:
+    // Nachweis und Steuerung haben verschiedene Lebenslaeufe. Der Nachweis
+    // in rundgang_aufgabe wird NIE angefasst; das Ereignis darf erledigt
+    // oder geloescht werden, ohne dass der Beleg von letzter Nacht sich
+    // aendert.
+    //
+    // Nur wenn tatsaechlich eingefuegt wurde: Die Warteschlange sendet
+    // Eintraege erneut, wenn das Netz zurueckkommt (ENT-132). INSERT IGNORE
+    // meldet dann 0 geaenderte Zeilen -- ohne diese Bedingung entstuende bei
+    // jedem Wiederholungsversuch ein weiteres Ereignis, und die Verwaltung
+    // saehe dieselbe klemmende Tuer fuenfmal.
+    if ($aStatus === 'nicht_moeglich' && $ein->rowCount() === 1
+        && hat_tabelle($pdo, 'ereignis_meldung')) {
+        try {
+            // Die Art wird GESUCHT, nicht angelegt: Laeuft die Einrichtung
+            // nach ENT-311 noch nicht, bleibt sie leer -- das Ereignis
+            // entsteht trotzdem. Eine Runde darf nicht an einem fehlenden
+            // Katalogeintrag scheitern.
+            $artId = null;
+            if (hat_tabelle($pdo, 'ereignisart')) {
+                $aSt = $pdo->prepare('SELECT id FROM ereignisart WHERE bezeichnung = ? AND aktiv = 1');
+                $aSt->execute([EREIGNISART_AUFGABE]);
+                $gefunden = $aSt->fetchColumn();
+                if ($gefunden !== false) { $artId = (int)$gefunden; }
+            }
+            $text = 'Aufgabe nicht möglich: „' . $bezeichnung . '"'
+                . ' (Kontrollpunkt: ' . $katZeile['punkt'] . ')'
+                . ' — Grund: ' . $grund;
+            $evt = $pdo->prepare(
+                'INSERT INTO ereignis_meldung
+                   (objekt_id, rundgang_id, einsatz_id, mitarbeiter_id, ereignisart_id,
+                    erfasst_am, bemerkung)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)'
+            );
+            $evt->execute([(int)$rundgang['objekt_id'], $rundgangId,
+                $rundgang['einsatz_id'] !== null ? (int)$rundgang['einsatz_id'] : null,
+                (int)$user['id'], $artId, $aErfasst, $text]);
+        } catch (Throwable $e) {
+            // Der Nachweis steht bereits. Scheitert das Ereignis, darf das
+            // die Antwort des Waechters nicht mitreissen -- er hat seine
+            // Arbeit getan. Gemeldet wird es trotzdem, sonst faellt ein
+            // dauerhaft kaputter Meldeweg niemandem auf.
+            $aufgabenErgebnisse[] = ['aufgabe_id' => $aufgabeId, 'kontrollpunkt_id' => $kpId,
+                'status' => 'ereignis_fehler',
+                'message' => 'Antwort gespeichert, Ereignismeldung fehlgeschlagen'];
+        }
+    }
     $aufgabenErgebnisse[] = ['aufgabe_id' => $aufgabeId, 'kontrollpunkt_id' => $kpId, 'status' => 'ok'];
 }
 
