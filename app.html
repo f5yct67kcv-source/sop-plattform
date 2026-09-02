@@ -3040,6 +3040,43 @@ function rdWarteschlangeHinzufuegen(eintrag) {
 // wird er wieder als offen gezeigt, nicht stillschweigend als erledigt
 // behauptet (ENT-182: Fehlermeldung + erneuter Versuch, alternativ "nicht
 // verfuegbar").
+/* Die Warteschlange ueber die Serverdaten legen (ENT-321).
+
+   Vom Projektinhaber im ersten echten Rundgang gefunden: Ein Punkt war
+   offline bestaetigt ("wird uebermittelt, sobald wieder Netz da ist") --
+   und fiel beim naechsten Laden auf "offen" zurueck. Der Zaehler ging von
+   2/2 auf 1/2.
+
+   Ursache: mein_rundgang_offen.php liefert, was der SERVER weiss. Was nur
+   im Geraet in der Warteschlange liegt, ist dort naturgemaess nicht dabei
+   -- und ueberschrieb beim Laden die richtige Anzeige.
+
+   Der Nachweis war nie verloren; er lag die ganze Zeit im Geraet. Falsch
+   war die ANZEIGE, und zwar in der gefaehrlichen Richtung: Sie sagte
+   "nicht erledigt", wo erledigt war. Ein Waechter haette denselben Punkt
+   ein zweites Mal bestaetigt, und in der Auswertung staenden zwei Scans
+   fuer einen Gang.
+
+   Dasselbe Muster wie rdAufgabenOffen() aus ENT-305 -- dort wurde die
+   Warteschlange von Anfang an mitgelesen. Hier fehlte es. */
+function rdWarteschlangeUeberlagern(kontrollpunkte, rundgangId) {
+  const wartend = rdWarteschlangeLesen()
+    .filter(e => Number(e.rundgang_id) === Number(rundgangId));
+  if (!wartend.length) { return kontrollpunkte; }
+  (kontrollpunkte || []).forEach(k => {
+    // Der Server hat immer recht, wenn er etwas weiss: Ein bereits
+    // angekommener Scan wird nicht von einem Warteschlangen-Eintrag
+    // ueberschrieben -- der ist dann nur noch nicht aufgeraeumt.
+    if (k.erledigt) { return; }
+    const e = wartend.find(x => Number(x.kontrollpunkt_id) === Number(k.id));
+    if (!e) { return; }
+    k.erledigt = { status: e.status, erfasst_am: e.erfasst_am,
+      beschreibung: e.beschreibung || null };
+    k.wartend = true;
+  });
+  return kontrollpunkte;
+}
+
 function rdWarteschlangeSenden() {
   const liste = rdWarteschlangeLesen();
   // Auch die Aufgaben-Antworten (ENT-305) muessen einen Rundgang in die
@@ -3236,6 +3273,10 @@ function rundgangFortsetzen(einsatzId) {
       return;
     }
     const r = data.rundgang;
+    // Was im Geraet auf die Uebermittlung wartet, gehoert ueber das, was
+    // der Server weiss (ENT-321) -- sonst faellt ein offline bestaetigter
+    // Punkt beim Laden auf "offen" zurueck.
+    r.kontrollpunkte = rdWarteschlangeUeberlagern(r.kontrollpunkte, r.id);
     rundgangAktiv = { id: r.id, einsatz_id: einsatzId, kontrollpunkte: r.kontrollpunkte,
       status: r.status, pausiert_seit: r.pausiert_seit,
       // Fuer den Timer (ENT-306). Beides kommt vom Server, nicht vom Geraet:
@@ -3243,6 +3284,9 @@ function rundgangFortsetzen(einsatzId) {
       // Laufzeit sehen.
       vorbereitet_am: r.vorbereitet_am || null,
       pause_minuten: Number(r.pause_minuten || 0),
+      // Fuer die Endzeit des Timers (ENT-321): Ist die Runde beendet,
+      // zaehlt die Uhr bis hierhin und nicht bis jetzt.
+      rohzeit_ende: r.rohzeit_ende || null,
       // Objekt, Ansprechpartner und Zentrale (ENT-308). Sie standen bis
       // hierher nur in der Vorschau -- also ausgerechnet vor dem Losgehen und
       // nicht in dem Moment, in dem jemand vor Ort etwas vorfindet. Der
@@ -3399,11 +3443,24 @@ function rgLaufzeit() {
   if (!start) return '–';
   const ms = Date.parse(String(start).replace(' ', 'T')) || 0;
   if (!ms) return '–';
-  let sek = Math.max(0, Math.floor((Date.now() - ms) / 1000));
+  // Eine BEENDETE Runde zaehlt nicht weiter (ENT-321). Vom Projektinhaber
+  // im ersten echten Rundgang gefunden: Es stand "Rundgang abgeschlossen"
+  // da, und die Uhr lief trotzdem -- nach vier Minuten auf 5:50, nach einer
+  // Stunde auf 1:33:17. Der Timer beantwortet "wie lange bin ich dran";
+  // wer fertig ist, ist gar nicht mehr dran.
+  //
+  // Gerechnet wird bis zum ENDE, nicht bis jetzt. Das Ende ist die
+  // Serverzeit (rohzeit_ende), solange sie da ist; fehlt sie -- etwa weil
+  // der letzte Punkt offline erfasst wurde --, faellt die Uhr auf den
+  // letzten erfassten Scan zurueck. Sie einfach stehen zu lassen waere
+  // ungenau: Beim naechsten Oeffnen staende sonst eine andere Zahl.
+  const bis = rgLaufEndeMs();
+  let sek = Math.max(0, Math.floor(((bis || Date.now()) - ms) / 1000));
   sek -= Math.max(0, Number(rundgangAktiv.pause_minuten || 0)) * 60;
   // Laufende Pause mitrechnen: Sonst liefe die Uhr weiter, waehrend die
   // Runde steht -- und zeigte am Ende mehr, als gearbeitet wurde.
-  if (rundgangAktiv.status === 'pausiert' && rundgangAktiv.pausiert_seit) {
+  // Auf einer beendeten Runde entfaellt das: Dort ist nichts mehr laufend.
+  if (!bis && rundgangAktiv.status === 'pausiert' && rundgangAktiv.pausiert_seit) {
     const pms = Date.parse(String(rundgangAktiv.pausiert_seit).replace(' ', 'T'));
     if (pms) { sek -= Math.max(0, Math.floor((Date.now() - pms) / 1000)); }
   }
@@ -3412,9 +3469,44 @@ function rgLaufzeit() {
   return `${p(Math.floor(sek / 3600))}:${p(Math.floor(sek / 60) % 60)}:${p(sek % 60)}`;
 }
 
+/* Wann die Runde geendet hat -- oder null, wenn sie noch laeuft (ENT-321).
+   Drei Quellen in dieser Reihenfolge, weil sie unterschiedlich verlaesslich
+   sind:
+     1. rohzeit_ende vom Server -- die Wahrheit, sobald sie da ist
+     2. der spaeteste erfasste Scan -- wenn der letzte Punkt offline
+        bestaetigt wurde und der Server es noch nicht weiss
+     3. null -- die Runde laeuft wirklich noch */
+function rgLaufEndeMs() {
+  if (!rundgangAktiv) { return null; }
+  const kps = rundgangAktiv.kontrollpunkte || [];
+  const beendet = rundgangAktiv.status === 'abgeschlossen'
+    || rundgangAktiv.status === 'abgebrochen'
+    || (kps.length > 0 && kps.every(k => k.erledigt));
+  if (!beendet) { return null; }
+  const ende = rundgangAktiv.rohzeit_ende || rundgangAktiv.beendet_am;
+  if (ende) {
+    const t = Date.parse(String(ende).replace(' ', 'T'));
+    if (t) { return t; }
+  }
+  let letzte = 0;
+  kps.forEach(k => {
+    if (!k.erledigt || !k.erledigt.erfasst_am) { return; }
+    const t = Date.parse(String(k.erledigt.erfasst_am).replace(' ', 'T'));
+    if (t && t > letzte) { letzte = t; }
+  });
+  return letzte || null;
+}
+
 function rgTimerStarten() {
   rgTimerStoppen();
-  rgsTimerLauf = setInterval(rgLaufKopfZeichnen, 1000);
+  rgsTimerLauf = setInterval(() => {
+    rgLaufKopfZeichnen();
+    // Sobald die Runde zu Ende ist, hoert die Uhr auf zu ticken. Einmal
+    // zeichnet sie noch -- damit die Endzeit dasteht -- und dann ist Ruhe.
+    // Ohne das liefe ein Zeitgeber im Sekundentakt weiter, auf einer Seite,
+    // an der sich nichts mehr aendert.
+    if (rgLaufEndeMs() !== null) { rgTimerStoppen(); }
+  }, 1000);
 }
 function rgTimerStoppen() {
   if (rgsTimerLauf) { clearInterval(rgsTimerLauf); rgsTimerLauf = null; }
