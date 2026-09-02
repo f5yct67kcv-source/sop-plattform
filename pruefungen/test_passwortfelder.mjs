@@ -82,7 +82,12 @@ check(`KRITISCH: alle Oberflaechen nennen dieselbe Mindestlaenge wie der Server 
   abweichend.length === 0);
 abweichend.forEach(([d, art, n]) => bad.push(`${d}: ${art} sagt ${n}, der Server verlangt ${serverMin}`));
 
-check(`Geprueft: ${zahlen.length} Angaben zur Mindestlaenge`, zahlen.length >= 6);
+// Die Schwelle war 6, solange index.html den Verwaltungsbereich trug: Dort
+// standen drei der Angaben (Passwort beim Anlegen, PIN, Zuruecksetzen). Mit
+// ENT-303 ist der Bereich entfallen, damit auch die drei Angaben. Die Zahl
+// sagt weiterhin "es wurde ueberhaupt etwas gemessen" -- sie ist keine
+// Vorgabe, wie viele Passwortfelder es geben muss.
+check(`Geprueft: ${zahlen.length} Angaben zur Mindestlaenge`, zahlen.length >= 4);
 
 console.log(bad.length ? `\n✓ ${ok.length} bestanden\n\n✗ ${bad.length} FEHLGESCHLAGEN:\n  - ${bad.join('\n  - ')}`
                        : `\n✓ ${ok.length} bestanden`);
