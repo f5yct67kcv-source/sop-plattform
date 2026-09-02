@@ -16,8 +16,12 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $input = json_decode(file_get_contents('php://input') ?: '[]', true) ?: [];
 $rundgangId = (int)($input['rundgang_id'] ?? 0);
 $scans = is_array($input['scans'] ?? null) ? $input['scans'] : [];
-if ($rundgangId <= 0 || !$scans) {
-    json_response(['status' => 'error', 'message' => 'rundgang_id und scans erforderlich'], 422);
+// Aufgaben-Antworten (ENT-305) reisen ueber DENSELBEN Endpunkt und dieselbe
+// Warteschlange wie die Scans. Ein eigener Endpunkt haette bedeutet, dass ein
+// offline erfasster Punkt ankommt und seine Aufgaben nicht -- oder umgekehrt.
+$aufgaben = is_array($input['aufgaben'] ?? null) ? $input['aufgaben'] : [];
+if ($rundgangId <= 0 || (!$scans && !$aufgaben)) {
+    json_response(['status' => 'error', 'message' => 'rundgang_id und scans oder aufgaben erforderlich'], 422);
 }
 
 $pdo = db();
@@ -151,4 +155,67 @@ foreach ($scans as $eintrag) {
     }
 }
 
-json_response(['status' => 'ok', 'rundgang_status' => $rundgang['status'], 'ergebnisse' => $ergebnisse]);
+// ── Aufgaben-Antworten (ENT-305) ──────────────────────────────────────
+//
+// Die Bezeichnung wird aus dem Katalog GELESEN, nicht aus der Anfrage
+// uebernommen: Sie ist der Nachweis, und ein Geraet darf nicht bestimmen,
+// was in der Auswertung steht. Kopiert wird sie trotzdem (eigene Spalte
+// statt Verweis), damit eine spaetere Umbenennung den Beleg von letzter
+// Nacht nicht rueckwirkend aendert.
+$aufgabenErgebnisse = [];
+$aufgabenTabelle = hat_tabelle($pdo, 'rundgang_aufgabe') && hat_tabelle($pdo, 'kontrollpunkt_aufgabe');
+foreach ($aufgaben as $eintrag) {
+    if (!is_array($eintrag)) { continue; }
+    $kpId      = (int)($eintrag['kontrollpunkt_id'] ?? 0);
+    $aufgabeId = (int)($eintrag['aufgabe_id'] ?? 0);
+    $aStatus   = (string)($eintrag['status'] ?? '');
+    $aErfasst  = trim((string)($eintrag['erfasst_am'] ?? ''));
+    $grund     = trim((string)($eintrag['grund'] ?? ''));
+
+    $melde = static function (string $text) use (&$aufgabenErgebnisse, $aufgabeId, $kpId) {
+        $aufgabenErgebnisse[] = ['aufgabe_id' => $aufgabeId, 'kontrollpunkt_id' => $kpId,
+            'status' => 'fehler', 'message' => $text];
+    };
+
+    if (!$aufgabenTabelle) { $melde('Aufgaben-Tabellen fehlen -- bitte einmal einrichten'); continue; }
+    if ($kpId <= 0 || $aufgabeId <= 0 || $aErfasst === ''
+        || !in_array($aStatus, ['erledigt', 'nicht_moeglich'], true)) {
+        $melde('ungueltige Aufgabenmeldung');
+        continue;
+    }
+    // Pflichtgrund bei "nicht moeglich" -- vom Projektinhaber so entschieden.
+    // Serverseitig geprueft, nicht nur im Formular: Ohne das Warum ist der
+    // Eintrag fuer die Verwaltung wertlos.
+    if ($aStatus === 'nicht_moeglich' && $grund === '') {
+        $melde('Bei "nicht moeglich" ist ein Grund erforderlich');
+        continue;
+    }
+
+    // Die Aufgabe muss an DIESEM Punkt haengen und aktiv sein. Im Formular
+    // ist nichts anderes anklickbar -- ueber die Anfrage schon.
+    $kat = $pdo->prepare(
+        'SELECT a.bezeichnung FROM kontrollpunkt_aufgabe ka
+           JOIN objekt_aufgabe a ON a.id = ka.aufgabe_id AND a.aktiv = 1
+          WHERE ka.kontrollpunkt_id = ? AND ka.aufgabe_id = ?'
+    );
+    $kat->execute([$kpId, $aufgabeId]);
+    $bezeichnung = $kat->fetchColumn();
+    if ($bezeichnung === false) {
+        $melde('Diese Aufgabe gehoert nicht zu diesem Kontrollpunkt');
+        continue;
+    }
+
+    // Doppelt gesendete Warteschlangen-Eintraege duerfen keinen zweiten
+    // Nachweis anlegen; die erste Antwort zaehlt und bleibt unveraendert.
+    $ein = $pdo->prepare(
+        'INSERT IGNORE INTO rundgang_aufgabe
+           (rundgang_id, kontrollpunkt_id, aufgabe_id, bezeichnung, status, grund, erfasst_am)
+         VALUES (?, ?, ?, ?, ?, ?, ?)'
+    );
+    $ein->execute([$rundgangId, $kpId, $aufgabeId, (string)$bezeichnung, $aStatus,
+        $grund === '' ? null : $grund, $aErfasst]);
+    $aufgabenErgebnisse[] = ['aufgabe_id' => $aufgabeId, 'kontrollpunkt_id' => $kpId, 'status' => 'ok'];
+}
+
+json_response(['status' => 'ok', 'rundgang_status' => $rundgang['status'],
+    'ergebnisse' => $ergebnisse, 'aufgaben_ergebnisse' => $aufgabenErgebnisse]);

@@ -87,5 +87,9 @@ $rundgang['kontrollpunkte'] = array_map(function ($k) use ($erledigtNach) {
     ] : null;
     return $k;
 }, $alle->fetchAll(PDO::FETCH_ASSOC));
+// Aufgaben je Punkt samt bereits gegebener Antwort (ENT-305) -- ohne sie
+// stellte ein erneutes Oeffnen der Runde dieselbe Frage noch einmal.
+$rundgang['kontrollpunkte'] = rundgang_punkte_mit_aufgaben(
+    $pdo, (int)$rundgang['id'], $rundgang['kontrollpunkte']);
 
 json_response(['status' => 'ok', 'rundgang' => $rundgang]);

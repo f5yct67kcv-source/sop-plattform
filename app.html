@@ -506,6 +506,23 @@ svg.i-sm { width: 17px; height: 17px; }
 .af-info { font-size: 13.5px; color: var(--ink-2); line-height: 1.5; margin-top: 3px; white-space: pre-line; }
 .af-ohne { padding: 0 14px 12px 46px; font-size: 13px; color: var(--ink-3); }
 
+/* Aufgabe bestaetigen (ENT-305). Die Wahl faerbt den gewaehlten Knopf --
+   Farbe UND Rahmen, damit die Unterscheidung nicht allein an der Farbe
+   haengt. "Nicht moeglich" bekommt das Warnrot, nicht das Gruen: Es ist eine
+   Abweichung, keine Erledigung. */
+.ab-karte { border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); padding: 14px; margin-bottom: 12px; }
+.ab-bez { font-size: 15.5px; font-weight: 650; line-height: 1.35; }
+.ab-info { font-size: 13.5px; color: var(--ink-2); line-height: 1.5; margin-top: 4px; white-space: pre-line; }
+.ab-wahl { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+/* 48px wie jeder .btn -- die beiden Knoepfe sind die eigentliche Handlung
+   dieser Schublade und duerfen nicht kleiner sein als der Rest. */
+.ab-btn { min-height: 48px; }
+.ab-btn.ab-an { border-color: var(--pos); background: var(--pos-soft); color: var(--pos); font-weight: 700; }
+.ab-btn.ab-an-neg { border-color: var(--neg); background: var(--neg-soft); color: var(--neg); }
+/* Hinweis an der erledigten Zeile, dass noch Aufgaben offen sind. */
+.ab-offen { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; margin-top: 4px; padding: 0 12px 0 10px; border: 1px solid var(--warn); border-radius: var(--r-sm); background: var(--warn-soft); color: var(--warn); font: inherit; font-size: 13.5px; font-weight: 640; cursor: pointer; }
+.ab-fertig { font-size: 12.5px; color: var(--pos); font-weight: 600; margin-top: 4px; }
+
 .rgs-fuss { padding: 14px 16px calc(16px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line-soft); background: var(--surface); flex: none; }
 .rgs-warn { display: flex; gap: 9px; font-size: 13.5px; line-height: 1.5; color: var(--warn); background: var(--warn-soft); border: 1px solid var(--warn); border-radius: var(--r-sm); padding: 11px 13px; }
 
@@ -903,6 +920,18 @@ const W = {
     afSeitentitel: 'Aufgaben',
     afKeine: 'An den Kontrollpunkten dieser Runde ist keine Aufgabe hinterlegt. Die Verwaltung verknüpft sie am Kontrollpunkt.',
     afOhneAufgabe: 'keine Aufgabe',
+    // Aufgabe bestaetigen waehrend der Runde (ENT-305)
+    abTitel: 'Aufgabe bestätigen',
+    abHinweis: 'Bitte jede Aufgabe beantworten, bevor du weitergehst.',
+    abErledigt: 'Erledigt',
+    abNichtMoeglich: 'Nicht möglich',
+    abGrund: 'Warum nicht?',
+    abGrundHinweis: 'Ohne Grund bleibt in der Auswertung „nicht möglich“ stehen — und niemand weiss, was zu tun ist.',
+    abGrundPflicht: 'Bitte einen Grund angeben.',
+    abSenden: 'Bestätigen',
+    abOffen: 'Aufgabe offen',
+    abOffenMehr: 'Aufgaben offen',
+    abFertig: 'Alle Aufgaben beantwortet',
     afHinweis: 'Diese Aufgaben stehen hier zum Nachlesen. Abgehakt wird noch nichts — das ist ein eigener Schritt.',
     rgsZeitfenster: 'Ausführbar',
     rgsJederzeit: 'Jederzeit',
@@ -973,6 +1002,11 @@ let blattId = null;
 // gezeigte Rundgang, oder null ausserhalb dieses Bildschirms.
 let rundgangAktiv = null;
 const RD_WARTESCHLANGE = 'sop_rundgang_warteschlange';
+// Eigene Ablage fuer die Aufgaben-Antworten (ENT-305). Sie reisen ueber
+// DENSELBEN Endpunkt wie die Scans, brauchen aber einen eigenen Schluessel:
+// Ein Scan wird je Kontrollpunkt einmal gemeldet, Antworten koennen zu
+// einem Punkt mehrere sein.
+const RD_AUFGABEN_WARTESCHLANGE = 'sop_rundgang_aufgaben';
 
 // ── Hilfen
 const $ = id => document.getElementById(id);
@@ -2835,14 +2869,27 @@ function rdWarteschlangeHinzufuegen(eintrag) {
 // verfuegbar").
 function rdWarteschlangeSenden() {
   const liste = rdWarteschlangeLesen();
-  if (!liste.length) return Promise.resolve();
+  // Auch die Aufgaben-Antworten (ENT-305) muessen einen Rundgang in die
+  // Gruppierung bringen koennen. Sonst passiert genau das hier Gefundene:
+  // Der Scan ist laengst uebermittelt und aus der Liste, die Antwort kommt
+  // Sekunden spaeter dazu -- und wird nie gesendet, weil die Scan-Liste leer
+  // ist. Sie bliebe fuer immer in der Warteschlange stehen.
+  const aufgabenListe = rdAufgabenWarteschlangeLesen();
+  if (!liste.length && !aufgabenListe.length) return Promise.resolve();
   const gruppen = {};
   liste.forEach(e => { (gruppen[e.rundgang_id] = gruppen[e.rundgang_id] || []).push(e); });
+  aufgabenListe.forEach(a => { gruppen[a.rundgang_id] = gruppen[a.rundgang_id] || []; });
   return Promise.all(Object.keys(gruppen).map(rid => {
     const scans = gruppen[rid];
+    // Antworten desselben Rundgangs reisen mit (ENT-305) -- eine Anfrage,
+    // eine Uebermittlung. Getrennt gesendet koennte ein Punkt ankommen und
+    // seine Aufgaben nicht, und die Auswertung zeigte einen bestaetigten
+    // Punkt ohne die Arbeit, die dort getan wurde.
+    const aufg = rdAufgabenWarteschlangeLesen().filter(a => Number(a.rundgang_id) === Number(rid));
     return api('mein_rundgang_scan.php', { method: 'POST', body: {
       rundgang_id: Number(rid),
       scans: scans.map(({ rundgang_id, ...rest }) => rest),
+      aufgaben: aufg.map(({ rundgang_id, ...rest }) => rest),
     } }).then(({ ok, data }) => {
       if (!ok || data.status !== 'ok') { return; } // bleibt in der Warteschlange
       // Nur die in DIESER Anfrage tatsaechlich uebermittelten Punkte entfernen
@@ -2852,6 +2899,16 @@ function rdWarteschlangeSenden() {
       const gesendeteIds = new Set(scans.map(s => Number(s.kontrollpunkt_id)));
       rdWarteschlangeSchreiben(rdWarteschlangeLesen().filter(e =>
         !(Number(e.rundgang_id) === Number(rid) && gesendeteIds.has(Number(e.kontrollpunkt_id)))));
+      // Nur die Antworten entfernen, die der Server auch angenommen hat.
+      // Eine abgelehnte (z.B. fehlender Grund) bleibt stehen und wird erneut
+      // versucht, statt lautlos zu verschwinden.
+      const angenommen = new Set((data.aufgaben_ergebnisse || [])
+        .filter(r => r.status === 'ok').map(r => r.kontrollpunkt_id + ':' + r.aufgabe_id));
+      if (aufg.length) {
+        rdAufgabenWarteschlangeSchreiben(rdAufgabenWarteschlangeLesen().filter(e =>
+          !(Number(e.rundgang_id) === Number(rid)
+            && angenommen.has(e.kontrollpunkt_id + ':' + e.aufgabe_id))));
+      }
       const ergebnisse = data.ergebnisse || [];
       let abgelehnt = false;
       if (rundgangAktiv && Number(rundgangAktiv.id) === Number(rid)) {
@@ -3034,6 +3091,12 @@ function rundgangAnzeigen(einsatzId) {
 // bereits fertigen Rundgang).
 function rundgangFussZeichnen() {
   if (!rundgangAktiv) return;
+  // Steht die Aufgaben-Rueckfrage offen (ENT-305), gehoert der Fuss ihr. Ohne
+  // diese Weiche loeschte das Neuzeichnen nach dem Senden der Warteschlange
+  // den "Bestaetigen"-Knopf -- die Schublade bliebe offen und unbedienbar.
+  // Gefunden, weil die Pruefung auf den Knopf wartete; im Betrieb waere es
+  // erst jemandem nachts vor einer toten Schublade aufgefallen.
+  if (abPunktId !== null) return;
   const einsatzId = rundgangAktiv.einsatz_id;
   const fertig = rundgangAktiv.kontrollpunkte.length > 0 && rundgangAktiv.kontrollpunkte.every(k => k.erledigt);
   const zurueck = `<button class="btn btn-plain" onclick="blattAuf(${Number(einsatzId)})">${esc(w('zurueck'))}</button>`;
@@ -3092,12 +3155,23 @@ function rdZeile(k, nr, gesperrt) {
     const statusTxt = istNv ? w('kpNichtVerfuegbar') : istEs ? w('kpErsatzscan') : w('kpBestaetigt') + ' ' + zeit;
     const hakenKlasse = istNv ? 'rd-haken-nv' : istEs ? 'rd-haken-es' : '';
     const hakenZeichen = istNv ? '!' : istEs ? '📷' : '✓';
+    // Offene Aufgaben an einem bereits erfassten Punkt (ENT-305): Wer die
+    // Schublade wegschiebt, muss hier sehen, dass noch etwas aussteht -- und
+    // sie erneut oeffnen koennen. Ein still verschwundener Auftrag waere
+    // schlimmer als die Frage selbst.
+    const offen = rdAufgabenOffen(k);
+    const hatAufgaben = (k.aufgaben || []).length;
     return `<div class="rd-zeile rd-fertig">
       <div class="rd-kopf">
         <span class="rd-nr">${nr}</span>
         <div class="rd-txt">
           <div class="rd-bez">${esc(k.bezeichnung)}</div>
           <div class="rd-meta">${esc(typLabel)} · ${esc(statusTxt)}${k.wartend ? ' · ' + esc(w('kpWirdGesendet')) : ''}</div>
+          ${offen.length ? `<button type="button" class="ab-offen" id="abOffen${Number(k.id)}"
+              onclick="rdAufgabenOeffnen(${Number(k.id)})">
+            <svg class="i i-sm" viewBox="0 0 24 24"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+            <span>${offen.length} ${esc(offen.length === 1 ? w('abOffen') : w('abOffenMehr'))}</span>
+          </button>` : (hatAufgaben ? `<div class="ab-fertig" id="abFertig${Number(k.id)}">${esc(w('abFertig'))}</div>` : '')}
         </div>
       </div>
       <span class="rd-haken ${hakenKlasse}">${hakenZeichen}</span>
@@ -3186,6 +3260,129 @@ function rdScanEintragen(k, status, ort, beschreibung, foto) {
     foto: foto || null,
   });
   rundgangListeZeichnen();
+  rdWarteschlangeSenden();
+  // Haengen an diesem Punkt Aufgaben, poppen sie jetzt auf (ENT-305). Der
+  // Scan ist zu diesem Zeitpunkt bereits festgehalten -- er darf nicht davon
+  // abhaengen, dass jemand die Schublade zu Ende bedient.
+  if (rdAufgabenOffen(k).length) { rdAufgabenOeffnen(k.id); }
+}
+
+/* ══ Aufgabe bestaetigen waehrend der Runde (ENT-305) ══════════════════
+   Vom Projektinhaber: "wenn der MA aktiv auf seiner Runde unterwegs ist und
+   ein Kontrollpunkt erfasst mit einer gekoppelten Aufgabe, ploppt diese auf
+   und er muss diese Aufgabe bestaetigen."
+
+   Zwei Wege, nicht einer: "Erledigt" oder "Nicht moeglich" mit Pflichtgrund
+   -- so entschieden. Gaebe es nur "Erledigt", tippte auch der darauf, der die
+   Aufgabe nicht ausfuehren konnte, und die Auswertung behauptete etwas, das
+   nicht stimmt. Dasselbe Muster hat der Kontrollpunkt selbst schon
+   (bestaetigt / nicht verfuegbar / Ersatzscan).
+
+   Der Scan wird NICHT zurueckgehalten, bis die Aufgaben beantwortet sind: Der
+   Punkt ist erfasst, das ist eine Tatsache. Wer die Schublade wegschiebt,
+   sieht an der Zeile weiter, dass etwas offen ist, und kann sie erneut
+   oeffnen -- ein verworfener Scan waere der groessere Schaden. */
+function rdAufgabenWarteschlangeLesen() {
+  try { return JSON.parse(localStorage.getItem(RD_AUFGABEN_WARTESCHLANGE) || '[]'); } catch { return []; }
+}
+function rdAufgabenWarteschlangeSchreiben(liste) {
+  try { localStorage.setItem(RD_AUFGABEN_WARTESCHLANGE, JSON.stringify(liste)); } catch {}
+}
+
+// Noch unbeantwortete Aufgaben eines Punktes -- beantwortet ist, was der
+// Server kennt ODER was in der Warteschlange auf die Uebermittlung wartet.
+function rdAufgabenOffen(k) {
+  if (!k || !rundgangAktiv) return [];
+  const wartend = new Set(rdAufgabenWarteschlangeLesen()
+    .filter(a => Number(a.rundgang_id) === Number(rundgangAktiv.id)
+      && Number(a.kontrollpunkt_id) === Number(k.id))
+    .map(a => Number(a.aufgabe_id)));
+  return (k.aufgaben || []).filter(a => !a.erledigt && !wartend.has(Number(a.id)));
+}
+
+let abPunktId = null;
+
+function rdAufgabenOeffnen(kontrollpunktId) {
+  const k = rundgangAktiv && rundgangAktiv.kontrollpunkte.find(x => Number(x.id) === Number(kontrollpunktId));
+  if (!k) return;
+  const offen = rdAufgabenOffen(k);
+  if (!offen.length) return;
+  abPunktId = Number(kontrollpunktId);
+  $('blTitel').textContent = w('abTitel');
+  $('blBody').innerHTML = `
+    <div style="font-size:13px;color:var(--ink-3);font-weight:620;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px">${esc(k.bezeichnung)}</div>
+    <div style="font-size:14px;color:var(--ink-2);margin-bottom:16px">${esc(w('abHinweis'))}</div>
+    <div id="abErr" class="msg-err" style="display:none"></div>
+    ${offen.map(a => `<div class="ab-karte" id="abK${Number(a.id)}" data-aufgabe="${Number(a.id)}">
+      <div class="ab-bez">${esc(a.bezeichnung)}</div>
+      ${a.information ? `<div class="ab-info">${esc(a.information)}</div>` : ''}
+      <div class="ab-wahl">
+        <button type="button" class="btn btn-plain ab-btn" data-wert="erledigt"
+                onclick="rdAufgabeWahl(${Number(a.id)}, 'erledigt')">${esc(w('abErledigt'))}</button>
+        <button type="button" class="btn btn-plain ab-btn" data-wert="nicht_moeglich"
+                onclick="rdAufgabeWahl(${Number(a.id)}, 'nicht_moeglich')">${esc(w('abNichtMoeglich'))}</button>
+      </div>
+      <div class="f ab-grund" id="abG${Number(a.id)}" style="display:none;margin-top:12px">
+        <label for="abT${Number(a.id)}">${esc(w('abGrund'))}</label>
+        <textarea class="inp" id="abT${Number(a.id)}" rows="2"></textarea>
+        <div class="rgs-leer" style="padding:6px 2px 0">${esc(w('abGrundHinweis'))}</div>
+      </div>
+    </div>`).join('')}`;
+  $('blFuss').innerHTML =
+    `<button class="btn btn-primary btn-wide" id="abBtn" onclick="rdAufgabenSenden()">${esc(w('abSenden'))}</button>`;
+  blattZeigen();
+}
+
+// Die Wahl wird nur gemerkt und angezeigt -- gesendet wird erst mit
+// "Bestaetigen". So laesst sich eine versehentliche Wahl korrigieren, bevor
+// sie ein Nachweis wird.
+function rdAufgabeWahl(aufgabeId, wert) {
+  const karte = $('abK' + Number(aufgabeId));
+  if (!karte) return;
+  karte.dataset.wahl = wert;
+  karte.querySelectorAll('.ab-btn').forEach(b => {
+    b.classList.toggle('ab-an', b.dataset.wert === wert);
+    b.classList.toggle('ab-an-neg', b.dataset.wert === wert && wert === 'nicht_moeglich');
+  });
+  const grund = $('abG' + Number(aufgabeId));
+  if (grund) { grund.style.display = wert === 'nicht_moeglich' ? '' : 'none'; }
+}
+
+function rdAufgabenSenden() {
+  const k = rundgangAktiv && rundgangAktiv.kontrollpunkte.find(x => Number(x.id) === Number(abPunktId));
+  if (!k) return;
+  const err = $('abErr'); if (err) err.style.display = 'none';
+  const karten = [...document.querySelectorAll('#blBody .ab-karte')];
+  const eintraege = [];
+  for (const karte of karten) {
+    const id = Number(karte.dataset.aufgabe);
+    const wahl = karte.dataset.wahl;
+    if (!wahl) {
+      if (err) { err.textContent = w('abHinweis'); err.style.display = ''; }
+      karte.scrollIntoView({ block: 'center' });
+      return;
+    }
+    const feld = $('abT' + id);
+    const grund = feld ? feld.value.trim() : '';
+    if (wahl === 'nicht_moeglich' && !grund) {
+      if (err) { err.textContent = w('abGrundPflicht'); err.style.display = ''; }
+      if (feld) feld.focus();
+      return;
+    }
+    eintraege.push({ rundgang_id: rundgangAktiv.id, kontrollpunkt_id: k.id,
+      aufgabe_id: id, status: wahl, grund: grund || null, erfasst_am: jetztDatetime() });
+  }
+  const liste = rdAufgabenWarteschlangeLesen();
+  eintraege.forEach(e => liste.push(e));
+  rdAufgabenWarteschlangeSchreiben(liste);
+  // Sofort im lokalen Stand vermerken, damit die Zeile nicht weiter "offen"
+  // meldet, waehrend die Uebermittlung noch laeuft.
+  eintraege.forEach(e => {
+    const a = (k.aufgaben || []).find(x => Number(x.id) === Number(e.aufgabe_id));
+    if (a) { a.erledigt = { status: e.status, grund: e.grund, erfasst_am: e.erfasst_am }; }
+  });
+  abPunktId = null;
+  rundgangAnzeigen(rundgangAktiv.einsatz_id);
   rdWarteschlangeSenden();
 }
 
