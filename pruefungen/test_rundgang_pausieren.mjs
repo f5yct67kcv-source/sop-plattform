@@ -124,8 +124,12 @@ const oeffne = async name => {
 
 // ══════════ OHNE LAUFENDE RUNDE GIBT ES NICHTS ZU PAUSIEREN ═══════════
 await oeffne('Runde ohne Lauf');
+// Ueber die ID, nicht ueber die Klasse: Seit ENT-299 traegt auch die
+// Beschriftung von "Zentrale und Notruf" die Klasse .rgs-mod-lb und steht
+// davor -- ein Zugriff ueber die Klasse griff die falsche und machte diese
+// Suite rot. Genau dafuer ist die volle Regression da.
 check('Der Bereich heisst "Funktionen" -- so nennt ihn der Projektinhaber',
-  (await page.textContent('.rgs-mod-lb')) === 'Funktionen');
+  (await page.textContent('#rgsFunktionenLb')) === 'Funktionen');
 check('KRITISCH: ohne laufende Runde gibt es die Funktion "Rundgang pausieren" nicht',
   !(await page.isVisible('#rgsModPause')));
 check('Ohne laufende Runde gibt es auch keinen Zustandsstreifen',

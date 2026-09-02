@@ -1256,6 +1256,16 @@ $spalten = [
     // Betrieb selbst existierte (nur fuer Mitarbeitende und Kunden).
     ['betrieb', 'telefon', 'ALTER TABLE betrieb ADD COLUMN telefon VARCHAR(50) NULL AFTER domizil_ort'],
     ['betrieb', 'email',   'ALTER TABLE betrieb ADD COLUMN email VARCHAR(200) NULL AFTER telefon'],
+    // Pikett-/Zentralnummer (ENT-299). BEWUSST eine eigene Spalte neben
+    // 'telefon': Das ist nicht dieselbe Nummer. 'telefon' steht auf dem
+    // Briefkopf und geht an Kunden -- die Buero-Nummer, die tagsueber
+    // klingelt. Diese hier sieht der Waechter nachts um drei im Rundgang und
+    // waehlt sie im Ereignisfall. Waeren es dieselbe Spalte, wuerde ein
+    // Aendern des Briefkopfs stillschweigend die Notfallnummer mitaendern.
+    // Kein stiller Rueckfall auf 'telefon', wenn diese Spalte leer ist: Dann
+    // erscheint in der App gar keine Zentrale, statt einer Nummer, an der
+    // nachts niemand abnimmt.
+    ['betrieb', 'pikett_telefon', 'ALTER TABLE betrieb ADD COLUMN pikett_telefon VARCHAR(50) NULL AFTER email'],
     // TINYINT NULL, nicht NOT NULL DEFAULT 0: NULL heisst 'noch nicht
     // entschieden', 0 heisst 'geprueft und nein'. Der Unterschied ist bei
     // GAV-AUS-004 wesentlich -- eine Vorbelegung waere eine Auslegung.

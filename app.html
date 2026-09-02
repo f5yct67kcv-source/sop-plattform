@@ -475,6 +475,34 @@ svg.i-sm { width: 17px; height: 17px; }
 .rgs-fuss { padding: 14px 16px calc(16px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line-soft); background: var(--surface); flex: none; }
 .rgs-warn { display: flex; gap: 9px; font-size: 13.5px; line-height: 1.5; color: var(--warn); background: var(--warn-soft); border: 1px solid var(--warn); border-radius: var(--r-sm); padding: 11px 13px; }
 
+/* Zentrale und Notruf (ENT-299). Nicht ausklappbar, anders als der
+   Ansprechpartner-Block darueber: Wer diese Nummern braucht, hat keine Hand
+   frei zum Aufklappen. Reihenfolge vom Projektinhaber vorgegeben -- eigene
+   Zentrale zuoberst, oeffentlicher Notruf darunter.
+
+   Die Zentrale traegt die Akzentfarbe (unser Weg), die Notrufnummern das
+   Rot der Negativ-Farbe (fremder Weg, letzte Stufe). Der Unterschied haengt
+   nicht allein an der Farbe: Die Zentrale ist eine breite Zeile mit Namen,
+   der Notruf sind drei gleich grosse Kacheln. */
+.rgs-hilfe { display: flex; flex-direction: column; gap: 8px; }
+.rgs-zentrale { display: flex; align-items: center; gap: 13px; min-height: 60px; padding: 0 16px; border: 1px solid var(--accent-line); border-radius: var(--r); background: var(--accent-soft); color: var(--ink); text-decoration: none; }
+.rgs-zentrale-ic { flex: none; width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid var(--accent); color: var(--accent); display: flex; align-items: center; justify-content: center; }
+/* Als Spalte, nicht als Zeile: Die drei Angaben sind <span> (in einem <a>
+   ist kein <div> erlaubt) und laegen sonst nebeneinander -- die
+   Beschriftung stuende dann NEBEN der Nummer statt darueber. */
+.rgs-zentrale-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+/* Beschriftung oben, Nummer darunter (CLAUDE.md) -- gleiches Muster wie die
+   Kennzahlen weiter oben, damit die Seite eine Ordnung hat. */
+.rgs-zentrale-lb { font-size: 11px; font-weight: 640; letter-spacing: .6px; text-transform: uppercase; color: var(--ink-3); }
+.rgs-zentrale-nr { font-size: 16px; font-weight: 660; color: var(--accent); margin-top: 2px; }
+.rgs-zentrale-name { font-size: 13px; color: var(--ink-2); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rgs-notruf { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+/* 60px wie die Funktionen darunter -- eine Notrufkachel darf nicht das
+   kleinste Ziel des Bildschirms sein. */
+.rgs-notruf a { min-height: 60px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; border: 1px solid var(--neg); border-radius: var(--r); background: var(--neg-soft); color: var(--neg); text-decoration: none; }
+.rgs-notruf-nr { font-size: 19px; font-weight: 720; letter-spacing: -.3px; }
+.rgs-notruf-wort { font-size: 11.5px; font-weight: 600; color: var(--ink-2); }
+
 /* Rueckfrage vor einer Zustandsaenderung (ENT-298). Liegt INNERHALB der
    Seite (position:absolute), nicht im Schublade-System: Die Schublade
    (z-index 61) wuerde die Seite dahinter verdecken und faehrt von unten ein
@@ -824,6 +852,13 @@ const W = {
     // "Funktionen" statt des frueheren "Module" (ENT-298): Der Projektinhaber
     // nennt diesen Bereich durchgehend so, "Module" war eine Erfindung von mir.
     rgsFunktionen: 'Funktionen',
+    // Zentrale und Notruf (ENT-299)
+    rgsHilfe: 'Zentrale und Notruf',
+    rgsZentrale: 'Zentrale',
+    rgsPolizei: 'Polizei',
+    rgsFeuerwehr: 'Feuerwehr',
+    rgsSanitaet: 'Sanität',
+    rgsKeineZentrale: 'Keine Pikettnummer hinterlegt — die Verwaltung trägt sie in den Betriebsdaten ein.',
     rgsKontrollpunkte: 'Kontrollpunkte',
     rgsZeitfenster: 'Ausführbar',
     rgsJederzeit: 'Jederzeit',
@@ -1512,6 +1547,19 @@ function rundgangSpontanWaehlen(vorlageId) {
    erst der Knopf am Fuss loest den unveraenderten Startweg aus --
    einschliesslich der Fenster-Weiche aus ENT-279, die weiterhin allein in
    rundgangSpontanWaehlen() sitzt und hier NICHT nachgebaut wird. */
+// Oeffentliche Notrufnummern der Schweiz (ENT-299). Fest, nicht pflegbar:
+// Sie sind gesetzlich vorgegeben und fuer jeden Betrieb dieselben -- ein
+// Einstellungsfeld dafuer waere eine Fehlerquelle ohne Nutzen (CLAUDE.md:
+// gesetzlich Verbindliches wird korrekt standardisiert, nicht frei
+// veraenderbar gemacht). 1414 (Rega) und 145 (Tox) bewusst NICHT dabei: Drei
+// Kacheln bleiben im Blick, sechs nicht -- und wer die Rega braucht, erreicht
+// sie ueber 144.
+const RGS_NOTRUF = [
+  { nr: '117', wort: 'rgsPolizei' },
+  { nr: '118', wort: 'rgsFeuerwehr' },
+  { nr: '144', wort: 'rgsSanitaet' },
+];
+
 let rgsVorlageId = null;
 let rgsAnsicht = 'uebersicht';   // 'uebersicht' | 'ereignis' -- welche Ebene der Seite offen ist
 let rgsDaten = null;             // zuletzt geladene Vorschau, damit der Rueckweg keinen neuen Abruf braucht
@@ -1572,6 +1620,8 @@ function rgSeiteZeichnen(d) {
   // ist diese Seite nicht mehr Vorschau, sondern der Ort, an den man
   // waehrend der Runde zurueckkommt.
   const lf = d.laufend || null;
+  // Eigene Zentrale (ENT-299) -- null, solange keine Pikettnummer gepflegt ist.
+  const z = d.zentrale && d.zentrale.telefon ? d.zentrale : null;
   const pausiert = !!lf && lf.status === 'pausiert';
   // Fuer die Ereignismeldung: zu welchem Objekt wird gemeldet (ENT-295).
   evObjekt = o.id ? { id: o.id, name: o.name } : null;
@@ -1640,8 +1690,28 @@ function rgSeiteZeichnen(d) {
       </div>
     </div>
 
+    <div class="rgs-hilfe">
+      <div class="rgs-mod-lb" id="rgsHilfeLb">${esc(w('rgsHilfe'))}</div>
+      ${z ? `<a class="rgs-zentrale" id="rgsZentrale" href="tel:${esc(String(z.telefon).replace(/\s/g, ''))}">
+        <span class="rgs-zentrale-ic">
+          <svg class="i i-sm" viewBox="0 0 24 24"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.4-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/></svg>
+        </span>
+        <span class="rgs-zentrale-txt">
+          <span class="rgs-zentrale-lb">${esc(w('rgsZentrale'))}</span>
+          <span class="rgs-zentrale-nr">${esc(z.telefon)}</span>
+          ${z.name ? `<span class="rgs-zentrale-name">${esc(z.name)}</span>` : ''}
+        </span>
+      </a>` : `<div class="rgs-leer" id="rgsKeineZentrale" style="padding:2px 2px 6px">${esc(w('rgsKeineZentrale'))}</div>`}
+      <div class="rgs-notruf" id="rgsNotruf">
+        ${RGS_NOTRUF.map(n => `<a href="tel:${n.nr}" aria-label="${esc(w(n.wort))} ${n.nr}">
+          <span class="rgs-notruf-nr">${n.nr}</span>
+          <span class="rgs-notruf-wort">${esc(w(n.wort))}</span>
+        </a>`).join('')}
+      </div>
+    </div>
+
     <div style="display:flex;flex-direction:column;gap:10px">
-      <div class="rgs-mod-lb">${esc(w('rgsFunktionen'))}</div>
+      <div class="rgs-mod-lb" id="rgsFunktionenLb">${esc(w('rgsFunktionen'))}</div>
       <button type="button" class="rgs-modul" id="rgsModKp" onclick="rgSeiteStarten()">
         <span class="rgs-modul-ic">
           <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="12" cy="10" r="3"/><path d="M12 21s-7-6.2-7-11a7 7 0 1 1 14 0c0 4.8-7 11-7 11z"/></svg>
