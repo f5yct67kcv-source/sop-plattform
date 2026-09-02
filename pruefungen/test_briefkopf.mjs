@@ -91,6 +91,29 @@ check('KRITISCH: ein leeres Firma/Name-Feld wird im Hauptdomizil-Zweig serversei
 check('KRITISCH: eine E-Mail-Adresse wird serverseitig auf Gueltigkeit geprueft, nicht nur durchgereicht',
   /FILTER_VALIDATE_EMAIL/.test(BET));
 
+// ENT-299: Die Pikett-/Zentralnummer ist eine EIGENE Spalte, nicht dieselbe
+// wie 'telefon'. 'telefon' steht auf dem Briefkopf und geht an Kunden; die
+// Pikettnummer sieht der Waechter nachts im Rundgang. Waeren es dieselbe
+// Spalte, wuerde ein Aendern des Briefkopfs stillschweigend die Notfall-
+// nummer mitaendern -- und ein Rueckfall von der einen auf die andere waere
+// eine Nummer, an der nachts niemand abnimmt.
+check('KRITISCH: die Pikettnummer wird als eigene Spalte gespeichert, nicht in telefon',
+  /pikett_telefon = \?/.test(BET) && /\$dPikett\s*=\s*trim/.test(BET));
+// Zeilenweise geprueft, NICHT mit einem Abstandsmuster: Eine erste Fassung
+// suchte "$dPikett = ... $dTelefon" mit hoechstens 40 Zeichen dazwischen --
+// die tatsaechliche Rueckfall-Zeile ist 45 Zeichen lang und waere glatt
+// durchgegangen. Aufgefallen erst in der Gegenprobe; ohne sie stuende hier
+// eine Pruefung, die nie etwas findet.
+check('KRITISCH: kein stiller Rueckfall von pikett_telefon auf telefon',
+  (() => {
+    const zeile = (BET.match(/^.*\$dPikett\s*=.*$/m) || [''])[0];
+    return zeile.includes("$in['pikett_telefon']") && !/\$dTelefon|\$in\['telefon'\]/.test(zeile);
+  })());
+check('Die Pikettnummer wird in der Laenge geprueft wie die uebrigen Nummern',
+  /mb_strlen\(\$dPikett\) > 50/.test(BET));
+check('Sie wird mitgelesen, sonst stuende das Feld nach dem Neuladen leer',
+  /SELECT[\s\S]{0,400}pikett_telefon[\s\S]{0,200}FROM betrieb/.test(BET));
+
 check('KRITISCH: der Server verknuepft den Kunden ueber die SCHICHT, nicht ueber den Namen',
   /LEFT JOIN einsaetze e ON e\.id = r\.einsatz_id/.test(RLIST)
   && /LEFT JOIN kunden k ON k\.id = e\.kunde_id/.test(RLIST));
@@ -180,7 +203,7 @@ let BETRIEB = { firma: '', zusatz: '', fusszeile: null, fusszeile2: null,
   qr_iban: null, qr_strasse: null, qr_hausnummer: null, qr_plz: null, qr_ort: null, qr_iban_gueltig: false,
   logo: null, logo_mime: null, logo_groesse: null,
   domizil_strasse: null, domizil_plz: null, domizil_ort: null,
-  telefon: null, email: null };
+  telefon: null, email: null, pikett_telefon: null };
 const gesendet = [];
 
 const browser = await chromium.launch({ executablePath: EXE });
@@ -215,7 +238,8 @@ await page.route('**/api/**', route => {
         BETRIEB = { ...BETRIEB, firma: dFirma,
           domizil_strasse: body.domizil_strasse || null, domizil_plz: body.domizil_plz || null,
           domizil_ort: body.domizil_ort || null,
-          telefon: body.telefon || null, email: body.email || null };
+          telefon: body.telefon || null, email: body.email || null,
+          pikett_telefon: body.pikett_telefon || null };
       }
       else { BETRIEB = { ...BETRIEB, firma: body.firma, zusatz: body.zusatz,
         fusszeile: body.fusszeile || null, fusszeile2: body.fusszeile2 || null,
@@ -455,6 +479,20 @@ check('KRITISCH: das Logo steht ebenfalls hier, nicht mehr bei Briefkopf für Ra
   await page.isVisible('#btLogoKarte') && await page.isVisible('#bkLogoStand'));
 check('Firma/Name, Telefon und E-Mail stehen als Felder auf der Karte',
   await page.isVisible('#bdFirma') && await page.isVisible('#bdTelefon') && await page.isVisible('#bdEmail'));
+check('KRITISCH: die Pikett-/Zentralnummer ist ein eigenes Feld neben Telefon (ENT-299)',
+  await page.isVisible('#bdPikett')
+  && await page.evaluate(() => document.getElementById('bdPikett') !== document.getElementById('bdTelefon')));
+check('Der Hinweis darunter sagt, wo die Nummer erscheint und wozu sie dient',
+  await page.evaluate(() => {
+    const h = document.querySelector('#bdPikett')?.parentElement?.querySelector('.f-hint');
+    return !!h && h.textContent.includes('Rundgang') && h.textContent.includes('Notrufnummern');
+  }));
+check('Der Hinweis steht UNTER dem Feld, nicht darueber (gemessen)',
+  await page.evaluate(() => {
+    const i = document.getElementById('bdPikett').getBoundingClientRect();
+    const h = document.getElementById('bdPikett').parentElement.querySelector('.f-hint').getBoundingClientRect();
+    return h.top >= i.bottom - 1;
+  }));
 check('KRITISCH: Firma/Name kommt bereits aus dem Briefkopf vorausgefuellt — dieselbe Spalte',
   (await page.inputValue('#bdFirma')) === 'CUPI 24 GmbH');
 
@@ -463,11 +501,14 @@ await page.fill('#bdPlz', '4600');
 await page.fill('#bdOrt', 'Olten');
 await page.fill('#bdTelefon', '044 123 45 67');
 await page.fill('#bdEmail', 'info@beispiel.ch');
+await page.fill('#bdPikett', '079 111 22 33');
 await page.click('#bdKarte .btn-primary');
 await page.waitForTimeout(400);
 check('KRITISCH: das Hauptdomizil wird eigenstaendig gespeichert',
   gesendet.some(b => b.domizil_strasse === 'Musterweg 1' && b.domizil_plz === '4600' && b.domizil_ort === 'Olten'
     && b.telefon === '044 123 45 67' && b.email === 'info@beispiel.ch'));
+check('KRITISCH: die Pikettnummer geht dabei als eigenes Feld mit -- getrennt von telefon (ENT-299)',
+  gesendet.some(b => b.pikett_telefon === '079 111 22 33' && b.telefon === '044 123 45 67'));
 check('KRITISCH: Firma wird dabei mitgeschickt (dieselbe Spalte wie im Briefkopf) — Zusatz/QR-Felder aber nicht',
   gesendet.some(b => 'domizil_strasse' in b && b.firma === 'CUPI 24 GmbH')
   && !gesendet.some(b => 'domizil_strasse' in b && ('zusatz' in b || 'fusszeile' in b || 'qr_iban' in b)));
@@ -484,6 +525,8 @@ check('Nach dem Neuladen steht das Hauptdomizil wieder im Formular',
   && (await page.inputValue('#bdOrt')) === 'Olten'
   && (await page.inputValue('#bdTelefon')) === '044 123 45 67'
   && (await page.inputValue('#bdEmail')) === 'info@beispiel.ch');
+check('Die Pikettnummer steht nach dem Neuladen ebenfalls wieder da',
+  (await page.inputValue('#bdPikett')) === '079 111 22 33');
 check('Und der Briefkopf ist beim erneuten Oeffnen ebenfalls noch da',
   BETRIEB.firma === 'CUPI 24 GmbH');
 

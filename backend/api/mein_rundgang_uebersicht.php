@@ -131,6 +131,26 @@ if ($v['kunde_id'] !== null && hat_tabelle($pdo, 'kunden_person')) {
     }
 }
 
+// Eigene Zentrale (ENT-299): die Pikettnummer aus den Betrieb-Stammdaten,
+// nicht die Buero-Nummer vom Briefkopf. Sie steht in der App ueber den
+// oeffentlichen Notrufnummern -- wer im Objekt etwas vorfindet, meldet
+// zuerst der eigenen Zentrale, ausser es brennt oder jemand ist verletzt.
+//
+// hat_spalte statt blindem SELECT: Der Endpunkt laeuft auch gegen eine
+// Datenbank, in der die Einrichtung nach ENT-299 noch nicht gelaufen ist.
+// Ohne diese Pruefung faele dort die ganze Rundgang-Vorschau aus -- wegen
+// einer Nebenangabe.
+$zentrale = null;
+if (hat_tabelle($pdo, 'betrieb') && hat_spalte($pdo, 'betrieb', 'pikett_telefon')) {
+    $bz = $pdo->query('SELECT firma, pikett_telefon FROM betrieb WHERE id = 1')->fetch(PDO::FETCH_ASSOC);
+    if ($bz && trim((string)$bz['pikett_telefon']) !== '') {
+        $zentrale = [
+            'name'    => trim((string)$bz['firma']) !== '' ? trim((string)$bz['firma']) : null,
+            'telefon' => trim((string)$bz['pikett_telefon']),
+        ];
+    }
+}
+
 json_response(['status' => 'ok',
     'vorlage' => [
         'id'          => (int)$v['id'],
@@ -150,4 +170,5 @@ json_response(['status' => 'ok',
     'kontrollpunkte'  => $kontrollpunkte,
     'ansprechpartner' => $ansprechpartner,
     'laufend'         => $laufend,
+    'zentrale'        => $zentrale,
 ]);
