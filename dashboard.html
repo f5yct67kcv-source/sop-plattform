@@ -5884,6 +5884,26 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
      dauert zwei Stunden, eine Frühschicht endet mittags. Darum trägt jede
      Schicht ihre eigene Zeit. Derselbe Dialog bearbeitet auch mehrere
      angehakte Schichten auf einmal. -->
+<!-- Bewegungsspur einer Runde (ENT-318). Eigenes Fenster und nicht in der
+     Liste: Die Spur ist der heikelste Datenbestand des Werkzeugs und wird
+     erst geladen, wenn jemand sie fuer eine bestimmte Runde ausdruecklich
+     ansieht -- nicht nebenbei beim Oeffnen einer Monatsauswertung. -->
+<div class="dlg-scrim" id="dlgSpur">
+  <div class="dlg" style="max-width:760px;width:100%">
+    <div class="dlg-hd">
+      <h2>Weg während der Runde</h2>
+      <p id="spurText"></p>
+    </div>
+    <div class="dlg-bd">
+      <div id="spurKarte" style="height:min(58vh,460px);border:1px solid var(--line);border-radius:var(--r);background:var(--surface-2)"></div>
+      <p class="mut" id="spurHinweis" style="margin-top:10px;font-size:13px"></p>
+    </div>
+    <div class="dlg-ft">
+      <button class="btn btn-plain" onclick="spurZu()">Schliessen</button>
+    </div>
+  </div>
+</div>
+
 <div class="dlg-scrim" id="dlgSchicht">
   <div class="dlg">
     <div class="dlg-hd">
@@ -14182,6 +14202,94 @@ const AE_AUFGABE_STATUS = {
 // gemessen blieben fuenf Spalten ohne jeden Hinweis auf noetiges seitliches
 // Scrollen unsichtbar. Gleiches Kartenmuster (".ag-karte") wie im Abgleich
 // und in der Einsatzliste, dort aus demselben Grund fuer schmale Flaechen.
+/* ══ Bewegungsspur einer Runde (ENT-318) ══════════════════════════════
+   Revidiert ENT-131, vom Projektinhaber entschieden.
+
+   Die Spur wird EINZELN geladen, nicht mit der Auswertung mitgeliefert:
+   Wer einen Monat oeffnet, bekommt nicht nebenbei die Aufenthaltsdaten
+   aller Mitarbeitenden. Das ist keine Sparsamkeit an der Leitung, sondern
+   an der Sache -- ein Datenbestand, den man nur sieht, wenn man ihn
+   ausdruecklich sehen will, wird auch nur dann angesehen. */
+let spurKarte = null, spurLinie = null, spurMarken = [];
+
+function spurZu() {
+  $('dlgSpur').classList.remove('on');
+  // Die Karte wird nicht behalten: Sonst haengt die Spur der letzten
+  // angesehenen Runde im Speicher, bis jemand die Seite neu laedt.
+  spurLinie = null; spurMarken = []; spurKarte = null;
+  $('spurKarte').innerHTML = '';
+}
+
+function spurZeigen(rundgangId, beschriftung) {
+  $('dlgSpur').classList.add('on');
+  $('spurText').textContent = beschriftung || '';
+  $('spurHinweis').textContent = '';
+  $('spurKarte').innerHTML = '<div class="mut" style="padding:22px;text-align:center">Wird geladen …</div>';
+  api('rundgang_spur.php?rundgang_id=' + Number(rundgangId)).then(({ ok, data }) => {
+    if (!ok || !data || data.status !== 'ok') {
+      $('spurKarte').innerHTML = '<div class="mut" style="padding:22px;text-align:center">Der Weg liess sich nicht laden.</div>';
+      return;
+    }
+    // Drei verschiedene Aussagen, drei verschiedene Texte -- sie sehen
+    // sonst alle gleich aus wie "es gibt nichts":
+    //   nicht eingerichtet · Runde vor der Ortung gelaufen · nichts erfasst
+    if (data.eingerichtet === false) {
+      $('spurKarte').innerHTML = '<div class="mut" style="padding:22px;text-align:center">'
+        + 'Wege werden noch nicht aufgezeichnet — dazu einmal „Einrichtung" ausführen.</div>';
+      return;
+    }
+    const punkte = (data.punkte || []).map(p => ({
+      lat: Number(p.lat), lng: Number(p.lng),
+      gen: p.genauigkeit_m == null ? null : Number(p.genauigkeit_m), am: p.erfasst_am,
+    })).filter(p => isFinite(p.lat) && isFinite(p.lng));
+    if (!punkte.length) {
+      $('spurKarte').innerHTML = '<div class="mut" style="padding:22px;text-align:center">'
+        + 'Für diese Runde ist kein Weg aufgezeichnet.<br>'
+        + '<span style="font-size:13px">Entweder lief sie vor der Aufzeichnung, oder das Gerät hatte keinen Standort.</span></div>';
+      return;
+    }
+    $('spurKarte').innerHTML = '';
+    spurKarteBauen(punkte);
+  });
+}
+
+function spurKarteBauen(punkte) {
+  googleMapsLaden().then(() => {
+    if (!$('dlgSpur').classList.contains('on')) { return; }   // inzwischen geschlossen
+    spurKarte = new google.maps.Map($('spurKarte'), {
+      center: punkte[0], zoom: 17,
+      streetViewControl: false, mapTypeControl: false, fullscreenControl: false,
+    });
+    spurLinie = new google.maps.Polyline({
+      map: spurKarte, path: punkte.map(p => ({ lat: p.lat, lng: p.lng })),
+      strokeColor: '#7098F7', strokeOpacity: 0.9, strokeWeight: 3,
+    });
+    // Anfang und Ende markieren -- eine Linie allein sagt nicht, in welche
+    // Richtung gelaufen wurde.
+    const marke = (p, farbe, titel) => new google.maps.Marker({
+      map: spurKarte, position: { lat: p.lat, lng: p.lng }, title: titel,
+      icon: { path: google.maps.SymbolPath.CIRCLE, scale: 7, fillColor: farbe,
+        fillOpacity: 1, strokeColor: '#FFFFFF', strokeWeight: 2 },
+    });
+    spurMarken = [marke(punkte[0], '#4FCE96', 'Anfang: ' + punkte[0].am),
+      marke(punkte[punkte.length - 1], '#E2B156', 'Ende: ' + punkte[punkte.length - 1].am)];
+    const g = new google.maps.LatLngBounds();
+    punkte.forEach(p => g.extend({ lat: p.lat, lng: p.lng }));
+    spurKarte.fitBounds(g, 40);
+    // Die Genauigkeit gehoert dazu: Ein Punkt mit 80 m Streuung sieht auf
+    // der Karte genauso scharf aus wie einer mit 5 m. Wer das nicht weiss,
+    // zieht Schluesse, die die Messung nicht hergibt.
+    const gen = punkte.map(p => p.gen).filter(x => x != null);
+    const schnitt = gen.length ? Math.round(gen.reduce((a, b) => a + b, 0) / gen.length) : null;
+    $('spurHinweis').textContent = punkte.length + ' Messpunkte'
+      + (schnitt !== null ? ' · Genauigkeit im Schnitt ± ' + schnitt + ' m' : '')
+      + ' · aufbewahrt für 90 Tage';
+  }).catch(() => {
+    $('spurKarte').innerHTML = '<div class="mut" style="padding:22px;text-align:center">'
+      + 'Die Karte liess sich nicht laden.</div>';
+  });
+}
+
 function aeZeichneScans(scans, aufgaben, offene) {
   const ziel = $('aeScanListe');
   if (!ziel) { return; }
@@ -14224,6 +14332,8 @@ function aeZeichneScans(scans, aufgaben, offene) {
         <div class="zeiten">${dmy(datum)}, <b>${esc(zeit)}</b> · ${esc(person)}</div>
         ${s.beschreibung ? `<div class="zeiten">${esc(s.beschreibung)}</div>` : ''}
         ${aeAufgabenZeilen(aufgNach[(s.kontrollpunkt_name || '') + '|' + datum], zugeordnet)}
+        ${s.rundgang_id ? `<button class="btn btn-plain btn-sm" style="margin-top:10px"
+          onclick="spurZeigen(${Number(s.rundgang_id)}, '${esc(s.objekt_name)} · ${dmy(datum)}')">Weg anzeigen</button>` : ''}
       </div>`;
   }).join('')
   // Antworten, zu denen im Zeitraum kein Scan steht (z.B. der Scan liegt am
