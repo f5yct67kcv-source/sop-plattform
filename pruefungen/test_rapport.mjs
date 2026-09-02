@@ -397,6 +397,145 @@ check('KRITISCH: der Aufrufer schickt weder Betreff noch Text mit',
 check('Das Fenster schliesst sich nach dem Versand',
   await page.evaluate(() => !document.getElementById('dlgRapportMail').classList.contains('on')));
 
+// ══════════ ABLAGE: AUSWERTUNG → RUNDGANGERLEDIGUNG ══════════════════
+// Die Frage des Projektinhabers war, WO durchgeführte Rundgänge dauerhaft
+// auffindbar sein sollen. Der Ort existierte bereits: der Reiter
+// „Rundgangerledigung" unter Arbeitsergebnisse. Er ist der einzige mit
+// einem freien Zeitraum und reicht damit weiter zurück als die 14 Tage der
+// Revierdienst-Hauptseite. Geprüft wird, dass er in DIESELBE Detailansicht
+// führt -- eine zweite wäre genau die Doppelung, die hier vermieden wurde.
+await page.evaluate(() => rgdZu());
+await page.evaluate(() => { arbeitsergebnisseOeffnen(); aeGoTab('erledigung'); });
+await page.waitForTimeout(600);
+const erlKarten = await page.evaluate(() =>
+  [...document.querySelectorAll('#aeErlListe .ag-karte')].map(k => ({
+    text: k.innerText,
+    klickbar: k.classList.contains('klickbar'),
+    tab: k.tabIndex,
+  })));
+check('KRITISCH: der Reiter listet die durchgeführten Rundgänge', erlKarten.length === 3);
+check('KRITISCH: die Dauer steht auch hier', erlKarten[0] && erlKarten[0].text.includes('1:14 h'));
+check('Eine laufende Runde zeigt auch hier "läuft" statt einer Zahl',
+  erlKarten[1] && erlKarten[1].text.includes('läuft') && !erlKarten[1].text.includes('0:00'));
+// Eine Runde ohne Zeitangaben bekommt gar keine Dauerangabe statt eines
+// nackten Gedankenstrichs mitten in der Zeile.
+check('Eine Runde ohne Zeitangaben trägt hier keine leere Dauer mit sich herum',
+  erlKarten[2] && !erlKarten[2].text.includes('– h'));
+check('KRITISCH: die Karten sind anklickbar und mit der Tastatur erreichbar',
+  erlKarten.length === 3 && erlKarten.every(k => k.klickbar && k.tab === 0));
+check('Dass sie anklickbar sind, ist auch zu sehen und nicht nur zu ahnen',
+  await page.evaluate(() => {
+    const k = document.querySelector('#aeErlListe .ag-karte');
+    return k && getComputedStyle(k).cursor === 'pointer';
+  }));
+await page.click('#aeErlListe .ag-karte');
+await page.waitForTimeout(600);
+check('KRITISCH: der Klick führt in DIESELBE Detailansicht, nicht in eine zweite',
+  await page.evaluate(() => document.getElementById('dlgRundgang').classList.contains('on')));
+await page.screenshot({ path: `${OUT}/rapport-03-erledigung.png` });
+
+// ══════════ DAS BLATT IM HAUSSTIL ════════════════════════════════════
+// Es gibt in diesem Haus EIN Rapportblatt-Aussehen (epBerichtBlatt, ENT-169).
+// Ein Rundgang-Rapport ist keine neue Gattung -- geprüft an den Merkmalen,
+// die den Hausstil ausmachen, nicht am Wortlaut.
+// Ausdrücklich im DUNKLEN Thema gemessen -- der Projektinhaber arbeitet
+// darin (siehe seine Bildschirmfotos). Im hellen Thema wäre die Prüfung
+// wertlos: Dort sind var(--surface)/var(--ink) zufällig dieselben Werte wie
+// Weiss und Schwarz, ein Blatt, das das Thema erbt, fiele nicht auf.
+await page.evaluate(() => document.documentElement.setAttribute('data-thema', 'dunkel'));
+await page.evaluate(() => rapportBlattFuellen(rgdDaten));
+const stil = await page.evaluate(() => {
+  const b = document.getElementById('rapportBlatt');
+  // Über den Textinhalt gesucht statt über die Baumstellung: Die Blätter des
+  // Hauses tragen ihre Gestaltung als Inline-Stil und haben keine Klassen,
+  // an denen sich greifen liesse -- und eine Suche über "div > div" prüfte
+  // die Verschachtelung mit, nicht das gesuchte Merkmal.
+  const titel = [...b.querySelectorAll('div')].find(x => x.textContent.trim() === 'Rundgang-Rapport');
+  const kopf = titel ? titel.closest('div[style*="border-bottom"]') : null;
+  return {
+    titel: titel ? titel.textContent.trim() : null,
+    titelGroesse: titel ? parseFloat(getComputedStyle(titel).fontSize) : 0,
+    kopfLinie: kopf ? getComputedStyle(kopf).borderBottomWidth : null,
+    weiss: getComputedStyle(b).backgroundColor,
+    tinte: getComputedStyle(b).color,
+    tabellen: b.querySelectorAll('table').length,
+  };
+});
+check('Das Blatt trägt den Titel oben links wie der Kundenrapport',
+  stil.titel === 'Rundgang-Rapport' && stil.titelGroesse >= 20);
+check('Mit derselben kräftigen Trennlinie unter dem Kopf', stil.kopfLinie === '2px');
+// Ein Dokument ist immer hell -- auch wenn das Dashboard gerade dunkel ist.
+check('KRITISCH: das Blatt ist hell, unabhängig vom Thema des Dashboards',
+  stil.weiss === 'rgb(255, 255, 255)' && stil.tinte === 'rgb(20, 22, 26)');
+check('Kopfangaben, Kontrollpunkte und Ereignisse stehen in eigenen Tabellen',
+  stil.tabellen === 3);
+await page.screenshot({ path: `${OUT}/rapport-04-blatt-dunkel.png` });
+await page.evaluate(() => document.documentElement.removeAttribute('data-thema'));
+// Die Fusszeile wird GETEILT, nicht nachgebaut -- sonst veraltet dieselbe
+// Adresse an zwei Orten verschieden.
+check('KRITISCH: die Fusszeile kommt aus der gemeinsamen Stelle des Hauses',
+  /\$\('rapportBlatt'\)\.innerHTML[\s\S]{0,4000}\$\{bkFusszeile\(\)\}/.test(DASH));
+check('Der Briefkopf des Betriebs wird verwendet, keine erfundene Absenderzeile',
+  /function rapportBlattFuellen[\s\S]{0,1200}briefkopf\.logo/.test(DASH)
+  && /function rapportBlattFuellen[\s\S]{0,1400}briefkopf\.firma/.test(DASH));
+
+// ══════════ DAS PDF IST WIRKLICH NICHT LEER ══════════════════════════
+// Diese Prüfung gibt es, weil genau das schiefging: Alle 80 übrigen
+// Prüfungen waren grün, und das heruntergeladene PDF war trotzdem leer.
+// Der Grund ist eine Eigenheit von html2pdf, die sich in keinem Quelltext
+// ablesen lässt: Es klont das übergebene Element MITSAMT SEINER id in einen
+// eigenen Behälter. Trug das Blatt selbst `position:absolute;left:-10000px`,
+// galt die Regel im Klon weiter, html2canvas mass eine Höhe von 0 und
+// erzeugte eine weisse Seite.
+//
+// Ein Quelltext-Test hätte das nie gefunden. Darum läuft hier die ECHTE
+// Bibliothek gegen das ECHTE Blatt, und gemessen wird das Ergebnis: Höhe
+// des gerasterten Bildes und Anteil nicht-weisser Bildpunkte.
+await page.unroute('**html2pdf.bundle.min.js');
+await page.addScriptTag({ path: `${WURZEL}/html2pdf.bundle.min.js` });
+const bild = await page.evaluate(async () => {
+  try {
+    rapportBlattFuellen(rgdDaten);
+    const c = await html2pdf().set({ margin: 10, html2canvas: { scale: 2 },
+      jsPDF: { unit: 'mm', format: 'a4' } }).from(document.getElementById('rapportBlatt'))
+      .toCanvas().get('canvas');
+    if (!c.width || !c.height) { return { w: c.width, h: c.height, anteil: 0 }; }
+    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    let dunkel = 0;
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i] < 200 || d[i + 1] < 200 || d[i + 2] < 200) { dunkel++; }
+    }
+    return { w: c.width, h: c.height, anteil: dunkel / (d.length / 4) * 100 };
+  } catch (e) { return { fehler: String(e) }; }
+});
+check('KRITISCH: das Rapportblatt hat im Klon überhaupt eine Höhe — genau hier war das PDF leer',
+  !bild.fehler && bild.h > 400);
+check('KRITISCH: die gerasterte Seite ist nicht weiss, es steht wirklich etwas darauf',
+  !bild.fehler && bild.anteil > 0.5);
+check('Sie ist so breit wie das Blatt, nicht auf einen Streifen zusammengefallen',
+  !bild.fehler && bild.w > 1000);
+
+// Und die Probe aufs Exempel: ein LEERES Blatt muss messbar anders
+// herauskommen. Ohne diesen Vergleich wüsste ich nicht, ob die Schwelle
+// oben überhaupt zwischen "voll" und "leer" unterscheidet.
+const leerBild = await page.evaluate(async () => {
+  try {
+    document.getElementById('rapportBlatt').innerHTML = '';
+    const c = await html2pdf().set({ margin: 10, html2canvas: { scale: 2 },
+      jsPDF: { unit: 'mm', format: 'a4' } }).from(document.getElementById('rapportBlatt'))
+      .toCanvas().get('canvas');
+    if (!c.width || !c.height) { return { h: c.height, anteil: 0 }; }
+    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    let dunkel = 0;
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i] < 200 || d[i + 1] < 200 || d[i + 2] < 200) { dunkel++; }
+    }
+    return { h: c.height, anteil: dunkel / (d.length / 4) * 100 };
+  } catch (e) { return { fehler: String(e) }; }
+});
+check('Die Messung unterscheidet wirklich zwischen vollem und leerem Blatt',
+  !bild.fehler && (leerBild.fehler !== undefined || leerBild.anteil < 0.5 || leerBild.h < 400));
+
 // ══════════ SCHLIESSEN RÄUMT AUF ══════════════════════════════════════
 await page.evaluate(() => rgdZu());
 await page.waitForTimeout(200);
