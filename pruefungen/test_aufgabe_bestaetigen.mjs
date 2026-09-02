@@ -51,8 +51,15 @@ check('KRITISCH: nur "erledigt" oder "nicht_moeglich" werden angenommen',
 check('KRITISCH: bei "nicht möglich" ist der Grund serverseitig Pflicht -- nicht nur im Formular',
   /\$aStatus === 'nicht_moeglich' && \$grund === ''/.test(SCAN));
 // Ein Geraet darf nicht bestimmen, was als Nachweis in der Auswertung steht.
+//
+// Auf die AUSSAGE geprueft, nicht auf den Wortlaut der Abfrage: Die erste
+// Fassung verglich die SELECT-Zeile Zeichen fuer Zeichen und wurde rot,
+// als ENT-311 eine weitere Spalte dazunahm -- ohne dass sich am Verhalten
+// etwas geaendert haette. Zweites Mal derselbe Fehler nach ENT-308
+// (dort war es die Einrueckung); eine Pruefung, die den Umbau bestraft
+// statt den Fehler, kostet Vertrauen.
 check('KRITISCH: die Bezeichnung kommt aus dem Katalog, nicht aus der Anfrage',
-  /SELECT a\.bezeichnung FROM kontrollpunkt_aufgabe ka/.test(SCAN)
+  /SELECT[\s\S]{0,120}a\.bezeichnung[\s\S]{0,200}FROM kontrollpunkt_aufgabe ka/.test(SCAN)
   && !/'bezeichnung'\s*=>\s*\$eintrag/.test(SCAN));
 check('KRITISCH: eine Aufgabe, die nicht an diesem Punkt hängt, wird abgewiesen',
   /WHERE ka\.kontrollpunkt_id = \? AND ka\.aufgabe_id = \?/.test(SCAN)

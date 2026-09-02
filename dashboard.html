@@ -14013,7 +14013,8 @@ function aeLadeScans() {
   if (!von || !bis) { return; }
   api(`rundgang_scan_liste.php?von=${encodeURIComponent(von)}&bis=${encodeURIComponent(bis)}`).then(({ ok, data }) => {
     const gut = ok && data.status === 'ok';
-    aeZeichneScans(gut ? data.scans : null, gut ? (data.aufgaben || []) : []);
+    aeZeichneScans(gut ? data.scans : null, gut ? (data.aufgaben || []) : [],
+      gut ? (data.offene_aufgaben || []) : []);
   });
 }
 
@@ -14029,6 +14030,12 @@ const AE_SCAN_STATUS = {
 const AE_AUFGABE_STATUS = {
   erledigt: ['chip-a', 'Erledigt'],
   nicht_moeglich: ['chip-n', 'Nicht möglich'],
+  // Eigene, staerkere Kennzeichnung (ENT-311): "Nicht möglich" heisst, dass
+  // jemand hingeschaut und geantwortet hat. "Unbeantwortet" heisst, dass
+  // niemand etwas gesagt hat -- man weiss nicht, ob die Aufgabe getan wurde
+  // oder nicht. Das ist der stillere und darum gefaehrlichere Fall und darf
+  // nicht dieselbe Farbe tragen.
+  unbeantwortet: ['chip-x', 'Unbeantwortet'],
 };
 
 // Karten statt Tabelle (ENT-243): eine Tabelle mit acht Spalten passte in der
@@ -14036,11 +14043,26 @@ const AE_AUFGABE_STATUS = {
 // gemessen blieben fuenf Spalten ohne jeden Hinweis auf noetiges seitliches
 // Scrollen unsichtbar. Gleiches Kartenmuster (".ag-karte") wie im Abgleich
 // und in der Einsatzliste, dort aus demselben Grund fuer schmale Flaechen.
-function aeZeichneScans(scans, aufgaben) {
+function aeZeichneScans(scans, aufgaben, offene) {
   const ziel = $('aeScanListe');
   if (!ziel) { return; }
   if (!scans) { ziel.innerHTML = EMPTY('Scans nicht verfügbar', 'Die Liste konnte nicht geladen werden.'); return; }
-  const aufg = aufgaben || [];
+  // Unbeantwortete Aufgaben reihen sich zwischen die beantworteten (ENT-311)
+  // statt in einer eigenen Liste zu stehen: Wer wissen will, was an einem
+  // Punkt geschah, soll das an EINER Stelle sehen. Eine zweite Liste haette
+  // dieselbe Nacht ein zweites Mal erzaehlt -- derselbe Grund, aus dem die
+  // Aufgaben schon in ENT-305 an ihren Scan gebunden wurden.
+  //
+  // Eigene ID-Kennung ("o"-Vorsatz), damit sie nicht mit der ID einer echten
+  // Antwort zusammenfaellt: Beide wandern durch dasselbe "zugeordnet"-Set,
+  // und eine Kollision liesse eine echte Antwort verschwinden.
+  const aufg = (aufgaben || []).concat((offene || []).map(o => ({
+    id: 'o' + o.rundgang_id + '-' + o.kontrollpunkt_id + '-' + o.aufgabe_id,
+    erfasst_am: o.erfasst_am, status: 'unbeantwortet', grund: null,
+    bezeichnung: o.bezeichnung, kontrollpunkt_name: o.kontrollpunkt_name,
+    kunde_name: o.kunde_name, objekt_name: o.objekt_name,
+    vorname: o.vorname, nachname: o.nachname,
+  })));
   if (!scans.length && !aufg.length) { ziel.innerHTML = EMPTY('Nichts vorhanden', 'Im gewählten Zeitraum liegt kein Kontrollpunkt-Scan vor.'); return; }
   // Aufgaben zum jeweiligen Kontrollpunkt gebündelt: Sie gehören zum Scan,
   // auch wenn sie Minuten später beantwortet wurden (der Wächter geht erst

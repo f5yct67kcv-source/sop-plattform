@@ -68,4 +68,56 @@ if (hat_tabelle(db(), 'rundgang_aufgabe')) {
     $aufgaben = $aStmt->fetchAll();
 }
 
-json_response(['status' => 'ok', 'scans' => $stmt->fetchAll(), 'aufgaben' => $aufgaben]);
+// UNBEANTWORTETE Aufgaben (ENT-311). Sie haben keine eigene Zeile -- eine
+// nicht beantwortete Aufgabe ist genau das Fehlen eines Eintrags. Deshalb
+// laesst sie sich nur finden, indem man die Kontrollpunkte einer beendeten
+// Runde gegen den Katalog haelt.
+//
+// Warum das noetig ist: Der Projektinhaber wollte, dass eine nicht erledigte
+// Aufgabe auffaellt. "Nicht moeglich" faellt seit ENT-311 im Meldeweg auf --
+// aber der Fall "niemand hat je geantwortet" blieb unsichtbar, weil nichts
+// da ist, was man anzeigen koennte. Er ist der stillere und darum
+// gefaehrlichere von beiden: Bei "nicht moeglich" weiss man wenigstens, dass
+// jemand hingeschaut hat.
+//
+// Nur BEENDETE Runden: Bei einer laufenden ist eine offene Aufgabe kein
+// Mangel, sondern Arbeit, die noch aussteht. Das eine als das andere
+// auszugeben waere dieselbe Verwechslung wie "unbekannt" mit "keine".
+$offene = [];
+if (hat_tabelle(db(), 'rundgang_aufgabe') && hat_tabelle(db(), 'kontrollpunkt_aufgabe')
+    && hat_tabelle(db(), 'objekt_aufgabe')) {
+    $oSql = "SELECT r.id AS rundgang_id, s.kontrollpunkt_id, k.bezeichnung AS kontrollpunkt_name,
+                    a.id AS aufgabe_id, a.bezeichnung,
+                    MIN(s.erfasst_am) AS erfasst_am,
+                    e.kunde_name, o.name AS objekt_name, e.titel,
+                    m.vorname, m.nachname
+               FROM rundgang_scan s
+               JOIN rundgang r ON r.id = s.rundgang_id
+                    AND r.status IN ('abgeschlossen', 'abgebrochen')
+               JOIN einsaetze e ON e.id = r.einsatz_id
+               JOIN objekte o ON o.id = r.objekt_id
+               JOIN mitarbeiter m ON m.id = r.mitarbeiter_id
+               JOIN kontrollpunkt k ON k.id = s.kontrollpunkt_id
+               JOIN kontrollpunkt_aufgabe ka ON ka.kontrollpunkt_id = s.kontrollpunkt_id
+               JOIN objekt_aufgabe a ON a.id = ka.aufgabe_id AND a.aktiv = 1
+               LEFT JOIN rundgang_aufgabe ra ON ra.rundgang_id = r.id
+                    AND ra.kontrollpunkt_id = s.kontrollpunkt_id
+                    AND ra.aufgabe_id = a.id
+              WHERE ra.id IS NULL AND DATE(s.erfasst_am) BETWEEN ? AND ?";
+    $oWerte = [$von, $bis];
+    if ($objektId !== null) { $oSql .= ' AND r.objekt_id = ?'; $oWerte[] = $objektId; }
+    $oSql .= ' GROUP BY r.id, s.kontrollpunkt_id, k.bezeichnung, a.id, a.bezeichnung,
+                        e.kunde_name, o.name, e.titel, m.vorname, m.nachname
+               ORDER BY erfasst_am DESC, a.id';
+    try {
+        $oStmt = db()->prepare($oSql);
+        $oStmt->execute($oWerte);
+        $offene = $oStmt->fetchAll();
+    } catch (Throwable $e) {
+        // Die Auswertung faellt nicht wegen einer Zusatzangabe aus.
+        $offene = [];
+    }
+}
+
+json_response(['status' => 'ok', 'scans' => $stmt->fetchAll(), 'aufgaben' => $aufgaben,
+    'offene_aufgaben' => $offene]);
