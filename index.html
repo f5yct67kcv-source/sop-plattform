@@ -20,6 +20,8 @@
   --accent: #2F5BD7; --accent-light: #EDF2FE; --green: #0E7C55; --green-bg: #E6F6EF;
   --red: #C2382A; --red-bg: #FCEDEB; --yellow: #9A6B08;
   --radius: 14px; --shadow: 0 1px 2px rgba(16,18,22,.06);
+  /* Ein Abstandswert fuer das ganze Formular (ENT-301). */
+  --luft: 14px;
   --shell: #16181D; --shell-hi: #1E2128; --shell-line: #272B33;
   --shell-txt: #9298A5; --shell-txt-hi: #F3F5F8;
 }
@@ -39,7 +41,7 @@ header h1 { font-size: 15px; font-weight: 660; letter-spacing: -.2px; color: var
 header img { width: 30px; height: 30px; border-radius: 8px; }
 
 .tabs { display: flex; background: var(--surface); border-bottom: 1px solid var(--border); overflow-x: auto; -webkit-overflow-scrolling: touch; }
-.tab { flex: 1; min-width: 80px; padding: 13px 8px; font-size: 12px; font-weight: 600; color: var(--sub); cursor: pointer; border-bottom: 2px solid transparent; text-align: center; white-space: nowrap; transition: all .15s; user-select: none; }
+.tab { flex: 1; min-width: 80px; min-height: 46px; padding: 14px 8px; font-size: 12px; font-weight: 600; color: var(--sub); cursor: pointer; border-bottom: 2px solid transparent; text-align: center; white-space: nowrap; transition: all .15s; user-select: none; }
 .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
 
 .page { display: none; padding: 16px; max-width: 680px; margin: 0 auto; padding-bottom: 48px; }
@@ -49,17 +51,32 @@ header img { width: 30px; height: 30px; border-radius: 8px; }
 .card-title { font-size: 11px; font-weight: 700; color: var(--sub); text-transform: uppercase; letter-spacing: .7px; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
 .opt-badge { font-size: 10px; font-weight: 700; color: var(--sub); background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; text-transform: uppercase; letter-spacing: .3px; }
 
-.field { margin-bottom: 13px; }
-.field:last-child { margin-bottom: 0; }
-.field label { display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; color: var(--sub); margin-bottom: 5px; text-transform: uppercase; letter-spacing: .4px; }
+/* Ein Abstand, nicht drei. Gemessen wurden am Handy 13 px zwischen den
+   meisten Feldern, 25 px vor dem zweiten Feld einer Zweierreihe (13 px Rand
+   plus 12 px Rasterabstand addiert) und 0 px danach: `.field:last-child` war
+   fuer das letzte Feld einer KARTE gedacht, traf aber auch das zweite Feld in
+   `.row2` -- und unter 500 px stapelt `.row2`, dann steht dieses Feld mitten
+   im Formular. Darum haengt der Abstand jetzt an der Reihe, nicht am Feld. */
+.field { margin-bottom: var(--luft); }
+.card > .field:last-child, .card > .row2:last-child { margin-bottom: 0; }
+.row2 .field { margin-bottom: 0; }
+/* Beschriftung in Normalschrift: Der Kartentitel ist die einzige versale
+   Ebene. Vorher standen drei uebereinander (Titel 11 px, Beschriftung 12 px,
+   Badge 10 px, alle fett) -- nichts trat hervor, alles wirkte gleich laut. */
+.field label { display: flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 600; color: var(--sub); margin-bottom: 6px; letter-spacing: 0; }
 .req { color: var(--red); font-size: 14px; line-height: 1; }
-.field input, .field select, .field textarea { width: 100%; border: 1.5px solid var(--border); border-radius: 9px; padding: 12px 14px; font-size: 15px; color: var(--text); background: var(--bg); transition: border-color .15s, background .15s; -webkit-appearance: none; appearance: none; font-family: inherit; }
+/* 16 px ist keine Geschmacksfrage: Darunter zoomt iOS beim Antippen in das
+   Feld hinein und bleibt dort. 44 px Mindesthoehe fuer den Finger. */
+.field input, .field select, .field textarea { width: 100%; min-height: 44px; border: 1.5px solid var(--border); border-radius: 9px; padding: 11px 14px; font-size: 16px; color: var(--text); background: var(--bg); transition: border-color .15s, background .15s; -webkit-appearance: none; appearance: none; font-family: inherit; }
+/* Ein festes, nicht aenderbares Feld (Einsatzart) -- vorher als Inline-Stil
+   am Element, damit ausserhalb des Systems und beim naechsten Mal vergessen. */
+.field input.fest { color: var(--sub); cursor: default; }
 .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--accent); background: #fff; }
 .field input.error, .field select.error { border-color: var(--red); background: #FFF5F5; }
 .field .err-msg { font-size: 11px; color: var(--red); margin-top: 4px; display: none; }
 .field.has-error .err-msg { display: block; }
 select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236B7280' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; padding-right: 36px; }
-.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--luft); margin-bottom: var(--luft); }
 
 .net-display { background: var(--green-bg); border: 1.5px solid #A7F3D0; border-radius: 10px; padding: 14px 18px; text-align: center; margin-bottom: 0; }
 .net-val { font-size: 32px; font-weight: 800; color: var(--green); line-height: 1; }
@@ -71,7 +88,7 @@ select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
 .confirm-box.box-error { background: var(--red-bg); border-color: #FCA5A5; }
 .confirm-box.box-error label { color: var(--red); }
 
-.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 13px 20px; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; border: none; transition: all .15s; font-family: inherit; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 46px; padding: 13px 20px; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; border: none; transition: all .15s; font-family: inherit; }
 .btn-primary { background: var(--accent); color: #fff; width: 100%; }
 .btn-primary:active { background: #1835a0; transform: scale(.98); }
 .btn-ghost { background: transparent; border: 1.5px solid var(--border); color: var(--text); }
@@ -254,7 +271,7 @@ tr:hover td { background: var(--accent-light); }
         </div>
         <div class="field">
           <label id="lbl-einsatzart">Einsatzart</label>
-          <input type="text" value="Verkehrsdienst" id="einsatzart" readonly style="background:var(--bg);color:var(--sub);cursor:default;">
+          <input type="text" value="Verkehrsdienst" id="einsatzart" class="fest" readonly>
         </div>
       </div>
       <div class="field">
