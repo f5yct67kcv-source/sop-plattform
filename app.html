@@ -523,6 +523,25 @@ svg.i-sm { width: 17px; height: 17px; }
 .ab-offen { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; margin-top: 4px; padding: 0 12px 0 10px; border: 1px solid var(--warn); border-radius: var(--r-sm); background: var(--warn-soft); color: var(--warn); font: inherit; font-size: 13.5px; font-weight: 640; cursor: pointer; }
 .ab-fertig { font-size: 12.5px; color: var(--pos); font-weight: 600; margin-top: 4px; }
 
+/* Zaehler und Timer im Kopf (ENT-306). Sie stehen bewusst NICHT im Rumpf:
+   Wer scrollt, soll trotzdem sehen, wie weit er ist und wie lange er dran
+   ist -- das ist im Vorbild genauso geloest. Feste Ziffernbreite, damit die
+   Zeile nicht bei jeder Sekunde springt. */
+.rd-zustand { font-size: 15px; font-weight: 640; margin-bottom: 12px; }
+.rgs-kopf-zahlen { display: flex; align-items: center; gap: 8px; flex: none; }
+.rgs-kopf-wert { min-height: 30px; display: inline-flex; align-items: center; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface-2); color: var(--ink-2); font-size: 13px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.rgs-kopf-zahlen[hidden] { display: none; }
+
+/* Reiterleiste der laufenden Runde (ENT-306). Unten, wo der Daumen ist --
+   dieselbe Stelle wie die Reiterleiste der App selbst, damit niemand zwei
+   Bedienlogiken lernen muss. */
+.rgs-reiter { display: flex; flex: none; border-top: 1px solid var(--line); background: var(--surface); padding-bottom: env(safe-area-inset-bottom); }
+.rgs-reiter[hidden] { display: none; }
+.rgs-reiter button { flex: 1; min-height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; background: none; border: 0; border-top: 2px solid transparent; margin-top: -1px; color: var(--ink-3); font: inherit; font-size: 11.5px; font-weight: 620; cursor: pointer; }
+/* Der aktive Reiter traegt Farbe UND einen Balken -- nicht nur Farbe. */
+.rgs-reiter button.an { color: var(--accent); border-top-color: var(--accent); }
+.rgs-reiter .zahl { position: absolute; transform: translate(14px, -10px); min-width: 17px; height: 17px; padding: 0 5px; border-radius: 9px; background: var(--warn); color: #0F1117; font-size: 10.5px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+
 .rgs-fuss { padding: 14px 16px calc(16px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line-soft); background: var(--surface); flex: none; }
 .rgs-warn { display: flex; gap: 9px; font-size: 13.5px; line-height: 1.5; color: var(--warn); background: var(--warn-soft); border: 1px solid var(--warn); border-radius: var(--r-sm); padding: 11px 13px; }
 
@@ -708,8 +727,13 @@ svg.i-sm { width: 17px; height: 17px; }
       <svg class="i" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
     </button>
     <h2 id="rgsTitel">–</h2>
+    <div class="rgs-kopf-zahlen" id="rgsKopfZahlen" hidden>
+      <span class="rgs-kopf-wert" id="rgsZaehler">–</span>
+      <span class="rgs-kopf-wert" id="rgsTimer">–</span>
+    </div>
   </header>
   <div class="rgs-bd" id="rgsBody"></div>
+  <div class="rgs-reiter" id="rgsReiter" hidden></div>
   <div class="rgs-fuss" id="rgsFuss"></div>
   <div class="rgs-dlg" id="rgsDlg" role="dialog" aria-modal="true" aria-labelledby="rgsDlgFrage" hidden>
     <div class="rgs-dlg-box">
@@ -907,6 +931,12 @@ const W = {
     // "Funktionen" statt des frueheren "Module" (ENT-298): Der Projektinhaber
     // nennt diesen Bereich durchgehend so, "Module" war eine Erfindung von mir.
     rgsFunktionen: 'Funktionen',
+    // Laufende Runde als Vollseite (ENT-306)
+    rgsReiterPunkte: 'Kontrollpunkte',
+    rgsReiterFunktionen: 'Funktionen',
+    rgsLaufTitel: 'Rundgang',
+    rgsAbbrechenModul: 'Rundgang abbrechen',
+    rgsTimerLb: 'Laufzeit',
     // Zentrale und Notruf (ENT-299)
     rgsHilfe: 'Zentrale und Notruf',
     rgsZentrale: 'Zentrale',
@@ -1640,10 +1670,24 @@ const RGS_NOTRUF = [
 
 let rgsVorlageId = null;
 let rgsAnsicht = 'uebersicht';   // 'uebersicht' | 'ereignis' | 'aufgaben' -- welche Ebene der Seite offen ist
+// Die Seite hat zwei Betriebsarten (ENT-306): 'vorschau' zeigt eine Runde,
+// BEVOR sie laeuft (ENT-294), 'lauf' zeigt die laufende. Dieselbe Seite,
+// weil es fuer den Waechter derselbe Ort ist -- und weil ein zweiter,
+// fast gleicher Vollbildschirm zwei Stellen waeren, die beide stimmen
+// muessten.
+let rgsModus = 'vorschau';
+let rgsReiter = 'punkte';        // 'punkte' | 'funktionen' (Karte folgt)
+let rgsTimerLauf = null;
+let rgsLaufTitel = '';
 let rgsDaten = null;             // zuletzt geladene Vorschau, damit der Rueckweg keinen neuen Abruf braucht
 
 function rgSeiteOeffnen(vorlageId) {
   rgsVorlageId = Number(vorlageId);
+  rgsModus = 'vorschau';
+  rgTimerStoppen();
+  $('rgsReiter').hidden = true;
+  $('rgsKopfZahlen').hidden = true;
+  $('rgsFuss').hidden = false;
   $('rgsTitel').textContent = '–';
   $('rgsBody').innerHTML = `<div class="sk" style="height:104px"></div><div class="sk" style="height:64px"></div>`;
   $('rgsFuss').innerHTML = '';
@@ -1668,6 +1712,12 @@ function rgSeiteZu() {
   rgsVorlageId = null;
   rgsAnsicht = 'uebersicht';
   rgsDaten = null;
+  rgsModus = 'vorschau';
+  rgsReiter = 'punkte';
+  rgTimerStoppen();   // sonst tickt er unsichtbar weiter
+  $('rgsReiter').hidden = true;
+  $('rgsKopfZahlen').hidden = true;
+  $('rgsFuss').hidden = false;
   rgsFrageZu();   // eine offene Rueckfrage darf die naechste Seite nicht erben
   $('rgSeite').classList.remove('on');
   $('rgSeite').setAttribute('aria-hidden', 'true');
@@ -1684,8 +1734,29 @@ function rgSeiteZurueck() {
 
 function rgSeiteZurueckZurUebersicht() {
   rgsAnsicht = 'uebersicht';
+  // In der laufenden Runde fuehrt der Rueckweg auf den Reiter zurueck, aus
+  // dem die Unterseite geoeffnet wurde -- nicht auf die Vorschau, die es
+  // hier gar nicht gibt.
+  if (rgsModus === 'lauf') {
+    $('rgsReiter').hidden = false;
+    $('rgsFuss').hidden = true;
+    $('rgsFuss').innerHTML = '';
+    $('rgsKopfZahlen').hidden = false;
+    $('rgsTitel').textContent = rgsLaufTitel || w('rgsLaufTitel');
+    rgLaufZeichnen();
+    return;
+  }
   if (rgsDaten) { rgSeiteZeichnen(rgsDaten); return; }
   rgSeiteZu();
+}
+
+// Unterseiten (Ereignis, Aufgaben) brauchen den Fuss und verdecken die
+// Reiterleiste -- sonst stuenden zwei Navigationen gleichzeitig da.
+function rgUnterseiteAn() {
+  if (rgsModus !== 'lauf') return;
+  $('rgsReiter').hidden = true;
+  $('rgsKopfZahlen').hidden = true;
+  $('rgsFuss').hidden = false;
 }
 
 function rgSeiteZeichnen(d) {
@@ -2012,6 +2083,7 @@ function afOeffnen() {
   if (!$('rgSeite').classList.contains('on')) return;
   if (!rgsDaten) return;
   rgsAnsicht = 'aufgaben';
+  rgUnterseiteAn();
   const punkte = rgsDaten.kontrollpunkte || [];
   $('rgsTitel').textContent = w('afSeitentitel');
   $('rgsFuss').innerHTML =
@@ -2046,6 +2118,7 @@ function afOeffnen() {
 function evOeffnen() {
   if (!$('rgSeite').classList.contains('on')) return;
   rgsAnsicht = 'ereignis';
+  rgUnterseiteAn();
   evFoto = null;
   $('rgsTitel').textContent = w('evTitel');
   $('rgsBody').innerHTML = `<div class="sk" style="height:120px"></div>`;
@@ -2264,6 +2337,7 @@ function rundgangSpontanStarten(vorlageId, ausnahmeGrund) {
       return;
     }
     rundgangAktiv = { id: data.rundgang_id, einsatz_id: data.einsatz_id, status: 'vorbereitet', pausiert_seit: null,
+      vorbereitet_am: jetztDatetime(), pause_minuten: 0,
       kontrollpunkte: (data.kontrollpunkte || []).map(k => ({ ...k, erledigt: null })) };
     ladeSchichten().then(() => rundgangAnzeigen(data.einsatz_id));
   });
@@ -3046,6 +3120,7 @@ function rundgangStartenMitVorlage(einsatzId, vorlageId, ausnahmeGrund) {
       return;
     }
     rundgangAktiv = { id: data.rundgang_id, einsatz_id: einsatzId, status: 'vorbereitet', pausiert_seit: null,
+      vorbereitet_am: jetztDatetime(), pause_minuten: 0,
       kontrollpunkte: (data.kontrollpunkte || []).map(k => ({ ...k, erledigt: null })) };
     rundgangAnzeigen(einsatzId);
   });
@@ -3063,25 +3138,195 @@ function rundgangFortsetzen(einsatzId) {
     }
     const r = data.rundgang;
     rundgangAktiv = { id: r.id, einsatz_id: einsatzId, kontrollpunkte: r.kontrollpunkte,
-      status: r.status, pausiert_seit: r.pausiert_seit };
+      status: r.status, pausiert_seit: r.pausiert_seit,
+      // Fuer den Timer (ENT-306). Beides kommt vom Server, nicht vom Geraet:
+      // Wer die Runde auf einem zweiten Geraet fortsetzt, soll dieselbe
+      // Laufzeit sehen.
+      vorbereitet_am: r.vorbereitet_am || null,
+      pause_minuten: Number(r.pause_minuten || 0) };
     rundgangAnzeigen(einsatzId);
   });
 }
 
 // ── Screen 2: die Checkliste, im selben #blatt wie die Schicht selbst ──
+/* Die laufende Runde als Vollseite statt als Schublade (ENT-306).
+   Vom Projektinhaber verlangt ("unsere Maske sieht noch sehr, sehr schlicht
+   aus"), schrittweise gebaut: zuerst das Geruest -- Reiter, Zaehler, Timer --,
+   die Karte folgt.
+
+   Die kurzen Eingaben (Ersatzscan, "nicht verfuegbar", Aufgaben-Rueckfrage,
+   Abbruchgrund) bleiben Schubladen UEBER dieser Seite. Genau dafuer wurde die
+   Schichtung in ENT-294 gebaut (z-index 55 gegen 61); sie hier nachzubauen
+   hiesse, fuenf funktionierende Ablaeufe gleichzeitig anzufassen. */
 function rundgangAnzeigen(einsatzId) {
   const e = schichten.find(x => Number(x.id) === Number(einsatzId));
   if (!e || !rundgangAktiv) return;
-  $('blTitel').textContent = w('rundgangTitel');
-  $('blBody').innerHTML = `
-    <div style="font-size:13px;color:var(--ink-3);font-weight:620;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px">${esc(e.objekt_name || e.kunde_name)}</div>
-    <div id="rdFortschritt" style="font-size:15px;font-weight:600;margin-bottom:16px"></div>
-    <div id="rdBanner"></div>
-    <div id="rdListe"></div>`;
-  rundgangFussZeichnen();
-  blattZeigen();
+  // Eine offene Schublade gehoert zu einem Schritt, der jetzt vorbei ist.
+  blattZu();
+  rgsModus = 'lauf';
+  rgsAnsicht = 'uebersicht';
+  rgsVorlageId = null;
+  // Ist die Runde beendet oder abgebrochen, gehoert der Blick auf die
+  // Kontrollpunkte: Dort steht, was daraus geworden ist. Im Funktionen-Reiter
+  // stuende der Nutzer sonst vor einer Liste, aus der gerade alles
+  // verschwunden ist.
+  if (rundgangAktiv.status === 'abgebrochen' || rundgangAktiv.status === 'abgeschlossen') {
+    rgsReiter = 'punkte';
+  }
+  rgsLaufTitel = e.objekt_name || e.kunde_name || w('rgsLaufTitel');
+  $('rgsTitel').textContent = rgsLaufTitel;
+  $('rgsFuss').innerHTML = '';
+  $('rgsFuss').hidden = true;
+  $('rgsReiter').hidden = false;
+  $('rgsKopfZahlen').hidden = false;
+  $('rgSeite').classList.add('on');
+  $('rgSeite').setAttribute('aria-hidden', 'false');
+  rgLaufReiterZeichnen();
+  rgLaufZeichnen();
+  rgTimerStarten();
   rdWarteschlangeSenden();
-  rundgangListeZeichnen();
+}
+
+function rgLaufReiterZeichnen() {
+  // Nur Reiter, die etwas zeigen. Ein "Karte"-Reiter mit dem Hinweis "folgt"
+  // waere ein Knopf, der nichts tut -- der zweite Schritt bringt ihn samt
+  // Inhalt.
+  const offeneAufgaben = (rundgangAktiv ? rundgangAktiv.kontrollpunkte : [])
+    .reduce((n, k) => n + (k.erledigt ? rdAufgabenOffen(k).length : 0), 0);
+  $('rgsReiter').innerHTML = [
+    ['punkte', w('rgsReiterPunkte'),
+      '<circle cx="12" cy="10" r="3"/><path d="M12 21s-7-6.2-7-11a7 7 0 1 1 14 0c0 4.8-7 11-7 11z"/>', 0],
+    ['funktionen', w('rgsReiterFunktionen'),
+      '<circle cx="12" cy="12" r="1.6"/><circle cx="5" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>', offeneAufgaben],
+  ].map(([id, lbl, pfad, zahl]) => `<button type="button" id="rgsRt-${id}"
+      class="${rgsReiter === id ? 'an' : ''}" onclick="rgLaufReiter('${id}')">
+      <span style="position:relative;display:inline-flex">
+        <svg class="i i-sm" viewBox="0 0 24 24">${pfad}</svg>
+        ${zahl ? `<span class="zahl">${zahl}</span>` : ''}
+      </span>
+      <span>${esc(lbl)}</span>
+    </button>`).join('');
+}
+
+function rgLaufReiter(id) {
+  rgsReiter = id;
+  rgLaufReiterZeichnen();
+  rgLaufZeichnen();
+}
+
+function rgLaufZeichnen() {
+  if (rgsModus !== 'lauf' || !rundgangAktiv) return;
+  if (rgsReiter === 'funktionen') { rgLaufFunktionen(); }
+  else {
+    // rdFortschritt bleibt bestehen, traegt aber seit ENT-306 nur noch den
+    // ZUSTAND ("abgebrochen"/"abgeschlossen"). Die Zahl steht im Kopf, wo sie
+    // auch beim Scrollen sichtbar bleibt -- sie zweimal zu zeigen waere
+    // dieselbe Angabe an zwei Orten, die auseinanderlaufen koennen.
+    $('rgsBody').innerHTML =
+      `<div id="rdFortschritt" class="rd-zustand"></div><div id="rdBanner"></div><div id="rdListe"></div>`;
+    rundgangListeZeichnen();
+  }
+  rgLaufKopfZeichnen();
+}
+
+// Zaehler und Timer. Der Zaehler nennt erledigte UND gesamte Punkte -- eine
+// blosse Zahl liesse offen, wovon (CLAUDE.md: keine Zahl ohne Bezug).
+function rgLaufKopfZeichnen() {
+  if (rgsModus !== 'lauf' || !rundgangAktiv) return;
+  const kps = rundgangAktiv.kontrollpunkte || [];
+  const fertig = kps.filter(k => k.erledigt).length;
+  const z = $('rgsZaehler'); if (z) { z.textContent = `${fertig} / ${kps.length}`; }
+  const t = $('rgsTimer');
+  if (t) { t.textContent = rgLaufzeit(); t.title = w('rgsTimerLb'); }
+}
+
+/* Laufzeit seit Rundgangbeginn, PAUSEN ABGEZOGEN.
+   Bewusst nicht die Rohzeit: Die beginnt nach ENT-145 erst mit dem ersten
+   bestaetigten Punkt und stuende auf 00:00, waehrend der Waechter noch zum
+   ersten Tor laeuft. Der Timer beantwortet "wie lange bin ich dran", nicht
+   "was wird verrechnet" -- die Rohzeit bleibt davon unberuehrt und wird
+   weiterhin allein serverseitig gefuehrt. */
+function rgLaufzeit() {
+  const start = rundgangAktiv && (rundgangAktiv.vorbereitet_am || rundgangAktiv.gestartet_am);
+  if (!start) return '–';
+  const ms = Date.parse(String(start).replace(' ', 'T')) || 0;
+  if (!ms) return '–';
+  let sek = Math.max(0, Math.floor((Date.now() - ms) / 1000));
+  sek -= Math.max(0, Number(rundgangAktiv.pause_minuten || 0)) * 60;
+  // Laufende Pause mitrechnen: Sonst liefe die Uhr weiter, waehrend die
+  // Runde steht -- und zeigte am Ende mehr, als gearbeitet wurde.
+  if (rundgangAktiv.status === 'pausiert' && rundgangAktiv.pausiert_seit) {
+    const pms = Date.parse(String(rundgangAktiv.pausiert_seit).replace(' ', 'T'));
+    if (pms) { sek -= Math.max(0, Math.floor((Date.now() - pms) / 1000)); }
+  }
+  sek = Math.max(0, sek);
+  const p = n => String(n).padStart(2, '0');
+  return `${p(Math.floor(sek / 3600))}:${p(Math.floor(sek / 60) % 60)}:${p(sek % 60)}`;
+}
+
+function rgTimerStarten() {
+  rgTimerStoppen();
+  rgsTimerLauf = setInterval(rgLaufKopfZeichnen, 1000);
+}
+function rgTimerStoppen() {
+  if (rgsTimerLauf) { clearInterval(rgsTimerLauf); rgsTimerLauf = null; }
+}
+
+// Funktionen-Reiter der laufenden Runde. Vier Eintraege, alle aus
+// rundgangAktiv allein bedienbar -- Ansprechpartner und Notruf brauchen die
+// Vorschau-Daten und kommen mit dem zweiten Schritt dazu.
+function rgLaufFunktionen() {
+  const einsatzId = Number(rundgangAktiv.einsatz_id);
+  const pausiert = rundgangAktiv.status === 'pausiert';
+  // NICHT nur am Status: Wird der letzte Punkt offline erfasst, ist die Runde
+  // faktisch fertig, waehrend der Server sie noch als 'laeuft' fuehrt. Genau
+  // dieselbe Bedingung nutzte der frueher hier stehende Fuss (ENT-146) --
+  // sonst boete die Seite Pausieren auf einer erledigten Runde an.
+  const kpsAlle = rundgangAktiv.kontrollpunkte || [];
+  const beendet = rundgangAktiv.status === 'abgeschlossen' || rundgangAktiv.status === 'abgebrochen'
+    || (kpsAlle.length > 0 && kpsAlle.every(k => k.erledigt));
+  const aufgabenGesamt = (rundgangAktiv.kontrollpunkte || [])
+    .reduce((n, k) => n + ((k.aufgaben || []).length), 0);
+  const modul = (id, wort, pfad, extra) => `<button type="button" class="rgs-modul" id="${id}" ${extra || ''}>
+      <span class="rgs-modul-ic"><svg class="i i-sm" viewBox="0 0 24 24">${pfad}</svg></span>
+      <span>${esc(wort)}</span>
+    </button>`;
+  $('rgsBody').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div class="rgs-mod-lb" id="rgsFunktionenLb">${esc(w('rgsFunktionen'))}</div>
+      ${modul('rgsLaufEreignis', w('evTitel'),
+        '<path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>',
+        'onclick="evOeffnen()"')}
+      ${aufgabenGesamt ? `<button type="button" class="rgs-modul" id="rgsLaufAufgaben" onclick="rgLaufAufgabenListe()">
+        <span class="rgs-modul-ic"><svg class="i i-sm" viewBox="0 0 24 24"><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><polyline points="4 6 5 7 7 5"/><polyline points="4 12 5 13 7 11"/><polyline points="4 18 5 19 7 17"/></svg></span>
+        <span>${esc(w('afTitel'))}</span>
+        <span class="rgs-modul-zahl">${aufgabenGesamt}</span>
+      </button>` : ''}
+      ${beendet ? '' : modul('rgsLaufPause', pausiert ? w('rgsFortsetzen') : w('rgsPausieren'),
+        pausiert ? '<polygon points="6 4 20 12 6 20 6 4"/>'
+                 : '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>',
+        `onclick="rgLaufPause(${einsatzId})"`)}
+      ${beendet ? '' : modul('rgsLaufAbbrechen', w('rgsAbbrechenModul'),
+        '<circle cx="12" cy="12" r="9"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/>',
+        `onclick="rundgangAbbrechenAnzeigen(${einsatzId})"`)}
+    </div>`;
+}
+
+// Pausieren aus dem Funktionen-Reiter: dieselbe Rueckfrage wie im
+// Einsatzmodus (ENT-298), damit es nicht zwei verschiedene Pausen gibt.
+function rgLaufPause(einsatzId) {
+  if (rundgangAktiv.status === 'pausiert') { rundgangWiederAufnehmen(einsatzId); return; }
+  rgsFrage(w('rgsPausierenFrage'), w('rgsPausierenTxt'), w('rgsJa'), () => {
+    rgsFrageZu();
+    rundgangPausieren(einsatzId);
+  });
+}
+
+// Aufgabenliste der laufenden Runde -- dieselbe Darstellung wie in der
+// Vorschau (ENT-304), nur aus rundgangAktiv statt aus rgsDaten gespeist.
+function rgLaufAufgabenListe() {
+  rgsDaten = { kontrollpunkte: rundgangAktiv.kontrollpunkte || [] };
+  afOeffnen();
 }
 
 // Eigene Funktion statt Teil von rundgangAnzeigen(): der Fuss muss sich auch
@@ -3091,6 +3336,9 @@ function rundgangAnzeigen(einsatzId) {
 // bereits fertigen Rundgang).
 function rundgangFussZeichnen() {
   if (!rundgangAktiv) return;
+  // Laeuft die Runde als Vollseite (ENT-306), gibt es keinen Schubladenfuss
+  // mehr: "Abbrechen" steht als Funktion, "Zurueck" ist der Pfeil im Kopf.
+  if (rgsModus === 'lauf') { rgLaufKopfZeichnen(); rgLaufReiterZeichnen(); return; }
   // Steht die Aufgaben-Rueckfrage offen (ENT-305), gehoert der Fuss ihr. Ohne
   // diese Weiche loeschte das Neuzeichnen nach dem Senden der Warteschlange
   // den "Bestaetigen"-Knopf -- die Schublade bliebe offen und unbedienbar.
@@ -3129,9 +3377,14 @@ function rundgangListeZeichnen() {
   const erledigt = kps.filter(k => k.erledigt).length;
   const fEl = $('rdFortschritt');
   if (fEl) {
-    fEl.textContent = rundgangAktiv.status === 'abgebrochen' ? w('rundgangAbgebrochen')
-      : (kps.length > 0 && erledigt === kps.length) ? w('rundgangAbgeschlossen')
-      : `${erledigt} ${w('von')} ${kps.length} ${w('erledigt')}`;
+    // Als Vollseite (ENT-306) steht die Zahl im Kopf; hier bleibt der Zustand.
+    // In der Schublade (Altweg) weiterhin der ganze Satz.
+    const zustand = rundgangAktiv.status === 'abgebrochen' ? w('rundgangAbgebrochen')
+      : (kps.length > 0 && erledigt === kps.length) ? w('rundgangAbgeschlossen') : '';
+    fEl.textContent = rgsModus === 'lauf'
+      ? zustand
+      : (zustand || `${erledigt} ${w('von')} ${kps.length} ${w('erledigt')}`);
+    fEl.style.display = fEl.textContent ? '' : 'none';
   }
   const bEl = $('rdBanner');
   if (bEl) {
@@ -3492,6 +3745,16 @@ function rundgangWiederAufnehmen(einsatzId) {
     if (btn) btn.disabled = false;
     if (!ok || data.status !== 'ok') { toast(data.message || w('netzfehler')); return; }
     rundgangAktiv.status = data.rundgang_status;
+    // Die gerade beendete Pause zur Summe addieren -- der Server tut dasselbe
+    // (mein_rundgang_fortsetzen.php). Ohne das liefe der Timer nach dem
+    // Fortsetzen um die Pausendauer vor, bis die Seite neu geladen wird.
+    if (rundgangAktiv.pausiert_seit) {
+      const pms = Date.parse(String(rundgangAktiv.pausiert_seit).replace(' ', 'T'));
+      if (pms) {
+        rundgangAktiv.pause_minuten = Number(rundgangAktiv.pause_minuten || 0)
+          + Math.max(0, Math.floor((Date.now() - pms) / 60000));
+      }
+    }
     rundgangAktiv.pausiert_seit = null;
     rundgangAnzeigen(einsatzId);
   });
@@ -3512,9 +3775,18 @@ function rundgangAbbrechenAnzeigen(einsatzId) {
       <textarea class="inp" id="raFreitext" rows="3"></textarea>
     </div>
     <div id="raErr" class="msg-err" style="display:none"></div>`;
+  // Der Rueckweg haengt davon ab, woher man kommt (ENT-306): aus den
+  // Funktionen der Vollseite fuehrt er zurueck auf die Seite, aus dem alten
+  // Beenden-Dialog dorthin.
   $('blFuss').innerHTML = `
-    <button class="btn btn-plain" onclick="rundgangBeendenAnzeigen(${Number(einsatzId)})">${esc(w('zurueck'))}</button>
+    <button class="btn btn-plain" onclick="${rgsModus === 'lauf'
+      ? 'blattZu()' : `rundgangBeendenAnzeigen(${Number(einsatzId)})`}">${esc(w('zurueck'))}</button>
     <button class="btn btn-neg" id="raBtn" onclick="rundgangAbbrechenSenden(${Number(einsatzId)})">${esc(w('rundgangAbbrechenBestaetigen'))}</button>`;
+  // Selbst oeffnen: Bis ENT-306 kam dieser Dialog immer aus einer bereits
+  // offenen Schublade (rundgangBeendenAnzeigen). Aus den Funktionen der
+  // Vollseite heraus ist sie zu -- ohne diesen Aufruf laege der Dialog
+  // ausserhalb des Bildschirms und waere unbedienbar.
+  blattZeigen();
 }
 
 function rundgangAbbrechenSenden(einsatzId) {

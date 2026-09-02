@@ -261,8 +261,12 @@ await page.evaluate(() => {
   rdScanEintragen(k, 'bestaetigt', { lat: 47.35, lng: 7.9 });
 });
 await page.waitForTimeout(400);
+// An der SICHTBARKEIT gemessen, nicht am Text: Seit ENT-306 schliesst
+// rundgangAnzeigen() die Schublade, ohne ihren Titel zu leeren -- eine
+// Textpruefung haette hier den stehengebliebenen alten Titel gelesen und
+// waere zufaellig rot geworden, ohne dass etwas kaputt ist.
 check('KRITISCH: ein Punkt ohne Aufgabe fragt nichts -- kein Dialog aus dem Nichts',
-  (await page.textContent('#blTitel')) !== 'Aufgabe bestätigen');
+  !(await page.isVisible('#blatt.on')));
 
 }
 

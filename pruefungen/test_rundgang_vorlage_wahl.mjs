@@ -102,8 +102,10 @@ check('Kein Auswahlbildschirm -- direkt die Checkliste', await page.isVisible('#
 const startAufrufKeine = rufe.find(r => r.p.includes('mein_rundgang_starten'));
 check('KRITISCH: ohne Vorlagen wird kein vorlage_id mitgeschickt',
   startAufrufKeine && !('vorlage_id' in startAufrufKeine.body));
-await page.click('#blFuss button');
-await page.waitForTimeout(200);
+// Seit ENT-306 laeuft die Runde als Vollseite; der Rueckweg ist der Pfeil im
+// Kopf, nicht mehr ein Schubladenfuss.
+await page.click('#rgsZurueck');
+await page.waitForTimeout(250);
 
 // ══════════ GENAU EINE VORLAGE: KEINE ECHTE ENTSCHEIDUNG, DIREKT STARTEN
 await page.evaluate(id => blattAuf(id), 72);
@@ -115,8 +117,8 @@ check('Kein Auswahlbildschirm bei nur einer Vorlage', await page.isVisible('#rdL
 const startAufrufEine = rufe.find(r => r.p.includes('mein_rundgang_starten'));
 check('KRITISCH: die einzige Vorlage wird automatisch mitgeschickt',
   startAufrufEine && startAufrufEine.body.vorlage_id === 501);
-await page.click('#blFuss button');
-await page.waitForTimeout(200);
+await page.click('#rgsZurueck');
+await page.waitForTimeout(250);
 
 // ══════════ MEHRERE VORLAGEN: AUSWAHLBILDSCHIRM
 await page.evaluate(id => blattAuf(id), 73);

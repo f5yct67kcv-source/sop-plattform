@@ -124,8 +124,13 @@ await page.route('**/api/**', route => {
     if (serverRundgang && !['abgeschlossen', 'abgebrochen'].includes(serverRundgang.status)) {
       return send({ status: 'error', message: 'Es laeuft bereits ein Rundgang fuer diesen Einsatz' });
     }
+    // vorbereitet_am wie der echte Server (SELECT * FROM rundgang): Der Timer
+    // der Vollseite (ENT-306) zaehlt ab dieser Zeit, nicht ab dem Moment des
+    // Fortsetzens -- sonst zeigte ein zweites Geraet 00:00:00.
+    const vorAm = new Date(Date.now() - 5 * 60000);
     serverRundgang = { id: ++naechsteRundgangId, einsatz_id: Number(body.einsatz_id), status: 'vorbereitet', scans: {},
-      pause_minuten: 0, pausiert_seit: null, abbruch_grund: null, abbruch_freitext: null };
+      pause_minuten: 0, pausiert_seit: null, abbruch_grund: null, abbruch_freitext: null,
+      vorbereitet_am: vorAm.toISOString().slice(0, 19).replace('T', ' ') };
     return send({ status: 'ok', rundgang_id: serverRundgang.id, kontrollpunkte: KP });
   }
   if (p.includes('mein_rundgang_offen')) {
@@ -136,7 +141,8 @@ await page.route('**/api/**', route => {
     }
     const kontrollpunkte = KP.map(k => ({ ...k, erledigt: serverRundgang.scans[k.id] || null }));
     return send({ status: 'ok', rundgang: { id: serverRundgang.id, einsatz_id: einsatzId, status: serverRundgang.status,
-      pausiert_seit: serverRundgang.pausiert_seit, kontrollpunkte } });
+      pausiert_seit: serverRundgang.pausiert_seit, vorbereitet_am: serverRundgang.vorbereitet_am,
+      pause_minuten: serverRundgang.pause_minuten, kontrollpunkte } });
   }
   if (p.includes('mein_rundgang_pausieren')) {
     if (!serverRundgang || serverRundgang.id !== Number(body.rundgang_id)) { return send({ status: 'error', message: 'unbekannt' }); }
@@ -233,9 +239,16 @@ await page.waitForTimeout(300);
 const gestartet = rufe.find(r => r.p.includes('mein_rundgang_starten'));
 check('KRITISCH: Start ruft mein_rundgang_starten.php mit der richtigen einsatz_id',
   !!gestartet && gestartet.body.einsatz_id === 61);
-check('Die Schublade zeigt jetzt die Checkliste', (await page.textContent('#blTitel')) === 'Rundgang');
-check('KRITISCH: der Fortschritt zeigt 0 von 3 -- nichts vorbelegt',
-  (await page.textContent('#rdFortschritt')).includes('0 von 3'));
+// Seit ENT-306 ist die laufende Runde eine Vollseite, keine Schublade. Der
+// Zaehler steht im Kopf, wo er auch beim Scrollen sichtbar bleibt.
+check('KRITISCH: die laufende Runde oeffnet als Vollseite mit Reitern',
+  await page.isVisible('#rgSeite') && await page.isVisible('#rgsReiter'));
+check('KRITISCH: der Zaehler zeigt 0 von 3 -- nichts vorbelegt',
+  (await page.textContent('#rgsZaehler')) === '0 / 3');
+check('KRITISCH: der Zaehler nennt beide Zahlen, nicht nur die erledigten (CLAUDE.md: keine Zahl ohne Bezug)',
+  (await page.textContent('#rgsZaehler')).includes('/'));
+check('Der Timer laeuft und steht im Kopf',
+  /^\d{2}:\d{2}:\d{2}$/.test((await page.textContent('#rgsTimer')).trim()));
 check('Alle drei Kontrollpunkte erscheinen in der richtigen Reihenfolge',
   await page.evaluate(() => [...document.querySelectorAll('.rd-bez')].map(e => e.textContent)
     .join('|') === 'Eingang|Kellerraum|Garage'));
@@ -259,7 +272,7 @@ check('KRITISCH: eine Ablehnung durch den Server macht den Punkt wieder offen, n
   await page.evaluate(() => !!document.getElementById('rdBtn1')));
 check('KRITISCH: die Fehlermeldung samt Distanz wird angezeigt (ENT-182)',
   (await page.textContent('#rdListe')).includes('438m entfernt'));
-check('Der Fortschritt bleibt bei 0 von 3', (await page.textContent('#rdFortschritt')).includes('0 von 3'));
+check('Der Zaehler bleibt bei 0 von 3', (await page.textContent('#rgsZaehler')) === '0 / 3');
 
 // ══════════════════════════════ GEOFENCE: ERFOLGREICH ══════════════════════
 rufe = [];
@@ -267,41 +280,49 @@ await page.evaluate(() => { window.__geoKoord = { lat: 47.20001, lng: 7.80001 };
 await page.click('#rdBtn1');
 await page.waitForTimeout(400);
 check('Der Punkt zeigt jetzt "Bestätigt"', (await page.textContent('#rdListe')).includes('Bestätigt'));
-check('KRITISCH: der Fortschritt zaehlt jetzt 1 von 3', (await page.textContent('#rdFortschritt')).includes('1 von 3'));
+check('KRITISCH: der Zaehler zaehlt jetzt 1 von 3', (await page.textContent('#rgsZaehler')) === '1 / 3');
 check('KRITISCH: der Zeitstempel ist geraeteseitig im MySQL-Format (Offline-Prinzip, ENT-132)',
   /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(
     rufe.find(r => r.p.includes('mein_rundgang_scan')).body.scans[0].erfasst_am));
 
 // ══════════════════════════════ PAUSIEREN / FORTSETZEN (ENT-146) ══════════
-check('Der "Beenden"-Knopf ist da, solange der Rundgang laeuft',
-  await page.isVisible('#blFuss button:has-text("Beenden")'));
-await page.click('#blFuss button:has-text("Beenden")');
-await page.waitForTimeout(200);
-check('KRITISCH: der Beenden-Dialog zeigt drei Optionen (Pausieren/Abbrechen/Schliessen)',
-  (await page.textContent('#blBody')).includes('Pausieren') && (await page.textContent('#blBody')).includes('Abbrechen')
-  && (await page.textContent('#blFuss')).includes('Schliessen'));
-
-// "Schliessen" ist der sichere Default -- ein Fehlklick darf nichts ausloesen.
+// Seit ENT-306 stehen Pausieren und Abbrechen als eigene Funktionen im
+// Reiter, nicht mehr hinter einem roten "Beenden" (dieselbe Ueberlegung wie
+// ENT-298: ein Knopf, der nach Abbruch aussieht, ist der falsche Weg zum
+// kurzen Unterbrechen).
 rufe = [];
-await page.click('#blFuss button:has-text("Schliessen")');
+await page.click('#rgsRt-funktionen');
 await page.waitForTimeout(200);
-check('KRITISCH: "Schliessen" sendet nichts und kehrt unveraendert zur Checkliste zurueck',
-  rufe.length === 0 && (await page.textContent('#blTitel')) === 'Rundgang'
-  && (await page.textContent('#rdFortschritt')).includes('1 von 3'));
+check('KRITISCH: Pausieren und Abbrechen stehen als eigene Funktionen da, solange die Runde laeuft',
+  await page.isVisible('#rgsLaufPause') && await page.isVisible('#rgsLaufAbbrechen'));
+check('KRITISCH: der Wechsel des Reiters sendet nichts', rufe.length === 0);
+
+// Rueckfrage vor dem Pausieren (ENT-298) -- und "Nein" darf nichts ausloesen.
+await page.click('#rgsLaufPause');
+await page.waitForTimeout(200);
+rufe = [];
+await page.click('#rgsDlgNein');
+await page.waitForTimeout(200);
+check('KRITISCH: "Nein" in der Rueckfrage sendet nichts',
+  rufe.length === 0 && !(await page.isVisible('#rgsDlg')));
 
 // Jetzt tatsaechlich pausieren.
-await page.click('#blFuss button:has-text("Beenden")');
-await page.waitForTimeout(150);
+await page.click('#rgsLaufPause');
+await page.waitForTimeout(200);
 rufe = [];
-await page.click('#blBody button:has-text("Pausieren")');
-await page.waitForTimeout(300);
+await page.click('#rgsDlgJa');
+await page.waitForTimeout(400);
 check('KRITISCH: Pausieren ruft mein_rundgang_pausieren.php mit der richtigen rundgang_id',
   !!rufe.find(r => r.p.includes('mein_rundgang_pausieren') && r.body.rundgang_id === serverRundgang.id));
+await page.click('#rgsRt-punkte');
+await page.waitForTimeout(200);
 check('KRITISCH: der Pausiert-Hinweis erscheint', (await page.textContent('#rdBanner')).includes('pausiert'));
 check('KRITISCH: waehrend der Pause gibt es keine Kontrollpunkt-Aktionen mehr',
   await page.evaluate(() => !document.querySelector('#rdListe button')));
-check('Statt "Beenden" steht jetzt "Fortsetzen" im Fuss',
-  (await page.textContent('#blFuss')).includes('Fortsetzen') && !(await page.textContent('#blFuss')).includes('Beenden'));
+await page.click('#rgsRt-funktionen');
+await page.waitForTimeout(200);
+check('Aus "Pausieren" wird "Fortsetzen"',
+  (await page.textContent('#rgsLaufPause')).includes('fortsetzen'));
 
 // Sperre gehoert in den Server, nicht nur in die Oberflaeche: direkt gegen
 // den Endpunkt geprueft, nicht nur ueber die (ohnehin fehlenden) Knoepfe.
@@ -317,12 +338,16 @@ check('KRITISCH: der Server lehnt einen Scan waehrend der Pause ab, nicht nur di
 
 // Fortsetzen.
 rufe = [];
-await page.click('#blFuss button:has-text("Fortsetzen")');
-await page.waitForTimeout(300);
+await page.click('#rgsLaufPause');
+await page.waitForTimeout(400);
 check('KRITISCH: Fortsetzen ruft mein_rundgang_fortsetzen.php',
   !!rufe.find(r => r.p.includes('mein_rundgang_fortsetzen') && r.body.rundgang_id === serverRundgang.id));
-check('KRITISCH: nach dem Fortsetzen ist "Beenden" wieder da, kein Pausiert-Hinweis mehr',
-  (await page.textContent('#blFuss')).includes('Beenden') && !(await page.textContent('#rdBanner')).includes('pausiert'));
+check('KRITISCH: nach dem Fortsetzen steht wieder "Pausieren" da',
+  (await page.textContent('#rgsLaufPause')).includes('pausieren'));
+await page.click('#rgsRt-punkte');
+await page.waitForTimeout(250);
+check('KRITISCH: kein Pausiert-Hinweis mehr',
+  !(await page.textContent('#rdBanner')).includes('pausiert'));
 check('KRITISCH: die Kontrollpunkt-Aktionen sind nach dem Fortsetzen wieder da',
   await page.evaluate(() => !!document.getElementById('rdBtn3')));
 
@@ -346,8 +371,8 @@ const nvGesendet = rufe.find(r => r.p.includes('mein_rundgang_scan'));
 check('KRITISCH: "nicht verfuegbar" sendet Status und Beschreibung',
   !!nvGesendet && nvGesendet.body.scans[0].status === 'nicht_verfuegbar'
   && nvGesendet.body.scans[0].beschreibung === 'Chip abgerissen');
-check('KRITISCH: der Fortschritt zaehlt "nicht verfuegbar" ebenfalls als erledigt (ENT-145)',
-  (await page.textContent('#rdFortschritt')).includes('2 von 3'));
+check('KRITISCH: der Zaehler zaehlt "nicht verfuegbar" ebenfalls als erledigt (ENT-145)',
+  (await page.textContent('#rgsZaehler')) === '2 / 3');
 check('Der Punkt zeigt ein Warnsymbol statt eines Hakens',
   await page.evaluate(() => !!document.querySelector('.rd-haken-nv')));
 
@@ -366,8 +391,12 @@ check('KRITISCH: die Meldung liegt lokal in der Warteschlange, solange sie nicht
   wartend.length === 1 && wartend[0].kontrollpunkt_id === 3);
 check('KRITISCH: kein Rundgang-Scan-Aufruf hat den Server tatsaechlich erreicht (Verbindung war unterbrochen)',
   !serverRundgang.scans[3]);
-check('KRITISCH: ein bereits vollstaendig erledigter Rundgang bietet kein "Beenden" mehr an -- nichts mehr zu pausieren/abbrechen',
-  !(await page.textContent('#blFuss')).includes('Beenden'));
+await page.click('#rgsRt-funktionen');
+await page.waitForTimeout(200);
+check('KRITISCH: ein bereits vollstaendig erledigter Rundgang bietet weder Pausieren noch Abbrechen an',
+  !(await page.isVisible('#rgsLaufPause')) && !(await page.isVisible('#rgsLaufAbbrechen')));
+await page.click('#rgsRt-punkte');
+await page.waitForTimeout(200);
 
 // ── Netz kommt zurueck: automatisches Nachsenden ohne Nutzerzutun
 scanOffline = false;
@@ -417,13 +446,19 @@ check('KRITISCH: nach Verlust des In-Memory-Zustands zeigt der Knopf "Fortsetzen
 await page.click('#blRundgang button:has-text("Rundgang fortsetzen")');
 await page.waitForTimeout(300);
 check('KRITISCH: Fortsetzen zeigt den tatsaechlichen Serverstand -- der bereits bestaetigte Punkt bleibt erledigt',
-  (await page.textContent('#rdFortschritt')).includes('1 von 3'));
+  (await page.textContent('#rgsZaehler')) === '1 / 3');
+// Die Laufzeit kommt beim Fortsetzen vom SERVER (vorbereitet_am), nicht vom
+// Geraet: Wer die Runde auf einem zweiten Geraet fortsetzt, soll dieselbe
+// Zeit sehen -- eine geraeteseitig neu gestartete Uhr zeigte 00:00:00.
+check('KRITISCH: der Timer zaehlt nach dem Fortsetzen ab dem echten Rundgangbeginn weiter',
+  (await page.textContent('#rgsTimer')).trim() !== '00:00:00'
+  && /^\d{2}:\d{2}:\d{2}$/.test((await page.textContent('#rgsTimer')).trim()));
 
 // ══════════════════════════════ ABBRECHEN (ENT-146) ══════════════════════
-await page.click('#blFuss button:has-text("Beenden")');
-await page.waitForTimeout(150);
-await page.click('#blBody button:has-text("Abbrechen")');
+await page.click('#rgsRt-funktionen');
 await page.waitForTimeout(200);
+await page.click('#rgsLaufAbbrechen');
+await page.waitForTimeout(250);
 check('KRITISCH: der Hinweis nennt den Abbruch als endgueltig', (await page.textContent('#blBody')).includes('endgültig'));
 rufe = [];
 await page.click('#blFuss button:has-text("Abbrechen bestätigen")');
@@ -440,16 +475,21 @@ check('KRITISCH: Abbrechen sendet Grund und Freitext an den Server',
   !!abbruchRuf && abbruchRuf.body.grund === 'notfall_gebunden' && abbruchRuf.body.freitext.includes('Kollege krank'));
 check('KRITISCH: die Checkliste zeigt danach "Abgebrochen", nicht mehr den Fortschritt',
   (await page.textContent('#rdFortschritt')).includes('Abgebrochen'));
+check('Der Zaehler im Kopf steht dabei weiterhin auf dem tatsaechlichen Stand',
+  (await page.textContent('#rgsZaehler')) === '1 / 3');
 check('KRITISCH: der Abbruchgrund wird angezeigt', (await page.textContent('#rdBanner')).includes('Durch Notfall anderweitig gebunden'));
 check('KRITISCH: bereits bestaetigte Kontrollpunkte bleiben nach dem Abbruch sichtbar (ENT-146 Punkt 3)',
   (await page.textContent('#rdListe')).includes('Bestätigt'));
 check('KRITISCH: nach einem Abbruch gibt es keine Aktions-Knoepfe mehr in der Liste',
   await page.evaluate(() => !document.querySelector('#rdListe button')));
-check('KRITISCH: im Fuss steht nur noch "Zurück", kein Beenden/Fortsetzen mehr',
-  (await page.textContent('#blFuss')).includes('Zurück') && !(await page.textContent('#blFuss')).includes('Beenden')
-  && !(await page.textContent('#blFuss')).includes('Fortsetzen'));
-await page.click('#blFuss button:has-text("Zurück")');
+// Seit ENT-306 fuehrt der Pfeil im Kopf aus der Seite heraus; einen
+// Schubladenfuss gibt es hier nicht mehr.
+await page.click('#rgsZurueck');
 await page.waitForTimeout(250);
+check('KRITISCH: der Zurueck-Pfeil schliesst die Seite',
+  !(await page.isVisible('#rgSeite')));
+await page.evaluate(() => blattAuf(61));
+await page.waitForTimeout(300);
 check('KRITISCH: nach einem Abbruch bietet die Schicht wieder "Rundgang starten" an',
   await page.evaluate(() =>
     [...document.querySelectorAll('#blRundgang button')].some(b => b.textContent.includes('Rundgang starten'))));
@@ -464,17 +504,21 @@ await page.evaluate(() => blattAuf(61));
 await page.waitForTimeout(250);
 await page.click('#blRundgang button:has-text("Rundgang starten")');
 await page.waitForTimeout(300);
-await page.click('#blFuss button:has-text("Beenden")');
-await page.waitForTimeout(150);
-await page.click('#blBody button:has-text("Pausieren")');
-await page.waitForTimeout(300);
-check('KRITISCH: waehrend der Pause bietet der Fuss sowohl Abbrechen als auch Fortsetzen an',
-  (await page.textContent('#blFuss')).includes('Abbrechen') && (await page.textContent('#blFuss')).includes('Fortsetzen'));
-check('Die beiden Knoepfe stehen bei pausiertem Rundgang gestapelt untereinander, nicht nebeneinander',
-  await page.evaluate(() => document.getElementById('blFuss').classList.contains('gestapelt')));
-rufe = [];
-await page.click('#blFuss button:has-text("Abbrechen")');
+await page.click('#rgsRt-funktionen');
 await page.waitForTimeout(200);
+await page.click('#rgsLaufPause');
+await page.waitForTimeout(200);
+await page.click('#rgsDlgJa');
+await page.waitForTimeout(400);
+// Der gemeldete Fehler aus ENT-290: Ein pausierter Rundgang liess sich nur
+// fortsetzen, nie abbrechen. Als Reiter stehen beide Wege nebeneinander --
+// die Weiche entfaellt damit ganz.
+check('KRITISCH: waehrend der Pause stehen Abbrechen UND Fortsetzen zur Wahl',
+  await page.isVisible('#rgsLaufAbbrechen') && await page.isVisible('#rgsLaufPause')
+  && (await page.textContent('#rgsLaufPause')).includes('fortsetzen'));
+rufe = [];
+await page.click('#rgsLaufAbbrechen');
+await page.waitForTimeout(250);
 check('KRITISCH: Abbrechen aus der Pause heraus oeffnet denselben Pflichtgrund-Dialog wie im laufenden Rundgang',
   (await page.textContent('#blBody')).includes('endgültig'));
 await page.selectOption('#raGrund', 'notfall_gebunden');
@@ -486,9 +530,11 @@ check('KRITISCH: der Abbruch aus der Pause heraus erreicht tatsaechlich den Serv
   !!abbruchAusPause && abbruchAusPause.body.grund === 'notfall_gebunden');
 check('KRITISCH: die Checkliste zeigt danach "Abgebrochen"',
   (await page.textContent('#rdFortschritt')).includes('Abgebrochen'));
-check('KRITISCH: nach dem Abbruch ist der Fuss nicht mehr gestapelt (nur noch "Zurück")',
-  !(await page.evaluate(() => document.getElementById('blFuss').classList.contains('gestapelt'))));
-await page.click('#blFuss button:has-text("Zurück")');
+await page.click('#rgsRt-funktionen');
+await page.waitForTimeout(200);
+check('KRITISCH: nach dem Abbruch steht weder Pausieren noch Abbrechen mehr da',
+  !(await page.isVisible('#rgsLaufPause')) && !(await page.isVisible('#rgsLaufAbbrechen')));
+await page.click('#rgsZurueck');
 await page.waitForTimeout(250);
 await page.evaluate(() => blattZu());
 
@@ -504,10 +550,21 @@ check('Am Desktop bleibt die Checkliste vollstaendig bedienbar',
   await page.isVisible('#rdListe') && await page.isVisible('#rdBtn3'));
 check('KRITISCH: am Desktop kein Seiten-Scroll', await page.evaluate(() =>
   document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1));
-await page.click('#blFuss button:has-text("Beenden")');
+// Die Seite haelt am Desktop App-Breite (ENT-294) -- die Reiterleiste darf
+// nicht darueber hinauslaufen.
+check('KRITISCH: die Reiterleiste bleibt am Desktop in der App-Breite',
+  await page.evaluate(() => {
+    const r = document.getElementById('rgsReiter').getBoundingClientRect();
+    const s = document.getElementById('rgSeite').getBoundingClientRect();
+    return r.width <= s.width + 1 && s.width <= 561;
+  }));
+check('KRITISCH: die Reiter sind mindestens 44px hoch (CLAUDE.md)',
+  await page.evaluate(() => [...document.querySelectorAll('#rgsReiter button')]
+    .every(b => b.getBoundingClientRect().height >= 44)));
+await page.click('#rgsRt-funktionen');
 await page.waitForTimeout(200);
-check('Der Beenden-Dialog ist auch am Desktop vollstaendig bedienbar, kein Seiten-Scroll',
-  await page.isVisible('#blBody button:has-text("Pausieren")')
+check('Die Funktionen sind auch am Desktop vollstaendig bedienbar, kein Seiten-Scroll',
+  await page.isVisible('#rgsLaufPause')
   && await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1));
 await page.screenshot({ path: `${OUT}/rd-03-desktop.png` });
 

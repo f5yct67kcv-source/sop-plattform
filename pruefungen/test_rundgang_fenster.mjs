@@ -186,6 +186,12 @@ check('KRITISCH: kein ausnahme_grund, wenn innerhalb des Fensters gestartet wurd
 // erfolgreichen Start oben zeigt der Fuss "Beenden", keinen Rueckweg. Ein
 // frischer blattAuf() ist derselbe robuste Weg wie zwischen den Schichten
 // oben, unabhaengig vom internen Zustand des zuvor gestarteten Rundgangs.
+// Seit ENT-306 bleibt die laufende Runde als Vollseite offen, bis man sie
+// schliesst -- der vorige Start hat sie geoeffnet. Ohne dieses Schliessen
+// laege ihre Checkliste noch da und die naechste Aussage pruefte den
+// Ueberrest statt den neuen Fall.
+await page.evaluate(() => { rgSeiteZu(); blattZu(); });
+await page.waitForTimeout(250);
 await page.evaluate(id => blattAuf(id), 82);
 await page.waitForTimeout(300);
 rufe = [];
@@ -254,8 +260,11 @@ await page.click('#rgsStartBtn');
 await page.waitForTimeout(350);
 check('KRITISCH: ein zweiter Startversuch derselben, schon laufenden Vorlage zeigt keine Doppelbelegungs-Fehlermeldung',
   !(await page.textContent('body')).includes('bereits andernorts eingeteilt'));
+// Der Zaehler steht seit ENT-306 im Kopf der Vollseite; #rdFortschritt traegt
+// dort nur noch den Zustand (abgebrochen/abgeschlossen) und ist waehrend der
+// laufenden Runde leer.
 check('KRITISCH: stattdessen wird die bereits laufende Runde fortgesetzt (dieselbe Checkliste, kein neuer Start)',
-  await page.isVisible('#rdListe') && (await page.textContent('#rdFortschritt')).includes('von'));
+  await page.isVisible('#rdListe') && (await page.textContent('#rgsZaehler')).includes('/'));
 
 spontanerEinsatz = null;
 aktiverSpontanRundgang = null;
