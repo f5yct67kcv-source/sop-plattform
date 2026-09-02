@@ -269,6 +269,66 @@ await page.waitForTimeout(900);
 check('Ohne Antippen bleibt es bei null Standortabfragen',
   await page.evaluate(() => window.__rufe() === 0));
 await page.screenshot({ path: `${OUT}/karte-03-mit-karte.png` });
+
+// ── Dritter Fehlerfall: Skript laedt, Schluessel wird abgelehnt ────────
+// Live aufgetreten (ENT-309): Das Skript laedt, google.maps ist da, die
+// Karte wird gebaut -- und erst danach meldet der Anbieter asynchron, dass
+// der Schluessel fuer diese Seite nicht gilt. Er schreibt dann seine eigene
+// graue Tafel in unseren Container: "Google Maps wurde auf dieser Seite
+// nicht richtig geladen. Technische Details entnimmst du der
+// JavaScript-Konsole." Das ist auf einem Diensthandy nachts keine Auskunft
+// -- und es ist genau das graue Rechteck, das diese Karte vermeiden soll.
+// Abfangbar ist es nur ueber gm_authFailure, das der Anbieter beim Namen
+// aufruft.
+// Erst pruefen, DASS es den Rueckruf gibt -- sonst stuerzt die Suite hier
+// ab, statt eine Aussage rot zu melden. Genau dieser Mangel ist in ENT-302,
+// ENT-304 und ENT-305 schon dreimal aufgetreten.
+const rueckrufDa = await page.evaluate(() => typeof window.gm_authFailure === 'function');
+check('KRITISCH: es gibt überhaupt einen Rückruf für den abgelehnten Schlüssel (gm_authFailure)', rueckrufDa);
+if (rueckrufDa) {
+await page.evaluate(() => window.gm_authFailure());
+await page.waitForTimeout(300);
+check('KRITISCH: ein abgelehnter Schlüssel wird in EIGENEN Worten erklärt, nicht mit der Tafel des Anbieters',
+  await page.isVisible('#rgsKarteStand')
+  && (await page.textContent('#rgsKarteStand')).includes('nicht freigegeben'));
+check('KRITISCH: der Text sagt, dass es nicht am Gerät liegt und die Runde weiterläuft',
+  await page.evaluate(() => {
+    const t = document.getElementById('rgsKarteStand').textContent;
+    return t.includes('kein Fehler an deinem Gerät') && t.includes('läuft normal weiter');
+  }));
+// "Gesperrt" und "ohne Netz" sind verschiedene Aussagen -- der eine Fall
+// vergeht von selbst, der andere braucht jemanden in der Verwaltung.
+check('KRITISCH: "gesperrt" sieht nicht aus wie "ohne Netz"',
+  await page.evaluate(() => !document.getElementById('rgsKarteStand').textContent.includes('ohne Netz')));
+check('Ein Knopf, der nichts mehr tun kann, verschwindet',
+  await page.$('#rgsZentrieren') === null);
+// Beim naechsten Oeffnen nicht erneut bauen: Der zweite Versuch endet
+// genauso, zeigt aber vorher wieder die fremde Tafel.
+await page.click('#rgsRt-punkte');
+await page.waitForTimeout(200);
+await page.click('#rgsRt-karte');
+await page.waitForTimeout(600);
+check('KRITISCH: beim erneuten Öffnen steht sofort die eigene Erklärung da',
+  await page.isVisible('#rgsKarteStand')
+  && (await page.textContent('#rgsKarteStand')).includes('nicht freigegeben'));
+check('Die Kontrollpunkt-Liste bleibt auch dann vollständig erreichbar',
+  await page.evaluate(async () => {
+    document.getElementById('rgsRt-punkte').click();
+    await new Promise(r => setTimeout(r, 200));
+    return document.querySelectorAll('#rdListe .rd-bez').length === 3;
+  }));
+await page.screenshot({ path: `${OUT}/karte-04-gesperrt.png` });
+await page.evaluate(() => { rgsMapsAbgelehnt = false; });
+} else {
+  ['KRITISCH: ein abgelehnter Schlüssel wird in EIGENEN Worten erklärt, nicht mit der Tafel des Anbieters',
+   'KRITISCH: der Text sagt, dass es nicht am Gerät liegt und die Runde weiterläuft',
+   'KRITISCH: "gesperrt" sieht nicht aus wie "ohne Netz"',
+   'Ein Knopf, der nichts mehr tun kann, verschwindet',
+   'KRITISCH: beim erneuten Öffnen steht sofort die eigene Erklärung da',
+   'Die Kontrollpunkt-Liste bleibt auch dann vollständig erreichbar',
+  ].forEach(n => check(n + ' (nicht prüfbar: kein gm_authFailure)', false));
+}
+
 await page.unroute('**maps.googleapis.com/**');
 await page.route('**maps.googleapis.com/**', route => route.abort());
 
