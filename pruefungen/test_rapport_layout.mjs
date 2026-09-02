@@ -26,12 +26,14 @@ const check = (n, c) => (c ? ok : bad).push(n);
 
 const browser = await chromium.launch({ executablePath: EXE });
 
+const gerufen = [];
+
 async function formular(breite, hoehe) {
   const p = await browser.newPage({ viewport: { width: breite, height: hoehe } });
   p.on('pageerror', e => bad.push(`JS-Fehler @${breite}: ${e.message}`));
-  await p.route('**/api/**', route => route.fulfill({ status: 200, contentType: 'application/json',
-    body: JSON.stringify({ status: 'ok', token: 't', name: 'm.muster', ist_admin: false,
-      rapporte: [], mitarbeiter: [], kunden: [], objekte: [], stats: [] }) }));
+  await p.route('**/api/**', route => (gerufen.push(route.request().url().split('/api/')[1]), route.fulfill({ status: 200, contentType: 'application/json',
+    body: JSON.stringify({ status: 'ok', token: 't', name: 'm.muster', ist_admin: true,
+      rapporte: [], mitarbeiter: [], kunden: [], objekte: [], stats: [] }) })));
   await p.goto(`file://${WURZEL}/index.html`);
   await p.fill('#loginName', 'm.muster');
   await p.fill('#loginPassword', 'egal');
@@ -60,8 +62,40 @@ const abstaende = p => p.evaluate(() => {
   return werte;
 });
 
-// ── HANDY ───────────────────────────────────────────────────────────────
+// ── KEIN VERWALTUNGSBEREICH IM ERFASSUNGSWERKZEUG (ENT-303) ─────────────
+// Der Rapport trug bis 2026-09-02 einen vollstaendigen Verwaltungsbereich:
+// Mitarbeitende anlegen samt Passwort, deaktivieren, Passwort zuruecksetzen,
+// per Diktat anlegen und bearbeiten, dazu Kunden und Objekte -- 11
+// Verwaltungs-Endpunkte in einem Formular, das draussen ausgefuellt wird.
+// Altbestand aus der Zeit, als der Rapport noch alleine stand; das Cockpit
+// macht dasselbe seither gruendlicher. Serverseitig war es dicht (die Rechte
+// greifen), aber es war ein zweiter, groberer Weg zu denselben Daten, den
+// keine Pruefung bewachte.
+//
+// Gemessen wird die Aussage: WELCHE Endpunkte das Werkzeug im Betrieb
+// anfasst -- nicht, ob ein bestimmtes Wort im Quelltext steht.
 let p = await formular(390, 844);
+
+const SCHREIBWEGE = ['mitarbeiter_create', 'mitarbeiter_update', 'mitarbeiter_deactivate',
+  'mitarbeiter_reset_password', 'kunden_create', 'kunden_update', 'kunden_delete',
+  'ki_mitarbeiter_parse', 'ki_mitarbeiter_edit_parse'];
+
+const reiter = await p.evaluate(() => [...document.querySelectorAll('.tabs .tab')]
+  .filter(e => e.offsetParent !== null).map(e => e.textContent.trim()));
+check(`KRITISCH: der Rapport hat nur Erfassen und Übersicht (${reiter.join(', ')})`,
+  reiter.length === 2 && reiter[0] === 'Erfassen' && reiter[1] === 'Übersicht');
+check('KRITISCH: auch als Admin kommt kein Verwaltungsreiter dazu',
+  await p.evaluate(() => currentUser && currentUser.ist_admin === true) && reiter.length === 2);
+check('Kein Feld zum Anlegen von Personen oder Passwörtern',
+  await p.evaluate(() => !document.querySelector('input[type=password]:not(#loginPassword)')));
+
+// Gegenprobe zur Entfernung: Die Kundenauswahl im Formular haengt an
+// kunden_list und muss weiterhin geladen werden -- sonst waere zu viel weg.
+check('KRITISCH: die Kundenauswahl im Formular wird weiterhin geladen',
+  gerufen.some(x => x.includes('kunden_list')));
+check('KRITISCH: kein schreibender Verwaltungs-Endpunkt wird angefasst',
+  !gerufen.some(x => SCHREIBWEGE.some(w => x.includes(w))));
+
 
 const luftHandy = await abstaende(p);
 const verschieden = [...new Set(luftHandy)].sort((a, b) => a - b);

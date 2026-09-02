@@ -71,7 +71,17 @@ Diese sind schon einmal gebrochen worden, jedes Mal beim Bauen von etwas
   dass etwas kaputtgeht — durch eine spätere Regel gleicher oder höherer
   Eigenspezifität.
 - Jede Änderung am Handy-Layout **zusätzlich am Desktop** prüfen, und
-  umgekehrt.
+  umgekehrt. Das gilt fürs **Prüfen**, nicht fürs Bauen — siehe nächster
+  Punkt.
+- **Was im Cockpit (Desktop) entsteht, wird nicht automatisch auch fürs
+  Handy gebaut.** Der mobile Zuschnitt ist eine eigene Entscheidung des
+  Projektinhabers, keine Folge davon, dass es die Funktion am Desktop gibt
+  (so schon ENT-235: Abgleich, Stammdaten, Revierdienst, Auswertung,
+  Administration und Einrichtung sind am Handy bewusst ausgeblendet).
+  **Vor jeder mobilen Umsetzung fragen** — auch dann, wenn die Funktion am
+  Desktop längst steht und die Übertragung naheliegt. Umgekehrt gilt: Fehlt
+  etwas am Handy, ist das erst ein Befund, wenn jemand es dort tatsächlich
+  braucht.
 - Überschrift oben, Wert darunter. Gleiches Muster auf beiden Seiten.
   Mittiges gehört in die Mitte des Containers (`1fr auto 1fr`), nicht
   zwischen zwei ungleich lange Texte.
