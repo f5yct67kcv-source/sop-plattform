@@ -313,6 +313,30 @@ svg.i-sm { width: 17px; height: 17px; }
 /* Entfernung zum Kontrollpunkt (ENT-317). Drei Zustaende, drei Farben --
    "unbekannt" traegt bewusst die stille Farbe und nicht die warnende:
    Wer nicht weiss, wo er ist, hat nichts falsch gemacht. */
+/* Das sichtbare Signal beim Erreichen eines Kontrollpunkts (ENT-319).
+   Es liegt ueber ALLEM -- auch ueber der Vollseite der laufenden Runde und
+   ueber offenen Schubladen (z-index 300 gegen 200 beim Toast): Wer gerade
+   eine Aufgabe beantwortet und dabei den naechsten Punkt erreicht, soll es
+   trotzdem sehen.
+
+   Gross und kraeftig, nicht dezent: Auf dem iPhone gibt es keine
+   Vibration (Apple unterstuetzt die Schnittstelle nicht), und der Ton kann
+   stummgeschaltet sein. Was man sieht, ist dort der einzige Kanal, der
+   sicher ankommt -- also darf er nicht wie ein Hinweis am Rand aussehen.
+
+   pointer-events: none, damit das Signal nie einen Knopf abfaengt, den der
+   Waechter gerade druecken wollte. */
+.rg-signal {
+  position: fixed; left: 50%; top: 22%; transform: translate(-50%, -12px);
+  z-index: 300; pointer-events: none;
+  max-width: min(88vw, 420px); padding: 18px 24px;
+  background: var(--pos); color: #0F1117;
+  border-radius: 18px; box-shadow: 0 12px 40px rgba(0,0,0,.45);
+  font-size: 19px; font-weight: 720; line-height: 1.35; text-align: center;
+  opacity: 0; transition: opacity .18s ease, transform .18s ease;
+}
+.rg-signal.an { opacity: 1; transform: translate(-50%, 0); }
+@media (prefers-reduced-motion: reduce) { .rg-signal { transition: opacity .18s ease; } }
 .rd-ort { font-size: 13px; margin: 8px 0 0 37px; font-weight: 560; }
 .rd-ort.drin { color: var(--pos); }
 .rd-ort.weit { color: var(--warn); }
@@ -971,6 +995,7 @@ const W = {
     rgsZentrieren: 'Zentrieren',
     rgsMeinStandort: 'Mein Standort',
     rgsOrtungLaeuft: 'Standort wird während der Runde verfolgt',
+    rgSignalDrin: 'Kontrollpunkt erreicht',
     rgsOrtungAus: 'Kein Standort — Ortung im Gerät erlauben',
     rdEntfernung: 'noch {m} m',
     rdImBereich: 'Du bist im Bereich',
@@ -3259,6 +3284,10 @@ function rundgangAnzeigen(einsatzId) {
   // neu beurteilt, nicht nur hier: Eine Runde kann waehrend der Anzeige
   // enden, etwa mit dem letzten Kontrollpunkt.
   rgOrtungNachfuehren();
+  // Der Tonkanal muss aus einer Nutzeraktion heraus entstehen, sonst bleibt
+  // er auf iOS stumm (ENT-319). Das Oeffnen der Runde IST eine -- jemand
+  // hat getippt, um hierherzukommen.
+  rgTonEntsperren();
   rdWarteschlangeSenden();
 }
 
@@ -3691,12 +3720,140 @@ function rgOrtungStarten() {
       genauigkeit: pos.coords.accuracy, zeit: Date.now() };
     try { rgStandortZeichnen(); } catch (e) {}
     try { rgSpurAufnehmen(rgsMeinOrt); } catch (e) {}
+    try { rgBereichPruefen(); } catch (e) {}
     // Die Liste zeigt Entfernungen -- sie muss mitwandern. Nur wenn sie
     // gerade sichtbar ist: sonst wuerde ein offenes Formular (Ersatzscan,
     // "nicht verfuegbar") beim naechsten Positionswechsel weggeworfen.
     if (rgsReiter === 'punkte' && abPunktId === null) { rundgangListeZeichnen(); }
   }, () => {}, { enableHighAccuracy: true, timeout: 20000, maximumAge: 5000 });
   } catch (e) { rgsOrtWache = null; }
+}
+
+/* ══ Signal beim Erreichen eines Kontrollpunkts (ENT-319) ═════════════
+   Vom Projektinhaber verlangt: "wenn der MA in den Radius vom
+   Kontrollpunkt gelangt und dieser greift, braucht es akustisch ein
+   deutliches Signal. Ebenso ein haptisches Feedback mit einer starken
+   Vibration. Damit der MA eine gute Rueckmeldung hat."
+
+   WAS AUF WELCHEM GERAET GEHT -- unbedingt so gebaut, dass das Fehlende
+   nicht still fehlt:
+   - Ton: funktioniert, sobald einmal getippt wurde (der Tonkanal ist auf
+     iOS bis dahin gesperrt). Er wird beim Oeffnen der Runde entsperrt.
+   - Vibration: navigator.vibrate gibt es in iOS Safari NICHT -- Apple
+     unterstuetzt die Schnittstelle nicht. Auf Android schon. Darum kommt
+     zusaetzlich immer eine deutliche SICHTBARE Rueckmeldung; sie ist der
+     einzige Kanal, der auf jedem Geraet ankommt.
+
+   Der Ton wird gerechnet statt als Datei ausgeliefert: kein zusaetzlicher
+   Download, kein Ladefehler unterwegs, und die Lautstaerke laesst sich
+   nicht versehentlich von einer Datei abhaengig machen. */
+let rgsTonKanal = null;
+
+// Der Tonkanal muss aus einer NUTZERAKTION heraus entstehen, sonst bleibt
+// er auf iOS stumm -- und zwar dauerhaft, nicht nur beim ersten Mal.
+function rgTonEntsperren() {
+  try {
+    if (!rgsTonKanal) {
+      const K = window.AudioContext || window.webkitAudioContext;
+      if (!K) { return; }
+      rgsTonKanal = new K();
+    }
+    if (rgsTonKanal.state === 'suspended') { rgsTonKanal.resume(); }
+  } catch (e) { rgsTonKanal = null; }
+}
+
+/* Zwei kurze, hohe Toene -- durchdringender als ein langer tiefer, und
+   unverwechselbar gegenueber einer Mitteilung des Telefons. */
+function rgTonSignal() {
+  if (!rgsTonKanal || rgsTonKanal.state !== 'running') { return false; }
+  try {
+    const jetzt = rgsTonKanal.currentTime;
+    [[880, 0], [1320, 0.16]].forEach(([hz, ab]) => {
+      const o = rgsTonKanal.createOscillator();
+      const g = rgsTonKanal.createGain();
+      o.type = 'square';        // traegt weiter als ein Sinus
+      o.frequency.value = hz;
+      // Kurz ein- und ausblenden: Ein hart geschalteter Rechteckton knackt.
+      g.gain.setValueAtTime(0.0001, jetzt + ab);
+      g.gain.exponentialRampToValueAtTime(0.5, jetzt + ab + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, jetzt + ab + 0.14);
+      o.connect(g); g.connect(rgsTonKanal.destination);
+      o.start(jetzt + ab); o.stop(jetzt + ab + 0.15);
+    });
+    return true;
+  } catch (e) { return false; }
+}
+
+// Gibt zurueck, ob wirklich vibriert wurde -- auf iOS ist das immer false,
+// und die Oberflaeche soll sich nicht darauf verlassen.
+function rgVibrieren() {
+  try {
+    if (!navigator.vibrate) { return false; }
+    // Kraeftiges Muster statt eines kurzen Zuckens: lang - Pause - lang.
+    return navigator.vibrate([300, 120, 300]) === true;
+  } catch (e) { return false; }
+}
+
+/* Die sichtbare Rueckmeldung. Sie ist NICHT die Zugabe, sondern der
+   verlaesslichste der drei Kanaele: Ton kann stummgeschaltet sein, die
+   Vibration gibt es auf dem iPhone gar nicht -- was man sieht, kommt
+   immer an. */
+function rgSichtSignal(text) {
+  let el = $('rgSignal');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'rgSignal';
+    el.className = 'rg-signal';
+    document.body.appendChild(el);
+  }
+  el.textContent = text;
+  el.classList.remove('an');
+  void el.offsetWidth;          // erzwingt den Neustart der Bewegung
+  el.classList.add('an');
+  clearTimeout(el._weg);
+  el._weg = setTimeout(() => { el.classList.remove('an'); }, 2600);
+}
+
+function rgSignalGeben(text) {
+  rgTonSignal();
+  rgVibrieren();
+  rgSichtSignal(text);
+}
+
+/* Wann das Signal kommt -- und vor allem, wann NICHT (ENT-319).
+
+   Der Uebergang draussen -> drinnen loest aus, nicht der Zustand
+   "drinnen". Ohne diese Unterscheidung piepte es bei jeder Messung neu,
+   also alle paar Sekunden, solange jemand am Punkt steht.
+
+   Und mit ABSTAND zurueckgesetzt (Hysterese): Eine GPS-Messung springt um
+   ein paar Meter, auch wenn man stillsteht. Genau am Radiusrand faellt sie
+   dadurch abwechselnd rein und raus -- ohne Hysterese ergaebe das eine
+   Kette von Signalen, und der Waechter schaltete den Ton nach der zweiten
+   Nacht ab. Erst wenn er RG_SIGNAL_ABSTAND Meter ausserhalb war, gilt er
+   wieder als draussen.
+
+   Erledigte Punkte loesen nichts aus: Wer an einem schon bestaetigten
+   Punkt vorbeigeht, bekommt keine Meldung mehr. */
+const RG_SIGNAL_ABSTAND = 15;
+
+// Reine Funktion, damit sich die Weiche ohne Geraet pruefen laesst.
+// drin: aktueller Zustand, war: gemerkter Zustand.
+function rgSignalNoetig(war, dist, radius) {
+  if (dist === null || dist === undefined) { return { signal: false, drin: war }; }
+  if (dist <= radius) { return { signal: war !== true, drin: true }; }
+  if (dist > radius + RG_SIGNAL_ABSTAND) { return { signal: false, drin: false }; }
+  return { signal: false, drin: war };   // im Zwischenband: Zustand behalten
+}
+
+function rgBereichPruefen() {
+  if (!rundgangAktiv || !rgsMeinOrt) { return; }
+  (rundgangAktiv.kontrollpunkte || []).forEach(k => {
+    if (k.typ !== 'geofence' || k.erledigt) { k._drin = false; return; }
+    const e = rgSignalNoetig(k._drin, rdEntfernungZu(k), rdRadiusVon(k));
+    k._drin = e.drin;
+    if (e.signal) { rgSignalGeben(w('rgSignalDrin') + ' — ' + k.bezeichnung); }
+  });
 }
 
 /* ══ Uebermittlung der Bewegungsspur (ENT-318) ════════════════════════
