@@ -6,7 +6,11 @@ import { WURZEL, HIER, OUT, browserPfad } from './pfade.mjs';
 import { chromium } from 'playwright';
 
 const EXE = browserPfad();
-const BILD = OUT + '/testbild.png';
+// Eigener Dateiname je Suite (ENT-310): Beide Suiten legten bis hierher
+// OUT/testbild.png an. Sequenziell harmlos, im parallelen Lauf ein
+// Wettlauf -- beide sehen "gibt es nicht" und schreiben gleichzeitig,
+// und die andere liest womoeglich eine halb geschriebene Datei.
+const BILD = OUT + '/testbild-diktat.png';
 {
   const { writeFileSync, existsSync } = await import('fs');
   if (!existsSync(BILD)) {
