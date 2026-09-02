@@ -464,6 +464,14 @@ a.nav-item { text-decoration: none; }
    im Haus bleiben bewusst unberuehrt -- ungeprueft globaler wirken hiesse,
    Layouts anzufassen, die niemand gemessen hat. */
 #view-betrieb .card-hd h3 { font-size: 13.5px; font-weight: 650; letter-spacing: -.1px; }
+/* Gruppenueberschrift im Fahrzeugformular (ENT-313). Zweiundzwanzig Felder
+   ohne Gliederung sind eine Wand; die Zwischenzeile teilt sie in vier
+   Abschnitte. Eigene Klasse statt einer Verschaerfung von .f label -- die
+   gilt fuer jedes Formular im Werkzeug, und eine Aenderung dort haette
+   Wirkungen weit ausserhalb dieser Karte. */
+.fz-grp { font-size: 11px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase;
+  color: var(--ink-3); margin: 22px 0 12px; padding-top: 14px; border-top: 1px solid var(--line); }
+.fz-grp:first-of-type { margin-top: 18px; }
 /* Betrieb: Kachel-Uebersicht mit groesseren Icons statt einer langen
    Kartenspalte (Projektinhaber-Vorgabe, 2026-08-28, nach Vorbild eines
    gezeigten Fremdsystems -- nicht 1:1 nachgebaut, sondern in der
@@ -5551,6 +5559,15 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
               <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
               <span class="bk-kachel-lbl">Rollen & Berechtigungen</span>
             </button>
+            <!-- Dienstfahrzeuge (ENT-313): der Fahrzeugbestand ist eine
+                 betriebliche Stammdatei wie die Anstellungsorte, darum hier
+                 und nicht in der Planung. Das spaetere Fahrtenbuch (Tacho bei
+                 Uebernahme/Rueckgabe, Abweichung, Luecke) gehoert NICHT
+                 hierher -- es ist taegliche Arbeit und keine Einstellung. -->
+            <button type="button" class="bk-kachel" onclick="bkAbschnittZeigen('fz')">
+              <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><path d="M3 13l2-5.5A2 2 0 0 1 6.9 6h10.2a2 2 0 0 1 1.9 1.5L21 13"/><path d="M3 13h18v4a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1v-1H6v1a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><circle cx="7" cy="15" r="1"/><circle cx="17" cy="15" r="1"/></svg></span>
+              <span class="bk-kachel-lbl">Dienstfahrzeuge</span>
+            </button>
           </div>
 
           <div class="card">
@@ -5797,6 +5814,128 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
               <button type="button" class="btn btn-plain btn-sm" id="bkLogoWeg"
                 style="display:none" onclick="bkLogoWeg()">Logo entfernen</button>
               <span class="note">höchstens 512 KB</span>
+            </div>
+          </div>
+        </div>
+        </div>
+        </div>
+
+        <!-- ─────────────────── DIENSTFAHRZEUGE (ENT-313) ───────────────────
+             STAMMDATEN, nicht Kontrolle. Hier steht, was ein Fahrzeug IST.
+             Was mit ihm geschah -- Tachostand bei Uebernahme und Rueckgabe,
+             Abweichung zur erwarteten Strecke, Luecke zwischen zwei
+             Dienstfahrten -- ist ein eigener, spaeterer Schritt mit eigener
+             Tabelle und gehoert dann NICHT unter "Einstellungen", sondern
+             dorthin, wo taeglich gearbeitet wird.
+
+             Das Feld "Dienstfahrzeug" am Einsatz (ENT-115 hat es bewusst
+             weggelassen: "Es gibt noch keine Fahrzeuge zum Auswaehlen; ein
+             leeres Auswahlfeld auf Vorrat waere Attrappe") wird erst gebaut,
+             wenn hier Fahrzeuge stehen -- also nach diesem Schritt. -->
+        <div class="bk-abschnitt" id="bkAb-fz" style="display:none">
+        <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="bkUebersichtZeigen()">Zurück</button>
+        <div class="grid">
+        <div class="card" id="fzKarte">
+          <div class="card-hd">
+            <span class="card-ic"><svg class="i" viewBox="0 0 24 24"><path d="M3 13l2-5.5A2 2 0 0 1 6.9 6h10.2a2 2 0 0 1 1.9 1.5L21 13"/><path d="M3 13h18v4a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1v-1H6v1a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><circle cx="7" cy="15" r="1"/><circle cx="17" cy="15" r="1"/></svg></span>
+            <h3>Dienstfahrzeuge</h3>
+          </div>
+          <div class="card-bd">
+            <div class="msg-err" id="fzErr" style="display:none"></div>
+            <div class="ki-hint web on" style="margin-bottom:14px">
+              <span>Der Fahrzeugbestand des Betriebs — Kontrollschild, Fahrzeugausweis,
+              Halterschaft, Standort, Termine. <b>Hier wird nichts kontrolliert und nichts
+              gerechnet.</b> Die Kilometerkontrolle (Tachostand bei Übernahme und Rückgabe,
+              Abweichung zur erwarteten Strecke) ist ein eigener Schritt und entsteht dort,
+              wo täglich gearbeitet wird — nicht in den Einstellungen.</span>
+            </div>
+            <div id="fzListe"></div>
+
+            <div class="fz-grp">Fahrzeug</div>
+            <div class="form-grid">
+              <div class="f"><label for="fzKennzeichen">Kontrollschild *</label>
+                <input class="inp" id="fzKennzeichen" maxlength="20" placeholder="z. B. SO 123456"></div>
+              <div class="f"><label for="fzBezeichnung">Interne Bezeichnung</label>
+                <input class="inp" id="fzBezeichnung" maxlength="200" placeholder="z. B. Patrouille 1"></div>
+              <div class="f"><label for="fzMarke">Marke</label><input class="inp" id="fzMarke" maxlength="100"></div>
+              <div class="f"><label for="fzModell">Modell</label><input class="inp" id="fzModell" maxlength="100"></div>
+              <div class="f"><label for="fzArt">Fahrzeugart</label>
+                <select class="inp" id="fzArt">
+                  <option value="personenwagen">Personenwagen</option>
+                  <option value="kombi">Kombi</option>
+                  <option value="lieferwagen">Lieferwagen</option>
+                  <option value="motorrad">Motorrad</option>
+                  <option value="anhaenger">Anhänger</option>
+                </select></div>
+              <div class="f"><label for="fzTreibstoff">Treibstoff</label>
+                <input class="inp" id="fzTreibstoff" maxlength="20" placeholder="z. B. Benzin"></div>
+              <div class="f"><label for="fzFarbe">Farbe</label><input class="inp" id="fzFarbe" maxlength="50"></div>
+            </div>
+
+            <div class="fz-grp">Ausweis und Halterschaft</div>
+            <div class="form-grid">
+              <div class="f"><label for="fzStammnummer">Stammnummer</label>
+                <input class="inp" id="fzStammnummer" maxlength="30" placeholder="aus dem Fahrzeugausweis"></div>
+              <div class="f"><label for="fzFahrgestell">Fahrgestellnummer</label>
+                <input class="inp" id="fzFahrgestell" maxlength="30"></div>
+              <div class="f"><label for="fzErstzulassung">Erstzulassung</label>
+                <input class="inp" id="fzErstzulassung" type="date"></div>
+              <div class="f"><label for="fzBesitzart">Halterschaft</label>
+                <select class="inp" id="fzBesitzart" onchange="fzZustandFelder()">
+                  <option value="eigentum">Eigentum</option>
+                  <option value="leasing">Leasing</option>
+                  <option value="miete">Miete</option>
+                </select></div>
+              <div class="f" id="fzBesitzBisFeld"><label for="fzBesitzBis">Vertrag läuft bis</label>
+                <input class="inp" id="fzBesitzBis" type="date"></div>
+            </div>
+
+            <div class="fz-grp">Standort und Zustand</div>
+            <div class="form-grid">
+              <div class="f"><label for="fzStandort">Standort</label>
+                <select class="inp" id="fzStandort"></select>
+                <div class="f-hint">Die Anstellungsorte aus dieser Ansicht. Von dort sind die
+                Wegstrecken zu den Objekten bereits gepflegt — sie sind später der Massstab,
+                gegen den gefahrene Kilometer geprüft werden können.</div></div>
+              <div class="f"><label for="fzStatus">Zustand</label>
+                <select class="inp" id="fzStatus" onchange="fzZustandFelder()">
+                  <option value="aktiv">In Betrieb</option>
+                  <option value="ausser_betrieb">Ausser Betrieb</option>
+                  <option value="verkauft">Verkauft</option>
+                </select></div>
+              <div class="f wide" id="fzGrundFeld"><label for="fzGrund">Grund</label>
+                <input class="inp" id="fzGrund" maxlength="200" placeholder="z. B. in der Werkstatt bis Ende Monat"></div>
+            </div>
+
+            <div class="fz-grp">Termine und Kilometerstand</div>
+            <div class="form-grid">
+              <div class="f"><label for="fzMfk">Nächste MFK</label><input class="inp" id="fzMfk" type="date"></div>
+              <div class="f"><label for="fzVignette">Vignette für das Jahr</label>
+                <input class="inp" id="fzVignette" inputmode="numeric" maxlength="4" placeholder="z. B. 2026"></div>
+              <div class="f"><label for="fzVersicherung">Versicherung</label>
+                <input class="inp" id="fzVersicherung" maxlength="200"></div>
+              <div class="f"><label for="fzPolice">Policen-Nummer</label>
+                <input class="inp" id="fzPolice" maxlength="50"></div>
+              <div class="f"><label for="fzServiceDatum">Nächster Service</label>
+                <input class="inp" id="fzServiceDatum" type="date"></div>
+              <div class="f"><label for="fzServiceKm">Nächster Service bei km</label>
+                <input class="inp" id="fzServiceKm" inputmode="numeric" placeholder="z. B. 120000"></div>
+              <div class="f"><label for="fzTachoKm">Kilometerstand</label>
+                <input class="inp" id="fzTachoKm" inputmode="numeric" placeholder="abgelesen, nicht geschätzt"></div>
+              <div class="f"><label for="fzTachoAm">Abgelesen am</label>
+                <input class="inp" id="fzTachoAm" type="date">
+                <div class="f-hint">Pflicht, sobald ein Kilometerstand dasteht. Ohne den Tag,
+                an dem abgelesen wurde, ist die Zahl nicht beurteilbar.</div></div>
+            </div>
+
+            <div class="form-grid">
+              <div class="f wide"><label for="fzBemerkung">Bemerkung</label>
+                <textarea class="inp" id="fzBemerkung" rows="3" maxlength="2000"></textarea></div>
+            </div>
+
+            <div style="display:flex;gap:10px;margin-top:12px">
+              <button class="btn btn-primary" id="fzBtn" onclick="fzSpeichern()">Hinzufügen</button>
+              <button class="btn btn-plain" onclick="fzFormularLeeren()">Zurücksetzen</button>
             </div>
           </div>
         </div>
@@ -7310,7 +7449,7 @@ const TITLES = {
   kunden:      ['Kunden', 'Stammdaten'],
   produkte:    ['Leistungen', 'Preise und Standardtexte für Offerten'],
   offerte:     ['Offerte', 'Positionen, Preise und Summen'],
-  betrieb:     ['Einstellungen', 'Betrieb, Briefkopf, Zugang und Rollen'],
+  betrieb:     ['Einstellungen', 'Betrieb, Briefkopf, Zugang, Rollen und Dienstfahrzeuge'],
   pensen:      ['Pensen', 'Jahresstunden gegen die Anstellungskategorie'],
   abwesenheiten: ['Abwesenheiten', 'Ferien, Krankheit und weitere Abwesenheiten im Überblick'],
   auslagen:    ['Auslagenersatz', 'Chronologisches Protokoll je Mitarbeitendem — Art. 18 Ziff. 10'],
@@ -14904,7 +15043,13 @@ function ladeBetrieb() {
   anTarget = null;
   $('anErr').style.display = 'none';
   bkLaden();
-  return ladeAnstellungsorte().then(() => { anListeZeichnen(); anFormularLeeren(); });
+  // Die Fahrzeuge erst NACH den Anstellungsorten: Die Standortwahl im
+  // Fahrzeugformular wird aus ihnen gebaut, und eine leere Liste saehe sonst
+  // aus wie "kein Anstellungsort erfasst".
+  return ladeAnstellungsorte().then(() => {
+    anListeZeichnen(); anFormularLeeren();
+    return ladeFahrzeuge().then(() => { fzListeZeichnen(); fzFormularLeeren(); });
+  });
 }
 
 // ══════════════════════════════════════════ BRIEFKOPF (ENT-155)
@@ -15445,6 +15590,255 @@ function anSpeichern() {
     anListeZeichnen(); anFormularLeeren(); loadObjekte();
     toast('Anstellungsort gespeichert.');
   });
+}
+
+// ══════════════════════════════════════════ DIENSTFAHRZEUGE (ENT-313)
+// Fahrzeugstamm des Betriebs. Bewusst nur Stammdaten -- was mit einem
+// Fahrzeug geschah, gehoert in ein Fahrtenbuch mit eigener Tabelle und
+// eigener Ansicht, nicht in eine Einstellungsseite.
+let fahrzeuge = [];
+let fzEingerichtet = true;   // liefert der Server; false = Tabelle fehlt noch
+let fzTarget = null;         // welches Fahrzeug wird gerade geaendert
+
+// Dieselben Schluessel wie FZ_ARTEN/FZ_STATUS/FZ_BESITZARTEN in
+// backend/api/fahrzeuge.php. Der Server weist ab, was er nicht kennt --
+// diese Tabellen sind nur die Beschriftung dazu, keine zweite Regel.
+const FZ_ART_TEXT = { personenwagen: 'Personenwagen', kombi: 'Kombi', lieferwagen: 'Lieferwagen',
+  motorrad: 'Motorrad', anhaenger: 'Anhänger' };
+const FZ_STATUS_TEXT = { aktiv: 'In Betrieb', ausser_betrieb: 'Ausser Betrieb', verkauft: 'Verkauft' };
+
+// "120'000", "120 000" und "120000" meinen dasselbe. Was keine Ziffer ist,
+// faellt weg -- sonst scheitert das Speichern an einem Trennzeichen, das
+// jeder so tippt.
+const fzNurZiffern = v => String(v == null ? '' : v).replace(/[^\d]/g, '');
+
+function fzFehler(text) {
+  const el = $('fzErr'); if (!el) { return; }
+  if (!text) { el.style.display = 'none'; return; }
+  el.textContent = text; el.style.display = '';
+}
+
+function ladeFahrzeuge() {
+  return api('fahrzeuge.php').then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') { fahrzeuge = []; fzEingerichtet = true; return; }
+    fahrzeuge = data.fahrzeuge || [];
+    // Fehlt der Schluessel (aeltere Antwort), gilt "eingerichtet" -- sonst
+    // stuende bei jedem alten Server faelschlich "nicht eingerichtet" da.
+    fzEingerichtet = data.eingerichtet !== false;
+  }).catch(() => { fahrzeuge = []; });
+}
+
+// Die Standortwahl kennt drei verschiedene Zustaende, und alle drei muessen
+// verschieden dastehen: kein Anstellungsort erfasst / erfasst, aber diesem
+// Fahrzeug keiner zugeordnet / einer zugeordnet. Wuerde der erste Fall
+// aussehen wie der zweite, suchte jemand die Liste, die es gar nicht gibt.
+function fzStandortOptionen() {
+  const sel = $('fzStandort'); if (!sel) { return; }
+  const vorher = sel.value;
+  if (!anstellungsorte.length) {
+    sel.innerHTML = '<option value="">Noch kein Anstellungsort erfasst</option>';
+    sel.disabled = true;
+    return;
+  }
+  sel.disabled = false;
+  sel.innerHTML = '<option value="">— keinem Standort zugeordnet —</option>'
+    + anstellungsorte.map(o => `<option value="${o.id}">${esc(o.bezeichnung)}</option>`).join('');
+  sel.value = vorher;
+}
+
+// Zwei Felder haben nur in einem Teil der Faelle eine Bedeutung. Sie werden
+// ausgeblendet statt bloss ignoriert: Der Server verwirft sie ohnehin (ein
+// Vertragsende bei Eigentum, ein Grund bei "In Betrieb"), und ein Feld, das
+// man ausfuellen kann und das beim Speichern verschwindet, ist stiller
+// Datenverlust.
+function fzZustandFelder() {
+  const besitz = $('fzBesitzart'), status = $('fzStatus');
+  if (!besitz || !status) { return; }
+  $('fzBesitzBisFeld').style.display = besitz.value === 'eigentum' ? 'none' : '';
+  $('fzGrundFeld').style.display = status.value === 'aktiv' ? 'none' : '';
+}
+
+function fzListeZeichnen() {
+  const box = $('fzListe'); if (!box) { return; }
+  fzStandortOptionen();
+
+  // "Nicht eingerichtet" ist etwas anderes als "keine Fahrzeuge erfasst":
+  // im ersten Fall kann niemand eines anlegen, im zweiten hat es nur noch
+  // niemand getan. Der Knopf wird deshalb gesperrt und sagt, warum.
+  const btn = $('fzBtn');
+  if (!fzEingerichtet) {
+    box.innerHTML = EMPTY('Noch nicht eingerichtet',
+      'Die Tabelle für die Fahrzeuge fehlt in der Datenbank. Einmal die Einrichtung ausführen '
+      + '(Zahnrad unten links), danach lassen sich Fahrzeuge erfassen.');
+    if (btn) { btn.disabled = true; btn.title = 'Erst die Einrichtung ausführen.'; }
+    return;
+  }
+  if (btn) { btn.disabled = false; btn.title = ''; }
+
+  if (!fahrzeuge.length) {
+    box.innerHTML = '<p class="zone-note">Noch kein Fahrzeug erfasst.</p>';
+    return;
+  }
+
+  const heute = isoTag();
+  const unbekannt = t => `<span style="color:var(--ink-3)">${t}</span>`;
+
+  box.innerHTML = `<div class="tw"><table class="tbl"><thead><tr>
+      <th>Kontrollschild</th><th>Fahrzeug</th><th>Standort</th><th>Zustand</th>
+      <th>Nächste MFK</th><th class="num">Kilometerstand</th><th></th>
+    </tr></thead><tbody>` + fahrzeuge.map(f => {
+    const fahrzeugText = [f.marke, f.modell].filter(Boolean).join(' ');
+    // Ein MFK-Datum in der Vergangenheit ist ueberfaellig -- das ist eine
+    // Tatsache und darf so dastehen. Ein FEHLENDES Datum ist dagegen kein
+    // "in Ordnung", sondern schlicht unbekannt, und wird auch so benannt.
+    const mfkAlt = f.mfk_naechste && f.mfk_naechste < heute;
+    const status = FZ_STATUS_TEXT[f.status] || f.status;
+    const statusKlasse = f.status === 'aktiv' ? 'chip-p' : (f.status === 'ausser_betrieb' ? 'chip-w' : 'chip-n');
+    return `<tr>
+      <td><b>${esc(f.kennzeichen)}</b>${f.bezeichnung ? `<div class="sec">${esc(f.bezeichnung)}</div>` : ''}</td>
+      <td>${fahrzeugText ? esc(fahrzeugText) : unbekannt('nicht erfasst')}
+        <div class="sec">${esc(FZ_ART_TEXT[f.art] || f.art)}</div></td>
+      <td>${f.standort_name ? esc(f.standort_name) : unbekannt('nicht zugeordnet')}</td>
+      <td><span class="chip ${statusKlasse}">${esc(status)}</span>
+        ${f.ausser_betrieb_grund ? `<div class="sec">${esc(f.ausser_betrieb_grund)}</div>` : ''}</td>
+      <td class="nowrap">${f.mfk_naechste
+        ? (mfkAlt ? `<span class="chip chip-x">überfällig</span><div class="sec">${dmy(f.mfk_naechste)}</div>`
+                  : dmy(f.mfk_naechste))
+        : unbekannt('nicht hinterlegt')}</td>
+      <td class="num nowrap">${f.tacho_km === null
+        ? unbekannt('nie abgelesen')
+        : `${nf(f.tacho_km)} km<div class="sec">${dmy(f.tacho_am)}</div>`}</td>
+      <td class="nowrap">
+        <button class="btn btn-plain btn-sm" onclick="fzBearbeiten(${f.id})">Ändern</button>
+        <button class="btn btn-plain btn-sm" style="color:var(--neg)" onclick="fzLoeschen(${f.id})">Löschen</button>
+      </td>
+    </tr>`;
+  }).join('') + `</tbody></table></div>`;
+}
+
+function fzFormularLeeren() {
+  fzTarget = null;
+  fzFehler('');
+  ['fzKennzeichen', 'fzBezeichnung', 'fzMarke', 'fzModell', 'fzTreibstoff', 'fzFarbe',
+   'fzStammnummer', 'fzFahrgestell', 'fzErstzulassung', 'fzBesitzBis', 'fzGrund',
+   'fzMfk', 'fzVignette', 'fzVersicherung', 'fzPolice', 'fzServiceDatum', 'fzServiceKm',
+   'fzTachoKm', 'fzTachoAm', 'fzBemerkung'].forEach(id => { if ($(id)) { $(id).value = ''; } });
+  if ($('fzArt')) { $('fzArt').value = 'personenwagen'; }
+  if ($('fzBesitzart')) { $('fzBesitzart').value = 'eigentum'; }
+  if ($('fzStatus')) { $('fzStatus').value = 'aktiv'; }
+  if ($('fzStandort')) { $('fzStandort').value = ''; }
+  if ($('fzBtn')) { $('fzBtn').textContent = 'Hinzufügen'; }
+  fzZustandFelder();
+}
+
+function fzBearbeiten(id) {
+  const f = fahrzeuge.find(x => Number(x.id) === Number(id));
+  if (!f) { return; }
+  fzFormularLeeren();
+  fzTarget = f.id;
+  $('fzKennzeichen').value = f.kennzeichen || '';
+  $('fzBezeichnung').value = f.bezeichnung || '';
+  $('fzMarke').value = f.marke || '';
+  $('fzModell').value = f.modell || '';
+  $('fzArt').value = f.art || 'personenwagen';
+  $('fzTreibstoff').value = f.treibstoff || '';
+  $('fzFarbe').value = f.farbe || '';
+  $('fzStammnummer').value = f.stammnummer || '';
+  $('fzFahrgestell').value = f.fahrgestellnummer || '';
+  $('fzErstzulassung').value = f.erstzulassung || '';
+  $('fzBesitzart').value = f.besitzart || 'eigentum';
+  $('fzBesitzBis').value = f.besitz_bis || '';
+  $('fzStandort').value = f.standort_id === null ? '' : String(f.standort_id);
+  $('fzStatus').value = f.status || 'aktiv';
+  $('fzGrund').value = f.ausser_betrieb_grund || '';
+  $('fzMfk').value = f.mfk_naechste || '';
+  $('fzVignette').value = f.vignette_jahr === null ? '' : f.vignette_jahr;
+  $('fzVersicherung').value = f.versicherung || '';
+  $('fzPolice').value = f.police_nr || '';
+  $('fzServiceDatum').value = f.service_naechster || '';
+  $('fzServiceKm').value = f.service_naechste_km === null ? '' : f.service_naechste_km;
+  $('fzTachoKm').value = f.tacho_km === null ? '' : f.tacho_km;
+  $('fzTachoAm').value = f.tacho_am || '';
+  $('fzBemerkung').value = f.bemerkung || '';
+  $('fzBtn').textContent = 'Speichern';
+  fzZustandFelder();
+  $('fzKennzeichen').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function fzLoeschen(id) {
+  const f = fahrzeuge.find(x => Number(x.id) === Number(id));
+  if (!f) { return; }
+  // Loeschen entfernt das Fahrzeug aus der Stammdatei. Wer es nur
+  // voruebergehend nicht braucht, setzt den Zustand -- das steht hier, weil
+  // sonst ein Fahrzeug in der Werkstatt geloescht wird und mit ihm seine
+  // Termine und sein letzter Kilometerstand.
+  askConfirm(`„${f.kennzeichen}“ löschen?`,
+    'Damit verschwindet das Fahrzeug samt Terminen und letztem Kilometerstand aus der Stammdatei. '
+    + 'Soll es nur vorübergehend nicht eingesetzt werden, ist „Ausser Betrieb“ der richtige Weg.',
+    'Löschen',
+    () => api('fahrzeuge.php', { method: 'POST', body: { id: f.id, loeschen: true } })
+      .then(({ ok, data }) => {
+        if (!ok || data.status !== 'ok') { fzFehler(data.message || 'Löschen fehlgeschlagen.'); return; }
+        fahrzeuge = data.fahrzeuge || [];
+        fzListeZeichnen(); fzFormularLeeren();
+        toast('Fahrzeug gelöscht.');
+      }));
+}
+
+function fzSpeichern() {
+  fzFehler('');
+  const kennzeichen = $('fzKennzeichen').value.trim();
+  if (!kennzeichen) { fzFehler('Das Kontrollschild ist erforderlich.'); return; }
+
+  const tachoKm = fzNurZiffern($('fzTachoKm').value);
+  const tachoAm = $('fzTachoAm').value;
+  // Dieselbe Regel wie im Server, hier nur frueher: Ein Kilometerstand ohne
+  // Ablesedatum ist nicht beurteilbar. Massgeblich bleibt die Pruefung in
+  // fahrzeuge.php -- diese hier erspart nur den Weg zum Server.
+  if (tachoKm && !tachoAm) {
+    fzFehler('Zum Kilometerstand gehört das Datum, an dem er abgelesen wurde.');
+    $('fzTachoAm').focus();
+    return;
+  }
+
+  const body = {
+    kennzeichen,
+    bezeichnung: $('fzBezeichnung').value.trim(),
+    marke: $('fzMarke').value.trim(),
+    modell: $('fzModell').value.trim(),
+    art: $('fzArt').value,
+    treibstoff: $('fzTreibstoff').value.trim(),
+    farbe: $('fzFarbe').value.trim(),
+    stammnummer: $('fzStammnummer').value.trim(),
+    fahrgestellnummer: $('fzFahrgestell').value.trim(),
+    erstzulassung: $('fzErstzulassung').value,
+    besitzart: $('fzBesitzart').value,
+    besitz_bis: $('fzBesitzBis').value,
+    standort_id: $('fzStandort').value,
+    status: $('fzStatus').value,
+    ausser_betrieb_grund: $('fzGrund').value.trim(),
+    mfk_naechste: $('fzMfk').value,
+    vignette_jahr: fzNurZiffern($('fzVignette').value),
+    versicherung: $('fzVersicherung').value.trim(),
+    police_nr: $('fzPolice').value.trim(),
+    service_naechster: $('fzServiceDatum').value,
+    service_naechste_km: fzNurZiffern($('fzServiceKm').value),
+    tacho_km: tachoKm,
+    tacho_am: tachoAm,
+    bemerkung: $('fzBemerkung').value.trim(),
+  };
+  if (fzTarget) { body.id = fzTarget; }
+
+  const b = $('fzBtn'); b.disabled = true;
+  api('fahrzeuge.php', { method: 'POST', body }).then(({ ok, data }) => {
+    b.disabled = false;
+    if (!ok || data.status !== 'ok') {
+      fzFehler(data.message || 'Speichern fehlgeschlagen.'); return;
+    }
+    fahrzeuge = data.fahrzeuge || [];
+    fzListeZeichnen(); fzFormularLeeren();
+    toast('Fahrzeug gespeichert.');
+  }).catch(() => { b.disabled = false; fzFehler('Speichern fehlgeschlagen.'); });
 }
 
 // Wegstrecken je Anstellungsort ablegen. Ein leeres Feld loescht den Eintrag
