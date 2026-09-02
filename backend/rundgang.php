@@ -28,6 +28,75 @@ function geo_distanz_meter(float $lat1, float $lng1, float $lat2, float $lng2): 
 // unveraendertes Verhalten von vor ENT-204 (alle aktiven Punkte des
 // Objekts). Ist eine Vorlage gesetzt, zaehlen nur deren Punkte, in ihrer
 // eigenen Reihenfolge statt der globalen kontrollpunkt.reihenfolge.
+// Aufgaben je Kontrollpunkt, samt bereits gegebener Antwort in DIESER Runde
+// (ENT-305). Eine Liste von Kontrollpunkten ohne ihre Aufgaben waere in der
+// App nutzlos: Die Aufgabe erscheint genau dann, wenn der Punkt erfasst wird.
+//
+// Nur aktive Aufgaben (ENT-302 setzt beim Entfernen aktiv = 0). Die bereits
+// gegebene Antwort kommt mit, damit ein erneutes Oeffnen der Runde nicht
+// dieselbe Frage noch einmal stellt -- und damit sichtbar bleibt, was schon
+// beantwortet ist.
+function rundgang_aufgaben_je_punkt(PDO $pdo, int $rundgangId, array $punktIds): array
+{
+    if (!$punktIds) { return []; }
+    // hat_tabelle steht in db.php und ist hier nicht garantiert geladen
+    // (diese Datei laeuft in Pruefungen isoliert). Darum die Tabellenfrage
+    // ueber einen Versuch statt ueber eine Hilfsfunktion.
+    $platz = implode(',', array_fill(0, count($punktIds), '?'));
+    try {
+        $s = $pdo->prepare(
+            "SELECT ka.kontrollpunkt_id, a.id, a.bezeichnung, a.information
+               FROM kontrollpunkt_aufgabe ka
+               JOIN objekt_aufgabe a ON a.id = ka.aufgabe_id AND a.aktiv = 1
+              WHERE ka.kontrollpunkt_id IN ($platz)
+              ORDER BY ka.reihenfolge, a.id"
+        );
+        $s->execute($punktIds);
+        $zeilen = $s->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        return [];
+    }
+
+    $antworten = [];
+    try {
+        $aStmt = $pdo->prepare(
+            'SELECT kontrollpunkt_id, aufgabe_id, status, grund, erfasst_am
+               FROM rundgang_aufgabe WHERE rundgang_id = ?'
+        );
+        $aStmt->execute([$rundgangId]);
+        foreach ($aStmt->fetchAll(PDO::FETCH_ASSOC) as $a) {
+            $antworten[(int)$a['kontrollpunkt_id'] . ':' . (int)$a['aufgabe_id']] = [
+                'status' => $a['status'], 'grund' => $a['grund'], 'erfasst_am' => $a['erfasst_am'],
+            ];
+        }
+    } catch (Throwable $e) {
+        $antworten = [];
+    }
+
+    $nach = [];
+    foreach ($zeilen as $z) {
+        $kid = (int)$z['kontrollpunkt_id'];
+        $nach[$kid][] = [
+            'id'          => (int)$z['id'],
+            'bezeichnung' => $z['bezeichnung'],
+            'information' => $z['information'],
+            'erledigt'    => $antworten[$kid . ':' . (int)$z['id']] ?? null,
+        ];
+    }
+    return $nach;
+}
+
+// Haengt die Aufgaben an eine bereits geladene Kontrollpunkt-Liste.
+function rundgang_punkte_mit_aufgaben(PDO $pdo, int $rundgangId, array $punkte): array
+{
+    $ids = array_map(static fn($k) => (int)$k['id'], $punkte);
+    $nach = rundgang_aufgaben_je_punkt($pdo, $rundgangId, $ids);
+    foreach ($punkte as $i => $k) {
+        $punkte[$i]['aufgaben'] = $nach[(int)$k['id']] ?? [];
+    }
+    return $punkte;
+}
+
 function rundgang_kontrollpunkte_uebrig(PDO $pdo, int $rundgangId, int $objektId, ?int $vorlageId = null): array
 {
     if ($vorlageId !== null) {
@@ -42,7 +111,7 @@ function rundgang_kontrollpunkte_uebrig(PDO $pdo, int $rundgangId, int $objektId
               ORDER BY p.reihenfolge, k.id'
         );
         $s->execute([$vorlageId, $objektId, $rundgangId]);
-        return $s->fetchAll(PDO::FETCH_ASSOC);
+        return rundgang_punkte_mit_aufgaben($pdo, $rundgangId, $s->fetchAll(PDO::FETCH_ASSOC));
     }
     $s = $pdo->prepare(
         'SELECT k.* FROM kontrollpunkt k
@@ -54,7 +123,7 @@ function rundgang_kontrollpunkte_uebrig(PDO $pdo, int $rundgangId, int $objektId
           ORDER BY k.reihenfolge, k.id'
     );
     $s->execute([$objektId, $rundgangId]);
-    return $s->fetchAll(PDO::FETCH_ASSOC);
+    return rundgang_punkte_mit_aufgaben($pdo, $rundgangId, $s->fetchAll(PDO::FETCH_ASSOC));
 }
 
 // Ist eine "bestaetigt"-Meldung fuer diesen Kontrollpunkt plausibel? NFC

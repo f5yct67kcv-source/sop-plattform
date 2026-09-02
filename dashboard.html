@@ -895,6 +895,12 @@ tbody tr.aus td { opacity: .55; }
    Tagesplan -- dieselbe Liste, nur nach einem Tag gefiltert. */
 tbody tr.status-abgeschlossen td { opacity: .55; }
 .ag-karte.status-abgeschlossen { opacity: .55; }
+/* Aufgabenzeile innerhalb einer Scan-Karte (ENT-305). Umbruchfaehig, weil
+   die Karte in einer hoechstens 420 px schmalen Schublade steht -- eine
+   feste Zeile liefe dort ueber den Rand (gleiche Ueberlegung wie ENT-243,
+   das die Tabelle deshalb ueberhaupt zu Karten gemacht hat). */
+.ae-aufgabe { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
+.ae-aufgabe .ae-grund { flex-basis: 100%; color: var(--ink-3); }
 /* Abgeglichene Zeile in Planung/Tagesplan (ENT-136): eigene, kraeftigere
    Kennzeichnung als das allgemeine ".zu" (das anderswo "gesperrt/blockiert"
    bedeutet, z. B. bei Sperrtagen, und darum Warnfarbe traegt). Hier ist Gruen
@@ -14006,7 +14012,8 @@ function aeLadeScans() {
   const von = $('aeScanVon').value, bis = $('aeScanBis').value;
   if (!von || !bis) { return; }
   api(`rundgang_scan_liste.php?von=${encodeURIComponent(von)}&bis=${encodeURIComponent(bis)}`).then(({ ok, data }) => {
-    aeZeichneScans(ok && data.status === 'ok' ? data.scans : null);
+    const gut = ok && data.status === 'ok';
+    aeZeichneScans(gut ? data.scans : null, gut ? (data.aufgaben || []) : []);
   });
 }
 
@@ -14015,17 +14022,36 @@ const AE_SCAN_STATUS = {
   nicht_verfuegbar: ['chip-n', 'Nicht verfügbar'],
   ersatzscan: ['chip-w', 'Ersatzscan'],
 };
+// Erledigte Aufgaben (ENT-305). "Nicht möglich" ist bewusst dieselbe
+// Kennzeichnung wie "Nicht verfügbar" beim Scan: In beiden Fällen ist der
+// Punkt erreicht, aber etwas ging nicht — dieselbe Aussage verdient dieselbe
+// Farbe.
+const AE_AUFGABE_STATUS = {
+  erledigt: ['chip-a', 'Erledigt'],
+  nicht_moeglich: ['chip-n', 'Nicht möglich'],
+};
 
 // Karten statt Tabelle (ENT-243): eine Tabelle mit acht Spalten passte in der
 // hoechstens 420 px schmalen Schublade nicht -- am gerenderten Zustand
 // gemessen blieben fuenf Spalten ohne jeden Hinweis auf noetiges seitliches
 // Scrollen unsichtbar. Gleiches Kartenmuster (".ag-karte") wie im Abgleich
 // und in der Einsatzliste, dort aus demselben Grund fuer schmale Flaechen.
-function aeZeichneScans(scans) {
+function aeZeichneScans(scans, aufgaben) {
   const ziel = $('aeScanListe');
   if (!ziel) { return; }
   if (!scans) { ziel.innerHTML = EMPTY('Scans nicht verfügbar', 'Die Liste konnte nicht geladen werden.'); return; }
-  if (!scans.length) { ziel.innerHTML = EMPTY('Nichts vorhanden', 'Im gewählten Zeitraum liegt kein Kontrollpunkt-Scan vor.'); return; }
+  const aufg = aufgaben || [];
+  if (!scans.length && !aufg.length) { ziel.innerHTML = EMPTY('Nichts vorhanden', 'Im gewählten Zeitraum liegt kein Kontrollpunkt-Scan vor.'); return; }
+  // Aufgaben zum jeweiligen Kontrollpunkt gebündelt: Sie gehören zum Scan,
+  // auch wenn sie Minuten später beantwortet wurden (der Wächter geht erst
+  // zur Tür, dann tippt er). Eine eigene zweite Liste hätte dieselbe Nacht
+  // zweimal erzählt.
+  const aufgNach = {};
+  aufg.forEach(a => {
+    const k = (a.kontrollpunkt_name || '') + '|' + String(a.erfasst_am).slice(0, 10);
+    (aufgNach[k] = aufgNach[k] || []).push(a);
+  });
+  const zugeordnet = new Set();
   ziel.innerHTML = scans.map(s => {
     const datum = String(s.erfasst_am).slice(0, 10);
     const zeit = String(s.erfasst_am).slice(11, 16);
@@ -14036,7 +14062,38 @@ function aeZeichneScans(scans) {
         <div class="wer">${esc(s.objekt_name)}${s.kontrollpunkt_name ? ' · ' + esc(s.kontrollpunkt_name) : ''}</div>
         <div class="zeiten">${dmy(datum)}, <b>${esc(zeit)}</b> · ${esc(person)}</div>
         ${s.beschreibung ? `<div class="zeiten">${esc(s.beschreibung)}</div>` : ''}
+        ${aeAufgabenZeilen(aufgNach[(s.kontrollpunkt_name || '') + '|' + datum], zugeordnet)}
       </div>`;
+  }).join('')
+  // Antworten, zu denen im Zeitraum kein Scan steht (z.B. der Scan liegt am
+  // Vortag): Sie dürfen nicht verschwinden — ein fehlender Nachweis ist
+  // schlimmer als eine zusätzliche Karte.
+  + aufg.filter(a => !zugeordnet.has(a.id)).map(a => {
+    const [klasse, txt] = AE_AUFGABE_STATUS[a.status] || ['chip-n', a.status];
+    const person = [a.nachname, a.vorname].filter(Boolean).join(', ') || '–';
+    return `<div class="ag-karte">
+        <div class="kopf"><b>${esc(a.kunde_name)}</b><span class="chip ${klasse}">${esc(txt)}</span></div>
+        <div class="wer">${esc(a.objekt_name)}${a.kontrollpunkt_name ? ' · ' + esc(a.kontrollpunkt_name) : ''}</div>
+        <div class="zeiten">${dmy(String(a.erfasst_am).slice(0, 10))}, <b>${esc(String(a.erfasst_am).slice(11, 16))}</b> · ${esc(person)}</div>
+        <div class="zeiten"><b>${esc(a.bezeichnung)}</b>${a.grund ? ' — ' + esc(a.grund) : ''}</div>
+      </div>`;
+  }).join('');
+}
+
+// Aufgabenzeilen innerhalb einer Scan-Karte. Der Zeitstempel steht bei JEDER
+// Aufgabe, nicht nur beim Scan: Er ist der Nachweis und kann Minuten vom Scan
+// abweichen.
+function aeAufgabenZeilen(liste, zugeordnet) {
+  if (!liste || !liste.length) { return ''; }
+  return liste.map(a => {
+    zugeordnet.add(a.id);
+    const [klasse, txt] = AE_AUFGABE_STATUS[a.status] || ['chip-n', a.status];
+    return `<div class="zeiten ae-aufgabe">
+      <span class="chip ${klasse}">${esc(txt)}</span>
+      <b>${esc(a.bezeichnung)}</b>
+      <span>${esc(String(a.erfasst_am).slice(11, 16))}</span>
+      ${a.grund ? `<span class="ae-grund">${esc(a.grund)}</span>` : ''}
+    </div>`;
   }).join('');
 }
 

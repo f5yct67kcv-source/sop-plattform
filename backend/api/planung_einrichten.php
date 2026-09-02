@@ -893,6 +893,50 @@ CREATE TABLE IF NOT EXISTS kunden_kontaktweg (
   FOREIGN KEY (aufgabe_id) REFERENCES objekt_aufgabe(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+// Erledigung einer Aufgabe waehrend eines Rundgangs (ENT-305).
+//
+// EIGENE Tabelle, und sie KOPIERT den Text, statt in den Katalog zu zeigen --
+// so von ENT-302 vorgesehen und dieselbe Trennung von Vorlage und
+// Durchfuehrung wie kontrollpunkt/rundgang_scan und masterschichten/
+// einsaetze. Der Grund ist der Nachweiswert: Wird "Tuere verschliessen"
+// spaeter in "Alle Tueren verschliessen" umbenannt, darf der Beleg von
+// letzter Nacht nicht rueckwirkend etwas anderes behaupten. aufgabe_id bleibt
+// als Herkunftsangabe daneben stehen, darf aber verschwinden.
+//
+// status: 'erledigt' | 'nicht_moeglich'. Zwei Wege, nicht einer -- vom
+// Projektinhaber so entschieden. Gaebe es nur "erledigt", tippte auch der
+// darauf, der die Aufgabe gar nicht ausfuehren konnte, und die Auswertung
+// behauptete etwas, das nicht stimmt. Bei 'nicht_moeglich' ist grund Pflicht
+// (serverseitig geprueft), sonst stuende dort "nicht moeglich" ohne Warum --
+// und genau das Warum ist die Information, die der Verwaltung fehlt.
+//
+// erfasst_am kommt GERAETESEITIG (Offline-Prinzip wie rundgang_scan,
+// ENT-132 Punkt 5): Der Waechter steht im Treppenhaus ohne Netz. Der
+// Zeitstempel zaehlt den Moment der Erledigung, nicht den der Uebermittlung
+// -- uebermittelt_am haelt die Differenz fest und macht eine lange
+// Offline-Phase sichtbar, die sonst niemand saehe.
+//
+// UNIQUE ueber (rundgang_id, kontrollpunkt_id, aufgabe_id): Dieselbe Aufgabe
+// wird in einer Runde einmal beantwortet. Ohne die Schranke legte ein
+// doppelt gesendeter Warteschlangen-Eintrag zwei Nachweise an, und die
+// Auswertung zaehlte falsch.
+'rundgang_aufgabe' => "CREATE TABLE rundgang_aufgabe (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  rundgang_id INT NOT NULL,
+  kontrollpunkt_id INT NULL,
+  aufgabe_id INT NULL,
+  bezeichnung VARCHAR(200) NOT NULL,
+  status VARCHAR(20) NOT NULL,
+  grund TEXT NULL,
+  erfasst_am DATETIME NOT NULL,
+  uebermittelt_am DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_runde_punkt_aufgabe (rundgang_id, kontrollpunkt_id, aufgabe_id),
+  KEY idx_rundgang (rundgang_id),
+  FOREIGN KEY (rundgang_id) REFERENCES rundgang(id) ON DELETE CASCADE,
+  FOREIGN KEY (kontrollpunkt_id) REFERENCES kontrollpunkt(id) ON DELETE SET NULL,
+  FOREIGN KEY (aufgabe_id) REFERENCES objekt_aufgabe(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
 // ── Offerten und spaeter Rechnungen (ENT-181) ─────────────────────────────
 //
 // Produkte sind Stammdaten: die immer gleichen Leistungen (Verkehrsdienst,
