@@ -66,6 +66,43 @@ $kpStmt = $pdo->prepare(
 $kpStmt->execute([$vorlageId, (int)$v['objekt_id']]);
 $kontrollpunkte = $kpStmt->fetchAll(PDO::FETCH_ASSOC);
 
+// Aufgaben je Kontrollpunkt (ENT-304). Der Katalog und die Verknuepfung
+// stammen aus ENT-302 (parallele Sitzung, Verwaltungsseite); hier werden sie
+// zum ersten Mal an jemanden ausgeliefert, der sie tatsaechlich ausfuehrt.
+//
+// Nur aktive Aufgaben: Eine entfernte Aufgabe wird nach ENT-302 auf aktiv = 0
+// gesetzt statt geloescht, damit ein spaeterer Nachweis nicht mitgerissen
+// wird. Wer sie hier trotzdem mitlieferte, liesse Waechter Arbeit tun, die
+// die Verwaltung abgeschafft hat.
+//
+// hat_tabelle, weil die Vorschau auch gegen eine Datenbank laeuft, in der die
+// Einrichtung nach ENT-302 noch nicht durchlief -- ohne die Pruefung fiele
+// die ganze Runde aus, wegen einer Zusatzangabe.
+$aufgabenJePunkt = [];
+if ($kontrollpunkte && hat_tabelle($pdo, 'kontrollpunkt_aufgabe') && hat_tabelle($pdo, 'objekt_aufgabe')) {
+    $ids = array_map(static fn($k) => (int)$k['id'], $kontrollpunkte);
+    $platz = implode(',', array_fill(0, count($ids), '?'));
+    $aStmt = $pdo->prepare(
+        "SELECT ka.kontrollpunkt_id, a.id, a.bezeichnung, a.information
+           FROM kontrollpunkt_aufgabe ka
+           JOIN objekt_aufgabe a ON a.id = ka.aufgabe_id AND a.aktiv = 1
+          WHERE ka.kontrollpunkt_id IN ($platz)
+          ORDER BY ka.reihenfolge, a.id"
+    );
+    $aStmt->execute($ids);
+    foreach ($aStmt->fetchAll(PDO::FETCH_ASSOC) as $a) {
+        $aufgabenJePunkt[(int)$a['kontrollpunkt_id']][] = [
+            'id'          => (int)$a['id'],
+            'bezeichnung' => $a['bezeichnung'],
+            'information' => $a['information'],
+        ];
+    }
+}
+foreach ($kontrollpunkte as &$kpZeile) {
+    $kpZeile['aufgaben'] = $aufgabenJePunkt[(int)$kpZeile['id']] ?? [];
+}
+unset($kpZeile);   // sonst zeigt die Referenz auf den letzten Eintrag weiter
+
 // Laeuft fuer diese Person auf DIESER Vorlage schon eine Runde (ENT-298)?
 // Die Seite ist nicht nur Vorschau vor dem Start, sondern auch der Ort, an
 // den man waehrend der Runde zurueckkommt -- ohne diese Angabe koennte sie

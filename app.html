@@ -480,6 +480,32 @@ svg.i-sm { width: 17px; height: 17px; }
 .rgs-modul-ic { flex: none; width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid var(--accent); color: var(--accent); display: flex; align-items: center; justify-content: center; }
 .rgs-modul-zahl { margin-left: auto; min-width: 26px; height: 26px; padding: 0 8px; border-radius: 13px; background: var(--accent); color: #0F1117; font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
 .rgs-modul-zahl.leer { background: var(--neg-soft); color: var(--neg); }
+/* Aufgaben je Kontrollpunkt (ENT-304). Punkt als Kopf, Aufgaben darunter --
+   dieselbe Ordnung wie die Runde selbst. Ein Punkt OHNE Aufgabe bleibt
+   sichtbar, aber gedaempft: Er sagt "hier ist nichts zu tun", nicht "hier
+   fehlt etwas". */
+.af-punkt { border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); overflow: hidden; margin-bottom: 10px; }
+/* Der Zusatz heisst "ohne", NICHT "leer": .leer ist bereits eine globale
+   Klasse dieser App (text-align:center, padding:46px 22px) fuer ganzseitige
+   Leerzustaende. Die erste Fassung hiess .af-punkt.leer und hat sich diese
+   Polsterung und die Zentrierung eingefangen -- der Block war doppelt so hoch
+   wie noetig und der Text stand mittig. Im Quelltext unsichtbar, erst am
+   gerenderten Zustand aufgefallen. */
+.af-punkt.ohne { background: none; }
+.af-punkt-kopf { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--line-soft); }
+.af-punkt.ohne .af-punkt-kopf { border-bottom: 0; }
+.af-nr { flex: none; width: 22px; height: 22px; border-radius: 50%; background: var(--line-soft); color: var(--ink-2); font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.af-punkt-bez { flex: 1; min-width: 0; font-size: 15px; font-weight: 640; }
+.af-punkt.ohne .af-punkt-bez { color: var(--ink-3); font-weight: 600; }
+.af-punkt-zahl { flex: none; min-width: 24px; height: 24px; padding: 0 8px; border-radius: 12px; background: var(--accent); color: #0F1117; font-size: 12.5px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.af-zeile { padding: 11px 14px 12px 46px; border-bottom: 1px solid var(--line-soft); }
+.af-zeile:last-child { border-bottom: 0; }
+/* Die Bezeichnung traegt --ink, die Erlaeuterung --ink-2: Was zu tun ist,
+   steht vor dem, was dazu zu wissen ist. */
+.af-bez { font-size: 15px; font-weight: 600; line-height: 1.35; }
+.af-info { font-size: 13.5px; color: var(--ink-2); line-height: 1.5; margin-top: 3px; white-space: pre-line; }
+.af-ohne { padding: 0 14px 12px 46px; font-size: 13px; color: var(--ink-3); }
+
 .rgs-fuss { padding: 14px 16px calc(16px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line-soft); background: var(--surface); flex: none; }
 .rgs-warn { display: flex; gap: 9px; font-size: 13.5px; line-height: 1.5; color: var(--warn); background: var(--warn-soft); border: 1px solid var(--warn); border-radius: var(--r-sm); padding: 11px 13px; }
 
@@ -872,6 +898,12 @@ const W = {
     rgsSanitaet: 'Sanität',
     rgsKeineZentrale: 'Keine Pikettnummer hinterlegt — die Verwaltung trägt sie in den Betriebsdaten ein.',
     rgsKontrollpunkte: 'Kontrollpunkte',
+    // Aufgaben je Kontrollpunkt (ENT-304, Datenmodell aus ENT-302)
+    afTitel: 'Aufgaben anzeigen',
+    afSeitentitel: 'Aufgaben',
+    afKeine: 'An den Kontrollpunkten dieser Runde ist keine Aufgabe hinterlegt. Die Verwaltung verknüpft sie am Kontrollpunkt.',
+    afOhneAufgabe: 'keine Aufgabe',
+    afHinweis: 'Diese Aufgaben stehen hier zum Nachlesen. Abgehakt wird noch nichts — das ist ein eigener Schritt.',
     rgsZeitfenster: 'Ausführbar',
     rgsJederzeit: 'Jederzeit',
     rgsAnzahlPunkte: 'Kontrollpunkte',
@@ -1573,7 +1605,7 @@ const RGS_NOTRUF = [
 ];
 
 let rgsVorlageId = null;
-let rgsAnsicht = 'uebersicht';   // 'uebersicht' | 'ereignis' -- welche Ebene der Seite offen ist
+let rgsAnsicht = 'uebersicht';   // 'uebersicht' | 'ereignis' | 'aufgaben' -- welche Ebene der Seite offen ist
 let rgsDaten = null;             // zuletzt geladene Vorschau, damit der Rueckweg keinen neuen Abruf braucht
 
 function rgSeiteOeffnen(vorlageId) {
@@ -1734,6 +1766,13 @@ function rgSeiteZeichnen(d) {
         </span>
         <span>${esc(w('rgsKontrollpunkte'))}</span>
         <span class="rgs-modul-zahl${punkte.length ? '' : ' leer'}">${punkte.length}</span>
+      </button>
+      <button type="button" class="rgs-modul" id="rgsModAufgaben" onclick="afOeffnen()">
+        <span class="rgs-modul-ic">
+          <svg class="i i-sm" viewBox="0 0 24 24"><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><polyline points="4 6 5 7 7 5"/><polyline points="4 12 5 13 7 11"/><polyline points="4 18 5 19 7 17"/></svg>
+        </span>
+        <span>${esc(w('afTitel'))}</span>
+        <span class="rgs-modul-zahl${afAnzahl(punkte) ? '' : ' leer'}">${afAnzahl(punkte)}</span>
       </button>
       <button type="button" class="rgs-modul" id="rgsModEreignis" onclick="evOeffnen()">
         <span class="rgs-modul-ic">
@@ -1915,6 +1954,59 @@ function evWarteschlangeSenden() {
       evWarteschlangeSchreiben(evWarteschlangeLesen().filter(m => !erledigt.has(String(m.lokal_id))));
     })
     .catch(() => {});
+}
+
+/* ── Aufgaben je Kontrollpunkt (ENT-304) ──────────────────────────────
+   Katalog und Verknuepfung stammen aus ENT-302 (Verwaltungsseite, parallele
+   Sitzung). Hier werden sie zum ersten Mal dem gezeigt, der sie ausfuehrt.
+
+   Gruppiert nach Kontrollpunkt, nicht als flache Liste: "Tuere verschliessen"
+   heisst an der Tiefgarage etwas anderes als am Haupteingang, und die Runde
+   laeuft ohnehin Punkt fuer Punkt. Punkte OHNE Aufgabe stehen bewusst mit
+   drin -- sonst liesse sich nicht unterscheiden, ob ein Punkt keine Aufgabe
+   hat oder ob er in dieser Runde gar nicht vorkommt (CLAUDE.md: "unbekannt"
+   darf nie wie "keine" aussehen).
+
+   Rein lesend, so vom Projektinhaber verlangt ("rein visuell"). Der Hinweis
+   am Kopf sagt das ausdruecklich, damit niemand auf eine Zeile tippt und auf
+   einen Haken wartet, den es noch nicht gibt. */
+function afAnzahl(punkte) {
+  return (punkte || []).reduce((n, k) => n + ((k.aufgaben || []).length), 0);
+}
+
+function afOeffnen() {
+  if (!$('rgSeite').classList.contains('on')) return;
+  if (!rgsDaten) return;
+  rgsAnsicht = 'aufgaben';
+  const punkte = rgsDaten.kontrollpunkte || [];
+  $('rgsTitel').textContent = w('afSeitentitel');
+  $('rgsFuss').innerHTML =
+    `<button class="btn btn-plain btn-wide" onclick="rgSeiteZurueckZurUebersicht()">${esc(w('zurueck'))}</button>`;
+
+  if (!afAnzahl(punkte)) {
+    $('rgsBody').innerHTML = `<div class="rgs-warn" id="afLeer">
+      <svg class="i i-sm" style="flex:none" viewBox="0 0 24 24"><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><polyline points="4 6 5 7 7 5"/><polyline points="4 12 5 13 7 11"/><polyline points="4 18 5 19 7 17"/></svg>
+      <span>${esc(w('afKeine'))}</span></div>`;
+    return;
+  }
+
+  $('rgsBody').innerHTML = `
+    <div class="rgs-leer" id="afHinweis" style="padding:0 2px 2px">${esc(w('afHinweis'))}</div>
+    ${punkte.map((k, i) => {
+      const aufg = k.aufgaben || [];
+      return `<div class="af-punkt${aufg.length ? '' : ' ohne'}">
+        <div class="af-punkt-kopf">
+          <span class="af-nr">${i + 1}</span>
+          <span class="af-punkt-bez">${esc(k.bezeichnung)}</span>
+          ${aufg.length ? `<span class="af-punkt-zahl">${aufg.length}</span>` : ''}
+        </div>
+        ${aufg.length ? aufg.map(a => `<div class="af-zeile">
+            <div class="af-bez">${esc(a.bezeichnung)}</div>
+            ${a.information ? `<div class="af-info">${esc(a.information)}</div>` : ''}
+          </div>`).join('')
+          : `<div class="af-ohne">${esc(w('afOhneAufgabe'))}</div>`}
+      </div>`;
+    }).join('')}`;
 }
 
 function evOeffnen() {
