@@ -234,7 +234,7 @@ for (const [datei, titel] of [
   ['pruef_rundgang.php', 'KRITISCH: Geofence-Pruefung und Restliste der Kontrollpunkte stimmen (ENT-132/ENT-145/ENT-180)'],
   ['pruef_ereignisse.php', 'KRITISCH: die Ereignis-Arten und ihre Abhakbarkeit stimmen (ENT-090/ENT-197)'],
   ['pruef_revierdienst_berechtigung.php', 'KRITISCH: die Weichen von ohneRevierdienstBerechtigung() stimmen (ENT-284)'],
-  ['pruef_aufgaben.php', 'KRITISCH: eine fremde oder entfernte Aufgabe laesst sich nicht an einen Kontrollpunkt haengen (ENT-300)'],
+  ['pruef_aufgaben.php', 'KRITISCH: eine fremde oder entfernte Aufgabe laesst sich nicht an einen Kontrollpunkt haengen (ENT-302)'],
 ]) {
   let aus = '', code = 0;
   try {

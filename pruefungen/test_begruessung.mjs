@@ -94,7 +94,7 @@ await page.screenshot({ path: OUT + '/80-begruessung.png' });
 // schief, morgens wie abends: Beide Listen enthalten drei Eintraege, aber
 // nur ZWEI verschiedene Texte ("Guten Abend" steht zweimal drin). Die
 // Wahrscheinlichkeit, zwoelfmal denselben zu ziehen, ist (2/3)^12 -- etwa
-// einer von 130 Laeufen. Genau so ist sie in der Regression zu ENT-300
+// einer von 130 Laeufen. Genau so ist sie in der Regression zu ENT-302
 // einmal rot geworden, ohne dass jemand etwas daran geaendert hatte.
 //
 // Ein zufaelliger Fehlschlag ist schlimmer als gar keine Pruefung: Er

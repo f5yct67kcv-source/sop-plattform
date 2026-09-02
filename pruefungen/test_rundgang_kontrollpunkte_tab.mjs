@@ -59,7 +59,7 @@ const VORLAGEN_ALLE = { status: 'ok', vorlagen: [
 
 let calls = [];
 
-// Aufgabenkatalog des Objekts (ENT-300). Bewusst veraenderlich: Legt die
+// Aufgabenkatalog des Objekts (ENT-302). Bewusst veraenderlich: Legt die
 // Oberflaeche eine Aufgabe an, muss sie danach auch in der Liste stehen --
 // eine feste Antwort haette das nie gezeigt.
 const AUFGABEN = {
@@ -186,7 +186,7 @@ await page.fill('#rdKpFilterTag', '');
 await page.waitForTimeout(100);
 
 // ══════════ CTA: "+ KONTROLLPUNKT ANLEGEN" ÖFFNET DAS FENSTER AN ORT UND STELLE
-// Bis ENT-300 wechselte dieser Knopf zur Kartenansicht -- dort lag das
+// Bis ENT-302 wechselte dieser Knopf zur Kartenansicht -- dort lag das
 // einzige Bearbeitungsfenster. Jetzt steht dasselbe Fenster auch neben der
 // Liste, also gibt es keinen Grund mehr, den Reiter zu verlassen.
 await page.click('button:has-text("+ Kontrollpunkt anlegen")');
@@ -209,7 +209,7 @@ check('Schliessen räumt die zweite Spalte wieder weg -- eine leere Spalte sieht
 // Playwright-Stapelauszug: Man sah, DASS etwas kaputt ist, aber nicht,
 // welche Aussage nicht mehr gilt.
 try {
-  // ══════════ ENT-300: JEDE ZEILE ÖFFNET DAS FENSTER, AUCH DER NFC-PUNKT
+  // ══════════ ENT-302: JEDE ZEILE ÖFFNET DAS FENSTER, AUCH DER NFC-PUNKT
   // Bis hierher fuehrte ein Knopf "Bearbeiten" in einen modalen Dialog, und
   // das Fenster gab es nur fuer GPS-Punkte. Verlangt ist: jeder Punkt
   // anklickbar, dasselbe Fenster, an beiden Orten.
@@ -248,7 +248,7 @@ try {
   check('Der Typ bleibt NFC und wird nicht stillschweigend zu Geofence',
     gespeichert && gespeichert.body.typ === 'nfc');
 
-  // ══════════ ENT-300: AUFGABEN AM KONTROLLPUNKT
+  // ══════════ ENT-302: AUFGABEN AM KONTROLLPUNKT
   await page.click('#rdKpTabelle tbody tr:has-text("Parkplatz")');
   await page.waitForTimeout(300);
   await page.click('#rdKdReiterAufg');
@@ -314,7 +314,7 @@ try {
   check('Die Verknüpfung nennt den richtigen Kontrollpunkt — Parkplatz, nicht den zuletzt offenen',
     setzen && Number(setzen.body.kontrollpunkt_id) === 2);
 
-  // ══════════ ENT-300: DAS FENSTER IST GROSS GENUG (gemessen, nicht angenommen)
+  // ══════════ ENT-302: DAS FENSTER IST GROSS GENUG (gemessen, nicht angenommen)
   // Ausdrueckliche Vorgabe des Projektinhabers ("achte auf genug Grösse").
   // Vorher war die Spalte auf 340-420px gedeckelt; im Referenzbild nimmt das
   // Fenster rund die Haelfte des Fensters ein.
@@ -353,7 +353,7 @@ try {
   await page.click('#rdKarteDetail .card-hd button:has-text("Schliessen")');
   await page.waitForTimeout(200);
 } catch (e) {
-  bad.push('ENT-300 (Fenster und Aufgaben): abgebrochen -- '
+  bad.push('ENT-302 (Fenster und Aufgaben): abgebrochen -- '
     + String(e.message || e).split('\n')[0]);
 }
 

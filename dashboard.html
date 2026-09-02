@@ -542,7 +542,7 @@ a.nav-item { text-decoration: none; }
   min-height: 0; max-height: var(--rdkarte-h); }
 .rdkarte-seite { max-height: var(--rdkarte-h); }
 .rdkarte-detail .card-bd { min-height: 0; overflow-y: auto; }
-/* Dasselbe Fenster in der Kontrollpunkt-Liste (ENT-300): Liste links,
+/* Dasselbe Fenster in der Kontrollpunkt-Liste (ENT-302): Liste links,
    Fenster rechts. Ohne offenes Fenster nimmt die Liste die ganze Breite --
    eine leere Spalte auf Vorrat sieht aus wie ein Fehler. */
 .rdkp-raum { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; align-items: start; }
@@ -556,10 +556,10 @@ a.nav-item { text-decoration: none; }
 @media (max-width: 900px) {
   .rdkp-raum, .rdkp-raum.mit-detail { grid-template-columns: 1fr; }
 }
-/* Aufgabenzeile im Fenster (ENT-300): Haken links, Text rechts. Die ganze
+/* Aufgabenzeile im Fenster (ENT-302): Haken links, Text rechts. Die ganze
    Zeile ist die Trefferflaeche -- ein 13px-Kaestchen allein waere auf dem
    Handy nicht zu treffen. */
-/* Anklickbare Zeile (ENT-300). Der Zeiger und die Hervorhebung sagen, dass
+/* Anklickbare Zeile (ENT-302). Der Zeiger und die Hervorhebung sagen, dass
    hier etwas passiert -- ohne beides sieht eine Tabelle aus wie eine
    Tabelle, und niemand klickt hinein. */
 tr.klickbar { cursor: pointer; }
@@ -4877,7 +4877,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
             <button class="btn btn-primary btn-sm" onclick="rdKdOeffnen('neu', 'liste')">+ Kontrollpunkt anlegen</button>
           </div>
           <!-- Zwei Spalten: Liste links, dasselbe Fenster rechts wie auf der
-               Kartenansicht (ENT-300). Es wird nicht kopiert, sondern beim
+               Kartenansicht (ENT-302). Es wird nicht kopiert, sondern beim
                Oeffnen hierher VERSCHOBEN -- ein Element, eine Maske, ein
                Satz Feld-ids. Zwei Kopien liefen sonst auseinander, sobald
                jemand nur eine davon anfasst. -->
@@ -4980,7 +4980,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
                   <div class="f wide"><label for="rdKdName">Name *</label><input class="inp" id="rdKdName" placeholder="z. B. Parkplatz"></div>
                   <div class="f wide"><label for="rdKdBeschreibung">Beschreibung</label><textarea class="inp" id="rdKdBeschreibung" rows="3" placeholder="Optionale Notiz zu diesem Punkt"></textarea></div>
                   <div class="f wide"><label>Bereich</label><div id="rdKdBereich" class="kp-meta">–</div></div>
-                  <!-- Typ und Chip-ID (ENT-300): Bis hierher war dieses Fenster
+                  <!-- Typ und Chip-ID (ENT-302): Bis hierher war dieses Fenster
                        ausdruecklich nur fuer GPS-Punkte (ENT-265), NFC-Punkte
                        liefen ueber den Dialog. Verlangt ist jetzt, JEDEN
                        Kontrollpunkt hier zu oeffnen -- also braucht es beide
@@ -5014,7 +5014,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
                      Timer fuer eingerichtet. -->
                 <p class="zone-note" style="margin-top:8px">Wird gespeichert, wirkt aber noch nicht: Der Rundgang-Timer startet zurzeit weiterhin beim ersten bestätigten Scan.</p>
               </div>
-              <!-- Aufgaben am Kontrollpunkt (ENT-300). Die Liste zeigt den
+              <!-- Aufgaben am Kontrollpunkt (ENT-302). Die Liste zeigt den
                    KATALOG des Objekts; der Haken sagt, ob die Aufgabe an
                    diesem Punkt haengt. Gespeichert wird zusammen mit dem
                    Punkt ueber denselben Knopf -- ein Fenster, ein
@@ -16767,7 +16767,7 @@ function rdKpTabelleZeichnen() {
       <th>Typ</th><th>Name</th><th>Tag Identifikator</th><th></th>
     </tr></thead><tbody>` + gefiltert.map(k => {
     const tag = k.typ === 'nfc' ? esc(k.chip_id || '–') : '–';
-    // Die ganze Zeile oeffnet das Fenster (ENT-300) -- der Knopf "Bearbeiten"
+    // Die ganze Zeile oeffnet das Fenster (ENT-302) -- der Knopf "Bearbeiten"
     // faellt hier weg, weil er dasselbe getan haette wie ein Klick daneben.
     // "Entfernen" bleibt ein eigener Knopf und stoppt die Weitergabe des
     // Klicks, sonst oeffnete das Loeschen zugleich das Fenster.
@@ -17287,7 +17287,7 @@ function rdKarteWaehlen(id) {
 
 // Fenster rechts (ENT-265): Bearbeitungsformular, nicht mehr nur Anzeige.
 // rdKarteAuswahl ist entweder die id eines bestehenden Punktes oder 'neu'.
-// ══════════ KONTROLLPUNKT-FENSTER AN ZWEI ORTEN (ENT-300)
+// ══════════ KONTROLLPUNKT-FENSTER AN ZWEI ORTEN (ENT-302)
 //
 // Es gibt genau EIN Fenster. Beim Oeffnen wird das Element in den Behaelter
 // verschoben, aus dem heraus geoeffnet wurde -- Kartenansicht oder Liste.
@@ -17345,7 +17345,7 @@ function rdKarteDetailZeichnen() {
     ? (typ === 'nfc' ? 'Neuer Kontrollpunkt' : 'Neuer GPS-Punkt')
     : k.bezeichnung;
   // Die Zeile ueber dem Titel sagt, WAS fuer ein Punkt das ist -- sie stand
-  // bisher fest auf "GPS-Punkt", weil es nur solche gab (ENT-300).
+  // bisher fest auf "GPS-Punkt", weil es nur solche gab (ENT-302).
   const kicker = $('rdKarteDetailTitel').parentElement.querySelector('.kp-meta');
   if (kicker) { kicker.textContent = typ === 'nfc' ? 'Kontrollpunkt · NFC-Chip' : 'Kontrollpunkt · GPS-Punkt'; }
   $('rdKdTyp').value = typ;
@@ -17428,7 +17428,7 @@ function rdKdSpeichern() {
   const lng = parseFloat(String($('rdKdLng').value).replace(',', '.'));
   if (!name) { err.textContent = 'Name erforderlich.'; err.style.display = ''; return; }
   // Koordinaten nur beim Geofence verlangen -- ein NFC-Chip hat keine
-  // (ENT-300). Vorher stand hier fest 'geofence', weil dieses Fenster nur
+  // (ENT-302). Vorher stand hier fest 'geofence', weil dieses Fenster nur
   // GPS-Punkte kannte.
   if (typ === 'geofence' && (!isFinite(lat) || !isFinite(lng))) {
     err.textContent = 'Breiten- und Längengrad erforderlich — Punkt auf der Karte anklicken oder Werte eintragen.';
@@ -17475,7 +17475,7 @@ function rdKdSpeichern() {
   });
 }
 
-// ══════════ AUFGABEN AM KONTROLLPUNKT (ENT-300)
+// ══════════ AUFGABEN AM KONTROLLPUNKT (ENT-302)
 //
 // Der Katalog gehoert dem Objekt, der Haken sagt, ob eine Aufgabe an DIESEM
 // Punkt haengt. Darum eine einzige Liste mit Haken statt der zweistufigen

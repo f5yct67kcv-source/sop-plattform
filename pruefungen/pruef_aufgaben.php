@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-// Die Abschottung der Aufgaben-Zuordnung (ENT-300), echt ausgefuehrt.
+// Die Abschottung der Aufgaben-Zuordnung (ENT-302), echt ausgefuehrt.
 //
 // WORUM ES GEHT: kontrollpunkt_aufgaben_setzen.php bekommt eine Liste von
 // Aufgaben-ids aus dem Browser. Im Browser sind nur die eigenen anklickbar

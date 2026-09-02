@@ -1,6 +1,6 @@
 <?php
 // Setzt die Aufgaben EINES Kontrollpunkts auf genau die uebergebene Liste
-// (ENT-300). Bewusst "setzen" statt "hinzufuegen/entfernen": Die Oberflaeche
+// (ENT-302). Bewusst "setzen" statt "hinzufuegen/entfernen": Die Oberflaeche
 // zeigt eine Liste mit Haken; was dort steht, ist danach der Stand. Zwei
 // Endpunkte fuer An und Ab liessen sich in falscher Reihenfolge aufrufen und
 // hinterliessen einen Zustand, den niemand angeklickt hat.

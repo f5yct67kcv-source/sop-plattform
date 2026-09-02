@@ -1,6 +1,6 @@
 <?php
 // Aufgabenkatalog eines Objekts samt Zuordnung zu den Kontrollpunkten
-// (ENT-300).
+// (ENT-302).
 //
 // Beides in EINER Antwort, nicht in zwei Abfragen: Das Seitenfenster eines
 // Kontrollpunkts braucht immer beides -- was es an Aufgaben gibt und welche

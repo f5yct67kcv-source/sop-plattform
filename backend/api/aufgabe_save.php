@@ -1,5 +1,5 @@
 <?php
-// Legt eine Aufgabe im Katalog eines Objekts an oder aendert sie (ENT-300).
+// Legt eine Aufgabe im Katalog eines Objekts an oder aendert sie (ENT-302).
 // Ohne "id" wird angelegt.
 //
 // Entfernt wird ueber aktiv = 0, nie per DELETE: Sobald die Erledigung einer

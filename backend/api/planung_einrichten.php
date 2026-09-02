@@ -848,7 +848,7 @@ CREATE TABLE IF NOT EXISTS kunden_kontaktweg (
   FOREIGN KEY (kontrollpunkt_id) REFERENCES kontrollpunkt(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
-// ── Aufgaben am Kontrollpunkt (ENT-300) ───────────────────────────────
+// ── Aufgaben am Kontrollpunkt (ENT-302) ───────────────────────────────
 //
 // Zwei Tabellen statt einer: Der KATALOG haelt den Text ein einziges Mal
 // ("Tuere verschliessen"), die VERKNUEPFUNG haengt ihn an beliebig viele
