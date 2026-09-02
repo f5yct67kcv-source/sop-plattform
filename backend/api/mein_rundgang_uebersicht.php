@@ -15,6 +15,7 @@
 // bisher erst nach dem Start in einer leeren Checkliste zu enden.
 declare(strict_types=1);
 require __DIR__ . '/../db.php';
+require_once __DIR__ . '/../rundgang.php';
 
 $user = require_session();
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
@@ -127,116 +128,16 @@ $laufend = $lf ? [
     'pausiert_seit'  => $lf['pausiert_seit'],
 ] : null;
 
-// Ansprechpartner aus ZWEI Quellen (ENT-300). Der Projektinhaber hat
-// entschieden: die Leute am Objekt ERGAENZEN die des Kunden, sie ersetzen
-// sie nicht. Reihenfolge darum Objekt zuerst -- der Hauswart ist vor Ort und
-// weiss, welche Tuer klemmt; die Kontaktperson des Kunden sitzt in der
-// Zentrale. Jeder Eintrag traegt 'quelle', damit in der App zu sehen ist,
-// wen man da anruft: Wer den Falschen weckt, ruft beim naechsten Mal
-// niemanden mehr an.
-//
-// Firmen-/objektweite Kontaktwege (person_id NULL) kommen je als eigener
-// Eintrag ohne Namen mit: eine allgemeine Nummer (Loge, Zentrale) ist nachts
-// oft der einzige erreichbare Weg.
-$ansprechpartner = [];
-
-if (hat_tabelle($pdo, 'objekt_person')) {
-    $opStmt = $pdo->prepare(
-        'SELECT id, anrede, vorname, nachname, funktion FROM objekt_person
-          WHERE objekt_id = ? ORDER BY sortierung, id'
-    );
-    $opStmt->execute([(int)$v['objekt_id']]);
-    $objektPersonen = $opStmt->fetchAll(PDO::FETCH_ASSOC);
-
-    $oWege = [];
-    if (hat_tabelle($pdo, 'objekt_kontaktweg')) {
-        $owStmt = $pdo->prepare(
-            'SELECT person_id, art, wert FROM objekt_kontaktweg
-              WHERE objekt_id = ? ORDER BY sortierung, id'
-        );
-        $owStmt->execute([(int)$v['objekt_id']]);
-        foreach ($owStmt->fetchAll(PDO::FETCH_ASSOC) as $w) {
-            $schluessel = $w['person_id'] === null ? 'objekt' : (string)(int)$w['person_id'];
-            $oWege[$schluessel][] = ['art' => $w['art'], 'wert' => $w['wert']];
-        }
-    }
-
-    foreach ($objektPersonen as $p) {
-        $name = trim(($p['vorname'] ?? '') . ' ' . ($p['nachname'] ?? ''));
-        $funktion = trim((string)($p['funktion'] ?? ''));
-        // Eine Person ohne Namen, aber mit Funktion ("Hauswart") ist gueltig
-        // -- brauchbar ist sie, sobald eines von beidem dasteht.
-        if ($name === '' && $funktion === '') { continue; }
-        $ansprechpartner[] = [
-            'name'     => $name !== '' ? $name : $funktion,
-            'anrede'   => $p['anrede'] ?: null,
-            'funktion' => ($name !== '' && $funktion !== '') ? $funktion : null,
-            'quelle'   => 'objekt',
-            'wege'     => $oWege[(string)(int)$p['id']] ?? [],
-        ];
-    }
-    if (!empty($oWege['objekt'])) {
-        $ansprechpartner[] = ['name' => $v['objekt_name'], 'anrede' => null,
-            'funktion' => null, 'quelle' => 'objekt', 'wege' => $oWege['objekt']];
-    }
-}
-if ($v['kunde_id'] !== null && hat_tabelle($pdo, 'kunden_person')) {
-    $pStmt = $pdo->prepare(
-        'SELECT id, anrede, vorname, nachname FROM kunden_person
-          WHERE kunde_id = ? ORDER BY sortierung, id'
-    );
-    $pStmt->execute([(int)$v['kunde_id']]);
-    $personen = $pStmt->fetchAll(PDO::FETCH_ASSOC);
-
-    $wege = [];
-    if (hat_tabelle($pdo, 'kunden_kontaktweg')) {
-        $wStmt = $pdo->prepare(
-            'SELECT person_id, art, wert FROM kunden_kontaktweg
-              WHERE kunde_id = ? ORDER BY sortierung, id'
-        );
-        $wStmt->execute([(int)$v['kunde_id']]);
-        foreach ($wStmt->fetchAll(PDO::FETCH_ASSOC) as $w) {
-            $schluessel = $w['person_id'] === null ? 'firma' : (string)(int)$w['person_id'];
-            $wege[$schluessel][] = ['art' => $w['art'], 'wert' => $w['wert']];
-        }
-    }
-
-    foreach ($personen as $p) {
-        $name = trim(($p['vorname'] ?? '') . ' ' . ($p['nachname'] ?? ''));
-        if ($name === '') { continue; }
-        $ansprechpartner[] = [
-            'name'     => $name,
-            'anrede'   => $p['anrede'] ?: null,
-            'funktion' => null,
-            'quelle'   => 'kunde',
-            'wege'     => $wege[(string)(int)$p['id']] ?? [],
-        ];
-    }
-    if (!empty($wege['firma'])) {
-        $ansprechpartner[] = ['name' => $v['kunde_name'], 'anrede' => null,
-            'funktion' => null, 'quelle' => 'kunde', 'wege' => $wege['firma']];
-    }
-}
-
-// Eigene Zentrale (ENT-299): die Pikettnummer aus den Betrieb-Stammdaten,
-// nicht die Buero-Nummer vom Briefkopf. Sie steht in der App ueber den
-// oeffentlichen Notrufnummern -- wer im Objekt etwas vorfindet, meldet
-// zuerst der eigenen Zentrale, ausser es brennt oder jemand ist verletzt.
-//
-// hat_spalte statt blindem SELECT: Der Endpunkt laeuft auch gegen eine
-// Datenbank, in der die Einrichtung nach ENT-299 noch nicht gelaufen ist.
-// Ohne diese Pruefung faele dort die ganze Rundgang-Vorschau aus -- wegen
-// einer Nebenangabe.
-$zentrale = null;
-if (hat_tabelle($pdo, 'betrieb') && hat_spalte($pdo, 'betrieb', 'pikett_telefon')) {
-    $bz = $pdo->query('SELECT firma, pikett_telefon FROM betrieb WHERE id = 1')->fetch(PDO::FETCH_ASSOC);
-    if ($bz && trim((string)$bz['pikett_telefon']) !== '') {
-        $zentrale = [
-            'name'    => trim((string)$bz['firma']) !== '' ? trim((string)$bz['firma']) : null,
-            'telefon' => trim((string)$bz['pikett_telefon']),
-        ];
-    }
-}
+// Ansprechpartner aus ZWEI Quellen (ENT-300): die Leute am Objekt ERGAENZEN
+// die des Kunden. Reihenfolge, Kennzeichnung und die Behandlung
+// objektweiter Kontaktwege stehen jetzt in rundgang_ansprechpartner()
+// (backend/rundgang.php) -- seit ENT-308 dieselbe Abfrage fuer Vorschau und
+// laufende Runde. Zwei Kopien waeren zwei Stellen, die beide stimmen
+// muessten.
+$ansprechpartner = rundgang_ansprechpartner($pdo, (int)$v['objekt_id'],
+    $v['kunde_id'] !== null ? (int)$v['kunde_id'] : null,
+    (string)$v['objekt_name'], $v['kunde_name']);
+$zentrale = rundgang_zentrale($pdo);
 
 json_response(['status' => 'ok',
     'vorlage' => [
