@@ -3169,6 +3169,107 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
   .ws-ort { margin-top: 0; }
 }
 
+
+/* ══ RUNDGANG-DETAILANSICHT (ENT-322) ═══════════════════════════════════
+   Aufbau nach den Hausregeln aus CLAUDE.md, Abschnitt "Gestaltung":
+
+   · Ueberschrift OBEN, Wert darunter -- in allen vier Kennzahlen dasselbe
+     Muster und dieselbe Schriftgroesse. Vier Bloecke nebeneinander, von
+     denen einer die Beschriftung unten traegt, wirken unruhig, ohne dass
+     man sagen kann warum.
+   · Luft ist Teil der Gestaltung: Kopf, Kennzahlenband und Zeitleiste sind
+     durch echte Abstaende getrennt, nicht durch Linien allein.
+   · Die Zeitleiste zeigt AUCH nicht besuchte Punkte. Ein Nachweis, in dem
+     das Fehlende fehlt, ist keiner -- und "nicht besucht" darf nie wie
+     "nicht vorhanden" aussehen (gleiche Familie wie: unbekannt ist nicht
+     keine). */
+.rgd-kopf { display: flex; align-items: flex-start; gap: 14px; }
+.rgd-kopf .titel { flex: 1; min-width: 0; }
+.rgd-kopf h2 { margin: 0 0 3px; font-size: 19px; letter-spacing: -.2px; }
+.rgd-kopf .unter { font-size: 13px; color: var(--ink-2); }
+
+/* Kennzahlenband. Beschriftung fein und versal OBEN, Wert gross darunter. */
+.rgd-band { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px;
+  background: var(--line); border: 1px solid var(--line); border-radius: var(--r);
+  overflow: hidden; margin: 20px 0 22px; }
+.rgd-band > div { background: var(--surface); padding: 12px 14px 13px; min-width: 0; }
+.rgd-band .l { font-size: 10.5px; font-weight: 640; letter-spacing: .6px;
+  text-transform: uppercase; color: var(--ink-3); margin-bottom: 7px; }
+.rgd-band .v { font-size: 21px; font-weight: 660; letter-spacing: -.4px;
+  color: var(--ink); line-height: 1.1; font-variant-numeric: tabular-nums; }
+.rgd-band .v .unit { font-size: 13px; font-weight: 560; color: var(--ink-3); letter-spacing: 0; }
+.rgd-band .f { font-size: 11.5px; color: var(--ink-3); margin-top: 5px; }
+
+.rgd-titel { font-size: 10.5px; font-weight: 640; letter-spacing: .6px;
+  text-transform: uppercase; color: var(--ink-3); margin: 0 0 10px; }
+
+/* Zeitleiste. Der senkrechte Faden ist ein Pseudoelement der Zeile, nicht
+   ein eigenes Element -- sonst muesste die letzte Zeile ihn abschneiden. */
+.rgd-leiste { position: relative; }
+.rgd-zeile { position: relative; display: grid; grid-template-columns: 54px 16px 1fr;
+  gap: 12px; padding: 0 0 16px; }
+.rgd-zeile:last-child { padding-bottom: 0; }
+.rgd-zeile .zeit { font-size: 13px; font-weight: 620; color: var(--ink);
+  font-variant-numeric: tabular-nums; text-align: right; padding-top: 1px; }
+.rgd-zeile.offen .zeit { color: var(--ink-3); font-weight: 560; }
+.rgd-zeile .faden { position: relative; }
+.rgd-zeile .faden::before { content: ''; position: absolute; left: 50%; top: 5px;
+  width: 10px; height: 10px; margin-left: -5px; border-radius: 50%;
+  background: var(--pos); box-shadow: 0 0 0 3px var(--pos-soft); }
+.rgd-zeile.warn .faden::before { background: var(--warn); box-shadow: 0 0 0 3px var(--warn-soft); }
+.rgd-zeile.offen .faden::before { background: var(--surface); border: 2px solid var(--line);
+  box-shadow: none; }
+.rgd-zeile:not(:last-child) .faden::after { content: ''; position: absolute; left: 50%;
+  top: 18px; bottom: -16px; width: 2px; margin-left: -1px; background: var(--line); }
+.rgd-zeile .inhalt { min-width: 0; }
+.rgd-zeile .name { font-size: 14px; font-weight: 600; color: var(--ink);
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.rgd-zeile.offen .name { color: var(--ink-2); }
+.rgd-zeile .text { font-size: 12.5px; color: var(--ink-2); margin-top: 4px; }
+.rgd-zeile .aufg { margin-top: 7px; display: grid; gap: 5px; }
+.rgd-zeile .aufg .a { display: flex; align-items: flex-start; gap: 8px; font-size: 12.5px;
+  color: var(--ink-2); }
+.rgd-zeile .aufg .a .chip { flex: none; margin-top: 1px; }
+
+.rgd-abschnitt { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--line-soft); }
+.rgd-ereignis { display: grid; grid-template-columns: 54px 1fr; gap: 12px;
+  padding: 9px 0; border-bottom: 1px solid var(--line-soft); font-size: 13px; }
+.rgd-ereignis:last-child { border-bottom: 0; }
+.rgd-ereignis .zeit { font-weight: 620; font-variant-numeric: tabular-nums; text-align: right; }
+.rgd-ereignis .art { font-weight: 600; }
+.rgd-ereignis .bem { color: var(--ink-2); margin-top: 2px; }
+
+#rgdKarte { height: min(46vh, 380px); border: 1px solid var(--line);
+  border-radius: var(--r); background: var(--surface-2); }
+
+/* Das Rapportblatt fuer das PDF. Es steht im Dokument, aber ausserhalb des
+   Bildes: html2pdf braucht ein WIRKLICH gerendertes Element -- ein Element
+   mit display:none hat keine Masse und ergibt eine leere Seite. Darum
+   absolut positioniert weit links statt versteckt. */
+#rapportBlatt { position: absolute; left: -10000px; top: 0; width: 720px;
+  background: #fff; color: #14161A; padding: 32px 36px;
+  font: 13px/1.5 -apple-system, 'Segoe UI', Arial, sans-serif; }
+#rapportBlatt h1 { margin: 0 0 4px; font-size: 20px; }
+#rapportBlatt .rb-unter { color: #545B67; font-size: 12.5px; margin-bottom: 20px; }
+#rapportBlatt table { width: 100%; border-collapse: collapse; }
+#rapportBlatt .rb-kopf td { padding: 3px 14px 3px 0; vertical-align: top; }
+#rapportBlatt .rb-kopf td.l { color: #545B67; white-space: nowrap; width: 130px; }
+#rapportBlatt h2 { font-size: 12px; letter-spacing: .6px; text-transform: uppercase;
+  color: #545B67; margin: 24px 0 8px; }
+#rapportBlatt .rb-liste th { text-align: left; font-size: 11px; text-transform: uppercase;
+  letter-spacing: .4px; color: #545B67; border-bottom: 1px solid #C9CDD4; padding: 0 8px 5px 0; }
+#rapportBlatt .rb-liste td { padding: 6px 8px 6px 0; border-bottom: 1px solid #E5E8EC;
+  vertical-align: top; }
+#rapportBlatt .rb-liste td.z { white-space: nowrap; width: 62px; }
+#rapportBlatt .rb-liste td.s { white-space: nowrap; width: 108px; }
+#rapportBlatt .rb-aufg { color: #545B67; font-size: 12px; margin-top: 3px; }
+#rapportBlatt .rb-fuss { margin-top: 26px; padding-top: 10px; border-top: 1px solid #C9CDD4;
+  color: #8B919D; font-size: 11px; }
+
+@media (max-width: 720px) {
+  .rgd-band { grid-template-columns: repeat(2, 1fr); }
+  .rgd-zeile { grid-template-columns: 46px 14px 1fr; gap: 9px; }
+}
 </style>
 <script src="gav.js"></script>
 <script src="zeitwahl.js"></script>
@@ -5884,25 +5985,68 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
      dauert zwei Stunden, eine Frühschicht endet mittags. Darum trägt jede
      Schicht ihre eigene Zeit. Derselbe Dialog bearbeitet auch mehrere
      angehakte Schichten auf einmal. -->
-<!-- Bewegungsspur einer Runde (ENT-318). Eigenes Fenster und nicht in der
-     Liste: Die Spur ist der heikelste Datenbestand des Werkzeugs und wird
-     erst geladen, wenn jemand sie fuer eine bestimmte Runde ausdruecklich
-     ansieht -- nicht nebenbei beim Oeffnen einer Monatsauswertung. -->
-<div class="dlg-scrim" id="dlgSpur">
-  <div class="dlg" style="max-width:760px;width:100%">
+<!-- Detailansicht einer Runde (ENT-322), gewachsen aus dem Spur-Fenster von
+     ENT-318. Bewusst EIN Fenster und nicht zwei nebeneinander: Der Weg ist
+     ein Teil dessen, was in der Runde geschah, kein eigenes Thema. Zwei
+     Fenster haetten dieselbe Nacht zweimal erzaehlt -- derselbe Grund, aus
+     dem die Aufgaben in ENT-305 an ihren Scan gebunden wurden.
+
+     Die Spur bleibt trotzdem ein eigener Ladevorgang hinter einem Knopf:
+     Sie ist der heikelste Datenbestand des Werkzeugs, und wer einen
+     Rapport ansieht, braucht nicht zwangslaeufig die Aufenthaltsdaten
+     dazu (Datensparsamkeit aus ENT-318, unveraendert). -->
+<div class="dlg-scrim" id="dlgRundgang">
+  <div class="dlg" style="max-width:820px;width:100%">
     <div class="dlg-hd">
-      <h2>Weg während der Runde</h2>
-      <p id="spurText"></p>
+      <div class="rgd-kopf">
+        <div class="titel">
+          <h2 id="rgdTitel">Rundgang</h2>
+          <div class="unter" id="rgdUnter"></div>
+        </div>
+        <span class="chip chip-n" id="rgdStatus" style="margin-top:3px"></span>
+      </div>
     </div>
-    <div class="dlg-bd">
-      <div id="spurKarte" style="height:min(58vh,460px);border:1px solid var(--line);border-radius:var(--r);background:var(--surface-2)"></div>
-      <p class="mut" id="spurHinweis" style="margin-top:10px;font-size:13px"></p>
-    </div>
+    <div class="dlg-bd" id="rgdBody"></div>
     <div class="dlg-ft">
-      <button class="btn btn-plain" onclick="spurZu()">Schliessen</button>
+      <button class="btn btn-plain" onclick="rgdZu()">Schliessen</button>
+      <div style="flex:1"></div>
+      <button class="btn btn-plain" id="rgdMailBtn" onclick="rgdMailOeffnen()">Per E-Mail senden</button>
+      <button class="btn btn-primary" id="rgdPdfBtn" onclick="rgdPdf()">Als PDF herunterladen</button>
     </div>
   </div>
 </div>
+
+<!-- Empfaengerabfrage fuer den Rapportversand (ENT-322). Eigener kleiner
+     Dialog statt eines prompt(): Die Adresse ist vorbelegt und muss
+     korrigierbar sein, und ein prompt() laesst sich nicht vorbelegen,
+     ohne dass es wie ein Fehler aussieht. -->
+<div class="dlg-scrim" id="dlgRapportMail">
+  <div class="dlg" style="max-width:460px">
+    <div class="dlg-hd">
+      <h2>Rapport per E-Mail senden</h2>
+      <p id="rmText"></p>
+    </div>
+    <div class="dlg-bd">
+      <div class="msg-err" id="rmErr" style="display:none"></div>
+      <div class="f">
+        <label for="rmEmpfaenger">Empfänger</label>
+        <input class="inp" id="rmEmpfaenger" type="email" placeholder="name@firma.ch" autocomplete="off">
+      </div>
+      <p class="note" id="rmHinweis" style="margin-top:10px"></p>
+    </div>
+    <div class="dlg-ft">
+      <button class="btn btn-plain" onclick="closeDlg('dlgRapportMail')">Abbrechen</button>
+      <div style="flex:1"></div>
+      <button class="btn btn-primary" id="rmBtn" onclick="rgdMailSenden()">Senden</button>
+    </div>
+  </div>
+</div>
+
+<!-- Das Blatt, aus dem das PDF entsteht (ENT-322). Es steht wirklich im
+     Dokument und ist nur aus dem Bild geschoben (siehe CSS): html2pdf
+     rastert das GERENDERTE Element -- ein display:none-Element hat keine
+     Masse und ergaebe eine leere Seite. -->
+<div id="rapportBlatt" aria-hidden="true"></div>
 
 <div class="dlg-scrim" id="dlgSchicht">
   <div class="dlg">
@@ -14054,8 +14198,11 @@ function renderLetzteRundgaenge(rundgaenge) {
     ziel.innerHTML = EMPTY('Noch nichts vorhanden', `In den letzten ${REVIERDIENST_LETZTE_TAGE} Tagen liegt kein Rundgang vor.`);
     return;
   }
+  // Die Zeile ist anklickbar und fuehrt in die Detailansicht (ENT-322).
+  // tabindex und Enter/Leertaste kommen mit: Eine Zeile, die nur die Maus
+  // oeffnen kann, ist fuer die Tastatur eine Sackgasse.
   ziel.innerHTML = `<table><thead><tr>
-      <th>Kunde</th><th>Bereich</th><th>Name</th><th>Datum</th><th>Zeit</th><th>Mitarbeiter</th><th>Status</th>
+      <th>Kunde</th><th>Bereich</th><th>Name</th><th>Datum</th><th>Zeit</th><th>Dauer</th><th>Mitarbeiter</th><th>Status</th>
     </tr></thead><tbody>` + rundgaenge.map(r => {
     const f = r.fortschritt || { gesamt: 0, bestaetigt: 0 };
     const gesamt = Number(f.gesamt), bestaetigt = Number(f.bestaetigt);
@@ -14064,12 +14211,23 @@ function renderLetzteRundgaenge(rundgaenge) {
     const voll = gesamt > 0 && bestaetigt >= gesamt;
     const pct = gesamt > 0 ? Math.round((bestaetigt / gesamt) * 100) : 0;
     const balkenKlasse = r.status === 'abgebrochen' ? 'pn-ueber_toleranz' : (voll ? 'pn-ok' : 'pn-nahe');
-    return `<tr>
+    // Die Dauer kommt fertig gerechnet aus dem Server (rundgang_dauer(),
+    // ENT-322) -- dieselbe Dreier-Regel, nach der auch die App rechnet
+    // (ENT-321). Zwei Rechnungen an zwei Orten laufen auseinander.
+    const dauer = rgdDauerText(r.dauer);
+    // "läuft" ist keine Zahl und bekommt darum auch keine Einheit --
+    // "läuft h" waere Unsinn.
+    const dauerZelle = dauer === 'läuft'
+      ? '<span style="color:var(--ink-3)">läuft</span>'
+      : (dauer === '–' ? '<span style="color:var(--ink-3)">–</span>' : esc(dauer) + ' h');
+    return `<tr class="klickbar" tabindex="0" onclick="rgdZeigen(${Number(r.id)})"
+        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();rgdZeigen(${Number(r.id)});}">
         <td class="nowrap">${esc(r.kunde_name)}</td>
         <td class="nowrap">${esc(r.objekt_name)}</td>
         <td>${r.titel ? esc(r.titel) : '<span style="color:var(--ink-3)">–</span>'}</td>
         <td class="nowrap">${dmy(r.datum)}</td>
         <td class="nowrap num">${esc(start)}</td>
+        <td class="nowrap num">${dauerZelle}</td>
         <td class="nowrap">${esc(person)}</td>
         <td style="min-width:110px">
           ${r.status === 'abgebrochen' ? '<span class="chip chip-n">Abgebrochen</span>' : ''}
@@ -14202,39 +14360,194 @@ const AE_AUFGABE_STATUS = {
 // gemessen blieben fuenf Spalten ohne jeden Hinweis auf noetiges seitliches
 // Scrollen unsichtbar. Gleiches Kartenmuster (".ag-karte") wie im Abgleich
 // und in der Einsatzliste, dort aus demselben Grund fuer schmale Flaechen.
-/* ══ Bewegungsspur einer Runde (ENT-318) ══════════════════════════════
-   Revidiert ENT-131, vom Projektinhaber entschieden.
+/* ══ RUNDGANG-DETAILANSICHT (ENT-322) ═════════════════════════════════
+   Gewachsen aus dem Spur-Fenster von ENT-318, das ENT-131 revidierte.
 
-   Die Spur wird EINZELN geladen, nicht mit der Auswertung mitgeliefert:
-   Wer einen Monat oeffnet, bekommt nicht nebenbei die Aufenthaltsdaten
-   aller Mitarbeitenden. Das ist keine Sparsamkeit an der Leitung, sondern
-   an der Sache -- ein Datenbestand, den man nur sieht, wenn man ihn
+   Der Weg wird weiterhin EINZELN geladen und erst auf Knopfdruck: Wer
+   einen Rapport ansieht, bekommt nicht nebenbei die Aufenthaltsdaten des
+   Mitarbeitenden. Das ist keine Sparsamkeit an der Leitung, sondern an
+   der Sache -- ein Datenbestand, den man nur sieht, wenn man ihn
    ausdruecklich sehen will, wird auch nur dann angesehen. */
-let spurKarte = null, spurLinie = null, spurMarken = [];
+let rgdKarte = null, rgdLinie = null, rgdMarken = [], rgdDaten = null;
 
-function spurZu() {
-  $('dlgSpur').classList.remove('on');
-  // Die Karte wird nicht behalten: Sonst haengt die Spur der letzten
-  // angesehenen Runde im Speicher, bis jemand die Seite neu laedt.
-  spurLinie = null; spurMarken = []; spurKarte = null;
-  $('spurKarte').innerHTML = '';
+const RGD_STATUS = {
+  vorbereitet:   ['chip-n', 'Vorbereitet'],
+  laeuft:        ['chip-a', 'Läuft'],
+  pausiert:      ['chip-w', 'Pausiert'],
+  abgeschlossen: ['chip-p', 'Abgeschlossen'],
+  abgebrochen:   ['chip-x', 'Abgebrochen'],
+};
+
+/* Dauer als Text. EINE Stelle, obwohl sie an vier Orten gebraucht wird
+   (Liste, Kennzahlenband, Rapportblatt, Mailtext): Vier Schreibweisen
+   derselben Zahl waeren vier Gelegenheiten, sie verschieden zu runden.
+   Gerechnet wird sie ohnehin nicht hier, sondern im Server
+   (rundgang_dauer() in backend/rundgang.php) -- diese Funktion formatiert
+   nur. */
+function rgdDauerText(dauer) {
+  if (!dauer) { return '–'; }
+  // Drei verschiedene Aussagen, drei verschiedene Texte: "läuft noch" ist
+  // etwas anderes als "keine Zeit erfasst", und beides etwas anderes als
+  // eine Dauer von null.
+  if (dauer.sekunden === null || dauer.sekunden === undefined) {
+    return dauer.quelle === 'laeuft' ? 'läuft' : '–';
+  }
+  const std = Math.floor(dauer.sekunden / 3600);
+  const min = Math.floor(dauer.sekunden / 60) % 60;
+  return std + ':' + String(min).padStart(2, '0');
 }
 
-function spurZeigen(rundgangId, beschriftung) {
-  $('dlgSpur').classList.add('on');
-  $('spurText').textContent = beschriftung || '';
-  $('spurHinweis').textContent = '';
-  $('spurKarte').innerHTML = '<div class="mut" style="padding:22px;text-align:center">Wird geladen …</div>';
-  api('rundgang_spur.php?rundgang_id=' + Number(rundgangId)).then(({ ok, data }) => {
+function rgdZu() {
+  $('dlgRundgang').classList.remove('on');
+  // Die Karte wird nicht behalten: Sonst haengt die Spur der zuletzt
+  // angesehenen Runde im Speicher, bis jemand die Seite neu laedt.
+  rgdLinie = null; rgdMarken = []; rgdKarte = null; rgdDaten = null;
+}
+
+function rgdZeigen(rundgangId) {
+  openDlg('dlgRundgang');
+  rgdDaten = null;
+  $('rgdTitel').textContent = 'Rundgang';
+  $('rgdUnter').textContent = '';
+  $('rgdStatus').textContent = '';
+  $('rgdStatus').className = 'chip chip-n';
+  $('rgdPdfBtn').disabled = true;
+  $('rgdMailBtn').disabled = true;
+  $('rgdBody').innerHTML = '<div class="sk" style="height:96px"></div>';
+  api('rundgang_detail.php?rundgang_id=' + Number(rundgangId)).then(({ ok, data }) => {
+    if (!$('dlgRundgang').classList.contains('on')) { return; }   // inzwischen geschlossen
+    if (!ok || !data || data.status !== 'ok' || !data.rundgang) {
+      $('rgdBody').innerHTML = EMPTY('Rundgang nicht verfügbar',
+        'Die Angaben zu dieser Runde konnten nicht geladen werden.');
+      return;
+    }
+    rgdDaten = data.rundgang;
+    rgdZeichnen(rgdDaten);
+  });
+}
+
+function rgdZeichnen(d) {
+  const person = [d.vorname, d.nachname].filter(Boolean).join(' ') || 'Ohne Namen';
+  $('rgdTitel').textContent = d.objekt_name || 'Objekt';
+  // "Nicht hinterlegt" statt einer leeren Stelle -- unbekannt darf nie wie
+  // keine aussehen.
+  $('rgdUnter').textContent = [d.kunde_name, d.vorlage_name || 'Alle Kontrollpunkte',
+    dmy(d.datum), person].filter(Boolean).join(' · ');
+  const [sk, st] = RGD_STATUS[d.status] || ['chip-n', d.status];
+  $('rgdStatus').className = 'chip ' + sk;
+  $('rgdStatus').textContent = st;
+  $('rgdPdfBtn').disabled = false;
+  $('rgdMailBtn').disabled = false;
+
+  const f = d.fortschritt || { gesamt: 0, bestaetigt: 0 };
+  const gesamt = Number(f.gesamt), bestaetigt = Number(f.bestaetigt);
+  const zeit = w => (w ? String(w).slice(11, 16) : '–');
+  // Die Endzeit kommt aus derselben Dreier-Regel wie die Dauer: Steht kein
+  // rohzeit_ende, aber die Runde ist beendet, gilt der letzte Scan
+  // (ENT-321). Sonst zeigte eine abgeschlossene Runde "Ende –", obwohl das
+  // Ende bekannt ist.
+  const endeRoh = d.rohzeit_ende || (d.dauer && d.dauer.quelle === 'letzter_scan' ? d.letzter_scan : null);
+  const pause = Number(d.pause_minuten || 0);
+
+  // Kennzahlenband: vier Bloecke, alle nach demselben Muster --
+  // Beschriftung oben, Wert darunter (Hausregel Gestaltung).
+  const band = [
+    { l: 'Start', v: zeit(d.rohzeit_start), f: dmy(d.datum) },
+    { l: 'Ende', v: zeit(endeRoh),
+      f: endeRoh ? '' : (d.dauer && d.dauer.quelle === 'laeuft' ? 'läuft noch' : 'nicht erfasst') },
+    { l: 'Dauer', v: rgdDauerText(d.dauer) + '<span class="unit"> h</span>',
+      f: pause > 0 ? nf(pause) + ' Min. Pause abgezogen' : '' },
+    // Zwei Einheiten nie unter einer Ueberschrift: Hier stehen Punkte, und
+    // zwar beide Zahlen ausgeschrieben, damit "9" nicht wie die Gesamtzahl
+    // aussieht.
+    { l: 'Kontrollpunkte', v: nf(bestaetigt) + '<span class="unit"> / ' + nf(gesamt) + '</span>',
+      f: gesamt > 0 ? nf(Math.round((bestaetigt / gesamt) * 100)) + ' % bestätigt' : 'keine hinterlegt' },
+  ];
+
+  const punkte = d.kontrollpunkte || [];
+  const ereignisse = d.ereignisse || [];
+  $('rgdBody').innerHTML =
+    (d.status === 'abgebrochen' ? rgdAbbruchHtml(d) : '')
+    + '<div class="rgd-band">' + band.map(b => '<div>'
+      + '<div class="l">' + esc(b.l) + '</div>'
+      + '<div class="v">' + b.v + '</div>'
+      + (b.f ? '<div class="f">' + esc(b.f) + '</div>' : '')
+      + '</div>').join('') + '</div>'
+    + '<p class="rgd-titel">Verlauf</p>'
+    + (punkte.length ? '<div class="rgd-leiste">' + punkte.map(rgdZeileHtml).join('') + '</div>'
+      : '<p class="mut" style="font-size:13px">Für diese Runde sind keine Kontrollpunkte hinterlegt.</p>')
+    + (ereignisse.length ? '<div class="rgd-abschnitt"><p class="rgd-titel">Ereignisse</p>'
+      + ereignisse.map(rgdEreignisHtml).join('') + '</div>' : '')
+    + '<div class="rgd-abschnitt"><p class="rgd-titel">Weg während der Runde</p>'
+      + '<div id="rgdWegHuelle"><button class="btn btn-plain btn-sm" onclick="rgdWegZeigen()">'
+      + 'Weg auf der Karte anzeigen</button>'
+      + '<p class="mut" style="margin-top:8px;font-size:12.5px">Die Bewegungsdaten werden erst auf '
+      + 'diesen Knopf hin geladen und für 90 Tage aufbewahrt.</p></div></div>';
+}
+
+// Ein Abbruch ist die wichtigste Aussage ueber eine Runde -- er steht oben,
+// nicht als Fussnote.
+function rgdAbbruchHtml(d) {
+  const grund = [d.abbruch_grund, d.abbruch_freitext].filter(Boolean).join(' — ');
+  return '<div class="msg-warn" style="display:block;margin-bottom:4px">Diese Runde wurde abgebrochen.'
+    + (grund ? ' ' + esc(grund) : '') + '</div>';
+}
+
+function rgdZeileHtml(k) {
+  const e = k.erledigt;
+  // Drei Zustaende, drei Darstellungen. Der dritte ist der wichtige: Ein
+  // nicht besuchter Punkt MUSS in der Liste stehen und als solcher zu
+  // erkennen sein -- ein Nachweis, in dem das Fehlende fehlt, ist keiner.
+  let klasse = 'offen', chip = '<span class="chip chip-n">Nicht besucht</span>', zeit = '–';
+  if (e) {
+    const [sk, st] = AE_SCAN_STATUS[e.status] || ['chip-n', e.status];
+    klasse = e.status === 'bestaetigt' ? '' : 'warn';
+    chip = '<span class="chip ' + sk + '">' + esc(st) + '</span>';
+    zeit = String(e.erfasst_am).slice(11, 16);
+  }
+  const aufgaben = (k.aufgaben || []).map(a => {
+    const [ak, at] = a.erledigt
+      ? (AE_AUFGABE_STATUS[a.erledigt.status] || ['chip-n', a.erledigt.status])
+      : AE_AUFGABE_STATUS.unbeantwortet;
+    const grund = a.erledigt && a.erledigt.grund ? ' — ' + a.erledigt.grund : '';
+    return '<div class="a"><span class="chip ' + ak + '">' + esc(at) + '</span>'
+      + '<span>' + esc(a.bezeichnung) + esc(grund) + '</span></div>';
+  }).join('');
+  return '<div class="rgd-zeile ' + klasse + '">'
+    + '<div class="zeit">' + esc(zeit) + '</div>'
+    + '<div class="faden"></div>'
+    + '<div class="inhalt">'
+      + '<div class="name">' + esc(k.bezeichnung) + chip
+      + (e && e.hat_foto ? '<span class="chip chip-n">Foto</span>' : '') + '</div>'
+      + (e && e.beschreibung ? '<div class="text">' + esc(e.beschreibung) + '</div>' : '')
+      + (aufgaben ? '<div class="aufg">' + aufgaben + '</div>' : '')
+    + '</div></div>';
+}
+
+function rgdEreignisHtml(e) {
+  return '<div class="rgd-ereignis">'
+    + '<div class="zeit">' + esc(String(e.erfasst_am).slice(11, 16)) + '</div>'
+    + '<div><div class="art">' + esc(e.art || 'Ohne Art') + '</div>'
+    + (e.bemerkung ? '<div class="bem">' + esc(e.bemerkung) + '</div>' : '')
+    + (e.hat_foto ? '<div class="bem">Mit Foto</div>' : '')
+    + '</div></div>';
+}
+
+function rgdWegZeigen() {
+  const huelle = $('rgdWegHuelle');
+  if (!huelle || !rgdDaten) { return; }
+  huelle.innerHTML = '<div class="mut" style="padding:22px;text-align:center">Wird geladen …</div>';
+  api('rundgang_spur.php?rundgang_id=' + Number(rgdDaten.id)).then(({ ok, data }) => {
+    if (!$('dlgRundgang').classList.contains('on')) { return; }
     if (!ok || !data || data.status !== 'ok') {
-      $('spurKarte').innerHTML = '<div class="mut" style="padding:22px;text-align:center">Der Weg liess sich nicht laden.</div>';
+      huelle.innerHTML = '<div class="mut" style="padding:22px;text-align:center">Der Weg liess sich nicht laden.</div>';
       return;
     }
     // Drei verschiedene Aussagen, drei verschiedene Texte -- sie sehen
     // sonst alle gleich aus wie "es gibt nichts":
     //   nicht eingerichtet · Runde vor der Ortung gelaufen · nichts erfasst
     if (data.eingerichtet === false) {
-      $('spurKarte').innerHTML = '<div class="mut" style="padding:22px;text-align:center">'
+      huelle.innerHTML = '<div class="mut" style="padding:22px;text-align:center">'
         + 'Wege werden noch nicht aufgezeichnet — dazu einmal „Einrichtung" ausführen.</div>';
       return;
     }
@@ -14243,50 +14556,236 @@ function spurZeigen(rundgangId, beschriftung) {
       gen: p.genauigkeit_m == null ? null : Number(p.genauigkeit_m), am: p.erfasst_am,
     })).filter(p => isFinite(p.lat) && isFinite(p.lng));
     if (!punkte.length) {
-      $('spurKarte').innerHTML = '<div class="mut" style="padding:22px;text-align:center">'
+      huelle.innerHTML = '<div class="mut" style="padding:22px;text-align:center">'
         + 'Für diese Runde ist kein Weg aufgezeichnet.<br>'
         + '<span style="font-size:13px">Entweder lief sie vor der Aufzeichnung, oder das Gerät hatte keinen Standort.</span></div>';
       return;
     }
-    $('spurKarte').innerHTML = '';
-    spurKarteBauen(punkte);
+    huelle.innerHTML = '<div id="rgdKarte"></div><p class="mut" id="rgdWegText" style="margin-top:9px;font-size:12.5px"></p>';
+    rgdKarteBauen(punkte);
   });
 }
 
-function spurKarteBauen(punkte) {
+function rgdKarteBauen(punkte) {
   googleMapsLaden().then(() => {
-    if (!$('dlgSpur').classList.contains('on')) { return; }   // inzwischen geschlossen
-    spurKarte = new google.maps.Map($('spurKarte'), {
+    if (!$('dlgRundgang').classList.contains('on') || !$('rgdKarte')) { return; }
+    rgdKarte = new google.maps.Map($('rgdKarte'), {
       center: punkte[0], zoom: 17,
       streetViewControl: false, mapTypeControl: false, fullscreenControl: false,
     });
-    spurLinie = new google.maps.Polyline({
-      map: spurKarte, path: punkte.map(p => ({ lat: p.lat, lng: p.lng })),
+    rgdLinie = new google.maps.Polyline({
+      map: rgdKarte, path: punkte.map(p => ({ lat: p.lat, lng: p.lng })),
       strokeColor: '#7098F7', strokeOpacity: 0.9, strokeWeight: 3,
     });
     // Anfang und Ende markieren -- eine Linie allein sagt nicht, in welche
     // Richtung gelaufen wurde.
     const marke = (p, farbe, titel) => new google.maps.Marker({
-      map: spurKarte, position: { lat: p.lat, lng: p.lng }, title: titel,
+      map: rgdKarte, position: { lat: p.lat, lng: p.lng }, title: titel,
       icon: { path: google.maps.SymbolPath.CIRCLE, scale: 7, fillColor: farbe,
         fillOpacity: 1, strokeColor: '#FFFFFF', strokeWeight: 2 },
     });
-    spurMarken = [marke(punkte[0], '#4FCE96', 'Anfang: ' + punkte[0].am),
+    rgdMarken = [marke(punkte[0], '#4FCE96', 'Anfang: ' + punkte[0].am),
       marke(punkte[punkte.length - 1], '#E2B156', 'Ende: ' + punkte[punkte.length - 1].am)];
     const g = new google.maps.LatLngBounds();
     punkte.forEach(p => g.extend({ lat: p.lat, lng: p.lng }));
-    spurKarte.fitBounds(g, 40);
+    rgdKarte.fitBounds(g, 40);
     // Die Genauigkeit gehoert dazu: Ein Punkt mit 80 m Streuung sieht auf
     // der Karte genauso scharf aus wie einer mit 5 m. Wer das nicht weiss,
     // zieht Schluesse, die die Messung nicht hergibt.
     const gen = punkte.map(p => p.gen).filter(x => x != null);
     const schnitt = gen.length ? Math.round(gen.reduce((a, b) => a + b, 0) / gen.length) : null;
-    $('spurHinweis').textContent = punkte.length + ' Messpunkte'
+    $('rgdWegText').textContent = punkte.length + ' Messpunkte'
       + (schnitt !== null ? ' · Genauigkeit im Schnitt ± ' + schnitt + ' m' : '')
       + ' · aufbewahrt für 90 Tage';
   }).catch(() => {
-    $('spurKarte').innerHTML = '<div class="mut" style="padding:22px;text-align:center">'
-      + 'Die Karte liess sich nicht laden.</div>';
+    const h = $('rgdWegHuelle');
+    if (h) { h.innerHTML = '<div class="mut" style="padding:22px;text-align:center">Die Karte liess sich nicht laden.</div>'; }
+  });
+}
+
+/* ══ RAPPORT ALS PDF (ENT-322) ════════════════════════════════════════
+   Das PDF entsteht aus einem EIGENEN Blatt, nicht aus dem Dialog selbst:
+   Der Dialog traegt Knoepfe, eine Karte und Rollbalken; ein Abzug davon
+   waere ein Bildschirmfoto, kein Rapport. Das Blatt bekommt dieselben
+   Daten, aber die Form eines Dokuments.
+
+   Ohne Karte -- Entscheid des Projektinhabers zu ENT-322. Zwei Gruende
+   trugen ihn: html2pdf rastert ueber html2canvas, und Google-Maps-Kacheln
+   sind fremder Herkunft und kaemen leer heraus (ein Kartenbild braeuchte
+   die separat abgerechnete Static Maps API); und ein Bewegungsweg im
+   Rapport an den Kunden gaebe diesem Aufenthaltsdaten des Mitarbeitenden,
+   die er zur Leistungskontrolle nicht braucht. */
+function rapportBlattFuellen(d) {
+  const person = [d.vorname, d.nachname].filter(Boolean).join(' ') || 'Ohne Namen';
+  const zeit = w => (w ? String(w).slice(11, 16) : '–');
+  const endeRoh = d.rohzeit_ende || (d.dauer && d.dauer.quelle === 'letzter_scan' ? d.letzter_scan : null);
+  const f = d.fortschritt || { gesamt: 0, bestaetigt: 0 };
+  const adresse = [d.strasse, d.ort].filter(Boolean).join(', ');
+  const [, st] = RGD_STATUS[d.status] || ['', d.status];
+
+  const kopf = [
+    ['Kunde', d.kunde_name || '–'],
+    ['Objekt', d.objekt_name + (adresse ? ', ' + adresse : '')],
+    ['Kontrollrunde', d.vorlage_name || 'Alle Kontrollpunkte des Objekts'],
+    ['Mitarbeiter', person],
+    ['Datum', dmy(d.datum)],
+    ['Beginn / Ende', zeit(d.rohzeit_start) + ' – ' + zeit(endeRoh)],
+    ['Dauer', rgdDauerText(d.dauer) + ' h'
+      + (Number(d.pause_minuten || 0) > 0 ? ' (ohne ' + nf(d.pause_minuten) + ' Min. Pause)' : '')],
+    ['Kontrollpunkte', nf(Number(f.bestaetigt)) + ' von ' + nf(Number(f.gesamt)) + ' bestätigt'],
+    ['Status', st],
+  ];
+  if (d.status === 'abgebrochen') {
+    kopf.push(['Abbruchgrund', [d.abbruch_grund, d.abbruch_freitext].filter(Boolean).join(' — ') || '–']);
+  }
+
+  const zeilen = (d.kontrollpunkte || []).map(k => {
+    const e = k.erledigt;
+    const stTxt = e ? (AE_SCAN_STATUS[e.status] || ['', e.status])[1] : 'Nicht besucht';
+    const aufg = (k.aufgaben || []).map(a => {
+      const at = a.erledigt ? (AE_AUFGABE_STATUS[a.erledigt.status] || ['', a.erledigt.status])[1]
+        : AE_AUFGABE_STATUS.unbeantwortet[1];
+      const grund = a.erledigt && a.erledigt.grund ? ' — ' + a.erledigt.grund : '';
+      return esc(a.bezeichnung) + ': ' + esc(at) + esc(grund);
+    }).join('<br>');
+    return '<tr><td class="z">' + esc(e ? String(e.erfasst_am).slice(11, 16) : '–') + '</td>'
+      + '<td>' + esc(k.bezeichnung)
+      + (e && e.beschreibung ? '<div class="rb-aufg">' + esc(e.beschreibung) + '</div>' : '')
+      + (aufg ? '<div class="rb-aufg">' + aufg + '</div>' : '') + '</td>'
+      + '<td class="s">' + esc(stTxt) + '</td></tr>';
+  }).join('');
+
+  const ereignisse = (d.ereignisse || []).map(e =>
+    '<tr><td class="z">' + esc(String(e.erfasst_am).slice(11, 16)) + '</td>'
+    + '<td>' + esc(e.art || 'Ohne Art')
+    + (e.bemerkung ? '<div class="rb-aufg">' + esc(e.bemerkung) + '</div>' : '')
+    + (e.hat_foto ? '<div class="rb-aufg">Mit Foto</div>' : '') + '</td></tr>').join('');
+
+  $('rapportBlatt').innerHTML =
+    '<h1>Rundgang-Rapport</h1>'
+    + '<div class="rb-unter">' + esc(d.objekt_name || '') + ' · ' + esc(dmy(d.datum)) + '</div>'
+    + '<table class="rb-kopf">' + kopf.map(z =>
+      '<tr><td class="l">' + esc(z[0]) + '</td><td>' + esc(z[1]) + '</td></tr>').join('') + '</table>'
+    + '<h2>Kontrollpunkte</h2>'
+    + (zeilen
+      ? '<table class="rb-liste"><thead><tr><th>Zeit</th><th>Kontrollpunkt</th><th>Status</th></tr></thead>'
+        + '<tbody>' + zeilen + '</tbody></table>'
+      : '<p>Für diese Runde sind keine Kontrollpunkte hinterlegt.</p>')
+    // Ein leerer Ereignisteil steht ausdruecklich da: "keine Ereignisse" ist
+    // eine Aussage, ein fehlender Abschnitt keine.
+    + '<h2>Ereignisse</h2>'
+    + (ereignisse
+      ? '<table class="rb-liste"><tbody>' + ereignisse + '</tbody></table>'
+      : '<p>Während dieser Runde wurde kein Ereignis gemeldet.</p>')
+    + '<div class="rb-fuss">Erstellt am ' + esc(dmy(isoTag())) + '. '
+    + 'Die Zeiten stammen aus den Erfassungen des Geräts; abweichende Übermittlungszeiten '
+    + 'ändern sie nicht.</div>';
+}
+
+// html2pdf.js wird erst BEIM KLICK nachgeladen (946 KB) -- gleiches Muster
+// wie in beleg_oeffentlich.php (ENT-206). Ein <script>-Tag im Kopf haette
+// jeden Aufruf des Dashboards um diese Menge verteuert, fuer eine Funktion,
+// die die meisten Sitzungen nie brauchen.
+let html2pdfVersprechen = null;
+function html2pdfLaden() {
+  if (html2pdfVersprechen) { return html2pdfVersprechen; }
+  html2pdfVersprechen = new Promise((resolve, reject) => {
+    if (typeof html2pdf !== 'undefined') { resolve(); return; }
+    const skript = document.createElement('script');
+    skript.src = 'html2pdf.bundle.min.js';
+    skript.onload = () => (typeof html2pdf !== 'undefined'
+      ? resolve() : reject(new Error('html2pdf nicht geladen')));
+    skript.onerror = () => reject(new Error('html2pdf konnte nicht geladen werden.'));
+    document.head.appendChild(skript);
+  });
+  return html2pdfVersprechen;
+}
+
+function rapportDateiname(d) {
+  const teil = String(d.objekt_name || 'Rundgang').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return 'Rapport-' + (teil || 'Rundgang') + '-' + String(d.datum).slice(0, 10) + '.pdf';
+}
+
+// Erzeugt das PDF und gibt es als Blob zurueck. EINE Stelle fuer beide
+// Wege (Herunterladen und Versenden) -- zwei Erzeugungen waeren zwei
+// Gelegenheiten, verschiedene Rapporte zu erzeugen.
+function rapportPdfBauen(d) {
+  return html2pdfLaden().then(() => {
+    rapportBlattFuellen(d);
+    return html2pdf().set({
+      margin: 10,
+      image: { type: 'jpeg', quality: 0.95 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['css', 'legacy'] },
+    }).from($('rapportBlatt')).outputPdf('blob');
+  });
+}
+
+function rgdPdf() {
+  if (!rgdDaten) { return; }
+  const btn = $('rgdPdfBtn'), alt = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Wird erstellt …';
+  rapportPdfBauen(rgdDaten).then(blob => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = rapportDateiname(rgdDaten);
+    document.body.appendChild(a); a.click(); a.remove();
+    // Erst freigeben, wenn der Browser die Datei geholt hat.
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    btn.disabled = false; btn.textContent = alt;
+  }).catch(() => {
+    btn.disabled = false; btn.textContent = alt;
+    toast('Der Rapport liess sich nicht erzeugen.');
+  });
+}
+
+function rgdMailOeffnen() {
+  if (!rgdDaten) { return; }
+  $('rmErr').style.display = 'none';
+  $('rmText').textContent = (rgdDaten.objekt_name || '') + ' · ' + dmy(rgdDaten.datum);
+  // Vorbelegt mit der hinterlegten Kundenadresse, aber frei aenderbar: Ein
+  // Rapport geht mal an den Kunden, mal an die eigene Leitung.
+  $('rmEmpfaenger').value = rgdDaten.kunde_email || '';
+  $('rmHinweis').textContent = rgdDaten.kunde_email
+    ? 'Vorbelegt mit der Haupt-E-Mail des Kunden. Der Rapport geht als PDF im Anhang.'
+    : 'Für diesen Kunden ist keine E-Mail hinterlegt. Der Rapport geht als PDF im Anhang.';
+  openDlg('dlgRapportMail');
+}
+
+function rgdMailSenden() {
+  if (!rgdDaten) { return; }
+  const empfaenger = $('rmEmpfaenger').value.trim();
+  const err = $('rmErr');
+  err.style.display = 'none';
+  // Die gleiche Pruefung steht im Server (ENT-322) -- hier nur, damit der
+  // Fehler ohne Umweg sichtbar wird. Eine Sperre gehoert in den Server,
+  // nicht nur in die Oberflaeche.
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(empfaenger)) {
+    err.textContent = 'Bitte eine gültige E-Mail-Adresse angeben.';
+    err.style.display = ''; return;
+  }
+  const btn = $('rmBtn'), alt = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Wird gesendet …';
+  rapportPdfBauen(rgdDaten).then(blob => new Promise((resolve, reject) => {
+    const leser = new FileReader();
+    leser.onload = () => resolve(String(leser.result).split(',')[1] || '');
+    leser.onerror = () => reject(new Error('Der Rapport liess sich nicht lesen.'));
+    leser.readAsDataURL(blob);
+  })).then(base64 => api('rundgang_rapport_versenden.php', { method: 'POST', body: {
+    rundgang_id: Number(rgdDaten.id), empfaenger, pdf: base64,
+  } })).then(({ ok, data }) => {
+    btn.disabled = false; btn.textContent = alt;
+    if (!ok || !data || data.status !== 'ok') {
+      err.textContent = (data && data.message) || 'Der Versand ist fehlgeschlagen.';
+      err.style.display = ''; return;
+    }
+    closeDlg('dlgRapportMail');
+    toast('Rapport an ' + empfaenger + ' gesendet.');
+  }).catch(() => {
+    btn.disabled = false; btn.textContent = alt;
+    err.textContent = 'Der Rapport liess sich nicht erzeugen.';
+    err.style.display = '';
   });
 }
 
@@ -14333,7 +14832,7 @@ function aeZeichneScans(scans, aufgaben, offene) {
         ${s.beschreibung ? `<div class="zeiten">${esc(s.beschreibung)}</div>` : ''}
         ${aeAufgabenZeilen(aufgNach[(s.kontrollpunkt_name || '') + '|' + datum], zugeordnet)}
         ${s.rundgang_id ? `<button class="btn btn-plain btn-sm" style="margin-top:10px"
-          onclick="spurZeigen(${Number(s.rundgang_id)}, '${esc(s.objekt_name)} · ${dmy(datum)}')">Weg anzeigen</button>` : ''}
+          onclick="rgdZeigen(${Number(s.rundgang_id)})">Rundgang ansehen</button>` : ''}
       </div>`;
   }).join('')
   // Antworten, zu denen im Zeitraum kein Scan steht (z.B. der Scan liegt am

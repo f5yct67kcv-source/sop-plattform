@@ -125,10 +125,17 @@ check('Die Drosselung ist mit nachvollziehbaren Werten gesetzt',
 // ══════════ DASHBOARD: DIE ANZEIGE ════════════════════════════════════
 await page.goto(`file://${WURZEL}/dashboard.html`);
 await page.waitForTimeout(400);
-check('KRITISCH: es gibt ein Fenster für den Weg',
-  await page.evaluate(() => !!document.getElementById('dlgSpur')));
+// Seit ENT-322 ist das Spur-Fenster in die Rundgang-Detailansicht
+// aufgegangen -- ein Fenster statt zwei, der Weg ist ein Teil dessen, was
+// in der Runde geschah. Die Datensparsamkeit von ENT-318 bleibt: Er wird
+// erst auf Knopfdruck geladen, nicht mit der Ansicht.
+check('KRITISCH: es gibt ein Fenster, in dem der Weg gezeigt wird',
+  await page.evaluate(() => !!document.getElementById('dlgRundgang')));
 check('Das Fenster ist geschlossen, solange niemand es öffnet',
-  await page.evaluate(() => !document.getElementById('dlgSpur').classList.contains('on')));
+  await page.evaluate(() => !document.getElementById('dlgRundgang').classList.contains('on')));
+check('KRITISCH: der Weg wird NICHT mit der Ansicht geladen, sondern erst auf Knopfdruck',
+  /rgdWegHuelle[\s\S]{0,300}onclick="rgdWegZeigen\(\)"/.test(DASH)
+  && /function rgdWegZeigen\(\)[\s\S]{0,400}rundgang_spur\.php/.test(DASH));
 // Drei verschiedene Aussagen, drei verschiedene Texte -- sie sehen sonst
 // alle gleich aus wie "es gibt nichts".
 check('KRITISCH: "nicht eingerichtet", "kein Weg" und "Ladefehler" sind drei verschiedene Texte',
@@ -143,7 +150,7 @@ check('Die Aufbewahrungsfrist steht dort, wo die Spur angesehen wird',
 check('Anfang und Ende sind markiert, nicht nur die Linie',
   /'Anfang: '/.test(DASH) && /'Ende: '/.test(DASH));
 check('Beim Schliessen bleibt die Spur nicht im Speicher liegen',
-  /function spurZu\(\)[\s\S]{0,300}spurKarte = null/.test(DASH));
+  /function rgdZu\(\)[\s\S]{0,300}rgdKarte = null/.test(DASH));
 await page.screenshot({ path: `${OUT}/spur-01-dashboard.png` });
 
 await browser.close();

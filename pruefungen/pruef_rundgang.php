@@ -236,5 +236,60 @@ pruef('Ein Fenster ueber Mitternacht lehnt eine Uhrzeit kurz nach Fensterende ab
 pruef('Eine Uhrzeit mit Sekunden (HH:MM:SS, wie sie MySQL TIME liefert) wird gleich ausgewertet wie ohne',
     rundgang_im_fenster('22:00:30', '21:00', '23:00', 5) === true);
 
+// ══════════════ DAUER EINER RUNDE (ENT-322)
+// Die Regel, nach der die Endzeit bestimmt wird, ist der eigentliche Inhalt:
+// Der Projektinhaber hat im Feld erlebt, dass eine abgeschlossene Runde
+// weiterzaehlte (ENT-321). Dieselbe Reihenfolge rechnet die App; hier
+// laeuft sie wirklich.
+$d = rundgang_dauer('2026-09-01 22:00:00', '2026-09-01 23:30:00', null, 0, 'abgeschlossen');
+pruef('KRITISCH: liegt rohzeit_ende vor, gilt es', $d['sekunden'] === 5400 && $d['quelle'] === 'rohzeit_ende');
+
+// Der Fall aus ENT-321: Runde beendet, aber der Server hat nie ein Ende
+// vermerkt. Ohne diesen Zweig stuende in der Liste dauerhaft "-".
+$d = rundgang_dauer('2026-09-01 22:00:00', null, '2026-09-01 22:45:00', 0, 'abgeschlossen');
+pruef('KRITISCH: ohne rohzeit_ende gilt bei beendeter Runde der letzte Scan',
+    $d['sekunden'] === 2700 && $d['quelle'] === 'letzter_scan');
+
+// Und die Gegenprobe dazu: Eine LAUFENDE Runde ist nicht deshalb fertig,
+// weil gerade nichts Neues ankam. Wuerde hier der letzte Scan gelten,
+// stuende in der Liste eine Dauer, die mit jedem Scan zurueckspringt.
+$d = rundgang_dauer('2026-09-01 22:00:00', null, '2026-09-01 22:45:00', 0, 'laeuft');
+pruef('KRITISCH: bei einer laufenden Runde gilt der letzte Scan NICHT als Ende',
+    $d['sekunden'] === null && $d['quelle'] === 'laeuft');
+pruef('Eine vorbereitete Runde zaehlt ebenfalls als laufend, nicht als abgeschlossen',
+    rundgang_dauer('2026-09-01 22:00:00', null, null, 0, 'vorbereitet')['quelle'] === 'laeuft');
+pruef('Eine pausierte Runde zaehlt ebenfalls als laufend',
+    rundgang_dauer('2026-09-01 22:00:00', null, null, 0, 'pausiert')['quelle'] === 'laeuft');
+
+// Die Pause ist gestoppte Zeit, keine Rundenzeit.
+$d = rundgang_dauer('2026-09-01 22:00:00', '2026-09-01 23:30:00', null, 20, 'abgeschlossen');
+pruef('KRITISCH: die Pause wird abgezogen', $d['sekunden'] === 4200);
+
+// Eine abgebrochene Runde hat trotzdem eine Dauer -- sie hat ja
+// stattgefunden.
+$d = rundgang_dauer('2026-09-01 22:00:00', null, '2026-09-01 22:12:00', 0, 'abgebrochen');
+pruef('Eine abgebrochene Runde bekommt ebenfalls eine Dauer',
+    $d['sekunden'] === 720 && $d['quelle'] === 'letzter_scan');
+
+// "Keine Dauer" und "Dauer null" sind verschiedene Aussagen -- eine
+// negative waere keine von beiden, sondern ein kaputter Datensatz.
+$d = rundgang_dauer('2026-09-01 23:00:00', '2026-09-01 22:00:00', null, 0, 'abgeschlossen');
+pruef('KRITISCH: eine negative Dauer wird auf 0 geklemmt statt weitergereicht', $d['sekunden'] === 0);
+$d = rundgang_dauer('2026-09-01 22:00:00', '2026-09-01 22:10:00', null, 600, 'abgeschlossen');
+pruef('Eine Pause laenger als die Runde ergibt 0, keine negative Zahl', $d['sekunden'] === 0);
+
+// Ohne Startzeit gibt es keine Dauer -- und das darf nicht wie "0 Minuten"
+// aussehen.
+pruef('KRITISCH: ohne Startzeit gibt es keine Dauer, keine Null',
+    rundgang_dauer(null, '2026-09-01 23:00:00', null, 0, 'abgeschlossen')['sekunden'] === null);
+pruef('Eine beendete Runde ohne jede Zeitangabe meldet "unbekannt", nicht "laeuft"',
+    rundgang_dauer(null, null, null, 0, 'abgeschlossen')['quelle'] === 'unbekannt');
+pruef('Ein leerer String zaehlt wie eine fehlende Angabe',
+    rundgang_dauer('', '', '', 0, 'abgeschlossen')['sekunden'] === null);
+// Eine Uhr, die ueber Mitternacht laeuft, ist der Normalfall im
+// Revierdienst -- nicht der Sonderfall.
+$d = rundgang_dauer('2026-09-01 23:40:00', '2026-09-02 00:25:00', null, 0, 'abgeschlossen');
+pruef('KRITISCH: eine Runde ueber Mitternacht wird richtig gerechnet', $d['sekunden'] === 2700);
+
 echo $ok . " Pruefungen bestanden\n";
 if ($bad) { echo count($bad) . " FEHLGESCHLAGEN:\n - " . implode("\n - ", $bad) . "\n"; exit(1); }
