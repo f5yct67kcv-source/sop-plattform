@@ -13,6 +13,15 @@ declare(strict_types=1);
    merkt es, weil sie trotzdem im Feed stehen. */
 const EREIGNISART_AUFGABE = 'Aufgabe nicht ausführbar';
 
+/* Wie lange eine Bewegungsspur aufbewahrt wird (ENT-318).
+   Als Konstante und mit Begruendung, damit die Zahl eine Entscheidung ist
+   und keine Zufaelligkeit: Die Spur dient dem Nachweis EINER Runde. Ist
+   diese Frist um, tragen die Kontrollpunkt-Scans mit ihren Zeitstempeln den
+   Nachweis weiter -- nur die Bewegung dazwischen verschwindet.
+   Nicht zu verwechseln mit den fuenf Jahren aus Art. 12 Ziff. 5 GAV: Die
+   gelten fuer die Lohnabrechnung, nicht fuer Aufenthaltsdaten. */
+const RUNDGANG_SPUR_TAGE = 90;
+
 // Haversine-Distanz in Metern zwischen zwei Koordinaten.
 function geo_distanz_meter(float $lat1, float $lng1, float $lat2, float $lng2): float
 {

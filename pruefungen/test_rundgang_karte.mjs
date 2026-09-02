@@ -41,16 +41,15 @@ check('KRITISCH: auch beim Fortsetzen liefert der Server Koordinaten und Radius'
   && /SELECT k\.id, k\.bezeichnung, p\.reihenfolge, k\.typ, k\.lat, k\.lng, k\.geofence_radius_m/.test(OFFEN));
 check('KRITISCH: die laufende Runde bekommt Ansprechpartner und Zentrale mit',
   /rundgang_ansprechpartner\(/.test(OFFEN) && /rundgang_zentrale\(/.test(OFFEN));
-// ENT-131 schliesst die kontinuierliche Positionsverfolgung aus. Ein
-// watchPosition waere genau das -- und niemand saehe es der Oberflaeche an.
-//
-// Geprueft wird der AUFRUF, nicht das Wort: app.html nennt watchPosition an
-// drei Stellen im Kommentar, gerade um zu begruenden, warum es fehlt. Eine
-// Suche nach dem blossen Wort waere hier dauerhaft rot gewesen und haette
-// den Kommentar bestraft statt den Code zu pruefen.
-check('KRITISCH: die App verfolgt die Position NICHT laufend (ENT-131)',
-  !/geolocation\s*\.\s*watchPosition/.test(APP)
-  && !/\bwatchPosition\s*\(/.test(APP.replace(/\/\/[^\n]*/g, '')));
+// ENT-131 schloss die kontinuierliche Positionsverfolgung aus. Seit
+// ENT-317 ist sie WAEHREND einer laufenden Runde erlaubt -- vom
+// Projektinhaber entschieden, weil sich Radien von 20-25 m sonst nicht
+// bedienen lassen. Geprueft wird darum nicht mehr die Abwesenheit von
+// watchPosition, sondern die GRENZE: dass sie mit der Runde endet.
+// Die Einzelheiten stehen in test_ortung.mjs.
+check('KRITISCH: die Ortung endet mit der Runde und ueberdauert sie nicht (ENT-317)',
+  /function rgOrtungStoppen/.test(APP) && /clearWatch/.test(APP)
+  && /function rgOrtungNachfuehren/.test(APP));
 check('Der Kartenschluessel ist derselbe wie im Dashboard -- kein zweiter Anbieter',
   APP.includes('maps.googleapis.com/maps/api/js?key=')
   && readFileSync(`${WURZEL}/dashboard.html`, 'utf8').includes('maps.googleapis.com/maps/api/js?key='));
