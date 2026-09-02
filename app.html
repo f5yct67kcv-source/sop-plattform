@@ -578,6 +578,14 @@ svg.i-sm { width: 17px; height: 17px; }
    Regel, weil .fehler bisher nur fuer .rgs-karte-stand galt: Ohne sie
    bliebe die Klasse wirkungslos, ohne dass etwas kaputtgeht. */
 .rgs-karte-hinweis.fehler { color: var(--warn); font-weight: 560; }
+/* Die Warnung bei fehlendem Standort (ENT-320). Bewusst ein Block und
+   keine Zeile: Sie ist eine Handlungsanweisung, kein Hinweis am Rand --
+   ohne Standort laesst sich kein einziger Kontrollpunkt bestaetigen. */
+.rgs-ortwarn { flex: none; border: 1px solid var(--warn); border-radius: var(--r);
+  background: var(--warn-soft); color: var(--ink); padding: 14px 16px;
+  font-size: 14px; line-height: 1.5; }
+.rgs-ortwarn-tt { font-weight: 700; color: var(--warn); margin-bottom: 6px; font-size: 15px; }
+.rgs-ortwarn-weg { margin-top: 10px; font-size: 13px; color: var(--ink-2); line-height: 1.55; }
 
 .rd-zustand { font-size: 15px; font-weight: 640; margin-bottom: 12px; }
 .rgs-kopf-zahlen { display: flex; align-items: center; gap: 8px; flex: none; }
@@ -995,6 +1003,13 @@ const W = {
     rgsZentrieren: 'Zentrieren',
     rgsMeinStandort: 'Mein Standort',
     rgsOrtungLaeuft: 'Standort wird während der Runde verfolgt',
+    rgOrtAusTitel: 'Kein Standort — die Runde lässt sich so nicht bestätigen',
+    rgOrtVerweigert: 'Der Standortzugriff ist gesperrt. Ohne ihn kannst du keinen Kontrollpunkt bestätigen, und es kommt kein Signal, wenn du einen erreichst.',
+    rgOrtWegIos: 'iPhone: Einstellungen › Datenschutz & Sicherheit › Ortungsdienste › Safari › „Beim Verwenden der App". Danach in Safari auf „aA" in der Adressleiste › Website-Einstellungen › Standort › Erlauben.',
+    rgOrtWegAndroid: 'Android: Einstellungen › Apps › Browser › Berechtigungen › Standort › Zulassen.',
+    rgOrtKeinSignal: 'Der Standort ist nicht verfügbar — draussen oder am Fenster geht es meist besser.',
+    rgOrtWartet: 'Standort wird gesucht …',
+    rgOrtErneut: 'Erneut versuchen',
     rgSignalDrin: 'Kontrollpunkt erreicht',
     rgsOrtungAus: 'Kein Standort — Ortung im Gerät erlauben',
     rdEntfernung: 'noch {m} m',
@@ -3350,8 +3365,13 @@ function rgLaufZeichnen() {
     // ZUSTAND ("abgebrochen"/"abgeschlossen"). Die Zahl steht im Kopf, wo sie
     // auch beim Scrollen sichtbar bleibt -- sie zweimal zu zeigen waere
     // dieselbe Angabe an zwei Orten, die auseinanderlaufen koennen.
+    // Die Warnung gehoert AUCH hierher (ENT-320): Der Waechter steht vor
+    // dem Kontrollpunkt und tippt auf "Bestaetigen", nicht auf die Karte.
+    // Nur unter der Karte zu warnen hiesse, sie dort zu verstecken, wo er
+    // gerade nicht hinsieht.
     $('rgsBody').innerHTML =
-      `<div id="rdFortschritt" class="rd-zustand"></div><div id="rdBanner"></div><div id="rdListe"></div>`;
+      rgOrtungHinweisHtml()
+      + `<div id="rdFortschritt" class="rd-zustand"></div><div id="rdBanner"></div><div id="rdListe"></div>`;
     rundgangListeZeichnen();
   }
   rgLaufKopfZeichnen();
@@ -3588,9 +3608,7 @@ function rgKarteZeichnen() {
   // Ortung, von der der Betroffene nichts weiss, ist etwas anderes als eine,
   // die offen angezeigt wird -- rechtlich wie menschlich. Steht dort,
   // solange die Verfolgung laeuft, und verschwindet mit ihr.
-  const ortungHinweis = rgsOrtWache !== null
-    ? `<div class="rgs-karte-hinweis" id="rgsOrtungHinweis">${esc(w('rgsOrtungLaeuft'))}</div>`
-    : '';
+  const ortungHinweis = rgOrtungHinweisHtml();
   $('rgsBody').innerHTML = `
     <div class="rgs-karte-huelle">
       <div class="rgs-karte" id="rgsKarte"></div>
@@ -3683,6 +3701,18 @@ function rgKartePunkteZeichnen(punkte) {
    ausdruecklich so verlangt. */
 let rgsOrtWache = null;       // Kennung von watchPosition
 let rgsMeinOrt = null;        // { lat, lng, genauigkeit, zeit } -- nur im Speicher
+/* Warum KEIN Standort da ist (ENT-320). Drei Zustaende, die sich
+   unterscheiden muessen:
+     null            -- noch keine Antwort, es laeuft
+     'verweigert'    -- gesperrt; kommt nie, ohne dass jemand etwas aendert
+     'nicht_da'      -- Sensor findet nichts (Keller, Tiefgarage); kann
+                        von selbst wiederkommen
+   Bis hierher wurde der Fehler-Rueckruf mit () => {} verschluckt. Die Folge
+   war die schlimmste Art Fehler: Es stand "Standort wird verfolgt" da,
+   waehrend gar nichts verfolgt wurde -- keine Entfernungen, keine
+   gesperrten Knoepfe, keine Signale, keine Spur. Vom Projektinhaber im
+   Betrieb gefunden, mit Safari auf "Nie". */
+let rgsOrtFehler = null;
 
 // Haversine, dieselbe Rechnung wie geo_distanz_meter() in backend/rundgang.php.
 // Bewusst nachgebaut statt den Server zu fragen: Die Pruefung muss OHNE Netz
@@ -3716,8 +3746,21 @@ function rgOrtungStarten() {
   // der Server prueft den Radius ohnehin.
   try {
   rgsOrtWache = navigator.geolocation.watchPosition(pos => {
+    // VOR der Zuweisung merken -- danach ist rgsMeinOrt immer gesetzt und
+    // die Frage waere sinnlos. Beim ersten Anlauf stand die Zeile darunter
+    // und war damit wirkungslos; von der Pruefung gefunden.
+    const ersterOrt = !rgsMeinOrt;
     rgsMeinOrt = { lat: pos.coords.latitude, lng: pos.coords.longitude,
       genauigkeit: pos.coords.accuracy, zeit: Date.now() };
+    // Kommt der Standort zurueck, verschwindet die Warnung von selbst --
+    // wer aus dem Keller herauskommt, soll sie nicht wegklicken muessen.
+    // Und beim ERSTEN Standort ebenfalls neu zeichnen, sonst bleibt
+    // "Standort wird gesucht ..." stehen, obwohl er laengst da ist: Der
+    // Rueckruf unten zeichnet nur die LISTE neu, nicht den Hinweis darueber.
+    if (rgsOrtFehler !== null || ersterOrt) {
+      rgsOrtFehler = null;
+      try { rgLaufZeichnen(); } catch (e) {}
+    }
     try { rgStandortZeichnen(); } catch (e) {}
     try { rgSpurAufnehmen(rgsMeinOrt); } catch (e) {}
     try { rgBereichPruefen(); } catch (e) {}
@@ -3725,7 +3768,16 @@ function rgOrtungStarten() {
     // gerade sichtbar ist: sonst wuerde ein offenes Formular (Ersatzscan,
     // "nicht verfuegbar") beim naechsten Positionswechsel weggeworfen.
     if (rgsReiter === 'punkte' && abPunktId === null) { rundgangListeZeichnen(); }
-  }, () => {}, { enableHighAccuracy: true, timeout: 20000, maximumAge: 5000 });
+  }, fehler => {
+    // Ausgewertet statt verschluckt (ENT-320).
+    // 1 = PERMISSION_DENIED, 2 = POSITION_UNAVAILABLE, 3 = TIMEOUT.
+    // Ein Zeitablauf ist KEIN Fehlschlag: watchPosition versucht es weiter,
+    // und wer gerade im Treppenhaus steht, bekommt gleich wieder Empfang.
+    // Ihn als Fehler zu zeigen hiesse, im Minutentakt zu warnen.
+    if (fehler && fehler.code === 3) { return; }
+    rgsOrtFehler = (fehler && fehler.code === 1) ? 'verweigert' : 'nicht_da';
+    try { rgLaufZeichnen(); } catch (e) {}
+  }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 5000 });
   } catch (e) { rgsOrtWache = null; }
 }
 
@@ -3812,6 +3864,53 @@ function rgSichtSignal(text) {
   el.classList.add('an');
   clearTimeout(el._weg);
   el._weg = setTimeout(() => { el.classList.remove('an'); }, 2600);
+}
+
+/* Was unter der Karte steht (ENT-320) -- und es ist NICHT immer dasselbe.
+
+   Bis hierher stand dort ausnahmslos "Standort wird waehrend der Runde
+   verfolgt", sobald watchPosition registriert war. Ob je eine Position
+   ankam, spielte keine Rolle. Bei gesperrtem Standortzugriff behauptete
+   die App damit genau das Gegenteil dessen, was passierte.
+
+   Jetzt vier Zustaende mit vier verschiedenen Aussagen -- und der
+   wichtigste davon ist eine Handlungsanweisung, keine Fehlermeldung: Wer
+   nachts vor einem Kontrollpunkt steht, den er nicht bestaetigen kann,
+   braucht den WEG zur Einstellung, nicht die Diagnose. */
+function rgOrtungHinweisHtml() {
+  if (rgsOrtWache === null) { return ''; }
+  if (rgsOrtFehler === 'verweigert') {
+    const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    return `<div class="rgs-ortwarn" id="rgsOrtWarn">
+      <div class="rgs-ortwarn-tt">${esc(w('rgOrtAusTitel'))}</div>
+      <div>${esc(w('rgOrtVerweigert'))}</div>
+      <div class="rgs-ortwarn-weg">${esc(w(iOS ? 'rgOrtWegIos' : 'rgOrtWegAndroid'))}</div>
+      <button type="button" class="btn btn-plain btn-wide" style="margin-top:12px"
+        onclick="rgOrtungErneut()">${esc(w('rgOrtErneut'))}</button>
+    </div>`;
+  }
+  if (rgsOrtFehler === 'nicht_da') {
+    return `<div class="rgs-ortwarn" id="rgsOrtWarn">
+      <div class="rgs-ortwarn-tt">${esc(w('rgOrtAusTitel'))}</div>
+      <div>${esc(w('rgOrtKeinSignal'))}</div>
+      <button type="button" class="btn btn-plain btn-wide" style="margin-top:12px"
+        onclick="rgOrtungErneut()">${esc(w('rgOrtErneut'))}</button>
+    </div>`;
+  }
+  if (!rgsMeinOrt) {
+    return `<div class="rgs-karte-hinweis" id="rgsOrtungHinweis">${esc(w('rgOrtWartet'))}</div>`;
+  }
+  return `<div class="rgs-karte-hinweis" id="rgsOrtungHinweis">${esc(w('rgsOrtungLaeuft'))}</div>`;
+}
+
+// Neu anlaufen lassen, nachdem jemand die Einstellung geaendert hat. Auf
+// iOS greift eine neue Berechtigung erst bei einer neuen Anfrage -- ohne
+// diesen Knopf muesste die ganze App neu geladen werden.
+function rgOrtungErneut() {
+  rgOrtungStoppen();
+  rgsOrtFehler = null;
+  rgOrtungNachfuehren();
+  rgLaufZeichnen();
 }
 
 function rgSignalGeben(text) {
@@ -3944,6 +4043,7 @@ function rgOrtungStoppen() {
   try { navigator.geolocation.clearWatch(rgsOrtWache); } catch (e) {}
   rgsOrtWache = null;
   rgsSpurLetzte = null;
+  rgsOrtFehler = null;
   // Was noch im Geraet liegt, jetzt noch loswerden -- der Server nimmt es
   // an, solange die Runde laeuft. Endet sie in derselben Sekunde, weist er
   // es ab und die App verwirft es; beides ist besser, als es liegenzulassen.
@@ -4144,7 +4244,10 @@ function rdZeile(k, nr, gesperrt) {
   // der Server entscheidet ohnehin noch einmal.
   const dist = kannScannen ? rdEntfernungZu(k) : null;
   const drin = dist === null ? null : dist <= rdRadiusVon(k);
+  // "Standort noch unbekannt" ist zu harmlos, wenn er GESPERRT ist -- das
+  // eine geht vorbei, das andere nie (ENT-320).
   const ortTxt = !kannScannen ? ''
+    : rgsOrtFehler === 'verweigert' ? `<div class="rd-ort weit">${esc(w('rgOrtAusTitel'))}</div>`
     : dist === null ? `<div class="rd-ort mut">${esc(w('rdOrtUnbekannt'))}</div>`
     : drin ? `<div class="rd-ort drin">${esc(w('rdImBereich'))}</div>`
     : `<div class="rd-ort weit">${esc(w('rdEntfernung').replace('{m}', String(Math.round(dist))))}</div>`;
