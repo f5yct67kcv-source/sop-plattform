@@ -458,6 +458,14 @@ svg.i-sm { width: 17px; height: 17px; }
 .rgs-person { padding: 12px 0; border-bottom: 1px solid var(--line-soft); }
 .rgs-person:last-child { border-bottom: 0; padding-bottom: 2px; }
 .rgs-person-name { font-size: 15px; font-weight: 620; }
+/* Herkunft und Funktion der Person (ENT-300). Wer nachts anruft, muss wissen,
+   wen er weckt: der Hauswart vor Ort ist ein anderer Anruf als die
+   Kontaktperson beim Kunden. Das Kennzeichen traegt Farbe UND Wort -- nicht
+   nur Farbe, sonst waere die Unterscheidung fuer manche gar keine. */
+.rgs-person-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 3px; }
+.rgs-quelle { font-size: 10.5px; font-weight: 680; letter-spacing: .5px; text-transform: uppercase; padding: 2px 7px; border-radius: 9px; background: var(--line-soft); color: var(--ink-2); border: 1px solid var(--line); }
+.rgs-quelle.vorort { background: var(--accent-soft); color: var(--accent); border-color: var(--accent-line); }
+.rgs-person-fkt { font-size: 13px; color: var(--ink-2); }
 /* Anrufen/Mailen sind echte Ziele mit dem Daumen -- 44px, nicht nur Text. */
 .rgs-weg { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; color: var(--accent); font-size: 14.5px; font-weight: 600; text-decoration: none; margin-right: 16px; }
 .rgs-leer { font-size: 14px; color: var(--ink-3); padding: 10px 0 2px; line-height: 1.5; }
@@ -848,7 +856,11 @@ const W = {
     // Einsatzmodus Rundgang (ENT-294)
     rgsRoute: 'Route öffnen',
     rgsAnsprechpartner: 'Ansprechpartner',
-    rgsKeineAnsprechpartner: 'Für diesen Kunden ist keine Ansprechperson hinterlegt.',
+    // Bezieht sich seit ENT-300 auf beide Quellen, nicht mehr nur auf den Kunden.
+    rgsKeineAnsprechpartner: 'Für dieses Objekt und diesen Kunden ist keine Ansprechperson hinterlegt.',
+    // Herkunft der Ansprechperson (ENT-300)
+    rgsVorOrt: 'Vor Ort',
+    rgsBeimKunden: 'Beim Kunden',
     // "Funktionen" statt des frueheren "Module" (ENT-298): Der Projektinhaber
     // nennt diesen Bereich durchgehend so, "Module" war eine Erfindung von mir.
     rgsFunktionen: 'Funktionen',
@@ -1680,6 +1692,10 @@ function rgSeiteZeichnen(d) {
         ${leute.length ? leute.map(p => `
           <div class="rgs-person">
             <div class="rgs-person-name">${esc([p.anrede, p.name].filter(Boolean).join(' '))}</div>
+            <div class="rgs-person-meta">
+              <span class="rgs-quelle${p.quelle === 'objekt' ? ' vorort' : ''}">${esc(w(p.quelle === 'objekt' ? 'rgsVorOrt' : 'rgsBeimKunden'))}</span>
+              ${p.funktion ? `<span class="rgs-person-fkt">${esc(p.funktion)}</span>` : ''}
+            </div>
             <div>${(p.wege || []).map(we => {
               const z = wegZiel(we);
               return z ? `<a class="rgs-weg" href="${esc(z)}">${esc(we.wert)}</a>`
