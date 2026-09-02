@@ -14725,6 +14725,25 @@ function openObjekt(id) {
       </div>
     </div></div>
 
+    <!-- Ansprechpartner vor Ort (ENT-300): hier auf der Objekt-Uebersicht,
+         nicht im Stammdaten-Dialog -- vom Projektinhaber so gewaehlt. Sie
+         gehoeren dorthin, wo Adresse und Kanton stehen: Es sind Merkmale des
+         OBJEKTS, nicht des Kunden, und beim Anlegen eines Objekts sollen sie
+         mitgepflegt werden statt in einer zweiten Maske vergessen zu gehen. -->
+    <div class="zone" style="margin-top:20px" id="opZone">
+      <div class="zone-hd">Ansprechpartner vor Ort</div>
+      <div class="zone-note">Wer am Objekt selbst erreichbar ist — Hauswart, Betriebsleiter, Loge.
+        Mitarbeitende sehen diese Angaben im laufenden Rundgang und rufen dort bei einem Vorfall an.
+        Sie <b>ergänzen</b> die Kontaktpersonen des Kunden, sie ersetzen sie nicht — in der App stehen
+        die Leute vor Ort zuoberst.</div>
+      <div id="opErr" class="msg-err" style="display:none"></div>
+      <div id="opPersonenListe"></div>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <button class="btn btn-quiet btn-sm" type="button" onclick="opPersonHinzu()">Ansprechpartner hinzufügen</button>
+        <button class="btn btn-primary btn-sm" type="button" id="opSpeichern" onclick="opSpeichern()">Ansprechpartner speichern</button>
+      </div>
+    </div>
+
     <div class="zone danger" style="margin-top:20px">
       <div class="zone-hd">Objekt entfernen</div>
       <div class="zone-note">Sind bereits Schichten daraus entstanden, wird das Objekt nur stillgelegt — geplante und vergangene Einsätze bleiben unverändert erhalten.</div>
@@ -14756,6 +14775,7 @@ function openObjekt(id) {
       <div id="msSeiteBedarf" style="margin-top:10px;overflow-x:auto"></div>
     </div>`;
 
+  opLaden(Number(id));
   obGoTab('uebersicht');
   msAlle = false;
   loadMasterschichten();
@@ -21573,6 +21593,139 @@ function kuPersonWeg(pi) {
 }
 function kuPersonWegHinzu(pi) { kuPersonenLesen(); kuPersonen[pi].kontaktwege.push({ art: 'telefon', wert: '' }); kuPersonenRender(); }
 function kuPersonWegWeg(pi, wi) { kuPersonenLesen(); kuPersonen[pi].kontaktwege.splice(wi, 1); kuPersonenRender(); }
+
+// ══ Ansprechpartner vor Ort, am Objekt (ENT-300) ═══════════════════════════
+// Bewusst dieselbe Bedienung wie die Kontaktpersonen beim Kunden (kuPersonen
+// weiter oben) und derselbe Zeilenaufbau -- wer das eine kann, kann das
+// andere. Eigener Zustand statt Mitbenutzung von kuPersonen: Der Kundendialog
+// kann gleichzeitig offen sein, und ein geteilter Zustand hiesse, dass ein
+// Speichern dort die Objektkontakte mitnimmt.
+//
+// Der Server ersetzt beim Speichern den ganzen Bestand des Objekts
+// (objekt_personen.php) -- die Maske schickt darum immer den vollstaendigen
+// Endzustand, nie einzelne Aenderungen.
+let opObjektId = null;
+let opPersonen = [];
+
+function opPersonLeer() {
+  return { anrede: '', vorname: '', nachname: '', funktion: '',
+    kontaktwege: [{ art: 'mobil', wert: '' }] };
+}
+
+function opLaden(objektId) {
+  opObjektId = Number(objektId);
+  opPersonen = [];
+  const el = $('opPersonenListe');
+  if (el) el.innerHTML = '<div class="sk" style="height:52px"></div>';
+  api('objekt_personen.php?objekt_id=' + opObjektId).then(({ ok, data }) => {
+    if (opObjektId !== Number(objektId)) return;   // zwischenzeitlich weitergeklickt
+    // Fehlt die Tabelle noch (Einrichtung nicht gelaufen), kommt eine leere
+    // Liste -- das ist derselbe Anblick wie "noch niemand hinterlegt". Der
+    // Unterschied faellt beim Speichern auf, mit einer Meldung, die sagt, was
+    // zu tun ist. Hier eine Warnung zu zeigen, hiesse sie auf jedem Objekt zu
+    // zeigen, auch wenn alles in Ordnung ist.
+    opPersonen = (ok && data.status === 'ok' && (data.personen || []).length)
+      ? data.personen.map(p => ({
+          anrede: p.anrede || '', vorname: p.vorname || '', nachname: p.nachname || '',
+          funktion: p.funktion || '',
+          kontaktwege: (p.kontaktwege || []).length ? p.kontaktwege.map(w => ({ ...w })) : [{ art: 'mobil', wert: '' }],
+        }))
+      : [opPersonLeer()];
+    opRender();
+  });
+}
+
+function opRender() {
+  const el = $('opPersonenListe');
+  if (!el) return;
+  el.innerHTML = opPersonen.map((p, pi) => `
+    <div class="ku-person">
+      <div class="form-grid">
+        <div class="f"><label for="opp_anrede_${pi}">Anrede</label>
+          <select class="inp" id="opp_anrede_${pi}" data-op="anrede" data-pi="${pi}">
+            <option value=""></option>
+            <option${p.anrede === 'Herr' ? ' selected' : ''}>Herr</option>
+            <option${p.anrede === 'Frau' ? ' selected' : ''}>Frau</option>
+          </select></div>
+        <div class="f"><label for="opp_vorname_${pi}">Vorname</label>
+          <input class="inp" id="opp_vorname_${pi}" data-op="vorname" data-pi="${pi}" value="${esc(p.vorname)}"></div>
+        <div class="f"><label for="opp_nachname_${pi}">Nachname</label>
+          <input class="inp" id="opp_nachname_${pi}" data-op="nachname" data-pi="${pi}" value="${esc(p.nachname)}"></div>
+      </div>
+      <div class="f"><label for="opp_funktion_${pi}">Funktion vor Ort</label>
+        <input class="inp" id="opp_funktion_${pi}" data-op="funktion" data-pi="${pi}" value="${esc(p.funktion)}"
+               maxlength="100" placeholder="z. B. Hauswart, Betriebsleiter, Loge">
+        <div class="f-hint">Um drei Uhr nachts ist das die Angabe, die zählt — nicht der Nachname.
+          Eine Zeile mit Funktion und Nummer, aber ohne Namen, ist ausdrücklich in Ordnung.</div></div>
+      ${p.kontaktwege.map((w, wi) => `
+        <div class="kw-reihe">
+          <select class="inp" data-opw="art" data-pi="${pi}" data-wi="${wi}" aria-label="Kontaktmöglichkeit">${kuWegOptionen(w.art)}</select>
+          <input class="inp" data-opw="wert" data-pi="${pi}" data-wi="${wi}" value="${esc(w.wert || '')}" aria-label="${esc(KU_LABEL[w.art] || 'Wert')}">
+          <button class="kw-weg" type="button" onclick="opWegWeg(${pi}, ${wi})" title="Zeile entfernen" aria-label="Zeile entfernen">${KU_PAPIERKORB}</button>
+        </div>`).join('')}
+      <div class="ku-person-ft">
+        <button class="btn btn-quiet btn-sm" type="button" onclick="opWegHinzu(${pi})">Weitere Kontaktmöglichkeit hinzufügen</button>
+        <button class="btn btn-quiet btn-sm" type="button" onclick="opPersonWeg(${pi})">Ansprechpartner löschen</button>
+      </div>
+    </div>`).join('');
+}
+
+// Vor jedem Neuzeichnen den Stand aus der Maske uebernehmen -- sonst geht
+// verloren, was seit dem letzten Zeichnen getippt wurde (gleiches Muster wie
+// kuPersonenLesen).
+function opLesen() {
+  document.querySelectorAll('#opPersonenListe [data-op]').forEach(el => {
+    const p = opPersonen[Number(el.dataset.pi)];
+    if (p) p[el.dataset.op] = el.value;
+  });
+  document.querySelectorAll('#opPersonenListe [data-opw]').forEach(el => {
+    const p = opPersonen[Number(el.dataset.pi)];
+    const w = p && p.kontaktwege[Number(el.dataset.wi)];
+    if (w) w[el.dataset.opw === 'art' ? 'art' : 'wert'] = el.value;
+  });
+}
+function opPersonHinzu() { opLesen(); opPersonen.push(opPersonLeer()); opRender(); }
+function opPersonWeg(pi) {
+  opLesen();
+  opPersonen.splice(pi, 1);
+  if (!opPersonen.length) opPersonen = [opPersonLeer()];
+  opRender();
+}
+function opWegHinzu(pi) { opLesen(); opPersonen[pi].kontaktwege.push({ art: 'telefon', wert: '' }); opRender(); }
+function opWegWeg(pi, wi) { opLesen(); opPersonen[pi].kontaktwege.splice(wi, 1); opRender(); }
+
+function opSpeichern() {
+  if (opObjektId === null) return;
+  opLesen();
+  const err = $('opErr'); if (err) err.style.display = 'none';
+  const btn = $('opSpeichern'); if (btn) btn.disabled = true;
+  api('objekt_personen.php', { method: 'POST',
+    body: { objekt_id: opObjektId, personen: opPersonen, kontaktwege: [] } })
+    .then(({ ok, data }) => {
+      if (btn) btn.disabled = false;
+      if (!ok || data.status !== 'ok') {
+        if (err) { err.textContent = data.message || 'Speichern fehlgeschlagen.'; err.style.display = ''; }
+        return;
+      }
+      // Den Stand vom Server uebernehmen, nicht den eigenen behalten: Er hat
+      // leere Zeilen entfernt und unbekannte Kontaktarten verworfen. Wer den
+      // eigenen Stand stehen liesse, zeigte etwas anderes an, als gespeichert
+      // ist -- und beim naechsten Speichern verschwaende es kommentarlos.
+      opPersonen = (data.personen || []).length
+        ? data.personen.map(p => ({
+            anrede: p.anrede || '', vorname: p.vorname || '', nachname: p.nachname || '',
+            funktion: p.funktion || '',
+            kontaktwege: (p.kontaktwege || []).length ? p.kontaktwege.map(w => ({ ...w })) : [{ art: 'mobil', wert: '' }],
+          }))
+        : [opPersonLeer()];
+      opRender();
+      toast('Ansprechpartner gespeichert.');
+    })
+    .catch(() => {
+      if (btn) btn.disabled = false;
+      if (err) { err.textContent = 'Netzwerkfehler.'; err.style.display = ''; }
+    });
+}
 
 // ── Recherche im Handelsregister und im Netz (ENT-019, seit ENT-042 hier) ──
 function kuRecherche() {
