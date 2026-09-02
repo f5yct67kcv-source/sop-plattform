@@ -49,4 +49,45 @@ $pdo->prepare(
      WHERE id = ?"
 )->execute([$grund, $freitext !== '' ? $freitext : null, $rundgangId]);
 
-json_response(['status' => 'ok']);
+/* Der Abbruch erscheint im Meldeweg (ENT-324).
+
+   Vom Projektinhaber verlangt: „Ich habe vorhin noch einen Rundgang bewusst
+   abgebrochen, diese Info muss ZWINGEND in die Ereignisse im Dashboard."
+
+   Er hat recht: Bis hierher stand der Abbruch nur an der Runde selbst. Wer
+   die Ereignisse durchsieht -- also den Ort, an dem im Betrieb nachgesehen
+   wird, was in der Nacht vorgefallen ist --, sah davon nichts. Eine
+   abgebrochene Runde ist aber genau so ein Vorfall.
+
+   Scheitert das Ereignis, ist der Abbruch selbst trotzdem gueltig: Er steht
+   mit Grund und Zeit an der Runde, die Auswertung zeigt ihn, es geht nichts
+   verloren. Gemeldet wird das Scheitern zurueck, damit ein dauerhaft
+   kaputter Meldeweg nicht still bleibt -- dieselbe Abwaegung wie in
+   ENT-311. */
+$ereignisFehler = null;
+try {
+    $artId = null;
+    if (hat_tabelle($pdo, 'ereignisart')) {
+        $aSt = $pdo->prepare('SELECT id FROM ereignisart WHERE bezeichnung = ? AND aktiv = 1');
+        $aSt->execute([EREIGNISART_ABBRUCH]);
+        $gefunden = $aSt->fetchColumn();
+        if ($gefunden !== false) { $artId = (int)$gefunden; }
+    }
+    // Der Klartext des Grundes wird KOPIERT, nicht nur der Code abgelegt:
+    // Wer das Ereignis spaeter liest, soll den Grund dort lesen koennen und
+    // nicht eine Kennung nachschlagen muessen (Nachweis-Prinzip).
+    $text = 'Rundgang abgebrochen — Grund: ' . RUNDGANG_ABBRUCH_GRUENDE[$grund]
+        . ($freitext !== '' ? ' — ' . $freitext : '');
+    $evt = $pdo->prepare(
+        'INSERT INTO ereignis_meldung
+           (objekt_id, rundgang_id, einsatz_id, mitarbeiter_id, ereignisart_id, erfasst_am, bemerkung)
+         VALUES (?, ?, ?, ?, ?, NOW(), ?)'
+    );
+    $evt->execute([(int)$rundgang['objekt_id'], $rundgangId,
+        $rundgang['einsatz_id'] !== null ? (int)$rundgang['einsatz_id'] : null,
+        (int)$user['id'], $artId, $text]);
+} catch (Throwable $e) {
+    $ereignisFehler = 'Abbruch gespeichert, Ereignismeldung fehlgeschlagen';
+}
+
+json_response(['status' => 'ok', 'ereignis_fehler' => $ereignisFehler]);

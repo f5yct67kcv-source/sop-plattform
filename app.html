@@ -63,6 +63,15 @@ svg.i-sm { width: 17px; height: 17px; }
 .btn-pos { background: var(--pos-soft); color: var(--pos); border-color: #BCE5D3; }
 .btn-neg { background: var(--neg-soft); color: var(--neg); border-color: #F3C8C2; }
 .btn-wide { width: 100%; }
+/* Ein Knopf mit Unterzeile (ENT-324). Der Grundknopf ist eine waagrechte
+   Flex-Reihe mit nowrap -- ein zweizeiliger Inhalt braucht darum beides
+   umgestellt, sonst stuenden Titel und Erklaerung nebeneinander und der
+   Text liefe aus dem Knopf heraus. Die Mindesthoehe waechst mit: 48 px
+   reichen fuer eine Zeile, nicht fuer zwei. */
+.btn-unter { display: block; font-size: 12.5px; font-weight: 450; opacity: .8;
+  margin-top: 3px; white-space: normal; line-height: 1.35; }
+.btn:has(.btn-unter) { flex-direction: column; justify-content: center; gap: 0;
+  min-height: 60px; padding: 11px 16px; white-space: normal; text-align: center; }
 .btn:disabled { opacity: .5; }
 .f { margin-bottom: 16px; }
 .f label { display: block; font-size: 12px; font-weight: 660; color: var(--ink-2); letter-spacing: .4px; text-transform: uppercase; margin-bottom: 7px; }
@@ -961,6 +970,12 @@ const W = {
     rundgangBeenden: 'Beenden', rundgangBeendenTitel: 'Rundgang beenden',
     rundgangBeendenFrage: 'Wie möchtest du fortfahren?',
     rundgangPausierenKnopf: 'Pausieren', rundgangAbbrechenKnopf: 'Abbrechen',
+    // Unter jedem Knopf steht, was er bewirkt (ENT-324) -- „Abbrechen" und
+    // „Pausieren" sehen sonst gleich harmlos aus, und nur eines davon laesst
+    // sich rueckgaengig machen.
+    rundgangPausierenUnter: 'Kann später wieder fortgesetzt werden',
+    rundgangAbbrechenUnter: 'Endgültig. Erfasste Kontrollpunkte bleiben erhalten.',
+    rundgangWeiterKnopf: 'Weiter', rundgangWeiterUnter: 'Den Rundgang fortsetzen',
     rundgangPauseWiederaufnehmen: 'Fortsetzen',
     rundgangPausiertHinweis: 'Der Rundgang ist pausiert. Kontrollpunkte lassen sich erst nach dem Fortsetzen wieder melden.',
     rundgangPausiertSeit: 'pausiert seit',
@@ -1818,8 +1833,35 @@ function rgSeiteZu() {
 // Modul-Unterseite auf die Uebersicht, von der Uebersicht aus der Seite
 // heraus. Ein Pfeil, der aus einer Unterseite gleich alles schliesst, waere
 // derselbe Sackgassen-Fehler wie der fehlende Rueckweg aus ENT-289.
+/* Die Zustaende, in denen eine Runde noch laeuft. Als Liste und nicht als
+   drei verstreute Vergleiche: Sie wird an mehreren Stellen gebraucht, und
+   ein vergessener Zustand hiesse, dass sich die Runde dort doch verlassen
+   laesst. */
+const RUNDGANG_OFFENE_STATUS = ['vorbereitet', 'laeuft', 'pausiert'];
+
+function rgLaufOffen() {
+  return rgsModus === 'lauf' && !!rundgangAktiv
+    && RUNDGANG_OFFENE_STATUS.includes(rundgangAktiv.status);
+}
+
 function rgSeiteZurueck() {
   if (rgsAnsicht !== 'uebersicht') { rgSeiteZurueckZurUebersicht(); return; }
+  /* Eine laufende Runde wird NICHT stillschweigend verlassen (ENT-324).
+
+     Vom Projektinhaber gemeldet: „Bei einem gestarteten Rundgang darf der
+     Bereich nicht über den Pfeil verlassen werden ohne Grundangabe."
+
+     Er hat recht, und der Fehler war eine Luecke, keine Entscheidung: Das
+     Sicherheitsmuster aus ENT-146 (Beenden fuehrt nie direkt zu einer
+     Aenderung, sondern erst zu Pausieren/Abbrechen/Weiter) haengt seit
+     jeher am Knopf „Beenden" -- der Zurueck-Pfeil daneben ging daran
+     vorbei. Wer ihn drueckte, liess eine Runde offen im System stehen,
+     ohne Pause und ohne Abbruchgrund: In der Auswertung sieht das aus wie
+     eine Runde, die noch laeuft, waehrend der Waechter laengst weg ist.
+
+     Der Pfeil aendert selbst nichts -- er stellt dieselbe Frage wie
+     „Beenden". „Weiter" ist der sichere Ausgang und tut gar nichts. */
+  if (rgLaufOffen()) { rundgangBeendenAnzeigen(rundgangAktiv.einsatz_id, 'pfeil'); return; }
   rgSeiteZu();
 }
 
@@ -4289,6 +4331,10 @@ function rundgangListeZeichnen() {
   }
   const gesperrt = rundgangAktiv.status === 'pausiert' || rundgangAktiv.status === 'abgebrochen';
   const lEl = $('rdListe');
+  // Eingetipptes zuerst ins Datenmodell zuruecklesen: Die Liste wird bei
+  // jeder neuen Position neu gezeichnet (ENT-317), und was nur im Feld
+  // stand, waere sonst nach Sekundenbruchteilen weg (ENT-324).
+  kps.forEach(k => { if (k.offen) { rdFormularStandSichern(k); } });
   if (lEl) { lEl.innerHTML = kps.map((k, i) => rdZeile(k, i + 1, gesperrt)).join(''); }
 }
 
@@ -4360,15 +4406,15 @@ function rdZeile(k, nr, gesperrt) {
       <button class="btn btn-plain" onclick="rdEsUm(${k.id})">${esc(w('kpErsatzscan'))}</button>
       <button class="btn btn-plain" onclick="rdNvUm(${k.id})">${esc(w('kpNichtVerfuegbar'))}</button>
     </div>
-    <div class="rd-nv" id="rdEs${k.id}" style="display:none">
+    <div class="rd-nv" id="rdEs${k.id}"${k.offen === 'es' ? '' : ' style="display:none"'}>
       <input type="file" accept="image/*" capture="environment" id="rdEsInput${k.id}" onchange="rdEsFotoGewaehlt(${k.id})" style="display:none">
       <button class="btn btn-plain" onclick="document.getElementById('rdEsInput${k.id}').click()">${esc(w('kpEsFotoAufnehmen'))}</button>
-      <img class="rd-es-vorschau" id="rdEsVorschau${k.id}" style="display:none" alt="">
-      <textarea class="inp" id="rdEsText${k.id}" rows="2" placeholder="${esc(w('kpBeschreibungPflicht'))}"></textarea>
+      <img class="rd-es-vorschau" id="rdEsVorschau${k.id}"${rdEsFotos[k.id] ? ` src="${rdEsFotos[k.id]}"` : ' style="display:none"'} alt="">
+      <textarea class="inp" id="rdEsText${k.id}" rows="2" placeholder="${esc(w('kpBeschreibungPflicht'))}">${esc(k.esText || '')}</textarea>
       <button class="btn btn-neg" onclick="rdEsSenden(${k.id})">${esc(w('kpEsMelden'))}</button>
     </div>
-    <div class="rd-nv" id="rdNv${k.id}" style="display:none">
-      <textarea class="inp" id="rdNvText${k.id}" rows="2" placeholder="${esc(w('kpBeschreibungPflicht'))}"></textarea>
+    <div class="rd-nv" id="rdNv${k.id}"${k.offen === 'nv' ? '' : ' style="display:none"'}>
+      <textarea class="inp" id="rdNvText${k.id}" rows="2" placeholder="${esc(w('kpBeschreibungPflicht'))}">${esc(k.nvText || '')}</textarea>
       <button class="btn btn-neg" onclick="rdNvSenden(${k.id})">${esc(w('kpNichtVerfuegbarMelden'))}</button>
     </div>
     <div class="msg-err" id="rdFehler${k.id}" style="display:none;margin:10px 0 0 37px"></div>`}
@@ -4445,16 +4491,14 @@ function rdMitOrt(k, kontrollpunktId, ort, btn) {
   rdScanEintragen(k, 'bestaetigt', ort);
 }
 
-function rdNvUm(kontrollpunktId) {
-  const el = $('rdNv' + kontrollpunktId);
-  if (el) { el.style.display = el.style.display === 'none' ? '' : 'none'; }
-}
+function rdNvUm(kontrollpunktId) { rdFormularUm(kontrollpunktId, 'nv'); }
 function rdNvSenden(kontrollpunktId) {
   const k = rundgangAktiv.kontrollpunkte.find(x => Number(x.id) === kontrollpunktId);
   if (!k) return;
   const feld = $('rdNvText' + kontrollpunktId);
   const text = feld ? feld.value.trim() : '';
   if (!text) { rdZeigeFehler(kontrollpunktId, w('kpBeschreibungPflicht')); return; }
+  k.offen = null; k.nvText = '';
   rdScanEintragen(k, 'nicht_verfuegbar', {}, text);
 }
 
@@ -4605,10 +4649,47 @@ function rdAufgabenSenden() {
 // kein technischer Vor-Ort-Nachweis wie NFC/Geofence.
 const rdEsFotos = {};   // Kontrollpunkt-Id -> komprimiertes Foto (data: URL), bis "Melden" gedrueckt wird
 
-function rdEsUm(kontrollpunktId) {
-  const el = $('rdEs' + kontrollpunktId);
-  if (el) { el.style.display = el.style.display === 'none' ? '' : 'none'; }
+/* Welches Formular an einem Punkt offen ist, steht am KONTROLLPUNKT und
+   nicht nur im DOM (ENT-324).
+
+   Der gemeldete Fehler: „Ersatzscan Foto kann man nicht tippen, verschwindet
+   die Funktion direkt wieder." Ursache: Seit die Ortung laeuft (ENT-317),
+   zeichnet JEDE neue Position die Liste neu, damit die Entfernungen
+   mitwandern. Das Formular lebte aber ausschliesslich in `style.display` --
+   und war beim naechsten Standortwechsel, also nach Sekundenbruchteilen,
+   wieder zu. Mit ihm verschwanden der eingetippte Grund und die Fotovorschau.
+
+   Genau dieselbe Falle hatte ENT-317 schon einmal bei den Fehlermeldungen
+   (rdZeigeFehler schreibt seither `k.fehler`); der Kommentar am Neuzeichnen
+   behauptete sogar ausdruecklich, offene Formulare seien geschuetzt -- sie
+   waren es nie. Ein Kommentar ist keine Pruefung.
+
+   Die Alternative waere gewesen, das Neuzeichnen zu unterdruecken, solange
+   ein Formular offen ist. Das ist schlechter: Dann friert die Entfernung
+   ein, und „im Bereich" erschiene nicht mehr, waehrend jemand am Formular
+   steht. Der Zustand gehoert an die Daten, nicht die Anzeige angehalten. */
+function rdFormularUm(kontrollpunktId, welches) {
+  const k = rundgangAktiv && rundgangAktiv.kontrollpunkte
+    ? rundgangAktiv.kontrollpunkte.find(x => Number(x.id) === Number(kontrollpunktId)) : null;
+  if (!k) { return; }
+  // Vor dem Umschalten sichern, was schon getippt wurde -- sonst ist es beim
+  // Wiederaufklappen weg.
+  rdFormularStandSichern(k);
+  k.offen = k.offen === welches ? null : welches;
+  rundgangListeZeichnen();
 }
+
+// Liest die beiden Textfelder eines Punktes ins Datenmodell zurueck. Wird
+// vor jedem Neuzeichnen aufgerufen: Ohne das ginge jeder Tastendruck
+// verloren, der zwischen zwei Standortmeldungen faellt.
+function rdFormularStandSichern(k) {
+  const es = $('rdEsText' + k.id);
+  if (es) { k.esText = es.value; }
+  const nv = $('rdNvText' + k.id);
+  if (nv) { k.nvText = nv.value; }
+}
+
+function rdEsUm(kontrollpunktId) { rdFormularUm(kontrollpunktId, 'es'); }
 
 // Verkleinert das Kamerafoto vor dem Versand: ein unkomprimiertes Handyfoto
 // (haeufig mehrere MB) wuerde sowohl das Server-Limit als auch den Platz der
@@ -4658,6 +4739,9 @@ function rdEsSenden(kontrollpunktId) {
   if (!text) { rdZeigeFehler(kontrollpunktId, w('kpBeschreibungPflicht')); return; }
   const foto = dataUrl.slice(dataUrl.indexOf(',') + 1);   // "data:image/jpeg;base64," abtrennen
   delete rdEsFotos[kontrollpunktId];
+  // Der Zustand des Formulars gehoert mit weggeraeumt (ENT-324) -- sonst
+  // klappte es beim naechsten Zeichnen wieder auf, mit altem Text darin.
+  k.offen = null; k.esText = '';
   rdScanEintragen(k, 'ersatzscan', {}, text, foto);
 }
 
@@ -4677,20 +4761,49 @@ const RUNDGANG_ABBRUCH_GRUENDE = {
 // Aenderung, sondern erst zu diesem Dialog mit drei Optionen. "Schliessen"
 // ist der sichere Default und tut nichts weiter, als zur Checkliste
 // zurueckzukehren.
-function rundgangBeendenAnzeigen(einsatzId) {
+/* $woher (ENT-324): 'pfeil', wenn die Frage aus dem Zurueck-Pfeil kommt.
+   Dann ist der WUNSCH, die Seite zu verlassen -- Pausieren und Abbrechen
+   fuehren anschliessend hinaus. Ueber den Knopf „Beenden" ist es
+   umgekehrt: Dort will jemand den Zustand aendern und danach sehen, dass
+   es geschehen ist; die Seite bleibt stehen. Zwei verschiedene Absichten,
+   und derselbe Dialog darf sie nicht gleich behandeln. */
+function rundgangBeendenAnzeigen(einsatzId, woher) {
+  const inLauf = rgsModus === 'lauf';
+  const raus = woher === 'pfeil' ? ', true' : '';
   $('blTitel').textContent = w('rundgangBeendenTitel');
+  // Unter jedem Knopf steht, was er bewirkt. Bei „Abbrechen" ist das keine
+  // Hoeflichkeit: Es ist der einzige Knopf hier, der sich nicht rueckgaengig
+  // machen laesst, und wer ihn statt „Pausieren" drueckt, kann die Runde
+  // nicht mehr aufnehmen.
   $('blBody').innerHTML = `
     <p style="font-size:15px;margin-bottom:20px">${esc(w('rundgangBeendenFrage'))}</p>
-    <button class="btn btn-plain btn-wide" style="margin-bottom:10px" onclick="rundgangPausieren(${Number(einsatzId)})">${esc(w('rundgangPausierenKnopf'))}</button>
-    <button class="btn btn-neg btn-wide" onclick="rundgangAbbrechenAnzeigen(${Number(einsatzId)})">${esc(w('rundgangAbbrechenKnopf'))}</button>`;
-  $('blFuss').innerHTML = `<button class="btn btn-primary btn-wide" onclick="rundgangAnzeigen(${Number(einsatzId)})">${esc(w('schliessen'))}</button>`;
+    <button class="btn btn-plain btn-wide" style="margin-bottom:10px" onclick="rundgangPausieren(${Number(einsatzId)}${raus})">
+      ${esc(w('rundgangPausierenKnopf'))}<span class="btn-unter">${esc(w('rundgangPausierenUnter'))}</span></button>
+    <button class="btn btn-neg btn-wide" onclick="rundgangAbbrechenAnzeigen(${Number(einsatzId)}, 'beenden'${raus})">
+      ${esc(w('rundgangAbbrechenKnopf'))}<span class="btn-unter">${esc(w('rundgangAbbrechenUnter'))}</span></button>`;
+  // In der Vollseite fuehrt „Weiter" nur aus dem Dialog heraus: Ein Aufruf
+  // von rundgangAnzeigen() oeffnete dort die alte Schublade ueber der
+  // laufenden Seite -- zwei Darstellungen derselben Runde uebereinander.
+  $('blFuss').innerHTML = `<button class="btn btn-primary btn-wide" onclick="${inLauf
+    ? 'blattZu()' : `rundgangAnzeigen(${Number(einsatzId)})`}">
+      ${esc(w('rundgangWeiterKnopf'))}<span class="btn-unter">${esc(w('rundgangWeiterUnter'))}</span></button>`;
+  // Selbst oeffnen: Aus dem Zurueck-Pfeil der Vollseite heraus ist die
+  // Schublade zu, und ein Dialog ausserhalb des Bildschirms waere schlimmer
+  // als gar keiner -- dieselbe Falle wie bei rundgangAbbrechenAnzeigen.
+  blattZeigen();
 }
 
-function rundgangPausieren(einsatzId) {
+// $raus (ENT-324): Kam die Frage aus dem Zurueck-Pfeil, fuehrt Pausieren
+// anschliessend wirklich hinaus -- sonst haette der Pfeil zwar gefragt, aber
+// nichts bewirkt. Die Runde bleibt dabei erreichbar: Der Chip auf „Heute"
+// ist ausdruecklich fuer den aktiven UND den pausierten Rundgang gebaut
+// (ENT-234), er ist der Weg zurueck.
+function rundgangPausieren(einsatzId, raus) {
   api('mein_rundgang_pausieren.php', { method: 'POST', body: { rundgang_id: rundgangAktiv.id } }).then(({ ok, data }) => {
     if (!ok || data.status !== 'ok') { toast(data.message || w('netzfehler')); return; }
     rundgangAktiv.status = 'pausiert';
     rundgangAktiv.pausiert_seit = jetztDatetime();
+    if (raus) { blattZu(); rgSeiteZu(); zeichneHeute(); return; }
     rundgangAnzeigen(einsatzId);
   });
 }
@@ -4717,7 +4830,12 @@ function rundgangWiederAufnehmen(einsatzId) {
   });
 }
 
-function rundgangAbbrechenAnzeigen(einsatzId) {
+// $woher (ENT-324): Wohin „Zurueck" fuehrt. Ohne diese Angabe landete der
+// Weg aus der Vollseite immer bei blattZu() -- auch wenn man ueber den
+// Beenden-Dialog hergekommen war, der dann uebersprungen wurde. Ein
+// Rueckweg, der eine Ebene ueberspringt, ist derselbe Sackgassen-Fehler wie
+// ein fehlender.
+function rundgangAbbrechenAnzeigen(einsatzId, woher, raus) {
   $('blTitel').textContent = w('rundgangAbbrechenTitel');
   $('blBody').innerHTML = `
     <div class="msg-err" style="color:var(--warn);background:var(--warn-soft)">${esc(w('rundgangAbbrechenHinweis'))}</div>
@@ -4736,9 +4854,9 @@ function rundgangAbbrechenAnzeigen(einsatzId) {
   // Funktionen der Vollseite fuehrt er zurueck auf die Seite, aus dem alten
   // Beenden-Dialog dorthin.
   $('blFuss').innerHTML = `
-    <button class="btn btn-plain" onclick="${rgsModus === 'lauf'
-      ? 'blattZu()' : `rundgangBeendenAnzeigen(${Number(einsatzId)})`}">${esc(w('zurueck'))}</button>
-    <button class="btn btn-neg" id="raBtn" onclick="rundgangAbbrechenSenden(${Number(einsatzId)})">${esc(w('rundgangAbbrechenBestaetigen'))}</button>`;
+    <button class="btn btn-plain" onclick="${woher === 'beenden' || rgsModus !== 'lauf'
+      ? `rundgangBeendenAnzeigen(${Number(einsatzId)})` : 'blattZu()'}">${esc(w('zurueck'))}</button>
+    <button class="btn btn-neg" id="raBtn" onclick="rundgangAbbrechenSenden(${Number(einsatzId)}${raus ? ', true' : ''})">${esc(w('rundgangAbbrechenBestaetigen'))}</button>`;
   // Selbst oeffnen: Bis ENT-306 kam dieser Dialog immer aus einer bereits
   // offenen Schublade (rundgangBeendenAnzeigen). Aus den Funktionen der
   // Vollseite heraus ist sie zu -- ohne diesen Aufruf laege der Dialog
@@ -4746,7 +4864,7 @@ function rundgangAbbrechenAnzeigen(einsatzId) {
   blattZeigen();
 }
 
-function rundgangAbbrechenSenden(einsatzId) {
+function rundgangAbbrechenSenden(einsatzId, raus) {
   const err = $('raErr'); err.style.display = 'none';
   const grund = $('raGrund').value;
   if (!grund) { err.textContent = w('rundgangAbbrechenGrundPflicht'); err.style.display = ''; return; }
@@ -4759,6 +4877,10 @@ function rundgangAbbrechenSenden(einsatzId) {
       rundgangAktiv.status = 'abgebrochen';
       rundgangAktiv.abbruch_grund = grund;
       rundgangAktiv.abbruch_freitext = freitext || null;
+      // Ist die Runde abgebrochen und die Frage kam aus dem Pfeil, ist der
+      // Weg hinaus die Antwort -- ein Zurueckspringen auf die Seite einer
+      // beendeten Runde waere eine Sackgasse.
+      if (raus) { blattZu(); rgSeiteZu(); zeichneHeute(); return; }
       rundgangAnzeigen(einsatzId);
     });
 }
