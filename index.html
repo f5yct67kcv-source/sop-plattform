@@ -123,21 +123,7 @@ tr:hover td { background: var(--accent-light); }
 .filter-row input, .filter-row select { border: 1.5px solid var(--border); border-radius: 8px; padding: 9px 12px; font-size: 13px; background: var(--surface); -webkit-appearance: none; appearance: none; font-family: inherit; color: var(--text); }
 .filter-row input { flex: 1; min-width: 140px; }
 
-.ma-stat-row { display: flex; align-items: center; justify-content: space-between; padding: 13px 0; border-bottom: 1px solid var(--border); }
-.ma-stat-row:last-child { border-bottom: none; }
-.ma-stat-name { font-weight: 700; font-size: 14px; }
-.ma-stat-meta { font-size: 12px; color: var(--sub); margin-top: 2px; }
-.ma-stat-h { font-size: 20px; font-weight: 800; color: var(--accent); }
 
-.admin-locked { text-align: center; padding: 48px 20px; }
-.lock-icon { font-size: 48px; margin-bottom: 16px; }
-.pin-input { font-size: 24px; letter-spacing: 8px; text-align: center; border: 2px solid var(--border); border-radius: 10px; padding: 14px; width: 100%; max-width: 200px; }
-.ma-chip { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border: 1px solid var(--border); border-radius: 9px; margin-bottom: 8px; background: var(--bg); }
-.ma-chip-name { font-weight: 600; }
-.ma-chip-remove { background: none; border: none; color: var(--red); cursor: pointer; font-size: 20px; padding: 0 4px; line-height: 1; }
-.new-ma-row { display: flex; gap: 8px; margin-top: 12px; }
-.new-ma-row input { flex: 1; border: 1.5px solid var(--border); border-radius: 9px; padding: 11px 14px; font-size: 14px; background: var(--surface); font-family: inherit; }
-.new-ma-row input:focus { outline: none; border-color: var(--accent); }
 
 .empty { text-align: center; padding: 40px 20px; color: var(--sub); }
 .empty .ico { font-size: 36px; margin-bottom: 10px; }
@@ -152,7 +138,6 @@ tr:hover td { background: var(--accent-light); }
 .modal p { font-size: 13px; color: var(--sub); margin-bottom: 20px; }
 .modal .btn-row { gap: 8px; }
 
-.divider { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
 
 .detail-row { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--border); }
 .detail-row:last-child { border-bottom: none; }
@@ -218,8 +203,6 @@ tr:hover td { background: var(--accent-light); }
 <div class="tabs">
   <div class="tab active" onclick="showTab('erfassen')" id="tab-erfassen">Erfassen</div>
   <div class="tab" onclick="showTab('uebersicht')" id="tab-uebersicht">Übersicht</div>
-  <div class="tab" onclick="showTab('mitarbeiter')" id="tab-mitarbeiter" style="display:none">Mitarbeiter</div>
-  <div class="tab" onclick="showTab('admin')" id="tab-admin" style="display:none">Admin</div>
 </div>
 
 <!-- ERFASSEN -->
@@ -366,65 +349,6 @@ tr:hover td { background: var(--accent-light); }
 </div>
 
 <!-- MITARBEITER -->
-<div class="page" id="page-mitarbeiter">
-  <div class="card">
-    <div class="card-title" id="lbl-sec-mastats">Gesamtstunden pro Mitarbeiter</div>
-    <div id="maStatsList"></div>
-  </div>
-</div>
-
-<!-- ADMIN -->
-<div class="page" id="page-admin">
-  <div class="tabs" style="position:static;border-radius:var(--radius);overflow:hidden;margin-bottom:14px;box-shadow:var(--shadow)">
-    <div class="tab active" onclick="showAdminSub('mitarbeiter')" id="admintab-mitarbeiter">Mitarbeiter</div>
-    <div class="tab" onclick="showAdminSub('kunden')" id="admintab-kunden">Kunden</div>
-    <div class="tab" onclick="showAdminSub('objekte')" id="admintab-objekte">Objekte</div>
-  </div>
-
-  <div id="adminPanel" class="admin-sub">
-    <div class="card">
-      <div class="card-title" id="lbl-sec-adminma">Mitarbeiterliste verwalten</div>
-      <div id="maChipList"></div>
-      <div class="new-ma-row" style="flex-wrap:wrap">
-        <input type="text" id="newMaInput" placeholder="Name..." style="min-width:120px">
-        <div class="pw-feld" style="min-width:120px">
-          <input type="password" id="newMaPassword" placeholder="Passwort (mind. 6 Zeichen)" style="width:100%" onkeydown="if(event.key==='Enter')addMa()">
-          <button type="button" class="pw-toggle" onclick="togglePw('newMaPassword',this)" aria-label="Passwort anzeigen">👁</button>
-        </div>
-        <button class="btn btn-green btn-sm" onclick="addMa()" id="btn-add-ma">+ Hinzufügen</button>
-      </div>
-      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn btn-ghost btn-sm" onclick="openKiMaModal()">🎙️ Per Sprache/Diktat anlegen</button>
-        <button class="btn btn-ghost btn-sm" onclick="openKiMaEditModal()">🎙️ Per Diktat bearbeiten</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="adminKundenPanel" class="admin-sub" style="display:none">
-    <div class="card">
-      <div class="card-title">Kunden verwalten</div>
-      <div id="kundenChipList"></div>
-      <div style="margin-top:10px">
-        <button class="btn btn-green btn-sm" onclick="openKundeAddModal()">+ Kunde hinzufügen</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="adminObjektePanel" class="admin-sub" style="display:none">
-    <div class="card">
-      <div class="card-title">Objekte (Revierdienst)</div>
-      <div class="empty">
-        <div class="ico">🚧</div>
-        <p>Noch nicht verfügbar — eigenständige Werkzeug-Spur (V3), wird separat aufgegriffen, sobald sie dran ist.</p>
-      </div>
-    </div>
-  </div>
-
-  <div style="text-align:right;margin-top:8px">
-    <button class="btn btn-ghost btn-sm" onclick="doLogout()" id="btn-logout">Abmelden</button>
-  </div>
-</div>
-
 <!-- DELETE MODAL -->
 <div class="modal-overlay" id="deleteModal">
   <div class="modal">
@@ -433,252 +357,6 @@ tr:hover td { background: var(--accent-light); }
     <div class="btn-row">
       <button class="btn btn-ghost" style="flex:1" onclick="closeModal()" id="btn-modal-cancel">Abbrechen</button>
       <button class="btn btn-red" style="flex:1" onclick="confirmDelete()" id="btn-modal-ok">Löschen</button>
-    </div>
-  </div>
-</div>
-
-<!-- MITARBEITER DETAIL MODAL -->
-<!-- KI-DIKTAT MITARBEITER -->
-<div class="modal-overlay" id="kiMaModal">
-  <div class="modal" style="max-width:420px">
-    <h3>Mitarbeiter per Sprache/Diktat</h3>
-    <p style="font-size:12px;color:var(--sub);margin:8px 0 12px">Tippe hier rein oder nutze das Mikrofon-Symbol der Tastatur zum Diktieren, z.B. „Neuer Mitarbeiter Hans Meier, Personalnummer 2530, geboren 3. Mai 1990, wohnhaft Musterweg 1, 3000 Bern, Mobil 079 123 45 67".</p>
-    <div class="field">
-      <textarea id="kiMaText" rows="4" placeholder="Text eingeben oder diktieren..."></textarea>
-    </div>
-    <div class="err-msg" id="kiMaError" style="display:none;margin-bottom:10px"></div>
-    <button class="btn btn-primary" style="width:100%" id="btn-ki-ma-submit" onclick="submitKiMaParse()">Felder erkennen</button>
-    <div class="btn-row" style="margin-top:16px">
-      <button class="btn btn-ghost" style="flex:1" onclick="closeKiMaModal()">Abbrechen</button>
-    </div>
-  </div>
-</div>
-
-<!-- KI-DIKTAT MITARBEITER BEARBEITEN -->
-<div class="modal-overlay" id="kiMaEditModal">
-  <div class="modal" style="max-width:420px">
-    <h3>Mitarbeiter per Diktat bearbeiten</h3>
-    <p style="font-size:12px;color:var(--sub);margin:8px 0 12px">Tippe oder diktiere, wen du meinst und was sich ändern soll, z.B. „Ändere die Adresse von Daniele Ciardo zu Musterstrasse 1, 3000 Bern". Tippfehler beim Namen sind kein Problem.</p>
-    <div class="field">
-      <textarea id="kiMaEditText" rows="4" placeholder="Text eingeben oder diktieren..."></textarea>
-    </div>
-    <div class="err-msg" id="kiMaEditError" style="display:none;margin-bottom:10px"></div>
-    <button class="btn btn-primary" style="width:100%" id="btn-ki-ma-edit-submit" onclick="submitKiMaEditParse()">Änderung erkennen</button>
-    <div class="btn-row" style="margin-top:16px">
-      <button class="btn btn-ghost" style="flex:1" onclick="closeKiMaEditModal()">Abbrechen</button>
-    </div>
-  </div>
-</div>
-
-<!-- KI-DIKTAT MITARBEITER: PRUEFEN VOR DEM ANLEGEN -->
-<div class="modal-overlay" id="kiMaReviewModal">
-  <div class="modal" style="max-width:420px;max-height:90vh;overflow-y:auto">
-    <h3>Neuer Mitarbeiter — bitte prüfen</h3>
-    <p style="font-size:12px;color:var(--sub);margin:8px 0 12px">Erkannt aus dem Diktat. Nichts ist gespeichert — bitte prüfen, korrigieren und Passwort setzen.</p>
-    <div class="field">
-      <label>Login-Name</label>
-      <input type="text" id="kiReviewLoginName">
-    </div>
-    <div class="field">
-      <label>Passwort</label>
-      <div class="pw-feld">
-        <input type="password" id="kiReviewPassword" placeholder="mind. 6 Zeichen">
-        <button type="button" class="pw-toggle" onclick="togglePw('kiReviewPassword',this)" aria-label="Passwort anzeigen">👁</button>
-      </div>
-    </div>
-    <hr class="divider">
-    <div class="row2">
-      <div class="field">
-        <label>Personalnummer</label>
-        <input type="text" id="kiReviewPersonalnummer">
-      </div>
-      <div class="field">
-        <label>Anrede</label>
-        <select id="kiReviewAnrede">
-          <option value="">–</option>
-          <option value="Herr">Herr</option>
-          <option value="Frau">Frau</option>
-          <option value="Divers">Divers</option>
-        </select>
-      </div>
-    </div>
-    <div class="row2">
-      <div class="field">
-        <label>Vorname</label>
-        <input type="text" id="kiReviewVorname">
-      </div>
-      <div class="field">
-        <label>Nachname</label>
-        <input type="text" id="kiReviewNachname">
-      </div>
-    </div>
-    <div class="field">
-      <label>Geburtsdatum</label>
-      <input type="date" id="kiReviewGeburtsdatum">
-    </div>
-    <div class="field">
-      <label>Strasse</label>
-      <input type="text" id="kiReviewStrasse">
-    </div>
-    <div class="field">
-      <label>Ort / PLZ</label>
-      <input type="text" id="kiReviewOrt">
-    </div>
-    <div class="row2">
-      <div class="field">
-        <label>Telefon</label>
-        <input type="text" id="kiReviewTelefon">
-      </div>
-      <div class="field">
-        <label>Mobil</label>
-        <input type="text" id="kiReviewMobil">
-      </div>
-    </div>
-    <div class="field">
-      <label>E-Mail</label>
-      <input type="email" id="kiReviewEmail">
-    </div>
-    <div class="err-msg" id="kiReviewError" style="display:none;margin-bottom:10px"></div>
-    <button class="btn btn-primary" style="width:100%" onclick="confirmKiMaCreate()">Mitarbeiter jetzt anlegen</button>
-    <div class="btn-row" style="margin-top:10px">
-      <button class="btn btn-ghost" style="flex:1" onclick="closeKiMaReviewModal()">Abbrechen</button>
-    </div>
-  </div>
-</div>
-
-<div class="modal-overlay" id="maDetailModal">
-  <div class="modal" style="max-width:420px;max-height:90vh;overflow-y:auto">
-    <h3>Mitarbeiter-Details</h3>
-    <div id="maDetailBody" style="margin:10px 0"></div>
-    <div class="row2">
-      <div class="field">
-        <label>Personalnummer</label>
-        <input type="text" id="maEditPersonalnummer">
-      </div>
-      <div class="field">
-        <label>Anrede</label>
-        <select id="maEditAnrede">
-          <option value="">–</option>
-          <option value="Herr">Herr</option>
-          <option value="Frau">Frau</option>
-          <option value="Divers">Divers</option>
-        </select>
-      </div>
-    </div>
-    <div class="row2">
-      <div class="field">
-        <label>Vorname</label>
-        <input type="text" id="maEditVorname">
-      </div>
-      <div class="field">
-        <label>Nachname</label>
-        <input type="text" id="maEditNachname">
-      </div>
-    </div>
-    <div class="field">
-      <label>Geburtsdatum</label>
-      <input type="date" id="maEditGeburtsdatum">
-    </div>
-    <div class="field">
-      <label>Strasse</label>
-      <input type="text" id="maEditStrasse">
-    </div>
-    <div class="field">
-      <label>Ort / PLZ</label>
-      <input type="text" id="maEditOrt">
-    </div>
-    <div class="row2">
-      <div class="field">
-        <label>Telefon</label>
-        <input type="text" id="maEditTelefon">
-      </div>
-      <div class="field">
-        <label>Mobil</label>
-        <input type="text" id="maEditMobil">
-      </div>
-    </div>
-    <div class="field">
-      <label>E-Mail</label>
-      <input type="email" id="maEditEmail">
-    </div>
-    <button class="btn btn-ghost btn-sm" style="width:100%;margin-top:4px" onclick="saveMaEdit()">Angaben speichern</button>
-    <hr class="divider">
-    <div class="field" style="margin-bottom:10px">
-      <label>Neues Passwort setzen</label>
-      <div class="pw-feld">
-        <input type="password" id="maResetPassword" placeholder="mind. 6 Zeichen">
-        <button type="button" class="pw-toggle" onclick="togglePw('maResetPassword',this)" aria-label="Passwort anzeigen">👁</button>
-      </div>
-    </div>
-    <button class="btn btn-ghost btn-sm" style="width:100%" onclick="resetMaPassword()">Passwort setzen</button>
-    <div class="btn-row" style="margin-top:16px">
-      <button class="btn btn-ghost" style="flex:1" onclick="closeMaDetailModal()">Schliessen</button>
-    </div>
-    <button class="btn btn-red" style="width:100%;margin-top:10px" id="btn-ma-remove" onclick="confirmRemoveMa()">Mitarbeiter entfernen</button>
-  </div>
-</div>
-
-<!-- KUNDE DETAIL MODAL -->
-<div class="modal-overlay" id="kundeDetailModal">
-  <div class="modal" style="max-width:380px">
-    <h3>Kunde bearbeiten</h3>
-    <div class="field" style="margin-top:10px">
-      <label>Name <span class="req">*</span></label>
-      <input type="text" id="kundeEditName">
-    </div>
-    <div class="field">
-      <label>Strasse <span class="req">*</span></label>
-      <input type="text" id="kundeEditStrasse">
-    </div>
-    <div class="field">
-      <label>Ort / PLZ <span class="req">*</span></label>
-      <input type="text" id="kundeEditOrt">
-    </div>
-    <div class="field">
-      <label>Telefon <span class="req">*</span></label>
-      <input type="text" id="kundeEditTelefon">
-    </div>
-    <div class="field">
-      <label>E-Mail</label>
-      <input type="email" id="kundeEditEmail">
-    </div>
-    <div class="err-msg" id="kundeEditError" style="display:none;margin-bottom:6px"></div>
-    <button class="btn btn-ghost btn-sm" style="width:100%;margin-top:6px" onclick="saveKundeEdit()">Speichern</button>
-    <div class="btn-row" style="margin-top:16px">
-      <button class="btn btn-ghost" style="flex:1" onclick="closeKundeDetailModal()">Schliessen</button>
-    </div>
-    <button class="btn btn-red" style="width:100%;margin-top:10px" onclick="confirmDeleteKunde()">Kunde entfernen</button>
-  </div>
-</div>
-
-<!-- KUNDE HINZUFUEGEN MODAL -->
-<div class="modal-overlay" id="kundeAddModal">
-  <div class="modal" style="max-width:380px">
-    <h3>Kunde hinzufügen</h3>
-    <div class="field" style="margin-top:10px">
-      <label>Name <span class="req">*</span></label>
-      <input type="text" id="newKundeName">
-    </div>
-    <div class="field">
-      <label>Strasse <span class="req">*</span></label>
-      <input type="text" id="newKundeStrasse">
-    </div>
-    <div class="field">
-      <label>Ort / PLZ <span class="req">*</span></label>
-      <input type="text" id="newKundeOrt">
-    </div>
-    <div class="field">
-      <label>Telefon <span class="req">*</span></label>
-      <input type="text" id="newKundeTelefon">
-    </div>
-    <div class="field">
-      <label>E-Mail</label>
-      <input type="email" id="newKundeEmail" onkeydown="if(event.key==='Enter')addKunde()">
-    </div>
-    <div class="err-msg" id="kundeAddError" style="display:none;margin-bottom:6px"></div>
-    <button class="btn btn-primary" style="width:100%" onclick="addKunde()">Kunde anlegen</button>
-    <div class="btn-row" style="margin-top:10px">
-      <button class="btn btn-ghost" style="flex:1" onclick="closeKundeAddModal()">Abbrechen</button>
     </div>
   </div>
 </div>
@@ -711,6 +389,7 @@ const PW_MIN = 6;
 
 // ── STATE
 let rapports       = [];
+let kundenOptions  = [];
 let deleteTargetId = null;
 let detailTargetId = null;
 
@@ -778,8 +457,6 @@ function showForgotPw() {
 function afterLogin() {
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('maDisplay').value = currentUser.name;
-  document.getElementById('tab-admin').style.display = currentUser.ist_admin ? '' : 'none';
-  document.getElementById('tab-mitarbeiter').style.display = currentUser.ist_admin ? '' : 'none';
   loadAll();
   loadKundenOptions();
 }
@@ -797,7 +474,7 @@ function loadAll() {
   apiCall('rapport_list.php').then(({ ok, data }) => {
     if (!ok || data.status !== 'ok') { if (!ok) doLogout(); return; }
     rapports = data.rapporte.map(mapRapport);
-    renderTable(); renderMaStats();
+    renderTable();
   });
 }
 
@@ -806,7 +483,6 @@ function loadAll() {
 // entfallen -- eine halb gepflegte Uebersetzung ist schlechter als keine.
 const T = {
     'h-title':'Stundenrapport','tab-erfassen':'Erfassen','tab-uebersicht':'Übersicht',
-    'tab-mitarbeiter':'Mitarbeiter','tab-admin':'Admin',
     'lbl-sec-ma':'Mitarbeiter','lbl-name':'Name','err-ma':'Bitte Mitarbeiter wählen.',
     'lbl-sec-auftrag':'Auftrag','lbl-kunde':'Kundenname','err-kunde':'Pflichtfeld',
     'lbl-strasse':'Strasse','err-strasse':'Pflichtfeld',
@@ -835,31 +511,23 @@ const T = {
     'modal-del-title':'Rapport löschen?',
     'modal-del-body':'Dieser Eintrag wird unwiderruflich gelöscht.',
     'btn-modal-cancel':'Abbrechen','btn-modal-ok':'Löschen',
-    'ea':['Verkehrsdienst','Absperrung','Veranstaltung','Escort','Sonstiges'],
     'pa':['Keine Pause','15 Minuten','30 Minuten','45 Minuten','1 Stunde','1.5 Stunden','2 Stunden'],
     'th':['Datum','Mitarbeiter','Kunde','Adresse','Art','Zeit','Pause','Netto','Unterschrift / Unterzeichner',''],
-    'no-data':'Keine Rapporte vorhanden.','del':'Löschen',
-    'ph-ma':'— wählen —','ph-filter':'Suche...','ph-new-ma':'Name hinzufügen...',
+    'no-data':'Keine Rapporte vorhanden.','del':'Löschen','ph-filter':'Suche...','ph-new-ma':'Name hinzufügen...',
     'ph-signame':'Vor- und Nachname',
     'ph-kunde':'z.B. Stadt Bern','ph-strasse':'z.B. Bahnhofstrasse 12',
     'ph-ort':'z.B. 3011 Bern','ph-auftragNr':'optional',
     'ph-bem':'Besondere Vorkommnisse...',
     'stat-r':'Rapporte','stat-h':'Stunden','stat-ma':'Mitarbeiter',
-    'lbl-einsaetze':'Einsätze','lbl-letzter':'Letzter',
-    'min':'Min.',
-    'tSaved':'✓ Rapport gespeichert!','tMaAdd':'✓ Mitarbeiter hinzugefügt.',
-    'tMaRem':'Mitarbeiter entfernt.','tPinOk':'✓ PIN geändert.',
-    'tAllDel':'Alle Rapporte gelöscht.','tDel':'Rapport gelöscht.',
-    'tCsv':'✓ CSV exportiert.','tNoData':'Keine Daten.',
-    'tWrongPin':'Falscher PIN.','tPinInvalid':'PIN muss 4 Ziffern haben.',
-    'tName':'Bitte Namen eingeben.','tConfirm':'Bitte Bestätigung anhaken.',
+    'min':'Min.','tDel':'Rapport gelöscht.',
+    'tCsv':'✓ CSV exportiert.','tNoData':'Keine Daten.','tConfirm':'Bitte Bestätigung anhaken.',
 };
 const t = k => T[k] || k;
 
 // ── BESCHRIFTUNG
 // Alle sichtbaren Texte kommen aus T, damit dieselbe Sache ueberall gleich heisst.
 function applyLang() {
-  const ids = ['h-title','tab-erfassen','tab-uebersicht','tab-mitarbeiter','tab-admin',
+  const ids = ['h-title','tab-erfassen','tab-uebersicht',
     'lbl-sec-ma','lbl-name','err-ma','lbl-sec-auftrag','lbl-kunde','err-kunde',
     'lbl-strasse','err-strasse','lbl-ort','err-ort','lbl-datum','err-datum',
     'lbl-einsatzart','lbl-auftragNr','lbl-sec-zeiten','lbl-von','err-von',
@@ -891,21 +559,8 @@ function showTab(name) {
   document.getElementById('tab-'+name).classList.add('active');
   document.getElementById('page-'+name).classList.add('active');
   if (name==='uebersicht') { renderStats(); renderTable(); }
-  if (name==='mitarbeiter') renderMaStats();
-  if (name==='admin') showAdminSub('mitarbeiter');
 }
 
-// ── ADMIN SUB-TABS
-function showAdminSub(name) {
-  ['mitarbeiter','kunden','objekte'].forEach(n => {
-    document.getElementById('admintab-'+n).classList.toggle('active', n===name);
-  });
-  document.getElementById('adminPanel').style.display = name==='mitarbeiter' ? '' : 'none';
-  document.getElementById('adminKundenPanel').style.display = name==='kunden' ? '' : 'none';
-  document.getElementById('adminObjektePanel').style.display = name==='objekte' ? '' : 'none';
-  if (name==='mitarbeiter') renderMaChips();
-  if (name==='kunden') renderKundenList();
-}
 
 // ── UNTERSCHRIFT (ENT-292)
 // Gezeichnet wird in unterschrift.js auf dem ganzen Bildschirm; hier steht nur
@@ -1044,15 +699,6 @@ function renderTable() {
 }
 function clearFilter(){document.getElementById('filterQ').value='';document.getElementById('filterM').value='';renderTable();}
 
-// ── MA STATS
-function renderMaStats() {
-  apiCall('mitarbeiter_stats.php').then(({ok,data})=>{
-    const con=document.getElementById('maStatsList');
-    if(!ok||data.status!=='ok'||!data.stats.length){con.innerHTML=`<div class="empty"><div class="ico">👤</div><p>${t('no-data')}</p></div>`;return;}
-    con.innerHTML=data.stats.map(d=>`<div class="ma-stat-row"><div><div class="ma-stat-name">${d.name}</div><div class="ma-stat-meta">${d.anzahl} ${t('lbl-einsaetze')} · ${t('lbl-letzter')}: ${d.letzter?fmtDate(d.letzter):'–'}</div></div><div class="ma-stat-h">${parseFloat(d.stunden).toFixed(2)} h</div></div>`).join('');
-  });
-}
-
 // ── DELETE
 function askDelete(id){deleteTargetId=id;document.getElementById('deleteModal').classList.add('show');}
 function closeModal(){document.getElementById('deleteModal').classList.remove('show');deleteTargetId=null;}
@@ -1137,278 +783,22 @@ function exportCSV() {
 let maListData = [];
 let maDetailTarget = null;
 
-function openKiMaModal(){
-  document.getElementById('kiMaText').value = '';
-  document.getElementById('kiMaError').style.display = 'none';
-  document.getElementById('kiMaModal').classList.add('show');
-}
-function closeKiMaModal(){ document.getElementById('kiMaModal').classList.remove('show'); }
-function submitKiMaParse(){
-  const text = document.getElementById('kiMaText').value.trim();
-  const errEl = document.getElementById('kiMaError');
-  errEl.style.display = 'none';
-  if (!text) { errEl.textContent = 'Bitte Text eingeben.'; errEl.style.display = ''; return; }
-  const btn = document.getElementById('btn-ki-ma-submit'); btn.disabled = true;
-  apiCall('ki_mitarbeiter_parse.php',{method:'POST',body:{text}}).then(({ok,data})=>{
-    btn.disabled = false;
-    if (!ok || data.status!=='ok') { errEl.textContent = data.message || 'Erkennung fehlgeschlagen.'; errEl.style.display = ''; return; }
-    closeKiMaModal();
-    openKiMaReviewModal(data.felder || {});
-  }).catch(()=>{ btn.disabled=false; errEl.textContent='Netzwerkfehler.'; errEl.style.display=''; });
+function applyKundeSelect(){
+  const idx = document.getElementById('kundeSelect').value;
+  if (idx==='') return;
+  const k = kundenOptions[idx];
+  if (!k) return;
+  document.getElementById('kunde').value = k.name;
+  document.getElementById('strasse').value = k.strasse;
+  document.getElementById('ort').value = k.ort;
 }
 
-// Echter Pruef-Schritt vor dem Anlegen: nichts wird gespeichert, bevor der
-// Admin hier alle erkannten Felder gesehen, ggf. korrigiert und ein
-// Passwort gesetzt hat.
-function openKiMaReviewModal(felder){
-  const vorname = (felder.vorname||'').toLowerCase().trim();
-  const nachname = (felder.nachname||'').toLowerCase().trim();
-  document.getElementById('kiReviewLoginName').value = (vorname && nachname) ? `${vorname}.${nachname}`.replace(/\s+/g,'') : '';
-  document.getElementById('kiReviewPassword').value = '';
-  document.getElementById('kiReviewPersonalnummer').value = felder.personalnummer || '';
-  document.getElementById('kiReviewAnrede').value = felder.anrede || '';
-  document.getElementById('kiReviewVorname').value = felder.vorname || '';
-  document.getElementById('kiReviewNachname').value = felder.nachname || '';
-  document.getElementById('kiReviewGeburtsdatum').value = felder.geburtsdatum || '';
-  document.getElementById('kiReviewStrasse').value = felder.strasse || '';
-  document.getElementById('kiReviewOrt').value = felder.ort || '';
-  document.getElementById('kiReviewTelefon').value = felder.telefon || '';
-  document.getElementById('kiReviewMobil').value = felder.mobil || '';
-  document.getElementById('kiReviewEmail').value = felder.email || '';
-  document.getElementById('kiReviewError').style.display = 'none';
-  document.getElementById('kiMaReviewModal').classList.add('show');
-}
-function closeKiMaReviewModal(){ document.getElementById('kiMaReviewModal').classList.remove('show'); }
-function confirmKiMaCreate(){
-  const errEl = document.getElementById('kiReviewError');
-  errEl.style.display = 'none';
-  const name = document.getElementById('kiReviewLoginName').value.trim();
-  const password = document.getElementById('kiReviewPassword').value;
-  if (!name) { errEl.textContent = 'Login-Name erforderlich.'; errEl.style.display = ''; return; }
-  if (password.length < PW_MIN) { errEl.textContent = `Passwort mindestens ${PW_MIN} Zeichen.`; errEl.style.display = ''; return; }
-  const body = {
-    name, password,
-    personalnummer: document.getElementById('kiReviewPersonalnummer').value.trim(),
-    anrede: document.getElementById('kiReviewAnrede').value,
-    vorname: document.getElementById('kiReviewVorname').value.trim(),
-    nachname: document.getElementById('kiReviewNachname').value.trim(),
-    geburtsdatum: document.getElementById('kiReviewGeburtsdatum').value,
-    strasse: document.getElementById('kiReviewStrasse').value.trim(),
-    ort: document.getElementById('kiReviewOrt').value.trim(),
-    telefon: document.getElementById('kiReviewTelefon').value.trim(),
-    mobil: document.getElementById('kiReviewMobil').value.trim(),
-    email: document.getElementById('kiReviewEmail').value.trim(),
-  };
-  apiCall('mitarbeiter_create.php',{method:'POST',body}).then(({ok,data})=>{
-    if (!ok || data.status!=='ok') { errEl.textContent = data.message || 'Fehler.'; errEl.style.display = ''; return; }
-    closeKiMaReviewModal();
-    renderMaChips();
-    showToast(t('tMaAdd'));
-  });
-}
-
-function openKiMaEditModal(){
-  document.getElementById('kiMaEditText').value = '';
-  document.getElementById('kiMaEditError').style.display = 'none';
-  document.getElementById('kiMaEditModal').classList.add('show');
-}
-function closeKiMaEditModal(){ document.getElementById('kiMaEditModal').classList.remove('show'); }
-function submitKiMaEditParse(){
-  const text = document.getElementById('kiMaEditText').value.trim();
-  const errEl = document.getElementById('kiMaEditError');
-  errEl.style.display = 'none';
-  if (!text) { errEl.textContent = 'Bitte Text eingeben.'; errEl.style.display = ''; return; }
-  const btn = document.getElementById('btn-ki-ma-edit-submit'); btn.disabled = true;
-  apiCall('ki_mitarbeiter_edit_parse.php',{method:'POST',body:{text}}).then(({ok,data})=>{
-    btn.disabled = false;
-    if (!ok || data.status!=='ok') { errEl.textContent = data.message || 'Erkennung fehlgeschlagen.'; errEl.style.display = ''; return; }
-    const idx = maListData.findIndex(m => m.name === data.mitarbeiter_login_name);
-    if (idx === -1) { errEl.textContent = 'Erkannter Mitarbeiter nicht gefunden.'; errEl.style.display = ''; return; }
-    closeKiMaEditModal();
-    showMaDetail(idx);
-    const felder = ['personalnummer','anrede','vorname','nachname','geburtsdatum','strasse','ort','telefon','mobil','email'];
-    const idPrefix = { personalnummer:'maEditPersonalnummer', anrede:'maEditAnrede', vorname:'maEditVorname', nachname:'maEditNachname',
-      geburtsdatum:'maEditGeburtsdatum', strasse:'maEditStrasse', ort:'maEditOrt', telefon:'maEditTelefon', mobil:'maEditMobil', email:'maEditEmail' };
-    const geaendert = [];
-    felder.forEach(f => { if (data.aenderungen && data.aenderungen[f] !== undefined) { document.getElementById(idPrefix[f]).value = data.aenderungen[f]; geaendert.push(f); } });
-    showToast(geaendert.length ? `✓ Erkannt: ${geaendert.join(', ')} — bitte prüfen und speichern.` : 'Mitarbeiter erkannt, aber keine Änderung gefunden.');
-  }).catch(()=>{ btn.disabled=false; errEl.textContent='Netzwerkfehler.'; errEl.style.display=''; });
-}
-
-function renderMaChips(){
-  apiCall('mitarbeiter_list.php').then(({ok,data})=>{
-    if(!ok||data.status!=='ok') return;
-    maListData = data.mitarbeiter.slice().sort((a,b)=>a.name.localeCompare(b.name));
-    const wrap = document.getElementById('maChipList');
-    if(!maListData.length){ wrap.innerHTML = `<div class="empty"><div class="ico">👤</div><p>${t('no-data')}</p></div>`; return; }
-    const rows = maListData.map((m,i)=>`<tr onclick="showMaDetail(${i})" style="cursor:pointer">
-      <td>${m.personalnummer||'–'}</td>
-      <td style="white-space:nowrap;color:var(--sub)">${m.anrede||'–'}</td>
-      <td><strong>${m.vorname||'–'}</strong></td>
-      <td><strong>${m.nachname||'–'}</strong>${m.ist_admin?' <span class="badge badge-blue" style="font-size:9px">Admin</span>':''}</td>
-      <td style="font-size:12px;color:var(--sub)">${m.strasse||'–'}</td>
-      <td style="font-size:12px;color:var(--sub);white-space:nowrap">${m.ort||'–'}</td>
-      <td style="white-space:nowrap">${m.telefon||'–'}</td>
-      <td style="white-space:nowrap">${m.mobil||'–'}</td>
-      <td style="font-size:12px">${m.email||'–'}</td>
-    </tr>`).join('');
-    wrap.innerHTML = `<div class="table-wrap"><table><thead><tr>
-      <th>Nr.</th><th>Anrede</th><th>Vorname</th><th>Nachname</th><th>Strasse</th><th>Ort</th><th>Telefon</th><th>Mobil</th><th>E-Mail</th>
-    </tr></thead><tbody>${rows}</tbody></table></div>`;
-  });
-}
-function addMa(){
-  const nameInp=document.getElementById('newMaInput'), passInp=document.getElementById('newMaPassword');
-  const name=nameInp.value.trim(), password=passInp.value;
-  if(!name){showToast(t('tName'));return;}
-  if(password.length<PW_MIN){showToast(`Passwort mindestens ${PW_MIN} Zeichen.`);return;}
-  apiCall('mitarbeiter_create.php',{method:'POST',body:{name,password}}).then(({ok,data})=>{
-    if(!ok||data.status!=='ok'){showToast(data.message||'Fehler.');return;}
-    nameInp.value='';passInp.value='';
-    renderMaChips();
-    showToast(t('tMaAdd'));
-  });
-}
-function showMaDetail(i){
-  const m = maListData[i];
-  if(!m) return;
-  maDetailTarget = m.name;
-  const rows = [
-    ['Login-Name', m.name],
-    ['Rolle', m.ist_admin ? 'Admin' : 'Mitarbeiter'],
-    ['Erstellt am', m.erstellt_am ? fmtDate(m.erstellt_am.split(' ')[0]) : '–'],
-  ];
-  document.getElementById('maDetailBody').innerHTML = rows.map(([k,v]) => `<div class="detail-row"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('');
-  document.getElementById('maEditPersonalnummer').value = m.personalnummer || '';
-  document.getElementById('maEditAnrede').value = m.anrede || '';
-  document.getElementById('maEditVorname').value = m.vorname || '';
-  document.getElementById('maEditNachname').value = m.nachname || '';
-  document.getElementById('maEditGeburtsdatum').value = m.geburtsdatum || '';
-  document.getElementById('maEditStrasse').value = m.strasse || '';
-  document.getElementById('maEditOrt').value = m.ort || '';
-  document.getElementById('maEditTelefon').value = m.telefon || '';
-  document.getElementById('maEditMobil').value = m.mobil || '';
-  document.getElementById('maEditEmail').value = m.email || '';
-  document.getElementById('btn-ma-remove').style.display = (m.name === currentUser.name) ? 'none' : '';
-  document.getElementById('maResetPassword').value = '';
-  document.getElementById('maDetailModal').classList.add('show');
-}
-function closeMaDetailModal(){document.getElementById('maDetailModal').classList.remove('show');maDetailTarget=null;}
-function saveMaEdit(){
-  if(!maDetailTarget) return;
-  const body = {
-    name: maDetailTarget,
-    personalnummer: document.getElementById('maEditPersonalnummer').value.trim(),
-    anrede: document.getElementById('maEditAnrede').value,
-    vorname: document.getElementById('maEditVorname').value.trim(),
-    nachname: document.getElementById('maEditNachname').value.trim(),
-    geburtsdatum: document.getElementById('maEditGeburtsdatum').value,
-    strasse: document.getElementById('maEditStrasse').value.trim(),
-    ort: document.getElementById('maEditOrt').value.trim(),
-    telefon: document.getElementById('maEditTelefon').value.trim(),
-    mobil: document.getElementById('maEditMobil').value.trim(),
-    email: document.getElementById('maEditEmail').value.trim(),
-  };
-  apiCall('mitarbeiter_update.php',{method:'POST',body}).then(({ok,data})=>{
-    if(!ok||data.status!=='ok'){showToast(data.message||'Fehler.');return;}
-    renderMaChips();showToast('✓ Angaben gespeichert.');
-  });
-}
-function resetMaPassword(){
-  if(!maDetailTarget) return;
-  const password = document.getElementById('maResetPassword').value;
-  if(password.length<PW_MIN){showToast(`Passwort mindestens ${PW_MIN} Zeichen.`);return;}
-  apiCall('mitarbeiter_reset_password.php',{method:'POST',body:{name:maDetailTarget,password}}).then(({ok,data})=>{
-    if(!ok||data.status!=='ok'){showToast(data.message||'Fehler.');return;}
-    document.getElementById('maResetPassword').value='';
-    showToast('✓ Passwort gesetzt.');
-  });
-}
-function confirmRemoveMa(){
-  if(!maDetailTarget) return;
-  const name = maDetailTarget;
-  if(!confirm(`"${name}" wirklich als Mitarbeiter entfernen?`)) return;
-  apiCall('mitarbeiter_deactivate.php',{method:'POST',body:{name}}).then(({ok,data})=>{
-    if(!ok||data.status!=='ok'){showToast(data.message||'Fehler.');return;}
-    closeMaDetailModal();renderMaChips();showToast(t('tMaRem'));
-  });
-}
-
-// ── KUNDEN (ADMIN)
-let kundenListData = [];
-let kundeDetailTarget = null;
-
-function renderKundenList(){
-  apiCall('kunden_list.php').then(({ok,data})=>{
-    if(!ok||data.status!=='ok') return;
-    kundenListData = data.kunden;
-    document.getElementById('kundenChipList').innerHTML = kundenListData.length ? kundenListData.map((k,i)=>
-      `<div class="ma-chip" style="cursor:pointer" onclick="showKundeDetail(${i})">
-         <span class="ma-chip-name">${k.name}<br><small style="color:var(--sub);font-weight:400">${k.strasse}, ${k.ort}</small></span>
-         <span style="color:var(--sub);font-size:18px">›</span>
-       </div>`).join('') : `<div class="empty"><div class="ico">🏢</div><p>${t('no-data')}</p></div>`;
-  });
-}
-function openKundeAddModal(){
-  ['newKundeName','newKundeStrasse','newKundeOrt','newKundeTelefon','newKundeEmail'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('kundeAddError').style.display = 'none';
-  document.getElementById('kundeAddModal').classList.add('show');
-}
-function closeKundeAddModal(){ document.getElementById('kundeAddModal').classList.remove('show'); }
-function addKunde(){
-  const errEl = document.getElementById('kundeAddError');
-  errEl.style.display = 'none';
-  const name=document.getElementById('newKundeName').value.trim();
-  const strasse=document.getElementById('newKundeStrasse').value.trim();
-  const ort=document.getElementById('newKundeOrt').value.trim();
-  const telefon=document.getElementById('newKundeTelefon').value.trim();
-  const email=document.getElementById('newKundeEmail').value.trim();
-  if(!name||!strasse||!ort||!telefon){errEl.textContent='Name, Strasse, Ort und Telefon erforderlich.';errEl.style.display='';return;}
-  apiCall('kunden_create.php',{method:'POST',body:{name,strasse,ort,telefon,email}}).then(({ok,data})=>{
-    if(!ok||data.status!=='ok'){errEl.textContent=data.message||'Fehler.';errEl.style.display='';return;}
-    closeKundeAddModal();renderKundenList();loadKundenOptions();showToast('✓ Kunde hinzugefügt.');
-  });
-}
-function showKundeDetail(i){
-  const k = kundenListData[i];
-  if(!k) return;
-  kundeDetailTarget = k.id;
-  document.getElementById('kundeEditName').value = k.name;
-  document.getElementById('kundeEditStrasse').value = k.strasse;
-  document.getElementById('kundeEditOrt').value = k.ort;
-  document.getElementById('kundeEditTelefon').value = k.telefon || '';
-  document.getElementById('kundeEditEmail').value = k.email || '';
-  document.getElementById('kundeEditError').style.display = 'none';
-  document.getElementById('kundeDetailModal').classList.add('show');
-}
-function closeKundeDetailModal(){document.getElementById('kundeDetailModal').classList.remove('show');kundeDetailTarget=null;}
-function saveKundeEdit(){
-  if(!kundeDetailTarget) return;
-  const errEl = document.getElementById('kundeEditError');
-  errEl.style.display = 'none';
-  const name=document.getElementById('kundeEditName').value.trim();
-  const strasse=document.getElementById('kundeEditStrasse').value.trim();
-  const ort=document.getElementById('kundeEditOrt').value.trim();
-  const telefon=document.getElementById('kundeEditTelefon').value.trim();
-  const email=document.getElementById('kundeEditEmail').value.trim();
-  if(!name||!strasse||!ort||!telefon){errEl.textContent='Name, Strasse, Ort und Telefon erforderlich.';errEl.style.display='';return;}
-  apiCall('kunden_update.php',{method:'POST',body:{id:kundeDetailTarget,name,strasse,ort,telefon,email}}).then(({ok,data})=>{
-    if(!ok||data.status!=='ok'){errEl.textContent=data.message||'Fehler.';errEl.style.display='';return;}
-    closeKundeDetailModal();renderKundenList();loadKundenOptions();showToast('✓ Gespeichert.');
-  });
-}
-function confirmDeleteKunde(){
-  if(!kundeDetailTarget) return;
-  const k = kundenListData.find(x=>x.id===kundeDetailTarget);
-  if(!confirm(`"${k?.name}" wirklich entfernen?`)) return;
-  apiCall('kunden_delete.php',{method:'POST',body:{id:kundeDetailTarget}}).then(({ok,data})=>{
-    if(!ok||data.status!=='ok'){showToast(data.message||'Fehler.');return;}
-    closeKundeDetailModal();renderKundenList();loadKundenOptions();showToast('Kunde entfernt.');
-  });
-}
-
-// ── KUNDE-AUSWAHL (ERFASSEN)
-let kundenOptions = [];
+// ── KUNDENAUSWAHL IM FORMULAR
+// Gehoert zur Erfassung, nicht zur Verwaltung: Sie fuellt die Auswahl
+// "Kunde waehlen" und schreibt nichts. Beim Entfernen des Verwaltungsbereichs
+// (ENT-303) ging sie versehentlich mit -- die Pruefung hat es gefangen, der
+// Fehler selbst blieb still, weil er in einem Promise steckt und darum kein
+// pageerror ausloest.
 function loadKundenOptions(){
   apiCall('kunden_list.php').then(({ok,data})=>{
     if(!ok||data.status!=='ok') return;
@@ -1418,15 +808,6 @@ function loadKundenOptions(){
     sel.innerHTML = '<option value="">— manuell eingeben —</option>' + kundenOptions.map((k,i)=>`<option value="${i}">${k.name}</option>`).join('');
     if (cur) sel.value = cur;
   });
-}
-function applyKundeSelect(){
-  const idx = document.getElementById('kundeSelect').value;
-  if (idx==='') return;
-  const k = kundenOptions[idx];
-  if (!k) return;
-  document.getElementById('kunde').value = k.name;
-  document.getElementById('strasse').value = k.strasse;
-  document.getElementById('ort').value = k.ort;
 }
 
 // ── UTILS
