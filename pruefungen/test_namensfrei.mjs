@@ -16,6 +16,17 @@
 // Bewusst NICHT geprueft: Vornamen. Ein Vorname allein benennt niemanden,
 // und eine Pflicht zu "Vorname: Muster" haette nur Rauschen erzeugt. Wer
 // einen echten Vor- UND Nachnamen einsetzt, scheitert am Nachnamen.
+//
+// NACHTRAG 2026-09-01: objekt_name kam dazu, nachdem der Waechter einen
+// echten Objektnamen durchgelassen hat. Eine parallele Sitzung brachte
+// beim Bau von ENT-294/295 Fixtures aus einer Fassung VOR der Bereinigung
+// zurueck ins Repository -- den Kundennamen fing diese Pruefung ab, den
+// Objektnamen daneben nicht, weil sie nur zwei Feldnamen kannte. Gefunden
+// wurde er erst beim Abgleich mit der Entfernungsliste aus ENT-288.
+// Die Lehre ist nicht "mehr Feldnamen aufzaehlen", sondern dass diese
+// Pruefung nur so weit reicht, wie ihre Feldliste -- was ausserhalb steht,
+// sieht sie nicht. Ein echter Name in einer Ueberschrift faellt weiterhin
+// durch.
 import { readdirSync, readFileSync } from 'fs';
 import { HIER } from './pfade.mjs';
 
@@ -24,7 +35,10 @@ const check = (n, c) => (c ? ok : bad).push(n);
 
 // Ein Wert gilt als Platzhalter, wenn er eine dieser Marken traegt. Sie
 // sind die im Bestand gewachsene Konvention, nicht neu erfunden.
-const MARKEN = /muster|beispiel|test|fremd|kunde|probe|nordbau|grossbau|techmuster|werkmuster|abc |cupi/i;
+// 'objekt' kam mit der Ausweitung auf objekt_name dazu: Die Objekt-Fixtures
+// im Haus heissen durchgehend "Objekt Nord", "Objekt A", "Objekt Mit" --
+// eine gewachsene Konvention, kein neu erfundener Freibrief.
+const MARKEN = /muster|beispiel|test|fremd|kunde|probe|objekt|nordbau|grossbau|techmuster|werkmuster|abc |cupi/i;
 
 // Werte, die keine Namen sind, sondern Beschriftungen und Zustaende: Sie
 // stehen in Namensfeldern, weil die Pruefung dort eine Zeile wiedererkennen
@@ -37,6 +51,10 @@ const KEINE_NAMEN = new Set([
   'Allein GmbH', 'Einmal AG', 'Einzelkunde AG', 'Nah AG', 'Objekt AG',
   'Reihe AG', 'Nur Ort AG', 'Eine sehr sehr lange Kundenbezeichnung AG',
   'Einwohnergemeinde Musterdorf', 'Gemeinde Beispieldorf', 'Gemeinde Musterdorf',
+  // Beschreibung eines Gebaeudetyps samt Himmelsrichtung, kein Eigenname.
+  // ENT-288 hat an derselben Zeile den KUNDEN ersetzt und diesen Objektnamen
+  // ausdruecklich stehen lassen -- die Einordnung ist also nicht neu.
+  'Einkaufszentrum Nord', 'Einkaufszentrum Nord West',
 ]);
 
 const dateien = readdirSync(HIER).filter(f => f.startsWith('test_') && f.endsWith('.mjs'));
@@ -45,7 +63,7 @@ const funde = {};
 for (const f of dateien) {
   if (f === 'test_namensfrei.mjs') { continue; }
   const text = readFileSync(HIER + '/' + f, 'utf8');
-  for (const m of text.matchAll(/(nachname|kunde_name)\s*:\s*'([^']*)'/g)) {
+  for (const m of text.matchAll(/(nachname|kunde_name|objekt_name)\s*:\s*'([^']*)'/g)) {
     const wert = m[2].trim();
     // Leere Werte und Einzelbuchstaben pruefen nichts und benennen niemanden.
     if (wert.length < 2) { continue; }
