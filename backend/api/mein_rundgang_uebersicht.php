@@ -66,6 +66,30 @@ $kpStmt = $pdo->prepare(
 $kpStmt->execute([$vorlageId, (int)$v['objekt_id']]);
 $kontrollpunkte = $kpStmt->fetchAll(PDO::FETCH_ASSOC);
 
+// Laeuft fuer diese Person auf DIESER Vorlage schon eine Runde (ENT-298)?
+// Die Seite ist nicht nur Vorschau vor dem Start, sondern auch der Ort, an
+// den man waehrend der Runde zurueckkommt -- ohne diese Angabe koennte sie
+// weder den Zustand zeigen noch "Rundgang pausieren" anbieten. Dieselbe
+// Bedingung wie die Selbstkollisions-Erkennung in
+// mein_rundgang_spontan_starten.php (ENT-290): eigene Person, gleiche
+// Vorlage, noch nicht endgueltig beendet.
+$lfStmt = $pdo->prepare(
+    "SELECT id, einsatz_id, status, vorbereitet_am, pausiert_seit
+       FROM rundgang
+      WHERE mitarbeiter_id = ? AND rundgang_vorlage_id = ?
+        AND status NOT IN ('abgeschlossen', 'abgebrochen')
+      ORDER BY id DESC LIMIT 1"
+);
+$lfStmt->execute([(int)$user['id'], $vorlageId]);
+$lf = $lfStmt->fetch(PDO::FETCH_ASSOC);
+$laufend = $lf ? [
+    'id'             => (int)$lf['id'],
+    'einsatz_id'     => (int)$lf['einsatz_id'],
+    'status'         => $lf['status'],
+    'vorbereitet_am' => $lf['vorbereitet_am'],
+    'pausiert_seit'  => $lf['pausiert_seit'],
+] : null;
+
 // Ansprechpartner: am Objekt selbst gibt es keine (die objekte-Tabelle
 // kennt nur Adressfelder) -- die Personen haengen am Kunden, mit ihren
 // Kontaktwegen in einer eigenen Tabelle. Firmen-Kontaktwege (person_id
@@ -125,4 +149,5 @@ json_response(['status' => 'ok',
     'kunde_name'      => $v['kunde_name'],
     'kontrollpunkte'  => $kontrollpunkte,
     'ansprechpartner' => $ansprechpartner,
+    'laufend'         => $laufend,
 ]);

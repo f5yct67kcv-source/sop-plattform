@@ -36,13 +36,27 @@ const PROFIL = { status: 'ok', monat: { anzahl: 0, stunden: 0 }, profil: {
   name: 'm.muster', ist_admin: false, personalnummer: 'P-001',
   vorname: 'Max', nachname: 'Muster', erstellt_am: tag(-30) + ' 10:00:00' } };
 
+// Zeitfenster der zweiten Runde: 06:00-07:00, und die Uhr wird weiter unten
+// fest auf 22:00 eingefroren. Beides gehoert zusammen -- weiter unten wird
+// geprueft, dass die Grundabfrage aus ENT-279 erscheint, und die erscheint
+// nur AUSSERHALB des Fensters.
+//
+// Ohne das eingefrorene "jetzt" war diese Suite taeglich zwischen 05:55 und
+// 07:05 rot (Toleranz RUNDGANG_FENSTER_TOLERANZ_MIN = 5), ohne dass
+// irgendetwas kaputt war -- aufgefallen in einem Lauf um 06:56 am
+// 2026-09-02 (ENT-298). test_rundgang_fenster.mjs macht es seit ENT-279
+// richtig; hier fehlte es schlicht.
+const FENSTER = ['06:00:00', '07:00:00'];
+const FENSTER_HM = FENSTER[0].slice(0, 5);
+const JETZT = new Date(`${tag(0)}T22:00:00`);
+
 const VORLAGEN_ALLE = [
   { id: 501, name: 'Schliessrunde Musterobjekt', objekt_id: 7, objekt_name: 'Musterobjekt Industrie',
     kunde_name: 'Musterliegenschaften AG', fenster_von: null, fenster_bis: null },
   // Zweite Runde OHNE zugeordnete Kontrollpunkte -- genau der gemeldete Fall
   // ("0 von 0 erledigt"), der bisher erst nach dem Start sichtbar wurde.
   { id: 502, name: 'Leere Runde', objekt_id: 7, objekt_name: 'Musterobjekt Industrie',
-    kunde_name: 'Musterliegenschaften AG', fenster_von: '06:00:00', fenster_bis: '07:00:00' },
+    kunde_name: 'Musterliegenschaften AG', fenster_von: FENSTER[0], fenster_bis: FENSTER[1] },
 ];
 
 const UEBERSICHT = {
@@ -62,7 +76,7 @@ const UEBERSICHT = {
         { art: 'telefon', wert: '062 000 00 00' }, { art: 'email', wert: 'kontakt@example.invalid' }] },
     ] },
   502: { status: 'ok',
-    vorlage: { id: 502, name: 'Leere Runde', fenster_von: '06:00:00', fenster_bis: '07:00:00' },
+    vorlage: { id: 502, name: 'Leere Runde', fenster_von: FENSTER[0], fenster_bis: FENSTER[1] },
     objekt: { id: 7, name: 'Musterobjekt Industrie', strasse: 'Musterweg 4', ort: '9999 Musterdorf',
       kanton: 'SO', bemerkung: null },
     kunde_name: 'Musterliegenschaften AG',
@@ -75,6 +89,9 @@ let rufe = [];
 const browser = await chromium.launch({ executablePath: EXE });
 const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
 page.on('pageerror', e => bad.push('JS-Fehler: ' + e.message));
+// Uhr einfrieren, damit die Fenster-Weiche unabhaengig von der tatsaechlichen
+// Tageszeit immer dasselbe Ergebnis liefert (siehe Kommentar bei FENSTER).
+await page.clock.install({ time: JETZT });
 
 await page.route('**/api/**', route => {
   const req = route.request();
@@ -219,7 +236,7 @@ check('Die Warnung nennt die Ursache (fehlende Zuordnung), nicht nur "keine Date
 check('Die Anzahl 0 wird als solche ausgewiesen, nicht verschwiegen',
   (await page.textContent('.rgs-fakten')).includes('0'));
 check('Das Zeitfenster dieser Runde steht als Uhrzeit da',
-  (await page.textContent('.rgs-fakten')).includes('06:00'));
+  (await page.textContent('.rgs-fakten')).includes(FENSTER_HM));
 check('Ohne Ansprechpartner erscheint ein erklärender Satz statt einer leeren Fläche',
   (await page.textContent('#rgsKlappAp .rgs-klapp-bd')).includes('keine Ansprechperson'));
 
