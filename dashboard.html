@@ -3234,29 +3234,25 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 #rgdKarte { height: min(46vh, 380px); border: 1px solid var(--line);
   border-radius: var(--r); background: var(--surface-2); }
 
-/* Das Rapportblatt fuer das PDF. Es steht im Dokument, aber ausserhalb des
-   Bildes: html2pdf braucht ein WIRKLICH gerendertes Element -- ein Element
-   mit display:none hat keine Masse und ergibt eine leere Seite. Darum
-   absolut positioniert weit links statt versteckt. */
-#rapportBlatt { position: absolute; left: -10000px; top: 0; width: 720px;
-  background: #fff; color: #14161A; padding: 32px 36px;
-  font: 13px/1.5 -apple-system, 'Segoe UI', Arial, sans-serif; }
-#rapportBlatt h1 { margin: 0 0 4px; font-size: 20px; }
-#rapportBlatt .rb-unter { color: #545B67; font-size: 12.5px; margin-bottom: 20px; }
-#rapportBlatt table { width: 100%; border-collapse: collapse; }
-#rapportBlatt .rb-kopf td { padding: 3px 14px 3px 0; vertical-align: top; }
-#rapportBlatt .rb-kopf td.l { color: #545B67; white-space: nowrap; width: 130px; }
-#rapportBlatt h2 { font-size: 12px; letter-spacing: .6px; text-transform: uppercase;
-  color: #545B67; margin: 24px 0 8px; }
-#rapportBlatt .rb-liste th { text-align: left; font-size: 11px; text-transform: uppercase;
-  letter-spacing: .4px; color: #545B67; border-bottom: 1px solid #C9CDD4; padding: 0 8px 5px 0; }
-#rapportBlatt .rb-liste td { padding: 6px 8px 6px 0; border-bottom: 1px solid #E5E8EC;
-  vertical-align: top; }
-#rapportBlatt .rb-liste td.z { white-space: nowrap; width: 62px; }
-#rapportBlatt .rb-liste td.s { white-space: nowrap; width: 108px; }
-#rapportBlatt .rb-aufg { color: #545B67; font-size: 12px; margin-top: 3px; }
-#rapportBlatt .rb-fuss { margin-top: 26px; padding-top: 10px; border-top: 1px solid #C9CDD4;
-  color: #8B919D; font-size: 11px; }
+/* Das Rapportblatt fuer das PDF (ENT-322, korrigiert in ENT-323).
+
+   Die Positionierung liegt an der HUELLE, nie am Blatt selbst -- siehe die
+   ausfuehrliche Begruendung beim Markup. Und das Blatt bekommt hier nur
+   Flaeche und Grundschrift: Sein ganzes Aussehen steht als Inline-Stil im
+   erzeugten Inhalt, wie bei den beiden anderen Blaettern des Hauses
+   (ofBlatt/epBerichtBlatt). Das ist kein Zufall, sondern dieselbe
+   Vorsichtsregel: Was im Klon nicht von der Seitenvorlage abhaengt, kann
+   der Klon auch nicht verlieren. */
+/* Anklickbare Karte (ENT-323). Dieselben drei Merkmale wie tr.klickbar bei
+   den Tabellenzeilen -- Zeiger, Hervorhebung, sichtbarer Tastaturfokus --,
+   damit im Haus EIN Muster fuer "hier passiert etwas beim Klicken" gilt. */
+.ag-karte.klickbar { cursor: pointer; }
+.ag-karte.klickbar:hover { background: var(--surface-2); border-color: var(--accent-line); }
+.ag-karte.klickbar:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+#rapportBlattHuelle { position: absolute; left: -10000px; top: 0; width: 820px; }
+#rapportBlatt { width: 760px; background: #FFFFFF; color: #14161A;
+  padding: 36px 40px; font: 13px/1.5 -apple-system, 'Segoe UI', Arial, sans-serif; }
 
 @media (max-width: 720px) {
   .rgd-band { grid-template-columns: repeat(2, 1fr); }
@@ -5903,11 +5899,20 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
   </div>
 </div>
 
-<!-- Das Blatt, aus dem das PDF entsteht (ENT-322). Es steht wirklich im
-     Dokument und ist nur aus dem Bild geschoben (siehe CSS): html2pdf
-     rastert das GERENDERTE Element -- ein display:none-Element hat keine
-     Masse und ergaebe eine leere Seite. -->
-<div id="rapportBlatt" aria-hidden="true"></div>
+<!-- Das Blatt, aus dem das PDF entsteht (ENT-322, korrigiert in ENT-323).
+     ZWEI Elemente, und das ist der ganze Punkt:
+
+     Die HUELLE ist aus dem Bild geschoben. Das BLATT selbst steht im
+     normalen Fluss und traegt keinerlei Positionierung.
+
+     Warum: html2pdf klont das uebergebene Element mitsamt seiner id in
+     einen eigenen Behaelter. Trug das Blatt selbst `position:absolute;
+     left:-10000px`, galt diese Regel im Klon weiter -- html2canvas mass
+     dann eine Hoehe von 0 und erzeugte eine leere Seite. Gemessen, nicht
+     vermutet: „element located at 340,0 with size 718x0". Liegt die
+     Positionierung an der Huelle, ist der Klon des Blattes ein ganz
+     gewoehnlicher Block und wird richtig gerendert. -->
+<div id="rapportBlattHuelle" aria-hidden="true"><div id="rapportBlatt"></div></div>
 
 <div class="dlg-scrim" id="dlgSchicht">
   <div class="dlg">
@@ -14482,65 +14487,105 @@ function rapportBlattFuellen(d) {
   const endeRoh = d.rohzeit_ende || (d.dauer && d.dauer.quelle === 'letzter_scan' ? d.letzter_scan : null);
   const f = d.fortschritt || { gesamt: 0, bestaetigt: 0 };
   const adresse = [d.strasse, d.ort].filter(Boolean).join(', ');
-  const [, st] = RGD_STATUS[d.status] || ['', d.status];
+  const [, statusText] = RGD_STATUS[d.status] || ['', d.status];
 
+  // Kopf, Kopfzeilen-Tabelle, Abschnittsbeschriftungen, Tabellen und
+  // Fusszeile sind wortgleich nach epBerichtBlatt() (Kundenrapport, ENT-169)
+  // gebaut -- inklusive der Masse. Es gibt in diesem Haus EIN Rapportblatt-
+  // Aussehen, und ein Rundgang-Rapport ist keine neue Gattung. bkFusszeile()
+  // wird geteilt, nicht nachgebaut: eine zweite Fusszeile waere ein zweiter
+  // Ort, an dem dieselbe Adresse veraltet.
+  const bkLogo = briefkopf.logo
+    ? `<img src="${esc(briefkopf.logo)}" alt="" style="max-height:88px;max-width:260px;display:block;margin:0 auto 8px">` : '';
+  const bkText = [
+    briefkopf.firma ? `<div style="font-weight:700;color:#14161A;font-size:13px">${esc(briefkopf.firma)}</div>` : '',
+    briefkopf.zusatz ? esc(briefkopf.zusatz) : '',
+  ].filter(Boolean).join('');
+
+  const kopfZeile = (a, v) => `<tr><td style="padding:7px 0;color:#6B7280;width:170px;border-bottom:1px solid #E5E8EC">${a}</td><td style="padding:7px 0;font-weight:600;border-bottom:1px solid #E5E8EC">${v}</td></tr>`;
   const kopf = [
-    ['Kunde', d.kunde_name || '–'],
-    ['Objekt', d.objekt_name + (adresse ? ', ' + adresse : '')],
-    ['Kontrollrunde', d.vorlage_name || 'Alle Kontrollpunkte des Objekts'],
-    ['Mitarbeiter', person],
-    ['Datum', dmy(d.datum)],
-    ['Beginn / Ende', zeit(d.rohzeit_start) + ' – ' + zeit(endeRoh)],
-    ['Dauer', rgdDauerText(d.dauer) + ' h'
-      + (Number(d.pause_minuten || 0) > 0 ? ' (ohne ' + nf(d.pause_minuten) + ' Min. Pause)' : '')],
+    ['Objekt', esc(d.objekt_name || '') + (adresse ? ', ' + esc(adresse) : '')],
+    ['Kontrollrunde', esc(d.vorlage_name || 'Alle Kontrollpunkte des Objekts')],
+    ['Mitarbeitende', esc(person)],
+    ['Beginn / Ende', esc(zeit(d.rohzeit_start)) + ' – ' + esc(zeit(endeRoh))],
+    ['Dauer', esc(rgdDauerText(d.dauer)) + ' h'
+      + (Number(d.pause_minuten || 0) > 0 ? ' <span style="font-weight:400;color:#6B7280">(ohne ' + nf(d.pause_minuten) + ' Min. Pause)</span>' : '')],
     ['Kontrollpunkte', nf(Number(f.bestaetigt)) + ' von ' + nf(Number(f.gesamt)) + ' bestätigt'],
-    ['Status', st],
-  ];
-  if (d.status === 'abgebrochen') {
-    kopf.push(['Abbruchgrund', [d.abbruch_grund, d.abbruch_freitext].filter(Boolean).join(' — ') || '–']);
-  }
+    ['Status', esc(statusText)],
+    // Ein Abbruch ist die wichtigste Aussage ueber eine Runde und steht im
+    // Kopf, nicht als Fussnote -- aber nur, wenn es einen gab.
+    ...(d.status === 'abgebrochen'
+      ? [['Abbruchgrund', esc([d.abbruch_grund, d.abbruch_freitext].filter(Boolean).join(' — ')) || '–']]
+      : []),
+  ].map(([a, v]) => kopfZeile(a, v)).join('');
+
+  const th = 'padding:6px 8px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:#6B7280;border-bottom:1.5px solid #16181D';
+  const td = 'padding:7px 8px;border-bottom:1px solid #E5E8EC;font-size:13.5px;vertical-align:top';
+  const lbl = 'font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#6B7280;font-weight:700;margin-bottom:6px';
 
   const zeilen = (d.kontrollpunkte || []).map(k => {
     const e = k.erledigt;
+    // Drei Zustaende, drei Texte. Der dritte ist der wichtige: Ein nicht
+    // besuchter Punkt MUSS im Rapport stehen und als solcher zu erkennen
+    // sein -- ein Nachweis, in dem das Fehlende fehlt, ist keiner.
     const stTxt = e ? (AE_SCAN_STATUS[e.status] || ['', e.status])[1] : 'Nicht besucht';
     const aufg = (k.aufgaben || []).map(a => {
       const at = a.erledigt ? (AE_AUFGABE_STATUS[a.erledigt.status] || ['', a.erledigt.status])[1]
         : AE_AUFGABE_STATUS.unbeantwortet[1];
       const grund = a.erledigt && a.erledigt.grund ? ' — ' + a.erledigt.grund : '';
-      return esc(a.bezeichnung) + ': ' + esc(at) + esc(grund);
-    }).join('<br>');
-    return '<tr><td class="z">' + esc(e ? String(e.erfasst_am).slice(11, 16) : '–') + '</td>'
-      + '<td>' + esc(k.bezeichnung)
-      + (e && e.beschreibung ? '<div class="rb-aufg">' + esc(e.beschreibung) + '</div>' : '')
-      + (aufg ? '<div class="rb-aufg">' + aufg + '</div>' : '') + '</td>'
-      + '<td class="s">' + esc(stTxt) + '</td></tr>';
+      return `<div style="font-size:12px;color:#6B7280;margin-top:3px">${esc(a.bezeichnung)}: <b style="color:#14161A;font-weight:600">${esc(at)}</b>${esc(grund)}</div>`;
+    }).join('');
+    return `<tr>
+      <td style="${td};white-space:nowrap;width:58px${e ? '' : ';color:#8B919D'}">${esc(e ? String(e.erfasst_am).slice(11, 16) : '–')}</td>
+      <td style="${td}">${esc(k.bezeichnung)}
+        ${e && e.beschreibung ? `<div style="font-size:12px;color:#6B7280;margin-top:3px">${esc(e.beschreibung)}</div>` : ''}
+        ${e && e.hat_foto ? '<div style="font-size:12px;color:#6B7280;margin-top:3px">Mit Foto</div>' : ''}
+        ${aufg}</td>
+      <td style="${td};white-space:nowrap;width:112px${e && e.status === 'bestaetigt' ? '' : ';font-weight:600'}">${esc(stTxt)}</td>
+    </tr>`;
   }).join('');
 
-  const ereignisse = (d.ereignisse || []).map(e =>
-    '<tr><td class="z">' + esc(String(e.erfasst_am).slice(11, 16)) + '</td>'
-    + '<td>' + esc(e.art || 'Ohne Art')
-    + (e.bemerkung ? '<div class="rb-aufg">' + esc(e.bemerkung) + '</div>' : '')
-    + (e.hat_foto ? '<div class="rb-aufg">Mit Foto</div>' : '') + '</td></tr>').join('');
+  const ereignisse = (d.ereignisse || []).map(e => `<tr>
+      <td style="${td};white-space:nowrap;width:58px">${esc(String(e.erfasst_am).slice(11, 16))}</td>
+      <td style="${td}"><b style="font-weight:600">${esc(e.art || 'Ohne Art')}</b>
+        ${e.bemerkung ? `<div style="font-size:12px;color:#6B7280;margin-top:3px">${esc(e.bemerkung)}</div>` : ''}
+        ${e.hat_foto ? '<div style="font-size:12px;color:#6B7280;margin-top:3px">Mit Foto</div>' : ''}</td>
+    </tr>`).join('');
 
-  $('rapportBlatt').innerHTML =
-    '<h1>Rundgang-Rapport</h1>'
-    + '<div class="rb-unter">' + esc(d.objekt_name || '') + ' · ' + esc(dmy(d.datum)) + '</div>'
-    + '<table class="rb-kopf">' + kopf.map(z =>
-      '<tr><td class="l">' + esc(z[0]) + '</td><td>' + esc(z[1]) + '</td></tr>').join('') + '</table>'
-    + '<h2>Kontrollpunkte</h2>'
-    + (zeilen
-      ? '<table class="rb-liste"><thead><tr><th>Zeit</th><th>Kontrollpunkt</th><th>Status</th></tr></thead>'
-        + '<tbody>' + zeilen + '</tbody></table>'
-      : '<p>Für diese Runde sind keine Kontrollpunkte hinterlegt.</p>')
-    // Ein leerer Ereignisteil steht ausdruecklich da: "keine Ereignisse" ist
-    // eine Aussage, ein fehlender Abschnitt keine.
-    + '<h2>Ereignisse</h2>'
-    + (ereignisse
-      ? '<table class="rb-liste"><tbody>' + ereignisse + '</tbody></table>'
-      : '<p>Während dieser Runde wurde kein Ereignis gemeldet.</p>')
-    + '<div class="rb-fuss">Erstellt am ' + esc(dmy(isoTag())) + '. '
-    + 'Die Zeiten stammen aus den Erfassungen des Geräts; abweichende Übermittlungszeiten '
-    + 'ändern sie nicht.</div>';
+  $('rapportBlatt').innerHTML = `
+    <div style="font-family:-apple-system,Segoe UI,Arial,sans-serif;color:#14161A">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:24px;border-bottom:2px solid #16181D;padding-bottom:14px;margin-bottom:22px">
+        <div>
+          <div style="font-size:21px;font-weight:800;letter-spacing:-.4px">Rundgang-Rapport</div>
+          <div style="font-size:12px;color:#6B7280;margin-top:3px">Rundgang-Nr. ${esc(d.id)} · ${esc(dmy(d.datum))}</div>
+        </div>
+        <div style="text-align:center;font-size:12px;color:#6B7280;line-height:1.5">${bkLogo}${bkText}</div>
+      </div>
+
+      ${d.kunde_name ? `<div style="margin-bottom:20px">
+        <div style="${lbl}">Kunde</div>
+        <div style="font-size:14px;line-height:1.5">${esc(d.kunde_name)}</div>
+      </div>` : ''}
+
+      <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:24px">${kopf}</table>
+
+      <div style="${lbl}">Kontrollpunkte</div>
+      ${zeilen ? `<table style="width:100%;border-collapse:collapse">
+        <thead><tr><th style="${th}">Zeit</th><th style="${th}">Kontrollpunkt</th><th style="${th}">Status</th></tr></thead>
+        <tbody>${zeilen}</tbody>
+      </table>` : '<div style="font-size:13.5px">Für diese Runde sind keine Kontrollpunkte hinterlegt.</div>'}
+
+      <div style="${lbl};margin-top:24px">Ereignisse</div>
+      ${ereignisse ? `<table style="width:100%;border-collapse:collapse"><tbody>${ereignisse}</tbody></table>`
+        // "Keine Ereignisse" ist eine Aussage, ein fehlender Abschnitt keine.
+        : '<div style="font-size:13.5px">Während dieser Runde wurde kein Ereignis gemeldet.</div>'}
+
+      <div style="margin-top:24px;font-size:11px;color:#8B919D;line-height:1.5">
+        Erstellt am ${esc(dmy(isoTag()))}. Die Zeiten stammen aus den Erfassungen des Geräts;
+        abweichende Übermittlungszeiten ändern sie nicht.
+      </div>
+      ${bkFusszeile()}
+    </div>`;
 }
 
 // html2pdf.js wird erst BEIM KLICK nachgeladen (946 KB) -- gleiches Muster
@@ -14767,10 +14812,21 @@ function aeZeichneErledigung(rundgaenge) {
     const voll = gesamt > 0 && bestaetigt >= gesamt;
     const pct = gesamt > 0 ? Math.round((bestaetigt / gesamt) * 100) : 0;
     const balkenKlasse = r.status === 'abgebrochen' ? 'pn-ueber_toleranz' : (voll ? 'pn-ok' : 'pn-nahe');
-    return `<div class="ag-karte">
+    // Dieselbe Dauer wie in "Letzte Rundgänge" und im Rapport, aus
+    // derselben Server-Rechnung (ENT-322) -- und "läuft" trägt auch hier
+    // keine Einheit.
+    const dauer = rgdDauerText(r.dauer);
+    const dauerText = dauer === 'läuft' ? 'läuft' : (dauer === '–' ? '' : dauer + ' h');
+    // Dieser Reiter ist die Ablage der durchgeführten Rundgänge (ENT-323):
+    // Er hat als einziger einen freien Zeitraum und reicht damit weiter
+    // zurück als die 14 Tage der Revierdienst-Hauptseite. Deshalb führt er
+    // in dieselbe Detailansicht -- und nicht in eine zweite, eigene.
+    return `<div class="ag-karte klickbar" tabindex="0" role="button"
+        onclick="rgdZeigen(${Number(r.id)})"
+        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();rgdZeigen(${Number(r.id)});}">
         <div class="kopf"><b>${esc(r.kunde_name)}</b>${r.status === 'abgebrochen' ? '<span class="chip chip-n">Abgebrochen</span>' : ''}</div>
         <div class="wer">${esc(r.objekt_name)}${r.titel ? ' · ' + esc(r.titel) : ''}</div>
-        <div class="zeiten">${dmy(r.datum)}, <b>${esc(start)}</b> · ${esc(person)}</div>
+        <div class="zeiten">${dmy(r.datum)}, <b>${esc(start)}</b>${dauerText ? ' · ' + esc(dauerText) : ''} · ${esc(person)}</div>
         <div class="pn-bar ${balkenKlasse}" style="margin-top:6px"><div class="fuell" style="width:${pct}%"></div></div>
         <div class="sec">${nf(bestaetigt)}/${nf(gesamt)}</div>
       </div>`;
