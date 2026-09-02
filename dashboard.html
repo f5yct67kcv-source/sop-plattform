@@ -14493,7 +14493,14 @@ function rgdZeichnen(d) {
 // Ein Abbruch ist die wichtigste Aussage ueber eine Runde -- er steht oben,
 // nicht als Fussnote.
 function rgdAbbruchHtml(d) {
-  const grund = [d.abbruch_grund, d.abbruch_freitext].filter(Boolean).join(' — ');
+  // Der Klartext aus dem Katalog, nicht das Codewort (ENT-324): Bis hierher
+  // stand hier „stelle_nicht_gefunden" statt „Stelle nicht gefunden". Die
+  // Zuordnung gab es bereits (RUNDGANG_ABBRUCH_GRUENDE) und wurde an einer
+  // dritten Stelle im Haus auch benutzt -- hier und im Rapportblatt war sie
+  // beim Bau von ENT-322 schlicht vergessen worden.
+  const grundText = d.abbruch_grund
+    ? (RUNDGANG_ABBRUCH_GRUENDE[d.abbruch_grund] || d.abbruch_grund) : '';
+  const grund = [grundText, d.abbruch_freitext].filter(Boolean).join(' — ');
   return '<div class="msg-warn" style="display:block;margin-bottom:4px">Diese Runde wurde abgebrochen.'
     + (grund ? ' ' + esc(grund) : '') + '</div>';
 }
@@ -14654,7 +14661,10 @@ function rapportBlattFuellen(d) {
     // Ein Abbruch ist die wichtigste Aussage ueber eine Runde und steht im
     // Kopf, nicht als Fussnote -- aber nur, wenn es einen gab.
     ...(d.status === 'abgebrochen'
-      ? [['Abbruchgrund', esc([d.abbruch_grund, d.abbruch_freitext].filter(Boolean).join(' — ')) || '–']]
+      ? [['Abbruchgrund', esc([
+          d.abbruch_grund ? (RUNDGANG_ABBRUCH_GRUENDE[d.abbruch_grund] || d.abbruch_grund) : '',
+          d.abbruch_freitext,
+        ].filter(Boolean).join(' — ')) || '–']]
       : []),
   ].map(([a, v]) => kopfZeile(a, v)).join('');
 
@@ -14963,9 +14973,12 @@ function aeZeichneErledigung(rundgaenge) {
     return `<div class="ag-karte klickbar" tabindex="0" role="button"
         onclick="rgdZeigen(${Number(r.id)})"
         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();rgdZeigen(${Number(r.id)});}">
-        <div class="kopf"><b>${esc(r.kunde_name)}</b>${r.status === 'abgebrochen' ? '<span class="chip chip-n">Abgebrochen</span>' : ''}</div>
+        <div class="kopf"><b>${esc(r.kunde_name)}</b>${r.status === 'abgebrochen' ? '<span class="chip chip-x">Abgebrochen</span>' : ''}</div>
         <div class="wer">${esc(r.objekt_name)}${r.titel ? ' · ' + esc(r.titel) : ''}</div>
         <div class="zeiten">${dmy(r.datum)}, <b>${esc(start)}</b>${dauerText ? ' · ' + esc(dauerText) : ''} · ${esc(person)}</div>
+        ${r.status === 'abgebrochen' ? `<div class="zeiten" style="color:var(--neg)">${
+          esc([r.abbruch_grund ? (RUNDGANG_ABBRUCH_GRUENDE[r.abbruch_grund] || r.abbruch_grund) : '',
+               r.abbruch_freitext].filter(Boolean).join(' — ') || 'Ohne Grundangabe')}</div>` : ''}
         <div class="pn-bar ${balkenKlasse}" style="margin-top:6px"><div class="fuell" style="width:${pct}%"></div></div>
         <div class="sec">${nf(bestaetigt)}/${nf(gesamt)}</div>
       </div>`;

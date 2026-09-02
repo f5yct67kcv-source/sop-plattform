@@ -203,8 +203,17 @@ async function neueSeite(schichten, extraRoutes, profilUeberschreibung) {
       const oben = document.elementFromPoint(t.left + t.width / 2, t.top + t.height / 2);
       return !!oben && !oben.closest('.tabs');
     }));
+  // Seit ENT-324 verlaesst der Pfeil eine laufende Runde nicht mehr
+  // stillschweigend, sondern stellt dieselbe Frage wie „Beenden"
+  // (Pausieren / Abbrechen / Weiter). Der Weg zum Chip auf „Heute" fuehrt
+  // also ueber „Pausieren" -- was zum Chip passt: Er ist ausdruecklich fuer
+  // den aktiven UND den pausierten Rundgang gebaut (ENT-234).
   await page.click('#rgsZurueck');
   await page.waitForTimeout(250);
+  check('KRITISCH: der Pfeil fragt bei laufender Runde nach, statt sie offen stehen zu lassen',
+    await page.evaluate(() => document.getElementById('blatt').classList.contains('on')));
+  await page.click('#blBody .btn-plain');   // Pausieren
+  await page.waitForTimeout(400);
   await page.click('#t-heute'); await page.waitForTimeout(250);
   check('Auf Heute erscheint der Rundgang-Chip', await page.isVisible('.rd-chip'));
   const chipTxt = await page.textContent('.rd-chip');

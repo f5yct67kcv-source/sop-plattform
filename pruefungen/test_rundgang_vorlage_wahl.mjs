@@ -103,9 +103,20 @@ const startAufrufKeine = rufe.find(r => r.p.includes('mein_rundgang_starten'));
 check('KRITISCH: ohne Vorlagen wird kein vorlage_id mitgeschickt',
   startAufrufKeine && !('vorlage_id' in startAufrufKeine.body));
 // Seit ENT-306 laeuft die Runde als Vollseite; der Rueckweg ist der Pfeil im
-// Kopf, nicht mehr ein Schubladenfuss.
-await page.click('#rgsZurueck');
-await page.waitForTimeout(250);
+// Kopf, nicht mehr ein Schubladenfuss. Seit ENT-324 verlaesst der Pfeil eine
+// laufende Runde nicht mehr stillschweigend, sondern fragt zuerst -- der Weg
+// hinaus fuehrt hier ueber „Abbrechen" mit Grund, damit die naechste Vorlage
+// mit einer leeren Lage beginnt und nicht auf eine noch offene Runde trifft.
+async function rundeAbbrechen() {
+  await page.click('#rgsZurueck');
+  await page.waitForTimeout(250);
+  await page.click('#blBody .btn-neg');       // Abbrechen
+  await page.waitForTimeout(250);
+  await page.selectOption('#raGrund', 'sonstige');
+  await page.click('#raBtn');
+  await page.waitForTimeout(400);
+}
+await rundeAbbrechen();
 
 // ══════════ GENAU EINE VORLAGE: KEINE ECHTE ENTSCHEIDUNG, DIREKT STARTEN
 await page.evaluate(id => blattAuf(id), 72);
@@ -117,8 +128,7 @@ check('Kein Auswahlbildschirm bei nur einer Vorlage', await page.isVisible('#rdL
 const startAufrufEine = rufe.find(r => r.p.includes('mein_rundgang_starten'));
 check('KRITISCH: die einzige Vorlage wird automatisch mitgeschickt',
   startAufrufEine && startAufrufEine.body.vorlage_id === 501);
-await page.click('#rgsZurueck');
-await page.waitForTimeout(250);
+await rundeAbbrechen();
 
 // ══════════ MEHRERE VORLAGEN: AUSWAHLBILDSCHIRM
 await page.evaluate(id => blattAuf(id), 73);

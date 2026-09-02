@@ -13,6 +13,15 @@ declare(strict_types=1);
    merkt es, weil sie trotzdem im Feed stehen. */
 const EREIGNISART_AUFGABE = 'Aufgabe nicht ausführbar';
 
+/* Die Ereignisart, unter der ein abgebrochener Rundgang im Meldeweg
+   erscheint (ENT-324). Vom Projektinhaber verlangt: „Ich habe vorhin noch
+   einen Rundgang bewusst abgebrochen, diese Info muss zwingend in die
+   Ereignisse im Dashboard."
+   Wie bei EREIGNISART_AUFGABE als Konstante: Der Endpunkt SUCHT sie, die
+   Einrichtung LEGT sie an -- laufen die Schreibweisen auseinander,
+   entstehen Ereignisse ohne Art, und niemand merkt es. */
+const EREIGNISART_ABBRUCH = 'Rundgang abgebrochen';
+
 /* Wie lange eine Bewegungsspur aufbewahrt wird (ENT-318).
    Als Konstante und mit Begruendung, damit die Zahl eine Entscheidung ist
    und keine Zufaelligkeit: Die Spur dient dem Nachweis EINER Runde. Ist

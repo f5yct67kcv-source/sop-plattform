@@ -1249,6 +1249,13 @@ if (!$nurPruefen && hat_tabelle_jetzt($pdo, 'ereignisart')) {
         if ($ein2->rowCount() === 1) {
             $getan[] = 'Ereignisart „' . EREIGNISART_AUFGABE . '" angelegt (ENT-311)';
         }
+        // Dasselbe fuer den Rundgang-Abbruch (ENT-324), aus demselben Grund
+        // ausserhalb der Startbestands-Bedingung.
+        $ein3 = $pdo->prepare('INSERT IGNORE INTO ereignisart (bezeichnung, sortierung) VALUES (?, ?)');
+        $ein3->execute([EREIGNISART_ABBRUCH, 96]);
+        if ($ein3->rowCount() === 1) {
+            $getan[] = 'Ereignisart „' . EREIGNISART_ABBRUCH . '" angelegt (ENT-324)';
+        }
     } catch (Throwable $e) {
         $fehler[] = 'Ereignisarten-Startbestand — ' . $e->getMessage();
     }
