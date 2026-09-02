@@ -87,13 +87,45 @@ check('KRITISCH: kein doppelt genannter Hinweis auf Bild/Screenshot im Platzhalt
 
 await page.screenshot({ path: OUT + '/80-begruessung.png' });
 
-// Wechselnde Formulierung: neu laden, Text darf sich unterscheiden koennen
-const grussTexte = new Set();
-for (let i = 0; i < 12; i++) {
-  await page.evaluate(() => renderBegruessung());
-  grussTexte.add(await page.textContent('#begrGruss'));
-}
-check('Die Begrüssung variiert über mehrere Aufrufe', grussTexte.size > 1);
+// Wechselnde Formulierung -- OHNE Wuerfel.
+//
+// Bis 2026-09-01 zog diese Pruefung zwoelfmal zufaellig und verlangte
+// mindestens zwei verschiedene Texte. Das ging in rund 0,8 % der Laeufe
+// schief, morgens wie abends: Beide Listen enthalten drei Eintraege, aber
+// nur ZWEI verschiedene Texte ("Guten Abend" steht zweimal drin). Die
+// Wahrscheinlichkeit, zwoelfmal denselben zu ziehen, ist (2/3)^12 -- etwa
+// einer von 130 Laeufen. Genau so ist sie in der Regression zu ENT-300
+// einmal rot geworden, ohne dass jemand etwas daran geaendert hatte.
+//
+// Ein zufaelliger Fehlschlag ist schlimmer als gar keine Pruefung: Er
+// bringt jeden roten Lauf in den Verdacht, auch nur Pech gewesen zu sein.
+// Geprueft wird darum jetzt die AUSSAGE statt eines Wurfs -- und zwar
+// beides, was sie meint:
+//   1. Der Vorrat je Tageszeit enthaelt ueberhaupt mehr als eine Formulierung.
+//   2. Die Anzeige greift auch wirklich darauf zu.
+const vorrat = await page.evaluate(() => BEGR_GRUSS);
+const tageszeiten = Object.keys(vorrat);
+check(`Es gibt für jede Tageszeit einen Vorrat (${tageszeiten.join(', ')})`, tageszeiten.length >= 3);
+const zuArm = tageszeiten.filter(z => new Set(vorrat[z]).size < 2);
+check('KRITISCH: jede Tageszeit hat mehr als eine Formulierung', zuArm.length === 0);
+zuArm.forEach(z => bad.push(`Tageszeit "${z}" hat nur eine einzige Formulierung`));
+
+// Jeden Eintrag des aktuellen Vorrats gezielt ansteuern, statt zu wuerfeln.
+const gezogen = await page.evaluate(() => {
+  const zeit = begrTageszeit();
+  const echt = Math.random;
+  const texte = [];
+  try {
+    BEGR_GRUSS[zeit].forEach((_, i) => {
+      Math.random = () => i / BEGR_GRUSS[zeit].length;
+      renderBegruessung();
+      texte.push(document.getElementById('begrGruss').textContent);
+    });
+  } finally { Math.random = echt; }
+  return texte;
+});
+check(`KRITISCH: die Anzeige nutzt den Vorrat wirklich (${new Set(gezogen).size} verschiedene aus ${gezogen.length} Einträgen)`,
+  new Set(gezogen).size > 1);
 
 // ══════════ DER GRUSS RICHTET SICH NACH DER UHRZEIT
 await page.evaluate(() => { window.__zeitFest = 9; Date.prototype.getHours = function () { return window.__zeitFest; }; renderBegruessung(); });
