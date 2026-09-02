@@ -428,3 +428,87 @@ function rundgang_vorlage_punkte_setzen(PDO $pdo, int $vorlageId, array $kontrol
 
     return null;
 }
+
+/* ══════════ DAUER EINER RUNDE (ENT-322) ══════════════════════════════════
+
+   Warum das eine eigene Funktion ist und nicht drei Zeilen im Endpunkt:
+
+   Die Endzeit einer Runde hat DREI Quellen, und sie sind nicht gleich gut.
+   Die App rechnet seit ENT-321 nach genau derselben Reihenfolge
+   (rgLaufEndeMs() in app.html), weil der Projektinhaber im Feld erlebt hat,
+   dass eine abgeschlossene Runde weiterzaehlte. Stuende die Regel hier ein
+   zweites Mal in eigenen Worten, zeigte die Liste im Dashboard frueher oder
+   spaeter eine andere Dauer als das Handy fuer dieselbe Runde -- und beide
+   waeren "richtig".
+
+     1. rohzeit_ende      Der Server hat das Ende selbst vermerkt. Gilt.
+     2. letzter Scan      Kein Ende vermerkt, aber die Runde ist beendet --
+                          dann ist der letzte angekommene Scan das, was
+                          nachweisbar geschehen ist.
+     3. gar nichts        Laeuft noch, oder es fehlt der Start.
+
+   Die Pause wird abgezogen: Sie ist gestoppte Zeit, keine Rundenzeit.
+   Ein negativer Wert wird auf 0 geklemmt statt weitergereicht -- eine
+   Dauer von "-4 Minuten" ist keine Aussage, sondern ein kaputter
+   Datensatz, und die Anzeige soll ihn nicht als Zahl adeln.
+
+   Reine Funktion, kein PDO: Genau darum laesst sie sich pruefen. */
+const RUNDGANG_OFFENE_STATUS = ['vorbereitet', 'laeuft', 'pausiert'];
+
+function rundgang_dauer(?string $start, ?string $ende, ?string $letzterScan,
+                        int $pauseMinuten, string $status): array
+{
+    $start = trim((string)$start);
+    $ende = trim((string)$ende);
+    $letzterScan = trim((string)$letzterScan);
+    $laeuft = in_array($status, RUNDGANG_OFFENE_STATUS, true);
+
+    if ($start === '') {
+        return ['sekunden' => null, 'quelle' => $laeuft ? 'laeuft' : 'unbekannt'];
+    }
+
+    // Bei einer laufenden Runde wird der letzte Scan NICHT als Ende genommen:
+    // Sie ist nicht fertig, nur weil gerade nichts Neues ankam.
+    $bis = $ende !== '' ? $ende : ($laeuft ? '' : $letzterScan);
+    if ($bis === '') {
+        return ['sekunden' => null, 'quelle' => $laeuft ? 'laeuft' : 'unbekannt'];
+    }
+
+    $vonTs = strtotime($start);
+    $bisTs = strtotime($bis);
+    if ($vonTs === false || $bisTs === false) {
+        return ['sekunden' => null, 'quelle' => 'unbekannt'];
+    }
+
+    $sek = $bisTs - $vonTs - max(0, $pauseMinuten) * 60;
+    return ['sekunden' => max(0, $sek), 'quelle' => $ende !== '' ? 'rohzeit_ende' : 'letzter_scan'];
+}
+
+/* Die Kontrollpunkte, die zu EINER Runde gehoeren (ENT-322).
+
+   Wortgleich aus mein_rundgang_offen.php hierher gezogen, damit es die
+   Vorlage-oder-Objekt-Weiche nur einmal gibt. Sie stand vorher an zwei
+   Stellen; mit der Detailansicht waere sie an drei gestanden, und eine
+   Runde ueber eine kleine Kontrollrunde saehe je nach Ansicht anders aus.
+
+   "Aktuell aktiv" ist bewusst dieselbe Abwaegung wie in
+   rundgang_fortschritt(): die Vorlage von heute, nicht die von damals. */
+function rundgang_punkte_der_runde(PDO $pdo, int $objektId, ?int $vorlageId): array
+{
+    if ($vorlageId !== null) {
+        $stmt = $pdo->prepare(
+            'SELECT k.id, k.bezeichnung, p.reihenfolge, k.typ, k.lat, k.lng, k.geofence_radius_m
+               FROM kontrollpunkt k
+               JOIN rundgang_vorlage_punkt p ON p.kontrollpunkt_id = k.id AND p.vorlage_id = ?
+              WHERE k.objekt_id = ? AND k.aktiv = 1 ORDER BY p.reihenfolge, k.id'
+        );
+        $stmt->execute([$vorlageId, $objektId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+    $stmt = $pdo->prepare(
+        'SELECT id, bezeichnung, reihenfolge, typ, lat, lng, geofence_radius_m
+           FROM kontrollpunkt WHERE objekt_id = ? AND aktiv = 1 ORDER BY reihenfolge, id'
+    );
+    $stmt->execute([$objektId]);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}

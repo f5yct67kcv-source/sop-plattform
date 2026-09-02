@@ -72,7 +72,25 @@ function smtp_befehl($fp, string $befehl, array $erwarteteCodes): string
 // mit einer fuer die Oberflaeche verstaendlichen Meldung, statt selbst einen
 // Fehler auszugeben -- der Aufrufer entscheidet, wie er das dem Benutzer
 // zeigt (siehe beleg_versenden.php).
-function smtp_senden(string $anEmail, string $anName, string $betreff, string $html, string $text): void
+/* $anhaenge (ENT-322): Liste von ['name' => 'rapport.pdf',
+   'mime' => 'application/pdf', 'inhalt' => <Rohbytes>].
+
+   Warum die Nachricht dann anders aufgebaut ist: Ohne Anhang ist die Mail
+   eine "multipart/alternative" -- zwei Darstellungen DERSELBEN Nachricht
+   (Text oder HTML), und das Programm des Empfaengers waehlt eine davon.
+   Ein Anhang ist aber keine andere Darstellung, sondern ein zweiter Teil
+   NEBEN der Nachricht. Haengte man ihn in dieselbe Alternative, waere er
+   fuer manche Programme eine dritte Variante des Textes und verschwaende
+   still. Deshalb wird die Alternative bei Anhaengen in ein
+   "multipart/mixed" eingepackt: aussen die Teile nebeneinander, innen die
+   Darstellungen zur Auswahl. Das ist die Bauart, die auch Outlook und
+   Apple Mail erwarten.
+
+   Ohne Anhang bleibt der Aufbau EXAKT wie bisher -- der Offert-Versand
+   (ENT-192) laeuft produktiv und soll von dieser Erweiterung nichts
+   merken. */
+function smtp_senden(string $anEmail, string $anName, string $betreff, string $html, string $text,
+                     array $anhaenge = []): void
 {
     if (!smtp_konfiguriert()) {
         throw new RuntimeException('Der E-Mail-Versand ist noch nicht eingerichtet (SMTP-Zugangsdaten fehlen).');
@@ -127,20 +145,11 @@ function smtp_senden(string $anEmail, string $anName, string $betreff, string $h
             ? smtp_kopf_kodieren($anName) . ' <' . $anEmail . '>'
             : $anEmail;
 
-        $kopf = [
-            'From: ' . $von,
-            'To: ' . $an,
-            'Subject: ' . smtp_kopf_kodieren($betreff),
-            'MIME-Version: 1.0',
-            'Content-Type: multipart/alternative; boundary="' . $grenze . '"',
-            'Date: ' . date('r'),
-        ];
         // Base64 fuer beide Teile: Eine SMTP-Zeile, die mit einem Punkt
         // beginnt, wuerde von manchen Servern als Nachrichtenende (dot
         // stuffing) missverstanden -- der Punkt ist im Base64-Alphabet aber
         // gar nicht enthalten, das Problem stellt sich also nie.
-        $nachricht = implode("\r\n", $kopf) . "\r\n\r\n"
-            . '--' . $grenze . "\r\n"
+        $alternative = '--' . $grenze . "\r\n"
             . "Content-Type: text/plain; charset=UTF-8\r\n"
             . "Content-Transfer-Encoding: base64\r\n\r\n"
             . chunk_split(base64_encode($text)) . "\r\n"
@@ -149,6 +158,40 @@ function smtp_senden(string $anEmail, string $anName, string $betreff, string $h
             . "Content-Transfer-Encoding: base64\r\n\r\n"
             . chunk_split(base64_encode($html)) . "\r\n"
             . '--' . $grenze . "--\r\n";
+
+        $kopf = [
+            'From: ' . $von,
+            'To: ' . $an,
+            'Subject: ' . smtp_kopf_kodieren($betreff),
+            'MIME-Version: 1.0',
+        ];
+
+        if (!$anhaenge) {
+            $kopf[] = 'Content-Type: multipart/alternative; boundary="' . $grenze . '"';
+            $kopf[] = 'Date: ' . date('r');
+            $nachricht = implode("\r\n", $kopf) . "\r\n\r\n" . $alternative;
+        } else {
+            $aussen = 'sop-mix-' . bin2hex(random_bytes(16));
+            $kopf[] = 'Content-Type: multipart/mixed; boundary="' . $aussen . '"';
+            $kopf[] = 'Date: ' . date('r');
+            $nachricht = implode("\r\n", $kopf) . "\r\n\r\n"
+                . '--' . $aussen . "\r\n"
+                . 'Content-Type: multipart/alternative; boundary="' . $grenze . "\"\r\n\r\n"
+                . $alternative;
+            foreach ($anhaenge as $a) {
+                // Der Dateiname wird nach RFC 2047 kodiert, falls er Umlaute
+                // traegt -- ein roher Umlaut im Kopfbereich macht die
+                // Nachricht unzustellbar oder den Namen unlesbar.
+                $dateiname = smtp_kopf_kodieren((string)($a['name'] ?? 'anhang'));
+                $mime = (string)($a['mime'] ?? 'application/octet-stream');
+                $nachricht .= '--' . $aussen . "\r\n"
+                    . 'Content-Type: ' . $mime . '; name="' . $dateiname . "\"\r\n"
+                    . "Content-Transfer-Encoding: base64\r\n"
+                    . 'Content-Disposition: attachment; filename="' . $dateiname . "\"\r\n\r\n"
+                    . chunk_split(base64_encode((string)($a['inhalt'] ?? ''))) . "\r\n";
+            }
+            $nachricht .= '--' . $aussen . "--\r\n";
+        }
 
         fwrite($fp, $nachricht . "\r\n.\r\n");
         $antwort = smtp_lesen($fp);
