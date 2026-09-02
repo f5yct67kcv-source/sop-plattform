@@ -804,6 +804,51 @@ CREATE TABLE IF NOT EXISTS kunden_kontaktweg (
   FOREIGN KEY (kontrollpunkt_id) REFERENCES kontrollpunkt(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+// ── Aufgaben am Kontrollpunkt (ENT-300) ───────────────────────────────
+//
+// Zwei Tabellen statt einer: Der KATALOG haelt den Text ein einziges Mal
+// ("Tuere verschliessen"), die VERKNUEPFUNG haengt ihn an beliebig viele
+// Kontrollpunkte. Der Grund ist Wiederholung -- dieselbe Aufgabe steht in
+// der Praxis an einem Dutzend Punkten, und eine geaenderte Formulierung
+// soll eine Aenderung sein und nicht zwoelf.
+//
+// Katalog je OBJEKT, nicht betriebsweit: Was an einem Objekt zu tun ist,
+// ergibt sich aus diesem Objekt. Ein betriebsweiter Katalog waere schnell
+// eine Liste, in der man sucht statt findet.
+//
+// GELOESCHT WIRD NICHT HART, sondern ueber aktiv = 0. Sobald die Erledigung
+// einer Aufgabe protokolliert wird (eigener Schritt), haengt an einer
+// Aufgabe ein Nachweis; ein DELETE risse ihn mit. Gleiches Prinzip wie bei
+// kontrollpunkt.aktiv.
+'objekt_aufgabe' => "CREATE TABLE objekt_aufgabe (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  objekt_id INT NOT NULL,
+  bezeichnung VARCHAR(200) NOT NULL,
+  -- Freitext wie im Referenzsystem 'Informationen': was genau zu tun ist.
+  information TEXT NULL,
+  aktiv TINYINT(1) NOT NULL DEFAULT 1,
+  erstellt_am DATETIME DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_objekt (objekt_id, aktiv),
+  FOREIGN KEY (objekt_id) REFERENCES objekte(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+// Reine Zuordnung, gleiche Bauart wie rundgang_vorlage_punkt: dieselbe
+// Aufgabe darf an vielen Punkten haengen, aber nicht zweimal am selben.
+// ON DELETE CASCADE auf beiden Seiten -- die Zuordnung ist kein Nachweis,
+// sie verschwindet mit Punkt oder Aufgabe. Der Nachweis (wer hat wann was
+// erledigt) bekommt spaeter eine eigene Tabelle und kopiert den Text, statt
+// hierher zu zeigen.
+'kontrollpunkt_aufgabe' => "CREATE TABLE kontrollpunkt_aufgabe (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  kontrollpunkt_id INT NOT NULL,
+  aufgabe_id INT NOT NULL,
+  reihenfolge INT NOT NULL DEFAULT 0,
+  UNIQUE KEY uniq_punkt_aufgabe (kontrollpunkt_id, aufgabe_id),
+  KEY idx_punkt (kontrollpunkt_id, reihenfolge),
+  FOREIGN KEY (kontrollpunkt_id) REFERENCES kontrollpunkt(id) ON DELETE CASCADE,
+  FOREIGN KEY (aufgabe_id) REFERENCES objekt_aufgabe(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
 // ── Offerten und spaeter Rechnungen (ENT-181) ─────────────────────────────
 //
 // Produkte sind Stammdaten: die immer gleichen Leistungen (Verkehrsdienst,

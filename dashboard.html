@@ -506,7 +506,7 @@ a.nav-item { text-decoration: none; }
 /* ENT-265: Das Fenster rechts ist keine reine Anzeige mehr, sondern das
    Bearbeitungsformular selbst -- es braucht deutlich mehr Breite (Vorgabe
    Projektinhaber, im Bildschirmfoto eingezeichnet). */
-.rdkarte-raum.mit-detail { grid-template-columns: minmax(200px, 260px) minmax(0, 1fr) minmax(340px, 420px); }
+.rdkarte-raum.mit-detail { grid-template-columns: minmax(200px, 260px) minmax(0, 1fr) minmax(420px, 520px); }
 .rdkarte-buehne { position: relative; }
 /* ENT-261: Die Karte nutzt die Bildschirmhoehe aus, und die Listenspalte
    links reicht genauso weit hinunter statt auf halber Hoehe aufzuhoeren
@@ -538,6 +538,37 @@ a.nav-item { text-decoration: none; }
   min-height: 0; max-height: var(--rdkarte-h); }
 .rdkarte-seite { max-height: var(--rdkarte-h); }
 .rdkarte-detail .card-bd { min-height: 0; overflow-y: auto; }
+/* Dasselbe Fenster in der Kontrollpunkt-Liste (ENT-300): Liste links,
+   Fenster rechts. Ohne offenes Fenster nimmt die Liste die ganze Breite --
+   eine leere Spalte auf Vorrat sieht aus wie ein Fehler. */
+.rdkp-raum { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; align-items: start; }
+.rdkp-raum.mit-detail { grid-template-columns: minmax(0, 1fr) minmax(420px, 520px); }
+/* Im Listenmodus deckelt keine Karte die Hoehe -- das Fenster darf so hoch
+   werden, wie sein Inhalt ist, statt auf Kartenhoehe abgeschnitten zu sein. */
+.rdkp-raum > .rdkarte-detail { align-self: stretch; display: flex; flex-direction: column; }
+.rdkp-raum > .rdkarte-detail .card-bd { overflow-y: visible; }
+/* Unter 900px stapeln, sonst steht das Fenster auf dem Handy in einer
+   340px-Spalte neben einer 0px-Liste. */
+@media (max-width: 900px) {
+  .rdkp-raum, .rdkp-raum.mit-detail { grid-template-columns: 1fr; }
+}
+/* Aufgabenzeile im Fenster (ENT-300): Haken links, Text rechts. Die ganze
+   Zeile ist die Trefferflaeche -- ein 13px-Kaestchen allein waere auf dem
+   Handy nicht zu treffen. */
+/* Anklickbare Zeile (ENT-300). Der Zeiger und die Hervorhebung sagen, dass
+   hier etwas passiert -- ohne beides sieht eine Tabelle aus wie eine
+   Tabelle, und niemand klickt hinein. */
+tr.klickbar { cursor: pointer; }
+tr.klickbar:hover td { background: var(--surface-2); }
+tr.klickbar:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+tr.klickbar.gewaehlt td { background: var(--accent-soft); }
+.rdkd-auf { display: flex; gap: 10px; align-items: flex-start; padding: 11px 10px;
+  border: 1px solid var(--line); border-radius: var(--r-sm); margin-bottom: 8px;
+  cursor: pointer; min-height: 44px; }
+.rdkd-auf.an { border-color: var(--accent); background: var(--accent-soft); }
+.rdkd-auf input { margin-top: 2px; flex: none; width: 17px; height: 17px; }
+.rdkd-auf-txt { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.rdkd-auf-txt .kp-meta { white-space: normal; }
 .rdkd-reiter { display: flex; gap: 6px; padding: 0 16px 12px; flex: none; }
 .rdkd-reiter button { flex: none; }
 /* Funktionen-Tabelle im Fenster: Beschriftung links, Beginn/Ende rechts --
@@ -4801,15 +4832,22 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
             <input class="inp" type="search" id="rdKpFilterName" placeholder="Name…" oninput="rdKpTabelleZeichnen()" style="width:auto" aria-label="Nach Name filtern">
             <input class="inp" type="search" id="rdKpFilterTag" placeholder="Tag Identifikator…" oninput="rdKpTabelleZeichnen()" style="width:auto" aria-label="Nach Tag Identifikator filtern">
             <div class="sp"></div>
-            <button class="btn btn-primary btn-sm" onclick="rdKrAbschnittZeigen('karte')">+ GPS-Punkt / Geofence anlegen</button>
+            <button class="btn btn-primary btn-sm" onclick="rdKdOeffnen('neu', 'liste')">+ Kontrollpunkt anlegen</button>
           </div>
-          <div class="card">
-            <!-- Tabelle (Desktop) und Karten (Handy, ab 720px per CSS
-                 getauscht) -- eine reine Tabelle blieb auf 390px seitlich
-                 unsichtbar ueberlaufend (am gerenderten Zustand gemessen,
-                 gleicher Fehler wie ENT-243 bei den Arbeitsergebnissen). -->
-            <div class="card-bd flush rdkp-tabelle-wrap"><div class="tw" id="rdKpTabelle"></div></div>
-            <div class="card-bd rdkp-karten" id="rdKpKarten"></div>
+          <!-- Zwei Spalten: Liste links, dasselbe Fenster rechts wie auf der
+               Kartenansicht (ENT-300). Es wird nicht kopiert, sondern beim
+               Oeffnen hierher VERSCHOBEN -- ein Element, eine Maske, ein
+               Satz Feld-ids. Zwei Kopien liefen sonst auseinander, sobald
+               jemand nur eine davon anfasst. -->
+          <div class="rdkp-raum" id="rdKpRaum">
+            <div class="card">
+              <!-- Tabelle (Desktop) und Karten (Handy, ab 720px per CSS
+                   getauscht) -- eine reine Tabelle blieb auf 390px seitlich
+                   unsichtbar ueberlaufend (am gerenderten Zustand gemessen,
+                   gleicher Fehler wie ENT-243 bei den Arbeitsergebnissen). -->
+              <div class="card-bd flush rdkp-tabelle-wrap"><div class="tw" id="rdKpTabelle"></div></div>
+              <div class="card-bd rdkp-karten" id="rdKpKarten"></div>
+            </div>
           </div>
         </div>
         <!-- Kartenansicht (ENT-259): Uebersichtskarte aller GPS-Punkte
@@ -4900,6 +4938,19 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
                   <div class="f wide"><label for="rdKdName">Name *</label><input class="inp" id="rdKdName" placeholder="z. B. Parkplatz"></div>
                   <div class="f wide"><label for="rdKdBeschreibung">Beschreibung</label><textarea class="inp" id="rdKdBeschreibung" rows="3" placeholder="Optionale Notiz zu diesem Punkt"></textarea></div>
                   <div class="f wide"><label>Bereich</label><div id="rdKdBereich" class="kp-meta">–</div></div>
+                  <!-- Typ und Chip-ID (ENT-300): Bis hierher war dieses Fenster
+                       ausdruecklich nur fuer GPS-Punkte (ENT-265), NFC-Punkte
+                       liefen ueber den Dialog. Verlangt ist jetzt, JEDEN
+                       Kontrollpunkt hier zu oeffnen -- also braucht es beide
+                       Typen an einer Stelle. -->
+                  <div class="f wide"><label for="rdKdTyp">Typ</label>
+                    <select class="inp" id="rdKdTyp" onchange="rdKdTypUm()">
+                      <option value="nfc">NFC-Chip</option>
+                      <option value="geofence">Geofence (GPS-Radius)</option>
+                    </select>
+                  </div>
+                  <div class="f wide" id="rdKdNfcFeld"><label for="rdKdChipId">Chip-ID</label>
+                    <input class="inp" id="rdKdChipId" placeholder="ID des eingelernten NFC-Chips"></div>
                   <div class="f"><label for="rdKdLat">Breitengrad *</label><input class="inp" id="rdKdLat" inputmode="decimal" placeholder="47.3769" oninput="rdKarteVorschauZeichnen()"></div>
                   <div class="f"><label for="rdKdLng">Längengrad *</label><input class="inp" id="rdKdLng" inputmode="decimal" placeholder="8.5417" oninput="rdKarteVorschauZeichnen()"></div>
                   <div class="f wide"><label for="rdKdRadius">Radius (Meter)</label><input class="inp" id="rdKdRadius" type="number" min="5" step="1" value="20" oninput="rdKarteVorschauZeichnen()"></div>
@@ -4921,8 +4972,36 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
                      Timer fuer eingerichtet. -->
                 <p class="zone-note" style="margin-top:8px">Wird gespeichert, wirkt aber noch nicht: Der Rundgang-Timer startet zurzeit weiterhin beim ersten bestätigten Scan.</p>
               </div>
+              <!-- Aufgaben am Kontrollpunkt (ENT-300). Die Liste zeigt den
+                   KATALOG des Objekts; der Haken sagt, ob die Aufgabe an
+                   diesem Punkt haengt. Gespeichert wird zusammen mit dem
+                   Punkt ueber denselben Knopf -- ein Fenster, ein
+                   "Speichern", nicht zwei Speicherbegriffe nebeneinander. -->
               <div class="card-bd" id="rdKdAufgaben" style="display:none">
-                <p class="zone-note">Folgt in einem späteren Schritt.</p>
+                <div class="msg-err" id="rdKdAufErr" style="display:none"></div>
+                <div class="bar-tools" style="margin-bottom:12px">
+                  <input class="inp" type="search" id="rdKdAufFilter" placeholder="Aufgabe suchen…"
+                         oninput="rdKdAufgabenZeichnen()" style="width:auto" aria-label="Aufgaben durchsuchen">
+                  <div class="sp"></div>
+                  <button class="btn btn-primary btn-sm" onclick="rdKdAufgabeNeu()">+ Aufgabe anlegen</button>
+                </div>
+                <!-- Anlegen inline statt in einem weiteren Dialog: Ein Dialog
+                     ueber einem Seitenfenster ueber einer Liste ist eine
+                     Ebene zu viel fuer zwei Felder. -->
+                <div id="rdKdAufNeu" style="display:none;margin-bottom:14px">
+                  <div class="f"><label for="rdKdAufName">Bezeichnung *</label>
+                    <input class="inp" id="rdKdAufName" placeholder="z. B. Türe verschliessen"
+                           onkeydown="if(event.key==='Enter')rdKdAufgabeAnlegen()"></div>
+                  <div class="f"><label for="rdKdAufInfo">Informationen</label>
+                    <textarea class="inp" id="rdKdAufInfo" rows="2" placeholder="Was genau zu tun ist"></textarea></div>
+                  <div class="bar-tools" style="margin-bottom:0">
+                    <div class="sp"></div>
+                    <button class="btn btn-plain btn-sm" onclick="rdKdAufgabeNeuZu()">Abbrechen</button>
+                    <button class="btn btn-primary btn-sm" onclick="rdKdAufgabeAnlegen()">Anlegen</button>
+                  </div>
+                </div>
+                <div id="rdKdAufZahl" class="kp-meta" style="margin-bottom:8px"></div>
+                <div id="rdKdAufListe"></div>
               </div>
               <div class="card-ft">
                 <button class="btn btn-plain btn-sm" onclick="rdKdZuruecksetzen()">Zurücksetzen</button>
@@ -16601,13 +16680,19 @@ function rdKpTabelleZeichnen() {
       <th>Typ</th><th>Name</th><th>Tag Identifikator</th><th></th>
     </tr></thead><tbody>` + gefiltert.map(k => {
     const tag = k.typ === 'nfc' ? esc(k.chip_id || '–') : '–';
-    return `<tr>
+    // Die ganze Zeile oeffnet das Fenster (ENT-300) -- der Knopf "Bearbeiten"
+    // faellt hier weg, weil er dasselbe getan haette wie ein Klick daneben.
+    // "Entfernen" bleibt ein eigener Knopf und stoppt die Weitergabe des
+    // Klicks, sonst oeffnete das Loeschen zugleich das Fenster.
+    const offen = Number(rdKarteAuswahl) === Number(k.id);
+    return `<tr class="klickbar${offen ? ' gewaehlt' : ''}" onclick="rdKdOeffnen(${Number(k.id)}, 'liste')"
+                tabindex="0" role="button" aria-label="Kontrollpunkt ${esc(k.bezeichnung)} öffnen"
+                onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();rdKdOeffnen(${Number(k.id)}, 'liste');}">
         <td><span class="chip ${k.typ === 'nfc' ? 'chip-a' : 'chip-w'}">${k.typ === 'nfc' ? 'NFC' : 'Geofence'}</span></td>
         <td><b>${esc(k.bezeichnung)}</b>${Number(k.aktiv) ? '' : ' <span class="chip chip-n">nicht aktiv</span>'}</td>
         <td class="nowrap">${tag}</td>
         <td class="nowrap">
-          <button class="btn btn-plain btn-sm" onclick="openKp('aendern',${Number(k.id)})">Bearbeiten</button>
-          <button class="btn btn-quiet btn-sm" onclick="askDeleteKp(${Number(k.id)})">Entfernen</button>
+          <button class="btn btn-quiet btn-sm" onclick="event.stopPropagation();askDeleteKp(${Number(k.id)})">Entfernen</button>
         </td>
       </tr>`;
   }).join('') + `</tbody></table>`;
@@ -16627,7 +16712,7 @@ function rdKpTabelleZeichnen() {
       </div>
       <div class="kp-meta">${meta}</div>
       <div style="display:flex;gap:7px;margin-top:9px">
-        <button class="btn btn-plain btn-sm" onclick="openKp('aendern',${Number(k.id)})">Bearbeiten</button>
+        <button class="btn btn-plain btn-sm" onclick="rdKdOeffnen(${Number(k.id)}, 'liste')">Öffnen</button>
         <div style="flex:1"></div>
         <button class="btn btn-quiet btn-sm" onclick="askDeleteKp(${Number(k.id)})">Entfernen</button>
       </div>
@@ -17100,8 +17185,7 @@ function rdKarteWaehlen(id) {
   const k = kontrollpunkte.find(x => Number(x.id) === Number(id));
   if (!k) return;
   if (rdGeoZeichnenAktiv) { rdGeoZeichnenAbbrechen(); }
-  rdKarteAuswahl = Number(id);
-  rdKarteDetailZeichnen();
+  rdKdOeffnen(Number(id), 'karte');
   if (rdKarteMapa && k.lat !== null && k.lng !== null) {
     // Das Fenster nimmt der Karte Breite weg -- erst der resize-Trigger, dann
     // erneut schwenken, sonst liegt der Punkt danach halb unter dem Fenster.
@@ -17116,6 +17200,52 @@ function rdKarteWaehlen(id) {
 
 // Fenster rechts (ENT-265): Bearbeitungsformular, nicht mehr nur Anzeige.
 // rdKarteAuswahl ist entweder die id eines bestehenden Punktes oder 'neu'.
+// ══════════ KONTROLLPUNKT-FENSTER AN ZWEI ORTEN (ENT-300)
+//
+// Es gibt genau EIN Fenster. Beim Oeffnen wird das Element in den Behaelter
+// verschoben, aus dem heraus geoeffnet wurde -- Kartenansicht oder Liste.
+// Der naheliegende Weg waere gewesen, das Markup zweimal hinzuschreiben;
+// dann haette es zwei Saetze gleicher Feld-ids gegeben, und schon der
+// naechste Zusatz waere nur an einer Stelle gelandet.
+let rdKdOrt = 'karte';          // 'karte' | 'liste'
+
+function rdKdBehaelter(ort) {
+  return $(ort === 'liste' ? 'rdKpRaum' : 'rdKarteRaum');
+}
+
+// Die Kartenvorschau darf nur laufen, wenn die Karte ueberhaupt sichtbar
+// ist. Aus der Liste heraus gibt es keine -- ein Aufruf ins Leere waere
+// kein Fehler, aber auch keine Vorschau, und das faellt niemandem auf.
+function rdKdAufKarte() { return rdKdOrt === 'karte' && !!rdKarteMapa; }
+
+// Der eine Weg ins Fenster, egal woher.
+function rdKdOeffnen(id, ort) {
+  const fenster = $('rdKarteDetail');
+  if (!fenster) return;
+  const zielOrt = ort || 'karte';
+  if (zielOrt !== rdKdOrt) {
+    // Alten Behaelter aufraeumen, sonst bleibt dort die zweite Spalte stehen.
+    const alt = rdKdBehaelter(rdKdOrt);
+    if (alt) { alt.classList.remove('mit-detail'); }
+    rdKdOrt = zielOrt;
+  }
+  const behaelter = rdKdBehaelter(rdKdOrt);
+  if (behaelter && fenster.parentElement !== behaelter) { behaelter.appendChild(fenster); }
+  rdKarteAuswahl = id === 'neu' ? 'neu' : Number(id);
+  rdKarteDetailZeichnen();
+  // Die Liste muss wissen, welche Zeile offen ist -- ohne das Neuzeichnen
+  // bleibt die Hervorhebung auf der zuvor gewaehlten stehen.
+  if (rdKdOrt === 'liste') { rdKpTabelleZeichnen(); }
+}
+
+function rdKdTypUm() {
+  const nfc = $('rdKdTyp').value === 'nfc';
+  $('rdKdNfcFeld').style.display = nfc ? '' : 'none';
+  ['rdKdLat', 'rdKdLng', 'rdKdRadius'].forEach(f => {
+    const feld = $(f); if (feld && feld.closest('.f')) { feld.closest('.f').style.display = nfc ? 'none' : ''; }
+  });
+}
+
 function rdKarteDetailZeichnen() {
   const fenster = $('rdKarteDetail');
   if (!fenster) return;
@@ -17123,7 +17253,16 @@ function rdKarteDetailZeichnen() {
   const k = neu ? null : kontrollpunkte.find(x => Number(x.id) === rdKarteAuswahl);
   if (!neu && !k) { rdKarteDetailSchliessen(); return; }
 
-  $('rdKarteDetailTitel').textContent = neu ? 'Neuer GPS-Punkt' : k.bezeichnung;
+  const typ = neu ? (rdKdOrt === 'liste' ? 'nfc' : 'geofence') : k.typ;
+  $('rdKarteDetailTitel').textContent = neu
+    ? (typ === 'nfc' ? 'Neuer Kontrollpunkt' : 'Neuer GPS-Punkt')
+    : k.bezeichnung;
+  // Die Zeile ueber dem Titel sagt, WAS fuer ein Punkt das ist -- sie stand
+  // bisher fest auf "GPS-Punkt", weil es nur solche gab (ENT-300).
+  const kicker = $('rdKarteDetailTitel').parentElement.querySelector('.kp-meta');
+  if (kicker) { kicker.textContent = typ === 'nfc' ? 'Kontrollpunkt · NFC-Chip' : 'Kontrollpunkt · GPS-Punkt'; }
+  $('rdKdTyp').value = typ;
+  $('rdKdChipId').value = neu ? '' : (k.chip_id || '');
   $('rdKdName').value = neu ? '' : k.bezeichnung;
   $('rdKdBeschreibung').value = !neu && k.beschreibung ? k.beschreibung : '';
   const objekt = objekte.find(o => Number(o.id) === Number(rdEinObjekt));
@@ -17151,11 +17290,14 @@ function rdKarteDetailZeichnen() {
     $('rdKdBzEnde').checked = !!Number(k.bereichszeit_ende);
   }
   $('rdKdErr').style.display = 'none';
+  rdKdTypUm();
   // Bei einem noch nicht gespeicherten Punkt gibt es nichts zu loeschen.
   $('rdKdLoeschen').textContent = neu ? 'Verwerfen' : 'Löschen';
   rdKdReiter('allgemeines');
+  rdKdAufgabenLaden();
   fenster.style.display = '';
-  $('rdKarteRaum').classList.add('mit-detail');
+  const behaelter = rdKdBehaelter(rdKdOrt);
+  if (behaelter) { behaelter.classList.add('mit-detail'); }
 }
 
 function rdKdReiter(id) {
@@ -17173,8 +17315,7 @@ function rdKdNeu() {
   // waehrend des Zeichnens gleichzeitig einen GPS-Punkt UND eine Vieleck-Ecke
   // setzen.
   if (rdGeoZeichnenAktiv) { rdGeoZeichnenAbbrechen(); }
-  rdKarteAuswahl = 'neu';
-  rdKarteDetailZeichnen();
+  rdKdOeffnen('neu', 'karte');
   // Vollstaendig neu zeichnen, nicht nur die Vorschau: der zuvor gewaehlte
   // Punkt war aus der Grundebene ausgenommen und muss jetzt wieder hinein.
   rdKarteUebersichtZeichnen();
@@ -17195,10 +17336,14 @@ function rdKdLoeschen() {
 function rdKdSpeichern() {
   const err = $('rdKdErr'); err.style.display = 'none';
   const name = $('rdKdName').value.trim();
+  const typ = $('rdKdTyp').value;
   const lat = parseFloat(String($('rdKdLat').value).replace(',', '.'));
   const lng = parseFloat(String($('rdKdLng').value).replace(',', '.'));
   if (!name) { err.textContent = 'Name erforderlich.'; err.style.display = ''; return; }
-  if (!isFinite(lat) || !isFinite(lng)) {
+  // Koordinaten nur beim Geofence verlangen -- ein NFC-Chip hat keine
+  // (ENT-300). Vorher stand hier fest 'geofence', weil dieses Fenster nur
+  // GPS-Punkte kannte.
+  if (typ === 'geofence' && (!isFinite(lat) || !isFinite(lng))) {
     err.textContent = 'Breiten- und Längengrad erforderlich — Punkt auf der Karte anklicken oder Werte eintragen.';
     err.style.display = ''; return;
   }
@@ -17207,8 +17352,10 @@ function rdKdSpeichern() {
     objekt_id: rdEinObjekt,
     bezeichnung: name,
     beschreibung: $('rdKdBeschreibung').value.trim(),
-    typ: 'geofence',
-    lat, lng,
+    typ,
+    chip_id: typ === 'nfc' ? $('rdKdChipId').value.trim() : '',
+    lat: typ === 'geofence' ? lat : null,
+    lng: typ === 'geofence' ? lng : null,
     geofence_radius_m: Number($('rdKdRadius').value) || 20,
     aktiv: $('rdKdAktiv').checked ? 1 : 0,
     bereichszeit_beginn: $('rdKdBzBeginn').checked ? 1 : 0,
@@ -17224,13 +17371,162 @@ function rdKdSpeichern() {
     b.disabled = false;
     if (!ok || data.status !== 'ok') { err.textContent = data.message || 'Speichern fehlgeschlagen.'; err.style.display = ''; return; }
     const zielId = Number(data.id);
-    loadKontrollpunkte().then(() => {
-      rdKarteAuswahl = zielId;
-      krPunkteAktualisieren();
-      rdKarteVorschauZeichnen();
-      toast('GPS-Punkt gespeichert.');
+    // Erst der Punkt, dann seine Aufgaben: Ein neuer Punkt hat vor dem
+    // Speichern noch keine id, an der eine Verknuepfung haengen koennte.
+    rdKdAufgabenSetzen(zielId).then(fehler => {
+      loadKontrollpunkte().then(() => {
+        rdKarteAuswahl = zielId;
+        krPunkteAktualisieren();
+        rdKpTabelleZeichnen();
+        rdKarteVorschauZeichnen();
+        // Die Aufgaben getrennt melden, wenn dort etwas schiefging -- sonst
+        // stuende "gespeichert" da, waehrend die halbe Eingabe fehlt.
+        if (fehler) { err.textContent = fehler; err.style.display = ''; toast('Punkt gespeichert, Aufgaben nicht.'); }
+        else { toast('Kontrollpunkt gespeichert.'); }
+      });
     });
   });
+}
+
+// ══════════ AUFGABEN AM KONTROLLPUNKT (ENT-300)
+//
+// Der Katalog gehoert dem Objekt, der Haken sagt, ob eine Aufgabe an DIESEM
+// Punkt haengt. Darum eine einzige Liste mit Haken statt der zweistufigen
+// Bedienung des Referenzsystems (erst Auswahlfenster, dann uebernehmen):
+// Dasselbe Ergebnis, ein Schritt weniger, und der Zustand ist immer
+// vollstaendig zu sehen.
+let rdKdKatalog = [];            // alle aktiven Aufgaben des Objekts
+let rdKdGewaehlt = new Set();    // ids, die an diesem Punkt haengen
+let rdKdKatalogEingerichtet = true;
+
+function rdKdAufgabenLaden() {
+  if (!rdEinObjekt) { rdKdKatalog = []; rdKdGewaehlt = new Set(); rdKdAufgabenZeichnen(); return; }
+  api(`aufgabe_liste.php?objekt_id=${Number(rdEinObjekt)}`).then(({ ok, data }) => {
+    if (!ok || !data || data.status !== 'ok') {
+      // Nicht stillschweigend leer zeigen: "nicht abrufbar" und "keine
+      // Aufgaben" sind zwei verschiedene Aussagen.
+      rdKdKatalog = null; rdKdAufgabenZeichnen(); return;
+    }
+    rdKdKatalogEingerichtet = data.eingerichtet !== false;
+    rdKdKatalog = Array.isArray(data.aufgaben) ? data.aufgaben : [];
+    const zu = (data.zuordnung || {})[String(rdKarteAuswahl)] || [];
+    rdKdGewaehlt = new Set(zu.map(Number));
+    rdKdAufgabenZeichnen();
+  });
+}
+
+function rdKdAufgabenZeichnen() {
+  const ziel = $('rdKdAufListe'), zahl = $('rdKdAufZahl');
+  if (!ziel) return;
+  if (rdKdKatalog === null) {
+    zahl.textContent = '';
+    ziel.innerHTML = EMPTY('Aufgaben nicht abrufbar',
+      'Die Liste konnte nicht geladen werden. Das heisst nicht, dass keine hinterlegt sind — einmal neu laden.');
+    return;
+  }
+  if (!rdKdKatalogEingerichtet) {
+    zahl.textContent = '';
+    ziel.innerHTML = EMPTY('Aufgaben noch nicht eingerichtet',
+      'Die Tabellen für Aufgaben fehlen in dieser Datenbank. Einmal „Einrichtung" in der Seitenleiste ausführen, dann erneut öffnen.');
+    return;
+  }
+  if (!rdKdKatalog.length) {
+    zahl.textContent = '';
+    ziel.innerHTML = EMPTY('Noch keine Aufgabe angelegt',
+      'Über „+ Aufgabe anlegen" die erste Aufgabe für dieses Objekt erfassen, etwa „Türe verschliessen".');
+    return;
+  }
+  const filter = ($('rdKdAufFilter').value || '').trim().toLowerCase();
+  const sichtbar = rdKdKatalog.filter(a => !filter
+    || (a.bezeichnung || '').toLowerCase().includes(filter)
+    || (a.information || '').toLowerCase().includes(filter));
+
+  // Zwei Einheiten getrennt halten: "verknüpft" zaehlt die Haken an DIESEM
+  // Punkt, "im Katalog" zaehlt alles, was es am Objekt gibt. Und sobald ein
+  // Filter greift, steht die Bezugsgroesse dabei (CLAUDE.md).
+  zahl.textContent = filter
+    ? `${sichtbar.length} von ${rdKdKatalog.length} Aufgaben im Katalog · ${rdKdGewaehlt.size} an diesem Punkt verknüpft`
+    : `${rdKdKatalog.length} Aufgaben im Katalog · ${rdKdGewaehlt.size} an diesem Punkt verknüpft`;
+
+  if (!sichtbar.length) {
+    ziel.innerHTML = EMPTY('Kein Treffer',
+      'Keine Aufgabe passt zur Suche. Der Katalog selbst ist nicht leer.');
+    return;
+  }
+  ziel.innerHTML = sichtbar.map(a => {
+    const an = rdKdGewaehlt.has(Number(a.id));
+    return `<label class="rdkd-auf${an ? ' an' : ''}">
+        <input type="checkbox" ${an ? 'checked' : ''} onchange="rdKdAufgabeUm(${Number(a.id)}, this.checked)">
+        <span class="rdkd-auf-txt">
+          <b>${esc(a.bezeichnung)}</b>
+          ${a.information ? `<span class="kp-meta">${esc(a.information)}</span>` : ''}
+        </span>
+      </label>`;
+  }).join('');
+}
+
+function rdKdAufgabeUm(id, an) {
+  if (an) { rdKdGewaehlt.add(Number(id)); } else { rdKdGewaehlt.delete(Number(id)); }
+  rdKdAufgabenZeichnen();
+}
+
+// Neue Katalogaufgabe. Sie wird sofort gespeichert -- sie gehoert dem
+// Objekt, nicht diesem Punkt -- und am offenen Punkt gleich angehakt.
+function rdKdAufgabeNeu() {
+  const err = $('rdKdAufErr'); err.style.display = 'none';
+  if (!rdEinObjekt) { err.textContent = 'Kein Objekt gewählt.'; err.style.display = ''; return; }
+  $('rdKdAufName').value = '';
+  $('rdKdAufInfo').value = '';
+  $('rdKdAufNeu').style.display = '';
+  $('rdKdAufName').focus();
+}
+
+function rdKdAufgabeNeuZu() {
+  $('rdKdAufNeu').style.display = 'none';
+  $('rdKdAufErr').style.display = 'none';
+}
+
+function rdKdAufgabeAnlegen() {
+  const err = $('rdKdAufErr'); err.style.display = 'none';
+  const text = $('rdKdAufName').value.trim();
+  const info = $('rdKdAufInfo').value.trim();
+  if (!text) { err.textContent = 'Bezeichnung erforderlich.'; err.style.display = ''; return; }
+  api('aufgabe_save.php', { method: 'POST',
+    body: { objekt_id: rdEinObjekt, bezeichnung: text, information: info } })
+    .then(({ ok, data }) => {
+      if (!ok || data.status !== 'ok') {
+        err.textContent = (data && data.message) || 'Anlegen fehlgeschlagen.'; err.style.display = ''; return;
+      }
+      rdKdKatalogEingerichtet = true;
+      if (rdKdKatalog === null) { rdKdKatalog = []; }
+      rdKdKatalog.push({ id: Number(data.id), bezeichnung: text, information: info || null, aktiv: 1 });
+      rdKdKatalog.sort((a, b) => String(a.bezeichnung).localeCompare(String(b.bezeichnung), 'de'));
+      // Neu angelegt heisst hier auch verknuepft -- man legt sie an, WEIL
+      // sie an diesen Punkt gehoert. Der Haken laesst sich sofort wieder
+      // wegnehmen.
+      rdKdGewaehlt.add(Number(data.id));
+      rdKdAufgabeNeuZu();
+      rdKdAufgabenZeichnen();
+      toast('Aufgabe angelegt und angehakt — mit „Speichern" wird sie am Punkt festgehalten.');
+    });
+}
+
+// Setzt die Verknuepfungen des Punktes auf den Stand der Haken. Gibt eine
+// Fehlermeldung zurueck oder null -- der Aufrufer entscheidet, wie er sie
+// zeigt.
+function rdKdAufgabenSetzen(kontrollpunktId) {
+  if (!kontrollpunktId || rdKdKatalog === null || !rdKdKatalogEingerichtet) { return Promise.resolve(null); }
+  return api('kontrollpunkt_aufgaben_setzen.php', {
+    method: 'POST',
+    body: { kontrollpunkt_id: Number(kontrollpunktId), aufgabe_ids: [...rdKdGewaehlt] },
+  }).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') { return data && data.message ? data.message : 'Aufgaben konnten nicht gespeichert werden.'; }
+    // Abgewiesene nicht verschweigen -- der Server nennt sie ausdruecklich.
+    if (Array.isArray(data.abgewiesen) && data.abgewiesen.length) {
+      return `${data.abgewiesen.length} Aufgabe(n) wurden abgewiesen — sie gehören nicht zu diesem Objekt.`;
+    }
+    return null;
+  }).catch(() => 'Aufgaben konnten nicht gespeichert werden.');
 }
 
 function rdKarteDetailSchliessen() {
@@ -17238,10 +17534,14 @@ function rdKarteDetailSchliessen() {
   if (!fenster) return;
   rdKarteAuswahl = null;
   fenster.style.display = 'none';
-  $('rdKarteRaum').classList.remove('mit-detail');
+  // Beide Behaelter aufraeumen -- das Fenster kann in jedem von beiden
+  // gestanden haben, und eine zurueckgebliebene zweite Rasterspalte sieht
+  // aus wie ein Ladefehler.
+  ['rdKarteRaum', 'rdKpRaum'].forEach(id => { const e = $(id); if (e) e.classList.remove('mit-detail'); });
   // Gleicher Grund wie in rdKdNeu(): der bisher gewaehlte Punkt gehoert
   // wieder in die Grundebene, sonst fehlt er auf der Karte.
   rdKarteUebersichtZeichnen();
+  rdKpTabelleZeichnen();
   if (rdKarteMapa) { setTimeout(() => { if (rdKarteMapa) google.maps.event.trigger(rdKarteMapa, 'resize'); }, 30); }
 }
 
