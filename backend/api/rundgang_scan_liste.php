@@ -17,7 +17,11 @@ $von = trim((string)($_GET['von'] ?? '')) ?: date('Y-m-d');
 $bis = trim((string)($_GET['bis'] ?? '')) ?: $von;
 $objektId = isset($_GET['objekt_id']) && $_GET['objekt_id'] !== '' ? (int)$_GET['objekt_id'] : null;
 
-$sql = 'SELECT s.id, s.erfasst_am, s.status, s.beschreibung,
+// r.id kommt mit (ENT-318), damit sich die Bewegungsspur einer Runde
+// gezielt nachladen laesst. Die Spur SELBST steht bewusst nicht hier drin:
+// Wer die Auswertung eines Monats oeffnet, soll nicht nebenbei die
+// Aufenthaltsdaten aller Mitarbeitenden geliefert bekommen.
+$sql = 'SELECT s.id, s.erfasst_am, s.status, s.beschreibung, r.id AS rundgang_id,
                k.bezeichnung AS kontrollpunkt_name,
                e.kunde_name, o.name AS objekt_name, e.titel,
                m.vorname, m.nachname

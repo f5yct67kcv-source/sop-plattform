@@ -310,6 +310,13 @@ svg.i-sm { width: 17px; height: 17px; }
 .rd-haken-nv { background: var(--warn-soft); color: var(--warn); }
 .rd-haken-es { background: var(--accent-soft); color: var(--accent); font-size: 13px; }
 .rd-es-vorschau { max-width: 140px; border-radius: 8px; align-self: flex-start; }
+/* Entfernung zum Kontrollpunkt (ENT-317). Drei Zustaende, drei Farben --
+   "unbekannt" traegt bewusst die stille Farbe und nicht die warnende:
+   Wer nicht weiss, wo er ist, hat nichts falsch gemacht. */
+.rd-ort { font-size: 13px; margin: 8px 0 0 37px; font-weight: 560; }
+.rd-ort.drin { color: var(--pos); }
+.rd-ort.weit { color: var(--warn); }
+.rd-ort.mut { color: var(--ink-3); font-weight: 400; }
 .rd-hinweis { font-size: 12.5px; color: var(--ink-3); margin: 8px 0 0 37px; }
 .rd-akt { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 0 37px; }
 .rd-nv { margin: 10px 0 0 37px; display: flex; flex-direction: column; gap: 8px; }
@@ -963,6 +970,12 @@ const W = {
     rgsKarteOhneOrt: 'ohne Koordinaten — nur in der Liste',
     rgsZentrieren: 'Zentrieren',
     rgsMeinStandort: 'Mein Standort',
+    rgsOrtungLaeuft: 'Standort wird während der Runde verfolgt',
+    rgsOrtungAus: 'Kein Standort — Ortung im Gerät erlauben',
+    rdEntfernung: 'noch {m} m',
+    rdImBereich: 'Du bist im Bereich',
+    rdZuWeit: 'Noch {m} m entfernt — der Punkt lässt sich erst im Bereich bestätigen',
+    rdOrtUnbekannt: 'Standort noch unbekannt',
     rgsReiterFunktionen: 'Funktionen',
     rgsLaufTitel: 'Rundgang',
     rgsAbbrechenModul: 'Rundgang abbrechen',
@@ -1067,6 +1080,12 @@ const RD_WARTESCHLANGE = 'sop_rundgang_warteschlange';
 // Ein Scan wird je Kontrollpunkt einmal gemeldet, Antworten koennen zu
 // einem Punkt mehrere sein.
 const RD_AUFGABEN_WARTESCHLANGE = 'sop_rundgang_aufgaben';
+// Bewegungsspur, die noch nicht uebermittelt ist (ENT-318). Eigene
+// Warteschlange und nicht die der Scans: Ein Scan ist ein Nachweis und muss
+// ankommen; eine Position ist eine Zugabe. Werden sie gemeinsam gefuehrt,
+// koennte eine gescheiterte Position einen Scan blockieren -- die falsche
+// Rangfolge.
+const RD_POSITIONEN = 'sop_rundgang_positionen';
 
 // ── Hilfen
 const $ = id => document.getElementById(id);
@@ -1745,6 +1764,8 @@ function rgSeiteZu() {
   rgsModus = 'vorschau';
   rgsReiter = 'punkte';
   rgTimerStoppen();   // sonst tickt er unsichtbar weiter
+  rgOrtungStoppen();  // sonst ortet das Geraet weiter, ohne dass es jemand sieht
+  rgsMeinOrt = null;  // die Position ueberdauert die Runde nicht
   $('rgsReiter').hidden = true;
   $('rgsKopfZahlen').hidden = true;
   $('rgsFuss').hidden = false;
@@ -3231,7 +3252,25 @@ function rundgangAnzeigen(einsatzId) {
   rgLaufReiterZeichnen();
   rgLaufZeichnen();
   rgTimerStarten();
+  // Ortung nur, solange die Runde tatsaechlich laeuft (ENT-317). Auf einer
+  // beendeten, abgebrochenen oder pausierten Runde hat sie nichts zu suchen
+  // -- so vom Projektinhaber verlangt ("wenn der Rundgang beendet wird, wird
+  // die Verfolgung nicht mehr aktiv"). Der Zustand wird bei jedem Zeichnen
+  // neu beurteilt, nicht nur hier: Eine Runde kann waehrend der Anzeige
+  // enden, etwa mit dem letzten Kontrollpunkt.
+  rgOrtungNachfuehren();
   rdWarteschlangeSenden();
+}
+
+/* Eine Stelle entscheidet, ob geortet wird -- nicht fuenf verstreute
+   Aufrufe. Wer das an jedem Zustandswechsel einzeln einbaut, vergisst
+   genau den einen, nach dem die Ortung weiterlaeuft. */
+function rgOrtungNachfuehren() {
+  const laeuft = rgsModus === 'lauf' && rundgangAktiv
+    && rundgangAktiv.status !== 'abgeschlossen'
+    && rundgangAktiv.status !== 'abgebrochen'
+    && rundgangAktiv.status !== 'pausiert';
+  if (laeuft) { rgOrtungStarten(); } else { rgOrtungStoppen(); }
 }
 
 function rgLaufReiterZeichnen() {
@@ -3269,6 +3308,12 @@ function rgLaufReiter(id) {
 
 function rgLaufZeichnen() {
   if (rgsModus !== 'lauf' || !rundgangAktiv) return;
+  // NACH dem Riegel und nicht davor (ENT-317): Die Ortung ist eine
+  // Zusatzfunktion; sie darf das Zeichnen der Seite weder verhindern noch
+  // verzoegern. Beim Bauen stand sie eine Zeile zu frueh -- ein Fehler in
+  // watchPosition riss die ganze Seite mit und der Waechter sah einen
+  // leeren Rumpf statt seiner Kontrollpunkte. Von der Regression gefunden.
+  rgOrtungNachfuehren();
   if (rgsReiter === 'karte') { rgKarteZeichnen(); }
   else if (rgsReiter === 'funktionen') { rgLaufFunktionen(); }
   else {
@@ -3510,6 +3555,13 @@ function rgKarteZeichnen() {
       <span>${esc(w('rgsKarteLeer'))}</span></div>${hinweis}`;
     return;
   }
+  // Wer geortet wird, muss es sehen koennen (ENT-317). Nicht Kosmetik: Eine
+  // Ortung, von der der Betroffene nichts weiss, ist etwas anderes als eine,
+  // die offen angezeigt wird -- rechtlich wie menschlich. Steht dort,
+  // solange die Verfolgung laeuft, und verschwindet mit ihr.
+  const ortungHinweis = rgsOrtWache !== null
+    ? `<div class="rgs-karte-hinweis" id="rgsOrtungHinweis">${esc(w('rgsOrtungLaeuft'))}</div>`
+    : '';
   $('rgsBody').innerHTML = `
     <div class="rgs-karte-huelle">
       <div class="rgs-karte" id="rgsKarte"></div>
@@ -3518,7 +3570,7 @@ function rgKarteZeichnen() {
         <svg class="i i-sm" viewBox="0 0 24 24"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
         <span>${esc(w('rgsZentrieren'))}</span>
       </button>
-    </div>${hinweis}`;
+    </div>${ortungHinweis}${hinweis}`;
 
   // Frueher wurde hier abgebrochen, sobald der Schluessel einmal abgelehnt
   // war. Das war falsch (ENT-312): Wird die Freigabe beim Anbieter in
@@ -3577,6 +3629,180 @@ function rgKartePunkteZeichnen(punkte) {
     // hiesse, denselben Ablauf ein zweites Mal zu bauen.
     marke.addListener('click', () => rgLaufReiter('punkte'));
     rgsKartenMarken.push(marke);
+  });
+}
+
+/* ══ Laufende Ortung waehrend der Runde (ENT-317) ═════════════════════
+   Revidiert ENT-131 teilweise. Vom Projektinhaber entschieden und
+   begruendet: "das System, so wie wir es bauen, braucht die kontinuierliche
+   Ortung, damit es sauber klappt ... ansonsten koennen solche kleine Radien
+   und auf kurzer Distanz nicht umgesetzt werden."
+
+   ENT-131 verwarf die laufende Ortung 2026-08-25 mit "hoeheres rechtliches
+   Risiko, KEIN bisher benannter Bedarf". Der Bedarf ist jetzt benannt: Ein
+   Radius von 20-25 m laesst sich ohne laufende Anzeige nicht bedienen -- der
+   Waechter erfuehre erst beim Antippen, dass er zu weit weg ist.
+
+   Zwei Dinge sind bewusst GETRENNT gebaut:
+   - Die Ortung im Geraet (hier). Sie macht die Bedienung erst moeglich und
+     verlaesst das Geraet nicht.
+   - Die Uebermittlung der Spur (Schritt 2). Sie ist der rechtlich heikle
+     Teil und laesst sich abschalten, ohne dass die Bedienbarkeit leidet.
+
+   Die Verfolgung laeuft NUR, solange eine Runde laeuft -- nicht pausiert,
+   nicht beendet, nicht im Hintergrund. Das hat der Projektinhaber
+   ausdruecklich so verlangt. */
+let rgsOrtWache = null;       // Kennung von watchPosition
+let rgsMeinOrt = null;        // { lat, lng, genauigkeit, zeit } -- nur im Speicher
+
+// Haversine, dieselbe Rechnung wie geo_distanz_meter() in backend/rundgang.php.
+// Bewusst nachgebaut statt den Server zu fragen: Die Pruefung muss OHNE Netz
+// funktionieren, sonst ist sie genau dann weg, wenn sie gebraucht wird.
+function rgDistanzMeter(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const rad = g => g * Math.PI / 180;
+  const dLat = rad(lat2 - lat1), dLng = rad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
+}
+
+// Entfernung zu einem Kontrollpunkt, oder null wenn etwas fehlt.
+// null heisst "unbekannt" und darf nie wie "zu weit" behandelt werden.
+function rdEntfernungZu(k) {
+  if (!rgsMeinOrt || !k || k.lat === null || k.lat === undefined
+      || k.lng === null || k.lng === undefined) { return null; }
+  const lat = Number(k.lat), lng = Number(k.lng);
+  if (!isFinite(lat) || !isFinite(lng)) { return null; }
+  return rgDistanzMeter(rgsMeinOrt.lat, rgsMeinOrt.lng, lat, lng);
+}
+
+function rdRadiusVon(k) { return Number(k && k.geofence_radius_m) || 20; }
+
+function rgOrtungStarten() {
+  if (rgsOrtWache !== null || !navigator.geolocation) { return; }
+  // Alles gekapselt: Ein Geraet ohne Standortdienst, eine verweigerte
+  // Berechtigung oder ein Browser, der watchPosition anders behandelt, darf
+  // niemals die Runde lahmlegen. Die Runde geht auch ohne Ortung weiter --
+  // der Server prueft den Radius ohnehin.
+  try {
+  rgsOrtWache = navigator.geolocation.watchPosition(pos => {
+    rgsMeinOrt = { lat: pos.coords.latitude, lng: pos.coords.longitude,
+      genauigkeit: pos.coords.accuracy, zeit: Date.now() };
+    try { rgStandortZeichnen(); } catch (e) {}
+    try { rgSpurAufnehmen(rgsMeinOrt); } catch (e) {}
+    // Die Liste zeigt Entfernungen -- sie muss mitwandern. Nur wenn sie
+    // gerade sichtbar ist: sonst wuerde ein offenes Formular (Ersatzscan,
+    // "nicht verfuegbar") beim naechsten Positionswechsel weggeworfen.
+    if (rgsReiter === 'punkte' && abPunktId === null) { rundgangListeZeichnen(); }
+  }, () => {}, { enableHighAccuracy: true, timeout: 20000, maximumAge: 5000 });
+  } catch (e) { rgsOrtWache = null; }
+}
+
+/* ══ Uebermittlung der Bewegungsspur (ENT-318) ════════════════════════
+   Vom Projektinhaber beauftragt. Bewusst so gebaut, dass so wenig anfaellt
+   wie moeglich, ohne den Zweck zu verfehlen:
+
+   - Gedrosselt: hoechstens alle RG_SPUR_SEKUNDEN ein Punkt, und nur wenn
+     man sich mindestens RG_SPUR_METER bewegt hat. Wer zwanzig Minuten an
+     einem Tor steht, erzeugt EINEN Punkt, nicht achtzig.
+   - Ungenaue Messungen fliegen raus. Ein Punkt mit 500 m Streuung sagt
+     nichts, faellt in einer Auswertung aber als "war dort" auf.
+   - Eigene Warteschlange, damit eine Position nie einen Scan blockiert.
+   - Die Spur wird VERWORFEN, sobald sie angekommen ist -- das Geraet ist
+     kein Archiv. */
+const RG_SPUR_SEKUNDEN = 15;
+const RG_SPUR_METER = 10;
+const RG_SPUR_GENAUIGKEIT_MAX = 100;   // Meter; darueber ist die Messung wertlos
+let rgsSpurLetzte = null;              // letzter AUFGENOMMENER Punkt
+let rgsSpurSendetGerade = false;
+
+function rgSpurLesen() {
+  try { return JSON.parse(localStorage.getItem(RD_POSITIONEN) || '[]'); } catch { return []; }
+}
+function rgSpurSchreiben(liste) {
+  // Obergrenze: Nach einer sehr langen Offline-Phase darf der Speicher des
+  // Geraets nicht volllaufen. Die AELTESTEN fliegen raus, nicht die
+  // neuesten -- die juengste Bewegung ist die, die noch jemanden
+  // interessiert.
+  try { localStorage.setItem(RD_POSITIONEN, JSON.stringify(liste.slice(-2000))); } catch {}
+}
+
+// Entscheidet, ob eine Position in die Spur gehoert. Reine Funktion, damit
+// sich die Drosselung ohne Geraet pruefen laesst.
+function rgSpurNehmen(letzte, neu) {
+  if (!neu || !isFinite(neu.lat) || !isFinite(neu.lng)) { return false; }
+  if (neu.genauigkeit != null && neu.genauigkeit > RG_SPUR_GENAUIGKEIT_MAX) { return false; }
+  if (!letzte) { return true; }
+  if ((neu.zeit - letzte.zeit) < RG_SPUR_SEKUNDEN * 1000) { return false; }
+  return rgDistanzMeter(letzte.lat, letzte.lng, neu.lat, neu.lng) >= RG_SPUR_METER;
+}
+
+function rgSpurAufnehmen(ort) {
+  if (!rundgangAktiv || !rgSpurNehmen(rgsSpurLetzte, ort)) { return; }
+  rgsSpurLetzte = ort;
+  const liste = rgSpurLesen();
+  liste.push({ rundgang_id: rundgangAktiv.id, lat: ort.lat, lng: ort.lng,
+    genauigkeit_m: ort.genauigkeit == null ? null : Math.round(ort.genauigkeit),
+    erfasst_am: jetztDatetime() });
+  rgSpurSchreiben(liste);
+  rgSpurSenden();
+}
+
+function rgSpurSenden() {
+  if (rgsSpurSendetGerade) { return; }
+  const alle = rgSpurLesen();
+  if (!alle.length) { return; }
+  // Nach Runde gruppieren: Die Warteschlange kann Punkte aus mehreren
+  // Runden enthalten, wenn eine davon offline zu Ende ging.
+  const rid = Number(alle[0].rundgang_id);
+  const dieser = alle.filter(x => Number(x.rundgang_id) === rid).slice(0, 200);
+  rgsSpurSendetGerade = true;
+  api('mein_rundgang_position.php', { method: 'POST',
+    body: { rundgang_id: rid, positionen: dieser.map(x => ({
+      lat: x.lat, lng: x.lng, genauigkeit_m: x.genauigkeit_m, erfasst_am: x.erfasst_am })) },
+  }).then(({ ok, data }) => {
+    rgsSpurSendetGerade = false;
+    if (ok && data && data.status === 'ok') {
+      // Nur die tatsaechlich gesendeten entfernen -- in der Zwischenzeit
+      // koennen neue dazugekommen sein.
+      const weg = new Set(dieser.map(x => x.erfasst_am + '|' + x.lat + '|' + x.lng));
+      rgSpurSchreiben(rgSpurLesen().filter(x =>
+        !(Number(x.rundgang_id) === rid && weg.has(x.erfasst_am + '|' + x.lat + '|' + x.lng))));
+      return;
+    }
+    // Nimmt der Server sie dauerhaft nicht an -- Runde beendet, Tabelle
+    // fehlt --, wird die Spur dieser Runde VERWORFEN statt ewig
+    // weitergeschleppt. Eine Position, die niemand mehr haben will, gehoert
+    // nicht auf dem Geraet aufbewahrt.
+    const code = data && data.code;
+    if (code === 'nicht_laufend' || code === 'keine_tabelle') {
+      rgSpurSchreiben(rgSpurLesen().filter(x => Number(x.rundgang_id) !== rid));
+    }
+  });
+}
+
+function rgOrtungStoppen() {
+  if (rgsOrtWache === null) { return; }
+  try { navigator.geolocation.clearWatch(rgsOrtWache); } catch (e) {}
+  rgsOrtWache = null;
+  rgsSpurLetzte = null;
+  // Was noch im Geraet liegt, jetzt noch loswerden -- der Server nimmt es
+  // an, solange die Runde laeuft. Endet sie in derselben Sekunde, weist er
+  // es ab und die App verwirft es; beides ist besser, als es liegenzulassen.
+  try { rgSpurSenden(); } catch (e) {}
+}
+
+// Der eigene Standort auf der Karte -- wird bei jeder neuen Position
+// versetzt, statt jedes Mal eine neue Marke anzulegen.
+function rgStandortZeichnen() {
+  if (!rgsKarte || !window.google || !rgsMeinOrt) { return; }
+  const ort = { lat: rgsMeinOrt.lat, lng: rgsMeinOrt.lng };
+  if (rgsStandortMarke) { rgsStandortMarke.setPosition(ort); return; }
+  rgsStandortMarke = new google.maps.Marker({
+    map: rgsKarte, position: ort, title: w('rgsMeinStandort'), zIndex: 1,
+    icon: { path: google.maps.SymbolPath.CIRCLE, scale: 7,
+      fillColor: '#F2F4F8', fillOpacity: 1, strokeColor: '#0F1117', strokeWeight: 3 },
   });
 }
 
@@ -3753,6 +3979,18 @@ function rdZeile(k, nr, gesperrt) {
   // ausschliesslich iPhone) technisch gar nicht laufen kann -- Web-NFC gibt es
   // auf iOS/Safari plattformbedingt nicht, unabhaengig von der Browserwahl.
   const kannScannen = k.typ === 'geofence';
+  // Entfernung zum Punkt (ENT-317). Drei Zustaende, nicht zwei:
+  //   Zahl  -- Position bekannt
+  //   null  -- Position noch UNBEKANNT
+  // "Unbekannt" darf nie wie "zu weit" aussehen (CLAUDE.md) und sperrt
+  // darum auch nichts: Wer nicht weiss, wo er ist, wird nicht gehindert --
+  // der Server entscheidet ohnehin noch einmal.
+  const dist = kannScannen ? rdEntfernungZu(k) : null;
+  const drin = dist === null ? null : dist <= rdRadiusVon(k);
+  const ortTxt = !kannScannen ? ''
+    : dist === null ? `<div class="rd-ort mut">${esc(w('rdOrtUnbekannt'))}</div>`
+    : drin ? `<div class="rd-ort drin">${esc(w('rdImBereich'))}</div>`
+    : `<div class="rd-ort weit">${esc(w('rdEntfernung').replace('{m}', String(Math.round(dist))))}</div>`;
   return `<div class="rd-zeile">
     <div class="rd-kopf">
       <span class="rd-nr">${nr}</span>
@@ -3761,11 +3999,12 @@ function rdZeile(k, nr, gesperrt) {
         <div class="rd-meta">${esc(typLabel)}</div>
       </div>
     </div>
+    ${gesperrt ? '' : ortTxt}
     ${!kannScannen && !gesperrt ? `<div class="rd-hinweis">${esc(w('kpNfcNichtVerfuegbarGeraet'))}</div>` : ''}
     ${k.fehler ? `<div class="msg-err" style="margin:10px 0 0 37px">${esc(k.fehler)}</div>` : ''}
     ${gesperrt ? '' : `
     <div class="rd-akt">
-      ${kannScannen ? `<button class="btn btn-primary" id="rdBtn${k.id}" onclick="rdBestaetigen(${k.id})">${esc(w('kpBestaetigen'))}</button>` : ''}
+      ${kannScannen ? `<button class="btn btn-primary" id="rdBtn${k.id}"${drin === false ? ' disabled' : ''} onclick="rdBestaetigen(${k.id})">${esc(w('kpBestaetigen'))}</button>` : ''}
       <button class="btn btn-plain" onclick="rdEsUm(${k.id})">${esc(w('kpErsatzscan'))}</button>
       <button class="btn btn-plain" onclick="rdNvUm(${k.id})">${esc(w('kpNichtVerfuegbar'))}</button>
     </div>
@@ -3785,6 +4024,13 @@ function rdZeile(k, nr, gesperrt) {
 }
 
 function rdZeigeFehler(kontrollpunktId, message) {
+  // Auch am Kontrollpunkt vermerken, nicht nur ins DOM schreiben (ENT-317).
+  // Seit die Ortung laeuft, zeichnet jede neue Position die Liste neu -- eine
+  // Meldung, die nur im DOM stand, war nach Sekundenbruchteilen weg. Der
+  // Waechter haette gesehen, dass der Knopf nicht reagiert, aber nicht warum.
+  const k = rundgangAktiv && rundgangAktiv.kontrollpunkte
+    ? rundgangAktiv.kontrollpunkte.find(x => Number(x.id) === Number(kontrollpunktId)) : null;
+  if (k) { k.fehler = message; }
   const el = $('rdFehler' + kontrollpunktId);
   if (el) { el.textContent = message; el.style.display = ''; }
 }
@@ -3799,11 +4045,52 @@ function rdBestaetigen(kontrollpunktId) {
   if (!navigator.geolocation) { rdZeigeFehler(kontrollpunktId, w('kpStandortFehler')); return; }
   const btn = $('rdBtn' + kontrollpunktId);
   if (btn) btn.disabled = true;
+
+  // Die laufende Ortung hat bereits eine frische Position -- die wird
+  // genommen, statt eine zweite Messung anzustossen (ENT-317). Das ist
+  // nicht nur schneller und sparsamer: Zwei gleichzeitige Abfragen an
+  // denselben Sensor koennen einander blockieren, und genau das ist beim
+  // Bauen passiert -- getCurrentPosition antwortete gar nicht mehr, solange
+  // watchPosition lief. Nur wenn keine frische Position vorliegt, wird
+  // einmalig gemessen (etwa direkt nach dem Oeffnen).
+  const frisch = rgsMeinOrt && (Date.now() - rgsMeinOrt.zeit) < 20000
+    ? { lat: rgsMeinOrt.lat, lng: rgsMeinOrt.lng } : null;
+  if (frisch) { rdMitOrt(k, kontrollpunktId, frisch, btn); return; }
+
   navigator.geolocation.getCurrentPosition(
-    pos => rdScanEintragen(k, 'bestaetigt', { lat: pos.coords.latitude, lng: pos.coords.longitude }),
+    pos => rdMitOrt(k, kontrollpunktId,
+      { lat: pos.coords.latitude, lng: pos.coords.longitude }, btn),
     () => { if (btn) btn.disabled = false; rdZeigeFehler(kontrollpunktId, w('kpStandortFehler')); },
     { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
   );
+}
+
+/* Der eigentliche Riegel (ENT-317) -- eine Stelle, gleich ob die Position
+   aus der laufenden Ortung stammt oder aus einer Einzelmessung. */
+function rdMitOrt(k, kontrollpunktId, ort, btn) {
+  // Vorab im GERAET pruefen, nicht erst am Server (ENT-317).
+  //
+  // Bis hierher wurde der Punkt sofort als erledigt angezeigt und in die
+  // Warteschlange gelegt; erst der Server wies ihn ab, und die App nahm die
+  // Bestaetigung wieder zurueck. Mit Netz dauert das Sekunden -- OHNE Netz
+  // passiert es gar nicht. Der Waechter konnte im Auto sitzend jeden Punkt
+  // "bestaetigen", alles sah gruen aus, und die Ruecknahme kam Stunden
+  // spaeter. Fuer ein Werkzeug, dessen Zweck der Nachweis ist, war das die
+  // gefaehrlichste Stelle im ganzen Ablauf.
+  //
+  // Die Koordinaten und der Radius liegen seit ENT-308 ohnehin im Geraet --
+  // die App kann also dieselbe Rechnung anstellen wie der Server, auch
+  // offline. Der Server prueft UNVERAENDERT weiter: Ein Geraet darf nie die
+  // letzte Instanz sein, sonst genuegte ein veraenderter Browser.
+  if (k.typ === 'geofence' && k.lat !== null && k.lat !== undefined) {
+    const dist = rgDistanzMeter(ort.lat, ort.lng, Number(k.lat), Number(k.lng));
+    if (dist > rdRadiusVon(k)) {
+      if (btn) { btn.disabled = false; }
+      rdZeigeFehler(kontrollpunktId, w('rdZuWeit').replace('{m}', String(Math.round(dist))));
+      return;
+    }
+  }
+  rdScanEintragen(k, 'bestaetigt', ort);
 }
 
 function rdNvUm(kontrollpunktId) {

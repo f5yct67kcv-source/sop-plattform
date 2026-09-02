@@ -760,6 +760,36 @@ CREATE TABLE IF NOT EXISTS kunden_kontaktweg (
 // separat fest, sonst liesse sich eine lange Offline-Phase nicht erkennen.
 // kontrollpunkt_id bleibt NULLable fuer den Fall, dass der Punkt spaeter aus
 // der Vorlage entfernt wird -- die Durchfuehrung als Nachweis bleibt stehen.
+// Bewegungsspur waehrend einer Runde (ENT-318, revidiert ENT-131).
+//
+// Der heikelste Datenbestand des ganzen Werkzeugs: Er zeigt, wo sich ein
+// Mitarbeitender wann aufgehalten hat. Drei Dinge halten ihn in Grenzen,
+// und alle drei sind Absicht, nicht Zufall:
+//
+//   1. Er haengt am RUNDGANG, nicht am Mitarbeitenden. Es gibt keine Spur
+//      ausserhalb einer Runde -- weder davor, noch danach, noch in Pausen.
+//      ON DELETE CASCADE: Verschwindet die Runde, verschwindet die Spur.
+//   2. genauigkeit_m wird mitgeschrieben. Ohne sie sieht ein Punkt mit 200 m
+//      Streuung genauso aus wie einer mit 5 m -- und jemand zoege daraus
+//      Schluesse, die die Messung gar nicht hergibt.
+//   3. erfasst_am geraeteseitig, uebermittelt_am serverseitig -- dieselbe
+//      Trennung wie bei rundgang_scan (ENT-132). Die Differenz macht eine
+//      lange Offline-Phase sichtbar, statt sie zu verstecken.
+//
+// KEIN Index auf (lat, lng): Es soll bewusst nicht bequem sein, die Frage
+// "wer war an diesem Ort" zu stellen. Gesucht wird nach Runde.
+'rundgang_position' => "CREATE TABLE rundgang_position (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  rundgang_id INT NOT NULL,
+  lat DECIMAL(10,7) NOT NULL,
+  lng DECIMAL(10,7) NOT NULL,
+  genauigkeit_m INT NULL,
+  erfasst_am DATETIME NOT NULL,
+  uebermittelt_am DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_rundgang (rundgang_id, erfasst_am),
+  FOREIGN KEY (rundgang_id) REFERENCES rundgang(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
 'rundgang_scan' => "CREATE TABLE rundgang_scan (
   id INT AUTO_INCREMENT PRIMARY KEY,
   rundgang_id INT NOT NULL,

@@ -453,6 +453,13 @@ const NUR_EIGENE_DATEN = [
   'zweifaktor_geraet_weg.php',
   'mein_rundgang_starten.php', // eigenen Rundgang fuer eigenen Einsatz starten (ENT-180)
   'mein_rundgang_scan.php',    // Kontrollpunkt-Scans am eigenen, laufenden Rundgang (ENT-180)
+  // Positionen zur EIGENEN, laufenden Runde (ENT-318). Der Endpunkt
+  // schreibt ausschliesslich zu einem Rundgang, dessen mitarbeiter_id
+  // aus der Sitzung stammt, und weist alles ab, was nicht laeuft --
+  // strenger als ein Recht es waere. LESEN darf die Spur dagegen nur,
+  // wer 'rundgang_einsehen' hat: rundgang_spur.php prueft das und steht
+  // darum bewusst NICHT in dieser Liste.
+  'mein_rundgang_position.php',
   'mein_rundgang_offen.php',   // eigenen offenen Rundgang zu einem Einsatz abfragen (Wiedereinstieg)
   'mein_rundgang_pausieren.php',  // eigenen Rundgang pausieren (ENT-146)
   'mein_rundgang_fortsetzen.php', // eigenen pausierten Rundgang fortsetzen (ENT-146)
