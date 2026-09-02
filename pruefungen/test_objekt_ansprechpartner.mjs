@@ -29,7 +29,12 @@ const tag = n => iso(new Date(Date.now() + n * 864e5));
 
 // ══════════ TEIL 1: DER ENDPUNKT, STATISCH GEPRÜFT ════════════════════
 const EP = readFileSync(`${WURZEL}/backend/api/objekt_personen.php`, 'utf8');
-const UEB = readFileSync(`${WURZEL}/backend/api/mein_rundgang_uebersicht.php`, 'utf8');
+// Seit ENT-308 steht die Zusammenfuehrung beider Quellen in
+// backend/rundgang.php -- dieselbe Abfrage bedient Vorschau UND laufende
+// Runde. Die Aussagen bleiben dieselben, nur die Datei ist eine andere.
+const UEB = readFileSync(`${WURZEL}/backend/rundgang.php`, 'utf8');
+const UEB_EP = readFileSync(`${WURZEL}/backend/api/mein_rundgang_uebersicht.php`, 'utf8');
+const OFFEN = readFileSync(`${WURZEL}/backend/api/mein_rundgang_offen.php`, 'utf8');
 const EINR = readFileSync(`${WURZEL}/backend/api/planung_einrichten.php`, 'utf8');
 
 check('KRITISCH: es gibt eigene Tabellen für Objekt-Kontakte, nach dem Muster der Kunden',
@@ -64,10 +69,23 @@ check('KRITISCH: objekt_save.php fasst die Ansprechpartner nicht an',
   !/objekt_person|objekt_kontaktweg/.test(readFileSync(`${WURZEL}/backend/api/objekt_save.php`, 'utf8')));
 check('KRITISCH: die Rundgang-Vorschau liest beide Quellen und kennzeichnet sie',
   /'quelle'\s*=>\s*'objekt'/.test(UEB) && /'quelle'\s*=>\s*'kunde'/.test(UEB));
+// Unabhaengig von der Einrueckung gesucht: Eine erste Fassung verglich zwei
+// wortgleiche Zeichenketten samt Leerzeichen -- nach dem Herausloesen in
+// backend/rundgang.php stimmte die Einrueckung nicht mehr, indexOf lieferte
+// -1, und die Pruefung wurde rot, ohne dass die Reihenfolge falsch war.
 check('KRITISCH: die Leute vor Ort stehen VOR denen des Kunden (Reihenfolge im Quelltext)',
-  UEB.indexOf("'quelle'   => 'objekt'") < UEB.indexOf("'quelle'   => 'kunde'"));
+  (() => {
+    const objekt = UEB.search(/'quelle'\s*=>\s*'objekt'/);
+    const kunde = UEB.search(/'quelle'\s*=>\s*'kunde'/);
+    return objekt > -1 && kunde > -1 && objekt < kunde;
+  })());
 check('Fehlt die Objekt-Tabelle noch, fällt die Vorschau nicht aus',
-  /hat_tabelle\(\$pdo, 'objekt_person'\)/.test(UEB));
+  /\$tabelleDa\(\$pdo, 'objekt_person'\)/.test(UEB));
+// ENT-308: Beide Endpunkte nutzen denselben Baustein -- nicht je eine eigene
+// Kopie, die auseinanderlaufen kann.
+check('KRITISCH: Vorschau UND laufende Runde nutzen dieselbe Abfrage, nicht zwei Kopien',
+  /rundgang_ansprechpartner\(/.test(UEB_EP) && /rundgang_ansprechpartner\(/.test(OFFEN)
+  && !/FROM objekt_person/.test(UEB_EP) && !/FROM objekt_person/.test(OFFEN));
 
 // ══════════ TEIL 2: PFLEGE AUF DER OBJEKT-ÜBERSICHT ═══════════════════
 const OBJEKTE = { status: 'ok', objekte: [

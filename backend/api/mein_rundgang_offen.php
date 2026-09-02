@@ -55,14 +55,19 @@ $vorlageId = $rundgang['rundgang_vorlage_id'] !== null ? (int)$rundgang['rundgan
 // nur die Runde begonnen wurde.
 if ($vorlageId !== null) {
     $alle = $pdo->prepare(
-        'SELECT k.id, k.bezeichnung, p.reihenfolge, k.typ FROM kontrollpunkt k
+        'SELECT k.id, k.bezeichnung, p.reihenfolge, k.typ, k.lat, k.lng, k.geofence_radius_m FROM kontrollpunkt k
           JOIN rundgang_vorlage_punkt p ON p.kontrollpunkt_id = k.id AND p.vorlage_id = ?
           WHERE k.objekt_id = ? AND k.aktiv = 1 ORDER BY p.reihenfolge, k.id'
     );
     $alle->execute([$vorlageId, $objektId]);
 } else {
+    // lat/lng/Radius muessen mit (ENT-308): Die Karte der laufenden Runde
+    // zeichnet daraus die Punkte. Bis hierher lieferte dieser Endpunkt sie
+    // NICHT, der Startweg (rundgang_kontrollpunkte_uebrig, SELECT k.*)
+    // dagegen schon -- die Karte haette je nach Einstieg Punkte gezeigt
+    // oder nicht. Gilt fuer BEIDE Abfragen oben und hier.
     $alle = $pdo->prepare(
-        'SELECT id, bezeichnung, reihenfolge, typ FROM kontrollpunkt
+        'SELECT id, bezeichnung, reihenfolge, typ, lat, lng, geofence_radius_m FROM kontrollpunkt
           WHERE objekt_id = ? AND aktiv = 1 ORDER BY reihenfolge, id'
     );
     $alle->execute([$objektId]);
@@ -91,5 +96,24 @@ $rundgang['kontrollpunkte'] = array_map(function ($k) use ($erledigtNach) {
 // stellte ein erneutes Oeffnen der Runde dieselbe Frage noch einmal.
 $rundgang['kontrollpunkte'] = rundgang_punkte_mit_aufgaben(
     $pdo, (int)$rundgang['id'], $rundgang['kontrollpunkte']);
+
+// Ansprechpartner, Zentrale und Objektangaben auch waehrend der Runde
+// (ENT-308): Der Waechter ruft nicht vor dem Losgehen an, sondern wenn er
+// etwas vorfindet. Bis hierher standen sie nur in der Vorschau.
+$oStmt = $pdo->prepare('SELECT name, strasse, ort, kanton, kunde_id, kunde_name FROM objekte WHERE id = ?');
+$oStmt->execute([$objektId]);
+$o = $oStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+$rundgang['objekt'] = [
+    'id'      => $objektId,
+    'name'    => $o['name'] ?? '',
+    'strasse' => $o['strasse'] ?? null,
+    'ort'     => $o['ort'] ?? null,
+    'kanton'  => $o['kanton'] ?? null,
+];
+$rundgang['kunde_name']      = $o['kunde_name'] ?? null;
+$rundgang['ansprechpartner'] = rundgang_ansprechpartner($pdo, $objektId,
+    isset($o['kunde_id']) && $o['kunde_id'] !== null ? (int)$o['kunde_id'] : null,
+    (string)($o['name'] ?? ''), $o['kunde_name'] ?? null);
+$rundgang['zentrale'] = rundgang_zentrale($pdo);
 
 json_response(['status' => 'ok', 'rundgang' => $rundgang]);

@@ -97,6 +97,107 @@ function rundgang_punkte_mit_aufgaben(PDO $pdo, int $rundgangId, array $punkte):
     return $punkte;
 }
 
+/* Ansprechpartner eines Objekts, aus BEIDEN Quellen (ENT-308).
+   Wortgleich aus mein_rundgang_uebersicht.php hierher gezogen, damit es sie
+   nur einmal gibt: Die laufende Runde braucht sie genauso wie die Vorschau
+   -- der Waechter ruft nicht vor dem Losgehen an, sondern wenn er etwas
+   vorfindet. Zwei Kopien derselben Abfrage waeren zwei Stellen, die beide
+   stimmen muessten.
+
+   Reihenfolge und Kennzeichnung wie in ENT-300 entschieden: Objekt zuerst,
+   jeder Eintrag mit 'quelle'. */
+function rundgang_ansprechpartner(PDO $pdo, int $objektId, ?int $kundeId,
+                                  string $objektName, ?string $kundeName): array
+{
+    $liste = [];
+    $tabelleDa = static function (PDO $p, string $t): bool {
+        try { $p->query("SELECT 1 FROM $t LIMIT 1"); return true; }
+        catch (Throwable $e) { return false; }
+    };
+
+    if ($tabelleDa($pdo, 'objekt_person')) {
+        $opStmt = $pdo->prepare(
+            'SELECT id, anrede, vorname, nachname, funktion FROM objekt_person
+              WHERE objekt_id = ? ORDER BY sortierung, id'
+        );
+        $opStmt->execute([$objektId]);
+        $oWege = [];
+        if ($tabelleDa($pdo, 'objekt_kontaktweg')) {
+            $owStmt = $pdo->prepare(
+                'SELECT person_id, art, wert FROM objekt_kontaktweg
+                  WHERE objekt_id = ? ORDER BY sortierung, id'
+            );
+            $owStmt->execute([$objektId]);
+            foreach ($owStmt->fetchAll(PDO::FETCH_ASSOC) as $w) {
+                $k = $w['person_id'] === null ? 'objekt' : (string)(int)$w['person_id'];
+                $oWege[$k][] = ['art' => $w['art'], 'wert' => $w['wert']];
+            }
+        }
+        foreach ($opStmt->fetchAll(PDO::FETCH_ASSOC) as $p) {
+            $name = trim(($p['vorname'] ?? '') . ' ' . ($p['nachname'] ?? ''));
+            $funktion = trim((string)($p['funktion'] ?? ''));
+            if ($name === '' && $funktion === '') { continue; }
+            $liste[] = [
+                'name'     => $name !== '' ? $name : $funktion,
+                'anrede'   => $p['anrede'] ?: null,
+                'funktion' => ($name !== '' && $funktion !== '') ? $funktion : null,
+                'quelle'   => 'objekt',
+                'wege'     => $oWege[(string)(int)$p['id']] ?? [],
+            ];
+        }
+        if (!empty($oWege['objekt'])) {
+            $liste[] = ['name' => $objektName, 'anrede' => null, 'funktion' => null,
+                'quelle' => 'objekt', 'wege' => $oWege['objekt']];
+        }
+    }
+
+    if ($kundeId !== null && $tabelleDa($pdo, 'kunden_person')) {
+        $pStmt = $pdo->prepare(
+            'SELECT id, anrede, vorname, nachname FROM kunden_person
+              WHERE kunde_id = ? ORDER BY sortierung, id'
+        );
+        $pStmt->execute([$kundeId]);
+        $wege = [];
+        if ($tabelleDa($pdo, 'kunden_kontaktweg')) {
+            $wStmt = $pdo->prepare(
+                'SELECT person_id, art, wert FROM kunden_kontaktweg
+                  WHERE kunde_id = ? ORDER BY sortierung, id'
+            );
+            $wStmt->execute([$kundeId]);
+            foreach ($wStmt->fetchAll(PDO::FETCH_ASSOC) as $w) {
+                $k = $w['person_id'] === null ? 'firma' : (string)(int)$w['person_id'];
+                $wege[$k][] = ['art' => $w['art'], 'wert' => $w['wert']];
+            }
+        }
+        foreach ($pStmt->fetchAll(PDO::FETCH_ASSOC) as $p) {
+            $name = trim(($p['vorname'] ?? '') . ' ' . ($p['nachname'] ?? ''));
+            if ($name === '') { continue; }
+            $liste[] = ['name' => $name, 'anrede' => $p['anrede'] ?: null, 'funktion' => null,
+                'quelle' => 'kunde', 'wege' => $wege[(string)(int)$p['id']] ?? []];
+        }
+        if (!empty($wege['firma'])) {
+            $liste[] = ['name' => (string)$kundeName, 'anrede' => null, 'funktion' => null,
+                'quelle' => 'kunde', 'wege' => $wege['firma']];
+        }
+    }
+    return $liste;
+}
+
+// Eigene Pikett-/Zentralnummer (ENT-299), ebenfalls fuer beide Wege.
+function rundgang_zentrale(PDO $pdo): ?array
+{
+    try {
+        $bz = $pdo->query('SELECT firma, pikett_telefon FROM betrieb WHERE id = 1')->fetch(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        return null;
+    }
+    if (!$bz || trim((string)($bz['pikett_telefon'] ?? '')) === '') { return null; }
+    return [
+        'name'    => trim((string)$bz['firma']) !== '' ? trim((string)$bz['firma']) : null,
+        'telefon' => trim((string)$bz['pikett_telefon']),
+    ];
+}
+
 function rundgang_kontrollpunkte_uebrig(PDO $pdo, int $rundgangId, int $objektId, ?int $vorlageId = null): array
 {
     if ($vorlageId !== null) {

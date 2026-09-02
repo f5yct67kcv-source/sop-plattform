@@ -64,7 +64,14 @@ export const GOOGLE_MAPS_MOCK = `
       super();
       this.container = container;
       container.classList.add('gm-mock-map');
-      container.style.position = container.style.position || 'relative';
+      // Die BERECHNETE Position pruefen, nicht die inline gesetzte -- so
+      // macht es auch die echte API. Die alte Fassung las
+      // container.style.position, das bei einer Vorgabe aus dem Stylesheet
+      // leer ist; sie schrieb dann inline 'relative' darueber und liess
+      // einen mit position:absolute und inset:0 aufgespannten Container auf
+      // 0 Pixel Hoehe zusammenfallen. Gefunden an der Rundgang-Karte
+      // (ENT-308), deren Container genau so aufgespannt ist.
+      if (getComputedStyle(container).position === 'static') { container.style.position = 'relative'; }
       container.style.overflow = 'hidden';
       this._center = opts && opts.center ? alsLiteral(opts.center) : { lat: 0, lng: 0 };
       this._zoom = (opts && opts.zoom) || 8;
@@ -136,8 +143,36 @@ export const GOOGLE_MAPS_MOCK = `
       this.draggable = !!opts.draggable;
       this.el = document.createElement('div');
       this.el.className = 'gm-mock-marker';
-      this.el.style.cssText = 'position:absolute;width:24px;height:24px;margin-left:-12px;margin-top:-24px;'
-        + 'border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#ea4335;cursor:pointer;z-index:10;';
+      // Zwei Erscheinungsformen, weil zwei Aufrufer: dashboard.html setzt
+      // weder icon noch label und bekommt weiterhin die rote Tropfenform.
+      // Die Rundgang-Karte (ENT-308) setzt beides -- Farbe UND Zeichen sind
+      // dort die Aussage ("erledigt", "offen", "abweichend"), und genau die
+      // muss sich messen lassen. Ohne diesen Zweig waere sie im Testdouble
+      // unsichtbar gewesen und haette nur im Quelltext nachgelesen werden
+      // koennen.
+      const ic = opts.icon, lb = opts.label;
+      if (ic || lb) {
+        const gr = Math.round((ic && ic.scale ? ic.scale : 12) * 2);
+        this.el.style.cssText = 'position:absolute;display:flex;align-items:center;'
+          + 'justify-content:center;border-radius:50%;cursor:pointer;'
+          + 'width:' + gr + 'px;height:' + gr + 'px;'
+          + 'margin-left:' + (-gr / 2) + 'px;margin-top:' + (-gr / 2) + 'px;'
+          + 'background:' + ((ic && ic.fillColor) || '#ea4335') + ';'
+          + 'border:' + ((ic && ic.strokeWeight) || 0) + 'px solid ' + ((ic && ic.strokeColor) || 'transparent') + ';'
+          + 'z-index:' + (opts.zIndex || 10) + ';';
+        if (lb) {
+          this.el.textContent = typeof lb === 'string' ? lb : (lb.text || '');
+          this.el.dataset.zeichen = this.el.textContent;
+          this.el.style.color = (typeof lb === 'object' && lb.color) || '#000';
+          this.el.style.fontSize = (typeof lb === 'object' && lb.fontSize) || '12px';
+          this.el.style.fontWeight = (typeof lb === 'object' && lb.fontWeight) || '400';
+        }
+        if (ic && ic.fillColor) { this.el.dataset.farbe = ic.fillColor; }
+      } else {
+        this.el.style.cssText = 'position:absolute;width:24px;height:24px;margin-left:-12px;margin-top:-24px;'
+          + 'border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#ea4335;cursor:pointer;z-index:10;';
+      }
+      if (opts.title) { this.el.title = opts.title; }
       this.el.addEventListener('click', e => { e.stopPropagation(); this._feuern('click'); });
       this._ziehenEinrichten();
       this.setMap(opts.map || null);
@@ -187,6 +222,12 @@ export const GOOGLE_MAPS_MOCK = `
         + 'border-radius:50%;cursor:pointer;background:' + farbe + ';opacity:.45;z-index:1;'
         + 'border:2px solid ' + (opts.strokeColor || farbe) + ';';
       this.el.addEventListener('click', e => { e.stopPropagation(); this._feuern('click'); });
+      // Radius und Farbe am DOM ablesbar (ENT-308): Ein Geofence-Kreis, der
+      // nicht dem echten Radius entspricht, ist eine Falschauskunft darueber,
+      // wo ein Scan noch zaehlt -- das muss pruefbar sein, ohne in die
+      // Attrappe hineinzugreifen.
+      this.el.dataset.radius = String(opts.radius);
+      this.el.dataset.farbe = farbe;
       this.setMap(opts.map || null);
     }
     setCenter(p) { this._center = alsLiteral(p); this._neuZeichnen(); }
@@ -271,6 +312,10 @@ export const GOOGLE_MAPS_MOCK = `
   window.google.maps = {
     Map, Marker, Circle, Polygon, LatLngBounds,
     ControlPosition: { LEFT_TOP: 'LEFT_TOP', TOP_LEFT: 'TOP_LEFT', RIGHT_TOP: 'RIGHT_TOP' },
+    // Die echte API kennt diese Konstanten; die Rundgang-Karte (ENT-308)
+    // zeichnet ihre Punkte damit als Kreissymbole statt als Stecknadeln.
+    SymbolPath: { CIRCLE: 0, FORWARD_CLOSED_ARROW: 1, FORWARD_OPEN_ARROW: 2,
+      BACKWARD_CLOSED_ARROW: 3, BACKWARD_OPEN_ARROW: 4 },
     event: ereignis,
   };
 })();

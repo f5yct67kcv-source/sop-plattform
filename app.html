@@ -415,7 +415,7 @@ svg.i-sm { width: 17px; height: 17px; }
 /* 44px Trefferflaeche (CLAUDE.md), der negative Rand haelt das Symbol
    trotzdem buendig an der Kante -- sonst steht der Titel eingerueckt. */
 .rgs-zurueck { min-height: 44px; min-width: 44px; padding: 0; margin-left: -10px; display: flex; align-items: center; justify-content: center; background: none; border: 0; color: var(--ink); cursor: pointer; }
-.rgs-bd { padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 14px; }
+.rgs-bd { padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); overflow-y: auto; flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 14px; }
 
 /* Kopfkarte: Objekt, Kunde, Adresse -- Reihenfolge vom Projektinhaber
    vorgegeben. Das Routen-Symbol steht rechts daneben, nicht darunter:
@@ -527,6 +527,22 @@ svg.i-sm { width: 17px; height: 17px; }
    Wer scrollt, soll trotzdem sehen, wie weit er ist und wie lange er dran
    ist -- das ist im Vorbild genauso geloest. Feste Ziffernbreite, damit die
    Zeile nicht bei jeder Sekunde springt. */
+/* Karte der laufenden Runde (ENT-308). Sie fuellt den Rumpf, statt in einer
+   festen Hoehe zu stecken: Wer nachts einen Punkt sucht, braucht Flaeche.
+   Der Rumpf ist eine Flex-Spalte -- ohne min-height:0 wuchse die Karte ueber
+   den Bildschirm hinaus statt sich einzupassen. */
+.rgs-karte-huelle { position: relative; flex: 1; min-height: 260px; border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; background: var(--surface-2); }
+.rgs-karte { position: absolute; inset: 0; }
+/* Ladehinweis und Fehlermeldung an derselben Stelle: Beides beantwortet
+   dieselbe Frage ("warum sehe ich nichts"), darum derselbe Ort. */
+.rgs-karte-stand { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 24px; font-size: 14px; line-height: 1.5; color: var(--ink-3); }
+.rgs-karte-stand.fehler { color: var(--warn); }
+/* Unten links wie im Vorbild, und mit 44px Trefferflaeche. */
+.rgs-karte-btn { position: absolute; left: 12px; bottom: 12px; min-height: 44px; display: inline-flex; align-items: center; gap: 8px; padding: 0 14px; border: 1px solid var(--accent-line); border-radius: var(--r-sm); background: var(--accent-soft); color: var(--accent); font: inherit; font-size: 14px; font-weight: 640; cursor: pointer; box-shadow: var(--sh-2); }
+/* "Nicht darstellbar" darf nie wie "nicht vorhanden" aussehen (CLAUDE.md) --
+   darum steht dieser Satz unter der Karte, nicht nur in der Liste. */
+.rgs-karte-hinweis { flex: none; font-size: 13px; color: var(--ink-3); line-height: 1.5; padding: 2px; }
+
 .rd-zustand { font-size: 15px; font-weight: 640; margin-bottom: 12px; }
 .rgs-kopf-zahlen { display: flex; align-items: center; gap: 8px; flex: none; }
 .rgs-kopf-wert { min-height: 30px; display: inline-flex; align-items: center; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface-2); color: var(--ink-2); font-size: 13px; font-weight: 650; font-variant-numeric: tabular-nums; }
@@ -932,7 +948,14 @@ const W = {
     // nennt diesen Bereich durchgehend so, "Module" war eine Erfindung von mir.
     rgsFunktionen: 'Funktionen',
     // Laufende Runde als Vollseite (ENT-306)
+    rgsReiterKarte: 'Karte',
     rgsReiterPunkte: 'Kontrollpunkte',
+    rgsKarteLaedt: 'Karte wird geladen …',
+    rgsKarteFehler: 'Die Karte liess sich nicht laden — ohne Netz geht das nicht. Die Kontrollpunkte stehen im Reiter daneben.',
+    rgsKarteLeer: 'Für diese Runde ist kein Kontrollpunkt auf der Karte darstellbar.',
+    rgsKarteOhneOrt: 'ohne Koordinaten — nur in der Liste',
+    rgsZentrieren: 'Zentrieren',
+    rgsMeinStandort: 'Mein Standort',
     rgsReiterFunktionen: 'Funktionen',
     rgsLaufTitel: 'Rundgang',
     rgsAbbrechenModul: 'Rundgang abbrechen',
@@ -1764,13 +1787,10 @@ function rgSeiteZeichnen(d) {
   rgsAnsicht = 'uebersicht';
   const o = d.objekt || {}, v = d.vorlage || {};
   const punkte = d.kontrollpunkte || [];
-  const leute = d.ansprechpartner || [];
   // Offene eigene Runde auf dieser Vorlage (ENT-298). Solange sie besteht,
   // ist diese Seite nicht mehr Vorschau, sondern der Ort, an den man
   // waehrend der Runde zurueckkommt.
   const lf = d.laufend || null;
-  // Eigene Zentrale (ENT-299) -- null, solange keine Pikettnummer gepflegt ist.
-  const z = d.zentrale && d.zentrale.telefon ? d.zentrale : null;
   const pausiert = !!lf && lf.status === 'pausiert';
   // Fuer die Ereignismeldung: zu welchem Objekt wird gemeldet (ENT-295).
   evObjekt = o.id ? { id: o.id, name: o.name } : null;
@@ -1780,10 +1800,6 @@ function rgSeiteZeichnen(d) {
   const ziel = encodeURIComponent([o.name, o.strasse, o.ort].filter(Boolean).join(', '));
   const fenster = (v.fenster_von && v.fenster_bis)
     ? `${hm(v.fenster_von)}–${hm(v.fenster_bis)}` : w('rgsJederzeit');
-
-  const wegZiel = we => we.art === 'email' ? 'mailto:' + we.wert
-    : (we.art === 'telefon' || we.art === 'mobil') ? 'tel:' + we.wert.replace(/\s/g, '')
-    : we.art === 'webseite' ? we.wert : null;
 
   const statusZeit = pausiert ? lf.pausiert_seit : (lf ? lf.vorbereitet_am : null);
 
@@ -1819,49 +1835,7 @@ function rgSeiteZeichnen(d) {
       </div>
     </div>
 
-    <div class="rgs-klapp" id="rgsKlappAp">
-      <button type="button" class="rgs-klapp-kopf" onclick="rgSeiteKlapp('rgsKlappAp')" aria-expanded="false">
-        <svg class="i i-sm rgs-klapp-pfeil" viewBox="0 0 24 24"><polyline points="9 6 15 12 9 18"/></svg>
-        <span>${esc(w('rgsAnsprechpartner'))}</span>
-        ${leute.length ? `<span class="rgs-klapp-zahl">${leute.length}</span>` : ''}
-      </button>
-      <div class="rgs-klapp-bd">
-        ${leute.length ? leute.map(p => `
-          <div class="rgs-person">
-            <div class="rgs-person-name">${esc([p.anrede, p.name].filter(Boolean).join(' '))}</div>
-            <div class="rgs-person-meta">
-              <span class="rgs-quelle${p.quelle === 'objekt' ? ' vorort' : ''}">${esc(w(p.quelle === 'objekt' ? 'rgsVorOrt' : 'rgsBeimKunden'))}</span>
-              ${p.funktion ? `<span class="rgs-person-fkt">${esc(p.funktion)}</span>` : ''}
-            </div>
-            <div>${(p.wege || []).map(we => {
-              const z = wegZiel(we);
-              return z ? `<a class="rgs-weg" href="${esc(z)}">${esc(we.wert)}</a>`
-                       : `<span class="rgs-weg" style="color:var(--ink-2)">${esc(we.wert)}</span>`;
-            }).join('')}</div>
-          </div>`).join('')
-        : `<div class="rgs-leer">${esc(w('rgsKeineAnsprechpartner'))}</div>`}
-      </div>
-    </div>
-
-    <div class="rgs-hilfe">
-      <div class="rgs-mod-lb" id="rgsHilfeLb">${esc(w('rgsHilfe'))}</div>
-      ${z ? `<a class="rgs-zentrale" id="rgsZentrale" href="tel:${esc(String(z.telefon).replace(/\s/g, ''))}">
-        <span class="rgs-zentrale-ic">
-          <svg class="i i-sm" viewBox="0 0 24 24"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.4-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/></svg>
-        </span>
-        <span class="rgs-zentrale-txt">
-          <span class="rgs-zentrale-lb">${esc(w('rgsZentrale'))}</span>
-          <span class="rgs-zentrale-nr">${esc(z.telefon)}</span>
-          ${z.name ? `<span class="rgs-zentrale-name">${esc(z.name)}</span>` : ''}
-        </span>
-      </a>` : `<div class="rgs-leer" id="rgsKeineZentrale" style="padding:2px 2px 6px">${esc(w('rgsKeineZentrale'))}</div>`}
-      <div class="rgs-notruf" id="rgsNotruf">
-        ${RGS_NOTRUF.map(n => `<a href="tel:${n.nr}" aria-label="${esc(w(n.wort))} ${n.nr}">
-          <span class="rgs-notruf-nr">${n.nr}</span>
-          <span class="rgs-notruf-wort">${esc(w(n.wort))}</span>
-        </a>`).join('')}
-      </div>
-    </div>
+    ${rgsKontakteHtml(d)}
 
     <div style="display:flex;flex-direction:column;gap:10px">
       <div class="rgs-mod-lb" id="rgsFunktionenLb">${esc(w('rgsFunktionen'))}</div>
@@ -1912,6 +1886,63 @@ function rgSeiteZeichnen(d) {
   $('rgsFuss').innerHTML = lf
     ? `<button class="btn btn-primary btn-wide" id="rgsStartBtn" onclick="rgSeiteZumRundgang()">${esc(w('rgsZumRundgang'))}</button>`
     : `<button class="btn btn-primary btn-wide" id="rgsStartBtn" onclick="rgSeiteStarten()">${esc(w('rgsStarten'))}</button>`;
+}
+
+/* Ansprechpartner, Zentrale und Notruf als EIN Baustein (ENT-308).
+   Aus rgSeiteZeichnen() herausgeloest, weil die laufende Runde dieselbe
+   Darstellung braucht -- zwei Kopien waeren zwei Stellen, die beide stimmen
+   muessten, und die zweite bliebe beim naechsten Zusatz zurueck.
+   Erwartet { objekt, kunde_name, ansprechpartner, zentrale }. */
+function rgsKontakteHtml(d) {
+  const leute = (d && d.ansprechpartner) || [];
+  const z = d && d.zentrale && d.zentrale.telefon ? d.zentrale : null;
+  const wegZiel = we => we.art === 'email' ? 'mailto:' + we.wert
+    : (we.art === 'telefon' || we.art === 'mobil') ? 'tel:' + we.wert.replace(/\s/g, '')
+    : we.art === 'webseite' ? we.wert : null;
+  return `
+    <div class="rgs-klapp" id="rgsKlappAp">
+      <button type="button" class="rgs-klapp-kopf" onclick="rgSeiteKlapp('rgsKlappAp')" aria-expanded="false">
+        <svg class="i i-sm rgs-klapp-pfeil" viewBox="0 0 24 24"><polyline points="9 6 15 12 9 18"/></svg>
+        <span>${esc(w('rgsAnsprechpartner'))}</span>
+        ${leute.length ? `<span class="rgs-klapp-zahl">${leute.length}</span>` : ''}
+      </button>
+      <div class="rgs-klapp-bd">
+        ${leute.length ? leute.map(p => `
+          <div class="rgs-person">
+            <div class="rgs-person-name">${esc([p.anrede, p.name].filter(Boolean).join(' '))}</div>
+            <div class="rgs-person-meta">
+              <span class="rgs-quelle${p.quelle === 'objekt' ? ' vorort' : ''}">${esc(w(p.quelle === 'objekt' ? 'rgsVorOrt' : 'rgsBeimKunden'))}</span>
+              ${p.funktion ? `<span class="rgs-person-fkt">${esc(p.funktion)}</span>` : ''}
+            </div>
+            <div>${(p.wege || []).map(we => {
+              const z = wegZiel(we);
+              return z ? `<a class="rgs-weg" href="${esc(z)}">${esc(we.wert)}</a>`
+                       : `<span class="rgs-weg" style="color:var(--ink-2)">${esc(we.wert)}</span>`;
+            }).join('')}</div>
+          </div>`).join('')
+        : `<div class="rgs-leer">${esc(w('rgsKeineAnsprechpartner'))}</div>`}
+      </div>
+    </div>
+
+    <div class="rgs-hilfe">
+      <div class="rgs-mod-lb" id="rgsHilfeLb">${esc(w('rgsHilfe'))}</div>
+      ${z ? `<a class="rgs-zentrale" id="rgsZentrale" href="tel:${esc(String(z.telefon).replace(/\s/g, ''))}">
+        <span class="rgs-zentrale-ic">
+          <svg class="i i-sm" viewBox="0 0 24 24"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.4-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/></svg>
+        </span>
+        <span class="rgs-zentrale-txt">
+          <span class="rgs-zentrale-lb">${esc(w('rgsZentrale'))}</span>
+          <span class="rgs-zentrale-nr">${esc(z.telefon)}</span>
+          ${z.name ? `<span class="rgs-zentrale-name">${esc(z.name)}</span>` : ''}
+        </span>
+      </a>` : `<div class="rgs-leer" id="rgsKeineZentrale" style="padding:2px 2px 6px">${esc(w('rgsKeineZentrale'))}</div>`}
+      <div class="rgs-notruf" id="rgsNotruf">
+        ${RGS_NOTRUF.map(n => `<a href="tel:${n.nr}" aria-label="${esc(w(n.wort))} ${n.nr}">
+          <span class="rgs-notruf-nr">${n.nr}</span>
+          <span class="rgs-notruf-wort">${esc(w(n.wort))}</span>
+        </a>`).join('')}
+      </div>
+    </div>`;
 }
 
 function rgSeiteKlapp(id) {
@@ -3143,7 +3174,16 @@ function rundgangFortsetzen(einsatzId) {
       // Wer die Runde auf einem zweiten Geraet fortsetzt, soll dieselbe
       // Laufzeit sehen.
       vorbereitet_am: r.vorbereitet_am || null,
-      pause_minuten: Number(r.pause_minuten || 0) };
+      pause_minuten: Number(r.pause_minuten || 0),
+      // Objekt, Ansprechpartner und Zentrale (ENT-308). Sie standen bis
+      // hierher nur in der Vorschau -- also ausgerechnet vor dem Losgehen und
+      // nicht in dem Moment, in dem jemand vor Ort etwas vorfindet. Der
+      // Endpunkt liefert sie jetzt mit; ohne diese vier Zeilen kaeme die
+      // Funktion "Ansprechpartner und Notruf" waehrend der Runde leer heraus.
+      objekt: r.objekt || null,
+      kunde_name: r.kunde_name || '',
+      ansprechpartner: r.ansprechpartner || [],
+      zentrale: r.zentrale || null };
     rundgangAnzeigen(einsatzId);
   });
 }
@@ -3193,7 +3233,13 @@ function rgLaufReiterZeichnen() {
   // Inhalt.
   const offeneAufgaben = (rundgangAktiv ? rundgangAktiv.kontrollpunkte : [])
     .reduce((n, k) => n + (k.erledigt ? rdAufgabenOffen(k).length : 0), 0);
+  // Auf der Karte darstellbar ist nur, was Koordinaten hat -- NFC-Punkte
+  // haben keine (ENT-265). Die Zahl am Reiter nennt darum die DARSTELLBAREN,
+  // und die Karte selbst sagt, wie viele sie nicht zeigt.
+  const kartePunkte = rgKarteDaten(rundgangAktiv ? rundgangAktiv.kontrollpunkte : []);
   $('rgsReiter').innerHTML = [
+    ['karte', w('rgsReiterKarte'),
+      '<polygon points="1 6 8 3 16 6 23 3 23 18 16 21 8 18 1 21"/><line x1="8" y1="3" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="21"/>', 0],
     ['punkte', w('rgsReiterPunkte'),
       '<circle cx="12" cy="10" r="3"/><path d="M12 21s-7-6.2-7-11a7 7 0 1 1 14 0c0 4.8-7 11-7 11z"/>', 0],
     ['funktionen', w('rgsReiterFunktionen'),
@@ -3216,7 +3262,8 @@ function rgLaufReiter(id) {
 
 function rgLaufZeichnen() {
   if (rgsModus !== 'lauf' || !rundgangAktiv) return;
-  if (rgsReiter === 'funktionen') { rgLaufFunktionen(); }
+  if (rgsReiter === 'karte') { rgKarteZeichnen(); }
+  else if (rgsReiter === 'funktionen') { rgLaufFunktionen(); }
   else {
     // rdFortschritt bleibt bestehen, traegt aber seit ENT-306 nur noch den
     // ZUSTAND ("abgebrochen"/"abgeschlossen"). Die Zahl steht im Kopf, wo sie
@@ -3306,10 +3353,178 @@ function rgLaufFunktionen() {
         pausiert ? '<polygon points="6 4 20 12 6 20 6 4"/>'
                  : '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>',
         `onclick="rgLaufPause(${einsatzId})"`)}
+      ${modul('rgsLaufKontakte', w('rgsHilfe'),
+        '<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.4-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/>',
+        'onclick="rgLaufKontakte()"')}
       ${beendet ? '' : modul('rgsLaufAbbrechen', w('rgsAbbrechenModul'),
         '<circle cx="12" cy="12" r="9"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/>',
         `onclick="rundgangAbbrechenAnzeigen(${einsatzId})"`)}
     </div>`;
+}
+
+/* ══ Karte der laufenden Runde (ENT-308) ═══════════════════════════════
+   Google Maps, wie in ENT-157 fuer das Dashboard entschieden und dort seit
+   ENT-269 im Einsatz -- derselbe clientseitige Browserschluessel, dieselbe
+   Referrer-Einschraenkung. Kein zweiter Kartenanbieter fuer dieselbe Aufgabe.
+
+   Drei Dinge, die diese Karte anders machen muss als die im Dashboard:
+   1. Sie laeuft OHNE NETZ ins Leere. Der Waechter steht im Keller. Statt
+      eines grauen Rechtecks sagt sie dann, was los ist -- und weist auf die
+      Liste hin, die offline weiterhin vollstaendig da ist.
+   2. NFC-Punkte haben keine Koordinaten (ENT-265) und koennen gar nicht
+      erscheinen. Die Karte nennt darum ausdruecklich, wie viele sie NICHT
+      zeigt: "nicht darstellbar" darf nie wie "nicht vorhanden" aussehen
+      (CLAUDE.md).
+   3. Die eigene Position wird GEZEIGT, aber nicht aufgezeichnet -- ENT-131
+      schliesst die kontinuierliche Positionsverfolgung aus. Kein watchPosition,
+      keine Uebermittlung, nur ein einmaliger Abruf auf Knopfdruck. */
+const RGS_MAPS_SCHLUESSEL = 'AIzaSyBdm5W2BwLAir3YHQusdpamrG1Mgx4AdzI';
+let rgsMapsVersprechen = null;
+let rgsKarte = null, rgsKartenMarken = [], rgsKartenKreise = [], rgsStandortMarke = null;
+
+function rgsMapsLaden() {
+  if (rgsMapsVersprechen) { return rgsMapsVersprechen; }
+  rgsMapsVersprechen = new Promise((resolve, reject) => {
+    if (window.google && window.google.maps) { resolve(); return; }
+    const skript = document.createElement('script');
+    skript.src = 'https://maps.googleapis.com/maps/api/js?key=' + RGS_MAPS_SCHLUESSEL;
+    // NICHT einfach resolve: Ein blockiertes oder leer beantwortetes Skript
+    // loest ebenfalls onload aus, ohne google.maps zu definieren -- so
+    // gefunden in der Pruefung, die maps.googleapis.com abweist. Ohne diese
+    // Weiche bekaeme der Waechter ein graues Rechteck ohne jede Erklaerung,
+    // also genau das, was diese Karte vermeiden soll.
+    skript.onload = () => {
+      if (window.google && window.google.maps) { resolve(); return; }
+      rgsMapsVersprechen = null;
+      reject(new Error('maps-leer'));
+    };
+    skript.onerror = () => {
+      // Beim naechsten Versuch neu laden duerfen: Ohne das Zuruecksetzen
+      // bliebe ein einmaliger Netzaussetzer fuer den Rest der Sitzung
+      // haengen -- und der Waechter kaeme aus dem Keller heraus nie mehr an
+      // die Karte.
+      rgsMapsVersprechen = null;
+      reject(new Error('maps'));
+    };
+    document.head.appendChild(skript);
+  });
+  return rgsMapsVersprechen;
+}
+
+/* Was laesst sich zeichnen, was nicht -- als reine Funktion, damit es sich
+   ohne geladene Karte pruefen laesst. */
+function rgKarteDaten(kontrollpunkte) {
+  const zeigbar = [], ohneOrt = [];
+  (kontrollpunkte || []).forEach((k, i) => {
+    const lat = Number(k.lat), lng = Number(k.lng);
+    if (k.lat === null || k.lat === undefined || k.lng === null || k.lng === undefined
+        || !isFinite(lat) || !isFinite(lng)) { ohneOrt.push(k); return; }
+    zeigbar.push({ nr: i + 1, id: Number(k.id), bezeichnung: k.bezeichnung, lat, lng,
+      radius: Number(k.geofence_radius_m || 0) || 20,
+      erledigt: k.erledigt ? k.erledigt.status : null });
+  });
+  return { zeigbar, ohneOrt };
+}
+
+function rgKarteZeichnen() {
+  const d = rgKarteDaten(rundgangAktiv ? rundgangAktiv.kontrollpunkte : []);
+  const hinweis = d.ohneOrt.length
+    ? `<div class="rgs-karte-hinweis" id="rgsKarteOhneOrt">${d.ohneOrt.length} ${esc(d.ohneOrt.length === 1 ? w('rgsReiterPunkte').slice(0, -1) : w('rgsReiterPunkte'))} ${esc(w('rgsKarteOhneOrt'))}</div>`
+    : '';
+  if (!d.zeigbar.length) {
+    $('rgsBody').innerHTML = `<div class="rgs-warn" id="rgsKarteLeer">
+      <svg class="i i-sm" style="flex:none" viewBox="0 0 24 24"><polygon points="1 6 8 3 16 6 23 3 23 18 16 21 8 18 1 21"/><line x1="8" y1="3" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="21"/></svg>
+      <span>${esc(w('rgsKarteLeer'))}</span></div>${hinweis}`;
+    return;
+  }
+  $('rgsBody').innerHTML = `
+    <div class="rgs-karte-huelle">
+      <div class="rgs-karte" id="rgsKarte"></div>
+      <div class="rgs-karte-stand" id="rgsKarteStand">${esc(w('rgsKarteLaedt'))}</div>
+      <button type="button" class="rgs-karte-btn" id="rgsZentrieren" onclick="rgKarteZentrieren()">
+        <svg class="i i-sm" viewBox="0 0 24 24"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+        <span>${esc(w('rgsZentrieren'))}</span>
+      </button>
+    </div>${hinweis}`;
+
+  rgsMapsLaden().then(() => {
+    // Der Reiter kann waehrend des Ladens gewechselt worden sein.
+    if (!$('rgsKarte')) { return; }
+    rgsKarte = new google.maps.Map($('rgsKarte'), {
+      center: { lat: d.zeigbar[0].lat, lng: d.zeigbar[0].lng }, zoom: 17,
+      streetViewControl: false, mapTypeControl: false, fullscreenControl: false,
+    });
+    rgKartePunkteZeichnen(d.zeigbar);
+    rgKarteZentrieren();
+    // Den Hinweis erst entfernen, wenn die Karte wirklich steht. Wird er
+    // vorher weggeraeumt und das Bauen scheitert, bleibt eine graue Flaeche
+    // ohne Erklaerung zurueck.
+    const stand = $('rgsKarteStand'); if (stand) { stand.remove(); }
+  }).catch(() => {
+    const stand = $('rgsKarteStand');
+    if (stand) { stand.textContent = w('rgsKarteFehler'); stand.classList.add('fehler'); }
+  });
+}
+
+// Farbe UND Form: erledigt ist gefuellt-gruen mit Haken, offen ist blau mit
+// Nummer, "nicht verfuegbar"/Ersatzscan tragen ein Ausrufezeichen. Wer die
+// Farben nicht unterscheidet, liest die Zeichen.
+function rgKartePunkteZeichnen(punkte) {
+  rgsKartenMarken.forEach(m => m.setMap(null));
+  rgsKartenKreise.forEach(k => k.setMap(null));
+  rgsKartenMarken = []; rgsKartenKreise = [];
+  punkte.forEach(p => {
+    const fertig = p.erledigt === 'bestaetigt';
+    const abweichend = p.erledigt && p.erledigt !== 'bestaetigt';
+    const farbe = fertig ? '#4FCE96' : abweichend ? '#E2B156' : '#7098F7';
+    const zeichen = fertig ? '✓' : abweichend ? '!' : String(p.nr);
+    rgsKartenKreise.push(new google.maps.Circle({
+      map: rgsKarte, center: { lat: p.lat, lng: p.lng }, radius: p.radius,
+      strokeColor: farbe, strokeOpacity: 0.7, strokeWeight: 1,
+      fillColor: farbe, fillOpacity: 0.12,
+    }));
+    const marke = new google.maps.Marker({
+      map: rgsKarte, position: { lat: p.lat, lng: p.lng }, title: p.bezeichnung,
+      label: { text: zeichen, color: '#0F1117', fontWeight: '700', fontSize: '12px' },
+      icon: {
+        path: google.maps.SymbolPath.CIRCLE, scale: 13,
+        fillColor: farbe, fillOpacity: 1, strokeColor: '#0F1117', strokeWeight: 2,
+      },
+    });
+    // Ein Tipp auf die Marke fuehrt in die Liste -- gemeldet wird dort, nicht
+    // auf der Karte: Die Bestaetigung haengt an Standortpruefung, Ersatzscan
+    // und Aufgaben-Rueckfrage, und die alle in eine Kartenblase zu holen
+    // hiesse, denselben Ablauf ein zweites Mal zu bauen.
+    marke.addListener('click', () => rgLaufReiter('punkte'));
+    rgsKartenMarken.push(marke);
+  });
+}
+
+/* Zentrieren: alle Punkte ins Bild, danach einmalig die eigene Position
+   dazuholen. Einmalig, nicht laufend -- ENT-131. */
+function rgKarteZentrieren() {
+  if (!rgsKarte || !window.google) { return; }
+  const d = rgKarteDaten(rundgangAktiv ? rundgangAktiv.kontrollpunkte : []);
+  if (!d.zeigbar.length) { return; }
+  const grenzen = new google.maps.LatLngBounds();
+  d.zeigbar.forEach(p => grenzen.extend({ lat: p.lat, lng: p.lng }));
+  if (d.zeigbar.length === 1) {
+    rgsKarte.setCenter({ lat: d.zeigbar[0].lat, lng: d.zeigbar[0].lng });
+    rgsKarte.setZoom(17);
+  } else {
+    rgsKarte.fitBounds(grenzen, 48);
+  }
+  if (!navigator.geolocation) { return; }
+  navigator.geolocation.getCurrentPosition(pos => {
+    if (!rgsKarte || !window.google) { return; }
+    const ort = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+    if (rgsStandortMarke) { rgsStandortMarke.setMap(null); }
+    rgsStandortMarke = new google.maps.Marker({
+      map: rgsKarte, position: ort, title: w('rgsMeinStandort'), zIndex: 1,
+      icon: { path: google.maps.SymbolPath.CIRCLE, scale: 7,
+        fillColor: '#F2F4F8', fillOpacity: 1, strokeColor: '#0F1117', strokeWeight: 3 },
+    });
+  }, () => {}, { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 });
 }
 
 // Pausieren aus dem Funktionen-Reiter: dieselbe Rueckfrage wie im
@@ -3320,6 +3535,29 @@ function rgLaufPause(einsatzId) {
     rgsFrageZu();
     rundgangPausieren(einsatzId);
   });
+}
+
+/* Ansprechpartner, Zentrale und Notruf waehrend der Runde (ENT-308).
+   Bis hierher standen sie nur in der Vorschau -- also ausgerechnet vor dem
+   Losgehen, nicht in dem Moment, in dem jemand etwas vorfindet. Dieselbe
+   Darstellung wie dort (ENT-299/ENT-300), aus den Daten, die
+   mein_rundgang_offen.php jetzt mitliefert. */
+function rgLaufKontakte() {
+  if (!rundgangAktiv) return;
+  rgsAnsicht = 'kontakte';
+  rgUnterseiteAn();
+  $('rgsTitel').textContent = w('rgsHilfe');
+  $('rgsFuss').innerHTML =
+    `<button class="btn btn-plain btn-wide" onclick="rgSeiteZurueckZurUebersicht()">${esc(w('zurueck'))}</button>`;
+  // Die Vorschau-Zeichnung erwartet ihre Daten in rgsDaten -- hier aus dem
+  // laufenden Rundgang zusammengesetzt, damit es nur EINE Darstellung gibt.
+  const daten = {
+    objekt: rundgangAktiv.objekt || {},
+    kunde_name: rundgangAktiv.kunde_name || '',
+    ansprechpartner: rundgangAktiv.ansprechpartner || [],
+    zentrale: rundgangAktiv.zentrale || null,
+  };
+  $('rgsBody').innerHTML = rgsKontakteHtml(daten);
 }
 
 // Aufgabenliste der laufenden Runde -- dieselbe Darstellung wie in der
