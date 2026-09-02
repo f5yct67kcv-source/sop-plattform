@@ -7,7 +7,11 @@ const EXE = browserPfad();
 // Repository. Es muss nur ein gueltiges PNG sein -- was darauf zu sehen
 // ist, spielt keine Rolle; geprueft wird der Weg vom Auswaehlen bis zur
 // Anfrage, nicht der Inhalt.
-const BILD = OUT + '/testbild.png';
+// Eigener Dateiname je Suite (ENT-310): Beide Suiten legten bis hierher
+// OUT/testbild.png an. Sequenziell harmlos, im parallelen Lauf ein
+// Wettlauf -- beide sehen "gibt es nicht" und schreiben gleichzeitig,
+// und die andere liest womoeglich eine halb geschriebene Datei.
+const BILD = OUT + '/testbild-begruessung.png';
 {
   const { writeFileSync, existsSync } = await import('fs');
   if (!existsSync(BILD)) {
