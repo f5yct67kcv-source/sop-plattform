@@ -15394,13 +15394,19 @@ function aeZeichneUebernahmen(eintraege, eingerichtet) {
     const datum = String(u.zeitpunkt).slice(0, 10);
     const zeit = String(u.zeitpunkt).slice(11, 16);
     const ohneFahrzeug = u.art === 'ohne_fahrzeug';
+    // "abgabe" (ENT-354) ist keine Übernahme mit Kilometerstand -- eine
+    // eigene dritte Aussage neben Übernahme und "kein Dienstfahrzeug", kein
+    // Quelle-Chip aus AE_UEB_QUELLE (der ist für die Wege EINER Übernahme
+    // gedacht, nicht für eine andere Art von Eintrag).
+    const abgabe = u.art === 'abgabe';
     const [klasse, txt] = ohneFahrzeug ? ['chip-n', 'Kein Dienstfahrzeug']
+      : abgabe ? ['chip-n', 'Abgegeben']
       : (AE_UEB_QUELLE[u.quelle] || ['chip-n', u.quelle]);
     return `<div class="ag-karte">
         <div class="kopf"><b>${ohneFahrzeug ? 'Kein Dienstfahrzeug' : esc(u.kennzeichen)}</b><span class="chip ${klasse}">${esc(txt)}</span></div>
         ${!ohneFahrzeug && u.fz_bezeichnung ? `<div class="wer">${esc(u.fz_bezeichnung)}</div>` : ''}
         <div class="zeiten">${dmy(datum)}, <b>${esc(zeit)}</b> · ${esc(u.person)}</div>
-        ${!ohneFahrzeug ? `<div class="zeiten">Kilometerstand: <b>${u.tacho_km === null ? '–' : nf(u.tacho_km) + ' km'}</b></div>` : ''}
+        ${!ohneFahrzeug && !abgabe ? `<div class="zeiten">Kilometerstand: <b>${u.tacho_km === null ? '–' : nf(u.tacho_km) + ' km'}</b></div>` : ''}
         ${u.kunde_name ? `<div class="zeiten">${esc(u.kunde_name)}${u.titel ? ' · ' + esc(u.titel) : ''}</div>` : ''}
         ${u.hat_foto ? `<button class="btn btn-plain btn-sm" style="margin-top:10px" onclick="aeUebernahmeFoto(${Number(u.id)})">Foto ansehen</button>` : ''}
       </div>`;

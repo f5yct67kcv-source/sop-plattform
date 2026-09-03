@@ -20,6 +20,10 @@
 //      drei verschiedene Aussagen mit drei verschiedenen Texten.
 //   5. "Zurück" im Formular führt zur Frage zurück, nicht an ihr vorbei.
 //   6. Die Kennung des Aufklebers verlässt die Adresszeile sofort.
+//   7. Eine mögliche Doppelbuchung (ENT-354) warnt, statt zu sperren -- und
+//      NUR bei Auswahl aus der Liste, nicht beim gescannten Aufkleber.
+//   8. Das eigene aktive Fahrzeug (ENT-354) steht in der eigenen Maske,
+//      "Abgeben" löst nichts in der Kilometerkette aus.
 import { WURZEL, HIER, browserPfad } from './pfade.mjs';
 import { chromium } from 'playwright';
 import { execFileSync } from 'child_process';
@@ -455,6 +459,162 @@ await page.waitForTimeout(400);
 check('KRITISCH: die Uebernahme ueber den Aufkleber sendet die Kennung, nicht die Fahrzeug-ID',
   gesendet.length === 1 && gesendet[0].kennung === 'abc123' && gesendet[0].fahrzeug_id === undefined);
 await page.close();
+
+// ══ 7. Doppelbuchungs-Warnung statt Sperre (ENT-354) ═══════════════════
+// ENT-340 verwarf eine echte Rueckgabe-Pflicht ausdruecklich ("eine
+// vergessene Rueckgabe reisst genau die Luecke, die die Kette schliessen
+// soll"). Der Projektinhaber entschied sich darum fuer eine WARNUNG, keine
+// Sperre: siehe AskUserQuestion-Antwort in ENT-354. Getestet wird darum
+// nicht nur "die Warnung erscheint", sondern auch "sie laesst sich mit
+// einem zweiten Tipp bestaetigen", und "sie erscheint NICHT beim Scan".
+const FZ_WARNUNG = [
+  { id: 1, kennzeichen: 'SO 999001', bezeichnung: 'Patrouille 1',
+    letzter_stand: { quelle: 'uebernahme', tacho_km: 61000, zeitpunkt: VORTAGE + ' 06:12:00',
+                     datum: VORTAGE, person: 'Andere Person', eigene: false } },
+  { id: 2, kennzeichen: 'SO 999002', bezeichnung: 'Patrouille 2',
+    letzter_stand: { quelle: 'uebernahme', tacho_km: 40000, zeitpunkt: VORTAGE + ' 07:00:00',
+                     datum: VORTAGE, person: 'Amelie Muster', eigene: true } },
+];
+fahrzeugAntwort = { status: 'ok', eingerichtet: true, fahrzeuge: FZ_WARNUNG,
+                    heute_beantwortet: true, mein_aktives_fahrzeug: null };
+page = await appStarten();
+await page.evaluate(() => fzuOeffnen());
+await page.waitForTimeout(300);
+
+check('KRITISCH: bei Auswahl eines fremd zuletzt uebernommenen Fahrzeugs erscheint eine Warnung mit Person und Zeitpunkt',
+  await (async () => {
+    await page.selectOption('#fzuWahl', '1');
+    await page.waitForTimeout(150);
+    const t = await page.textContent('#fzuStand');
+    return /Andere Person/.test(t) && /Trotzdem/.test(t);
+  })());
+
+gesendet = [];
+await page.fill('#fzuKm', '61200');
+await page.setInputFiles('#fzuFotoInput', { name: 'tacho.png', mimeType: 'image/png', buffer: PNG_1X1 });
+await page.waitForTimeout(300);
+await page.click('#fzuBtn');
+await page.waitForTimeout(300);
+check('KRITISCH: der erste Tipp sendet noch nichts, sondern verlangt eine Bestaetigung',
+  gesendet.length === 0 && /Trotzdem/.test(await page.textContent('#fzuBtn')));
+
+await page.click('#fzuBtn');
+await page.waitForTimeout(300);
+check('KRITISCH: der zweite Tipp (Bestaetigung) sendet die Uebernahme',
+  gesendet.length === 1 && gesendet[0].fahrzeug_id === 1);
+
+// Eine neue Auswahl braucht eine neue Bestaetigung -- sonst bliebe eine
+// einmal erteilte Bestaetigung an einer spaeteren, anderen Auswahl haengen.
+await page.evaluate(() => { fzuHeuteBeantwortet = true; fzuOeffnen(); });
+await page.waitForTimeout(300);
+await page.selectOption('#fzuWahl', '2');
+await page.waitForTimeout(150);
+check('Bei einem eigenen zuletzt uebernommenen Fahrzeug erscheint KEINE Warnung',
+  !/Trotzdem/.test(await page.textContent('#fzuStand')));
+gesendet = [];
+await page.fill('#fzuKm', '40200');
+await page.setInputFiles('#fzuFotoInput', { name: 'tacho.png', mimeType: 'image/png', buffer: PNG_1X1 });
+await page.waitForTimeout(300);
+await page.click('#fzuBtn');
+await page.waitForTimeout(300);
+check('KRITISCH: ohne Fremd-Warnung sendet bereits der erste Tipp',
+  gesendet.length === 1 && gesendet[0].fahrzeug_id === 2);
+
+// Der erfolgreiche Versand oben hat die Maske geschlossen (fzuWeiter) --
+// fuer die naechste Auswahl wird sie frisch wieder geoeffnet, nicht auf der
+// bereits abgeschlossenen Instanz weitergemacht.
+await page.evaluate(() => fzuOeffnen());
+await page.waitForTimeout(300);
+await page.selectOption('#fzuWahl', '1');
+await page.waitForTimeout(150);
+gesendet = [];
+await page.fill('#fzuKm', '61200');
+await page.setInputFiles('#fzuFotoInput', { name: 'tacho.png', mimeType: 'image/png', buffer: PNG_1X1 });
+await page.waitForTimeout(300);
+await page.click('#fzuBtn');
+await page.waitForTimeout(300);
+check('KRITISCH: nach einem Wechsel der Auswahl verlangt dasselbe fremde Fahrzeug erneut eine Bestaetigung',
+  gesendet.length === 0 && /Trotzdem/.test(await page.textContent('#fzuBtn')));
+await page.close();
+
+// ── Beim gescannten Aufkleber erscheint dieselbe Warnung NICHT ──────────
+// Eine normale Schichtuebergabe scannt routinemaessig ein Fahrzeug, das
+// zuletzt eine andere Person hatte -- das ist der Normalfall, keine
+// Doppelbuchung. Waere die Warnung hier auch da, warnte sie bei JEDER
+// Uebergabe und waere keine Warnung mehr.
+fahrzeugAntwort = { status: 'ok', eingerichtet: true,
+  fahrzeug: { id: 1, kennzeichen: 'SO 999001', bezeichnung: 'Patrouille 1', status: 'aktiv',
+              letzter_stand: { quelle: 'uebernahme', tacho_km: 61000, zeitpunkt: VORTAGE + ' 06:12:00',
+                               datum: VORTAGE, person: 'Andere Person', eigene: false } } };
+page = await appStarten('app.html?fz=abc123');
+await page.waitForTimeout(700);
+check('KRITISCH: beim gescannten Aufkleber erscheint KEINE Fremd-Warnung, obwohl "eigene" false ist',
+  !/Trotzdem/.test(await page.textContent('#fzuStand')));
+gesendet = [];
+await page.fill('#fzuKm', '61500');
+await page.setInputFiles('#fzuFotoInput', { name: 'tacho.png', mimeType: 'image/png', buffer: PNG_1X1 });
+await page.waitForTimeout(300);
+await page.click('#fzuBtn');
+await page.waitForTimeout(300);
+check('KRITISCH: beim Scan sendet bereits der erste Tipp, ohne Bestaetigungsschritt',
+  gesendet.length === 1 && gesendet[0].kennung === 'abc123');
+await page.close();
+fahrzeugAntwort = { status: 'ok', eingerichtet: true, fahrzeuge: FAHRZEUGE, heute_beantwortet: false };
+
+// ══ 8. "Aktuell bei dir" und Abgeben (ENT-354) ══════════════════════════
+// Rein informativ -- Abgeben loest nichts in der Kilometerkette aus, siehe
+// meine_fahrzeug_uebernahme.php. Absichtlich NICHT ueber den Riegel
+// (fzuTor/die Ja-Nein-Frage) getestet, sondern nur ueber die Kachel
+// (fzuOeffnen): Genau dort ist die Anzeige verdrahtet, siehe app.html.
+const MEIN_AKTIV = { id: 3, kennzeichen: 'SO 999003', bezeichnung: 'Patrouille 3',
+  seit: VORTAGE + ' 06:00:00' };
+fahrzeugAntwort = { status: 'ok', eingerichtet: true, fahrzeuge: FAHRZEUGE,
+                    heute_beantwortet: false, mein_aktives_fahrzeug: MEIN_AKTIV };
+page = await appStarten();
+await page.evaluate(() => zeige('waechter'));
+await page.waitForTimeout(150);
+await page.click('#mk-fahrzeug');
+await page.waitForTimeout(300);
+text = await blattText(page);
+check('KRITISCH: die Kachel zeigt zuerst das eigene aktive Fahrzeug, nicht sofort das Formular',
+  /SO 999003/.test(text) && await page.locator('#fzuWahl').count() === 0);
+check('Zwei Wege stehen zur Wahl: weiteres Fahrzeug erfassen, oder abgeben',
+  await page.locator('#fzuAbgebenBtn').count() === 1
+  && await page.locator('#blFuss button', { hasText: 'Weiteres Fahrzeug' }).count() === 1);
+
+check('KRITISCH: der Riegel vor dem Rundgang (Ja/Nein-Frage) zeigt weiterhin die Frage, nicht die aktive Anzeige',
+  await (async () => {
+    await page.evaluate(() => { blattZu(); zeige('waechter'); });
+    await page.waitForTimeout(150);
+    await page.click('#mk-rundgang');
+    await page.waitForTimeout(400);
+    return /Nimmst du/.test(await blattText(page));
+  })());
+
+await page.evaluate(() => { blattZu(); zeige('waechter'); });
+await page.waitForTimeout(150);
+await page.click('#mk-fahrzeug');
+await page.waitForTimeout(300);
+await page.locator('#blFuss button', { hasText: 'Weiteres Fahrzeug' }).click();
+await page.waitForTimeout(200);
+check('"Weiteres Fahrzeug erfassen" fuehrt zum normalen Formular',
+  await page.locator('#fzuWahl').count() === 1);
+await page.close();
+
+page = await appStarten();
+await page.evaluate(() => zeige('waechter'));
+await page.waitForTimeout(150);
+await page.click('#mk-fahrzeug');
+await page.waitForTimeout(300);
+gesendet = [];
+await page.click('#fzuAbgebenBtn');
+await page.waitForTimeout(300);
+check('KRITISCH: "Fahrzeug abgeben" sendet art=abgabe mit der richtigen Fahrzeug-ID',
+  gesendet.length === 1 && gesendet[0].art === 'abgabe' && gesendet[0].fahrzeug_id === 3);
+check('Nach der Abgabe schliesst die Maske, mit einer eigenen Meldung',
+  !(await blattOffen(page)) && /Abgabe erfasst/.test(await page.textContent('#toast')));
+await page.close();
+fahrzeugAntwort = { status: 'ok', eingerichtet: true, fahrzeuge: FAHRZEUGE, heute_beantwortet: false };
 
 // ══════════════════════════════════════════════════════════════════════════
 // TEIL 4 — Der Aufkleber im Cockpit

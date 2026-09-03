@@ -29,6 +29,17 @@
 //     sich leicht, und ohne Foto als Beleg fällt der Fehler niemandem auf.
 //     Das Foto ersetzt die Zahl nicht (dieselbe Abstimmungs-Begründung wie
 //     zuvor), es sichert sie ab.
+//
+//  4. "ABGABE" (ENT-354) IST KEINE RÜCKGABE IM SINNE VON PUNKT 1. Sie
+//     entsteht nur auf ausdrücklichen Tipp der Person, trägt keinen
+//     Kilometerstand und wirkt sich auf die Kette selbst nicht aus --
+//     fz_bezugsstand() zählt weiterhin ausschliesslich 'uebernahme'. Sie
+//     räumt nur die eigene "Aktuell bei dir"-Anzeige weg, mit der ENT-354
+//     einer doppelten Übernahme desselben Fahrzeugs durch zwei Personen
+//     vorbeugt. Vergisst jemand den Tipp, passiert nichts Schlimmeres, als
+//     dass die eigene Anzeige stehen bleibt, bis die nächste echte
+//     Übernahme sie ohnehin ablöst -- genau nicht das Risiko, das Punkt 1
+//     an einer echten Rückgabe verwarf.
 declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../fahrzeug.php';
@@ -47,7 +58,7 @@ if (!hat_tabelle($pdo, 'fahrzeuge') || !hat_tabelle($pdo, 'fahrzeug_uebernahme')
 
 $input = json_decode(file_get_contents('php://input') ?: '[]', true) ?: [];
 $art = (string)($input['art'] ?? 'uebernahme');
-if (!in_array($art, ['uebernahme', 'ohne_fahrzeug'], true)) {
+if (!in_array($art, ['uebernahme', 'ohne_fahrzeug', 'abgabe'], true)) {
     json_response(['status' => 'error', 'message' => 'unbekannte Art'], 422);
 }
 $bemerkung = trim((string)($input['bemerkung'] ?? ''));
@@ -79,6 +90,31 @@ if ($art === 'ohne_fahrzeug') {
     );
     $ins->execute([(int)$user['id'], $einsatzId, $bemerkung === '' ? null : $bemerkung]);
     json_response(['status' => 'ok', 'art' => 'ohne_fahrzeug', 'id' => (int)$pdo->lastInsertId()]);
+}
+
+// ── Abgeben (ENT-354) ────────────────────────────────────────────────
+// Rein informativ, kein Riegel: Löst nichts in der Kette aus (fz_bezugsstand()
+// zählt weiterhin nur 'uebernahme') und macht das Fahrzeug für niemanden
+// frei oder besetzt -- es räumt nur die eigene "Aktuell bei dir"-Anzeige aus
+// dem Weg. Nur das eigene, aktuell aktive Fahrzeug lässt sich abgeben, sonst
+// könnte die Anzeige einer fremden Person verschwinden, ohne dass diese
+// etwas getan hat.
+if ($art === 'abgabe') {
+    $fahrzeugId = (int)($input['fahrzeug_id'] ?? 0);
+    if ($fahrzeugId <= 0) {
+        json_response(['status' => 'error', 'message' => 'Kein Fahrzeug angegeben.'], 422);
+    }
+    $meins = fz_meine_aktiv($pdo, (int)$user['id']);
+    if ($meins === null || $meins['id'] !== $fahrzeugId) {
+        json_response(['status' => 'error',
+            'message' => 'Dieses Fahrzeug ist bei dir nicht als aktiv erfasst.'], 409);
+    }
+    $ins = $pdo->prepare(
+        "INSERT INTO fahrzeug_uebernahme (art, fahrzeug_id, mitarbeiter_id, zeitpunkt, quelle)
+         VALUES ('abgabe', ?, ?, NOW(), 'app')"
+    );
+    $ins->execute([$fahrzeugId, (int)$user['id']]);
+    json_response(['status' => 'ok', 'art' => 'abgabe', 'id' => (int)$pdo->lastInsertId()]);
 }
 
 // ── Übernahme ────────────────────────────────────────────────────────

@@ -60,6 +60,11 @@ const UEBERNAHMEN = { status: 'ok', eingerichtet: true, eintraege: [
   { id: 3, art: 'ohne_fahrzeug', zeitpunkt: `${T0} 07:05:00`, tacho_km: null, quelle: 'antwort', hat_foto: false,
     fahrzeug_id: null, kennzeichen: null, fz_bezeichnung: null,
     person: 'Hans Beispiel', kunde_name: null, titel: null },
+  // Eine "Abgabe" (ENT-354) ist weder eine Übernahme noch "kein
+  // Dienstfahrzeug" -- eine vierte, eigene Aussage ohne Kilometerstand.
+  { id: 4, art: 'abgabe', zeitpunkt: `${T0} 08:00:00`, tacho_km: null, quelle: 'app', hat_foto: false,
+    fahrzeug_id: 3, kennzeichen: 'SO 999003', fz_bezeichnung: 'Patrouille 3',
+    person: 'Erika Muster', kunde_name: null, titel: null },
 ]};
 
 let calls = [];
@@ -265,6 +270,17 @@ check('Die zweite Übernahme nennt die manuelle Quelle',
 // sie muss als solche benannt sein, nicht als "SO –" oder Ähnliches.
 check('KRITISCH: "kein Dienstfahrzeug" steht als eigene Aussage da, nicht als leeres Fahrzeugfeld',
   uebInhalt.includes('Kein Dienstfahrzeug'));
+// Eine Abgabe (ENT-354) ist eine vierte, eigene Aussage -- kein Quelle-Chip
+// wie bei einer Übernahme (die hätte "app" ausgegeben) und kein
+// Kilometerstand, den es für diese Art gar nicht gibt.
+check('KRITISCH: eine Abgabe ist als solche benannt ("Abgegeben"), nicht mit dem rohen Quelle-Wert "app"',
+  uebInhalt.includes('SO 999003') && uebInhalt.includes('Abgegeben') && !uebInhalt.includes('>app<'));
+check('KRITISCH: eine Abgabe zeigt keinen Kilometerstand -- den Wert gibt es für diese Art nicht',
+  await page.evaluate(() => {
+    const karten = [...document.querySelectorAll('#aeUebListe .ag-karte')];
+    const abgabeKarte = karten.find(k => k.textContent.includes('Abgegeben'));
+    return !!abgabeKarte && !abgabeKarte.textContent.includes('Kilometerstand');
+  }));
 check('Kunde/Einsatz erscheinen, wo einer bekannt ist',
   uebInhalt.includes('Muster Liegenschaften AG') && uebInhalt.includes('Öffnungsrunde'));
 check('Person je Übernahme erscheint', uebInhalt.includes('Erika Muster') && uebInhalt.includes('Hans Beispiel'));

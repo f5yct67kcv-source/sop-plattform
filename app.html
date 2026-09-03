@@ -981,6 +981,15 @@ const W = {
     // Hinweis im Formular selbst statt einer eigenen Zwischenmaske (ENT-347).
     fzuTippScan: 'Am schnellsten geht es mit dem Aufkleber im Fahrzeug.',
     fzuTippScanLink: 'Wie geht das?',
+    // Warnung vor einer moeglichen Doppelbuchung (ENT-354): kein Riegel,
+    // aber eine Bestaetigung mit Namen und Zeitpunkt fuer den Fall, dass
+    // jemand sich beim Fahrzeug vertippt hat.
+    fzuFremdWarnung: 'Zuletzt übernommen von {person} am {zeit}. Trotzdem übernehmen?',
+    fzuFremdBestaetigen: 'Trotzdem übernehmen',
+    // "Aktuell bei dir" -- die eigene Maske (ENT-354).
+    fzuAktivLabel: 'Aktuell bei dir', fzuAktivSeit: 'übernommen am',
+    fzuWeiteresFahrzeug: 'Weiteres Fahrzeug erfassen', fzuAbgeben: 'Fahrzeug abgeben',
+    fzuAbgabeGespeichert: 'Abgabe erfasst.',
     route: 'Route öffnen', routeFehlt: 'Für diese Schicht ist keine Adresse hinterlegt.',
     dokumente: 'Unterlagen', dokumenteLaden: 'wird geladen …',
     dokumentFehler: 'Die Unterlage liess sich nicht öffnen.',
@@ -1887,6 +1896,8 @@ let fzuGewaehlt = null;         // {id, kennzeichen, bezeichnung, letzter_stand}
 let fzuKennung = null;          // aus dem Aufkleber, verlässt das Gerät nur beim Senden
 let fzuFoto = null;
 let fzuDanach = null;           // was nach dem Abschicken geschehen soll (Riegel)
+let fzuMeinAktiv = null;        // {id, kennzeichen, bezeichnung, seit} (ENT-354)
+let fzuFremdBestaetigt = false; // zweiter Tipp nach der Doppelbuchungs-Warnung (ENT-354)
 
 function fzuLaden() {
   return api('meine_fahrzeuge.php').then(({ ok, data }) => {
@@ -1894,8 +1905,20 @@ function fzuLaden() {
     fzuEingerichtet = data.eingerichtet !== false;
     fzuFahrzeuge = data.fahrzeuge || [];
     fzuHeuteBeantwortet = !!data.heute_beantwortet;
+    fzuMeinAktiv = data.mein_aktives_fahrzeug || null;
     return true;
   });
+}
+
+// "03.09. 06:12" -- fuer die Doppelbuchungs-Warnung und die eigene
+// "Aktuell bei dir"-Anzeige (ENT-354). Kein geteilter Formatierer in dieser
+// Datei fuer Datum+Zeit zusammen; bewusst lokal statt einer neuen
+// Hilfsfunktion fuer diese eine Stelle.
+function fzuZeitText(iso) {
+  const d = new Date(String(iso || '').replace(' ', 'T'));
+  if (isNaN(d)) { return iso || ''; }
+  return d.toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit' }) + ' '
+       + d.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' });
 }
 
 // Der Riegel. weiter() wird in JEDEM Fall irgendwann aufgerufen -- entweder
@@ -1986,13 +2009,51 @@ function fzuZurueck() {
   blattZu();
 }
 
-// Die Kachel im Wächter-Bereich.
+// Die Kachel im Wächter-Bereich. Ist gerade ein Fahrzeug bei dieser Person
+// aktiv (ENT-354), steht das zuerst -- "in seiner Maske sichtbar", nicht
+// erst nach einer neuen Übernahme-Frage. Über den Riegel (fzuTor) oder den
+// Aufkleber (fzuAusKennung) läuft das bewusst NICHT mit: Beide sind eigene,
+// bereits ausführlich geprüfte Abläufe, in die diese Anzeige nicht
+// hineingehört.
 function fzuOeffnen() {
   fzuDanach = null;
   fzuLaden().then(geladen => {
     if (!geladen) { toast(w('fzuNichtAbrufbar')); return; }
+    if (fzuMeinAktiv) { fzuAktivZeigen(); return; }
     fzuFormular();
   });
+}
+
+// "Aktuell bei dir" (ENT-354) -- rein informativ, kein Riegel. "Abgeben"
+// löst nichts in der Kette aus, siehe meine_fahrzeug_uebernahme.php.
+function fzuAktivZeigen() {
+  const f = fzuMeinAktiv;
+  $('blTitel').textContent = w('fzuTitel');
+  $('blBody').innerHTML = `
+    <p style="margin:0 0 4px;font-size:12.5px;letter-spacing:.02em;text-transform:uppercase;color:var(--ink-3)">${esc(w('fzuAktivLabel'))}</p>
+    <p style="margin:0 0 4px;font-size:24px;font-weight:650">${esc(f.kennzeichen || '')}</p>
+    <p style="margin:0;font-size:13px;color:var(--ink-3)">${f.bezeichnung ? esc(f.bezeichnung) + ' — ' : ''}${esc(w('fzuAktivSeit'))} ${esc(fzuZeitText(f.seit))}</p>`;
+  $('blFuss').className = 'blatt-ft gestapelt';
+  $('blFuss').innerHTML = `
+    <button class="btn btn-plain" onclick="fzuFormular()">${esc(w('fzuWeiteresFahrzeug'))}</button>
+    <button class="btn btn-primary" id="fzuAbgebenBtn" onclick="fzuAbgeben()">${esc(w('fzuAbgeben'))}</button>`;
+  blattZeigen();
+}
+
+function fzuAbgeben() {
+  const f = fzuMeinAktiv; if (!f) return;
+  const btn = $('fzuAbgebenBtn'); if (btn) btn.disabled = true;
+  api('meine_fahrzeug_uebernahme.php', { method: 'POST', body: { art: 'abgabe', fahrzeug_id: Number(f.id) } })
+    .then(({ ok, data }) => {
+      if (!ok || data.status !== 'ok') {
+        if (btn) btn.disabled = false;
+        toast(data.message || w('netzfehler'));
+        return;
+      }
+      fzuMeinAktiv = null;
+      toast(w('fzuAbgabeGespeichert'));
+      fzuWeiter();
+    });
 }
 
 // Der Aufkleber im Auto. Das Kennzeichen wird SERVERSEITIG aufgelöst; die
@@ -2015,6 +2076,10 @@ function fzuAusKennung(kennung) {
 function fzuFormular() {
   const liste = fzuFahrzeuge || [];
   $('blTitel').textContent = w('fzuTitel');
+  // Ein Abstecher zur Anleitung und zurück soll keine stehengebliebene
+  // Bestätigung mitbringen -- lieber einmal zu oft bestätigen als einmal zu
+  // wenig gewarnt werden (ENT-354).
+  fzuFremdBestaetigt = false;
 
   // Vier verschiedene Aussagen, vier Texte.
   if (fzuEingerichtet === false) {
@@ -2107,17 +2172,44 @@ function fzuFormular() {
   if (fzuFoto) { fzuFotoVorschau(); }
 }
 
+// Ist die letzte Übernahme dieses Fahrzeugs von jemand anderem als der
+// eingeloggten Person? Dieselbe Auskunft entscheidet die Warnung hier UND
+// die Bestätigung beim Abschicken (fzuSenden) -- eine Stelle, nicht zwei,
+// die auseinanderlaufen könnten (ENT-354).
+//
+// NUR bei Auswahl aus der Liste, NICHT beim gescannten Aufkleber
+// (fzuKennung gesetzt): Wer den Aufkleber scannt, steht vor genau diesem
+// Fahrzeug -- eine normale Schichtübergabe scannt routinemässig ein
+// Fahrzeug, das zuletzt eine andere Person hatte, und das wäre sonst bei
+// JEDER Übergabe eine Warnung, die nichts mehr warnt. Das Risiko, das diese
+// Warnung abfängt (ein falsch angetipptes Fahrzeug in der Liste), gibt es
+// beim Scan gar nicht.
+function fzuIstFremd(st) {
+  return !fzuKennung && !!st && st.quelle === 'uebernahme' && st.eigene === false;
+}
+
 // Der bekannte Stand -- worauf die Eingabe aufsetzt. "Noch keiner" ist eine
-// eigene Aussage und darf nicht wie "0 km" aussehen.
+// eigene Aussage und darf nicht wie "0 km" aussehen. Gehört das Fahrzeug
+// laut Kette gerade jemand anderem, steht das WARNEND davor (ENT-354) --
+// nicht als Ersatz für die Bestätigungspflicht beim Abschicken, sondern
+// damit ein falsch angetipptes Fahrzeug schon beim Auswählen auffällt, nicht
+// erst beim Absenden.
 function fzuStandZeichnen() {
   const el = $('fzuStand'); if (!el) return;
   const st = fzuGewaehlt ? fzuGewaehlt.letzter_stand : null;
-  if (!fzuGewaehlt) { el.textContent = ''; return; }
+  if (!fzuGewaehlt) { el.innerHTML = ''; return; }
   if (!st) { el.textContent = w('fzuStandKeiner'); return; }
   const wann = String(st.zeitpunkt || '').slice(0, 10);
-  el.textContent = w('fzuLetzterStand') + ': ' + Number(st.tacho_km).toLocaleString('de-CH') + ' km'
+  const standText = w('fzuLetzterStand') + ': ' + Number(st.tacho_km).toLocaleString('de-CH') + ' km'
     + (wann ? ' (' + wann.slice(8, 10) + '.' + wann.slice(5, 7) + '.' + wann.slice(0, 4) + ')' : '')
     + (st.person ? ' — ' + st.person : (st.quelle === 'stammdaten' ? ' — ' + w('fzuStandStamm') : ''));
+  if (fzuIstFremd(st)) {
+    el.innerHTML = `<div>${esc(standText)}</div>
+      <div style="margin-top:6px;color:var(--warn);font-weight:600">${esc(w('fzuFremdWarnung')
+        .replace('{person}', st.person || '').replace('{zeit}', fzuZeitText(st.zeitpunkt)))}</div>`;
+  } else {
+    el.textContent = standText;
+  }
 }
 
 // Der bekannte Stand kommt mit der Liste, nicht per Nachladen: Ein
@@ -2127,6 +2219,11 @@ function fzuWahlGeaendert() {
   const el = $('fzuWahl'); if (!el) return;
   const id = Number(el.value || 0);
   fzuGewaehlt = id ? ((fzuFahrzeuge || []).find(f => Number(f.id) === id) || null) : null;
+  // Eine neue Auswahl braucht eine neue Bestätigung -- sonst bliebe die
+  // Bestätigung eines zuvor gewählten fremden Fahrzeugs an einem später
+  // gewählten hängen (ENT-354).
+  fzuFremdBestaetigt = false;
+  const btn = $('fzuBtn'); if (btn) { btn.textContent = w('fzuUebernehmen'); }
   fzuStandZeichnen();
 }
 
@@ -2170,6 +2267,21 @@ function fzuSenden() {
   // Betrieb anders anfuehlt") -- eine 5-6-stellige, von Hand eingetippte
   // Zahl vertippt sich leicht, und ohne Beleg faellt das niemandem auf.
   if (!fzuFoto) { zeig(w('fzuFotoPflicht')); return; }
+
+  // Warnung statt Riegel (ENT-354): Steht das Fahrzeug laut Kette gerade bei
+  // jemand anderem, braucht es einen zweiten, bestätigenden Tipp -- fängt
+  // ein falsch angetipptes Fahrzeug ab, ohne eine normale Übergabe zu
+  // blockieren (die selbst genau denselben Ablauf ist: eine andere Person
+  // übernimmt, was zuletzt jemand anders hatte). fzuIstFremd() schliesst
+  // den gescannten Aufkleber bereits aus.
+  const stFuerWarnung = fzuGewaehlt ? fzuGewaehlt.letzter_stand : null;
+  if (fzuIstFremd(stFuerWarnung) && !fzuFremdBestaetigt) {
+    fzuFremdBestaetigt = true;
+    zeig(w('fzuFremdWarnung').replace('{person}', stFuerWarnung.person || '')
+      .replace('{zeit}', fzuZeitText(stFuerWarnung.zeitpunkt)));
+    const warnBtn = $('fzuBtn'); if (warnBtn) { warnBtn.textContent = w('fzuFremdBestaetigen'); }
+    return;
+  }
 
   const btn = $('fzuBtn'); if (btn) btn.disabled = true;
   const body = { art: 'uebernahme', tacho_km: Number(km) };
