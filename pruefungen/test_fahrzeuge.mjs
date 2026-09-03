@@ -71,13 +71,22 @@ check('KRITISCH: nicht erfasste Zahlen bleiben NULL und werden nicht zu 0',
 // Diese Datei fuehrt Stammdaten. Entstuende hier eine Kilometerkontrolle,
 // waere sie am falschen Ort -- und die Trennung, auf der ENT-313 beruht,
 // waere still aufgehoben. Geprueft wird nicht der Wortlaut (ein Kommentar
-// darf ueber das Fahrtenbuch reden), sondern WELCHE TABELLEN der Endpunkt
-// anfasst: Kommt eine dritte dazu, tut er mehr als Stammdaten zu fuehren.
-const FZ_TABELLEN = [...FZ.matchAll(/\b(?:FROM|INTO|UPDATE|JOIN)\s+([a-z_]+)/g)]
+// darf ueber das Fahrtenbuch reden), sondern WAS der Endpunkt anfasst.
+//
+// Geschrieben wird ausschliesslich in `fahrzeuge`. Gelesen werden zusaetzlich
+// `anstellungsorte` (der Standort) und seit ENT-328 `einsaetze` -- fuer die
+// Zaehlung, die das Loeschen eines eingeteilten Fahrzeugs verhindert. Ein
+// Fahrtenbuch braeuchte eine eigene Tabelle und einen Schreibweg dorthin;
+// beides faellt hier auf.
+const FZ_SCHREIBT = [...FZ.matchAll(/\b(?:INSERT INTO|UPDATE|DELETE FROM)\s+([a-z_]+)/g)]
+  .map(m => m[1]);
+const FZ_LIEST = [...FZ.matchAll(/\b(?:FROM|JOIN)\s+([a-z_]+)/g)]
   .map(m => m[1]).filter(t => t !== 'DUPLICATE');
-check('KRITISCH: der Stammdaten-Endpunkt fasst nur fahrzeuge und anstellungsorte an',
-  FZ_TABELLEN.length > 0
-  && FZ_TABELLEN.every(t => t === 'fahrzeuge' || t === 'anstellungsorte'));
+check('KRITISCH: geschrieben wird ausschliesslich in die Fahrzeug-Stammdaten',
+  FZ_SCHREIBT.length > 0 && FZ_SCHREIBT.every(t => t === 'fahrzeuge'));
+check('KRITISCH: gelesen wird nur, was der Stamm braucht — kein Fahrtenbuch',
+  FZ_LIEST.length > 0
+  && FZ_LIEST.every(t => ['fahrzeuge', 'anstellungsorte', 'einsaetze'].includes(t)));
 
 // ══════════════════════════════════════════════════════════════════════════
 // TEIL 2 — Die Oberflaeche

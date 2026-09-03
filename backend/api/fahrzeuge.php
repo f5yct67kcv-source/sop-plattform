@@ -102,6 +102,22 @@ if (!empty($in['loeschen'])) {
     if ($id <= 0) {
         json_response(['status' => 'error', 'message' => 'id fehlt'], 422);
     }
+    // Ein Fahrzeug, das an einem Einsatz haengt, wird nicht geloescht
+    // (ENT-328). Welches Fahrzeug gefahren wurde, ist eine Tatsache; sie
+    // still auf NULL zu setzen wuerde die Vergangenheit veraendern. Wer das
+    // Fahrzeug nicht mehr braucht, setzt es ausser Betrieb -- dann bleibt
+    // sichtbar, was war.
+    if (hat_spalte($pdo, 'einsaetze', 'fahrzeug_id')) {
+        $z = $pdo->prepare('SELECT COUNT(*) FROM einsaetze WHERE fahrzeug_id = ?');
+        $z->execute([$id]);
+        $anzahl = (int)$z->fetchColumn();
+        if ($anzahl > 0) {
+            json_response(['status' => 'error', 'message' =>
+                'Dieses Fahrzeug ist ' . $anzahl . ' ' . ($anzahl === 1 ? 'Einsatz' : 'Einsätzen')
+                . ' zugeteilt und lässt sich darum nicht löschen. Setze es stattdessen auf '
+                . '„Ausser Betrieb“ — dann bleibt nachvollziehbar, womit gefahren wurde.'], 409);
+        }
+    }
     $pdo->prepare('DELETE FROM fahrzeuge WHERE id = ?')->execute([$id]);
     json_response(['status' => 'ok', 'eingerichtet' => true, 'fahrzeuge' => fz_lesen($pdo)]);
 }

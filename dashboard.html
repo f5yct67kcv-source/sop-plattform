@@ -5471,6 +5471,16 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
           <div class="ma-pick" id="enNMa"></div>
           <div class="pick-foot" id="enNMaFoot"></div>
         </div>
+        <!-- Dienstfahrzeug und Fahrer (ENT-328). Genau das Feld, das ENT-115
+             bewusst weggelassen hat, solange es keine Fahrzeuge zu wählen gab
+             — seit ENT-313 gibt es sie. Steht hier und nicht bei „Weg und
+             Auslagenersatz": Wer fährt, ist eine Frage der Zuteilung. Die
+             GELD-Folge steht trotzdem darunter, denn sie entsteht hier. -->
+        <div class="f"><label for="enNFahrzeug_id">Dienstfahrzeug</label>
+          <select class="inp" id="enNFahrzeug_id" onchange="enFahrzeugGeaendert()"></select></div>
+        <div class="f"><label for="enNFahrer_id">Fahrer</label>
+          <select class="inp" id="enNFahrer_id"></select></div>
+        <div class="f wide"><div class="f-hint" id="enNFahrerHinweis"></div></div>
   </div>
 </div>
 
@@ -12138,6 +12148,113 @@ function pickRefresh(prefix) {
   pickRender(prefix, pickIds(prefix), prefix === 'enE' ? enTarget : null);
 }
 
+// ══════════════════════════════════════════ DIENSTFAHRZEUG AM EINSATZ (ENT-328)
+//
+// Der Planer bestimmt Fahrzeug UND Fahrer -- ausdrueckliche Vorgabe des
+// Projektinhabers, nicht "wer das Fahrzeug in der App zuerst uebernimmt".
+// Verantwortung wird zugeteilt, nicht ausgehandelt.
+//
+// Am Fahrer haengt Geld: Wer im Geschaeftsfahrzeug faehrt, bekommt
+// Fahrzeitersatz, aber keinen Fahrkostenersatz (Art. 18 Ziff. 4/5,
+// auslagen.php). Der Server setzt das Verkehrsmittel dieser einen Zuteilung
+// deshalb mit; die uebrigen Eingeteilten bleiben unberuehrt, denn dass sie
+// mitfahren, waere eine Annahme.
+
+// Die Fahrzeugliste wird in der Planung nur EINMAL geholt. In der
+// Betriebsansicht laedt ladeBetrieb() sie ohnehin neu -- beide schreiben in
+// dasselbe `fahrzeuge`, es gibt also keine zweite Liste, die veralten koennte.
+let fzLadenLauf = null;
+let fzFuerPlanungDa = false;   // Liste wirklich geholt? (nicht: Liste nicht leer)
+function ladeFahrzeugeEinmal() {
+  if (!fzLadenLauf) { fzLadenLauf = ladeFahrzeuge().then(() => { fzFuerPlanungDa = true; }); }
+  return fzLadenLauf;
+}
+
+// Vier Zustaende, vier Texte -- die Regel, die in diesem Werkzeug am
+// haeufigsten gebrochen wurde: nicht eingerichtet / kein Fahrzeug erfasst /
+// keines eingeteilt / eines eingeteilt. Wer sie vermengt, laesst jemanden
+// nach einer Liste suchen, die es gar nicht gibt.
+function enFahrzeugOptionen(sel, gewaehlt) {
+  if (!sel) { return; }
+  if (!fzEingerichtet) {
+    sel.innerHTML = '<option value="">Dienstfahrzeuge noch nicht eingerichtet</option>';
+    sel.disabled = true; return;
+  }
+  const aktive = fahrzeuge.filter(f => f.status === 'aktiv');
+  if (!aktive.length && gewaehlt == null) {
+    sel.innerHTML = '<option value="">Kein Fahrzeug im Betrieb erfasst</option>';
+    sel.disabled = true; return;
+  }
+  sel.disabled = false;
+  // Ein bereits eingeteiltes Fahrzeug, das inzwischen ausser Betrieb steht,
+  // bleibt waehlbar und sagt das dazu. Es still aus der Liste zu nehmen
+  // hiesse, die Zuteilung beim naechsten Speichern zu verlieren.
+  const liste = aktive.slice();
+  if (gewaehlt != null && !liste.some(f => Number(f.id) === Number(gewaehlt))) {
+    const weg = fahrzeuge.find(f => Number(f.id) === Number(gewaehlt));
+    if (weg) { liste.push(weg); }
+  }
+  sel.innerHTML = '<option value="">— kein Dienstfahrzeug —</option>'
+    + liste.map(f => {
+        const name = [f.kennzeichen, f.bezeichnung].filter(Boolean).join(' · ');
+        const zusatz = f.status === 'aktiv' ? '' : (f.status === 'verkauft' ? ' (verkauft)' : ' (ausser Betrieb)');
+        return `<option value="${f.id}"${Number(f.id) === Number(gewaehlt) ? ' selected' : ''}>${esc(name)}${zusatz}</option>`;
+      }).join('');
+  sel.value = gewaehlt == null ? '' : String(gewaehlt);
+}
+
+// Fahrer nur aus den TATSAECHLICH Zugeteilten. Wer nicht auf der Schicht
+// steht, kann sie nicht fahren -- der Server weist das ohnehin ab, und eine
+// Auswahl anzubieten, die abgewiesen wird, ist eine Falle.
+function enFahrerOptionen(sel, ids, gewaehlt) {
+  if (!sel) { return; }
+  if (!ids.length) {
+    sel.innerHTML = '<option value="">Zuerst Mitarbeitende zuteilen</option>';
+    sel.disabled = true; return;
+  }
+  sel.disabled = false;
+  sel.innerHTML = '<option value="">— noch nicht bestimmt —</option>'
+    + ids.map(id => {
+        const m = mitarbeiter.find(x => Number(x.id) === Number(id));
+        const name = (m && (fullName(m) || m.name)) || ('#' + id);
+        return `<option value="${id}"${Number(id) === Number(gewaehlt) ? ' selected' : ''}>${esc(name)}</option>`;
+      }).join('');
+  sel.value = gewaehlt == null ? '' : String(gewaehlt);
+}
+
+const EN_FAHRER_GELD = 'Wer fährt, reist im Geschäftsfahrzeug: Fahrzeitersatz ja, '
+  + 'Fahrkostenersatz nein (Art. 18 Ziff. 4/5). Das Verkehrsmittel dieser Person wird beim '
+  + 'Speichern entsprechend gesetzt. Die übrigen Eingeteilten bleiben unberührt — ob sie '
+  + 'mitfahren, entscheidest du je Person unter „Verkehrsmittel zum Einsatz".';
+
+function enFahrzeugGeaendert() {
+  const fz = $('enNFahrzeug_id'), fa = $('enNFahrer_id'), hint = $('enNFahrerHinweis');
+  if (!fz || !fa) { return; }
+  const hatFahrzeug = !!fz.value;
+  if (!hatFahrzeug) {
+    // Ein Fahrer ohne Fahrzeug ist keine Angabe -- der Server weist ihn ab.
+    fa.value = '';
+    fa.disabled = true;
+    if (hint) { hint.textContent = 'Ohne Dienstfahrzeug wird kein Fahrer bestimmt.'; }
+    return;
+  }
+  enFahrerOptionen(fa, pickIds('enN'), fa.value ? Number(fa.value) : null);
+  if (hint) { hint.textContent = EN_FAHRER_GELD; }
+}
+
+// Wird aus pickFoot() gerufen: Aendert sich die Zuteilung, muss die
+// Fahrerauswahl mitziehen -- sonst steht dort jemand, der die Schicht
+// gerade verlassen hat.
+function enFahrerNachziehen() {
+  const fa = $('enNFahrer_id');
+  if (!fa) { return; }
+  const ids = pickIds('enN');
+  const vorher = fa.value ? Number(fa.value) : null;
+  const bleibt = vorher !== null && ids.includes(vorher) ? vorher : null;
+  if (!$('enNFahrzeug_id') || !$('enNFahrzeug_id').value) { enFahrzeugGeaendert(); return; }
+  enFahrerOptionen(fa, ids, bleibt);
+}
+
 function pickFoot(prefix) {
   const el = $(prefix + 'MaFoot');
   if (!el) return;
@@ -12148,6 +12265,9 @@ function pickFoot(prefix) {
   el.innerHTML = `<span class="chip ${fehlt ? 'chip-w' : 'chip-p'}">${n}/${bedarf}</span>`
     + `<span>${fehlt ? `noch ${fehlt} ${fehlt === 1 ? 'Person' : 'Personen'} offen` : 'Bedarf gedeckt'}</span>`
     + (gesperrt ? `<span class="chip chip-x">${gesperrt} zeitlich belegt</span>` : '');
+  // Der Fahrer muss zugeteilt sein (ENT-328) -- faellt jemand aus der
+  // Auswahl, darf er nicht als Fahrer stehenbleiben.
+  if (prefix === 'enN' && typeof enFahrerNachziehen === 'function') { enFahrerNachziehen(); }
 }
 
 // ── Anlegen
@@ -12181,6 +12301,21 @@ function openEinsatzNeu(felder, maNamen) {
   if ($('enNDatumBis')) $('enNDatumBis').value = '';
   enZeitraum();
   enWegZone();
+  // Dienstfahrzeug und Fahrer zuruecksetzen (ENT-328) -- beim zweiten Oeffnen
+  // duerfen keine Reste des vorigen Einsatzes stehen. Die Liste kommt aus der
+  // Betriebsansicht; wer direkt in der Planung startet, hat sie noch nicht.
+  if ($('enNFahrzeug_id')) {
+    $('enNFahrzeug_id').value = '';
+    $('enNFahrer_id').value = '';
+    enFahrzeugOptionen($('enNFahrzeug_id'), null);
+    enFahrzeugGeaendert();
+    ladeFahrzeugeEinmal().then(() => {
+      if (!$('enNFahrzeug_id')) { return; }
+      const gewaehlt = $('enNFahrzeug_id').value ? Number($('enNFahrzeug_id').value) : null;
+      enFahrzeugOptionen($('enNFahrzeug_id'), gewaehlt);
+      enFahrzeugGeaendert();
+    });
+  }
 
   const ids = maNamen.map(n => (mitarbeiter.find(m => m.name === n) || {}).id).filter(Boolean);
   pickRender('enN', ids, null);
@@ -12248,7 +12383,7 @@ function enSammeln(prefix) {
     // leeren, und ein stiller Datenverlust beim Bearbeiten waere die Folge.
     ...enWennDa(prefix, ['kanton', 'veranstaltung', 'treffpunkt', 'taetigkeit',
                          'qualifikation', 'kontakt_vorname', 'kontakt_nachname', 'kontakt_telefon',
-                         'weg_km', 'weg_minuten']),
+                         'weg_km', 'weg_minuten', 'fahrzeug_id', 'fahrer_id']),
     mitarbeiter: pickIds(prefix),
     // Nur wer ausdruecklich bestaetigt wurde, wird umgeplant (ENT-060). Die
     // Liste geht mit, damit der Server dieselbe Entscheidung trifft wie die
@@ -16562,6 +16697,7 @@ function epKopfZeichnen() {
     </div>
     ${epWegWarnung(e)}
     ${epGavAus010Warnung(e)}
+    ${epFahrzeugBlock(e)}
     ${epVerkehrsmittelBlock(e)}
     <div class="card-bd ep-zone">${epRapportBlock(e)}${epDokBlock()}</div>
     ${epRechnungBlock(e)}`;
@@ -16822,6 +16958,153 @@ function epBerichtBlatt(b) {
 // Nur sichtbar, wenn die Zone ueberhaupt Auslagenersatz ausloest -- in einer
 // Zone ohne Entschaedigung waere die Frage "womit reist du an" fuer den
 // Anspruch folgenlos, und ein Auswahlfeld ohne Wirkung ist Ballast.
+// ── Dienstfahrzeug und Fahrer am Einsatz (ENT-328) ──────────────────────
+//
+// Steht unmittelbar VOR dem Verkehrsmittel-Block, weil es ihn bestimmt: Wer
+// faehrt, hat 'Geschaeftsfahrzeug' und keinen Fahrkostenersatz. Zwei Bloecke
+// nebeneinander, die dasselbe sagen koennten, waeren zwei Wahrheiten -- der
+// Server setzt das Verkehrsmittel des Fahrers darum selbst.
+//
+// Die ERWARTETE Fahrstrecke ist hier eine Anzeige, kein gespeicherter Wert.
+// Sie gilt nur, wenn das Fahrzeug am Hauptanstellungsort steht -- dann, und
+// nur dann, ist die gemessene Wegstrecke ab HAO auch die Strecke des
+// Fahrzeugs. Steht es anderswo, heisst es "nicht bestimmbar" und ausdruecklich
+// nicht "0 km" (OP-316).
+function epErwarteteStrecke(e, fz) {
+  if (!fz) { return null; }
+  const hao = typeof aoHao === 'function' ? aoHao() : null;
+  if (!e.weg_km) { return { text: 'nicht bestimmbar', grund: 'Für diesen Einsatz ist keine Wegstrecke erfasst.' }; }
+  if (!hao) { return { text: 'nicht bestimmbar', grund: 'Es ist kein Hauptanstellungsort hinterlegt.' }; }
+  if (fz.standort_id == null) {
+    return { text: 'nicht bestimmbar', grund: 'Für dieses Fahrzeug ist kein Standort hinterlegt.' };
+  }
+  if (Number(fz.standort_id) !== Number(hao.id)) {
+    return { text: 'nicht bestimmbar',
+      grund: `Das Fahrzeug steht an einem anderen Ort als dem Hauptanstellungsort, auf den sich die
+              erfasste Wegstrecke bezieht.` };
+  }
+  return { text: `${nf(2 * Number(e.weg_km), 1)} km`,
+    grund: `Hin und zurück: 2 × ${nf(Number(e.weg_km), 1)} km ab ${esc(hao.bezeichnung)}. Erwartungswert
+            für einen späteren Abgleich mit dem Tachostand — kein gespeicherter Wert.` };
+}
+
+function epFahrzeugBlock(e) {
+  if (!e) { return ''; }
+  // Wird der Einsatzplan als erste Ansicht geoeffnet, ist die Fahrzeugliste
+  // noch unterwegs. Dann faenden weder das Kennzeichen noch die erwartete
+  // Strecke ihr Fahrzeug -- der Block stuende halb leer da, ohne dass etwas
+  // kaputt waere. Also: einmal nachladen und den ganzen Kopf neu zeichnen.
+  // Das Merkmal ist "Liste geholt", nicht "Liste nicht leer" -- sonst liefe
+  // ein Betrieb ohne Fahrzeuge in eine Endlosschleife.
+  if (!fzFuerPlanungDa) {
+    ladeFahrzeugeEinmal().then(() => { if ($('epKopf')) { epKopfZeichnen(); } });
+  }
+  // Der Schluessel fehlt ganz, solange die Einrichtung nicht gelaufen ist
+  // (einsatz_list.php). Das ist etwas anderes als "kein Fahrzeug zugeteilt"
+  // und wird auch anders benannt.
+  const eingerichtet = Object.prototype.hasOwnProperty.call(e, 'fahrzeug_id');
+  const gesperrt = enGesperrt(e);
+  const fz = eingerichtet && e.fahrzeug_id != null
+    ? fahrzeuge.find(f => Number(f.id) === Number(e.fahrzeug_id)) : null;
+
+  let inhalt;
+  if (!eingerichtet) {
+    inhalt = `<div class="zone-note">Die Einrichtung für Dienstfahrzeuge ist noch nicht gelaufen —
+      darum lässt sich hier keines zuteilen. Das ist etwas anderes als „kein Fahrzeug im Einsatz".</div>`;
+  } else if (gesperrt) {
+    // Festgeschrieben: anzeigen, nicht anbieten. Am Fahrer haengt der
+    // Fahrkostenersatz, und der ist beim Abgleich bereits erfasst (ENT-045).
+    const fahrer = e.fahrer_id != null ? mitarbeiter.find(m => Number(m.id) === Number(e.fahrer_id)) : null;
+    inhalt = `<div class="ep-kopf" style="padding:0">
+      <div class="ep-kf"><span>Dienstfahrzeug</span><b>${fz
+        ? esc([fz.kennzeichen, fz.bezeichnung].filter(Boolean).join(' · '))
+        : (e.fahrzeug_id == null ? 'keines eingeteilt' : 'nicht mehr erfasst')}</b></div>
+      <div class="ep-kf"><span>Fahrer</span><b>${fahrer
+        ? esc(fullName(fahrer) || fahrer.name)
+        : (e.fahrer_id == null ? 'nicht bestimmt' : 'nicht mehr erfasst')}</b></div>
+    </div>`;
+  } else {
+    const ids = [...new Set((epPos || []).filter(epBesetzt).map(p => Number(p.mitarbeiter_id)))];
+    inhalt = `<div class="form-grid">
+        <div class="f"><label for="epFahrzeug">Dienstfahrzeug</label>
+          <select class="inp" id="epFahrzeug" onchange="epFahrzeugGeaendert()"></select></div>
+        <div class="f"><label for="epFahrer">Fahrer</label>
+          <select class="inp" id="epFahrer" onchange="epFahrzeugSpeichern()"></select></div>
+      </div>
+      <div class="zone-note" id="epFahrzeugHinweis"></div>`;
+    // Die Auswahlfelder werden nach dem Einsetzen gefuellt: Sie brauchen die
+    // Fahrzeugliste, und die kommt gegebenenfalls erst noch.
+    setTimeout(() => {
+      if (!$('epFahrzeug')) { return; }
+      enFahrzeugOptionen($('epFahrzeug'), e.fahrzeug_id);
+      enFahrerOptionen($('epFahrer'), ids, e.fahrer_id);
+      epFahrzeugHinweis(e);
+    }, 0);
+  }
+
+  const erwartet = epErwarteteStrecke(e, fz);
+  return `<div class="card-bd" style="padding:0 16px 14px">
+    <div class="zone">
+      <div class="zone-hd">Dienstfahrzeug und Fahrer</div>
+      ${inhalt}
+      ${erwartet ? `<div class="zone-note" style="margin-top:10px"><b>Erwartete Fahrstrecke:
+        ${erwartet.text}</b> — ${erwartet.grund}</div>` : ''}
+    </div></div>`;
+}
+
+function epFahrzeugHinweis(e) {
+  const el = $('epFahrzeugHinweis'), fz = $('epFahrzeug'), fa = $('epFahrer');
+  if (!el || !fz || !fa) { return; }
+  if (!fz.value) {
+    fa.value = ''; fa.disabled = true;
+    el.textContent = 'Ohne Dienstfahrzeug wird kein Fahrer bestimmt.';
+    return;
+  }
+  if (!fa.disabled || fa.options.length > 1) { fa.disabled = fa.options.length <= 1; }
+  el.textContent = EN_FAHRER_GELD;
+}
+
+function epFahrzeugGeaendert() {
+  const fz = $('epFahrzeug'), fa = $('epFahrer');
+  if (!fz || !fa) { return; }
+  // Faellt das Fahrzeug weg, faellt der Fahrer mit -- der Server weist einen
+  // Fahrer ohne Fahrzeug ohnehin ab.
+  if (!fz.value) { fa.value = ''; }
+  epFahrzeugHinweis(epEinsatz);
+  epFahrzeugSpeichern();
+}
+
+function epFahrzeugSpeichern() {
+  const fz = $('epFahrzeug'), fa = $('epFahrer');
+  if (!fz || !fa || !epEinsatz) { return; }
+  api('einsatz_fahrzeug.php', { method: 'POST', body: {
+    einsatz_id: epEinsatz.id, fahrzeug_id: fz.value, fahrer_id: fa.value,
+  } }).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') {
+      toast(data.message || 'Das Dienstfahrzeug liess sich nicht speichern.');
+      // Zurueck auf den Stand, den der Server kennt -- sonst zeigt die
+      // Oberflaeche eine Zuteilung an, die es nicht gibt.
+      enFahrzeugOptionen(fz, epEinsatz.fahrzeug_id);
+      enFahrerOptionen(fa, [...new Set((epPos || []).filter(epBesetzt).map(p => Number(p.mitarbeiter_id)))],
+        epEinsatz.fahrer_id);
+      epFahrzeugHinweis(epEinsatz);
+      return;
+    }
+    epEinsatz.fahrzeug_id = data.fahrzeug_id;
+    epEinsatz.fahrer_id = data.fahrer_id;
+    // Der Server hat das Verkehrsmittel des Fahrers mitgesetzt -- der
+    // Verkehrsmittel-Block daneben muss das zeigen, sonst stehen zwei
+    // verschiedene Angaben nebeneinander.
+    (epPos || []).forEach(p => {
+      if (Number(p.mitarbeiter_id) === Number(data.fahrer_id)) {
+        p.verkehrsmittel = 'Geschaeftsfahrzeug'; p.oev_rappen = null;
+      }
+    });
+    epKopfZeichnen();
+    toast('Dienstfahrzeug gespeichert.');
+  }).catch(() => toast('Das Dienstfahrzeug liess sich nicht speichern.'));
+}
+
 function epVerkehrsmittelBlock(e) {
   if (!e || !e.weg_km || enGesperrt(e)) { return ''; }
   const nao = typeof aoNao === 'function' ? aoNao() : null;
@@ -16838,10 +17121,16 @@ function epVerkehrsmittelBlock(e) {
     const vorgabe = ma ? ma.verkehrsmittel : null;
     const wert = p.verkehrsmittel || '';   // '' heisst: die Vorgabe gilt
     const name = (ma && (fullName(ma) || ma.name)) || p.mitarbeiter || ('#' + p.mitarbeiter_id);
+    // Wer das Dienstfahrzeug fuehrt, faehrt damit -- das Feld steht fest
+    // (ENT-328). Der Server weist eine Aenderung ohnehin ab; ein bedienbares
+    // Feld, das beim Klicken eine Fehlermeldung wirft, waere eine Falle.
+    const istFahrer = e.fahrer_id != null && Number(e.fahrer_id) === Number(p.mitarbeiter_id);
     return `<div class="f" style="margin-bottom:9px">
-      <label>${esc(name)}${vorgabe ? '' : ' <span class="note" style="font-weight:500">— keine Vorgabe hinterlegt</span>'}</label>
+      <label>${esc(name)}${istFahrer
+        ? ' <span class="note" style="font-weight:500">— fährt das Dienstfahrzeug</span>'
+        : (vorgabe ? '' : ' <span class="note" style="font-weight:500">— keine Vorgabe hinterlegt</span>')}</label>
       <div class="inp-row">
-        <select class="inp" data-vm-ma="${Number(p.mitarbeiter_id)}" onchange="epVerkehrsmittelGeaendert(this)">
+        <select class="inp"${istFahrer ? ' disabled' : ''} data-vm-ma="${Number(p.mitarbeiter_id)}" onchange="epVerkehrsmittelGeaendert(this)">
           <option value="">${vorgabe ? 'Vorgabe: ' + esc(vorgabe) : '– kein Verkehrsmittel gewählt –'}</option>
           ${optionen.map(o => `<option value="${esc(o)}"${wert === o ? ' selected' : ''}>${esc(o)}</option>`).join('')}
         </select>
