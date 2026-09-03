@@ -490,6 +490,31 @@ const totEintraege = NUR_EIGENE_DATEN.filter(f => !apiDateien.includes(f));
 check('Die Ausnahmeliste nennt nur Endpunkte, die es gibt', totEintraege.length === 0);
 if (totEintraege.length) { bad.push('Ausnahme ohne Datei: ' + totEintraege.join(', ')); }
 
+// KRITISCH: Die Pruefung oben sieht nur, was NACH einem vorhandenen
+// require_session() fehlt. Ein Endpunkt, der require_session() komplett
+// vergisst, kommt an ihr vorbei -- er faellt aus dem Filter in Zeile 478
+// heraus, bevor die Rechtepruefung ueberhaupt verlangt wird. Diese Pruefung
+// schliesst genau diese Luecke: JEDER Endpunkt braucht eine gueltige
+// Sitzung, ausser den drei namentlich begruendeten, die absichtlich ohne
+// Anmeldung erreichbar sind.
+const OEFFENTLICH_OHNE_SITZUNG = {
+  'login.php':              'meldet erst an -- kann noch keine Sitzung verlangen',
+  'logout.php':             'beendet die Sitzung -- muss auch mit abgelaufenem/fremdem Token loeschen duerfen',
+  'beleg_oeffentlich.php':  'Kundenportal ohne Konto -- der 256-Bit-Token in der URL ersetzt die Anmeldung (ENT-192)',
+  'beleg_entscheidung.php': 'Annehmen/Ablehnen aus derselben unangemeldeten Kundenansicht -- derselbe versand_token wie beleg_oeffentlich.php ersetzt die Anmeldung, nur POST, erste Entscheidung zaehlt (ENT-192)',
+};
+const ohneSitzung = apiDateien.filter(f => {
+  if (OEFFENTLICH_OHNE_SITZUNG[f]) { return false; }
+  return !/require_session\s*\(/.test(ohneKommentar(f));
+});
+check('KRITISCH: jeder Endpunkt verlangt eine gueltige Sitzung -- ausser den namentlich begruendeten oeffentlichen',
+  ohneSitzung.length === 0);
+if (ohneSitzung.length) { bad.push('ohne require_session: ' + ohneSitzung.join(', ')); }
+
+const toteOeffentlich = Object.keys(OEFFENTLICH_OHNE_SITZUNG).filter(f => !apiDateien.includes(f));
+check('Die Liste der oeffentlichen Endpunkte nennt nur Endpunkte, die es gibt', toteOeffentlich.length === 0);
+if (toteOeffentlich.length) { bad.push('oeffentliche Ausnahme ohne Datei: ' + toteOeffentlich.join(', ')); }
+
 // Die Anmeldung muss den zweiten Faktor auch VERLANGEN und Fehlversuche
 // zaehlen -- sonst laesst sich der sechsstellige Code durchprobieren.
 const loginOhneKommentar = ohneKommentar('login.php');
