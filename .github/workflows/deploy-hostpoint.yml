@@ -1,13 +1,27 @@
 name: Deploy Rapport-Tool zu Hostpoint
 
 # Zwei Laufzeitumgebungen, EIN Workflow (ENT-341, Variante B): main deployt
-# nach Produktion, staging nach der getrennten Testinstanz. Welches
-# GitHub Environment aktiv ist, entscheidet einzig der Branchname -- die
-# Kopierliste und alle sed-Zeilen unten bleiben fuer beide identisch, nur
-# die WERTE hinter den Secret-Namen unterscheiden sich zwischen den beiden
-# Environments (Settings → Environments in GitHub). Das ist der einzige
-# dauerhafte Unterschied zwischen den Umgebungen -- nicht zwei gepflegte
-# Kopien dieses Workflows.
+# nach Produktion, staging nach der getrennten Testinstanz. Welches GitHub
+# Environment aktiv ist, entscheidet der Branchname -- Kopierliste und
+# Platzhalter-Ersetzung bleiben fuer beide identisch, nur die WERTE hinter
+# den Secret-Namen unterscheiden sich (Settings → Environments in GitHub).
+# Das ist der einzige dauerhafte Unterschied zwischen den Umgebungen --
+# nicht zwei gepflegte Kopien dieses Workflows.
+#
+# Staging-Secrets tragen durchgehend das Praefix STAGING_ und sind EIGENE,
+# von den Produktions-Namen VERSCHIEDENE Secret-Namen -- nicht nur eigene
+# Werte desselben Namens in einem zweiten Environment (verschaerft auf
+# Wunsch des Projektinhabers, nachdem die erste Fassung nur auf getrennte
+# Environments gesetzt hatte). Grund: GitHub faellt bei einem fehlenden
+# Environment-Secret still auf ein gleichnamiges Repository-Secret zurueck.
+# Mit identischen Namen in beiden Environments waere ein vergessenes
+# Staging-Secret KEIN Fehler, sondern ein STILLER Rueckgriff auf die
+# produktive Datenbank oder den produktiven FTP-Account -- der Lauf ginge
+# durch, richtete aber moeglicherweise Schaden an der echten Anlage an. Mit
+# eigenen Namen gibt es diesen Rueckfall strukturell nicht: Ein fehlendes
+# STAGING_DB_HOST hat keinen gleichnamigen Ersatz, sondern ist schlicht
+# leer -- und der erste Schritt unten erkennt genau das und bricht den Lauf
+# ab, bevor irgendetwas kopiert oder hochgeladen wird.
 on:
   push:
     branches: [main, staging]
@@ -19,6 +33,135 @@ jobs:
     environment: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
     steps:
       - uses: actions/checkout@v4
+
+      # Erster Schritt, bewusst VOR jedem Kopieren oder Hochladen: waehlt
+      # anhand des Branchnamens den richtigen Satz Secrets und bricht den
+      # gesamten Lauf ab, wenn eines der fuer diese Umgebung ERFORDERLICHEN
+      # fehlt. "Erforderlich" heisst: ohne diesen Wert liefe die Anwendung
+      # gar nicht (DB, FTP-Ziel) oder ein sichtbares Feature bliebe fuer
+      # alle kaputt (Maps-Schluessel, Staging-Testadresse). SMTP_* und
+      # ANTHROPIC_API_KEY bleiben absichtlich NICHT erforderlich -- beide
+      # Funktionen erkennen einen fehlenden Wert bereits selbst und melden
+      # "nicht eingerichtet" statt mit einem Platzhalter zu arbeiten
+      # (smtp_konfiguriert() in mailer.php, die Leerpruefung in ai.php).
+      - name: Umgebung waehlen und erforderliche Secrets pruefen
+        env:
+          # Produktion -- bestehende Secret-Namen, unveraendert.
+          P_DB_HOST: ${{ secrets.DB_HOST }}
+          P_DB_NAME: ${{ secrets.DB_NAME }}
+          P_DB_USER: ${{ secrets.DB_USER }}
+          P_DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          P_HOSTPOINT_FTP_HOST: ${{ secrets.HOSTPOINT_FTP_HOST }}
+          P_HOSTPOINT_FTP_USER: ${{ secrets.HOSTPOINT_FTP_USER }}
+          P_HOSTPOINT_FTP_PASSWORD: ${{ secrets.HOSTPOINT_FTP_PASSWORD }}
+          P_SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          P_SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          P_SMTP_VERSCHLUESSELUNG: ${{ secrets.SMTP_VERSCHLUESSELUNG }}
+          P_SMTP_USER: ${{ secrets.SMTP_USER }}
+          P_SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          P_SMTP_ABSENDER: ${{ secrets.SMTP_ABSENDER }}
+          P_SMTP_ABSENDER_NAME: ${{ secrets.SMTP_ABSENDER_NAME }}
+          P_ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          P_MAPS_JS_KEY: ${{ secrets.MAPS_JS_KEY }}
+          # Staging -- eigene, von Produktion VERSCHIEDENE Secret-Namen.
+          S_DB_HOST: ${{ secrets.STAGING_DB_HOST }}
+          S_DB_NAME: ${{ secrets.STAGING_DB_NAME }}
+          S_DB_USER: ${{ secrets.STAGING_DB_USER }}
+          S_DB_PASSWORD: ${{ secrets.STAGING_DB_PASSWORD }}
+          S_HOSTPOINT_FTP_HOST: ${{ secrets.STAGING_HOSTPOINT_FTP_HOST }}
+          S_HOSTPOINT_FTP_USER: ${{ secrets.STAGING_HOSTPOINT_FTP_USER }}
+          S_HOSTPOINT_FTP_PASSWORD: ${{ secrets.STAGING_HOSTPOINT_FTP_PASSWORD }}
+          S_SMTP_HOST: ${{ secrets.STAGING_SMTP_HOST }}
+          S_SMTP_PORT: ${{ secrets.STAGING_SMTP_PORT }}
+          S_SMTP_VERSCHLUESSELUNG: ${{ secrets.STAGING_SMTP_VERSCHLUESSELUNG }}
+          S_SMTP_USER: ${{ secrets.STAGING_SMTP_USER }}
+          S_SMTP_PASSWORD: ${{ secrets.STAGING_SMTP_PASSWORD }}
+          S_SMTP_ABSENDER: ${{ secrets.STAGING_SMTP_ABSENDER }}
+          S_SMTP_ABSENDER_NAME: ${{ secrets.STAGING_SMTP_ABSENDER_NAME }}
+          S_ANTHROPIC_API_KEY: ${{ secrets.STAGING_ANTHROPIC_API_KEY }}
+          S_MAPS_JS_KEY: ${{ secrets.STAGING_MAPS_JS_KEY }}
+          S_STAGING_TESTMAIL: ${{ secrets.STAGING_TESTMAIL }}
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            UMGEBUNG=production
+            EFF_DB_HOST="$P_DB_HOST"; EFF_DB_NAME="$P_DB_NAME"
+            EFF_DB_USER="$P_DB_USER"; EFF_DB_PASSWORD="$P_DB_PASSWORD"
+            EFF_HOSTPOINT_FTP_HOST="$P_HOSTPOINT_FTP_HOST"
+            EFF_HOSTPOINT_FTP_USER="$P_HOSTPOINT_FTP_USER"
+            EFF_HOSTPOINT_FTP_PASSWORD="$P_HOSTPOINT_FTP_PASSWORD"
+            EFF_SMTP_HOST="$P_SMTP_HOST"; EFF_SMTP_PORT="$P_SMTP_PORT"
+            EFF_SMTP_VERSCHLUESSELUNG="$P_SMTP_VERSCHLUESSELUNG"
+            EFF_SMTP_USER="$P_SMTP_USER"; EFF_SMTP_PASSWORD="$P_SMTP_PASSWORD"
+            EFF_SMTP_ABSENDER="$P_SMTP_ABSENDER"; EFF_SMTP_ABSENDER_NAME="$P_SMTP_ABSENDER_NAME"
+            EFF_ANTHROPIC_API_KEY="$P_ANTHROPIC_API_KEY"; EFF_MAPS_JS_KEY="$P_MAPS_JS_KEY"
+            EFF_STAGING_TESTMAIL=""
+
+            PFLICHT_FEHLT=""
+            [ -z "$EFF_DB_HOST" ]                && PFLICHT_FEHLT="$PFLICHT_FEHLT DB_HOST"
+            [ -z "$EFF_DB_NAME" ]                && PFLICHT_FEHLT="$PFLICHT_FEHLT DB_NAME"
+            [ -z "$EFF_DB_USER" ]                && PFLICHT_FEHLT="$PFLICHT_FEHLT DB_USER"
+            [ -z "$EFF_DB_PASSWORD" ]            && PFLICHT_FEHLT="$PFLICHT_FEHLT DB_PASSWORD"
+            [ -z "$EFF_HOSTPOINT_FTP_HOST" ]     && PFLICHT_FEHLT="$PFLICHT_FEHLT HOSTPOINT_FTP_HOST"
+            [ -z "$EFF_HOSTPOINT_FTP_USER" ]     && PFLICHT_FEHLT="$PFLICHT_FEHLT HOSTPOINT_FTP_USER"
+            [ -z "$EFF_HOSTPOINT_FTP_PASSWORD" ] && PFLICHT_FEHLT="$PFLICHT_FEHLT HOSTPOINT_FTP_PASSWORD"
+            [ -z "$EFF_MAPS_JS_KEY" ]            && PFLICHT_FEHLT="$PFLICHT_FEHLT MAPS_JS_KEY"
+          else
+            UMGEBUNG=staging
+            EFF_DB_HOST="$S_DB_HOST"; EFF_DB_NAME="$S_DB_NAME"
+            EFF_DB_USER="$S_DB_USER"; EFF_DB_PASSWORD="$S_DB_PASSWORD"
+            EFF_HOSTPOINT_FTP_HOST="$S_HOSTPOINT_FTP_HOST"
+            EFF_HOSTPOINT_FTP_USER="$S_HOSTPOINT_FTP_USER"
+            EFF_HOSTPOINT_FTP_PASSWORD="$S_HOSTPOINT_FTP_PASSWORD"
+            EFF_SMTP_HOST="$S_SMTP_HOST"; EFF_SMTP_PORT="$S_SMTP_PORT"
+            EFF_SMTP_VERSCHLUESSELUNG="$S_SMTP_VERSCHLUESSELUNG"
+            EFF_SMTP_USER="$S_SMTP_USER"; EFF_SMTP_PASSWORD="$S_SMTP_PASSWORD"
+            EFF_SMTP_ABSENDER="$S_SMTP_ABSENDER"; EFF_SMTP_ABSENDER_NAME="$S_SMTP_ABSENDER_NAME"
+            EFF_ANTHROPIC_API_KEY="$S_ANTHROPIC_API_KEY"; EFF_MAPS_JS_KEY="$S_MAPS_JS_KEY"
+            EFF_STAGING_TESTMAIL="$S_STAGING_TESTMAIL"
+
+            PFLICHT_FEHLT=""
+            [ -z "$EFF_DB_HOST" ]                && PFLICHT_FEHLT="$PFLICHT_FEHLT STAGING_DB_HOST"
+            [ -z "$EFF_DB_NAME" ]                && PFLICHT_FEHLT="$PFLICHT_FEHLT STAGING_DB_NAME"
+            [ -z "$EFF_DB_USER" ]                && PFLICHT_FEHLT="$PFLICHT_FEHLT STAGING_DB_USER"
+            [ -z "$EFF_DB_PASSWORD" ]            && PFLICHT_FEHLT="$PFLICHT_FEHLT STAGING_DB_PASSWORD"
+            [ -z "$EFF_HOSTPOINT_FTP_HOST" ]     && PFLICHT_FEHLT="$PFLICHT_FEHLT STAGING_HOSTPOINT_FTP_HOST"
+            [ -z "$EFF_HOSTPOINT_FTP_USER" ]     && PFLICHT_FEHLT="$PFLICHT_FEHLT STAGING_HOSTPOINT_FTP_USER"
+            [ -z "$EFF_HOSTPOINT_FTP_PASSWORD" ] && PFLICHT_FEHLT="$PFLICHT_FEHLT STAGING_HOSTPOINT_FTP_PASSWORD"
+            [ -z "$EFF_MAPS_JS_KEY" ]            && PFLICHT_FEHLT="$PFLICHT_FEHLT STAGING_MAPS_JS_KEY"
+            [ -z "$EFF_STAGING_TESTMAIL" ]       && PFLICHT_FEHLT="$PFLICHT_FEHLT STAGING_TESTMAIL"
+          fi
+
+          if [ -n "$PFLICHT_FEHLT" ]; then
+            echo "::error::Deployment abgebrochen -- fuer Environment $UMGEBUNG fehlen erforderliche Secrets:$PFLICHT_FEHLT"
+            exit 1
+          fi
+
+          # Fuer die folgenden Schritte als Umgebungsvariablen weiterreichen.
+          # GitHub maskiert Werte, die einmal ueber "secrets." referenziert
+          # wurden, im Log unabhaengig davon, ueber wie viele Variablen sie
+          # danach noch laufen.
+          {
+            echo "UMGEBUNG=$UMGEBUNG"
+            echo "EFF_DB_HOST=$EFF_DB_HOST"
+            echo "EFF_DB_NAME=$EFF_DB_NAME"
+            echo "EFF_DB_USER=$EFF_DB_USER"
+            echo "EFF_DB_PASSWORD=$EFF_DB_PASSWORD"
+            echo "EFF_HOSTPOINT_FTP_HOST=$EFF_HOSTPOINT_FTP_HOST"
+            echo "EFF_HOSTPOINT_FTP_USER=$EFF_HOSTPOINT_FTP_USER"
+            echo "EFF_HOSTPOINT_FTP_PASSWORD=$EFF_HOSTPOINT_FTP_PASSWORD"
+            echo "EFF_SMTP_HOST=$EFF_SMTP_HOST"
+            echo "EFF_SMTP_PORT=$EFF_SMTP_PORT"
+            echo "EFF_SMTP_VERSCHLUESSELUNG=$EFF_SMTP_VERSCHLUESSELUNG"
+            echo "EFF_SMTP_USER=$EFF_SMTP_USER"
+            echo "EFF_SMTP_PASSWORD=$EFF_SMTP_PASSWORD"
+            echo "EFF_SMTP_ABSENDER=$EFF_SMTP_ABSENDER"
+            echo "EFF_SMTP_ABSENDER_NAME=$EFF_SMTP_ABSENDER_NAME"
+            echo "EFF_ANTHROPIC_API_KEY=$EFF_ANTHROPIC_API_KEY"
+            echo "EFF_MAPS_JS_KEY=$EFF_MAPS_JS_KEY"
+            echo "EFF_STAGING_TESTMAIL=$EFF_STAGING_TESTMAIL"
+          } >> "$GITHUB_ENV"
 
       - name: Platzhalter durch echte Werte ersetzen
         run: |
@@ -101,40 +244,58 @@ jobs:
           # setup.php / setup.html bewusst NICHT hier -- Ersteinrichtung ist ein
           # einmaliger manueller Upload, damit die Datei nicht bei jedem Push
           # automatisch neu auf den Server kommt.
-          sed -i "s|__DB_HOST__|${{ secrets.DB_HOST }}|g" dist/db.php
-          sed -i "s|__DB_NAME__|${{ secrets.DB_NAME }}|g" dist/db.php
-          sed -i "s|__DB_USER__|${{ secrets.DB_USER }}|g" dist/db.php
-          sed -i "s|__DB_PASS__|${{ secrets.DB_PASSWORD }}|g" dist/db.php
-          sed -i "s|__ANTHROPIC_API_KEY__|${{ secrets.ANTHROPIC_API_KEY }}|g" dist/ai.php
+          #
+          # Ab hier kommen alle Werte aus dem vorigen Schritt (EFF_*,
+          # UMGEBUNG) -- nicht mehr direkt aus "secrets.", damit es nur EINE
+          # Stelle gibt, an der Produktion und Staging auseinandergehalten
+          # werden.
+          sed -i "s|__DB_HOST__|$EFF_DB_HOST|g" dist/db.php
+          sed -i "s|__DB_NAME__|$EFF_DB_NAME|g" dist/db.php
+          sed -i "s|__DB_USER__|$EFF_DB_USER|g" dist/db.php
+          sed -i "s|__DB_PASS__|$EFF_DB_PASSWORD|g" dist/db.php
+          # APP_ENV (ENT-341, Revision): explizite Umgebungskennung statt
+          # Ableitung aus dem Hostnamen -- traegt sowohl db.php als auch
+          # testumgebung.js, damit Backend und die drei Frontends dieselbe
+          # Quelle der Wahrheit verwenden.
+          sed -i "s|__APP_ENV__|$UMGEBUNG|g" dist/db.php
+          sed -i "s|__APP_ENV__|$UMGEBUNG|g" dist/testumgebung.js
+          sed -i "s|__ANTHROPIC_API_KEY__|$EFF_ANTHROPIC_API_KEY|g" dist/ai.php
           # SMTP fuer den Offert-Versand (ENT-192). Bleiben die Secrets ungesetzt,
           # steht weiterhin woertlich "__SMTP_HOST__" usw. in dist/mailer.php --
           # smtp_konfiguriert() erkennt das und meldet "nicht eingerichtet",
-          # statt mit einem Platzhalter als Hostnamen zu verbinden.
-          sed -i "s|__SMTP_HOST__|${{ secrets.SMTP_HOST }}|g" dist/mailer.php
-          sed -i "s|__SMTP_PORT__|${{ secrets.SMTP_PORT }}|g" dist/mailer.php
-          sed -i "s|__SMTP_VERSCHLUESSELUNG__|${{ secrets.SMTP_VERSCHLUESSELUNG }}|g" dist/mailer.php
-          sed -i "s|__SMTP_USER__|${{ secrets.SMTP_USER }}|g" dist/mailer.php
-          sed -i "s|__SMTP_PASSWORD__|${{ secrets.SMTP_PASSWORD }}|g" dist/mailer.php
-          sed -i "s|__SMTP_ABSENDER__|${{ secrets.SMTP_ABSENDER }}|g" dist/mailer.php
-          sed -i "s|__SMTP_ABSENDER_NAME__|${{ secrets.SMTP_ABSENDER_NAME }}|g" dist/mailer.php
-          # Staging-Mailmodus (ENT-341): Ausserhalb der Produktionsdomain
-          # leitet mailer.php JEDE Mail auf diese Adresse um. Bleibt das
-          # Secret in einer Umgebung ungesetzt, steht weiterhin woertlich
-          # "__STAGING_TESTMAIL__" in dist/mailer.php -- smtp_ziel() erkennt
-          # das (gleiche Absicherung wie bei den SMTP-Secrets oben) und
-          # smtp_senden() bricht dann ab, statt irgendwohin zu senden.
-          sed -i "s|__STAGING_TESTMAIL__|${{ secrets.STAGING_TESTMAIL }}|g" dist/mailer.php
+          # statt mit einem Platzhalter als Hostnamen zu verbinden. Staging hat
+          # seit der Verschaerfung von ENT-341 ein EIGENES Postfach
+          # (STAGING_SMTP_*) statt des produktiven -- die Umleitung auf
+          # STAGING_TESTMAIL bleibt trotzdem zusaetzlich und unveraendert
+          # bestehen, siehe unten.
+          sed -i "s|__SMTP_HOST__|$EFF_SMTP_HOST|g" dist/mailer.php
+          sed -i "s|__SMTP_PORT__|$EFF_SMTP_PORT|g" dist/mailer.php
+          sed -i "s|__SMTP_VERSCHLUESSELUNG__|$EFF_SMTP_VERSCHLUESSELUNG|g" dist/mailer.php
+          sed -i "s|__SMTP_USER__|$EFF_SMTP_USER|g" dist/mailer.php
+          sed -i "s|__SMTP_PASSWORD__|$EFF_SMTP_PASSWORD|g" dist/mailer.php
+          sed -i "s|__SMTP_ABSENDER__|$EFF_SMTP_ABSENDER|g" dist/mailer.php
+          sed -i "s|__SMTP_ABSENDER_NAME__|$EFF_SMTP_ABSENDER_NAME|g" dist/mailer.php
+          # Staging-Mailmodus (ENT-341): Ausserhalb der Produktion leitet
+          # mailer.php JEDE Mail auf diese Adresse um -- unabhaengig davon,
+          # ueber welches Postfach (siehe SMTP_* oben) sie verschickt wird.
+          # Bleibt das Secret in einer Umgebung ungesetzt, steht weiterhin
+          # woertlich "__STAGING_TESTMAIL__" in dist/mailer.php -- smtp_ziel()
+          # erkennt das und smtp_senden() bricht dann ab, statt irgendwohin
+          # zu senden. Fuer main ist EFF_STAGING_TESTMAIL bewusst leer, das
+          # ist unschaedlich: ist_produktion() ist dort wahr, smtp_ziel()
+          # fragt die Testadresse in diesem Zweig gar nicht erst ab.
+          sed -i "s|__STAGING_TESTMAIL__|$EFF_STAGING_TESTMAIL|g" dist/mailer.php
           # Google-Maps-Browserschluessel (ENT-341): eigener Schluessel je
           # Umgebung, in BEIDEN Oberflaechen, die die Karte laden.
-          sed -i "s|__MAPS_JS_KEY__|${{ secrets.MAPS_JS_KEY }}|g" dist/dashboard.html
-          sed -i "s|__MAPS_JS_KEY__|${{ secrets.MAPS_JS_KEY }}|g" dist/app.html
+          sed -i "s|__MAPS_JS_KEY__|$EFF_MAPS_JS_KEY|g" dist/dashboard.html
+          sed -i "s|__MAPS_JS_KEY__|$EFF_MAPS_JS_KEY|g" dist/app.html
 
       - name: Nach Hostpoint hochladen (FTPS)
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
-          server: ${{ secrets.HOSTPOINT_FTP_HOST }}
-          username: ${{ secrets.HOSTPOINT_FTP_USER }}
-          password: ${{ secrets.HOSTPOINT_FTP_PASSWORD }}
+          server: ${{ env.EFF_HOSTPOINT_FTP_HOST }}
+          username: ${{ env.EFF_HOSTPOINT_FTP_USER }}
+          password: ${{ env.EFF_HOSTPOINT_FTP_PASSWORD }}
           protocol: ftps
           local-dir: ./dist/
           # Sowohl der produktive FTP-Account (rapport@itufeden.myhostpoint.ch,
@@ -142,6 +303,7 @@ jobs:
           # separate Staging-Account (ENT-341, auf sein eigenes Verzeichnis
           # eingeschraenkt) sind bereits von Hostpoint auf ihr jeweiliges
           # Verzeichnis begrenzt -- daher hier immer nur "/", nicht der volle
-          # Pfad. Welcher Account tatsaechlich verwendet wird, entscheiden die
-          # Secrets des aktiven Environments oben, nicht diese Zeile.
+          # Pfad. Welcher Account tatsaechlich verwendet wird, entscheidet
+          # ausschliesslich der vorige Schritt (EFF_HOSTPOINT_FTP_*), nicht
+          # diese Zeile.
           server-dir: /

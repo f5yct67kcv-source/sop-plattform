@@ -107,6 +107,42 @@ for (const seite of seiten) {
 // Lesen zu überlassen.
 check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.test(workflow));
 
+// ── Staging darf niemals auf Production-Secrets zurückfallen (ENT-341,
+// verschärft auf Wunsch des Projektinhabers) ──────────────────────────────
+//
+// Warum diese Prüfung: GitHub fällt bei einem fehlenden Environment-Secret
+// still auf ein gleichnamiges Repository-Secret zurück. Die einzige
+// strukturelle Absicherung dagegen sind DISJUNKTE Secret-Namen für Staging
+// (STAGING_DB_HOST statt DB_HOST) -- eine Konfigurationsdisziplin ("beide
+// Environments sauber trennen") wäre keine Prüfung, sondern eine Hoffnung.
+// Geprüft wird die AUSSAGE ("es gibt keinen Namen, den beide Umgebungen
+// teilen"), nicht der Wortlaut einer einzelnen Zeile.
+{
+  const pflichtNamen = ['DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASSWORD',
+    'HOSTPOINT_FTP_HOST', 'HOSTPOINT_FTP_USER', 'HOSTPOINT_FTP_PASSWORD'];
+  const geteilteNamen = pflichtNamen.filter(n =>
+    new RegExp(`secrets\\.${n}\\b`).test(workflow) && !new RegExp(`secrets\\.STAGING_${n}\\b`).test(workflow));
+  check('KRITISCH: jedes Produktions-Secret hat ein eigenes STAGING_-Gegenstück im Workflow',
+    geteilteNamen.length === 0);
+  if (geteilteNamen.length) { bad.push('ohne STAGING_-Gegenstück: ' + geteilteNamen.join(', ')); }
+
+  // Gegenprobe der Aussage selbst: Ein Muster, das nur auf den Wortlaut prüft
+  // ("STAGING_" kommt irgendwo vor), würde grün bleiben, auch wenn die
+  // FTP-Zugangsdaten wieder direkt aus "secrets." kämen. Deshalb zusätzlich:
+  // Der FTP-Deploy-Schritt selbst darf NICHT direkt auf "secrets.HOSTPOINT_FTP_*"
+  // zeigen, sondern nur auf die zuvor aufgelösten env.EFF_*-Werte -- das ist
+  // die Stelle, die bei einer versehentlichen Rückumstellung tatsächlich
+  // Schaden anrichten würde.
+  check('KRITISCH: der FTP-Upload verwendet die aufgelösten EFF_*-Werte, nicht direkt secrets.HOSTPOINT_FTP_*',
+    /server:\s*\$\{\{\s*env\.EFF_HOSTPOINT_FTP_HOST\s*\}\}/.test(workflow)
+    && !/server:\s*\$\{\{\s*secrets\.HOSTPOINT_FTP_HOST\s*\}\}/.test(workflow));
+
+  // Ein fehlendes Pflicht-Secret muss den Lauf abbrechen -- sonst deployt
+  // der Workflow mit leeren Platzhaltern weiter, unbemerkt.
+  check('KRITISCH: der Workflow bricht bei fehlendem Pflicht-Secret ab (exit 1)',
+    /PFLICHT_FEHLT/.test(workflow) && /exit 1/.test(workflow));
+}
+
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
 console.log('Alle Pruefungen bestanden.');
