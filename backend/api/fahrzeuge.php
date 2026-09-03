@@ -20,6 +20,10 @@
 declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../rechte.php';
+// Jede Aenderung am Fahrzeug wird protokolliert (ENT-330). Das Logbuch gab es
+// seit ENT-077; es war allgemein gebaut, aber nur an der Personalakte
+// angeschlossen -- hier kommt der zweite Bereich dazu.
+require_once __DIR__ . '/../logbuch.php';
 
 $user = require_session();
 // Lesen darf, wer plant ODER den Betrieb einrichtet. Heute traegt die
@@ -118,7 +122,17 @@ if (!empty($in['loeschen'])) {
                 . '„Ausser Betrieb“ — dann bleibt nachvollziehbar, womit gefahren wurde.'], 409);
         }
     }
+    // Vor dem Loeschen lesen: Danach gibt es das Kennzeichen nicht mehr, und
+    // ein Verlaufseintrag "Fahrzeug 7 geloescht" waere unlesbar.
+    $weg = $pdo->prepare('SELECT kennzeichen FROM fahrzeuge WHERE id = ?');
+    $weg->execute([$id]);
+    $wegKz = (string)($weg->fetchColumn() ?: ('#' . $id));
+
     $pdo->prepare('DELETE FROM fahrzeuge WHERE id = ?')->execute([$id]);
+    // Der Eintrag bleibt stehen, obwohl der Datensatz weg ist -- sonst
+    // verschwaende ein geloeschtes Fahrzeug spurlos, und genau das soll ein
+    // Logbuch verhindern.
+    logbuch_schreiben($pdo, $user, 'fahrzeug', $id, 'geloescht', $wegKz, null);
     json_response(['status' => 'ok', 'eingerichtet' => true, 'fahrzeuge' => fz_lesen($pdo)]);
 }
 
@@ -239,14 +253,36 @@ if ($doppelt->fetchColumn()) {
 
 $spalten = array_keys($werte);
 if ($id > 0) {
+    // Der Stand VOR dem Schreiben -- nur die Spalten, die hier gesetzt werden.
+    // logbuch_vergleichen() schreibt daraus je Unterschied eine Zeile.
+    $vorstmt = $pdo->prepare('SELECT ' . implode(', ', $spalten) . ' FROM fahrzeuge WHERE id = ?');
+    $vorstmt->execute([$id]);
+    $vorher = $vorstmt->fetch(PDO::FETCH_ASSOC) ?: [];
+
     $satz = implode(', ', array_map(fn($s) => "$s = ?", $spalten));
     $stmt = $pdo->prepare("UPDATE fahrzeuge SET $satz WHERE id = ?");
     $stmt->execute([...array_values($werte), $id]);
+
+    // Nach dem Schreiben, nicht davor: Scheitert das UPDATE, steht auch
+    // nichts im Verlauf. Ein Protokoll, das Aenderungen behauptet, die es
+    // nicht gab, ist schlimmer als keines.
+    if ($vorher) { logbuch_vergleichen($pdo, $user, 'fahrzeug', $id, $vorher, $werte); }
 } else {
     $platz = implode(', ', array_fill(0, count($spalten), '?'));
     $stmt = $pdo->prepare('INSERT INTO fahrzeuge (' . implode(', ', $spalten) . ") VALUES ($platz)");
     $stmt->execute(array_values($werte));
     $id = (int)$pdo->lastInsertId();
+    // Dasselbe Muster wie bei der Personalakte (mitarbeiter_create.php): EIN
+    // Eintrag "angelegt" statt zwanzig Zeilen fuer zwanzig Felder. Ein
+    // frisch angelegtes Fahrzeug hat keine Vorgeschichte, gegen die sich
+    // etwas vergleichen liesse.
+    logbuch_schreiben($pdo, $user, 'fahrzeug', $id, 'angelegt', null, $kennzeichen);
+    // Steht beim Anlegen schon ein Kilometerstand da, wird er EIGENS
+    // festgehalten: An ihm haengt die spaetere Kontrolle, und "irgendwann
+    // beim Anlegen" waere dafuer zu ungenau.
+    if ($tachoKm !== null) {
+        logbuch_schreiben($pdo, $user, 'fahrzeug', $id, 'tacho_km', null, (string)$tachoKm);
+    }
 }
 
 json_response(['status' => 'ok', 'id' => $id, 'eingerichtet' => true, 'fahrzeuge' => fz_lesen($pdo)]);

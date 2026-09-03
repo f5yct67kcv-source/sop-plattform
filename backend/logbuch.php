@@ -35,7 +35,13 @@
 // niemand bestellt hat.
 declare(strict_types=1);
 
-const LOGBUCH_BEREICHE = ['mitarbeiter'];
+// 'fahrzeug' seit ENT-330: genau der Fall, fuer den die Tabelle allgemein
+// gebaut wurde (siehe letzter Absatz oben). Der Projektinhaber: *"Wichtig ist
+// beim Erfassen und Erstellen des Dienstfahrzeugs und beim Eintragen der
+// Kilometerstand, dass dies mit einem Logeintrag registriert wird."* Am
+// Kilometerstand haengt spaeter die Kontrolle gefahrener Strecken -- eine
+// Zahl, die sich spurlos aendern laesst, traegt keine Kontrolle.
+const LOGBUCH_BEREICHE = ['mitarbeiter', 'fahrzeug'];
 
 function logbuch_tabelle_da(PDO $pdo): bool
 {

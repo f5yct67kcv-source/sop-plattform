@@ -5973,11 +5973,29 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
                 <input class="inp" id="fzTachoAm" type="date">
                 <div class="f-hint">Pflicht, sobald ein Kilometerstand dasteht. Ohne den Tag,
                 an dem abgelesen wurde, ist die Zahl nicht beurteilbar.</div></div>
+              <!-- Wer den Kilometerstand zuletzt angefasst hat (ENT-330) — genau
+                   hier verlangt, nicht irgendwo am Seitenende: An dieser Zahl
+                   hängt die spätere Kontrolle gefahrener Strecken.
+                   „Abgelesen am" (oben) und „geändert am" (hier) sind zwei
+                   verschiedene Dinge und stehen darum getrennt: das eine ist
+                   eine fachliche Angabe des Menschen, das andere ein
+                   Zeitstempel des Systems. -->
+              <div class="f wide"><div class="f-hint" id="fzTachoLog"></div></div>
             </div>
 
             <div class="form-grid">
               <div class="f wide"><label for="fzBemerkung">Bemerkung</label>
                 <textarea class="inp" id="fzBemerkung" rows="3" maxlength="2000"></textarea></div>
+            </div>
+
+            <!-- Änderungsverlauf (ENT-330). Dasselbe Logbuch wie bei der
+                 Personalakte (ENT-077), nur ein zweiter Bereich darin — keine
+                 zweite Protokollführung daneben. Steht am Ende des Formulars:
+                 Es ist Nachschlagewerk, nicht Eingabe. -->
+            <div class="zone" id="fzVerlaufZone" style="margin-top:18px;display:none">
+              <div class="zone-hd">Änderungsverlauf</div>
+              <div class="zone-note" id="fzVerlaufKopf"></div>
+              <div id="fzVerlauf"></div>
             </div>
 
             <div style="display:flex;gap:10px;margin-top:12px">
@@ -16007,6 +16025,104 @@ function fzListeZeichnen() {
   }).join('') + `</tbody></table></div>`;
 }
 
+// ── Änderungsverlauf eines Fahrzeugs (ENT-330) ──────────────────────────
+//
+// Vom Projektinhaber verlangt: *„dass dies mit einem Logeintrag registriert
+// wird […] am besten zusätzlich auch auf der Seite vermerkt mit Datum und
+// Zeitstempel Person"*. Beides kommt aus DERSELBEN Quelle -- dem Logbuch aus
+// ENT-077. Eine zweite Spalte „zuletzt geaendert von" am Fahrzeug waere ein
+// zweiter Ort, an dem dieselbe Tatsache steht und veralten kann.
+let fzLog = null;          // null = noch nicht geholt, [] = nichts vorhanden
+let fzLogEingerichtet = true;
+let fzLogFuer = null;      // zu welchem Fahrzeug gehoert der Stand?
+
+// Die Feldnamen der Datenbank sind fuer den Verlauf unlesbar. Dieselben
+// Beschriftungen wie im Formular darueber -- steht im Verlauf ein anderes
+// Wort als am Feld, sucht man das Feld vergeblich.
+const FZ_FELD_TEXT = {
+  angelegt: 'Fahrzeug angelegt', geloescht: 'Fahrzeug gelöscht',
+  kennzeichen: 'Kontrollschild', bezeichnung: 'Interne Bezeichnung',
+  marke: 'Marke', modell: 'Modell', art: 'Fahrzeugart', treibstoff: 'Treibstoff',
+  farbe: 'Farbe', stammnummer: 'Stammnummer', fahrgestellnummer: 'Fahrgestellnummer',
+  erstzulassung: 'Erstzulassung', besitzart: 'Halterschaft', besitz_bis: 'Vertrag läuft bis',
+  standort_id: 'Standort', status: 'Zustand', ausser_betrieb_grund: 'Grund',
+  mfk_naechste: 'Nächste MFK', vignette_jahr: 'Vignette für das Jahr',
+  versicherung: 'Versicherung', police_nr: 'Policen-Nummer',
+  service_naechster: 'Nächster Service', service_naechste_km: 'Nächster Service bei km',
+  tacho_km: 'Kilometerstand', tacho_am: 'Abgelesen am', bemerkung: 'Bemerkung',
+};
+
+// Ein leerer Wert heisst „stand nichts da" -- nicht „0" und nicht nichts.
+const fzLogWert = w => (w === null || w === '') ? '—' : esc(String(w));
+
+function fzLogLaden(id) {
+  fzLog = null; fzLogFuer = id;
+  return api('fahrzeug_logbuch.php?fahrzeug_id=' + encodeURIComponent(id)).then(({ ok, data }) => {
+    // Nur uebernehmen, wenn inzwischen nicht ein anderes Fahrzeug geoeffnet
+    // wurde -- sonst zeigt die Karte den Verlauf des vorigen.
+    if (fzLogFuer !== id) { return; }
+    if (!ok || data.status !== 'ok') { fzLog = []; fzLogEingerichtet = true; return; }
+    fzLog = data.eintraege || [];
+    fzLogEingerichtet = data.eingerichtet !== false;
+  }).catch(() => { if (fzLogFuer === id) { fzLog = []; } });
+}
+
+function fzLogZeichnen() {
+  const zone = $('fzVerlaufZone'), kopf = $('fzVerlaufKopf'),
+        liste = $('fzVerlauf'), tacho = $('fzTachoLog');
+  if (!zone || !kopf || !liste || !tacho) { return; }
+
+  // Neues Fahrzeug: Es gibt noch nichts zu zeigen, und „nie geaendert" waere
+  // die falsche Aussage -- es existiert noch gar nicht.
+  if (!fzTarget) {
+    zone.style.display = 'none';
+    tacho.textContent = 'Wer den Kilometerstand einträgt, wird beim Speichern festgehalten.';
+    return;
+  }
+  zone.style.display = '';
+
+  if (fzLog === null) {
+    kopf.textContent = 'Verlauf wird geladen …';
+    liste.innerHTML = ''; tacho.textContent = '';
+    return;
+  }
+  // Vier verschiedene Aussagen, vier Texte: Logbuch nicht eingerichtet /
+  // eingerichtet, aber nichts geändert / geändert / der Kilometerstand
+  // eigens. „Nicht eingerichtet" darf nie wie „nichts passiert" aussehen.
+  if (!fzLogEingerichtet) {
+    kopf.textContent = 'Das Logbuch ist noch nicht eingerichtet — darum steht hier kein Verlauf. '
+      + 'Das ist etwas anderes als „an diesem Fahrzeug wurde nichts geändert".';
+    liste.innerHTML = '';
+    tacho.textContent = 'Ohne eingerichtetes Logbuch lässt sich nicht sagen, wer den Kilometerstand zuletzt geändert hat.';
+    return;
+  }
+
+  const wer = e => `${dmyZeit(e.zeitpunkt)} — ${esc(e.akteur_anzeige || e.akteur_name || '?')}`;
+  const letzte = fzLog[0] || null;
+  kopf.textContent = letzte
+    ? 'Zuletzt geändert: ' + dmyZeit(letzte.zeitpunkt) + ' — ' + (letzte.akteur_anzeige || letzte.akteur_name || '?')
+    : 'Seit der Einrichtung des Logbuchs wurde an diesem Fahrzeug nichts geändert.';
+
+  // Der Kilometerstand eigens -- an ihm hängt die spätere Kontrolle.
+  const letzteKm = fzLog.find(e => e.feld === 'tacho_km');
+  tacho.innerHTML = letzteKm
+    ? `<b>Kilometerstand zuletzt geändert:</b> ${wer(letzteKm)}`
+      + (letzteKm.wert_alt !== null && letzteKm.wert_alt !== ''
+          ? ` (${fzLogWert(letzteKm.wert_alt)} → ${fzLogWert(letzteKm.wert_neu)})` : '')
+    : 'Der Kilometerstand wurde seit der Einrichtung des Logbuchs nicht geändert.';
+
+  if (!fzLog.length) { liste.innerHTML = ''; return; }
+  liste.innerHTML = `<div class="tw"><table class="tbl"><thead><tr>
+      <th>Wann</th><th>Wer</th><th>Was</th><th>Von</th><th>Auf</th>
+    </tr></thead><tbody>` + fzLog.map(e => `<tr>
+      <td class="nowrap">${dmyZeit(e.zeitpunkt)}</td>
+      <td>${esc(e.akteur_anzeige || e.akteur_name || '?')}</td>
+      <td>${esc(FZ_FELD_TEXT[e.feld] || e.feld)}</td>
+      <td>${e.werte_verborgen ? '<span style="color:var(--ink-3)">nicht protokolliert</span>' : fzLogWert(e.wert_alt)}</td>
+      <td>${e.werte_verborgen ? '<span style="color:var(--ink-3)">nicht protokolliert</span>' : fzLogWert(e.wert_neu)}</td>
+    </tr>`).join('') + `</tbody></table></div>`;
+}
+
 function fzFormularLeeren() {
   fzTarget = null;
   fzFehler('');
@@ -16020,6 +16136,8 @@ function fzFormularLeeren() {
   if ($('fzStandort')) { $('fzStandort').value = ''; }
   if ($('fzBtn')) { $('fzBtn').textContent = 'Hinzufügen'; }
   fzZustandFelder();
+  fzLog = null; fzLogFuer = null;
+  fzLogZeichnen();
 }
 
 function fzBearbeiten(id) {
@@ -16053,6 +16171,8 @@ function fzBearbeiten(id) {
   $('fzBemerkung').value = f.bemerkung || '';
   $('fzBtn').textContent = 'Speichern';
   fzZustandFelder();
+  fzLogZeichnen();                                   // zeigt sofort „wird geladen …"
+  fzLogLaden(f.id).then(() => fzLogZeichnen());
   $('fzKennzeichen').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
