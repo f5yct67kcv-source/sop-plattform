@@ -733,6 +733,8 @@ svg.i-sm { width: 17px; height: 17px; }
   color: var(--accent); display: inline-flex; align-items: center; justify-content: center; flex: none; }
 .mk-kachel-ic svg.i { width: 28px; height: 28px; }
 .mk-kachel-lbl { font-size: 13.5px; font-weight: 600; line-height: 1.35; }
+.mk-kachel-txt { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.mk-kachel-sub { font-size: 11.5px; font-weight: 650; color: var(--accent); }
 
 /* ── Unterreiter (ENT-234: Plan + Sperren in einem Reiter). Gleiche
    Trefferflaeche wie ein Hauptreiter (44px), aber schmaler und ohne
@@ -988,6 +990,7 @@ const W = {
     fzuFremdBestaetigen: 'Trotzdem übernehmen',
     // "Aktuell bei dir" -- die eigene Maske (ENT-354).
     fzuAktivLabel: 'Aktuell bei dir', fzuAktivSeit: 'übernommen am',
+    fzuKachelAktiv: 'Aktiv: {kennzeichen}',
     fzuWeiteresFahrzeug: 'Weiteres Fahrzeug erfassen', fzuAbgeben: 'Fahrzeug abgeben',
     fzuAbgabeGespeichert: 'Abgabe erfasst.',
     route: 'Route öffnen', routeFehlt: 'Für diese Schicht ist keine Adresse hinterlegt.',
@@ -1849,17 +1852,40 @@ function zeichneWaechter() {
     <div class="mk-grid">
       <button type="button" id="mk-rundgang" class="mk-kachel" onclick="rundgangUebersichtOeffnen()">
         <span class="mk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M12 19h4a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2H8a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h4"/></svg></span>
-        <span class="mk-kachel-lbl">${esc(w('waechterRundgangLbl'))}</span>
+        <span class="mk-kachel-txt"><span class="mk-kachel-lbl">${esc(w('waechterRundgangLbl'))}</span></span>
       </button>
       <button type="button" id="mk-fahrzeug" class="mk-kachel" onclick="fzuOeffnen()">
         <span class="mk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><path d="M5 17H3v-5l2-5h14l2 5v5h-2"/><circle cx="7.5" cy="17" r="2"/><circle cx="16.5" cy="17" r="2"/><line x1="9.5" y1="17" x2="14.5" y2="17"/></svg></span>
-        <span class="mk-kachel-lbl">${esc(w('fzuKachel'))}</span>
+        <span class="mk-kachel-txt" id="mk-fahrzeug-txt"><span class="mk-kachel-lbl">${esc(w('fzuKachel'))}</span></span>
       </button>
       <button type="button" id="mk-schluessel" class="mk-kachel" onclick="toast('Folgt in einem späteren Schritt.')">
         <span class="mk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><circle cx="7" cy="15" r="4"/><line x1="10" y1="12" x2="20" y2="2"/><line x1="15" y1="7" x2="18" y2="10"/><line x1="18" y1="4" x2="21" y2="7"/></svg></span>
-        <span class="mk-kachel-lbl">${esc(w('waechterSchluesselLbl'))}</span>
+        <span class="mk-kachel-txt"><span class="mk-kachel-lbl">${esc(w('waechterSchluesselLbl'))}</span></span>
       </button>
     </div>`;
+  fzuKachelHinweisZeigen();
+}
+
+// Der Hinweis "Aktiv: …" auf der Kachel selbst (Rückmeldung nach ENT-354:
+// "kein Hinweis, dass eine Übernahme stattgefunden hat"). Braucht einen
+// eigenen Datenabruf, weil die Kachel vorher nie etwas lud -- bewusst erst
+// NACH dem synchronen Grundgerüst in zeichneWaechter(), damit das Öffnen
+// des Bereichs nicht auf das Netz wartet.
+//
+// BEWUSST NICHT über fzuLaden(): Diese Funktion würde fzuFahrzeuge,
+// fzuHeuteBeantwortet und fzuEingerichtet gleich mit überschreiben -- Felder,
+// von denen der tägliche Riegel (fzuTor) abhängt. Ein zusätzlicher,
+// beiläufiger Abruf beim blossen Öffnen des Wächter-Bereichs darf den
+// bereits bekannten Riegel-Stand nicht überschreiben; er braucht nur EIN
+// Feld aus derselben Antwort und liest darum isoliert.
+function fzuKachelHinweisZeigen() {
+  api('meine_fahrzeuge.php').then(({ ok, data }) => {
+    if (!ok || !data || data.status !== 'ok' || !data.mein_aktives_fahrzeug) return;
+    const ziel = $('mk-fahrzeug-txt');
+    if (!ziel || ziel.querySelector('.mk-kachel-sub')) return;
+    ziel.insertAdjacentHTML('beforeend', `<span class="mk-kachel-sub">${esc(w('fzuKachelAktiv')
+      .replace('{kennzeichen}', data.mein_aktives_fahrzeug.kennzeichen || ''))}</span>`);
+  });
 }
 
 /* ══ FAHRZEUGÜBERNAHME (ENT-340) ═══════════════════════════════════════
