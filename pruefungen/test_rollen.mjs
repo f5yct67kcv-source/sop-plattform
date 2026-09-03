@@ -121,7 +121,16 @@ try {
   // Die Oberflaeche spiegelt den Katalog aus rechte.php. Laufen die beiden
   // auseinander, verspricht ein Kaestchen etwas anderes, als der Server tut.
   const phpRollen = [...php.matchAll(/^const ROLLE_\w+\s*=\s*'([a-z]+)';/gm)].map(m => m[1]);
-  const jsRollen  = [...html.matchAll(/^  \['([a-z]+)', '[^']+',$/gm)].map(m => m[1]);
+  // Nur INNERHALB von "const ROLLEN = [ ... ];" suchen, nicht im ganzen
+  // Dokument (ENT-325): Das Muster "zwei Leerzeichen, ['kennung', 'Text',"
+  // ist nicht den Rollen vorbehalten. Es traf beim Umbau der
+  // Arbeitsergebnisse auch AE_REITER -- die Suite meldete daraufhin
+  // "Wachbuch" als unbekannte Rolle, obwohl am Rollen-Katalog nichts
+  // geaendert war. Eine Pruefung, die an einer ganz anderen Aenderung
+  // anschlaegt, sagt nichts mehr ueber ihre eigene Aussage aus.
+  const rollenBlock = (html.match(/^const ROLLEN = \[$([\s\S]*?)^\];$/m) || [, ''])[1];
+  const jsRollen  = [...rollenBlock.matchAll(/^  \['([a-z]+)', '[^']+',$/gm)].map(m => m[1]);
+  check('Der Rollen-Katalog der Oberflaeche ist ueberhaupt auffindbar', jsRollen.length > 0);
   // Waechtersystem (ENT-169/ENT-180) steckt serverseitig schon immer im
   // selben Rollen-Katalog wie die anderen vier. Bis ENT-285 stand sie in
   // der Oberflaeche trotzdem in einem eigenen Reiter (mdtab-waechter,
