@@ -209,6 +209,51 @@ function rundgang_ansprechpartner(PDO $pdo, int $objektId, ?int $kundeId,
 }
 
 // Eigene Pikett-/Zentralnummer (ENT-299), ebenfalls fuer beide Wege.
+/* Darf diese Person in den Revierdienst-Bereich? (ENT-338)
+ *
+ * EINE Stelle fuer vier Endpunkte (Rundgaenge-Uebersicht, Vorschau einer
+ * Runde, spontaner Start, Ereignismeldung). Vorher stand in jedem dieselbe
+ * Abfrage von Hand -- und alle vier fragten das FALSCHE:
+ *
+ *   "War diese Person jemals einem Objekt mit aktiven Kontrollpunkten
+ *    zugeteilt?"
+ *
+ * Diese Herleitung hat ENT-284 abgeloest. Seither entscheidet das bewusst
+ * von Personal/Verwaltung gesetzte Merkmal `mitarbeiter.revierdienst_
+ * berechtigt`, und die "jemals zugeteilt"-Abfrage war nur noch die
+ * einmalige Migration, die dieses Merkmal befuellt hat. In app.html wurde
+ * das nachgezogen (waechterSichtbar()), serverseitig nicht -- die Kommentare
+ * in den vier Endpunkten behaupteten sogar, sie fragten dasselbe wie
+ * waechterSichtbar(). Taten sie nicht.
+ *
+ * Folge im Betrieb, vom Projektinhaber gemeldet: Ein frisch angelegter,
+ * in der Personalakte freigegebener Waechter sah den Reiter, bekam von
+ * jedem dieser Endpunkte aber 403 -- also genau den Konflikt, gegen den
+ * ENT-284 gebaut wurde, eine Ebene tiefer.
+ *
+ * Fehlt die Spalte (Einrichtung noch nicht gelaufen), gilt weiterhin die
+ * alte Herleitung. Sonst wuerde ein nicht migrierter Bestand alle
+ * aussperren -- eine Zugriffsaenderung darf nie an einer fehlenden
+ * Migration haengen.
+ */
+function revierdienst_zugang(PDO $pdo, int $mitarbeiterId): bool
+{
+    if (hat_spalte($pdo, 'mitarbeiter', 'revierdienst_berechtigt')) {
+        $st = $pdo->prepare('SELECT revierdienst_berechtigt FROM mitarbeiter WHERE id = ?');
+        $st->execute([$mitarbeiterId]);
+        $wert = $st->fetchColumn();
+        return $wert !== false && (int)$wert === 1;
+    }
+    $st = $pdo->prepare(
+        'SELECT COUNT(*) FROM einsatz_zuteilung z
+          JOIN einsaetze e ON e.id = z.einsatz_id
+          JOIN kontrollpunkt k ON k.objekt_id = e.objekt_id AND k.aktiv = 1
+         WHERE z.mitarbeiter_id = ?'
+    );
+    $st->execute([$mitarbeiterId]);
+    return (int)$st->fetchColumn() > 0;
+}
+
 function rundgang_zentrale(PDO $pdo): ?array
 {
     try {
