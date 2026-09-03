@@ -311,7 +311,7 @@ await oeffne(71);
 const kopf71 = (await page.textContent('#epKopf')).replace(/\s+/g, ' ');
 check('KRITISCH: der Einsatzplan zeigt Dienstfahrzeug und Fahrer',
   /Dienstfahrzeug und Verkehrsmittel/.test(kopf71));
-// ENT-330: Fahrzeugwahl und Verkehrsmittel standen als ZWEI Karten
+// ENT-334: Fahrzeugwahl und Verkehrsmittel standen als ZWEI Karten
 // untereinander und erzaehlten dasselbe -- vom Projektinhaber als Dopplung
 // beanstandet. Genau EIN Block, sonst waechst sie wieder nach.
 check('KRITISCH: es ist EIN Block, nicht zwei nebeneinander',
@@ -386,7 +386,7 @@ check('KRITISCH: Handy: es hat mindestens 16 px Schrift — darunter zoomt iOS h
 check('KRITISCH: Handy: die Ansicht laeuft nicht ueber den Bildschirmrand hinaus', !masse.breiter);
 
 // ══════════════════════════════════════════════════════════════════════════
-// TEIL 4 — Die Mitarbeiter-App (ENT-330)
+// TEIL 4 — Die Mitarbeiter-App (ENT-334)
 //
 // Der Projektinhaber: *„Der MA muss in der APP in der geplanten Schicht sein
 // Dienstfahrzeug sehen, dass er verwenden muss."* Der mobile Zuschnitt war

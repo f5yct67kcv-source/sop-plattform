@@ -25,7 +25,7 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $bis)) {
     $bis = date('Y-m-d', strtotime('+90 days'));
 }
 
-// Dienstfahrzeug der Schicht (ENT-330). Nur, wenn die Einrichtung gelaufen
+// Dienstfahrzeug der Schicht (ENT-334). Nur, wenn die Einrichtung gelaufen
 // ist -- eine fehlende Spalte in einem SELECT ist ein Fehler, kein leeres
 // Feld, und die App wuerde dann GAR KEINE Schichten mehr anzeigen.
 $hatFahrzeug = hat_spalte(db(), 'einsaetze', 'fahrzeug_id') && hat_tabelle(db(), 'fahrzeuge');
@@ -42,7 +42,7 @@ $stmt = db()->prepare(
             e.kanton, e.veranstaltung, e.treffpunkt, e.taetigkeit, e.qualifikation,
             e.kontakt_vorname, e.kontakt_nachname, e.kontakt_telefon,
             z.zusage, z.gesehen_am, o.name AS objekt_name, e.objekt_id,'
-    // ENT-330: Welches Dienstfahrzeug fuer diese Schicht eingeteilt ist und
+    // ENT-334: Welches Dienstfahrzeug fuer diese Schicht eingeteilt ist und
     // WER es fuehrt. Der Projektinhaber: *"Der MA muss in der APP in der
     // geplanten Schicht sein Dienstfahrzeug sehen, dass er verwenden muss."*
     // Die fahrer_id geht NICHT hinaus (dieser Endpunkt gibt grundsaetzlich
@@ -155,7 +155,7 @@ if ($schichten) {
     }
 }
 foreach ($schichten as &$s) {
-    // ENT-330. Ein Teilobjekt statt fuenf loser Felder -- und die Rohfelder
+    // ENT-334. Ein Teilobjekt statt fuenf loser Felder -- und die Rohfelder
     // verschwinden, damit keine Mitarbeiter-ID hinausgeht.
     if (array_key_exists('fahrzeug_kennzeichen', $s)) {
         if ($s['fahrzeug_kennzeichen'] !== null) {
