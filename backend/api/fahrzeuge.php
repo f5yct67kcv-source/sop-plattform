@@ -24,6 +24,9 @@ require_once __DIR__ . '/../rechte.php';
 // seit ENT-077; es war allgemein gebaut, aber nur an der Personalakte
 // angeschlossen -- hier kommt der zweite Bereich dazu.
 require_once __DIR__ . '/../logbuch.php';
+// Aufkleber-Schluessel (ENT-335) -- dieselbe Erzeugung wie beim Einrichten,
+// nicht eine zweite daneben.
+require_once __DIR__ . '/../fahrzeug.php';
 
 $user = require_session();
 // Lesen darf, wer plant ODER den Betrieb einrichtet. Heute traegt die
@@ -52,15 +55,21 @@ function fz_datum(?string $wert): ?string
     return preg_match('/^\d{4}-\d{2}-\d{2}$/', $wert) ? $wert : null;
 }
 
-function fz_lesen(PDO $pdo): array
+// Der Aufkleber-Schlüssel geht NUR an die Verwaltung, nie an alle, die
+// planen dürfen (ENT-335). Er ist das einzige, was eine Übernahme daran
+// bindet, dass jemand vor dem Fahrzeug stand: Wer ihn kennt, kann eine
+// Übernahme buchen, ohne je im Auto gesessen zu haben. Gebraucht wird er
+// genau einmal -- zum Drucken des Aufklebers.
+function fz_lesen(PDO $pdo, bool $mitKennung = false): array
 {
+    $kennung = $mitKennung && hat_spalte($pdo, 'fahrzeuge', 'qr_kennung') ? ', f.qr_kennung' : '';
     $rows = $pdo->query(
         'SELECT f.id, f.kennzeichen, f.bezeichnung, f.marke, f.modell, f.art, f.treibstoff,
                 f.farbe, f.stammnummer, f.fahrgestellnummer, f.erstzulassung, f.besitzart,
                 f.besitz_bis, f.standort_id, f.status, f.ausser_betrieb_grund, f.mfk_naechste,
                 f.vignette_jahr, f.versicherung, f.police_nr, f.service_naechster,
                 f.service_naechste_km, f.tacho_km, f.tacho_am, f.bemerkung,
-                o.bezeichnung AS standort_name
+                o.bezeichnung AS standort_name' . $kennung . '
          FROM fahrzeuge f
          LEFT JOIN anstellungsorte o ON o.id = f.standort_id
          ORDER BY f.status = \'verkauft\', f.kennzeichen'
@@ -91,7 +100,7 @@ if (!hat_tabelle($pdo, 'fahrzeuge')) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    json_response(['status' => 'ok', 'eingerichtet' => true, 'fahrzeuge' => fz_lesen($pdo)]);
+    json_response(['status' => 'ok', 'eingerichtet' => true, 'fahrzeuge' => fz_lesen($pdo, darf($user, 'betrieb'))]);
 }
 
 require_recht($user, 'betrieb');
@@ -133,7 +142,7 @@ if (!empty($in['loeschen'])) {
     // verschwaende ein geloeschtes Fahrzeug spurlos, und genau das soll ein
     // Logbuch verhindern.
     logbuch_schreiben($pdo, $user, 'fahrzeug', $id, 'geloescht', $wegKz, null);
-    json_response(['status' => 'ok', 'eingerichtet' => true, 'fahrzeuge' => fz_lesen($pdo)]);
+    json_response(['status' => 'ok', 'eingerichtet' => true, 'fahrzeuge' => fz_lesen($pdo, darf($user, 'betrieb'))]);
 }
 
 // Kontrollschild vereinheitlichen: Grossbuchstaben, genau ein Leerzeichen
@@ -277,6 +286,11 @@ if ($id > 0) {
     // frisch angelegtes Fahrzeug hat keine Vorgeschichte, gegen die sich
     // etwas vergleichen liesse.
     logbuch_schreiben($pdo, $user, 'fahrzeug', $id, 'angelegt', null, $kennzeichen);
+    // Aufkleber-Schluessel gleich mitgeben (ENT-335), damit kein Fahrzeug
+    // ohne dasteht. Bewusst NICHT ins Logbuch: Der Schluessel ist das
+    // Geheimnis, das den Aufkleber traegt -- er gehoert nicht in einen
+    // Verlauf, den mehr Leute lesen duerfen als ihn kennen sollen.
+    fz_kennungen_nachtragen($pdo);
     // Steht beim Anlegen schon ein Kilometerstand da, wird er EIGENS
     // festgehalten: An ihm haengt die spaetere Kontrolle, und "irgendwann
     // beim Anlegen" waere dafuer zu ungenau.
@@ -285,4 +299,4 @@ if ($id > 0) {
     }
 }
 
-json_response(['status' => 'ok', 'id' => $id, 'eingerichtet' => true, 'fahrzeuge' => fz_lesen($pdo)]);
+json_response(['status' => 'ok', 'id' => $id, 'eingerichtet' => true, 'fahrzeuge' => fz_lesen($pdo, darf($user, 'betrieb'))]);

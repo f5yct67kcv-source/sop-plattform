@@ -16144,11 +16144,110 @@ function fzListeZeichnen() {
         ? unbekannt('nie abgelesen')
         : `${nf(f.tacho_km)} km<div class="sec">${dmy(f.tacho_am)}</div>`}</td>
       <td class="nowrap">
+        <button class="btn btn-plain btn-sm" onclick="fzAufkleber(${f.id})"${f.qr_kennung ? '' : ' disabled title="Erst die Einrichtung ausführen — dann bekommt jedes Fahrzeug einen Aufkleber-Schlüssel."'}>Aufkleber</button>
         <button class="btn btn-plain btn-sm" onclick="fzBearbeiten(${f.id})">Ändern</button>
         <button class="btn btn-plain btn-sm" style="color:var(--neg)" onclick="fzLoeschen(${f.id})">Löschen</button>
       </td>
     </tr>`;
   }).join('') + `</tbody></table></div>`;
+}
+
+// ── Aufkleber für das Fahrzeug (ENT-335) ────────────────────────────────
+//
+// Die Idee des Projektinhabers: *„Im Auto ein QR anbringen, vielleicht am
+// Rückspiegel wie ein Duftbaum. Mitarbeiter steigt in Dienstfahrzeug scannt
+// Code, fotografiert Tacho und/oder trägt KM ein."*
+//
+// GESCANNT WIRD MIT DER NORMALEN KAMERA-APP DES TELEFONS, nicht mit einem
+// eingebauten Scanner: Der QR-Code enthält schlicht die Adresse der App mit
+// der Kennung daran (app.html?fz=…). Jedes Telefon kann das ab Werk, es
+// braucht keine Kameraerlaubnis im Browser, und auf iOS-Safari wäre ein
+// eigener Scanner ohnehin nicht verlässlich verfügbar.
+//
+// Der Code wird HIER erzeugt, aus qrcode.js -- derselben Bibliothek, die
+// schon den Zahlteil der QR-Rechnung zeichnet (ENT-205). Kein zweiter Weg
+// für dieselbe Sache und nichts, was von einem fremden Server nachgeladen
+// werden müsste.
+// qrcode.js wird ERST BEI BEDARF geladen, nicht bei jedem Öffnen des
+// Cockpits: 57 KB für eine Funktion, die ein paarmal im Jahr gebraucht wird,
+// zahlt sonst jeder Seitenaufruf mit.
+let fzQrGeladen = null;
+function fzQrLaden() {
+  if (fzQrGeladen) { return fzQrGeladen; }
+  fzQrGeladen = new Promise((fertig, fehler) => {
+    if (typeof qrcode === 'function') { fertig(); return; }
+    const s = document.createElement('script');
+    s.src = 'qrcode.js';
+    s.onload = () => (typeof qrcode === 'function' ? fertig() : fehler(new Error('qrcode fehlt')));
+    s.onerror = () => fehler(new Error('qrcode.js nicht ladbar'));
+    document.head.appendChild(s);
+  });
+  // Ein einmal gescheiterter Versuch darf nicht für immer scheitern --
+  // sonst hilft nach einem Netzaussetzer nur noch ein Seitenneuladen.
+  fzQrGeladen.catch(() => { fzQrGeladen = null; });
+  return fzQrGeladen;
+}
+
+function fzAufkleber(id) {
+  const f = fahrzeuge.find(x => Number(x.id) === Number(id));
+  if (!f) { return; }
+  if (!f.qr_kennung) {
+    toast('Für dieses Fahrzeug ist noch kein Aufkleber-Schlüssel vergeben. Einmal die Einrichtung ausführen.');
+    return;
+  }
+  // Absolute Adresse, weil der Aufkleber im Auto klebt und dort niemand eine
+  // relative Adresse auflösen kann.
+  const ziel = new URL('app.html', location.href);
+  ziel.searchParams.set('fz', f.qr_kennung);
+
+  // Der Code wird HIER erzeugt und als fertiges SVG ins Druckfenster
+  // geschrieben -- NICHT dort per <script src> nachgeladen.
+  //
+  // Der Umweg hat einen gemessenen Grund: Ein mit window.open('') geöffnetes
+  // Fenster ist about:blank, und ein dort eingehängtes Skript wird nicht
+  // ausgeführt. Der Aufkleber blieb leer, ohne Fehlermeldung -- auch onerror
+  // schlug nicht an. Fertiges Markup hat dieses Problem nicht.
+  fzQrLaden().then(() => {
+    const q = qrcode(0, 'M');
+    q.addData(ziel.toString());
+    q.make();
+    fzAufkleberFenster(f, q.createSvgTag({ cellSize: 4, margin: 0 }));
+  }).catch(() => toast('Der QR-Code liess sich nicht erzeugen (qrcode.js nicht ladbar).'));
+}
+
+function fzAufkleberFenster(f, svg) {
+  const fenster = window.open('', '_blank', 'width=520,height=680');
+  if (!fenster) { toast('Der Ausdruck wurde vom Browser blockiert. Bitte Pop-ups für diese Seite erlauben.'); return; }
+  const name = [f.marke, f.modell].filter(Boolean).join(' ');
+  fenster.document.write(`<!doctype html><html lang="de"><head><meta charset="utf-8">
+    <title>Aufkleber ${esc(f.kennzeichen)}</title>
+    <style>
+      body { font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; margin: 0;
+             display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+      /* Feste Breite in Millimetern: Der Aufkleber wird geklebt, nicht am
+         Bildschirm gelesen -- was zählt, ist die gedruckte Grösse. 62 mm
+         passt auf gängiges Etikettenpapier und lässt den Code gross genug
+         für eine Handykamera aus Armlänge. */
+      .kleber { width: 62mm; border: 1px solid #C8CDD4; border-radius: 4mm;
+                padding: 6mm; text-align: center; }
+      .lb { font-size: 8pt; letter-spacing: .08em; text-transform: uppercase;
+            color: #6B7280; margin: 0 0 1mm }
+      .kz { font-size: 15pt; font-weight: 700; margin: 0 0 1mm }
+      .bez { font-size: 9pt; color: #6B7280; margin: 0 0 4mm }
+      .qr svg { width: 42mm; height: 42mm; display: block; margin: 0 auto }
+      .txt { font-size: 8.5pt; color: #374151; margin: 4mm 0 0; line-height: 1.35 }
+      @media print { body { min-height: 0 } .kleber { border-color: #9AA1AA } }
+    </style></head><body>
+    <div class="kleber">
+      <p class="lb">Fahrzeugübernahme</p>
+      <p class="kz">${esc(f.kennzeichen)}</p>
+      <p class="bez">${esc(f.bezeichnung || name || '')}</p>
+      <div class="qr" id="qr">${svg}</div>
+      <p class="txt">Vor der Fahrt scannen und den Kilometerstand eintragen.</p>
+    </div></body></html>`);
+  fenster.document.close();
+  fenster.focus();
+  fenster.print();
 }
 
 // ── Änderungsverlauf eines Fahrzeugs (ENT-330) ──────────────────────────
