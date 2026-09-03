@@ -153,6 +153,58 @@ const reihenfolge = await page.evaluate(() => {
 check('KRITISCH: Objekt steht über Kunde, Kunde über Adresse (gemessen, nicht behauptet)',
   reihenfolge.objekt > 0 && reihenfolge.objekt < reihenfolge.kunde && reihenfolge.kunde < reihenfolge.adresse);
 
+// ══════════ FEHLENDE ANGABE SIEHT NICHT AUS WIE GAR KEINE ═════════════
+// Vom Projektinhaber gemeldet (ENT-331): "Im Rundgangübersicht werden Kunde
+// und Ansprechperson nicht mehr angezeigt." Der Fall liess sich mit
+// vollstaendigen Daten nicht nachstellen -- was bleibt, ist die Luecke, die
+// ihn moeglich macht: Fehlte die Angabe, stand dort ein LEERES Feld. Ob die
+// Angabe fehlt oder die Ansicht kaputt ist, war daran nicht zu erkennen.
+// CLAUDE.md: "unbekannt" darf nie wie "keine" aussehen -- und beides nie
+// wie "kaputt".
+const fehlend = await page.evaluate(() => {
+  // rgSeiteZeichnen merkt sich die uebergebenen Daten (rgsDaten) -- die
+  // vollstaendigen darum vorher wegsichern, sonst misst alles Folgende den
+  // verstuemmelten Stand.
+  window.__voll = JSON.parse(JSON.stringify(rgsDaten));
+  const d = JSON.parse(JSON.stringify(rgsDaten));
+  d.kunde_name = '';
+  d.objekt.name = '';
+  rgSeiteZeichnen(d);
+  const k = document.querySelector('.rgs-obj-kunde');
+  const o = document.querySelector('.rgs-obj-name');
+  const st = el => { const c = getComputedStyle(el); return { txt: el.textContent.trim(),
+    kursiv: c.fontStyle === 'italic', h: el.getBoundingClientRect().height }; };
+  return { kunde: st(k), objekt: st(o) };
+});
+check('KRITISCH: ein fehlender Kundenname erscheint als Auskunft, nicht als leere Zeile',
+  fehlend.kunde.txt.includes('nicht hinterlegt') && fehlend.kunde.h > 8);
+check('KRITISCH: ein fehlender Objektname ebenso',
+  fehlend.objekt.txt.includes('nicht hinterlegt') && fehlend.objekt.h > 8);
+check('Die Ersatzangabe ist als solche erkennbar (kursiv), nicht wie ein echter Name gesetzt',
+  fehlend.kunde.kursiv && fehlend.objekt.kursiv);
+// Zurueck zu den vollstaendigen Daten -- alles Weitere misst wieder den
+// Normalfall.
+await page.evaluate(() => rgSeiteZeichnen(window.__voll));
+await page.waitForTimeout(150);
+check('Mit vollständigen Daten steht der Kundenname wieder normal da',
+  await page.evaluate(() => {
+    const k = document.querySelector('.rgs-obj-kunde');
+    return k.textContent.trim() === 'Musterliegenschaften AG'
+      && getComputedStyle(k).fontStyle !== 'italic';
+  }));
+// Der zugeklappte Kopf muss die Zahl nennen. Sonst sagt er nichts darueber,
+// ob es Ansprechpartner GIBT -- und "keine" saehe wieder aus wie "nicht
+// geladen".
+// Nicht ueber page.textContent: Fehlt das Element -- und genau das ist der
+// Fall, gegen den hier geprueft wird --, laeuft der Aufruf 30 Sekunden ins
+// Leere und reisst die Suite mit. Eine abgestuerzte Suite meldet keine rote
+// Pruefung, sondern gar nichts.
+check('KRITISCH: der Ansprechpartner-Kopf nennt die Anzahl, auch zugeklappt',
+  await page.evaluate(() => {
+    const z = document.querySelector('#rgsKlappAp .rgs-klapp-zahl');
+    return !!z && z.textContent.trim() === '1';
+  }));
+
 // ══════════ DUNKLER EINSATZMODUS ══════════════════════════════════════
 const farben = await page.evaluate(() => {
   const rgb = s => getComputedStyle(document.querySelector(s));
@@ -239,6 +291,11 @@ check('Das Zeitfenster dieser Runde steht als Uhrzeit da',
   (await page.textContent('.rgs-fakten')).includes(FENSTER_HM));
 check('Ohne Ansprechpartner erscheint ein erklärender Satz statt einer leeren Fläche',
   (await page.textContent('#rgsKlappAp .rgs-klapp-bd')).includes('keine Ansprechperson'));
+check('KRITISCH: und zugeklappt steht dort eine 0, nicht gar nichts',
+  await page.evaluate(() => {
+    const z = document.querySelector('#rgsKlappAp .rgs-klapp-zahl');
+    return !!z && z.textContent.trim() === '0' && z.getBoundingClientRect().width > 0;
+  }));
 
 // ══════════ ZURÜCK ════════════════════════════════════════════════════
 // Die Groesse wird gemessen, SOLANGE die Seite offen ist -- eine

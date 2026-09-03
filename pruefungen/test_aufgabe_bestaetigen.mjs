@@ -137,6 +137,11 @@ await page.waitForTimeout(400);
 // Rundgang oeffnen (Einsatz 71, offener Rundgang aus dem Mock).
 await page.evaluate(() => { ladeSchichten().then(() => rundgangFortsetzen(71)); });
 await page.waitForTimeout(600);
+// Seit ENT-331 beginnt eine Runde auf dem Kartenreiter. Diese Suite prueft
+// die Aufgaben AN den Kontrollpunkten -- der Reiter wird darum ausdruecklich
+// auf die Liste gestellt, statt sich auf den Startzustand zu verlassen.
+await page.evaluate(() => rgLaufReiter('punkte'));
+await page.waitForTimeout(300);
 check('Die Checkliste ist offen', await page.isVisible('#rdListe'));
 
 // ── Kontrollpunkt MIT Aufgaben erfassen ───────────────────────────────

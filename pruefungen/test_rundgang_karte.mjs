@@ -27,6 +27,16 @@ const EXE = browserPfad();
 const ok = [], bad = [];
 const check = (n, c) => (c ? ok : bad).push(n);
 
+// Ein Klick auf ein Element, das es nicht gibt, laeuft in Playwright 30
+// Sekunden lang ins Leere und reisst dann die ganze Suite mit. In einer
+// Gegenprobe ist genau das der Normalfall -- und eine abgestuerzte Suite
+// meldet KEINE rote Pruefung, sie meldet gar nichts. Diesen Mangel gab es
+// in diesem Projekt schon mehrfach; darum hier von Anfang an kurze
+// Fristen und ein Rueckgabewert statt eines Absturzes.
+const klick = async (page, s) => { try { await page.click(s, { timeout: 2500 }); return true; }
+                                   catch (e) { return false; } };
+const txt = async (page, s) => { try { return await page.textContent(s, { timeout: 2500 }); }
+                                 catch (e) { return null; } };
 const iso = d => new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
 const tag = n => iso(new Date(Date.now() + n * 864e5));
 
@@ -79,6 +89,8 @@ const KP = [
 const browser = await chromium.launch({ executablePath: EXE });
 const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
 page.on('pageerror', e => bad.push('JS-Fehler: ' + e.message));
+let ohneOrt = false;
+await page.exposeFunction('__ohneOrtSetzen', v => { ohneOrt = !!v; });
 await page.route('**/api/**', route => {
   const url = new URL(route.request().url());
   const p = url.pathname.split('/api/')[1];
@@ -88,9 +100,13 @@ await page.route('**/api/**', route => {
   if (p.includes('mein_profil')) return send(PROFIL);
   if (p.includes('rapport_list')) return send({ status: 'ok', rapporte: [] });
   if (p.includes('mein_rundgang_offen')) {
+    // __ohneOrt: derselbe Rundgang, aber alle Punkte ohne Koordinaten --
+    // fuer die Pruefung, dass eine reine NFC-Runde nicht auf der Karte
+    // oeffnet. Wird von der Seite selbst gesetzt.
+    const kps = JSON.parse(JSON.stringify(KP));
     return send({ status: 'ok', rundgang: { id: 951, status: 'laeuft', pausiert_seit: null,
       vorbereitet_am: tag(0) + ' 02:00:00', pause_minuten: 0,
-      kontrollpunkte: JSON.parse(JSON.stringify(KP)),
+      kontrollpunkte: ohneOrt ? kps.map(k => ({ ...k, lat: null, lng: null })) : kps,
       objekt: { id: 7, name: 'Musterobjekt Industrie', strasse: 'Musterweg 4', ort: '9999 Musterdorf', kanton: 'SO' },
       kunde_name: 'Musterliegenschaften AG',
       ansprechpartner: [{ name: 'Ruedi Beispiel', anrede: 'Herr', funktion: 'Hauswart', quelle: 'objekt',
@@ -268,6 +284,194 @@ await page.waitForTimeout(900);
 check('Ohne Antippen bleibt es bei null Standortabfragen',
   await page.evaluate(() => window.__rufe() === 0));
 await page.screenshot({ path: `${OUT}/karte-03-mit-karte.png` });
+
+// ══════════ ENT-331: VOLLE BREITE UND NACHTSICHT ══════════════════════
+// Vom Projektinhaber: "Innerhalb des Rundgangs, Kartenreiter. Hier moechte
+// ich, dass die volle Breite ausgenuetzt wird vom Bildschirm. Ausserdem
+// muss die Moeglichkeit bestehen, eine 'Nachtsicht' zu bekommen wie im
+// Screenshot von Coredinate."
+//
+// Beides wird GEMESSEN, nicht im Quelltext nachgelesen (CLAUDE.md): Die
+// Breite an den tatsaechlichen Rechtecken, die Nachtsicht an der Farbe,
+// die die Karte dadurch wirklich annimmt. Eine CSS-Regel kann wirkungslos
+// bleiben, ohne dass etwas kaputtgeht.
+const breite = await page.evaluate(() => {
+  const h = document.querySelector('.rgs-karte-huelle');
+  const s = document.getElementById('rgSeite');
+  if (!h || !s) return null;
+  const k = h.getBoundingClientRect(), seite = s.getBoundingClientRect();
+  return { kl: k.left, kr: k.right, kb: k.width, sl: seite.left, sr: seite.right, sb: seite.width };
+}) || { kl: -1, kr: -1, kb: -1, sl: 0, sr: 0, sb: 0 };
+check('KRITISCH: die Karte nutzt die volle Breite der Seite (gemessen, 390px)',
+  Math.abs(breite.kb - breite.sb) <= 1);
+check('KRITISCH: sie steht dabei bündig an beiden Rändern, nicht nur breiter',
+  Math.abs(breite.kl - breite.sl) <= 1 && Math.abs(breite.kr - breite.sr) <= 1);
+check('KRITISCH: die volle Breite erzeugt keinen waagrechten Seiten-Scroll',
+  await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1));
+// Ein Randstreifen des Rumpfes darf dabei nicht mitverschwinden: Die Liste
+// und die Hinweise behalten ihren Rand, nur die Karte geht bis aussen.
+await klick(page, '#rgsRt-punkte');
+await page.waitForTimeout(250);
+check('Der Rand des Rumpfes bleibt für alles andere erhalten',
+  await page.evaluate(() => {
+    const l = document.getElementById('rdListe');
+    if (!l) return false;
+    const seite = document.getElementById('rgSeite').getBoundingClientRect();
+    return l.getBoundingClientRect().left - seite.left >= 12;
+  }));
+await klick(page, '#rgsRt-karte');
+await page.waitForTimeout(700);
+
+// ── Nachtsicht ────────────────────────────────────────────────────────
+const nachtDa = await page.$('#rgsNachtsicht') !== null;
+check('KRITISCH: es gibt überhaupt einen Nachtsicht-Knopf', nachtDa);
+check('KRITISCH: Nachtsicht ist die VORGABE — die Runde läuft nachts',
+  nachtDa && await page.evaluate(() =>
+    document.getElementById('rgsNachtsicht').getAttribute('aria-pressed') === 'true'
+    && document.getElementById('rgsNachtsicht').classList.contains('an')));
+// Der eigentliche Beweis: Die Karte wird dadurch wirklich dunkel. Die
+// Attrappe faerbt ihren Container mit der Grundfarbe des uebergebenen
+// Stils -- ohne das waere nur belegt, dass irgendein Array uebergeben wurde.
+const dunkel = await page.evaluate(() => {
+  const el = document.getElementById('rgsKarte');
+  return el ? el.dataset.kartenstil : null;
+});
+check('KRITISCH: die Karte nimmt den dunklen Stil tatsächlich an (gemessen)',
+  typeof dunkel === 'string' && dunkel !== 'standard' && dunkel !== undefined
+  && (() => { const h = dunkel.replace('#', '');
+       if (h.length !== 6) return false;
+       const hell = (parseInt(h.slice(0,2),16) + parseInt(h.slice(2,4),16) + parseInt(h.slice(4,6),16)) / 3;
+       return hell < 90; })());
+check('Der Knopf hat die geforderte Trefferfläche von 44px (CLAUDE.md)',
+  nachtDa && await page.evaluate(() =>
+    document.getElementById('rgsNachtsicht').getBoundingClientRect().height >= 44));
+check('Er überdeckt den Zentrieren-Knopf nicht',
+  nachtDa && await page.evaluate(() => {
+    const a = document.getElementById('rgsZentrieren').getBoundingClientRect();
+    const b = document.getElementById('rgsNachtsicht').getBoundingClientRect();
+    return b.left >= a.right + 8;
+  }));
+check('Beide Knöpfe stehen innerhalb der Karte, nicht darüber hinaus',
+  nachtDa && await page.evaluate(() => {
+    const k = document.querySelector('.rgs-karte-huelle').getBoundingClientRect();
+    const b = document.getElementById('rgsNachtsicht').getBoundingClientRect();
+    const a = document.getElementById('rgsZentrieren').getBoundingClientRect();
+    return a.left >= k.left && b.right <= k.right && a.bottom <= k.bottom && b.bottom <= k.bottom;
+  }));
+await page.screenshot({ path: `${OUT}/karte-05-nachtsicht.png` });
+
+// Abschalten muss auch wirklich abschalten -- sonst waere der Knopf eine
+// Behauptung. Und die Wahl muss die Runde ueberdauern: Wer sie bei jedem
+// Reiterwechsel neu treffen muesste, wuerde sie nicht treffen.
+await klick(page, '#rgsNachtsicht');
+await page.waitForTimeout(300);
+check('KRITISCH: Abschalten macht die Karte wieder hell (gemessen)',
+  await page.evaluate(() => {
+    const el = document.getElementById('rgsKarte');
+    return !!el && el.dataset.kartenstil === 'standard';
+  }));
+check('Der Knopf zeigt den neuen Zustand an, nicht den alten',
+  await page.evaluate(() => {
+    const b = document.getElementById('rgsNachtsicht');
+    return !!b && b.getAttribute('aria-pressed') === 'false' && !b.classList.contains('an');
+  }));
+await klick(page, '#rgsRt-punkte');
+await page.waitForTimeout(200);
+await klick(page, '#rgsRt-karte');
+await page.waitForTimeout(700);
+check('KRITISCH: die Wahl überdauert den Reiterwechsel',
+  await page.evaluate(() => {
+    const el = document.getElementById('rgsKarte'), b = document.getElementById('rgsNachtsicht');
+    return !!el && !!b && el.dataset.kartenstil === 'standard'
+      && b.getAttribute('aria-pressed') === 'false';
+  }));
+check('Sie überdauert auch das Verlassen und erneute Öffnen der Runde',
+  await page.evaluate(async () => {
+    rgSeiteZu();
+    await new Promise(r => setTimeout(r, 250));
+    rundgangFortsetzen(71);
+    await new Promise(r => setTimeout(r, 1600));
+    const el = document.getElementById('rgsKarte');
+    return !!el && el.dataset.kartenstil === 'standard';
+  }));
+// Wieder einschalten und dabei pruefen, dass es in BEIDE Richtungen geht.
+await klick(page, '#rgsNachtsicht');
+await page.waitForTimeout(300);
+check('KRITISCH: Einschalten geht ebenso — der Schalter kennt beide Richtungen',
+  await page.evaluate(() => {
+    const el = document.getElementById('rgsKarte'), b = document.getElementById('rgsNachtsicht');
+    return !!el && !!b && el.dataset.kartenstil !== 'standard'
+      && b.getAttribute('aria-pressed') === 'true';
+  }));
+
+// ── Der Kartenreiter steht beim Start von selbst offen ────────────────
+// Vom Projektinhaber: "beim Rundgang start bitte direkt zuerst den
+// Kartenreiter zeigen." Beim Losgehen lautet die Frage "wo bin ich, wo ist
+// der naechste Punkt" -- die beantwortet die Karte, nicht die Liste.
+check('KRITISCH: eine frisch geöffnete Runde steht auf dem Kartenreiter',
+  await page.evaluate(async () => {
+    rgSeiteZu();
+    await new Promise(r => setTimeout(r, 250));
+    rundgangFortsetzen(71);
+    await new Promise(r => setTimeout(r, 1600));
+    const rt = document.getElementById('rgsRt-karte');
+    return !!rt && rt.classList.contains('an') && rgsReiter === 'karte';
+  }));
+// Und der Reiter darf nicht kleben: Wer bewusst in die Liste wechselt, muss
+// dort bleiben. Die Seite wird waehrend einer Runde bei JEDER neuen
+// Position neu gezeichnet -- ohne diese Grenze spraenge die Ansicht im
+// Sekundentakt auf die Karte zurueck.
+// Neu gezeichnet wird ueber rundgangAnzeigen() -- dort sitzt die Weiche.
+// rgLaufZeichnen() allein waere die falsche Stelle: Es zeichnet nur den
+// gewaehlten Reiter und kann den Reiter gar nicht wechseln; eine Pruefung
+// darauf koennte nie rot werden (in der Gegenprobe genau so aufgefallen).
+check('KRITISCH: ein danach gewählter Reiter bleibt beim Neuzeichnen stehen',
+  await page.evaluate(async () => {
+    rgLaufReiter('punkte');
+    await new Promise(r => setTimeout(r, 250));
+    rundgangAnzeigen(71);
+    await new Promise(r => setTimeout(r, 400));
+    return rgsReiter === 'punkte' && !!document.getElementById('rdListe');
+  }));
+// Eine Runde ganz ohne darstellbare Punkte (nur NFC) darf NICHT auf der
+// Karte oeffnen: Dort staende dann „keine darstellbaren Punkte" statt der
+// Kontrollpunkte -- der Waechter wuerde mit einer Fehlanzeige begruesst.
+check('KRITISCH: eine Runde ohne darstellbare Punkte öffnet auf der Liste, nicht auf der leeren Karte',
+  await page.evaluate(async () => {
+    rgSeiteZu();
+    await new Promise(r => setTimeout(r, 250));
+    await window.__ohneOrtSetzen(true);   // die Attrappe liefert dann Punkte ohne Koordinaten
+    rundgangAktiv = null;
+    rundgangFortsetzen(71);
+    await new Promise(r => setTimeout(r, 1200));
+    const ok = rgsReiter === 'punkte' && !!document.getElementById('rdListe');
+    await window.__ohneOrtSetzen(false);
+    return ok;
+  }));
+// Eine beendete oder abgebrochene Runde bleibt auf der Liste: Dort steht,
+// was geschehen ist -- eine Karte ohne laufende Position sagt dazu nichts.
+check('Eine abgeschlossene Runde öffnet weiterhin auf der Liste, nicht auf der Karte',
+  await page.evaluate(async () => {
+    rgSeiteZu();
+    await new Promise(r => setTimeout(r, 250));
+    rundgangAktiv = null;
+    rundgangFortsetzen(71);
+    await new Promise(r => setTimeout(r, 900));
+    if (!rundgangAktiv) return false;
+    rundgangAktiv.status = 'abgeschlossen';
+    rundgangAnzeigen(71);
+    await new Promise(r => setTimeout(r, 400));
+    return rgsReiter === 'punkte';
+  }));
+// Zustand fuer die nachfolgenden Abschnitte wieder herstellen.
+await page.evaluate(async () => {
+  rgSeiteZu();
+  await new Promise(r => setTimeout(r, 250));
+  rundgangFortsetzen(71);
+  await new Promise(r => setTimeout(r, 1600));
+});
+await klick(page, '#rgsRt-karte');
+await page.waitForTimeout(700);
 
 // ── Dritter Fehlerfall: Skript laedt, Schluessel wird abgelehnt ────────
 // Live aufgetreten (ENT-309): Das Skript laedt, google.maps ist da, die

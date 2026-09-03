@@ -55,6 +55,31 @@ export const GOOGLE_MAPS_MOCK = `
     isEmpty() { return this.minLat === null; }
   }
 
+  // Die echte API nimmt den Ankerpunkt eines Symbols als google.maps.Point
+  // entgegen (ENT-331: das Wachmann-Schild sitzt mit (12,12) mittig auf der
+  // Position statt mit der linken oberen Ecke).
+  class Point {
+    constructor(x, y) { this.x = Number(x); this.y = Number(y); }
+    equals(o) { return !!o && o.x === this.x && o.y === this.y; }
+    toString() { return '(' + this.x + ', ' + this.y + ')'; }
+  }
+
+  // Aus einem styles-Array die Grundfarbe der Kartenflaeche herausziehen
+  // (Eintrag ohne featureType mit elementType 'geometry'). Damit bekommt
+  // der Karten-Container im Testdouble tatsaechlich die Farbe des
+  // gewaehlten Stils -- Nachtsicht ist so am GERENDERTEN Zustand messbar
+  // (CLAUDE.md: "Gestaltung wird gemessen, nicht im Quelltext nachgelesen")
+  // und nicht nur daran, dass irgendein Array uebergeben wurde.
+  function stilGrundfarbe(styles) {
+    if (!Array.isArray(styles)) return null;
+    for (const s of styles) {
+      if (s && !s.featureType && s.elementType === 'geometry' && Array.isArray(s.stylers)) {
+        for (const st of s.stylers) { if (st && st.color) return st.color; }
+      }
+    }
+    return null;
+  }
+
   class Kartending {
     constructor() { Object.assign(this, listenbar()); }
   }
@@ -76,6 +101,7 @@ export const GOOGLE_MAPS_MOCK = `
       this._center = opts && opts.center ? alsLiteral(opts.center) : { lat: 0, lng: 0 };
       this._zoom = (opts && opts.zoom) || 8;
       this._objekte = new Set();
+      this._stilAnwenden(opts && opts.styles);
       this.controls = new Proxy({}, { get: (t, k) => (t[k] = t[k] || makeControlArray(this)) });
       container.addEventListener('click', e => {
         if (e.target !== container) return; // Marker/Kreis stoppen die Ausbreitung selbst
@@ -92,6 +118,24 @@ export const GOOGLE_MAPS_MOCK = `
         this._feuern('rightclick', { latLng: machLatLng(p.lat, p.lng) });
       });
     }
+    // Kartenstil (ENT-331, Nachtsicht). Die echte API faerbt damit die
+    // Kacheln; hier wird der Container eingefaerbt, weil das Testdouble
+    // keine Kacheln hat. Der leere Stil ('[]' = Standardkarte) faellt auf
+    // die helle Grundfarbe zurueck -- sonst bliebe die Karte nach dem
+    // Abschalten dunkel und das Ausschalten waere nicht pruefbar.
+    _stilAnwenden(styles) {
+      this._styles = Array.isArray(styles) ? styles : [];
+      const farbe = stilGrundfarbe(this._styles);
+      this.container.dataset.kartenstil = farbe || 'standard';
+      this.container.style.background = farbe || '#E5E3DF';
+    }
+    setOptions(opts) {
+      if (!opts) return;
+      if ('styles' in opts) { this._stilAnwenden(opts.styles); }
+      if (opts.center) { this.setCenter(opts.center); }
+      if (opts.zoom != null) { this.setZoom(opts.zoom); }
+    }
+    getStyles() { return this._styles; }
     setCenter(c) { this._center = alsLiteral(c); this._neuPositionieren(); }
     getCenter() { return machLatLng(this._center.lat, this._center.lng); }
     setZoom(z) { this._zoom = z; this._neuPositionieren(); }
@@ -151,8 +195,45 @@ export const GOOGLE_MAPS_MOCK = `
       // unsichtbar gewesen und haette nur im Quelltext nachgelesen werden
       // koennen.
       const ic = opts.icon, lb = opts.label;
-      if (ic || lb) {
+      if (ic && typeof ic.path === 'string') {
+        // Symbol mit eigener Form (ENT-331: Wachmann-Schild fuer den eigenen
+        // Standort). Die echte API zeichnet den SVG-Pfad im 24er-Raster und
+        // skaliert ihn mit 'scale'; hier steht wirklich dieser Pfad im DOM --
+        // sonst waere die Form nur im Quelltext nachlesbar und eine Pruefung
+        // koennte nicht unterscheiden, ob der Standort als Schild oder als
+        // Kreis erscheint. Der Anker verschiebt das Symbol so, dass der
+        // angegebene Punkt auf der Koordinate sitzt (Standard: Mitte).
+        const sk = ic.scale || 1;
+        const gr = 24 * sk;
+        // Ohne anchor haengt ein Symbol mit dem NULLPUNKT seines Pfades an
+        // der Koordinate -- so macht es die echte API. Hier denselben
+        // Vorgabewert zu nehmen ist keine Kleinigkeit: Eine Attrappe, die
+        // von sich aus zentriert, wuerde einen fehlenden Anker verzeihen und
+        // die Pruefung darauf waere wirkungslos (in der Gegenprobe genau so
+        // aufgefallen).
+        const ax = ic.anchor ? ic.anchor.x : 0, ay = ic.anchor ? ic.anchor.y : 0;
+        this.el.style.cssText = 'position:absolute;cursor:pointer;'
+          + 'width:' + gr + 'px;height:' + gr + 'px;'
+          + 'margin-left:' + (-ax * sk) + 'px;margin-top:' + (-ay * sk) + 'px;'
+          + 'z-index:' + (opts.zIndex || 10) + ';';
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('viewBox', '0 0 24 24');
+        svg.setAttribute('width', String(gr));
+        svg.setAttribute('height', String(gr));
+        const pf = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        pf.setAttribute('d', ic.path);
+        pf.setAttribute('fill', ic.fillColor || '#000');
+        pf.setAttribute('fill-opacity', ic.fillOpacity != null ? String(ic.fillOpacity) : '1');
+        pf.setAttribute('stroke', ic.strokeColor || 'none');
+        pf.setAttribute('stroke-width', String(ic.strokeWeight || 0));
+        svg.appendChild(pf);
+        this.el.appendChild(svg);
+        this.el.dataset.symbolart = 'pfad';
+        this.el.dataset.pfad = ic.path;
+        if (ic.fillColor) { this.el.dataset.farbe = ic.fillColor; }
+      } else if (ic || lb) {
         const gr = Math.round((ic && ic.scale ? ic.scale : 12) * 2);
+        this.el.dataset.symbolart = 'kreis';
         this.el.style.cssText = 'position:absolute;display:flex;align-items:center;'
           + 'justify-content:center;border-radius:50%;cursor:pointer;'
           + 'width:' + gr + 'px;height:' + gr + 'px;'
@@ -310,7 +391,7 @@ export const GOOGLE_MAPS_MOCK = `
 
   window.google = window.google || {};
   window.google.maps = {
-    Map, Marker, Circle, Polygon, LatLngBounds,
+    Map, Marker, Circle, Polygon, LatLngBounds, Point,
     ControlPosition: { LEFT_TOP: 'LEFT_TOP', TOP_LEFT: 'TOP_LEFT', RIGHT_TOP: 'RIGHT_TOP' },
     // Die echte API kennt diese Konstanten; die Rundgang-Karte (ENT-308)
     // zeichnet ihre Punkte damit als Kreissymbole statt als Stecknadeln.

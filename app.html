@@ -464,6 +464,11 @@ svg.i-sm { width: 17px; height: 17px; }
 .rgs-objekt-txt { flex: 1; min-width: 0; }
 .rgs-obj-name { font-size: 19px; font-weight: 700; letter-spacing: -.3px; line-height: 1.25; }
 .rgs-obj-kunde { font-size: 14.5px; color: var(--ink-2); margin-top: 2px; }
+/* Fehlende Angabe: sichtbar, aber erkennbar keine echte Angabe (ENT-331).
+   Kursiv und gedaempft -- niemand liest das versehentlich als Kundenname. */
+.rgs-obj-name.fehlt, .rgs-obj-kunde.fehlt { color: var(--ink-3); font-style: italic; font-weight: 500; }
+.rgs-obj-name.fehlt { font-size: 16px; }
+.rgs-klapp-zahl.leer { opacity: .55; }
 /* Die Adresse traegt --ink-2, nicht die blasseste Stufe: Fuer jemanden, der
    nachts erst hinfahren muss, ist sie Kerninformation, kein Beiwerk. */
 .rgs-obj-adr { font-size: 14.5px; color: var(--ink-2); margin-top: 10px; line-height: 1.45; }
@@ -571,12 +576,30 @@ svg.i-sm { width: 17px; height: 17px; }
    festen Hoehe zu stecken: Wer nachts einen Punkt sucht, braucht Flaeche.
    Der Rumpf ist eine Flex-Spalte -- ohne min-height:0 wuchse die Karte ueber
    den Bildschirm hinaus statt sich einzupassen. */
-.rgs-karte-huelle { position: relative; flex: 1; min-height: 260px; border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; background: var(--surface-2); }
+/* Volle Bildschirmbreite (ENT-331), ausdrückliche Vorgabe des
+   Projektinhabers. Der Rumpf (.rgs-bd) hat 16 px Rand -- der wird hier mit
+   einem negativen Aussenabstand aufgehoben, statt den Rand für alle Reiter
+   zu entfernen: Die Liste und die Hinweise sollen ihn behalten.
+   Ohne seitlichen Rahmen und ohne Eckenrundung, sonst sähe eine Karte, die
+   bis an den Rand geht, aus wie eine, die abgeschnitten wurde. */
+.rgs-karte-huelle { position: relative; flex: 1; min-height: 260px;
+  margin: 0 -16px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+  overflow: hidden; background: var(--surface-2); }
 .rgs-karte { position: absolute; inset: 0; }
 /* Ladehinweis und Fehlermeldung an derselben Stelle: Beides beantwortet
    dieselbe Frage ("warum sehe ich nichts"), darum derselbe Ort. */
 .rgs-karte-stand { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 24px; font-size: 14px; line-height: 1.5; color: var(--ink-3); }
 .rgs-karte-stand.fehler { color: var(--warn); }
+/* Zweiter Knopf rechts: Nachtsicht. Gleiche Bauart wie „Zentrieren",
+   damit auf der Karte EIN Knopfmuster gilt -- nur die Farbe sagt, ob er an
+   ist: eingeschaltet in der Akzentfarbe wie „Zentrieren", ausgeschaltet
+   neutral. Ein Umschalter, der immer gleich aussieht, sagt nichts. */
+.rgs-karte-btn2 { position: absolute; right: 12px; bottom: 12px; min-height: 44px;
+  display: inline-flex; align-items: center; gap: 8px; padding: 0 14px;
+  border: 1px solid var(--line); border-radius: var(--r-sm);
+  background: var(--surface); color: var(--ink-2); font: inherit; font-size: 14px;
+  font-weight: 640; cursor: pointer; box-shadow: var(--sh-2); }
+.rgs-karte-btn2.an { border-color: var(--accent-line); background: var(--accent-soft); color: var(--accent); }
 /* Unten links wie im Vorbild, und mit 44px Trefferflaeche. */
 .rgs-karte-btn { position: absolute; left: 12px; bottom: 12px; min-height: 44px; display: inline-flex; align-items: center; gap: 8px; padding: 0 14px; border: 1px solid var(--accent-line); border-radius: var(--r-sm); background: var(--accent-soft); color: var(--accent); font: inherit; font-size: 14px; font-weight: 640; cursor: pointer; box-shadow: var(--sh-2); }
 /* "Nicht darstellbar" darf nie wie "nicht vorhanden" aussehen (CLAUDE.md) --
@@ -973,6 +996,7 @@ const W = {
     // Unter jedem Knopf steht, was er bewirkt (ENT-324) -- „Abbrechen" und
     // „Pausieren" sehen sonst gleich harmlos aus, und nur eines davon laesst
     // sich rueckgaengig machen.
+    rgsNachtsicht: 'Nachtsicht',
     rundgangPausierenUnter: 'Kann später wieder fortgesetzt werden',
     rundgangAbbrechenUnter: 'Endgültig. Erfasste Kontrollpunkte bleiben erhalten.',
     rundgangWeiterKnopf: 'Weiter', rundgangWeiterUnter: 'Den Rundgang fortsetzen',
@@ -998,6 +1022,14 @@ const W = {
     // Einsatzmodus Rundgang (ENT-294)
     rgsRoute: 'Route öffnen',
     rgsAnsprechpartner: 'Ansprechpartner',
+    // „Nicht hinterlegt" ist eine Auskunft, ein leeres Feld ist keine
+    // (ENT-331). Vom Projektinhaber gemeldet: „Kunde und Ansprechperson
+    // werden nicht mehr angezeigt." Ob die Angabe fehlt oder die Zeile nur
+    // leer blieb, war an der Ansicht nicht zu unterscheiden -- und genau
+    // das darf nicht sein (CLAUDE.md: „unbekannt" darf nie wie „keine"
+    // aussehen, und beides nie wie „kaputt").
+    rgsKeinKunde: 'Kunde nicht hinterlegt',
+    rgsKeinObjekt: 'Objekt nicht hinterlegt',
     // Bezieht sich seit ENT-300 auf beide Quellen, nicht mehr nur auf den Kunden.
     rgsKeineAnsprechpartner: 'Für dieses Objekt und diesen Kunden ist keine Ansprechperson hinterlegt.',
     // Herkunft der Ansprechperson (ENT-300)
@@ -1780,7 +1812,12 @@ let rgsAnsicht = 'uebersicht';   // 'uebersicht' | 'ereignis' | 'aufgaben' -- we
 // fast gleicher Vollbildschirm zwei Stellen waeren, die beide stimmen
 // muessten.
 let rgsModus = 'vorschau';
-let rgsReiter = 'punkte';        // 'punkte' | 'funktionen' (Karte folgt)
+let rgsReiter = 'punkte';        // 'punkte' | 'karte' | 'funktionen'
+// Ob die laufende Runde in dieser Sitzung schon einmal gezeichnet wurde
+// (ENT-331). Ohne dieses Merkmal spränge die Ansicht bei jeder neuen
+// Position auf die Karte zurück -- wer die Liste offen hat, verlöre sie
+// im Sekundentakt.
+let rgsLaufBegonnen = false;
 let rgsTimerLauf = null;
 let rgsLaufTitel = '';
 let rgsDaten = null;             // zuletzt geladene Vorschau, damit der Rueckweg keinen neuen Abruf braucht
@@ -1818,6 +1855,7 @@ function rgSeiteZu() {
   rgsDaten = null;
   rgsModus = 'vorschau';
   rgsReiter = 'punkte';
+  rgsLaufBegonnen = false;   // die naechste Runde beginnt wieder auf der Karte
   rgTimerStoppen();   // sonst tickt er unsichtbar weiter
   rgOrtungStoppen();  // sonst ortet das Geraet weiter, ohne dass es jemand sieht
   rgsMeinOrt = null;  // die Position ueberdauert die Runde nicht
@@ -1923,8 +1961,8 @@ function rgSeiteZeichnen(d) {
     <div class="karte"><div class="karte-bd">
       <div class="rgs-objekt">
         <div class="rgs-objekt-txt">
-          <div class="rgs-obj-name">${esc(o.name || '')}</div>
-          <div class="rgs-obj-kunde">${esc(d.kunde_name || '')}</div>
+          <div class="rgs-obj-name${o.name ? '' : ' fehlt'}">${esc(o.name || w('rgsKeinObjekt'))}</div>
+          <div class="rgs-obj-kunde${d.kunde_name ? '' : ' fehlt'}">${esc(d.kunde_name || w('rgsKeinKunde'))}</div>
           ${adresse.length ? `<div class="rgs-obj-adr">${adresse.map(esc).join('<br>')}</div>` : ''}
         </div>
         ${adresse.length ? `<a class="rgs-route" href="https://www.google.com/maps/dir/?api=1&destination=${ziel}"
@@ -2014,7 +2052,7 @@ function rgsKontakteHtml(d) {
       <button type="button" class="rgs-klapp-kopf" onclick="rgSeiteKlapp('rgsKlappAp')" aria-expanded="false">
         <svg class="i i-sm rgs-klapp-pfeil" viewBox="0 0 24 24"><polyline points="9 6 15 12 9 18"/></svg>
         <span>${esc(w('rgsAnsprechpartner'))}</span>
-        ${leute.length ? `<span class="rgs-klapp-zahl">${leute.length}</span>` : ''}
+        <span class="rgs-klapp-zahl${leute.length ? '' : ' leer'}">${leute.length}</span>
       </button>
       <div class="rgs-klapp-bd">
         ${leute.length ? leute.map(p => `
@@ -3366,7 +3404,24 @@ function rundgangAnzeigen(einsatzId) {
   // verschwunden ist.
   if (rundgangAktiv.status === 'abgebrochen' || rundgangAktiv.status === 'abgeschlossen') {
     rgsReiter = 'punkte';
+  } else if (rgsReiter !== 'karte' && !rgsLaufBegonnen
+             && rgKarteDaten(rundgangAktiv.kontrollpunkte).zeigbar.length) {
+    /* Eine frisch begonnene Runde startet auf der KARTE (ENT-331), Vorgabe
+       des Projektinhabers. Sie beantwortet die Frage, die man beim
+       Losgehen wirklich hat: wo bin ich, wo ist der nächste Punkt. Die
+       Liste beantwortet „was ist schon erledigt" -- das interessiert
+       später.
+       Nur beim ERSTEN Zeichnen der Runde: Wer danach bewusst auf einen
+       anderen Reiter wechselt, soll dort bleiben, auch wenn die Seite
+       neu gezeichnet wird (das geschieht bei jeder neuen Position).
+
+       Und nur, wenn die Karte überhaupt etwas zeigen kann: Eine Runde aus
+       lauter NFC-Punkten hat keine Koordinaten. Dort auf die Karte zu
+       springen hiesse, den Wächter mit „keine darstellbaren Punkte" zu
+       begrüssen — und ihm den einen Reiter wegzunehmen, der ihm hilft. */
+    rgsReiter = 'karte';
   }
+  rgsLaufBegonnen = true;
   rgsLaufTitel = e.objekt_name || e.kunde_name || w('rgsLaufTitel');
   $('rgsTitel').textContent = rgsLaufTitel;
   $('rgsFuss').innerHTML = '';
@@ -3727,6 +3782,50 @@ function rgKarteDaten(kontrollpunkte) {
   return { zeigbar, ohneOrt };
 }
 
+/* Nachtsicht (ENT-331), Vorgabe des Projektinhabers nach dem Vorbild von
+   Coredinate. Ein Kartenstil, kein zusätzlicher Dienst: Google Maps nimmt
+   die Farben als `styles`-Angabe entgegen, das kostet keinen weiteren
+   Aufruf und keine weitere Abrechnung.
+
+   Der Grund ist derselbe, aus dem die ganze Rundgang-Seite dunkel ist
+   (siehe Kommentar bei .rgs): Die Runde läuft abends und nachts, und ein
+   weisser Vollbildschirm blendet und zerstört die Nachtsicht. Eine helle
+   Karte mitten in einer dunklen Seite ist genau dieser Fehler, nur kleiner.
+
+   Deshalb ist Nachtsicht die VORGABE und nicht ein Schalter, den man erst
+   finden muss -- abschaltbar bleibt sie trotzdem, für den seltenen Fall
+   einer Tagesrunde. Die Wahl überdauert die Sitzung (localStorage). */
+const RG_NACHT_SCHLUESSEL = 'sop_rundgang_nachtsicht';
+const RG_NACHT_STIL = [
+  { elementType: 'geometry', stylers: [{ color: '#1B2230' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#9AA3B2' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#0F1117' }] },
+  { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+  { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#2A3147' }] },
+  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#151B27' }] },
+  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#3A4360' }] },
+  { featureType: 'road.local', elementType: 'labels.text.fill', stylers: [{ color: '#7E8798' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#101725' }] },
+  { featureType: 'landscape.man_made', elementType: 'geometry', stylers: [{ color: '#202838' }] },
+];
+
+function rgNachtAn() {
+  try { return localStorage.getItem(RG_NACHT_SCHLUESSEL) !== 'aus'; }
+  catch (e) { return true; }   // kein Speicher: die Vorgabe gilt trotzdem
+}
+
+function rgNachtUm() {
+  const neu = rgNachtAn() ? 'aus' : 'an';
+  try { localStorage.setItem(RG_NACHT_SCHLUESSEL, neu); } catch (e) {}
+  if (rgsKarte) { rgsKarte.setOptions({ styles: neu === 'an' ? RG_NACHT_STIL : [] }); }
+  const btn = $('rgsNachtsicht');
+  if (btn) {
+    btn.classList.toggle('an', neu === 'an');
+    btn.setAttribute('aria-pressed', neu === 'an' ? 'true' : 'false');
+  }
+}
+
 function rgKarteZeichnen() {
   const d = rgKarteDaten(rundgangAktiv ? rundgangAktiv.kontrollpunkte : []);
   const hinweis = d.ohneOrt.length
@@ -3751,6 +3850,11 @@ function rgKarteZeichnen() {
         <svg class="i i-sm" viewBox="0 0 24 24"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
         <span>${esc(w('rgsZentrieren'))}</span>
       </button>
+      <button type="button" class="rgs-karte-btn2${rgNachtAn() ? ' an' : ''}" id="rgsNachtsicht"
+          onclick="rgNachtUm()" aria-pressed="${rgNachtAn() ? 'true' : 'false'}">
+        <svg class="i i-sm" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        <span>${esc(w('rgsNachtsicht'))}</span>
+      </button>
     </div>${ortungHinweis}${hinweis}`;
 
   // Frueher wurde hier abgebrochen, sobald der Schluessel einmal abgelehnt
@@ -3763,11 +3867,19 @@ function rgKarteZeichnen() {
   rgsMapsLaden().then(() => {
     // Der Reiter kann waehrend des Ladens gewechselt worden sein.
     if (!$('rgsKarte')) { return; }
+    // Die alte Standortmarke haengt an der eben ersetzten Karte und ist
+    // damit weg -- sie muss vergessen werden, sonst haelt die App eine
+    // Marke fuer gesetzt, die in keinem Dokument mehr steht, und der eigene
+    // Standort bliebe nach jedem Reiterwechsel unsichtbar (ENT-331; vorher
+    // verdeckt davon, dass der Zentrieren-Knopf jedes Mal eine neue baute).
+    rgsStandortMarke = null;
     rgsKarte = new google.maps.Map($('rgsKarte'), {
       center: { lat: d.zeigbar[0].lat, lng: d.zeigbar[0].lng }, zoom: 17,
       streetViewControl: false, mapTypeControl: false, fullscreenControl: false,
+      styles: rgNachtAn() ? RG_NACHT_STIL : [],
     });
     rgKartePunkteZeichnen(d.zeigbar);
+    rgStandortZeichnen();   // eine bereits bekannte Position sofort wieder zeigen
     rgKarteZentrieren();
     // Den Hinweis erst entfernen, wenn die Karte wirklich steht. Wird er
     // vorher weggeraeumt und das Bauen scheitert, bleibt eine graue Flaeche
@@ -4186,15 +4298,48 @@ function rgOrtungStoppen() {
 
 // Der eigene Standort auf der Karte -- wird bei jeder neuen Position
 // versetzt, statt jedes Mal eine neue Marke anzulegen.
-function rgStandortZeichnen() {
-  if (!rgsKarte || !window.google || !rgsMeinOrt) { return; }
-  const ort = { lat: rgsMeinOrt.lat, lng: rgsMeinOrt.lng };
+//
+// EINE Stelle baut diese Marke (ENT-331). Vorher waren es zwei: die
+// laufende Ortung hier und der Zentrieren-Knopf weiter unten, der die
+// bestehende Marke sogar wegwarf und eine eigene setzte. Beim Umstellen
+// auf das Wachmann-Zeichen blieb die zweite ein weisser Punkt -- ein Tipp
+// auf "Zentrieren" haette das Zeichen wieder in einen Punkt zurueck-
+// verwandelt. Von der Pruefung gefunden, nicht vermutet.
+function rgStandortMarkeSetzen(ort) {
+  if (!rgsKarte || !window.google) { return; }
   if (rgsStandortMarke) { rgsStandortMarke.setPosition(ort); return; }
+  /* Ein Schild statt eines weissen Punktes (ENT-331), Wunsch des
+     Projektinhabers: „beim Trackersymbol wäre es cool, wenn es etwas geben
+     würde wie Wachmann, oder ein Symbol das auf Security hinweist".
+
+     Das Schild ist das Zeichen, das im Haus schon für den Revierdienst
+     steht (Navigationspunkt „Auswertung"/Wächter im Dashboard) -- kein
+     neues Sinnbild erfunden. Es ist ausserdem auf einer Karte auf einen
+     Blick von einem Kontrollpunkt-Kreis zu unterscheiden, und genau darum
+     geht es: Der eigene Standort darf nicht aussehen wie ein Ziel.
+
+     Weisse Füllung mit dunklem Rand bleibt: Auf einer Nachtsicht-Karte ist
+     Weiss die einzige Farbe, die sich gegen alles durchsetzt. */
   rgsStandortMarke = new google.maps.Marker({
+    // Bewusst UNTER den Kontrollpunkten (zIndex 1, wie beim frueheren
+    // Punkt): Die Kontrollpunkt-Marken tragen ihren Zustand als Zeichen
+    // (Haken, Ausrufezeichen, Nummer). Das Schild ist deutlich groesser als
+    // der alte Punkt -- oben drueber wuerde es genau diese Auskunft
+    // verdecken, und zwar in dem Moment, in dem man davorsteht.
     map: rgsKarte, position: ort, title: w('rgsMeinStandort'), zIndex: 1,
-    icon: { path: google.maps.SymbolPath.CIRCLE, scale: 7,
-      fillColor: '#F2F4F8', fillOpacity: 1, strokeColor: '#0F1117', strokeWeight: 3 },
+    icon: {
+      path: 'M12 2 4 5.2v6.1c0 5 3.4 9.6 8 10.7 4.6-1.1 8-5.7 8-10.7V5.2L12 2z'
+        + 'M12 7.2a2.1 2.1 0 1 0 0 4.2 2.1 2.1 0 0 0 0-4.2z'
+        + 'M8.2 16.6c0-2 1.7-3.1 3.8-3.1s3.8 1.1 3.8 3.1v.6H8.2v-.6z',
+      fillColor: '#F2F4F8', fillOpacity: 1, strokeColor: '#0F1117', strokeWeight: 1.4,
+      scale: 1.35, anchor: new google.maps.Point(12, 12),
+    },
   });
+}
+
+function rgStandortZeichnen() {
+  if (!rgsMeinOrt) { return; }
+  rgStandortMarkeSetzen({ lat: rgsMeinOrt.lat, lng: rgsMeinOrt.lng });
 }
 
 /* Zentrieren: alle Punkte ins Bild, danach einmalig die eigene Position
@@ -4214,13 +4359,9 @@ function rgKarteZentrieren() {
   if (!navigator.geolocation) { return; }
   navigator.geolocation.getCurrentPosition(pos => {
     if (!rgsKarte || !window.google) { return; }
-    const ort = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-    if (rgsStandortMarke) { rgsStandortMarke.setMap(null); }
-    rgsStandortMarke = new google.maps.Marker({
-      map: rgsKarte, position: ort, title: w('rgsMeinStandort'), zIndex: 1,
-      icon: { path: google.maps.SymbolPath.CIRCLE, scale: 7,
-        fillColor: '#F2F4F8', fillOpacity: 1, strokeColor: '#0F1117', strokeWeight: 3 },
-    });
+    // Dieselbe Marke wie bei der laufenden Ortung (ENT-331) -- nicht eine
+    // zweite, eigene. Der eigene Standort sieht auf beiden Wegen gleich aus.
+    rgStandortMarkeSetzen({ lat: pos.coords.latitude, lng: pos.coords.longitude });
   }, () => {}, { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 });
 }
 
