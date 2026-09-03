@@ -263,11 +263,14 @@ jobs:
           # SMTP fuer den Offert-Versand (ENT-192). Bleiben die Secrets ungesetzt,
           # steht weiterhin woertlich "__SMTP_HOST__" usw. in dist/mailer.php --
           # smtp_konfiguriert() erkennt das und meldet "nicht eingerichtet",
-          # statt mit einem Platzhalter als Hostnamen zu verbinden. Staging hat
-          # seit der Verschaerfung von ENT-341 ein EIGENES Postfach
-          # (STAGING_SMTP_*) statt des produktiven -- die Umleitung auf
-          # STAGING_TESTMAIL bleibt trotzdem zusaetzlich und unveraendert
-          # bestehen, siehe unten.
+          # statt mit einem Platzhalter als Hostnamen zu verbinden. STAGING_SMTP_*
+          # sind eigene, von SMTP_* verschiedene Secret-NAMEN (kein struktureller
+          # Rueckfall moeglich, siehe ENT-343 Punkt 1) -- tragen aber seit ENT-367
+          # dieselben WERTE wie Production: Hostpoint erlaubt kontoweit nur ein
+          # kostenloses Postfach auf *.myhostpoint.ch, das bereits produktiv
+          # belegt ist, und sop-plattform hat keine eigene Domain. Die Umleitung
+          # auf STAGING_TESTMAIL bleibt deshalb die massgebliche Absicherung,
+          # siehe unten.
           sed -i "s|__SMTP_HOST__|$EFF_SMTP_HOST|g" dist/mailer.php
           sed -i "s|__SMTP_PORT__|$EFF_SMTP_PORT|g" dist/mailer.php
           sed -i "s|__SMTP_VERSCHLUESSELUNG__|$EFF_SMTP_VERSCHLUESSELUNG|g" dist/mailer.php

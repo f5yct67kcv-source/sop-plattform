@@ -105,7 +105,7 @@ unten).
 | `HOSTPOINT_FTP_PASSWORD` | `STAGING_HOSTPOINT_FTP_PASSWORD` | Passwort dazu | dieselbe Stelle |
 | `MAPS_JS_KEY` | `STAGING_MAPS_JS_KEY` | Google-Maps-Browserschluessel (Kontrollpunkt-Karte, Geofence-Auswahl, Objektplan) | console.cloud.google.com — je Umgebung ein **eigener** Schluessel, referrer-beschraenkt auf genau die eine Domain |
 | `ANTHROPIC_API_KEY` | `STAGING_ANTHROPIC_API_KEY` | Diktat, Kundenrecherche, Planungsvorschlaege | console.anthropic.com; bei Verlust neu erzeugen, der alte laesst sich nicht anzeigen |
-| `SMTP_HOST` | `STAGING_SMTP_HOST` | Mailserver fuer den Offert-Versand (ENT-192) | Hostpoint-Kundencenter → E-Mail → SMTP-Einstellungen — je ein **eigenes** Postfach |
+| `SMTP_HOST` | `STAGING_SMTP_HOST` | Mailserver fuer den Offert-Versand (ENT-192) | Hostpoint-Kundencenter → E-Mail → SMTP-Einstellungen — **dasselbe** Postfach wie Production (ENT-367: kein zweites kostenloses Postfach ohne eigene Domain verfuegbar), Werte identisch mit `SMTP_*` |
 | `SMTP_PORT` | `STAGING_SMTP_PORT` | Port dazu (meist 587 mit `tls`, oder 465 mit `ssl`) | dieselbe Stelle |
 | `SMTP_VERSCHLUESSELUNG` | `STAGING_SMTP_VERSCHLUESSELUNG` | `tls`, `ssl` oder leer | dieselbe Stelle, je nach Port |
 | `SMTP_USER` | `STAGING_SMTP_USER` | Postfach-Login | dieselbe Stelle |
@@ -129,8 +129,11 @@ der alte Wert bleibt in der Git-Historie und in Zwischenspeichern stehen.
 ## Staging (ENT-341)
 
 Eine vollstaendig getrennte Testinstanz — dieselbe Codebasis, eigene
-Datenbank, eigenes FTP-Ziel, eigenes SMTP-Postfach, eigene Secrets unter
-eigenen Namen, keine echten Geschaeftsdaten. Adresse und genaue
+Datenbank, eigenes FTP-Ziel, eigene Secrets unter eigenen Namen, keine
+echten Geschaeftsdaten. Beim SMTP-Versand teilt sich Staging das Postfach
+mit Production (ENT-367) — die Secret-*Namen* bleiben trotzdem eigene
+(`STAGING_SMTP_*`), nur die *Werte* sind vorerst identisch; die zwingende
+Empfaenger-Umleitung unten macht das unkritisch. Adresse und genaue
 Hostpoint-Einrichtung stehen im Entscheidungsprotokoll des
 Projekt-Repositories (ENT-341); hier nur, was den Code betrifft:
 
@@ -152,8 +155,9 @@ Projekt-Repositories (ENT-341); hier nur, was den Code betrifft:
 - **E-Mail-Versand** ausserhalb der Produktion geht ausschliesslich an die
   in `STAGING_TESTMAIL` konfigurierte Adresse — `backend/mailer.php`,
   Funktion `smtp_ziel()` — **unabhaengig davon**, ueber welches Postfach
-  (eigenes `STAGING_SMTP_*`) sie tatsaechlich verschickt wird. Der
-  urspruenglich eingegebene Empfaenger bleibt im Betreff sichtbar.
+  (`STAGING_SMTP_*`, seit ENT-367 mit denselben Werten wie `SMTP_*`) sie
+  tatsaechlich verschickt wird. Der urspruenglich eingegebene Empfaenger
+  bleibt im Betreff sichtbar.
 - **Einrichtung einer neuen/leeren Staging-Datenbank:** `backend/schema.sql`
   einmalig in phpMyAdmin ausfuehren, danach `setup.php`/`setup.html`
   temporaer hochladen und den ersten Admin-Account anlegen (**danach
