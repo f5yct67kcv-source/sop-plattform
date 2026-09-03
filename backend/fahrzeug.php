@@ -157,12 +157,36 @@ function fz_meine_aktiv(PDO $pdo, int $mitarbeiterId): ?array
 // "voriger": die vorangehende Übernahme DESSELBEN Fahrzeugs -- derselbe
 // Bezug, den fz_bezugsstand() auch für die NÄCHSTE Übernahme heranzöge,
 // hier per Korrelation für JEDE Zeile mitgeholt (nicht nur die aktuellste).
+// "soll_*" (ENT-361): die Soll-Distanz zwischen dieser und der vorigen
+// Übernahme, aus den bereits für den GAV-Auslagenersatz erfassten Wegen
+// (einsaetze.weg_km, ENT-116) hergeleitet -- KEIN neues Erfassungsfeld,
+// keine Fahrzeugstandort-Frage (OP-316 bleibt für diesen Vergleich
+// unberührt). Datumsgenau verglichen (DATE(), portabel zwischen MySQL und
+// SQLite), nicht zeitgenau -- der Projektinhaber selbst: "nicht die 100%
+// genaue Ermittlung, aber grössere Abweichung muss man erkennen können".
+// Drei Werte statt einem: Zahl der zugeteilten Einsätze im Fenster, davon
+// mit gesetztem weg_km, und die Summe -- sonst würde ein NUR TEILWEISE
+// erfasster weg_km still zu einer zu niedrigen Soll-Distanz führen, ohne
+// dass das irgendwo sichtbar wäre ("unbekannt darf nie wie keine aussehen").
+// 'entfallen'/'abgelehnt' zählen nicht mit (dieselbe Ausnahme wie ENT-350).
 const FZ_UEBERNAHME_LISTE_SQL = "SELECT u.id, u.art, u.zeitpunkt, u.tacho_km, u.quelle,
            u.mitarbeiter_id AS eigene_mitarbeiter_id, u.foto IS NOT NULL AS hat_foto,
            f.id AS fahrzeug_id, f.kennzeichen, f.bezeichnung AS fz_bezeichnung,
            m.vorname, m.nachname, m.name,
            e.kunde_name, e.titel,
-           voriger.tacho_km AS voriger_km, voriger.mitarbeiter_id AS voriger_mitarbeiter_id
+           voriger.tacho_km AS voriger_km, voriger.mitarbeiter_id AS voriger_mitarbeiter_id,
+           (SELECT COUNT(*) FROM einsaetze se JOIN einsatz_zuteilung sz ON sz.einsatz_id = se.id
+             WHERE sz.mitarbeiter_id = u.mitarbeiter_id AND sz.zusage NOT IN ('entfallen', 'abgelehnt')
+               AND se.datum BETWEEN DATE(voriger.zeitpunkt) AND DATE(u.zeitpunkt)
+           ) AS soll_einsaetze,
+           (SELECT COUNT(se.weg_km) FROM einsaetze se JOIN einsatz_zuteilung sz ON sz.einsatz_id = se.id
+             WHERE sz.mitarbeiter_id = u.mitarbeiter_id AND sz.zusage NOT IN ('entfallen', 'abgelehnt')
+               AND se.datum BETWEEN DATE(voriger.zeitpunkt) AND DATE(u.zeitpunkt)
+           ) AS soll_einsaetze_mit_weg_km,
+           (SELECT SUM(2 * se.weg_km) FROM einsaetze se JOIN einsatz_zuteilung sz ON sz.einsatz_id = se.id
+             WHERE sz.mitarbeiter_id = u.mitarbeiter_id AND sz.zusage NOT IN ('entfallen', 'abgelehnt')
+               AND se.datum BETWEEN DATE(voriger.zeitpunkt) AND DATE(u.zeitpunkt)
+           ) AS soll_km_summe
       FROM fahrzeug_uebernahme u
       LEFT JOIN fahrzeuge f ON f.id = u.fahrzeug_id
       JOIN mitarbeiter m ON m.id = u.mitarbeiter_id
@@ -174,25 +198,51 @@ const FZ_UEBERNAHME_LISTE_SQL = "SELECT u.id, u.art, u.zeitpunkt, u.tacho_km, u.
            ORDER BY v.zeitpunkt DESC, v.id DESC LIMIT 1
       )";
 
-// Zwei Feststellungen aus dem Vorwert (ENT-356), getrennt von der SQL-
-// Abfrage geprüft, damit beide für sich falsch sein können, ohne dass die
-// jeweils andere Prüfung es verdeckt:
+// Ab welcher Differenz zwischen gefahrenen und erwarteten Kilometern die
+// Abweichungs-Feststellung anschlägt (ENT-361). Fest statt prozentual, auf
+// ausdrücklichen Wunsch des Projektinhabers: "10km" -- Stauumfahrungen u.ä.
+// bis in diese Grössenordnung sind normal.
+const FZ_ABWEICHUNG_TOLERANZ_KM = 10;
+
+// Drei Feststellungen (ENT-356/ENT-361), getrennt von der SQL-Abfrage
+// geprüft, damit jede für sich falsch sein kann, ohne dass eine andere es
+// verdeckt. Alle drei bleiben Feststellungen, keine Beanstandungen --
+// OP-314/ENT-356.
+//
 //  - "auffaellig": derselbe Sprung wie beim Abschicken selbst
 //    (FZ_SPRUNG_AUFFAELLIG) -- hier zusätzlich fürs Cockpit sichtbar
-//    gemacht, nicht nur im Toast der fahrenden Person.
+//    gemacht, nicht nur im Toast der fahrenden Person. Das ist ENT-313s
+//    "Lücke" -- braucht keinen Erwartungswert.
 //  - "wiederholt": dieselbe Person, dasselbe Fahrzeug, derselbe Stand wie
 //    bei ihrer EIGENEN letzten Übernahme -- anders als der bewusst
 //    erlaubte Fall "andere Person übernimmt beim gleichen Stand" (ENT-340),
 //    den fz_stand_pruefen() weiterhin nicht abweist.
-// Beides bleibt eine Feststellung, keine Beanstandung -- OP-314/ENT-356.
-function fz_uebernahme_feststellungen(?int $tachoKm, ?int $vorigerKm, ?int $vorigerMa, ?int $eigeneMa): array
+//  - "abweichend": gefahrene gegen erwartete Kilometer -- ENT-313s
+//    "Abweichung". Erwartet ist die Summe der bereits für den GAV-
+//    Auslagenersatz erfassten Wege (weg_km, ENT-116) über alle Einsätze
+//    zwischen dieser und der vorigen Übernahme. Fehlt weg_km bei
+//    MINDESTENS EINEM dieser Einsätze, ist die Summe unvollständig und
+//    NICHT vergleichbar -- "soll_unvollstaendig" macht das sichtbar, statt
+//    still eine zu niedrige Erwartung anzunehmen ("unbekannt darf nie wie
+//    keine aussehen").
+function fz_uebernahme_feststellungen(?int $tachoKm, ?int $vorigerKm, ?int $vorigerMa, ?int $eigeneMa,
+    int $sollEinsaetze = 0, int $sollEinsaetzeMitWegKm = 0, ?float $sollKmSumme = null): array
 {
     $kmSeither = ($tachoKm !== null && $vorigerKm !== null) ? $tachoKm - $vorigerKm : null;
+
+    $sollUnvollstaendig = $sollEinsaetze > 0 && $sollEinsaetzeMitWegKm < $sollEinsaetze;
+    $sollKm = ($sollEinsaetze > 0 && !$sollUnvollstaendig) ? (float)$sollKmSumme : null;
+    $abweichungKm = ($kmSeither !== null && $sollKm !== null) ? $kmSeither - $sollKm : null;
+
     return [
         'km_seither' => $kmSeither,
         'auffaellig' => $kmSeither !== null && $kmSeither > FZ_SPRUNG_AUFFAELLIG,
         'wiederholt' => $vorigerKm !== null && $tachoKm === $vorigerKm
             && $vorigerMa !== null && $vorigerMa === $eigeneMa,
+        'soll_km' => $sollKm,
+        'soll_unvollstaendig' => $sollUnvollstaendig,
+        'abweichung_km' => $abweichungKm,
+        'abweichend' => $abweichungKm !== null && abs($abweichungKm) > FZ_ABWEICHUNG_TOLERANZ_KM,
     ];
 }
 

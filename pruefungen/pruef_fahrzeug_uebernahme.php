@@ -30,7 +30,9 @@ $pdo->exec('CREATE TABLE fahrzeug_uebernahme (id INTEGER PRIMARY KEY, art TEXT, 
             mitarbeiter_id INT, einsatz_id INT NULL, zeitpunkt TEXT, tacho_km INT NULL,
             quelle TEXT, foto BLOB NULL, bemerkung TEXT NULL)');
 $pdo->exec('CREATE TABLE mitarbeiter (id INTEGER PRIMARY KEY, vorname TEXT, nachname TEXT, name TEXT)');
-$pdo->exec('CREATE TABLE einsaetze (id INTEGER PRIMARY KEY, kunde_name TEXT NULL, titel TEXT NULL)');
+$pdo->exec('CREATE TABLE einsaetze (id INTEGER PRIMARY KEY, kunde_name TEXT NULL, titel TEXT NULL,
+            datum TEXT NULL, von TEXT NULL, weg_km REAL NULL)');
+$pdo->exec('CREATE TABLE einsatz_zuteilung (einsatz_id INT, mitarbeiter_id INT, zusage TEXT)');
 // Erfundene Namen und Kontrollschilder mit hoher Nummer -- kein echtes
 // Fahrzeug, keine echte Person.
 $pdo->exec("INSERT INTO mitarbeiter VALUES (7, 'Vorname', 'Nachname', 'vn')");
@@ -230,10 +232,11 @@ pruef('KRITISCH: nimmt dieselbe Person ein zweites Fahrzeug, ohne das erste abzu
     . 'gilt nur das zweite (juengere) als aktiv',
     ($x = fz_meine_aktiv($pdo, 8)) !== null && $x['id'] === 16);
 
-// ── fz_uebernahme_feststellungen() (ENT-356) -- reine Funktion, keine DB ──
-pruef('Ohne Vorwert (erste Uebernahme eines Fahrzeugs) gibt es keine Feststellung',
-    fz_uebernahme_feststellungen(50000, null, null, 7)
-    === ['km_seither' => null, 'auffaellig' => false, 'wiederholt' => false]);
+// ── fz_uebernahme_feststellungen() (ENT-356/ENT-361) -- reine Funktion, keine DB ──
+pruef('Ohne Vorwert (erste Uebernahme eines Fahrzeugs) und ohne Einsaetze im Fenster gibt es keine Feststellung',
+    fz_uebernahme_feststellungen(50000, null, null, 7) === ['km_seither' => null, 'auffaellig' => false,
+        'wiederholt' => false, 'soll_km' => null, 'soll_unvollstaendig' => false,
+        'abweichung_km' => null, 'abweichend' => false]);
 pruef('Ein kleiner, normaler Zuwachs ist weder auffaellig noch wiederholt',
     ($f = fz_uebernahme_feststellungen(50050, 50000, 7, 8))['km_seither'] === 50
     && $f['auffaellig'] === false && $f['wiederholt'] === false);
@@ -248,6 +251,71 @@ pruef('KRITISCH: derselbe Stand durch eine ANDERE Person gilt NICHT als wiederho
     fz_uebernahme_feststellungen(50000, 50000, 7, 8)['wiederholt'] === false);
 pruef('Ein sinkender Stand (fz_stand_pruefen weist ihn ohnehin ab) ist nicht "auffaellig"',
     fz_uebernahme_feststellungen(49000, 50000, 7, 8)['auffaellig'] === false);
+
+// ── fz_uebernahme_feststellungen(): "abweichend"/"soll_km" (ENT-361) ──────
+// 70 km erwartet (5 Einsaetze mit weg_km, komplett), 68 km gefahren -- innerhalb
+// der Toleranz.
+$f3 = fz_uebernahme_feststellungen(50068, 50000, 7, 8, 1, 1, 70.0);
+pruef('Eine kleine Abweichung innerhalb der Toleranz (FZ_ABWEICHUNG_TOLERANZ_KM) ist nicht "abweichend"',
+    $f3['soll_km'] === 70.0 && $f3['abweichung_km'] === -2.0 && $f3['abweichend'] === false);
+
+// 70 km erwartet, 100 km gefahren -- ueber der Toleranz (das Beispiel des
+// Projektinhabers selbst).
+$f4 = fz_uebernahme_feststellungen(50100, 50000, 7, 8, 1, 1, 70.0);
+pruef('KRITISCH: eine Abweichung ueber der Toleranz wird erkannt (Beispiel: 70 erwartet, 100 gefahren)',
+    $f4['abweichung_km'] === 30.0 && $f4['abweichend'] === true);
+
+// Genau auf der Toleranzgrenze zaehlt noch nicht als abweichend (dieselbe
+// "> nicht >=" Konvention wie bei "auffaellig").
+$f5 = fz_uebernahme_feststellungen(50000 + FZ_ABWEICHUNG_TOLERANZ_KM, 50000, 7, 8, 1, 1, 0.0);
+pruef('Eine Abweichung GENAU auf der Toleranzgrenze gilt noch nicht als abweichend',
+    $f5['abweichend'] === false);
+
+// Ohne jeden Einsatz im Fenster gibt es nichts zu vergleichen -- weder
+// abweichend noch unvollstaendig, einfach kein Vergleichswert.
+$f6 = fz_uebernahme_feststellungen(50999, 50000, 7, 8, 0, 0, null);
+pruef('KRITISCH: ohne Einsaetze im Fenster gibt es keine Soll-Distanz und keine Abweichungs-Feststellung',
+    $f6['soll_km'] === null && $f6['abweichend'] === false && $f6['soll_unvollstaendig'] === false);
+
+// Fehlt bei MINDESTENS EINEM Einsatz im Fenster die Wegstrecke, ist die
+// Summe unvollstaendig -- KEIN Vergleich auf Basis einer zu niedrigen Zahl.
+$f7 = fz_uebernahme_feststellungen(50999, 50000, 7, 8, 3, 2, 40.0);
+pruef('KRITISCH: fehlt bei einem Einsatz im Fenster die Wegstrecke, gilt die Soll-Distanz als '
+    . 'unvollstaendig -- kein stiller Vergleich gegen eine zu niedrige Zahl',
+    $f7['soll_unvollstaendig'] === true && $f7['soll_km'] === null && $f7['abweichend'] === false);
+
+// ── FZ_UEBERNAHME_LISTE_SQL: "soll_*" (ENT-361) -- echte Ausfuehrung ──────
+// Zwei Einsaetze mit weg_km=15 (Hin+Rueck macht das Fenster 07:00-13:00 aus,
+// vor der zweiten Uebernahme) -- Soll = 2*15 + 2*15 = 60 km, gefahren 61200-
+// 61100 = 100 km -- eine echte Abweichung ueber die volle Kette gerechnet.
+$neu(19);
+$kette(19, 'uebernahme', 61100, '2026-07-01 06:00:00', 7);
+$pdo->exec("INSERT INTO einsaetze (id, datum, von, weg_km) VALUES (101, '2026-07-01', '07:00:00', 15.0)");
+$pdo->exec("INSERT INTO einsatz_zuteilung (einsatz_id, mitarbeiter_id, zusage) VALUES (101, 7, 'zugesagt')");
+$pdo->exec("INSERT INTO einsaetze (id, datum, von, weg_km) VALUES (102, '2026-07-01', '11:00:00', 15.0)");
+$pdo->exec("INSERT INTO einsatz_zuteilung (einsatz_id, mitarbeiter_id, zusage) VALUES (102, 7, 'zugesagt')");
+// Ein DRITTER Einsatz existiert, gehoert aber einer ANDEREN Person -- darf
+// die Summe fuer Mitarbeiter 7 nicht mitzaehlen.
+$pdo->exec("INSERT INTO einsaetze (id, datum, von, weg_km) VALUES (103, '2026-07-01', '09:00:00', 999.0)");
+$pdo->exec("INSERT INTO einsatz_zuteilung (einsatz_id, mitarbeiter_id, zusage) VALUES (103, 8, 'zugesagt')");
+// Ein VIERTER Einsatz gehoert Mitarbeiter 7, ist aber 'entfallen' -- zaehlt
+// nicht mit (gleiche Ausnahme wie ENT-350).
+$pdo->exec("INSERT INTO einsaetze (id, datum, von, weg_km) VALUES (104, '2026-07-01', '10:00:00', 999.0)");
+$pdo->exec("INSERT INTO einsatz_zuteilung (einsatz_id, mitarbeiter_id, zusage) VALUES (104, 7, 'entfallen')");
+$kette(19, 'uebernahme', 61200, '2026-07-01 14:00:00', 7);
+
+$stmt2 = $pdo->prepare(FZ_UEBERNAHME_LISTE_SQL . ' WHERE u.fahrzeug_id = ? AND u.tacho_km = ?');
+$stmt2->execute([19, 61200]);
+$zeile19 = $stmt2->fetch();
+pruef('KRITISCH: die Soll-Summe zaehlt nur die eigenen, nicht entfallenen Einsaetze im Fenster',
+    $zeile19 !== false && (int)$zeile19['soll_einsaetze'] === 2
+    && (int)$zeile19['soll_einsaetze_mit_weg_km'] === 2 && (float)$zeile19['soll_km_summe'] === 60.0);
+$f8 = fz_uebernahme_feststellungen((int)$zeile19['tacho_km'], (int)$zeile19['voriger_km'],
+    (int)$zeile19['voriger_mitarbeiter_id'], (int)$zeile19['eigene_mitarbeiter_id'],
+    (int)$zeile19['soll_einsaetze'], (int)$zeile19['soll_einsaetze_mit_weg_km'],
+    (float)$zeile19['soll_km_summe']);
+pruef('KRITISCH: end-to-end (SQL + Funktion) erkennt die Kette 61100->61200 gegen Soll 60 km als abweichend',
+    $f8['soll_km'] === 60.0 && $f8['km_seither'] === 100 && $f8['abweichend'] === true);
 
 // ── FZ_UEBERNAHME_LISTE_SQL (ENT-356) -- echte Ausfuehrung gegen SQLite ────
 // Dieselbe Konstante, die auch fahrzeug_uebernahme_liste.php verwendet --

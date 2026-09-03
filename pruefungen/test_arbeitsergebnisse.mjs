@@ -76,6 +76,20 @@ const UEBERNAHMEN = { status: 'ok', eingerichtet: true, eintraege: [
     fahrzeug_id: 6, kennzeichen: 'SO 999006', fz_bezeichnung: 'Patrouille 6',
     person: 'Hans Beispiel', kunde_name: null, titel: null,
     km_seither: 0, auffaellig: false, wiederholt: true },
+  // Eine dritte Feststellung (ENT-361): gefahren gegen erwartet, aus den
+  // bereits fuer den GAV-Auslagenersatz erfassten Wegen (weg_km, ENT-116).
+  { id: 7, art: 'uebernahme', zeitpunkt: `${T0} 11:00:00`, tacho_km: 20100, quelle: 'liste', hat_foto: false,
+    fahrzeug_id: 7, kennzeichen: 'SO 999007', fz_bezeichnung: 'Patrouille 7',
+    person: 'Erika Muster', kunde_name: null, titel: null,
+    km_seither: 100, auffaellig: false, wiederholt: false,
+    soll_km: 70, soll_unvollstaendig: false, abweichung_km: 30, abweichend: true },
+  // Fehlt bei einem Einsatz im Fenster die Wegstrecke, ist die Soll-Distanz
+  // unvollstaendig -- eine eigene, neutrale Aussage, kein "abweichend".
+  { id: 8, art: 'uebernahme', zeitpunkt: `${T0} 12:00:00`, tacho_km: 15300, quelle: 'liste', hat_foto: false,
+    fahrzeug_id: 8, kennzeichen: 'SO 999008', fz_bezeichnung: 'Patrouille 8',
+    person: 'Hans Beispiel', kunde_name: null, titel: null,
+    km_seither: 300, auffaellig: false, wiederholt: false,
+    soll_km: null, soll_unvollstaendig: true, abweichung_km: null, abweichend: false },
 ]};
 
 let calls = [];
@@ -315,6 +329,31 @@ check('Eine unauffällige Übernahme (SO 999001) zeigt keine der beiden Feststel
     const karte = karten.find(k => k.textContent.includes('SO 999001'));
     return !!karte && !/Auffällig/.test(karte.textContent);
   }));
+
+// ══════════ DRITTE FESTSTELLUNG (ENT-361): ABWEICHUNG ══════════════════════
+// Gefahren gegen erwartet (aus weg_km, ENT-116) -- ebenfalls eine reine
+// Feststellung, keine Beanstandung (OP-314).
+check('KRITISCH: eine Abweichung ueber der Toleranz wird als eigene Feststellung mit Soll- und Ist-Zahl angezeigt',
+  await page.evaluate(() => {
+    const karten = [...document.querySelectorAll('#aeUebListe .ag-karte')];
+    const karte = karten.find(k => k.textContent.includes('SO 999007'));
+    return !!karte && /Abweichung/.test(karte.textContent)
+      && /100/.test(karte.textContent) && /70/.test(karte.textContent);
+  }));
+check('KRITISCH: eine unvollstaendige Soll-Distanz wird als eigene, neutrale Aussage benannt, '
+    + 'nicht als "abweichend" und nicht stillschweigend uebergangen',
+  await page.evaluate(() => {
+    const karten = [...document.querySelectorAll('#aeUebListe .ag-karte')];
+    const karte = karten.find(k => k.textContent.includes('SO 999008'));
+    return !!karte && /unvollständig/.test(karte.textContent) && !/Abweichung:/.test(karte.textContent);
+  }));
+check('Eine unauffällige Übernahme (SO 999001) zeigt auch keine Abweichungs-Feststellung',
+  await page.evaluate(() => {
+    const karten = [...document.querySelectorAll('#aeUebListe .ag-karte')];
+    const karte = karten.find(k => k.textContent.includes('SO 999001'));
+    return !!karte && !/Abweichung/.test(karte.textContent) && !/unvollständig/.test(karte.textContent);
+  }));
+
 check('Kunde/Einsatz erscheinen, wo einer bekannt ist',
   uebInhalt.includes('Muster Liegenschaften AG') && uebInhalt.includes('Öffnungsrunde'));
 check('Person je Übernahme erscheint', uebInhalt.includes('Erika Muster') && uebInhalt.includes('Hans Beispiel'));
