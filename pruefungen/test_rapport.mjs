@@ -405,7 +405,9 @@ check('Das Fenster schliesst sich nach dem Versand',
 // Revierdienst-Hauptseite. Geprüft wird, dass er in DIESELBE Detailansicht
 // führt -- eine zweite wäre genau die Doppelung, die hier vermieden wurde.
 await page.evaluate(() => rgdZu());
-await page.evaluate(() => { arbeitsergebnisseOeffnen(); aeGoTab('erledigung'); });
+// Seit ENT-325 ist das eine eigene Ansicht, keine Schublade -- über go(),
+// sonst bliebe der Bereich verborgen und die Karten wären nicht anklickbar.
+await page.evaluate(() => { go('arbeitsergebnisse'); aeGoTab('erledigung'); });
 await page.waitForTimeout(600);
 const erlKarten = await page.evaluate(() =>
   [...document.querySelectorAll('#aeErlListe .ag-karte')].map(k => ({
