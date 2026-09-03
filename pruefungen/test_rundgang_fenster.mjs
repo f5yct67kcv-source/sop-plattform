@@ -20,6 +20,14 @@ import { chromium } from 'playwright';
 const EXE = browserPfad();
 const ok = [], bad = [];
 const check = (n, c) => (c ? ok : bad).push(n);
+// "Die Runde laeuft" wurde hier bisher an der sichtbaren Kontrollpunkt-Liste
+// festgemacht. Seit ENT-331 oeffnet eine begonnene Runde auf dem
+// Kartenreiter -- die Liste ist dann zwar erreichbar, aber nicht sichtbar.
+// Gemessen wird darum, was die Pruefungen eigentlich meinen: Die laufende
+// Runde steht als Vollseite offen. Das ist unabhaengig davon, welcher Reiter
+// gerade gewaehlt ist, und damit die genauere Aussage.
+const laufOffen = async page => await page.isVisible('#rgsReiter')
+  && await page.evaluate(() => rgsModus === 'lauf');
 
 // Eingefroren auf 22:00 an einem beliebigen, weit in der Zukunft liegenden
 // Tag -- die Schichten unten liegen an genau diesem Datum.
@@ -176,7 +184,7 @@ check('Bei zwei Vorlagen erscheint zuerst die Auswahl', await page.isVisible('#r
 await page.click('#rdVorlageListe button:has-text("Nachtrunde")');
 await page.waitForTimeout(300);
 check('KRITISCH: eine Vorlage INNERHALB ihres Fensters startet sofort, ohne Grundabfrage',
-  await page.isVisible('#rdListe'));
+  await laufOffen(page));
 const startInnerhalb = rufe.find(r => r.p.includes('mein_rundgang_starten'));
 check('KRITISCH: kein ausnahme_grund, wenn innerhalb des Fensters gestartet wurde',
   startInnerhalb && !('ausnahme_grund' in startInnerhalb.body) && startInnerhalb.body.vorlage_id === 901);
@@ -217,7 +225,7 @@ await page.waitForTimeout(300);
 const startAussen = rufe.find(r => r.p.includes('mein_rundgang_starten'));
 check('KRITISCH: der gewaehlte Grund wird mitgeschickt',
   startAussen && startAussen.body.ausnahme_grund === 'kurzfristige_umdisposition' && startAussen.body.vorlage_id === 902);
-check('Nach dem Senden erscheint die Checkliste', await page.isVisible('#rdListe'));
+check('Nach dem Senden läuft die Runde', await laufOffen(page));
 
 // ══════════ SPONTANER START ÜBER DIE OBJEKTÜBERGREIFENDE ÜBERSICHT
 // (ENT-279-Fortsetzung): dieselbe Fenster-Weiche wie beim schichtgebundenen
@@ -241,8 +249,8 @@ await page.waitForTimeout(300);
 const spontanInnerhalb = rufe.find(r => r.p.includes('mein_rundgang_spontan_starten'));
 check('KRITISCH: eine Vorlage INNERHALB ihres Fensters startet ohne Grundabfrage',
   spontanInnerhalb && !('ausnahme_grund' in spontanInnerhalb.body) && spontanInnerhalb.body.vorlage_id === 901);
-check('KRITISCH: nach erfolgreichem spontanem Start erscheint die echte Checkliste (Einsatz wurde gefunden)',
-  await page.isVisible('#rdListe'));
+check('KRITISCH: nach erfolgreichem spontanem Start läuft die echte Runde (Einsatz wurde gefunden)',
+  await laufOffen(page));
 
 // ══════════ GEMELDETER FEHLER: DIESELBE, SCHON LAUFENDE VORLAGE ERNEUT
 // ANTIPPEN -- fuehrt zum Fortsetzen der bestehenden Runde, nicht zu "Du bist
@@ -263,8 +271,8 @@ check('KRITISCH: ein zweiter Startversuch derselben, schon laufenden Vorlage zei
 // Der Zaehler steht seit ENT-306 im Kopf der Vollseite; #rdFortschritt traegt
 // dort nur noch den Zustand (abgebrochen/abgeschlossen) und ist waehrend der
 // laufenden Runde leer.
-check('KRITISCH: stattdessen wird die bereits laufende Runde fortgesetzt (dieselbe Checkliste, kein neuer Start)',
-  await page.isVisible('#rdListe') && (await page.textContent('#rgsZaehler')).includes('/'));
+check('KRITISCH: stattdessen wird die bereits laufende Runde fortgesetzt (kein neuer Start)',
+  await laufOffen(page) && (await page.textContent('#rgsZaehler')).includes('/'));
 
 spontanerEinsatz = null;
 aktiverSpontanRundgang = null;

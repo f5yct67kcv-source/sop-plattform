@@ -259,8 +259,17 @@ check('KRITISCH: und es wird kein Ausnahmegrund für etwas verlangt, das schon l
   !(await page.isVisible('#rfsGrund')));
 // Seit ENT-306 fuehrt "Zum Rundgang" in die laufende Runde als Vollseite --
 // dieselbe Seite, andere Betriebsart: Reiterleiste statt Vorschau-Fuss.
-check('Stattdessen öffnet sich die laufende Runde als Vollseite mit Checkliste',
-  await page.isVisible('#rgsReiter') && (await page.textContent('#rdListe')).includes('Eingang Nord'));
+// Seit ENT-331 oeffnet eine laufende Runde auf dem Kartenreiter. Geprueft
+// wird hier, dass die Runde als Vollseite offen ist UND die Kontrollpunkte
+// darin erreichbar sind -- darum der ausdrueckliche Reiterwechsel.
+const vollseiteDa = await page.isVisible('#rgsReiter');
+await page.evaluate(() => rgLaufReiter('punkte'));
+await page.waitForTimeout(300);
+check('Stattdessen öffnet sich die laufende Runde als Vollseite mit erreichbarer Checkliste',
+  vollseiteDa && await page.evaluate(() => {
+    const l = document.getElementById('rdListe');
+    return !!l && l.textContent.includes('Eingang Nord');
+  }));
 check('Die Vorschau-Module sind dabei weg -- die Runde laeuft, sie wird nicht mehr angekuendigt',
   !(await page.isVisible('#rgsModPause')));
 
