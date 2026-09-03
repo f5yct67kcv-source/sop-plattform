@@ -88,6 +88,10 @@ await page.fill('#gName', 'm.muster'); await page.fill('#gPass', 'x'); await pag
 await page.waitForSelector('.app.on');
 await page.waitForTimeout(400);
 
+// Seit ENT-335 ist "Zentrale und Notruf" ein Klappblock (Wunsch des
+// Projektinhabers: "um mehr Uebersicht zu erzeugen"). Alles, was den INHALT
+// des Blocks misst, muss ihn darum aufklappen -- das Klappverhalten selbst
+// wird weiter unten eigens geprueft.
 const oeffne = async name => {
   await page.evaluate(() => { blattZu(); rgSeiteZu(); });
   await page.evaluate(() => rundgangUebersichtOeffnen());
@@ -95,9 +99,18 @@ const oeffne = async name => {
   await page.click(`#blBody button:has-text("${name}")`);
   await page.waitForTimeout(400);
 };
+const hilfeAuf = async () => {
+  const zu = await page.evaluate(() => {
+    const k = document.getElementById('rgsKlappHilfe');
+    return !!k && !k.classList.contains('auf');
+  });
+  if (zu) { try { await page.click('#rgsKlappHilfe .rgs-klapp-kopf', { timeout: 2500 }); } catch (e) {} }
+  await page.waitForTimeout(250);
+};
 
 // ══════════ MIT GEPFLEGTER ZENTRALE ═══════════════════════════════════
 await oeffne('Runde mit Zentrale');
+await hilfeAuf();
 check('KRITISCH: die eigene Zentrale steht mit ihrer Nummer da',
   await page.isVisible('#rgsZentrale')
   && (await page.textContent('#rgsZentrale')).includes('079 111 22 33'));
@@ -126,7 +139,12 @@ check('KRITISCH: die eigene Zentrale steht ÜBER dem Notruf -- so vom Projektinh
 check('Der ganze Block steht über den Funktionen, nicht darunter (gemessen)',
   await page.evaluate(() => document.getElementById('rgsNotruf').getBoundingClientRect().top
     < document.getElementById('rgsModKp').getBoundingClientRect().top));
-check('Der Block braucht kein Aufklappen -- die Nummern sind sofort sichtbar',
+// REVIDIERT durch ENT-335: Der Block klappt jetzt zu. Was bleibt -- und was
+// hier an seine Stelle tritt -- ist der Grund hinter der alten Pruefung:
+// Die Notrufnummern duerfen nicht VERSTECKT sein. Sie stehen darum im
+// zugeklappten Kopf, lesbar ohne einen einzigen Tipp; getippt wird nur zum
+// Waehlen. Das eigentliche Klappverhalten steht im eigenen Abschnitt unten.
+check('KRITISCH: aufgeklappt sind die Nummern erreichbar',
   await page.isVisible('#rgsNotruf a'));
 // Die beiden Beschriftungen teilen sich die Klasse .rgs-mod-lb. Beim Bauen
 // hat genau das test_rundgang_pausieren.mjs rot gemacht: Dort griff ein
@@ -151,6 +169,7 @@ await page.screenshot({ path: `${OUT}/zentrale-01-mobil.png` });
 
 // ══════════ OHNE GEPFLEGTE ZENTRALE ═══════════════════════════════════
 await oeffne('Runde ohne Zentrale');
+await hilfeAuf();
 check('KRITISCH: ohne gepflegte Pikettnummer erscheint KEINE Zentrale -- kein stiller Rückfall auf eine andere Nummer',
   !(await page.isVisible('#rgsZentrale')));
 check('KRITISCH: stattdessen steht da, warum sie fehlt und wer sie einträgt -- nicht eine leere Fläche',
@@ -171,6 +190,7 @@ check('Die drei Notruf-Kacheln sind gleich breit (CLAUDE.md: gleiches Muster neb
 await page.setViewportSize({ width: 1440, height: 900 });
 await page.waitForTimeout(250);
 await oeffne('Runde mit Zentrale');
+await hilfeAuf();
 check('Am Desktop bleibt der Block innerhalb der App-Breite',
   await page.evaluate(() => {
     const n = document.getElementById('rgsNotruf').getBoundingClientRect();
@@ -185,6 +205,115 @@ check('Auch am Desktop sind die Kacheln gleich breit',
 check('KRITISCH: am Desktop kein waagrechter Seiten-Scroll', await page.evaluate(() =>
   document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1));
 await page.screenshot({ path: `${OUT}/zentrale-02-desktop.png` });
+
+
+// ══════════ ENT-335: KLAPPBLOCK, UND KEIN ZUSAMMENGEDRÜCKTER RUMPF ═════
+// Vom Projektinhaber: "Ich [würde] die Zentrale und Alarmnummer ebenfalls
+// ausklappbar machen, um mehr Übersicht zu erzeugen."
+await page.evaluate(() => { try { localStorage.removeItem('sop_rundgang_hilfe_offen'); } catch (e) {} });
+await oeffne('Runde mit Zentrale');
+check('KRITISCH: der Block ist von sich aus zugeklappt',
+  await page.evaluate(() => {
+    const k = document.getElementById('rgsKlappHilfe');
+    const bd = k && k.querySelector('.rgs-klapp-bd');
+    return !!k && !k.classList.contains('auf') && !!bd && getComputedStyle(bd).display === 'none';
+  }));
+// Ein Klappblock, der verschweigt, was er verbirgt, waere bei NOTRUFNUMMERN
+// das Falsche: Wer 117 braucht, darf nicht erst suchen muessen, wo sie
+// stecken. Sie stehen darum lesbar im zugeklappten Kopf.
+check('KRITISCH: die Notrufnummern stehen trotzdem lesbar im zugeklappten Kopf',
+  await page.evaluate(() => {
+    const z = document.querySelector('#rgsKlappHilfe .rgs-klapp-nr');
+    if (!z) return false;
+    const t = z.textContent;
+    const r = z.getBoundingClientRect();
+    return t.includes('117') && t.includes('118') && t.includes('144') && r.width > 0 && r.height > 0;
+  }));
+check('Und der Kopf sagt weiterhin, worum es geht',
+  (await page.textContent('#rgsHilfeLb')) === 'Zentrale und Notruf');
+check('Der Kopf ist mindestens 44px hoch (CLAUDE.md)',
+  await page.evaluate(() => document.querySelector('#rgsKlappHilfe .rgs-klapp-kopf')
+    .getBoundingClientRect().height >= 44));
+await page.click('#rgsKlappHilfe .rgs-klapp-kopf');
+await page.waitForTimeout(250);
+check('KRITISCH: ein Tipp öffnet ihn und die Nummern sind wählbar',
+  await page.isVisible('#rgsNotruf a') && await page.isVisible('#rgsZentrale'));
+// Wer ihn offen laesst, soll ihn offen wiederfinden -- sonst muesste er vor
+// jeder Runde erneut aufgeklappt werden.
+await page.evaluate(() => { blattZu(); rgSeiteZu(); });
+await oeffne('Runde mit Zentrale');
+check('KRITISCH: die Wahl überdauert das Schliessen und erneute Öffnen der Seite',
+  await page.evaluate(() => {
+    const k = document.getElementById('rgsKlappHilfe');
+    return !!k && k.classList.contains('auf');
+  }));
+await page.click('#rgsKlappHilfe .rgs-klapp-kopf');
+await page.waitForTimeout(250);
+await page.evaluate(() => { blattZu(); rgSeiteZu(); });
+await oeffne('Runde mit Zentrale');
+check('Und das Zuklappen ebenso -- der Schalter kennt beide Richtungen',
+  await page.evaluate(() => {
+    const k = document.getElementById('rgsKlappHilfe');
+    return !!k && !k.classList.contains('auf');
+  }));
+
+// ── In der LAUFENDEN Runde bleibt er offen ────────────────────────────
+// ENT-299 Ziffer 4 wird nur zur Haelfte revidiert. Der Satz „Wer diese
+// Nummern braucht, hat keine Hand frei zum Aufklappen" gilt dort, wo er
+// gemeint war: waehrend der Runde. Dort gibt es keinen Schalter und der
+// Block steht offen -- unveraendert seit ENT-299.
+check('KRITISCH: in der laufenden Runde gibt es keinen Klappschalter für den Notruf',
+  await page.evaluate(async () => {
+    rgsModus = 'lauf';
+    rgSeiteZeichnen(rgsDaten);
+    await new Promise(r => setTimeout(r, 250));
+    const klapp = document.getElementById('rgsKlappHilfe');
+    const notruf = document.getElementById('rgsNotruf');
+    const sichtbar = !!notruf && notruf.getBoundingClientRect().height > 0;
+    const lb = document.getElementById('rgsHilfeLb');
+    rgsModus = 'vorschau';
+    rgSeiteZeichnen(rgsDaten);
+    return !klapp && sichtbar && !!lb && lb.textContent === 'Zentrale und Notruf';
+  }));
+await page.waitForTimeout(250);
+
+// ── Der zusammengedrückte Rumpf (der eigentliche Befund) ──────────────
+// Vom Projektinhaber mit einem Bildschirmfoto gemeldet: Objekt, Kunde,
+// Adresse, Zeitfenster und Ansprechpartner fehlten -- auf dem Handy, nicht
+// im Test. Die Ursache war nicht fehlender Text, sondern Flexbox: .karte,
+// .rgs-fakten und .rgs-klapp tragen `overflow: hidden`, damit faellt ihre
+// automatische Mindesthoehe auf 0, und im Flex-Rumpf wurden sie auf wenige
+// Pixel zusammengedrueckt, sobald der Inhalt nicht mehr auf den Bildschirm
+// passte. Auf dem iPhone ist der sichtbare Bereich wegen der Safari-Leiste
+// kuerzer als die 844px der Pruefung -- darum fiel es dort auf und hier
+// nicht. Gemessen wird jetzt an mehreren Hoehen.
+for (const hoehe of [844, 720, 660, 600]) {
+  await page.setViewportSize({ width: 390, height: hoehe });
+  await page.waitForTimeout(250);
+  const m = await page.evaluate(() => {
+    const h = s => { const e = document.querySelector(s); return e ? e.getBoundingClientRect().height : -1; };
+    return { karte: h('.karte'), fakten: h('.rgs-fakten'), klapp: h('#rgsKlappAp'),
+             hilfe: h('#rgsKlappHilfe'), name: h('.rgs-obj-name'), wert: h('.rgs-fakt-wert') };
+  });
+  check(`KRITISCH: bei ${hoehe}px Höhe wird kein Block zusammengedrückt`,
+    m.karte > 100 && m.fakten > 44 && m.klapp >= 44 && m.hilfe >= 44
+    && m.name > 12 && m.wert > 12);
+}
+// Und der Text steht wirklich da, nicht nur der Rahmen -- eine Huelle in
+// voller Hoehe mit abgeschnittenem Inhalt waere derselbe Fehler.
+await page.setViewportSize({ width: 390, height: 600 });
+await page.waitForTimeout(250);
+check('KRITISCH: Objekt, Kunde und Zeitfenster stehen auch auf dem kurzen Bildschirm im Kasten',
+  await page.evaluate(() => {
+    const drin = s => {
+      const e = document.querySelector(s); if (!e) return false;
+      const r = e.getBoundingClientRect();
+      const k = e.closest('.karte, .rgs-fakten').getBoundingClientRect();
+      return r.height > 12 && r.top >= k.top - 1 && r.bottom <= k.bottom + 1;
+    };
+    return drin('.rgs-obj-name') && drin('.rgs-obj-kunde') && drin('.rgs-fakt-wert');
+  }));
+await page.setViewportSize({ width: 390, height: 844 });
 
 await browser.close();
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
