@@ -42,6 +42,24 @@ $verkehrsmittel = trim((string)($in['verkehrsmittel'] ?? ''));
 if ($verkehrsmittel !== '' && !in_array($verkehrsmittel, MA_VERKEHRSMITTEL, true)) {
     json_response(['status' => 'error', 'message' => 'Unbekanntes Verkehrsmittel'], 422);
 }
+
+// Wer als Fahrer des Dienstfahrzeugs bestimmt ist, faehrt damit zum Einsatz
+// (ENT-325). Ein abweichendes Verkehrsmittel waere eine zweite Angabe ueber
+// dieselbe Fahrt -- und der Abgleich rechnete daraus einen Fahrkostenersatz
+// fuer ein Auto, das dem Betrieb selbst gehoert (Art. 18 Ziff. 4/5). Die
+// Sperre steht hier im Server und nicht nur in der Oberflaeche: Was man am
+// Browser vorbei umgehen kann, ist keine Sperre.
+if (hat_spalte(db(), 'einsaetze', 'fahrer_id')) {
+    $f = db()->prepare('SELECT fahrer_id FROM einsaetze WHERE id = ?');
+    $f->execute([$einsatzId]);
+    $fahrerId = $f->fetchColumn();
+    if ($fahrerId !== false && $fahrerId !== null && (int)$fahrerId === $maId
+        && $verkehrsmittel !== 'Geschaeftsfahrzeug') {
+        json_response(['status' => 'error', 'message' =>
+            'Diese Person ist als Fahrer des Dienstfahrzeugs eingeteilt und fährt damit zum '
+            . 'Einsatz. Zum Ändern zuerst die Fahrzeugzuteilung lösen.'], 409);
+    }
+}
 // Nur bei "Oeffentlicher Verkehr" hat ein Billettpreis ueberhaupt eine
 // Bedeutung -- fuer jedes andere Verkehrsmittel wird er verworfen, statt
 // als Karteileiche stehenzubleiben und spaeter falsch gelesen zu werden.

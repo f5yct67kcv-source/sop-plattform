@@ -1563,6 +1563,26 @@ $spalten = [
     // Arbeitsort, passt die gespeicherte Zahl nicht mehr -- ohne diesen
     // Abgleich faellt das niemandem auf.
     ['einsaetze', 'weg_adresse', 'ALTER TABLE einsaetze ADD COLUMN weg_adresse VARCHAR(300) NULL AFTER weg_minuten'],
+    // Dienstfahrzeug und Fahrer am Einsatz (ENT-325, Schritt 2 aus ENT-313).
+    // ENT-115 hatte das Auswahlfeld bewusst weggelassen -- es gab keine
+    // Fahrzeuge zum Waehlen. Seit ENT-313 gibt es sie.
+    //
+    // KEIN Fremdschluessel, obwohl es sich anboete: Die Nachtragsliste hier
+    // kann nur Spalten ergaenzen. Die Bindung wird stattdessen an beiden
+    // Enden im Code gehalten -- einsatz_save.php/einsatz_fahrzeug.php nehmen
+    // nur bestehende Fahrzeuge an, und fahrzeuge.php verweigert das Loeschen
+    // eines Fahrzeugs, das an einem Einsatz haengt. Ein ON DELETE SET NULL
+    // waere hier ohnehin falsch: Welches Fahrzeug gefahren wurde, ist eine
+    // Tatsache und darf nicht still verschwinden.
+    //
+    // fahrer_id ist die EINE Person, die das Fahrzeug fuehrt -- vom Planer
+    // bestimmt, nicht in der App ausgehandelt. Sie muss dem Einsatz zugeteilt
+    // sein, und ohne Fahrzeug hat sie keine Bedeutung; beides wird im Code
+    // durchgesetzt. Am Fahrer haengt Geld: Wer im Geschaeftsfahrzeug faehrt,
+    // bekommt Fahrzeitersatz, aber keinen Fahrkostenersatz (Art. 18 Ziff. 4/5,
+    // auslagen.php).
+    ['einsaetze', 'fahrzeug_id', 'ALTER TABLE einsaetze ADD COLUMN fahrzeug_id INT NULL AFTER weg_adresse'],
+    ['einsaetze', 'fahrer_id',   'ALTER TABLE einsaetze ADD COLUMN fahrer_id INT NULL AFTER fahrzeug_id'],
     // Eine Fahrzeit-Position ist KEINE Arbeitszeit (Art. 18 Ziff. 2, wörtlich:
     // "wird nicht an die Arbeitszeit gemäss diesem GAV angerechnet"). Sie
     // steht im Raster, damit der Planer die Anfahrt sieht -- sie darf aber
