@@ -64,9 +64,14 @@ in `dashboard.html` — eine Zeile aendern genuegt.
 
 ## Deploy
 
-Jeder Push auf `main` loest den Workflow `.github/workflows/deploy-hostpoint.yml`
-aus: Platzhalter (`__DB_HOST__`, `__ANTHROPIC_API_KEY__` usw.) werden aus
-GitHub Secrets ersetzt, danach FTPS-Upload zu Hostpoint.
+Jeder Push auf `main` **oder** `staging` loest denselben Workflow
+`.github/workflows/deploy-hostpoint.yml` aus (ENT-341): Platzhalter
+(`__DB_HOST__`, `__ANTHROPIC_API_KEY__` usw.) werden aus GitHub Secrets
+ersetzt, danach FTPS-Upload zu Hostpoint. `main` deployt nach Produktion,
+`staging` nach der getrennten Testinstanz — **derselbe Workflow, dieselbe
+Dateiliste**, nur das GitHub Environment (`production`/`staging`, siehe
+`Settings → Environments`) und damit die Werte hinter den Secret-Namen
+unterscheiden sich. Siehe „Staging" weiter unten.
 
 **Im Quellcode stehen nie echte Zugangsdaten** — nur Platzhalter. Wer die Dateien
 lokal oeffnet, sieht keine Geheimnisse.
@@ -98,14 +103,54 @@ auslesen** — das ist kein Mangel, sondern der Sinn eines Secrets.
 | `SMTP_PASSWORD` | Passwort dazu | Hostpoint-Kundencenter → E-Mail; bei Verlust dort neu setzen |
 | `SMTP_ABSENDER` | Absenderadresse der Offert-Mails (muss zum Postfach passen) | dieselbe Stelle |
 | `SMTP_ABSENDER_NAME` | Angezeigter Absendername (optional, sonst nur die Adresse) | frei waehlbar |
+| `MAPS_JS_KEY` | Google-Maps-Browserschluessel fuer Kontrollpunkt-Karte, Geofence-Auswahl, Objektplan | console.cloud.google.com — je Umgebung ein **eigener** Schluessel (ENT-341), referrer-beschraenkt auf genau die eine Domain |
+| `STAGING_TESTMAIL` | Nur im Environment `staging` gesetzt: Zieladresse, auf die **jede** ausgehende Mail umgeleitet wird (ENT-341) | frei waehlbar, sollte kein produktives Postfach sein |
 
 Fehlen die SMTP-Secrets, meldet „Per E-Mail versenden" im Dashboard „noch
 nicht eingerichtet" — es wird nie versucht, mit einem Platzhalter als Hostnamen
-zu verbinden.
+zu verbinden. Fehlt `STAGING_TESTMAIL` im Environment `staging`, bricht der
+Versand dort mit einer eigenen Fehlermeldung ab, statt irgendwohin zu senden.
+
+Alle Secrets bis auf `STAGING_TESTMAIL` existieren in **beiden** Environments
+(`production` und `staging`), aber mit **unterschiedlichen Werten** — siehe
+„Staging" weiter unten. Zwei Namen sind besonders leicht zu verwechseln:
+`DB_*`/`HOSTPOINT_FTP_*` je aus dem **jeweils eigenen** Hostpoint-Account, nie
+aus dem anderen kopiert.
 
 **Wenn ein Wert je an eine falsche Stelle geraten ist** — in einen Commit, einen
 Chat, ein Bildschirmfoto: **neu erzeugen, nicht loeschen.** Loeschen hilft nicht,
 der alte Wert bleibt in der Git-Historie und in Zwischenspeichern stehen.
+
+## Staging (ENT-341)
+
+Eine vollstaendig getrennte Testinstanz — dieselbe Codebasis, eigene
+Datenbank, eigenes FTP-Ziel, eigene Secrets, keine echten Geschaeftsdaten.
+Adresse und genaue Hostpoint-Einrichtung stehen im Entscheidungsprotokoll
+des Projekt-Repositories (ENT-341); hier nur, was den Code betrifft:
+
+- **Branch `staging`** loest denselben Deploy-Workflow aus wie `main`, mit
+  dem GitHub Environment `staging` statt `production` (siehe oben).
+- **`ist_produktion()`** in `backend/db.php` erkennt die Produktionsdomain
+  am Hostnamen (`PRODUKTIONS_DOMAIN`-Konstante) — jeder andere Hostname
+  gilt als „nicht Produktion". Dieselbe Unterscheidung trifft
+  `testumgebung.js` client-seitig fuer das sichtbare
+  „TESTUMGEBUNG"-Kennzeichen (kleiner Hinweis unten rechts, ueberlagert
+  nichts).
+- **E-Mail-Versand** ausserhalb der Produktion geht ausschliesslich an die
+  in `STAGING_TESTMAIL` konfigurierte Adresse — `backend/mailer.php`,
+  Funktion `smtp_ziel()`. Der urspruenglich eingegebene Empfaenger bleibt
+  im Betreff sichtbar.
+- **Einrichtung einer neuen/leeren Staging-Datenbank:** `backend/schema.sql`
+  einmalig in phpMyAdmin ausfuehren, danach `setup.php`/`setup.html`
+  temporaer hochladen und den ersten Admin-Account anlegen (**danach
+  sofort wieder loeschen**, siehe oben), danach im Dashboard unter
+  „Betrieb → Einrichtung" den bestehenden, idempotenten
+  `planung_einrichten.php`-Endpunkt ausfuehren. Kein eigenes
+  Migrations-Werkzeug noetig — dieser Ablauf existiert bereits fuer
+  Produktion und funktioniert unveraendert fuer Staging.
+- **Zuruecksetzen** einer Staging-Datenbank ist bewusst manuell (siehe
+  ENT-341, Punkt 6): Datenbank in phpMyAdmin leeren, obigen Ablauf
+  wiederholen. Es gibt keinen automatischen Reset-Endpunkt.
 
 ### Lokal testen
 
