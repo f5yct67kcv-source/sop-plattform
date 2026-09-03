@@ -1188,6 +1188,11 @@ th.sortbar.aktiv .pf { opacity: 1; color: var(--accent); }
 .dot.neg { background: var(--neg); box-shadow: 0 0 0 3px var(--neg-soft); }
 /* Wer abgesagt hat, bleibt sichtbar -- aber als das, was er ist (ENT-113). */
 .nm.nm-abgelehnt { background: var(--neg-soft); color: var(--neg); text-decoration: line-through; }
+/* Entfallen ist NICHT dasselbe wie abgelehnt (ENT-347): Der Mitarbeiter hat
+   nicht abgesagt, er ist zur selben Zeit auf einer Runde. Darum durchgestrichen
+   wie eine Absage -- der Platz ist ebenso offen --, aber in Warnfarbe statt in
+   Rot: Es ist kein Konflikt mit der Person, sondern eine Umdisposition. */
+.nm.nm-entfallen { background: var(--warn-soft); color: var(--warn); text-decoration: line-through; }
 .rank.click { cursor: pointer; }
 .rank.click:hover { background: var(--bg); }
 
@@ -11596,6 +11601,19 @@ function ruheLuecken(datum, von, bis, ausserId) {
 // gekennzeichnet: Wer abgesagt hat, ist die wichtigste Information ueberhaupt
 // -- ihn herauszufiltern hiesse, sie zu verstecken.
 const zusageVon = m => String((m && m.zusage) || 'offen');
+/* EINE Regel, was als Besetzung zaehlt (ENT-347).
+   Bisher stand "!== 'abgelehnt'" an mehreren Stellen einzeln -- in der
+   Planungsliste, im Positionsraster, in den Beschriftungen. Ein zweiter
+   Zustand, der ebenfalls nicht besetzt, waere an einer davon vergessen
+   worden, und dann zaehlte der Kopf "1 / 1", waehrend niemand kommt.
+
+   'entfallen' ist der neue Zustand (ENT-347): Der Waechter hat bestaetigt,
+   dass er zur selben Zeit eine Revierrunde laeuft -- die Zuteilung bleibt
+   als Zeile stehen (Nachweis: er WAR eingeteilt), zaehlt aber nicht mehr
+   als Besetzung. Damit springt die Schicht sichtbar auf unterbesetzt,
+   statt still doppelt belegt zu sein. */
+const ZUSAGE_NICHT_BESETZT = ['abgelehnt', 'entfallen'];
+const zaehltAlsBesetzt = z => !ZUSAGE_NICHT_BESETZT.includes(String(z || 'offen'));
 // Ein Name in der Liste sagt jetzt auch, ob die Person abgesagt hat.
 // Ohne das stuende sie unauffaellig zwischen den anderen, obwohl ihr Platz
 // wieder offen ist (ENT-113).
@@ -11613,13 +11631,20 @@ const nameChip = (m, e) => {
   if (zusageVon(m) === 'abgelehnt') {
     return `<span class="nm nm-abgelehnt" title="Hat abgelehnt — der Platz ist wieder offen">${name}</span>`;
   }
+  if (zusageVon(m) === 'entfallen') {
+    return `<span class="nm nm-entfallen" title="Entfallen — läuft zur selben Zeit eine Revierrunde. Der Platz ist wieder offen.">${name}</span>`;
+  }
   const r = e ? agRapport({ einsatz_id: e.id, mitarbeiter_id: m.id }) : null;
   const rapIkone = r ? `<button type="button" class="nm-rap" title="Rapport von ${name}, ${dmy(r.datum)} — ansehen"
       onclick="event.stopPropagation();openDrawer(${Number(r.id)})">${RAP_IKONE}</button>` : '';
   return `<span class="nm">${name}${rapIkone}</span>`;
 };
-const besetzt = e => (e.mitarbeiter || []).filter(m => zusageVon(m) !== 'abgelehnt');
+const besetzt = e => (e.mitarbeiter || []).filter(m => zaehltAlsBesetzt(zusageVon(m)));
 const hatAbgelehnt = e => (e.mitarbeiter || []).some(m => zusageVon(m) === 'abgelehnt');
+// Eigene Auskunft, nicht mit der Absage vermischt: „hat abgelehnt" und
+// „ist entfallen, weil er eine Runde laeuft" sind fuer den Planer zwei
+// verschiedene Lagen mit zwei verschiedenen naechsten Schritten.
+const hatEntfallen = e => (e.mitarbeiter || []).some(m => zusageVon(m) === 'entfallen');
 const fehlend = e => (e.status === 'abgesagt' ? 0 : Math.max(0, Number(e.bedarf) - besetzt(e).length));
 
 // Ein leeres Feld heisst "kein Limit auf dieser Seite" -- damit deckt derselbe
@@ -17429,14 +17454,15 @@ function epVerkehrsmittelSpeichern(maId) {
 // Der Balken sagt jetzt, woran man ist (ENT-113): gelb = eingeteilt, aber
 // noch keine Rueckmeldung; gruen = zugesagt; rot = abgelehnt. Vorher war
 // jede besetzte Schicht gelb, und ob jemand abgesagt hatte, stand nirgends.
-const EP_ZUSAGE_KLASSE = { zugesagt: 'zugesagt', abgelehnt: 'abgelehnt' };
+const EP_ZUSAGE_KLASSE = { zugesagt: 'zugesagt', abgelehnt: 'abgelehnt', entfallen: 'abgelehnt' };
 const epZusageKlasse = p => EP_ZUSAGE_KLASSE[String(p.zusage || 'offen')] || 'besetzt';
 // Wer abgelehnt hat, besetzt die Position nicht -- dieselbe Regel wie in der
 // Planungsliste (ENT-113). Ohne sie zaehlte der Kopf "3 / 3", waehrend im
 // Raster eine Absage rot leuchtet.
-const epBesetzt = p => !!p.mitarbeiter_id && String(p.zusage || 'offen') !== 'abgelehnt';
+const epBesetzt = p => !!p.mitarbeiter_id && zaehltAlsBesetzt(p.zusage);
 const epZusageWort = p => !p.mitarbeiter_id ? ''
   : (p.zusage === 'zugesagt' ? 'Hat zugesagt'
+    : p.zusage === 'entfallen' ? 'ENTFALLEN — läuft eine Revierrunde, die Schicht ist offen'
     : p.zusage === 'abgelehnt' ? 'HAT ABGELEHNT — die Schicht ist offen'
     : 'Eingeteilt, noch keine Rückmeldung')
     + (p.gesehen_am ? ' · Schicht in der App angesehen' : ' · noch nicht angesehen');

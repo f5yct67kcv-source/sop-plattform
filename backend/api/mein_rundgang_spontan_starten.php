@@ -144,6 +144,39 @@ try {
     $rIns->execute([$einsatzId, (int)$user['id'], (int)$v['objekt_id'], $vorlageId, $ausnahmeGrund]);
     $rundgangId = (int)$pdo->lastInsertId();
 
+    /* Aus der kollidierenden Schicht ENTFALLEN, nicht daraus geloescht
+       (ENT-347, vom Projektinhaber entschieden).
+
+       Sein Anlass: "Wenn ein Mitarbeiter deutlich bestaetigt, dass er an
+       einem anderen Auftrag arbeitet, muss es ihn aus der anderen Schicht
+       zwangsmaessig entfernen. Das ist eine zuverlaessige Methodik und
+       schuetzt den Planer vor einem Fehler."
+
+       Entfernt wird die Person aus der BESETZUNG -- die Zuteilungszeile
+       selbst bleibt stehen. Zwei Gruende, beide wichtiger als die eine
+       gesparte Zeile:
+        - Nachweis: Dass sie dort eingeteilt WAR, ist bei arbeitsrechtlichen
+          und GAV-Fragen die entscheidende Auskunft. Ein DELETE nimmt sie mit.
+        - Der eigentliche Schutz des Planers ist nicht das Verschwinden,
+          sondern die UNTERBESETZUNG: Die Schicht springt im Plan von 1/1 auf
+          0/1 und wird als unterbesetzt markiert. Eine geloeschte Zeile
+          erzeugt dasselbe Bild -- aber ohne die Erklaerung, warum.
+
+       Nur die tatsaechlich ueberschneidenden Zuteilungen dieser Person, und
+       nur die, die heute noch als Besetzung zaehlen. Eine bereits
+       abgelehnte Schicht wird nicht angetastet: Dort ist der Platz schon
+       offen, und "abgelehnt" ist eine Aussage der Person, die kein
+       Automatismus ueberschreiben darf. */
+    $entfallen = [];
+    foreach ($doppelt as $d) {
+        $up = $pdo->prepare(
+            "UPDATE einsatz_zuteilung SET zusage = 'entfallen'
+              WHERE einsatz_id = ? AND mitarbeiter_id = ? AND zusage NOT IN ('abgelehnt', 'entfallen')"
+        );
+        $up->execute([(int)$d['einsatz_id'], (int)$user['id']]);
+        if ($up->rowCount() === 1) { $entfallen[] = $d['was']; }
+    }
+
     $pdo->commit();
 } catch (Throwable $e) {
     $pdo->rollBack();
@@ -175,8 +208,14 @@ if ($doppelt) {
         // abgelegt (Nachweis-Prinzip): Wer die Meldung spaeter liest, soll
         // dort lesen koennen, WOGEGEN gestartet wurde -- auch dann noch,
         // wenn der geplante Einsatz inzwischen umgeplant oder geloescht ist.
+        // Der Klartext nennt BEIDES: dass gestartet wurde, und was das mit
+        // der geplanten Schicht gemacht hat. Ein Ereignis, das nur den Start
+        // meldet, liesse den Planer im Glauben, die Schicht sei noch besetzt.
         $text = 'Rundgang „' . $v['name'] . '" gestartet, obwohl zur selben Zeit eingeteilt: '
-            . $doppelt[0]['was'];
+            . $doppelt[0]['was']
+            . ($entfallen
+                ? ' — aus dieser Einteilung entfallen: ' . implode(', ', $entfallen)
+                : ' — die Einteilung blieb unveraendert');
         $evt = $pdo->prepare(
             'INSERT INTO ereignis_meldung
                (objekt_id, rundgang_id, einsatz_id, mitarbeiter_id, ereignisart_id, erfasst_am, bemerkung)
@@ -191,4 +230,5 @@ if ($doppelt) {
 
 $kontrollpunkte = rundgang_kontrollpunkte_uebrig($pdo, $rundgangId, (int)$v['objekt_id'], $vorlageId);
 json_response(['status' => 'ok', 'einsatz_id' => $einsatzId, 'rundgang_id' => $rundgangId,
-               'kontrollpunkte' => $kontrollpunkte, 'ereignis_fehler' => $ereignisFehler]);
+               'kontrollpunkte' => $kontrollpunkte, 'ereignis_fehler' => $ereignisFehler,
+               'entfallen' => $entfallen ?? []]);

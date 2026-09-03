@@ -72,8 +72,21 @@ check('KRITISCH: jeder andere Status loescht einen vorhandenen Schnappschuss',
   /} else {\s*\$auslagenLoeschen->execute\(\[\$einsatzId, \$maId\]\);/.test(ABGLEICH));
 check('KRITISCH: die Ausnahme an der Zuteilung schlaegt die Vorgabe der Person',
   /\$ausn && \$ausn\['verkehrsmittel'\] !== null[\s\S]{0,80}\? \$ausn\['verkehrsmittel'\]\s*:\s*\(\$vorgabeWert/.test(ABGLEICH));
-check('KRITISCH: der Tageskonflikt zaehlt jeden anderen, nicht abgesagten Einsatz desselben Tages',
-  /e\.status != 'abgesagt' AND e\.id != \?/.test(ABGLEICH));
+// GEAENDERT durch ENT-347. Diese Pruefung hielt die alte Regel fest: JEDER
+// andere, nicht abgesagte Einsatz desselben Tages zaehlte. Seither zaehlt
+// eine ENTFALLENE Zuteilung nicht mehr mit -- wer aus einer Schicht
+// entfallen ist, war dort nicht und hatte darum keinen Hin- und Rueckweg
+// dorthin. Das ist keine GAV-Auslegung, sondern eine Tatsachenfeststellung
+// davor (Vermerk bei GAV-AUS-010 im Auslegungsregister).
+//
+// Geprueft wird darum jetzt BEIDES: dass die Einschraenkung da ist -- und
+// dass sie GENAU 'entfallen' betrifft und nichts weiter. Eine Sperre, die
+// aus Versehen auch 'abgelehnt' oder 'offen' ausnaehme, wuerde still zu
+// wenig sperren, und das faellt an einer Auszahlung auf, nicht hier.
+check('KRITISCH: der Tageskonflikt zaehlt jeden anderen, nicht abgesagten Einsatz desselben Tages -- ausser entfallenen (ENT-347)',
+  /e\.status != 'abgesagt'\s*\n\s*AND z\.zusage != 'entfallen' AND e\.id != \?/.test(ABGLEICH));
+check('KRITISCH: und die Ausnahme betrifft NUR "entfallen", nicht auch abgelehnte oder offene Zuteilungen',
+  (ABGLEICH.match(/z\.zusage (?:!=|<>) '[a-z]+'/g) || []).join('|') === "z.zusage != 'entfallen'");
 check('Schreiben und Loeschen laufen in derselben Transaktion wie die Ist-Zeiten',
   ABGLEICH.indexOf('$pdo->beginTransaction()') < ABGLEICH.indexOf('$auslagenSpeichern(')
   && ABGLEICH.indexOf('$auslagenSpeichern(') < ABGLEICH.indexOf('$pdo->commit()'));
