@@ -414,11 +414,17 @@ check('Das Ereignis nennt, was mit der geplanten Schicht geschehen ist',
 // Sonst meldete die Sperre denselben Konflikt bei jedem weiteren Versuch --
 // gegen eine Zuteilung, die sie selbst aufgeloest hat.
 check('KRITISCH: die Doppelbelegungs-Sperre zählt entfallene Zuteilungen nicht mehr mit',
-  /AND z\.zusage <> 'entfallen'/.test(PLA));
+  /AND z\.zusage NOT IN \('entfallen', 'abgelehnt'\)/.test(PLA));
+// REVIDIERT durch ENT-350 (OP-348, vom Projektinhaber entschieden): 'abgelehnt'
+// zaehlt jetzt ebenfalls nicht mehr mit. Vorher ein bewusster Widerspruch zur
+// Planungsliste (dort zaehlt eine Absage seit ENT-113 nicht als besetzt) --
+// jetzt sagen Anzeige und Sperre dasselbe.
+check('KRITISCH: und ebenso abgelehnte Zuteilungen (ENT-350)',
+  /AND z\.zusage NOT IN \('entfallen', 'abgelehnt'\)\s*\n\s*AND e\.datum BETWEEN/.test(PLA));
 // Ohne das waere die halbe Wirkung verpufft: sichtbar unterbesetzt, aber der
 // Auslagenersatz weiter gesperrt wegen einer Zuteilung, die es nicht gibt.
-check('KRITISCH: die GAV-AUS-010-Tagesprüfung ebenso',
-  /AND z\.zusage != 'entfallen' AND e\.id != \?/.test(ABG));
+check('KRITISCH: die GAV-AUS-010-Tagesprüfung ebenso -- entfallen UND abgelehnt',
+  /AND z\.zusage NOT IN \('entfallen', 'abgelehnt'\) AND e\.id != \?/.test(ABG));
 
 // Eine Regel, was als Besetzung zaehlt -- nicht drei.
 check('KRITISCH: das Cockpit hat EINE Regel für "zählt als Besetzung"',

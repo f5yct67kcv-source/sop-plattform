@@ -94,21 +94,24 @@ try {
     // dashboard.html): irgendein anderer, nicht abgesagter Einsatz derselben
     // Person am selben Kalendertag. Warnung und tatsaechliche Sperre muessen
     // denselben Fall meinen, sonst waere die Warnung irrefuehrend.
-    // Entfallene Zuteilungen zaehlen hier NICHT mit (ENT-347). Das ist keine
-    // GAV-Auslegung, sondern eine Tatsache: Wer aus einer Schicht entfallen
-    // ist, war dort nicht -- und hatte darum auch keinen Hin- und Rueckweg
-    // dorthin. Die Frage aus GAV-AUS-010 ("welcher von mehreren Einsaetzen
-    // ist DER eine Weg") stellt sich fuer einen Einsatz nicht, den niemand
-    // angetreten hat. Vermerk dazu im Auslegungsregister bei GAV-AUS-010.
+    // Entfallene UND abgelehnte Zuteilungen zaehlen hier NICHT mit
+    // (ENT-347, erweitert ENT-350/OP-348). Das ist keine GAV-Auslegung,
+    // sondern eine Tatsache: Wer aus einer Schicht entfallen ist oder sie
+    // abgelehnt hat, war dort nicht -- und hatte darum auch keinen Hin- und
+    // Rueckweg dorthin. Die Frage aus GAV-AUS-010 ("welcher von mehreren
+    // Einsaetzen ist DER eine Weg") stellt sich fuer einen Einsatz nicht,
+    // den niemand angetreten hat. Vermerk dazu im Auslegungsregister bei
+    // GAV-AUS-010.
     //
-    // Ohne diese Zeile waere die Wirkung von ENT-347 zur Haelfte verpufft:
-    // Die Schicht waere sichtbar unterbesetzt, ihr Auslagenersatz aber
-    // weiterhin gesperrt -- wegen einer Zuteilung, die es nicht mehr gibt.
+    // Ohne diese Zeile waere die Wirkung von ENT-347/350 zur Haelfte
+    // verpufft: Die Schicht waere sichtbar unterbesetzt, ihr Auslagenersatz
+    // aber weiterhin gesperrt -- wegen einer Zuteilung, die niemand
+    // wahrgenommen hat.
     $tagKonflikt = $pdo->prepare(
         "SELECT COUNT(*) FROM einsatz_zuteilung z
          JOIN einsaetze e ON e.id = z.einsatz_id
          WHERE z.mitarbeiter_id = ? AND e.datum = ? AND e.status != 'abgesagt'
-           AND z.zusage != 'entfallen' AND e.id != ?"
+           AND z.zusage NOT IN ('entfallen', 'abgelehnt') AND e.id != ?"
     );
     $auslagenSchreiben = $pdo->prepare(
         'INSERT INTO einsatz_auslagen

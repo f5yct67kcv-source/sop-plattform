@@ -277,14 +277,14 @@ function doppelbelegungen(int $einsatzId, string $datum, string $von, string $bi
               -- Versuch erneut -- gegen eine Zuteilung, die sie selbst
               -- aufgeloest hat.
               --
-              -- 'abgelehnt' ist hier BEWUSST nicht mitgenommen: Dass eine
-              -- Absage weiterhin als Doppelbelegung gilt, ist ein
-              -- bestehender Widerspruch zur Planungsliste (dort zaehlt sie
-              -- nicht als besetzt) -- aber ein eigener, aelterer, und ihn
-              -- hier mitzuaendern wuerde die Planungssperre breit
-              -- verschieben, ohne dass jemand danach gefragt hat.
-              -- Festgehalten als OP-348.
-              AND z.zusage <> 'entfallen'
+              -- 'abgelehnt' ist seit ENT-350 ebenfalls ausgenommen (OP-348,
+              -- vom Projektinhaber entschieden): Die Planungsliste zeigte
+              -- eine abgelehnte Zuteilung schon seit ENT-113 als NICHT
+              -- besetzt -- die Sperre behauptete an derselben Zeile das
+              -- Gegenteil. Eine Ablehnung ist eine aktive Aussage der
+              -- Person („ich mache das nicht“) und kein Grund, sie an
+              -- einem anderen Objekt zur selben Zeit zu blockieren.
+              AND z.zusage NOT IN ('entfallen', 'abgelehnt')
               AND e.datum BETWEEN DATE_SUB(?, INTERVAL 1 DAY) AND DATE_ADD(?, INTERVAL 1 DAY)";
     $stmt = db()->prepare($sql);
     $stmt->execute([...$mitarbeiterIds, $einsatzId, $datum, $datum]);
