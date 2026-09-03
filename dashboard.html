@@ -514,6 +514,13 @@ a.nav-item { text-decoration: none; }
    das beanstandet, und er hat recht: Sieben Kacheln auf zwei Ebenen sind
    keine Reiterleiste mehr, sondern ein Block. Die Reihe darf die volle
    Breite nehmen, die Liste darunter bleibt schmal. */
+/* Fotobeleg eines Ersatzscans (ENT-329). Klein genug, dass die Zeitleiste
+   eine Zeitleiste bleibt, gross genug, dass man erkennt, was fotografiert
+   wurde -- wer mehr sehen will, öffnet das Bild in einem eigenen Reiter. */
+.rgd-foto-huelle { margin-top: 8px; }
+.rgd-foto { max-width: 220px; max-height: 160px; border-radius: var(--r-sm);
+  border: 1px solid var(--line); display: block; }
+
 #view-arbeitsergebnisse #aeInhalt { max-width: 980px; }
 #view-arbeitsergebnisse .rdkr-reiter { justify-content: flex-start; gap: 6px; }
 #view-arbeitsergebnisse .rdkr-tab { padding: 7px 10px; }
@@ -14292,11 +14299,16 @@ function rdKpisZeichnen() {
     return;
   }
   const rgHeute = (rdKpiRundgaenge || []).filter(r => r.datum === heute);
+  // Auch die Kachel zählt seit ENT-329 „erledigt" (bestätigt + Ersatzscan),
+  // nicht nur „bestätigt" -- sonst zeigte dieselbe Nacht hier eine andere
+  // Zahl als in der Liste zwei Blöcke weiter unten.
   const fortschrittHeute = rgHeute.reduce((s, r) => {
     const f = r.fortschritt || { gesamt: 0, bestaetigt: 0 };
-    return { gesamt: s.gesamt + Number(f.gesamt), bestaetigt: s.bestaetigt + Number(f.bestaetigt) };
-  }, { gesamt: 0, bestaetigt: 0 });
-  const pct = fortschrittHeute.gesamt > 0 ? Math.round((fortschrittHeute.bestaetigt / fortschrittHeute.gesamt) * 100) : null;
+    return { gesamt: s.gesamt + Number(f.gesamt),
+      erledigt: s.erledigt + (f.erledigt !== undefined ? Number(f.erledigt) : Number(f.bestaetigt)),
+      ersatz: s.ersatz + Number(f.ersatzscan || 0) };
+  }, { gesamt: 0, erledigt: 0, ersatz: 0 });
+  const pct = fortschrittHeute.gesamt > 0 ? Math.round((fortschrittHeute.erledigt / fortschrittHeute.gesamt) * 100) : null;
   const abgebrochenHeute = rgHeute.filter(r => r.status === 'abgebrochen').length;
 
   const cards = [
@@ -14308,7 +14320,9 @@ function rdKpisZeichnen() {
       f: `<span>${nf((rdKpiRundgaenge || []).length)} in den letzten ${REVIERDIENST_LETZTE_TAGE} Tagen</span>` },
     { i: RD_IC.haken, l: 'Kontrollpunkte heute',
       v: pct !== null ? `${nf(pct)}<span class="unit">%</span>` : '–',
-      f: pct !== null ? `<span>${nf(fortschrittHeute.bestaetigt)} von ${nf(fortschrittHeute.gesamt)} bestätigt</span>` : '<span>Noch kein Rundgang heute</span>' },
+      f: pct !== null ? `<span>${nf(fortschrittHeute.erledigt)} von ${nf(fortschrittHeute.gesamt)} erledigt${
+        fortschrittHeute.ersatz > 0 ? ', ' + nf(fortschrittHeute.ersatz) + ' per Ersatzscan' : ''}</span>`
+        : '<span>Noch kein Rundgang heute</span>' },
     { i: RD_IC.warnung, l: 'Abgebrochen',
       v: rdKpiRundgaenge !== null ? nf(abgebrochenHeute) : '–',
       f: '<span>Rundgänge heute</span>' },
@@ -14411,12 +14425,20 @@ function renderLetzteRundgaenge(rundgaenge) {
       <th>Kunde</th><th>Bereich</th><th>Name</th><th>Datum</th><th>Zeit</th><th>Dauer</th><th>Mitarbeiter</th><th>Status</th>
     </tr></thead><tbody>` + rundgaenge.map(r => {
     const f = r.fortschritt || { gesamt: 0, bestaetigt: 0 };
-    const gesamt = Number(f.gesamt), bestaetigt = Number(f.bestaetigt);
+    const gesamt = Number(f.gesamt);
+    // Erledigt = bestätigt + Ersatzscan (ENT-329). Eine Runde, deren letzter
+    // Punkt per Fotobeleg erledigt wurde, ist gelaufen -- sie sah hier
+    // vorher aus wie eine abgebrochene.
+    const ersatz = Number(f.ersatzscan || 0);
+    const erledigt = f.erledigt !== undefined ? Number(f.erledigt) : Number(f.bestaetigt);
     const start = r.rohzeit_start ? String(r.rohzeit_start).slice(11, 16) : '–';
     const person = [r.nachname, r.vorname].filter(Boolean).join(', ') || '–';
-    const voll = gesamt > 0 && bestaetigt >= gesamt;
-    const pct = gesamt > 0 ? Math.round((bestaetigt / gesamt) * 100) : 0;
-    const balkenKlasse = r.status === 'abgebrochen' ? 'pn-ueber_toleranz' : (voll ? 'pn-ok' : 'pn-nahe');
+    const voll = gesamt > 0 && erledigt >= gesamt;
+    const pct = gesamt > 0 ? Math.round((erledigt / gesamt) * 100) : 0;
+    // Vollständig, aber mit Ersatzscan: eigener Ton statt Grün. Grün hiesse
+    // „technisch belegt", und das stimmt dann nicht.
+    const balkenKlasse = r.status === 'abgebrochen' ? 'pn-ueber_toleranz'
+      : (voll ? (ersatz > 0 ? 'pn-nahe' : 'pn-ok') : 'pn-nahe');
     // Die Dauer kommt fertig gerechnet aus dem Server (rundgang_dauer(),
     // ENT-322) -- dieselbe Dreier-Regel, nach der auch die App rechnet
     // (ENT-321). Zwei Rechnungen an zwei Orten laufen auseinander.
@@ -14438,7 +14460,8 @@ function renderLetzteRundgaenge(rundgaenge) {
         <td style="min-width:110px">
           ${r.status === 'abgebrochen' ? '<span class="chip chip-n">Abgebrochen</span>' : ''}
           <div class="pn-bar ${balkenKlasse}"><div class="fuell" style="width:${pct}%"></div></div>
-          <div class="sec">${nf(bestaetigt)}/${nf(gesamt)}</div>
+          <div class="sec">${nf(erledigt)}/${nf(gesamt)}${ersatz > 0
+            ? ' <span title="davon per Ersatzscan belegt" style="color:var(--warn)">· ' + nf(ersatz) + '&nbsp;Ersatz</span>' : ''}</div>
         </td>
       </tr>`;
   }).join('') + `</tbody></table>`;
@@ -14615,6 +14638,18 @@ const AE_AUFGABE_STATUS = {
    der Sache -- ein Datenbestand, den man nur sieht, wenn man ihn
    ausdruecklich sehen will, wird auch nur dann angesehen. */
 let rgdKarte = null, rgdLinie = null, rgdMarken = [], rgdDaten = null;
+/* Ersatzscan-Fotos, Scan-Id -> Objekt-URL (ENT-329).
+
+   Einmal geholt, von BEIDEN Ansichten benutzt: der Detailansicht und dem
+   Rapportblatt. Das ist nicht nur sparsam, es ist die Voraussetzung dafür,
+   dass das Foto im PDF überhaupt ankommt: html2pdf rastert das Blatt in dem
+   Moment, in dem es gerufen wird. Ein Bild, das dann noch lädt, fehlt --
+   und zwar still. Aus einem bereits geladenen Blob steht es sofort.
+
+   Der Token darf nicht in die URL (test_php.mjs prüft das), darum fetch()
+   mit Kopfzeile statt <img src>. Dasselbe Vorgehen wie bei den
+   Ereignisfotos (ENT-297). */
+let rgdFotos = {};
 
 const RGD_STATUS = {
   vorbereitet:   ['chip-n', 'Vorbereitet'],
@@ -14648,6 +14683,10 @@ function rgdZu() {
   // Die Karte wird nicht behalten: Sonst haengt die Spur der zuletzt
   // angesehenen Runde im Speicher, bis jemand die Seite neu laedt.
   rgdLinie = null; rgdMarken = []; rgdKarte = null; rgdDaten = null;
+  // Objekt-URLs wieder freigeben -- sonst hält der Browser jedes Foto jeder
+  // angesehenen Runde bis zum Neuladen der Seite fest.
+  Object.values(rgdFotos).forEach(u => { try { URL.revokeObjectURL(u); } catch (e) {} });
+  rgdFotos = {};
 }
 
 function rgdZeigen(rundgangId) {
@@ -14669,6 +14708,7 @@ function rgdZeigen(rundgangId) {
     }
     rgdDaten = data.rundgang;
     rgdZeichnen(rgdDaten);
+    rgdFotosLaden(rgdDaten);
   });
 }
 
@@ -14687,6 +14727,11 @@ function rgdZeichnen(d) {
 
   const f = d.fortschritt || { gesamt: 0, bestaetigt: 0 };
   const gesamt = Number(f.gesamt), bestaetigt = Number(f.bestaetigt);
+  // „Erledigt" fasst bestätigt und Ersatzscan zusammen (ENT-329). Der
+  // Rückfall auf bestaetigt gilt nur für eine Antwort, die das Feld noch
+  // nicht kennt -- besser eine zu kleine Zahl als gar keine.
+  const ersatz = Number(f.ersatzscan || 0);
+  const erledigt = f.erledigt !== undefined ? Number(f.erledigt) : bestaetigt;
   const zeit = w => (w ? String(w).slice(11, 16) : '–');
   // Die Endzeit kommt aus derselben Dreier-Regel wie die Dauer: Steht kein
   // rohzeit_ende, aber die Runde ist beendet, gilt der letzte Scan
@@ -14706,14 +14751,20 @@ function rgdZeichnen(d) {
     // Zwei Einheiten nie unter einer Ueberschrift: Hier stehen Punkte, und
     // zwar beide Zahlen ausgeschrieben, damit "9" nicht wie die Gesamtzahl
     // aussieht.
-    { l: 'Kontrollpunkte', v: nf(bestaetigt) + '<span class="unit"> / ' + nf(gesamt) + '</span>',
-      f: gesamt > 0 ? nf(Math.round((bestaetigt / gesamt) * 100)) + ' % bestätigt' : 'keine hinterlegt' },
+    // „erledigt" statt „bestätigt", und die Fusszeile sagt, WIE erledigt --
+    // sonst verschwände der Ersatzscan unter „bestätigt" und der Nachweis
+    // behauptete eine technische Prüfung, die es nicht gab.
+    { l: 'Kontrollpunkte', v: nf(erledigt) + '<span class="unit"> / ' + nf(gesamt) + '</span>',
+      f: gesamt === 0 ? 'keine hinterlegt'
+        : nf(Math.round((erledigt / gesamt) * 100)) + ' % erledigt'
+          + (ersatz > 0 ? ' · davon ' + nf(ersatz) + ' per Ersatzscan' : '') },
   ];
 
   const punkte = d.kontrollpunkte || [];
   const ereignisse = d.ereignisse || [];
   $('rgdBody').innerHTML =
     (d.status === 'abgebrochen' ? rgdAbbruchHtml(d) : '')
+    + rgdErsatzHtml(ersatz)
     + '<div class="rgd-band">' + band.map(b => '<div>'
       + '<div class="l">' + esc(b.l) + '</div>'
       + '<div class="v">' + b.v + '</div>'
@@ -14746,6 +14797,50 @@ function rgdAbbruchHtml(d) {
     + (grund ? ' ' + esc(grund) : '') + '</div>';
 }
 
+/* Warnhinweis bei Ersatzscans (ENT-329), vom Projektinhaber verlangt:
+   „…kann der Rundgang auch als abgeschlossen deklariert werden, allerdings
+   mit einem Warnhinweis, dass ein Ersatzscan eingefügt wurde."
+
+   Er steht OBEN, nicht als Fussnote: Wer die Runde als vollständig abhakt,
+   soll vorher wissen, dass ein Punkt nicht technisch belegt ist. Ein
+   Fotobeleg sagt „ich war dort" -- ein NFC-/Geofence-Scan beweist es. */
+function rgdErsatzHtml(ersatz) {
+  if (!ersatz) { return ''; }
+  return '<div class="msg-warn" style="display:block;margin:0 0 4px">'
+    + (ersatz === 1
+      ? 'Ein Kontrollpunkt wurde per <strong>Ersatzscan</strong> belegt, nicht technisch bestätigt.'
+      : nf(ersatz) + ' Kontrollpunkte wurden per <strong>Ersatzscan</strong> belegt, nicht technisch bestätigt.')
+    + ' Der Fotobeleg steht beim jeweiligen Punkt.</div>';
+}
+
+/* Holt die Ersatzscan-Fotos, sobald die Runde offen ist. Erst danach
+   zeichnet die Zeile das Bild -- vorher steht dort ein Platzhalter, kein
+   leerer Rahmen: „wird geladen" und „kein Foto" sind verschiedene Aussagen. */
+function rgdFotosLaden(d) {
+  (d.kontrollpunkte || []).forEach(k => {
+    const e = k.erledigt;
+    if (!e || !e.hat_foto || !e.scan_id) { return; }
+    fetch(API + 'rundgang_scan_foto.php?id=' + Number(e.scan_id),
+      { headers: { 'X-Auth-Token': token } })
+      .then(r => (r.ok ? r.blob() : Promise.reject(new Error('foto'))))
+      .then(b => {
+        if (!rgdDaten || Number(rgdDaten.id) !== Number(d.id)) { return; }  // inzwischen andere Runde
+        rgdFotos[e.scan_id] = URL.createObjectURL(b);
+        const ziel = $('rgdFoto' + e.scan_id);
+        if (ziel) {
+          ziel.innerHTML = `<a href="${rgdFotos[e.scan_id]}" target="_blank" rel="noopener">`
+            + `<img src="${rgdFotos[e.scan_id]}" alt="Fotobeleg zum Ersatzscan" class="rgd-foto"></a>`;
+        }
+      })
+      .catch(() => {
+        const ziel = $('rgdFoto' + e.scan_id);
+        // Ein fehlgeschlagenes Foto darf nicht wie „kein Foto" aussehen --
+        // der Beleg ist da, nur die Übertragung ging schief.
+        if (ziel) { ziel.innerHTML = '<span class="mut" style="font-size:12.5px">Der Fotobeleg liess sich nicht laden.</span>'; }
+      });
+  });
+}
+
 function rgdZeileHtml(k) {
   const e = k.erledigt;
   // Drei Zustaende, drei Darstellungen. Der dritte ist der wichtige: Ein
@@ -14770,9 +14865,14 @@ function rgdZeileHtml(k) {
     + '<div class="zeit">' + esc(zeit) + '</div>'
     + '<div class="faden"></div>'
     + '<div class="inhalt">'
-      + '<div class="name">' + esc(k.bezeichnung) + chip
-      + (e && e.hat_foto ? '<span class="chip chip-n">Foto</span>' : '') + '</div>'
+      + '<div class="name">' + esc(k.bezeichnung) + chip + '</div>'
       + (e && e.beschreibung ? '<div class="text">' + esc(e.beschreibung) + '</div>' : '')
+      // Das Bild selbst statt eines Chips „Foto" (ENT-329): Der Beleg ist
+      // der Inhalt des Ersatzscans, nicht eine Eigenschaft davon.
+      + (e && e.hat_foto && e.scan_id
+        ? '<div class="rgd-foto-huelle" id="rgdFoto' + Number(e.scan_id) + '">'
+          + '<span class="mut" style="font-size:12.5px">Fotobeleg wird geladen …</span></div>'
+        : '')
       + (aufgaben ? '<div class="aufg">' + aufgaben + '</div>' : '')
     + '</div></div>';
 }
@@ -14873,6 +14973,8 @@ function rapportBlattFuellen(d) {
   const zeit = w => (w ? String(w).slice(11, 16) : '–');
   const endeRoh = d.rohzeit_ende || (d.dauer && d.dauer.quelle === 'letzter_scan' ? d.letzter_scan : null);
   const f = d.fortschritt || { gesamt: 0, bestaetigt: 0 };
+  const ersatz = Number(f.ersatzscan || 0);
+  const erledigt = f.erledigt !== undefined ? Number(f.erledigt) : Number(f.bestaetigt);
   const adresse = [d.strasse, d.ort].filter(Boolean).join(', ');
   const [, statusText] = RGD_STATUS[d.status] || ['', d.status];
 
@@ -14897,7 +14999,9 @@ function rapportBlattFuellen(d) {
     ['Beginn / Ende', esc(zeit(d.rohzeit_start)) + ' – ' + esc(zeit(endeRoh))],
     ['Dauer', esc(rgdDauerText(d.dauer)) + ' h'
       + (Number(d.pause_minuten || 0) > 0 ? ' <span style="font-weight:400;color:#6B7280">(ohne ' + nf(d.pause_minuten) + ' Min. Pause)</span>' : '')],
-    ['Kontrollpunkte', nf(Number(f.bestaetigt)) + ' von ' + nf(Number(f.gesamt)) + ' bestätigt'],
+    ['Kontrollpunkte', nf(erledigt) + ' von ' + nf(Number(f.gesamt)) + ' erledigt'
+      + (ersatz > 0 ? ' <span style="font-weight:400;color:#6B7280">(davon '
+        + nf(ersatz) + ' per Ersatzscan)</span>' : '')],
     ['Status', esc(statusText)],
     // Ein Abbruch ist die wichtigste Aussage ueber eine Runde und steht im
     // Kopf, nicht als Fussnote -- aber nur, wenn es einen gab.
@@ -14929,7 +15033,13 @@ function rapportBlattFuellen(d) {
       <td style="${td};white-space:nowrap;width:58px${e ? '' : ';color:#8B919D'}">${esc(e ? String(e.erfasst_am).slice(11, 16) : '–')}</td>
       <td style="${td}">${esc(k.bezeichnung)}
         ${e && e.beschreibung ? `<div style="font-size:12px;color:#6B7280;margin-top:3px">${esc(e.beschreibung)}</div>` : ''}
-        ${e && e.hat_foto ? '<div style="font-size:12px;color:#6B7280;margin-top:3px">Mit Foto</div>' : ''}
+        ${e && e.hat_foto ? (rgdFotos[e.scan_id]
+          // Das Bild selbst, wenn es geladen ist. Ist es das nicht, steht
+          // wenigstens da, DASS ein Beleg vorliegt -- ein stillschweigend
+          // fehlendes Foto wäre schlimmer als der Satz darüber.
+          ? `<img src="${rgdFotos[e.scan_id]}" alt="" style="max-width:200px;max-height:150px;
+              border:1px solid #E5E8EC;border-radius:4px;display:block;margin-top:6px">`
+          : '<div style="font-size:12px;color:#6B7280;margin-top:3px">Fotobeleg vorhanden (nicht abrufbar)</div>') : ''}
         ${aufg}</td>
       <td style="${td};white-space:nowrap;width:112px${e && e.status === 'bestaetigt' ? '' : ';font-weight:600'}">${esc(stTxt)}</td>
     </tr>`;
@@ -14958,6 +15068,15 @@ function rapportBlattFuellen(d) {
       </div>` : ''}
 
       <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:24px">${kopf}</table>
+
+      ${ersatz > 0 ? `<div style="border:1px solid #E2B156;background:#FBF3E0;color:#9A6B08;
+          border-radius:6px;padding:9px 12px;margin-bottom:18px;font-size:12.5px;line-height:1.5">
+          <strong>Hinweis:</strong> ${ersatz === 1
+            ? 'Ein Kontrollpunkt wurde per Ersatzscan belegt'
+            : nf(ersatz) + ' Kontrollpunkte wurden per Ersatzscan belegt'} —
+          mit Fotobeleg statt technischer Bestätigung durch NFC oder Standort.
+          Der Beleg steht bei der jeweiligen Zeile.
+        </div>` : ''}
 
       <div style="${lbl}">Kontrollpunkte</div>
       ${zeilen ? `<table style="width:100%;border-collapse:collapse">
@@ -15198,12 +15317,15 @@ function aeZeichneErledigung(rundgaenge) {
   if (!rundgaenge.length) { ziel.innerHTML = EMPTY('Noch nichts vorhanden', 'Im gewählten Zeitraum liegt kein Rundgang vor.'); return; }
   ziel.innerHTML = rundgaenge.map(r => {
     const f = r.fortschritt || { gesamt: 0, bestaetigt: 0 };
-    const gesamt = Number(f.gesamt), bestaetigt = Number(f.bestaetigt);
+    const gesamt = Number(f.gesamt);
+    const ersatz = Number(f.ersatzscan || 0);
+    const erledigt = f.erledigt !== undefined ? Number(f.erledigt) : Number(f.bestaetigt);
     const start = r.rohzeit_start ? String(r.rohzeit_start).slice(11, 16) : '–';
     const person = [r.nachname, r.vorname].filter(Boolean).join(', ') || '–';
-    const voll = gesamt > 0 && bestaetigt >= gesamt;
-    const pct = gesamt > 0 ? Math.round((bestaetigt / gesamt) * 100) : 0;
-    const balkenKlasse = r.status === 'abgebrochen' ? 'pn-ueber_toleranz' : (voll ? 'pn-ok' : 'pn-nahe');
+    const voll = gesamt > 0 && erledigt >= gesamt;
+    const pct = gesamt > 0 ? Math.round((erledigt / gesamt) * 100) : 0;
+    const balkenKlasse = r.status === 'abgebrochen' ? 'pn-ueber_toleranz'
+      : (voll ? (ersatz > 0 ? 'pn-nahe' : 'pn-ok') : 'pn-nahe');
     // Dieselbe Dauer wie in "Letzte Rundgänge" und im Rapport, aus
     // derselben Server-Rechnung (ENT-322) -- und "läuft" trägt auch hier
     // keine Einheit.
@@ -15223,7 +15345,8 @@ function aeZeichneErledigung(rundgaenge) {
           esc([r.abbruch_grund ? (RUNDGANG_ABBRUCH_GRUENDE[r.abbruch_grund] || r.abbruch_grund) : '',
                r.abbruch_freitext].filter(Boolean).join(' — ') || 'Ohne Grundangabe')}</div>` : ''}
         <div class="pn-bar ${balkenKlasse}" style="margin-top:6px"><div class="fuell" style="width:${pct}%"></div></div>
-        <div class="sec">${nf(bestaetigt)}/${nf(gesamt)}</div>
+        <div class="sec">${nf(erledigt)}/${nf(gesamt)}${ersatz > 0
+          ? ' <span style="color:var(--warn)">· ' + nf(ersatz) + ' per Ersatzscan</span>' : ''}</div>
       </div>`;
   }).join('');
 }
