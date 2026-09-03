@@ -98,8 +98,22 @@ if ($doppelt) {
         json_response(['status' => 'laeuft_bereits',
             'einsatz_id' => $konfliktEinsatzId, 'rundgang_id' => (int)$bestehendeRundgangId]);
     }
-    json_response(['status' => 'error',
-        'message' => 'Du bist zu dieser Zeit bereits andernorts eingeteilt: ' . $doppelt[0]['was']], 409);
+    // KEINE Sperre mehr (ENT-342, revidiert ENT-022 fuer diesen einen Weg).
+    // Der Projektinhaber: Der Disponent plant kurzfristig um, der Waechter
+    // steht vor dem Objekt -- und genau dann ist der Planer oft nicht
+    // erreichbar. Eine Sperre schuetzt hier vor einem Planungsfehler, den
+    // der Waechter draussen gar nicht beheben kann.
+    //
+    // Stattdessen: einmal bestaetigen. Die Anfrage muss `trotz_
+    // doppelbelegung` mitschicken; ohne das kommt die Kollision samt
+    // Klartext zurueck, damit die App fragen kann. Das ist dasselbe Muster
+    // wie die Zuteilungs-Warnung aus ENT-284 -- blockieren, bis es GESEHEN
+    // ist, nicht bis es aufgeloest ist.
+    if (empty($input['trotz_doppelbelegung'])) {
+        json_response(['status' => 'error', 'code' => 'doppelbelegung',
+            'message' => 'Du bist zu dieser Zeit bereits andernorts eingeteilt: ' . $doppelt[0]['was'],
+            'kollision' => ['was' => $doppelt[0]['was'], 'einsatz_id' => $konfliktEinsatzId]], 409);
+    }
 }
 
 $pdo->beginTransaction();
@@ -136,5 +150,45 @@ try {
     throw $e;
 }
 
+/* Die Disposition muss es erfahren (ENT-342). Zwei Orte, zwei Momente:
+   Die Marke an der geplanten Schicht findet, wer den Plan ansieht -- sie
+   wird in einsatz_list.php ABGELEITET und braucht darum keine neue Spalte
+   und keine Migration. Das Ereignis hier findet, wer den Tag durchgeht.
+
+   Wie bei ENT-311/324: Der Endpunkt SUCHT die Ereignisart, er legt sie
+   nicht an. Fehlt sie (Einrichtung noch nicht gedrueckt), entsteht die
+   Meldung trotzdem -- ohne Art, aber mit dem vollen Klartext. Eine
+   Meldung ohne Art ist auffindbar, eine gar nicht geschriebene nicht.
+   Und der Start selbst darf daran nie scheitern: Er ist bereits
+   festgeschrieben, das Ereignis ist der Nachweis darueber. */
+$ereignisFehler = null;
+if ($doppelt) {
+    try {
+        $artId = null;
+        if (hat_tabelle($pdo, 'ereignisart')) {
+            $aSt = $pdo->prepare('SELECT id FROM ereignisart WHERE bezeichnung = ? AND aktiv = 1');
+            $aSt->execute([EREIGNISART_PARALLELRUNDE]);
+            $gefunden = $aSt->fetchColumn();
+            if ($gefunden !== false) { $artId = (int)$gefunden; }
+        }
+        // Der Klartext der Kollision wird KOPIERT, nicht nur die Einsatz-Id
+        // abgelegt (Nachweis-Prinzip): Wer die Meldung spaeter liest, soll
+        // dort lesen koennen, WOGEGEN gestartet wurde -- auch dann noch,
+        // wenn der geplante Einsatz inzwischen umgeplant oder geloescht ist.
+        $text = 'Rundgang „' . $v['name'] . '" gestartet, obwohl zur selben Zeit eingeteilt: '
+            . $doppelt[0]['was'];
+        $evt = $pdo->prepare(
+            'INSERT INTO ereignis_meldung
+               (objekt_id, rundgang_id, einsatz_id, mitarbeiter_id, ereignisart_id, erfasst_am, bemerkung)
+             VALUES (?, ?, ?, ?, ?, NOW(), ?)'
+        );
+        $evt->execute([(int)$v['objekt_id'], $rundgangId, $einsatzId,
+            (int)$user['id'], $artId, $text]);
+    } catch (Throwable $e) {
+        $ereignisFehler = 'Rundgang gestartet, Ereignismeldung fehlgeschlagen';
+    }
+}
+
 $kontrollpunkte = rundgang_kontrollpunkte_uebrig($pdo, $rundgangId, (int)$v['objekt_id'], $vorlageId);
-json_response(['status' => 'ok', 'einsatz_id' => $einsatzId, 'rundgang_id' => $rundgangId, 'kontrollpunkte' => $kontrollpunkte]);
+json_response(['status' => 'ok', 'einsatz_id' => $einsatzId, 'rundgang_id' => $rundgangId,
+               'kontrollpunkte' => $kontrollpunkte, 'ereignis_fehler' => $ereignisFehler]);
