@@ -32,7 +32,11 @@ const RUNDGAENGE = { status: 'ok', rundgaenge: [
     vorbereitet_am: `${HEUTE} 21:00:00`, rohzeit_start: `${HEUTE} 21:02:00`,
     rohzeit_ende: null, datum: HEUTE, kunde_name: 'Beispiel Immobilien GmbH',
     objekt_name: 'Testliegenschaft Süd', titel: null, vorname: 'Hans', nachname: 'Beispiel',
-    fortschritt: { gesamt: 4, bestaetigt: 1, nicht_verfuegbar: 0 }, pause_minuten: 0 },
+    // Ein Punkt per Ersatzscan (ENT-329): Er zaehlt als erledigt mit, wird
+    // aber getrennt ausgewiesen. Der Punkt mit "nicht_verfuegbar" oben zaehlt
+    // dagegen NICHT -- dort wurde der Punkt gar nicht erreicht.
+    fortschritt: { gesamt: 4, bestaetigt: 1, nicht_verfuegbar: 0, ersatzscan: 1, erledigt: 2 },
+    pause_minuten: 0 },
   // Pausiert (ENT-146) -- die Rohzeit "laeuft nicht noch", sie steht still.
   { id: 3, einsatz_id: 12, objekt_id: 1, mitarbeiter_id: 5, status: 'pausiert',
     vorbereitet_am: `${HEUTE} 22:00:00`, rohzeit_start: `${HEUTE} 22:05:00`,
@@ -154,8 +158,12 @@ check('KRITISCH: vier Kennzahlen-Kacheln stehen da, in dieser Reihenfolge',
   && kpiTexte[2].includes('Kontrollpunkte heute') && kpiTexte[3].includes('Abgebrochen'));
 check('KRITISCH: "Rundgänge heute" zaehlt nur die vier Testrundgaenge von HEUTE, nicht mehr',
   kpiTexte[1].includes('4'));
-check('KRITISCH: "Kontrollpunkte heute" ist die echte Quote ueber alle Rundgaenge von heute (6 von 14 = 43 %), keine Scheinzahl',
-  kpiTexte[2].includes('43') && kpiTexte[2].includes('6 von 14 bestätigt'));
+// 2 + 2 + 1 + 2 = 7 von 14. Der Ersatzscan der zweiten Runde zaehlt mit,
+// der nicht verfuegbare Punkt der ersten nicht (ENT-329).
+check('KRITISCH: "Kontrollpunkte heute" ist die echte Quote ueber alle Rundgaenge von heute (7 von 14 = 50 %), keine Scheinzahl',
+  kpiTexte[2].includes('50') && kpiTexte[2].includes('7 von 14 erledigt'));
+check('KRITISCH: der Ersatzscan wird dabei ausgewiesen, nicht unter "bestätigt" versteckt',
+  kpiTexte[2].includes('1 per Ersatzscan'));
 check('KRITISCH: "Abgebrochen" zaehlt den einen Rundgang mit status=abgebrochen',
   kpiTexte[3].includes('1'));
 check('KRITISCH: ohne Wächter-Status-Antwort zeigt "Aktive Wächter" einen Strich, keine erfundene Zahl',
@@ -169,8 +177,13 @@ check('Ein Rundgang ohne Einsatztitel zeigt einen Strich statt einer Luecke',
   (await page.$$eval('#rdLetzteListe tbody tr', rs =>
     rs.some(r => r.children[2].textContent.trim() === '–'))));
 check('KRITISCH: die Startzeit erscheint', liste.includes('20:04') && liste.includes('21:02'));
+// Die zweite Runde steht jetzt auf 2/4 statt 1/4: Ihr zweiter Punkt wurde
+// per Ersatzscan erledigt (ENT-329). Dass es ein Ersatzscan war, steht
+// daneben -- sonst behauptete die Zahl eine technische Bestaetigung.
 check('KRITISCH: der Fortschritt steht als Zahlenverhaeltnis da, nicht nur ein Balken (ENT-145)',
-  liste.includes('2/3') && liste.includes('1/4'));
+  liste.includes('2/3') && liste.includes('2/4'));
+check('KRITISCH: ein per Ersatzscan erledigter Punkt wird in der Liste ausgewiesen',
+  /1\s*Ersatz/.test(liste));
 check('KRITISCH: ein abgebrochener Rundgang ist als solcher gekennzeichnet', liste.includes('Abgebrochen'));
 
 // ── Leerer Zeitraum: "nichts vorhanden" statt einer leeren Flaeche

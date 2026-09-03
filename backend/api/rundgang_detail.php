@@ -74,8 +74,10 @@ $rundgang['fortschritt'] = rundgang_fortschritt($pdo, $rundgangId, $objektId, $v
 // Alle Punkte der Runde -- auch die NICHT besuchten. Nur die Scans zu zeigen
 // hiesse, dass ein ausgelassener Kontrollpunkt im Rapport gar nicht
 // vorkommt; ein Nachweis, in dem das Fehlende fehlt, ist keiner.
+// Die id kommt mit (ENT-329): Ohne sie liesse sich das Foto eines
+// Ersatzscans nicht abrufen -- rundgang_scan_foto.php braucht sie.
 $scans = $pdo->prepare(
-    'SELECT kontrollpunkt_id, status, erfasst_am, uebermittelt_am, beschreibung,
+    'SELECT id, kontrollpunkt_id, status, erfasst_am, uebermittelt_am, beschreibung,
             foto_mime IS NOT NULL AS hat_foto
        FROM rundgang_scan WHERE rundgang_id = ?'
 );
@@ -84,6 +86,7 @@ $erledigtNach = [];
 foreach ($scans->fetchAll(PDO::FETCH_ASSOC) as $s) {
     if ($s['kontrollpunkt_id'] !== null) {
         $erledigtNach[(int)$s['kontrollpunkt_id']] = [
+            'scan_id'       => (int)$s['id'],
             'status'        => $s['status'],
             'erfasst_am'    => $s['erfasst_am'],
             'uebermittelt_am' => $s['uebermittelt_am'],

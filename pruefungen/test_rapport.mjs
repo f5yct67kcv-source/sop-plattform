@@ -31,6 +31,34 @@ const VERSAND = readFileSync(`${WURZEL}/backend/api/rundgang_rapport_versenden.p
 const DETAIL = readFileSync(`${WURZEL}/backend/api/rundgang_detail.php`, 'utf8');
 const LISTE = readFileSync(`${WURZEL}/backend/api/rundgang_liste.php`, 'utf8');
 
+// ══════════ SERVER: DER FOTOBELEG (ENT-329) ══════════════════════════
+const FOTO = readFileSync(`${WURZEL}/backend/api/rundgang_scan_foto.php`, 'utf8');
+const RG = readFileSync(`${WURZEL}/backend/rundgang.php`, 'utf8');
+check('KRITISCH: der Fotobeleg wird nur mit dem Auswertungsrecht ausgeliefert',
+  /require_recht\(\$user, 'rundgang_einsehen'\)/.test(FOTO));
+// Der Mimetyp stammt aus der Prüfung beim Speichern (erste Bytes), nicht aus
+// einer Angabe des Absenders -- er darf ohne weitere Prüfung gesetzt werden.
+check('Der Mimetyp kommt aus der Datenbank, nicht aus der Anfrage',
+  /header\('Content-Type: ' \. \$r\['foto_mime'\]\)/.test(FOTO));
+// Ein zwischengespeichertes Bild wäre nach einem Rechteentzug weiterhin
+// abrufbar.
+check('KRITISCH: das Bild landet nicht im Zwischenspeicher',
+  /Cache-Control: private, no-store/.test(FOTO));
+check('Der Browser darf den Typ nicht selbst erraten', /X-Content-Type-Options: nosniff/.test(FOTO));
+check('Fehlt ein Foto, sagt der Endpunkt das, statt etwas Leeres zu liefern',
+  /Zu diesem Scan gibt es kein Foto/.test(FOTO));
+// Ohne die Scan-Id liesse sich das Foto gar nicht abrufen.
+check('KRITISCH: die Detailansicht liefert die Scan-Id mit',
+  /'scan_id'\s*=> \(int\)\$s\['id'\]/.test(DETAIL));
+// Die Trennung in der Datenhaltung bleibt (ENT-145/Q-22) -- geändert hat
+// sich nur, was die Anzeige zusammenfasst.
+check('KRITISCH: "erledigt" ist bestätigt PLUS Ersatzscan',
+  /'erledigt' => \$bestaetigt \+ \$ersatzscan/.test(RG));
+check('KRITISCH: "nicht verfügbar" zählt dabei NICHT mit',
+  !/'erledigt' =>[^;]*nichtVerfuegbar/.test(RG));
+check('Die Einzelzahlen bleiben daneben stehen', /'bestaetigt' => \$bestaetigt/.test(RG)
+  && /'ersatzscan' => \$ersatzscan/.test(RG));
+
 // ══════════ SERVER: DIE DAUER KOMMT VON DORT ══════════════════════════
 // Zwei Rechnungen an zwei Orten laufen auseinander -- die Oberflaeche darf
 // die Endzeit nicht selbst zusammensuchen.
@@ -114,7 +142,7 @@ const DETAIL41 = { status: 'ok', rundgang: {
   letzter_scan: heute + ' 23:10:00', pause_minuten: 12,
   abbruch_grund: null, abbruch_freitext: null,
   dauer: { sekunden: 3720, quelle: 'rohzeit_ende' },
-  fortschritt: { gesamt: 3, bestaetigt: 1, nicht_verfuegbar: 1, ersatzscan: 0 },
+  fortschritt: { gesamt: 3, bestaetigt: 1, nicht_verfuegbar: 0, ersatzscan: 1, erledigt: 2 },
   kontrollpunkte: [
     { id: 1, bezeichnung: 'Haupteingang', reihenfolge: 1, typ: 'geofence',
       erledigt: { status: 'bestaetigt', erfasst_am: heute + ' 22:07:00',
@@ -124,9 +152,12 @@ const DETAIL41 = { status: 'ok', rundgang: {
           erledigt: { status: 'erledigt', grund: null, erfasst_am: heute + ' 22:07:20' } },
         { id: 6, bezeichnung: 'Licht löschen', information: null, erledigt: null },
       ] },
+    // Ersatzscan MIT Fotobeleg -- genau der Fall, den der Projektinhaber
+    // gemeldet hat (ENT-329): Der Punkt wurde aufgesucht, liess sich aber
+    // nicht technisch bestätigen.
     { id: 2, bezeichnung: 'Tor Nord', reihenfolge: 2, typ: 'geofence',
-      erledigt: { status: 'nicht_verfuegbar', erfasst_am: heute + ' 22:41:00',
-        uebermittelt_am: heute + ' 22:41:10', beschreibung: 'Baustelle, kein Durchgang',
+      erledigt: { scan_id: 4711, status: 'ersatzscan', erfasst_am: heute + ' 22:41:00',
+        uebermittelt_am: heute + ' 22:41:10', beschreibung: 'Chip zerstört, Foto als Beleg',
         hat_foto: true },
       aufgaben: [] },
     // Der wichtige Fall: nie besucht. Er MUSS in der Liste stehen.
@@ -141,6 +172,14 @@ const DETAIL41 = { status: 'ok', rundgang: {
 
 const gerufen = [];
 let versandKoerper = null;
+// Ein wirklich gültiges 1x1-PNG: Ein kaputtes Bild lädt nicht und wäre
+// unsichtbar, ohne dass der Code etwas falsch macht -- die Prüfung hätte
+// dann den Test gemessen, nicht die Anwendung.
+const PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+  'base64');
+const fotoRufe = [];
+let fotoKopf = null;
 const browser = await chromium.launch({ executablePath: browserPfad() });
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 page.on('pageerror', e => bad.push('JS-Fehler: ' + e.message));
@@ -152,6 +191,11 @@ await page.route('**/api/**', r => {
   if (p.includes('rundgang_detail')) return send(DETAIL41);
   if (p.includes('rundgang_liste')) return send(RUNDGAENGE);
   if (p.includes('rundgang_spur')) return send({ status: 'ok', punkte: [], eingerichtet: true });
+  if (p.includes('rundgang_scan_foto')) {
+    fotoRufe.push(new URL(r.request().url()).search);
+    fotoKopf = r.request().headers()['x-auth-token'] || null;
+    return r.fulfill({ status: 200, contentType: 'image/png', body: PNG });
+  }
   if (p.includes('rundgang_rapport_versenden')) {
     versandKoerper = JSON.parse(r.request().postData() || '{}');
     return send({ status: 'ok', empfaenger: versandKoerper.empfaenger, dateiname: 'x.pdf' });
@@ -240,8 +284,13 @@ check('Die abgezogene Pause wird ausgewiesen, nicht verschwiegen',
   band.some(b => b.l === 'Dauer' && b.f.includes('12') && b.f.includes('Pause')));
 // Zwei Einheiten nie unter einer Ueberschrift: „1" allein saehe aus wie die
 // Gesamtzahl.
-check('KRITISCH: die Kontrollpunkte stehen als "1 / 3", nicht als nackte Zahl',
-  band.some(b => b.l === 'Kontrollpunkte' && b.v.replace(/\s/g, '') === '1/3'));
+// „Erledigt" statt „bestätigt" (ENT-329): bestätigt + Ersatzscan. Ein Punkt,
+// der per Fotobeleg erledigt wurde, ist erledigt -- er ist nur nicht
+// technisch bestätigt, und genau das sagt die Fusszeile darunter.
+check('KRITISCH: die Kontrollpunkte stehen als "2 / 3", nicht als nackte Zahl',
+  band.some(b => b.l === 'Kontrollpunkte' && b.v.replace(/\s/g, '') === '2/3'));
+check('KRITISCH: der Ersatzscan wird dabei ausgewiesen, nicht unter "bestätigt" versteckt',
+  band.some(b => b.l === 'Kontrollpunkte' && /Ersatzscan/.test(b.f)));
 
 const zeilenTexte = await page.evaluate(() =>
   [...document.querySelectorAll('.rgd-zeile')].map(z => ({
@@ -263,17 +312,56 @@ check('KRITISCH: und ist als "Nicht besucht" gekennzeichnet, nicht als leere Zei
 const zeitVon = t => (zeilenTexte.find(z => z.name.includes(t)) || {}).zeit;
 check('Er trägt keine erfundene Uhrzeit', zeitVon('Kellerabgang') === '–');
 check('Ein bestätigter Punkt trägt seine Uhrzeit', zeitVon('Haupteingang') === '22:07');
-check('Ein nicht verfügbarer Punkt ist als solcher gekennzeichnet',
-  zeilenTexte.some(z => z.name.includes('Tor Nord') && z.name.includes('Nicht verfügbar')));
+check('Ein per Ersatzscan belegter Punkt ist als solcher gekennzeichnet',
+  zeilenTexte.some(z => z.name.includes('Tor Nord') && z.name.includes('Ersatzscan')));
 
 const koerper = await page.textContent('#rgdBody');
-check('Die Bemerkung des Wächters steht dabei', koerper.includes('Baustelle, kein Durchgang'));
+check('Die Bemerkung des Wächters steht dabei', koerper.includes('Chip zerstört, Foto als Beleg'));
+// Vom Projektinhaber verlangt: „…allerdings mit einem Warnhinweis, dass ein
+// Ersatzscan eingefügt wurde." Er steht OBEN, nicht als Fussnote: Wer die
+// Runde als vollständig abhakt, soll vorher wissen, dass ein Punkt nicht
+// technisch belegt ist.
+check('KRITISCH: die Detailansicht warnt sichtbar vor dem Ersatzscan',
+  koerper.includes('Ersatzscan') && koerper.includes('nicht technisch bestätigt'));
+check('KRITISCH: der Warnhinweis steht ÜBER dem Verlauf, nicht darunter',
+  await page.evaluate(() => {
+    const warn = document.querySelector('#rgdBody .msg-warn');
+    const band = document.querySelector('#rgdBody .rgd-band');
+    return !!warn && !!band
+      && warn.getBoundingClientRect().top < band.getBoundingClientRect().top;
+  }));
 check('Eine beantwortete Aufgabe steht beim Punkt', koerper.includes('Türe verschlossen?'));
 // ENT-311: Eine nicht beantwortete Aufgabe ist genau das Fehlen eines
 // Eintrags -- sie muss trotzdem auffallen.
 check('KRITISCH: eine UNBEANTWORTETE Aufgabe fällt auf, statt zu fehlen',
   koerper.includes('Licht löschen') && koerper.includes('Unbeantwortet'));
 check('Die Ereignisse der Runde stehen dabei', koerper.includes('Sachbeschädigung'));
+// ══════════ DER FOTOBELEG DES ERSATZSCANS ═══════════════════════════
+// Vom Projektinhaber verlangt: „Ebenfalls wichtig ist, dass das Foto, das
+// der Mitarbeiter eingefügt hat, übermittelt wird in die Rundgangauswertung
+// und dann auch in den Rapport."
+//
+// Die Fotos werden seit ENT-182 erfasst und lagen seither in der Datenbank,
+// ohne dass irgendeine Ansicht sie zeigen konnte -- der Kommentarkopf von
+// ereignis_foto.php (ENT-297) hielt das ausdrücklich fest.
+await page.waitForTimeout(500);
+check('KRITISCH: das Foto des Ersatzscans wird geholt',
+  fotoRufe.some(q => q.includes('id=4711')));
+// Der Token darf nicht in die URL (er landete sonst in Server-Protokollen
+// und im Browserverlauf -- eine ausdrücklich geprüfte Regel, test_php.mjs).
+check('KRITISCH: der Token geht als Kopfzeile mit, NICHT in der URL',
+  fotoKopf === 't' && !fotoRufe.some(q => /token/i.test(q)));
+check('KRITISCH: das Foto erscheint in der Detailansicht',
+  await page.evaluate(() => {
+    const i = document.querySelector('#rgdFoto4711 img');
+    return !!i && i.naturalWidth > 0;
+  }));
+// Ein Bild, das man nicht grösser bekommt, nützt bei einem Beleg wenig.
+check('Es lässt sich in voller Grösse öffnen',
+  await page.evaluate(() => !!document.querySelector('#rgdFoto4711 a[target="_blank"]')));
+// Ein Punkt OHNE Foto bekommt keinen leeren Rahmen.
+check('Ein Punkt ohne Fotobeleg trägt keinen leeren Bildrahmen',
+  await page.evaluate(() => !document.querySelector('.rgd-zeile:first-child .rgd-foto-huelle')));
 await page.screenshot({ path: `${OUT}/rapport-01-detail.png` });
 
 // ══════════ GESTALTUNG, GEMESSEN ══════════════════════════════════════
@@ -325,9 +413,33 @@ check('KRITISCH: der nicht besuchte Punkt steht auch im Rapport',
 check('Die unbeantwortete Aufgabe steht auch im Rapport',
   blatt.includes('Licht löschen') && blatt.includes('Unbeantwortet'));
 check('Das Ereignis steht im Rapport', blatt.includes('Sachbeschädigung'));
-// Der Entscheid des Projektinhabers zu ENT-322: keine Karte im Rapport.
+// Der Warnhinweis gehört auch ins Dokument -- der Rapport ist das, was der
+// Kunde in die Hand bekommt, und dort darf ein Fotobeleg nicht wie eine
+// technische Bestätigung aussehen.
+check('KRITISCH: der Rapport weist den Ersatzscan aus',
+  blatt.includes('Ersatzscan') && blatt.toLowerCase().includes('hinweis'));
+check('KRITISCH: und zählt ihn in der Kopfzeile als erledigt mit',
+  blatt.includes('2 von 3 erledigt'));
+// Das Bild selbst, nicht der Satz „Mit Foto": Der Beleg IST der Inhalt des
+// Ersatzscans.
+check('KRITISCH: der Fotobeleg steht als Bild im Rapport',
+  await page.evaluate(() => {
+    const i = [...document.querySelectorAll('#rapportBlatt img')]
+      .filter(x => (x.getAttribute('src') || '').startsWith('blob:'));
+    return i.length === 1 && i[0].naturalWidth > 0;
+  }));
+// Der Entscheid des Projektinhabers zu ENT-322: keine KARTE im Rapport.
+// Beim ersten Anlauf verbot diese Prüfung jedes Bild -- und schlug damit an,
+// als in ENT-329 der Fotobeleg dazukam, der ausdrücklich gewollt ist. Eine
+// Prüfung, die mehr verbietet als gemeint war, sagt nichts mehr über ihre
+// eigene Aussage aus. Jetzt zielt sie auf die Karte.
 check('KRITISCH: der Rapport enthält keine Karte',
-  await page.evaluate(() => !document.querySelector('#rapportBlatt img, #rapportBlatt canvas, #rapportBlatt iframe')));
+  await page.evaluate(() => {
+    const b = document.getElementById('rapportBlatt');
+    if (b.querySelector('canvas, iframe, .gm-style')) { return false; }
+    return [...b.querySelectorAll('img')]
+      .every(i => !/googleapis|gstatic|maps/i.test(i.getAttribute('src') || ''));
+  }));
 // „Keine Ereignisse" ist eine Aussage, ein fehlender Abschnitt keine.
 const leer = await page.evaluate(() => {
   const kopie = JSON.parse(JSON.stringify(rgdDaten));
@@ -543,6 +655,10 @@ await page.evaluate(() => rgdZu());
 await page.waitForTimeout(200);
 check('Beim Schliessen bleiben die Daten der Runde nicht liegen',
   await page.evaluate(() => rgdDaten === null && rgdKarte === null));
+// Objekt-URLs müssen freigegeben werden -- sonst hält der Browser jedes Foto
+// jeder angesehenen Runde bis zum Neuladen der Seite fest.
+check('KRITISCH: die geladenen Fotos werden beim Schliessen freigegeben',
+  await page.evaluate(() => Object.keys(rgdFotos).length === 0));
 
 await browser.close();
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);

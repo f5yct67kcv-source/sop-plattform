@@ -372,8 +372,22 @@ function rundgang_fortschritt(PDO $pdo, int $rundgangId, int $objektId, ?int $vo
         // Scan nicht mehr unterscheidbar (Einheiten nie vermischen).
         if ($z['status'] === 'ersatzscan') { $ersatzscan = (int)$z['n']; }
     }
+    /* 'erledigt' fasst zusammen, was als KONTROLLIERT gilt (ENT-329):
+       bestaetigt + ersatzscan. Ein Ersatzscan ist ein Fotobeleg statt einer
+       technischen Prüfung -- der Punkt wurde aufgesucht, nur liess er sich
+       nicht per NFC/Geofence bestätigen (Chip zerstört, kein Netz).
+
+       'nicht_verfuegbar' zählt bewusst NICHT mit: Dort wurde der Punkt gar
+       nicht erreicht. Das ist der Unterschied, auf den es ankommt.
+
+       Die Einzelzahlen bleiben daneben stehen und werden NICHT ersetzt --
+       die Begründung aus ENT-145/Q-22 gilt für die Datenhaltung unverändert
+       weiter: Ein Fotobeleg muss von einem echten NFC-/Geofence-Scan
+       unterscheidbar bleiben. Geändert hat sich nur, was die Anzeige als
+       'erledigt' zusammenfasst -- und sie weist den Ersatzscan sichtbar aus,
+       statt ihn unter 'bestätigt' verschwinden zu lassen. */
     return ['gesamt' => $gesamt, 'bestaetigt' => $bestaetigt, 'nicht_verfuegbar' => $nichtVerfuegbar,
-            'ersatzscan' => $ersatzscan];
+            'ersatzscan' => $ersatzscan, 'erledigt' => $bestaetigt + $ersatzscan];
 }
 
 // Erkennt JPEG/PNG anhand der Magic Bytes, nicht anhand einer vom Client
