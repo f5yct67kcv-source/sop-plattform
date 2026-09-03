@@ -89,7 +89,36 @@ foreach ($zstmt->fetchAll() as $z) {
     ];
 }
 
-$einsaetze = array_map(function ($e) use ($proEinsatz, $hatFahrzeug) {
+/* Runden, die WAEHREND einer geplanten Schicht gestartet wurden (ENT-342).
+   Seit dort die Sperre gefallen ist, muss die Disposition es sehen -- und
+   zwar an der geplanten Schicht, nicht nur in einer Ereignisliste.
+
+   ABGELEITET statt gespeichert: keine neue Spalte, keine Migration (die
+   Einrichtung muss also nicht gedrueckt werden), und die Angabe kann nicht
+   veralten -- wird der spontane Einsatz geloescht oder umgeplant,
+   verschwindet die Marke von selbst. Erfasst werden dadurch ausserdem
+   rueckwirkend alle Kollisionen, die schon in den Daten stehen.
+
+   Eine Abfrage fuer die ganze Liste, nicht eine je Einsatz: Ein Monatsplan
+   waere sonst schnell dreistellig (dieselbe Ueberlegung wie bei den
+   Zuteilungen oben). */
+$spontanSql = 'SELECT e.id, e.datum, e.von, e.bis, e.titel, e.kunde_name, z.mitarbeiter_id
+                 FROM einsaetze e
+                 JOIN einsatz_zuteilung z ON z.einsatz_id = e.id
+                WHERE e.spontan_erzeugt = 1';
+if ($eingegrenzt) { $spontanSql .= ' AND e.datum BETWEEN ? AND ?'; }
+$spStmt = db()->prepare($spontanSql);
+$spStmt->execute($args);
+$spontane = $spStmt->fetchAll();
+
+$ueberschneidet = static function (string $vonA, string $bisA, string $vonB, string $bisB): bool {
+    // Ueber Mitternacht laufende Schichten sind hier bewusst NICHT
+    // gesondert behandelt: Der spontane Einsatz dauert 30 Minuten und
+    // entsteht im Moment des Starts, er kann den Tag nicht ueberschreiten.
+    return $vonA < $bisB && $vonB < $bisA;
+};
+
+$einsaetze = array_map(function ($e) use ($proEinsatz, $hatFahrzeug, $spontane, $ueberschneidet) {
     $e['id'] = (int)$e['id'];
     // ENT-328. Fehlt die Spalte noch, geht der Schluessel GAR NICHT hinaus --
     // die Oberflaeche unterscheidet dann "nicht eingerichtet" von "kein
@@ -105,6 +134,27 @@ $einsaetze = array_map(function ($e) use ($proEinsatz, $hatFahrzeug) {
     $e['bedarf'] = (int)$e['bedarf'];
     $e['spontan_erzeugt'] = (bool)$e['spontan_erzeugt'];
     $e['mitarbeiter'] = $proEinsatz[$e['id']] ?? [];
+    // Nur an der GEPLANTEN Schicht, nicht am spontanen Einsatz selbst --
+    // dort waere die Angabe eine Selbstauskunft ohne Wert.
+    $e['parallel_runden'] = [];
+    if (!$e['spontan_erzeugt']) {
+        $eigene = array_column($e['mitarbeiter'], 'id');
+        foreach ($spontane as $sp) {
+            if ((int)$sp['id'] === $e['id']) { continue; }
+            if ($sp['datum'] !== $e['datum']) { continue; }
+            if (!in_array((int)$sp['mitarbeiter_id'], $eigene, true)) { continue; }
+            if (!$ueberschneidet((string)$e['von'], (string)$e['bis'],
+                                 (string)$sp['von'], (string)$sp['bis'])) { continue; }
+            $e['parallel_runden'][] = [
+                'einsatz_id'     => (int)$sp['id'],
+                'mitarbeiter_id' => (int)$sp['mitarbeiter_id'],
+                'titel'          => $sp['titel'],
+                'kunde_name'     => $sp['kunde_name'],
+                'von'            => $sp['von'],
+                'bis'            => $sp['bis'],
+            ];
+        }
+    }
     return $e;
 }, $einsaetze);
 
