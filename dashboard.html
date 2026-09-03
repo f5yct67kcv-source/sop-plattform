@@ -15408,6 +15408,8 @@ function aeZeichneUebernahmen(eintraege, eingerichtet) {
         <div class="zeiten">${dmy(datum)}, <b>${esc(zeit)}</b> · ${esc(u.person)}</div>
         ${!ohneFahrzeug && !abgabe ? `<div class="zeiten">Kilometerstand: <b>${u.tacho_km === null ? '–' : nf(u.tacho_km) + ' km'}</b></div>` : ''}
         ${u.kunde_name ? `<div class="zeiten">${esc(u.kunde_name)}${u.titel ? ' · ' + esc(u.titel) : ''}</div>` : ''}
+        ${u.auffaellig ? `<div class="msg-warn">Auffällig: ${u.km_seither > 0 ? '+' : ''}${nf(u.km_seither)} km seit der letzten Übernahme dieses Fahrzeugs.</div>` : ''}
+        ${u.wiederholt ? `<div class="msg-warn">Auffällig: gleicher Kilometerstand wie bei der eigenen letzten Übernahme dieses Fahrzeugs.</div>` : ''}
         ${u.hat_foto ? `<button class="btn btn-plain btn-sm" style="margin-top:10px" onclick="aeUebernahmeFoto(${Number(u.id)})">Foto ansehen</button>` : ''}
       </div>`;
   }).join('');

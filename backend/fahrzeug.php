@@ -148,6 +148,54 @@ function fz_meine_aktiv(PDO $pdo, int $mitarbeiterId): ?array
              'bezeichnung' => $ff['bezeichnung'], 'seit' => (string)$r['zeitpunkt']];
 }
 
+// Die Übernahmen-Liste fürs Cockpit (ENT-346/fahrzeug_uebernahme_liste.php),
+// als Konstante statt inline im Endpunkt -- damit eine echte Prüfung
+// (pruef_fahrzeug_uebernahme.php) exakt dieselbe Abfrage gegen SQLite
+// ausführen kann, die auch gegen die echte Datenbank läuft. Der Aufrufer
+// hängt den optionalen Fahrzeug-Filter und die Sortierung selbst an.
+//
+// "voriger": die vorangehende Übernahme DESSELBEN Fahrzeugs -- derselbe
+// Bezug, den fz_bezugsstand() auch für die NÄCHSTE Übernahme heranzöge,
+// hier per Korrelation für JEDE Zeile mitgeholt (nicht nur die aktuellste).
+const FZ_UEBERNAHME_LISTE_SQL = "SELECT u.id, u.art, u.zeitpunkt, u.tacho_km, u.quelle,
+           u.mitarbeiter_id AS eigene_mitarbeiter_id, u.foto IS NOT NULL AS hat_foto,
+           f.id AS fahrzeug_id, f.kennzeichen, f.bezeichnung AS fz_bezeichnung,
+           m.vorname, m.nachname, m.name,
+           e.kunde_name, e.titel,
+           voriger.tacho_km AS voriger_km, voriger.mitarbeiter_id AS voriger_mitarbeiter_id
+      FROM fahrzeug_uebernahme u
+      LEFT JOIN fahrzeuge f ON f.id = u.fahrzeug_id
+      JOIN mitarbeiter m ON m.id = u.mitarbeiter_id
+      LEFT JOIN einsaetze e ON e.id = u.einsatz_id
+      LEFT JOIN fahrzeug_uebernahme voriger ON voriger.id = (
+          SELECT v.id FROM fahrzeug_uebernahme v
+           WHERE v.art = 'uebernahme' AND v.fahrzeug_id = u.fahrzeug_id AND v.tacho_km IS NOT NULL
+             AND (v.zeitpunkt < u.zeitpunkt OR (v.zeitpunkt = u.zeitpunkt AND v.id < u.id))
+           ORDER BY v.zeitpunkt DESC, v.id DESC LIMIT 1
+      )";
+
+// Zwei Feststellungen aus dem Vorwert (ENT-356), getrennt von der SQL-
+// Abfrage geprüft, damit beide für sich falsch sein können, ohne dass die
+// jeweils andere Prüfung es verdeckt:
+//  - "auffaellig": derselbe Sprung wie beim Abschicken selbst
+//    (FZ_SPRUNG_AUFFAELLIG) -- hier zusätzlich fürs Cockpit sichtbar
+//    gemacht, nicht nur im Toast der fahrenden Person.
+//  - "wiederholt": dieselbe Person, dasselbe Fahrzeug, derselbe Stand wie
+//    bei ihrer EIGENEN letzten Übernahme -- anders als der bewusst
+//    erlaubte Fall "andere Person übernimmt beim gleichen Stand" (ENT-340),
+//    den fz_stand_pruefen() weiterhin nicht abweist.
+// Beides bleibt eine Feststellung, keine Beanstandung -- OP-314/ENT-356.
+function fz_uebernahme_feststellungen(?int $tachoKm, ?int $vorigerKm, ?int $vorigerMa, ?int $eigeneMa): array
+{
+    $kmSeither = ($tachoKm !== null && $vorigerKm !== null) ? $tachoKm - $vorigerKm : null;
+    return [
+        'km_seither' => $kmSeither,
+        'auffaellig' => $kmSeither !== null && $kmSeither > FZ_SPRUNG_AUFFAELLIG,
+        'wiederholt' => $vorigerKm !== null && $tachoKm === $vorigerKm
+            && $vorigerMa !== null && $vorigerMa === $eigeneMa,
+    ];
+}
+
 // Der Schlüssel hinter dem Aufkleber. Zufällig und nicht aus Kennzeichen
 // oder ID abgeleitet: Wäre er ableitbar, liesse sich für jedes Fahrzeug eine
 // Übernahme buchen, ohne je davorgestanden zu haben -- und der Aufkleber

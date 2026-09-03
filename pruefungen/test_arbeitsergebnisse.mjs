@@ -65,6 +65,17 @@ const UEBERNAHMEN = { status: 'ok', eingerichtet: true, eintraege: [
   { id: 4, art: 'abgabe', zeitpunkt: `${T0} 08:00:00`, tacho_km: null, quelle: 'app', hat_foto: false,
     fahrzeug_id: 3, kennzeichen: 'SO 999003', fz_bezeichnung: 'Patrouille 3',
     person: 'Erika Muster', kunde_name: null, titel: null },
+  // Zwei Feststellungen (ENT-356), server-seitig vorberechnet -- die
+  // Berechnung selbst ist Sache von pruef_fahrzeug_uebernahme.php (echte
+  // SQLite-Ausführung), hier wird nur die Anzeige geprüft.
+  { id: 5, art: 'uebernahme', zeitpunkt: `${T0} 09:00:00`, tacho_km: 55000, quelle: 'liste', hat_foto: false,
+    fahrzeug_id: 5, kennzeichen: 'SO 999005', fz_bezeichnung: 'Patrouille 5',
+    person: 'Erika Muster', kunde_name: null, titel: null,
+    km_seither: 1150, auffaellig: true, wiederholt: false },
+  { id: 6, art: 'uebernahme', zeitpunkt: `${T0} 10:00:00`, tacho_km: 30000, quelle: 'liste', hat_foto: false,
+    fahrzeug_id: 6, kennzeichen: 'SO 999006', fz_bezeichnung: 'Patrouille 6',
+    person: 'Hans Beispiel', kunde_name: null, titel: null,
+    km_seither: 0, auffaellig: false, wiederholt: true },
 ]};
 
 let calls = [];
@@ -280,6 +291,29 @@ check('KRITISCH: eine Abgabe zeigt keinen Kilometerstand -- den Wert gibt es fü
     const karten = [...document.querySelectorAll('#aeUebListe .ag-karte')];
     const abgabeKarte = karten.find(k => k.textContent.includes('Abgegeben'));
     return !!abgabeKarte && !abgabeKarte.textContent.includes('Kilometerstand');
+  }));
+
+// ══════════ ZWEI FESTSTELLUNGEN (ENT-356): AUFFÄLLIG, WIEDERHOLT ═══════════
+// Reine Feststellungen, keine Beanstandungen (OP-314) -- geprüft wird nur,
+// dass die vom Server mitgelieferten Flags sichtbar werden, nicht die
+// Berechnung selbst (die läuft echt in pruef_fahrzeug_uebernahme.php).
+check('KRITISCH: ein auffälliger Kilometersprung wird als eigene Feststellung angezeigt, mit der genannten Zahl',
+  await page.evaluate(() => {
+    const karten = [...document.querySelectorAll('#aeUebListe .ag-karte')];
+    const karte = karten.find(k => k.textContent.includes('SO 999005'));
+    return !!karte && /Auffällig/.test(karte.textContent) && /1.150/.test(karte.textContent);
+  }));
+check('KRITISCH: ein wiederholter Kilometerstand (dieselbe Person) wird als eigene Feststellung angezeigt',
+  await page.evaluate(() => {
+    const karten = [...document.querySelectorAll('#aeUebListe .ag-karte')];
+    const karte = karten.find(k => k.textContent.includes('SO 999006'));
+    return !!karte && /Auffällig.*gleicher Kilometerstand/.test(karte.textContent);
+  }));
+check('Eine unauffällige Übernahme (SO 999001) zeigt keine der beiden Feststellungen',
+  await page.evaluate(() => {
+    const karten = [...document.querySelectorAll('#aeUebListe .ag-karte')];
+    const karte = karten.find(k => k.textContent.includes('SO 999001'));
+    return !!karte && !/Auffällig/.test(karte.textContent);
   }));
 check('Kunde/Einsatz erscheinen, wo einer bekannt ist',
   uebInhalt.includes('Muster Liegenschaften AG') && uebInhalt.includes('Öffnungsrunde'));
