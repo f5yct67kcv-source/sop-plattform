@@ -499,6 +499,105 @@ function einsatz_sperre_pruefen(PDO $pdo, int $einsatzId): void
     }
 }
 
+// ── Dienstfahrzeug und Fahrer am Einsatz (ENT-328) ────────────────────
+//
+// EINE Pruefstelle fuer BEIDE Schreibwege: einsatz_save.php (beim Anlegen und
+// Aendern aus der Anlegen-Ansicht) und einsatz_fahrzeug.php (nachtraeglich im
+// Einsatzplan). Zwei getrennte Pruefungen waeren zwei Wahrheiten darueber,
+// welche Kombination zulaessig ist -- dieselbe Ueberlegung wie bei darf() in
+// rechte.php.
+//
+// Antwortet selbst mit einer Fehlermeldung und bricht ab; der Aufrufer
+// bekommt nur zurueck, was er speichern darf.
+//
+// $zuteilung sind die Mitarbeiter-IDs, die NACH diesem Speichern am Einsatz
+// haengen -- nicht die davor. Sonst liesse sich ein Fahrer bestimmen, der im
+// selben Zug aus der Schicht genommen wird.
+function einsatz_fahrzeug_pruefen(PDO $pdo, ?int $fahrzeugId, ?int $fahrerId,
+                                  array $zuteilung, ?int $bisherFahrzeugId = null): array
+{
+    if ($fahrzeugId !== null && $fahrzeugId <= 0) { $fahrzeugId = null; }
+    if ($fahrerId !== null && $fahrerId <= 0) { $fahrerId = null; }
+
+    // Ohne Fahrzeug hat ein Fahrer keine Bedeutung. Die Angabe wird nicht
+    // still verworfen, sondern abgewiesen -- wer einen Fahrer eintraegt, ohne
+    // dass ein Fahrzeug dasteht, hat sich vertan und soll das erfahren.
+    if ($fahrzeugId === null && $fahrerId !== null) {
+        json_response(['status' => 'error', 'message' =>
+            'Ein Fahrer ohne Dienstfahrzeug ergibt keine Angabe. Zuerst das Fahrzeug wählen.'], 422);
+    }
+    if ($fahrzeugId === null) { return ['fahrzeug_id' => null, 'fahrer_id' => null]; }
+
+    if (!hat_tabelle($pdo, 'fahrzeuge')) {
+        json_response(['status' => 'error', 'message' =>
+            'Es sind noch keine Dienstfahrzeuge eingerichtet.'], 422);
+    }
+    $s = $pdo->prepare('SELECT kennzeichen, status FROM fahrzeuge WHERE id = ?');
+    $s->execute([$fahrzeugId]);
+    $fz = $s->fetch(PDO::FETCH_ASSOC);
+    if (!$fz) {
+        json_response(['status' => 'error', 'message' => 'Dieses Fahrzeug gibt es nicht.'], 422);
+    }
+    // Ein Fahrzeug ausser Betrieb oder verkauft laesst sich nicht NEU
+    // einteilen. Ein bereits eingeteiltes bleibt stehen, auch wenn es
+    // spaeter in die Werkstatt geht: Was gefahren wurde, ist eine Tatsache,
+    // und ein Speichern der Bemerkung darf sie nicht wegraeumen.
+    if ($fz['status'] !== 'aktiv' && (int)$fahrzeugId !== (int)$bisherFahrzeugId) {
+        json_response(['status' => 'error', 'message' =>
+            $fz['kennzeichen'] . ' steht nicht im Betrieb ('
+            . ($fz['status'] === 'verkauft' ? 'verkauft' : 'ausser Betrieb')
+            . ') und lässt sich nicht einteilen.'], 422);
+    }
+
+    // Der Fahrer muss dem Einsatz zugeteilt sein. Sonst faehrt jemand ein
+    // Fahrzeug zu einer Schicht, auf der er gar nicht steht -- und die
+    // Auslagen-Folge unten traefe eine Zuteilung, die es nicht gibt.
+    if ($fahrerId !== null && !in_array($fahrerId, array_map('intval', $zuteilung), true)) {
+        json_response(['status' => 'error', 'message' =>
+            'Der Fahrer muss diesem Einsatz zugeteilt sein.'], 422);
+    }
+
+    return ['fahrzeug_id' => $fahrzeugId, 'fahrer_id' => $fahrerId];
+}
+
+// Die Geld-Folge der Fahrerbestimmung, an EINER Stelle (ENT-328).
+//
+// Wer das Geschaeftsfahrzeug fuehrt, faehrt damit zum Einsatz. Das Verkehrs-
+// mittel dieser Zuteilung MUSS dann 'Geschaeftsfahrzeug' sein -- sonst
+// rechnet der Abgleich einen Fahrkostenersatz fuer ein Auto, das dem Betrieb
+// selbst gehoert (auslagen.php, Art. 18 Ziff. 4/5). Zwei Angaben ueber
+// dieselbe Fahrt, die sich widersprechen koennen, waeren genau die zweite
+// Wahrheit, die es hier nicht geben darf.
+//
+// Ausdruecklich NICHT gesetzt wird das Verkehrsmittel der UEBRIGEN
+// Eingeteilten. Dass sie mitfahren, waere eine Annahme -- sie koennen mit dem
+// eigenen Auto oder dem Zug direkt zum Einsatzort kommen. Der Planer
+// entscheidet das je Person weiter wie bisher.
+function einsatz_fahrer_verkehrsmittel_setzen(PDO $pdo, int $einsatzId,
+                                              ?int $fahrerId, ?int $bisherFahrerId = null): void
+{
+    if ($einsatzId <= 0) { return; }
+
+    // Wer nicht mehr faehrt, faellt auf die Vorgabe seines Stammblatts
+    // zurueck (NULL) statt auf einem stehengebliebenen 'Geschaeftsfahrzeug'
+    // sitzenzubleiben. Bewusst NUR die bisherige Fahrerin oder der bisherige
+    // Fahrer und bewusst nur, wenn dort noch der von uns gesetzte Wert steht:
+    // Hat jemand danach von Hand etwas anderes eingetragen, gehoert das ihm
+    // und wird nicht ueberschrieben.
+    if ($bisherFahrerId !== null && $bisherFahrerId !== $fahrerId) {
+        $pdo->prepare(
+            "UPDATE einsatz_zuteilung SET verkehrsmittel = NULL, oev_rappen = NULL
+             WHERE einsatz_id = ? AND mitarbeiter_id = ? AND verkehrsmittel = 'Geschaeftsfahrzeug'"
+        )->execute([$einsatzId, $bisherFahrerId]);
+    }
+
+    if ($fahrerId === null) { return; }
+    $pdo->prepare(
+        "UPDATE einsatz_zuteilung SET verkehrsmittel = 'Geschaeftsfahrzeug', oev_rappen = NULL
+         WHERE einsatz_id = ? AND mitarbeiter_id = ?"
+    )->execute([$einsatzId, $fahrerId]);
+}
+
 // Anstellungskategorie nach Art. 8 GAV (ENT-065). Leer bleibt leer: Eine
 // geratene Kategorie behauptet eine Obergrenze, die niemand vereinbart hat.
 function kategorie_pruefen($w): ?string {

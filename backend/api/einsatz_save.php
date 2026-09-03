@@ -58,6 +58,15 @@ $wegAdr = trim((string)($input['weg_adresse'] ?? '')) ?: null;
 // serie_id wird beim AENDERN bewusst nicht angefasst: Die UPDATE-Anweisung
 // unten fuehrt die Spalte nicht. Wer einen Tag einer Reihe bearbeitet, loest
 // ihn damit nicht heraus.
+// ENT-328. Dienstfahrzeug und Fahrer -- nur angefasst, wenn die Anfrage die
+// Schluessel WIRKLICH mitschickt. Die Bearbeiten-Schublade kennt die Felder
+// nicht; wuerden sie hier unbesehen gelesen, leerte jedes Speichern aus der
+// Schublade eine bestehende Fahrzeugzuteilung. Derselbe stille Datenverlust,
+// vor dem ENT-115 schon einmal stand.
+$fahrzeugGesendet = array_key_exists('fahrzeug_id', $input) || array_key_exists('fahrer_id', $input);
+$fahrzeugId = ($input['fahrzeug_id'] ?? '') === '' ? null : (int)$input['fahrzeug_id'];
+$fahrerId   = ($input['fahrer_id'] ?? '')   === '' ? null : (int)$input['fahrer_id'];
+
 $serieId  = isset($input['serie_id']) && $input['serie_id'] !== '' ? (int)$input['serie_id'] : null;
 $serieNeu = !empty($input['serie_neu']);
 if ($serieId !== null && $serieId <= 0) { $serieId = null; }
@@ -184,6 +193,27 @@ if ($zuteilung) {
     }
 }
 
+// ENT-328. Geprueft wird gegen die Zuteilung, die NACH diesem Speichern gilt
+// -- sonst liesse sich jemand zum Fahrer bestimmen, der im selben Zug aus der
+// Schicht faellt. Die Pruefung selbst steht in planung.php, weil
+// einsatz_fahrzeug.php sie ebenso braucht.
+$bisherFahrzeugId = null;
+$bisherFahrerId = null;
+if ($fahrzeugGesendet && hat_spalte(db(), 'einsaetze', 'fahrzeug_id')) {
+    if ($id > 0) {
+        $alt = db()->prepare('SELECT fahrzeug_id, fahrer_id FROM einsaetze WHERE id = ?');
+        $alt->execute([$id]);
+        $altZeile = $alt->fetch(PDO::FETCH_ASSOC) ?: [];
+        $bisherFahrzeugId = isset($altZeile['fahrzeug_id']) ? (int)$altZeile['fahrzeug_id'] : null;
+        $bisherFahrerId   = isset($altZeile['fahrer_id']) ? (int)$altZeile['fahrer_id'] : null;
+    }
+    $geprueft = einsatz_fahrzeug_pruefen(db(), $fahrzeugId, $fahrerId, $zuteilung, $bisherFahrzeugId);
+    $fahrzeugId = $geprueft['fahrzeug_id'];
+    $fahrerId   = $geprueft['fahrer_id'];
+} else {
+    $fahrzeugGesendet = false;   // Spalte fehlt noch: nicht schreiben, nicht behaupten
+}
+
 $pdo = db();
 $pdo->beginTransaction();
 try {
@@ -238,6 +268,18 @@ try {
         foreach ($zuteilung as $mid) {
             $ins->execute([$id, $mid]);
         }
+    }
+
+    // ENT-328. Eigene Anweisung statt zwei weiterer Spalten in der festen
+    // Liste oben: Die laeuft auch fuer die Bearbeiten-Schublade, die die
+    // Felder nicht kennt -- dort wuerden sie mit NULL ueberschrieben.
+    if ($fahrzeugGesendet) {
+        $pdo->prepare('UPDATE einsaetze SET fahrzeug_id = ?, fahrer_id = ? WHERE id = ?')
+            ->execute([$fahrzeugId, $fahrerId, $id]);
+        // In derselben Transaktion wie die Zuteilung: Ein Fahrer ohne die
+        // zugehoerige Verkehrsmittel-Folge waere ein Datensatz, aus dem der
+        // Abgleich einen Fahrkostenersatz fuer das eigene Auto errechnet.
+        einsatz_fahrer_verkehrsmittel_setzen($pdo, $id, $fahrerId, $bisherFahrerId);
     }
     $pdo->commit();
 } catch (Throwable $e) {
