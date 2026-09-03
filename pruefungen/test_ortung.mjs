@@ -247,9 +247,37 @@ await page.evaluate(() => rundgangFortsetzen(71));
 await page.waitForTimeout(1400);
 await page.click('#rgsRt-karte');
 await page.waitForTimeout(800);
+// REVIDIERT durch ENT-355: Die Aussage steht nicht mehr als Zeile UNTER der
+// Karte, sondern als Marke AUF der Karte. ENT-317 gilt unveraendert -- wer
+// geortet wird, muss es sehen koennen --, nur der Ort hat gewechselt.
+// Darum wird hier schaerfer geprueft als vorher: Es genuegt nicht, dass das
+// Element im Baum steht; es muss eine echte Flaeche haben, innerhalb der
+// Karte liegen und an seiner Stelle auch wirklich obenauf sein. Eine Marke,
+// die hinter der Karte oder ausserhalb des Bildes liegt, ist keine Aussage.
+const chip = await page.evaluate(() => {
+  const c = document.getElementById('rgsOrtChip');
+  const h = document.querySelector('.rgs-karte-huelle');
+  if (!c || !h) { return null; }
+  const rc = c.getBoundingClientRect(), rh = h.getBoundingClientRect();
+  const oben = document.elementFromPoint(rc.left + rc.width / 2, rc.top + rc.height / 2);
+  return { text: (c.textContent || '').trim(), breite: rc.width, hoehe: rc.height,
+           drin: rc.top >= rh.top - 1 && rc.bottom <= rh.bottom + 1
+              && rc.left >= rh.left - 1 && rc.right <= rh.right + 1,
+           obenauf: !!oben && (oben === c || c.contains(oben)) };
+});
 check('KRITISCH: während der Ortung steht sichtbar da, dass geortet wird',
+  !!chip && chip.text.includes('Ortung läuft') && chip.breite > 60 && chip.hoehe > 16);
+check('KRITISCH: die Ortungsmarke liegt auf der Karte und ist nicht verdeckt',
+  !!chip && chip.drin && chip.obenauf);
+// Der Punkte-Reiter hat keine Karte -- dort MUSS die Zeile bleiben, sonst
+// staende dem Waechter auf diesem Reiter gar nichts mehr ueber seine Ortung.
+await page.click('#rgsRt-punkte');
+await page.waitForTimeout(400);
+check('KRITISCH: auf dem Punkte-Reiter steht die Ortung weiterhin als Zeile',
   await page.isVisible('#rgsOrtungHinweis')
   && (await page.textContent('#rgsOrtungHinweis')).includes('verfolgt'));
+await page.click('#rgsRt-karte');
+await page.waitForTimeout(600);
 check('Die eigene Position steht auf der Karte',
   await page.evaluate(() => rgsStandortMarke !== null));
 
