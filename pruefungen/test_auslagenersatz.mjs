@@ -79,14 +79,21 @@ check('KRITISCH: die Ausnahme an der Zuteilung schlaegt die Vorgabe der Person',
 // dorthin. Das ist keine GAV-Auslegung, sondern eine Tatsachenfeststellung
 // davor (Vermerk bei GAV-AUS-010 im Auslegungsregister).
 //
+// REVIDIERT durch ENT-350 (OP-348, vom Projektinhaber entschieden): Nicht
+// nur 'entfallen' zaehlt hier nicht mehr mit, sondern auch 'abgelehnt' --
+// derselbe Grund wie bei 'entfallen': wer abgelehnt hat, war nicht dort und
+// hatte keinen Hin- und Rueckweg dorthin. Vorher war das ein bewusster
+// Widerspruch zur Planungsliste (dort zaehlt eine Absage seit ENT-113
+// schon nicht als besetzt) -- jetzt sagen Anzeige und Sperre dasselbe.
+//
 // Geprueft wird darum jetzt BEIDES: dass die Einschraenkung da ist -- und
-// dass sie GENAU 'entfallen' betrifft und nichts weiter. Eine Sperre, die
-// aus Versehen auch 'abgelehnt' oder 'offen' ausnaehme, wuerde still zu
-// wenig sperren, und das faellt an einer Auszahlung auf, nicht hier.
-check('KRITISCH: der Tageskonflikt zaehlt jeden anderen, nicht abgesagten Einsatz desselben Tages -- ausser entfallenen (ENT-347)',
-  /e\.status != 'abgesagt'\s*\n\s*AND z\.zusage != 'entfallen' AND e\.id != \?/.test(ABGLEICH));
-check('KRITISCH: und die Ausnahme betrifft NUR "entfallen", nicht auch abgelehnte oder offene Zuteilungen',
-  (ABGLEICH.match(/z\.zusage (?:!=|<>) '[a-z]+'/g) || []).join('|') === "z.zusage != 'entfallen'");
+// dass sie GENAU diese zwei Zustaende betrifft und nichts weiter. Eine
+// Sperre, die aus Versehen auch 'offen' oder 'zugesagt' ausnaehme, wuerde
+// still zu wenig sperren, und das faellt an einer Auszahlung auf, nicht hier.
+check('KRITISCH: der Tageskonflikt zaehlt jeden anderen, nicht abgesagten Einsatz desselben Tages -- ausser entfallenen und abgelehnten (ENT-347/350)',
+  /e\.status != 'abgesagt'\s*\n\s*AND z\.zusage NOT IN \('entfallen', 'abgelehnt'\) AND e\.id != \?/.test(ABGLEICH));
+check('KRITISCH: und die Ausnahme betrifft NUR diese beiden Zustände, nicht auch offene oder zugesagte Zuteilungen',
+  (ABGLEICH.match(/z\.zusage NOT IN \([^)]*\)/g) || []).join('|') === "z.zusage NOT IN ('entfallen', 'abgelehnt')");
 check('Schreiben und Loeschen laufen in derselben Transaktion wie die Ist-Zeiten',
   ABGLEICH.indexOf('$pdo->beginTransaction()') < ABGLEICH.indexOf('$auslagenSpeichern(')
   && ABGLEICH.indexOf('$auslagenSpeichern(') < ABGLEICH.indexOf('$pdo->commit()'));
