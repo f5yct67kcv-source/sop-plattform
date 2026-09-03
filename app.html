@@ -456,6 +456,22 @@ svg.i-sm { width: 17px; height: 17px; }
    trotzdem buendig an der Kante -- sonst steht der Titel eingerueckt. */
 .rgs-zurueck { min-height: 44px; min-width: 44px; padding: 0; margin-left: -10px; display: flex; align-items: center; justify-content: center; background: none; border: 0; color: var(--ink); cursor: pointer; }
 .rgs-bd { padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); overflow-y: auto; flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 14px; }
+/* KEIN Bloecke-Zusammendruecken (ENT-335). Der Rumpf ist eine Flex-Spalte;
+   Flex-Kinder duerfen von sich aus schrumpfen. Normalerweise schuetzt sie
+   ihre automatische Mindesthoehe davor -- die faellt aber auf 0, sobald ein
+   Block `overflow: hidden` traegt. Genau das tun .karte, .rgs-fakten und
+   .rgs-klapp (sie brauchen es fuer ihre abgerundeten Ecken).
+
+   Folge auf einem kurzen Bildschirm: Passt der Inhalt nicht mehr, wurden
+   genau diese drei Bloecke auf wenige Pixel zusammengedrueckt und ihr Text
+   abgeschnitten -- Objekt, Kunde, Adresse, Zeitfenster und Ansprechpartner
+   verschwanden, waehrend alles darunter normal dastand. Vom Projektinhaber
+   gemeldet und am Bildschirmfoto nachgemessen: Auf 720 px Hoehe schrumpfte
+   .rgs-fakten von 50 auf 16 px, auf 660 px auf 0.
+
+   Der Rumpf scrollt ohnehin (overflow-y: auto) -- die Bloecke sollen ihn
+   also laenger machen, nicht kleiner werden. */
+.rgs-bd > * { flex-shrink: 0; }
 
 /* Kopfkarte: Objekt, Kunde, Adresse -- Reihenfolge vom Projektinhaber
    vorgegeben. Das Routen-Symbol steht rechts daneben, nicht darunter:
@@ -469,6 +485,12 @@ svg.i-sm { width: 17px; height: 17px; }
 .rgs-obj-name.fehlt, .rgs-obj-kunde.fehlt { color: var(--ink-3); font-style: italic; font-weight: 500; }
 .rgs-obj-name.fehlt { font-size: 16px; }
 .rgs-klapp-zahl.leer { opacity: .55; }
+/* Die Notrufnummern im zugeklappten Kopf (ENT-335): lesbar, aber erkennbar
+   eine Vorschau auf den Inhalt und kein Knopf. Auf schmalen Geraeten darf
+   sie den Titel nicht verdraengen -- darum darf sie verschwinden, bevor
+   „Zentrale und Notruf" abgeschnitten wuerde. */
+.rgs-klapp-nr { font-variant-numeric: tabular-nums; letter-spacing: .2px; white-space: nowrap; }
+@media (max-width: 359px) { .rgs-klapp-nr { display: none; } }
 /* Die Adresse traegt --ink-2, nicht die blasseste Stufe: Fuer jemanden, der
    nachts erst hinfahren muss, ist sie Kerninformation, kein Beiwerk. */
 .rgs-obj-adr { font-size: 14.5px; color: var(--ink-2); margin-top: 10px; line-height: 1.45; }
@@ -2072,8 +2094,16 @@ function rgsKontakteHtml(d) {
       </div>
     </div>
 
+    ${rgsModus === 'lauf' ? `<div class="rgs-mod-lb" id="rgsHilfeLb">${esc(w('rgsHilfe'))}</div>`
+    : `<div class="rgs-klapp${rgHilfeOffen() ? ' auf' : ''}" id="rgsKlappHilfe">
+      <button type="button" class="rgs-klapp-kopf" onclick="rgHilfeKlapp()"
+          aria-expanded="${rgHilfeOffen() ? 'true' : 'false'}">
+        <svg class="i i-sm rgs-klapp-pfeil" viewBox="0 0 24 24"><polyline points="9 6 15 12 9 18"/></svg>
+        <span id="rgsHilfeLb">${esc(w('rgsHilfe'))}</span>
+        <span class="rgs-klapp-zahl rgs-klapp-nr">${RGS_NOTRUF.map(n => n.nr).join(' · ')}</span>
+      </button>
+      <div class="rgs-klapp-bd">`}
     <div class="rgs-hilfe">
-      <div class="rgs-mod-lb" id="rgsHilfeLb">${esc(w('rgsHilfe'))}</div>
       ${z ? `<a class="rgs-zentrale" id="rgsZentrale" href="tel:${esc(String(z.telefon).replace(/\s/g, ''))}">
         <span class="rgs-zentrale-ic">
           <svg class="i i-sm" viewBox="0 0 24 24"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.4-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/></svg>
@@ -2090,7 +2120,40 @@ function rgsKontakteHtml(d) {
           <span class="rgs-notruf-wort">${esc(w(n.wort))}</span>
         </a>`).join('')}
       </div>
-    </div>`;
+    </div>
+    ${rgsModus === 'lauf' ? '' : `</div></div>`}`;
+}
+
+/* Zentrale und Notruf ausklappbar (ENT-335), Wunsch des Projektinhabers:
+   „um mehr Übersicht zu erzeugen". Der Block ist der höchste auf der Seite;
+   zugeklappt passt die Vorschau auf einen Bildschirm.
+
+   Das REVIDIERT ENT-299 Ziffer 4 („Nicht ausklappbar ... Wer diese Nummern
+   braucht, hat keine Hand frei zum Aufklappen") -- aber nur zur Hälfte, und
+   die andere Hälfte bleibt bewusst stehen:
+
+   - NUR in der Vorschau, also VOR dem Losgehen. Dort ist niemand im
+     Ernstfall, und dort stand der Block dem Überblick im Weg.
+   - In der LAUFENDEN Runde bleibt er unverändert offen und ohne Schalter.
+     Genau dort greift das Argument aus ENT-299, und es ist nicht schwächer
+     geworden: Wer 117 wählen muss, darf nicht vorher aufklappen müssen.
+   - Auch zugeklappt NENNT der Kopf die Nummern (117 · 118 · 144). Wer sie
+     im Ernstfall sucht, sieht sie ohne einen einzigen Tipp; getippt wird
+     nur zum Wählen. Ein Klappblock, der verschweigt, was er verbirgt, wäre
+     hier das Falsche.
+   - Die Wahl überdauert die Sitzung. Wer den Block offen lässt, findet ihn
+     offen wieder -- niemand muss ihn vor jeder Runde erneut aufklappen. */
+const RGS_HILFE_SCHLUESSEL = 'sop_rundgang_hilfe_offen';
+
+function rgHilfeOffen() {
+  try { return localStorage.getItem(RGS_HILFE_SCHLUESSEL) === 'ja'; }
+  catch (e) { return false; }
+}
+
+function rgHilfeKlapp() {
+  const auf = !rgHilfeOffen();
+  try { localStorage.setItem(RGS_HILFE_SCHLUESSEL, auf ? 'ja' : 'nein'); } catch (e) {}
+  rgSeiteKlapp('rgsKlappHilfe');
 }
 
 function rgSeiteKlapp(id) {
