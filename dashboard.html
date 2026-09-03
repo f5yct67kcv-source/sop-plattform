@@ -3295,6 +3295,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 </style>
 <script src="gav.js"></script>
 <script src="zeitwahl.js"></script>
+<script src="testumgebung.js"></script>
 <script>
 /* Muss VOR dem ersten Zeichnen laufen, sonst blitzt die helle Fassung
    kurz auf, bevor die dunkle greift (ENT-029). Ohne gespeicherte Wahl
@@ -17985,11 +17986,14 @@ function googleMapsLaden() {
     // Der Schluessel ist ein clientseitiger Maps-JS-Browserschluessel: das
     // Sichtbarwerden im Quelltext ist bei diesem Schluesseltyp normal und
     // unvermeidbar, der eigentliche Schutz laeuft ueber die
-    // HTTP-Referrer-Einschraenkung in der Google-Cloud-Konsole (auf
-    // https://rapport.itufeden.myhostpoint.ch/*) und die zusaetzliche
-    // API-Einschraenkung auf ausschliesslich die Maps JavaScript API --
-    // nicht ueber Geheimhaltung.
-    skript.src = 'https://maps.googleapis.com/maps/api/js?key=AIzaSyBdm5W2BwLAir3YHQusdpamrG1Mgx4AdzI';
+    // HTTP-Referrer-Einschraenkung in der Google-Cloud-Konsole und die
+    // zusaetzliche API-Einschraenkung auf ausschliesslich die Maps
+    // JavaScript API -- nicht ueber Geheimhaltung.
+    // Platzhalter, beim Deploy aus GitHub Secrets ersetzt (ENT-341): eigener
+    // Schluessel je Umgebung, damit die produktive Referrer-Beschraenkung
+    // (weiterhin auf https://rapport.itufeden.myhostpoint.ch/*) unangetastet
+    // bleibt und Staging-Tests nicht dasselbe Kontingent verbrauchen.
+    skript.src = 'https://maps.googleapis.com/maps/api/js?key=__MAPS_JS_KEY__';
     skript.onload = resolve;
     skript.onerror = () => reject(new Error('Google Maps konnte nicht geladen werden.'));
     document.head.appendChild(skript);
