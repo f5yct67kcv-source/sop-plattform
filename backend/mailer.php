@@ -1,5 +1,12 @@
 <?php
 declare(strict_types=1);
+// ist_produktion() fuer den Staging-Mailmodus (ENT-341) -- require_once,
+// nicht require: beide Aufrufer dieser Datei binden db.php bereits vor
+// mailer.php ein, ein zweites Laden waere sonst ein harter Abbruch am
+// Ausnahmehandler vorbei (derselbe Fallstrick wie in planung_einrichten.php
+// dokumentiert).
+require_once __DIR__ . '/db.php';
+
 // Minimaler SMTP-Client fuer den Offert-Versand (ENT-192).
 //
 // Bewusst OHNE Bibliothek (PHPMailer o.ae.): Der Deploy kopiert einzelne
@@ -43,6 +50,45 @@ function smtp_kopf_kodieren(string $text): string
         return $text;
     }
     return '=?UTF-8?B?' . base64_encode($text) . '?=';
+}
+
+// Ist dieser Wert noch der unveraenderte Platzhalter (Secret nicht gesetzt
+// oder die sed-Zeile im Deploy-Workflow fehlt)? Eigene, reine Funktion statt
+// eines Inline-Vergleichs, damit sich auch der „bereits konfiguriert"-Fall
+// mit einem frei gewaehlten Testwert pruefen laesst -- nicht nur der eine
+// Zustand, der in dieser Umgebung tatsaechlich erreichbar ist.
+//
+// $ohneSchlussstriche MUSS ohne den abschliessenden doppelten Unterstrich
+// uebergeben werden: Der Deploy-sed ersetzt nur exakte Treffer auf
+// z. B. "__STAGING_TESTMAIL__", und ein Vergleichsziel mit demselben
+// abschliessenden Doppel-Unterstrich wuerde vom selben sed mitgetroffen --
+// genau der ENT-192-Fehler (siehe Kommentar zu smtp_konfiguriert() oben).
+function platzhalter_offen(string $wert, string $ohneSchlussstriche): bool
+{
+    return $wert === '' || str_contains($wert, $ohneSchlussstriche);
+}
+
+// Staging-Mailmodus (ENT-341). Eine reine Funktion ohne Netzwerk- oder
+// $_SERVER-Zugriff -- damit sich die Umleitung fuer sich pruefen laesst,
+// ohne einen Socket zu oeffnen (gleiche Ueberlegung wie bei
+// sitzung_abgelaufen() in db.php).
+//
+// Ausserhalb der Produktion wird IMMER auf die konfigurierte Testadresse
+// umgeleitet, unabhaengig vom eingegebenen Empfaenger -- es gibt keinen
+// Fall, in dem eine Nicht-Produktions-Instanz einen anderen als diesen
+// einen Empfaenger anschreiben darf. Fehlt die Testadresse (Secret nicht
+// gesetzt), liefert die Funktion einen leeren Empfaenger zurueck --
+// smtp_senden() bricht dann ab, statt irgendwohin zu senden.
+function smtp_ziel(string $anEmail, string $anName, bool $produktion): array
+{
+    if ($produktion) {
+        return [$anEmail, $anName];
+    }
+    $testAdresse = '__STAGING_TESTMAIL__';
+    if (platzhalter_offen($testAdresse, '__STAGING_TESTMAIL')) {
+        return ['', ''];
+    }
+    return [$testAdresse, 'Staging-Testadresse'];
 }
 
 function smtp_lesen($fp): string
@@ -95,6 +141,28 @@ function smtp_senden(string $anEmail, string $anName, string $betreff, string $h
     if (!smtp_konfiguriert()) {
         throw new RuntimeException('Der E-Mail-Versand ist noch nicht eingerichtet (SMTP-Zugangsdaten fehlen).');
     }
+
+    // Staging-Mailmodus (ENT-341): ausserhalb der Produktion geht JEDE Mail
+    // ausschliesslich an die konfigurierte Testadresse, nie an den
+    // eingegebenen Empfaenger. Bewusst vor jedem Verbindungsaufbau geprueft,
+    // damit ein falscher Empfaenger nicht einmal eine Socket-Verbindung
+    // ausloest.
+    $produktion = ist_produktion();
+    [$zielEmail, $zielName] = smtp_ziel($anEmail, $anName, $produktion);
+    if ($zielEmail === '') {
+        throw new RuntimeException(
+            'Staging-Mailmodus: keine Testadresse konfiguriert (Secret STAGING_TESTMAIL fehlt) -- '
+            . 'kein Versand, auch nicht an die Testadresse.'
+        );
+    }
+    if (!$produktion) {
+        // Der urspruengliche Empfaenger bleibt im Betreff sichtbar, sonst
+        // liesse sich im Testpostfach nicht mehr nachvollziehen, wer
+        // eigentlich angeschrieben werden sollte.
+        $betreff = '[TESTUMGEBUNG -- eigentlich an ' . $anEmail . '] ' . $betreff;
+    }
+    $anEmail = $zielEmail;
+    $anName = $zielName;
 
     $host = '__SMTP_HOST__';
     $port = (int)'__SMTP_PORT__';
