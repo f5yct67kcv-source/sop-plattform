@@ -1070,8 +1070,13 @@ const W = {
     // die Folge, nicht nur die Lage: Es wird gemeldet -- das ist der Grund,
     // warum die Sperre entfallen darf.
     rgsDoppelFrage: 'Du bist zu dieser Zeit anderswo eingeteilt',
-    rgsDoppelTxt: 'Der Rundgang lässt sich trotzdem starten. Die Einsatzleitung sieht danach an der geplanten Schicht, dass du zur selben Zeit eine Revierrunde gelaufen bist.',
+    rgsDoppelTxt: 'Der Rundgang lässt sich starten — du wirst dann aus der anderen Einteilung genommen, und die Einsatzleitung sieht diese Schicht als unbesetzt.',
     rgsDoppelJa: 'Trotzdem starten',
+    // Seit ENT-347 hat die Bestaetigung eine FOLGE fuer die andere Schicht.
+    // Der Satz muss sie nennen -- sonst bestaetigt jemand etwas, dessen
+    // Wirkung er nicht kennt.
+    entfallen: 'Entfallen',
+    entfallenTxt: 'Du bist aus dieser Einteilung genommen, weil du zur selben Zeit eine Revierrunde gestartet hast. Die Einsatzleitung sieht die Schicht als unbesetzt.',
     rundgangPausierenUnter: 'Kann später wieder fortgesetzt werden',
     rundgangAbbrechenUnter: 'Endgültig. Erfasste Kontrollpunkte bleiben erhalten.',
     rundgangWeiterKnopf: 'Weiter', rundgangWeiterUnter: 'Den Rundgang fortsetzen',
@@ -3380,6 +3385,23 @@ function blattFussZeichnen(e) {
   const schliessen = `<button class="btn btn-plain" onclick="blattZu()">${esc(w('schliessen'))}</button>`;
   if (e.status === 'abgesagt') { el.className = 'blatt-ft'; el.innerHTML = schliessen; return; }
 
+  /* Entfallen (ENT-347): Diese Einteilung besteht NICHT mehr -- der
+     Waechter hat zur selben Zeit eine Revierrunde gestartet und ist dadurch
+     aus der Besetzung genommen worden. Hier keine Zusage-Knoepfe: Es gibt
+     nichts mehr zuzusagen, und ein „Zusagen" wuerde ihn stillschweigend
+     zurueck in eine Schicht setzen, aus der ihn das System bewusst
+     herausgenommen hat. Wer wieder hinein will, klaert das mit der
+     Einsatzleitung -- deshalb steht die Auskunft da, aber kein Knopf. */
+  if (e.zusage === 'entfallen') {
+    el.className = 'blatt-ft gestapelt';
+    el.innerHTML = `
+      <div class="ft-stand">
+        <span class="marke m-w">${esc(w('entfallen'))}</span>
+        <span class="ft-txt">${esc(w('entfallenTxt'))}</span>
+      </div>
+      <div class="ft-reihe">${schliessen}</div>`;
+    return;
+  }
   // Rückmeldung ist freiwillig -- die Einteilung bleibt so oder so bestehen.
   const beantwortet = e.zusage === 'zugesagt' || e.zusage === 'abgelehnt';
   if (!beantwortet || antwortOffen) {
