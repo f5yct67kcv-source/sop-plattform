@@ -166,13 +166,8 @@ async function appStarten(url) {
 }
 
 const blattText = async page => (await page.textContent('#blBody')).replace(/\s+/g, ' ');
-// Knopfbeschriftungen der Wegwahl/Anleitung stehen in der Fussleiste, nicht
-// im Rumpf -- eine eigene Auslesefunktion, damit die Pruefungen die
-// richtige Stelle lesen statt zufaellig im Rumpf danach zu suchen.
-const blattFussText = async page => (await page.textContent('#blFuss')).replace(/\s+/g, ' ');
 const blattOffen = page => page.evaluate(() => document.getElementById('blatt').classList.contains('on'));
 const frageDa = async page => /Nimmst du/.test(await blattText(page));
-const wegwahlDa = async page => /Aufkleber scannen/.test(await blattFussText(page));
 
 // Bleibt die Frage aus, sind die daran haengenden Pruefungen gegenstandslos.
 // Sie duerfen dann NICHT an einem fehlenden Knopf abstuerzen: Ein Absturz
@@ -196,81 +191,86 @@ check('KRITISCH: vor dem Rundgang kommt zuerst die Frage nach dem Dienstfahrzeug
 check('KRITISCH: die Rundgangliste wird noch gar nicht geholt, solange die Frage offen ist',
   !gerufen.some(p => p.includes('mein_rundgang_vorlagen_alle')));
 
-// ── "Ja" fuehrt zur Wegwahl (Aufkleber/manuell), nicht direkt ins Formular ──
-// Vom Projektinhaber verlangt, nachdem er die Kachel getestet hatte: Sie
-// sprang direkt zur manuellen Liste, ohne je auf den Aufkleber hinzuweisen.
+// ── "Ja" fuehrt direkt ins Formular, mit einem Hinweis auf den Aufkleber ──
+// Bis ENT-346 stand hier eine eigene Wegwahl-Zwischenmaske; in ENT-347
+// wieder entfernt (Begruendung siehe fzuAnleitung() in app.html): Sie sah
+// nur, wer die App OHNE Scan oeffnete -- fuer die war "moechtest du
+// stattdessen scannen?" bei jedem Mal ein zusaetzlicher Tipp fuer eine
+// Entscheidung, die durch das blosse Oeffnen ohne Kamera schon gefallen war.
 if (!await frageDa(page)) {
   entfaellt('die Frage kam gar nicht erst', [
-    'KRITISCH: "Ja" fuehrt zur Wegwahl, nicht direkt ins Formular',
-    'KRITISCH: "Aufkleber scannen" zeigt eine Anleitung, keinen eigenen Scanner im Browser',
-    'Von der Anleitung "Zurueck" fuehrt zur Wegwahl zurueck',
-    'Das Formular (ueber "Kein Aufkleber verfuegbar") nennt den zuletzt bekannten Stand',
-    'KRITISCH: "Zurueck" im Formular fuehrt zur Wegwahl zurueck, nicht in den Rundgang',
-    'KRITISCH: Von der Wegwahl "Zurueck" fuehrt zur Frage zurueck, nicht in den Rundgang',
+    'KRITISCH: "Ja" fuehrt direkt ins Formular, kein Zwischenschritt mehr',
+    'Nach der Fahrzeugwahl nennt das Formular den zuletzt bekannten Stand',
+    'Das Formular zeigt einen Hinweis auf den Aufkleber, mit Link zur Anleitung',
+    'KRITISCH: der Anleitungs-Link zeigt eine Anleitung, keinen eigenen Scanner im Browser',
+    'Von der Anleitung "Zurueck" fuehrt zum Formular zurueck',
+    'KRITISCH: "Zurueck" im Formular fuehrt zur Frage zurueck, nicht in den Rundgang',
     'KRITISCH: "kein Dienstfahrzeug" wird als Antwort GESPEICHERT, nicht nur durchgelassen',
     'KRITISCH: danach geht es in den Rundgang weiter',
     'KRITISCH: nach der Antwort kommt die Frage nicht erneut']);
 } else {
 await page.locator('#blFuss button.btn-primary').click();
 await page.waitForTimeout(200);
-check('KRITISCH: "Ja" fuehrt zur Wegwahl, nicht direkt ins Formular',
-  /Aufkleber scannen/.test(await blattFussText(page)) && /Kein Aufkleber verfügbar/.test(await blattFussText(page))
-  && await page.locator('#fzuWahl').count() === 0);
+text = await blattText(page);
+check('KRITISCH: "Ja" fuehrt direkt ins Formular, kein Zwischenschritt mehr',
+  await page.locator('#fzuWahl').count() === 1);
+const hinweisDa = /Aufkleber/.test(text) && await page.locator('#blBody button', { hasText: 'geht das' }).count() === 1;
+check('Das Formular zeigt einen Hinweis auf den Aufkleber, mit Link zur Anleitung', hinweisDa);
+// CLAUDE.md: Bedienelemente auf dem Handy mindestens 44 px hoch. Ein Wort
+// am Satzende (der urspruengliche Entwurf, ein <a> im Fliesstext) mass hier
+// beim Messen nur rund 33 px -- der ganze Hinweis ist darum ein einziger,
+// voll antippbarer Knopf.
+if (hinweisDa) {
+  check('KRITISCH: der Hinweis-Knopf ist auf dem Handy mindestens 44 px hoch',
+    await page.evaluate(() => document.querySelector('#blBody button').getBoundingClientRect().height) >= 44);
+}
 
-// Faellt die Wegwahl aus (siehe Gegenprobe), duerfen die folgenden Klicks
-// nicht auf nie erschienene Knoepfe warten und den Lauf abbrechen -- sie
-// sollen SAGEN, was fehlt.
-if (!await wegwahlDa(page)) {
-  entfaellt('die Wegwahl kam gar nicht erst', [
-    'KRITISCH: "Aufkleber scannen" zeigt eine Anleitung, keinen eigenen Scanner im Browser',
-    'Von der Anleitung "Zurueck" fuehrt zur Wegwahl zurueck',
-    'Das Formular (ueber "Kein Aufkleber verfuegbar") nennt den zuletzt bekannten Stand',
-    'KRITISCH: "Zurueck" im Formular fuehrt zur Wegwahl zurueck, nicht in den Rundgang',
-    'KRITISCH: Von der Wegwahl "Zurueck" fuehrt zur Frage zurueck, nicht in den Rundgang']);
+// Der zuletzt bekannte Stand steht erst NACH der Fahrzeugwahl da (er hängt
+// am gewählten Fahrzeug) -- eine leere Auswahl hat keinen Stand zu nennen.
+await page.selectOption('#fzuWahl', '1');
+await page.waitForTimeout(150);
+check('Nach der Fahrzeugwahl nennt das Formular den zuletzt bekannten Stand',
+  /61.?000/.test(await blattText(page)));
+
+// Fehlt der Link, waere ein Klick darauf mehrdeutig und liesse den Lauf
+// abstuerzen statt rot zu werden -- die folgenden Pruefungen haengen alle
+// an diesem einen Klick.
+if (!hinweisDa) {
+  entfaellt('der Anleitungs-Link fehlte bereits', [
+    'KRITISCH: der Anleitungs-Link zeigt eine Anleitung, keinen eigenen Scanner im Browser',
+    'Von der Anleitung "Zurueck" fuehrt zum Formular zurueck',
+    'KRITISCH: "Zurueck" im Formular fuehrt zur Frage zurueck, nicht in den Rundgang']);
 } else {
-// ── "Aufkleber scannen" ist eine Anleitung, kein In-App-Scanner ────────
+// ── Der Anleitungs-Link ist eine Anleitung, kein In-App-Scanner ────────
 // Eine Webseite kann die native Kamera-App nicht im Scan-Modus starten --
 // das kann nur der Mensch selbst. Ein <video>-Element waere das Zeichen
 // einer eigenen Kamera-Vorschau im Browser; die soll es nicht geben.
-await page.locator('#blFuss button.btn-primary').click();
+await page.locator('#blBody button', { hasText: 'geht das' }).click();
 await page.waitForTimeout(200);
 text = await blattText(page);
-check('KRITISCH: "Aufkleber scannen" zeigt eine Anleitung, keinen eigenen Scanner im Browser',
+check('KRITISCH: der Anleitungs-Link zeigt eine Anleitung, keinen eigenen Scanner im Browser',
   /Kamera-App/.test(text) && await page.locator('video').count() === 0
   && await page.locator('input[type=file]').count() === 0);
 
-// Zeigt die Anleitung nicht die erwartete Seite, ist auch die Fussleiste
-// nicht die der Anleitung (dort steht genau ein Knopf) -- ein blinder Klick
-// waere mehrdeutig und liesse den Lauf abstuerzen statt rot zu werden.
+// Zeigt die Anleitung nicht die erwartete Seite, ist die anschliessende
+// Ruecknavigation ebenfalls gegenstandslos -- statt blind weiterzuklicken
+// und den Lauf abstuerzen zu lassen, wird das benannt.
 if (!/Kamera-App/.test(text)) {
   entfaellt('die Anleitung kam gar nicht erst', [
-    'Von der Anleitung "Zurueck" fuehrt zur Wegwahl zurueck',
-    'Das Formular (ueber "Kein Aufkleber verfuegbar") nennt den zuletzt bekannten Stand',
-    'KRITISCH: "Zurueck" im Formular fuehrt zur Wegwahl zurueck, nicht in den Rundgang',
-    'KRITISCH: Von der Wegwahl "Zurueck" fuehrt zur Frage zurueck, nicht in den Rundgang']);
+    'Von der Anleitung "Zurueck" fuehrt zum Formular zurueck',
+    'KRITISCH: "Zurueck" im Formular fuehrt zur Frage zurueck, nicht in den Rundgang']);
 } else {
 await page.locator('#blFuss button').click();
 await page.waitForTimeout(200);
-check('Von der Anleitung "Zurueck" fuehrt zur Wegwahl zurueck',
-  /Aufkleber scannen/.test(await blattFussText(page)));
-
-// ── "Kein Aufkleber verfügbar" fuehrt zum bestehenden Formular ─────────
-await page.locator('#blFuss button', { hasText: 'Kein Aufkleber' }).click();
-await page.waitForTimeout(200);
-check('Das Formular (ueber "Kein Aufkleber verfuegbar") nennt den zuletzt bekannten Stand',
-  /61.?000/.test(await blattText(page)) || await page.locator('#fzuWahl').count() === 1);
+check('Von der Anleitung "Zurueck" fuehrt zum Formular zurueck',
+  await page.locator('#fzuWahl').count() === 1);
 
 await page.evaluate(() => fzuZurueck());
 await page.waitForTimeout(200);
-check('KRITISCH: "Zurueck" im Formular fuehrt zur Wegwahl zurueck, nicht in den Rundgang',
-  /Aufkleber scannen/.test(await blattFussText(page))
-  && !gerufen.some(p => p.includes('mein_rundgang_vorlagen_alle')));
-
-await page.evaluate(() => fzuWegWahlZurueck());
-await page.waitForTimeout(200);
-check('KRITISCH: Von der Wegwahl "Zurueck" fuehrt zur Frage zurueck, nicht in den Rundgang',
+check('KRITISCH: "Zurueck" im Formular fuehrt zur Frage zurueck, nicht in den Rundgang',
   /Nimmst du/.test(await blattText(page))
   && !gerufen.some(p => p.includes('mein_rundgang_vorlagen_alle')));
+}
 }
 }
 
@@ -299,7 +299,6 @@ check('KRITISCH: nach der Antwort kommt die Frage nicht erneut',
   !/Nimmst du/.test(await blattText(page))
   && gerufen.some(p => p.includes('mein_rundgang_vorlagen_alle')));
 }
-}
 await page.close();
 
 // ══ 4. Der Riegel sitzt AUCH vor dem zweiten Weg (eigene Schicht) ═══════
@@ -321,9 +320,9 @@ if (!await frageDa(page)) {
     'KRITISCH: nach der Uebernahme geht es in den Rundgang weiter',
     'KRITISCH: ohne Kilometerstand wird nichts gesendet -- die Kette braucht die Zahl']);
 } else {
-// Die Navigation Frage -> Wegwahl -> Formular ist bereits in Abschnitt 1
-// geprueft; hier zaehlt nur noch das Senden selbst -- direkter Einstieg
-// ins Formular, wie schon beim ersten Test dieses Abschnitts.
+// Die Navigation Frage -> Formular ist bereits in Abschnitt 1 geprueft;
+// hier zaehlt nur noch das Senden selbst -- direkter Einstieg ins Formular,
+// wie schon beim ersten Test dieses Abschnitts.
 gesendet = [];
 await page.evaluate(() => fzuFormular());
 await page.waitForTimeout(250);
@@ -340,14 +339,12 @@ check('KRITISCH: nach der Uebernahme geht es in den Rundgang weiter',
   gerufen.some(p => p.startsWith('mein_rundgang_vorlagen.php')));
 
 // ── Ohne Kilometerstand wird nichts gesendet ───────────────────────────
-// Diesmal ueber die echten Knoepfe (Kachel -> Wegwahl -> "Kein Aufkleber
-// verfuegbar"), damit auch dieser Weg zum Formular mindestens einmal echt
-// angeklickt und nicht nur direkt aufgerufen wird.
+// Diesmal ueber die Kachel selbst (fzuOeffnen), damit dieser Einstieg zum
+// Formular mindestens einmal echt durchlaufen wird, nicht nur direkt
+// aufgerufen.
 gesendet = [];
 await page.evaluate(() => { fzuHeuteBeantwortet = false; fzuOeffnen(); });
 await page.waitForTimeout(300);
-await page.locator('#blFuss button', { hasText: 'Kein Aufkleber' }).click();
-await page.waitForTimeout(200);
 await page.selectOption('#fzuWahl', '2');
 await page.click('#fzuBtn');
 await page.waitForTimeout(300);

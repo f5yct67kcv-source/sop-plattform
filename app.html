@@ -975,10 +975,11 @@ const W = {
     fzuSchonHeute: 'Du hast die Frage heute schon beantwortet. Eine weitere Übernahme ist trotzdem möglich.',
     // Wegwahl zwischen der Frage und dem Formular: Aufkleber scannen (der
     // nahegelegte Weg) oder ohne Aufkleber (der bewusste Rückfall).
-    fzuWegHinweis: 'Am schnellsten geht es mit dem Aufkleber im Fahrzeug — er wählt das richtige Fahrzeug automatisch.',
-    fzuWegScannen: 'Aufkleber scannen', fzuWegOhne: 'Kein Aufkleber verfügbar',
     fzuAnleitungTitel: 'Aufkleber scannen',
     fzuAnleitungText: 'Öffne die Kamera-App deines Telefons und richte sie auf den QR-Aufkleber im Fahrzeug. Sobald du die Benachrichtigung antippst, öffnet sich die Übernahme direkt mit dem richtigen Fahrzeug.',
+    // Hinweis im Formular selbst statt einer eigenen Zwischenmaske (ENT-347).
+    fzuTippScan: 'Am schnellsten geht es mit dem Aufkleber im Fahrzeug.',
+    fzuTippScanLink: 'Wie geht das?',
     route: 'Route öffnen', routeFehlt: 'Für diese Schicht ist keine Adresse hinterlegt.',
     dokumente: 'Unterlagen', dokumenteLaden: 'wird geladen …',
     dokumentFehler: 'Die Unterlage liess sich nicht öffnen.',
@@ -1926,51 +1927,31 @@ function fzuFrageZeigen(weiter) {
   const fuss = $('blFuss');
   fuss.className = 'blatt-ft gestapelt';
   fuss.innerHTML = `
-    <button class="btn btn-primary" onclick="fzuWegWahl()">${esc(w('fzuJa'))}</button>
+    <button class="btn btn-primary" onclick="fzuFormular()">${esc(w('fzuJa'))}</button>
     <button class="btn btn-plain" id="fzuNeinBtn" onclick="fzuOhneFahrzeug()">${esc(w('fzuNein'))}</button>`;
   blattZeigen();
 }
 
-// Zwischenschritt zwischen der Ja/Nein-Frage (oder der Kachel) und dem
-// eigentlichen Formular: WIE wird übernommen? Vom Projektinhaber verlangt,
-// nachdem er die Kachel ohne diesen Schritt getestet hatte -- er sprang
-// direkt zur manuellen Liste, ohne je auf den Aufkleber im Fahrzeug
-// hinzuweisen. *"Wir wollen ja dahingehend, dass die Mitarbeiter [...] die
-// Codes scannen müssen"*: Scannen soll der nahegelegte, schnellere Weg
-// sein, die Liste der bewusste Rückfall.
+// Rein informativ -- kein Scan-Vorgang im Browser. Eine Webseite kann die
+// Kamera-App des Telefons nicht im Scan-Modus starten, das kann nur der
+// Mensch selbst; ein echter In-App-Scanner (Kamera-Vorschau + JS-Bibliothek)
+// wäre mehr Code für etwas, das die eingebaute Kamera bereits zuverlässiger
+// kann (ENT-340). Erreichbar über den Hinweis im Formular (fzuFormular).
+// Nach dem Lesen scannt die Person mit der eigenen Kamera-App ausserhalb
+// dieser Seite -- das öffnet die App über fzuAusKennung() neu.
 //
-// "Aufkleber scannen" öffnet KEINEN Scanner im Browser, sondern eine
-// Anleitung zur Kamera-App des Telefons (fzuAnleitung()) -- eine Webseite
-// kann diese App nicht im Scan-Modus starten, das kann nur der Mensch
-// selbst. Ein echter In-App-Scanner (Kamera-Vorschau + JS-Bibliothek) wäre
-// mehr Code für etwas, das die eingebaute Kamera praktisch jedes Telefons
-// bereits zuverlässiger kann; explizit verworfen (siehe fzuAusKennung).
-function fzuWegWahl() {
-  // Nicht eingerichtet oder kein Fahrzeug erfasst: Scannen wäre sinnlos --
-  // dieselbe Meldung wie im Formular, keine zweite Fassung derselben
-  // Aussage. fzuTor() schliesst diesen Fall für den Riegel-Weg zwar schon
-  // aus, die Kachel (fzuOeffnen) tut das nicht -- darum hier zusätzlich.
-  if (fzuEingerichtet === false || !(fzuFahrzeuge || []).length) { fzuFormular(); return; }
-  $('blTitel').textContent = w('fzuTitel');
-  $('blBody').innerHTML = `
-    <p style="margin:0 0 16px;font-size:13px;color:var(--ink-3)">${esc(w('fzuWegHinweis'))}</p>`;
-  const fuss = $('blFuss');
-  fuss.className = 'blatt-ft gestapelt';
-  fuss.innerHTML = `
-    <button class="btn btn-plain" onclick="fzuWegWahlZurueck()">${esc(w('zurueck'))}</button>
-    <button class="btn btn-primary" onclick="fzuAnleitung()">${esc(w('fzuWegScannen'))}</button>
-    <button class="btn btn-plain" onclick="fzuFormular()">${esc(w('fzuWegOhne'))}</button>`;
-  blattZeigen();
-}
-
-// Rein informativ -- kein Scan-Vorgang im Browser (siehe Begründung bei
-// fzuWegWahl). Nach dem Lesen scannt die Person mit der eigenen Kamera-App
-// ausserhalb dieser Seite; das öffnet die App über fzuAusKennung() neu.
+// Ursprünglich stand davor eine eigene Wegwahl-Zwischenmaske (ENT-346).
+// Wieder entfernt (ENT-347): Sie sieht nur, wer die App OHNE Scan öffnet --
+// wer scannt, kommt über den Aufkleber-Link direkt ins Formular und sieht
+// die Wegwahl nie. Für die übrigen war "möchtest du stattdessen scannen?"
+// bei jedem Mal ein zusätzlicher Tipp für eine Entscheidung, die durch das
+// blosse Öffnen der App ohne Kamera faktisch schon gefallen war. Ein
+// Hinweis direkt im Formular sagt dasselbe, ohne den zusätzlichen Schritt.
 function fzuAnleitung() {
   $('blTitel').textContent = w('fzuAnleitungTitel');
   $('blBody').innerHTML = `<p style="margin:0;font-size:15px;line-height:1.6">${esc(w('fzuAnleitungText'))}</p>`;
   $('blFuss').className = 'blatt-ft';
-  $('blFuss').innerHTML = `<button class="btn btn-plain" onclick="fzuWegWahl()">${esc(w('zurueck'))}</button>`;
+  $('blFuss').innerHTML = `<button class="btn btn-plain" onclick="fzuFormular()">${esc(w('zurueck'))}</button>`;
   blattZeigen();
 }
 
@@ -1995,20 +1976,11 @@ function fzuWeiter() {
   if (w2) { w2(); }
 }
 
-// "Zurück" im Formular fuehrt zur Wegwahl zurueck (Aufkleber/manuell) --
-// dem unmittelbar vorigen Schritt. Ausnahme: Kam die Person ueber den
-// gescannten Aufkleber (fzuAusKennung), gab es keine Wegwahl davor -- das
-// Fahrzeug stand schon fest --, dort schliesst "Zurueck" die Schublade.
-function fzuZurueck() {
-  if (fzuKennung) { blattZu(); return; }
-  fzuWegWahl();
-}
-
-// "Zurück" auf der Wegwahl heisst ZURÜCK ZUR FRAGE, nicht weiter in den
+// "Zurück" im Formular heisst ZURÜCK ZUR FRAGE, nicht weiter in den
 // Rundgang -- sonst wäre der Riegel mit einem Knopf zu umgehen, und zwar
-// mit dem, den man drückt, wenn man sich vertippt hat. Ohne Riegel
-// (Kachel) schliesst sie die Schublade.
-function fzuWegWahlZurueck() {
+// mit dem, den man drückt, wenn man sich vertippt hat. Ohne Riegel (Kachel,
+// Aufkleber) schliesst er die Schublade.
+function fzuZurueck() {
   if (fzuDanach) { fzuFrageZeigen(fzuDanach); return; }
   blattZu();
 }
@@ -2018,7 +1990,7 @@ function fzuOeffnen() {
   fzuDanach = null;
   fzuLaden().then(geladen => {
     if (!geladen) { toast(w('fzuNichtAbrufbar')); return; }
-    fzuWegWahl();
+    fzuFormular();
   });
 }
 
@@ -2063,8 +2035,15 @@ function fzuFormular() {
 
   // Kam die Person über den Aufkleber, steht das Fahrzeug fest und wird
   // GENANNT statt zur Wahl gestellt: Sie steht davor, eine Auswahlliste wäre
-  // eine Gelegenheit, sich zu vertun.
-  const fest = fzuGewaehlt;
+  // eine Gelegenheit, sich zu vertun. "Fest" heisst darum: über den Aufkleber
+  // gekommen (fzuKennung gesetzt) -- NICHT einfach "schon einmal etwas
+  // gewählt". Sonst zeigte ein erneuter Aufruf dieses Formulars (z. B. nach
+  // einem Abstecher zur Anleitung und zurück) fälschlich wieder die feste
+  // Anzeige der zuletzt gewählten Zeile, obwohl die Auswahl gar nicht aus
+  // dem Aufkleber stammte. Ohne "fest" wird jede stehengebliebene Auswahl
+  // verworfen, damit Dropdown und Stand-Zeile zusammenpassen.
+  const fest = fzuKennung ? fzuGewaehlt : null;
+  if (!fest) { fzuGewaehlt = null; }
   const feld = fest
     ? `<div class="rgs-fakt" style="border:1px solid var(--line);border-radius:var(--r-sm);margin-bottom:14px">
          <div class="rgs-fakt-lb">${esc(w('fzuFahrzeug'))}</div>
@@ -2078,8 +2057,28 @@ function fzuFormular() {
          </select>
        </div>`;
 
+  // Hinweis auf den Aufkleber -- nur, wenn noch keiner gescannt wurde (sonst
+  // stände er neben einem bereits feststehenden Fahrzeug und wäre unnötig).
+  // Kein Zwischenschritt mehr davor (ENT-347): Wer scannt, kommt ohnehin nie
+  // hierher vorbei, und für alle anderen ist ein Hinweis in der Zeile
+  // schneller gelesen als ein zusätzlicher Tipp durch eine eigene Maske.
+  // Als eigener, ganz antippbarer Knopf statt eines Wort-Links im
+  // Fliesstext: Ein Link am Satzende mass am Handy nur rund 33 px hoch --
+  // unter den 44 px, die CLAUDE.md für Bedienelemente verlangt. Gemessen
+  // am gerenderten Zustand, nicht angenommen.
+  const scanHinweis = !fest
+    ? `<button type="button" onclick="fzuAnleitung()" style="display:flex;align-items:center;gap:8px;
+         width:100%;min-height:44px;margin:0 0 14px;padding:10px 12px;text-align:left;
+         font-size:13px;color:var(--ink-2);background:var(--accent-soft);
+         border:1px solid var(--accent-line);border-radius:var(--r-sm)">
+         <span style="flex:1">${esc(w('fzuTippScan'))}</span>
+         <span style="color:var(--accent);font-weight:620;white-space:nowrap">${esc(w('fzuTippScanLink'))}</span>
+       </button>`
+    : '';
+
   $('blBody').innerHTML = `
     ${fzuHeuteBeantwortet ? `<p style="margin:0 0 12px;font-size:13px;color:var(--ink-3)">${esc(w('fzuSchonHeute'))}</p>` : ''}
+    ${scanHinweis}
     ${feld}
     <div id="fzuStand" style="margin:-4px 0 14px;font-size:13px;color:var(--ink-3)"></div>
     <div class="f"><label for="fzuKm">${esc(w('fzuKm'))}</label>

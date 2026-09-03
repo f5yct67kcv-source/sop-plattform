@@ -7539,7 +7539,7 @@ const TITLES = {
   pensen:      ['Pensen', 'Jahresstunden gegen die Anstellungskategorie'],
   abwesenheiten: ['Abwesenheiten', 'Ferien, Krankheit und weitere Abwesenheiten im Überblick'],
   auslagen:    ['Auslagenersatz', 'Chronologisches Protokoll je Mitarbeitendem — Art. 18 Ziff. 10'],
-  arbeitsergebnisse: ['Arbeitsergebnisse', 'Wachbuch, Kontrollpunktscans, Ereignisse und Rundgänge im Zeitraum'],
+  arbeitsergebnisse: ['Arbeitsergebnisse', 'Wachbuch, Kontrollpunktscans, Ereignisse, Rundgänge und Fahrzeugübernahmen im Zeitraum'],
   rundgaenge:  ['Übersicht', 'Rundgänge, GPS, Aufgaben und Auswertungen auf einen Blick'],
   revierdienst: ['Revierdienst', 'Kontrollpunkte und Kontrollrunden je Objekt einrichten'],
   einsatzneu:  ['Neuer Einsatz', 'Kunde, Ort, Zeit und Zuteilung'],
@@ -14564,8 +14564,13 @@ const AE_REITER = [
     '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>'],
   ['schluessel', 'Schlüsselprotokoll',
     '<circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3 20 3"/><path d="M17 6l2 2"/><path d="M14.5 8.5l2 2"/>'],
+  // ENT-346: nicht unter Einstellungen -> Dienstfahrzeuge (dort ausdruecklich
+  // "hier wird nichts kontrolliert und nichts gerechnet", ENT-313), sondern
+  // hier -- derselbe Zeitraum-Auswertungsort wie Wachbuch/Scans/Ereignisse.
+  ['fahrzeuguebernahmen', 'Fahrzeugübernahmen',
+    '<path d="M3 13l2-5.5A2 2 0 0 1 6.9 6h10.2a2 2 0 0 1 1.9 1.5L21 13"/><path d="M3 13h18v4a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1v-1H6v1a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><circle cx="7" cy="15" r="1"/><circle cx="17" cy="15" r="1"/>'],
 ];
-const AE_VERDRAHTET = ['scans', 'erledigung'];
+const AE_VERDRAHTET = ['scans', 'erledigung', 'fahrzeuguebernahmen'];
 let aeTab = 'scans';
 
 /* Seit ENT-325 eine eigene Ansicht statt einer Schublade, mit derselben
@@ -14618,6 +14623,7 @@ function aeRenderTab() {
   }
   if (aeTab === 'scans') { aeRenderScans(); return; }
   if (aeTab === 'erledigung') { aeRenderErledigung(); return; }
+  if (aeTab === 'fahrzeuguebernahmen') { aeRenderUebernahmen(); return; }
 }
 
 // Beide verdrahteten Reiter teilen dieselbe Vorgabe wie Auslagenersatz/Pensen
@@ -15335,6 +15341,86 @@ function aeAufgabenZeilen(liste, zugeordnet) {
       ${a.grund ? `<span class="ae-grund">${esc(a.grund)}</span>` : ''}
     </div>`;
   }).join('');
+}
+
+// ── Fahrzeugübernahmen (ENT-346) ────────────────────────────────────
+// Gleiches Muster wie aeRenderScans/aeLadeScans/aeZeichneScans oben --
+// eigener Reiter, eigener Zeitraum, eigene Kartenliste.
+const AE_UEB_QUELLE = {
+  qr: ['chip-p', 'QR-Aufkleber'], liste: ['chip-n', 'Manuell'], antwort: ['chip-n', 'Antwort'],
+};
+
+function aeRenderUebernahmen() {
+  const [von, bis] = aeVormonatBisHeute();
+  $('aeInhalt').innerHTML = `
+    <div class="bar-tools">
+      <div class="tool-gruppe">
+        <input class="inp" type="date" id="aeUebVon" style="width:auto" value="${von}" onchange="aeLadeUebernahmen()" aria-label="Zeitraum von">
+        <span class="tool-bis">bis</span>
+        <input class="inp" type="date" id="aeUebBis" style="width:auto" value="${bis}" onchange="aeLadeUebernahmen()" aria-label="Zeitraum bis">
+      </div>
+    </div>
+    <div id="aeUebListe"><div class="sk" style="height:52px"></div></div>`;
+  aeLadeUebernahmen();
+}
+
+function aeLadeUebernahmen() {
+  // Die Felder gibt es nur, solange dieser Reiter gezeichnet ist -- gleiche
+  // Absicherung wie bei aeLadeScans.
+  const vonEl = $('aeUebVon'), bisEl = $('aeUebBis');
+  if (!vonEl || !bisEl) { return; }
+  const von = vonEl.value, bis = bisEl.value;
+  if (!von || !bis) { return; }
+  api(`fahrzeug_uebernahme_liste.php?von=${encodeURIComponent(von)}&bis=${encodeURIComponent(bis)}`).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') { aeZeichneUebernahmen(null, true); return; }
+    aeZeichneUebernahmen(data.eintraege, data.eingerichtet !== false);
+  });
+}
+
+// Drei verschiedene Aussagen, drei verschiedene Texte: nicht eingerichtet /
+// nicht ladbar / im Zeitraum nichts vorhanden. "Unbekannt" darf nie wie
+// "keine" aussehen (CLAUDE.md).
+function aeZeichneUebernahmen(eintraege, eingerichtet) {
+  const ziel = $('aeUebListe');
+  if (!ziel) { return; }
+  if (!eingerichtet) {
+    ziel.innerHTML = EMPTY('Noch nicht eingerichtet',
+      'Die Fahrzeugübernahme ist in der Datenbank noch nicht eingerichtet. Das ist etwas anderes als „im Zeitraum keine Übernahmen".');
+    return;
+  }
+  if (!eintraege) { ziel.innerHTML = EMPTY('Übernahmen nicht verfügbar', 'Die Liste konnte nicht geladen werden.'); return; }
+  if (!eintraege.length) { ziel.innerHTML = EMPTY('Nichts vorhanden', 'Im gewählten Zeitraum liegt keine Fahrzeugübernahme vor.'); return; }
+  ziel.innerHTML = eintraege.map(u => {
+    const datum = String(u.zeitpunkt).slice(0, 10);
+    const zeit = String(u.zeitpunkt).slice(11, 16);
+    const ohneFahrzeug = u.art === 'ohne_fahrzeug';
+    const [klasse, txt] = ohneFahrzeug ? ['chip-n', 'Kein Dienstfahrzeug']
+      : (AE_UEB_QUELLE[u.quelle] || ['chip-n', u.quelle]);
+    return `<div class="ag-karte">
+        <div class="kopf"><b>${ohneFahrzeug ? 'Kein Dienstfahrzeug' : esc(u.kennzeichen)}</b><span class="chip ${klasse}">${esc(txt)}</span></div>
+        ${!ohneFahrzeug && u.fz_bezeichnung ? `<div class="wer">${esc(u.fz_bezeichnung)}</div>` : ''}
+        <div class="zeiten">${dmy(datum)}, <b>${esc(zeit)}</b> · ${esc(u.person)}</div>
+        ${!ohneFahrzeug ? `<div class="zeiten">Kilometerstand: <b>${u.tacho_km === null ? '–' : nf(u.tacho_km) + ' km'}</b></div>` : ''}
+        ${u.kunde_name ? `<div class="zeiten">${esc(u.kunde_name)}${u.titel ? ' · ' + esc(u.titel) : ''}</div>` : ''}
+        ${u.hat_foto ? `<button class="btn btn-plain btn-sm" style="margin-top:10px" onclick="aeUebernahmeFoto(${Number(u.id)})">Foto ansehen</button>` : ''}
+      </div>`;
+  }).join('');
+}
+
+// Gleicher Weg wie evfFotoLaden (ENT-297): per fetch() samt Token holen und
+// als Objekt-URL oeffnen. Ein <img src="fahrzeug_uebernahme_foto.php?id=…">
+// ginge nicht -- der Token darf nicht in die URL (test_php.mjs prueft das).
+// Erst auf Klick geladen, nicht vorab fuer jede Karte: Wer die Auswertung
+// eines Monats oeffnet, soll nicht nebenbei jedes Foto abrufen.
+function aeUebernahmeFoto(id) {
+  fetch(API + 'fahrzeug_uebernahme_foto.php?id=' + Number(id), { headers: { 'X-Auth-Token': token } })
+    .then(r => r.ok ? r.blob() : Promise.reject(new Error('foto')))
+    .then(b => {
+      const url = URL.createObjectURL(b);
+      window.open(url, '_blank', 'noopener');
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    })
+    .catch(() => toast('Das Foto liess sich nicht laden.'));
 }
 
 function aeRenderErledigung() {
