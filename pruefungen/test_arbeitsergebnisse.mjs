@@ -1,10 +1,10 @@
 // Auswertung > "Arbeitsergebnisse" (ENT-243, umgebaut in ENT-325): eine
 // eigene Ansicht mit derselben Kachelreihe wie "Kontrollrunde ändern"
 // (.rdkr-reiter/.rdkr-tab), nicht mehr eine Schublade mit einer senkrechten
-// Reiterliste. Volles Gerüst, aber nur "Kontrollpunktscans" und
-// "Rundgangerledigung" tatsächlich verdrahtet; die übrigen fünf haben noch
-// kein Datenmodell und sagen das sichtbar, statt auszusehen wie die anderen
-// und dann nichts zu zeigen.
+// Reiterliste. Volles Gerüst, aber nur "Kontrollpunktscans",
+// "Rundgangerledigung" und "Fahrzeugübernahmen" (ENT-346) tatsächlich
+// verdrahtet; die übrigen fünf haben noch kein Datenmodell und sagen das
+// sichtbar, statt auszusehen wie die anderen und dann nichts zu zeigen.
 import { WURZEL, OUT, browserPfad } from './pfade.mjs';
 import { chromium } from 'playwright';
 
@@ -46,6 +46,27 @@ const RUNDGAENGE = { status: 'ok', rundgaenge: [
     vorname: 'Erika', nachname: 'Muster', fortschritt: { gesamt: 3, bestaetigt: 3, nicht_verfuegbar: 0 } },
 ]};
 
+// Erfundene Kontrollschilder mit hoher Nummer -- kein echtes Fahrzeug
+// (gleiche Konvention wie test_fahrzeug_uebernahme.mjs). Eine Zeile mit
+// Foto, eine ohne, und eine "kein Dienstfahrzeug"-Antwort -- die drei Fälle,
+// die sich am deutlichsten unterscheiden müssen.
+const UEBERNAHMEN = { status: 'ok', eingerichtet: true, eintraege: [
+  { id: 1, art: 'uebernahme', zeitpunkt: `${T1} 06:12:00`, tacho_km: 61200, quelle: 'qr', hat_foto: true,
+    fahrzeug_id: 1, kennzeichen: 'SO 999001', fz_bezeichnung: 'Patrouille 1',
+    person: 'Erika Muster', kunde_name: 'Muster Liegenschaften AG', titel: 'Öffnungsrunde' },
+  { id: 2, art: 'uebernahme', zeitpunkt: `${T0} 07:03:00`, tacho_km: 40500, quelle: 'liste', hat_foto: false,
+    fahrzeug_id: 2, kennzeichen: 'SO 999002', fz_bezeichnung: null,
+    person: 'Hans Beispiel', kunde_name: null, titel: null },
+  { id: 3, art: 'ohne_fahrzeug', zeitpunkt: `${T0} 07:05:00`, tacho_km: null, quelle: 'antwort', hat_foto: false,
+    fahrzeug_id: null, kennzeichen: null, fz_bezeichnung: null,
+    person: 'Hans Beispiel', kunde_name: null, titel: null },
+  // Eine "Abgabe" (ENT-354) ist weder eine Übernahme noch "kein
+  // Dienstfahrzeug" -- eine vierte, eigene Aussage ohne Kilometerstand.
+  { id: 4, art: 'abgabe', zeitpunkt: `${T0} 08:00:00`, tacho_km: null, quelle: 'app', hat_foto: false,
+    fahrzeug_id: 3, kennzeichen: 'SO 999003', fz_bezeichnung: 'Patrouille 3',
+    person: 'Erika Muster', kunde_name: null, titel: null },
+]};
+
 let calls = [];
 
 function setup(page) {
@@ -59,6 +80,7 @@ function setup(page) {
     if (path.includes('dashboard_stats')) return send({ status: 'ok', kpi: {}, verlauf: [], angemeldet: [], pro_mitarbeiter: [], letzte_rapporte: [] });
     if (path.includes('rundgang_scan_liste')) return send(SCANS);
     if (path.includes('rundgang_liste')) return send(RUNDGAENGE);
+    if (path.includes('fahrzeug_uebernahme_liste')) return send(UEBERNAHMEN);
     if (path.includes('mitarbeiter_list')) return send({ status: 'ok', mitarbeiter: [] });
     // kontrolleNavKlick() landet auf Pensen -- ohne dieses Fixture crasht
     // zeichnePensen() auf pensen.mitarbeiter.map() (gleiches Muster wie in
@@ -109,17 +131,17 @@ check('Der Seitentitel lautet "Arbeitsergebnisse"',
 check('Der Menüpunkt ist als aktiv markiert',
   await page.evaluate(() => document.getElementById('nav-kontrolle-arbeitsergebnisse').classList.contains('on')));
 
-// ══════════ ALLE SIEBEN KACHELN IN DER VORGEGEBENEN REIHENFOLGE
+// ══════════ ALLE ACHT KACHELN IN DER VORGEGEBENEN REIHENFOLGE
 const reiter = await page.$$eval('#aeReiter .rdkr-tab .rdkr-tab-lbl', els => els.map(e => e.textContent.trim()));
-check('KRITISCH: alle sieben Reiter stehen da, in der vorgegebenen Reihenfolge', JSON.stringify(reiter) ===
-  JSON.stringify(['Wachbuch', 'Kontrollpunktscans', 'Ereignisse', 'Rundgangerledigung', 'Aufgabenerledigung', 'Alarme', 'Schlüsselprotokoll']));
+check('KRITISCH: alle acht Reiter stehen da, in der vorgegebenen Reihenfolge', JSON.stringify(reiter) ===
+  JSON.stringify(['Wachbuch', 'Kontrollpunktscans', 'Ereignisse', 'Rundgangerledigung', 'Aufgabenerledigung', 'Alarme', 'Schlüsselprotokoll', 'Fahrzeugübernahmen']));
 // Dasselbe Muster wie "Kontrollrunde ändern" -- ein zweites Reiter-Aussehen
 // im Haus für dieselbe Sache wäre eine zweite Sprache.
 check('KRITISCH: sie benutzen dieselbe Kachelreihe wie "Kontrollrunde ändern"',
   await page.evaluate(() => {
     const r = document.getElementById('aeReiter');
     return r.classList.contains('rdkr-reiter')
-      && r.querySelectorAll('.rdkr-tab').length === 7;
+      && r.querySelectorAll('.rdkr-tab').length === 8;
   }));
 check('Jede Kachel trägt ein Sinnbild',
   await page.evaluate(() =>
@@ -143,7 +165,7 @@ check('KRITISCH: die Ansicht startet auf einem verdrahteten Reiter',
 check('KRITISCH: die noch nicht verdrahteten Reiter sind schon an der Kachel zu erkennen',
   await page.evaluate(() => {
     const mit = ['wachbuch', 'ereignisse', 'aufgaben', 'alarme', 'schluessel'];
-    const ohne = ['scans', 'erledigung'];
+    const ohne = ['scans', 'erledigung', 'fahrzeuguebernahmen'];
     const farbe = t => {
       const e = document.getElementById('ae-tab-' + t);
       return e ? getComputedStyle(e.querySelector('.rdkr-tab-lbl')).color : null;
@@ -226,6 +248,91 @@ await page.waitForTimeout(150);
 check('KRITISCH: kein Rundgang im Zeitraum sagt das mit eigenem Text (nicht "in den letzten 14 Tagen", das gilt nur der Kachel)',
   (await page.textContent('#aeInhalt')).includes('Im gewählten Zeitraum liegt kein Rundgang vor.'));
 
+// ══════════ FAHRZEUGÜBERNAHMEN (ENT-346): NICHT UNTER EINSTELLUNGEN ═════
+// ENT-313 hatte das ausdrücklich ausgeschlossen ("hier wird nichts
+// kontrolliert und nichts gerechnet") -- dieser Reiter ist die Umsetzung
+// von "dort, wo täglich gearbeitet wird".
+calls = [];
+await klick('#ae-tab-fahrzeuguebernahmen');
+await page.waitForTimeout(200);
+check('KRITISCH: "Fahrzeugübernahmen" ruft fahrzeug_uebernahme_liste.php auf',
+  calls.some(c => c.path.includes('fahrzeug_uebernahme_liste')));
+const uebRuf = calls.find(c => c.path.includes('fahrzeug_uebernahme_liste')) || { query: {} };
+check('Auch hier: Vorgabe ist der zurückliegende Monat bis heute',
+  !!uebRuf.query.von && uebRuf.query.von !== uebRuf.query.bis);
+const uebInhalt = await page.textContent('#aeInhalt');
+check('Die Übernahme mit Fahrzeug nennt Kontrollschild, Kilometerstand und Quelle',
+  uebInhalt.includes('SO 999001') && uebInhalt.includes('61') && uebInhalt.includes('200')
+  && uebInhalt.includes('QR-Aufkleber'));
+check('Die zweite Übernahme nennt die manuelle Quelle',
+  uebInhalt.includes('SO 999002') && uebInhalt.includes('Manuell'));
+// "Kein Dienstfahrzeug" ist eine eigene Aussage, kein leerer Fahrzeugname --
+// sie muss als solche benannt sein, nicht als "SO –" oder Ähnliches.
+check('KRITISCH: "kein Dienstfahrzeug" steht als eigene Aussage da, nicht als leeres Fahrzeugfeld',
+  uebInhalt.includes('Kein Dienstfahrzeug'));
+// Eine Abgabe (ENT-354) ist eine vierte, eigene Aussage -- kein Quelle-Chip
+// wie bei einer Übernahme (die hätte "app" ausgegeben) und kein
+// Kilometerstand, den es für diese Art gar nicht gibt.
+check('KRITISCH: eine Abgabe ist als solche benannt ("Abgegeben"), nicht mit dem rohen Quelle-Wert "app"',
+  uebInhalt.includes('SO 999003') && uebInhalt.includes('Abgegeben') && !uebInhalt.includes('>app<'));
+check('KRITISCH: eine Abgabe zeigt keinen Kilometerstand -- den Wert gibt es für diese Art nicht',
+  await page.evaluate(() => {
+    const karten = [...document.querySelectorAll('#aeUebListe .ag-karte')];
+    const abgabeKarte = karten.find(k => k.textContent.includes('Abgegeben'));
+    return !!abgabeKarte && !abgabeKarte.textContent.includes('Kilometerstand');
+  }));
+check('Kunde/Einsatz erscheinen, wo einer bekannt ist',
+  uebInhalt.includes('Muster Liegenschaften AG') && uebInhalt.includes('Öffnungsrunde'));
+check('Person je Übernahme erscheint', uebInhalt.includes('Erika Muster') && uebInhalt.includes('Hans Beispiel'));
+check('KRITISCH: auch hier Karten ohne waagrechten Scroll',
+  await page.evaluate(() => {
+    const inhalt = document.getElementById('aeInhalt');
+    return inhalt.scrollWidth <= inhalt.clientWidth + 1 && !inhalt.querySelector('table');
+  }));
+// Nur die Übernahme MIT Foto (id 1) trägt einen "Foto ansehen"-Knopf --
+// sonst wäre ein Knopf, der ins Leere klickt, dieselbe falsche Auskunft
+// wie ein Feld, das etwas verspricht, was nicht da ist.
+const fotoKnopfAnzahl = await page.$$eval('#aeInhalt button',
+  els => els.filter(b => b.textContent.includes('Foto ansehen')).length);
+check('KRITISCH: genau eine Karte hat einen Foto-Knopf -- nur die Übernahme, die ein Foto trägt',
+  fotoKnopfAnzahl === 1);
+
+// Der Foto-Knopf holt das Bild per fetch() (Token im Kopf, nicht in der
+// URL -- test_php.mjs prüft das) und öffnet es in einem neuen Tab, statt
+// es ungefragt für jede Karte vorzuladen. Nur geprüft, wenn der Knopf
+// tatsächlich da ist -- ein Klick auf einen fehlenden Knopf soll den Lauf
+// nicht mit einem Absturz statt eines roten Ergebnisses beenden.
+if (fotoKnopfAnzahl !== 1) {
+  bad.push('KRITISCH: der Foto-Knopf öffnet das Bild in einem neuen Tab, nicht in der Auswertung selbst — der Foto-Knopf fehlte bereits');
+} else {
+await page.route('**/api/fahrzeug_uebernahme_foto.php**', route =>
+  route.fulfill({ status: 200, contentType: 'image/jpeg', body: Buffer.from([0xff, 0xd8, 0xff, 0xd9]) }));
+const [fotoTab] = await Promise.all([
+  page.context().waitForEvent('page'),
+  page.$$eval('#aeInhalt button', els => els.find(b => b.textContent.includes('Foto ansehen')).click()),
+]);
+await fotoTab.waitForLoadState('domcontentloaded').catch(() => {});
+check('KRITISCH: der Foto-Knopf öffnet das Bild in einem neuen Tab, nicht in der Auswertung selbst',
+  fotoTab.url().startsWith('blob:'));
+await fotoTab.close();
+}
+
+// Leerer Zeitraum ist etwas anderes als "nicht eingerichtet" -- zwei
+// verschiedene Aussagen, zwei verschiedene Texte.
+await page.route('**/api/fahrzeug_uebernahme_liste.php**', route =>
+  route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'ok', eingerichtet: true, eintraege: [] }) }));
+await page.evaluate(() => aeLadeUebernahmen());
+await page.waitForTimeout(150);
+check('KRITISCH: keine Übernahme im Zeitraum sagt das explizit',
+  (await page.textContent('#aeInhalt')).includes('Im gewählten Zeitraum liegt keine Fahrzeugübernahme vor.'));
+
+await page.route('**/api/fahrzeug_uebernahme_liste.php**', route =>
+  route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'ok', eingerichtet: false, eintraege: [] }) }));
+await page.evaluate(() => aeLadeUebernahmen());
+await page.waitForTimeout(150);
+check('KRITISCH: fehlende Einrichtung sagt das explizit -- nicht dieselbe Meldung wie ein leerer Zeitraum',
+  (await page.textContent('#aeInhalt')).includes('noch nicht eingerichtet'));
+
 // ══════════ ZURUECK ZU EINEM UNVERDRAHTETEN REITER: KEIN HAENGENBLEIBEN
 await klick('#ae-tab-ereignisse');
 await page.waitForTimeout(100);
@@ -241,18 +348,33 @@ check('Der Reiter "Ereignisse" ist jetzt aktiv, "Rundgangerledigung" nicht mehr'
 check('KRITISCH: immer genau eine Kachel ist hervorgehoben',
   await page.evaluate(() => document.querySelectorAll('#aeReiter .rdkr-tab.aktiv').length === 1));
 
-// Eine mittige Reiterreihe über linksbündigem Inhalt wirkt unruhig, ohne
-// dass man sagen kann warum (CLAUDE.md: gleiches Muster auf beiden Seiten).
-// Gemessen am gerenderten Zustand, nicht im Quelltext nachgelesen.
-// Ausdrückliche Vorgabe des Projektinhabers: „bitte die Kacheln wie
-// gewünscht auf einer Ebene!" Die Reihe brach zuvor um, weil sie 1401 px
-// brauchte und die Lesebreite nach Abzug der Ränder nur 1388 px liess --
-// dreizehn Pixel. Gemessen wird das Ergebnis, nicht die Regel dahinter.
-check('KRITISCH: die sieben Kacheln stehen am Desktop auf EINER Ebene',
+// Ausdrückliche Vorgabe des Projektinhabers zu den ursprünglichen sieben
+// Kacheln: „bitte die Kacheln wie gewünscht auf einer Ebene!" (ENT-326) --
+// die Reihe brach damals um, weil sie 1401 px brauchte und die Lesebreite
+// nach Abzug der Ränder nur 1388 px liess. Die sieben stehen bei dieser
+// Fensterbreite weiterhin auf einer Ebene; erst die achte, mit ENT-346
+// hinzugekommene Kachel bricht in eine zweite Zeile um -- gemessen und
+// geprüft, statt anzunehmen, dass "eine Ebene" für acht genauso gilt wie
+// für sieben. Der Umbruch selbst ist kein Mangel: Er reiht sich links
+// unter die erste Zeile ein, statt irgendwo mittendrin zu brechen oder
+// über den Rand zu laufen (nächste beide Prüfungen).
+check('KRITISCH: die ersten sieben Kacheln stehen weiterhin auf einer Ebene',
   await page.evaluate(() => {
     const t = [...document.querySelectorAll('#aeReiter .rdkr-tab')];
-    return t.length === 7
-      && new Set(t.map(b => Math.round(b.getBoundingClientRect().top))).size === 1;
+    return t.length === 8
+      && new Set(t.slice(0, 7).map(b => Math.round(b.getBoundingClientRect().top))).size === 1;
+  }));
+check('KRITISCH: die achte Kachel ("Fahrzeugübernahmen") bricht sauber in eine eigene Zeile um',
+  await page.evaluate(() => {
+    // t[7].getBoundingClientRect() auf einer fehlenden achten Kachel wuerde
+    // den ganzen Lauf mit einem Absturz beenden statt rot zu werden -- die
+    // Laenge wird darum zuerst geprueft, nicht erst beim Zugriff bemerkt.
+    const t = [...document.querySelectorAll('#aeReiter .rdkr-tab')];
+    if (t.length !== 8) { return false; }
+    const ersteZeile = Math.round(t[0].getBoundingClientRect().top);
+    const achte = t[7].getBoundingClientRect();
+    return Math.round(achte.top) > ersteZeile
+      && Math.round(achte.left) === Math.round(t[0].getBoundingClientRect().left);
   }));
 // Die Reihe darf dafür breit werden, die Liste darunter nicht: Eine Karte
 // mit vier kurzen Zeilen über die ganze Fensterbreite schiebt den Status-Chip
@@ -283,7 +405,7 @@ check('KRITISCH: kein Seiten-Scroll bei 390px', await page.evaluate(() =>
   document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1));
 // Die Kachelreihe bricht auf dem Handy um, statt zu schrumpfen oder aus
 // dem Bild zu laufen -- gemessen am gerenderten Zustand.
-check('KRITISCH: alle sieben Kacheln bleiben auf dem Handy sichtbar und im Bild',
+check('KRITISCH: alle acht Kacheln bleiben auf dem Handy sichtbar und im Bild',
   await page.evaluate(() => {
     const breite = document.documentElement.clientWidth;
     return [...document.querySelectorAll('#aeReiter .rdkr-tab')].every(b => {

@@ -48,7 +48,13 @@ const FZ_SPRUNG_AUFFAELLIG = 800;
 //
 // Rückgabe: null, wenn es überhaupt keinen bekannten Stand gibt -- das ist
 // etwas anderes als "0 km" und muss auch anders angezeigt werden.
-function fz_bezugsstand(PDO $pdo, int $fahrzeugId): ?array
+//
+// $eigeneId (ENT-354): Gibt der Aufrufer die eigene Mitarbeiter-ID mit,
+// trägt das Ergebnis zusätzlich 'eigene' -- die Ja/Nein-Auskunft, ob die
+// letzte Übernahme von genau dieser Person stammt. Die rohe mitarbeiter_id
+// der letzten Übernahme verlässt diese Funktion nie, nur diese Auskunft --
+// beide Aufrufer geben ihr Ergebnis direkt als JSON weiter.
+function fz_bezugsstand(PDO $pdo, int $fahrzeugId, ?int $eigeneId = null): ?array
 {
     $letzte = null;
     if (hat_tabelle($pdo, 'fahrzeug_uebernahme')) {
@@ -71,6 +77,9 @@ function fz_bezugsstand(PDO $pdo, int $fahrzeugId): ?array
                 'datum'     => substr((string)$r['zeitpunkt'], 0, 10),
                 'person'    => $name !== '' ? $name : null,
             ];
+            if ($eigeneId !== null) {
+                $letzte['eigene'] = ((int)$r['mitarbeiter_id'] === $eigeneId);
+            }
         }
     }
 
@@ -95,6 +104,48 @@ function fz_bezugsstand(PDO $pdo, int $fahrzeugId): ?array
     if ($letzte === null) { return $stamm; }
     if ($stamm === null) { return $letzte; }
     return $stamm['datum'] >= $letzte['datum'] ? $stamm : $letzte;
+}
+
+// Das Fahrzeug, das gerade als "bei dieser Person aktiv" gilt (ENT-354) --
+// rein informativ für die eigene Maske, kein Riegel und kein zweiter
+// Eintragspfad in der Kette. Zwei Regeln entscheiden, in dieser Reihenfolge:
+//
+//  1. Die eigene LETZTE Zeile zu einem Fahrzeug entscheidet -- 'uebernahme'
+//     oder 'abgabe', je nachdem was zuletzt war. Eine 'abgabe' beendet die
+//     Anzeige sofort, unabhängig davon, was fz_bezugsstand() zur Kette sagt.
+//  2. Bei 'uebernahme' gilt es nur, solange seither niemand sonst dasselbe
+//     Fahrzeug übernommen hat (fz_bezugsstand() mit der eigenen ID bleibt
+//     'eigene' => true) -- sonst hat es faktisch schon gewechselt, auch ohne
+//     eine eigene Abgabe.
+//
+// 'abgabe' bleibt dabei bewusst wirkungslos für fz_bezugsstand() selbst
+// (dort zählt weiterhin nur 'uebernahme'): Ein Vergessen dieses Knopfs kann
+// darum nie die Kilometerkette stören, nur die eigene Anzeige hier stehen
+// lassen, bis das nächste echte Übernahme-Ereignis sie ohnehin ablöst --
+// genau das Gegenteil des Rückgabe-Risikos, das ENT-340 verworfen hat.
+function fz_meine_aktiv(PDO $pdo, int $mitarbeiterId): ?array
+{
+    if (!hat_tabelle($pdo, 'fahrzeug_uebernahme')) { return null; }
+    $s = $pdo->prepare(
+        "SELECT fahrzeug_id, art, zeitpunkt FROM fahrzeug_uebernahme
+          WHERE art IN ('uebernahme', 'abgabe') AND mitarbeiter_id = ? AND fahrzeug_id IS NOT NULL
+          ORDER BY zeitpunkt DESC, id DESC LIMIT 1"
+    );
+    $s->execute([$mitarbeiterId]);
+    $r = $s->fetch(PDO::FETCH_ASSOC);
+    if (!$r || $r['art'] !== 'uebernahme') { return null; }
+
+    $bez = fz_bezugsstand($pdo, (int)$r['fahrzeug_id'], $mitarbeiterId);
+    if ($bez === null || $bez['quelle'] !== 'uebernahme' || !($bez['eigene'] ?? false)) {
+        return null;
+    }
+
+    $f = $pdo->prepare('SELECT id, kennzeichen, bezeichnung FROM fahrzeuge WHERE id = ?');
+    $f->execute([(int)$r['fahrzeug_id']]);
+    $ff = $f->fetch(PDO::FETCH_ASSOC);
+    if (!$ff) { return null; }
+    return ['id' => (int)$ff['id'], 'kennzeichen' => $ff['kennzeichen'],
+             'bezeichnung' => $ff['bezeichnung'], 'seit' => (string)$r['zeitpunkt']];
 }
 
 // Der Schlüssel hinter dem Aufkleber. Zufällig und nicht aus Kennzeichen

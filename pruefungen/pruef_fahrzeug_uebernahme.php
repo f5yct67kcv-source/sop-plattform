@@ -24,7 +24,7 @@ require __DIR__ . '/../backend/fahrzeug.php';
 
 $pdo = new PDO('sqlite::memory:', null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                                                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]);
-$pdo->exec('CREATE TABLE fahrzeuge (id INTEGER PRIMARY KEY, kennzeichen TEXT, status TEXT,
+$pdo->exec('CREATE TABLE fahrzeuge (id INTEGER PRIMARY KEY, kennzeichen TEXT, bezeichnung TEXT NULL, status TEXT,
             tacho_km INT NULL, tacho_am TEXT NULL, qr_kennung TEXT NULL)');
 $pdo->exec('CREATE TABLE fahrzeug_uebernahme (id INTEGER PRIMARY KEY, art TEXT, fahrzeug_id INT,
             mitarbeiter_id INT, einsatz_id INT NULL, zeitpunkt TEXT, tacho_km INT NULL,
@@ -33,6 +33,7 @@ $pdo->exec('CREATE TABLE mitarbeiter (id INTEGER PRIMARY KEY, vorname TEXT, nach
 // Erfundene Namen und Kontrollschilder mit hoher Nummer -- kein echtes
 // Fahrzeug, keine echte Person.
 $pdo->exec("INSERT INTO mitarbeiter VALUES (7, 'Vorname', 'Nachname', 'vn')");
+$pdo->exec("INSERT INTO mitarbeiter VALUES (8, 'Andere', 'Person', 'ap')");
 
 $neu = function (int $id) use ($pdo) {
     $pdo->prepare("INSERT INTO fahrzeuge (id, kennzeichen, status) VALUES (?, ?, 'aktiv')")
@@ -41,9 +42,9 @@ $neu = function (int $id) use ($pdo) {
 $stamm = function (int $id, ?int $km, ?string $am) use ($pdo) {
     $pdo->prepare('UPDATE fahrzeuge SET tacho_km = ?, tacho_am = ? WHERE id = ?')->execute([$km, $am, $id]);
 };
-$kette = function (int $fz, string $art, ?int $km, string $zeit) use ($pdo) {
+$kette = function (int $fz, string $art, ?int $km, string $zeit, int $ma = 7) use ($pdo) {
     $pdo->prepare("INSERT INTO fahrzeug_uebernahme (art, fahrzeug_id, mitarbeiter_id, zeitpunkt, tacho_km, quelle)
-                   VALUES (?, ?, 7, ?, ?, 'qr')")->execute([$art, $fz, $zeit, $km]);
+                   VALUES (?, ?, ?, ?, ?, 'qr')")->execute([$art, $fz, $ma, $zeit, $km]);
 };
 
 // ── Gar nichts bekannt ────────────────────────────────────────────────────
@@ -169,6 +170,64 @@ pruef('Jedes uebrige Fahrzeug bekommt einen Schluessel',
 // Ein zweiter Lauf vergibt nichts mehr -- der Nachtrag ist wiederholbar.
 pruef('Ein zweiter Einrichtungslauf vergibt keine neuen Schluessel',
     fz_kennungen_nachtragen($pdo) === 0);
+
+// ── fz_bezugsstand() mit eigener ID (ENT-354) ─────────────────────────────
+// Neue Fahrzeuge ab hier, NACH dem Nachtragen oben -- sonst verschoebe sich
+// dessen Zaehlung ("8" bereits vergebene Schluessel).
+$neu(10); $kette(10, 'uebernahme', 50000, '2026-05-01 07:00:00');
+$bezEigen = fz_bezugsstand($pdo, 10, 7);
+pruef('KRITISCH: die eigene ID erkennt die eigene letzte Uebernahme',
+    ($bezEigen['eigene'] ?? null) === true);
+$bezFremd = fz_bezugsstand($pdo, 10, 8);
+pruef('KRITISCH: eine andere ID erkennt dieselbe Uebernahme als NICHT eigene',
+    ($bezFremd['eigene'] ?? null) === false);
+pruef('Ohne mitgegebene eigene ID bleibt "eigene" unbesetzt -- kein stiller Vorgabewert',
+    !array_key_exists('eigene', fz_bezugsstand($pdo, 10)));
+
+$neu(11); $stamm(11, 20000, '2026-05-01');
+pruef('Beim Stammdatenwert (keine Uebernahme in der Kette) bleibt "eigene" unbesetzt',
+    !array_key_exists('eigene', fz_bezugsstand($pdo, 11, 7)));
+
+// ── fz_meine_aktiv() (ENT-354) ─────────────────────────────────────────────
+// Rein informativ fuer die eigene Maske -- siehe Kommentar in fahrzeug.php.
+pruef('Ohne jede Uebernahme gibt es kein aktives Fahrzeug',
+    fz_meine_aktiv($pdo, 999) === null);
+
+$neu(12); $kette(12, 'uebernahme', 1000, '2026-05-01 08:00:00', 7);
+$aktiv12 = fz_meine_aktiv($pdo, 7);
+pruef('KRITISCH: die eigene letzte Uebernahme gilt als aktives Fahrzeug',
+    $aktiv12 !== null && $aktiv12['id'] === 12);
+pruef('Eine andere Person meldet dieses Fahrzeug NICHT als ihr eigenes aktives',
+    fz_meine_aktiv($pdo, 8) === null);
+
+// Uebernimmt jemand anders dasselbe Fahrzeug, erlischt meine Anzeige --
+// auch ohne dass ich je "abgegeben" haette.
+$neu(13); $kette(13, 'uebernahme', 2000, '2026-05-01 08:00:00', 7);
+$kette(13, 'uebernahme', 2100, '2026-05-01 09:00:00', 8);
+pruef('KRITISCH: uebernimmt jemand anders dasselbe Fahrzeug, gilt es fuer mich nicht mehr als aktiv',
+    fz_meine_aktiv($pdo, 7) === null);
+pruef('...und gilt stattdessen bei der Person, die es zuletzt uebernommen hat',
+    ($x = fz_meine_aktiv($pdo, 8)) !== null && $x['id'] === 13);
+
+// Abgabe beendet die eigene Anzeige, auch ohne dass jemand anders uebernimmt.
+$neu(14); $kette(14, 'uebernahme', 3000, '2026-05-01 08:00:00', 7);
+pruef('Vor der Abgabe gilt das Fahrzeug als aktiv',
+    ($x = fz_meine_aktiv($pdo, 7)) !== null && $x['id'] === 14);
+$kette(14, 'abgabe', null, '2026-05-01 10:00:00', 7);
+pruef('KRITISCH: nach der eigenen Abgabe gilt kein Fahrzeug mehr als aktiv',
+    fz_meine_aktiv($pdo, 7) === null);
+pruef('KRITISCH: eine Abgabe aendert den Bezugsstand der Kette NICHT -- '
+    . 'fz_bezugsstand() zaehlt weiterhin nur "uebernahme" (ENT-340 bleibt unberuehrt)',
+    fz_bezugsstand($pdo, 14)['tacho_km'] === 3000);
+
+// Nimmt dieselbe Person ein zweites Fahrzeug, ohne das erste abzugeben, gilt
+// nur das zweite (das juengere) als aktiv.
+$neu(15); $neu(16);
+$kette(15, 'uebernahme', 500, '2026-05-01 11:00:00', 8);
+$kette(16, 'uebernahme', 700, '2026-05-01 12:00:00', 8);
+pruef('KRITISCH: nimmt dieselbe Person ein zweites Fahrzeug, ohne das erste abzugeben, '
+    . 'gilt nur das zweite (juengere) als aktiv',
+    ($x = fz_meine_aktiv($pdo, 8)) !== null && $x['id'] === 16);
 
 echo $ok . " Pruefungen bestanden\n";
 if ($bad) { foreach ($bad as $b3) { echo "  X $b3\n"; } exit(1); }
