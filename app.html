@@ -702,7 +702,11 @@ svg.i-sm { width: 17px; height: 17px; }
 /* Beschriftung oben, Aussage darunter -- dasselbe Muster wie ueberall sonst. */
 .rgs-dlg-lb { font-size: 11px; font-weight: 640; letter-spacing: .6px; text-transform: uppercase; color: var(--warn); }
 .rgs-dlg-frage { font-size: 17px; font-weight: 660; line-height: 1.3; margin-top: 6px; }
-.rgs-dlg-txt { font-size: 14px; color: var(--ink-2); line-height: 1.5; margin-top: 10px; }
+/* pre-line (ENT-342): Der Text wird mit textContent gesetzt -- ein
+   Zeilenumbruch darin bliebe sonst wirkungslos, und zwei Saetze liefen
+   ineinander. Gefunden am gerenderten Zustand, nicht im Quelltext: Die
+   Kollision („Muster AG 12:00-18:00") klebte am folgenden Satz. */
+.rgs-dlg-txt { font-size: 14px; color: var(--ink-2); line-height: 1.5; margin-top: 10px; white-space: pre-line; }
 /* "Nein" links und zuerst: der harmlose Ausgang ist der leicht erreichbare. */
 .rgs-dlg-fuss { display: flex; gap: 10px; margin-top: 20px; }
 .rgs-dlg-fuss .btn { flex: 1; }
@@ -1062,6 +1066,12 @@ const W = {
     // „Pausieren" sehen sonst gleich harmlos aus, und nur eines davon laesst
     // sich rueckgaengig machen.
     rgsNachtsicht: 'Nachtsicht',
+    // Rueckfrage statt Sperre bei Doppelbelegung (ENT-342). Der Satz nennt
+    // die Folge, nicht nur die Lage: Es wird gemeldet -- das ist der Grund,
+    // warum die Sperre entfallen darf.
+    rgsDoppelFrage: 'Du bist zu dieser Zeit anderswo eingeteilt',
+    rgsDoppelTxt: 'Der Rundgang lässt sich trotzdem starten. Die Einsatzleitung sieht danach an der geplanten Schicht, dass du zur selben Zeit eine Revierrunde gelaufen bist.',
+    rgsDoppelJa: 'Trotzdem starten',
     rundgangPausierenUnter: 'Kann später wieder fortgesetzt werden',
     rundgangAbbrechenUnter: 'Endgültig. Erfasste Kontrollpunkte bleiben erhalten.',
     rundgangWeiterKnopf: 'Weiter', rundgangWeiterUnter: 'Den Rundgang fortsetzen',
@@ -2958,10 +2968,16 @@ function rundgangSpontanAusnahmeGrundSenden(vorlageId) {
 // Einsatz muss im lokalen schichten-Array stehen, bevor rundgangAnzeigen()
 // ihn dort findet (gleiches Prinzip wie ueberall sonst -- schichten kommt
 // ausschliesslich vom Server, nie lokal erfunden).
-function rundgangSpontanStarten(vorlageId, ausnahmeGrund) {
+/* trotzDoppel: der zweite Anlauf, nachdem die Kollision bestaetigt wurde
+   (ENT-342). Die Sperre ist gefallen -- der Disponent plant kurzfristig um,
+   der Waechter steht vor dem Objekt, und dann ist der Planer oft nicht am
+   Telefon. Geblieben ist die Rueckfrage: blockieren, bis es GESEHEN ist,
+   nicht bis es aufgeloest ist (gleiches Muster wie ENT-284). */
+function rundgangSpontanStarten(vorlageId, ausnahmeGrund, trotzDoppel) {
   document.querySelectorAll('#blBody button, #rfsBtn').forEach(b => b.disabled = true);
   const body = { vorlage_id: vorlageId };
   if (ausnahmeGrund) body.ausnahme_grund = ausnahmeGrund;
+  if (trotzDoppel) body.trotz_doppelbelegung = true;
   api('mein_rundgang_spontan_starten.php', { method: 'POST', body }).then(({ ok, data }) => {
     // Dieselbe Vorlage laeuft fuer diese Person schon (ENT-290, gemeldeter
     // Fehler: zweimal angetippt landete bisher in der Doppelbelegungs-Sperre
@@ -2972,11 +2988,27 @@ function rundgangSpontanStarten(vorlageId, ausnahmeGrund) {
       ladeSchichten().then(() => rundgangFortsetzen(data.einsatz_id));
       return;
     }
+    // Zur selben Zeit anderswo eingeteilt: fragen statt sperren (ENT-342).
+    // Der Klartext der Kollision steht in der Frage -- wer sie liest, kann
+    // selbst entscheiden, ob er vorher doch kurz anruft.
+    if (!ok && data && data.code === 'doppelbelegung') {
+      document.querySelectorAll('#blBody button, #rfsBtn').forEach(b => b.disabled = false);
+      rgsFrage(w('rgsDoppelFrage'),
+        ((data.kollision && data.kollision.was) ? data.kollision.was + '\n\n' : '')
+          + w('rgsDoppelTxt'),
+        w('rgsDoppelJa'),
+        () => { rgsFrageZu(); rundgangSpontanStarten(vorlageId, ausnahmeGrund, true); });
+      return;
+    }
     if (!ok || data.status !== 'ok') {
       document.querySelectorAll('#blBody button, #rfsBtn').forEach(b => b.disabled = false);
       toast(data.message || w('netzfehler'));
       return;
     }
+    // Der Start ist gelungen, aber die Meldung an die Disposition nicht
+    // (ENT-342). Das gehoert gesagt -- der Waechter darf nicht glauben,
+    // die Umplanung sei damit dokumentiert.
+    if (data.ereignis_fehler) { toast(data.ereignis_fehler); }
     rundgangAktiv = { id: data.rundgang_id, einsatz_id: data.einsatz_id, status: 'vorbereitet', pausiert_seit: null,
       vorbereitet_am: jetztDatetime(), pause_minuten: 0,
       kontrollpunkte: (data.kontrollpunkte || []).map(k => ({ ...k, erledigt: null })) };

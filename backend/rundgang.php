@@ -22,6 +22,20 @@ const EREIGNISART_AUFGABE = 'Aufgabe nicht ausführbar';
    entstehen Ereignisse ohne Art, und niemand merkt es. */
 const EREIGNISART_ABBRUCH = 'Rundgang abgebrochen';
 
+/* Eine Runde, die waehrend einer anderswo geplanten Schicht gestartet wurde
+   (ENT-342). Bis dahin war das eine SPERRE: Der Server wies den Start mit
+   409 ab. Vom Projektinhaber aufgehoben, mit Begruendung -- der Disponent
+   plant kurzfristig um, der Waechter steht davor und kommt nicht weiter,
+   und ausgerechnet dann ist der Planer oft nicht am Telefon. Die Sperre
+   schuetzte vor einem Planungsfehler, den der Waechter draussen gar nicht
+   beheben kann.
+
+   An die Stelle der Sperre tritt Sichtbarkeit: Der Waechter bestaetigt
+   einmal, und die Disposition sieht es an ZWEI Orten -- an der geplanten
+   Schicht (abgeleitet in einsatz_list.php, ohne neue Spalte) und hier als
+   Ereignis. */
+const EREIGNISART_PARALLELRUNDE = 'Rundgang trotz anderer Einteilung';
+
 /* Wie lange eine Bewegungsspur aufbewahrt wird (ENT-318).
    Als Konstante und mit Begruendung, damit die Zahl eine Entscheidung ist
    und keine Zufaelligkeit: Die Spur dient dem Nachweis EINER Runde. Ist

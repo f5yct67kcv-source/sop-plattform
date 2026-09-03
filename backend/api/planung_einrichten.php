@@ -1308,6 +1308,13 @@ if (!$nurPruefen && hat_tabelle_jetzt($pdo, 'ereignisart')) {
         if ($ein3->rowCount() === 1) {
             $getan[] = 'Ereignisart „' . EREIGNISART_ABBRUCH . '" angelegt (ENT-324)';
         }
+        // Und fuer die Runde trotz anderer Einteilung (ENT-342), aus
+        // demselben Grund ausserhalb der Startbestands-Bedingung.
+        $ein4 = $pdo->prepare('INSERT IGNORE INTO ereignisart (bezeichnung, sortierung) VALUES (?, ?)');
+        $ein4->execute([EREIGNISART_PARALLELRUNDE, 97]);
+        if ($ein4->rowCount() === 1) {
+            $getan[] = 'Ereignisart „' . EREIGNISART_PARALLELRUNDE . '" angelegt (ENT-342)';
+        }
     } catch (Throwable $e) {
         $fehler[] = 'Ereignisarten-Startbestand — ' . $e->getMessage();
     }

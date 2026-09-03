@@ -11894,7 +11894,7 @@ function plZeile(e, opts) {
       <td><span class="chip chip-n">${esc(e.einsatzart)}</span>${sparteChip(e)}</td>
       <td class="num"><span class="chip ${e.status === 'abgesagt' ? 'chip-n' : (fehlt ? 'chip-w' : 'chip-p')}">${besetzt(e).length}/${nf(e.bedarf)}</span></td>
       <td>${teile.length ? `<div class="crew">${teile.join('')}</div>` : '<span style="color:var(--ink-3)">–</span>'}</td>
-      <td><span class="chip ${st[1]}">${st[0]}${gesperrt ? SCHLOSS_ZU : ''}</span>${einsatzRapportWeichtAb(e) ? ` <span class="rap-abw" title="Rapport weicht vom Plan ab">⚠️</span>` : ''}${e.spontan_erzeugt ? ` <span class="rap-abw" title="Spontan gestartet, nicht vom Planer angelegt">⚡</span>` : ''}</td>
+      <td><span class="chip ${st[1]}">${st[0]}${gesperrt ? SCHLOSS_ZU : ''}</span>${einsatzMarken(e)}</td>
     </tr>`;
 }
 
@@ -11932,7 +11932,7 @@ function plKarte(e, opts) {
     <div class="wer">${esc(e.kunde_name)}${e.titel ? ` · ${esc(e.titel)}` : ''}</div>
     <div class="zeiten">${esc(e.ort)}${e.strasse ? ` · ${esc(e.strasse)}` : ''}</div>
     <div class="marken">
-      <span class="chip ${st[1]}">${st[0]}${gesperrt ? SCHLOSS_ZU : ''}</span>${einsatzRapportWeichtAb(e) ? ` <span class="rap-abw" title="Rapport weicht vom Plan ab">⚠️</span>` : ''}${e.spontan_erzeugt ? ` <span class="rap-abw" title="Spontan gestartet, nicht vom Planer angelegt">⚡</span>` : ''}
+      <span class="chip ${st[1]}">${st[0]}${gesperrt ? SCHLOSS_ZU : ''}</span>${einsatzMarken(e)}
       ${zug.slice(0, 3).map(m => nameChip(m, e)).join('')}
       ${zug.length > 3 ? `<span class="nm">+${zug.length - 3}</span>` : ''}
       ${fehlt ? `<span class="nm off">${fehlt} offen</span>` : ''}
@@ -12955,6 +12955,36 @@ function enStatusMarke(e) {
 // rationen sind gehoisted, die Reihenfolge im Quelltext spielt hier keine
 // Rolle), nur ohne agZeilen: die Liste zeigt Einsaetze, nicht einzelne
 // Zuteilungen, und braucht darum bloss ein Ja/Nein pro Einsatz.
+/* Alle Marken hinter dem Status-Chip an EINER Stelle (ENT-342).
+   Vorher stand dieselbe Kette an vier Orten -- Planungsliste, Tagesplan und
+   zwei weitere Ansichten. Eine neue Marke haette man dreimal richtig und
+   einmal falsch eingebaut; genau dieser Fehler ist in diesem Projekt schon
+   passiert (ENT-323, eine von vier Fussnoten ersetzt). */
+function einsatzMarken(e) {
+  const m = [];
+  if (einsatzRapportWeichtAb(e)) {
+    m.push(`<span class="rap-abw" title="Rapport weicht vom Plan ab">⚠️</span>`);
+  }
+  if (e.spontan_erzeugt) {
+    m.push(`<span class="rap-abw" title="Spontan gestartet, nicht vom Planer angelegt">⚡</span>`);
+  }
+  // Runde waehrend dieser geplanten Schicht (ENT-342). Seit dort die Sperre
+  // gefallen ist, ist DIESE Marke die Gegenleistung: Der Planer sieht am
+  // Einsatz selbst, dass jemand zur selben Zeit eine Revierrunde gelaufen
+  // ist -- mit Namen, damit klar ist, wer, und mit der Runde, damit klar
+  // ist, wogegen.
+  const par = e.parallel_runden || [];
+  if (par.length) {
+    const wer = p => {
+      const m2 = (e.mitarbeiter || []).find(x => Number(x.id) === Number(p.mitarbeiter_id));
+      return m2 ? ((m2.vorname || '') + ' ' + (m2.nachname || '')).trim() || m2.name : 'Mitarbeiter';
+    };
+    const txt = par.map(p => `${wer(p)}: ${p.titel || p.kunde_name || 'Rundgang'} ab ${String(p.von).slice(0, 5)}`).join(' · ');
+    m.push(`<span class="rap-abw" title="${esc('Revierrunde während dieser Schicht — ' + txt)}">🔀</span>`);
+  }
+  return m.length ? ' ' + m.join(' ') : '';
+}
+
 function einsatzRapportWeichtAb(e) {
   return (e.mitarbeiter || []).some(m => {
     const r = agRapport({ einsatz_id: e.id, mitarbeiter_id: m.id });
@@ -21554,7 +21584,7 @@ function renderTagesplan() {
       <div class="wer">${esc(e.kunde_name)}${e.titel ? ` · ${esc(e.titel)}` : ''}</div>
       <div class="zeiten">${esc(e.ort)}${e.strasse ? ` · ${esc(e.strasse)}` : ''}</div>
       <div class="marken">
-        <span class="chip ${st[1]}">${st[0]}${gesperrt ? SCHLOSS_ZU : ''}</span>${einsatzRapportWeichtAb(e) ? ` <span class="rap-abw" title="Rapport weicht vom Plan ab">⚠️</span>` : ''}${e.spontan_erzeugt ? ` <span class="rap-abw" title="Spontan gestartet, nicht vom Planer angelegt">⚡</span>` : ''}
+        <span class="chip ${st[1]}">${st[0]}${gesperrt ? SCHLOSS_ZU : ''}</span>${einsatzMarken(e)}
         ${zug.length ? zug.map(m => nameChip(m, e)).join('') : ''}
         ${fehlt ? `<span class="nm off">${fehlt} offen</span>` : ''}
       </div>
@@ -21580,7 +21610,7 @@ function renderTagesplan() {
         <td>${esc(e.ort)}${e.strasse ? `<div class="sec">${esc(e.strasse)}</div>` : ''}</td>
         <td class="num"><span class="chip ${e.status === 'abgesagt' ? 'chip-n' : (fehlt ? 'chip-w' : 'chip-p')}">${besetzt(e).length}/${nf(e.bedarf)}</span></td>
         <td>${teile.length ? `<div class="crew">${teile.join('')}</div>` : '<span style="color:var(--ink-3)">–</span>'}</td>
-        <td><span class="chip ${st[1]}">${st[0]}${gesperrt ? SCHLOSS_ZU : ''}</span>${einsatzRapportWeichtAb(e) ? ` <span class="rap-abw" title="Rapport weicht vom Plan ab">⚠️</span>` : ''}${e.spontan_erzeugt ? ` <span class="rap-abw" title="Spontan gestartet, nicht vom Planer angelegt">⚡</span>` : ''}</td>
+        <td><span class="chip ${st[1]}">${st[0]}${gesperrt ? SCHLOSS_ZU : ''}</span>${einsatzMarken(e)}</td>
       </tr>`;
     }).join('') + `</tbody></table></div></div></div>`;
 }
