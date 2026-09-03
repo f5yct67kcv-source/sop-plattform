@@ -74,7 +74,7 @@ check('KRITISCH: nicht erfasste Zahlen bleiben NULL und werden nicht zu 0',
 // darf ueber das Fahrtenbuch reden), sondern WAS der Endpunkt anfasst.
 //
 // Geschrieben wird ausschliesslich in `fahrzeuge`. Gelesen werden zusaetzlich
-// `anstellungsorte` (der Standort) und seit ENT-325 `einsaetze` -- fuer die
+// `anstellungsorte` (der Standort) und seit ENT-328 `einsaetze` -- fuer die
 // Zaehlung, die das Loeschen eines eingeteilten Fahrzeugs verhindert. Ein
 // Fahrtenbuch braeuchte eine eigene Tabelle und einen Schreibweg dorthin;
 // beides faellt hier auf.

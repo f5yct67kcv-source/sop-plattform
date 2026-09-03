@@ -1563,7 +1563,7 @@ $spalten = [
     // Arbeitsort, passt die gespeicherte Zahl nicht mehr -- ohne diesen
     // Abgleich faellt das niemandem auf.
     ['einsaetze', 'weg_adresse', 'ALTER TABLE einsaetze ADD COLUMN weg_adresse VARCHAR(300) NULL AFTER weg_minuten'],
-    // Dienstfahrzeug und Fahrer am Einsatz (ENT-325, Schritt 2 aus ENT-313).
+    // Dienstfahrzeug und Fahrer am Einsatz (ENT-328, Schritt 2 aus ENT-313).
     // ENT-115 hatte das Auswahlfeld bewusst weggelassen -- es gab keine
     // Fahrzeuge zum Waehlen. Seit ENT-313 gibt es sie.
     //

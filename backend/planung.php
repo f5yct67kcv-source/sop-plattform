@@ -499,7 +499,7 @@ function einsatz_sperre_pruefen(PDO $pdo, int $einsatzId): void
     }
 }
 
-// ── Dienstfahrzeug und Fahrer am Einsatz (ENT-325) ────────────────────
+// ── Dienstfahrzeug und Fahrer am Einsatz (ENT-328) ────────────────────
 //
 // EINE Pruefstelle fuer BEIDE Schreibwege: einsatz_save.php (beim Anlegen und
 // Aendern aus der Anlegen-Ansicht) und einsatz_fahrzeug.php (nachtraeglich im
@@ -560,7 +560,7 @@ function einsatz_fahrzeug_pruefen(PDO $pdo, ?int $fahrzeugId, ?int $fahrerId,
     return ['fahrzeug_id' => $fahrzeugId, 'fahrer_id' => $fahrerId];
 }
 
-// Die Geld-Folge der Fahrerbestimmung, an EINER Stelle (ENT-325).
+// Die Geld-Folge der Fahrerbestimmung, an EINER Stelle (ENT-328).
 //
 // Wer das Geschaeftsfahrzeug fuehrt, faehrt damit zum Einsatz. Das Verkehrs-
 // mittel dieser Zuteilung MUSS dann 'Geschaeftsfahrzeug' sein -- sonst

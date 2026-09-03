@@ -44,7 +44,7 @@ if ($verkehrsmittel !== '' && !in_array($verkehrsmittel, MA_VERKEHRSMITTEL, true
 }
 
 // Wer als Fahrer des Dienstfahrzeugs bestimmt ist, faehrt damit zum Einsatz
-// (ENT-325). Ein abweichendes Verkehrsmittel waere eine zweite Angabe ueber
+// (ENT-328). Ein abweichendes Verkehrsmittel waere eine zweite Angabe ueber
 // dieselbe Fahrt -- und der Abgleich rechnete daraus einen Fahrkostenersatz
 // fuer ein Auto, das dem Betrieb selbst gehoert (Art. 18 Ziff. 4/5). Die
 // Sperre steht hier im Server und nicht nur in der Oberflaeche: Was man am

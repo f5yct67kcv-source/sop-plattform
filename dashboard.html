@@ -5423,7 +5423,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
           <div class="ma-pick" id="enNMa"></div>
           <div class="pick-foot" id="enNMaFoot"></div>
         </div>
-        <!-- Dienstfahrzeug und Fahrer (ENT-325). Genau das Feld, das ENT-115
+        <!-- Dienstfahrzeug und Fahrer (ENT-328). Genau das Feld, das ENT-115
              bewusst weggelassen hat, solange es keine Fahrzeuge zu wählen gab
              — seit ENT-313 gibt es sie. Steht hier und nicht bei „Weg und
              Auslagenersatz": Wer fährt, ist eine Frage der Zuteilung. Die
@@ -12096,7 +12096,7 @@ function pickRefresh(prefix) {
   pickRender(prefix, pickIds(prefix), prefix === 'enE' ? enTarget : null);
 }
 
-// ══════════════════════════════════════════ DIENSTFAHRZEUG AM EINSATZ (ENT-325)
+// ══════════════════════════════════════════ DIENSTFAHRZEUG AM EINSATZ (ENT-328)
 //
 // Der Planer bestimmt Fahrzeug UND Fahrer -- ausdrueckliche Vorgabe des
 // Projektinhabers, nicht "wer das Fahrzeug in der App zuerst uebernimmt".
@@ -12213,7 +12213,7 @@ function pickFoot(prefix) {
   el.innerHTML = `<span class="chip ${fehlt ? 'chip-w' : 'chip-p'}">${n}/${bedarf}</span>`
     + `<span>${fehlt ? `noch ${fehlt} ${fehlt === 1 ? 'Person' : 'Personen'} offen` : 'Bedarf gedeckt'}</span>`
     + (gesperrt ? `<span class="chip chip-x">${gesperrt} zeitlich belegt</span>` : '');
-  // Der Fahrer muss zugeteilt sein (ENT-325) -- faellt jemand aus der
+  // Der Fahrer muss zugeteilt sein (ENT-328) -- faellt jemand aus der
   // Auswahl, darf er nicht als Fahrer stehenbleiben.
   if (prefix === 'enN' && typeof enFahrerNachziehen === 'function') { enFahrerNachziehen(); }
 }
@@ -12249,7 +12249,7 @@ function openEinsatzNeu(felder, maNamen) {
   if ($('enNDatumBis')) $('enNDatumBis').value = '';
   enZeitraum();
   enWegZone();
-  // Dienstfahrzeug und Fahrer zuruecksetzen (ENT-325) -- beim zweiten Oeffnen
+  // Dienstfahrzeug und Fahrer zuruecksetzen (ENT-328) -- beim zweiten Oeffnen
   // duerfen keine Reste des vorigen Einsatzes stehen. Die Liste kommt aus der
   // Betriebsansicht; wer direkt in der Planung startet, hat sie noch nicht.
   if ($('enNFahrzeug_id')) {
@@ -16748,7 +16748,7 @@ function epBerichtBlatt(b) {
 // Nur sichtbar, wenn die Zone ueberhaupt Auslagenersatz ausloest -- in einer
 // Zone ohne Entschaedigung waere die Frage "womit reist du an" fuer den
 // Anspruch folgenlos, und ein Auswahlfeld ohne Wirkung ist Ballast.
-// ── Dienstfahrzeug und Fahrer am Einsatz (ENT-325) ──────────────────────
+// ── Dienstfahrzeug und Fahrer am Einsatz (ENT-328) ──────────────────────
 //
 // Steht unmittelbar VOR dem Verkehrsmittel-Block, weil es ihn bestimmt: Wer
 // faehrt, hat 'Geschaeftsfahrzeug' und keinen Fahrkostenersatz. Zwei Bloecke
@@ -16912,7 +16912,7 @@ function epVerkehrsmittelBlock(e) {
     const wert = p.verkehrsmittel || '';   // '' heisst: die Vorgabe gilt
     const name = (ma && (fullName(ma) || ma.name)) || p.mitarbeiter || ('#' + p.mitarbeiter_id);
     // Wer das Dienstfahrzeug fuehrt, faehrt damit -- das Feld steht fest
-    // (ENT-325). Der Server weist eine Aenderung ohnehin ab; ein bedienbares
+    // (ENT-328). Der Server weist eine Aenderung ohnehin ab; ein bedienbares
     // Feld, das beim Klicken eine Fehlermeldung wirft, waere eine Falle.
     const istFahrer = e.fahrer_id != null && Number(e.fahrer_id) === Number(p.mitarbeiter_id);
     return `<div class="f" style="margin-bottom:9px">

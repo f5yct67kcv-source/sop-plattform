@@ -13,7 +13,7 @@ $von = trim((string)($_GET['von'] ?? ''));
 $bis = trim((string)($_GET['bis'] ?? ''));
 $eingegrenzt = preg_match('/^\d{4}-\d{2}-\d{2}$/', $von) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $bis);
 
-// ENT-325: Dienstfahrzeug und Fahrer stehen erst nach dem naechsten
+// ENT-328: Dienstfahrzeug und Fahrer stehen erst nach dem naechsten
 // Einrichtungslauf in der Tabelle. Ohne diese Abfrage bricht zwischen Deploy
 // und Einrichtung die GANZE Planungsansicht weg -- eine fehlende Spalte in
 // einem SELECT ist ein Fehler, kein leeres Feld.
@@ -91,7 +91,7 @@ foreach ($zstmt->fetchAll() as $z) {
 
 $einsaetze = array_map(function ($e) use ($proEinsatz, $hatFahrzeug) {
     $e['id'] = (int)$e['id'];
-    // ENT-325. Fehlt die Spalte noch, geht der Schluessel GAR NICHT hinaus --
+    // ENT-328. Fehlt die Spalte noch, geht der Schluessel GAR NICHT hinaus --
     // die Oberflaeche unterscheidet dann "nicht eingerichtet" von "kein
     // Fahrzeug zugeteilt". Ein 0 oder ein null waere fuer sie dasselbe wie
     // "keines", und genau diese Verwechslung soll es hier nicht geben.

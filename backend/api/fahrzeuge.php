@@ -103,7 +103,7 @@ if (!empty($in['loeschen'])) {
         json_response(['status' => 'error', 'message' => 'id fehlt'], 422);
     }
     // Ein Fahrzeug, das an einem Einsatz haengt, wird nicht geloescht
-    // (ENT-325). Welches Fahrzeug gefahren wurde, ist eine Tatsache; sie
+    // (ENT-328). Welches Fahrzeug gefahren wurde, ist eine Tatsache; sie
     // still auf NULL zu setzen wuerde die Vergangenheit veraendern. Wer das
     // Fahrzeug nicht mehr braucht, setzt es ausser Betrieb -- dann bleibt
     // sichtbar, was war.

@@ -58,7 +58,7 @@ $wegAdr = trim((string)($input['weg_adresse'] ?? '')) ?: null;
 // serie_id wird beim AENDERN bewusst nicht angefasst: Die UPDATE-Anweisung
 // unten fuehrt die Spalte nicht. Wer einen Tag einer Reihe bearbeitet, loest
 // ihn damit nicht heraus.
-// ENT-325. Dienstfahrzeug und Fahrer -- nur angefasst, wenn die Anfrage die
+// ENT-328. Dienstfahrzeug und Fahrer -- nur angefasst, wenn die Anfrage die
 // Schluessel WIRKLICH mitschickt. Die Bearbeiten-Schublade kennt die Felder
 // nicht; wuerden sie hier unbesehen gelesen, leerte jedes Speichern aus der
 // Schublade eine bestehende Fahrzeugzuteilung. Derselbe stille Datenverlust,
@@ -193,7 +193,7 @@ if ($zuteilung) {
     }
 }
 
-// ENT-325. Geprueft wird gegen die Zuteilung, die NACH diesem Speichern gilt
+// ENT-328. Geprueft wird gegen die Zuteilung, die NACH diesem Speichern gilt
 // -- sonst liesse sich jemand zum Fahrer bestimmen, der im selben Zug aus der
 // Schicht faellt. Die Pruefung selbst steht in planung.php, weil
 // einsatz_fahrzeug.php sie ebenso braucht.
@@ -270,7 +270,7 @@ try {
         }
     }
 
-    // ENT-325. Eigene Anweisung statt zwei weiterer Spalten in der festen
+    // ENT-328. Eigene Anweisung statt zwei weiterer Spalten in der festen
     // Liste oben: Die laeuft auch fuer die Bearbeiten-Schublade, die die
     // Felder nicht kennt -- dort wuerden sie mit NULL ueberschrieben.
     if ($fahrzeugGesendet) {
