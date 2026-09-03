@@ -2605,6 +2605,22 @@ function rgSeiteZumRundgang() {
 let rgsFrageJa = null;
 
 function rgsFrage(frage, text, jaWort, jaFn) {
+  /* Die Schublade zuerst schliessen (ENT-345). Sie liegt mit z-index 61
+     UEBER der Rundgang-Seite (55), und dieser Dialog ist ein KIND dieser
+     Seite -- sein eigener z-index von 5 gilt nur innerhalb ihres
+     Stapelkontexts und kann die Schublade darum nie ueberholen.
+
+     Folge, vom Projektinhaber gemeldet: Wer im Fenster „Ausserhalb der
+     üblichen Zeit" einen Grund wählte und auf „Rundgang starten" tippte,
+     sah scheinbar NICHTS geschehen -- die Rückfrage stand hinter der
+     Maske. Erst das Schliessen über das Kreuz brachte sie zum Vorschein.
+
+     Die Sperre sitzt hier und nicht bei dem einen Aufrufer, der sie
+     ausgelöst hat: Jeder künftige rgsFrage()-Aufruf aus einer offenen
+     Schublade lief in dieselbe Falle, und der nächste würde sie so wenig
+     kommen sehen wie ich. rgSeiteOeffnen() macht es aus demselben Grund
+     schon lange so. */
+  blattZu();
   rgsFrageJa = jaFn;
   $('rgsDlgLb').textContent = w('rgsWarnung');
   $('rgsDlgFrage').textContent = frage;

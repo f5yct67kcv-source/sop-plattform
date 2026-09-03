@@ -76,7 +76,13 @@ check('KRITISCH: nur an der geplanten Schicht, nicht am spontanen Einsatz selbst
 // ══════════ APP: FRAGEN STATT SPERREN ════════════════════════════════
 const VORLAGEN = { status: 'ok', vorlagen: [
   { id: 501, name: 'Musterrunde Nord', objekt_id: 7, objekt_name: 'Objekt Nord',
-    kunde_name: 'Muster AG', fenster_von: null, fenster_bis: null }] };
+    kunde_name: 'Muster AG', fenster_von: null, fenster_bis: null },
+  // Zweite Vorlage MIT Zeitfenster -- und zwar einem, das garantiert nicht
+  // jetzt ist (Fenster 03:00-03:30 mit 5 Minuten Toleranz, siehe
+  // RUNDGANG_FENSTER_TOLERANZ_MIN). Nur so laeuft der Start ueber die
+  // Grundmaske, und nur DIESER Weg hatte den gemeldeten Fehler.
+  { id: 502, name: 'Musterrunde Fenster', objekt_id: 7, objekt_name: 'Objekt Nord',
+    kunde_name: 'Muster AG', fenster_von: '03:00:00', fenster_bis: '03:30:00' }] };
 const PROFIL = { status: 'ok', monat: { anzahl: 0, stunden: 0 }, profil: {
   name: 'm.muster', ist_admin: false, personalnummer: 'P-001', vorname: 'Max',
   nachname: 'Muster', erstellt_am: tag(-30) + ' 10:00:00', revierdienst_berechtigt: true } };
@@ -98,8 +104,10 @@ await page.route('**/api/**', route => {
   if (p.includes('rapport_list')) return send({ status: 'ok', rapporte: [] });
   if (p.includes('mein_rundgang_vorlagen_alle')) return send(VORLAGEN);
   if (p.includes('mein_rundgang_uebersicht')) {
+    const vid = Number(new URL(req.url()).searchParams.get('vorlage_id') || 501);
+    const v = (VORLAGEN.vorlagen.find(x => x.id === vid) || VORLAGEN.vorlagen[0]);
     return send({ status: 'ok',
-      vorlage: { id: 501, name: 'Musterrunde Nord', fenster_von: null, fenster_bis: null },
+      vorlage: { id: v.id, name: v.name, fenster_von: v.fenster_von, fenster_bis: v.fenster_bis },
       objekt: { id: 7, name: 'Objekt Nord', strasse: 'Musterweg 4', ort: '9999 Musterdorf', kanton: 'SO', bemerkung: null },
       kunde_name: 'Muster AG', kontrollpunkte: [{ id: 1, bezeichnung: 'Eingang', typ: 'geofence' }],
       ansprechpartner: [], zentrale: null });
@@ -191,6 +199,67 @@ await page.waitForTimeout(700);
 check('KRITISCH: eine fehlgeschlagene Meldung an die Disposition wird dem Wächter gesagt',
   (await page.textContent('body')).includes('Ereignismeldung fehlgeschlagen'));
 mitBestaetigung = null;
+
+// ── Der Weg ÜBER die Grundmaske (ENT-345, gemeldeter Fehler) ─────────
+// Vom Projektinhaber: „Wenn man einen Grund angibt für die
+// außerordentliche Durchführung und auf 'Rundgang starten' klickt,
+// passiert scheinbar nichts. Wenn man oben beim Kreuz die Maske schliesst,
+// kommt das Warnfenster erst zum Vorschein."
+//
+// Ursache: Die Schublade liegt mit z-index 61 ÜBER der Rundgang-Seite (55),
+// und die Rückfrage ist ein KIND dieser Seite -- ihr eigener z-index gilt
+// nur innerhalb deren Stapelkontexts und kann die Schublade nie überholen.
+//
+// Dass mir das durchging, hat einen Grund, der hier festgehalten gehört:
+// Die Prüfungen oben nehmen den DIREKTEN Weg (Runde ohne Zeitfenster). Der
+// gemeldete Fehler sitzt auf dem ZWEITEN Weg. Zwei Einstiege, einer
+// geprüft -- das reicht nicht.
+startRufe = [];
+await page.evaluate(() => { blattZu(); rgSeiteZu(); });
+await page.waitForTimeout(150);
+await page.evaluate(() => rundgangUebersichtOeffnen());
+await page.waitForTimeout(350);
+await klick(page, '#blBody button:has-text("Musterrunde Fenster")');
+await page.waitForTimeout(400);
+await klick(page, '#rgsStartBtn');
+await page.waitForTimeout(400);
+check('KRITISCH: ausserhalb des Fensters erscheint zuerst die Grundmaske',
+  await page.evaluate(() => !!document.getElementById('rfsGrund')
+    && document.getElementById('blatt').classList.contains('on')));
+await page.selectOption('#rfsGrund', 'planer_freigabe').catch(() => {});
+await klick(page, '#rfsBtn');
+await page.waitForTimeout(500);
+// Der eigentliche Befund: Die Rueckfrage darf nicht HINTER der Maske
+// stehen. Gemessen wird am gerenderten Zustand -- ein hidden=false allein
+// haette den Fehler nie gezeigt, die Rueckfrage war ja "offen", nur
+// unsichtbar.
+const sicht = await page.evaluate(() => {
+  const dlg = document.getElementById('rgsDlg');
+  const blatt = document.getElementById('blatt');
+  if (!dlg || !blatt) return null;
+  const box = dlg.querySelector('.rgs-dlg-box');
+  const r = box ? box.getBoundingClientRect() : { width: 0, height: 0, left: 0, top: 0 };
+  // Wer liegt an der Mitte des Dialogs wirklich oben?
+  const oben = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+  return { offen: !dlg.hidden, blattOffen: blatt.classList.contains('on'),
+           flaeche: r.width * r.height,
+           obenImDialog: !!oben && !!oben.closest('#rgsDlg') };
+});
+check('KRITISCH: nach dem Grund erscheint die Rückfrage — und zwar SICHTBAR',
+  !!sicht && sicht.offen && sicht.flaeche > 1000 && sicht.obenImDialog);
+check('KRITISCH: die Grundmaske ist dabei geschlossen, sie verdeckt nichts mehr',
+  !!sicht && !sicht.blattOffen);
+check('Der Grund wird beim zweiten Anlauf mitgeschickt, nicht verworfen',
+  await page.evaluate(async () => {
+    const ja = document.getElementById('rgsDlgJa');
+    if (!ja) return false;
+    ja.click();
+    await new Promise(r => setTimeout(r, 600));
+    return true;
+  }) && startRufe.length === 2
+    && startRufe[1].ausnahme_grund === 'planer_freigabe'
+    && startRufe[1].trotz_doppelbelegung === true);
+await page.screenshot({ path: `${OUT}/parallel-03-nach-grund.png` });
 
 await browser.close();
 
@@ -284,6 +353,37 @@ check('Das Blitz-Zeichen für "spontan erzeugt" bleibt daneben erhalten',
   !!zeilen.spontan && zeilen.spontan.zeichen.includes('⚡'));
 await dash.screenshot({ path: `${OUT}/parallel-02-cockpit.png` });
 await browser2.close();
+
+// ══════════ OP-343: WAS DER ABGLEICH MIT ZWEI EINSAETZEN MACHT ════════
+// Ausdruecklich geprueft, weil die Doppelbelegung seit ENT-342 bewusst
+// entsteht und der naechste Monatsabschluss echtes Geld betrifft. Drei
+// Zusicherungen -- jede einzeln nachgesehen, nicht angenommen:
+const ABG = readFileSync(`${WURZEL}/backend/api/einsatz_abgleich.php`, 'utf8');
+const AUSL = readFileSync(`${WURZEL}/backend/auslagen.php`, 'utf8');
+
+// 1. Der Abgleich rechnet keine Arbeitszeit. Ohne diese Zusicherung koennte
+//    ein zweiter Einsatz am selben Tag ueberhaupt zu doppeltem Lohn fuehren.
+check('OP-343: der Abgleich leitet weiterhin KEINE Arbeitszeit und keine Zuschläge ab',
+  /Bewusst KEINE Berechnung der ARBEITSZEIT/.test(ABG)
+  && !/stunden|lohn_rappen|zuschlag_rappen/i.test(
+       ABG.replace(/^\s*\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '')));
+
+// 2. Der spontane Einsatz traegt KEIN weg_km. Damit ist sein Auslagenersatz
+//    "nicht bestimmbar" statt "0" oder gar eines zweiten Betrages -- der
+//    entscheidende Grund, warum kein doppelter Auslagenersatz entsteht.
+check('OP-343: der spontane Einsatz wird ohne Wegstrecke angelegt -- er erzeugt darum keinen zweiten Auslagenersatz',
+  /INSERT INTO einsaetze \(kunde_id, kunde_name, titel, strasse, ort, kanton, einsatzart, sparte,\s*\n\s*datum, von, bis, bedarf, status, bemerkung, erstellt_von, spontan_erzeugt\)/.test(EP)
+  && !/weg_km/.test(EP));
+
+// 3. Die AUS-010-Sperre greift VOR jeder Betragsrechnung, aber NACH dem
+//    Anstellungsgebiet (dort ist ohnehin nichts geschuldet). Genau diese
+//    Reihenfolge entscheidet, ob der neue Fall heute schon Wirkung hat.
+const iAnst = AUSL.indexOf("if (!$zone['entschaedigung'])");
+const iAus010 = AUSL.indexOf("if ($gavAus010Blockiert)");
+check('OP-343: das Anstellungsgebiet wird VOR der AUS-010-Sperre entschieden (heute ohne Wirkung)',
+  iAnst > 0 && iAus010 > 0 && iAnst < iAus010);
+check('OP-343: die AUS-010-Sperre setzt einen Grund und KEINEN Betrag',
+  /\$zeile\['gesperrt_grund'\] = 'gav_aus_010';\s*\n\s*return \$zeile;/.test(AUSL));
 
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
