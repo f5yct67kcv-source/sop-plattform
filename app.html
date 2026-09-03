@@ -900,6 +900,17 @@ const W = {
     waechterUebersichtTitel: 'Rundgänge',
     waechterUebersichtLeer: 'Keine Rundgänge verfügbar',
     waechterUebersichtLeerText: 'Es sind aktuell keine Kontrollrunden hinterlegt.',
+    // Drei verschiedene Sachverhalte, drei verschiedene Meldungen (ENT-338).
+    // Vorher wurde JEDER Fehlschlag -- fehlende Berechtigung, Serverfehler,
+    // Funkloch -- zur leeren Liste und damit zu „Es sind aktuell keine
+    // Kontrollrunden hinterlegt". Das ist eine Falschauskunft: Die Runden
+    // sind hinterlegt, sie sind nur nicht erreichbar. CLAUDE.md: „unbekannt"
+    // darf nie wie „keine" aussehen.
+    waechterKeinZugriff: 'Revierdienst nicht freigegeben',
+    waechterKeinZugriffText: 'Für dich ist der Revierdienst in der Personalakte noch nicht freigegeben. Die Verwaltung kann das setzen — danach erscheinen die Runden hier.',
+    waechterLadefehler: 'Rundgänge nicht geladen',
+    waechterLadefehlerText: 'Die Liste konnte nicht abgerufen werden. Das kann an der Verbindung liegen.',
+    nochmal: 'Nochmals versuchen',
     rundgangChipLaeuft: 'Rundgang läuft', rundgangChipPausiert: 'Rundgang pausiert',
     sperrenTitel: 'Tage sperren', gesperrt: 'Gesperrt', frei: 'Frei',
     sperrenText: 'Tippe auf einen Tag, an dem du nicht kannst. Die Planung sieht das und berücksichtigt es — eine Zusage ist es nicht.',
@@ -2135,11 +2146,35 @@ function rundgangUebersichtOeffnen() {
 }
 
 function rundgangUebersichtLaden() {
-  api('mein_rundgang_vorlagen_alle.php').then(({ ok, data }) => {
-    const vorlagen = (ok && data.status === 'ok') ? (data.vorlagen || []) : [];
+  api('mein_rundgang_vorlagen_alle.php').then(({ ok, status, data }) => {
+    /* Fehlschlag ist nicht dasselbe wie Leere (ENT-338). Vom Projektinhaber
+       gemeldet: Ein freigegebener Waechter sah „Es sind aktuell keine
+       Kontrollrunden hinterlegt" -- obwohl Runden hinterlegt waren und der
+       Server mit 403 geantwortet hatte. Die Meldung war falsch, und sie
+       nahm ihm zugleich die Auskunft, was zu tun ist. */
+    const gelungen = ok && data.status === 'ok';
+    const vorlagen = gelungen ? (data.vorlagen || []) : [];
     rdSpontanVorlagen = vorlagen;
     blattId = null;
     $('blTitel').textContent = w('waechterUebersichtTitel');
+    if (!gelungen) {
+      const gesperrt = status === 403;
+      $('blBody').innerHTML =
+        LEER(w(gesperrt ? 'waechterKeinZugriff' : 'waechterLadefehler'),
+             gesperrt ? w('waechterKeinZugriffText')
+                      : ((data && data.message) || w('waechterLadefehlerText')),
+             gesperrt
+               ? '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>'
+               : '<circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>')
+        // Ein Funkloch geht vorbei -- dann muss man es erneut versuchen
+        // koennen, ohne die Seite zu verlassen. Eine fehlende Freigabe geht
+        // nicht vorbei; dort waere der Knopf eine leere Zusage.
+        + (gesperrt ? '' : `<button class="btn btn-plain btn-wide" style="margin-top:10px"
+             onclick="rundgangUebersichtOeffnen()">${esc(w('nochmal'))}</button>`);
+      $('blFuss').innerHTML = `<button class="btn btn-plain" onclick="zeige('waechter')">${esc(w('zurueck'))}</button>`;
+      blattZeigen();
+      return;
+    }
     $('blBody').innerHTML = vorlagen.length
       ? `<div style="display:flex;flex-direction:column;gap:8px">${vorlagen.map(v => `
           <button type="button" class="btn btn-plain btn-wide" style="display:flex;flex-direction:column;align-items:flex-start;height:auto;min-height:44px;padding:12px 14px;white-space:normal;text-align:left;gap:2px" onclick="rgSeiteOeffnen(${Number(v.id)})">

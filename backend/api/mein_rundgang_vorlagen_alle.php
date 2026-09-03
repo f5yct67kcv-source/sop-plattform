@@ -12,6 +12,7 @@
 // gehören in den Server, nicht nur in die Oberfläche).
 declare(strict_types=1);
 require __DIR__ . '/../db.php';
+require_once __DIR__ . '/../rundgang.php';
 
 $user = require_session();
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
@@ -20,18 +21,14 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 
 $pdo = db();
 
-// Mindestens einmal (irgendwann, nicht nur heute) einem Objekt mit aktiven
-// Kontrollpunkten zugeteilt gewesen -- wer nie Revierdienst macht, bekommt
-// keine objektfremde Liste zu sehen.
-$chk = $pdo->prepare(
-    'SELECT COUNT(*) FROM einsatz_zuteilung z
-      JOIN einsaetze e ON e.id = z.einsatz_id
-      JOIN kontrollpunkt k ON k.objekt_id = e.objekt_id AND k.aktiv = 1
-     WHERE z.mitarbeiter_id = ?'
-);
-$chk->execute([(int)$user['id']]);
-if ((int)$chk->fetchColumn() === 0) {
-    json_response(['status' => 'error', 'message' => 'Kein Zugriff auf die Rundgänge-Übersicht'], 403);
+// Ein Gate fuer alle Revierdienst-Endpunkte (ENT-338): das in der
+// Personalakte gesetzte Merkmal `revierdienst_berechtigt`, dasselbe, das
+// in app.html den Waechter-Reiter sichtbar macht. Hier stand bis dahin
+// die alte, von ENT-284 abgeloeste Herleitung "jemals einem Objekt mit
+// Kontrollpunkten zugeteilt" -- Begruendung bei revierdienst_zugang().
+if (!revierdienst_zugang($pdo, (int)$user['id'])) {
+    json_response(['status' => 'error', 'message' => 'Kein Zugriff auf die Rundgänge-Übersicht',
+                   'code' => 'keine_revierdienst_berechtigung'], 403);
 }
 
 $stmt = $pdo->prepare(
