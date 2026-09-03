@@ -34,6 +34,11 @@ const EP = readFileSync(`${WURZEL}/backend/api/mein_rundgang_spontan_starten.php
 const RG = readFileSync(`${WURZEL}/backend/rundgang.php`, 'utf8');
 const LIST = readFileSync(`${WURZEL}/backend/api/einsatz_list.php`, 'utf8');
 const EINR = readFileSync(`${WURZEL}/backend/api/planung_einrichten.php`, 'utf8');
+const ABG = readFileSync(`${WURZEL}/backend/api/einsatz_abgleich.php`, 'utf8');
+const AUSL = readFileSync(`${WURZEL}/backend/auslagen.php`, 'utf8');
+const PLA = readFileSync(`${WURZEL}/backend/planung.php`, 'utf8');
+const DASH = readFileSync(`${WURZEL}/dashboard.html`, 'utf8');
+const APP_Q = readFileSync(`${WURZEL}/app.html`, 'utf8');
 
 check('KRITISCH: der Start ist nicht mehr unbedingt gesperrt -- er fragt nur noch nach',
   /empty\(\$input\['trotz_doppelbelegung'\]\)/.test(EP));
@@ -151,8 +156,12 @@ check('KRITISCH: der Start endet NICHT stumm in einer Fehlermeldung, sondern fra
 const frage = await page.textContent('#rgsDlg');
 check('KRITISCH: die Frage nennt, WOGEGEN gestartet wird -- nicht nur "Konflikt"',
   frage.includes('Muster AG') && frage.includes('12:00'));
-check('Und sie nennt die Folge: die Einsatzleitung sieht es an der geplanten Schicht',
-  frage.includes('Einsatzleitung') && frage.includes('geplanten Schicht'));
+// Seit ENT-347 hat die Bestaetigung eine echte FOLGE: Er wird aus der
+// anderen Einteilung genommen. Wer das nicht liest, bestaetigt etwas, dessen
+// Wirkung er nicht kennt -- darum steht es in der Frage, nicht erst danach.
+check('Und sie nennt die Folge: er wird aus der anderen Einteilung genommen',
+  frage.includes('aus der anderen Einteilung genommen')
+  && frage.includes('unbesetzt'));
 // Die Kollision und der Erklaersatz duerfen nicht ineinanderlaufen -- der
 // Umbruch steht im Text, er muss auch gerendert werden (am Bildschirm
 // gemessen, nicht im Quelltext nachgelesen).
@@ -264,7 +273,6 @@ await page.screenshot({ path: `${OUT}/parallel-03-nach-grund.png` });
 await browser.close();
 
 // ══════════ COCKPIT: DIE MARKE AN DER GEPLANTEN SCHICHT ═══════════════
-const DASH = readFileSync(`${WURZEL}/dashboard.html`, 'utf8');
 check('KRITISCH: alle Marken hinter dem Status-Chip stehen an EINER Stelle',
   /function einsatzMarken\(e\) \{/.test(DASH));
 // Vier Ansichten benutzen sie. Vorher stand dieselbe Kette viermal da --
@@ -283,11 +291,14 @@ check('Der Titel ist gegen Anführungszeichen im Namen abgesichert',
 // nur, dass die Zeichenkette dasteht -- nicht, dass der Planer sie sieht.
 const HEUTE = iso(new Date());
 const A = { id: 1, name: 'm.muster', vorname: 'Max', nachname: 'Muster', zusage: 'zugesagt' };
+// Dieselbe Person, aber aus der Schicht entfallen (ENT-347) -- so sieht die
+// geplante Schicht aus, nachdem der Waechter bestaetigt hat.
+const A_ENTF = { ...A, zusage: 'entfallen' };
 const EINSAETZE = { status: 'ok', einsaetze: [
   // Die GEPLANTE Schicht -- hier gehoert die Marke hin.
   { id: 11, kunde_id: 1, kunde_name: 'Muster AG', titel: 'Verkehrsdienst Kreisel', strasse: null,
     ort: '4632 Musterdorf', einsatzart: 'Verkehrsdienst', datum: HEUTE, von: '12:00:00', bis: '18:00:00',
-    bedarf: 1, status: 'bestaetigt', bemerkung: null, mitarbeiter: [A], spontan_erzeugt: false,
+    bedarf: 1, status: 'bestaetigt', bemerkung: null, mitarbeiter: [A_ENTF], spontan_erzeugt: false,
     parallel_runden: [{ einsatz_id: 12, mitarbeiter_id: 1, titel: 'Spontaner Rundgang: Musterrunde Nord',
                         kunde_name: 'Muster AG', von: '13:00:00', bis: '13:30:00' }] },
   // Die spontane Runde selbst -- hier waere die Marke eine Selbstauskunft.
@@ -351,15 +362,85 @@ check('KRITISCH: am spontanen Einsatz selbst steht sie NICHT -- das wäre eine S
   !!zeilen.spontan && !zeilen.spontan.zeichen.includes('🔀'));
 check('Das Blitz-Zeichen für "spontan erzeugt" bleibt daneben erhalten',
   !!zeilen.spontan && zeilen.spontan.zeichen.includes('⚡'));
+
+// ── Der eigentliche Schutz des Planers, gemessen ─────────────────────
+// Nicht die Marke, sondern die UNTERBESETZUNG: Die Schicht muss von 1/1 auf
+// 0/1 springen und als unterbesetzt markiert sein. Genau das war der Punkt
+// des Projektinhabers -- eine still doppelt belegte Schicht sieht besetzt
+// aus, eine unterbesetzte nicht.
+const besetzung = await dash.evaluate(() => {
+  const raus = {};
+  document.querySelectorAll('#plTable table tbody tr').forEach(tr => {
+    if (!tr.textContent.includes('Verkehrsdienst Kreisel')) return;
+    const chips = [...tr.querySelectorAll('.chip')].map(c => ({
+      txt: c.textContent.trim(), klasse: c.className }));
+    const nm = tr.querySelector('.nm');
+    raus.chips = chips;
+    raus.name = nm ? { txt: nm.textContent.trim(), klasse: nm.className,
+                       titel: nm.getAttribute('title') || '',
+                       durchgestrichen: getComputedStyle(nm).textDecorationLine.includes('line-through') } : null;
+  });
+  return raus;
+});
+check('KRITISCH: die geplante Schicht zählt den Entfallenen NICHT als Besetzung (0/1, gemessen)',
+  !!besetzung.chips && besetzung.chips.some(c => c.txt === '0/1'));
+check('KRITISCH: und sie ist als unterbesetzt markiert, nicht als vollständig',
+  !!besetzung.chips && besetzung.chips.some(c => c.txt === '0/1' && /chip-w/.test(c.klasse)));
+check('Der Name steht weiterhin da -- die Zuteilung ist nicht gelöscht (Nachweis)',
+  !!besetzung.name && besetzung.name.txt.includes('Muster'));
+check('Er ist erkennbar entfallen, nicht als Absage ausgegeben',
+  !!besetzung.name && /nm-entfallen/.test(besetzung.name.klasse)
+  && besetzung.name.durchgestrichen
+  && besetzung.name.titel.includes('Revierrunde'));
 await dash.screenshot({ path: `${OUT}/parallel-02-cockpit.png` });
 await browser2.close();
+
+// ══════════ ENT-347: AUS DER SCHICHT ENTFALLEN, NICHT GELOESCHT ═══════
+// Vom Projektinhaber: „Wenn ein Mitarbeiter deutlich bestaetigt, dass er an
+// einem anderen Auftrag arbeitet, muss es ihn aus der anderen Schicht
+// zwangsmaessig entfernen. Das schuetzt den Planer vor einem Fehler."
+// Und auf Rueckfrage praezisiert: „seine schicht wird nicht rausgelöscht,
+// er wird nur entfernt aus der schicht".
+check('KRITISCH: die kollidierende Zuteilung wird auf "entfallen" gesetzt, nicht gelöscht',
+  /UPDATE einsatz_zuteilung SET zusage = 'entfallen'/.test(EP)
+  && !/DELETE FROM einsatz_zuteilung/.test(EP));
+// „abgelehnt" ist eine Aussage der Person. Kein Automatismus darf sie
+// ueberschreiben -- und dort ist der Platz ohnehin schon offen.
+check('KRITISCH: eine bereits abgelehnte oder entfallene Einteilung wird nicht angetastet',
+  /zusage NOT IN \('abgelehnt', 'entfallen'\)/.test(EP));
+check('Das Ereignis nennt, was mit der geplanten Schicht geschehen ist',
+  /aus dieser Einteilung entfallen/.test(EP)
+  && /die Einteilung blieb unveraendert/.test(EP));
+// Sonst meldete die Sperre denselben Konflikt bei jedem weiteren Versuch --
+// gegen eine Zuteilung, die sie selbst aufgeloest hat.
+check('KRITISCH: die Doppelbelegungs-Sperre zählt entfallene Zuteilungen nicht mehr mit',
+  /AND z\.zusage <> 'entfallen'/.test(PLA));
+// Ohne das waere die halbe Wirkung verpufft: sichtbar unterbesetzt, aber der
+// Auslagenersatz weiter gesperrt wegen einer Zuteilung, die es nicht gibt.
+check('KRITISCH: die GAV-AUS-010-Tagesprüfung ebenso',
+  /AND z\.zusage != 'entfallen' AND e\.id != \?/.test(ABG));
+
+// Eine Regel, was als Besetzung zaehlt -- nicht drei.
+check('KRITISCH: das Cockpit hat EINE Regel für "zählt als Besetzung"',
+  /const ZUSAGE_NICHT_BESETZT = \['abgelehnt', 'entfallen'\];/.test(DASH)
+  && /const zaehltAlsBesetzt = /.test(DASH));
+check('Und sowohl die Planungsliste als auch das Positionsraster benutzen sie',
+  /const besetzt = e => \(e\.mitarbeiter \|\| \[\]\)\.filter\(m => zaehltAlsBesetzt\(zusageVon\(m\)\)\)/.test(DASH)
+  && /const epBesetzt = p => !!p\.mitarbeiter_id && zaehltAlsBesetzt\(p\.zusage\)/.test(DASH));
+check('Entfallen ist im Cockpit von "abgelehnt" unterscheidbar -- zwei verschiedene Lagen',
+  /nm-entfallen/.test(DASH) && /ENTFALLEN — läuft eine Revierrunde/.test(DASH));
+// Der Waechter darf sich nicht stillschweigend in eine Schicht
+// zurueckklicken, aus der ihn das System bewusst genommen hat.
+check('KRITISCH: in der App gibt es bei einer entfallenen Schicht keine Zusage-Knöpfe',
+  /if \(e\.zusage === 'entfallen'\) \{/.test(APP_Q)
+  && /entfallenTxt/.test(APP_Q));
+check('KRITISCH: die Rückfrage nennt die Folge — er wird aus der anderen Einteilung genommen',
+  /du wirst dann aus der anderen Einteilung genommen/.test(APP_Q));
 
 // ══════════ OP-343: WAS DER ABGLEICH MIT ZWEI EINSAETZEN MACHT ════════
 // Ausdruecklich geprueft, weil die Doppelbelegung seit ENT-342 bewusst
 // entsteht und der naechste Monatsabschluss echtes Geld betrifft. Drei
 // Zusicherungen -- jede einzeln nachgesehen, nicht angenommen:
-const ABG = readFileSync(`${WURZEL}/backend/api/einsatz_abgleich.php`, 'utf8');
-const AUSL = readFileSync(`${WURZEL}/backend/auslagen.php`, 'utf8');
 
 // 1. Der Abgleich rechnet keine Arbeitszeit. Ohne diese Zusicherung koennte
 //    ein zweiter Einsatz am selben Tag ueberhaupt zu doppeltem Lohn fuehren.

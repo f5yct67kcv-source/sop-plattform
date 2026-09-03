@@ -270,6 +270,21 @@ function doppelbelegungen(int $einsatzId, string $datum, string $von, string $bi
             WHERE z.mitarbeiter_id IN ($marken)
               AND e.id <> ?
               AND e.status <> 'abgesagt'
+              -- Entfallene Zuteilungen belegen niemanden mehr (ENT-347):
+              -- Die Zeile bleibt als Nachweis stehen, dass die Person dort
+              -- eingeteilt WAR, aber sie ist es nicht mehr. Ohne diese Zeile
+              -- meldete die Sperre denselben Konflikt bei jedem weiteren
+              -- Versuch erneut -- gegen eine Zuteilung, die sie selbst
+              -- aufgeloest hat.
+              --
+              -- 'abgelehnt' ist hier BEWUSST nicht mitgenommen: Dass eine
+              -- Absage weiterhin als Doppelbelegung gilt, ist ein
+              -- bestehender Widerspruch zur Planungsliste (dort zaehlt sie
+              -- nicht als besetzt) -- aber ein eigener, aelterer, und ihn
+              -- hier mitzuaendern wuerde die Planungssperre breit
+              -- verschieben, ohne dass jemand danach gefragt hat.
+              -- Festgehalten als OP-348.
+              AND z.zusage <> 'entfallen'
               AND e.datum BETWEEN DATE_SUB(?, INTERVAL 1 DAY) AND DATE_ADD(?, INTERVAL 1 DAY)";
     $stmt = db()->prepare($sql);
     $stmt->execute([...$mitarbeiterIds, $einsatzId, $datum, $datum]);
