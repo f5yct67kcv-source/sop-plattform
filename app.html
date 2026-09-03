@@ -931,7 +931,7 @@ const W = {
     // nur in der Farbe.
     dienstfahrzeug: 'Dienstfahrzeug', duFaehrst: 'Du fährst',
     faehrtWer: 'fährt', fahrerOffen: 'Fahrer noch nicht bestimmt',
-    // Fahrzeugübernahme (ENT-335). Vier Zustände, vier Texte: nicht
+    // Fahrzeugübernahme (ENT-340). Vier Zustände, vier Texte: nicht
     // eingerichtet / eingerichtet, aber kein Fahrzeug erfasst / nicht
     // abrufbar / kein Kilometerstand bekannt. Sie sehen sich ähnlich und
     // bedeuten Verschiedenes.
@@ -1315,7 +1315,7 @@ function starten() {
   // Meldung noch Eintraege in localStorage, wird jetzt ein Sendeversuch
   // unternommen (ENT-132 Punkt 5).
   rdWarteschlangeSenden();
-  // Der Aufkleber im Fahrzeug (ENT-335) fuehrt auf app.html?fz=<Kennung>.
+  // Der Aufkleber im Fahrzeug (ENT-340) fuehrt auf app.html?fz=<Kennung>.
   // Bewusst die normale Kamera-App des Telefons als Scanner: Sie kann jedes
   // Geraet, sie oeffnet die Adresse selbst, und ein eigener Scanner im
   // Browser waere auf iOS-Safari ohnehin nicht zuverlaessig verfuegbar.
@@ -1791,7 +1791,7 @@ function zeichneRapport() {
 // Fortsetzung) -- die eigene, bereits zugeteilte Schicht bleibt daneben
 // weiterhin ueber "Heute"/"Plan" erreichbar (rundgangAbschnittZeichnen,
 // ENT-180/182/145/146/153), keine zweite Checkliste fuer denselben Fall.
-// "Fahrzeugübernahme" (ENT-335) steht bewusst NEBEN "Rundgänge" und nicht
+// "Fahrzeugübernahme" (ENT-340) steht bewusst NEBEN "Rundgänge" und nicht
 // darin: Sie gehoert zum Antritt, nicht zur Runde. Vom Projektinhaber so
 // verlangt -- *"bevor ein Rundgang angeklickt wird, die Frage kommt, ob ein
 // Dienstfahrzeug im Einsatz ist"* --, weil der Waechter sonst losfaehrt und
@@ -1819,7 +1819,7 @@ function zeichneWaechter() {
     </div>`;
 }
 
-/* ══ FAHRZEUGÜBERNAHME (ENT-335) ═══════════════════════════════════════
+/* ══ FAHRZEUGÜBERNAHME (ENT-340) ═══════════════════════════════════════
    Der Weg, den der Projektinhaber beschrieben hat: *"Mitarbeiter steigt in
    Dienstfahrzeug scannt Code, fotografiert Tacho und/oder trägt KM ein,
    wählt Dienstfahrzeug aus, Schickt ab fertig."*
@@ -2127,7 +2127,7 @@ function fzuLaufenderEinsatz() {
 // generellen Revierdienst-Bezug geprueft (mein_rundgang_vorlagen_alle.php),
 // hier keine weitere Bedingung noetig.
 let rdSpontanVorlagen = [];
-// Der Riegel aus ENT-335 sitzt VOR dem Laden, nicht danach: Wer die Liste
+// Der Riegel aus ENT-340 sitzt VOR dem Laden, nicht danach: Wer die Liste
 // schon sieht, ist gedanklich unterwegs. Beide Wege in den Rundgang gehen
 // hier durch -- dieser und rundgangStarten() an der eigenen Schicht.
 function rundgangUebersichtOeffnen() {
@@ -3708,7 +3708,7 @@ function rundgangAbschnittZeichnen(e) {
 // keine echte Entscheidung.
 let rdVorlagenGeladen = [];
 
-// Zweiter Weg in den Rundgang -- derselbe Riegel (ENT-335). Ein Riegel, um
+// Zweiter Weg in den Rundgang -- derselbe Riegel (ENT-340). Ein Riegel, um
 // den ein Weg herumfuehrt, ist keiner.
 function rundgangStarten(einsatzId) {
   fzuTor(() => rundgangStartenNachFrage(einsatzId));

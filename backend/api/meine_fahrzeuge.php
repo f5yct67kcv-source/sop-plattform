@@ -1,5 +1,5 @@
 <?php
-// Fahrzeuge für die eigene Übernahme (ENT-335).
+// Fahrzeuge für die eigene Übernahme (ENT-340).
 //
 // GET ?kennung=…  -> das EINE Fahrzeug hinter dem gescannten Aufkleber
 // GET             -> die Liste der Fahrzeuge im Betrieb (Rückfallweg, wenn

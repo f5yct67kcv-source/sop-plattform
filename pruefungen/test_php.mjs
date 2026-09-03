@@ -470,7 +470,7 @@ const NUR_EIGENE_DATEN = [
   'mein_rundgang_uebersicht.php', // rein lesende Vorschau einer Kontrollrunde vor dem Start; dasselbe Gate wie mein_rundgang_vorlagen_alle.php -- nur wer ueberhaupt Revierdienst macht (ENT-294)
   'mein_ereignis_melden.php',    // meldet Vorfaelle als die eigene Person, mit demselben Revierdienst-Gate (ENT-295)
   'ereignisart_liste.php',       // reiner Stammdaten-Katalog fuer die Auswahl beim Melden, keine personenbezogenen Daten (ENT-295)
-  // Fahrzeugübernahme (ENT-335). Beide Endpunkte arbeiten ausschliesslich
+  // Fahrzeugübernahme (ENT-340). Beide Endpunkte arbeiten ausschliesslich
   // mit der eigenen Person: Die mitarbeiter_id stammt aus der Sitzung, nie
   // aus der Anfrage. Ein Recht waere hier falsch -- JEDE eingeteilte Person
   // nimmt Fahrzeuge, nicht nur die Verwaltung. Herausgegeben wird nur, was

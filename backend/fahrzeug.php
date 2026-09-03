@@ -1,5 +1,5 @@
 <?php
-// Gemeinsame Logik der Fahrzeugübernahme (ENT-335).
+// Gemeinsame Logik der Fahrzeugübernahme (ENT-340).
 //
 // Liegt hier und nicht in den beiden Endpunkten, weil sich die Frage
 // "worauf setzt dieser Kilometerstand auf?" nur EINMAL beantworten lässt.
@@ -110,7 +110,7 @@ function fz_kennung_neu(): string
 }
 
 // Versieht Fahrzeuge ohne Aufkleber-Schlüssel mit einem. Läuft beim
-// Einrichten und beim Anlegen -- Fahrzeuge aus der Zeit vor ENT-335 hätten
+// Einrichten und beim Anlegen -- Fahrzeuge aus der Zeit vor ENT-340 hätten
 // sonst nie einen und blieben stumm, ohne dass es jemandem auffiele.
 // Gibt die Zahl der vergebenen Schlüssel zurück.
 function fz_kennungen_nachtragen(PDO $pdo): int

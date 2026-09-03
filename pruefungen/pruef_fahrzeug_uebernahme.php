@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-// Echte Ausfuehrung der Uebernahme-Logik (ENT-335) gegen eine wirkliche
+// Echte Ausfuehrung der Uebernahme-Logik (ENT-340) gegen eine wirkliche
 // Datenbank (SQLite im Arbeitsspeicher) -- gleiches Muster wie
 // pruef_dienstfahrzeug.php.
 //

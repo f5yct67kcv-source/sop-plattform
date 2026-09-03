@@ -24,7 +24,7 @@ require_once __DIR__ . '/../rechte.php';
 // seit ENT-077; es war allgemein gebaut, aber nur an der Personalakte
 // angeschlossen -- hier kommt der zweite Bereich dazu.
 require_once __DIR__ . '/../logbuch.php';
-// Aufkleber-Schluessel (ENT-335) -- dieselbe Erzeugung wie beim Einrichten,
+// Aufkleber-Schluessel (ENT-340) -- dieselbe Erzeugung wie beim Einrichten,
 // nicht eine zweite daneben.
 require_once __DIR__ . '/../fahrzeug.php';
 
@@ -56,7 +56,7 @@ function fz_datum(?string $wert): ?string
 }
 
 // Der Aufkleber-Schlüssel geht NUR an die Verwaltung, nie an alle, die
-// planen dürfen (ENT-335). Er ist das einzige, was eine Übernahme daran
+// planen dürfen (ENT-340). Er ist das einzige, was eine Übernahme daran
 // bindet, dass jemand vor dem Fahrzeug stand: Wer ihn kennt, kann eine
 // Übernahme buchen, ohne je im Auto gesessen zu haben. Gebraucht wird er
 // genau einmal -- zum Drucken des Aufklebers.
@@ -286,7 +286,7 @@ if ($id > 0) {
     // frisch angelegtes Fahrzeug hat keine Vorgeschichte, gegen die sich
     // etwas vergleichen liesse.
     logbuch_schreiben($pdo, $user, 'fahrzeug', $id, 'angelegt', null, $kennzeichen);
-    // Aufkleber-Schluessel gleich mitgeben (ENT-335), damit kein Fahrzeug
+    // Aufkleber-Schluessel gleich mitgeben (ENT-340), damit kein Fahrzeug
     // ohne dasteht. Bewusst NICHT ins Logbuch: Der Schluessel ist das
     // Geheimnis, das den Aufkleber traegt -- er gehoert nicht in einen
     // Verlauf, den mehr Leute lesen duerfen als ihn kennen sollen.

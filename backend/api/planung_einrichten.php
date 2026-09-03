@@ -1201,7 +1201,7 @@ CREATE TABLE IF NOT EXISTS fahrzeuge (
   FOREIGN KEY (standort_id) REFERENCES anstellungsorte(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
-// Fahrzeugübernahme (ENT-335). Die Kette, auf der die Kilometerkontrolle
+// Fahrzeugübernahme (ENT-340). Die Kette, auf der die Kilometerkontrolle
 // aus ENT-313 beruht: Wer nimmt wann welches Fahrzeug mit welchem
 // Tachostand.
 //
@@ -1635,7 +1635,7 @@ $spalten = [
     // auslagen.php).
     ['einsaetze', 'fahrzeug_id', 'ALTER TABLE einsaetze ADD COLUMN fahrzeug_id INT NULL AFTER weg_adresse'],
     ['einsaetze', 'fahrer_id',   'ALTER TABLE einsaetze ADD COLUMN fahrer_id INT NULL AFTER fahrzeug_id'],
-    // Kennung auf dem Aufkleber im Fahrzeug (ENT-335). Undurchsichtig und
+    // Kennung auf dem Aufkleber im Fahrzeug (ENT-340). Undurchsichtig und
     // zufaellig -- stuende dort die Fahrzeugnummer im Klartext, liesse sich
     // die des Nachbarfahrzeugs erraten. Wird beim ersten Bedarf erzeugt,
     // nicht auf Vorrat: Ein Fahrzeug ohne Aufkleber braucht keine.
@@ -1821,9 +1821,9 @@ foreach ($spalten as [$tabelle, $spalte, $sql]) {
     schritt($pdo, $sql, "Spalte $tabelle.$spalte", $getan, $fehler);
 }
 
-// ── 2a0. Aufkleber-Schluessel nachtragen (ENT-335). Jedes Fahrzeug braucht
+// ── 2a0. Aufkleber-Schluessel nachtragen (ENT-340). Jedes Fahrzeug braucht
 // einen, sonst laesst es sich nicht scannen -- und Fahrzeuge aus der Zeit
-// vor ENT-335 haetten nie einen bekommen.
+// vor ENT-340 haetten nie einen bekommen.
 //
 // Wiederholbar und ungefaehrlich: Vergeben wird nur, wo NICHTS steht. Ein
 // bestehender Schluessel wird nie ueberschrieben; das wuerde jeden schon
