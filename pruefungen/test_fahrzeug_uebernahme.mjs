@@ -20,6 +20,10 @@
 //      drei verschiedene Aussagen mit drei verschiedenen Texten.
 //   5. "Zurück" im Formular führt zur Frage zurück, nicht an ihr vorbei.
 //   6. Die Kennung des Aufklebers verlässt die Adresszeile sofort.
+//   7. Eine mögliche Doppelbuchung (ENT-354) warnt, statt zu sperren -- und
+//      NUR bei Auswahl aus der Liste, nicht beim gescannten Aufkleber.
+//   8. Das eigene aktive Fahrzeug (ENT-354) steht in der eigenen Maske,
+//      "Abgeben" löst nichts in der Kilometerkette aus.
 import { WURZEL, HIER, browserPfad } from './pfade.mjs';
 import { chromium } from 'playwright';
 import { execFileSync } from 'child_process';
@@ -27,6 +31,13 @@ import { readFileSync } from 'fs';
 
 const ok = [], bad = [];
 const check = (n, c) => (c ? ok : bad).push(n);
+
+// Minimales, aber echtes 1x1-PNG -- damit der Browser es tatsaechlich als
+// Bild dekodieren kann (gleiche Fixtur wie test_ersatzscan.mjs).
+const PNG_1X1 = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+  'base64'
+);
 
 // ══════════════════════════════════════════════════════════════════════════
 // TEIL 1 — Die Regeln laufen wirklich (PHP, SQLite im Arbeitsspeicher)
@@ -166,13 +177,8 @@ async function appStarten(url) {
 }
 
 const blattText = async page => (await page.textContent('#blBody')).replace(/\s+/g, ' ');
-// Knopfbeschriftungen der Wegwahl/Anleitung stehen in der Fussleiste, nicht
-// im Rumpf -- eine eigene Auslesefunktion, damit die Pruefungen die
-// richtige Stelle lesen statt zufaellig im Rumpf danach zu suchen.
-const blattFussText = async page => (await page.textContent('#blFuss')).replace(/\s+/g, ' ');
 const blattOffen = page => page.evaluate(() => document.getElementById('blatt').classList.contains('on'));
 const frageDa = async page => /Nimmst du/.test(await blattText(page));
-const wegwahlDa = async page => /Aufkleber scannen/.test(await blattFussText(page));
 
 // Bleibt die Frage aus, sind die daran haengenden Pruefungen gegenstandslos.
 // Sie duerfen dann NICHT an einem fehlenden Knopf abstuerzen: Ein Absturz
@@ -196,81 +202,86 @@ check('KRITISCH: vor dem Rundgang kommt zuerst die Frage nach dem Dienstfahrzeug
 check('KRITISCH: die Rundgangliste wird noch gar nicht geholt, solange die Frage offen ist',
   !gerufen.some(p => p.includes('mein_rundgang_vorlagen_alle')));
 
-// ── "Ja" fuehrt zur Wegwahl (Aufkleber/manuell), nicht direkt ins Formular ──
-// Vom Projektinhaber verlangt, nachdem er die Kachel getestet hatte: Sie
-// sprang direkt zur manuellen Liste, ohne je auf den Aufkleber hinzuweisen.
+// ── "Ja" fuehrt direkt ins Formular, mit einem Hinweis auf den Aufkleber ──
+// Bis ENT-346 stand hier eine eigene Wegwahl-Zwischenmaske; in ENT-347
+// wieder entfernt (Begruendung siehe fzuAnleitung() in app.html): Sie sah
+// nur, wer die App OHNE Scan oeffnete -- fuer die war "moechtest du
+// stattdessen scannen?" bei jedem Mal ein zusaetzlicher Tipp fuer eine
+// Entscheidung, die durch das blosse Oeffnen ohne Kamera schon gefallen war.
 if (!await frageDa(page)) {
   entfaellt('die Frage kam gar nicht erst', [
-    'KRITISCH: "Ja" fuehrt zur Wegwahl, nicht direkt ins Formular',
-    'KRITISCH: "Aufkleber scannen" zeigt eine Anleitung, keinen eigenen Scanner im Browser',
-    'Von der Anleitung "Zurueck" fuehrt zur Wegwahl zurueck',
-    'Das Formular (ueber "Kein Aufkleber verfuegbar") nennt den zuletzt bekannten Stand',
-    'KRITISCH: "Zurueck" im Formular fuehrt zur Wegwahl zurueck, nicht in den Rundgang',
-    'KRITISCH: Von der Wegwahl "Zurueck" fuehrt zur Frage zurueck, nicht in den Rundgang',
+    'KRITISCH: "Ja" fuehrt direkt ins Formular, kein Zwischenschritt mehr',
+    'Nach der Fahrzeugwahl nennt das Formular den zuletzt bekannten Stand',
+    'Das Formular zeigt einen Hinweis auf den Aufkleber, mit Link zur Anleitung',
+    'KRITISCH: der Anleitungs-Link zeigt eine Anleitung, keinen eigenen Scanner im Browser',
+    'Von der Anleitung "Zurueck" fuehrt zum Formular zurueck',
+    'KRITISCH: "Zurueck" im Formular fuehrt zur Frage zurueck, nicht in den Rundgang',
     'KRITISCH: "kein Dienstfahrzeug" wird als Antwort GESPEICHERT, nicht nur durchgelassen',
     'KRITISCH: danach geht es in den Rundgang weiter',
     'KRITISCH: nach der Antwort kommt die Frage nicht erneut']);
 } else {
 await page.locator('#blFuss button.btn-primary').click();
 await page.waitForTimeout(200);
-check('KRITISCH: "Ja" fuehrt zur Wegwahl, nicht direkt ins Formular',
-  /Aufkleber scannen/.test(await blattFussText(page)) && /Kein Aufkleber verfügbar/.test(await blattFussText(page))
-  && await page.locator('#fzuWahl').count() === 0);
+text = await blattText(page);
+check('KRITISCH: "Ja" fuehrt direkt ins Formular, kein Zwischenschritt mehr',
+  await page.locator('#fzuWahl').count() === 1);
+const hinweisDa = /Aufkleber/.test(text) && await page.locator('#blBody button', { hasText: 'geht das' }).count() === 1;
+check('Das Formular zeigt einen Hinweis auf den Aufkleber, mit Link zur Anleitung', hinweisDa);
+// CLAUDE.md: Bedienelemente auf dem Handy mindestens 44 px hoch. Ein Wort
+// am Satzende (der urspruengliche Entwurf, ein <a> im Fliesstext) mass hier
+// beim Messen nur rund 33 px -- der ganze Hinweis ist darum ein einziger,
+// voll antippbarer Knopf.
+if (hinweisDa) {
+  check('KRITISCH: der Hinweis-Knopf ist auf dem Handy mindestens 44 px hoch',
+    await page.evaluate(() => document.querySelector('#blBody button').getBoundingClientRect().height) >= 44);
+}
 
-// Faellt die Wegwahl aus (siehe Gegenprobe), duerfen die folgenden Klicks
-// nicht auf nie erschienene Knoepfe warten und den Lauf abbrechen -- sie
-// sollen SAGEN, was fehlt.
-if (!await wegwahlDa(page)) {
-  entfaellt('die Wegwahl kam gar nicht erst', [
-    'KRITISCH: "Aufkleber scannen" zeigt eine Anleitung, keinen eigenen Scanner im Browser',
-    'Von der Anleitung "Zurueck" fuehrt zur Wegwahl zurueck',
-    'Das Formular (ueber "Kein Aufkleber verfuegbar") nennt den zuletzt bekannten Stand',
-    'KRITISCH: "Zurueck" im Formular fuehrt zur Wegwahl zurueck, nicht in den Rundgang',
-    'KRITISCH: Von der Wegwahl "Zurueck" fuehrt zur Frage zurueck, nicht in den Rundgang']);
+// Der zuletzt bekannte Stand steht erst NACH der Fahrzeugwahl da (er hängt
+// am gewählten Fahrzeug) -- eine leere Auswahl hat keinen Stand zu nennen.
+await page.selectOption('#fzuWahl', '1');
+await page.waitForTimeout(150);
+check('Nach der Fahrzeugwahl nennt das Formular den zuletzt bekannten Stand',
+  /61.?000/.test(await blattText(page)));
+
+// Fehlt der Link, waere ein Klick darauf mehrdeutig und liesse den Lauf
+// abstuerzen statt rot zu werden -- die folgenden Pruefungen haengen alle
+// an diesem einen Klick.
+if (!hinweisDa) {
+  entfaellt('der Anleitungs-Link fehlte bereits', [
+    'KRITISCH: der Anleitungs-Link zeigt eine Anleitung, keinen eigenen Scanner im Browser',
+    'Von der Anleitung "Zurueck" fuehrt zum Formular zurueck',
+    'KRITISCH: "Zurueck" im Formular fuehrt zur Frage zurueck, nicht in den Rundgang']);
 } else {
-// ── "Aufkleber scannen" ist eine Anleitung, kein In-App-Scanner ────────
+// ── Der Anleitungs-Link ist eine Anleitung, kein In-App-Scanner ────────
 // Eine Webseite kann die native Kamera-App nicht im Scan-Modus starten --
 // das kann nur der Mensch selbst. Ein <video>-Element waere das Zeichen
 // einer eigenen Kamera-Vorschau im Browser; die soll es nicht geben.
-await page.locator('#blFuss button.btn-primary').click();
+await page.locator('#blBody button', { hasText: 'geht das' }).click();
 await page.waitForTimeout(200);
 text = await blattText(page);
-check('KRITISCH: "Aufkleber scannen" zeigt eine Anleitung, keinen eigenen Scanner im Browser',
+check('KRITISCH: der Anleitungs-Link zeigt eine Anleitung, keinen eigenen Scanner im Browser',
   /Kamera-App/.test(text) && await page.locator('video').count() === 0
   && await page.locator('input[type=file]').count() === 0);
 
-// Zeigt die Anleitung nicht die erwartete Seite, ist auch die Fussleiste
-// nicht die der Anleitung (dort steht genau ein Knopf) -- ein blinder Klick
-// waere mehrdeutig und liesse den Lauf abstuerzen statt rot zu werden.
+// Zeigt die Anleitung nicht die erwartete Seite, ist die anschliessende
+// Ruecknavigation ebenfalls gegenstandslos -- statt blind weiterzuklicken
+// und den Lauf abstuerzen zu lassen, wird das benannt.
 if (!/Kamera-App/.test(text)) {
   entfaellt('die Anleitung kam gar nicht erst', [
-    'Von der Anleitung "Zurueck" fuehrt zur Wegwahl zurueck',
-    'Das Formular (ueber "Kein Aufkleber verfuegbar") nennt den zuletzt bekannten Stand',
-    'KRITISCH: "Zurueck" im Formular fuehrt zur Wegwahl zurueck, nicht in den Rundgang',
-    'KRITISCH: Von der Wegwahl "Zurueck" fuehrt zur Frage zurueck, nicht in den Rundgang']);
+    'Von der Anleitung "Zurueck" fuehrt zum Formular zurueck',
+    'KRITISCH: "Zurueck" im Formular fuehrt zur Frage zurueck, nicht in den Rundgang']);
 } else {
 await page.locator('#blFuss button').click();
 await page.waitForTimeout(200);
-check('Von der Anleitung "Zurueck" fuehrt zur Wegwahl zurueck',
-  /Aufkleber scannen/.test(await blattFussText(page)));
-
-// ── "Kein Aufkleber verfügbar" fuehrt zum bestehenden Formular ─────────
-await page.locator('#blFuss button', { hasText: 'Kein Aufkleber' }).click();
-await page.waitForTimeout(200);
-check('Das Formular (ueber "Kein Aufkleber verfuegbar") nennt den zuletzt bekannten Stand',
-  /61.?000/.test(await blattText(page)) || await page.locator('#fzuWahl').count() === 1);
+check('Von der Anleitung "Zurueck" fuehrt zum Formular zurueck',
+  await page.locator('#fzuWahl').count() === 1);
 
 await page.evaluate(() => fzuZurueck());
 await page.waitForTimeout(200);
-check('KRITISCH: "Zurueck" im Formular fuehrt zur Wegwahl zurueck, nicht in den Rundgang',
-  /Aufkleber scannen/.test(await blattFussText(page))
-  && !gerufen.some(p => p.includes('mein_rundgang_vorlagen_alle')));
-
-await page.evaluate(() => fzuWegWahlZurueck());
-await page.waitForTimeout(200);
-check('KRITISCH: Von der Wegwahl "Zurueck" fuehrt zur Frage zurueck, nicht in den Rundgang',
+check('KRITISCH: "Zurueck" im Formular fuehrt zur Frage zurueck, nicht in den Rundgang',
   /Nimmst du/.test(await blattText(page))
   && !gerufen.some(p => p.includes('mein_rundgang_vorlagen_alle')));
+}
 }
 }
 
@@ -299,7 +310,6 @@ check('KRITISCH: nach der Antwort kommt die Frage nicht erneut',
   !/Nimmst du/.test(await blattText(page))
   && gerufen.some(p => p.includes('mein_rundgang_vorlagen_alle')));
 }
-}
 await page.close();
 
 // ══ 4. Der Riegel sitzt AUCH vor dem zweiten Weg (eigene Schicht) ═══════
@@ -321,33 +331,46 @@ if (!await frageDa(page)) {
     'KRITISCH: nach der Uebernahme geht es in den Rundgang weiter',
     'KRITISCH: ohne Kilometerstand wird nichts gesendet -- die Kette braucht die Zahl']);
 } else {
-// Die Navigation Frage -> Wegwahl -> Formular ist bereits in Abschnitt 1
-// geprueft; hier zaehlt nur noch das Senden selbst -- direkter Einstieg
-// ins Formular, wie schon beim ersten Test dieses Abschnitts.
+// Die Navigation Frage -> Formular ist bereits in Abschnitt 1 geprueft;
+// hier zaehlt nur noch das Senden selbst -- direkter Einstieg ins Formular,
+// wie schon beim ersten Test dieses Abschnitts.
 gesendet = [];
 await page.evaluate(() => fzuFormular());
 await page.waitForTimeout(250);
 await page.selectOption('#fzuWahl', '1');
 await page.fill('#fzuKm', '61200');
+
+// ── Foto ist seit ENT-352 Pflicht, nicht mehr freiwillig ────────────────
+// Bewusst VOR der Fotoauswahl gesendet, sonst wuerde dieser Schritt nicht
+// zeigen, ob wirklich das fehlende Foto blockiert (gleiches Muster wie
+// test_ersatzscan.mjs).
+await page.click('#fzuBtn');
+await page.waitForTimeout(300);
+check('KRITISCH: ohne Foto wird nichts gesendet -- der Kilometerstand allein reicht seit ENT-352 nicht mehr',
+  gesendet.length === 0 && await page.locator('#fzuErr').isVisible());
+
+await page.setInputFiles('#fzuFotoInput', { name: 'tacho.png', mimeType: 'image/png', buffer: PNG_1X1 });
+await page.waitForTimeout(300);
+
 await page.click('#fzuBtn');
 await page.waitForTimeout(500);
 check('KRITISCH: die Uebernahme sendet Fahrzeug und Kilometerstand',
   gesendet.length === 1 && gesendet[0].art === 'uebernahme'
   && gesendet[0].fahrzeug_id === 1 && gesendet[0].tacho_km === 61200);
+check('KRITISCH: das Pflicht-Foto wird als Base64 mitgesendet',
+  typeof gesendet[0].foto === 'string' && gesendet[0].foto.length > 0);
 check('Die laufende Schicht wird mitgegeben, damit sich die Fahrt zuordnen laesst',
   gesendet[0].einsatz_id === 61);
 check('KRITISCH: nach der Uebernahme geht es in den Rundgang weiter',
   gerufen.some(p => p.startsWith('mein_rundgang_vorlagen.php')));
 
 // ── Ohne Kilometerstand wird nichts gesendet ───────────────────────────
-// Diesmal ueber die echten Knoepfe (Kachel -> Wegwahl -> "Kein Aufkleber
-// verfuegbar"), damit auch dieser Weg zum Formular mindestens einmal echt
-// angeklickt und nicht nur direkt aufgerufen wird.
+// Diesmal ueber die Kachel selbst (fzuOeffnen), damit dieser Einstieg zum
+// Formular mindestens einmal echt durchlaufen wird, nicht nur direkt
+// aufgerufen.
 gesendet = [];
 await page.evaluate(() => { fzuHeuteBeantwortet = false; fzuOeffnen(); });
 await page.waitForTimeout(300);
-await page.locator('#blFuss button', { hasText: 'Kein Aufkleber' }).click();
-await page.waitForTimeout(200);
 await page.selectOption('#fzuWahl', '2');
 await page.click('#fzuBtn');
 await page.waitForTimeout(300);
@@ -429,11 +452,169 @@ check('Beim gescannten Fahrzeug gibt es keine Auswahlliste -- man steht davor',
 
 gesendet = [];
 await page.fill('#fzuKm', '61500');
+await page.setInputFiles('#fzuFotoInput', { name: 'tacho.png', mimeType: 'image/png', buffer: PNG_1X1 });
+await page.waitForTimeout(300);
 await page.click('#fzuBtn');
 await page.waitForTimeout(400);
 check('KRITISCH: die Uebernahme ueber den Aufkleber sendet die Kennung, nicht die Fahrzeug-ID',
   gesendet.length === 1 && gesendet[0].kennung === 'abc123' && gesendet[0].fahrzeug_id === undefined);
 await page.close();
+
+// ══ 7. Doppelbuchungs-Warnung statt Sperre (ENT-354) ═══════════════════
+// ENT-340 verwarf eine echte Rueckgabe-Pflicht ausdruecklich ("eine
+// vergessene Rueckgabe reisst genau die Luecke, die die Kette schliessen
+// soll"). Der Projektinhaber entschied sich darum fuer eine WARNUNG, keine
+// Sperre: siehe AskUserQuestion-Antwort in ENT-354. Getestet wird darum
+// nicht nur "die Warnung erscheint", sondern auch "sie laesst sich mit
+// einem zweiten Tipp bestaetigen", und "sie erscheint NICHT beim Scan".
+const FZ_WARNUNG = [
+  { id: 1, kennzeichen: 'SO 999001', bezeichnung: 'Patrouille 1',
+    letzter_stand: { quelle: 'uebernahme', tacho_km: 61000, zeitpunkt: VORTAGE + ' 06:12:00',
+                     datum: VORTAGE, person: 'Andere Person', eigene: false } },
+  { id: 2, kennzeichen: 'SO 999002', bezeichnung: 'Patrouille 2',
+    letzter_stand: { quelle: 'uebernahme', tacho_km: 40000, zeitpunkt: VORTAGE + ' 07:00:00',
+                     datum: VORTAGE, person: 'Amelie Muster', eigene: true } },
+];
+fahrzeugAntwort = { status: 'ok', eingerichtet: true, fahrzeuge: FZ_WARNUNG,
+                    heute_beantwortet: true, mein_aktives_fahrzeug: null };
+page = await appStarten();
+await page.evaluate(() => fzuOeffnen());
+await page.waitForTimeout(300);
+
+check('KRITISCH: bei Auswahl eines fremd zuletzt uebernommenen Fahrzeugs erscheint eine Warnung mit Person und Zeitpunkt',
+  await (async () => {
+    await page.selectOption('#fzuWahl', '1');
+    await page.waitForTimeout(150);
+    const t = await page.textContent('#fzuStand');
+    return /Andere Person/.test(t) && /Trotzdem/.test(t);
+  })());
+
+gesendet = [];
+await page.fill('#fzuKm', '61200');
+await page.setInputFiles('#fzuFotoInput', { name: 'tacho.png', mimeType: 'image/png', buffer: PNG_1X1 });
+await page.waitForTimeout(300);
+await page.click('#fzuBtn');
+await page.waitForTimeout(300);
+check('KRITISCH: der erste Tipp sendet noch nichts, sondern verlangt eine Bestaetigung',
+  gesendet.length === 0 && /Trotzdem/.test(await page.textContent('#fzuBtn')));
+
+await page.click('#fzuBtn');
+await page.waitForTimeout(300);
+check('KRITISCH: der zweite Tipp (Bestaetigung) sendet die Uebernahme',
+  gesendet.length === 1 && gesendet[0].fahrzeug_id === 1);
+
+// Eine neue Auswahl braucht eine neue Bestaetigung -- sonst bliebe eine
+// einmal erteilte Bestaetigung an einer spaeteren, anderen Auswahl haengen.
+await page.evaluate(() => { fzuHeuteBeantwortet = true; fzuOeffnen(); });
+await page.waitForTimeout(300);
+await page.selectOption('#fzuWahl', '2');
+await page.waitForTimeout(150);
+check('Bei einem eigenen zuletzt uebernommenen Fahrzeug erscheint KEINE Warnung',
+  !/Trotzdem/.test(await page.textContent('#fzuStand')));
+gesendet = [];
+await page.fill('#fzuKm', '40200');
+await page.setInputFiles('#fzuFotoInput', { name: 'tacho.png', mimeType: 'image/png', buffer: PNG_1X1 });
+await page.waitForTimeout(300);
+await page.click('#fzuBtn');
+await page.waitForTimeout(300);
+check('KRITISCH: ohne Fremd-Warnung sendet bereits der erste Tipp',
+  gesendet.length === 1 && gesendet[0].fahrzeug_id === 2);
+
+// Der erfolgreiche Versand oben hat die Maske geschlossen (fzuWeiter) --
+// fuer die naechste Auswahl wird sie frisch wieder geoeffnet, nicht auf der
+// bereits abgeschlossenen Instanz weitergemacht.
+await page.evaluate(() => fzuOeffnen());
+await page.waitForTimeout(300);
+await page.selectOption('#fzuWahl', '1');
+await page.waitForTimeout(150);
+gesendet = [];
+await page.fill('#fzuKm', '61200');
+await page.setInputFiles('#fzuFotoInput', { name: 'tacho.png', mimeType: 'image/png', buffer: PNG_1X1 });
+await page.waitForTimeout(300);
+await page.click('#fzuBtn');
+await page.waitForTimeout(300);
+check('KRITISCH: nach einem Wechsel der Auswahl verlangt dasselbe fremde Fahrzeug erneut eine Bestaetigung',
+  gesendet.length === 0 && /Trotzdem/.test(await page.textContent('#fzuBtn')));
+await page.close();
+
+// ── Beim gescannten Aufkleber erscheint dieselbe Warnung NICHT ──────────
+// Eine normale Schichtuebergabe scannt routinemaessig ein Fahrzeug, das
+// zuletzt eine andere Person hatte -- das ist der Normalfall, keine
+// Doppelbuchung. Waere die Warnung hier auch da, warnte sie bei JEDER
+// Uebergabe und waere keine Warnung mehr.
+fahrzeugAntwort = { status: 'ok', eingerichtet: true,
+  fahrzeug: { id: 1, kennzeichen: 'SO 999001', bezeichnung: 'Patrouille 1', status: 'aktiv',
+              letzter_stand: { quelle: 'uebernahme', tacho_km: 61000, zeitpunkt: VORTAGE + ' 06:12:00',
+                               datum: VORTAGE, person: 'Andere Person', eigene: false } } };
+page = await appStarten('app.html?fz=abc123');
+await page.waitForTimeout(700);
+check('KRITISCH: beim gescannten Aufkleber erscheint KEINE Fremd-Warnung, obwohl "eigene" false ist',
+  !/Trotzdem/.test(await page.textContent('#fzuStand')));
+gesendet = [];
+await page.fill('#fzuKm', '61500');
+await page.setInputFiles('#fzuFotoInput', { name: 'tacho.png', mimeType: 'image/png', buffer: PNG_1X1 });
+await page.waitForTimeout(300);
+await page.click('#fzuBtn');
+await page.waitForTimeout(300);
+check('KRITISCH: beim Scan sendet bereits der erste Tipp, ohne Bestaetigungsschritt',
+  gesendet.length === 1 && gesendet[0].kennung === 'abc123');
+await page.close();
+fahrzeugAntwort = { status: 'ok', eingerichtet: true, fahrzeuge: FAHRZEUGE, heute_beantwortet: false };
+
+// ══ 8. "Aktuell bei dir" und Abgeben (ENT-354) ══════════════════════════
+// Rein informativ -- Abgeben loest nichts in der Kilometerkette aus, siehe
+// meine_fahrzeug_uebernahme.php. Absichtlich NICHT ueber den Riegel
+// (fzuTor/die Ja-Nein-Frage) getestet, sondern nur ueber die Kachel
+// (fzuOeffnen): Genau dort ist die Anzeige verdrahtet, siehe app.html.
+const MEIN_AKTIV = { id: 3, kennzeichen: 'SO 999003', bezeichnung: 'Patrouille 3',
+  seit: VORTAGE + ' 06:00:00' };
+fahrzeugAntwort = { status: 'ok', eingerichtet: true, fahrzeuge: FAHRZEUGE,
+                    heute_beantwortet: false, mein_aktives_fahrzeug: MEIN_AKTIV };
+page = await appStarten();
+await page.evaluate(() => zeige('waechter'));
+await page.waitForTimeout(150);
+await page.click('#mk-fahrzeug');
+await page.waitForTimeout(300);
+text = await blattText(page);
+check('KRITISCH: die Kachel zeigt zuerst das eigene aktive Fahrzeug, nicht sofort das Formular',
+  /SO 999003/.test(text) && await page.locator('#fzuWahl').count() === 0);
+check('Zwei Wege stehen zur Wahl: weiteres Fahrzeug erfassen, oder abgeben',
+  await page.locator('#fzuAbgebenBtn').count() === 1
+  && await page.locator('#blFuss button', { hasText: 'Weiteres Fahrzeug' }).count() === 1);
+
+check('KRITISCH: der Riegel vor dem Rundgang (Ja/Nein-Frage) zeigt weiterhin die Frage, nicht die aktive Anzeige',
+  await (async () => {
+    await page.evaluate(() => { blattZu(); zeige('waechter'); });
+    await page.waitForTimeout(150);
+    await page.click('#mk-rundgang');
+    await page.waitForTimeout(400);
+    return /Nimmst du/.test(await blattText(page));
+  })());
+
+await page.evaluate(() => { blattZu(); zeige('waechter'); });
+await page.waitForTimeout(150);
+await page.click('#mk-fahrzeug');
+await page.waitForTimeout(300);
+await page.locator('#blFuss button', { hasText: 'Weiteres Fahrzeug' }).click();
+await page.waitForTimeout(200);
+check('"Weiteres Fahrzeug erfassen" fuehrt zum normalen Formular',
+  await page.locator('#fzuWahl').count() === 1);
+await page.close();
+
+page = await appStarten();
+await page.evaluate(() => zeige('waechter'));
+await page.waitForTimeout(150);
+await page.click('#mk-fahrzeug');
+await page.waitForTimeout(300);
+gesendet = [];
+await page.click('#fzuAbgebenBtn');
+await page.waitForTimeout(300);
+check('KRITISCH: "Fahrzeug abgeben" sendet art=abgabe mit der richtigen Fahrzeug-ID',
+  gesendet.length === 1 && gesendet[0].art === 'abgabe' && gesendet[0].fahrzeug_id === 3);
+check('Nach der Abgabe schliesst die Maske, mit einer eigenen Meldung',
+  !(await blattOffen(page)) && /Abgabe erfasst/.test(await page.textContent('#toast')));
+await page.close();
+fahrzeugAntwort = { status: 'ok', eingerichtet: true, fahrzeuge: FAHRZEUGE, heute_beantwortet: false };
 
 // ══════════════════════════════════════════════════════════════════════════
 // TEIL 4 — Der Aufkleber im Cockpit
