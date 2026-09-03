@@ -450,8 +450,19 @@ svg.i-sm { width: 17px; height: 17px; }
   color-scheme: dark;
 }
 .rgs.on { display: flex; }
-.rgs-kopf { display: flex; align-items: center; gap: 6px; padding: 10px 14px 12px; border-bottom: 1px solid var(--line-soft); flex: none; background: var(--surface); }
+.rgs-kopf { display: flex; align-items: center; gap: 6px; padding: 10px 14px 12px; flex: none; background: var(--surface); }
 .rgs-kopf h2 { font-size: 17px; font-weight: 680; letter-spacing: -.3px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Der Rahmen sass am Kopf. Steht die Zahlenzeile darunter, gehoert er ans
+   ENDE des Blocks -- sonst liefe eine Linie mitten hindurch. */
+.rgs-kopf:has(+ .rgs-kopf-zahlen[hidden]) { border-bottom: 1px solid var(--line-soft); }
+/* Waehrend der Runde tritt der Firmenname zurueck (ENT-355): kleiner,
+   gedaempft, nicht mehr fett. Er bleibt lesbar -- auf dem Handy ist die
+   Kopfzeile der einzige Ort, der sagt, wo man ist (CLAUDE.md) --, aber er
+   nimmt den beiden Zahlen nicht mehr den Platz weg.
+   Ueber :has statt ueber eine Klasse: Die Zahlenzeile wird an sechs Stellen
+   ein- und ausgeblendet; eine Klasse muesste an allen sechs mitgepflegt
+   werden und waere irgendwann an einer davon vergessen. */
+.rgs-kopf:has(+ .rgs-kopf-zahlen:not([hidden])) h2 { font-size: 13.5px; font-weight: 600; color: var(--ink-3); letter-spacing: 0; }
 /* 44px Trefferflaeche (CLAUDE.md), der negative Rand haelt das Symbol
    trotzdem buendig an der Kante -- sonst steht der Titel eingerueckt. */
 .rgs-zurueck { min-height: 44px; min-width: 44px; padding: 0; margin-left: -10px; display: flex; align-items: center; justify-content: center; background: none; border: 0; color: var(--ink); cursor: pointer; }
@@ -547,6 +558,17 @@ svg.i-sm { width: 17px; height: 17px; }
 .rgs-modul-ic { flex: none; width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid var(--accent); color: var(--accent); display: flex; align-items: center; justify-content: center; }
 .rgs-modul-zahl { margin-left: auto; min-width: 26px; height: 26px; padding: 0 8px; border-radius: 13px; background: var(--accent); color: #0F1117; font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
 .rgs-modul-zahl.leer { background: var(--neg-soft); color: var(--neg); }
+/* Zustandswort rechts am Schalter (ENT-355). Ein Umschalter, der immer
+   gleich aussieht, sagt nichts (dieselbe Ueberlegung wie bei Nachtsicht):
+   eingeschaltet in der Akzentfarbe, ausgeschaltet neutral -- und zusaetzlich
+   mit WORT, nicht nur mit Farbe. */
+.rgs-modul-zust { margin-left: auto; flex: none; padding: 4px 11px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--surface-2); color: var(--ink-3);
+  font-size: 12.5px; font-weight: 700; letter-spacing: .3px; }
+.rgs-modul-zust.an { border-color: var(--accent-line); background: var(--accent-soft); color: var(--accent); }
+/* Der erklaerende Satz unter dem Schalter: Wer eine Einstellung trifft, die
+   Akku kostet, soll das vorher wissen und nicht hinterher merken. */
+.rgs-modul-txt { font-size: 12.5px; line-height: 1.5; color: var(--ink-3); padding: 0 4px; margin-top: -4px; }
 /* Aufgaben je Kontrollpunkt (ENT-304). Punkt als Kopf, Aufgaben darunter --
    dieselbe Ordnung wie die Runde selbst. Ein Punkt OHNE Aufgabe bleibt
    sichtbar, aber gedaempft: Er sagt "hier ist nichts zu tun", nicht "hier
@@ -616,14 +638,48 @@ svg.i-sm { width: 17px; height: 17px; }
    damit auf der Karte EIN Knopfmuster gilt -- nur die Farbe sagt, ob er an
    ist: eingeschaltet in der Akzentfarbe wie „Zentrieren", ausgeschaltet
    neutral. Ein Umschalter, der immer gleich aussieht, sagt nichts. */
-.rgs-karte-btn2 { position: absolute; right: 12px; bottom: 12px; min-height: 44px;
+.rgs-karte-btn2 { position: absolute; right: 12px; bottom: 28px; min-height: 44px;
   display: inline-flex; align-items: center; gap: 8px; padding: 0 14px;
   border: 1px solid var(--line); border-radius: var(--r-sm);
   background: var(--surface); color: var(--ink-2); font: inherit; font-size: 14px;
   font-weight: 640; cursor: pointer; box-shadow: var(--sh-2); }
 .rgs-karte-btn2.an { border-color: var(--accent-line); background: var(--accent-soft); color: var(--accent); }
 /* Unten links wie im Vorbild, und mit 44px Trefferflaeche. */
-.rgs-karte-btn { position: absolute; left: 12px; bottom: 12px; min-height: 44px; display: inline-flex; align-items: center; gap: 8px; padding: 0 14px; border: 1px solid var(--accent-line); border-radius: var(--r-sm); background: var(--accent-soft); color: var(--accent); font: inherit; font-size: 14px; font-weight: 640; cursor: pointer; box-shadow: var(--sh-2); }
+.rgs-karte-btn { position: absolute; left: 12px; bottom: 28px; min-height: 44px; display: inline-flex; align-items: center; gap: 8px; padding: 0 14px; border: 1px solid var(--accent-line); border-radius: var(--r-sm); background: var(--accent-soft); color: var(--accent); font: inherit; font-size: 14px; font-weight: 640; cursor: pointer; box-shadow: var(--sh-2); }
+/* Beide Kartenknoepfe sitzen bewusst 28 px ueber der Kante, nicht 12
+   (ENT-355). Darunter laeuft die Leiste des Kartenanbieters mit dem
+   Kartendaten-Hinweis und dem Link auf seine Nutzungsbedingungen. Sie darf
+   nach den Nutzungsbedingungen von Google Maps Platform weder entfernt noch
+   verdeckt oder veraendert werden -- ein Knopf, der halb darauf liegt,
+   verdeckt sie. Der Projektinhaber wollte die Knoepfe naeher an die Kante;
+   das ist erfuellt, weil unter der Karte gleichzeitig die Ortungszeile
+   weggefallen ist und die Karte entsprechend hoeher reicht. Wer den
+   Anbieterhinweis wirklich loswerden will, muss den Kartenanbieter
+   wechseln, nicht die Leiste ueberdecken. */
+
+/* Die Ortungsmarke, oben links auf der Karte -- die Ecke, in der weder ein
+   Knopf noch der Anbieterhinweis liegt. */
+.rgs-ortchip { position: absolute; left: 10px; top: 10px; display: inline-flex;
+  align-items: center; gap: 7px; max-width: calc(100% - 20px); padding: 6px 11px;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--surface);
+  color: var(--ink-2); font-size: 12.5px; font-weight: 620; line-height: 1.2;
+  box-shadow: var(--sh-2); }
+/* Bewusst NICHT pointer-events:none: Im Zustand "steht" haengt am Chip der
+   erklaerende Text, warum die Ortung steht und was dagegen hilft -- der
+   waere sonst unerreichbar. Die Flaeche ist klein und sitzt in der Ecke;
+   die Karte laesst sich ueberall sonst weiterhin schieben. */
+.rgs-ortchip-pkt { width: 8px; height: 8px; border-radius: 50%; flex: none;
+  background: var(--pos); animation: rgsOrtPuls 2s ease-in-out infinite; }
+.rgs-ortchip.sucht .rgs-ortchip-pkt { background: var(--ink-3); }
+/* Steht die Ortung, ist das keine Verzierung mehr, sondern eine Aussage
+   ueber die Datenqualitaet der laufenden Runde -- darum Warnfarbe und ein
+   ruhiger Punkt statt eines pulsierenden. */
+.rgs-ortchip.steht { border-color: var(--warn); background: var(--warn-soft); color: var(--warn); }
+.rgs-ortchip.steht .rgs-ortchip-pkt { background: var(--warn); animation: none; }
+@keyframes rgsOrtPuls { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+/* Wer die Bewegung im System abgeschaltet hat, bekommt sie auch hier nicht. */
+@media (prefers-reduced-motion: reduce) { .rgs-ortchip-pkt { animation: none; } }
+
 /* "Nicht darstellbar" darf nie wie "nicht vorhanden" aussehen (CLAUDE.md) --
    darum steht dieser Satz unter der Karte, nicht nur in der Liste. */
 .rgs-karte-hinweis { flex: none; font-size: 13px; color: var(--ink-3); line-height: 1.5; padding: 2px; }
@@ -642,8 +698,20 @@ svg.i-sm { width: 17px; height: 17px; }
 .rgs-ortwarn-weg { margin-top: 10px; font-size: 13px; color: var(--ink-2); line-height: 1.55; }
 
 .rd-zustand { font-size: 15px; font-weight: 640; margin-bottom: 12px; }
-.rgs-kopf-zahlen { display: flex; align-items: center; gap: 8px; flex: none; }
-.rgs-kopf-wert { min-height: 30px; display: inline-flex; align-items: center; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface-2); color: var(--ink-2); font-size: 13px; font-weight: 650; font-variant-numeric: tabular-nums; }
+/* Zwei gleich breite Bloecke, gleiches Muster, gleiche Schriftgroessen
+   (CLAUDE.md: „Gleiches Muster auf beiden Seiten"). Zwei Spalten zu 1fr,
+   nicht flex mit Abstandhalter -- so steht jeder Wert wirklich in der Mitte
+   SEINES Blocks und nicht in der Mitte des Zwischenraums. */
+.rgs-kopf-zahlen { display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+  flex: none; padding: 0 14px 14px; background: var(--surface);
+  border-bottom: 1px solid var(--line-soft); }
+.rgs-kopf-blk { display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 9px 10px 10px; border: 1px solid var(--line); border-radius: var(--r-sm);
+  background: var(--surface-2); min-width: 0; }
+.rgs-kopf-lb { font-size: 10.5px; font-weight: 700; letter-spacing: .9px;
+  text-transform: uppercase; color: var(--ink-3); }
+.rgs-kopf-wert { font-size: 25px; line-height: 1.1; font-weight: 700; color: var(--ink);
+  font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
 .rgs-kopf-zahlen[hidden] { display: none; }
 
 /* Reiterleiste der laufenden Runde (ENT-306). Unten, wo der Daumen ist --
@@ -845,11 +913,25 @@ svg.i-sm { width: 17px; height: 17px; }
       <svg class="i" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
     </button>
     <h2 id="rgsTitel">–</h2>
-    <div class="rgs-kopf-zahlen" id="rgsKopfZahlen" hidden>
-      <span class="rgs-kopf-wert" id="rgsZaehler">–</span>
-      <span class="rgs-kopf-wert" id="rgsTimer">–</span>
-    </div>
   </header>
+  <!-- Zaehler und Laufzeit als eigene Zeile UNTER dem Kopf (ENT-355).
+       Vorgabe des Projektinhabers: Beide Zahlen gehoeren in den Fokus, der
+       Firmenname dahinter. Bis hierher war es umgekehrt -- der Name stand
+       gross in der Mitte, die beiden Zahlen als zwei kleine graue Chips
+       daneben. Wer auf der Runde aufs Handy schaut, will wissen, wie weit
+       er ist und wie lange er dran ist; welchen Kunden er abgeht, weiss er.
+       Aufbau nach CLAUDE.md: Beschriftung OBEN, Wert darunter, beide
+       Bloecke im selben Muster und in derselben Schriftgroesse. -->
+  <div class="rgs-kopf-zahlen" id="rgsKopfZahlen" hidden>
+    <div class="rgs-kopf-blk">
+      <div class="rgs-kopf-lb" id="rgsZaehlerLb">–</div>
+      <div class="rgs-kopf-wert" id="rgsZaehler">–</div>
+    </div>
+    <div class="rgs-kopf-blk">
+      <div class="rgs-kopf-lb" id="rgsTimerLb">–</div>
+      <div class="rgs-kopf-wert" id="rgsTimer">–</div>
+    </div>
+  </div>
   <div class="rgs-bd" id="rgsBody"></div>
   <div class="rgs-reiter" id="rgsReiter" hidden></div>
   <div class="rgs-fuss" id="rgsFuss"></div>
@@ -1164,6 +1246,17 @@ const W = {
     rgsLaufTitel: 'Rundgang',
     rgsAbbrechenModul: 'Rundgang abbrechen',
     rgsTimerLb: 'Laufzeit',
+    rgsZaehlerLb: 'Punkte',
+    // Bildschirm wach halten (ENT-355)
+    rgsWach: 'Bildschirm wach halten',
+    rgsWachEin: 'Ein',
+    rgsWachAus: 'Aus',
+    rgsWachTxt: 'Sperrt sich der Bildschirm, hält das Gerät die Ortung an und die Runde bekommt Lücken. Wach halten schliesst die Lücken, braucht aber deutlich mehr Akku.',
+    // Ortungsanzeige auf der Karte (ENT-355)
+    rgsOrtLaeuft: 'Ortung läuft',
+    rgsOrtSucht: 'Standort wird gesucht',
+    rgsOrtSteht: 'Ortung steht seit {min} min',
+    rgsOrtStehtTitel: 'Seit {min} Minuten kam keine neue Position. Meist war der Bildschirm gesperrt — dann hält das Gerät die Ortung an. „Bildschirm wach halten\u201C unter Funktionen verhindert das.',
     // Zentrale und Notruf (ENT-299)
     rgsHilfe: 'Zentrale und Notruf',
     rgsZentrale: 'Zentrale',
@@ -4241,6 +4334,7 @@ function rgLaufZeichnen() {
   // watchPosition riss die ganze Seite mit und der Waechter sah einen
   // leeren Rumpf statt seiner Kontrollpunkte. Von der Regression gefunden.
   rgOrtungNachfuehren();
+  rgWachAnfordern();
   if (rgsReiter === 'karte') { rgKarteZeichnen(); }
   else if (rgsReiter === 'funktionen') { rgLaufFunktionen(); }
   else {
@@ -4268,7 +4362,15 @@ function rgLaufKopfZeichnen() {
   const fertig = kps.filter(k => k.erledigt).length;
   const z = $('rgsZaehler'); if (z) { z.textContent = `${fertig} / ${kps.length}`; }
   const t = $('rgsTimer');
-  if (t) { t.textContent = rgLaufzeit(); t.title = w('rgsTimerLb'); }
+  if (t) { t.textContent = rgLaufzeit(); }
+  // Die Beschriftungen stehen im Aufbau leer und kommen von hier, damit sie
+  // aus der Woertertabelle stammen wie jeder andere sichtbare Text auch.
+  const zl = $('rgsZaehlerLb'); if (zl) { zl.textContent = w('rgsZaehlerLb'); }
+  const tl = $('rgsTimerLb'); if (tl) { tl.textContent = w('rgsTimerLb'); }
+  // Die Ortungsanzeige auf der Karte altert mit der Zeit ("steht seit 3 min")
+  // -- sie muss darum mit demselben Takt nachgefuehrt werden wie die Uhr,
+  // sonst bliebe sie auf dem Stand der letzten Positionsmeldung stehen.
+  rgOrtChipZeichnen();
 }
 
 /* Laufzeit seit Rundgangbeginn, PAUSEN ABGEZOGEN.
@@ -4385,6 +4487,13 @@ function rgLaufFunktionen() {
         pausiert ? '<polygon points="6 4 20 12 6 20 6 4"/>'
                  : '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>',
         `onclick="rgLaufPause(${einsatzId})"`)}
+      ${(!beendet && rgWachMoeglich()) ? `<button type="button" class="rgs-modul" id="rgsLaufWach"
+        onclick="rgWachUm()" aria-pressed="${rgWachAn() ? 'true' : 'false'}">
+        <span class="rgs-modul-ic"><svg class="i i-sm" viewBox="0 0 24 24"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg></span>
+        <span>${esc(w('rgsWach'))}</span>
+        <span class="rgs-modul-zust${rgWachAn() ? ' an' : ''}" id="rgsLaufWachZust">${esc(w(rgWachAn() ? 'rgsWachEin' : 'rgsWachAus'))}</span>
+      </button>
+      <div class="rgs-modul-txt" id="rgsLaufWachTxt">${esc(w('rgsWachTxt'))}</div>` : ''}
       ${modul('rgsLaufKontakte', w('rgsHilfe'),
         '<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.4-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/>',
         'onclick="rgLaufKontakte()"')}
@@ -4568,6 +4677,67 @@ function rgNachtUm() {
   }
 }
 
+/* ══ Bildschirm wach halten (ENT-355) ═════════════════════════════════
+   Vorgabe des Projektinhabers nach dem Vorbild von Coredinate.
+
+   Der Grund ist kein Komfort, sondern Datenqualitaet: Sperrt sich der
+   Bildschirm, haelt der Browser watchPosition an. Die Runde bekommt dann
+   eine Luecke, ohne dass irgendwo ein Fehler auftaucht -- genau der Fall,
+   den die Ortungsmarke jetzt als "Ortung steht seit x min" meldet. Dieser
+   Schalter ist die Gegenmassnahme dazu.
+
+   AUS als Vorgabe, ausdruecklich so entschieden: Eine Runde lief im
+   Echtbetrieb ueber neun Stunden. Ein Bildschirm, der neun Stunden an
+   bleibt, leert den Akku, und ein leeres Geraet ortet gar nicht mehr --
+   die Vorgabe "an" wuerde das Problem also nicht loesen, sondern nur
+   verschieben. Wer eine kurze Runde mit lueckenloser Spur braucht, schaltet
+   ein; die Wahl bleibt auf dem Geraet (localStorage).
+
+   Die Sperre geht beim Wegschalten der Seite von sich aus verloren -- so
+   ist die Schnittstelle gebaut. Darum wird sie beim Zurueckkommen neu
+   angefordert, sonst waere sie nach dem ersten Blick auf eine andere App
+   still weg, waehrend der Schalter weiter "Ein" zeigt. */
+const RG_WACH_SCHLUESSEL = 'sop_rundgang_wachhalten';
+let rgsWachSperre = null;
+
+function rgWachMoeglich() {
+  try { return !!(navigator.wakeLock && navigator.wakeLock.request); }
+  catch (e) { return false; }
+}
+
+function rgWachAn() {
+  try { return localStorage.getItem(RG_WACH_SCHLUESSEL) === 'an'; }
+  catch (e) { return false; }   // kein Speicher: die Vorgabe (aus) gilt
+}
+
+async function rgWachAnfordern() {
+  if (!rgWachMoeglich() || !rgWachAn() || rgsWachSperre) { return; }
+  // Nur waehrend einer laufenden Runde. Ein Schalter, der den Bildschirm
+  // auch auf der Uebersicht wachhaelt, waere ein Akkufresser ohne Zweck.
+  if (rgsModus !== 'lauf' || !rundgangAktiv) { return; }
+  try {
+    rgsWachSperre = await navigator.wakeLock.request('screen');
+    rgsWachSperre.addEventListener('release', () => { rgsWachSperre = null; });
+  } catch (e) { rgsWachSperre = null; }   // z.B. wenig Akku: das Geraet darf nein sagen
+}
+
+function rgWachFreigeben() {
+  if (!rgsWachSperre) { return; }
+  try { rgsWachSperre.release(); } catch (e) {}
+  rgsWachSperre = null;
+}
+
+function rgWachUm() {
+  const neu = rgWachAn() ? 'aus' : 'an';
+  try { localStorage.setItem(RG_WACH_SCHLUESSEL, neu); } catch (e) {}
+  if (neu === 'an') { rgWachAnfordern(); } else { rgWachFreigeben(); }
+  if (rgsReiter === 'funktionen') { rgLaufFunktionen(); }
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') { rgWachAnfordern(); }
+});
+
 function rgKarteZeichnen() {
   const d = rgKarteDaten(rundgangAktiv ? rundgangAktiv.kontrollpunkte : []);
   const hinweis = d.ohneOrt.length
@@ -4583,11 +4753,12 @@ function rgKarteZeichnen() {
   // Ortung, von der der Betroffene nichts weiss, ist etwas anderes als eine,
   // die offen angezeigt wird -- rechtlich wie menschlich. Steht dort,
   // solange die Verfolgung laeuft, und verschwindet mit ihr.
-  const ortungHinweis = rgOrtungHinweisHtml();
+  const ortungHinweis = rgOrtungHinweisHtml(true);
   $('rgsBody').innerHTML = `
     <div class="rgs-karte-huelle">
       <div class="rgs-karte" id="rgsKarte"></div>
       <div class="rgs-karte-stand" id="rgsKarteStand">${esc(w('rgsKarteLaedt'))}</div>
+      ${rgOrtChipHtml()}
       <button type="button" class="rgs-karte-btn" id="rgsZentrieren" onclick="rgKarteZentrieren()">
         <svg class="i i-sm" viewBox="0 0 24 24"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
         <span>${esc(w('rgsZentrieren'))}</span>
@@ -4865,7 +5036,67 @@ function rgSichtSignal(text) {
    wichtigste davon ist eine Handlungsanweisung, keine Fehlermeldung: Wer
    nachts vor einem Kontrollpunkt steht, den er nicht bestaetigen kann,
    braucht den WEG zur Einstellung, nicht die Diagnose. */
-function rgOrtungHinweisHtml() {
+/* Wie es der Ortung GERADE geht -- eine Stelle, zwei Anzeigen (ENT-355).
+
+   Neu ist der Zustand 'steht': Bis hierher kannte die App nur "es kommt
+   etwas" und "es kommt nichts mehr, weil ein Fehler da ist". Der haeufigste
+   Fall draussen ist aber ein dritter: Der Bildschirm sperrt sich, das Geraet
+   haelt watchPosition an, es kommt kein Fehler -- und die App zeigte
+   weiterhin die alte Position, als waere sie aktuell. Das ist genau der
+   Fehler, den CLAUDE.md verbietet: „unbekannt" darf nie wie „bekannt"
+   aussehen. Nach 90 Sekunden ohne neue Position sagt sie es jetzt.
+
+   Die 90 Sekunden sind bewusst grosszuegig: watchPosition meldet nur bei
+   BEWEGUNG neu. Wer zwei Minuten an einem Tor steht, ist nicht "ohne
+   Ortung" -- darum keine Schwelle im Sekundenbereich, die dauernd
+   Fehlalarm gaebe. */
+const RG_ORT_STILL_MS = 90000;
+
+function rgOrtLage() {
+  if (rgsOrtWache === null) { return { art: 'aus', min: 0 }; }
+  if (rgsOrtFehler === 'verweigert') { return { art: 'verweigert', min: 0 }; }
+  if (rgsOrtFehler === 'nicht_da') { return { art: 'nicht_da', min: 0 }; }
+  if (!rgsMeinOrt) { return { art: 'sucht', min: 0 }; }
+  const alt = Date.now() - (rgsMeinOrt.zeit || 0);
+  if (rgsMeinOrt.zeit && alt > RG_ORT_STILL_MS) {
+    return { art: 'steht', min: Math.max(1, Math.round(alt / 60000)) };
+  }
+  return { art: 'laeuft', min: 0 };
+}
+
+/* Die Marke auf der Karte (ENT-355). Sie ersetzt die Zeile UNTER der Karte,
+   die dort bis hierher stand ("Standort wird waehrend der Runde verfolgt").
+
+   Der Satz verschwindet nicht, er zieht um: ENT-317 gilt unveraendert --
+   wer geortet wird, muss es sehen koennen. Auf der Karte steht die Aussage
+   sogar naeher an der Sache, statt als Fusszeile, ueber die man hinwegliest.
+   Gewonnen sind rund 20 px Hoehe, die jetzt die Karte hat, und die beiden
+   Knoepfe sitzen tiefer. */
+function rgOrtChipHtml() {
+  const l = rgOrtLage();
+  if (l.art !== 'laeuft' && l.art !== 'sucht' && l.art !== 'steht') { return ''; }
+  return `<div class="rgs-ortchip" id="rgsOrtChip">
+    <span class="rgs-ortchip-pkt"></span><span class="rgs-ortchip-tx"></span>
+  </div>`;
+}
+
+function rgOrtChipZeichnen() {
+  const el = $('rgsOrtChip');
+  if (!el) { return; }
+  const l = rgOrtLage();
+  const tx = el.querySelector('.rgs-ortchip-tx');
+  el.classList.toggle('steht', l.art === 'steht');
+  el.classList.toggle('sucht', l.art === 'sucht');
+  if (l.art === 'steht') {
+    if (tx) { tx.textContent = w('rgsOrtSteht').replace('{min}', String(l.min)); }
+    el.title = w('rgsOrtStehtTitel').replace('{min}', String(l.min));
+  } else {
+    if (tx) { tx.textContent = w(l.art === 'sucht' ? 'rgsOrtSucht' : 'rgsOrtLaeuft'); }
+    el.removeAttribute('title');
+  }
+}
+
+function rgOrtungHinweisHtml(aufKarte) {
   if (rgsOrtWache === null) { return ''; }
   if (rgsOrtFehler === 'verweigert') {
     const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
@@ -4884,6 +5115,15 @@ function rgOrtungHinweisHtml() {
       <button type="button" class="btn btn-plain btn-wide" style="margin-top:12px"
         onclick="rgOrtungErneut()">${esc(w('rgOrtErneut'))}</button>
     </div>`;
+  }
+  // Auf der Karte tragen diese beiden Zustaende die Marke, nicht die Zeile.
+  // Auf dem Punkte-Reiter gibt es keine Karte -- dort bleibt die Zeile, sonst
+  // stuende dem Waechter dort gar nichts mehr ueber seine Ortung (ENT-317).
+  if (aufKarte) { return ''; }
+  const l = rgOrtLage();
+  if (l.art === 'steht') {
+    return `<div class="rgs-karte-hinweis fehler" id="rgsOrtungHinweis">${
+      esc(w('rgsOrtSteht').replace('{min}', String(l.min)))}</div>`;
   }
   if (!rgsMeinOrt) {
     return `<div class="rgs-karte-hinweis" id="rgsOrtungHinweis">${esc(w('rgOrtWartet'))}</div>`;
@@ -5030,6 +5270,10 @@ function rgOrtungStoppen() {
   if (rgsOrtWache === null) { return; }
   try { navigator.geolocation.clearWatch(rgsOrtWache); } catch (e) {}
   rgsOrtWache = null;
+  // Die Runde ist vorbei -- der Bildschirm darf sich wieder sperren. Ohne
+  // diese Zeile bliebe er nach einer beendeten Runde bis zum Schliessen der
+  // App an, und der Akku waere fuer nichts weg.
+  rgWachFreigeben();
   rgsSpurLetzte = null;
   rgsOrtFehler = null;
   // Was noch im Geraet liegt, jetzt noch loswerden -- der Server nimmt es
