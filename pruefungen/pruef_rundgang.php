@@ -93,11 +93,11 @@ pruef('KRITISCH: ein anderer Rundgang am selben Objekt startet mit einer eigenen
 // ══════════════ RUNDGANG_FORTSCHRITT -- FUER DIE UEBERSICHT (ENT-183)
 $fortschritt = rundgang_fortschritt($pdo, 100, 1);
 pruef('KRITISCH: Fortschritt zaehlt bestaetigte und nicht-verfuegbare Punkte getrennt',
-    $fortschritt === ['gesamt' => 3, 'bestaetigt' => 1, 'nicht_verfuegbar' => 1, 'ersatzscan' => 0]);
+    $fortschritt === ['gesamt' => 3, 'bestaetigt' => 1, 'nicht_verfuegbar' => 1, 'ersatzscan' => 0, 'erledigt' => 1]);
 
 $fortschrittAnders = rundgang_fortschritt($pdo, 200, 1);
 pruef('KRITISCH: ein anderer Rundgang hat einen eigenen, unbeeinflussten Fortschritt',
-    $fortschrittAnders === ['gesamt' => 3, 'bestaetigt' => 0, 'nicht_verfuegbar' => 0, 'ersatzscan' => 0]);
+    $fortschrittAnders === ['gesamt' => 3, 'bestaetigt' => 0, 'nicht_verfuegbar' => 0, 'ersatzscan' => 0, 'erledigt' => 0]);
 
 // Alle drei Punkte des Rundgangs 100 erledigen -> "gesamt" bleibt korrekt,
 // auch wenn nichts mehr offen ist (kein Verwechseln mit "es gibt keine
@@ -106,7 +106,7 @@ $pdo->exec("INSERT INTO rundgang_scan (rundgang_id, kontrollpunkt_id, status, er
             VALUES (100, 3, 'bestaetigt', '2026-01-01 08:10:00')");
 $fortschritt = rundgang_fortschritt($pdo, 100, 1);
 pruef('KRITISCH: vollstaendig erledigt zeigt trotzdem die richtige Gesamtzahl, nicht 0',
-    $fortschritt === ['gesamt' => 3, 'bestaetigt' => 2, 'nicht_verfuegbar' => 1, 'ersatzscan' => 0]);
+    $fortschritt === ['gesamt' => 3, 'bestaetigt' => 2, 'nicht_verfuegbar' => 1, 'ersatzscan' => 0, 'erledigt' => 2]);
 
 // ══════════════ RUNDGANG_VORLAGE_PUNKTE_SETZEN -- KONTROLLRUNDEN (ENT-204)
 $pdo->exec('CREATE TABLE rundgang_vorlage (id INTEGER PRIMARY KEY AUTOINCREMENT, objekt_id INT, name TEXT, aktiv INT)');
@@ -168,7 +168,7 @@ pruef('KRITISCH: die Reihenfolge folgt der Vorlage, nicht kontrollpunkt.reihenfo
 
 $fortschrittVorlage = rundgang_fortschritt($pdo, 300, 1, $kurzrundeId);
 pruef('KRITISCH: "gesamt" zaehlt bei gewaehlter Vorlage nur deren Punkte (2, nicht 3)',
-    $fortschrittVorlage === ['gesamt' => 2, 'bestaetigt' => 0, 'nicht_verfuegbar' => 0, 'ersatzscan' => 0]);
+    $fortschrittVorlage === ['gesamt' => 2, 'bestaetigt' => 0, 'nicht_verfuegbar' => 0, 'ersatzscan' => 0, 'erledigt' => 0]);
 
 $pdo->exec("INSERT INTO rundgang_scan (rundgang_id, kontrollpunkt_id, status, erfasst_am)
             VALUES (300, 1, 'bestaetigt', '2026-01-01 09:00:00')");
@@ -177,7 +177,7 @@ pruef('Ein bestaetigter Vorlagen-Punkt verschwindet auch hier aus der Restliste'
     count($uebrigVorlage) === 1 && $uebrigVorlage[0]['bezeichnung'] === 'Parkplatz');
 $fortschrittVorlage = rundgang_fortschritt($pdo, 300, 1, $kurzrundeId);
 pruef('Fortschritt zaehlt den bestaetigten Vorlagen-Punkt, "gesamt" bleibt bei 2',
-    $fortschrittVorlage === ['gesamt' => 2, 'bestaetigt' => 1, 'nicht_verfuegbar' => 0, 'ersatzscan' => 0]);
+    $fortschrittVorlage === ['gesamt' => 2, 'bestaetigt' => 1, 'nicht_verfuegbar' => 0, 'ersatzscan' => 0, 'erledigt' => 1]);
 
 pruef('KRITISCH: ohne Vorlage (null) bleibt das alte Verhalten -- alle drei Punkte zaehlen weiterhin',
     count(rundgang_kontrollpunkte_uebrig($pdo, 300, 1)) === 2 // Eingang schon bestaetigt, 2 von 3 offen
@@ -202,8 +202,32 @@ $uebrigErsatzscan = rundgang_kontrollpunkte_uebrig($pdo, 400, 1);
 pruef('KRITISCH: ein per Ersatzscan erledigter Punkt verschwindet aus der Restliste',
     !in_array('Keller', array_column($uebrigErsatzscan, 'bezeichnung'), true));
 $fortschrittErsatzscan = rundgang_fortschritt($pdo, 400, 1);
+// Die Trennung in der DATENHALTUNG bleibt (ENT-145/Q-22): Ein Fotobeleg
+// muss von einem echten NFC-/Geofence-Scan unterscheidbar bleiben.
 pruef('KRITISCH: Ersatzscan zaehlt separat, nicht als "bestaetigt" mit',
-    $fortschrittErsatzscan === ['gesamt' => 3, 'bestaetigt' => 0, 'nicht_verfuegbar' => 0, 'ersatzscan' => 1]);
+    $fortschrittErsatzscan['bestaetigt'] === 0 && $fortschrittErsatzscan['ersatzscan'] === 1);
+// Neu seit ENT-329: 'erledigt' fasst zusammen, was als kontrolliert gilt.
+pruef('KRITISCH: "erledigt" zaehlt den Ersatzscan mit',
+    $fortschrittErsatzscan['erledigt'] === 1);
+
+// Ein NICHT VERFUEGBARER Punkt zaehlt dagegen nicht als erledigt -- dort
+// wurde der Punkt gar nicht erreicht. Das ist der Unterschied, auf den es
+// ankommt, und der einzige Grund, warum 'erledigt' nicht einfach die Zahl
+// aller Scans ist.
+$pdo->exec("INSERT INTO rundgang_scan (rundgang_id, kontrollpunkt_id, status, erfasst_am, beschreibung)
+            VALUES (400, 3, 'nicht_verfuegbar', '2026-01-01 10:05:00', 'Tor verschlossen')");
+$fortschrittGemischt = rundgang_fortschritt($pdo, 400, 1);
+pruef('KRITISCH: "nicht verfuegbar" zaehlt NICHT als erledigt',
+    $fortschrittGemischt['nicht_verfuegbar'] === 1 && $fortschrittGemischt['erledigt'] === 1);
+$pdo->exec("INSERT INTO rundgang_scan (rundgang_id, kontrollpunkt_id, status, erfasst_am)
+            VALUES (400, 1, 'bestaetigt', '2026-01-01 10:10:00')");
+$fortschrittVoll = rundgang_fortschritt($pdo, 400, 1);
+pruef('KRITISCH: bestaetigt und Ersatzscan zusammen ergeben "erledigt"',
+    $fortschrittVoll['erledigt'] === 2 && $fortschrittVoll['bestaetigt'] === 1
+    && $fortschrittVoll['ersatzscan'] === 1);
+pruef('Die Einzelzahlen bleiben daneben stehen und werden nicht ersetzt',
+    array_key_exists('bestaetigt', $fortschrittVoll) && array_key_exists('ersatzscan', $fortschrittVoll)
+    && array_key_exists('nicht_verfuegbar', $fortschrittVoll));
 
 // ══════════════ RUNDGANG_IM_FENSTER -- AUSFUEHRUNGSFENSTER (ENT-279)
 pruef('Ohne konfiguriertes Fenster (beide NULL) schraenkt die Funktion nichts ein',
