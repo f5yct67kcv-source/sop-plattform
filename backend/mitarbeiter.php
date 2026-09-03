@@ -228,39 +228,6 @@ function ma_spalte_da(PDO $pdo, string $spalte): bool
            && (bool)$pdo->query("SHOW COLUMNS FROM mitarbeiter LIKE " . $pdo->quote($spalte))->fetch();
 }
 
-// ── AHV-Nummer ───────────────────────────────────────────────────────────
-// Die 13-stellige Versichertennummer beginnt mit 756 und traegt an letzter
-// Stelle eine Pruefziffer nach EAN-13. Geprueft wird sie deshalb wirklich
-// und nicht bloss auf Laenge: Eine vertippte AHV-Nummer faellt sonst erst
-// bei der Ausgleichskasse auf, und dann ist sie in mehreren Meldungen drin.
-function ahv_ziffern(string $wert): string
-{
-    return preg_replace('/\D/', '', $wert) ?? '';
-}
-
-function ahv_gueltig(string $wert): bool
-{
-    $z = ahv_ziffern($wert);
-    if (strlen($z) !== 13 || substr($z, 0, 3) !== '756') { return false; }
-    // EAN-13: Ziffern von links, abwechselnd mit 1 und 3 gewichtet; die
-    // Pruefziffer ergaenzt die Summe auf das naechste Vielfache von zehn.
-    $summe = 0;
-    for ($i = 0; $i < 12; $i++) {
-        $summe += ((int)$z[$i]) * ($i % 2 === 0 ? 1 : 3);
-    }
-    return ((10 - ($summe % 10)) % 10) === (int)$z[12];
-}
-
-// Einheitliche Schreibweise 756.XXXX.XXXX.XX. Gespeichert wird die
-// formatierte Fassung, damit sie ueberall gleich aussieht; unlesbare
-// Eingaben bleiben unveraendert stehen und werden von der Pruefung erwischt.
-function ahv_formatieren(string $wert): string
-{
-    $z = ahv_ziffern($wert);
-    if (strlen($z) !== 13) { return trim($wert); }
-    return substr($z, 0, 3) . '.' . substr($z, 3, 4) . '.' . substr($z, 7, 4) . '.' . substr($z, 11, 2);
-}
-
 // ── Eingabe lesen ────────────────────────────────────────────────────────
 // Gibt die Spaltenwerte zurueck, die geschrieben werden sollen, sowie eine
 // Liste von Beanstandungen. Nicht mitgeschickte Felder bleiben beim
@@ -352,13 +319,14 @@ function ma_eingabe_lesen(array $input, array $bestand = [], ?PDO $pdo = null): 
         }
     }
 
-    // AHV-Nummer: einheitlich schreiben und wirklich pruefen.
+    // AHV-Nummer: wird bis auf Weiteres nicht erfasst (ENT-348). Datenminimierung
+    // statt Verschluesselung -- die Nummer liegt heute im Klartext in der
+    // Datenbank (OP-62) und wird fuer keine aktive Funktion gebraucht. Erst eine
+    // kuenftige Lohnbuchhaltung (Lohnausweise aus der Software) braucht sie
+    // wieder; bis dahin blockt dieser zentrale Einlesepunkt jeden Schreibweg --
+    // ein Verbot nur in der Oberflaeche liesse sich am Browser vorbei umgehen.
     if (array_key_exists('ahv_nr', $spalten) && (string)$spalten['ahv_nr'] !== '') {
-        if (!ahv_gueltig((string)$spalten['ahv_nr'])) {
-            $fehler[] = 'AHV-Nummer: Pruefziffer stimmt nicht oder Format ist falsch (756.XXXX.XXXX.XX)';
-        } else {
-            $spalten['ahv_nr'] = ahv_formatieren((string)$spalten['ahv_nr']);
-        }
+        $fehler[] = 'AHV-Nummer: wird zurzeit nicht erfasst (ENT-348)';
     }
 
     // Art. 10 Ziff. 4 GAV: "Mitarbeitende mit einem eidgenoessischen

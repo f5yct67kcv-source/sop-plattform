@@ -39,7 +39,7 @@ const DOSSIER = {
   anstellungskategorie: 'C', pensum_stunden: 900, eintritt: '2025-01-01',
   fachausweis: 'Bewachung', fachausweis_am: '2022-09-01', basisausbildung_am: '',
   diensthundefuehrer: 1, waffentragberechtigt: 0, revierdienst_berechtigt: 1, sprache: 'de',
-  ahv_nr: '756.1234.5678.97', aufenthaltsbewilligung: 'C', zemis_nr: '',
+  aufenthaltsbewilligung: 'C', zemis_nr: '',
   // Ein abgelaufener und ein bald ablaufender Ausweis: beides muss die
   // Leseansicht benennen, sonst plant jemand eine Person ein, die nicht darf.
   aufenthalt_gueltig_bis: '2020-01-01',
@@ -185,8 +185,11 @@ check('Ja/Nein steht als Haken, nicht als 1',
     && document.getElementById('mb_waffentragberechtigt').checked === false));
 check('Die Revierdienst-Berechtigung ebenso, im eigenen Abschnitt (ENT-284)',
   await page.evaluate(() => document.getElementById('mb_revierdienst_berechtigt').checked === true));
-check('Die AHV-Nummer steht nur hier, nicht in der Liste',
-  await page.inputValue('#mb_ahv_nr') === '756.1234.5678.97');
+check('KRITISCH: die AHV-Nummer laesst sich nicht mehr erfassen (ENT-348) -- Feld ist gesperrt',
+  await page.evaluate(() => {
+    const e = document.getElementById('mb_ahv_nr');
+    return !!e && e.disabled && e.value === '';
+  }));
 
 // ══════════════ GAV-HINWEISE SAGEN, SIE SETZEN NICHT
 {
@@ -421,7 +424,7 @@ check('Die AHV-Nummer steht nur hier, nicht in der Liste',
     return {
       karten: [...document.querySelectorAll('#mdBereich_person .ma-block > h3')].map(h => h.textContent),
       abschnitte: q('.ma-block').map(b => b.dataset.abschnitt),
-      geburt: zeile('Geburtsdatum'), ahv: zeile('AHV-Nummer'),
+      geburt: zeile('Geburtsdatum'), ahv: zeile('AHV-Nummer'), ahvLabel: q('dt').some(x => x.textContent === 'AHV-Nummer'),
       strasse: zeile('Strasse'), ort: zeile('PLZ und Ort'),
       funktion: zeile('Funktion'), standort: zeile('Standort'),
       fa: zeile('Eidg. Fachausweis'), berechtigt: zeile('Berechtigt für'),
@@ -436,8 +439,8 @@ check('Die AHV-Nummer steht nur hier, nicht in der Liste',
   });
   check('KRITISCH: die Detailseite zeigt das Geburtsdatum, statt "–" wie vor ENT-072',
     d.geburt === '05.05.1990');
-  check('KRITISCH: die AHV-Nummer steht auf der Detailseite, nicht nur im Formular',
-    d.ahv === '756.1234.5678.97');
+  check('KRITISCH: die AHV-Nummer erscheint auch auf der Detailseite nirgends mehr (ENT-348)',
+    !d.ahvLabel);
   check('Eine Adresse liest sich als Adresse, nicht als fuenf Zeilen',
     d.strasse === 'Musterweg 3' && d.ort === '4600 Testort');
   check('Auswahlfelder zeigen den Namen, nicht die Id',
@@ -585,9 +588,8 @@ check('Die AHV-Nummer steht nur hier, nicht in der Liste',
     await page.fill('#mbNeuPass', 'blauerstuhlamsee');
     // Seit ENT-077 Rollen statt Admin-Haekchen.
     await page.check('#mbNeuRolle_verwaltung');
-    await page.fill('#mb_ahv_nr', '756.1234.5678.97');
-    // AHV steht bei "Person", der Fachausweis bei "Einsatz" (ENT-287) --
-    // auch beim ANLEGEN muss ein Bereichswechsel beides behalten.
+    // Fachausweis steht bei "Einsatz" (ENT-287) -- auch beim ANLEGEN muss
+    // ein Bereichswechsel den vorher getippten Namen behalten.
     await page.click('#mbtab-einsatz');
     await page.waitForTimeout(200);
     await page.selectOption('#mb_fachausweis', 'Bewachung');
@@ -599,8 +601,7 @@ check('Die AHV-Nummer steht nur hier, nicht in der Liste',
   check('Die gewählte Rolle geht mit (ENT-077)',
     gesendet && Array.isArray(gesendet.rollen) && gesendet.rollen.includes('verwaltung'));
   check('KRITISCH: die neuen Felder gehen beim ANLEGEN genauso mit wie beim Aendern',
-    gesendet && gesendet.ahv_nr === '756.1234.5678.97' && gesendet.fachausweis === 'Bewachung'
-    && Object.keys(gesendet).length >= 50);
+    gesendet && gesendet.fachausweis === 'Bewachung' && Object.keys(gesendet).length >= 49);
   check('Nach dem Anlegen steht die neue Person offen, nicht die leere Liste',
     await page.evaluate(() => document.getElementById('mv-detail').classList.contains('on')));
 }

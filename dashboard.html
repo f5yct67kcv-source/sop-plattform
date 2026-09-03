@@ -22798,7 +22798,13 @@ const MB_ABSCHNITTE = [
   // "Versicherungsdaten" führt. Es ist dieselbe Frage: was liegt über
   // diese Person amtlich vor.
   { id: 'personendaten', bereich: 'person', spalte: 2, titel: 'Personendaten und Bewilligungen', felder: [
-    ['ahv_nr',         'AHV-Nummer',     'f', null, '756.XXXX.XXXX.XX', true],
+    // Bewusst weiterhin deaktiviert statt entfernt (ENT-348): Die Nummer
+    // wird erst mit einer kuenftigen Lohnbuchhaltung wieder erfasst. Die
+    // eigentliche Sperre sitzt serverseitig in mitarbeiter.php; das Feld
+    // bleibt aber in dieser Liste stehen, weil mbLabel() von hier aus auch
+    // die Beschriftung fuer AELTERE Logbuch-Eintraege holt -- ein Entfernen
+    // liesse "AHV-Nummer geaendert" in alten Eintraegen zu "ahv_nr" verkommen.
+    ['ahv_nr',         'AHV-Nummer',     'f', null, 'wird zurzeit nicht erfasst (ENT-348)', true, true],
     ['geburtsdatum',   'Geburtsdatum',   'd'],
     ['nationalitaet',  'Nationalität',   'f'],
     ['heimatort',      'Heimatort',      'f'],
@@ -23094,7 +23100,7 @@ function mbZeichnen() {
   };
   const mark = f => (mbAend[f] !== undefined ? ' ki' : '');
 
-  const feld = ([f, label, typ, quelle, hinweis, breit]) => {
+  const feld = ([f, label, typ, quelle, hinweis, breit, gesperrt]) => {
     const id = 'mb_' + f;
     let steuer;
     if (typ === 'a') {
@@ -23107,8 +23113,14 @@ function mbZeichnen() {
     } else {
       const t = typ === 'd' ? 'date' : typ === 'z' ? 'number' : 'text';
       const horcher = (f === 'vorname' || f === 'nachname') ? ' oninput="mbNameVorschlag()"' : '';
+      // gesperrt (ENT-348): Feld bleibt in der Liste fuer die Beschriftung
+      // aelterer Logbuch-Eintraege, laesst sich aber nicht mehr befuellen --
+      // die serverseitige Ablehnung in mitarbeiter.php ist die eigentliche
+      // Sperre, das hier ist nur die Vermeidung einer Eingabe, die ohnehin
+      // verworfen wuerde.
       steuer = `<input class="inp${mark(f)}" id="${id}" type="${t}" value="${esc(wert(f))}"`
-             + (hinweis ? ` placeholder="${esc(hinweis)}"` : '') + horcher + '>';
+             + (hinweis ? ` placeholder="${esc(hinweis)}"` : '') + (gesperrt ? ' disabled' : '')
+             + horcher + '>';
     }
     return `<div class="f${breit ? ' wide' : ''}"><label for="${id}">${esc(label)}</label>${steuer}</div>`;
   };
