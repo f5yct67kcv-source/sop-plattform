@@ -26,6 +26,7 @@ require_once __DIR__ . '/../mitarbeiter.php';
 require_once __DIR__ . '/../kunden.php';
 require_once __DIR__ . '/../produkte.php';
 require_once __DIR__ . '/../rundgang.php';
+require_once __DIR__ . '/../fahrzeug.php';
 
 $user = require_session();
 require_recht($user, 'betrieb');
@@ -1200,6 +1201,57 @@ CREATE TABLE IF NOT EXISTS fahrzeuge (
   FOREIGN KEY (standort_id) REFERENCES anstellungsorte(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+// Fahrzeugübernahme (ENT-340). Die Kette, auf der die Kilometerkontrolle
+// aus ENT-313 beruht: Wer nimmt wann welches Fahrzeug mit welchem
+// Tachostand.
+//
+// NUR DIE UEBERNAHME, keine Rueckgabe. Der Zaehler kennt keine Luecken --
+// jeder Kilometer zwischen zwei Uebernahmen gehoert zwangslaeufig dem, der
+// das Fahrzeug in dieser Zeit hatte. Eine zweite Erfassung bei der Rueckgabe
+// verdoppelte die Bedienschritte, ohne die Kette zu schliessen (sie ist
+// bereits geschlossen). Der Projektinhaber: "die Prozesse moeglichst
+// einfach und effizient".
+//
+// art: 'uebernahme' = ein Fahrzeug wurde genommen (mit Tachostand)
+//      'ohne_fahrzeug' = die Person hat die Frage ausdruecklich verneint
+// Beides steht in DERSELBEN Tabelle, weil es dieselbe Frage zum selben
+// Zeitpunkt beantwortet. "Gefragt und verneint" ist etwas anderes als "nie
+// gefragt" -- ohne den zweiten Fall waere spaeter nicht unterscheidbar, ob
+// jemand die Uebernahme vergessen oder keine gebraucht hat. Die Kette liest
+// ausschliesslich art = 'uebernahme'.
+//
+// fahrzeug_id und tacho_km sind darum NULL-faehig -- bei 'ohne_fahrzeug'
+// gibt es beides nicht.
+//
+// einsatz_id ist NULL-faehig und bleibt es: Die Uebernahme haengt
+// ausdruecklich NICHT am Einsatz. Wer spontan ein Fahrzeug nimmt, faellt
+// sonst aus der Kette -- und das sind genau die Fahrten, um die es geht.
+//
+// Das Foto liegt als LONGBLOB in der Datenbank, nicht im Dateisystem --
+// dieselbe Entscheidung wie beim Logo (ENT-155) und bei den Ereignisfotos
+// (ENT-297): kein Pfad, der ueber eine geratene Adresse abrufbar waere.
+'fahrzeug_uebernahme' => "
+CREATE TABLE IF NOT EXISTS fahrzeug_uebernahme (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  art VARCHAR(20) NOT NULL DEFAULT 'uebernahme',
+  fahrzeug_id INT NULL,
+  mitarbeiter_id INT NOT NULL,
+  einsatz_id INT NULL,
+  zeitpunkt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  tacho_km INT NULL,
+  -- Woher die Zuordnung stammt: 'qr' = Aufkleber gescannt, 'liste' = von
+  -- Hand aus der Fahrzeugliste gewaehlt (Aufkleber fehlt, Kamera streikt),
+  -- 'antwort' = die Frage wurde mit 'kein Dienstfahrzeug' beantwortet.
+  -- Dieselbe Unterscheidung wie beim Ersatzscan am Kontrollpunkt (ENT-182):
+  -- Beide Wege sind gueltig, aber sie sind nicht dasselbe.
+  quelle VARCHAR(20) NOT NULL DEFAULT 'qr',
+  foto LONGBLOB NULL,
+  foto_mime VARCHAR(100) NULL,
+  bemerkung TEXT NULL,
+  KEY idx_fahrzeug_zeit (fahrzeug_id, zeitpunkt),
+  KEY idx_person_zeit (mitarbeiter_id, zeitpunkt)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
 ];
 
 foreach ($tabellen as $name => $sql) {
@@ -1590,6 +1642,11 @@ $spalten = [
     // auslagen.php).
     ['einsaetze', 'fahrzeug_id', 'ALTER TABLE einsaetze ADD COLUMN fahrzeug_id INT NULL AFTER weg_adresse'],
     ['einsaetze', 'fahrer_id',   'ALTER TABLE einsaetze ADD COLUMN fahrer_id INT NULL AFTER fahrzeug_id'],
+    // Kennung auf dem Aufkleber im Fahrzeug (ENT-340). Undurchsichtig und
+    // zufaellig -- stuende dort die Fahrzeugnummer im Klartext, liesse sich
+    // die des Nachbarfahrzeugs erraten. Wird beim ersten Bedarf erzeugt,
+    // nicht auf Vorrat: Ein Fahrzeug ohne Aufkleber braucht keine.
+    ['fahrzeuge', 'qr_kennung', 'ALTER TABLE fahrzeuge ADD COLUMN qr_kennung VARCHAR(40) NULL'],
     // Eine Fahrzeit-Position ist KEINE Arbeitszeit (Art. 18 Ziff. 2, wörtlich:
     // "wird nicht an die Arbeitszeit gemäss diesem GAV angerechnet"). Sie
     // steht im Raster, damit der Planer die Anfahrt sieht -- sie darf aber
@@ -1769,6 +1826,30 @@ foreach ($spalten as [$tabelle, $spalte, $sql]) {
     }
     if ($nurPruefen) { $getan[] = "Spalte $tabelle.$spalte fehlt noch"; continue; }
     schritt($pdo, $sql, "Spalte $tabelle.$spalte", $getan, $fehler);
+}
+
+// ── 2a0. Aufkleber-Schluessel nachtragen (ENT-340). Jedes Fahrzeug braucht
+// einen, sonst laesst es sich nicht scannen -- und Fahrzeuge aus der Zeit
+// vor ENT-340 haetten nie einen bekommen.
+//
+// Wiederholbar und ungefaehrlich: Vergeben wird nur, wo NICHTS steht. Ein
+// bestehender Schluessel wird nie ueberschrieben; das wuerde jeden schon
+// geklebten Aufkleber im selben Moment ungueltig machen.
+if (hat_tabelle_jetzt($pdo, 'fahrzeuge') && hat_spalte($pdo, 'fahrzeuge', 'qr_kennung')) {
+    if ($nurPruefen) {
+        $offen = (int)$pdo->query("SELECT COUNT(*) FROM fahrzeuge
+                                    WHERE qr_kennung IS NULL OR qr_kennung = ''")->fetchColumn();
+        if ($offen > 0) { $getan[] = "Aufkleber-Schluessel fehlen noch fuer $offen Fahrzeug(e)"; }
+        else { $schon[] = 'Alle Fahrzeuge haben einen Aufkleber-Schluessel'; }
+    } else {
+        try {
+            $n = fz_kennungen_nachtragen($pdo);
+            if ($n > 0) { $getan[] = "Aufkleber-Schluessel fuer $n Fahrzeug(e) vergeben"; }
+            else { $schon[] = 'Alle Fahrzeuge haben einen Aufkleber-Schluessel'; }
+        } catch (Throwable $e) {
+            $fehler[] = 'Aufkleber-Schluessel — ' . $e->getMessage();
+        }
+    }
 }
 
 // ── 2a1. Revierdienst-Berechtigung einmalig nachtragen (ENT-284): fuer

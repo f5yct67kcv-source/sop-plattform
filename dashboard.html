@@ -5980,11 +5980,29 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
                 <input class="inp" id="fzTachoAm" type="date">
                 <div class="f-hint">Pflicht, sobald ein Kilometerstand dasteht. Ohne den Tag,
                 an dem abgelesen wurde, ist die Zahl nicht beurteilbar.</div></div>
+              <!-- Wer den Kilometerstand zuletzt angefasst hat (ENT-330) — genau
+                   hier verlangt, nicht irgendwo am Seitenende: An dieser Zahl
+                   hängt die spätere Kontrolle gefahrener Strecken.
+                   „Abgelesen am" (oben) und „geändert am" (hier) sind zwei
+                   verschiedene Dinge und stehen darum getrennt: das eine ist
+                   eine fachliche Angabe des Menschen, das andere ein
+                   Zeitstempel des Systems. -->
+              <div class="f wide"><div class="f-hint" id="fzTachoLog"></div></div>
             </div>
 
             <div class="form-grid">
               <div class="f wide"><label for="fzBemerkung">Bemerkung</label>
                 <textarea class="inp" id="fzBemerkung" rows="3" maxlength="2000"></textarea></div>
+            </div>
+
+            <!-- Änderungsverlauf (ENT-330). Dasselbe Logbuch wie bei der
+                 Personalakte (ENT-077), nur ein zweiter Bereich darin — keine
+                 zweite Protokollführung daneben. Steht am Ende des Formulars:
+                 Es ist Nachschlagewerk, nicht Eingabe. -->
+            <div class="zone" id="fzVerlaufZone" style="margin-top:18px;display:none">
+              <div class="zone-hd">Änderungsverlauf</div>
+              <div class="zone-note" id="fzVerlaufKopf"></div>
+              <div id="fzVerlauf"></div>
             </div>
 
             <div style="display:flex;gap:10px;margin-top:12px">
@@ -12222,10 +12240,13 @@ function enFahrerOptionen(sel, ids, gewaehlt) {
   sel.value = gewaehlt == null ? '' : String(gewaehlt);
 }
 
+// Kurz gefasst seit ENT-334: Der Satz stand zweimal fast gleich auf einem
+// Bildschirm, einmal hier und einmal im Verkehrsmittel-Block darunter. Was
+// bleibt, ist die Geldfolge und der Riegel gegen die falsche Annahme, die
+// uebrigen fuehren automatisch mit.
 const EN_FAHRER_GELD = 'Wer fährt, reist im Geschäftsfahrzeug: Fahrzeitersatz ja, '
-  + 'Fahrkostenersatz nein (Art. 18 Ziff. 4/5). Das Verkehrsmittel dieser Person wird beim '
-  + 'Speichern entsprechend gesetzt. Die übrigen Eingeteilten bleiben unberührt — ob sie '
-  + 'mitfahren, entscheidest du je Person unter „Verkehrsmittel zum Einsatz".';
+  + 'Fahrkostenersatz nein (Art. 18 Ziff. 4/5) — das Verkehrsmittel dieser Person wird '
+  + 'mitgesetzt. Die übrigen Eingeteilten bleiben unberührt.';
 
 function enFahrzeugGeaendert() {
   const fz = $('enNFahrzeug_id'), fa = $('enNFahrer_id'), hint = $('enNFahrerHinweis');
@@ -16153,11 +16174,208 @@ function fzListeZeichnen() {
         ? unbekannt('nie abgelesen')
         : `${nf(f.tacho_km)} km<div class="sec">${dmy(f.tacho_am)}</div>`}</td>
       <td class="nowrap">
+        <button class="btn btn-plain btn-sm" onclick="fzAufkleber(${f.id})"${f.qr_kennung ? '' : ' disabled title="Erst die Einrichtung ausführen — dann bekommt jedes Fahrzeug einen Aufkleber-Schlüssel."'}>Aufkleber</button>
         <button class="btn btn-plain btn-sm" onclick="fzBearbeiten(${f.id})">Ändern</button>
         <button class="btn btn-plain btn-sm" style="color:var(--neg)" onclick="fzLoeschen(${f.id})">Löschen</button>
       </td>
     </tr>`;
   }).join('') + `</tbody></table></div>`;
+}
+
+// ── Aufkleber für das Fahrzeug (ENT-340) ────────────────────────────────
+//
+// Die Idee des Projektinhabers: *„Im Auto ein QR anbringen, vielleicht am
+// Rückspiegel wie ein Duftbaum. Mitarbeiter steigt in Dienstfahrzeug scannt
+// Code, fotografiert Tacho und/oder trägt KM ein."*
+//
+// GESCANNT WIRD MIT DER NORMALEN KAMERA-APP DES TELEFONS, nicht mit einem
+// eingebauten Scanner: Der QR-Code enthält schlicht die Adresse der App mit
+// der Kennung daran (app.html?fz=…). Jedes Telefon kann das ab Werk, es
+// braucht keine Kameraerlaubnis im Browser, und auf iOS-Safari wäre ein
+// eigener Scanner ohnehin nicht verlässlich verfügbar.
+//
+// Der Code wird HIER erzeugt, aus qrcode.js -- derselben Bibliothek, die
+// schon den Zahlteil der QR-Rechnung zeichnet (ENT-205). Kein zweiter Weg
+// für dieselbe Sache und nichts, was von einem fremden Server nachgeladen
+// werden müsste.
+// qrcode.js wird ERST BEI BEDARF geladen, nicht bei jedem Öffnen des
+// Cockpits: 57 KB für eine Funktion, die ein paarmal im Jahr gebraucht wird,
+// zahlt sonst jeder Seitenaufruf mit.
+let fzQrGeladen = null;
+function fzQrLaden() {
+  if (fzQrGeladen) { return fzQrGeladen; }
+  fzQrGeladen = new Promise((fertig, fehler) => {
+    if (typeof qrcode === 'function') { fertig(); return; }
+    const s = document.createElement('script');
+    s.src = 'qrcode.js';
+    s.onload = () => (typeof qrcode === 'function' ? fertig() : fehler(new Error('qrcode fehlt')));
+    s.onerror = () => fehler(new Error('qrcode.js nicht ladbar'));
+    document.head.appendChild(s);
+  });
+  // Ein einmal gescheiterter Versuch darf nicht für immer scheitern --
+  // sonst hilft nach einem Netzaussetzer nur noch ein Seitenneuladen.
+  fzQrGeladen.catch(() => { fzQrGeladen = null; });
+  return fzQrGeladen;
+}
+
+function fzAufkleber(id) {
+  const f = fahrzeuge.find(x => Number(x.id) === Number(id));
+  if (!f) { return; }
+  if (!f.qr_kennung) {
+    toast('Für dieses Fahrzeug ist noch kein Aufkleber-Schlüssel vergeben. Einmal die Einrichtung ausführen.');
+    return;
+  }
+  // Absolute Adresse, weil der Aufkleber im Auto klebt und dort niemand eine
+  // relative Adresse auflösen kann.
+  const ziel = new URL('app.html', location.href);
+  ziel.searchParams.set('fz', f.qr_kennung);
+
+  // Der Code wird HIER erzeugt und als fertiges SVG ins Druckfenster
+  // geschrieben -- NICHT dort per <script src> nachgeladen.
+  //
+  // Der Umweg hat einen gemessenen Grund: Ein mit window.open('') geöffnetes
+  // Fenster ist about:blank, und ein dort eingehängtes Skript wird nicht
+  // ausgeführt. Der Aufkleber blieb leer, ohne Fehlermeldung -- auch onerror
+  // schlug nicht an. Fertiges Markup hat dieses Problem nicht.
+  fzQrLaden().then(() => {
+    const q = qrcode(0, 'M');
+    q.addData(ziel.toString());
+    q.make();
+    fzAufkleberFenster(f, q.createSvgTag({ cellSize: 4, margin: 0 }));
+  }).catch(() => toast('Der QR-Code liess sich nicht erzeugen (qrcode.js nicht ladbar).'));
+}
+
+function fzAufkleberFenster(f, svg) {
+  const fenster = window.open('', '_blank', 'width=520,height=680');
+  if (!fenster) { toast('Der Ausdruck wurde vom Browser blockiert. Bitte Pop-ups für diese Seite erlauben.'); return; }
+  const name = [f.marke, f.modell].filter(Boolean).join(' ');
+  fenster.document.write(`<!doctype html><html lang="de"><head><meta charset="utf-8">
+    <title>Aufkleber ${esc(f.kennzeichen)}</title>
+    <style>
+      body { font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; margin: 0;
+             display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+      /* Feste Breite in Millimetern: Der Aufkleber wird geklebt, nicht am
+         Bildschirm gelesen -- was zählt, ist die gedruckte Grösse. 62 mm
+         passt auf gängiges Etikettenpapier und lässt den Code gross genug
+         für eine Handykamera aus Armlänge. */
+      .kleber { width: 62mm; border: 1px solid #C8CDD4; border-radius: 4mm;
+                padding: 6mm; text-align: center; }
+      .lb { font-size: 8pt; letter-spacing: .08em; text-transform: uppercase;
+            color: #6B7280; margin: 0 0 1mm }
+      .kz { font-size: 15pt; font-weight: 700; margin: 0 0 1mm }
+      .bez { font-size: 9pt; color: #6B7280; margin: 0 0 4mm }
+      .qr svg { width: 42mm; height: 42mm; display: block; margin: 0 auto }
+      .txt { font-size: 8.5pt; color: #374151; margin: 4mm 0 0; line-height: 1.35 }
+      @media print { body { min-height: 0 } .kleber { border-color: #9AA1AA } }
+    </style></head><body>
+    <div class="kleber">
+      <p class="lb">Fahrzeugübernahme</p>
+      <p class="kz">${esc(f.kennzeichen)}</p>
+      <p class="bez">${esc(f.bezeichnung || name || '')}</p>
+      <div class="qr" id="qr">${svg}</div>
+      <p class="txt">Vor der Fahrt scannen und den Kilometerstand eintragen.</p>
+    </div></body></html>`);
+  fenster.document.close();
+  fenster.focus();
+  fenster.print();
+}
+
+// ── Änderungsverlauf eines Fahrzeugs (ENT-330) ──────────────────────────
+//
+// Vom Projektinhaber verlangt: *„dass dies mit einem Logeintrag registriert
+// wird […] am besten zusätzlich auch auf der Seite vermerkt mit Datum und
+// Zeitstempel Person"*. Beides kommt aus DERSELBEN Quelle -- dem Logbuch aus
+// ENT-077. Eine zweite Spalte „zuletzt geaendert von" am Fahrzeug waere ein
+// zweiter Ort, an dem dieselbe Tatsache steht und veralten kann.
+let fzLog = null;          // null = noch nicht geholt, [] = nichts vorhanden
+let fzLogEingerichtet = true;
+let fzLogFuer = null;      // zu welchem Fahrzeug gehoert der Stand?
+
+// Die Feldnamen der Datenbank sind fuer den Verlauf unlesbar. Dieselben
+// Beschriftungen wie im Formular darueber -- steht im Verlauf ein anderes
+// Wort als am Feld, sucht man das Feld vergeblich.
+const FZ_FELD_TEXT = {
+  angelegt: 'Fahrzeug angelegt', geloescht: 'Fahrzeug gelöscht',
+  kennzeichen: 'Kontrollschild', bezeichnung: 'Interne Bezeichnung',
+  marke: 'Marke', modell: 'Modell', art: 'Fahrzeugart', treibstoff: 'Treibstoff',
+  farbe: 'Farbe', stammnummer: 'Stammnummer', fahrgestellnummer: 'Fahrgestellnummer',
+  erstzulassung: 'Erstzulassung', besitzart: 'Halterschaft', besitz_bis: 'Vertrag läuft bis',
+  standort_id: 'Standort', status: 'Zustand', ausser_betrieb_grund: 'Grund',
+  mfk_naechste: 'Nächste MFK', vignette_jahr: 'Vignette für das Jahr',
+  versicherung: 'Versicherung', police_nr: 'Policen-Nummer',
+  service_naechster: 'Nächster Service', service_naechste_km: 'Nächster Service bei km',
+  tacho_km: 'Kilometerstand', tacho_am: 'Abgelesen am', bemerkung: 'Bemerkung',
+};
+
+// Ein leerer Wert heisst „stand nichts da" -- nicht „0" und nicht nichts.
+const fzLogWert = w => (w === null || w === '') ? '—' : esc(String(w));
+
+function fzLogLaden(id) {
+  fzLog = null; fzLogFuer = id;
+  return api('fahrzeug_logbuch.php?fahrzeug_id=' + encodeURIComponent(id)).then(({ ok, data }) => {
+    // Nur uebernehmen, wenn inzwischen nicht ein anderes Fahrzeug geoeffnet
+    // wurde -- sonst zeigt die Karte den Verlauf des vorigen.
+    if (fzLogFuer !== id) { return; }
+    if (!ok || data.status !== 'ok') { fzLog = []; fzLogEingerichtet = true; return; }
+    fzLog = data.eintraege || [];
+    fzLogEingerichtet = data.eingerichtet !== false;
+  }).catch(() => { if (fzLogFuer === id) { fzLog = []; } });
+}
+
+function fzLogZeichnen() {
+  const zone = $('fzVerlaufZone'), kopf = $('fzVerlaufKopf'),
+        liste = $('fzVerlauf'), tacho = $('fzTachoLog');
+  if (!zone || !kopf || !liste || !tacho) { return; }
+
+  // Neues Fahrzeug: Es gibt noch nichts zu zeigen, und „nie geaendert" waere
+  // die falsche Aussage -- es existiert noch gar nicht.
+  if (!fzTarget) {
+    zone.style.display = 'none';
+    tacho.textContent = 'Wer den Kilometerstand einträgt, wird beim Speichern festgehalten.';
+    return;
+  }
+  zone.style.display = '';
+
+  if (fzLog === null) {
+    kopf.textContent = 'Verlauf wird geladen …';
+    liste.innerHTML = ''; tacho.textContent = '';
+    return;
+  }
+  // Vier verschiedene Aussagen, vier Texte: Logbuch nicht eingerichtet /
+  // eingerichtet, aber nichts geändert / geändert / der Kilometerstand
+  // eigens. „Nicht eingerichtet" darf nie wie „nichts passiert" aussehen.
+  if (!fzLogEingerichtet) {
+    kopf.textContent = 'Das Logbuch ist noch nicht eingerichtet — darum steht hier kein Verlauf. '
+      + 'Das ist etwas anderes als „an diesem Fahrzeug wurde nichts geändert".';
+    liste.innerHTML = '';
+    tacho.textContent = 'Ohne eingerichtetes Logbuch lässt sich nicht sagen, wer den Kilometerstand zuletzt geändert hat.';
+    return;
+  }
+
+  const wer = e => `${dmyZeit(e.zeitpunkt)} — ${esc(e.akteur_anzeige || e.akteur_name || '?')}`;
+  const letzte = fzLog[0] || null;
+  kopf.textContent = letzte
+    ? 'Zuletzt geändert: ' + dmyZeit(letzte.zeitpunkt) + ' — ' + (letzte.akteur_anzeige || letzte.akteur_name || '?')
+    : 'Seit der Einrichtung des Logbuchs wurde an diesem Fahrzeug nichts geändert.';
+
+  // Der Kilometerstand eigens -- an ihm hängt die spätere Kontrolle.
+  const letzteKm = fzLog.find(e => e.feld === 'tacho_km');
+  tacho.innerHTML = letzteKm
+    ? `<b>Kilometerstand zuletzt geändert:</b> ${wer(letzteKm)}`
+      + (letzteKm.wert_alt !== null && letzteKm.wert_alt !== ''
+          ? ` (${fzLogWert(letzteKm.wert_alt)} → ${fzLogWert(letzteKm.wert_neu)})` : '')
+    : 'Der Kilometerstand wurde seit der Einrichtung des Logbuchs nicht geändert.';
+
+  if (!fzLog.length) { liste.innerHTML = ''; return; }
+  liste.innerHTML = `<div class="tw"><table class="tbl"><thead><tr>
+      <th>Wann</th><th>Wer</th><th>Was</th><th>Von</th><th>Auf</th>
+    </tr></thead><tbody>` + fzLog.map(e => `<tr>
+      <td class="nowrap">${dmyZeit(e.zeitpunkt)}</td>
+      <td>${esc(e.akteur_anzeige || e.akteur_name || '?')}</td>
+      <td>${esc(FZ_FELD_TEXT[e.feld] || e.feld)}</td>
+      <td>${e.werte_verborgen ? '<span style="color:var(--ink-3)">nicht protokolliert</span>' : fzLogWert(e.wert_alt)}</td>
+      <td>${e.werte_verborgen ? '<span style="color:var(--ink-3)">nicht protokolliert</span>' : fzLogWert(e.wert_neu)}</td>
+    </tr>`).join('') + `</tbody></table></div>`;
 }
 
 function fzFormularLeeren() {
@@ -16173,6 +16391,8 @@ function fzFormularLeeren() {
   if ($('fzStandort')) { $('fzStandort').value = ''; }
   if ($('fzBtn')) { $('fzBtn').textContent = 'Hinzufügen'; }
   fzZustandFelder();
+  fzLog = null; fzLogFuer = null;
+  fzLogZeichnen();
 }
 
 function fzBearbeiten(id) {
@@ -16206,6 +16426,8 @@ function fzBearbeiten(id) {
   $('fzBemerkung').value = f.bemerkung || '';
   $('fzBtn').textContent = 'Speichern';
   fzZustandFelder();
+  fzLogZeichnen();                                   // zeigt sofort „wird geladen …"
+  fzLogLaden(f.id).then(() => fzLogZeichnen());
   $('fzKennzeichen').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
@@ -16727,8 +16949,7 @@ function epKopfZeichnen() {
     </div>
     ${epWegWarnung(e)}
     ${epGavAus010Warnung(e)}
-    ${epFahrzeugBlock(e)}
-    ${epVerkehrsmittelBlock(e)}
+    ${epFahrtBlock(e)}
     <div class="card-bd ep-zone">${epRapportBlock(e)}${epDokBlock()}</div>
     ${epRechnungBlock(e)}`;
 }
@@ -17018,34 +17239,35 @@ function epErwarteteStrecke(e, fz) {
             für einen späteren Abgleich mit dem Tachostand — kein gespeicherter Wert.` };
 }
 
-function epFahrzeugBlock(e) {
+function epFahrtBlock(e) {
   if (!e) { return ''; }
   // Wird der Einsatzplan als erste Ansicht geoeffnet, ist die Fahrzeugliste
-  // noch unterwegs. Dann faenden weder das Kennzeichen noch die erwartete
-  // Strecke ihr Fahrzeug -- der Block stuende halb leer da, ohne dass etwas
-  // kaputt waere. Also: einmal nachladen und den ganzen Kopf neu zeichnen.
-  // Das Merkmal ist "Liste geholt", nicht "Liste nicht leer" -- sonst liefe
-  // ein Betrieb ohne Fahrzeuge in eine Endlosschleife.
+  // noch unterwegs -- dann faenden weder das Kennzeichen noch die erwartete
+  // Strecke ihr Fahrzeug. Einmal nachladen, Kopf neu zeichnen. Das Merkmal
+  // ist "Liste geholt", nicht "Liste nicht leer" -- sonst liefe ein Betrieb
+  // ohne Fahrzeuge in eine Endlosschleife.
   if (!fzFuerPlanungDa) {
     ladeFahrzeugeEinmal().then(() => { if ($('epKopf')) { epKopfZeichnen(); } });
   }
+
   // Der Schluessel fehlt ganz, solange die Einrichtung nicht gelaufen ist
-  // (einsatz_list.php). Das ist etwas anderes als "kein Fahrzeug zugeteilt"
-  // und wird auch anders benannt.
+  // (einsatz_list.php). Das ist etwas anderes als "kein Fahrzeug zugeteilt".
   const eingerichtet = Object.prototype.hasOwnProperty.call(e, 'fahrzeug_id');
   const gesperrt = enGesperrt(e);
   const fz = eingerichtet && e.fahrzeug_id != null
     ? fahrzeuge.find(f => Number(f.id) === Number(e.fahrzeug_id)) : null;
+  const ids = [...new Set((epPos || []).filter(epBesetzt).map(p => Number(p.mitarbeiter_id)))];
 
-  let inhalt;
+  // ── Teil 1: Fahrzeug und Fahrer
+  let oben;
   if (!eingerichtet) {
-    inhalt = `<div class="zone-note">Die Einrichtung für Dienstfahrzeuge ist noch nicht gelaufen —
+    oben = `<div class="zone-note">Die Einrichtung für Dienstfahrzeuge ist noch nicht gelaufen —
       darum lässt sich hier keines zuteilen. Das ist etwas anderes als „kein Fahrzeug im Einsatz".</div>`;
   } else if (gesperrt) {
-    // Festgeschrieben: anzeigen, nicht anbieten. Am Fahrer haengt der
-    // Fahrkostenersatz, und der ist beim Abgleich bereits erfasst (ENT-045).
+    // Festgeschrieben: anzeigen, nicht anbieten (ENT-045). Am Fahrer haengt
+    // der Fahrkostenersatz, und der ist beim Abgleich bereits erfasst.
     const fahrer = e.fahrer_id != null ? mitarbeiter.find(m => Number(m.id) === Number(e.fahrer_id)) : null;
-    inhalt = `<div class="ep-kopf" style="padding:0">
+    oben = `<div class="ep-kopf" style="padding:0">
       <div class="ep-kf"><span>Dienstfahrzeug</span><b>${fz
         ? esc([fz.kennzeichen, fz.bezeichnung].filter(Boolean).join(' · '))
         : (e.fahrzeug_id == null ? 'keines eingeteilt' : 'nicht mehr erfasst')}</b></div>
@@ -17054,16 +17276,13 @@ function epFahrzeugBlock(e) {
         : (e.fahrer_id == null ? 'nicht bestimmt' : 'nicht mehr erfasst')}</b></div>
     </div>`;
   } else {
-    const ids = [...new Set((epPos || []).filter(epBesetzt).map(p => Number(p.mitarbeiter_id)))];
-    inhalt = `<div class="form-grid">
+    oben = `<div class="form-grid">
         <div class="f"><label for="epFahrzeug">Dienstfahrzeug</label>
           <select class="inp" id="epFahrzeug" onchange="epFahrzeugGeaendert()"></select></div>
         <div class="f"><label for="epFahrer">Fahrer</label>
           <select class="inp" id="epFahrer" onchange="epFahrzeugSpeichern()"></select></div>
       </div>
       <div class="zone-note" id="epFahrzeugHinweis"></div>`;
-    // Die Auswahlfelder werden nach dem Einsetzen gefuellt: Sie brauchen die
-    // Fahrzeugliste, und die kommt gegebenenfalls erst noch.
     setTimeout(() => {
       if (!$('epFahrzeug')) { return; }
       enFahrzeugOptionen($('epFahrzeug'), e.fahrzeug_id);
@@ -17073,12 +17292,59 @@ function epFahrzeugBlock(e) {
   }
 
   const erwartet = epErwarteteStrecke(e, fz);
+
+  // ── Teil 2: Verkehrsmittel je Person -- nur, wo es ueberhaupt um Geld geht
+  //
+  // Steht IM SELBEN Block, nicht daneben: Bis ENT-334 waren es zwei Karten
+  // untereinander, die dasselbe erzaehlten -- wer faehrt, stand einmal als
+  // Fahrerwahl und einmal als festgestelltes Verkehrsmittel, mit zwei langen
+  // Hinweisen ueber denselben Sachverhalt. Der Projektinhaber hat das als
+  // Dopplung beanstandet.
+  const nao = typeof aoNao === 'function' ? aoNao() : null;
+  const z = (e.weg_km && typeof gavZone === 'function')
+    ? gavZone(e.weg_km, null, nao ? nao.km_zum_anderen : null) : null;
+  const leute = (epPos || []).filter(epBesetzt);
+  const vmZeigen = !gesperrt && z && z.entschaedigung && leute.length;
+
+  const optionen = ['Privatfahrzeug', 'Oeffentlicher Verkehr', 'Mitfahrer', 'Geschaeftsfahrzeug'];
+  const zeile = p => {
+    const ma = mitarbeiter.find(m => Number(m.id) === Number(p.mitarbeiter_id));
+    const vorgabe = ma ? ma.verkehrsmittel : null;
+    const wert = p.verkehrsmittel || '';   // '' heisst: die Vorgabe gilt
+    const name = (ma && (fullName(ma) || ma.name)) || p.mitarbeiter || ('#' + p.mitarbeiter_id);
+    // Wer das Dienstfahrzeug fuehrt, faehrt damit -- das Feld steht fest
+    // (ENT-328). Der Server weist eine Aenderung ohnehin ab; ein bedienbares
+    // Feld, das beim Klicken eine Fehlermeldung wirft, waere eine Falle.
+    const istFahrer = e.fahrer_id != null && Number(e.fahrer_id) === Number(p.mitarbeiter_id);
+    return `<div class="f" style="margin-bottom:9px">
+      <label>${esc(name)}${istFahrer
+        ? ' <span class="note" style="font-weight:500">— fährt das Dienstfahrzeug</span>'
+        : (vorgabe ? '' : ' <span class="note" style="font-weight:500">— keine Vorgabe hinterlegt</span>')}</label>
+      <div class="inp-row">
+        <select class="inp"${istFahrer ? ' disabled' : ''} data-vm-ma="${Number(p.mitarbeiter_id)}" onchange="epVerkehrsmittelGeaendert(this)">
+          <option value="">${vorgabe ? 'Vorgabe: ' + esc(vorgabe) : '– kein Verkehrsmittel gewählt –'}</option>
+          ${optionen.map(o => `<option value="${esc(o)}"${wert === o ? ' selected' : ''}>${esc(o)}</option>`).join('')}
+        </select>
+        <input class="inp" type="number" min="0" max="999.99" step="0.05" data-vm-oev="${Number(p.mitarbeiter_id)}"
+               style="max-width:130px;display:${wert === 'Oeffentlicher Verkehr' ? '' : 'none'}"
+               placeholder="Billett CHF" value="${p.oev_rappen != null ? (p.oev_rappen / 100).toFixed(2) : ''}"
+               onchange="epVerkehrsmittelSpeichern(${Number(p.mitarbeiter_id)})">
+      </div>
+    </div>`;
+  };
+
   return `<div class="card-bd" style="padding:0 16px 14px">
     <div class="zone">
-      <div class="zone-hd">Dienstfahrzeug und Fahrer</div>
-      ${inhalt}
-      ${erwartet ? `<div class="zone-note" style="margin-top:10px"><b>Erwartete Fahrstrecke:
+      <div class="zone-hd">Dienstfahrzeug und Verkehrsmittel</div>
+      ${oben}
+      ${erwartet ? `<div class="zone-note" style="margin-top:8px"><b>Erwartete Fahrstrecke:
         ${erwartet.text}</b> — ${erwartet.grund}</div>` : ''}
+      ${vmZeigen ? `<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line)">
+        <div class="zone-note" style="margin-bottom:10px">Verkehrsmittel je Person — massgeblich für den
+          Fahrkostenersatz (Art. 18 Ziff. 4/5). Ohne Angabe gilt beim Abgleich die Vorgabe aus dem
+          Stammblatt.</div>
+        ${leute.map(zeile).join('')}
+      </div>` : ''}
     </div></div>`;
 }
 
@@ -17133,54 +17399,6 @@ function epFahrzeugSpeichern() {
     epKopfZeichnen();
     toast('Dienstfahrzeug gespeichert.');
   }).catch(() => toast('Das Dienstfahrzeug liess sich nicht speichern.'));
-}
-
-function epVerkehrsmittelBlock(e) {
-  if (!e || !e.weg_km || enGesperrt(e)) { return ''; }
-  const nao = typeof aoNao === 'function' ? aoNao() : null;
-  const z = typeof gavZone === 'function'
-    ? gavZone(e.weg_km, null, nao ? nao.km_zum_anderen : null) : null;
-  if (!z || !z.entschaedigung) { return ''; }
-
-  const leute = (epPos || []).filter(epBesetzt);
-  if (!leute.length) { return ''; }
-
-  const optionen = ['Privatfahrzeug', 'Oeffentlicher Verkehr', 'Mitfahrer', 'Geschaeftsfahrzeug'];
-  const zeile = p => {
-    const ma = mitarbeiter.find(m => Number(m.id) === Number(p.mitarbeiter_id));
-    const vorgabe = ma ? ma.verkehrsmittel : null;
-    const wert = p.verkehrsmittel || '';   // '' heisst: die Vorgabe gilt
-    const name = (ma && (fullName(ma) || ma.name)) || p.mitarbeiter || ('#' + p.mitarbeiter_id);
-    // Wer das Dienstfahrzeug fuehrt, faehrt damit -- das Feld steht fest
-    // (ENT-328). Der Server weist eine Aenderung ohnehin ab; ein bedienbares
-    // Feld, das beim Klicken eine Fehlermeldung wirft, waere eine Falle.
-    const istFahrer = e.fahrer_id != null && Number(e.fahrer_id) === Number(p.mitarbeiter_id);
-    return `<div class="f" style="margin-bottom:9px">
-      <label>${esc(name)}${istFahrer
-        ? ' <span class="note" style="font-weight:500">— fährt das Dienstfahrzeug</span>'
-        : (vorgabe ? '' : ' <span class="note" style="font-weight:500">— keine Vorgabe hinterlegt</span>')}</label>
-      <div class="inp-row">
-        <select class="inp"${istFahrer ? ' disabled' : ''} data-vm-ma="${Number(p.mitarbeiter_id)}" onchange="epVerkehrsmittelGeaendert(this)">
-          <option value="">${vorgabe ? 'Vorgabe: ' + esc(vorgabe) : '– kein Verkehrsmittel gewählt –'}</option>
-          ${optionen.map(o => `<option value="${esc(o)}"${wert === o ? ' selected' : ''}>${esc(o)}</option>`).join('')}
-        </select>
-        <input class="inp" type="number" min="0" max="999.99" step="0.05" data-vm-oev="${Number(p.mitarbeiter_id)}"
-               style="max-width:130px;display:${wert === 'Oeffentlicher Verkehr' ? '' : 'none'}"
-               placeholder="Billett CHF" value="${p.oev_rappen != null ? (p.oev_rappen / 100).toFixed(2) : ''}"
-               onchange="epVerkehrsmittelSpeichern(${Number(p.mitarbeiter_id)})">
-      </div>
-    </div>`;
-  };
-
-  return `<div class="card-bd" style="padding:0 16px 14px">
-    <div class="zone">
-      <div class="zone-hd">Verkehrsmittel zum Einsatz</div>
-      <div class="zone-note">Massgeblich für den Fahrkostenersatz (Art. 18 Ziff. 4/5) — der
-        Fahrzeitersatz ist davon unabhängig. Ohne Angabe wird beim Abgleich die im Stammblatt
-        hinterlegte Vorgabe verwendet; hier lässt sie sich nur für diesen einen Einsatz
-        überschreiben, etwa für eine Fahrgemeinschaft.</div>
-      ${leute.map(zeile).join('')}
-    </div></div>`;
 }
 
 function epVerkehrsmittelGeaendert(sel) {

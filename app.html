@@ -941,6 +941,38 @@ const W = {
     kunde: 'Kunde', arbeitsort: 'Arbeitsort', zeit: 'Zeit', einsatzart: 'Einsatzart',
     bemerkung: 'Bemerkung', objekt: 'Objekt', imTeam: 'im Team',
     treffpunkt: 'Treffpunkt', kontaktVorOrt: 'Kontakt vor Ort',
+    // Dienstfahrzeug der Schicht (ENT-334). "Du fährst" ist eine Aufgabe,
+    // "fährt" eine Auskunft -- der Unterschied muss im Wort liegen, nicht
+    // nur in der Farbe.
+    dienstfahrzeug: 'Dienstfahrzeug', duFaehrst: 'Du fährst',
+    faehrtWer: 'fährt', fahrerOffen: 'Fahrer noch nicht bestimmt',
+    // Fahrzeugübernahme (ENT-340). Vier Zustände, vier Texte: nicht
+    // eingerichtet / eingerichtet, aber kein Fahrzeug erfasst / nicht
+    // abrufbar / kein Kilometerstand bekannt. Sie sehen sich ähnlich und
+    // bedeuten Verschiedenes.
+    fzuKachel: 'Fahrzeugübernahme', fzuTitel: 'Fahrzeug übernehmen',
+    fzuFrageTitel: 'Dienstfahrzeug?',
+    fzuFrage: 'Nimmst du heute ein Dienstfahrzeug?',
+    fzuFrageHinweis: 'Übernimm es, bevor du losfährst — nachher stimmt der Kilometerstand beim Antritt nicht mehr. Die Frage kommt einmal pro Tag.',
+    fzuJa: 'Ja, Fahrzeug übernehmen', fzuNein: 'Nein, kein Dienstfahrzeug',
+    fzuFahrzeug: 'Fahrzeug', fzuFahrzeugWahl: 'Bitte wählen',
+    fzuFahrzeugPflicht: 'Bitte ein Fahrzeug wählen.',
+    fzuKm: 'Kilometerstand', fzuKmHinweis: 'Die Zahl auf dem Tacho, ohne Nachkommastellen.',
+    fzuKmPflicht: 'Bitte den Kilometerstand eintragen.',
+    fzuFoto: 'Foto vom Tacho (freiwillig)', fzuFotoAufnehmen: 'Tacho fotografieren',
+    fzuFotoEntfernen: 'Foto entfernen', fzuFotoFehler: 'Das Foto liess sich nicht verarbeiten.',
+    fzuLetzterStand: 'Zuletzt bekannt', fzuStandStamm: 'aus den Stammdaten',
+    fzuStandKeiner: 'Für dieses Fahrzeug ist noch kein Kilometerstand erfasst.',
+    fzuUebernehmen: 'Übernehmen', fzuGespeichert: 'Fahrzeug übernommen.',
+    fzuOhneGespeichert: 'Notiert: heute ohne Dienstfahrzeug.',
+    fzuSeither: 'Seit dem letzten Stand',
+    fzuNichtEingerichtet: 'Die Fahrzeugübernahme ist noch nicht eingerichtet.',
+    fzuNichtEingerichtetText: 'Das ist etwas anderes als „kein Fahrzeug vorhanden“ — die Verwaltung muss die Einrichtung einmal ausführen.',
+    fzuKeineFahrzeuge: 'Kein Dienstfahrzeug im Betrieb',
+    fzuKeineFahrzeugeText: 'Es ist zurzeit kein Fahrzeug erfasst, das sich übernehmen liesse.',
+    fzuNichtAbrufbar: 'Die Fahrzeugfrage liess sich nicht laden — bitte die Übernahme im Wächter-Bereich nachholen.',
+    fzuScanUnbekannt: 'Dieser Aufkleber gehört zu keinem Fahrzeug.',
+    fzuSchonHeute: 'Du hast die Frage heute schon beantwortet. Eine weitere Übernahme ist trotzdem möglich.',
     route: 'Route öffnen', routeFehlt: 'Für diese Schicht ist keine Adresse hinterlegt.',
     dokumente: 'Unterlagen', dokumenteLaden: 'wird geladen …',
     dokumentFehler: 'Die Unterlage liess sich nicht öffnen.',
@@ -1304,6 +1336,20 @@ function starten() {
   // Meldung noch Eintraege in localStorage, wird jetzt ein Sendeversuch
   // unternommen (ENT-132 Punkt 5).
   rdWarteschlangeSenden();
+  // Der Aufkleber im Fahrzeug (ENT-340) fuehrt auf app.html?fz=<Kennung>.
+  // Bewusst die normale Kamera-App des Telefons als Scanner: Sie kann jedes
+  // Geraet, sie oeffnet die Adresse selbst, und ein eigener Scanner im
+  // Browser waere auf iOS-Safari ohnehin nicht zuverlaessig verfuegbar.
+  //
+  // Die Kennung wird SOFORT aus der Adresszeile entfernt: Sie ist das
+  // Geheimnis hinter dem Aufkleber und hat weder im Verlauf noch in einem
+  // geteilten Link etwas zu suchen.
+  const start = new URLSearchParams(location.search);
+  const fzKennung = start.get('fz');
+  if (fzKennung) {
+    history.replaceState(null, '', location.pathname);
+    fzuAusKennung(fzKennung);
+  }
 }
 
 // ══════════════════════════════════════════ LADEN
@@ -1766,6 +1812,13 @@ function zeichneRapport() {
 // Fortsetzung) -- die eigene, bereits zugeteilte Schicht bleibt daneben
 // weiterhin ueber "Heute"/"Plan" erreichbar (rundgangAbschnittZeichnen,
 // ENT-180/182/145/146/153), keine zweite Checkliste fuer denselben Fall.
+// "Fahrzeugübernahme" (ENT-340) steht bewusst NEBEN "Rundgänge" und nicht
+// darin: Sie gehoert zum Antritt, nicht zur Runde. Vom Projektinhaber so
+// verlangt -- *"bevor ein Rundgang angeklickt wird, die Frage kommt, ob ein
+// Dienstfahrzeug im Einsatz ist"* --, weil der Waechter sonst losfaehrt und
+// die Uebernahme vergisst. Der Riegel dazu sitzt in fzuTor(); die Kachel ist
+// der Weg fuer alle uebrigen Faelle (zweites Fahrzeug am selben Tag, Fahrt
+// ohne Rundgang).
 // "Schluesselverwaltung" ist inhaltlich entschieden (ENT-149), aber noch
 // nicht gebaut -- gleicher Platzhalter-Umgang wie bei den Betrieb-Kacheln
 // in dashboard.html (onclick -> toast).
@@ -1776,11 +1829,315 @@ function zeichneWaechter() {
         <span class="mk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M12 19h4a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2H8a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h4"/></svg></span>
         <span class="mk-kachel-lbl">${esc(w('waechterRundgangLbl'))}</span>
       </button>
+      <button type="button" id="mk-fahrzeug" class="mk-kachel" onclick="fzuOeffnen()">
+        <span class="mk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><path d="M5 17H3v-5l2-5h14l2 5v5h-2"/><circle cx="7.5" cy="17" r="2"/><circle cx="16.5" cy="17" r="2"/><line x1="9.5" y1="17" x2="14.5" y2="17"/></svg></span>
+        <span class="mk-kachel-lbl">${esc(w('fzuKachel'))}</span>
+      </button>
       <button type="button" id="mk-schluessel" class="mk-kachel" onclick="toast('Folgt in einem späteren Schritt.')">
         <span class="mk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><circle cx="7" cy="15" r="4"/><line x1="10" y1="12" x2="20" y2="2"/><line x1="15" y1="7" x2="18" y2="10"/><line x1="18" y1="4" x2="21" y2="7"/></svg></span>
         <span class="mk-kachel-lbl">${esc(w('waechterSchluesselLbl'))}</span>
       </button>
     </div>`;
+}
+
+/* ══ FAHRZEUGÜBERNAHME (ENT-340) ═══════════════════════════════════════
+   Der Weg, den der Projektinhaber beschrieben hat: *"Mitarbeiter steigt in
+   Dienstfahrzeug scannt Code, fotografiert Tacho und/oder trägt KM ein,
+   wählt Dienstfahrzeug aus, Schickt ab fertig."*
+
+   DREI EINSTIEGE, EIN FORMULAR:
+    1. der Aufkleber im Auto (?fz=… beim Start der App, fzuAusUrl),
+    2. die Kachel im Wächter-Bereich (fzuOeffnen),
+    3. der Riegel vor dem Rundgang (fzuTor).
+
+   Der Riegel ist der eigentliche Auftrag: *"bevor ein Rundgang angeklickt
+   wird, die Frage kommt, ob ein Dienstfahrzeug im Einsatz ist... dass der
+   Mitarbeiter nicht schon losfährt zum Objekt, in die Rundgänge geht und
+   der Prozess der Fahrzeugübernahme vergisst."* Er sitzt vor BEIDEN Wegen
+   in den Rundgang -- Kachel und eigene Schicht. Ein Riegel, um den ein Weg
+   herumführt, ist keiner.
+
+   Er fragt EINMAL PRO TAG, nicht bei jedem Antippen: Wer die Frage bei
+   jeder Runde derselben Nacht wieder sieht, klickt sie weg, ohne sie zu
+   lesen -- und dann hat man eine Nachfrage gebaut, die nichts mehr sichert.
+   Und "kein Dienstfahrzeug" wird MITGESCHRIEBEN, nicht bloss durchgelassen:
+   Sonst liesse sich später nicht unterscheiden, ob jemand ohne Fahrzeug
+   unterwegs war oder die Frage nie gesehen hat.
+
+   NIE BLOCKIEREND: Lässt sich die Frage nicht laden, geht es weiter. Der
+   Rundgang ist die Pflicht, die Übernahme die Begleitung -- ein Netzfehler
+   darf keinen Wächter vor einem verschlossenen Bildschirm stehen lassen. */
+let fzuFahrzeuge = null;        // null = noch nicht geladen (nicht: keine)
+let fzuEingerichtet = null;     // null = unbekannt, false = Einrichtung fehlt
+let fzuHeuteBeantwortet = false;
+let fzuGewaehlt = null;         // {id, kennzeichen, bezeichnung, letzter_stand}
+let fzuKennung = null;          // aus dem Aufkleber, verlässt das Gerät nur beim Senden
+let fzuFoto = null;
+let fzuDanach = null;           // was nach dem Abschicken geschehen soll (Riegel)
+
+function fzuLaden() {
+  return api('meine_fahrzeuge.php').then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') { fzuEingerichtet = null; return false; }
+    fzuEingerichtet = data.eingerichtet !== false;
+    fzuFahrzeuge = data.fahrzeuge || [];
+    fzuHeuteBeantwortet = !!data.heute_beantwortet;
+    return true;
+  });
+}
+
+// Der Riegel. weiter() wird in JEDEM Fall irgendwann aufgerufen -- entweder
+// sofort oder nachdem die Frage beantwortet ist.
+function fzuTor(weiter) {
+  if (fzuHeuteBeantwortet) { weiter(); return; }
+  fzuLaden().then(geladen => {
+    if (!geladen) { toast(w('fzuNichtAbrufbar')); weiter(); return; }
+    // Nicht eingerichtet und "kein Fahrzeug erfasst" sind zwei verschiedene
+    // Aussagen -- gefragt wird in beiden Fällen nicht, aber sie werden nicht
+    // in einen Topf geworfen: Wer nie ein Fahrzeug erfasst hat, soll keine
+    // Frage sehen, und wer die Einrichtung schuldet, merkt es im Cockpit.
+    if (!fzuEingerichtet || fzuHeuteBeantwortet || !(fzuFahrzeuge || []).length) { weiter(); return; }
+    fzuFrageZeigen(weiter);
+  });
+}
+
+function fzuFrageZeigen(weiter) {
+  fzuDanach = weiter || null;
+  $('blTitel').textContent = w('fzuFrageTitel');
+  $('blBody').innerHTML = `
+    <p style="margin:0 0 6px;font-weight:650">${esc(w('fzuFrage'))}</p>
+    <p style="margin:0 0 16px;font-size:13px;color:var(--ink-3)">${esc(w('fzuFrageHinweis'))}</p>
+    <div id="fzuFrageErr" class="msg-err" style="display:none"></div>`;
+  // Die beiden Antworten stehen UNTEREINANDER, nicht nebeneinander:
+  // Nebeneinander passten die zwei Texte auf einem 390-px-Telefon nicht --
+  // der rechte Knopf wurde am Rand abgeschnitten. Gemessen am gerenderten
+  // Zustand, im Quelltext war davon nichts zu sehen. .gestapelt ist das
+  // bestehende Muster dafür (siehe rundgangFussZeichnen).
+  const fuss = $('blFuss');
+  fuss.className = 'blatt-ft gestapelt';
+  fuss.innerHTML = `
+    <button class="btn btn-primary" onclick="fzuFormular()">${esc(w('fzuJa'))}</button>
+    <button class="btn btn-plain" id="fzuNeinBtn" onclick="fzuOhneFahrzeug()">${esc(w('fzuNein'))}</button>`;
+  blattZeigen();
+}
+
+// "Nein" ist eine Antwort und wird gespeichert. Scheitert das Speichern,
+// geht es trotzdem weiter -- aber der Tag gilt dann NICHT als beantwortet,
+// die Frage kommt beim nächsten Mal wieder.
+function fzuOhneFahrzeug() {
+  const btn = $('fzuNeinBtn'); if (btn) btn.disabled = true;
+  api('meine_fahrzeug_uebernahme.php', { method: 'POST', body: { art: 'ohne_fahrzeug' } })
+    .then(({ ok, data }) => {
+      if (ok && data.status === 'ok') { fzuHeuteBeantwortet = true; toast(w('fzuOhneGespeichert')); }
+      else { toast(data.message || w('netzfehler')); }
+      fzuWeiter();
+    });
+}
+
+// Nach dem Abschicken: zurück in den Ablauf, aus dem der Riegel kam. Ohne
+// Riegel (Kachel oder Aufkleber) bleibt der Wächter-Bereich stehen.
+function fzuWeiter() {
+  const w2 = fzuDanach; fzuDanach = null;
+  blattZu();
+  if (w2) { w2(); }
+}
+
+// "Zurück" im Formular heisst ZURÜCK ZUR FRAGE, nicht weiter in den
+// Rundgang -- sonst wäre der Riegel mit einem Knopf zu umgehen, und zwar
+// mit dem, den man drückt, wenn man sich vertippt hat. Ohne Riegel
+// (Kachel, Aufkleber) schliesst er die Schublade.
+function fzuZurueck() {
+  if (fzuDanach) { fzuFrageZeigen(fzuDanach); return; }
+  blattZu();
+}
+
+// Die Kachel im Wächter-Bereich.
+function fzuOeffnen() {
+  fzuDanach = null;
+  fzuLaden().then(geladen => {
+    if (!geladen) { toast(w('fzuNichtAbrufbar')); return; }
+    fzuFormular();
+  });
+}
+
+// Der Aufkleber im Auto. Das Kennzeichen wird SERVERSEITIG aufgelöst; die
+// Kennung selbst wird hier nur weitergereicht und nie angezeigt.
+function fzuAusKennung(kennung) {
+  api('meine_fahrzeuge.php?kennung=' + encodeURIComponent(kennung)).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok' || !data.fahrzeug) {
+      toast(data.message || w('fzuScanUnbekannt'));
+      fzuOeffnen();
+      return;
+    }
+    fzuEingerichtet = true;
+    fzuKennung = kennung;
+    fzuGewaehlt = data.fahrzeug;
+    fzuDanach = null;
+    fzuFormular();
+  });
+}
+
+function fzuFormular() {
+  const liste = fzuFahrzeuge || [];
+  $('blTitel').textContent = w('fzuTitel');
+
+  // Vier verschiedene Aussagen, vier Texte.
+  if (fzuEingerichtet === false) {
+    $('blBody').innerHTML = LEER(w('fzuNichtEingerichtet'), w('fzuNichtEingerichtetText'),
+      '<path d="M5 17H3v-5l2-5h14l2 5v5h-2"/><circle cx="7.5" cy="17" r="2"/><circle cx="16.5" cy="17" r="2"/>');
+    $('blFuss').className = 'blatt-ft';
+    $('blFuss').innerHTML = `<button class="btn btn-plain" onclick="fzuWeiter()">${esc(w('zurueck'))}</button>`;
+    blattZeigen();
+    return;
+  }
+  if (!fzuGewaehlt && !liste.length) {
+    $('blBody').innerHTML = LEER(w('fzuKeineFahrzeuge'), w('fzuKeineFahrzeugeText'),
+      '<path d="M5 17H3v-5l2-5h14l2 5v5h-2"/><circle cx="7.5" cy="17" r="2"/><circle cx="16.5" cy="17" r="2"/>');
+    $('blFuss').className = 'blatt-ft';
+    $('blFuss').innerHTML = `<button class="btn btn-plain" onclick="fzuWeiter()">${esc(w('zurueck'))}</button>`;
+    blattZeigen();
+    return;
+  }
+
+  // Kam die Person über den Aufkleber, steht das Fahrzeug fest und wird
+  // GENANNT statt zur Wahl gestellt: Sie steht davor, eine Auswahlliste wäre
+  // eine Gelegenheit, sich zu vertun.
+  const fest = fzuGewaehlt;
+  const feld = fest
+    ? `<div class="rgs-fakt" style="border:1px solid var(--line);border-radius:var(--r-sm);margin-bottom:14px">
+         <div class="rgs-fakt-lb">${esc(w('fzuFahrzeug'))}</div>
+         <div class="rgs-fakt-wert">${esc(fest.kennzeichen)}</div>
+         ${fest.bezeichnung ? `<div class="rgs-leer" style="padding:4px 0 0;font-size:12.5px">${esc(fest.bezeichnung)}</div>` : ''}
+       </div>`
+    : `<div class="f"><label for="fzuWahl">${esc(w('fzuFahrzeug'))}</label>
+         <select class="inp" id="fzuWahl" onchange="fzuWahlGeaendert()">
+           <option value="">${esc(w('fzuFahrzeugWahl'))}</option>
+           ${liste.map(f => `<option value="${Number(f.id)}">${esc(f.kennzeichen)}${f.bezeichnung ? ' · ' + esc(f.bezeichnung) : ''}</option>`).join('')}
+         </select>
+       </div>`;
+
+  $('blBody').innerHTML = `
+    ${fzuHeuteBeantwortet ? `<p style="margin:0 0 12px;font-size:13px;color:var(--ink-3)">${esc(w('fzuSchonHeute'))}</p>` : ''}
+    ${feld}
+    <div id="fzuStand" style="margin:-4px 0 14px;font-size:13px;color:var(--ink-3)"></div>
+    <div class="f"><label for="fzuKm">${esc(w('fzuKm'))}</label>
+      <input class="inp" id="fzuKm" type="number" inputmode="numeric" min="0" step="1">
+      <div style="font-size:12.5px;color:var(--ink-3);margin-top:4px">${esc(w('fzuKmHinweis'))}</div>
+    </div>
+    <div class="f" style="margin-bottom:0">
+      <label>${esc(w('fzuFoto'))}</label>
+      <div id="fzuFotoBereich">
+        <button type="button" class="btn btn-plain" style="min-height:44px" onclick="document.getElementById('fzuFotoInput').click()">
+          <svg class="i i-sm" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          ${esc(w('fzuFotoAufnehmen'))}
+        </button>
+      </div>
+      <input type="file" accept="image/*" capture="environment" id="fzuFotoInput" onchange="fzuFotoGewaehlt()" style="display:none">
+    </div>
+    <div id="fzuErr" class="msg-err" style="display:none;margin-top:12px"></div>`;
+  // Stapelung der Frage wieder aufheben -- sie gehört zu jenem Schritt.
+  $('blFuss').className = 'blatt-ft';
+  $('blFuss').innerHTML = `
+    <button class="btn btn-plain" onclick="fzuZurueck()">${esc(w('zurueck'))}</button>
+    <button class="btn btn-primary" id="fzuBtn" onclick="fzuSenden()">${esc(w('fzuUebernehmen'))}</button>`;
+  blattZeigen();
+  fzuStandZeichnen();
+  if (fzuFoto) { fzuFotoVorschau(); }
+}
+
+// Der bekannte Stand -- worauf die Eingabe aufsetzt. "Noch keiner" ist eine
+// eigene Aussage und darf nicht wie "0 km" aussehen.
+function fzuStandZeichnen() {
+  const el = $('fzuStand'); if (!el) return;
+  const st = fzuGewaehlt ? fzuGewaehlt.letzter_stand : null;
+  if (!fzuGewaehlt) { el.textContent = ''; return; }
+  if (!st) { el.textContent = w('fzuStandKeiner'); return; }
+  const wann = String(st.zeitpunkt || '').slice(0, 10);
+  el.textContent = w('fzuLetzterStand') + ': ' + Number(st.tacho_km).toLocaleString('de-CH') + ' km'
+    + (wann ? ' (' + wann.slice(8, 10) + '.' + wann.slice(5, 7) + '.' + wann.slice(0, 4) + ')' : '')
+    + (st.person ? ' — ' + st.person : (st.quelle === 'stammdaten' ? ' — ' + w('fzuStandStamm') : ''));
+}
+
+// Der bekannte Stand kommt mit der Liste, nicht per Nachladen: Ein
+// Nachladen je Auswahl wäre ein Wettlauf, an dessen Ende der Stand des
+// vorigen Fahrzeugs neben dem neuen stehen kann.
+function fzuWahlGeaendert() {
+  const el = $('fzuWahl'); if (!el) return;
+  const id = Number(el.value || 0);
+  fzuGewaehlt = id ? ((fzuFahrzeuge || []).find(f => Number(f.id) === id) || null) : null;
+  fzuStandZeichnen();
+}
+
+function fzuFotoGewaehlt() {
+  const input = $('fzuFotoInput');
+  const datei = input && input.files && input.files[0];
+  if (!datei) return;
+  // Dieselbe Komprimierung wie beim Ersatzscan -- ein rohes Handyfoto
+  // sprengt die Grenze im Server.
+  rdEsKomprimieren(datei).then(dataUrl => { fzuFoto = dataUrl; fzuFotoVorschau(); })
+    .catch(() => toast(w('fzuFotoFehler')));
+}
+
+function fzuFotoVorschau() {
+  const bereich = $('fzuFotoBereich'); if (!bereich || !fzuFoto) return;
+  bereich.innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px">
+      <img src="${fzuFoto}" alt="" class="rd-es-vorschau">
+      <button type="button" class="btn btn-plain" style="min-height:44px" onclick="fzuFotoEntfernen()">${esc(w('fzuFotoEntfernen'))}</button>
+    </div>`;
+}
+
+function fzuFotoEntfernen() {
+  fzuFoto = null;
+  const bereich = $('fzuFotoBereich'); if (!bereich) return;
+  bereich.innerHTML = `
+    <button type="button" class="btn btn-plain" style="min-height:44px" onclick="document.getElementById('fzuFotoInput').click()">
+      <svg class="i i-sm" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+      ${esc(w('fzuFotoAufnehmen'))}
+    </button>`;
+}
+
+function fzuSenden() {
+  const err = $('fzuErr'); if (err) { err.style.display = 'none'; }
+  const zeig = t => { if (err) { err.textContent = t; err.style.display = ''; } else { toast(t); } };
+  if (!fzuGewaehlt) { zeig(w('fzuFahrzeugPflicht')); return; }
+  const kmEl = $('fzuKm');
+  const km = kmEl ? String(kmEl.value).trim() : '';
+  if (km === '' || !/^\d+$/.test(km)) { zeig(w('fzuKmPflicht')); return; }
+
+  const btn = $('fzuBtn'); if (btn) btn.disabled = true;
+  const body = { art: 'uebernahme', tacho_km: Number(km) };
+  // Die Kennung geht mit, wenn der Weg über den Aufkleber lief -- daran
+  // hängt, ob der Server die Übernahme als 'qr' oder als 'liste' vermerkt.
+  if (fzuKennung) { body.kennung = fzuKennung; } else { body.fahrzeug_id = Number(fzuGewaehlt.id); }
+  // Der Einsatz, falls gerade einer läuft -- der Server prüft nach, ob er
+  // wirklich der eigene ist, und verwirft ihn sonst.
+  const eigener = fzuLaufenderEinsatz();
+  if (eigener) { body.einsatz_id = eigener; }
+  if (fzuFoto) { body.foto = fzuFoto.replace(/^data:[^,]+,/, ''); }
+
+  api('meine_fahrzeug_uebernahme.php', { method: 'POST', body }).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') {
+      if (btn) btn.disabled = false;
+      zeig(data.message || w('netzfehler'));
+      return;
+    }
+    fzuHeuteBeantwortet = true;
+    fzuFoto = null; fzuKennung = null; fzuGewaehlt = null;
+    toast(data.km_seither !== null && data.km_seither !== undefined
+      ? w('fzuGespeichert') + ' ' + w('fzuSeither') + ': ' + Number(data.km_seither).toLocaleString('de-CH') + ' km.'
+      : w('fzuGespeichert'));
+    fzuWeiter();
+  });
+}
+
+// Die Schicht, in der die Person gerade steckt -- nur zur Zuordnung. Fehlt
+// sie, bleibt die Übernahme trotzdem gültig: Eine spontane Fahrt gehört
+// ausdrücklich in die Kette.
+function fzuLaufenderEinsatz() {
+  if (rundgangAktiv && rundgangAktiv.einsatz_id) { return Number(rundgangAktiv.einsatz_id); }
+  const heute = jetztDatetime().slice(0, 10);
+  const treffer = (schichten || []).find(e => String(e.datum || '').slice(0, 10) === heute);
+  return treffer ? Number(treffer.id) : null;
 }
 
 // ── Rundgänge-Übersicht, objektübergreifend (ENT-279-Fortsetzung) ──────
@@ -1791,7 +2148,14 @@ function zeichneWaechter() {
 // generellen Revierdienst-Bezug geprueft (mein_rundgang_vorlagen_alle.php),
 // hier keine weitere Bedingung noetig.
 let rdSpontanVorlagen = [];
+// Der Riegel aus ENT-340 sitzt VOR dem Laden, nicht danach: Wer die Liste
+// schon sieht, ist gedanklich unterwegs. Beide Wege in den Rundgang gehen
+// hier durch -- dieser und rundgangStarten() an der eigenen Schicht.
 function rundgangUebersichtOeffnen() {
+  fzuTor(() => rundgangUebersichtLaden());
+}
+
+function rundgangUebersichtLaden() {
   api('mein_rundgang_vorlagen_alle.php').then(({ ok, status, data }) => {
     /* Fehlschlag ist nicht dasselbe wie Leere (ENT-338). Vom Projektinhaber
        gemeldet: Ein freigegebener Waechter sah „Es sind aktuell keine
@@ -2942,6 +3306,7 @@ function blattAuf(id) {
           href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(schichtAdresse(e))}"
           >${ROUTE_IKONE}${esc(w('route'))}</a>` : ''}</dd>
       ${e.treffpunkt ? `<dt>${esc(w('treffpunkt'))}</dt><dd>${esc(e.treffpunkt)}</dd>` : ''}
+      ${dienstfahrzeugZeile(e)}
       ${e.kontakt_vorname || e.kontakt_nachname || e.kontakt_telefon ? `<dt>${esc(w('kontaktVorOrt'))}</dt><dd>${
         esc([e.kontakt_vorname, e.kontakt_nachname].filter(Boolean).join(' '))
       }${e.kontakt_telefon ? `${e.kontakt_vorname || e.kontakt_nachname ? '<br>' : ''}<a href="tel:${
@@ -3038,6 +3403,35 @@ function blattFussZeichnen(e) {
 // wen er vor Ort sucht, klappt auf.
 const TEAM_PFEIL = '<svg viewBox="0 0 24 24" aria-hidden="true" class="team-pfeil">'
   + '<polyline points="6 9 12 15 18 9"/></svg>';
+
+// ── Dienstfahrzeug der Schicht (ENT-334) ────────────────────────────────
+//
+// Der Projektinhaber: *"Der MA muss in der APP in der geplanten Schicht sein
+// Dienstfahrzeug sehen, dass er verwenden muss."*
+//
+// ZWEI VERSCHIEDENE AUSSAGEN, zwei verschiedene Texte: Wer als Fahrer
+// eingeteilt ist, liest eine AUFGABE ("Du fährst") -- wer mitfährt, eine
+// AUSKUNFT ("fährt: …"), damit er weiss, wie das Team hinkommt und wen er
+// sucht. Beides an derselben Stelle gleich zu formulieren hiesse, dem Fahrer
+// seine Zuständigkeit zu verschweigen.
+//
+// Die Namen der Eingeteilten zeigt die App ohnehin schon (Schicht > Team,
+// ENT-121); mit dem Fahrernamen kommt also nichts Neues über Personen dazu.
+//
+// Fehlt der Schlüssel ganz, ist die Einrichtung noch nicht gelaufen -- dann
+// steht hier nichts, statt "kein Fahrzeug" zu behaupten.
+function dienstfahrzeugZeile(e) {
+  const f = e.fahrzeug;
+  if (!f || !f.kennzeichen) { return ''; }
+  const name = [f.kennzeichen, f.bezeichnung].filter(Boolean).join(' · ');
+  const wert = f.ich_fahre
+    ? `<b>${esc(w('duFaehrst'))}:</b> ${esc(name)}`
+    // "noch nicht bestimmt" ist etwas anderes als "niemand fährt".
+    : `${esc(name)}<br><span style="color:var(--ink-3)">${f.fahrer_name
+        ? esc(w('faehrtWer')) + ': ' + esc(f.fahrer_name)
+        : esc(w('fahrerOffen'))}</span>`;
+  return `<dt>${esc(w('dienstfahrzeug'))}</dt><dd>${wert}</dd>`;
+}
 
 function teamBlock(e) {
   const liste = Array.isArray(e.team) ? e.team : [];
@@ -3381,7 +3775,13 @@ function rundgangAbschnittZeichnen(e) {
 // keine echte Entscheidung.
 let rdVorlagenGeladen = [];
 
+// Zweiter Weg in den Rundgang -- derselbe Riegel (ENT-340). Ein Riegel, um
+// den ein Weg herumfuehrt, ist keiner.
 function rundgangStarten(einsatzId) {
+  fzuTor(() => rundgangStartenNachFrage(einsatzId));
+}
+
+function rundgangStartenNachFrage(einsatzId) {
   const btn = document.querySelector('#blRundgang button');
   if (btn) btn.disabled = true;
   api('mein_rundgang_vorlagen.php?einsatz_id=' + einsatzId).then(({ ok, data }) => {

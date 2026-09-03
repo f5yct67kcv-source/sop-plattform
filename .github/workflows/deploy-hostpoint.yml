@@ -71,6 +71,7 @@ jobs:
           cp backend/ereignisse.php dist/ereignisse.php
           cp backend/auslagen.php dist/auslagen.php
           cp backend/rundgang.php dist/rundgang.php
+          cp backend/fahrzeug.php dist/fahrzeug.php
           cp backend/geofence_bereich.php dist/geofence_bereich.php
           cp backend/belege.php dist/belege.php
           cp backend/qrrechnung.php dist/qrrechnung.php

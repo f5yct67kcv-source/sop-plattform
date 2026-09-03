@@ -101,6 +101,25 @@ pruef('Ohne Tabelle liefert das Lesen eine leere Liste, keinen Fehler',
     logbuch_lesen($pdo, 'mitarbeiter', 7) === []);
 $GLOBALS['tabelleDa'] = true;
 
+// ══════════════ DER BEREICH 'fahrzeug' (ENT-330)
+// logbuch_schreiben() nimmt nur bekannte Bereiche an und meldet einen
+// unbekannten NICHT als Fehler, sondern gibt still false zurueck. Faellt
+// 'fahrzeug' aus der Liste, hoert das Fahrzeug-Protokoll also lautlos auf --
+// genau die Art Ausfall, die niemand bemerkt. Darum hier ausgefuehrt und
+// nicht im Quelltext nachgelesen.
+pruef('KRITISCH: der Bereich "fahrzeug" wird angenommen',
+    logbuch_schreiben($pdo, $chefin, 'fahrzeug', 42, 'tacho_km', '20000', '20450') === true);
+pruef('KRITISCH: ein Kilometerstand steht mit altem UND neuem Wert im Verlauf',
+    (function () use ($pdo) {
+        $e = logbuch_lesen($pdo, 'fahrzeug', 42);
+        return count($e) === 1 && $e[0]['feld'] === 'tacho_km'
+            && $e[0]['wert_alt'] === '20000' && $e[0]['wert_neu'] === '20450';
+    })());
+pruef('Der Verlauf eines Fahrzeugs enthaelt keine fremden Bereiche',
+    logbuch_lesen($pdo, 'fahrzeug', 7) === []);
+pruef('KRITISCH: ein unbekannter Bereich wird weiterhin abgewiesen',
+    logbuch_schreiben($pdo, $chefin, 'erfundenerbereich', 1, 'x', 'a', 'b') === false);
+
 // Ein misslungener Eintrag darf das Speichern nicht verhindern
 $pdo->exec('DROP TABLE aenderungslog');
 $konnte = true;

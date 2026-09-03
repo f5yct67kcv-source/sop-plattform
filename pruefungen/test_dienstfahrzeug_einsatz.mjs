@@ -310,7 +310,19 @@ async function oeffne(id) {
 await oeffne(71);
 const kopf71 = (await page.textContent('#epKopf')).replace(/\s+/g, ' ');
 check('KRITISCH: der Einsatzplan zeigt Dienstfahrzeug und Fahrer',
-  /Dienstfahrzeug und Fahrer/.test(kopf71));
+  /Dienstfahrzeug und Verkehrsmittel/.test(kopf71));
+// ENT-334: Fahrzeugwahl und Verkehrsmittel standen als ZWEI Karten
+// untereinander und erzaehlten dasselbe -- vom Projektinhaber als Dopplung
+// beanstandet. Genau EIN Block, sonst waechst sie wieder nach.
+check('KRITISCH: es ist EIN Block, nicht zwei nebeneinander',
+  await page.evaluate(() => [...document.querySelectorAll('#epKopf .zone-hd')]
+    .filter(h => /Fahrzeug|Verkehrsmittel/.test(h.textContent)).length) === 1);
+check('KRITISCH: die Verkehrsmittel je Person stehen in demselben Block',
+  await page.evaluate(() => {
+    const sel = document.querySelector('[data-vm-ma="12"]');
+    const wahl = document.getElementById('epFahrzeug');
+    return !!sel && !!wahl && sel.closest('.zone') === wahl.closest('.zone');
+  }));
 check('KRITISCH: die erwartete Fahrstrecke ist Hin- und Rueckweg — 2 × 24 km',
   /Erwartete Fahrstrecke: 48[.,]0 km/.test(kopf71));
 check('Sie sagt dazu, dass sie kein gespeicherter Wert ist',
@@ -346,7 +358,7 @@ check('Und der Grund steht dabei',
 await oeffne(72);
 const kopf72 = (await page.textContent('#epKopf')).replace(/\s+/g, ' ');
 check('Ohne eingeteiltes Fahrzeug wird keine Strecke behauptet',
-  /Dienstfahrzeug und Fahrer/.test(kopf72) && !/Erwartete Fahrstrecke/.test(kopf72));
+  /Dienstfahrzeug und Verkehrsmittel/.test(kopf72) && !/Erwartete Fahrstrecke/.test(kopf72));
 
 await oeffne(74);
 const kopf74 = (await page.textContent('#epKopf')).replace(/\s+/g, ' ');
@@ -372,6 +384,104 @@ check('Handy: das Fahrzeugfeld ist mindestens 44 px hoch', masse.hoehe >= 44);
 check('KRITISCH: Handy: es hat mindestens 16 px Schrift — darunter zoomt iOS hinein',
   masse.schrift >= 16);
 check('KRITISCH: Handy: die Ansicht laeuft nicht ueber den Bildschirmrand hinaus', !masse.breiter);
+
+// ══════════════════════════════════════════════════════════════════════════
+// TEIL 4 — Die Mitarbeiter-App (ENT-334)
+//
+// Der Projektinhaber: *„Der MA muss in der APP in der geplanten Schicht sein
+// Dienstfahrzeug sehen, dass er verwenden muss."* Der mobile Zuschnitt war
+// als OP-327 offen und ist damit entschieden.
+//
+// Zwei verschiedene Aussagen, zwei verschiedene Texte: Der Fahrer liest eine
+// AUFGABE, die Mitfahrenden eine AUSKUNFT. Waeren beide gleich formuliert,
+// erfuehre der Fahrer nicht, dass es ihn betrifft.
+// ══════════════════════════════════════════════════════════════════════════
+const MS = readFileSync(`${WURZEL}/backend/api/meine_schichten.php`, 'utf8');
+check('KRITISCH: die App-Schichten fallen ohne die Spalten nicht aus',
+  /hat_spalte\(db\(\), 'einsaetze', 'fahrzeug_id'\)/.test(MS));
+check('KRITISCH: die Mitarbeiter-ID des Fahrers geht NICHT an die App',
+  /unset\(\$s\['fahrzeug_kennzeichen'\][\s\S]{0,200}fahrer_id_roh/.test(MS));
+
+const MEINE = {
+  status: 'ok',
+  schichten: [
+    // 61: diese Person faehrt
+    { id: 61, kunde_name: 'Muster AG', titel: null, strasse: 'Baustelle 5', ort: '4600 Olten',
+      einsatzart: 'Verkehrsdienst', sparte: 'sicherheit', datum: HEUTE, von: '08:00:00',
+      bis: '12:00:00', status: 'bestaetigt', bemerkung: null, zusage: 'zugesagt',
+      objekt_name: null, im_team: 2, team: [], kanton: 'SO',
+      fahrzeug: { kennzeichen: 'SO 999001', bezeichnung: 'Patrouille 1',
+        ich_fahre: true, fahrer_name: 'Anna Muster' } },
+    // 62: jemand anderes faehrt
+    { id: 62, kunde_name: 'Muster AG', titel: null, strasse: 'Baustelle 6', ort: '4600 Olten',
+      einsatzart: 'Verkehrsdienst', sparte: 'sicherheit', datum: HEUTE, von: '13:00:00',
+      bis: '17:00:00', status: 'bestaetigt', bemerkung: null, zusage: 'zugesagt',
+      objekt_name: null, im_team: 2, team: [], kanton: 'SO',
+      fahrzeug: { kennzeichen: 'SO 999002', bezeichnung: 'Ersatzwagen',
+        ich_fahre: false, fahrer_name: 'Beat Beispiel' } },
+    // 63: Fahrzeug eingeteilt, Fahrer noch offen
+    { id: 63, kunde_name: 'Muster AG', titel: null, strasse: 'Baustelle 7', ort: '4600 Olten',
+      einsatzart: 'Verkehrsdienst', sparte: 'sicherheit', datum: HEUTE, von: '18:00:00',
+      bis: '20:00:00', status: 'bestaetigt', bemerkung: null, zusage: 'zugesagt',
+      objekt_name: null, im_team: 1, team: [], kanton: 'SO',
+      fahrzeug: { kennzeichen: 'SO 999003', bezeichnung: null,
+        ich_fahre: false, fahrer_name: null } },
+    // 64: gar kein Fahrzeug -- dann steht dort NICHTS, nicht "keines"
+    { id: 64, kunde_name: 'Muster AG', titel: null, strasse: 'Baustelle 8', ort: '4600 Olten',
+      einsatzart: 'Verkehrsdienst', sparte: 'sicherheit', datum: HEUTE, von: '20:00:00',
+      bis: '22:00:00', status: 'bestaetigt', bemerkung: null, zusage: 'zugesagt',
+      objekt_name: null, im_team: 1, team: [], kanton: 'SO', fahrzeug: null },
+  ],
+};
+
+const appSeite = await browser.newPage({ viewport: { width: 390, height: 844 } });
+appSeite.on('pageerror', e => bad.push('JS-Fehler (App): ' + e.message));
+await appSeite.route('**/api/**', route => {
+  const p = route.request().url().split('/api/')[1].split('?')[0];
+  const send = b => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) });
+  if (p.includes('login')) return send({ status: 'ok', token: 't', name: 'amuster', ist_admin: false });
+  if (p.includes('meine_schichten')) return send(MEINE);
+  if (p.includes('mein_profil')) return send({ status: 'ok', profil: { name: 'amuster' } });
+  return send({ status: 'ok' });
+});
+await appSeite.goto(`file://${WURZEL}/app.html`);
+await appSeite.fill('#gName', 'amuster');
+await appSeite.fill('#gPass', 'x');
+await appSeite.click('#gBtn');
+await appSeite.waitForSelector('#app.on');
+await appSeite.waitForTimeout(500);
+
+const blatt = async id => {
+  await appSeite.evaluate(i => blattAuf(i), id);
+  await appSeite.waitForTimeout(350);
+  return (await appSeite.textContent('#blBody')).replace(/\s+/g, ' ');
+};
+
+const b61 = await blatt(61);
+check('KRITISCH: der Fahrer sieht sein Dienstfahrzeug in der Schicht',
+  /Dienstfahrzeug/.test(b61) && /SO 999001/.test(b61) && /Patrouille 1/.test(b61));
+check('KRITISCH: und zwar als Aufgabe — "Du fährst"', /Du fährst/.test(b61));
+
+const b62 = await blatt(62);
+check('KRITISCH: wer nicht faehrt, sieht das Fahrzeug als Auskunft mit dem Fahrernamen',
+  /SO 999002/.test(b62) && /Beat Beispiel/.test(b62));
+check('KRITISCH: bei ihm steht NICHT "Du fährst"', !/Du fährst/.test(b62));
+
+const b63 = await blatt(63);
+check('KRITISCH: ein noch nicht bestimmter Fahrer heisst so — nicht "niemand fährt"',
+  /noch nicht bestimmt/.test(b63) && /SO 999003/.test(b63));
+
+const b64 = await blatt(64);
+check('KRITISCH: ohne eingeteiltes Fahrzeug steht in der Schicht gar nichts dazu',
+  !/Dienstfahrzeug/.test(b64) && !/SO 9990/.test(b64));
+
+// Gemessen, nicht nachgelesen: Die Zeile darf das schmale Blatt nicht sprengen.
+await blatt(61);
+check('KRITISCH: Handy: das Schichtblatt laeuft nicht ueber den Bildschirmrand',
+  await appSeite.evaluate(() => document.getElementById('blBody').scrollWidth
+    <= document.documentElement.clientWidth + 1));
+
+await appSeite.close();
 
 await browser.close();
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);

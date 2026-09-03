@@ -20,6 +20,13 @@
 declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../rechte.php';
+// Jede Aenderung am Fahrzeug wird protokolliert (ENT-330). Das Logbuch gab es
+// seit ENT-077; es war allgemein gebaut, aber nur an der Personalakte
+// angeschlossen -- hier kommt der zweite Bereich dazu.
+require_once __DIR__ . '/../logbuch.php';
+// Aufkleber-Schluessel (ENT-340) -- dieselbe Erzeugung wie beim Einrichten,
+// nicht eine zweite daneben.
+require_once __DIR__ . '/../fahrzeug.php';
 
 $user = require_session();
 // Lesen darf, wer plant ODER den Betrieb einrichtet. Heute traegt die
@@ -48,15 +55,21 @@ function fz_datum(?string $wert): ?string
     return preg_match('/^\d{4}-\d{2}-\d{2}$/', $wert) ? $wert : null;
 }
 
-function fz_lesen(PDO $pdo): array
+// Der Aufkleber-Schlüssel geht NUR an die Verwaltung, nie an alle, die
+// planen dürfen (ENT-340). Er ist das einzige, was eine Übernahme daran
+// bindet, dass jemand vor dem Fahrzeug stand: Wer ihn kennt, kann eine
+// Übernahme buchen, ohne je im Auto gesessen zu haben. Gebraucht wird er
+// genau einmal -- zum Drucken des Aufklebers.
+function fz_lesen(PDO $pdo, bool $mitKennung = false): array
 {
+    $kennung = $mitKennung && hat_spalte($pdo, 'fahrzeuge', 'qr_kennung') ? ', f.qr_kennung' : '';
     $rows = $pdo->query(
         'SELECT f.id, f.kennzeichen, f.bezeichnung, f.marke, f.modell, f.art, f.treibstoff,
                 f.farbe, f.stammnummer, f.fahrgestellnummer, f.erstzulassung, f.besitzart,
                 f.besitz_bis, f.standort_id, f.status, f.ausser_betrieb_grund, f.mfk_naechste,
                 f.vignette_jahr, f.versicherung, f.police_nr, f.service_naechster,
                 f.service_naechste_km, f.tacho_km, f.tacho_am, f.bemerkung,
-                o.bezeichnung AS standort_name
+                o.bezeichnung AS standort_name' . $kennung . '
          FROM fahrzeuge f
          LEFT JOIN anstellungsorte o ON o.id = f.standort_id
          ORDER BY f.status = \'verkauft\', f.kennzeichen'
@@ -87,7 +100,7 @@ if (!hat_tabelle($pdo, 'fahrzeuge')) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    json_response(['status' => 'ok', 'eingerichtet' => true, 'fahrzeuge' => fz_lesen($pdo)]);
+    json_response(['status' => 'ok', 'eingerichtet' => true, 'fahrzeuge' => fz_lesen($pdo, darf($user, 'betrieb'))]);
 }
 
 require_recht($user, 'betrieb');
@@ -118,8 +131,18 @@ if (!empty($in['loeschen'])) {
                 . '„Ausser Betrieb“ — dann bleibt nachvollziehbar, womit gefahren wurde.'], 409);
         }
     }
+    // Vor dem Loeschen lesen: Danach gibt es das Kennzeichen nicht mehr, und
+    // ein Verlaufseintrag "Fahrzeug 7 geloescht" waere unlesbar.
+    $weg = $pdo->prepare('SELECT kennzeichen FROM fahrzeuge WHERE id = ?');
+    $weg->execute([$id]);
+    $wegKz = (string)($weg->fetchColumn() ?: ('#' . $id));
+
     $pdo->prepare('DELETE FROM fahrzeuge WHERE id = ?')->execute([$id]);
-    json_response(['status' => 'ok', 'eingerichtet' => true, 'fahrzeuge' => fz_lesen($pdo)]);
+    // Der Eintrag bleibt stehen, obwohl der Datensatz weg ist -- sonst
+    // verschwaende ein geloeschtes Fahrzeug spurlos, und genau das soll ein
+    // Logbuch verhindern.
+    logbuch_schreiben($pdo, $user, 'fahrzeug', $id, 'geloescht', $wegKz, null);
+    json_response(['status' => 'ok', 'eingerichtet' => true, 'fahrzeuge' => fz_lesen($pdo, darf($user, 'betrieb'))]);
 }
 
 // Kontrollschild vereinheitlichen: Grossbuchstaben, genau ein Leerzeichen
@@ -239,14 +262,41 @@ if ($doppelt->fetchColumn()) {
 
 $spalten = array_keys($werte);
 if ($id > 0) {
+    // Der Stand VOR dem Schreiben -- nur die Spalten, die hier gesetzt werden.
+    // logbuch_vergleichen() schreibt daraus je Unterschied eine Zeile.
+    $vorstmt = $pdo->prepare('SELECT ' . implode(', ', $spalten) . ' FROM fahrzeuge WHERE id = ?');
+    $vorstmt->execute([$id]);
+    $vorher = $vorstmt->fetch(PDO::FETCH_ASSOC) ?: [];
+
     $satz = implode(', ', array_map(fn($s) => "$s = ?", $spalten));
     $stmt = $pdo->prepare("UPDATE fahrzeuge SET $satz WHERE id = ?");
     $stmt->execute([...array_values($werte), $id]);
+
+    // Nach dem Schreiben, nicht davor: Scheitert das UPDATE, steht auch
+    // nichts im Verlauf. Ein Protokoll, das Aenderungen behauptet, die es
+    // nicht gab, ist schlimmer als keines.
+    if ($vorher) { logbuch_vergleichen($pdo, $user, 'fahrzeug', $id, $vorher, $werte); }
 } else {
     $platz = implode(', ', array_fill(0, count($spalten), '?'));
     $stmt = $pdo->prepare('INSERT INTO fahrzeuge (' . implode(', ', $spalten) . ") VALUES ($platz)");
     $stmt->execute(array_values($werte));
     $id = (int)$pdo->lastInsertId();
+    // Dasselbe Muster wie bei der Personalakte (mitarbeiter_create.php): EIN
+    // Eintrag "angelegt" statt zwanzig Zeilen fuer zwanzig Felder. Ein
+    // frisch angelegtes Fahrzeug hat keine Vorgeschichte, gegen die sich
+    // etwas vergleichen liesse.
+    logbuch_schreiben($pdo, $user, 'fahrzeug', $id, 'angelegt', null, $kennzeichen);
+    // Aufkleber-Schluessel gleich mitgeben (ENT-340), damit kein Fahrzeug
+    // ohne dasteht. Bewusst NICHT ins Logbuch: Der Schluessel ist das
+    // Geheimnis, das den Aufkleber traegt -- er gehoert nicht in einen
+    // Verlauf, den mehr Leute lesen duerfen als ihn kennen sollen.
+    fz_kennungen_nachtragen($pdo);
+    // Steht beim Anlegen schon ein Kilometerstand da, wird er EIGENS
+    // festgehalten: An ihm haengt die spaetere Kontrolle, und "irgendwann
+    // beim Anlegen" waere dafuer zu ungenau.
+    if ($tachoKm !== null) {
+        logbuch_schreiben($pdo, $user, 'fahrzeug', $id, 'tacho_km', null, (string)$tachoKm);
+    }
 }
 
-json_response(['status' => 'ok', 'id' => $id, 'eingerichtet' => true, 'fahrzeuge' => fz_lesen($pdo)]);
+json_response(['status' => 'ok', 'id' => $id, 'eingerichtet' => true, 'fahrzeuge' => fz_lesen($pdo, darf($user, 'betrieb'))]);

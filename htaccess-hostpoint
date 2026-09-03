@@ -21,7 +21,7 @@
 # Klartext aus. Dann waeren die Zugangsdaten oeffentlich.
 # Diese Dateien werden nur von den Endpunkten unter /api eingebunden und nie
 # direkt aufgerufen; ein direkter Abruf ist also immer verkehrt.
-<FilesMatch "^(db|ai|planung|kunden|mitarbeiter|layout|anmeldung|zweifaktor|rechte|logbuch|ereignisse|auslagen|rundgang|geofence_bereich|belege|qrrechnung|produkte|mailer|ferien|setup)\.php$">
+<FilesMatch "^(db|ai|planung|kunden|mitarbeiter|layout|anmeldung|zweifaktor|rechte|logbuch|ereignisse|auslagen|rundgang|fahrzeug|geofence_bereich|belege|qrrechnung|produkte|mailer|ferien|setup)\.php$">
   <IfModule mod_authz_core.c>
     Require all denied
   </IfModule>

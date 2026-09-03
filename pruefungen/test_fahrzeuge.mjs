@@ -88,6 +88,29 @@ check('KRITISCH: gelesen wird nur, was der Stamm braucht — kein Fahrtenbuch',
   FZ_LIEST.length > 0
   && FZ_LIEST.every(t => ['fahrzeuge', 'anstellungsorte', 'einsaetze'].includes(t)));
 
+// ── Logbuch (ENT-330) ─────────────────────────────────────────────────────
+// Das Logbuch gab es seit ENT-077, allgemein gebaut, aber nur an der
+// Personalakte. Hier kommt der zweite Bereich dazu. Dass er ueberhaupt
+// angenommen wird, prueft pruef_logbuch.php WIRKLICH AUSGEFUEHRT -- ein
+// unbekannter Bereich wuerde still nichts schreiben.
+const FZLOG = readFileSync(`${WURZEL}/backend/api/fahrzeug_logbuch.php`, 'utf8');
+
+check('KRITISCH: jede Feldaenderung am Fahrzeug geht ins Logbuch',
+  /logbuch_vergleichen\(\$pdo, \$user, 'fahrzeug'/.test(FZ));
+check('KRITISCH: das Anlegen wird festgehalten', /'angelegt', null, \$kennzeichen/.test(FZ));
+check('KRITISCH: ein beim Anlegen erfasster Kilometerstand wird eigens festgehalten',
+  /'tacho_km', null, \(string\)\$tachoKm/.test(FZ));
+check('KRITISCH: geloescht wird mit dem Kontrollschild protokolliert, nicht mit einer Nummer',
+  /SELECT kennzeichen FROM fahrzeuge WHERE id = \?/.test(FZ) && /'geloescht'/.test(FZ));
+check('KRITISCH: der Verlauf laesst sich nur lesen — kein Schreibweg',
+  /'nur GET'/.test(FZLOG) && !/INSERT|UPDATE |DELETE FROM/.test(FZLOG));
+check('Der Verlauf verlangt das Recht "betrieb"',
+  /require_recht\(\$user, 'betrieb'\)/.test(FZLOG));
+check('KRITISCH: ein fehlendes Logbuch meldet das, statt eine leere Liste auszugeben',
+  /'eingerichtet' => logbuch_tabelle_da\(\$pdo\)/.test(FZLOG));
+check('Der ausgeschriebene Name wird beim Lesen aufgeloest, nicht doppelt gespeichert',
+  /akteur_anzeige/.test(FZLOG) && /FROM mitarbeiter WHERE id IN/.test(FZLOG));
+
 // ══════════════════════════════════════════════════════════════════════════
 // TEIL 2 — Die Oberflaeche
 // ══════════════════════════════════════════════════════════════════════════
@@ -118,6 +141,22 @@ let FAHRZEUGE = [
     tacho_km: null, tacho_am: null, bemerkung: null },
 ];
 let EINGERICHTET = true;
+// Verlauf je Fahrzeug (ENT-330). Fahrzeug 1 hat einen, Fahrzeug 2 keinen --
+// "eingerichtet, aber nichts geaendert" ist eine eigene Aussage.
+// Erfundene Person, kein echter Name (CLAUDE.md).
+const AKTEUR = { akteur_id: 9, akteur_name: 'amuster', akteur_anzeige: 'Anna Muster' };
+const LOGBUCH = {
+  1: [
+    { id: 3, zeitpunkt: HEUTE + ' 10:05:00', ...AKTEUR, bereich: 'fahrzeug', objekt_id: 1,
+      feld: 'tacho_km', wert_alt: '20000', wert_neu: '20450', werte_verborgen: 0 },
+    { id: 2, zeitpunkt: HEUTE + ' 09:40:00', ...AKTEUR, bereich: 'fahrzeug', objekt_id: 1,
+      feld: 'status', wert_alt: 'aktiv', wert_neu: 'ausser_betrieb', werte_verborgen: 0 },
+    { id: 1, zeitpunkt: HEUTE + ' 08:00:00', ...AKTEUR, bereich: 'fahrzeug', objekt_id: 1,
+      feld: 'angelegt', wert_alt: null, wert_neu: 'SO 999001', werte_verborgen: 0 },
+  ],
+  2: [],
+};
+let LOG_EINGERICHTET = true;
 const gesendet = [];
 let naechsteAntwort = null;   // erzwingt eine Fehlerantwort fuer den naechsten POST
 
@@ -134,6 +173,11 @@ await page.route('**/api/**', route => {
   if (u.includes('me.php')) return s({ status: 'ok', name: 'adrian', ist_admin: true,
     rollen: ['verwaltung'], rechte: ['betrieb', 'plan', 'kunden', 'abgleich', 'personal_lesen'] });
   if (u.includes('anstellungsorte')) return s({ status: 'ok', orte: ORTE });
+  if (u.includes('fahrzeug_logbuch')) {
+    const id = Number((u.match(/fahrzeug_id=(\d+)/) || [])[1] || 0);
+    return s({ status: 'ok', eingerichtet: LOG_EINGERICHTET,
+      eintraege: LOG_EINGERICHTET ? (LOGBUCH[id] || []) : [] });
+  }
   if (u.includes('fahrzeuge.php')) {
     if (body) {
       gesendet.push(body);
@@ -247,6 +291,51 @@ check('KRITISCH: eine Abweisung des Servers steht in der Karte, nicht nur in der
   /bereits erfasst/.test(await page.textContent('#fzErr')));
 check('Der Knopf ist danach wieder bedienbar',
   await page.evaluate(() => !document.getElementById('fzBtn').disabled));
+
+// ── Der Verlauf: wer hat was wann geaendert (ENT-330) ────────────────────
+await page.evaluate(() => fzBearbeiten(1));
+await page.waitForTimeout(500);
+const kopf = await page.textContent('#fzVerlaufKopf');
+const tachoZeile = await page.textContent('#fzTachoLog');
+check('KRITISCH: die Karte sagt, wer zuletzt geaendert hat — mit Datum und Uhrzeit',
+  /Zuletzt geändert:/.test(kopf) && /10:05/.test(kopf) && /Anna Muster/.test(kopf));
+check('KRITISCH: der Kilometerstand hat eine EIGENE Zeile — an ihm haengt die Kontrolle',
+  /Kilometerstand zuletzt geändert/.test(tachoZeile) && /Anna Muster/.test(tachoZeile));
+check('KRITISCH: sie nennt den alten UND den neuen Wert',
+  /20000/.test(tachoZeile) && /20450/.test(tachoZeile));
+const verlauf = await page.textContent('#fzVerlauf');
+check('Der ganze Verlauf steht darunter, nicht nur der letzte Eintrag',
+  /Kilometerstand/.test(verlauf) && /Zustand/.test(verlauf) && /Fahrzeug angelegt/.test(verlauf));
+check('KRITISCH: die Feldnamen stehen ausgeschrieben da, nicht als Spaltennamen',
+  !/tacho_km/.test(verlauf) && !/ausser_betrieb_grund/.test(verlauf));
+
+// Ein Fahrzeug ohne Eintraege ist etwas anderes als ein fehlendes Logbuch.
+await page.evaluate(() => fzBearbeiten(2));
+await page.waitForTimeout(500);
+check('KRITISCH: ohne Eintraege heisst es "nichts geändert" — nicht "nicht eingerichtet"',
+  /nichts geändert/.test(await page.textContent('#fzVerlaufKopf'))
+  && !/nicht eingerichtet/.test(await page.textContent('#fzVerlaufKopf')));
+check('Und beim Kilometerstand ebenso',
+  /nicht geändert/.test(await page.textContent('#fzTachoLog')));
+
+// Beim Anlegen gibt es noch nichts — "nie geaendert" waere die falsche Aussage.
+await page.evaluate(() => fzFormularLeeren());
+await page.waitForTimeout(200);
+check('KRITISCH: beim neuen Fahrzeug ist der Verlauf gar nicht erst da',
+  !(await page.isVisible('#fzVerlaufZone')));
+check('Stattdessen steht dort, dass es beim Speichern festgehalten wird',
+  /beim Speichern festgehalten/.test(await page.textContent('#fzTachoLog')));
+
+// Fehlendes Logbuch: eigene Aussage, nicht "nichts passiert".
+LOG_EINGERICHTET = false;
+await page.evaluate(() => fzBearbeiten(1));
+await page.waitForTimeout(500);
+const ohneLog = await page.textContent('#fzVerlaufKopf');
+check('KRITISCH: ein fehlendes Logbuch sagt das — und nicht "nichts geändert"',
+  /nicht eingerichtet/.test(ohneLog) && !/Zuletzt geändert:/.test(ohneLog));
+check('KRITISCH: dann wird auch beim Kilometerstand nichts behauptet',
+  /lässt sich nicht sagen/.test(await page.textContent('#fzTachoLog')));
+LOG_EINGERICHTET = true;
 
 // ── Aendern fuellt das Formular, ohne Reste des vorigen Standes ───────────
 await page.evaluate(() => fzBearbeiten(2));
