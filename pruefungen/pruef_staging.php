@@ -1,9 +1,20 @@
 <?php
-// ist_produktion() (backend/db.php) und der Staging-Mailmodus
-// (backend/mailer.php, ENT-341) wirklich ausfuehren.
+// umgebung_ist_produktion()/ist_produktion() (backend/db.php) und der
+// Staging-Mailmodus (backend/mailer.php, ENT-341) wirklich ausfuehren.
+//
+// APP_ENV ist seit der Verschaerfung auf Wunsch des Projektinhabers eine
+// PHP-Konstante (explizit beim Deploy gesetzt, nicht mehr aus dem
+// Hostnamen abgeleitet) und laesst sich nach der Definition nicht mehr
+// aendern -- ein Test kaeme an ist_produktion() selbst also nur an EINEM
+// Zustand vorbei (hier immer "__APP_ENV__", der unersetzte Platzhalter,
+// weil diese Suite nie ueber den Deploy-Workflow laeuft). Deshalb wird die
+// eigentliche Entscheidungsregel als eigene, reine Funktion
+// umgebung_ist_produktion(string $wert) mit frei gewaehlten Werten
+// geprueft -- das deckt auch den Fall "APP_ENV=production" ab, den die
+// Konstante hier nie erreicht.
 //
 // Gegenprobe (CLAUDE.md: "den behobenen Fehler absichtlich wieder
-// einbauen"): platzhalter_offen() wird hier auch mit einem frei gewaehlten,
+// einbauen"): platzhalter_offen() wird ebenfalls mit einem frei gewaehlten,
 // bereits "konfigurierten" Testwert geprueft -- nicht nur mit dem einen
 // Platzhalter-Zustand, der in dieser Umgebung tatsaechlich erreichbar ist.
 // Baut jemand den ENT-192-Fehler nach (Vergleichsziel MIT abschliessendem
@@ -17,14 +28,23 @@ function check(string $name, bool $bedingung): void {
     if ($bedingung) { $ok++; } else { $bad[] = $name; }
 }
 
-$_SERVER['HTTP_HOST'] = 'rapport.itufeden.myhostpoint.ch';
-check('KRITISCH: die Produktionsdomain gilt als Produktion', ist_produktion());
+check('KRITISCH: der exakte Wert "production" gilt als Produktion',
+    umgebung_ist_produktion('production'));
+check('KRITISCH: "staging" gilt NICHT als Produktion',
+    !umgebung_ist_produktion('staging'));
+check('KRITISCH: ein leerer Wert gilt NICHT als Produktion (sichere Richtung)',
+    !umgebung_ist_produktion(''));
+check('KRITISCH: der unersetzte Platzhalter selbst gilt NICHT als Produktion',
+    !umgebung_ist_produktion('__APP_ENV__'));
+check('KRITISCH: ein Tippfehler wie "Production" gilt NICHT als Produktion -- kein Gross-/Kleinschreibungs-Rueckfall',
+    !umgebung_ist_produktion('Production'));
 
-$_SERVER['HTTP_HOST'] = 'rapport-test.itufeden.myhostpoint.ch';
-check('KRITISCH: jede andere Domain gilt NICHT als Produktion', !ist_produktion());
-
-unset($_SERVER['HTTP_HOST']);
-check('KRITISCH: ein fehlender Host gilt ebenfalls NICHT als Produktion (sichere Richtung)',
+// ist_produktion() selbst laeuft in dieser Suite immer mit dem unersetzten
+// Platzhalter (kein Deploy-Workflow hier) -- muss also NICHT Produktion
+// ergeben. Das ist keine Umgehung der eigentlichen Pruefung oben, sondern
+// die zusaetzliche Bestaetigung, dass ist_produktion() tatsaechlich
+// APP_ENV liest und nicht etwas anderes.
+check('KRITISCH: ist_produktion() liest APP_ENV -- hier immer NICHT Produktion',
     !ist_produktion());
 
 // smtp_ziel() auf Produktion: unveraendert, unabhaengig vom Zustand der

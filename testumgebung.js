@@ -1,12 +1,18 @@
-// TESTUMGEBUNG-Kennzeichen (ENT-341).
+// TESTUMGEBUNG-Kennzeichen (ENT-341, verschaerft auf Wunsch des
+// Projektinhabers).
 //
-// Erkennt Staging rein am Hostnamen -- dieselbe Unterscheidung wie
-// ist_produktion() in backend/db.php, hier aber client-seitig: index.html,
-// app.html und dashboard.html sind statische Dateien ohne Platzhalter-
-// Ersetzung beim Deploy (siehe .github/workflows/deploy-hostpoint.yml),
-// koennen also nicht aus einem Secret lesen. Ein falscher oder unbekannter
-// Hostname zaehlt bewusst als "nicht Produktion" -- dieselbe sichere
-// Richtung wie im Backend.
+// Explizit beim Deploy gesetzt -- derselbe Platzhalter, den auch
+// backend/db.php traegt (dieselbe sed-Zeile im Deploy-Workflow ersetzt
+// __APP_ENV__ in BEIDEN Dateien) -- NICHT aus dem Hostnamen abgeleitet.
+// Dieselbe Begruendung wie bei ist_produktion() in backend/db.php: ein
+// Hostname kann anders ankommen, als die Umgebung tatsaechlich ist: der
+// Deploy-Lauf selbst weiss es zweifelsfrei.
+//
+// Fail-safe: der Hinweis erscheint bei JEDEM Wert ausser dem exakten
+// "production" -- ein leerer oder unersetzter Platzhalter zeigt ihn also
+// eher zu oft als zu selten. Das ist die sichere Richtung: der Hinweis ist
+// nur eine Anzeige, kein Sicherheitsmechanismus, aber er soll nie in
+// Produktion und nie faelschlich verschwinden.
 //
 // Bewusst ein reiner Overlay-Hinweis statt eines Banners im Layoutfluss:
 // eine feste Ecke mit pointer-events:none kann keine bestehende Kopfzeile,
@@ -14,8 +20,8 @@
 // nicht auf dem Handy, wo Bedienelemente laut CLAUDE.md mindestens 44px
 // hoch sein muessen.
 (function () {
-  var PRODUKTIONS_DOMAIN = 'rapport.itufeden.myhostpoint.ch';
-  if (location.hostname === PRODUKTIONS_DOMAIN) { return; }
+  var APP_ENV = '__APP_ENV__';
+  if (APP_ENV === 'production') { return; }
 
   var hinweis = document.createElement('div');
   hinweis.textContent = 'TESTUMGEBUNG';
