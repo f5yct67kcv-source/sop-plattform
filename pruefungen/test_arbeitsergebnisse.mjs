@@ -69,6 +69,11 @@ function setup(page) {
 }
 
 const browser = await chromium.launch({ executablePath: EXE });
+// Bewusst die SCHMALSTE Desktop-Breite, auf der die Kachelreihe noch auf
+// eine Ebene passt: Sie braucht rund 1110 px, hier stehen 1156 px zur
+// Verfügung. Auf einem breiteren Fenster zu prüfen wäre bequemer und
+// wertloser -- eine spätere Änderung, die die Kacheln breiter macht, fiele
+// dort nicht auf und erst beim Projektinhaber (ENT-326).
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 page.on('pageerror', e => bad.push('JS-Fehler: ' + e.message));
 
@@ -131,13 +136,31 @@ check('KRITISCH: die Ansicht startet auf einem verdrahteten Reiter',
   }));
 // „Unbekannt darf nie wie keine aussehen": Ein Reiter, der aussieht wie die
 // anderen und dann nichts zeigt, ist derselbe Fehler.
-check('KRITISCH: die noch nicht verdrahteten Reiter sagen das schon an der Kachel',
+// Seit ENT-326 gedämpft statt mit einem "folgt"-Chip daneben: Der Chip war
+// ehrlich, aber fünfmal 41 px in einer Zeile, die auf EINE Ebene passen soll.
+// Geprüft wird die Aussage, nicht das Mittel -- gemessen an der tatsächlich
+// gerenderten Farbe, nicht an einer Klasse allein.
+check('KRITISCH: die noch nicht verdrahteten Reiter sind schon an der Kachel zu erkennen',
   await page.evaluate(() => {
     const mit = ['wachbuch', 'ereignisse', 'aufgaben', 'alarme', 'schluessel'];
     const ohne = ['scans', 'erledigung'];
-    const txt = t => { const e = document.getElementById('ae-tab-' + t); return e ? e.textContent : null; };
-    return mit.every(t => (txt(t) || '').includes('folgt'))
-      && ohne.every(t => txt(t) !== null && !txt(t).includes('folgt'));
+    const farbe = t => {
+      const e = document.getElementById('ae-tab-' + t);
+      return e ? getComputedStyle(e.querySelector('.rdkr-tab-lbl')).color : null;
+    };
+    const gedaempft = farbe('wachbuch'), normal = farbe('erledigung');
+    return !!gedaempft && !!normal && gedaempft !== normal
+      && mit.every(t => farbe(t) === gedaempft)
+      && ohne.every(t => farbe(t) === normal);
+  }));
+// Und dort, wo Farbe allein nicht ankommt -- Vorleseprogramm, Mauszeiger.
+check('KRITISCH: die Aussage steht auch im Text, nicht nur in der Farbe',
+  await page.evaluate(() => {
+    const e = document.getElementById('ae-tab-wachbuch');
+    const f = document.getElementById('ae-tab-erledigung');
+    return !!e && (e.getAttribute('title') || '').includes('folgt später')
+      && (e.getAttribute('aria-label') || '').includes('folgt später')
+      && !!f && !f.getAttribute('title');
   }));
 
 // ══════════ UNVERDRAHTETE REITER: BLEIBENDER HINWEIS, KEIN TOAST
@@ -221,6 +244,25 @@ check('KRITISCH: immer genau eine Kachel ist hervorgehoben',
 // Eine mittige Reiterreihe über linksbündigem Inhalt wirkt unruhig, ohne
 // dass man sagen kann warum (CLAUDE.md: gleiches Muster auf beiden Seiten).
 // Gemessen am gerenderten Zustand, nicht im Quelltext nachgelesen.
+// Ausdrückliche Vorgabe des Projektinhabers: „bitte die Kacheln wie
+// gewünscht auf einer Ebene!" Die Reihe brach zuvor um, weil sie 1401 px
+// brauchte und die Lesebreite nach Abzug der Ränder nur 1388 px liess --
+// dreizehn Pixel. Gemessen wird das Ergebnis, nicht die Regel dahinter.
+check('KRITISCH: die sieben Kacheln stehen am Desktop auf EINER Ebene',
+  await page.evaluate(() => {
+    const t = [...document.querySelectorAll('#aeReiter .rdkr-tab')];
+    return t.length === 7
+      && new Set(t.map(b => Math.round(b.getBoundingClientRect().top))).size === 1;
+  }));
+// Die Reihe darf dafür breit werden, die Liste darunter nicht: Eine Karte
+// mit vier kurzen Zeilen über die ganze Fensterbreite schiebt den Status-Chip
+// so weit vom Text weg, dass er nicht mehr dazugehört.
+check('KRITISCH: die Liste bleibt trotzdem auf Lesebreite',
+  await page.evaluate(() => {
+    const i = document.getElementById('aeInhalt').getBoundingClientRect();
+    const r = document.getElementById('aeReiter').getBoundingClientRect();
+    return i.width > 400 && i.width <= 1000 && r.width > i.width;
+  }));
 check('KRITISCH: die Kachelreihe steht bündig zum Inhalt darunter, nicht mittig',
   await page.evaluate(() => {
     const tab = document.querySelector('#aeReiter .rdkr-tab');
@@ -230,11 +272,6 @@ check('KRITISCH: die Kachelreihe steht bündig zum Inhalt darunter, nicht mittig
   }));
 // Eine Karte mit vier kurzen Zeilen über die volle Fensterbreite schiebt den
 // Status-Chip so weit vom Text weg, dass er nicht mehr dazugehört.
-check('KRITISCH: die Spalte hat eine Lesebreite, statt über die ganze Seite zu laufen',
-  await page.evaluate(() => {
-    const v = document.getElementById('view-arbeitsergebnisse').getBoundingClientRect();
-    return v.width > 400 && v.width <= 1000;
-  }));
 check('KRITISCH: kein Seiten-Scroll am Desktop',
   await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1));
 await page.screenshot({ path: `${OUT}/ae-01-desktop.png` });

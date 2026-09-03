@@ -508,8 +508,26 @@ a.nav-item { text-decoration: none; }
    (CLAUDE.md: gleiches Muster auf beiden Seiten). Und die Spalte bekommt
    eine Lesebreite: Eine Karte mit vier kurzen Zeilen über 1200 px schiebt
    den Status-Chip so weit vom Text weg, dass er nicht mehr dazugehört. */
-#view-arbeitsergebnisse { max-width: 980px; }
-#view-arbeitsergebnisse .rdkr-reiter { justify-content: flex-start; }
+/* Die Lesebreite gilt fuer den INHALT, nicht fuer die Kachelreihe (ENT-326).
+   Beim ersten Anlauf lag sie auf der ganzen Ansicht -- damit brach die Reihe
+   auf zwei Zeilen um, obwohl daneben Platz frei war. Der Projektinhaber hat
+   das beanstandet, und er hat recht: Sieben Kacheln auf zwei Ebenen sind
+   keine Reiterleiste mehr, sondern ein Block. Die Reihe darf die volle
+   Breite nehmen, die Liste darunter bleibt schmal. */
+#view-arbeitsergebnisse #aeInhalt { max-width: 980px; }
+#view-arbeitsergebnisse .rdkr-reiter { justify-content: flex-start; gap: 6px; }
+#view-arbeitsergebnisse .rdkr-tab { padding: 7px 10px; }
+/* Noch nicht verdrahtet: gedämpft statt mit einem "folgt"-Chip daneben
+   (ENT-326). Der Chip war ehrlich, aber teuer -- fünfmal 41 px in einer
+   Zeile, die auf eine Ebene passen soll. Gedämpfte Schrift und ein
+   neutrales statt blaues Sinnbild sagen dasselbe auf einen Blick und
+   brauchen keinen Platz.
+   Die Kachel bleibt anklickbar und erklärt beim Antippen, was folgt --
+   sie ist nicht gesperrt, nur noch ohne Inhalt. Deshalb keine
+   Ausgrauung bis zur Unleserlichkeit: "unbekannt" darf nie wie "keine"
+   aussehen, aber auch nicht wie "kaputt". */
+#view-arbeitsergebnisse .rdkr-tab.folgt .rdkr-tab-lbl { color: var(--ink-3); font-weight: 550; }
+#view-arbeitsergebnisse .rdkr-tab.folgt .rdkr-tab-ic { background: var(--line-soft); color: var(--ink-3); }
 .rdkr-tab.aktiv { border-color: var(--accent); background: var(--accent-soft); }
 .rdkr-tab.aktiv .rdkr-tab-ic { background: var(--accent); color: #fff; }
 /* Auf dem Handy bleiben es Bedienelemente, also mindestens 44px hoch. */
@@ -14464,13 +14482,18 @@ let aeTab = 'scans';
 function arbeitsergebnisseOeffnen() {
   const ziel = $('aeReiter');
   if (!ziel) { return; }
-  ziel.innerHTML = AE_REITER.map(([t, lbl, ic]) => `
-    <button type="button" class="rdkr-tab${t === aeTab ? ' aktiv' : ''}" id="ae-tab-${t}"
-        data-reiter="${t}" onclick="aeGoTab('${t}')">
+  ziel.innerHTML = AE_REITER.map(([t, lbl, ic]) => {
+    const folgt = !AE_VERDRAHTET.includes(t);
+    // title und aria-label tragen die Aussage auch dorthin, wo die
+    // Dämpfung allein nicht ankommt: Vorleseprogramm und Mauszeiger.
+    return `
+    <button type="button" class="rdkr-tab${t === aeTab ? ' aktiv' : ''}${folgt ? ' folgt' : ''}"
+        id="ae-tab-${t}" data-reiter="${t}" onclick="aeGoTab('${t}')"
+        ${folgt ? `title="${esc(lbl)} folgt später" aria-label="${esc(lbl)} — folgt später"` : ''}>
       <span class="rdkr-tab-ic"><svg class="i" viewBox="0 0 24 24">${ic}</svg></span>
       <span class="rdkr-tab-lbl">${esc(lbl)}</span>
-      ${AE_VERDRAHTET.includes(t) ? '' : '<span class="chip chip-n">folgt</span>'}
-    </button>`).join('');
+    </button>`;
+  }).join('');
   aeRenderTab();
 }
 
