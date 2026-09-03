@@ -19,13 +19,16 @@
 //     ob jemand privat gefahren ist oder ob er die Frage nie gesehen hat.
 //     "Nicht gefragt" und "verneint" sind verschiedene Aussagen.
 //
-//  3. DIE KILOMETERZAHL IST PFLICHT, DAS FOTO NICHT. Der Projektinhaber
-//     schrieb "und/oder"; hier ist es bewusst enger. Ein Foto allein ist eine
-//     Zahl, die noch niemand gelesen hat -- die spätere Abstimmung mit den
+//  3. KILOMETERZAHL UND FOTO SIND BEIDE PFLICHT (ENT-352, revidiert ENT-340).
+//     ENT-340 liess zunächst nur die Zahl gelten -- ein Foto allein ist eine
+//     Zahl, die noch niemand gelesen hat, und die spätere Abstimmung mit den
 //     Schichten bräuchte einen Menschen, der jedes Bild von Hand abtippt.
-//     Das Foto bleibt daneben zulässig und ist dann der Beleg für die Zahl.
-//     Umkehrbar: Wer es anders will, macht das Foto zur Pflicht statt die
-//     Zahl.
+//     Das galt aber ausdrücklich als "umkehrbar, falls sich das im Betrieb
+//     anders anfühlt" -- und genau das ist nach dem ersten echten Test
+//     eingetreten: eine 5-6-stellige, von Hand eingetippte Zahl vertippt
+//     sich leicht, und ohne Foto als Beleg fällt der Fehler niemandem auf.
+//     Das Foto ersetzt die Zahl nicht (dieselbe Abstimmungs-Begründung wie
+//     zuvor), es sichert sie ab.
 declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../fahrzeug.php';
@@ -132,22 +135,26 @@ if ($fehler !== null) {
     json_response(['status' => 'error', 'bezug' => $bezug, 'message' => $fehler], 409);
 }
 
-// Foto, wenn eines mitkommt.
-$foto = null; $fotoMime = null;
-if (isset($input['foto']) && (string)$input['foto'] !== '') {
-    $fotoRoh = base64_decode((string)$input['foto'], true);
-    if ($fotoRoh === false || $fotoRoh === '') {
-        json_response(['status' => 'error', 'message' => 'Das Foto liess sich nicht lesen.'], 422);
-    }
-    if (strlen($fotoRoh) > FZ_FOTO_MAX) {
-        json_response(['status' => 'error', 'message' => 'Foto zu gross (höchstens 2 MB).'], 422);
-    }
-    $fotoMime = ersatzscan_foto_mime($fotoRoh);
-    if ($fotoMime === null) {
-        json_response(['status' => 'error', 'message' => 'Nur JPEG- oder PNG-Fotos.'], 422);
-    }
-    $foto = $fotoRoh;
+// Foto vom Tacho: Pflicht seit ENT-352, nicht mehr freiwillig (ENT-340
+// selbst hielt das für "umkehrbar, falls sich das im Betrieb anders
+// anfühlt" -- genau das ist nach dem ersten echten Test eingetreten). Eine
+// 5-6-stellige, von Hand eingetippte Zahl vertippt sich leicht, und ohne
+// Beleg fällt der Fehler niemandem auf.
+if (!isset($input['foto']) || (string)$input['foto'] === '') {
+    json_response(['status' => 'error', 'message' => 'Bitte ein Foto vom Tacho mitschicken.'], 422);
 }
+$fotoRoh = base64_decode((string)$input['foto'], true);
+if ($fotoRoh === false || $fotoRoh === '') {
+    json_response(['status' => 'error', 'message' => 'Das Foto liess sich nicht lesen.'], 422);
+}
+if (strlen($fotoRoh) > FZ_FOTO_MAX) {
+    json_response(['status' => 'error', 'message' => 'Foto zu gross (höchstens 2 MB).'], 422);
+}
+$fotoMime = ersatzscan_foto_mime($fotoRoh);
+if ($fotoMime === null) {
+    json_response(['status' => 'error', 'message' => 'Nur JPEG- oder PNG-Fotos.'], 422);
+}
+$foto = $fotoRoh;
 
 // Doppelt abgeschickt (zweimal getippt, Netz gewackelt) legt keine zweite
 // Übernahme an. Enger Rahmen: dieselbe Person, dasselbe Fahrzeug, derselbe

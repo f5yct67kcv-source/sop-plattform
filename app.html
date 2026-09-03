@@ -959,8 +959,9 @@ const W = {
     fzuFahrzeugPflicht: 'Bitte ein Fahrzeug wählen.',
     fzuKm: 'Kilometerstand', fzuKmHinweis: 'Die Zahl auf dem Tacho, ohne Nachkommastellen.',
     fzuKmPflicht: 'Bitte den Kilometerstand eintragen.',
-    fzuFoto: 'Foto vom Tacho (freiwillig)', fzuFotoAufnehmen: 'Tacho fotografieren',
+    fzuFoto: 'Foto vom Tacho', fzuFotoAufnehmen: 'Tacho fotografieren',
     fzuFotoEntfernen: 'Foto entfernen', fzuFotoFehler: 'Das Foto liess sich nicht verarbeiten.',
+    fzuFotoPflicht: 'Bitte ein Foto vom Tacho aufnehmen — sonst ist ein Zahlenverdreher im Kilometerstand nicht mehr zu erkennen.',
     fzuLetzterStand: 'Zuletzt bekannt', fzuStandStamm: 'aus den Stammdaten',
     fzuStandKeiner: 'Für dieses Fahrzeug ist noch kein Kilometerstand erfasst.',
     fzuUebernehmen: 'Übernehmen', fzuGespeichert: 'Fahrzeug übernommen.',
@@ -2165,6 +2166,10 @@ function fzuSenden() {
   const kmEl = $('fzuKm');
   const km = kmEl ? String(kmEl.value).trim() : '';
   if (km === '' || !/^\d+$/.test(km)) { zeig(w('fzuKmPflicht')); return; }
+  // Seit ENT-352 Pflicht (vorher ENT-340: "umkehrbar, falls sich das im
+  // Betrieb anders anfuehlt") -- eine 5-6-stellige, von Hand eingetippte
+  // Zahl vertippt sich leicht, und ohne Beleg faellt das niemandem auf.
+  if (!fzuFoto) { zeig(w('fzuFotoPflicht')); return; }
 
   const btn = $('fzuBtn'); if (btn) btn.disabled = true;
   const body = { art: 'uebernahme', tacho_km: Number(km) };

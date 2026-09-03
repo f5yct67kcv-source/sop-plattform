@@ -28,6 +28,13 @@ import { readFileSync } from 'fs';
 const ok = [], bad = [];
 const check = (n, c) => (c ? ok : bad).push(n);
 
+// Minimales, aber echtes 1x1-PNG -- damit der Browser es tatsaechlich als
+// Bild dekodieren kann (gleiche Fixtur wie test_ersatzscan.mjs).
+const PNG_1X1 = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+  'base64'
+);
+
 // ══════════════════════════════════════════════════════════════════════════
 // TEIL 1 — Die Regeln laufen wirklich (PHP, SQLite im Arbeitsspeicher)
 // ══════════════════════════════════════════════════════════════════════════
@@ -328,11 +335,26 @@ await page.evaluate(() => fzuFormular());
 await page.waitForTimeout(250);
 await page.selectOption('#fzuWahl', '1');
 await page.fill('#fzuKm', '61200');
+
+// ── Foto ist seit ENT-352 Pflicht, nicht mehr freiwillig ────────────────
+// Bewusst VOR der Fotoauswahl gesendet, sonst wuerde dieser Schritt nicht
+// zeigen, ob wirklich das fehlende Foto blockiert (gleiches Muster wie
+// test_ersatzscan.mjs).
+await page.click('#fzuBtn');
+await page.waitForTimeout(300);
+check('KRITISCH: ohne Foto wird nichts gesendet -- der Kilometerstand allein reicht seit ENT-352 nicht mehr',
+  gesendet.length === 0 && await page.locator('#fzuErr').isVisible());
+
+await page.setInputFiles('#fzuFotoInput', { name: 'tacho.png', mimeType: 'image/png', buffer: PNG_1X1 });
+await page.waitForTimeout(300);
+
 await page.click('#fzuBtn');
 await page.waitForTimeout(500);
 check('KRITISCH: die Uebernahme sendet Fahrzeug und Kilometerstand',
   gesendet.length === 1 && gesendet[0].art === 'uebernahme'
   && gesendet[0].fahrzeug_id === 1 && gesendet[0].tacho_km === 61200);
+check('KRITISCH: das Pflicht-Foto wird als Base64 mitgesendet',
+  typeof gesendet[0].foto === 'string' && gesendet[0].foto.length > 0);
 check('Die laufende Schicht wird mitgegeben, damit sich die Fahrt zuordnen laesst',
   gesendet[0].einsatz_id === 61);
 check('KRITISCH: nach der Uebernahme geht es in den Rundgang weiter',
@@ -426,6 +448,8 @@ check('Beim gescannten Fahrzeug gibt es keine Auswahlliste -- man steht davor',
 
 gesendet = [];
 await page.fill('#fzuKm', '61500');
+await page.setInputFiles('#fzuFotoInput', { name: 'tacho.png', mimeType: 'image/png', buffer: PNG_1X1 });
+await page.waitForTimeout(300);
 await page.click('#fzuBtn');
 await page.waitForTimeout(400);
 check('KRITISCH: die Uebernahme ueber den Aufkleber sendet die Kennung, nicht die Fahrzeug-ID',
