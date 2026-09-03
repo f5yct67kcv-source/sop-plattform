@@ -28,8 +28,9 @@ $pdo->exec('CREATE TABLE fahrzeuge (id INTEGER PRIMARY KEY, kennzeichen TEXT, be
             tacho_km INT NULL, tacho_am TEXT NULL, qr_kennung TEXT NULL)');
 $pdo->exec('CREATE TABLE fahrzeug_uebernahme (id INTEGER PRIMARY KEY, art TEXT, fahrzeug_id INT,
             mitarbeiter_id INT, einsatz_id INT NULL, zeitpunkt TEXT, tacho_km INT NULL,
-            quelle TEXT, bemerkung TEXT NULL)');
+            quelle TEXT, foto BLOB NULL, bemerkung TEXT NULL)');
 $pdo->exec('CREATE TABLE mitarbeiter (id INTEGER PRIMARY KEY, vorname TEXT, nachname TEXT, name TEXT)');
+$pdo->exec('CREATE TABLE einsaetze (id INTEGER PRIMARY KEY, kunde_name TEXT NULL, titel TEXT NULL)');
 // Erfundene Namen und Kontrollschilder mit hoher Nummer -- kein echtes
 // Fahrzeug, keine echte Person.
 $pdo->exec("INSERT INTO mitarbeiter VALUES (7, 'Vorname', 'Nachname', 'vn')");
@@ -228,6 +229,65 @@ $kette(16, 'uebernahme', 700, '2026-05-01 12:00:00', 8);
 pruef('KRITISCH: nimmt dieselbe Person ein zweites Fahrzeug, ohne das erste abzugeben, '
     . 'gilt nur das zweite (juengere) als aktiv',
     ($x = fz_meine_aktiv($pdo, 8)) !== null && $x['id'] === 16);
+
+// ── fz_uebernahme_feststellungen() (ENT-356) -- reine Funktion, keine DB ──
+pruef('Ohne Vorwert (erste Uebernahme eines Fahrzeugs) gibt es keine Feststellung',
+    fz_uebernahme_feststellungen(50000, null, null, 7)
+    === ['km_seither' => null, 'auffaellig' => false, 'wiederholt' => false]);
+pruef('Ein kleiner, normaler Zuwachs ist weder auffaellig noch wiederholt',
+    ($f = fz_uebernahme_feststellungen(50050, 50000, 7, 8))['km_seither'] === 50
+    && $f['auffaellig'] === false && $f['wiederholt'] === false);
+pruef('KRITISCH: ein Sprung ueber FZ_SPRUNG_AUFFAELLIG wird als auffaellig erkannt',
+    fz_uebernahme_feststellungen(50000 + FZ_SPRUNG_AUFFAELLIG + 1, 50000, 7, 8)['auffaellig'] === true);
+pruef('Ein Sprung GENAU auf der Grenze gilt noch nicht als auffaellig',
+    fz_uebernahme_feststellungen(50000 + FZ_SPRUNG_AUFFAELLIG, 50000, 7, 8)['auffaellig'] === false);
+pruef('KRITISCH: derselbe Stand durch dieselbe Person gilt als wiederholt',
+    fz_uebernahme_feststellungen(50000, 50000, 7, 7)['wiederholt'] === true);
+pruef('KRITISCH: derselbe Stand durch eine ANDERE Person gilt NICHT als wiederholt '
+    . '-- ENT-340 erlaubt das ausdruecklich (Fahrzeug ohne Fahrt weitergereicht)',
+    fz_uebernahme_feststellungen(50000, 50000, 7, 8)['wiederholt'] === false);
+pruef('Ein sinkender Stand (fz_stand_pruefen weist ihn ohnehin ab) ist nicht "auffaellig"',
+    fz_uebernahme_feststellungen(49000, 50000, 7, 8)['auffaellig'] === false);
+
+// ── FZ_UEBERNAHME_LISTE_SQL (ENT-356) -- echte Ausfuehrung gegen SQLite ────
+// Dieselbe Konstante, die auch fahrzeug_uebernahme_liste.php verwendet --
+// ein Nachbau wuerde nur beweisen, dass der Nachbau stimmt.
+$neu(17); $neu(18);
+$kette(17, 'uebernahme', 60000, '2026-06-01 07:00:00', 7);   // erste, kein Vorwert
+$kette(17, 'uebernahme', 60050, '2026-06-01 12:00:00', 7);   // normaler Zuwachs
+$kette(17, 'uebernahme', 60050, '2026-06-02 07:00:00', 7);   // dieselbe Person, gleicher Stand
+$kette(17, 'uebernahme', 60050, '2026-06-02 12:00:00', 8);   // ANDERE Person, gleicher Stand -- erlaubt
+$kette(17, 'uebernahme', 61200, '2026-06-03 07:00:00', 8);   // grosser Sprung
+$kette(18, 'uebernahme', 10000, '2026-06-01 07:00:00', 7);   // anderes Fahrzeug, eigene Kette
+
+$stmt = $pdo->prepare(FZ_UEBERNAHME_LISTE_SQL . ' WHERE u.fahrzeug_id = ? ORDER BY u.zeitpunkt ASC, u.id ASC');
+$stmt->execute([17]);
+$zeilen = $stmt->fetchAll();
+pruef('KRITISCH: FZ_UEBERNAHME_LISTE_SQL liefert alle fuenf Zeilen dieses Fahrzeugs',
+    count($zeilen) === 5);
+pruef('KRITISCH: die erste Zeile hat keinen Vorwert (erste Uebernahme des Fahrzeugs)',
+    $zeilen[0]['voriger_km'] === null && $zeilen[0]['voriger_mitarbeiter_id'] === null);
+pruef('KRITISCH: die zweite Zeile bezieht sich auf die erste, nicht auf ein anderes Fahrzeug',
+    (int)$zeilen[1]['voriger_km'] === 60000 && (int)$zeilen[1]['voriger_mitarbeiter_id'] === 7);
+pruef('KRITISCH: die vierte Zeile (andere Person) bezieht den Vorwert trotzdem korrekt -- '
+    . 'der Personenwechsel aendert an "voriger" nichts, nur an "wiederholt" spaeter',
+    (int)$zeilen[3]['voriger_km'] === 60050 && (int)$zeilen[3]['voriger_mitarbeiter_id'] === 7);
+pruef('Das zweite Fahrzeug (18) taucht in der Filterung auf Fahrzeug 17 nicht auf',
+    !in_array(18, array_column($zeilen, 'fahrzeug_id')));
+
+// Und zusammengesetzt mit fz_uebernahme_feststellungen(), wie der Endpunkt es tut:
+$f1 = fz_uebernahme_feststellungen((int)$zeilen[2]['tacho_km'],
+    $zeilen[2]['voriger_km'] !== null ? (int)$zeilen[2]['voriger_km'] : null,
+    $zeilen[2]['voriger_mitarbeiter_id'] !== null ? (int)$zeilen[2]['voriger_mitarbeiter_id'] : null,
+    (int)$zeilen[2]['eigene_mitarbeiter_id']);
+pruef('KRITISCH: Zeile 3 (dieselbe Person, gleicher Stand am Folgetag) wird end-to-end als wiederholt erkannt',
+    $f1['wiederholt'] === true);
+$f2 = fz_uebernahme_feststellungen((int)$zeilen[4]['tacho_km'],
+    $zeilen[4]['voriger_km'] !== null ? (int)$zeilen[4]['voriger_km'] : null,
+    $zeilen[4]['voriger_mitarbeiter_id'] !== null ? (int)$zeilen[4]['voriger_mitarbeiter_id'] : null,
+    (int)$zeilen[4]['eigene_mitarbeiter_id']);
+pruef('KRITISCH: Zeile 5 (Sprung von 60050 auf 61200) wird end-to-end als auffaellig erkannt',
+    $f2['auffaellig'] === true && $f2['km_seither'] === 1150);
 
 echo $ok . " Pruefungen bestanden\n";
 if ($bad) { foreach ($bad as $b3) { echo "  X $b3\n"; } exit(1); }

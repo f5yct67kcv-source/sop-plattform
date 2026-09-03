@@ -616,6 +616,34 @@ check('Nach der Abgabe schliesst die Maske, mit einer eigenen Meldung',
 await page.close();
 fahrzeugAntwort = { status: 'ok', eingerichtet: true, fahrzeuge: FAHRZEUGE, heute_beantwortet: false };
 
+// ══ 9. Der Hinweis auf der Kachel selbst ════════════════════════════════
+// Ohne diesen Abschnitt zeigte nur die Maske NACH dem Antippen "Aktuell bei
+// dir" -- Rückmeldung des Projektinhabers nach dem Live-Test: "Ich sehe
+// kein Hinweis bei der Fahrzeugübernahme, dass eine Übernahme
+// stattgefunden hat." Der Hinweis muss also schon auf der Kachel selbst
+// stehen, bevor überhaupt getippt wird.
+fahrzeugAntwort = { status: 'ok', eingerichtet: true, fahrzeuge: FAHRZEUGE,
+                    heute_beantwortet: false, mein_aktives_fahrzeug: MEIN_AKTIV };
+page = await appStarten();
+await page.evaluate(() => zeige('waechter'));
+await page.waitForTimeout(400);
+check('KRITISCH: die Kachel selbst zeigt bereits "Aktiv: …", ohne dass man draufgetippt hat',
+  (await page.textContent('#mk-fahrzeug')).includes('SO 999003'));
+check('Die anderen beiden Kacheln bleiben unberührt -- kein Hinweis, der dort nicht hingehört',
+  await page.locator('#mk-rundgang .mk-kachel-sub').count() === 0
+  && await page.locator('#mk-schluessel .mk-kachel-sub').count() === 0);
+await page.close();
+
+fahrzeugAntwort = { status: 'ok', eingerichtet: true, fahrzeuge: FAHRZEUGE,
+                    heute_beantwortet: false, mein_aktives_fahrzeug: null };
+page = await appStarten();
+await page.evaluate(() => zeige('waechter'));
+await page.waitForTimeout(400);
+check('KRITISCH: ohne aktives Fahrzeug bleibt die Kachel ohne Zusatzhinweis',
+  await page.locator('#mk-fahrzeug .mk-kachel-sub').count() === 0);
+await page.close();
+fahrzeugAntwort = { status: 'ok', eingerichtet: true, fahrzeuge: FAHRZEUGE, heute_beantwortet: false };
+
 // ══════════════════════════════════════════════════════════════════════════
 // TEIL 4 — Der Aufkleber im Cockpit
 // ══════════════════════════════════════════════════════════════════════════

@@ -1,7 +1,7 @@
 <?php
 // Fahrzeugübernahmen im Zeitraum, für die Auswertung "Arbeitsergebnisse"
-// (ENT-346). Reine Anzeige, keine Berechnung -- gleiches Muster wie
-// rundgang_scan_liste.php für die Kontrollpunktscans desselben Bereichs.
+// (ENT-346) -- gleiches Muster wie rundgang_scan_liste.php für die
+// Kontrollpunktscans desselben Bereichs.
 //
 // WARUM HIER UND NICHT UNTER DIENSTFAHRZEUGE (ENT-313): Dort steht
 // ausdrücklich "Hier wird nichts kontrolliert und nichts gerechnet" -- die
@@ -9,11 +9,21 @@
 // zu den übrigen Zeitraum-Auswertungen (Wachbuch, Scans, Ereignisse), nicht
 // in die Fahrzeug-Einstellungen.
 //
+// SEIT ENT-356 KEINE REINE ANZEIGE MEHR: Zwei Feststellungen ("auffaellig",
+// "wiederholt", siehe unten) werden hier berechnet -- das ist ENT-313s
+// "Lücke" (Tachostand gegen den letzten bekannten Stand), die ausdrücklich
+// KEINEN Erwartungswert braucht. Bewusst weiterhin keine "Abweichung"
+// (gefahren gegen erwartete Distanz einer Schicht) und keine Beanstandung
+// mit Konsequenz -- Letzteres bleibt durch OP-314 blockiert, bis die
+// Privatnutzungs-Regel schriftlich vorliegt und den Mitarbeitenden bekannt
+// ist.
+//
 // RECHT: 'betrieb', dasselbe wie fahrzeug_logbuch.php -- wer die Fahrzeuge
 // pflegen darf, muss auch sehen können, wer sie zuletzt übernommen hat.
 declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../rechte.php';
+require_once __DIR__ . '/../fahrzeug.php';
 
 $user = require_session();
 require_recht($user, 'betrieb');
@@ -38,16 +48,11 @@ $fahrzeugId = isset($_GET['fahrzeug_id']) && $_GET['fahrzeug_id'] !== '' ? (int)
 // genutzt) -- kein zweiter Weg über die Kundentabelle nötig. LEFT JOIN, weil
 // eine spontane Fahrt ohne Einsatz gültig ist (siehe meine_fahrzeug_uebernahme.php)
 // und dann keinen Zusammenhang zu zeigen hat, statt einen zu erfinden.
-$sql = 'SELECT u.id, u.art, u.zeitpunkt, u.tacho_km, u.quelle,
-               u.foto IS NOT NULL AS hat_foto,
-               f.id AS fahrzeug_id, f.kennzeichen, f.bezeichnung AS fz_bezeichnung,
-               m.vorname, m.nachname, m.name,
-               e.kunde_name, e.titel
-          FROM fahrzeug_uebernahme u
-          LEFT JOIN fahrzeuge f ON f.id = u.fahrzeug_id
-          JOIN mitarbeiter m ON m.id = u.mitarbeiter_id
-          LEFT JOIN einsaetze e ON e.id = u.einsatz_id
-         WHERE DATE(u.zeitpunkt) BETWEEN ? AND ?';
+//
+// Abfrage und "voriger"-Bezug liegen in fahrzeug.php (FZ_UEBERNAHME_LISTE_SQL),
+// nicht hier -- damit dieselbe Abfrage auch in pruef_fahrzeug_uebernahme.php
+// echt gegen SQLite laufen kann (ENT-356).
+$sql = FZ_UEBERNAHME_LISTE_SQL . ' WHERE DATE(u.zeitpunkt) BETWEEN ? AND ?';
 $werte = [$von, $bis];
 if ($fahrzeugId !== null) {
     $sql .= ' AND u.fahrzeug_id = ?';
@@ -65,6 +70,15 @@ $eintraege = array_map(function (array $r): array {
     $name = trim(($r['vorname'] ?? '') . ' ' . ($r['nachname'] ?? ''));
     $r['person'] = $name !== '' ? $name : (string)($r['name'] ?? '?');
     unset($r['vorname'], $r['nachname'], $r['name']);
+
+    // Zwei Feststellungen aus dem Vorwert (ENT-356) -- Berechnung in
+    // fz_uebernahme_feststellungen() (fahrzeug.php), damit sie isoliert
+    // (ohne Datenbank) geprüft werden kann.
+    $vorigerKm = $r['voriger_km'] !== null ? (int)$r['voriger_km'] : null;
+    $vorigerMa = $r['voriger_mitarbeiter_id'] !== null ? (int)$r['voriger_mitarbeiter_id'] : null;
+    $eigeneMa = $r['eigene_mitarbeiter_id'] !== null ? (int)$r['eigene_mitarbeiter_id'] : null;
+    $r += fz_uebernahme_feststellungen($r['tacho_km'], $vorigerKm, $vorigerMa, $eigeneMa);
+    unset($r['voriger_km'], $r['voriger_mitarbeiter_id'], $r['eigene_mitarbeiter_id']);
     return $r;
 }, $stmt->fetchAll(PDO::FETCH_ASSOC));
 
