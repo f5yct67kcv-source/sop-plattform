@@ -93,6 +93,10 @@ async function seite(hoehe) {
     if (p.includes('mein_profil')) return send(PROFIL);
     if (p.includes('rapport_list')) return send({ status: 'ok', rapporte: [] });
     if (p.includes('mein_rundgang_offen')) return send({ status: 'ok', rundgang: JSON.parse(JSON.stringify(RUNDE)) });
+    if (p.includes('mein_rundgang_uebersicht')) return send({ status: 'ok',
+      objekt: { id: 7, name: 'Musterobjekt', strasse: 'Musterweg 4', ort: '9999 Musterdorf' },
+      vorlage: { id: 3, name: 'Musterrunde Quartier' },
+      kontrollpunkte: RUNDE.kontrollpunkte, laufend: null });
     return send({ status: 'ok' });
   });
   await page.route('**maps.googleapis.com/**', r =>
@@ -109,8 +113,10 @@ const masse = page => page.evaluate(() => {
     return { t: r.top, b: r.bottom, l: r.left, r: r.right, w: r.width, h: r.height,
              fs: parseFloat(c.fontSize), fw: parseInt(c.fontWeight, 10) }; };
   return { titel: g('#rgsTitel'), zaehler: g('#rgsZaehler'), timer: g('#rgsTimer'),
-           zLb: g('#rgsZaehlerLb'), tLb: g('#rgsTimerLb'), zBlk: g('#rgsKopfZahlen > :nth-child(1)'),
-           tBlk: g('#rgsKopfZahlen > :nth-child(2)'), chip: g('#rgsOrtChip'),
+           zChip: g('#rgsZaehlerChip'), tChip: g('#rgsTimerChip'), zeilen: g('#rgsZchips'),
+           chip: g('#rgsOrtChip'), kopf: g('.rgs-kopf'), reiter: g('.rgs-reiter'),
+           zVerankerung: (() => { const e = document.getElementById('rgsZchips');
+             return e ? getComputedStyle(e).position : null; })(),
            huelle: g('.rgs-karte-huelle'), zen: g('#rgsZentrieren'), nacht: g('#rgsNachtsicht'),
            zeile: !!document.getElementById('rgsOrtungHinweis') };
 });
@@ -127,34 +133,64 @@ let m = await masse(page);
 // eine abgestuerzte Suite meldet gar keine rote Pruefung, sie meldet nichts.
 // Genau so ist eine Gegenprobe in dieser Sitzung durchgerutscht.
 for (const [nm, el] of [['Titel', m.titel], ['Zaehler', m.zaehler], ['Laufzeit', m.timer],
-    ['Zaehler-Beschriftung', m.zLb], ['Laufzeit-Beschriftung', m.tLb],
-    ['Zaehlerblock', m.zBlk], ['Laufzeitblock', m.tBlk], ['Ortungsmarke', m.chip],
-    ['Kartenhuelle', m.huelle], ['Zentrieren', m.zen], ['Nachtsicht', m.nacht]]) {
+    ['Zaehler-Chip', m.zChip], ['Laufzeit-Chip', m.tChip], ['Chipzeile', m.zeilen],
+    ['Ortungsmarke', m.chip], ['Kartenhuelle', m.huelle], ['Kopf', m.kopf],
+    ['Reiterleiste', m.reiter], ['Zentrieren', m.zen], ['Nachtsicht', m.nacht]]) {
   check(`KRITISCH: das Bauteil "${nm}" ist auf dem Bildschirm vorhanden`, !!el);
 }
 
-check('KRITISCH: waehrend der Runde treten Zaehler und Laufzeit vor den Firmennamen',
-  !!m.zaehler && !!m.timer && !!m.titel
-  && m.zaehler?.fs >= 22 && m.timer?.fs >= 22 && m.titel?.fs <= 14);
-check('Beide Zahlen sind gleich gross -- ein Block darf nicht wichtiger aussehen als der andere',
-  Math.abs(m.zaehler?.fs - m.timer?.fs) < 0.5 && Math.abs(m.zLb?.fs - m.tLb?.fs) < 0.5);
-check('KRITISCH: die Beschriftung steht UEBER dem Wert, nicht darunter (CLAUDE.md)',
-  m.zLb?.b <= m.zaehler?.t + 1 && m.tLb?.b <= m.timer?.t + 1);
-check('Beide Bloecke stehen auf derselben Hoehe -- gleiches Muster auf beiden Seiten',
-  Math.abs(m.zLb?.t - m.tLb?.t) < 1 && Math.abs(m.zaehler?.t - m.timer?.t) < 1);
-const mitte = b => b ? (b.l + b.r) / 2 : NaN;
-check('KRITISCH: jeder Wert steht in der Mitte SEINES Blocks, nicht im Zwischenraum',
-  Math.abs(mitte(m.zaehler) - mitte(m.zBlk)) < 2 && Math.abs(mitte(m.timer) - mitte(m.tBlk)) < 2);
-check('Der Firmenname bleibt lesbar -- zurueckgenommen ist nicht dasselbe wie weg',
+// ══════════ DIE KARTE IST DAS ZENTRALE ELEMENT ════════════════════════
+// REVIDIERT durch ENT-361. ENT-355 stellte Zaehler und Laufzeit gross in
+// einer eigenen Zeile unter dem Kopf heraus -- und verbrauchte damit rund
+// 146 px fuer zwei Zahlen. Der Projektinhaber, woertlich: "Hier hast du
+// leider viiiel zu viel Platz verschenkt! Die Karte ist das zentrale
+// Element." Die Zahlen liegen jetzt ALS UEBERLAGERUNG auf der Karte; eine
+// Ueberlagerung kostet keine Layouthoehe.
+//
+// Diese Pruefungen sind darum nicht gelockert, sondern umgedreht: Frueher
+// wurde geprueft, dass die Zahlen gross sind. Jetzt wird geprueft, dass die
+// Karte den Platz hat UND die Zahlen trotzdem lesbar bleiben.
+check('KRITISCH: die Karte beginnt direkt unter dem Kopf -- kein Leerraum dazwischen',
+  Math.abs(m.huelle?.t - m.kopf?.b) <= 2);
+check('KRITISCH: die Karte reicht bis an die Reiterleiste -- kein Leerraum darunter',
+  Math.abs(m.reiter?.t - m.huelle?.b) <= 2);
+check('KRITISCH: die Chips liegen innerhalb der Kartenflaeche',
+  m.zChip?.t >= m.huelle?.t && m.zChip?.b <= m.huelle?.b
+  && m.tChip?.t >= m.huelle?.t && m.tChip?.b <= m.huelle?.b);
+// Getrennte Pruefung, und zwar an der gemessenen Verankerung: Dass die Chips
+// im Kartenbereich LIEGEN, sagt noch nicht, dass sie dort ueberlagern -- im
+// Fluss stuenden sie an fast derselben Stelle und saehen beinahe gleich aus.
+// Genau das hat eine Gegenprobe aufgedeckt: Sie stellte die Chips von
+// "absolute" auf "static", und die Lage-Pruefung blieb gruen.
+check('KRITISCH: die Chips ueberlagern die Karte, statt im Fluss zu stehen',
+  m.zVerankerung === 'absolute');
+check('KRITISCH: die Karte nimmt den groessten Teil des Bildschirms ein',
+  m.huelle?.h > (m.reiter?.b || 0) * 0.7);
+
+// Lesbar heisst nicht gross: Die Werte sind bewusst kleiner als in ENT-355
+// (16 statt 25 px), duerfen aber nicht wieder auf Chipgroesse zurueckfallen.
+check('Zaehler und Laufzeit bleiben gut lesbar',
+  m.zaehler?.fs >= 15 && m.timer?.fs >= 15);
+check('KRITISCH: sie spielen sich aber nicht mehr auf -- hoechstens 18 px',
+  m.zaehler?.fs <= 18 && m.timer?.fs <= 18);
+check('Beide Zahlen sind gleich gross -- keine ist wichtiger als die andere',
+  Math.abs(m.zaehler?.fs - m.timer?.fs) < 0.5);
+check('Beide stehen auf derselben Hoehe',
+  Math.abs(m.zaehler?.t - m.timer?.t) < 1);
+check('KRITISCH: der Firmenname tritt hinter die Zahlen zurueck',
+  m.titel?.fs < m.zaehler?.fs);
+check('Er bleibt trotzdem lesbar -- zurueckgenommen ist nicht dasselbe wie weg',
   m.titel?.fs >= 12 && m.titel?.h > 10 && m.titel?.w > 100);
-check('Die beiden Bloecke sind gleich breit',
-  Math.abs(m.zBlk?.w - m.tBlk?.w) < 2);
+check('Der Kopf beansprucht nicht mehr als eine Zeile plus Trefferflaeche',
+  m.kopf?.h <= 64);
 
 // ══════════ KARTE: Knoepfe tiefer, Anbieterleiste frei ════════════════
 check('KRITISCH: die Zeile unter der Karte ist weg -- die Karte hat die Hoehe',
   m.zeile === false);
-check('KRITISCH: die Ortungsmarke steht stattdessen auf der Karte',
+check('KRITISCH: die Ortungsmarke steht auf der Karte',
   !!m.chip && m.chip.h > 16 && m.chip.t >= m.huelle?.t && m.chip.b <= m.huelle?.b);
+check('KRITISCH: die Ortungsmarke verdeckt die beiden Zahlen nicht',
+  m.chip?.t >= m.zChip?.b && m.chip?.t >= m.tChip?.b);
 check('KRITISCH: beide Kartenknoepfe halten Abstand zur Anbieterleiste am unteren Rand',
   m.huelle?.b - m.zen?.b >= 24 && m.huelle?.b - m.nacht?.b >= 24);
 check('Die Knoepfe sitzen trotzdem tief -- weiter unten als die halbe Karte',
@@ -163,6 +199,35 @@ check('Beide Kartenknoepfe behalten 44 px Trefferflaeche (CLAUDE.md)',
   m.zen?.h >= 44 && m.nacht?.h >= 44);
 check('Marke und Knoepfe ueberlappen sich nicht',
   m.chip?.b < m.zen?.t && m.chip?.b < m.nacht?.t);
+check('Die Zahlen und die Knoepfe ueberlappen sich nicht',
+  m.zChip?.b < m.zen?.t && m.tChip?.b < m.nacht?.t);
+
+// ══════════ REITER OHNE KARTE ════════════════════════════════════════
+// Dort gibt es nichts zu ueberlagern -- die Chips stehen im Fluss, und der
+// Vollflaechen-Modus der Karte muss wieder abgeraeumt sein. Eine Gegenprobe
+// hat gezeigt, dass genau das vorher ungeprueft war: Blieb die Klasse
+// stehen, klebte die Liste ohne Luft am Kopf, und keine Pruefung merkte es.
+await page.click('#rgsRt-punkte'); await page.waitForTimeout(600);
+const liste = await page.evaluate(() => {
+  const z = document.getElementById('rgsZchips');
+  const k = document.querySelector('.rgs-kopf');
+  const bd = document.getElementById('rgsBody');
+  const erstes = bd && bd.firstElementChild;
+  return { chips: !!z, verankerung: z ? getComputedStyle(z).position : null,
+           luft: (erstes && k) ? erstes.getBoundingClientRect().top - k.getBoundingClientRect().bottom : -1,
+           vollNoch: !!bd && bd.classList.contains('voll'),
+           links: erstes ? erstes.getBoundingClientRect().left : -1 };
+});
+check('KRITISCH: auf dem Punkte-Reiter stehen dieselben Zahlen als Zeile',
+  liste.chips === true);
+check('Dort stehen sie im Fluss, nicht als Ueberlagerung',
+  liste.verankerung !== 'absolute');
+check('KRITISCH: der Vollflaechen-Modus der Karte ist dort wieder abgeraeumt',
+  liste.vollNoch === false);
+check('KRITISCH: zwischen Kopf und Inhalt bleibt Luft -- die Liste klebt nicht am Kopf',
+  liste.luft >= 10);
+check('Und sie klebt auch nicht am linken Rand',
+  liste.links >= 12);
 
 // ══════════ WACH HALTEN ═══════════════════════════════════════════════
 await page.click('#rgsRt-funktionen'); await page.waitForTimeout(500);
@@ -235,13 +300,25 @@ await page.close();
 page = await seite(844);
 await page.evaluate(() => ladeSchichten());
 await page.waitForTimeout(600);
+// Die Vorschau muss geoeffnet werden, sonst prueft der Abschnitt einen
+// Bildschirm, den es gar nicht gibt. Genau das war hier der Fall: Eine
+// Gegenprobe schob der Vorschau Chips unter und nichts wurde rot -- weil
+// die Vorschau nie gezeichnet wurde.
+await page.evaluate(() => rgSeiteOeffnen(3));
+await page.waitForTimeout(900);
+check('KRITISCH: die Vorschau ist ueberhaupt geoeffnet -- sonst prueft der Rest nichts',
+  await page.evaluate(() => document.getElementById('rgSeite').classList.contains('on')
+    && (document.getElementById('rgsTitel').textContent || '').length > 1));
 const vorschau = await page.evaluate(() => {
   const t = document.getElementById('rgsTitel');
-  const z = document.getElementById('rgsKopfZahlen');
-  return { fs: parseFloat(getComputedStyle(t).fontSize), zahlenWeg: z.hidden };
+  return { fs: t ? parseFloat(getComputedStyle(t).fontSize) : 0,
+           zahlenWeg: !document.getElementById('rgsZchips'),
+           klasseWeg: !document.getElementById('rgSeite')?.classList.contains('zahlen') };
 });
 check('KRITISCH: ohne laufende Runde bleibt der Titel gross -- dort gibt es keine Zahlen, die vorgehen',
   vorschau.zahlenWeg === true && vorschau.fs >= 16);
+check('Und die Seite fuehrt sich auch innerlich nicht als laufende Runde',
+  vorschau.klasseWeg === true);
 await page.close();
 
 // ══════════ KLEINE BILDSCHIRME ════════════════════════════════════════
@@ -251,12 +328,15 @@ for (const h of [720, 660, 600]) {
   await page.waitForTimeout(1500);
   await page.click('#rgsRt-karte'); await page.waitForTimeout(900);
   const k = await masse(page);
-  check(`${h} px: der Kopf wird nicht zusammengedrueckt`,
-    k.zaehler?.fs >= 22 && k.timer?.fs >= 22 && k.zBlk?.h > 40);
+  check(`${h} px: die Zahlen bleiben lesbar und werden nicht zusammengedrueckt`,
+    k.zaehler?.fs >= 15 && k.timer?.fs >= 15 && k.zChip?.h >= 30);
+  check(`${h} px: die Karte bekommt weiterhin den ganzen Rumpf`,
+    Math.abs(k.huelle?.t - k.kopf?.b) <= 2 && Math.abs(k.reiter?.t - k.huelle?.b) <= 2);
   check(`${h} px: die Knoepfe halten weiterhin Abstand zur Anbieterleiste`,
     k.huelle?.b - k.zen?.b >= 24 && k.huelle?.b - k.nacht?.b >= 24);
-  check(`${h} px: die Ortungsmarke liegt im Bild`,
-    !!k.chip && k.chip.t >= k.huelle?.t && k.chip.b <= k.huelle?.b);
+  check(`${h} px: Zahlen und Ortungsmarke liegen im Bild und ueberlappen sich nicht`,
+    !!k.chip && k.chip.t >= k.huelle?.t && k.chip.b <= k.huelle?.b
+    && k.chip.t >= k.zChip?.b && k.zChip?.b < k.zen?.t);
   await page.close();
 }
 

@@ -452,17 +452,16 @@ svg.i-sm { width: 17px; height: 17px; }
 .rgs.on { display: flex; }
 .rgs-kopf { display: flex; align-items: center; gap: 6px; padding: 10px 14px 12px; flex: none; background: var(--surface); }
 .rgs-kopf h2 { font-size: 17px; font-weight: 680; letter-spacing: -.3px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* Der Rahmen sass am Kopf. Steht die Zahlenzeile darunter, gehoert er ans
-   ENDE des Blocks -- sonst liefe eine Linie mitten hindurch. */
-.rgs-kopf:has(+ .rgs-kopf-zahlen[hidden]) { border-bottom: 1px solid var(--line-soft); }
+.rgs-kopf { border-bottom: 1px solid var(--line-soft); }
 /* Waehrend der Runde tritt der Firmenname zurueck (ENT-355): kleiner,
    gedaempft, nicht mehr fett. Er bleibt lesbar -- auf dem Handy ist die
    Kopfzeile der einzige Ort, der sagt, wo man ist (CLAUDE.md) --, aber er
-   nimmt den beiden Zahlen nicht mehr den Platz weg.
-   Ueber :has statt ueber eine Klasse: Die Zahlenzeile wird an sechs Stellen
-   ein- und ausgeblendet; eine Klasse muesste an allen sechs mitgepflegt
-   werden und waere irgendwann an einer davon vergessen. */
-.rgs-kopf:has(+ .rgs-kopf-zahlen:not([hidden])) h2 { font-size: 13.5px; font-weight: 600; color: var(--ink-3); letter-spacing: 0; }
+   spielt sich nicht mehr auf. Ohne laufende Runde bleibt er gross: Dort gibt
+   es keine Zahlen, hinter die er zuruecktreten muesste.
+   Der Kopf ist ausserdem schmaler geworden (ENT-361) -- jede Zeile, die er
+   nicht braucht, gehoert der Karte. */
+.rgs.zahlen .rgs-kopf { padding: 6px 14px 8px; }
+.rgs.zahlen .rgs-kopf h2 { font-size: 13.5px; font-weight: 600; color: var(--ink-3); letter-spacing: 0; }
 /* 44px Trefferflaeche (CLAUDE.md), der negative Rand haelt das Symbol
    trotzdem buendig an der Kante -- sonst steht der Titel eingerueckt. */
 .rgs-zurueck { min-height: 44px; min-width: 44px; padding: 0; margin-left: -10px; display: flex; align-items: center; justify-content: center; background: none; border: 0; color: var(--ink); cursor: pointer; }
@@ -629,6 +628,19 @@ svg.i-sm { width: 17px; height: 17px; }
 .rgs-karte-huelle { position: relative; flex: 1; min-height: 260px;
   margin: 0 -16px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
   overflow: hidden; background: var(--surface-2); }
+/* Die Karte bekommt den ganzen Rumpf (ENT-361). Zwischen Kopf und Karte lagen
+   12 px Abstand der Seite plus 16 px Innenrand des Rumpfs, unter der Karte
+   dasselbe noch einmal -- zusammen 56 px Leerraum um das Element herum, das
+   das wichtigste dieser Seite ist. Auf dem Karten-Reiter fallen beide weg.
+   Auf den anderen Reitern bleiben sie: Dort steht eine Liste, und eine Liste
+   ohne Rand klebt am Bildschirmrand. */
+.rgs.voll { gap: 0; }
+.rgs-bd.voll { padding: 0; }
+.rgs-bd.voll .rgs-karte-huelle { margin: 0; border-top: 0; }
+/* Was ausser der Karte noch im Rumpf steht -- die Ortungswarnungen -- braucht
+   seinen Rand zurueck, sonst klebte der Warntext an der Kante. */
+.rgs-bd.voll > :not(.rgs-karte-huelle) { margin: 0 16px; }
+.rgs-bd.voll > :last-child:not(.rgs-karte-huelle) { margin-bottom: calc(12px + env(safe-area-inset-bottom)); }
 .rgs-karte { position: absolute; inset: 0; }
 /* Ladehinweis und Fehlermeldung an derselben Stelle: Beides beantwortet
    dieselbe Frage ("warum sehe ich nichts"), darum derselbe Ort. */
@@ -659,7 +671,10 @@ svg.i-sm { width: 17px; height: 17px; }
 
 /* Die Ortungsmarke, oben links auf der Karte -- die Ecke, in der weder ein
    Knopf noch der Anbieterhinweis liegt. */
-.rgs-ortchip { position: absolute; left: 10px; top: 10px; display: inline-flex;
+/* Unter den Wert-Chips (ENT-361): Die Ortungsmarke ist die dritte
+   Ueberlagerung in derselben Ecke und darf die beiden Zahlen nicht
+   verdecken. 10 px Rand + 34 px Chiphoehe + 8 px Luft = 52 px. */
+.rgs-ortchip { position: absolute; left: 10px; top: 52px; z-index: 2; display: inline-flex;
   align-items: center; gap: 7px; max-width: calc(100% - 20px); padding: 6px 11px;
   border: 1px solid var(--line); border-radius: 999px; background: var(--surface);
   color: var(--ink-2); font-size: 12.5px; font-weight: 620; line-height: 1.2;
@@ -698,21 +713,23 @@ svg.i-sm { width: 17px; height: 17px; }
 .rgs-ortwarn-weg { margin-top: 10px; font-size: 13px; color: var(--ink-2); line-height: 1.55; }
 
 .rd-zustand { font-size: 15px; font-weight: 640; margin-bottom: 12px; }
-/* Zwei gleich breite Bloecke, gleiches Muster, gleiche Schriftgroessen
-   (CLAUDE.md: „Gleiches Muster auf beiden Seiten"). Zwei Spalten zu 1fr,
-   nicht flex mit Abstandhalter -- so steht jeder Wert wirklich in der Mitte
-   SEINES Blocks und nicht in der Mitte des Zwischenraums. */
-.rgs-kopf-zahlen { display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
-  flex: none; padding: 0 14px 14px; background: var(--surface);
-  border-bottom: 1px solid var(--line-soft); }
-.rgs-kopf-blk { display: flex; flex-direction: column; align-items: center; gap: 3px;
-  padding: 9px 10px 10px; border: 1px solid var(--line); border-radius: var(--r-sm);
-  background: var(--surface-2); min-width: 0; }
-.rgs-kopf-lb { font-size: 10.5px; font-weight: 700; letter-spacing: .9px;
-  text-transform: uppercase; color: var(--ink-3); }
-.rgs-kopf-wert { font-size: 25px; line-height: 1.1; font-weight: 700; color: var(--ink);
-  font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
-.rgs-kopf-zahlen[hidden] { display: none; }
+/* Nur fuer Vorlesewerkzeuge sichtbar. Das Symbol im Chip sagt einem
+   sehenden Auge, was die Zahl bedeutet; einer Vorlesestimme sagt es nichts. */
+.vh { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
+
+/* Zaehler und Laufzeit als Chips (ENT-361, revidiert ENT-355).
+   Auf der Karte als Ueberlagerung -- das kostet keine Layouthoehe, die Karte
+   reicht darunter durch. Auf den Reitern ohne Karte als schmale Zeile. */
+.rgs-zchips { display: flex; align-items: center; gap: 8px; flex: none; flex-wrap: wrap; }
+.rgs-zchips.auf-karte { position: absolute; left: 10px; top: 10px; z-index: 2;
+  max-width: calc(100% - 20px); }
+.rgs-zchip { display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--surface);
+  color: var(--ink-2); box-shadow: var(--sh-2); }
+.rgs-zchip .i { flex: none; color: var(--ink-3); }
+.rgs-zchip-wert { font-size: 16px; line-height: 1.15; font-weight: 700; color: var(--ink);
+  font-variant-numeric: tabular-nums; letter-spacing: -.2px; }
 
 /* Reiterleiste der laufenden Runde (ENT-306). Unten, wo der Daumen ist --
    dieselbe Stelle wie die Reiterleiste der App selbst, damit niemand zwei
@@ -916,24 +933,6 @@ svg.i-sm { width: 17px; height: 17px; }
     </button>
     <h2 id="rgsTitel">–</h2>
   </header>
-  <!-- Zaehler und Laufzeit als eigene Zeile UNTER dem Kopf (ENT-355).
-       Vorgabe des Projektinhabers: Beide Zahlen gehoeren in den Fokus, der
-       Firmenname dahinter. Bis hierher war es umgekehrt -- der Name stand
-       gross in der Mitte, die beiden Zahlen als zwei kleine graue Chips
-       daneben. Wer auf der Runde aufs Handy schaut, will wissen, wie weit
-       er ist und wie lange er dran ist; welchen Kunden er abgeht, weiss er.
-       Aufbau nach CLAUDE.md: Beschriftung OBEN, Wert darunter, beide
-       Bloecke im selben Muster und in derselben Schriftgroesse. -->
-  <div class="rgs-kopf-zahlen" id="rgsKopfZahlen" hidden>
-    <div class="rgs-kopf-blk">
-      <div class="rgs-kopf-lb" id="rgsZaehlerLb">–</div>
-      <div class="rgs-kopf-wert" id="rgsZaehler">–</div>
-    </div>
-    <div class="rgs-kopf-blk">
-      <div class="rgs-kopf-lb" id="rgsTimerLb">–</div>
-      <div class="rgs-kopf-wert" id="rgsTimer">–</div>
-    </div>
-  </div>
   <div class="rgs-bd" id="rgsBody"></div>
   <div class="rgs-reiter" id="rgsReiter" hidden></div>
   <div class="rgs-fuss" id="rgsFuss"></div>
@@ -2556,7 +2555,7 @@ function rgSeiteOeffnen(vorlageId) {
   rgsModus = 'vorschau';
   rgTimerStoppen();
   $('rgsReiter').hidden = true;
-  $('rgsKopfZahlen').hidden = true;
+  rgZahlenAn(false);
   $('rgsFuss').hidden = false;
   $('rgsTitel').textContent = '–';
   $('rgsBody').innerHTML = `<div class="sk" style="height:104px"></div><div class="sk" style="height:64px"></div>`;
@@ -2589,7 +2588,7 @@ function rgSeiteZu() {
   rgOrtungStoppen();  // sonst ortet das Geraet weiter, ohne dass es jemand sieht
   rgsMeinOrt = null;  // die Position ueberdauert die Runde nicht
   $('rgsReiter').hidden = true;
-  $('rgsKopfZahlen').hidden = true;
+  rgZahlenAn(false);
   $('rgsFuss').hidden = false;
   rgsFrageZu();   // eine offene Rueckfrage darf die naechste Seite nicht erben
   $('rgSeite').classList.remove('on');
@@ -2641,7 +2640,7 @@ function rgSeiteZurueckZurUebersicht() {
     $('rgsReiter').hidden = false;
     $('rgsFuss').hidden = true;
     $('rgsFuss').innerHTML = '';
-    $('rgsKopfZahlen').hidden = false;
+    rgZahlenAn(true);
     $('rgsTitel').textContent = rgsLaufTitel || w('rgsLaufTitel');
     rgLaufZeichnen();
     return;
@@ -2655,7 +2654,7 @@ function rgSeiteZurueckZurUebersicht() {
 function rgUnterseiteAn() {
   if (rgsModus !== 'lauf') return;
   $('rgsReiter').hidden = true;
-  $('rgsKopfZahlen').hidden = true;
+  rgZahlenAn(false);
   $('rgsFuss').hidden = false;
 }
 
@@ -4288,7 +4287,7 @@ function rundgangAnzeigen(einsatzId) {
   $('rgsFuss').innerHTML = '';
   $('rgsFuss').hidden = true;
   $('rgsReiter').hidden = false;
-  $('rgsKopfZahlen').hidden = false;
+  rgZahlenAn(true);
   $('rgSeite').classList.add('on');
   $('rgSeite').setAttribute('aria-hidden', 'false');
   rgLaufReiterZeichnen();
@@ -4361,6 +4360,10 @@ function rgLaufZeichnen() {
   // leeren Rumpf statt seiner Kontrollpunkte. Von der Regression gefunden.
   rgOrtungNachfuehren();
   rgWachAnfordern();
+  // Erst abraeumen, dann setzt nur der echte Kartenpfad die Klasse wieder.
+  // Anders herum bliebe sie stehen, wenn die Karte nichts zu zeigen hat und
+  // stattdessen ein Warnblock erscheint -- der klebte dann am Bildschirmrand.
+  rgVollflaeche(false);
   if (rgsReiter === 'karte') { rgKarteZeichnen(); }
   else if (rgsReiter === 'funktionen') { rgLaufFunktionen(); }
   else {
@@ -4372,8 +4375,11 @@ function rgLaufZeichnen() {
     // dem Kontrollpunkt und tippt auf "Bestaetigen", nicht auf die Karte.
     // Nur unter der Karte zu warnen hiesse, sie dort zu verstecken, wo er
     // gerade nicht hinsieht.
+    // Hier gibt es keine Karte, auf die etwas gelegt werden koennte -- darum
+    // stehen dieselben Chips als schmale Zeile oben (ENT-361).
     $('rgsBody').innerHTML =
-      rgOrtungHinweisHtml()
+      rgZahlenChipsHtml(false)
+      + rgOrtungHinweisHtml()
       + `<div id="rdFortschritt" class="rd-zustand"></div><div id="rdBanner"></div><div id="rdListe"></div>`;
     rundgangListeZeichnen();
   }
@@ -4389,10 +4395,6 @@ function rgLaufKopfZeichnen() {
   const z = $('rgsZaehler'); if (z) { z.textContent = `${fertig} / ${kps.length}`; }
   const t = $('rgsTimer');
   if (t) { t.textContent = rgLaufzeit(); }
-  // Die Beschriftungen stehen im Aufbau leer und kommen von hier, damit sie
-  // aus der Woertertabelle stammen wie jeder andere sichtbare Text auch.
-  const zl = $('rgsZaehlerLb'); if (zl) { zl.textContent = w('rgsZaehlerLb'); }
-  const tl = $('rgsTimerLb'); if (tl) { tl.textContent = w('rgsTimerLb'); }
   // Die Ortungsanzeige auf der Karte altert mit der Zeit ("steht seit 3 min")
   // -- sie muss darum mit demselben Takt nachgefuehrt werden wie die Uhr,
   // sonst bliebe sie auf dem Stand der letzten Positionsmeldung stehen.
@@ -4499,6 +4501,7 @@ function rgLaufFunktionen() {
       <span>${esc(wort)}</span>
     </button>`;
   $('rgsBody').innerHTML = `
+    ${rgZahlenChipsHtml(false)}
     <div style="display:flex;flex-direction:column;gap:10px">
       <div class="rgs-mod-lb" id="rgsFunktionenLb">${esc(w('rgsFunktionen'))}</div>
       ${modul('rgsLaufEreignis', w('evTitel'),
@@ -4780,11 +4783,12 @@ function rgKarteZeichnen() {
   // die offen angezeigt wird -- rechtlich wie menschlich. Steht dort,
   // solange die Verfolgung laeuft, und verschwindet mit ihr.
   const ortungHinweis = rgOrtungHinweisHtml(true);
+  rgVollflaeche(true);
   $('rgsBody').innerHTML = `
     <div class="rgs-karte-huelle">
       <div class="rgs-karte" id="rgsKarte"></div>
       <div class="rgs-karte-stand" id="rgsKarteStand">${esc(w('rgsKarteLaedt'))}</div>
-      ${rgOrtChipHtml()}
+      ${rgZahlenChipsHtml(true)}${rgOrtChipHtml()}
       <button type="button" class="rgs-karte-btn" id="rgsZentrieren" onclick="rgKarteZentrieren()">
         <svg class="i i-sm" viewBox="0 0 24 24"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
         <span>${esc(w('rgsZentrieren'))}</span>
@@ -5062,6 +5066,59 @@ function rgSichtSignal(text) {
    wichtigste davon ist eine Handlungsanweisung, keine Fehlermeldung: Wer
    nachts vor einem Kontrollpunkt steht, den er nicht bestaetigen kann,
    braucht den WEG zur Einstellung, nicht die Diagnose. */
+/* Zaehler und Laufzeit (ENT-361, revidiert ENT-355).
+
+   ENT-355 stellte beide Zahlen gross heraus -- in einer eigenen Zeile UNTER
+   dem Kopf, mit Beschriftung darueber. Das war zu viel des Guten: Kopf und
+   Zahlenzeile zusammen frassen rund 146 px, und die Karte, die das zentrale
+   Element dieser Seite ist, bekam den Rest. Der Projektinhaber, woertlich:
+   „Hier hast du leider viiiel zu viel Platz verschenkt! Die Karte ist das
+   zentrale Element."
+
+   Jetzt liegen beide Werte ALS UEBERLAGERUNG auf der Karte. Das ist der
+   springende Punkt: Eine Ueberlagerung kostet keine Layouthoehe -- die Karte
+   reicht darunter durch. So sind beide Zahlen weiterhin ohne Scrollen
+   sichtbar, und die Karte hat trotzdem die volle Hoehe.
+
+   Auf den Reitern "Kontrollpunkte" und "Funktionen" gibt es keine Karte, auf
+   die etwas gelegt werden koennte -- dort stehen dieselben Chips als schmale
+   Zeile oben im Rumpf. Gleiches Aussehen, andere Verankerung.
+
+   Kleiner als in ENT-355 (16 px statt 25 px) und ohne die Beschriftung
+   darueber: Ein Symbol sagt hier dasselbe wie ein Wort und braucht eine
+   Zeile weniger. Die Regel „keine Zahl ohne Bezug" ist damit erfuellt --
+   nicht durch Weglassen des Bezugs, sondern durch ein anderes Zeichen
+   dafuer. */
+let rgsZahlenAn = false;
+
+function rgZahlenAn(ja) {
+  rgsZahlenAn = !!ja;
+  const seite = $('rgSeite');
+  if (seite) { seite.classList.toggle('zahlen', rgsZahlenAn); }
+}
+
+/* Vollflaechen-Modus: Rumpf ohne Rand, Seite ohne Abstand (ENT-361). */
+function rgVollflaeche(ja) {
+  const seite = $('rgSeite'); if (seite) { seite.classList.toggle('voll', !!ja); }
+  const bd = $('rgsBody'); if (bd) { bd.classList.toggle('voll', !!ja); }
+}
+
+function rgZahlenChipsHtml(aufKarte) {
+  if (!rgsZahlenAn) { return ''; }
+  return `<div class="rgs-zchips${aufKarte ? ' auf-karte' : ''}" id="rgsZchips">
+    <span class="rgs-zchip" id="rgsZaehlerChip" title="${esc(w('rgsZaehlerLb'))}">
+      <svg class="i i-sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="10" r="3"/><path d="M12 21s-7-6.2-7-11a7 7 0 1 1 14 0c0 4.8-7 11-7 11z"/></svg>
+      <span class="rgs-zchip-wert" id="rgsZaehler">–</span>
+      <span class="vh" id="rgsZaehlerLb">${esc(w('rgsZaehlerLb'))}</span>
+    </span>
+    <span class="rgs-zchip" id="rgsTimerChip" title="${esc(w('rgsTimerLb'))}">
+      <svg class="i i-sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>
+      <span class="rgs-zchip-wert" id="rgsTimer">–</span>
+      <span class="vh" id="rgsTimerLb">${esc(w('rgsTimerLb'))}</span>
+    </span>
+  </div>`;
+}
+
 /* Wie es der Ortung GERADE geht -- eine Stelle, zwei Anzeigen (ENT-355).
 
    Neu ist der Zustand 'steht': Bis hierher kannte die App nur "es kommt
