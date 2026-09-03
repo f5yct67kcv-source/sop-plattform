@@ -967,6 +967,7 @@ svg.i-sm { width: 17px; height: 17px; }
 <script src="gav.js"></script>
 <script src="zeitwahl.js"></script>
 <script src="unterschrift.js"></script>
+<script src="testumgebung.js"></script>
 <script>
 /* ══════════════════════════════════════════════════════════════════
    WORTLAUT — alle sichtbaren Texte an einer Stelle, damit dieselbe Sache
@@ -4548,7 +4549,14 @@ function rgLaufFunktionen() {
    3. Die eigene Position wird GEZEIGT, aber nicht aufgezeichnet -- ENT-131
       schliesst die kontinuierliche Positionsverfolgung aus. Kein watchPosition,
       keine Uebermittlung, nur ein einmaliger Abruf auf Knopfdruck. */
-const RGS_MAPS_SCHLUESSEL = 'AIzaSyBdm5W2BwLAir3YHQusdpamrG1Mgx4AdzI';
+// Platzhalter, beim Deploy aus GitHub Secrets ersetzt (ENT-341) -- eigener
+// Schluessel je Umgebung, damit die produktive Referrer-Beschraenkung in
+// der Google-Cloud-Konsole unangetastet bleibt und Staging-Tests nicht
+// dasselbe Kontingent verbrauchen. Vorher stand hier der Schluessel im
+// Klartext; das Sichtbarwerden im Quelltext war schon davor normal und
+// unvermeidbar (Client-Schluessel), der Schutz laeuft weiterhin ueber die
+// Referrer-Einschraenkung, nicht ueber Geheimhaltung.
+const RGS_MAPS_SCHLUESSEL = '__MAPS_JS_KEY__';
 let rgsMapsVersprechen = null;
 let rgsKarte = null, rgsKartenMarken = [], rgsKartenKreise = [], rgsStandortMarke = null;
 // Der Schluessel wurde vom Kartenanbieter abgelehnt (ENT-309). Eigener

@@ -26,6 +26,40 @@ function json_response($data, int $status = 200): void {
     exit;
 }
 
+// ── Umgebung (ENT-341, verschaerft auf Wunsch des Projektinhabers) ─────
+// Explizit beim Deploy gesetzt -- derselbe Platzhalter-Mechanismus wie bei
+// __DB_HOST__ usw. -- NICHT aus dem Hostnamen abgeleitet. Ein Hostname kann
+// sich durch eine Weiterleitung, einen falsch gesetzten DNS-Eintrag oder
+// einen direkten IP-Zugriff anders zeigen, als die Umgebung tatsaechlich
+// ist; der Deploy-Lauf selbst weiss dagegen zweifelsfrei, fuer welches
+// GitHub Environment (und damit welche Secrets) er gerade laeuft, und
+// traegt das jetzt direkt ein, statt es dem Server ueberlassen, es aus der
+// Anfrage zu erraten.
+const APP_ENV = '__APP_ENV__';
+
+// Eigene, reine Funktion fuer den Vergleich statt eines Inline-Vergleichs
+// gegen die Konstante direkt: APP_ENV laesst sich nach der Definition nicht
+// mehr veraendern (PHP-Konstante), ein Test kaeme an einem Inline-Vergleich
+// also nur an EINEM Zustand vorbei. So bleibt die Entscheidungsregel selbst
+// mit einem frei gewaehlten Wert pruefbar (siehe pruefungen/pruef_staging.php).
+//
+// Fail-safe: wahr NUR beim exakten Wert "production". Ein leerer, ein noch
+// unersetzter ("__APP_ENV__") oder irgendein anderer Wert -- auch ein
+// Tippfehler wie "Production" -- gilt als NICHT Produktion. Der einzige
+// Ort, der sich auf dieses Ergebnis verlaesst (siehe mailer.php), ist der
+// E-Mail-Versand -- dort ist "haelt sich faelschlich fuer Staging und
+// blockiert eine Mail" der harmlose Fehler, "haelt sich faelschlich fuer
+// Produktion und verschickt eine echte Mail" der teure.
+function umgebung_ist_produktion(string $wert): bool
+{
+    return $wert === 'production';
+}
+
+function ist_produktion(): bool
+{
+    return umgebung_ist_produktion(APP_ENV);
+}
+
 // ── Sitzungsdauer (ENT-075) ───────────────────────────────────────────
 // Bis hierher lief eine Sitzung NIE ab: Ein einmal abgegriffener Token galt
 // fuer immer. Jetzt gelten zwei Grenzen gleichzeitig -- ein absolutes Alter

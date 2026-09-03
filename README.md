@@ -64,9 +64,14 @@ in `dashboard.html` — eine Zeile aendern genuegt.
 
 ## Deploy
 
-Jeder Push auf `main` loest den Workflow `.github/workflows/deploy-hostpoint.yml`
-aus: Platzhalter (`__DB_HOST__`, `__ANTHROPIC_API_KEY__` usw.) werden aus
-GitHub Secrets ersetzt, danach FTPS-Upload zu Hostpoint.
+Jeder Push auf `main` **oder** `staging` loest denselben Workflow
+`.github/workflows/deploy-hostpoint.yml` aus (ENT-341): Platzhalter
+(`__DB_HOST__`, `__ANTHROPIC_API_KEY__` usw.) werden aus GitHub Secrets
+ersetzt, danach FTPS-Upload zu Hostpoint. `main` deployt nach Produktion,
+`staging` nach der getrennten Testinstanz — **derselbe Workflow, dieselbe
+Dateiliste**, nur das GitHub Environment (`production`/`staging`, siehe
+`Settings → Environments`) und damit die Werte hinter den Secret-Namen
+unterscheiden sich. Siehe „Staging" weiter unten.
 
 **Im Quellcode stehen nie echte Zugangsdaten** — nur Platzhalter. Wer die Dateien
 lokal oeffnet, sieht keine Geheimnisse.
@@ -78,34 +83,92 @@ Ersteinrichtung war ein einmaliger manueller Upload und ist erledigt (OP-17).
 
 **Hier stehen keine Werte, nur die Liste.** Die Werte selbst gehoeren in einen
 Passwortmanager. In GitHub sind sie hinterlegt unter
-`Settings → Secrets and variables → Actions` und lassen sich dort **nicht mehr
-auslesen** — das ist kein Mangel, sondern der Sinn eines Secrets.
+`Settings → Environments → production` bzw. `→ staging` und lassen sich dort
+**nicht mehr auslesen** — das ist kein Mangel, sondern der Sinn eines Secrets.
 
-| Name in GitHub | Wofuer | Woher der Wert kommt |
-|---|---|---|
-| `DB_HOST` | Datenbankserver | Hostpoint-Kundencenter → Datenbanken |
-| `DB_NAME` | Name der Datenbank | Hostpoint-Kundencenter → Datenbanken |
-| `DB_USER` | Datenbankbenutzer | Hostpoint-Kundencenter → Datenbanken |
-| `DB_PASSWORD` | Passwort dazu | Hostpoint-Kundencenter; bei Verlust dort neu setzen |
-| `ANTHROPIC_API_KEY` | Diktat, Kundenrecherche, Planungsvorschlaege | console.anthropic.com; bei Verlust neu erzeugen, der alte laesst sich nicht anzeigen |
-| `HOSTPOINT_FTP_HOST` | Ziel des Deploys | Hostpoint-Kundencenter → FTP |
-| `HOSTPOINT_FTP_USER` | FTP-Benutzer | Hostpoint-Kundencenter → FTP |
-| `HOSTPOINT_FTP_PASSWORD` | Passwort dazu | Hostpoint-Kundencenter → FTP |
-| `SMTP_HOST` | Mailserver fuer den Offert-Versand (ENT-192) | Hostpoint-Kundencenter → E-Mail → SMTP-Einstellungen der Domain |
-| `SMTP_PORT` | Port dazu (meist 587 mit `tls`, oder 465 mit `ssl`) | dieselbe Stelle |
-| `SMTP_VERSCHLUESSELUNG` | `tls`, `ssl` oder leer | dieselbe Stelle, je nach Port |
-| `SMTP_USER` | Postfach-Login | Hostpoint-Kundencenter → E-Mail |
-| `SMTP_PASSWORD` | Passwort dazu | Hostpoint-Kundencenter → E-Mail; bei Verlust dort neu setzen |
-| `SMTP_ABSENDER` | Absenderadresse der Offert-Mails (muss zum Postfach passen) | dieselbe Stelle |
-| `SMTP_ABSENDER_NAME` | Angezeigter Absendername (optional, sonst nur die Adresse) | frei waehlbar |
+**Wichtig seit der Verschaerfung von ENT-341: Production- und
+Staging-Secrets tragen unterschiedliche NAMEN**, nicht nur unterschiedliche
+Werte im jeweiligen Environment. Ein Secret-Name, den es nur bei Production
+gibt, hat bei Staging keinen gleichnamigen Rueckgriff — fehlt ein
+Staging-Secret, bricht der Deploy mit einer klaren Fehlermeldung ab, statt
+still auf den produktiven Wert zurueckzufallen (siehe „Staging" weiter
+unten).
 
-Fehlen die SMTP-Secrets, meldet „Per E-Mail versenden" im Dashboard „noch
-nicht eingerichtet" — es wird nie versucht, mit einem Platzhalter als Hostnamen
-zu verbinden.
+| Production-Secret | Staging-Secret | Wofuer | Woher der Wert kommt |
+|---|---|---|---|
+| `DB_HOST` | `STAGING_DB_HOST` | Datenbankserver | Hostpoint-Kundencenter → Datenbanken, je aus dem **eigenen** Account |
+| `DB_NAME` | `STAGING_DB_NAME` | Name der Datenbank | dieselbe Stelle |
+| `DB_USER` | `STAGING_DB_USER` | Datenbankbenutzer | dieselbe Stelle |
+| `DB_PASSWORD` | `STAGING_DB_PASSWORD` | Passwort dazu | dieselbe Stelle; bei Verlust dort neu setzen |
+| `HOSTPOINT_FTP_HOST` | `STAGING_HOSTPOINT_FTP_HOST` | Ziel des Deploys | Hostpoint-Kundencenter → FTP, je der **eigene** Account |
+| `HOSTPOINT_FTP_USER` | `STAGING_HOSTPOINT_FTP_USER` | FTP-Benutzer | dieselbe Stelle |
+| `HOSTPOINT_FTP_PASSWORD` | `STAGING_HOSTPOINT_FTP_PASSWORD` | Passwort dazu | dieselbe Stelle |
+| `MAPS_JS_KEY` | `STAGING_MAPS_JS_KEY` | Google-Maps-Browserschluessel (Kontrollpunkt-Karte, Geofence-Auswahl, Objektplan) | console.cloud.google.com — je Umgebung ein **eigener** Schluessel, referrer-beschraenkt auf genau die eine Domain |
+| `ANTHROPIC_API_KEY` | `STAGING_ANTHROPIC_API_KEY` | Diktat, Kundenrecherche, Planungsvorschlaege | console.anthropic.com; bei Verlust neu erzeugen, der alte laesst sich nicht anzeigen |
+| `SMTP_HOST` | `STAGING_SMTP_HOST` | Mailserver fuer den Offert-Versand (ENT-192) | Hostpoint-Kundencenter → E-Mail → SMTP-Einstellungen — **dasselbe** Postfach wie Production (ENT-367: kein zweites kostenloses Postfach ohne eigene Domain verfuegbar), Werte identisch mit `SMTP_*` |
+| `SMTP_PORT` | `STAGING_SMTP_PORT` | Port dazu (meist 587 mit `tls`, oder 465 mit `ssl`) | dieselbe Stelle |
+| `SMTP_VERSCHLUESSELUNG` | `STAGING_SMTP_VERSCHLUESSELUNG` | `tls`, `ssl` oder leer | dieselbe Stelle, je nach Port |
+| `SMTP_USER` | `STAGING_SMTP_USER` | Postfach-Login | dieselbe Stelle |
+| `SMTP_PASSWORD` | `STAGING_SMTP_PASSWORD` | Passwort dazu | dieselbe Stelle; bei Verlust dort neu setzen |
+| `SMTP_ABSENDER` | `STAGING_SMTP_ABSENDER` | Absenderadresse (muss zum jeweiligen Postfach passen) | dieselbe Stelle |
+| `SMTP_ABSENDER_NAME` | `STAGING_SMTP_ABSENDER_NAME` | Angezeigter Absendername (optional) | frei waehlbar |
+| — | `STAGING_TESTMAIL` | Zieladresse, auf die **jede** aus Staging versendete Mail umgeleitet wird | frei waehlbar, kein produktives Postfach |
+
+**Erforderlich, sonst bricht der Deploy ab** (siehe Workflow-Schritt „Umgebung
+waehlen und erforderliche Secrets pruefen"): `DB_*`, `HOSTPOINT_FTP_*` und
+`MAPS_JS_KEY` — jeweils production- oder staging-seitig, je nach Branch —
+sowie bei Staging zusaetzlich `STAGING_TESTMAIL`. **Optional, mit
+eingebauter Ersatzmeldung statt Absturz:** `SMTP_*` (meldet „noch nicht
+eingerichtet") und `ANTHROPIC_API_KEY` (KI-Funktionen liefern dann nichts,
+statt zu scheitern) — dieselbe Regel gilt fuer die `STAGING_`-Varianten.
 
 **Wenn ein Wert je an eine falsche Stelle geraten ist** — in einen Commit, einen
 Chat, ein Bildschirmfoto: **neu erzeugen, nicht loeschen.** Loeschen hilft nicht,
 der alte Wert bleibt in der Git-Historie und in Zwischenspeichern stehen.
+
+## Staging (ENT-341)
+
+Eine vollstaendig getrennte Testinstanz — dieselbe Codebasis, eigene
+Datenbank, eigenes FTP-Ziel, eigene Secrets unter eigenen Namen, keine
+echten Geschaeftsdaten. Beim SMTP-Versand teilt sich Staging das Postfach
+mit Production (ENT-367) — die Secret-*Namen* bleiben trotzdem eigene
+(`STAGING_SMTP_*`), nur die *Werte* sind vorerst identisch; die zwingende
+Empfaenger-Umleitung unten macht das unkritisch. Adresse und genaue
+Hostpoint-Einrichtung stehen im Entscheidungsprotokoll des
+Projekt-Repositories (ENT-341); hier nur, was den Code betrifft:
+
+- **Branch `staging`** loest denselben Deploy-Workflow aus wie `main`, mit
+  dem GitHub Environment `staging` statt `production` (siehe oben).
+- **Kein Rueckfall auf Production-Secrets:** Staging-Secrets tragen eigene
+  Namen (`STAGING_DB_HOST` statt `DB_HOST` usw., siehe Tabelle oben). Der
+  erste Schritt des Workflows loest fuer die aktive Umgebung den richtigen
+  Satz auf und **bricht den Lauf ab**, wenn eines der erforderlichen fehlt
+  — bevor irgendetwas kopiert oder hochgeladen wird.
+- **`APP_ENV`** ist eine explizite, beim Deploy gesetzte Umgebungskennung
+  (`production` oder `staging`) — **nicht** aus dem Hostnamen abgeleitet.
+  `ist_produktion()`/`umgebung_ist_produktion()` in `backend/db.php` sind
+  fail-safe: nur der exakte Wert `production` gilt als Produktion, jeder
+  andere Wert (leer, unersetzt, ein Tippfehler) als Staging. Dieselbe
+  Konstante und dieselbe Regel traegt `testumgebung.js` client-seitig fuer
+  das sichtbare „TESTUMGEBUNG"-Kennzeichen (kleiner Hinweis unten rechts,
+  ueberlagert nichts).
+- **E-Mail-Versand** ausserhalb der Produktion geht ausschliesslich an die
+  in `STAGING_TESTMAIL` konfigurierte Adresse — `backend/mailer.php`,
+  Funktion `smtp_ziel()` — **unabhaengig davon**, ueber welches Postfach
+  (`STAGING_SMTP_*`, seit ENT-367 mit denselben Werten wie `SMTP_*`) sie
+  tatsaechlich verschickt wird. Der urspruenglich eingegebene Empfaenger
+  bleibt im Betreff sichtbar.
+- **Einrichtung einer neuen/leeren Staging-Datenbank:** `backend/schema.sql`
+  einmalig in phpMyAdmin ausfuehren, danach `setup.php`/`setup.html`
+  temporaer hochladen und den ersten Admin-Account anlegen (**danach
+  sofort wieder loeschen**, siehe oben), danach im Dashboard unter
+  „Betrieb → Einrichtung" den bestehenden, idempotenten
+  `planung_einrichten.php`-Endpunkt ausfuehren. Kein eigenes
+  Migrations-Werkzeug noetig — dieser Ablauf existiert bereits fuer
+  Produktion und funktioniert unveraendert fuer Staging.
+- **Zuruecksetzen** einer Staging-Datenbank ist bewusst manuell (siehe
+  ENT-341, Punkt 6): Datenbank in phpMyAdmin leeren, obigen Ablauf
+  wiederholen. Es gibt keinen automatischen Reset-Endpunkt.
 
 ### Lokal testen
 
