@@ -26,6 +26,21 @@ function json_response($data, int $status = 200): void {
     exit;
 }
 
+// ── Umgebung (ENT-341) ─────────────────────────────────────────────────
+// Genau eine Domain gilt als Produktion. Alles andere -- auch ein
+// versehentlich falsch konfigurierter oder unbekannter Host -- zaehlt als
+// NICHT Produktion. Das ist absichtlich die sichere Richtung: Der einzige
+// Ort, der sich auf dieses Ergebnis verlaesst (siehe mailer.php), ist der
+// E-Mail-Versand -- dort ist "haelt sich faelschlich fuer Staging und
+// blockiert eine Mail" der harmlose Fehler, "haelt sich faelschlich fuer
+// Produktion und verschickt eine echte Mail" der teure.
+const PRODUKTIONS_DOMAIN = 'rapport.itufeden.myhostpoint.ch';
+
+function ist_produktion(): bool
+{
+    return ($_SERVER['HTTP_HOST'] ?? '') === PRODUKTIONS_DOMAIN;
+}
+
 // ── Sitzungsdauer (ENT-075) ───────────────────────────────────────────
 // Bis hierher lief eine Sitzung NIE ab: Ein einmal abgegriffener Token galt
 // fuer immer. Jetzt gelten zwei Grenzen gleichzeitig -- ein absolutes Alter
