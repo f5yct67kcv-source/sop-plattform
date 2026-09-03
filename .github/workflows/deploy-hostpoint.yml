@@ -1,13 +1,22 @@
 name: Deploy Rapport-Tool zu Hostpoint
 
+# Zwei Laufzeitumgebungen, EIN Workflow (ENT-341, Variante B): main deployt
+# nach Produktion, staging nach der getrennten Testinstanz. Welches
+# GitHub Environment aktiv ist, entscheidet einzig der Branchname -- die
+# Kopierliste und alle sed-Zeilen unten bleiben fuer beide identisch, nur
+# die WERTE hinter den Secret-Namen unterscheiden sich zwischen den beiden
+# Environments (Settings → Environments in GitHub). Das ist der einzige
+# dauerhafte Unterschied zwischen den Umgebungen -- nicht zwei gepflegte
+# Kopien dieses Workflows.
 on:
   push:
-    branches: [main]
+    branches: [main, staging]
   workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -35,6 +44,14 @@ jobs:
           # fehlt die Zeile, laesst der Kunde live nirgends mehr
           # unterschreiben, und lokal faellt es NICHT auf.
           cp unterschrift.js dist/unterschrift.js
+          # testumgebung.js traegt das TESTUMGEBUNG-Kennzeichen fuer ALLE
+          # DREI Oberflaechen (ENT-341) -- derselbe Fallstrick wie bei
+          # gav.js/zeitwahl.js/unterschrift.js oben: fehlt die Zeile, faellt
+          # das Kennzeichen auf Staging lautlos weg, und lokal faellt es
+          # NICHT auf. test_deploy.mjs prueft das bereits automatisch mit,
+          # weil es jedes <script src> in den drei Seiten gegen diese Liste
+          # abgleicht.
+          cp testumgebung.js dist/testumgebung.js
           # html2pdf.bundle.min.js (ENT-206): erst bei Klick auf "Herunter-
           # laden" per JS nachgeladen, deshalb kein literales <script>-Tag im
           # HTML -- test_deploy.mjs prueft trotzdem, dass sie hier steht.
@@ -100,6 +117,17 @@ jobs:
           sed -i "s|__SMTP_PASSWORD__|${{ secrets.SMTP_PASSWORD }}|g" dist/mailer.php
           sed -i "s|__SMTP_ABSENDER__|${{ secrets.SMTP_ABSENDER }}|g" dist/mailer.php
           sed -i "s|__SMTP_ABSENDER_NAME__|${{ secrets.SMTP_ABSENDER_NAME }}|g" dist/mailer.php
+          # Staging-Mailmodus (ENT-341): Ausserhalb der Produktionsdomain
+          # leitet mailer.php JEDE Mail auf diese Adresse um. Bleibt das
+          # Secret in einer Umgebung ungesetzt, steht weiterhin woertlich
+          # "__STAGING_TESTMAIL__" in dist/mailer.php -- smtp_ziel() erkennt
+          # das (gleiche Absicherung wie bei den SMTP-Secrets oben) und
+          # smtp_senden() bricht dann ab, statt irgendwohin zu senden.
+          sed -i "s|__STAGING_TESTMAIL__|${{ secrets.STAGING_TESTMAIL }}|g" dist/mailer.php
+          # Google-Maps-Browserschluessel (ENT-341): eigener Schluessel je
+          # Umgebung, in BEIDEN Oberflaechen, die die Karte laden.
+          sed -i "s|__MAPS_JS_KEY__|${{ secrets.MAPS_JS_KEY }}|g" dist/dashboard.html
+          sed -i "s|__MAPS_JS_KEY__|${{ secrets.MAPS_JS_KEY }}|g" dist/app.html
 
       - name: Nach Hostpoint hochladen (FTPS)
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
@@ -109,7 +137,11 @@ jobs:
           password: ${{ secrets.HOSTPOINT_FTP_PASSWORD }}
           protocol: ftps
           local-dir: ./dist/
-          # Der FTP-Account "rapport@itufeden.myhostpoint.ch" ist bereits fest
-          # auf /home/itufeden/www/rapport eingeschraenkt (Hostpoint-Vorgabe) --
-          # daher hier nur "/", nicht der volle Pfad.
+          # Sowohl der produktive FTP-Account (rapport@itufeden.myhostpoint.ch,
+          # fest auf /home/itufeden/www/rapport eingeschraenkt) als auch der
+          # separate Staging-Account (ENT-341, auf sein eigenes Verzeichnis
+          # eingeschraenkt) sind bereits von Hostpoint auf ihr jeweiliges
+          # Verzeichnis begrenzt -- daher hier immer nur "/", nicht der volle
+          # Pfad. Welcher Account tatsaechlich verwendet wird, entscheiden die
+          # Secrets des aktiven Environments oben, nicht diese Zeile.
           server-dir: /
