@@ -5,8 +5,8 @@
 //     nicht von einem leeren zu unterscheiden.
 //  2. Die Uebersicht zeigt wenig -- aber nie zu wenig: Was jemanden von
 //     einem Einsatz abhaelt, steht oben und nicht hinter einer Einstellung.
-//  3. Die AHV-Nummer gehoert nicht auf die Ansicht, die im Vorbeigehen
-//     offen steht.
+//  3. Ein vertrauliches Feld (z. B. der Strafregisterauszug) gehoert nicht
+//     auf die Ansicht, die im Vorbeigehen offen steht.
 //  4. Eine Anordnung, die sich nicht speichern liess, darf nicht so
 //     aussehen, als waere sie gespeichert.
 import { WURZEL, HIER, OUT, browserPfad } from './pfade.mjs';
@@ -31,7 +31,7 @@ const MA = [{ id: 1, name: 'mitarbeiter-a', vorname: 'Vorname', nachname: 'Testp
   fachausweis: 'Bewachung', diensthundefuehrer: 1, waffentragberechtigt: 0 }];
 const DOSSIER = { ...MA[0], geburtsdatum: '1990-05-05', land: 'CH', anrede: 'Herr',
   nationalitaet: 'CH', heimatort: 'Testgemeinde', zivilstand: 'ledig',
-  ahv_nr: '756.1234.5678.97', kurzzeichen: 'VT', geschlecht: 'maennlich',
+  kurzzeichen: 'VT', geschlecht: 'maennlich',
   anstellungskategorie: 'C', pensum_stunden: 900, eintritt: '2025-01-01',
   fachausweis_am: '2022-09-01', basisausbildung_am: '', sprache: 'de',
   aufenthaltsbewilligung: 'C', aufenthalt_gueltig_bis: '2020-01-01',
@@ -107,7 +107,7 @@ await oeffnen();
   const u = await page.evaluate(() => ({
     sichtbar: [...document.querySelectorAll('#mdFlow .dash-item:not(.versteckt)')].map(e => e.dataset.widget),
     person: [...document.querySelectorAll('#mdFlow [data-widget=person] dt')].map(d => d.textContent),
-    ahv: document.querySelector('#mdFlow [data-widget=person]').textContent,
+    vertraulich: document.querySelector('#mdFlow [data-widget=person]').textContent,
     status: document.querySelector('#mdFlow [data-widget=status]').textContent.replace(/\s+/g, ' '),
     karten: document.querySelectorAll('#mdFlow .dash-item:not(.versteckt) .card').length,
   }));
@@ -116,8 +116,8 @@ await oeffnen();
     && u.person.includes('Vorname') && u.person.includes('PLZ und Ort') && u.person.includes('Mobil'));
   check('Personalien, Adresse und Kontakt stehen NICHT mehr als drei Kacheln da',
     !u.sichtbar.includes('kontakt') && !u.sichtbar.includes('adresse'));
-  check('KRITISCH: die AHV-Nummer steht nicht auf der Schulterblick-Ansicht',
-    !u.ahv.includes('756.1234.5678.97'));
+  check('KRITISCH: ein vertrauliches Feld (Strafregisterauszug) steht nicht auf der Schulterblick-Ansicht',
+    !u.vertraulich.includes('2024-12-01'));
   check('Auch Kurzzeichen und Geschlecht gehoeren nicht dorthin',
     !u.person.includes('Kurzzeichen') && !u.person.includes('Geschlecht'));
   check('Die Übersicht zeigt wenige Container, nicht alle zehn', u.karten <= 4);
@@ -174,8 +174,8 @@ await oeffnen();
     Object.values(je).every(x => x.spalten >= 1 && x.buendig));
   check('Person und Adresse steht oben links im Bereich "Person"',
     je.person.karten[0] === 'Person und Adresse');
-  check('KRITISCH: die AHV-Nummer steht bei der Person -- dort gehoert sie hin, nicht auf der Übersicht',
-    je.person.text.includes('756.1234.5678.97'));
+  check('KRITISCH: der Strafregisterauszug steht bei der Person -- dort gehoert er hin, nicht auf der Übersicht',
+    je.person.text.includes('2024-12-01') || /01\.12\.2024/.test(je.person.text));
   check('KRITISCH: was nichts mit Personalien zu tun hat, steht NICHT mehr bei der Person (ENT-287)',
     !/Rollen/.test(je.person.text) && !/Login-Name/.test(je.person.text)
     && !je.person.abschnitte.includes('einsatzbereich'));
