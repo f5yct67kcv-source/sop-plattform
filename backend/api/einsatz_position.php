@@ -361,9 +361,25 @@ if ($aktion === 'zuteilen') {
     $pdo->prepare('UPDATE einsatz_zuteilung SET position_id = NULL WHERE position_id = ?')->execute([$positionId]);
     // Der Primaerschluessel ist (einsatz_id, mitarbeiter_id): dieselbe Person
     // steht also hoechstens einmal am Einsatz und wechselt nur die Position.
+    //
+    // zusage wird zurueckgesetzt, aber NUR aus 'entfallen'/'abgelehnt' heraus
+    // (ENT-351, OP-349). Ohne das war das aktive Zuteilen einer Person, die
+    // entfallen oder abgelehnt hatte, wirkungslos: Der Planer klickte sie auf
+    // die Position, und sie stand danach immer noch durchgestrichen als
+    // "ENTFALLEN"/"ABGELEHNT" da -- ihr einziger Weg zurueck war das rote
+    // Kreuz ("loesen"), das aber die ganze Zeile LOESCHT und damit genau den
+    // Nachweis vernichtet, den ENT-347 bewusst erhalten wollte.
+    //
+    // Eine bereits offene oder zugesagte Person bleibt beim reinen
+    // Positionswechsel unangetastet -- sie muss sich nicht neu bestaetigen,
+    // nur weil der Planer sie auf eine andere Position derselben Schicht
+    // verschiebt. Nur der Uebergang AUS einem "nicht dabei"-Zustand heraus
+    // ist eine aktive Entscheidung des Planers und setzt zurueck.
     $pdo->prepare(
-        'INSERT INTO einsatz_zuteilung (einsatz_id, mitarbeiter_id, position_id)
-         VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE position_id = VALUES(position_id)'
+        "INSERT INTO einsatz_zuteilung (einsatz_id, mitarbeiter_id, position_id)
+         VALUES (?, ?, ?)
+         ON DUPLICATE KEY UPDATE position_id = VALUES(position_id),
+           zusage = IF(zusage IN ('entfallen', 'abgelehnt'), 'offen', zusage)"
     )->execute([$einsatzId, $maId, $positionId]);
     json_response(['status' => 'ok', 'positionen' => positionen($pdo, $einsatzId)]);
 }

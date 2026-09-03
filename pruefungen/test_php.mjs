@@ -605,6 +605,37 @@ sqlBeanstandet.forEach(z => bad.push('SQL: ' + z.trim().slice(2)));
 if (beanstandet.length) { beanstandet.forEach(z => console.log('   ' + z.trim())); }
 if (syntaxFehler.length) { console.log('   Syntax: ' + syntaxFehler.join(', ')); }
 
+// ── Zuteilen holt eine entfallene/abgelehnte Person zurueck (ENT-351) ──
+// Der Projektinhaber, an einem konkreten Beispiel nachgefragt: Eine Person
+// lehnt eine Schicht ab (oder ist entfallen, ENT-347) -- wie kommt der
+// Planer sie im Cockpit zurueck? Gefunden beim Nachlesen: Der bestehende
+// Weg (dieselbe Person erneut auf die Position klicken) war WIRKUNGSLOS --
+// der INSERT ... ON DUPLICATE KEY UPDATE setzte nur position_id, zusage
+// blieb 'entfallen'/'abgelehnt' stehen, und die Kachel zeigte die Person
+// weiterhin durchgestrichen, obwohl der Planer sie gerade aktiv zugeteilt
+// hatte. Der einzige WIRKENDE Weg war das rote Kreuz ("loesen") -- das aber
+// die ganze Zuteilungszeile LOESCHT und damit den Nachweis vernichtet, den
+// ENT-347 bewusst erhalten wollte.
+{
+  const EP = readFileSync(`${WURZEL}/backend/api/einsatz_position.php`, 'utf8');
+  const zuteilenBlock = (EP.match(/if \(\$aktion === 'zuteilen'\) \{[\s\S]*?\n\}/) || [''])[0];
+  check('KRITISCH: "zuteilen" setzt eine entfallene/abgelehnte Zuteilung auf "offen" zurück',
+    /zusage = IF\(zusage IN \('entfallen', 'abgelehnt'\), 'offen', zusage\)/.test(zuteilenBlock));
+  // Eine bereits offene oder zugesagte Person darf beim reinen
+  // Positionswechsel NICHT zuruecksetzen -- sonst muesste sich jemand, der
+  // schon zugesagt hat, neu bestaetigen, nur weil der Planer die Position
+  // wechselt. Geprueft am IF-Ausdruck selbst: Nur "entfallen"/"abgelehnt"
+  // duerfen als Bedingung stehen, kein drittes Wort daneben.
+  const bedingung = (zuteilenBlock.match(/zusage IN \(([^)]*)\)/) || [null, ''])[1];
+  check('KRITISCH: die Rücksetzung betrifft NUR diese zwei Zustände -- "offen"/"zugesagt" bleiben beim Positionswechsel unangetastet',
+    bedingung.replace(/\s/g, '') === "'entfallen','abgelehnt'");
+  // Der Primaerschluessel bleibt unveraendert (einsatz_id, mitarbeiter_id) --
+  // sonst waere die ganze Ueberlegung hinfaellig, weil pro Position statt
+  // pro Person gezaehlt wuerde.
+  check('Der zusammengesetzte Primärschlüssel (einsatz_id, mitarbeiter_id) bleibt dabei unverändert',
+    /INSERT INTO einsatz_zuteilung \(einsatz_id, mitarbeiter_id, position_id\)/.test(zuteilenBlock));
+}
+
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
 console.log('Alle Pruefungen bestanden.');
