@@ -12112,8 +12112,9 @@ function pickRefresh(prefix) {
 // Betriebsansicht laedt ladeBetrieb() sie ohnehin neu -- beide schreiben in
 // dasselbe `fahrzeuge`, es gibt also keine zweite Liste, die veralten koennte.
 let fzLadenLauf = null;
+let fzFuerPlanungDa = false;   // Liste wirklich geholt? (nicht: Liste nicht leer)
 function ladeFahrzeugeEinmal() {
-  if (!fzLadenLauf) { fzLadenLauf = ladeFahrzeuge(); }
+  if (!fzLadenLauf) { fzLadenLauf = ladeFahrzeuge().then(() => { fzFuerPlanungDa = true; }); }
   return fzLadenLauf;
 }
 
@@ -16779,6 +16780,15 @@ function epErwarteteStrecke(e, fz) {
 
 function epFahrzeugBlock(e) {
   if (!e) { return ''; }
+  // Wird der Einsatzplan als erste Ansicht geoeffnet, ist die Fahrzeugliste
+  // noch unterwegs. Dann faenden weder das Kennzeichen noch die erwartete
+  // Strecke ihr Fahrzeug -- der Block stuende halb leer da, ohne dass etwas
+  // kaputt waere. Also: einmal nachladen und den ganzen Kopf neu zeichnen.
+  // Das Merkmal ist "Liste geholt", nicht "Liste nicht leer" -- sonst liefe
+  // ein Betrieb ohne Fahrzeuge in eine Endlosschleife.
+  if (!fzFuerPlanungDa) {
+    ladeFahrzeugeEinmal().then(() => { if ($('epKopf')) { epKopfZeichnen(); } });
+  }
   // Der Schluessel fehlt ganz, solange die Einrichtung nicht gelaufen ist
   // (einsatz_list.php). Das ist etwas anderes als "kein Fahrzeug zugeteilt"
   // und wird auch anders benannt.
@@ -16819,13 +16829,6 @@ function epFahrzeugBlock(e) {
       enFahrzeugOptionen($('epFahrzeug'), e.fahrzeug_id);
       enFahrerOptionen($('epFahrer'), ids, e.fahrer_id);
       epFahrzeugHinweis(e);
-      if (!fahrzeuge.length && fzEingerichtet) {
-        ladeFahrzeugeEinmal().then(() => {
-          if (!$('epFahrzeug')) { return; }
-          enFahrzeugOptionen($('epFahrzeug'), e.fahrzeug_id);
-          epFahrzeugHinweis(e);
-        });
-      }
     }, 0);
   }
 

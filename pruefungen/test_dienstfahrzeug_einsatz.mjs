@@ -211,6 +211,27 @@ await page.goto(`file://${WURZEL}/dashboard.html`);
 await page.fill('#gName', 'adrian'); await page.fill('#gPass', 'x'); await page.click('#gBtn');
 await page.waitForSelector('#shell.on'); await page.waitForTimeout(700);
 
+// ── KALTER WEG: der Einsatzplan als ERSTE Ansicht ────────────────────────
+//
+// Wer morgens das Cockpit oeffnet und direkt einen Einsatz aufmacht, hat die
+// Fahrzeugliste noch nicht geladen -- sie kommt sonst aus der Betriebs- oder
+// der Anlegen-Ansicht. Genau dieser Weg hat beim Messen am gerenderten
+// Zustand zwei Fehler gezeigt, die der warme Weg verdeckt: das Kennzeichen
+// blieb leer, der gespeicherte Fahrer wurde weggeraeumt und die erwartete
+// Strecke fehlte ganz. Diese Pruefungen stehen darum GANZ VORNE, vor allem,
+// was die Liste nebenbei laedt.
+await page.evaluate(() => { go('planung'); goTab('einsaetze'); });
+await page.waitForTimeout(400);
+await page.evaluate(() => epAuf(71));
+await page.waitForTimeout(900);
+const kalt = (await page.textContent('#epKopf')).replace(/\s+/g, ' ');
+check('KRITISCH: kalt geoeffnet steht das eingeteilte Fahrzeug da, nicht ein leeres Feld',
+  (await page.inputValue('#epFahrzeug')) === '1');
+check('KRITISCH: kalt geoeffnet bleibt der gespeicherte Fahrer stehen',
+  (await page.inputValue('#epFahrer')) === '11');
+check('KRITISCH: kalt geoeffnet steht auch die erwartete Fahrstrecke da',
+  /Erwartete Fahrstrecke: 48[.,]0 km/.test(kalt));
+
 // ── Anlegen-Ansicht: das Feld, das ENT-115 zurueckgestellt hatte ──────────
 await page.evaluate(() => { go('planung'); goTab('einsaetze'); });
 await page.waitForTimeout(400);
