@@ -881,6 +881,11 @@ const W = {
     kunde: 'Kunde', arbeitsort: 'Arbeitsort', zeit: 'Zeit', einsatzart: 'Einsatzart',
     bemerkung: 'Bemerkung', objekt: 'Objekt', imTeam: 'im Team',
     treffpunkt: 'Treffpunkt', kontaktVorOrt: 'Kontakt vor Ort',
+    // Dienstfahrzeug der Schicht (ENT-330). "Du fährst" ist eine Aufgabe,
+    // "fährt" eine Auskunft -- der Unterschied muss im Wort liegen, nicht
+    // nur in der Farbe.
+    dienstfahrzeug: 'Dienstfahrzeug', duFaehrst: 'Du fährst',
+    faehrtWer: 'fährt', fahrerOffen: 'Fahrer noch nicht bestimmt',
     route: 'Route öffnen', routeFehlt: 'Für diese Schicht ist keine Adresse hinterlegt.',
     dokumente: 'Unterlagen', dokumenteLaden: 'wird geladen …',
     dokumentFehler: 'Die Unterlage liess sich nicht öffnen.',
@@ -2774,6 +2779,7 @@ function blattAuf(id) {
           href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(schichtAdresse(e))}"
           >${ROUTE_IKONE}${esc(w('route'))}</a>` : ''}</dd>
       ${e.treffpunkt ? `<dt>${esc(w('treffpunkt'))}</dt><dd>${esc(e.treffpunkt)}</dd>` : ''}
+      ${dienstfahrzeugZeile(e)}
       ${e.kontakt_vorname || e.kontakt_nachname || e.kontakt_telefon ? `<dt>${esc(w('kontaktVorOrt'))}</dt><dd>${
         esc([e.kontakt_vorname, e.kontakt_nachname].filter(Boolean).join(' '))
       }${e.kontakt_telefon ? `${e.kontakt_vorname || e.kontakt_nachname ? '<br>' : ''}<a href="tel:${
@@ -2870,6 +2876,35 @@ function blattFussZeichnen(e) {
 // wen er vor Ort sucht, klappt auf.
 const TEAM_PFEIL = '<svg viewBox="0 0 24 24" aria-hidden="true" class="team-pfeil">'
   + '<polyline points="6 9 12 15 18 9"/></svg>';
+
+// ── Dienstfahrzeug der Schicht (ENT-330) ────────────────────────────────
+//
+// Der Projektinhaber: *"Der MA muss in der APP in der geplanten Schicht sein
+// Dienstfahrzeug sehen, dass er verwenden muss."*
+//
+// ZWEI VERSCHIEDENE AUSSAGEN, zwei verschiedene Texte: Wer als Fahrer
+// eingeteilt ist, liest eine AUFGABE ("Du fährst") -- wer mitfährt, eine
+// AUSKUNFT ("fährt: …"), damit er weiss, wie das Team hinkommt und wen er
+// sucht. Beides an derselben Stelle gleich zu formulieren hiesse, dem Fahrer
+// seine Zuständigkeit zu verschweigen.
+//
+// Die Namen der Eingeteilten zeigt die App ohnehin schon (Schicht > Team,
+// ENT-121); mit dem Fahrernamen kommt also nichts Neues über Personen dazu.
+//
+// Fehlt der Schlüssel ganz, ist die Einrichtung noch nicht gelaufen -- dann
+// steht hier nichts, statt "kein Fahrzeug" zu behaupten.
+function dienstfahrzeugZeile(e) {
+  const f = e.fahrzeug;
+  if (!f || !f.kennzeichen) { return ''; }
+  const name = [f.kennzeichen, f.bezeichnung].filter(Boolean).join(' · ');
+  const wert = f.ich_fahre
+    ? `<b>${esc(w('duFaehrst'))}:</b> ${esc(name)}`
+    // "noch nicht bestimmt" ist etwas anderes als "niemand fährt".
+    : `${esc(name)}<br><span style="color:var(--ink-3)">${f.fahrer_name
+        ? esc(w('faehrtWer')) + ': ' + esc(f.fahrer_name)
+        : esc(w('fahrerOffen'))}</span>`;
+  return `<dt>${esc(w('dienstfahrzeug'))}</dt><dd>${wert}</dd>`;
+}
 
 function teamBlock(e) {
   const liste = Array.isArray(e.team) ? e.team : [];

@@ -12233,10 +12233,13 @@ function enFahrerOptionen(sel, ids, gewaehlt) {
   sel.value = gewaehlt == null ? '' : String(gewaehlt);
 }
 
+// Kurz gefasst seit ENT-330: Der Satz stand zweimal fast gleich auf einem
+// Bildschirm, einmal hier und einmal im Verkehrsmittel-Block darunter. Was
+// bleibt, ist die Geldfolge und der Riegel gegen die falsche Annahme, die
+// uebrigen fuehren automatisch mit.
 const EN_FAHRER_GELD = 'Wer fährt, reist im Geschäftsfahrzeug: Fahrzeitersatz ja, '
-  + 'Fahrkostenersatz nein (Art. 18 Ziff. 4/5). Das Verkehrsmittel dieser Person wird beim '
-  + 'Speichern entsprechend gesetzt. Die übrigen Eingeteilten bleiben unberührt — ob sie '
-  + 'mitfahren, entscheidest du je Person unter „Verkehrsmittel zum Einsatz".';
+  + 'Fahrkostenersatz nein (Art. 18 Ziff. 4/5) — das Verkehrsmittel dieser Person wird '
+  + 'mitgesetzt. Die übrigen Eingeteilten bleiben unberührt.';
 
 function enFahrzeugGeaendert() {
   const fz = $('enNFahrzeug_id'), fa = $('enNFahrer_id'), hint = $('enNFahrerHinweis');
@@ -16694,8 +16697,7 @@ function epKopfZeichnen() {
     </div>
     ${epWegWarnung(e)}
     ${epGavAus010Warnung(e)}
-    ${epFahrzeugBlock(e)}
-    ${epVerkehrsmittelBlock(e)}
+    ${epFahrtBlock(e)}
     <div class="card-bd ep-zone">${epRapportBlock(e)}${epDokBlock()}</div>
     ${epRechnungBlock(e)}`;
 }
@@ -16985,34 +16987,35 @@ function epErwarteteStrecke(e, fz) {
             für einen späteren Abgleich mit dem Tachostand — kein gespeicherter Wert.` };
 }
 
-function epFahrzeugBlock(e) {
+function epFahrtBlock(e) {
   if (!e) { return ''; }
   // Wird der Einsatzplan als erste Ansicht geoeffnet, ist die Fahrzeugliste
-  // noch unterwegs. Dann faenden weder das Kennzeichen noch die erwartete
-  // Strecke ihr Fahrzeug -- der Block stuende halb leer da, ohne dass etwas
-  // kaputt waere. Also: einmal nachladen und den ganzen Kopf neu zeichnen.
-  // Das Merkmal ist "Liste geholt", nicht "Liste nicht leer" -- sonst liefe
-  // ein Betrieb ohne Fahrzeuge in eine Endlosschleife.
+  // noch unterwegs -- dann faenden weder das Kennzeichen noch die erwartete
+  // Strecke ihr Fahrzeug. Einmal nachladen, Kopf neu zeichnen. Das Merkmal
+  // ist "Liste geholt", nicht "Liste nicht leer" -- sonst liefe ein Betrieb
+  // ohne Fahrzeuge in eine Endlosschleife.
   if (!fzFuerPlanungDa) {
     ladeFahrzeugeEinmal().then(() => { if ($('epKopf')) { epKopfZeichnen(); } });
   }
+
   // Der Schluessel fehlt ganz, solange die Einrichtung nicht gelaufen ist
-  // (einsatz_list.php). Das ist etwas anderes als "kein Fahrzeug zugeteilt"
-  // und wird auch anders benannt.
+  // (einsatz_list.php). Das ist etwas anderes als "kein Fahrzeug zugeteilt".
   const eingerichtet = Object.prototype.hasOwnProperty.call(e, 'fahrzeug_id');
   const gesperrt = enGesperrt(e);
   const fz = eingerichtet && e.fahrzeug_id != null
     ? fahrzeuge.find(f => Number(f.id) === Number(e.fahrzeug_id)) : null;
+  const ids = [...new Set((epPos || []).filter(epBesetzt).map(p => Number(p.mitarbeiter_id)))];
 
-  let inhalt;
+  // ── Teil 1: Fahrzeug und Fahrer
+  let oben;
   if (!eingerichtet) {
-    inhalt = `<div class="zone-note">Die Einrichtung für Dienstfahrzeuge ist noch nicht gelaufen —
+    oben = `<div class="zone-note">Die Einrichtung für Dienstfahrzeuge ist noch nicht gelaufen —
       darum lässt sich hier keines zuteilen. Das ist etwas anderes als „kein Fahrzeug im Einsatz".</div>`;
   } else if (gesperrt) {
-    // Festgeschrieben: anzeigen, nicht anbieten. Am Fahrer haengt der
-    // Fahrkostenersatz, und der ist beim Abgleich bereits erfasst (ENT-045).
+    // Festgeschrieben: anzeigen, nicht anbieten (ENT-045). Am Fahrer haengt
+    // der Fahrkostenersatz, und der ist beim Abgleich bereits erfasst.
     const fahrer = e.fahrer_id != null ? mitarbeiter.find(m => Number(m.id) === Number(e.fahrer_id)) : null;
-    inhalt = `<div class="ep-kopf" style="padding:0">
+    oben = `<div class="ep-kopf" style="padding:0">
       <div class="ep-kf"><span>Dienstfahrzeug</span><b>${fz
         ? esc([fz.kennzeichen, fz.bezeichnung].filter(Boolean).join(' · '))
         : (e.fahrzeug_id == null ? 'keines eingeteilt' : 'nicht mehr erfasst')}</b></div>
@@ -17021,16 +17024,13 @@ function epFahrzeugBlock(e) {
         : (e.fahrer_id == null ? 'nicht bestimmt' : 'nicht mehr erfasst')}</b></div>
     </div>`;
   } else {
-    const ids = [...new Set((epPos || []).filter(epBesetzt).map(p => Number(p.mitarbeiter_id)))];
-    inhalt = `<div class="form-grid">
+    oben = `<div class="form-grid">
         <div class="f"><label for="epFahrzeug">Dienstfahrzeug</label>
           <select class="inp" id="epFahrzeug" onchange="epFahrzeugGeaendert()"></select></div>
         <div class="f"><label for="epFahrer">Fahrer</label>
           <select class="inp" id="epFahrer" onchange="epFahrzeugSpeichern()"></select></div>
       </div>
       <div class="zone-note" id="epFahrzeugHinweis"></div>`;
-    // Die Auswahlfelder werden nach dem Einsetzen gefuellt: Sie brauchen die
-    // Fahrzeugliste, und die kommt gegebenenfalls erst noch.
     setTimeout(() => {
       if (!$('epFahrzeug')) { return; }
       enFahrzeugOptionen($('epFahrzeug'), e.fahrzeug_id);
@@ -17040,12 +17040,59 @@ function epFahrzeugBlock(e) {
   }
 
   const erwartet = epErwarteteStrecke(e, fz);
+
+  // ── Teil 2: Verkehrsmittel je Person -- nur, wo es ueberhaupt um Geld geht
+  //
+  // Steht IM SELBEN Block, nicht daneben: Bis ENT-330 waren es zwei Karten
+  // untereinander, die dasselbe erzaehlten -- wer faehrt, stand einmal als
+  // Fahrerwahl und einmal als festgestelltes Verkehrsmittel, mit zwei langen
+  // Hinweisen ueber denselben Sachverhalt. Der Projektinhaber hat das als
+  // Dopplung beanstandet.
+  const nao = typeof aoNao === 'function' ? aoNao() : null;
+  const z = (e.weg_km && typeof gavZone === 'function')
+    ? gavZone(e.weg_km, null, nao ? nao.km_zum_anderen : null) : null;
+  const leute = (epPos || []).filter(epBesetzt);
+  const vmZeigen = !gesperrt && z && z.entschaedigung && leute.length;
+
+  const optionen = ['Privatfahrzeug', 'Oeffentlicher Verkehr', 'Mitfahrer', 'Geschaeftsfahrzeug'];
+  const zeile = p => {
+    const ma = mitarbeiter.find(m => Number(m.id) === Number(p.mitarbeiter_id));
+    const vorgabe = ma ? ma.verkehrsmittel : null;
+    const wert = p.verkehrsmittel || '';   // '' heisst: die Vorgabe gilt
+    const name = (ma && (fullName(ma) || ma.name)) || p.mitarbeiter || ('#' + p.mitarbeiter_id);
+    // Wer das Dienstfahrzeug fuehrt, faehrt damit -- das Feld steht fest
+    // (ENT-328). Der Server weist eine Aenderung ohnehin ab; ein bedienbares
+    // Feld, das beim Klicken eine Fehlermeldung wirft, waere eine Falle.
+    const istFahrer = e.fahrer_id != null && Number(e.fahrer_id) === Number(p.mitarbeiter_id);
+    return `<div class="f" style="margin-bottom:9px">
+      <label>${esc(name)}${istFahrer
+        ? ' <span class="note" style="font-weight:500">— fährt das Dienstfahrzeug</span>'
+        : (vorgabe ? '' : ' <span class="note" style="font-weight:500">— keine Vorgabe hinterlegt</span>')}</label>
+      <div class="inp-row">
+        <select class="inp"${istFahrer ? ' disabled' : ''} data-vm-ma="${Number(p.mitarbeiter_id)}" onchange="epVerkehrsmittelGeaendert(this)">
+          <option value="">${vorgabe ? 'Vorgabe: ' + esc(vorgabe) : '– kein Verkehrsmittel gewählt –'}</option>
+          ${optionen.map(o => `<option value="${esc(o)}"${wert === o ? ' selected' : ''}>${esc(o)}</option>`).join('')}
+        </select>
+        <input class="inp" type="number" min="0" max="999.99" step="0.05" data-vm-oev="${Number(p.mitarbeiter_id)}"
+               style="max-width:130px;display:${wert === 'Oeffentlicher Verkehr' ? '' : 'none'}"
+               placeholder="Billett CHF" value="${p.oev_rappen != null ? (p.oev_rappen / 100).toFixed(2) : ''}"
+               onchange="epVerkehrsmittelSpeichern(${Number(p.mitarbeiter_id)})">
+      </div>
+    </div>`;
+  };
+
   return `<div class="card-bd" style="padding:0 16px 14px">
     <div class="zone">
-      <div class="zone-hd">Dienstfahrzeug und Fahrer</div>
-      ${inhalt}
-      ${erwartet ? `<div class="zone-note" style="margin-top:10px"><b>Erwartete Fahrstrecke:
+      <div class="zone-hd">Dienstfahrzeug und Verkehrsmittel</div>
+      ${oben}
+      ${erwartet ? `<div class="zone-note" style="margin-top:8px"><b>Erwartete Fahrstrecke:
         ${erwartet.text}</b> — ${erwartet.grund}</div>` : ''}
+      ${vmZeigen ? `<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line)">
+        <div class="zone-note" style="margin-bottom:10px">Verkehrsmittel je Person — massgeblich für den
+          Fahrkostenersatz (Art. 18 Ziff. 4/5). Ohne Angabe gilt beim Abgleich die Vorgabe aus dem
+          Stammblatt.</div>
+        ${leute.map(zeile).join('')}
+      </div>` : ''}
     </div></div>`;
 }
 
@@ -17100,54 +17147,6 @@ function epFahrzeugSpeichern() {
     epKopfZeichnen();
     toast('Dienstfahrzeug gespeichert.');
   }).catch(() => toast('Das Dienstfahrzeug liess sich nicht speichern.'));
-}
-
-function epVerkehrsmittelBlock(e) {
-  if (!e || !e.weg_km || enGesperrt(e)) { return ''; }
-  const nao = typeof aoNao === 'function' ? aoNao() : null;
-  const z = typeof gavZone === 'function'
-    ? gavZone(e.weg_km, null, nao ? nao.km_zum_anderen : null) : null;
-  if (!z || !z.entschaedigung) { return ''; }
-
-  const leute = (epPos || []).filter(epBesetzt);
-  if (!leute.length) { return ''; }
-
-  const optionen = ['Privatfahrzeug', 'Oeffentlicher Verkehr', 'Mitfahrer', 'Geschaeftsfahrzeug'];
-  const zeile = p => {
-    const ma = mitarbeiter.find(m => Number(m.id) === Number(p.mitarbeiter_id));
-    const vorgabe = ma ? ma.verkehrsmittel : null;
-    const wert = p.verkehrsmittel || '';   // '' heisst: die Vorgabe gilt
-    const name = (ma && (fullName(ma) || ma.name)) || p.mitarbeiter || ('#' + p.mitarbeiter_id);
-    // Wer das Dienstfahrzeug fuehrt, faehrt damit -- das Feld steht fest
-    // (ENT-328). Der Server weist eine Aenderung ohnehin ab; ein bedienbares
-    // Feld, das beim Klicken eine Fehlermeldung wirft, waere eine Falle.
-    const istFahrer = e.fahrer_id != null && Number(e.fahrer_id) === Number(p.mitarbeiter_id);
-    return `<div class="f" style="margin-bottom:9px">
-      <label>${esc(name)}${istFahrer
-        ? ' <span class="note" style="font-weight:500">— fährt das Dienstfahrzeug</span>'
-        : (vorgabe ? '' : ' <span class="note" style="font-weight:500">— keine Vorgabe hinterlegt</span>')}</label>
-      <div class="inp-row">
-        <select class="inp"${istFahrer ? ' disabled' : ''} data-vm-ma="${Number(p.mitarbeiter_id)}" onchange="epVerkehrsmittelGeaendert(this)">
-          <option value="">${vorgabe ? 'Vorgabe: ' + esc(vorgabe) : '– kein Verkehrsmittel gewählt –'}</option>
-          ${optionen.map(o => `<option value="${esc(o)}"${wert === o ? ' selected' : ''}>${esc(o)}</option>`).join('')}
-        </select>
-        <input class="inp" type="number" min="0" max="999.99" step="0.05" data-vm-oev="${Number(p.mitarbeiter_id)}"
-               style="max-width:130px;display:${wert === 'Oeffentlicher Verkehr' ? '' : 'none'}"
-               placeholder="Billett CHF" value="${p.oev_rappen != null ? (p.oev_rappen / 100).toFixed(2) : ''}"
-               onchange="epVerkehrsmittelSpeichern(${Number(p.mitarbeiter_id)})">
-      </div>
-    </div>`;
-  };
-
-  return `<div class="card-bd" style="padding:0 16px 14px">
-    <div class="zone">
-      <div class="zone-hd">Verkehrsmittel zum Einsatz</div>
-      <div class="zone-note">Massgeblich für den Fahrkostenersatz (Art. 18 Ziff. 4/5) — der
-        Fahrzeitersatz ist davon unabhängig. Ohne Angabe wird beim Abgleich die im Stammblatt
-        hinterlegte Vorgabe verwendet; hier lässt sie sich nur für diesen einen Einsatz
-        überschreiben, etwa für eine Fahrgemeinschaft.</div>
-      ${leute.map(zeile).join('')}
-    </div></div>`;
 }
 
 function epVerkehrsmittelGeaendert(sel) {

@@ -25,6 +25,11 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $bis)) {
     $bis = date('Y-m-d', strtotime('+90 days'));
 }
 
+// Dienstfahrzeug der Schicht (ENT-330). Nur, wenn die Einrichtung gelaufen
+// ist -- eine fehlende Spalte in einem SELECT ist ein Fehler, kein leeres
+// Feld, und die App wuerde dann GAR KEINE Schichten mehr anzeigen.
+$hatFahrzeug = hat_spalte(db(), 'einsaetze', 'fahrzeug_id') && hat_tabelle(db(), 'fahrzeuge');
+
 $stmt = db()->prepare(
     // e.sparte muss mit (ENT-061): Ohne sie koennte die App nicht wissen,
     // dass fuer eine Reinigungsschicht kein Zeitbonus zu rechnen ist --
@@ -36,7 +41,16 @@ $stmt = db()->prepare(
             -- Verwaltung -- also genau dort, wo sie niemandem nuetzen.
             e.kanton, e.veranstaltung, e.treffpunkt, e.taetigkeit, e.qualifikation,
             e.kontakt_vorname, e.kontakt_nachname, e.kontakt_telefon,
-            z.zusage, z.gesehen_am, o.name AS objekt_name, e.objekt_id,
+            z.zusage, z.gesehen_am, o.name AS objekt_name, e.objekt_id,'
+    // ENT-330: Welches Dienstfahrzeug fuer diese Schicht eingeteilt ist und
+    // WER es fuehrt. Der Projektinhaber: *"Der MA muss in der APP in der
+    // geplanten Schicht sein Dienstfahrzeug sehen, dass er verwenden muss."*
+    // Die fahrer_id geht NICHT hinaus (dieser Endpunkt gibt grundsaetzlich
+    // keine Mitarbeiter-IDs heraus) -- verglichen wird unten in PHP.
+    . ($hatFahrzeug ? '
+            e.fahrer_id AS fahrer_id_roh, f.kennzeichen AS fahrzeug_kennzeichen,
+            f.bezeichnung AS fahrzeug_bezeichnung,
+            fm.vorname AS fahrer_vorname, fm.nachname AS fahrer_nachname, fm.name AS fahrer_login,' : '') . '
             -- Ob es fuer diesen Einsatz ueberhaupt einen Rundgang geben kann
             -- (Revierdienst-Tool V3, ENT-180/182): die App bietet "Rundgang
             -- starten" nur an, wenn am Objekt aktive Kontrollpunkte gepflegt
@@ -73,7 +87,10 @@ $stmt = db()->prepare(
      FROM einsatz_zuteilung z
      JOIN einsaetze e ON e.id = z.einsatz_id
      LEFT JOIN objekte o ON o.id = e.objekt_id
-     LEFT JOIN mitarbeiter us ON us.id = e.unterschrift_von
+     LEFT JOIN mitarbeiter us ON us.id = e.unterschrift_von'
+    . ($hatFahrzeug ? '
+     LEFT JOIN fahrzeuge f ON f.id = e.fahrzeug_id
+     LEFT JOIN mitarbeiter fm ON fm.id = e.fahrer_id' : '') . '
      WHERE z.mitarbeiter_id = ? AND e.datum BETWEEN ? AND ?
      ORDER BY e.datum, e.von'
 );
@@ -138,6 +155,29 @@ if ($schichten) {
     }
 }
 foreach ($schichten as &$s) {
+    // ENT-330. Ein Teilobjekt statt fuenf loser Felder -- und die Rohfelder
+    // verschwinden, damit keine Mitarbeiter-ID hinausgeht.
+    if (array_key_exists('fahrzeug_kennzeichen', $s)) {
+        if ($s['fahrzeug_kennzeichen'] !== null) {
+            $fahrerName = trim(($s['fahrer_vorname'] ?? '') . ' ' . ($s['fahrer_nachname'] ?? ''));
+            if ($fahrerName === '') { $fahrerName = (string)($s['fahrer_login'] ?? ''); }
+            $s['fahrzeug'] = [
+                'kennzeichen' => $s['fahrzeug_kennzeichen'],
+                'bezeichnung' => $s['fahrzeug_bezeichnung'],
+                // Faehrt DIESE Person? Danach richtet sich, ob die App eine
+                // Aufgabe anzeigt ("Du faehrst") oder eine Auskunft.
+                'ich_fahre'   => $s['fahrer_id_roh'] !== null
+                                 && (int)$s['fahrer_id_roh'] === (int)$user['id'],
+                // Leer heisst "noch niemand bestimmt" -- ausdruecklich etwas
+                // anderes als "niemand faehrt".
+                'fahrer_name' => $fahrerName !== '' ? $fahrerName : null,
+            ];
+        } else {
+            $s['fahrzeug'] = null;
+        }
+        unset($s['fahrzeug_kennzeichen'], $s['fahrzeug_bezeichnung'], $s['fahrer_id_roh'],
+              $s['fahrer_vorname'], $s['fahrer_nachname'], $s['fahrer_login']);
+    }
     $s['team'] = $team[$s['id']] ?? [];
     // Die Anzahl bleibt, was sie war -- die Oberflaeche zeigt sie an vielen
     // Stellen, an denen die Namensliste nicht hingehoert.
