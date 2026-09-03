@@ -28,6 +28,10 @@ const check = (n, c) => (c ? ok : bad).push(n);
 const APP = readFileSync(`${WURZEL}/app.html`, 'utf8');
 const RG = readFileSync(`${WURZEL}/backend/rundgang.php`, 'utf8');
 
+// Siehe test_rundgang_karte.mjs: ein Klick ins Leere reisst sonst die
+// ganze Suite mit, und eine abgestuerzte Suite meldet keine rote Pruefung.
+const klick = async s => { try { await page.click(s, { timeout: 2500 }); return true; }
+                           catch (e) { return false; } };
 const iso = d => new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
 const tag = n => iso(new Date(Date.now() + n * 864e5));
 
@@ -132,11 +136,16 @@ check('KRITISCH: ein Fehler in der Ortung kann nicht nach aussen schlagen',
   /try \{\s*\n\s*rgsOrtWache = navigator\.geolocation\.watchPosition/.test(APP)
   && /try \{ navigator\.geolocation\.clearWatch/.test(APP));
 // Die Seite muss stehen, auch wenn die Ortung reihenweise scheitert.
+// Seit ENT-331 beginnt eine Runde auf dem Kartenreiter -- der Reiter wird
+// hier ausdruecklich auf die Liste gestellt, damit diese Pruefung weiter
+// genau das misst, was sie messen soll (der Rumpf mit den Kontrollpunkten
+// steht), und nicht nebenbei zur Reiter-Pruefung wird.
 check('KRITISCH: die Kontrollpunkte stehen auch dann, wenn die Ortung wirft',
   await page.evaluate(() => {
     const echt = navigator.geolocation.watchPosition;
     navigator.geolocation.watchPosition = () => { throw new Error('kaputt'); };
     rgOrtungStoppen();
+    rgsReiter = 'punkte';
     let stand = false;
     try { rgLaufZeichnen(); stand = !!document.getElementById('rdListe'); } catch (e) { stand = false; }
     navigator.geolocation.watchPosition = echt;
@@ -243,6 +252,77 @@ check('KRITISCH: während der Ortung steht sichtbar da, dass geortet wird',
   && (await page.textContent('#rgsOrtungHinweis')).includes('verfolgt'));
 check('Die eigene Position steht auf der Karte',
   await page.evaluate(() => rgsStandortMarke !== null));
+
+// ── ENT-331: Wachmann-Zeichen statt weissem Punkt ─────────────────────
+// Vom Projektinhaber: "beim Trackersymbol waere es cool, wenn es etwas
+// geben wuerde wie Wachmann, oder ein Symbol das auf Security hinweist".
+// Der Punkt dahinter ist mehr als Geschmack: Der eigene Standort darf auf
+// der Karte nicht aussehen wie ein Ziel. Kontrollpunkte sind Kreise -- ein
+// weiterer Kreis in einer weiteren Farbe waere im Dunkeln genau die
+// Verwechslung, die niemand bemerkt.
+const marken = await page.evaluate(() =>
+  [...document.querySelectorAll('#rgsKarte .gm-mock-marker')].map(e => ({
+    art: e.dataset.symbolart || '',
+    pfad: (e.dataset.pfad || '').length,
+    z: Number(e.style.zIndex || 0),
+    b: e.getBoundingClientRect().width,
+    h: e.getBoundingClientRect().height,
+  })));
+check('KRITISCH: der eigene Standort trägt ein eigenes Zeichen, keinen Kreis wie ein Kontrollpunkt',
+  marken.filter(m => m.art === 'pfad').length === 1
+  && marken.filter(m => m.art === 'kreis').length >= 1);
+check('KRITISCH: das Zeichen ist wirklich eine Form und keine leere Hülle',
+  (marken.find(m => m.art === 'pfad') || { pfad: 0 }).pfad > 30);
+// Bewusst UNTER den Kontrollpunkten: Deren Marken tragen ihren Zustand als
+// Zeichen (Haken, Ausrufezeichen, Nummer). Das Schild ist groesser als der
+// frueher hier gezeichnete Punkt -- oben drueber wuerde es genau diese
+// Auskunft verdecken, und zwar in dem Moment, in dem man davorsteht.
+check('Es verdeckt keinen Kontrollpunkt, sondern liegt darunter',
+  (() => { const eig = marken.find(m => m.art === 'pfad');
+    const kps = marken.filter(m => m.art === 'kreis');
+    return !!eig && kps.length > 0 && kps.every(k => eig.z < k.z); })());
+check('Es ist auf einer nächtlichen Karte auch wirklich zu finden (mindestens 24px, gemessen)',
+  (() => { const eig = marken.find(m => m.art === 'pfad');
+    return !!eig && eig.b >= 24 && eig.h >= 24; })());
+// Der Anker: Das Zeichen muss AUF der Position sitzen, nicht daneben. Ohne
+// anchor haengt ein Pfad-Symbol mit seiner linken oberen Ecke an der
+// Koordinate -- der eigene Standort waere dann um eine halbe Symbolbreite
+// verschoben, und genau das faellt auf einer Karte nie auf, sondern fuehrt
+// nur in die falsche Richtung.
+check('KRITISCH: das Zeichen sitzt mittig auf der Position, nicht mit der Ecke daneben',
+  await page.evaluate(() => {
+    const el = [...document.querySelectorAll('#rgsKarte .gm-mock-marker')]
+      .find(e => e.dataset.symbolart === 'pfad');
+    if (!el || !rgsMeinOrt || !rgsKarte) return false;
+    const soll = rgsKarte._latLngZuPixel(rgsMeinOrt.lat, rgsMeinOrt.lng);
+    const k = document.getElementById('rgsKarte').getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    const ist = { x: r.left - k.left + r.width / 2, y: r.top - k.top + r.height / 2 };
+    return Math.abs(ist.x - soll.x) <= 2 && Math.abs(ist.y - soll.y) <= 2;
+  }));
+// Nach einem Reiterwechsel wird die Karte neu gebaut. Die alte Marke haengt
+// dann an einem Container, den es nicht mehr gibt -- ohne Aufraeumen haelt
+// die App sie fuer gesetzt und der eigene Standort bliebe unsichtbar.
+// Genau dieser Fall war da (ENT-331) und blieb verdeckt, weil der
+// Zentrieren-Knopf jedes Mal heimlich eine zweite Marke baute.
+await klick('#rgsRt-punkte');
+await page.waitForTimeout(300);
+await klick('#rgsRt-karte');
+await page.waitForTimeout(900);
+check('KRITISCH: nach einem Reiterwechsel steht die eigene Position wieder auf der Karte',
+  await page.evaluate(() =>
+    [...document.querySelectorAll('#rgsKarte .gm-mock-marker')]
+      .filter(e => e.dataset.symbolart === 'pfad').length === 1));
+// Und der Zentrieren-Knopf darf sie nicht in einen Punkt zurueckverwandeln
+// -- vor ENT-331 baute er eine eigene Marke mit eigenem Aussehen.
+await klick('#rgsZentrieren');
+await page.waitForTimeout(900);
+check('KRITISCH: "Zentrieren" verändert das Zeichen nicht und legt keine zweite Marke an',
+  await page.evaluate(() => {
+    const alle = [...document.querySelectorAll('#rgsKarte .gm-mock-marker')];
+    return alle.filter(e => e.dataset.symbolart === 'pfad').length === 1
+      && alle.filter(e => e.dataset.symbolart === 'kreis').length === 2;
+  }));
 await page.screenshot({ path: `${OUT}/ortung-02-karte.png` });
 
 // ══════════ GESTALTUNG, GEMESSEN ══════════════════════════════════════
