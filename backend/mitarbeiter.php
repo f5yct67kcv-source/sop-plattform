@@ -18,6 +18,11 @@ require_once __DIR__ . '/kunden.php';
 // nicht nachgebaut -- sonst gaebe es zwei Meinungen darueber, was eine
 // gueltige Anstellungskategorie ist.
 require_once __DIR__ . '/planung.php';
+// logbuch_schreiben() fuer ma_login_migrieren() (ENT-381) -- die Umstellung
+// bestehender Login-Namen schreibt ihren eigenen Logbuch-Eintrag, statt das
+// dem Endpunkt zu ueberlassen: Sonst gaebe es zwei Stellen, die wissen
+// muessten, wann genau ein Konto tatsaechlich umbenannt wurde.
+require_once __DIR__ . '/logbuch.php';
 
 // ── Zulaessige Werte ─────────────────────────────────────────────────────
 // Feste Listen, weil es feste Begriffe sind: Der Zivilstand und die
@@ -257,6 +262,83 @@ function ma_login_generieren(string $vorname, string $nachname, PDO $pdo): strin
         $kandidat = $basis . $lauf;
     }
     return $kandidat;
+}
+
+// ── Login-Namen-Umstellung im Bestand (ENT-381) ─────────────────────────
+// ENT-376 gilt seither nur fuer NEUE Konten. Auf ausdruecklichen Wunsch des
+// Projektinhabers (harter Schnitt, keine Uebergangsfrist -- der Login-Name
+// ist die einzige Anmeldekennung, es gibt kein Login per E-Mail) stellt
+// diese Funktion auch bestehende Konten auf dasselbe Muster um.
+//
+// Reine Berechnung, schreibt nichts -- Vorschau (GET) und Ausfuehrung
+// (POST) im Endpunkt rufen dieselbe Funktion auf, damit garantiert
+// dasselbe herauskommt, was vorher angezeigt wurde.
+//
+// Verarbeitet in Reihenfolge der ID (== Reihenfolge des Anlegens): Bei
+// Namensgleichheit bekommt, wer zuerst da war, die Form ohne Nummer --
+// dasselbe Prinzip wie bei der ENT-Nummern-Korrektur im Projekt-
+// Repository ("behalten darf sie, wer sie zuerst vergeben hat").
+//
+// Wessen Vor- oder Nachname fehlt, wird uebersprungen und behaelt den
+// bisherigen Namen -- der zaehlt von Anfang an als vergeben, nicht erst,
+// wenn die Reihe an ihn kaeme, sonst koennte ihm jemand anders seinen
+// Namen wegnehmen.
+//
+// Idempotent: ein zweiter Lauf berechnet fuer bereits umgestellte Konten
+// wieder denselben Namen (Status "unveraendert") und ruehrt sie nicht an.
+function ma_login_migrationsplan(PDO $pdo): array
+{
+    $rows = $pdo->query('SELECT id, name, vorname, nachname FROM mitarbeiter ORDER BY id')
+                ->fetchAll(PDO::FETCH_ASSOC);
+
+    $reserviert = [];
+    foreach ($rows as $r) {
+        if (trim((string)$r['vorname']) === '' || trim((string)$r['nachname']) === '') {
+            $reserviert[$r['name']] = true;
+        }
+    }
+
+    $plan = [];
+    foreach ($rows as $r) {
+        $vorname = trim((string)$r['vorname']);
+        $nachname = trim((string)$r['nachname']);
+        if ($vorname === '' || $nachname === '') {
+            $plan[] = ['id' => (int)$r['id'], 'alt' => $r['name'], 'neu' => null,
+                'status' => 'uebersprungen', 'grund' => 'Vorname oder Nachname fehlt'];
+            continue;
+        }
+        $basis = strtolower(preg_replace('/\s+/', '', "$vorname.$nachname"));
+        $kandidat = $basis;
+        for ($lauf = 2; isset($reserviert[$kandidat]); $lauf++) {
+            $kandidat = $basis . $lauf;
+        }
+        $reserviert[$kandidat] = true;
+        $plan[] = ['id' => (int)$r['id'], 'alt' => $r['name'], 'neu' => $kandidat,
+            'status' => $kandidat === $r['name'] ? 'unveraendert' : 'umbenannt', 'grund' => null];
+    }
+    return $plan;
+}
+
+// Fuehrt den Plan aus ma_login_migrationsplan() wirklich aus: benennt um,
+// beendet die Sitzungen der umbenannten Konten (das alte Passwort bleibt
+// gueltig, aber der alte Login-Name nicht mehr -- ein noch offenes
+// Browserfenster darf nicht unter dem alten Namen weiterlaufen) und
+// schreibt je Konto einen Logbuch-Eintrag. Nur Zeilen mit Status
+// "umbenannt" werden angefasst; "unveraendert" und "uebersprungen" bleiben
+// unberuehrt, auch in ihren Sitzungen.
+function ma_login_migrieren(PDO $pdo, array $akteur): array
+{
+    $plan = ma_login_migrationsplan($pdo);
+    $upd = $pdo->prepare('UPDATE mitarbeiter SET name = ? WHERE id = ?');
+    $ses = $pdo->prepare('DELETE FROM sessions WHERE mitarbeiter_id = ?');
+    foreach ($plan as $eintrag) {
+        if ($eintrag['status'] !== 'umbenannt') { continue; }
+        $upd->execute([$eintrag['neu'], $eintrag['id']]);
+        $ses->execute([$eintrag['id']]);
+        logbuch_schreiben($pdo, $akteur, 'mitarbeiter', $eintrag['id'],
+            'name', $eintrag['alt'], $eintrag['neu']);
+    }
+    return $plan;
 }
 
 // ── Eingabe lesen ────────────────────────────────────────────────────────
