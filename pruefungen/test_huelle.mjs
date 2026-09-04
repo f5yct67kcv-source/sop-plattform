@@ -1,4 +1,8 @@
-// Drei Hüllenzustände: 232 px — 64 px — Kopfleiste (ENT-086).
+// Zwei Hüllenzustände: 232 px — Kopfleiste (ENT-086, seit ENT-396 ohne den
+// schmalen 64-px-Zwischenschritt: er zeigte nur Symbole ohne Beschriftung
+// und war neben der Kopfleiste eine zweite, schwaechere Antwort auf
+// dasselbe Beduerfnis -- jeder Bereich hat ohnehin schon eigene Unterreiter).
+// Standard bleibt die volle Leiste, wie schon vor ENT-396.
 //
 // Diese Suite misst am gerenderten Zustand, nicht im Quelltext. Eine
 // CSS-Regel kann wirkungslos bleiben, ohne dass etwas kaputtgeht -- durch
@@ -7,7 +11,7 @@
 //
 // Der teuerste Fehler waere hier nicht ein falscher Pixelwert, sondern ein
 // Zustand, in dem ein Menuepunkt UNERREICHBAR wird, ohne dass es jemandem
-// auffaellt -- genau das war bis hierher im schmalen Modus der Fall:
+// auffaellt -- genau das war vor ENT-086 im schmalen Modus der Fall:
 // "Objekte" und "Rapporte" liessen sich dort gar nicht anwaehlen.
 //
 // Alle Testdaten sind erfunden.
@@ -49,8 +53,7 @@ const mass = (p, sel) => p.evaluate(s => {
 
 const zustand = p => p.evaluate(() => {
   const sh = document.getElementById('shell');
-  return { schmal: sh.classList.contains('schmal'), aus: sh.classList.contains('aus'),
-           sideW: getComputedStyle(sh).getPropertyValue('--side-w').trim() };
+  return { aus: sh.classList.contains('aus'), sideW: getComputedStyle(sh).getPropertyValue('--side-w').trim() };
 });
 
 // ══════════════════════════════ BREITBILD: der volle Zyklus
@@ -59,20 +62,15 @@ const zustand = p => p.evaluate(() => {
 
   let z = await zustand(p);
   let side = await mass(p, '#side'), main = await mass(p, '.main');
-  check('Startzustand ist die volle Leiste', !z.schmal && !z.aus && z.sideW === '232px');
+  check('Startzustand ist die volle Leiste', !z.aus && z.sideW === '232px');
   check('Die Leiste ist tatsaechlich 232 px breit (gemessen)', side.w === 232);
   check('Der Inhalt beginnt genau dahinter', main.ml === '232px');
   const breiteVoll = (await mass(p, '.content')).w;
 
   await p.click('#btnSchmal'); await p.waitForTimeout(250);
-  z = await zustand(p); side = await mass(p, '#side');
-  check('KRITISCH: ein Klick fuehrt in den schmalen Zustand', z.schmal && !z.aus);
-  check('Gemessen 64 px', side.w === 64);
-
-  await p.click('#btnSchmal'); await p.waitForTimeout(250);
   z = await zustand(p); side = await mass(p, '#side'); main = await mass(p, '.main');
   const top = await mass(p, '.topbar');
-  check('KRITISCH: der zweite Klick blendet die Leiste aus', z.aus && !z.schmal);
+  check('KRITISCH: ein Klick blendet die Leiste aus und legt sie waagrecht an', z.aus);
   check('KRITISCH: sie liegt jetzt waagrecht ueber die volle Breite', side.w === 1600 && side.x === 0 && side.y === 0);
   check('Und ist so hoch wie die Werkzeugleiste (60 px)', side.h === 60);
   check('Der Inhalt rueckt nicht mehr zur Seite', main.ml === '0px');
@@ -85,7 +83,7 @@ const zustand = p => p.evaluate(() => {
 
   await p.click('#btnSchmal'); await p.waitForTimeout(250);
   z = await zustand(p);
-  check('Der dritte Klick fuehrt zurueck zum Anfang', !z.schmal && !z.aus);
+  check('Der zweite Klick fuehrt zurueck zur vollen Leiste', !z.aus);
 
   await p.screenshot({ path: `${OUT}/huelle-voll.png` });
   await p.close();
@@ -99,7 +97,7 @@ const zustand = p => p.evaluate(() => {
 // Die Unterkategorien stehen jetzt nur noch in der Werkzeugleiste.
 try {
   const p = await seite(1600, 900);
-  await p.click('#btnSchmal'); await p.waitForTimeout(250);   // schmal
+  await p.click('#btnSchmal'); await p.waitForTimeout(250);   // aus
 
   await p.click('#nav-kunden'); await p.waitForTimeout(350);
   const k = await mass(p, '#navg-kunden .nav-kinder');
@@ -108,15 +106,6 @@ try {
     (await p.textContent('#pgTitle')) === 'Kunden');
   const ts = await mass(p, '#topSub');
   check('Und die Unterkategorien stehen in der Werkzeugleiste', ts.display === 'flex');
-
-  // Dasselbe im Kopfleisten-Zustand
-  await p.evaluate(() => go('uebersicht')); await p.waitForTimeout(200);
-  await p.click('#btnSchmal'); await p.waitForTimeout(250);   // aus
-  await p.click('#nav-kunden'); await p.waitForTimeout(350);
-  check('Auch in der Kopfleiste klappt nichts auf',
-    (await mass(p, '#navg-kunden .nav-kinder')).display === 'none');
-  check('Und der Bereich wird trotzdem erreicht',
-    (await p.textContent('#pgTitle')) === 'Kunden');
 
   // Bei voller Leiste bleibt das Aufklappen wie bisher
   await p.click('#btnSchmal'); await p.waitForTimeout(250);   // voll
@@ -153,7 +142,7 @@ try {
 //
 // Die Grenze lag zuerst bei 1281 px -- geraten, nicht gemessen. Auf einem
 // Notebook mit doppelter Aufloesung ist ein Fenster oft nur 1000 CSS-Pixel
-// breit; dort fiel der dritte Zustand wortlos auf die schmale Leiste
+// breit; dort fiel der kompakte Zustand wortlos auf eine schmale Leiste
 // zurueck, und der Knopf sah aus, als tue er nichts. Gemessen braucht die
 // Kopfleiste bei 1000 px nur 539 px.
 {
@@ -191,7 +180,7 @@ try {
 // ══════════════════════════════ DER ZUSTAND UEBERLEBT DAS NEULADEN
 {
   const p = await seite(1600, 900);
-  await p.click('#btnSchmal'); await p.click('#btnSchmal'); await p.waitForTimeout(250);
+  await p.click('#btnSchmal'); await p.waitForTimeout(250);
   check('Vor dem Neuladen: ausgeblendet', (await zustand(p)).aus);
   await p.reload();
   // Die Sitzung ueberlebt das Neuladen, die Anmeldemaske erscheint dann
@@ -414,6 +403,20 @@ try {
   await p.screenshot({ path: `${OUT}/huelle-kopf-beschriftet.png` });
   await p.close();
 } catch (e) { bad.push('Unterkategorien: ' + String(e).split('\n')[0].slice(0, 120)); }
+
+// ══════════════════════════════ KEIN SEITEN-SCROLL IN KEINEM ZUSTAND
+//
+// Frueher eine Eigenschaft des schmalen Zustands allein (ENT-086); gilt seit
+// ENT-396 fuer die beiden verbliebenen Zustaende.
+try {
+  const p = await seite(1440, 900);
+  for (const z of ['aus', 'voll']) {
+    await p.evaluate(x => huelleSetzen(x), z); await p.waitForTimeout(250);
+    check(`Kein waagrechter Seiten-Scroll im Zustand "${z}"`,
+      await p.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1));
+  }
+  await p.close();
+} catch (e) { bad.push('Seiten-Scroll: ' + String(e).split('\n')[0].slice(0, 120)); }
 
 await browser.close();
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);

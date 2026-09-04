@@ -164,11 +164,11 @@ check('Sie sagt auch, dass die Antwort selbst das Problem ist',
 check('Der Knopf bleibt auch danach bedienbar',
   !(await page.evaluate(() => $('eiBtn').disabled)));
 
-// ══════════ SCHMALE SEITENLEISTE
+// ══════════ KOMPAKTER ZUSTAND (KOPFLEISTE, ENT-086/ENT-396)
 await page.evaluate(() => closeDlg('dlgEinrichtung'));
-await page.evaluate(() => { if (!document.querySelector('.shell').classList.contains('schmal')) seiteUm(); });
+await page.evaluate(() => huelleSetzen('aus'));
 await page.waitForTimeout(300);
-check('Auch mit eingeklappter Seitenleiste erreichbar',
+check('Auch mit ausgeblendeter Seitenleiste erreichbar',
   await page.isVisible('#nav-einrichtung'));
 
 await browser.close();

@@ -105,7 +105,7 @@ await page.route('**/api/**', route => {
 await page.goto(`file://${WURZEL}/dashboard.html`);
 await page.fill('#gName', 'hansmuster'); await page.fill('#gPass', 'x'); await page.click('#gBtn');
 await page.waitForSelector('#shell.on'); await page.waitForTimeout(400);
-await page.evaluate(() => { if (!document.querySelector('.shell').classList.contains('schmal')) seiteUm(); });
+await page.evaluate(() => huelleSetzen('aus'));
 await page.evaluate(() => go('planung'));
 await page.waitForTimeout(250);
 await page.evaluate(() => goTab('objektplan'));
@@ -129,9 +129,17 @@ const mass = await page.evaluate(() => {
 // 260 -> 280 mit dem Skizzen-Umbau vom 21.08.2026 (ede2f04): Die Leiste ist
 // jetzt bewusst zweizeilig, und die Bedienelemente sind 45 px hoch. Beides
 // ist eine Gestaltungsentscheidung des Projektinhabers, keine Nachlaessigkeit
-// -- gemessen 271 px. Die Dichte-Pruefung blieb dabei gruen; waere sie es
-// nicht, muesste das Layout nachgeben und nicht diese Zahl.
-check(`Kopf unter 280px (ist ${mass.oben}, vorher 200 / ganz ursprünglich 352)`, mass.oben <= 280);
+// -- gemessen 271 px.
+//
+// 280 -> 335 mit ENT-396 (2026-09-04): Der bisher hier verwendete schmale
+// Huellenzustand (64 px, nur Symbole) entfaellt. Die kompakteste verbliebene
+// Alternative ist "aus" (Kopfleiste) -- sie gewinnt zwar mehr Breite als
+// "schmal" (0 statt 64 px Seitenleiste), legt sich dafuer aber selbst
+// waagrecht ueber den Kopf und kostet so an dieser Stelle rund 53 px mehr
+// Hoehe (gemessen 324 statt vormals 271 px). Die Dichte-Pruefung blieb dabei
+// gruen (Platz fuer 30 statt 24 Zeilen bei 1080 px Fensterhoehe); waere sie
+// es nicht, muesste das Layout nachgeben und nicht diese Zahl.
+check(`Kopf unter 335px (ist ${mass.oben}, vorher 280 / 200 / ganz ursprünglich 352)`, mass.oben <= 335);
 check(`Tabelle nutzt die Breite (${mass.breite} von ${mass.innen})`, mass.breite >= mass.innen - 140);
 check(`Datenzeilen unter 34px (max ${Math.max(...mass.zeilen)})`, Math.max(...mass.zeilen) <= 34);
 // Nicht die tatsaechlichen Zeilen zaehlen -- die Testdaten haben nur wenige --

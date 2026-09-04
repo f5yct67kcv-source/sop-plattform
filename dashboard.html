@@ -191,6 +191,12 @@ html[data-thema="dunkel"] .card,
 html[data-thema="dunkel"] .kpi { border-color: var(--line); }
 html[data-thema="dunkel"] .scrim,
 html[data-thema="dunkel"] .dlg-scrim { background: rgba(0,0,0,.62); }
+/* Ohne dies gewinnt die Regel oben gegen ".dlg-scrim.verschoben" weiter
+   unten (ENT-111) -- beide haben zwei Selektor-Teile gleicher Art, aber
+   diese hier zusaetzlich den Typselektor "html" und damit hoehere
+   Eigenspezifitaet. Im Dunkeln blieb der Schleier darum verdunkelt, auch
+   wenn der Dialog beiseitegeschoben war. Gemessen, nicht angenommen. */
+html[data-thema="dunkel"] .dlg-scrim.verschoben { background: rgba(0,0,0,.15); }
 html[data-thema="dunkel"] .inp { background: var(--surface-2); }
 html[data-thema="dunkel"] .inp:focus { background: var(--surface); }
 /* Der Punkt "hier ist nichts" darf im Dunkeln nicht heller wirken als Text. */
@@ -2771,45 +2777,45 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 .opl-posten .stand { flex: none; display: inline-flex; min-width: 40px; height: 24px; padding: 0 7px; border-radius: 5px; align-items: center; justify-content: center; font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
 
 
-/* Schmale Seitenleiste — mehr Arbeitsfläche für die breiten Raster.
+/* Kompakter Zustand der Seitenleiste (ENT-396: nur noch "aus", der
+   frühere schmale Icon-Zustand ist entfallen -- er war neben der
+   Kopfleiste eine zweite, schwaechere Antwort auf dasselbe Beduerfnis).
    Nur ab Tabletbreite: darunter ist die Leiste ohnehin ausgeklappt-verborgen
    und wird über den Burger geöffnet. */
 @media (min-width: 901px) {
-  .shell.schmal { --side-w: 64px; }
-  /* "aus" bekommt seinen eigenen Wert weiter unten. Hier stand vorher ein
-     Rueckfall auf 64 px fuer alles unter 1281 px -- eine GERATENE Grenze.
-     Gemessen braucht die Kopfleiste bei 1000 px Fensterbreite nur 539 px.
-     Auf einem Notebook mit doppelter Aufloesung ist ein Fenster oft genau
-     so breit; dort erschien der dritte Zustand nie, und der Knopf sah aus,
-     als tue er nichts. Die Grenze ist jetzt dieselbe wie fuer den schmalen
-     Zustand: ab 901 px. Darunter ist die Leiste ohnehin eine Schublade. */
+  /* Hier stand vorher ein Rueckfall auf 64 px fuer alles unter 1281 px --
+     eine GERATENE Grenze. Gemessen braucht die Kopfleiste bei 1000 px
+     Fensterbreite nur 539 px. Auf einem Notebook mit doppelter Aufloesung
+     ist ein Fenster oft genau so breit; dort erschien der kompakte Zustand
+     nie, und der Knopf sah aus, als tue er nichts. Die Grenze ist darum
+     901 px. Darunter ist die Leiste ohnehin eine Schublade. */
   .shell.aus { --side-w: 64px; }
-  .shell.schmal .side-nav, .shell.aus .side-nav { padding: 14px 8px; }
-  .shell.schmal .side-foot, .shell.aus .side-foot { padding: 10px 8px; }
-  .shell.schmal .nav-lbl, .shell.aus .nav-lbl { display: none; }
-  .shell.schmal .nav-item, .shell.aus .nav-item { justify-content: center; gap: 0; padding: 10px 0; }
-  .shell.schmal .nav-item .lbl, .shell.schmal .nav-item .tag,
+  .shell.aus .side-nav { padding: 14px 8px; }
+  .shell.aus .side-foot { padding: 10px 8px; }
+  .shell.aus .nav-lbl { display: none; }
+  .shell.aus .nav-item { justify-content: center; gap: 0; padding: 10px 0; }
   .shell.aus .nav-item .lbl, .shell.aus .nav-item .tag { display: none; }
   /* Kein Untermenü an der Leiste, weder eingerückt noch schwebend: Die
      Unterkategorien stehen im kompakten Zustand in der Werkzeugleiste
      (siehe .top-sub). Beides zugleich war dem Projektinhaber zu viel --
      und er hat recht: dieselbe Auswahl zweimal im selben Bild ist
      Doppelung, nicht Komfort. */
-  .shell.schmal .nav-eltern .chev, .shell.aus .nav-eltern .chev { display: none; }
-  .shell.schmal .nav-kinder, .shell.aus .nav-kinder { display: none; }
-  .shell.schmal .side-brand, .shell.aus .side-brand { justify-content: center; padding: 0 8px; }
-  .shell.schmal .side-brand .txt, .shell.aus .side-brand .txt { display: none; }
-  .shell.schmal .side-user, .shell.aus .side-user { justify-content: center; padding: 7px 0; }
-  .shell.schmal .side-user .who, .shell.aus .side-user .who { display: none; }
+  .shell.aus .nav-eltern .chev { display: none; }
+  .shell.aus .nav-kinder { display: none; }
+  .shell.aus .side-brand { justify-content: center; padding: 0 8px; }
+  .shell.aus .side-brand .txt { display: none; }
+  .shell.aus .side-user { justify-content: center; padding: 7px 0; }
+  .shell.aus .side-user .who { display: none; }
   /* Die Trennlinie zwischen den Gruppen bleibt als schmaler Strich sichtbar,
      damit die Gliederung nicht ganz verloren geht. */
-  .shell.schmal .side-nav .nav-lbl + .nav-item { margin-top: 10px; border-top: 1px solid var(--shell-line); padding-top: 14px; }
+  .shell.aus .side-nav .nav-lbl + .nav-item { margin-top: 10px; border-top: 1px solid var(--shell-line); padding-top: 14px; }
 }
-/* ─── Dritter Hüllenzustand (ENT-086): die Seitenleiste wird zur Kopfleiste.
+/* ─── Der kompakte Hüllenzustand (ENT-086, seit ENT-396 der einzige neben
+   "voll"): die Seitenleiste wird zur Kopfleiste.
    Bewusst eine reine Darstellungsänderung -- dasselbe Markup wandert nicht
    im DOM umher, es legt sich waagrecht. Damit bleiben IDs, Klickpfade und
    rechteAnwenden() unberührt.
-   Ab 901 px -- derselben Grenze wie der schmale Zustand. */
+   Ab 901 px -- derselben Grenze wie oben. */
 @media (min-width: 901px) {
   .shell.aus { --side-w: 0px; }
   .shell.aus .side {
@@ -3328,13 +3334,13 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 <script src="testumgebung.js"></script>
 <script>
 /* Muss VOR dem ersten Zeichnen laufen, sonst blitzt die helle Fassung
-   kurz auf, bevor die dunkle greift (ENT-029). Ohne gespeicherte Wahl
-   entscheidet die Einstellung des Betriebssystems. */
+   kurz auf, bevor die dunkle greift. Ohne gespeicherte Wahl gilt seit
+   ENT-397 die dunkle Darstellung als Standard, unabhaengig von der
+   Einstellung des Betriebssystems (vorher ENT-029: dort entschied das
+   Betriebssystem). Wer hell bevorzugt, schaltet einmal um -- die Wahl
+   bleibt danach wie bisher am Geraet gespeichert. */
 (function () {
-  var w = localStorage.getItem('rv3_thema');
-  if (!w) {
-    w = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dunkel' : 'hell';
-  }
+  var w = localStorage.getItem('rv3_thema') || 'dunkel';
   document.documentElement.setAttribute('data-thema', w);
 })();
 </script>
@@ -8546,26 +8552,25 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { glockeSchliessen(); }
 });
 
-// Schmale Seitenleiste: mehr Platz für die breiten Raster. Die Wahl bleibt
-// erhalten, damit sie nicht bei jedem Laden neu getroffen werden muss.
-// ══════════════════════════════════════════ HUELLE (ENT-086)
-// Drei Zustaende statt zwei: 232 px -- 64 px -- Kopfleiste. Der Knopf
-// schaltet reihum weiter. Absichtlich EIN Knopf statt dreier: Wer den
-// Platz braucht, drueckt so lange, bis es passt; ein Wahlfeld mit drei
-// Moeglichkeiten waere fuer eine Groesse zu viel Bedienung.
-const HUELLE_ZUSTAENDE = ['voll', 'schmal', 'aus'];
+// Seitenleiste: Die Wahl bleibt erhalten, damit sie nicht bei jedem Laden
+// neu getroffen werden muss.
+// ══════════════════════════════════════════ HUELLE (ENT-086, seit ENT-396)
+// Zwei Zustaende: 232 px -- Kopfleiste. Der Knopf schaltet um. Bis ENT-396
+// gab es dazwischen einen dritten, schmalen Icon-Zustand (64 px, ohne
+// Beschriftung); der Projektinhaber hielt ihn fuer ueberfluessig, weil jeder
+// Bereich seine Unterkategorien ohnehin schon als Reiter zeigt -- die
+// Kopfleiste deckt denselben Platzgewinn ab und beschriftet dabei sogar noch.
+const HUELLE_ZUSTAENDE = ['voll', 'aus'];
 const HUELLE_TITEL = {
-  voll:   'Seitenleiste einklappen',
-  schmal: 'Seitenleiste ausblenden',
-  aus:    'Seitenleiste einblenden',
+  voll: 'Seitenleiste ausblenden',
+  aus:  'Seitenleiste einblenden',
 };
 
 function huelleLesen() {
   const z = localStorage.getItem('rv3_huelle');
   if (HUELLE_ZUSTAENDE.includes(z)) { return z; }
-  // Uebernahme des alten Schalters: Wer eingeklappt gearbeitet hat, soll
-  // nach dem Update nicht ploetzlich die breite Leiste vorfinden.
-  if (localStorage.getItem('rv3_schmal') === '1') { return 'schmal'; }
+  // Kein gespeicherter Wert, oder der mit ENT-396 entfallene schmale
+  // Zustand: Standard bleibt die volle Leiste, wie schon vor ENT-396.
   return 'voll';
 }
 
@@ -8576,7 +8581,7 @@ function huelleSetzen(zustand, merken = true) {
   if (!HUELLE_ZUSTAENDE.includes(zustand)) { zustand = 'voll'; }
   const sh = $('shell');
   if (!sh) { return; }
-  sh.classList.remove('schmal', 'aus');
+  sh.classList.remove('aus');
   if (zustand !== 'voll') { sh.classList.add(zustand); }
   if (merken) { localStorage.setItem('rv3_huelle', zustand); }
   const b = $('btnSchmal');
@@ -8590,13 +8595,15 @@ function seiteUm() {
   huelleSetzen(HUELLE_ZUSTAENDE[(i + 1) % HUELLE_ZUSTAENDE.length]);
 }
 
-// Kompakt heisst: Die Beschriftungen sind weg, ein eingeruecktes Untermenue
-// hat keinen Platz. Gilt fuer beide kompakten Zustaende -- und nur oberhalb
-// von 900 px, darunter ist die Leiste eine Schublade mit voller Breite.
+// Kompakt heisst: ein eingeruecktes Untermenue an der Leiste hat keinen
+// Platz mehr, die Unterkategorien stehen stattdessen in der Werkzeugleiste.
+// Seit ENT-396 gibt es dafuer nur noch den einen Zustand "aus" -- und nur
+// oberhalb von 900 px, darunter ist die Leiste eine Schublade mit voller
+// Breite.
 function huelleKompakt() {
   const sh = $('shell');
   return !!sh
-      && (sh.classList.contains('schmal') || sh.classList.contains('aus'))
+      && sh.classList.contains('aus')
       && window.matchMedia('(min-width: 901px)').matches;
 }
 

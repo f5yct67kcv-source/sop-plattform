@@ -69,23 +69,28 @@ let { browser, page } = await starte();
 check('Der Schalter ist in der Kopfzeile', await page.isVisible('#btnThema'));
 check('Er ist als Schalter ausgezeichnet',
   await page.evaluate(() => $('btnThema').getAttribute('role') === 'switch'));
-check('Ohne Wahl startet es hell',
-  await page.evaluate(() => document.documentElement.getAttribute('data-thema') === 'hell'));
-check('Der Schalter meldet „aus"',
-  await page.evaluate(() => $('btnThema').getAttribute('aria-checked') === 'false'));
-check('Er trägt eine sprechende Beschriftung',
-  (await page.getAttribute('#btnThema', 'title')).includes('dunkle'));
-
-await page.click('#btnThema');
-await page.waitForTimeout(350);
-check('Ein Klick schaltet auf dunkel',
+check('KRITISCH: ohne Wahl startet es dunkel (ENT-397)',
   await page.evaluate(() => document.documentElement.getAttribute('data-thema') === 'dunkel'));
 check('Der Schalter meldet „an"',
   await page.evaluate(() => $('btnThema').getAttribute('aria-checked') === 'true'));
+check('Er trägt eine sprechende Beschriftung',
+  (await page.getAttribute('#btnThema', 'title')).includes('helle'));
+
+await page.click('#btnThema');
+await page.waitForTimeout(350);
+check('Ein Klick schaltet auf hell',
+  await page.evaluate(() => document.documentElement.getAttribute('data-thema') === 'hell'));
+check('Der Schalter meldet „aus"',
+  await page.evaluate(() => $('btnThema').getAttribute('aria-checked') === 'false'));
 check('Die Wahl wird gespeichert',
-  await page.evaluate(() => localStorage.getItem('rv3_thema') === 'dunkel'));
+  await page.evaluate(() => localStorage.getItem('rv3_thema') === 'hell'));
 check('Die Systemleiste zieht mit',
-  await page.evaluate(() => document.querySelector('meta[name="theme-color"]').content === '#0B0D11'));
+  await page.evaluate(() => document.querySelector('meta[name="theme-color"]').content === '#16181D'));
+
+await page.click('#btnThema');
+await page.waitForTimeout(350);
+check('Zurück auf dunkel',
+  await page.evaluate(() => document.documentElement.getAttribute('data-thema') === 'dunkel'));
 
 // ══════════════ ES IST WIRKLICH DUNKEL
 // Die Flaeche, auf der ein Text wirklich liegt -- nicht der Seitengrund.

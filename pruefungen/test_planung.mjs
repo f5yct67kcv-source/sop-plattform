@@ -296,8 +296,18 @@ check('Zeitliche Ueberschneidung wird gemeldet', clash.length === 1 && clash[0].
 check('Ueberschneidung nennt die Zeit', clash[0].includes('07:00–16:00'));
 // Adrian ist hier bereits zugeteilt -> bedienbar, damit man ihn entfernen kann
 check('Bereits Zugeteilter bleibt bedienbar', !(await page.isDisabled('#enEMa input[value="1"]')));
-check('Warnung fuer Zugeteilte in Gelb', await page.$eval('#enEMa .clash',
-  el => getComputedStyle(el).color === 'rgb(154, 107, 8)'));
+// Die Warnfarbe selbst ist ein Gestaltungsmerkmal (--warn) und je Thema
+// verschieden (hell: #9A6B08, dunkel: #E2B156, ENT-029/ENT-397) -- geprueft
+// wird die Aussage "traegt die Warnfarbe", nicht ein an ein Thema gebundener
+// Literalwert.
+check('Warnung fuer Zugeteilte in der Warnfarbe', await page.$eval('#enEMa .clash', el => {
+  const probe = document.createElement('span');
+  probe.style.color = 'var(--warn)';
+  document.body.appendChild(probe);
+  const erwartet = getComputedStyle(probe).color;
+  probe.remove();
+  return getComputedStyle(el).color === erwartet;
+}));
 check('Hinweis grenzt sich von der GAV-Pruefung ab', (await page.textContent('#drawer .zone')).includes('nicht'));
 check('Besetzungsstand unter der Auswahl', (await page.textContent('#enEMaFoot')).includes('1/1'));
 await page.screenshot({ path: `${OUT}/23-planung-schublade.png` });
