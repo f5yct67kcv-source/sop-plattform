@@ -220,17 +220,97 @@ const textKontrastAufFoto = async sel => {
   if (farbe === null || maxL === null) return null;
   return kontrastGegenLeuchte(farbe, maxL);
 };
-for (const [bezeichnung, sel] of [
+const TEXTE = [
   ['Firmenname', '.gate-oben .sub'],
   ['Beschriftung "Name"', '#lb-name'],
   ['Beschriftung "Passwort"', '#lb-pass'],
   ['"Passwort vergessen?"', '#lb-pwvergessen'],
-]) {
+];
+
+// ══════════ ENT-394: VIDEO-HINTERGRUND, UEBER DEM FOTO ════════════════
+// Das Video liegt ALS ZUSAETZLICHE Ebene ueber dem bereits geprueften
+// Foto (ENT-392 bleibt unveraendert als CSS-background stehen, siehe
+// Dateikopf-Kommentar im CSS). Deshalb hier ZWEI getrennte Kontrast-
+// Nachweise statt einem: einmal fuer das laufende Video (unten), einmal
+// fuer den Foto-Rueckfall bei reduzierter Bewegung (am Ende dieses
+// Abschnitts) -- beides sind unterschiedliche, real vorkommende
+// Anzeigezustaende, keiner davon darf angenommen statt gemessen werden.
+const video = await mass('.gate-video');
+check('KRITISCH: das Video ist auf dem Desktop eingebunden', video !== null);
+const quellen = await ev(() =>
+  [...document.querySelectorAll('.gate-video source')].map(s => ({ src: s.getAttribute('src'), typ: s.getAttribute('type') })));
+check('KRITISCH: WebM/VP9 UND MP4/H.264 sind beide als Quelle eingetragen -- '
+    + 'nicht jeder Browser kann beide Formate abspielen (dieses Test-Chromium selbst kein H.264)',
+  Array.isArray(quellen)
+  && quellen.some(q => q.src?.endsWith('.webm') && q.typ === 'video/webm')
+  && quellen.some(q => q.src?.endsWith('.mp4') && q.typ === 'video/mp4'));
+const videoAttribute = await ev(() => {
+  const v = document.querySelector('.gate-video');
+  return { autoplay: v.autoplay, muted: v.muted, loop: v.loop, playsinline: v.hasAttribute('playsinline') };
+});
+check('KRITISCH: autoplay, muted, loop und playsinline sind gesetzt -- ohne "muted" '
+    + 'verweigern die meisten Browser Autoplay ohne Nutzeraktion',
+  videoAttribute !== null && videoAttribute.autoplay && videoAttribute.muted
+  && videoAttribute.loop && videoAttribute.playsinline);
+
+// Spielt es wirklich, oder steht es nur da? Zeit VOR und NACH einer
+// echten Wartezeit vergleichen -- kein Seek, das waere kein Nachweis
+// von Autoplay, nur von Steuerbarkeit.
+const zeitVorher = await ev(() => document.querySelector('.gate-video')?.currentTime ?? null);
+await page.waitForTimeout(600);
+const zeitNachher = await ev(() => document.querySelector('.gate-video')?.currentTime ?? null);
+check('KRITISCH: das Video spielt tatsaechlich von selbst (die Zeit laeuft weiter, ohne Klick)',
+  zeitVorher !== null && zeitNachher !== null && zeitNachher > zeitVorher);
+
+// Kontrast an FUENF Zeitpunkten der zehnsekuendigen Schleife, nicht nur
+// an einem -- das Versprechen aus der Probe eingeloest ("das habe ich
+// fuer diese Probe nicht gemacht", siehe ENT-394-Eintrag). Deterministisch
+// per Seek statt per Wartezeit: pausiert, damit zwischen "seeked"-Ereignis
+// und Bildschirmfoto kein zusaetzliches Stueck weiterlaeuft.
+await ev(() => document.querySelector('.gate-video')?.pause());
+const seekeZu = async zeit => ev(t => new Promise(res => {
+  const v = document.querySelector('.gate-video');
+  if (!v) return res(false);
+  const fertig = () => { v.removeEventListener('seeked', fertig); res(true); };
+  v.addEventListener('seeked', fertig);
+  v.currentTime = t;
+}), zeit);
+const ZEITPUNKTE = [0.3, 2.5, 5, 7.5, 9.7];
+for (const [bezeichnung, sel] of TEXTE) {
+  let schlechtester = Infinity;
+  for (const zeit of ZEITPUNKTE) {
+    await seekeZu(zeit);
+    const k = await textKontrastAufFoto(sel);
+    if (k !== null && k < schlechtester) { schlechtester = k; }
+  }
+  check(`KRITISCH: ${bezeichnung} bleibt VOR dem LAUFENDEN Video an allen ${ZEITPUNKTE.length} `
+      + `geprueften Zeitpunkten der Schleife lesbar (>= 4.5:1, schlechtester gemessener Wert: `
+      + `${schlechtester === Infinity ? 'nicht messbar' : schlechtester.toFixed(2)})`,
+    schlechtester >= 4.5);
+}
+
+// ══════════ ENT-392: DER FOTO-RUECKFALL BEI REDUZIERTER BEWEGUNG ══════
+// Wer Bewegung reduziert eingestellt hat, bekommt NIE das Video zu sehen
+// -- das ist die einzige zuverlaessige Stelle, an der sich das reine
+// Foto (ENT-392, seit dieser Aenderung die Ausweichebene) noch isoliert
+// pruefen laesst: sobald das Video eingebunden ist, liegt es sonst IMMER
+// sichtbar darueber.
+await page.emulateMedia({ reducedMotion: 'reduce' });
+await page.waitForTimeout(150);
+check('KRITISCH: bei reduzierter Bewegung ist das Video unsichtbar',
+  await ev(() => getComputedStyle(document.querySelector('.gate-video')).display === 'none'));
+check('KRITISCH: und auch der eigene Video-Schleier -- sonst legt sich eine dunkle '
+    + 'Flaeche ueber das Foto, ohne dass ein Video sie rechtfertigt',
+  await ev(() => getComputedStyle(document.querySelector('.gate-schleier')).display === 'none'));
+check('KRITISCH: das Hintergrundfoto ist auf dem Desktop eingebunden',
+  await ev(() => getComputedStyle(document.getElementById('gate')).backgroundImage.includes('anmeldung-nacht.webp')));
+for (const [bezeichnung, sel] of TEXTE) {
   const k = await textKontrastAufFoto(sel);
   check(`KRITISCH: ${bezeichnung} bleibt VOR dem echten Foto lesbar (>= 4.5:1, `
-      + `am hellsten Bildpunkt hinter dem Text gemessen)`,
+      + `am hellsten Bildpunkt hinter dem Text gemessen) -- Zustand "reduzierte Bewegung"`,
     k !== null && k >= 4.5);
 }
+await page.emulateMedia({ reducedMotion: 'no-preference' });
 
 // ══════════ EINE FEHLERMELDUNG LIEST AUF DUNKLEM GRUND ════════════════
 await page.setViewportSize({ width: 390, height: 844 });

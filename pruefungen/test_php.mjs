@@ -182,6 +182,23 @@ check('KRITISCH: mitarbeiter_create.php bildet die Personalnummer selbst, statt 
 check("KRITISCH: ma_eingabe_lesen() sperrt die Personalnummer zentral gegen jeden Schreibweg -- Anlegen UND Bearbeiten laufen dort durch",
   /if \(\$feld === 'personalnummer'\)/.test(mitarbeiterPhpOhneKommentar));
 
+// ── Von Hand aendern fuer die Verwaltung (ENT-393): Personalnummer und
+// Login-Name sind fuer alle anderen weiter gesperrt (siehe die Pruefung
+// oben), aber mitarbeiter_update.php darf sie mit dem Recht "rechte" UND
+// derselben Formpruefung, die auch die automatische Bildung benutzt,
+// gezielt oeffnen -- sonst waere die Sperre fuer alle wieder eine
+// Umgehung fuer wen auch immer als Erstes danach fragt.
+const updateOhneKommentar = execFileSync('cat', [`${WURZEL}/backend/api/mitarbeiter_update.php`],
+  { encoding: 'utf8' }).replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+check('KRITISCH: eine manuelle Personalnummer-Aenderung laeuft durch dieselbe Formpruefung wie die automatische Ziehung',
+  /ma_personalnummer_gueltig\s*\(/.test(updateOhneKommentar));
+check('KRITISCH: eine manuelle Login-Namen-Aenderung laeuft durch dieselbe Formpruefung wie die automatische Bildung',
+  /ma_login_name_gueltig\s*\(/.test(updateOhneKommentar));
+check('KRITISCH: beide manuellen Aenderungen verlangen das Recht "rechte" (dieselbe Schwelle wie Rollenvergabe und "Login-Namen umstellen")',
+  (updateOhneKommentar.match(/darf\(\$user,\s*'rechte'\)/g) || []).length >= 3);
+check('KRITISCH: nach einer manuellen Login-Namen-Aenderung werden die Sitzungen dieser Person beendet -- wie bei "Login-Namen umstellen"',
+  /DELETE FROM sessions WHERE mitarbeiter_id/.test(updateOhneKommentar));
+
 // ── Passwort-Ruecksetzung per E-Mail-Link, ENT-373 (Quelltext -- die
 // Endpunkte benutzen MySQL-eigene Syntax und lassen sich nicht gegen den
 // SQLite-Stub ausfuehren, siehe pruef_passwort_reset.php).

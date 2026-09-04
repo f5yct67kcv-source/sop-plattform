@@ -256,12 +256,18 @@ if (!hinweisDa) {
 // Eine Webseite kann die native Kamera-App nicht im Scan-Modus starten --
 // das kann nur der Mensch selbst. Ein <video>-Element waere das Zeichen
 // einer eigenen Kamera-Vorschau im Browser; die soll es nicht geben.
+// Bewusst auf #blBody eingeschraenkt, nicht auf die ganze Seite: seit
+// ENT-394 traegt die Anmeldemaske selbst ein <video> (Hintergrund-Schleife,
+// ausserhalb dieses Blatts) -- ein Treffer dort waere kein In-App-Scanner
+// in DIESEM Formular, sondern ein voellig unbeteiligtes Element anderswo
+// im DOM. Die Aussage dieser Pruefung gilt dem Anleitungs-Blatt, nicht der
+// gesamten Seite.
 await page.locator('#blBody button', { hasText: 'geht das' }).click();
 await page.waitForTimeout(200);
 text = await blattText(page);
 check('KRITISCH: der Anleitungs-Link zeigt eine Anleitung, keinen eigenen Scanner im Browser',
-  /Kamera-App/.test(text) && await page.locator('video').count() === 0
-  && await page.locator('input[type=file]').count() === 0);
+  /Kamera-App/.test(text) && await page.locator('#blBody video').count() === 0
+  && await page.locator('#blBody input[type=file]').count() === 0);
 
 // Zeigt die Anleitung nicht die erwartete Seite, ist die anschliessende
 // Ruecknavigation ebenfalls gegenstandslos -- statt blind weiterzuklicken

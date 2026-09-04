@@ -285,6 +285,85 @@ try {
     gesendet === null);
 } catch (e) { check('Abschnitt Rollenvergabe ohne Abbruch: ' + e.message, false); }
 
+// ══════════════ LOGIN-NAME UND PERSONALNUMMER VON HAND AENDERN (ENT-393)
+// Beide sind fuer alle anderen gesperrt (ENT-376/381/387) -- diese Karte
+// prueft die eine Ausnahme: dieselbe Rechteschwelle wie Rollenvergabe
+// ('rechte', exklusiv Verwaltung), und dass eine falsche Eingabe gar nicht
+// erst zum Server geht.
+try {
+  meineRechte = ALLE_RECHTE; meineRollen = ['verwaltung'];
+  await anmelden();
+  await page.evaluate(() => { go('mitarbeiter'); openMaDetail('planer'); });
+  await page.waitForTimeout(800);
+  await page.evaluate(() => mdBearbeiten());
+  await page.waitForTimeout(600);
+  await page.click('#mbtab-zugang');
+  await page.waitForTimeout(300);
+
+  check('KRITISCH: mit dem Recht "rechte" ist der Login-Name ein Eingabefeld, vorbefuellt mit dem bisherigen Namen',
+    (await page.inputValue('#mbLoginNeu')) === 'planer');
+  await page.click('#mbtab-anstellung');
+  await page.waitForTimeout(300);
+  check('KRITISCH: mit dem Recht "rechte" ist die Personalnummer nicht mehr gesperrt',
+    !(await page.isDisabled('#mb_personalnummer')));
+
+  // Falsches Muster: Grossschreibung/Leerzeichen -- darf gar nicht erst
+  // gesendet werden (Sperre gehoert in den Server, aber die Oberflaeche
+  // erspart den unnoetigen Umweg).
+  gesendet = null;
+  await page.click('#mbtab-zugang');
+  await page.waitForTimeout(200);
+  await page.fill('#mbLoginNeu', 'Zwei Planung');
+  await page.click('#mbSpeichern');
+  await page.waitForTimeout(400);
+  check('KRITISCH: ein falsches Muster wird abgelehnt, bevor ueberhaupt gesendet wird',
+    gesendet === null && /Muster/.test(await page.textContent('#mbErr')));
+
+  // Richtiges Muster: wird als eigenes Feld mitgeschickt, der bisherige
+  // Name bleibt der Bezugspunkt (WHERE-Schluessel im Server).
+  gesendet = null;
+  await page.fill('#mbLoginNeu', 'zwei.planung');
+  await page.click('#mbtab-anstellung');
+  await page.waitForTimeout(200);
+  await page.fill('#mb_personalnummer', '4711');
+  await page.click('#mbSpeichern');
+  await page.waitForTimeout(400);
+  check('KRITISCH: eine gueltige Aenderung wird als eigenes Feld "name_neu" mitgeschickt, der bisherige Name bleibt der Bezug',
+    gesendet && gesendet.name === 'planer' && gesendet.name_neu === 'zwei.planung');
+  check('Die von Hand geaenderte Personalnummer geht mit',
+    gesendet && gesendet.personalnummer === '4711');
+
+  // Unveraendert gelassen: kein "name_neu" im Kartenkoerper, obwohl das
+  // Feld existiert -- sonst muesste jede Aenderung an einer Person mit
+  // einem (noch) nicht musterkonformen Bestandsnamen daran scheitern.
+  await page.evaluate(() => { go('mitarbeiter'); openMaDetail('planer'); });
+  await page.waitForTimeout(700);
+  await page.evaluate(() => mdBearbeiten());
+  await page.waitForTimeout(500);
+  gesendet = null;
+  await page.click('#mbSpeichern');
+  await page.waitForTimeout(400);
+  check('Unveraendert gelassen wird kein "name_neu" mitgeschickt',
+    gesendet && !('name_neu' in gesendet));
+
+  // Ohne das Recht "rechte" bleibt beides gesperrt wie bisher.
+  meineRechte = ['personal_lesen', 'personal_schreiben']; meineRollen = ['personal'];
+  await anmelden();
+  await page.evaluate(() => { go('mitarbeiter'); openMaDetail('planer'); });
+  await page.waitForTimeout(800);
+  await page.evaluate(() => mdBearbeiten());
+  await page.waitForTimeout(600);
+  await page.click('#mbtab-zugang');
+  await page.waitForTimeout(300);
+  check('KRITISCH: ohne das Recht "rechte" bleibt der Login-Name reiner Text, kein Eingabefeld',
+    (await page.$('#mbLoginNeu')) === null
+    && (await page.textContent('#mbKarten')).includes('planer'));
+  await page.click('#mbtab-anstellung');
+  await page.waitForTimeout(300);
+  check('KRITISCH: ohne das Recht "rechte" bleibt die Personalnummer gesperrt',
+    await page.isDisabled('#mb_personalnummer'));
+} catch (e) { check('Abschnitt Login-Name/Personalnummer von Hand ohne Abbruch: ' + e.message, false); }
+
 // ══════════════ WAECHTERSYSTEM: FUENFTE ROLLE STATT EIGENER REITER (ENT-285)
 // Bis ENT-285 hatte diese Rolle einen eigenen Reiter (ENT-169/ENT-186) --
 // hier wird geprueft, dass sie jetzt genau denselben Kaestchen-Weg nimmt

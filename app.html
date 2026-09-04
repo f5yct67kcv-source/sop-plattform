@@ -149,6 +149,12 @@ svg.i-sm { width: 17px; height: 17px; }
   --sh-1: none;
   --sh-2: 0 8px 28px -8px rgba(0,0,0,.6);
   color-scheme: dark;
+  /* Einmal definiert, zweimal gebraucht (ENT-394): als Teil des CSS-
+     background auf #gate (Ausweichebene: Foto ohne Video, siehe unten)
+     UND als eigene Flaeche .gate-schleier UEBER dem <video> -- ein Video
+     deckt das darunterliegende CSS-background vollstaendig ab, der
+     Schleier braucht also eine eigene Ebene, aber denselben Wert. */
+  --gate-schleier: linear-gradient(rgba(10,11,15,.66), rgba(10,11,15,.82));
 }
 /* margin:auto statt justify-content:center -- reicht die Hoehe nicht
    (kleines Geraet, offene Tastatur), bleibt der obere Rand so
@@ -183,6 +189,12 @@ svg.i-sm { width: 17px; height: 17px; }
   font-size: 13px; font-weight: 640; letter-spacing: 2.4px; text-transform: uppercase; }
 /* Die Karte ist weg: kein Grund, kein Rand, kein Schatten, kein Radius. */
 .gate-form { background: none; border-radius: 0; padding: 0; box-shadow: none; }
+/* Video-Hintergrund (ENT-394) -- auf dem Handy unsichtbar, wie das Foto
+   auch. Ausserhalb der Desktop-Regel unten bleibt display:none die
+   einzige Definition, die zaehlt: Autoplay laueft nicht rueckwirkend an,
+   nur weil display spaeter auf block wechselt, aber es kostet auch kein
+   Netzwerk/Decoding, solange das Element gar nicht sichtbar ist. */
+.gate-video, .gate-schleier { display: none; }
 /* Felder wie im dunklen Cockpit (dashboard.html): ruhende Flaeche etwas
    heller als der Grund, im Fokus dunkler -- so wandert die Aufmerksamkeit
    ins Feld, statt dass es beim Antippen aufleuchtet. */
@@ -220,13 +232,34 @@ svg.i-sm { width: 17px; height: 17px; }
      Getestet: die tatsaechlich gerenderte Flaeche hinter Firmenname,
      Feldbeschriftungen und dem Link liegt auch MIT Foto unter L*=0.06 --
      dunkler als die reine Verlaufsflaeche vorher, der Kontrast ist also
-     nicht schwaecher geworden, nur das Bild ist jetzt da. */
+     nicht schwaecher geworden, nur das Bild ist jetzt da.
+
+     ENT-394: Dasselbe Foto bleibt hier unveraendert als CSS-Hintergrund
+     stehen -- es ist jetzt die AUSWEICHEBENE fuer alles, was das <video>
+     darueber nicht rendert: bevor das erste Bild decodiert ist, bei
+     reduzierter Bewegung (siehe unten), oder falls ein Browser einmal
+     keine der beiden Videoquellen abspielen kann. Nichts an dieser
+     bereits gemessenen und ausgelieferten Ebene wurde angefasst. */
   #gate { background:
     radial-gradient(80% 68% at 50% 14%, #1C2639 0%, rgba(28,38,57,0) 66%),
-    linear-gradient(rgba(10,11,15,.66), rgba(10,11,15,.82)),
+    var(--gate-schleier),
     url('img/anmeldung-nacht.webp') 62% center / cover no-repeat,
     #0F1117; }
-  .gate-mitte { max-width: 400px; }
+  /* Das <video> liegt UEBER dieser Ausweichebene, der eigene Schleier
+     UEBER dem Video (ein deckendes Video wuerde den CSS-Schleier
+     darunter sonst unsichtbar machen), der Anmeldeblock UEBER allem. */
+  .gate-video { display: block; position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: cover; object-position: 62% center; z-index: 0; }
+  .gate-schleier { display: block; position: absolute; inset: 0; z-index: 1;
+    background: var(--gate-schleier); }
+  /* Wer bewegungsempfindlich ist oder es in den Systemeinstellungen
+     abgeschaltet hat, bekommt das ruhige Foto -- nicht nur eine
+     Empfehlung, sondern das bereits gemessene, bereits ausgelieferte
+     ENT-392-Ergebnis, das ohne das Video ohnehin darunter liegt. */
+  @media (prefers-reduced-motion: reduce) {
+    .gate-video, .gate-schleier { display: none; }
+  }
+  .gate-mitte { max-width: 400px; position: relative; z-index: 2; }
   .gate-oben img { width: 176px; height: 176px;
     filter: drop-shadow(0 22px 44px rgba(0,0,0,.8)); }
   .gate-oben .sub { margin-top: 26px; font-size: 15px; letter-spacing: 3px; }
@@ -987,6 +1020,21 @@ svg.i-sm { width: 17px; height: 17px; }
 
 <!-- ══════════════════════════ ANMELDUNG ══════════════════════════ -->
 <div id="gate">
+ <!-- Video-Hintergrund auf dem Desktop (ENT-394). WebM/VP9 zuerst -- kleiner
+      und von den meisten Desktop-Browsern unterstuetzt --, MP4/H.264 als
+      Ausweiche fuer Safari/iOS, das kein WebM zuverlaessig abspielt. Kein
+      "type"-Attribut je Quelle im Sinne einer harten Anforderung, sondern
+      im Sinne der Web-Norm: der Browser waehlt die erste Quelle, die er
+      abspielen kann, und ignoriert den Rest -- pro Besuch wird darum nur
+      EINE der beiden Dateien tatsaechlich geladen, nicht beide. Kein
+      "poster": das CSS-Foto darunter (siehe #gate-Regel oben) uebernimmt
+      genau diese Rolle schon, ein zweites Bild waere dieselbe Datei
+      zweimal eingebunden. -->
+ <video class="gate-video" autoplay muted loop playsinline>
+   <source src="img/anmeldung-nacht.webm" type="video/webm">
+   <source src="img/anmeldung-nacht.mp4" type="video/mp4">
+ </video>
+ <div class="gate-schleier"></div>
  <div class="gate-mitte">
   <div class="gate-oben">
     <img src="icons/icon-192.png" alt="">

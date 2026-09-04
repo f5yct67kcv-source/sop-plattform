@@ -53,6 +53,18 @@ pruef('Die Suche nach der naechsten freien Nummer laeuft tatsaechlich weiter',
 pruef('Ein unverwandter Name kollidiert nicht mit',
     ma_login_generieren('Erika', 'Muster', $pdo) === 'erika.muster');
 
+// ── Von Hand eingetragene Korrektur: dasselbe Muster (ENT-393) ───────────
+// Was ma_login_generieren() SELBST erzeugen wuerde, muss ma_login_name_gueltig()
+// auch fuer eine von Hand eingetragene Korrektur akzeptieren -- sonst
+// wiedersprechen sich Erzeugung und Pruefung.
+pruef('KRITISCH: eine automatisch gebildete Form gilt auch als gueltige Korrektur',
+    ma_login_name_gueltig(ma_login_generieren('Adrian', 'von Arb', $pdo)));
+pruef('KRITISCH: Gross-/Kleinschreibung wird abgelehnt', !ma_login_name_gueltig('Max.Muster'));
+pruef('KRITISCH: ein Leerzeichen wird abgelehnt', !ma_login_name_gueltig('max muster'));
+pruef('KRITISCH: ohne Punkt (kein vorname.nachname) wird abgelehnt', !ma_login_name_gueltig('maxmuster'));
+pruef('Leer wird abgelehnt', !ma_login_name_gueltig(''));
+pruef('Eine laufende Nummer am Ende bleibt gueltig', ma_login_name_gueltig('max.muster2'));
+
 echo "$ok Pruefungen bestanden\n";
 foreach ($bad as $b) { echo "X $b\n"; }
 exit($bad ? 1 : 0);
