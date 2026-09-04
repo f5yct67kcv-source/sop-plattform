@@ -193,7 +193,7 @@ jobs:
 
       - name: Platzhalter durch echte Werte ersetzen
         run: |
-          mkdir -p dist/api dist/icons dist/fonts
+          mkdir -p dist/api dist/icons dist/fonts dist/img
           cp index.html dist/index.html
           cp dashboard.html dist/dashboard.html
           cp app.html dist/app.html
@@ -246,6 +246,12 @@ jobs:
           # verlangt, dass die Lizenz die Schrift begleitet.
           cp fonts/*.woff2 dist/fonts/
           cp fonts/inter-LICENSE.txt dist/fonts/inter-LICENSE.txt
+          # Hintergrundfoto der Anmeldemaske auf dem Desktop (ENT-392) --
+          # per CSS-url() aus app.html geholt, genau derselbe Fallstrick
+          # wie bei den Schriftschnitten oben: fehlt die Datei auf dem
+          # Server, faellt der Hintergrund lautlos auf die reine
+          # Verlaufsflaeche zurueck, lokal faellt es NICHT auf.
+          cp img/anmeldung-nacht.webp dist/img/anmeldung-nacht.webp
           cp backend/db.php dist/db.php
           cp backend/ai.php dist/ai.php
           cp backend/planung.php dist/planung.php

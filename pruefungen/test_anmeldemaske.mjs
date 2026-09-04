@@ -155,6 +155,83 @@ check('Der Knopf ist auch auf dem Desktop noch der Knopf, nicht ein Band',
 check('KRITISCH: die Marke waechst auf dem grossen Schirm mit, statt in der Flaeche zu verschwinden',
   dLogo !== null && logo !== null && dLogo.w > logo.w * 1.2);
 
+// ══════════ ENT-392: HINTERGRUNDFOTO AUF DEM DESKTOP ══════════════════
+// Ein Foto statt der reinen Verlaufsflaeche kann den Kontrast der Texte
+// unterlaufen, die KEIN eigenes Feld-Grund haben (Firmenname, Feld-
+// beschriftungen, "Passwort vergessen?"). Quelltext sagt nichts darueber,
+// WIE hell die tatsaechlich gerenderte Flaeche hinter diesen Texten ist --
+// das haengt vom Bildinhalt UND vom Schleier zusammen ab. Darum wird hier
+// wirklich fotografiert (page.screenshot) und im Bild selbst gemessen,
+// nicht nur die CSS-Werte gelesen (CLAUDE.md: "Gestaltung wird gemessen,
+// nicht im Quelltext nachgelesen").
+check('KRITISCH: das Hintergrundfoto ist auf dem Desktop eingebunden',
+  await ev(() => getComputedStyle(document.getElementById('gate')).backgroundImage.includes('anmeldung-nacht.webp')));
+
+// Misst am tatsaechlichen Bildpunkt: Textknoten-Rahmen abfotografieren,
+// im Browser selbst per canvas dekodieren (kein eigener PNG-Decoder
+// noetig), hellsten Bildpunkt in der Flaeche suchen -- das ist der
+// Worst-Case fuer helle Schrift auf dunklem Grund -- und den WCAG-
+// Kontrast dagegen rechnen. Nutzt dieselbe leuchte()-Funktion wie oben,
+// nur gegen eine bereits berechnete Leuchtdichte statt gegen eine zweite
+// Farbe (der Bildpunkt hat keinen CSS-Farbwert, nur RGB aus dem Pixel).
+const kontrastGegenLeuchte = (farbeStr, lb) => {
+  const [r, g, b] = (farbeStr.match(/\d+/g) || []).slice(0, 3).map(Number);
+  const la = leuchte(r, g, b);
+  const [l1, l2] = [la, lb].sort((x, y) => y - x);
+  return (l1 + .05) / (l2 + .05);
+};
+const textKontrastAufFoto = async sel => {
+  const box = await ev(s => {
+    const el = document.querySelector(s);
+    const r = document.createRange(); r.selectNodeContents(el);
+    const b = r.getBoundingClientRect();
+    return { x: b.x, y: b.y, w: b.width, h: b.height };
+  }, sel);
+  if (!box || box.w < 1 || box.h < 1) return null;
+  const clip = { x: Math.max(0, Math.floor(box.x)), y: Math.max(0, Math.floor(box.y)),
+    width: Math.max(1, Math.ceil(box.w)), height: Math.max(1, Math.ceil(box.h)) };
+  const farbe = await ev(s => getComputedStyle(document.querySelector(s)).color, sel);
+  // Die Schrift selbst muss aus der Aufnahme raus: sonst misst man die
+  // Leuchtdichte der hellen Buchstaben gegen sich selbst -- das ergibt
+  // immer einen Kontrast nahe 1, unabhaengig vom tatsaechlichen Hintergrund
+  // (per Debug-Ausgabe gefunden: alle drei Feldbeschriftungen kamen auf
+  // exakt dieselbe "hellste" Leuchtdichte, weil das die Schriftfarbe war).
+  // Text kurz unsichtbar machen, NACKTEN Hintergrund fotografieren, wieder
+  // herstellen -- das Layout aendert sich dabei nicht, nur die Farbe.
+  await ev(s => { document.querySelector(s).style.color = 'transparent'; }, sel);
+  const buf = await page.screenshot({ clip }).catch(() => null);
+  await ev(s => { document.querySelector(s).style.color = ''; }, sel);
+  if (!buf) return null;
+  const b64 = buf.toString('base64');
+  const maxL = await page.evaluate(async b64 => {
+    const img = new Image();
+    await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = 'data:image/png;base64,' + b64; });
+    const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+    const ctx = c.getContext('2d'); ctx.drawImage(img, 0, 0);
+    const data = ctx.getImageData(0, 0, c.width, c.height).data;
+    const lin = v => { v /= 255; return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; };
+    let max = -1;
+    for (let i = 0; i < data.length; i += 4) {
+      const L = .2126 * lin(data[i]) + .7152 * lin(data[i + 1]) + .0722 * lin(data[i + 2]);
+      if (L > max) max = L;
+    }
+    return max;
+  }, b64).catch(() => null);
+  if (farbe === null || maxL === null) return null;
+  return kontrastGegenLeuchte(farbe, maxL);
+};
+for (const [bezeichnung, sel] of [
+  ['Firmenname', '.gate-oben .sub'],
+  ['Beschriftung "Name"', '#lb-name'],
+  ['Beschriftung "Passwort"', '#lb-pass'],
+  ['"Passwort vergessen?"', '#lb-pwvergessen'],
+]) {
+  const k = await textKontrastAufFoto(sel);
+  check(`KRITISCH: ${bezeichnung} bleibt VOR dem echten Foto lesbar (>= 4.5:1, `
+      + `am hellsten Bildpunkt hinter dem Text gemessen)`,
+    k !== null && k >= 4.5);
+}
+
 // ══════════ EINE FEHLERMELDUNG LIEST AUF DUNKLEM GRUND ════════════════
 await page.setViewportSize({ width: 390, height: 844 });
 await ev(() => { const e = document.getElementById('gErr');
