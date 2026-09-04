@@ -1,0 +1,21 @@
+# Hashes der drei Staging-Quelldateien zum Zeitpunkt der letzten manuellen
+# Synchronisierung bei Hostpoint (Drift-Guard, ENT-384/ENT-387). Der
+# Staging-Deploy vergleicht diese Werte mit den aktuellen Hashes der drei
+# Dateien und bricht bei jeder Abweichung ab -- siehe deploy-hostpoint.yml,
+# Schritt "Umgebung waehlen und erforderliche Secrets pruefen".
+#
+# htaccess-hostpoint       -> unterhalb von "#@__HCP_END__@#" in die
+#                             Staging-.htaccess (Passwortschutz-Block bleibt
+#                             oberhalb unangetastet)
+# htaccess-staging-zusatz  -> direkt im Anschluss daran, in derselben
+#                             Staging-.htaccess (X-Robots-Tag, ENT-387)
+# robots-staging.txt       -> als eigene Datei robots.txt in www/staging
+#
+# Aktualisieren nach jeder inhaltlichen Aenderung an einer der drei Dateien:
+# 1. sha256sum htaccess-hostpoint htaccess-staging-zusatz robots-staging.txt
+# 2. Die geaenderte Datei wie oben beschrieben erneut manuell bei Hostpoint
+#    eintragen (Explorer -> www/staging).
+# 3. Den neuen Hash unten in der passenden Zeile eintragen und committen.
+htaccess-hostpoint:532ab68c5100550b16c5c3b006f53dc7837ccc39c6628fce7f178aff93309f3f
+htaccess-staging-zusatz:7b6df04b9fd9decbeb68442a6080b3e39c384e31d59273e53f938549c8e26208
+robots-staging.txt:e120f27381f482e2de05b11355c7d1818e8266d282cec8cf04bc8b33916e7583

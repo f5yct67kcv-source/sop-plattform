@@ -161,9 +161,48 @@ jobs:
             esac
           fi
 
+          # Drift-Guard fuer die manuell bei Hostpoint gepflegten Staging-Dateien
+          # (ENT-384, erweitert ENT-387): Der Passwortschutz verwaltet sich
+          # selbst oberhalb der Markierung "#@__HCP_END__@#" in der dortigen
+          # .htaccess; unterhalb davon stehen von Hand die Inhalte von
+          # htaccess-hostpoint UND htaccess-staging-zusatz (X-Robots-Tag),
+          # und robots.txt liegt als eigene Datei daneben. Der Deploy laesst
+          # alle drei fuer Staging unangetastet (siehe FTP-Schritt unten) --
+          # sonst wuerde jeder Deploy den Schutz stillschweigend entfernen.
+          # Das bedeutet aber auch: aendert sich eine der drei Quelldateien
+          # hier im Repository, driftet die Staging-Kopie unbemerkt
+          # auseinander, wenn niemand manuell nachzieht. Deshalb muss jeder
+          # Hash exakt dem Stand entsprechen, der zuletzt manuell uebertragen
+          # wurde (staging-htaccess.synced-sha256, Format "datei:hash" je
+          # Zeile) -- sonst bricht der Staging-Deploy ab, statt mit
+          # veralteten Regeln weiterzulaufen.
+          if [ "$UMGEBUNG" = "staging" ]; then
+            for DRIFT_DATEI in htaccess-hostpoint htaccess-staging-zusatz robots-staging.txt; do
+              AKTUELLER_HASH=$(sha256sum "$DRIFT_DATEI" | cut -d' ' -f1)
+              SYNCED_HASH=$(grep -E "^${DRIFT_DATEI}:" staging-htaccess.synced-sha256 | cut -d':' -f2 | tr -d '[:space:]')
+              if [ -z "$SYNCED_HASH" ] || [ "$AKTUELLER_HASH" != "$SYNCED_HASH" ]; then
+                echo "::error::Staging-Deploy abgebrochen -- $DRIFT_DATEI wurde seit der letzten manuellen Staging-Synchronisierung veraendert oder hat keinen erfassten Hash (Hash-Abweichung, ENT-384/ENT-387). Bitte den Inhalt von $DRIFT_DATEI erneut manuell bei Hostpoint eintragen und anschliessend staging-htaccess.synced-sha256 mit dem neuen Hash aktualisieren."
+                exit 1
+              fi
+            done
+          fi
+
           if [ -n "$PFLICHT_FEHLT" ]; then
             echo "::error::Deployment abgebrochen -- fuer Environment $UMGEBUNG fehlen erforderliche Secrets:$PFLICHT_FEHLT"
             exit 1
+          fi
+
+          # Von Upload/Loeschung auszunehmende Dateien fuer den FTP-Schritt
+          # unten (ENT-384/ENT-387) -- als eigene, mehrzeilige Umgebungs-
+          # variable statt direkt im YAML verdrahtet, weil die Deploy-Action
+          # ihre "exclude"-Liste zeilenweise erwartet und eine echte
+          # Mehrzeilen-Zeichenkette in einem Bash-String einfacher und
+          # robuster zu bauen ist als in einem YAML-Ausdruck. Fuer Production
+          # bleibt der Wert leer, dort laeuft der Upload unveraendert.
+          if [ "$UMGEBUNG" = "staging" ]; then
+            STAGING_EXCLUDE=$'.htaccess\nrobots.txt'
+          else
+            STAGING_EXCLUDE=""
           fi
 
           # Fuer die folgenden Schritte als Umgebungsvariablen weiterreichen.
@@ -189,6 +228,15 @@ jobs:
             echo "EFF_ANTHROPIC_API_KEY=$EFF_ANTHROPIC_API_KEY"
             echo "EFF_MAPS_JS_KEY=$EFF_MAPS_JS_KEY"
             echo "EFF_STAGING_TESTMAIL=$EFF_STAGING_TESTMAIL"
+          } >> "$GITHUB_ENV"
+
+          # Mehrzeiliger Wert -- eigener Heredoc-Block statt einer einfachen
+          # "KEY=value"-Zeile, sonst wuerde der eingebettete Zeilenumbruch die
+          # GITHUB_ENV-Datei zerreissen.
+          {
+            echo "STAGING_EXCLUDE<<STAGING_EXCLUDE_ENDE"
+            echo "$STAGING_EXCLUDE"
+            echo "STAGING_EXCLUDE_ENDE"
           } >> "$GITHUB_ENV"
 
       - name: Platzhalter durch echte Werte ersetzen
@@ -273,7 +321,12 @@ jobs:
           cp backend/mailer.php dist/mailer.php
           cp backend/ferien.php dist/ferien.php
           # Schutzeinstellungen (ENT-075). Im Repository heisst die Datei
-          # bewusst ohne fuehrenden Punkt -- sonst uebersieht man sie.
+          # bewusst ohne fuehrenden Punkt -- sonst uebersieht man sie. Wird
+          # trotzdem fuer BEIDE Umgebungen hier erzeugt (auch wenn der
+          # FTP-Schritt unten sie fuer Staging von Upload/Loeschung
+          # ausschliesst, ENT-384) -- so bleibt dieser Schritt umgebungs-
+          # unabhaengig, und ein spaeteres Aendern der Ausschluss-Regel
+          # bringt hier nichts durcheinander.
           cp htaccess-hostpoint dist/.htaccess
           cp backend/api/*.php dist/api/
           # setup.php / setup.html bewusst NICHT hier -- Ersteinrichtung ist ein
@@ -350,3 +403,107 @@ jobs:
           # ausschliesslich der vorige Schritt (EFF_HOSTPOINT_FTP_*), nicht
           # diese Zeile.
           server-dir: /
+          # ENT-384/ENT-387: Bei Staging bleiben .htaccess UND robots.txt von
+          # Upload UND Loeschung ausgenommen. .htaccess traegt oberhalb von
+          # "#@__HCP_END__@#" den von Hostpoints eigener Passwortschutz-
+          # Oberflaeche verwalteten Basic-Auth-Block (kein AuthUserFile o. ae.
+          # sichtbar -- Hostpoint verwaltet die Zugangsdaten offenbar
+          # ausserhalb der sichtbaren Datei) und darunter von Hand die Inhalte
+          # von htaccess-hostpoint sowie htaccess-staging-zusatz (X-Robots-Tag).
+          # robots.txt liegt als eigene, ebenfalls nur manuell gepflegte Datei
+          # daneben. Wuerde dieser Schritt sie wie jede andere Datei
+          # ueberschreiben oder loeschen, verschwaende der Schutz beim
+          # naechsten Deploy lautlos -- genau das soll dieser Ausschluss
+          # verhindern. Fuer Production bleibt STAGING_EXCLUDE leer, dort
+          # laeuft der Upload unveraendert wie bisher.
+          exclude: ${{ env.STAGING_EXCLUDE }}
+
+      # ENT-384: Beweist, dass der Hostpoint-Passwortschutz auf Staging
+      # tatsaechlich aktiv ist -- eine reine Konfigurationspruefung waere nur
+      # eine Behauptung, dieser Schritt fragt die echte, gerade deployte Seite
+      # ab. Verlangt wird nicht nur HTTP 401, sondern zusaetzlich ein
+      # "WWW-Authenticate: Basic"-Kopf -- ein 401 aus einem anderen Grund
+      # (z. B. ein eigener, produktiver Auth-Mechanismus) waere kein Nachweis
+      # fuer DIESEN Schutz. Netzwerkfehler und Timeouts zaehlen ausdruecklich
+      # als Fehlschlag, nicht als "nicht pruefbar, also ok".
+      - name: Staging-Passwortschutz verifizieren
+        if: ${{ env.UMGEBUNG == 'staging' }}
+        run: |
+          set -uo pipefail
+          if [ -z "${{ vars.STAGING_DOMAIN }}" ]; then
+            echo "::error::Staging-Deploy abgebrochen -- Environment-Variable STAGING_DOMAIN fehlt, der Passwortschutz kann ohne sie nicht verifiziert werden (ENT-384)."
+            exit 1
+          fi
+          HEADERS=$(curl -sS -D - -o /dev/null --max-time 15 --connect-timeout 10 "https://${{ vars.STAGING_DOMAIN }}/" 2>&1)
+          if [ $? -ne 0 ]; then
+            echo "::error::Staging-Passwortschutz-Pruefung fehlgeschlagen (Netzwerkfehler/Timeout beim Abruf von https://${{ vars.STAGING_DOMAIN }}/): $HEADERS"
+            exit 1
+          fi
+          if ! echo "$HEADERS" | head -1 | grep -qE '^HTTP/[0-9.]+ 401'; then
+            echo "::error::Staging-Passwortschutz nicht nachweisbar -- erwartet HTTP 401, tatsaechliche Antwortzeile: $(echo "$HEADERS" | head -1)"
+            exit 1
+          fi
+          if ! echo "$HEADERS" | grep -qi '^WWW-Authenticate:.*Basic'; then
+            echo "::error::Staging-Passwortschutz-Nachweis unvollstaendig -- HTTP 401 erhalten, aber kein 'WWW-Authenticate: Basic'-Kopf gefunden. Kopfzeilen: $HEADERS"
+            exit 1
+          fi
+          echo "Staging-Passwortschutz verifiziert (HTTP 401, WWW-Authenticate: Basic)."
+
+      # ENT-387: Beweist die zweite Schutzschicht (X-Robots-Tag, robots.txt),
+      # die greifen soll, falls Basic Auth kuenftig versehentlich geschwaecht
+      # wird. Ein unauthentifizierter Abruf waere hier KEIN Nachweis: wegen
+      # "Require valid-user" liefert JEDER Pfad -- ob robots.txt existiert
+      # oder nicht -- ohnehin 401, das Ergebnis waere unabhaengig vom
+      # tatsaechlichen Dateiinhalt immer gleich. Deshalb authentifiziert mit
+      # einem eigenen technischen Benutzer (qa-probe, ENT-387), nicht mit
+      # persoenlichen Zugangsdaten. Beide Abrufe verzichten bewusst auf
+      # "-L"/"--location" (ein Redirect auf einen fremden Host darf niemals
+      # als Erfolg durchgehen) und auf "-k"/"--insecure" (TLS wird regulaer
+      # geprueft) -- ein DNS-, TLS-, Netzwerk- oder Timeout-Fehler faellt
+      # damit automatisch unter denselben Fehlschlag-Zweig wie bei der
+      # Passwortschutz-Pruefung oben.
+      - name: Staging-Suchmaschinenausschluss verifizieren (X-Robots-Tag, robots.txt)
+        if: ${{ env.UMGEBUNG == 'staging' }}
+        run: |
+          set -uo pipefail
+          if [ -z "${{ vars.STAGING_DOMAIN }}" ]; then
+            echo "::error::Staging-Deploy abgebrochen -- Environment-Variable STAGING_DOMAIN fehlt, der Suchmaschinenausschluss kann ohne sie nicht verifiziert werden (ENT-387)."
+            exit 1
+          fi
+          if [ -z "${{ secrets.STAGING_BASIC_AUTH_USER }}" ] || [ -z "${{ secrets.STAGING_BASIC_AUTH_PASSWORD }}" ]; then
+            echo "::error::Staging-Deploy abgebrochen -- STAGING_BASIC_AUTH_USER/STAGING_BASIC_AUTH_PASSWORD fehlen, der authentifizierte Nachweis kann ohne sie nicht gefuehrt werden (ENT-387)."
+            exit 1
+          fi
+
+          AUTH_ROOT=$(curl -sS -D - -o /dev/null --max-time 15 --connect-timeout 10 -u "${{ secrets.STAGING_BASIC_AUTH_USER }}:${{ secrets.STAGING_BASIC_AUTH_PASSWORD }}" "https://${{ vars.STAGING_DOMAIN }}/" 2>&1)
+          if [ $? -ne 0 ]; then
+            echo "::error::Suchmaschinenausschluss-Pruefung fehlgeschlagen (DNS-/TLS-/Netzwerkfehler oder Timeout beim authentifizierten Abruf von https://${{ vars.STAGING_DOMAIN }}/): $AUTH_ROOT"
+            exit 1
+          fi
+          if ! echo "$AUTH_ROOT" | head -1 | grep -qE '^HTTP/[0-9.]+ 200'; then
+            echo "::error::Anwendung ueber Staging-Basic-Auth nicht erreichbar -- erwartet HTTP 200 auf '/', tatsaechliche Antwortzeile: $(echo "$AUTH_ROOT" | head -1)"
+            exit 1
+          fi
+          if ! echo "$AUTH_ROOT" | grep -qi '^X-Robots-Tag:.*noindex'; then
+            echo "::error::X-Robots-Tag fehlt oder enthaelt kein 'noindex' auf der authentifiziert abgerufenen Startseite. Kopfzeilen: $AUTH_ROOT"
+            exit 1
+          fi
+
+          AUTH_ROBOTS=$(curl -sS -D - --max-time 15 --connect-timeout 10 -u "${{ secrets.STAGING_BASIC_AUTH_USER }}:${{ secrets.STAGING_BASIC_AUTH_PASSWORD }}" "https://${{ vars.STAGING_DOMAIN }}/robots.txt" 2>&1)
+          if [ $? -ne 0 ]; then
+            echo "::error::Suchmaschinenausschluss-Pruefung fehlgeschlagen (DNS-/TLS-/Netzwerkfehler oder Timeout beim authentifizierten Abruf von https://${{ vars.STAGING_DOMAIN }}/robots.txt): $AUTH_ROBOTS"
+            exit 1
+          fi
+          if ! echo "$AUTH_ROBOTS" | head -1 | grep -qE '^HTTP/[0-9.]+ 200'; then
+            echo "::error::robots.txt auf Staging nicht erreichbar -- erwartet HTTP 200, tatsaechliche Antwortzeile: $(echo "$AUTH_ROBOTS" | head -1)"
+            exit 1
+          fi
+          if ! echo "$AUTH_ROBOTS" | grep -qE '^User-agent:[[:space:]]*\*'; then
+            echo "::error::robots.txt-Inhalt unvollstaendig -- 'User-agent: *' nicht gefunden. Antwort: $AUTH_ROBOTS"
+            exit 1
+          fi
+          if ! echo "$AUTH_ROBOTS" | grep -qE '^Disallow:[[:space:]]*/[[:space:]]*$'; then
+            echo "::error::robots.txt-Inhalt unvollstaendig -- 'Disallow: /' nicht gefunden. Antwort: $AUTH_ROBOTS"
+            exit 1
+          fi
+          echo "Staging-Suchmaschinenausschluss verifiziert (X-Robots-Tag: noindex auf '/', robots.txt mit User-agent:*/Disallow:/ erreichbar)."
