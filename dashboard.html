@@ -222,50 +222,97 @@ body {
 svg.i { width: 18px; height: 18px; stroke: currentColor; stroke-width: 1.7; fill: none; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 svg.i-sm { width: 15px; height: 15px; }
 
-/* ══════════════════════════════════════════ ZUGANGS-GATE */
-#gate { position: fixed; inset: 0; z-index: 900; background: var(--shell); display: flex; align-items: center; justify-content: center; padding: 24px; }
-.gate-card { width: 100%; max-width: 360px; background: var(--surface); border-radius: var(--r-lg); padding: 32px; box-shadow: var(--sh-3);
-  position: relative; z-index: 2; }
-.gate-brand { display: flex; align-items: center; gap: 11px; margin-bottom: 26px; }
-.gate-brand img { width: 36px; height: 36px; border-radius: 9px; object-fit: contain; background: var(--shell); padding: 3px; }
-.gate-brand .wm { font-size: 16px; font-weight: 700; letter-spacing: -.2px; }
-.gate-brand .sub { font-size: 11px; color: var(--ink-3); letter-spacing: .3px; }
+/* ══════════════════════════════════════════ ZUGANGS-GATE
+   Umgebaut auf Wunsch des Projektinhabers (ENT-396): "cockpit hat noch
+   das alte layout, bitte ebenfalls ergaenzen" -- nach dem Vorbild von
+   app.html (ENT-385/388). Die Karte faellt weg, Text liegt seither
+   DIREKT auf Foto/Video. Damit das lesbar bleibt, UNABHAENGIG vom
+   Hell/Dunkel-Schalter der Seite, traegt #gate ab jetzt eine EIGENE,
+   lokale Farbpalette -- Zeichen fuer Zeichen dieselben Werte wie in
+   app.html#gate, nicht neu erfunden. Diese Custom Properties ueber-
+   schreiben die globalen (--ink, --surface-2, --accent, ...) NUR
+   innerhalb von #gate; jede Komponente, die var(--ink-2) etc. bereits
+   benutzt (.f label, .msg-err, .btn-plain, ...), liest hier automatisch
+   die dunklen Werte, ganz ohne eigene Regeln je Komponente. */
+#gate {
+  position: fixed; inset: 0; z-index: 900; display: flex; overflow-y: auto;
+  padding: 32px 22px calc(32px + env(safe-area-inset-bottom));
+  color: var(--ink);
+  background: radial-gradient(112% 62% at 50% 12%, #1A2334 0%, rgba(26,35,52,0) 60%), #0F1117;
+
+  --bg:           #0F1117;
+  --surface:      #161B27;
+  --surface-2:    #1E2535;
+  --line:         #2A3147;
+  --line-soft:    #232A3B;
+  --line-hi:      #3B4560;
+  --ink:          #F2F4F8;
+  --ink-2:        #B6BCC8;
+  --ink-3:        #868D9A;
+  --accent:       #7098F7;
+  --accent-hi:    #8DAEFA;
+  --accent-soft:  #1A2440;
+  --accent-line:  #2D3D63;
+  --pos: #4FCE96;  --pos-soft: #10281E;
+  --neg: #F27F70;  --neg-soft: #2E1A18;
+  --sh-1: none;
+  --sh-2: 0 8px 28px -8px rgba(0,0,0,.6);
+  color-scheme: dark;
+  --gate-schleier: linear-gradient(rgba(10,11,15,.66), rgba(10,11,15,.82));
+}
+/* margin:auto statt align-items/justify-content:center (wie app.html):
+   reicht die Hoehe nicht (kleines Geraet, offene Tastatur, 2FA-Feld
+   zusaetzlich eingeblendet), bleibt der obere Rand erreichbar, statt dass
+   zentrierter Inhalt oben abgeschnitten wird. */
+.gate-mitte { margin: auto; width: 100%; max-width: 348px; position: relative; z-index: 2; }
+.gate-oben { text-align: center; margin-bottom: 34px; }
+.gate-oben img { width: 104px; height: 104px; filter: drop-shadow(0 16px 32px rgba(0,0,0,.75)); }
+.gate-oben .wm { margin-top: 18px; color: var(--ink); font-size: 20px; font-weight: 700; letter-spacing: -.3px; }
+.gate-oben .sub { margin-top: 4px; color: var(--ink-2);
+  font-size: 12px; font-weight: 640; letter-spacing: 2px; text-transform: uppercase; }
 .gate-msg { font-size: 13px; color: var(--ink-2); margin-bottom: 20px; line-height: 1.6; }
+#gate .inp { background: var(--surface-2); }
+#gate .inp:focus { background: var(--surface); }
+#gate .pw-toggle { opacity: .75; }
+/* Derselbe Grund wie in app.html (ENT-388): Weiss auf dem hellen
+   --accent des Dunkelmodus (#7098F7) ergibt nur 2.8:1, auf dem
+   kraeftigeren #2F5BD7 dagegen 5.8:1 -- gerechnet, nicht geschaetzt. */
+#gate .btn-primary { background: #2F5BD7; }
+#gate .btn-primary:hover { background: #2549B0; }
 /* Dieselbe Nachtszene wie in der Mitarbeiter-App (ENT-392/394), auf
    Wunsch des Projektinhabers wiederverwendet statt neu erzeugt -- gleiche
-   Marke, keine zusaetzlichen Higgsfield-Kosten. WICHTIGER UNTERSCHIED zu
-   app.html: dort traegt Text DIREKT auf dem Foto/Video (keine Karte mehr,
-   siehe ENT-385), darum brauchte es dort einen eigenen Schleier und eine
-   an fuenf Zeitpunkten gemessene Kontrastpruefung. Hier bleibt die
-   .gate-card vollstaendig UNVERAENDERT und deckend -- kein einziges
-   Zeichen Text liegt direkt auf dem Video. Der Kontrast der Karte war
-   schon vorher korrekt und ist von dieser Aenderung nicht beruehrt,
-   deshalb keine eigene Kontrastpruefung noetig (nur ein Undurchsichtig-
-   keits-Nachweis fuer die Karte selbst, siehe test_cockpit_gate.mjs).
-   Unconditional in BEIDEN Farbthemen: --shell ist in "hell" (#16181D)
-   wie in "dunkel" (#0B0D11) bereits sehr dunkel -- die Seitenleiste
-   bleibt laut Bauart in beiden Themen der dunkelste Bereich (siehe
-   Kommentar bei html[data-thema="dunkel"] weiter unten). Ein heller Grund
-   hinter der Nachtszene kaeme darum in keinem der beiden Themen vor.
+   Marke, keine zusaetzlichen Higgsfield-Kosten.
+   Unconditional in BEIDEN Farbthemen: --shell (die alte Kartenfarbe) war
+   in "hell" (#16181D) wie in "dunkel" (#0B0D11) bereits sehr dunkel --
+   seit die Karte weg ist, spielt das ohnehin keine Rolle mehr, weil
+   #gate jetzt seine eigene, feste Palette hat (siehe oben) und nicht
+   mehr vom Seitenthema abhaengt.
 
    REIHENFOLGE WICHTIG (CLAUDE.md: "Eine CSS-Regel kann wirkungslos
    bleiben... durch eine spaetere Regel gleicher oder hoeherer
    Eigenspezifitaet"): diese unbedingte display:none-Regel muss VOR der
-   Medienabfrage unten stehen. Stuende sie danach, gewaenne sie bei
-   gleicher Spezifitaet allein durch die spaetere Position im Quelltext
-   -- unabhaengig vom Fensterbreite. Genau das ist beim ersten Versuch
-   passiert und erst am gerenderten Zustand aufgefallen (display:none
-   auch bei 1440 px), nicht im Quelltext. */
+   Medienabfrage unten stehen -- genau der Fehler, der beim ersten Bau
+   dieser Datei (ENT-395) tatsaechlich passiert ist und nur am
+   gerenderten Zustand auffiel, nicht im Quelltext. */
 .gate-video, .gate-schleier { display: none; }
 @media (min-width: 900px) {
   #gate { background:
     radial-gradient(80% 68% at 50% 14%, #1C2639 0%, rgba(28,38,57,0) 66%),
+    var(--gate-schleier),
     url('img/anmeldung-nacht.webp') 62% center / cover no-repeat,
-    var(--shell); }
+    #0F1117; }
+  .gate-mitte { max-width: 400px; }
+  .gate-oben img { width: 176px; height: 176px;
+    filter: drop-shadow(0 22px 44px rgba(0,0,0,.8)); }
+  .gate-oben .sub { margin-top: 8px; font-size: 14px; letter-spacing: 2.6px; }
+  .gate-oben { margin-bottom: 44px; }
   .gate-video { display: block; position: absolute; inset: 0; width: 100%; height: 100%;
     object-fit: cover; object-position: 62% center; z-index: 0; }
+  /* Deutlich kraeftiger als vor ENT-396 (.42/.58): dort schuetzte die
+     Karte den Text, der Schleier war reine Tiefenwirkung. Jetzt liegt
+     Text direkt auf dem Video -- derselbe Wert wie in app.html. */
   .gate-schleier { display: block; position: absolute; inset: 0; z-index: 1;
-    background: linear-gradient(rgba(10,11,15,.42), rgba(10,11,15,.58)); }
+    background: var(--gate-schleier); }
   @media (prefers-reduced-motion: reduce) {
     .gate-video, .gate-schleier { display: none; }
   }
@@ -3384,21 +3431,18 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 <!-- ══════════════════════════ ZUGANGS-GATE ══════════════════════════ -->
 <div id="gate">
   <!-- Video-Hintergrund auf dem Desktop, dieselbe Szene wie app.html
-       (ENT-392/394) -- siehe CSS-Kommentar bei #gate fuer den Unterschied
-       zur Mitarbeiter-App: hier bleibt .gate-card deckend, kein Text
-       liegt direkt auf dem Video. -->
+       (ENT-392/394/396) -- die Karte ist seit ENT-396 weg, Text liegt
+       jetzt direkt auf Foto/Video, wie in app.html seit ENT-385. -->
   <video class="gate-video" autoplay muted loop playsinline>
     <source src="img/anmeldung-nacht.webm" type="video/webm">
     <source src="img/anmeldung-nacht.mp4" type="video/mp4">
   </video>
   <div class="gate-schleier"></div>
-  <div class="gate-card">
-    <div class="gate-brand">
+  <div class="gate-mitte">
+    <div class="gate-oben">
       <img src="icons/icon-192.png" alt="">
-      <div>
-        <div class="wm" id="gateWm">Cockpit</div>
-        <div class="sub">CUPI 24 GmbH</div>
-      </div>
+      <div class="wm" id="gateWm">Cockpit</div>
+      <div class="sub">CUPI 24 GmbH</div>
     </div>
 
     <div id="gateLogin">
