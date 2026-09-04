@@ -31,7 +31,8 @@ $pdo->exec('CREATE TABLE fahrzeug_uebernahme (id INTEGER PRIMARY KEY, art TEXT, 
             quelle TEXT, foto BLOB NULL, bemerkung TEXT NULL)');
 $pdo->exec('CREATE TABLE mitarbeiter (id INTEGER PRIMARY KEY, vorname TEXT, nachname TEXT, name TEXT)');
 $pdo->exec('CREATE TABLE einsaetze (id INTEGER PRIMARY KEY, kunde_name TEXT NULL, titel TEXT NULL,
-            datum TEXT NULL, von TEXT NULL, weg_km REAL NULL)');
+            datum TEXT NULL, von TEXT NULL, bis TEXT NULL, weg_km REAL NULL,
+            fahrzeug_id INT NULL, fahrer_id INT NULL)');
 $pdo->exec('CREATE TABLE einsatz_zuteilung (einsatz_id INT, mitarbeiter_id INT, zusage TEXT)');
 // Erfundene Namen und Kontrollschilder mit hoher Nummer -- kein echtes
 // Fahrzeug, keine echte Person.
@@ -443,6 +444,31 @@ $f2 = fz_uebernahme_feststellungen((int)$zeilen[4]['tacho_km'],
     (int)$zeilen[4]['eigene_mitarbeiter_id']);
 pruef('KRITISCH: Zeile 5 (Sprung von 60050 auf 61200) wird end-to-end als auffaellig erkannt',
     $f2['auffaellig'] === true && $f2['km_seither'] === 1150);
+
+// ── FZ_EINSATZ_GEHOERT_SQL (ENT-381) -- echte Ausfuehrung ────────────────
+// Die Frage, die entscheidet, ob eine Fahrt einem Dienst zugeordnet werden
+// darf. Sie ist die Sicherheitsschranke des Endpunkts: Ohne sie liesse
+// sich eine Fahrt an einen FREMDEN Dienst haengen und damit eine Erklaerung
+// erfinden, die es nicht gibt. Darum hier echt ausgefuehrt, nicht
+// nachgebaut.
+$pdo->exec("INSERT INTO einsaetze (id, datum, von, bis) VALUES (201, '2026-08-05', '07:00:00', '12:00:00')");
+$pdo->exec("INSERT INTO einsatz_zuteilung (einsatz_id, mitarbeiter_id, zusage) VALUES (201, 7, 'zugesagt')");
+$pdo->exec("INSERT INTO einsaetze (id, datum, von, bis) VALUES (202, '2026-08-05', '07:00:00', '12:00:00')");
+$pdo->exec("INSERT INTO einsatz_zuteilung (einsatz_id, mitarbeiter_id, zusage) VALUES (202, 8, 'zugesagt')");
+$pdo->exec("INSERT INTO einsaetze (id, datum, von, bis) VALUES (203, '2026-08-05', '07:00:00', '12:00:00')");
+$pdo->exec("INSERT INTO einsatz_zuteilung (einsatz_id, mitarbeiter_id, zusage) VALUES (203, 7, 'entfallen')");
+$gehoert = function (int $einsatz, int $ma) use ($pdo): bool {
+    $q = $pdo->prepare(FZ_EINSATZ_GEHOERT_SQL);
+    $q->execute([$einsatz, $ma]);
+    return $q->fetchColumn() !== false;
+};
+pruef('Der eigene, zugesagte Einsatz darf zugeordnet werden', $gehoert(201, 7));
+pruef('KRITISCH: der Einsatz einer ANDEREN Person darf NICHT zugeordnet werden -- '
+    . 'sonst liesse sich eine Fahrt an einen fremden Dienst haengen',
+    !$gehoert(201, 8) && !$gehoert(202, 7));
+pruef('KRITISCH: ein entfallener eigener Einsatz erklaert keine Fahrt und wird nicht angeboten',
+    !$gehoert(203, 7));
+pruef('Ein Einsatz, den es gar nicht gibt, wird abgewiesen', !$gehoert(999999, 7));
 
 echo $ok . " Pruefungen bestanden\n";
 if ($bad) { foreach ($bad as $b3) { echo "  X $b3\n"; } exit(1); }

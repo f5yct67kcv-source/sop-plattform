@@ -63,14 +63,116 @@ $sql .= ' ORDER BY u.zeitpunkt DESC, u.id DESC';
 
 $stmt = $pdo->prepare($sql);
 $stmt->execute($werte);
-$eintraege = array_map(function (array $r): array {
+$zeilen = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// ── Zuordnungs-Vermerk und Vorschläge (ENT-381) ──────────────────────
+//
+// BEIDES IN EIGENEN ABFRAGEN, NICHT IN FZ_UEBERNAHME_LISTE_SQL: Der
+// Vermerk steht in zwei Spalten, die erst mit dem nächsten
+// Einrichtungslauf entstehen -- stünden sie in der gemeinsamen Abfrage,
+// fiele die ganze Ansicht aus, solange die Einrichtung nicht gelaufen ist.
+// Und die Vorschläge sind eine LISTE je Zeile, keine einzelne Zahl; als
+// Unterabfrage liessen sie sich gar nicht ausdrücken.
+$vermerke = [];
+if ($zeilen && hat_spalte($pdo, 'fahrzeug_uebernahme', 'einsatz_zugeordnet_von')) {
+    $ids = array_map(static fn(array $r): int => (int)$r['id'], $zeilen);
+    $platz = implode(',', array_fill(0, count($ids), '?'));
+    $q = $pdo->prepare(
+        "SELECT u.id, u.einsatz_zugeordnet_am, zm.vorname, zm.nachname, zm.name
+           FROM fahrzeug_uebernahme u
+           LEFT JOIN mitarbeiter zm ON zm.id = u.einsatz_zugeordnet_von
+          WHERE u.id IN ($platz) AND u.einsatz_zugeordnet_von IS NOT NULL"
+    );
+    $q->execute($ids);
+    foreach ($q->fetchAll(PDO::FETCH_ASSOC) as $z) {
+        $zn = trim(($z['vorname'] ?? '') . ' ' . ($z['nachname'] ?? ''));
+        if ($zn === '') { $zn = trim((string)($z['name'] ?? '')); }
+        $vermerke[(int)$z['id']] = [
+            'person' => $zn !== '' ? $zn : null,
+            'am' => (string)$z['einsatz_zugeordnet_am'],
+        ];
+    }
+}
+
+// Vorschläge: alle eigenen, nicht abgesagten Einsätze DERSELBEN PERSON am
+// Tag der Übernahme. EINE Abfrage für die ganze Seite statt einer je Zeile
+// -- eine Monatsansicht hat schnell dutzende Zeilen. Gefiltert wird
+// anschliessend in PHP nach (Person, Datum).
+//
+// Nur für echte Übernahmen mit Fahrzeug: Bei "kein Dienstfahrzeug" gibt es
+// keine Fahrt zu erklären, und eine Abgabe trägt keinen Kilometerstand --
+// dort wäre eine Einsatz-Zuordnung eine Behauptung ohne Gegenstand.
+$hatFzPlan = hat_spalte($pdo, 'einsaetze', 'fahrzeug_id');
+$hatFahrerPlan = hat_spalte($pdo, 'einsaetze', 'fahrer_id');
+$kandidaten = [];
+$bedarf = array_filter($zeilen, static fn(array $r): bool =>
+    $r['art'] === 'uebernahme' && $r['fahrzeug_id'] !== null);
+if ($bedarf) {
+    $personen = array_values(array_unique(array_map(
+        static fn(array $r): int => (int)$r['eigene_mitarbeiter_id'], $bedarf)));
+    $tage = array_values(array_unique(array_map(
+        static fn(array $r): string => substr((string)$r['zeitpunkt'], 0, 10), $bedarf)));
+    $pP = implode(',', array_fill(0, count($personen), '?'));
+    $pT = implode(',', array_fill(0, count($tage), '?'));
+    $felder = 'e.id, e.datum, e.von, e.bis, e.kunde_name, e.titel, z.mitarbeiter_id'
+        . ($hatFzPlan ? ', e.fahrzeug_id AS geplantes_fahrzeug' : ', NULL AS geplantes_fahrzeug')
+        . ($hatFahrerPlan ? ', e.fahrer_id AS geplanter_fahrer' : ', NULL AS geplanter_fahrer');
+    $q = $pdo->prepare(
+        "SELECT $felder FROM einsaetze e
+           JOIN einsatz_zuteilung z ON z.einsatz_id = e.id
+          WHERE z.mitarbeiter_id IN ($pP) AND e.datum IN ($pT)
+            AND z.zusage NOT IN ('entfallen', 'abgelehnt')
+          ORDER BY e.von, e.id"
+    );
+    $q->execute(array_merge($personen, $tage));
+    foreach ($q->fetchAll(PDO::FETCH_ASSOC) as $e) {
+        $kandidaten[(int)$e['mitarbeiter_id'] . '|' . substr((string)$e['datum'], 0, 10)][] = $e;
+    }
+}
+
+$eintraege = array_map(function (array $r) use ($vermerke, $kandidaten): array {
     $r['id'] = (int)$r['id'];
     $r['fahrzeug_id'] = $r['fahrzeug_id'] !== null ? (int)$r['fahrzeug_id'] : null;
     $r['tacho_km'] = $r['tacho_km'] !== null ? (int)$r['tacho_km'] : null;
+    $r['einsatz_id'] = $r['einsatz_id'] !== null ? (int)$r['einsatz_id'] : null;
     $r['hat_foto'] = (bool)$r['hat_foto'];
     $name = trim(($r['vorname'] ?? '') . ' ' . ($r['nachname'] ?? ''));
     $r['person'] = $name !== '' ? $name : (string)($r['name'] ?? '?');
     unset($r['vorname'], $r['nachname'], $r['name']);
+
+    // Wer die Zuordnung gesetzt hat -- fehlt der Vermerk, stammt sie von
+    // der fahrenden Person selbst (ENT-340). Zwei Wege, zwei Aussagen.
+    $r['einsatz_zugeordnet'] = $vermerke[$r['id']] ?? null;
+
+    // Die Vorschläge nur, wo auch zugeordnet werden kann, und ohne den
+    // bereits verknüpften Einsatz -- er steht schon oben in der Karte.
+    // Reihenfolge: Wo am Einsatz genau dieses Fahrzeug (oder diese Person
+    // als Fahrer) geplant ist, ist die Übereinstimmung stärker als ein
+    // blosses "am selben Tag" -- das gehört nach oben und wird benannt.
+    $vor = [];
+    if ($r['art'] === 'uebernahme' && $r['fahrzeug_id'] !== null) {
+        $schluessel = (int)$r['eigene_mitarbeiter_id'] . '|' . substr((string)$r['zeitpunkt'], 0, 10);
+        foreach ($kandidaten[$schluessel] ?? [] as $e) {
+            if ($r['einsatz_id'] !== null && (int)$e['id'] === $r['einsatz_id']) { continue; }
+            $passt = $e['geplantes_fahrzeug'] !== null
+                && (int)$e['geplantes_fahrzeug'] === $r['fahrzeug_id'];
+            $vor[] = [
+                'id' => (int)$e['id'],
+                'kunde_name' => $e['kunde_name'],
+                'titel' => $e['titel'],
+                'von' => substr((string)$e['von'], 0, 5),
+                'bis' => substr((string)$e['bis'], 0, 5),
+                'passt_fahrzeug' => $passt,
+                'passt_fahrer' => $e['geplanter_fahrer'] !== null
+                    && (int)$e['geplanter_fahrer'] === (int)$r['eigene_mitarbeiter_id'],
+            ];
+        }
+        usort($vor, static fn(array $a, array $b): int =>
+            ($b['passt_fahrzeug'] <=> $a['passt_fahrzeug'])
+            ?: ($b['passt_fahrer'] <=> $a['passt_fahrer'])
+            ?: strcmp((string)$a['von'], (string)$b['von']));
+    }
+    $r['einsatz_vorschlaege'] = $vor;
 
     // Vier Feststellungen aus dem Vorwert (ENT-356/ENT-361/ENT-377) --
     // Berechnung in fz_uebernahme_feststellungen() (fahrzeug.php), damit sie
@@ -88,6 +190,6 @@ $eintraege = array_map(function (array $r): array {
         $r['soll_einsaetze'], $r['soll_einsaetze_mit_weg_km'], $r['soll_km_summe'],
         $r['abgaben_dazwischen']);
     return $r;
-}, $stmt->fetchAll(PDO::FETCH_ASSOC));
+}, $zeilen);
 
 json_response(['status' => 'ok', 'eingerichtet' => true, 'eintraege' => $eintraege]);

@@ -195,7 +195,8 @@ const FZ_UEBERNAHME_LISTE_SQL = "SELECT u.id, u.art, u.zeitpunkt, u.tacho_km, u.
            u.mitarbeiter_id AS eigene_mitarbeiter_id, u.foto IS NOT NULL AS hat_foto,
            f.id AS fahrzeug_id, f.kennzeichen, f.bezeichnung AS fz_bezeichnung,
            m.vorname, m.nachname, m.name,
-           e.kunde_name, e.titel,
+           u.einsatz_id, e.kunde_name, e.titel, e.datum AS einsatz_datum,
+           e.von AS einsatz_von, e.bis AS einsatz_bis,
            voriger.tacho_km AS voriger_km, voriger.mitarbeiter_id AS voriger_mitarbeiter_id,
            (SELECT COUNT(*) FROM einsaetze se JOIN einsatz_zuteilung sz ON sz.einsatz_id = se.id
              WHERE sz.mitarbeiter_id = u.mitarbeiter_id AND sz.zusage NOT IN ('entfallen', 'abgelehnt')
@@ -223,6 +224,23 @@ const FZ_UEBERNAHME_LISTE_SQL = "SELECT u.id, u.art, u.zeitpunkt, u.tacho_km, u.
              AND (v.zeitpunkt < u.zeitpunkt OR (v.zeitpunkt = u.zeitpunkt AND v.id < u.id))
            ORDER BY v.zeitpunkt DESC, v.id DESC LIMIT 1
       )";
+
+// Darf dieser Einsatz dieser Übernahme zugeordnet werden (ENT-381)?
+//
+// Er muss der Person gehören, die das FAHRZEUG übernommen hat -- nicht der
+// Person, die im Cockpit gerade zuordnet. Sonst liesse sich eine Fahrt an
+// einen fremden Dienst hängen und damit eine Erklärung erfinden, die es
+// nicht gibt. 'entfallen'/'abgelehnt' zählen nicht: Ein abgesagter Dienst
+// erklärt keine Fahrt (dieselbe Ausnahme wie ENT-350/ENT-362).
+//
+// Als Konstante statt inline im Endpunkt -- damit pruef_fahrzeug_uebernahme.php
+// exakt diese Abfrage echt gegen SQLite ausführen kann. Ein Nachbau würde
+// nur beweisen, dass der Nachbau stimmt (gleiches Muster wie
+// FZ_UEBERNAHME_LISTE_SQL).
+const FZ_EINSATZ_GEHOERT_SQL = "SELECT e.id FROM einsaetze e
+      JOIN einsatz_zuteilung z ON z.einsatz_id = e.id
+     WHERE e.id = ? AND z.mitarbeiter_id = ?
+       AND z.zusage NOT IN ('entfallen', 'abgelehnt')";
 
 // Ab welcher Differenz zwischen gefahrenen und erwarteten Kilometern die
 // Abweichungs-Feststellung anschlägt (ENT-361). Fest statt prozentual, auf

@@ -51,9 +51,15 @@ const RUNDGAENGE = { status: 'ok', rundgaenge: [
 // Foto, eine ohne, und eine "kein Dienstfahrzeug"-Antwort -- die drei Fälle,
 // die sich am deutlichsten unterscheiden müssen.
 const UEBERNAHMEN = { status: 'ok', eingerichtet: true, eintraege: [
+  // kunde_name/titel stammen aus dem verknuepften Einsatz -- ohne einsatz_id
+  // gibt es sie in der echten Antwort gar nicht (LEFT JOIN ueber einsatz_id).
+  // einsatz_zugeordnet fehlt: die Verknuepfung kam von der fahrenden Person
+  // selbst, nicht nachtraeglich vom Buero (ENT-381).
   { id: 1, art: 'uebernahme', zeitpunkt: `${T1} 06:12:00`, tacho_km: 61200, quelle: 'qr', hat_foto: true,
     fahrzeug_id: 1, kennzeichen: 'SO 999001', fz_bezeichnung: 'Patrouille 1',
-    person: 'Erika Muster', kunde_name: 'Muster Liegenschaften AG', titel: 'Öffnungsrunde' },
+    person: 'Erika Muster', kunde_name: 'Muster Liegenschaften AG', titel: 'Öffnungsrunde',
+    einsatz_id: 501, einsatz_von: '06:00:00', einsatz_bis: '07:00:00',
+    einsatz_zugeordnet: null, einsatz_vorschlaege: [] },
   { id: 2, art: 'uebernahme', zeitpunkt: `${T0} 07:03:00`, tacho_km: 40500, quelle: 'liste', hat_foto: false,
     fahrzeug_id: 2, kennzeichen: 'SO 999002', fz_bezeichnung: null,
     person: 'Hans Beispiel', kunde_name: null, titel: null },
@@ -98,6 +104,31 @@ const UEBERNAHMEN = { status: 'ok', eingerichtet: true, eintraege: [
     km_seither: 20, auffaellig: false, wiederholt: false,
     soll_km: null, soll_unvollstaendig: false, abweichung_km: null, abweichend: false,
     unbelegt: true },
+  // Einsatz-Zuordnung (ENT-381), vier verschiedene Lagen:
+  // 10 = nicht zugeordnet, aber zwei Vorschlaege (einer mit geplantem Fahrzeug)
+  { id: 10, art: 'uebernahme', zeitpunkt: `${T0} 14:00:00`, tacho_km: 33000, quelle: 'liste', hat_foto: false,
+    fahrzeug_id: 10, kennzeichen: 'SO 999010', fz_bezeichnung: 'Patrouille 10',
+    person: 'Hans Beispiel', kunde_name: null, titel: null, einsatz_id: null,
+    einsatz_zugeordnet: null,
+    einsatz_vorschlaege: [
+      { id: 771, kunde_name: 'Beispiel Verwaltung AG', titel: 'Revierdienst Nord',
+        von: '14:30', bis: '14:45', passt_fahrzeug: true, passt_fahrer: true },
+      { id: 772, kunde_name: 'Beispiel Verwaltung AG', titel: 'Revierdienst Süd',
+        von: '17:00', bis: '17:20', passt_fahrzeug: false, passt_fahrer: false },
+    ] },
+  // 11 = nicht zugeordnet, gar keine Schicht an dem Tag
+  { id: 11, art: 'uebernahme', zeitpunkt: `${T0} 15:00:00`, tacho_km: 44000, quelle: 'liste', hat_foto: false,
+    fahrzeug_id: 11, kennzeichen: 'SO 999011', fz_bezeichnung: 'Patrouille 11',
+    person: 'Hans Beispiel', kunde_name: null, titel: null, einsatz_id: null,
+    einsatz_zugeordnet: null, einsatz_vorschlaege: [] },
+  // 12 = zugeordnet, aber NACHTRAEGLICH durch das Buero -- andere Aussage
+  // als die Selbstzuordnung beim Erfassen (id 1).
+  { id: 12, art: 'uebernahme', zeitpunkt: `${T0} 16:00:00`, tacho_km: 52000, quelle: 'liste', hat_foto: false,
+    fahrzeug_id: 12, kennzeichen: 'SO 999012', fz_bezeichnung: 'Patrouille 12',
+    person: 'Hans Beispiel', kunde_name: 'Beispiel Verwaltung AG', titel: 'Nachtrunde',
+    einsatz_id: 773, einsatz_von: '22:00:00', einsatz_bis: '23:00:00',
+    einsatz_zugeordnet: { person: 'Adrian Beispiel', am: `${T0} 16:30:00` },
+    einsatz_vorschlaege: [] },
 ]};
 
 let calls = [];
@@ -107,7 +138,11 @@ function setup(page) {
     const req = route.request();
     const u = new URL(req.url());
     const path = u.pathname.split('/api/')[1];
-    calls.push({ path, query: Object.fromEntries(u.searchParams) });
+    // Der Rumpf gehoert dazu, seit es schreibende Aufrufe gibt (ENT-381):
+    // Ohne ihn liesse sich nur pruefen, DASS gerufen wurde, nicht WOMIT --
+    // und eine Zuordnung mit der falschen Nummer waere genau der Fehler,
+    // der niemandem auffiele.
+    calls.push({ path, query: Object.fromEntries(u.searchParams), rumpf: req.postData() });
     const send = b => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) });
     if (path.includes('login')) return send({ status: 'ok', token: 't', name: 'adrian', ist_admin: true });
     if (path.includes('dashboard_stats')) return send({ status: 'ok', kpi: {}, verlauf: [], angemeldet: [], pro_mitarbeiter: [], letzte_rapporte: [] });
@@ -380,6 +415,74 @@ check('Eine unauffällige Übernahme (SO 999001) zeigt keine Unbelegt-Feststellu
     const karte = karten.find(k => k.textContent.includes('SO 999001'));
     return !!karte && !/Unbelegt/.test(karte.textContent);
   }));
+
+// ══════════ EINSATZ-ZUORDNUNG (ENT-381) ═══════════════════════════════════
+// Vier Lagen, vier verschiedene Aussagen -- "kein Vorschlag" und "nichts
+// vorhanden" duerfen nicht gleich aussehen (CLAUDE.md).
+const uebKarte = (kz) => page.evaluate((k) => {
+  const karte = [...document.querySelectorAll('#aeUebListe .ag-karte')]
+    .find(el => el.textContent.includes(k));
+  if (!karte) return null;
+  const sp = karte.querySelector('.fzu-einsatz');
+  return {
+    text: karte.textContent.replace(/\s+/g, ' '),
+    hatSpalte: !!sp,
+    zugeordnet: !!(sp && sp.classList.contains('zugeordnet')),
+    hatWahl: !!karte.querySelector('select'),
+    optionen: [...karte.querySelectorAll('option')].map(o => o.textContent),
+  };
+}, kz);
+
+let k1 = await uebKarte('SO 999001');
+check('KRITISCH: eine vom Fahrer selbst zugeordnete Übernahme zeigt den Einsatz und benennt die Herkunft',
+  !!k1 && k1.zugeordnet && /Muster Liegenschaften AG/.test(k1.text)
+  && /fahrenden Person selbst/.test(k1.text));
+
+let k12 = await uebKarte('SO 999012');
+check('KRITISCH: eine nachträglich vom Büro zugeordnete Übernahme sagt WER und WANN -- '
+    + 'nicht dieselbe Aussage wie die Selbstzuordnung beim Erfassen',
+  !!k12 && k12.zugeordnet && /Zugeordnet von Adrian Beispiel/.test(k12.text));
+
+let k10 = await uebKarte('SO 999010');
+check('KRITISCH: eine nicht zugeordnete Übernahme mit passenden Schichten bietet sie zur Auswahl an',
+  !!k10 && !k10.zugeordnet && k10.hatWahl && k10.optionen.length === 2);
+check('KRITISCH: die stärkere Übereinstimmung (geplantes Fahrzeug) wird benannt und steht zuoberst',
+  !!k10 && /dieses Fahrzeug geplant/.test(k10.optionen[0] || ''));
+
+let k11 = await uebKarte('SO 999011');
+check('KRITISCH: ohne Schicht an diesem Tag steht das als eigener Satz da -- keine leere Auswahl',
+  !!k11 && k11.hatSpalte && !k11.hatWahl && /keine Schicht erfasst/.test(k11.text));
+
+check('Bei "kein Dienstfahrzeug" und bei einer Abgabe gibt es gar keine Einsatz-Spalte',
+  await page.evaluate(() => {
+    const karten = [...document.querySelectorAll('#aeUebListe .ag-karte')];
+    const ohne = karten.find(k => k.textContent.includes('Kein Dienstfahrzeug'));
+    const abg = karten.find(k => k.textContent.includes('Abgegeben'));
+    return !!ohne && !!abg && !ohne.querySelector('.fzu-einsatz') && !abg.querySelector('.fzu-einsatz');
+  }));
+
+// Schreibender Weg: die Nummern muessen stimmen, nicht nur der Aufruf.
+calls = [];
+await page.evaluate(() => {
+  document.getElementById('fzuEinsatzWahl10').value = '772';
+  aeUebEinsatzZuordnen(10);
+});
+await page.waitForTimeout(150);
+const zuRuf = calls.find(c => c.path.includes('fahrzeug_uebernahme_einsatz'));
+check('KRITISCH: "Einsatz zuordnen" schickt die Übernahme UND den gewählten Einsatz -- '
+    + 'nicht nur irgendeinen Vorschlag',
+  !!zuRuf && JSON.parse(zuRuf.rumpf || '{}').uebernahme_id === 10
+  && JSON.parse(zuRuf.rumpf || '{}').einsatz_id === 772);
+check('Nach dem Zuordnen wird die Liste neu geladen -- die Karte zeigt sonst weiter den alten Stand',
+  calls.some(c => c.path.includes('fahrzeug_uebernahme_liste')));
+
+calls = [];
+await page.evaluate(() => aeUebEinsatzLoesen(12));
+await page.waitForTimeout(150);
+const losRuf = calls.find(c => c.path.includes('fahrzeug_uebernahme_einsatz'));
+check('KRITISCH: "Zuordnung lösen" schickt ausdrücklich null -- ein Fehlgriff muss zurücknehmbar sein',
+  !!losRuf && JSON.parse(losRuf.rumpf || '{}').uebernahme_id === 12
+  && JSON.parse(losRuf.rumpf || '{}').einsatz_id === null);
 
 check('Kunde/Einsatz erscheinen, wo einer bekannt ist',
   uebInhalt.includes('Muster Liegenschaften AG') && uebInhalt.includes('Öffnungsrunde'));

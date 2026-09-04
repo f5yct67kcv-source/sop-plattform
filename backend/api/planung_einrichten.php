@@ -1669,6 +1669,18 @@ $spalten = [
     // die des Nachbarfahrzeugs erraten. Wird beim ersten Bedarf erzeugt,
     // nicht auf Vorrat: Ein Fahrzeug ohne Aufkleber braucht keine.
     ['fahrzeuge', 'qr_kennung', 'ALTER TABLE fahrzeuge ADD COLUMN qr_kennung VARCHAR(40) NULL'],
+    // Wer die Verknuepfung Uebernahme <-> Einsatz gesetzt hat und wann
+    // (ENT-381). Die Verknuepfung selbst steht seit ENT-340 in einsatz_id --
+    // aber sie kann auf zwei ganz verschiedenen Wegen entstanden sein: Die
+    // fahrende Person hat sie beim Erfassen selbst mitgegeben, oder das Buero
+    // hat sie nachtraeglich zugeordnet. Beides ist zulaessig, beides hat aber
+    // eine andere Beweiskraft -- und genau daran haengt OP-314. Bleibt NULL,
+    // wo die Zuordnung vom Fahrer selbst kam: "vom Fahrer" und "nachtraeglich
+    // zugeordnet" sind zwei Aussagen, nicht eine.
+    ['fahrzeug_uebernahme', 'einsatz_zugeordnet_von',
+        'ALTER TABLE fahrzeug_uebernahme ADD COLUMN einsatz_zugeordnet_von INT NULL AFTER einsatz_id'],
+    ['fahrzeug_uebernahme', 'einsatz_zugeordnet_am',
+        'ALTER TABLE fahrzeug_uebernahme ADD COLUMN einsatz_zugeordnet_am DATETIME NULL AFTER einsatz_zugeordnet_von'],
     // Eine Fahrzeit-Position ist KEINE Arbeitszeit (Art. 18 Ziff. 2, wörtlich:
     // "wird nicht an die Arbeitszeit gemäss diesem GAV angerechnet"). Sie
     // steht im Raster, damit der Planer die Anfahrt sieht -- sie darf aber
