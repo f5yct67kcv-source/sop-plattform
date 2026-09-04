@@ -445,15 +445,25 @@ try {
     await sichtbar('lmKarte'));
 
   lmMigAntwort = [
-    { id: 1, alt: 'chefin', neu: 'eine.leitung', status: 'umbenannt', grund: null },
-    { id: 2, alt: 'planer', neu: 'zwei.planung', status: 'umbenannt', grund: null },
-    { id: 3, alt: 'hilfe', neu: 'hilfe', status: 'unveraendert', grund: null },
-    { id: 4, alt: 'systemkonto', neu: null, status: 'uebersprungen', grund: 'Vorname oder Nachname fehlt' },
+    { id: 1, alt: 'chefin', neu: 'eine.leitung', status: 'umbenannt', grund: null,
+      personalnummer: 'P-001', aktiv: true, erstellt_am: '2025-01-02 08:00:00' },
+    // Zwei Zeilen mit demselben Namen -- eine davon inaktiv (Karteileiche,
+    // in der normalen Mitarbeiterliste unsichtbar). Genau dieser Fall
+    // wurde beim ersten echten Einsatz entdeckt: ohne Status/Datum liess
+    // sich nicht erkennen, dass es zwei verschiedene Konten sind.
+    { id: 2, alt: 'planer', neu: 'zwei.planung', status: 'umbenannt', grund: null,
+      personalnummer: 'P-002', aktiv: false, erstellt_am: '2024-03-01 09:00:00' },
+    { id: 6, alt: 'planer-alt', neu: 'zwei.planung2', status: 'umbenannt', grund: null,
+      personalnummer: null, aktiv: true, erstellt_am: '2025-06-01 09:00:00' },
+    { id: 3, alt: 'hilfe', neu: 'hilfe', status: 'unveraendert', grund: null,
+      personalnummer: 'P-003', aktiv: true, erstellt_am: '2025-03-04 08:00:00' },
+    { id: 4, alt: 'systemkonto', neu: null, status: 'uebersprungen', grund: 'Vorname oder Nachname fehlt',
+      personalnummer: null, aktiv: true, erstellt_am: '2024-01-01 00:00:00' },
   ];
   await page.click('button:has-text("Vorschau laden")');
   await page.waitForTimeout(400);
   const vorschau = (await page.textContent('#lmInhalt')).replace(/\s+/g, ' ');
-  check('Die Vorschau nennt die Anzahl der umzustellenden Login-Namen', /\b2\b/.test(vorschau));
+  check('Die Vorschau nennt die Anzahl der umzustellenden Login-Namen', /\b3\b/.test(vorschau));
   check('KRITISCH: die Tabelle zeigt alten UND neuen Namen nebeneinander',
     /chefin/.test(vorschau) && /eine\.leitung/.test(vorschau)
     && /planer/.test(vorschau) && /zwei\.planung/.test(vorschau));
@@ -462,7 +472,17 @@ try {
   check('Uebersprungene und unveraenderte Kontos werden als Anzahl genannt, nicht verschwiegen',
     /1 ohne Vor- oder Nachname übersprungen/.test(vorschau) && /1 entsprechen bereits dem Muster/.test(vorschau));
   check('Der Knopf zum Ausfuehren nennt dieselbe Anzahl',
-    /2 Login-Namen umstellen/.test(await page.textContent('#lmInhalt')));
+    /3 Login-Namen umstellen/.test(await page.textContent('#lmInhalt')));
+  // Personalnummer, Status und Anlegedatum (ENT-383): der eigentliche
+  // Grund fuer diese Spalten -- zwei gleich benannte Zeilen unterscheidbar
+  // machen, statt wie ein Fehler auszusehen.
+  check('KRITISCH: Personalnummer, Status und Anlegedatum stehen in der Tabelle',
+    /P-001/.test(vorschau) && /P-002/.test(vorschau)
+    && /01\.03\.2024/.test(vorschau) && /01\.06\.2025/.test(vorschau));
+  check('KRITISCH: eine fehlende Personalnummer zeigt "–", nicht "null" oder "undefined"',
+    !/null|undefined/.test(vorschau));
+  check('KRITISCH: das inaktive der beiden gleichnamigen Konten ist als "inaktiv" erkennbar',
+    /inaktiv/.test(vorschau));
 
   // Ausfuehren: erst die Rueckfrage, kein Schreiben davor
   gesendet = null; lmMigAufruf = null;
@@ -488,7 +508,8 @@ try {
   await anmelden();
   await page.evaluate(() => { go('betrieb'); bkAbschnittZeigen('rv'); });
   await page.waitForTimeout(900);
-  lmMigAntwort = [{ id: 1, alt: 'chefin', neu: 'chefin', status: 'unveraendert', grund: null }];
+  lmMigAntwort = [{ id: 1, alt: 'chefin', neu: 'chefin', status: 'unveraendert', grund: null,
+    personalnummer: 'P-001', aktiv: true, erstellt_am: '2025-01-02 08:00:00' }];
   await page.click('button:has-text("Vorschau laden")');
   await page.waitForTimeout(400);
   const leer = (await page.textContent('#lmInhalt')).replace(/\s+/g, ' ');

@@ -286,9 +286,21 @@ function ma_login_generieren(string $vorname, string $nachname, PDO $pdo): strin
 //
 // Idempotent: ein zweiter Lauf berechnet fuer bereits umgestellte Konten
 // wieder denselben Namen (Status "unveraendert") und ruehrt sie nicht an.
+//
+// Personalnummer, Status und Anlegedatum kommen mit (ENT-383) -- nicht fuer
+// die Berechnung, sondern damit die Vorschau zwei gleich benannte Zeilen
+// unterscheidbar macht. Genau das deckte beim ersten echten Blick auf den
+// Plan eine bestehende Dopplung im Bestand auf: zwei Datensaetze mit
+// demselben Vor-/Nachnamen, einer davon inaktiv und darum in der normalen
+// Liste (mitarbeiter_list.php, WHERE aktiv = 1) gar nicht sichtbar. Ohne
+// diese Angaben liesse sich vor der Ausfuehrung nicht erkennen, ob das
+// zwei echte Personen oder eine Karteileiche ist. Keine vertraulichen
+// Felder (ma_vertrauliche_felder()) -- alle drei stehen ohnehin schon in
+// der normalen Mitarbeiterliste.
 function ma_login_migrationsplan(PDO $pdo): array
 {
-    $rows = $pdo->query('SELECT id, name, vorname, nachname FROM mitarbeiter ORDER BY id')
+    $rows = $pdo->query('SELECT id, name, vorname, nachname, personalnummer, aktiv, erstellt_am
+                          FROM mitarbeiter ORDER BY id')
                 ->fetchAll(PDO::FETCH_ASSOC);
 
     $reserviert = [];
@@ -298,13 +310,19 @@ function ma_login_migrationsplan(PDO $pdo): array
         }
     }
 
+    $zeile = fn(array $r, ?string $neu, string $status, ?string $grund) => [
+        'id' => (int)$r['id'], 'alt' => $r['name'], 'neu' => $neu,
+        'status' => $status, 'grund' => $grund,
+        'personalnummer' => $r['personalnummer'], 'aktiv' => (bool)$r['aktiv'],
+        'erstellt_am' => $r['erstellt_am'],
+    ];
+
     $plan = [];
     foreach ($rows as $r) {
         $vorname = trim((string)$r['vorname']);
         $nachname = trim((string)$r['nachname']);
         if ($vorname === '' || $nachname === '') {
-            $plan[] = ['id' => (int)$r['id'], 'alt' => $r['name'], 'neu' => null,
-                'status' => 'uebersprungen', 'grund' => 'Vorname oder Nachname fehlt'];
+            $plan[] = $zeile($r, null, 'uebersprungen', 'Vorname oder Nachname fehlt');
             continue;
         }
         $basis = strtolower(preg_replace('/\s+/', '', "$vorname.$nachname"));
@@ -313,8 +331,7 @@ function ma_login_migrationsplan(PDO $pdo): array
             $kandidat = $basis . $lauf;
         }
         $reserviert[$kandidat] = true;
-        $plan[] = ['id' => (int)$r['id'], 'alt' => $r['name'], 'neu' => $kandidat,
-            'status' => $kandidat === $r['name'] ? 'unveraendert' : 'umbenannt', 'grund' => null];
+        $plan[] = $zeile($r, $kandidat, $kandidat === $r['name'] ? 'unveraendert' : 'umbenannt', null);
     }
     return $plan;
 }

@@ -16134,10 +16134,19 @@ function lmZeichnen(ausgefuehrt) {
   const umbenannt = plan.filter(p => p.status === 'umbenannt');
   const unveraendert = plan.filter(p => p.status === 'unveraendert');
   const uebersprungen = plan.filter(p => p.status === 'uebersprungen');
-  const zeile = p => `<tr><td>${esc(p.alt)}</td><td>${esc(p.neu)}</td></tr>`;
+  // Personalnummer, Status und Anlegedatum stehen mit dabei (ENT-383): Zwei
+  // Zeilen mit demselben Namen sehen sonst wie ein Fehler aus, obwohl sie
+  // oft zwei echte, unterschiedliche Datensaetze sind -- eine inaktive
+  // Karteileiche und ein spaeter neu angelegtes Konto zum Beispiel. Ohne
+  // diese Angaben liesse sich das vor der Ausfuehrung nicht unterscheiden.
+  const zeile = p => `<tr><td>${esc(p.alt)}</td><td>${esc(p.neu)}</td>
+    <td>${esc(p.personalnummer || '–')}</td>
+    <td>${p.aktiv ? 'aktiv' : '<span style="color:var(--neg)">inaktiv</span>'}</td>
+    <td>${dmy(p.erstellt_am)}</td></tr>`;
   const tabelle = umbenannt.length ? `
     <div style="overflow:auto;max-height:320px;margin-top:10px;border:1px solid var(--line);border-radius:8px">
-      <table><thead><tr><th>Bisheriger Login-Name</th><th>Neuer Login-Name</th></tr></thead>
+      <table><thead><tr><th>Bisheriger Login-Name</th><th>Neuer Login-Name</th>
+        <th>Pers-Nr.</th><th>Status</th><th>Angelegt am</th></tr></thead>
       <tbody>${umbenannt.map(zeile).join('')}</tbody></table>
     </div>` : '';
   const zusatz = (uebersprungen.length ? `${uebersprungen.length} ohne Vor- oder Nachname übersprungen. ` : '')
