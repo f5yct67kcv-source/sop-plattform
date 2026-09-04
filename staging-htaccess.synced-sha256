@@ -1,0 +1,14 @@
+# Hash von htaccess-hostpoint zum Zeitpunkt der letzten manuellen
+# Synchronisierung der Staging-.htaccess bei Hostpoint (Drift-Guard,
+# ENT-384). Der Staging-Deploy vergleicht diesen Wert mit dem aktuellen
+# Hash von htaccess-hostpoint und bricht bei Abweichung ab -- siehe
+# deploy-hostpoint.yml, Schritt "Umgebung waehlen und erforderliche
+# Secrets pruefen".
+#
+# Aktualisieren nach jeder inhaltlichen Aenderung an htaccess-hostpoint:
+# 1. sha256sum htaccess-hostpoint
+# 2. Den Inhalt von htaccess-hostpoint erneut unterhalb von
+#    "#@__HCP_END__@#" in die Staging-.htaccess bei Hostpoint eintragen
+#    (Explorer -> www/staging -> .htaccess -> editieren).
+# 3. Den neuen Hash unten eintragen und committen.
+532ab68c5100550b16c5c3b006f53dc7837ccc39c6628fce7f178aff93309f3f

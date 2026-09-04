@@ -166,6 +166,53 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     qaTagAbbruch.test(workflow));
 }
 
+// ── Hostpoint-Passwortschutz auf Staging: nie stillschweigend entfernt,
+// nie unbemerkt veraltet, aktiv nachgewiesen statt nur angenommen (ENT-384)
+// ────────────────────────────────────────────────────────────────────────
+//
+// Warum diese Prüfung: Der Passwortschutz lebt in einer Datei
+// (Staging-.htaccess bei Hostpoint), die unser Deploy normalerweise bei
+// jedem Lauf überschreiben würde. Drei Aussagen müssen gemeinsam gelten,
+// nicht nur der Wortlaut einzelner Zeilen: (1) ein geändertes
+// htaccess-hostpoint ohne manuelle Nachführung bricht den Staging-Deploy
+// ab, (2) die Staging-.htaccess wird von Upload UND Löschung ausgenommen,
+// (3) der Nachweis danach ist ein echter HTTP-Test (401 UND
+// WWW-Authenticate: Basic, nicht nur eines von beidem -- ein 401 aus
+// einem anderen Grund wäre sonst ein falscher Nachweis), der bei
+// Netzwerkfehlern ebenfalls abbricht statt es als "nicht prüfbar, also ok"
+// durchgehen zu lassen.
+{
+  const verifySchritt = (/Staging-Passwortschutz verifizieren[\s\S]{0,2500}/.exec(workflow) ?? [''])[0];
+
+  check('KRITISCH: ein verändertes htaccess-hostpoint ohne manuelle Staging-Synchronisierung bricht den Staging-Deploy ab',
+    /sha256sum htaccess-hostpoint/.test(workflow)
+    && /staging-htaccess\.synced-sha256/.test(workflow)
+    && /exit 1/.test(workflow)
+    && existsSync(`${WURZEL}/staging-htaccess.synced-sha256`));
+
+  check('KRITISCH: die Staging-.htaccess wird beim FTP-Upload nicht angefasst (kein Upload, keine Löschung)',
+    /exclude:\s*\$\{\{\s*env\.UMGEBUNG\s*==\s*'staging'[\s\S]{0,60}\.htaccess/.test(workflow));
+
+  // Nicht nur "kommen die Wörter 401/WWW-Authenticate/Basic irgendwo vor"
+  // -- das bliebe grün, auch wenn nur die abschliessende Erfolgsmeldung
+  // ("... verifiziert (HTTP 401, WWW-Authenticate: Basic)") übrig wäre und
+  // die eigentliche Prüfung fehlte. Verlangt wird die tatsächliche
+  // grep-Bedingung in unmittelbarer Nähe zu ihrem eigenen Abbruch.
+  check('KRITISCH: der Passwortschutz-Nachweis verlangt HTTP 401 UND einen WWW-Authenticate-Basic-Kopf, nicht nur eines von beidem',
+    /grep -qE '\^HTTP\/\[0-9\.\]\+ 401'[\s\S]{0,250}exit 1/.test(workflow)
+    && /grep -qi '\^WWW-Authenticate:\.\*Basic'[\s\S]{0,250}exit 1/.test(workflow));
+
+  check('KRITISCH: der Nachweis nutzt die Environment-Variable STAGING_DOMAIN, kein Secret',
+    /vars\.STAGING_DOMAIN/.test(verifySchritt) && !/secrets\.STAGING_DOMAIN/.test(workflow));
+
+  // Auch hier reicht "--max-time und exit 1 kommen beide im Schritt vor"
+  // nicht -- die anderen Abbrüche im selben Schritt (fehlende Variable,
+  // falscher Status) haben ebenfalls ein "exit 1". Verlangt wird konkret,
+  // dass der curl-Fehlschlag selbst (nicht 0) zum eigenen Abbruch führt.
+  check('KRITISCH: ein Netzwerkfehler/Timeout beim Passwortschutz-Nachweis bricht den Deploy ab, statt als "ok" durchzugehen',
+    /\$\?\s*-ne\s*0[\s\S]{0,200}exit 1/.test(verifySchritt));
+}
+
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
 console.log('Alle Pruefungen bestanden.');

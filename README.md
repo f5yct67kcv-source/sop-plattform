@@ -183,6 +183,27 @@ Projekt-Repositories (ENT-341); hier nur, was den Code betrifft:
   Produktion automatisch das Praefix `[STAGING]` (`smtp_absender_name()`,
   ENT-371 Bedingung 4) — unabhaengig davon, was im Secret
   `STAGING_SMTP_ABSENDER_NAME` konfiguriert ist.
+- **HTTP-Basic-Auth vor der gesamten Staging-Instanz (ENT-384):** verwaltet
+  bei Hostpoint selbst, ueber „Explorer → www/staging → Web-Einstellungen
+  fuer aktuelles Verzeichnis → Passwortschutz". Die dortige `.htaccess`
+  traegt oberhalb der Markierung `#@__HCP_END__@#` den von Hostpoint
+  verwalteten Auth-Block, darunter von Hand eine Kopie von
+  `htaccess-hostpoint`. Der Deploy-Workflow **schliesst `.htaccess` fuer
+  Staging von Upload und Loeschung aus** (`exclude` bei der FTP-Deploy-
+  Action) — sonst wuerde jeder Deploy den Passwortschutz stillschweigend
+  entfernen. Ein **Drift-Guard** vergleicht bei jedem Staging-Deploy den
+  aktuellen Hash von `htaccess-hostpoint` mit dem in
+  `staging-htaccess.synced-sha256` festgehaltenen Stand der letzten
+  manuellen Synchronisierung — weichen sie ab, bricht der Deploy ab, statt
+  Staging mit veralteten eigenen Regeln weiterlaufen zu lassen (Schritt
+  „Umgebung waehlen und erforderliche Secrets pruefen"). Nach jedem
+  Staging-Deploy verifiziert ein eigener Schritt („Staging-Passwortschutz
+  verifizieren") die echte, gerade deployte Seite: verlangt wird HTTP 401
+  **und** ein `WWW-Authenticate: Basic`-Kopf — ein 401 aus einem anderen
+  Grund waere kein Nachweis. Netzwerkfehler/Timeouts zaehlen als
+  Fehlschlag. Die dafuer genutzte Domain steht als **Environment-Variable**
+  `STAGING_DOMAIN` (nicht als Secret, da nicht vertraulich) im
+  GitHub-Environment `staging`.
 - **Einrichtung einer neuen/leeren Staging-Datenbank:** `backend/schema.sql`
   einmalig in phpMyAdmin ausfuehren, danach `setup.php`/`setup.html`
   temporaer hochladen und den ersten Admin-Account anlegen (**danach
