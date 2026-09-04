@@ -139,6 +139,23 @@ const createOhneKommentar = execFileSync('cat', [`${WURZEL}/backend/api/mitarbei
 check('KRITISCH: mitarbeiter_create.php bildet den Login-Namen selbst, statt ihn aus der Eingabe zu uebernehmen',
   /ma_login_generieren\s*\(/.test(createOhneKommentar) && !/\$input\['name'\]/.test(createOhneKommentar));
 
+// ── Die Umstellung bestehender Login-Namen wird WIRKLICH ausgefuehrt
+// (ENT-381) -- Namensgleichheit, uebersprungene Konten ohne Vor-/Nachname,
+// gezielte Sitzungsloeschung und das Logbuch muessen alle stimmen, nicht
+// nur die Umbenennung selbst.
+let lmAus = '', lmCode = 0;
+try {
+  lmAus = execFileSync('php', [`${HIER}/pruef_mitarbeiter_login_migration.php`],
+    { encoding: 'utf8' });
+} catch (e) {
+  lmAus = String(e.stdout || '') + String(e.stderr || '');
+  lmCode = e.status || 1;
+}
+const lmBeanstandet = lmAus.split('\n').filter(z => z.trim().startsWith('X '));
+check('KRITISCH: die Umstellung bestehender Login-Namen (Plan und Ausführung) läuft korrekt durch',
+  lmCode === 0 && lmBeanstandet.length === 0);
+if (lmBeanstandet.length) { lmBeanstandet.forEach(z => bad.push('PHP-Login-Migration: ' + z.trim())); }
+
 // ── Passwort-Ruecksetzung per E-Mail-Link, ENT-373 (Quelltext -- die
 // Endpunkte benutzen MySQL-eigene Syntax und lassen sich nicht gegen den
 // SQLite-Stub ausfuehren, siehe pruef_passwort_reset.php).

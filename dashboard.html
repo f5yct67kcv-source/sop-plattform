@@ -5753,6 +5753,32 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
             <div id="rvInhalt"><div style="color:var(--ink-3)">Wird geladen …</div></div>
           </div>
         </div>
+        <!-- Login-Namen umstellen (ENT-381): eigene Karte, nicht Teil der
+             Rollen-Karte darueber -- dort geht es darum, WAS jemand darf,
+             hier darum, WIE die Anmeldung heisst. Bewusst nicht bei
+             "Einrichtung": Die legt nur Tabellen/Spalten an und aendert nie
+             Bestandsdaten ("es wird nichts gelöscht oder geleert") -- das
+             hier tut genau das, an echten Zugangsdaten, darum eigene
+             Vorschau und eigene, ausdrueckliche Bestaetigung. -->
+        <div class="card" id="lmKarte">
+          <div class="card-hd">
+            <span class="card-ic"><svg class="i" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></span>
+            <h3>Login-Namen umstellen</h3>
+          </div>
+          <div class="card-bd">
+            <div class="ki-hint web on" style="margin-bottom:14px">
+              <span>Stellt bestehende Login-Namen auf dasselbe Muster wie beim Anlegen (ENT-376) um:
+                <code>vorname.nachname</code>, klein geschrieben, ohne Leerzeichen -- z.&nbsp;B.
+                „Adrian von Arb" → <code>adrian.vonarb</code>. <b>Harter Schnitt:</b> Der alte
+                Login-Name gilt danach sofort nicht mehr, jede betroffene Person muss den neuen
+                kennen, bevor sie sich wieder anmelden kann. Wessen Vorname oder Nachname fehlt,
+                wird übersprungen und behält den bisherigen Namen.</span>
+            </div>
+            <div class="msg-err" id="lmErr" style="display:none"></div>
+            <button type="button" class="btn btn-plain btn-sm" onclick="lmVorschau()">Vorschau laden</button>
+            <div id="lmInhalt" style="margin-top:14px"></div>
+          </div>
+        </div>
         </div>
         </div>
 
@@ -8304,7 +8330,7 @@ function go(view) {
   topSubZeichnen();
   if (view === 'planung' && MOBIL() && pTab === 'uebersicht') goTab('einsaetze');
   if (view === 'mitarbeiter' && !mitarbeiter.length) loadMitarbeiter();
-  if (view === 'betrieb') { ladeBetrieb(); zfLaden(); rvLaden(); }
+  if (view === 'betrieb') { ladeBetrieb(); zfLaden(); rvLaden(); lmSichtbarkeit(); }
   // Die Administrationsgruppe klappt auf, wenn eine ihrer Seiten offen ist --
   // und der Elternpunkt wird mitmarkiert, sonst sieht die Seitenleiste aus,
   // als waere man nirgends (dasselbe Muster wie bei den Kunden, ENT-039).
@@ -15947,6 +15973,104 @@ function rvLaden() {
         Es zählen nur aktive Konten.
       </span></div>`;
   });
+}
+
+// ── Login-Namen umstellen (ENT-381) ──────────────────────────────────────
+// Gleiche Berechtigung wie die Rollenvergabe (darf('rechte') == exklusiv
+// Verwaltung, siehe rollen_katalog() im Server) -- diese Karte aendert die
+// Anmeldung jeder Person, das ist kein geringeres Recht als Rollen zu
+// vergeben.
+let lmPlan = null;
+
+function lmSichtbarkeit() {
+  const k = $('lmKarte');
+  if (k) { k.style.display = darf('rechte') ? '' : 'none'; }
+}
+
+function lmFehler(text) {
+  const e = $('lmErr');
+  if (!e) return;
+  e.textContent = text || '';
+  e.style.display = text ? '' : 'none';
+}
+
+function lmVorschau() {
+  lmFehler('');
+  $('lmInhalt').innerHTML = '<p class="zone-note">Wird geprüft …</p>';
+  api('mitarbeiter_zugang_migrieren.php').then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') {
+      $('lmInhalt').innerHTML = '';
+      lmFehler(data && data.message ? data.message : 'Vorschau fehlgeschlagen.');
+      return;
+    }
+    lmPlan = data.plan || [];
+    lmZeichnen(false);
+  }).catch(() => { $('lmInhalt').innerHTML = ''; lmFehler('Netzwerkfehler.'); });
+}
+
+// `ausgefuehrt` unterscheidet die Vorschau (Knopf zum Anstossen) von der
+// Meldung danach (kein Knopf mehr, nur noch das Ergebnis zum Ablesen und
+// Weitergeben) -- dieselbe Tabelle traegt beides, damit niemand die Liste
+// der neuen Namen ein zweites Mal zusammensuchen muss.
+function lmZeichnen(ausgefuehrt) {
+  const plan = lmPlan || [];
+  const umbenannt = plan.filter(p => p.status === 'umbenannt');
+  const unveraendert = plan.filter(p => p.status === 'unveraendert');
+  const uebersprungen = plan.filter(p => p.status === 'uebersprungen');
+  const zeile = p => `<tr><td>${esc(p.alt)}</td><td>${esc(p.neu)}</td></tr>`;
+  const tabelle = umbenannt.length ? `
+    <div style="overflow:auto;max-height:320px;margin-top:10px;border:1px solid var(--line);border-radius:8px">
+      <table><thead><tr><th>Bisheriger Login-Name</th><th>Neuer Login-Name</th></tr></thead>
+      <tbody>${umbenannt.map(zeile).join('')}</tbody></table>
+    </div>` : '';
+  const zusatz = (uebersprungen.length ? `${uebersprungen.length} ohne Vor- oder Nachname übersprungen. ` : '')
+    + `${unveraendert.length} entsprechen bereits dem Muster.`;
+  let kopf;
+  if (ausgefuehrt) {
+    kopf = `<div class="ki-hint web on" style="background:var(--pos-soft);color:var(--pos)"><span>
+      <b>${umbenannt.length} Login-Namen umgestellt.</b> Jede betroffene Person ist überall abgemeldet
+      und kommt mit dem alten Namen nicht mehr hinein — bitte allen unten aufgeführten den neuen
+      Namen mitteilen. ${esc(zusatz)}</span></div>`;
+    const eigene = umbenannt.find(p => me && p.alt === me.name);
+    if (eigene) {
+      kopf += `<div class="ki-hint web on" style="margin-top:10px;background:var(--neg-soft);color:var(--neg)"><span>
+        <b>Die eigene Anmeldung wurde mit umgestellt:</b> dein neuer Login-Name ist
+        <b>„${esc(eigene.neu)}“</b>. Am besten jetzt notieren, bevor du dich abmeldest.</span>
+        <button class="btn btn-plain btn-sm" style="margin-top:8px" onclick="doLogout()">Jetzt abmelden</button></div>`;
+    }
+  } else if (!umbenannt.length) {
+    kopf = `<p class="zone-note">Nichts zu tun — alle Login-Namen entsprechen bereits dem Muster
+      ${uebersprungen.length ? `(${uebersprungen.length} ohne Vor- oder Nachname übersprungen)` : ''}.</p>`;
+  } else {
+    kopf = `<p class="zone-note"><b>${umbenannt.length}</b> Login-Namen würden umgestellt. ${esc(zusatz)}</p>
+      <div class="zone danger" style="margin-top:10px">
+        <div class="zone-hd">Jetzt umstellen</div>
+        <div class="zone-note">Nicht rückgängig zu machen: Der alte Login-Name gilt danach sofort nicht mehr.</div>
+        <button class="btn btn-danger btn-sm" onclick="lmAusfuehrenFragen()">${umbenannt.length} Login-Namen umstellen</button>
+      </div>`;
+  }
+  $('lmInhalt').innerHTML = kopf + tabelle;
+}
+
+function lmAusfuehrenFragen() {
+  const anzahl = (lmPlan || []).filter(p => p.status === 'umbenannt').length;
+  askConfirm('Login-Namen umstellen?',
+    `${anzahl} Login-Namen werden jetzt umgestellt. Jede betroffene Person wird überall abgemeldet ` +
+    'und kommt mit dem alten Namen nicht mehr hinein.',
+    'Umstellen', lmAusfuehren);
+}
+
+function lmAusfuehren() {
+  lmFehler('');
+  api('mitarbeiter_zugang_migrieren.php', { method: 'POST', body: { bestaetigt: true } }).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') {
+      lmFehler(data && data.message ? data.message : 'Umstellen fehlgeschlagen.');
+      return;
+    }
+    lmPlan = data.plan || [];
+    lmZeichnen(true);
+    loadMitarbeiter();
+  }).catch(() => lmFehler('Netzwerkfehler.'));
 }
 
 function zfLaden() {

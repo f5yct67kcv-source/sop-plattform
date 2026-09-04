@@ -47,6 +47,10 @@ const LOG = [
 let meineRechte = ALLE_RECHTE, meineRollen = ['verwaltung'];
 let gesendet = null, logAntwort = null, dossierRollen = ['planung'];
 let rollenEingerichtet = true;
+// Login-Namen-Umstellung (ENT-381): der Mock antwortet mit demselben Plan
+// auf GET (Vorschau) wie auf POST (Ausfuehrung), genau wie der echte
+// Endpunkt -- lmMigAntwort wird je Testfall gesetzt.
+let lmMigAntwort = null, lmMigAufruf = null;
 
 const browser = await chromium.launch({ executablePath: EXE });
 const page = await browser.newPage({ viewport: { width: 1600, height: 1100 } });
@@ -91,6 +95,15 @@ await page.route('**/api/**', r => {
       darf_aendern: kann('personal_schreiben'),
       darf_rollen: kann('rechte'),
       rollen_eingerichtet: rollenEingerichtet });
+  }
+  if (u.includes('mitarbeiter_zugang_migrieren')) {
+    if (!kann('rechte')) return send({ status: 'error', message: 'Dafür fehlt dir die Berechtigung.' }, 403);
+    const methode = r.request().method();
+    lmMigAufruf = { methode, body: methode === 'POST' ? koerper() : null };
+    if (methode === 'POST' && (!lmMigAufruf.body || lmMigAufruf.body.bestaetigt !== true)) {
+      return send({ status: 'error', message: 'Bestätigung erforderlich' }, 400);
+    }
+    return send({ status: 'ok', plan: lmMigAntwort || [] });
   }
   if (u.includes('zweifaktor_status')) return send({ status: 'ok', moeglich: true, an: false, geraete: [] });
   if (u.includes('anstellungsorte')) return send({ status: 'ok', orte: [] });
@@ -421,6 +434,81 @@ try {
   check('KRITISCH: ohne Recht zur Rollenvergabe fehlt die Rollenübersicht',
     !(await sichtbar('rvKarte')));
 } catch (e) { check('Abschnitt ohne Recht ohne Abbruch: ' + e.message, false); }
+
+// ══════════════ LOGIN-NAMEN UMSTELLEN (ENT-381)
+try {
+  meineRechte = ALLE_RECHTE; meineRollen = ['verwaltung'];
+  await anmelden();
+  await page.evaluate(() => { go('betrieb'); bkAbschnittZeigen('rv'); });
+  await page.waitForTimeout(900);
+  check('KRITISCH: mit dem Recht zur Rollenvergabe steht die Karte da',
+    await sichtbar('lmKarte'));
+
+  lmMigAntwort = [
+    { id: 1, alt: 'chefin', neu: 'eine.leitung', status: 'umbenannt', grund: null },
+    { id: 2, alt: 'planer', neu: 'zwei.planung', status: 'umbenannt', grund: null },
+    { id: 3, alt: 'hilfe', neu: 'hilfe', status: 'unveraendert', grund: null },
+    { id: 4, alt: 'systemkonto', neu: null, status: 'uebersprungen', grund: 'Vorname oder Nachname fehlt' },
+  ];
+  await page.click('button:has-text("Vorschau laden")');
+  await page.waitForTimeout(400);
+  const vorschau = (await page.textContent('#lmInhalt')).replace(/\s+/g, ' ');
+  check('Die Vorschau nennt die Anzahl der umzustellenden Login-Namen', /\b2\b/.test(vorschau));
+  check('KRITISCH: die Tabelle zeigt alten UND neuen Namen nebeneinander',
+    /chefin/.test(vorschau) && /eine\.leitung/.test(vorschau)
+    && /planer/.test(vorschau) && /zwei\.planung/.test(vorschau));
+  check('KRITISCH: unveraenderte und uebersprungene Kontos stehen NICHT in der Umstellungstabelle -- nur die tatsaechlich betroffenen',
+    !vorschau.includes('hilfe') && !vorschau.includes('systemkonto'));
+  check('Uebersprungene und unveraenderte Kontos werden als Anzahl genannt, nicht verschwiegen',
+    /1 ohne Vor- oder Nachname übersprungen/.test(vorschau) && /1 entsprechen bereits dem Muster/.test(vorschau));
+  check('Der Knopf zum Ausfuehren nennt dieselbe Anzahl',
+    /2 Login-Namen umstellen/.test(await page.textContent('#lmInhalt')));
+
+  // Ausfuehren: erst die Rueckfrage, kein Schreiben davor
+  gesendet = null; lmMigAufruf = null;
+  await page.click('button:has-text("Login-Namen umstellen")');
+  await page.waitForSelector('#dlgConfirm.on');
+  check('KRITISCH: vor dem Ausfuehren steht eine Rueckfrage', lmMigAufruf === null);
+  await page.click('#cfBtn');
+  await page.waitForTimeout(500);
+  check('KRITISCH: die Ausfuehrung ist ein POST mit ausdruecklicher Bestaetigung',
+    lmMigAufruf && lmMigAufruf.methode === 'POST' && lmMigAufruf.body.bestaetigt === true);
+  const ergebnis = (await page.textContent('#lmInhalt')).replace(/\s+/g, ' ');
+  check('Die Meldung nennt, dass umgestellt wurde, und mahnt zur Mitteilung',
+    /umgestellt/.test(ergebnis) && /mitteilen/.test(ergebnis));
+  check('KRITISCH: die eigene Anmeldung war mit dabei -- eigener Hinweis mit dem neuen Namen',
+    /eigene Anmeldung/.test(ergebnis) && /eine\.leitung/.test(ergebnis));
+  check('Ein Knopf zum Abmelden steht bereit, statt automatisch mitten im Lesen abzumelden',
+    await sichtbar('lmInhalt') && /Jetzt abmelden/.test(ergebnis));
+} catch (e) { check('Abschnitt Login-Namen umstellen ohne Abbruch: ' + e.message, false); }
+
+// Nichts zu tun: kein Umstellen-Knopf, klare Aussage statt leerer Tabelle
+try {
+  meineRechte = ALLE_RECHTE; meineRollen = ['verwaltung'];
+  await anmelden();
+  await page.evaluate(() => { go('betrieb'); bkAbschnittZeigen('rv'); });
+  await page.waitForTimeout(900);
+  lmMigAntwort = [{ id: 1, alt: 'chefin', neu: 'chefin', status: 'unveraendert', grund: null }];
+  await page.click('button:has-text("Vorschau laden")');
+  await page.waitForTimeout(400);
+  const leer = (await page.textContent('#lmInhalt')).replace(/\s+/g, ' ');
+  check('KRITISCH: "nichts zu tun" sagt das ausdruecklich, statt eine leere Tabelle zu zeigen',
+    /Nichts zu tun/.test(leer));
+  check('KRITISCH: ohne etwas umzustellen gibt es auch keinen Umstellen-Knopf',
+    !(await page.$('button:has-text("Login-Namen umstellen")')));
+} catch (e) { check('Abschnitt "nichts zu tun" ohne Abbruch: ' + e.message, false); }
+
+// Ohne das Recht zur Rollenvergabe fehlt auch diese Karte
+try {
+  meineRechte = ['plan', 'kunden', 'abgleich', 'personal_lesen', 'betrieb'];
+  meineRollen = ['planung'];
+  await anmelden();
+  await page.evaluate(() => go('betrieb'));
+  await page.waitForTimeout(900);
+  check('KRITISCH: ohne Recht zur Rollenvergabe fehlt auch die Karte "Login-Namen umstellen"',
+    !(await sichtbar('lmKarte')));
+  meineRechte = ALLE_RECHTE; meineRollen = ['verwaltung'];
+} catch (e) { check('Abschnitt Login-Namen ohne Recht ohne Abbruch: ' + e.message, false); }
 
 check('Keine JavaScript-Fehler', jsFehler.length === 0);
 if (jsFehler.length) { bad.push('JS: ' + jsFehler.slice(0, 3).join(' | ')); }
