@@ -24,7 +24,7 @@ const FZ_FOTO_MAX = 2 * 1024 * 1024;
 // er wird nur BENANNT, damit die spätere Abstimmung (Projektinhaber: "dass
 // die Anzahl gefahrener Kilometer in etwa den Richtlinien besteht") nicht
 // bei null anfangen muss. Wert vom Projektinhaber ausdrücklich vorgegeben
-// (ENT-371, revidiert den ursprünglich angenommenen Wert 800): Ein
+// (ENT-374, revidiert den ursprünglich angenommenen Wert 800): Ein
 // Tageseinsatz mit Hin- und Rückfahrt liegt im Schweizer Mittelland normal
 // zwischen 20 und 300 km; darüber wird es "exotisch" -- ein Auftrag an den
 // äusseren Landesgrenzen, wo selten Einsätze stattfinden.
@@ -208,7 +208,11 @@ const FZ_UEBERNAHME_LISTE_SQL = "SELECT u.id, u.art, u.zeitpunkt, u.tacho_km, u.
            (SELECT SUM(2 * se.weg_km) FROM einsaetze se JOIN einsatz_zuteilung sz ON sz.einsatz_id = se.id
              WHERE sz.mitarbeiter_id = u.mitarbeiter_id AND sz.zusage NOT IN ('entfallen', 'abgelehnt')
                AND se.datum BETWEEN DATE(voriger.zeitpunkt) AND DATE(u.zeitpunkt)
-           ) AS soll_km_summe
+           ) AS soll_km_summe,
+           (SELECT COUNT(*) FROM fahrzeug_uebernahme ab
+             WHERE ab.art = 'abgabe' AND ab.fahrzeug_id = u.fahrzeug_id
+               AND ab.zeitpunkt > voriger.zeitpunkt AND ab.zeitpunkt < u.zeitpunkt
+           ) AS abgaben_dazwischen
       FROM fahrzeug_uebernahme u
       LEFT JOIN fahrzeuge f ON f.id = u.fahrzeug_id
       JOIN mitarbeiter m ON m.id = u.mitarbeiter_id
@@ -226,10 +230,10 @@ const FZ_UEBERNAHME_LISTE_SQL = "SELECT u.id, u.art, u.zeitpunkt, u.tacho_km, u.
 // bis in diese Grössenordnung sind normal.
 const FZ_ABWEICHUNG_TOLERANZ_KM = 10;
 
-// Drei Feststellungen (ENT-356/ENT-361), getrennt von der SQL-Abfrage
-// geprüft, damit jede für sich falsch sein kann, ohne dass eine andere es
-// verdeckt. Alle drei bleiben Feststellungen, keine Beanstandungen --
-// OP-314/ENT-356.
+// Vier Feststellungen (ENT-356/ENT-361/ENT-377), getrennt von der SQL-
+// Abfrage geprüft, damit jede für sich falsch sein kann, ohne dass eine
+// andere es verdeckt. Alle vier bleiben Feststellungen, keine
+// Beanstandungen -- OP-314/ENT-356.
 //
 //  - "auffaellig": derselbe Sprung wie beim Abschicken selbst
 //    (FZ_SPRUNG_AUFFAELLIG) -- hier zusätzlich fürs Cockpit sichtbar
@@ -247,8 +251,20 @@ const FZ_ABWEICHUNG_TOLERANZ_KM = 10;
 //    NICHT vergleichbar -- "soll_unvollstaendig" macht das sichtbar, statt
 //    still eine zu niedrige Erwartung anzunehmen ("unbekannt darf nie wie
 //    keine aussehen").
+//  - "unbelegt" (ENT-377): Zwischen der vorigen Übernahme und dieser hier
+//    liegt eine 'Abgabe' -- die erklärt "Wagen steht jetzt still", schreibt
+//    aber selbst KEINEN Kilometerstand (ENT-354, bewusst wirkungslos für
+//    die Kette). Zeigt diese Übernahme trotzdem einen höheren Stand als die
+//    vorige, wurde seither gefahren, ohne dass jemand dafür eine Übernahme
+//    erfasst hat -- anders als beim gewöhnlichen Übergabe-Sprung (ohne
+//    Abgabe dazwischen) ist hier JEDE Differenz über 0 km auffällig, nicht
+//    erst ab einer Schwelle: Nach einer Abgabe ist Stillstand die einzige
+//    erwartete Zahl, jede Bewegung eine Abweichung von genau dieser
+//    Erwartung. Auf ausdrücklichen Wunsch des Projektinhabers nach einem
+//    echten Test, bei dem genau das unbemerkt blieb.
 function fz_uebernahme_feststellungen(?int $tachoKm, ?int $vorigerKm, ?int $vorigerMa, ?int $eigeneMa,
-    int $sollEinsaetze = 0, int $sollEinsaetzeMitWegKm = 0, ?float $sollKmSumme = null): array
+    int $sollEinsaetze = 0, int $sollEinsaetzeMitWegKm = 0, ?float $sollKmSumme = null,
+    int $abgabenDazwischen = 0): array
 {
     $kmSeither = ($tachoKm !== null && $vorigerKm !== null) ? $tachoKm - $vorigerKm : null;
 
@@ -265,6 +281,7 @@ function fz_uebernahme_feststellungen(?int $tachoKm, ?int $vorigerKm, ?int $vori
         'soll_unvollstaendig' => $sollUnvollstaendig,
         'abweichung_km' => $abweichungKm,
         'abweichend' => $abweichungKm !== null && abs($abweichungKm) > FZ_ABWEICHUNG_TOLERANZ_KM,
+        'unbelegt' => $kmSeither !== null && $kmSeither > 0 && $abgabenDazwischen > 0,
     ];
 }
 
