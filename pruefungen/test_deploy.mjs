@@ -82,6 +82,23 @@ for (const seite of seiten) {
   }
 }
 
+// Dasselbe fuer Dateien, die per <source src="..."> geladen werden -- bis
+// ENT-392/ENT-394 gab es keine Video-/Audioquelle in einer der drei Seiten,
+// weder die <script src>- noch die CSS-url()-Pruefung oben haetten sie
+// gefangen: <source> ist weder ein <script>-Tag noch ein CSS-Konstrukt.
+for (const seite of seiten) {
+  const html = readFileSync(`${WURZEL}/${seite}`, 'utf8');
+  const quellen = [...html.matchAll(/<source\s+src="([^"]+)"/g)].map(m => m[1])
+    .filter((q, i, arr) => arr.indexOf(q) === i)
+    .filter(q => !/^https?:\/\//.test(q))
+    .map(q => q.replace(/^\//, ''));
+  for (const q of quellen) {
+    check(`${seite} laedt ${q} per <source> — die Datei gibt es`, existsSync(`${WURZEL}/${q}`));
+    check(`KRITISCH: ${q} wird auch deployt (per <source> von ${seite} geladen)`,
+      kopierteQuellen.some(zeile => alsGlobPassend(q, zeile)));
+  }
+}
+
 // Die Schriftlizenz muss mit. Die SIL Open Font License 1.1 verlangt, dass
 // sie die Schrift begleitet -- wer die woff2 ausliefert und die Lizenz
 // weglaesst, verteilt sie nicht lizenzkonform. Kein Aussehen-Problem,
