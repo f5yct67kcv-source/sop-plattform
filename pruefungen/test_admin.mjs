@@ -66,6 +66,14 @@ async function setup(page) {
       if (k) k.aktiv = body.aktiv;
       return send({ status: 'ok', aktiv: body.aktiv });
     }
+    // Der Login-Name kommt seit ENT-376 vom Server zurueck (er bildet ihn
+    // aus Vorname/Nachname) -- ohne ihn wuesste die Oberflaeche nicht, wen
+    // sie nach dem Anlegen oeffnen soll.
+    if (path.includes('mitarbeiter_create')) {
+      const login = `${(body && body.vorname) || ''}.${(body && body.nachname) || ''}`
+        .toLowerCase().replace(/\s+/g, '');
+      return send({ status: 'ok', name: login });
+    }
     // Vereinheitlichter Router seit ENT-042 -- ein Endpunkt statt vier
     // einzelner Diktat-Endpunkte. Verzweigt hier im Test wie das echte KI-
     // Modell anhand des Textinhalts.
@@ -320,20 +328,28 @@ check('Der Knopf sagt "anlegen", nicht "speichern"',
   (await page.textContent('#mbSpeichern')).includes('anlegen'));
 await page.click('#mbSpeichern');
 await page.waitForTimeout(200);
-check('Ohne Login-Name kein Anlegen', writes().length === 0 && await page.isVisible('#mbErr'));
-await page.fill('#mbNeuName', 'hans.muster');
+check('Ohne Vorname/Nachname kein Anlegen', writes().length === 0 && await page.isVisible('#mbErr'));
+// Seit ENT-376 gibt es kein Login-Name-Feld mehr -- er wird aus Vorname und
+// Nachname gebildet.
+await page.fill('#mb_vorname', 'Hans');
+await page.fill('#mb_nachname', 'Muster');
+await page.waitForTimeout(150);
+check('Der Login-Name wird schon vor dem Speichern angezeigt',
+  (await page.inputValue('#mbNeuName')) === 'hans.muster');
 await page.fill('#mbNeuPass', '123');
 await page.click('#mbSpeichern');
 await page.waitForTimeout(200);
 check('Zu kurzes Passwort kein Anlegen', writes().length === 0);
 await page.fill('#mbNeuPass', 'blauerstuhlamsee');
-await page.fill('#mb_vorname', 'Hans');
 // Seit ENT-077 gibt es kein Admin-Haekchen mehr, sondern Rollen.
 await page.check('#mbNeuRolle_verwaltung');
 await page.click('#mbSpeichern');
 await page.waitForTimeout(600);
 const cr = calls.find(c => c.path.includes('mitarbeiter_create'));
-check('Anlegen sendet Name und Passwort', cr && cr.body.name === 'hans.muster' && cr.body.password === 'blauerstuhlamsee');
+check('Anlegen sendet Vorname, Nachname und Passwort',
+  cr && cr.body.vorname === 'Hans' && cr.body.nachname === 'Muster' && cr.body.password === 'blauerstuhlamsee');
+check('KRITISCH: der Login-Name kommt nicht vom Client -- der Server bildet ihn (ENT-376)',
+  cr && !('name' in cr.body));
 check('Die gewählte Rolle geht mit (ENT-077)',
   cr && Array.isArray(cr.body.rollen) && cr.body.rollen.includes('verwaltung'));
 check('Detailfeld wird mitgesendet', cr && cr.body.vorname === 'Hans');
@@ -363,7 +379,7 @@ check('Der Hinweis sagt, dass das Passwort selbst zu setzen ist',
 check('Vorname uebernommen', (await page.inputValue('#mb_vorname')) === 'Hans');
 check('Personalnummer uebernommen', (await page.inputValue('#mb_personalnummer')) === '2530');
 check('Geburtsdatum uebernommen', (await page.inputValue('#mb_geburtsdatum')) === '1990-05-03');
-check('Login-Name vorgeschlagen', (await page.inputValue('#mbNeuName')) === 'hans.muster');
+check('Login-Name aus dem Diktat gebildet', (await page.inputValue('#mbNeuName')) === 'hans.muster');
 check('Passwort NICHT vorbelegt', (await page.inputValue('#mbNeuPass')) === '');
 check('Erkannte Felder blau markiert', (await page.$$('#mbKarten .inp.ki')).length >= 6);
 check('Nicht erkanntes Feld unmarkiert', !(await page.getAttribute('#mb_telefon', 'class')).includes('ki'));

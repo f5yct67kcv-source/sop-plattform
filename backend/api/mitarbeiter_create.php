@@ -13,7 +13,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 $input = json_decode(file_get_contents('php://input'), true) ?? [];
-$name = trim((string)($input['name'] ?? ''));
+$vorname = trim((string)($input['vorname'] ?? ''));
+$nachname = trim((string)($input['nachname'] ?? ''));
 $password = (string)($input['password'] ?? '');
 // Rollen statt "Admin ja/nein" (ENT-077). Wer keine Rollen mitschickt oder
 // sie nicht vergeben darf, legt eine mitarbeitende Person an -- die
@@ -26,18 +27,18 @@ if (is_array($input['rollen'] ?? null) && darf($user, 'rechte')) {
 if (!$rollen) { $rollen = [ROLLE_MITARBEITEND]; }
 $istAdmin = in_array(ROLLE_VERWALTUNG, $rollen, true) ? 1 : 0;
 
-if ($name === '') {
-    json_response(['status' => 'error', 'message' => 'Name erforderlich'], 400);
+// Der Login-Name kommt nicht mehr aus dem Formular, sondern wird hier
+// gebildet (ENT-376) -- ein mitgeschickter "name" wird ignoriert, sonst
+// waere das nur eine Sperre in der Oberflaeche und liesse sich am Browser
+// vorbei umgehen.
+if ($vorname === '' || $nachname === '') {
+    json_response(['status' => 'error',
+        'message' => 'Vorname und Nachname erforderlich -- daraus wird der Login-Name gebildet'], 400);
 }
+$name = ma_login_generieren($vorname, $nachname, db());
 $pwFehler = passwort_pruefen($password, $name, (bool)$istAdmin);
 if ($pwFehler !== null) {
     json_response(['status' => 'error', 'message' => $pwFehler], 400);
-}
-
-$check = db()->prepare('SELECT COUNT(*) AS c FROM mitarbeiter WHERE name = ?');
-$check->execute([$name]);
-if ((int)$check->fetch()['c'] > 0) {
-    json_response(['status' => 'error', 'message' => "Login-Name \"$name\" ist bereits vergeben"], 409);
 }
 
 // Alle uebrigen Angaben laufen durch dieselbe Fachlogik wie das Bearbeiten
@@ -78,4 +79,8 @@ if ($neueId > 0) {
     logbuch_schreiben(db(), $user, 'mitarbeiter', $neueId, 'angelegt', null, $name);
 }
 
-json_response(['status' => 'ok']);
+// Der Name geht mit zurueck: Er kommt seit ENT-376 nicht mehr vom Client
+// (er koennte bei Namensgleichheit eine laufende Nummer tragen, die die
+// Oberflaeche vorher nicht kennen konnte) -- ohne ihn wuesste die
+// Oberflaeche nicht, welche Person sie nach dem Anlegen oeffnen soll.
+json_response(['status' => 'ok', 'name' => $name]);
