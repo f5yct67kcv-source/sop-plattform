@@ -2597,6 +2597,31 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 .ag-karte .zeiten { font-size: 13px; color: var(--ink-3); margin-top: 5px; }
 .ag-karte .zeiten b { color: var(--ink-1); font-weight: 620; }
 .ag-karte .marken { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; align-items: center; }
+/* Fahrzeugübernahme mit eigener Einsatz-Spalte rechts (ENT-381). Zweispaltig
+   erst ab genug Breite -- darunter stuende die Spalte gequetscht neben dem
+   Text, statt ihn zu ergaenzen. Die Auswertung ist am Handy ohnehin
+   ausgeblendet (ENT-235), das Fenster kann aber schmal sein. */
+.fzu-karte { display: grid; grid-template-columns: minmax(0, 1fr) 272px; gap: 18px; align-items: start; }
+/* Beide Spalten duerfen schrumpfen. Ohne min-width:0 nimmt ein Gitterkind
+   die Breite seines breitesten Inhalts als Untergrenze -- beim Auswahlfeld
+   ist das der laengste Optionstext, und die Karte schob die Ansicht dann um
+   genau die Spaltenluecke nach rechts hinaus. Am gerenderten Zustand
+   gemessen, nicht im Quelltext vermutet (CLAUDE.md). */
+.fzu-karte > * { min-width: 0; }
+@media (max-width: 980px) { .fzu-karte { grid-template-columns: 1fr; gap: 12px; } }
+.fzu-einsatz { border: 1px solid var(--line); border-radius: var(--r-sm); padding: 10px 11px; background: var(--surface-2); }
+.fzu-einsatz select.inp, .fzu-einsatz .btn { max-width: 100%; }
+.fzu-einsatz .btn { white-space: normal; text-align: left; }
+/* Gruen heisst in dieser Oberflaeche "zugesagt/bestaetigt" (siehe
+   Farb-Konvention im Variablenblock) -- eine zugeordnete Fahrt traegt
+   dieselbe Aussage und darum dieselbe Farbe. NICHT die Klasse
+   "abgeglichen" wiederverwendet: Die gehoert dem Schicht-Abgleich
+   (ENT-045) und heisst dort "festgeschrieben", etwas anderes. */
+.fzu-einsatz.zugeordnet { border-color: var(--pos); background: var(--pos-soft); }
+.fzu-einsatz-lb { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--ink-3); font-weight: 700; margin-bottom: 6px; }
+.fzu-einsatz .herkunft { font-size: 11.5px; color: var(--ink-3); margin-top: 6px; line-height: 1.45; }
+.fzu-einsatz .keiner { font-size: 12.5px; color: var(--ink-3); line-height: 1.45; }
+.fzu-einsatz select.inp { margin-bottom: 8px; }
 /* Tagesueberschrift zwischen den Karten -- dieselbe Rolle wie die Gruppenzeile
    in der Tabelle (ENT-058). */
 .pk-tag { display: flex; align-items: baseline; gap: 8px; padding: 12px 14px 7px;
@@ -15408,20 +15433,112 @@ function aeZeichneUebernahmen(eintraege, eingerichtet) {
     const [klasse, txt] = ohneFahrzeug ? ['chip-n', 'Kein Dienstfahrzeug']
       : abgabe ? ['chip-n', 'Abgegeben']
       : (AE_UEB_QUELLE[u.quelle] || ['chip-n', u.quelle]);
-    return `<div class="ag-karte">
+    return `<div class="ag-karte fzu-karte">
+        <div>
         <div class="kopf"><b>${ohneFahrzeug ? 'Kein Dienstfahrzeug' : esc(u.kennzeichen)}</b><span class="chip ${klasse}">${esc(txt)}</span></div>
         ${!ohneFahrzeug && u.fz_bezeichnung ? `<div class="wer">${esc(u.fz_bezeichnung)}</div>` : ''}
         <div class="zeiten">${dmy(datum)}, <b>${esc(zeit)}</b> · ${esc(u.person)}</div>
         ${!ohneFahrzeug && !abgabe ? `<div class="zeiten">Kilometerstand: <b>${u.tacho_km === null ? '–' : nf(u.tacho_km) + ' km'}</b></div>` : ''}
-        ${u.kunde_name ? `<div class="zeiten">${esc(u.kunde_name)}${u.titel ? ' · ' + esc(u.titel) : ''}</div>` : ''}
+        ${(ohneFahrzeug || abgabe) && u.kunde_name ? `<div class="zeiten">${esc(u.kunde_name)}${u.titel ? ' · ' + esc(u.titel) : ''}</div>` : ''}
         ${u.auffaellig ? `<div class="msg-warn">Auffällig: ${u.km_seither > 0 ? '+' : ''}${nf(u.km_seither)} km seit der letzten Übernahme dieses Fahrzeugs.</div>` : ''}
         ${u.wiederholt ? `<div class="msg-warn">Auffällig: gleicher Kilometerstand wie bei der eigenen letzten Übernahme dieses Fahrzeugs.</div>` : ''}
         ${u.abweichend ? `<div class="msg-warn">Abweichung: ${nf(u.km_seither)} km gefahren, ${nf(u.soll_km)} km anhand der Einsätze erwartet (${u.abweichung_km > 0 ? '+' : ''}${nf(u.abweichung_km)} km).</div>` : ''}
         ${u.soll_unvollstaendig ? `<div class="zeiten">Soll-Distanz unvollständig -- mindestens ein Einsatz in diesem Zeitraum hat keine hinterlegte Wegstrecke.</div>` : ''}
         ${u.unbelegt ? `<div class="msg-err">Unbelegt: ${nf(u.km_seither)} km seit der letzten Abgabe gefahren, ohne dass jemand dafür eine Übernahme erfasst hat.</div>` : ''}
         ${u.hat_foto ? `<button class="btn btn-plain btn-sm" style="margin-top:10px" onclick="aeUebernahmeFoto(${Number(u.id)})">Foto ansehen</button>` : ''}
+        </div>
+        ${aeUebEinsatzSpalte(u, ohneFahrzeug, abgabe)}
       </div>`;
   }).join('');
+}
+
+// Die Einsatz-Spalte rechts an der Karte (ENT-381).
+//
+// VIER VERSCHIEDENE AUSSAGEN, VIER TEXTE (CLAUDE.md): zugeordnet / nicht
+// zugeordnet, aber Vorschlaege da / keine Schicht an diesem Tag / diese Art
+// von Eintrag kennt keine Zuordnung. "Kein Vorschlag" und "nichts
+// vorhanden" duerfen nicht gleich aussehen.
+//
+// Bei "kein Dienstfahrzeug" und bei einer Abgabe gibt es nichts zuzuordnen:
+// Dort wurde keine Fahrt erfasst, die ein Einsatz erklaeren koennte. Die
+// Spalte bleibt dann ganz weg, statt eine leere Huelle zu zeigen.
+function aeUebEinsatzSpalte(u, ohneFahrzeug, abgabe) {
+  if (ohneFahrzeug || abgabe) { return '<div></div>'; }
+  const kopf = '<div class="fzu-einsatz-lb">Einsatz</div>';
+  if (u.einsatz_id) {
+    // Woher die Zuordnung stammt, ist keine Nebensache: Vom Fahrer selbst
+    // beim Erfassen mitgegeben ist etwas anderes als nachtraeglich vom
+    // Buero gesetzt -- daran haengt, was der Eintrag spaeter belegt.
+    const z = u.einsatz_zugeordnet;
+    const herkunft = z
+      ? `Zugeordnet von ${esc(z.person || 'unbekannt')}${z.am ? ' am ' + dmy(String(z.am).slice(0, 10)) : ''}.`
+      : 'Beim Erfassen von der fahrenden Person selbst zugeordnet.';
+    const bez = [u.kunde_name, u.titel].filter(Boolean).map(esc).join(' · ') || ('Einsatz ' + Number(u.einsatz_id));
+    const zeit = u.einsatz_von ? `${String(u.einsatz_von).slice(0, 5)}–${String(u.einsatz_bis || '').slice(0, 5)}` : '';
+    return `<div class="fzu-einsatz zugeordnet">
+        ${kopf}
+        <button class="btn btn-plain btn-sm" style="width:100%;text-align:left"
+                onclick="aeUebEinsatzOeffnen(${Number(u.einsatz_id)})">${bez}${zeit ? ' · ' + esc(zeit) : ''}</button>
+        <div class="herkunft">${herkunft}</div>
+        <button class="btn btn-plain btn-sm" style="margin-top:8px"
+                onclick="aeUebEinsatzLoesen(${Number(u.id)})">Zuordnung lösen</button>
+      </div>`;
+  }
+  const vor = u.einsatz_vorschlaege || [];
+  if (!vor.length) {
+    return `<div class="fzu-einsatz">${kopf}
+        <div class="keiner">Für diese Person ist an diesem Tag keine Schicht erfasst — es gibt nichts zuzuordnen.</div>
+      </div>`;
+  }
+  // "Geplantes Fahrzeug" ist die staerkere Uebereinstimmung als das blosse
+  // gleiche Datum -- sie steht oben (Server sortiert) und wird benannt,
+  // damit die Wahl nicht geraten werden muss.
+  const optionen = vor.map(e => {
+    const teile = [e.von && e.bis ? `${e.von}–${e.bis}` : '', e.kunde_name || '', e.titel || '']
+      .filter(Boolean).join(' · ');
+    const stark = e.passt_fahrzeug ? ' — dieses Fahrzeug geplant'
+      : (e.passt_fahrer ? ' — als Fahrer geplant' : '');
+    return `<option value="${Number(e.id)}">${esc(teile + stark)}</option>`;
+  }).join('');
+  return `<div class="fzu-einsatz">
+      ${kopf}
+      <select class="inp" id="fzuEinsatzWahl${Number(u.id)}">${optionen}</select>
+      <button class="btn btn-primary btn-sm" onclick="aeUebEinsatzZuordnen(${Number(u.id)})">Einsatz zuordnen</button>
+    </div>`;
+}
+
+// epAuf() sucht den Einsatz in der geladenen Planungsliste. Die Auswertung
+// laedt sie nicht von sich aus (loadEinsaetze laeuft je Bereich) -- ohne
+// dieses Nachladen liefe der Klick auf "Einsatz nicht gefunden", obwohl es
+// den Einsatz gibt.
+function aeUebEinsatzOeffnen(einsatzId) {
+  if (einsaetze.length) { epAuf(einsatzId); return; }
+  loadEinsaetze().then(() => epAuf(einsatzId));
+}
+
+function aeUebEinsatzZuordnen(uebernahmeId) {
+  const el = $('fzuEinsatzWahl' + Number(uebernahmeId));
+  const wahl = el ? Number(el.value || 0) : 0;
+  if (!wahl) { toast('Bitte zuerst einen Einsatz wählen.'); return; }
+  aeUebEinsatzSchreiben(uebernahmeId, wahl, 'Einsatz zugeordnet.');
+}
+
+function aeUebEinsatzLoesen(uebernahmeId) {
+  aeUebEinsatzSchreiben(uebernahmeId, null, 'Zuordnung gelöst.');
+}
+
+// Ein Weg fuer beide Richtungen: Setzen und Loesen unterscheiden sich nur
+// im Wert, nicht im Ablauf -- zwei Funktionen dafuer liefen frueher oder
+// spaeter auseinander.
+function aeUebEinsatzSchreiben(uebernahmeId, einsatzId, meldung) {
+  api('fahrzeug_uebernahme_einsatz.php', {
+    method: 'POST',
+    body: { uebernahme_id: Number(uebernahmeId), einsatz_id: einsatzId },
+  }).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') { toast(data.message || 'Das hat nicht geklappt.'); return; }
+    toast(meldung);
+    aeLadeUebernahmen();
+  });
 }
 
 // Gleicher Weg wie evfFotoLaden (ENT-297): per fetch() samt Token holen und
