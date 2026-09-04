@@ -100,6 +100,22 @@ $akteur = ['id' => 99, 'name' => 'verwaltung-test'];
         !array_filter($plan2, fn($p) => $p['status'] === 'zugewiesen'));
 }
 
+// ── Von Hand eingetragene Korrektur: dasselbe Muster (ENT-393) ───────────
+{
+    $pdo = neueDb();
+    for ($i = 0; $i < 20; $i++) {
+        pruef('KRITISCH: eine automatisch gezogene Nummer gilt auch als gueltige Korrektur',
+            ma_personalnummer_gueltig(ma_personalnummer_generieren($pdo)));
+    }
+    pruef('KRITISCH: dreistellig wird abgelehnt', !ma_personalnummer_gueltig('999'));
+    pruef('KRITISCH: fuenfstellig wird abgelehnt', !ma_personalnummer_gueltig('10000'));
+    pruef('KRITISCH: eine fuehrende Null wird abgelehnt', !ma_personalnummer_gueltig('0123'));
+    pruef('KRITISCH: Text wird abgelehnt', !ma_personalnummer_gueltig('abcd'));
+    pruef('Leer wird abgelehnt', !ma_personalnummer_gueltig(''));
+    pruef('Eine gueltige Nummer am unteren Rand des Bereichs', ma_personalnummer_gueltig('1000'));
+    pruef('Eine gueltige Nummer am oberen Rand des Bereichs', ma_personalnummer_gueltig('9999'));
+}
+
 echo "$ok Pruefungen bestanden\n";
 foreach ($bad as $b) { echo "X $b\n"; }
 exit($bad ? 1 : 0);

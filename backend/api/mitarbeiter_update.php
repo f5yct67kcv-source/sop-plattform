@@ -31,6 +31,55 @@ if ($gelesen['fehler']) {
     json_response(['status' => 'error', 'message' => implode('; ', $gelesen['fehler'])], 400);
 }
 $s = $gelesen['spalten'];
+
+// Personalnummer und Login-Name von Hand aendern (ENT-393): Beide sind
+// sonst gesperrt (ENT-387 bzw. ENT-376/381), aber die Verwaltung muss eine
+// falsch vergebene Nummer oder einen verschriebenen Namen korrigieren
+// koennen. ma_eingabe_lesen() kennt keine Rechte -- die Pruefung lebt darum
+// hier, direkt am Eingang, mit demselben Recht wie Rollenvergabe und
+// "Login-Namen umstellen" (beides ebenfalls exklusiv Verwaltung).
+if (array_key_exists('personalnummer', $input)) {
+    $neuePn = trim((string)$input['personalnummer']);
+    if ($neuePn !== (string)($bestand['personalnummer'] ?? '')) {
+        if (!darf($user, 'rechte')) {
+            json_response(['status' => 'error',
+                'message' => 'Die Personalnummer darf nur die Verwaltung ändern.'], 403);
+        }
+        if (!ma_personalnummer_gueltig($neuePn)) {
+            json_response(['status' => 'error',
+                'message' => 'Personalnummer muss vierstellig sein (1000–9999).'], 400);
+        }
+        $frei = db()->prepare('SELECT COUNT(*) AS c FROM mitarbeiter WHERE personalnummer = ? AND id <> ?');
+        $frei->execute([$neuePn, $bestand['id']]);
+        if ((int)$frei->fetch()['c'] > 0) {
+            json_response(['status' => 'error', 'message' => 'Diese Personalnummer ist bereits vergeben.'], 400);
+        }
+        $s['personalnummer'] = $neuePn;
+    }
+}
+
+$nameNeu = null;
+if (array_key_exists('name_neu', $input)) {
+    $roh = trim((string)$input['name_neu']);
+    if ($roh !== '' && $roh !== $bestand['name']) {
+        if (!darf($user, 'rechte')) {
+            json_response(['status' => 'error',
+                'message' => 'Der Login-Name darf nur die Verwaltung ändern.'], 403);
+        }
+        if (!ma_login_name_gueltig($roh)) {
+            json_response(['status' => 'error',
+                'message' => 'Login-Name muss dem Muster vorname.nachname entsprechen (klein geschrieben, ohne Leerzeichen).'], 400);
+        }
+        $frei = db()->prepare('SELECT COUNT(*) AS c FROM mitarbeiter WHERE name = ? AND id <> ?');
+        $frei->execute([$roh, $bestand['id']]);
+        if ((int)$frei->fetch()['c'] > 0) {
+            json_response(['status' => 'error', 'message' => 'Dieser Login-Name ist bereits vergeben.'], 400);
+        }
+        $nameNeu = $roh;
+        $s['name'] = $nameNeu;
+    }
+}
+
 if (!$s) {
     json_response(['status' => 'ok', 'geaendert' => 0]);
 }
@@ -53,6 +102,13 @@ if (!darf($user, 'personal_vertraulich')) {
 $sql = 'UPDATE mitarbeiter SET ' . implode(', ', array_map(fn($f) => "$f = ?", array_keys($s)))
      . ' WHERE name = ?';
 db()->prepare($sql)->execute(array_merge(array_values($s), [$name]));
+
+// Wurde der Login-Name gerade geaendert, gilt der alte sofort nicht mehr --
+// dasselbe Prinzip wie bei "Login-Namen umstellen" (ENT-381): ein noch
+// offenes Browserfenster darf nicht unter dem alten Namen weiterlaufen.
+if ($nameNeu !== null) {
+    db()->prepare('DELETE FROM sessions WHERE mitarbeiter_id = ?')->execute([(int)$bestand['id']]);
+}
 
 // Ins Logbuch, WER wann WAS geaendert hat (ENT-077). Erst nach dem
 // Speichern: Ein Eintrag ueber eine Aenderung, die gar nicht stattgefunden

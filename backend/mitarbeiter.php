@@ -245,9 +245,11 @@ function ma_spalte_da(PDO $pdo, string $spalte): bool
 // Gibt es die Kombination schon (Namensgleichheit), haengt eine laufende
 // Nummer an: max.muster, bei Kollision max.muster2, max.muster3, ... Das
 // Anlegen soll nie an einem gleichlautenden Namen scheitern (Entscheidung
-// des Projektinhabers, ENT-376) -- anders als bei anderen eindeutigen
-// Feldern gibt es hier keine sinnvolle manuelle Korrektur, die der
-// Bedienende stattdessen eintippen koennte.
+// des Projektinhabers, ENT-376).
+//
+// Seit ENT-393 gibt es doch eine manuelle Korrektur -- aber nur fuer die
+// Verwaltung (Recht 'rechte') und nur im selben Muster, siehe
+// ma_login_name_gueltig() unten und die Ausnahme in mitarbeiter_update.php.
 function ma_login_generieren(string $vorname, string $nachname, PDO $pdo): string
 {
     $v = trim($vorname);
@@ -262,6 +264,16 @@ function ma_login_generieren(string $vorname, string $nachname, PDO $pdo): strin
         $kandidat = $basis . $lauf;
     }
     return $kandidat;
+}
+
+// Prueft, ob ein von Hand eingetragener Login-Name demselben Muster folgt,
+// das ma_login_generieren() selbst erzeugen wuerde: klein geschrieben, ohne
+// Leerzeichen, mindestens zwei durch einen Punkt getrennte Teile (ENT-393).
+// Nur die FORM wird geprueft, nicht die Eindeutigkeit -- das ist Sache des
+// Aufrufers, der den Bestand kennt (siehe mitarbeiter_update.php).
+function ma_login_name_gueltig(string $name): bool
+{
+    return preg_match('/^[\p{Ll}0-9]+(\.[\p{Ll}0-9]+)+$/u', $name) === 1;
 }
 
 // ── Login-Namen-Umstellung im Bestand (ENT-381) ─────────────────────────
@@ -363,7 +375,9 @@ function ma_login_migrieren(PDO $pdo, array $akteur): array
 // fortlaufend: eine vierstellige Zahl (1000-9999), die weder Anlegereihen-
 // folge noch Mitarbeiterzahl verraet -- anders als eine hochzaehlende
 // Nummer. Einzige Vorgabe: jede Person hat eine, und welche, laesst sich
-// nachtraeglich nicht mehr aendern (siehe die Sperre in ma_eingabe_lesen()).
+// nachtraeglich nicht mehr aendern -- ausser fuer die Verwaltung, siehe
+// ma_personalnummer_gueltig() und die Ausnahme in mitarbeiter_update.php
+// (ENT-393). Die Sperre fuer alle anderen bleibt in ma_eingabe_lesen().
 function ma_personalnummer_generieren(PDO $pdo): string
 {
     $stmt = $pdo->prepare('SELECT COUNT(*) AS c FROM mitarbeiter WHERE personalnummer = ?');
@@ -377,6 +391,16 @@ function ma_personalnummer_generieren(PDO $pdo): string
     // echter Befund (Stellenzahl zu knapp geworden) und kein Fall fuer eine
     // Endlosschleife, die den Aufruf einfach haengen liesse.
     throw new RuntimeException('Keine freie Personalnummer gefunden.');
+}
+
+// Prueft, ob eine von Hand eingetragene Personalnummer demselben Muster
+// folgt, das ma_personalnummer_generieren() selbst ziehen wuerde: vierstellig,
+// erste Ziffer nicht 0 (Bereich 1000-9999) (ENT-393). Nur die FORM wird
+// geprueft, nicht die Eindeutigkeit -- das ist Sache des Aufrufers, der den
+// Bestand kennt (siehe mitarbeiter_update.php).
+function ma_personalnummer_gueltig(string $pn): bool
+{
+    return preg_match('/^[1-9]\d{3}$/', $pn) === 1;
 }
 
 // ── Personalnummern-Nachtrag im Bestand (ENT-387) ───────────────────────
@@ -455,6 +479,12 @@ function ma_eingabe_lesen(array $input, array $bestand = [], ?PDO $pdo = null): 
         // (ENT-348, die nie erfasst werden soll) schickt ein gewoehnliches
         // Formular hier den unveraenderten Bestandswert bei jedem Speichern
         // mit -- ein Fehler dabei bräche jedes normale Speichern.
+        //
+        // Diese Funktion kennt keine Rechte -- die eine Ausnahme (Verwaltung
+        // darf von Hand korrigieren, ENT-393) lebt darum bewusst NICHT hier,
+        // sondern als gezielter Zusatzschritt in mitarbeiter_update.php, der
+        // ueber $s['personalnummer'] hinweg entscheidet, nachdem diese
+        // Funktion zurueckgekehrt ist.
         if ($feld === 'personalnummer') {
             if (array_key_exists('personalnummer', $bestand)) {
                 $spalten['personalnummer'] = $bestand['personalnummer'];
