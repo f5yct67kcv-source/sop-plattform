@@ -912,6 +912,16 @@ svg.i-sm { width: 17px; height: 17px; }
       <div class="pw-feld"><input class="inp" id="grNeu" type="password" placeholder="mind. 6 Zeichen" autocomplete="new-password">
         <button type="button" class="pw-toggle" aria-label="Passwort anzeigen"
                 onclick="togglePw('grNeu', this)">👁</button></div></div>
+    <!-- Wiederholung (ENT-379, Wunsch des Projektinhabers): Ohne sie faellt
+         ein Tippfehler erst beim naechsten Anmeldeversuch auf -- und genau
+         dann, wenn das alte Passwort schon vergessen und das neue falsch
+         eingetippt ist, kommt niemand mehr rein. Gleiches Muster wie im
+         Cockpit bei mitarbeiter_reset_password.php ("Neues Passwort" /
+         "Zur Bestaetigung wiederholen"). -->
+    <div class="f"><label for="grNeu2" id="lb-grneu2">Zur Bestätigung wiederholen</label>
+      <div class="pw-feld"><input class="inp" id="grNeu2" type="password" placeholder="nochmals dasselbe" autocomplete="new-password">
+        <button type="button" class="pw-toggle" aria-label="Passwort anzeigen"
+                onclick="togglePw('grNeu2', this)">👁</button></div></div>
     <button class="btn btn-primary btn-wide" id="grBtn" onclick="pwResetSpeichern()">Passwort speichern</button>
   </div>
 </div>
@@ -1496,14 +1506,21 @@ function pwVergessenSenden() {
 }
 function pwResetSpeichern() {
   const neu = $('grNeu').value;
+  const wiederholung = $('grNeu2').value;
   const err = $('grErr'); err.style.display = 'none';
   if (neu.length < PW_MIN) { err.textContent = 'Passwort mindestens ' + PW_MIN + ' Zeichen'; err.style.display = ''; return; }
+  // Erst NACH der Laengenpruefung vergleichen: Sonst stuende bei "x"/"x"
+  // die falsche Meldung ("stimmt nicht ueberein") statt der eigentlichen
+  // ("zu kurz"). Vor dem Server, nicht danach -- ein Tippfehler in der
+  // Wiederholung soll nicht erst als Serverfehler zurueckkommen.
+  if (neu !== wiederholung) { err.textContent = 'Die beiden Passwörter stimmen nicht überein.'; err.style.display = ''; return; }
   const b = $('grBtn'); b.disabled = true;
   api('passwort_zuruecksetzen.php', { method: 'POST', body: { token: pwResetToken, neu } }).then(({ ok, data }) => {
     b.disabled = false;
     if (!ok || data.status !== 'ok') { err.textContent = data.message || w('netzfehler'); err.style.display = ''; return; }
     pwResetToken = null;
     $('grNeu').value = '';
+    $('grNeu2').value = '';
     $('gName').value = data.name || '';
     $('gPass').value = '';
     gateZeige('login');

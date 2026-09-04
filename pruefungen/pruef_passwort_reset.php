@@ -66,6 +66,20 @@ pruef('KRITISCH: die Admin-Ausnahme steht VOR dem Anlegen des Tokens',
 pruef('KRITISCH: darf_verwaltung() wird tatsaechlich benutzt (nicht nur ist_admin direkt)',
     str_contains($anfordern, 'darf_verwaltung('));
 
+// Zwei Adressen im Personaldossier -- E-Mail Geschaeft (email) und E-Mail
+// privat (email_privat). Eine erste Fassung las nur "email" und ging bei
+// jedem Konto leer aus, das nur die private Adresse hinterlegt hat --
+// am eigenen Testkonto des Projektinhabers gefunden, kein Quelltextfehler,
+// der beim Schreiben aufgefallen waere.
+pruef('KRITISCH: die Abfrage liest BEIDE Adressfelder, nicht nur "email"',
+    (bool)preg_match('/SELECT id, ist_admin, email, email_privat, vorname, nachname FROM mitarbeiter/', $anfordern));
+pruef('KRITISCH: die private Adresse hat Vorrang -- eine geschaeftliche Adresse '
+    . 'haengt oft an der Infrastruktur, aus der jemand gerade ausgesperrt ist',
+    (bool)preg_match("/\\\$email = trim\\(\\(string\\)\\(\\\$person\\['email_privat'\\] \\?\\? ''\\)\\);\\s*"
+        . "\\n\\s*if \\(\\\$email === ''\\) \\{ \\\$email = trim\\(\\(string\\)\\\$person\\['email'\\]\\); \\}/", $anfordern));
+pruef('Erst wenn BEIDE Felder leer sind, wird abgebrochen',
+    (bool)preg_match("/\\\$email === ''.*\\n.*if \\(\\\$email === ''\\) \\{ return; \\}/", $anfordern));
+
 pruef('Der Token ist 256 Bit Zufall (random_bytes(32)), gehasht per SHA-256',
     str_contains($anfordern, 'random_bytes(32)') && str_contains($anfordern, "hash('sha256', \$tokenRoh)"));
 pruef('KRITISCH: ein frueherer, noch offener Token derselben Person wird VOR dem neuen entwertet',

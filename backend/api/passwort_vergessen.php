@@ -67,7 +67,7 @@ function versuch_link_zu_verschicken(PDO $pdo, string $name): void
 {
     if (!hat_tabelle($pdo, 'passwort_reset') || !smtp_konfiguriert()) { return; }
 
-    $s = $pdo->prepare('SELECT id, ist_admin, email, vorname, nachname FROM mitarbeiter WHERE name = ? AND aktiv = 1');
+    $s = $pdo->prepare('SELECT id, ist_admin, email, email_privat, vorname, nachname FROM mitarbeiter WHERE name = ? AND aktiv = 1');
     $s->execute([$name]);
     $person = $s->fetch(PDO::FETCH_ASSOC);
     if (!$person) { return; }
@@ -76,7 +76,19 @@ function versuch_link_zu_verschicken(PDO $pdo, string $name): void
     $istVerwaltung = darf_verwaltung(['rollen' => rechte_rollen($pdo, $id, (bool)$person['ist_admin'])]);
     if ($istVerwaltung) { return; }   // siehe Dateikopf -- kein Link fuer Admin-/Personal-Konten
 
-    $email = trim((string)$person['email']);
+    // Zwei Adressen im Personaldossier -- E-Mail Geschaeft (email) und
+    // E-Mail privat (email_privat, seit der Erweiterung in
+    // planung_einrichten.php). Die erste Fassung dieses Endpunkts las nur
+    // "email" und ging bei jedem Konto leer aus, das ausschliesslich eine
+    // private Adresse hinterlegt hat -- vom Projektinhaber am eigenen
+    // Testkonto gefunden.
+    //
+    // PRIVAT ZUERST, nicht Geschaeft: Der ganze Zweck dieses Wegs ist, wer
+    // gerade NICHT ins System kommt -- eine geschaeftliche Adresse haengt
+    // oft an genau der Infrastruktur, aus der man ausgesperrt ist. Die
+    // private Adresse ist die, die auf dem eigenen Telefon ankommt.
+    $email = trim((string)($person['email_privat'] ?? ''));
+    if ($email === '') { $email = trim((string)$person['email']); }
     if ($email === '') { return; }
 
     // Ein frueherer, noch nicht eingeloester Link wird ungueltig: Sonst

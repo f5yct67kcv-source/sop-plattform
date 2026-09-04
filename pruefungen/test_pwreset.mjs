@@ -107,12 +107,24 @@ check('KRITISCH: der Token verschwindet sofort aus der Adresszeile -- er ist ein
   await ev(() => location.search) === '');
 
 await fuelle('#grNeu', 'x');
+await fuelle('#grNeu2', 'x');
 await klick('#grBtn');
 await page.waitForTimeout(200);
 check('KRITISCH: ein zu kurzes Passwort loest keine Anfrage an den Server aus',
   !rufe.some(r => r.p.includes('passwort_zuruecksetzen')));
 
+// ══════════ ENT-379: DIE WIEDERHOLUNG MUSS UEBEREINSTIMMEN ════════════
 await fuelle('#grNeu', 'einLangesUndMerkbaresPasswort');
+await fuelle('#grNeu2', 'einAnderesPasswort');
+await klick('#grBtn');
+await page.waitForTimeout(200);
+check('KRITISCH: bei abweichender Wiederholung geht KEINE Anfrage an den Server',
+  !rufe.some(r => r.p.includes('passwort_zuruecksetzen')));
+check('KRITISCH: stattdessen erscheint die Nichtuebereinstimmungs-Meldung',
+  (await page.textContent('#grErr').catch(() => '')).includes('stimmen nicht überein'));
+
+await fuelle('#grNeu', 'einLangesUndMerkbaresPasswort');
+await fuelle('#grNeu2', 'einLangesUndMerkbaresPasswort');
 await klick('#grBtn');
 await page.waitForTimeout(300);
 check('KRITISCH: der ROHE Token aus der Adresszeile wird mitgeschickt',
@@ -123,11 +135,14 @@ check('KRITISCH: der Anmeldename wird mit dem vom Server genannten Namen vorausg
   (await page.inputValue('#gName').catch(() => '')) === 'm.muster');
 check('Das neue Passwort steht nicht mehr im Feld, wenn es wieder auftaucht',
   (await page.inputValue('#grNeu').catch(() => '')) === '');
+check('Auch die Wiederholung ist wieder leer',
+  (await page.inputValue('#grNeu2').catch(() => '')) === '');
 
 // ══════════ EIN SCHLECHTER TOKEN ZEIGT DEN SERVERFEHLER, WECHSELT NICHT
 await page.goto(`file://${WURZEL}/app.html?reset=schlechter-token`);
 await page.waitForTimeout(400);
 await fuelle('#grNeu', 'einLangesUndMerkbaresPasswort');
+await fuelle('#grNeu2', 'einLangesUndMerkbaresPasswort');
 await klick('#grBtn');
 await page.waitForTimeout(300);
 check('KRITISCH: bei einem abgelehnten Token bleibt der Reset-Bildschirm stehen',
