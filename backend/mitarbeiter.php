@@ -358,6 +358,81 @@ function ma_login_migrieren(PDO $pdo, array $akteur): array
     return $plan;
 }
 
+// ── Personalnummer automatisch (ENT-387) ────────────────────────────────
+// Auf ausdruecklichen Wunsch des Projektinhabers zufaellig statt
+// fortlaufend: eine vierstellige Zahl (1000-9999), die weder Anlegereihen-
+// folge noch Mitarbeiterzahl verraet -- anders als eine hochzaehlende
+// Nummer. Einzige Vorgabe: jede Person hat eine, und welche, laesst sich
+// nachtraeglich nicht mehr aendern (siehe die Sperre in ma_eingabe_lesen()).
+function ma_personalnummer_generieren(PDO $pdo): string
+{
+    $stmt = $pdo->prepare('SELECT COUNT(*) AS c FROM mitarbeiter WHERE personalnummer = ?');
+    for ($versuch = 0; $versuch < 500; $versuch++) {
+        $kandidat = (string)random_int(1000, 9999);
+        $stmt->execute([$kandidat]);
+        if ((int)$stmt->fetch()['c'] === 0) { return $kandidat; }
+    }
+    // Bei 9000 moeglichen Werten in den ueblichen Groessenordnungen dieses
+    // Betriebs praktisch unerreichbar -- kommt es doch so weit, ist das ein
+    // echter Befund (Stellenzahl zu knapp geworden) und kein Fall fuer eine
+    // Endlosschleife, die den Aufruf einfach haengen liesse.
+    throw new RuntimeException('Keine freie Personalnummer gefunden.');
+}
+
+// ── Personalnummern-Nachtrag im Bestand (ENT-387) ───────────────────────
+// Wer schon eine Personalnummer hat, behaelt sie unveraendert -- nur wer
+// keine hat, bekommt eine zugewiesen. Reine Berechnung, schreibt nichts;
+// Vorschau (GET) und Ausfuehrung (POST) im Endpunkt rufen dieselbe Funktion
+// auf, gleiches Muster wie ma_login_migrationsplan().
+//
+// Anders als beim Login-Namen gibt es hier keine Namensgleichheit und
+// keine uebersprungenen Zeilen: Jede Person ohne Nummer bekommt eine.
+function ma_personalnummer_migrationsplan(PDO $pdo): array
+{
+    $rows = $pdo->query('SELECT id, name, personalnummer, aktiv, erstellt_am FROM mitarbeiter ORDER BY id')
+                ->fetchAll(PDO::FETCH_ASSOC);
+    $vergeben = [];
+    foreach ($rows as $r) {
+        $pn = trim((string)$r['personalnummer']);
+        if ($pn !== '') { $vergeben[$pn] = true; }
+    }
+
+    $plan = [];
+    foreach ($rows as $r) {
+        $pn = trim((string)$r['personalnummer']);
+        if ($pn !== '') {
+            $plan[] = ['id' => (int)$r['id'], 'name' => $r['name'], 'alt' => $pn, 'neu' => $pn,
+                'status' => 'unveraendert', 'aktiv' => (bool)$r['aktiv'], 'erstellt_am' => $r['erstellt_am']];
+            continue;
+        }
+        do {
+            $kandidat = (string)random_int(1000, 9999);
+        } while (isset($vergeben[$kandidat]));
+        $vergeben[$kandidat] = true;
+        $plan[] = ['id' => (int)$r['id'], 'name' => $r['name'], 'alt' => null, 'neu' => $kandidat,
+            'status' => 'zugewiesen', 'aktiv' => (bool)$r['aktiv'], 'erstellt_am' => $r['erstellt_am']];
+    }
+    return $plan;
+}
+
+// Fuehrt den Plan aus ma_personalnummer_migrationsplan() wirklich aus.
+// Anders als bei ma_login_migrieren() gibt es hier keine Sitzungen zu
+// beenden -- die Personalnummer ist kein Anmeldemerkmal, ihre Vergabe
+// meldet niemanden ab. Nur Zeilen mit Status "zugewiesen" werden
+// angefasst; wer schon eine Nummer hatte, bleibt unberuehrt.
+function ma_personalnummer_migrieren(PDO $pdo, array $akteur): array
+{
+    $plan = ma_personalnummer_migrationsplan($pdo);
+    $upd = $pdo->prepare('UPDATE mitarbeiter SET personalnummer = ? WHERE id = ?');
+    foreach ($plan as $eintrag) {
+        if ($eintrag['status'] !== 'zugewiesen') { continue; }
+        $upd->execute([$eintrag['neu'], $eintrag['id']]);
+        logbuch_schreiben($pdo, $akteur, 'mitarbeiter', $eintrag['id'],
+            'personalnummer', $eintrag['alt'], $eintrag['neu']);
+    }
+    return $plan;
+}
+
 // ── Eingabe lesen ────────────────────────────────────────────────────────
 // Gibt die Spaltenwerte zurueck, die geschrieben werden sollen, sowie eine
 // Liste von Beanstandungen. Nicht mitgeschickte Felder bleiben beim
@@ -372,6 +447,20 @@ function ma_eingabe_lesen(array $input, array $bestand = [], ?PDO $pdo = null): 
     // die volle Liste (so koennen Pruefungen die Logik ohne Datenbank testen).
     $felder = $pdo ? ma_vorhandene_felder($pdo) : ma_felder();
     foreach ($felder as $feld => $typ) {
+        // Personalnummer wird automatisch vergeben und laesst sich danach
+        // nicht mehr aendern (ENT-387) -- weder beim Anlegen (das setzt
+        // mitarbeiter_create.php separat ueber ma_personalnummer_generieren())
+        // noch beim Bearbeiten. Ein mitgeschickter Wert wird stillschweigend
+        // uebergangen statt einen Fehler zu werfen: Anders als bei ahv_nr
+        // (ENT-348, die nie erfasst werden soll) schickt ein gewoehnliches
+        // Formular hier den unveraenderten Bestandswert bei jedem Speichern
+        // mit -- ein Fehler dabei bräche jedes normale Speichern.
+        if ($feld === 'personalnummer') {
+            if (array_key_exists('personalnummer', $bestand)) {
+                $spalten['personalnummer'] = $bestand['personalnummer'];
+            }
+            continue;
+        }
         if (!array_key_exists($feld, $input)) {
             if (array_key_exists($feld, $bestand)) { $spalten[$feld] = $bestand[$feld]; }
             continue;

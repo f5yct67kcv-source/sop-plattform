@@ -326,8 +326,11 @@ function anthropic_route_diktat(string $text, array $kunden, array $mitarbeiter,
                     'type' => 'object',
                     'description' => 'Nur ausfuellen, wenn bereich = mitarbeiter und aktion = neu.',
                     'properties' => [
+                        // Keine personalnummer: sie wird seit ENT-387 automatisch
+                        // vergeben und liesse sich aus einem Diktat ohnehin nicht
+                        // uebernehmen -- die Angabe wuerde nur eine Erwartung wecken,
+                        // die das Anlegen dann stillschweigend verwirft.
                         'vorname' => ['type' => 'string'], 'nachname' => ['type' => 'string'],
-                        'personalnummer' => ['type' => 'string'],
                         'anrede' => ['type' => 'string', 'enum' => ['Herr', 'Frau', 'Divers']],
                         'geburtsdatum' => ['type' => 'string', 'description' => 'Format JJJJ-MM-TT'],
                         'strasse' => ['type' => 'string'], 'ort' => ['type' => 'string'],
@@ -348,7 +351,9 @@ function anthropic_route_diktat(string $text, array $kunden, array $mitarbeiter,
                             'type' => 'object',
                             'description' => 'Nur die tatsaechlich im Text genannten Felder eintragen, alle anderen weglassen.',
                             'properties' => [
-                                'personalnummer' => ['type' => 'string'],
+                                // Keine personalnummer hier: sie laesst sich seit
+                                // ENT-387 nicht mehr aendern (weder beim Anlegen
+                                // noch beim Bearbeiten).
                                 'anrede' => ['type' => 'string', 'enum' => ['Herr', 'Frau', 'Divers']],
                                 'vorname' => ['type' => 'string'], 'nachname' => ['type' => 'string'],
                                 'geburtsdatum' => ['type' => 'string', 'description' => 'Format JJJJ-MM-TT'],

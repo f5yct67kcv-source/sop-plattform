@@ -51,6 +51,8 @@ let rollenEingerichtet = true;
 // auf GET (Vorschau) wie auf POST (Ausfuehrung), genau wie der echte
 // Endpunkt -- lmMigAntwort wird je Testfall gesetzt.
 let lmMigAntwort = null, lmMigAufruf = null;
+// Personalnummern-Nachtrag (ENT-387): gleiches Mock-Muster.
+let pnMigAntwort = null, pnMigAufruf = null;
 
 const browser = await chromium.launch({ executablePath: EXE });
 const page = await browser.newPage({ viewport: { width: 1600, height: 1100 } });
@@ -104,6 +106,15 @@ await page.route('**/api/**', r => {
       return send({ status: 'error', message: 'Bestätigung erforderlich' }, 400);
     }
     return send({ status: 'ok', plan: lmMigAntwort || [] });
+  }
+  if (u.includes('mitarbeiter_personalnummer_migrieren')) {
+    if (!kann('personal_schreiben')) return send({ status: 'error', message: 'Dafür fehlt dir die Berechtigung.' }, 403);
+    const methode = r.request().method();
+    pnMigAufruf = { methode, body: methode === 'POST' ? koerper() : null };
+    if (methode === 'POST' && (!pnMigAufruf.body || pnMigAufruf.body.bestaetigt !== true)) {
+      return send({ status: 'error', message: 'Bestätigung erforderlich' }, 400);
+    }
+    return send({ status: 'ok', plan: pnMigAntwort || [] });
   }
   if (u.includes('zweifaktor_status')) return send({ status: 'ok', moeglich: true, an: false, geraete: [] });
   if (u.includes('anstellungsorte')) return send({ status: 'ok', orte: [] });
@@ -530,6 +541,98 @@ try {
     !(await sichtbar('lmKarte')));
   meineRechte = ALLE_RECHTE; meineRollen = ['verwaltung'];
 } catch (e) { check('Abschnitt Login-Namen ohne Recht ohne Abbruch: ' + e.message, false); }
+
+// ══════════════ PERSONALNUMMERN NACHTRAGEN (ENT-387)
+try {
+  meineRechte = ALLE_RECHTE; meineRollen = ['verwaltung'];
+  await anmelden();
+  await page.evaluate(() => { go('betrieb'); bkAbschnittZeigen('pn'); });
+  await page.waitForTimeout(900);
+  check('KRITISCH: mit dem Recht "personal_schreiben" steht die Karte da',
+    await sichtbar('pnKarte'));
+
+  pnMigAntwort = [
+    { id: 2, name: 'daniel.muccio', alt: null, neu: '4821', status: 'zugewiesen',
+      aktiv: true, erstellt_am: '2025-02-01 09:00:00' },
+    { id: 3, name: 'test.hans', alt: null, neu: '7093', status: 'zugewiesen',
+      aktiv: false, erstellt_am: '2025-03-01 09:00:00' },
+    { id: 1, name: 'adrian.vonarb', alt: '1', neu: '1', status: 'unveraendert',
+      aktiv: true, erstellt_am: '2025-01-05 10:00:00' },
+  ];
+  await page.click('#pnKarte button:has-text("Vorschau laden")');
+  await page.waitForTimeout(400);
+  const vorschau = (await page.textContent('#pnInhalt')).replace(/\s+/g, ' ');
+  check('Die Vorschau nennt die Anzahl der zuzuweisenden Personalnummern', /\b2\b/.test(vorschau));
+  check('KRITISCH: die Tabelle zeigt Login-Name und neue Personalnummer',
+    /daniel\.muccio/.test(vorschau) && /4821/.test(vorschau)
+    && /test\.hans/.test(vorschau) && /7093/.test(vorschau));
+  check('KRITISCH: bereits vergebene Personalnummern stehen NICHT in der Zuweisungstabelle',
+    !vorschau.includes('adrian.vonarb'));
+  check('KRITISCH: der Status unterscheidet aktiv/inaktiv, auch hier',
+    /inaktiv/.test(vorschau));
+  check('Der Knopf zum Ausfuehren nennt dieselbe Anzahl',
+    /2 Personalnummern vergeben/.test(await page.textContent('#pnInhalt')));
+
+  // Ausfuehren: erst die Rueckfrage, kein Schreiben davor
+  gesendet = null; pnMigAufruf = null;
+  await page.click('button:has-text("Personalnummern vergeben")');
+  await page.waitForSelector('#dlgConfirm.on');
+  check('KRITISCH: vor dem Ausfuehren steht eine Rueckfrage', pnMigAufruf === null);
+  await page.click('#cfBtn');
+  await page.waitForTimeout(500);
+  check('KRITISCH: die Ausfuehrung ist ein POST mit ausdruecklicher Bestaetigung',
+    pnMigAufruf && pnMigAufruf.methode === 'POST' && pnMigAufruf.body.bestaetigt === true);
+  const ergebnis = (await page.textContent('#pnInhalt')).replace(/\s+/g, ' ');
+  check('Die Meldung nennt, dass Personalnummern vergeben wurden',
+    /vergeben/.test(ergebnis));
+  check('KRITISCH: kein Abmelde-Hinweis -- die Personalnummer ist kein Anmeldemerkmal',
+    !/abgemeldet|abmelden/i.test(ergebnis));
+} catch (e) { check('Abschnitt Personalnummern nachtragen ohne Abbruch: ' + e.message, false); }
+
+// Nichts zu tun: kein Vergeben-Knopf, klare Aussage statt leerer Tabelle
+try {
+  meineRechte = ALLE_RECHTE; meineRollen = ['verwaltung'];
+  await anmelden();
+  await page.evaluate(() => { go('betrieb'); bkAbschnittZeigen('pn'); });
+  await page.waitForTimeout(900);
+  pnMigAntwort = [{ id: 1, name: 'adrian.vonarb', alt: '1', neu: '1', status: 'unveraendert',
+    aktiv: true, erstellt_am: '2025-01-05 10:00:00' }];
+  await page.click('#pnKarte button:has-text("Vorschau laden")');
+  await page.waitForTimeout(400);
+  const leer = (await page.textContent('#pnInhalt')).replace(/\s+/g, ' ');
+  check('KRITISCH: "nichts zu tun" sagt das ausdruecklich, statt eine leere Tabelle zu zeigen',
+    /Nichts zu tun/.test(leer));
+  check('KRITISCH: ohne etwas zuzuweisen gibt es auch keinen Vergeben-Knopf',
+    !(await page.$('button:has-text("Personalnummern vergeben")')));
+} catch (e) { check('Abschnitt "nichts zu tun" (Personalnummern) ohne Abbruch: ' + e.message, false); }
+
+// Personal_schreiben genuegt -- unabhaengig vom Recht "rechte" (Verwaltung),
+// das die Login-Namen-Karte verlangt. Zwei verschiedene Gates fuer zwei
+// verschieden riskante Aktionen.
+try {
+  meineRechte = ['plan', 'kunden', 'abgleich', 'personal_lesen', 'personal_schreiben', 'personal_vertraulich'];
+  meineRollen = ['personal'];
+  await anmelden();
+  await page.evaluate(() => go('betrieb'));
+  await page.waitForTimeout(900);
+  check('KRITISCH: "personal_schreiben" allein reicht fuer die Personalnummern-Karte',
+    await sichtbar('bkKachelPn'));
+  check('Ohne das Recht "rechte" bleibt die Login-Namen-Karte trotzdem verborgen',
+    !(await sichtbar('bkKachelRv')));
+  meineRechte = ALLE_RECHTE; meineRollen = ['verwaltung'];
+} catch (e) { check('Abschnitt Personalnummern-Recht ohne Abbruch: ' + e.message, false); }
+
+// Ohne "personal_schreiben" fehlt die Karte
+try {
+  meineRechte = ['plan', 'kunden', 'abgleich', 'personal_lesen', 'betrieb'];
+  meineRollen = ['planung'];
+  await anmelden();
+  await page.evaluate(() => go('betrieb'));
+  await page.waitForTimeout(900);
+  check('KRITISCH: ohne "personal_schreiben" fehlt die Karte "Personalnummern"',
+    !(await sichtbar('bkKachelPn')));
+  meineRechte = ALLE_RECHTE; meineRollen = ['verwaltung'];
+} catch (e) { check('Abschnitt Personalnummern ohne Recht ohne Abbruch: ' + e.message, false); }
 
 check('Keine JavaScript-Fehler', jsFehler.length === 0);
 if (jsFehler.length) { bad.push('JS: ' + jsFehler.slice(0, 3).join(' | ')); }
