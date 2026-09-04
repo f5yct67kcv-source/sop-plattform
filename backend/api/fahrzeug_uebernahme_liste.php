@@ -9,14 +9,14 @@
 // zu den übrigen Zeitraum-Auswertungen (Wachbuch, Scans, Ereignisse), nicht
 // in die Fahrzeug-Einstellungen.
 //
-// SEIT ENT-356 KEINE REINE ANZEIGE MEHR: Zwei Feststellungen ("auffaellig",
-// "wiederholt", siehe unten) werden hier berechnet -- das ist ENT-313s
-// "Lücke" (Tachostand gegen den letzten bekannten Stand), die ausdrücklich
-// KEINEN Erwartungswert braucht. Bewusst weiterhin keine "Abweichung"
-// (gefahren gegen erwartete Distanz einer Schicht) und keine Beanstandung
-// mit Konsequenz -- Letzteres bleibt durch OP-314 blockiert, bis die
-// Privatnutzungs-Regel schriftlich vorliegt und den Mitarbeitenden bekannt
-// ist.
+// SEIT ENT-356/ENT-361 KEINE REINE ANZEIGE MEHR: Drei Feststellungen
+// ("auffaellig", "wiederholt", "abweichend", siehe fz_uebernahme_feststellungen()
+// in fahrzeug.php) werden hier berechnet -- ENT-313s "Lücke" (kein
+// Erwartungswert nötig) UND "Abweichung" (Erwartungswert aus weg_km,
+// ENT-116). Bewusst weiterhin keine Beanstandung mit Konsequenz -- das
+// bleibt durch OP-314 blockiert, bis die Privatnutzungs-Regel schriftlich
+// vorliegt und den Mitarbeitenden bekannt ist (Inhalt bereits entschieden,
+// ENT-356).
 //
 // RECHT: 'betrieb', dasselbe wie fahrzeug_logbuch.php -- wer die Fahrzeuge
 // pflegen darf, muss auch sehen können, wer sie zuletzt übernommen hat.
@@ -71,14 +71,19 @@ $eintraege = array_map(function (array $r): array {
     $r['person'] = $name !== '' ? $name : (string)($r['name'] ?? '?');
     unset($r['vorname'], $r['nachname'], $r['name']);
 
-    // Zwei Feststellungen aus dem Vorwert (ENT-356) -- Berechnung in
+    // Drei Feststellungen aus dem Vorwert (ENT-356/ENT-361) -- Berechnung in
     // fz_uebernahme_feststellungen() (fahrzeug.php), damit sie isoliert
     // (ohne Datenbank) geprüft werden kann.
     $vorigerKm = $r['voriger_km'] !== null ? (int)$r['voriger_km'] : null;
     $vorigerMa = $r['voriger_mitarbeiter_id'] !== null ? (int)$r['voriger_mitarbeiter_id'] : null;
     $eigeneMa = $r['eigene_mitarbeiter_id'] !== null ? (int)$r['eigene_mitarbeiter_id'] : null;
-    $r += fz_uebernahme_feststellungen($r['tacho_km'], $vorigerKm, $vorigerMa, $eigeneMa);
-    unset($r['voriger_km'], $r['voriger_mitarbeiter_id'], $r['eigene_mitarbeiter_id']);
+    $sollEinsaetze = (int)($r['soll_einsaetze'] ?? 0);
+    $sollEinsaetzeMitWegKm = (int)($r['soll_einsaetze_mit_weg_km'] ?? 0);
+    $sollKmSumme = $r['soll_km_summe'] !== null ? (float)$r['soll_km_summe'] : null;
+    $r += fz_uebernahme_feststellungen($r['tacho_km'], $vorigerKm, $vorigerMa, $eigeneMa,
+        $sollEinsaetze, $sollEinsaetzeMitWegKm, $sollKmSumme);
+    unset($r['voriger_km'], $r['voriger_mitarbeiter_id'], $r['eigene_mitarbeiter_id'],
+        $r['soll_einsaetze'], $r['soll_einsaetze_mit_weg_km'], $r['soll_km_summe']);
     return $r;
 }, $stmt->fetchAll(PDO::FETCH_ASSOC));
 
