@@ -3359,6 +3359,10 @@ function zeichneMenu() {
         <span class="mk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg></span>
         <span class="mk-kachel-lbl">${esc(w('meineStunden'))}</span>
       </button>
+      <button type="button" id="mk-abwesenheit" class="mk-kachel" onclick="abwesenheitAusMenue()">
+        <span class="mk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg></span>
+        <span class="mk-kachel-lbl">${esc(w('abwesenheit'))}</span>
+      </button>
     </div>
 
     <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">
@@ -3406,6 +3410,20 @@ function datenSeiteAuf() {
   h.style.display = 'none';
   u.style.display = '';
   window.scrollTo(0, 0);
+}
+
+/* Kachel "Abwesenheit" im Menue (ENT-370). Anders als die beiden anderen
+   Kacheln fuehrt sie NICHT auf eine Unterseite dieses Reiters, sondern in
+   den Unterreiter "Abwesenheit" von Plan (ENT-255) -- der Bereich selbst
+   ist nicht neu, nur der zweite Weg dorthin. Grund: Der Projektinhaber hat
+   ihn im Menue gesucht, weil dort bei Coredinate der Antrag liegt; im Plan-
+   Reiter haette ihn ohne diese Kachel niemand vermutet. Zwei Wege auf
+   dasselbe Ziel statt eines zweiten Bauteils -- die Liste, der Saldo und
+   "Neuer Antrag" bleiben an ihrem einen Ort (planUnterWahl), nichts wird
+   dafuer verdoppelt. */
+function abwesenheitAusMenue() {
+  planUnter = 'abwesenheit';
+  zeige('plan');
 }
 function datenSeiteZu() {
   const h = $('pr-haupt'), u = $('pr-daten');
