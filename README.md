@@ -64,14 +64,17 @@ in `dashboard.html` — eine Zeile aendern genuegt.
 
 ## Deploy
 
-Jeder Push auf `main` **oder** `staging` loest denselben Workflow
-`.github/workflows/deploy-hostpoint.yml` aus (ENT-341): Platzhalter
-(`__DB_HOST__`, `__ANTHROPIC_API_KEY__` usw.) werden aus GitHub Secrets
-ersetzt, danach FTPS-Upload zu Hostpoint. `main` deployt nach Produktion,
-`staging` nach der getrennten Testinstanz — **derselbe Workflow, dieselbe
-Dateiliste**, nur das GitHub Environment (`production`/`staging`, siehe
-`Settings → Environments`) und damit die Werte hinter den Secret-Namen
-unterscheiden sich. Siehe „Staging" weiter unten.
+Jeder Push auf `main` loest den Workflow
+`.github/workflows/deploy-hostpoint.yml` aus (ENT-341) und deployt nach
+Produktion: Platzhalter (`__DB_HOST__`, `__ANTHROPIC_API_KEY__` usw.)
+werden aus GitHub Secrets ersetzt, danach FTPS-Upload zu Hostpoint.
+Ein Deploy nach Staging läuft über **denselben Workflow, dieselbe
+Dateiliste**, aber ausschliesslich manuell gegen einen `qa-*`-Tag statt
+per Push — kein dauerhafter Branch `staging` mehr (ENT-372, revidiert
+ENT-341 Punkt 5). Welches GitHub Environment (`production`/`staging`,
+siehe `Settings → Environments`) greift und damit welche Werte hinter den
+Secret-Namen stehen, entscheidet in beiden Fällen der Ref (Branch `main`
+oder `qa-*`-Tag). Siehe „Staging" weiter unten.
 
 **Im Quellcode stehen nie echte Zugangsdaten** — nur Platzhalter. Wer die Dateien
 lokal oeffnet, sieht keine Geheimnisse.
@@ -116,7 +119,8 @@ unten).
 
 **Erforderlich, sonst bricht der Deploy ab** (siehe Workflow-Schritt „Umgebung
 waehlen und erforderliche Secrets pruefen"): `DB_*`, `HOSTPOINT_FTP_*` und
-`MAPS_JS_KEY` — jeweils production- oder staging-seitig, je nach Branch —
+`MAPS_JS_KEY` — jeweils production- oder staging-seitig, je nachdem, ob
+gegen `main` oder einen `qa-*`-Tag deployt wird —
 sowie bei Staging zusaetzlich `STAGING_TESTMAIL`. **Optional, mit
 eingebauter Ersatzmeldung statt Absturz:** `SMTP_*` (meldet „noch nicht
 eingerichtet") und `ANTHROPIC_API_KEY` (KI-Funktionen liefern dann nichts,
@@ -126,19 +130,37 @@ statt zu scheitern) — dieselbe Regel gilt fuer die `STAGING_`-Varianten.
 Chat, ein Bildschirmfoto: **neu erzeugen, nicht loeschen.** Loeschen hilft nicht,
 der alte Wert bleibt in der Git-Historie und in Zwischenspeichern stehen.
 
-## Staging (ENT-341)
+## Staging (ENT-341, Deploy-Mechanismus revidiert durch ENT-372)
 
 Eine vollstaendig getrennte Testinstanz — dieselbe Codebasis, eigene
 Datenbank, eigenes FTP-Ziel, eigene Secrets unter eigenen Namen, keine
 echten Geschaeftsdaten. Beim SMTP-Versand teilt sich Staging das Postfach
-mit Production (ENT-367) — die Secret-*Namen* bleiben trotzdem eigene
+mit Production, als bewusst begrenzte, mit sieben Bedingungen versehene
+Ausnahme (ENT-367/ENT-371) — die Secret-*Namen* bleiben trotzdem eigene
 (`STAGING_SMTP_*`), nur die *Werte* sind vorerst identisch; die zwingende
 Empfaenger-Umleitung unten macht das unkritisch. Adresse und genaue
 Hostpoint-Einrichtung stehen im Entscheidungsprotokoll des
 Projekt-Repositories (ENT-341); hier nur, was den Code betrifft:
 
-- **Branch `staging`** loest denselben Deploy-Workflow aus wie `main`, mit
-  dem GitHub Environment `staging` statt `production` (siehe oben).
+- **Kein dauerhafter Branch `staging`.** Ein Push auf `main` loest
+  ausschliesslich den Production-Deploy aus. Ein Staging-Deploy entsteht
+  **ausschliesslich manuell** ("Run workflow" in GitHub Actions) gegen
+  einen **Git-Tag** der Form `qa-JJJJ-MM-TT-NNN` (z. B. `qa-2026-09-04-001`),
+  der exakt auf einem bestehenden `main`-Commit liegt — nie gegen einen
+  Branch. Grund (ENT-372): `main` bleibt alleinige Source of Truth, es darf
+  keinen Staging-spezifischen Code geben, der spaeter zurueckgemergt werden
+  muesste. Ein Tag ist dafuer die richtige Wahl, weil sich git-technisch
+  kein Commit "auf" einen Tag pushen laesst — anders als bei einem Branch
+  ist das kein Konventions-, sondern ein struktureller Schutz. Das
+  GitHub-Environment `staging` ist zusaetzlich ueber "Deployment branches
+  and tags" auf das Muster `qa-*` beschraenkt; der Workflow selbst bricht
+  ausserdem ab, wenn ein Staging-Lauf gegen einen Ref ohne dieses Muster
+  ausgeloest wird.
+  ```
+  git tag qa-2026-09-04-001 <main-commit>
+  git push origin qa-2026-09-04-001
+  # danach in GitHub Actions: "Run workflow" -> Use workflow from: dieser Tag
+  ```
 - **Kein Rueckfall auf Production-Secrets:** Staging-Secrets tragen eigene
   Namen (`STAGING_DB_HOST` statt `DB_HOST` usw., siehe Tabelle oben). Der
   erste Schritt des Workflows loest fuer die aktive Umgebung den richtigen
@@ -157,7 +179,10 @@ Projekt-Repositories (ENT-341); hier nur, was den Code betrifft:
   Funktion `smtp_ziel()` — **unabhaengig davon**, ueber welches Postfach
   (`STAGING_SMTP_*`, seit ENT-367 mit denselben Werten wie `SMTP_*`) sie
   tatsaechlich verschickt wird. Der urspruenglich eingegebene Empfaenger
-  bleibt im Betreff sichtbar.
+  bleibt im Betreff sichtbar, und der Absendername traegt ausserhalb der
+  Produktion automatisch das Praefix `[STAGING]` (`smtp_absender_name()`,
+  ENT-371 Bedingung 4) — unabhaengig davon, was im Secret
+  `STAGING_SMTP_ABSENDER_NAME` konfiguriert ist.
 - **Einrichtung einer neuen/leeren Staging-Datenbank:** `backend/schema.sql`
   einmalig in phpMyAdmin ausfuehren, danach `setup.php`/`setup.html`
   temporaer hochladen und den ersten Admin-Account anlegen (**danach
