@@ -547,6 +547,28 @@ CREATE TABLE IF NOT EXISTS kunden_kontaktweg (
   FOREIGN KEY (mitarbeiter_id) REFERENCES mitarbeiter(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+// Passwort-Ruecksetzung per E-Mail-Link (ENT-373). NUR fuer normale
+// Mitarbeitende -- ein Admin-/Personal-Konto bekommt nie einen Eintrag hier
+// (siehe passwort_vergessen.php), weil an einem Admin-Zugang die ganze
+// Personalakte haengt und ein abgegriffenes privates Postfach sonst dieselbe
+// Tuer waere wie das fehlende erzwungene 2FA (siehe zweifaktor.php).
+//
+// token_hash ist SHA-256, nicht bcrypt: Anders als ein Passwort ist der Token
+// selbst schon 256 Bit Zufall -- kein Salz noetig, dafuer ein direkter,
+// indizierter Treffer bei der Ruecknahme (derselbe Grund wie bei
+// zwei_faktor_geraete.merkmal_hash oben).
+'passwort_reset' => "CREATE TABLE passwort_reset (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  mitarbeiter_id INT NOT NULL,
+  token_hash CHAR(64) NOT NULL,
+  erstellt_am DATETIME DEFAULT CURRENT_TIMESTAMP,
+  laeuft_ab DATETIME NOT NULL,
+  benutzt_am DATETIME NULL,
+  UNIQUE KEY uq_token (token_hash),
+  KEY idx_person (mitarbeiter_id, benutzt_am),
+  FOREIGN KEY (mitarbeiter_id) REFERENCES mitarbeiter(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
 // Rollen je Person (ENT-077). Mehrere Zeilen je Mitarbeitendem sind der
 // Zweck der Tabelle, nicht ein Nebeneffekt: Planung und Personal sind zwei
 // verschiedene Arbeiten, keine Stufen uebereinander.

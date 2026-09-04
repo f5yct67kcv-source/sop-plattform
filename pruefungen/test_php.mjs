@@ -115,9 +115,26 @@ const pwBeanstandet = pwAus.split('\n').filter(z => z.trim().startsWith('X '));
 check('KRITISCH: schwache Passwoerter werden abgewiesen', pwCode === 0 && pwBeanstandet.length === 0);
 if (pwBeanstandet.length) { pwBeanstandet.forEach(z => bad.push('PHP-Passwort: ' + z.trim())); }
 
+// ── Passwort-Ruecksetzung per E-Mail-Link, ENT-373 (Quelltext -- die
+// Endpunkte benutzen MySQL-eigene Syntax und lassen sich nicht gegen den
+// SQLite-Stub ausfuehren, siehe pruef_passwort_reset.php).
+let prAus = '', prCode = 0;
+try {
+  prAus = execFileSync('php', [`${HIER}/pruef_passwort_reset.php`],
+    { encoding: 'utf8' });
+} catch (e) {
+  prAus = String(e.stdout || '') + String(e.stderr || '');
+  prCode = e.status || 1;
+}
+const prBeanstandet = prAus.split('\n').filter(z => z.trim().startsWith('✗ '));
+check('KRITISCH: die Passwort-Ruecksetzung erfuellt alle eigenen Regeln (Admin-Ausnahme, Gleichlaut, Token-Hashing)',
+  prCode === 0 && prBeanstandet.length === 0);
+if (prBeanstandet.length) { prBeanstandet.forEach(z => bad.push('PHP-Reset: ' + z.trim())); }
+
 // Alle DREI Stellen, an denen ein Passwort gesetzt wird, muessen die Regel
 // aufrufen -- eine vergessene Stelle waere ein offenes Hintertuerchen.
-const pwStellen = ['mitarbeiter_create.php', 'mitarbeiter_reset_password.php', 'mein_passwort.php'];
+const pwStellen = ['mitarbeiter_create.php', 'mitarbeiter_reset_password.php', 'mein_passwort.php',
+  'passwort_zuruecksetzen.php'];
 // Kommentare vorher weg: Ein Hinweis "// passwort_pruefen (ENT-075)" neben
 // dem require ist kein Aufruf. Die erste Fassung dieser Pruefung ist genau
 // darauf hereingefallen -- sie blieb gruen, als der Aufruf entfernt wurde.
