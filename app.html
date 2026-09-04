@@ -96,6 +96,12 @@ svg.i-sm { width: 17px; height: 17px; }
 .pw-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .inp:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .msg-err { font-size: 14px; color: var(--neg); background: var(--neg-soft); border-radius: var(--r-sm); padding: 11px 13px; margin-bottom: 16px; }
+.msg-ok { font-size: 14px; color: var(--pos); background: var(--pos-soft); border-radius: var(--r-sm); padding: 11px 13px; margin-bottom: 16px; }
+/* Passwort-vergessen/-zuruecksetzen im Gate (ENT-373). */
+.gate-link { display: block; width: 100%; margin-top: 14px; padding: 4px; background: none; border: 0;
+  color: var(--ink-2); font: inherit; font-size: 13.5px; font-weight: 620; text-align: center; cursor: pointer;
+  min-height: 44px; }
+.gate-hinweis { font-size: 13.5px; color: var(--ink-2); line-height: 1.5; margin: 0 0 16px; }
 
 /* Unterschrift: Knopf und Vorschau kommen aus unterschrift.js (ENT-292), das
    auch index.html laedt -- eine Unterschrift, egal ueber welchen Weg. Das
@@ -868,7 +874,7 @@ svg.i-sm { width: 17px; height: 17px; }
     <div class="wm">Cockpit</div>
     <div class="sub">CUPI 24 GmbH</div>
   </div>
-  <div class="gate-form">
+  <div class="gate-form" id="gate-login">
     <div id="gErr" class="msg-err" style="display:none"></div>
     <div class="f"><label for="gName" id="lb-name">Name</label><input class="inp" id="gName" autocomplete="username" autocapitalize="none"></div>
     <div class="f"><label for="gPass" id="lb-pass">Passwort</label>
@@ -876,6 +882,37 @@ svg.i-sm { width: 17px; height: 17px; }
         <button type="button" class="pw-toggle" aria-label="Passwort anzeigen"
                 onclick="togglePw('gPass', this)">👁</button></div></div>
     <button class="btn btn-primary btn-wide" id="gBtn" onclick="anmelden()">Anmelden</button>
+    <button type="button" class="gate-link" id="lb-pwvergessen" onclick="pwVergessenZeigen()">Passwort vergessen?</button>
+  </div>
+
+  <!-- "Passwort vergessen" (ENT-373): Anmeldename eingeben, ein Link geht
+       -- falls hinterlegt -- per E-Mail raus. Bewusst im GATE-Container und
+       NICHT in der Schublade (.blatt): Die Schublade sitzt auf z-index 61,
+       das Gate auf z-index 900 -- vor der Anmeldung waere sie unsichtbar
+       dahinter verschwunden (dieselbe Art Fehler wie bei ENT-345/346,
+       diesmal vor dem Bauen gefunden statt danach). -->
+  <div class="gate-form" id="gate-vergessen" style="display:none">
+    <div id="gvErr" class="msg-err" style="display:none"></div>
+    <div id="gvOk" class="msg-ok" style="display:none"></div>
+    <p class="gate-hinweis" id="gvHinweis">Anmeldename eingeben. Ist eine E-Mail-Adresse hinterlegt, geht ein Link zum Zurücksetzen dorthin.</p>
+    <div class="f"><label for="gvName" id="lb-gvname">Anmeldename</label><input class="inp" id="gvName" autocomplete="username" autocapitalize="none"></div>
+    <button class="btn btn-primary btn-wide" id="gvBtn" onclick="pwVergessenSenden()">Link anfordern</button>
+    <button type="button" class="gate-link" id="lb-gvzurueck" onclick="pwVergessenZurueck()">Zurück zur Anmeldung</button>
+  </div>
+
+  <!-- Neues Passwort setzen (ENT-373): erscheint anstelle der Anmeldung,
+       sobald die Adresszeile ?reset=<token> traegt (siehe ganz unten im
+       Skript). Der Token wird sofort aus der Adresszeile entfernt -- er ist
+       ein Geheimnis und hat im Verlauf nichts zu suchen (gleiches Muster
+       wie die Fahrzeug-Kennung, ENT-340). -->
+  <div class="gate-form" id="gate-reset" style="display:none">
+    <div id="grErr" class="msg-err" style="display:none"></div>
+    <p class="gate-hinweis">Neues Passwort für dieses Konto festlegen.</p>
+    <div class="f"><label for="grNeu" id="lb-grneu">Neues Passwort</label>
+      <div class="pw-feld"><input class="inp" id="grNeu" type="password" placeholder="mind. 6 Zeichen" autocomplete="new-password">
+        <button type="button" class="pw-toggle" aria-label="Passwort anzeigen"
+                onclick="togglePw('grNeu', this)">👁</button></div></div>
+    <button class="btn btn-primary btn-wide" id="grBtn" onclick="pwResetSpeichern()">Passwort speichern</button>
   </div>
 </div>
 
@@ -1423,6 +1460,57 @@ function beschriften() {
 }
 
 // ══════════════════════════════════════════ ZUGANG
+// "Passwort vergessen" / "Neues Passwort setzen" (ENT-373). Drei Zustaende
+// EINES Containers (#gate), nicht drei Seiten -- passt zum Rest der App
+// (siehe planUnterWahl: ein Container, mehrere sichtbare Teile).
+let pwResetToken = null;   // gesetzt, sobald ?reset=<token> gelesen wurde
+function gateZeige(teil) {
+  $('gate-login').style.display = teil === 'login' ? '' : 'none';
+  $('gate-vergessen').style.display = teil === 'vergessen' ? '' : 'none';
+  $('gate-reset').style.display = teil === 'reset' ? '' : 'none';
+}
+function pwVergessenZeigen() {
+  $('gvName').value = $('gName').value;   // was schon eingetippt war, nicht nochmal verlangen
+  $('gvErr').style.display = 'none';
+  $('gvOk').style.display = 'none';
+  $('gvHinweis').style.display = '';
+  gateZeige('vergessen');
+}
+function pwVergessenZurueck() {
+  gateZeige('login');
+}
+function pwVergessenSenden() {
+  const name = $('gvName').value.trim();
+  const err = $('gvErr'); err.style.display = 'none';
+  if (!name) { err.textContent = 'Anmeldename erforderlich'; err.style.display = ''; return; }
+  const b = $('gvBtn'); b.disabled = true;
+  api('passwort_vergessen.php', { method: 'POST', body: { name } }).then(({ data }) => {
+    b.disabled = false;
+    // Die Antwort ist absichtlich in JEDEM Fall dieselbe (siehe
+    // passwort_vergessen.php) -- hier wird sie unveraendert gezeigt, es gibt
+    // nichts zu unterscheiden.
+    $('gvHinweis').style.display = 'none';
+    $('gvOk').textContent = data.message || 'Falls dieser Anmeldename mit einer hinterlegten E-Mail-Adresse verknüpft ist, wurde eine Nachricht verschickt.';
+    $('gvOk').style.display = '';
+  });
+}
+function pwResetSpeichern() {
+  const neu = $('grNeu').value;
+  const err = $('grErr'); err.style.display = 'none';
+  if (neu.length < PW_MIN) { err.textContent = 'Passwort mindestens ' + PW_MIN + ' Zeichen'; err.style.display = ''; return; }
+  const b = $('grBtn'); b.disabled = true;
+  api('passwort_zuruecksetzen.php', { method: 'POST', body: { token: pwResetToken, neu } }).then(({ ok, data }) => {
+    b.disabled = false;
+    if (!ok || data.status !== 'ok') { err.textContent = data.message || w('netzfehler'); err.style.display = ''; return; }
+    pwResetToken = null;
+    $('grNeu').value = '';
+    $('gName').value = data.name || '';
+    $('gPass').value = '';
+    gateZeige('login');
+    toast('Passwort gesetzt -- bitte anmelden');
+  });
+}
+
 function anmelden() {
   const name = $('gName').value.trim(), pass = $('gPass').value;
   const err = $('gErr'); err.style.display = 'none';
@@ -6311,7 +6399,21 @@ $('gPass').addEventListener('keydown', e => { if (e.key === 'Enter') anmelden();
 $('gName').addEventListener('keydown', e => { if (e.key === 'Enter') $('gPass').focus(); });
 
 beschriften();
-if (token && ich) starten();
+// Ein Reset-Link geht immer vor der normalen Anmeldung -- auch wenn noch
+// eine gueltige Sitzung im Speicher liegt (siehe pwResetSpeichern: ein
+// erfolgreicher Reset raeumt ohnehin ALLE Sitzungen ab). Die Kennung wird
+// SOFORT aus der Adresszeile entfernt, gleiches Muster wie bei der
+// Fahrzeug-Kennung (?fz=) in starten(): Sie ist ein Geheimnis und hat weder
+// im Verlauf noch in einem geteilten Link etwas zu suchen.
+const gStart = new URLSearchParams(location.search);
+const gResetToken = gStart.get('reset');
+if (gResetToken) {
+  history.replaceState(null, '', location.pathname);
+  pwResetToken = gResetToken;
+  gateZeige('reset');
+} else if (token && ich) {
+  starten();
+}
 </script>
 </body>
 </html>
