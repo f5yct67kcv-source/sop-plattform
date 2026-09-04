@@ -895,8 +895,10 @@ svg.i-sm { width: 17px; height: 17px; }
     <div id="gvErr" class="msg-err" style="display:none"></div>
     <div id="gvOk" class="msg-ok" style="display:none"></div>
     <p class="gate-hinweis" id="gvHinweis">Anmeldename eingeben. Ist eine E-Mail-Adresse hinterlegt, geht ein Link zum Zurücksetzen dorthin.</p>
-    <div class="f"><label for="gvName" id="lb-gvname">Anmeldename</label><input class="inp" id="gvName" autocomplete="username" autocapitalize="none"></div>
-    <button class="btn btn-primary btn-wide" id="gvBtn" onclick="pwVergessenSenden()">Link anfordern</button>
+    <div id="gvFelder">
+      <div class="f"><label for="gvName" id="lb-gvname">Anmeldename</label><input class="inp" id="gvName" autocomplete="username" autocapitalize="none"></div>
+      <button class="btn btn-primary btn-wide" id="gvBtn" onclick="pwVergessenSenden()">Link anfordern</button>
+    </div>
     <button type="button" class="gate-link" id="lb-gvzurueck" onclick="pwVergessenZurueck()">Zurück zur Anmeldung</button>
   </div>
 
@@ -1484,6 +1486,7 @@ function pwVergessenZeigen() {
   $('gvErr').style.display = 'none';
   $('gvOk').style.display = 'none';
   $('gvHinweis').style.display = '';
+  $('gvFelder').style.display = '';
   gateZeige('vergessen');
 }
 function pwVergessenZurueck() {
@@ -1502,6 +1505,11 @@ function pwVergessenSenden() {
     $('gvHinweis').style.display = 'none';
     $('gvOk').textContent = data.message || 'Falls dieser Anmeldename mit einer hinterlegten E-Mail-Adresse verknüpft ist, wurde eine Nachricht verschickt.';
     $('gvOk').style.display = '';
+    // Nach dem Absenden gibt es hier nichts mehr zu tun -- ein zweiter Klick
+    // aendert an der (absichtlich gleichbleibenden) Antwort nichts. Feld und
+    // Knopf weg, nur noch der Weg zurueck bleibt stehen (Wunsch des
+    // Projektinhabers nach dem ersten Live-Test).
+    $('gvFelder').style.display = 'none';
   });
 }
 function pwResetSpeichern() {

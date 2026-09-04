@@ -77,11 +77,23 @@ check('KRITISCH: die Antwort des Servers wird unveraendert gezeigt -- keine eige
   (await page.textContent('#gvOk').catch(() => '')).includes('GENAU DIESELBE NACHRICHT, immer'));
 check('Der Hinweistext vor dem Absenden ist danach weg -- die Bestaetigung ersetzt ihn',
   await ev(() => getComputedStyle(document.getElementById('gvHinweis')).display === 'none'));
+check('KRITISCH: Namensfeld und Knopf sind nach dem Absenden weg -- ein zweiter Klick aendert nichts',
+  await ev(() => getComputedStyle(document.getElementById('gvFelder')).display === 'none'));
+check('Nur noch "Zurueck zur Anmeldung" bleibt sichtbar',
+  await page.isVisible('#lb-gvzurueck'));
 
 await klick('#lb-gvzurueck');   // "Zurueck zur Anmeldung" -- einziger uebriger .gate-link in dieser Ansicht
 await page.waitForTimeout(300);
 check('KRITISCH: "Zurueck zur Anmeldung" fuehrt tatsaechlich zurueck',
   await ev(() => getComputedStyle(document.getElementById('gate-login')).display !== 'none'));
+
+// ══════════ EIN ERNEUTER AUFRUF ZEIGT FELD UND KNOPF WIEDER ═══════════
+await klick('#lb-pwvergessen');
+await page.waitForTimeout(200);
+check('KRITISCH: beim erneuten Oeffnen stehen Namensfeld und Knopf wieder da',
+  await ev(() => getComputedStyle(document.getElementById('gvFelder')).display !== 'none'));
+await klick('#lb-gvzurueck');
+await page.waitForTimeout(200);
 
 // ══════════ EIN LEERER NAME WIRD ABGEFANGEN, OHNE ANFRAGE ═════════════
 rufe.length = 0;
