@@ -69,6 +69,17 @@ check('KRITISCH: der unersetzte Platzhalter selbst gilt als offen',
 check('KRITISCH (Gegenprobe ENT-192): ein echter, konfigurierter Wert gilt NICHT als offen',
     !platzhalter_offen('test-postfach@beispiel.ch', '__STAGING_TESTMAIL'));
 
+// smtp_absender_name() -- Bedingung 4 der SMTP-Ausnahme (ENT-371): der
+// Absender muss ausserhalb der Produktion als Staging erkennbar sein, egal
+// was im Secret konfiguriert ist. Mit frei gewaehlten Namen geprueft, nicht
+// nur mit dem einen Platzhalter-Zustand dieser Umgebung.
+check('KRITISCH: auf Produktion bleibt der konfigurierte Absendername unveraendert',
+    smtp_absender_name('Cupi 24 GmbH', true) === 'Cupi 24 GmbH');
+check('KRITISCH (ENT-371 Bedingung 4): ausserhalb der Produktion traegt der Absender das Praefix [STAGING]',
+    smtp_absender_name('Cupi 24 GmbH', false) === '[STAGING] Cupi 24 GmbH');
+check('KRITISCH: ein leerer Absendername bleibt ausserhalb der Produktion trotzdem als Staging erkennbar',
+    smtp_absender_name('', false) === '[STAGING]');
+
 echo "\n" . $ok . ' bestanden, ' . count($bad) . " nicht bestanden\n";
 if ($bad) { foreach ($bad as $b) { echo '  x ' . $b . "\n"; } exit(1); }
 echo "Alle Pruefungen bestanden.\n";

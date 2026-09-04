@@ -143,6 +143,29 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     /PFLICHT_FEHLT/.test(workflow) && /exit 1/.test(workflow));
 }
 
+// ── Staging deployt nur gegen qa-*-Tags, nie gegen einen Branch (ENT-372,
+// revidiert ENT-341 Punkt 5) ──────────────────────────────────────────────
+//
+// Warum diese Prüfung: Der dauerhafte Branch "staging" wurde ersatzlos
+// gestrichen -- ein beschreibbarer Branch widerspricht der Vorgabe "main
+// ist alleinige Source of Truth, kein Staging-spezifischer Code, der
+// zurückgemerged werden müsste". Geprüft wird die AUSSAGE ("kein Push auf
+// main+staging mehr, ein Staging-Deploy ohne passenden qa-*-Tag bricht
+// ab"), nicht nur, ob der String "qa-*" irgendwo im Workflow vorkommt.
+{
+  check('KRITISCH: main ist der einzige Push-Auslöser, kein Branch "staging" mehr',
+    /push:\s*\n\s*branches:\s*\[main\]/.test(workflow)
+    && !/branches:\s*\[\s*main\s*,\s*staging\s*\]/.test(workflow));
+
+  // Gegenprobe der Aussage selbst: Ein Muster, das nur nach "qa-*" sucht,
+  // bliebe grün, wenn das nur in einem Kommentar auftaucht. Deshalb muss
+  // die Prüfung tatsächlich an den github.ref_name UND an einen Abbruch
+  // (exit 1) gekoppelt sein, innerhalb des staging-Zweigs.
+  const qaTagAbbruch = /if\s*\[\s*"\$UMGEBUNG"\s*=\s*"staging"\s*\][\s\S]{0,300}?github\.ref_name[\s\S]{0,200}?qa-\*[\s\S]{0,300}?exit 1/;
+  check('KRITISCH: ein Staging-Deploy ohne passenden qa-*-Tag bricht ab (exit 1)',
+    qaTagAbbruch.test(workflow));
+}
+
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
 console.log('Alle Pruefungen bestanden.');

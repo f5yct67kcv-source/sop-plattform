@@ -91,6 +91,22 @@ function smtp_ziel(string $anEmail, string $anName, bool $produktion): array
     return [$testAdresse, 'Staging-Testadresse'];
 }
 
+// Bedingung 4 der SMTP-Ausnahme (ENT-371): Der Absender soll ausserhalb der
+// Produktion als Staging erkennbar sein -- unabhaengig davon, was im
+// konfigurierten Secret STAGING_SMTP_ABSENDER_NAME steht (das seit ENT-367
+// denselben Wert wie SMTP_ABSENDER_NAME traegt). Deshalb hier automatisch
+// erzwungen statt der Sorgfalt beim Befuellen des Secrets ueberlassen --
+// dieselbe Haltung wie bei der Empfaenger-Umleitung: eine Absicherung im
+// Server, nicht nur eine Konvention. Reine Funktion, mit frei gewaehltem
+// Namen (auch leer) pruefbar.
+function smtp_absender_name(string $konfiguriert, bool $produktion): string
+{
+    if ($produktion) {
+        return $konfiguriert;
+    }
+    return $konfiguriert === '' ? '[STAGING]' : '[STAGING] ' . $konfiguriert;
+}
+
 function smtp_lesen($fp): string
 {
     $antwort = '';
@@ -170,7 +186,7 @@ function smtp_senden(string $anEmail, string $anName, string $betreff, string $h
     $user = '__SMTP_USER__';
     $pass = '__SMTP_PASSWORD__';
     $absenderEmail = smtp_absender_adresse();
-    $absenderName = '__SMTP_ABSENDER_NAME__';
+    $absenderName = smtp_absender_name('__SMTP_ABSENDER_NAME__', $produktion);
 
     $transport = $verschluesselung === 'ssl' ? 'ssl://' : '';
     $ctx = stream_context_create(['ssl' => ['verify_peer' => true, 'verify_peer_name' => true]]);

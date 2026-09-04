@@ -2,11 +2,11 @@ name: Deploy Rapport-Tool zu Hostpoint
 
 # Zwei Laufzeitumgebungen, EIN Workflow (ENT-341, Variante B): main deployt
 # nach Produktion, staging nach der getrennten Testinstanz. Welches GitHub
-# Environment aktiv ist, entscheidet der Branchname -- Kopierliste und
-# Platzhalter-Ersetzung bleiben fuer beide identisch, nur die WERTE hinter
-# den Secret-Namen unterscheiden sich (Settings → Environments in GitHub).
-# Das ist der einzige dauerhafte Unterschied zwischen den Umgebungen --
-# nicht zwei gepflegte Kopien dieses Workflows.
+# Environment aktiv ist, entscheidet der REF, gegen den der Lauf ausgeloest
+# wird -- Kopierliste und Platzhalter-Ersetzung bleiben fuer beide identisch,
+# nur die WERTE hinter den Secret-Namen unterscheiden sich (Settings →
+# Environments in GitHub). Das ist der einzige dauerhafte Unterschied
+# zwischen den Umgebungen -- nicht zwei gepflegte Kopien dieses Workflows.
 #
 # Staging-Secrets tragen durchgehend das Praefix STAGING_ und sind EIGENE,
 # von den Produktions-Namen VERSCHIEDENE Secret-Namen -- nicht nur eigene
@@ -22,9 +22,22 @@ name: Deploy Rapport-Tool zu Hostpoint
 # STAGING_DB_HOST hat keinen gleichnamigen Ersatz, sondern ist schlicht
 # leer -- und der erste Schritt unten erkennt genau das und bricht den Lauf
 # ab, bevor irgendetwas kopiert oder hochgeladen wird.
+#
+# Kein dauerhafter Branch "staging" mehr (ENT-372, revidiert ENT-341 Punkt
+# 5): Die neue, vom Projektinhaber als "hoechste Architekturvorgabe"
+# bezeichnete Regel verlangt, dass main alleinige Source of Truth bleibt und
+# kein Staging-spezifischer Code entstehen kann, der spaeter zurueckgemergt
+# werden muesste. Ein beschreibbarer Branch waere genau das -- ein Tag ist
+# es strukturell nicht, es laesst sich kein Commit "auf" einen Tag pushen.
+# main wird deshalb ausschliesslich per Push deployt (immer Production);
+# Staging entsteht ausschliesslich durch einen manuellen "Run workflow"
+# gegen einen Tag der Form qa-JJJJ-MM-TT-NNN, der exakt auf einem
+# bestehenden main-Commit liegt. github.ref_name liefert in diesem Fall den
+# Tag-Namen -- die Umgebungs-Logik weiter unten unterscheidet dadurch
+# unveraendert zwischen main (Production) und allem anderen (Staging).
 on:
   push:
-    branches: [main, staging]
+    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -35,7 +48,8 @@ jobs:
       - uses: actions/checkout@v4
 
       # Erster Schritt, bewusst VOR jedem Kopieren oder Hochladen: waehlt
-      # anhand des Branchnamens den richtigen Satz Secrets und bricht den
+      # anhand des Refs (main-Branch oder qa-*-Tag, ENT-372) den richtigen
+      # Satz Secrets und bricht den
       # gesamten Lauf ab, wenn eines der fuer diese Umgebung ERFORDERLICHEN
       # fehlt. "Erforderlich" heisst: ohne diesen Wert liefe die Anwendung
       # gar nicht (DB, FTP-Ziel) oder ein sichtbares Feature bliebe fuer
@@ -131,6 +145,20 @@ jobs:
             [ -z "$EFF_HOSTPOINT_FTP_PASSWORD" ] && PFLICHT_FEHLT="$PFLICHT_FEHLT STAGING_HOSTPOINT_FTP_PASSWORD"
             [ -z "$EFF_MAPS_JS_KEY" ]            && PFLICHT_FEHLT="$PFLICHT_FEHLT STAGING_MAPS_JS_KEY"
             [ -z "$EFF_STAGING_TESTMAIL" ]       && PFLICHT_FEHLT="$PFLICHT_FEHLT STAGING_TESTMAIL"
+          fi
+
+          # ENT-372: Staging deployt ausschliesslich gegen einen Tag der Form
+          # qa-JJJJ-MM-TT-NNN, nie gegen einen Branch. Ohne diese Pruefung
+          # wuerde ein Dispatch gegen IRGENDEINEN Branch, der nicht "main"
+          # heisst, klaglos mit Staging-Secrets bespielt -- dieselbe Pruefung,
+          # die das GitHub-Environment "staging" ueber "Deployment branches
+          # and tags" (Muster qa-*) zusaetzlich extern erzwingt.
+          if [ "$UMGEBUNG" = "staging" ]; then
+            case "${{ github.ref_name }}" in
+              qa-*) ;;
+              *) echo "::error::Staging-Deploy abgebrochen -- Ref '${{ github.ref_name }}' ist kein qa-*-Tag (ENT-372). Staging deployt ausschliesslich gegen einen Tag der Form qa-JJJJ-MM-TT-NNN, nie gegen einen Branch."
+                 exit 1 ;;
+            esac
           fi
 
           if [ -n "$PFLICHT_FEHLT" ]; then
@@ -269,9 +297,14 @@ jobs:
           # Rueckfall moeglich, siehe ENT-343 Punkt 1) -- tragen aber seit ENT-367
           # dieselben WERTE wie Production: Hostpoint erlaubt kontoweit nur ein
           # kostenloses Postfach auf *.myhostpoint.ch, das bereits produktiv
-          # belegt ist, und sop-plattform hat keine eigene Domain. Die Umleitung
-          # auf STAGING_TESTMAIL bleibt deshalb die massgebliche Absicherung,
-          # siehe unten.
+          # belegt ist, und sop-plattform hat keine eigene Domain. ENT-371
+          # bestaetigt das als bewusste, eng begrenzte Ausnahme von der sonst
+          # harten Infrastrukturtrennung (ENT-372) -- gilt AUSSCHLIESSLICH
+          # fuer SMTP, kein Praezedenzfall fuer DB/FTP/Storage/API-Keys. Die
+          # Umleitung auf STAGING_TESTMAIL bleibt die massgebliche
+          # Absicherung, siehe unten; mailer.php kennzeichnet den
+          # Absendernamen ausserhalb der Produktion zusaetzlich automatisch
+          # mit "[STAGING]" (ENT-371 Bedingung 4).
           sed -i "s|__SMTP_HOST__|$EFF_SMTP_HOST|g" dist/mailer.php
           sed -i "s|__SMTP_PORT__|$EFF_SMTP_PORT|g" dist/mailer.php
           sed -i "s|__SMTP_VERSCHLUESSELUNG__|$EFF_SMTP_VERSCHLUESSELUNG|g" dist/mailer.php
