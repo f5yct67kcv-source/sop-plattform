@@ -90,6 +90,14 @@ const UEBERNAHMEN = { status: 'ok', eingerichtet: true, eintraege: [
     person: 'Hans Beispiel', kunde_name: null, titel: null,
     km_seither: 300, auffaellig: false, wiederholt: false,
     soll_km: null, soll_unvollstaendig: true, abweichung_km: null, abweichend: false },
+  // Eine vierte Feststellung (ENT-377): Bewegung zwischen einer Abgabe und
+  // der naechsten Uebernahme, ohne dass jemand sie sich zugeordnet hat.
+  { id: 9, art: 'uebernahme', zeitpunkt: `${T0} 13:00:00`, tacho_km: 20020, quelle: 'liste', hat_foto: false,
+    fahrzeug_id: 9, kennzeichen: 'SO 999009', fz_bezeichnung: 'Patrouille 9',
+    person: 'Hans Beispiel', kunde_name: null, titel: null,
+    km_seither: 20, auffaellig: false, wiederholt: false,
+    soll_km: null, soll_unvollstaendig: false, abweichung_km: null, abweichend: false,
+    unbelegt: true },
 ]};
 
 let calls = [];
@@ -352,6 +360,25 @@ check('Eine unauffällige Übernahme (SO 999001) zeigt auch keine Abweichungs-Fe
     const karten = [...document.querySelectorAll('#aeUebListe .ag-karte')];
     const karte = karten.find(k => k.textContent.includes('SO 999001'));
     return !!karte && !/Abweichung/.test(karte.textContent) && !/unvollständig/.test(karte.textContent);
+  }));
+
+// ══════════ VIERTE FESTSTELLUNG (ENT-377): UNBELEGT ════════════════════════
+// Bewegung nach einer erklaerten Abgabe -- weiterhin nur eine Feststellung,
+// keine Beanstandung (OP-314), aber deutlich markiert (msg-err statt
+// msg-warn), auf ausdruecklichen Wunsch des Projektinhabers nach seinem
+// eigenen Live-Test.
+check('KRITISCH: unbelegte Kilometer nach einer Abgabe werden als eigene, deutliche Feststellung angezeigt',
+  await page.evaluate(() => {
+    const karten = [...document.querySelectorAll('#aeUebListe .ag-karte')];
+    const karte = karten.find(k => k.textContent.includes('SO 999009'));
+    return !!karte && /Unbelegt/.test(karte.textContent) && /20/.test(karte.textContent)
+      && !!karte.querySelector('.msg-err');
+  }));
+check('Eine unauffällige Übernahme (SO 999001) zeigt keine Unbelegt-Feststellung',
+  await page.evaluate(() => {
+    const karten = [...document.querySelectorAll('#aeUebListe .ag-karte')];
+    const karte = karten.find(k => k.textContent.includes('SO 999001'));
+    return !!karte && !/Unbelegt/.test(karte.textContent);
   }));
 
 check('Kunde/Einsatz erscheinen, wo einer bekannt ist',

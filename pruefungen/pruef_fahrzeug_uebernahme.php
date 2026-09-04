@@ -254,7 +254,7 @@ pruef('KRITISCH: nimmt dieselbe Person ein zweites Fahrzeug, ohne das erste abzu
 pruef('Ohne Vorwert (erste Uebernahme eines Fahrzeugs) und ohne Einsaetze im Fenster gibt es keine Feststellung',
     fz_uebernahme_feststellungen(50000, null, null, 7) === ['km_seither' => null, 'auffaellig' => false,
         'wiederholt' => false, 'soll_km' => null, 'soll_unvollstaendig' => false,
-        'abweichung_km' => null, 'abweichend' => false]);
+        'abweichung_km' => null, 'abweichend' => false, 'unbelegt' => false]);
 pruef('Ein kleiner, normaler Zuwachs ist weder auffaellig noch wiederholt',
     ($f = fz_uebernahme_feststellungen(50050, 50000, 7, 8))['km_seither'] === 50
     && $f['auffaellig'] === false && $f['wiederholt'] === false);
@@ -301,6 +301,75 @@ $f7 = fz_uebernahme_feststellungen(50999, 50000, 7, 8, 3, 2, 40.0);
 pruef('KRITISCH: fehlt bei einem Einsatz im Fenster die Wegstrecke, gilt die Soll-Distanz als '
     . 'unvollstaendig -- kein stiller Vergleich gegen eine zu niedrige Zahl',
     $f7['soll_unvollstaendig'] === true && $f7['soll_km'] === null && $f7['abweichend'] === false);
+
+// ── fz_uebernahme_feststellungen(): "unbelegt" (ENT-377) -- reine Funktion ──
+// Der real beobachtete Fall (Live-Test des Projektinhabers): Zwischen zwei
+// Uebernahmen liegt eine 'Abgabe' -- danach ist Stillstand die einzige
+// erwartete Zahl, JEDE Differenz zaehlt, keine Schwelle wie bei "auffaellig".
+pruef('KRITISCH: eine Bewegung zwischen einer Abgabe und der naechsten Uebernahme gilt als unbelegt, '
+    . 'auch weit unterhalb der Auffaellig-Schwelle',
+    fz_uebernahme_feststellungen(50020, 50000, 7, 8, 0, 0, null, 1)['unbelegt'] === true);
+pruef('Ohne Abgabe dazwischen ist derselbe kleine Sprung NICHT unbelegt -- normale Uebergabe',
+    fz_uebernahme_feststellungen(50020, 50000, 7, 8, 0, 0, null, 0)['unbelegt'] === false);
+pruef('Eine Abgabe ohne jede Bewegung danach (gleicher Stand) ist nicht unbelegt',
+    fz_uebernahme_feststellungen(50000, 50000, 7, 8, 0, 0, null, 1)['unbelegt'] === false);
+pruef('Ohne Vorwert (keine Kette) ist auch mit Abgabe-Zaehler nichts unbelegt -- es gibt nichts zu vergleichen',
+    fz_uebernahme_feststellungen(50000, null, null, 8, 0, 0, null, 1)['unbelegt'] === false);
+
+// ── FZ_UEBERNAHME_LISTE_SQL: "unbelegt" (ENT-377) -- echte Ausfuehrung ────
+// Fahrzeug 21: Adrian uebernimmt, gibt (ohne km) ab, Hans uebernimmt 20 km
+// spaeter -- genau der Testfall, der die Luecke aufgedeckt hat.
+$neu(21);
+$kette(21, 'uebernahme', 70000, '2026-08-01 07:00:00', 7);
+$kette(21, 'abgabe', null, '2026-08-01 07:05:00', 7);
+$kette(21, 'uebernahme', 70020, '2026-08-01 09:00:00', 8);
+$stmt3 = $pdo->prepare(FZ_UEBERNAHME_LISTE_SQL . ' WHERE u.fahrzeug_id = ? AND u.art = ? AND u.tacho_km = ?');
+$stmt3->execute([21, 'uebernahme', 70020]);
+$zeile21 = $stmt3->fetch();
+pruef('KRITISCH: die SQL zaehlt die Abgabe zwischen der vorigen Uebernahme und dieser hier',
+    $zeile21 !== false && (int)$zeile21['abgaben_dazwischen'] === 1);
+$f9 = fz_uebernahme_feststellungen((int)$zeile21['tacho_km'], (int)$zeile21['voriger_km'],
+    (int)$zeile21['voriger_mitarbeiter_id'], (int)$zeile21['eigene_mitarbeiter_id'],
+    0, 0, null, (int)$zeile21['abgaben_dazwischen']);
+pruef('KRITISCH: end-to-end (SQL + Funktion) erkennt die 20 km nach der Abgabe als unbelegt',
+    $f9['unbelegt'] === true && $f9['km_seither'] === 20);
+
+// Fahrzeug 22: derselbe 20-km-Sprung, aber OHNE Abgabe dazwischen -- eine
+// gewoehnliche Uebergabe von einer Person an eine andere. Muss unbelegt
+// bleiben, sonst waere jede normale Uebergabe markiert.
+$neu(22);
+$kette(22, 'uebernahme', 80000, '2026-08-01 07:00:00', 7);
+$kette(22, 'uebernahme', 80020, '2026-08-01 09:00:00', 8);
+$stmt4 = $pdo->prepare(FZ_UEBERNAHME_LISTE_SQL . ' WHERE u.fahrzeug_id = ? AND u.tacho_km = ?');
+$stmt4->execute([22, 80020]);
+$zeile22 = $stmt4->fetch();
+$f10 = fz_uebernahme_feststellungen((int)$zeile22['tacho_km'], (int)$zeile22['voriger_km'],
+    (int)$zeile22['voriger_mitarbeiter_id'], (int)$zeile22['eigene_mitarbeiter_id'],
+    0, 0, null, (int)$zeile22['abgaben_dazwischen']);
+pruef('KRITISCH: dieselbe Differenz OHNE Abgabe dazwischen bleibt unbelegt=false -- '
+    . 'sonst waere jede normale Uebergabe markiert',
+    (int)$zeile22['abgaben_dazwischen'] === 0 && $f10['unbelegt'] === false);
+
+// Fahrzeug 23: eine Abgabe existiert fuer dieses Fahrzeug, liegt aber VOR
+// dem massgeblichen Fenster (einer frueheren, bereits abgeschlossenen
+// Episode) -- die Zeitfenster-Grenze der Unterabfrage muss das ausblenden,
+// sonst zaehlte irgendeine Abgabe irgendwann, nicht die richtige.
+$neu(23);
+$kette(23, 'uebernahme', 90000, '2026-08-02 07:00:00', 7);
+$kette(23, 'abgabe', null, '2026-08-02 07:05:00', 7);          // fruehere Episode
+$kette(23, 'uebernahme', 90000, '2026-08-02 07:10:00', 7);      // dieselbe Person, schliesst sie sauber
+$kette(23, 'uebernahme', 90050, '2026-08-02 09:00:00', 8);      // KEINE Abgabe zwischen 07:10 und hier
+$stmt5 = $pdo->prepare(FZ_UEBERNAHME_LISTE_SQL . ' WHERE u.fahrzeug_id = ? AND u.tacho_km = ? AND u.mitarbeiter_id = ?');
+$stmt5->execute([23, 90050, 8]);
+$zeile23 = $stmt5->fetch();
+pruef('KRITISCH: eine Abgabe VOR dem massgeblichen Fenster (fruehere Episode) zaehlt nicht mit -- '
+    . 'nur eine Abgabe ZWISCHEN der vorigen und dieser Uebernahme ist relevant',
+    $zeile23 !== false && (int)$zeile23['abgaben_dazwischen'] === 0);
+$f11 = fz_uebernahme_feststellungen((int)$zeile23['tacho_km'], (int)$zeile23['voriger_km'],
+    (int)$zeile23['voriger_mitarbeiter_id'], (int)$zeile23['eigene_mitarbeiter_id'],
+    0, 0, null, (int)$zeile23['abgaben_dazwischen']);
+pruef('KRITISCH: end-to-end bleibt dieser Sprung unbelegt=false, obwohl irgendwann eine Abgabe stattfand',
+    $f11['unbelegt'] === false);
 
 // ── FZ_UEBERNAHME_LISTE_SQL: "soll_*" (ENT-361) -- echte Ausfuehrung ──────
 // Zwei Einsaetze mit weg_km=15 (Hin+Rueck macht das Fenster 07:00-13:00 aus,

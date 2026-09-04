@@ -15413,6 +15413,7 @@ function aeZeichneUebernahmen(eintraege, eingerichtet) {
         ${u.wiederholt ? `<div class="msg-warn">Auffällig: gleicher Kilometerstand wie bei der eigenen letzten Übernahme dieses Fahrzeugs.</div>` : ''}
         ${u.abweichend ? `<div class="msg-warn">Abweichung: ${nf(u.km_seither)} km gefahren, ${nf(u.soll_km)} km anhand der Einsätze erwartet (${u.abweichung_km > 0 ? '+' : ''}${nf(u.abweichung_km)} km).</div>` : ''}
         ${u.soll_unvollstaendig ? `<div class="zeiten">Soll-Distanz unvollständig -- mindestens ein Einsatz in diesem Zeitraum hat keine hinterlegte Wegstrecke.</div>` : ''}
+        ${u.unbelegt ? `<div class="msg-err">Unbelegt: ${nf(u.km_seither)} km seit der letzten Abgabe gefahren, ohne dass jemand dafür eine Übernahme erfasst hat.</div>` : ''}
         ${u.hat_foto ? `<button class="btn btn-plain btn-sm" style="margin-top:10px" onclick="aeUebernahmeFoto(${Number(u.id)})">Foto ansehen</button>` : ''}
       </div>`;
   }).join('');
