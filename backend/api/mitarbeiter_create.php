@@ -57,7 +57,11 @@ $s = $gelesen['spalten'];
 $felder = array_keys($s);
 // passwort_geaendert_am gehoert nicht in die Feldliste -- es wird vom System
 // gesetzt, nicht vom Formular. Es kommt nur mit, wenn die Spalte schon da ist.
-$fest = ['name' => $name, 'password_hash' => password_hash($password, PASSWORD_DEFAULT, ['cost' => PASSWORT_KOSTEN]), 'ist_admin' => $istAdmin];
+// Die Personalnummer wird hier gebildet, nicht im Formular (ENT-387) --
+// ma_eingabe_lesen() laesst sie beim Anlegen deshalb konsequent aus, ein
+// mitgeschickter Wert waere ohnehin ignoriert worden.
+$fest = ['name' => $name, 'password_hash' => password_hash($password, PASSWORD_DEFAULT, ['cost' => PASSWORT_KOSTEN]),
+    'ist_admin' => $istAdmin, 'personalnummer' => ma_personalnummer_generieren(db())];
 $jetzt = ma_spalte_da(db(), 'passwort_geaendert_am');
 $sql = 'INSERT INTO mitarbeiter (' . implode(', ', array_keys($fest))
      . ($jetzt ? ', passwort_geaendert_am' : '')

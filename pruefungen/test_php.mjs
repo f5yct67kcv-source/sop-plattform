@@ -156,6 +156,32 @@ check('KRITISCH: die Umstellung bestehender Login-Namen (Plan und Ausführung) l
   lmCode === 0 && lmBeanstandet.length === 0);
 if (lmBeanstandet.length) { lmBeanstandet.forEach(z => bad.push('PHP-Login-Migration: ' + z.trim())); }
 
+// ── Die automatische Personalnummer wird WIRKLICH gezogen und vergeben
+// (ENT-387) -- Kollisionsvermeidung, gezielte Zuweisung nur an fehlende
+// Nummern und das Logbuch muessen stimmen, nicht nur die Ziehung selbst.
+let pnAus = '', pnCode = 0;
+try {
+  pnAus = execFileSync('php', [`${HIER}/pruef_mitarbeiter_personalnummer.php`],
+    { encoding: 'utf8' });
+} catch (e) {
+  pnAus = String(e.stdout || '') + String(e.stderr || '');
+  pnCode = e.status || 1;
+}
+const pnBeanstandet = pnAus.split('\n').filter(z => z.trim().startsWith('X '));
+check('KRITISCH: die automatische Personalnummer (Ziehung und Bestandsnachtrag) läuft korrekt durch',
+  pnCode === 0 && pnBeanstandet.length === 0);
+if (pnBeanstandet.length) { pnBeanstandet.forEach(z => bad.push('PHP-Personalnummer: ' + z.trim())); }
+
+// Die Personalnummer darf nicht aus der Eingabe uebernommen werden, weder
+// beim Anlegen noch beim Bearbeiten -- sonst waere die Sperre nur
+// Dekoration im Formular.
+const mitarbeiterPhpOhneKommentar = execFileSync('cat', [`${WURZEL}/backend/mitarbeiter.php`],
+  { encoding: 'utf8' }).replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+check('KRITISCH: mitarbeiter_create.php bildet die Personalnummer selbst, statt sie aus der Eingabe zu uebernehmen',
+  /ma_personalnummer_generieren\s*\(/.test(createOhneKommentar));
+check("KRITISCH: ma_eingabe_lesen() sperrt die Personalnummer zentral gegen jeden Schreibweg -- Anlegen UND Bearbeiten laufen dort durch",
+  /if \(\$feld === 'personalnummer'\)/.test(mitarbeiterPhpOhneKommentar));
+
 // ── Passwort-Ruecksetzung per E-Mail-Link, ENT-373 (Quelltext -- die
 // Endpunkte benutzen MySQL-eigene Syntax und lassen sich nicht gegen den
 // SQLite-Stub ausfuehren, siehe pruef_passwort_reset.php).

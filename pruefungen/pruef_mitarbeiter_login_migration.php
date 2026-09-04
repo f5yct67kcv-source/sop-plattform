@@ -26,7 +26,8 @@ require __DIR__ . '/../backend/mitarbeiter.php';
 function neueDb(): PDO {
     $pdo = new PDO('sqlite::memory:', null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                                                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]);
-    $pdo->exec('CREATE TABLE mitarbeiter (id INTEGER PRIMARY KEY, name TEXT, vorname TEXT, nachname TEXT)');
+    $pdo->exec('CREATE TABLE mitarbeiter (id INTEGER PRIMARY KEY, name TEXT, vorname TEXT, nachname TEXT,
+                personalnummer TEXT, aktiv INTEGER DEFAULT 1, erstellt_am TEXT)');
     $pdo->exec('CREATE TABLE sessions (token TEXT PRIMARY KEY, mitarbeiter_id INT)');
     $pdo->exec('CREATE TABLE aenderungslog (id INTEGER PRIMARY KEY, zeitpunkt TEXT, akteur_id INT,
                 akteur_name TEXT, bereich TEXT, objekt_id INT, feld TEXT, wert_alt TEXT, wert_neu TEXT,
@@ -41,18 +42,23 @@ $akteur = ['id' => 99, 'name' => 'verwaltung-test'];
     $pdo = neueDb();
     // Genau das Beispiel des Projektinhabers, unter dem alten, frei
     // getippten Namen ohne Punkt.
-    $pdo->exec("INSERT INTO mitarbeiter VALUES (1, 'adrianvonarb', 'Adrian', 'von Arb')");
+    $pdo->exec("INSERT INTO mitarbeiter VALUES (1, 'adrianvonarb', 'Adrian', 'von Arb', 'P-001', 1, '2025-01-05 10:00:00')");
     // Zwei Namensgleiche -- id 2 war zuerst da, bekommt die saubere Form.
-    $pdo->exec("INSERT INTO mitarbeiter VALUES (2, 'mm-alt-a', 'Max', 'Muster')");
-    $pdo->exec("INSERT INTO mitarbeiter VALUES (3, 'mm-alt-b', 'Max', 'Muster')");
+    // Eine davon INAKTIV: genau der Fall, der beim ersten echten Einsatz
+    // dieser Funktion auffiel -- eine Karteileiche, die in der normalen
+    // Liste (mitarbeiter_list.php, WHERE aktiv = 1) gar nicht auftaucht,
+    // hier aber trotzdem umbenannt wird, weil sie noch einen Login-Namen
+    // vergeben hat, der sonst niemandem sonst weggenommen werden darf.
+    $pdo->exec("INSERT INTO mitarbeiter VALUES (2, 'mm-alt-a', 'Max', 'Muster', 'P-002', 0, '2024-03-01 09:00:00')");
+    $pdo->exec("INSERT INTO mitarbeiter VALUES (3, 'mm-alt-b', 'Max', 'Muster', 'P-003', 1, '2025-06-01 09:00:00')");
     // KRITISCH: Ein Konto ohne Nachname (Systemkonto, unvollstaendige
     // Altdaten) traegt zufaellig genau den Namen, den Max Muster durch die
     // Vorreservierung eigentlich zuerst haette -- die Vorreservierung muss
     // verhindern, dass Max Muster (id 2, unten weiter oben in der Tabelle)
     // ihm den Namen wegnimmt.
-    $pdo->exec("INSERT INTO mitarbeiter VALUES (4, 'max.muster', 'Systemkonto', '')");
+    $pdo->exec("INSERT INTO mitarbeiter VALUES (4, 'max.muster', 'Systemkonto', '', NULL, 1, '2024-01-01 00:00:00')");
     // Bereits im neuen Muster -- soll als "unveraendert" durchgehen.
-    $pdo->exec("INSERT INTO mitarbeiter VALUES (5, 'erika.muster', 'Erika', 'Muster')");
+    $pdo->exec("INSERT INTO mitarbeiter VALUES (5, 'erika.muster', 'Erika', 'Muster', 'P-005', 1, '2025-02-02 08:00:00')");
 
     $plan = ma_login_migrationsplan($pdo);
     $von = fn($id) => current(array_filter($plan, fn($p) => $p['id'] === $id));
@@ -71,15 +77,24 @@ $akteur = ['id' => 99, 'name' => 'verwaltung-test'];
         $von(3)['neu'] === 'max.muster3' && $von(3)['status'] === 'umbenannt');
     pruef('Bereits passender Name gilt als unveraendert, nicht als umbenannt',
         $von(5)['neu'] === 'erika.muster' && $von(5)['status'] === 'unveraendert');
+
+    // ── Personalnummer, Status und Anlegedatum kommen mit (ENT-383) ──────
+    pruef('Die Personalnummer kommt unveraendert mit', $von(1)['personalnummer'] === 'P-001');
+    pruef('Eine fehlende Personalnummer kommt als null mit, nicht als leerer Text',
+        $von(4)['personalnummer'] === null);
+    pruef('KRITISCH: der Status unterscheidet die beiden gleichnamigen Konten -- eines ist inaktiv',
+        $von(2)['aktiv'] === false && $von(3)['aktiv'] === true);
+    pruef('Das Anlegedatum kommt mit -- daran erkennt man, welches der beiden das aeltere Konto ist',
+        $von(2)['erstellt_am'] === '2024-03-01 09:00:00' && $von(3)['erstellt_am'] === '2025-06-01 09:00:00');
 }
 
 // ── Die Ausfuehrung: schreibt wirklich, loescht nur die richtigen Sitzungen,
 //    protokolliert nur echte Aenderungen ───────────────────────────────────
 {
     $pdo = neueDb();
-    $pdo->exec("INSERT INTO mitarbeiter VALUES (1, 'adrianvonarb', 'Adrian', 'von Arb')");
-    $pdo->exec("INSERT INTO mitarbeiter VALUES (4, 'max.muster', 'Systemkonto', '')");
-    $pdo->exec("INSERT INTO mitarbeiter VALUES (5, 'erika.muster', 'Erika', 'Muster')");
+    $pdo->exec("INSERT INTO mitarbeiter VALUES (1, 'adrianvonarb', 'Adrian', 'von Arb', 'P-001', 1, '2025-01-05 10:00:00')");
+    $pdo->exec("INSERT INTO mitarbeiter VALUES (4, 'max.muster', 'Systemkonto', '', NULL, 1, '2024-01-01 00:00:00')");
+    $pdo->exec("INSERT INTO mitarbeiter VALUES (5, 'erika.muster', 'Erika', 'Muster', 'P-005', 1, '2025-02-02 08:00:00')");
     // Je eine Sitzung fuer alle drei -- nur die von id 1 (wird umbenannt)
     // darf danach weg sein.
     $pdo->exec("INSERT INTO sessions VALUES ('tok-1', 1)");

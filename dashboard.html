@@ -5644,6 +5644,15 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
               <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
               <span class="bk-kachel-lbl">Rollen & Berechtigungen</span>
             </button>
+            <!-- Personalnummern (ENT-387): eigene Kachel statt Teil von
+                 "Rollen & Berechtigungen" -- dort geht es um Zugriff, hier um
+                 ein Stammdatenfeld ohne Rechtebezug. Gleiche Bauart wie
+                 "Login-Namen umstellen" bei den Rollen: Vorschau, dann
+                 ausdrueckliche Bestaetigung. -->
+            <button type="button" class="bk-kachel" id="bkKachelPn" onclick="bkAbschnittZeigen('pn')">
+              <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="7" y1="15" x2="13" y2="15"/></svg></span>
+              <span class="bk-kachel-lbl">Personalnummern</span>
+            </button>
             <!-- Dienstfahrzeuge (ENT-313): der Fahrzeugbestand ist eine
                  betriebliche Stammdatei wie die Anstellungsorte, darum hier
                  und nicht in der Planung. Das spaetere Fahrtenbuch (Tacho bei
@@ -5802,6 +5811,32 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
             <div class="msg-err" id="lmErr" style="display:none"></div>
             <button type="button" class="btn btn-plain btn-sm" onclick="lmVorschau()">Vorschau laden</button>
             <div id="lmInhalt" style="margin-top:14px"></div>
+          </div>
+        </div>
+        </div>
+        </div>
+
+        <!-- Personalnummern (ENT-387): Nachtrag fuer Bestandsdaten ohne
+             Nummer, eigene Unteransicht neben "Rollen & Berechtigungen". -->
+        <div class="bk-abschnitt" id="bkAb-pn" style="display:none">
+        <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="bkUebersichtZeigen()">Zurück</button>
+        <div class="grid">
+        <div class="card" id="pnKarte">
+          <div class="card-hd">
+            <span class="card-ic"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="7" y1="15" x2="13" y2="15"/></svg></span>
+            <h3>Personalnummern</h3>
+          </div>
+          <div class="card-bd">
+            <div class="ki-hint web on" style="margin-bottom:14px">
+              <span>Jede Person bekommt beim Anlegen automatisch eine vierstellige Personalnummer
+                (1000–9999), zufällig statt fortlaufend vergeben — sie verrät damit weder Anlegereihenfolge
+                noch Mitarbeiterzahl. Das Feld lässt sich danach nicht mehr ändern. Wer schon eine
+                Personalnummer hat, behält sie unverändert; hier lassen sich nur <b>fehlende</b>
+                Personalnummern im Bestand nachtragen.</span>
+            </div>
+            <div class="msg-err" id="pnErr" style="display:none"></div>
+            <button type="button" class="btn btn-plain btn-sm" onclick="pnVorschau()">Vorschau laden</button>
+            <div id="pnInhalt" style="margin-top:14px"></div>
           </div>
         </div>
         </div>
@@ -8355,7 +8390,7 @@ function go(view) {
   topSubZeichnen();
   if (view === 'planung' && MOBIL() && pTab === 'uebersicht') goTab('einsaetze');
   if (view === 'mitarbeiter' && !mitarbeiter.length) loadMitarbeiter();
-  if (view === 'betrieb') { ladeBetrieb(); zfLaden(); rvLaden(); lmSichtbarkeit(); }
+  if (view === 'betrieb') { ladeBetrieb(); zfLaden(); rvLaden(); lmSichtbarkeit(); pnSichtbarkeit(); }
   // Die Administrationsgruppe klappt auf, wenn eine ihrer Seiten offen ist --
   // und der Elternpunkt wird mitmarkiert, sonst sieht die Seitenleiste aus,
   // als waere man nirgends (dasselbe Muster wie bei den Kunden, ENT-039).
@@ -16134,10 +16169,19 @@ function lmZeichnen(ausgefuehrt) {
   const umbenannt = plan.filter(p => p.status === 'umbenannt');
   const unveraendert = plan.filter(p => p.status === 'unveraendert');
   const uebersprungen = plan.filter(p => p.status === 'uebersprungen');
-  const zeile = p => `<tr><td>${esc(p.alt)}</td><td>${esc(p.neu)}</td></tr>`;
+  // Personalnummer, Status und Anlegedatum stehen mit dabei (ENT-383): Zwei
+  // Zeilen mit demselben Namen sehen sonst wie ein Fehler aus, obwohl sie
+  // oft zwei echte, unterschiedliche Datensaetze sind -- eine inaktive
+  // Karteileiche und ein spaeter neu angelegtes Konto zum Beispiel. Ohne
+  // diese Angaben liesse sich das vor der Ausfuehrung nicht unterscheiden.
+  const zeile = p => `<tr><td>${esc(p.alt)}</td><td>${esc(p.neu)}</td>
+    <td>${esc(p.personalnummer || '–')}</td>
+    <td>${p.aktiv ? 'aktiv' : '<span style="color:var(--neg)">inaktiv</span>'}</td>
+    <td>${dmy(p.erstellt_am)}</td></tr>`;
   const tabelle = umbenannt.length ? `
     <div style="overflow:auto;max-height:320px;margin-top:10px;border:1px solid var(--line);border-radius:8px">
-      <table><thead><tr><th>Bisheriger Login-Name</th><th>Neuer Login-Name</th></tr></thead>
+      <table><thead><tr><th>Bisheriger Login-Name</th><th>Neuer Login-Name</th>
+        <th>Pers-Nr.</th><th>Status</th><th>Angelegt am</th></tr></thead>
       <tbody>${umbenannt.map(zeile).join('')}</tbody></table>
     </div>` : '';
   const zusatz = (uebersprungen.length ? `${uebersprungen.length} ohne Vor- oder Nachname übersprungen. ` : '')
@@ -16188,6 +16232,96 @@ function lmAusfuehren() {
     lmZeichnen(true);
     loadMitarbeiter();
   }).catch(() => lmFehler('Netzwerkfehler.'));
+}
+
+// ── Personalnummern nachtragen (ENT-387) ─────────────────────────────────
+// Gleiche Bauart wie "Login-Namen umstellen" (Vorschau, dann ausdrueckliche
+// Bestaetigung), aber ohne Sitzungs-/Abmelde-Hinweis: Die Personalnummer
+// ist kein Anmeldemerkmal. Sichtbar mit demselben Recht wie das
+// gewoehnliche Bearbeiten der Personalakte (personal_schreiben) --
+// schwaecher als bei den Login-Namen, weil hier nichts an der Anmeldung
+// haengt.
+let pnPlan = null;
+
+function pnSichtbarkeit() {
+  const kachel = $('bkKachelPn');
+  if (kachel) { kachel.style.display = darf('personal_schreiben') ? '' : 'none'; }
+  const karte = $('pnKarte');
+  if (karte) { karte.style.display = darf('personal_schreiben') ? '' : 'none'; }
+}
+
+function pnFehler(text) {
+  const e = $('pnErr');
+  if (!e) return;
+  e.textContent = text || '';
+  e.style.display = text ? '' : 'none';
+}
+
+function pnVorschau() {
+  pnFehler('');
+  $('pnInhalt').innerHTML = '<p class="zone-note">Wird geprüft …</p>';
+  api('mitarbeiter_personalnummer_migrieren.php').then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') {
+      $('pnInhalt').innerHTML = '';
+      pnFehler(data && data.message ? data.message : 'Vorschau fehlgeschlagen.');
+      return;
+    }
+    pnPlan = data.plan || [];
+    pnZeichnen(false);
+  }).catch(() => { $('pnInhalt').innerHTML = ''; pnFehler('Netzwerkfehler.'); });
+}
+
+// `ausgefuehrt` unterscheidet Vorschau (Knopf zum Anstossen) von der
+// Meldung danach, wie bei lmZeichnen().
+function pnZeichnen(ausgefuehrt) {
+  const plan = pnPlan || [];
+  const zugewiesen = plan.filter(p => p.status === 'zugewiesen');
+  const unveraendert = plan.filter(p => p.status === 'unveraendert');
+  const zeile = p => `<tr><td>${esc(p.name)}</td><td>${esc(p.neu)}</td>
+    <td>${p.aktiv ? 'aktiv' : '<span style="color:var(--neg)">inaktiv</span>'}</td>
+    <td>${dmy(p.erstellt_am)}</td></tr>`;
+  const tabelle = zugewiesen.length ? `
+    <div style="overflow:auto;max-height:320px;margin-top:10px;border:1px solid var(--line);border-radius:8px">
+      <table><thead><tr><th>Login-Name</th><th>Neue Personalnummer</th><th>Status</th><th>Angelegt am</th></tr></thead>
+      <tbody>${zugewiesen.map(zeile).join('')}</tbody></table>
+    </div>` : '';
+  let kopf;
+  if (ausgefuehrt) {
+    kopf = `<div class="ki-hint web on" style="background:var(--pos-soft);color:var(--pos)"><span>
+      <b>${zugewiesen.length} Personalnummern vergeben.</b>
+      ${unveraendert.length} hatten bereits eine und blieben unverändert.</span></div>`;
+  } else if (!zugewiesen.length) {
+    kopf = `<p class="zone-note">Nichts zu tun — alle Mitarbeitenden haben bereits eine Personalnummer.</p>`;
+  } else {
+    kopf = `<p class="zone-note"><b>${zugewiesen.length}</b> Personalnummern würden vergeben.
+      ${unveraendert.length} haben bereits eine.</p>
+      <div class="zone danger" style="margin-top:10px">
+        <div class="zone-hd">Jetzt vergeben</div>
+        <div class="zone-note">Nicht rückgängig zu machen: Die Personalnummer lässt sich danach nicht mehr ändern.</div>
+        <button class="btn btn-danger btn-sm" onclick="pnAusfuehrenFragen()">${zugewiesen.length} Personalnummern vergeben</button>
+      </div>`;
+  }
+  $('pnInhalt').innerHTML = kopf + tabelle;
+}
+
+function pnAusfuehrenFragen() {
+  const anzahl = (pnPlan || []).filter(p => p.status === 'zugewiesen').length;
+  askConfirm('Personalnummern vergeben?',
+    `${anzahl} Personen bekommen jetzt eine Personalnummer. Sie lässt sich danach nicht mehr ändern.`,
+    'Vergeben', pnAusfuehren);
+}
+
+function pnAusfuehren() {
+  pnFehler('');
+  api('mitarbeiter_personalnummer_migrieren.php', { method: 'POST', body: { bestaetigt: true } }).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') {
+      pnFehler(data && data.message ? data.message : 'Vergeben fehlgeschlagen.');
+      return;
+    }
+    pnPlan = data.plan || [];
+    pnZeichnen(true);
+    loadMitarbeiter();
+  }).catch(() => pnFehler('Netzwerkfehler.'));
 }
 
 function zfLaden() {
@@ -23031,7 +23165,11 @@ const MB_ABSCHNITTE = [
 
   // ── Anstellung ───────────────────────────────────────────────────────
   { id: 'betrieb', bereich: 'anstellung', spalte: 1, titel: 'Betriebliches', felder: [
-    ['personalnummer',    'Personalnummer', 'f'],
+    // Automatisch vergeben und nicht mehr aenderbar (ENT-387) -- gesperrt
+    // wie ahv_nr (ENT-348), gleiche Bauart. Anders als ahv_nr traegt das
+    // Feld aber einen echten Wert, der beim Anlegen erst noch entsteht --
+    // der Hinweis dient bis dahin als Platzhaltertext.
+    ['personalnummer',    'Personalnummer', 'f', null, 'wird automatisch vergeben', false, true],
     ['kurzzeichen',       'Kurzzeichen',    'f'],
     ['funktion_id',       'Funktion',       'a', 'funktion'],
     ['abteilung_id',      'Abteilung',      'a', 'abteilung'],

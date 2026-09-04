@@ -81,8 +81,10 @@ async function setup(page) {
       const t = (body.text || '').toLowerCase();
       if (t.includes('ändere')) return send({ status: 'ok', bereich: 'mitarbeiter', aktion: 'aendern',
         mitarbeiter_login_name: 'dario.beispiel', aenderungen: { strasse: 'Musterstrasse 1', ort: '3000 Bern' } });
+      // Keine personalnummer im simulierten KI-Ergebnis (ENT-387): das
+      // echte Schema in ai.php fragt sie fuer eine Neuanlage nicht mehr ab.
       if (t.includes('neuer mitarbeiter')) return send({ status: 'ok', bereich: 'mitarbeiter', aktion: 'neu', felder: {
-        vorname: 'Hans', nachname: 'Muster', personalnummer: '2530', anrede: 'Herr',
+        vorname: 'Hans', nachname: 'Muster', anrede: 'Herr',
         geburtsdatum: '1990-05-03', strasse: 'Musterweg 1', ort: '3000 Bern', mobil: '079 123 45 67' } });
       // Telefon absichtlich nicht erkannt -- prueft Hinweis auf offene Pflichtfelder
       if (t.includes('neuer kunde')) return send({ status: 'ok', bereich: 'kunde', aktion: 'neu', felder: {
@@ -366,7 +368,7 @@ await page.waitForSelector('#dlgSprechen.on');
 await page.click('#gsBtn');
 await page.waitForTimeout(200);
 check('Leeres Diktat wird abgewiesen', !calls.some(c => c.path.includes('ki_router_parse')));
-await page.fill('#gsText', 'Neuer Mitarbeiter Hans Muster, Personalnummer 2530');
+await page.fill('#gsText', 'Neuer Mitarbeiter Hans Muster, geboren am 3. Mai 1990');
 await page.click('#gsBtn');
 await page.waitForSelector('#mv-bearbeiten.on');
 await page.waitForTimeout(500);
@@ -377,11 +379,13 @@ check('Diktat-Hinweis sichtbar', await page.isVisible('#mbKi .ki-hint.on'));
 check('Der Hinweis sagt, dass das Passwort selbst zu setzen ist',
   /Passwort musst du selbst setzen/.test(await page.textContent('#mbKi')));
 check('Vorname uebernommen', (await page.inputValue('#mb_vorname')) === 'Hans');
-check('Personalnummer uebernommen', (await page.inputValue('#mb_personalnummer')) === '2530');
+check('KRITISCH: die Personalnummer bleibt leer -- sie wird erst beim Anlegen automatisch vergeben (ENT-387)',
+  (await page.inputValue('#mb_personalnummer')) === '');
+check('Das Personalnummer-Feld ist gesperrt, auch auf der Anlegen-Flaeche', await page.isDisabled('#mb_personalnummer'));
 check('Geburtsdatum uebernommen', (await page.inputValue('#mb_geburtsdatum')) === '1990-05-03');
 check('Login-Name aus dem Diktat gebildet', (await page.inputValue('#mbNeuName')) === 'hans.muster');
 check('Passwort NICHT vorbelegt', (await page.inputValue('#mbNeuPass')) === '');
-check('Erkannte Felder blau markiert', (await page.$$('#mbKarten .inp.ki')).length >= 6);
+check('Erkannte Felder blau markiert', (await page.$$('#mbKarten .inp.ki')).length >= 5);
 check('Nicht erkanntes Feld unmarkiert', !(await page.getAttribute('#mb_telefon', 'class')).includes('ki'));
 await page.click('#mbSpeichern');
 await page.waitForTimeout(250);
