@@ -65,7 +65,20 @@ check('KRITISCH: der eingegebene Text liest hell auf dunkel, nicht schwarz auf d
 // ══════════ DAS LOGO IST "MUTIGER" GEWORDEN ═══════════════════════════
 const logo = await mass('.gate-oben img');
 check('KRITISCH: das Logo ist deutlich groesser als die frueheren 66 px',
-  logo !== null && logo.w >= 96 && logo.h >= 96);
+  logo !== null && logo.w >= 120 && logo.h >= 120);
+// Zweite Runde des Projektinhabers: "nur das kreisrunde logo, ohne den
+// Rahmen". Die weisse Flaeche, das Eckenrund und der helle Ring kamen
+// alle aus dem CSS -- keiner davon darf zurueckkommen.
+const fassung = await ev(() => {
+  const c = getComputedStyle(document.querySelector('.gate-oben img'));
+  return { grund: c.backgroundColor, radius: c.borderRadius,
+           padding: c.paddingTop, schatten: c.boxShadow };
+});
+check('KRITISCH: das Logo traegt keine weisse Flaeche mehr hinter sich',
+  fassung !== null && /rgba\(0, 0, 0, 0\)|transparent/.test(fassung.grund));
+check('KRITISCH: und keinen gerundeten Rahmen -- kein Eckenrund, kein Innenabstand, kein Ring',
+  fassung !== null && parseFloat(fassung.radius) === 0
+  && parseFloat(fassung.padding) === 0 && fassung.schatten === 'none');
 const mitte = await mass('.gate-mitte');
 // CLAUDE.md: "Mittiges gehoert wirklich in die Mitte -- bezogen auf den
 // Container." Zwei Pixel Toleranz fuer ungerade Breiten.
@@ -128,12 +141,19 @@ await page.setViewportSize({ width: 1440, height: 900 });
 await page.waitForTimeout(250);
 const dMitte = await mass('.gate-mitte');
 const dCta = await mass('#gBtn');
+const dLogo = await mass('.gate-oben img');
 check('KRITISCH: auf dem Desktop bleibt die Spalte schmal, statt sich ueber die ganze Breite zu ziehen',
-  dMitte !== null && dMitte.w <= 400);
+  dMitte !== null && dMitte.w <= 420);
 check('Und sie steht dort mittig',
   dMitte !== null && Math.abs((dMitte.x + dMitte.w / 2) - 720) <= 2);
 check('Der Knopf ist auch auf dem Desktop noch der Knopf, nicht ein Band',
-  dCta !== null && dCta.w <= 400);
+  dCta !== null && dCta.w <= 420);
+// Der Projektinhaber hat beanstandet, der Block wirke auf dem grossen
+// Schirm "sehr klein zur Gesamtflaeche". Antwort war nicht, die Felder
+// breiter zu ziehen, sondern die Marke wachsen zu lassen -- das haelt
+// diese Pruefung fest.
+check('KRITISCH: die Marke waechst auf dem grossen Schirm mit, statt in der Flaeche zu verschwinden',
+  dLogo !== null && logo !== null && dLogo.w > logo.w * 1.2);
 
 // ══════════ EINE FEHLERMELDUNG LIEST AUF DUNKLEM GRUND ════════════════
 await page.setViewportSize({ width: 390, height: 844 });
