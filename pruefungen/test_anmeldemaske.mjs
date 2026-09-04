@@ -1,0 +1,151 @@
+// Der Anmeldebildschirm der Mitarbeiter-App (ENT-385).
+//
+// Umgebaut auf Wunsch des Projektinhabers: Logo gross, Wortmarke
+// "Cockpit" weg, weisse Karte weg, Farbigkeit des Dashboard-Dunkelmodus.
+// Diese Suite haelt das Ergebnis am GERENDERTEN Zustand fest -- CLAUDE.md:
+// "Gestaltung wird gemessen, nicht im Quelltext nachgelesen. Eine
+// CSS-Regel kann wirkungslos bleiben, ohne dass etwas kaputtgeht."
+// Darum steht hier keine einzige Pruefung auf Quelltext.
+import { WURZEL, browserPfad } from './pfade.mjs';
+import { chromium } from 'playwright';
+
+const ok = [], bad = [];
+const check = (n, c) => (c ? ok : bad).push(n);
+
+const browser = await chromium.launch({ executablePath: browserPfad() });
+const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+page.setDefaultTimeout(5000);
+page.on('pageerror', e => bad.push('JS-Fehler: ' + e.message));
+const ev = (fn, ...a) => page.evaluate(fn, ...a).catch(() => null);
+
+// Kontrast nach WCAG. Wird gerechnet, nicht geschaetzt: "sieht hell genug
+// aus" ist auf einem dunklen Grund die haeufigste Selbsttaeuschung.
+const leuchte = (r, g, b) => {
+  const k = v => { v /= 255; return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; };
+  return .2126 * k(r) + .7152 * k(g) + .0722 * k(b);
+};
+const kontrast = (a, b) => {
+  const z = s => (s.match(/\d+/g) || []).slice(0, 3).map(Number);
+  const [l1, l2] = [leuchte(...z(a)), leuchte(...z(b))].sort((x, y) => y - x);
+  return (l1 + .05) / (l2 + .05);
+};
+
+await page.goto(`file://${WURZEL}/app.html`);
+await page.waitForTimeout(400);
+
+const mass = async sel => ev(s => {
+  const e = document.querySelector(s);
+  if (!e) return null;
+  const r = e.getBoundingClientRect(), c = getComputedStyle(e);
+  return { x: r.x, y: r.y, w: r.width, h: r.height, unten: r.bottom,
+           fs: parseFloat(c.fontSize), farbe: c.color, grund: c.backgroundColor,
+           schatten: c.boxShadow };
+}, sel);
+
+// ══════════ WAS WEGFALLEN SOLLTE, IST WEG ═════════════════════════════
+check('KRITISCH: die Wortmarke "Cockpit" steht nicht mehr auf dem Zugang zur Mitarbeiter-App',
+  await ev(() => !document.querySelector('.gate-oben .wm')));
+const form = await mass('#gate-login');
+check('KRITISCH: die weisse Karte ist weg -- der Formularblock hat keine eigene Flaeche',
+  form !== null && /rgba\(0, 0, 0, 0\)|transparent/.test(form.grund));
+check('KRITISCH: und auch keinen Schatten mehr, der eine Kartenkante andeuten wuerde',
+  form !== null && form.schatten === 'none');
+
+// ══════════ FARBIGKEIT DER DESKTOP-VARIANTE ═══════════════════════════
+// Zeichen fuer Zeichen die Werte aus dashboard.html, html[data-thema="dunkel"].
+const grund = await ev(() => getComputedStyle(document.getElementById('gate')).backgroundColor);
+check('KRITISCH: der Grund traegt den --bg des Dashboard-Dunkelmodus (#0F1117)',
+  grund === 'rgb(15, 17, 23)');
+const feld = await mass('#gName');
+check('Das Eingabefeld hebt sich vom Grund ab (--surface-2 #1E2535)',
+  feld !== null && feld.grund === 'rgb(30, 37, 53)');
+check('KRITISCH: der eingegebene Text liest hell auf dunkel, nicht schwarz auf dunkel',
+  feld !== null && kontrast(feld.farbe, feld.grund) >= 7);
+
+// ══════════ DAS LOGO IST "MUTIGER" GEWORDEN ═══════════════════════════
+const logo = await mass('.gate-oben img');
+check('KRITISCH: das Logo ist deutlich groesser als die frueheren 66 px',
+  logo !== null && logo.w >= 96 && logo.h >= 96);
+const mitte = await mass('.gate-mitte');
+// CLAUDE.md: "Mittiges gehoert wirklich in die Mitte -- bezogen auf den
+// Container." Zwei Pixel Toleranz fuer ungerade Breiten.
+check('Das Logo steht waagrecht wirklich mittig, nicht nur ungefaehr',
+  logo !== null && mitte !== null
+  && Math.abs((logo.x + logo.w / 2) - (mitte.x + mitte.w / 2)) <= 2);
+check('Der Firmenname steht als einzige Textzeile unter dem Logo',
+  (await page.textContent('.gate-oben .sub').catch(() => '')).trim() !== '');
+
+// ══════════ CLAUDE.md: TREFFERFLAECHEN UND SCHRIFTGROESSEN ════════════
+const pass = await mass('#gPass');
+const cta = await mass('#gBtn');
+const link = await mass('#lb-pwvergessen');
+check('KRITISCH: beide Eingabefelder sind mindestens 44 px hoch',
+  feld !== null && pass !== null && feld.h >= 44 && pass.h >= 44);
+check('KRITISCH: beide Eingabefelder haben mindestens 16 px Schrift -- darunter zoomt iOS hinein',
+  feld !== null && pass !== null && feld.fs >= 16 && pass.fs >= 16);
+check('KRITISCH: der Anmeldeknopf ist mindestens 48 px hoch',
+  cta !== null && cta.h >= 48);
+check('"Passwort vergessen?" hat die volle 44-px-Trefferflaeche',
+  link !== null && link.h >= 44);
+
+// ══════════ DER MEISTGEDRUECKTE KNOPF MUSS LESBAR BLEIBEN ═════════════
+// Der Grund fuer die Ausnahme im CSS: der helle --accent des
+// Dunkelmodus (#7098F7) traegt weisse Schrift nur mit 2.8:1.
+check('KRITISCH: die Schrift auf dem Anmeldeknopf erreicht mindestens 4.5:1 Kontrast',
+  cta !== null && kontrast(cta.farbe, cta.grund) >= 4.5);
+check('Auch die Beschriftungen ueber den Feldern bleiben gut lesbar (>= 4.5:1)',
+  await ev(g => {
+    const c = getComputedStyle(document.getElementById('lb-name'));
+    return { farbe: c.color, grund: g };
+  }, grund).then(r => r !== null && kontrast(r.farbe, r.grund) >= 4.5));
+
+// ══════════ CLAUDE.md: UEBERSCHRIFT OBEN, WERT DARUNTER ═══════════════
+const lbl = await mass('#lb-name');
+check('KRITISCH: die Beschriftung steht UEBER dem Feld, nicht darunter',
+  lbl !== null && feld !== null && lbl.y < feld.y);
+
+// ══════════ ZWEI GRUPPEN, NICHT EINE REIHE ════════════════════════════
+// Der Abstand zwischen Logoblock und Formular muss groesser sein als der
+// zwischen zwei Feldern -- sonst liest alles als eine einzige Kette.
+const firma = await mass('.gate-oben .sub');
+check('Identitaet und Formular stehen als zwei Gruppen auseinander',
+  firma !== null && lbl !== null && pass !== null && feld !== null
+  && (lbl.y - firma.unten) > (pass.y - feld.unten) * 0.6);
+
+// ══════════ NICHTS SCROLLT, AUCH AUF EINEM KLEINEN GERAET ═════════════
+const passt = async () => ev(() => {
+  const g = document.getElementById('gate');
+  return g.scrollHeight <= g.clientHeight + 1;
+});
+check('KRITISCH: auf 390x844 muss nicht gescrollt werden', await passt());
+await page.setViewportSize({ width: 360, height: 640 });
+await page.waitForTimeout(250);
+check('KRITISCH: auch auf einem kleinen Geraet (360x640) passt alles auf den Schirm',
+  await passt());
+
+// ══════════ DESKTOP: KEINE ANMELDUNG UEBER 1440 PX BREITE ═════════════
+await page.setViewportSize({ width: 1440, height: 900 });
+await page.waitForTimeout(250);
+const dMitte = await mass('.gate-mitte');
+const dCta = await mass('#gBtn');
+check('KRITISCH: auf dem Desktop bleibt die Spalte schmal, statt sich ueber die ganze Breite zu ziehen',
+  dMitte !== null && dMitte.w <= 400);
+check('Und sie steht dort mittig',
+  dMitte !== null && Math.abs((dMitte.x + dMitte.w / 2) - 720) <= 2);
+check('Der Knopf ist auch auf dem Desktop noch der Knopf, nicht ein Band',
+  dCta !== null && dCta.w <= 400);
+
+// ══════════ EINE FEHLERMELDUNG LIEST AUF DUNKLEM GRUND ════════════════
+await page.setViewportSize({ width: 390, height: 844 });
+await ev(() => { const e = document.getElementById('gErr');
+  e.textContent = 'Name oder Passwort stimmt nicht'; e.style.display = ''; });
+await page.waitForTimeout(150);
+const err = await mass('#gErr');
+check('KRITISCH: die Fehlermeldung nimmt die dunkle Variante, nicht das helle Rosa der Hellansicht',
+  err !== null && kontrast(err.farbe, err.grund) >= 4.5
+  && leuchte(...(err.grund.match(/\d+/g) || []).slice(0, 3).map(Number)) < 0.2);
+
+await browser.close();
+console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden`);
+if (bad.length) { console.log('\n✗ ' + bad.length + ' FEHLGESCHLAGEN:'); bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
+console.log('\nAlle Pruefungen bestanden.');

@@ -108,13 +108,85 @@ svg.i-sm { width: 17px; height: 17px; }
    kleine 160-px-Feld von ENT-082 ist damit entfallen; es war nicht als
    Unterschriftsfeld zu erkennen und viel zu klein zum Schreiben. */
 
-/* ══════════════════════════════════════════ ZUGANG */
-#gate { position: fixed; inset: 0; z-index: 900; background: var(--shell); display: flex; flex-direction: column; padding: 28px 22px calc(28px + env(safe-area-inset-bottom)); }
-.gate-oben { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
-.gate-oben img { width: 66px; height: 66px; border-radius: 18px; background: #fff; padding: 5px; margin-bottom: 18px; }
-.gate-oben .wm { color: var(--shell-txt-hi); font-size: 26px; font-weight: 700; letter-spacing: -.5px; }
-.gate-oben .sub { color: #656B78; font-size: 12px; letter-spacing: 1.2px; text-transform: uppercase; margin-top: 4px; }
-.gate-form { background: var(--surface); border-radius: var(--r-lg); padding: 22px; box-shadow: var(--sh-2); }
+/* ══════════════════════════════════════════ ZUGANG
+   Umgebaut auf Wunsch des Projektinhabers (ENT-385). Drei Eingriffe:
+   das Logo wird gross statt beilaeufig, die Wortmarke "Cockpit" faellt
+   weg (dies ist der Zugang zur MITARBEITER-App, nicht zur Verwaltung --
+   der Firmenname allein sagt, wo man ist), und die weisse Karte faellt
+   ersatzlos: Felder und Knopf stehen direkt auf dem dunklen Grund.
+
+   Die Farbwerte sind -- genau wie bei .rgs weiter unten -- NICHT neu
+   erfunden, sondern Zeichen fuer Zeichen die des Dashboard-Dunkelmodus
+   (dashboard.html, html[data-thema="dunkel"]); der Projektinhaber hat
+   ausdruecklich die Farbigkeit der Desktop-Variante gewuenscht. Sie
+   stehen als lokale Ueberschreibung auf dem Container: .inp, .f label,
+   .msg-err und .gate-link werden dadurch von selbst dunkel, ohne dass
+   eine einzige bestehende Regel angefasst werden muss -- und keine
+   andere Ansicht der App aendert sich. */
+#gate {
+  position: fixed; inset: 0; z-index: 900; display: flex; overflow-y: auto;
+  padding: 32px 22px calc(32px + env(safe-area-inset-bottom));
+  color: var(--ink);
+  /* Ein sehr flacher Schein hinter dem Logo. Seit die Karte als
+     Begrenzung fehlt, ist er das Einzige, was der Flaeche Tiefe gibt --
+     bewusst so schwach, dass er als Licht und nicht als Farbfeld liest. */
+  background: radial-gradient(112% 62% at 50% 12%, #1A2334 0%, rgba(26,35,52,0) 60%), #0F1117;
+
+  --bg:           #0F1117;
+  --surface:      #161B27;
+  --surface-2:    #1E2535;
+  --line:         #2A3147;
+  --line-soft:    #232A3B;
+  --ink:          #F2F4F8;
+  --ink-2:        #B6BCC8;
+  --ink-3:        #868D9A;
+  --accent:       #7098F7;
+  --accent-hi:    #8DAEFA;
+  --accent-soft:  #1A2440;
+  --accent-line:  #2D3D63;
+  --pos: #4FCE96;  --pos-soft: #10281E;
+  --neg: #F27F70;  --neg-soft: #2E1A18;
+  --sh-1: none;
+  --sh-2: 0 8px 28px -8px rgba(0,0,0,.6);
+  color-scheme: dark;
+}
+/* margin:auto statt justify-content:center -- reicht die Hoehe nicht
+   (kleines Geraet, offene Tastatur), bleibt der obere Rand so
+   erreichbar, waehrend zentrierter Flex-Inhalt oben abgeschnitten wuerde. */
+.gate-mitte { margin: auto; width: 100%; max-width: 348px; }
+/* 42 px, nicht 34: Der Abstand zwischen Logoblock und Formular muss
+   deutlich groesser sein als der zwischen zwei Feldern (41 px), sonst
+   lesen Identitaet und Eingabe als eine einzige Reihe statt als zwei
+   Gruppen -- am gerenderten Zustand gemessen, nicht geschaetzt. */
+.gate-oben { text-align: center; margin-bottom: 42px; }
+/* "Mutiger" (Wortlaut des Projektinhabers): 66 -> 104 px. Der haarfeine
+   helle Ring loest das Logo vom Grund, ohne eine zweite Kartenkante
+   einzufuehren -- die eine, die es gab, ist ja gerade weggefallen. */
+.gate-oben img {
+  width: 104px; height: 104px; border-radius: 27px; background: #fff; padding: 9px;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.07), 0 20px 44px -20px rgba(0,0,0,.95);
+}
+/* Der Firmenname traegt jetzt allein, was vorher Wortmarke und Unterzeile
+   zu zweit trugen -- darum groesser und weiter gesperrt als die alten 12 px. */
+.gate-oben .sub { margin-top: 20px; color: var(--ink-2);
+  font-size: 13px; font-weight: 640; letter-spacing: 2.4px; text-transform: uppercase; }
+/* Die Karte ist weg: kein Grund, kein Rand, kein Schatten, kein Radius. */
+.gate-form { background: none; border-radius: 0; padding: 0; box-shadow: none; }
+/* Felder wie im dunklen Cockpit (dashboard.html): ruhende Flaeche etwas
+   heller als der Grund, im Fokus dunkler -- so wandert die Aufmerksamkeit
+   ins Feld, statt dass es beim Antippen aufleuchtet. */
+#gate .inp { background: var(--surface-2); }
+#gate .inp:focus { background: var(--surface); }
+#gate .pw-toggle { opacity: .75; }
+/* Der Anmeldeknopf behaelt das kraeftige Blau der Hellvariante, statt dem
+   hellen --accent des Dunkelmodus zu folgen: Weiss auf #2F5BD7 ergibt
+   5.8:1, Weiss auf #7098F7 nur 2.8:1 -- gerechnet, nicht geschaetzt. Fuer
+   den meistgedrueckten Knopf der App, oft draussen bei hellem Licht, ist
+   das der Unterschied zwischen lesbar und erahnbar. */
+#gate .btn-primary { background: #2F5BD7; min-height: 52px; font-size: 16px;
+  box-shadow: 0 12px 28px -16px rgba(47,91,215,.75); }
+#gate .btn-primary:active { background: #2549B0; }
+#gate .gate-link:active { color: var(--ink); }
 
 /* ══════════════════════════════════════════ GERÜST */
 .app { display: none; min-height: 100%; flex-direction: column; }
@@ -869,9 +941,9 @@ svg.i-sm { width: 17px; height: 17px; }
 
 <!-- ══════════════════════════ ANMELDUNG ══════════════════════════ -->
 <div id="gate">
+ <div class="gate-mitte">
   <div class="gate-oben">
     <img src="icons/icon-192.png" alt="">
-    <div class="wm">Cockpit</div>
     <div class="sub">CUPI 24 GmbH</div>
   </div>
   <div class="gate-form" id="gate-login">
@@ -926,6 +998,7 @@ svg.i-sm { width: 17px; height: 17px; }
                 onclick="togglePw('grNeu2', this)">👁</button></div></div>
     <button class="btn btn-primary btn-wide" id="grBtn" onclick="pwResetSpeichern()">Passwort speichern</button>
   </div>
+ </div>
 </div>
 
 <!-- ══════════════════════════ APP ══════════════════════════ -->
