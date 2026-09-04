@@ -45,7 +45,8 @@ const BELEGE = { status: 'ok', naechste_nummer: 'OF-0126', belege: [
 ]};
 const KU = { status: 'ok', kunden: [
   { id: 1, name: 'Gemeinde Beispieldorf', kundennummer: 'A0025', strasse: 'Dorfstrasse', hausnummer: '4', plz: '4448', ort: 'Beispieldorf', aktiv: 1,
-    personen: [{ id: 5, anrede: 'Herr', vorname: 'Patrick', nachname: 'Beispiel' }], kontaktwege: [] },
+    personen: [{ id: 5, anrede: 'Herr', vorname: 'Patrick', nachname: 'Beispiel',
+      kontaktwege: [{ art: 'email', wert: 'patrick@beispieldorf.ch' }] }], kontaktwege: [] },
   { id: 2, name: 'Beispielhof Immobilien', kundennummer: 'A0220', strasse: 'Weg', hausnummer: '1', plz: '4600', ort: 'Olten', aktiv: 1, personen: [], kontaktwege: [] },
 ]};
 
@@ -294,6 +295,11 @@ await page.waitForTimeout(150);
 const personOpt = await page.$$eval('#of_person option', o => o.map(x => x.textContent.trim()));
 check('KRITISCH: die Ansprechpersonen des gewählten Kunden stehen zur Auswahl',
   personOpt.some(t => t.includes('Patrick Beispiel')));
+// Die hinterlegte E-Mail-Adresse steht direkt in der Auswahl -- beim Versand
+// per E-Mail muss sie sichtbar sein, ohne dass man erst in den Kundenstamm
+// wechselt.
+check('KRITISCH: die hinterlegte E-Mail-Adresse der Ansprechperson steht in der Auswahl',
+  personOpt.some(t => t === 'Herr Patrick Beispiel (patrick@beispieldorf.ch)'));
 await page.fill('#of_kunde', 'Beispielhof Immobilien');
 await page.evaluate(() => ofKundeGewaehlt());
 await page.waitForTimeout(150);

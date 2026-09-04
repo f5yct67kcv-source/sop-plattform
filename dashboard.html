@@ -10132,7 +10132,12 @@ function ofPersonenFuellen(personId) {
   const personen = (k && k.personen) || [];
   $('of_person').innerHTML = '<option value="">– keine –</option>' + personen.map(p => {
     const name = [p.anrede, p.vorname, p.nachname].filter(Boolean).join(' ');
-    return `<option value="${Number(p.id)}"${Number(p.id) === Number(personId) ? ' selected' : ''}>${esc(name)}</option>`;
+    // E-Mail in Klammern dahinter, falls hinterlegt: beim Versand per
+    // E-Mail direkt aus der Auswahl ersichtlich, ohne dass man erst in
+    // den Kundenstamm wechseln muss.
+    const email = (p.kontaktwege || []).find(w => w.art === 'email' && w.wert);
+    const text = email ? `${name} (${email.wert})` : name;
+    return `<option value="${Number(p.id)}"${Number(p.id) === Number(personId) ? ' selected' : ''}>${esc(text)}</option>`;
   }).join('');
   $('of_person').disabled = personen.length === 0;
 }
