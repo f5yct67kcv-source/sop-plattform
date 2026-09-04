@@ -565,13 +565,17 @@ await page.click('#t-menu');
 await page.waitForTimeout(200);
 const menuText = await T('#v-menu');
 check('Menü zeigt den vollen Namen', menuText.includes('Dario Beispiel'));
-// Seit ENT-370 steht eine dritte Kachel dabei (Abwesenheit) -- die
-// Zusicherung gilt weiterhin: mindestens diese beiden sind da, genau die
-// bekannten drei insgesamt (nicht "irgendeine Zahl").
+// Seit ENT-370 steht eine dritte Kachel dabei (Abwesenheit), seit ENT-398
+// eine vierte (Einstellungen) -- die Zusicherung gilt weiterhin: mindestens
+// diese beiden sind da, genau die bekannten vier insgesamt (nicht
+// "irgendeine Zahl"). Die Zahl wird bewusst mitgezaehlt: Eine Kachel, die
+// jemand versehentlich zweimal einhaengt, faellt sonst niemandem auf.
 check('Menü zeigt die Kacheln Meine Daten/Meine Stunden',
   await page.evaluate(() => !!document.getElementById('mk-daten') && !!document.getElementById('mk-stunden')));
-check('Menü zeigt genau drei Kacheln, keine vergessene oder ueberzaehlige',
-  await page.evaluate(() => document.querySelectorAll('#v-menu .mk-kachel').length === 3));
+check('Menü zeigt genau vier Kacheln, keine vergessene oder ueberzaehlige',
+  await page.evaluate(() => document.querySelectorAll('#v-menu .mk-kachel').length === 4));
+check('Und die vierte ist Einstellungen (ENT-398)',
+  await page.evaluate(() => !!document.getElementById('mk-einstellungen')));
 await page.evaluate(() => datenSeiteAuf());
 await page.waitForTimeout(150);
 const datenText = await T('#pr-daten');
