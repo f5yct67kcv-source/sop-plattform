@@ -42,9 +42,12 @@ const FZ_SPRUNG_AUFFAELLIG = 800;
 // den Fehler noch korrigieren könnte. Ein Eingriff der Verwaltung ist
 // nachvollziehbar -- er steht mit Namen im Logbuch (ENT-330).
 //
-// Bei gleichem Datum gewinnt der Stammdatenwert. Er ist der jüngere Vorgang:
-// Die Übernahme hat ihn ja gerade erst geschrieben; steht dort etwas
-// anderes, hat jemand danach von Hand eingegriffen.
+// Bei gleichem Datum gewinnt der Stammdatenwert NUR, wenn er vom letzten
+// Kettenwert abweicht -- das ist der Eingriff der Verwaltung. Stimmt er
+// exakt überein, ist das der automatische Spiegel derselben Übernahme,
+// kein Eingriff (ENT-354-Nachbesserung nach Live-Test): Sonst würde die
+// "besetzt/fremd"-Auskunft an jedem Tag mit einer echten Übernahme sofort
+// wieder auf die anonyme Stammdaten-Zeile zurückfallen, siehe unten.
 //
 // Rückgabe: null, wenn es überhaupt keinen bekannten Stand gibt -- das ist
 // etwas anderes als "0 km" und muss auch anders angezeigt werden.
@@ -103,7 +106,22 @@ function fz_bezugsstand(PDO $pdo, int $fahrzeugId, ?int $eigeneId = null): ?arra
 
     if ($letzte === null) { return $stamm; }
     if ($stamm === null) { return $letzte; }
-    return $stamm['datum'] >= $letzte['datum'] ? $stamm : $letzte;
+    if ($stamm['datum'] !== $letzte['datum']) {
+        return $stamm['datum'] > $letzte['datum'] ? $stamm : $letzte;
+    }
+    // Gleiches Datum: JEDE Uebernahme schreibt den Stammdatenwert automatisch
+    // mit (meine_fahrzeug_uebernahme.php, "UPDATE fahrzeuge SET tacho_km = ?,
+    // tacho_am = CURDATE()") -- am selben Tag ist der Stammdatenwert darum in
+    // aller Regel genau dieser Spiegel, kein zusaetzlicher Buero-Eingriff.
+    // Nur wenn er vom letzten Kettenwert ABWEICHT, hat wirklich jemand danach
+    // von Hand korrigiert (siehe Fahrzeug 6/5 oben) -- dann gewinnt er weiter.
+    // Stimmt er ueberein, gilt weiterhin die Kette: Sie allein traegt Person
+    // und Uhrzeit, und ohne diese Unterscheidung wuerde die "besetzt/fremd"-
+    // Auskunft (ENT-354) an JEDEM Tag mit einer echten Uebernahme sofort
+    // wieder auf die anonyme Stammdaten-Zeile zurueckfallen -- real
+    // beobachtet: zwei Personen konnten dasselbe Fahrzeug am selben Tag ohne
+    // jede Warnung nacheinander uebernehmen.
+    return $stamm['tacho_km'] === $letzte['tacho_km'] ? $letzte : $stamm;
 }
 
 // Das Fahrzeug, das gerade als "bei dieser Person aktiv" gilt (ENT-354) --
