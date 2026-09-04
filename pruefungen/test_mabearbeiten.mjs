@@ -76,8 +76,15 @@ await page.route('**/api/**', async r => {
   }
   if (u.includes('mitarbeiter_create')) {
     gesendet = JSON.parse(r.request().postData() || '{}');
-    return speichernOk ? send({ status: 'ok' })
-      : send({ status: 'error', message: 'Login-Name bereits vergeben.' });
+    // Ein Login-Name laesst sich seit ENT-376 nicht mehr manuell vergeben --
+    // der Server bildet ihn selbst (ma_login_generieren) und liefert ihn in
+    // der Antwort mit, weil die Oberflaeche ihn sonst nicht kennt. Der Mock
+    // bildet dieselbe Regel nach; eine Ablehnung simuliert er stattdessen
+    // ueber eine andere, weiterhin moegliche Ursache (etwa eine Passwortregel).
+    const login = `${gesendet.vorname || ''}.${gesendet.nachname || ''}`
+      .toLowerCase().replace(/\s+/g, '');
+    return speichernOk ? send({ status: 'ok', name: login })
+      : send({ status: 'error', message: 'Das Passwort enthält ein zu naheliegendes Wort.' });
   }
   if (u.includes('mitarbeiter_update')) {
     gesendet = JSON.parse(r.request().postData() || '{}');
@@ -534,37 +541,48 @@ check('KRITISCH: die AHV-Nummer laesst sich nicht mehr erfassen (ENT-348) -- Fel
   check('KRITISCH: es sind dieselben Abschnitte und Felder wie beim Bearbeiten',
     a.karten === 9 && a.felder >= 49);
   check('Beim Anlegen ist nichts vorbelegt', a.leer);
-  check('Login-Name und Passwort stehen als Pflichtfelder da', a.band);
+  check('Login-Name (automatisch) und Passwort stehen im Pflichtband', a.band);
   check('Sie stehen OBEN, nicht in einer Karte zwischen neun anderen', a.bandOben);
   check('Und ueber die ganze Breite, damit man sie nicht uebersieht', a.bandBreit);
-  check('Der Schreibfokus liegt im ersten Pflichtfeld', a.fokus === 'mbNeuName');
+  // Seit ENT-376 ist der Login-Name kein Eingabefeld mehr -- der Fokus
+  // faengt darum beim Vornamen an, aus dem er zusammen mit dem Nachnamen
+  // gebildet wird.
+  check('Der Schreibfokus liegt im Vornamen, aus dem der Login-Name entsteht',
+    a.fokus === 'mb_vorname');
   check('Kein Passwort-Zuruecksetzen bei jemandem, den es noch nicht gibt', !a.pw);
   check('Kein Entfernen-Knopf bei jemandem, den es noch nicht gibt', a.weg === 0);
   check('KRITISCH: kein Befund "Basisausbildung offen" auf einem leeren Formular',
     !/Basisausbildung offen/.test(a.hinweise));
   check('Das Pflichtband traegt dieselbe Ueberschriftform wie die Abschnitte', a.gleicheUeberschrift);
 
-  // Der Login-Name wird vorgeschlagen -- und hoert damit auf, sobald jemand
-  // selbst tippt. Ein Feld, das sich unter der Hand aendert, ist schlimmer
-  // als gar kein Vorschlag.
+  // Der Login-Name wird seit ENT-376 ausschliesslich aus Vor- und Nachname
+  // gebildet -- kein Eingabefeld mehr, kein "selbst getippt", darum auch
+  // kein Einfrieren mehr: er zieht bei jeder Aenderung sofort nach.
+  check('KRITISCH: der Login-Name laesst sich nicht selbst eintippen',
+    await page.evaluate(() => document.getElementById('mbNeuName').readOnly));
   await page.fill('#mb_vorname', 'Hans');
   await page.fill('#mb_nachname', 'Muster');
   await page.waitForTimeout(150);
-  check('Der Login-Name wird aus Vor- und Nachname vorgeschlagen',
+  check('Der Login-Name wird aus Vor- und Nachname gebildet',
     (await page.inputValue('#mbNeuName')) === 'hans.muster');
-  await page.fill('#mbNeuName', 'h.muster');
   await page.fill('#mb_nachname', 'Mueller');
   await page.waitForTimeout(150);
-  check('KRITISCH: ein selbst gesetzter Login-Name wird nicht mehr ueberschrieben',
-    (await page.inputValue('#mbNeuName')) === 'h.muster');
+  check('KRITISCH: er aendert sich mit dem Nachnamen mit -- es gibt kein "angefasst" mehr',
+    (await page.inputValue('#mbNeuName')) === 'hans.mueller');
 
-  // Pflichtangaben
-  await page.fill('#mbNeuName', '');
+  // Pflichtangaben: ohne Vorname und Nachname laesst sich kein Login-Name
+  // bilden, also auch nichts anlegen.
+  await page.fill('#mb_vorname', '');
+  await page.fill('#mb_nachname', '');
+  await page.waitForTimeout(150);
+  check('Ohne Vor- oder Nachname zeigt die Vorschau nichts an',
+    (await page.inputValue('#mbNeuName')) === '');
   await page.click('#mbSpeichern');
   await page.waitForTimeout(300);
-  check('KRITISCH: ohne Login-Name wird nichts angelegt',
-    gesendet === null && /Login-Name erforderlich/.test(await page.textContent('#mbErr')));
-  await page.fill('#mbNeuName', 'hans.mueller');
+  check('KRITISCH: ohne Vorname und Nachname wird nichts angelegt',
+    gesendet === null && /Vorname und Nachname erforderlich/.test(await page.textContent('#mbErr')));
+  await page.fill('#mb_vorname', 'Hans');
+  await page.fill('#mb_nachname', 'Mueller');
   await page.fill('#mbNeuPass', 'kurz');
   await page.click('#mbSpeichern');
   await page.waitForTimeout(400);
@@ -619,14 +637,16 @@ check('KRITISCH: die AHV-Nummer laesst sich nicht mehr erfassen (ENT-348) -- Fel
   gesendet = null;
   await page.evaluate(() => mbNeu());
   await page.waitForTimeout(500);
-  await page.fill('#mbNeuName', 'schon.da');
+  await page.fill('#mb_vorname', 'Hans');
+  await page.fill('#mb_nachname', 'Muster');
   await page.fill('#mbNeuPass', 'blauerstuhlamsee');
   await page.click('#mbSpeichern');
   await page.waitForTimeout(400);
-  check('KRITISCH: ein vergebener Login-Name erscheint als stehendes Band',
-    /bereits vergeben/.test(await page.textContent('#mbErr')));
+  check('KRITISCH: eine Ablehnung beim Anlegen erscheint als stehendes Band',
+    /naheliegendes Wort/.test(await page.textContent('#mbErr')));
   check('Die Eingaben bleiben stehen, statt verloren zu gehen',
-    (await page.inputValue('#mbNeuName')) === 'schon.da'
+    (await page.inputValue('#mb_vorname')) === 'Hans'
+    && (await page.inputValue('#mbNeuName')) === 'hans.muster'
     && await page.evaluate(() => document.getElementById('mv-bearbeiten').classList.contains('on')));
   speichernOk = true;
   await page.evaluate(() => mbAbbrechen());
@@ -649,7 +669,7 @@ check('KRITISCH: die AHV-Nummer laesst sich nicht mehr erfassen (ENT-348) -- Fel
     band: document.getElementById('mbKi').textContent.replace(/\s+/g, ' '),
   }));
   check('Das Diktat legt auf derselben Flaeche an', d.offen);
-  check('Der Login-Name ist aus dem Diktat vorgeschlagen', d.name === 'erika.muster');
+  check('Der Login-Name ist aus dem Diktat gebildet', d.name === 'erika.muster');
   check('KRITISCH: das Passwort wird NIE vorbelegt', d.pass === '');
   check('KRITISCH: "3000 Bern" wird auch beim Anlegen getrennt',
     d.plz === '3000' && d.ort === 'Bern');

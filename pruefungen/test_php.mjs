@@ -115,6 +115,30 @@ const pwBeanstandet = pwAus.split('\n').filter(z => z.trim().startsWith('X '));
 check('KRITISCH: schwache Passwoerter werden abgewiesen', pwCode === 0 && pwBeanstandet.length === 0);
 if (pwBeanstandet.length) { pwBeanstandet.forEach(z => bad.push('PHP-Passwort: ' + z.trim())); }
 
+// ── Der Login-Name wird WIRKLICH gebildet (ENT-376). Namensgleichheit muss
+// zu verschiedenen, eindeutigen Login-Namen fuehren (laufende Nummer),
+// nicht zu einem abgelehnten Anlegen.
+let lnAus = '', lnCode = 0;
+try {
+  lnAus = execFileSync('php', [`${HIER}/pruef_mitarbeiter_login.php`],
+    { encoding: 'utf8' });
+} catch (e) {
+  lnAus = String(e.stdout || '') + String(e.stderr || '');
+  lnCode = e.status || 1;
+}
+const lnBeanstandet = lnAus.split('\n').filter(z => z.trim().startsWith('X '));
+check('KRITISCH: der Login-Name wird korrekt aus Vor- und Nachname gebildet, auch bei Namensgleichheit',
+  lnCode === 0 && lnBeanstandet.length === 0);
+if (lnBeanstandet.length) { lnBeanstandet.forEach(z => bad.push('PHP-Login-Name: ' + z.trim())); }
+
+// Der Login-Name darf nicht (wieder) aus dem Formular kommen -- sonst waere
+// die Bildung im Server nur Dekoration, und ein Aufruf am Formular vorbei
+// koennte sich weiterhin einen beliebigen Namen aussuchen.
+const createOhneKommentar = execFileSync('cat', [`${WURZEL}/backend/api/mitarbeiter_create.php`],
+  { encoding: 'utf8' }).replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+check('KRITISCH: mitarbeiter_create.php bildet den Login-Namen selbst, statt ihn aus der Eingabe zu uebernehmen',
+  /ma_login_generieren\s*\(/.test(createOhneKommentar) && !/\$input\['name'\]/.test(createOhneKommentar));
+
 // ── Passwort-Ruecksetzung per E-Mail-Link, ENT-373 (Quelltext -- die
 // Endpunkte benutzen MySQL-eigene Syntax und lassen sich nicht gegen den
 // SQLite-Stub ausfuehren, siehe pruef_passwort_reset.php).

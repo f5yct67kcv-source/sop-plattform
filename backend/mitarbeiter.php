@@ -228,6 +228,37 @@ function ma_spalte_da(PDO $pdo, string $spalte): bool
            && (bool)$pdo->query("SHOW COLUMNS FROM mitarbeiter LIKE " . $pdo->quote($spalte))->fetch();
 }
 
+// ── Login-Name automatisch (ENT-376) ────────────────────────────────────
+// Der Login-Name laesst sich nach dem Anlegen nicht mehr aendern -- eine
+// frei getippte erste Fassung liesse sich also nie mehr korrigieren.
+// Darum wird er hier zentral aus Vorname und Nachname gebildet, klein
+// geschrieben und ohne Leerzeichen ("Adrian von Arb" -> "adrian.vonarb").
+// Das laeuft im Server, nicht nur im Formular (mitarbeiter_create.php ruft
+// dies auf und ignoriert einen mitgeschickten Login-Namen) -- eine Sperre,
+// die sich am Browser vorbei umgehen liesse, waere keine.
+//
+// Gibt es die Kombination schon (Namensgleichheit), haengt eine laufende
+// Nummer an: max.muster, bei Kollision max.muster2, max.muster3, ... Das
+// Anlegen soll nie an einem gleichlautenden Namen scheitern (Entscheidung
+// des Projektinhabers, ENT-376) -- anders als bei anderen eindeutigen
+// Feldern gibt es hier keine sinnvolle manuelle Korrektur, die der
+// Bedienende stattdessen eintippen koennte.
+function ma_login_generieren(string $vorname, string $nachname, PDO $pdo): string
+{
+    $v = trim($vorname);
+    $n = trim($nachname);
+    if ($v === '' || $n === '') { return ''; }
+    $basis = strtolower(preg_replace('/\s+/', '', "$v.$n"));
+    $stmt = $pdo->prepare('SELECT COUNT(*) AS c FROM mitarbeiter WHERE name = ?');
+    $kandidat = $basis;
+    for ($lauf = 2; $lauf < 1000; $lauf++) {
+        $stmt->execute([$kandidat]);
+        if ((int)$stmt->fetch()['c'] === 0) { return $kandidat; }
+        $kandidat = $basis . $lauf;
+    }
+    return $kandidat;
+}
+
 // ── Eingabe lesen ────────────────────────────────────────────────────────
 // Gibt die Spaltenwerte zurueck, die geschrieben werden sollen, sowie eine
 // Liste von Beanstandungen. Nicht mitgeschickte Felder bleiben beim

@@ -22913,7 +22913,6 @@ function darf(recht) {
 let mbAend  = {};        // aus dem Diktat uebernommen, noch nicht gespeichert
 let mbListen = {};       // pflegbare Listen aus der Antwort
 let mbNeuModus = false;  // legt die Flaeche eine Person an statt sie zu aendern?
-let mbNameBeruehrt = false;  // hat jemand den Login-Namen selbst angefasst?
 
 function mbAlleFelder() {
   const f = [];
@@ -22939,7 +22938,6 @@ function mbNeu(felder) {
   if (geteilt) { felder = Object.assign({}, felder, geteilt); }
 
   mbNeuModus = true;
-  mbNameBeruehrt = false;
   mbBereich = MB_BEREICHE[0][0];         // Ein neues Formular faengt vorne an
   mbAend = felder;                       // Diktiertes wird blau markiert
   maAkte = { name: '', ist_admin: false };
@@ -22953,7 +22951,10 @@ function mbNeu(felder) {
   (anstellungsorte.length ? Promise.resolve() : ladeAnstellungsorte()).then(() => {
     mbZeichnen();
     mbPwLaenge();
-    const n = $('mbNeuName');
+    // Der Login-Name ist seit ENT-376 keine Eingabe mehr -- der Schreibfokus
+    // faengt darum beim Vornamen an, aus dem er zusammen mit dem Nachnamen
+    // gebildet wird.
+    const n = $('mb_vorname');
     if (n) { n.focus(); }
   });
 }
@@ -22981,11 +22982,14 @@ function mbPwLaenge() {
   if (feld) { feld.placeholder = `mind. ${mbPwMin()} Zeichen`; }
 }
 
-// Vorschlag fuer den Login-Namen, solange ihn niemand selbst angefasst hat.
-// Sobald jemand darin tippt, bleibt sein Wert stehen -- ein Feld, das sich
-// unter der Hand wieder aendert, ist schlimmer als gar kein Vorschlag.
+// Der Login-Name ist kein Eingabefeld mehr (ENT-376): Er laesst sich nach
+// dem Anlegen nicht mehr aendern, darum wird er hier nur noch aus Vor- und
+// Nachname VORGERECHNET -- zur Anzeige, exakt nach demselben Muster wie
+// ma_login_generieren() im Server, der ihn tatsaechlich setzt und dabei bei
+// Namensgleichheit eine laufende Nummer anhaengt (das zeigt diese Vorschau
+// bewusst nicht vorweg, weil sie den Bestand dafuer nicht kennt).
 function mbNameVorschlag() {
-  if (!mbNeuModus || mbNameBeruehrt) { return; }
+  if (!mbNeuModus) { return; }
   const v = ($('mb_vorname') || {}).value || '';
   const n = ($('mb_nachname') || {}).value || '';
   const feld = $('mbNeuName');
@@ -23091,7 +23095,7 @@ function mbZeichnen() {
   const m = maAkte || {};
   $('mbName').textContent = mbNeuModus ? 'Neuer Mitarbeitender' : (fullName(m) || m.name || '–');
   $('mbSub').textContent = mbNeuModus
-    ? 'Login-Name und Passwort sind Pflicht, alles Weitere lässt sich später ergänzen.'
+    ? 'Vorname, Nachname und Passwort sind Pflicht, alles Weitere lässt sich später ergänzen.'
     : [m.personalnummer ? 'Pers-Nr. ' + m.personalnummer : '', m.name,
        m.ist_admin ? 'Verwaltung (Admin)' : 'Mitarbeitende(r)'].filter(Boolean).join(' · ');
   $('mbSpeichern').textContent = mbNeuModus ? 'Mitarbeitenden anlegen' : 'Angaben speichern';
@@ -23177,7 +23181,7 @@ function mbZeichnen() {
   const kiText = erkannt.length
     ? `Blau markiert wurde aus dem Diktat übernommen: ${esc(erkannt.map(mbLabel).join(', '))}. `
       + (mbNeuModus
-         ? 'Der Login-Name ist ein Vorschlag, das Passwort musst du selbst setzen.'
+         ? 'Der Login-Name wird daraus gebildet, das Passwort musst du selbst setzen.'
          : 'Es ist noch nichts gespeichert — bitte prüfen und oben speichern.')
     : (mbNeuModus && Object.keys(mbAend).length
        ? 'Aus dem Diktat liess sich kein Feld zuordnen — bitte von Hand ausfüllen.' : '');
@@ -23199,8 +23203,9 @@ function mbNeuKonto() {
       <div class="card-hd"><h3>Zugang anlegen</h3></div>
       <div class="card-bd">
         <div class="form-grid">
-          <div class="f"><label for="mbNeuName">Login-Name *</label>
-            <input class="inp" id="mbNeuName" autocomplete="off" oninput="mbNameBeruehrt = true"></div>
+          <div class="f"><label for="mbNeuName">Login-Name</label>
+            <input class="inp" id="mbNeuName" readonly tabindex="-1"
+                   placeholder="wird aus Vorname und Nachname gebildet"></div>
           <div class="f"><label for="mbNeuPass">Passwort *</label>
             <div class="pw-feld">
               <input class="inp" id="mbNeuPass" type="password" placeholder="mind. ${PW_MIN} Zeichen" autocomplete="new-password">
@@ -23385,10 +23390,17 @@ function mbSpeichern() {
   };
 
   if (mbNeuModus) {
-    body.name = ($('mbNeuName').value || '').trim();
     body.password = $('mbNeuPass').value || '';
     if (darf('rechte')) { body.rollen = mbRollenLesen('mbNeuRolle_'); }
-    if (!body.name) { scheitern('Login-Name erforderlich.'); $('mbNeuName').focus(); return; }
+    // Der Login-Name kommt seit ENT-376 nicht mehr aus einem eigenen Feld,
+    // sondern aus Vorname und Nachname -- der Server bildet ihn (und haengt
+    // bei Namensgleichheit eine laufende Nummer an). Ohne beide laesst sich
+    // keiner bilden.
+    if (!(body.vorname || '').trim() || !(body.nachname || '').trim()) {
+      scheitern('Vorname und Nachname erforderlich -- daraus wird der Login-Name gebildet.', 'person');
+      $('mb_vorname').focus();
+      return;
+    }
     if (body.password.length < mbPwMin()) {
       scheitern(`Passwort mindestens ${mbPwMin()} Zeichen`
         + (mbPwMin() > PW_MIN ? ' für Verwaltungszugänge.' : '.'));
@@ -23421,7 +23433,10 @@ function mbSpeichern() {
       return;
     }
     if (mbNeuModus) {
-      const name = body.name;
+      // Der Server liefert den Namen zurueck (ENT-376): Er bildet ihn selbst
+      // und haengt bei Namensgleichheit eine laufende Nummer an, die die
+      // Oberflaeche vorher nicht kennen konnte.
+      const name = data.name;
       mbNeuModus = false;
       mbAend = {};
       // Auf die neu angelegte Person, nicht in die Liste: Man sieht sofort,
