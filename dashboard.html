@@ -23498,6 +23498,14 @@ function mbZeichnen() {
   const mark = f => (mbAend[f] !== undefined ? ' ki' : '');
 
   const feld = ([f, label, typ, quelle, hinweis, breit, gesperrt]) => {
+    // Personalnummer ist fuer alle anderen gesperrt (ENT-387), aber die
+    // Verwaltung darf eine falsch vergebene Nummer korrigieren (ENT-393) --
+    // dieselbe Berechtigungsschwelle wie beim Login-Namen in mbKonto(). Beim
+    // Anlegen bleibt sie in jedem Fall gesperrt: Da gibt es noch keine
+    // Nummer zu korrigieren, der Server zieht sie erst beim Speichern
+    // (ma_personalnummer_generieren, ENT-387) und ein mitgeschicktes Feld
+    // waere hier nur eine Eingabe, die still verworfen wuerde.
+    if (f === 'personalnummer' && !mbNeuModus && darf('rechte')) { gesperrt = false; }
     const id = 'mb_' + f;
     let steuer;
     if (typ === 'a') {
@@ -23672,7 +23680,11 @@ function mbKonto(nachPasswort) {
   const darfRollen = darf('rechte');
   return `
     <dl class="dl" style="margin-top:6px">
-      <dt>Login-Name</dt><dd>${esc(m.name || '–')}</dd>
+      <dt>Login-Name</dt><dd>${darfRollen ? `
+        <input class="inp" id="mbLoginNeu" value="${esc(m.name || '')}" style="max-width:260px">
+        <div class="note" style="margin-top:4px">Format: vorname.nachname, klein geschrieben, ohne Leerzeichen.
+          Wird geändert: alle Sitzungen dieser Person enden sofort.</div>`
+        : esc(m.name || '–')}</dd>
       ${mbRollenBlock(rollen, darfRollen, 'maRolle_')}
       <dt>Angelegt am</dt><dd>${m.erstellt_am ? dmy(m.erstellt_am) : '–'}</dd>
     </dl>
@@ -23794,6 +23806,29 @@ function mbSpeichern() {
     }
   } else {
     body.name = maAkte.name;
+    // Login-Name von Hand aendern (ENT-393): nur sichtbar, wer 'rechte' hat
+    // (siehe mbKonto()) -- serverseitig nochmals geprueft, das hier ist nur
+    // die Vermeidung einer Eingabe, die ohnehin abgelehnt wuerde.
+    // Nur pruefen, wenn wirklich ein anderer Name eingetragen wurde -- sonst
+    // muesste jede Aenderung an einer Person, deren bestehender Login-Name
+    // das Muster (noch) nicht erfuellt, am unberuehrten Feld scheitern.
+    const loginFeld = $('mbLoginNeu');
+    if (loginFeld) {
+      const neu = (loginFeld.value || '').trim().toLowerCase();
+      if (neu !== maAkte.name) {
+        if (!neu) {
+          scheitern('Login-Name darf nicht leer sein.', 'zugang');
+          loginFeld.focus();
+          return;
+        }
+        if (!/^[\p{Ll}0-9]+(\.[\p{Ll}0-9]+)+$/u.test(neu)) {
+          scheitern('Login-Name muss dem Muster vorname.nachname entsprechen (klein geschrieben, ohne Leerzeichen).', 'zugang');
+          loginFeld.focus();
+          return;
+        }
+        body.name_neu = neu;
+      }
+    }
     // Rollen nur mitschicken, wenn die Kaestchen ueberhaupt dastehen --
     // sonst wuerde ein Speichern aus einer Rolle ohne Rechtevergabe die
     // vorhandenen Rollen mit einer leeren Liste ueberschreiben.
@@ -23830,12 +23865,23 @@ function mbSpeichern() {
         .then(() => { openMaDetail(name); toast(`„${name}“ angelegt.`); });
       return;
     }
+    // Wurde der eigene Login-Name gerade geaendert, ist die eigene Sitzung
+    // serverseitig schon beendet (ENT-393, gleiches Prinzip wie bei "Login-
+    // Namen umstellen", ENT-381) -- ein weiterer Aufruf mit ihr scheitert.
+    // Statt dessen gleich abmelden, mit dem neuen Namen zum Merken.
+    if (body.name_neu && me && body.name === me.name) {
+      toast(`Login-Name geändert auf „${body.name_neu}“ — bitte merken.`);
+      setTimeout(doLogout, 1800);
+      return;
+    }
     toast('Angaben gespeichert.');
     // Erst die Akte neu holen, dann zurueck: Der Server formt Werte um
     // (AHV-Nummer, PLZ/Ort-Trennung, geprueftes Pensum). Wer stattdessen den
     // abgeschickten Stand stehen liesse, saehe auf der Detailseite etwas
-    // anderes als in der Datenbank.
-    Promise.all([maAkteLaden(body.name).catch(() => null), loadMitarbeiter()])
+    // anderes als in der Datenbank. Wurde der Login-Name geaendert, gilt der
+    // alte nicht mehr -- nachgeladen wird unter dem neuen.
+    const ladeName = body.name_neu || body.name;
+    Promise.all([maAkteLaden(ladeName).catch(() => null), loadMitarbeiter()])
       .then(() => { mbAbbrechen(); });
   });
 }
