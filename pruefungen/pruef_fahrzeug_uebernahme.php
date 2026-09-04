@@ -191,6 +191,24 @@ $neu(11); $stamm(11, 20000, '2026-05-01');
 pruef('Beim Stammdatenwert (keine Uebernahme in der Kette) bleibt "eigene" unbesetzt',
     !array_key_exists('eigene', fz_bezugsstand($pdo, 11, 7)));
 
+// ── Gleiches Datum, gleicher Wert: der eigene Spiegel schlaegt sich nicht ──
+// Der real beobachtete Fall (Live-Test des Projektinhabers): Eine echte
+// Uebernahme schreibt den Stammdatenwert automatisch als exakten Spiegel
+// mit (meine_fahrzeug_uebernahme.php). Ohne diese Unterscheidung gewaenne
+// dieser Spiegel gegen die eigene Kette, die ihn erzeugt hat -- die
+// "besetzt/fremd"-Warnung (ENT-354) und der Aktiv-Hinweis (ENT-359) fielen
+// dann an JEDEM Tag mit einer echten Uebernahme sofort auf die anonyme
+// Stammdaten-Zeile zurueck, und eine zweite Person konnte dasselbe Fahrzeug
+// ohne jede Warnung uebernehmen.
+$neu(20); $kette(20, 'uebernahme', 55000, '2026-04-10 08:15:00');
+$stamm(20, 55000, '2026-04-10');
+pruef('KRITISCH: stimmt der Stammdatenwert exakt mit der letzten Uebernahme ueberein, '
+    . 'ist das ihr eigener Spiegel, keine Buero-Korrektur -- die Kette (mit Person) bleibt massgeblich',
+    fz_bezugsstand($pdo, 20)['quelle'] === 'uebernahme');
+pruef('KRITISCH: ohne diese Unterscheidung wuerde fz_meine_aktiv() nie mehr anschlagen, '
+    . 'sobald die eigene Uebernahme heute schon im Stammdatenspiegel steht',
+    (fz_bezugsstand($pdo, 20, 7)['eigene'] ?? null) === true);
+
 // ── fz_meine_aktiv() (ENT-354) ─────────────────────────────────────────────
 // Rein informativ fuer die eigene Maske -- siehe Kommentar in fahrzeug.php.
 pruef('Ohne jede Uebernahme gibt es kein aktives Fahrzeug',
