@@ -21,10 +21,14 @@ require_once __DIR__ . '/rundgang.php';
 const FZ_FOTO_MAX = 2 * 1024 * 1024;
 
 // Ein Sprung dieser Grösse zwischen zwei Übernahmen ist nicht verboten --
-// eine Fahrt nach Genf und zurück erreicht ihn. Er wird nur BENANNT, damit
-// die spätere Abstimmung (Projektinhaber: "dass die Anzahl gefahrener
-// Kilometer in etwa den Richtlinien besteht") nicht bei null anfangen muss.
-const FZ_SPRUNG_AUFFAELLIG = 800;
+// er wird nur BENANNT, damit die spätere Abstimmung (Projektinhaber: "dass
+// die Anzahl gefahrener Kilometer in etwa den Richtlinien besteht") nicht
+// bei null anfangen muss. Wert vom Projektinhaber ausdrücklich vorgegeben
+// (ENT-371, revidiert den ursprünglich angenommenen Wert 800): Ein
+// Tageseinsatz mit Hin- und Rückfahrt liegt im Schweizer Mittelland normal
+// zwischen 20 und 300 km; darüber wird es "exotisch" -- ein Auftrag an den
+// äusseren Landesgrenzen, wo selten Einsätze stattfinden.
+const FZ_SPRUNG_AUFFAELLIG = 300;
 
 // Worauf ein neuer Kilometerstand aufsetzt.
 //
