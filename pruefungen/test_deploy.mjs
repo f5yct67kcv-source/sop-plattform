@@ -11,6 +11,7 @@
 // ENT-049). Ein Kommentar ist aber keine Prüfung.
 import { WURZEL } from './pfade.mjs';
 import { readFileSync, existsSync, readdirSync } from 'fs';
+import { createHash } from 'crypto';
 
 const ok = [], bad = [];
 const check = (n, c) => (c ? ok : bad).push(n);
@@ -185,13 +186,15 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
   const verifySchritt = (/Staging-Passwortschutz verifizieren[\s\S]{0,2500}/.exec(workflow) ?? [''])[0];
 
   check('KRITISCH: ein verändertes htaccess-hostpoint ohne manuelle Staging-Synchronisierung bricht den Staging-Deploy ab',
-    /sha256sum htaccess-hostpoint/.test(workflow)
-    && /staging-htaccess\.synced-sha256/.test(workflow)
-    && /exit 1/.test(workflow)
+    /for DRIFT_DATEI in htaccess-hostpoint htaccess-staging-zusatz robots-staging\.txt/.test(workflow)
+    && /AKTUELLER_HASH=\$\(sha256sum "\$DRIFT_DATEI"/.test(workflow)
+    && /"\$AKTUELLER_HASH"\s*!=\s*"\$SYNCED_HASH"[\s\S]{0,500}exit 1/.test(workflow)
     && existsSync(`${WURZEL}/staging-htaccess.synced-sha256`));
 
-  check('KRITISCH: die Staging-.htaccess wird beim FTP-Upload nicht angefasst (kein Upload, keine Löschung)',
-    /exclude:\s*\$\{\{\s*env\.UMGEBUNG\s*==\s*'staging'[\s\S]{0,60}\.htaccess/.test(workflow));
+  check('KRITISCH: sowohl .htaccess als auch robots.txt werden beim Staging-FTP-Upload nicht angefasst (kein Upload, keine Löschung), Production bleibt ohne Ausschluss',
+    /STAGING_EXCLUDE=\$'\.htaccess\\nrobots\.txt'/.test(workflow)
+    && /STAGING_EXCLUDE=""/.test(workflow)
+    && /exclude:\s*\$\{\{\s*env\.STAGING_EXCLUDE\s*\}\}/.test(workflow));
 
   // Nicht nur "kommen die Wörter 401/WWW-Authenticate/Basic irgendwo vor"
   // -- das bliebe grün, auch wenn nur die abschliessende Erfolgsmeldung
@@ -211,6 +214,82 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
   // dass der curl-Fehlschlag selbst (nicht 0) zum eigenen Abbruch führt.
   check('KRITISCH: ein Netzwerkfehler/Timeout beim Passwortschutz-Nachweis bricht den Deploy ab, statt als "ok" durchzugehen',
     /\$\?\s*-ne\s*0[\s\S]{0,200}exit 1/.test(verifySchritt));
+}
+
+// ── Staging-Suchmaschinenausschluss: X-Robots-Tag und robots.txt zusätzlich
+// zu Basic Auth, aktiv per HTTP nachgewiesen (ENT-387)
+// ────────────────────────────────────────────────────────────────────────
+//
+// Basic Auth (ENT-384) verhindert Indexierung bereits strukturell. Diese
+// zweite Schicht soll greifen, falls Basic Auth künftig versehentlich
+// geschwächt wird -- deshalb wird sie unabhängig davon aktiv nachgewiesen,
+// nicht nur als Konfiguration angenommen. Ein unauthentifizierter Abruf
+// wäre hier kein Nachweis (liefert wegen "Require valid-user" immer 401,
+// unabhängig vom tatsächlichen Dateiinhalt) -- deshalb authentifiziert mit
+// eigenen, nur für diesen Zweck bestimmten Secrets.
+{
+  const suchmaschinenSchritt = (/Staging-Suchmaschinenausschluss verifizieren[\s\S]{0,3000}/.exec(workflow) ?? [''])[0];
+
+  check('KRITISCH: htaccess-staging-zusatz existiert und setzt X-Robots-Tag: noindex dauerhaft (mit "always", nicht nur bei Erfolgsantworten)',
+    existsSync(`${WURZEL}/htaccess-staging-zusatz`)
+    && /Header\s+always\s+set\s+X-Robots-Tag\s+"noindex/.test(readFileSync(`${WURZEL}/htaccess-staging-zusatz`, 'utf8')));
+
+  check('KRITISCH: robots-staging.txt existiert und sperrt tatsächlich alles (User-agent: * / Disallow: /)',
+    existsSync(`${WURZEL}/robots-staging.txt`)
+    && /^User-agent:\s*\*/m.test(readFileSync(`${WURZEL}/robots-staging.txt`, 'utf8'))
+    && /^Disallow:\s*\/\s*$/m.test(readFileSync(`${WURZEL}/robots-staging.txt`, 'utf8')));
+
+  // Kein "die Datei existiert", sondern: der dort hinterlegte Hash stimmt
+  // TATSÄCHLICH mit dem aktuellen Inhalt der drei Quelldateien überein.
+  // Sonst könnte irgendein Platzhalter-Hash stehen, der nie mehr aktualisiert
+  // wird, und der Drift-Guard würde niemals mehr auslösen.
+  {
+    const sha256 = pfad => createHash('sha256').update(readFileSync(pfad)).digest('hex');
+    const syncDatei = readFileSync(`${WURZEL}/staging-htaccess.synced-sha256`, 'utf8');
+    for (const datei of ['htaccess-hostpoint', 'htaccess-staging-zusatz', 'robots-staging.txt']) {
+      const zeile = syncDatei.split('\n').find(z => z.startsWith(`${datei}:`));
+      check(`KRITISCH: staging-htaccess.synced-sha256 trägt den tatsächlich aktuellen Hash von ${datei}`,
+        !!zeile && zeile.split(':')[1]?.trim() === sha256(`${WURZEL}/${datei}`));
+    }
+  }
+
+  check('KRITISCH: die authentifizierte Startseiten-Prüfung verlangt HTTP 200 UND X-Robots-Tag: noindex, beides einzeln an einen Abbruch gekoppelt',
+    /grep -qE '\^HTTP\/\[0-9\.\]\+ 200'[\s\S]{0,250}exit 1/.test(suchmaschinenSchritt)
+    && /grep -qi '\^X-Robots-Tag:\.\*noindex'[\s\S]{0,250}exit 1/.test(suchmaschinenSchritt));
+
+  check('KRITISCH: die authentifizierte robots.txt-Prüfung verlangt HTTP 200 UND den Inhalt User-agent: * UND Disallow: /, alle drei einzeln an einen Abbruch gekoppelt',
+    /grep -qE '\^HTTP\/\[0-9\.\]\+ 200'[\s\S]{0,600}exit 1/.test(suchmaschinenSchritt)
+    && /grep -qE '\^User-agent:\[\[:space:\]\]\*\\\*'[\s\S]{0,250}exit 1/.test(suchmaschinenSchritt)
+    && /grep -qE '\^Disallow:\[\[:space:\]\]\*\/\[\[:space:\]\]\*\$'[\s\S]{0,250}exit 1/.test(suchmaschinenSchritt));
+
+  check('KRITISCH: beide authentifizierten Abrufe (Startseite UND robots.txt) brechen bei DNS-/TLS-/Netzwerkfehler oder Timeout ab, statt als "ok" durchzugehen',
+    (suchmaschinenSchritt.match(/\$\?\s*-ne\s*0[\s\S]{0,300}exit 1/g) ?? []).length >= 2);
+
+  // Nicht nur "das richtige Secret kommt irgendwo im Schritt vor" -- das
+  // bliebe grün, wenn nur EINER der beiden authentifizierten Abrufe
+  // (Startseite ODER robots.txt) tatsächlich STAGING_BASIC_AUTH_* nutzt und
+  // der andere heimlich auf einen anderen Zugang umgestellt wird. Verlangt
+  // wird, dass JEDES "-u ..." im Schritt exakt dieses Secret-Paar ist.
+  {
+    const alleAuthAbrufe = suchmaschinenSchritt.match(/-u\s+"[^"]*"/g) ?? [];
+    const korrekteAuthAbrufe = suchmaschinenSchritt.match(/-u\s+"\$\{\{\s*secrets\.STAGING_BASIC_AUTH_USER\s*\}\}:\$\{\{\s*secrets\.STAGING_BASIC_AUTH_PASSWORD\s*\}\}"/g) ?? [];
+    check('KRITISCH: beide authentifizierten Abrufe (Startseite UND robots.txt) nutzen ausschliesslich STAGING_BASIC_AUTH_USER/PASSWORD, keinen persönlichen oder produktiven Zugang',
+      alleAuthAbrufe.length >= 2 && alleAuthAbrufe.length === korrekteAuthAbrufe.length);
+  }
+
+  check('KRITISCH: fehlende STAGING_BASIC_AUTH_USER/PASSWORD brechen den Nachweis ab, statt ohne Zugangsdaten "leer" weiterzulaufen',
+    /secrets\.STAGING_BASIC_AUTH_USER[\s\S]{0,120}secrets\.STAGING_BASIC_AUTH_PASSWORD[\s\S]{0,250}exit 1/.test(suchmaschinenSchritt));
+
+  // Ohne diese beiden Wächter könnte ein Redirect auf einen fremden Host
+  // (curl -L folgt ihm und meldet am Ende trotzdem "200") oder ein
+  // abgeschaltetes Zertifikats-Prüfen (-k) die ganze Nachweiskette
+  // unbemerkt aushebeln, unabhängig davon, was die einzelnen grep-Prüfungen
+  // oben verlangen.
+  check('KRITISCH: keine der HTTP-Prüfungen deaktiviert die TLS-Zertifikatsprüfung (kein curl -k/--insecure)',
+    !/curl\s+[^\n]*(-k\b|--insecure)/.test(workflow));
+
+  check('KRITISCH: keine der HTTP-Prüfungen folgt Weiterleitungen (kein curl -L/--location) -- ein Redirect auf einen fremden Host kann so nie als Erfolg durchgehen',
+    !/curl\s+[^\n]*(-L\b|--location)/.test(workflow));
 }
 
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);

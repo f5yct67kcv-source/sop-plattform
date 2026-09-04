@@ -116,6 +116,8 @@ unten).
 | `SMTP_ABSENDER` | `STAGING_SMTP_ABSENDER` | Absenderadresse (muss zum jeweiligen Postfach passen) | dieselbe Stelle |
 | `SMTP_ABSENDER_NAME` | `STAGING_SMTP_ABSENDER_NAME` | Angezeigter Absendername (optional) | frei waehlbar |
 | — | `STAGING_TESTMAIL` | Zieladresse, auf die **jede** aus Staging versendete Mail umgeleitet wird | frei waehlbar, kein produktives Postfach |
+| — | `STAGING_BASIC_AUTH_USER` | Benutzername fuer den authentifizierten Suchmaschinenausschluss-Nachweis (ENT-387) | Hostpoint-Passwortschutz (Explorer → www/staging → Web-Einstellungen → Passwortschutz), eigener technischer Benutzer `qa-probe`, nicht der persoenliche Zugang |
+| — | `STAGING_BASIC_AUTH_PASSWORD` | Passwort dazu | dieselbe Stelle; eigenes starkes Zufallspasswort |
 
 **Erforderlich, sonst bricht der Deploy ab** (siehe Workflow-Schritt „Umgebung
 waehlen und erforderliche Secrets pruefen"): `DB_*`, `HOSTPOINT_FTP_*` und
@@ -204,6 +206,32 @@ Projekt-Repositories (ENT-341); hier nur, was den Code betrifft:
   Fehlschlag. Die dafuer genutzte Domain steht als **Environment-Variable**
   `STAGING_DOMAIN` (nicht als Secret, da nicht vertraulich) im
   GitHub-Environment `staging`.
+- **Suchmaschinenausschluss zusaetzlich zu Basic Auth (ENT-387):** Basic
+  Auth bleibt primaerer Schutz; zwei weitere, unabhaengige Schichten
+  greifen, falls er kuenftig versehentlich geschwaecht wird. `X-Robots-Tag:
+  noindex, nofollow, noarchive` kommt ueber `mod_headers` aus
+  `htaccess-staging-zusatz` — wie `htaccess-hostpoint` nur manuell
+  unterhalb von `#@__HCP_END__@#` in die Staging-`.htaccess` eingetragen,
+  nie Teil von `htaccess-hostpoint` selbst (sonst auch auf Production).
+  `robots.txt` (`User-agent: *` / `Disallow: /`, Quelle
+  `robots-staging.txt`) liegt einmalig manuell als eigene Datei in
+  `www/staging`; der Deploy-Workflow schliesst fuer Staging **sowohl
+  `.htaccess` als auch `robots.txt`** von Upload und Loeschung aus. Der
+  Drift-Guard (`staging-htaccess.synced-sha256`) trackt inzwischen alle
+  drei Quelldateien einzeln (`htaccess-hostpoint`, `htaccess-staging-
+  zusatz`, `robots-staging.txt`). Nach jedem Staging-Deploy verifiziert ein
+  eigener Schritt („Staging-Suchmaschinenausschluss verifizieren")
+  authentifiziert (eigener technischer Benutzer `qa-probe` im
+  Hostpoint-Passwortschutz, Secrets `STAGING_BASIC_AUTH_USER`/
+  `STAGING_BASIC_AUTH_PASSWORD`): die Startseite liefert HTTP 200 mit
+  `X-Robots-Tag: noindex`, `robots.txt` liefert HTTP 200 mit `User-agent:
+  *`/`Disallow: /`. Ein unauthentifizierter Abruf waere hier kein Nachweis
+  — wegen `Require valid-user` liefert jeder Pfad ohnehin 401, unabhaengig
+  vom tatsaechlichen Dateiinhalt. Alle HTTP-Pruefungen in diesem Workflow
+  verifizieren TLS reguraer (kein `-k`/`--insecure`) und folgen keiner
+  Weiterleitung (kein `-L`/`--location`) — ein Redirect auf einen fremden
+  Host kann so nie als Erfolg durchgehen; DNS-/TLS-/Netzwerk-/Timeout-Fehler
+  gelten als Fehlschlag.
 - **Einrichtung einer neuen/leeren Staging-Datenbank:** `backend/schema.sql`
   einmalig in phpMyAdmin ausfuehren, danach `setup.php`/`setup.html`
   temporaer hochladen und den ersten Admin-Account anlegen (**danach

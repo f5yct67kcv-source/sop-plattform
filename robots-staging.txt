@@ -1,0 +1,5 @@
+# Staging-only (ENT-387) -- nicht fuer Production. Manuell als robots.txt
+# in www/staging bei Hostpoint angelegt, vom Staging-Deploy ausdruecklich
+# von Upload und Loeschung ausgenommen (siehe deploy-hostpoint.yml).
+User-agent: *
+Disallow: /

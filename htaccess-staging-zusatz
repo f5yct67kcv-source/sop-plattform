@@ -1,0 +1,15 @@
+# Staging-spezifische Zusatzregel (ENT-387): NUR fuer Staging bestimmt, wird
+# manuell zusaetzlich zum Inhalt von htaccess-hostpoint unterhalb von
+# "#@__HCP_END__@#" in die .htaccess bei Hostpoint eingetragen (Explorer ->
+# www/staging -> .htaccess -> editieren, im Anschluss an den dort bereits
+# stehenden Inhalt von htaccess-hostpoint).
+#
+# Diese Datei wird von keinem Deploy kopiert, hochgeladen oder geloescht --
+# sie landet nie in dist/ und nie auf Production. "Header always set" statt
+# nur "Header set": ohne "always" liefert Apache den Header bei
+# Fehlerantworten (u. a. HTTP 401, die Regel auf Staging so gut wie immer
+# zuerst trifft) teils nicht aus -- siehe htaccess-hostpoint, das denselben
+# Mechanismus bereits fuer die produktiven Sicherheits-Header verwendet.
+<IfModule mod_headers.c>
+  Header always set X-Robots-Tag "noindex, nofollow, noarchive"
+</IfModule>
