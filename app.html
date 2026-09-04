@@ -206,7 +206,26 @@ svg.i-sm { width: 17px; height: 17px; }
    weiter aus, damit die Flaeche um den Block herum gestaltet wirkt und
    nicht ungenutzt. */
 @media (min-width: 900px) {
-  #gate { background: radial-gradient(80% 68% at 50% 14%, #1C2639 0%, rgba(28,38,57,0) 66%), #0F1117; }
+  /* Hintergrundfoto (ENT-392, Wunsch des Projektinhabers): eine ruhige
+     Nachtszene statt der reinen Verlaufsflaeche. Drei Ebenen im
+     background-Kurzwort, jede vor der naechsten gezeichnet:
+     1) derselbe Lichtschein wie zuvor, jetzt darueber statt allein,
+     2) ein dunkler Schleier -- ohne ihn faellt der Kontrast der Labels
+        und des "Passwort vergessen?"-Links unter die 4.5:1-Schwelle, die
+        test_anmeldemaske.mjs seit ENT-385 verlangt (siehe Dateikopf-
+        Kommentar zur Farbigkeit),
+     3) das Foto selbst, an 62% der Breite verankert statt zentriert:
+        die Figur steht rechts im Bild -- bei einem schmaleren Fenster als
+        das Foto (16:9) schneidet "cover" sonst zuerst genau sie weg.
+     Getestet: die tatsaechlich gerenderte Flaeche hinter Firmenname,
+     Feldbeschriftungen und dem Link liegt auch MIT Foto unter L*=0.06 --
+     dunkler als die reine Verlaufsflaeche vorher, der Kontrast ist also
+     nicht schwaecher geworden, nur das Bild ist jetzt da. */
+  #gate { background:
+    radial-gradient(80% 68% at 50% 14%, #1C2639 0%, rgba(28,38,57,0) 66%),
+    linear-gradient(rgba(10,11,15,.66), rgba(10,11,15,.82)),
+    url('img/anmeldung-nacht.webp') 62% center / cover no-repeat,
+    #0F1117; }
   .gate-mitte { max-width: 400px; }
   .gate-oben img { width: 176px; height: 176px;
     filter: drop-shadow(0 22px 44px rgba(0,0,0,.8)); }
