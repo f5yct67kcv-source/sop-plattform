@@ -3009,6 +3009,13 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
      Gemessen bei 390 px: mit min-width: 0 sind es 118/118/118, und kein
      Text wird abgeschnitten (scrollWidth <= clientWidth geprueft). */
   #view-planung .tab { flex: 1 1 0; min-width: 0; text-align: center; padding-left: 4px; padding-right: 4px; }
+  /* Gleiches Muster fuer die neue Kunden-Reiterleiste (ENT-399) -- sonst
+     bliebe "Offerten" nur ueber das eingebaute Scrollen von .tabs (auto)
+     erreichbar, und ein abgeschnittener Reiter sieht auf den ersten Blick
+     aus wie das Ende der Leiste, nicht wie ein vierter Punkt. Bei vier
+     kurzen Woertern (laengstes "Offerten") reicht min-width: 0 auf 390 px,
+     kein Scrollen noetig -- gemessen. */
+  #kuMobilTabs .tab { flex: 1 1 0; min-width: 0; text-align: center; padding-left: 4px; padding-right: 4px; }
   /* Der linke und der rechte rücken an ihren Rand, statt ihre Zelle zu
      zentrieren -- sonst stünde aussen wieder Luft.
      Bewusst über die IDs und NICHT über :first-of-type/:last-of-type: Die
@@ -3560,14 +3567,25 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
         <span class="lbl">Abgleich</span>
       </button>
 
+      <!-- "Kunden" bleibt seit ENT-399 auch auf dem Handy ein Hauptpunkt,
+           gleiches Muster wie "Planung" (ENT-233): der Knopf selbst navigiert
+           direkt (kuNavKlick()), nur die Aufklapp-Kinder und der Pfeil sind
+           "nur-desktop" -- auf dem Handy uebernimmt stattdessen die eigens
+           dafuer eingefuegte Reiterleiste in #view-kunden (".tabs.nur-schmal"
+           dort). Anlass: Anruf-Szenario -- der Planer ist unterwegs, der
+           Kunde am Telefon braucht kurzfristig Rapport oder Offerte, beide
+           lagen bisher nur am Desktop. "Stammdaten" bleibt trotzdem
+           "nur-desktop": das ist nur die Rubriks-Beschriftung ueber der
+           Gruppe, "Kunden" bleibt der einzige Punkt darunter, der mobil
+           erscheint (Administration bleibt vollstaendig verborgen). -->
       <div class="nav-lbl nur-desktop" style="margin-top:16px">Stammdaten</div>
-      <div class="nav-gruppe nur-desktop" id="navg-kunden">
+      <div class="nav-gruppe" id="navg-kunden">
         <button class="nav-item nav-eltern" id="nav-kunden" title="Kunden" onclick="kuNavKlick()">
           <svg class="i" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
           <span class="lbl">Kunden</span>
-          <svg class="i chev" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+          <svg class="i chev nur-desktop" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
         </button>
-        <div class="nav-kinder">
+        <div class="nav-kinder nur-desktop">
           <button class="nav-kind" id="nav-kunden-uebersicht" onclick="go('kunden'); kuGoTab('uebersicht')">Adressen</button>
           <button class="nav-kind" id="nav-kunden-objekte" onclick="go('kunden'); kuGoTab('objekte')">Objekte</button>
           <button class="nav-kind" id="nav-kunden-rapporte" onclick="go('kunden'); kuGoTab('rapporte')">Rapporte</button>
@@ -4410,10 +4428,24 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
       </section>
 
       <!-- ─────────── KUNDEN ─────────── -->
-      <!-- Kein gemeinsamer Reiter oben mehr: Adressen und Objekte sind
-           eigenständige Bereiche, die Seitenleiste allein navigiert
-           zwischen ihnen -- ein zweiter Umschalter wäre doppelt gemoppelt. -->
+      <!-- Kein gemeinsamer Reiter oben mehr FUER DEN DESKTOP: Adressen und
+           Objekte sind eigenstaendige Bereiche, die Seitenleiste allein
+           navigiert zwischen ihnen -- ein zweiter Umschalter waere dort
+           doppelt gemoppelt.
+           Seit ENT-399 (Handy-Anruf-Szenario) gibt es trotzdem eine
+           Reiterleiste hier -- aber nur "nur-schmal", also nur dort
+           sichtbar, wo die Seitenleisten-Kinder ohnehin "nur-desktop" sind
+           (kein Widerspruch zum Absatz oben: fuer den Desktop aendert sich
+           nichts). Gleiches Muster wie #view-planung .tabs. Rechnungen
+           bekommt bewusst KEINEN Reiter hier -- die Ausnahme betrifft nur
+           Adressen/Objekte/Rapporte/Offerten, siehe ENT-399. -->
       <section class="view" id="view-kunden">
+        <div class="tabs" id="kuMobilTabs">
+          <button class="tab on nur-schmal" id="kutab-uebersicht" onclick="kuGoTab('uebersicht')">Adressen</button>
+          <button class="tab nur-schmal" id="kutab-objekte" onclick="kuGoTab('objekte')">Objekte</button>
+          <button class="tab nur-schmal" id="kutab-rapporte" onclick="kuGoTab('rapporte')">Rapporte</button>
+          <button class="tab nur-schmal" id="kutab-offerten" onclick="kuGoTab('offerten')">Offerten</button>
+        </div>
         <!-- ── Adressen (bisher "Übersicht") -- Kundenliste, ueberarbeitet (ENT-040):
              eigener Alle/Archiviert-Umschalter, sortierbare Spalten,
              erweiterte Suche, Zeilen-Aktionsmenü. ── -->
@@ -13426,6 +13458,12 @@ function kuGoTab(t) {
   // Die Detailseite ist kein eigener Seitenleisten-Ziel, sondern ein
   // Drilldown aus Adressen -- "Adressen" bleibt entsprechend markiert.
   ($('nav-kunden-' + t) || $('nav-kunden-uebersicht')).classList.add('on');
+  // Gleiches Muster fuer die mobile Reiterleiste (ENT-399, "#kuMobilTabs" --
+  // eigens benannt statt ".tab" allgemein, sonst wuerden die Alle/Archiviert-
+  // Umschalter von Adressen und Offerten mitgeloescht).
+  document.querySelectorAll('#kuMobilTabs .tab').forEach(b => b.classList.remove('on'));
+  const kutabBtn = $('kutab-' + t); if (kutabBtn) { kutabBtn.classList.add('on'); }
+  else { const f = $('kutab-uebersicht'); if (f) { f.classList.add('on'); } }
   topSubZeichnen();
   $('pgCrumb').textContent = t === 'objekte' ? 'Daueraufträge und ihre Masterschichten'
     : t === 'rapporte' ? 'Alle erfassten Einsätze'
@@ -22240,14 +22278,25 @@ function openDrawer(id) {
     (r.unterschrift
       ? `<div class="sig-box"><div class="lb">Unterschrift Kunde</div><img src="${esc(r.unterschrift)}" alt="Unterschrift"></div>`
       : `<div class="sig-box"><div class="lb">Unterschrift Kunde</div><p style="font-size:12.5px;color:var(--ink-3)">Keine Unterschrift erfasst.</p></div>`) +
-    `<p class="zone-note" style="margin-top:20px">Für ein PDF im Druckdialog „Als PDF sichern“ wählen.</p>`;
+    `<p class="zone-note" style="margin-top:20px">Direkt als PDF: „Herunterladen“ oder „Teilen“ unten. Für den Ausdruck selbst „Kundenbericht drucken“, im Druckdialog lässt sich dort auch „Als PDF sichern“ wählen.</p>`;
+  // Herunterladen/Teilen (ENT-399): direkter Weg zum PDF, ohne den Umweg
+  // ueber den System-Druckdialog -- Anruf-Szenario, der Kunde am Telefon
+  // braucht den Rapport sofort. "Teilen" bleibt daneben sichtbar, auch wo
+  // Web-Share nicht unterstuetzt wird: kdRapportTeilen() faellt dann
+  // erklaerend auf denselben Download zurueck, statt den Knopf zu verstecken.
   $('drFoot').innerHTML =
-    `<button class="btn btn-primary" onclick="printReport()">
+    `<button class="btn btn-quiet btn-sm" id="drDlBtn" onclick="kdRapportHerunterladen(${Number(id)})" title="Rapport als PDF herunterladen" aria-label="Rapport als PDF herunterladen">
+       <svg class="i i-sm" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+     </button>
+     <button class="btn btn-quiet btn-sm" id="drTeilenBtn" onclick="kdRapportTeilen(${Number(id)})" title="Rapport teilen" aria-label="Rapport teilen">
+       <svg class="i i-sm" viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+     </button>
+     <button class="btn btn-primary btn-sm" onclick="printReport()" title="Kundenbericht drucken">
        <svg class="i i-sm" viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-       Kundenbericht drucken
+       <span class="lbl">Kundenbericht drucken</span>
      </button>
      <div style="flex:1"></div>
-     <button class="btn btn-plain" onclick="askDeleteRapport(${Number(id)})">Löschen</button>`;
+     <button class="btn btn-plain" id="drDeleteBtn" onclick="askDeleteRapport(${Number(id)})">Löschen</button>`;
   showDrawer();
 }
 
@@ -24713,9 +24762,14 @@ function rapportRechnungsadresse(r) {
   return sauber.length ? { zeilen: sauber, abweichend: abw } : null;
 }
 
-function printReport() {
-  const r = rapporte.find(x => Number(x.id) === drawerId);
-  if (!r) return;
+// Baut das Blatt fuer genau EINEN erfassten Rapport (Kunden/Rapporte,
+// ENT-155). Bewusst aus printReport() herausgezogen (ENT-399): dieselbe
+// Vorsichtsregel wie beim Rundgang-Blatt (siehe #rapportBlattHuelle) --
+// eine einzige Erzeugung fuer alle drei Wege (Drucken, Herunterladen,
+// Teilen), damit sie nie auseinanderlaufen. Rein inline gestylt wie die
+// beiden anderen Blaetter des Hauses (ofBlatt/epBerichtBlatt): der Klon
+// haengt so an nichts, was er verlieren koennte.
+function kdBerichtBlatt(r) {
   const re = rapportRechnungsadresse(r);
   const line = (k2, v) => `<tr><td style="padding:7px 0;color:#6B7280;width:170px;border-bottom:1px solid #E5E8EC">${k2}</td><td style="padding:7px 0;font-weight:600;border-bottom:1px solid #E5E8EC">${v}</td></tr>`;
   const rows = [
@@ -24748,7 +24802,7 @@ function printReport() {
     briefkopf.zusatz ? esc(briefkopf.zusatz) : '',
   ].filter(Boolean).join('');
 
-  $('printArea').innerHTML = `
+  return `
     <div style="font-family:-apple-system,Segoe UI,Arial,sans-serif;color:#14161A;max-width:700px;margin:0 auto">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:24px;border-bottom:2px solid #16181D;padding-bottom:14px;margin-bottom:22px">
         <div>
@@ -24775,7 +24829,93 @@ function printReport() {
       </div>
       ${bkFusszeile()}
     </div>`;
+}
+
+function printReport() {
+  const r = rapporte.find(x => Number(x.id) === drawerId);
+  if (!r) return;
+  $('printArea').innerHTML = kdBerichtBlatt(r);
   window.print();
+}
+
+function kdRapportDateiname(r) {
+  const teil = String(r.kunde || 'Rapport').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return 'Rapport-' + (teil || 'Rapport') + '-' + String(r.datum).slice(0, 10) + '.pdf';
+}
+
+// Gleiche Erzeugung wie rapportPdfBauen() (Rundgang) -- dieselbe verborgene
+// Huelle #rapportBlattHuelle/#rapportBlatt, nur mit dem Kunden-Rapport-Blatt
+// statt dem Rundgang-Blatt gefuellt. Getrennte Funktion statt einer
+// gemeinsamen Fallunterscheidung in rapportBlattFuellen(): die beiden
+// Datenformen (Rundgang vs. einzelner Schicht-Rapport) teilen sich sonst
+// nichts, und eine Verzweigung dort haette nur eine neue Stelle geschaffen,
+// an der beide Formen auseinanderlaufen koennen.
+function kdRapportPdfBauen(r) {
+  return html2pdfLaden().then(() => {
+    $('rapportBlatt').innerHTML = kdBerichtBlatt(r);
+    return html2pdf().set({
+      margin: 10,
+      image: { type: 'jpeg', quality: 0.95 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['css', 'legacy'] },
+    }).from($('rapportBlatt')).outputPdf('blob');
+  });
+}
+
+// Herunterladen und Teilen (ENT-399): Anruf-Szenario -- der Planer ist
+// unterwegs, der Kunde am Telefon will den Rapport sofort. "Drucken" fuehrt
+// mobil nur zum systemeigenen Druckdialog (dort laesst sich zwar auch
+// "Als PDF sichern" waehlen, aber das ist auf dem Handy ein Umweg ueber
+// mehrere Dialoge); diese beiden Knoepfe erzeugen die Datei direkt.
+function kdRapportHerunterladen(id) {
+  const r = rapporte.find(x => Number(x.id) === Number(id));
+  if (!r) { return; }
+  // Reine Icon-Knoepfe (kein Text -- die feste Drawer-Breite von 420 px
+  // liesse fuer vier Fusszeilen-Knoepfe sonst keinen Platz, gemessen bei
+  // ENT-399), darum genuegt "disabled" waehrend der Erzeugung als Rueck-
+  // meldung -- .btn:disabled ist bereits sichtbar abgeblendet.
+  const btn = $('drDlBtn');
+  if (btn) { btn.disabled = true; }
+  kdRapportPdfBauen(r).then(blob => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = kdRapportDateiname(r);
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    if (btn) { btn.disabled = false; }
+  }).catch(() => {
+    if (btn) { btn.disabled = false; }
+    toast('Der Rapport liess sich nicht erzeugen.');
+  });
+}
+
+function kdRapportTeilen(id) {
+  const r = rapporte.find(x => Number(x.id) === Number(id));
+  if (!r) { return; }
+  const btn = $('drTeilenBtn');
+  if (btn) { btn.disabled = true; }
+  kdRapportPdfBauen(r).then(blob => {
+    const datei = new File([blob], kdRapportDateiname(r), { type: 'application/pdf' });
+    if (navigator.canShare && navigator.canShare({ files: [datei] })) {
+      return navigator.share({ files: [datei], title: 'Rapport Nr. ' + r.id });
+    }
+    // Kein Datei-Teilen auf diesem Geraet/Browser (z.B. Desktop ohne
+    // Web-Share-Unterstuetzung): "unbekannt darf nie wie keine aussehen" --
+    // statt stillschweigend nichts zu tun, wird heruntergeladen und das auch
+    // gesagt, nicht nur der Download ohne Erklaerung ausgeloest.
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = kdRapportDateiname(r);
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    toast('Teilen wird hier nicht unterstützt — der Rapport wurde stattdessen heruntergeladen.');
+    if (btn) { btn.disabled = false; }
+  }).catch(err => {
+    if (btn) { btn.disabled = false; }
+    if (err && err.name === 'AbortError') { return; }
+    toast('Der Rapport liess sich nicht teilen.');
+  });
 }
 
 // ══════════════════════════════════════════ START
