@@ -300,6 +300,13 @@ jobs:
           # Server, faellt der Hintergrund lautlos auf die reine
           # Verlaufsflaeche zurueck, lokal faellt es NICHT auf.
           cp img/anmeldung-nacht.webp dist/img/anmeldung-nacht.webp
+          # Video-Hintergrund (ENT-394, ergaenzt das Foto darueber) --
+          # WebM/VP9 und MP4/H.264 als zwei <source>-Quellen in app.html,
+          # derselbe Fallstrick wie beim Foto: fehlt eine der beiden
+          # Dateien, spielt sie fuer die Browser, die genau dieses Format
+          # brauchen, gar nichts ab, und lokal faellt es NICHT auf.
+          cp img/anmeldung-nacht.webm dist/img/anmeldung-nacht.webm
+          cp img/anmeldung-nacht.mp4 dist/img/anmeldung-nacht.mp4
           cp backend/db.php dist/db.php
           cp backend/ai.php dist/ai.php
           cp backend/planung.php dist/planung.php
