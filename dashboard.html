@@ -3425,7 +3425,11 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
    sieht der Inhalt aus wie ein eigener Eintrag, sobald mehrere Karten
    offen sind. */
 .kk-koerper { margin-top: 11px; padding-top: 11px; border-top: 1px solid var(--line-soft); }
-.kk-koerper .dl { grid-template-columns: 104px 1fr; }
+/* Die Beschriftungsspalte bleibt bei den 118 px der uebrigen Definitions-
+   listen des Hauses. Enger gesetzt (104 px, erster Versuch) stiess
+   "MASTERSCHICHTEN" an den Wert daneben -- gemessen. overflow-wrap sichert
+   den Fall ab, dass spaeter eine noch laengere Beschriftung dazukommt. */
+.kk-koerper .dl dt { overflow-wrap: anywhere; }
 .kk-tasten { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 13px; }
 /* Die Knoepfe im Koerper gehoeren zur Karte, nicht zum Aufklappen: Ein
    Klick auf sie darf die Karte nicht gleich wieder zuklappen (jedes
@@ -4482,6 +4486,12 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
               <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
               <input class="inp" type="search" id="kQ" placeholder="Kunde, Nummer, Kontaktperson, Notiz …" oninput="renderKunden()">
             </div>
+            <!-- Nur auf dem Handy (ENT-401): Am Desktop sortieren die
+                 Spaltenkoepfe, die es auf der Karte nicht gibt. -->
+            <button class="btn btn-quiet btn-sm nur-schmal" id="kuSortBtn" onclick="kuSortNameUm()">
+              <svg class="i i-sm" viewBox="0 0 24 24"><line x1="6" y1="4" x2="6" y2="20"/><polyline points="3 17 6 20 9 17"/><line x1="13" y1="6" x2="21" y2="6"/><line x1="13" y1="12" x2="19" y2="12"/><line x1="13" y1="18" x2="17" y2="18"/></svg>
+              <span class="lbl">A – Z</span>
+            </button>
             <div class="sp" style="flex:1"></div>
             <!-- Etwas grösser als die übrigen Kopfzeilen-Knöpfe (kein
                  btn-sm) -- präsenter auf ausdrücklichen Wunsch, aber bewusst
@@ -4506,6 +4516,13 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
               <input class="inp" type="search" id="oQ" placeholder="Objekt, Kunde oder Ort …" oninput="renderObjekte()">
             </div>
             <label class="check" style="font-size:12.5px"><input type="checkbox" id="oInaktiv" onchange="renderObjekte()"> auch stillgelegte</label>
+            <!-- Nur auf dem Handy (ENT-401). Die Objektliste hatte bis dahin
+                 gar keine Sortierung -- jetzt hat sie eine, und zwar fuer
+                 Karte und Tabelle dieselbe. -->
+            <button class="btn btn-quiet btn-sm nur-schmal" id="obSortBtn" onclick="obSortNameUm()">
+              <svg class="i i-sm" viewBox="0 0 24 24"><line x1="6" y1="4" x2="6" y2="20"/><polyline points="3 17 6 20 9 17"/><line x1="13" y1="6" x2="21" y2="6"/><line x1="13" y1="12" x2="19" y2="12"/><line x1="13" y1="18" x2="17" y2="18"/></svg>
+              <span class="lbl">In Betrieb zuerst</span>
+            </button>
             <div class="sp" style="flex:1"></div>
             <button class="btn btn-primary btn-sm" onclick="openObjektNeu()">
               <svg class="i i-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -7264,6 +7281,20 @@ let rSortRichtung = 'ab';
 // Rapporte nebeneinander offen zu haben ist beim Vergleichen der Punkt.
 const rOffen = new Set();
 const ofOffen = new Set();
+// Seit ENT-401 tragen auch Adressen und Objekte Karten (ENT-400 hatte nur
+// Rapporte und Offerten umgestellt; der Projektinhaber will alle vier).
+const kuOffen = new Set();
+const obOffen = new Set();
+// Objekte: DREI Zustaende, nicht zwei. Der Server liefert bereits sortiert
+// (objekt_list.php: ORDER BY aktiv DESC, name) -- also "in Betrieb zuerst,
+// dann alphabetisch". Diese Ordnung ist keine Zufallsreihenfolge, die man
+// stillschweigend ersetzen darf: Wer die Liste durchgeht, will die
+// stillgelegten Objekte nicht zwischen den laufenden haben. Der Ausgangs-
+// zustand sortiert darum GAR NICHT nach, sondern laesst die Server-Ordnung
+// stehen; erst ein Klick wechselt auf reines A–Z bzw. Z–A. Damit aendert
+// sich am Desktop nichts, solange niemand den Knopf drueckt -- und den gibt
+// es dort nicht.
+let obSortModus = 'standard';   // 'standard' | 'auf' | 'ab'
 let maEingerichtet = true;  // stehen die Felder aus ENT-072 in der Datenbank?
 let enTarget = null;   // offener Einsatz (id)
 let obTarget = null;   // offenes Objekt (id)
@@ -11815,6 +11846,79 @@ function kuArchivGo(t) {
 function kuStrasse(k) { return [k.strasse, k.hausnummer].filter(Boolean).join(' ').trim(); }
 function kuPlzOrt(k) { return [k.plz, k.ort].filter(Boolean).join(' ').trim(); }
 
+// ── Handy: Kunden als aufklappbare Karten (ENT-401) ───────────────────────
+//
+// Am Desktop sortieren die Spaltenkoepfe nach sieben Feldern. Auf dem Handy
+// gibt es keine Koepfe, und der einzige Schluessel, nach dem man eine
+// Adressliste durchsieht, ist der Name -- der Umschalter setzt das Feld
+// darum ausdruecklich auf "name" (dieselbe Ueberlegung wie bei ofSortDatumUm).
+function kuSortNameUm() {
+  kuSortRichtung = (kuSortFeld === 'name' && kuSortRichtung === 'auf') ? 'ab' : 'auf';
+  kuSortFeld = 'name';
+  renderKunden();
+}
+
+function kuKarteUm(id) {
+  const k = Number(id);
+  if (kuOffen.has(k)) { kuOffen.delete(k); } else { kuOffen.add(k); }
+  renderKunden();
+}
+
+// Telefon und E-Mail als echte Verweise: Auf dem Handy ist das der ganze
+// Zweck der Adressliste -- der Kunde ruft an, man sucht ihn und ruft zurueck,
+// ohne die Nummer abzuschreiben. Am Desktop steht dieselbe Angabe als Text
+// in der Tabelle, dort waere ein Anruf-Verweis wirkungslos.
+function kuWahlZeile(wert, art) {
+  if (!wert) { return '<span style="color:var(--ink-3)">–</span>'; }
+  const ziel = art === 'tel' ? 'tel:' + String(wert).replace(/[^\d+]/g, '') : 'mailto:' + wert;
+  return `<a href="${esc(ziel)}" onclick="event.stopPropagation()">${esc(wert)}</a>`;
+}
+
+function kuKarte(k, rapporteZahl) {
+  const id = Number(k.id);
+  const offen = kuOffen.has(id);
+  const zeilen = [
+    ['Kunden-Nr.', dash(k.kundennummer)],
+    ['Kunde', esc(k.name)],
+    ...(k.art === 'privat' ? [['Art', 'Privatperson']] : []),
+    ['Strasse', dash(kuStrasse(k))],
+    ['PLZ / Ort', dash(kuPlzOrt(k))],
+    ['Telefon', kuWahlZeile(k.telefon, 'tel')],
+    ['E-Mail', kuWahlZeile(k.email, 'mail')],
+    ['Kontaktperson', dash(k.kontaktperson)],
+    ['Rapporte', rapporteZahl ? nf(rapporteZahl) : '<span style="color:var(--ink-3)">noch keine</span>'],
+    ['Notiz', dash(k.notiz)],
+  ];
+  const koerper = offen ? `
+    <div class="kk-koerper">
+      <dl class="dl">${zeilen.map(([a, v]) => `<dt>${a}</dt><dd>${v}</dd>`).join('')}</dl>
+      <div class="kk-tasten">
+        <button class="btn btn-plain btn-sm" onclick="event.stopPropagation(); openKundeDetail(${id})">Öffnen</button>
+        <button class="btn btn-plain btn-sm" onclick="event.stopPropagation(); openKundeBearbeiten(${id})">Bearbeiten</button>
+        <div class="sp" style="flex:1"></div>
+        <button class="btn btn-quiet btn-sm rowmenu-btn" onclick="kuMenuOeffnen(event, ${id})" aria-label="Weitere Aktionen">
+          <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
+        </button>
+      </div>
+    </div>` : '';
+  return `<div class="ag-karte klickbar" tabindex="0" role="button" aria-expanded="${offen ? 'true' : 'false'}"
+      onclick="kuKarteUm(${id})"
+      onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();kuKarteUm(${id});}">
+      <div class="kopf">
+        <b>${esc(k.name)}</b>
+        ${k.kundennummer ? `<span class="chip chip-n">${esc(k.kundennummer)}</span>` : ''}
+        <div class="sp" style="flex:1"></div>
+        <svg class="kk-pfeil" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="wer">${dash(kuPlzOrt(k))}${kuStrasse(k) ? ' · ' + esc(kuStrasse(k)) : ''}</div>
+      <div class="zeiten">${k.telefon ? esc(k.telefon) : 'keine Telefonnummer'}${
+        rapporteZahl ? ` · ${nf(rapporteZahl)} Rapporte` : ''}</div>
+      ${k.art === 'privat' ? '<div class="marken"><span class="chip chip-n">Privatperson</span></div>' : ''}
+      ${koerper}
+    </div>`;
+}
+
 function renderKunden() {
   const q = ($('kQ').value || '').toLowerCase().trim();
   const wollAktiv = kuArchivTab === 'alle' ? 1 : 0;
@@ -11832,6 +11936,17 @@ function renderKunden() {
     const c = String(a[kuSortFeld] || '').localeCompare(String(b[kuSortFeld] || ''), 'de', { numeric: true, sensitivity: 'base' });
     return kuSortRichtung === 'auf' ? c : -c;
   });
+  // Der Handy-Umschalter sagt, wonach TATSAECHLICH sortiert ist (ENT-401) --
+  // steht das Feld aus einer Desktop-Sitzung auf Nummer oder Ort, behauptet
+  // er nicht "A–Z", sondern bietet an, auf den Namen zu wechseln.
+  const kuSortBtn = $('kuSortBtn');
+  if (kuSortBtn) {
+    const lbl = kuSortBtn.querySelector('.lbl');
+    if (lbl) {
+      lbl.textContent = kuSortFeld !== 'name' ? 'Nach Name sortieren'
+        : (kuSortRichtung === 'auf' ? 'A – Z' : 'Z – A');
+    }
+  }
   if (!d.length) {
     $('kuTable').innerHTML = kunden.length
       ? EMPTY('Keine Treffer', kuArchivTab === 'alle' ? 'Für diese Suche gibt es keine Kunden.' : 'Für diese Suche gibt es keine archivierten Kunden.')
@@ -11840,7 +11955,10 @@ function renderKunden() {
   }
   const zaehl = {};
   rapporte.forEach(r => { zaehl[r.kunde] = (zaehl[r.kunde] || 0) + 1; });
-  $('kuTable').innerHTML = `<table><thead><tr>
+  // Handy: dieselben Kunden als Karten (ENT-401), Desktop unveraendert die
+  // Tabelle -- beide aus demselben gefilterten und sortierten d[].
+  $('kuTable').innerHTML = `<div class="nur-schmal">${d.map(k => kuKarte(k, zaehl[k.name])).join('')}</div>`
+    + `<table class="nur-breit"><thead><tr>
       ${kuTh('kundennummer', 'Nr.')}${kuTh('name', 'Kunde')}${kuTh('strasse', 'Strasse')}${kuTh('ort', 'Ort')}${kuTh('telefon', 'Telefon', true)}<th>E-Mail</th><th class="num">Rapporte</th><th class="num">Aktion</th>
     </tr></thead><tbody>` + d.map(k => `
       <tr class="click" onclick="openKundeDetail(${Number(k.id)})">
@@ -13958,11 +14076,100 @@ function gavAus010Balken(liste) {
   </div>`;
 }
 
+// ── Handy: Objekte als aufklappbare Karten (ENT-401) ──────────────────────
+//
+// Die Objektliste hatte bisher gar keine Sortierung -- sie stand in der
+// Reihenfolge des Servers. Der Umschalter sortiert nach Objektnamen und gilt
+// fuer BEIDE Darstellungen, damit Karte und Tabelle nie verschieden ordnen.
+function obSortNameUm() {
+  obSortModus = obSortModus === 'standard' ? 'auf' : (obSortModus === 'auf' ? 'ab' : 'standard');
+  renderObjekte();
+}
+
+function obKarteUm(id) {
+  const k = Number(id);
+  if (obOffen.has(k)) { obOffen.delete(k); } else { obOffen.add(k); }
+  renderObjekte();
+}
+
+function obKarte(o) {
+  const id = Number(o.id);
+  const offen = obOffen.has(id);
+  // zoneChip() liefert einen Strich, solange keine Anstellungsorte
+  // eingerichtet sind -- eine gueltige Aussage ("nicht beurteilbar"), aber nur
+  // MIT Beschriftung. In der Markenzeile stuende ein nackter Strich zwischen
+  // Chips und hiesse dort gar nichts; im aufgeklappten Koerper steht er
+  // dagegen unter "Auslagen" und ist damit lesbar.
+  const zone = zoneChip(o);
+  const zoneMarke = zone.includes('class="chip') ? zone : '';
+  // Dieselben Angaben wie in der Tabelle. "Nicht eingerichtet" und "keine"
+  // bleiben dabei unterscheidbar: Ohne Masterschichten steht hier nicht "0",
+  // sondern dass keine hinterlegt sind (CLAUDE.md).
+  const zeilen = [
+    ['Kunde', esc(o.kunde_name)],
+    ['Strasse', dash(o.strasse)],
+    ['Ort', esc(o.ort)],
+    ['Kanton', dash(o.kanton)],
+    ['Einsatzart', esc(o.einsatzart)],
+    ['Auslagen', zone],
+    ['Masterschichten', o.masterschichten
+      ? nf(o.masterschichten)
+      : '<span style="color:var(--ink-3)">keine hinterlegt</span>'],
+    ['Std. je Durchgang', o.masterschichten
+      ? nf(o.stunden_je_einsatz, 2) + ' h'
+      : '<span style="color:var(--ink-3)">–</span>'],
+    ['Zustand', o.aktiv ? 'in Betrieb' : 'stillgelegt'],
+    ['Bemerkung', dash(o.bemerkung)],
+  ];
+  const koerper = offen ? `
+    <div class="kk-koerper">
+      <dl class="dl">${zeilen.map(([a, v]) => `<dt>${a}</dt><dd>${v}</dd>`).join('')}</dl>
+      <div class="kk-tasten">
+        <button class="btn btn-plain btn-sm" onclick="event.stopPropagation(); openObjekt(${id})">Öffnen</button>
+      </div>
+    </div>` : '';
+  return `<div class="ag-karte klickbar" tabindex="0" role="button" aria-expanded="${offen ? 'true' : 'false'}"
+      onclick="obKarteUm(${id})"
+      onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();obKarteUm(${id});}">
+      <div class="kopf">
+        <b>${esc(o.name)}</b>
+        <span class="chip ${o.aktiv ? 'chip-p' : 'chip-n'}">${o.aktiv ? 'in Betrieb' : 'stillgelegt'}</span>
+        <div class="sp" style="flex:1"></div>
+        <svg class="kk-pfeil" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="wer">${esc(o.kunde_name)}</div>
+      <div class="zeiten">${esc(o.ort)}${o.strasse ? ' · ' + esc(o.strasse) : ''}</div>
+      <div class="marken">
+        <span class="chip chip-n">${esc(o.einsatzart)}</span>${sparteChip(o)}${zoneMarke}
+      </div>
+      ${koerper}
+    </div>`;
+}
+
 function renderObjekte() {
   const q = ($('oQ').value || '').toLowerCase().trim();
   const mitInaktiv = $('oInaktiv').checked;
   const d = objekte.filter(o => (mitInaktiv || o.aktiv) &&
     (!q || [o.name, o.kunde_name, o.ort, o.strasse].some(f => String(f || '').toLowerCase().includes(q))));
+  // Sortierung seit ENT-401, fuer Karte und Tabelle gleichermassen -- und im
+  // Ausgangszustand ausdruecklich KEINE: Dann bleibt die Ordnung des Servers
+  // stehen (in Betrieb zuerst, dann alphabetisch), siehe obSortModus.
+  if (obSortModus !== 'standard') {
+    d.sort((a, b) => {
+      const c = String(a.name || '').localeCompare(String(b.name || ''), 'de', { numeric: true, sensitivity: 'base' });
+      return obSortModus === 'auf' ? c : -c;
+    });
+  }
+  const obSortBtn = $('obSortBtn');
+  if (obSortBtn) {
+    const lbl = obSortBtn.querySelector('.lbl');
+    // Der Knopf nennt den Zustand, in dem die Liste GERADE ist.
+    if (lbl) {
+      lbl.textContent = obSortModus === 'standard' ? 'In Betrieb zuerst'
+        : (obSortModus === 'auf' ? 'A – Z' : 'Z – A');
+    }
+  }
   // Ueber der GANZEN Liste, nicht nur der gefilterten Ansicht (OP-104): Sonst
   // verschwindet der Hinweis, sobald jemand einen Suchbegriff eintippt, und
   // genau das darf bei einer Auslagenpflicht nicht passieren.
@@ -13973,7 +14180,11 @@ function renderObjekte() {
       : EMPTY('Noch keine Objekte', 'Ein Objekt ist der feste Einsatzort eines Dauerauftrags. Mit „Neues Objekt“ das erste anlegen.'));
     return;
   }
-  $('oTable').innerHTML = balken + `<table><thead><tr>
+  // Handy: dieselben Objekte als Karten (ENT-401), Desktop unveraendert die
+  // Tabelle. Der Auslagen-Hinweisbalken steht ueber beiden.
+  $('oTable').innerHTML = balken
+    + `<div class="nur-schmal">${d.map(o => obKarte(o)).join('')}</div>`
+    + `<table class="nur-breit"><thead><tr>
       <th>Objekt</th><th>Kunde</th><th>Ort</th><th>Kanton</th><th>Einsatzart</th>
       <th>Auslagen</th>
       <th class="num">Masterschichten</th><th class="num">Std. je Durchgang</th><th>Zustand</th>

@@ -1,4 +1,5 @@
-// Rapporte und Offerten als aufklappbare Karten auf dem Handy (ENT-400).
+// Alle vier Kunden-Reiter als aufklappbare Karten auf dem Handy
+// (ENT-400: Rapporte und Offerten, ENT-401: Adressen und Objekte).
 //
 // Der Anlass war eine MESSUNG, keine Meinung: Beide Listen sind neun Spalten
 // breit. Auf 390 px blieb davon ein waagrecht schiebbarer Streifen uebrig, in
@@ -64,8 +65,20 @@ const mock = page => page.route('**/api/**', r => {
   if (u.includes('rapport_list')) return send(RAP);
   if (u.includes('beleg_list')) return send(BEL);
   if (u.includes('kunden_list')) return send({ status: 'ok', kunden: [
-    { id: 1, name: 'Beispiel Consulting GmbH', strasse: 'Mustergasse 2', ort: '4600 Olten' },
-    { id: 2, name: 'Muster AG', strasse: 'Beispielweg 7', ort: '4632 Trimbach' }]});
+    { id: 1, name: 'Beispiel Consulting GmbH', kundennummer: 'K0001', strasse: 'Mustergasse', hausnummer: '2',
+      plz: '4600', ort: 'Olten', telefon: '062 000 00 00', email: 'info@beispiel.ch',
+      kontaktperson: 'R. Muster', notiz: 'Schluessel im Tresor', aktiv: 1 },
+    { id: 2, name: 'Muster AG', kundennummer: 'K0002', strasse: 'Beispielweg', hausnummer: '7',
+      plz: '4632', ort: 'Trimbach', telefon: null, email: null, kontaktperson: null, notiz: null, aktiv: 1 },
+    { id: 3, name: 'Alpha Privat', kundennummer: 'K0003', art: 'privat', strasse: 'Seeweg', hausnummer: '1',
+      plz: '4600', ort: 'Olten', telefon: '079 000 00 00', email: 'a@beispiel.ch', aktiv: 1 }]});
+  if (u.includes('objekt_list')) return send({ status: 'ok', objekte: [
+    { id: 1, kunde_id: 1, kunde_name: 'Beispiel Consulting GmbH', name: 'Einkaufszentrum Nord West',
+      strasse: 'Mustergasse 2', plz: '4600', ort: 'Olten', kanton: 'SO', einsatzart: 'Revierdienst',
+      aktiv: 1, masterschichten: 2, stunden_je_einsatz: 0.5, bemerkung: 'Zufahrt hinten', distanzen: {} },
+    { id: 2, kunde_id: 2, kunde_name: 'Muster AG', name: 'Baustelle Kreisel',
+      strasse: 'Beispielweg 7', plz: '4632', ort: 'Trimbach', kanton: 'SO', einsatzart: 'Verkehrsdienst',
+      aktiv: 1, masterschichten: 0, stunden_je_einsatz: 0, bemerkung: null, distanzen: {} }]});
   return send({ status: 'ok', kpi: {}, verlauf: [], angemeldet: [], pro_mitarbeiter: [], letzte_rapporte: [],
     rapporte: [], kunden: [], belege: [], produkte: [], feiertage: [], gepflegt: {}, orte: [] });
 });
@@ -282,6 +295,114 @@ check('KRITISCH: das Offerten-Suchfeld filtert die Karten', (await kartenDaten('
 await m.fill('#ofQ', '');
 await m.waitForTimeout(400);
 
+// ── Adressen (ENT-401) ─────────────────────────────────────────────────────
+await m.evaluate(() => kuGoTab('uebersicht'));
+await m.waitForTimeout(700);
+s = await schiebt();
+check(`KRITISCH: Adressen schieben die Seite nicht waagrecht (${s.seite} px)`, s.seite <= 1);
+check(`KRITISCH: die Adressliste selbst schiebt nicht mehr waagrecht (${s.tw} px)`, s.tw <= 1);
+
+let a = await kartenDaten('kuTable');
+check('Mobil steht je Kunde eine Karte', a.length === 3);
+check('KRITISCH: die Kundentabelle ist mobil nicht sichtbar',
+  await m.evaluate(() => !document.querySelector('#kuTable table')?.getClientRects().length));
+check('Zugeklappt zeigt die Karte Name, Nummer, Ort und Telefon',
+  /Beispiel Consulting GmbH/.test(kn(a, 0).text) && /K0001/.test(kn(a, 0).text)
+  && /Olten/.test(kn(a, 0).text) && /062 000 00 00/.test(kn(a, 0).text));
+// "unbekannt" darf nie wie "keine" aussehen: Ein Kunde ohne Telefon zeigt
+// das ausdruecklich an, statt die Zeile wegzulassen.
+check('Ein Kunde ohne Telefonnummer sagt das, statt die Zeile wegzulassen',
+  a.some(x => /keine Telefonnummer/.test(x.text)));
+
+await karteTippen('kuTable', 0);
+a = await kartenDaten('kuTable');
+check('KRITISCH: die Adress-Karte klappt auf', kn(a, 0).offen && kn(a, 0).koerper);
+check('Aufgeklappt stehen E-Mail, Kontaktperson und Notiz da',
+  /info@beispiel\.ch/.test(kn(a, 0).text) && /R\. Muster/.test(kn(a, 0).text)
+  && /Schluessel im Tresor/.test(kn(a, 0).text));
+// Der eigentliche Handy-Gewinn: Die Nummer laesst sich waehlen, statt sie
+// abzuschreiben. Geprueft am tatsaechlichen Verweisziel, nicht am Text.
+check('KRITISCH: die Telefonnummer ist ein Anruf-Verweis (tel:)',
+  await m.evaluate(() => {
+    const a2 = document.querySelector('#kuTable .kk-koerper a[href^="tel:"]');
+    return !!a2 && /^tel:\+?[\d]+$/.test(a2.getAttribute('href'));
+  }));
+check('Die E-Mail ist ein mailto-Verweis',
+  await m.evaluate(() => !!document.querySelector('#kuTable .kk-koerper a[href^="mailto:"]')));
+const kuTasten = await m.evaluate(() => [...document.querySelectorAll('#kuTable .ag-karte .kk-tasten .btn')]
+  .map(b => b.textContent.replace(/\s+/g, ' ').trim()));
+check(`Die offene Adresse bietet Oeffnen und Bearbeiten (${kuTasten.join(', ')})`,
+  kuTasten.some(t => /Öffnen/.test(t)) && kuTasten.some(t => /Bearbeiten/.test(t)));
+
+// Sortierung: Das Feld steht anfangs auf "kundennummer" (Desktop-Vorgabe),
+// darum bietet der Knopf zuerst den Wechsel auf den Namen an.
+await knopfTippen('#kuSortBtn');
+const nachName = (await kartenDaten('kuTable')).map(x => x.datum);
+check('KRITISCH: der Knopf sortiert die Adressen nach Namen (A–Z)',
+  nachName[0] === 'Alpha Privat' && nachName[nachName.length - 1] === 'Muster AG');
+await knopfTippen('#kuSortBtn');
+check('KRITISCH: ein weiterer Klick dreht auf Z–A',
+  (await kartenDaten('kuTable')).map(x => x.datum)[0] === 'Muster AG');
+
+await m.fill('#kQ', 'Alpha');
+await m.waitForTimeout(400);
+check('KRITISCH: das Adress-Suchfeld filtert die Karten', (await kartenDaten('kuTable')).length === 1);
+await m.fill('#kQ', '');
+await m.waitForTimeout(400);
+
+// ── Objekte (ENT-401) ──────────────────────────────────────────────────────
+await m.evaluate(() => kuGoTab('objekte'));
+await m.waitForTimeout(700);
+s = await schiebt();
+check(`KRITISCH: Objekte schieben die Seite nicht waagrecht (${s.seite} px)`, s.seite <= 1);
+check(`KRITISCH: die Objektliste selbst schiebt nicht mehr waagrecht (${s.tw} px)`, s.tw <= 1);
+
+let ob = await kartenDaten('oTable');
+check('Mobil steht je Objekt eine Karte', ob.length === 2);
+check('KRITISCH: die Objekttabelle ist mobil nicht sichtbar',
+  await m.evaluate(() => !document.querySelector('#oTable table')?.getClientRects().length));
+// KRITISCH und der Grund fuer den dritten Zustand: objekt_list.php liefert
+// bereits sortiert (ORDER BY aktiv DESC, name). Wuerde die Oberflaeche im
+// Ausgangszustand selbst nachsortieren, verloere die Liste die Gruppierung
+// "in Betrieb zuerst" -- und zwar auch am Desktop, wo niemand danach
+// gefragt hat. Genau das ist beim Bauen passiert und hat test_auslagen und
+// test_objekte rot gemacht. Geprueft wird darum, dass die gelieferte
+// Reihenfolge unangetastet bleibt, solange niemand den Knopf drueckt.
+check('KRITISCH: im Ausgangszustand bleibt die Reihenfolge des Servers stehen',
+  kn(ob, 0).datum === 'Einkaufszentrum Nord West' && kn(ob, 1).datum === 'Baustelle Kreisel');
+check('Der Knopf nennt diesen Zustand beim Namen',
+  /In Betrieb zuerst/.test(await m.evaluate(() => (document.getElementById('obSortBtn') || {}).textContent || '')));
+check('Zugeklappt zeigt die Karte Objekt, Kunde, Ort und Zustand',
+  /Einkaufszentrum/.test(kn(ob, 0).text) && /Beispiel Consulting/.test(kn(ob, 0).text)
+  && /Olten/.test(kn(ob, 0).text) && /in Betrieb/.test(kn(ob, 0).text));
+
+await karteTippen('oTable', 0);
+ob = await kartenDaten('oTable');
+check('KRITISCH: die Objekt-Karte klappt auf', kn(ob, 0).offen && kn(ob, 0).koerper);
+check('Aufgeklappt stehen Kanton, Masterschichten und Bemerkung da',
+  /SO/.test(kn(ob, 0).text) && /Zufahrt hinten/.test(kn(ob, 0).text));
+// "keine hinterlegt" statt "0": nicht eingerichtet ist nicht dasselbe wie null.
+await karteTippen('oTable', 1);
+check('Ein Objekt ohne Masterschichten sagt "keine hinterlegt" statt "0"',
+  /keine hinterlegt/.test(kn(await kartenDaten('oTable'), 1).text));
+
+// Drei Zustaende, im Kreis: Standard -> A-Z -> Z-A -> Standard.
+await knopfTippen('#obSortBtn');
+check('KRITISCH: ein Klick sortiert die Objekte alphabetisch',
+  (await kartenDaten('oTable')).map(x => x.datum)[0] === 'Baustelle Kreisel');
+await knopfTippen('#obSortBtn');
+check('KRITISCH: der zweite Klick dreht auf Z–A',
+  (await kartenDaten('oTable')).map(x => x.datum)[0] === 'Einkaufszentrum Nord West');
+await knopfTippen('#obSortBtn');
+check('KRITISCH: der dritte Klick fuehrt zurueck zur Server-Ordnung',
+  (await kartenDaten('oTable')).map(x => x.datum)[0] === 'Einkaufszentrum Nord West'
+  && /In Betrieb zuerst/.test(await m.evaluate(() => (document.getElementById('obSortBtn') || {}).textContent || '')));
+await m.fill('#oQ', 'Kreisel');
+await m.waitForTimeout(400);
+check('KRITISCH: das Objekt-Suchfeld filtert die Karten', (await kartenDaten('oTable')).length === 1);
+await m.fill('#oQ', '');
+await m.waitForTimeout(400);
+
 await m.screenshot({ path: `${OUT}/kundenkarten-mobil.png` });
 await m.close();
 
@@ -308,6 +429,18 @@ check('Die Offerten-Karten sind am Desktop ausgeblendet',
   await d.evaluate(() => !document.querySelector('#ofTable .nur-schmal')?.getClientRects().length));
 check('Am Desktop sortieren weiterhin die Spaltenkoepfe',
   await d.evaluate(() => document.querySelectorAll('#ofTable th.sortbar').length >= 6));
+for (const [tab, id, name] of [['uebersicht', 'kuTable', 'Adressen'], ['objekte', 'oTable', 'Objekte']]) {
+  await d.evaluate(t => kuGoTab(t), tab);
+  await d.waitForTimeout(600);
+  check(`KRITISCH: am Desktop bleibt die ${name}-Tabelle die Darstellung`,
+    await d.evaluate(s2 => !!document.querySelector('#' + s2 + ' table')?.getClientRects().length, id));
+  check(`Die ${name}-Karten sind am Desktop ausgeblendet`,
+    await d.evaluate(s2 => !document.querySelector('#' + s2 + ' .nur-schmal')?.getClientRects().length, id));
+}
+check('Der Adress-Sortierknopf ist am Desktop ausgeblendet',
+  await d.evaluate(() => !document.getElementById('kuSortBtn')?.getClientRects().length));
+check('Der Objekt-Sortierknopf ist am Desktop ausgeblendet',
+  await d.evaluate(() => !document.getElementById('obSortBtn')?.getClientRects().length));
 await d.close();
 
 await browser.close();
