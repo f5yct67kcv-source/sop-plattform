@@ -565,17 +565,32 @@ await page.click('#t-menu');
 await page.waitForTimeout(200);
 const menuText = await T('#v-menu');
 check('Menü zeigt den vollen Namen', menuText.includes('Dario Beispiel'));
-// Seit ENT-370 steht eine dritte Kachel dabei (Abwesenheit), seit ENT-398
-// eine vierte (Einstellungen) -- die Zusicherung gilt weiterhin: mindestens
-// diese beiden sind da, genau die bekannten vier insgesamt (nicht
-// "irgendeine Zahl"). Die Zahl wird bewusst mitgezaehlt: Eine Kachel, die
-// jemand versehentlich zweimal einhaengt, faellt sonst niemandem auf.
+// Die Kachelliste ist ueber die Zeit gewachsen: ENT-370 Abwesenheit,
+// ENT-398 Einstellungen, ENT-402 Spesen/Passwort/Zum Cockpit -- letzteres
+// nur fuer die Verwaltung. Die Zusicherung gilt weiterhin: die bekannten
+// Kacheln sind da, und es sind GENAU sie (nicht "irgendeine Zahl"). Eine
+// Kachel, die jemand versehentlich zweimal einhaengt, faellt sonst
+// niemandem auf.
+// Dieses Profil ist NICHT Verwaltung (ist_admin: false) -- "Zum Cockpit"
+// darf hier darum fehlen, und genau das wird unten geprueft.
 check('Menü zeigt die Kacheln Meine Daten/Meine Stunden',
   await page.evaluate(() => !!document.getElementById('mk-daten') && !!document.getElementById('mk-stunden')));
-check('Menü zeigt genau vier Kacheln, keine vergessene oder ueberzaehlige',
-  await page.evaluate(() => document.querySelectorAll('#v-menu .mk-kachel').length === 4));
-check('Und die vierte ist Einstellungen (ENT-398)',
-  await page.evaluate(() => !!document.getElementById('mk-einstellungen')));
+check('Menü zeigt genau die sechs Kacheln ohne Verwaltungsrecht, keine vergessene oder ueberzaehlige',
+  await page.evaluate(() => [...document.querySelectorAll('#v-menu .mk-kachel')].map(k => k.id).join(',')
+    === 'mk-daten,mk-stunden,mk-abwesenheit,mk-spesen,mk-passwort,mk-einstellungen'));
+check('KRITISCH: „Zum Cockpit" fehlt ohne Verwaltungsrecht (ENT-402)',
+  await page.evaluate(() => !document.getElementById('mk-cockpit')));
+// Seit ENT-402 ist die Knopfreihe unter den Kacheln ersatzlos weg: Passwort
+// und Zum Cockpit sind Kacheln, Abmelden ist der Knopf oben in der Karte.
+check('KRITISCH: keine breite Knopfreihe mehr unter den Kacheln (ENT-402)',
+  await page.evaluate(() => document.querySelectorAll('#pr-haupt .btn-wide').length === 0));
+check('Abmelden liegt stattdessen oben in der Profilkarte',
+  await page.evaluate(() => {
+    const b = document.getElementById('mk-abmelden');
+    return !!b && document.querySelector('#pr-haupt .karte').contains(b);
+  }));
+check('Und ist als Abmelden beschriftet, obwohl er nur ein Sinnbild zeigt',
+  await page.evaluate(() => (document.getElementById('mk-abmelden').getAttribute('aria-label') || '').includes('bmelden')));
 await page.evaluate(() => datenSeiteAuf());
 await page.waitForTimeout(150);
 const datenText = await T('#pr-daten');
@@ -774,8 +789,16 @@ await page.waitForTimeout(200);
 await page.click('#t-menu'); await page.waitForTimeout(200);
 await page.evaluate(() => { localStorage.setItem('rv3_token', 'x'); });
 await page.evaluate(() => { window.__reload = false; });
+// Seit ENT-402 ist Abmelden ein Sinnbild ohne Beschriftung oben in der
+// Profilkarte. Die Aussage bleibt dieselbe -- der Weg hinaus ist im Menue
+// erreichbar --, nur der sichtbare Text ist weg. Geprueft wird darum der
+// zugaengliche Name (aria-label bzw. Text), nicht der Wortlaut im Knopf:
+// sonst waere die Pruefung an der Darstellung gescheitert, obwohl die
+// Sache da ist. Umgekehrt faellt so auch ein Sinnbild OHNE Beschriftung
+// auf -- das waere fuer ein Vorleseprogramm ein namenloser Knopf.
 check('Abmelden ist erreichbar',
-  await page.evaluate(() => [...document.querySelectorAll('#v-menu button')].some(b => /Abmelden/.test(b.textContent))));
+  await page.evaluate(() => [...document.querySelectorAll('#v-menu button')]
+    .some(b => /Abmelden/.test(b.getAttribute('aria-label') || b.textContent))));
 
 await page.screenshot({ path: OUT + '/40-app-menu.png' });
 await page.click('#t-heute'); await page.waitForTimeout(250);
