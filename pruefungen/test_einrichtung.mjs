@@ -164,7 +164,7 @@ check('Sie sagt auch, dass die Antwort selbst das Problem ist',
 check('Der Knopf bleibt auch danach bedienbar',
   !(await page.evaluate(() => $('eiBtn').disabled)));
 
-// ══════════ KOMPAKTER ZUSTAND (KOPFLEISTE, ENT-086/ENT-396)
+// ══════════ KOMPAKTER ZUSTAND (KOPFLEISTE, ENT-086/ENT-408)
 await page.evaluate(() => closeDlg('dlgEinrichtung'));
 await page.evaluate(() => huelleSetzen('aus'));
 await page.waitForTimeout(300);

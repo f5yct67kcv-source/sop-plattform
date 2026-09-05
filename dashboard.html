@@ -2817,7 +2817,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 .opl-posten .stand { flex: none; display: inline-flex; min-width: 40px; height: 24px; padding: 0 7px; border-radius: 5px; align-items: center; justify-content: center; font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
 
 
-/* Kompakter Zustand der Seitenleiste (ENT-396: nur noch "aus", der
+/* Kompakter Zustand der Seitenleiste (ENT-408: nur noch "aus", der
    frühere schmale Icon-Zustand ist entfallen -- er war neben der
    Kopfleiste eine zweite, schwaechere Antwort auf dasselbe Beduerfnis).
    Nur ab Tabletbreite: darunter ist die Leiste ohnehin ausgeklappt-verborgen
@@ -2850,7 +2850,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
      damit die Gliederung nicht ganz verloren geht. */
   .shell.aus .side-nav .nav-lbl + .nav-item { margin-top: 10px; border-top: 1px solid var(--shell-line); padding-top: 14px; }
 }
-/* ─── Der kompakte Hüllenzustand (ENT-086, seit ENT-396 der einzige neben
+/* ─── Der kompakte Hüllenzustand (ENT-086, seit ENT-408 der einzige neben
    "voll"): die Seitenleiste wird zur Kopfleiste.
    Bewusst eine reine Darstellungsänderung -- dasselbe Markup wandert nicht
    im DOM umher, es legt sich waagrecht. Damit bleiben IDs, Klickpfade und
@@ -8603,8 +8603,8 @@ document.addEventListener('keydown', e => {
 
 // Seitenleiste: Die Wahl bleibt erhalten, damit sie nicht bei jedem Laden
 // neu getroffen werden muss.
-// ══════════════════════════════════════════ HUELLE (ENT-086, seit ENT-396)
-// Zwei Zustaende: 232 px -- Kopfleiste. Der Knopf schaltet um. Bis ENT-396
+// ══════════════════════════════════════════ HUELLE (ENT-086, seit ENT-408)
+// Zwei Zustaende: 232 px -- Kopfleiste. Der Knopf schaltet um. Bis ENT-408
 // gab es dazwischen einen dritten, schmalen Icon-Zustand (64 px, ohne
 // Beschriftung); der Projektinhaber hielt ihn fuer ueberfluessig, weil jeder
 // Bereich seine Unterkategorien ohnehin schon als Reiter zeigt -- die
@@ -8618,7 +8618,7 @@ const HUELLE_TITEL = {
 function huelleLesen() {
   const z = localStorage.getItem('rv3_huelle');
   if (HUELLE_ZUSTAENDE.includes(z)) { return z; }
-  // Kein gespeicherter Wert, oder der mit ENT-396 entfallene schmale
+  // Kein gespeicherter Wert, oder der mit ENT-408 entfallene schmale
   // Zustand: Standard ist seit ENT-407 die Kopfleiste -- sie zeigt mehr
   // Uebersicht als die volle Leiste.
   return 'aus';
@@ -8647,7 +8647,7 @@ function seiteUm() {
 
 // Kompakt heisst: ein eingeruecktes Untermenue an der Leiste hat keinen
 // Platz mehr, die Unterkategorien stehen stattdessen in der Werkzeugleiste.
-// Seit ENT-396 gibt es dafuer nur noch den einen Zustand "aus" -- und nur
+// Seit ENT-408 gibt es dafuer nur noch den einen Zustand "aus" -- und nur
 // oberhalb von 900 px, darunter ist die Leiste eine Schublade mit voller
 // Breite.
 function huelleKompakt() {

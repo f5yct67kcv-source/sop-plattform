@@ -131,7 +131,7 @@ const mass = await page.evaluate(() => {
 // ist eine Gestaltungsentscheidung des Projektinhabers, keine Nachlaessigkeit
 // -- gemessen 271 px.
 //
-// 280 -> 335 mit ENT-396 (2026-09-04): Der bisher hier verwendete schmale
+// 280 -> 335 mit ENT-408 (2026-09-04): Der bisher hier verwendete schmale
 // Huellenzustand (64 px, nur Symbole) entfaellt. Die kompakteste verbliebene
 // Alternative ist "aus" (Kopfleiste) -- sie gewinnt zwar mehr Breite als
 // "schmal" (0 statt 64 px Seitenleiste), legt sich dafuer aber selbst

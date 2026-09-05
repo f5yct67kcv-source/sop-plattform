@@ -1,4 +1,4 @@
-// Zwei Hüllenzustände: 232 px — Kopfleiste (ENT-086, seit ENT-396 ohne den
+// Zwei Hüllenzustände: 232 px — Kopfleiste (ENT-086, seit ENT-408 ohne den
 // schmalen 64-px-Zwischenschritt: er zeigte nur Symbole ohne Beschriftung
 // und war neben der Kopfleiste eine zweite, schwaechere Antwort auf
 // dasselbe Beduerfnis -- jeder Bereich hat ohnehin schon eigene Unterreiter).
