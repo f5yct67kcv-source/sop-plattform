@@ -8084,16 +8084,34 @@ const ORD_BEREICHE = {
       // ersten eigenen Speichern zu und uebersteuerte eine gerade von Hand
       // getroffene Wahl -- ein Zuruecksetzen, fuer das der Benutzer keinen
       // Anhaltspunkt haette.
-      if (!localStorage.getItem('rv3_dash_zeit_umzug')) {
-        localStorage.setItem('rv3_dash_zeit_umzug', '1');
+      // Stufe "2", nicht bloss "gesetzt/nicht gesetzt" (ENT-412): Wer die
+      // erste, fehlerhafte Fassung schon geladen hat, traegt bereits eine
+      // "1" -- bei ihm liefe der Umzug nie wieder, und die Uebersicht
+      // bliebe dauerhaft falsch angeordnet. Die Stufe laesst ihn genau
+      // einmal nachholen. Der Preis: Wer die Begruessung nach dem ersten
+      // Laden bewusst wieder auf volle Breite gestellt hat, findet sie
+      // noch einmal halb. Das ist hinzunehmen -- die Alternative waere,
+      // den Fehler stehen zu lassen.
+      if (localStorage.getItem('rv3_dash_zeit_umzug') !== '2') {
         if (Array.isArray(g)) {
           g = g.filter(x => x && x.id !== 'zeit');
           const i = g.findIndex(x => x && x.id === 'begruessung');
           if (i >= 0) {
             g[i] = { ...g[i], breite: 'halb' };
             g.splice(i + 1, 0, { id: 'zeit', sichtbar: true, breite: 'halb' });
+            // ZURUECKSCHREIBEN, nicht nur im Arbeitsspeicher umstellen.
+            // Genau das fehlte zuerst (ENT-412): Der Merker wurde gesetzt,
+            // die umgestellte Anordnung aber nie gespeichert. Beim ersten
+            // Aufruf stimmte das Bild, beim naechsten Laden las ordLaden()
+            // wieder die ALTE Anordnung, der Merker blockierte den Umzug --
+            // und "Datum & Zeit" fiel ueber ordAbgleichen() ans Ende der
+            // Liste, waehrend die Begruessung wieder breit dastand.
+            // Merker und gespeicherter Stand muessen zusammen umgestellt
+            // werden oder gar nicht.
+            localStorage.setItem('rv3_dash_layout', JSON.stringify(g));
           }
         }
+        localStorage.setItem('rv3_dash_zeit_umzug', '2');
       }
       return Promise.resolve(g);
     },

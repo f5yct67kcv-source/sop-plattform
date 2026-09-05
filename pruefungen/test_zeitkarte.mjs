@@ -19,10 +19,16 @@ async function seite(breite = 1600, vorbelegt, umzugSchonGelaufen = false) {
   const p = await browser.newPage({ viewport: { width: breite, height: 1000 } });
   p.on('pageerror', e => bad.push('JS-Fehler: ' + e.message));
   if (vorbelegt !== undefined) {
-    await p.addInitScript(v => { try { localStorage.setItem('rv3_dash_layout', v); } catch (e) {} }, vorbelegt);
+    // Nur beim ERSTEN Laden vorbelegen. Ohne diese Sperre setzt Playwright
+    // die alte Anordnung bei jedem Neuladen zurueck und ueberschreibt, was
+    // der Umzug gespeichert hat -- die Pruefung unten saehe dann einen
+    // Fehler, den es gar nicht gibt.
+    await p.addInitScript(v => { try {
+      if (!localStorage.getItem('rv3_dash_layout')) { localStorage.setItem('rv3_dash_layout', v); }
+    } catch (e) {} }, vorbelegt);
   }
   if (umzugSchonGelaufen) {
-    await p.addInitScript(() => { try { localStorage.setItem('rv3_dash_zeit_umzug', '1'); } catch (e) {} });
+    await p.addInitScript(() => { try { localStorage.setItem('rv3_dash_zeit_umzug', '2'); } catch (e) {} });
   }
   await p.route('**/api/**', r => {
     const u = r.request().url();
@@ -198,6 +204,87 @@ try {
     nach2[0].id === 'begruessung' && nach2[0].breite === 'voll');
   await p.close(); await p2.close();
 } catch (e) { bad.push('Umzug: ' + String(e).split('\n')[0].slice(0, 120)); }
+
+// ══════════════════════════════ DER UMZUG UEBERSTEHT DAS NEULADEN
+//
+// Die Pruefung, die beim ersten Anlauf gefehlt hat (ENT-412). Der Umzug
+// stellte die Anordnung nur im Arbeitsspeicher um und setzte den Merker,
+// schrieb sie aber nie zurueck. Beim ersten Aufruf stimmte das Bild --
+// beim naechsten Laden las ordLaden() wieder die ALTE Anordnung, der
+// Merker blockierte den Umzug, und "Datum & Zeit" fiel ans Ende der Liste.
+// Eine Pruefung, die nur den ersten Aufruf ansieht, ist an genau dieser
+// Stelle blind.
+try {
+  const alt = JSON.stringify([
+    { id: 'begruessung', sichtbar: true, breite: 'voll' },
+    { id: 'kpi', sichtbar: true, breite: 'voll' },
+    { id: 'letzte', sichtbar: true },
+  ]);
+  const p = await seite(1600, alt);
+  const lage = async () => p.evaluate(() => {
+    const stand = ordStand('uebersicht');
+    const i = stand.findIndex(x => x.id === 'begruessung');
+    const r = w => document.querySelector(`[data-widget="${w}"]`).getBoundingClientRect();
+    return { breite: stand[i] && stand[i].breite,
+             danach: stand[i + 1] && stand[i + 1].id,
+             nebeneinander: Math.abs(r('begruessung').top - r('zeit').top) < 1,
+             gespeichert: (JSON.parse(localStorage.getItem('rv3_dash_layout') || '[]')).map(x => x.id) };
+  });
+  const vorher = await lage();
+  check('Nach dem Umzug steht "Datum & Zeit" neben der Begrüssung',
+    vorher.breite === 'halb' && vorher.danach === 'zeit' && vorher.nebeneinander);
+  check('KRITISCH: der Umzug wird auch GESPEICHERT, nicht nur angezeigt',
+    vorher.gespeichert.includes('zeit'));
+
+  await p.reload();
+  await p.waitForSelector('#shell.on'); await p.waitForTimeout(500);
+  const nachher = await lage();
+  check('KRITISCH: nach dem Neuladen steht sie immer noch daneben',
+    nachher.breite === 'halb' && nachher.danach === 'zeit' && nachher.nebeneinander);
+  check('KRITISCH: und die Begrüssung springt nicht auf volle Breite zurück',
+    nachher.breite === 'halb');
+  await p.close();
+} catch (e) { bad.push('Neuladen: ' + String(e).split('\n')[0].slice(0, 120)); }
+
+// ══════════════════════════════ EIN ALTER, FEHLERHAFTER MERKER WIRD NACHGEHOLT
+//
+// Wer die erste Fassung schon geladen hat, traegt einen Merker der Stufe
+// "1" und eine unveraenderte Anordnung. Ohne Stufenwechsel liefe der Umzug
+// bei ihm nie wieder -- die Uebersicht bliebe dauerhaft falsch angeordnet.
+try {
+  const p = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
+  p.on('pageerror', e => bad.push('JS-Fehler: ' + e.message));
+  await p.addInitScript(() => { try {
+    if (localStorage.getItem('rv3_dash_layout')) { return; }
+    localStorage.setItem('rv3_dash_zeit_umzug', '1');
+    localStorage.setItem('rv3_dash_layout', JSON.stringify([
+      { id: 'begruessung', sichtbar: true, breite: 'voll' }, { id: 'kpi', sichtbar: true }]));
+  } catch (e) {} });
+  await p.route('**/api/**', r => {
+    const u = r.request().url();
+    const send = b => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) });
+    if (u.includes('login')) return send({ status: 'ok', token: 't', name: 'a', ist_admin: true });
+    if (u.includes('dashboard_stats')) return send({ status: 'ok',
+      kpi: { rapporte_monat: 0, rapporte_vormonat: 0, stunden_monat: 0, stunden_vormonat: 0,
+             mitarbeiter: 1, kunden: 1, rapporte_total: 0 },
+      verlauf: [], angemeldet: [], pro_mitarbeiter: [], letzte_rapporte: [], sperr_ereignisse: [] });
+    return send({ status: 'ok', einsaetze: [], kunden: [], rapporte: [], objekte: [],
+      mitarbeiter: [], feiertage: [], gepflegt: {}, sperren: [] });
+  });
+  await p.goto(`file://${WURZEL}/dashboard.html`);
+  await p.fill('#gName', 'a'); await p.fill('#gPass', 'x'); await p.click('#gBtn');
+  await p.waitForSelector('#shell.on'); await p.waitForTimeout(500);
+  const geheilt = await p.evaluate(() => {
+    const stand = ordStand('uebersicht');
+    const i = stand.findIndex(x => x.id === 'begruessung');
+    return { breite: stand[i] && stand[i].breite, danach: stand[i + 1] && stand[i + 1].id,
+             merker: localStorage.getItem('rv3_dash_zeit_umzug') };
+  });
+  check('KRITISCH: ein Merker der alten Stufe holt den Umzug nach',
+    geheilt.breite === 'halb' && geheilt.danach === 'zeit');
+  check('Und wird dabei auf die neue Stufe gehoben', geheilt.merker === '2');
+  await p.close();
+} catch (e) { bad.push('Alter Merker: ' + String(e).split('\n')[0].slice(0, 120)); }
 
 // ══════════════════════════════ DAS KONTOMENUE AM LOGO
 try {

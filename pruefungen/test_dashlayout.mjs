@@ -23,7 +23,7 @@ async function starte(vorbelegt) {
     // mit einer VORGEGEBENEN Anordnung, und ein Umzug, der sie beim Laden
     // umschreibt, prueft etwas anderes als das, was draufsteht. Den Umzug
     // selbst prueft test_zeitkarte.mjs -- dort ohne diesen Merker.
-    await page.addInitScript(() => { try { localStorage.setItem('rv3_dash_zeit_umzug', '1'); } catch (e) {} });
+    await page.addInitScript(() => { try { localStorage.setItem('rv3_dash_zeit_umzug', '2'); } catch (e) {} });
   }
   await page.route('**/api/**', route => {
     const u = route.request().url();
