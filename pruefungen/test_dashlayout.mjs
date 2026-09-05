@@ -18,6 +18,12 @@ async function starte(vorbelegt) {
   page.on('pageerror', e => bad.push('JS-Fehler: ' + e.message));
   if (vorbelegt !== undefined) {
     await page.addInitScript(v => { try { localStorage.setItem('rv3_dash_layout', v); } catch (e) {} }, vorbelegt);
+    // Der einmalige Umzug aus ENT-410 (Begruessung auf halbe Breite, "Datum
+    // & Zeit" daneben) wird hier abgehakt: Diese Suite prueft die Mechanik
+    // mit einer VORGEGEBENEN Anordnung, und ein Umzug, der sie beim Laden
+    // umschreibt, prueft etwas anderes als das, was draufsteht. Den Umzug
+    // selbst prueft test_zeitkarte.mjs -- dort ohne diesen Merker.
+    await page.addInitScript(() => { try { localStorage.setItem('rv3_dash_zeit_umzug', '1'); } catch (e) {} });
   }
   await page.route('**/api/**', route => {
     const u = route.request().url();
@@ -36,7 +42,7 @@ async function starte(vorbelegt) {
 // Registrierung im Dashboard geprueft -- so muss ein neuer Container nur an
 // einer Stelle nachgetragen werden, und die Pruefung sagt trotzdem noch
 // etwas aus: Sie haelt fest, in welcher Reihenfolge die Uebersicht startet.
-const STANDARD = ['begruessung', 'kpi', 'kurzwahl', 'verlauf', 'angemeldet', 'letzte', 'proma', 'ereignisse'];
+const STANDARD = ['begruessung', 'zeit', 'kpi', 'kurzwahl', 'verlauf', 'angemeldet', 'letzte', 'proma', 'ereignisse'];
 
 const reihenfolge = page => page.evaluate(() =>
   [...document.querySelectorAll('.dash-item')].sort((a, b) => Number(a.style.order) - Number(b.style.order)).map(e => e.dataset.widget));
@@ -46,7 +52,7 @@ let { browser, page } = await starte();
 // ══════════ GRUNDZUSTAND
 check('„Bearbeiten“ steht oben rechts', await page.isVisible('#btnDashBearbeiten'));
 check('Die Bearbeitungsleiste ist zunächst verborgen', !(await page.isVisible('#dashEditleiste')));
-check('Alle acht Container sind da',
+check('Alle neun Container sind da',
   await page.evaluate(n => document.querySelectorAll('.dash-item').length === n, STANDARD.length));
 check('KRITISCH: die Pruefung kennt dieselben Container wie das Dashboard',
   JSON.stringify(await page.evaluate(() => DASH_WIDGETS.map(w => w.id))) === JSON.stringify(STANDARD));
@@ -72,15 +78,30 @@ try {
   const m = await page.evaluate(() => {
     const r = id => document.querySelector(`[data-widget="${id}"]`).getBoundingClientRect();
     const flow = document.getElementById('dashFlow').getBoundingClientRect();
-    return { flow: flow.width, begr: r('begruessung'), kpi: r('kpi'), erg: r('ereignisse'),
+    return { flow: flow.width, begr: r('begruessung'), zeit: r('zeit'), kpi: r('kpi'), erg: r('ereignisse'),
              wachsen: getComputedStyle(document.querySelector('[data-widget="begruessung"]')).flexGrow };
   });
   const halb = (m.flow - 16) / 2;
   check('KRITISCH: die Begrüssung nimmt die halbe Seite', Math.abs(m.begr.width - halb) < 1.5);
-  check('KRITISCH: die Kennzahlen stehen DANEBEN, nicht darunter',
-    Math.abs(m.begr.top - m.kpi.top) < 1 && m.kpi.left >= m.begr.right - 1);
+  // Seit ENT-410 steht "Datum & Zeit" neben der Begruessung -- vorher lagen
+  // dort die Kennzahlen. Geprueft wird weiterhin dasselbe: dass in der
+  // ersten Zeile wirklich zwei Container NEBENEINANDER stehen und die Zeile
+  // zusammen ausfuellen.
+  check('KRITISCH: „Datum & Zeit" steht DANEBEN, nicht darunter',
+    Math.abs(m.begr.top - m.zeit.top) < 1 && m.zeit.left >= m.begr.right - 1);
   check('Und die beiden füllen die Zeile zusammen aus',
-    Math.abs((m.begr.width + m.kpi.width + 16) - m.flow) < 1.5);
+    Math.abs((m.begr.width + m.zeit.width + 16) - m.flow) < 1.5);
+  // Gleich hohe Karten in der ersten Zeile: Die Begruessung war gemessen
+  // 267 px hoch, die Zeitkarte 308 -- nebeneinander sah das aus, als sei
+  // eine abgeschnitten. Geprueft an der KARTE, nicht am Container: Der
+  // Container ist durch den Flex-Fluss ohnehin immer gleich hoch, die Karte
+  // darin war es nicht.
+  check('KRITISCH: beide Karten der ersten Zeile sind gleich hoch',
+    await page.evaluate(() => {
+      const h = w => document.querySelector(`[data-widget="${w}"] > .card`).getBoundingClientRect().height;
+      return Math.abs(h('begruessung') - h('zeit')) < 1;
+    }));
+  check('Die Kennzahlen rücken in die zweite Zeile', m.kpi.top > m.begr.bottom - 1);
   check('KRITISCH: die Ereignisse bleiben auf voller Breite',
     Math.abs(m.erg.width - m.flow) < 1.5);
   // Ein halber Container, der allein in seiner Zeile steht, soll halb bleiben

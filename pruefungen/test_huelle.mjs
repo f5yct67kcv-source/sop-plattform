@@ -164,15 +164,26 @@ try {
   check('KRITISCH: bei 1000 px erscheint die Kopfleiste wirklich', z.sideW === '0px');
   check('Sie liegt waagrecht ueber die volle Breite', side.w === 1000 && side.h === 60);
   check('Der Inhalt rueckt darunter', main.ml === '0px' && main.pt === '60px');
+  // Seit ENT-410 steht das Logo rechts aussen und der Fussteil klappt als
+  // Menue darunter auf, statt in der Zeile zu stehen. Zu pruefen bleibt
+  // dasselbe: dass sich in der 60 px hohen Leiste nichts ueberschneidet --
+  // nur ist der einzige Nachbar der Navigation jetzt das Logo, und zwar
+  // rechts von ihr.
   const platz = await p.evaluate(() => {
     const n = document.querySelector('.side-nav').getBoundingClientRect();
     const b = document.querySelector('.side-brand').getBoundingClientRect();
-    const f = document.querySelector('.side-foot').getBoundingClientRect();
-    return { ueberlappt: n.left < b.right - 1 || n.right > f.left + 1,
-             mittig: Math.abs((n.left + n.width / 2) - 500) <= 4 };
+    return { ueberlappt: n.right > b.left + 1,
+             mittig: Math.abs((n.left + n.width / 2) - 500) <= 4,
+             einZeilig: document.querySelector('#side').scrollHeight <= 60 };
   });
   check('KRITISCH: nichts ueberlappt bei 1000 px', platz.ueberlappt === false);
   check('Und die Symbole stehen auch dort mittig', platz.mittig);
+  // Gegen einen Fehler, der beim Bau von ENT-410 tatsaechlich passiert ist:
+  // Das Logo in Spalte 3 schob die Navigation per Rasterautomatik in eine
+  // ZWEITE Zeile -- die Leiste blieb 60 px hoch, ihr Inhalt wuchs auf 81 px
+  // und lief halb hinter die Werkzeugleiste. Im Quelltext war davon nichts
+  // zu sehen, nur am gerenderten Zustand.
+  check('KRITISCH: die Leiste bleibt einzeilig', platz.einZeilig);
   await p.close();
 }
 
@@ -279,12 +290,30 @@ try {
   check('Das Symbol steht ueber der Beschriftung', paar.symbolOben);
   check('Und alles bleibt in der 60 px hohen Leiste', paar.drin);
 
-  // Die Knoepfe im Fussteil bleiben bewusst ohne Schrift
+  // Der Fussteil war bis ENT-410 eine Symbolreihe rechts in der Leiste --
+  // ohne Schrift, sonst wurde die Zeile zu lang. Seither steht er ueberhaupt
+  // nicht mehr in der Zeile, sondern klappt unter dem Logo auf; dort ist
+  // Platz, und die Eintraege tragen wieder ihre Namen.
   const fuss = await p.evaluate(() => {
-    const e = document.querySelector('.side-foot .nav-item .lbl');
-    return e ? e.getBoundingClientRect().height : 0;
+    const f = document.querySelector('#sideFoot');
+    const zu = getComputedStyle(f).display;
+    document.getElementById('btnMarke').click();
+    const auf = getComputedStyle(f).display;
+    const namen = [...f.querySelectorAll('.nav-item .lbl')]
+      .filter(e => e.getBoundingClientRect().height > 0).map(e => e.textContent.trim());
+    const r = f.getBoundingClientRect();
+    const b = document.querySelector('.side-brand').getBoundingClientRect();
+    return { zu, auf, namen, unterDemLogo: r.top >= b.bottom - 1,
+             buendigRechts: Math.abs(r.right - b.right) <= 1,
+             imFenster: r.right <= window.innerWidth };
   });
-  check('Der Fussteil bleibt bei Symbolen', fuss === 0);
+  check('KRITISCH: der Fussteil steht nicht mehr in der Kopfzeile', fuss.zu === 'none');
+  check('KRITISCH: er klappt am Logo auf', fuss.auf !== 'none');
+  check('Und traegt dort Beschriftungen statt blosser Symbole',
+    ['Einrichtung', 'Zur App', 'Abmelden'].every(n => fuss.namen.includes(n)));
+  check('Das Menue haengt unter dem Logo', fuss.unterDemLogo);
+  check('Und schliesst buendig mit ihm ab', fuss.buendigRechts && fuss.imFenster);
+  await p.evaluate(() => markenMenuSchliessen());
 
   // Mittig heisst: in der Mitte des Fensters, nicht in der Mitte des
   // Rests zwischen Logo und Fussteil. Die beiden sind verschieden breit --
@@ -292,18 +321,20 @@ try {
   const mitte = await p.evaluate(() => {
     const n = document.querySelector('.side-nav').getBoundingClientRect();
     const b = document.querySelector('.side-brand').getBoundingClientRect();
-    const f = document.querySelector('.side-foot').getBoundingClientRect();
     return { navMitte: Math.round(n.left + n.width / 2),
              fenster: Math.round(window.innerWidth / 2),
-             brandLinks: Math.round(b.left), fussRechts: Math.round(f.right),
-             breiteUngleich: Math.abs(b.width - f.width) > 20 };
+             brandRechts: Math.round(b.right), fensterBreite: window.innerWidth,
+             mittigImRest: Math.abs((n.left + n.width / 2) - b.left / 2) <= 4 };
   });
   check('KRITISCH: die Symbole stehen in der Mitte des Fensters',
     Math.abs(mitte.navMitte - mitte.fenster) <= 4);
-  check('Und das, obwohl Logo und Fussteil verschieden breit sind',
-    mitte.breiteUngleich);
-  check('Das Logo bleibt links', mitte.brandLinks <= 20);
-  check('Der Fussteil bleibt rechts', mitte.fussRechts >= 1600 - 20);
+  // Die Gegenprobe zur vorigen Zeile: Links vom Logo ist jetzt ALLES frei.
+  // Wer die Navigation mit einem Abstandhalter statt mit 1fr auto 1fr
+  // zentriert, landet in der Mitte dieser freien Flaeche -- rund 20 px zu
+  // weit links. Beides zugleich kann nicht stimmen.
+  check('Und nicht in der Mitte der freien Flaeche links davon', !mitte.mittigImRest);
+  check('KRITISCH: das Logo steht ganz aussen rechts',
+    mitte.fensterBreite - mitte.brandRechts <= 20);
   await p.close();
 } catch (e) { bad.push('Beschriftungen: ' + String(e).split('\n')[0].slice(0, 120)); }
 
@@ -313,12 +344,19 @@ try {
   await p.evaluate(() => huelleSetzen('aus')); await p.waitForTimeout(300);
   const platz = await p.evaluate(() => {
     const n = document.querySelector('.side-nav');
-    const letzte = [...document.querySelectorAll('.side-foot .nav-item, .side-foot .side-user')].pop();
+    // Rechts aussen steht seit ENT-410 der Markenknopf; der Fussteil ist
+    // zugeklappt und haette gar keine Ausdehnung, die man messen koennte.
+    const letzte = document.querySelector('.side-brand').getBoundingClientRect();
+    document.getElementById('btnMarke').click();
+    const menue = document.querySelector('#sideFoot').getBoundingClientRect();
     return { ueberlauf: n.scrollWidth - n.clientWidth,
-             rechts: letzte ? Math.round(letzte.getBoundingClientRect().right) : 0 };
+             rechts: Math.round(letzte.right),
+             menueLinks: Math.round(menue.left), menueRechts: Math.round(menue.right) };
   });
   check('KRITISCH: bei 1281 px laeuft die Navigation nicht ueber', platz.ueberlauf <= 1);
   check('KRITISCH: der letzte Knopf bleibt im Fenster', platz.rechts > 0 && platz.rechts <= 1281);
+  check('KRITISCH: und das aufgeklappte Menue ebenfalls',
+    platz.menueLinks >= 0 && platz.menueRechts <= 1281);
   await p.close();
 } catch (e) { bad.push('Ueberlauf 1281: ' + String(e).split('\n')[0].slice(0, 120)); }
 

@@ -26,6 +26,12 @@ async function seite(vorbelegt, breite = 1600, rapporte = 0) {
   p.on('pageerror', e => bad.push('JS-Fehler: ' + e.message));
   if (vorbelegt !== undefined) {
     await p.addInitScript(v => { try { localStorage.setItem('rv3_dash_layout', v); } catch (e) {} }, vorbelegt);
+    // Der einmalige Umzug aus ENT-410 (Begruessung auf halbe Breite, "Datum
+    // & Zeit" daneben) wird hier abgehakt: Diese Suite prueft die Mechanik
+    // mit einer VORGEGEBENEN Anordnung, und ein Umzug, der sie beim Laden
+    // umschreibt, prueft etwas anderes als das, was draufsteht. Den Umzug
+    // selbst prueft test_zeitkarte.mjs -- dort ohne diesen Merker.
+    await p.addInitScript(() => { try { localStorage.setItem('rv3_dash_zeit_umzug', '1'); } catch (e) {} });
   }
   await p.route('**/api/**', r => {
     const pf = r.request().url().split('/api/')[1].split('?')[0];
