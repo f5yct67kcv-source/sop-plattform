@@ -62,6 +62,10 @@ await page.route('**/api/**', route => {
 await page.goto(URL);
 await page.fill('#gName', 'adrian'); await page.fill('#gPass', 'x'); await page.click('#gBtn');
 await page.waitForSelector('#shell.on'); await page.waitForTimeout(700);
+// Volle Leiste ausdruecklich erzwingen: Diese Suite prueft die Objektliste,
+// nicht die Huelle (ENT-407) -- sie soll nicht vom jeweiligen Huellen-
+// Standard abhaengen, damit spaetere Aenderungen daran hier nichts brechen.
+await page.evaluate(() => huelleSetzen('voll'));
 
 // ══════════════ DIE REGEL SELBST (gav.js)
 const z = async (h, n, d) => page.evaluate(([a, b, c]) => {

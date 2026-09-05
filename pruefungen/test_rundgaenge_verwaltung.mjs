@@ -142,6 +142,10 @@ await page.evaluate(() => localStorage.clear());
 await page.goto(SEITE);
 await page.fill('#gName', 'adrian'); await page.fill('#gPass', 'x'); await page.click('#gBtn');
 await page.waitForSelector('#kpiGrid .kpi-val');
+// Volle Leiste ausdruecklich erzwingen: Ein Teil dieser Suite prueft das
+// Auf-/Zuklappen der Revierdienst-Gruppe an der Leiste selbst (ENT-271) --
+// das gibt es nur im Zustand "voll", nicht in der Kopfleiste (ENT-407).
+await page.evaluate(() => huelleSetzen('voll'));
 
 await page.evaluate(() => go('rundgaenge'));
 await page.waitForSelector('#view-rundgaenge.on');

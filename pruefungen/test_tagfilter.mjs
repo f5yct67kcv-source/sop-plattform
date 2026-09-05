@@ -283,6 +283,11 @@ await m.close();
 
 // ══════════════════════════════════════════ DESKTOP
 const d = await seite(1440, 900);
+// Volle Leiste ausdruecklich erzwingen: Weiter unten wird die Gruppe
+// zwangsweise "offen" gesetzt, um die Reiter zu vermessen -- das wirkt nur
+// im Zustand "voll". In der Kopfleiste (ENT-407) bleiben .nav-kinder ganz
+// unabhaengig von der "offen"-Klasse ausgeblendet.
+await d.evaluate(() => huelleSetzen('voll'));
 await d.evaluate(t => { $('tgD').value = t; goTab('tag'); }, TAG);
 await d.waitForTimeout(500);
 

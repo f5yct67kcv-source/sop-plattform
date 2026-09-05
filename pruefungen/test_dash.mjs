@@ -107,6 +107,10 @@ await page.fill('#gPass', 'geheim');
 await page.click('#gBtn');
 await page.waitForSelector('#shell.on', { timeout: 5000 });
 await page.waitForSelector('#kpiGrid .kpi-val', { timeout: 5000 });
+// Volle Leiste ausdruecklich erzwingen: Diese Suite prueft das Dashboard,
+// nicht die Huelle (ENT-407) -- der Klick auf Unterkategorien weiter unten
+// setzt die ausgeklappte Leiste voraus.
+await page.evaluate(() => huelleSetzen('voll'));
 check('Shell nach Login sichtbar', await page.isVisible('#shell'));
 check('dashboard_stats.php aufgerufen', calls.some(c => c.includes('dashboard_stats')));
 

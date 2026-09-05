@@ -118,6 +118,11 @@ await page.goto(URL);
 await page.fill('#gName', 'adrian'); await page.fill('#gPass', 'x'); await page.click('#gBtn');
 await page.waitForSelector('#shell.on');
 await page.waitForTimeout(400);
+// Volle Leiste ausdruecklich erzwingen: Die folgende Pruefung gilt der
+// ausgeklappten Leiste selbst (Sichtbarkeit des Reiters nach dem Oeffnen
+// der Gruppe) -- das ist keine Aussage ueber die Huelle (ENT-407) als
+// Ganzes, die bleibt test_huelle.mjs vorbehalten.
+await page.evaluate(() => huelleSetzen('voll'));
 
 await page.click('#nav-kunden');
 await page.waitForTimeout(150);
@@ -320,6 +325,7 @@ try {
   await p2.goto(URL);
   await p2.fill('#gName', 'adrian'); await p2.fill('#gPass', 'x'); await p2.click('#gBtn');
   await p2.waitForSelector('#shell.on'); await p2.waitForTimeout(400);
+  await p2.evaluate(() => huelleSetzen('voll'));
   await p2.click('#nav-kunden'); await p2.waitForTimeout(150);
   await p2.click('#nav-kunden-rechnungen'); await p2.waitForTimeout(300);
   check('KRITISCH: eine leere Rechnungsliste sagt "Noch keine Rechnungen", nicht "Keine Treffer"',

@@ -2,7 +2,8 @@
 // schmalen 64-px-Zwischenschritt: er zeigte nur Symbole ohne Beschriftung
 // und war neben der Kopfleiste eine zweite, schwaechere Antwort auf
 // dasselbe Beduerfnis -- jeder Bereich hat ohnehin schon eigene Unterreiter).
-// Standard bleibt die volle Leiste, wie schon vor ENT-396.
+// Standard ist seit ENT-407 die Kopfleiste, nicht mehr die volle Leiste --
+// der Projektinhaber empfand sie als deutlich uebersichtlicher.
 //
 // Diese Suite misst am gerenderten Zustand, nicht im Quelltext. Eine
 // CSS-Regel kann wirkungslos bleiben, ohne dass etwas kaputtgeht -- durch
@@ -62,30 +63,29 @@ const zustand = p => p.evaluate(() => {
 
   let z = await zustand(p);
   let side = await mass(p, '#side'), main = await mass(p, '.main');
-  check('Startzustand ist die volle Leiste', !z.aus && z.sideW === '232px');
-  check('Die Leiste ist tatsaechlich 232 px breit (gemessen)', side.w === 232);
-  check('Der Inhalt beginnt genau dahinter', main.ml === '232px');
-  const breiteVoll = (await mass(p, '.content')).w;
+  check('KRITISCH: der Standard ist seit ENT-407 die Kopfleiste, nicht die volle Leiste',
+    z.aus && z.sideW === '0px');
+  check('Sie liegt waagrecht ueber die volle Breite', side.w === 1600 && side.x === 0 && side.y === 0);
+  check('Und ist so hoch wie die Werkzeugleiste (60 px)', side.h === 60);
+  check('Der Inhalt rueckt nicht zur Seite', main.ml === '0px');
+  check('Sondern nach unten -- die Leiste verdeckt ihn nicht', main.pt === '60px');
+  const breiteAus = (await mass(p, '.content')).w;
 
   await p.click('#btnSchmal'); await p.waitForTimeout(250);
   z = await zustand(p); side = await mass(p, '#side'); main = await mass(p, '.main');
-  const top = await mass(p, '.topbar');
-  check('KRITISCH: ein Klick blendet die Leiste aus und legt sie waagrecht an', z.aus);
-  check('KRITISCH: sie liegt jetzt waagrecht ueber die volle Breite', side.w === 1600 && side.x === 0 && side.y === 0);
-  check('Und ist so hoch wie die Werkzeugleiste (60 px)', side.h === 60);
-  check('Der Inhalt rueckt nicht mehr zur Seite', main.ml === '0px');
-  check('Sondern nach unten -- die Leiste verdeckt ihn nicht', main.pt === '60px');
-  check('Die Werkzeugleiste klebt unter der Navigation, nicht darueber', top.y === 60);
+  check('KRITISCH: ein Klick fuehrt zur vollen Leiste', !z.aus && z.sideW === '232px');
+  check('Gemessen 232 px', side.w === 232);
+  check('Der Inhalt beginnt genau dahinter', main.ml === '232px');
+  const breiteVoll = (await mass(p, '.content')).w;
 
-  const breiteAus = (await mass(p, '.content')).w;
-  check('KRITISCH: der gewonnene Platz wird zu Inhalt, nicht zu Rand',
+  check('KRITISCH: der gewonnene Platz der Kopfleiste wird zu Inhalt, nicht zu Rand',
     breiteAus > breiteVoll);
 
   await p.click('#btnSchmal'); await p.waitForTimeout(250);
   z = await zustand(p);
-  check('Der zweite Klick fuehrt zurueck zur vollen Leiste', !z.aus);
+  check('Der zweite Klick fuehrt zurueck zur Kopfleiste', z.aus);
 
-  await p.screenshot({ path: `${OUT}/huelle-voll.png` });
+  await p.screenshot({ path: `${OUT}/huelle-kopfleiste.png` });
   await p.close();
 }
 
@@ -97,7 +97,7 @@ const zustand = p => p.evaluate(() => {
 // Die Unterkategorien stehen jetzt nur noch in der Werkzeugleiste.
 try {
   const p = await seite(1600, 900);
-  await p.click('#btnSchmal'); await p.waitForTimeout(250);   // aus
+  // Standard ist bereits die Kopfleiste (ENT-407) -- kein Klick noetig.
 
   await p.click('#nav-kunden'); await p.waitForTimeout(350);
   const k = await mass(p, '#navg-kunden .nav-kinder');
@@ -119,7 +119,7 @@ try {
   check('Und "Objekte" ist dort direkt anklickbar',
     (await mass(p, '#nav-kunden-objekte')).h > 0);
 
-  await p.screenshot({ path: `${OUT}/huelle-kopfleiste.png` });
+  await p.screenshot({ path: `${OUT}/huelle-voll.png` });
   await p.close();
 } catch (e) { bad.push('Untermenue: ' + String(e).split('\n')[0].slice(0, 120)); }
 
@@ -147,10 +147,8 @@ try {
 // Kopfleiste bei 1000 px nur 539 px.
 {
   const p = await seite(1000, 800);
-  await p.evaluate(() => huelleSetzen('aus'));
-  await p.waitForTimeout(250);
   const z = await zustand(p), side = await mass(p, '#side'), main = await mass(p, '.main');
-  check('KRITISCH: bei 1000 px erscheint die Kopfleiste wirklich', z.sideW === '0px');
+  check('KRITISCH: bei 1000 px erscheint die Kopfleiste bereits als Standard', z.sideW === '0px');
   check('Sie liegt waagrecht ueber die volle Breite', side.w === 1000 && side.h === 60);
   check('Der Inhalt rueckt darunter', main.ml === '0px' && main.pt === '60px');
   const platz = await p.evaluate(() => {
@@ -168,8 +166,6 @@ try {
 // ══════════════════════════════ HANDYBREITE BLEIBT DIE SCHUBLADE
 {
   const p = await seite(800, 800);
-  await p.evaluate(() => huelleSetzen('aus'));
-  await p.waitForTimeout(250);
   const kompakt = await p.evaluate(() => huelleKompakt());
   const main = await mass(p, '.main');
   check('KRITISCH: unter 901 px greift der kompakte Zustand nicht', kompakt === false);
@@ -180,8 +176,8 @@ try {
 // ══════════════════════════════ DER ZUSTAND UEBERLEBT DAS NEULADEN
 {
   const p = await seite(1600, 900);
-  await p.click('#btnSchmal'); await p.waitForTimeout(250);
-  check('Vor dem Neuladen: ausgeblendet', (await zustand(p)).aus);
+  await p.click('#btnSchmal'); await p.waitForTimeout(250);   // -> volle Leiste, gegen den Standard
+  check('Vor dem Neuladen: volle Leiste gewaehlt', !(await zustand(p)).aus);
   await p.reload();
   // Die Sitzung ueberlebt das Neuladen, die Anmeldemaske erscheint dann
   // gar nicht -- beide Wege zulassen, statt einen anzunehmen.
@@ -190,7 +186,8 @@ try {
     await p.fill('#gName', 'adrian'); await p.fill('#gPass', 'x'); await p.click('#gBtn');
   }
   await p.waitForSelector('#shell.on'); await p.waitForTimeout(500);
-  check('KRITISCH: der Zustand ist nach dem Neuladen derselbe', (await zustand(p)).aus);
+  check('KRITISCH: die gewaehlte volle Leiste bleibt nach dem Neuladen erhalten, statt auf den Standard zurueckzufallen',
+    !(await zustand(p)).aus);
   await p.close();
 }
 
@@ -231,10 +228,10 @@ try {
     check(`KRITISCH: ${v} behaelt die Lesebreite`, (await weit()) === false);
   }
 
-  // Gemessen statt geglaubt, und im Zustand, in dem es zaehlt: ausgeblendete
-  // Leiste, 1600 px Fenster. Die Einsatzliste nutzt sie ganz, die Kundenseite
-  // bleibt beim Deckel von 1440 px. Der Unterschied ist der ganze Punkt.
-  await p.evaluate(() => huelleSetzen('aus')); await p.waitForTimeout(250);
+  // Gemessen statt geglaubt, und im Zustand, in dem es zaehlt: Kopfleiste
+  // (seit ENT-407 der Standard), 1600 px Fenster. Die Einsatzliste nutzt sie
+  // ganz, die Kundenseite bleibt beim Deckel von 1440 px. Der Unterschied
+  // ist der ganze Punkt.
   await p.evaluate(() => go('planung'));
   await p.evaluate(() => goTab('einsaetze')); await p.waitForTimeout(250);
   const bEins = (await mass(p, '.content')).w;
@@ -249,7 +246,7 @@ try {
 // ══════════════════════════════ BESCHRIFTUNG UNTER DEN SYMBOLEN
 try {
   const p = await seite(1600, 900);
-  await p.evaluate(() => huelleSetzen('aus')); await p.waitForTimeout(300);
+  // Standard ist bereits die Kopfleiste (ENT-407).
 
   const lbl = await p.evaluate(() => [...document.querySelectorAll('.side-nav .nav-item .lbl')]
     .map(e => ({ text: e.textContent.trim(), sichtbar: e.getBoundingClientRect().height > 0 })));
@@ -299,7 +296,6 @@ try {
 // ══════════════════════════════ KEIN UEBERLAUF AM UNTEREN RAND (1281 px)
 try {
   const p = await seite(1281, 800);
-  await p.evaluate(() => huelleSetzen('aus')); await p.waitForTimeout(300);
   const platz = await p.evaluate(() => {
     const n = document.querySelector('.side-nav');
     const letzte = [...document.querySelectorAll('.side-foot .nav-item, .side-foot .side-user')].pop();
@@ -316,6 +312,7 @@ try {
   const p = await seite(1600, 900);
 
   // Voll ausgefahren: nicht noetig, die Seitenleiste zeigt sie selbst
+  await p.evaluate(() => huelleSetzen('voll')); await p.waitForTimeout(300);
   await p.evaluate(() => go('kunden')); await p.waitForTimeout(300);
   let ts = await mass(p, '#topSub');
   check('Bei voller Leiste bleibt die Werkzeugleiste frei', ts.display === 'none');
@@ -405,9 +402,6 @@ try {
 } catch (e) { bad.push('Unterkategorien: ' + String(e).split('\n')[0].slice(0, 120)); }
 
 // ══════════════════════════════ KEIN SEITEN-SCROLL IN KEINEM ZUSTAND
-//
-// Frueher eine Eigenschaft des schmalen Zustands allein (ENT-086); gilt seit
-// ENT-396 fuer die beiden verbliebenen Zustaende.
 try {
   const p = await seite(1440, 900);
   for (const z of ['aus', 'voll']) {

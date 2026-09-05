@@ -106,6 +106,10 @@ const anmelden = async () => {
   await page.goto(SEITE);
   await page.fill('#gName', 'adrian'); await page.fill('#gPass', 'x'); await page.click('#gBtn');
   await page.waitForSelector('#kpiGrid .kpi-val');
+  // Volle Leiste ausdruecklich erzwingen: Diese Suite prueft die
+  // Sichtbarkeit von Kacheln nach dem Aufklappen der Gruppe -- das gibt es
+  // nur im Zustand "voll", nicht in der Kopfleiste (ENT-407).
+  await page.evaluate(() => huelleSetzen('voll'));
 };
 
 // ══════════ MIT DEM RECHT: DIE KACHEL ERSCHEINT UND LÄDT

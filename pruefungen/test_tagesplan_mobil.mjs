@@ -39,6 +39,11 @@ async function seite(w, h) {
   await p.goto(URL);
   await p.fill('#gName', 'adrian'); await p.fill('#gPass', 'x'); await p.click('#gBtn');
   await p.waitForSelector('#shell.on'); await p.waitForTimeout(600);
+  // Volle Leiste ausdruecklich erzwingen (wirkt nur ab 901 px, siehe
+  // huelleKompakt()): der Desktop-Teil dieser Suite liest die Reiter-
+  // reihenfolge aus der sichtbaren Leiste, das gibt es nur im Zustand
+  // "voll", nicht in der Kopfleiste (ENT-407).
+  await p.evaluate(() => huelleSetzen('voll'));
   return p;
 }
 

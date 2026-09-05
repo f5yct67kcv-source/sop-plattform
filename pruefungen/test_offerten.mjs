@@ -171,6 +171,10 @@ await page.goto(URL);
 await page.fill('#gName', 'adrian'); await page.fill('#gPass', 'x'); await page.click('#gBtn');
 await page.waitForSelector('#shell.on');
 await page.waitForTimeout(400);
+// Volle Leiste ausdruecklich erzwingen: Diese Suite prueft Offerten, nicht
+// die Huelle (ENT-407) -- der folgende Ablauf (Gruppe oeffnen, Unterpunkt
+// anklicken) setzt die ausgeklappte Leiste voraus.
+await page.evaluate(() => huelleSetzen('voll'));
 
 // ══════════════════════════════════════════════════════════════════════════
 // TEIL 1 — Die Liste

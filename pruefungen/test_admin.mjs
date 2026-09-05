@@ -115,9 +115,13 @@ await page.fill('#gName', 'adrian'); await page.fill('#gPass', 'x'); await page.
 await page.waitForSelector('#kpiGrid .kpi-val');
 
 // ══════════ MITARBEITENDE: bearbeiten
-await page.evaluate(() => { if (!document.getElementById('navg-admin').classList.contains('offen')) { document.getElementById('nav-admin').click(); } });
+// element.click() statt page.click(): der Knopf ist im Standard-
+// Huellenzustand "aus" (Kopfleiste, ENT-407) in der Leiste selbst
+// unsichtbar -- die Unterkategorien stehen dort in der Werkzeugleiste.
+// element.click() loest denselben onclick aus wie ein echter Klick,
+// unabhaengig vom Huellenzustand und ohne die Gruppe erst oeffnen zu muessen.
+await page.evaluate(() => document.getElementById('nav-admin-mitarbeiter').click());
 await page.waitForTimeout(250);
-await page.click('#nav-admin-mitarbeiter');
 await page.waitForSelector('#maTable table');
 check('Kein Diktat-Knopf mehr bei Mitarbeitenden -- Anlegen und Ändern laufen jetzt über den globalen Sprechen-Knopf (ENT-042)',
   (await page.$$('#view-mitarbeiter button:has-text("Diktat")')).length === 0);
@@ -629,9 +633,13 @@ const rd = calls.find(c => c.path.includes('rapport_delete'));
 check('Rapport wird mit id geloescht', rd && rd.body.id === 284);
 
 // ══════════ BEDIENUNG
-await page.evaluate(() => { if (!document.getElementById('navg-admin').classList.contains('offen')) { document.getElementById('nav-admin').click(); } });
+// element.click() statt page.click(): der Knopf ist im Standard-
+// Huellenzustand "aus" (Kopfleiste, ENT-407) in der Leiste selbst
+// unsichtbar -- die Unterkategorien stehen dort in der Werkzeugleiste.
+// element.click() loest denselben onclick aus wie ein echter Klick,
+// unabhaengig vom Huellenzustand und ohne die Gruppe erst oeffnen zu muessen.
+await page.evaluate(() => document.getElementById('nav-admin-mitarbeiter').click());
 await page.waitForTimeout(250);
-await page.click('#nav-admin-mitarbeiter');
 await page.waitForSelector('#maTable table');
 // "Neuer Mitarbeitender" gehoert seit ENT-048 zur Liste und ist auf der
 // Detailseite ausgeblendet -- also zuerst dorthin zurueck.
@@ -661,9 +669,13 @@ check('Escape schliesst erst den Dialog, nicht die Schublade', await page.isVisi
 await page.keyboard.press('Escape');
 await page.waitForTimeout(300);
 check('Zweites Escape schliesst die Schublade', !(await page.isVisible('#drawer.on')));
-await page.evaluate(() => { if (!document.getElementById('navg-admin').classList.contains('offen')) { document.getElementById('nav-admin').click(); } });
+// element.click() statt page.click(): der Knopf ist im Standard-
+// Huellenzustand "aus" (Kopfleiste, ENT-407) in der Leiste selbst
+// unsichtbar -- die Unterkategorien stehen dort in der Werkzeugleiste.
+// element.click() loest denselben onclick aus wie ein echter Klick,
+// unabhaengig vom Huellenzustand und ohne die Gruppe erst oeffnen zu muessen.
+await page.evaluate(() => document.getElementById('nav-admin-mitarbeiter').click());
 await page.waitForTimeout(250);
-await page.click('#nav-admin-mitarbeiter');
 await page.waitForSelector('#maTable table');
 
 // Kein Seiten-Scroll -- fuer den Dialog wie fuer die Anlegen-Flaeche. Beide

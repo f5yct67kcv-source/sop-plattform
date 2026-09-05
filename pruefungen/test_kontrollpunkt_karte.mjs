@@ -86,6 +86,9 @@ const anmelden = async () => {
 };
 
 const zurEinrichtung = async () => {
+  // Volle Leiste ausdruecklich erzwingen: Diese Suite prueft die
+  // Kontrollpunkt-Karte, nicht die Huelle (ENT-407).
+  await page.evaluate(() => huelleSetzen('voll'));
   await page.evaluate(() => {
     if (!document.getElementById('navg-revierdienst').classList.contains('offen')) {
       document.getElementById('nav-revierdienst').click();

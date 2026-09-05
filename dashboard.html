@@ -8619,8 +8619,9 @@ function huelleLesen() {
   const z = localStorage.getItem('rv3_huelle');
   if (HUELLE_ZUSTAENDE.includes(z)) { return z; }
   // Kein gespeicherter Wert, oder der mit ENT-396 entfallene schmale
-  // Zustand: Standard bleibt die volle Leiste, wie schon vor ENT-396.
-  return 'voll';
+  // Zustand: Standard ist seit ENT-407 die Kopfleiste -- sie zeigt mehr
+  // Uebersicht als die volle Leiste.
+  return 'aus';
 }
 
 // Bewusst im Browser gemerkt und nicht am Konto: Der Zustand haengt an der

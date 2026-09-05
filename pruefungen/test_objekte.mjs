@@ -133,6 +133,10 @@ await setup(page);
 await page.goto(URL);
 await page.fill('#gName', 'adrian'); await page.fill('#gPass', 'x'); await page.click('#gBtn');
 await page.waitForSelector('#kpiGrid .kpi-val');
+// Volle Leiste ausdruecklich erzwingen: Diese Suite prueft Objekte/Planung,
+// nicht die Huelle (ENT-407) -- mehrere Pruefungen unten setzen das
+// Aufklappen der Seitenleiste voraus (z. B. "Kunden-Dropdown klappt auf").
+await page.evaluate(() => huelleSetzen('voll'));
 
 // ══════════ REITER
 await page.click('#nav-planung');

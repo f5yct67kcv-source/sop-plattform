@@ -134,6 +134,10 @@ await setup(page);
 await page.goto(URL);
 await page.fill('#gName', 'adrian'); await page.fill('#gPass', 'x'); await page.click('#gBtn');
 await page.waitForSelector('#kpiGrid .kpi-val');
+// Volle Leiste ausdruecklich erzwingen: Diese Suite prueft die Planung,
+// nicht die Huelle (ENT-407) -- mehrere Klicks unten treffen Unterpunkte,
+// die nur bei ausgeklappter Leiste direkt anklickbar sind.
+await page.evaluate(() => huelleSetzen('voll'));
 
 // ══════════ ANSICHT
 check('Navigationspunkt Planung vorhanden', await page.isVisible('#nav-planung'));

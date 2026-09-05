@@ -92,6 +92,10 @@ await page.goto(`file://${WURZEL}/dashboard.html`);
 await page.fill('#gName', 'a'); await page.fill('#gPass', 'x'); await page.click('#gBtn');
 await page.waitForSelector('#shell.on');
 await page.waitForTimeout(400);
+// Volle Leiste ausdruecklich erzwingen: Diese Suite prueft Dienstplaene,
+// nicht die Huelle (ENT-407) -- der Klick auf Unterkategorien weiter unten
+// setzt die ausgeklappte Leiste voraus.
+await page.evaluate(() => huelleSetzen('voll'));
 
 // ══════════════════════════ ZEITBONUS: REINE RECHNUNG
 check('KRITISCH: 15 Min. voll in der Nacht ergeben anteilig 1.5 Min. Bonus, nicht 0',

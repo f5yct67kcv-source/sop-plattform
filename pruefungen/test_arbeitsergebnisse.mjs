@@ -173,6 +173,10 @@ await page.evaluate(() => localStorage.clear());
 await page.goto(SEITE);
 await page.fill('#gName', 'adrian'); await page.fill('#gPass', 'x'); await page.click('#gBtn');
 await page.waitForSelector('#kpiGrid .kpi-val');
+// Volle Leiste ausdruecklich erzwingen: Diese Suite prueft die
+// Arbeitsergebnisse, nicht die Huelle (ENT-407) -- die Sichtbarkeits-
+// pruefung unten setzt die ausgeklappte Leiste voraus.
+await page.evaluate(() => huelleSetzen('voll'));
 
 // Gruppe oeffnen (wie zurEinrichtung() in test_kontrollpunkte.mjs), dann den
 // neuen Menuepunkt anklicken.
