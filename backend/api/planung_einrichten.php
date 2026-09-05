@@ -1160,6 +1160,48 @@ CREATE TABLE IF NOT EXISTS abwesenheiten (
   FOREIGN KEY (mitarbeiter_id) REFERENCES mitarbeiter(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+// Quittungsbelege der Mitarbeitenden (ENT-413). Bewusst NICHT der
+// Auslagenersatz nach Art. 18 GAV -- der liegt in einsatz_auslagen und
+// entsteht beim Abgleich aus Zone und Wegstrecke (siehe backend/spesen.php,
+// Abschnitt "Abgrenzung").
+//
+// Aufbau nach dem Vorbild von abwesenheiten darueber: dieselbe Abfolge
+// erfassen -> einreichen -> entscheiden, dieselben Spaltennamen fuer den
+// Entscheid. Wer das eine gelesen hat, kennt das andere.
+//
+// betrag_rappen als INT und nicht DECIMAL: Franken mit Nachkommastellen
+// summieren sich ueber viele Belege zu Rundungsdrift, Rappen nicht --
+// dieselbe Regel wie bei den Offerten und in auslagen.php.
+//
+// beleg als LONGBLOB neben dem Datensatz statt als Datei im Dateisystem:
+// gleiches Vorgehen wie bei ereignis_meldung.foto. Ein Beleg ohne seinen
+// Datensatz ist wertlos, und eine Datei neben der Datenbank waere beim
+// Sichern ein zweiter, leicht vergessener Weg. NULL heisst "kein Beleg
+// angehaengt" -- ein Eintrag ohne Bild bleibt moeglich, weil eine Quittung
+// auch nachgereicht werden kann.
+'spesen' => "
+CREATE TABLE IF NOT EXISTS spesen (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  mitarbeiter_id INT NOT NULL,
+  datum DATE NOT NULL,
+  kategorie VARCHAR(20) NOT NULL,
+  betrag_rappen INT NOT NULL,
+  notiz TEXT NULL,
+  beleg LONGBLOB NULL,
+  beleg_mime VARCHAR(50) NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'erfasst',
+  erfasst_am DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  eingereicht_am DATETIME NULL,
+  ablehnung_grund TEXT NULL,
+  entschieden_von INT NULL,
+  entschieden_am DATETIME NULL,
+  geaendert_am DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY idx_person_datum (mitarbeiter_id, datum),
+  KEY idx_status (status, datum),
+  FOREIGN KEY (mitarbeiter_id) REFERENCES mitarbeiter(id) ON DELETE CASCADE,
+  FOREIGN KEY (entschieden_von) REFERENCES mitarbeiter(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
 // Dienstfahrzeuge (ENT-313). Reine STAMMDATEN -- der Fahrzeugbestand des
 // Betriebs, so wie anstellungsorte die Anstellungsorte haelt. Hier wird
 // nichts kontrolliert und nichts gerechnet: Das Fahrtenbuch (Tachostand bei

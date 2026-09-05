@@ -1484,16 +1484,54 @@ const W = {
     pwZeigen: 'Passwort anzeigen', pwVerbergen: 'Passwort verbergen',
     passwortOk: 'Passwort geändert.', abmelden: 'Abmelden',
     zumCockpit: 'Zum Cockpit',
-    // Menue-Umbau (ENT-402)
+    // Menue-Umbau (ENT-402), gefuellt mit ENT-413
     spesen: 'Spesen',
     spesenTitel: 'Spesen',
     // Vier verschiedene Sachverhalte, vier verschiedene Texte (CLAUDE.md).
-    // Das hier ist "noch nicht eingerichtet" -- NICHT "du hast keine
-    // Spesen". Der Unterschied ist keine Wortklauberei: Wer eine
-    // Tankquittung in der Tasche hat und "keine Spesen" liest, glaubt,
-    // sie sei verschwunden.
+    // "Noch nicht eingerichtet" heisst: Die Tabelle fehlt, weil die
+    // Einrichtung nicht gelaufen ist -- NICHT "du hast keine Spesen". Wer
+    // eine Tankquittung in der Tasche hat und "keine Spesen" liest, glaubt,
+    // sie sei verschwunden. Beide Texte stehen deshalb nebeneinander und
+    // werden nie gegeneinander ausgetauscht.
     spesenLeer: 'Noch nicht eingerichtet',
-    spesenLeerText: 'Hier kommen deine Quittungsbelege hin — Tankquittungen und geschäftliche Einkäufe. Der Bereich wird gerade gebaut. Belege bis dahin bitte wie bisher aufbewahren und einreichen.',
+    spesenLeerText: 'Der Spesenbereich ist auf diesem Server noch nicht eingerichtet. Belege bitte wie bisher aufbewahren und einreichen.',
+    spesenKeine: 'Noch keine Belege',
+    spesenKeineText: 'Hier kommen deine Quittungsbelege hin — Tankquittungen, geschäftliche Einkäufe, Parkgebühren. Mit „Beleg erfassen“ den ersten anlegen.',
+    spesenNeu: 'Beleg erfassen',
+    spesenBearbeiten: 'Beleg bearbeiten',
+    spesenAendern: 'Ändern',
+    spesenDatum: 'Belegdatum',
+    spesenKategorie: 'Kategorie',
+    spesenBetrag: 'Betrag (CHF)',
+    spesenNotiz: 'Notiz',
+    spesenBeleg: 'Beleg (Foto oder PDF)',
+    spesenBelegWaehlen: 'Foto oder PDF wählen',
+    spesenBelegAnsehen: 'Beleg ansehen',
+    spesenBelegEntfernen: 'Beleg entfernen',
+    spesenBelegPdf: 'PDF-Beleg',
+    spesenBelegKeiner: 'Kein Beleg angehängt',
+    spesenEinreichen: 'Einreichen',
+    spesenZurueckziehen: 'Zurückziehen',
+    spesenLoeschen: 'Löschen',
+    spesenGespeichert: 'Beleg gespeichert.',
+    spesenEingereicht: 'Beleg eingereicht.',
+    spesenZurueckgezogen: 'Beleg zurückgezogen.',
+    spesenGeloescht: 'Beleg gelöscht.',
+    spesenBetragNoetig: 'Bitte einen Betrag grösser als null eingeben.',
+    spesenDatumZukunft: 'Das Belegdatum liegt in der Zukunft.',
+    spesenBelegZuGross: 'Der Beleg ist zu gross (höchstens 4 MB).',
+    spesenBelegArt: 'Nur JPEG, PNG oder PDF.',
+    spesenBelegFehler: 'Der Beleg konnte nicht gelesen werden.',
+    spesenLoeschenFrage: 'Diesen Beleg wirklich löschen?',
+    // Die vier Zustaende. "Erfasst" sagt ausdruecklich, dass der Beleg noch
+    // NICHT bei der Verwaltung ist -- ohne diesen Satz haelt man einen
+    // erfassten Beleg fuer eingereicht und wartet auf eine Antwort, die
+    // niemand geben kann.
+    spesenStatusErfasst: 'Erfasst',
+    spesenStatusEingereicht: 'Eingereicht',
+    spesenStatusFreigegeben: 'Freigegeben',
+    spesenStatusAbgelehnt: 'Abgelehnt',
+    spesenNochNichtEingereicht: 'Noch nicht eingereicht — liegt bei dir.',
     // Einstellungen (ENT-398)
     einstellungen: 'Einstellungen', darstellung: 'Darstellung',
     themaDunkel: 'Dunkle Darstellung',
@@ -3851,8 +3889,7 @@ function zeichneMenu() {
         </button>
         <h2>${esc(w('spesenTitel'))}</h2>
       </div>
-      ${LEER(w('spesenLeer'), w('spesenLeerText'),
-        '<path d="M6 2h9l4 4v16l-3-1.6L13 22l-3-1.6L7 22l-3-1.6V4a2 2 0 0 1 2-2z"/><line x1="8.5" y1="8.5" x2="14" y2="8.5"/><line x1="8.5" y1="12" x2="14" y2="12"/>')}
+      <div id="spesenInhalt"></div>
     </div>
 
     <div id="pr-einst" style="display:none">
@@ -3925,18 +3962,41 @@ function datenSeiteZu() {
   window.scrollTo(0, 0);
 }
 
-// ══════════════════════════════════════════ SPESEN (ENT-402)
-// Vorerst nur das Geruest: Kachel, Unterseite, ehrlicher Leerzustand. Was
-// Spesen hier koennen sollen -- Quittungsbelege fotografieren, einreichen,
-// Stand verfolgen --, ist noch nicht entschieden und wird gesondert
-// aufgegriffen. Bis dahin steht auf der Seite, dass sie noch nicht
-// eingerichtet ist, und NICHT, dass es keine Spesen gibt.
+// ══════════════════════════════════════════ SPESEN (ENT-402, gefuellt mit ENT-413)
+//
+// Quittungsbelege: erfassen, Beleg anhaengen, einreichen, Stand verfolgen.
+// AUSDRUECKLICH NICHT der Auslagenersatz nach Art. 18 GAV -- der wird
+// serverseitig beim Abgleich berechnet (backend/auslagen.php) und hat mit
+// dieser Seite nichts zu tun (OP-392, backend/spesen.php).
+//
+// Die Seite rechnet nichts. Der Betrag steht auf der Quittung, die Person
+// tippt ihn ab, der Server prueft nur Form und Grenzen.
+const SPESEN_STATUS_MARKE = {
+  erfasst: 'm-n', eingereicht: 'm-w', freigegeben: 'm-p', abgelehnt: 'm-x',
+};
+const SPESEN_STATUS_TEXT = {
+  erfasst: 'spesenStatusErfasst', eingereicht: 'spesenStatusEingereicht',
+  freigegeben: 'spesenStatusFreigegeben', abgelehnt: 'spesenStatusAbgelehnt',
+};
+// Vom Server geliefert (SPESEN_KATEGORIEN in backend/spesen.php) statt hier
+// zweitgeschrieben: Eine fuenfte Kategorie soll nicht an zwei Stellen
+// nachgezogen werden muessen. Bis zum ersten Laden leer -- nicht geraten.
+let spesenKategorien = {};
+let meineSpesen = [];
+let spesenEingerichtet = true;
+// Der gewaehlte Beleg als Data-URL, solange das Formular offen ist. Er geht
+// erst beim Speichern mit; ein Zwischenspeichern auf dem Server bei jedem
+// Tastendruck waere fuer eine 4-MB-Datei uebertrieben.
+let spesenBelegNeu = null;
+let spesenBelegWeg = false;
+
 function spesenSeiteAuf() {
   const h = $('pr-haupt'), u = $('pr-spesen');
   if (!h || !u) return;
   h.style.display = 'none';
   u.style.display = '';
   window.scrollTo(0, 0);
+  ladeSpesen().then(zeichneSpesen);
 }
 function spesenSeiteZu() {
   const h = $('pr-haupt'), u = $('pr-spesen');
@@ -3944,6 +4004,228 @@ function spesenSeiteZu() {
   u.style.display = 'none';
   h.style.display = '';
   window.scrollTo(0, 0);
+}
+
+function ladeSpesen() {
+  return api('meine_spesen.php').then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') { meineSpesen = []; return; }
+    // "nicht eingerichtet" kommt als eigenes Feld und nicht als leere Liste:
+    // Sonst waere der haeufigste Zustand (noch keine Belege) von einem
+    // Serverproblem nicht zu unterscheiden.
+    spesenEingerichtet = data.eingerichtet !== false;
+    spesenKategorien = data.kategorien || {};
+    meineSpesen = data.spesen || [];
+  });
+}
+
+function spesenChf(rappen) { return (Number(rappen) / 100).toFixed(2); }
+
+function zeichneSpesen() {
+  const el = $('spesenInhalt');
+  if (!el) { return; }
+  if (!spesenEingerichtet) {
+    el.innerHTML = LEER(w('spesenLeer'), w('spesenLeerText'),
+      '<path d="M6 2h9l4 4v16l-3-1.6L13 22l-3-1.6L7 22l-3-1.6V4a2 2 0 0 1 2-2z"/><line x1="8.5" y1="8.5" x2="14" y2="8.5"/><line x1="8.5" y1="12" x2="14" y2="12"/>');
+    return;
+  }
+  let html = `<div style="padding:14px 16px 6px">
+    <button class="btn btn-primary" style="width:100%" onclick="spNeu()">${esc(w('spesenNeu'))}</button>
+  </div>`;
+  if (!meineSpesen.length) {
+    el.innerHTML = html + LEER(w('spesenKeine'), w('spesenKeineText'),
+      '<path d="M6 2h9l4 4v16l-3-1.6L13 22l-3-1.6L7 22l-3-1.6V4a2 2 0 0 1 2-2z"/><line x1="8.5" y1="8.5" x2="14" y2="8.5"/><line x1="8.5" y1="12" x2="14" y2="12"/>');
+    return;
+  }
+  html += meineSpesen.map(s => {
+    const offen = s.status === 'erfasst';
+    return `<div class="karte">
+      <div class="karte-bd">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <b style="font-size:14.5px">CHF ${esc(spesenChf(s.betrag_rappen))}</b>
+          <span class="marke ${SPESEN_STATUS_MARKE[s.status] || 'm-n'}">${esc(w(SPESEN_STATUS_TEXT[s.status] || s.status))}</span>
+        </div>
+        <div style="font-size:13px;color:var(--ink-2);margin-top:4px">
+          ${dmy(s.datum)} · ${esc(spesenKategorien[s.kategorie] || s.kategorie)}
+        </div>
+        ${s.notiz ? `<div style="font-size:13px;color:var(--ink-2);margin-top:2px">${esc(s.notiz)}</div>` : ''}
+        ${s.hat_beleg
+          ? `<button class="btn btn-plain" style="margin-top:8px" onclick="spBelegAnsehen(${s.id})">${esc(w('spesenBelegAnsehen'))}</button>`
+          : `<div style="font-size:13px;color:var(--ink-3);margin-top:6px">${esc(w('spesenBelegKeiner'))}</div>`}
+        ${offen ? `<div style="font-size:13px;color:var(--ink-3);margin-top:6px">${esc(w('spesenNochNichtEingereicht'))}</div>` : ''}
+        ${s.status === 'abgelehnt' && s.ablehnung_grund
+          ? `<div style="font-size:13px;color:var(--neg);margin-top:6px">${esc(s.ablehnung_grund)}</div>` : ''}
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+          ${offen ? `
+            <button class="btn btn-primary" onclick="spEinreichen(${s.id})">${esc(w('spesenEinreichen'))}</button>
+            <button class="btn btn-plain" onclick="spBearbeiten(${s.id})">${esc(w('spesenAendern'))}</button>
+            <button class="btn btn-plain" onclick="spLoeschen(${s.id})">${esc(w('spesenLoeschen'))}</button>` : ''}
+          ${s.status === 'eingereicht'
+            ? `<button class="btn btn-plain" onclick="spZurueckziehen(${s.id})">${esc(w('spesenZurueckziehen'))}</button>` : ''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  el.innerHTML = html;
+}
+
+// ── Beleg waehlen ─────────────────────────────────────────────────────
+// Fotos werden im Browser verkleinert (rdEsKomprimieren, 1280 px / JPEG
+// 0.7) -- ein unkomprimiertes Handyfoto sprengt sonst das Server-Limit. Ein
+// PDF geht unveraendert durch: Es laesst sich hier nicht verkleinern, und
+// eine gescannte Rechnung soll ankommen, wie sie ist.
+function spBelegGewaehlt() {
+  const input = $('spBelegInput');
+  const datei = input && input.files && input.files[0];
+  if (!datei) { return; }
+  const fertig = dataUrl => {
+    const roh = dataUrl.slice(dataUrl.indexOf(',') + 1);
+    // Grob gerechnet: Base64 ist rund ein Drittel groesser als die Daten.
+    // Die massgebliche Pruefung macht der Server (SPESEN_BELEG_MAX); hier
+    // steht sie nur, damit man nicht 4 MB hochlaedt, um dann abgewiesen zu
+    // werden.
+    if (roh.length * 0.75 > 4 * 1024 * 1024) { toast(w('spesenBelegZuGross')); return; }
+    spesenBelegNeu = dataUrl;
+    spesenBelegWeg = false;
+    spBelegStandZeichnen();
+  };
+  if (datei.type === 'application/pdf') {
+    const leser = new FileReader();
+    leser.onerror = () => toast(w('spesenBelegFehler'));
+    leser.onload = () => fertig(String(leser.result));
+    leser.readAsDataURL(datei);
+    return;
+  }
+  if (!/^image\/(jpeg|png)$/.test(datei.type)) { toast(w('spesenBelegArt')); return; }
+  rdEsKomprimieren(datei).then(fertig).catch(() => toast(w('spesenBelegFehler')));
+}
+
+function spBelegStandZeichnen() {
+  const el = $('spBelegStand');
+  if (!el) { return; }
+  const s = spesenBelegNeu ? String(spesenBelegNeu) : '';
+  if (s.startsWith('data:application/pdf')) {
+    el.innerHTML = `<div style="font-size:13px;color:var(--ink-2)">${esc(w('spesenBelegPdf'))}</div>`;
+    return;
+  }
+  if (s) {
+    el.innerHTML = `<img src="${esc(s)}" alt="" style="max-width:100%;border-radius:8px;margin-top:4px">`;
+    return;
+  }
+  const b = blattId && meineSpesen.find(x => x.id === blattId);
+  if (b && b.hat_beleg && !spesenBelegWeg) {
+    el.innerHTML = `<div style="font-size:13px;color:var(--ink-2)">${
+      esc(b.beleg_ist_pdf ? w('spesenBelegPdf') : w('spesenBelegAnsehen'))}</div>`;
+    return;
+  }
+  el.innerHTML = `<div style="font-size:13px;color:var(--ink-3)">${esc(w('spesenBelegKeiner'))}</div>`;
+}
+
+function spBelegEntfernen() {
+  spesenBelegNeu = null;
+  spesenBelegWeg = true;
+  const input = $('spBelegInput'); if (input) { input.value = ''; }
+  spBelegStandZeichnen();
+}
+
+// ── Formular ──────────────────────────────────────────────────────────
+function spNeu() { spFormular(null); }
+function spBearbeiten(id) { spFormular(meineSpesen.find(x => x.id === id) || null); }
+
+function spFormular(eintrag) {
+  blattId = eintrag ? eintrag.id : null;
+  spesenBelegNeu = null;
+  spesenBelegWeg = false;
+  $('blTitel').textContent = eintrag ? w('spesenBearbeiten') : w('spesenNeu');
+  const kat = Object.entries(spesenKategorien);
+  $('blBody').innerHTML = `
+    <div class="f"><label for="spDatum">${esc(w('spesenDatum'))}</label>
+      <input class="inp" type="date" id="spDatum" max="${isoTag()}" value="${esc(eintrag ? eintrag.datum : isoTag())}"></div>
+    <div class="f"><label for="spKategorie">${esc(w('spesenKategorie'))}</label>
+      <select class="inp" id="spKategorie">
+        ${kat.map(([k, txt]) => `<option value="${esc(k)}"${eintrag && eintrag.kategorie === k ? ' selected' : ''}>${esc(txt)}</option>`).join('')}
+      </select></div>
+    <div class="f"><label for="spBetrag">${esc(w('spesenBetrag'))}</label>
+      <input class="inp" id="spBetrag" type="text" inputmode="decimal"
+             value="${eintrag ? esc(spesenChf(eintrag.betrag_rappen)) : ''}" placeholder="0.00"></div>
+    <div class="f"><label for="spNotiz">${esc(w('spesenNotiz'))}</label>
+      <input class="inp" id="spNotiz" maxlength="500" value="${eintrag && eintrag.notiz ? esc(eintrag.notiz) : ''}"></div>
+    <div class="f"><label for="spBelegInput">${esc(w('spesenBeleg'))}</label>
+      <input type="file" id="spBelegInput" accept="image/jpeg,image/png,application/pdf" onchange="spBelegGewaehlt()"
+             style="font-size:16px;min-height:44px">
+      <div id="spBelegStand" style="margin-top:8px"></div>
+      <button type="button" class="btn btn-plain" style="margin-top:8px" onclick="spBelegEntfernen()">${esc(w('spesenBelegEntfernen'))}</button>
+    </div>`;
+  $('blFuss').innerHTML = `
+    <button class="btn btn-plain" onclick="blattZu()">${esc(w('abbrechen'))}</button>
+    <button class="btn btn-primary" onclick="spSpeichern()">${esc(w('speichern'))}</button>`;
+  spBelegStandZeichnen();
+  blattZeigen();
+}
+
+// Franken zu Rappen. Komma wie Punkt annehmen -- auf einer Schweizer
+// Tastatur tippt man das eine so schnell wie das andere, und ein Betrag,
+// der wegen des Trennzeichens als 0 gelesen wird, faellt erst spaeter auf
+// (gleiche Regel wie chfZuRappen() im Cockpit).
+function spChfZuRappen(text) {
+  const n = parseFloat(String(text == null ? '' : text).replace(/'/g, '').replace(',', '.'));
+  return Number.isFinite(n) ? Math.round(n * 100) : 0;
+}
+
+function spSpeichern() {
+  const datum = $('spDatum').value;
+  const kategorie = $('spKategorie').value;
+  const betrag = spChfZuRappen($('spBetrag').value);
+  const notiz = $('spNotiz').value.trim();
+  if (!datum) { toast(w('spesenDatumZukunft')); return; }
+  if (datum > isoTag()) { toast(w('spesenDatumZukunft')); return; }
+  if (betrag <= 0) { toast(w('spesenBetragNoetig')); return; }
+  const rumpf = { datum, kategorie, betrag_rappen: betrag, notiz };
+  if (blattId) { rumpf.id = blattId; }
+  if (spesenBelegNeu) { rumpf.beleg = String(spesenBelegNeu).slice(String(spesenBelegNeu).indexOf(',') + 1); }
+  else if (spesenBelegWeg) { rumpf.beleg_entfernen = true; }
+  api('meine_spesen.php', { method: 'POST', body: rumpf }).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') { toast(data.message || w('netzfehler')); return; }
+    toast(w('spesenGespeichert'));
+    blattZu();
+    ladeSpesen().then(zeichneSpesen);
+  });
+}
+
+function spSchalten(id, rumpf, meldung) {
+  api('meine_spesen.php', { method: 'POST', body: Object.assign({ id }, rumpf) }).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') { toast(data.message || w('netzfehler')); return; }
+    toast(meldung);
+    ladeSpesen().then(zeichneSpesen);
+  });
+}
+function spEinreichen(id) { spSchalten(id, { einreichen: true }, w('spesenEingereicht')); }
+function spZurueckziehen(id) { spSchalten(id, { zurueckziehen: true }, w('spesenZurueckgezogen')); }
+function spLoeschen(id) {
+  if (!confirm(w('spesenLoeschenFrage'))) { return; }
+  spSchalten(id, { loeschen: true }, w('spesenGeloescht'));
+}
+
+// Der Beleg wird per fetch() samt Token geholt und als Objekt-URL geoeffnet:
+// Der Sitzungs-Token darf NICHT in die URL (Server-Protokolle, Verlauf --
+// eine ausdrueckliche Regel, siehe test_php.mjs), ein schlichtes
+// <img src="..."> oder <a href="..."> funktioniert deshalb nicht.
+//
+// Gleiches Vorgehen wie dokOeffnen() weiter unten, einschliesslich des
+// Fallstricks dort: Das Fenster wird VOR dem Holen geoeffnet -- nach einem
+// await gilt der Tipp nicht mehr als Nutzeraktion und der Browser blockiert
+// es.
+function spBelegAnsehen(id) {
+  const f = window.open('', '_blank');
+  fetch(API + 'meine_spesen_beleg.php?id=' + encodeURIComponent(id),
+        { headers: token ? { 'X-Auth-Token': token } : {} })
+    .then(r => { if (!r.ok) throw new Error('http'); return r.blob(); })
+    .then(b => {
+      const url = URL.createObjectURL(b);
+      if (f) { f.location = url; } else { location.href = url; }
+      // Nicht sofort freigeben -- das neue Fenster braucht die URL noch.
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    })
+    .catch(() => { if (f) f.close(); toast(w('spesenBelegFehler')); });
 }
 
 // ══════════════════════════════════════════ EINSTELLUNGEN (ENT-398)

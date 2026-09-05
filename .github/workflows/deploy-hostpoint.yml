@@ -327,6 +327,7 @@ jobs:
           cp backend/produkte.php dist/produkte.php
           cp backend/mailer.php dist/mailer.php
           cp backend/ferien.php dist/ferien.php
+          cp backend/spesen.php dist/spesen.php
           # Schutzeinstellungen (ENT-075). Im Repository heisst die Datei
           # bewusst ohne fuehrenden Punkt -- sonst uebersieht man sie. Wird
           # trotzdem fuer BEIDE Umgebungen hier erzeugt (auch wenn der

@@ -582,6 +582,14 @@ const NUR_EIGENE_DATEN = [
   'meine_fahrzeug_uebernahme.php',
   'meine_abwesenheit.php',        // eigene Abwesenheitsantraege (ENT-255)
   'abwesenheit_saldo.php',        // eigener Ferien-Saldo -- mehr nur mit Recht "personal_lesen" (ENT-255)
+  // Spesen (ENT-413). Beide arbeiten ausschliesslich mit der eigenen
+  // Person: mitarbeiter_id stammt aus der Sitzung, nie aus der Anfrage.
+  // Ein Recht waere hier falsch -- JEDE Person reicht eigene Belege ein,
+  // nicht nur die Verwaltung. Die Verwaltungsseite (spesen_list.php,
+  // spesen_entscheiden.php, spesen_beleg.php) prueft dagegen
+  // 'personal_schreiben' und steht darum bewusst NICHT hier.
+  'meine_spesen.php',
+  'meine_spesen_beleg.php',
 ];
 const ohnePruefung = apiDateien.filter(f => {
   const q = ohneKommentar(f);

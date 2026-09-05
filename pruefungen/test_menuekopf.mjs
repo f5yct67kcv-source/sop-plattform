@@ -131,21 +131,21 @@ check('Kein Querlauf im Menü',
   await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth) <= 1);
 await page.screenshot({ path: OUT + '/menue-01-mitarbeiter.png' });
 
-// ── Spesen: Gerüst, aber ehrlich
+// ── Spesen
+// Seit ENT-413 ist die Seite gefüllt (Belege erfassen, einreichen, Stand
+// verfolgen) und nicht mehr das Gerüst aus ENT-402. Diese Suite prüft hier
+// nur noch die Verdrahtung der Kachel; der Inhalt der Seite -- und
+// insbesondere die Regel, dass „nicht eingerichtet", „noch keine Belege"
+// und „kein Treffer" drei verschiedene Texte brauchen -- steht in
+// test_spesen.mjs, mit Gegenprobe.
 await page.click('#mk-spesen'); await page.waitForTimeout(350);
 check('Die Spesen-Kachel führt auf die Unterseite', await page.isVisible('#pr-spesen'));
 check('Das Menü tritt dabei zurück', !(await page.isVisible('#pr-haupt')));
 const spesenTxt = (await page.textContent('#pr-spesen') || '').toLowerCase();
-check('KRITISCH: die Seite sagt, dass sie noch nicht eingerichtet ist',
-  spesenTxt.includes('noch nicht eingerichtet'));
-check('Sie sagt auch, was hierher gehört -- sonst weiss niemand, wofür die Kachel da ist',
+check('Die Seite sagt, was hierher gehört -- sonst weiss niemand, wofür die Kachel da ist',
   spesenTxt.includes('quittung'));
-// CLAUDE.md, die wichtigste Regel der Liste: „unbekannt" darf nie wie
-// „keine" aussehen. Wer eine Tankquittung in der Tasche hat und „keine
-// Spesen" liest, glaubt, sie sei verschwunden.
-check('KRITISCH: sie behauptet NICHT, es gebe keine Spesen',
-  !/keine spesen|keine belege|nichts vorhanden/.test(spesenTxt));
-check('Und sie sagt, was bis dahin zu tun ist', spesenTxt.includes('aufbewahren'));
+check('Und sie bietet an, einen Beleg zu erfassen',
+  await page.isVisible('#spesenInhalt .btn-primary'));
 await page.screenshot({ path: OUT + '/menue-02-spesen.png' });
 await page.click('#pr-spesen .seiten-kopf .btn'); await page.waitForTimeout(300);
 check('Zurück führt ins Menü', await page.isVisible('#pr-haupt') && !(await page.isVisible('#pr-spesen')));

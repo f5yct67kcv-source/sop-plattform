@@ -3830,6 +3830,13 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
           <button class="nav-kind" id="nav-kontrolle-pensen" onclick="go('pensen')">Pensen</button>
           <button class="nav-kind" id="nav-kontrolle-auslagen" onclick="go('auslagen')">Auslagenersatz</button>
           <button class="nav-kind" id="nav-kontrolle-abwesenheiten" onclick="go('abwesenheiten')">Abwesenheiten</button>
+          <!-- Spesen (ENT-413) steht bewusst hier und nicht unter
+               Administration: Es ist ein Entscheid über den Anspruch einer
+               Person, wie der Abwesenheitsentscheid direkt darüber. Der
+               Nachbar "Auslagenersatz" ist etwas anderes und heisst darum
+               auch anders (Art. 18 GAV, aus Zone und Wegstrecke gerechnet)
+               -- hier geht es um Quittungsbelege. -->
+          <button class="nav-kind" id="nav-kontrolle-spesen" onclick="go('spesen')">Spesen</button>
           <!-- Seit ENT-325 eine eigene Ansicht wie Pensen/Auslagenersatz
                daneben, keine Schublade mehr -- damit auch mit "on"-Markierung:
                Man soll sehen, wo man steht. -->
@@ -5136,6 +5143,26 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
           <div class="card-hd"><h3>Offene Anträge</h3></div>
           <div class="card-bd" id="awOffeneListe"></div>
         </div>
+      </section>
+
+      <!-- Spesen: eingereichte Quittungsbelege (ENT-413).
+           Bewusst KEIN Monatsraster wie bei den Abwesenheiten darüber: Ein
+           Beleg ist ein Zeitpunkt, kein Zeitraum, und was zu tun ist, hängt
+           am Status und nicht am Monat. Der Filter steht darum auf dem
+           Status, und "Eingereicht" ist die Voreinstellung -- wer die
+           Ansicht öffnet, will wissen, was zu entscheiden ist. -->
+      <section class="view" id="view-spesen">
+        <div class="bar-tools">
+          <select class="inp" id="spStatusFilter" style="width:auto" onchange="spLaden()" aria-label="Status">
+            <option value="eingereicht">Eingereicht</option>
+            <option value="freigegeben">Freigegeben</option>
+            <option value="abgelehnt">Abgelehnt</option>
+            <option value="alle">Alle entschiedenen und offenen</option>
+          </select>
+          <div class="sp" style="flex:1"></div>
+          <b id="spSumme" class="nowrap"></b>
+        </div>
+        <div id="spTable"></div>
       </section>
 
       <!-- Arbeitsergebnisse (ENT-243, Revision in ENT-325): eine eigene
@@ -8022,6 +8049,7 @@ const TITLES = {
   pensen:      ['Pensen', 'Jahresstunden gegen die Anstellungskategorie'],
   abwesenheiten: ['Abwesenheiten', 'Ferien, Krankheit und weitere Abwesenheiten im Überblick'],
   auslagen:    ['Auslagenersatz', 'Chronologisches Protokoll je Mitarbeitendem — Art. 18 Ziff. 10'],
+  spesen:      ['Spesen', 'Eingereichte Quittungsbelege freigeben oder ablehnen'],
   arbeitsergebnisse: ['Arbeitsergebnisse', 'Wachbuch, Kontrollpunktscans, Ereignisse, Rundgänge und Fahrzeugübernahmen im Zeitraum'],
   rundgaenge:  ['Übersicht', 'Rundgänge, GPS, Aufgaben und Auswertungen auf einen Blick'],
   revierdienst: ['Revierdienst', 'Kontrollpunkte und Kontrollrunden je Objekt einrichten'],
@@ -8849,17 +8877,19 @@ function go(view) {
   if (view === 'betrieb') { $('nav-admin-betrieb').classList.add('on'); }
   if (view === 'produkte') { produkte.length ? renderProdukte() : loadProdukte(); }
   const kontrView = view === 'pensen' || view === 'auslagen' || view === 'abwesenheiten'
-    || view === 'arbeitsergebnisse';
+    || view === 'arbeitsergebnisse' || view === 'spesen';
   $('navg-kontrolle').classList.toggle('offen', kontrView);
   if (kontrView) { $('nav-kontrolle').classList.add('on'); }
   $('nav-kontrolle-pensen').classList.toggle('on', view === 'pensen');
   $('nav-kontrolle-auslagen').classList.toggle('on', view === 'auslagen');
   $('nav-kontrolle-abwesenheiten').classList.toggle('on', view === 'abwesenheiten');
   $('nav-kontrolle-arbeitsergebnisse').classList.toggle('on', view === 'arbeitsergebnisse');
+  $('nav-kontrolle-spesen').classList.toggle('on', view === 'spesen');
   if (view === 'arbeitsergebnisse') { arbeitsergebnisseOeffnen(); }
   if (view === 'pensen') { ladePensen(); }
   if (view === 'auslagen') { auslagenVorgabe(); ladeAuslagen(); }
   if (view === 'abwesenheiten') { awLaden(); }
+  if (view === 'spesen') { spLaden(); }
   // Revierdienst (ENT-224): Uebersicht (Rundgaenge, Durchfuehrung) und
   // Einrichtung (Kontrollpunkte/-runden) sind zwei Seiten derselben Rubrik,
   // gleiches Elterngruppen-Muster wie bei Kontrolle/Administration oben.
@@ -15077,6 +15107,129 @@ function awEntscheiden(id, status, grund) {
       toast(status === 'genehmigt' ? 'Antrag genehmigt.' : 'Antrag abgelehnt.');
       awLaden();
     });
+}
+
+// ══════════════════════════════════════════ SPESEN (ENT-413)
+//
+// Eingereichte Quittungsbelege freigeben oder ablehnen. ABGRENZUNG: Das ist
+// NICHT der Auslagenersatz nach Art. 18 GAV (Ansicht "Auslagenersatz"
+// nebenan, aus Zone und Wegstrecke gerechnet) -- hier geht es um
+// abgetippte Quittungen. Es wird nichts berechnet und nichts ausgelegt.
+//
+// Eine Freigabe sagt "der Beleg ist anerkannt", NICHT "das Geld ist
+// geflossen" -- die Auszahlung ist ein eigener Vorgang und hat hier
+// bewusst keinen Schalter (OP-392 offen).
+let spesen = [];
+let spesenEingerichtet = true;
+let spesenKategorien = {};
+const SP_STATUS_CHIP = {
+  erfasst: 'chip-n', eingereicht: 'chip-w', freigegeben: 'chip-p', abgelehnt: 'chip-x',
+};
+const SP_STATUS_TEXT = {
+  erfasst: 'Erfasst', eingereicht: 'Eingereicht',
+  freigegeben: 'Freigegeben', abgelehnt: 'Abgelehnt',
+};
+
+function spLaden() {
+  const status = ($('spStatusFilter') || {}).value || 'eingereicht';
+  return api('spesen_list.php?status=' + encodeURIComponent(status)).then(({ ok, status: hs, data }) => {
+    if (hs === 401) return doLogout();
+    // 403 heisst: angemeldet, aber ohne 'personal_schreiben'. Kein Fehler,
+    // der jemanden beunruhigen muesste -- dieselbe Handhabung wie bei den
+    // Offerten (loadProdukte).
+    if (hs === 403) return;
+    if (!ok || data.status !== 'ok') { toast(data.message || 'Spesen konnten nicht geladen werden.'); return; }
+    spesenEingerichtet = data.eingerichtet !== false;
+    spesenKategorien = data.kategorien || {};
+    spesen = data.spesen || [];
+    renderSpesen();
+  });
+}
+
+function renderSpesen() {
+  const el = $('spTable'); if (!el) { return; }
+  const summeEl = $('spSumme');
+  // Vier verschiedene Sachverhalte, vier verschiedene Texte (CLAUDE.md).
+  // "Nicht eingerichtet" ist etwas anderes als "keine Belege" und etwas
+  // anderes als "kein Treffer fuer diesen Filter".
+  if (!spesenEingerichtet) {
+    if (summeEl) { summeEl.textContent = ''; }
+    el.innerHTML = EMPTY('Noch nicht eingerichtet',
+      'Die Spesentabelle fehlt auf diesem Server. Sie entsteht beim nächsten Lauf der Einrichtung.');
+    return;
+  }
+  if (!spesen.length) {
+    if (summeEl) { summeEl.textContent = ''; }
+    const filter = ($('spStatusFilter') || {}).value || 'eingereicht';
+    el.innerHTML = filter === 'eingereicht'
+      ? EMPTY('Keine offenen Belege', 'Zurzeit ist nichts zu entscheiden. Eingereichte Belege erscheinen hier.')
+      : EMPTY('Kein Treffer', 'Für diesen Status liegt kein Beleg vor. Filter zurücksetzen und erneut versuchen.');
+    return;
+  }
+  // Die Summe nennt ausdruecklich, worauf sie sich bezieht: Eine gefilterte
+  // Zahl allein sieht aus wie die Gesamtzahl (CLAUDE.md).
+  if (summeEl) {
+    const summe = spesen.reduce((s, x) => s + (Number(x.betrag_rappen) || 0), 0);
+    summeEl.textContent = `${nf(spesen.length)} Belege · CHF ${chf(summe)}`;
+  }
+  el.innerHTML = `<table><thead><tr>
+      <th>Status</th><th>Datum</th><th>Mitarbeitende</th><th>Kategorie</th>
+      <th class="num">Betrag</th><th>Notiz</th><th>Beleg</th><th class="num">Aktion</th>
+    </tr></thead><tbody>` + spesen.map(s => `
+      <tr>
+        <td><span class="chip ${SP_STATUS_CHIP[s.status] || 'chip-n'}">${esc(SP_STATUS_TEXT[s.status] || s.status)}</span></td>
+        <td class="nowrap num">${dmy(s.datum)}</td>
+        <td class="strong">${esc(s.person)}</td>
+        <td class="nowrap">${esc(spesenKategorien[s.kategorie] || s.kategorie)}</td>
+        <td class="num nowrap strong">CHF ${chf(s.betrag_rappen)}</td>
+        <td>${s.notiz ? esc(s.notiz) : '<span style="color:var(--ink-3)">–</span>'}
+            ${s.status === 'abgelehnt' && s.ablehnung_grund
+              ? `<div class="sec" style="color:var(--neg)">${esc(s.ablehnung_grund)}</div>` : ''}</td>
+        <td>${s.hat_beleg
+          ? `<button class="btn btn-plain btn-sm" onclick="spBelegOeffnen(${Number(s.id)})">${s.beleg_ist_pdf ? 'PDF' : 'Bild'}</button>`
+          : '<span style="color:var(--ink-3)">kein Beleg</span>'}</td>
+        <td class="num nowrap">
+          ${s.status === 'eingereicht' ? `
+            <button class="btn btn-primary btn-sm" onclick="spEntscheiden(${Number(s.id)}, 'freigegeben')">Freigeben</button>
+            <button class="btn btn-plain btn-sm" onclick="spAblehnenDialog(${Number(s.id)})">Ablehnen</button>`
+          : `<span class="sec">${s.entschieden_am ? 'entschieden ' + dmy(s.entschieden_am) : ''}</span>`}
+        </td>
+      </tr>`).join('') + `</tbody></table>`;
+}
+
+function spEntscheiden(id, status, grund) {
+  api('spesen_entscheiden.php', { method: 'POST', body: { id, status, ablehnung_grund: grund || '' } })
+    .then(({ ok, data }) => {
+      if (!ok || data.status !== 'ok') { toast(data.message || 'Entscheidung fehlgeschlagen.'); return; }
+      toast(status === 'freigegeben' ? 'Beleg freigegeben.' : 'Beleg abgelehnt.');
+      spLaden();
+    });
+}
+
+// prompt() aus demselben Grund wie bei awAblehnenDialog() unten -- eine
+// Ablehnungsbegruendung ist ein seltener, kurzer Text.
+function spAblehnenDialog(id) {
+  const grund = prompt('Grund für die Ablehnung:');
+  if (grund === null) { return; }
+  if (!grund.trim()) { toast('Eine Ablehnung braucht eine Begründung.'); return; }
+  spEntscheiden(id, 'abgelehnt', grund.trim());
+}
+
+// Der Beleg wird per fetch() samt Token geholt: Der Sitzungs-Token darf
+// NICHT in die URL (test_php.mjs). Fenster VOR dem Holen oeffnen, sonst
+// gilt der Klick nicht mehr als Nutzeraktion und der Browser blockiert es
+// -- derselbe Fallstrick wie bei dokOeffnen() in der App.
+function spBelegOeffnen(id) {
+  const f = window.open('', '_blank');
+  fetch(API + 'spesen_beleg.php?id=' + encodeURIComponent(id),
+        { headers: token ? { 'X-Auth-Token': token } : {} })
+    .then(r => { if (!r.ok) throw new Error('http'); return r.blob(); })
+    .then(b => {
+      const url = URL.createObjectURL(b);
+      if (f) { f.location = url; } else { location.href = url; }
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    })
+    .catch(() => { if (f) f.close(); toast('Der Beleg konnte nicht geladen werden.'); });
 }
 
 // Ein prompt() statt eines eigenen Dialogs -- eine Ablehnungsbegruendung ist
