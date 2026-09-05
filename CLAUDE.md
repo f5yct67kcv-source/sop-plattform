@@ -8,6 +8,13 @@ Repository** (`sop-projekt`), nicht hier.
 **Am Projekt arbeiten mehrere Sitzungen gleichzeitig.** Alles unten folgt
 daraus.
 
+**Lies zu Beginn ausserdem `STARTPROMPT.md`.** Dort steht, wie die Arbeit auf
+mehrere Sitzungen geschnitten wird: ein Chat, eine Aufgabe; welche Bereiche es
+gibt und welche Dateien dazugehoeren; was querliegend ist und allein laufen
+muss; und was vor dem Schliessen eines Chats zu tun ist. Sagt der Projektinhaber
+nur einen Bereich und eine Aufgabe, findest du den Rest dort — frag nicht nach,
+was dort schon steht.
+
 ---
 
 ## Vor der Arbeit
@@ -121,10 +128,32 @@ python3 skizze-einbetten.py
 
 ## Entscheidungen und Nummern
 
-ENT-Nummern werden **nie wiederverwendet**. Vor der Vergabe im Projekt-
-Repository in `00-projekt/entscheidungsprotokoll.md` nachsehen, welche frei
-ist. Eine Entscheidung ist erst eine Entscheidung, wenn sie dort steht —
-Vorschläge und Diskussionsstände sind keine.
+ENT- und OP-Nummern werden **nie wiederverwendet**. Eine Entscheidung ist erst
+eine Entscheidung, wenn sie im Protokoll steht — Vorschläge und
+Diskussionsstände sind keine.
+
+**Vor der Vergabe alle Branches prüfen, nicht nur den eigenen (ENT-080).** Im
+Projekt-Repository nur in die eigene Arbeitskopie zu sehen genügt **nicht**: Es
+wird in mehreren Chats parallel gearbeitet, und ein Merge deckt die
+Doppelvergabe nicht auf — werden beide Einträge oben eingefügt, verschmilzt Git
+sie geräuschlos, und die Nummer steht danach zweimal da. Zweimal passiert:
+ENT-043 am 19.08.2026, OP-49/OP-50 am 20.08.2026.
+
+Im Projekt-Repository ausführen:
+
+```bash
+git fetch origin --prune
+for br in $(git branch -r | grep -v HEAD); do
+  git show $br:00-projekt/entscheidungsprotokoll.md 2>/dev/null | grep -o '^## ENT-[0-9]*'
+  git show $br:00-projekt/offene-punkte.md          2>/dev/null | grep -o 'OP-[0-9]*'
+done | grep -o '[0-9]*' | sort -n | tail -1
+```
+
+Ist eine Nummer doch doppelt vergeben: **behalten darf sie, wer sie zuerst
+vergeben hat** (Commit-Zeitpunkt). Der spätere Eintrag wird auf die nächste
+freie Nummer umgehängt, Inhalt und Datum bleiben unverändert, beide Einträge
+verweisen aufeinander, und die Umhängung kommt in den Abschnitt „Korrektur der
+Nummerierung" in `offene-punkte.md`.
 
 ## Erst fragen, dann bauen
 
