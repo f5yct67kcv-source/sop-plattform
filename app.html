@@ -366,6 +366,18 @@ svg.i-sm { width: 17px; height: 17px; }
 .kopf .kreis { width: 42px; height: 42px; border-radius: 50%; background: var(--accent); color: var(--auf-farbe); display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700; flex: none; }
 
 .inhalt { flex: 1; padding: 18px 16px calc(var(--tab-h) + 26px + env(safe-area-inset-bottom)); }
+/* Im Menue faellt die Kopfzeile weg (ENT-402): Sie zeigte den Anmeldenamen
+   und das Datum -- direkt darunter stand dieselbe Person noch einmal, mit
+   dem VOLLEN Namen und dem Anmeldenamen als Unterzeile. Zweimal dasselbe,
+   die schlechtere Fassung oben.
+   Nur hier, nicht in der ganzen App: Auf Heute und Plan ist die Kopfzeile
+   keine Dopplung, und sie traegt das Datum -- auf dem Handy ist sie der
+   einzige Ort, der sagt, wo man ist (CLAUDE.md).
+   Der obere Rand des Inhalts muss die Kerbe dann selbst freihalten; das
+   tat vorher die Kopfzeile mit ihrem eigenen safe-area-Polster. Ohne diese
+   Zeile stuende die Profilkarte unter der Uhr des Telefons. */
+.app.ohne-kopf .kopf { display: none; }
+.app.ohne-kopf .inhalt { padding-top: calc(18px + env(safe-area-inset-top)); }
 .v { display: none; }
 .v.on { display: block; animation: auf .18s ease-out; }
 @keyframes auf { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
@@ -1038,7 +1050,8 @@ svg.i-sm { width: 17px; height: 17px; }
 .mk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 14px; margin-bottom: 20px; }
 .mk-kachel { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center;
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--sh-1);
-  padding: 22px 14px; min-height: 132px; width: 100%; cursor: pointer; font: inherit; color: inherit; }
+  padding: 22px 14px; min-height: 132px; width: 100%; cursor: pointer; font: inherit; color: inherit;
+  text-decoration: none; }
 .mk-kachel:active { background: var(--accent-soft); border-color: var(--accent-line); }
 .mk-kachel:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .mk-kachel-ic { width: 56px; height: 56px; border-radius: 14px; background: var(--accent-soft);
@@ -1047,6 +1060,25 @@ svg.i-sm { width: 17px; height: 17px; }
 .mk-kachel-lbl { font-size: 13.5px; font-weight: 600; line-height: 1.35; }
 .mk-kachel-txt { display: flex; flex-direction: column; align-items: center; gap: 3px; }
 .mk-kachel-sub { font-size: 11.5px; font-weight: 650; color: var(--accent); }
+
+/* ── Kopf der Profilkarte im Menue (ENT-402). Seit die Kopfzeile im Menue
+   wegfaellt, ist diese Karte das oberste Element -- und traegt darum den
+   Abmelde-Knopf, dort wo vorher der Aktualisieren-Knopf sass.
+   Er steht am rechten Rand auf halber Hoehe, nicht in die Ecke gequetscht:
+   44 px Trefferflaeche brauchen Platz, und in der Ecke einer 90-px-Karte
+   sieht ein Knopf wie ein Schliessen-Kreuz aus. */
+.pr-kopf { display: flex; align-items: center; gap: 14px; }
+.pr-kopf-txt { flex: 1; min-width: 0; }
+.pr-kopf-name { font-size: 18px; font-weight: 700; letter-spacing: -.3px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pr-kopf-sub { font-size: 13px; color: var(--ink-3);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pr-abmelden { flex: none; width: 44px; height: 44px; margin-right: -8px;
+  display: flex; align-items: center; justify-content: center;
+  background: none; border: 0; border-radius: var(--r-sm);
+  color: var(--ink-3); cursor: pointer; }
+.pr-abmelden:active { background: var(--neg-soft); color: var(--neg); }
+.pr-abmelden:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
 /* ── Einstellungen (ENT-398). Eine Zeile, keine Kachel: Der Schalter
    selbst ist mit 30 px zu flach fuer den Daumen (CLAUDE.md: 44 px), darum
@@ -1452,6 +1484,16 @@ const W = {
     pwZeigen: 'Passwort anzeigen', pwVerbergen: 'Passwort verbergen',
     passwortOk: 'Passwort geändert.', abmelden: 'Abmelden',
     zumCockpit: 'Zum Cockpit',
+    // Menue-Umbau (ENT-402)
+    spesen: 'Spesen',
+    spesenTitel: 'Spesen',
+    // Vier verschiedene Sachverhalte, vier verschiedene Texte (CLAUDE.md).
+    // Das hier ist "noch nicht eingerichtet" -- NICHT "du hast keine
+    // Spesen". Der Unterschied ist keine Wortklauberei: Wer eine
+    // Tankquittung in der Tasche hat und "keine Spesen" liest, glaubt,
+    // sie sei verschwunden.
+    spesenLeer: 'Noch nicht eingerichtet',
+    spesenLeerText: 'Hier kommen deine Quittungsbelege hin — Tankquittungen und geschäftliche Einkäufe. Der Bereich wird gerade gebaut. Belege bis dahin bitte wie bisher aufbewahren und einreichen.',
     // Einstellungen (ENT-398)
     einstellungen: 'Einstellungen', darstellung: 'Darstellung',
     themaDunkel: 'Dunkle Darstellung',
@@ -1913,6 +1955,10 @@ function zeige(r) {
   document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('on'));
   $('v-' + r).classList.add('on');
   $('t-' + r).classList.add('on');
+  // Im Menue traegt die Profilkarte, was sonst die Kopfzeile sagt -- und
+  // zwar besser (voller Name statt Anmeldename). Nur dort faellt sie
+  // darum weg (ENT-402), siehe .app.ohne-kopf im Regelwerk.
+  $('app').classList.toggle('ohne-kopf', r === 'menu');
   window.scrollTo(0, 0);
   zeichne();
 }
@@ -3736,13 +3782,16 @@ function zeichneMenu() {
   const zeile = (k, v) => v ? `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>` : '';
   $('v-menu').innerHTML = `
     <div id="pr-haupt">
-    <div class="karte"><div class="karte-bd" style="display:flex;align-items:center;gap:14px">
-      <div class="kreis" style="width:52px;height:52px;border-radius:50%;background:var(--accent);color:var(--auf-farbe);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700">${esc(initialen(vollerName(p) || (ich && ich.name)))}</div>
-      <div style="min-width:0">
-        <div style="font-size:18px;font-weight:700;letter-spacing:-.3px">${esc(vollerName(p) || (ich && ich.name) || '–')}</div>
-        <div style="font-size:13px;color:var(--ink-3)">${esc(w('anmeldename'))}: ${esc(p.name || (ich && ich.name) || '–')}</div>
+    <div class="karte"><div class="karte-bd"><div class="pr-kopf">
+      <div class="kreis" style="width:52px;height:52px;border-radius:50%;background:var(--accent);color:var(--auf-farbe);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;flex:none">${esc(initialen(vollerName(p) || (ich && ich.name)))}</div>
+      <div class="pr-kopf-txt">
+        <div class="pr-kopf-name">${esc(vollerName(p) || (ich && ich.name) || '–')}</div>
+        <div class="pr-kopf-sub">${esc(w('anmeldename'))}: ${esc(p.name || (ich && ich.name) || '–')}</div>
       </div>
-    </div></div>
+      <button type="button" class="pr-abmelden" id="mk-abmelden" onclick="abmelden()" aria-label="${esc(w('abmelden'))}" title="${esc(w('abmelden'))}">
+        <svg class="i" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+    </div></div></div>
 
     <div class="mk-grid">
       <button type="button" id="mk-daten" class="mk-kachel" onclick="datenSeiteAuf()">
@@ -3757,16 +3806,22 @@ function zeichneMenu() {
         <span class="mk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg></span>
         <span class="mk-kachel-lbl">${esc(w('abwesenheit'))}</span>
       </button>
+      <button type="button" id="mk-spesen" class="mk-kachel" onclick="spesenSeiteAuf()">
+        <span class="mk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><path d="M6 2h9l4 4v16l-3-1.6L13 22l-3-1.6L7 22l-3-1.6V4a2 2 0 0 1 2-2z"/><line x1="8.5" y1="8.5" x2="14" y2="8.5"/><line x1="8.5" y1="12" x2="14" y2="12"/></svg></span>
+        <span class="mk-kachel-lbl">${esc(w('spesen'))}</span>
+      </button>
+      <button type="button" id="mk-passwort" class="mk-kachel" onclick="passwortBlatt()">
+        <span class="mk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><rect x="4" y="10.5" width="16" height="11" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg></span>
+        <span class="mk-kachel-lbl">${esc(w('passwortAendern'))}</span>
+      </button>
       <button type="button" id="mk-einstellungen" class="mk-kachel" onclick="einstSeiteAuf()">
         <span class="mk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
         <span class="mk-kachel-lbl">${esc(w('einstellungen'))}</span>
       </button>
-    </div>
-
-    <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">
-      <button class="btn btn-plain btn-wide" onclick="passwortBlatt()">${esc(w('passwortAendern'))}</button>
-      ${p.ist_admin ? `<a class="btn btn-plain btn-wide" href="dashboard.html" title="Zur Verwaltung">${esc(w('zumCockpit'))}</a>` : ''}
-      <button class="btn btn-plain btn-wide" style="color:var(--neg)" onclick="abmelden()">${esc(w('abmelden'))}</button>
+      ${p.ist_admin ? `<a id="mk-cockpit" class="mk-kachel" href="dashboard.html" title="Zur Verwaltung">
+        <span class="mk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="18" x2="12" y2="21"/></svg></span>
+        <span class="mk-kachel-lbl">${esc(w('zumCockpit'))}</span>
+      </a>` : ''}
     </div>
     </div>
 
@@ -3787,6 +3842,17 @@ function zeichneMenu() {
       </dl>
       <p style="font-size:13px;color:var(--ink-3);margin-top:14px">${esc(w('datenHinweis'))}</p>
       </div></div>
+    </div>
+
+    <div id="pr-spesen" style="display:none">
+      <div class="seiten-kopf">
+        <button class="btn btn-plain" onclick="spesenSeiteZu()" style="min-height:40px;padding:0 12px" aria-label="${esc(w('zurueckZumMenue'))}" title="${esc(w('zurueckZumMenue'))}">
+          <svg class="i i-sm" viewBox="0 0 24 24"><polyline points="15 5 8 12 15 19"/></svg>
+        </button>
+        <h2>${esc(w('spesenTitel'))}</h2>
+      </div>
+      ${LEER(w('spesenLeer'), w('spesenLeerText'),
+        '<path d="M6 2h9l4 4v16l-3-1.6L13 22l-3-1.6L7 22l-3-1.6V4a2 2 0 0 1 2-2z"/><line x1="8.5" y1="8.5" x2="14" y2="8.5"/><line x1="8.5" y1="12" x2="14" y2="12"/>')}
     </div>
 
     <div id="pr-einst" style="display:none">
@@ -3853,6 +3919,27 @@ function abwesenheitAusMenue() {
 }
 function datenSeiteZu() {
   const h = $('pr-haupt'), u = $('pr-daten');
+  if (!h || !u) return;
+  u.style.display = 'none';
+  h.style.display = '';
+  window.scrollTo(0, 0);
+}
+
+// ══════════════════════════════════════════ SPESEN (ENT-402)
+// Vorerst nur das Geruest: Kachel, Unterseite, ehrlicher Leerzustand. Was
+// Spesen hier koennen sollen -- Quittungsbelege fotografieren, einreichen,
+// Stand verfolgen --, ist noch nicht entschieden und wird gesondert
+// aufgegriffen. Bis dahin steht auf der Seite, dass sie noch nicht
+// eingerichtet ist, und NICHT, dass es keine Spesen gibt.
+function spesenSeiteAuf() {
+  const h = $('pr-haupt'), u = $('pr-spesen');
+  if (!h || !u) return;
+  h.style.display = 'none';
+  u.style.display = '';
+  window.scrollTo(0, 0);
+}
+function spesenSeiteZu() {
+  const h = $('pr-haupt'), u = $('pr-spesen');
   if (!h || !u) return;
   u.style.display = 'none';
   h.style.display = '';
