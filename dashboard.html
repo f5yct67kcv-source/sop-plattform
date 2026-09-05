@@ -408,6 +408,13 @@ select.inp { padding-right: 30px; background-image: linear-gradient(45deg, trans
 }
 .side-brand { display: flex; align-items: center; gap: 11px; padding: 0 18px; height: var(--top-h); border-bottom: 1px solid var(--shell-line); flex: none; }
 .side-brand img { width: 30px; height: 30px; border-radius: 8px; object-fit: contain; background: #fff; padding: 2px; }
+/* Der Markenknopf ist in der Seitenleiste nur die Fassung des Logos; erst in
+   der Kopfleiste wird er zum Griff des Kontomenues (siehe .shell.aus). Darum
+   hier bewusst ohne Zeigerhand und ohne Schwebefarbe -- ein Knopf, der nichts
+   tut, soll auch nicht so aussehen. */
+.marken-knopf { display: inline-flex; flex: none; padding: 0; border: none;
+  background: none; cursor: default; border-radius: 8px; }
+.marken-knopf img { display: block; }
 .side-brand .wm { color: var(--shell-txt-hi); font-size: 15px; font-weight: 700; letter-spacing: -.2px; line-height: 1.15; }
 .side-brand .sub { color: #656B78; font-size: 10px; letter-spacing: .8px; text-transform: uppercase; }
 
@@ -2222,8 +2229,50 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
 
 /* ── Begrüssungs-Container mit Diktat-Router (ENT-032) */
 .begr-karte .card-bd { padding: 22px 24px; }
-.begr-kopf h2 { font-size: 21px; font-weight: 720; letter-spacing: -.3px; margin-bottom: 4px; }
-.begr-kopf p { font-size: 13.5px; color: var(--ink-2); line-height: 1.5; min-height: 1.4em; }
+.begr-kopf h2 { font-size: 21px; font-weight: 720; letter-spacing: -.3px; }
+
+/* ── Datum & Zeit (ENT-410)
+   Drei Zeilen, von der groben zur feinen Einheit. Die Wochenzahl ist die
+   grosse: Sie ist die Einheit, in der geplant wird. Tabellenziffern ueberall
+   dort, wo sich der Wert laufend aendert -- sonst wandert die Uhrzeit bei
+   jedem Minutenwechsel um Bruchteile hin und her. */
+.zeit-karte .card-bd { padding: 22px 24px; flex: 1; display: flex; }
+.zeit-raster { flex: 1; display: flex; flex-direction: column; }
+.zeit-zeile { padding: 15px 0; border-top: 1px solid var(--line-soft); }
+.zeit-zeile:first-child { padding-top: 0; border-top: none; }
+.zeit-zeile:last-child { padding-bottom: 0; }
+.zeit-zeile .lb { display: block; font-size: 10.5px; font-weight: 700; letter-spacing: .9px;
+  text-transform: uppercase; color: var(--ink-3); margin-bottom: 7px; }
+.zeit-zeile .wert { display: block; font-size: 19px; font-weight: 650; letter-spacing: -.3px; line-height: 1.2; }
+.zeit-kw .wert { font-size: 46px; font-weight: 760; letter-spacing: -1.8px; line-height: 1;
+  font-variant-numeric: tabular-nums; }
+.zeit-kw .spanne { display: block; font-size: 12.5px; color: var(--ink-2); margin-top: 8px; }
+.zeit-uhr .wert { font-size: 30px; font-weight: 700; letter-spacing: -.9px;
+  font-variant-numeric: tabular-nums; }
+/* Zieht jemand die Karte hoeher, verteilen sich die drei Zeilen darin, statt
+   oben zu kleben und unten eine Leerflaeche zu lassen. */
+.dash-item.dh .zeit-raster { justify-content: space-between; }
+/* Begruessung und Datum & Zeit stehen nebeneinander und bilden die erste
+   Zeile der Uebersicht. Gemessen war die Begruessung 267 px hoch und die
+   Zeitkarte 308 -- nebeneinander sieht das aus, als sei eine der beiden
+   abgeschnitten. Beide fuellen darum ihren Container, die hoehere gibt die
+   Zeilenhoehe vor.
+   Bewusst nur diese zwei und nicht alle Karten: Weiter unten stehen Listen
+   sehr verschiedener Laenge nebeneinander, und eine auf fremde Hoehe
+   gestreckte Liste erzeugt eine Leerflaeche, die nichts aussagt.
+   Die Regel steht VOR .dash-item.dh > .card (gleiche Eigenspezifitaet),
+   damit eine von Hand gezogene Hoehe weiterhin gewinnt. */
+.dash-item[data-widget="begruessung"] > .card,
+.dash-item[data-widget="zeit"] > .card {
+  height: 100%; display: flex; flex-direction: column;
+}
+
+/* Auf voller Breite waeren drei kurze Zeilen ueber 1400 px verloren -- dann
+   stehen sie nebeneinander, weiterhin Ueberschrift oben und Wert darunter. */
+.dash-item.dw-voll .zeit-raster { flex-direction: row; gap: 28px; }
+.dash-item.dw-voll .zeit-zeile { flex: 1; padding: 0 0 0 28px;
+  border-top: none; border-left: 1px solid var(--line-soft); }
+.dash-item.dw-voll .zeit-zeile:first-child { padding-left: 0; border-left: none; }
 /* ── Diktat-Router (ENT-032), seit ENT-107 mit Prefix mehrfach einsetzbar --
    auf der Übersicht als Teil der Begrüssung, in Planung/Einsätze als eigene
    Zeile unter der Filterleiste. Eine gemeinsame Klasse statt einer zweiten
@@ -2287,12 +2336,10 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
   .diktat-router .sprach .cta { width: auto; flex: 1 1 132px; height: auto; min-height: 44px; }
   .diktat-router .sprach .viz { flex-basis: 100%; }
   /* Der Kurzueberblick unter der Grussformel (naechster Einsatz, Sperrtage,
-     Rueckmeldungen) macht die Uebersicht auf dem Handy ueberladen: bis der
-     eigentliche Inhalt (Kennzahlen, Rapporte) sichtbar wird, muss dort weit
-     gescrollt werden. Auf breiteren Bildschirmen bleibt er stehen -- da
-     nimmt derselbe Satz nur eine statt mehrerer Zeilen ein und stoert nicht
-     (Projektinhaber-Vorgabe, 2026-08-28). */
-  #begrNaechstes { display: none; }
+     Rueckmeldungen) war auf dem Handy ausgeblendet, weil er die Uebersicht
+     ueberladen hat. Seit ENT-410 gibt es ihn ueberhaupt nicht mehr -- der
+     Projektinhaber wollte ihn auch am Desktop weghaben. Die Regel ist damit
+     gegenstandslos und steht nur noch als Spur hier. */
 }
 
 /* ── Konfigurierbares Dashboard (ENT-031)
@@ -2913,10 +2960,21 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
   .shell.aus .side {
     display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
   }
-  .shell.aus .side-brand { grid-column: 1; justify-self: start; }
-  .shell.aus .side-foot  { grid-column: 3; justify-self: end; }
+  /* ENT-410: Das Logo steht ganz aussen rechts, der Fussteil klappt als
+     Kontomenue darunter auf. Die Navigation bleibt in Spalte 2 und damit in
+     der Mitte des FENSTERS -- 1fr auto 1fr haelt die beiden Aussenspalten
+     gleich breit, auch wenn links nichts mehr steht. Genau darum steht hier
+     weiterhin ein Raster und kein Abstandhalter. */
+  .shell.aus .side-brand { grid-row: 1; grid-column: 3; justify-self: end; padding: 0 0 0 10px; }
+  /* grid-row: 1 an beiden ist keine Zierde, sondern Pflicht, seit das Logo
+     in Spalte 3 steht. Die Rasterautomatik setzt Elemente der Reihe nach:
+     Das Logo belegt Spalte 3, danach steht der Zeiger hinter der letzten
+     Spalte -- die Navigation mit "grid-column: 2" passt nicht mehr in
+     dieselbe Zeile und rutscht in eine zweite. Gemessen wuchs die Leiste
+     dadurch von 59 auf 81 px Inhalt: Logo oben, Navigation darunter, halb
+     hinter der Werkzeugleiste. Im Quelltext war davon nichts zu sehen. */
   .shell.aus .side-nav {
-    grid-column: 2; justify-self: center;
+    grid-row: 1; grid-column: 2; justify-self: center;
     display: flex; flex-direction: row; align-items: center; gap: 2px;
     flex: none; padding: 0; overflow: visible;
   }
@@ -2936,11 +2994,76 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
     letter-spacing: .3px; line-height: 1.1; white-space: nowrap;
   }
   .shell.aus .side-nav .nav-item svg.i { width: 19px; height: 19px; }
+  /* ── Kontomenue am Logo (ENT-410)
+     Wieder eine reine Darstellungsaenderung, aus demselben Grund wie oben:
+     Dasselbe .side-foot wandert nicht im DOM umher, es legt sich als Blatt
+     unter den Markenknopf. Damit bleiben IDs, Klickpfade, rechteAnwenden()
+     und die Markup-Reihenfolge (Einrichtung, Benutzerblock, Zur App,
+     Abmelden) unberuehrt. Die Reihenfolge IM MENUE macht "order" -- oben der
+     Benutzerblock, wie im Vorbild des Projektinhabers, unten das Abmelden.
+     Der Fussteil steht ausserhalb des Rasters (grid-column: auto): absolut
+     gesetzt bezieht er sich damit auf den Innenrand von .side und nicht auf
+     eine Rasterzelle, die es beim Aufklappen gar nicht mehr braucht. */
   .shell.aus .side-foot {
-    display: flex; flex-direction: row; align-items: center; gap: 2px;
-    flex: none; padding: 0; border-top: none;
+    grid-column: auto;
+    position: absolute; top: calc(var(--top-h) + 4px); right: 14px; left: auto;
+    z-index: 60; width: 252px; max-width: calc(100vw - 28px);
+    display: none; flex-direction: column; gap: 1px;
+    padding: 7px; border-top: none;
+    background: var(--shell); border: 1px solid var(--shell-line);
+    border-radius: 14px;
+    box-shadow: 0 18px 44px rgba(0, 0, 0, .42), 0 2px 10px rgba(0, 0, 0, .26);
   }
-  .shell.aus .side-foot .nav-item { margin-top: 0; }
+  .shell.aus.menue-offen .side-foot { display: flex; animation: markenBlatt .14s ease-out; }
+  @keyframes markenBlatt { from { opacity: 0; transform: translateY(-6px); } }
+
+  /* Im Menue ist Platz -- hier stehen die Beschriftungen wieder, anders als
+     in der Symbolreihe der Kopfleiste. Ein Menue aus vier namenlosen
+     Symbolen untereinander waere ein Raetsel. */
+  .shell.aus .side-foot .nav-item {
+    order: 3; width: 100%; justify-content: flex-start; gap: 11px;
+    min-height: 40px; margin: 0; padding: 9px 10px; border-radius: 9px;
+    font-size: 13.5px;
+  }
+  .shell.aus .side-foot .nav-item .lbl { display: block; }
+  .shell.aus .side-foot .nav-item svg.i { flex: none; }
+  .shell.aus .side-foot #nav-einrichtung { order: 2; }
+  .shell.aus .side-foot #nav-zurapp      { order: 3; }
+  /* Der Benutzerblock steht oben und traegt wieder Namen und Rolle: Das
+     Menue soll zuerst beantworten, WER angemeldet ist -- danach erst, was
+     man tun kann. In der Symbolreihe war dafuer kein Platz. */
+  .shell.aus .side-foot .side-user {
+    order: 1; justify-content: flex-start; gap: 11px;
+    padding: 9px 10px 12px; margin-bottom: 5px;
+    border-bottom: 1px solid var(--shell-line);
+  }
+  .shell.aus .side-foot .side-user .who { display: block; }
+  /* Abmelden ist der einzige Eintrag, den man nicht versehentlich treffen
+     soll -- abgesetzt und in der Warnfarbe, wie im Vorbild. Die Trennlinie
+     liegt als Pseudoelement ueber dem Knopf und nicht als sein Rand, sonst
+     wandert sie beim Schweben mit in die Farbflaeche. */
+  .shell.aus .side-foot #nav-abmelden {
+    order: 4; position: relative; margin-top: 6px; color: var(--neg);
+  }
+  .shell.aus .side-foot #nav-abmelden::before {
+    content: ''; position: absolute; left: 0; right: 0; top: -4px;
+    height: 1px; background: var(--shell-line);
+  }
+  .shell.aus .side-foot #nav-abmelden svg.i { stroke: var(--neg); }
+  .shell.aus .side-foot #nav-abmelden:hover { background: var(--neg-soft); color: var(--neg); }
+
+  /* Erst hier wird das Logo zum Bedienelement -- mit Zeigerhand, Schwebe-
+     farbe und einem Ring, solange das Menue offen ist. Kreisrund, weil das
+     Logo selbst kreisrund ist: ein abgerundetes Quadrat um einen Kreis
+     erzeugt vier sichtbare weisse Ecken. */
+  .shell.aus .marken-knopf {
+    cursor: pointer; padding: 3px; border-radius: 50%;
+    transition: background .13s, box-shadow .13s;
+  }
+  .shell.aus .marken-knopf img { border-radius: 50%; }
+  .shell.aus .marken-knopf:hover { background: var(--shell-hi); }
+  .shell.aus .marken-knopf:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .shell.aus.menue-offen .marken-knopf { background: var(--shell-hi); box-shadow: 0 0 0 2px var(--accent); }
   /* Der Inhalt rückt unter die Leiste statt neben sie. Die Werkzeugleiste
      klebt darunter, nicht darüber -- sonst verdeckt sie die Navigation. */
   .shell.aus .main { padding-top: var(--top-h); }
@@ -2978,6 +3101,14 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
      Benutzer sind Auswertungen fuer den Schreibtisch, kein Blick unterwegs
      -- auf dem Desktop bleiben beide unveraendert bestehen. */
   .dash-item[data-widget="verlauf"], .dash-item[data-widget="angemeldet"] { display: none !important; }
+  /* "Datum & Zeit" ebenso (ENT-410, Entscheid Projektinhaber). Kalenderwoche,
+     Datum und Uhrzeit stehen auf dem Handy bereits in der Statusleiste des
+     Geraets -- eine Karte, die sie wiederholt, kostet nur den Weg zu den
+     Kennzahlen darunter. Der Container bleibt in der Liste und laesst sich
+     am Desktop weiter ein- und ausblenden; hier greift nur die Anzeige.
+     Kein Automatismus: Ob und wie die Karte am Handy erscheint, ist eine
+     eigene Entscheidung und keine Folge davon, dass es sie am Desktop gibt. */
+  .dash-item[data-widget="zeit"] { display: none !important; }
   /* Von den vier KPI-Kacheln bleiben nur Rapporte und Nettostunden: Bestand
      (Mitarbeitende, Kunden) ist eine Zahl fuers Buero, kein Tagesgeschaeft.
      #kpiGrid statt .kpi, weil dieselbe Kachel-Klasse auch im Planungs-KPI
@@ -3529,7 +3660,16 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 
   <aside class="side" id="side">
     <div class="side-brand">
-      <img src="icons/icon-192.png" alt="">
+      <!-- Das Logo ist in der Kopfleiste (Huellenzustand "aus") der Griff zum
+           Kontomenue -- siehe .shell.aus .side-foot weiter unten. In den
+           beiden Seitenleisten-Zustaenden steht der Fussteil ohnehin sichtbar
+           da; dort waere ein Aufklappmenue ein zweiter Weg zum selben Ziel,
+           darum ist der Knopf dann untaetig (siehe markenMenuUm). -->
+      <button type="button" class="marken-knopf" id="btnMarke" onclick="markenMenuUm(event)"
+              aria-haspopup="true" aria-expanded="false" aria-controls="sideFoot"
+              title="Konto, Einrichtung und Abmelden" aria-label="Konto, Einrichtung und Abmelden">
+        <img src="icons/icon-192.png" alt="">
+      </button>
       <div class="txt">
         <div class="wm" id="sideWm">Cockpit</div>
         <div class="sub">CUPI 24</div>
@@ -3708,7 +3848,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 
     </nav>
 
-    <div class="side-foot">
+    <div class="side-foot" id="sideFoot">
       <button class="nav-item nur-desktop" id="nav-einrichtung" title="Einrichtung" onclick="openDlg('dlgEinrichtung')">
         <span class="ico-wrap">
           <svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.2.5.66.86 1.19.91H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -3738,7 +3878,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
         <svg class="i" viewBox="0 0 24 24"><polyline points="16 3 20 7 16 11"/><line x1="20" y1="7" x2="9" y2="7"/><polyline points="8 13 4 17 8 21"/><line x1="4" y1="17" x2="15" y2="17"/></svg>
         <span class="lbl">Zur App</span>
       </a>
-      <button class="nav-item" onclick="doLogout()">
+      <button class="nav-item" id="nav-abmelden" onclick="doLogout()">
         <svg class="i" viewBox="0 0 24 24"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
         <span class="lbl">Abmelden</span>
       </button>
@@ -3837,7 +3977,6 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
               <div class="card-bd">
                 <div class="begr-kopf">
                   <h2 id="begrGruss">Guten Tag</h2>
-                  <p id="begrNaechstes">Einen Moment …</p>
                 </div>
                 <div class="diktat-router">
                   <div class="diktat-eingabe" id="rtDropzone" ondragover="rtDragUeber(event,'rt')" ondragleave="rtDragWeg('rt')" ondrop="rtDrop(event,'rt')">
@@ -3865,6 +4004,35 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
                   </div>
                   <div class="sprach-hint" id="rtSprachHint"></div>
                   <div class="msg-err" id="rtErr" style="display:none"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Datum & Zeit (ENT-410). Steht neben der Begruessung und fuellt
+               die Haelfte, die dort frei wurde, seit die Begruessung nicht
+               mehr ueber die volle Breite laeuft. Heruntergebrochen von der
+               groben zur feinen Einheit: Woche, Tag, Uhrzeit -- jeweils
+               Ueberschrift oben, Wert darunter, wie ueberall sonst.
+               Die Wochenspanne steht dabei, weil eine nackte Wochenzahl
+               niemandem sagt, welche Tage gemeint sind. -->
+          <div class="dash-item dw-halb" data-widget="zeit">
+            <div class="card zeit-karte">
+              <div class="card-bd">
+                <div class="zeit-raster">
+                  <div class="zeit-zeile zeit-kw">
+                    <span class="lb">Kalenderwoche</span>
+                    <b class="wert" id="zeitKw">–</b>
+                    <span class="spanne" id="zeitSpanne">–</span>
+                  </div>
+                  <div class="zeit-zeile">
+                    <span class="lb">Datum</span>
+                    <b class="wert" id="zeitDatum">–</b>
+                  </div>
+                  <div class="zeit-zeile zeit-uhr">
+                    <span class="lb">Uhrzeit</span>
+                    <b class="wert" id="zeitUhr">–</b>
+                  </div>
                 </div>
               </div>
             </div>
@@ -7696,6 +7864,7 @@ function enter() {
   $('gate').style.display = 'none';
   $('shell').classList.add('on');
   huelleSetzen(huelleLesen(), false);
+  zeitTaktStarten();
   $('uName').textContent = me.name;
   // Statt immer "Administration" die tatsaechlichen Rollen. Wer als Planung
   // angemeldet ist, soll das sehen -- sonst wundert er sich, warum Knoepfe
@@ -7859,6 +8028,7 @@ const TITLES = {
 
 const DASH_WIDGETS = [
   { id: 'begruessung', titel: 'Begrüssung' },
+  { id: 'zeit', titel: 'Datum & Zeit' },
   { id: 'kpi', titel: 'Kennzahlen' },
   { id: 'kurzwahl', titel: 'Schnellzugriff' },
   { id: 'verlauf', titel: 'Stundenverlauf' },
@@ -7886,6 +8056,28 @@ const ORD_BEREICHE = {
       // angepasst hat, und niemand haette einen Anhaltspunkt warum.
       if (Array.isArray(g)) {
         g = g.map(x => (x && x.id === 'sperrfeed') ? { ...x, id: 'ereignisse' } : x);
+      }
+      // ENT-410: Die Begruessung lief bei vielen ueber die volle Breite --
+      // daneben war Platz, und dort steht jetzt "Datum & Zeit". Ein neuer
+      // Container reiht sich laut ordAbgleichen() ganz HINTEN ein; ohne
+      // diesen Umzug landete er also unter allem anderen, waehrend die
+      // Begruessung oben breit stehen bliebe. Genau das Bild, das der
+      // Projektinhaber weghaben wollte.
+      // Einmalig: Der Merker wird auch dann gesetzt, wenn es noch gar keine
+      // gespeicherte Anordnung gibt. Sonst schnappte der Umzug erst beim
+      // ersten eigenen Speichern zu und uebersteuerte eine gerade von Hand
+      // getroffene Wahl -- ein Zuruecksetzen, fuer das der Benutzer keinen
+      // Anhaltspunkt haette.
+      if (!localStorage.getItem('rv3_dash_zeit_umzug')) {
+        localStorage.setItem('rv3_dash_zeit_umzug', '1');
+        if (Array.isArray(g)) {
+          g = g.filter(x => x && x.id !== 'zeit');
+          const i = g.findIndex(x => x && x.id === 'begruessung');
+          if (i >= 0) {
+            g[i] = { ...g[i], breite: 'halb' };
+            g.splice(i + 1, 0, { id: 'zeit', sichtbar: true, breite: 'halb' });
+          }
+        }
       }
       return Promise.resolve(g);
     },
@@ -8251,6 +8443,66 @@ function ordDropFlaeche(e) {
   ordAnwenden(ordAktiv, ordEntwurf, true);
 }
 
+// ══════════════════════════════════════════ DATUM & ZEIT (ENT-410)
+// Der Container neben der Begruessung. Rechnet nichts vom Server nach --
+// Kalenderwoche, Datum und Uhrzeit stehen im Browser fest, und ein Aufruf
+// dafuer waere Aufwand ohne Gewinn.
+//
+// Die Wochenzahl kommt aus kalenderwoche() (ISO-8601, dieselbe Rechnung wie
+// in app.html, ENT-023) -- nicht ein zweites Mal gerechnet. Eine zweite
+// Zaehlung waere genau die Sorte Doppelung, die irgendwann um eine Woche
+// auseinanderlaeuft, ohne dass jemand merkt, welche der beiden stimmt.
+const ZEIT_WOCHENTAGE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+const ZEIT_MONATE = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
+  'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+
+function zeitZeichnen() {
+  const kw = $('zeitKw');
+  if (!kw) { return; }
+  const jetzt = new Date();
+  kw.textContent = kalenderwoche(jetzt);
+  // Montag ist der erste Tag der Woche -- dieselbe Festlegung wie in der
+  // ISO-Zaehlung darueber. getDay() zaehlt ab Sonntag, darum (+6) % 7.
+  const mo = new Date(jetzt.getFullYear(), jetzt.getMonth(), jetzt.getDate());
+  mo.setDate(mo.getDate() - ((mo.getDay() + 6) % 7));
+  const so = new Date(mo);
+  so.setDate(so.getDate() + 6);
+  $('zeitSpanne').textContent = zeitSpanne(mo, so);
+  $('zeitDatum').textContent = `${ZEIT_WOCHENTAGE[jetzt.getDay()]}, ${jetzt.getDate()}. `
+    + `${ZEIT_MONATE[jetzt.getMonth()]} ${jetzt.getFullYear()}`;
+  $('zeitUhr').textContent = String(jetzt.getHours()).padStart(2, '0')
+    + ':' + String(jetzt.getMinutes()).padStart(2, '0');
+}
+
+// "1. – 7. September 2026" innerhalb eines Monats, "29. September –
+// 5. Oktober 2026" darueber hinweg, "29. Dezember 2025 – 4. Januar 2026"
+// ueber den Jahreswechsel. Den Monat zweimal zu nennen, wo er derselbe ist,
+// macht die Zeile nur laenger; ihn wegzulassen, wo er wechselt, macht sie
+// falsch.
+function zeitSpanne(a, b) {
+  const selbesJahr = a.getFullYear() === b.getFullYear();
+  const selberMonat = selbesJahr && a.getMonth() === b.getMonth();
+  const links = selberMonat
+    ? `${a.getDate()}.`
+    : `${a.getDate()}. ${ZEIT_MONATE[a.getMonth()]}${selbesJahr ? '' : ' ' + a.getFullYear()}`;
+  return `${links} – ${b.getDate()}. ${ZEIT_MONATE[b.getMonth()]} ${b.getFullYear()}`;
+}
+
+// Die Uhr laeuft minutengenau weiter und faengt dabei die volle Minute ab.
+// Ein fester 60-Sekunden-Takt haette je nach Ladezeitpunkt bis zu 59
+// Sekunden Rueckstand -- die Anzeige stuende dann dauerhaft auf der
+// vorherigen Minute, was schlimmer ist als gar keine Uhr.
+// Sekunden zeigt sie bewusst nicht: Eine Ziffer, die im Augenwinkel jede
+// Sekunde springt, zieht den Blick von der Arbeit weg.
+let zeitTakt = null;
+function zeitTaktStarten() {
+  zeitZeichnen();
+  if (zeitTakt) { clearTimeout(zeitTakt); }
+  const jetzt = new Date();
+  const bisZurMinute = 60000 - (jetzt.getSeconds() * 1000 + jetzt.getMilliseconds());
+  zeitTakt = setTimeout(zeitTaktStarten, bisZurMinute + 25);
+}
+
 // ══════════════════════════════════════════ BEGRÜSSUNG UND DIKTAT-ROUTER (ENT-032)
 // Persoenliche Begruessung mit wechselnden Formulierungen, ein Kurzueberblick
 // und ein Diktat-/Bild-Router, der erkennt, in welchen Bereich ein Eingabe
@@ -8263,7 +8515,6 @@ const BEGR_GRUSS = {
   tag: ['Guten Tag', 'Schön, dass du da bist', 'Willkommen zurück'],
   abend: ['Guten Abend', 'Noch spät unterwegs?', 'Guten Abend'],
 };
-let naechstesDaten = null;
 let rtBild = {};   // { base64, mime, url } eines vorbereiteten Bildes, je Router-Prefix
 
 function begrTageszeit() {
@@ -8271,14 +8522,16 @@ function begrTageszeit() {
   return h < 11 ? 'morgen' : h < 18 ? 'tag' : 'abend';
 }
 
-function ladeNaechstes() {
-  // Fuer den Vornamen in der Begruessung -- der Login liefert nur den
-  // technischen Namen, den echten Vornamen kennt erst die Personalliste.
+// ENT-410: Bis hierher holte diese Stelle zusaetzlich naechstes.php fuer die
+// Zeile unter dem Gruss ("Heute um 09:15 steht ... an"). Die Zeile ist auf
+// Vorgabe des Projektinhabers entfallen; der Aufruf war danach ohne
+// Verbraucher und ist mit ihr gegangen. Der Endpunkt selbst bleibt bestehen
+// -- entfernt wird der Aufruf, nicht die Schnittstelle.
+function ladeBegruessung() {
+  // Fuer den Vornamen im Gruss -- der Login liefert nur den technischen
+  // Namen, den echten Vornamen kennt erst die Personalliste.
   const mitarbeiterDa = mitarbeiter.length ? Promise.resolve() : loadMitarbeiter();
-  return Promise.all([
-    api('naechstes.php').then(({ ok, data }) => { naechstesDaten = (ok && data.status === 'ok') ? data : null; }),
-    mitarbeiterDa,
-  ]).then(renderBegruessung);
+  return Promise.resolve(mitarbeiterDa).then(renderBegruessung);
 }
 
 function renderBegruessung() {
@@ -8290,41 +8543,7 @@ function renderBegruessung() {
   const eintrag = mitarbeiter.find(m => m.name === (me && me.name));
   const vorname = (eintrag && eintrag.vorname) || ((me && me.name) || '').split(/[.\s]/)[0];
   $('begrGruss').textContent = vorname ? `${gruss}, ${esc(vorname)}` : gruss;
-
-  const n = naechstesDaten;
-  if (!n) { $('begrNaechstes').textContent = 'Einen Moment …'; return; }
-
-  const teile = [];
-  const e = n.naechster_einsatz;
-  if (e) {
-    const heute = isoTag();
-    const wannWort = e.datum === heute ? 'heute' : e.datum === isoTag(new Date(Date.now() + 864e5)) ? 'morgen' : `am ${dmy(e.datum)}`;
-    const wo = e.objekt_name || e.titel || e.kunde_name;
-    const offen = Math.max(0, e.bedarf - e.zugeteilt);
-    const zeitSatz = [
-      `${wannWort} um ${hmKurz(e.von)} steht „${esc(wo)}“ an`,
-      `${wannWort}, ${hmKurz(e.von)} Uhr: „${esc(wo)}“`,
-      `als Nächstes: „${esc(wo)}“ ${wannWort} um ${hmKurz(e.von)}`,
-    ];
-    let satz = zeitSatz[Math.floor(Math.random() * zeitSatz.length)];
-    if (offen > 0) satz += ` — noch ${offen} ${offen === 1 ? 'Schicht offen' : 'Schichten offen'}`;
-    teile.push(satz);
-  } else {
-    teile.push('kein anstehender Einsatz geplant');
-  }
-  if (n.neue_sperrtage > 0) {
-    teile.push(`${n.neue_sperrtage} ${n.neue_sperrtage === 1 ? 'neuer Sperrtag' : 'neue Sperrtage'}`);
-  }
-  if (n.offene_zusagen > 0) {
-    teile.push(`${n.offene_zusagen} offene ${n.offene_zusagen === 1 ? 'Rückmeldung' : 'Rückmeldungen'}`);
-  }
-  $('begrNaechstes').innerHTML = esc(teile[0].charAt(0).toUpperCase() + teile[0].slice(1))
-    + (teile.length > 1 ? '. ' + teile.slice(1).map(esc).join(', ') + '.' : '.');
-  // Klick fuehrt zum naechsten Einsatz, wenn es einen gibt.
-  $('begrNaechstes').style.cursor = e ? 'pointer' : '';
-  $('begrNaechstes').onclick = e ? () => { pTab = 'tag'; $('tgD').value = e.datum; go('planung'); } : null;
 }
-const hmKurz = t => String(t || '').slice(0, 5);
 
 // ── Router: Text/Diktat
 //
@@ -8753,6 +8972,55 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { glockeSchliessen(); }
 });
 
+// ══════════════════════════════════════════ KONTOMENUE AM LOGO (ENT-410)
+// Nur in der Kopfleiste. Dort ist der Fussteil der Seitenleiste nicht mehr
+// als Symbolreihe zu sehen, sondern klappt unter dem Logo auf -- in den
+// beiden Seitenleisten-Zustaenden steht er ohnehin sichtbar da, und ein
+// Menue waere dann ein zweiter Weg zum selben Ziel. Darum tut der Knopf
+// dort nichts, statt dieselben Eintraege ein zweites Mal anzubieten.
+//
+// Die Breitenbedingung ist dieselbe wie im CSS (901 px): Darunter ist die
+// Leiste eine Schublade, und die Aufklapp-Regeln greifen nicht. Ohne diese
+// Bedingung wuerde der Knopf am Handy eine Klasse setzen, die nichts
+// bewirkt -- und aria-expanded meldete ein Menue, das niemand sieht.
+function markenMenuMoeglich() {
+  const sh = $('shell');
+  return !!sh && sh.classList.contains('aus')
+    && window.matchMedia('(min-width: 901px)').matches;
+}
+
+function markenMenuUm(ev) {
+  if (ev) { ev.stopPropagation(); }
+  if (!markenMenuMoeglich()) { return; }
+  const sh = $('shell');
+  const offen = sh.classList.toggle('menue-offen');
+  const b = $('btnMarke');
+  if (b) { b.setAttribute('aria-expanded', String(offen)); }
+}
+
+function markenMenuSchliessen() {
+  const sh = $('shell');
+  if (!sh || !sh.classList.contains('menue-offen')) { return; }
+  sh.classList.remove('menue-offen');
+  const b = $('btnMarke');
+  if (b) { b.setAttribute('aria-expanded', 'false'); }
+}
+
+// Daneben tippen schliesst -- dieselbe Regel wie bei Burger und Glocke.
+// Ein Klick IM Menue schliesst ebenfalls: Jeder Eintrag fuehrt irgendwohin,
+// und ein Menue, das nach der Wahl offen stehen bleibt, verdeckt genau das
+// Ergebnis, das man sehen wollte. Der Markenknopf ist ausgenommen, sonst
+// wuerde sein eigener Klick sofort wieder schliessen.
+document.addEventListener('click', e => {
+  const sh = $('shell');
+  if (!sh || !sh.classList.contains('menue-offen')) { return; }
+  if (e.target.closest('#btnMarke')) { return; }
+  markenMenuSchliessen();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { markenMenuSchliessen(); }
+});
+
 // Schmale Seitenleiste: mehr Platz für die breiten Raster. Die Wahl bleibt
 // erhalten, damit sie nicht bei jedem Laden neu getroffen werden muss.
 // ══════════════════════════════════════════ HUELLE (ENT-086)
@@ -8789,6 +9057,7 @@ function huelleSetzen(zustand, merken = true) {
   const b = $('btnSchmal');
   if (b) { b.title = HUELLE_TITEL[zustand]; b.setAttribute('aria-label', HUELLE_TITEL[zustand]); }
   navGruppenZu();
+  markenMenuSchliessen();
   topSubZeichnen();
 }
 
@@ -8864,13 +9133,14 @@ window.addEventListener('resize', () => { if (huelleKompakt()) { navGruppenZu();
 // (ENT-197) soll unabhaengig von der gerade offenen Seite aktuell sein.
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') { return; }
+  zeitTaktStarten();
   loadStats();
   if ($('view-kunden').classList.contains('on') && kuTab === 'offerten') { loadBelege(); }
 });
 
 // ══════════════════════════════════════════ LADEN
 function reloadAll() {
-  Promise.all([loadStats(), loadRapporte(), ladeNaechstes()]);
+  Promise.all([loadStats(), loadRapporte(), ladeBegruessung()]);
   if (mitarbeiter.length) loadMitarbeiter();
   if (kunden.length) loadKunden();
   if (einsaetze.length || $('view-planung').classList.contains('on')) loadEinsaetze();

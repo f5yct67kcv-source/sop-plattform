@@ -70,15 +70,25 @@ await page.waitForSelector('#shell.on'); await page.waitForTimeout(500);
 check('Der Container ist als erster da',
   await page.evaluate(() => document.querySelector('.dash-item').dataset.widget === 'begruessung'));
 check('Die Begrüssung nennt den Vornamen', (await page.textContent('#begrGruss')).includes('Adrian'));
-check('„Was steht an" wird geladen', rufe.some(r => r.p.includes('naechstes')));
-const naechstesTxt = await page.textContent('#begrNaechstes');
-check('Der nächste Einsatz wird genannt', naechstesTxt.includes('Muster Center'));
-check('Heute wird als „heute" erkannt', /heute/i.test(naechstesTxt));
-// Seit ENT-058 heisst es Schichten, nicht Stellen.
-check('Offene Schichten werden genannt', naechstesTxt.includes('1 Schicht offen'));
-check('KRITISCH: die alte Benennung taucht nicht wieder auf', !/Stelle/.test(naechstesTxt));
-check('Sperrtage werden genannt', naechstesTxt.includes('2 neue Sperrtage'));
-check('Offene Rückmeldungen werden genannt', naechstesTxt.includes('3 offene Rückmeldungen'));
+
+// ── Der Kurzueberblick unter der Grussformel ist mit ENT-410 entfallen
+// (Vorgabe Projektinhaber). Geprueft wird die Aussage, nicht der Wortlaut:
+// Der Gruss darf ausser der Anrede NICHTS weiter behaupten, und der Aufruf,
+// der nur diese Zeile gefuellt hat, unterbleibt.
+//
+// Die zweite Pruefung haengt bewusst NICHT an der ID #begrNaechstes: Ein
+// Nachfolger unter anderem Namen wuerde sonst durchrutschen. Sie sieht in
+// den Text der ganzen Karte -- steht dort wieder ein Einsatz aus der
+// Antwort, faellt sie um.
+check('KRITISCH: der Kurzüberblick unter der Grussformel ist weg',
+  await page.evaluate(() => {
+    const kopf = document.querySelector('.begr-kopf');
+    return kopf.children.length === 1 && kopf.children[0].id === 'begrGruss';
+  }));
+check('KRITISCH: und mit ihm der Einsatz, der darin stand',
+  !(await page.textContent('.begr-karte')).includes('Muster Center'));
+check('KRITISCH: „Was steht an" wird nicht mehr abgefragt — der Aufruf hatte keinen Abnehmer mehr',
+  !rufe.some(r => r.p.includes('naechstes')));
 
 // ── Kurzes Platzhalter-Beispiel im Diktatfeld (Projektinhaber-Vorgabe,
 // 2026-08-28: der volle Beispielsatz inkl. "Bild einfügen"/"Screenshot"
@@ -381,17 +391,17 @@ try {
   check('Sie füllen die schmale Zeile aus, statt bei 140 px zu bleiben',
     m.sprechen.w !== 140 || m.erkennen.w !== 140);
 
-  // ── Kurzueberblick ("naechster Einsatz, Sperrtage, Rueckmeldungen") macht
-  // die Uebersicht auf dem Handy ueberladen -- bis zu den eigentlichen
-  // Kennzahlen musste weit gescrollt werden (Projektinhaber-Vorgabe,
-  // 2026-08-28). Auf dem Handy weg, der DATENSATZ bleibt aber unveraendert
-  // (kein Feature entfernt, siehe naechstesTxt-Pruefungen oben bei 1500px).
-  check('KRITISCH: der Kurzueberblick unter der Grussformel ist auf dem Handy ausgeblendet',
-    !(await page.isVisible('#begrNaechstes')));
+  // Der Kurzueberblick war auf dem Handy ausgeblendet und ist seit ENT-410
+  // ueberall weg. Geprueft wird darum jetzt das Gegenteil von damals: dass
+  // er auf KEINER Breite wieder auftaucht -- eine Pruefung, die nur "auf dem
+  // Handy unsichtbar" verlangt, waere seither auch dann gruen, wenn er am
+  // Desktop zurueckkaeme.
+  check('KRITISCH: auf dem Handy steht unter dem Gruss nichts mehr',
+    await page.evaluate(() => document.querySelector('.begr-kopf').children.length === 1));
   await page.setViewportSize({ width: 1500, height: 1100 });
   await page.waitForTimeout(250);
-  check('KRITISCH: auf dem Desktop bleibt der Kurzueberblick sichtbar',
-    await page.isVisible('#begrNaechstes'));
+  check('KRITISCH: und am Desktop ebenso wenig',
+    await page.evaluate(() => document.querySelector('.begr-kopf').children.length === 1));
 } catch (e) { bad.push('Handy: ' + String(e).split('\n')[0].slice(0, 120)); }
 
 // ══════════ DER CONTAINER GEHÖRT ZUM KONFIGURIERBAREN DASHBOARD (ENT-031)
