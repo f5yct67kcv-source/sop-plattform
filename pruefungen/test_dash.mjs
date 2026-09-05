@@ -312,11 +312,13 @@ await page.click('.btn-burger');
 await page.waitForTimeout(350);
 check('Burger öffnet das Menue',
   await page.evaluate(() => document.getElementById('side').classList.contains('on')));
-// Seit ENT-057 ist der Kundenbereich mobil nicht mehr im Menue -- er ist
-// Schreibtischarbeit. Geprueft wird jetzt das Gegenteil von frueher: dass er
-// dort NICHT steht, und dass stattdessen erklaert wird, wo er geblieben ist.
-check('Mobil: Kunden stehen nicht mehr im Menue',
-  await page.evaluate(() => !document.getElementById('nav-kunden').getClientRects().length));
+// Seit ENT-057 war der Kundenbereich mobil nicht mehr im Menue -- er galt als
+// reine Schreibtischarbeit. Seit ENT-399 gilt das nur noch fuer Rechnungen
+// und das Aufklapp-Kindermenue: "Kunden" selbst ist wieder da (Anruf-
+// Szenario, gleiches Muster wie "Planung"), damit Adressen, Objekte,
+// Rapporte und Offerten unterwegs erreichbar sind.
+check('Mobil: Kunden steht seit ENT-399 wieder im Menue',
+  await page.evaluate(() => !!document.getElementById('nav-kunden').getClientRects().length));
 // Der erklaerende Kasten ist mit ENT-067 wieder verschwunden: Der Projekt-
 // inhaber wollte den Platz fuer die Navigation, und ein Hinweis, der bei
 // jedem Oeffnen dasteht, ist nach dem zweiten Mal nur noch Moebelstueck.

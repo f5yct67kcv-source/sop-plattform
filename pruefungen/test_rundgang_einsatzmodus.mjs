@@ -213,17 +213,40 @@ const farben = await page.evaluate(() => {
   return {
     seiteBg: hell(rgb('#rgSeite').backgroundColor),
     seiteTxt: hell(rgb('#rgSeite').color),
-    // body, NICHT .inhalt/.app: die sind transparent (rgba(0,0,0,0)) und
-    // haetten hier eine Helligkeit von 0 ergeben -- die Pruefung waere
-    // dauerhaft rot gewesen, ohne dass etwas kaputt ist.
-    appBg: hell(rgb('body').backgroundColor),
     akzent: rgb('.rgs-modul-zahl').backgroundColor,
   };
 });
 check('KRITISCH: der Einsatzmodus ist wirklich dunkel (Hintergrund dunkel, Schrift hell)',
   farben.seiteBg < 60 && farben.seiteTxt > 180);
-check('KRITISCH: der Rest der App bleibt hell -- ENT-029 gilt dort unverändert weiter',
-  farben.appBg > 180);
+// Bis ENT-398 stand hier die Gegenprobe „der Rest der App bleibt hell":
+// Der Einsatzmodus war die einzige dunkle Insel, und eine Regel, die aus
+// Versehen auf die ganze App durchschlaegt, waere sonst nicht aufgefallen.
+// Seit ENT-398 ist die App selbst dunkel -- diese Gegenprobe waere jetzt
+// dauerhaft rot, ohne dass etwas kaputt ist. An ihre Stelle tritt die
+// Aussage, die weiterhin gilt und die auch weiterhin brechen KANN: Der
+// Einsatzmodus bleibt dunkel, ganz gleich wie der Schalter im Menue steht.
+// Die Begruendung aus ENT-294 haengt nicht an der Standardfassung -- wer
+// nachts einen Rundgang laeuft, will keinen weissen Vollbildschirm.
+await page.evaluate(() => themaSetzen('hell'));
+await page.waitForTimeout(250);
+const beiHell = await page.evaluate(() => {
+  const zahl = c => c.match(/\d+/g).slice(0, 3).map(Number);
+  const hell = c => { const [r, g, b] = zahl(c); return (r * 299 + g * 587 + b * 114) / 1000; };
+  return {
+    seite: hell(getComputedStyle(document.querySelector('#rgSeite')).backgroundColor),
+    txt: hell(getComputedStyle(document.querySelector('#rgSeite')).color),
+    // body, NICHT .inhalt/.app: die sind durchsichtig (rgba(0,0,0,0)) und
+    // ergaeben hier eine Helligkeit von 0 -- die Gegenprobe waere dauerhaft
+    // rot gewesen, ohne dass etwas kaputt ist.
+    app: hell(getComputedStyle(document.body).backgroundColor),
+  };
+});
+check('KRITISCH: der Einsatzmodus bleibt dunkel, auch wenn die App auf hell steht (ENT-294/398)',
+  beiHell.seite < 60 && beiHell.txt > 180);
+check('Gegenprobe: die App selbst ist dabei tatsächlich hell -- sonst prüfte der Satz oben nichts',
+  beiHell.app > 180);
+await page.evaluate(() => themaSetzen('dunkel'));
+await page.waitForTimeout(250);
 check('Die blaue Dashboard-Farbe wird in der für dunklen Grund vorgesehenen Aufhellung verwendet (#7098F7)',
   farben.akzent.replace(/\s/g, '') === 'rgb(112,152,247)');
 

@@ -67,26 +67,34 @@ window.Unterschrift = (function () {
   const esc = s => String(s == null ? '' : s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
+  /* Die Werte mit Rueckfall -- var(--x, #alt) -- sind nicht Zierde: Diese
+     Datei liegt in app.html UND in index.html. app.html kennt seit ENT-398
+     eine helle und eine dunkle Fassung, index.html nur die helle und nicht
+     alle diese Merkmale. Der Rueckfall ist genau der Wert, der vorher fest
+     hier stand; index.html sieht darum unveraendert aus (nachgemessen).
+     Betroffen sind nur die Teile, die INNERHALB einer Karte stehen. Der
+     Vollbild-Unterschriftsschirm weiter unten bleibt fest dunkel, und das
+     Papier bleibt weiss -- ein dunkler Grund machte den Strich unsichtbar. */
   const CSS = `
 .usig-cta { display: inline-flex; align-items: center; justify-content: center; gap: 9px;
-  min-height: 52px; padding: 0 22px; border-radius: 11px; border: 1.5px dashed #B9C4DA;
-  background: #F7F9FD; color: #2F5BD7; font: inherit; font-size: 15px; font-weight: 700;
+  min-height: 52px; padding: 0 22px; border-radius: 11px; border: 1.5px dashed var(--accent-line, #B9C4DA);
+  background: var(--accent-soft, #F7F9FD); color: var(--accent, #2F5BD7); font: inherit; font-size: 15px; font-weight: 700;
   cursor: pointer; -webkit-tap-highlight-color: transparent; }
-.usig-cta:hover { background: #EDF2FE; border-color: #2F5BD7; }
+.usig-cta:hover { background: var(--accent-soft, #EDF2FE); border-color: var(--accent, #2F5BD7); }
 .usig-cta .usig-feder { font-size: 17px; }
 
 .usig-fertig { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
-.usig-vorschau { height: 54px; max-width: 190px; background: #fff; border: 1px solid #E5E8EC;
+.usig-vorschau { height: 54px; max-width: 190px; background: #fff; border: 1px solid var(--line, #E5E8EC);
   border-radius: 8px; padding: 4px 8px; object-fit: contain; }
 .usig-etikett { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .7px;
-  color: #8B919D; }
-.usig-fertig-wert { font-size: 15px; font-weight: 700; color: #0E7C55; margin-top: 2px; }
-.usig-fertig-wert small { display: block; font-size: 12.5px; font-weight: 600; color: #8B919D;
+  color: var(--ink-3, #8B919D); }
+.usig-fertig-wert { font-size: 15px; font-weight: 700; color: var(--pos, #0E7C55); margin-top: 2px; }
+.usig-fertig-wert small { display: block; font-size: 12.5px; font-weight: 600; color: var(--ink-3, #8B919D);
   margin-top: 1px; }
 .usig-knoepfe { display: flex; gap: 8px; margin-left: auto; }
-.usig-klein { min-height: 44px; padding: 0 14px; border-radius: 9px; border: 1px solid #E5E8EC;
-  background: #fff; color: #14161A; font: inherit; font-size: 13.5px; font-weight: 650; cursor: pointer; }
-.usig-klein.usig-weg { color: #C2382A; }
+.usig-klein { min-height: 44px; padding: 0 14px; border-radius: 9px; border: 1px solid var(--line, #E5E8EC);
+  background: var(--surface, #fff); color: var(--ink, #14161A); font: inherit; font-size: 13.5px; font-weight: 650; cursor: pointer; }
+.usig-klein.usig-weg { color: var(--neg, #C2382A); }
 
 /* Ueber allem: Anmeldeschirm (1000), Schublade und Modalfenster liegen
    darunter -- der Kunde soll beim Unterschreiben nichts anderes sehen. */

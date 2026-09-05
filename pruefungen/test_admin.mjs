@@ -622,8 +622,13 @@ calls = [];
 await page.click('#rapporteTable tbody tr:first-child');
 await page.waitForSelector('#drawer.on');
 await page.waitForTimeout(250);
-check('Rapport-Schublade hat Drucken und Loeschen', (await page.$$('#drFoot button')).length === 2);
-await page.click('#drFoot .btn-plain');
+// Seit ENT-399 kommen "Herunterladen" und "Teilen" dazu (Anruf-Szenario,
+// direkter PDF-Weg ohne den Systemdruckdialog) -- macht aus den bisher zwei
+// Knoepfen vier. "Loeschen" wird seither ueber die eigene ID angeklickt,
+// nicht mehr ueber ".btn-plain": Das traf zuvor eindeutig nur "Loeschen",
+// seit den beiden neuen Knoepfen (dieselbe Klasse) waere es mehrdeutig.
+check('Rapport-Schublade hat Herunterladen, Teilen, Drucken und Loeschen', (await page.$$('#drFoot button')).length === 4);
+await page.click('#drDeleteBtn');
 await page.waitForSelector('#dlgConfirm.on');
 check('Rapport-Loeschen fragt nach', await page.isVisible('#dlgConfirm.on'));
 check('Rueckfrage nennt die Nummer', (await page.textContent('#cfText')).includes('284'));

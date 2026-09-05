@@ -472,7 +472,14 @@ await page.screenshot({ path: `${OUT}/34-matrix-mobil.png` });
 // dasselbe Muster wie in test_mobil.mjs, direkt ueber go()/kuGoTab().
 await page.evaluate(() => { go('kunden'); kuGoTab('objekte'); });
 await page.waitForTimeout(200);
-await page.click('#oTable tbody tr:first-child');
+// Seit ENT-401 traegt die Objektliste auf 390px Karten statt der Tabelle --
+// die Zeile, die frueher angeklickt wurde, ist hier gar nicht mehr da. Der
+// Weg ins Objekt fuehrt jetzt ueber die Karte: antippen klappt sie auf,
+// "Oeffnen" darin fuehrt in die Detailansicht. Die Absicht dieser Pruefung
+// (kein Seiten-Scroll trotz Wochentag-Bedarfstabelle) bleibt unveraendert.
+await page.click('#oTable .nur-schmal .ag-karte');
+await page.waitForTimeout(300);
+await page.click('#oTable .ag-karte .kk-tasten .btn');
 await page.waitForTimeout(400);
 // Bedarfstabelle sitzt im Masterschichten-Reiter, nicht im vorbelegten
 // Uebersicht-Reiter -- ohne den Wechsel waere die Box unsichtbar
