@@ -929,6 +929,12 @@ tbody tr.summe td { background: var(--surface-2); font-weight: 650; border-top: 
    eines Symbols (siehe Begruendung dort) und darf die Spalte dafuer breiter
    ziehen. */
 .rapp-klammer { width: 1%; padding: 4px 8px !important; text-align: center; border-left: 3px solid var(--line-hi); }
+/* Der Kopf DERSELBEN Spalte (ENT-417): Breite, Innenabstand und Mitte
+   uebernimmt er mit -- sonst stuende ueber einer 8-px-Zelle ein 18-px-Kopf,
+   und die Spaltengrenze saehe je nach Zeile anders aus. Nur die linke
+   Randlinie bleibt draussen: Sie markiert eine Zeilengruppe, und im Kopf
+   gibt es keine Gruppe, die sie markieren koennte. */
+thead th.rapp-klammer { border-left: none; }
 /* Die ganze Gruppe traegt eine zurueckhaltende Flaeche (ENT-178) -- die
    Randlinie allein an der Klammer-Zelle war nachweislich nicht selbsterklaerend
    genug. Bewusst NICHT --serie-soft: dieselbe Begruendung wie beim Verzicht
@@ -1767,12 +1773,20 @@ tbody tr.serie-grp-ende > td { border-bottom: 2px solid var(--serie); }
 .ag-karte.serie-anker { border-top: 2px solid var(--serie); }
 .ag-karte.serie-grp-ende { border-bottom: 2px solid var(--serie); }
 /* Zeitspalte: Pfeil und Uhrzeit sind eine Einheit und bleiben zusammen --
-   sonst schiebt der Pfeil die Uhrzeit aus der Zelle in die naechste Spalte. */
+   sonst schiebt der Pfeil die Uhrzeit aus der Zelle in die naechste Spalte.
+   Der Pfeil steht seit ENT-417 HINTER der Uhrzeit, wie in der Handy-Karte
+   (plKarte) schon immer: Linksbuendig haette er sonst nur die Zeilen mit
+   Reihe um seine Breite eingerueckt -- 29 px Versatz gegenueber jeder
+   anderen Zeile derselben Spalte. */
 .pl-zeit { display: inline-flex; align-items: center; gap: 5px; }
 /* Die Marke steht in der Tabelle immer auf einer eigenen Zeile unter der
    Uhrzeit. Als inline-flex lag sie in derselben Zeile wie die Uhrzeit und
-   ragte -- die Zelle ist nowrap -- sichtbar in die Spalte "Kunde" hinein. */
-table.pl-tab td .serie-marke { display: flex; width: fit-content; margin-left: auto; margin-top: 5px; }
+   ragte -- die Zelle ist nowrap -- sichtbar in die Spalte "Kunde" hinein.
+   Sie richtet sich an derselben Kante aus wie die Uhrzeit darueber
+   (ENT-417): Seit die Zeitspalte linksbuendig steht, waere ein
+   margin-left:auto eine zweite, gegenlaeufige Kante in einer einzigen
+   Zelle -- Uhrzeit links, Marke rechts. */
+table.pl-tab td .serie-marke { display: flex; width: fit-content; margin-right: auto; margin-top: 5px; }
 .serie-marke {
   display: inline-flex; align-items: center; gap: 5px; margin-top: 3px;
   border: 1px solid var(--serie-line); background: var(--surface); color: var(--serie);
@@ -1849,7 +1863,17 @@ tr.serie-folge:hover > td, .ag-karte.serie-folge:hover { background: var(--serie
 /* Der eingeschobene Tag steht sichtbar INNERHALB der Gruppe: eingerueckt an
    einer Schiene, mit eigenem Datum -- er steht ja ausserhalb seines
    Tageskopfs und waere sonst ein Einsatz ohne Datum. */
-tr.serie-kind > td:first-child { border-left: 3px solid var(--serie); }
+/* Die Schiene wird GEZEICHNET, nicht gerandet (ENT-137/140/417). Ein echter
+   Rand gehoert zum Kastenmodell und verschiebt die Inhaltskante der Zelle --
+   bei border-collapse um die halbe Randbreite, gemessen 1.5 px. Solange die
+   Zeitspalte rechtsbuendig stand, fiel das nicht auf: Die Uhrzeit endete
+   ohnehin an der rechten Kante. Linksbuendig stuende der eingeschobene Tag
+   1.5 px weiter innen als der erste -- genau die Verschiebung, die hier
+   zweimal beanstandet worden ist. Als innerer Schatten liegt die Schiene im
+   Innenabstand und bewegt nichts; die Ausrichtung stimmt dann nicht ungefaehr,
+   sondern exakt, ohne eine Rechnung, die eine andere Randbreite still falsch
+   macht. Dieselbe Technik wie bei der festgeschriebenen Schicht (ENT-045). */
+tr.serie-kind > td:first-child { box-shadow: inset 3px 0 0 0 var(--serie); }
 .ag-karte.serie-kind { margin-left: 14px; border-left: 3px solid var(--serie); border-top-left-radius: 0; border-bottom-left-radius: 0; }
 .serie-kind-datum { display: inline-block; font-size: 10.5px; font-weight: 660; color: var(--serie);
   text-transform: uppercase; letter-spacing: .02em; margin-right: 6px; }
@@ -2076,7 +2100,11 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
 .gr .blk.zu .i-schloss { width: 9px; height: 9px; margin-right: 1px; stroke-width: 2.8; }
 .gr tr.leerzeile td.lb b { color: var(--ink-3); font-weight: 550; }
 .gr td.sum { position: sticky; right: 0; background: var(--surface); border-left: 1px solid var(--line); padding: 7px 12px; text-align: right; font-size: 11.5px; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.gr thead th.sum { background: var(--surface-2); }
+/* Rechtsbuendig wie die Werte darunter (ENT-417). ".gr thead th" setzt
+   text-align:center fuer die Tagesspalten -- die Summenspalte hat das
+   stillschweigend geerbt, waehrend ".gr td.sum" seine Stunden rechts
+   ausrichtet. Gemessen: Kopf mittig, Wert rechts, in jedem .gr-Raster. */
+.gr thead th.sum { background: var(--surface-2); text-align: right; }
 
 /* ── Objektplanung: dichte Monatsansicht (ENT-024).
    Am Schreibtisch zählt, wie viel auf einen Blick zusammenpasst. Die Zeilen
@@ -8788,8 +8816,24 @@ function themaUm() {
 // 'objekt' seit ENT-200: eigene Ansicht statt Schublade, aus demselben Grund
 // wie 'offerte' -- Masterschichten und Kontrollpunkte (ENT-186) sind
 // Listen unbestimmter Laenge, keine 440px-Schublade haelt das auf Dauer.
-const ANSICHT_WEIT   = ['uebersicht', 'planung', 'abgleich', 'pensen', 'auslagen', 'rundgaenge', 'revierdienst', 'einsatzplan', 'einsatzneu', 'offerte', 'objekt'];
+// ENT-417: Die Listenansichten kommen dazu. Der 1440-px-Deckel ist eine
+// LESEBREITE -- er gehoert vor eine Spalte Fliesstext oder ein Formular, nicht
+// vor eine Tabelle mit neun bis elf Spalten. Gemessen bei 1728 px Fenster im
+// Kopfleisten-Zustand: 288 px blieben rechts leer, bei 1920 px sind es 480 px
+// (25 % der Flaeche), waehrend dieselbe Zeile links "Basellandschaftliche
+// Gebaeudeversicherung" und eine E-Mail-Adresse nebeneinander quetschte.
+// Bewusst je Ansicht und nicht global: 'betrieb' bleibt draussen (fast nur
+// Formulare), und 'mitarbeiter' entscheidet gleich noch je Reiter nach --
+// die Bearbeitungsmaske dort ist ein Formular und bleibt auf Lesebreite.
+// 'arbeitsergebnisse' bleibt ebenfalls draussen: Es zeichnet seit ENT-243
+// Karten statt Tabellen, und eine 1900 px breite Karte gewinnt nichts.
+const ANSICHT_WEIT   = ['uebersicht', 'planung', 'abgleich', 'pensen', 'auslagen', 'rundgaenge', 'revierdienst', 'einsatzplan', 'einsatzneu', 'offerte', 'objekt',
+                        'kunden', 'mitarbeiter', 'produkte', 'abwesenheiten'];
 const PLANUNG_WEIT   = ['uebersicht', 'einsaetze', 'objektplan', 'tag'];
+// Dieselbe Nachentscheidung je Reiter wie PLANUNG_WEIT, hier fuer die
+// Mitarbeitenden: Liste und Personalakte sind Tabellen, "bearbeiten" ist ein
+// Formular.
+const MITARBEITER_WEIT = ['liste', 'detail'];
 
 function weiteAnsicht(an) {
   const c = document.querySelector('.content');
@@ -8844,9 +8888,12 @@ function go(view) {
   // Umgekehrt der globale Sprechen-Knopf: die Übersicht hat den Diktat-Router
   // schon im Begrüssungs-Container, ein zweiter daneben wäre doppelt (ENT-038).
   $('btnSprechen').style.display = view === 'uebersicht' ? 'none' : '';
-  // Die Planung entscheidet gleich noch je Reiter nach; alle anderen
-  // Ansichten sind hier abschliessend geklaert.
-  if (view !== 'planung') { weiteAnsicht(ANSICHT_WEIT.includes(view)); }
+  // Planung und Mitarbeitende entscheiden gleich noch je Reiter nach; alle
+  // anderen Ansichten sind hier abschliessend geklaert. Bei den Mitarbeitenden
+  // erledigt das maGoTab() weiter unten -- go() faellt dort ohnehin immer auf
+  // die Liste zurueck, und jeder andere Reiterwechsel laeuft ebenfalls durch
+  // maGoTab(). Eine zweite Entscheidung hier waere eine zweite Wahrheit.
+  if (view !== 'planung' && view !== 'mitarbeiter') { weiteAnsicht(ANSICHT_WEIT.includes(view)); }
   topSubZeichnen();
   if (view === 'planung' && MOBIL() && pTab === 'uebersicht') goTab('einsaetze');
   if (view === 'mitarbeiter' && !mitarbeiter.length) loadMitarbeiter();
@@ -9358,7 +9405,7 @@ function renderLetzte() {
       <th>Datum</th><th>Mitarbeitende</th><th>Kunde</th><th>Einsatzart</th><th class="num">Netto</th>
     </tr></thead><tbody>` + l.map(r => `
       <tr class="click" onclick="openDrawer(${Number(r.id)})">
-        <td class="nowrap num">${dmy(r.datum)}</td>
+        <td class="nowrap">${dmy(r.datum)}</td>
         <td class="strong">${esc(r.mitarbeiter)}</td>
         <td>${esc(r.kunde)}<div class="sec">${esc(r.ort)}</div></td>
         <td><span class="chip chip-n">${esc(r.einsatzart)}</span></td>
@@ -9882,12 +9929,12 @@ function renderRapporte() {
   // Einsatzes dazwischen, entsteht keine Gruppe -- bewusste Rueckfallwirkung,
   // siehe Begruendung bei rapporteGruppieren().
   const zelle = r => `
-        <td class="nowrap num">${dmy(r.datum)}</td>
+        <td class="nowrap">${dmy(r.datum)}</td>
         <td class="strong nowrap">${esc(r.mitarbeiter)}</td>
         <td>${esc(r.kunde)}<div class="sec">${esc(r.strasse)}</div></td>
         <td class="nowrap">${esc(r.ort)}</td>
         <td><span class="chip chip-n">${esc(r.einsatzart)}</span></td>
-        <td class="nowrap num">${hm(r.von)}–${hm(r.bis)}</td>
+        <td class="nowrap">${hm(r.von)}–${hm(r.bis)}</td>
         <td class="num nowrap" style="color:var(--ink-3)">${nf(r.pause_min)} min</td>
         <td class="num nowrap"><span class="chip chip-p">${nf(r.netto_h, 2)} h</span></td>
         <td>${r.unterzeichner ? esc(r.unterzeichner) : '<span style="color:var(--ink-3)">–</span>'}</td>`;
@@ -9901,7 +9948,7 @@ function renderRapporte() {
     .join('');
   $('rapporteTable').innerHTML = `<div class="nur-schmal">${karten}</div>`
     + `<table class="nur-breit"><thead><tr>
-      <th></th><th>Datum</th><th>Mitarbeitende</th><th>Kunde</th><th>Ort</th>
+      <th class="rapp-klammer"></th><th>Datum</th><th>Mitarbeitende</th><th>Kunde</th><th>Ort</th>
       <th>Einsatzart</th><th>Zeit</th><th class="num">Pause</th><th class="num">Netto</th><th>Unterzeichner</th>
     </tr></thead><tbody>${rapporteZeilenMitKlammer(d, zelle)}</tbody></table>`;
 }
@@ -10349,8 +10396,8 @@ function renderOfferten() {
     + `<table class="nur-breit"><thead><tr>
       ${ofTh('status', 'Status')}${ofTh('nummer', 'Nr.')}${ofTh('referenz', 'Referenz')}
       ${ofTh('titel', 'Titel')}${ofTh('empfaenger', 'Empfänger')}
-      ${ofTh('datum', 'Offertendatum', true)}${ofTh('total_rappen', 'Offertensumme', true)}
-      ${ofTh('gueltig_bis', 'Gültig bis', true)}<th class="num">Aktion</th>
+      ${ofTh('datum', 'Offertendatum')}${ofTh('total_rappen', 'Offertensumme', true)}
+      ${ofTh('gueltig_bis', 'Gültig bis')}<th class="num">Aktion</th>
     </tr></thead><tbody>` + d.map(b => {
       const si = ofStatusInfo(b.status);
       // Abgelaufen heisst nicht abgelehnt -- die Offerte bleibt gueltig
@@ -10367,9 +10414,9 @@ function renderOfferten() {
         <td>${b.titel ? esc(b.titel) : '<span style="color:var(--ink-3)">ohne Titel</span>'}</td>
         <td>${ofEmpfaenger(b) ? esc(ofEmpfaenger(b)) : '<span style="color:var(--ink-3)">–</span>'}
             ${b.kundennummer ? `<div class="sec">${esc(b.kundennummer)}</div>` : ''}</td>
-        <td class="nowrap num">${dmy(b.datum)}</td>
+        <td class="nowrap">${dmy(b.datum)}</td>
         <td class="num nowrap strong">CHF ${chf(b.total_rappen)}</td>
-        <td class="nowrap num">${dmy(b.gueltig_bis)}
+        <td class="nowrap">${dmy(b.gueltig_bis)}
             ${abgelaufen ? '<div class="sec" style="color:var(--warn)">abgelaufen</div>' : ''}</td>
         <td class="num" onclick="event.stopPropagation()">
           <button class="btn btn-quiet btn-sm rowmenu-btn" onclick="ofMenuOeffnen(event, ${Number(b.id)})" aria-label="Aktionen">
@@ -10516,7 +10563,7 @@ function renderRechnungen() {
   $('reTable').innerHTML = `<table><thead><tr>
       ${reTh('status', 'Status')}${reTh('faellig_bis', 'Fällig')}${reTh('nummer', 'Nr.')}${reTh('referenz', 'Referenz')}
       ${reTh('titel', 'Titel')}${reTh('empfaenger', 'Empfänger')}
-      ${reTh('datum', 'Rechnungsdatum', true)}${reTh('total_rappen', 'Betrag', true)}
+      ${reTh('datum', 'Rechnungsdatum')}${reTh('total_rappen', 'Betrag', true)}
       ${reTh('offen_rappen', 'Offener Betrag', true)}<th class="num">Aktion</th>
     </tr></thead><tbody>` + d.map(b => {
       const si = reStatusInfo(b);
@@ -10530,7 +10577,7 @@ function renderRechnungen() {
         <td>${b.titel ? esc(b.titel) : '<span style="color:var(--ink-3)">ohne Titel</span>'}</td>
         <td>${reEmpfaenger(b) ? esc(reEmpfaenger(b)) : '<span style="color:var(--ink-3)">–</span>'}
             ${b.kundennummer ? `<div class="sec">${esc(b.kundennummer)}</div>` : ''}</td>
-        <td class="nowrap num">${dmy(b.datum)}</td>
+        <td class="nowrap">${dmy(b.datum)}</td>
         <td class="num nowrap strong">CHF ${chf(b.total_rappen)}</td>
         <td class="num nowrap"${offen ? '' : ' style="color:var(--ink-3)"'}>CHF ${chf(offen)}</td>
         <td class="num" onclick="event.stopPropagation()">
@@ -11581,14 +11628,14 @@ function renderMitarbeiter() {
       <th>Ort</th><th>Telefon</th><th>Mobil</th><th>E-Mail</th><th>Berechtigt</th><th>Rolle</th>
     </tr></thead><tbody>` + d.map(m => `
       <tr class="click" onclick="openMaDetail('${esc(m.name)}')">
-        <td class="num nowrap">${dash(m.personalnummer)}</td>
+        <td class="nowrap">${dash(m.personalnummer)}</td>
         <td class="nowrap">${dash(m.vorname)}</td>
         <td class="strong nowrap">${dash(m.nachname)}<div class="sec">${esc(m.name)}</div></td>
         <td class="nowrap">${dash(maListenName('funktion', m.funktion_id))}</td>
         <td>${dash([m.strasse, m.hausnummer].filter(Boolean).join(' '))}</td>
         <td class="nowrap">${dash([m.plz, m.ort].filter(Boolean).join(' '))}</td>
-        <td class="nowrap num">${dash(m.telefon)}</td>
-        <td class="nowrap num">${dash(m.mobil)}</td>
+        <td class="nowrap">${dash(m.telefon)}</td>
+        <td class="nowrap">${dash(m.mobil)}</td>
         <td>${dash(m.email)}</td>
         <td class="nowrap">${maBerechtigungen(m)}</td>
         <td>${Number(m.ist_admin) ? '<span class="chip chip-a">Admin</span>' : '<span class="chip chip-n">Mitarbeit.</span>'}</td>
@@ -11657,6 +11704,7 @@ function maAkteLaden(name) {
 function maGoTab(t) {
   document.querySelectorAll('#view-mitarbeiter .ma-tab').forEach(v => v.classList.remove('on'));
   $('mv-' + t).classList.add('on');
+  weiteAnsicht(MITARBEITER_WEIT.includes(t));
   $('pgCrumb').textContent = t === 'detail' ? 'Mitarbeitendendetails'
     : t === 'bearbeiten' ? 'Angaben bearbeiten' : 'Stammdaten';
   if (t === 'liste') { mdName = null; renderMitarbeiter(); }
@@ -12349,14 +12397,14 @@ function renderKunden() {
   // Tabelle -- beide aus demselben gefilterten und sortierten d[].
   $('kuTable').innerHTML = `<div class="nur-schmal">${d.map(k => kuKarte(k, zaehl[k.name])).join('')}</div>`
     + `<table class="nur-breit"><thead><tr>
-      ${kuTh('kundennummer', 'Nr.')}${kuTh('name', 'Kunde')}${kuTh('strasse', 'Strasse')}${kuTh('ort', 'Ort')}${kuTh('telefon', 'Telefon', true)}<th>E-Mail</th><th class="num">Rapporte</th><th class="num">Aktion</th>
+      ${kuTh('kundennummer', 'Nr.')}${kuTh('name', 'Kunde')}${kuTh('strasse', 'Strasse')}${kuTh('ort', 'Ort')}${kuTh('telefon', 'Telefon')}<th>E-Mail</th><th class="num">Rapporte</th><th class="num">Aktion</th>
     </tr></thead><tbody>` + d.map(k => `
       <tr class="click" onclick="openKundeDetail(${Number(k.id)})">
         <td class="nowrap">${dash(k.kundennummer)}</td>
         <td class="strong">${esc(k.name)}${k.art === 'privat' ? '<div class="sec">Privatperson</div>' : ''}</td>
         <td>${dash(kuStrasse(k))}</td>
         <td class="nowrap">${dash(kuPlzOrt(k))}</td>
-        <td class="nowrap num">${dash(k.telefon)}</td>
+        <td class="nowrap">${dash(k.telefon)}</td>
         <td>${dash(k.email)}</td>
         <td class="num">${zaehl[k.name] ? nf(zaehl[k.name]) : '<span style="color:var(--ink-3)">–</span>'}</td>
         <td class="num" onclick="event.stopPropagation()">
@@ -12885,7 +12933,7 @@ function plZeile(e, opts) {
     : '';
   return `
     <tr${ankerId} class="click${istHeute ? ' heute' : ''}${gesperrt ? ' zu abgeglichen' : ''}${serieStand(e) ? ' serie' : ''}${e.status === 'abgeschlossen' ? ' status-abgeschlossen' : ''}${gruppe}${opts.ende ? ' serie-grp-ende' : ''}" onclick="openEinsatz(${Number(e.id)})">
-      <td class="nowrap num">${opts.verschachtelt ? `<span class="serie-kind-datum">${dmy(tagVon(e))}</span>` : ''}<span class="pl-zeit">${klapp}<span>${hm(e.von)}–${hm(e.bis)}</span></span>${ueberNacht(e) ? '<div class="sec">bis Folgetag</div>' : ''}${!opts.verschachtelt ? serieMarke(e) : ''}</td>
+      <td class="nowrap">${opts.verschachtelt ? `<span class="serie-kind-datum">${dmy(tagVon(e))}</span>` : ''}<span class="pl-zeit"><span>${hm(e.von)}–${hm(e.bis)}</span>${klapp}</span>${ueberNacht(e) ? '<div class="sec">bis Folgetag</div>' : ''}${!opts.verschachtelt ? serieMarke(e) : ''}</td>
       <td class="strong">${esc(e.kunde_name)}${e.titel ? `<div class="sec">${esc(e.titel)}</div>` : ''}</td>
       <td>${esc(e.ort)}${e.strasse ? `<div class="sec">${esc(e.strasse)}</div>` : ''}</td>
       <td><span class="chip chip-n">${esc(e.einsatzart)}</span>${sparteChip(e)}</td>
@@ -14308,16 +14356,16 @@ function renderKundeDetail() {
     const treffer = belege.filter(b => Number(b.kunde_id) === Number(kdId) && Number(b.aktiv ?? 1) === 1);
     $('kdOfferten').innerHTML = treffer.length
       ? `<table><thead><tr><th>Status</th><th>Nr.</th><th>Titel</th>
-           <th class="num">Datum</th><th class="num">Summe</th><th class="num">Gültig bis</th></tr></thead>
+           <th>Datum</th><th class="num">Summe</th><th>Gültig bis</th></tr></thead>
          <tbody>${treffer.map(b => {
            const si = ofStatusInfo(b.status);
            return `<tr class="click" onclick="ofOeffnen(${Number(b.id)})">
              <td><span class="chip ${si.chip}">${esc(si.text)}</span></td>
              <td class="strong nowrap">${esc(b.nummer)}</td>
              <td>${b.titel ? esc(b.titel) : '<span style="color:var(--ink-3)">ohne Titel</span>'}</td>
-             <td class="nowrap num">${dmy(b.datum)}</td>
+             <td class="nowrap">${dmy(b.datum)}</td>
              <td class="num nowrap">CHF ${chf(b.total_rappen)}</td>
-             <td class="nowrap num">${dmy(b.gueltig_bis)}</td></tr>`;
+             <td class="nowrap">${dmy(b.gueltig_bis)}</td></tr>`;
          }).join('')}</tbody></table>`
       : EMPTY('Keine Offerten', 'Für diesen Kunden liegt noch keine Offerte vor.');
   }
@@ -14396,10 +14444,10 @@ function rapporteZeilenMitKlammer(treffer, zelle) {
 }
 
 function kdRapporteTabelle(treffer) {
-  const zelle = r => `<td class="nowrap num">${dmy(r.datum)}</td><td>${esc(r.mitarbeiter)}</td>
+  const zelle = r => `<td class="nowrap">${dmy(r.datum)}</td><td>${esc(r.mitarbeiter)}</td>
       <td class="nowrap">${hm(r.von)}–${hm(r.bis)}</td><td class="num">${nf(Number(r.netto_h), 2)} h</td>
       <td>${dash(r.auftrag_nr)}</td>`;
-  return `<table><thead><tr><th></th><th>Datum</th><th>Mitarbeitende</th><th>Zeit</th><th class="num">Netto</th><th>Auftrag-Nr.</th></tr></thead>
+  return `<table><thead><tr><th class="rapp-klammer"></th><th>Datum</th><th>Mitarbeitende</th><th>Zeit</th><th class="num">Netto</th><th>Auftrag-Nr.</th></tr></thead>
     <tbody>${rapporteZeilenMitKlammer(treffer, zelle)}</tbody></table>`;
 }
 
@@ -15548,7 +15596,7 @@ function renderLetzteRundgaenge(rundgaenge) {
   // tabindex und Enter/Leertaste kommen mit: Eine Zeile, die nur die Maus
   // oeffnen kann, ist fuer die Tastatur eine Sackgasse.
   ziel.innerHTML = `<table><thead><tr>
-      <th>Kunde</th><th>Bereich</th><th>Name</th><th>Datum</th><th>Zeit</th><th>Dauer</th><th>Mitarbeiter</th><th>Status</th>
+      <th>Kunde</th><th>Bereich</th><th>Name</th><th>Datum</th><th>Zeit</th><th class="num">Dauer</th><th>Mitarbeiter</th><th>Status</th>
     </tr></thead><tbody>` + rundgaenge.map(r => {
     const f = r.fortschritt || { gesamt: 0, bestaetigt: 0 };
     const gesamt = Number(f.gesamt);
@@ -15580,7 +15628,7 @@ function renderLetzteRundgaenge(rundgaenge) {
         <td class="nowrap">${esc(r.objekt_name)}</td>
         <td>${r.titel ? esc(r.titel) : '<span style="color:var(--ink-3)">–</span>'}</td>
         <td class="nowrap">${dmy(r.datum)}</td>
-        <td class="nowrap num">${esc(start)}</td>
+        <td class="nowrap">${esc(start)}</td>
         <td class="nowrap num">${dauerZelle}</td>
         <td class="nowrap">${esc(person)}</td>
         <td style="min-width:110px">
@@ -21213,7 +21261,7 @@ function evfZeichnen(liste) {
   zaehler.textContent = liste.length + (liste.length === 1 ? ' Ereignis' : ' Ereignisse');
 
   $('evfListe').innerHTML = `<table><thead><tr>
-      <th>Gemeldet</th><th>Art</th><th>Objekt</th><th>Person</th><th></th>
+      <th>Gemeldet</th><th>Art</th><th>Objekt</th><th>Person</th><th class="num"></th>
     </tr></thead><tbody>${liste.map(e => `
       <tr class="click" onclick="evfDetail(${Number(e.id)})">
         <td>${esc(dmyZeit(e.erfasst_am))}${e.gesehen_am ? '' : ' <span class="chip chip-a">neu</span>'}</td>
@@ -21603,7 +21651,7 @@ function ladeFeiertage() {
     }
     $('ftInhalt').innerHTML = `<table><thead><tr><th>Datum</th><th>Tag</th><th>Feiertag</th><th>Umfang</th></tr></thead><tbody>`
       + data.feiertage.map(f => `<tr>
-          <td class="nowrap num">${dmy(f.datum)}</td>
+          <td class="nowrap">${dmy(f.datum)}</td>
           <td class="nowrap" style="color:var(--ink-3)">${WD[new Date(f.datum + 'T12:00:00').getDay()].slice(0, 2)}</td>
           <td>${esc(f.name)}</td>
           <td>${f.halbtags ? `<span class="chip chip-w">ab ${hm(f.ab_zeit)}</span>` : '<span class="chip chip-n">ganzer Tag</span>'}</td>
@@ -23091,7 +23139,7 @@ function renderTagesplan() {
       const teile = zug.map(m => nameChip(m, e));
       if (fehlt) teile.push(`<span class="nm off">${fehlt} offen</span>`);
       return `<tr class="click${gesperrt ? ' zu abgeglichen' : ''}${e.status === 'abgeschlossen' ? ' status-abgeschlossen' : ''}" onclick="openEinsatz(${Number(e.id)})">
-        <td class="nowrap num">${hm(e.von)}–${hm(e.bis)}${ueberNacht(e) ? '<div class="sec">bis Folgetag</div>' : ''}</td>
+        <td class="nowrap">${hm(e.von)}–${hm(e.bis)}${ueberNacht(e) ? '<div class="sec">bis Folgetag</div>' : ''}</td>
         <td class="strong">${esc(e.kunde_name)}${e.titel ? `<div class="sec">${esc(e.titel)}</div>` : ''}</td>
         <td>${esc(e.ort)}${e.strasse ? `<div class="sec">${esc(e.strasse)}</div>` : ''}</td>
         <td class="num"><span class="chip ${e.status === 'abgesagt' ? 'chip-n' : (fehlt ? 'chip-w' : 'chip-p')}">${besetzt(e).length}/${nf(e.bedarf)}</span></td>
@@ -25115,7 +25163,7 @@ function impBerichtZeichnen(b) {
     <div style="margin-top:14px">
       <div class="feld-titel">So kämen sie an${b.neu > b.vorschau.length ? ' (erste ' + b.vorschau.length + ')' : ''}</div>
       <div class="tw"><table class="tbl"><thead><tr><th>Zeile</th><th>Name</th><th>PLZ</th><th>Ort</th></tr></thead>
-      <tbody>${b.vorschau.map(v => `<tr><td class="num" style="color:var(--ink-3)">${v.zeile}</td>
+      <tbody>${b.vorschau.map(v => `<tr><td style="color:var(--ink-3)">${v.zeile}</td>
         <td><b>${esc(v.name)}</b></td><td>${esc(v.plz)}</td><td>${esc(v.ort)}</td></tr>`).join('')}
       </tbody></table></div>
     </div>` : '';

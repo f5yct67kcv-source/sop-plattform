@@ -1456,7 +1456,23 @@ const klammerAuf = await page.evaluate(() => {
     ankerOben: anker ? breit(anker, 'borderTopWidth') : 0,
     letzterIstEnde: !!letzterKind && letzterKind.classList.contains('serie-grp-ende'),
     letzterUnten: letzterKind ? breit(letzterKind, 'borderBottomWidth') : 0,
-    kindHatSchiene: letzterKind ? (parseFloat(getComputedStyle(letzterKind.querySelector('td')).borderLeftWidth) || 0) : 0,
+    // Wie breit die Schiene links an der Zelle ist -- unabhaengig davon, WIE
+    // sie gezeichnet wird. Seit ENT-417 ist sie ein innerer Schatten statt
+    // eines Randes: Ein echter Rand gehoert zum Kastenmodell und verschob die
+    // linksbuendige Uhrzeit gegenueber der Nachbarzeile. Geprueft wird die
+    // Aussage "es ist eine sichtbare Schiene da", nicht die Technik dahinter.
+    kindHatSchiene: letzterKind ? (() => {
+      const cs = getComputedStyle(letzterKind.querySelector('td'));
+      const rand = parseFloat(cs.borderLeftWidth) || 0;
+      let schatten = 0;
+      if ((cs.boxShadow || '').includes('inset')) {
+        const l = (cs.boxShadow.match(/-?[\d.]+px/g) || []).map(parseFloat);
+        // Erste Laengenangabe ist der waagrechte Versatz, zweite der
+        // senkrechte -- eine Schiene links steht waagrecht und nicht senkrecht.
+        if (l.length >= 2 && Math.abs(l[1]) < 0.5) { schatten = Math.abs(l[0]); }
+      }
+      return Math.max(rand, schatten);
+    })() : 0,
   };
 });
 check('KRITISCH: ausgeklappt wandert die untere Klammer an den letzten Tag der Gruppe — sonst liefe sie mitten hindurch',
@@ -1468,19 +1484,27 @@ check('Der eingeschobene Tag steht an einer sichtbaren Schiene — er gehört er
 // (ENT-137, ENT-140). Der eingeschobene Tag traegt eine Schiene links und ein
 // Datum darueber -- beides darf die Uhrzeit NICHT gegenueber dem ersten Tag
 // verschieben. Am gerenderten Text gemessen, nicht an der Zelle.
+// Gemessen wird seit ENT-417 die LINKE Kante: Die Zeitspalte steht seitdem
+// linksbuendig (Kopf und Wert auf derselben Kante, wie ueberall im Cockpit),
+// und die tragende Kante einer linksbuendigen Spalte ist die linke. Die
+// Aussage bleibt dieselbe -- Schiene, Datum und Aufklapp-Pfeil duerfen die
+// Uhrzeit nicht gegenueber der Nachbarzeile verschieben.
 check('KRITISCH: die Uhrzeit des eingeschobenen Tages steht exakt unter der des ersten Tages — die Schiene verschiebt nichts',
   await page.evaluate(() => {
     const kante = sel => {
       const el = document.querySelector(sel);
       if (!el) { return null; }
       const r = document.createRange(); r.selectNodeContents(el);
-      return r.getBoundingClientRect().right;
+      return r.getBoundingClientRect().left;
     };
     const a = kante('tr[onclick="openEinsatz(201)"] .pl-zeit span');
     const k = kante('tr[onclick="openEinsatz(202)"] .pl-zeit span');
     const d = kante('tr[onclick="openEinsatz(202)"] .serie-kind-datum');
-    return a !== null && k !== null && d !== null
-      && Math.abs(a - k) < 0.5 && Math.abs(k - d) < 0.5;
+    // Und eine Zeile ohne Reihe: Der Aufklapp-Pfeil des Ankers darf die
+    // Uhrzeit auch dort nicht verschieben.
+    const n = kante('tr[onclick="openEinsatz(204)"] .pl-zeit span');
+    return a !== null && k !== null && d !== null && n !== null
+      && Math.abs(a - k) < 0.5 && Math.abs(k - d) < 0.5 && Math.abs(a - n) < 0.5;
   }));
 await page.evaluate(() => {
   pSerieOffen = new Set(); $('pSchnell').value = 'alle'; pSchnellSetzen();
