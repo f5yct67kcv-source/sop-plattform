@@ -33,50 +33,14 @@ if (!hat_tabelle($pdo, 'spesen')) {
 // Voreinstellung sind die offenen Faelle: Wer die Ansicht oeffnet, will
 // wissen, was zu entscheiden ist. Die entschiedenen bleiben ueber den
 // Filter erreichbar, damit eine Freigabe nachvollziehbar bleibt.
-$status = (string)($_GET['status'] ?? 'eingereicht');
-$erlaubt = ['eingereicht', 'freigegeben', 'abgelehnt'];
-$wo = 'WHERE s.status <> \'erfasst\'';
-$werte = [];
-if ($status !== 'alle') {
-    if (!in_array($status, $erlaubt, true)) {
-        json_response(['status' => 'error', 'message' => 'Unbekannter Status'], 400);
-    }
-    $wo = 'WHERE s.status = ?';
-    $werte[] = $status;
+$filter = (string)($_GET['status'] ?? 'eingereicht');
+if (!in_array($filter, ['eingereicht', 'freigegeben', 'abgelehnt', 'alle'], true)) {
+    json_response(['status' => 'error', 'message' => 'Unbekannter Status'], 400);
 }
-
-// Der Name kommt aus dem Mitarbeiterstamm, nicht aus dem Beleg -- die
-// Liste zeigt damit den heutigen Namen. Vertrauliche Personalfelder werden
-// hier nicht angefasst (ma_vertrauliche_felder, CLAUDE.md): Fuer eine
-// Spesenfreigabe braucht es den Namen, sonst nichts.
-$s = $pdo->prepare(
-    'SELECT s.id, s.mitarbeiter_id, s.datum, s.kategorie, s.betrag_rappen, s.notiz,
-            s.status, s.erfasst_am, s.eingereicht_am, s.ablehnung_grund,
-            s.entschieden_am, s.entschieden_von, s.beleg_mime,
-            m.name, m.vorname, m.nachname
-     FROM spesen s
-     JOIN mitarbeiter m ON m.id = s.mitarbeiter_id
-     ' . $wo . '
-     ORDER BY s.datum DESC, s.id DESC'
-);
-$s->execute($werte);
-
-$zeilen = array_map(static function (array $r): array {
-    $r['betrag_rappen'] = (int)$r['betrag_rappen'];
-    $r['hat_beleg'] = $r['beleg_mime'] !== null;
-    $r['beleg_ist_pdf'] = $r['beleg_mime'] === 'application/pdf';
-    // Ein fertiger Anzeigename statt dreier Felder: vorname/nachname sind
-    // im Stamm optional (schema.sql), name ist es nicht -- die Ansicht
-    // haette sonst dieselbe Rueckfallkette noch einmal zu bauen.
-    $voll = trim(((string)$r['vorname']) . ' ' . ((string)$r['nachname']));
-    $r['person'] = $voll !== '' ? $voll : (string)$r['name'];
-    unset($r['beleg_mime'], $r['vorname'], $r['nachname'], $r['name']);
-    return $r;
-}, $s->fetchAll());
 
 json_response([
     'status' => 'ok',
     'eingerichtet' => true,
     'kategorien' => SPESEN_KATEGORIEN,
-    'spesen' => $zeilen,
+    'spesen' => spesen_liste_verwaltung($pdo, $filter),
 ]);

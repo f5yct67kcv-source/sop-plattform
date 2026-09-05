@@ -26,15 +26,6 @@ $in = json_decode(file_get_contents('php://input'), true) ?? [];
 $id = (int)($in['id'] ?? 0);
 $status = trim((string)($in['status'] ?? ''));
 $grund = trim((string)($in['ablehnung_grund'] ?? ''));
-
-if (!in_array($status, ['freigegeben', 'abgelehnt'], true)) {
-    json_response(['status' => 'error', 'message' => 'Status muss freigegeben oder abgelehnt sein'], 400);
-}
-// Eine Ablehnung ohne Begruendung waere fuer die betroffene Person nicht
-// nachvollziehbar -- dieselbe Regel wie beim Abwesenheitsentscheid.
-if ($status === 'abgelehnt' && $grund === '') {
-    json_response(['status' => 'error', 'message' => 'Eine Ablehnung braucht eine Begründung'], 400);
-}
 if (mb_strlen($grund) > 500) { $grund = mb_substr($grund, 0, 500); }
 
 $pdo = db();
@@ -42,25 +33,18 @@ if (!hat_tabelle($pdo, 'spesen')) {
     json_response(['status' => 'error', 'message' => 'Der Spesenbereich ist noch nicht eingerichtet'], 404);
 }
 
-// Ein Beleg im Zustand 'erfasst' liegt noch in der Mappe der Person und ist
-// kein Antrag -- er laesst sich darum auch nicht entscheiden. Ein bereits
-// entschiedener dagegen schon: Erneutes Entscheiden ueberschreibt bewusst,
-// statt eine eigene Korrektur-Historie zu verlangen (gleiche Handhabung wie
-// abwesenheit_entscheiden.php und beleg_status.php, keine neue Ausnahme).
-$s = $pdo->prepare('SELECT status FROM spesen WHERE id = ?');
-$s->execute([$id]);
-$vorher = $s->fetchColumn();
-if ($vorher === false) {
-    json_response(['status' => 'error', 'message' => 'Beleg nicht gefunden'], 404);
+// Entschieden wird in backend/spesen.php -- diese Datei uebersetzt nur
+// zwischen HTTP und Regel. Jede Absage nennt ihren Grund beim Namen.
+$ergebnis = spesen_entscheiden($pdo, (int)$user['id'], $id, $status, $grund);
+if ($ergebnis !== 'ok') {
+    $texte = [
+        'status_unbekannt'  => ['Status muss freigegeben oder abgelehnt sein', 400],
+        'grund_fehlt'       => ['Eine Ablehnung braucht eine Begründung', 400],
+        'nicht_gefunden'    => ['Beleg nicht gefunden', 404],
+        'nicht_eingereicht' => ['Dieser Beleg ist noch nicht eingereicht.', 409],
+    ];
+    [$text, $code] = $texte[$ergebnis] ?? ['Das ist so nicht möglich.', 400];
+    json_response(['status' => 'error', 'grund' => $ergebnis, 'message' => $text], $code);
 }
-if ($vorher === 'erfasst') {
-    json_response(['status' => 'error',
-        'message' => 'Dieser Beleg ist noch nicht eingereicht.'], 400);
-}
-
-$pdo->prepare(
-    'UPDATE spesen SET status = ?, ablehnung_grund = ?, entschieden_von = ?, entschieden_am = NOW()
-     WHERE id = ?'
-)->execute([$status, $status === 'abgelehnt' ? $grund : null, (int)$user['id'], $id]);
 
 json_response(['status' => 'ok', 'id' => $id, 'neuer_status' => $status]);

@@ -86,21 +86,50 @@ check('KRITISCH: die Verwaltungs-Endpunkte stehen NICHT in der Ausnahmeliste',
   && !/'spesen_beleg\.php'/.test(PHPTEST));
 check('KRITISCH: alle drei Verwaltungs-Endpunkte pruefen dasselbe Recht',
   [LISTE, ENTSCHEIDEN, BELEG].every(q => /require_recht\(\$user,\s*'personal_schreiben'\)/.test(q)));
-// Die eigene Person kommt aus der SITZUNG, nie aus dem Rumpf -- sonst
-// koennte jemand fremde Belege lesen, indem er eine andere id schickt.
-check('KRITISCH: die eigenen Endpunkte binden jede Abfrage an die Sitzung',
-  [MEINE, MEIN_BELEG].every(q => /\$ich = \(int\)\$user\['id'\]/.test(q)
-    && /mitarbeiter_id = \?/.test(q)));
-check('KRITISCH: der eigene Belegabruf filtert schon in der Abfrage auf die eigene Person',
-  /WHERE id = \? AND mitarbeiter_id = \?/.test(MEIN_BELEG));
-// Ein Beleg im Zustand 'erfasst' liegt noch in der Mappe der Person -- die
-// Verwaltung bekommt ihn nicht zu sehen, auch nicht mit Recht.
-// Der Ausschluss steht einmal in doppelten und einmal in einfachen
-// Anfuehrungszeichen (dort mit Gegenschraegstrich) -- geprueft wird die
-// Aussage, nicht die Schreibweise.
-const ohneErfasst = q => /status\s*<>\s*\\?'erfasst\\?'/.test(q);
-check('KRITISCH: die Verwaltung sieht keine Belege, die noch nicht eingereicht sind',
-  ohneErfasst(BELEG) && ohneErfasst(LISTE));
+// Die eigene Person kommt aus der SITZUNG, nie aus dem Rumpf. DASS die
+// Trennung wirkt, prueft pruef_spesen.php an einer echten Datenbank
+// ("einer FREMDEN Person nicht -- auch nicht mit richtiger id"). Hier bleibt
+// die Aussage, dass die Endpunkte gar keine Gelegenheit haben, eine fremde
+// Person unterzuschieben: Sie holen $ich aus der Sitzung und lesen nirgends
+// eine mitarbeiter_id aus der Anfrage.
+check('KRITISCH: die eigenen Endpunkte holen die Person aus der Sitzung',
+  [MEINE, MEIN_BELEG].every(q => /\$ich = \(int\)\$user\['id'\]/.test(q)));
+check('KRITISCH: kein eigener Endpunkt nimmt eine mitarbeiter_id aus der Anfrage entgegen',
+  ![MEINE, MEIN_BELEG].some(q =>
+    /\$in\[\s*'mitarbeiter_id'\s*\]|\$_GET\[\s*'mitarbeiter_id'\s*\]|\$_POST\[\s*'mitarbeiter_id'\s*\]/.test(q)));
+check('Und sie geben genau diese Person an die Regeln weiter',
+  /spesen_eigene\(\$pdo, \$ich\)/.test(MEINE) && /\$ich, \$id\)/.test(MEIN_BELEG));
+// Dass die Verwaltung keine Belege im Zustand 'erfasst' sieht, wurde hier
+// frueher am Quelltext geprueft. Das ist die schwache Art (CLAUDE.md: eine
+// Pruefung, die nachsieht, ob ein Wort im Code steht, bleibt gruen, wenn die
+// Formulierung sich aendert und die Sache verschwindet). Die Regel laeuft
+// jetzt in pruef_spesen.php gegen eine echte Datenbank; hier bleibt nur die
+// Aussage, dass die Endpunkte selbst NICHTS mehr entscheiden, sondern die
+// Regeln aufrufen -- sonst koennte neben der gepruften Regel eine zweite,
+// ungepruefte im Endpunkt entstehen.
+const ROHSQL = /\b(UPDATE|DELETE\s+FROM|INSERT\s+INTO)\s+spesen\b/i;
+check('KRITISCH: kein Endpunkt schreibt an der geprueften Regel vorbei selbst in die Tabelle',
+  ![MEINE, MEIN_BELEG, LISTE, ENTSCHEIDEN, BELEG].some(q => ROHSQL.test(q)));
+check('Die Endpunkte rufen die Regeln aus backend/spesen.php auf',
+  /spesen_einreichen\(|spesen_aendern\(/.test(MEINE)
+  && /spesen_entscheiden\(/.test(ENTSCHEIDEN)
+  && /spesen_liste_verwaltung\(/.test(LISTE));
+
+// Die Regeln laufen in der Pruefung gegen SQLite, auf dem Server gegen
+// MySQL. Beide Tabellen muessen dieselben Spalten haben -- sonst prueft
+// pruef_spesen.php eine Tabelle, die es so gar nicht gibt.
+const KERNPRUEF = readFileSync(`${HIER}/pruef_spesen.php`, 'utf8');
+const spaltenAus = quelle => {
+  const ddl = (quelle.match(/CREATE TABLE (?:IF NOT EXISTS )?spesen \(([\s\S]*?)\n\s*(?:KEY|FOREIGN KEY|\))/) || ['', ''])[1];
+  return new Set(ddl.split('\n').map(z => (z.trim().match(/^([a-z_]+)\s/) || [])[1]).filter(Boolean));
+};
+const echteSpalten = spaltenAus(EINRICHTEN);
+const testSpalten = new Set((KERNPRUEF.match(/const SPESEN_TESTSPALTEN = \[([\s\S]*?)\];/) || ['', ''])[1]
+  .match(/'([a-z_]+)'/g)?.map(s => s.replace(/'/g, '')) || []);
+const fehlend = [...echteSpalten].filter(s => !testSpalten.has(s));
+const zuviel = [...testSpalten].filter(s => !echteSpalten.has(s));
+check(`KRITISCH: die Testtabelle hat dieselben Spalten wie die echte (fehlt: ${fehlend.join(', ') || '–'}; zu viel: ${zuviel.join(', ') || '–'})`,
+  echteSpalten.size > 5 && fehlend.length === 0 && zuviel.length === 0);
 
 // Der Deploy kopiert nur namentlich gelistete Dateien aus backend/ --
 // api/*.php geht per Platzhalter, backend/spesen.php nicht.
@@ -246,6 +275,68 @@ letzterRumpf = null;
 await p.click('#blFuss .btn-primary');
 await p.waitForTimeout(400);
 check('KRITISCH: ohne Betrag wird nichts gespeichert', letzterRumpf === null);
+await p.close();
+
+// ── Ohne Verbindung ───────────────────────────────────────────────────────
+// Eine Tankquittung entsteht an der Tankstelle, und dort ist der Empfang
+// oft schlecht. Geprueft wird der ganze Weg: speichern ohne Verbindung,
+// Anzeige als wartend, Uebertragung beim Wiederverbinden.
+p = await appStarten({ status: 'ok', eingerichtet: true, kategorien: KATEGORIEN, spesen: [] });
+// Ab hier faellt jeder POST aus -- wie ohne Empfang.
+await p.route('**/api/meine_spesen.php', route =>
+  route.request().method() === 'POST' ? route.abort() : route.continue());
+await p.click('#spesenInhalt .btn-primary');
+await p.waitForTimeout(300);
+await p.fill('#spBetrag', '61.20');
+await p.fill('#spDatum', T(24));
+await p.click('#blFuss .btn-primary');
+await p.waitForTimeout(500);
+
+const wartend = await p.evaluate(() => JSON.parse(localStorage.getItem('sop_spesen_warteschlange') || '[]'));
+check('KRITISCH: ohne Verbindung geht der Beleg nicht verloren, sondern wartet',
+  wartend.length === 1 && wartend[0].rumpf.betrag_rappen === 6120);
+const wartendText = (await p.textContent('#spesenInhalt')).replace(/\s+/g, ' ');
+check('KRITISCH: die Karte sagt, dass er nur auf dem Geraet liegt -- nicht dass er gespeichert ist',
+  /wartet auf übertragung/i.test(wartendText) && /nur auf diesem gerät/i.test(wartendText));
+// Ein wartender Beleg ist einer -- "noch keine Belege" waere hier falsch.
+check('KRITISCH: mit einem wartenden Beleg steht nicht „noch keine Belege" da',
+  !/noch keine belege/i.test(wartendText));
+
+// Das Blatt ausdruecklich schliessen, bevor es weitergeht. Bleibt es offen
+// -- etwa weil das Sichern nicht geklappt hat --, faengt es den naechsten
+// Klick ab, und die Reihe stuerzt mit einer Zeitueberschreitung ab, statt
+// einen Befund zu melden. Eine Pruefung, die abstuerzt, sagt nicht, was
+// fehlt (gleiche Vorsorge wie kn()/karteTippen() in test_kundenkarten.mjs).
+await p.evaluate(() => { try { blattZu(); } catch (e) {} });
+await p.waitForTimeout(300);
+
+// Eine inhaltliche Absage darf NICHT in die Warteschlange: Sie wuerde bei
+// jedem Versuch erneut abgewiesen und alle spaeteren blockieren.
+await p.unroute('**/api/meine_spesen.php');
+await p.route('**/api/meine_spesen.php', route => route.request().method() === 'POST'
+  ? route.fulfill({ status: 400, contentType: 'application/json',
+      body: JSON.stringify({ status: 'error', message: 'Das Belegdatum liegt in der Zukunft' }) })
+  : route.continue());
+await p.click('#spesenInhalt .btn-primary');
+await p.waitForTimeout(300);
+await p.fill('#spBetrag', '10.00');
+await p.click('#blFuss .btn-primary');
+await p.waitForTimeout(500);
+check('KRITISCH: ein inhaltlich abgelehnter Beleg landet NICHT in der Warteschlange',
+  (await p.evaluate(() => JSON.parse(localStorage.getItem('sop_spesen_warteschlange') || '[]'))).length === 1);
+await p.evaluate(() => { try { blattZu(); } catch (e) {} });
+await p.waitForTimeout(300);
+
+// Wiederverbinden: der wartende Beleg geht raus und verschwindet aus der
+// Warteschlange.
+await p.unroute('**/api/meine_spesen.php');
+letzterRumpf = null;
+await p.evaluate(() => window.dispatchEvent(new Event('online')));
+await p.waitForTimeout(700);
+check('KRITISCH: beim Wiederverbinden wird der wartende Beleg uebertragen',
+  letzterRumpf && letzterRumpf.betrag_rappen === 6120);
+check('Und ist danach nicht mehr in der Warteschlange',
+  (await p.evaluate(() => JSON.parse(localStorage.getItem('sop_spesen_warteschlange') || '[]'))).length === 0);
 await p.close();
 
 // ── Die Liste ─────────────────────────────────────────────────────────────

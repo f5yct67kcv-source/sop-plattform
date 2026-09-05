@@ -92,6 +92,195 @@ check('Die vier Zustaende sind vollstaendig und in der Reihenfolge des Ablaufs',
 check('Die Beleggrenze ist gesetzt und nicht unbegrenzt',
     SPESEN_BELEG_MAX > 0 && SPESEN_BELEG_MAX <= 8 * 1024 * 1024);
 
+// ══════════════════════════════════════════════════════════════════════════
+// DIE ZUSTANDSREGELN GEGEN EINE ECHTE DATENBANK
+// ══════════════════════════════════════════════════════════════════════════
+//
+// SQLite im Arbeitsspeicher, gleiches Muster wie pruef_dienstfahrzeug.php.
+// Bis hierher wurden die Regeln nur GELESEN -- wer darf einen Beleg aendern,
+// ab wann sieht ihn die Verwaltung, was passiert nach einem Entscheid. Eine
+// Pruefung, die dafuer den Quelltext durchsucht, bleibt gruen, wenn die
+// Formulierung sich aendert und die Sache verschwindet (CLAUDE.md).
+//
+// Die Tabelle wird hier in SQLite-Schreibweise angelegt; die MySQL-Fassung
+// steht in planung_einrichten.php. Dass beide dieselben SPALTEN haben,
+// prueft test_spesen.mjs -- sonst liefe diese Reihe gegen eine Tabelle, die
+// es so auf dem Server gar nicht gibt.
+const SPESEN_TESTSPALTEN = [
+    'id', 'mitarbeiter_id', 'datum', 'kategorie', 'betrag_rappen', 'notiz',
+    'beleg', 'beleg_mime', 'status', 'erfasst_am', 'eingereicht_am',
+    'ablehnung_grund', 'entschieden_von', 'entschieden_am', 'geaendert_am',
+];
+
+$pdo = new PDO('sqlite::memory:', null, null, [
+    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]);
+$pdo->exec('CREATE TABLE mitarbeiter (id INTEGER PRIMARY KEY, name TEXT,
+    vorname TEXT, nachname TEXT)');
+$pdo->exec("INSERT INTO mitarbeiter (id, name, vorname, nachname)
+    VALUES (7, 'dario.beispiel', 'Dario', 'Beispiel'),
+           (8, 'anna.beispiel', NULL, NULL),
+           (9, 'verwaltung.beispiel', 'Vera', 'Beispiel')");
+$pdo->exec("CREATE TABLE spesen (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    mitarbeiter_id INTEGER NOT NULL,
+    datum TEXT NOT NULL,
+    kategorie TEXT NOT NULL,
+    betrag_rappen INTEGER NOT NULL,
+    notiz TEXT NULL,
+    beleg BLOB NULL,
+    beleg_mime TEXT NULL,
+    status TEXT NOT NULL DEFAULT 'erfasst',
+    erfasst_am TEXT NULL,
+    eingereicht_am TEXT NULL,
+    ablehnung_grund TEXT NULL,
+    entschieden_von INTEGER NULL,
+    entschieden_am TEXT NULL,
+    geaendert_am TEXT NULL)");
+
+$ICH = 7; $ANDERE = 8; $VERWALTUNG = 9;
+$feld = fn(array $u = []) => array_merge(
+    ['datum' => '2026-03-20', 'kategorie' => 'tanken', 'betrag_rappen' => 8540, 'notiz' => 'Tankstelle'], $u);
+
+// ── Anlegen ───────────────────────────────────────────────────────────
+$id = spesen_anlegen($pdo, $ICH, $feld(['beleg' => $jpeg, 'beleg_mime' => 'image/jpeg']));
+check('Ein neuer Beleg bekommt eine id', $id > 0);
+$eigene = spesen_eigene($pdo, $ICH);
+check('Er steht danach in der eigenen Liste', count($eigene) === 1);
+check('KRITISCH: er beginnt im Zustand "erfasst" -- nicht eingereicht',
+    $eigene[0]['status'] === 'erfasst');
+check('Die Liste traegt den Beleg NICHT mit, nur den Hinweis darauf',
+    !array_key_exists('beleg', $eigene[0]) && $eigene[0]['hat_beleg'] === true
+    && $eigene[0]['beleg_ist_pdf'] === false);
+check('Der Betrag kommt als ganze Zahl zurueck, nicht als Text',
+    $eigene[0]['betrag_rappen'] === 8540);
+
+// ── Die Verwaltung sieht einen erfassten Beleg NICHT ──────────────────
+// Das ist der ganze Zweck der Trennung. Bis hierher stand diese Regel nur
+// als Zeichenkette im Quelltext.
+check('KRITISCH: ein erfasster Beleg erscheint nicht in der Verwaltungsliste',
+    spesen_liste_verwaltung($pdo, 'alle') === []);
+check('KRITISCH: und sein Beleg wird der Verwaltung nicht herausgegeben',
+    spesen_beleg_verwaltung($pdo, $id) === null);
+check('Der eigenen Person schon', spesen_beleg_eigen($pdo, $ICH, $id) !== null);
+check('KRITISCH: einer FREMDEN Person nicht -- auch nicht mit richtiger id',
+    spesen_beleg_eigen($pdo, $ANDERE, $id) === null);
+
+// ── Aendern, solange er in der eigenen Mappe liegt ────────────────────
+check('Ein erfasster Beleg laesst sich aendern',
+    spesen_aendern($pdo, $ICH, $id, $feld(['betrag_rappen' => 1250]), false, null, null) === 'ok');
+check('Die Aenderung steht auch wirklich da',
+    spesen_eigene($pdo, $ICH)[0]['betrag_rappen'] === 1250);
+check('KRITISCH: der Beleg bleibt dabei erhalten -- Aendern wirft ihn nicht weg',
+    spesen_eigene($pdo, $ICH)[0]['hat_beleg'] === true);
+check('KRITISCH: eine fremde Person kann ihn nicht aendern',
+    spesen_aendern($pdo, $ANDERE, $id, $feld(['betrag_rappen' => 1]), false, null, null) === 'nicht_gefunden');
+check('Und der Betrag steht danach unveraendert da',
+    spesen_eigene($pdo, $ICH)[0]['betrag_rappen'] === 1250);
+check('Ein ausdrueckliches Entfernen loescht den Beleg dann doch',
+    spesen_aendern($pdo, $ICH, $id, $feld(['betrag_rappen' => 1250]), true, null, null) === 'ok'
+    && spesen_eigene($pdo, $ICH)[0]['hat_beleg'] === false);
+
+// ── Einreichen ────────────────────────────────────────────────────────
+check('Einreichen geht aus "erfasst"', spesen_einreichen($pdo, $ICH, $id) === 'ok');
+check('Der Zustand steht danach auf "eingereicht"',
+    spesen_eigene($pdo, $ICH)[0]['status'] === 'eingereicht');
+check('Und der Zeitpunkt ist vermerkt', spesen_eigene($pdo, $ICH)[0]['eingereicht_am'] !== null);
+check('KRITISCH: ein zweites Einreichen prallt ab',
+    spesen_einreichen($pdo, $ICH, $id) === 'nicht_mehr_erfasst');
+
+// DIE Regel, um die es geht: Ab dem Einreichen ist der Beleg fuer die
+// Verwaltung eine feste Groesse. Liesse er sich noch umschreiben, waere die
+// Freigabe auf einen anderen Betrag erteilt worden als den, der danach
+// dasteht.
+check('KRITISCH: ein eingereichter Beleg laesst sich NICHT mehr aendern',
+    spesen_aendern($pdo, $ICH, $id, $feld(['betrag_rappen' => 999999]), false, null, null) === 'nicht_mehr_erfasst');
+check('Und der Betrag ist wirklich unveraendert geblieben',
+    spesen_eigene($pdo, $ICH)[0]['betrag_rappen'] === 1250);
+check('KRITISCH: ein eingereichter Beleg laesst sich NICHT loeschen',
+    spesen_loeschen($pdo, $ICH, $id) === 'nicht_mehr_erfasst');
+check('Er steht danach noch da', count(spesen_eigene($pdo, $ICH)) === 1);
+
+// Jetzt sieht die Verwaltung ihn -- und erst jetzt.
+$vw = spesen_liste_verwaltung($pdo, 'eingereicht');
+check('KRITISCH: jetzt erscheint er in der Verwaltungsliste', count($vw) === 1);
+check('Mit einem fertigen Anzeigenamen aus dem Stamm', ($vw[0]['person'] ?? '') === 'Dario Beispiel');
+check('Der Filter greift: unter "freigegeben" steht er nicht',
+    spesen_liste_verwaltung($pdo, 'freigegeben') === []);
+
+// ── Zurueckziehen ─────────────────────────────────────────────────────
+check('Zurueckziehen geht, solange nicht entschieden ist',
+    spesen_zurueckziehen($pdo, $ICH, $id) === 'ok');
+check('Danach liegt er wieder in der eigenen Mappe',
+    spesen_eigene($pdo, $ICH)[0]['status'] === 'erfasst');
+check('Und der Einreiche-Zeitpunkt ist wieder leer',
+    spesen_eigene($pdo, $ICH)[0]['eingereicht_am'] === null);
+check('KRITISCH: die Verwaltung sieht ihn danach wieder NICHT',
+    spesen_liste_verwaltung($pdo, 'alle') === []);
+check('Ein erfasster Beleg laesst sich nicht zurueckziehen',
+    spesen_zurueckziehen($pdo, $ICH, $id) === 'nicht_eingereicht');
+
+// ── Entscheiden ───────────────────────────────────────────────────────
+check('KRITISCH: ein erfasster Beleg laesst sich nicht entscheiden -- auch nicht mit Recht',
+    spesen_entscheiden($pdo, $VERWALTUNG, $id, 'freigegeben', null) === 'nicht_eingereicht');
+spesen_einreichen($pdo, $ICH, $id);
+check('KRITISCH: eine Ablehnung ohne Begruendung wird abgewiesen',
+    spesen_entscheiden($pdo, $VERWALTUNG, $id, 'abgelehnt', '   ') === 'grund_fehlt');
+check('Und der Beleg ist danach unveraendert eingereicht',
+    spesen_eigene($pdo, $ICH)[0]['status'] === 'eingereicht');
+check('Ein erfundener Status wird abgewiesen',
+    spesen_entscheiden($pdo, $VERWALTUNG, $id, 'genehmigt', null) === 'status_unbekannt');
+check('Eine Ablehnung mit Begruendung geht durch',
+    spesen_entscheiden($pdo, $VERWALTUNG, $id, 'abgelehnt', 'Bitte über den Materialantrag.') === 'ok');
+$nachher = spesen_eigene($pdo, $ICH)[0];
+check('Der Grund steht bei der Person', $nachher['ablehnung_grund'] === 'Bitte über den Materialantrag.');
+check('Und wer entschieden hat, ist vermerkt',
+    (int)$pdo->query("SELECT entschieden_von FROM spesen WHERE id = $id")->fetchColumn() === $VERWALTUNG);
+
+// Erneutes Entscheiden ueberschreibt bewusst -- aber der Ablehnungsgrund
+// darf nicht stehenbleiben, sonst traegt ein freigegebener Beleg einen Text,
+// der ihn ablehnt.
+// Der Grund wird hier ABSICHTLICH mitgeschickt, obwohl freigegeben wird --
+// die Oberflaeche tut das auch (sie sendet das Feld immer mit). Wuerde die
+// Regel ihn einfach uebernehmen, traege ein freigegebener Beleg einen Text,
+// der ihn ablehnt. Mit einem leeren Grund zu pruefen waere wertlos gewesen:
+// Die Gegenprobe blieb damit gruen.
+check('Ein Entscheid laesst sich korrigieren',
+    spesen_entscheiden($pdo, $VERWALTUNG, $id, 'freigegeben', 'versehentlich mitgeschickt') === 'ok');
+check('KRITISCH: bei der Freigabe verschwindet der Ablehnungsgrund, auch wenn einer mitkommt',
+    spesen_eigene($pdo, $ICH)[0]['ablehnung_grund'] === null);
+
+// Nach dem Entscheid ist Schluss: Ein Entscheid ist ein Beleg, keine Notiz.
+check('KRITISCH: ein entschiedener Beleg laesst sich nicht zurueckziehen',
+    spesen_zurueckziehen($pdo, $ICH, $id) === 'nicht_eingereicht');
+check('KRITISCH: und nicht loeschen', spesen_loeschen($pdo, $ICH, $id) === 'nicht_mehr_erfasst');
+check('KRITISCH: und nicht aendern',
+    spesen_aendern($pdo, $ICH, $id, $feld(), false, null, null) === 'nicht_mehr_erfasst');
+
+// ── Loeschen, wo es erlaubt ist ───────────────────────────────────────
+$id2 = spesen_anlegen($pdo, $ICH, $feld());
+check('Ein erfasster Beleg laesst sich loeschen', spesen_loeschen($pdo, $ICH, $id2) === 'ok');
+check('Und ist danach weg', count(spesen_eigene($pdo, $ICH)) === 1);
+check('Ein zweites Loeschen findet ihn nicht mehr',
+    spesen_loeschen($pdo, $ICH, $id2) === 'nicht_gefunden');
+
+// ── Trennung der Personen ─────────────────────────────────────────────
+$fremd = spesen_anlegen($pdo, $ANDERE, $feld(['betrag_rappen' => 4200]));
+check('KRITISCH: die eigene Liste zeigt keine fremden Belege',
+    count(spesen_eigene($pdo, $ICH)) === 1 && count(spesen_eigene($pdo, $ANDERE)) === 1);
+spesen_einreichen($pdo, $ANDERE, $fremd);
+$alle = spesen_liste_verwaltung($pdo, 'alle');
+check('Die Verwaltung sieht beide Personen', count($alle) === 2);
+check('Auch ohne Vor-/Nachnamen steht ein Name da, nicht eine leere Zelle',
+    in_array('anna.beispiel', array_column($alle, 'person'), true));
+
+// ── Sortierung ────────────────────────────────────────────────────────
+$alt = spesen_anlegen($pdo, $ICH, $feld(['datum' => '2026-01-05']));
+$neu = spesen_anlegen($pdo, $ICH, $feld(['datum' => '2026-05-05']));
+$reihe = array_column(spesen_eigene($pdo, $ICH), 'datum');
+check('Die neuesten Belege stehen oben',
+    $reihe[0] === '2026-05-05' && $reihe[count($reihe) - 1] === '2026-01-05');
+
 echo ($ok + count($bad)) . " Pruefungen ausgefuehrt, $ok bestanden\n";
 foreach ($bad as $b) { echo "X $b\n"; }
 exit(count($bad) ? 1 : 0);

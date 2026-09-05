@@ -33,10 +33,8 @@ if (!hat_tabelle($pdo, 'spesen')) {
     json_response(['status' => 'error', 'message' => 'nicht gefunden'], 404);
 }
 
-$stmt = $pdo->prepare("SELECT beleg, beleg_mime FROM spesen WHERE id = ? AND status <> 'erfasst'");
-$stmt->execute([$id]);
-$r = $stmt->fetch(PDO::FETCH_ASSOC);
-if (!$r || $r['beleg'] === null || $r['beleg_mime'] === null) {
+$r = spesen_beleg_verwaltung($pdo, $id);
+if ($r === null) {
     json_response(['status' => 'error', 'message' => 'Zu diesem Eintrag gibt es keinen Beleg'], 404);
 }
 

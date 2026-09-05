@@ -36,10 +36,8 @@ if (!hat_tabelle($pdo, 'spesen')) {
 
 // mitarbeiter_id in der WHERE-Bedingung, nicht erst im Vergleich danach:
 // Ein fremder Beleg wird gar nicht erst gelesen.
-$stmt = $pdo->prepare('SELECT beleg, beleg_mime FROM spesen WHERE id = ? AND mitarbeiter_id = ?');
-$stmt->execute([$id, $ich]);
-$r = $stmt->fetch(PDO::FETCH_ASSOC);
-if (!$r || $r['beleg'] === null || $r['beleg_mime'] === null) {
+$r = spesen_beleg_eigen($pdo, $ich, $id);
+if ($r === null) {
     json_response(['status' => 'error', 'message' => 'Zu diesem Eintrag gibt es keinen Beleg'], 404);
 }
 

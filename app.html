@@ -1532,6 +1532,17 @@ const W = {
     spesenStatusFreigegeben: 'Freigegeben',
     spesenStatusAbgelehnt: 'Abgelehnt',
     spesenNochNichtEingereicht: 'Noch nicht eingereicht — liegt bei dir.',
+    // Warteschlange ohne Verbindung (ENT-413). Ein wartender Beleg ist NICHT
+    // dasselbe wie ein erfasster: Er liegt nur auf dem Gerät. Wer das
+    // verwechselt, wechselt das Telefon und wundert sich.
+    spesenWartet: 'Wartet auf Übertragung',
+    spesenWarteHinweis: 'Ohne Verbindung gespeichert — liegt nur auf diesem Gerät. Wird übertragen, sobald du wieder online bist.',
+    spesenWarteGesichert: 'Ohne Verbindung gespeichert. Wird übertragen, sobald du online bist.',
+    spesenWarteVoll: 'Kein Platz mehr auf dem Gerät. Dieser Beleg braucht eine Verbindung — bitte später erneut versuchen.',
+    spesenWarteGesendet: 'Wartende Belege übertragen.',
+    spesenWarteAbgelehnt: 'Ein wartender Beleg wurde nicht angenommen und ist verworfen: ',
+    spesenVerwerfen: 'Verwerfen',
+    spesenVerwerfenFrage: 'Diesen wartenden Beleg verwerfen? Er ist noch nirgends gespeichert.',
     // Einstellungen (ENT-398)
     einstellungen: 'Einstellungen', darstellung: 'Darstellung',
     themaDunkel: 'Dunkle Darstellung',
@@ -3990,13 +4001,76 @@ let spesenEingerichtet = true;
 let spesenBelegNeu = null;
 let spesenBelegWeg = false;
 
+// ── Ohne Verbindung (ENT-413) ─────────────────────────────────────────
+// Eine Tankquittung entsteht an der Tankstelle, und dort ist der Empfang
+// oft schlecht -- genau der Ort, an dem ein "Netzfehler" den Eintrag
+// verlieren wuerde. Gleiches Muster wie bei den Vorfallmeldungen
+// (EV_WARTESCHLANGE) und den Kontrollpunkt-Scans.
+//
+// WICHTIG in der Darstellung: Ein wartender Beleg ist NICHT dasselbe wie
+// ein erfasster. Er liegt nur auf diesem Geraet -- nicht auf dem Server,
+// nicht in der Sicherung, und ein Geraetewechsel verliert ihn. Die Karte
+// sagt das ausdruecklich, statt ihn wie einen gespeicherten aussehen zu
+// lassen ("unbekannt" darf nie wie "keine" aussehen, gleiche Familie).
+const SP_WARTESCHLANGE = 'sop_spesen_warteschlange';
+
+function spWarteLesen() {
+  try { return JSON.parse(localStorage.getItem(SP_WARTESCHLANGE) || '[]'); } catch { return []; }
+}
+// Gibt zurueck, OB es geklappt hat. Ein voller Speicher wird nicht
+// verschluckt: Sonst verschwaende der Beleg lautlos, und das ist der eine
+// Fehler, den man hier nicht machen darf.
+function spWarteSchreiben(liste) {
+  try { localStorage.setItem(SP_WARTESCHLANGE, JSON.stringify(liste)); return true; }
+  catch { return false; }
+}
+
+// Sendet die wartenden Belege der Reihe nach. Einzeln und nicht als Bündel:
+// Belege entstehen einzeln, und so sagt jede Absage, welchen Beleg sie
+// betrifft.
+function spWarteSenden() {
+  const liste = spWarteLesen();
+  if (!liste.length) { return Promise.resolve(false); }
+  let etwasGetan = false;
+  return liste.reduce((kette, eintrag) => kette.then(() =>
+    api('meine_spesen.php', { method: 'POST', body: eintrag.rumpf }).then(({ ok, status, data }) => {
+      const entfernen = () => {
+        spWarteSchreiben(spWarteLesen().filter(x => x.lokal_id !== eintrag.lokal_id));
+        etwasGetan = true;
+      };
+      if (ok && data.status === 'ok') { entfernen(); return; }
+      // Immer noch keine Verbindung: liegen lassen, naechster Versuch.
+      if (status === 0) { return; }
+      // Inhaltlich abgewiesen (etwa ein Betrag ueber der Grenze): NICHT
+      // ewig wiederholen, sonst blockiert dieser eine Beleg alle spaeteren.
+      // Er verschwindet -- aber nicht stillschweigend, die Person erfaehrt
+      // den Grund und kann ihn neu erfassen.
+      entfernen();
+      toast(w('spesenWarteAbgelehnt') + (data.message || ''));
+    })
+  ), Promise.resolve()).then(() => etwasGetan);
+}
+
+// Beim Wiederverbinden von selbst -- wie bei Rundgang und Vorfallmeldung.
+window.addEventListener('online', () => {
+  spWarteSenden().then(getan => {
+    if (!getan) { return; }
+    toast(w('spesenWarteGesendet'));
+    if ($('pr-spesen') && $('pr-spesen').style.display !== 'none') {
+      ladeSpesen().then(zeichneSpesen);
+    }
+  });
+});
+
 function spesenSeiteAuf() {
   const h = $('pr-haupt'), u = $('pr-spesen');
   if (!h || !u) return;
   h.style.display = 'none';
   u.style.display = '';
   window.scrollTo(0, 0);
-  ladeSpesen().then(zeichneSpesen);
+  // Erst die wartenden loswerden, dann laden -- sonst zeigt die Liste einen
+  // Beleg als "wartend", der gerade angekommen ist.
+  spWarteSenden().then(() => ladeSpesen()).then(zeichneSpesen);
 }
 function spesenSeiteZu() {
   const h = $('pr-haupt'), u = $('pr-spesen');
@@ -4031,7 +4105,29 @@ function zeichneSpesen() {
   let html = `<div style="padding:14px 16px 6px">
     <button class="btn btn-primary" style="width:100%" onclick="spNeu()">${esc(w('spesenNeu'))}</button>
   </div>`;
-  if (!meineSpesen.length) {
+
+  // Wartende zuerst: Sie sind das, worum man sich noch kuemmern muss.
+  const wartend = spWarteLesen();
+  html += wartend.map(x => `<div class="karte">
+      <div class="karte-bd">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <b style="font-size:14.5px">CHF ${esc(spesenChf(x.rumpf.betrag_rappen))}</b>
+          <span class="marke m-a">${esc(w('spesenWartet'))}</span>
+        </div>
+        <div style="font-size:13px;color:var(--ink-2);margin-top:4px">
+          ${dmy(x.rumpf.datum)} · ${esc(spesenKategorien[x.rumpf.kategorie] || x.rumpf.kategorie)}
+        </div>
+        ${x.rumpf.notiz ? `<div style="font-size:13px;color:var(--ink-2);margin-top:2px">${esc(x.rumpf.notiz)}</div>` : ''}
+        <div style="font-size:13px;color:var(--ink-3);margin-top:6px">${esc(w('spesenWarteHinweis'))}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+          <button class="btn btn-plain" onclick="spWarteVerwerfen('${esc(x.lokal_id)}')">${esc(w('spesenVerwerfen'))}</button>
+        </div>
+      </div>
+    </div>`).join('');
+
+  // "Noch keine Belege" darf nur dastehen, wenn wirklich keine da sind --
+  // ein wartender Beleg ist einer.
+  if (!meineSpesen.length && !wartend.length) {
     el.innerHTML = html + LEER(w('spesenKeine'), w('spesenKeineText'),
       '<path d="M6 2h9l4 4v16l-3-1.6L13 22l-3-1.6L7 22l-3-1.6V4a2 2 0 0 1 2-2z"/><line x1="8.5" y1="8.5" x2="14" y2="8.5"/><line x1="8.5" y1="12" x2="14" y2="12"/>');
     return;
@@ -4183,12 +4279,40 @@ function spSpeichern() {
   if (blattId) { rumpf.id = blattId; }
   if (spesenBelegNeu) { rumpf.beleg = String(spesenBelegNeu).slice(String(spesenBelegNeu).indexOf(',') + 1); }
   else if (spesenBelegWeg) { rumpf.beleg_entfernen = true; }
-  api('meine_spesen.php', { method: 'POST', body: rumpf }).then(({ ok, data }) => {
-    if (!ok || data.status !== 'ok') { toast(data.message || w('netzfehler')); return; }
-    toast(w('spesenGespeichert'));
+  api('meine_spesen.php', { method: 'POST', body: rumpf }).then(({ ok, status, data }) => {
+    if (ok && data.status === 'ok') {
+      toast(w('spesenGespeichert'));
+      blattZu();
+      ladeSpesen().then(zeichneSpesen);
+      return;
+    }
+    // status 0 heisst: gar keine Verbindung -- nicht "abgelehnt". Nur dann
+    // wandert der Beleg in die Warteschlange. Eine inhaltliche Absage
+    // (Betrag zu gross, Datum in der Zukunft) gehoert NICHT dorthin, sie
+    // wuerde bei jedem Versuch erneut abgewiesen.
+    if (status !== 0) { toast(data.message || w('netzfehler')); return; }
+    // Ein bereits gespeicherter Beleg wird nicht in die Warteschlange
+    // gelegt: Sie kennt nur das Anlegen, und ein wartendes "Aendern"
+    // koennte eine spaetere Aenderung ueberholen.
+    if (blattId) { toast(w('netzfehler')); return; }
+    const liste = spWarteLesen();
+    liste.push({ lokal_id: 'sp' + Date.now() + '-' + Math.random().toString(36).slice(2, 8), rumpf });
+    if (!spWarteSchreiben(liste)) {
+      // Kein Platz -- meist ein grosses PDF. Das Formular bleibt offen,
+      // damit nichts verloren geht.
+      toast(w('spesenWarteVoll'));
+      return;
+    }
+    toast(w('spesenWarteGesichert'));
     blattZu();
-    ladeSpesen().then(zeichneSpesen);
+    zeichneSpesen();
   });
+}
+
+function spWarteVerwerfen(lokalId) {
+  if (!confirm(w('spesenVerwerfenFrage'))) { return; }
+  spWarteSchreiben(spWarteLesen().filter(x => x.lokal_id !== lokalId));
+  zeichneSpesen();
 }
 
 function spSchalten(id, rumpf, meldung) {
