@@ -64,6 +64,11 @@ async function anmelden(page, rechte) {
   await page.fill('#gName', 'a'); await page.fill('#gPass', 'x'); await page.click('#gBtn');
   await page.waitForSelector('#shell.on');
   await page.waitForTimeout(300);
+  // Volle Leiste ausdruecklich erzwingen: In der Kopfleiste (ENT-407, seit
+  // hier Standard) sind .nav-kinder unabhaengig vom Rechte-Gating immer
+  // display:none -- das wuerde die folgenden Sichtbarkeitspruefungen
+  // verfaelschen, die ausschliesslich das Rechte-Gating selbst pruefen.
+  await page.evaluate(() => huelleSetzen('voll'));
 }
 
 const browser = await chromium.launch({ executablePath: browserPfad() });

@@ -133,6 +133,11 @@ await mock(p6, true);
 await p6.goto(`file://${WURZEL}/dashboard.html`);
 await p6.fill('#gName', 'hansmuster'); await p6.fill('#gPass', 'x'); await p6.click('#gBtn');
 await p6.waitForSelector('#shell.on'); await p6.waitForTimeout(500);
+// Volle Leiste ausdruecklich erzwingen: Der erste Klick auf #btnSchmal
+// fuehrt seit ENT-407 nicht mehr in einen schmalen Icon-Zustand, sondern
+// in die Kopfleiste -- dort sind Fussteil-Knoepfe wie "Zur App" ohnehin
+// schon ohne Beschriftung, ohne dass diese Pruefung das aussagen will.
+await p6.evaluate(() => huelleSetzen('voll'));
 const daKnopf6 = await p6.evaluate(() => !!document.getElementById('nav-zurapp'));
 if (!daKnopf6) { bad.push('Wechsel-Knopf fehlt auch auf dem Desktop'); }
 else {

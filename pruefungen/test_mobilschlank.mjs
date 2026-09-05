@@ -235,6 +235,11 @@ await m.close();
 const d = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 d.setDefaultTimeout(5000);
 await mock(d); await anmelden(d);
+// Volle Leiste ausdruecklich erzwingen: Diese Suite prueft, dass der
+// mobile Zuschnitt den Desktop nicht beeinflusst -- gemessen wird darum
+// die klassische, seitliche Leiste, nicht die seit ENT-407 fuer neue
+// Profile standardmaessige Kopfleiste.
+await d.evaluate(() => huelleSetzen('voll'));
 const menueD = await d.evaluate(() => [...document.querySelectorAll('.side-nav .nav-item')]
   .filter(e => e.getClientRects().length)
   .map(e => (e.querySelector('.lbl') || e).textContent.trim()));

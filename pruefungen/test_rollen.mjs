@@ -129,6 +129,12 @@ const anmelden = async () => {
   await page.fill('#gName', 'chefin'); await page.fill('#gPass', 'x'); await page.click('#gBtn');
   try { await page.waitForSelector('#shell.on', { timeout: 4000 }); } catch { return false; }
   await page.waitForTimeout(500);
+  // Volle Leiste ausdruecklich erzwingen: sichtbar() prueft weiter unten
+  // Unterpunkte wie nav-admin-mitarbeiter/-betrieb per Rechte-Gating
+  // (display:none). In der Kopfleiste (ENT-407, seit hier Standard) sind
+  // .nav-kinder unabhaengig vom Recht immer display:none -- das wuerde
+  // das Rechte-Gating selbst unpruefbar machen.
+  await page.evaluate(() => huelleSetzen('voll'));
   return true;
 };
 

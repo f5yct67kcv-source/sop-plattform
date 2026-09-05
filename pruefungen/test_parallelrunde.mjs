@@ -333,6 +333,10 @@ await dash.route('**maps.googleapis.com/**', r => r.abort());
 await dash.goto(`file://${WURZEL}/dashboard.html`);
 await dash.fill('#gName', 'adrian'); await dash.fill('#gPass', 'x'); await dash.click('#gBtn');
 await dash.waitForSelector('#kpiGrid .kpi-val', { timeout: 15000 }).catch(() => {});
+// Volle Leiste ausdruecklich erzwingen: Diese Suite prueft parallele
+// Runden, nicht die Huelle (ENT-407) -- der Klick auf den Unterpunkt
+// unten setzt die ausgeklappte Leiste voraus.
+await dash.evaluate(() => huelleSetzen('voll'));
 await klick(dash, '#nav-planung');
 await klick(dash, '#nav-planung-einsaetze');
 await dash.waitForSelector('#plTable table', { timeout: 15000 }).catch(() => {});
