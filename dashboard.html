@@ -9937,6 +9937,14 @@ function ofKarte(b, heute) {
     <div class="kk-koerper">
       <dl class="dl">${zeilen.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>
       <div class="kk-tasten">
+        <button class="btn btn-plain btn-sm" onclick="event.stopPropagation(); ofHerunterladen(${id}, this)">
+          <svg class="i i-sm" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Herunterladen
+        </button>
+        <button class="btn btn-plain btn-sm" onclick="event.stopPropagation(); ofTeilen(${id}, this)">
+          <svg class="i i-sm" viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+          Teilen
+        </button>
         <button class="btn btn-plain btn-sm" onclick="event.stopPropagation(); ofVorschau(${id})">Vorschau</button>
         <button class="btn btn-plain btn-sm" onclick="event.stopPropagation(); ofOeffnen(${id})">Bearbeiten</button>
         <button class="btn btn-plain btn-sm" onclick="event.stopPropagation(); ofDrucken(${id})">Drucken</button>
@@ -10986,10 +10994,88 @@ function ofDrucken(id) {
   }).catch(() => toast('Der Beleg liess sich nicht laden.'));
 }
 
+// ── Offerte als PDF herunterladen und teilen (ENT-403) ─────────────────────
+//
+// Gleiches Muster wie beim Rapport (ENT-399/ENT-400): dieselbe verborgene
+// Huelle #rapportBlattHuelle/#rapportBlatt, dieselbe html2pdf-Einstellung,
+// derselbe Rueckfallweg beim Teilen. Der Unterschied zum Rapport ist, dass
+// die Zahlen NICHT aus der Liste stammen duerfen: belege[] traegt nur die
+// Kopfdaten, die Positionen und Summen rechnet beleg_lesen.php frisch aus
+// (siehe ofDrucken). Darum erst laden, dann setzen -- was heruntergeladen
+// wird, soll das sein, was gespeichert ist.
+function ofDateiname(b) {
+  const teil = String(b.nummer || 'Offerte').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return (teil || 'Offerte') + '.pdf';
+}
+
+function ofPdfBauen(id) {
+  return api('beleg_lesen.php?id=' + Number(id)).then(({ ok, data }) => {
+    if (!ok || !data || data.status !== 'ok') {
+      throw new Error((data && data.message) || 'Der Beleg liess sich nicht laden.');
+    }
+    return html2pdfLaden().then(() => {
+      $('rapportBlatt').innerHTML = ofBlatt(data.beleg, data.kunde, data.person);
+      return html2pdf().set({
+        margin: 10,
+        image: { type: 'jpeg', quality: 0.95 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: ['css', 'legacy'] },
+      }).from($('rapportBlatt')).outputPdf('blob').then(blob => ({ blob, beleg: data.beleg }));
+    });
+  });
+}
+
+function ofHerunterladen(id, knopf) {
+  if (!id) { toast('Der Beleg muss zuerst gespeichert werden.'); return; }
+  if (knopf) { knopf.disabled = true; }
+  ofPdfBauen(id).then(({ blob, beleg }) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = ofDateiname(beleg);
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    if (knopf) { knopf.disabled = false; }
+  }).catch(() => {
+    if (knopf) { knopf.disabled = false; }
+    toast('Die Offerte liess sich nicht erzeugen.');
+  });
+}
+
+function ofTeilen(id, knopf) {
+  if (!id) { toast('Der Beleg muss zuerst gespeichert werden.'); return; }
+  if (knopf) { knopf.disabled = true; }
+  ofPdfBauen(id).then(({ blob, beleg }) => {
+    const name = ofDateiname(beleg);
+    const datei = new File([blob], name, { type: 'application/pdf' });
+    if (navigator.canShare && navigator.canShare({ files: [datei] })) {
+      return navigator.share({ files: [datei], title: name });
+    }
+    // Kein Datei-Teilen auf diesem Geraet: herunterladen UND es sagen --
+    // ein Knopf, der wortlos nichts tut, ist von einem Fehler nicht zu
+    // unterscheiden (dieselbe Regel wie bei kdRapportTeilen).
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    toast('Teilen wird hier nicht unterstützt — die Offerte wurde stattdessen heruntergeladen.');
+    if (knopf) { knopf.disabled = false; }
+  }).catch(err => {
+    if (knopf) { knopf.disabled = false; }
+    if (err && err.name === 'AbortError') { return; }
+    toast('Die Offerte liess sich nicht teilen.');
+  });
+}
+
 // Vorschau (ENT-192): dasselbe Blatt wie ofDrucken(), aber in einem Dialog
 // statt im Druckdialog -- "wie sieht es aus", ohne einen Druckvorgang
-// auszuloesen. Es gibt in diesem Projekt keine PDF-Bibliothek: Diese
-// Ansicht IST das Dokument (siehe ofBlatt()), kein separat erzeugtes PDF.
+// auszuloesen. Diese Ansicht IST das Dokument (siehe ofBlatt()).
+// Nachtrag ENT-403: Der Satz "es gibt in diesem Projekt keine PDF-
+// Bibliothek", der hier bis dahin stand, stimmt nicht mehr -- html2pdf wird
+// seit ENT-322 bei Bedarf nachgeladen (html2pdfLaden()) und erzeugt seit
+// ENT-399 auch Rapport- und seit ENT-403 Offerten-PDFs. An ofBlatt() aendert
+// das nichts: Dasselbe Blatt geht in die Vorschau, in den Druck und ins PDF.
 function ofVorschau(id) {
   if (!id) { toast('Der Beleg muss zuerst gespeichert werden.'); return; }
   api('beleg_lesen.php?id=' + Number(id)).then(({ ok, data }) => {

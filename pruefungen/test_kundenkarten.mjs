@@ -1,5 +1,6 @@
 // Alle vier Kunden-Reiter als aufklappbare Karten auf dem Handy
-// (ENT-400: Rapporte und Offerten, ENT-401: Adressen und Objekte).
+// (ENT-400: Rapporte und Offerten, ENT-401: Adressen und Objekte,
+// ENT-403: Herunterladen und Teilen auch bei der Offerte).
 //
 // Der Anlass war eine MESSUNG, keine Meinung: Beide Listen sind neun Spalten
 // breit. Auf 390 px blieb davon ein waagrecht schiebbarer Streifen uebrig, in
@@ -64,6 +65,19 @@ const mock = page => page.route('**/api/**', r => {
     rechte: ['kunden', 'abgleich', 'personal_lesen', 'betrieb', 'plan'] });
   if (u.includes('rapport_list')) return send(RAP);
   if (u.includes('beleg_list')) return send(BEL);
+  // Das PDF darf NICHT aus der Liste gebaut werden: belege[] traegt nur die
+  // Kopfdaten, beleg_lesen.php rechnet Positionen und Summen frisch. Der
+  // Mock bildet das nach, damit die Pruefung denselben Weg geht wie der Code.
+  if (u.includes('beleg_lesen')) {
+    const id = Number((u.split('id=')[1] || '').split('&')[0]);
+    const b = BEL.belege.find(x => Number(x.id) === id) || BEL.belege[0];
+    return send({ status: 'ok',
+      beleg: { ...b, rabatt_bp: 0,
+        positionen: [{ id: 1, text: 'Verkehrsdienst', menge: 5, einheit: 'h',
+                       einzelpreis_rappen: 19420, mwst_bp: 810 }] },
+      kunde: { id: 1, name: 'Beispiel Consulting GmbH', strasse: 'Mustergasse 2', plz: '4600', ort: 'Olten' },
+      person: null });
+  }
   if (u.includes('kunden_list')) return send({ status: 'ok', kunden: [
     { id: 1, name: 'Beispiel Consulting GmbH', kundennummer: 'K0001', strasse: 'Mustergasse', hausnummer: '2',
       plz: '4600', ort: 'Olten', telefon: '062 000 00 00', email: 'info@beispiel.ch',
@@ -280,6 +294,29 @@ const ofTasten = await m.evaluate(() => [...document.querySelectorAll('#ofTable 
 check(`Die offene Offerte bietet Vorschau, Bearbeiten und Drucken (${ofTasten.join(', ')})`,
   ofTasten.some(t => /Vorschau/.test(t)) && ofTasten.some(t => /Bearbeiten/.test(t))
   && ofTasten.some(t => /Drucken/.test(t)));
+// Seit ENT-403 dieselben zwei Wege wie beim Rapport (ENT-400) -- das war der
+// ausdrueckliche Wunsch: "so wie es bei Rapporte schon ist".
+check('KRITISCH: die offene Offerte bietet auch Herunterladen und Teilen',
+  ofTasten.some(t => /Herunterladen/.test(t)) && ofTasten.some(t => /Teilen/.test(t)));
+const ofZuKlein = await m.evaluate(() => [...document.querySelectorAll('#ofTable .ag-karte .kk-tasten .btn')]
+  .filter(b => b.getBoundingClientRect().height < 43.9).length);
+check('Die Knoepfe der Offerten-Karte sind mindestens 44 px hoch', ofZuKlein === 0);
+
+// Und wieder: geprueft wird, ob wirklich eine Datei entsteht -- nicht, ob
+// eine Funktion existiert.
+const ofDlVersprechen = m.waitForEvent('download', { timeout: 20000 }).catch(() => null);
+await m.evaluate(() => {
+  const b = [...document.querySelectorAll('#ofTable .ag-karte .kk-tasten .btn')]
+    .find(x => /Herunterladen/.test(x.textContent));
+  if (b) { b.click(); }
+});
+const ofDatei = await ofDlVersprechen;
+check('KRITISCH: "Herunterladen" erzeugt bei der Offerte tatsaechlich eine Datei', !!ofDatei);
+check(`Und zwar ein PDF, benannt nach der Offertennummer (${ofDatei ? ofDatei.suggestedFilename() : '–'})`,
+  !!ofDatei && /^OF-2026-004\.pdf$/.test(ofDatei.suggestedFilename()));
+await m.waitForTimeout(300);
+check('Der Klick klappt die Offerten-Karte nicht zu',
+  kn(await kartenDaten('ofTable'), 0).offen);
 
 // Sortierung der Offerten: dieselbe Aussage wie oben, eigene Zustandsgroesse.
 const ofDaten = async () => (await kartenDaten('ofTable')).map(x => x.datum);
