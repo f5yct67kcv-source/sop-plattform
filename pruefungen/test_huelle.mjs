@@ -74,10 +74,14 @@ const zustand = p => p.evaluate(() => {
   const top = await mass(p, '.topbar');
   check('KRITISCH: der zweite Klick blendet die Leiste aus', z.aus && !z.schmal);
   check('KRITISCH: sie liegt jetzt waagrecht ueber die volle Breite', side.w === 1600 && side.x === 0 && side.y === 0);
-  check('Und ist so hoch wie die Werkzeugleiste (60 px)', side.h === 60);
+  // ENT-411: 70 px statt 60. Die Kopfleiste traegt Symbol UND Beschriftung
+  // uebereinander, die Werkzeugleiste darunter eine einzige Textzeile --
+  // sie sind darum verschieden hoch, und das ist gewollt.
+  check('Und ist 70 px hoch', side.h === 70);
+  check('KRITISCH: die Werkzeugleiste waechst NICHT mit', top.h === 60);
   check('Der Inhalt rueckt nicht mehr zur Seite', main.ml === '0px');
-  check('Sondern nach unten -- die Leiste verdeckt ihn nicht', main.pt === '60px');
-  check('Die Werkzeugleiste klebt unter der Navigation, nicht darueber', top.y === 60);
+  check('Sondern nach unten -- die Leiste verdeckt ihn nicht', main.pt === '70px');
+  check('Die Werkzeugleiste klebt unter der Navigation, nicht darueber', top.y === 70);
 
   const breiteAus = (await mass(p, '.content')).w;
   check('KRITISCH: der gewonnene Platz wird zu Inhalt, nicht zu Rand',
@@ -162,8 +166,8 @@ try {
   await p.waitForTimeout(250);
   const z = await zustand(p), side = await mass(p, '#side'), main = await mass(p, '.main');
   check('KRITISCH: bei 1000 px erscheint die Kopfleiste wirklich', z.sideW === '0px');
-  check('Sie liegt waagrecht ueber die volle Breite', side.w === 1000 && side.h === 60);
-  check('Der Inhalt rueckt darunter', main.ml === '0px' && main.pt === '60px');
+  check('Sie liegt waagrecht ueber die volle Breite', side.w === 1000 && side.h === 70);
+  check('Der Inhalt rueckt darunter', main.ml === '0px' && main.pt === '70px');
   // Seit ENT-410 steht das Logo rechts aussen und der Fussteil klappt als
   // Menue darunter auf, statt in der Zeile zu stehen. Zu pruefen bleibt
   // dasselbe: dass sich in der 60 px hohen Leiste nichts ueberschneidet --
@@ -174,7 +178,7 @@ try {
     const b = document.querySelector('.side-brand').getBoundingClientRect();
     return { ueberlappt: n.right > b.left + 1,
              mittig: Math.abs((n.left + n.width / 2) - 500) <= 4,
-             einZeilig: document.querySelector('#side').scrollHeight <= 60 };
+             einZeilig: document.querySelector('#side').scrollHeight <= 70 };
   });
   check('KRITISCH: nichts ueberlappt bei 1000 px', platz.ueberlappt === false);
   check('Und die Symbole stehen auch dort mittig', platz.mittig);
@@ -195,7 +199,25 @@ try {
   const kompakt = await p.evaluate(() => huelleKompakt());
   const main = await mass(p, '.main');
   check('KRITISCH: unter 901 px greift der kompakte Zustand nicht', kompakt === false);
-  check('Der Inhalt bekommt keinen Kopfleisten-Abstand', main.pt !== '60px');
+  check('Der Inhalt bekommt keinen Kopfleisten-Abstand', main.pt !== '70px');
+  // ENT-411 ist querliegend: --top-h treibt ausser der Kopfleiste auch die
+  // Werkzeugleiste, den Schubladenkopf auf dem Handy und scroll-margin-top
+  // fuer Sprungmarken. Gewachsen ist NUR die Kopfleiste (eigener Wert
+  // --kopf-h). Waere stattdessen --top-h erhoeht worden, faende man den
+  // Fehler hier: Der Schubladenkopf auf dem Handy waere ohne Anlass 10 px
+  // hoeher, und jede Sprungmarke landete 10 px zu tief.
+  const unberuehrt = await p.evaluate(() => {
+    const tb = document.querySelector('.topbar').getBoundingClientRect();
+    const dh = document.querySelector('.drawer-hd');
+    const stil = getComputedStyle(document.documentElement);
+    return { topbar: Math.round(tb.height),
+             schublade: dh ? Math.round(parseFloat(getComputedStyle(dh).height)) : 60,
+             topH: stil.getPropertyValue('--top-h').trim() };
+  });
+  check('KRITISCH: die Werkzeugleiste ist auf dem Handy unveraendert 60 px',
+    unberuehrt.topbar === 60);
+  check('KRITISCH: der Schubladenkopf ebenso', unberuehrt.schublade === 60);
+  check('KRITISCH: --top-h ist unangetastet geblieben', unberuehrt.topH === '60px');
   await p.close();
 }
 
@@ -285,10 +307,23 @@ try {
     const it = document.querySelector('#nav-planung');
     const i = it.querySelector('svg.i').getBoundingClientRect();
     const l = it.querySelector('.lbl').getBoundingClientRect();
-    return { symbolOben: i.top < l.top, drin: it.getBoundingClientRect().bottom <= 60 };
+    const sub = document.querySelector('#topSub button, #topSub a');
+    return { symbolOben: i.top < l.top, drin: it.getBoundingClientRect().bottom <= 70,
+             lblPx: parseFloat(getComputedStyle(it.querySelector('.lbl')).fontSize),
+             subPx: sub ? parseFloat(getComputedStyle(sub).fontSize) : 0,
+             iconPx: Math.round(i.width) };
   });
   check('Das Symbol steht ueber der Beschriftung', paar.symbolOben);
-  check('Und alles bleibt in der 60 px hohen Leiste', paar.drin);
+  check('Und alles bleibt in der 70 px hohen Leiste', paar.drin);
+  // ENT-411, der eigentliche Anlass der Vergroesserung: Die Beschriftung der
+  // HAUPTnavigation war mit 9,5 px kleiner als die der Unternavigation in der
+  // Werkzeugleiste (13 px) -- eine umgekehrte Rangfolge, die man sieht, ohne
+  // sagen zu koennen warum. Geprueft wird das VERHAELTNIS, nicht die Zahl:
+  // Eine Pruefung auf "12 px" waere auch dann gruen, wenn die Unterreiter
+  // eines Tages auf 16 px wachsen und die Rangfolge wieder kippt.
+  check('KRITISCH: die Hauptnavigation ist nicht kleiner beschriftet als die Unternavigation',
+    paar.lblPx >= paar.subPx - 1.5);
+  check('Und ihr Symbol traegt die Zeile, statt sich zu verstecken', paar.iconPx >= 22);
 
   // Der Fussteil war bis ENT-410 eine Symbolreihe rechts in der Leiste --
   // ohne Schrift, sonst wurde die Zeile zu lang. Seither steht er ueberhaupt

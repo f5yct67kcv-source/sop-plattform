@@ -2945,9 +2945,18 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
    rechteAnwenden() unberührt.
    Ab 901 px -- derselben Grenze wie der schmale Zustand. */
 @media (min-width: 901px) {
-  .shell.aus { --side-w: 0px; }
+  /* ENT-411: Die Kopfleiste bekommt einen EIGENEN Wert und waechst auf
+     70 px. Bewusst nicht ueber --top-h: der treibt auch die Werkzeugleiste
+     darunter, den Schubladenkopf auf dem Handy und scroll-margin-top fuer
+     Sprungmarken. Waeren beide Leisten mitgewachsen, kostete die Aenderung
+     20 px Kopfhoehe statt 10 -- und die Werkzeugleiste traegt eine einzige
+     Textzeile, die keine zusaetzliche Hoehe braucht.
+     Die beiden Leisten sind darum verschieden hoch, und das ist gewollt:
+     Die obere traegt Symbol UND Beschriftung uebereinander, die untere eine
+     Zeile. */
+  .shell.aus { --side-w: 0px; --kopf-h: 70px; }
   .shell.aus .side {
-    right: 0; bottom: auto; width: auto; height: var(--top-h);
+    right: 0; bottom: auto; width: auto; height: var(--kopf-h);
     flex-direction: row; align-items: center; gap: 4px;
     padding: 0 14px; border-bottom: 1px solid var(--shell-line);
   }
@@ -2985,15 +2994,22 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
      ueberall sonst auch. Nur die Hauptnavigation bekommt sie; die Knoepfe
      im Fussteil (Einrichtung, Zur App, Abmelden) bleiben Symbole, sonst
      wird die Zeile auf schmalen Bildschirmen zu lang. */
+  /* ENT-411: Gemessen war die Beschriftung hier 9,5 px gross -- die
+     Unterreiter in der Werkzeugleiste direkt darunter sind 13 px. Die
+     HAUPTnavigation stand damit kleiner beschriftet da als die
+     Unternavigation; eine umgekehrte Rangfolge, die man sieht, ohne sagen
+     zu koennen warum. Waagrecht war reichlich Platz frei (gemessen 489 px
+     zwischen Navigation und Logo), senkrecht nicht -- darum wuchs die
+     Leiste mit, statt die Reiter in die vorhandenen 60 px zu quetschen. */
   .shell.aus .side-nav .nav-item {
-    flex-direction: column; justify-content: center; gap: 2px;
-    min-width: 62px; padding: 5px 8px;
+    flex-direction: column; justify-content: center; gap: 4px;
+    min-width: 84px; padding: 7px 10px;
   }
   .shell.aus .side-nav .nav-item .lbl {
-    display: block; font-size: 9.5px; font-weight: 650;
-    letter-spacing: .3px; line-height: 1.1; white-space: nowrap;
+    display: block; font-size: 12px; font-weight: 650;
+    letter-spacing: .2px; line-height: 1.1; white-space: nowrap;
   }
-  .shell.aus .side-nav .nav-item svg.i { width: 19px; height: 19px; }
+  .shell.aus .side-nav .nav-item svg.i { width: 24px; height: 24px; }
   /* ── Kontomenue am Logo (ENT-410)
      Wieder eine reine Darstellungsaenderung, aus demselben Grund wie oben:
      Dasselbe .side-foot wandert nicht im DOM umher, es legt sich als Blatt
@@ -3006,7 +3022,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
      eine Rasterzelle, die es beim Aufklappen gar nicht mehr braucht. */
   .shell.aus .side-foot {
     grid-column: auto;
-    position: absolute; top: calc(var(--top-h) + 4px); right: 14px; left: auto;
+    position: absolute; top: calc(var(--kopf-h) + 4px); right: 14px; left: auto;
     z-index: 60; width: 252px; max-width: calc(100vw - 28px);
     display: none; flex-direction: column; gap: 1px;
     padding: 7px; border-top: none;
@@ -3066,8 +3082,8 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
   .shell.aus.menue-offen .marken-knopf { background: var(--shell-hi); box-shadow: 0 0 0 2px var(--accent); }
   /* Der Inhalt rückt unter die Leiste statt neben sie. Die Werkzeugleiste
      klebt darunter, nicht darüber -- sonst verdeckt sie die Navigation. */
-  .shell.aus .main { padding-top: var(--top-h); }
-  .shell.aus .topbar { top: var(--top-h); }
+  .shell.aus .main { padding-top: var(--kopf-h); }
+  .shell.aus .topbar { top: var(--kopf-h); }
 }
 
 .btn-schmal { display: inline-flex; }
