@@ -169,6 +169,88 @@ check('KRITISCH: "Abgebrochen" zaehlt den einen Rundgang mit status=abgebrochen'
 check('KRITISCH: ohne Wächter-Status-Antwort zeigt "Aktive Wächter" einen Strich, keine erfundene Zahl',
   kpiTexte[0].includes('–'));
 
+// ── Gestalt: der Kennzahlen-Block ist so gross wie die Karte daneben
+// (ENT-417). Rueckmeldung Projektinhaber 2026-09-05 mit markiertem
+// Bildschirmfoto: "das Fenster sauber angleichen von der Groesse wie
+// nebenan".
+//
+// Gemessen am gerenderten Zustand, nicht im Quelltext nachgelesen: Die
+// vorige Fassung hatte den CONTAINER laengst auf Kartenhoehe stehen
+// (align-items: stretch) -- der INHALT stand darin trotzdem mittig
+// zwischen zwei Luecken, und ein margin-bottom aus der .grid-Basis zog die
+// Unterkante zusaetzlich nach oben. Eine Pruefung, die nur nach einer
+// CSS-Regel sucht, waere dabei gruen geblieben.
+//
+// Zweimal gemessen, mit KURZER und mit LANGER Waechterliste: Bei fast
+// gleich hohen Bloecken faellt eine mittige Ausrichtung kaum auf -- der
+// Fehler waechst erst mit dem Hoehenunterschied. Eine Messung bei nur
+// einer Hoehe haette 142 px Versatz nicht gesehen.
+const gemessen = () => page.evaluate(() => {
+  const karte = document.querySelector('#rdUebersicht .g-1-1 > .card');
+  const kacheln = [...document.querySelectorAll('#rdKpiGrid > .kpi')];
+  const k = karte.getBoundingClientRect();
+  const erste = kacheln[0].getBoundingClientRect();
+  const letzte = kacheln[kacheln.length - 1].getBoundingClientRect();
+  return {
+    nebeneinander: erste.left >= k.right - 1,
+    oben: Math.round(erste.top - k.top),
+    unten: Math.round(k.bottom - letzte.bottom),
+    hoehen: [...new Set(kacheln.map(e => Math.round(e.getBoundingClientRect().height)))],
+    kartenHoehe: Math.round(k.height),
+    zeilen: new Set(kacheln.map(e => Math.round(e.getBoundingClientRect().top))).size,
+    // Abstand der Fusszeile zur Kachel-Unterkante: In einer hohen Kachel
+    // soll sich der Inhalt verteilen (Beschriftung oben, Zahl darunter,
+    // Fusszeile unten) statt oben zu kleben und unten eine leere Haelfte
+    // zu lassen -- dieselbe Ordnung wie bei den groessenverstellbaren
+    // Containern der Haupt-Uebersicht.
+    fussAbstand: Math.round(erste.bottom - kacheln[0].querySelector('.kpi-foot').getBoundingClientRect().bottom),
+  };
+});
+
+const kurz = await gemessen();
+check('Die Messung greift ueberhaupt: Karte und Kennzahlen stehen nebeneinander', kurz.nebeneinander);
+check('KRITISCH: bei kurzer Waechterliste steht der Kennzahlen-Block oben buendig mit der Karte daneben',
+  Math.abs(kurz.oben) <= 2);
+check('KRITISCH: und unten ebenso buendig -- kein hineingerutschter Block',
+  Math.abs(kurz.unten) <= 2);
+check('Alle vier Kacheln sind gleich hoch -- sonst franst der Block aus', kurz.hoehen.length === 1);
+
+// Jetzt dieselbe Seite mit einer LANGEN Waechterliste: Die Karte daneben
+// waechst, der Kennzahlen-Block muss mitwachsen. Vier erfundene Personen,
+// dasselbe Format wie in test_waechter_status.mjs.
+await page.route('**/api/revierdienst_status.php**', route => route.fulfill({
+  status: 200, contentType: 'application/json',
+  body: JSON.stringify({ status: 'ok', datum: HEUTE, eingeteilt: 4, aktiv: 1, leute: [
+    { mitarbeiter_id: 1, vorname: 'Anna', nachname: 'Muster', funktion: 'Revierführer',
+      einsatz_id: 1, titel: 'Schliessrunde Nacht', objekt_id: 1, objekt_name: 'Testliegenschaft Nord',
+      rundgang_id: 9, status: 'aktiv', letzter_punkt: 'Tor 4' },
+    { mitarbeiter_id: 2, vorname: 'Beat', nachname: 'Beispiel', funktion: 'Wächter',
+      einsatz_id: 2, titel: 'Kontrollgang', objekt_id: 2, objekt_name: 'Testliegenschaft Süd',
+      rundgang_id: 10, status: 'pause', letzter_punkt: 'Eingang Süd' },
+    { mitarbeiter_id: 3, vorname: 'Cara', nachname: 'Probe', funktion: 'Wächter',
+      einsatz_id: 3, titel: 'Revierdienst', objekt_id: 1, objekt_name: 'Testliegenschaft Nord',
+      rundgang_id: null, status: 'frei', letzter_punkt: null },
+    { mitarbeiter_id: 4, vorname: 'Dora', nachname: 'Test', funktion: 'Wächter',
+      einsatz_id: 4, titel: 'Schliessrunde', objekt_id: 2, objekt_name: 'Testliegenschaft Süd',
+      rundgang_id: 11, status: 'frei', letzter_punkt: null },
+  ]}),
+}));
+await page.evaluate(() => revierdienstUebersichtOeffnen());
+await page.waitForSelector('#wsListe .ws-karte');
+await page.waitForTimeout(250);
+const lang = await gemessen();
+// Ohne diese Kontrolle prueft der Rest nichts: Waere die Karte gleich hoch
+// geblieben, waere auch eine mittige Ausrichtung "buendig".
+check('Die Messung greift: die Karte ist mit vier Eingeteilten deutlich hoeher als vorher',
+  lang.kartenHoehe > kurz.kartenHoehe + 50);
+check('KRITISCH: auch bei langer Waechterliste steht der Kennzahlen-Block oben buendig',
+  Math.abs(lang.oben) <= 2);
+check('KRITISCH: und unten buendig -- die Kacheln wachsen mit, statt mittig stehenzubleiben',
+  Math.abs(lang.unten) <= 2);
+check('Auch dann sind alle vier Kacheln gleich hoch', lang.hoehen.length === 1);
+check('KRITISCH: in der hoeheren Kachel verteilt sich der Inhalt -- die Fusszeile steht unten, nicht oben angeklebt',
+  lang.hoehen[0] > 150 && lang.fussAbstand < 30);
+
 const liste = await page.textContent('#rdLetzteListe');
 check('KRITISCH: Kunde, Bereich (Objekt) und Mitarbeiter je Rundgang erscheinen',
   liste.includes('Muster Liegenschaften AG') && liste.includes('Testliegenschaft Nord') && liste.includes('Muster, Erika'));
@@ -204,6 +286,16 @@ await page.setViewportSize({ width: 390, height: 844 });
 await page.waitForTimeout(200);
 check('KRITISCH: kein Seiten-Scroll bei 390px', await page.evaluate(() =>
   document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1));
+// Am Handy stehen Karte und Kennzahlen untereinander, nicht nebeneinander --
+// dort darf die Buendigkeit von oben (ENT-417) die Kacheln NICHT in die
+// Hoehe ziehen. Gegenprobe zur Desktop-Messung: dieselbe Regel, andere
+// Anordnung (CLAUDE.md: jede Aenderung am Desktop zusaetzlich am Handy
+// pruefen, und umgekehrt).
+const mobil = await gemessen();
+check('KRITISCH: am Handy stehen die Kennzahlen unter der Karte, nicht daneben', !mobil.nebeneinander);
+check('KRITISCH: am Handy stehen die vier Kacheln einzeln untereinander', mobil.zeilen === 4);
+check('Am Handy bleiben die Kacheln gleich hoch und normal hoch, nicht auf Kartenhoehe gedehnt',
+  mobil.hoehen.length === 1 && mobil.hoehen[0] < 200);
 await page.screenshot({ path: `${OUT}/rg-uebersicht-02-mobil.png` });
 await page.setViewportSize({ width: 1440, height: 1000 });
 

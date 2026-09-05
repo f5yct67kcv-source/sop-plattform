@@ -820,7 +820,29 @@ tr.klickbar.gewaehlt td { background: var(--accent-soft); }
    Unter 560px (siehe rdUebersicht-Zeile weiter unten) faellt die Zeile
    ohnehin auf eine Spalte zusammen; dort soll auch dieser Block ein-
    spaltig werden, nicht zweispaltig-schmal bleiben. */
-#rdKpiGrid { grid-template-columns: repeat(2, 1fr); align-content: center; }
+#rdKpiGrid { grid-template-columns: repeat(2, 1fr); }
+/* Buendig mit der Karte daneben (ENT-417). Rueckmeldung Projektinhaber
+   2026-09-05 mit markiertem Bildschirmfoto: "das Fenster sauber angleichen
+   von der Groesse wie nebenan". Die Regel weiter unten stellte bisher nur
+   den CONTAINER auf Kartenhoehe (#rdUebersicht .g-1-1 { align-items:
+   stretch }) -- der Inhalt darin stand aber weiterhin mittig zwischen zwei
+   Luecken, und die 16 px margin-bottom aus der .grid-Basis zogen die
+   Unterkante zusaetzlich nach oben. Gemessen bei leerer Waechterliste:
+   Oberkante 13 px zu tief, Unterkante 28 px zu hoch; bei sechs
+   Eingeteilten 142 px bzw. 158 px. Der Block sah dadurch nicht wie ein
+   zweiter Block gleicher Groesse aus, sondern wie ein hineingerutschter.
+   Drei Dinge, die zusammengehoeren:
+     1. Die beiden Zeilen fuellen die Hoehe (1fr, nicht mittig gestapelt).
+     2. Kein margin-bottom -- als Raster IM Raster ist der Abstand die
+        gap der .g-1-1, nicht ein eigener Aussenrand.
+     3. In der hoeheren Kachel verteilt sich der Inhalt, statt oben zu
+        kleben: Beschriftung oben, Zahl darunter, Fusszeile unten.
+   Punkt 3 ist nicht neu erfunden, sondern dieselbe Regel wie bei den
+   groessenverstellbaren Containern der Haupt-Uebersicht (.dash-item.dh
+   .kpi, ENT-098) -- EIN Muster im Haus, nicht zwei. */
+#rdKpiGrid { grid-auto-rows: 1fr; margin-bottom: 0; }
+#rdKpiGrid .kpi { display: flex; flex-direction: column; justify-content: space-between; }
+#rdKpiGrid .kpi-foot { margin-top: 0; }
 @media (max-width: 560px) {
   #rdKpiGrid { grid-template-columns: 1fr; }
 }
