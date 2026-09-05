@@ -7277,12 +7277,16 @@ let drawerId = null;   // offener Rapport in der Schublade
 // 'ab' = neueste zuerst; das ist auch die Reihenfolge, in der rapport_list.php
 // liefert (ORDER BY datum DESC), die Voreinstellung aendert also nichts.
 let rSortRichtung = 'ab';
-// Welche Karten aufgeklappt sind. Set und nicht ein einzelnes Feld: Mehrere
-// Rapporte nebeneinander offen zu haben ist beim Vergleichen der Punkt.
-const rOffen = new Set();
-const ofOffen = new Set();
+// Welche Karte je Liste aufgeklappt ist -- Akkordeon (ENT-409, revidiert
+// ENT-400 Punkt 4): hoechstens eine, das Aufklappen einer anderen klappt die
+// vorherige automatisch zu. Ein einzelnes Feld statt eines Sets genuegt darum
+// je Liste; Rapporte und Offerten sind unabhaengige Zustaende.
+let rOffenId = null;
+let ofOffenId = null;
 // Seit ENT-401 tragen auch Adressen und Objekte Karten (ENT-400 hatte nur
-// Rapporte und Offerten umgestellt; der Projektinhaber will alle vier).
+// Rapporte und Offerten umgestellt; der Projektinhaber will alle vier). Sie
+// behalten bewusst die Mehrfachauswahl (Set) -- ENT-409 gilt nur fuer
+// Rapporte und Offerten, nicht fuer diese beiden.
 const kuOffen = new Set();
 const obOffen = new Set();
 // Objekte: DREI Zustaende, nicht zwei. Der Server liefert bereits sortiert
@@ -9483,7 +9487,7 @@ function rSortUm() {
 
 function rKarteUm(id) {
   const k = Number(id);
-  if (rOffen.has(k)) { rOffen.delete(k); } else { rOffen.add(k); }
+  rOffenId = rOffenId === k ? null : k;
   renderRapporte();
 }
 
@@ -9493,7 +9497,7 @@ function rKarteUm(id) {
 // gesehen hat, soll nicht zweimal dasselbe unter zwei Namen lernen.
 function rKarte(r, gruppenGroesse) {
   const id = Number(r.id);
-  const offen = rOffen.has(id);
+  const offen = rOffenId === id;
   const teilEinerGruppe = gruppenGroesse > 1;
   // "Kundenrapport drucken" gehoert zum EINSATZ, nicht zur einzelnen Person
   // (siehe rapporteKlammerZelle). In der Tabelle steht er darum einmal an der
@@ -9905,13 +9909,13 @@ function ofSortDatumUm() {
 
 function ofKarteUm(id) {
   const k = Number(id);
-  if (ofOffen.has(k)) { ofOffen.delete(k); } else { ofOffen.add(k); }
+  ofOffenId = ofOffenId === k ? null : k;
   renderOfferten();
 }
 
 function ofKarte(b, heute) {
   const id = Number(b.id);
-  const offen = ofOffen.has(id);
+  const offen = ofOffenId === id;
   const si = ofStatusInfo(b.status);
   // Gleiche Regel wie in der Tabelle: abgelaufen heisst nicht abgelehnt, und
   // bei einer bestaetigten oder abgelehnten Offerte ist das Datum belanglos.

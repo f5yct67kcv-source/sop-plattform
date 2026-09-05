@@ -1,6 +1,8 @@
 // Alle vier Kunden-Reiter als aufklappbare Karten auf dem Handy
 // (ENT-400: Rapporte und Offerten, ENT-401: Adressen und Objekte,
-// ENT-403: Herunterladen und Teilen auch bei der Offerte).
+// ENT-403: Herunterladen und Teilen auch bei der Offerte,
+// ENT-409: Rapporte/Offerten als Akkordeon -- Adressen/Objekte unveraendert
+// mit Mehrfachauswahl, siehe dort).
 //
 // Der Anlass war eine MESSUNG, keine Meinung: Beide Listen sind neun Spalten
 // breit. Auf 390 px blieb davon ein waagrecht schiebbarer Streifen uebrig, in
@@ -189,16 +191,20 @@ check('Aufgeklappt stehen die hinteren Tabellenspalten da (Pause, Unterzeichner,
   /30 Min\./.test(kn(k, 0).text) && /R\. Muster/.test(kn(k, 0).text) && /Baustellenverkehr/.test(kn(k, 0).text));
 check('Die uebrigen Karten bleiben davon unberuehrt', k.slice(1).every(x => !x.offen));
 
-// Mehrere gleichzeitig offen: der Grund fuer ein Set statt eines Feldes.
+// Akkordeon (ENT-409, revidiert ENT-400 Punkt 4): eine zweite Karte zu
+// oeffnen klappt die erste automatisch zu, ohne einen zweiten Tipp darauf.
 await karteTippen('rapporteTable', 2);
 k = await kartenDaten('rapporteTable');
-check('Zwei Karten koennen gleichzeitig offen sein', kn(k, 0).offen && kn(k, 2).offen);
+check('KRITISCH: eine zweite Karte zu oeffnen klappt die erste automatisch zu',
+  !kn(k, 0).offen && kn(k, 2).offen);
 
-// Wieder zu.
-await karteTippen('rapporteTable', 0);
+// Ein Tipp auf die offene Karte klappt nur sie zu, ohne eine andere zu oeffnen.
+// Zustand danach bewusst "alle zu" -- das braucht die spaetere Pruefung der
+// Handlungen (sie oeffnet Karte 1 frisch und erwartet sie vorher geschlossen).
+await karteTippen('rapporteTable', 2);
 k = await kartenDaten('rapporteTable');
-check('KRITISCH: ein zweiter Tipp klappt wieder zu', !kn(k, 0).offen && !kn(k, 0).koerper);
-check('Und laesst die andere offene Karte offen', kn(k, 2).offen);
+check('KRITISCH: ein zweiter Tipp auf dieselbe Karte klappt sie zu, ohne eine andere zu oeffnen',
+  k.every(x => !x.offen));
 
 // Der Hinweis auf zusammengehoerende Rapporte steht bei genau den beiden
 // Karten desselben Einsatzes -- die Tabelle zeigt dort eine Klammer.
@@ -317,6 +323,18 @@ check(`Und zwar ein PDF, benannt nach der Offertennummer (${ofDatei ? ofDatei.su
 await m.waitForTimeout(300);
 check('Der Klick klappt die Offerten-Karte nicht zu',
   kn(await kartenDaten('ofTable'), 0).offen);
+
+// Akkordeon (ENT-409, revidiert ENT-400 Punkt 4): eigener Zustand je Liste,
+// aber dieselbe Regel wie bei den Rapporten -- eine zweite Offerte zu
+// oeffnen klappt die erste automatisch zu.
+await karteTippen('ofTable', 1);
+o = await kartenDaten('ofTable');
+check('KRITISCH: eine zweite Offerte zu oeffnen klappt die erste automatisch zu',
+  !kn(o, 0).offen && kn(o, 1).offen);
+await karteTippen('ofTable', 1);
+o = await kartenDaten('ofTable');
+check('KRITISCH: ein zweiter Tipp auf dieselbe Offerte klappt sie zu, ohne eine andere zu oeffnen',
+  o.every(x => !x.offen));
 
 // Sortierung der Offerten: dieselbe Aussage wie oben, eigene Zustandsgroesse.
 const ofDaten = async () => (await kartenDaten('ofTable')).map(x => x.datum);
