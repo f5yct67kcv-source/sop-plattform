@@ -580,6 +580,32 @@ try {
   });
   check('Gruss, Feld und Knopfreihe stehen auf einer Flucht',
     Math.abs(m.gruss - m.feld) < 1 && Math.abs(m.knoepfe - m.feld) < 1);
+
+  // Die drei Abstaende im Block (Skizze des Projektinhabers, ENT-434).
+  // Gemessen von Kante zu Kante der SICHTBAREN Teile -- Gruss, Eingabefeld,
+  // Knopfreihe --, nicht an den Kaesten darum: Zwischen Feld und seinem
+  // Kasten liegen 5 px, und wer den Abstand am Kasten misst, prueft eine
+  // andere Zahl als die, die man sieht.
+  //
+  // Der Grund fuer diese Pruefung: Gruss und Feld klebten mit NULL Pixel
+  // aneinander, weil ".card-bd > .diktat-router { margin-top: 0 }" weiter
+  // unten im Regelwerk steht und den Abstand des Routers aufhob. Zwei
+  // Anlaeufe, den Abstand zu setzen, blieben wirkungslos: gleiche
+  // Eigenspezifitaet, spaetere Regel gewinnt. Genau das sieht man dem
+  // Quelltext nicht an.
+  const ab = await page.evaluate(() => {
+    const r = s => document.querySelector(s).getBoundingClientRect();
+    const g = r('#begrGruss'), t = r('#rtText'), s = r('#rtSprach');
+    return { grussZuFeld: t.top - g.bottom, feldZuKnoepfe: s.top - t.bottom };
+  });
+  check(`KRITISCH: zwischen Gruss und Eingabefeld liegen 16 px `
+    + `(${Math.round(ab.grussZuFeld)}) -- sie klebten aneinander`,
+    Math.abs(ab.grussZuFeld - 16) <= 2);
+  check(`KRITISCH: zwischen Eingabefeld und Knopfreihe liegen 24 px `
+    + `(${Math.round(ab.feldZuKnoepfe)})`, Math.abs(ab.feldZuKnoepfe - 24) <= 2);
+  check('Und die Knopfreihe steht weiter vom Feld weg als der Gruss darueber --'
+    + ' der Titel gehoert naeher zum Feld als die Bedienung darunter',
+    ab.feldZuKnoepfe > ab.grussZuFeld);
   await page.setViewportSize({ width: 1500, height: 1100 });
 } catch (e) { bad.push('Eingabespalte: ' + String(e).split('\n')[0].slice(0, 120)); }
 
