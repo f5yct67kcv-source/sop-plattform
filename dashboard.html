@@ -8,7 +8,11 @@
      ignoriert user-scalable=no aus Barrierefreiheitsgruenden -- gegen das
      versehentliche Doppeltippen und das Zoomen beim Feld-Fokus hilft
      zusaetzlich touch-action und eine Schriftgroesse ab 16px in Feldern. -->
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<!-- Die id ist kein Schmuck: Die Notfall-Desktopansicht (ENT-427) schaltet
+     genau diese Angabe um. Sie ist damit die EINZIGE Quelle fuer beide
+     Zustaende -- der Handy-Wert wird beim Laden von hier abgelesen und nicht
+     im Skript ein zweites Mal hingeschrieben. -->
+<meta name="viewport" id="metaViewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Cockpit</title>
 <link rel="icon" href="icons/icon-32.png" type="image/png">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
@@ -479,6 +483,57 @@ select.inp { padding-right: 30px; background-image: linear-gradient(45deg, trans
 /* Der Wechsel-Knopf ist ein echter Link (Seitenwechsel, kein Zustand im
    Fenster) und muss trotzdem wie die uebrigen Eintraege aussehen. */
 a.nav-item { text-decoration: none; }
+
+/* ══════════════════════════════════════════ DESKTOP-ANSICHT AM HANDY (ENT-427)
+   Eine Notfalloption, keine zweite Bedienung: Sie holt die am Handy bewusst
+   ausgeblendeten Bereiche (ENT-235: Abgleich, Stammdaten, Revierdienst,
+   Auswertung, Administration, Einrichtung) im Ausnahmefall auf das Geraet,
+   indem sie die Viewport-Angabe auf eine feste Breite stellt. Genau das tut
+   auch "Desktop-Website anfordern" im Browser -- nur dass es dort nach jedem
+   Neuladen wieder verloren geht und in einer installierten App gar nicht
+   erst zur Verfuegung steht.
+
+   Der Eintrag steht bewusst NICHT auf ".nur-desktop" und auch nicht auf
+   ".nur-schublade": Beide haengen an der Fensterbreite, und die ist nach dem
+   Umschalten 1280 px. Der Rueckweg waere damit genau dann verschwunden, wenn
+   man ihn braucht. Sichtbar macht ihn darum das Skript, anhand des GERAETS
+   (Beruehrung + schmaler Bildschirm) statt anhand der gesetzten Breite --
+   ueber style.display wie in rechteAnwenden(), nicht ueber eine Regel hier:
+   Eine Regel muesste den Anzeigewert von .nav-item ("flex") ein zweites Mal
+   hinschreiben und liefe beim naechsten Umbau daran vorbei. Bis das Skript
+   entschieden hat, ist die ganze Huelle ohnehin ausgeblendet (.shell). */
+
+/* Die Lupe rechnet die Verkleinerung heraus.
+   Bei 390 px Geraet auf 1280 px Seite steht alles auf 30 % -- ein 50 px
+   hoher Menueeintrag ist dann physisch 15 px hoch und mit dem Daumen kaum
+   zu treffen. Der Rueckweg darf daran nicht scheitern, sonst ist die
+   Notfalloption selbst der Notfall. Der Knopf wird deshalb um denselben
+   Faktor wieder aufgezogen, mit dem die Seite verkleinert wird: Was hier
+   in Pixeln steht, kommt auf dem Geraet auch in Pixeln an.
+   Reihenfolge im transform ist wichtig: erst skalieren, dann verschieben --
+   so wird auch der Abstand zum Rand mitgerechnet und der Knopf klebt nicht
+   in der Ecke. */
+:root { --desktop-lupe: 1; }
+.desktop-zurueck {
+  display: none;
+  position: fixed; right: 0; bottom: env(safe-area-inset-bottom, 0px);
+  transform-origin: bottom right;
+  transform: scale(var(--desktop-lupe)) translate(-14px, -14px);
+  /* Ueber den Dialogen (z-index 900). Ein Fluchtweg, den ein offener Dialog
+     verdeckt, ist keiner -- man kaeme sonst aus einer 30 % kleinen Ansicht
+     erst heraus, nachdem man den Dialog darin geschlossen hat. */
+  z-index: 950;
+  align-items: center; gap: 8px;
+  min-height: 44px; padding: 10px 16px;
+  border-radius: 999px; border: 1px solid var(--line);
+  background: var(--surface); color: var(--ink);
+  font: inherit; font-size: 14px; font-weight: 600;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .34), 0 2px 8px rgba(0, 0, 0, .2);
+  cursor: pointer;
+}
+.desktop-zurueck svg { width: 18px; height: 18px; flex: none;
+  fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+html[data-desktop="an"] .desktop-zurueck { display: inline-flex; }
 
 .main { margin-left: var(--side-w); min-height: 100vh; display: flex; flex-direction: column; }
 .topbar {
@@ -4192,6 +4247,39 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
   try { g = localStorage.getItem('rv3_glas') === 'aus' ? 'aus' : 'an'; } catch (e) {}
   document.documentElement.setAttribute('data-glas', g);
 })();
+/* Desktop-Ansicht am Handy (ENT-427) -- die Notfalloption.
+   Auch dies muss VOR dem ersten Zeichnen laufen, aus einem staerkeren Grund
+   als bei hell/dunkel: Wer die Wahl getroffen hat und neu laedt, saehe sonst
+   erst die Handy-Ansicht, danach spraenge das ganze Raster um. Bei einer
+   Ansicht, die auf 30 % verkleinert steht, ist das kein Aufblitzen mehr,
+   sondern ein Sprung ueber den halben Bildschirm.
+
+   Was hier steht, ist bewusst das Minimum: den Wert lesen, die Angabe
+   setzen, die Kennzeichnung am <html> hinterlegen. Die Bedingungen (nur
+   Beruehrungsgeraet, nur schmal) prueft das Hauptskript spaeter -- sie
+   brauchen Funktionen, die es hier noch nicht gibt, und ein gespeicherter
+   Wert kann ohnehin nur von DIESEM Geraet stammen.
+
+   window.VP_HANDY liest den Ausgangswert aus dem Tag selbst statt ihn zu
+   wiederholen. Zwei Zeichenketten mit demselben Inhalt an zwei Stellen
+   laufen frueher oder spaeter auseinander -- und dann fuehrte der Rueckweg
+   auf eine Angabe, die es im Kopf der Datei gar nicht mehr gibt. */
+(function () {
+  var m = document.getElementById('metaViewport');
+  window.VP_HANDY = m ? m.getAttribute('content') : 'width=device-width, initial-scale=1.0';
+  window.DESKTOP_BREITE = 1280;
+  /* Kein "user-scalable=no" und kein "maximum-scale": Zoomen wird hier
+     ausdruecklich wieder ERLAUBT. Auf einem 390 px breiten Geraet steht die
+     Seite dann bei rund 30 % -- ohne Zoom waere sie zwar da, aber nicht
+     lesbar, und die Notfalloption liefe leer. */
+  window.VP_DESKTOP = 'width=' + window.DESKTOP_BREITE;
+  var an = false;
+  try { an = localStorage.getItem('rv3_desktop') === 'an'; } catch (e) {}
+  if (an && m) {
+    m.setAttribute('content', window.VP_DESKTOP);
+    document.documentElement.setAttribute('data-desktop', 'an');
+  }
+})();
 </script>
 </head>
 <body>
@@ -4497,6 +4585,17 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
         <svg class="i" viewBox="0 0 24 24"><polyline points="16 3 20 7 16 11"/><line x1="20" y1="7" x2="9" y2="7"/><polyline points="8 13 4 17 8 21"/><line x1="4" y1="17" x2="15" y2="17"/></svg>
         <span class="lbl">Zur App</span>
       </a>
+      <!-- Desktop-Ansicht am Handy (ENT-427). Unter "Zur App" und ueber
+           "Abmelden": "Zur App" ist der Alltagsweg, dies hier der Ausnahmeweg,
+           und Abmelden bleibt der abgesetzte letzte Eintrag.
+           Beschriftung und Sinnbild wechseln mit dem Zustand (siehe
+           desktopKnopfBeschriften) -- der Eintrag ist derselbe Schalter in
+           beide Richtungen, kein zweiter Eintrag daneben, der irgendwann mit
+           dem ersten auseinanderlaeuft. -->
+      <button class="nav-item" id="nav-desktop" onclick="desktopUmschalten()">
+        <svg class="i" id="navDesktopBild" viewBox="0 0 24 24"><rect x="2.5" y="4" width="19" height="13" rx="2"/><line x1="8.5" y1="20.5" x2="15.5" y2="20.5"/><line x1="12" y1="17" x2="12" y2="20.5"/></svg>
+        <span class="lbl" id="navDesktopLbl">Desktop-Ansicht</span>
+      </button>
       <button class="nav-item" id="nav-abmelden" onclick="doLogout()">
         <svg class="i" viewBox="0 0 24 24"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
         <span class="lbl">Abmelden</span>
@@ -7195,6 +7294,21 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
     </div>
   </div>
 </div>
+
+<!-- Rueckweg aus der Desktop-Ansicht (ENT-427). Steht ausserhalb der Huelle
+     und nicht in ihr: "position: fixed" bezieht sich sonst auf den naechsten
+     Vorfahren mit transform/filter/backdrop-filter -- und mit Liquid Glass
+     (ENT-418) gibt es davon in der Huelle mehrere. Er waere dann nicht mehr
+     am Bildschirmrand, sondern irgendwo darin.
+     Sichtbar NUR, solange die Desktop-Ansicht laeuft (CSS am data-desktop),
+     und in der Grundfassung "display: none" -- ein Knopf, der am Desktop
+     dauerhaft in der Ecke klebt, waere aus einer Notfalloption ein
+     Dauergast. -->
+<button type="button" class="desktop-zurueck" id="desktopZurueck" onclick="desktopSetzen(false)"
+        title="Zurück zur Handy-Ansicht" aria-label="Zurück zur Handy-Ansicht">
+  <svg viewBox="0 0 24 24"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><line x1="10.5" y1="18.5" x2="13.5" y2="18.5"/></svg>
+  <span>Handy-Ansicht</span>
+</button>
 
 <!-- ══════════════════════════ DETAIL-SCHUBLADE ══════════════════════════ -->
 <div class="scrim" id="scrim" onclick="closeDrawer()"></div>
@@ -10035,6 +10149,128 @@ function topSubZeichnen() {
 }
 
 window.addEventListener('resize', () => { if (huelleKompakt()) { navGruppenZu(); } topSubZeichnen(); });
+
+// ══════════════════════════════════════════ DESKTOP-ANSICHT AM HANDY (ENT-427)
+// Die Notfalloption: Am Handy sind Abgleich, Stammdaten, Revierdienst,
+// Auswertung, Administration und Einrichtung bewusst ausgeblendet (ENT-235).
+// Wer unterwegs doch einmal an einen dieser Bereiche muss, stellt die Seite
+// hier auf eine feste Breite -- dieselbe Mechanik wie "Desktop-Website
+// anfordern" im Browser, nur dass sie das Neuladen ueberlebt und auch in
+// einer installierten App zur Verfuegung steht.
+//
+// Ausdruecklich KEIN mobiler Nachbau dieser Bereiche. Ob und wie sie am
+// Handy erscheinen, bleibt eine eigene Entscheidung (ENT-235); hier gibt es
+// nur den Weg auf die vorhandene Desktop-Fassung, verkleinert und zoombar.
+
+// Wie breit ist das GERAET -- unabhaengig davon, wie breit die Seite gerade
+// gesetzt ist. Genau darauf kommt es an: window.innerWidth meldet nach dem
+// Umschalten 1280 (gemessen) und waere als Mass damit untauglich; der
+// Rueckweg verschwaende in dem Moment, in dem man ihn braucht.
+// Zwei Quellen und davon die KLEINERE:
+//  - screen.width kennt die Viewport-Angabe nicht (gemessen: bleibt bei 390,
+//    waehrend innerWidth auf 1280 springt), dreht sich aber auf iOS nicht mit.
+//  - window.outerWidth folgt der Drehung, meldet auf manchen iOS-Fassungen
+//    aber dasselbe wie innerWidth -- dort waere es nach dem Umschalten 1280.
+// Das Minimum nimmt in beiden Faellen den brauchbaren Wert.
+function geraeteBreite() {
+  const quellen = [window.screen && window.screen.width, window.outerWidth].filter(w => w > 0);
+  return quellen.length ? Math.min(...quellen) : 390;
+}
+
+// Ein Zeigergeraet-Bildschirm ignoriert die Viewport-Angabe komplett. Ein
+// Knopf, der dort nichts bewirkt, wird darum gar nicht erst angeboten --
+// "tut nichts" ist schlimmer als "gibt es nicht".
+function beruehrungsgeraet() {
+  return (window.matchMedia && window.matchMedia('(pointer: coarse)').matches)
+      || (navigator.maxTouchPoints || 0) > 0;
+}
+
+// Auf einem breiten Tablet steht ohnehin die Desktop-Fassung -- dann gibt es
+// nichts umzuschalten. Die Grenze ist dieselbe wie im CSS (900 px).
+function desktopWahlMoeglich() { return beruehrungsgeraet() && geraeteBreite() <= 900; }
+
+function desktopAn() { return document.documentElement.getAttribute('data-desktop') === 'an'; }
+
+// Der Faktor, mit dem der Rueckweg-Knopf gegen die Verkleinerung aufgezogen
+// wird -- siehe .desktop-zurueck im CSS. In der Handy-Ansicht ist er 1: Dort
+// wird nichts verkleinert, und der Knopf ist ohnehin nicht zu sehen.
+function desktopLupeSetzen() {
+  const lupe = desktopAn() ? Math.max(1, DESKTOP_BREITE / geraeteBreite()) : 1;
+  document.documentElement.style.setProperty('--desktop-lupe', String(lupe));
+}
+
+// Ein Schalter, zwei Richtungen. Beschriftung, Titel und Sinnbild folgen dem
+// Zustand -- nicht zwei Eintraege nebeneinander, von denen einer immer der
+// falsche ist.
+function desktopKnopfBeschriften() {
+  const b = $('nav-desktop'), lbl = $('navDesktopLbl'), bild = $('navDesktopBild');
+  if (!b || !lbl || !bild) { return; }
+  const an = desktopAn();
+  lbl.textContent = an ? 'Handy-Ansicht' : 'Desktop-Ansicht';
+  b.title = an
+    ? 'Zurück zur Handy-Ansicht'
+    : 'Notfalloption: die Desktop-Fassung auf dem Handy — verkleinert, dafür mit allen Bereichen';
+  // Handy-Umriss statt Bildschirm-Umriss, sobald der Knopf zurueckfuehrt.
+  bild.innerHTML = an
+    ? '<rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><line x1="10.5" y1="18.5" x2="13.5" y2="18.5"/>'
+    : '<rect x="2.5" y="4" width="19" height="13" rx="2"/><line x1="8.5" y1="20.5" x2="15.5" y2="20.5"/><line x1="12" y1="17" x2="12" y2="20.5"/>';
+}
+
+// Sichtbarkeit des Menueeintrags. Bewusst ueber style.display und nicht ueber
+// eine CSS-Klasse an der Fensterbreite: Nach dem Umschalten ist das Fenster
+// 1280 px breit: jede breitenabhaengige Regel wuerde den Rueckweg genau dann
+// ausblenden, wenn er gebraucht wird.
+function desktopEintragZeigen() {
+  const b = $('nav-desktop');
+  if (b) { b.style.display = desktopWahlMoeglich() || desktopAn() ? '' : 'none'; }
+}
+
+function desktopSetzen(an, merken = true) {
+  const m = $('metaViewport');
+  if (!m) { return; }
+  // Die Schublade zuerst schliessen. Sie ist nur unter 900 px eine Schublade;
+  // bliebe "on" stehen, staende sie in der Desktop-Fassung als aufgeklappte
+  // Seitenleiste ueber dem Inhalt, und der gemerkte Scrollstand ginge mit.
+  toggleSide(false);
+  m.setAttribute('content', an ? VP_DESKTOP : VP_HANDY);
+  document.documentElement.setAttribute('data-desktop', an ? 'an' : 'aus');
+  if (merken) { try { localStorage.setItem('rv3_desktop', an ? 'an' : 'aus'); } catch (e) {} }
+  desktopLupeSetzen();
+  desktopKnopfBeschriften();
+  desktopEintragZeigen();
+  // Dasselbe Nachziehen wie in huelleSetzen(): Kopfleiste, Glocke und
+  // Unterreiter haengen alle an derselben 901-px-Bedingung, und die kippt
+  // hier gerade. Nicht auf das resize-Ereignis verlassen -- es deckt nur
+  // zwei der vier Punkte ab.
+  navGruppenZu();
+  markenMenuSchliessen();
+  glockeVerorten();
+  topSubZeichnen();
+}
+
+function desktopUmschalten() { desktopSetzen(!desktopAn()); }
+
+// Beim Start: Der Kopf der Datei hat die Angabe schon gesetzt, falls sie
+// gemerkt war -- hier kommt nur noch dazu, was Funktionen braucht.
+// Der Sonderfall ist die gemerkte Wahl auf einem Geraet, das sie gar nicht
+// umsetzen kann (Bildschirm ohne Beruehrung, breites Fenster). Dann wird sie
+// still zurueckgenommen statt stehengelassen: Sonst klebte auf einem
+// Schreibtisch-Bildschirm dauerhaft ein Knopf, der dort nichts bedeutet.
+function desktopStart() {
+  if (desktopAn() && !desktopWahlMoeglich()) { desktopSetzen(false); return; }
+  desktopLupeSetzen();
+  desktopKnopfBeschriften();
+  desktopEintragZeigen();
+}
+
+// Drehen aendert die Geraetebreite und damit die Lupe. Ohne dies bliebe der
+// Rueckweg-Knopf nach dem Drehen in der Groesse der vorherigen Lage stehen.
+window.addEventListener('resize', () => { desktopLupeSetzen(); desktopEintragZeigen(); });
+
+// Sofort und nicht erst in enter(): Wer abgemeldet in der Desktop-Ansicht
+// landet, sieht sonst eine auf 30 % verkleinerte Anmeldemaske ohne jeden
+// Rueckweg -- der Menueeintrag liegt hinter der Anmeldung.
+desktopStart();
 
 // Offerten haben keinen Rueckruf vom Kundenportal (ENT-192): eine
 // Annahme/Ablehnung dort aendert den Status sofort in der Datenbank, aber
