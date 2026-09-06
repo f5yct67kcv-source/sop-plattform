@@ -98,6 +98,18 @@ foreach ($liste as &$m) {
         true, $jetzt
     );
     $m['geplant'] = !$m['archiviert'] && $m['sichtbar_ab'] !== null && $m['sichtbar_ab'] > $jetzt;
+    // Archiv heisst: nicht mehr in der App -- zurueckgezogen ODER
+    // abgelaufen (ENT-433). Die Antwort kommt aus mitteilung_im_archiv()
+    // und wird im Cockpit NICHT noch einmal aus den drei Marken
+    // zusammengesetzt: Dieselbe Grenze entscheidet ueber die Ansicht und
+    // ueber das Loeschen, und sie steht an einer Stelle.
+    $m['im_archiv'] = mitteilung_im_archiv($m, $jetzt);
+    // Abgelaufen ist NICHT dasselbe wie zurueckgezogen: Eine
+    // zurueckgezogene Mitteilung holt "Wieder aufnehmen" zurueck, eine
+    // abgelaufene nicht -- da muesste das Datum geaendert werden. Das
+    // Cockpit braucht den Unterschied, um keinen Knopf anzubieten, der
+    // nichts bewirkt.
+    $m['abgelaufen'] = $m['sichtbar_bis'] !== null && $m['sichtbar_bis'] < $jetzt;
     // Der Push-Zustand (ENT-424). Die Bilanz kommt als fertige Zahlen
     // heraus, nicht als Text -- die Oberflaeche soll sie nicht auseinander-
     // nehmen muessen. Fehlt sie, ist das "noch nicht verschickt" und NICHT

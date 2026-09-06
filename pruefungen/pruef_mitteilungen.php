@@ -109,6 +109,53 @@ pruef('Dieselbe Mitteilung ist vor ihrem Beginn unsichtbar und danach sichtbar',
     !mitteilung_sichtbar_fuer($holen(4), true, $jetzt)
     && mitteilung_sichtbar_fuer($holen(4), true, '2031-07-02 08:00:00'));
 
+// ══════════════ DAS ARCHIV -- UND DAMIT DIE LOESCHSPERRE (ENT-433)
+// mitteilung_im_archiv() entscheidet zweierlei zugleich: welche Ansicht im
+// Cockpit eine Mitteilung zeigt UND ob sie endgueltig geloescht werden
+// darf. Ein Fehler hier loeschte also nicht bloss falsch einsortiert --
+// er gaebe eine laufende Mitteilung zum Loeschen frei.
+pruef('KRITISCH: eine zurueckgezogene Mitteilung steht im Archiv',
+    mitteilung_im_archiv($holen(7), $jetzt));
+pruef('KRITISCH: eine abgelaufene steht im Archiv, auch ohne Zurueckziehen',
+    mitteilung_im_archiv($holen(5), $jetzt));
+pruef('KRITISCH: eine laufende steht NICHT im Archiv -- sie waere sonst loeschbar',
+    !mitteilung_im_archiv($holen(1), $jetzt));
+pruef('KRITISCH: eine GEPLANTE steht nicht im Archiv -- sie war noch gar nicht draussen',
+    !mitteilung_im_archiv($holen(4), $jetzt));
+pruef('Eine mit offenem Fenster steht nicht im Archiv',
+    !mitteilung_im_archiv($holen(6), $jetzt));
+// Der Zeitpunkt ist auch hier ein Parameter: derselbe Datensatz wandert
+// mit der Zeit ins Archiv, ohne dass jemand etwas anfasst.
+pruef('KRITISCH: dieselbe Mitteilung ist vor ihrem Ablauf nicht im Archiv und danach schon',
+    !mitteilung_im_archiv($holen(6), $jetzt)
+    && mitteilung_im_archiv($holen(6), '2031-07-02 08:00:00'));
+// Genau am Ablaufzeitpunkt ist sie noch sichtbar -- und darf darum auch
+// noch nicht im Archiv stehen. Die beiden Grenzen muessen dieselbe sein,
+// sonst gaebe es einen Moment, in dem eine Mitteilung in der App steht und
+// sich gleichzeitig loeschen liesse.
+$grenze = $holen(5)['sichtbar_bis'];
+pruef('KRITISCH: am Ablaufzeitpunkt selbst ist sie sichtbar UND nicht im Archiv',
+    mitteilung_sichtbar_fuer($holen(5), true, $grenze)
+    && !mitteilung_im_archiv($holen(5), $grenze));
+
+// Die Gegenprobe zur Sperre: Kein Fall darf gleichzeitig sichtbar und
+// loeschbar sein. Ohne diese Schleife koennte eine der beiden Bedingungen
+// eine Zeile verlieren, ohne dass etwas rot wird.
+$widerspruch = [];
+foreach ($faelle as $f) {
+    $m = $holen($f[0]);
+    foreach ([$frueher, $jetzt, $spaeter] as $zeitpunkt) {
+        foreach ([false, true] as $revier) {
+            if (mitteilung_sichtbar_fuer($m, $revier, $zeitpunkt)
+                && mitteilung_im_archiv($m, $zeitpunkt)) {
+                $widerspruch[] = $f[0] . '@' . $zeitpunkt;
+            }
+        }
+    }
+}
+pruef('KRITISCH: keine Mitteilung ist gleichzeitig in der App sichtbar und loeschbar',
+    $widerspruch === []);
+
 // ══════════════ GEGENPROBE: SQL GEGEN PHP
 // Beide Wege muessen bei jedem Fall und bei beiden Personenarten dasselbe
 // sagen. Ohne diese Schleife koennte die SQL-Bedingung eine Bedingung

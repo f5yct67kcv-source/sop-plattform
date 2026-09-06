@@ -4238,6 +4238,12 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
    Sie ist eine Nachschlagsache, kein eigener Arbeitsschritt. */
 .mtl-leser { margin-top: 10px; padding: 10px 12px; background: var(--line-soft);
   border-radius: var(--r-sm); font-size: 12.5px; color: var(--ink-2); line-height: 1.7; }
+/* Endgueltig loeschen sieht anders aus als der Rest der Zeile (ENT-433):
+   nicht laut gefuellt -- der Knopf steht neben harmlosen --, aber auch
+   nicht gleich. Ein Handgriff ohne Rueckweg darf sich nicht wie
+   "Bearbeiten" anfuehlen. */
+.mtl-akt .mtl-loeschen { color: var(--neg); }
+.mtl-akt .mtl-loeschen:hover { background: var(--neg); color: #fff; border-color: var(--neg); }
 </style>
 <script src="gav.js"></script>
 <script src="zeitwahl.js"></script>
@@ -5926,7 +5932,16 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
           </div>
 
           <div class="card">
-            <div class="card-hd"><h3>Bestehende Mitteilungen</h3></div>
+            <div class="card-hd">
+              <h3>Bestehende Mitteilungen</h3>
+              <div class="sp"></div>
+              <!-- Beide Zahlen stehen immer da: Eine gefilterte Zahl allein
+                   sieht aus wie die Gesamtzahl (Hausregel). -->
+              <div class="seg2">
+                <button type="button" id="mtlAnsichtLaufend" class="on" onclick="mtlAnsichtSetzen('laufend')">Laufend</button>
+                <button type="button" id="mtlAnsichtArchiv" onclick="mtlAnsichtSetzen('archiv')">Archiv</button>
+              </div>
+            </div>
             <div class="card-bd" id="mtlListe"></div>
           </div>
         </div>
@@ -13395,6 +13410,10 @@ let mtlPushGeraete = -1;   // -1 = unbekannt
 // verschiedenen Stellen.
 let mtlPushGrund = '';
 
+// Welche der beiden Ansichten offen ist (ENT-433). "laufend" ist der
+// Normalfall -- das Archiv sucht man auf, es draengt sich nicht auf.
+let mtlAnsicht = 'laufend';
+
 // Leerzustand in der Hausform (.empty) -- dieselbe Darstellung wie überall
 // sonst im Cockpit, statt einer eigenen Textzeile nur für diese Seite.
 function mtlLeerBlock(titel, text) {
@@ -13416,6 +13435,15 @@ function mtlLaden() {
   });
 }
 
+function mtlAnsichtSetzen(welche) {
+  mtlAnsicht = welche === 'archiv' ? 'archiv' : 'laufend';
+  // Die Leserliste gehoert zu einem Eintrag, nicht zur Seite -- beim
+  // Wechseln zu bleibt sie sonst zu einer Mitteilung offen, die gar nicht
+  // mehr angezeigt wird.
+  mtlLeserOffen = 0;
+  mtlZeichnen();
+}
+
 function mtlZeichnen() {
   const ziel = $('mtlListe');
   if (!ziel) { return; }
@@ -13432,13 +13460,42 @@ function mtlZeichnen() {
       'Die Liste liess sich nicht laden. Ob Mitteilungen bestehen, ist gerade unbekannt.');
     return;
   }
+  // Aufteilung nach der Grenze, die der Server zieht (im_archiv): nicht
+  // mehr in der App = zurueckgezogen oder abgelaufen. Hier wird sie NICHT
+  // aus den Marken nachgebaut -- eine zweite Fassung derselben Regel
+  // liefe irgendwann auseinander.
+  const archiv  = mtlListe.filter(m => m.im_archiv);
+  const laufend = mtlListe.filter(m => !m.im_archiv);
+  mtlUmschalterZeichnen(laufend.length, archiv.length);
+  const zeigen = mtlAnsicht === 'archiv' ? archiv : laufend;
+
+  // Vier verschiedene Nicht-Faelle, vier verschiedene Saetze. "Kein
+  // Treffer" und "nichts vorhanden" sind nicht dasselbe (Hausregel), und
+  // ein leeres Archiv heisst etwas anderes als eine leere Gegenwart.
   if (!mtlListe.length) {
     ziel.innerHTML = mtlLeerBlock('Keine Mitteilungen',
       'Es wurde noch keine Mitteilung verfasst.');
     return;
   }
+  if (!zeigen.length && mtlAnsicht === 'archiv') {
+    ziel.innerHTML = mtlLeerBlock('Archiv leer',
+      'Hier landet, was zurückgezogen oder abgelaufen ist — und nur hier lässt sich etwas '
+      + 'endgültig löschen. Bisher steht nichts darin; '
+      + (laufend.length === 1 ? 'die eine Mitteilung ist noch aktuell.'
+                              : `die ${laufend.length} bestehenden Mitteilungen sind noch aktuell.`));
+    return;
+  }
+  if (!zeigen.length) {
+    ziel.innerHTML = mtlLeerBlock('Nichts Laufendes',
+      'Zurzeit ist keine Mitteilung in der App zu sehen. '
+      + (archiv.length === 1 ? 'Eine liegt im Archiv.' : `${archiv.length} liegen im Archiv.`));
+    return;
+  }
 
-  ziel.innerHTML = mtlListe.map(m => {
+  ziel.innerHTML = zeigen.map(m => {
+    // Kommt vom Server (siehe mitteilung_list.php) und wird hier nicht aus
+    // den Marken erraten.
+    const abgelaufen = !!m.abgelaufen;
     const marken = [];
     if (m.stufe === 'wichtig') { marken.push('<span class="chip chip-x">Wichtig</span>'); }
     marken.push(`<span class="chip chip-n">${m.zielgruppe === 'revier' ? 'Nur Revierdienst' : 'Alle'}</span>`);
@@ -13492,14 +13549,59 @@ function mtlZeichnen() {
       <div class="mtl-akt">
         <button type="button" class="btn btn-plain btn-sm" onclick="mtlBearbeiten(${m.id})">Bearbeiten</button>
         <button type="button" class="btn btn-plain btn-sm" onclick="mtlLeserUm(${m.id})">Wer hat gelesen</button>
-        <button type="button" class="btn btn-plain btn-sm" onclick="mtlArchivieren(${m.id}, ${m.archiviert ? 'true' : 'false'})">${
-          m.archiviert ? 'Wieder aufnehmen' : 'Zurückziehen'}</button>
+        ${!m.im_archiv ? `<button type="button" class="btn btn-plain btn-sm" onclick="mtlArchivieren(${m.id}, false)">Zurückziehen</button>` : ''}
+        ${m.archiviert && !abgelaufen ? `<button type="button" class="btn btn-plain btn-sm" onclick="mtlArchivieren(${m.id}, true)">Wieder aufnehmen</button>` : ''}
+        ${m.im_archiv ? `<button type="button" class="btn btn-plain btn-sm mtl-loeschen" onclick="mtlLoeschen(${m.id})">Endgültig löschen</button>` : ''}
       </div>
       ${mtlLeserOffen === m.id ? `<div class="mtl-leser" id="mtlLeser${m.id}">Wird geladen …</div>` : ''}
     </div>`;
   }).join('');
 
   if (mtlLeserOffen) { mtlLeserLaden(mtlLeserOffen); }
+}
+
+// Der Umschalter traegt beide Zahlen. Eine gefilterte Liste ohne die
+// andere Zahl sieht aus wie die ganze (Hausregel: keine Zahl ohne Bezug,
+// sobald ein Filter greift). Beschriftet wird erst, wenn die Zahlen
+// bekannt sind -- vorher stehen die Woerter ohne Zahl da, nicht mit einer
+// erfundenen Null.
+function mtlUmschalterZeichnen(laufend, archiv) {
+  const a = $('mtlAnsichtLaufend'), b = $('mtlAnsichtArchiv');
+  if (!a || !b) { return; }
+  a.textContent = 'Laufend ' + laufend;
+  b.textContent = 'Archiv ' + archiv;
+  a.classList.toggle('on', mtlAnsicht !== 'archiv');
+  b.classList.toggle('on', mtlAnsicht === 'archiv');
+}
+
+// Endgültig löschen (ENT-433). Die Rückfrage benennt die FOLGE, nicht nur
+// die Handlung: Was mitgeht, ist der Lesestand -- also der Nachweis, wer
+// die Mitteilung gesehen und bestätigt hat. Wer nur "Wirklich löschen?"
+// liest, weiss das nicht.
+//
+// Die eigentliche Sperre steht im Server (api/mitteilung_loeschen.php);
+// dass dieser Knopf nur im Archiv steht, erspart bloss den Umweg.
+function mtlLoeschen(id) {
+  const m = mtlListe.find(x => Number(x.id) === Number(id));
+  if (!m) { return; }
+  const nachweis = Number(m.gelesen_anzahl) > 0
+    ? `\n\nDamit verschwindet auch der Lesestand: ${m.gelesen_anzahl} `
+      + (Number(m.gelesen_anzahl) === 1 ? 'Person hat' : 'Personen haben')
+      + ' gelesen, dass sie da war.'
+    : '\n\nGelesen hat sie niemand — es geht kein Nachweis verloren.';
+  if (!confirm(`„${m.titel}“ endgültig löschen?${nachweis}\n\nDas lässt sich nicht rückgängig machen.`)) {
+    return;
+  }
+  api('mitteilung_loeschen.php', { method: 'POST', body: { id: Number(id) } })
+    .then(({ ok, data }) => {
+      if (!ok || !data || data.status !== 'ok') {
+        toast((data && data.message) || 'Die Mitteilung liess sich nicht löschen.');
+        return;
+      }
+      toast('Mitteilung endgültig gelöscht.');
+      if (mtlLeserOffen === Number(id)) { mtlLeserOffen = 0; }
+      mtlLaden();
+    });
 }
 
 // Die Leserliste. Eigener Abruf und nicht Teil der Liste: Bei 40

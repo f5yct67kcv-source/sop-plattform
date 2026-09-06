@@ -34,40 +34,51 @@ const LISTE = [
     zielgruppe: 'alle', stufe: 'wichtig', sichtbar_ab: null, sichtbar_bis: null,
     erstellt_am: '2029-03-01 09:00:00', archiviert_am: null, verfasser_name: 'Die Geschäftsleitung',
     gelesen_anzahl: 12, bestaetigt_anzahl: 9, empfaenger_anzahl: 18,
-    archiviert: false, laeuft: true, geplant: false },
+    archiviert: false, laeuft: true, geplant: false, im_archiv: false, abgelaufen: false },
   { id: 4, titel: 'Ferien eintragen', text: 'Bitte bis Ende Monat.',
     zielgruppe: 'alle', stufe: 'normal', sichtbar_ab: '2029-05-01 00:00:00', sichtbar_bis: null,
     erstellt_am: '2029-02-20 08:00:00', archiviert_am: null, verfasser_name: 'Das Personalbüro',
     gelesen_anzahl: 0, bestaetigt_anzahl: 0, empfaenger_anzahl: 18,
-    archiviert: false, laeuft: false, geplant: true },
+    archiviert: false, laeuft: false, geplant: true, im_archiv: false, abgelaufen: false },
   { id: 3, titel: 'Alte Meldung', text: 'Längst vorbei.',
     zielgruppe: 'alle', stufe: 'normal', sichtbar_ab: null, sichtbar_bis: '2029-01-01 23:59:59',
     erstellt_am: '2028-12-01 08:00:00', archiviert_am: null, verfasser_name: 'Das Personalbüro',
     gelesen_anzahl: 4, bestaetigt_anzahl: 0, empfaenger_anzahl: 18,
-    archiviert: false, laeuft: false, geplant: false },
+    archiviert: false, laeuft: false, geplant: false, im_archiv: true, abgelaufen: true },
   { id: 2, titel: 'Zurückgezogen', text: 'War ein Irrtum.',
     zielgruppe: 'alle', stufe: 'normal', sichtbar_ab: null, sichtbar_bis: null,
     erstellt_am: '2029-01-15 08:00:00', archiviert_am: '2029-01-16 08:00:00',
     verfasser_name: 'Das Personalbüro',
     gelesen_anzahl: 1, bestaetigt_anzahl: 0, empfaenger_anzahl: 18,
-    archiviert: true, laeuft: false, geplant: false },
+    archiviert: true, laeuft: false, geplant: false, im_archiv: true, abgelaufen: false },
+  { id: 6, titel: 'Doppelt erledigt', text: 'Zurückgezogen und längst abgelaufen.',
+    zielgruppe: 'alle', stufe: 'normal', sichtbar_ab: null, sichtbar_bis: '2029-01-01 23:59:59',
+    erstellt_am: '2028-11-01 08:00:00', archiviert_am: '2028-12-05 08:00:00',
+    verfasser_name: 'Das Personalbüro',
+    gelesen_anzahl: 3, bestaetigt_anzahl: 0, empfaenger_anzahl: 18,
+    archiviert: true, laeuft: false, geplant: false, im_archiv: true, abgelaufen: true },
   { id: 1, titel: 'Schlüsselkasten', text: 'Ab sofort im Revierfahrzeug.',
     zielgruppe: 'revier', stufe: 'normal', sichtbar_ab: null, sichtbar_bis: null,
     erstellt_am: '2029-02-10 08:00:00', archiviert_am: null, verfasser_name: 'Die Einsatzleitung',
     gelesen_anzahl: 2, bestaetigt_anzahl: 0, empfaenger_anzahl: -1,
-    archiviert: false, laeuft: true, geplant: false },
+    archiviert: false, laeuft: true, geplant: false, im_archiv: false, abgelaufen: false },
 ];
 
 let meineRechte = ['plan', 'kunden', 'abgleich', 'personal_lesen', 'personal_schreiben',
   'personal_vertraulich', 'betrieb', 'rechte', 'offerten', 'mitteilungen'];
 let meineRollen = ['verwaltung'];
 let listenAntwort = { status: 'ok', eingerichtet: true, mitteilungen: LISTE };
-let gesendet = null, archiviert = null;
+let gesendet = null, archiviert = null, geloescht = null;
+// Die Rueckfrage vor dem endgueltigen Loeschen (ENT-433). Playwright
+// weist Dialoge sonst stillschweigend ab -- dann liefe die Pruefung an
+// der Rueckfrage vorbei, ohne dass es auffiele.
+let dialogText = '', dialogAnnehmen = true;
 
 const browser = await chromium.launch({ executablePath: EXE });
 const page = await browser.newPage({ viewport: { width: 1600, height: 1100 } });
 page.setDefaultTimeout(5000);
 page.on('pageerror', e => bad.push('JS-Fehler: ' + e.message));
+page.on('dialog', d => { dialogText = d.message(); return dialogAnnehmen ? d.accept() : d.dismiss(); });
 
 await page.route('**/api/**', r => {
   const u = r.request().url();
@@ -90,6 +101,10 @@ await page.route('**/api/**', r => {
   if (u.includes('mitteilung_save')) {
     gesendet = JSON.parse(r.request().postData() || '{}');
     return send({ status: 'ok', id: 9, angelegt: true });
+  }
+  if (u.includes('mitteilung_loeschen')) {
+    geloescht = JSON.parse(r.request().postData() || '{}');
+    return send({ status: 'ok', id: geloescht.id, lesestand_entfernt: 4 });
   }
   if (u.includes('mitteilung_archivieren')) {
     archiviert = JSON.parse(r.request().postData() || '{}');
@@ -142,15 +157,49 @@ await page.waitForTimeout(600);
 check('Die Ansicht ist offen',
   await ev(() => document.getElementById('view-mitteilungen')?.classList.contains('on')));
 
-const eintraege = await ev(() => [...document.querySelectorAll('#mtlListe .mtl-eintrag')].map(e => ({
+// Die Liste ist seit ENT-433 zweigeteilt: Laufend und Archiv. Was
+// angezeigt wird, haengt also an der Ansicht -- darum wird sie hier
+// ausdruecklich gewaehlt und nicht angenommen.
+const eintraegeLesen = () => ev(() => [...document.querySelectorAll('#mtlListe .mtl-eintrag')].map(e => ({
   id: e.dataset.id,
   marken: [...e.querySelectorAll('.mtl-marken .chip')].map(c => c.textContent.trim()),
   meta: e.querySelector('.mtl-meta')?.textContent || '',
+  knoepfe: [...e.querySelectorAll('.mtl-akt button')].map(b => b.textContent.trim()),
 })));
-check('KRITISCH: alle fuenf Mitteilungen erscheinen, auch die zurueckgezogene',
-  Array.isArray(eintraege) && eintraege.length === 5);
+async function ansicht(welche) {
+  await ev(w => mtlAnsichtSetzen(w), welche);
+  await page.waitForTimeout(200);
+  return await eintraegeLesen();
+}
 
-const finde = id => (eintraege || []).find(e => e.id === String(id)) || { marken: [], meta: '' };
+const laufende = await ansicht('laufend');
+const archivierte = await ansicht('archiv');
+const eintraege = [...(laufende || []), ...(archivierte || [])];
+
+check('KRITISCH: die laufende Ansicht zeigt NUR, was in der App zu sehen ist',
+  Array.isArray(laufende) && laufende.length === 3
+  && !laufende.some(e => ['2', '3'].includes(e.id)));
+check('KRITISCH: das Archiv zeigt das Zurueckgezogene UND das Abgelaufene',
+  Array.isArray(archivierte) && archivierte.length === 3
+  && archivierte.some(e => e.id === '2') && archivierte.some(e => e.id === '3'));
+check('KRITISCH: keine Mitteilung verschwindet zwischen den beiden Ansichten',
+  eintraege.length === 6 && new Set(eintraege.map(e => e.id)).size === 6);
+
+// Beide Zahlen stehen am Umschalter -- eine gefilterte Liste ohne die
+// andere Zahl sieht aus wie die ganze (Hausregel).
+const umschalter = await ev(() => ({
+  laufend: document.getElementById('mtlAnsichtLaufend')?.textContent.trim() || '',
+  archiv:  document.getElementById('mtlAnsichtArchiv')?.textContent.trim() || '',
+  anLaufend: !!document.getElementById('mtlAnsichtLaufend')?.classList.contains('on'),
+  anArchiv:  !!document.getElementById('mtlAnsichtArchiv')?.classList.contains('on'),
+}));
+check('KRITISCH: der Umschalter nennt BEIDE Zahlen, nicht nur die angezeigte',
+  /\b3\b/.test(umschalter.laufend) && /\b3\b/.test(umschalter.archiv));
+check('KRITISCH: die offene Ansicht ist als solche gekennzeichnet -- und nur sie',
+  umschalter.anArchiv && !umschalter.anLaufend);
+
+await ansicht('laufend');
+const finde = id => (eintraege || []).find(e => e.id === String(id)) || { marken: [], meta: '', knoepfe: [] };
 
 // Vier Zustaende, vier verschiedene Woerter -- "nicht sichtbar" waere fuer
 // alle vier dasselbe und fuer keinen richtig.
@@ -234,10 +283,100 @@ await page.waitForTimeout(400);
 check('KRITISCH: eine laufende Mitteilung wird zurueckgezogen, nicht geloescht',
   archiviert && Number(archiviert.id) === 5 && archiviert.zurueck === false);
 archiviert = null;
+// Die zurueckgezogene steht seit ENT-433 im Archiv, nicht mehr in der
+// laufenden Liste.
+await ansicht('archiv');
 await klick('#mtlListe .mtl-eintrag[data-id="2"] .mtl-akt button:nth-child(3)');
 await page.waitForTimeout(400);
 check('Eine zurueckgezogene laesst sich wieder aufnehmen',
   archiviert && Number(archiviert.id) === 2 && archiviert.zurueck === true);
+
+// ══════════════ 8b. ENDGUELTIG LOESCHEN (ENT-433) ═════════════════════
+// Zwei verschiedene Folgen, zwei verschiedene Handgriffe: Zurueckziehen
+// nimmt aus der App, Loeschen aus der Datenbank -- samt Lesestand. Der
+// zweite steht darum NUR im Archiv, und die Sperre dazu steht im Server
+// (mitteilung_loeschen.php); hier wird geprueft, dass das Cockpit sie
+// nicht unterlaeuft.
+const knoepfeArchiv = await ansicht('archiv');
+const knopfNamen = id => (knoepfeArchiv || []).find(e => e.id === String(id))?.knoepfe || [];
+const knopfNamenLaufend = id => (laufende || []).find(e => e.id === String(id))?.knoepfe || [];
+check('KRITISCH: an einer laufenden Mitteilung gibt es KEIN "Endgültig löschen"',
+  !knopfNamenLaufend(5).some(k => /löschen/i.test(k))
+  && !knopfNamenLaufend(4).some(k => /löschen/i.test(k))
+  && !knopfNamenLaufend(1).some(k => /löschen/i.test(k)));
+check('KRITISCH: an einer laufenden steht stattdessen "Zurückziehen"',
+  knopfNamenLaufend(5).some(k => /Zurückziehen/.test(k)));
+check('KRITISCH: im Archiv steht "Endgültig löschen" -- bei der zurueckgezogenen',
+  knopfNamen(2).some(k => /Endgültig löschen/.test(k)));
+check('KRITISCH: und bei der abgelaufenen, die nie zurueckgezogen wurde',
+  knopfNamen(3).some(k => /Endgültig löschen/.test(k)));
+check('Im Archiv wird nicht noch einmal "Zurückziehen" angeboten',
+  !knopfNamen(2).some(k => /Zurückziehen/.test(k)) && !knopfNamen(3).some(k => /Zurückziehen/.test(k)));
+check('"Wieder aufnehmen" steht bei der zurueckgezogenen, die noch gilt',
+  knopfNamen(2).some(k => /Wieder aufnehmen/.test(k)));
+check('Bei der nie zurueckgezogenen, abgelaufenen gibt es nichts aufzunehmen',
+  !knopfNamen(3).some(k => /Wieder aufnehmen/.test(k)));
+check('KRITISCH: bei einer zurueckgezogenen UND abgelaufenen fehlt "Wieder aufnehmen" -- '
+    + 'sie käme dadurch nicht zurück, das Datum ist vorbei',
+  !knopfNamen(6).some(k => /Wieder aufnehmen/.test(k)));
+check('KRITISCH: loeschen laesst sie sich trotzdem',
+  knopfNamen(6).some(k => /Endgültig löschen/.test(k)));
+
+// GEMESSEN, nicht im Quelltext nachgelesen (CLAUDE.md): Eine CSS-Regel
+// kann wirkungslos bleiben, ohne dass etwas kaputtgeht. Ein Handgriff ohne
+// Rückweg darf sich nicht wie "Bearbeiten" anfühlen.
+const loeschMass = await ev(() => {
+  const e = document.querySelector('#mtlListe .mtl-eintrag[data-id="2"]');
+  const l = e?.querySelector('button.mtl-loeschen');
+  const n = e?.querySelector('.mtl-akt button');
+  if (!l || !n) { return null; }
+  const r = l.getBoundingClientRect();
+  return { farbe: getComputedStyle(l).color, normal: getComputedStyle(n).color,
+           hoehe: r.height, breite: r.width,
+           zeile: e.querySelector('.mtl-akt').getBoundingClientRect().width };
+});
+check('KRITISCH: der Loeschknopf hebt sich farblich vom harmlosen Nachbarn ab',
+  !!loeschMass && loeschMass.farbe !== loeschMass.normal);
+check('Er wird nicht ueber die volle Breite gestreckt',
+  !!loeschMass && loeschMass.breite < loeschMass.zeile * 0.8);
+
+// Die Rueckfrage muss die FOLGE benennen, nicht nur die Handlung.
+geloescht = null; dialogText = ''; dialogAnnehmen = false;
+await klick('#mtlListe .mtl-eintrag[data-id="3"] .mtl-akt button.mtl-loeschen');
+await page.waitForTimeout(400);
+check('KRITISCH: vor dem Loeschen wird zurueckgefragt', dialogText.length > 20);
+check('KRITISCH: die Rueckfrage nennt die Mitteilung beim Titel',
+  /Alte Meldung/.test(dialogText));
+check('KRITISCH: sie sagt, dass der Lesestand mitgeht -- '
+    + '"Wirklich löschen?" allein verschweigt genau das',
+  /Lesestand/.test(dialogText) && /4 /.test(dialogText));
+check('KRITISCH: sie sagt, dass es keinen Rueckweg gibt',
+  /nicht rückgängig/i.test(dialogText));
+check('KRITISCH: wer die Rueckfrage ablehnt, loescht NICHTS', geloescht === null);
+
+// Und beim Annehmen geht die richtige Mitteilung weg.
+dialogAnnehmen = true;
+await klick('#mtlListe .mtl-eintrag[data-id="3"] .mtl-akt button.mtl-loeschen');
+await page.waitForTimeout(500);
+check('KRITISCH: nach dem Annehmen wird geloescht -- und zwar diese Mitteilung',
+  geloescht && Number(geloescht.id) === 3);
+check('KRITISCH: das Loeschen geht an einen EIGENEN Endpunkt, nicht ans Archivieren',
+  archiviert === null || Number(archiviert.id) !== 3);
+
+// Eine Mitteilung ohne Leser: Dort waere "der Lesestand geht mit" eine
+// erfundene Drohung -- die Rueckfrage sagt dann etwas anderes.
+listenAntwort = { status: 'ok', eingerichtet: true, push_eingerichtet: true, push_geraete: 1,
+  mitteilungen: [{ ...LISTE[3], gelesen_anzahl: 0 }] };
+await anmelden();
+await ev(() => go('mitteilungen'));
+await page.waitForTimeout(500);
+await ansicht('archiv');
+dialogText = ''; dialogAnnehmen = false;
+await klick('#mtlListe .mtl-eintrag[data-id="2"] .mtl-akt button.mtl-loeschen');
+await page.waitForTimeout(400);
+check('KRITISCH: hat niemand gelesen, wird kein Nachweisverlust behauptet',
+  /niemand/i.test(dialogText) && !/Lesestand/.test(dialogText));
+listenAntwort = { status: 'ok', eingerichtet: true, mitteilungen: LISTE };
 
 // ══════════════ 9. DIE DREI NICHT-FAELLE ══════════════════════════════
 async function leerText(a) {
@@ -256,6 +395,33 @@ check('KRITISCH: "nicht abrufbar" sagt etwas anderes als "keine Mitteilungen"', 
 check('KRITISCH: und etwas anderes als "nicht eingerichtet"', tFehler !== tUneing);
 check('Bei einem Fehler wird nicht behauptet, es gebe keine Mitteilungen',
   !/keine mitteilung/i.test(tFehler));
+
+// Zwei weitere Nicht-Faelle seit ENT-433. Ein Filter, der alles
+// ausblendet, darf nie wie "nichts vorhanden" aussehen (CLAUDE.md) -- und
+// ein leeres Archiv heisst etwas anderes als eine leere Gegenwart.
+async function leerInAnsicht(mitteilungen, welche) {
+  listenAntwort = { status: 'ok', eingerichtet: true, mitteilungen };
+  await anmelden();
+  await ev(() => go('mitteilungen'));
+  await page.waitForTimeout(500);
+  await ev(w => mtlAnsichtSetzen(w), welche);
+  await page.waitForTimeout(200);
+  return ((await ev(() => document.getElementById('mtlListe')?.textContent || '')) || '')
+    .replace(/\s+/g, ' ').trim();
+}
+const tArchivLeer = await leerInAnsicht(LISTE.filter(m => !m.im_archiv), 'archiv');
+const tNichtsLauft = await leerInAnsicht(LISTE.filter(m => m.im_archiv), 'laufend');
+check('KRITISCH: ein leeres Archiv sagt etwas anderes als "keine Mitteilungen"',
+  tArchivLeer !== tLeer && !/noch keine Mitteilung verfasst/.test(tArchivLeer));
+check('KRITISCH: "nichts Laufendes" sagt etwas anderes als "keine Mitteilungen"',
+  tNichtsLauft !== tLeer && !/noch keine Mitteilung verfasst/.test(tNichtsLauft));
+check('KRITISCH: und die beiden sagen nicht dasselbe',
+  tArchivLeer !== tNichtsLauft);
+check('Das leere Archiv verweist auf die Mitteilungen, die es sehr wohl gibt',
+  /\b3\b/.test(tArchivLeer));
+check('"Nichts Laufendes" verweist auf das, was im Archiv liegt',
+  /Archiv/.test(tNichtsLauft) && /\b3\b/.test(tNichtsLauft));
+listenAntwort = { status: 'ok', eingerichtet: true, mitteilungen: LISTE };
 
 // ══════════════ 9b. WARUM PUSH NICHT EINGERICHTET IST ═════════════════
 // Fünf Ursachen, fünf verschiedene Handgriffe an verschiedenen Stellen --
