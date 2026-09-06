@@ -58,15 +58,16 @@ function rollen_katalog(): array
         ],
         ROLLE_PERSONAL => [
             'titel'    => 'Personal',
-            'text'     => 'Die vollständige Personalakte inklusive der vertraulichen Angaben, Anlegen und Ändern von Mitarbeitenden. Keine Einsatzplanung, keine Kunden.',
-            'rechte'   => ['personal_lesen', 'personal_schreiben', 'personal_vertraulich'],
+            'text'     => 'Die vollständige Personalakte inklusive der vertraulichen Angaben, Anlegen und Ändern von Mitarbeitenden, Mitteilungen an die Belegschaft. Keine Einsatzplanung, keine Kunden.',
+            'rechte'   => ['personal_lesen', 'personal_schreiben', 'personal_vertraulich',
+                           'mitteilungen'],
         ],
         ROLLE_VERWALTUNG => [
             'titel'    => 'Verwaltung',
-            'text'     => 'Alles, zusätzlich die Betriebseinstellungen, die Einrichtung, die Offerten und die Rollenvergabe selbst.',
+            'text'     => 'Alles, zusätzlich die Betriebseinstellungen, die Einrichtung, die Offerten, die Mitteilungen und die Rollenvergabe selbst.',
             'rechte'   => ['plan', 'kunden', 'abgleich', 'personal_lesen',
                            'personal_schreiben', 'personal_vertraulich',
-                           'betrieb', 'rechte', 'offerten'],
+                           'betrieb', 'rechte', 'offerten', 'mitteilungen'],
         ],
         // Bewusst NICHT in "Alles" bei Verwaltung enthalten (ENT-169: "nur
         // ausgewählte Benutzer") -- wer im Revierdienst-Wächtersystem
@@ -81,7 +82,7 @@ function rollen_katalog(): array
 }
 
 // ── Die Rechte ────────────────────────────────────────────────────────
-// Bewusst grob geschnitten: acht Rechte, nicht sechzig. Jedes zusaetzliche
+// Bewusst grob geschnitten: ein gutes Dutzend, nicht sechzig. Jedes zusaetzliche
 // Recht ist eine weitere Kombination, die jemand pruefen muesste.
 function rechte_katalog(): array
 {
@@ -94,6 +95,14 @@ function rechte_katalog(): array
         'personal_vertraulich' => 'AHV-Nummer, Bewilligungen, Register-, Herkunfts- und Familienangaben',
         'betrieb'              => 'Betriebseinstellungen, Listen, Einrichtung',
         'rechte'               => 'Rollen vergeben und das Logbuch lesen',
+        // Mitteilungen an die Belegschaft (ENT-421). Eigenes Recht und nicht
+        // unter 'betrieb' mitgefuehrt: Eine Mitteilung erscheint bei JEDEM
+        // Mitarbeitenden im Telefon und traegt den Namen des Betriebs --
+        // wer Listen und Einstellungen pflegen darf, muss darum nicht auch
+        // im Namen des Betriebs sprechen duerfen. Vergeben an Verwaltung
+        // und Personal (siehe rollen_katalog): Die benannten Anlaesse --
+        // Ferien eintragen, Mitarbeitersitzung -- sind Personalthemen.
+        'mitteilungen'         => 'Mitteilungen an die Belegschaft verfassen und zurückziehen',
         // Revierdienst-Tool / V3 (ENT-169/ENT-180) -- eigene Rechte statt
         // Mitbenutzung von 'plan', damit sie unabhaengig von der
         // Einsatzplanung vergeben werden koennen (siehe ROLLE_WAECHTER).

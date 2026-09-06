@@ -336,6 +336,8 @@ for (const [datei, titel] of [
   ['pruef_ereignisse.php', 'KRITISCH: die Ereignis-Arten und ihre Abhakbarkeit stimmen (ENT-090/ENT-197)'],
   ['pruef_revierdienst_berechtigung.php', 'KRITISCH: die Weichen von ohneRevierdienstBerechtigung() stimmen (ENT-284)'],
   ['pruef_aufgaben.php', 'KRITISCH: eine fremde oder entfernte Aufgabe laesst sich nicht an einen Kontrollpunkt haengen (ENT-302)'],
+  ['pruef_mitteilungen.php', 'KRITISCH: Sichtbarkeit und Lesestand der Mitteilungen stimmen -- SQL und PHP sagen dasselbe (ENT-421)'],
+  ['pruef_push.php', 'KRITISCH: die VAPID-Signatur haelt der Gegenpruefung stand und ein toter Endpunkt wird abgemeldet (ENT-424)'],
 ]) {
   let aus = '', code = 0;
   try {
@@ -582,6 +584,25 @@ const NUR_EIGENE_DATEN = [
   'meine_fahrzeug_uebernahme.php',
   'meine_abwesenheit.php',        // eigene Abwesenheitsantraege (ENT-255)
   'abwesenheit_saldo.php',        // eigener Ferien-Saldo -- mehr nur mit Recht "personal_lesen" (ENT-255)
+  // Mitteilungen aus Sicht der empfangenden Person (ENT-421). Kein Recht,
+  // sondern strikt eigene Daten: JEDE angemeldete Person bekommt
+  // Mitteilungen -- das ist der Sinn der Sache. Die mitarbeiter_id stammt
+  // ausnahmslos aus der Sitzung, und was jemand sehen darf, entscheidet
+  // mitteilung_sql_sichtbar() serverseitig; auch das Setzen von "gelesen"
+  // prueft vorher, ob die Mitteilung fuer diese Person ueberhaupt sichtbar
+  // ist. Das VERWALTEN (anlegen, alle sehen, zurueckziehen) haengt dagegen
+  // am Recht 'mitteilungen' -- mitteilung_list/save/archivieren.php stehen
+  // darum bewusst NICHT hier.
+  'meine_mitteilungen.php',
+  // Benachrichtigungen ein- und ausschalten (ENT-424). Kein Recht: JEDE
+  // angemeldete Person darf ihre eigenen Geraete anmelden. Die
+  // mitarbeiter_id stammt ausnahmslos aus der Sitzung, und auch das
+  // Abmelden sucht das Abo nur innerhalb der eigenen Person -- mit einem
+  // fremden Endpunkt laesst sich niemandem die Benachrichtigung
+  // abstellen. Der VERSAND (push_versand.php) haengt dagegen am Recht
+  // 'mitteilungen' oder am Zeitgeber-Schluessel und steht darum bewusst
+  // NICHT hier.
+  'push_einrichtung.php',
 ];
 const ohnePruefung = apiDateien.filter(f => {
   const q = ohneKommentar(f);

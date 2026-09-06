@@ -118,6 +118,9 @@ unten).
 | — | `STAGING_TESTMAIL` | Zieladresse, auf die **jede** aus Staging versendete Mail umgeleitet wird | frei waehlbar, kein produktives Postfach |
 | — | `STAGING_BASIC_AUTH_USER` | Benutzername fuer den authentifizierten Suchmaschinenausschluss-Nachweis (ENT-387) | Hostpoint-Passwortschutz (Explorer → www/staging → Web-Einstellungen → Passwortschutz), eigener technischer Benutzer `qa-probe`, nicht der persoenliche Zugang |
 | — | `STAGING_BASIC_AUTH_PASSWORD` | Passwort dazu | dieselbe Stelle; eigenes starkes Zufallspasswort |
+| `VAPID_PRIVATE_PEM_B64` | `STAGING_VAPID_PRIVATE_PEM_B64` | Signierschluessel fuer Push-Benachrichtigungen (ENT-424) | selbst erzeugen, siehe unten — je Umgebung ein **eigener**, sonst klingeln Testversande auf den echten Telefonen |
+| `VAPID_KONTAKT` | `STAGING_VAPID_KONTAKT` | Absenderkontakt im Push-JWT, `mailto:…` oder `https://…` (RFC 8292 verlangt ihn) | frei waehlbar, muss erreichbar sein |
+| `PUSH_CRON_SCHLUESSEL` | `STAGING_PUSH_CRON_SCHLUESSEL` | Schluessel, mit dem der Hostpoint-Zeitgeber den Nachzuegler-Versand aufruft | selbst erzeugen: `openssl rand -hex 24` |
 
 **Erforderlich, sonst bricht der Deploy ab** (siehe Workflow-Schritt „Umgebung
 waehlen und erforderliche Secrets pruefen"): `DB_*`, `HOSTPOINT_FTP_*` und
@@ -126,7 +129,51 @@ gegen `main` oder einen `qa-*`-Tag deployt wird —
 sowie bei Staging zusaetzlich `STAGING_TESTMAIL`. **Optional, mit
 eingebauter Ersatzmeldung statt Absturz:** `SMTP_*` (meldet „noch nicht
 eingerichtet") und `ANTHROPIC_API_KEY` (KI-Funktionen liefern dann nichts,
-statt zu scheitern) — dieselbe Regel gilt fuer die `STAGING_`-Varianten.
+statt zu scheitern) sowie `VAPID_*` und `PUSH_CRON_SCHLUESSEL` (Push meldet
+„noch nicht eingerichtet") — dieselbe Regel gilt fuer die
+`STAGING_`-Varianten.
+
+### Push-Benachrichtigungen einrichten (ENT-424)
+
+Drei Schritte, einmalig je Umgebung. Ohne sie laeuft alles Uebrige normal
+weiter — die App meldet dann ausdruecklich „auf dem Server noch nicht
+eingerichtet", statt so zu tun, als sei Push eingeschaltet.
+
+**1. Schluesselpaar erzeugen** (auf dem eigenen Rechner, nicht auf dem
+Server):
+
+```
+openssl ecparam -genkey -name prime256v1 -noout -out vapid.pem
+base64 -w0 vapid.pem            # macOS: base64 -i vapid.pem
+```
+
+Die ausgegebene, **einzeilige** Zeichenkette ist der Wert fuer
+`VAPID_PRIVATE_PEM_B64`. Einzeilig ist Pflicht: Die Ersetzung im Deploy ist
+ein `sed`-Aufruf und vertraegt keine Zeilenumbrueche. `vapid.pem` danach in
+den Passwortmanager legen und die Datei loeschen — sie gehoert nicht ins
+Repository. Der **oeffentliche** Schluessel wird daraus abgeleitet und ist
+kein eigenes Secret.
+
+**2. `VAPID_KONTAKT` setzen**, z. B. `mailto:it@…`. Fehlt er, gilt Push als
+nicht eingerichtet — mehrere Push-Dienste weisen ein JWT ohne `sub` ab.
+
+**3. Zeitgeber einrichten** (Hostpoint-Kundencenter → Cronjobs), damit
+vorbereitete Mitteilungen zum gesetzten Zeitpunkt klingeln:
+
+```
+*/15 * * * *  curl -s "https://<domain>/api/push_versand.php?schluessel=<PUSH_CRON_SCHLUESSEL>"
+```
+
+Ohne Zeitgeber geht nichts verloren: Eine sofort veroeffentlichte Mitteilung
+klingelt weiterhin direkt beim Speichern, und eine vorbereitete wird
+nachgeholt, sobald jemand im Cockpit die Mitteilungsseite oeffnet. Der
+Zeitgeber ist der verlaessliche Weg, das Uebrige der Rueckfall.
+
+**Was Push nicht kann:** Auf dem iPhone gibt es Web Push ausschliesslich fuer
+Web-Apps, die ueber „Teilen → Zum Home-Bildschirm" installiert sind — im
+Safari-Tab nicht, unabhaengig von jeder Erlaubnis. Android kann es auch im
+Browser. Die App sagt das je Geraet ausdruecklich und zeigt auf dem iPhone
+die noetigen Schritte.
 
 **Wenn ein Wert je an eine falsche Stelle geraten ist** — in einen Commit, einen
 Chat, ein Bildschirmfoto: **neu erzeugen, nicht loeschen.** Loeschen hilft nicht,
