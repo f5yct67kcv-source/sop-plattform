@@ -243,6 +243,35 @@ check('KRITISCH: das Neuzeichnen loest keinen JS-Fehler aus', bad.length === jsF
 await klick('#t-heute');
 await page.waitForTimeout(300);
 
+// ══════════════ 7b. BEIDE FASSUNGEN, GEMESSEN ════════════════════════
+// Die Kopfzeile traegt seit ENT-420 in "hell" andere Farben. Die Glocke
+// sitzt darin -- gemessen wird darum in beiden Fassungen, ob sie sich
+// ueberhaupt vom Grund abhebt. Nachgelesen im Regelwerk saehe man das
+// nicht: --shell-txt-hi wird je Fassung anders gesetzt.
+for (const thema of ['hell', 'dunkel']) {
+  antwort = { status: 'ok', eingerichtet: true, mitteilungen: MITTEILUNGEN,
+              ungelesen: 2, revier_ungelesen: 0, unterbrechen: [] };
+  await page.goto(`file://${WURZEL}/app.html`);
+  await page.evaluate(t => { localStorage.clear(); localStorage.setItem('rv3_app_thema', t); }, thema);
+  await page.goto(`file://${WURZEL}/app.html`);
+  await page.fill('#gName', 'm.muster'); await page.fill('#gPass', 'x'); await page.click('#gBtn');
+  await page.waitForTimeout(700);
+  const f = await ev(() => {
+    const g = document.getElementById('mitGlocke'), z = document.getElementById('mitZahl');
+    const zahl = z.getBoundingClientRect();
+    const farbe = t => (getComputedStyle(t).color.match(/\d+/g) || []).map(Number);
+    const grund = t => (getComputedStyle(t).backgroundColor.match(/\d+/g) || []).map(Number);
+    const hell = c => c.length >= 3 ? (c[0] * 299 + c[1] * 587 + c[2] * 114) / 1000 : 0;
+    return { unterschied: Math.abs(hell(farbe(g)) - hell(grund(document.querySelector('.kopf')))),
+             zahlUnterschied: Math.abs(hell(farbe(z)) - hell(grund(z))),
+             imBild: zahl.right <= 390 && zahl.top >= 0 && zahl.left >= 0 };
+  });
+  check(`KRITISCH: die Glocke hebt sich in der Fassung "${thema}" vom Grund ab`,
+    !!f && f.unterschied > 60);
+  check(`Der Zaehler ist in der Fassung "${thema}" lesbar`, !!f && f.zahlUnterschied > 60);
+  check(`Und er steht in der Fassung "${thema}" vollstaendig im Bild`, !!f && f.imBild);
+}
+
 // ══════════════ 8. DIE VIER NICHT-FAELLE ══════════════════════════════
 // Sie müssen VERSCHIEDENE Sätze sagen. Verglichen wird der tatsächliche
 // Text, nicht ein Wort aus dem Quelltext -- eine Prüfung, die den Wortlaut
