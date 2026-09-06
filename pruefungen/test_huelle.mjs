@@ -396,6 +396,72 @@ try {
   await p.close();
 } catch (e) { bad.push('Beschriftungen: ' + String(e).split('\n')[0].slice(0, 120)); }
 
+// ══════════════════════════════ GLOCKE UND LOGO IN DER KOPFLEISTE (ENT-416)
+//
+// Die Glocke hat zwei Plaetze: in der Kopfleiste neben dem Logo, sonst in
+// der Werkzeugleiste. Geprueft wird beides -- und vor allem, dass es
+// DIESELBE Glocke ist. Eine zweite daneben waere eine Kopie, die
+// irgendwann auseinanderlaeuft; der Zaehler stuende dann an zwei Stellen
+// verschieden, und niemand wuesste, welcher stimmt.
+try {
+  const p = await seite(1600, 900);
+  await p.evaluate(() => huelleSetzen('aus')); await p.waitForTimeout(300);
+  const kopf = await p.evaluate(() => {
+    const g = document.querySelector('#btnGlocke').getBoundingClientRect();
+    const l = document.querySelector('.marken-knopf').getBoundingClientRect();
+    const bild = document.querySelector('.marken-knopf img').getBoundingClientRect();
+    const nav = document.querySelector('.side-nav .nav-item svg.i').getBoundingClientRect();
+    const leiste = document.querySelector('#side').getBoundingClientRect();
+    return { anzahl: document.querySelectorAll('#btnGlocke, .glocke-wrap').length,
+             inMarke: !!document.querySelector('.side-brand .glocke-wrap'),
+             linksVomLogo: g.right <= l.left + 1,
+             inLeiste: g.bottom <= leiste.bottom && g.top >= leiste.top,
+             logoBild: Math.round(bild.width), navIkon: Math.round(nav.width),
+             abstand: Math.round(l.left - g.right), sichtbar: g.width > 0 };
+  });
+  check('KRITISCH: die Glocke steht in der Kopfleiste beim Logo', kopf.inMarke && kopf.inLeiste);
+  check('Und zwar links davon, nicht dahinter', kopf.linksVomLogo && kopf.abstand > 0);
+  // Genau EIN Knopf und EINE Huelle -- zusammen also zwei Treffer. Kaeme
+  // eine zweite Glocke dazu, waeren es vier.
+  check('KRITISCH: es gibt sie nur einmal im Dokument, keine zweite Kopie', kopf.anzahl === 2);
+  check('Das Logo ist deutlich groesser als die Symbole der Navigation',
+    kopf.logoBild >= 36 && kopf.logoBild > kopf.navIkon);
+
+  // Das Panel haengt auf Koerperebene und bekommt seine Koordinaten beim
+  // Oeffnen -- es muss dem Knopf an den neuen Platz folgen.
+  await p.click('#btnGlocke'); await p.waitForTimeout(250);
+  const panel = await p.evaluate(() => {
+    const pa = document.querySelector('.glocke-panel').getBoundingClientRect();
+    const k = document.querySelector('#btnGlocke').getBoundingClientRect();
+    return { unter: Math.round(pa.top - k.bottom), buendig: Math.abs(pa.right - k.right) <= 1,
+             imFenster: pa.left >= 0 && pa.right <= window.innerWidth };
+  });
+  check('KRITISCH: das Benachrichtigungs-Panel folgt dem Knopf an den neuen Platz',
+    panel.unter >= 0 && panel.unter < 24 && panel.buendig && panel.imFenster);
+  await p.keyboard.press('Escape'); await p.waitForTimeout(150);
+
+  // Zurueck in die Seitenleiste: dort gehoert sie wieder in die
+  // Werkzeugleiste -- die Leiste ist dann eine schmale Spalte, in der
+  // ein Zaehler untergeht.
+  await p.evaluate(() => huelleSetzen('voll')); await p.waitForTimeout(300);
+  const leiste = await p.evaluate(() => ({
+    inWerkzeug: !!document.querySelector('.tb-rechts .glocke-wrap'),
+    sichtbar: document.querySelector('#btnGlocke').getBoundingClientRect().width > 0 }));
+  check('KRITISCH: in der Seitenleiste steht sie wieder in der Werkzeugleiste',
+    leiste.inWerkzeug && leiste.sichtbar);
+
+  // Und auf dem Handy erst recht: In der Schublade waere sie hinter dem
+  // Burger versteckt -- eine Benachrichtigung mit Zaehler, die man erst
+  // aufklappen muss, ist keine.
+  await p.setViewportSize({ width: 390, height: 800 }); await p.waitForTimeout(350);
+  const handy = await p.evaluate(() => ({
+    inWerkzeug: !!document.querySelector('.tb-rechts .glocke-wrap'),
+    sichtbar: document.querySelector('#btnGlocke').getBoundingClientRect().width > 0 }));
+  check('KRITISCH: auf dem Handy bleibt sie sichtbar in der Werkzeugleiste',
+    handy.inWerkzeug && handy.sichtbar);
+  await p.close();
+} catch (e) { bad.push('Glocke: ' + String(e).split('\n')[0].slice(0, 120)); }
+
 // ══════════════════════════════ KEIN UEBERLAUF AM UNTEREN RAND (1281 px)
 try {
   const p = await seite(1281, 800);

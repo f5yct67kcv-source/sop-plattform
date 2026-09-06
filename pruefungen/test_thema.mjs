@@ -221,8 +221,22 @@ const schattenDunkel = await schatten();
 await page.click('#btnThema'); await page.waitForTimeout(350);
 const schattenHell = await schatten();
 
-check('KRITISCH: im Dunkeln wirft keine Karte einen Schatten (ENT-227)',
-  schattenDunkel.karte === 'none');
+// Formuliert als AUSSAGE, nicht als Wortlaut (ENT-419): "kein Schatten
+// faellt nach aussen". Bis ENT-418 war das dasselbe wie boxShadow ===
+// 'none', weil die Karte im Dunkeln ueberhaupt keinen Schatten trug. Seit
+// Liquid Glass traegt sie eine Lichtkante -- und eine Kante ist in CSS ein
+// inset-Schatten. Der Satz von ENT-227 gilt unveraendert weiter: im
+// Dunkeln traegt der Rand, nicht der Schatten. Nur ist der Rand jetzt die
+// Kante.
+// Was diese Pruefung weiterhin faengt, ist genau der Fehler, um den es
+// ENT-227 ging: ein --sh-1, das im Dunkeln wieder unter jede Karte einen
+// echten Schatten wirft. Der traegt kein "inset" und ist nicht
+// durchsichtig -- und wird hier rot.
+const nurNachInnen = w => w === 'none'
+  || w.split(/,(?![^(]*\))/).every(lage =>
+       lage.includes('inset') || /rgba\([^)]*,\s*0\s*\)/.test(lage));
+check('KRITISCH: im Dunkeln faellt kein Schatten nach aussen (ENT-227/ENT-419)',
+  nurNachInnen(schattenDunkel.karte));
 check('Im Dunkeln traegt stattdessen der Rand', schattenDunkel.rand !== '0px');
 check('Im Hellen bleibt der Schatten -- dort gibt es keinen Randkontrast, der ihn ersetzt',
   schattenHell.karte !== 'none');
