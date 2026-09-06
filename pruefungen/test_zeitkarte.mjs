@@ -25,6 +25,13 @@ const browser = await chromium.launch({ executablePath: EXE });
 // laedt -- der Umzug aus ENT-410 soll sie ja gerade beim Laden vorfinden.
 async function seite(breite = 1600, vorbelegt, umzugSchonGelaufen = false, thema) {
   const p = await browser.newPage({ viewport: { width: breite, height: 1000 } });
+  // Laenger geduldig als die 30 Sekunden der Voreinstellung. Gewartet wird
+  // weiterhin auf einen ZUSTAND, nicht auf eine Frist -- die Aussage bleibt
+  // dieselbe, nur die Geduld waechst. Unter vier gleichzeitigen Prueflaeufen
+  // auf vier Kernen ist diese Suite einmal in den Zeitablauf gelaufen,
+  // obwohl sie einzeln in 24 Sekunden durchlaeuft. Eine rote Meldung, die
+  // nur von der Maschinenlast kommt, kostet mehr Vertrauen als sie einbringt.
+  p.setDefaultTimeout(60000);
   p.on('pageerror', e => bad.push('JS-Fehler: ' + e.message));
   if (thema) { await p.addInitScript(t => { try { localStorage.setItem('rv3_thema', t); } catch (e) {} }, thema); }
   if (vorbelegt !== undefined) {
@@ -361,24 +368,28 @@ try {
     const cs = getComputedStyle(bd);
     const kacheln = [...document.querySelectorAll('.zk-klapp, .zk-tag')].map(k => k.getBoundingClientRect());
     return {
-      nebeneinander: Math.abs(r('.zeit-kw').top - r('.zeit-objekte').top) < 2
-        && r('.zeit-objekte').left >= r('.zeit-kw').right - 1,
+      nebeneinander: Math.abs(r('.zeit-kw').top - r('.zeit-tag').top) < 2
+        && r('.zeit-tag').left >= r('.zeit-kw').right - 1,
       spalten: [r('.zeit-kw').width, r('.zeit-tag').width, r('.zeit-uhr').width],
       randUeberlauf: Math.max(...kacheln.map(k => k.right))
         - (r('.zeit-karte .card-bd').right - parseFloat(cs.paddingRight)),
       hoehe: r('.zk-tag').height,
-      untenRaus: r('.zeit-objekte').bottom - r('.zeit-karte').bottom,
+      spanneUmbruch: r('#zeitSpanne').height > 24,
+      untenRaus: Math.max(r('.zeit-tag').bottom, r('.zeit-uhr').bottom) - r('.zeit-karte').bottom,
     };
   });
   check('KRITISCH: auf voller Breite stehen die Bloecke nebeneinander', b.nebeneinander);
   const [kw, tag, uhr] = b.spalten;
-  check('KRITISCH: Datum und Uhrzeit bekommen gleich viel Breite',
-    Math.abs(tag - uhr) < 2);
-  check('KRITISCH: und die Wochenzahl ebenfalls, statt die halbe Karte zu nehmen',
-    Math.abs(kw - tag) < 40);
+  // Gleiche Drittel waren es bis ENT-426. Sie gaben der Wochenzahl 452 px
+  // fuer rund 260 px Inhalt und deckelten die Uhr im selben Drittel bei
+  // 142 px -- die Karte sah leer aus. Jetzt bekommen die Kacheln, was sie
+  // brauchen, und die Wochenzahl den Rest. Geprueft wird deshalb nicht mehr
+  // Gleichheit, sondern dass die Aufteilung in die richtige Richtung geht.
+  check('KRITISCH: die Uhrzeit bekommt mehr Breite als die Wochenzahl -- sie braucht sie auch',
+    uhr > kw);
+  check('Die Wochenzahl behaelt genug Breite fuer ihre Spanne', !b.spanneUmbruch);
   check('KRITISCH: auch dort laeuft keine Kachel ueber den Rand', b.randUeberlauf <= 1);
   check('Und nichts unten heraus', b.untenRaus <= 1);
-  check('Die Kacheln sind dabei nicht kleiner als auf halber Breite', b.hoehe >= 130);
 
   // Die Spalte ist hier am engsten -- und eine zu enge Spalte quetscht die
   // Kacheln, statt dass etwas ueberlaeuft. Gemessen wurde eine Uhr, die
@@ -419,6 +430,108 @@ try {
     rausgeragt.length === 0);
   await p.close();
 } catch (e) { bad.push('Volle Breite: ' + String(e).split('\n')[0].slice(0, 120)); }
+
+// ══════════════════════════════ DIE KACHELN FUELLEN DIE KARTE (ENT-426)
+//
+// Der Befund des Projektinhabers am laufenden Betrieb: "sieht ein wenig leer
+// aus". Nachgemessen an seiner Anordnung -- Karte 1345 x 425 px -- waren es
+// 44 Prozent Fuellgrad; der Rest war Luft. Ursache: Die Kachelgroesse hing
+// nur an der BREITE, und in der dreispaltigen Fassung bekam die Uhr davon
+// ein Drittel und blieb bei 142 px stehen, gleich wie hoch die Karte war.
+//
+// Diese Pruefung geht die Lagen durch, in denen die Karte ihre Hoehe von
+// aussen bekommt -- neben der Begruessung oder von Hand gezogen. Sie ist
+// bewusst an den FUELLGRAD gehaengt und nicht an eine Kachelgroesse: Eine
+// Zahl wie "mindestens 250 px" waere schon durch eine andere Kartenbreite
+// falsch, und niemand koennte sagen, ob sie noch die richtige Aussage macht.
+try {
+  const p = await seite(1920);
+  const lage = async (breiteZeit, breiteBegr, hoehe) => {
+    await p.evaluate(([bz, bb, h]) => {
+      const b = document.querySelector('[data-widget="begruessung"]');
+      const z = document.querySelector('[data-widget="zeit"]');
+      b.classList.remove('dw-halb'); z.classList.remove('dw-halb');
+      b.style.flex = `0 0 ${bb}px`; z.style.flex = `0 0 ${bz}px`;
+      b.classList.add('dh'); z.classList.add('dh');
+      b.style.setProperty('--dh', h + 'px'); z.style.setProperty('--dh', h + 'px');
+      delete window.__zkVorher;
+    }, [breiteZeit, breiteBegr, hoehe]);
+    // Warten, bis die Kachelgroesse zur Ruhe gekommen ist, statt auf eine
+    // feste Frist. Eine Frist ist immer falsch: ohne Last zu lang, unter
+    // Last zu kurz. Beim ersten Anlauf stand hier eine halbe Sekunde je
+    // Lage -- die Suite wurde dadurch so lang, dass unter parallelem Lauf
+    // eine ANDERE Pruefung in dieser Datei in ihren Zeitablauf lief.
+    await p.waitForFunction(() => {
+      const k = document.querySelector('.zk-tag');
+      if (!k) { return false; }
+      const h = Math.round(k.getBoundingClientRect().height);
+      const still = window.__zkVorher === h;
+      window.__zkVorher = h;
+      return still;
+    }, null, { timeout: 10000, polling: 100 }).catch(() => {});
+    return p.evaluate(() => {
+      const bd = document.querySelector('.zeit-karte .card-bd');
+      const r = bd.getBoundingClientRect(), s = getComputedStyle(bd);
+      const innenH = r.height - parseFloat(s.paddingTop) - parseFloat(s.paddingBottom);
+      const kacheln = [...document.querySelectorAll('.zk-klapp, .zk-tag')].map(k => k.getBoundingClientRect());
+      const teile = [...document.querySelectorAll('.zeit-kw .lb, .zeit-kw .wert, .zeit-kw .spanne, .zeit-zeile .lb, .zk-uhr, .zk-tag')]
+        .map(e => e.getBoundingClientRect());
+      return {
+        fuell: (Math.max(...teile.map(t => t.bottom)) - Math.min(...teile.map(t => t.top))) / innenH,
+        kachel: kacheln[0].height,
+        rechtsRaus: Math.max(...kacheln.map(k => k.right)) - (r.right - parseFloat(s.paddingRight)),
+        untenRaus: Math.max(...kacheln.map(k => k.bottom)) - (r.bottom - parseFloat(s.paddingBottom)),
+        scrollt: bd.scrollHeight > bd.clientHeight + 1,
+        spanneUmbruch: document.querySelector('#zeitSpanne').getBoundingClientRect().height > 24,
+      };
+    });
+  };
+
+  // Genau die Anordnung aus dem Bildschirmfoto.
+  const breit = await lage(1345, 580, 425);
+  check(`KRITISCH: die breite Karte ist gefuellt statt halb leer `
+    + `(${Math.round(breit.fuell * 100)} % belegt, vor ENT-426 waren es 44)`, breit.fuell >= .7);
+  check('KRITISCH: dabei laeuft nichts nach rechts hinaus', breit.rechtsRaus <= 1);
+  check('KRITISCH: und nichts nach unten', breit.untenRaus <= 1);
+  check('Die Wochenspanne bricht dabei nicht um', !breit.spanneUmbruch);
+
+  // Dieselbe Breite, doppelte Hoehe: Die Kachel darf nicht kleiner werden.
+  const hoch = await lage(1345, 580, 620);
+  check('KRITISCH: mehr Hoehe macht die Kachel nicht kleiner',
+    hoch.kachel >= breit.kachel - 1);
+  check('Auch in der hohen Karte laeuft nichts hinaus',
+    hoch.rechtsRaus <= 1 && hoch.untenRaus <= 1);
+
+  // Und zurueck: Wird die Karte wieder flach, muss die Kachel FOLGEN. Ohne
+  // das bliebe sie auf der Groesse der hohen Karte stehen und liefe unten
+  // heraus -- ein Fehler, den nur der Weg zurueck zeigt, nie der Hinweg.
+  const flach = await lage(1345, 580, 240);
+  check('KRITISCH: wird die Karte wieder flach, schrumpft die Kachel mit',
+    flach.kachel < hoch.kachel - 1);
+  check('KRITISCH: und die Karte bekommt dabei keine Bildlaufleiste', !flach.scrollt);
+  check('KRITISCH: auch flach laeuft nichts hinaus',
+    flach.rechtsRaus <= 1 && flach.untenRaus <= 1);
+
+  // Sehr breite Karte mittlerer Hoehe: Hier bindet die HOEHE, nicht die
+  // Breite. Gemessen bleibt bei 1600 x 300 px unten null Luft, waehrend
+  // rechts noch 134 px frei sind -- die einzige der geprueften Lagen, in der
+  // die Hoehenmessung ueberhaupt entscheidet.
+  await lage(1600, 300, 220);
+  const hoehenfall = await lage(1600, 300, 300);
+  check(`KRITISCH: wo die Hoehe bindet, ist die Karte ebenfalls gefuellt `
+    + `(${Math.round(hoehenfall.fuell * 100)} % belegt)`, hoehenfall.fuell >= .95);
+  check('Auch dort laeuft nichts hinaus',
+    hoehenfall.rechtsRaus <= 1 && hoehenfall.untenRaus <= 1);
+
+  // Schmale, hohe Karte: Hier bindet die Breite, nicht die Hoehe -- zwei
+  // Objekte nebeneinander koennen nicht beliebig hoch werden, ohne ihr
+  // Seitenverhaeltnis zu verlieren. Geprueft wird deshalb nur, dass nichts
+  // ueberlaeuft; ein voller Fuellgrad ist hier nicht zu haben.
+  const schmal = await lage(650, 580, 700);
+  check('In der schmalen, hohen Karte bindet die Breite -- nichts laeuft hinaus',
+    schmal.rechtsRaus <= 1 && schmal.untenRaus <= 1);
+  await p.close();
+} catch (e) { bad.push('Fuellgrad: ' + String(e).split('\n')[0].slice(0, 120)); }
 
 // ══════════════════════════════ AM HANDY NICHT
 //
