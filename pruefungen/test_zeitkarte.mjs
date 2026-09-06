@@ -183,14 +183,17 @@ try {
 try {
   const p = await seite();
   const g = await p.evaluate(() => {
+    // Seit ENT-430 tragen Datum und Uhrzeit keine Ueberschrift mehr -- eine
+    // Klappuhr und ein Kalenderblatt sagen von selbst, was sie zeigen. Wo
+    // eine steht, muss sie weiterhin oben stehen und versal sein; wo keine
+    // steht, ist das kein Mangel, sondern der Entscheid.
     const zeilen = [...document.querySelectorAll('.zeit-zeile')].map(z => {
       const lb = z.querySelector('.lb');
       const v = z.querySelector('.wert, .zk-uhr, .zk-tag');
-      return { hatWert: !!v,
-               lblOben: v ? lb.getBoundingClientRect().bottom <= v.getBoundingClientRect().top + 1 : false,
-               lblKlein: parseFloat(getComputedStyle(lb).fontSize),
-               lblGroesse: getComputedStyle(lb).fontSize,
-               versal: getComputedStyle(lb).textTransform };
+      return { hatWert: !!v, hatLabel: !!lb,
+               lblOben: !lb || (v && lb.getBoundingClientRect().bottom <= v.getBoundingClientRect().top + 1),
+               lblGroesse: lb ? getComputedStyle(lb).fontSize : null,
+               versal: lb ? getComputedStyle(lb).textTransform : 'uppercase' };
     });
     const karte = document.querySelector('.zeit-karte').getBoundingClientRect();
     const bd = document.querySelector('.zeit-karte .card-bd');
@@ -226,11 +229,16 @@ try {
   });
   check('Es sind drei Bloecke: Woche, Tag, Uhrzeit', g.zeilen.length === 3);
   check('Jeder traegt einen Wert', g.zeilen.every(z => z.hatWert));
-  check('KRITISCH: in jedem Block steht die Ueberschrift ueber dem Wert',
+  check('KRITISCH: wo eine Ueberschrift steht, steht sie ueber dem Wert',
     g.zeilen.every(z => z.lblOben));
   check('Und versal gesetzt, wie ueberall sonst', g.zeilen.every(z => z.versal === 'uppercase'));
-  check('KRITISCH: alle drei Ueberschriften sind gleich gross -- gleiches Muster auf beiden Seiten',
-    new Set(g.zeilen.map(z => z.lblGroesse)).size === 1);
+  // Die Wochenzahl BEHAELT ihre Ueberschrift, und das ist kein Zufall: "36"
+  // allein sagt niemandem, was gemeint ist -- eine Klappuhr schon.
+  check('KRITISCH: die Wochenzahl behaelt ihre Ueberschrift', g.zeilen[0].hatLabel);
+  check('Datum und Uhrzeit tragen keine mehr (ENT-430)',
+    g.zeilen.slice(1).every(z => !z.hatLabel));
+  check('Es bleibt bei genau einer Ueberschrift in der Karte',
+    g.zeilen.filter(z => z.hatLabel).length === 1);
   check('KRITISCH: Datum und Uhrzeit sind gleich hoch, sonst wirkt eine der beiden abgeschnitten',
     g.gleichHoch);
   check('Die Woche steht weiterhin ueber Tag und Uhrzeit -- von der groben zur feinen Einheit',

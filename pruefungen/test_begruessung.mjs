@@ -337,6 +337,13 @@ try {
 // nichts falsch war. Die Aussage der Pruefung bleibt unveraendert; nur der
 // Zeitpunkt der Messung ist jetzt bestimmt statt geschaetzt.
 const uebergangSteht = async () => {
+  // Den Zeiger von den Knoepfen wegnehmen. Er bleibt liegen, wo der letzte
+  // Klick war, und .btn:hover faerbt mit var(--bg) statt var(--surface) --
+  // gemessen wuerde dann die Hoverfarbe und nicht die Ruhefarbe. Bisher ging
+  // das gut, weil der Zeiger zufaellig neben den Knoepfen lag; nach einer
+  // Layout-Aenderung lag er auf "Erkennen", und die Pruefung meldete einen
+  // Fehler, den es an der Farbe nicht gab.
+  await page.mouse.move(5, 5);
   await page.waitForFunction(() => ['#rtMik', '#rtBtn', '#rtSprach button[title="Bild auswählen"]']
     .flatMap(s => { const e = document.querySelector(s); return e ? e.getAnimations() : []; })
     .every(a => a.playState === 'finished' || a.playState === 'idle'), null, { timeout: 5000 });
@@ -491,6 +498,90 @@ try {
   check('Der Router in Planung/Einsaetze ist unveraendert',
     anderswo === null || anderswo !== 'none');
 } catch (e) { bad.push('Sprach-Hinweis: ' + String(e).split('\n')[0].slice(0, 120)); }
+
+// ══════════════════════════════ DIE EINGABESPALTE IST FLACH UND HAT LUFT (ENT-432)
+//
+// Der Projektinhaber: "es ist zu dicht" -- und: die Spalte zum Eintippen
+// SENKRECHT reduzieren. Gemessen war die Enge echt: Der Inhalt brauchte
+// 178 px bei 167 px Innenhoehe und ragte oben aus der Karte heraus.
+//
+// (ENT-430 hatte daraus eine waagrechte Lesebreite gemacht -- ein
+// Missverstaendnis. Die Pruefungen dazu sind mit diesem Abschnitt ersetzt.)
+try {
+  // Frisch laden: Der Abschnitt davor laesst die Mikrofon-Warnung sichtbar
+  // im Hinweisfeld stehen. Sie macht die Karte hoeher und verschiebt die
+  // untere Kante -- gemessen wuerde dann eine Unwucht, die es im
+  // Ruhezustand nicht gibt.
+  await page.reload();
+  await page.waitForSelector('#shell.on');
+  await page.setViewportSize({ width: 2000, height: 1100 });
+  await page.evaluate(() => huelleSetzen('aus'));
+  await page.waitForTimeout(700);
+  const m = await page.evaluate(() => {
+    const bd = document.querySelector('.begr-karte .card-bd');
+    const karte = document.querySelector('.begr-karte').getBoundingClientRect();
+    const box = s => document.querySelector(s).getBoundingClientRect();
+    const t = document.querySelector('#rtText'), cs = getComputedStyle(t);
+    // Passt der Platzhalter in eine Zeile? Gemessen mit den Schriftwerten,
+    // die das Feld gerendert TRAEGT -- nicht mit denen, die im Regelwerk
+    // stehen. Ein umbrechender Platzhalter fuellt das flache Feld randvoll
+    // und macht die Enge wieder auf, gegen die die Kuerzung gedacht war.
+    const c = document.createElement('canvas').getContext('2d');
+    c.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+    const textBreite = c.measureText(t.placeholder).width;
+    const platz = t.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    const zeile = parseFloat(cs.lineHeight);
+    const rahmen = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom)
+      + parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth);
+    return {
+      feldHoehe: box('#rtText').height, zweiZeilen: zeile * 2 + rahmen,
+      platzhalterPasst: textBreite <= platz,
+      // Luft zwischen Karte und Inhalt, oben wie unten.
+      luftOben: box('#begrGruss').top - karte.top,
+      luftUnten: karte.bottom - box('#rtSprach').bottom,
+      gruss: box('#begrGruss').left, feld: box('#rtText').left, knoepfe: box('#rtSprach').left,
+    };
+  });
+  check(`KRITISCH: das Eingabefeld ist so hoch wie seine zwei Zeilen und keinen `
+    + `Pixel mehr (${Math.round(m.feldHoehe)} gegen ${Math.round(m.zweiZeilen)} px gerechnet)`,
+    Math.abs(m.feldHoehe - m.zweiZeilen) <= 1);
+  check('KRITISCH: der Platzhalter passt in eine Zeile -- sonst fuellt er das flache'
+    + ' Feld randvoll und die Enge ist wieder da', m.platzhalterPasst);
+  check(`KRITISCH: der Inhalt hat Luft zum Kartenrand, oben wie unten `
+    + `(${Math.round(m.luftOben)} / ${Math.round(m.luftUnten)} px) -- vorher ragte er `
+    + `elf Pixel heraus`, m.luftOben >= 25 && m.luftUnten >= 25);
+  check('KRITISCH: und zu gleichen Teilen -- der Block sitzt senkrecht mittig',
+    Math.abs(m.luftOben - m.luftUnten) <= 6);
+
+  // Die senkrechte Mitte hat im Ruhezustand KEINE Wirkung: Die Begruessung
+  // ist selbst die hoehere der beiden Karten und damit genau so hoch wie ihr
+  // Inhalt. Sie greift erst, wenn die Nachbarin hoeher wird -- und dann ist
+  // sie der Unterschied zwischen "mittig" und "oben klebend, unten Loch".
+  // Nachgestellt, weil eine Regel, die nie gemessen wurde, eine Behauptung
+  // ist.
+  const gestreckt = await page.evaluate(() => {
+    const z = document.querySelector('[data-widget="zeit"]');
+    z.classList.add('dh'); z.style.setProperty('--dh', '420px');
+    return new Promise(r => setTimeout(() => {
+      const k = document.querySelector('.begr-karte').getBoundingClientRect();
+      const b = s => document.querySelector(s).getBoundingClientRect();
+      r({ karte: k.height,
+          oben: b('#begrGruss').top - k.top,
+          unten: k.bottom - b('#rtSprach').bottom });
+    }, 500));
+  });
+  check(`KRITISCH: wird die Nachbarkarte hoeher, sitzt der Block mittig statt oben `
+    + `zu kleben (${Math.round(gestreckt.oben)} / ${Math.round(gestreckt.unten)} px `
+    + `bei ${Math.round(gestreckt.karte)} px Karte)`,
+    gestreckt.karte > 300 && Math.abs(gestreckt.oben - gestreckt.unten) <= 6);
+  await page.evaluate(() => {
+    const z = document.querySelector('[data-widget="zeit"]');
+    z.classList.remove('dh'); z.style.removeProperty('--dh');
+  });
+  check('Gruss, Feld und Knopfreihe stehen auf einer Flucht',
+    Math.abs(m.gruss - m.feld) < 1 && Math.abs(m.knoepfe - m.feld) < 1);
+  await page.setViewportSize({ width: 1500, height: 1100 });
+} catch (e) { bad.push('Eingabespalte: ' + String(e).split('\n')[0].slice(0, 120)); }
 
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
