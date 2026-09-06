@@ -362,7 +362,7 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
 }
 
 // ── qa-version.json: Live-Version-Nachweis fuer den externen QA-Runner,
-// ausschliesslich Staging betreffend (ENT-432)
+// ausschliesslich Staging betreffend (ENT-435)
 // ────────────────────────────────────────────────────────────────────────
 //
 // Warum diese Prüfung: sop-qa-runner (getrenntes Repository) muss vor jedem

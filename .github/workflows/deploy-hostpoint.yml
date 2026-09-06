@@ -432,7 +432,7 @@ jobs:
           sed -i "s|__PUSH_CRON_SCHLUESSEL__|$EFF_PUSH_CRON_SCHLUESSEL|g" dist/api/push_versand.php
           sed -i "s|__MAPS_JS_KEY__|$EFF_MAPS_JS_KEY|g" dist/app.html
 
-      # Live-Version-Verifikation fuer den externen QA-Runner (ENT-432,
+      # Live-Version-Verifikation fuer den externen QA-Runner (ENT-435,
       # sop-qa-runner). Ausschliesslich fuer Staging, keine Secrets: Beide
       # Werte kommen aus dem GitHub-Kontext, nicht aus "secrets.". Staging
       # deployt seit ENT-372 ausschliesslich per workflow_dispatch gegen
