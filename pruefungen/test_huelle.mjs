@@ -268,24 +268,47 @@ try {
     check(`${v} nutzt die volle Breite`, await weit());
   }
 
+  // Die Listenansichten sind seit ENT-422 dazugekommen. Der Deckel ist eine
+  // LESEBREITE -- er gehoert vor eine Textspalte oder ein Formular, nicht vor
+  // eine Tabelle mit elf Spalten. Gemessen bei 1920 px blieben dort 480 px
+  // rechts leer, waehrend dieselbe Zeile links einen langen Firmennamen und
+  // eine E-Mail-Adresse nebeneinander quetschte.
+  for (const v of ['kunden', 'mitarbeiter', 'produkte', 'abwesenheiten']) {
+    await p.evaluate(x => go(x), v); await p.waitForTimeout(250);
+    check(`KRITISCH: ${v} nutzt die volle Breite`, await weit());
+  }
+
   // Und die Gegenrichtung: Wo Formulare stehen, bleibt die Lesebreite.
   // Ein 2500 px breites Formular ist nicht besser, sondern unlesbar.
-  for (const v of ['betrieb', 'kunden', 'mitarbeiter']) {
+  // 'betrieb' ist fast nur Formular; bei den Mitarbeitenden entscheidet der
+  // Reiter -- Liste und Personalakte sind Tabellen, "bearbeiten" ist ein
+  // Formular und behaelt den Deckel (MITARBEITER_WEIT).
+  for (const v of ['betrieb']) {
     await p.evaluate(x => go(x), v); await p.waitForTimeout(250);
     check(`KRITISCH: ${v} behaelt die Lesebreite`, (await weit()) === false);
   }
+  await p.evaluate(() => { go('mitarbeiter'); maGoTab('bearbeiten'); });
+  await p.waitForTimeout(250);
+  check('KRITISCH: die Bearbeitungsmaske der Mitarbeitenden behaelt die Lesebreite',
+    (await weit()) === false);
+  await p.evaluate(() => maGoTab('liste')); await p.waitForTimeout(200);
 
   // Gemessen statt geglaubt, und im Zustand, in dem es zaehlt: ausgeblendete
-  // Leiste, 1600 px Fenster. Die Einsatzliste nutzt sie ganz, die Kundenseite
-  // bleibt beim Deckel von 1440 px. Der Unterschied ist der ganze Punkt.
+  // Leiste, 1600 px Fenster. Einsatzliste und Kundenliste nutzen sie ganz,
+  // die Einstellungen bleiben beim Deckel von 1440 px. Der Unterschied ist
+  // der ganze Punkt -- nur verlaeuft er seit ENT-422 zwischen Tabelle und
+  // Formular, nicht mehr zwischen Planung und Stammdaten.
   await p.evaluate(() => huelleSetzen('aus')); await p.waitForTimeout(250);
   await p.evaluate(() => go('planung'));
   await p.evaluate(() => goTab('einsaetze')); await p.waitForTimeout(250);
   const bEins = (await mass(p, '.content')).w;
   await p.evaluate(() => go('kunden')); await p.waitForTimeout(250);
   const bKund = (await mass(p, '.content')).w;
+  await p.evaluate(() => go('betrieb')); await p.waitForTimeout(250);
+  const bBetr = (await mass(p, '.content')).w;
   check('KRITISCH: die Einsatzliste nutzt die ganze Breite', bEins === 1600);
-  check('KRITISCH: die Kundenseite bleibt bei der Lesebreite', bKund === 1440);
+  check('KRITISCH: die Kundenliste nutzt die ganze Breite', bKund === 1600);
+  check('KRITISCH: die Einstellungen bleiben bei der Lesebreite', bBetr === 1440);
 
   await p.close();
 }
