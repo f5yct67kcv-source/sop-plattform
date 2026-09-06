@@ -170,7 +170,7 @@ check('KRITISCH: ohne Wächter-Status-Antwort zeigt "Aktive Wächter" einen Stri
   kpiTexte[0].includes('–'));
 
 // ── Gestalt: der Kennzahlen-Block ist so gross wie die Karte daneben
-// (ENT-417). Rueckmeldung Projektinhaber 2026-09-05 mit markiertem
+// (ENT-417). Rueckmeldung Projektinhaber 2026-09-06 mit markiertem
 // Bildschirmfoto: "das Fenster sauber angleichen von der Groesse wie
 // nebenan".
 //
