@@ -295,6 +295,40 @@ $z = $pdo->query('SELECT fehler_zahl, letzter_erfolg, letzter_fehler FROM push_a
 pruef('KRITISCH: ein Erfolg setzt den Fehlerzaehler zurueck', (int)$z['fehler_zahl'] === 0);
 pruef('Und haelt den Zeitpunkt fest', $z['letzter_erfolg'] === '2030-02-02 12:00:00');
 
+// ── DER ZEITGEBER-ZUGANG
+// Vier Lagen, vier Antworten. Beim Einrichten kamen alle als "kein Token"
+// heraus -- die Meldung der Sitzungspruefung, in die der Aufruf mangels
+// gueltigem Schluessel hineinlief. Vier verschiedene Handgriffe an vier
+// verschiedenen Stellen sahen gleich aus.
+$echt = str_repeat('a1b2', 12);
+pruef('KRITISCH: ein unersetzter Platzhalter heisst "nicht eingerichtet"',
+    push_zeitgeber_lage('__PUSH_CRON_SCHLUESSEL__', $echt) === 'nicht_eingerichtet');
+pruef('KRITISCH: ein leeres Secret ebenso',
+    push_zeitgeber_lage('', $echt) === 'nicht_eingerichtet');
+pruef('KRITISCH: ohne Schluessel in der Adresse heisst es so -- '
+    . 'und NICHT "falscher Schluessel"',
+    push_zeitgeber_lage($echt, '') === 'kein_schluessel_in_der_adresse');
+pruef('KRITISCH: ein falscher Schluessel wird als solcher benannt',
+    push_zeitgeber_lage($echt, 'etwas-anderes') === 'falscher_schluessel');
+pruef('KRITISCH: der richtige Schluessel geht durch',
+    push_zeitgeber_lage($echt, $echt) === 'ok');
+pruef('KRITISCH: ein Schluessel, der nur ein Zeichen laenger ist, geht NICHT durch -- '
+    . 'genau der Fall "Prozentzeichen mitkopiert"',
+    push_zeitgeber_lage($echt, $echt . '%') === 'falscher_schluessel');
+pruef('Ein zu kurzer Schluessel ebenfalls nicht',
+    push_zeitgeber_lage($echt, substr($echt, 0, -1)) === 'falscher_schluessel');
+pruef('KRITISCH: die vier Lagen sind unterscheidbar (CLAUDE.md)',
+    count(array_unique([
+        push_zeitgeber_lage('', $echt),
+        push_zeitgeber_lage($echt, ''),
+        push_zeitgeber_lage($echt, 'falsch'),
+        push_zeitgeber_lage($echt, $echt),
+    ])) === 4);
+// Ohne Schluessel UND ohne Einrichtung geht "nicht eingerichtet" vor --
+// sonst hiesse es "gib einen Schluessel mit", obwohl keiner hilft.
+pruef('Ohne beides gilt "nicht eingerichtet"',
+    push_zeitgeber_lage('', '') === 'nicht_eingerichtet');
+
 // ── WER WIRD ANGESCHRIEBEN
 // Der Verfasser ist NICHT ausgenommen (Entscheidung des Projektinhabers,
 // 2026-09-06). Zuerst war er es; beim Einrichten fiel der Widerspruch auf:
