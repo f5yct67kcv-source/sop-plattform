@@ -2292,12 +2292,30 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
 /* ── Begrüssungs-Container mit Diktat-Router (ENT-032) */
 .begr-karte .card-bd { padding: 22px 24px; }
 /* Feinjustierung aus der Skizze des Projektinhabers vom 2026-09-06 (ENT-428):
-   Gruss fuenf Pixel nach rechts und elf nach oben, Knopfreihe drei nach
-   unten, Eingabefeld ein Pixel flacher. Alles auf die Uebersicht begrenzt --
-   .sprach und .sprach-hint stehen ebenso in Planung/Einsaetze und in zwei
-   Dialogen, und dort ist nichts beanstandet worden. */
+   Gruss elf Pixel nach oben, Knopfreihe drei nach unten, Eingabefeld ein
+   Pixel flacher. Alles auf die Uebersicht begrenzt -- .sprach und
+   .sprach-hint stehen ebenso in Planung/Einsaetze und in zwei Dialogen, und
+   dort ist nichts beanstandet worden.
+   Die fuenf Pixel nach rechts aus derselben Skizze sind mit ENT-430
+   entfallen: Der Block steht jetzt mittig, und ein Gruss, der fuenf Pixel
+   weiter rechts beginnt als das Feld darunter, stuende sichtbar aus der
+   Flucht. */
 .begr-kopf h2 { font-size: 21px; font-weight: 720; letter-spacing: -.3px;
-  margin: -11px 0 0 5px; }
+  margin: -11px 0 0; }
+
+/* ── Die Eingabespalte hat eine Lesebreite und steht mittig (ENT-430)
+   Der Projektinhaber: "das linke fenster ist etwas ueberfrachtet". Ueber die
+   volle Kartenbreite lief das Eingabefeld gemessen 900 px weit -- ein Feld,
+   in das man einen Satz diktiert, und kein Fliesstext.
+   Mittig heisst hier wirklich mittig im Container (margin-inline: auto),
+   nicht ein Abstandhalter neben dem Inhalt. Der Text darin bleibt
+   linksbuendig: Gruss, Feld und Knopfreihe stehen auf einer Flucht, und
+   zentrierter Text ueber einem linksbuendigen Feld wirkt unruhig, ohne dass
+   man sagen kann warum.
+   Nur die Uebersicht: Derselbe Router steht in Planung/Einsaetze und in zwei
+   Dialogen, wo die Breite nicht beanstandet ist. */
+.begr-karte .begr-kopf,
+.begr-karte .diktat-router { max-width: 640px; margin-inline: auto; }
 .begr-karte .sprach { margin-top: 13px; }
 /* Ein Pixel flacher. Zwei Dinge muessen dabei stimmen:
    Die Mindesthoehe von textarea.inp (92 px) muss mitgehen -- sie gewinnt
@@ -4721,10 +4739,12 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
           <!-- Datum & Zeit (ENT-410, seit ENT-423 als Klappuhr und Tageskachel).
                Steht neben der Begruessung und fuellt die Haelfte, die dort frei
                wurde, seit die Begruessung nicht mehr ueber die volle Breite
-               laeuft. Weiter von der groben zur feinen Einheit -- Woche, Tag,
-               Uhrzeit --, jeweils Ueberschrift oben, Wert darunter, wie ueberall
-               sonst. Die Wochenspanne steht dabei, weil eine nackte Wochenzahl
-               niemandem sagt, welche Tage gemeint sind.
+               laeuft. Weiter von der groben zur feinen Einheit: Woche, Tag,
+               Uhrzeit. Die Wochenzahl behaelt ihre Ueberschrift und ihre
+               Spanne -- eine nackte 36 sagt niemandem, was gemeint ist. Ueber
+               den beiden Kacheln steht seit ENT-430 keine mehr: Eine Klappuhr
+               und ein Kalenderblatt sagen von selbst, was sie zeigen, und den
+               ausgeschriebenen Wert traegt ohnehin das aria-label.
 
                Die beiden Kacheln tragen den Wert in ZIFFERN, nicht in Text: Was
                die Klappuhr zeigt, steht in vier Halbflaechen verteilt (zwei
@@ -4747,7 +4767,6 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
                   </div>
                   <div class="zeit-objekte">
                     <div class="zeit-zeile zeit-tag">
-                      <span class="lb">Datum</span>
                       <div class="zk-tag" id="zeitDatum" role="img" aria-label="–">
                         <span class="zk-tag-kopf">
                           <i class="zk-wt" id="zeitWt">–</i><i class="zk-mo" id="zeitMo">–</i>
@@ -4756,7 +4775,6 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
                       </div>
                     </div>
                     <div class="zeit-zeile zeit-uhr">
-                      <span class="lb">Uhrzeit</span>
                       <div class="zk-uhr" id="zeitUhr" role="img" aria-label="–">
                         <div class="zk-klapp" id="zeitStd">
                           <div class="zk-h zk-h-o"><span></span></div>

@@ -492,6 +492,62 @@ try {
     anderswo === null || anderswo !== 'none');
 } catch (e) { bad.push('Sprach-Hinweis: ' + String(e).split('\n')[0].slice(0, 120)); }
 
+// ══════════════════════════════ DIE EINGABESPALTE HAT LESEBREITE UND STEHT MITTIG
+//
+// Der Projektinhaber: "das linke fenster ist etwas ueberfrachtet ... die
+// eingabespalte verkleinern und mit dem gewonnenen Platz einmitten"
+// (ENT-430). Ueber die volle Kartenbreite lief das Feld gemessen 900 px --
+// ein Feld fuer einen diktierten Satz, kein Fliesstext.
+//
+// "Mittig" wird als Gleichheit der beiden Luftraeume geprueft, nicht als
+// CSS-Eigenschaft: Ein margin-inline:auto steht auch dann im Regelwerk, wenn
+// eine spaetere Regel es aushebelt (CLAUDE.md: gemessen, nicht nachgelesen).
+try {
+  // Breites Fenster mit eingeklappter Leiste: nur dort ist die Karte
+  // ueberhaupt breiter als die Lesebreite. In einem schmalen Fenster nimmt
+  // das Feld die volle Breite, und das ist richtig so -- die Lesebreite ist
+  // eine Obergrenze, kein Zwang. Eine Pruefung im schmalen Fenster wuerde
+  // eine Verletzung melden, wo keine ist.
+  await page.setViewportSize({ width: 2000, height: 1100 });
+  await page.evaluate(() => huelleSetzen('aus'));
+  await page.waitForTimeout(600);
+  const m = await page.evaluate(() => {
+    const bd = document.querySelector('.begr-karte .card-bd');
+    const cs = getComputedStyle(bd), r = bd.getBoundingClientRect();
+    const innenL = r.left + parseFloat(cs.paddingLeft);
+    const innenR = r.right - parseFloat(cs.paddingRight);
+    const box = s => document.querySelector(s).getBoundingClientRect();
+    const feld = box('#rtText');
+    return {
+      innen: innenR - innenL, feld: feld.width,
+      luftLinks: feld.left - innenL, luftRechts: innenR - feld.right,
+      // Der Gruss selbst, nicht sein Behaelter: Ein Versatz sitzt am h2 und
+      // laesst den Behaelter unberuehrt -- gemessen an ihm waere die Flucht
+      // auch dann in Ordnung, wenn der Text sichtbar daneben steht.
+      kopfLinks: box('#begrGruss').left, feldLinks: feld.left, knoepfeLinks: box('#rtSprach').left,
+    };
+  });
+  check('KRITISCH: das Eingabefeld ist schmaler als die Karte -- eine Lesebreite,'
+    + ' keine volle Kartenbreite', m.feld < m.innen - 100);
+  check(`KRITISCH: der gewonnene Platz liegt zu gleichen Teilen links und rechts `
+    + `(${Math.round(m.luftLinks)} gegen ${Math.round(m.luftRechts)} px)`,
+    Math.abs(m.luftLinks - m.luftRechts) <= 2);
+  check('Gruss, Feld und Knopfreihe stehen auf einer Flucht -- der Block ist mittig,'
+    + ' sein Inhalt bleibt linksbuendig',
+    Math.abs(m.kopfLinks - m.feldLinks) < 1 && Math.abs(m.knoepfeLinks - m.feldLinks) < 1);
+
+  // Nur die Uebersicht: Derselbe Router steht in Planung/Einsaetze, wo die
+  // Breite nicht beanstandet ist.
+  const anderswo = await page.evaluate(() => {
+    const e = document.querySelector('#peDropzone');
+    if (!e) { return null; }
+    return getComputedStyle(e.closest('.diktat-router')).maxWidth;
+  });
+  check('Der Router in Planung/Einsaetze behaelt seine Breite',
+    anderswo === null || anderswo === 'none');
+  await page.setViewportSize({ width: 1500, height: 1100 });
+} catch (e) { bad.push('Eingabespalte: ' + String(e).split('\n')[0].slice(0, 120)); }
+
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
 console.log('Alle Pruefungen bestanden.');
