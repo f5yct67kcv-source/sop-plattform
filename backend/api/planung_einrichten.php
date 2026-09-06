@@ -1274,6 +1274,63 @@ CREATE TABLE IF NOT EXISTS fahrzeug_uebernahme (
   KEY idx_person_zeit (mitarbeiter_id, zeitpunkt)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+// Mitteilungen an die Belegschaft (ENT-421). Die Regeln dazu stehen in
+// backend/mitteilungen.php; hier nur, wie sie gespeichert werden.
+//
+// zielgruppe: 'alle' oder 'revier'. Ein Feld statt einer Empfaengertabelle
+// -- vom Projektinhaber so entschieden, siehe mitteilungen.php.
+//
+// stufe: 'normal' oder 'wichtig'. Nur 'wichtig' unterbricht beim Oeffnen
+// der App.
+//
+// sichtbar_ab/sichtbar_bis: beide NULL erlaubt. NULL heisst "sofort" bzw.
+// "laeuft nicht ab" -- ausdruecklich NICHT 0000-00-00, weil ein Nulldatum
+// je nach MySQL-Betriebsart mal als "sehr frueh" und mal als Fehler gilt.
+//
+// verfasser_name steht NEBEN verfasser_id, obwohl das eine Doppelung ist:
+// Der Fremdschluessel setzt beim Loeschen eines Kontos auf NULL (SET NULL,
+// nicht CASCADE -- eine Mitteilung verschwindet nicht, weil jemand den
+// Betrieb verlaesst), und ohne den mitgeschriebenen Namen stuende danach
+// kein Absender mehr da.
+'mitteilungen' => "
+CREATE TABLE IF NOT EXISTS mitteilungen (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  titel VARCHAR(120) NOT NULL,
+  text TEXT NOT NULL,
+  zielgruppe VARCHAR(10) NOT NULL DEFAULT 'alle',
+  stufe VARCHAR(10) NOT NULL DEFAULT 'normal',
+  sichtbar_ab DATETIME NULL,
+  sichtbar_bis DATETIME NULL,
+  verfasser_id INT NULL,
+  verfasser_name VARCHAR(200) NULL,
+  erstellt_am DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  archiviert_am DATETIME NULL,
+  KEY idx_lauf (archiviert_am, sichtbar_ab, sichtbar_bis),
+  FOREIGN KEY (verfasser_id) REFERENCES mitarbeiter(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+// Wer welche Mitteilung gelesen hat (ENT-421).
+//
+// Eine Zeile je Person und Mitteilung, Primaerschluessel ueber beide: Das
+// zweite Lesen legt keine zweite Zeile an, und gelesen_am bleibt der ERSTE
+// Kontakt (siehe mitteilung_gelesen_merken()).
+//
+// bestaetigt_am ist NICHT dasselbe wie gelesen_am: Es wird nur gesetzt, wenn
+// jemand ein Wichtig-Fenster ausdruecklich weggeklickt hat. Beides in einer
+// Spalte zusammenzufassen hiesse, "hat aufgeklappt" und "hat bestaetigt" als
+// dieselbe Aussage zu fuehren -- sie sind es nicht.
+'mitteilung_gelesen' => "
+CREATE TABLE IF NOT EXISTS mitteilung_gelesen (
+  mitteilung_id INT NOT NULL,
+  mitarbeiter_id INT NOT NULL,
+  gelesen_am DATETIME NOT NULL,
+  bestaetigt_am DATETIME NULL,
+  PRIMARY KEY (mitteilung_id, mitarbeiter_id),
+  KEY idx_person (mitarbeiter_id),
+  FOREIGN KEY (mitteilung_id) REFERENCES mitteilungen(id) ON DELETE CASCADE,
+  FOREIGN KEY (mitarbeiter_id) REFERENCES mitarbeiter(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
 ];
 
 foreach ($tabellen as $name => $sql) {

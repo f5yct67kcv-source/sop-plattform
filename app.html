@@ -1140,6 +1140,88 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
 .rd-chip-txt span { display: block; font-size: 12.5px; color: var(--ink-2); margin-top: 1px; }
 .rd-chip .chev { flex: none; width: 18px; height: 18px; stroke: var(--ink-3); fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 
+/* ══ MITTEILUNGEN (ENT-421) ═══════════════════════════════════════════
+   Glocke in der Kopfzeile statt eines sechsten Reiters. Vom Projektinhaber
+   so entschieden: *"die Leute kennen dies von Social Media bereits ... wenn
+   sie dort eine Veränderung sehen, tippen sie instinktiv immer zuerst
+   darauf"* -- und sechs Reiter sind ihm zu viel. Die Reiterleiste bleibt
+   damit unverändert bei fünf; Heute und Plan bleiben getrennt.
+
+   Derselbe Ort wie im Cockpit (ENT-416, Glocke neben dem Logo). Zwei
+   Oberflächen, dieselbe Sache, derselbe Platz.
+
+   44 px Trefferfläche (CLAUDE.md) -- auf dem Handy ist die obere Ecke die
+   ungünstigste Stelle, die es gibt; ein 32-px-Symbol wäre dort nicht
+   zuverlässig zu treffen. */
+.mit-glocke { position: relative; flex: none; min-width: 44px; min-height: 44px;
+  display: flex; align-items: center; justify-content: center;
+  background: none; border: 0; padding: 0; cursor: pointer; color: var(--shell-txt-hi); }
+.mit-glocke svg.i { width: 24px; height: 24px; }
+/* Im Menü sitzt dieselbe Glocke in der Profilkarte (mitGlockeVerorten) --
+   dort auf hellem Grund, also mit der Textfarbe der Karte statt der der
+   Kopfzeile. */
+.pr-kopf .mit-glocke { color: var(--ink-2); }
+/* Der Zähler. min-width statt fester Breite: zweistellig darf er wachsen,
+   ohne dass die Ziffern am Rand kleben. Ab 100 steht "99+" -- eine
+   dreistellige Zahl passt in keinen Punkt dieser Grösse. */
+.mit-zahl { position: absolute; top: 2px; right: 2px; min-width: 17px; height: 17px; padding: 0 4px;
+  border-radius: 9px; background: var(--neg); color: #fff; font-size: 10.5px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; line-height: 1; }
+.mit-zahl[hidden] { display: none; }
+
+/* Die Mitteilungsseite. Eigene Vollseite über der Reiterleiste, wie der
+   Einsatzmodus (.rgs) -- nicht als Reiter-Ansicht: Sie gehört zu keinem
+   Reiter, und der Weg zurück muss dorthin führen, wo man herkam. */
+.mit-seite { position: fixed; left: 0; right: 0; top: 0; bottom: 0; z-index: 56;
+  display: none; flex-direction: column; background: var(--bg); color: var(--ink);
+  padding-top: env(safe-area-inset-top); }
+.mit-seite.on { display: flex; }
+.mit-kopf { display: flex; align-items: center; gap: 6px; padding: 10px 14px 12px; flex: none;
+  background: var(--surface); border-bottom: 1px solid var(--line-soft); }
+.mit-kopf h2 { font-size: 17px; font-weight: 680; letter-spacing: -.3px; flex: 1; min-width: 0; }
+.mit-zurueck { min-height: 44px; min-width: 44px; padding: 0; margin-left: -10px; display: flex;
+  align-items: center; justify-content: center; background: none; border: 0; color: var(--ink); cursor: pointer; }
+.mit-bd { padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); overflow-y: auto; flex: 1; min-height: 0; }
+
+/* Eine Mitteilung in der Liste. Überschrift oben, Text darunter (CLAUDE.md:
+   Überschrift oben, Wert darunter) -- die Zeile mit Absender und Datum
+   steht unten und klein, sie beantwortet keine Frage, die man zuerst
+   stellt. */
+.mit-karte { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r);
+  box-shadow: var(--sh-1); padding: 16px; margin-bottom: 12px; }
+/* Ungelesen: ein farbiger Streifen links. Nicht die ganze Karte einfärben --
+   bei fünf ungelesenen Mitteilungen wäre der Bildschirm dann blau, und die
+   eine wichtige darin fiele nicht mehr auf. */
+.mit-karte.neu { border-left: 3px solid var(--accent); }
+.mit-karte.wichtig { border-left: 3px solid var(--neg); }
+.mit-karte h3 { font-size: 15.5px; font-weight: 680; letter-spacing: -.2px; margin-bottom: 6px; }
+.mit-karte .mit-text { font-size: 14px; line-height: 1.55; color: var(--ink-2); white-space: pre-wrap; }
+.mit-karte .mit-fuss { display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  margin-top: 12px; font-size: 12px; color: var(--ink-3); }
+.mit-marken { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+
+/* Das Fenster für eine wichtige Mitteilung. Es unterbricht -- also sitzt es
+   über allem, auch über dem Einsatzmodus, und lässt sich nicht durch einen
+   Klick daneben schliessen: Genau das wäre das versehentliche Wegwischen,
+   das der Bestätigung ihren Wert nähme. */
+.mit-dlg { position: fixed; inset: 0; z-index: 70; display: none;
+  align-items: center; justify-content: center; padding: 20px;
+  background: rgba(0,0,0,.55); }
+.mit-dlg.on { display: flex; }
+.mit-dlg-box { background: var(--surface); color: var(--ink); border-radius: var(--r);
+  box-shadow: 0 18px 50px rgba(0,0,0,.35); width: 100%; max-width: 420px;
+  max-height: 80vh; display: flex; flex-direction: column; overflow: hidden; }
+.mit-dlg-kopf { padding: 18px 20px 0; }
+.mit-dlg-lb { font-size: 11.5px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; color: var(--neg); }
+.mit-dlg-kopf h3 { font-size: 18px; font-weight: 700; letter-spacing: -.3px; margin-top: 6px; }
+.mit-dlg-bd { padding: 12px 20px 0; overflow-y: auto; font-size: 14.5px; line-height: 1.55;
+  color: var(--ink-2); white-space: pre-wrap; }
+.mit-dlg-meta { padding: 12px 20px 0; font-size: 12px; color: var(--ink-3); }
+.mit-dlg-fuss { padding: 16px 20px calc(16px + env(safe-area-inset-bottom)); }
+/* Der Knopf steht allein in seiner Zeile -- und wird trotzdem NICHT über
+   die volle Breite gestreckt (CLAUDE.md). Rechtsbündig, wie ein Abschluss. */
+.mit-dlg-fuss { display: flex; justify-content: flex-end; }
+
 @media (min-width: 700px) {
   /* Auf grösseren Geräten mittig halten statt in die Breite ziehen */
   .app { max-width: 560px; margin: 0 auto; box-shadow: 0 0 0 1px var(--line); min-height: 100vh; }
@@ -1152,6 +1234,7 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
      ohne diese Zeile lief er als einziger Bereich ueber die volle
      Bildschirmbreite, mit einem 1400px breiten "Rundgang starten". */
   .rgs { max-width: 560px; left: 50%; transform: translateX(-50%); box-shadow: 0 0 0 1px var(--line); }
+  .mit-seite { max-width: 560px; left: 50%; transform: translateX(-50%); box-shadow: 0 0 0 1px var(--line); }
 }
 </style>
 </head>
@@ -1242,6 +1325,10 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
       <b id="kName">–</b>
       <span id="kDatum">–</span>
     </div>
+    <button class="mit-glocke" id="mitGlocke" onclick="mitSeiteAuf()" aria-label="Mitteilungen">
+      <svg class="i" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 6-2.5 7-2.5 7h17S18 14 18 8z"/><path d="M13.7 20a2 2 0 0 1-3.4 0"/></svg>
+      <span class="mit-zahl" id="mitZahl" hidden>0</span>
+    </button>
     <button class="btn btn-plain" style="min-height:40px;padding:0 12px;background:var(--shell-hi);border-color:var(--shell-line);color:var(--shell-txt-hi)" onclick="allesLaden()" id="kLaden" aria-label="Aktualisieren">
       <svg class="i i-sm" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
     </button>
@@ -1304,6 +1391,35 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
   </div>
 </div>
 
+<!-- Mitteilungen (ENT-421): eigene Vollseite hinter der Glocke, liegt wie
+     der Einsatzmodus über der Reiterleiste. -->
+<div class="mit-seite" id="mitSeite" aria-hidden="true">
+  <header class="mit-kopf">
+    <button class="mit-zurueck" onclick="mitSeiteZu()" aria-label="Zurück">
+      <svg class="i" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+    <h2 id="mitTitel">Mitteilungen</h2>
+  </header>
+  <div class="mit-bd" id="mitBody"></div>
+</div>
+
+<!-- Das Fenster für eine wichtige Mitteilung. Es wird beim Öffnen der App
+     gezeigt und muss weggeklickt werden; der Wegklick IST die Bestätigung
+     (ENT-421). -->
+<div class="mit-dlg" id="mitDlg" role="dialog" aria-modal="true" aria-labelledby="mitDlgTitel" aria-hidden="true">
+  <div class="mit-dlg-box">
+    <div class="mit-dlg-kopf">
+      <div class="mit-dlg-lb" id="mitDlgLb">Wichtige Mitteilung</div>
+      <h3 id="mitDlgTitel">–</h3>
+    </div>
+    <div class="mit-dlg-bd" id="mitDlgText"></div>
+    <div class="mit-dlg-meta" id="mitDlgMeta"></div>
+    <div class="mit-dlg-fuss">
+      <button class="btn btn-primary" id="mitDlgOk" onclick="mitDlgBestaetigen()">Verstanden</button>
+    </div>
+  </div>
+</div>
+
 <div class="abdunkeln" id="abdunkeln" onclick="blattZu()"></div>
 <div class="blatt" id="blatt" aria-hidden="true">
   <div class="blatt-griff"><i></i></div>
@@ -1340,6 +1456,27 @@ const W = {
     waechter: 'Wächter', menu: 'Menü',
     meineDaten: 'Meine Daten', zurueckZumMenue: 'Zurück zum Menü',
     waechterRundgangLbl: 'Rundgänge', waechterSchluesselLbl: 'Schlüsselverwaltung',
+
+    // ── Mitteilungen (ENT-421).
+    // Vier verschiedene Sachverhalte, vier verschiedene Texte (CLAUDE.md:
+    // "unbekannt" darf nie wie "keine" aussehen):
+    //   mitLeer            -- es gibt nichts (Normalfall, kein Fehler)
+    //   mitUneingerichtet  -- die Funktion ist noch nicht eingerichtet
+    //   mitFehler          -- der Abruf ist gescheitert (Funkloch, Serverfehler)
+    //   mitKeinZugriff     -- angemeldet, aber nicht befugt
+    mitteilungen: 'Mitteilungen', mitWaechterKachel: 'Revier-Infos',
+    mitLeer: 'Keine Mitteilungen',
+    mitLeerText: 'Sobald es etwas gibt, steht es hier.',
+    mitRevierLeer: 'Keine Revier-Mitteilungen',
+    mitRevierLeerText: 'Für den Revierdienst liegt gerade nichts vor.',
+    mitUneingerichtet: 'Noch nicht eingerichtet',
+    mitUneingerichtetText: 'Die Mitteilungen sind auf diesem Server noch nicht eingerichtet — das erledigt die Verwaltung einmalig unter Einrichtung.',
+    mitFehler: 'Mitteilungen nicht abrufbar',
+    mitFehlerText: 'Die Verbindung kam nicht zustande. Ob Mitteilungen vorliegen, ist gerade unbekannt — bitte später erneut versuchen.',
+    mitWichtig: 'Wichtig', mitRevier: 'Revier', mitNeu: 'Neu',
+    mitDlgLabel: 'Wichtige Mitteilung', mitVerstanden: 'Verstanden',
+    mitVon: 'von', mitBestaetigt: 'Bestätigt am',
+    mitLaeuftAb: 'Sichtbar bis',
     waechterUebersichtTitel: 'Rundgänge',
     waechterUebersichtLeer: 'Keine Rundgänge verfügbar',
     waechterUebersichtLeerText: 'Es sind aktuell keine Kontrollrunden hinterlegt.',
@@ -1715,6 +1852,21 @@ let rapporte = [];
 let sperrtage = {};   // Datum -> Bemerkung (ENT-028)
 let meineAbwesenheiten = [];   // eigene Abwesenheitsantraege (ENT-255)
 let profil = null;
+// ── Mitteilungen (ENT-421).
+// mitStand ist bewusst KEIN Boolean: Es gibt vier Zustaende, und drei davon
+// duerfen nicht wie "keine Mitteilungen" aussehen (CLAUDE.md, meistverletzte
+// Hausregel). 'unbekannt' ist der Ausgangswert vor dem ersten Abruf.
+let mitteilungen = [];
+let mitStand = 'unbekannt';   // unbekannt | ok | uneingerichtet | fehler
+let mitUngelesen = 0;
+let mitRevierUngelesen = 0;
+// Die Nummern, die beim Oeffnen unterbrechen muessen -- serverseitig
+// bestimmt (meine_mitteilungen.php), hier nur abgearbeitet.
+let mitUnterbrechen = [];
+let mitDlgId = null;
+// Zeigt die Seite gerade nur die Revier-Mitteilungen? Gesetzt beim Einstieg
+// ueber die Waechter-Kachel, nicht beim Einstieg ueber die Glocke.
+let mitNurRevier = false;
 // Die frühere Monatssumme aus den Rapporten ist entfallen (ENT-049): der
 // Rapport kennt die tatsächliche Pausenabrechnung noch nicht, die entsteht
 // erst im Abgleich. Zwei Stundenzahlen für denselben Monat wären für
@@ -1792,6 +1944,10 @@ function beschriften() {
   $('lb-tab-rapport').textContent = w('rapport');
   $('lb-tab-waechter').textContent = w('waechter');
   $('lb-tab-menu').textContent = w('menu');
+  $('mitTitel').textContent = w('mitteilungen');
+  $('mitGlocke').setAttribute('aria-label', w('mitteilungen'));
+  $('mitDlgLb').textContent = w('mitDlgLabel');
+  $('mitDlgOk').textContent = w('mitVerstanden');
 }
 
 // ══════════════════════════════════════════ ZUGANG
@@ -1911,8 +2067,14 @@ function allesLaden() {
   const b = $('kLaden'); b.disabled = true;
   const heute = new Date();
   $('kDatum').textContent = WOCHENTAG[heute.getDay()] + ', ' + dmy(isoTag(heute));
-  return Promise.all([ladeSchichten(), ladeProfil(), ladeRapporte(), ladeSperren(), ladeAbwesenheiten()])
-    .then(() => { b.disabled = false; waechterTabAktualisieren(); zeichne(); });
+  return Promise.all([ladeSchichten(), ladeProfil(), ladeRapporte(), ladeSperren(),
+                      ladeAbwesenheiten(), ladeMitteilungen()])
+    .then(() => {
+      b.disabled = false; waechterTabAktualisieren(); zeichne();
+      // Erst NACH dem Zeichnen: Das Fenster legt sich ueber die fertige
+      // Oberflaeche, nicht ueber einen halb aufgebauten Bildschirm.
+      mitFensterPruefen();
+    });
 }
 
 // ENT-234, seit ENT-284 umgestellt: "Wächter" erscheint nur mit der
@@ -1961,6 +2123,10 @@ function zeige(r) {
   $('app').classList.toggle('ohne-kopf', r === 'menu');
   window.scrollTo(0, 0);
   zeichne();
+  // NACH dem Zeichnen: Im Menue wird die Profilkarte erst dort gebaut --
+  // vorher gaebe es kein Ziel, und die Glocke bliebe in der ausgeblendeten
+  // Kopfzeile stehen (ENT-421).
+  mitGlockeVerorten();
 }
 function zeichne() {
   beschriften();
@@ -2391,12 +2557,32 @@ function zeichneWaechter() {
         <span class="mk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><path d="M5 17H3v-5l2-5h14l2 5v5h-2"/><circle cx="7.5" cy="17" r="2"/><circle cx="16.5" cy="17" r="2"/><line x1="9.5" y1="17" x2="14.5" y2="17"/></svg></span>
         <span class="mk-kachel-txt" id="mk-fahrzeug-txt"><span class="mk-kachel-lbl">${esc(w('fzuKachel'))}</span></span>
       </button>
+      <button type="button" id="mk-revierinfo" class="mk-kachel" onclick="mitSeiteAuf(true)">
+        <span class="mk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 6-2.5 7-2.5 7h17S18 14 18 8z"/><path d="M13.7 20a2 2 0 0 1-3.4 0"/></svg></span>
+        <span class="mk-kachel-txt" id="mk-revierinfo-txt"><span class="mk-kachel-lbl">${esc(w('mitWaechterKachel'))}</span></span>
+      </button>
       <button type="button" id="mk-schluessel" class="mk-kachel" onclick="toast('Folgt in einem späteren Schritt.')">
         <span class="mk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><circle cx="7" cy="15" r="4"/><line x1="10" y1="12" x2="20" y2="2"/><line x1="15" y1="7" x2="18" y2="10"/><line x1="18" y1="4" x2="21" y2="7"/></svg></span>
         <span class="mk-kachel-txt"><span class="mk-kachel-lbl">${esc(w('waechterSchluesselLbl'))}</span></span>
       </button>
     </div>`;
   fzuKachelHinweisZeigen();
+  mitKachelHinweisZeigen();
+}
+
+// Die Zahl auf der Revier-Infos-Kachel (ENT-421). Kein eigener Abruf: Der
+// Stand kommt aus demselben Laden wie die Glocke -- eine zweite Abfrage
+// koennte eine andere Zahl liefern als der Zaehler daneben.
+//
+// "Unbekannt" wird als solches ausgewiesen und NICHT als 0 gezeigt: Ohne
+// erfolgreichen Abruf (Funkloch, nicht eingerichtet) steht gar keine Zahl
+// da, statt einer beruhigenden Null.
+function mitKachelHinweisZeigen() {
+  const ziel = $('mk-revierinfo-txt');
+  if (!ziel || ziel.querySelector('.mk-kachel-sub')) { return; }
+  if (mitStand !== 'ok' || mitRevierUngelesen <= 0) { return; }
+  ziel.insertAdjacentHTML('beforeend',
+    `<span class="mk-kachel-sub">${mitRevierUngelesen} ${esc(w('mitNeu').toLowerCase())}</span>`);
 }
 
 // Der Hinweis "Aktiv: …" auf der Kachel selbst (Rückmeldung nach ENT-354:
@@ -2419,6 +2605,234 @@ function fzuKachelHinweisZeigen() {
     ziel.insertAdjacentHTML('beforeend', `<span class="mk-kachel-sub">${esc(w('fzuKachelAktiv')
       .replace('{kennzeichen}', data.mein_aktives_fahrzeug.kennzeichen || ''))}</span>`);
   });
+}
+
+/* ══ MITTEILUNGEN (ENT-421) ════════════════════════════════════════════
+   Der Auftrag des Projektinhabers: *"sehr wichtige mitteilung einzugeben
+   ausserhalb von Gruppenchats. Z.b Ferien eintragen, Mitarbeitersitzung"*,
+   zusätzlich im Wächter-Bereich für die Infos, die *"nur die Revier MA"*
+   angehen. Löst die schlanke Fassung aus ENT-176 ein.
+
+   DREI ORTE, EINE LISTE:
+    1. die Glocke in der Kopfzeile (alles, was mich angeht),
+    2. die Kachel "Revier-Infos" im Wächter-Bereich (dieselbe Liste, auf
+       Revier gefiltert -- kein zweiter Datenbestand, gelesen bleibt
+       gelesen),
+    3. das Fenster beim Öffnen, aber NUR für Stufe "wichtig".
+
+   Zu 3.: Bewusst nicht jede Mitteilung. Ein Riegel, der täglich kommt,
+   wird gewohnheitsmässig weggeklickt -- und dann trifft es genau die eine
+   Meldung, auf die es ankommt.
+
+   WAS DIESE FUNKTION NICHT KANN, und das muss man wissen: Die App kennt
+   keine Push-Benachrichtigungen. Eine Mitteilung erreicht niemanden, der
+   die App nicht von sich aus öffnet. Der Zähler und das Fenster wirken
+   beide erst DANN. Echter Push (Handy klingelt bei geschlossener App) wäre
+   ein eigener Bau -- siehe OP-421. */
+
+function ladeMitteilungen() {
+  return api('meine_mitteilungen.php').then(({ ok, status, data }) => {
+    // Vier Fälle, vier Antworten. Der frühere Reflex "im Zweifel leere
+    // Liste" hat im Wächter-Bereich schon einmal aus "nicht erreichbar"
+    // ein "es gibt nichts" gemacht (ENT-338) -- hier von Anfang an nicht.
+    if (!ok || !data || data.status !== 'ok') {
+      mitStand = 'fehler'; mitteilungen = [];
+      mitUngelesen = 0; mitRevierUngelesen = 0; mitUnterbrechen = [];
+      mitZahlZeigen();
+      return;
+    }
+    if (data.eingerichtet === false) {
+      mitStand = 'uneingerichtet'; mitteilungen = [];
+      mitUngelesen = 0; mitRevierUngelesen = 0; mitUnterbrechen = [];
+      mitZahlZeigen();
+      return;
+    }
+    mitStand = 'ok';
+    mitteilungen = data.mitteilungen || [];
+    mitUngelesen = data.ungelesen || 0;
+    mitRevierUngelesen = data.revier_ungelesen || 0;
+    mitUnterbrechen = data.unterbrechen || [];
+    mitZahlZeigen();
+  });
+}
+
+// Der Zähler an der Glocke. Ab 100 "99+" -- drei Ziffern passen in keinen
+// Punkt dieser Grösse, und der Unterschied zwischen 112 und 113 ändert
+// ohnehin nichts am nächsten Handgriff.
+function mitZahlZeigen() {
+  const el = $('mitZahl');
+  if (!el) { return; }
+  el.hidden = mitUngelesen <= 0;
+  el.textContent = mitUngelesen > 99 ? '99+' : String(mitUngelesen);
+}
+
+// Die Glocke sitzt in der Kopfzeile -- die im Menü wegfällt (ENT-402).
+// Verschoben wird das VORHANDENE Element, keine zweite Glocke: Zwei Knöpfe
+// mit je eigenem Zähler wären zwei Wahrheiten, sobald einer nicht
+// nachgezogen wird. Dasselbe Vorgehen wie im Cockpit (glockeVerorten,
+// ENT-416).
+//
+// WICHTIG: Steht die Glocke in der Profilkarte, wird sie beim Neuzeichnen
+// des Menues MITGELOESCHT -- zeichneMenu() setzt innerHTML neu, und ein
+// Kind darin ueberlebt das nicht. Danach war $('mitGlocke') null und
+// beschriften() stuerzte ab. Darum holt zeichneMenu() sie VOR dem
+// Neuaufbau in die Kopfzeile zurueck (mitGlockeInKopf) und stellt sie
+// danach wieder hin. In der Kopfzeile kann ihr das nicht passieren: Die
+// Kopfzeile wird nie neu gebaut.
+function mitGlockeVerorten() {
+  const glocke = $('mitGlocke');
+  if (!glocke) { return; }
+  const kopf = document.querySelector('.kopf');
+  const karte = document.querySelector('#v-menu .pr-kopf');
+  const ziel = (reiter === 'menu' && karte) ? karte : kopf;
+  if (!ziel || glocke.parentElement === ziel) { return; }
+  // In der Kopfzeile vor dem Aktualisieren-Knopf, in der Profilkarte vor
+  // dem Abmelden-Knopf -- beide Male links vom letzten Element.
+  const letzter = ziel === kopf ? $('kLaden') : $('mk-abmelden');
+  if (letzter) { ziel.insertBefore(glocke, letzter); } else { ziel.appendChild(glocke); }
+}
+
+// Die Glocke in Sicherheit bringen, bevor ein Bereich neu gebaut wird, in
+// dem sie gerade steht.
+function mitGlockeInKopf() {
+  const glocke = $('mitGlocke');
+  const kopf = document.querySelector('.kopf');
+  if (!glocke || !kopf || glocke.parentElement === kopf) { return; }
+  const laden = $('kLaden');
+  if (laden) { kopf.insertBefore(glocke, laden); } else { kopf.appendChild(glocke); }
+}
+
+// ── Die Seite
+// $nurRevier: Einstieg über die Wächter-Kachel. Dann steht auch ein anderer
+// Titel oben -- auf dem Handy ist die Kopfzeile der einzige Ort, der sagt,
+// wo man ist (CLAUDE.md), und "Mitteilungen" über einer gefilterten Liste
+// wäre eine Zahl ohne Bezug in Textform.
+function mitSeiteAuf(nurRevier) {
+  mitNurRevier = !!nurRevier;
+  $('mitTitel').textContent = mitNurRevier ? w('mitWaechterKachel') : w('mitteilungen');
+  $('mitSeite').classList.add('on');
+  $('mitSeite').setAttribute('aria-hidden', 'false');
+  mitZeichnen();
+  // Frisch nachladen, aber die Seite steht schon: Wer die Glocke drückt,
+  // soll nicht auf das Netz warten, bevor er überhaupt etwas sieht.
+  ladeMitteilungen().then(() => { if ($('mitSeite').classList.contains('on')) { mitZeichnen(); } });
+}
+
+function mitSeiteZu() {
+  $('mitSeite').classList.remove('on');
+  $('mitSeite').setAttribute('aria-hidden', 'true');
+  mitNurRevier = false;
+}
+
+// Welche Mitteilungen die Seite gerade zeigt.
+function mitSichtbare() {
+  return mitNurRevier ? mitteilungen.filter(m => m.zielgruppe === 'revier') : mitteilungen;
+}
+
+function mitZeichnen() {
+  const ziel = $('mitBody');
+  if (!ziel) { return; }
+
+  // Die drei Nicht-Fälle zuerst, jeder mit eigenem Text.
+  if (mitStand === 'uneingerichtet') {
+    ziel.innerHTML = LEER(w('mitUneingerichtet'), w('mitUneingerichtetText'));
+    return;
+  }
+  if (mitStand === 'fehler' || mitStand === 'unbekannt') {
+    ziel.innerHTML = LEER(w('mitFehler'), w('mitFehlerText'));
+    return;
+  }
+
+  const liste = mitSichtbare();
+  if (!liste.length) {
+    // "Kein Treffer" und "nichts vorhanden" sind verschiedene Aussagen
+    // (CLAUDE.md): Die gefilterte Revier-Ansicht sagt darum etwas anderes
+    // als die vollständige Liste.
+    ziel.innerHTML = mitNurRevier
+      ? LEER(w('mitRevierLeer'), w('mitRevierLeerText'))
+      : LEER(w('mitLeer'), w('mitLeerText'));
+    return;
+  }
+
+  ziel.innerHTML = liste.map(m => {
+    const wichtig = m.stufe === 'wichtig';
+    const marken = [];
+    if (wichtig) { marken.push(`<span class="marke m-x">${esc(w('mitWichtig'))}</span>`); }
+    if (m.zielgruppe === 'revier' && !mitNurRevier) { marken.push(`<span class="marke m-n">${esc(w('mitRevier'))}</span>`); }
+    if (!m.gelesen) { marken.push(`<span class="marke m-p">${esc(w('mitNeu'))}</span>`); }
+    const fuss = [];
+    if (m.verfasser_name) { fuss.push(esc(w('mitVon')) + ' ' + esc(m.verfasser_name)); }
+    fuss.push(dmy(m.erstellt_am));
+    if (m.sichtbar_bis) { fuss.push(esc(w('mitLaeuftAb')) + ' ' + dmy(m.sichtbar_bis)); }
+    return `<article class="mit-karte${m.gelesen ? '' : ' neu'}${wichtig ? ' wichtig' : ''}" data-id="${m.id}">
+      ${marken.length ? `<div class="mit-marken">${marken.join('')}</div>` : ''}
+      <h3>${esc(m.titel)}</h3>
+      <div class="mit-text">${esc(m.text)}</div>
+      <div class="mit-fuss">${fuss.join(' · ')}</div>
+    </article>`;
+  }).join('');
+
+  // Alles, was hier steht, ist gelesen -- die Karten sind vollständig
+  // ausgeschrieben, es gibt nichts aufzuklappen. Ein zusätzlicher
+  // "gelesen"-Knopf wäre ein Klick ohne Aussage.
+  liste.filter(m => !m.gelesen).forEach(m => mitGelesenMelden(m.id, false));
+}
+
+// Vermerkt den Lesestand auf dem Server und zieht den Zähler nach. Der
+// örtliche Stand wird SOFORT gesetzt, nicht erst nach der Antwort: Im
+// Funkloch soll die Liste nicht so aussehen, als wäre nichts passiert. Der
+// Nachweis in der Verwaltung entsteht trotzdem erst beim erfolgreichen
+// Aufruf -- das ist der Unterschied zwischen "gesehen" und "belegt", und er
+// gehört serverseitig entschieden.
+function mitGelesenMelden(id, bestaetigt) {
+  const m = mitteilungen.find(x => Number(x.id) === Number(id));
+  if (m && !m.gelesen) {
+    m.gelesen = true;
+    mitUngelesen = Math.max(0, mitUngelesen - 1);
+    if (m.zielgruppe === 'revier') { mitRevierUngelesen = Math.max(0, mitRevierUngelesen - 1); }
+    mitZahlZeigen();
+  }
+  if (m && bestaetigt) { m.bestaetigt = true; }
+  return api('meine_mitteilungen.php', { method: 'POST', body: { id: Number(id), bestaetigt: !!bestaetigt } });
+}
+
+// ── Das Fenster für eine wichtige Mitteilung
+// Es zeigt IMMER nur eine. Liegen mehrere vor, kommt die nächste, sobald
+// diese bestätigt ist -- ein Stapel von vier Fenstern gleichzeitig wäre
+// genau das Wegklicken ohne Lesen, das die Stufe verhindern soll.
+function mitFensterPruefen() {
+  if (mitStand !== 'ok' || !mitUnterbrechen.length) { return; }
+  // Nicht mitten in einen laufenden Rundgang hineinplatzen (ENT-294): Wer
+  // draussen an einem Kontrollpunkt steht, bekommt ein Fenster vor die
+  // Checkliste gelegt, das er in dem Moment nicht braucht. Es kommt beim
+  // nächsten Öffnen der App wieder -- unbestätigt bleibt unbestätigt.
+  if (rundgangAktiv) { return; }
+  const naechste = mitUnterbrechen[0];
+  const m = mitteilungen.find(x => Number(x.id) === Number(naechste));
+  if (!m) { mitUnterbrechen.shift(); return; }
+  mitDlgId = m.id;
+  $('mitDlgTitel').textContent = m.titel;
+  $('mitDlgText').textContent = m.text;
+  const meta = [];
+  if (m.verfasser_name) { meta.push(w('mitVon') + ' ' + m.verfasser_name); }
+  meta.push(dmy(m.erstellt_am));
+  $('mitDlgMeta').textContent = meta.join(' · ');
+  $('mitDlg').classList.add('on');
+  $('mitDlg').setAttribute('aria-hidden', 'false');
+  $('mitDlgOk').focus();
+}
+
+function mitDlgBestaetigen() {
+  const id = mitDlgId;
+  $('mitDlg').classList.remove('on');
+  $('mitDlg').setAttribute('aria-hidden', 'true');
+  mitDlgId = null;
+  if (id === null) { return; }
+  mitUnterbrechen = mitUnterbrechen.filter(x => Number(x) !== Number(id));
+  mitGelesenMelden(id, true);
+  if ($('mitSeite').classList.contains('on')) { mitZeichnen(); }
+  // Liegt noch eine vor, kommt sie jetzt -- eine nach der anderen.
+  mitFensterPruefen();
 }
 
 /* ══ FAHRZEUGÜBERNAHME (ENT-340) ═══════════════════════════════════════
@@ -3778,6 +4192,9 @@ function rundgangSpontanStarten(vorlageId, ausnahmeGrund, trotzDoppel) {
 // erweitert. Kuenftige Menue-Punkte (z.B. Abwesenheiten, Stufe 4) bekommen
 // hier eine weitere Kachel, kein neuer Reiter.
 function zeichneMenu() {
+  // Die Glocke steht moeglicherweise in der Profilkarte -- der naechste
+  // innerHTML-Aufbau wuerde sie mitloeschen (ENT-421).
+  mitGlockeInKopf();
   const p = profil || {};
   const zeile = (k, v) => v ? `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>` : '';
   $('v-menu').innerHTML = `
@@ -3892,6 +4309,8 @@ function zeichneMenu() {
   // Der Schalter wird mit dem Menue neu gebaut -- sein Zustand steht im
   // Bauplan nur als Ausgangswert und muss hier nachgestellt werden.
   themaSchalterStellen();
+  // Und die Glocke zurueck an ihren Platz in der frisch gebauten Karte.
+  mitGlockeVerorten();
 }
 
 // Meine-Daten-Unterseite (ENT-234) -- gleiches Muster wie stdSeiteAuf/
