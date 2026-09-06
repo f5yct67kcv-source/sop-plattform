@@ -518,8 +518,9 @@ try {
   const n2 = await p.evaluate(() => [...document.querySelectorAll('#topSub button')].map(b => b.textContent));
   // Seit ENT-181 drei: Leistungen steht zwischen Mitarbeitenden und den
   // Einstellungen (Namen seit ENT-229/ENT-230, vorher Produkte/Betrieb).
+  // Seit ENT-421 vier: "Mitteilungen" kommt hinten dazu.
   check('KRITISCH: auch die Administration zeigt ihre Unterkategorien',
-    JSON.stringify(n2) === JSON.stringify(['Mitarbeitende', 'Leistungen', 'Einstellungen']));
+    JSON.stringify(n2) === JSON.stringify(['Mitarbeitende', 'Leistungen', 'Einstellungen', 'Mitteilungen']));
 
   // Ein Bereich ohne Untergruppen zeigt keine leere Leiste
   await p.evaluate(() => go('abgleich')); await p.waitForTimeout(300);
@@ -542,14 +543,29 @@ try {
   };
   const mKunden = await mitteVon(() => go('kunden'));
   const mAdmin  = await mitteVon(() => go('mitarbeiter'));
+  // Der Revierdienst hat nur zwei Unterkategorien -- er ist seit ENT-421 die
+  // kurze Leiste im Vergleich. Vorher war es die Administration mit drei;
+  // sie hat inzwischen vier ("Mitteilungen") und ist damit fast so breit wie
+  // die Kunden. Eine Breitenprobe zwischen zwei fast gleich breiten Leisten
+  // belegt nichts -- die Aussage lautet "verschieden viele, gleiche Mitte",
+  // und dafuer braucht es einen echten Unterschied.
+  const mPlanung = await mitteVon(() => go('planung'));
   check('Bei den Kunden stehen fuenf Unterkategorien (ENT-181)', mKunden.anzahl === 5);
-  check('Bei der Administration drei (ENT-181)', mAdmin.anzahl === 3);
+  check('Bei der Administration vier (ENT-181/ENT-421)', mAdmin.anzahl === 4);
+  check('Bei der Planung ebenfalls vier', mPlanung.anzahl === 4);
   check('KRITISCH: fuenf Unterkategorien stehen in der Fenstermitte',
     Math.abs(mKunden.mitte - 800) <= 4);
-  check('KRITISCH: drei ebenfalls -- die Zahl aendert die Mitte nicht',
+  check('KRITISCH: vier ebenfalls -- die Zahl aendert die Mitte nicht',
     Math.abs(mAdmin.mitte - 800) <= 4);
+  check('KRITISCH: und eine anders breite Leiste ebenfalls',
+    Math.abs(mPlanung.mitte - 800) <= 4);
+  // Der Vergleich braucht zwei WIRKLICH verschieden breite Leisten -- sonst
+  // belegt er nichts. Bis ENT-421 waren das Kunden (fuenf) und
+  // Administration (drei); seit "Mitteilungen" dazukam, sind die beiden
+  // fast gleich breit (414 gegen 413 px gemessen). Die Planung ist mit
+  // kuerzeren Namen deutlich schmaler und uebernimmt diese Rolle.
   check('Und die Leisten sind wirklich verschieden breit',
-    Math.abs(mKunden.breite - mAdmin.breite) > 20);
+    Math.abs(mKunden.breite - mPlanung.breite) > 20);
 
   // Ohne Unterkategorien darf die rechte Gruppe NICHT in die Mitte rutschen.
   // Ein Element mit display:none ist kein Rasterfeld -- ohne ausdrueckliche

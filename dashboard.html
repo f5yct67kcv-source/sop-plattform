@@ -4031,6 +4031,34 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
 @media (max-width: 620px) { .glas-schalter { width: 46px; height: 28px; }
   .glas-schalter .knopf { width: 22px; height: 22px; }
   html[data-glas="an"] .glas-schalter .knopf { transform: translateX(18px); } }
+
+/* ══ MITTEILUNGEN (ENT-421) ═══════════════════════════════════════════
+   Zwei Spalten nebeneinander, ab 900 px Fensterbreite. Darunter
+   untereinander -- ein 320 px breites Formular neben einer 320 px breiten
+   Liste ist keine Uebersicht, sondern zwei Saeulen, die beide nicht
+   lesbar sind. */
+.mtl-raster { display: grid; grid-template-columns: 1fr; gap: 20px; align-items: start; }
+@media (min-width: 900px) { .mtl-raster { grid-template-columns: minmax(0, 420px) minmax(0, 1fr); } }
+/* Zwei Felder nebeneinander, sobald Platz ist -- Zielgruppe/Stufe und
+   Ab/Bis gehoeren je paarweise zusammen. */
+.mtl-zeile { display: grid; grid-template-columns: 1fr; gap: 0 14px; }
+@media (min-width: 560px) { .mtl-zeile { grid-template-columns: 1fr 1fr; } }
+/* Knopfgruppe: 10 px Abstand, wie ueberall im Haus (ENT-174). Rechtsbuendig
+   und NICHT ueber die volle Breite gestreckt (CLAUDE.md). */
+.mtl-knoepfe { display: flex; justify-content: flex-end; gap: 10px; }
+
+.mtl-eintrag { padding: 14px 0; border-bottom: 1px solid var(--line-soft); }
+.mtl-eintrag:last-child { border-bottom: 0; }
+.mtl-eintrag.aus { opacity: .6; }
+.mtl-marken { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.mtl-eintrag h4 { font-size: 14.5px; font-weight: 660; letter-spacing: -.2px; }
+.mtl-eintrag .mtl-text { font-size: 13px; color: var(--ink-2); line-height: 1.5; margin-top: 4px; white-space: pre-wrap; }
+.mtl-meta { font-size: 12px; color: var(--ink-3); margin-top: 8px; }
+.mtl-akt { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+/* Die Leserliste haengt unter dem Eintrag, nicht in einem eigenen Fenster:
+   Sie ist eine Nachschlagsache, kein eigener Arbeitsschritt. */
+.mtl-leser { margin-top: 10px; padding: 10px 12px; background: var(--line-soft);
+  border-radius: var(--r-sm); font-size: 12.5px; color: var(--ink-2); line-height: 1.7; }
 </style>
 <script src="gav.js"></script>
 <script src="zeitwahl.js"></script>
@@ -4326,6 +4354,11 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
                die alten Namen. -->
           <button class="nav-kind" id="nav-admin-produkte" onclick="go('produkte')">Leistungen</button>
           <button class="nav-kind" id="nav-admin-betrieb" onclick="go('betrieb')">Einstellungen</button>
+          <!-- Mitteilungen an die Belegschaft (ENT-421). Unter Administration
+               und nicht unter Auswertung: Hier wird etwas verfasst, nicht
+               ausgewertet -- dieselbe Rubrik wie Mitarbeitende, an denen
+               dieselben Leute arbeiten. -->
+          <button class="nav-kind" id="nav-admin-mitteilungen" onclick="go('mitteilungen')">Mitteilungen</button>
         </div>
       </div>
 
@@ -5616,6 +5649,76 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
         <div class="card" style="margin-top:20px">
           <div class="card-hd"><h3>Offene Anträge</h3></div>
           <div class="card-bd" id="awOffeneListe"></div>
+        </div>
+      </section>
+
+      <!-- ══════════════════════ MITTEILUNGEN (ENT-421) ══════════════════
+           Hier entsteht, was in der App hinter der Glocke steht. Der
+           Auftrag des Projektinhabers: wichtige Mitteilungen ausserhalb von
+           Gruppenchats -- Ferien eintragen, Mitarbeitersitzung.
+
+           Zwei Spalten: links das Formular (es ist der Zweck der Seite),
+           rechts die Liste des Bestehenden mit dem Lesestand. Auf schmalen
+           Fenstern untereinander (siehe .mtl-raster im Regelwerk). -->
+      <section class="view" id="view-mitteilungen">
+        <div class="mtl-raster">
+          <div class="card">
+            <div class="card-hd"><h3 id="mtlFormTitel">Neue Mitteilung</h3></div>
+            <div id="mtlPushHinweis"></div>
+            <div class="card-bd">
+              <div class="f">
+                <label for="mtlTitel">Titel</label>
+                <input class="inp" id="mtlTitel" maxlength="120" placeholder="z. B. Mitarbeitersitzung am 24.09.">
+              </div>
+              <div class="f">
+                <label for="mtlText">Text</label>
+                <textarea class="inp" id="mtlText" rows="5" placeholder="Kurz und vollständig — es gibt keine Rückfragefunktion."></textarea>
+                <div class="f-hint">Reiner Text. Keine Formatierung, keine Anhänge (ENT-176).</div>
+              </div>
+              <div class="mtl-zeile">
+                <div class="f">
+                  <label for="mtlZielgruppe">Wer sieht sie</label>
+                  <select class="inp" id="mtlZielgruppe">
+                    <option value="alle">Alle Mitarbeitenden</option>
+                    <option value="revier">Nur Revierdienst</option>
+                  </select>
+                </div>
+                <div class="f">
+                  <label for="mtlStufe">Stufe</label>
+                  <select class="inp" id="mtlStufe">
+                    <option value="normal">Normal — nur Zähler an der Glocke</option>
+                    <option value="wichtig">Wichtig — Fenster beim Öffnen der App</option>
+                  </select>
+                </div>
+              </div>
+              <div class="f-hint" style="margin:-8px 0 14px">
+                „Wichtig" unterbricht: Die Mitteilung legt sich beim nächsten Öffnen
+                der App über den Bildschirm und muss bestätigt werden. Sparsam
+                einsetzen — was täglich unterbricht, wird weggeklickt statt gelesen.
+              </div>
+              <div class="mtl-zeile">
+                <div class="f">
+                  <label for="mtlAb">Sichtbar ab</label>
+                  <input class="inp" id="mtlAb" type="datetime-local">
+                  <div class="f-hint">Leer = sofort.</div>
+                </div>
+                <div class="f">
+                  <label for="mtlBis">Sichtbar bis</label>
+                  <input class="inp" id="mtlBis" type="datetime-local">
+                  <div class="f-hint">Leer = bis zum Zurückziehen.</div>
+                </div>
+              </div>
+              <div class="mtl-knoepfe">
+                <button type="button" class="btn btn-plain" id="mtlAbbrechen" onclick="mtlFormLeeren()" style="display:none">Abbrechen</button>
+                <button type="button" class="btn btn-primary" id="mtlSpeichern" onclick="mtlSpeichern()">Veröffentlichen</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-hd"><h3>Bestehende Mitteilungen</h3></div>
+            <div class="card-bd" id="mtlListe"></div>
+          </div>
         </div>
       </section>
 
@@ -8439,6 +8542,7 @@ const NAV_RECHTE = {
   'nav-admin-mitarbeiter':  'personal_lesen',
   'nav-admin-produkte':     'offerten',
   'nav-admin-betrieb':      'betrieb',
+  'nav-admin-mitteilungen': 'mitteilungen',
   // Seit ENT-224 haengen die Kinder von Kontrolle (jetzt "Auswertung") am
   // selben Recht 'plan' -- Rundgaenge als operativer Ablauf (das fruehere
   // 'rundgang_einsehen'-Kind) lebt unter der eigenen Rubrik "Revierdienst",
@@ -8475,7 +8579,8 @@ function rechteAnwenden() {
   const admGruppe = $('navg-admin');
   if (admGruppe) {
     admGruppe.style.display =
-      (darf('personal_lesen') || darf('betrieb') || darf('offerten')) ? '' : 'none';
+      (darf('personal_lesen') || darf('betrieb') || darf('offerten')
+       || darf('mitteilungen')) ? '' : 'none';
   }
   // Seit ENT-224 haengt "Kontrolle" nur noch an 'plan' -- Rundgaenge (das
   // fruehere 'rundgang_einsehen'-Kind) lebt jetzt unter "Revierdienst".
@@ -8515,7 +8620,8 @@ const TITLES = {
   revierdienst: ['Revierdienst', 'Kontrollpunkte und Kontrollrunden je Objekt einrichten'],
   einsatzneu:  ['Neuer Einsatz', 'Kunde, Ort, Zeit und Zuteilung'],
   einsatzplan: ['Einsatz planen', 'Positionen und Zeiten im Detail'],
-  objekt:      ['Objekt', 'Stammdaten, Masterschichten und Kontrollpunkte']
+  objekt:      ['Objekt', 'Stammdaten, Masterschichten und Kontrollpunkte'],
+  mitteilungen: ['Mitteilungen', 'Was die Belegschaft in der App zu sehen bekommt']
 };
 
 // Monatsraster brauchen die volle Fensterbreite, alles andere bleibt auf
@@ -9388,7 +9494,8 @@ function go(view) {
   // Die Administrationsgruppe klappt auf, wenn eine ihrer Seiten offen ist --
   // und der Elternpunkt wird mitmarkiert, sonst sieht die Seitenleiste aus,
   // als waere man nirgends (dasselbe Muster wie bei den Kunden, ENT-039).
-  const imAdmin = view === 'mitarbeiter' || view === 'betrieb' || view === 'produkte';
+  const imAdmin = view === 'mitarbeiter' || view === 'betrieb' || view === 'produkte'
+    || view === 'mitteilungen';
   $('navg-admin').classList.toggle('offen', imAdmin);
   if (imAdmin) { $('nav-admin').classList.add('on'); }
   document.querySelectorAll('#navg-admin .nav-kind').forEach(k => k.classList.remove('on'));
@@ -9396,6 +9503,7 @@ function go(view) {
   if (view === 'produkte') { $('nav-admin-produkte').classList.add('on'); }
   if (view === 'betrieb') { $('nav-admin-betrieb').classList.add('on'); }
   if (view === 'produkte') { produkte.length ? renderProdukte() : loadProdukte(); }
+  if (view === 'mitteilungen') { $('nav-admin-mitteilungen').classList.add('on'); mtlLaden(); }
   const kontrView = view === 'pensen' || view === 'auslagen' || view === 'abwesenheiten'
     || view === 'arbeitsergebnisse';
   $('navg-kontrolle').classList.toggle('offen', kontrView);
@@ -12791,6 +12899,269 @@ function dmyZeit(z) {
   if (isNaN(d)) { return String(z); }
   return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.`
        + `${d.getFullYear()}, ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+/* ══ MITTEILUNGEN (ENT-421) ════════════════════════════════════════════
+   Die Verwaltungsseite zu dem, was in der App hinter der Glocke steht.
+
+   Zwei Zahlen, zwei Bedeutungen -- und sie werden NICHT vermischt
+   (CLAUDE.md: Einheiten nie vermischen):
+     "gelesen"    -- hat die Mitteilung geöffnet
+     "bestätigt"  -- hat ein Wichtig-Fenster ausdrücklich weggeklickt
+   Bei einer normalen Mitteilung gibt es kein Fenster, also auch keine
+   Bestätigung; dort steht die Zahl gar nicht erst da, statt als 0 zu
+   erscheinen. */
+let mtlListe = [];
+let mtlStand = 'unbekannt';   // unbekannt | ok | uneingerichtet | fehler
+let mtlBearbeitetId = 0;
+// Welche Leserliste gerade aufgeklappt ist (0 = keine).
+let mtlLeserOffen = 0;
+// Push-Zustand der ganzen Anlage (ENT-424): eingerichtet ja/nein und wie
+// viele Geraete insgesamt eingeschaltet haben. "Niemand hat es
+// eingeschaltet" und "Push ist gar nicht eingerichtet" sind zwei
+// verschiedene Aussagen und bekommen zwei verschiedene Saetze.
+let mtlPushEingerichtet = false;
+let mtlPushGeraete = -1;   // -1 = unbekannt
+
+// Leerzustand in der Hausform (.empty) -- dieselbe Darstellung wie überall
+// sonst im Cockpit, statt einer eigenen Textzeile nur für diese Seite.
+function mtlLeerBlock(titel, text) {
+  return `<div class="empty">
+    <div class="ic"><svg class="i" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 6-2.5 7-2.5 7h17S18 14 18 8z"/><path d="M13.7 20a2 2 0 0 1-3.4 0"/></svg></div>
+    <h3>${esc(titel)}</h3><p>${esc(text)}</p></div>`;
+}
+
+function mtlLaden() {
+  return api('mitteilung_list.php').then(({ ok, data }) => {
+    if (!ok || !data || data.status !== 'ok') { mtlStand = 'fehler'; mtlListe = []; }
+    else if (data.eingerichtet === false) { mtlStand = 'uneingerichtet'; mtlListe = []; }
+    else { mtlStand = 'ok'; mtlListe = data.mitteilungen || []; }
+    mtlPushEingerichtet = !!(data && data.push_eingerichtet);
+    mtlPushGeraete = (data && typeof data.push_geraete === 'number') ? data.push_geraete : -1;
+    mtlZeichnen();
+    mtlPushHinweisZeichnen();
+  });
+}
+
+function mtlZeichnen() {
+  const ziel = $('mtlListe');
+  if (!ziel) { return; }
+  // Drei Nicht-Fälle, drei verschiedene Sätze -- "unbekannt" darf nie wie
+  // "keine" aussehen (CLAUDE.md).
+  if (mtlStand === 'uneingerichtet') {
+    ziel.innerHTML = mtlLeerBlock('Noch nicht eingerichtet',
+      'Die Mitteilungen sind auf diesem Server noch nicht eingerichtet. Einmal „Einrichtung" '
+      + 'ausführen — dabei werden die beiden Tabellen angelegt.');
+    return;
+  }
+  if (mtlStand !== 'ok') {
+    ziel.innerHTML = mtlLeerBlock('Nicht abrufbar',
+      'Die Liste liess sich nicht laden. Ob Mitteilungen bestehen, ist gerade unbekannt.');
+    return;
+  }
+  if (!mtlListe.length) {
+    ziel.innerHTML = mtlLeerBlock('Keine Mitteilungen',
+      'Es wurde noch keine Mitteilung verfasst.');
+    return;
+  }
+
+  ziel.innerHTML = mtlListe.map(m => {
+    const marken = [];
+    if (m.stufe === 'wichtig') { marken.push('<span class="chip chip-x">Wichtig</span>'); }
+    marken.push(`<span class="chip chip-n">${m.zielgruppe === 'revier' ? 'Nur Revierdienst' : 'Alle'}</span>`);
+    // Der Zustand: läuft / geplant / abgelaufen / zurückgezogen. Vier
+    // verschiedene Sachverhalte, vier verschiedene Wörter -- "nicht
+    // sichtbar" wäre für alle vier dasselbe und für keinen richtig.
+    if (m.archiviert)      { marken.push('<span class="chip chip-n">Zurückgezogen</span>'); }
+    else if (m.geplant)    { marken.push('<span class="chip chip-w">Geplant</span>'); }
+    else if (m.laeuft)     { marken.push('<span class="chip chip-p">Läuft</span>'); }
+    else                   { marken.push('<span class="chip chip-n">Abgelaufen</span>'); }
+
+    // "12 von 18" statt "12" -- eine Zahl ohne Bezug sieht aus wie die
+    // Gesamtzahl. Ist der Nenner unbekannt (-1, siehe
+    // mitteilung_empfaengerzahl), wird er auch nicht behauptet.
+    const nenner = Number(m.empfaenger_anzahl);
+    const gelesen = nenner >= 0
+      ? `${m.gelesen_anzahl} von ${nenner} gelesen`
+      : `${m.gelesen_anzahl} gelesen (von wie vielen: unbekannt)`;
+    const bestaetigt = m.stufe === 'wichtig'
+      ? ` · ${m.bestaetigt_anzahl} bestätigt`
+      : '';
+
+    const zeit = [];
+    if (m.sichtbar_ab)  { zeit.push('ab ' + dmyZeit(m.sichtbar_ab)); }
+    if (m.sichtbar_bis) { zeit.push('bis ' + dmyZeit(m.sichtbar_bis)); }
+
+    // Was die Benachrichtigung tatsächlich getan hat (ENT-424). Vier
+    // verschiedene Sachverhalte, vier verschiedene Sätze -- "nicht
+    // verschickt" darf nie wie "an null Geräte verschickt" aussehen.
+    const pb = m.push_bilanz;
+    let push;
+    if (!mtlPushEingerichtet)        { push = 'Benachrichtigung: nicht eingerichtet'; }
+    else if (m.geplant)              { push = 'Benachrichtigung: folgt, sobald sie sichtbar wird'; }
+    else if (!m.push_gesendet_am)    { push = 'Benachrichtigung: noch nicht verschickt'; }
+    else if (!pb || !pb.geraete)     { push = 'Benachrichtigung: kein Gerät eingeschaltet'; }
+    else {
+      // Zwei Einheiten NICHT vermischt: "Geräte" zählt Abos, nicht
+      // Personen -- eine Person kann Telefon und Tablet haben.
+      push = `Benachrichtigung: ${pb.zugestellt} von ${pb.geraete} Geräten`;
+      if (pb.fehler)  { push += `, ${pb.fehler} fehlgeschlagen`; }
+      if (pb.entfernt) { push += `, ${pb.entfernt} abgemeldet`; }
+    }
+
+    return `<div class="mtl-eintrag${m.archiviert ? ' aus' : ''}" data-id="${m.id}">
+      <div class="mtl-marken">${marken.join('')}</div>
+      <h4>${esc(m.titel)}</h4>
+      <div class="mtl-text">${esc(m.text)}</div>
+      <div class="mtl-meta">${esc(m.verfasser_name || 'Verfasser unbekannt')} · ${dmyZeit(m.erstellt_am)}${
+        zeit.length ? ' · ' + esc(zeit.join(', ')) : ''} · ${esc(gelesen)}${esc(bestaetigt)}</div>
+      <div class="mtl-meta">${esc(push)}</div>
+      <div class="mtl-akt">
+        <button type="button" class="btn btn-plain btn-sm" onclick="mtlBearbeiten(${m.id})">Bearbeiten</button>
+        <button type="button" class="btn btn-plain btn-sm" onclick="mtlLeserUm(${m.id})">Wer hat gelesen</button>
+        <button type="button" class="btn btn-plain btn-sm" onclick="mtlArchivieren(${m.id}, ${m.archiviert ? 'true' : 'false'})">${
+          m.archiviert ? 'Wieder aufnehmen' : 'Zurückziehen'}</button>
+      </div>
+      ${mtlLeserOffen === m.id ? `<div class="mtl-leser" id="mtlLeser${m.id}">Wird geladen …</div>` : ''}
+    </div>`;
+  }).join('');
+
+  if (mtlLeserOffen) { mtlLeserLaden(mtlLeserOffen); }
+}
+
+// Die Leserliste. Eigener Abruf und nicht Teil der Liste: Bei 40
+// Mitteilungen mal 30 Personen wären das 1200 Zeilen für eine Ansicht, in
+// der man jeweils EINE aufklappt.
+function mtlLeserUm(id) {
+  mtlLeserOffen = mtlLeserOffen === id ? 0 : id;
+  mtlZeichnen();
+}
+
+function mtlLeserLaden(id) {
+  const ziel = $('mtlLeser' + id);
+  if (!ziel) { return; }
+  api('mitteilung_list.php?id=' + encodeURIComponent(id)).then(({ ok, data }) => {
+    if (!ok || !data || data.status !== 'ok') {
+      ziel.textContent = 'Die Leserliste liess sich nicht laden — wer gelesen hat, ist gerade unbekannt.';
+      return;
+    }
+    const leser = data.leser || [];
+    if (!leser.length) {
+      // "Noch niemand" ist eine Aussage, "keine Daten" wäre keine.
+      ziel.textContent = 'Noch niemand hat diese Mitteilung geöffnet.';
+      return;
+    }
+    ziel.innerHTML = leser.map(l => {
+      const name = [l.vorname, l.nachname].filter(Boolean).join(' ') || l.name || 'Ohne Namen';
+      return `${esc(name)} — ${dmyZeit(l.gelesen_am)}${
+        l.bestaetigt_am ? ' · bestätigt ' + dmyZeit(l.bestaetigt_am) : ''}`;
+    }).join('<br>');
+  });
+}
+
+/* Der Zustand der Benachrichtigungen, ueber dem Formular (ENT-424).
+
+   Er steht dort und nicht in einer eigenen Ansicht, weil er genau in dem
+   Moment zaehlt, in dem jemand eine Mitteilung schreibt: Wer hier
+   "veroeffentlichen" drueckt, soll wissen, ob dabei ueberhaupt ein Telefon
+   klingelt.
+
+   Drei verschiedene Aussagen, drei verschiedene Saetze -- "nicht
+   eingerichtet", "niemand hat es eingeschaltet" und "n Geraete" sind nicht
+   dasselbe. */
+function mtlPushHinweisZeichnen() {
+  const ziel = $('mtlPushHinweis');
+  if (!ziel) { return; }
+  if (!mtlPushEingerichtet) {
+    ziel.innerHTML = `<div class="card-bd" style="padding-bottom:0">
+      <div class="f-hint" style="margin:0">Benachrichtigungen sind noch nicht eingerichtet —
+      eine neue Mitteilung erscheint nur in der App, das Telefon meldet sich nicht.
+      Dafür fehlt auf dem Server der Push-Schlüssel.</div></div>`;
+    return;
+  }
+  if (mtlPushGeraete <= 0) {
+    ziel.innerHTML = `<div class="card-bd" style="padding-bottom:0">
+      <div class="f-hint" style="margin:0">Noch niemand hat Benachrichtigungen eingeschaltet.
+      Eine neue Mitteilung erscheint vorerst nur in der App.</div></div>`;
+    return;
+  }
+  ziel.innerHTML = `<div class="card-bd" style="padding-bottom:0">
+    <div class="f-hint" style="margin:0">Eine neue Mitteilung meldet sich auf
+    ${mtlPushGeraete} ${mtlPushGeraete === 1 ? 'Gerät' : 'Geräten'}.</div></div>`;
+}
+
+function mtlFormLeeren() {
+  mtlBearbeitetId = 0;
+  $('mtlTitel').value = '';
+  $('mtlText').value = '';
+  $('mtlZielgruppe').value = 'alle';
+  $('mtlStufe').value = 'normal';
+  $('mtlAb').value = '';
+  $('mtlBis').value = '';
+  $('mtlFormTitel').textContent = 'Neue Mitteilung';
+  $('mtlSpeichern').textContent = 'Veröffentlichen';
+  $('mtlAbbrechen').style.display = 'none';
+}
+
+function mtlBearbeiten(id) {
+  const m = mtlListe.find(x => Number(x.id) === Number(id));
+  if (!m) { return; }
+  mtlBearbeitetId = Number(id);
+  $('mtlTitel').value = m.titel || '';
+  $('mtlText').value = m.text || '';
+  $('mtlZielgruppe').value = m.zielgruppe || 'alle';
+  $('mtlStufe').value = m.stufe || 'normal';
+  // datetime-local will "JJJJ-MM-TTTHH:MM" -- die Datenbank liefert
+  // "JJJJ-MM-TT HH:MM:SS".
+  $('mtlAb').value  = m.sichtbar_ab  ? String(m.sichtbar_ab).replace(' ', 'T').slice(0, 16) : '';
+  $('mtlBis').value = m.sichtbar_bis ? String(m.sichtbar_bis).replace(' ', 'T').slice(0, 16) : '';
+  $('mtlFormTitel').textContent = 'Mitteilung bearbeiten';
+  $('mtlSpeichern').textContent = 'Änderung speichern';
+  $('mtlAbbrechen').style.display = '';
+  window.scrollTo(0, 0);
+}
+
+function mtlSpeichern() {
+  const titel = $('mtlTitel').value.trim();
+  const text  = $('mtlText').value.trim();
+  if (!titel || !text) { toast('Titel und Text sind nötig.'); return; }
+
+  const koerper = {
+    titel, text,
+    zielgruppe: $('mtlZielgruppe').value,
+    stufe: $('mtlStufe').value,
+    sichtbar_ab: $('mtlAb').value,
+    sichtbar_bis: $('mtlBis').value,
+  };
+  if (mtlBearbeitetId) { koerper.id = mtlBearbeitetId; }
+
+  const knopf = $('mtlSpeichern');
+  knopf.disabled = true;
+  api('mitteilung_save.php', { method: 'POST', body: koerper }).then(({ ok, data }) => {
+    knopf.disabled = false;
+    if (!ok || !data || data.status !== 'ok') {
+      // Die Meldung des Servers steht vorn -- sie sagt, WAS nicht stimmt
+      // (Zeitfenster verdreht, Titel zu lang). Ein pauschales
+      // "Speichern fehlgeschlagen" liesse nur Raten übrig.
+      toast((data && data.message) || 'Die Mitteilung liess sich nicht speichern.');
+      return;
+    }
+    toast(data.angelegt ? 'Mitteilung veröffentlicht.' : 'Änderung gespeichert.');
+    mtlFormLeeren();
+    mtlLaden();
+  });
+}
+
+function mtlArchivieren(id, zurueck) {
+  api('mitteilung_archivieren.php', { method: 'POST', body: { id: Number(id), zurueck: !!zurueck } })
+    .then(({ ok, data }) => {
+      if (!ok || !data || data.status !== 'ok') {
+        toast((data && data.message) || 'Das liess sich nicht ändern.');
+        return;
+      }
+      toast(zurueck ? 'Mitteilung wieder aufgenommen.' : 'Mitteilung zurückgezogen.');
+      mtlLaden();
+    });
 }
 
 function mdDienstplaene() {
