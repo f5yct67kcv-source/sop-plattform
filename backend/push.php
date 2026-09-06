@@ -270,6 +270,32 @@ function push_ursprung(string $endpunkt): ?string
     return $t['scheme'] . '://' . $t['host'];
 }
 
+/**
+ * Wie steht es um den Zeitgeber-Zugang? Vier verschiedene Antworten.
+ *
+ * Nachgetragen, weil beim Einrichten alle vier Faelle als "kein Token"
+ * herauskamen -- die Meldung der Sitzungspruefung, in die der Aufruf
+ * mangels gueltigem Schluessel hineinlief. "Nicht eingerichtet",
+ * "Schluessel fehlt in der Adresse", "Schluessel stimmt nicht" und "nicht
+ * angemeldet" verlangen vier verschiedene Handgriffe. Dieselbe Hausregel
+ * wie bei push_grund(): "unbekannt" darf nie wie "keine" aussehen.
+ *
+ * Reine Funktion mit beiden Werten als Parameter -- so laesst sich jeder
+ * Fall pruefen, ohne den Endpunkt aufzurufen.
+ *
+ * VERGLICHEN WIRD MIT hash_equals: Ein Vergleich, der beim ersten falschen
+ * Zeichen abbricht, verraet ueber die Antwortzeit, wie viele Zeichen
+ * stimmen.
+ */
+function push_zeitgeber_lage(string $erwartet, string $mitgegeben): string
+{
+    if ($erwartet === '' || str_starts_with($erwartet, '__PUSH_CRON')) {
+        return 'nicht_eingerichtet';
+    }
+    if ($mitgegeben === '') { return 'kein_schluessel_in_der_adresse'; }
+    return hash_equals($erwartet, $mitgegeben) ? 'ok' : 'falscher_schluessel';
+}
+
 // ── Der Versand ───────────────────────────────────────────────────────
 /**
  * Was mit einem Abo nach der Antwort des Push-Dienstes geschehen soll.
