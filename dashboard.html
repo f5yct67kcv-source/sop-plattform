@@ -2293,27 +2293,150 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
 .begr-karte .card-bd { padding: 22px 24px; }
 .begr-kopf h2 { font-size: 21px; font-weight: 720; letter-spacing: -.3px; }
 
-/* ── Datum & Zeit (ENT-410)
-   Drei Zeilen, von der groben zur feinen Einheit. Die Wochenzahl ist die
-   grosse: Sie ist die Einheit, in der geplant wird. Tabellenziffern ueberall
-   dort, wo sich der Wert laufend aendert -- sonst wandert die Uhrzeit bei
-   jedem Minutenwechsel um Bruchteile hin und her. */
-.zeit-karte .card-bd { padding: 22px 24px; flex: 1; display: flex; }
-.zeit-raster { flex: 1; display: flex; flex-direction: column; }
-.zeit-zeile { padding: 15px 0; border-top: 1px solid var(--line-soft); }
-.zeit-zeile:first-child { padding-top: 0; border-top: none; }
-.zeit-zeile:last-child { padding-bottom: 0; }
+/* ── Datum & Zeit (ENT-410, Kacheln seit ENT-423)
+   Weiterhin von der groben zur feinen Einheit: die Kalenderwoche als Band
+   oben, darunter Tag und Uhrzeit als zwei gleich hohe Kacheln -- links das
+   Datum als Tageskachel, rechts die Uhrzeit als Klappuhr. Ueberschrift oben,
+   Wert darunter, in beiden Bloecken dieselbe Ordnung und dieselbe Groesse.
+   Tabellenziffern ueberall dort, wo sich der Wert laufend aendert -- sonst
+   wandert die Uhrzeit bei jedem Minutenwechsel um Bruchteile hin und her.
+
+   Die Kacheln sind in HELL wie in DUNKEL anthrazit (Entscheid des
+   Projektinhabers). Ihre Farben stehen deshalb hier und NICHT bei den
+   Themenwerten in :root -- eine helle Klappuhr sieht aus wie ein
+   Eingabefeld, und ein Wert, der in :root steht, wird beim naechsten
+   Themen-Feinschliff mitgezogen, ohne dass jemand diese Absicht kennt.
+   Aus demselben Grund traegt der Wochentag den blauen Akzent und nicht das
+   Rot der Vorlage: In dieser Oberflaeche heisst Rot "gesperrt". */
+.zeit-karte .card-bd { padding: 22px 24px; flex: 1; display: flex;
+  /* Die Kachelgroesse haengt an der Breite der KARTE, nicht an der des
+     Fensters: Dieselbe Karte steht mal auf halber, mal auf voller Breite und
+     laesst sich zusaetzlich von Hand ziehen. Eine Fenster-Medienregel traefe
+     davon nur einen Fall und liesse die Kacheln in den anderen ueberlaufen. */
+  container-type: inline-size; }
+.zeit-raster { flex: 1; display: flex; flex-direction: column;
+  --zk-h:         132px;              /* Kachelhoehe; alles andere rechnet daraus */
+  --zk-flaeche:   #1C212C;            /* untere Haelfte und Tageskachel */
+  --zk-flaeche-o: #262D3D;            /* obere Haelfte, eine Spur heller */
+  --zk-ziffer:    #F1F4FA;
+  --zk-kante:     #0B0E14;            /* die Linie, an der die Klappe haengt */
+  --zk-akzent:    #7FA6FF;
+  --zk-matt:      #9AA3B5;
+  --zk-ring:      rgba(255, 255, 255, .1); }
+@container (max-width: 560px) { .zeit-raster { --zk-h: 96px; } }
+@container (max-width: 452px) { .zeit-raster { --zk-h: 78px; } }
 .zeit-zeile .lb { display: block; font-size: 10.5px; font-weight: 700; letter-spacing: .9px;
   text-transform: uppercase; color: var(--ink-3); margin-bottom: 7px; }
 .zeit-zeile .wert { display: block; font-size: 19px; font-weight: 650; letter-spacing: -.3px; line-height: 1.2; }
-.zeit-kw .wert { font-size: 46px; font-weight: 760; letter-spacing: -1.8px; line-height: 1;
-  font-variant-numeric: tabular-nums; }
-.zeit-kw .spanne { display: block; font-size: 12.5px; color: var(--ink-2); margin-top: 8px; }
-.zeit-uhr .wert { font-size: 30px; font-weight: 700; letter-spacing: -.9px;
-  font-variant-numeric: tabular-nums; }
-/* Zieht jemand die Karte hoeher, verteilen sich die drei Zeilen darin, statt
-   oben zu kleben und unten eine Leerflaeche zu lassen. */
-.dash-item.dh .zeit-raster { justify-content: space-between; }
+
+/* Die Wochenzahl und ihre Spanne stehen nebeneinander auf einer Grundlinie,
+   die Ueberschrift darueber ueber beiden. Nicht zwei Zeilen untereinander:
+   Der Groessen- und Farbunterschied trennt die beiden bereits deutlich
+   genug, und eine Zeile weniger laesst den Kacheln darunter die Luft. */
+.zeit-kw { display: grid; grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas: "lb lb" "wert spanne"; align-items: baseline; column-gap: 18px;
+  padding-bottom: 17px; border-bottom: 1px solid var(--line-soft); }
+.zeit-kw .lb { grid-area: lb; }
+.zeit-kw .wert { grid-area: wert; font-size: 32px; font-weight: 760; letter-spacing: -1.2px;
+  line-height: 1; font-variant-numeric: tabular-nums; }
+.zeit-kw .spanne { grid-area: spanne; font-size: 12.5px; color: var(--ink-2); }
+
+/* Zieht jemand die Karte hoeher, sitzen die Kacheln mittig im gewonnenen
+   Raum, statt oben zu kleben und unten eine Leerflaeche zu lassen. */
+.zeit-objekte { flex: 1; display: flex; align-items: center; justify-content: space-between;
+  gap: 22px; padding-top: 18px; }
+
+/* ── Klappuhr
+   Zwei Kacheln, Stunde und Minute, jede aus vier Halbflaechen: zwei ruhende
+   (oben der neue, unten noch der alte Wert) und zwei klappende. Die Ziffer
+   steht in jeder Halbflaeche VOLLSTAENDIG und wird nur beschnitten -- stuende
+   oben und unten je ein halbes Zeichen, muesste die Schrift auf den Pixel
+   genau in der Mitte geteilt sein, was keine Schrift tut. */
+.zk-uhr { display: flex; gap: calc(var(--zk-h) * .085); }
+.zk-klapp { position: relative; flex: 0 0 auto;
+  width: calc(var(--zk-h) * 1.22); height: var(--zk-h);
+  perspective: 520px; font-size: calc(var(--zk-h) * .6); font-weight: 720;
+  letter-spacing: -.035em; font-variant-numeric: tabular-nums; color: var(--zk-ziffer);
+  border-radius: 19px; box-shadow: 0 0 0 1px var(--zk-ring);
+  filter: drop-shadow(0 10px 22px rgba(8, 11, 18, .34)); }
+.zk-h { position: absolute; left: 0; right: 0; height: 50%; overflow: hidden;
+  background: var(--zk-flaeche); backface-visibility: hidden; }
+.zk-h-o { top: 0; border-radius: 19px 19px 0 0; background: var(--zk-flaeche-o);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08); }
+.zk-h-u { bottom: 0; border-radius: 0 0 19px 19px; }
+.zk-h span { position: absolute; left: 0; width: 100%; height: var(--zk-h);
+  line-height: var(--zk-h); text-align: center; }
+.zk-h-o span { top: 0; }
+.zk-h-u span { bottom: 0; }
+/* Die Kante, an der die Klappe haengt, und der Schatten, den sie darunter
+   wirft. Beide ueber der Ziffer, sonst laege die Ziffer darauf. */
+.zk-h-o::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+  background: var(--zk-kante); z-index: 2; }
+/* Zurueckhaltend: Der Schatten liegt ueber der Ziffer, und bei .46 sah die
+   Ziffer unter der Kante aus, als sei sie verschmiert -- gemessen war das
+   kein Fehler, aber gesehen einer. */
+.zk-h-u::before { content: ''; position: absolute; left: 0; right: 0; top: 0;
+  height: calc(var(--zk-h) * .085); z-index: 2; pointer-events: none;
+  background: linear-gradient(rgba(0, 0, 0, .2), rgba(0, 0, 0, 0)); }
+/* Ruhend liegen beide Klappteile still: das obere flach auf seiner
+   Ausgangslage, das untere hochkant. Sichtbar werden sie erst, wenn
+   klappSetzen() die Bewegung ausloest -- sonst verdeckte das obere
+   dauerhaft die ruhende Flaeche darunter. */
+.zk-ab, .zk-an { visibility: hidden; z-index: 3; }
+.zk-ab { transform-origin: 50% 100%; }
+.zk-an { transform-origin: 50% 0; transform: rotateX(90deg); }
+.zk-klapp.laeuft .zk-ab { visibility: visible;
+  animation: zkAb .3s cubic-bezier(.46, .03, .9, .52) forwards; }
+.zk-klapp.laeuft .zk-an { visibility: visible;
+  animation: zkAn .34s cubic-bezier(.15, .62, .38, 1) .28s forwards; }
+@keyframes zkAb { from { transform: rotateX(0deg); } to { transform: rotateX(-90deg); } }
+@keyframes zkAn { from { transform: rotateX(90deg); } to { transform: rotateX(0deg); } }
+
+/* ── Tageskachel
+   Wochentag und Monat klein oben, die Tageszahl gross darunter -- dieselbe
+   Ordnung wie in der Karte drumherum, nur eine Ebene tiefer. */
+.zk-tag { flex: 0 0 auto; width: calc(var(--zk-h) * 1.14); height: var(--zk-h); border-radius: 19px;
+  background: var(--zk-flaeche); display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: calc(var(--zk-h) * .035);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), 0 0 0 1px var(--zk-ring),
+    0 10px 22px -8px rgba(8, 11, 18, .34); }
+.zk-tag-kopf { display: flex; gap: .34em; font-size: calc(var(--zk-h) * .155);
+  font-weight: 700; letter-spacing: -.01em; line-height: 1; }
+.zk-wt { font-style: normal; color: var(--zk-akzent); }
+.zk-mo { font-style: normal; color: var(--zk-matt); }
+.zk-tag-zahl { font-size: calc(var(--zk-h) * .5); font-weight: 760; letter-spacing: -.04em;
+  line-height: 1; color: var(--zk-ziffer); font-variant-numeric: tabular-nums; }
+
+/* ── Drei Spalten, sobald die Karte breit genug ist
+   So wie vor den Kacheln auch schon. Untereinander blieben auf voller Breite
+   gemessen ueber 700 px rechts leer, und die 394 px zwischen Datum und
+   Uhrzeit lasen sich nicht mehr als Paar.
+
+   An der KARTENBREITE festgemacht, nicht an .dw-voll: Eine halbe Karte ist
+   bei 1120 px Fensterbreite gemessen 836 px breit und braucht dieselbe
+   Aufteilung, ohne je "voll" zu heissen.
+
+   Die Kachelhoehe waechst hier mit der Breite, weil jede Spalte nur ein
+   Drittel davon abbekommt -- eine feste Groesse liefe in der schmalsten
+   Karte, die diese Regel noch trifft, aus ihrer Spalte heraus. Der Faktor
+   ist gemessen, nicht geschaetzt: Die Uhr braucht 2 x 1.22 + 0.085 = 2.525
+   Kachelhoehen plus 30 px Einzug, und das muss in ein Drittel der Breite
+   passen.
+
+   Dieser Block steht bewusst ZULETZT: Er ueberschreibt .zeit-objekte und
+   .zeit-kw bei gleicher Eigenspezifitaet und war weiter oben wirkungslos --
+   gemessen kamen dabei Spalten von 648/298/298 px heraus statt 422/422/422,
+   ohne dass irgendetwas kaputt aussah. */
+@container (min-width: 780px) {
+  .zeit-raster { --zk-h: clamp(78px, 11cqw, 148px); flex-direction: row; align-items: stretch; }
+  .zeit-kw { flex: 1; align-content: center; row-gap: 6px;
+    grid-template-columns: minmax(0, 1fr); grid-template-areas: "lb" "wert" "spanne";
+    border-bottom: none; padding-bottom: 0; padding-right: 30px; }
+  .zeit-objekte { flex: 2; padding-top: 0; gap: 0; }
+  .zeit-tag, .zeit-uhr { flex: 1; min-width: 0; padding-left: 30px;
+    border-left: 1px solid var(--line-soft);
+    display: flex; flex-direction: column; justify-content: center; align-items: flex-start; }
+}
 /* Begruessung und Datum & Zeit stehen nebeneinander und bilden die erste
    Zeile der Uebersicht. Gemessen war die Begruessung 267 px hoch und die
    Zeitkarte 308 -- nebeneinander sieht das aus, als sei eine der beiden
@@ -2329,12 +2452,6 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
   height: 100%; display: flex; flex-direction: column;
 }
 
-/* Auf voller Breite waeren drei kurze Zeilen ueber 1400 px verloren -- dann
-   stehen sie nebeneinander, weiterhin Ueberschrift oben und Wert darunter. */
-.dash-item.dw-voll .zeit-raster { flex-direction: row; gap: 28px; }
-.dash-item.dw-voll .zeit-zeile { flex: 1; padding: 0 0 0 28px;
-  border-top: none; border-left: 1px solid var(--line-soft); }
-.dash-item.dw-voll .zeit-zeile:first-child { padding-left: 0; border-left: none; }
 /* ── Diktat-Router (ENT-032), seit ENT-107 mit Prefix mehrfach einsetzbar --
    auf der Übersicht als Teil der Begrüssung, in Planung/Einsätze als eigene
    Zeile unter der Filterleiste. Eine gemeinsame Klasse statt einer zweiten
@@ -4525,13 +4642,24 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
             </div>
           </div>
 
-          <!-- Datum & Zeit (ENT-410). Steht neben der Begruessung und fuellt
-               die Haelfte, die dort frei wurde, seit die Begruessung nicht
-               mehr ueber die volle Breite laeuft. Heruntergebrochen von der
-               groben zur feinen Einheit: Woche, Tag, Uhrzeit -- jeweils
-               Ueberschrift oben, Wert darunter, wie ueberall sonst.
-               Die Wochenspanne steht dabei, weil eine nackte Wochenzahl
-               niemandem sagt, welche Tage gemeint sind. -->
+          <!-- Datum & Zeit (ENT-410, seit ENT-423 als Klappuhr und Tageskachel).
+               Steht neben der Begruessung und fuellt die Haelfte, die dort frei
+               wurde, seit die Begruessung nicht mehr ueber die volle Breite
+               laeuft. Weiter von der groben zur feinen Einheit -- Woche, Tag,
+               Uhrzeit --, jeweils Ueberschrift oben, Wert darunter, wie ueberall
+               sonst. Die Wochenspanne steht dabei, weil eine nackte Wochenzahl
+               niemandem sagt, welche Tage gemeint sind.
+
+               Die beiden Kacheln tragen den Wert in ZIFFERN, nicht in Text: Was
+               die Klappuhr zeigt, steht in vier Halbflaechen verteilt (zwei
+               ruhende, zwei klappende), und die Tageskachel kuerzt Wochentag und
+               Monat ab. Fuer Screenreader -- und fuer die Pruefung -- traegt
+               darum jede Kachel den ausgeschriebenen Wert im aria-label; die
+               Beschriftung ist damit nicht nur Beiwerk, sondern die einzige
+               Stelle, an der "09:53" und "Sonntag, 6. September 2026" als ein
+               Stueck Text existieren. zeitZeichnen() setzt beides aus derselben
+               Quelle, damit Kachel und Beschriftung nicht auseinanderlaufen
+               koennen. -->
           <div class="dash-item dw-halb" data-widget="zeit">
             <div class="card zeit-karte">
               <div class="card-bd">
@@ -4541,13 +4669,33 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
                     <b class="wert" id="zeitKw">–</b>
                     <span class="spanne" id="zeitSpanne">–</span>
                   </div>
-                  <div class="zeit-zeile">
-                    <span class="lb">Datum</span>
-                    <b class="wert" id="zeitDatum">–</b>
-                  </div>
-                  <div class="zeit-zeile zeit-uhr">
-                    <span class="lb">Uhrzeit</span>
-                    <b class="wert" id="zeitUhr">–</b>
+                  <div class="zeit-objekte">
+                    <div class="zeit-zeile zeit-tag">
+                      <span class="lb">Datum</span>
+                      <div class="zk-tag" id="zeitDatum" role="img" aria-label="–">
+                        <span class="zk-tag-kopf">
+                          <i class="zk-wt" id="zeitWt">–</i><i class="zk-mo" id="zeitMo">–</i>
+                        </span>
+                        <span class="zk-tag-zahl" id="zeitTag">–</span>
+                      </div>
+                    </div>
+                    <div class="zeit-zeile zeit-uhr">
+                      <span class="lb">Uhrzeit</span>
+                      <div class="zk-uhr" id="zeitUhr" role="img" aria-label="–">
+                        <div class="zk-klapp" id="zeitStd">
+                          <div class="zk-h zk-h-o"><span></span></div>
+                          <div class="zk-h zk-h-u"><span></span></div>
+                          <div class="zk-h zk-h-o zk-ab"><span></span></div>
+                          <div class="zk-h zk-h-u zk-an"><span></span></div>
+                        </div>
+                        <div class="zk-klapp" id="zeitMin">
+                          <div class="zk-h zk-h-o"><span></span></div>
+                          <div class="zk-h zk-h-u"><span></span></div>
+                          <div class="zk-h zk-h-o zk-ab"><span></span></div>
+                          <div class="zk-h zk-h-u zk-an"><span></span></div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -9064,7 +9212,60 @@ const ZEIT_WOCHENTAGE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnersta
 const ZEIT_MONATE = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
   'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
 
-function zeitZeichnen() {
+// Eine Klappkachel auf einen neuen Wert setzen (ENT-423).
+//
+// Vier Halbflaechen: zwei ruhende (oben, unten) und zwei klappende. Waehrend
+// der Bewegung zeigt die obere ruhende bereits den NEUEN Wert -- verdeckt vom
+// wegklappenden alten --, die untere noch den alten, bis die neue Klappe
+// darueberfaellt.
+//
+// Danach wird aufgeraeumt: Die untere ruhende Flaeche bekommt den neuen Wert,
+// und die Klappteile treten ab. Es waere verlockend, das zu sparen, weil die
+// hereingeklappte Flaeche liegen bleibt und die untere ohnehin verdeckt --
+// aber dann truege eine sichtbare Flaeche dauerhaft den ALTEN Wert und
+// wuerde in dem Moment sichtbar, in dem die Bewegung einmal nicht zu Ende
+// laeuft. Ein Anblick, den niemand nachstellen kann und der aussieht wie
+// eine stehengebliebene Uhr.
+function klappSetzen(kachel, wert, ohneKlappen) {
+  if (!kachel || kachel.dataset.wert === wert) { return; }
+  const alt = kachel.dataset.wert || wert;
+  kachel.dataset.wert = wert;
+  const [oben, unten, ab, an] = kachel.querySelectorAll('span');
+  oben.textContent = wert;
+  ab.textContent = alt;
+  an.textContent = wert;
+  // Beim ersten Zeichnen springt die Kachel um: Eine Uhr, die beim Laden der
+  // Seite einmal durchklappt, behauptet einen Wechsel, den es nicht gab.
+  // Dasselbe, wenn das Betriebssystem Bewegung abbestellt hat.
+  if (ohneKlappen || alt === wert || klappRuhig()) {
+    unten.textContent = wert;
+    kachel.classList.remove('laeuft');
+    return;
+  }
+  unten.textContent = alt;
+  kachel.classList.remove('laeuft');
+  void kachel.offsetWidth;   // erzwingt den Neustart der Bewegung
+  kachel.classList.add('laeuft');
+}
+
+// Ende der Bewegung. Ein Ereignis statt eines Zeitgebers: Es kommt, wenn die
+// Bewegung wirklich vorbei ist, und bleibt aus, wenn sie gar nicht erst
+// lief -- dann steht ohnehin schon das Richtige da.
+// Auf dem Container, nicht auf jeder Flaeche einzeln: Das Ereignis steigt
+// auf, und so ueberlebt die Anmeldung jedes spaetere Umhaengen im Baum.
+function klappAufraeumen(e) {
+  const flaeche = e.target;
+  if (!flaeche.classList || !flaeche.classList.contains('zk-an')) { return; }
+  const kachel = e.currentTarget;
+  kachel.querySelectorAll('span')[1].textContent = kachel.dataset.wert;
+  kachel.classList.remove('laeuft');
+}
+
+function klappRuhig() {
+  return !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+}
+
+function zeitZeichnen(ohneKlappen) {
   const kw = $('zeitKw');
   if (!kw) { return; }
   const jetzt = new Date();
@@ -9076,10 +9277,25 @@ function zeitZeichnen() {
   const so = new Date(mo);
   so.setDate(so.getDate() + 6);
   $('zeitSpanne').textContent = zeitSpanne(mo, so);
-  $('zeitDatum').textContent = `${ZEIT_WOCHENTAGE[jetzt.getDay()]}, ${jetzt.getDate()}. `
-    + `${ZEIT_MONATE[jetzt.getMonth()]} ${jetzt.getFullYear()}`;
-  $('zeitUhr').textContent = String(jetzt.getHours()).padStart(2, '0')
-    + ':' + String(jetzt.getMinutes()).padStart(2, '0');
+
+  // Tageskachel. Die Kuerzel kommen aus denselben beiden Listen wie der
+  // ausgeschriebene Wert -- eine zweite Liste mit "So" und "Sep" waere die
+  // Sorte Doppelung, die irgendwann auseinanderlaeuft.
+  const wochentag = ZEIT_WOCHENTAGE[jetzt.getDay()];
+  const monat = ZEIT_MONATE[jetzt.getMonth()];
+  $('zeitWt').textContent = wochentag.slice(0, 2);
+  $('zeitMo').textContent = monat.slice(0, 3);
+  $('zeitTag').textContent = jetzt.getDate();
+  // Ausgeschrieben nur noch fuer Screenreader: Die Kachel selbst zeigt
+  // "So Sep 6", vorgelesen wuerde das zum Buchstabensalat.
+  $('zeitDatum').setAttribute('aria-label',
+    `${wochentag}, ${jetzt.getDate()}. ${monat} ${jetzt.getFullYear()}`);
+
+  const std = String(jetzt.getHours()).padStart(2, '0');
+  const min = String(jetzt.getMinutes()).padStart(2, '0');
+  klappSetzen($('zeitStd'), std, ohneKlappen);
+  klappSetzen($('zeitMin'), min, ohneKlappen);
+  $('zeitUhr').setAttribute('aria-label', std + ':' + min);
 }
 
 // "1. – 7. September 2026" innerhalb eines Monats, "29. September –
@@ -9103,8 +9319,15 @@ function zeitSpanne(a, b) {
 // Sekunden zeigt sie bewusst nicht: Eine Ziffer, die im Augenwinkel jede
 // Sekunde springt, zieht den Blick von der Arbeit weg.
 let zeitTakt = null;
+let klappAngemeldet = false;
 function zeitTaktStarten() {
-  zeitZeichnen();
+  if (!klappAngemeldet && $('zeitStd')) {
+    klappAngemeldet = true;
+    for (const k of [$('zeitStd'), $('zeitMin')]) { k.addEventListener('animationend', klappAufraeumen); }
+  }
+  // Nur der allererste Durchlauf setzt die Kacheln ohne Bewegung; jeder
+  // spaetere ist ein echter Minutenwechsel und darf klappen.
+  zeitZeichnen(zeitTakt === null);
   if (zeitTakt) { clearTimeout(zeitTakt); }
   const jetzt = new Date();
   const bisZurMinute = 60000 - (jetzt.getSeconds() * 1000 + jetzt.getMilliseconds());
