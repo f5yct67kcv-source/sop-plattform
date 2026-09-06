@@ -52,6 +52,14 @@
 :root {
   /* Seitenleiste (Graphit) */
   --shell:        #16181D;
+  /* Dieselbe Farbe noch einmal als Kanaele. Sie ist NICHT als zweite
+     Farbmarke gedacht und wird nie allein geaendert -- sie existiert, weil
+     rgba(var(--x-rgb), a) sich zu rgba(...) berechnet, color-mix() dagegen
+     zu color(srgb ...). Und color(srgb ...) liest jeder Zahlenausdruck in
+     den Pruefungen falsch: 0.0862745 wird zu "0" und "862745". Dass beide
+     Fassungen dieselbe Farbe meinen, prueft test_glas.mjs am gerenderten
+     Zustand -- auseinanderlaufen koennen sie also nicht unbemerkt. */
+  --shell-rgb:    22,24,29;
   --shell-hi:     #1E2128;
   --shell-line:   #272B33;
   --shell-txt:    #9298A5;
@@ -60,6 +68,7 @@
   /* Arbeitsflaeche */
   --bg:           #F7F8FA;
   --surface:      #FFFFFF;
+  --surface-rgb:  255,255,255;   /* Kanaele, siehe --shell-rgb */
   --line:         #E5E8EC;
   --line-soft:    #EFF1F4;
 
@@ -139,6 +148,7 @@ html[data-thema="dunkel"] {
   /* Die Seitenleiste bleibt der dunkelste Bereich, damit die Gliederung
      erhalten bleibt und die Arbeitsflaeche sich weiterhin abhebt. */
   --shell:        #0B0D11;
+  --shell-rgb:    11,13,17;
   --shell-hi:     #14171C;
   --shell-line:   #23272F;
   --shell-txt:    #8A919E;
@@ -146,6 +156,7 @@ html[data-thema="dunkel"] {
 
   --bg:           #0F1117;
   --surface:      #161B27;
+  --surface-rgb:  22,27,39;
   --surface-2:    #1E2535;
   --surface-3:    #242C3E;
   --line:         #2A3147;
@@ -242,6 +253,7 @@ svg.i-sm { width: 15px; height: 15px; }
 
   --bg:           #0F1117;
   --surface:      #161B27;
+  --surface-rgb:  22,27,39;
   --surface-2:    #1E2535;
   --line:         #2A3147;
   --line-soft:    #232A3B;
@@ -3098,7 +3110,29 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
     cursor: pointer; padding: 3px; border-radius: 50%;
     transition: background .13s, box-shadow .13s;
   }
-  .shell.aus .marken-knopf img { border-radius: 50%; }
+  .shell.aus .marken-knopf img { width: 40px; height: 40px; border-radius: 50%; }
+
+  /* ── Glocke neben dem Logo (ENT-416)
+     In der Kopfleiste steht sie neben dem Logo statt in der Werkzeugleiste
+     darunter -- Vorgabe des Projektinhabers nach fremdem Vorbild. Verschoben
+     wird das VORHANDENE Element (siehe glockeVerorten), keine zweite Glocke:
+     Eine Kopie laeuft irgendwann auseinander, und der Zaehler stuende dann
+     an zwei Stellen verschieden.
+     Groesser als in der Werkzeugleiste, weil sie hier neben einem 40-px-Logo
+     und ueber 24-px-Symbolen steht -- ein kleiner Knopf sieht dort aus wie
+     vergessen. */
+  .shell.aus .side-brand .glocke-wrap { flex: none; }
+  .shell.aus .side-brand .btn-glocke {
+    width: 42px; height: 42px; padding: 0; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--shell-txt); background: none; border: none;
+  }
+  .shell.aus .side-brand .btn-glocke svg.i { width: 24px; height: 24px; stroke: currentColor; }
+  .shell.aus .side-brand .btn-glocke:hover { background: var(--shell-hi); color: var(--shell-txt-hi); }
+  /* Der Ring um den Zaehler trennt ihn vom Untergrund. In der Werkzeugleiste
+     ist der aus Glas, hier ist es die Leistenfarbe -- ohne diese Zeile
+     stuende ein heller Ring auf dunklem Grund. */
+  .shell.aus .side-brand .glocke-badge { box-shadow: 0 0 0 2px var(--shell); }
   .shell.aus .marken-knopf:hover { background: var(--shell-hi); }
   .shell.aus .marken-knopf:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .shell.aus.menue-offen .marken-knopf { background: var(--shell-hi); box-shadow: 0 0 0 2px var(--accent); }
@@ -3336,6 +3370,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
      --surface und --ink dort dunkle Werte tragen. */
   .side {
     --shell:        var(--surface);
+    --shell-rgb:    var(--surface-rgb);   /* zieht mit, siehe --shell-rgb */
     --shell-hi:     var(--accent-soft);
     --shell-line:   var(--line);
     --shell-txt:    var(--ink-2);
@@ -3612,6 +3647,348 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
   .rgd-band { grid-template-columns: repeat(2, 1fr); }
   .rgd-zeile { grid-template-columns: 46px 14px 1fr; gap: 9px; }
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   LIQUID GLASS (ENT-418) — an- und abschaltbar, Voreinstellung AN (ENT-419)
+
+   Eine zweite Fassung derselben Oberflaeche: Kacheln und Fenster werden
+   durchscheinend und tragen eine Lichtkante, wie Apple sie seit iOS 26
+   verwendet. Der Schalter steht in der Kopfleiste neben hell/dunkel.
+   "Aus" ist Zeichen fuer Zeichen die Darstellung, die vor ENT-418 da war --
+   dieser ganze Block haengt an html[data-glas="an"] und ist sonst
+   wirkungslos. Seit ENT-419 ist "an" die Voreinstellung; wer abschaltet,
+   bekommt die alte Fassung unveraendert zurueck.
+
+   Vier Regeln, an die sich der Block haelt:
+
+   1. KEINE ZWEITE FARBWELT. Die Tinte wird aus den BESTEHENDEN Marken
+      gemischt (--surface, --shell), nicht neu erfunden. Damit zieht das
+      Glas bei jeder kuenftigen Palettenaenderung automatisch mit, in
+      beiden Themen.
+      Gemischt wird ueber die Kanalfassung -- rgba(var(--surface-rgb), a)
+      -- und AUSDRUECKLICH NICHT ueber color-mix(). Der Grund ist gemessen
+      und war die unangenehmste Ueberraschung dieses Umbaus: color-mix()
+      berechnet sich in Chrome zu "color(srgb 0.0862745 0.105882 ...)".
+      Jeder Zahlenausdruck in den bestehenden Pruefungen liest daraus
+      "0" und "862745" statt 22 und 27 -- acht Suiten messen Flaechen-
+      farben so, und sie wuerden ab dem Tag, an dem Glas voreingestellt
+      ist, stillschweigend Unsinn vergleichen. rgba() liefert rgba().
+
+   2. UNSCHAERFE NUR DORT, WO WIRKLICH ETWAS DAHINTER DURCHLAEUFT --
+      Kopfleiste, Seitenleiste, Fenster, Schublade, Menues. NICHT auf
+      Kacheln: Hinter einer Kachel liegt nur der weiche Grund, und einen
+      weichen Verlauf weichzuzeichnen aendert am Bild nichts. Es kostet
+      aber zweierlei -- Rechenzeit bei jedem Bildaufbau und, schwerer
+      wiegend, backdrop-filter macht die eigene Box zum Bezugsrahmen fuer
+      position:fixed-Nachfahren und oeffnet einen Stapelkontext. Genau
+      daran hing das Glockenmenue schon einmal 51 px ueber dem oberen
+      Bildschirmrand (siehe Kommentar bei #glockePanel). Glasig macht eine
+      Kachel die Durchsicht und die Kante, nicht die Unschaerfe.
+
+   3. TABELLEN BLEIBEN FEST. Der Tabellenkoerper einer Karte behaelt
+      seinen deckenden Grund. Sonst scheint die scrollende Zeile durch die
+      festgehaltene Spalte: .gr td.lb, .mx td.lb und .gr td.sum sind
+      position:sticky und muessen verdecken, was unter ihnen durchlaeuft.
+      Glas ist hier die Fassung, nicht der Inhalt.
+
+   4. NUR MATERIAL, KEIN UMBAU. Keine Zeile hier verschiebt ein Element,
+      aendert eine Groesse oder einen Weg zu einer Funktion. Was sich
+      aendert, sind Flaechenfarbe, Kante, Schatten und Radius.
+   ══════════════════════════════════════════════════════════════════════ */
+
+html[data-glas="an"] {
+  /* Wie viel Farbe von der Flaeche uebrig bleibt. Getrennte Stufen, nicht
+     eine: Ein Fenster liegt UEBER Inhalt und muss mehr decken als eine
+     Kachel, die auf dem leeren Grund liegt -- sonst liest man zwei Ebenen
+     gleichzeitig. --glas-schiene (die Seitenleiste) steht bewusst NUR in
+     der dunklen Fassung, siehe die Regel weiter unten. */
+  --glas-kachel:  .54;
+  --glas-fenster: .84;
+
+  --glas-unschaerfe:  20px;
+  --glas-saettigung: 165%;
+
+  /* Die Kante ist das eigentliche Erkennungszeichen, nicht die Durchsicht:
+     Licht bricht am Rand des Glases -- oben hell, unten tief. Ohne sie
+     sieht eine durchscheinende Flaeche bloss blass aus. */
+  --glas-kante-hell: rgba(255,255,255,.90);
+  --glas-kante-tief: rgba(16,18,22,.10);
+  --glas-linie:      rgba(255,255,255,.55);
+  --glas-abheben:    0 10px 30px -14px rgba(16,18,22,.20);
+
+  /* Radien eine Stufe weicher (16 -> 20, 12 -> 15). Bewusst klein
+     gehalten: Es soll dasselbe Raster bleiben, nur mit weicherer Fassung. */
+  --glas-r:    15px;
+  --glas-r-lg: 20px;
+
+  /* Der Grund, auf den das Glas schaut. */
+  --glas-grund-1: rgba(47,91,215,.22);
+  --glas-grund-2: rgba(107,79,168,.17);
+  --glas-grund-3: rgba(15,122,107,.13);
+
+  /* Die Kopfleiste hat ihr Milchglas schon; hier wird es nur duenner. */
+  --glas: rgba(255,255,255,.60);
+}
+
+html[data-glas="an"][data-thema="dunkel"] {
+  /* Auf dunklem Grund kehrt sich die Kante um: Das Licht sitzt aussen als
+     feiner heller Saum, die Tiefe darunter ist Schwarz, nicht Grau. */
+  --glas-kante-hell: rgba(255,255,255,.15);
+  --glas-kante-tief: rgba(0,0,0,.38);
+  --glas-linie:      rgba(255,255,255,.09);
+  /* Im Dunkeln traegt die Kante, nicht der Schatten -- dieselbe Aussage
+     wie ENT-227 fuer die deckende Fassung. Ein Wert statt "none", weil er
+     in einer Schattenliste steht. */
+  --glas-abheben:    0 0 0 0 rgba(0,0,0,0);
+
+  --glas-grund-1: rgba(112,152,247,.26);
+  --glas-grund-2: rgba(182,160,234,.18);
+  --glas-grund-3: rgba(79,217,195,.13);
+
+  --glas: rgba(22,27,39,.62);
+
+  /* Im Dunkeln gilt die Rechnung andersherum als im Hellen: Dort toent der
+     Verlauf die Kachel DUNKLER und der Text gewinnt Kontrast, hier hellt er
+     sie auf und der Text verliert. Darum deckt die Kachel im Dunkeln mehr
+     -- gemessen, nicht geschaetzt (test_glas.mjs prueft beide Fassungen). */
+  --glas-kachel:  .62;
+  --glas-schiene: .74;
+}
+
+/* ── Der Grund, auf den das Glas schaut ─────────────────────────────────
+   Ohne ihn gibt es nichts zu brechen: Durchsicht auf einfarbigem Grund
+   sieht genauso aus wie kein Glas. Drei sehr weite, flau gesetzte Kreise
+   statt eines Farbverlaufs ueber die Diagonale -- so bleibt die Mitte, wo
+   Tabellen und Zahlen liegen, am ruhigsten, und die Farbe sammelt sich
+   dort, wo ohnehin Rand ist.
+
+   Als EIGENE, fest stehende Ebene, nicht als background-attachment:fixed
+   am Koerper. Beides sieht gleich aus -- der Verlauf steht still, waehrend
+   die Kacheln darueber wandern, und erst dadurch aendert sich beim
+   Scrollen, was eine Kachel durchscheinen laesst. Der Unterschied ist die
+   Rechenlast, und die ist hier GEMESSEN worden, nicht vermutet:
+
+   Mit background-attachment:fixed muss der Browser den Verlauf bei jedem
+   Bildaufbau des Koerpers neu zeichnen. Unter Last hat das gereicht, um
+   eine 130-ms-Ueberblendung an .btn nach 200 ms noch nicht fertig sein zu
+   lassen -- test_begruessung.mjs wurde dadurch in vier von acht parallelen
+   Laeufen rot (auf origin/main null von acht). Als eigene Ebene mit
+   position:fixed kann der Browser den Verlauf einmal zeichnen und danach
+   nur noch zusammensetzen; die Ueberblendung hat ihre Reserve zurueck.
+
+   z-index:-1 heisst hier: hinter dem Inhalt des Koerpers, aber VOR dessen
+   Hintergrundfarbe -- genau die Ebene, die gebraucht wird. */
+html[data-glas="an"] body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    radial-gradient(1500px 900px at  2% -18%, var(--glas-grund-1), transparent 66%),
+    radial-gradient(1250px 950px at 102%  6%, var(--glas-grund-2), transparent 64%),
+    radial-gradient(1400px 1000px at 46% 118%, var(--glas-grund-3), transparent 68%);
+  background-repeat: no-repeat;
+}
+
+/* ── Kacheln: durchscheinend, mit Kante, ohne Unschaerfe (Regel 2) ────── */
+html[data-glas="an"] .card,
+html[data-glas="an"] .kpi,
+html[data-glas="an"] .bk-kachel,
+html[data-glas="an"] .md-kachel,
+html[data-glas="an"] .pn-kopf,
+html[data-glas="an"] .pn-zeile,
+html[data-glas="an"] .opl-tag,
+html[data-glas="an"] .ep-leute {
+  background: rgba(var(--surface-rgb), var(--glas-kachel));
+  border-color: var(--glas-linie);
+  /* Drei Lagen: das Abheben, die scharfe Lichtkante oben, die Tiefe unten.
+     Alle drei sind HAARLINIEN ohne Weichzeichnung -- das ist eine
+     Messentscheidung und zugleich die naehere Nachbildung.
+
+     Gemessen: Zwei zusaetzliche, weich auslaufende Innenschatten (12/24
+     und 14/26 px) auf jeder Kachel kosteten auf der Uebersicht rund 17 ms
+     je Bildaufbau -- 181 ms statt 164 ms, bis eine 130-ms-Ueberblendung
+     stand. Das ist der groesste Einzelposten des ganzen Glases, groesser
+     als die Unschaerfe der Kopfleiste und der Verlauf zusammen (beide
+     zusammen: 0 ms messbar). Weichzeichnung ueber eine Flaeche ist teuer,
+     eine Linie ist es nicht.
+
+     Und optisch verliert es nichts: Bei Apple ist die Kante eine scharfe
+     Spiegelung am Glasrand, kein Schimmer, der nach innen auslaeuft. Der
+     weiche Verlauf war die weniger treue Nachbildung -- und die teurere. */
+  box-shadow:
+    var(--glas-abheben),
+    inset 0 1px 0 0 var(--glas-kante-hell),
+    inset 0 -1px 0 0 var(--glas-kante-tief);
+}
+html[data-glas="an"] .card,
+html[data-glas="an"] .bk-kachel { border-radius: var(--glas-r-lg); }
+html[data-glas="an"] .kpi,
+html[data-glas="an"] .md-kachel,
+html[data-glas="an"] .pn-kopf,
+html[data-glas="an"] .pn-zeile,
+html[data-glas="an"] .opl-tag,
+html[data-glas="an"] .ep-leute { border-radius: var(--glas-r); }
+
+/* ── Regel 3: der Tabellenkoerper bleibt deckend ───────────────────────
+   .card-bd.flush traegt die Raster (.gr, .mx) mit ihren festgehaltenen
+   Spalten. Bliebe er durchscheinend, saehe man die scrollende Zeile durch
+   die stehende Spalte hindurch -- und die stehende Spalte saehe zugleich
+   wie ein aufgehellter Fleck auf der Karte aus, weil sie deckend bleiben
+   MUSS. Beides faellt weg, wenn der Koerper selbst deckt. Der Rahmen der
+   Karte -- Kopf, Kante, Radius, Schatten -- bleibt Glas. */
+html[data-glas="an"] .card-bd.flush { background: var(--surface); }
+html[data-glas="an"] .card > .card-bd.flush:last-child  { border-radius: 0 0 var(--glas-r-lg) var(--glas-r-lg); }
+html[data-glas="an"] .card > .card-bd.flush:first-child { border-radius: var(--glas-r-lg) var(--glas-r-lg) 0 0; }
+/* Gleiche Eigenspezifitaet wie die zwei darueber -- die Reihenfolge
+   entscheidet, darum steht der Sonderfall zuletzt. */
+html[data-glas="an"] .card > .card-bd.flush:only-child  { border-radius: var(--glas-r-lg); }
+
+/* ── Fenster: Glas MIT Unschaerfe, denn hier laeuft Inhalt dahinter ──── */
+html[data-glas="an"] .dlg,
+html[data-glas="an"] .drawer,
+html[data-glas="an"] .rowmenu-pop,
+html[data-glas="an"] .glocke-panel,
+html[data-glas="an"] .rdkarte-suche-treffer {
+  background: rgba(var(--surface-rgb), var(--glas-fenster));
+  backdrop-filter: saturate(var(--glas-saettigung)) blur(var(--glas-unschaerfe));
+  -webkit-backdrop-filter: saturate(var(--glas-saettigung)) blur(var(--glas-unschaerfe));
+  border: 1px solid var(--glas-linie);
+}
+html[data-glas="an"] .dlg,
+html[data-glas="an"] .glocke-panel { border-radius: 22px; }
+html[data-glas="an"] .rowmenu-pop,
+html[data-glas="an"] .rdkarte-suche-treffer { border-radius: 14px; }
+/* Die Schublade sitzt am rechten Rand fest -- nur die Innenkante rundet. */
+html[data-glas="an"] .drawer { border-radius: 22px 0 0 22px; border-right: none; }
+
+/* Die Lichtkante der Fenster liegt oben UND an der Innenkante: ein Fenster
+   steht frei im Raum, eine Kachel liegt auf dem Grund. */
+html[data-glas="an"] .dlg,
+html[data-glas="an"] .drawer,
+html[data-glas="an"] .glocke-panel {
+  box-shadow:
+    var(--sh-3),
+    inset 0 1px 0 0 var(--glas-kante-hell),
+    inset 1px 0 0 0 var(--glas-kante-hell),
+    inset 0 -1px 0 0 var(--glas-kante-tief);
+}
+
+/* ── Leisten ───────────────────────────────────────────────────────────
+   Die Kopfleiste hat ihr Milchglas seit jeher; hier wird nur die
+   Unschaerfe kraeftiger, die Farbe kommt oben aus --glas. */
+html[data-glas="an"] .topbar {
+  backdrop-filter: saturate(var(--glas-saettigung)) blur(var(--glas-unschaerfe));
+  -webkit-backdrop-filter: saturate(var(--glas-saettigung)) blur(var(--glas-unschaerfe));
+  border-bottom-color: var(--glas-linie);
+  box-shadow: inset 0 -1px 0 0 var(--glas-kante-tief);
+}
+/* Die Seitenleiste wird NUR in der dunklen Fassung zu Glas. Das ist kein
+   Versehen und keine Sparsamkeit, sondern das Ergebnis der Messung:
+
+   Sie ist der einzige dunkle Block auf einer hellen Seite. Jedes Prozent
+   Durchsicht hellt ihren Grund in Richtung Verlauf auf -- waehrend
+   .nav-lbl und .side-brand .sub mit #5C626E einen FESTEN Grauwert tragen,
+   der davon nichts weiss (zwei bewusst eingetragene Werte, siehe Kommentar
+   dort). Und weil relative Helligkeit am dunklen Ende steil verlaeuft,
+   schlaegt schon wenig Durchsicht stark durch: gemessen 2.9:1 -> 2.3:1 bei
+   66 % Deckung, und selbst bei 96 % noch 2.7:1. Die Rubriken "BETRIEB" und
+   "STAMMDATEN" waren dabei am Bildschirm praktisch verschwunden, ohne dass
+   irgendetwas kaputtging -- genau die Sorte Fehler, die man nur beim
+   Messen findet. test_glas.mjs misst das jetzt bei jedem Lauf mit.
+
+   Im Dunkeln liegt die Leiste dagegen auf dunklem Grund. Da hellt
+   Durchsicht nicht auf, und sie vertraegt deutlich mehr davon.
+   Gemischt wird aus --shell, nicht aus einem eigenen Wert: So gilt
+   dieselbe Regel am Schreibtisch (Graphit) und auf dem Handy, wo die
+   Leiste seit ENT-071 ueber --shell: var(--surface) dem Hell/Dunkel-
+   Schalter folgt. */
+html[data-glas="an"][data-thema="dunkel"] .side {
+  background: rgba(var(--shell-rgb), var(--glas-schiene));
+}
+/* Die Unschaerfe bekommt sie NUR als Schublade, also unter 900 px -- und
+   damit gilt Regel 2 auch hier, statt eine Ausnahme fuer die Seitenleiste
+   zu machen: Am Schreibtisch steht die Leiste fest links, und der Inhalt
+   beginnt rechts von ihr (.main traegt margin-left: var(--side-w)). Hinter
+   ihr laeuft also NICHTS durch -- nur der ruhige Verlauf, und den
+   weichzuzeichnen aendert am Bild nichts. Als Schublade auf dem Handy legt
+   sie sich dagegen ueber den Inhalt; dort ist die Unschaerfe das, was sie
+   lesbar macht.
+
+   Der Preis war gemessen, nicht vermutet: Eine 232 px breite, bildschirm-
+   hohe Unschaerfe ueber die volle Hoehe hat auf der Uebersicht so viel
+   Rechenzeit gekostet, dass eine 130-ms-Ueberblendung an .btn nach 200 ms
+   noch nicht fertig war -- test_begruessung.mjs wurde dadurch in 7 von 12
+   parallelen Laeufen rot, und zwar ausschliesslich im dunklen Thema, also
+   genau dort, wo diese Regel greift. Mit derselben Datei und Glas
+   ausgeschaltet: 12 von 12 gruen. */
+@media (max-width: 900px) {
+  html[data-glas="an"][data-thema="dunkel"] .side {
+    backdrop-filter: saturate(var(--glas-saettigung)) blur(var(--glas-unschaerfe));
+    -webkit-backdrop-filter: saturate(var(--glas-saettigung)) blur(var(--glas-unschaerfe));
+  }
+}
+
+/* ── Wenn der Browser kein backdrop-filter kann ────────────────────────
+   Dann bleibt von Glas nur Blaesse uebrig, weil hinter diesen Flaechen
+   wirklich Inhalt durchlaeuft und ihn niemand mehr weichzeichnet. In dem
+   Fall decken sie wieder voll -- lieber gewoehnlich als unlesbar.
+   Die Kacheln brauchen das nicht: Hinter ihnen liegt nur der ruhige
+   Grund, den auch die Unschaerfe nicht veraendert haette. */
+@supports not ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) {
+  html[data-glas="an"] .dlg,
+  html[data-glas="an"] .drawer,
+  html[data-glas="an"] .rowmenu-pop,
+  html[data-glas="an"] .glocke-panel,
+  html[data-glas="an"] .rdkarte-suche-treffer { background: var(--surface); }
+  html[data-glas="an"][data-thema="dunkel"] .side { background: var(--shell); }
+  html[data-glas="an"] .topbar { background: var(--surface); }
+}
+
+/* Wer am Betriebssystem "weniger Transparenz" eingestellt hat, meint genau
+   das. Die Kante und der Grund bleiben, die Durchsicht geht fast ganz weg. */
+@media (prefers-reduced-transparency: reduce) {
+  html[data-glas="an"] { --glas-kachel: .96; --glas-fenster: .99; --glas-schiene: .97; }
+}
+
+/* Auf dem Handy weniger Unschaerfe: dieselbe Wirkung, weniger Rechenlast auf
+   Geraeten, die im Dienst und nicht am Schreibtisch benutzt werden. */
+@media (max-width: 620px) {
+  html[data-glas="an"] { --glas-unschaerfe: 14px; }
+}
+
+/* ── Der Schalter ──────────────────────────────────────────────────────
+   Gleiche Bauart und Groesse wie der Hell/Dunkel-Schalter daneben (ENT-029)
+   -- zwei Schalter nebeneinander, die verschieden aussehen, wirken wie zwei
+   verschiedene Dinge. Eigene Klasse statt derselben, weil die dunkle Fassung
+   von .thema-schalter dessen Knopf verschiebt: Ein Glas-Schalter, der im
+   Dunkeln von selbst umspringt, wuerde einen Zustand behaupten, den er
+   nicht hat. */
+/* Im Menuekopf des Handys stehen seit ENT-418 zwei Schalter statt einem.
+   Eigene Huelle, damit "space-between" von .side-kopf weiterhin den Titel
+   nach links und die Schaltergruppe nach rechts stellt -- ohne sie waeren es
+   drei Kinder und der Hell/Dunkel-Schalter saesse in der Mitte. */
+.side-kopf-schalter { display: flex; align-items: center; gap: 10px; flex: none; }
+.glas-schalter { flex: none; width: 52px; height: 30px; border-radius: 999px; padding: 0;
+  border: 1px solid var(--line); background: var(--bg); cursor: pointer; position: relative;
+  transition: background .18s, border-color .18s; }
+.glas-schalter:hover { border-color: var(--line-hi); }
+.glas-schalter .knopf { position: absolute; top: 2px; left: 2px; width: 24px; height: 24px;
+  border-radius: 50%; background: var(--surface); box-shadow: var(--sh-1);
+  display: flex; align-items: center; justify-content: center; transition: transform .2s; }
+.glas-schalter svg { width: 14px; height: 14px; fill: none; stroke-width: 2.1;
+  stroke-linecap: round; stroke-linejoin: round; }
+.glas-schalter .i-glas { stroke: var(--ink-3); transition: stroke .16s; }
+html[data-glas="an"] .glas-schalter { background: var(--accent-soft); border-color: var(--accent-line); }
+html[data-glas="an"] .glas-schalter .knopf { transform: translateX(22px); }
+html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
+@media (prefers-reduced-motion: reduce) {
+  .glas-schalter, .glas-schalter .knopf, .glas-schalter svg { transition: none; }
+}
+@media (max-width: 620px) { .glas-schalter { width: 46px; height: 28px; }
+  .glas-schalter .knopf { width: 22px; height: 22px; }
+  html[data-glas="an"] .glas-schalter .knopf { transform: translateX(18px); } }
 </style>
 <script src="gav.js"></script>
 <script src="zeitwahl.js"></script>
@@ -3626,6 +4003,21 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
     w = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dunkel' : 'hell';
   }
   document.documentElement.setAttribute('data-thema', w);
+})();
+/* Liquid Glass (ENT-418, Voreinstellung nach ENT-419). Aus demselben
+   Grund vor dem ersten Zeichnen: Sonst steht die deckende Fassung einen
+   Wimpernschlag lang da und springt dann um. Eigener Block mit eigenem
+   try, damit ein Speicher, der nicht lesbar ist (privates Fenster), nicht
+   auch noch die Hell/Dunkel-Wahl darueber mitreisst.
+   Ohne gespeicherte Wahl: AN (ENT-419). Anders als bei hell/dunkel gibt es
+   hier keine Einstellung des Betriebssystems, die man befragen koennte.
+   Der Vergleich steht darum auf 'aus' und nicht auf 'an': Nur eine
+   ausdrueckliche Abwahl schaltet ab -- ein leerer oder unlesbarer Speicher
+   fuehrt zur neuen Fassung, nicht zur alten. */
+(function () {
+  var g = 'an';
+  try { g = localStorage.getItem('rv3_glas') === 'aus' ? 'aus' : 'an'; } catch (e) {}
+  document.documentElement.setAttribute('data-glas', g);
 })();
 </script>
 </head>
@@ -3720,12 +4112,23 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
          aus wie ein Menuepunkt und verhielt sich nicht wie einer. -->
     <div class="side-kopf nur-schublade">
       <span class="titel">Menü</span>
+      <span class="side-kopf-schalter">
+      <!-- Liquid Glass auf dem Handy (ENT-418): derselbe Ort wie der
+           Hell/Dunkel-Schalter, aus demselben Grund wie ENT-067 -- als Zeile
+           in der Liste saehe er aus wie ein Menuepunkt und verhielte sich
+           nicht wie einer. -->
+      <button class="glas-schalter" id="btnGlasMob" onclick="glasUm()" role="switch" aria-checked="false" title="Durchscheinende Oberfläche" aria-label="Durchscheinende Oberfläche ein- oder ausschalten">
+        <span class="knopf">
+          <svg class="i-glas" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="12" height="12" rx="3.4"/><path d="M8.5 20.5h8a4 4 0 0 0 4-4v-8"/></svg>
+        </span>
+      </button>
       <button class="thema-schalter" id="btnThemaMob" onclick="themaUm()" role="switch" aria-checked="false" title="Hell oder dunkel" aria-label="Zwischen heller und dunkler Darstellung wechseln">
         <span class="knopf">
           <svg class="i-sonne" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><line x1="12" y1="1.5" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22.5"/><line x1="4.2" y1="4.2" x2="5.9" y2="5.9"/><line x1="18.1" y1="18.1" x2="19.8" y2="19.8"/><line x1="1.5" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22.5" y2="12"/><line x1="4.2" y1="19.8" x2="5.9" y2="18.1"/><line x1="18.1" y1="5.9" x2="19.8" y2="4.2"/></svg>
           <svg class="i-mond" viewBox="0 0 24 24"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11z"/></svg>
         </span>
       </button>
+      </span>
     </div>
 
     <nav class="side-nav">
@@ -3973,6 +4376,20 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
       <button class="btn-sprechen" id="btnSprechen" onclick="gsOeffnen()" title="Diktieren oder tippen" style="display:none">
         <svg class="i i-sm" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
         <span class="lbl">Sprechen</span>
+      </button>
+      <!-- Liquid Glass (ENT-418). Direkt neben hell/dunkel, weil es dieselbe
+           Art von Wahl ist: Wie die Oberflaeche aussieht, nicht was sie tut.
+           Das Zeichen sind zwei versetzte Scheiben -- eine Flaeche, durch die
+           man eine zweite sieht.
+           LINKS davon, nicht rechts: Der Hell/Dunkel-Schalter ist seit
+           ENT-067 das aeusserste Element rechts, und test_menue.mjs misst
+           genau das ("er sitzt rechts", Abstand zum Rand < 30 px). Ein
+           neuer Schalter rechts daneben haette ihn um rund 56 px nach
+           innen geschoben -- gemessen, nicht vermutet. -->
+      <button class="glas-schalter ohne-schublade" id="btnGlas" onclick="glasUm()" role="switch" aria-checked="false" title="Durchscheinende Oberfläche" aria-label="Durchscheinende Oberfläche ein- oder ausschalten">
+        <span class="knopf">
+          <svg class="i-glas" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="12" height="12" rx="3.4"/><path d="M8.5 20.5h8a4 4 0 0 0 4-4v-8"/></svg>
+        </span>
       </button>
       <button class="thema-schalter ohne-schublade" id="btnThema" onclick="themaUm()" role="switch" aria-checked="false" title="Hell oder dunkel" aria-label="Zwischen heller und dunkler Darstellung wechseln">
         <span class="knopf">
@@ -7887,6 +8304,7 @@ function enter() {
   // Der Wert steht schon am Dokument -- hier nur Schalter und Systemleiste
   // nachziehen.
   themaSetzen(document.documentElement.getAttribute('data-thema') || 'hell');
+  glasSetzen(document.documentElement.getAttribute('data-glas') === 'an');
   // Massgeblich ist seit ENT-077 die Rolle, nicht mehr "Admin ja/nein":
   // Auch Planung und Personal gehoeren ins Dashboard, obwohl sie keine
   // Verwaltung sind.
@@ -8782,6 +9200,29 @@ function themaUm() {
   themaSetzen(document.documentElement.getAttribute('data-thema') === 'dunkel' ? 'hell' : 'dunkel');
 }
 
+// ══════════════════════════════════════════ LIQUID GLASS (ENT-418)
+// Dieselbe Bauart wie hell/dunkel darueber: Der Wert steht schon im Kopf der
+// Seite am Dokument, hier wird nur noch umgeschaltet und gespeichert. Zwei
+// Schalter, ein Zustand -- der jeweils verborgene wird beim Breitenwechsel
+// sichtbar und stuende sonst falsch da.
+//
+// Kein Eingriff in die Systemleistenfarbe (anders als themaSetzen): Glas
+// aendert nicht, ob es hell oder dunkel ist, nur wie dicht die Flaechen sind.
+function glasSetzen(an) {
+  document.documentElement.setAttribute('data-glas', an ? 'an' : 'aus');
+  try { localStorage.setItem('rv3_glas', an ? 'an' : 'aus'); } catch (e) {}
+  ['btnGlas', 'btnGlasMob'].forEach(id => {
+    const b = $(id);
+    if (!b) { return; }
+    b.setAttribute('aria-checked', an ? 'true' : 'false');
+    b.title = an ? 'Durchscheinende Oberfläche ausschalten' : 'Durchscheinende Oberfläche einschalten';
+  });
+}
+
+function glasUm() {
+  glasSetzen(document.documentElement.getAttribute('data-glas') !== 'an');
+}
+
 // Welche Ansichten die volle Breite wollen -- EINE Liste statt verstreuter
 // Bedingungen (ENT-086, OP-87). Mehr Platz ist nicht ueberall besser: Eine
 // Liste gewinnt Spalten, ein Formular verliert Lesbarkeit, wenn Beschriftung
@@ -9039,11 +9480,47 @@ document.addEventListener('keydown', e => {
 // Leiste eine Schublade, und die Aufklapp-Regeln greifen nicht. Ohne diese
 // Bedingung wuerde der Knopf am Handy eine Klasse setzen, die nichts
 // bewirkt -- und aria-expanded meldete ein Menue, das niemand sieht.
-function markenMenuMoeglich() {
+// Liegt die Navigation gerade waagrecht als Kopfleiste? Genau dann gibt es
+// den Markenknopf als Bedienelement UND den Platz neben dem Logo, an dem die
+// Glocke stehen soll. Eine Bedingung, zwei Verwender -- nicht zweimal
+// hingeschrieben, sonst driften sie auseinander.
+function kopfleisteAktiv() {
   const sh = $('shell');
   return !!sh && sh.classList.contains('aus')
     && window.matchMedia('(min-width: 901px)').matches;
 }
+
+function markenMenuMoeglich() { return kopfleisteAktiv(); }
+
+// ── Die Glocke hat zwei Plaetze (ENT-416)
+// In der Kopfleiste neben dem Logo, sonst wie bisher in der Werkzeugleiste.
+// Verschoben wird DASSELBE Element: Eine zweite Glocke daneben waere eine
+// Kopie, die irgendwann auseinanderlaeuft -- genau so ist der globale
+// Sprechen-Dialog entstanden und ohne Bild-Erkennung stehengeblieben
+// (ENT-107). Der Zaehler, die Klickbehandlung und die ID bleiben dieselben;
+// glockePositionieren() liest die Knopfposition ohnehin bei jedem Oeffnen
+// neu, das Panel folgt also von allein.
+//
+// Auf dem Handy und in den Seitenleisten-Zustaenden bleibt sie in der
+// Werkzeugleiste. Sie in die Leiste zu haengen hiesse dort, sie hinter dem
+// Burger zu verstecken -- eine Benachrichtigung mit Zaehler, die man erst
+// aufklappen muss, ist keine.
+function glockeVerorten() {
+  const glocke = document.querySelector('.glocke-wrap');
+  const marke  = document.querySelector('.side-brand');
+  const leiste = document.querySelector('.tb-rechts');
+  if (!glocke || !marke || !leiste) { return; }
+  const ziel = kopfleisteAktiv() ? marke : leiste;
+  if (glocke.parentElement === ziel) { return; }
+  // Jeweils ganz vorne: in der Kopfleiste links vom Logo, in der
+  // Werkzeugleiste als erstes Symbol (ENT-197).
+  ziel.insertBefore(glocke, ziel.firstChild);
+}
+
+// Der Zustandswechsel laeuft ueber huelleSetzen(); die Fensterbreite kann
+// sich aber auch ohne ihn aendern -- ein gezogenes Fenster ueber die
+// 901-px-Grenze hinweg liesse die Glocke sonst am falschen Platz stehen.
+window.matchMedia('(min-width: 901px)').addEventListener('change', glockeVerorten);
 
 function markenMenuUm(ev) {
   if (ev) { ev.stopPropagation(); }
@@ -9114,6 +9591,7 @@ function huelleSetzen(zustand, merken = true) {
   if (b) { b.title = HUELLE_TITEL[zustand]; b.setAttribute('aria-label', HUELLE_TITEL[zustand]); }
   navGruppenZu();
   markenMenuSchliessen();
+  glockeVerorten();
   topSubZeichnen();
 }
 
