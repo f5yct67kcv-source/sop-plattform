@@ -11,6 +11,17 @@
 <meta name="theme-color" content="#161B27">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CUPI 24">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<!-- Eigenes Manifest (ENT-424), nicht das von index.html: Dort steht
+     start_url "./" -- eine von app.html aus installierte App landete damit
+     auf der Rapport-Erfassung statt in der Mitarbeiter-App. Zwei Seiten,
+     zwei Einstiege, zwei Manifeste; das Regelwerk und die Symbole bleiben
+     dieselben.
+     Gebraucht wird es fuer die Push-Benachrichtigungen: Auf dem iPhone
+     gibt es Web Push ausschliesslich fuer Web-Apps, die ueber
+     "Teilen -> Zum Home-Bildschirm" installiert sind. -->
+<link rel="manifest" href="manifest-app.json">
 <script>
 /* Hell oder dunkel (ENT-398). Muss VOR dem ersten Zeichnen laufen, sonst
    blitzt die helle Fassung kurz auf, bevor die dunkle greift -- dieselbe
@@ -1154,6 +1165,30 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
 .rd-chip-txt span { display: block; font-size: 12.5px; color: var(--ink-2); margin-top: 1px; }
 .rd-chip .chev { flex: none; width: 18px; height: 18px; stroke: var(--ink-3); fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 
+/* ══ BENACHRICHTIGUNGEN (ENT-424) ═════════════════════════════════════
+   Der Schalter in den Einstellungen benutzt den VORHANDENEN .schalter von
+   den Sperrtagen -- ein zweiter Schalter, der anders aussieht als der
+   erste, waere fuer denselben Zweck eine zweite Sprache. Nur die Farbe im
+   Zustand "an" wechselt: Dort steht Orange fuer "gesperrt", hier waere es
+   eine Warnung ohne Anlass. */
+.schalter.blau.an { background: var(--accent); }
+/* Nicht bedienbar (kein Push moeglich, Server nicht eingerichtet, im
+   Browser abgelehnt): gedaempft -- und die Zeile sagt darunter, WARUM.
+   Ein ausgegrauter Schalter ohne Begruendung ist die schlechteste
+   Auskunft von allen. */
+.einst-zeile[aria-disabled="true"] { cursor: default; }
+.einst-zeile[aria-disabled="true"] .schalter { opacity: .45; }
+.einst-zeile[aria-disabled="true"]:active { background: none; }
+
+/* Die Anleitung fuers iPhone. Steht nur da, wenn sie tatsaechlich noetig
+   ist -- eine dauerhaft sichtbare Anleitung fuer etwas, das schon erledigt
+   ist, liest niemand mehr. */
+.push-hinweis { font-size: 12.5px; color: var(--ink-2); line-height: 1.55;
+  background: var(--accent-soft); border: 1px solid var(--accent-line);
+  border-radius: var(--r-sm); padding: 12px 14px; margin: 10px 2px 0; }
+.push-hinweis b { display: block; margin-bottom: 4px; color: var(--ink); }
+.push-hinweis ol { margin: 6px 0 0 18px; padding: 0; }
+.push-hinweis li { margin-bottom: 3px; }
 /* ══ MITTEILUNGEN (ENT-421) ═══════════════════════════════════════════
    Glocke in der Kopfzeile statt eines sechsten Reiters. Vom Projektinhaber
    so entschieden: *"die Leute kennen dies von Social Media bereits ... wenn
@@ -1489,6 +1524,33 @@ const W = {
     mitFehlerText: 'Die Verbindung kam nicht zustande. Ob Mitteilungen vorliegen, ist gerade unbekannt — bitte später erneut versuchen.',
     mitWichtig: 'Wichtig', mitRevier: 'Revier', mitNeu: 'Neu',
     mitDlgLabel: 'Wichtige Mitteilung', mitVerstanden: 'Verstanden',
+
+    // ── Benachrichtigungen (ENT-424).
+    // SECHS Zustaende, sechs verschiedene Saetze. Sie duerfen nie gleich
+    // aussehen (CLAUDE.md): "geht auf diesem Geraet nicht", "auf dem
+    // Server nicht eingerichtet", "im Browser abgelehnt", "ausgeschaltet",
+    // "eingeschaltet" und "Zustand unbekannt" sind sechs verschiedene
+    // Sachverhalte -- und nur bei einem davon hilft es, den Schalter
+    // umzulegen.
+    push: 'Benachrichtigungen',
+    pushAn: 'Eingeschaltet — neue Mitteilungen melden sich auf diesem Gerät.',
+    pushAus: 'Ausgeschaltet — du siehst neue Mitteilungen erst beim Öffnen der App.',
+    pushUnmoeglich: 'Auf diesem Gerät nicht möglich.',
+    pushIosTab: 'Im Safari-Tab gibt es keine Benachrichtigungen. Dafür muss die App auf dem Home-Bildschirm liegen.',
+    pushServerFehlt: 'Auf dem Server noch nicht eingerichtet — das erledigt die Verwaltung einmalig.',
+    pushAbgelehnt: 'Im Browser abgelehnt. Wieder erlauben geht nur in den Geräte-Einstellungen, nicht hier.',
+    pushUnbekannt: 'Zustand unbekannt — die Verbindung kam nicht zustande.',
+    pushWirdGeschaltet: 'Einen Moment …',
+    pushFehlgeschlagen: 'Das Einschalten hat nicht geklappt.',
+    pushAbgebrochen: 'Ohne Erlaubnis geht es nicht.',
+    pushEingeschaltet: 'Benachrichtigungen eingeschaltet.',
+    pushAusgeschaltet: 'Benachrichtigungen ausgeschaltet.',
+    pushMehrereGeraete: 'Auf {n} weiteren Geräten eingeschaltet.',
+    pushIosTitel: 'So geht es auf dem iPhone',
+    pushIosS1: 'Unten in der Leiste auf „Teilen" tippen',
+    pushIosS2: '„Zum Home-Bildschirm" wählen',
+    pushIosS3: 'Die App vom Home-Bildschirm aus öffnen',
+    pushIosS4: 'Hier zurückkommen und den Schalter umlegen',
     mitVon: 'von', mitBestaetigt: 'Bestätigt am',
     mitLaeuftAb: 'Sichtbar bis',
     waechterUebersichtTitel: 'Rundgänge',
@@ -1881,6 +1943,21 @@ let mitDlgId = null;
 // Zeigt die Seite gerade nur die Revier-Mitteilungen? Gesetzt beim Einstieg
 // ueber die Waechter-Kachel, nicht beim Einstieg ueber die Glocke.
 let mitNurRevier = false;
+
+// ── Benachrichtigungen (ENT-424).
+// pushStand ist bewusst KEIN Boolean: Es gibt sechs Zustaende, und fuenf
+// davon duerfen nicht wie "ausgeschaltet" aussehen (CLAUDE.md).
+//   'unbekannt'  vor dem ersten Abruf oder wenn er scheiterte
+//   'unmoeglich' dieser Browser kann kein Push (iPhone im Safari-Tab)
+//   'server'     auf dem Server nicht eingerichtet
+//   'abgelehnt'  im Browser abgelehnt -- der Schalter hilft hier nicht
+//   'aus'        moeglich, aber kein Abo auf diesem Geraet
+//   'an'         Abo vorhanden
+let pushStand = 'unbekannt';
+let pushSchluessel = null;    // oeffentlicher VAPID-Schluessel vom Server
+let pushGeraete = 0;          // wie viele Geraete hat diese Person insgesamt
+let pushSchaltet = false;     // waehrend des Umschaltens
+let swReg = null;             // die Service-Worker-Registrierung
 // Die frühere Monatssumme aus den Rapporten ist entfallen (ENT-049): der
 // Rapport kennt die tatsächliche Pausenabrechnung noch nicht, die entsteht
 // erst im Abgleich. Zwei Stundenzahlen für denselben Monat wären für
@@ -2060,6 +2137,13 @@ function starten() {
   // Meldung noch Eintraege in localStorage, wird jetzt ein Sendeversuch
   // unternommen (ENT-132 Punkt 5).
   rdWarteschlangeSenden();
+  // Den Service Worker registrieren (ENT-424). Er traegt die
+  // Benachrichtigungen und macht die App auf Android installierbar.
+  // Bewusst OHNE Erlaubnisfrage: Die kommt erst, wenn jemand den Schalter
+  // in den Einstellungen umlegt. Ein Erlaubnisfenster beim Start wird
+  // reflexartig weggeklickt -- und "abgelehnt" laesst sich in der App
+  // nicht mehr zurueckholen.
+  swSicherstellen();
   // Der Aufkleber im Fahrzeug (ENT-340) fuehrt auf app.html?fz=<Kennung>.
   // Bewusst die normale Kamera-App des Telefons als Scanner: Sie kann jedes
   // Geraet, sie oeffnet die Adresse selbst, und ein eigener Scanner im
@@ -2082,7 +2166,7 @@ function allesLaden() {
   const heute = new Date();
   $('kDatum').textContent = WOCHENTAG[heute.getDay()] + ', ' + dmy(isoTag(heute));
   return Promise.all([ladeSchichten(), ladeProfil(), ladeRapporte(), ladeSperren(),
-                      ladeAbwesenheiten(), ladeMitteilungen()])
+                      ladeAbwesenheiten(), ladeMitteilungen(), pushZustandLaden()])
     .then(() => {
       b.disabled = false; waechterTabAktualisieren(); zeichne();
       // Erst NACH dem Zeichnen: Das Fenster legt sich ueber die fertige
@@ -2619,6 +2703,269 @@ function fzuKachelHinweisZeigen() {
     ziel.insertAdjacentHTML('beforeend', `<span class="mk-kachel-sub">${esc(w('fzuKachelAktiv')
       .replace('{kennzeichen}', data.mein_aktives_fahrzeug.kennzeichen || ''))}</span>`);
   });
+}
+
+/* ══ BENACHRICHTIGUNGEN (ENT-424) ══════════════════════════════════════
+   Fortsetzung von ENT-421. Dort endete die Kette beim Oeffnen der App:
+   Wer nicht hineinsah, erfuhr nichts. Jetzt meldet sich das Geraet.
+
+   WEB PUSH, NICHT NATIV. Die offiziellen Apps warten auf die
+   Store-Freigabe; bis dahin ist das der einzige Weg ohne Apple-/Google-
+   Freigabe. Vom Projektinhaber so entschieden ("jetzt bauen, Aufruf an die
+   Belegschaft spaeter").
+
+   DIE HARTE GRENZE, und sie wird der Person auch gesagt: Auf dem iPhone
+   gibt es Web Push ausschliesslich fuer Web-Apps, die ueber
+   "Teilen -> Zum Home-Bildschirm" installiert sind. Im Safari-Tab gibt es
+   ihn nicht -- unabhaengig von jeder Erlaubnis. Android kann es auch im
+   Browser.
+
+   SECHS ZUSTAENDE, SECHS SAETZE. Ein ausgegrauter Schalter ohne
+   Begruendung ist die schlechteste Auskunft von allen; "geht hier nicht",
+   "nicht eingerichtet", "abgelehnt" und "aus" verlangen vier verschiedene
+   Handlungen. */
+
+// Kann dieser Browser ueberhaupt Push? Drei Dinge muessen da sein --
+// fehlt eines, gibt es keinen Weg, und das ist eine Eigenschaft des
+// Geraets, keine Einstellung.
+function pushMoeglichHier() {
+  return typeof navigator !== 'undefined' && 'serviceWorker' in navigator
+      && typeof window !== 'undefined' && 'PushManager' in window
+      && 'Notification' in window;
+}
+
+// Laeuft die App vom Home-Bildschirm (installiert) oder im Browser-Tab?
+// Auf dem iPhone entscheidet genau das darueber, ob Push moeglich ist.
+function appInstalliert() {
+  try {
+    return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
+        || navigator.standalone === true;
+  } catch (e) { return false; }
+}
+
+function istApple() {
+  const ua = navigator.userAgent || '';
+  // iPadOS meldet sich seit Jahren als Macintosh -- der Zusatz mit dem
+  // Bildschirmkontakt trennt ein iPad von einem echten Mac.
+  return /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+}
+
+/* Der Zustand aus den vier Angaben, die ihn bestimmen -- als REINE
+   Funktion, ohne Browser und ohne Netz.
+
+   Warum getrennt: So laesst sich jeder der sechs Zustaende pruefen, ohne
+   einen echten Push-Dienst, ein echtes iPhone und eine echte Erlaubnis zu
+   haben. Die Oberflaeche zeichnet nur, was hier herauskommt. */
+function pushZustandBestimmen(a) {
+  if (!a.abrufOk) { return 'unbekannt'; }
+  if (!a.moeglich) { return 'unmoeglich'; }
+  if (!a.serverEingerichtet) { return 'server'; }
+  // Die Ablehnung steht VOR dem Abo: Wer die Erlaubnis entzogen hat,
+  // dessen altes Abo ist wertlos -- "eingeschaltet" waere dann falsch.
+  if (a.erlaubnis === 'denied') { return 'abgelehnt'; }
+  return a.aboDa ? 'an' : 'aus';
+}
+
+// Den Service Worker registrieren. Ohne ihn gibt es weder Push noch die
+// Installierbarkeit. Scheitert es (etwa weil die Seite als Datei geoeffnet
+// wurde), ist das kein Fehler, sondern der Zustand "hier nicht moeglich".
+function swSicherstellen() {
+  if (swReg) { return Promise.resolve(swReg); }
+  if (!pushMoeglichHier()) { return Promise.resolve(null); }
+  return navigator.serviceWorker.register('sw.js')
+    .then(r => { swReg = r; return r; })
+    .catch(() => null);
+}
+
+// Das Abo dieses Geraets, sofern eines besteht.
+function pushAboHolen() {
+  return swSicherstellen()
+    .then(r => (r && r.pushManager) ? r.pushManager.getSubscription() : null)
+    .catch(() => null);
+}
+
+/* Den Zustand vom Server holen und mit dem des Geraets zusammenlegen.
+
+   Der Server ist gefragt, weil nur er weiss, ob ueberhaupt ein Schluessel
+   hinterlegt ist -- und weil ein Abo, das der Browser noch kennt, dort
+   laengst abgemeldet sein kann (der Push-Dienst hatte es abgewiesen). Der
+   Browser ist gefragt, weil nur er die Erlaubnis kennt. Keines von beiden
+   allein ergibt die Wahrheit. */
+function pushZustandLaden() {
+  const moeglich = pushMoeglichHier();
+  return pushAboHolen().then(abo => {
+    const endpunkt = abo ? abo.endpoint : '';
+    return api('push_einrichtung.php' + (endpunkt ? '?endpunkt=' + encodeURIComponent(endpunkt) : ''))
+      .then(({ ok, data }) => {
+        const abrufOk = !!(ok && data && data.status === 'ok');
+        pushSchluessel = abrufOk ? (data.schluessel || null) : null;
+        pushGeraete = abrufOk ? (data.geraete || 0) : 0;
+        pushStand = pushZustandBestimmen({
+          abrufOk,
+          moeglich,
+          serverEingerichtet: abrufOk && !!data.eingerichtet,
+          erlaubnis: (typeof Notification !== 'undefined') ? Notification.permission : 'default',
+          // BEIDE muessen es kennen: Der Browser hat ein Abo UND der
+          // Server fuehrt es. Kennt nur der Browser es, ist es serverseitig
+          // abgemeldet worden und es kaeme nie etwas an -- "eingeschaltet"
+          // waere dann eine Falschauskunft.
+          aboDa: !!abo && abrufOk && !!data.dieses_geraet,
+        });
+      });
+  });
+}
+
+// Der base64url-Schluessel des Servers als Bytefolge -- so verlangt es
+// `applicationServerKey`.
+function pushSchluesselBytes(b64) {
+  const rest = '='.repeat((4 - b64.length % 4) % 4);
+  const roh = atob((b64 + rest).replace(/-/g, '+').replace(/_/g, '/'));
+  const bytes = new Uint8Array(roh.length);
+  for (let i = 0; i < roh.length; i++) { bytes[i] = roh.charCodeAt(i); }
+  return bytes;
+}
+
+function pushB64(buffer) {
+  return btoa(String.fromCharCode.apply(null, new Uint8Array(buffer)))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+/* Ein- oder ausschalten.
+
+   Die Erlaubnis wird NUR auf Tippen angefragt, nie von selbst. Ein
+   Erlaubnisfenster, das ungefragt beim Start erscheint, wird reflexartig
+   weggeklickt -- und danach steht der Zustand auf "abgelehnt", der sich
+   in der App nicht mehr zurueckholen laesst. */
+function pushUmschalten() {
+  if (pushSchaltet) { return; }
+  // In den vier nicht bedienbaren Zustaenden tut der Schalter NICHTS --
+  // die Zeile darunter sagt bereits, warum, und ein Klick, der nichts
+  // bewirkt und nichts sagt, sieht wie ein Fehler aus.
+  if (pushStand !== 'an' && pushStand !== 'aus') { return; }
+  pushSchaltet = true;
+  zeichneMenu();
+  const fertig = (meldung) => {
+    pushSchaltet = false;
+    if (meldung) { toast(meldung); }
+    return pushZustandLaden().then(() => zeichneMenu());
+  };
+
+  if (pushStand === 'an') {
+    return pushAboHolen().then(abo => {
+      const endpunkt = abo ? abo.endpoint : '';
+      // Erst beim Server abmelden, dann im Browser: Andersherum bliebe bei
+      // einem Netzfehler ein Servereintrag ohne Gegenstueck stehen, und
+      // die Person bekaeme weiter Benachrichtigungen, die sie abbestellt hat.
+      return api('push_einrichtung.php', { method: 'POST', body: { aus: true, endpunkt } })
+        .then(() => (abo ? abo.unsubscribe().catch(() => {}) : null))
+        .then(() => fertig(w('pushAusgeschaltet')));
+    });
+  }
+
+  return Notification.requestPermission().then(erlaubnis => {
+    if (erlaubnis !== 'granted') { return fertig(w('pushAbgebrochen')); }
+    if (!pushSchluessel) { return fertig(w('pushServerFehlt')); }
+    return swSicherstellen().then(r => {
+      if (!r) { return fertig(w('pushFehlgeschlagen')); }
+      return r.pushManager.subscribe({
+        // Pflicht: Ohne diese Angabe lehnt Chrome das Abo ab. Sie
+        // bedeutet, dass jede Zustellung sichtbar sein muss -- genau das
+        // tut der Service Worker.
+        userVisibleOnly: true,
+        applicationServerKey: pushSchluesselBytes(pushSchluessel),
+      }).then(abo => {
+        const j = abo.toJSON ? abo.toJSON() : {};
+        return api('push_einrichtung.php', { method: 'POST', body: {
+          endpunkt: abo.endpoint,
+          kanal: 'webpush',
+          p256dh: (j.keys && j.keys.p256dh) || pushB64(abo.getKey ? abo.getKey('p256dh') : new ArrayBuffer(0)),
+          auth: (j.keys && j.keys.auth) || pushB64(abo.getKey ? abo.getKey('auth') : new ArrayBuffer(0)),
+          geraet: pushGeraeteName(),
+        } }).then(({ ok, data }) => {
+          if (!ok || !data || data.status !== 'ok') {
+            // Der Server hat es nicht angenommen -- dann darf auch im
+            // Browser kein Abo stehenbleiben, sonst zeigt die App
+            // "eingeschaltet" und es kommt trotzdem nie etwas an.
+            return abo.unsubscribe().catch(() => {})
+              .then(() => fertig((data && data.message) || w('pushFehlgeschlagen')));
+          }
+          return fertig(w('pushEingeschaltet'));
+        });
+      }).catch(() => fertig(w('pushFehlgeschlagen')));
+    });
+  }).catch(() => fertig(w('pushFehlgeschlagen')));
+}
+
+/* Eine kurze, grobe Geraetebezeichnung fuer die Verwaltung -- damit dort
+   nicht nur eine Nummer steht.
+
+   BEWUSST NICHT die vollstaendige Browserkennung: Die ist ein
+   Wiedererkennungsmerkmal und wird fuer den Zweck ("welches meiner
+   Geraete ist das?") nicht gebraucht. */
+function pushGeraeteName() {
+  const ua = navigator.userAgent || '';
+  const art = /iPhone/.test(ua) ? 'iPhone'
+            : /iPad/.test(ua) ? 'iPad'
+            : /Android/.test(ua) ? 'Android'
+            : /Macintosh/.test(ua) ? 'Mac'
+            : /Windows/.test(ua) ? 'Windows' : 'Gerät';
+  return art + (appInstalliert() ? ' (App)' : ' (Browser)');
+}
+
+// Der erklaerende Satz zum aktuellen Zustand. Getrennt vom Zeichnen,
+// damit sich jeder Zustand einzeln pruefen laesst.
+function pushSatz() {
+  if (pushSchaltet) { return w('pushWirdGeschaltet'); }
+  if (pushStand === 'an') {
+    // "Auf 2 weiteren Geraeten" -- eine Zahl ohne Bezug saehe aus wie die
+    // Gesamtzahl. Das eigene Geraet zaehlt nicht mit, es steht ja hier.
+    const weitere = Math.max(0, pushGeraete - 1);
+    return w('pushAn') + (weitere > 0
+      ? ' ' + w('pushMehrereGeraete').replace('{n}', String(weitere)) : '');
+  }
+  if (pushStand === 'aus') { return w('pushAus'); }
+  if (pushStand === 'server') { return w('pushServerFehlt'); }
+  if (pushStand === 'abgelehnt') { return w('pushAbgelehnt'); }
+  if (pushStand === 'unmoeglich') {
+    // Auf dem iPhone ist "geht hier nicht" kein Endpunkt, sondern eine
+    // Anleitung -- darum ein eigener Satz statt des allgemeinen.
+    return istApple() && !appInstalliert() ? w('pushIosTab') : w('pushUnmoeglich');
+  }
+  return w('pushUnbekannt');
+}
+
+// Der Block fuer die Einstellungen. Wird von zeichneMenu() eingesetzt.
+function pushBlock() {
+  const an = pushStand === 'an';
+  const bedienbar = !pushSchaltet && (pushStand === 'an' || pushStand === 'aus');
+  // Die Anleitung erscheint NUR, wenn sie tatsaechlich hilft: auf einem
+  // Apple-Geraet, das noch nicht installiert ist. Auf Android waere sie
+  // schlicht falsch, und auf einem bereits installierten iPhone waere sie
+  // eine Aufforderung zu etwas Erledigtem.
+  const anleitung = pushStand === 'unmoeglich' && istApple() && !appInstalliert();
+  return `
+    <div class="titel">${esc(w('push'))}</div>
+    <div class="karte"><div class="karte-bd" style="padding:0">
+      <button type="button" class="einst-zeile" id="btnPush" role="switch"
+              aria-checked="${an ? 'true' : 'false'}"
+              aria-disabled="${bedienbar ? 'false' : 'true'}"
+              onclick="pushUmschalten()">
+        <span class="einst-txt">
+          <b>${esc(w('push'))}</b>
+          <span id="pushSatz">${esc(pushSatz())}</span>
+        </span>
+        <span class="schalter blau${an ? ' an' : ''}" aria-hidden="true"><i></i></span>
+      </button>
+    </div></div>
+    ${anleitung ? `<div class="push-hinweis" id="pushAnleitung">
+      <b>${esc(w('pushIosTitel'))}</b>
+      <ol>
+        <li>${esc(w('pushIosS1'))}</li>
+        <li>${esc(w('pushIosS2'))}</li>
+        <li>${esc(w('pushIosS3'))}</li>
+        <li>${esc(w('pushIosS4'))}</li>
+      </ol>
+    </div>` : ''}`;
 }
 
 /* ══ MITTEILUNGEN (ENT-421) ════════════════════════════════════════════
@@ -4309,6 +4656,7 @@ function zeichneMenu() {
         </button>
       </div></div>
       <p style="font-size:12.5px;color:var(--ink-3);line-height:1.5;padding:0 2px">${esc(w('themaRundgangHinweis'))}</p>
+      ${pushBlock()}
     </div>
 
     <div id="pr-stunden" style="display:none">

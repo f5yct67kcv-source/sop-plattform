@@ -9,6 +9,7 @@ declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../rechte.php';
 require_once __DIR__ . '/../mitteilungen.php';
+require_once __DIR__ . '/../push.php';
 
 $user = require_session();
 require_recht($user, 'mitteilungen');
@@ -104,12 +105,44 @@ if ($id > 0) {
     json_response(['status' => 'ok', 'id' => $id, 'angelegt' => false]);
 }
 
+$jetzt = date('Y-m-d H:i:s');
 $st = $pdo->prepare(
     'INSERT INTO mitteilungen
        (titel, text, zielgruppe, stufe, sichtbar_ab, sichtbar_bis, verfasser_id, verfasser_name, erstellt_am)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
 );
 $st->execute([$titel, $text, $zielgruppe, $stufe, $ab, $bis,
-    (int)$user['id'], $verfasser, date('Y-m-d H:i:s')]);
+    (int)$user['id'], $verfasser, $jetzt]);
+$neueId = (int)$pdo->lastInsertId();
 
-json_response(['status' => 'ok', 'id' => (int)$pdo->lastInsertId(), 'angelegt' => true]);
+// ── Benachrichtigung (ENT-424)
+// NUR beim Anlegen, nicht beim Aendern: Eine korrigierte Schreibweise darf
+// nicht ein zweites Mal das Telefon klingeln lassen. Und NUR, wenn die
+// Mitteilung jetzt schon sichtbar ist -- eine vorbereitete holt der
+// Nachzuegler-Versand ab (api/push_versand.php), sonst klingelte es zu
+// etwas, das in der App noch gar nicht steht.
+//
+// Der Versand haengt am selben Aufruf wie das Speichern. Das ist Absicht:
+// Die Person, die gerade auf "Veroeffentlichen" gedrueckt hat, soll in der
+// Antwort sehen, ob es hinausging. Ein misslungener Versand darf das
+// Speichern aber NICHT zuruecknehmen -- die Mitteilung steht dann in der
+// App, nur ohne Klingeln, und das ist der bessere der beiden Fehler.
+$bilanz = null;
+if (push_konfiguriert() && hat_tabelle($pdo, 'push_abo')
+    && mitteilung_sichtbar_fuer(
+        ['archiviert_am' => null, 'zielgruppe' => $zielgruppe,
+         'sichtbar_ab' => $ab, 'sichtbar_bis' => $bis], true, $jetzt)) {
+    try {
+        $bilanz = push_fuer_mitteilung($pdo, [
+            'zielgruppe' => $zielgruppe, 'stufe' => $stufe, 'verfasser_id' => (int)$user['id'],
+        ], $jetzt);
+        push_mitteilung_vermerken($pdo, $neueId, $bilanz, $jetzt);
+    } catch (Throwable $e) {
+        // Bewusst verschluckt und NICHT als Fehler zurueckgegeben: siehe
+        // oben. Die Mitteilung bleibt gespeichert; push_gesendet_am bleibt
+        // leer, damit der Nachzuegler-Lauf es erneut versucht.
+        $bilanz = null;
+    }
+}
+
+json_response(['status' => 'ok', 'id' => $neueId, 'angelegt' => true, 'push' => $bilanz]);

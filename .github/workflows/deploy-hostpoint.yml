@@ -95,6 +95,18 @@ jobs:
           S_ANTHROPIC_API_KEY: ${{ secrets.STAGING_ANTHROPIC_API_KEY }}
           S_MAPS_JS_KEY: ${{ secrets.STAGING_MAPS_JS_KEY }}
           S_STAGING_TESTMAIL: ${{ secrets.STAGING_TESTMAIL }}
+          # Push-Benachrichtigungen (ENT-424). Eigene, von den
+          # Production-Namen VERSCHIEDENE Secret-Namen fuer Staging -- kein
+          # struktureller Rueckfall moeglich (ENT-343 Punkt 1). Und
+          # ausdruecklich EIGENE WERTE: Ein Schluessel, den sich Staging und
+          # Produktion teilen, hiesse, dass ein Testversand auf den echten
+          # Telefonen klingelt.
+          P_VAPID_PRIVATE_PEM_B64: ${{ secrets.VAPID_PRIVATE_PEM_B64 }}
+          P_VAPID_KONTAKT: ${{ secrets.VAPID_KONTAKT }}
+          P_PUSH_CRON_SCHLUESSEL: ${{ secrets.PUSH_CRON_SCHLUESSEL }}
+          S_VAPID_PRIVATE_PEM_B64: ${{ secrets.STAGING_VAPID_PRIVATE_PEM_B64 }}
+          S_VAPID_KONTAKT: ${{ secrets.STAGING_VAPID_KONTAKT }}
+          S_PUSH_CRON_SCHLUESSEL: ${{ secrets.STAGING_PUSH_CRON_SCHLUESSEL }}
         run: |
           set -euo pipefail
 
@@ -111,6 +123,9 @@ jobs:
             EFF_SMTP_ABSENDER="$P_SMTP_ABSENDER"; EFF_SMTP_ABSENDER_NAME="$P_SMTP_ABSENDER_NAME"
             EFF_ANTHROPIC_API_KEY="$P_ANTHROPIC_API_KEY"; EFF_MAPS_JS_KEY="$P_MAPS_JS_KEY"
             EFF_STAGING_TESTMAIL=""
+            EFF_VAPID_PRIVATE_PEM_B64="$P_VAPID_PRIVATE_PEM_B64"
+            EFF_VAPID_KONTAKT="$P_VAPID_KONTAKT"
+            EFF_PUSH_CRON_SCHLUESSEL="$P_PUSH_CRON_SCHLUESSEL"
 
             PFLICHT_FEHLT=""
             [ -z "$EFF_DB_HOST" ]                && PFLICHT_FEHLT="$PFLICHT_FEHLT DB_HOST"
@@ -134,6 +149,9 @@ jobs:
             EFF_SMTP_ABSENDER="$S_SMTP_ABSENDER"; EFF_SMTP_ABSENDER_NAME="$S_SMTP_ABSENDER_NAME"
             EFF_ANTHROPIC_API_KEY="$S_ANTHROPIC_API_KEY"; EFF_MAPS_JS_KEY="$S_MAPS_JS_KEY"
             EFF_STAGING_TESTMAIL="$S_STAGING_TESTMAIL"
+            EFF_VAPID_PRIVATE_PEM_B64="$S_VAPID_PRIVATE_PEM_B64"
+            EFF_VAPID_KONTAKT="$S_VAPID_KONTAKT"
+            EFF_PUSH_CRON_SCHLUESSEL="$S_PUSH_CRON_SCHLUESSEL"
 
             PFLICHT_FEHLT=""
             [ -z "$EFF_DB_HOST" ]                && PFLICHT_FEHLT="$PFLICHT_FEHLT STAGING_DB_HOST"
@@ -281,6 +299,7 @@ jobs:
           # Maps wird per <script src="https://maps.googleapis.com/..."> in
           # dashboard.html selbst geladen, kein lokaler Kopiervorgang noetig.
           cp manifest.json dist/manifest.json
+          cp manifest-app.json dist/manifest-app.json
           cp sw.js dist/sw.js
           cp icons/*.png dist/icons/
           # Inter wird seit ENT-223/OP-224 selbst ausgeliefert statt von
@@ -328,6 +347,7 @@ jobs:
           cp backend/mailer.php dist/mailer.php
           cp backend/ferien.php dist/ferien.php
           cp backend/mitteilungen.php dist/mitteilungen.php
+          cp backend/push.php dist/push.php
           # Schutzeinstellungen (ENT-075). Im Repository heisst die Datei
           # bewusst ohne fuehrenden Punkt -- sonst uebersieht man sie. Wird
           # trotzdem fuer BEIDE Umgebungen hier erzeugt (auch wenn der
@@ -392,6 +412,21 @@ jobs:
           # Google-Maps-Browserschluessel (ENT-341): eigener Schluessel je
           # Umgebung, in BEIDEN Oberflaechen, die die Karte laden.
           sed -i "s|__MAPS_JS_KEY__|$EFF_MAPS_JS_KEY|g" dist/dashboard.html
+          # Push-Benachrichtigungen (ENT-424). Wie bei SMTP bewusst NICHT
+          # erforderlich: Bleiben die Secrets ungesetzt, steht weiterhin
+          # woertlich "__VAPID_PRIVATE_PEM_B64__" in dist/push.php --
+          # push_konfiguriert() erkennt das und meldet "nicht eingerichtet",
+          # statt mit einem Platzhalter als Schluessel zu signieren.
+          # VAPID_PRIVATE_PEM_B64 ist base64 der PEM-Datei des privaten
+          # P-256-Schluessels, EINZEILIG (base64 -w0) -- sed vertraegt
+          # keine Zeilenumbrueche im Ersatzwert.
+          sed -i "s|__VAPID_PRIVATE_PEM_B64__|$EFF_VAPID_PRIVATE_PEM_B64|g" dist/push.php
+          sed -i "s|__VAPID_KONTAKT__|$EFF_VAPID_KONTAKT|g" dist/push.php
+          # Der Schluessel fuer den Zeitgeber-Aufruf (Hostpoint-Cronjob).
+          # Ohne ihn bleibt dieser Weg zu; der Versand laeuft dann nur beim
+          # Veroeffentlichen und beilaeufig beim Oeffnen der
+          # Mitteilungsseite im Cockpit.
+          sed -i "s|__PUSH_CRON_SCHLUESSEL__|$EFF_PUSH_CRON_SCHLUESSEL|g" dist/api/push_versand.php
           sed -i "s|__MAPS_JS_KEY__|$EFF_MAPS_JS_KEY|g" dist/app.html
 
       - name: Nach Hostpoint hochladen (FTPS)

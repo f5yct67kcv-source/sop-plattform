@@ -337,6 +337,7 @@ for (const [datei, titel] of [
   ['pruef_revierdienst_berechtigung.php', 'KRITISCH: die Weichen von ohneRevierdienstBerechtigung() stimmen (ENT-284)'],
   ['pruef_aufgaben.php', 'KRITISCH: eine fremde oder entfernte Aufgabe laesst sich nicht an einen Kontrollpunkt haengen (ENT-302)'],
   ['pruef_mitteilungen.php', 'KRITISCH: Sichtbarkeit und Lesestand der Mitteilungen stimmen -- SQL und PHP sagen dasselbe (ENT-421)'],
+  ['pruef_push.php', 'KRITISCH: die VAPID-Signatur haelt der Gegenpruefung stand und ein toter Endpunkt wird abgemeldet (ENT-424)'],
 ]) {
   let aus = '', code = 0;
   try {
@@ -593,6 +594,15 @@ const NUR_EIGENE_DATEN = [
   // am Recht 'mitteilungen' -- mitteilung_list/save/archivieren.php stehen
   // darum bewusst NICHT hier.
   'meine_mitteilungen.php',
+  // Benachrichtigungen ein- und ausschalten (ENT-424). Kein Recht: JEDE
+  // angemeldete Person darf ihre eigenen Geraete anmelden. Die
+  // mitarbeiter_id stammt ausnahmslos aus der Sitzung, und auch das
+  // Abmelden sucht das Abo nur innerhalb der eigenen Person -- mit einem
+  // fremden Endpunkt laesst sich niemandem die Benachrichtigung
+  // abstellen. Der VERSAND (push_versand.php) haengt dagegen am Recht
+  // 'mitteilungen' oder am Zeitgeber-Schluessel und steht darum bewusst
+  // NICHT hier.
+  'push_einrichtung.php',
 ];
 const ohnePruefung = apiDateien.filter(f => {
   const q = ohneKommentar(f);

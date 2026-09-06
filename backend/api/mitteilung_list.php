@@ -10,6 +10,7 @@ declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../rechte.php';
 require_once __DIR__ . '/../mitteilungen.php';
+require_once __DIR__ . '/../push.php';
 
 $user = require_session();
 require_recht($user, 'mitteilungen');
@@ -22,6 +23,27 @@ if (!hat_tabelle($pdo, 'mitteilungen')) {
 }
 
 $jetzt = date('Y-m-d H:i:s');
+
+// Nachzuegler-Versand als Rueckfall (ENT-424): Eine vorbereitete Mitteilung,
+// deren Zeitpunkt inzwischen erreicht ist, hat beim Speichern noch nichts
+// ausgeloest. Verlaesslich holt das der Zeitgeber nach (api/push_versand.php);
+// wo keiner eingerichtet ist, geschieht es hier -- beim Oeffnen der
+// Mitteilungsseite im Cockpit.
+//
+// BEWUSST HIER und nicht in meine_mitteilungen.php: Dort wartete jemand
+// draussen beim Oeffnen der App darauf, dass sein Telefon dreissig
+// Push-Dienste anschreibt.
+if (push_konfiguriert() && hat_tabelle($pdo, 'push_abo')) {
+    try {
+        foreach (push_faellige_mitteilungen($pdo, $jetzt) as $f) {
+            push_mitteilung_vermerken($pdo, (int)$f['id'],
+                push_fuer_mitteilung($pdo, $f, $jetzt), $jetzt);
+        }
+    } catch (Throwable $e) {
+        // Eine Stoerung beim Versand darf die Liste nicht verhindern --
+        // sie ist der Zweck dieses Endpunkts, der Versand die Zugabe.
+    }
+}
 
 // Nur die Nummer? Dann mit den Namen derer, die gelesen haben. Bewusst ein
 // eigener Zweig statt Namen an jeder Zeile der Liste: Bei 40 Mitteilungen
@@ -45,7 +67,8 @@ $st = $pdo->query(
             m.sichtbar_ab, m.sichtbar_bis, m.erstellt_am, m.archiviert_am,
             m.verfasser_name,
             (SELECT COUNT(*) FROM mitteilung_gelesen g WHERE g.mitteilung_id = m.id) AS gelesen_anzahl,
-            (SELECT COUNT(*) FROM mitteilung_gelesen g WHERE g.mitteilung_id = m.id AND g.bestaetigt_am IS NOT NULL) AS bestaetigt_anzahl
+            (SELECT COUNT(*) FROM mitteilung_gelesen g WHERE g.mitteilung_id = m.id AND g.bestaetigt_am IS NOT NULL) AS bestaetigt_anzahl,
+            m.push_gesendet_am, m.push_bilanz
        FROM mitteilungen m
       ORDER BY m.erstellt_am DESC, m.id DESC'
 );
@@ -75,7 +98,21 @@ foreach ($liste as &$m) {
         true, $jetzt
     );
     $m['geplant'] = !$m['archiviert'] && $m['sichtbar_ab'] !== null && $m['sichtbar_ab'] > $jetzt;
+    // Der Push-Zustand (ENT-424). Die Bilanz kommt als fertige Zahlen
+    // heraus, nicht als Text -- die Oberflaeche soll sie nicht auseinander-
+    // nehmen muessen. Fehlt sie, ist das "noch nicht verschickt" und NICHT
+    // "an null Geraete verschickt": zwei verschiedene Aussagen.
+    $m['push_bilanz'] = $m['push_bilanz'] !== null
+        ? (json_decode((string)$m['push_bilanz'], true) ?: null) : null;
 }
 unset($m);
 
-json_response(['status' => 'ok', 'eingerichtet' => true, 'mitteilungen' => $liste, 'jetzt' => $jetzt]);
+json_response(['status' => 'ok', 'eingerichtet' => true, 'mitteilungen' => $liste, 'jetzt' => $jetzt,
+    // Damit die Verwaltungsseite den Unterschied zwischen "niemand hat
+    // Benachrichtigungen eingeschaltet" und "Push ist gar nicht
+    // eingerichtet" zeigen kann (ENT-424).
+    'push_eingerichtet' => push_konfiguriert() && hat_tabelle($pdo, 'push_abo'),
+    'push_geraete' => hat_tabelle($pdo, 'push_abo')
+        ? (int)$pdo->query('SELECT COUNT(*) FROM push_abo WHERE abgemeldet_am IS NULL')->fetchColumn()
+        : -1,
+]);

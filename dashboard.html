@@ -5622,6 +5622,7 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
         <div class="mtl-raster">
           <div class="card">
             <div class="card-hd"><h3 id="mtlFormTitel">Neue Mitteilung</h3></div>
+            <div id="mtlPushHinweis"></div>
             <div class="card-bd">
               <div class="f">
                 <label for="mtlTitel">Titel</label>
@@ -12730,6 +12731,12 @@ let mtlStand = 'unbekannt';   // unbekannt | ok | uneingerichtet | fehler
 let mtlBearbeitetId = 0;
 // Welche Leserliste gerade aufgeklappt ist (0 = keine).
 let mtlLeserOffen = 0;
+// Push-Zustand der ganzen Anlage (ENT-424): eingerichtet ja/nein und wie
+// viele Geraete insgesamt eingeschaltet haben. "Niemand hat es
+// eingeschaltet" und "Push ist gar nicht eingerichtet" sind zwei
+// verschiedene Aussagen und bekommen zwei verschiedene Saetze.
+let mtlPushEingerichtet = false;
+let mtlPushGeraete = -1;   // -1 = unbekannt
 
 // Leerzustand in der Hausform (.empty) -- dieselbe Darstellung wie überall
 // sonst im Cockpit, statt einer eigenen Textzeile nur für diese Seite.
@@ -12744,7 +12751,10 @@ function mtlLaden() {
     if (!ok || !data || data.status !== 'ok') { mtlStand = 'fehler'; mtlListe = []; }
     else if (data.eingerichtet === false) { mtlStand = 'uneingerichtet'; mtlListe = []; }
     else { mtlStand = 'ok'; mtlListe = data.mitteilungen || []; }
+    mtlPushEingerichtet = !!(data && data.push_eingerichtet);
+    mtlPushGeraete = (data && typeof data.push_geraete === 'number') ? data.push_geraete : -1;
     mtlZeichnen();
+    mtlPushHinweisZeichnen();
   });
 }
 
@@ -12797,12 +12807,30 @@ function mtlZeichnen() {
     if (m.sichtbar_ab)  { zeit.push('ab ' + dmyZeit(m.sichtbar_ab)); }
     if (m.sichtbar_bis) { zeit.push('bis ' + dmyZeit(m.sichtbar_bis)); }
 
+    // Was die Benachrichtigung tatsächlich getan hat (ENT-424). Vier
+    // verschiedene Sachverhalte, vier verschiedene Sätze -- "nicht
+    // verschickt" darf nie wie "an null Geräte verschickt" aussehen.
+    const pb = m.push_bilanz;
+    let push;
+    if (!mtlPushEingerichtet)        { push = 'Benachrichtigung: nicht eingerichtet'; }
+    else if (m.geplant)              { push = 'Benachrichtigung: folgt, sobald sie sichtbar wird'; }
+    else if (!m.push_gesendet_am)    { push = 'Benachrichtigung: noch nicht verschickt'; }
+    else if (!pb || !pb.geraete)     { push = 'Benachrichtigung: kein Gerät eingeschaltet'; }
+    else {
+      // Zwei Einheiten NICHT vermischt: "Geräte" zählt Abos, nicht
+      // Personen -- eine Person kann Telefon und Tablet haben.
+      push = `Benachrichtigung: ${pb.zugestellt} von ${pb.geraete} Geräten`;
+      if (pb.fehler)  { push += `, ${pb.fehler} fehlgeschlagen`; }
+      if (pb.entfernt) { push += `, ${pb.entfernt} abgemeldet`; }
+    }
+
     return `<div class="mtl-eintrag${m.archiviert ? ' aus' : ''}" data-id="${m.id}">
       <div class="mtl-marken">${marken.join('')}</div>
       <h4>${esc(m.titel)}</h4>
       <div class="mtl-text">${esc(m.text)}</div>
       <div class="mtl-meta">${esc(m.verfasser_name || 'Verfasser unbekannt')} · ${dmyZeit(m.erstellt_am)}${
         zeit.length ? ' · ' + esc(zeit.join(', ')) : ''} · ${esc(gelesen)}${esc(bestaetigt)}</div>
+      <div class="mtl-meta">${esc(push)}</div>
       <div class="mtl-akt">
         <button type="button" class="btn btn-plain btn-sm" onclick="mtlBearbeiten(${m.id})">Bearbeiten</button>
         <button type="button" class="btn btn-plain btn-sm" onclick="mtlLeserUm(${m.id})">Wer hat gelesen</button>
@@ -12844,6 +12872,37 @@ function mtlLeserLaden(id) {
         l.bestaetigt_am ? ' · bestätigt ' + dmyZeit(l.bestaetigt_am) : ''}`;
     }).join('<br>');
   });
+}
+
+/* Der Zustand der Benachrichtigungen, ueber dem Formular (ENT-424).
+
+   Er steht dort und nicht in einer eigenen Ansicht, weil er genau in dem
+   Moment zaehlt, in dem jemand eine Mitteilung schreibt: Wer hier
+   "veroeffentlichen" drueckt, soll wissen, ob dabei ueberhaupt ein Telefon
+   klingelt.
+
+   Drei verschiedene Aussagen, drei verschiedene Saetze -- "nicht
+   eingerichtet", "niemand hat es eingeschaltet" und "n Geraete" sind nicht
+   dasselbe. */
+function mtlPushHinweisZeichnen() {
+  const ziel = $('mtlPushHinweis');
+  if (!ziel) { return; }
+  if (!mtlPushEingerichtet) {
+    ziel.innerHTML = `<div class="card-bd" style="padding-bottom:0">
+      <div class="f-hint" style="margin:0">Benachrichtigungen sind noch nicht eingerichtet —
+      eine neue Mitteilung erscheint nur in der App, das Telefon meldet sich nicht.
+      Dafür fehlt auf dem Server der Push-Schlüssel.</div></div>`;
+    return;
+  }
+  if (mtlPushGeraete <= 0) {
+    ziel.innerHTML = `<div class="card-bd" style="padding-bottom:0">
+      <div class="f-hint" style="margin:0">Noch niemand hat Benachrichtigungen eingeschaltet.
+      Eine neue Mitteilung erscheint vorerst nur in der App.</div></div>`;
+    return;
+  }
+  ziel.innerHTML = `<div class="card-bd" style="padding-bottom:0">
+    <div class="f-hint" style="margin:0">Eine neue Mitteilung meldet sich auf
+    ${mtlPushGeraete} ${mtlPushGeraete === 1 ? 'Gerät' : 'Geräten'}.</div></div>`;
 }
 
 function mtlFormLeeren() {

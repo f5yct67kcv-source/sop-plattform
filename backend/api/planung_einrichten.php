@@ -1331,6 +1331,44 @@ CREATE TABLE IF NOT EXISTS mitteilung_gelesen (
   FOREIGN KEY (mitarbeiter_id) REFERENCES mitarbeiter(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+// Push-Abos je Geraet (ENT-424). Eine Person kann mehrere haben -- Telefon
+// und Tablet sind zwei Geraete und bekommen beide eine Benachrichtigung.
+//
+// endpunkt ist die Adresse, an die der Push-Dienst zustellt. Sie ist lang
+// (bis ueber 500 Zeichen) und je Geraet einmalig -- darum VARCHAR(500) und
+// ein Schluessel nur ueber die ersten 191 Zeichen: Ein UNIQUE ueber die
+// volle Laenge sprengt in utf8mb4 die Indexgrenze von MySQL. Die
+// Eindeutigkeit sichert darum der Endpunkt selbst beim Anlegen
+// (push_einrichtung.php sucht vorher), nicht die Datenbank.
+//
+// p256dh und auth kommen vom Browser mit dem Abo und werden HEUTE NICHT
+// gebraucht -- es wird ohne Nutzlast verschickt (siehe push.php). Sie
+// stehen trotzdem hier: Ohne sie muesste jede Person ihr Abo neu erteilen,
+// falls spaeter doch ein Titel mitgeschickt werden soll.
+//
+// abgemeldet_am statt Loeschen: Wer nachvollziehen will, warum jemand
+// keine Benachrichtigung bekommen hat, braucht den Eintrag noch.
+'push_abo' => "
+CREATE TABLE IF NOT EXISTS push_abo (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  mitarbeiter_id INT NOT NULL,
+  kanal VARCHAR(10) NOT NULL DEFAULT 'webpush',
+  endpunkt VARCHAR(500) NOT NULL,
+  p256dh VARCHAR(200) NULL,
+  auth VARCHAR(100) NULL,
+  geraet VARCHAR(60) NULL,
+  erstellt_am DATETIME NOT NULL,
+  letzter_erfolg DATETIME NULL,
+  letzter_fehler VARCHAR(200) NULL,
+  letzter_fehler_am DATETIME NULL,
+  fehler_zahl INT NOT NULL DEFAULT 0,
+  abgemeldet_am DATETIME NULL,
+  abmeldegrund VARCHAR(100) NULL,
+  KEY idx_person (mitarbeiter_id, abgemeldet_am),
+  KEY idx_endpunkt (endpunkt(191)),
+  FOREIGN KEY (mitarbeiter_id) REFERENCES mitarbeiter(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
 ];
 
 foreach ($tabellen as $name => $sql) {
@@ -1401,6 +1439,15 @@ if (!$nurPruefen && hat_tabelle_jetzt($pdo, 'ereignisart')) {
 
 // ── 2. Spalten nachtragen, falls die erste Fassung schon lief
 $spalten = [
+    // Push-Versand je Mitteilung (ENT-424). push_gesendet_am ist zugleich
+    // die Sperre gegen ein zweites Mal: Ohne sie schickte jeder
+    // Nachzuegler-Lauf dieselbe Meldung erneut. push_bilanz haelt fest,
+    // was tatsaechlich hinausging -- "an 12 Geraete verschickt" darf keine
+    // Behauptung sein.
+    ['mitteilungen', 'push_gesendet_am',
+     'ALTER TABLE mitteilungen ADD COLUMN push_gesendet_am DATETIME NULL AFTER erstellt_am'],
+    ['mitteilungen', 'push_bilanz',
+     'ALTER TABLE mitteilungen ADD COLUMN push_bilanz VARCHAR(200) NULL AFTER push_gesendet_am'],
     ['einsaetze', 'objekt_id',        'ALTER TABLE einsaetze ADD COLUMN objekt_id INT NULL AFTER kunde_name'],
     ['einsaetze', 'masterschicht_id', 'ALTER TABLE einsaetze ADD COLUMN masterschicht_id INT NULL AFTER objekt_id'],
     // ENT-119: Zugehoerigkeit zu einer zusammen angelegten Reihe. NULL heisst

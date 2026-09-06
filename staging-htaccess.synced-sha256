@@ -16,6 +16,6 @@
 # 2. Die geaenderte Datei wie oben beschrieben erneut manuell bei Hostpoint
 #    eintragen (Explorer -> www/staging).
 # 3. Den neuen Hash unten in der passenden Zeile eintragen und committen.
-htaccess-hostpoint:cd069fa5a1e343cc759c693e5592493c62aa4fcc04a148e83b42f4a626e0fede
+htaccess-hostpoint:c0fda3981c8e0a262187aaf71acc7ba3f27aa2d0a3c219ff5d4999857bdab0d2
 htaccess-staging-zusatz:7b6df04b9fd9decbeb68442a6080b3e39c384e31d59273e53f938549c8e26208
 robots-staging.txt:e120f27381f482e2de05b11355c7d1818e8266d282cec8cf04bc8b33916e7583
