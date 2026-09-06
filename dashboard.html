@@ -3805,6 +3805,20 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
    den Fall ab, dass spaeter eine noch laengere Beschriftung dazukommt. */
 .kk-koerper .dl dt { overflow-wrap: anywhere; }
 .kk-tasten { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 13px; }
+
+/* Belegvorschau (ENT-425). Das Blatt behaelt seine Dokumentbreite, der
+   Rahmen bekommt die verkleinerte Hoehe -- siehe Begruendung beim Markup.
+   Das Polster ist auf dem Handy schmaler: 32 px auf jeder Seite waren dort
+   ein Sechstel der Bildschirmbreite. */
+#ofVorschauInhalt { padding: 32px; }
+/* BEWUSST ohne overflow:hidden. Die Hoehe hier wird gerechnet (Blatthoehe mal
+   Massstab); waere sie einmal zu klein -- etwa weil das Logo im Briefkopf
+   beim Messen noch nicht geladen war --, verschwaende ein "hidden" den
+   unteren Teil des Dokuments spurlos. Ohne ihn ist der schlimmste Fall ein
+   zu enger Abstand nach unten, und der faellt auf, statt zu taeuschen. */
+#ofVorschauMass { }
+#ofVorschauBlatt { transform-origin: top left; }
+@media (max-width: 620px) { #ofVorschauInhalt { padding: 12px; } }
 /* Die Knoepfe im Koerper gehoeren zur Karte, nicht zum Aufklappen: Ein
    Klick auf sie darf die Karte nicht gleich wieder zuklappen (jedes
    onclick ruft darum stopPropagation). */
@@ -5720,11 +5734,11 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
               </div>
               <label class="check">
                 <input type="checkbox" id="of_unterschriftsseite">
-                Unterschriftsseite hinzufügen
+                Unterschriftsfelder hinzufügen
               </label>
               <div class="sec" style="margin-top:8px">
-                Fügt dem Ausdruck eine zusätzliche Seite mit Feldern für Ort, Datum und
-                Unterschrift an.
+                Setzt Felder für Ort, Datum und Unterschrift ans Ende des Belegs — auf
+                dieselbe Seite, nicht auf ein eigenes Blatt (ENT-425).
               </div>
             </div></div>
           </div>
@@ -7427,8 +7441,18 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
       <h2>Vorschau</h2>
       <p>So sieht die Offerte für den Kunden aus.</p>
     </div>
+    <!-- Die Vorschau zeigt ein A4-Blatt fester Breite (ofBlatt: 700 px). Auf
+         dem Handy ist der Dialog 390 px breit -- das Blatt lief darum links
+         und rechts aus dem Bild, und man schob ein Dokument hin und her,
+         von dem man nie eine ganze Zeile sah (ENT-425).
+         Ein Dokument wird nicht umbrochen, es wird verkleinert: #ofVorschauBlatt
+         behaelt seine 700 px und wird per transform skaliert, #ofVorschauMass
+         traegt die daraus entstehende Hoehe -- transform aendert das Layout
+         sonst nicht, und unter dem Blatt bliebe ein leerer Streifen. -->
     <div class="dlg-bd" style="background:#F4F5F7">
-      <div id="ofVorschauInhalt" style="background:#fff;padding:32px;border-radius:8px"></div>
+      <div id="ofVorschauInhalt" style="background:#fff;border-radius:8px">
+        <div id="ofVorschauMass"><div id="ofVorschauBlatt"></div></div>
+      </div>
     </div>
     <div class="dlg-ft">
       <button class="btn btn-plain" onclick="closeDlg('dlgOfVorschau')">Schliessen</button>
@@ -12396,6 +12420,89 @@ function ofDateiname(b) {
   return (teil || 'Offerte') + '.pdf';
 }
 
+// ── Ein Blatt zu einem PDF machen, moeglichst auf EINER Seite (ENT-425) ────
+//
+// html2pdf schneidet ein zu hohes Blatt stumpf an der Seitengrenze ab und
+// setzt den Rest auf Seite 2. Bei einer Offerte mit einer einzigen Position
+// landete so der Unterschriftenblock allein auf der zweiten Seite, waehrend
+// die erste halb leer blieb -- vom Projektinhaber beanstandet.
+//
+// Darum: rendern, dann nachsehen, wie viele Seiten daraus geworden sind. Bei
+// mehr als einer wird dasselbe Bild auf eine Seite verkleinert -- aber nur,
+// solange es lesbar bleibt. Wer eine Offerte ueber zwanzig Positionen auf ein
+// A4 presst, macht sie unlesbar; unterhalb von PDF_MIN_MASSSTAB bleibt es
+// darum beim mehrseitigen Satz. "Nach Moeglichkeit auf eine Seite" heisst
+// nicht "um jeden Preis".
+const PDF_RAND = 10;            // mm, auf allen Seiten
+const PDF_MIN_MASSSTAB = 0.62;  // darunter lieber zwei Seiten als eine Lupe
+// A4 hoch in Millimetern. Muss zur jsPDF-Angabe in PDF_OPTIONEN passen
+// (format 'a4', orientation 'portrait'); test_offerten.mjs vergleicht beide
+// gegeneinander, damit die Zahlen nicht auseinanderlaufen.
+const PDF_SEITE = { breite: 210, hoehe: 297 };
+const PDF_OPTIONEN = {
+  margin: PDF_RAND,
+  image: { type: 'jpeg', quality: 0.95 },
+  html2canvas: { scale: 2, useCORS: true },
+  jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+  pagebreak: { mode: ['css', 'legacy'] },
+};
+
+// Ein AUSDRUECKLICH gewollter Seitenumbruch wird nie wegskaliert: Wer im
+// Blatt-HTML einen Umbruch setzt, will zwei Blaetter -- die zweite Seite ist
+// dann kein Fehler, sondern die Bestellung, und Wegskalieren hoebe eine
+// bewusst eingeschaltete Funktion auf. Derzeit setzt kein Blatt einen
+// solchen Umbruch (der Unterschriftsblock tat es bis ENT-425); die Weiche
+// bleibt, damit ein kuenftiger Umbruch nicht stillschweigend verschwindet.
+function blattHatSeitenumbruch(el) {
+  return !!el.querySelector('[style*="page-break-before"], [style*="break-before"], .html2pdf__page-break');
+}
+
+// Ein leeres A4-Blatt, in das sich zeichnen laesst.
+//
+// jsPDF liegt im html2pdf-Bundle NICHT global, und ein zweites Dokument
+// laesst sich auch nicht ueber `pdf.constructor` bauen: der ist schlicht
+// `Object` (gemessen). Genau daran ist der erste Anlauf dieser Funktion
+// gescheitert -- die Verkleinerung warf "Cannot read properties of undefined
+// (reading 'pageSize')" und die Offerte kam wortlos nie an. Ein leeres Blatt
+// entsteht darum ueber html2pdf selbst, aus einem winzigen Quellelement, und
+// wird danach geleert. Die Seiten zu loeschen statt sie zu uebermalen ist
+// Absicht: uebermalte Seiten blieben als unsichtbare Bilder in der Datei --
+// im Versuch 629 KB statt 317 KB.
+function leeresBlattPdf() {
+  const winzig = document.createElement('div');
+  winzig.style.cssText = 'width:10px;height:10px;background:#fff';
+  return html2pdf().set(PDF_OPTIONEN).from(winzig).toPdf().get('pdf').then(pdf => {
+    for (let i = pdf.internal.getNumberOfPages(); i >= 1; i--) { pdf.deletePage(i); }
+    pdf.addPage();
+    return pdf;
+  });
+}
+
+function blattPdfBlob(el) {
+  const arbeit = html2pdf().set(PDF_OPTIONEN).from(el);
+  const gewollt = blattHatSeitenumbruch(el);
+  // Der Canvas entsteht einmal; toPdf() weiter unten zeichnet das Blatt
+  // nicht neu, sondern nimmt genau diesen.
+  return arbeit.toCanvas().get('canvas').then(canvas => {
+    const alsSatz = () => arbeit.toPdf().get('pdf').then(pdf => pdf.output('blob'));
+    if (!canvas || !canvas.width || !canvas.height) { return alsSatz(); }
+    const maxB = PDF_SEITE.breite - 2 * PDF_RAND;
+    const maxH = PDF_SEITE.hoehe - 2 * PDF_RAND;
+    // Wie hoch das Blatt auf voller Seitenbreite waere -- daraus steht schon
+    // fest, ob es auf eine Seite passt. Dafuer muss das mehrseitige PDF gar
+    // nicht erst gebaut werden.
+    const volleHoehe = maxB * canvas.height / canvas.width;
+    const massstab = Math.min(1, maxH / volleHoehe);
+    if (massstab >= 1 || gewollt || massstab < PDF_MIN_MASSSTAB) { return alsSatz(); }
+    const b = maxB * massstab, h = volleHoehe * massstab;
+    return leeresBlattPdf().then(pdf => {
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG',
+        (PDF_SEITE.breite - b) / 2, PDF_RAND, b, h);
+      return pdf.output('blob');
+    });
+  });
+}
+
 function ofPdfBauen(id) {
   return api('beleg_lesen.php?id=' + Number(id)).then(({ ok, data }) => {
     if (!ok || !data || data.status !== 'ok') {
@@ -12403,13 +12510,7 @@ function ofPdfBauen(id) {
     }
     return html2pdfLaden().then(() => {
       $('rapportBlatt').innerHTML = ofBlatt(data.beleg, data.kunde, data.person);
-      return html2pdf().set({
-        margin: 10,
-        image: { type: 'jpeg', quality: 0.95 },
-        html2canvas: { scale: 2, useCORS: true },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['css', 'legacy'] },
-      }).from($('rapportBlatt')).outputPdf('blob').then(blob => ({ blob, beleg: data.beleg }));
+      return blattPdfBlob($('rapportBlatt')).then(blob => ({ blob, beleg: data.beleg }));
     });
   });
 }
@@ -12470,10 +12571,42 @@ function ofVorschau(id) {
     if (!ok || data.status !== 'ok') {
       toast(data.message || 'Der Beleg liess sich nicht laden.'); return;
     }
-    $('ofVorschauInhalt').innerHTML = ofBlatt(data.beleg, data.kunde, data.person);
+    $('ofVorschauBlatt').innerHTML = ofBlatt(data.beleg, data.kunde, data.person);
     openDlg('dlgOfVorschau');
+    // Erst nach dem Oeffnen einpassen: Vorher ist der Dialog verborgen und
+    // clientWidth 0 -- man wuerde durch Null teilen und auf Verdacht
+    // skalieren, statt am gerenderten Zustand zu messen (CLAUDE.md).
+    ofVorschauEinpassen();
+    // Und noch einmal, sobald das Logo des Briefkopfs steht: Vorher ist das
+    // Blatt niedriger, als es sein wird.
+    const bilder = [...$('ofVorschauBlatt').querySelectorAll('img')].filter(i => !i.complete);
+    let offen = bilder.length;
+    bilder.forEach(i => {
+      const fertig = () => { if (--offen <= 0) { ofVorschauEinpassen(); } };
+      i.addEventListener('load', fertig, { once: true });
+      i.addEventListener('error', fertig, { once: true });
+    });
   }).catch(() => toast('Der Beleg liess sich nicht laden.'));
 }
+
+// Das Blatt auf die verfuegbare Breite herunterrechnen. Nie vergroessern:
+// Ein A4-Blatt auf einem breiten Schirm aufzublasen macht es nicht lesbarer,
+// nur ungewohnt.
+const OF_VORSCHAU_BREITE = 700;   // Dokumentbreite aus ofBlatt()
+function ofVorschauEinpassen() {
+  const rahmen = $('ofVorschauInhalt'), mass = $('ofVorschauMass'), blatt = $('ofVorschauBlatt');
+  if (!rahmen || !mass || !blatt || !blatt.firstElementChild) { return; }
+  blatt.style.width = OF_VORSCHAU_BREITE + 'px';
+  const verfuegbar = rahmen.clientWidth - 2 * parseFloat(getComputedStyle(rahmen).paddingLeft || 0);
+  const k = Math.min(1, verfuegbar / OF_VORSCHAU_BREITE);
+  blatt.style.transform = k < 1 ? `scale(${k})` : '';
+  mass.style.height = Math.ceil(blatt.offsetHeight * k) + 'px';
+}
+// Dreht jemand das Geraet, aendert sich die verfuegbare Breite -- dann muss
+// neu gerechnet werden, sonst steht das Blatt schief im Rahmen.
+window.addEventListener('resize', () => {
+  if ($('dlgOfVorschau') && $('dlgOfVorschau').classList.contains('on')) { ofVorschauEinpassen(); }
+});
 
 // Per E-Mail versenden (ENT-192): verschickt keinen PDF-Anhang, sondern einen
 // Link auf eine unangemeldete Web-Ansicht (backend/api/beleg_oeffentlich.php),
@@ -12560,29 +12693,32 @@ function ofBlatt(b, kunde, person) {
         <div style="white-space:pre-line;line-height:1.5">${esc(text)}</div>
       </div>` : '';
 
-  // Zusaetzliche Seite mit Unterschriftsfeldern, nur wenn ausdruecklich
-  // angefordert (of_unterschriftsseite). Der erzwungene Seitenumbruch ist
-  // hier ABSICHT -- im Unterschied zu ENT-179, wo ein UNGEWOLLTER zweiter
-  // Blatt-Rand behoben wurde. Faellt briefkopf.firma leer aus, weil er noch
-  // nicht gepflegt ist, steht dort "Auftragnehmer" statt eines erfundenen
-  // Firmennamens.
+  // Unterschriftsblock, nur wenn ausdruecklich angefordert
+  // (of_unterschriftsseite). Steht seit ENT-425 im normalen Fluss am Ende
+  // des Blattes statt auf einer erzwungenen zweiten Seite -- ein kurzer
+  // Beleg passte sonst allein wegen dieses Blocks nie auf eine Seite. Der
+  // Haken entscheidet seither nur noch, OB der Block erscheint, nicht mehr
+  // WO. `page-break-inside:avoid` haelt ihn zusammen, falls ein langer Beleg
+  // ihn doch auf die naechste Seite schiebt -- eine halbe Unterschriftszeile
+  // am Seitenende waere unbrauchbar.
+  // Kein wiederholter "Offertennummer OF-xxxx"-Titel mehr: die Nummer steht
+  // auf derselben Seite bereits im Kopf. Stattdessen dieselbe Beschriftung
+  // wie bei Notizen und Bedingungen. Faellt briefkopf.firma leer aus, weil er
+  // noch nicht gepflegt ist, steht dort "Auftragnehmer" statt eines
+  // erfundenen Firmennamens.
   const unterschriftsseite = Number(b.unterschriftsseite) ? `
-    <div style="page-break-before:always;break-before:page;padding-top:60px;
-                font-family:-apple-system,Segoe UI,Arial,sans-serif;color:#14161A;
-                max-width:700px;margin:0 auto;font-size:12px">
-      <div style="font-size:15px;font-weight:700;margin-bottom:40px">
-        ${esc(BELEG_TITEL_FELD[b.art] || 'Offertennummer')} ${esc(b.nummer)}
-      </div>
-      <div style="color:#6B7280;margin-bottom:60px">Ort, Datum</div>
-      <div style="border-bottom:1px solid #14161A;width:260px;margin-bottom:60px"></div>
+    <div style="margin-top:34px;page-break-inside:avoid;break-inside:avoid">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#6B7280;margin-bottom:18px">Unterschriften</div>
+      <div style="color:#6B7280;margin-bottom:34px">Ort, Datum</div>
+      <div style="border-bottom:1px solid #14161A;width:260px;margin-bottom:40px"></div>
       <div style="display:flex;gap:60px">
         <div style="flex:1">
-          <div style="border-bottom:1px solid #14161A;height:60px"></div>
+          <div style="border-bottom:1px solid #14161A;height:46px"></div>
           <div style="margin-top:8px;font-size:11px;color:#6B7280">
             Unterschrift ${esc((kunde && kunde.name) || 'Auftraggeber')}</div>
         </div>
         <div style="flex:1">
-          <div style="border-bottom:1px solid #14161A;height:60px"></div>
+          <div style="border-bottom:1px solid #14161A;height:46px"></div>
           <div style="margin-top:8px;font-size:11px;color:#6B7280">
             Unterschrift ${esc(String(briefkopf.firma || '').trim() || 'Auftragnehmer')}</div>
         </div>
@@ -12625,9 +12761,10 @@ function ofBlatt(b, kunde, person) {
       <table style="margin-left:auto;margin-top:14px;border-collapse:collapse">${summen}</table>
       ${abschnitt('Notizen', b.oeffentliche_notizen)}
       ${abschnitt('Bedingungen', b.bedingungen)}
+      ${unterschriftsseite}
       ${b.fusszeile_text ? `<div style="margin-top:26px;padding-top:14px;border-top:1px solid #E5E8EC;white-space:pre-line;line-height:1.5">${esc(b.fusszeile_text)}</div>` : ''}
       ${bkFusszeile()}
-    </div>${unterschriftsseite}`;
+    </div>`;
 }
 
 // Wie die Nummer auf dem Blatt heisst. Je Belegart eigener Wortlaut --
@@ -27075,13 +27212,10 @@ function kdRapportDateiname(r) {
 function kdRapportPdfBauen(r) {
   return html2pdfLaden().then(() => {
     $('rapportBlatt').innerHTML = kdBerichtBlatt(r);
-    return html2pdf().set({
-      margin: 10,
-      image: { type: 'jpeg', quality: 0.95 },
-      html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      pagebreak: { mode: ['css', 'legacy'] },
-    }).from($('rapportBlatt')).outputPdf('blob');
+    // Seit ENT-425 dieselbe Erzeugung wie bei der Offerte: moeglichst eine
+    // Seite. Der Rapport hatte dasselbe Problem -- Unterschriftenblock und
+    // Fusszeile kippten bei laengeren Bemerkungen auf Seite 2.
+    return blattPdfBlob($('rapportBlatt'));
   });
 }
 

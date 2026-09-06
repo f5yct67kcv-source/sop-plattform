@@ -776,7 +776,7 @@ await page.waitForTimeout(100);
 check('KRITISCH: ein abgebrochener "Neue Adresse"-Dialog löscht den Rückruf wieder',
   await page.evaluate(() => kuNeuRueckkehr === null));
 
-// ── Druckvorlage: Unterschriftsseite und die drei neuen Textfelder ───────
+// ── Druckvorlage: Unterschriftsblock und die drei neuen Textfelder ──────
 const blattMit = await page.evaluate(() => {
   const b = { art: 'offerte', nummer: 'OF-0130', titel: 'Nachtwache', referenz: null,
     datum: '2026-04-01', gueltig_bis: '2026-05-01', rabatt_bp: 0, unterschriftsseite: 1,
@@ -791,8 +791,42 @@ const blattMit = await page.evaluate(() => {
 check('Öffentliche Notizen erscheinen auf dem Ausdruck', blattMit.includes('Zutritt nur nach Voranmeldung.'));
 check('Bedingungen erscheinen auf dem Ausdruck', blattMit.includes('Zahlbar innert 30 Tagen netto.'));
 check('Die Fusszeile erscheint auf dem Ausdruck', blattMit.includes('Wir schätzen Ihr Vertrauen.'));
-check('KRITISCH: die Unterschriftsseite hängt mit erzwungenem Seitenumbruch an',
-  blattMit.includes('page-break-before:always') && blattMit.includes('Unterschrift Gemeinde Beispieldorf'));
+// ENT-425: Der Block gehoert seither ins Blatt, nicht auf ein eigenes
+// Papier. Geprueft wird die Aussage am aufgebauten DOM -- steht der Block
+// INNERHALB des Blattes, vor der Fusszeile, und ohne erzwungenen Umbruch?
+// Eine reine Zeichenkettensuche nach "page-break-before" wuerde gruen
+// bleiben, wenn der Block ganz verschwaende.
+const blockLage = await page.evaluate(html => {
+  const h = document.createElement('div');
+  h.innerHTML = html;
+  const blatt = h.firstElementChild;
+  const alle = [...h.querySelectorAll('*')];
+  // Nur Blattknoten vergleichen: der aeussere Blatt-Container enthaelt jeden
+  // dieser Texte, und "enthaelt" ist nicht "steht davor".
+  const blatt_ = alle.filter(el => !el.querySelector('*'));
+  const block = blatt_.find(el => /^Unterschriften$/.test(el.textContent.trim()));
+  const feld = blatt_.find(el => /Unterschrift Gemeinde Beispieldorf/.test(el.textContent));
+  const fuss = blatt_.find(el => /Wir schätzen Ihr Vertrauen\./.test(el.textContent));
+  return {
+    vorhanden: !!feld,
+    imBlatt: !!feld && blatt.contains(feld),
+    ueberschriftDarueber: !!(block && feld) &&
+      (block.compareDocumentPosition(feld) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+    vorDerFusszeile: !!(feld && fuss) &&
+      (feld.compareDocumentPosition(fuss) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+    // el.style, nicht getComputedStyle: das Fragment haengt nicht im
+    // Dokument, dort liefert getComputedStyle nur leere Werte -- die Pruefung
+    // waere immer gruen gewesen (in der Gegenprobe aufgefallen).
+    umbruch: alle.some(el => el.style.breakBefore === 'page'
+      || el.style.pageBreakBefore === 'always'),
+    zusammenhalten: alle.some(el => el.style.breakInside === 'avoid'),
+  };
+}, blattMit);
+check('KRITISCH: der Unterschriftsblock steht im Blatt selbst, nicht auf einem eigenen Papier',
+  blockLage.vorhanden && blockLage.imBlatt && !blockLage.umbruch);
+check('Der Unterschriftsblock steht vor der Fusszeile', blockLage.vorDerFusszeile);
+check('Überschrift oben, Felder darunter', blockLage.ueberschriftDarueber);
+check('Der Unterschriftsblock wird nicht über zwei Seiten zerrissen', blockLage.zusammenhalten);
 
 const blattOhne = await page.evaluate(() => {
   const b = { art: 'offerte', nummer: 'OF-0131', titel: 'x', datum: '2026-04-01', rabatt_bp: 0,
@@ -800,7 +834,25 @@ const blattOhne = await page.evaluate(() => {
   b.summen = belegSummen(b.positionen, 0);
   return ofBlatt(b, null, null);
 });
-check('Ohne den Haken bleibt die Unterschriftsseite ganz weg', !blattOhne.includes('page-break-before'));
+check('Ohne den Haken bleibt der Unterschriftsblock ganz weg',
+  !blattOhne.includes('Unterschrift') && !blattOhne.includes('Ort, Datum'));
+
+// PDF_SEITE steht als Zahl im Code, weil die Entscheidung "passt das auf eine
+// Seite?" faellt, BEVOR es ein PDF gibt, aus dem sich die Seitengroesse lesen
+// liesse (ENT-425). Diese Pruefung haelt die Zahl an das, was jsPDF mit
+// derselben Angabe tatsaechlich baut -- sonst laufen beide auseinander, ohne
+// dass etwas kaputtgeht.
+const seitenMass = await page.evaluate(async () => {
+  await html2pdfLaden();
+  const winzig = document.createElement('div');
+  winzig.style.cssText = 'width:10px;height:10px;background:#fff';
+  const pdf = await html2pdf().set(PDF_OPTIONEN).from(winzig).toPdf().get('pdf');
+  return { breite: pdf.internal.pageSize.getWidth(), hoehe: pdf.internal.pageSize.getHeight(),
+           erwartet: PDF_SEITE };
+});
+check(`KRITISCH: PDF_SEITE stimmt mit dem, was jsPDF baut (${Math.round(seitenMass.breite)}×${Math.round(seitenMass.hoehe)} mm)`,
+  Math.abs(seitenMass.breite - seitenMass.erwartet.breite) < 0.5
+  && Math.abs(seitenMass.hoehe - seitenMass.erwartet.hoehe) < 0.5);
 check('Ohne Notizen/Bedingungen/Fusszeile steht auch nichts Leeres auf dem Blatt',
   !blattOhne.includes('Notizen') && !blattOhne.includes('Bedingungen'));
 

@@ -159,30 +159,35 @@ try {
       /Ablehnen/.test(await page.textContent('.zusammenfassung'))
       && /Annehmen/.test(await page.textContent('.zusammenfassung')));
     check('KRITISCH: kein QR-Zahlteil bei einer Offerte', !(await page.isVisible('text=Zahlung per QR-Rechnung')));
-    check('KRITISCH: ohne angehakte Unterschriftsseite steht kein Unterschriftsblock im Dokument',
+    check('KRITISCH: ohne angehakten Unterschriftsblock steht kein Unterschriftsblock im Dokument',
       !(await page.isVisible('text=Ort, Datum')));
     await page.close();
   }
 
-  // ── offerte_unterschrift: Unterschriftsseite (ENT-207) ──────────────────
+  // ── offerte_unterschrift: Unterschriftsblock (ENT-207, ENT-425) ─────────
   {
     const page = await browser.newPage({ viewport: { width: 1200, height: 1000 } });
     const fehler = [];
     page.on('pageerror', e => fehler.push(e.message));
     await page.goto(url('offerte_unterschrift'), { waitUntil: 'load' });
-    check('KRITISCH: keine JS-Fehler mit angehakter Unterschriftsseite', fehler.length === 0);
-    check('KRITISCH: die Unterschriftsseite steht im Dokument (Ort, Datum, zwei Unterschriftsfelder)',
+    check('KRITISCH: keine JS-Fehler mit angehaktem Unterschriftsblock', fehler.length === 0);
+    check('KRITISCH: der Unterschriftsblock steht im Dokument (Ort, Datum, zwei Unterschriftsfelder)',
       /Ort, Datum/.test(await page.textContent('#dokumentGanz'))
       && /Unterschrift abc consulting gmbh/.test(await page.textContent('#dokumentGanz'))
       && /Unterschrift Cupi 24 GmbH/.test(await page.textContent('#dokumentGanz')));
-    check('KRITISCH: die Unterschriftsseite erzwingt einen Seitenumbruch (page-break-before)',
+    // ENT-425: Der Block liegt seither IM Blatt (#dokumentSeite), nicht mehr
+    // als eigenes Geschwister dahinter mit erzwungenem Umbruch. Gemessen am
+    // gerenderten Zustand, nicht am Quelltext: Wo steht das Feld wirklich,
+    // und rechnet der Browser irgendwo mit einem Seitenumbruch?
+    check('KRITISCH: der Unterschriftsblock steht im Blatt selbst, ohne erzwungenen Seitenumbruch',
       await page.evaluate(() => {
-        const bloecke = [...document.querySelectorAll('#dokumentGanz > div')];
-        const letzte = bloecke[bloecke.length - 1];
-        return !!letzte && letzte.getAttribute('style').includes('page-break-before:always')
-          && letzte.textContent.includes('Ort, Datum');
+        const alle = [...document.querySelectorAll('#dokumentGanz *')];
+        const feld = alle.find(el => /Unterschrift abc consulting gmbh/.test(el.textContent)
+          && !el.querySelector('*'));
+        const umbruch = alle.some(el => getComputedStyle(el).breakBefore === 'page');
+        return !!feld && document.getElementById('dokumentSeite').contains(feld) && !umbruch;
       }));
-    check('KRITISCH: "Herunterladen" fasst Dokument UND Unterschriftsseite in einer PDF zusammen',
+    check('KRITISCH: "Herunterladen" fasst Dokument UND Unterschriftsblock in einer PDF zusammen',
       await page.evaluate(() => document.getElementById('dokumentGanz').contains(document.getElementById('dokumentSeite'))));
     await page.close();
   }
