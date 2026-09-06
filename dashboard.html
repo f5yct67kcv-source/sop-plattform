@@ -2290,42 +2290,73 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
 }
 
 /* ── Begrüssungs-Container mit Diktat-Router (ENT-032) */
-.begr-karte .card-bd { padding: 22px 24px; }
-/* Feinjustierung aus der Skizze des Projektinhabers vom 2026-09-06 (ENT-428):
-   Gruss elf Pixel nach oben, Knopfreihe drei nach unten, Eingabefeld ein
-   Pixel flacher. Alles auf die Uebersicht begrenzt -- .sprach und
-   .sprach-hint stehen ebenso in Planung/Einsaetze und in zwei Dialogen, und
-   dort ist nichts beanstandet worden.
-   Die fuenf Pixel nach rechts aus derselben Skizze sind mit ENT-430
-   entfallen: Der Block steht jetzt mittig, und ein Gruss, der fuenf Pixel
-   weiter rechts beginnt als das Feld darunter, stuende sichtbar aus der
-   Flucht. */
+/* Luft statt Enge (ENT-432). Der Projektinhaber: "es ist zu dicht".
+   Gemessen stimmte das genau: Der Inhalt brauchte 178 px bei 167 px
+   Innenhoehe und ragte oben aus der Karte heraus.
+   Zwei Griffe dagegen. Der eine ist der Innenabstand -- 22 auf 34 Pixel oben
+   und unten; das ist die Luft, die vorher fehlte. Der andere ist die
+   senkrechte Mitte: Die Karte ist so hoch wie ihre Nachbarin (ENT-410), und
+   was daran ueber den Inhalt hinausgeht, liegt jetzt zu gleichen Teilen
+   ueber und unter ihm statt als Rest am Fuss. */
+.begr-karte .card-bd { padding: 34px 24px; display: flex; flex-direction: column;
+  /* flex: 1 muss dabei sein, sonst ist der Rumpf nur so hoch wie sein Inhalt
+     und die Zentrierung hat nichts zu verteilen. Gemessen klebte der Block
+     bei gestreckter Nachbarkarte oben (35 px oben, 235 px unten) -- die
+     Regel stand da und tat nichts. */
+  flex: 1 1 auto; justify-content: center; }
+/* Der Gruss steht wieder auf seinem eigenen Abstand (ENT-432). Die elf
+   Pixel nach oben aus der Skizze (ENT-428) und die fuenf nach rechts
+   (entfallen mit ENT-430) waren beide Notloesungen gegen dieselbe Enge:
+   Der Inhalt brauchte gemessen 178 px bei 167 px Innenhoehe und ragte oben
+   heraus. Die Enge ist jetzt an der Wurzel weg -- das Eingabefeld ist
+   flacher, und was frei wird, liegt als Luft ueber und unter dem Block. */
 .begr-kopf h2 { font-size: 21px; font-weight: 720; letter-spacing: -.3px;
-  margin: -11px 0 0; }
+  margin: 0; }
 
-/* ── Die Eingabespalte hat eine Lesebreite und steht mittig (ENT-430)
-   Der Projektinhaber: "das linke fenster ist etwas ueberfrachtet". Ueber die
-   volle Kartenbreite lief das Eingabefeld gemessen 900 px weit -- ein Feld,
-   in das man einen Satz diktiert, und kein Fliesstext.
-   Mittig heisst hier wirklich mittig im Container (margin-inline: auto),
-   nicht ein Abstandhalter neben dem Inhalt. Der Text darin bleibt
-   linksbuendig: Gruss, Feld und Knopfreihe stehen auf einer Flucht, und
-   zentrierter Text ueber einem linksbuendigen Feld wirkt unruhig, ohne dass
-   man sagen kann warum.
+/* Die Lesebreite von 640 px aus ENT-430 ist mit ENT-432 wieder entfallen.
+   Sie beruhte auf einem Missverstaendnis: Der Projektinhaber wollte die
+   Eingabespalte SENKRECHT kuerzen, nicht waagrecht. Zwei Dinge gingen dabei
+   auch messbar schief -- der Platzhaltertext brach auf 1.9 Zeilen um und
+   fuellte das flachere Feld randvoll, und .begr-kopf schrumpfte im
+   Flex-Container auf seine Textbreite (205 statt 640 px) und rutschte mit
+   margin-inline:auto aus der Flucht zum Feld darunter. Beides waere mit
+   width:100% zu haben gewesen; die Breite war aber gar nicht gemeint. */
+/* Die drei Abstaende im Block, aus der Skizze des Projektinhabers vom
+   2026-09-06 (ENT-434). Gemessen klebten Gruss und Eingabefeld mit NULL
+   Pixel aneinander: Der Innenabstand von .diktat-router zaehlt ab der
+   Unterkante von .begr-kopf, und dessen Zeilenbox reicht bereits bis dorthin.
+   Auf dem Bildschirm sah das aus wie ein Titel, der auf dem Feld aufsitzt.
+   Jetzt 16 px zwischen Gruss und Feld, 24 px zwischen Feld und Knopfreihe --
+   die Werte aus der Skizze, gerechnet aus ihren Zielpositionen und nicht
+   aus den Verschiebungen einzeln, weil die drei sich gegenseitig mitziehen.
+   Die 19 px an der Knopfreihe sind kein Tippfehler: Zwischen Eingabefeld und
+   dem Kasten darum liegen gemessen 5 px, und der Abstand SOLL zwischen dem
+   Feld und den Knoepfen stimmen, nicht zwischen den Kaesten.
    Nur die Uebersicht: Derselbe Router steht in Planung/Einsaetze und in zwei
-   Dialogen, wo die Breite nicht beanstandet ist. */
-.begr-karte .begr-kopf,
-.begr-karte .diktat-router { max-width: 640px; margin-inline: auto; }
-.begr-karte .sprach { margin-top: 13px; }
-/* Ein Pixel flacher. Zwei Dinge muessen dabei stimmen:
-   Die Mindesthoehe von textarea.inp (92 px) muss mitgehen -- sie gewinnt
-   sonst gegen jede Hoehe darunter, und die Regel bliebe wirkungslos, ohne
-   dass etwas kaputt aussieht.
-   Und die feste Hoehe gilt NUR bei ungezogener Karte: Wird die Begruessung
-   hoeher gezogen, soll das Eingabefeld die gewonnene Hoehe nehmen (so seit
-   jeher, gemessen von test_containergroesse.mjs). Eine feste Hoehe hier
-   haette das stillgelegt -- die Karte waere gewachsen, das Feld nicht. */
-.dash-item:not(.dh) .begr-karte #rtText { height: 91px; min-height: 91px; }
+   Dialogen, wo nichts beanstandet ist.
+
+   Die Selektoren sind absichtlich eine Stufe schaerfer als noetig: Weiter
+   unten stehen ".card-bd > .diktat-router { margin-top: 0 }" und
+   ".diktat-router .sprach { margin-top: 10px }" -- beide mit derselben
+   Eigenspezifitaet wie die naheliegende Fassung und SPAETER im Regelwerk.
+   Mit ".begr-karte .diktat-router" standen diese Zeilen hier und taten
+   nichts; gemessen blieb der Abstand bei 0 und 10 px. */
+.begr-karte .card-bd > .diktat-router { margin-top: 16px; }
+.begr-karte .diktat-router .sprach { margin-top: 19px; }
+/* Das Eingabefeld ist so hoch wie seine zwei Zeilen und keinen Pixel mehr
+   (ENT-432, auf Vorgabe des Projektinhabers). Gerechnet aus dem gerenderten
+   Zustand: 2 x 21.7 px Zeilenhoehe + 2 x 9 px Innenabstand + 2 px Rand =
+   64 px. Vorher waren es 91 -- die 27 Pixel Reserve darin hat nie jemand
+   gebraucht, und sie waren es, die die Karte randvoll machten.
+   Wer mehr Platz will, zieht das Feld am Griff unten rechts auf; es bleibt
+   resize: vertical.
+   Zwei Dinge muessen dabei stimmen: Die Mindesthoehe von textarea.inp
+   (92 px) muss mitgehen -- sie gewinnt sonst gegen jede Hoehe darunter, und
+   die Regel bliebe wirkungslos, ohne dass etwas kaputt aussieht. Und die
+   feste Hoehe gilt NUR bei ungezogener Karte: Wird die Begruessung hoeher
+   gezogen, nimmt das Feld die gewonnene Hoehe (so seit jeher, gemessen von
+   test_containergroesse.mjs). */
+.dash-item:not(.dh) .begr-karte #rtText { height: 64px; min-height: 64px; }
 /* Der Erklaersatz entfaellt hier. NUR er: Dieselbe Flaeche zeigt weiter
    "Das Mikrofon liefert kein Signal", "Die Aufnahme liess sich nicht
    starten" und "Aufnahme laeuft". Ein leeres Feld soll dabei keinen
@@ -4256,6 +4287,12 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
    Sie ist eine Nachschlagsache, kein eigener Arbeitsschritt. */
 .mtl-leser { margin-top: 10px; padding: 10px 12px; background: var(--line-soft);
   border-radius: var(--r-sm); font-size: 12.5px; color: var(--ink-2); line-height: 1.7; }
+/* Endgueltig loeschen sieht anders aus als der Rest der Zeile (ENT-433):
+   nicht laut gefuellt -- der Knopf steht neben harmlosen --, aber auch
+   nicht gleich. Ein Handgriff ohne Rueckweg darf sich nicht wie
+   "Bearbeiten" anfuehlen. */
+.mtl-akt .mtl-loeschen { color: var(--neg); }
+.mtl-akt .mtl-loeschen:hover { background: var(--neg); color: #fff; border-color: var(--neg); }
 </style>
 <script src="gav.js"></script>
 <script src="zeitwahl.js"></script>
@@ -5944,7 +5981,16 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
           </div>
 
           <div class="card">
-            <div class="card-hd"><h3>Bestehende Mitteilungen</h3></div>
+            <div class="card-hd">
+              <h3>Bestehende Mitteilungen</h3>
+              <div class="sp"></div>
+              <!-- Beide Zahlen stehen immer da: Eine gefilterte Zahl allein
+                   sieht aus wie die Gesamtzahl (Hausregel). -->
+              <div class="seg2">
+                <button type="button" id="mtlAnsichtLaufend" class="on" onclick="mtlAnsichtSetzen('laufend')">Laufend</button>
+                <button type="button" id="mtlAnsichtArchiv" onclick="mtlAnsichtSetzen('archiv')">Archiv</button>
+              </div>
+            </div>
             <div class="card-bd" id="mtlListe"></div>
           </div>
         </div>
@@ -13413,6 +13459,10 @@ let mtlPushGeraete = -1;   // -1 = unbekannt
 // verschiedenen Stellen.
 let mtlPushGrund = '';
 
+// Welche der beiden Ansichten offen ist (ENT-433). "laufend" ist der
+// Normalfall -- das Archiv sucht man auf, es draengt sich nicht auf.
+let mtlAnsicht = 'laufend';
+
 // Leerzustand in der Hausform (.empty) -- dieselbe Darstellung wie überall
 // sonst im Cockpit, statt einer eigenen Textzeile nur für diese Seite.
 function mtlLeerBlock(titel, text) {
@@ -13434,6 +13484,15 @@ function mtlLaden() {
   });
 }
 
+function mtlAnsichtSetzen(welche) {
+  mtlAnsicht = welche === 'archiv' ? 'archiv' : 'laufend';
+  // Die Leserliste gehoert zu einem Eintrag, nicht zur Seite -- beim
+  // Wechseln zu bleibt sie sonst zu einer Mitteilung offen, die gar nicht
+  // mehr angezeigt wird.
+  mtlLeserOffen = 0;
+  mtlZeichnen();
+}
+
 function mtlZeichnen() {
   const ziel = $('mtlListe');
   if (!ziel) { return; }
@@ -13450,13 +13509,42 @@ function mtlZeichnen() {
       'Die Liste liess sich nicht laden. Ob Mitteilungen bestehen, ist gerade unbekannt.');
     return;
   }
+  // Aufteilung nach der Grenze, die der Server zieht (im_archiv): nicht
+  // mehr in der App = zurueckgezogen oder abgelaufen. Hier wird sie NICHT
+  // aus den Marken nachgebaut -- eine zweite Fassung derselben Regel
+  // liefe irgendwann auseinander.
+  const archiv  = mtlListe.filter(m => m.im_archiv);
+  const laufend = mtlListe.filter(m => !m.im_archiv);
+  mtlUmschalterZeichnen(laufend.length, archiv.length);
+  const zeigen = mtlAnsicht === 'archiv' ? archiv : laufend;
+
+  // Vier verschiedene Nicht-Faelle, vier verschiedene Saetze. "Kein
+  // Treffer" und "nichts vorhanden" sind nicht dasselbe (Hausregel), und
+  // ein leeres Archiv heisst etwas anderes als eine leere Gegenwart.
   if (!mtlListe.length) {
     ziel.innerHTML = mtlLeerBlock('Keine Mitteilungen',
       'Es wurde noch keine Mitteilung verfasst.');
     return;
   }
+  if (!zeigen.length && mtlAnsicht === 'archiv') {
+    ziel.innerHTML = mtlLeerBlock('Archiv leer',
+      'Hier landet, was zurückgezogen oder abgelaufen ist — und nur hier lässt sich etwas '
+      + 'endgültig löschen. Bisher steht nichts darin; '
+      + (laufend.length === 1 ? 'die eine Mitteilung ist noch aktuell.'
+                              : `die ${laufend.length} bestehenden Mitteilungen sind noch aktuell.`));
+    return;
+  }
+  if (!zeigen.length) {
+    ziel.innerHTML = mtlLeerBlock('Nichts Laufendes',
+      'Zurzeit ist keine Mitteilung in der App zu sehen. '
+      + (archiv.length === 1 ? 'Eine liegt im Archiv.' : `${archiv.length} liegen im Archiv.`));
+    return;
+  }
 
-  ziel.innerHTML = mtlListe.map(m => {
+  ziel.innerHTML = zeigen.map(m => {
+    // Kommt vom Server (siehe mitteilung_list.php) und wird hier nicht aus
+    // den Marken erraten.
+    const abgelaufen = !!m.abgelaufen;
     const marken = [];
     if (m.stufe === 'wichtig') { marken.push('<span class="chip chip-x">Wichtig</span>'); }
     marken.push(`<span class="chip chip-n">${m.zielgruppe === 'revier' ? 'Nur Revierdienst' : 'Alle'}</span>`);
@@ -13510,14 +13598,59 @@ function mtlZeichnen() {
       <div class="mtl-akt">
         <button type="button" class="btn btn-plain btn-sm" onclick="mtlBearbeiten(${m.id})">Bearbeiten</button>
         <button type="button" class="btn btn-plain btn-sm" onclick="mtlLeserUm(${m.id})">Wer hat gelesen</button>
-        <button type="button" class="btn btn-plain btn-sm" onclick="mtlArchivieren(${m.id}, ${m.archiviert ? 'true' : 'false'})">${
-          m.archiviert ? 'Wieder aufnehmen' : 'Zurückziehen'}</button>
+        ${!m.im_archiv ? `<button type="button" class="btn btn-plain btn-sm" onclick="mtlArchivieren(${m.id}, false)">Zurückziehen</button>` : ''}
+        ${m.archiviert && !abgelaufen ? `<button type="button" class="btn btn-plain btn-sm" onclick="mtlArchivieren(${m.id}, true)">Wieder aufnehmen</button>` : ''}
+        ${m.im_archiv ? `<button type="button" class="btn btn-plain btn-sm mtl-loeschen" onclick="mtlLoeschen(${m.id})">Endgültig löschen</button>` : ''}
       </div>
       ${mtlLeserOffen === m.id ? `<div class="mtl-leser" id="mtlLeser${m.id}">Wird geladen …</div>` : ''}
     </div>`;
   }).join('');
 
   if (mtlLeserOffen) { mtlLeserLaden(mtlLeserOffen); }
+}
+
+// Der Umschalter traegt beide Zahlen. Eine gefilterte Liste ohne die
+// andere Zahl sieht aus wie die ganze (Hausregel: keine Zahl ohne Bezug,
+// sobald ein Filter greift). Beschriftet wird erst, wenn die Zahlen
+// bekannt sind -- vorher stehen die Woerter ohne Zahl da, nicht mit einer
+// erfundenen Null.
+function mtlUmschalterZeichnen(laufend, archiv) {
+  const a = $('mtlAnsichtLaufend'), b = $('mtlAnsichtArchiv');
+  if (!a || !b) { return; }
+  a.textContent = 'Laufend ' + laufend;
+  b.textContent = 'Archiv ' + archiv;
+  a.classList.toggle('on', mtlAnsicht !== 'archiv');
+  b.classList.toggle('on', mtlAnsicht === 'archiv');
+}
+
+// Endgültig löschen (ENT-433). Die Rückfrage benennt die FOLGE, nicht nur
+// die Handlung: Was mitgeht, ist der Lesestand -- also der Nachweis, wer
+// die Mitteilung gesehen und bestätigt hat. Wer nur "Wirklich löschen?"
+// liest, weiss das nicht.
+//
+// Die eigentliche Sperre steht im Server (api/mitteilung_loeschen.php);
+// dass dieser Knopf nur im Archiv steht, erspart bloss den Umweg.
+function mtlLoeschen(id) {
+  const m = mtlListe.find(x => Number(x.id) === Number(id));
+  if (!m) { return; }
+  const nachweis = Number(m.gelesen_anzahl) > 0
+    ? `\n\nDamit verschwindet auch der Lesestand: ${m.gelesen_anzahl} `
+      + (Number(m.gelesen_anzahl) === 1 ? 'Person hat' : 'Personen haben')
+      + ' gelesen, dass sie da war.'
+    : '\n\nGelesen hat sie niemand — es geht kein Nachweis verloren.';
+  if (!confirm(`„${m.titel}“ endgültig löschen?${nachweis}\n\nDas lässt sich nicht rückgängig machen.`)) {
+    return;
+  }
+  api('mitteilung_loeschen.php', { method: 'POST', body: { id: Number(id) } })
+    .then(({ ok, data }) => {
+      if (!ok || !data || data.status !== 'ok') {
+        toast((data && data.message) || 'Die Mitteilung liess sich nicht löschen.');
+        return;
+      }
+      toast('Mitteilung endgültig gelöscht.');
+      if (mtlLeserOffen === Number(id)) { mtlLeserOffen = 0; }
+      mtlLaden();
+    });
 }
 
 // Die Leserliste. Eigener Abruf und nicht Teil der Liste: Bei 40

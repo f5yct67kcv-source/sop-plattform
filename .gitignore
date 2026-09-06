@@ -19,7 +19,11 @@ Thumbs.db
 .idea/
 
 # Pruefungen: Abhaengigkeiten und Bildschirmfotos entstehen bei jedem Lauf neu
-pruefungen/node_modules/
+# Ohne Schraegstrich am Ende: In manchen Umgebungen ist node_modules ein
+# SYMLINK auf die System-Module statt ein eigener Ordner. Mit Schraegstrich
+# passt die Zeile nur auf Ordner, und der Symlink stand als unversioniert da
+# -- ein Verweis auf einen rechnerspezifischen Pfad, der nie ins Repo gehoert.
+pruefungen/node_modules
 pruefungen/bilder/
 # Entsteht bei "npm install" in pruefungen/. Versioniert war hier noch nie
 # eines -- gepflegt wird package.json. Wer die Playwright-Fassung doch

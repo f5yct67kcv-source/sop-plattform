@@ -93,6 +93,31 @@ function mitteilung_sichtbar_fuer(array $m, bool $revierBerechtigt, string $jetz
 }
 
 /**
+ * Steht diese Mitteilung im Archiv?
+ *
+ * Zwei Wege fuehren hinein, und beide bedeuten dasselbe: nicht mehr in der
+ * App. Zurueckgezogen (archiviert_am gesetzt) oder abgelaufen
+ * (sichtbar_bis vorbei). Eine GEPLANTE Mitteilung gehoert nicht dazu --
+ * sie war noch gar nicht draussen; sie ist unterwegs, nicht erledigt.
+ *
+ * Diese Funktion ist zugleich die Loeschsperre (ENT-433): Endgueltig
+ * geloescht werden darf nur, was hier steht. Sie liegt darum in dieser
+ * Datei und nicht im Endpunkt -- Cockpit und Server ziehen dieselbe
+ * Grenze, wirksam ist die im Server (api/mitteilung_loeschen.php), das
+ * Cockpit erspart nur den Umweg.
+ *
+ * $jetzt wird mitgegeben, aus demselben Grund wie bei
+ * mitteilung_sichtbar_fuer(): sonst liesse sich der Ablauf nicht mit einem
+ * Zeitpunkt pruefen, den es gerade nicht ist.
+ */
+function mitteilung_im_archiv(array $m, string $jetzt): bool
+{
+    if (!empty($m['archiviert_am'])) { return true; }
+    $bis = trim((string)($m['sichtbar_bis'] ?? ''));
+    return $bis !== '' && $bis < $jetzt;
+}
+
+/**
  * Unterbricht diese Mitteilung beim Oeffnen der App?
  *
  * Nur die Stufe "wichtig", und nur solange diese Person sie nicht
