@@ -50,6 +50,58 @@ for (const seite of [...seiten, ...phpDateien]) {
   }
 }
 
+/* Jeder Wert, der beim Deploy eingesetzt wird, muss den Schrittwechsel
+   ueberleben (ENT-424).
+
+   Der Fehler, gegen den das steht, ist echt passiert und hat eine
+   Dreiviertelstunde gekostet: Die drei Push-Werte wurden im Schritt
+   "Umgebung waehlen" gesetzt, aber nicht in $GITHUB_ENV geschrieben. Der
+   Schritt "Platzhalter durch echte Werte ersetzen" laeuft in einer EIGENEN
+   Shell -- dort war die Variable leer, und sed setzte einen leeren Wert
+   ein. Kein Fehler, kein rotes Feld: Der Deploy meldete Erfolg, und auf
+   dem Server stand `const VAPID_PRIVAT_B64 = '';`.
+
+   Geprueft wird die Aussage, nicht der Wortlaut: Jede Variable, die in
+   einer sed-Ersetzung VERWENDET wird, muss vorher weitergereicht worden
+   sein. Wer eine vierte hinzufuegt und die Weitergabe vergisst, faellt
+   hier auf -- unabhaengig davon, wie sie heisst. */
+{
+  // Alle in sed-Ersetzungen verwendeten Variablen einsammeln.
+  const benutzt = [...workflow.matchAll(/sed -i "s\|__[A-Z0-9_]+__\|\$([A-Za-z_][A-Za-z0-9_]*)\|g"/g)]
+    .map(m => m[1])
+    .filter((v, i, a) => a.indexOf(v) === i);
+  check('Der Deploy setzt ueberhaupt Werte ein', benutzt.length >= 5);
+
+  // Wird der Wert an die folgenden Schritte weitergereicht? Gesucht wird
+  // die Zeile, die ihn in $GITHUB_ENV schreibt. Bewusst ueber den ganzen
+  // Workflow und nicht ueber einen herausgeschnittenen Block: Ein
+  // Blockmuster haengt daran, wie die Klammern gerade stehen, und wuerde
+  // beim naechsten Umbau still leer laufen -- dann waere die Pruefung
+  // gruen, ohne etwas zu pruefen. (Genau das ist beim Schreiben dieser
+  // Zeilen passiert.)
+  const fehlend = benutzt.filter(v => !new RegExp(`echo "${v}=`).test(workflow));
+  check('KRITISCH: jeder eingesetzte Wert wird an den naechsten Schritt weitergereicht '
+      + '($GITHUB_ENV) -- sonst ersetzt sed still durch nichts',
+    fehlend.length === 0);
+  if (fehlend.length) { bad.push('nicht weitergereicht: ' + fehlend.join(', ')); }
+}
+
+/* Die Push-Dateien brauchen ihre Platzhalter -- und zwar in der Datei, die
+   auch kopiert wird (ENT-424). Ein Platzhalter, den niemand ersetzt, waere
+   ein Schluessel, der nie ankommt; eine Ersetzung ohne Platzhalter waere
+   eine Zeile, die nichts tut. */
+for (const [datei, platzhalter] of [
+  ['backend/push.php', ['__VAPID_PRIVATE_PEM_B64__', '__VAPID_KONTAKT__']],
+  ['backend/api/push_versand.php', ['__PUSH_CRON_SCHLUESSEL__']],
+]) {
+  const inhalt = readFileSync(`${WURZEL}/${datei}`, 'utf8');
+  for (const ph of platzhalter) {
+    check(`${datei} traegt den Platzhalter ${ph}`, inhalt.includes(ph));
+    check(`KRITISCH: ${ph} wird beim Deploy auch ersetzt`,
+      new RegExp(`sed -i "s\\|${ph}\\|`).test(workflow));
+  }
+}
+
 // Dasselbe für Dateien, die das CSS per url(...) holt -- Schriften, Bilder,
 // Hintergründe. Bis ENT-223 gab es hier gar keine solche Datei, seither
 // liegen zwei Schriftschnitte unter fonts/ (Inter, selbst ausgeliefert statt
