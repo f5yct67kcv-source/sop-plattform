@@ -1,9 +1,17 @@
-// Datum & Zeit und das Kontomenue am Logo (ENT-410).
+// Datum & Zeit und das Kontomenue am Logo (ENT-410, Kacheln seit ENT-423).
 //
 // Beides kam mit derselben Ansage des Projektinhabers: Die Begruessung nahm
 // die ganze Breite ein, daneben soll die Kalenderwoche stehen; das Logo
 // wandert nach rechts aussen, und die Symbole, die dort standen, klappen
 // darunter auf.
+//
+// Seit ENT-423 stehen Datum und Uhrzeit als Kacheln da -- eine Klappuhr und
+// eine Tageskachel. Damit verschiebt sich, WO der Wert steht: Er verteilt
+// sich auf vier Halbflaechen je Kachel und auf drei Kuerzel, und der
+// ausgeschriebene Satz existiert nur noch als aria-label. Deshalb liest diese
+// Pruefung den Wert nicht mehr aus einem Textknoten, sondern aus den
+// Flaechen, die tatsaechlich zu sehen sind -- was der Code zu zeigen
+// GLAUBT (dataset.wert), ist hier nirgends der Pruefgegenstand.
 import { WURZEL, OUT, browserPfad } from './pfade.mjs';
 import { chromium } from 'playwright';
 
@@ -15,9 +23,10 @@ const browser = await chromium.launch({ executablePath: EXE });
 
 // Anordnung vorbelegen? Dann kommt sie in den Speicher, BEVOR die Seite
 // laedt -- der Umzug aus ENT-410 soll sie ja gerade beim Laden vorfinden.
-async function seite(breite = 1600, vorbelegt, umzugSchonGelaufen = false) {
+async function seite(breite = 1600, vorbelegt, umzugSchonGelaufen = false, thema) {
   const p = await browser.newPage({ viewport: { width: breite, height: 1000 } });
   p.on('pageerror', e => bad.push('JS-Fehler: ' + e.message));
+  if (thema) { await p.addInitScript(t => { try { localStorage.setItem('rv3_thema', t); } catch (e) {} }, thema); }
   if (vorbelegt !== undefined) {
     // Nur beim ERSTEN Laden vorbelegen. Ohne diese Sperre setzt Playwright
     // die alte Anordnung bei jedem Neuladen zurueck und ueberschreibt, was
@@ -47,15 +56,38 @@ async function seite(breite = 1600, vorbelegt, umzugSchonGelaufen = false) {
   return p;
 }
 
+// Im Browser: Welche Ziffern zeigt eine Klappkachel gerade WIRKLICH?
+//
+// Vier Halbflaechen liegen uebereinander, zwei davon klappen. Eine hochkant
+// stehende Klappe ist nicht zu sehen, auch wenn sie im Baum steht und Text
+// traegt. Geprueft wird deshalb, was nach Sichtbarkeit und Drehlage uebrig
+// bleibt -- bei rotateX steht der Kosinus des Winkels in m22, und bei
+// 90 Grad ist er 0.
+const SICHTBARE_ZIFFERN = `(id) => {
+  const k = document.getElementById(id);
+  return [...k.querySelectorAll('.zk-h')].filter(h => {
+    const s = getComputedStyle(h);
+    if (s.visibility === 'hidden' || s.display === 'none' || s.opacity === '0') { return false; }
+    if (s.transform === 'none') { return true; }
+    return Math.abs(new DOMMatrix(s.transform).m22) > .02;
+  }).map(h => h.querySelector('span').textContent.trim());
+}`;
+
 // ══════════════════════════════ DIE KARTE ZEIGT, WAS SIE SOLL
 try {
   const p = await seite();
-  const w = await p.evaluate(() => ({
-    kw: document.getElementById('zeitKw').textContent.trim(),
-    spanne: document.getElementById('zeitSpanne').textContent.trim(),
-    datum: document.getElementById('zeitDatum').textContent.trim(),
-    uhr: document.getElementById('zeitUhr').textContent.trim(),
-  }));
+  const w = await p.evaluate(sz => {
+    const zeigt = eval(sz);
+    const t = id => document.getElementById(id).textContent.trim();
+    return {
+      kw: t('zeitKw'), spanne: t('zeitSpanne'),
+      // Die Tageskachel: drei Stuecke auf dem Bildschirm, ein Satz im Label.
+      tagKachel: [t('zeitWt'), t('zeitMo'), t('zeitTag')],
+      datum: document.getElementById('zeitDatum').getAttribute('aria-label').trim(),
+      uhr: document.getElementById('zeitUhr').getAttribute('aria-label').trim(),
+      std: zeigt('zeitStd'), min: zeigt('zeitMin'),
+    };
+  }, SICHTBARE_ZIFFERN);
 
   // Die Wochenzahl wird NICHT aus dem Dashboard uebernommen, sondern hier
   // unabhaengig gerechnet -- und bewusst anders herum als dort: kalenderwoche()
@@ -88,12 +120,30 @@ try {
       .some(t => w.datum.startsWith(t)));
   check('KRITISCH: und es ist der heutige Tag',
     w.datum.includes(jetzt.getDate() + '.') && w.datum.includes(String(jetzt.getFullYear())));
+
+  // Die Tageskachel zeigt Kuerzel. Sie muessen zum ausgeschriebenen Satz
+  // passen -- sonst liest der Bildschirm etwas anderes vor als der
+  // Screenreader, und niemand von beiden merkt es.
+  const [kuerzelWt, kuerzelMo, tagZahl] = w.tagKachel;
+  check('KRITISCH: die Tageskachel zeigt den heutigen Tag als Zahl',
+    tagZahl === String(jetzt.getDate()));
+  check('KRITISCH: ihr Wochentagskuerzel gehoert zum ausgeschriebenen Wochentag',
+    kuerzelWt.length >= 2 && w.datum.startsWith(kuerzelWt));
+  check('KRITISCH: und ihr Monatskuerzel zum ausgeschriebenen Monat',
+    kuerzelMo.length >= 3 && w.datum.includes(kuerzelMo));
+
+  // Die Uhrzeit. Gelesen aus den Flaechen, die zu sehen sind -- nicht aus
+  // dem Wert, den der Code sich gemerkt hat.
   check('Die Uhrzeit steht als HH:MM da', /^\d{2}:\d{2}$/.test(w.uhr));
   check('KRITISCH: die Uhrzeit ist die jetzige, nicht irgendeine',
     Math.abs((Number(w.uhr.slice(0, 2)) * 60 + Number(w.uhr.slice(3)))
       - (jetzt.getHours() * 60 + jetzt.getMinutes())) <= 2);
   check('Keine Sekunden -- eine Ziffer, die jede Sekunde springt, zieht den Blick weg',
     !/\d{2}:\d{2}:\d{2}/.test(w.uhr));
+  check('In Ruhe zeigt jede Klappkachel genau einen Wert, nicht zwei nebeneinander',
+    w.std.length > 0 && new Set(w.std).size === 1 && w.min.length > 0 && new Set(w.min).size === 1);
+  check('KRITISCH: was die Kacheln zeigen, ist auch das, was ihre Beschriftung sagt',
+    w.std[0] + ':' + w.min[0] === w.uhr);
   await p.close();
 } catch (e) { bad.push('Inhalt: ' + String(e).split('\n')[0].slice(0, 120)); }
 
@@ -119,31 +169,256 @@ try {
 } catch (e) { bad.push('Wochenspanne: ' + String(e).split('\n')[0].slice(0, 120)); }
 
 // ══════════════════════════════ GESTALTUNG: UEBERSCHRIFT OBEN, WERT DARUNTER
+//
+// Der Wert ist seit den Kacheln nicht mehr in jedem Block ein Textknoten --
+// bei Datum und Uhrzeit ist es die Kachel selbst. Geprueft wird deshalb der
+// Werttraeger, nicht die Klasse .wert.
 try {
   const p = await seite();
   const g = await p.evaluate(() => {
     const zeilen = [...document.querySelectorAll('.zeit-zeile')].map(z => {
-      const l = z.querySelector('.lb').getBoundingClientRect();
-      const v = z.querySelector('.wert').getBoundingClientRect();
-      return { lblOben: l.bottom <= v.top + 1,
-               lblKlein: parseFloat(getComputedStyle(z.querySelector('.lb')).fontSize),
-               wertGross: parseFloat(getComputedStyle(z.querySelector('.wert')).fontSize),
-               versal: getComputedStyle(z.querySelector('.lb')).textTransform };
+      const lb = z.querySelector('.lb');
+      const v = z.querySelector('.wert, .zk-uhr, .zk-tag');
+      return { hatWert: !!v,
+               lblOben: v ? lb.getBoundingClientRect().bottom <= v.getBoundingClientRect().top + 1 : false,
+               lblKlein: parseFloat(getComputedStyle(lb).fontSize),
+               lblGroesse: getComputedStyle(lb).fontSize,
+               versal: getComputedStyle(lb).textTransform };
     });
     const karte = document.querySelector('.zeit-karte').getBoundingClientRect();
-    const letzte = [...document.querySelectorAll('.zeit-zeile')].pop().getBoundingClientRect();
-    return { zeilen, ueberlauf: letzte.bottom - karte.bottom };
+    const bd = document.querySelector('.zeit-karte .card-bd');
+    const r = s => document.querySelector(s).getBoundingClientRect();
+    const kacheln = [...document.querySelectorAll('.zk-klapp, .zk-tag')].map(k => k.getBoundingClientRect());
+    return { zeilen,
+      ueberlauf: [...document.querySelectorAll('.zeit-zeile')]
+        .reduce((m, z) => Math.max(m, z.getBoundingClientRect().bottom), 0) - karte.bottom,
+      // Steht keine Kachel weiter rechts, als die Karte reicht?
+      randUeberlauf: Math.max(...kacheln.map(k => k.right)) - (bd.getBoundingClientRect().right
+        - parseFloat(getComputedStyle(bd).paddingRight)),
+      // Kein Kachelinhalt darf ueber seine Kachel hinausragen -- passiert
+      // still, sobald der Flex-Algorithmus eine Kachel zusammendrueckt.
+      zifferPasst: [...document.querySelectorAll('.zk-klapp')].every(k => {
+        const kr = k.getBoundingClientRect();
+        const rg = document.createRange();
+        rg.selectNodeContents(k.querySelector('.zk-h-o span'));
+        const gr = rg.getBoundingClientRect();
+        return gr.left >= kr.left - .5 && gr.right <= kr.right + .5;
+      }),
+      // Die Klappkante schneidet die Ziffer mittig -- sonst sieht die Kachel
+      // aus wie ein Feld mit einem Strich darin.
+      kanteMittig: (() => {
+        const k = document.querySelector('.zk-klapp').getBoundingClientRect();
+        const rg = document.createRange();
+        rg.selectNodeContents(document.querySelector('.zk-klapp .zk-h-o span'));
+        const gr = rg.getBoundingClientRect();
+        return Math.abs((gr.top + gr.height / 2) - (k.top + k.height / 2));
+      })(),
+      gleichHoch: Math.abs(r('.zk-uhr').height - r('.zk-tag').height) < 1,
+      kwUeberDenObjekten: r('.zeit-kw').bottom <= r('.zeit-objekte').top + 1,
+    };
   });
-  check('Es sind drei Zeilen: Woche, Tag, Uhrzeit', g.zeilen.length === 3);
-  check('KRITISCH: in jeder Zeile steht die Ueberschrift ueber dem Wert',
+  check('Es sind drei Bloecke: Woche, Tag, Uhrzeit', g.zeilen.length === 3);
+  check('Jeder traegt einen Wert', g.zeilen.every(z => z.hatWert));
+  check('KRITISCH: in jedem Block steht die Ueberschrift ueber dem Wert',
     g.zeilen.every(z => z.lblOben));
-  check('Die Ueberschrift ist kleiner als der Wert', g.zeilen.every(z => z.lblKlein < z.wertGross));
   check('Und versal gesetzt, wie ueberall sonst', g.zeilen.every(z => z.versal === 'uppercase'));
+  check('KRITISCH: alle drei Ueberschriften sind gleich gross -- gleiches Muster auf beiden Seiten',
+    new Set(g.zeilen.map(z => z.lblGroesse)).size === 1);
+  check('KRITISCH: Datum und Uhrzeit sind gleich hoch, sonst wirkt eine der beiden abgeschnitten',
+    g.gleichHoch);
+  check('Die Woche steht weiterhin ueber Tag und Uhrzeit -- von der groben zur feinen Einheit',
+    g.kwUeberDenObjekten);
   check('KRITISCH: nichts laeuft unten aus der Karte heraus', g.ueberlauf <= 1);
+  check('KRITISCH: und keine Kachel ueber den rechten Rand hinaus', g.randUeberlauf <= 1);
+  check('KRITISCH: keine Ziffer ragt aus ihrer Kachel -- eine gequetschte Kachel bricht nichts,'
+    + ' sieht aber falsch aus', g.zifferPasst);
+  check('KRITISCH: die Klappkante schneidet die Ziffer mittig (Abweichung unter 2 px)',
+    g.kanteMittig < 2);
   await p.screenshot({ path: OUT + '/90-zeitkarte.png',
     clip: { x: 800, y: 130, width: 790, height: 340 } });
   await p.close();
 } catch (e) { bad.push('Gestaltung: ' + String(e).split('\n')[0].slice(0, 120)); }
+
+// ══════════════════════════════ DIE KACHELN SIND IN BEIDEN THEMEN DUNKEL
+//
+// Ausdruecklicher Entscheid des Projektinhabers: Eine helle Klappuhr sieht
+// aus wie ein Eingabefeld. Die Kachelfarben stehen deshalb NICHT bei den
+// Themenwerten -- diese Pruefung ist das, was sie dort haelt, wenn beim
+// naechsten Themen-Feinschliff jemand die Werte einsammelt.
+//
+// Gemessen wird die Helligkeit der gerenderten Farbe, nicht der Hex-Wert:
+// Eine Pruefung auf "#1C212C" waere schon dann gruen, wenn eine spaetere
+// Regel die Flaeche laengst weiss faerbt.
+try {
+  const hell = f => { const [r, g, b] = f.match(/[\d.]+/g).map(Number);
+    return (.2126 * r + .7152 * g + .0722 * b) / 255; };
+  for (const thema of ['hell', 'dunkel']) {
+    const p = await seite(1600, undefined, false, thema);
+    const f = await p.evaluate(() => {
+      const cs = s => getComputedStyle(document.querySelector(s));
+      return { oben: cs('.zk-klapp .zk-h-o').backgroundColor,
+               unten: cs('.zk-klapp .zk-h-u').backgroundColor,
+               tag: cs('.zk-tag').backgroundColor,
+               ziffer: cs('.zk-klapp').color,
+               tagZahl: cs('.zk-tag-zahl').color,
+               wochentag: cs('.zk-wt').color,
+               kante: cs('.zk-klapp .zk-h-o').getPropertyValue('--zk-kante').trim()
+                 ? (() => { const d = document.createElement('div');
+                     d.style.backgroundColor = getComputedStyle(document.querySelector('.zeit-raster'))
+                       .getPropertyValue('--zk-kante');
+                     document.body.appendChild(d);
+                     const c = getComputedStyle(d).backgroundColor; d.remove(); return c; })()
+                 : 'rgb(0, 0, 0)',
+               karte: cs('.zeit-karte').backgroundColor };
+    });
+    check(`Im Thema "${thema}": beide Haelften der Klappuhr sind dunkel`,
+      hell(f.oben) < .2 && hell(f.unten) < .2);
+    check(`Im Thema "${thema}": die Tageskachel ebenso`, hell(f.tag) < .2);
+    check(`KRITISCH: im Thema "${thema}" stehen helle Ziffern darauf`,
+      hell(f.ziffer) > .8 && hell(f.tagZahl) > .8);
+    // Als Verhaeltnis, nicht als Differenz: Im dunklen Thema liegt die Karte
+    // selbst schon bei 0.1 Helligkeit, dort ist eine Differenz von 0.1 nach
+    // unten gar nicht mehr zu haben. Eine Pruefung, die das verlangt, waere
+    // nicht streng, sondern unerfuellbar -- und wuerde mit der Zeit
+    // weggelassen statt erfuellt.
+    const verh = (a, b) => (Math.max(a, b) + .05) / (Math.min(a, b) + .05);
+    check(`KRITISCH: im Thema "${thema}" hebt sich die Kachel von der Karte ab`,
+      verh(hell(f.karte), hell(f.oben)) >= 1.3);
+    check(`Im Thema "${thema}" ist die Klappkante auf der Kachel zu sehen`,
+      verh(hell(f.oben), hell(f.kante)) >= 1.2);
+    check(`KRITISCH: im Thema "${thema}" bleibt die Ziffer auf der Kachel gut lesbar`,
+      verh(hell(f.ziffer), hell(f.oben)) >= 3);
+    // Rot heisst in dieser Oberflaeche "gesperrt" -- der Wochentag darf das
+    // Rot der Vorlage darum nicht uebernehmen.
+    const [wr, wg, wb] = f.wochentag.match(/[\d.]+/g).map(Number);
+    check(`Im Thema "${thema}" ist der Wochentag nicht rot -- Rot heisst hier "gesperrt"`,
+      !(wr > 150 && wr - Math.max(wg, wb) > 45));
+    await p.close();
+  }
+} catch (e) { bad.push('Kachelfarben: ' + String(e).split('\n')[0].slice(0, 120)); }
+
+// ══════════════════════════════ DIE KLAPPUHR KLAPPT -- UND ZEIGT DANACH DEN NEUEN WERT
+//
+// Der Fehler, den eine Pruefung auf dataset.wert nicht sehen wuerde: Die
+// Kachel merkt sich den neuen Wert, zeigt aber weiter den alten, weil eine
+// der vier Halbflaechen nicht mitgezogen ist. Gelesen wird darum, was am
+// Ende sichtbar ist.
+try {
+  const p = await seite();
+  const lauf = await p.evaluate(sz => {
+    const zeigt = eval(sz);
+    const k = document.getElementById('zeitMin');
+    const vorher = zeigt('zeitMin');
+    const neu = vorher[0] === '07' ? '08' : '07';
+    const ruhigVorher = !k.classList.contains('laeuft');
+    klappSetzen(k, neu);
+    return { vorher, neu, ruhigVorher, laeuftJetzt: k.classList.contains('laeuft') };
+  }, SICHTBARE_ZIFFERN);
+  check('KRITISCH: beim ersten Zeichnen klappt nichts -- eine Uhr, die beim Laden'
+    + ' durchklappt, behauptet einen Wechsel, den es nicht gab', lauf.ruhigVorher);
+  check('Ein echter Minutenwechsel loest die Bewegung aus', lauf.laeuftJetzt);
+
+  // Mitten in der Bewegung darf der alte Wert noch zu sehen sein -- das ist
+  // die Bewegung. Danach nicht mehr.
+  await p.waitForTimeout(1000);
+  const danach = await p.evaluate(sz => eval(sz)('zeitMin'), SICHTBARE_ZIFFERN);
+  check('KRITISCH: nach der Bewegung steht ueberall der neue Wert',
+    danach.length > 0 && danach.every(z => z === lauf.neu));
+  check('KRITISCH: und nirgends mehr der alte', !danach.includes(lauf.vorher[0]));
+
+  // Und die Beschriftung darf nicht zurueckbleiben: Sie wird an anderer
+  // Stelle gesetzt als die Kacheln.
+  const rund = await p.evaluate(sz => {
+    const zeigt = eval(sz);
+    zeitZeichnen();
+    return { std: zeigt('zeitStd'), min: zeigt('zeitMin'),
+             label: document.getElementById('zeitUhr').getAttribute('aria-label') };
+  }, SICHTBARE_ZIFFERN);
+  await p.waitForTimeout(900);
+  const rund2 = await p.evaluate(sz => ({ std: eval(sz)('zeitStd'), min: eval(sz)('zeitMin'),
+    label: document.getElementById('zeitUhr').getAttribute('aria-label') }), SICHTBARE_ZIFFERN);
+  check('KRITISCH: nach dem naechsten Durchlauf stimmen Kacheln und Beschriftung wieder ueberein',
+    rund2.std[0] + ':' + rund2.min[0] === rund2.label);
+  check('Die Stundenkachel klappt dabei nicht mit, wenn nur die Minute wechselt',
+    new Set(rund.std).size === 1);
+  await p.close();
+} catch (e) { bad.push('Klappen: ' + String(e).split('\n')[0].slice(0, 120)); }
+
+// ══════════════════════════════ DIE BREITE KARTE TEILT SICH IN DREI GLEICHE SPALTEN
+//
+// Genau hier ist beim Bauen ein Fehler passiert, den man nicht sieht: Die
+// Regel fuer die breite Karte stand VOR .zeit-objekte und blieb bei gleicher
+// Eigenspezifitaet wirkungslos. Gemessen kamen Spalten von 648/298/298 px
+// heraus statt drei gleichen -- kaputt sah dabei nichts aus.
+try {
+  const p = await seite();
+  await p.evaluate(() => { const e = document.querySelector('[data-widget="zeit"]');
+    e.classList.remove('dw-halb'); e.classList.add('dw-voll'); });
+  await p.waitForTimeout(300);
+  const b = await p.evaluate(() => {
+    const r = s => document.querySelector(s).getBoundingClientRect();
+    const bd = document.querySelector('.zeit-karte .card-bd');
+    const cs = getComputedStyle(bd);
+    const kacheln = [...document.querySelectorAll('.zk-klapp, .zk-tag')].map(k => k.getBoundingClientRect());
+    return {
+      nebeneinander: Math.abs(r('.zeit-kw').top - r('.zeit-objekte').top) < 2
+        && r('.zeit-objekte').left >= r('.zeit-kw').right - 1,
+      spalten: [r('.zeit-kw').width, r('.zeit-tag').width, r('.zeit-uhr').width],
+      randUeberlauf: Math.max(...kacheln.map(k => k.right))
+        - (r('.zeit-karte .card-bd').right - parseFloat(cs.paddingRight)),
+      hoehe: r('.zk-tag').height,
+      untenRaus: r('.zeit-objekte').bottom - r('.zeit-karte').bottom,
+    };
+  });
+  check('KRITISCH: auf voller Breite stehen die Bloecke nebeneinander', b.nebeneinander);
+  const [kw, tag, uhr] = b.spalten;
+  check('KRITISCH: Datum und Uhrzeit bekommen gleich viel Breite',
+    Math.abs(tag - uhr) < 2);
+  check('KRITISCH: und die Wochenzahl ebenfalls, statt die halbe Karte zu nehmen',
+    Math.abs(kw - tag) < 40);
+  check('KRITISCH: auch dort laeuft keine Kachel ueber den Rand', b.randUeberlauf <= 1);
+  check('Und nichts unten heraus', b.untenRaus <= 1);
+  check('Die Kacheln sind dabei nicht kleiner als auf halber Breite', b.hoehe >= 130);
+
+  // Die Spalte ist hier am engsten -- und eine zu enge Spalte quetscht die
+  // Kacheln, statt dass etwas ueberlaeuft. Gemessen wurde eine Uhr, die
+  // 217 px braucht, auf 158 px zusammengedrueckt; die Ziffern standen
+  // seitlich ueber ihrer Kachel, ohne dass eine Ueberlaufmessung anschlug.
+  // Durchgegangen wird eine Reihe von Kartenbreiten, weil die Kachelgroesse
+  // mit der Breite waechst: Die knappste Lage liegt nicht am Rand des
+  // Bereichs, sondern irgendwo darin.
+  const eng = [];
+  for (const breite of [1120, 1240, 1360, 1520, 1700, 1900]) {
+    await p.setViewportSize({ width: breite, height: 1000 });
+    await p.waitForTimeout(220);
+    eng.push(await p.evaluate(b2 => {
+      const passt = k => {
+        const kr = k.getBoundingClientRect();
+        const rg = document.createRange();
+        rg.selectNodeContents(k.querySelector('.zk-h-o span'));
+        const gr = rg.getBoundingClientRect();
+        return gr.left >= kr.left - .5 && gr.right <= kr.right + .5;
+      };
+      const soll = [...document.querySelectorAll('.zk-klapp')]
+        .map(k => k.getBoundingClientRect().width);
+      const h = document.querySelector('.zk-tag').getBoundingClientRect().height;
+      return { breite: b2,
+               // Die Kachelbreite folgt der Hoehe. Weicht sie ab, ist die
+               // Kachel gestaucht worden.
+               gestaucht: soll.some(w => Math.abs(w - h * 1.22) > 1.5),
+               zifferDrin: [...document.querySelectorAll('.zk-klapp')].every(passt) };
+    }, breite));
+  }
+  const gestaucht = eng.filter(x => x.gestaucht).map(x => x.breite);
+  const rausgeragt = eng.filter(x => !x.zifferDrin).map(x => x.breite);
+  check('KRITISCH: keine Kartenbreite drueckt die Kacheln zusammen'
+    + (gestaucht.length ? ' (gestaucht bei ' + gestaucht.join(', ') + ' px)' : ''),
+    gestaucht.length === 0);
+  check('KRITISCH: und bei keiner ragt eine Ziffer aus ihrer Kachel'
+    + (rausgeragt.length ? ' (bei ' + rausgeragt.join(', ') + ' px)' : ''),
+    rausgeragt.length === 0);
+  await p.close();
+} catch (e) { bad.push('Volle Breite: ' + String(e).split('\n')[0].slice(0, 120)); }
 
 // ══════════════════════════════ AM HANDY NICHT
 //
