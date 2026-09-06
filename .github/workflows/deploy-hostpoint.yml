@@ -432,6 +432,26 @@ jobs:
           sed -i "s|__PUSH_CRON_SCHLUESSEL__|$EFF_PUSH_CRON_SCHLUESSEL|g" dist/api/push_versand.php
           sed -i "s|__MAPS_JS_KEY__|$EFF_MAPS_JS_KEY|g" dist/app.html
 
+      # Live-Version-Verifikation fuer den externen QA-Runner (ENT-432,
+      # sop-qa-runner). Ausschliesslich fuer Staging, keine Secrets: Beide
+      # Werte kommen aus dem GitHub-Kontext, nicht aus "secrets.". Staging
+      # deployt seit ENT-372 ausschliesslich per workflow_dispatch gegen
+      # einen Tag der Form qa-JJJJ-MM-TT-NNN -- github.ref_name ist in
+      # diesem Fall bereits der qa_tag, github.sha bereits der exakte
+      # deployte Commit. Fuer Production laeuft dieser Schritt gar nicht
+      # (if-Bedingung); dist/qa-version.json existiert dort in keinem Lauf
+      # und wird folglich auch nie hochgeladen -- Production bleibt damit
+      # strukturell unveraendert, nicht nur der Absicht nach.
+      - name: qa-version.json erzeugen (nur Staging)
+        if: ${{ env.UMGEBUNG == 'staging' }}
+        run: |
+          cat > dist/qa-version.json << EOF
+          {
+            "qa_tag": "${{ github.ref_name }}",
+            "commit_sha": "${{ github.sha }}"
+          }
+          EOF
+
       - name: Nach Hostpoint hochladen (FTPS)
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
