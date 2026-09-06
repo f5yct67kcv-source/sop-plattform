@@ -297,6 +297,29 @@ const aufFarbeHell = await page.evaluate(() => {
 });
 check(`KRITISCH: Schrift auf farbiger Fläche auch im Hellen lesbar (${kontrast(...aufFarbeHell).toFixed(1)}:1)`,
   kontrast(...aufFarbeHell) >= 4.5);
+
+// Die Kopfzeile war bis ENT-417 in BEIDEN Themen dunkel -- --shell kam
+// unveraendert vom Cockpit und hatte dort nie eine helle Fassung. Gegenprobe
+// zu Zeile 124/125 (dort MUSS der Grund dunkel sein, hier darf er es nicht
+// mehr): ohne diese Pruefung waere der Fehler unbemerkt gruen geblieben,
+// genau wie er es bis zu diesem Fix tatsaechlich war.
+const kopfHell = await echterGrund(page, '.kopf .wer b');
+check('KRITISCH: die Kopfzeile ist in der hellen Fassung nicht mehr schwarz', !istDunkel(kopfHell.grund));
+check(`Der Name auf der Kopfzeile bleibt lesbar (${kontrast(kopfHell.text, kopfHell.grund).toFixed(1)}:1)`,
+  kontrast(kopfHell.text, kopfHell.grund) >= 7);
+const unterzeileHell = await echterGrund(page, '.kopf .wer span');
+check(`Die Unterzeile der Kopfzeile bleibt lesbar (${kontrast(unterzeileHell.text, unterzeileHell.grund).toFixed(1)}:1)`,
+  kontrast(unterzeileHell.text, unterzeileHell.grund) >= 4.5);
+
+// Dieselbe Kopfzeile bedient auch "Wächter" (kein eigenes Element, nur ein
+// anderer Reiter dahinter) -- genau dort ist der schwarze Rest aufgefallen.
+await page.evaluate(() => zeige('waechter'));
+await page.waitForTimeout(400);
+const kopfWaechterHell = await echterGrund(page, '.kopf .wer b');
+check('KRITISCH: auch auf "Wächter" bleibt die Kopfzeile hell', !istDunkel(kopfWaechterHell.grund));
+await page.evaluate(() => zeige('heute'));
+await page.waitForTimeout(300);
+
 await page.screenshot({ path: OUT + '/appthema-04-heute-hell.png' });
 
 // ══════════════════════════════════════════ FORM BLEIBT, NUR FARBE WECHSELT
