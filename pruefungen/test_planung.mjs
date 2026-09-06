@@ -1457,7 +1457,7 @@ const klammerAuf = await page.evaluate(() => {
     letzterIstEnde: !!letzterKind && letzterKind.classList.contains('serie-grp-ende'),
     letzterUnten: letzterKind ? breit(letzterKind, 'borderBottomWidth') : 0,
     // Wie breit die Schiene links an der Zelle ist -- unabhaengig davon, WIE
-    // sie gezeichnet wird. Seit ENT-417 ist sie ein innerer Schatten statt
+    // sie gezeichnet wird. Seit ENT-422 ist sie ein innerer Schatten statt
     // eines Randes: Ein echter Rand gehoert zum Kastenmodell und verschob die
     // linksbuendige Uhrzeit gegenueber der Nachbarzeile. Geprueft wird die
     // Aussage "es ist eine sichtbare Schiene da", nicht die Technik dahinter.
@@ -1484,7 +1484,7 @@ check('Der eingeschobene Tag steht an einer sichtbaren Schiene — er gehört er
 // (ENT-137, ENT-140). Der eingeschobene Tag traegt eine Schiene links und ein
 // Datum darueber -- beides darf die Uhrzeit NICHT gegenueber dem ersten Tag
 // verschieben. Am gerenderten Text gemessen, nicht an der Zelle.
-// Gemessen wird seit ENT-417 die LINKE Kante: Die Zeitspalte steht seitdem
+// Gemessen wird seit ENT-422 die LINKE Kante: Die Zeitspalte steht seitdem
 // linksbuendig (Kopf und Wert auf derselben Kante, wie ueberall im Cockpit),
 // und die tragende Kante einer linksbuendigen Spalte ist die linke. Die
 // Aussage bleibt dieselbe -- Schiene, Datum und Aufklapp-Pfeil duerfen die

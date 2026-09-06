@@ -963,7 +963,7 @@ tbody tr.summe td { background: var(--surface-2); font-weight: 650; border-top: 
    eines Symbols (siehe Begruendung dort) und darf die Spalte dafuer breiter
    ziehen. */
 .rapp-klammer { width: 1%; padding: 4px 8px !important; text-align: center; border-left: 3px solid var(--line-hi); }
-/* Der Kopf DERSELBEN Spalte (ENT-417): Breite, Innenabstand und Mitte
+/* Der Kopf DERSELBEN Spalte (ENT-422): Breite, Innenabstand und Mitte
    uebernimmt er mit -- sonst stuende ueber einer 8-px-Zelle ein 18-px-Kopf,
    und die Spaltengrenze saehe je nach Zeile anders aus. Nur die linke
    Randlinie bleibt draussen: Sie markiert eine Zeilengruppe, und im Kopf
@@ -1808,7 +1808,7 @@ tbody tr.serie-grp-ende > td { border-bottom: 2px solid var(--serie); }
 .ag-karte.serie-grp-ende { border-bottom: 2px solid var(--serie); }
 /* Zeitspalte: Pfeil und Uhrzeit sind eine Einheit und bleiben zusammen --
    sonst schiebt der Pfeil die Uhrzeit aus der Zelle in die naechste Spalte.
-   Der Pfeil steht seit ENT-417 HINTER der Uhrzeit, wie in der Handy-Karte
+   Der Pfeil steht seit ENT-422 HINTER der Uhrzeit, wie in der Handy-Karte
    (plKarte) schon immer: Linksbuendig haette er sonst nur die Zeilen mit
    Reihe um seine Breite eingerueckt -- 29 px Versatz gegenueber jeder
    anderen Zeile derselben Spalte. */
@@ -1817,7 +1817,7 @@ tbody tr.serie-grp-ende > td { border-bottom: 2px solid var(--serie); }
    Uhrzeit. Als inline-flex lag sie in derselben Zeile wie die Uhrzeit und
    ragte -- die Zelle ist nowrap -- sichtbar in die Spalte "Kunde" hinein.
    Sie richtet sich an derselben Kante aus wie die Uhrzeit darueber
-   (ENT-417): Seit die Zeitspalte linksbuendig steht, waere ein
+   (ENT-422): Seit die Zeitspalte linksbuendig steht, waere ein
    margin-left:auto eine zweite, gegenlaeufige Kante in einer einzigen
    Zelle -- Uhrzeit links, Marke rechts. */
 table.pl-tab td .serie-marke { display: flex; width: fit-content; margin-right: auto; margin-top: 5px; }
@@ -2134,7 +2134,7 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
 .gr .blk.zu .i-schloss { width: 9px; height: 9px; margin-right: 1px; stroke-width: 2.8; }
 .gr tr.leerzeile td.lb b { color: var(--ink-3); font-weight: 550; }
 .gr td.sum { position: sticky; right: 0; background: var(--surface); border-left: 1px solid var(--line); padding: 7px 12px; text-align: right; font-size: 11.5px; white-space: nowrap; font-variant-numeric: tabular-nums; }
-/* Rechtsbuendig wie die Werte darunter (ENT-417). ".gr thead th" setzt
+/* Rechtsbuendig wie die Werte darunter (ENT-422). ".gr thead th" setzt
    text-align:center fuer die Tagesspalten -- die Summenspalte hat das
    stillschweigend geerbt, waehrend ".gr td.sum" seine Stunden rechts
    ausrichtet. Gemessen: Kopf mittig, Wert rechts, in jedem .gr-Raster. */
@@ -9279,7 +9279,7 @@ function glasUm() {
 // 'objekt' seit ENT-200: eigene Ansicht statt Schublade, aus demselben Grund
 // wie 'offerte' -- Masterschichten und Kontrollpunkte (ENT-186) sind
 // Listen unbestimmter Laenge, keine 440px-Schublade haelt das auf Dauer.
-// ENT-417: Die Listenansichten kommen dazu. Der 1440-px-Deckel ist eine
+// ENT-422: Die Listenansichten kommen dazu. Der 1440-px-Deckel ist eine
 // LESEBREITE -- er gehoert vor eine Spalte Fliesstext oder ein Formular, nicht
 // vor eine Tabelle mit neun bis elf Spalten. Gemessen bei 1728 px Fenster im
 // Kopfleisten-Zustand: 288 px blieben rechts leer, bei 1920 px sind es 480 px

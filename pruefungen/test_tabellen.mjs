@@ -1,5 +1,5 @@
 // Tabellen im Cockpit: Breite ausgenutzt, Kopf und Wert an derselben Kante
-// (ENT-417).
+// (ENT-422).
 //
 // Zwei Befunde vom Projektinhaber am 05.09.2026, beide am gerenderten Zustand
 // nachgemessen, nicht im Quelltext gelesen:

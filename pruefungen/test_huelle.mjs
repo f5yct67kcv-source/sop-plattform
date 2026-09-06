@@ -268,7 +268,7 @@ try {
     check(`${v} nutzt die volle Breite`, await weit());
   }
 
-  // Die Listenansichten sind seit ENT-417 dazugekommen. Der Deckel ist eine
+  // Die Listenansichten sind seit ENT-422 dazugekommen. Der Deckel ist eine
   // LESEBREITE -- er gehoert vor eine Textspalte oder ein Formular, nicht vor
   // eine Tabelle mit elf Spalten. Gemessen bei 1920 px blieben dort 480 px
   // rechts leer, waehrend dieselbe Zeile links einen langen Firmennamen und
@@ -296,7 +296,7 @@ try {
   // Gemessen statt geglaubt, und im Zustand, in dem es zaehlt: ausgeblendete
   // Leiste, 1600 px Fenster. Einsatzliste und Kundenliste nutzen sie ganz,
   // die Einstellungen bleiben beim Deckel von 1440 px. Der Unterschied ist
-  // der ganze Punkt -- nur verlaeuft er seit ENT-417 zwischen Tabelle und
+  // der ganze Punkt -- nur verlaeuft er seit ENT-422 zwischen Tabelle und
   // Formular, nicht mehr zwischen Planung und Stammdaten.
   await p.evaluate(() => huelleSetzen('aus')); await p.waitForTimeout(250);
   await p.evaluate(() => go('planung'));
