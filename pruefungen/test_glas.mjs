@@ -151,7 +151,11 @@ const farben = page => page.evaluate(() => {
   return { kpiGrund: k.backgroundColor, kpiRadius: k.borderRadius,
            ink: c('.kpi-val').color, ink3: c('.kpi-top span').color,
            cardGrund: c('.card').backgroundColor,
-           bodyBild: getComputedStyle(document.body).backgroundImage,
+           // Der Verlauf liegt seit ENT-419 auf einer eigenen, fest
+           // stehenden Ebene (body::before) statt am Koerper selbst --
+           // aus Rechenlast, siehe Kommentar dort. Gelesen wird darum
+           // die Ebene, nicht der Koerper.
+           bodyBild: getComputedStyle(document.body, '::before').backgroundImage,
            cardUnschaerfe: c('.card').backdropFilter || c('.card').webkitBackdropFilter,
            // Die Seitenleiste. Ihre beiden leisen Beschriftungen tragen einen
            // FESTEN Grauwert (#5C626E), der von --shell nichts weiss: Wird
@@ -178,18 +182,64 @@ check('KRITISCH: und LINKS davon -- der Hell/Dunkel-Schalter bleibt aussen',
     const t = $('btnThema').getBoundingClientRect(), g = $('btnGlas').getBoundingClientRect();
     return g.right <= t.left + 1;
   }));
-check('Ohne Wahl ist er aus',
-  await page.evaluate(() => document.documentElement.getAttribute('data-glas') === 'aus'));
-check('Und meldet das auch so', await page.getAttribute('#btnGlas', 'aria-checked') === 'false');
+check('Ohne Wahl ist er AN (ENT-419)',
+  await page.evaluate(() => document.documentElement.getAttribute('data-glas') === 'an'));
+check('Und meldet das auch so', await page.getAttribute('#btnGlas', 'aria-checked') === 'true');
 check('Er traegt eine sprechende Beschriftung',
-  (await page.getAttribute('#btnGlas', 'title')).toLowerCase().includes('einschalten'));
+  (await page.getAttribute('#btnGlas', 'title')).toLowerCase().includes('ausschalten'));
+
+// ══════════════════════════════════════════ 1b. DIE KANALFASSUNG DER MARKEN
+// --surface-rgb und --shell-rgb sind dieselbe Farbe wie --surface und
+// --shell, nur als Zahlen. Sie existieren, weil rgba(var(--x-rgb), a) sich
+// zu rgba(...) berechnet und color-mix() zu color(srgb ...) -- und letzteres
+// lesen die Zahlenausdruecke der uebrigen Suiten falsch. Zwei Fassungen
+// derselben Farbe koennen auseinanderlaufen; darum wird hier GEMESSEN, dass
+// sie es nicht tun: zwei Probeflaechen, eine je Schreibweise, und die
+// gerechneten Farben muessen gleich sein.
+const kanaeleStimmen = () => page.evaluate(() => {
+  const pruefe = (farbe, kanaele) => {
+    const a = document.createElement('div'), b = document.createElement('div');
+    a.style.background = `var(${farbe})`;
+    b.style.background = `rgb(var(${kanaele}))`;
+    document.body.append(a, b);
+    const gleich = getComputedStyle(a).backgroundColor === getComputedStyle(b).backgroundColor;
+    const wert = getComputedStyle(a).backgroundColor;
+    a.remove(); b.remove();
+    return { gleich, wert };
+  };
+  return { surface: pruefe('--surface', '--surface-rgb'), shell: pruefe('--shell', '--shell-rgb') };
+});
+let kanaele = await kanaeleStimmen();
+check(`KRITISCH: --surface-rgb ist dieselbe Farbe wie --surface (${kanaele.surface.wert})`,
+  kanaele.surface.gleich);
+check(`KRITISCH: --shell-rgb ist dieselbe Farbe wie --shell (${kanaele.shell.wert})`,
+  kanaele.shell.gleich);
+
+// Und die Flaechenfarbe kommt als rgba() heraus, nicht als color(srgb ...).
+// Nicht Formalismus: Genau daran haetten acht bestehende Suiten still
+// Unsinn gemessen.
+check('KRITISCH: die Glasflaeche berechnet sich zu rgba(), nicht zu color(srgb ...)',
+  await page.evaluate(() => {
+    const w = getComputedStyle(document.querySelector('.kpi')).backgroundColor;
+    return w.startsWith('rgba(') && !w.includes('srgb');
+  }));
 
 // ══════════════════════════════════════════ 2. AUS IST DIE ALTE DARSTELLUNG
+// Seit ENT-419 ist "an" die Voreinstellung, also wird "aus" hier
+// hergestellt statt vorgefunden. Der Zustand selbst muss derselbe bleiben:
+// Wer abschaltet, bekommt die Fassung von vor ENT-418 unveraendert zurueck.
+await page.click('#btnGlas');
+await page.waitForTimeout(400);
+check('Ein Klick schaltet ab',
+  await page.evaluate(() => document.documentElement.getAttribute('data-glas') === 'aus'));
+check('Die Abwahl wird gespeichert',
+  await page.evaluate(() => localStorage.getItem('rv3_glas') === 'aus'));
 const ausFarben = await farben(page);
 const ausMasse = await masse(page);
 check('KRITISCH: ausgeschaltet sind die Kacheln deckend -- wie vorher',
   alpha(ausFarben.kpiGrund) === 1 && alpha(ausFarben.cardGrund) === 1);
-check('KRITISCH: ausgeschaltet traegt der Grund kein Bild', ausFarben.bodyBild === 'none');
+check('KRITISCH: ausgeschaltet traegt der Grund kein Bild',
+  ausFarben.bodyBild === 'none' || ausFarben.bodyBild === '');
 
 // Die gemessenen Kontraste im ausgeschalteten Zustand -- sie sind der
 // Massstab, an dem sich das Glas gleich messen lassen muss.
@@ -204,10 +254,10 @@ const kontrastAus = {
   markeSub: kontrast(ausFarben.markeSub, schieneAus.farbe),
 };
 
-// ══════════════════════════════════════════ 3. EINSCHALTEN
+// ══════════════════════════════════════════ 3. WIEDER EINSCHALTEN
 await page.click('#btnGlas');
 await page.waitForTimeout(400);
-check('Ein Klick schaltet ein',
+check('Ein weiterer Klick schaltet wieder ein',
   await page.evaluate(() => document.documentElement.getAttribute('data-glas') === 'an'));
 check('Der Schalter meldet „an"', await page.getAttribute('#btnGlas', 'aria-checked') === 'true');
 check('Die Wahl wird gespeichert',
@@ -310,15 +360,22 @@ check(`Dunkel: die Rubriken der Seitenleiste bleiben sichtbar `
   kontrast(dunkelFarben.navLbl, schieneDunkel.farbe) >= 3);
 check(`Dunkel: die Menueeintraege bleiben gut lesbar`,
   kontrast(dunkelFarben.navItem, schieneDunkel.farbe) >= 4.5);
+kanaele = await kanaeleStimmen();
+check(`KRITISCH: --surface-rgb stimmt auch im Dunkeln (${kanaele.surface.wert})`,
+  kanaele.surface.gleich);
+check(`KRITISCH: --shell-rgb stimmt auch im Dunkeln (${kanaele.shell.wert})`,
+  kanaele.shell.gleich);
 // ENT-227 sagt: im Dunkeln traegt der Rand, nicht der Schatten. Unter Glas
 // traegt die KANTE -- und die ist ein inset-Schatten. Die Aussage bleibt
 // also dieselbe und wird hier auch so geprueft: keine Lage, die nach
 // AUSSEN faellt. (Ein Eintrag mit Deckkraft 0 zaehlt als keiner -- so
 // bleibt --glas-abheben in einer Liste stehen, ohne zu wirken.)
 check('KRITISCH: im Dunkeln faellt kein Schatten nach aussen (ENT-227)',
-  await page.evaluate(() => getComputedStyle(document.querySelector('.card')).boxShadow
-    .split(/,(?![^(]*\))/)
-    .every(t => t.includes('inset') || /rgba\([^)]*,\s*0\s*\)/.test(t))));
+  await page.evaluate(() => {
+    const w = getComputedStyle(document.querySelector('.card')).boxShadow;
+    return w === 'none' || w.split(/,(?![^(]*\))/)
+      .every(t => t.includes('inset') || /rgba\([^)]*,\s*0\s*\)/.test(t));
+  }));
 await page.screenshot({ path: OUT + '/96-glas-dunkel.png' });
 await page.click('#btnThema');
 await page.waitForTimeout(300);
@@ -469,8 +526,16 @@ check('KRITISCH: das Merkmal steht frueh genug am Dokument',
 await browser.close();
 
 ({ browser, page } = await starte('aus'));
-check('Auch „aus" bleibt gespeichert',
+check('Auch „aus" bleibt gespeichert -- eine Abwahl haelt',
   await page.evaluate(() => document.documentElement.getAttribute('data-glas') === 'aus'));
+check('Und der Schalter steht dann auch so da',
+  await page.getAttribute('#btnGlas', 'aria-checked') === 'false');
+// Ein unbrauchbarer Wert im Speicher darf nicht abschalten: Nur eine
+// ausdrueckliche Abwahl tut das (ENT-419).
+await browser.close();
+({ browser, page } = await starte('quatsch'));
+check('Ein unbrauchbarer gespeicherter Wert fuehrt zur Voreinstellung, nicht zum Aus',
+  await page.evaluate(() => document.documentElement.getAttribute('data-glas') === 'an'));
 await browser.close();
 
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);

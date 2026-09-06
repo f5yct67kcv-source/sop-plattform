@@ -52,6 +52,14 @@
 :root {
   /* Seitenleiste (Graphit) */
   --shell:        #16181D;
+  /* Dieselbe Farbe noch einmal als Kanaele. Sie ist NICHT als zweite
+     Farbmarke gedacht und wird nie allein geaendert -- sie existiert, weil
+     rgba(var(--x-rgb), a) sich zu rgba(...) berechnet, color-mix() dagegen
+     zu color(srgb ...). Und color(srgb ...) liest jeder Zahlenausdruck in
+     den Pruefungen falsch: 0.0862745 wird zu "0" und "862745". Dass beide
+     Fassungen dieselbe Farbe meinen, prueft test_glas.mjs am gerenderten
+     Zustand -- auseinanderlaufen koennen sie also nicht unbemerkt. */
+  --shell-rgb:    22,24,29;
   --shell-hi:     #1E2128;
   --shell-line:   #272B33;
   --shell-txt:    #9298A5;
@@ -60,6 +68,7 @@
   /* Arbeitsflaeche */
   --bg:           #F7F8FA;
   --surface:      #FFFFFF;
+  --surface-rgb:  255,255,255;   /* Kanaele, siehe --shell-rgb */
   --line:         #E5E8EC;
   --line-soft:    #EFF1F4;
 
@@ -139,6 +148,7 @@ html[data-thema="dunkel"] {
   /* Die Seitenleiste bleibt der dunkelste Bereich, damit die Gliederung
      erhalten bleibt und die Arbeitsflaeche sich weiterhin abhebt. */
   --shell:        #0B0D11;
+  --shell-rgb:    11,13,17;
   --shell-hi:     #14171C;
   --shell-line:   #23272F;
   --shell-txt:    #8A919E;
@@ -146,6 +156,7 @@ html[data-thema="dunkel"] {
 
   --bg:           #0F1117;
   --surface:      #161B27;
+  --surface-rgb:  22,27,39;
   --surface-2:    #1E2535;
   --surface-3:    #242C3E;
   --line:         #2A3147;
@@ -242,6 +253,7 @@ svg.i-sm { width: 15px; height: 15px; }
 
   --bg:           #0F1117;
   --surface:      #161B27;
+  --surface-rgb:  22,27,39;
   --surface-2:    #1E2535;
   --line:         #2A3147;
   --line-soft:    #232A3B;
@@ -3336,6 +3348,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
      --surface und --ink dort dunkle Werte tragen. */
   .side {
     --shell:        var(--surface);
+    --shell-rgb:    var(--surface-rgb);   /* zieht mit, siehe --shell-rgb */
     --shell-hi:     var(--accent-soft);
     --shell-line:   var(--line);
     --shell-txt:    var(--ink-2);
@@ -3614,24 +3627,30 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 }
 
 /* ══════════════════════════════════════════════════════════════════════
-   LIQUID GLASS (ENT-418) — an- und abschaltbar, Voreinstellung AUS
+   LIQUID GLASS (ENT-418) — an- und abschaltbar, Voreinstellung AN (ENT-419)
 
    Eine zweite Fassung derselben Oberflaeche: Kacheln und Fenster werden
    durchscheinend und tragen eine Lichtkante, wie Apple sie seit iOS 26
    verwendet. Der Schalter steht in der Kopfleiste neben hell/dunkel.
-   "Aus" ist Zeichen fuer Zeichen die Darstellung, die vorher da war --
+   "Aus" ist Zeichen fuer Zeichen die Darstellung, die vor ENT-418 da war --
    dieser ganze Block haengt an html[data-glas="an"] und ist sonst
-   wirkungslos.
+   wirkungslos. Seit ENT-419 ist "an" die Voreinstellung; wer abschaltet,
+   bekommt die alte Fassung unveraendert zurueck.
 
    Vier Regeln, an die sich der Block haelt:
 
-   1. KEINE ZWEITE FARBWELT. Die Tinte wird mit color-mix aus den
-      BESTEHENDEN Marken gemischt (--surface, --shell). Damit zieht das
+   1. KEINE ZWEITE FARBWELT. Die Tinte wird aus den BESTEHENDEN Marken
+      gemischt (--surface, --shell), nicht neu erfunden. Damit zieht das
       Glas bei jeder kuenftigen Palettenaenderung automatisch mit, in
-      beiden Themen, und es gibt keine zweite Stelle, an der Farben
-      gepflegt werden muessten. Vor jeder color-mix-Zeile steht die
-      unvermischte Farbe: Ein Browser ohne color-mix laesst die zweite
-      Zeile fallen und zeigt die heutige, deckende Flaeche.
+      beiden Themen.
+      Gemischt wird ueber die Kanalfassung -- rgba(var(--surface-rgb), a)
+      -- und AUSDRUECKLICH NICHT ueber color-mix(). Der Grund ist gemessen
+      und war die unangenehmste Ueberraschung dieses Umbaus: color-mix()
+      berechnet sich in Chrome zu "color(srgb 0.0862745 0.105882 ...)".
+      Jeder Zahlenausdruck in den bestehenden Pruefungen liest daraus
+      "0" und "862745" statt 22 und 27 -- acht Suiten messen Flaechen-
+      farben so, und sie wuerden ab dem Tag, an dem Glas voreingestellt
+      ist, stillschweigend Unsinn vergleichen. rgba() liefert rgba().
 
    2. UNSCHAERFE NUR DORT, WO WIRKLICH ETWAS DAHINTER DURCHLAEUFT --
       Kopfleiste, Seitenleiste, Fenster, Schublade, Menues. NICHT auf
@@ -3661,8 +3680,8 @@ html[data-glas="an"] {
      Kachel, die auf dem leeren Grund liegt -- sonst liest man zwei Ebenen
      gleichzeitig. --glas-schiene (die Seitenleiste) steht bewusst NUR in
      der dunklen Fassung, siehe die Regel weiter unten. */
-  --glas-kachel:  54%;
-  --glas-fenster: 84%;
+  --glas-kachel:  .54;
+  --glas-fenster: .84;
 
   --glas-unschaerfe:  20px;
   --glas-saettigung: 165%;
@@ -3710,8 +3729,8 @@ html[data-glas="an"][data-thema="dunkel"] {
      Verlauf die Kachel DUNKLER und der Text gewinnt Kontrast, hier hellt er
      sie auf und der Text verliert. Darum deckt die Kachel im Dunkeln mehr
      -- gemessen, nicht geschaetzt (test_glas.mjs prueft beide Fassungen). */
-  --glas-kachel:  62%;
-  --glas-schiene: 74%;
+  --glas-kachel:  .62;
+  --glas-schiene: .74;
 }
 
 /* ── Der Grund, auf den das Glas schaut ─────────────────────────────────
@@ -3720,15 +3739,33 @@ html[data-glas="an"][data-thema="dunkel"] {
    statt eines Farbverlaufs ueber die Diagonale -- so bleibt die Mitte, wo
    Tabellen und Zahlen liegen, am ruhigsten, und die Farbe sammelt sich
    dort, wo ohnehin Rand ist.
-   background-attachment:fixed haelt den Verlauf beim Scrollen still,
-   waehrend die Kacheln darueber wandern. Erst dadurch aendert sich, was
-   eine Kachel durchscheinen laesst, sobald man scrollt. */
-html[data-glas="an"] body {
+
+   Als EIGENE, fest stehende Ebene, nicht als background-attachment:fixed
+   am Koerper. Beides sieht gleich aus -- der Verlauf steht still, waehrend
+   die Kacheln darueber wandern, und erst dadurch aendert sich beim
+   Scrollen, was eine Kachel durchscheinen laesst. Der Unterschied ist die
+   Rechenlast, und die ist hier GEMESSEN worden, nicht vermutet:
+
+   Mit background-attachment:fixed muss der Browser den Verlauf bei jedem
+   Bildaufbau des Koerpers neu zeichnen. Unter Last hat das gereicht, um
+   eine 130-ms-Ueberblendung an .btn nach 200 ms noch nicht fertig sein zu
+   lassen -- test_begruessung.mjs wurde dadurch in vier von acht parallelen
+   Laeufen rot (auf origin/main null von acht). Als eigene Ebene mit
+   position:fixed kann der Browser den Verlauf einmal zeichnen und danach
+   nur noch zusammensetzen; die Ueberblendung hat ihre Reserve zurueck.
+
+   z-index:-1 heisst hier: hinter dem Inhalt des Koerpers, aber VOR dessen
+   Hintergrundfarbe -- genau die Ebene, die gebraucht wird. */
+html[data-glas="an"] body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
   background-image:
     radial-gradient(1500px 900px at  2% -18%, var(--glas-grund-1), transparent 66%),
     radial-gradient(1250px 950px at 102%  6%, var(--glas-grund-2), transparent 64%),
     radial-gradient(1400px 1000px at 46% 118%, var(--glas-grund-3), transparent 68%);
-  background-attachment: fixed;
   background-repeat: no-repeat;
 }
 
@@ -3741,16 +3778,27 @@ html[data-glas="an"] .pn-kopf,
 html[data-glas="an"] .pn-zeile,
 html[data-glas="an"] .opl-tag,
 html[data-glas="an"] .ep-leute {
-  background: var(--surface);
-  background: color-mix(in srgb, var(--surface) var(--glas-kachel), transparent);
+  background: rgba(var(--surface-rgb), var(--glas-kachel));
   border-color: var(--glas-linie);
-  /* Vier Lagen, von aussen nach innen: das Abheben, die scharfe Lichtkante
-     ganz oben, ihr weiches Abklingen nach innen, die Tiefe unten. */
+  /* Drei Lagen: das Abheben, die scharfe Lichtkante oben, die Tiefe unten.
+     Alle drei sind HAARLINIEN ohne Weichzeichnung -- das ist eine
+     Messentscheidung und zugleich die naehere Nachbildung.
+
+     Gemessen: Zwei zusaetzliche, weich auslaufende Innenschatten (12/24
+     und 14/26 px) auf jeder Kachel kosteten auf der Uebersicht rund 17 ms
+     je Bildaufbau -- 181 ms statt 164 ms, bis eine 130-ms-Ueberblendung
+     stand. Das ist der groesste Einzelposten des ganzen Glases, groesser
+     als die Unschaerfe der Kopfleiste und der Verlauf zusammen (beide
+     zusammen: 0 ms messbar). Weichzeichnung ueber eine Flaeche ist teuer,
+     eine Linie ist es nicht.
+
+     Und optisch verliert es nichts: Bei Apple ist die Kante eine scharfe
+     Spiegelung am Glasrand, kein Schimmer, der nach innen auslaeuft. Der
+     weiche Verlauf war die weniger treue Nachbildung -- und die teurere. */
   box-shadow:
     var(--glas-abheben),
     inset 0 1px 0 0 var(--glas-kante-hell),
-    inset 0 12px 24px -18px var(--glas-kante-hell),
-    inset 0 -14px 26px -20px var(--glas-kante-tief);
+    inset 0 -1px 0 0 var(--glas-kante-tief);
 }
 html[data-glas="an"] .card,
 html[data-glas="an"] .bk-kachel { border-radius: var(--glas-r-lg); }
@@ -3781,8 +3829,7 @@ html[data-glas="an"] .drawer,
 html[data-glas="an"] .rowmenu-pop,
 html[data-glas="an"] .glocke-panel,
 html[data-glas="an"] .rdkarte-suche-treffer {
-  background: var(--surface);
-  background: color-mix(in srgb, var(--surface) var(--glas-fenster), transparent);
+  background: rgba(var(--surface-rgb), var(--glas-fenster));
   backdrop-filter: saturate(var(--glas-saettigung)) blur(var(--glas-unschaerfe));
   -webkit-backdrop-filter: saturate(var(--glas-saettigung)) blur(var(--glas-unschaerfe));
   border: 1px solid var(--glas-linie);
@@ -3803,7 +3850,7 @@ html[data-glas="an"] .glocke-panel {
     var(--sh-3),
     inset 0 1px 0 0 var(--glas-kante-hell),
     inset 1px 0 0 0 var(--glas-kante-hell),
-    inset 0 -16px 30px -22px var(--glas-kante-tief);
+    inset 0 -1px 0 0 var(--glas-kante-tief);
 }
 
 /* ── Leisten ───────────────────────────────────────────────────────────
@@ -3836,15 +3883,37 @@ html[data-glas="an"] .topbar {
    Leiste seit ENT-071 ueber --shell: var(--surface) dem Hell/Dunkel-
    Schalter folgt. */
 html[data-glas="an"][data-thema="dunkel"] .side {
-  background: var(--shell);
-  background: color-mix(in srgb, var(--shell) var(--glas-schiene), transparent);
-  backdrop-filter: saturate(var(--glas-saettigung)) blur(var(--glas-unschaerfe));
-  -webkit-backdrop-filter: saturate(var(--glas-saettigung)) blur(var(--glas-unschaerfe));
+  background: rgba(var(--shell-rgb), var(--glas-schiene));
+}
+/* Die Unschaerfe bekommt sie NUR als Schublade, also unter 900 px -- und
+   damit gilt Regel 2 auch hier, statt eine Ausnahme fuer die Seitenleiste
+   zu machen: Am Schreibtisch steht die Leiste fest links, und der Inhalt
+   beginnt rechts von ihr (.main traegt margin-left: var(--side-w)). Hinter
+   ihr laeuft also NICHTS durch -- nur der ruhige Verlauf, und den
+   weichzuzeichnen aendert am Bild nichts. Als Schublade auf dem Handy legt
+   sie sich dagegen ueber den Inhalt; dort ist die Unschaerfe das, was sie
+   lesbar macht.
+
+   Der Preis war gemessen, nicht vermutet: Eine 232 px breite, bildschirm-
+   hohe Unschaerfe ueber die volle Hoehe hat auf der Uebersicht so viel
+   Rechenzeit gekostet, dass eine 130-ms-Ueberblendung an .btn nach 200 ms
+   noch nicht fertig war -- test_begruessung.mjs wurde dadurch in 7 von 12
+   parallelen Laeufen rot, und zwar ausschliesslich im dunklen Thema, also
+   genau dort, wo diese Regel greift. Mit derselben Datei und Glas
+   ausgeschaltet: 12 von 12 gruen. */
+@media (max-width: 900px) {
+  html[data-glas="an"][data-thema="dunkel"] .side {
+    backdrop-filter: saturate(var(--glas-saettigung)) blur(var(--glas-unschaerfe));
+    -webkit-backdrop-filter: saturate(var(--glas-saettigung)) blur(var(--glas-unschaerfe));
+  }
 }
 
 /* ── Wenn der Browser kein backdrop-filter kann ────────────────────────
-   Dann bleibt von Glas nur Blaesse uebrig. In dem Fall decken die Fenster
-   wieder voll -- lieber gewoehnlich als unlesbar. */
+   Dann bleibt von Glas nur Blaesse uebrig, weil hinter diesen Flaechen
+   wirklich Inhalt durchlaeuft und ihn niemand mehr weichzeichnet. In dem
+   Fall decken sie wieder voll -- lieber gewoehnlich als unlesbar.
+   Die Kacheln brauchen das nicht: Hinter ihnen liegt nur der ruhige
+   Grund, den auch die Unschaerfe nicht veraendert haette. */
 @supports not ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) {
   html[data-glas="an"] .dlg,
   html[data-glas="an"] .drawer,
@@ -3858,7 +3927,7 @@ html[data-glas="an"][data-thema="dunkel"] .side {
 /* Wer am Betriebssystem "weniger Transparenz" eingestellt hat, meint genau
    das. Die Kante und der Grund bleiben, die Durchsicht geht fast ganz weg. */
 @media (prefers-reduced-transparency: reduce) {
-  html[data-glas="an"] { --glas-kachel: 96%; --glas-fenster: 99%; --glas-schiene: 97%; }
+  html[data-glas="an"] { --glas-kachel: .96; --glas-fenster: .99; --glas-schiene: .97; }
 }
 
 /* Auf dem Handy weniger Unschaerfe: dieselbe Wirkung, weniger Rechenlast auf
@@ -3913,17 +3982,19 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
   }
   document.documentElement.setAttribute('data-thema', w);
 })();
-/* Liquid Glass (ENT-418). Aus demselben Grund vor dem ersten Zeichnen:
-   Sonst steht die deckende Fassung einen Wimpernschlag lang da und
-   springt dann um. Eigener Block mit eigenem try, damit ein Speicher, der
-   nicht lesbar ist (privates Fenster), nicht auch noch die Hell/Dunkel-
-   Wahl darueber mitreisst.
-   Ohne gespeicherte Wahl: AUS. Anders als bei hell/dunkel gibt es hier
-   keine Einstellung des Betriebssystems, die man befragen koennte -- und
-   "aus" ist die Darstellung, die vorher da war. */
+/* Liquid Glass (ENT-418, Voreinstellung nach ENT-419). Aus demselben
+   Grund vor dem ersten Zeichnen: Sonst steht die deckende Fassung einen
+   Wimpernschlag lang da und springt dann um. Eigener Block mit eigenem
+   try, damit ein Speicher, der nicht lesbar ist (privates Fenster), nicht
+   auch noch die Hell/Dunkel-Wahl darueber mitreisst.
+   Ohne gespeicherte Wahl: AN (ENT-419). Anders als bei hell/dunkel gibt es
+   hier keine Einstellung des Betriebssystems, die man befragen koennte.
+   Der Vergleich steht darum auf 'aus' und nicht auf 'an': Nur eine
+   ausdrueckliche Abwahl schaltet ab -- ein leerer oder unlesbarer Speicher
+   fuehrt zur neuen Fassung, nicht zur alten. */
 (function () {
-  var g = 'aus';
-  try { g = localStorage.getItem('rv3_glas') === 'an' ? 'an' : 'aus'; } catch (e) {}
+  var g = 'an';
+  try { g = localStorage.getItem('rv3_glas') === 'aus' ? 'aus' : 'an'; } catch (e) {}
   document.documentElement.setAttribute('data-glas', g);
 })();
 </script>
