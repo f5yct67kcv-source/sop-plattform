@@ -432,6 +432,66 @@ const gespeichert = JSON.parse(await page.evaluate(() => localStorage.getItem('r
 check('Der Zustand wird mitgespeichert wie jeder andere Container',
   gespeichert.find(x => x.id === 'begruessung').sichtbar === false);
 
+// ══════════════════════════════ DER ERKLAERSATZ IST WEG -- DIE WARNUNGEN NICHT
+//
+// Skizze des Projektinhabers vom 2026-09-06 (ENT-428): Der Satz "Sprich in
+// ganzen Saetzen ..." soll auf der Uebersicht verschwinden. Dasselbe Feld
+// traegt aber auch die Warnungen und Fehler des Diktats -- ein Mikrofon ohne
+// Signal, eine Aufnahme, die nicht startet, ein Browser, der es nicht kann.
+// Waere das Feld ganz ausgeblendet, druecke jemand auf Sprechen, saehe nichts
+// geschehen und erfuehre nicht warum: genau der Fall, den die Projektregel
+// "unbekannt darf nie wie keine aussehen" meint.
+//
+// Geprueft wird darum am gerenderten Zustand, dass BEIDES stimmt: der Satz
+// unsichtbar, jede Meldung sichtbar.
+try {
+  // Die Anordnung zuruecksetzen: Der Abschnitt davor hat die Begruessung
+  // ausgeblendet und gespeichert. Ohne das misst diese Pruefung eine
+  // versteckte Karte und haelt jede Meldung fuer unsichtbar -- gruen waere
+  // sie dann nie, aber aus dem falschen Grund.
+  await page.evaluate(() => { try { localStorage.removeItem('rv3_dash_layout'); } catch (e) {} });
+  await page.reload();
+  await page.waitForSelector('#shell.on'); await page.waitForTimeout(600);
+  check('Die Begruessung steht fuer diesen Abschnitt wieder da',
+    await page.isVisible('.dash-item[data-widget="begruessung"]'));
+
+  const ruhe = await page.evaluate(() => {
+    const h = document.getElementById('rtSprachHint');
+    const r = h.getBoundingClientRect();
+    return { text: h.textContent.trim(), hoehe: r.height, breite: r.width };
+  });
+  check('KRITISCH: der Erklaersatz steht auf der Uebersicht nicht mehr da',
+    ruhe.hoehe === 0 && ruhe.breite === 0);
+  check('Der Text ist dabei nur ausgeblendet, nicht geloescht -- Screenreader'
+    + ' und die Meldungslogik brauchen dasselbe Feld', ruhe.text.length > 20);
+
+  // Jede der Meldungen, die das Feld tragen kann. Gesetzt wird die Klasse,
+  // die der Quelltext dafuer vergibt -- nicht "ruhe", und genau darum
+  // muessen sie sichtbar bleiben.
+  for (const [klasse, was] of [['sprach-hint warn', 'eine Warnung'],
+                               ['sprach-hint neg', 'ein Fehler'],
+                               ['sprach-hint', 'die laufende Aufnahme']]) {
+    const sichtbar = await page.evaluate(k => {
+      const h = document.getElementById('rtSprachHint');
+      h.className = k;
+      h.textContent = 'Das Mikrofon liefert kein Signal.';
+      const r = h.getBoundingClientRect();
+      return r.height > 0 && r.width > 0;
+    }, klasse);
+    check(`KRITISCH: ${was} erscheint weiterhin im selben Feld`, sichtbar);
+  }
+
+  // Und die anderen Diktat-Stellen behalten ihren Erklaersatz: Beanstandet
+  // war die Uebersicht, nicht der Router als solcher.
+  const anderswo = await page.evaluate(() => {
+    const h = document.getElementById('peSprachHint');
+    if (!h) { return null; }
+    return getComputedStyle(h).display;
+  });
+  check('Der Router in Planung/Einsaetze ist unveraendert',
+    anderswo === null || anderswo !== 'none');
+} catch (e) { bad.push('Sprach-Hinweis: ' + String(e).split('\n')[0].slice(0, 120)); }
+
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
 console.log('Alle Pruefungen bestanden.');

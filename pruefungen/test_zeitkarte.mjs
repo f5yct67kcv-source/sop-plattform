@@ -389,6 +389,7 @@ try {
     uhr > kw);
   check('Die Wochenzahl behaelt genug Breite fuer ihre Spanne', !b.spanneUmbruch);
   check('KRITISCH: auch dort laeuft keine Kachel ueber den Rand', b.randUeberlauf <= 1);
+
   check('Und nichts unten heraus', b.untenRaus <= 1);
 
   // Die Spalte ist hier am engsten -- und eine zu enge Spalte quetscht die
@@ -532,6 +533,47 @@ try {
     schmal.rechtsRaus <= 1 && schmal.untenRaus <= 1);
   await p.close();
 } catch (e) { bad.push('Fuellgrad: ' + String(e).split('\n')[0].slice(0, 120)); }
+
+// ══════════════════════════════ OHNE TRENNSTRICHE TRAEGT DER ABSTAND (ENT-428)
+//
+// Die feinen senkrechten Striche sind auf Vorgabe des Projektinhabers weg.
+// Damit ist der ABSTAND das Einzige, was Datum und Uhrzeit noch trennt --
+// und er muss deutlich groesser sein als der zwischen den beiden
+// Uhrkacheln. Sonst stehen drei Kacheln in gleichem Abstand nebeneinander
+// und lesen sich als EINE Reihe statt als zwei verschiedene Angaben.
+// Gemessen war genau das der Fall, als mit dem Strich auch sein Einzug bei
+// der Uhrzeit wegfiel: 16 px zwischen Datum und Uhr, 12 px innerhalb.
+//
+// Gemessen wird in der Lage des Projektinhabers -- Seitenleiste
+// eingeklappt, Karte rund 830 px breit. In einer sehr viel breiteren Karte
+// bestimmt die Flaechenverteilung den Abstand, und der Einzug faellt kaum
+// ins Gewicht; die Pruefung waere dort blind fuer die Aussage.
+try {
+  // 1728 px: die Fensterbreite aus der Skizze. Bei 1600 bleibt die Karte
+  // mit eingeklappter Leiste knapp unter den 780 px, ab denen sie sich
+  // dreispaltig stellt -- die Pruefung haette dort nichts zu messen.
+  const p = await seite(1728);
+  await p.evaluate(() => huelleSetzen('aus'));
+  await p.waitForTimeout(700);
+  const t = await p.evaluate(() => {
+    const r = s => document.querySelector(s).getBoundingClientRect();
+    const kacheln = [...document.querySelectorAll('.zk-klapp')].map(k => k.getBoundingClientRect());
+    return {
+      dreispaltig: r('.zeit-tag').left >= r('.zeit-kw').right - 1,
+      striche: [...document.querySelectorAll('.zeit-tag, .zeit-uhr, .zeit-kw')]
+        .map(e => parseFloat(getComputedStyle(e).borderLeftWidth) || 0),
+      zwischenGruppen: Math.round(kacheln[0].left - r('.zk-tag').right),
+      inDerUhr: Math.round(kacheln[1].left - kacheln[0].right),
+    };
+  });
+  check('Die Karte steht dabei dreispaltig -- sonst misst der Rest nichts', t.dreispaltig);
+  check('KRITISCH: keine senkrechten Trennstriche mehr in der Karte',
+    t.striche.every(b => b === 0));
+  check(`KRITISCH: Datum und Uhrzeit stehen mindestens doppelt so weit `
+    + `auseinander wie die beiden Uhrkacheln (${t.zwischenGruppen} gegen `
+    + `${t.inDerUhr} px)`, t.zwischenGruppen >= t.inDerUhr * 2);
+  await p.close();
+} catch (e) { bad.push('Trennung: ' + String(e).split('\n')[0].slice(0, 120)); }
 
 // ══════════════════════════════ AM HANDY NICHT
 //

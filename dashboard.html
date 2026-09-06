@@ -2291,7 +2291,29 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
 
 /* ── Begrüssungs-Container mit Diktat-Router (ENT-032) */
 .begr-karte .card-bd { padding: 22px 24px; }
-.begr-kopf h2 { font-size: 21px; font-weight: 720; letter-spacing: -.3px; }
+/* Feinjustierung aus der Skizze des Projektinhabers vom 2026-09-06 (ENT-428):
+   Gruss fuenf Pixel nach rechts und elf nach oben, Knopfreihe drei nach
+   unten, Eingabefeld ein Pixel flacher. Alles auf die Uebersicht begrenzt --
+   .sprach und .sprach-hint stehen ebenso in Planung/Einsaetze und in zwei
+   Dialogen, und dort ist nichts beanstandet worden. */
+.begr-kopf h2 { font-size: 21px; font-weight: 720; letter-spacing: -.3px;
+  margin: -11px 0 0 5px; }
+.begr-karte .sprach { margin-top: 13px; }
+/* Ein Pixel flacher. Zwei Dinge muessen dabei stimmen:
+   Die Mindesthoehe von textarea.inp (92 px) muss mitgehen -- sie gewinnt
+   sonst gegen jede Hoehe darunter, und die Regel bliebe wirkungslos, ohne
+   dass etwas kaputt aussieht.
+   Und die feste Hoehe gilt NUR bei ungezogener Karte: Wird die Begruessung
+   hoeher gezogen, soll das Eingabefeld die gewonnene Hoehe nehmen (so seit
+   jeher, gemessen von test_containergroesse.mjs). Eine feste Hoehe hier
+   haette das stillgelegt -- die Karte waere gewachsen, das Feld nicht. */
+.dash-item:not(.dh) .begr-karte #rtText { height: 91px; min-height: 91px; }
+/* Der Erklaersatz entfaellt hier. NUR er: Dieselbe Flaeche zeigt weiter
+   "Das Mikrofon liefert kein Signal", "Die Aufnahme liess sich nicht
+   starten" und "Aufnahme laeuft". Ein leeres Feld soll dabei keinen
+   Abstand halten, sonst bliebe eine Luecke ohne Aussage. */
+.begr-karte .sprach-hint.ruhe { display: none; }
+.sprach-hint:empty { margin-top: 0; }
 
 /* ── Datum & Zeit (ENT-410, Kacheln seit ENT-423)
    Weiterhin von der groben zur feinen Einheit: die Kalenderwoche als Band
@@ -2458,9 +2480,19 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
      Paar statt zwischen den drei Zonen. Gemessen bekam die Wochenzahl so
      720 px, waehrend die Kacheln in ihrer halben Karte stecken blieben. */
   .zeit-objekte { display: contents; padding-top: 0; gap: 0; }
-  .zeit-tag, .zeit-uhr { flex: 1 0 auto; padding-left: 30px;
-    border-left: 1px solid var(--line-soft);
+  /* Ohne senkrechte Trennstriche (Skizze des Projektinhabers, ENT-428): Die
+     Kacheln sind selbst schon Flaechen mit eigener Kante -- ein Strich
+     daneben teilt ein zweites Mal, was bereits geteilt aussieht.
+     Nur beim DATUM faellt mit dem Strich auch sein Einzug weg (30 auf 8, die
+     22 aus der Skizze). Die Uhrzeit behaelt ihn: Ohne Strich ist der Abstand
+     das Einzige, was Datum und Uhrzeit noch trennt, und mit 8 px standen die
+     drei Kacheln gemessen 11 px auseinander -- genauso weit wie die beiden
+     Uhrkacheln voneinander. Sie lasen sich dann als EINE Reihe aus drei
+     Kacheln statt als zwei verschiedene Angaben. */
+  .zeit-tag, .zeit-uhr { flex: 1 0 auto;
     display: flex; flex-direction: column; justify-content: center; align-items: flex-start; }
+  .zeit-tag { padding-left: 8px; }
+  .zeit-uhr { padding-left: 30px; }
 }
 /* Begruessung und Datum & Zeit stehen nebeneinander und bilden die erste
    Zeile der Uebersicht. Gemessen war die Begruessung 267 px hoch und die
@@ -2659,6 +2691,11 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
    ein Rest -- daneben klafft eine Luecke, die keine Aussage hat. Vier, zwei
    oder eine, nie drei. */
 .dash-item.dw-halb .g-kpi { grid-template-columns: repeat(2, 1fr); }
+/* Acht Pixel Abstand ueber den Kennzahlen (Skizze des Projektinhabers,
+   ENT-428). Der Container darueber waechst dadurch um dieselben acht -- in
+   der Skizze standen drei; beides zugleich ginge nur, wenn die Kacheln
+   flacher wuerden, und flacher waren sie dort nicht. */
+#kpiGrid { margin-top: 8px; }
 .dash-item.versteckt { display: none; }
 
 /* Bearbeitungsmodus */
@@ -23485,7 +23522,12 @@ function sprachBereit(prefix) {
     return;
   }
   wrap.style.display = '';
-  hint.className = 'sprach-hint';
+  // "ruhe" markiert den ERKLAERSATZ, nicht das Feld: Auf der Uebersicht ist
+  // er auf Vorgabe des Projektinhabers ausgeblendet, waehrend Warnungen,
+  // Fehler und die Rueckmeldung der laufenden Aufnahme im selben Feld
+  // weiterhin erscheinen. Ohne diese Trennung waere ein stummgeschaltetes
+  // Mikrofon nicht mehr von einem stummen Programm zu unterscheiden.
+  hint.className = 'sprach-hint ruhe';
   // Wo die Erkennung stattfindet, wird gesagt und nicht verschwiegen -- der
   // Ton geht an den Browserhersteller (ENT-027, OP-28).
   hint.innerHTML = 'Sprich in ganzen Sätzen. Der Text erscheint im Feld und lässt sich vor dem Erkennen noch ändern. '
