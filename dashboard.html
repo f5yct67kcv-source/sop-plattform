@@ -2315,7 +2315,16 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
      davon nur einen Fall und liesse die Kacheln in den anderen ueberlaufen. */
   container-type: inline-size; }
 .zeit-raster { flex: 1; display: flex; flex-direction: column;
-  --zk-h:         132px;              /* Kachelhoehe; alles andere rechnet daraus */
+  /* Kachelhoehe; alles andere rechnet daraus. Den laufenden Wert setzt
+     zkGroesse() als --zk-mass, gemessen am tatsaechlich freien Platz --
+     Hoehe UND Breite. Die Zahl hier ist nur der Rueckfall fuer den Moment
+     vor der ersten Messung und fuer den Fall, dass kein Skript laeuft.
+     Warum gemessen und nicht gerechnet: Die Hoehe der Karte kommt von
+     aussen (sie folgt der Begruessung daneben oder einer gezogenen Hoehe),
+     und CSS kann die Hoehe des Elternteils nicht lesen. Ein cqh-Container
+     waere der CSS-Weg, verlangt aber "container-type: size" -- das zwingt
+     jede Karte, deren Hoehe vom Inhalt kommt, auf null. */
+  --zk-h:         var(--zk-mass, 132px);
   --zk-flaeche:   #1C212C;            /* untere Haelfte und Tageskachel */
   --zk-flaeche-o: #262D3D;            /* obere Haelfte, eine Spur heller */
   --zk-ziffer:    #F1F4FA;
@@ -2323,8 +2332,8 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
   --zk-akzent:    #7FA6FF;
   --zk-matt:      #9AA3B5;
   --zk-ring:      rgba(255, 255, 255, .1); }
-@container (max-width: 560px) { .zeit-raster { --zk-h: 96px; } }
-@container (max-width: 452px) { .zeit-raster { --zk-h: 78px; } }
+@container (max-width: 560px) { .zeit-raster { --zk-h: var(--zk-mass, 96px); } }
+@container (max-width: 452px) { .zeit-raster { --zk-h: var(--zk-mass, 78px); } }
 .zeit-zeile .lb { display: block; font-size: 10.5px; font-weight: 700; letter-spacing: .9px;
   text-transform: uppercase; color: var(--ink-3); margin-bottom: 7px; }
 .zeit-zeile .wert { display: block; font-size: 19px; font-weight: 650; letter-spacing: -.3px; line-height: 1.2; }
@@ -2341,8 +2350,9 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
   line-height: 1; font-variant-numeric: tabular-nums; }
 .zeit-kw .spanne { grid-area: spanne; font-size: 12.5px; color: var(--ink-2); }
 
-/* Zieht jemand die Karte hoeher, sitzen die Kacheln mittig im gewonnenen
-   Raum, statt oben zu kleben und unten eine Leerflaeche zu lassen. */
+/* Die Kacheln fuellen den Raum -- zkGroesse() laesst sie mitwachsen. Was
+   danach uebrig bleibt, weil die Breite frueher bindet als die Hoehe, liegt
+   zu gleichen Teilen ueber und unter ihnen statt als Streifen am Fuss. */
 .zeit-objekte { flex: 1; display: flex; align-items: center; justify-content: space-between;
   gap: 22px; padding-top: 18px; }
 
@@ -2428,12 +2438,27 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
    gemessen kamen dabei Spalten von 648/298/298 px heraus statt 422/422/422,
    ohne dass irgendetwas kaputt aussah. */
 @container (min-width: 780px) {
-  .zeit-raster { --zk-h: clamp(78px, 11cqw, 148px); flex-direction: row; align-items: stretch; }
-  .zeit-kw { flex: 1; align-content: center; row-gap: 6px;
+  .zeit-raster { --zk-h: var(--zk-mass, 132px); flex-direction: row; align-items: stretch; }
+  /* Die drei Zonen teilen sich den Ueberschuss, aber jede bringt ihren
+     eigenen Bedarf mit -- die Kacheln ihre Groesse, die Wochenzahl ihre
+     240 px. Feste Drittel waren es bis ENT-426: Die Wochenzahl bekam
+     gemessen 452 px fuer rund 260 px Inhalt, waehrend die Uhr im selben
+     Drittel bei 142 px gedeckelt blieb, gleich wie hoch die Karte war.
+     Die Wochenzahl stattdessen den ganzen Ueberschuss nehmen zu lassen war
+     ebenfalls falsch: In einer breiten, FLACHEN Karte, in der die Hoehe die
+     Kacheln deckelt, wuchs ihre Spalte auf 720 px fuer denselben Text.
+     zkGroesse() holt sich, was die Zonen hergeben, solange die Kacheln davon
+     wachsen koennen; was danach bleibt, verteilt sich gleichmaessig.
+     Die 240 px sind die Untergrenze, unter der die Wochenspanne umbricht. */
+  .zeit-kw { flex: 1 1 240px; min-width: 240px; align-content: center; row-gap: 6px;
     grid-template-columns: minmax(0, 1fr); grid-template-areas: "lb" "wert" "spanne";
     border-bottom: none; padding-bottom: 0; padding-right: 30px; }
-  .zeit-objekte { flex: 2; padding-top: 0; gap: 0; }
-  .zeit-tag, .zeit-uhr { flex: 1; min-width: 0; padding-left: 30px;
+  /* Aufgeloest: Sonst stuenden Datum und Uhrzeit gemeinsam in EINER Zelle,
+     und der Ueberschuss verteilte sich zwischen der Wochenzahl und diesem
+     Paar statt zwischen den drei Zonen. Gemessen bekam die Wochenzahl so
+     720 px, waehrend die Kacheln in ihrer halben Karte stecken blieben. */
+  .zeit-objekte { display: contents; padding-top: 0; gap: 0; }
+  .zeit-tag, .zeit-uhr { flex: 1 0 auto; padding-left: 30px;
     border-left: 1px solid var(--line-soft);
     display: flex; flex-direction: column; justify-content: center; align-items: flex-start; }
 }
@@ -3780,6 +3805,20 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
    den Fall ab, dass spaeter eine noch laengere Beschriftung dazukommt. */
 .kk-koerper .dl dt { overflow-wrap: anywhere; }
 .kk-tasten { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 13px; }
+
+/* Belegvorschau (ENT-425). Das Blatt behaelt seine Dokumentbreite, der
+   Rahmen bekommt die verkleinerte Hoehe -- siehe Begruendung beim Markup.
+   Das Polster ist auf dem Handy schmaler: 32 px auf jeder Seite waren dort
+   ein Sechstel der Bildschirmbreite. */
+#ofVorschauInhalt { padding: 32px; }
+/* BEWUSST ohne overflow:hidden. Die Hoehe hier wird gerechnet (Blatthoehe mal
+   Massstab); waere sie einmal zu klein -- etwa weil das Logo im Briefkopf
+   beim Messen noch nicht geladen war --, verschwaende ein "hidden" den
+   unteren Teil des Dokuments spurlos. Ohne ihn ist der schlimmste Fall ein
+   zu enger Abstand nach unten, und der faellt auf, statt zu taeuschen. */
+#ofVorschauMass { }
+#ofVorschauBlatt { transform-origin: top left; }
+@media (max-width: 620px) { #ofVorschauInhalt { padding: 12px; } }
 /* Die Knoepfe im Koerper gehoeren zur Karte, nicht zum Aufklappen: Ein
    Klick auf sie darf die Karte nicht gleich wieder zuklappen (jedes
    onclick ruft darum stopPropagation). */
@@ -5695,11 +5734,11 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
               </div>
               <label class="check">
                 <input type="checkbox" id="of_unterschriftsseite">
-                Unterschriftsseite hinzufügen
+                Unterschriftsfelder hinzufügen
               </label>
               <div class="sec" style="margin-top:8px">
-                Fügt dem Ausdruck eine zusätzliche Seite mit Feldern für Ort, Datum und
-                Unterschrift an.
+                Setzt Felder für Ort, Datum und Unterschrift ans Ende des Belegs — auf
+                dieselbe Seite, nicht auf ein eigenes Blatt (ENT-425).
               </div>
             </div></div>
           </div>
@@ -7402,8 +7441,18 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
       <h2>Vorschau</h2>
       <p>So sieht die Offerte für den Kunden aus.</p>
     </div>
+    <!-- Die Vorschau zeigt ein A4-Blatt fester Breite (ofBlatt: 700 px). Auf
+         dem Handy ist der Dialog 390 px breit -- das Blatt lief darum links
+         und rechts aus dem Bild, und man schob ein Dokument hin und her,
+         von dem man nie eine ganze Zeile sah (ENT-425).
+         Ein Dokument wird nicht umbrochen, es wird verkleinert: #ofVorschauBlatt
+         behaelt seine 700 px und wird per transform skaliert, #ofVorschauMass
+         traegt die daraus entstehende Hoehe -- transform aendert das Layout
+         sonst nicht, und unter dem Blatt bliebe ein leerer Streifen. -->
     <div class="dlg-bd" style="background:#F4F5F7">
-      <div id="ofVorschauInhalt" style="background:#fff;padding:32px;border-radius:8px"></div>
+      <div id="ofVorschauInhalt" style="background:#fff;border-radius:8px">
+        <div id="ofVorschauMass"><div id="ofVorschauBlatt"></div></div>
+      </div>
     </div>
     <div class="dlg-ft">
       <button class="btn btn-plain" onclick="closeDlg('dlgOfVorschau')">Schliessen</button>
@@ -9265,6 +9314,185 @@ function klappRuhig() {
   return !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
 }
 
+// ── Die Kacheln fuellen die Karte (ENT-426)
+//
+// Die Karte ist oft hoeher, als ihr Inhalt braucht: Sie folgt der Hoehe der
+// Begruessung daneben oder einer von Hand gezogenen. Gemessen blieben in
+// einer breiten Anordnung 44 Prozent Fuellgrad -- der Rest war Luft.
+//
+// CSS kann das nicht loesen. Die Breite eines Containers ist ueber cqw
+// lesbar, seine Hoehe nur ueber "container-type: size" -- und das zwingt
+// jede Karte, deren Hoehe vom Inhalt kommt, auf null. Also wird gemessen.
+//
+// Gemessen, NICHT gerechnet: Der Zusammenhang zwischen Kachelhoehe und
+// belegtem Platz steht im Regelwerk (Seitenverhaeltnis, Abstaende, Einzuege,
+// Beschriftungen) und darf sich dort aendern. Statt diese Zahlen hier ein
+// zweites Mal zu fuehren -- die Sorte Doppelung, die irgendwann
+// auseinanderlaeuft --, liest diese Funktion sie bei jedem Lauf am
+// gerenderten Zustand ab:
+//
+//   Breite:  wie viele Kachelhoehen die Kacheln nebeneinander belegen,
+//            ergibt sich aus Summe(Breiten) / Hoehe.
+//   Hoehe:   eine Kachelreihe, also Faktor eins.
+//
+// Zwei Durchlaeufe, weil ein Wachstum in der Breite die Umbrueche daneben
+// verschieben kann und der zweite Lauf das nachfuehrt. Abbruch, sobald der
+// Rest unter einem Pixel liegt.
+const ZK_KLEINST = 78;      // darunter wird die Ziffer unleserlich
+const ZK_GROESST = 420;     // darueber wirkt die Karte wie ein Bahnhofsanzeiger
+
+function zkGroesse() {
+  const raster = document.querySelector('.zeit-raster');
+  const bd = raster && raster.closest('.card-bd');
+  // Nicht sichtbar (am Handy ausgeblendet, Container versteckt)? Dann gibt es
+  // nichts zu messen -- und ein gemessener Nullwert waere schlimmer als
+  // keiner: Er wuerde die Kachel beim naechsten Einblenden auf ihr Kleinstmass
+  // stellen und dort lassen.
+  if (!bd || !bd.getClientRects().length) { return; }
+
+  for (let lauf = 0; lauf < 4; lauf++) {
+    const kacheln = [...raster.querySelectorAll('.zk-klapp, .zk-tag')].map(k => k.getBoundingClientRect());
+    if (!kacheln.length || !kacheln[0].height) { return; }
+    const hoehe = kacheln[0].height;
+
+    const stil = getComputedStyle(bd);
+    const r = bd.getBoundingClientRect();
+
+    // Die freie Hoehe liegt zu beiden Seiten der Kacheln, weil sie mittig
+    // stehen. Beide Anteile zaehlen -- nur den unteren zu nehmen hiesse, die
+    // Kachel bei jedem Lauf um die Haelfte des Moeglichen wachsen zu lassen.
+    // Der eigene Innenabstand des Objektbereichs ist gewollter Abstand und
+    // keine Luft; er wird abgezogen.
+    // Der Bereich, in dem die Kacheln stehen: aus den Zonen selbst, nicht aus
+    // ihrem Behaelter -- auf breiter Karte ist der aufgeloest und hat keinen
+    // Kasten mehr. Was ausserhalb der Zonen liegt (der Abstand unter der
+    // Wochenzahl), ist gewollt und faellt so von selbst heraus.
+    const zonenEl = [...raster.querySelectorAll('.zeit-tag, .zeit-uhr')];
+    const zonen = zonenEl.map(e => e.getBoundingClientRect());
+    const bereichOben = Math.min(...zonen.map(z => z.top));
+    const bereichUnten = Math.max(...zonen.map(z => z.bottom));
+    const beschriftungen = [...raster.querySelectorAll('.zeit-tag .lb, .zeit-uhr .lb')]
+      .map(e => e.getBoundingClientRect());
+    const inhaltOben = Math.min(...beschriftungen.map(e => e.top), ...kacheln.map(k => k.top));
+    const inhaltUnten = Math.max(...kacheln.map(k => k.bottom));
+    const luftUnten = Math.max(0, inhaltOben - bereichOben)
+      + (bereichUnten - inhaltUnten)
+      + ((r.bottom - parseFloat(stil.paddingBottom)) - bereichUnten);
+
+    // Die freie Breite liegt nicht rechts von den Kacheln -- dort endet die
+    // letzte buendig am Rand ihrer Zone. Sie steckt in den ZONEN selbst:
+    // Jede haelt etwas ueber ihren eigenen Bedarf hinaus, und alles davon
+    // koennen die Kacheln bekommen.
+    //
+    // Der Bedarf einer Zone ist das Groessere aus zwei Dingen: was ihr Inhalt
+    // gerendert belegt, und was ihre Mindestbreite verlangt. Fuer die
+    // Kachelzonen zaehlt das Erste, fuer die Wochenzahl das Zweite -- eine
+    // Regel fuer beide statt zwei unterschiedener Faelle.
+    //
+    // Ohne diesen Teil misst die Funktion in der breiten Karte eine Luft von
+    // null und laesst die Kacheln stehen, wo sie sind: Sie fuellen ihre Zone
+    // ja bereits, und dass die Zone selbst wachsen koennte, sieht man ihnen
+    // nicht an. Genau der Fall, um den es hier geht.
+    const kwEl = raster.querySelector('.zeit-kw');
+    const alleZonen = zonenEl.slice();
+    if (Math.min(...zonen.map(z => z.left)) >= kwEl.getBoundingClientRect().right - 1) {
+      alleZonen.push(kwEl);
+    }
+    let zonenLuft = 0;
+    for (const el of alleZonen) {
+      const z = el.getBoundingClientRect();
+      const belegt = [...el.querySelectorAll('.zk-klapp, .zk-tag, .lb, .wert, .spanne')]
+        .reduce((m, c) => Math.max(m, c.getBoundingClientRect().right), z.left) - z.left;
+      const mindest = parseFloat(getComputedStyle(el).minWidth) || 0;
+      zonenLuft += Math.max(0, z.width - Math.max(belegt, mindest));
+    }
+
+    // Stehen die Zonen zusaetzlich mit Abstand voneinander, zaehlt auch der --
+    // abzueglich dessen, was als Abstand gewollt ist. Der Abstand kommt vom
+    // Kasten, in dem die Zonen tatsaechlich liegen; auf breiter Karte ist das
+    // nicht mehr ihr Behaelter im Markup, sondern das Raster.
+    const gap = parseFloat(getComputedStyle(
+      getComputedStyle(zonenEl[0].parentElement).display === 'contents'
+        ? raster : zonenEl[0].parentElement).columnGap) || 0;
+    const sortiert = alleZonen.map(e => e.getBoundingClientRect()).sort((a, b) => a.left - b.left);
+    let dazwischen = 0;
+    for (let i = 1; i < sortiert.length; i++) {
+      dazwischen += Math.max(0, (sortiert[i].left - sortiert[i - 1].right) - gap);
+    }
+
+    // Ragt eine Kachel ueber den Innenrand hinaus, zaehlt das als negative
+    // Luft und hat Vorrang. Ohne diesen Fall findet die Funktion nur Platz
+    // und nie Enge: Unter Druck geben die Zonen nach und die Kacheln treten
+    // aus ihnen heraus -- in keiner Zone fehlt dann Luft, und der Ueberlauf
+    // bliebe stehen. Gemessen sind so 50 px ueber den Rand hinausgestanden,
+    // nachdem eine breite Karte schmal gezogen wurde.
+    const ueberRand = Math.max(...kacheln.map(k => k.right))
+      - (r.right - parseFloat(stil.paddingRight));
+    const luftRechts = ueberRand > 0 ? -ueberRand : zonenLuft + dazwischen;
+
+    // Wie viele Kachelhoehen belegen die Kacheln in der Breite? Gemessen als
+    // SPANNWEITE je Zone, nicht als Summe der Kachelbreiten: Zwischen den
+    // beiden Uhrkacheln liegt ein Abstand, der mit der Kachel mitwaechst.
+    // Ihn nicht mitzuzaehlen unterschaetzt den Bedarf -- gemessen lief die
+    // Uhr dadurch um vier Pixel ueber den Rand und blieb dort, weil der
+    // Fehler unter der Abbruchschwelle lag.
+    //
+    // Zur Ehrlichkeit: Baut man diesen Teil zurueck auf die blosse Summe der
+    // Kachelbreiten, schlaegt keine Pruefung an -- der Ueberlauf-Vorrang
+    // weiter unten nimmt das Ueberschiessen im naechsten Durchlauf zurueck.
+    // Dasselbe gilt fuer die beidseitige Hoehenmessung: Halbiert man sie,
+    // holt die Wiederholung den Rest in drei weiteren Durchlaeufen fast ein.
+    // Beide bleiben trotzdem, weil sie die richtige Rechnung sind und in
+    // EINEM Schritt treffen; die Wiederholung ist die Absicherung, nicht der
+    // Normalfall. Eine Pruefung, die das nachweisen will, muesste die
+    // Durchlaufzahl messen statt das Ergebnis -- und pruefte damit die
+    // Bauart statt der Aussage.
+    let spanne = 0;
+    for (const el of zonenEl) {
+      const ks = [...el.querySelectorAll('.zk-klapp, .zk-tag')].map(k => k.getBoundingClientRect());
+      if (ks.length) {
+        spanne += Math.max(...ks.map(k => k.right)) - Math.min(...ks.map(k => k.left));
+      }
+    }
+    const breit = spanne / hoehe;
+
+    // Das Knappere von beiden entscheidet. Ein negativer Wert laesst die
+    // Kachel schrumpfen -- dieselbe Rechnung, und sie faengt zugleich die von
+    // Hand zu klein gezogene Karte ab, die bisher eine Bildlaufleiste bekam.
+    //
+    // Beim Wachsen bleibt ein halbes Pixel stehen. Ohne das schoss die
+    // Kachel gemessen um ein Pixel ueber den Rand hinaus und blieb dort:
+    // Ein Pixel Kachelhoehe sind fast vier Pixel Breite, also lag der
+    // Ueberlauf unter der Abbruchschwelle und wurde nie zurueckgenommen.
+    // Ein Ueberlauf gilt deshalb nie als klein genug zum Stehenlassen.
+    const zuwachs = Math.min(luftUnten, luftRechts / breit);
+    if (zuwachs >= 0 && zuwachs < 1) { return; }
+    const soll = hoehe + (zuwachs > 0 ? zuwachs - .5 : zuwachs);
+    const neu = Math.max(ZK_KLEINST, Math.min(ZK_GROESST, soll));
+    if (Math.abs(neu - hoehe) < .05) { return; }
+    raster.style.setProperty('--zk-mass', neu.toFixed(1) + 'px');
+  }
+}
+
+// Die Karte selbst beobachten, nicht die Kacheln: Ihre Groesse kommt von
+// aussen und aendert sich durch --zk-mass nicht. Andersherum haette jede
+// Anpassung die naechste ausgeloest.
+let zkWaechter = null;
+function zkWaechterStarten() {
+  const bd = document.querySelector('.zeit-karte .card-bd');
+  if (!bd || zkWaechter || !window.ResizeObserver) { return; }
+  let angemeldet = false;
+  zkWaechter = new ResizeObserver(() => {
+    if (angemeldet) { return; }
+    angemeldet = true;
+    // Erst im naechsten Bild rechnen: Waehrend der Beobachter laeuft, ist das
+    // Layout noch nicht fertig, und ein Schreiben aus dem Rueckruf heraus
+    // meldet der Browser als Schleife.
+    requestAnimationFrame(() => { angemeldet = false; zkGroesse(); });
+  });
+  zkWaechter.observe(bd);
+}
+
 function zeitZeichnen(ohneKlappen) {
   const kw = $('zeitKw');
   if (!kw) { return; }
@@ -9324,7 +9552,9 @@ function zeitTaktStarten() {
   if (!klappAngemeldet && $('zeitStd')) {
     klappAngemeldet = true;
     for (const k of [$('zeitStd'), $('zeitMin')]) { k.addEventListener('animationend', klappAufraeumen); }
+    zkWaechterStarten();
   }
+  zkGroesse();
   // Nur der allererste Durchlauf setzt die Kacheln ohne Bewegung; jeder
   // spaetere ist ein echter Minutenwechsel und darf klappen.
   zeitZeichnen(zeitTakt === null);
@@ -12190,6 +12420,89 @@ function ofDateiname(b) {
   return (teil || 'Offerte') + '.pdf';
 }
 
+// ── Ein Blatt zu einem PDF machen, moeglichst auf EINER Seite (ENT-425) ────
+//
+// html2pdf schneidet ein zu hohes Blatt stumpf an der Seitengrenze ab und
+// setzt den Rest auf Seite 2. Bei einer Offerte mit einer einzigen Position
+// landete so der Unterschriftenblock allein auf der zweiten Seite, waehrend
+// die erste halb leer blieb -- vom Projektinhaber beanstandet.
+//
+// Darum: rendern, dann nachsehen, wie viele Seiten daraus geworden sind. Bei
+// mehr als einer wird dasselbe Bild auf eine Seite verkleinert -- aber nur,
+// solange es lesbar bleibt. Wer eine Offerte ueber zwanzig Positionen auf ein
+// A4 presst, macht sie unlesbar; unterhalb von PDF_MIN_MASSSTAB bleibt es
+// darum beim mehrseitigen Satz. "Nach Moeglichkeit auf eine Seite" heisst
+// nicht "um jeden Preis".
+const PDF_RAND = 10;            // mm, auf allen Seiten
+const PDF_MIN_MASSSTAB = 0.62;  // darunter lieber zwei Seiten als eine Lupe
+// A4 hoch in Millimetern. Muss zur jsPDF-Angabe in PDF_OPTIONEN passen
+// (format 'a4', orientation 'portrait'); test_offerten.mjs vergleicht beide
+// gegeneinander, damit die Zahlen nicht auseinanderlaufen.
+const PDF_SEITE = { breite: 210, hoehe: 297 };
+const PDF_OPTIONEN = {
+  margin: PDF_RAND,
+  image: { type: 'jpeg', quality: 0.95 },
+  html2canvas: { scale: 2, useCORS: true },
+  jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+  pagebreak: { mode: ['css', 'legacy'] },
+};
+
+// Ein AUSDRUECKLICH gewollter Seitenumbruch wird nie wegskaliert: Wer im
+// Blatt-HTML einen Umbruch setzt, will zwei Blaetter -- die zweite Seite ist
+// dann kein Fehler, sondern die Bestellung, und Wegskalieren hoebe eine
+// bewusst eingeschaltete Funktion auf. Derzeit setzt kein Blatt einen
+// solchen Umbruch (der Unterschriftsblock tat es bis ENT-425); die Weiche
+// bleibt, damit ein kuenftiger Umbruch nicht stillschweigend verschwindet.
+function blattHatSeitenumbruch(el) {
+  return !!el.querySelector('[style*="page-break-before"], [style*="break-before"], .html2pdf__page-break');
+}
+
+// Ein leeres A4-Blatt, in das sich zeichnen laesst.
+//
+// jsPDF liegt im html2pdf-Bundle NICHT global, und ein zweites Dokument
+// laesst sich auch nicht ueber `pdf.constructor` bauen: der ist schlicht
+// `Object` (gemessen). Genau daran ist der erste Anlauf dieser Funktion
+// gescheitert -- die Verkleinerung warf "Cannot read properties of undefined
+// (reading 'pageSize')" und die Offerte kam wortlos nie an. Ein leeres Blatt
+// entsteht darum ueber html2pdf selbst, aus einem winzigen Quellelement, und
+// wird danach geleert. Die Seiten zu loeschen statt sie zu uebermalen ist
+// Absicht: uebermalte Seiten blieben als unsichtbare Bilder in der Datei --
+// im Versuch 629 KB statt 317 KB.
+function leeresBlattPdf() {
+  const winzig = document.createElement('div');
+  winzig.style.cssText = 'width:10px;height:10px;background:#fff';
+  return html2pdf().set(PDF_OPTIONEN).from(winzig).toPdf().get('pdf').then(pdf => {
+    for (let i = pdf.internal.getNumberOfPages(); i >= 1; i--) { pdf.deletePage(i); }
+    pdf.addPage();
+    return pdf;
+  });
+}
+
+function blattPdfBlob(el) {
+  const arbeit = html2pdf().set(PDF_OPTIONEN).from(el);
+  const gewollt = blattHatSeitenumbruch(el);
+  // Der Canvas entsteht einmal; toPdf() weiter unten zeichnet das Blatt
+  // nicht neu, sondern nimmt genau diesen.
+  return arbeit.toCanvas().get('canvas').then(canvas => {
+    const alsSatz = () => arbeit.toPdf().get('pdf').then(pdf => pdf.output('blob'));
+    if (!canvas || !canvas.width || !canvas.height) { return alsSatz(); }
+    const maxB = PDF_SEITE.breite - 2 * PDF_RAND;
+    const maxH = PDF_SEITE.hoehe - 2 * PDF_RAND;
+    // Wie hoch das Blatt auf voller Seitenbreite waere -- daraus steht schon
+    // fest, ob es auf eine Seite passt. Dafuer muss das mehrseitige PDF gar
+    // nicht erst gebaut werden.
+    const volleHoehe = maxB * canvas.height / canvas.width;
+    const massstab = Math.min(1, maxH / volleHoehe);
+    if (massstab >= 1 || gewollt || massstab < PDF_MIN_MASSSTAB) { return alsSatz(); }
+    const b = maxB * massstab, h = volleHoehe * massstab;
+    return leeresBlattPdf().then(pdf => {
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG',
+        (PDF_SEITE.breite - b) / 2, PDF_RAND, b, h);
+      return pdf.output('blob');
+    });
+  });
+}
+
 function ofPdfBauen(id) {
   return api('beleg_lesen.php?id=' + Number(id)).then(({ ok, data }) => {
     if (!ok || !data || data.status !== 'ok') {
@@ -12197,13 +12510,7 @@ function ofPdfBauen(id) {
     }
     return html2pdfLaden().then(() => {
       $('rapportBlatt').innerHTML = ofBlatt(data.beleg, data.kunde, data.person);
-      return html2pdf().set({
-        margin: 10,
-        image: { type: 'jpeg', quality: 0.95 },
-        html2canvas: { scale: 2, useCORS: true },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['css', 'legacy'] },
-      }).from($('rapportBlatt')).outputPdf('blob').then(blob => ({ blob, beleg: data.beleg }));
+      return blattPdfBlob($('rapportBlatt')).then(blob => ({ blob, beleg: data.beleg }));
     });
   });
 }
@@ -12264,10 +12571,42 @@ function ofVorschau(id) {
     if (!ok || data.status !== 'ok') {
       toast(data.message || 'Der Beleg liess sich nicht laden.'); return;
     }
-    $('ofVorschauInhalt').innerHTML = ofBlatt(data.beleg, data.kunde, data.person);
+    $('ofVorschauBlatt').innerHTML = ofBlatt(data.beleg, data.kunde, data.person);
     openDlg('dlgOfVorschau');
+    // Erst nach dem Oeffnen einpassen: Vorher ist der Dialog verborgen und
+    // clientWidth 0 -- man wuerde durch Null teilen und auf Verdacht
+    // skalieren, statt am gerenderten Zustand zu messen (CLAUDE.md).
+    ofVorschauEinpassen();
+    // Und noch einmal, sobald das Logo des Briefkopfs steht: Vorher ist das
+    // Blatt niedriger, als es sein wird.
+    const bilder = [...$('ofVorschauBlatt').querySelectorAll('img')].filter(i => !i.complete);
+    let offen = bilder.length;
+    bilder.forEach(i => {
+      const fertig = () => { if (--offen <= 0) { ofVorschauEinpassen(); } };
+      i.addEventListener('load', fertig, { once: true });
+      i.addEventListener('error', fertig, { once: true });
+    });
   }).catch(() => toast('Der Beleg liess sich nicht laden.'));
 }
+
+// Das Blatt auf die verfuegbare Breite herunterrechnen. Nie vergroessern:
+// Ein A4-Blatt auf einem breiten Schirm aufzublasen macht es nicht lesbarer,
+// nur ungewohnt.
+const OF_VORSCHAU_BREITE = 700;   // Dokumentbreite aus ofBlatt()
+function ofVorschauEinpassen() {
+  const rahmen = $('ofVorschauInhalt'), mass = $('ofVorschauMass'), blatt = $('ofVorschauBlatt');
+  if (!rahmen || !mass || !blatt || !blatt.firstElementChild) { return; }
+  blatt.style.width = OF_VORSCHAU_BREITE + 'px';
+  const verfuegbar = rahmen.clientWidth - 2 * parseFloat(getComputedStyle(rahmen).paddingLeft || 0);
+  const k = Math.min(1, verfuegbar / OF_VORSCHAU_BREITE);
+  blatt.style.transform = k < 1 ? `scale(${k})` : '';
+  mass.style.height = Math.ceil(blatt.offsetHeight * k) + 'px';
+}
+// Dreht jemand das Geraet, aendert sich die verfuegbare Breite -- dann muss
+// neu gerechnet werden, sonst steht das Blatt schief im Rahmen.
+window.addEventListener('resize', () => {
+  if ($('dlgOfVorschau') && $('dlgOfVorschau').classList.contains('on')) { ofVorschauEinpassen(); }
+});
 
 // Per E-Mail versenden (ENT-192): verschickt keinen PDF-Anhang, sondern einen
 // Link auf eine unangemeldete Web-Ansicht (backend/api/beleg_oeffentlich.php),
@@ -12354,29 +12693,32 @@ function ofBlatt(b, kunde, person) {
         <div style="white-space:pre-line;line-height:1.5">${esc(text)}</div>
       </div>` : '';
 
-  // Zusaetzliche Seite mit Unterschriftsfeldern, nur wenn ausdruecklich
-  // angefordert (of_unterschriftsseite). Der erzwungene Seitenumbruch ist
-  // hier ABSICHT -- im Unterschied zu ENT-179, wo ein UNGEWOLLTER zweiter
-  // Blatt-Rand behoben wurde. Faellt briefkopf.firma leer aus, weil er noch
-  // nicht gepflegt ist, steht dort "Auftragnehmer" statt eines erfundenen
-  // Firmennamens.
+  // Unterschriftsblock, nur wenn ausdruecklich angefordert
+  // (of_unterschriftsseite). Steht seit ENT-425 im normalen Fluss am Ende
+  // des Blattes statt auf einer erzwungenen zweiten Seite -- ein kurzer
+  // Beleg passte sonst allein wegen dieses Blocks nie auf eine Seite. Der
+  // Haken entscheidet seither nur noch, OB der Block erscheint, nicht mehr
+  // WO. `page-break-inside:avoid` haelt ihn zusammen, falls ein langer Beleg
+  // ihn doch auf die naechste Seite schiebt -- eine halbe Unterschriftszeile
+  // am Seitenende waere unbrauchbar.
+  // Kein wiederholter "Offertennummer OF-xxxx"-Titel mehr: die Nummer steht
+  // auf derselben Seite bereits im Kopf. Stattdessen dieselbe Beschriftung
+  // wie bei Notizen und Bedingungen. Faellt briefkopf.firma leer aus, weil er
+  // noch nicht gepflegt ist, steht dort "Auftragnehmer" statt eines
+  // erfundenen Firmennamens.
   const unterschriftsseite = Number(b.unterschriftsseite) ? `
-    <div style="page-break-before:always;break-before:page;padding-top:60px;
-                font-family:-apple-system,Segoe UI,Arial,sans-serif;color:#14161A;
-                max-width:700px;margin:0 auto;font-size:12px">
-      <div style="font-size:15px;font-weight:700;margin-bottom:40px">
-        ${esc(BELEG_TITEL_FELD[b.art] || 'Offertennummer')} ${esc(b.nummer)}
-      </div>
-      <div style="color:#6B7280;margin-bottom:60px">Ort, Datum</div>
-      <div style="border-bottom:1px solid #14161A;width:260px;margin-bottom:60px"></div>
+    <div style="margin-top:34px;page-break-inside:avoid;break-inside:avoid">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#6B7280;margin-bottom:18px">Unterschriften</div>
+      <div style="color:#6B7280;margin-bottom:34px">Ort, Datum</div>
+      <div style="border-bottom:1px solid #14161A;width:260px;margin-bottom:40px"></div>
       <div style="display:flex;gap:60px">
         <div style="flex:1">
-          <div style="border-bottom:1px solid #14161A;height:60px"></div>
+          <div style="border-bottom:1px solid #14161A;height:46px"></div>
           <div style="margin-top:8px;font-size:11px;color:#6B7280">
             Unterschrift ${esc((kunde && kunde.name) || 'Auftraggeber')}</div>
         </div>
         <div style="flex:1">
-          <div style="border-bottom:1px solid #14161A;height:60px"></div>
+          <div style="border-bottom:1px solid #14161A;height:46px"></div>
           <div style="margin-top:8px;font-size:11px;color:#6B7280">
             Unterschrift ${esc(String(briefkopf.firma || '').trim() || 'Auftragnehmer')}</div>
         </div>
@@ -12419,9 +12761,10 @@ function ofBlatt(b, kunde, person) {
       <table style="margin-left:auto;margin-top:14px;border-collapse:collapse">${summen}</table>
       ${abschnitt('Notizen', b.oeffentliche_notizen)}
       ${abschnitt('Bedingungen', b.bedingungen)}
+      ${unterschriftsseite}
       ${b.fusszeile_text ? `<div style="margin-top:26px;padding-top:14px;border-top:1px solid #E5E8EC;white-space:pre-line;line-height:1.5">${esc(b.fusszeile_text)}</div>` : ''}
       ${bkFusszeile()}
-    </div>${unterschriftsseite}`;
+    </div>`;
 }
 
 // Wie die Nummer auf dem Blatt heisst. Je Belegart eigener Wortlaut --
@@ -26869,13 +27212,10 @@ function kdRapportDateiname(r) {
 function kdRapportPdfBauen(r) {
   return html2pdfLaden().then(() => {
     $('rapportBlatt').innerHTML = kdBerichtBlatt(r);
-    return html2pdf().set({
-      margin: 10,
-      image: { type: 'jpeg', quality: 0.95 },
-      html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      pagebreak: { mode: ['css', 'legacy'] },
-    }).from($('rapportBlatt')).outputPdf('blob');
+    // Seit ENT-425 dieselbe Erzeugung wie bei der Offerte: moeglichst eine
+    // Seite. Der Rapport hatte dasselbe Problem -- Unterschriftenblock und
+    // Fusszeile kippten bei laengeren Bemerkungen auf Seite 2.
+    return blattPdfBlob($('rapportBlatt'));
   });
 }
 

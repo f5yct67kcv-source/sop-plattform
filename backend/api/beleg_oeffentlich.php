@@ -329,34 +329,32 @@ try {
         ? '<img src="' . portal_esc($logoDatenUrl) . '" alt="" style="max-height:96px;max-width:200px;display:block;margin-left:auto">'
         : '';
 
-    // Unterschriftsseite (ENT-187 intern, ENT-207 hier nachgezogen): der
+    // Unterschriftsblock (ENT-187 intern, ENT-207 hier nachgezogen): der
     // Haken "Unterschriftsseite hinzufügen" im Formular (of_unterschriftsseite)
     // wurde bisher nur im internen Ausdruck (ofBlatt() in dashboard.html)
     // beruecksichtigt -- auf der oeffentlichen Kundenseite, ueber die der
     // Kunde die Datei tatsaechlich druckt/herunterlaedt, hatte er GAR KEINE
     // Wirkung. Gleiche Feldnamen/Aufbau wie im internen Ausdruck, damit ein
-    // Beleg von innen und ueber den Portal-Link dieselbe Unterschriftsseite
-    // zeigt.
+    // Beleg von innen und ueber den Portal-Link denselben Block zeigt --
+    // seit ENT-425 einschliesslich der Platzierung: im normalen Fluss am
+    // Ende des Blattes, nicht mehr auf einer erzwungenen zweiten Seite.
+    // Wer hier etwas aendert, aendert es auch in ofBlatt().
     $unterschriftsseite = '';
     if (!empty($b['unterschriftsseite'])) {
         $auftraggeber = trim((string)($kunde['name'] ?? ''));
         $auftraggeber = $auftraggeber !== '' ? $auftraggeber : 'Auftraggeber';
         $auftragnehmer = $firma !== '' ? $firma : 'Auftragnehmer';
-        $unterschriftsseite = '<div style="page-break-before:always;break-before:page;padding-top:60px;'
-            . 'font-family:-apple-system,Segoe UI,Arial,sans-serif;color:#14161A;'
-            . 'max-width:700px;margin:0 auto;font-size:12px">'
-            . '<div style="font-size:15px;font-weight:700;margin-bottom:40px">'
-            . portal_esc($titel . 'nummer') . ' ' . portal_esc($b['nummer'])
-            . '</div>'
-            . '<div style="color:#6B7280;margin-bottom:60px">Ort, Datum</div>'
-            . '<div style="border-bottom:1px solid #14161A;width:260px;margin-bottom:60px"></div>'
+        $unterschriftsseite = '<div style="margin-top:34px;page-break-inside:avoid;break-inside:avoid">'
+            . '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#6B7280;margin-bottom:18px">Unterschriften</div>'
+            . '<div style="color:#6B7280;margin-bottom:34px;font-size:12px">Ort, Datum</div>'
+            . '<div style="border-bottom:1px solid #14161A;width:260px;margin-bottom:40px"></div>'
             . '<div style="display:flex;gap:60px">'
             . '<div style="flex:1">'
-            . '<div style="border-bottom:1px solid #14161A;height:60px"></div>'
+            . '<div style="border-bottom:1px solid #14161A;height:46px"></div>'
             . '<div style="margin-top:8px;font-size:11px;color:#6B7280">Unterschrift ' . portal_esc($auftraggeber) . '</div>'
             . '</div>'
             . '<div style="flex:1">'
-            . '<div style="border-bottom:1px solid #14161A;height:60px"></div>'
+            . '<div style="border-bottom:1px solid #14161A;height:46px"></div>'
             . '<div style="margin-top:8px;font-size:11px;color:#6B7280">Unterschrift ' . portal_esc($auftragnehmer) . '</div>'
             . '</div>'
             . '</div>'
@@ -393,6 +391,7 @@ try {
         . $qrZahlteil
         . $abschnitt('Notizen', $b['oeffentliche_notizen'])
         . $abschnitt('Bedingungen', $b['bedingungen'])
+        . $unterschriftsseite
         // margin-top:auto auf dem LETZTEN Flex-Kind schiebt es an den
         // unteren Rand der Seite, egal wie wenig Inhalt darueber steht --
         // auch wenn die Beleg-Fusszeile selbst leer ist, bleibt so die
@@ -402,7 +401,6 @@ try {
         . $betriebFusszeile
         . '</div>'
         . '</div>'
-        . $unterschriftsseite
         . '</div>';
 
     // Herunterladen laedt html2pdf.js erst BEIM KLICK nach (946 KB, fast

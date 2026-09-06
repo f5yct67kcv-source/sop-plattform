@@ -1,6 +1,7 @@
 // Alle vier Kunden-Reiter als aufklappbare Karten auf dem Handy
 // (ENT-400: Rapporte und Offerten, ENT-401: Adressen und Objekte,
-// ENT-403: Herunterladen und Teilen auch bei der Offerte).
+// ENT-403: Herunterladen und Teilen auch bei der Offerte, ENT-425: Vorschau
+// und PDF).
 //
 // Der Anlass war eine MESSUNG, keine Meinung: Beide Listen sind neun Spalten
 // breit. Auf 390 px blieb davon ein waagrecht schiebbarer Streifen uebrig, in
@@ -15,6 +16,7 @@
 // wirklich eine Datei erzeugt (nicht ob eine Funktion existiert).
 import { WURZEL, OUT, browserPfad } from './pfade.mjs';
 import { chromium } from 'playwright';
+import { readFile } from 'fs/promises';
 
 const EXE = browserPfad();
 const ok = [], bad = [];
@@ -46,9 +48,11 @@ const RAP = { status: 'ok', rapporte: [
 ]};
 
 const BEL = { status: 'ok', belege: [
+  // unterschriftsseite: der Fall aus ENT-425 -- eine kurze Offerte, die den
+  // Unterschriftsblock traegt und trotzdem auf EINE Seite gehoert.
   { id: 9, art: 'offerte', nummer: 'OF-2026-004', referenz: 'Projekt Nord', titel: 'Verkehrsdienst Baustelle',
     kunde_id: 1, kunde_name: 'Beispiel Consulting GmbH', kundennummer: 'K0001', status: 'versendet',
-    datum: T(26), gueltig_bis: T(28), total_rappen: 104855, aktiv: 1 },
+    datum: T(26), gueltig_bis: T(28), total_rappen: 104855, aktiv: 1, unterschriftsseite: 1 },
   { id: 8, art: 'offerte', nummer: 'OF-2026-003', referenz: null, titel: null,
     kunde_id: 2, kunde_name: 'Muster AG', kundennummer: 'K0002', status: 'entwurf',
     datum: T(20), gueltig_bis: T(24), total_rappen: 95200, aktiv: 1 },
@@ -71,10 +75,22 @@ const mock = page => page.route('**/api/**', r => {
   if (u.includes('beleg_lesen')) {
     const id = Number((u.split('id=')[1] || '').split('&')[0]);
     const b = BEL.belege.find(x => Number(x.id) === id) || BEL.belege[0];
+    // Beleg 7 ist absichtlich zu lang fuer ein Blatt: er belegt die andere
+    // Haelfte von ENT-425 -- "auf eine Seite" gilt nur, solange das Ergebnis
+    // lesbar bleibt (PDF_MIN_MASSSTAB), sonst bleibt es beim mehrseitigen Satz.
+    // Beleg 8 liegt dazwischen: knapp zu hoch fuer ein Blatt, aber verkleinert
+    // noch lesbar. Nur dieser Fall laeuft ueber den Verkleinerungsweg -- der
+    // Weg also, der bis ENT-425 wortlos abbrach (pdf.constructor ist Object,
+    // nicht jsPDF). Ohne diesen Beleg pruefte die Reihe genau ihn nicht.
+    const langePositionen = anz => Array.from({ length: anz }, (_, i) => ({ id: i + 1,
+      text: 'Revierdienst Nacht', beschreibung: 'Rundgang ' + (i + 1) + ', gemaess Vereinbarung',
+      menge: 1, einheit: 'h', einzelpreis_rappen: 4500, mwst_bp: 810 }));
+    const positionen = id === 7 ? langePositionen(60)
+      : (id === 8 ? langePositionen(26)
+      : [{ id: 1, text: 'Verkehrsdienst', menge: 5, einheit: 'h',
+           einzelpreis_rappen: 19420, mwst_bp: 810 }]);
     return send({ status: 'ok',
-      beleg: { ...b, rabatt_bp: 0,
-        positionen: [{ id: 1, text: 'Verkehrsdienst', menge: 5, einheit: 'h',
-                       einzelpreis_rappen: 19420, mwst_bp: 810 }] },
+      beleg: { ...b, rabatt_bp: 0, positionen },
       kunde: { id: 1, name: 'Beispiel Consulting GmbH', strasse: 'Mustergasse 2', plz: '4600', ort: 'Olten' },
       person: null });
   }
@@ -314,6 +330,21 @@ const ofDatei = await ofDlVersprechen;
 check('KRITISCH: "Herunterladen" erzeugt bei der Offerte tatsaechlich eine Datei', !!ofDatei);
 check(`Und zwar ein PDF, benannt nach der Offertennummer (${ofDatei ? ofDatei.suggestedFilename() : '–'})`,
   !!ofDatei && /^OF-2026-004\.pdf$/.test(ofDatei.suggestedFilename()));
+
+// ── ENT-425: "alles auf eine Seite" ───────────────────────────────────────
+// Dieselbe Offerte traegt den Unterschriftsblock (unterschriftsseite: 1). Bis
+// ENT-425 erzwang der Block einen Seitenumbruch: eine Offerte mit einer
+// einzigen Position kam als zwei Blaetter an, das zweite fast leer. Gezaehlt
+// wird darum in der HERUNTERGELADENEN Datei, nicht im HTML -- der Umbruch
+// entsteht erst beim Setzen.
+const seitenZahl = async (datei) => {
+  if (!datei) { return -1; }
+  const roh = await readFile(await datei.path(), 'latin1');
+  return (roh.match(/\/Type\s*\/Page[^s]/g) || []).length;
+};
+const seitenKurz = await seitenZahl(ofDatei);
+check(`KRITISCH: die kurze Offerte mit Unterschriftsblock kommt auf EINER Seite (${seitenKurz})`,
+  seitenKurz === 1);
 await m.waitForTimeout(300);
 check('Der Klick klappt die Offerten-Karte nicht zu',
   kn(await kartenDaten('ofTable'), 0).offen);
@@ -331,6 +362,68 @@ await m.waitForTimeout(400);
 check('KRITISCH: das Offerten-Suchfeld filtert die Karten', (await kartenDaten('ofTable')).length === 1);
 await m.fill('#ofQ', '');
 await m.waitForTimeout(400);
+
+// ── ENT-425: die Vorschau muss in den Dialog passen ───────────────────────
+// Das Blatt ist 700 px breit, der Dialog auf dem Handy rund 344 px. Vorher
+// stand das Blatt in voller Breite darin und war rechts abgeschnitten --
+// vom Projektinhaber beanstandet ("Die Vorschauen sehen nicht korrekt aus").
+// Gemessen wird die Lage am gerenderten Zustand, nicht die CSS-Regel: eine
+// transform-Regel kann wirkungslos bleiben, ohne dass etwas kaputtgeht.
+await m.evaluate(() => ofVorschau(9));
+await m.waitForSelector('#dlgOfVorschau.on');
+await m.waitForTimeout(1200);
+const vor = await m.evaluate(() => {
+  const rahmen = document.getElementById('ofVorschauInhalt');
+  const mass = document.getElementById('ofVorschauMass');
+  const blatt = document.getElementById('ofVorschauBlatt');
+  const rb = blatt.getBoundingClientRect(), rr = rahmen.getBoundingClientRect();
+  return {
+    passt: rb.right <= rr.right + 1 && rb.left >= rr.left - 1,
+    breite: Math.round(rb.width), rahmen: Math.round(rr.width),
+    seitenScroll: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    rahmenScroll: rahmen.scrollWidth - rahmen.clientWidth,
+    // Der Platzhalter muss so hoch sein wie das verkleinerte Blatt --
+    // transform aendert die Layout-Hoehe nicht, darum wird sie gesetzt.
+    massHoehe: Math.round(parseFloat(mass.style.height || 0)),
+    blattHoehe: Math.round(rb.height),
+    inhalt: /Verkehrsdienst Baustelle/.test(blatt.textContent),
+    unterschrift: /Unterschrift Beispiel Consulting GmbH/.test(blatt.textContent),
+  };
+});
+check(`KRITISCH: die Vorschau steht ganz im Dialog (Blatt ${vor.breite} px in ${vor.rahmen} px)`,
+  vor.passt);
+check('KRITISCH: in der Vorschau muss nichts waagrecht geschoben werden',
+  vor.seitenScroll === 0 && vor.rahmenScroll <= 0);
+check('Die Vorschau zeigt wirklich den Beleg, nicht nur einen leeren Rahmen', vor.inhalt);
+check('Der Unterschriftsblock steht in derselben Vorschau', vor.unterschrift);
+check(`Der Platzhalter ist so hoch wie das verkleinerte Blatt (${vor.massHoehe} zu ${vor.blattHoehe} px)`,
+  Math.abs(vor.massHoehe - vor.blattHoehe) <= 2);
+await m.evaluate(() => closeDlg('dlgOfVorschau'));
+await m.waitForTimeout(300);
+
+// ── ENT-425: "auf eine Seite" gilt nur, solange es lesbar bleibt ──────────
+// Beleg 7 hat 60 Positionen. Auf ein A4 gepresst waere er eine Lupe -- unter
+// PDF_MIN_MASSSTAB bleibt es darum beim mehrseitigen Satz. Ohne diese
+// Gegenrichtung waere die Pruefung oben mit "immer eine Seite" zu erfuellen.
+const langVersprechen = m.waitForEvent('download', { timeout: 30000 }).catch(() => null);
+await m.evaluate(() => ofHerunterladen(7, null));
+const langDatei = await langVersprechen;
+const seitenLang = await seitenZahl(langDatei);
+check('KRITISCH: eine sehr lange Offerte kommt trotzdem an (kein stiller Abbruch)', !!langDatei);
+check(`KRITISCH: und wird nicht auf ein unlesbares A4 gepresst (${seitenLang} Seiten)`,
+  seitenLang > 1);
+
+// Der Fall dazwischen -- und der einzige, der ueberhaupt verkleinert. Beleg 8
+// hat 26 Positionen: von Hand gesetzt zwei Blaetter, verkleinert eines. Genau
+// hier brach das Herunterladen bis ENT-425 wortlos ab, ohne dass irgendeine
+// Pruefung es gemerkt haette; ein "kein Download" faellt hier jetzt auf.
+const mittelVersprechen = m.waitForEvent('download', { timeout: 30000 }).catch(() => null);
+await m.evaluate(() => ofHerunterladen(8, null));
+const mittelDatei = await mittelVersprechen;
+const seitenMittel = await seitenZahl(mittelDatei);
+check('KRITISCH: eine knapp zu lange Offerte kommt an (der Verkleinerungsweg laeuft)',
+  !!mittelDatei);
+check(`KRITISCH: und passt danach auf EINE Seite (${seitenMittel})`, seitenMittel === 1);
 
 // ── Adressen (ENT-401) ─────────────────────────────────────────────────────
 await m.evaluate(() => kuGoTab('uebersicht'));
