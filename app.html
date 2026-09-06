@@ -135,6 +135,20 @@ html[data-thema="dunkel"] {
   --shell-txt-hi: #F2F4F8;
   --sh-3: 0 -8px 32px -12px rgba(0,0,0,.7);
 }
+/* Die Kopfzeile in "hell" (ENT-417): --shell stammte unveraendert vom
+   Cockpit und war dort in BEIDEN Themen dunkel (dashboard.html, "die alte
+   Kartenfarbe") -- fuer "dunkel" richtig, weil Kopf und Inhalt dieselbe
+   Flaeche tragen sollen (Kommentar oben), aber in "hell" blieb die
+   Kopfzeile dadurch ein schwarzer Balken mitten in der hellen App. Nur die
+   Kopfzeile wechselt hier auf die Grundfarben -- .toast bleibt bewusst
+   dunkel (eigenes, festes Weiss als Schrift) und ist darum aussen vor. */
+html[data-thema="hell"] .kopf {
+  --shell:        var(--surface);
+  --shell-hi:     var(--accent-soft);
+  --shell-line:   var(--line);
+  --shell-txt:    var(--ink-2);
+  --shell-txt-hi: var(--ink);
+}
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 html, body { height: 100%; }
 body {

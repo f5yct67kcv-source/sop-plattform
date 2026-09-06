@@ -329,10 +329,23 @@ try {
 
 // Farbe traegt die Unterscheidung, nicht die Form -- in BEIDEN Themen. Ein
 // fester Farbwert saehe in einem der beiden falsch aus.
+// Gewartet wird, bis die Ueberblendung WIRKLICH steht, statt 200 ms zu
+// hoffen (ENT-419). .btn blendet background ueber 130 ms; die feste Frist
+// liess davon 70 ms Reserve, und die reicht unter parallelem Lauf nicht
+// zuverlaessig -- gemessen wurde ein Wert MITTEN in der Ueberblendung,
+// woraufhin der Vergleich mit --accent scheiterte, obwohl an der Farbe
+// nichts falsch war. Die Aussage der Pruefung bleibt unveraendert; nur der
+// Zeitpunkt der Messung ist jetzt bestimmt statt geschaetzt.
+const uebergangSteht = async () => {
+  await page.waitForFunction(() => ['#rtMik', '#rtBtn', '#rtSprach button[title="Bild auswählen"]']
+    .flatMap(s => { const e = document.querySelector(s); return e ? e.getAnimations() : []; })
+    .every(a => a.playState === 'finished' || a.playState === 'idle'), null, { timeout: 5000 });
+  await page.waitForTimeout(60);
+};
 for (const thema of ['hell', 'dunkel']) {
   try {
     await page.evaluate(t => themaSetzen(t), thema);
-    await page.waitForTimeout(200);
+    await uebergangSteht();
     const f = await page.evaluate(() => {
       const bg = s => getComputedStyle(document.querySelector(s)).backgroundColor;
       const wurzel = getComputedStyle(document.documentElement);
