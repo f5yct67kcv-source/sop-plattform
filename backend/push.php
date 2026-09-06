@@ -124,15 +124,59 @@ function push_kontakt(): string
 }
 
 /**
+ * WARUM ist Push nicht eingerichtet? Fuenf verschiedene Antworten.
+ *
+ * Nachgetragen, nachdem beim ersten Einrichten genau das gefehlt hat: Die
+ * Oberflaeche sagte "auf dem Server fehlt der Push-Schluessel" -- und liess
+ * offen, ob gar keiner ankam (Secret-Name oder Environment falsch) oder ob
+ * der Wert unlesbar war (ein Zeichen zu viel beim Kopieren). Das sind
+ * zwei verschiedene Handgriffe an zwei verschiedenen Stellen, und Raten
+ * kostete eine halbe Stunde. Hausregel: "unbekannt" darf nie wie "keine"
+ * aussehen -- hier sahen zwei Ursachen gleich aus.
+ *
+ * Die Rueckgabe nennt NIE den Schluessel selbst oder Teile davon. Sie sagt
+ * nur, welcher Handgriff fehlt.
+ */
+function push_grund(): string
+{
+    $wert = VAPID_PRIVAT_B64;
+    if ($wert === '' || str_starts_with($wert, '__VAPID')) {
+        // Der Platzhalter steht noch da (kein Deploy gelaufen) oder das
+        // Secret kam leer an (Name oder Environment stimmt nicht).
+        return 'kein_schluessel';
+    }
+    $pem = base64_decode($wert, true);
+    if ($pem === false || $pem === '') {
+        // base64_decode im strengen Modus weist jedes Zeichen ausserhalb
+        // des Alphabets ab -- etwa das "%", das die Mac-Shell ans Ende
+        // einer Zeile ohne Zeilenumbruch setzt und das beim Markieren mit
+        // der Maus mitkommt.
+        return 'schluessel_unlesbar';
+    }
+    $k = openssl_pkey_get_private($pem);
+    if ($k === false) { return 'schluessel_ungueltig'; }
+    $d = openssl_pkey_get_details($k);
+    if (!isset($d['ec']['curve_name']) || $d['ec']['curve_name'] !== 'prime256v1') {
+        return 'falsche_kurve';
+    }
+    if (push_kontakt() === '') { return 'kein_kontakt'; }
+    return 'ok';
+}
+
+/**
  * Ist Push ueberhaupt eingerichtet?
  *
  * Beides noetig: Schluessel UND Kontaktadresse. Ohne Kontakt weisen
  * mehrere Push-Dienste das JWT ab -- ein halb eingerichteter Push
  * scheitert dann erst beim ersten echten Versand.
+ *
+ * EINE Wahrheit: Diese Funktion leitet sich aus push_grund() ab, statt die
+ * Bedingungen ein zweites Mal aufzuschreiben. Zwei Listen von Bedingungen
+ * fuer dieselbe Frage laufen irgendwann auseinander.
  */
 function push_konfiguriert(): bool
 {
-    return push_privatschluessel() !== null && push_kontakt() !== '';
+    return push_grund() === 'ok';
 }
 
 /**

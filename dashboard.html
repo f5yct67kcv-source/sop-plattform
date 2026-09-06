@@ -12785,6 +12785,12 @@ let mtlLeserOffen = 0;
 // verschiedene Aussagen und bekommen zwei verschiedene Saetze.
 let mtlPushEingerichtet = false;
 let mtlPushGeraete = -1;   // -1 = unbekannt
+// WARUM nicht eingerichtet -- benennt den noetigen Handgriff statt nur
+// "fehlt" (ENT-424). Nachgetragen, weil beim ersten Einrichten genau das
+// fehlte: "kein Schluessel angekommen" und "Schluessel unlesbar" sahen
+// gleich aus, sind aber zwei verschiedene Handgriffe an zwei
+// verschiedenen Stellen.
+let mtlPushGrund = '';
 
 // Leerzustand in der Hausform (.empty) -- dieselbe Darstellung wie überall
 // sonst im Cockpit, statt einer eigenen Textzeile nur für diese Seite.
@@ -12801,6 +12807,7 @@ function mtlLaden() {
     else { mtlStand = 'ok'; mtlListe = data.mitteilungen || []; }
     mtlPushEingerichtet = !!(data && data.push_eingerichtet);
     mtlPushGeraete = (data && typeof data.push_geraete === 'number') ? data.push_geraete : -1;
+    mtlPushGrund = (data && data.push_grund) || '';
     mtlZeichnen();
     mtlPushHinweisZeichnen();
   });
@@ -12936,10 +12943,29 @@ function mtlPushHinweisZeichnen() {
   const ziel = $('mtlPushHinweis');
   if (!ziel) { return; }
   if (!mtlPushEingerichtet) {
+    // Fünf Ursachen, fünf verschiedene Handgriffe. "Fehlt" allein liesse
+    // offen, ob das Secret gar nicht ankommt oder nur unlesbar ist — das
+    // eine wird in GitHub behoben, das andere beim Kopieren.
+    const GRUND = {
+      keine_tabelle: 'Die Tabelle für die Geräte fehlt noch — einmal „Einrichtung" ausführen.',
+      kein_schluessel: 'Auf dem Server ist kein Schlüssel angekommen. Entweder ist das Secret '
+        + '<code>VAPID_PRIVATE_PEM_B64</code> nicht gesetzt, es steht im falschen Environment, '
+        + 'oder seit dem Setzen ist kein Deploy gelaufen — der Wert wird erst beim Deploy eingesetzt.',
+      schluessel_unlesbar: 'Der hinterlegte Schlüssel lässt sich nicht lesen — im Wert steht ein '
+        + 'Zeichen, das dort nicht hingehört. Häufigster Fall: das <code>%</code>, das die '
+        + 'Mac-Shell ans Zeilenende setzt und das beim Markieren mitkommt. Neu setzen mit '
+        + '<code>openssl base64 -A -in vapid.pem | pbcopy</code> und einfügen, ohne zu markieren.',
+      schluessel_ungueltig: 'Der hinterlegte Wert ist lesbar, aber kein Schlüssel. Vermutlich wurde '
+        + 'die falsche Datei kodiert.',
+      falsche_kurve: 'Der Schlüssel liegt auf der falschen Kurve. Er muss mit '
+        + '<code>openssl ecparam -genkey -name prime256v1</code> erzeugt sein.',
+      kein_kontakt: 'Der Schlüssel steht, aber <code>VAPID_KONTAKT</code> fehlt — eine Adresse wie '
+        + '<code>mailto:…</code>. Ohne sie weisen mehrere Push-Dienste die Anfrage ab.',
+    };
+    const satz = GRUND[mtlPushGrund] || 'Der Grund liess sich nicht ermitteln.';
     ziel.innerHTML = `<div class="card-bd" style="padding-bottom:0">
       <div class="f-hint" style="margin:0">Benachrichtigungen sind noch nicht eingerichtet —
-      eine neue Mitteilung erscheint nur in der App, das Telefon meldet sich nicht.
-      Dafür fehlt auf dem Server der Push-Schlüssel.</div></div>`;
+      eine neue Mitteilung erscheint nur in der App, das Telefon meldet sich nicht.<br>${satz}</div></div>`;
     return;
   }
   if (mtlPushGeraete <= 0) {
