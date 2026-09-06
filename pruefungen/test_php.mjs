@@ -338,6 +338,7 @@ for (const [datei, titel] of [
   ['pruef_aufgaben.php', 'KRITISCH: eine fremde oder entfernte Aufgabe laesst sich nicht an einen Kontrollpunkt haengen (ENT-302)'],
   ['pruef_mitteilungen.php', 'KRITISCH: Sichtbarkeit und Lesestand der Mitteilungen stimmen -- SQL und PHP sagen dasselbe (ENT-421)'],
   ['pruef_push.php', 'KRITISCH: die VAPID-Signatur haelt der Gegenpruefung stand und ein toter Endpunkt wird abgemeldet (ENT-424)'],
+  ['pruef_mitteilung_loeschen.php', 'KRITISCH: eine laufende Mitteilung laesst sich auch am Browser vorbei nicht loeschen (ENT-433)'],
 ]) {
   let aus = '', code = 0;
   try {
