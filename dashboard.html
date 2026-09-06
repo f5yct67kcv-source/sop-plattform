@@ -3076,7 +3076,29 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
     cursor: pointer; padding: 3px; border-radius: 50%;
     transition: background .13s, box-shadow .13s;
   }
-  .shell.aus .marken-knopf img { border-radius: 50%; }
+  .shell.aus .marken-knopf img { width: 40px; height: 40px; border-radius: 50%; }
+
+  /* ── Glocke neben dem Logo (ENT-416)
+     In der Kopfleiste steht sie neben dem Logo statt in der Werkzeugleiste
+     darunter -- Vorgabe des Projektinhabers nach fremdem Vorbild. Verschoben
+     wird das VORHANDENE Element (siehe glockeVerorten), keine zweite Glocke:
+     Eine Kopie laeuft irgendwann auseinander, und der Zaehler stuende dann
+     an zwei Stellen verschieden.
+     Groesser als in der Werkzeugleiste, weil sie hier neben einem 40-px-Logo
+     und ueber 24-px-Symbolen steht -- ein kleiner Knopf sieht dort aus wie
+     vergessen. */
+  .shell.aus .side-brand .glocke-wrap { flex: none; }
+  .shell.aus .side-brand .btn-glocke {
+    width: 42px; height: 42px; padding: 0; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--shell-txt); background: none; border: none;
+  }
+  .shell.aus .side-brand .btn-glocke svg.i { width: 24px; height: 24px; stroke: currentColor; }
+  .shell.aus .side-brand .btn-glocke:hover { background: var(--shell-hi); color: var(--shell-txt-hi); }
+  /* Der Ring um den Zaehler trennt ihn vom Untergrund. In der Werkzeugleiste
+     ist der aus Glas, hier ist es die Leistenfarbe -- ohne diese Zeile
+     stuende ein heller Ring auf dunklem Grund. */
+  .shell.aus .side-brand .glocke-badge { box-shadow: 0 0 0 2px var(--shell); }
   .shell.aus .marken-knopf:hover { background: var(--shell-hi); }
   .shell.aus .marken-knopf:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .shell.aus.menue-offen .marken-knopf { background: var(--shell-hi); box-shadow: 0 0 0 2px var(--accent); }
@@ -9365,11 +9387,47 @@ document.addEventListener('keydown', e => {
 // Leiste eine Schublade, und die Aufklapp-Regeln greifen nicht. Ohne diese
 // Bedingung wuerde der Knopf am Handy eine Klasse setzen, die nichts
 // bewirkt -- und aria-expanded meldete ein Menue, das niemand sieht.
-function markenMenuMoeglich() {
+// Liegt die Navigation gerade waagrecht als Kopfleiste? Genau dann gibt es
+// den Markenknopf als Bedienelement UND den Platz neben dem Logo, an dem die
+// Glocke stehen soll. Eine Bedingung, zwei Verwender -- nicht zweimal
+// hingeschrieben, sonst driften sie auseinander.
+function kopfleisteAktiv() {
   const sh = $('shell');
   return !!sh && sh.classList.contains('aus')
     && window.matchMedia('(min-width: 901px)').matches;
 }
+
+function markenMenuMoeglich() { return kopfleisteAktiv(); }
+
+// ── Die Glocke hat zwei Plaetze (ENT-416)
+// In der Kopfleiste neben dem Logo, sonst wie bisher in der Werkzeugleiste.
+// Verschoben wird DASSELBE Element: Eine zweite Glocke daneben waere eine
+// Kopie, die irgendwann auseinanderlaeuft -- genau so ist der globale
+// Sprechen-Dialog entstanden und ohne Bild-Erkennung stehengeblieben
+// (ENT-107). Der Zaehler, die Klickbehandlung und die ID bleiben dieselben;
+// glockePositionieren() liest die Knopfposition ohnehin bei jedem Oeffnen
+// neu, das Panel folgt also von allein.
+//
+// Auf dem Handy und in den Seitenleisten-Zustaenden bleibt sie in der
+// Werkzeugleiste. Sie in die Leiste zu haengen hiesse dort, sie hinter dem
+// Burger zu verstecken -- eine Benachrichtigung mit Zaehler, die man erst
+// aufklappen muss, ist keine.
+function glockeVerorten() {
+  const glocke = document.querySelector('.glocke-wrap');
+  const marke  = document.querySelector('.side-brand');
+  const leiste = document.querySelector('.tb-rechts');
+  if (!glocke || !marke || !leiste) { return; }
+  const ziel = kopfleisteAktiv() ? marke : leiste;
+  if (glocke.parentElement === ziel) { return; }
+  // Jeweils ganz vorne: in der Kopfleiste links vom Logo, in der
+  // Werkzeugleiste als erstes Symbol (ENT-197).
+  ziel.insertBefore(glocke, ziel.firstChild);
+}
+
+// Der Zustandswechsel laeuft ueber huelleSetzen(); die Fensterbreite kann
+// sich aber auch ohne ihn aendern -- ein gezogenes Fenster ueber die
+// 901-px-Grenze hinweg liesse die Glocke sonst am falschen Platz stehen.
+window.matchMedia('(min-width: 901px)').addEventListener('change', glockeVerorten);
 
 function markenMenuUm(ev) {
   if (ev) { ev.stopPropagation(); }
@@ -9440,6 +9498,7 @@ function huelleSetzen(zustand, merken = true) {
   if (b) { b.title = HUELLE_TITEL[zustand]; b.setAttribute('aria-label', HUELLE_TITEL[zustand]); }
   navGruppenZu();
   markenMenuSchliessen();
+  glockeVerorten();
   topSubZeichnen();
 }
 
