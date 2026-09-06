@@ -2290,42 +2290,52 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
 }
 
 /* ── Begrüssungs-Container mit Diktat-Router (ENT-032) */
-.begr-karte .card-bd { padding: 22px 24px; }
-/* Feinjustierung aus der Skizze des Projektinhabers vom 2026-09-06 (ENT-428):
-   Gruss elf Pixel nach oben, Knopfreihe drei nach unten, Eingabefeld ein
-   Pixel flacher. Alles auf die Uebersicht begrenzt -- .sprach und
-   .sprach-hint stehen ebenso in Planung/Einsaetze und in zwei Dialogen, und
-   dort ist nichts beanstandet worden.
-   Die fuenf Pixel nach rechts aus derselben Skizze sind mit ENT-430
-   entfallen: Der Block steht jetzt mittig, und ein Gruss, der fuenf Pixel
-   weiter rechts beginnt als das Feld darunter, stuende sichtbar aus der
-   Flucht. */
+/* Luft statt Enge (ENT-432). Der Projektinhaber: "es ist zu dicht".
+   Gemessen stimmte das genau: Der Inhalt brauchte 178 px bei 167 px
+   Innenhoehe und ragte oben aus der Karte heraus.
+   Zwei Griffe dagegen. Der eine ist der Innenabstand -- 22 auf 34 Pixel oben
+   und unten; das ist die Luft, die vorher fehlte. Der andere ist die
+   senkrechte Mitte: Die Karte ist so hoch wie ihre Nachbarin (ENT-410), und
+   was daran ueber den Inhalt hinausgeht, liegt jetzt zu gleichen Teilen
+   ueber und unter ihm statt als Rest am Fuss. */
+.begr-karte .card-bd { padding: 34px 24px; display: flex; flex-direction: column;
+  /* flex: 1 muss dabei sein, sonst ist der Rumpf nur so hoch wie sein Inhalt
+     und die Zentrierung hat nichts zu verteilen. Gemessen klebte der Block
+     bei gestreckter Nachbarkarte oben (35 px oben, 235 px unten) -- die
+     Regel stand da und tat nichts. */
+  flex: 1 1 auto; justify-content: center; }
+/* Der Gruss steht wieder auf seinem eigenen Abstand (ENT-432). Die elf
+   Pixel nach oben aus der Skizze (ENT-428) und die fuenf nach rechts
+   (entfallen mit ENT-430) waren beide Notloesungen gegen dieselbe Enge:
+   Der Inhalt brauchte gemessen 178 px bei 167 px Innenhoehe und ragte oben
+   heraus. Die Enge ist jetzt an der Wurzel weg -- das Eingabefeld ist
+   flacher, und was frei wird, liegt als Luft ueber und unter dem Block. */
 .begr-kopf h2 { font-size: 21px; font-weight: 720; letter-spacing: -.3px;
-  margin: -11px 0 0; }
+  margin: 0; }
 
-/* ── Die Eingabespalte hat eine Lesebreite und steht mittig (ENT-430)
-   Der Projektinhaber: "das linke fenster ist etwas ueberfrachtet". Ueber die
-   volle Kartenbreite lief das Eingabefeld gemessen 900 px weit -- ein Feld,
-   in das man einen Satz diktiert, und kein Fliesstext.
-   Mittig heisst hier wirklich mittig im Container (margin-inline: auto),
-   nicht ein Abstandhalter neben dem Inhalt. Der Text darin bleibt
-   linksbuendig: Gruss, Feld und Knopfreihe stehen auf einer Flucht, und
-   zentrierter Text ueber einem linksbuendigen Feld wirkt unruhig, ohne dass
-   man sagen kann warum.
-   Nur die Uebersicht: Derselbe Router steht in Planung/Einsaetze und in zwei
-   Dialogen, wo die Breite nicht beanstandet ist. */
-.begr-karte .begr-kopf,
-.begr-karte .diktat-router { max-width: 640px; margin-inline: auto; }
+/* Die Lesebreite von 640 px aus ENT-430 ist mit ENT-432 wieder entfallen.
+   Sie beruhte auf einem Missverstaendnis: Der Projektinhaber wollte die
+   Eingabespalte SENKRECHT kuerzen, nicht waagrecht. Zwei Dinge gingen dabei
+   auch messbar schief -- der Platzhaltertext brach auf 1.9 Zeilen um und
+   fuellte das flachere Feld randvoll, und .begr-kopf schrumpfte im
+   Flex-Container auf seine Textbreite (205 statt 640 px) und rutschte mit
+   margin-inline:auto aus der Flucht zum Feld darunter. Beides waere mit
+   width:100% zu haben gewesen; die Breite war aber gar nicht gemeint. */
 .begr-karte .sprach { margin-top: 13px; }
-/* Ein Pixel flacher. Zwei Dinge muessen dabei stimmen:
-   Die Mindesthoehe von textarea.inp (92 px) muss mitgehen -- sie gewinnt
-   sonst gegen jede Hoehe darunter, und die Regel bliebe wirkungslos, ohne
-   dass etwas kaputt aussieht.
-   Und die feste Hoehe gilt NUR bei ungezogener Karte: Wird die Begruessung
-   hoeher gezogen, soll das Eingabefeld die gewonnene Hoehe nehmen (so seit
-   jeher, gemessen von test_containergroesse.mjs). Eine feste Hoehe hier
-   haette das stillgelegt -- die Karte waere gewachsen, das Feld nicht. */
-.dash-item:not(.dh) .begr-karte #rtText { height: 91px; min-height: 91px; }
+/* Das Eingabefeld ist so hoch wie seine zwei Zeilen und keinen Pixel mehr
+   (ENT-432, auf Vorgabe des Projektinhabers). Gerechnet aus dem gerenderten
+   Zustand: 2 x 21.7 px Zeilenhoehe + 2 x 9 px Innenabstand + 2 px Rand =
+   64 px. Vorher waren es 91 -- die 27 Pixel Reserve darin hat nie jemand
+   gebraucht, und sie waren es, die die Karte randvoll machten.
+   Wer mehr Platz will, zieht das Feld am Griff unten rechts auf; es bleibt
+   resize: vertical.
+   Zwei Dinge muessen dabei stimmen: Die Mindesthoehe von textarea.inp
+   (92 px) muss mitgehen -- sie gewinnt sonst gegen jede Hoehe darunter, und
+   die Regel bliebe wirkungslos, ohne dass etwas kaputt aussieht. Und die
+   feste Hoehe gilt NUR bei ungezogener Karte: Wird die Begruessung hoeher
+   gezogen, nimmt das Feld die gewonnene Hoehe (so seit jeher, gemessen von
+   test_containergroesse.mjs). */
+.dash-item:not(.dh) .begr-karte #rtText { height: 64px; min-height: 64px; }
 /* Der Erklaersatz entfaellt hier. NUR er: Dieselbe Flaeche zeigt weiter
    "Das Mikrofon liefert kein Signal", "Die Aufnahme liess sich nicht
    starten" und "Aufnahme laeuft". Ein leeres Feld soll dabei keinen
