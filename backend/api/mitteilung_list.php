@@ -112,6 +112,10 @@ json_response(['status' => 'ok', 'eingerichtet' => true, 'mitteilungen' => $list
     // Benachrichtigungen eingeschaltet" und "Push ist gar nicht
     // eingerichtet" zeigen kann (ENT-424).
     'push_eingerichtet' => push_konfiguriert() && hat_tabelle($pdo, 'push_abo'),
+    // WARUM nicht eingerichtet -- damit die Oberflaeche den noetigen
+    // Handgriff nennen kann statt nur "fehlt" (ENT-424). Nennt nie den
+    // Schluessel selbst.
+    'push_grund' => hat_tabelle($pdo, 'push_abo') ? push_grund() : 'keine_tabelle',
     'push_geraete' => hat_tabelle($pdo, 'push_abo')
         ? (int)$pdo->query('SELECT COUNT(*) FROM push_abo WHERE abgemeldet_am IS NULL')->fetchColumn()
         : -1,

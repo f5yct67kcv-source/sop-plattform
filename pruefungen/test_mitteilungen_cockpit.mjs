@@ -257,14 +257,55 @@ check('KRITISCH: und etwas anderes als "nicht eingerichtet"', tFehler !== tUnein
 check('Bei einem Fehler wird nicht behauptet, es gebe keine Mitteilungen',
   !/keine mitteilung/i.test(tFehler));
 
+// ══════════════ 9b. WARUM PUSH NICHT EINGERICHTET IST ═════════════════
+// Fünf Ursachen, fünf verschiedene Handgriffe an verschiedenen Stellen --
+// "fehlt" allein liesse offen, ob das Secret gar nicht ankommt oder nur
+// unlesbar ist. Nachgetragen, nachdem beim ersten echten Einrichten genau
+// das gefehlt hat und eine halbe Stunde Raten kostete.
+async function pushSatz(grund) {
+  listenAntwort = { status: 'ok', eingerichtet: true, mitteilungen: LISTE,
+                    push_eingerichtet: false, push_geraete: 0, push_grund: grund };
+  await anmelden();
+  await ev(() => go('mitteilungen'));
+  await page.waitForTimeout(500);
+  return ((await ev(() => document.getElementById('mtlPushHinweis')?.textContent || '')) || '')
+    .replace(/\s+/g, ' ').trim();
+}
+const gruende = {};
+for (const g of ['keine_tabelle', 'kein_schluessel', 'schluessel_unlesbar',
+                 'schluessel_ungueltig', 'falsche_kurve', 'kein_kontakt']) {
+  gruende[g] = await pushSatz(g);
+  check(`Der Grund "${g}" wird erklaert`, gruende[g].length > 40);
+}
+check('KRITISCH: alle sechs Gruende sagen etwas VERSCHIEDENES (CLAUDE.md)',
+  new Set(Object.values(gruende)).size === 6);
+check('KRITISCH: "kein Schluessel angekommen" nennt das Secret und den noetigen Deploy',
+  /VAPID_PRIVATE_PEM_B64/.test(gruende.kein_schluessel) && /Deploy/.test(gruende.kein_schluessel));
+check('KRITISCH: "unlesbar" nennt den haeufigsten Fall beim Namen',
+  /%/.test(gruende.schluessel_unlesbar));
+check('KRITISCH: "kein Kontakt" verweist nicht auf den Schluessel',
+  /VAPID_KONTAKT/.test(gruende.kein_kontakt));
+check('"Tabelle fehlt" verweist auf die Einrichtung',
+  /Einrichtung/.test(gruende.keine_tabelle));
+
+// Ein unbekannter Grund darf nicht wie ein bekannter aussehen.
+const unbekannt = await pushSatz('irgendwas-neues');
+check('KRITISCH: ein unbekannter Grund sagt, dass er unbekannt ist -- '
+    + 'statt einen falschen Handgriff zu nennen',
+  /nicht ermitteln/i.test(unbekannt)
+  && !Object.values(gruende).some(g => g === unbekannt));
+
 // ══════════════ 10. GESTALTUNG, GEMESSEN ══════════════════════════════
 // Die Hausregel verlangt Messen am gerenderten Zustand, nicht Nachlesen im
 // Quelltext: Eine CSS-Regel kann wirkungslos bleiben, ohne dass etwas
 // kaputtgeht.
-listenAntwort = { status: 'ok', eingerichtet: true, mitteilungen: LISTE };
+listenAntwort = { status: 'ok', eingerichtet: true, mitteilungen: LISTE,
+                  push_eingerichtet: true, push_geraete: 3, push_grund: 'ok' };
 await anmelden();
 await ev(() => go('mitteilungen'));
 await page.waitForTimeout(500);
+check('Ist Push eingerichtet, steht die Zahl der erreichbaren Geraete da',
+  /3 Geräten/.test((await ev(() => document.getElementById('mtlPushHinweis')?.textContent || '')) || ''));
 const mass = await ev(() => {
   const raster = document.querySelector('.mtl-raster');
   const knoepfe = document.querySelector('.mtl-knoepfe');

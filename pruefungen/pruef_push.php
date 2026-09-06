@@ -61,6 +61,64 @@ require $tmp;
 // ── EINRICHTUNG
 pruef('Mit Schluessel und Kontakt gilt Push als eingerichtet', push_konfiguriert());
 pruef('Der private Schluessel wird geladen', push_privatschluessel() !== null);
+pruef('Und der Grund lautet "ok"', push_grund() === 'ok');
+
+// ── WARUM NICHT EINGERICHTET
+// Fuenf Ursachen, fuenf verschiedene Antworten -- jede verlangt einen
+// anderen Handgriff an einer anderen Stelle. Nachgetragen, nachdem beim
+// ersten echten Einrichten "kein Schluessel angekommen" und "Schluessel
+// unlesbar" gleich aussahen und eine halbe Stunde Raten kosteten.
+//
+// Geprueft wird an einer EIGENEN Kopie der Datei je Fall: push.php haelt
+// den Wert in einer Konstanten, die sich nicht umsetzen laesst. Die
+// Funktion wird darum je Fall unter eigenem Namen geladen -- derselbe
+// Quelltext, andere Werte.
+function pruef_grund_mit(string $schluessel, string $kontakt): string
+{
+    static $nr = 0;
+    $nr++;
+    $quelle = (string)file_get_contents(__DIR__ . '/../backend/push.php');
+    // Nur die Funktion push_grund() herausloesen und unter eigenem Namen
+    // laden. So laeuft der ECHTE Rumpf, nur mit anderen Konstanten.
+    $anfang = strpos($quelle, 'function push_grund(): string');
+    $ende = strpos($quelle, "\n}", $anfang) + 2;
+    $rumpf = substr($quelle, $anfang, $ende - $anfang);
+    $rumpf = str_replace('function push_grund(): string', "function pruef_grund_$nr(): string", $rumpf);
+    $rumpf = str_replace('VAPID_PRIVAT_B64', "PRUEF_SCHLUESSEL_$nr", $rumpf);
+    $rumpf = str_replace('push_kontakt()', "PRUEF_KONTAKT_$nr", $rumpf);
+    define("PRUEF_SCHLUESSEL_$nr", $schluessel);
+    define("PRUEF_KONTAKT_$nr", $kontakt);
+    eval($rumpf);
+    return ('pruef_grund_' . $nr)();
+}
+
+$gueltig = base64_encode($pem);
+$gruende = [
+    'kein Deploy gelaufen'   => pruef_grund_mit('__VAPID_PRIVATE_PEM_B64__', 'mailto:a@b.invalid'),
+    'Secret leer angekommen' => pruef_grund_mit('', 'mailto:a@b.invalid'),
+    'Prozentzeichen am Ende' => pruef_grund_mit($gueltig . '%', 'mailto:a@b.invalid'),
+    'kein Schluessel drin'   => pruef_grund_mit(base64_encode('nur irgendein Text'), 'mailto:a@b.invalid'),
+    'Kontakt fehlt'          => pruef_grund_mit($gueltig, ''),
+    'alles gut'              => pruef_grund_mit($gueltig, 'mailto:a@b.invalid'),
+];
+pruef('KRITISCH: ein unersetzter Platzhalter heisst "kein Schluessel"',
+    $gruende['kein Deploy gelaufen'] === 'kein_schluessel');
+pruef('KRITISCH: ein leeres Secret heisst ebenfalls "kein Schluessel"',
+    $gruende['Secret leer angekommen'] === 'kein_schluessel');
+pruef('KRITISCH: ein Prozentzeichen am Ende heisst "unlesbar" -- '
+    . 'nicht dasselbe wie "kein Schluessel"',
+    $gruende['Prozentzeichen am Ende'] === 'schluessel_unlesbar');
+pruef('KRITISCH: lesbar, aber kein Schluessel, heisst "ungueltig"',
+    $gruende['kein Schluessel drin'] === 'schluessel_ungueltig');
+pruef('KRITISCH: ein fehlender Kontakt wird als solcher benannt -- '
+    . 'nicht als fehlender Schluessel',
+    $gruende['Kontakt fehlt'] === 'kein_kontakt');
+pruef('Mit allem gilt es als eingerichtet', $gruende['alles gut'] === 'ok');
+pruef('KRITISCH: die fuenf Fehlerbilder sind unterscheidbar (CLAUDE.md)',
+    count(array_unique([$gruende['Secret leer angekommen'], $gruende['Prozentzeichen am Ende'],
+        $gruende['kein Schluessel drin'], $gruende['Kontakt fehlt'], $gruende['alles gut']])) === 5);
+pruef('KRITISCH: kein Grund verraet den Schluessel selbst',
+    !array_filter($gruende, fn($g) => str_contains($gueltig, $g) || strlen($g) > 40));
 
 // ── DER OEFFENTLICHE SCHLUESSEL
 // Er muss genau 65 Byte lang sein und mit 0x04 beginnen -- ein Browser

@@ -47,6 +47,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         'status'        => 'ok',
         'eingerichtet'  => $tabelleDa && push_konfiguriert(),
         'tabelle_da'    => $tabelleDa,
+        // Warum nicht eingerichtet (ENT-424). Die App zeigt es nicht
+        // an -- die Mitarbeitenden koennen daran nichts aendern --, aber
+        // es steht in der Antwort, damit sich der Fall am Geraet
+        // nachsehen laesst, ohne im Cockpit zu suchen.
+        'grund'         => $tabelleDa ? push_grund() : 'keine_tabelle',
         'schluessel'    => push_oeffentlicher_schluessel(),
         'dieses_geraet' => $abo !== null,
         'geraete'       => $geraete,

@@ -246,6 +246,9 @@ jobs:
             echo "EFF_ANTHROPIC_API_KEY=$EFF_ANTHROPIC_API_KEY"
             echo "EFF_MAPS_JS_KEY=$EFF_MAPS_JS_KEY"
             echo "EFF_STAGING_TESTMAIL=$EFF_STAGING_TESTMAIL"
+            echo "EFF_VAPID_PRIVATE_PEM_B64=$EFF_VAPID_PRIVATE_PEM_B64"
+            echo "EFF_VAPID_KONTAKT=$EFF_VAPID_KONTAKT"
+            echo "EFF_PUSH_CRON_SCHLUESSEL=$EFF_PUSH_CRON_SCHLUESSEL"
           } >> "$GITHUB_ENV"
 
           # Mehrzeiliger Wert -- eigener Heredoc-Block statt einer einfachen
