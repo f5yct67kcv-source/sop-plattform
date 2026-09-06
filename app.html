@@ -1248,6 +1248,21 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
 .mit-karte .mit-fuss { display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
   margin-top: 12px; font-size: 12px; color: var(--ink-3); }
 .mit-marken { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+/* Termin (ENT-436). Die Zeitangabe steht als eigene Zeile ueber dem Text --
+   sie ist die eine Angabe, wegen der jemand zu- oder absagt. */
+.mit-karte.termin { border-left: 3px solid var(--accent); }
+.mit-termin-zeit { display: flex; gap: 8px; align-items: baseline; margin: 8px 0 2px;
+  font-size: 14px; font-weight: 640; color: var(--ink); }
+.mit-termin-ort { font-size: 13px; color: var(--ink-3); margin-bottom: 2px; }
+/* Zwei gleich grosse Knoepfe nebeneinander, beide mindestens 44 px hoch
+   (CLAUDE.md). Der eigene Stand ist nicht nur farblich markiert, sondern
+   steht darunter auch als Satz -- Farbe allein ist keine Auskunft. */
+.mit-antwort { display: flex; gap: 8px; margin-top: 12px; }
+.mit-antwort .btn { flex: 1; min-height: 44px; }
+.mit-antwort .btn.an { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.mit-antwort .btn.ab.an { border-color: var(--neg); box-shadow: inset 0 0 0 1px var(--neg); }
+.mit-antwort-stand { margin-top: 8px; font-size: 13px; font-weight: 620; color: var(--ink-2); }
+.mit-antwort-stand.offen { color: var(--neg); }
 
 /* Das Fenster für eine wichtige Mitteilung. Es unterbricht -- also sitzt es
    über allem, auch über dem Einsatzmodus, und lässt sich nicht durch einen
@@ -1269,7 +1284,11 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
 .mit-dlg-fuss { padding: 16px 20px calc(16px + env(safe-area-inset-bottom)); }
 /* Der Knopf steht allein in seiner Zeile -- und wird trotzdem NICHT über
    die volle Breite gestreckt (CLAUDE.md). Rechtsbündig, wie ein Abschluss. */
-.mit-dlg-fuss { display: flex; justify-content: flex-end; }
+.mit-dlg-fuss { display: flex; justify-content: flex-end; gap: 8px; }
+/* .btn setzt display selbst -- ohne diese Zeile bliebe ein Knopf mit
+   [hidden] sichtbar (dieselbe Falle wie bei .mit-zahl). Aufgefallen in der
+   Prüfung: "Verstanden" stand neben den Termin-Knöpfen. */
+.mit-dlg-fuss .btn[hidden] { display: none; }
 
 @media (min-width: 700px) {
   /* Auf grösseren Geräten mittig halten statt in die Breite ziehen */
@@ -1464,7 +1483,13 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
     <div class="mit-dlg-bd" id="mitDlgText"></div>
     <div class="mit-dlg-meta" id="mitDlgMeta"></div>
     <div class="mit-dlg-fuss">
+      <!-- Bei einer Mitteilung genuegt "Verstanden"; ein Termin fragt
+           stattdessen nach einer Antwort und laesst "Später" zu (ENT-436).
+           Nie beides gleichzeitig sichtbar. -->
       <button class="btn btn-primary" id="mitDlgOk" onclick="mitDlgBestaetigen()">Verstanden</button>
+      <button class="btn btn-plain" id="mitDlgSpaeter" hidden onclick="mitDlgSpaeter()">Später</button>
+      <button class="btn btn-plain" id="mitDlgAb" hidden onclick="mitDlgAntwort('abgesagt')">Absagen</button>
+      <button class="btn btn-primary" id="mitDlgZu" hidden onclick="mitDlgAntwort('zugesagt')">Zusagen</button>
     </div>
   </div>
 </div>
@@ -1524,6 +1549,18 @@ const W = {
     mitFehlerText: 'Die Verbindung kam nicht zustande. Ob Mitteilungen vorliegen, ist gerade unbekannt — bitte später erneut versuchen.',
     mitWichtig: 'Wichtig', mitRevier: 'Revier', mitNeu: 'Neu',
     mitDlgLabel: 'Wichtige Mitteilung', mitVerstanden: 'Verstanden',
+
+    // ── Termine (ENT-436). Ein Termin ist eine Mitteilung, die eine
+    // Antwort verlangt. Drei Zustaende, drei verschiedene Saetze:
+    // zugesagt, abgesagt und "noch nicht beantwortet" -- Letzteres ist
+    // ausdruecklich KEINE Absage.
+    mitTermin: 'Termin',
+    mitZusagen: 'Zusagen', mitAbsagen: 'Absagen', mitSpaeter: 'Später',
+    mitAntwortOffen: 'Noch nicht beantwortet',
+    mitAntwortZugesagt: 'Du hast zugesagt', mitAntwortAbgesagt: 'Du hast abgesagt',
+    mitAntwortAendern: 'Antwort lässt sich ändern, solange der Termin läuft.',
+    mitDlgTerminLabel: 'Termin — bitte antworten',
+    mitAntwortFehler: 'Die Antwort kam nicht durch — sie ist NICHT gespeichert. Bitte erneut versuchen.',
 
     // ── Benachrichtigungen (ENT-424).
     // SECHS Zustaende, sechs verschiedene Saetze. Sie duerfen nie gleich
@@ -2039,6 +2076,9 @@ function beschriften() {
   $('mitGlocke').setAttribute('aria-label', w('mitteilungen'));
   $('mitDlgLb').textContent = w('mitDlgLabel');
   $('mitDlgOk').textContent = w('mitVerstanden');
+  $('mitDlgSpaeter').textContent = w('mitSpaeter');
+  $('mitDlgZu').textContent = w('mitZusagen');
+  $('mitDlgAb').textContent = w('mitAbsagen');
 }
 
 // ══════════════════════════════════════════ ZUGANG
@@ -3010,7 +3050,9 @@ function ladeMitteilungen() {
     }
     mitStand = 'ok';
     mitteilungen = data.mitteilungen || [];
-    mitUngelesen = data.ungelesen || 0;
+    // Die Serverzahl der offenen Punkte (ENT-436) -- sie zaehlt dasselbe
+    // wie mitOffeneZahl() und dient, solange die Liste noch nicht steht.
+    mitUngelesen = typeof data.offen === 'number' ? data.offen : (data.ungelesen || 0);
     mitRevierUngelesen = data.revier_ungelesen || 0;
     mitUnterbrechen = data.unterbrechen || [];
     mitZahlZeigen();
@@ -3020,11 +3062,30 @@ function ladeMitteilungen() {
 // Der Zähler an der Glocke. Ab 100 "99+" -- drei Ziffern passen in keinen
 // Punkt dieser Grösse, und der Unterschied zwischen 112 und 113 ändert
 // ohnehin nichts am nächsten Handgriff.
+// Was noch etwas von dieser Person will (ENT-436): eine ungelesene
+// Mitteilung ODER ein Termin ohne Antwort. Je Eintrag hoechstens einmal --
+// ein ungelesener Termin ist EIN offener Punkt, nicht zwei.
+//
+// Gezaehlt wird aus der Liste und nicht der Serverzahl nachgezogen: Nach
+// einer Antwort im Funkloch stimmte die Serverzahl sonst nicht mehr mit
+// dem ueberein, was auf dem Bildschirm steht.
+function mitOffeneZahl(liste) {
+  return (liste || []).filter(m => !m.gelesen || mitTerminOffen(m)).length;
+}
+
+function mitTerminOffen(m) {
+  return !!m.ist_termin && (m.antwort || 'offen') === 'offen';
+}
+
 function mitZahlZeigen() {
   const el = $('mitZahl');
   if (!el) { return; }
-  el.hidden = mitUngelesen <= 0;
-  el.textContent = mitUngelesen > 99 ? '99+' : String(mitUngelesen);
+  // Steht die Liste noch nicht (erster Abruf laeuft, oder er ist
+  // gescheitert), gilt die Serverzahl. Sie ist dasselbe Mass -- siehe
+  // meine_mitteilungen.php.
+  const zahl = mitStand === 'ok' ? mitOffeneZahl(mitteilungen) : mitUngelesen;
+  el.hidden = zahl <= 0;
+  el.textContent = zahl > 99 ? '99+' : String(zahl);
 }
 
 // Die Glocke sitzt in der Kopfzeile -- die im Menü wegfällt (ENT-402).
@@ -3117,18 +3178,25 @@ function mitZeichnen() {
 
   ziel.innerHTML = liste.map(m => {
     const wichtig = m.stufe === 'wichtig';
+    const termin = !!m.ist_termin;
     const marken = [];
+    if (termin) { marken.push(`<span class="marke m-p">${esc(w('mitTermin'))}</span>`); }
     if (wichtig) { marken.push(`<span class="marke m-x">${esc(w('mitWichtig'))}</span>`); }
     if (m.zielgruppe === 'revier' && !mitNurRevier) { marken.push(`<span class="marke m-n">${esc(w('mitRevier'))}</span>`); }
     if (!m.gelesen) { marken.push(`<span class="marke m-p">${esc(w('mitNeu'))}</span>`); }
     const fuss = [];
     if (m.verfasser_name) { fuss.push(esc(w('mitVon')) + ' ' + esc(m.verfasser_name)); }
     fuss.push(dmy(m.erstellt_am));
-    if (m.sichtbar_bis) { fuss.push(esc(w('mitLaeuftAb')) + ' ' + dmy(m.sichtbar_bis)); }
-    return `<article class="mit-karte${m.gelesen ? '' : ' neu'}${wichtig ? ' wichtig' : ''}" data-id="${m.id}">
+    // Bei einem Termin steht das Ablaufdatum NICHT im Fuss: Es ist
+    // derselbe Zeitpunkt wie der Termin selbst (siehe mitteilung_save.php)
+    // und stuende sonst zweimal da, einmal als "läuft ab".
+    if (m.sichtbar_bis && !termin) { fuss.push(esc(w('mitLaeuftAb')) + ' ' + dmy(m.sichtbar_bis)); }
+    return `<article class="mit-karte${m.gelesen ? '' : ' neu'}${wichtig ? ' wichtig' : ''}${termin ? ' termin' : ''}" data-id="${m.id}">
       ${marken.length ? `<div class="mit-marken">${marken.join('')}</div>` : ''}
       <h3>${esc(m.titel)}</h3>
+      ${termin ? mitTerminAngabe(m) : ''}
       <div class="mit-text">${esc(m.text)}</div>
+      ${termin ? mitAntwortBlock(m) : ''}
       <div class="mit-fuss">${fuss.join(' · ')}</div>
     </article>`;
   }).join('');
@@ -3137,6 +3205,77 @@ function mitZeichnen() {
   // ausgeschrieben, es gibt nichts aufzuklappen. Ein zusätzlicher
   // "gelesen"-Knopf wäre ein Klick ohne Aussage.
   liste.filter(m => !m.gelesen).forEach(m => mitGelesenMelden(m.id, false));
+}
+
+// Wann und wo (ENT-436). Die eine Angabe, wegen der jemand zu- oder absagt
+// -- darum als eigene Zeile über dem Text und nicht im Fuss zwischen
+// Verfasser und Datum.
+function mitTerminZeit(m) {
+  if (!m.beginn) { return ''; }
+  const d = new Date(String(m.beginn).replace(' ', 'T'));
+  const tag = isNaN(d.getTime()) ? '' : WOCHENTAG[d.getDay()] + ', ';
+  let s = tag + dmy(m.beginn) + ', ' + String(m.beginn).slice(11, 16);
+  if (m.ende) {
+    // Endet der Termin am selben Tag, genügt die Uhrzeit -- sonst steht
+    // das Datum zweimal da. Über Mitternacht hinaus steht es ausgeschrieben,
+    // sonst sähe ein zweitägiger Termin wie ein sehr kurzer aus.
+    s += String(m.ende).slice(0, 10) === String(m.beginn).slice(0, 10)
+      ? '–' + String(m.ende).slice(11, 16)
+      : ' – ' + dmy(m.ende) + ', ' + String(m.ende).slice(11, 16);
+  }
+  return s;
+}
+
+function mitTerminAngabe(m) {
+  const zeit = mitTerminZeit(m);
+  return (zeit ? `<div class="mit-termin-zeit">${esc(zeit)}</div>` : '')
+    + (m.ort ? `<div class="mit-termin-ort">${esc(m.ort)}</div>` : '');
+}
+
+// Zwei Knöpfe und ein Satz. Der Satz ist nicht doppelt gemoppelt: Welcher
+// Knopf farblich hervorgehoben ist, sieht nicht jeder -- und "noch nicht
+// beantwortet" hat gar keinen hervorgehobenen Knopf und wäre sonst gar
+// nicht erkennbar. Ein offener Termin sagt das ausdrücklich; er sieht nie
+// aus wie eine Absage.
+function mitAntwortBlock(m) {
+  const a = m.antwort || 'offen';
+  const stand = a === 'zugesagt' ? w('mitAntwortZugesagt')
+              : a === 'abgesagt' ? w('mitAntwortAbgesagt')
+              : w('mitAntwortOffen');
+  return `<div class="mit-antwort">
+      <button type="button" class="btn btn-plain zu${a === 'zugesagt' ? ' an' : ''}"
+              onclick="mitAntwortSenden(${m.id}, 'zugesagt')">✅ ${esc(w('mitZusagen'))}</button>
+      <button type="button" class="btn btn-plain ab${a === 'abgesagt' ? ' an' : ''}"
+              onclick="mitAntwortSenden(${m.id}, 'abgesagt')">❌ ${esc(w('mitAbsagen'))}</button>
+    </div>
+    <div class="mit-antwort-stand${a === 'offen' ? ' offen' : ''}">${esc(stand)}</div>`;
+}
+
+// Die Antwort geht an einen eigenen Endpunkt (mitteilung_antwort.php) und
+// wird ERST NACH der Serverantwort örtlich übernommen -- anders als der
+// Lesestand, der sofort gesetzt wird. Grund: "gelesen" ist eine Beobachtung
+// und darf im Funkloch vorauseilen; eine Zusage ist eine Erklärung, auf die
+// sich die Verwaltung verlässt. Was hier steht, muss dort angekommen sein.
+function mitAntwortSenden(id, antwort) {
+  return api('mitteilung_antwort.php', { method: 'POST', body: { id: Number(id), antwort } })
+    .then(({ ok, data }) => {
+      if (!ok || !data || data.status !== 'ok') {
+        toast((data && data.message) || w('mitAntwortFehler'));
+        return false;
+      }
+      const m = mitteilungen.find(x => Number(x.id) === Number(id));
+      if (m) {
+        m.antwort = antwort;
+        // Die Antwort ist zugleich ein Lesenachweis -- so hält es der
+        // Server (termin_antwort_merken), und die Anzeige darf nichts
+        // anderes behaupten.
+        m.gelesen = true;
+      }
+      mitUnterbrechen = mitUnterbrechen.filter(x => Number(x) !== Number(id));
+      mitZahlZeigen();
+      if ($('mitSeite').classList.contains('on')) { mitZeichnen(); }
+      return true;
+    });
 }
 
 // Vermerkt den Lesestand auf dem Server und zieht den Zähler nach. Der
@@ -3172,22 +3311,72 @@ function mitFensterPruefen() {
   const m = mitteilungen.find(x => Number(x.id) === Number(naechste));
   if (!m) { mitUnterbrechen.shift(); return; }
   mitDlgId = m.id;
+  const termin = !!m.ist_termin;
+  $('mitDlgLb').textContent = termin ? w('mitDlgTerminLabel') : w('mitDlgLabel');
   $('mitDlgTitel').textContent = m.titel;
   $('mitDlgText').textContent = m.text;
   const meta = [];
+  // Beim Termin steht die Zeit ZUERST -- danach wird gefragt, nicht nach
+  // dem Verfassungsdatum.
+  if (termin) {
+    const zeit = mitTerminZeit(m);
+    if (zeit) { meta.push(zeit); }
+    if (m.ort) { meta.push(m.ort); }
+  }
   if (m.verfasser_name) { meta.push(w('mitVon') + ' ' + m.verfasser_name); }
   meta.push(dmy(m.erstellt_am));
   $('mitDlgMeta').textContent = meta.join(' · ');
+  // Entweder "Verstanden" oder die drei Termin-Knöpfe -- nie beides.
+  $('mitDlgOk').hidden = termin;
+  $('mitDlgSpaeter').hidden = !termin;
+  $('mitDlgZu').hidden = !termin;
+  $('mitDlgAb').hidden = !termin;
   $('mitDlg').classList.add('on');
   $('mitDlg').setAttribute('aria-hidden', 'false');
-  $('mitDlgOk').focus();
+  (termin ? $('mitDlgZu') : $('mitDlgOk')).focus();
+}
+
+// "Später" (ENT-436): Das Fenster geht zu, die Frage bleibt. Es wird NICHTS
+// gespeichert -- keine Antwort und auch keine Bestätigung. Der Termin
+// zählt weiter an der Glocke und fragt beim nächsten Öffnen der App wieder.
+//
+// Bewusst kein "erst antworten, dann weiter": Wer im Dienst steht und
+// zuerst nachsehen muss, klickt sonst irgendetwas -- und dann steht eine
+// Zusage da, die nichts wert ist.
+function mitDlgSpaeter() {
+  const id = mitDlgId;
+  mitDlgSchliessen();
+  if (id === null) { return; }
+  // Nur aus der Warteschlange dieses App-Starts nehmen, damit nicht sofort
+  // dasselbe Fenster wiederkommt. Der Server weiss davon nichts.
+  mitUnterbrechen = mitUnterbrechen.filter(x => Number(x) !== Number(id));
+  mitFensterPruefen();
+}
+
+// Zu- oder absagen direkt aus dem Fenster. Das Fenster schliesst erst,
+// wenn die Antwort angekommen ist -- sonst stünde es zu, während der
+// Server nichts von der Zusage weiß.
+function mitDlgAntwort(antwort) {
+  const id = mitDlgId;
+  if (id === null) { return; }
+  [$('mitDlgZu'), $('mitDlgAb'), $('mitDlgSpaeter')].forEach(b => { b.disabled = true; });
+  mitAntwortSenden(id, antwort).then(gelungen => {
+    [$('mitDlgZu'), $('mitDlgAb'), $('mitDlgSpaeter')].forEach(b => { b.disabled = false; });
+    if (!gelungen) { return; }
+    mitDlgSchliessen();
+    mitFensterPruefen();
+  });
+}
+
+function mitDlgSchliessen() {
+  $('mitDlg').classList.remove('on');
+  $('mitDlg').setAttribute('aria-hidden', 'true');
+  mitDlgId = null;
 }
 
 function mitDlgBestaetigen() {
   const id = mitDlgId;
-  $('mitDlg').classList.remove('on');
-  $('mitDlg').setAttribute('aria-hidden', 'true');
-  mitDlgId = null;
+  mitDlgSchliessen();
   if (id === null) { return; }
   mitUnterbrechen = mitUnterbrechen.filter(x => Number(x) !== Number(id));
   mitGelesenMelden(id, true);

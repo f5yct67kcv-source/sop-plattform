@@ -51,23 +51,61 @@ if (push_konfiguriert() && hat_tabelle($pdo, 'push_abo')) {
 // jeweils EINE Mitteilung aufklappt.
 $detail = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 if ($detail > 0) {
-    $st = $pdo->prepare(
-        'SELECT m.vorname, m.nachname, m.name, g.gelesen_am, g.bestaetigt_am
-           FROM mitteilung_gelesen g
-           JOIN mitarbeiter m ON m.id = g.mitarbeiter_id
-          WHERE g.mitteilung_id = ?
-          ORDER BY g.gelesen_am'
-    );
-    $st->execute([$detail]);
-    json_response(['status' => 'ok', 'eingerichtet' => true, 'leser' => $st->fetchAll()]);
+    $art = $pdo->prepare('SELECT art, zielgruppe FROM mitteilungen WHERE id = ?');
+    $art->execute([$detail]);
+    $kopf = $art->fetch() ?: ['art' => 'info', 'zielgruppe' => 'alle'];
+    $istTermin = mitteilung_ist_termin($kopf);
+
+    // Bei einem TERMIN werden ALLE Empfaenger aufgezaehlt, nicht nur die,
+    // die schon geoeffnet haben (ENT-436). Sonst beantwortete die Liste
+    // die eigentliche Frage nicht: "Wen muss ich noch anrufen?" Wer nicht
+    // geantwortet hat, taucht sonst gar nicht auf -- und Fehlen sieht aus
+    // wie Nichtvorhandensein.
+    //
+    // Bei einer Mitteilung bleibt es bei den Lesern: Dort gibt es nichts
+    // zu beantworten, und eine Liste aller Nichtleser waere eine
+    // Anwesenheitskontrolle, die niemand bestellt hat.
+    $wo = $istTermin ? mitteilung_empfaenger_wo($pdo, (string)$kopf['zielgruppe']) : null;
+    if ($istTermin && $wo !== null) {
+        $st = $pdo->prepare(
+            "SELECT p.vorname, p.nachname, p.name, g.gelesen_am, g.bestaetigt_am,
+                    g.antwort, g.antwort_am
+               FROM mitarbeiter p
+               LEFT JOIN mitteilung_gelesen g
+                      ON g.mitarbeiter_id = p.id AND g.mitteilung_id = ?
+              WHERE $wo
+              ORDER BY p.nachname, p.vorname, p.name"
+        );
+        $st->execute([$detail]);
+    } else {
+        $st = $pdo->prepare(
+            'SELECT p.vorname, p.nachname, p.name, g.gelesen_am, g.bestaetigt_am,
+                    g.antwort, g.antwort_am
+               FROM mitteilung_gelesen g
+               JOIN mitarbeiter p ON p.id = g.mitarbeiter_id
+              WHERE g.mitteilung_id = ?
+              ORDER BY g.gelesen_am'
+        );
+        $st->execute([$detail]);
+    }
+    json_response(['status' => 'ok', 'eingerichtet' => true,
+        'ist_termin' => $istTermin,
+        // Steht der Empfaengerkreis nicht fest (Revier ohne die Spalte),
+        // ist die Liste unvollstaendig -- und sagt das, statt Vollstaendig-
+        // keit vorzutaeuschen.
+        'vollzaehlig' => !$istTermin || $wo !== null,
+        'leser' => $st->fetchAll()]);
 }
 
 $st = $pdo->query(
     'SELECT m.id, m.titel, m.text, m.zielgruppe, m.stufe,
+            m.art, m.beginn, m.ende, m.ort,
             m.sichtbar_ab, m.sichtbar_bis, m.erstellt_am, m.archiviert_am,
             m.verfasser_name,
             (SELECT COUNT(*) FROM mitteilung_gelesen g WHERE g.mitteilung_id = m.id) AS gelesen_anzahl,
             (SELECT COUNT(*) FROM mitteilung_gelesen g WHERE g.mitteilung_id = m.id AND g.bestaetigt_am IS NOT NULL) AS bestaetigt_anzahl,
+            (SELECT COUNT(*) FROM mitteilung_gelesen g WHERE g.mitteilung_id = m.id AND g.antwort = \'zugesagt\') AS zugesagt_anzahl,
+            (SELECT COUNT(*) FROM mitteilung_gelesen g WHERE g.mitteilung_id = m.id AND g.antwort = \'abgesagt\') AS abgesagt_anzahl,
             m.push_gesendet_am, m.push_bilanz
        FROM mitteilungen m
       ORDER BY m.erstellt_am DESC, m.id DESC'
@@ -82,6 +120,13 @@ foreach (MITTEILUNG_ZIELGRUPPEN as $z) { $nenner[$z] = mitteilung_empfaengerzahl
 foreach ($liste as &$m) {
     $m['gelesen_anzahl']     = (int)$m['gelesen_anzahl'];
     $m['bestaetigt_anzahl']  = (int)$m['bestaetigt_anzahl'];
+    // Die Antworten auf einen Termin (ENT-436). "offen" wird NICHT
+    // mitgeschickt, sondern in der Oberflaeche aus dem Nenner gerechnet --
+    // und nur dort, wo der Nenner bekannt ist. Eine Zahl "0 offen" bei
+    // unbekanntem Empfaengerkreis waere eine Behauptung.
+    $m['ist_termin']      = mitteilung_ist_termin($m);
+    $m['zugesagt_anzahl'] = (int)$m['zugesagt_anzahl'];
+    $m['abgesagt_anzahl'] = (int)$m['abgesagt_anzahl'];
     // -1 bedeutet unbekannt (siehe mitteilung_empfaengerzahl) und bleibt
     // -1: Die Oberflaeche muss den Unterschied zu 0 zeigen koennen.
     $m['empfaenger_anzahl']  = $nenner[$m['zielgruppe']] ?? -1;

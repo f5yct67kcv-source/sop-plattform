@@ -62,14 +62,26 @@ $liste = mitteilungen_fuer_person($pdo, $ich, $revier, $jetzt);
 
 $ungelesen = 0;
 $revierUngelesen = 0;
+// "Offen" ist mehr als "ungelesen" (ENT-436): Ein gelesener Termin ohne
+// Antwort will weiterhin etwas. Je Eintrag zaehlt er hoechstens einmal --
+// ein ungelesener Termin ist EIN offener Punkt, nicht zwei.
+$offen = 0;
 $unterbrechen = [];
 foreach ($liste as &$m) {
     $m['gelesen']    = $m['gelesen_am'] !== null;
     $m['bestaetigt'] = $m['bestaetigt_am'] !== null;
+    // Die eigene Antwort auf einen Termin (ENT-436) -- 'offen', solange
+    // keine vorliegt. Die Antworten der ANDEREN stehen hier bewusst nicht:
+    // Wer zu- und wer abgesagt hat, sieht nur die Verwaltung im Cockpit.
+    // Eine Absage hat oft einen persoenlichen Grund; sie vor der ganzen
+    // Belegschaft abgeben zu muessen, treibt zu Zusagen, die nicht halten.
+    $m['ist_termin'] = mitteilung_ist_termin($m);
+    $m['antwort']    = $m['ist_termin'] ? termin_antwort($m) : null;
     if (!$m['gelesen']) {
         $ungelesen++;
         if ($m['zielgruppe'] === 'revier') { $revierUngelesen++; }
     }
+    if (!$m['gelesen'] || ($m['ist_termin'] && $m['antwort'] === 'offen')) { $offen++; }
     // Was beim Oeffnen der App unterbrechen muss. Der Server entscheidet
     // das, nicht die Oberflaeche: Eine Regel, die nur im Browser steht,
     // laesst sich am Browser vorbei umgehen -- und der Nachweis
@@ -83,6 +95,7 @@ json_response([
     'eingerichtet'     => true,
     'mitteilungen'     => $liste,
     'ungelesen'        => $ungelesen,
+    'offen'            => $offen,
     'revier_ungelesen' => $revierUngelesen,
     'unterbrechen'     => $unterbrechen,
 ]);

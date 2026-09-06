@@ -42,10 +42,12 @@ $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
 $pdo->exec('CREATE TABLE mitteilungen (
   id INTEGER PRIMARY KEY, titel TEXT, text TEXT, zielgruppe TEXT, stufe TEXT,
+  art TEXT DEFAULT \'info\', beginn TEXT, ende TEXT, ort TEXT,
   sichtbar_ab TEXT, sichtbar_bis TEXT, verfasser_id INTEGER, verfasser_name TEXT,
   erstellt_am TEXT, archiviert_am TEXT)');
 $pdo->exec('CREATE TABLE mitteilung_gelesen (
   mitteilung_id INTEGER, mitarbeiter_id INTEGER, gelesen_am TEXT, bestaetigt_am TEXT,
+  antwort TEXT DEFAULT \'offen\', antwort_am TEXT,
   PRIMARY KEY (mitteilung_id, mitarbeiter_id))');
 $pdo->exec('CREATE TABLE mitarbeiter (id INTEGER PRIMARY KEY, aktiv INTEGER,
   revierdienst_berechtigt INTEGER)');
@@ -204,7 +206,9 @@ $merken = function (int $id, int $person, bool $bestaetigt, string $zeit) use ($
     $da->execute([$id, $person]);
     $alt = $da->fetch();
     if (!$alt) {
-        $pdo->prepare('INSERT INTO mitteilung_gelesen VALUES (?, ?, ?, ?)')
+        $pdo->prepare('INSERT INTO mitteilung_gelesen
+                         (mitteilung_id, mitarbeiter_id, gelesen_am, bestaetigt_am)
+                       VALUES (?, ?, ?, ?)')
             ->execute([$id, $person, $zeit, $bestaetigt ? $zeit : null]);
         return;
     }
@@ -238,6 +242,82 @@ pruef('Der Nenner "revier" zaehlt nur aktive mit Revierdienst',
 $GLOBALS['spalteDa'] = false;
 pruef('KRITISCH: ohne die Spalte ist der Revier-Nenner UNBEKANNT (-1) und nicht 0',
     mitteilung_empfaengerzahl($pdo, 'revier') === -1);
+$GLOBALS['spalteDa'] = true;
+
+// ══════════════ TERMINE (ENT-436)
+// Ein Termin ist eine Mitteilung, die eine Antwort verlangt. Die
+// gefaehrliche Verwechslung ist "offen" mit "abgesagt": Wer nicht
+// geantwortet hat, hat NICHT abgesagt (CLAUDE.md).
+pruef('Es gibt genau zwei Arten', MITTEILUNG_ARTEN === ['info', 'termin']);
+pruef('Eine erfundene Art gilt nicht', !mitteilung_art_gueltig('einladung'));
+pruef('KRITISCH: "offen" ist keine Antwort, die sich abgeben laesst',
+    !termin_antwort_gueltig('offen'));
+pruef('Zusagen und Absagen sind gueltige Antworten',
+    termin_antwort_gueltig('zugesagt') && termin_antwort_gueltig('abgesagt'));
+pruef('Eine erfundene Antwort gilt nicht', !termin_antwort_gueltig('vielleicht'));
+
+pruef('Ohne Art ist es eine Mitteilung, kein Termin',
+    !mitteilung_ist_termin(['titel' => 'x']));
+pruef('Mit art=termin ist es einer', mitteilung_ist_termin(['art' => 'termin']));
+
+pruef('KRITISCH: keine Zeile heisst "offen", nicht "abgesagt"',
+    termin_antwort(['art' => 'termin', 'antwort' => null]) === 'offen');
+pruef('KRITISCH: ein unbekannter Wert in der Spalte heisst ebenfalls "offen"',
+    termin_antwort(['antwort' => 'vielleicht']) === 'offen');
+pruef('Eine abgegebene Antwort kommt unveraendert zurueck',
+    termin_antwort(['antwort' => 'abgesagt']) === 'abgesagt');
+
+// Das Fenster: Ein Termin fragt, bis geantwortet ist -- unabhaengig von
+// der Stufe. Eine Mitteilung fragt nur bei "wichtig".
+pruef('KRITISCH: ein unbeantworteter Termin unterbricht, auch mit Stufe normal',
+    mitteilung_unterbricht(['art' => 'termin', 'stufe' => 'normal', 'antwort' => null]));
+pruef('KRITISCH: ein beantworteter Termin unterbricht nicht mehr',
+    !mitteilung_unterbricht(['art' => 'termin', 'stufe' => 'normal', 'antwort' => 'zugesagt']));
+pruef('KRITISCH: auch eine Absage beendet das Fragen -- sie ist eine Antwort',
+    !mitteilung_unterbricht(['art' => 'termin', 'stufe' => 'wichtig', 'antwort' => 'abgesagt']));
+pruef('Blosses Lesen beendet das Fragen beim Termin NICHT',
+    mitteilung_unterbricht(['art' => 'termin', 'gelesen_am' => $frueher,
+                            'bestaetigt_am' => $frueher, 'antwort' => 'offen']));
+
+// ── Die Antwort festhalten, gegen die echte Datenbank
+$pdo->exec("INSERT INTO mitteilungen (id, titel, zielgruppe, stufe, art, beginn, erstellt_am)
+            VALUES (20, 'Sitzung', 'alle', 'normal', 'termin', '2031-07-01 17:00:00', '$frueher')");
+termin_antwort_merken($pdo, 20, 5, 'zugesagt', $frueher);
+$z = $pdo->query('SELECT * FROM mitteilung_gelesen WHERE mitteilung_id = 20 AND mitarbeiter_id = 5')->fetch();
+pruef('Die erste Antwort legt die Zeile an', $z && $z['antwort'] === 'zugesagt');
+pruef('KRITISCH: die Antwort gilt zugleich als gelesen -- wer aus dem Fenster '
+    . 'antwortet, hat die Liste nie geoeffnet',
+    $z['gelesen_am'] === $frueher);
+
+termin_antwort_merken($pdo, 20, 5, 'abgesagt', $spaeter);
+$z2 = $pdo->query('SELECT * FROM mitteilung_gelesen WHERE mitteilung_id = 20 AND mitarbeiter_id = 5')->fetch();
+pruef('KRITISCH: eine geaenderte Meinung ueberschreibt die Antwort',
+    $z2['antwort'] === 'abgesagt');
+pruef('KRITISCH: und legt keine zweite Zeile an',
+    (int)$pdo->query('SELECT COUNT(*) FROM mitteilung_gelesen WHERE mitteilung_id = 20')->fetchColumn() === 1);
+pruef('antwort_am folgt der letzten Entscheidung', $z2['antwort_am'] === $spaeter);
+pruef('KRITISCH: gelesen_am bleibt trotzdem der ERSTE Kontakt',
+    $z2['gelesen_am'] === $frueher);
+
+// Wer die Liste geoeffnet, aber nicht geantwortet hat: Die Zeile besteht
+// schon, die Antwort kommt spaeter dazu.
+$merken(20, 6, false, $frueher);
+$vorher = $pdo->query('SELECT * FROM mitteilung_gelesen WHERE mitteilung_id = 20 AND mitarbeiter_id = 6')->fetch();
+pruef('Wer nur geoeffnet hat, steht auf "offen"',
+    termin_antwort($vorher) === 'offen' && $vorher['gelesen_am'] === $frueher);
+termin_antwort_merken($pdo, 20, 6, 'zugesagt', $spaeter);
+$nachher = $pdo->query('SELECT * FROM mitteilung_gelesen WHERE mitteilung_id = 20 AND mitarbeiter_id = 6')->fetch();
+pruef('KRITISCH: die spaetere Antwort verschiebt den Lesezeitpunkt nicht',
+    $nachher['antwort'] === 'zugesagt' && $nachher['gelesen_am'] === $frueher);
+
+// ── Empfaengerkreis: EINE Bedingung fuer Zahl und Liste
+$wo = mitteilung_empfaenger_wo($pdo, 'alle');
+$ausListe = (int)$pdo->query("SELECT COUNT(*) FROM mitarbeiter WHERE $wo")->fetchColumn();
+pruef('KRITISCH: die Empfaengerliste zaehlt dieselben Personen wie der Nenner',
+    $ausListe === mitteilung_empfaengerzahl($pdo, 'alle'));
+$GLOBALS['spalteDa'] = false;
+pruef('KRITISCH: ohne die Revier-Spalte ist der Kreis UNBEKANNT (null), nicht leer',
+    mitteilung_empfaenger_wo($pdo, 'revier') === null);
 $GLOBALS['spalteDa'] = true;
 
 echo $ok . " Pruefungen bestanden\n";

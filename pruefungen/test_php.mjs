@@ -339,6 +339,8 @@ for (const [datei, titel] of [
   ['pruef_mitteilungen.php', 'KRITISCH: Sichtbarkeit und Lesestand der Mitteilungen stimmen -- SQL und PHP sagen dasselbe (ENT-421)'],
   ['pruef_push.php', 'KRITISCH: die VAPID-Signatur haelt der Gegenpruefung stand und ein toter Endpunkt wird abgemeldet (ENT-424)'],
   ['pruef_mitteilung_loeschen.php', 'KRITISCH: eine laufende Mitteilung laesst sich auch am Browser vorbei nicht loeschen (ENT-433)'],
+  ['pruef_mitteilung_antwort.php', 'KRITISCH: auf einen fremden oder nicht sichtbaren Termin laesst sich nicht zusagen (ENT-436)'],
+  ['pruef_mitteilung_liste.php', 'KRITISCH: die Antwortliste eines Termins nennt ALLE Empfaenger, auch die ohne Antwort (ENT-436)'],
 ]) {
   let aus = '', code = 0;
   try {
@@ -595,6 +597,14 @@ const NUR_EIGENE_DATEN = [
   // am Recht 'mitteilungen' -- mitteilung_list/save/archivieren.php stehen
   // darum bewusst NICHT hier.
   'meine_mitteilungen.php',
+  // Auf einen Termin zu- oder absagen (ENT-436). Ebenfalls kein Recht: Wer
+  // einen Termin sieht, darf antworten. Vor dem Vermerken wird geprueft,
+  // ob der Termin fuer DIESE Person sichtbar ist und ob es ueberhaupt ein
+  // Termin ist; die Person selbst kommt aus der Sitzung. Wer die Antworten
+  // ANDERER sehen will, braucht das Recht 'mitteilungen'
+  // (mitteilung_list.php) -- der Endpunkt hier gibt keine fremde Antwort
+  // heraus.
+  'mitteilung_antwort.php',
   // Benachrichtigungen ein- und ausschalten (ENT-424). Kein Recht: JEDE
   // angemeldete Person darf ihre eigenen Geraete anmelden. Die
   // mitarbeiter_id stammt ausnahmslos aus der Sitzung, und auch das

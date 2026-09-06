@@ -30,6 +30,11 @@ $titel      = trim((string)($in['titel'] ?? ''));
 $text       = trim((string)($in['text'] ?? ''));
 $zielgruppe = trim((string)($in['zielgruppe'] ?? 'alle'));
 $stufe      = trim((string)($in['stufe'] ?? 'normal'));
+// Art und die drei Termin-Felder (ENT-436). Ein Termin ist eine Mitteilung,
+// die zusaetzlich eine Antwort verlangt -- darum dieselbe Tabelle und
+// derselbe Endpunkt.
+$art        = trim((string)($in['art'] ?? 'info'));
+$ort        = mb_substr(trim((string)($in['ort'] ?? '')), 0, 120);
 
 // Leere Zeitangaben sind NULL, nicht ''. NULL heisst hier "keine Grenze"
 // (sofort sichtbar / laeuft nicht ab) -- ein leerer Text waere in der
@@ -49,6 +54,9 @@ if (!mitteilung_zielgruppe_gueltig($zielgruppe)) {
 }
 if (!mitteilung_stufe_gueltig($stufe)) {
     json_response(['status' => 'error', 'message' => "Stufe muss 'normal' oder 'wichtig' sein"], 400);
+}
+if (!mitteilung_art_gueltig($art)) {
+    json_response(['status' => 'error', 'message' => "Art muss 'info' oder 'termin' sein"], 400);
 }
 
 // JJJJ-MM-TT HH:MM (die Oberflaeche schickt genau das) oder JJJJ-MM-TT.
@@ -74,6 +82,30 @@ function mitteilung_zeit(?string $wert, bool $tagesende): ?string
 $ab  = mitteilung_zeit($ab, false);
 $bis = mitteilung_zeit($bis, true);
 
+// ── Termin (ENT-436)
+$beginn = mitteilung_zeit(trim((string)($in['beginn'] ?? '')) ?: null, false);
+$ende   = mitteilung_zeit(trim((string)($in['ende'] ?? ''))   ?: null, true);
+if ($art !== 'termin') {
+    // Wer die Art zurueckstellt, soll keine Zeitangaben behalten, die
+    // nirgends mehr stehen -- sie kaemen beim naechsten Umschalten
+    // unerwartet wieder hervor.
+    $beginn = null; $ende = null; $ort = '';
+} else {
+    if ($beginn === null) {
+        json_response(['status' => 'error',
+            'message' => 'Ein Termin braucht einen Beginn — ohne ihn lässt sich nicht zu- oder absagen.'], 400);
+    }
+    if ($ende !== null && $ende < $beginn) {
+        json_response(['status' => 'error', 'message' => 'Das Ende liegt vor dem Beginn.'], 400);
+    }
+    // Ein Termin verschwindet von selbst, wenn er vorbei ist: Danach gibt
+    // es nichts mehr zuzusagen, und er stuende sonst in der App wie eine
+    // offene Frage. Ausdruecklich gesetzt statt als Sonderregel im Lesen --
+    // so gilt fuer Termine dieselbe Sichtbarkeitsregel wie fuer alles
+    // andere (mitteilungen.php), und die Verwaltung kann sie ueberschreiben.
+    if ($bis === null) { $bis = $ende ?? $beginn; }
+}
+
 if ($ab !== null && $bis !== null && $bis < $ab) {
     json_response(['status' => 'error',
         'message' => '„Sichtbar bis" liegt vor „sichtbar ab" — so erscheint die Mitteilung nie.'], 400);
@@ -98,20 +130,22 @@ if ($verfasser === '') { $verfasser = (string)($user['name'] ?? ''); }
 if ($id > 0) {
     $st = $pdo->prepare(
         'UPDATE mitteilungen
-            SET titel = ?, text = ?, zielgruppe = ?, stufe = ?, sichtbar_ab = ?, sichtbar_bis = ?
+            SET titel = ?, text = ?, zielgruppe = ?, stufe = ?, art = ?,
+                beginn = ?, ende = ?, ort = ?, sichtbar_ab = ?, sichtbar_bis = ?
           WHERE id = ?'
     );
-    $st->execute([$titel, $text, $zielgruppe, $stufe, $ab, $bis, $id]);
+    $st->execute([$titel, $text, $zielgruppe, $stufe, $art, $beginn, $ende, $ort, $ab, $bis, $id]);
     json_response(['status' => 'ok', 'id' => $id, 'angelegt' => false]);
 }
 
 $jetzt = date('Y-m-d H:i:s');
 $st = $pdo->prepare(
     'INSERT INTO mitteilungen
-       (titel, text, zielgruppe, stufe, sichtbar_ab, sichtbar_bis, verfasser_id, verfasser_name, erstellt_am)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+       (titel, text, zielgruppe, stufe, art, beginn, ende, ort,
+        sichtbar_ab, sichtbar_bis, verfasser_id, verfasser_name, erstellt_am)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
 );
-$st->execute([$titel, $text, $zielgruppe, $stufe, $ab, $bis,
+$st->execute([$titel, $text, $zielgruppe, $stufe, $art, $beginn, $ende, $ort, $ab, $bis,
     (int)$user['id'], $verfasser, $jetzt]);
 $neueId = (int)$pdo->lastInsertId();
 

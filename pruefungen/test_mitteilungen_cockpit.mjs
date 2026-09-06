@@ -51,6 +51,14 @@ const LISTE = [
     verfasser_name: 'Das Personalbüro',
     gelesen_anzahl: 1, bestaetigt_anzahl: 0, empfaenger_anzahl: 18,
     archiviert: true, laeuft: false, geplant: false, im_archiv: true, abgelaufen: false },
+  { id: 7, titel: 'Mitarbeitersitzung', text: 'Traktanden folgen.',
+    zielgruppe: 'alle', stufe: 'normal', art: 'termin', ist_termin: true,
+    beginn: '2029-09-24 17:00:00', ende: '2029-09-24 19:00:00', ort: 'Aufenthaltsraum',
+    sichtbar_ab: null, sichtbar_bis: '2029-09-24 19:00:00',
+    erstellt_am: '2029-09-01 08:00:00', archiviert_am: null, verfasser_name: 'Die Geschäftsleitung',
+    gelesen_anzahl: 5, bestaetigt_anzahl: 0, empfaenger_anzahl: 18,
+    zugesagt_anzahl: 3, abgesagt_anzahl: 1,
+    archiviert: false, laeuft: true, geplant: false, im_archiv: false, abgelaufen: false },
   { id: 6, titel: 'Doppelt erledigt', text: 'Zurückgezogen und längst abgelaufen.',
     zielgruppe: 'alle', stufe: 'normal', sichtbar_ab: null, sichtbar_bis: '2029-01-01 23:59:59',
     erstellt_am: '2028-11-01 08:00:00', archiviert_am: '2028-12-05 08:00:00',
@@ -88,6 +96,20 @@ await page.route('**/api/**', r => {
       ist_admin: meineRollen.includes('verwaltung'), rollen: meineRollen, rechte: meineRechte });
   }
   if (u.includes('mitteilung_list')) {
+    if (u.includes('id=7')) {
+      // Beim Termin zaehlt die Antwort ALLER Empfaenger -- auch derer, die
+      // die App nie geoeffnet haben (ENT-436).
+      return send({ status: 'ok', eingerichtet: true, ist_termin: true, vollzaehlig: true, leser: [
+        { vorname: 'Max', nachname: 'Muster', name: 'm.muster',
+          gelesen_am: '2029-09-02 10:00:00', bestaetigt_am: null,
+          antwort: 'zugesagt', antwort_am: '2029-09-02 10:01:00' },
+        { vorname: 'Rita', nachname: 'Beispiel', name: 'r.beispiel',
+          gelesen_am: '2029-09-02 11:00:00', bestaetigt_am: null,
+          antwort: 'abgesagt', antwort_am: '2029-09-02 11:05:00' },
+        { vorname: 'Ohne', nachname: 'Beispiel', name: 'o.beispiel',
+          gelesen_am: null, bestaetigt_am: null, antwort: 'offen', antwort_am: null },
+      ] });
+    }
     if (u.includes('id=')) {
       return send({ status: 'ok', eingerichtet: true, leser: [
         { vorname: 'Max', nachname: 'Muster', name: 'm.muster',
@@ -177,13 +199,13 @@ const archivierte = await ansicht('archiv');
 const eintraege = [...(laufende || []), ...(archivierte || [])];
 
 check('KRITISCH: die laufende Ansicht zeigt NUR, was in der App zu sehen ist',
-  Array.isArray(laufende) && laufende.length === 3
+  Array.isArray(laufende) && laufende.length === 4
   && !laufende.some(e => ['2', '3'].includes(e.id)));
 check('KRITISCH: das Archiv zeigt das Zurueckgezogene UND das Abgelaufene',
   Array.isArray(archivierte) && archivierte.length === 3
   && archivierte.some(e => e.id === '2') && archivierte.some(e => e.id === '3'));
 check('KRITISCH: keine Mitteilung verschwindet zwischen den beiden Ansichten',
-  eintraege.length === 6 && new Set(eintraege.map(e => e.id)).size === 6);
+  eintraege.length === 7 && new Set(eintraege.map(e => e.id)).size === 7);
 
 // Beide Zahlen stehen am Umschalter -- eine gefilterte Liste ohne die
 // andere Zahl sieht aus wie die ganze (Hausregel).
@@ -194,7 +216,7 @@ const umschalter = await ev(() => ({
   anArchiv:  !!document.getElementById('mtlAnsichtArchiv')?.classList.contains('on'),
 }));
 check('KRITISCH: der Umschalter nennt BEIDE Zahlen, nicht nur die angezeigte',
-  /\b3\b/.test(umschalter.laufend) && /\b3\b/.test(umschalter.archiv));
+  /\b4\b/.test(umschalter.laufend) && /\b3\b/.test(umschalter.archiv));
 check('KRITISCH: die offene Ansicht ist als solche gekennzeichnet -- und nur sie',
   umschalter.anArchiv && !umschalter.anLaufend);
 
@@ -303,6 +325,7 @@ const knopfNamenLaufend = id => (laufende || []).find(e => e.id === String(id))?
 check('KRITISCH: an einer laufenden Mitteilung gibt es KEIN "Endgültig löschen"',
   !knopfNamenLaufend(5).some(k => /löschen/i.test(k))
   && !knopfNamenLaufend(4).some(k => /löschen/i.test(k))
+  && !knopfNamenLaufend(7).some(k => /löschen/i.test(k))
   && !knopfNamenLaufend(1).some(k => /löschen/i.test(k)));
 check('KRITISCH: an einer laufenden steht stattdessen "Zurückziehen"',
   knopfNamenLaufend(5).some(k => /Zurückziehen/.test(k)));
@@ -418,7 +441,7 @@ check('KRITISCH: "nichts Laufendes" sagt etwas anderes als "keine Mitteilungen"'
 check('KRITISCH: und die beiden sagen nicht dasselbe',
   tArchivLeer !== tNichtsLauft);
 check('Das leere Archiv verweist auf die Mitteilungen, die es sehr wohl gibt',
-  /\b3\b/.test(tArchivLeer));
+  /\b4\b/.test(tArchivLeer));
 check('"Nichts Laufendes" verweist auf das, was im Archiv liegt',
   /Archiv/.test(tNichtsLauft) && /\b3\b/.test(tNichtsLauft));
 listenAntwort = { status: 'ok', eingerichtet: true, mitteilungen: LISTE };
@@ -508,6 +531,133 @@ const schmal = await ev(() => {
 check('Am schmalen Fenster stehen sie untereinander',
   !!schmal && schmal.spalten === 1 && schmal.untereinander);
 check('Und die Seite laeuft dabei nicht seitlich ueber', !!schmal && !schmal.ueberlauf);
+
+// ══════════════ 11. TERMINE (ENT-436) ═════════════════════════════════
+// Ein Termin ist eine Mitteilung mit Zeit, Ort und Antwort. Zwei Dinge
+// koennen hier still falsch werden: Die Termin-Felder gelten fuer eine
+// Mitteilung mit (dann stuende an einer Info eine Uhrzeit, die niemand
+// gesetzt hat), und "offen" wird aus Zahlen gerechnet, die es gar nicht
+// hergeben.
+listenAntwort = { status: 'ok', eingerichtet: true, mitteilungen: LISTE,
+                  push_eingerichtet: true, push_geraete: 3, push_grund: 'ok' };
+await anmelden();
+await ev(() => go('mitteilungen'));
+await page.waitForTimeout(600);
+
+const terminEintrag = await ev(() => {
+  const e = document.querySelector('#mtlListe .mtl-eintrag[data-id="7"]');
+  return e ? {
+    marken: [...e.querySelectorAll('.mtl-marken .chip')].map(c => c.textContent.trim()),
+    termin: e.querySelector('.mtl-termin')?.textContent || '',
+    antworten: e.querySelector('.mtl-antworten')?.textContent || '',
+  } : null;
+});
+check('Der Termin ist in der Liste als solcher gekennzeichnet',
+  !!terminEintrag && terminEintrag.marken.some(m => /Termin/.test(m)));
+check('KRITISCH: Datum, Zeit und Ort stehen daran',
+  !!terminEintrag && /24\.09\.2029/.test(terminEintrag.termin)
+  && /17:00/.test(terminEintrag.termin) && /Aufenthaltsraum/.test(terminEintrag.termin));
+check('KRITISCH: die Antworten stehen mit Bezug da -- zugesagt, abgesagt UND offen',
+  !!terminEintrag && /3 zugesagt/.test(terminEintrag.antworten)
+  && /1 abgesagt/.test(terminEintrag.antworten) && /14 von 18/.test(terminEintrag.antworten));
+check('KRITISCH: an einer gewoehnlichen Mitteilung steht keine Antwortzeile',
+  (await ev(() => !document.querySelector('#mtlListe .mtl-eintrag[data-id="5"] .mtl-antworten'))) === true);
+
+// Unbekannter Empfaengerkreis: Dann wird "offen" NICHT behauptet.
+listenAntwort = { status: 'ok', eingerichtet: true, push_eingerichtet: true, push_geraete: 3,
+  mitteilungen: [{ ...LISTE[0], id: 7, ist_termin: true, art: 'termin',
+    beginn: '2029-09-24 17:00:00', ende: null, ort: '', empfaenger_anzahl: -1,
+    zugesagt_anzahl: 2, abgesagt_anzahl: 0 }] };
+await anmelden();
+await ev(() => go('mitteilungen'));
+await page.waitForTimeout(500);
+const ohneNenner = (await ev(() => document.querySelector('#mtlListe .mtl-antworten')?.textContent)) || '';
+check('KRITISCH: ist der Empfaengerkreis unbekannt, wird KEINE Zahl offener Antworten behauptet',
+  /unbekannt/i.test(ohneNenner) && !/von -1/.test(ohneNenner) && !/0 (von )?noch offen/.test(ohneNenner));
+check('Die abgegebenen Antworten stehen trotzdem da', /2 zugesagt/.test(ohneNenner));
+
+// Die Namensliste: alle Empfaenger, auch wer nie geoeffnet hat.
+listenAntwort = { status: 'ok', eingerichtet: true, mitteilungen: LISTE,
+                  push_eingerichtet: true, push_geraete: 3, push_grund: 'ok' };
+await anmelden();
+await ev(() => go('mitteilungen'));
+await page.waitForTimeout(600);
+await klick('#mtlListe .mtl-eintrag[data-id="7"] .mtl-akt button:nth-child(2)');
+await page.waitForTimeout(600);
+const liste7 = ((await ev(() => document.getElementById('mtlLeser7')?.textContent || '')) || '')
+  .replace(/\s+/g, ' ').trim();
+check('KRITISCH: die Namensliste nennt die Zusage', /Max Muster/.test(liste7) && /zugesagt/.test(liste7));
+check('KRITISCH: und die Absage', /Rita Beispiel/.test(liste7) && /abgesagt/.test(liste7));
+check('KRITISCH: wer nicht geantwortet hat, steht MIT NAMEN da -- '
+    + 'sonst bliebe die Frage "wen muss ich noch fragen?" unbeantwortet',
+  /Ohne Beispiel/.test(liste7) && /noch nicht geantwortet/.test(liste7));
+check('KRITISCH: "noch nicht geoeffnet" ist etwas anderes als ein leeres Feld',
+  /noch nicht geöffnet/.test(liste7));
+
+// ── Das Formular
+await klick('#mtlAbbrechen');
+await page.waitForTimeout(200);
+check('KRITISCH: die Termin-Felder sind bei einer Mitteilung ausgeblendet',
+  !(await page.isVisible('#mtlBeginn')));
+await klick('#mtlArtTermin');
+await page.waitForTimeout(300);
+check('KRITISCH: nach dem Umschalten stehen Beginn, Ende und Ort da',
+  (await page.isVisible('#mtlBeginn')) && (await page.isVisible('#mtlEnde'))
+  && (await page.isVisible('#mtlOrt')));
+check('Die Überschrift des Formulars zieht mit',
+  /Termin/.test((await ev(() => document.getElementById('mtlFormTitel')?.textContent)) || ''));
+
+// Ohne Beginn wird nichts abgeschickt -- der Server weist es ebenfalls ab.
+await page.fill('#mtlTitel', 'Sitzung');
+await page.fill('#mtlText', 'Bitte alle.');
+gesendet = null;
+await klick('#mtlSpeichern');
+await page.waitForTimeout(400);
+check('KRITISCH: ein Termin ohne Beginn wird gar nicht erst abgeschickt', gesendet === null);
+
+await page.fill('#mtlBeginn', '2029-11-05T17:00');
+await page.fill('#mtlEnde', '2029-11-05T19:00');
+await page.fill('#mtlOrt', 'Aufenthaltsraum');
+gesendet = null;
+await klick('#mtlSpeichern');
+await page.waitForTimeout(500);
+check('KRITISCH: der Termin wird als Termin abgeschickt', gesendet && gesendet.art === 'termin');
+check('KRITISCH: Beginn, Ende und Ort kommen mit',
+  gesendet && String(gesendet.beginn).startsWith('2029-11-05')
+  && String(gesendet.ende).startsWith('2029-11-05') && gesendet.ort === 'Aufenthaltsraum');
+
+// Zurueckschalten OHNE zwischendurch zu speichern: Die eingetippten
+// Termin-Angaben stehen dann noch in den (ausgeblendeten) Feldern und
+// dürfen trotzdem nicht mitgehen. Ohne diese Reihenfolge prüfte der
+// Abschnitt nichts -- nach einem erfolgreichen Speichern ist das Formular
+// ohnehin leer. (Genau daran ist die Gegenprobe zuerst grün geblieben.)
+await klick('#mtlArtTermin');
+await page.waitForTimeout(200);
+await page.fill('#mtlTitel', 'Doch nur eine Mitteilung');
+await page.fill('#mtlText', 'Ohne Zeit.');
+await page.fill('#mtlBeginn', '2029-11-05T17:00');
+await page.fill('#mtlOrt', 'Aufenthaltsraum');
+await klick('#mtlArtInfo');
+await page.waitForTimeout(200);
+check('Die Termin-Felder sind nach dem Zurueckschalten wieder ausgeblendet',
+  !(await page.isVisible('#mtlBeginn')));
+gesendet = null;
+await klick('#mtlSpeichern');
+await page.waitForTimeout(500);
+check('KRITISCH: zurueckgeschaltet geht sie als Mitteilung hinaus',
+  gesendet && gesendet.art === 'info');
+check('KRITISCH: und ohne die Termin-Angaben -- sonst stuende an einer Mitteilung eine Uhrzeit',
+  gesendet && !gesendet.beginn && !gesendet.ende && !gesendet.ort);
+
+// Bearbeiten eines Termins holt die Felder zurueck.
+await klick('#mtlListe .mtl-eintrag[data-id="7"] .mtl-akt button:nth-child(1)');
+await page.waitForTimeout(400);
+check('KRITISCH: beim Bearbeiten steht der Termin wieder als Termin da',
+  (await page.isVisible('#mtlBeginn'))
+  && (await ev(() => document.getElementById('mtlBeginn')?.value)) === '2029-09-24T17:00');
+check('Ort und Ende kommen mit',
+  (await ev(() => document.getElementById('mtlOrt')?.value)) === 'Aufenthaltsraum'
+  && (await ev(() => document.getElementById('mtlEnde')?.value)) === '2029-09-24T19:00');
 
 await browser.close();
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden`);
