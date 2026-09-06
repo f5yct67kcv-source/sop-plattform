@@ -2321,7 +2321,28 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
    Flex-Container auf seine Textbreite (205 statt 640 px) und rutschte mit
    margin-inline:auto aus der Flucht zum Feld darunter. Beides waere mit
    width:100% zu haben gewesen; die Breite war aber gar nicht gemeint. */
-.begr-karte .sprach { margin-top: 13px; }
+/* Die drei Abstaende im Block, aus der Skizze des Projektinhabers vom
+   2026-09-06 (ENT-434). Gemessen klebten Gruss und Eingabefeld mit NULL
+   Pixel aneinander: Der Innenabstand von .diktat-router zaehlt ab der
+   Unterkante von .begr-kopf, und dessen Zeilenbox reicht bereits bis dorthin.
+   Auf dem Bildschirm sah das aus wie ein Titel, der auf dem Feld aufsitzt.
+   Jetzt 16 px zwischen Gruss und Feld, 24 px zwischen Feld und Knopfreihe --
+   die Werte aus der Skizze, gerechnet aus ihren Zielpositionen und nicht
+   aus den Verschiebungen einzeln, weil die drei sich gegenseitig mitziehen.
+   Die 19 px an der Knopfreihe sind kein Tippfehler: Zwischen Eingabefeld und
+   dem Kasten darum liegen gemessen 5 px, und der Abstand SOLL zwischen dem
+   Feld und den Knoepfen stimmen, nicht zwischen den Kaesten.
+   Nur die Uebersicht: Derselbe Router steht in Planung/Einsaetze und in zwei
+   Dialogen, wo nichts beanstandet ist.
+
+   Die Selektoren sind absichtlich eine Stufe schaerfer als noetig: Weiter
+   unten stehen ".card-bd > .diktat-router { margin-top: 0 }" und
+   ".diktat-router .sprach { margin-top: 10px }" -- beide mit derselben
+   Eigenspezifitaet wie die naheliegende Fassung und SPAETER im Regelwerk.
+   Mit ".begr-karte .diktat-router" standen diese Zeilen hier und taten
+   nichts; gemessen blieb der Abstand bei 0 und 10 px. */
+.begr-karte .card-bd > .diktat-router { margin-top: 16px; }
+.begr-karte .diktat-router .sprach { margin-top: 19px; }
 /* Das Eingabefeld ist so hoch wie seine zwei Zeilen und keinen Pixel mehr
    (ENT-432, auf Vorgabe des Projektinhabers). Gerechnet aus dem gerenderten
    Zustand: 2 x 21.7 px Zeilenhoehe + 2 x 9 px Innenabstand + 2 px Rand =
