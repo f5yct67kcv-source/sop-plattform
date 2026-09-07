@@ -1446,6 +1446,12 @@ CREATE TABLE IF NOT EXISTS kundenzugang (
   name VARCHAR(200) NOT NULL,
   email VARCHAR(200) NOT NULL,
   funktion VARCHAR(120) NULL,
+  -- NULL heisst: noch kein Passwort gesetzt (ENT-444). Dann fuehrt nur der
+  -- Einmal-Code hinein, und der verlangt danach eines. Bewusst kein eigener
+  -- Ja/Nein-Schalter daneben: Der koennte auf ja stehen, waehrend gar kein
+  -- Passwort hinterlegt ist -- gleiche Ueberlegung wie bei der abweichenden
+  -- Rechnungsadresse (ENT-155), gefuellt heisst gesetzt.
+  password_hash VARCHAR(255) NULL,
   aktiv TINYINT(1) NOT NULL DEFAULT 1,
   erstellt_am DATETIME DEFAULT CURRENT_TIMESTAMP,
   -- Wer hat einem Betriebsfremden Zugang gegeben, und wann wurde er
@@ -1568,6 +1574,11 @@ if (!$nurPruefen && hat_tabelle_jetzt($pdo, 'ereignisart')) {
 
 // ── 2. Spalten nachtragen, falls die erste Fassung schon lief
 $spalten = [
+    // Kundenportal: eigenes Passwort statt Einmal-Code bei jeder Anmeldung
+    // (ENT-444). Bestehende Zugaenge bleiben NULL und gehen weiter ueber den
+    // Code -- er verlangt beim naechsten Mal ein Passwort.
+    ['kundenzugang', 'password_hash',
+     'ALTER TABLE kundenzugang ADD COLUMN password_hash VARCHAR(255) NULL AFTER funktion'],
     // Push-Versand je Mitteilung (ENT-424). push_gesendet_am ist zugleich
     // die Sperre gegen ein zweites Mal: Ohne sie schickte jeder
     // Nachzuegler-Lauf dieselbe Meldung erneut. push_bilanz haelt fest,

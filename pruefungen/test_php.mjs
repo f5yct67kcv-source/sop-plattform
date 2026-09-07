@@ -226,15 +226,18 @@ if (prBeanstandet.length) { prBeanstandet.forEach(z => bad.push('PHP-Reset: ' + 
 
 // Alle DREI Stellen, an denen ein Passwort gesetzt wird, muessen die Regel
 // aufrufen -- eine vergessene Stelle waere ein offenes Hintertuerchen.
+// Seit ENT-444 auch das Kundenportal: Ein Kundenpasswort ist kein
+// Passwort zweiter Klasse -- eine eigene, mildere Regel dafuer waere genau
+// die zweite Wahrheit, die dieses Haus an anderer Stelle verbietet.
 const pwStellen = ['mitarbeiter_create.php', 'mitarbeiter_reset_password.php', 'mein_passwort.php',
-  'passwort_zuruecksetzen.php'];
+  'passwort_zuruecksetzen.php', 'portal_passwort_setzen.php'];
 // Kommentare vorher weg: Ein Hinweis "// passwort_pruefen (ENT-075)" neben
 // dem require ist kein Aufruf. Die erste Fassung dieser Pruefung ist genau
 // darauf hereingefallen -- sie blieb gruen, als der Aufruf entfernt wurde.
 const ohneKommentar = f => execFileSync('cat', [`${WURZEL}/backend/api/` + f],
   { encoding: 'utf8' }).replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
 const ohneRegel = pwStellen.filter(f => !/passwort_pruefen\s*\(/.test(ohneKommentar(f)));
-check('KRITISCH: alle drei Stellen zum Passwortsetzen pruefen die Regel',
+check('KRITISCH: jede Stelle zum Passwortsetzen prueft die Regel',
   ohneRegel.length === 0);
 if (ohneRegel.length) { bad.push('ohne Passwortregel: ' + ohneRegel.join(', ')); }
 

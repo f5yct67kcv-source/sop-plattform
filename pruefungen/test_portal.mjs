@@ -17,6 +17,22 @@ const SEITE = `file://${WURZEL}/portal.html`;
 const EXE = browserPfad();
 const ok = [], bad = [];
 const check = (n, c) => (c ? ok : bad).push(n);
+// Klicken mit kurzer Frist und ohne Absturz: Fehlt ein Element, weil eine
+// Gegenprobe es entfernt hat, wartet page.click() dreissig Sekunden und
+// reisst die Suite mit. Rot ist sie dadurch zwar, aber die Zusammenfassung
+// mit den BENANNTEN Aussagen kommt nie -- und genau die braucht man, um zu
+// sehen, WELCHE Zusage verletzt ist (derselbe Grund wie in
+// test_arbeitsergebnisse.mjs).
+async function klick(sel, seite) {
+  try { await (seite || page).click(sel, { timeout: 3000 }); return true; }
+  catch (e) { bad.push('nicht anklickbar: ' + sel); return false; }
+}
+// Dasselbe fuer das Ausfuellen -- ein unsichtbares Feld laesst page.fill()
+// genauso lange warten wie ein unsichtbarer Knopf page.click().
+async function fuell(sel, wert, seite) {
+  try { await (seite || page).fill(sel, wert, { timeout: 3000 }); return true; }
+  catch (e) { bad.push('nicht ausfuellbar: ' + sel); return false; }
+}
 
 const iso = d => new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
 const vorTagen = n => { const d = new Date(); d.setDate(d.getDate() - n); return iso(d); };
@@ -44,6 +60,8 @@ const leer = grund => ({
 
 let antwort = VOLL;
 let anmeldeFehler = false;
+let passwortNoetig = false;
+let pwFehler = null;
 let calls = [];
 
 function setup(page) {
@@ -63,7 +81,12 @@ function setup(page) {
         return send({ status: 'error',
           message: 'Der Code stimmt nicht oder gilt nicht mehr. Bitte einen neuen Code anfordern.' }, 401);
       }
-      return send({ status: 'ok', token: 't', name: 'A. Beispielperson', kunde: 'Muster Liegenschaften AG' });
+      return send({ status: 'ok', token: 't', name: 'A. Beispielperson',
+        kunde: 'Muster Liegenschaften AG', passwort_noetig: passwortNoetig });
+    }
+    if (path.includes('portal_passwort_setzen')) {
+      if (pwFehler) { return send({ status: 'error', message: pwFehler }, 422); }
+      return send({ status: 'ok' });
     }
     if (path.includes('portal_rundgaenge')) return send(antwort);
     if (path.includes('portal_abmelden')) return send({ status: 'ok' });
@@ -129,9 +152,38 @@ check('Der Knopf ist nicht über die volle Breite gestreckt',
     return b.width < document.body.getBoundingClientRect().width - 40;
   }));
 
-// ── Anmeldeweg ───────────────────────────────────────────────────────
-await page.fill('#email', 'a.beispiel@example.invalid');
-await page.click('#code-holen');
+// ── Anmeldeweg: erst das Passwort (der Normalfall) ───────────────────
+check('Die Anmeldemaske fragt nach Passwort, nicht nach einem Code',
+  await page.isVisible('#passwort') && await page.isVisible('#anmelden-pw'));
+check('KRITISCH: das Passwortfeld verbirgt die Eingabe',
+  await page.getAttribute('#passwort', 'type') === 'password');
+// Der Codeweg steht daneben und ist beschriftet -- beim ersten Mal hat
+// niemand ein Passwort, und wer eines vergessen hat, sucht genau hier.
+check('Der Weg ueber einen Code ist von der Anmeldemaske aus erreichbar',
+  await page.isVisible('#code-holen'));
+
+await fuell('#email', 'a.beispiel@example.invalid');
+await fuell('#passwort', 'ein sicheres langes wort');
+calls = [];
+await klick('#anmelden-pw');
+await page.waitForTimeout(300);
+{
+  const an = calls.find(c => c.path.includes('portal_anmelden'));
+  const rumpf = JSON.parse((an && an.rumpf) || '{}');
+  check('KRITISCH: das Passwort geht an den Server, nicht ein Code',
+    rumpf.passwort === 'ein sicheres langes wort' && rumpf.code === undefined);
+}
+check('Mit Passwort landet man direkt in der Liste', await page.isVisible('#inhalt'));
+
+// Abmelden, damit der Codeweg von vorn geprueft werden kann.
+await klick('#abmelden');
+await page.waitForTimeout(250);
+await klick('#wieder-anmelden');
+await page.waitForTimeout(150);
+
+// ── Anmeldeweg ueber den Einmal-Code ─────────────────────────────────
+await fuell('#email', 'a.beispiel@example.invalid');
+await klick('#code-holen');
 await page.waitForTimeout(200);
 check('Nach dem Anfordern kommt die Code-Eingabe', await page.isVisible('#schritt-code'));
 // KRITISCH: Die Seite darf nicht verraten, ob es den Zugang gibt -- sonst
@@ -149,15 +201,15 @@ check('KRITISCH: das Code-Feld ist mindestens 44 px hoch und hat mindestens 16 p
 
 // Falscher Code: die Meldung erscheint, die Anmeldung bleibt stehen
 anmeldeFehler = true;
-await page.fill('#code', '000000');
-await page.click('#anmelden');
+await fuell('#code', '000000');
+await klick('#anmelden');
 await page.waitForTimeout(200);
 check('Ein falscher Code wird gemeldet und führt nicht weiter',
   await page.isVisible('#fehler-code') && await page.isVisible('#schritt-code'));
 
 anmeldeFehler = false;
-await page.fill('#code', '123456');
-await page.click('#anmelden');
+await fuell('#code', '123456');
+await klick('#anmelden');
 await page.waitForTimeout(300);
 check('Ein richtiger Code führt in die Liste', await page.isVisible('#inhalt'));
 check('KRITISCH: der Kunde steht in der Kopfzeile — auf dem Handy sagt nur sie, wo man ist',
@@ -235,13 +287,103 @@ antwort = VOLL;
 await page.evaluate(() => laden());
 await page.waitForTimeout(200);
 calls = [];
-await page.click('#abmelden');
+await klick('#abmelden');
 await page.waitForTimeout(250);
 check('Das Abmelden erreicht den Server (der Token wird dort gelöscht)',
   calls.some(c => c.path.includes('portal_abmelden')));
-check('Nach dem Abmelden steht wieder die Adresseingabe da', await page.isVisible('#schritt-adresse'));
+// KRITISCH: Nicht zurueck zur Anmeldemaske. Die sieht aus, als sei die
+// Abmeldung fehlgeschlagen und man muesse es erneut versuchen -- und man
+// weiss nicht, ob man das Fenster jetzt schliessen darf.
+check('KRITISCH: nach dem Abmelden kommt eine Bestätigung, nicht wieder die Anmeldemaske',
+  await page.isVisible('#abgemeldet') && !(await page.isVisible('#schritt-adresse')));
+const abtext = await page.textContent('#abgemeldet');
+check('KRITISCH: die Bestätigung sagt, dass die Abmeldung geklappt hat',
+  /erfolgreich abgemeldet/.test(abtext));
+check('KRITISCH: und dass man das Fenster jetzt schliessen kann',
+  /schliessen/.test(abtext));
+check('Von dort führt ein Weg zurück zur Anmeldung', await page.isVisible('#wieder-anmelden'));
+// Auch dieser Knopf steht allein in seiner Zeile und wird darum NICHT ueber
+// die volle Breite gestreckt (Hausregel). Zentriert sieht am Bild breiter
+// aus, als er ist -- darum gemessen und nicht nach Augenschein beurteilt.
+check('Der Knopf der Bestätigung ist nicht über die volle Breite gestreckt',
+  await page.evaluate(() => {
+    const k = document.getElementById('wieder-anmelden').getBoundingClientRect();
+    const z = document.getElementById('wieder-anmelden').parentElement.getBoundingClientRect();
+    return k.width < z.width - 40;
+  }));
 check('KRITISCH: der Token ist danach auch im Browser weg',
   await page.evaluate(() => !localStorage.getItem('portal_token')));
+await page.screenshot({ path: `${OUT}/portal-05-abgemeldet.png` });
+await klick('#wieder-anmelden');
+await page.waitForTimeout(150);
+check('Der Weg zurück führt zur Anmeldemaske', await page.isVisible('#schritt-adresse'));
+
+// ── Passwort festlegen nach einer Code-Anmeldung ─────────────────────
+// Der ganze Zweck des Umbaus: Der Code ist der Weg HINEIN, nicht der Weg
+// fuer jeden Tag. Wer noch kein Passwort hat, bekommt danach die Maske.
+passwortNoetig = true;
+await fuell('#email', 'a.beispiel@example.invalid');
+await klick('#code-holen');
+await page.waitForTimeout(200);
+await fuell('#code', '123456');
+await klick('#anmelden');
+await page.waitForTimeout(300);
+check('KRITISCH: ohne gesetztes Passwort verlangt das Portal danach eines',
+  await page.isVisible('#schritt-passwort') && !(await page.isVisible('#inhalt')));
+check('Beide Passwortfelder verbergen die Eingabe',
+  await page.getAttribute('#pw-neu', 'type') === 'password'
+  && await page.getAttribute('#pw-neu2', 'type') === 'password');
+check('KRITISCH: die Passwortfelder sind auf dem Handy 44 px hoch und 16 px gross',
+  await page.evaluate(() => ['pw-neu', 'pw-neu2'].every(id => {
+    const e = document.getElementById(id);
+    return e.getBoundingClientRect().height >= 44
+        && parseFloat(getComputedStyle(e).fontSize) >= 16;
+  })));
+
+// Zwei verschiedene Eingaben: Das faengt die Seite ab, ohne den Server zu
+// fragen -- ein Vertipper ist kein Sicherheitsfall.
+calls = [];
+await fuell('#pw-neu', 'ein sicheres langes wort');
+await fuell('#pw-neu2', 'ein anderes langes wort');
+await klick('#pw-speichern');
+await page.waitForTimeout(200);
+check('KRITISCH: zwei verschiedene Eingaben werden gemeldet und nicht gespeichert',
+  await page.isVisible('#fehler-passwort')
+  && !calls.some(c => c.path.includes('portal_passwort_setzen')));
+
+// Ein zu schwaches Passwort weist der SERVER ab -- und seine Begruendung
+// wird unveraendert gezeigt, nicht durch eine eigene ersetzt.
+pwFehler = 'Das Passwort enthält ein zu naheliegendes Wort ("passwort").';
+await fuell('#pw-neu', 'passwort123'); await fuell('#pw-neu2', 'passwort123');
+await klick('#pw-speichern');
+await page.waitForTimeout(250);
+check('KRITISCH: die Begründung des Servers erscheint unverändert',
+  (await page.textContent('#fehler-passwort')).includes('zu naheliegendes Wort'));
+check('Und man bleibt auf der Maske, statt ohne Passwort weiterzukommen',
+  await page.isVisible('#schritt-passwort'));
+
+pwFehler = null;
+calls = [];
+await fuell('#pw-neu', 'ein sicheres langes wort');
+await fuell('#pw-neu2', 'ein sicheres langes wort');
+await klick('#pw-speichern');
+await page.waitForTimeout(300);
+{
+  const setzen = calls.find(c => c.path.includes('portal_passwort_setzen'));
+  check('Das Passwort erreicht den Server', !!setzen);
+  if (setzen) {
+    const rumpf = JSON.parse(setzen.rumpf || '{}');
+    check('KRITISCH: der Endpunkt bekommt nur das Passwort, keine Zugangsnummer',
+      rumpf.passwort === 'ein sicheres langes wort'
+      && rumpf.zugang_id === undefined && rumpf.kunde_id === undefined);
+  }
+}
+check('Nach dem Setzen geht es in die Liste', await page.isVisible('#inhalt'));
+passwortNoetig = false;
+
+calls = [];
+await klick('#abmelden');
+await page.waitForTimeout(250);
 
 // ══ Desktop ═════════════════════════════════════════════════════════════
 // Jede Änderung am Handy-Layout wird zusätzlich am Desktop geprüft, und
@@ -252,11 +394,11 @@ await setup(gross);
 await gross.goto(SEITE);
 await gross.evaluate(() => localStorage.clear());
 await gross.goto(SEITE);
-await gross.fill('#email', 'a.beispiel@example.invalid');
-await gross.click('#code-holen');
+await fuell('#email', 'a.beispiel@example.invalid', gross);
+await klick('#code-holen', gross);
 await gross.waitForTimeout(150);
-await gross.fill('#code', '123456');
-await gross.click('#anmelden');
+await fuell('#code', '123456', gross);
+await klick('#anmelden', gross);
 await gross.waitForTimeout(300);
 check('Die Liste erscheint auch am Desktop', await gross.isVisible('#inhalt'));
 // Die Seite darf am breiten Bildschirm nicht über die volle Breite laufen --
@@ -314,11 +456,11 @@ check('KRITISCH: die Verlaufsebene liegt hinter der Seite (drei Kreise)',
 // Glas, sondern nur eine Karte mit runden Ecken.
 check('KRITISCH: die Kachel ist durchscheinend, nicht deckend',
   /^rgba\(/.test(dunkelWerte.karte) && parseFloat(dunkelWerte.karte.split(',')[3]) < 0.95);
-await dunkel.fill('#email', 'a.beispiel@example.invalid');
-await dunkel.click('#code-holen');
+await fuell('#email', 'a.beispiel@example.invalid', dunkel);
+await klick('#code-holen', dunkel);
 await dunkel.waitForTimeout(150);
-await dunkel.fill('#code', '123456');
-await dunkel.click('#anmelden');
+await fuell('#code', '123456', dunkel);
+await klick('#anmelden', dunkel);
 await dunkel.waitForTimeout(300);
 check('Die Liste erscheint auch in der dunklen Fassung', await dunkel.isVisible('#inhalt'));
 await dunkel.screenshot({ path: `${OUT}/portal-03-dunkel.png` });
