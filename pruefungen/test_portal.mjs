@@ -65,6 +65,83 @@ const VOLL = {
       fortschritt: { gesamt: 0, erledigt: 0, bestaetigt: 0, ersatzscan: 0 } },
   ],
 };
+// Ein 1x1-PNG als Fotobeleg. Der Inhalt ist gleichgueltig -- geprueft wird,
+// dass ueberhaupt ein Bild ankommt und nicht ein Platzhaltertext bleibt.
+const FOTO_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+  'base64');
+
+// Die Detailantworten, je Runde eine -- und sie stimmen mit den Zahlen der
+// Liste ueberein. Ein Beleg, der in der Liste „6 von 6" sagt und im Detail
+// drei Punkte zeigt, prueft nichts; er verwirrt nur den, der das Bild
+// ansieht.
+//
+// Alle drei tragen ABSICHTLICH vorname/nachname: Sollte der Server sie
+// eines Tages doch mitschicken, muss die Oberflaeche sie trotzdem nicht
+// anzeigen -- der Name haengt an OP-423 und ist nicht entschieden.
+const punkt = (id, name, zustand, zeit, zusatz = {}) => ({
+  id, bezeichnung: name, aufgaben: zusatz.aufgaben || [],
+  erledigt: zustand === null ? null : {
+    scan_id: 500 + id, status: zustand, erfasst_am: zeit,
+    beschreibung: zusatz.beschreibung || null, hat_foto: !!zusatz.hat_foto,
+  },
+});
+const rumpf = (id, tag, zusatz) => ({
+  id, datum: tag, objekt_name: 'Testliegenschaft Nord',
+  vorname: 'Vorname', nachname: 'Nachnamenstest',
+  rohzeit_start: `${tag} 22:04:00`, rohzeit_ende: `${tag} 22:41:00`,
+  letzter_scan: `${tag} 22:39:00`, pause_minuten: 0,
+  dauer: { sekunden: 2220, quelle: 'rohzeit_ende' },
+  ereignisse: [], ...zusatz,
+});
+const DETAILS = {
+  // Runde 10: alle sechs Punkte technisch bestaetigt -- der glatte Fall.
+  10: rumpf(10, vorTagen(2), {
+    status: 'abgeschlossen',
+    fortschritt: { gesamt: 6, erledigt: 6, bestaetigt: 6, ersatzscan: 0, nicht_verfuegbar: 0 },
+    kontrollpunkte: [
+      punkt(1, 'Eingang Nord', 'bestaetigt', `${vorTagen(2)} 22:07:00`),
+      punkt(2, 'Tiefgarage', 'bestaetigt', `${vorTagen(2)} 22:11:00`,
+        { aufgaben: [{ id: 9, bezeichnung: 'Türe verschliessen',
+                       erledigt: { status: 'erledigt', grund: null } }] }),
+      punkt(3, 'Veloraum', 'bestaetigt', `${vorTagen(2)} 22:16:00`),
+      punkt(4, 'Treppenhaus West', 'bestaetigt', `${vorTagen(2)} 22:23:00`),
+      punkt(5, 'Waschküche', 'bestaetigt', `${vorTagen(2)} 22:30:00`),
+      punkt(6, 'Aussenbereich', 'bestaetigt', `${vorTagen(2)} 22:38:00`),
+    ],
+  }),
+  // Runde 11: abgebrochen nach zwei Punkten -- vier wurden nie besucht.
+  11: rumpf(11, vorTagen(5), {
+    status: 'abgebrochen',
+    fortschritt: { gesamt: 6, erledigt: 2, bestaetigt: 2, ersatzscan: 0, nicht_verfuegbar: 0 },
+    kontrollpunkte: [
+      punkt(1, 'Eingang Nord', 'bestaetigt', `${vorTagen(5)} 21:33:00`),
+      punkt(2, 'Tiefgarage', 'bestaetigt', `${vorTagen(5)} 21:38:00`),
+      punkt(3, 'Veloraum', null, null),
+      punkt(4, 'Treppenhaus West', null, null),
+      punkt(5, 'Waschküche', null, null),
+      punkt(6, 'Rückseite Veloraum', null, null),
+    ],
+    ereignisse: [{ id: 77, erfasst_am: `${vorTagen(5)} 21:36:00`,
+                   art: 'Sachbeschädigung', bemerkung: 'Scheibe im Treppenhaus beschädigt',
+                   hat_foto: true }],
+  }),
+  // Runde 12: vollstaendig, aber ein Punkt nur per Fotobeleg.
+  12: rumpf(12, vorTagen(8), {
+    status: 'abgeschlossen',
+    fortschritt: { gesamt: 6, erledigt: 6, bestaetigt: 5, ersatzscan: 1, nicht_verfuegbar: 0 },
+    kontrollpunkte: [
+      punkt(1, 'Eingang Nord', 'bestaetigt', `${vorTagen(8)} 23:15:00`),
+      punkt(2, 'Tiefgarage', 'ersatzscan', `${vorTagen(8)} 23:22:00`,
+        { beschreibung: 'Chip liess sich nicht lesen', hat_foto: true }),
+      punkt(3, 'Veloraum', 'bestaetigt', `${vorTagen(8)} 23:27:00`),
+      punkt(4, 'Treppenhaus West', 'bestaetigt', `${vorTagen(8)} 23:31:00`),
+      punkt(5, 'Waschküche', 'bestaetigt', `${vorTagen(8)} 23:36:00`),
+      punkt(6, 'Aussenbereich', 'bestaetigt', `${vorTagen(8)} 23:40:00`),
+    ],
+  }),
+};
+
 const leer = grund => ({
   status: 'ok', kunde: 'Muster Liegenschaften AG', person: 'A. Beispielperson',
   zeitraum: { von: vorTagen(30), bis: vorTagen(0) },
@@ -100,6 +177,18 @@ function setup(page) {
       }
       return send({ status: 'ok', token: 't', name: 'A. Beispielperson',
         kunde: 'Muster Liegenschaften AG' });
+    }
+    if (path.includes('portal_rundgang_detail')) {
+      const id = Number(new URL(req.url()).searchParams.get('rundgang_id'));
+      const d = DETAILS[id];
+      // Der echte Endpunkt antwortet auf eine fremde oder laufende Runde mit
+      // genau diesem 404 -- eine eigene Antwort je Fall waere ein
+      // Auskunftsdienst darueber, welche Nummern es gibt.
+      return d ? send({ status: 'ok', rundgang: d })
+               : send({ status: 'error', message: 'Dieser Rundgang ist nicht abrufbar.' }, 404);
+    }
+    if (path.includes('portal_rundgang_foto')) {
+      return route.fulfill({ status: 200, contentType: 'image/png', body: FOTO_PNG });
     }
     if (path.includes('portal_rundgaenge')) return send(antwort);
     if (path.includes('portal_abmelden')) return send({ status: 'ok' });
@@ -469,6 +558,127 @@ check('Der Abmeldeknopf steht auch auf dem Handy rechts',
 
 await page.screenshot({ path: `${OUT}/portal-01-handy.png` });
 
+// ══ Aufklappbares Detail (ENT-455) ══════════════════════════════════════
+// Gefordert war ausdruecklich ein Aufklapper „auf derselben Zeilenbreite",
+// kein Fenster. Das wird GEMESSEN: Die Tafel muss unter ihrer Zeile liegen
+// und dieselbe Breite haben -- im Quelltext saehe man das nicht.
+await klick('#liste .zeile');
+await page.waitForTimeout(300);
+const lage1 = await page.evaluate(() => {
+  const z = document.querySelector('#liste .zeile');
+  const t = z.nextElementSibling;
+  if (!t || !t.classList.contains('detail')) { return null; }
+  const a = z.getBoundingClientRect(), b = t.getBoundingClientRect();
+  return { unter: b.top >= a.bottom - 1, links: Math.abs(a.left - b.left),
+           breite: Math.abs(a.width - b.width), hoehe: b.height };
+});
+check('KRITISCH: der Klick öffnet eine Tafel DIREKT UNTER der Zeile, kein Fenster',
+  !!lage1 && lage1.unter);
+check('KRITISCH: und sie steht auf derselben Zeilenbreite',
+  !!lage1 && lage1.links <= 1 && lage1.breite <= 1);
+check('Die Tafel hat auch Inhalt, nicht nur Höhe null', !!lage1 && lage1.hoehe > 80);
+check('Die Zeile meldet dem Vorleseprogramm, dass sie offen ist',
+  (await page.getAttribute('#liste .zeile', 'aria-expanded')) === 'true');
+
+const detail = await page.textContent('#liste .detail');
+// Der Kern des Wunsches: „man sieht, wann welcher Punkt genommen worden ist".
+check('KRITISCH: jeder Kontrollpunkt steht mit seiner Uhrzeit da',
+  /22:07/.test(detail) && /Eingang Nord/.test(detail)
+  && /22:38/.test(detail) && /Aussenbereich/.test(detail));
+check('Die Aufgabe unter dem Kontrollpunkt steht mit ihrem Zustand da',
+  /Türe verschliessen/.test(detail) && /Erledigt/.test(detail));
+// „Kein Ereignis gemeldet" ist eine Aussage, ein fehlender Abschnitt keine.
+check('KRITISCH: ohne Ereignisse steht der Satz da, nicht eine leere Fläche',
+  /kein Ereignis gemeldet/.test(detail));
+// Kennzahlen: Beschriftung oben, Wert darunter (Hausregel) -- gemessen.
+check('KRITISCH: im Kennzahlenband steht die Beschriftung ÜBER dem Wert',
+  await page.evaluate(() => {
+    const k = document.querySelector('#liste .detail .kennzahlen > div');
+    return k.querySelector('.k-l').getBoundingClientRect().bottom
+        <= k.querySelector('.k-v').getBoundingClientRect().top + 1;
+  }));
+check('Start, Ende, Dauer und Kontrollpunkte stehen als vier Blöcke da',
+  await page.evaluate(() =>
+    document.querySelectorAll('#liste .detail .kennzahlen > div').length === 4));
+check('KRITISCH: auf dem Handy stehen sie zu zweit nebeneinander, nicht zu viert',
+  await page.evaluate(() => {
+    const k = [...document.querySelectorAll('#liste .detail .kennzahlen > div')]
+      .map(e => Math.round(e.getBoundingClientRect().top));
+    return new Set(k).size === 2;
+  }));
+// Der Faden verbindet die Knoten. Ohne align-self:stretch faellt er in einem
+// Raster mit align-items:start auf null zusammen: Die Punkte stehen da, die
+// Linie dazwischen fehlt -- am Bild aufgefallen, im Quelltext unsichtbar.
+check('KRITISCH: der Faden zwischen den Kontrollpunkten ist wirklich zu sehen',
+  await page.evaluate(() => [...document.querySelectorAll('#liste .detail .v-faden')]
+    .every(f => f.getBoundingClientRect().height > 10)));
+
+// Der Name der eingesetzten Person bleibt draussen, solange OP-423 offen ist
+// -- und zwar AUCH DANN, wenn der Server ihn mitschicken sollte. Der Beleg
+// trägt ihn absichtlich.
+check('KRITISCH: kein Personenname im Detail — auch wenn die Antwort einen trägt (OP-423)',
+  !/Nachnamenstest/.test(detail) && !/Vorname/.test(detail));
+
+// ── Zweite Runde: abgebrochen, vier Punkte nie besucht ───────────────
+await page.evaluate(() => document.querySelectorAll('#liste .zeile')[1].click());
+await page.waitForTimeout(300);
+const detail2 = await page.evaluate(() =>
+  document.querySelectorAll('#liste .zeile')[1].nextElementSibling.textContent);
+// Ein Nachweis, in dem das Fehlende fehlt, ist keiner.
+check('KRITISCH: nicht besuchte Punkte erscheinen ebenfalls und sind als solche benannt',
+  /Waschküche/.test(detail2) && /Nicht besucht/.test(detail2));
+check('KRITISCH: ein gemeldetes Ereignis erscheint mit Zeit und Art',
+  /21:36/.test(detail2) && /Sachbeschädigung/.test(detail2));
+
+// ── Dritte Runde: vollständig, aber mit Fotobeleg ────────────────────
+await page.evaluate(() => document.querySelectorAll('#liste .zeile')[2].click());
+await page.waitForTimeout(500);
+const detail3 = await page.evaluate(() =>
+  document.querySelectorAll('#liste .zeile')[2].nextElementSibling.textContent);
+check('Ein Fotobeleg heisst im Portal „Fotobeleg", nicht „Ersatzscan"',
+  /Fotobeleg/.test(detail3) && !/Ersatzscan/.test(detail3));
+check('KRITISCH: und der Hinweis sagt, was das bedeutet — nicht technisch bestätigt',
+  /nicht technisch|statt technisch/.test(detail3));
+check('KRITISCH: der Fotobeleg erscheint als Bild, nicht als Platzhaltertext',
+  await page.evaluate(() => {
+    const b = document.querySelectorAll('#liste .zeile')[2]
+      .nextElementSibling.querySelector('.v-foto img');
+    return !!b && b.naturalWidth > 0;
+  }));
+// Mehrere dürfen offen sein: Ein Aufklapper, der beim Öffnen einen anderen
+// zuklappt, nimmt gerade das weg, wofür man ihn öffnet.
+check('Ein zweiter und dritter Aufklapper schliessen die vorigen nicht',
+  await page.evaluate(() => document.querySelectorAll('#liste .detail').length === 3));
+await page.screenshot({ path: `${OUT}/portal-08-detail-handy.png` });
+
+// Erst alles zuklappen, damit die naechste Zusage bei null anfaengt.
+await page.evaluate(() => document.querySelectorAll('#liste .zeile.offen').forEach(z => z.click()));
+await page.waitForTimeout(200);
+check('Alle Tafeln lassen sich wieder schliessen',
+  await page.evaluate(() => document.querySelectorAll('#liste .detail').length === 0));
+
+// Zuklappen. Die Tafel wird ENTFERNT und nicht versteckt -- sonst zählte
+// sie für :last-child weiter mit und die letzte Zeile behielte einen Strich.
+await klick('#liste .zeile');
+await page.waitForTimeout(300);
+await klick('#liste .zeile');
+await page.waitForTimeout(200);
+check('KRITISCH: ein zweiter Klick klappt wieder zu',
+  await page.evaluate(() => document.querySelectorAll('#liste .detail').length === 0));
+check('Und die Zeile meldet das auch',
+  (await page.getAttribute('#liste .zeile', 'aria-expanded')) === 'false');
+
+// Eine Zeile, die nur die Maus öffnet, ist für die Tastatur eine Sackgasse.
+await page.focus('#liste .zeile');
+await page.keyboard.press('Enter');
+await page.waitForTimeout(300);
+check('KRITISCH: die Zeile lässt sich auch mit der Tastatur öffnen',
+  await page.evaluate(() => document.querySelectorAll('#liste .detail').length === 1));
+// Mehrere dürfen offen sein: Ein Aufklapper, der beim Öffnen einen anderen
+// zuklappt, nimmt gerade das weg, wofür man ihn öffnet.
+await page.evaluate(() => document.querySelectorAll('#liste .zeile.offen').forEach(z => z.click()));
+await page.waitForTimeout(200);
+
 // ── Die drei leeren Zustände ─────────────────────────────────────────
 const texte = {};
 for (const grund of ['kein_revierdienst', 'noch_nichts_erfasst', 'kein_treffer_im_zeitraum']) {
@@ -621,17 +831,52 @@ check('KRITISCH: und sie beginnen an derselben Stelle — sonst sind sie nicht v
 // eine ausgefranste rechte Kante, die man erst im Bild sieht.
 check('KRITISCH: die Zustandsmarken enden alle an derselben rechten Kante',
   await gross.evaluate(() => {
-    const marken = [...document.querySelectorAll('#liste .zeile .marke-zustand')];
-    const kanten = marken.map(m => m.getBoundingClientRect().right);
-    const spalten = marken.map(m => m.parentElement.getBoundingClientRect().right);
-    return kanten.length >= 3
-      && kanten.every(x => Math.abs(x - kanten[0]) <= 1)
-      && kanten.every((x, i) => Math.abs(x - spalten[i]) <= 1);
+    const kanten = [...document.querySelectorAll('#liste .zeile .marke-zustand')]
+      .map(m => m.getBoundingClientRect().right);
+    // Nur die rechten Kanten: Die Marken sind verschieden breit, also fällt
+    // eine verlorene Rechtsbündigkeit genau hier auf (linksbündig endeten
+    // sie an verschiedenen Stellen).
+    return kanten.length >= 3 && kanten.every(x => Math.abs(x - kanten[0]) <= 1);
   }));
 check('KRITISCH: und der Füllstand stimmt auch am Desktop mit den Zahlen überein',
   Math.abs(bDesk[1].gefuellt / bDesk[1].spur - 1 / 3) < 0.04);
 check('Der Fotobeleg-Hinweis steht auch am Desktop da',
   /1 davon mit Fotobeleg/.test(await gross.textContent('#liste')));
+
+// Dasselbe Aufklappen am Desktop -- jede Änderung am Handy-Layout wird
+// zusätzlich am Desktop geprüft (CLAUDE.md).
+await klick('#liste .zeile', gross);
+await gross.waitForTimeout(400);
+const lageD = await gross.evaluate(() => {
+  const z = document.querySelector('#liste .zeile');
+  const t = z.nextElementSibling;
+  if (!t || !t.classList.contains('detail')) { return null; }
+  const a = z.getBoundingClientRect(), b = t.getBoundingClientRect();
+  return { unter: b.top >= a.bottom - 1, breite: Math.abs(a.width - b.width),
+           spalten: new Set([...t.querySelectorAll('.kennzahlen > div')]
+             .map(e => Math.round(e.getBoundingClientRect().top))).size };
+});
+check('KRITISCH: auch am Desktop öffnet die Tafel unter der Zeile und auf deren Breite',
+  !!lageD && lageD.unter && lageD.breite <= 1);
+// Vier Blöcke auf 390 px wären 80 px breit; am Desktop ist der Platz da.
+check('KRITISCH: am Desktop stehen die vier Kennzahlen auf EINER Zeile',
+  !!lageD && lageD.spalten === 1);
+const detailD = await gross.textContent('#liste .detail');
+check('Auch am Desktop stehen die Kontrollpunkte mit ihren Uhrzeiten da',
+  /22:07/.test(detailD) && /Eingang Nord/.test(detailD));
+check('KRITISCH: und auch am Desktop kein Personenname (OP-423)',
+  !/Nachnamenstest/.test(detailD) && !/Vorname/.test(detailD));
+// Der nicht besuchte Punkt gehört auch hier ins Bild.
+await gross.evaluate(() => document.querySelectorAll('#liste .zeile')[1].click());
+await gross.waitForTimeout(300);
+check('KRITISCH: auch am Desktop erscheinen die nicht besuchten Punkte',
+  await gross.evaluate(() => {
+    const t = document.querySelectorAll('#liste .zeile')[1].nextElementSibling.textContent;
+    return /Waschküche/.test(t) && /Nicht besucht/.test(t);
+  }));
+await gross.screenshot({ path: `${OUT}/portal-09-detail-desktop.png` });
+await gross.evaluate(() => document.querySelectorAll('#liste .zeile.offen').forEach(z => z.click()));
+await gross.waitForTimeout(200);
 
 // Und nichts läuft seitlich aus dem Bild (weder hier noch auf dem Handy).
 check('KRITISCH: die Seite scrollt nicht waagrecht',

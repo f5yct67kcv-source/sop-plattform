@@ -1,0 +1,161 @@
+<?php
+// Kundenportal: EINE Runde in voller Tiefe (ENT-455).
+//
+// GET ?rundgang_id=<n> -> { status, rundgang: { ... } }
+//
+// Das Gegenstueck zu rundgang_detail.php, aber NICHT dessen Wiederverwendung:
+// Jener Endpunkt haengt an require_session() und rundgaenge_lesen, und ihn
+// fuer zwei Personenkreise zu oeffnen hiesse, an einer Stelle ueber beide zu
+// entscheiden. Ein Kundenzugang und ein Verwaltungszugang trennen sich hier
+// genauso wie in kundenportal.php begruendet.
+//
+// WAS AUSDRUECKLICH NICHT MITGEHT -- und warum:
+//
+//   - Der NAME der eingesetzten Person. ENT-441 hat ihn aus der Portalliste
+//     herausgehalten; welche Fassung (aus / nur Vorname / voll) im Detail
+//     erscheint, ist Gegenstand von OP-423 und noch nicht entschieden. Bis
+//     dahin gilt die sparsame Vorbelegung -- er verlaesst den Server nicht.
+//   - Der KUNDENNAME und der interne Einsatztitel (einsaetze.titel). Der
+//     erste ist im Portal immer derselbe, der zweite ist fuer Disponenten
+//     geschrieben.
+//   - Der ABBRUCHGRUND. Ebenfalls OP-423. Dass abgebrochen wurde, steht da;
+//     warum, ist noch nicht entschieden.
+//   - Die BEWEGUNGSSPUR (rundgang_spur.php). ENT-441 Punkt 3 schliesst sie
+//     ausdruecklich aus, ENT-322 aus demselben Grund fuer den Rapport.
+//
+// Die kunde_id kommt aus der Sitzung, nie aus der Anfrage.
+declare(strict_types=1);
+require __DIR__ . '/../db.php';
+require_once __DIR__ . '/../kundenportal.php';
+require_once __DIR__ . '/../rundgang.php';
+
+$zugang = require_kundensession();
+
+if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+    json_response(['status' => 'error', 'message' => 'nur GET'], 405);
+}
+
+$rundgangId = (int)($_GET['rundgang_id'] ?? 0);
+if ($rundgangId <= 0) {
+    json_response(['status' => 'error', 'message' => 'rundgang_id erforderlich'], 422);
+}
+
+$pdo = db();
+$objektIds = kp_objekt_ids($pdo, $zugang['kunde_id']);
+
+// EINE Antwort fuer alle drei Faelle: gibt es nicht / gehoert einem anderen
+// Kunden / laeuft noch. Drei verschiedene Antworten waeren ein
+// Auskunftsdienst darueber, welche Nummern im System vergeben sind.
+$nichtAbrufbar = static function (): void {
+    json_response(['status' => 'error',
+        'message' => 'Dieser Rundgang ist nicht abrufbar.'], 404);
+};
+
+if (!$objektIds) { $nichtAbrufbar(); }
+
+$stmt = $pdo->prepare(
+    'SELECT r.id, r.objekt_id, r.status, r.rundgang_vorlage_id,
+            r.rohzeit_start, r.rohzeit_ende, r.pause_minuten,
+            e.datum, o.name AS objekt_name, o.strasse, o.ort,
+            (SELECT MAX(s.erfasst_am) FROM rundgang_scan s WHERE s.rundgang_id = r.id) AS letzter_scan
+       FROM rundgang r
+       JOIN einsaetze e ON e.id = r.einsatz_id
+       JOIN objekte o ON o.id = r.objekt_id
+      WHERE r.id = ?'
+);
+$stmt->execute([$rundgangId]);
+$r = $stmt->fetch(PDO::FETCH_ASSOC);
+if (!$r) { $nichtAbrufbar(); }
+
+$laeuft = in_array((string)$r['status'], RUNDGANG_OFFENE_STATUS, true);
+if (!kp_runde_sichtbar((int)$r['objekt_id'], $objektIds, $laeuft)) { $nichtAbrufbar(); }
+
+$objektId  = (int)$r['objekt_id'];
+$vorlageId = $r['rundgang_vorlage_id'] !== null ? (int)$r['rundgang_vorlage_id'] : null;
+
+// Alle Punkte der Runde -- auch die NICHT besuchten. Nur die Scans zu zeigen
+// hiesse, dass ein ausgelassener Kontrollpunkt im Nachweis gar nicht
+// vorkommt; ein Nachweis, in dem das Fehlende fehlt, ist keiner
+// (ENT-441 Punkt 3, wortgleich zur Begruendung in rundgang_detail.php).
+$scans = $pdo->prepare(
+    'SELECT id, kontrollpunkt_id, status, erfasst_am, beschreibung,
+            foto_mime IS NOT NULL AS hat_foto
+       FROM rundgang_scan WHERE rundgang_id = ?'
+);
+$scans->execute([$rundgangId]);
+$erledigtNach = [];
+foreach ($scans->fetchAll(PDO::FETCH_ASSOC) as $s) {
+    if ($s['kontrollpunkt_id'] !== null) {
+        $erledigtNach[(int)$s['kontrollpunkt_id']] = [
+            'scan_id'      => (int)$s['id'],
+            'status'       => (string)$s['status'],
+            'erfasst_am'   => $s['erfasst_am'],
+            'beschreibung' => $s['beschreibung'],
+            'hat_foto'     => (bool)$s['hat_foto'],
+        ];
+    }
+}
+
+$rohPunkte = rundgang_punkte_der_runde($pdo, $objektId, $vorlageId);
+$rohPunkte = array_map(static function ($k) use ($erledigtNach) {
+    $k['id'] = (int)$k['id'];
+    $k['erledigt'] = $erledigtNach[$k['id']] ?? null;
+    return $k;
+}, $rohPunkte);
+$mitAufgaben = rundgang_punkte_mit_aufgaben($pdo, $rundgangId, $rohPunkte);
+
+// Die Geodaten der Kontrollpunkte (lat/lng/geofence_radius_m) bleiben hier
+// draussen. Sie kommen aus rundgang_punkte_der_runde() mit, werden aber
+// ohne Karte fuer nichts gebraucht -- und was nicht gebraucht wird, wird
+// nicht ausgeliefert.
+$punkte = array_map(static fn(array $k): array => [
+    'id'          => (int)$k['id'],
+    'bezeichnung' => (string)$k['bezeichnung'],
+    'erledigt'    => $k['erledigt'],
+    'aufgaben'    => $k['aufgaben'] ?? [],
+], $mitAufgaben);
+
+// Ereignisse dieser Runde (ENT-441 Punkt 3a: im Fremdsystem ein eigener
+// Menuepunkt der Kundenansicht, hier unter der Runde, an der sie haengen).
+// Das Foto selbst bleibt draussen -- es waere ein LONGBLOB je Zeile.
+$ereignisse = [];
+if (hat_tabelle($pdo, 'ereignis_meldung')) {
+    $eStmt = $pdo->prepare(
+        'SELECT em.id, em.erfasst_am, em.bemerkung,
+                em.foto_mime IS NOT NULL AS hat_foto, ea.bezeichnung AS art
+           FROM ereignis_meldung em
+           LEFT JOIN ereignisart ea ON ea.id = em.ereignisart_id
+          WHERE em.rundgang_id = ?
+          ORDER BY em.erfasst_am, em.id'
+    );
+    $eStmt->execute([$rundgangId]);
+    foreach ($eStmt->fetchAll(PDO::FETCH_ASSOC) as $e) {
+        $ereignisse[] = [
+            'id'         => (int)$e['id'],
+            'erfasst_am' => $e['erfasst_am'],
+            'art'        => $e['art'],
+            'bemerkung'  => $e['bemerkung'],
+            'hat_foto'   => (bool)$e['hat_foto'],
+        ];
+    }
+}
+
+json_response(['status' => 'ok', 'rundgang' => [
+    'id'             => (int)$r['id'],
+    'datum'          => (string)$r['datum'],
+    'objekt_name'    => (string)$r['objekt_name'],
+    'strasse'        => (string)($r['strasse'] ?? ''),
+    'ort'            => (string)($r['ort'] ?? ''),
+    'status'         => (string)$r['status'],
+    'rohzeit_start'  => $r['rohzeit_start'],
+    'rohzeit_ende'   => $r['rohzeit_ende'],
+    'letzter_scan'   => $r['letzter_scan'],
+    'pause_minuten'  => (int)$r['pause_minuten'],
+    'dauer'          => rundgang_dauer($r['rohzeit_start'], $r['rohzeit_ende'],
+        $r['letzter_scan'], (int)$r['pause_minuten'], (string)$r['status']),
+    'fortschritt'    => rundgang_fortschritt($pdo, $rundgangId, $objektId, $vorlageId),
+    'kontrollpunkte' => $punkte,
+    // Immer mitgeliefert, auch leer: „keine Ereignisse" ist eine Aussage,
+    // ein fehlendes Feld keine (Hausregel).
+    'ereignisse'     => $ereignisse,
+]]);
