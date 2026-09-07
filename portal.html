@@ -145,6 +145,21 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
 .knopfzeile{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:18px}
 
 .hinweis{font-size:13.5px;color:var(--ink-3);margin:10px 0 0}
+
+/* Das kleine Fenster. Deckt mehr als eine Kachel (es liegt UEBER Inhalt und
+   muss ihn verdecken, sonst liest man zwei Ebenen gleichzeitig) und hat als
+   einziges Element der Seite eine Unschaerfe -- hier laeuft tatsaechlich
+   etwas dahinter durch. */
+.fenster-grund{position:fixed;inset:0;z-index:50;display:flex;
+               align-items:center;justify-content:center;padding:16px;
+               background:rgba(8,10,16,.55)}
+.fenster{width:100%;max-width:420px;border-radius:var(--r-lg);padding:24px;
+         background:rgba(var(--surface-rgb),.94);
+         backdrop-filter:saturate(165%) blur(20px);
+         -webkit-backdrop-filter:saturate(165%) blur(20px);
+         border:1px solid var(--glas-linie);
+         box-shadow:0 24px 64px -16px rgba(0,0,0,.55),
+                    inset 0 1px 0 0 var(--glas-kante-hell)}
 /* Der zweite Weg steht in einem eigenen, ruhigen Kasten -- er gehoert nicht
    zum Anmeldeformular darueber, sondern ist die Antwort auf eine andere
    Frage. Nach einem Fehlversuch tritt er hervor, ohne die Stelle zu
@@ -218,6 +233,39 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
        verschiedene Aufgaben, und ein Kopf, der beides halb tut, tut keines
        ganz. Das Logo ist dasselbe wie im Cockpit und in der Mitarbeiter-App
        -- icons/icon-192.png, schon im Deploy. -->
+  <!-- Kleines Fenster ueber der Seite (ENT-448). Bewusst ein Fenster und
+       kein weiterer Schritt: Die Anmeldemaske bleibt sichtbar dahinter, und
+       wer versehentlich geklickt hat, ist mit einem Schliessen zurueck --
+       ohne dass die Seite den Zustand gewechselt haette. -->
+  <div class="fenster-grund" id="anfrage-fenster" hidden>
+    <div class="fenster" role="dialog" aria-modal="true" aria-labelledby="anfrage-titel">
+      <div class="feld" style="margin-bottom:16px">
+        <div class="bez">Passwort vergessen oder zum ersten Mal hier?</div>
+        <div class="wert" id="anfrage-titel">Wir schicken Ihnen einen Link</div>
+      </div>
+      <div id="anfrage-formular">
+        <label for="anfrage-email">E-Mail-Adresse</label>
+        <input id="anfrage-email" type="email" autocomplete="email" inputmode="email"
+               placeholder="name@beispiel.ch">
+        <div class="knopfzeile">
+          <button class="knopf" id="anfrage-senden">Link anfordern</button>
+          <button class="knopf still" id="anfrage-schliessen">Abbrechen</button>
+        </div>
+        <p class="hinweis">Über den Link legen Sie Ihr Passwort fest. Danach melden
+          Sie sich damit an.</p>
+        <p class="fehler" id="fehler-anfrage" hidden></p>
+      </div>
+      <div id="anfrage-fertig" hidden style="text-align:center">
+        <div style="font-size:34px;line-height:1;margin-bottom:12px" aria-hidden="true">✓</div>
+        <div class="wert" id="anfrage-fertig-text"></div>
+        <p class="hinweis" id="anfrage-fertig-unter"></p>
+        <div class="knopfzeile" style="justify-content:center">
+          <button class="knopf still" id="anfrage-zu">Schliessen</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="empfang" id="empfang">
     <img src="icons/icon-192.png" alt="">
     <h1>Herzlich willkommen im Kundenportal</h1>
@@ -268,35 +316,17 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
         <strong>Passwort vergessen?</strong> Oder zum ersten Mal hier —
         dann haben Sie noch keines.</p>
       <div class="knopfzeile" style="margin-top:10px">
-        <button class="knopf still" id="code-holen">Code per E-Mail anfordern</button>
+        <button class="knopf still" id="link-holen">Link per E-Mail anfordern</button>
       </div>
     </div>
-  </div>
-
-  <!-- Schritt 2: Code -->
-  <div class="karte" id="schritt-code" hidden>
-    <div class="feld" style="margin-bottom:16px">
-      <div class="bez">Code eingeben</div>
-      <div class="wert" id="code-an"></div>
-    </div>
-    <label for="code">Sechsstelliger Code</label>
-    <input id="code" type="text" inputmode="numeric" autocomplete="one-time-code"
-           maxlength="6" placeholder="000000"
-           style="letter-spacing:6px;font-size:22px;font-weight:700;text-align:center">
-    <div class="knopfzeile">
-      <button class="knopf" id="anmelden">Anmelden</button>
-      <button class="knopf still" id="zurueck">Andere Adresse</button>
-    </div>
-    <p class="hinweis" id="code-hinweis"></p>
-    <p class="fehler" id="fehler-code" hidden></p>
   </div>
 
   <!-- Schritt 3: Passwort festlegen. Erscheint nach einer Code-Anmeldung,
        solange noch keines gesetzt ist -- danach nie wieder. -->
   <div class="karte" id="schritt-passwort" hidden>
     <div class="feld" style="margin-bottom:16px">
-      <div class="bez">Noch ein Schritt</div>
-      <div class="wert">Legen Sie Ihr Passwort fest</div>
+      <div class="bez">Passwort festlegen</div>
+      <div class="wert" id="pw-titel">Wählen Sie Ihr Passwort</div>
     </div>
     <p class="hinweis" style="margin:0 0 16px">
       Damit melden Sie sich künftig direkt an, ohne Code. Eine merkbare
@@ -394,8 +424,12 @@ const LEER = {
 };
 
 let token = null;
+// Der Token aus dem Link (?neu=<token>), solange das Passwort noch nicht
+// gesetzt ist. Er wandert NICHT in den Speicher -- er ist einmalig und
+// gilt nur fuer diesen einen Vorgang.
+let neuToken = null;
 
-const SCHRITTE = ['schritt-adresse', 'schritt-code', 'schritt-passwort',
+const SCHRITTE = ['schritt-adresse', 'schritt-passwort',
                  'pw-fertig', 'abgemeldet', 'inhalt'];
 
 function zeige(welche) {
@@ -430,13 +464,6 @@ function angemeldet(daten) {
   token = daten.token;
   try { localStorage.setItem(SCHLUESSEL, token); } catch (e) { /* privates Fenster */ }
   kopfSetzen(daten.kunde, daten.name);
-  if (daten.passwort_noetig) {
-    fehler('fehler-passwort', '');
-    $('pw-neu').value = ''; $('pw-neu2').value = '';
-    zeige('schritt-passwort');
-    $('pw-neu').focus();
-    return;
-  }
   zeige('inhalt');
   laden();
 }
@@ -470,40 +497,53 @@ $('passwort').addEventListener('keydown', e => {
   if (e.key === 'Enter') { $('anmelden-pw').click(); }
 });
 
-$('code-holen').addEventListener('click', async () => {
-  const email = $('email').value.trim();
-  fehler('fehler-adresse', '');
-  if (!email) { fehler('fehler-adresse', 'Bitte die E-Mail-Adresse eingeben.'); return; }
-  $('code-holen').disabled = true;
-  const { daten } = await ruf('portal_code_anfordern.php',
-    { method: 'POST', body: JSON.stringify({ email }) });
-  $('code-holen').disabled = false;
-  // Die Antwort ist immer dieselbe -- auch die Oberflaeche verraet darum
-  // nicht, ob es den Zugang gibt.
-  $('code-an').textContent = email;
-  $('code-hinweis').textContent = 'Der Code gilt '
-    + (daten.gueltig_minuten || 15) + ' Minuten und nur einmal. '
-    + 'Kommt keine E-Mail an, ist zu dieser Adresse kein Zugang hinterlegt.';
-  zeige('schritt-code');
-  $('code').focus();
+// ── Der zweite Weg: Link anfordern ────────────────────────────────────
+// Ein Fenster und kein weiterer Schritt: Die Anmeldemaske bleibt dahinter
+// sichtbar, und wer versehentlich geklickt hat, ist mit einem Schliessen
+// zurueck -- ohne dass die Seite den Zustand gewechselt haette.
+function anfrageOeffnen() {
+  fehler('fehler-anfrage', '');
+  $('anfrage-formular').hidden = false;
+  $('anfrage-fertig').hidden = true;
+  // Was schon eingetippt war, nicht noch einmal verlangen.
+  $('anfrage-email').value = $('email').value.trim();
+  $('anfrage-fenster').hidden = false;
+  $('anfrage-email').focus();
+}
+
+function anfrageSchliessen() {
+  $('anfrage-fenster').hidden = true;
+}
+
+$('link-holen').addEventListener('click', anfrageOeffnen);
+$('anfrage-schliessen').addEventListener('click', anfrageSchliessen);
+$('anfrage-zu').addEventListener('click', anfrageSchliessen);
+// Escape schliesst -- ein Fenster ohne Ausweg ist eine Falle.
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !$('anfrage-fenster').hidden) { anfrageSchliessen(); }
 });
 
-$('zurueck').addEventListener('click', () => { fehler('fehler-code', ''); zeige('schritt-adresse'); });
+$('anfrage-senden').addEventListener('click', async () => {
+  const email = $('anfrage-email').value.trim();
+  fehler('fehler-anfrage', '');
+  if (!email) { fehler('fehler-anfrage', 'Bitte die E-Mail-Adresse eingeben.'); return; }
+  $('anfrage-senden').disabled = true;
+  const { daten } = await ruf('portal_link_anfordern.php',
+    { method: 'POST', body: JSON.stringify({ email }) });
+  $('anfrage-senden').disabled = false;
+  // Die Antwort ist immer dieselbe -- auch die Seite verraet darum nicht,
+  // ob es zu dieser Adresse einen Zugang gibt.
+  $('anfrage-formular').hidden = true;
+  $('anfrage-fertig-text').textContent = 'Die Nachricht ist unterwegs.';
+  $('anfrage-fertig-unter').textContent =
+    'Wenn zu ' + email + ' ein Zugang besteht, finden Sie dort einen Link. '
+    + 'Er gilt ' + (daten.gueltig_minuten || 30) + ' Minuten und nur einmal. '
+    + 'Kommt keine Nachricht an, ist zu dieser Adresse kein Zugang hinterlegt.';
+  $('anfrage-fertig').hidden = false;
+});
 
-$('anmelden').addEventListener('click', async () => {
-  const email = $('email').value.trim();
-  const code = $('code').value.trim();
-  fehler('fehler-code', '');
-  if (!code) { fehler('fehler-code', 'Bitte den Code aus der E-Mail eingeben.'); return; }
-  $('anmelden').disabled = true;
-  const { ok, daten } = await ruf('portal_anmelden.php',
-    { method: 'POST', body: JSON.stringify({ email, code }) });
-  $('anmelden').disabled = false;
-  if (!ok || !daten.token) {
-    fehler('fehler-code', daten.message || 'Die Anmeldung hat nicht geklappt.');
-    return;
-  }
-  angemeldet(daten);
+$('anfrage-email').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { $('anfrage-senden').click(); }
 });
 
 // ── Passwort festlegen ────────────────────────────────────────────────
@@ -519,16 +559,22 @@ $('pw-speichern').addEventListener('click', async () => {
     return;
   }
   $('pw-speichern').disabled = true;
-  const { ok, code, daten } = await ruf('portal_passwort_setzen.php',
-    { method: 'POST', body: JSON.stringify({ passwort: pw }) });
+  const { ok, daten } = await ruf('portal_neues_passwort.php',
+    { method: 'POST', body: JSON.stringify({ token: neuToken, passwort: pw }) });
   $('pw-speichern').disabled = false;
-  if (code === 401) { abgemeldet(); return; }
   if (!ok) {
     // Die Begruendung kommt vom Server und ist ohne Nachschlagen
     // verstaendlich -- sie wird darum unveraendert gezeigt.
     fehler('fehler-passwort', daten.message || 'Das Passwort liess sich nicht speichern.');
     return;
   }
+  // Der Link hat ausgewiesen, das Passwort bestaetigt -- die Sitzung kommt
+  // gleich mit, damit niemand es im naechsten Schritt sofort wieder tippen
+  // muss.
+  token = daten.token;
+  try { localStorage.setItem(SCHLUESSEL, token); } catch (e) { /* privates Fenster */ }
+  kopfSetzen(daten.kunde, daten.name);
+  neuToken = null;
   $('pw-neu').value = ''; $('pw-neu2').value = '';
   // Erst die Bestaetigung, dann die Uebersicht -- nicht umgekehrt und nicht
   // beides auf einmal.
@@ -548,7 +594,6 @@ $('abmelden').addEventListener('click', async () => {
   await ruf('portal_abmelden.php', { method: 'POST' });
   token = null;
   try { localStorage.removeItem(SCHLUESSEL); } catch (e) { /* egal */ }
-  $('code').value = '';
   $('passwort').value = '';
   kopfSetzen(null, null);
   // Nicht zurueck zur Anmeldemaske: Die sieht aus, als sei die Abmeldung
@@ -648,6 +693,23 @@ function abgemeldet() {
 
 // ── Start ─────────────────────────────────────────────────────────────
 (function start() {
+  // Ein Link zum Passwortsetzen geht IMMER vor -- auch wenn noch eine
+  // gueltige Sitzung im Speicher liegt (dasselbe Vorgehen wie in app.html
+  // seit ENT-373; das Setzen raeumt ohnehin alle Sitzungen ab).
+  //
+  // Der Token wird SOFORT aus der Adresszeile entfernt: Er ist ein
+  // Geheimnis und hat weder im Verlauf noch in einem weitergegebenen Link
+  // etwas zu suchen.
+  const ausAdresse = new URLSearchParams(location.search).get('neu');
+  if (ausAdresse) {
+    history.replaceState(null, '', location.pathname);
+    neuToken = ausAdresse;
+    fehler('fehler-passwort', '');
+    $('pw-neu').value = ''; $('pw-neu2').value = '';
+    zeige('schritt-passwort');
+    $('pw-neu').focus();
+    return;
+  }
   try { token = localStorage.getItem(SCHLUESSEL); } catch (e) { token = null; }
   if (token) { zeige('inhalt'); laden(); }
   else { zeige('schritt-adresse'); }

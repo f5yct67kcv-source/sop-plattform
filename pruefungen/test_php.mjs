@@ -230,7 +230,7 @@ if (prBeanstandet.length) { prBeanstandet.forEach(z => bad.push('PHP-Reset: ' + 
 // Passwort zweiter Klasse -- eine eigene, mildere Regel dafuer waere genau
 // die zweite Wahrheit, die dieses Haus an anderer Stelle verbietet.
 const pwStellen = ['mitarbeiter_create.php', 'mitarbeiter_reset_password.php', 'mein_passwort.php',
-  'passwort_zuruecksetzen.php', 'portal_passwort_setzen.php'];
+  'passwort_zuruecksetzen.php', 'portal_neues_passwort.php'];
 // Kommentare vorher weg: Ein Hinweis "// passwort_pruefen (ENT-075)" neben
 // dem require ist kein Aufruf. Die erste Fassung dieser Pruefung ist genau
 // darauf hereingefallen -- sie blieb gruen, als der Aufruf entfernt wurde.
@@ -663,7 +663,12 @@ check('Es gibt ueberhaupt Portal-Endpunkte zu pruefen', portalDateien.length > 0
 // Die beiden Eingaenge. Wer dort ankommt, ist noch niemand -- sie koennen
 // keine Sitzung verlangen, die erst bei ihnen entsteht. Namentlich benannt
 // und nicht ueber ein Muster erkannt: Ein dritter Eingang soll auffallen.
-const PORTAL_EINGAENGE = ['portal_code_anfordern.php', 'portal_anmelden.php'];
+const PORTAL_EINGAENGE = ['portal_link_anfordern.php', 'portal_anmelden.php',
+  // Seit ENT-448: Der Link IST der Ausweis. Wer ihn hat, hat Zugriff auf das
+  // hinterlegte Postfach -- mehr verlangt auch der Mitarbeiterweg nicht
+  // (ENT-373). Eine Kundensitzung kann dieser Endpunkt nicht verlangen, er
+  // eroeffnet sie ja erst.
+  'portal_neues_passwort.php'];
 
 const ohneKundensitzung = portalDateien.filter(f =>
   !PORTAL_EINGAENGE.includes(f) && !/require_kundensession\s*\(/.test(ohneKommentar(f)));
