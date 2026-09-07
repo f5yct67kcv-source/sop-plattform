@@ -625,6 +625,13 @@ html[data-desktop="an"] .desktop-zurueck { display: inline-flex; }
    im Haus bleiben bewusst unberuehrt -- ungeprueft globaler wirken hiesse,
    Layouts anzufassen, die niemand gemessen hat. */
 #view-betrieb .card-hd h3 { font-size: 13.5px; font-weight: 650; letter-spacing: -.1px; }
+
+/* Kundenzugaenge (ENT-441). Eigene Klasse mit Praefix statt der im Haus
+   verbreiteten .mut -- die ist an 16 Stellen im Einsatz, hat aber gar keine
+   CSS-Definition (gemeldet als eigener offener Punkt, gleiche Familie wie
+   OP-418). Wer sie hier benutzt haette, bekaeme unauffaellig normalen Text
+   statt eines gedaempften Nebensatzes. Gemessen, nicht nachgelesen. */
+#view-portal .kz-neben { font-size: 12px; color: var(--ink-3); }
 /* Gruppenueberschrift im Fahrzeugformular (ENT-313). Zweiundzwanzig Felder
    ohne Gliederung sind eine Wand; die Zwischenzeile teilt sie in vier
    Abschnitte. Eigene Klasse statt einer Verschaerfung von .f label -- die
@@ -4686,6 +4693,11 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
                ausgewertet -- dieselbe Rubrik wie Mitarbeitende, an denen
                dieselben Leute arbeiten. -->
           <button class="nav-kind" id="nav-admin-mitteilungen" onclick="go('mitteilungen')">Mitteilungen</button>
+          <!-- Kundenzugaenge zum Portal (ENT-441). Unter Administration und
+               nicht unter Kunden: Hier wird kein Kundenstamm gepflegt, hier
+               wird jemandem von aussen ein Zugang ins System gegeben. Das
+               eigene Recht 'portal' haelt das auseinander. -->
+          <button class="nav-kind" id="nav-admin-portal" onclick="go('portal')">Kundenzugänge</button>
         </div>
       </div>
 
@@ -5965,6 +5977,22 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
           </button>
         </div>
         <div class="card"><div class="card-bd flush"><div class="tw" id="prodTable"></div></div></div>
+      </section>
+
+      <!-- Kundenzugaenge zum Portal (ENT-441) -->
+      <section class="view" id="view-portal">
+        <div class="bar-tools">
+          <div class="search">
+            <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input class="inp" type="search" id="kzQ" placeholder="Kunde, Name oder E-Mail …" oninput="kzZeichnen()">
+          </div>
+          <div class="sp" style="flex:1"></div>
+          <button class="btn btn-primary btn-sm" onclick="kzNeu()">
+            <svg class="i i-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Neuer Zugang
+          </button>
+        </div>
+        <div class="card"><div class="card-bd flush"><div class="tw" id="kzTable"></div></div></div>
       </section>
 
       <section class="view" id="view-pensen">
@@ -7925,6 +7953,43 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
   <option>km</option><option>Tag</option><option>Monat</option><option>m²</option>
 </datalist>
 
+<!-- Kundenzugang zum Portal anlegen oder aendern (ENT-441).
+     Die E-Mail-Adresse IST die Anmeldung -- es gibt kein Passwortfeld, weil
+     es kein Passwort gibt (Einmal-Code, ENT-441 Punkt 7). Auch kein
+     "Einladung senden": Der Kunde fordert seinen Code auf der Portalseite
+     selbst an, und ein Versandknopf hier waere ein zweiter Weg, ueber die
+     Firmenadresse Nachrichten auszuloesen. -->
+<div class="dlg-scrim" id="dlgKundenzugang">
+  <div class="dlg">
+    <div class="dlg-hd">
+      <h2 id="kzTitel">Neuer Kundenzugang</h2>
+      <p>Diese Person kann sich am Kundenportal anmelden und die abgeschlossenen
+         Rundgänge aller Objekte ihres Kunden einsehen. Nur lesen — ändern kann sie nichts.</p>
+    </div>
+    <div class="dlg-bd">
+      <div class="msg-err" id="kzErr" style="display:none"></div>
+      <div class="form-grid">
+        <div class="f wide"><label for="kz_kunde">Kunde *</label>
+          <select class="inp" id="kz_kunde"></select></div>
+        <div class="f wide"><label for="kz_name">Name der Person *</label>
+          <input class="inp" id="kz_name" placeholder="Vor- und Nachname"></div>
+        <div class="f wide"><label for="kz_email">E-Mail-Adresse *</label>
+          <input class="inp" id="kz_email" type="email" placeholder="name@beispiel.ch"></div>
+        <div class="f wide"><label for="kz_funktion">Funktion beim Kunden</label>
+          <input class="inp" id="kz_funktion" placeholder="z. B. Hauswart, Verwaltung"></div>
+        <div class="f wide" style="display:flex;align-items:center;gap:10px">
+          <input type="checkbox" id="kz_aktiv" checked style="width:auto;min-height:auto">
+          <label for="kz_aktiv" style="margin:0">Zugang ist offen</label></div>
+      </div>
+      <p class="note" id="kz_hinweis" style="display:none"></p>
+    </div>
+    <div class="dlg-ft">
+      <button class="btn btn-plain" onclick="closeDlg('dlgKundenzugang')">Abbrechen</button>
+      <button class="btn btn-primary" id="kzSaveBtn" onclick="kzSpeichern()">Speichern</button>
+    </div>
+  </div>
+</div>
+
 <!-- Kundenstamm aus einer CSV-Datei einlesen (ENT-066). Drei Schritte in
      einem Fenster: Datei waehlen, Spalten zuordnen, Bericht. Die Datei wird
      im Browser gelesen und verlaesst ihn erst, wenn zugeordnet ist. -->
@@ -8974,6 +9039,7 @@ const NAV_RECHTE = {
   'nav-admin-produkte':     'offerten',
   'nav-admin-betrieb':      'betrieb',
   'nav-admin-mitteilungen': 'mitteilungen',
+  'nav-admin-portal':       'portal',
   // Seit ENT-224 haengen die Kinder von Kontrolle (jetzt "Auswertung") am
   // selben Recht 'plan' -- Rundgaenge als operativer Ablauf (das fruehere
   // 'rundgang_einsehen'-Kind) lebt unter der eigenen Rubrik "Revierdienst",
@@ -9011,7 +9077,7 @@ function rechteAnwenden() {
   if (admGruppe) {
     admGruppe.style.display =
       (darf('personal_lesen') || darf('betrieb') || darf('offerten')
-       || darf('mitteilungen')) ? '' : 'none';
+       || darf('mitteilungen') || darf('portal')) ? '' : 'none';
   }
   // Seit ENT-224 haengt "Kontrolle" nur noch an 'plan' -- Rundgaenge (das
   // fruehere 'rundgang_einsehen'-Kind) lebt jetzt unter "Revierdienst".
@@ -9052,7 +9118,8 @@ const TITLES = {
   einsatzneu:  ['Neuer Einsatz', 'Kunde, Ort, Zeit und Zuteilung'],
   einsatzplan: ['Einsatz planen', 'Positionen und Zeiten im Detail'],
   objekt:      ['Objekt', 'Stammdaten, Masterschichten und Kontrollpunkte'],
-  mitteilungen: ['Mitteilungen', 'Was die Belegschaft in der App zu sehen bekommt']
+  mitteilungen: ['Mitteilungen', 'Was die Belegschaft in der App zu sehen bekommt'],
+  portal:       ['Kundenzugänge', 'Wer von aussen die Rundgänge seiner Objekte einsehen darf']
 };
 
 // Monatsraster brauchen die volle Fensterbreite, alles andere bleibt auf
@@ -10182,7 +10249,7 @@ function go(view) {
   // und der Elternpunkt wird mitmarkiert, sonst sieht die Seitenleiste aus,
   // als waere man nirgends (dasselbe Muster wie bei den Kunden, ENT-039).
   const imAdmin = view === 'mitarbeiter' || view === 'betrieb' || view === 'produkte'
-    || view === 'mitteilungen';
+    || view === 'mitteilungen' || view === 'portal';
   $('navg-admin').classList.toggle('offen', imAdmin);
   if (imAdmin) { $('nav-admin').classList.add('on'); }
   document.querySelectorAll('#navg-admin .nav-kind').forEach(k => k.classList.remove('on'));
@@ -10191,6 +10258,7 @@ function go(view) {
   if (view === 'betrieb') { $('nav-admin-betrieb').classList.add('on'); }
   if (view === 'produkte') { produkte.length ? renderProdukte() : loadProdukte(); }
   if (view === 'mitteilungen') { $('nav-admin-mitteilungen').classList.add('on'); mtlLaden(); }
+  if (view === 'portal') { $('nav-admin-portal').classList.add('on'); kzLaden(); }
   const kontrView = view === 'pensen' || view === 'auslagen' || view === 'abwesenheiten'
     || view === 'arbeitsergebnisse';
   $('navg-kontrolle').classList.toggle('offen', kontrView);
@@ -10697,6 +10765,164 @@ function loadMitarbeiter() {
     mbListen = data.listen || {};
     maEingerichtet = data.eingerichtet !== false;
     renderMitarbeiter();
+  });
+}
+
+// ══════════════════════════════════════════ KUNDENZUGAENGE (ENT-441)
+//
+// Die Verwaltungsseite des Kundenportals. Sie legt Zugaenge an und sperrt
+// sie -- mehr nicht. Es gibt kein Passwortfeld, weil es kein Passwort gibt
+// (Anmeldung per Einmal-Code an die hinterlegte Adresse), und keinen
+// Einladungsversand: Der Kunde fordert den Code auf der Portalseite selbst
+// an.
+//
+// Der Server entscheidet ueber das Recht 'portal'; was hier ausgeblendet
+// wird, erspart nur den Umweg (Hausregel: Sperren gehoeren in den Server).
+let kundenzugaenge = [];
+// Drei Zustaende, nicht zwei: geladen, noch nicht geladen, und "Einrichtung
+// ist nicht gelaufen". Der letzte darf nie wie "keine Zugaenge" aussehen.
+let kzEingerichtet = null;
+
+function kzLaden() {
+  $('kzTable').innerHTML = '<div class="leer">…</div>';
+  // Die Kundenliste wird fuer den Auswahlkasten gebraucht. Wer direkt auf
+  // diese Ansicht springt, hat sie noch nicht -- dann erst laden.
+  const vorlauf = kunden.length ? Promise.resolve() : loadKunden();
+  vorlauf.then(() => api('kundenzugang_list.php')).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') {
+      $('kzTable').innerHTML = '<div class="leer">Die Zugänge liessen sich nicht laden.</div>';
+      return;
+    }
+    kundenzugaenge = data.zugaenge || [];
+    kzEingerichtet = data.eingerichtet !== false;
+    kzZeichnen();
+  });
+}
+
+function kzZeichnen() {
+  const q = ($('kzQ').value || '').trim().toLowerCase();
+  const liste = kundenzugaenge.filter(z => !q
+    || (z.kunde_name + ' ' + z.name + ' ' + z.email).toLowerCase().includes(q));
+
+  // Vier Aussagen, vier Texte (Hausregel: „unbekannt darf nie wie keine
+  // aussehen"). „Einrichtung fehlt", „noch keiner angelegt" und „kein
+  // Treffer" sind drei verschiedene Dinge, und der Filterfall nennt
+  // ausserdem, wie viele es insgesamt gibt.
+  if (!liste.length) {
+    let text;
+    if (kzEingerichtet === false) {
+      text = 'Die Einrichtung ist noch nicht gelaufen — unten links „Einrichtung" ausführen, '
+           + 'danach lassen sich Zugänge anlegen.';
+    } else if (!kundenzugaenge.length) {
+      text = 'Noch kein Kundenzugang angelegt.';
+    } else {
+      text = 'Kein Treffer für diese Suche — ' + kundenzugaenge.length
+           + (kundenzugaenge.length === 1 ? ' Zugang vorhanden.' : ' Zugänge vorhanden.');
+    }
+    $('kzTable').innerHTML = '<div class="leer">' + esc(text) + '</div>';
+    return;
+  }
+
+  const zeilen = liste.map(z => {
+    // NULL heisst „noch nie angemeldet" und ist etwas anderes als „lange
+    // nicht mehr da". Ein Strich wuerde beides gleich aussehen lassen.
+    const zugriff = z.letzter_zugriff
+      ? dmy(z.letzter_zugriff)
+      : '<span class="kz-neben">noch nie angemeldet</span>';
+    const stand = z.aktiv
+      ? '<span class="chip chip-p">Offen</span>'
+      : '<span class="chip chip-x">Gesperrt</span>';
+    // Ein Zugang zu einem stillgelegten Kunden bleibt bewusst offen (die
+    // Frage ist in ENT-441 offen). Sichtbar gemacht wird er trotzdem --
+    // sonst faende ihn niemand.
+    const kundeHinweis = z.kunde_aktiv ? ''
+      : ' <span class="kz-neben">(Kunde stillgelegt)</span>';
+    return `<tr onclick="kzBearbeiten(${z.id})" style="cursor:pointer">
+      <td>${esc(z.kunde_name)}${kundeHinweis}</td>
+      <td>${esc(z.name)}${z.funktion ? '<div class="kz-neben">' + esc(z.funktion) + '</div>' : ''}</td>
+      <td>${esc(z.email)}</td>
+      <td>${stand}</td>
+      <td>${zugriff}</td>
+    </tr>`;
+  }).join('');
+
+  $('kzTable').innerHTML = `<table class="tbl">
+    <thead><tr><th>Kunde</th><th>Person</th><th>E-Mail</th><th>Zugang</th><th>Zuletzt angemeldet</th></tr></thead>
+    <tbody>${zeilen}</tbody></table>`;
+}
+
+function kzKundenFuellen(gewaehlt) {
+  // Stillgelegte Kunden bleiben waehlbar, wenn bereits ein Zugang an ihnen
+  // haengt -- sonst liesse sich ein bestehender Eintrag nicht mehr
+  // speichern, weil sein eigener Kunde fehlt.
+  const auswahl = kunden.filter(k => Number(k.aktiv ?? 1) || k.id === gewaehlt);
+  $('kz_kunde').innerHTML = auswahl
+    .map(k => `<option value="${k.id}"${k.id === gewaehlt ? ' selected' : ''}>${esc(k.name)}</option>`)
+    .join('');
+}
+
+function kzNeu() {
+  $('kzTitel').textContent = 'Neuer Kundenzugang';
+  $('kzErr').style.display = 'none';
+  $('kz_hinweis').style.display = 'none';
+  kzKundenFuellen(0);
+  $('kz_kunde').disabled = false;
+  $('kz_name').value = '';
+  $('kz_email').value = '';
+  $('kz_funktion').value = '';
+  $('kz_aktiv').checked = true;
+  $('kzSaveBtn').dataset.id = '';
+  openDlg('dlgKundenzugang');
+}
+
+function kzBearbeiten(id) {
+  const z = kundenzugaenge.find(x => x.id === id);
+  if (!z) { return; }
+  $('kzTitel').textContent = 'Kundenzugang ändern';
+  $('kzErr').style.display = 'none';
+  kzKundenFuellen(z.kunde_id);
+  // Der Kunde wird nicht umgehaengt: Ein Zugang, der ploetzlich einem
+  // anderen Kunden gehoert, zeigte rueckwirkend fremde Objekte. Der Server
+  // nimmt eine Aenderung ohnehin nicht an -- hier steht sie gar nicht erst
+  // zur Wahl.
+  $('kz_kunde').disabled = true;
+  $('kz_name').value = z.name;
+  $('kz_email').value = z.email;
+  $('kz_funktion').value = z.funktion || '';
+  $('kz_aktiv').checked = !!z.aktiv;
+  $('kzSaveBtn').dataset.id = String(id);
+  const teile = [];
+  if (z.erstellt_von) { teile.push('Angelegt von ' + z.erstellt_von); }
+  if (z.gesperrt_am) { teile.push('Gesperrt am ' + dmy(z.gesperrt_am)); }
+  if (z.sitzungen) {
+    teile.push(z.sitzungen === 1 ? '1 offene Anmeldung' : z.sitzungen + ' offene Anmeldungen');
+  }
+  $('kz_hinweis').textContent = teile.join(' · ');
+  $('kz_hinweis').style.display = teile.length ? '' : 'none';
+  openDlg('dlgKundenzugang');
+}
+
+function kzSpeichern() {
+  const id = $('kzSaveBtn').dataset.id;
+  const koerper = {
+    name:     $('kz_name').value.trim(),
+    email:    $('kz_email').value.trim(),
+    funktion: $('kz_funktion').value.trim(),
+    aktiv:    $('kz_aktiv').checked,
+  };
+  if (id) { koerper.id = Number(id); }
+  else { koerper.kunde_id = Number($('kz_kunde').value); }
+
+  $('kzSaveBtn').disabled = true;
+  api('kundenzugang_save.php', { method: 'POST', body: koerper }).then(({ ok, data }) => {
+    $('kzSaveBtn').disabled = false;
+    if (!ok || data.status !== 'ok') {
+      $('kzErr').textContent = data.message || 'Speichern hat nicht geklappt.';
+      $('kzErr').style.display = '';
+      return;
+    }
+    closeDlg('dlgKundenzugang');
+    kzLaden();
   });
 }
 
