@@ -1380,6 +1380,88 @@ CREATE TABLE IF NOT EXISTS push_abo (
   FOREIGN KEY (mitarbeiter_id) REFERENCES mitarbeiter(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+// ══ Kundenportal (ENT-441) ════════════════════════════════════════════
+//
+// Ein Kundenzugang ist BEWUSST keine Zeile in `mitarbeiter`. An jener
+// Tabelle haengen Personalakte, Rollen, Pensen, Zuteilung und Lohnfolgen;
+// ein Kunde darin muesste in jeder Liste, die Mitarbeitende zeigt, wieder
+// herausgefiltert werden -- und jede kuenftige Liste wuerde diese Regel
+// nicht erben. Mit eigenen Tabellen findet require_session() einen
+// Kundenzugang schlicht nicht, und kein Verwaltungsendpunkt ist ueber
+// diesen Weg erreichbar.
+//
+// Ein Zugang gehoert zu genau EINEM Kunden und sieht dessen Objekte --
+// eine Spalte, keine Zuordnungstabelle. Damit erscheint ein neu angelegtes
+// Objekt von selbst; niemand muss an eine Freischaltung denken.
+//
+// ON DELETE CASCADE am Kunden: Wird ein Kunde geloescht, hat sein Zugang
+// nichts mehr zu zeigen. Einen Kunden auf inaktiv zu setzen (kunden.aktiv)
+// beruehrt den Zugang dagegen NICHT -- ob das eine das andere nach sich
+// ziehen soll, ist eine offene Frage aus ENT-441 und wird hier nicht still
+// entschieden.
+
+// UNIQUE auf email: Die Adresse IST die Anmeldung (ENT-441 Punkt 7). Zwei
+// Zugaenge mit derselben Adresse waeren zwei Wahrheiten -- der Code ginge
+// an eine Adresse und passte auf zwei Konten.
+'kundenzugang' => "
+CREATE TABLE IF NOT EXISTS kundenzugang (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  kunde_id INT NOT NULL,
+  name VARCHAR(200) NOT NULL,
+  email VARCHAR(200) NOT NULL,
+  funktion VARCHAR(120) NULL,
+  aktiv TINYINT(1) NOT NULL DEFAULT 1,
+  erstellt_am DATETIME DEFAULT CURRENT_TIMESTAMP,
+  -- Wer hat einem Betriebsfremden Zugang gegeben, und wann wurde er
+  -- entzogen? Das gehoert festgehalten. Das bestehende Logbuch
+  -- (aenderungslog) taugt dafuer NICHT: Es wird ausschliesslich im
+  -- Personaldossier einer Person angezeigt, ein Kundenzugang-Eintrag
+  -- erschiene dort nirgends. Zwei Spalten hier sind ehrlicher als ein
+  -- Protokolleintrag, den niemand zu sehen bekommt.
+  erstellt_von INT NULL,
+  gesperrt_am DATETIME NULL,
+  letzter_zugriff DATETIME NULL,
+  UNIQUE KEY uq_email (email),
+  KEY idx_kunde (kunde_id, aktiv),
+  FOREIGN KEY (kunde_id) REFERENCES kunden(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+// Einmal-Codes fuer die Anmeldung (ENT-441 Punkt 7). GEHASHT, nicht im
+// Klartext -- derselbe Grund wie bei den Notfallcodes der Zwei-Faktor-
+// Anmeldung: Der Code ist der ganze Weg hinein, und eine gestohlene
+// Datenbank darf ihn nicht mitliefern.
+//
+// versuche zaehlt die Fehleingaben AUF DIESEN Code. Ohne diesen Zaehler
+// liesse sich ein sechsstelliger Code in wenigen Minuten durchprobieren;
+// die Bremse in anmeldung.php greift hier nicht, weil sie an Login-Namen
+// haengt und ein Kundenzugang keinen hat.
+'kundenzugang_code' => "
+CREATE TABLE IF NOT EXISTS kundenzugang_code (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  zugang_id INT NOT NULL,
+  code_hash VARCHAR(255) NOT NULL,
+  erstellt_am DATETIME NOT NULL,
+  gueltig_bis DATETIME NOT NULL,
+  versuche INT NOT NULL DEFAULT 0,
+  eingeloest_am DATETIME NULL,
+  KEY idx_zugang (zugang_id, eingeloest_am),
+  FOREIGN KEY (zugang_id) REFERENCES kundenzugang(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+// Eigene Sitzungstabelle. sessions.mitarbeiter_id traegt einen
+// Fremdschluessel auf mitarbeiter -- ein Kundenzugang passt dort nicht
+// hinein, und genau das ist erwuenscht: Zwei getrennte Tabellen sind zwei
+// getrennte Wege, die sich nicht versehentlich kreuzen koennen.
+'kunden_sessions' => "
+CREATE TABLE IF NOT EXISTS kunden_sessions (
+  token VARCHAR(64) PRIMARY KEY,
+  zugang_id INT NOT NULL,
+  erstellt_am DATETIME NOT NULL,
+  letzte_nutzung DATETIME NOT NULL,
+  KEY idx_zugang (zugang_id),
+  FOREIGN KEY (zugang_id) REFERENCES kundenzugang(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
 ];
 
 foreach ($tabellen as $name => $sql) {

@@ -64,10 +64,11 @@ function rollen_katalog(): array
         ],
         ROLLE_VERWALTUNG => [
             'titel'    => 'Verwaltung',
-            'text'     => 'Alles, zusätzlich die Betriebseinstellungen, die Einrichtung, die Offerten, die Mitteilungen und die Rollenvergabe selbst.',
+            'text'     => 'Alles, zusätzlich die Betriebseinstellungen, die Einrichtung, die Offerten, die Mitteilungen, die Kundenzugänge zum Portal und die Rollenvergabe selbst.',
             'rechte'   => ['plan', 'kunden', 'abgleich', 'personal_lesen',
                            'personal_schreiben', 'personal_vertraulich',
-                           'betrieb', 'rechte', 'offerten', 'mitteilungen'],
+                           'betrieb', 'rechte', 'offerten', 'mitteilungen',
+                           'portal'],
         ],
         // Bewusst NICHT in "Alles" bei Verwaltung enthalten (ENT-169: "nur
         // ausgewählte Benutzer") -- wer im Revierdienst-Wächtersystem
@@ -109,6 +110,17 @@ function rechte_katalog(): array
         'rundgang_verwalten'   => 'Kontrollpunkte und Rundgang-Vorlagen pro Objekt anlegen und ändern',
         'rundgang_einsehen'    => 'Laufende und abgeschlossene Rundgänge einsehen',
         'alarmempfaenger'      => 'Als Kontaktperson für den Alleinarbeiterschutz hinterlegbar',
+        // Kundenportal (ENT-441). Eigenes Recht und ausdruecklich NICHT unter
+        // 'kunden' mitgefuehrt -- dieselbe Trennung und derselbe Grund wie bei
+        // den Offerten (ENT-181): Wer Adressen pflegen darf, muss darum nicht
+        // einem BETRIEBSFREMDEN Einblick in Einsaetze oeffnen duerfen. Die
+        // Rolle 'Planung' traegt 'kunden'; ohne diese Trennung koennte jede
+        // planende Person einem Dritten Zugang verschaffen.
+        //
+        // Es ist das einzige Recht im Katalog, das einen Zugang fuer Menschen
+        // ausserhalb des Betriebs oeffnet. Genau darum ist es ein eigenes:
+        // Was es tut, soll an seinem Namen ablesbar sein.
+        'portal'               => 'Kundenzugänge zum Portal anlegen, sperren und die Portal-Einstellungen setzen',
         // Bewusst NICHT unter 'kunden' mitgefuehrt (ENT-181): Eine Offerte
         // zeigt Preise, Rabatte und damit die Kalkulation. Wer Adressen
         // pflegen darf, muss sie nicht sehen. Vorerst traegt nur die

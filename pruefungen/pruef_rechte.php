@@ -68,6 +68,21 @@ pruef('KRITISCH: Verwaltung bekommt die Waechtersystem-Rechte NICHT automatisch 
     count(array_intersect(['rundgang_verwalten', 'rundgang_einsehen', 'alarmempfaenger'],
         rechte_aus_rollen(['verwaltung']))) === 0);
 
+// Kundenportal (ENT-441). 'portal' ist das einzige Recht im Katalog, das
+// einen Zugang fuer Menschen AUSSERHALB des Betriebs oeffnet. Es gehoert
+// der Verwaltung und ausdruecklich keiner anderen Rolle -- vor allem nicht
+// 'Planung', die ueber 'kunden' ohnehin am Kundenstamm sitzt. Ohne diese
+// Trennung koennte jede planende Person einem Dritten Einblick in Einsaetze
+// verschaffen (gleiche Ueberlegung wie ENT-181 bei den Offerten).
+pruef('KRITISCH: Verwaltung darf Kundenzugaenge zum Portal verwalten (ENT-441)',
+    in_array('portal', rechte_aus_rollen(['verwaltung']), true));
+$portalFremd = [];
+foreach (['mitarbeitend', 'planung', 'personal', 'waechter'] as $rolle) {
+    if (in_array('portal', rechte_aus_rollen([$rolle]), true)) { $portalFremd[] = $rolle; }
+}
+pruef('KRITISCH: ausser der Verwaltung oeffnet keine Rolle einen Kundenzugang (ENT-441)',
+    $portalFremd === []);
+
 $planung = rechte_aus_rollen(['planung']);
 pruef('KRITISCH: Planung sieht Mitarbeitende, aber nicht die vertraulichen Angaben',
     in_array('personal_lesen', $planung, true) && !in_array('personal_vertraulich', $planung, true));

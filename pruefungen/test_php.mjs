@@ -341,6 +341,7 @@ for (const [datei, titel] of [
   ['pruef_mitteilung_loeschen.php', 'KRITISCH: eine laufende Mitteilung laesst sich auch am Browser vorbei nicht loeschen (ENT-433)'],
   ['pruef_mitteilung_antwort.php', 'KRITISCH: auf einen fremden oder nicht sichtbaren Termin laesst sich nicht zusagen (ENT-436)'],
   ['pruef_mitteilung_liste.php', 'KRITISCH: die Antwortliste eines Termins nennt ALLE Empfaenger, auch die ohne Antwort (ENT-436)'],
+  ['pruef_kundenportal.php', 'KRITISCH: Sitzungsablauf, Einmal-Code und E-Mail-Abgleich des Kundenportals stimmen (ENT-441)'],
 ]) {
   let aus = '', code = 0;
   try {
@@ -631,6 +632,73 @@ if (ohnePruefung.length) { bad.push('ohne Rechtepruefung: ' + ohnePruefung.join(
 const totEintraege = NUR_EIGENE_DATEN.filter(f => !apiDateien.includes(f));
 check('Die Ausnahmeliste nennt nur Endpunkte, die es gibt', totEintraege.length === 0);
 if (totEintraege.length) { bad.push('Ausnahme ohne Datei: ' + totEintraege.join(', ')); }
+
+// ── Kundenportal (ENT-441) ────────────────────────────────────────────
+// Die Endpunkte des Portals gehen einen ANDEREN Weg als alle uebrigen: Sie
+// pruefen kein Recht aus rechte.php, weil ein Kundenzugang keine Rechte hat
+// -- er hat genau eine Eigenschaft, die kunde_id. Damit fallen sie aus der
+// Pruefung oben heraus (die greift nur bei require_session), und ohne die
+// folgenden Regeln waeren sie der eine Ort im Haus, an dem gar nichts
+// geprueft wird. Genau der Fall, vor dem CLAUDE.md warnt: etwas Neues, das
+// die Regel nicht geerbt hat.
+const portalDateien = apiDateien.filter(f => f.startsWith('portal_'));
+check('Es gibt ueberhaupt Portal-Endpunkte zu pruefen', portalDateien.length > 0);
+
+// Die beiden Eingaenge. Wer dort ankommt, ist noch niemand -- sie koennen
+// keine Sitzung verlangen, die erst bei ihnen entsteht. Namentlich benannt
+// und nicht ueber ein Muster erkannt: Ein dritter Eingang soll auffallen.
+const PORTAL_EINGAENGE = ['portal_code_anfordern.php', 'portal_anmelden.php'];
+
+const ohneKundensitzung = portalDateien.filter(f =>
+  !PORTAL_EINGAENGE.includes(f) && !/require_kundensession\s*\(/.test(ohneKommentar(f)));
+check('KRITISCH: jeder Portal-Endpunkt ausser den benannten Eingaengen verlangt eine Kundensitzung',
+  ohneKundensitzung.length === 0);
+if (ohneKundensitzung.length) { bad.push('ohne Kundensitzung: ' + ohneKundensitzung.join(', ')); }
+
+const toteEingaenge = PORTAL_EINGAENGE.filter(f => !apiDateien.includes(f));
+check('Die Eingangsliste des Portals nennt nur Endpunkte, die es gibt', toteEingaenge.length === 0);
+if (toteEingaenge.length) { bad.push('Portal-Eingang ohne Datei: ' + toteEingaenge.join(', ')); }
+
+// Ein Portal-Endpunkt, der require_session() aufruft, haette den falschen
+// Zugang: Das ist die Verwaltungssitzung. Beides in derselben Datei waere
+// eine Verwechslung, die niemandem auffiele -- sie funktioniert ja.
+const portalMitAdminSitzung = portalDateien.filter(f =>
+  /(?<!kunden)require_session\s*\(/.test(ohneKommentar(f)));
+check('KRITISCH: kein Portal-Endpunkt benutzt die Verwaltungssitzung',
+  portalMitAdminSitzung.length === 0);
+if (portalMitAdminSitzung.length) {
+  bad.push('Portal mit Verwaltungssitzung: ' + portalMitAdminSitzung.join(', '));
+}
+
+// DIE KERNREGEL. Ein Portal-Endpunkt, der eine kunde_id oder zugang_id aus
+// der Anfrage naehme, liesse jeden angemeldeten Kunden die Daten jedes
+// anderen lesen -- durch blosses Hochzaehlen einer Zahl. Beide Werte
+// stammen ausnahmslos aus require_kundensession(). Dieselbe Regel wie bei
+// den Zwei-Faktor-Endpunkten (die Person kommt aus der Sitzung, nie aus der
+// Anfrage), hier fuer den Kunden.
+const fremdSchluessel = /\$(?:_GET|_POST|_REQUEST|in|input|daten)\s*\[\s*['"](?:kunde_id|zugang_id|kundenzugang_id|mitarbeiter_id)['"]/;
+const portalMitFremdId = portalDateien.filter(f => fremdSchluessel.test(ohneKommentar(f)));
+check('KRITISCH: kein Portal-Endpunkt nimmt eine Kunden- oder Zugangsnummer aus der Anfrage',
+  portalMitFremdId.length === 0);
+if (portalMitFremdId.length) { bad.push('Portal liest fremde Kennung: ' + portalMitFremdId.join(', ')); }
+
+// Die Verwaltungsseite der Kundenzugaenge haengt am Recht 'portal' -- nicht
+// an 'kunden'. Wer Adressen pflegt, soll keinen Zugang fuer Betriebsfremde
+// oeffnen koennen (ENT-441 Punkt 9, gleiche Trennung wie ENT-181).
+const zugangDateien = apiDateien.filter(f => f.startsWith('kundenzugang_'));
+check('Es gibt Verwaltungsendpunkte fuer Kundenzugaenge', zugangDateien.length > 0);
+const zugangOhnePortalrecht = zugangDateien.filter(f =>
+  !/require_recht\s*\(\s*\$user\s*,\s*'portal'\s*\)/.test(ohneKommentar(f)));
+check("KRITISCH: die Kundenzugang-Verwaltung verlangt das Recht 'portal'",
+  zugangOhnePortalrecht.length === 0);
+if (zugangOhnePortalrecht.length) {
+  bad.push('Kundenzugang ohne Recht portal: ' + zugangOhnePortalrecht.join(', '));
+}
+
+// Das Recht muss im Katalog stehen und darf NUR der Verwaltung gehoeren.
+// Stuende es bei 'Planung', koennte jede planende Person einem Dritten
+// Zugang verschaffen -- genau das war der Grund, es zu trennen.
+check("KRITISCH: das Recht 'portal' steht im Rechtekatalog", /'portal'\s*=>/.test(rechteQuelle));
 
 // Die Anmeldung muss den zweiten Faktor auch VERLANGEN und Fehlversuche
 // zaehlen -- sonst laesst sich der sechsstellige Code durchprobieren.

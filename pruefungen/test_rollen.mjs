@@ -168,15 +168,20 @@ try {
   const rumpf = (php.match(/function rechte_katalog\(\): array\s*\{[\s\S]*?\n\}/) || [''])[0];
   const phpRechte = [...rumpf.matchAll(/'(\w+)' *=> '[^']+',/g)].map(m => m[1]);
   // Zwoelf seit ENT-180 (drei Waechtersystem-Rechte) und ENT-181 ('offerten'),
-  // dreizehn seit ENT-421 ('mitteilungen').
+  // dreizehn seit ENT-421 ('mitteilungen'), vierzehn seit ENT-441 ('portal').
+  // 'portal' ist das einzige Recht im Katalog, das einen Zugang fuer
+  // Menschen AUSSERHALB des Betriebs oeffnet -- es traegt nur die
+  // Verwaltung, nicht 'Planung' (die ueber 'kunden' ohnehin am Kundenstamm
+  // sitzt). Dass es hier bewusst eingetragen werden musste, ist der Zweck
+  // dieser Zahl.
   // Die feste Zahl ist Absicht und keine Bequemlichkeit: Sie zwingt jeden,
   // der ein Recht ergaenzt, hier vorbeizukommen und es bewusst zu tun -- die
   // Regel aus ENT-077 lautet "grob geschnitten, nicht sechzig", und ein
   // stillschweigend wachsender Katalog waere genau der Weg dorthin.
-  check('Der Server kennt genau die acht urspruenglichen plus drei Waechtersystem-, ein Offerten- und ein Mitteilungsrecht (ENT-169/ENT-180/ENT-181/ENT-421)',
-    phpRechte.length === 13 && phpRechte.includes('personal_vertraulich')
+  check('Der Server kennt genau die acht urspruenglichen plus drei Waechtersystem-, ein Offerten-, ein Mitteilungs- und ein Portalrecht (ENT-169/ENT-180/ENT-181/ENT-421/ENT-441)',
+    phpRechte.length === 14 && phpRechte.includes('personal_vertraulich')
     && phpRechte.includes('rundgang_verwalten') && phpRechte.includes('offerten')
-    && phpRechte.includes('mitteilungen'));
+    && phpRechte.includes('mitteilungen') && phpRechte.includes('portal'));
 } catch (e) { check('Katalogvergleich lief durch: ' + e.message, false); }
 
 // ══════════════ VOLLE RECHTE: ALLES DA
