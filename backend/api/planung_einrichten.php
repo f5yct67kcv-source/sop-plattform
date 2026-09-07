@@ -1504,6 +1504,179 @@ CREATE TABLE IF NOT EXISTS kunden_sessions (
   FOREIGN KEY (zugang_id) REFERENCES kundenzugang(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+// ══ Lohn (ENT-451) ══════════════════════════════════════════════════════
+// Vier Tabellen, weil vier verschiedene Dinge: WAS eine Person verdient
+// (lohn_ansatz), WAS ihr abgezogen wird (lohn_person), WELCHE Saetze der
+// Betrieb anwendet (lohn_abzug) und WELCHE Zeilen eine Abrechnung ueberhaupt
+// kennt (lohnart). Eine gemeinsame Tabelle waere kuerzer und liesse sich
+// spaeter nicht mehr auseinandernehmen.
+//
+// ALLE Personen-Tabellen sind HISTORISIERT: eine Zeile je Gueltigkeitsdatum,
+// nie ein Ueberschreiben. Sonst veraendert eine Ansatzerhoehung rueckwirkend
+// abgeschlossene Abrechnungen -- genau das, was CLAUDE.md Teil B ausschliesst.
+// Betraege durchgehend in RAPPEN, Prozentsaetze in Basispunkten (833 = 8,33 %).
+
+// Der Lohnartenkatalog. Eine Tabelle und kein Quelltext (ENT-451): Jede
+// neue Zulage waere sonst ein Deploy. Die sechs *_pflichtig-Kennzeichen
+// sind der Kern -- sie erklaeren, warum eine Position in einer
+// Bemessungsgrundlage auftaucht und in einer anderen nicht.
+'lohnart' => "
+CREATE TABLE IF NOT EXISTS lohnart (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  schluessel VARCHAR(40) NOT NULL,
+  bezeichnung VARCHAR(120) NOT NULL,
+  -- stundensatz | prozent | fixbetrag | monatslohn | abzug | netto
+  -- VARCHAR statt ENUM, gleiche Wahl wie bei objekte.sparte: eine siebte
+  -- Art soll keine Tabellenaenderung brauchen.
+  art VARCHAR(20) NOT NULL,
+  -- Bei art='prozent': worauf sich der Satz bezieht.
+  basis_schluessel VARCHAR(40) NULL,
+  satz_bp INT NULL,
+  ahv_pflichtig TINYINT(1) NOT NULL DEFAULT 0,
+  ferien_pflichtig TINYINT(1) NOT NULL DEFAULT 0,
+  ml13_pflichtig TINYINT(1) NOT NULL DEFAULT 0,
+  bvg_pflichtig TINYINT(1) NOT NULL DEFAULT 0,
+  uvg_pflichtig TINYINT(1) NOT NULL DEFAULT 0,
+  qst_pflichtig TINYINT(1) NOT NULL DEFAULT 0,
+  -- Der Artikel, auf dem die Lohnart beruht. Leer heisst 'betrieblich' --
+  -- das ist eine Aussage, keine Luecke: Der 13. Monatslohn etwa ist KEINE
+  -- GAV-Pflicht (er kommt nur in Art. 25 Ziff. 2 als BVG-Bemessung vor).
+  gav_grundlage VARCHAR(120) NULL,
+  -- Vom Werkzeug angelegt und nicht loeschbar. Wer den Grundlohn loescht,
+  -- haette eine Abrechnung ohne Lohn.
+  system TINYINT(1) NOT NULL DEFAULT 0,
+  sortierung INT NOT NULL DEFAULT 100,
+  aktiv TINYINT(1) NOT NULL DEFAULT 1,
+  bemerkung TEXT NULL,
+  geaendert_am DATETIME NULL,
+  geaendert_von INT NULL,
+  UNIQUE KEY uq_schluessel (schluessel),
+  KEY idx_aktiv (aktiv, sortierung)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+// Was eine Person verdient, ab wann. Die LOHNFORM steht hier NICHT als
+// eigenes Feld -- sie folgt nach Art. 8 Ziff. 1a aus der Kategorie und wird
+// in lohn.php abgeleitet. Die Kategorie selbst wird mitgeschrieben, damit
+// eine spaetere Umstufung den alten Ansatz nicht umdeutet.
+'lohn_ansatz' => "
+CREATE TABLE IF NOT EXISTS lohn_ansatz (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  mitarbeiter_id INT NOT NULL,
+  gueltig_ab DATE NOT NULL,
+  -- Schnappschuss der Kategorie nach Art. 8 zum Zeitpunkt der Erfassung.
+  kategorie CHAR(1) NULL,
+  -- Stundenlohn (Kat. C) oder Monatslohn (Kat. A/B) -- welches von beidem,
+  -- sagt die Kategorie. Ohne Ferienentschaedigung: der Zuschlag nach
+  -- Art. 20 Ziff. 2 kommt obendrauf und wird abgeleitet, nicht erfasst.
+  ansatz_rappen INT NOT NULL,
+  -- Art. 20 Ziff. 2: Die laufende Auszahlung des Ferienlohnes ist NUR
+  -- zulaessig bei unregelmaessiger Teilzeit oder kurzen Einsaetzen, wenn es
+  -- im Vertrag schriftlich steht und in jeder Abrechnung separat
+  -- ausgewiesen wird. Fehlt das Kennzeichen, wird der Anspruch als Guthaben
+  -- gefuehrt statt laufend ausbezahlt (GAV-AUS-016).
+  ferien_laufend TINYINT(1) NOT NULL DEFAULT 0,
+  -- Anteil 13. Monatslohn in Basispunkten. BETRIEBLICH, keine GAV-Pflicht --
+  -- NULL heisst 'kein 13. Monatslohn vereinbart', nicht '0 %'.
+  ml13_bp INT NULL,
+  -- Art. 19: je Zuschlag entweder 'monat' oder 'stunde' und der Betrag.
+  -- Wer waehlt und wie 'pro rata' bemisst, ist GAV-AUS-014; erfasst wird
+  -- darum, was im Vertrag steht, statt es herzuleiten.
+  zuschlag_fachausweis_art VARCHAR(10) NULL,
+  zuschlag_fachausweis_rappen INT NULL,
+  zuschlag_hund_art VARCHAR(10) NULL,
+  zuschlag_hund_rappen INT NULL,
+  zuschlag_waffe_art VARCHAR(10) NULL,
+  zuschlag_waffe_rappen INT NULL,
+  bemerkung TEXT NULL,
+  erfasst_am DATETIME DEFAULT CURRENT_TIMESTAMP,
+  erfasst_von INT NULL,
+  UNIQUE KEY uq_person_ab (mitarbeiter_id, gueltig_ab),
+  FOREIGN KEY (mitarbeiter_id) REFERENCES mitarbeiter(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+// Was einer Person abgezogen wird, ab wann. Getrennt vom Ansatz, weil sich
+// beides unabhaengig aendert: Eine Lohnerhoehung ist kein Kassenwechsel.
+'lohn_person' => "
+CREATE TABLE IF NOT EXISTS lohn_person (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  mitarbeiter_id INT NOT NULL,
+  gueltig_ab DATE NOT NULL,
+  nbu_pflichtig TINYINT(1) NOT NULL DEFAULT 1,
+  ktg_pflichtig TINYINT(1) NOT NULL DEFAULT 1,
+  bvg_angeschlossen TINYINT(1) NOT NULL DEFAULT 0,
+  -- Monatlicher Arbeitnehmer-Anteil aus der Meldung der Pensionskasse.
+  -- BEWUSST erfasst und NICHT hergeleitet (ENT-451): Die Skala der Kasse
+  -- ist deren Vertragswerk, nicht der GAV. Art. 25 Ziff. 3 gibt nur die
+  -- Untergrenze (9 % des koordinierten Lohnes, hoechstens die Haelfte
+  -- davon zulasten der Person) -- eine selbst gerechnete Altersgutschrift
+  -- waere eine Behauptung ueber einen fremden Vertrag.
+  bvg_beitrag_rappen INT NULL,
+  qst_pflichtig TINYINT(1) NOT NULL DEFAULT 0,
+  qst_kanton VARCHAR(2) NULL,
+  qst_tarifcode VARCHAR(10) NULL,
+  qst_kinder INT NULL,
+  bemerkung TEXT NULL,
+  erfasst_am DATETIME DEFAULT CURRENT_TIMESTAMP,
+  erfasst_von INT NULL,
+  UNIQUE KEY uq_person_ab (mitarbeiter_id, gueltig_ab),
+  FOREIGN KEY (mitarbeiter_id) REFERENCES mitarbeiter(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+// Betriebsweite Abzugssaetze mit Gueltigkeitszeitraum -- gleiche Bauart wie
+// GAV_REGELWERK in gav.js. Beim Fortschreiben wird ANGEHAENGT, der alte
+// Eintrag bleibt stehen: Eine Satzaenderung per 1.1. darf den Dezember
+// nicht rueckwirkend neu rechnen.
+'lohn_abzug' => "
+CREATE TABLE IF NOT EXISTS lohn_abzug (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  schluessel VARCHAR(20) NOT NULL,
+  bezeichnung VARCHAR(120) NOT NULL,
+  gueltig_ab DATE NOT NULL,
+  gueltig_bis DATE NULL,
+  -- Arbeitnehmer-Anteil in Basispunkten (530 = 5,30 %).
+  satz_bp INT NULL,
+  -- Nur wo der Satz nicht prozentual ist: PaKo Kat. A ist ein Monatsbetrag.
+  fix_rappen INT NULL,
+  -- UVG-Hoechstlohn je Jahr; NULL heisst 'keine Obergrenze'.
+  hoechstlohn_rappen INT NULL,
+  -- Woher der Wert stammt. An dieser Zahl haengt Geld -- da darf spaeter
+  -- niemand raten muessen, ob sie jemand eingetippt oder aus einer
+  -- Verfuegung uebernommen hat.
+  quelle VARCHAR(200) NULL,
+  bemerkung TEXT NULL,
+  geaendert_am DATETIME NULL,
+  geaendert_von INT NULL,
+  UNIQUE KEY uq_schluessel_ab (schluessel, gueltig_ab)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+// Wohin der Auszahlungsbetrag geht. Eine Zeile je Empfaenger, weil eine
+// Person mehr als einen haben kann -- eine Lohnpfaendung teilt den Betrag,
+// und ein einzelnes IBAN-Feld am Personalstamm koennte das nie abbilden.
+//
+// art='fix' nimmt einen festen Betrag vorweg, art='rest' bekommt, was
+// uebrig bleibt. Genau EINE Zeile je Person darf 'rest' sein; das prueft
+// der Endpunkt, nicht die Tabelle.
+//
+// Die IBAN ist ein vertrauliches Personenfeld und wird wie ahv_nr
+// behandelt: Sie verlaesst den Server nur mit dem Recht lohn_lesen.
+'lohn_zahlung' => "
+CREATE TABLE IF NOT EXISTS lohn_zahlung (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  mitarbeiter_id INT NOT NULL,
+  reihenfolge INT NOT NULL DEFAULT 1,
+  art VARCHAR(10) NOT NULL DEFAULT 'rest',
+  betrag_rappen INT NULL,
+  iban VARCHAR(34) NOT NULL,
+  empfaenger VARCHAR(200) NULL,
+  bank VARCHAR(200) NULL,
+  aktiv TINYINT(1) NOT NULL DEFAULT 1,
+  bemerkung TEXT NULL,
+  geaendert_am DATETIME NULL,
+  geaendert_von INT NULL,
+  KEY idx_person (mitarbeiter_id, aktiv, reihenfolge),
+  FOREIGN KEY (mitarbeiter_id) REFERENCES mitarbeiter(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
 ];
 
 foreach ($tabellen as $name => $sql) {
@@ -1569,6 +1742,119 @@ if (!$nurPruefen && hat_tabelle_jetzt($pdo, 'ereignisart')) {
         }
     } catch (Throwable $e) {
         $fehler[] = 'Ereignisarten-Startbestand — ' . $e->getMessage();
+    }
+}
+
+// ── 1c. Startbestand des Lohnartenkatalogs (ENT-451). Nur wenn die Tabelle
+// LEER ist -- sonst kaeme eine bewusst geloeschte Lohnart beim naechsten
+// Einrichten zurueck. Dasselbe Muster wie bei den Ereignisarten.
+//
+// Angelegt werden ausschliesslich Lohnarten, die auf einem erfassten
+// GAV-Artikel beruhen oder strukturell noetig sind. Sie tragen system=1 und
+// lassen sich nicht loeschen -- wer den Grundlohn loescht, haette eine
+// Abrechnung ohne Lohn. Betriebliche Zulagen legt die Verwaltung selbst an.
+//
+// Die sechs *_pflichtig-Kennzeichen sind je Zeile einzeln gesetzt, nicht
+// ueber eine Voreinstellung: Wer eine Lohnart anlegt, entscheidet jedes
+// bewusst. Reihenfolge der Werte:
+//   ahv, ferien, ml13, bvg, uvg, qst
+if (!$nurPruefen && hat_tabelle_jetzt($pdo, 'lohnart')) {
+    try {
+        if ((int)$pdo->query('SELECT COUNT(*) FROM lohnart')->fetchColumn() === 0) {
+            $lohnarten = [
+                // [schluessel, bezeichnung, art, basis, satz_bp, 6 Kennzeichen, gav, sortierung]
+                ['grundlohn_stunde', 'Grundlohn pro Stunde', 'stundensatz', null, null,
+                 1,1,1,1,1,1, 'Art. 16 i.V.m. Anhang 1 GAV', 10],
+                ['grundlohn_monat', 'Monatslohn', 'monatslohn', null, null,
+                 1,0,1,1,1,1, 'Art. 16 i.V.m. Anhang 1 GAV', 11],
+                // Ferienentschaedigung traegt selbst keine Ferienentschaedigung
+                // und keinen 13. Monatslohn -- sonst rechnete sich ein Zuschlag
+                // auf einen Zuschlag. Der Satz steht bewusst NICHT hier: Er
+                // wird nach Art. 20 Ziff. 2 aus dem Alter abgeleitet
+                // (lohn_ferienentschaedigung_bp), nicht je Person eingetippt.
+                ['ferienentschaedigung', 'Ferienentschädigung', 'prozent', 'grundlohn', null,
+                 1,0,0,1,1,1, 'Art. 20 Ziff. 2 GAV', 20],
+                // KEINE GAV-Pflicht -- der GAV kennt den 13. Monatslohn nur in
+                // Art. 25 Ziff. 2 als Bestandteil der BVG-Bemessung. Darum
+                // steht bei gav_grundlage nichts, und das ist eine Aussage.
+                ['anteil_13ml', 'Anteil 13. Monatslohn', 'prozent', 'grundlohn', null,
+                 1,0,0,1,1,1, null, 21],
+                ['zuschlag_fachausweis', 'Zuschlag Fachausweis', 'stundensatz', null, null,
+                 1,1,1,1,1,1, 'Art. 19 Ziff. 1 GAV', 30],
+                ['zuschlag_hund', 'Zuschlag Diensthund', 'stundensatz', null, null,
+                 1,1,1,1,1,1, 'Art. 19 Ziff. 2 GAV', 31],
+                ['zuschlag_waffe', 'Zuschlag Schusswaffe', 'stundensatz', null, null,
+                 1,1,1,1,1,1, 'Art. 19 Ziff. 3 GAV', 32],
+                ['zeitzuschlag', 'Zeitzuschlag über 210 Stunden', 'prozent', 'grundlohn', 2500,
+                 1,1,1,1,1,1, 'Art. 14 Ziff. 3 GAV', 33],
+                // Auslagenersatz ist KEIN Lohn: nicht AHV-pflichtig, in keiner
+                // Bemessungsgrundlage, und nach GAV-AUS-009 gehoert er in eine
+                // getrennte Spesenabrechnung nach Art. 18 Ziff. 10 -- nicht in
+                // die Arbeitszeitabrechnung nach Art. 12 Ziff. 5. Er erscheint
+                // darum als eigener Block, nicht in der Stundensumme.
+                ['auslagenersatz', 'Auslagenersatz', 'netto', null, null,
+                 0,0,0,0,0,0, 'Art. 18 GAV', 40],
+                // Abzuege. Ihre SAETZE stehen in lohn_abzug mit
+                // Gueltigkeitszeitraum -- hier steht nur, dass es die Zeile
+                // gibt und wie sie heisst.
+                ['ahv', 'AHV-, IV-, EO-Beitrag', 'abzug', 'ahv_brutto', null,
+                 0,0,0,0,0,0, null, 50],
+                ['alv', 'ALV-Beitrag', 'abzug', 'ahv_brutto', null,
+                 0,0,0,0,0,0, null, 51],
+                ['nbu', 'NBU-Beitrag', 'abzug', 'uvg_brutto', null,
+                 0,0,0,0,0,0, null, 52],
+                ['ktg', 'Krankentaggeld-Beitrag', 'abzug', 'ahv_brutto', null,
+                 0,0,0,0,0,0, 'Art. 17 Ziff. 3 GAV', 53],
+                ['bvg', 'BVG-Beitrag', 'abzug', null, null,
+                 0,0,0,0,0,0, 'Art. 25 GAV', 54],
+                // Art. 6 Ziff. 2 verlangt ausdruecklich, dass dieser Abzug
+                // "bei der Lohnabrechnung aufzufuehren" ist -- er darf nie
+                // stillschweigend im Nettolohn verschwinden.
+                ['pako', 'Vollzugskostenbeitrag PaKo', 'abzug', null, null,
+                 0,0,0,0,0,0, 'Art. 6 Ziff. 2 GAV', 55],
+                ['quellensteuer', 'Quellensteuer', 'abzug', 'qst_brutto', null,
+                 0,0,0,0,0,0, null, 56],
+            ];
+            $ein = $pdo->prepare(
+                'INSERT IGNORE INTO lohnart
+                 (schluessel, bezeichnung, art, basis_schluessel, satz_bp,
+                  ahv_pflichtig, ferien_pflichtig, ml13_pflichtig,
+                  bvg_pflichtig, uvg_pflichtig, qst_pflichtig,
+                  gav_grundlage, system, sortierung)
+                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,1,?)'
+            );
+            $n = 0;
+            foreach ($lohnarten as $la) { $ein->execute($la); $n += $ein->rowCount(); }
+            if ($n > 0) { $getan[] = "Lohnartenkatalog angelegt ($n Lohnarten, ENT-451)"; }
+        }
+    } catch (Throwable $e) {
+        $fehler[] = 'Lohnarten-Startbestand — ' . $e->getMessage();
+    }
+}
+
+// ── 1d. lohn_abzug bekommt BEWUSST keinen Startbestand (ENT-451).
+//
+// AHV-, ALV-, NBU-, KTG- und BVG-Saetze sind gesetzliche bzw. vertragliche
+// Werte, die jaehrlich aendern und nirgends im Projekt als Quelle erfasst
+// sind. Ein vorbelegter Satz saehe aus wie eine gepruefte Zahl und wuerde
+// weiterrechnen, wenn er veraltet -- ohne dass etwas kaputtginge. Er muss
+// darum einmal von Hand erfasst werden, mit Angabe der Quelle.
+//
+// Die Ausnahme ist der PaKo-Beitrag: Er steht woertlich im GAV (Art. 6
+// Ziff. 2, CHF 0.015 je Stunde bzw. CHF 2.50 pro Monat) und lebt darum als
+// versionierte Konstante in backend/lohn.php -- dieselbe Stelle und
+// dieselbe Bauart wie die Mindestloehne aus Anhang 1.
+//
+// Fehlt ein Satz, wird NICHT mit 0 gerechnet, sondern gesperrt. Das ist der
+// Unterschied zwischen "kein Abzug" und "Abzug unbekannt".
+if (hat_tabelle_jetzt($pdo, 'lohn_abzug')) {
+    try {
+        if ((int)$pdo->query('SELECT COUNT(*) FROM lohn_abzug')->fetchColumn() === 0) {
+            $getan[] = 'Abzugssätze (lohn_abzug) sind noch nicht erfasst — '
+                     . 'AHV, ALV, NBU, KTG und BVG einmalig unter Lohn → Sätze eintragen';
+        }
+    } catch (Throwable $e) {
+        $fehler[] = 'Abzugssätze prüfen — ' . $e->getMessage();
     }
 }
 

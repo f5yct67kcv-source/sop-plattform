@@ -358,6 +358,7 @@ jobs:
           cp backend/produkte.php dist/produkte.php
           cp backend/mailer.php dist/mailer.php
           cp backend/ferien.php dist/ferien.php
+          cp backend/lohn.php dist/lohn.php
           cp backend/mitteilungen.php dist/mitteilungen.php
           cp backend/push.php dist/push.php
           # Schutzeinstellungen (ENT-075). Im Repository heisst die Datei

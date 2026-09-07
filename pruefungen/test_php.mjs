@@ -342,6 +342,7 @@ if (zfBeanstandet.length) { zfBeanstandet.forEach(z => bad.push('PHP-Zweifaktor:
 // Rechteregel nie vorbei.
 for (const [datei, titel] of [
   ['pruef_rechte.php',  'KRITISCH: die Rollen geben genau die entschiedenen Rechte'],
+  ['pruef_lohn.php', 'KRITISCH: Lohnform, Mindestlohn, Ferienentschaedigung und PaKo-Beitrag stimmen mit dem GAV ueberein (ENT-451)'],
   ['pruef_logbuch.php', 'KRITISCH: das Logbuch haelt fest, wer was geaendert hat'],
   ['pruef_einsatz_abgeschlossen.php', 'KRITISCH: "abgeschlossen" verlangt ALLE zugesagten Rapporte (ENT-128)'],
   ['pruef_rundgang.php', 'KRITISCH: Geofence-Pruefung und Restliste der Kontrollpunkte stimmen (ENT-132/ENT-145/ENT-180)'],
