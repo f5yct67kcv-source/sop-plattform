@@ -93,10 +93,21 @@ pruef('KRITISCH: ein erfundenes Recht steht nicht im Katalog', !recht_gueltig('a
 
 // ══════════════ DIE SYSTEMROLLEN -- der Kern der Gegenprobe zu ENT-440
 $sys = system_rollen();
-pruef('Es gibt die vier urspruenglichen Rollen plus die Waechtersystem-Rolle (ENT-180)',
-    count($sys) === 5);
-pruef('Die Rollen heissen wie entschieden',
-    array_keys($sys) === ['mitarbeitend', 'planung', 'personal', 'verwaltung', 'waechter']);
+pruef('Es gibt sechs Systemrollen (vier aus ENT-077, Waechtersystem ENT-180, Administrator ENT-442)',
+    count($sys) === 6);
+pruef('Die Rollen heissen wie entschieden -- und stehen vom kleinsten zum groessten Zugriff',
+    array_keys($sys) === ['mitarbeitend', 'planung', 'personal', 'administrator', 'verwaltung', 'waechter']);
+// Der Schluessel ist die Zuteilung, der Titel nur die Anzeige. ENT-442 hat
+// drei Titel gewechselt und KEINEN Schluessel -- genau darum musste keine
+// Zeile in mitarbeiter_rollen wandern.
+pruef('KRITISCH: die Anzeigenamen aus ENT-442 stehen da',
+    $sys['mitarbeitend']['titel'] === 'Personal'
+    && $sys['personal']['titel'] === 'Personaladministration'
+    && $sys['verwaltung']['titel'] === 'Verwalter');
+pruef('KRITISCH: und die Schluessel dahinter sind unveraendert geblieben',
+    isset($sys['mitarbeitend'], $sys['personal'], $sys['verwaltung']));
+pruef('Jede Systemrolle bringt ein Symbol fuer ihre Kachel mit',
+    count(array_filter($sys, fn($d) => ($d['ikone'] ?? '') !== '')) === 6);
 pruef('KRITISCH: jede Systemrolle nennt nur Bereiche, die es gibt, mit Stufen, die es dort gibt',
     (function () use ($sys) {
         foreach ($sys as $d) {
@@ -105,7 +116,7 @@ pruef('KRITISCH: jede Systemrolle nennt nur Bereiche, die es gibt, mit Stufen, d
         return true;
     })());
 pruef('Jede Systemrolle traegt eine Beschreibung',
-    count(array_filter($sys, fn($d) => strlen($d['text']) > 40)) === 5);
+    count(array_filter($sys, fn($d) => strlen($d['text']) > 40)) === 6);
 pruef('KRITISCH: "mitarbeitend" hat kein einziges Recht -- sonst kaeme sie ins Cockpit',
     rechte_aus_rollen(['mitarbeitend']) === []);
 
@@ -140,10 +151,36 @@ pruef('KRITISCH: Personal plant nicht und kommt nicht an die Kunden (ENT-077)',
 pruef('KRITISCH: Offerten bleiben von den Kunden getrennt (ENT-181)',
     darf(['rollen' => ['planung']], 'kunden_schreiben')
     && !darf(['rollen' => ['planung']], 'offerten_lesen'));
-pruef('KRITISCH: die Verwaltung bekommt das Waechtersystem NICHT mit (ENT-169)',
-    !darf(['rollen' => ['verwaltung']], 'kontrollpunkte_lesen')
-    && !darf(['rollen' => ['verwaltung']], 'rundgaenge_lesen')
-    && !darf(['rollen' => ['verwaltung']], 'alarmempfaenger_lesen'));
+// ENT-442 hat ENT-169 hier im Kern revidiert: Der Verwalter verwaltet auch
+// den Revierdienst. Die eigentliche Absicht von ENT-169 bleibt aber gewahrt
+// -- und genau die wird hier geprueft: "Alarmempfaenger" ist kein Zugriff,
+// sondern die Bereitschaft, nachts angerufen zu werden.
+pruef('KRITISCH: der Verwalter verwaltet den Revierdienst (ENT-442)',
+    darf(['rollen' => ['verwaltung']], 'kontrollpunkte_schreiben')
+    && darf(['rollen' => ['verwaltung']], 'rundgaenge_schreiben'));
+pruef('KRITISCH: aber er wird dadurch NICHT zum Alarmempfaenger (ENT-169 im Kern)',
+    !darf(['rollen' => ['verwaltung']], 'alarmempfaenger_lesen'));
+pruef('KRITISCH: der Verwalter traegt jeden Bereich ausser diesem einen',
+    count(array_diff(array_keys(bereiche_katalog()),
+        array_keys(stufen_aus_rollen(['verwaltung'])))) === 1);
+
+// ── Der Administrator (ENT-442): fuehrt den Betrieb, richtet ihn nicht ein
+pruef('KRITISCH: der Administrator fuehrt den Betrieb -- Kunden, Offerten, Rechnungen',
+    darf(['rollen' => ['administrator']], 'kunden_schreiben')
+    && darf(['rollen' => ['administrator']], 'offerten_schreiben')
+    && darf(['rollen' => ['administrator']], 'einsaetze_schreiben'));
+pruef('KRITISCH: er kommt NICHT an die vertraulichen Personalangaben',
+    !darf(['rollen' => ['administrator']], 'personal_vertraulich_lesen'));
+pruef('KRITISCH: er kann keine Rollen vergeben -- sonst gaebe er sich alles Uebrige selbst',
+    !darf(['rollen' => ['administrator']], 'rechte_schreiben')
+    && !darf(['rollen' => ['administrator']], 'logbuch_lesen'));
+pruef('KRITISCH: er richtet den Betrieb nicht ein, sieht die Einstellungen aber',
+    darf(['rollen' => ['administrator']], 'betrieb_lesen')
+    && !darf(['rollen' => ['administrator']], 'betrieb_schreiben'));
+pruef('KRITISCH: der Revierdienst haengt auch fuer ihn an der Waechterrolle',
+    !darf(['rollen' => ['administrator']], 'kontrollpunkte_lesen'));
+pruef('Der Administrator kann echt weniger als der Verwalter',
+    count(rechte_aus_rollen(['administrator'])) < count(rechte_aus_rollen(['verwaltung'])));
 pruef('KRITISCH: das Waechtersystem kommt an keine Personendaten',
     !darf(['rollen' => ['waechter']], 'personal_lesen')
     && !darf(['rollen' => ['waechter']], 'personal_vertraulich_lesen'));
@@ -265,7 +302,7 @@ pruef('KRITISCH: die gesaeten Systemrollen aus der Datenbank ergeben dieselben R
         return true;
     })());
 pruef('Die Datenbank kennzeichnet sie als Systemrollen',
-    count(array_filter($defs, fn($d) => $d['system'])) === 5);
+    count(array_filter($defs, fn($d) => $d['system'])) === 6);
 
 // ── Der Zwischenzustand: Rollen zugeteilt, Profiltabellen noch nicht da
 $GLOBALS['tabellen']['rollen'] = false;

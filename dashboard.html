@@ -3214,45 +3214,77 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
    Zuteilung in der Personalakte, die Merkmale in zwei weiteren Reitern
    derselben Akte. */
 
-/* Eine Profilzeile. Raster statt Flex, damit Name, Traegerzahl und Knopf
-   in allen Zeilen auf derselben Linie stehen -- bei Flex wandert der Knopf
-   mit der Textlaenge. */
-.rp-zeile { display: grid; grid-template-columns: 1fr auto; align-items: start; gap: 12px;
-            padding: 12px 0; border-bottom: 1px solid var(--line); }
-.rp-zeile:last-child { border-bottom: 0; }
-.rp-kopf { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
-.rp-kopf b { font-size: 13.5px; font-weight: 650; }
-.rp-text { font-size: 12px; line-height: 1.45; color: var(--ink-3); max-width: 78ch; }
-/* Das Schloss der Systemrollen. Nicht nur ein Symbol: daneben steht das
-   Wort, sonst muss man es erraten. */
-.rp-schloss { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700;
-              letter-spacing: .4px; text-transform: uppercase; color: var(--ink-3); }
-.rp-schloss svg { width: 12px; height: 12px; }
+/* Die Profile als KACHELN (ENT-442). Vorher eine Liste untereinander --
+   der Projektinhaber: "eine gute und strukturierte Uebersicht ist das A und
+   O". Gleiche Bildsprache wie die Kacheln auf der Uebersicht (.bk-kachel):
+   Symbol oben, Name darunter. Hier zusaetzlich die Traegerzahl und ein
+   Satz, wofuer das Profil da ist -- eine Kachel, die nur einen Namen zeigt,
+   zwingt zum Anklicken, um zu erfahren, was dahinter steckt. */
+.rp-kachel-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(212px, 1fr)); gap: 14px; }
+.rp-kachel { display: flex; flex-direction: column; align-items: center; gap: 9px; text-align: center;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r);
+  box-shadow: var(--sh-1); padding: 18px 14px 16px; cursor: pointer; font: inherit; color: inherit;
+  min-height: 178px; }
+.rp-kachel:hover { border-color: var(--accent-line); box-shadow: var(--sh-2); }
+.rp-kachel:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Das offene Profil bleibt erkennbar, waehrend man unten in der Matrix
+   arbeitet -- sonst weiss man nach dem Scrollen nicht mehr, welches. */
+.rp-kachel.offen { border-color: var(--accent); box-shadow: var(--sh-2); }
+.rp-kachel-ic { position: relative; width: 52px; height: 52px; border-radius: 14px;
+  background: var(--accent-soft); display: flex; align-items: center; justify-content: center; flex: none; }
+.rp-kachel-ic svg { width: 26px; height: 26px; stroke: var(--accent); fill: none;
+  stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+/* Das Schloss sitzt AM Symbol, nicht in einer eigenen Zeile: Es sagt etwas
+   ueber das Profil selbst, nicht ueber seine Vergabe. */
+.rp-kachel-schloss { position: absolute; right: -5px; bottom: -5px; width: 20px; height: 20px;
+  border-radius: 999px; background: var(--surface); border: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: center; }
+.rp-kachel-schloss svg { width: 11px; height: 11px; stroke: var(--ink-3); stroke-width: 2.4; }
+.rp-kachel-name { font-size: 13.5px; font-weight: 650; line-height: 1.3; }
+.rp-kachel-text { font-size: 11.5px; line-height: 1.4; color: var(--ink-3);
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+/* Die Traegerzahl steht als Wort dabei, nicht als nackte Ziffer: "0" allein
+   liesse offen, ob niemand es traegt oder ob nichts geladen wurde. */
+.rp-kachel-zahl { font-size: 11px; font-weight: 700; letter-spacing: .3px; color: var(--ink-3);
+  margin-top: auto; padding-top: 4px; }
+.rp-kachel-zahl b { color: var(--accent); font-size: 12.5px; }
+/* Die Kachel zum Anlegen: gestrichelt, damit sie als Platz und nicht als
+   bestehendes Profil gelesen wird. */
+.rp-kachel.neu { border-style: dashed; box-shadow: none; justify-content: center; }
+.rp-kachel.neu .rp-kachel-ic { background: transparent; border: 1px dashed var(--line-hi); }
 
-/* Die Matrix: eine Zeile je Bereich, Beschriftung links, Stufenwahl rechts.
-   Feste Spaltenbreite fuer die Wahl, damit die Schalter aller Zeilen
-   untereinander stehen -- ausgerichtete Schalter lassen sich mit einem
-   Blick lesen, versetzte nicht. */
-.rm-gruppe { margin-top: 18px; }
-.rm-gruppe:first-child { margin-top: 6px; }
+/* Die Matrix in SPALTEN (ENT-442). Vorher standen 20 Zeilen untereinander
+   auf voller Breite -- eine Scrollstrecke, auf der man den Ueberblick genau
+   dann verliert, wenn man ihn braucht. Jetzt fliesst je Gruppe ein Block in
+   die naechste Spalte; die Gruppe bleibt dabei ZUSAMMEN (Grid mit Bloecken,
+   nicht CSS-Spalten -- die zerschneiden eine Gruppe mitten im Umbruch).
+
+   Und die Beschriftung steht OBEN, die Stufenwahl darunter (Projektregel).
+   In einer schmalen Spalte waere es sonst umgekehrt: Der Name fiele auf
+   150 px zusammen, damit die Schalter danebenpassen. */
+.rm-spalten { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+              gap: 10px 22px; align-items: start; }
+.rm-gruppe { break-inside: avoid; }
 .rm-gruppe-hd { font-size: 11px; font-weight: 700; letter-spacing: .7px; text-transform: uppercase;
-                color: var(--ink-3); padding-bottom: 6px; border-bottom: 1px solid var(--line); }
-.rm-zeile { display: grid; grid-template-columns: 1fr 258px; align-items: center; gap: 16px;
-            padding: 9px 0; border-bottom: 1px solid var(--line-soft); }
-.rm-zeile:last-child { border-bottom: 0; }
-.rm-zeile b { display: block; font-size: 13px; font-weight: 640; }
-.rm-zeile small { display: block; font-size: 11.5px; line-height: 1.4; color: var(--ink-3); margin-top: 2px; }
+                color: var(--ink-3); padding: 0 0 6px; border-bottom: 1px solid var(--line);
+                margin-bottom: 2px; }
+.rm-zeile { padding: 9px 0; border-bottom: 1px solid var(--line-soft); }
+.rm-gruppe .rm-zeile:last-child { border-bottom: 0; }
+.rm-zeile b { display: block; font-size: 12.5px; font-weight: 640; line-height: 1.3; }
+.rm-zeile small { display: block; font-size: 11px; line-height: 1.4; color: var(--ink-3);
+                  margin: 1px 0 6px; }
 
 /* Segmentschalter. Die Stufen stehen ausgeschrieben und nicht als Symbol:
-   Ein durchgestrichenes Auge muss man lernen, "verborgen" nicht. */
-/* Feste Segmentbreite statt 1fr, und der Schalter beginnt links buendig
-   (ENT-440, am gerenderten Zustand gemessen): Mit 1fr dehnten sich die zwei
-   Segmente einer Zeile ohne Schreibstufe auf dieselbe Gesamtbreite wie drei
-   -- "verborgen" begann dann je nach Zeile an einer anderen Stelle, und die
-   Spalte liess sich nicht mehr mit einem Blick lesen. Jetzt steht jede Stufe
-   immer an derselben Stelle; wo es keine Schreibstufe gibt, ist dort nichts
-   -- sichtbar, statt durch Dehnung verdeckt. */
-.rm-stufen { display: grid; grid-auto-flow: column; grid-auto-columns: 86px; justify-self: start;
+   Ein durchgestrichenes Auge muss man lernen, "verborgen" nicht.
+
+   FESTE Segmentbreite, nicht 1fr, und links buendig (am gerenderten Zustand
+   gemessen): Mit 1fr teilt eine Zeile ohne Schreibstufe ihre zwei Segmente
+   in Haelften, eine mit drei in Drittel -- "lesen" stuende dann je nach
+   Zeile an einer anderen Stelle, und die Spalte liesse sich nicht mehr mit
+   einem Blick lesen. Jetzt steht jede Stufe immer gleich; wo es keine
+   Schreibstufe gibt, ist dort nichts -- sichtbar, statt durch Dehnung
+   verdeckt. */
+.rm-stufen { display: grid; grid-auto-flow: column; grid-auto-columns: 84px; justify-self: start;
              border: 1px solid var(--line); border-radius: 7px; overflow: hidden; background: var(--surface-2); }
 .rm-stufe { appearance: none; border: 0; border-left: 1px solid var(--line); background: none;
             font-family: inherit; font-size: 11.5px; font-weight: 650; color: var(--ink-3);
@@ -3276,7 +3308,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 .rm-stufe:disabled { cursor: default; opacity: .78; }
 /* Zeile mit vertraulichen Daten: der Rand sagt, dass hier Personendaten
    haengen, bevor jemand den Schalter anfasst. */
-.rm-zeile.heikel { border-left: 3px solid var(--warn); padding-left: 10px; margin-left: -13px; }
+.rm-zeile.heikel { border-left: 3px solid var(--warn); padding-left: 9px; margin-left: -12px; }
 
 /* Zuteilung und Einsatzmerkmale: Person links, Schalter rechts. */
 .rz-tab { width: 100%; border-collapse: collapse; }
@@ -7247,9 +7279,6 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
           <div class="card-hd">
             <span class="card-ic"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
             <h3>Profile</h3>
-            <div class="sp"></div>
-            <button type="button" class="btn btn-primary btn-sm" id="rvNeuKnopf"
-                    onclick="rvProfilOeffnen(null)">Profil anlegen</button>
           </div>
           <div class="card-bd">
             <div id="rvInhalt"><div style="color:var(--ink-3)">Wird geladen …</div></div>
@@ -19269,6 +19298,21 @@ const RV_STUFEN_TEXT = { verborgen: 'verborgen', lesen: 'lesen', schreiben: 'sch
 // Häkchen beim Überfliegen auffällt.
 const RV_HEIKEL = ['personal', 'personal_vertraulich', 'logbuch'];
 
+// Symbole der Profilkacheln (ENT-442). Der Server schickt nur den NAMEN
+// ('person', 'kalender', …) -- gezeichnet wird hier. Ein SVG-Pfad im
+// Rechtekern waere Gestaltung an der falschen Stelle, und ein eigenes
+// Profil, das keinen Namen mitbringt, faellt auf 'profil' zurueck.
+const RV_IKONEN = {
+  person:      '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+  kalender:    '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+  akte:        '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><circle cx="12" cy="14" r="2"/><path d="M9 19a3 3 0 0 1 6 0"/>',
+  steuer:      '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.2.5.66.86 1.19.91H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
+  schluessel:  '<circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3 20 3"/><path d="M17 6l2 2"/><path d="M14.5 8.5l2 2"/>',
+  schild:      '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/>',
+  profil:      '<circle cx="12" cy="12" r="9"/><path d="M12 8v8"/><path d="M8 12h8"/>',
+};
+const RV_SCHLOSS = '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>';
+
 // Die drei Einsatzmerkmale mit ihrem Bewilligungsfeld. Steht hier und nicht
 // in einer zweiten Wortliste: Die Beschriftungen kommen aus MB_ABSCHNITTE,
 // dieselbe Quelle wie die Personalakte.
@@ -19331,9 +19375,6 @@ function rvLaden() {
 function rvZeichnen() {
   const d = rvStand;
   if (!d) { return; }
-  const neuKnopf = $('rvNeuKnopf');
-  if (neuKnopf) { neuKnopf.style.display = (d.darf_aendern && d.eingerichtet) ? '' : 'none'; }
-
   // Ohne die Tabellen stehen unten Rückfallwerte aus dem Code, keine
   // gespeicherten Profile. Das muss dastehen: Sonst sieht eine nicht
   // gelaufene Einrichtung genauso aus wie eine erledigte -- und man sucht
@@ -19352,39 +19393,57 @@ function rvZeichnen() {
   if (rvOffen !== null) { rvMatrixZeichnen(); }
 }
 
-// ── Block 1: die Profile ─────────────────────────────────────────────
+// ── Block 1: die Profile als Kacheln (ENT-442) ───────────────────────
+// Vorher eine Liste untereinander. Der Projektinhaber: "eine gute und
+// strukturierte Uebersicht ist das A und O" -- gleiche Bildsprache wie die
+// Kacheln auf der Uebersicht, damit die Seite nicht wie ein Formular
+// aussieht, sondern wie eine Auswahl.
+//
+// Die Kacheln entstehen AUS DER PROFILLISTE des Servers, nicht aus einer
+// festen Reihe hier: Legt jemand ein Profil an -- oder traegt eine andere
+// Sitzung eine neue Systemrolle ein --, erscheint die Kachel von selbst.
 function rvProfileZeichnen(hinweis) {
   const d = rvStand;
   const nurLesen = !d.darf_aendern;
-  const zeile = p => `
-    <div class="rp-zeile">
-      <div>
-        <div class="rp-kopf">
-          <b>${esc(p.titel)}</b>
-          ${p.system ? `<span class="rp-schloss" title="Systemrolle — nicht änderbar">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
-                 stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-            Systemrolle</span>` : ''}
-          <span class="chip ${p.traeger ? 'chip-a' : 'chip-n'}">${p.traeger}</span>
-        </div>
-        <div class="rp-text">${esc(p.text) || '<i>ohne Beschreibung</i>'}</div>
-      </div>
-      <button type="button" class="btn btn-plain btn-sm" onclick="rvProfilOeffnen('${esc(p.schluessel)}')">
-        ${(p.system || nurLesen) ? 'Ansehen' : 'Bearbeiten'}</button>
-    </div>`;
 
-  // "Keine eigenen Profile" ist eine Aussage über den Bestand, nicht über
-  // den Zugriff -- darum steht sie als Satz da und nicht als leere Fläche.
+  const kachel = p => `
+    <button type="button" class="rp-kachel${rvOffen === p.schluessel ? ' offen' : ''}"
+            onclick="rvProfilOeffnen('${esc(p.schluessel)}')"
+            aria-pressed="${rvOffen === p.schluessel}">
+      <span class="rp-kachel-ic">
+        <svg viewBox="0 0 24 24">${RV_IKONEN[p.ikone] || RV_IKONEN.profil}</svg>
+        ${p.system ? `<span class="rp-kachel-schloss" title="Systemrolle — nicht änderbar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-linecap="round" stroke-linejoin="round">${RV_SCHLOSS}</svg></span>` : ''}
+      </span>
+      <span class="rp-kachel-name">${esc(p.titel)}</span>
+      <span class="rp-kachel-text">${esc(p.text) || 'ohne Beschreibung'}</span>
+      <span class="rp-kachel-zahl">${p.traeger
+        ? `<b>${p.traeger}</b> ${p.traeger === 1 ? 'Person' : 'Personen'}`
+        : 'niemand zugeteilt'}</span>
+    </button>`;
+
+  // Die Kachel zum Anlegen steht MIT in der Reihe und nicht als Knopf
+  // darueber: Ein neues Profil ist dasselbe wie die bestehenden, nur noch
+  // nicht da.
+  const neueKachel = (d.darf_aendern && d.eingerichtet) ? `
+    <button type="button" class="rp-kachel neu" onclick="rvProfilOeffnen(null)">
+      <span class="rp-kachel-ic"><svg viewBox="0 0 24 24" fill="none" stroke="var(--ink-3)"
+        stroke-width="1.9" stroke-linecap="round"><line x1="12" y1="6" x2="12" y2="18"/><line x1="6" y1="12" x2="18" y2="12"/></svg></span>
+      <span class="rp-kachel-name">Profil anlegen</span>
+      <span class="rp-kachel-text">Eigenes Profil aus den Bereichen zusammenstellen</span>
+    </button>` : '';
+
+  // "Keine eigenen Profile" ist eine Aussage ueber den Bestand, nicht ueber
+  // den Zugriff -- darum steht sie als Satz da und nicht als leere Flaeche.
   const eigene = d.profile.filter(p => !p.system);
-  const eigenText = eigene.length
-    ? ''
-    : `<p class="zone-note" style="margin-top:12px">Es gibt noch kein eigenes Profil.
-        Die fünf Systemrollen oben decken den heutigen Betrieb ab; ein eigenes Profil
-        lohnt sich, wenn jemand genau dazwischen liegt — etwa „Kunden ansehen, aber
-        nicht ändern“.</p>`;
+  const eigenText = eigene.length ? '' : `
+    <p class="zone-note" style="margin-top:14px">Es gibt noch kein eigenes Profil.
+      Die Systemrollen oben decken den heutigen Betrieb ab; ein eigenes lohnt sich,
+      wenn jemand genau dazwischen liegt — etwa „Kunden ansehen, aber nicht ändern“.</p>`;
 
   $('rvInhalt').innerHTML = hinweis + `
-    <div>${d.profile.map(zeile).join('')}</div>
+    <div class="rp-kachel-grid">${d.profile.map(kachel).join('')}${neueKachel}</div>
     ${eigenText}
     ${nurLesen ? `<div class="ki-hint web on" style="margin-top:14px"><span>
       Du darfst die Profile <b>ansehen</b>, aber nicht ändern — dafür braucht es
@@ -19448,9 +19507,12 @@ function rvMatrixZeichnen() {
     </div>`;
   };
 
+  // Beschriftung OBEN, Stufenwahl darunter (Projektregel). In einer
+  // schmalen Spalte waere es sonst umgekehrt: Der Name fiele auf 150 px
+  // zusammen, damit die Schalter danebenpassen.
   const zeile = b => `
     <div class="rm-zeile${RV_HEIKEL.includes(b.schluessel) ? ' heikel' : ''}">
-      <div><b>${esc(b.titel)}</b><small>${esc(b.text)}</small></div>
+      <b>${esc(b.titel)}</b><small>${esc(b.text)}</small>
       ${schalter(b)}
     </div>`;
 
@@ -19470,11 +19532,11 @@ function rvMatrixZeichnen() {
         <input class="inp" id="rvText" maxlength="500" value="${esc(e.text)}"
                placeholder="Wofür ist dieses Profil da?" ${gesperrt ? 'disabled' : ''}></div>
     </div>
-    ${gruppen.map(g => `
+    <div class="rm-spalten">${gruppen.map(g => `
       <div class="rm-gruppe">
         <div class="rm-gruppe-hd">${esc(g.name)}</div>
         ${g.zeilen.map(zeile).join('')}
-      </div>`).join('')}
+      </div>`).join('')}</div>
     ${gesperrt ? '' : `
       <div style="display:flex;gap:8px;margin-top:20px;flex-wrap:wrap">
         <button type="button" class="btn btn-primary" onclick="rvProfilSpeichern()">Profil speichern</button>
@@ -26868,16 +26930,18 @@ const MB_ABSCHNITTE = [
 // die Wahrheit, hier nur die Beschriftung. Eine Pruefung vergleicht beide
 // Fassungen miteinander, damit sie nicht auseinanderlaufen.
 const ROLLEN = [
-  ['mitarbeitend', 'Mitarbeitend',
-   'Nur die eigenen Daten in der App: eigene Schichten, eigene Rapporte, eigene Sperrtage. Kein Zugang zur Verwaltung.'],
+  ['mitarbeitend', 'Personal',
+   'Die Belegschaft: eigene Schichten, eigene Rapporte, eigene Sperrtage in der App. Kein Zugang zum Cockpit.'],
   ['planung', 'Planung',
    'Einsätze, Objekte, Masterschichten, Kunden und der Abgleich der Ist-Zeiten. Sieht Mitarbeitende mit Name, Funktion und Berechtigungen — nicht AHV-Nummer, Aufenthaltsstatus oder Registerdaten.'],
-  ['personal', 'Personal',
-   'Die vollständige Personalakte inklusive der vertraulichen Angaben, Anlegen und Ändern von Mitarbeitenden. Keine Einsatzplanung, keine Kunden.'],
-  ['verwaltung', 'Verwaltung',
-   'Alles, zusätzlich die Betriebseinstellungen, die Einrichtung und die Rollenvergabe selbst.'],
+  ['personal', 'Personaladministration',
+   'Die vollständige Personalakte inklusive der vertraulichen Angaben, Anlegen und Ändern von Mitarbeitenden, Mitteilungen an die Belegschaft. Keine Einsatzplanung, keine Kunden.'],
+  ['administrator', 'Administrator',
+   'Führt den Betrieb: Einsätze, Objekte, Kunden, Offerten und Rechnungen, Abgleich, Abwesenheiten und Mitteilungen. Sieht Mitarbeitende ohne die vertraulichen Angaben. Keine Betriebseinstellungen, keine Einrichtung, keine Rollenvergabe.'],
+  ['verwaltung', 'Verwalter',
+   'Alles: der ganze Betrieb, die Einstellungen, die Einrichtung, der Revierdienst und die Rollenvergabe selbst. Nicht dabei ist einzig „Alarmempfänger" — das ist kein Recht, sondern die Bereitschaft, im Ernstfall angerufen zu werden, und wird je Person vergeben.'],
   ['waechter', 'Wächtersystem',
-   'Kontrollpunkte und Rundgang-Vorlagen pro Objekt pflegen, laufende und abgeschlossene Rundgänge einsehen, als Kontaktperson für den Alleinarbeiterschutz hinterlegbar.'],
+   'Revierdienst: Kontrollpunkte und Rundgang-Vorlagen pro Objekt pflegen, laufende und abgeschlossene Rundgänge einsehen, als Kontaktperson für den Alleinarbeiterschutz hinterlegbar. Unabhängig von den anderen Rollen — wird zusätzlich vergeben.'],
 ];
 // Seit ENT-440 gibt es neben den fuenf Systemrollen eigene Profile. Sie
 // stehen in der Datenbank und koennen darum nicht in einer Liste im Browser

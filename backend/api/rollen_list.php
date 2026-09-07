@@ -34,6 +34,7 @@ foreach ($defs as $schluessel => $d) {
         'titel'      => $d['titel'],
         'text'       => $d['text'],
         'system'     => (bool)($d['system'] ?? ist_systemrolle($schluessel)),
+        'ikone'      => $d['ikone'] ?? 'profil',
         'stufen'     => (object)$d['stufen'],
         'traeger'    => count($traeger[$schluessel] ?? []),
     ];
