@@ -55,9 +55,9 @@ check('Der Kilometerstand traegt sein Ablesedatum bei sich',
 check('Der Standort zeigt auf die Anstellungsorte — dort haengen die gepflegten Wegstrecken',
   /FOREIGN KEY \(standort_id\) REFERENCES anstellungsorte\(id\)/.test(EINR));
 
-check('KRITISCH: Aendern verlangt das Recht "betrieb"', /require_recht\(\$user, 'betrieb'\)/.test(FZ));
+check('KRITISCH: Aendern verlangt das Recht "betrieb"', /require_recht\(\$user, 'fahrzeuge_schreiben'\)/.test(FZ));
 check('KRITISCH: Lesen steht vor der Betriebs-Rechtepruefung — die Planung braucht die Auswahlliste',
-  FZ.indexOf("REQUEST_METHOD'] === 'GET'") < FZ.indexOf("require_recht($user, 'betrieb')"));
+  FZ.indexOf("REQUEST_METHOD'] === 'GET'") < FZ.indexOf("require_recht($user, 'fahrzeuge_schreiben')"));
 check('KRITISCH: eine fehlende Tabelle meldet "eingerichtet: false" statt einer leeren Liste ohne Hinweis',
   /hat_tabelle\(\$pdo, 'fahrzeuge'\)[\s\S]{0,400}'eingerichtet' => false/.test(FZ));
 check('KRITISCH: ein Kilometerstand ohne Ablesedatum wird serverseitig abgewiesen',
@@ -105,7 +105,7 @@ check('KRITISCH: geloescht wird mit dem Kontrollschild protokolliert, nicht mit 
 check('KRITISCH: der Verlauf laesst sich nur lesen — kein Schreibweg',
   /'nur GET'/.test(FZLOG) && !/INSERT|UPDATE |DELETE FROM/.test(FZLOG));
 check('Der Verlauf verlangt das Recht "betrieb"',
-  /require_recht\(\$user, 'betrieb'\)/.test(FZLOG));
+  /require_recht\(\$user, 'fahrzeuge_lesen'\)/.test(FZLOG));
 check('KRITISCH: ein fehlendes Logbuch meldet das, statt eine leere Liste auszugeben',
   /'eingerichtet' => logbuch_tabelle_da\(\$pdo\)/.test(FZLOG));
 check('Der ausgeschriebene Name wird beim Lesen aufgeloest, nicht doppelt gespeichert',
@@ -171,7 +171,12 @@ await page.route('**/api/**', route => {
   const s = x => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(x) });
   if (u.includes('login')) return s({ status: 'ok', token: 't', name: 'adrian', ist_admin: true });
   if (u.includes('me.php')) return s({ status: 'ok', name: 'adrian', ist_admin: true,
-    rollen: ['verwaltung'], rechte: ['betrieb', 'plan', 'kunden', 'abgleich', 'personal_lesen'] });
+    rollen: ['verwaltung'], rechte: ['betrieb_lesen', 'betrieb_schreiben', 'fahrzeuge_lesen',
+      'fahrzeuge_schreiben', 'einsaetze_lesen', 'einsaetze_schreiben',
+      'objekte_lesen', 'objekte_schreiben', 'masterschichten_lesen',
+      'masterschichten_schreiben', 'verfuegbarkeit_lesen', 'kunden_lesen',
+      'kunden_schreiben', 'abgleich_lesen', 'abgleich_schreiben',
+      'auslagen_lesen', 'personal_lesen', 'abwesenheiten_lesen'] });
   if (u.includes('anstellungsorte')) return s({ status: 'ok', orte: ORTE });
   if (u.includes('fahrzeug_logbuch')) {
     const id = Number((u.match(/fahrzeug_id=(\d+)/) || [])[1] || 0);

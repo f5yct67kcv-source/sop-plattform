@@ -12,7 +12,7 @@ require __DIR__ . '/../belege.php';
 require __DIR__ . '/../kunden.php';
 
 $user = require_session();
-require_recht($user, 'offerten');
+require_recht($user, 'offerten_lesen');
 
 $id = (int)($_GET['id'] ?? 0);
 if ($id <= 0) {

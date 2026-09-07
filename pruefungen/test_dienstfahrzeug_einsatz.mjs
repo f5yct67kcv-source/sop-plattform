@@ -183,7 +183,12 @@ await page.route('**/api/**', route => {
   const s = x => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(x) });
   if (p.includes('login')) return s({ status: 'ok', token: 't', name: 'adrian', ist_admin: true });
   if (p.includes('me.php')) return s({ status: 'ok', name: 'adrian', ist_admin: true,
-    rollen: ['verwaltung'], rechte: ['betrieb', 'plan', 'kunden', 'abgleich', 'personal_lesen'] });
+    rollen: ['verwaltung'], rechte: ['betrieb_lesen', 'betrieb_schreiben', 'fahrzeuge_lesen',
+      'fahrzeuge_schreiben', 'einsaetze_lesen', 'einsaetze_schreiben',
+      'objekte_lesen', 'objekte_schreiben', 'masterschichten_lesen',
+      'masterschichten_schreiben', 'verfuegbarkeit_lesen', 'kunden_lesen',
+      'kunden_schreiben', 'abgleich_lesen', 'abgleich_schreiben',
+      'auslagen_lesen', 'personal_lesen', 'abwesenheiten_lesen'] });
   if (p.includes('mitarbeiter_list')) return s({ status: 'ok', mitarbeiter: MA });
   if (p.includes('anstellungsorte')) return s({ status: 'ok', orte: ORTE });
   if (p.includes('fahrzeuge.php')) return s({ status: 'ok', eingerichtet: true, fahrzeuge: FAHRZEUGE });

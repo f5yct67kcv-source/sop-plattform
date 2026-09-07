@@ -16,19 +16,61 @@ const EXE = browserPfad();
 const ok = [], bad = [];
 const check = (n, c) => (c ? ok : bad).push(n);
 
-const ALLE_RECHTE = ['plan', 'kunden', 'abgleich', 'personal_lesen',
-  'personal_schreiben', 'personal_vertraulich', 'betrieb', 'rechte'];
+// Die Rechte werden nicht abgeschrieben, sondern aus bereiche_katalog() in
+// backend/rechte.php abgeleitet (ENT-440): Eine Liste von Hand hier waere
+// eine zweite Wahrheit und liefe beim naechsten neuen Bereich still
+// auseinander. Die Ableitung ist dieselbe wie im Server: <bereich>_<stufe>.
+const { readFileSync: _lies } = await import('fs');
+const RECHTE_PHP = _lies(`${WURZEL}/backend/rechte.php`, 'utf8');
+const BEREICHE = [...(RECHTE_PHP.match(/function bereiche_katalog\(\): array\s*\{[\s\S]*?\n\}/) || [''])[0]
+  .matchAll(/'([a-z_]+)' => \[\s*\n\s*'gruppe'\s*=> '([^']+)',\s*\n\s*'titel'\s*=> '([^']+)',[\s\S]*?'stufen' => \[([^\]]*)\]/g)]
+  .map(m => ({ schluessel: m[1], gruppe: m[2], titel: m[3],
+               stufen: (m[4].match(/STUFE_(LESEN|SCHREIBEN)/g) || []).map(x => x.split('_')[1].toLowerCase()) }));
+const ALLE_RECHTE = BEREICHE.flatMap(b => b.stufen.map(st => b.schluessel + '_' + st));
 
+// Die Profile, wie rollen_list.php sie liefert: die fuenf Systemrollen plus
+// ein eigenes -- ohne ein eigenes liesse sich nicht pruefen, dass die
+// Oberflaeche die Sperre nur auf Systemrollen anwendet.
+const stufenVon = ist => Object.fromEntries(ist);
+let PROFILE = [
+  { schluessel: 'mitarbeitend', titel: 'Mitarbeitend', text: 'Nur die eigenen Daten in der App.',
+    system: true, stufen: {}, traeger: 1 },
+  { schluessel: 'planung', titel: 'Planung', text: 'Einsätze, Objekte, Kunden — nicht AHV-Nummer.',
+    system: true, stufen: stufenVon([['einsaetze','schreiben'],['kunden','schreiben'],['personal','lesen']]), traeger: 1 },
+  { schluessel: 'personal', titel: 'Personal', text: 'Die vollständige Personalakte.',
+    system: true, stufen: stufenVon([['personal','schreiben'],['personal_vertraulich','schreiben']]), traeger: 0 },
+  { schluessel: 'verwaltung', titel: 'Verwaltung', text: 'Alles, zusätzlich die Rollenvergabe selbst.',
+    system: true, stufen: stufenVon([['einsaetze','schreiben'],['personal','schreiben'],
+      ['personal_vertraulich','schreiben'],['betrieb','schreiben'],['rechte','schreiben'],['logbuch','lesen']]), traeger: 1 },
+  { schluessel: 'waechter', titel: 'Wächtersystem', text: 'Kontrollpunkte und Rundgänge.',
+    system: true, stufen: stufenVon([['kontrollpunkte','schreiben'],['rundgaenge','schreiben']]), traeger: 0 },
+  { schluessel: 'dispo_ohne_kunden', titel: 'Disposition ohne Kundenpflege',
+    text: 'Plant Einsätze, sieht Kunden nur an.', system: false,
+    stufen: stufenVon([['einsaetze','schreiben'],['kunden','lesen']]), traeger: 0 },
+];
+
+// Bewilligungsdaten bewusst WEIT weg von heute (CLAUDE.md / test_datumsfest):
+// ein Datum nahe am heutigen Tag kippt beim Datumswechsel und macht die
+// Suite an einem beliebigen Morgen rot, ohne dass sich etwas geaendert hat.
 const MA = [
-  // diensthundefuehrer testet die neue zweite Liste in "Rollen & Berechtigungen"
-  // (ENT-285) -- eine Person, die sowohl bei einer Rolle als auch bei einem
-  // Faehigkeitsmerkmal auftaucht, nicht zwei unabhaengige Fixtures.
+  // diensthundefuehrer testet den Block "Einsatzmerkmale" auf der zentralen
+  // Seite -- eine Person, die sowohl bei einem Profil als auch bei einem
+  // Merkmal auftaucht, nicht zwei unabhaengige Fixtures.
   { id: 1, name: 'chefin', vorname: 'Eine', nachname: 'Leitung', personalnummer: 'P-001',
-    ist_admin: true, aktiv: 1, erstellt_am: '2025-01-02', rollen: ['verwaltung'], diensthundefuehrer: 1 },
+    ist_admin: true, aktiv: 1, erstellt_am: '2025-01-02', rollen: ['verwaltung'],
+    diensthundefuehrer: 1, diensthund_bewilligung_bis: '2099-12-31',
+    waffentragberechtigt: 0, revierdienst_berechtigt: 0 },
   { id: 2, name: 'planer', vorname: 'Zwei', nachname: 'Planung', personalnummer: 'P-002',
-    ist_admin: false, aktiv: 1, erstellt_am: '2025-02-03', rollen: ['planung'] },
+    ist_admin: false, aktiv: 1, erstellt_am: '2025-02-03', rollen: ['planung'],
+    // Haekchen gesetzt, Bewilligung laengst abgelaufen -- der Fall, den die
+    // Seite beanstanden muss.
+    diensthundefuehrer: 0, waffentragberechtigt: 1, waffe_bewilligung_bis: '2019-03-31',
+    revierdienst_berechtigt: 0 },
   { id: 3, name: 'hilfe', vorname: 'Drei', nachname: 'Mitarbeit', personalnummer: 'P-003',
-    ist_admin: false, aktiv: 1, erstellt_am: '2025-03-04', rollen: ['mitarbeitend'] },
+    ist_admin: false, aktiv: 1, erstellt_am: '2025-03-04', rollen: ['mitarbeitend'],
+    // Haekchen gesetzt, ueberhaupt keine Bewilligung erfasst -- eine ANDERE
+    // Aussage als "abgelaufen" und darum ein eigener Text.
+    diensthundefuehrer: 1, waffentragberechtigt: 0, revierdienst_berechtigt: 1 },
 ];
 const LISTEN = { funktion: [{ id: 1, bezeichnung: 'Sicherheitsmitarbeiter' }], abteilung: [] };
 
@@ -51,6 +93,13 @@ let rollenEingerichtet = true;
 // auf GET (Vorschau) wie auf POST (Ausfuehrung), genau wie der echte
 // Endpunkt -- lmMigAntwort wird je Testfall gesetzt.
 let lmMigAntwort = null, lmMigAufruf = null;
+// Zentrale Rollenseite (ENT-440): was der Versuchsaufbau zurueckmeldet und
+// was die Oberflaeche an ihn geschickt hat.
+let profilGesendet = null, zuteilGesendet = null, loeschGesendet = null;
+let rollenAntwortFehler = null;
+// Antwort mit status:'ok', aber ohne die drei Listen -- so sieht es aus,
+// wenn ein Zwischenspeicher oder ein halb ausgerollter Deploy antwortet.
+let rollenAntwortUnvollstaendig = false;
 // Personalnummern-Nachtrag (ENT-387): gleiches Mock-Muster.
 let pnMigAntwort = null, pnMigAufruf = null;
 
@@ -83,10 +132,37 @@ await page.route('**/api/**', r => {
     return send(logAntwort || { status: 'ok', eingerichtet: true, eintraege: LOG, grenze: 200, gekuerzt: false });
   }
   if (u.includes('mitarbeiter_dossier')) {
-    return send({ status: 'ok', eingerichtet: true, vertraulich: kann('personal_vertraulich'),
+    return send({ status: 'ok', eingerichtet: true, vertraulich: kann('personal_vertraulich_lesen'),
       darf_aendern: kann('personal_schreiben'),
-      darf_rollen: kann('rechte'),
+      darf_rollen: kann('rechte_schreiben'),
+      profile: PROFILE.map(({ schluessel, titel, text, system }) => ({ schluessel, titel, text, system })),
       mitarbeiter: { ...MA[1], rollen: dossierRollen, sprache: 'de' } });
+  }
+  // ── Die zentrale Rollenseite (ENT-440) ──
+  if (u.includes('rollen_list')) {
+    if (!kann('rechte_lesen')) return send({ status: 'error', message: 'Dafür fehlt dir die Berechtigung.' }, 403);
+    if (rollenAntwortUnvollstaendig) { return send({ status: 'ok', eingerichtet: true }); }
+    return send({ status: 'ok', eingerichtet: rollenEingerichtet,
+      bereiche: BEREICHE.map(b => ({ ...b, text: 'Was ' + b.titel + ' umfasst.' })),
+      profile: PROFILE,
+      personen: MA,
+      darf_aendern: kann('rechte_schreiben'),
+      darf_merkmale: kann('personal_schreiben') });
+  }
+  if (u.includes('rolle_speichern')) {
+    profilGesendet = koerper();
+    if (rollenAntwortFehler) return send({ status: 'error', message: rollenAntwortFehler }, 400);
+    return send({ status: 'ok', schluessel: profilGesendet.schluessel || 'neues_profil' });
+  }
+  if (u.includes('rolle_loeschen')) {
+    loeschGesendet = koerper();
+    if (rollenAntwortFehler) return send({ status: 'error', message: rollenAntwortFehler }, 400);
+    return send({ status: 'ok' });
+  }
+  if (u.includes('rollen_zuteilen')) {
+    zuteilGesendet = koerper();
+    if (rollenAntwortFehler) return send({ status: 'error', message: rollenAntwortFehler }, 400);
+    return send({ status: 'ok' });
   }
   if (u.includes('mitarbeiter_update') || u.includes('mitarbeiter_create')) {
     gesendet = koerper();
@@ -95,11 +171,12 @@ await page.route('**/api/**', r => {
   if (u.includes('mitarbeiter_list')) {
     return send({ status: 'ok', mitarbeiter: MA, listen: LISTEN, eingerichtet: true,
       darf_aendern: kann('personal_schreiben'),
-      darf_rollen: kann('rechte'),
+      darf_rollen: kann('rechte_schreiben'),
+      profile: PROFILE.map(({ schluessel, titel, text, system }) => ({ schluessel, titel, text, system })),
       rollen_eingerichtet: rollenEingerichtet });
   }
   if (u.includes('mitarbeiter_zugang_migrieren')) {
-    if (!kann('rechte')) return send({ status: 'error', message: 'Dafür fehlt dir die Berechtigung.' }, 403);
+    if (!kann('rechte_schreiben')) return send({ status: 'error', message: 'Dafür fehlt dir die Berechtigung.' }, 403);
     const methode = r.request().method();
     lmMigAufruf = { methode, body: methode === 'POST' ? koerper() : null };
     if (methode === 'POST' && (!lmMigAufruf.body || lmMigAufruf.body.bestaetigt !== true)) {
@@ -138,45 +215,35 @@ const sichtbar = sel => page.evaluate(s => {
 }, sel);
 
 // ══════════════ DER KATALOG STIMMT MIT DEM SERVER UEBEREIN
+// Seit ENT-440 kommen die Bereiche der Matrix vom SERVER (rollen_list.php)
+// und stehen nicht mehr in einer Liste im Browser -- die frueher hier
+// geprueften zwei Fassungen gibt es nicht mehr. Geblieben ist EINE
+// Spiegelung: die fuenf Systemrollen in `const ROLLEN` als Rueckfall fuer
+// den Zustand VOR der Einrichtung. Laeuft die auseinander, zeigt die
+// Oberflaeche vor der Einrichtung andere Rollen an, als der Server kennt.
 try {
-  const { readFileSync } = await import('fs');
-  const php = readFileSync(`${WURZEL}/backend/rechte.php`, 'utf8');
-  const html = readFileSync(`${WURZEL}/dashboard.html`, 'utf8');
-  // Die Oberflaeche spiegelt den Katalog aus rechte.php. Laufen die beiden
-  // auseinander, verspricht ein Kaestchen etwas anderes, als der Server tut.
-  const phpRollen = [...php.matchAll(/^const ROLLE_\w+\s*=\s*'([a-z]+)';/gm)].map(m => m[1]);
-  // Nur INNERHALB von "const ROLLEN = [ ... ];" suchen, nicht im ganzen
-  // Dokument (ENT-325): Das Muster "zwei Leerzeichen, ['kennung', 'Text',"
-  // ist nicht den Rollen vorbehalten. Es traf beim Umbau der
-  // Arbeitsergebnisse auch AE_REITER -- die Suite meldete daraufhin
-  // "Wachbuch" als unbekannte Rolle, obwohl am Rollen-Katalog nichts
-  // geaendert war. Eine Pruefung, die an einer ganz anderen Aenderung
-  // anschlaegt, sagt nichts mehr ueber ihre eigene Aussage aus.
+  const html = _lies(`${WURZEL}/dashboard.html`, 'utf8');
+  check('Die Bereiche lassen sich aus rechte.php ueberhaupt ablesen', BEREICHE.length > 0);
+  check('KRITISCH: es sind die 20 Bereiche aus ENT-440 -- die feste Zahl zwingt jeden, der einen ergaenzt, hier vorbeizukommen',
+    BEREICHE.length === 20);
+  check('KRITISCH: jeder Bereich kennt mindestens die Stufe "lesen"',
+    BEREICHE.every(b => b.stufen.includes('lesen')));
+  check('KRITISCH: das Logbuch hat keine Schreibstufe (ENT-077: es ist nur lesend)',
+    !(BEREICHE.find(b => b.schluessel === 'logbuch') || { stufen: ['schreiben'] }).stufen.includes('schreiben'));
+  check('Daraus ergeben sich 36 Rechte', ALLE_RECHTE.length === 36);
+
+  // Die fuenf Systemrollen: Server gegen Rueckfallliste der Oberflaeche.
+  const phpRollen = [...RECHTE_PHP.matchAll(/^const ROLLE_\w+\s*=\s*'([a-z]+)';/gm)].map(m => m[1]);
   const rollenBlock = (html.match(/^const ROLLEN = \[$([\s\S]*?)^\];$/m) || [, ''])[1];
-  const jsRollen  = [...rollenBlock.matchAll(/^  \['([a-z]+)', '[^']+',$/gm)].map(m => m[1]);
-  check('Der Rollen-Katalog der Oberflaeche ist ueberhaupt auffindbar', jsRollen.length > 0);
-  // Waechtersystem (ENT-169/ENT-180) steckt serverseitig schon immer im
-  // selben Rollen-Katalog wie die anderen vier. Bis ENT-285 stand sie in
-  // der Oberflaeche trotzdem in einem eigenen Reiter (mdtab-waechter,
-  // ENT-186/ENT-189) statt im selben Kaestchen-Block -- seit ENT-285 nicht
-  // mehr, darum jetzt ein direkter Abgleich ohne Ausnahmeliste.
-  check('KRITISCH: die Oberflaeche kennt genau die Rollen des Servers',
+  const jsRollen = [...rollenBlock.matchAll(/^  \['([a-z]+)', '[^']+',$/gm)].map(m => m[1]);
+  check('Der Rueckfall-Katalog der Oberflaeche ist ueberhaupt auffindbar', jsRollen.length > 0);
+  check('KRITISCH: die Oberflaeche kennt als Rueckfall genau die Systemrollen des Servers',
     JSON.stringify(phpRollen) === JSON.stringify(jsRollen));
-  // Nur aus dem Rumpf von rechte_katalog() lesen -- sonst zaehlen die
-  // Meldungstexte weiter unten mit, die genauso aussehen. Genau das ist der
-  // ersten Fassung dieser Pruefung passiert.
-  const rumpf = (php.match(/function rechte_katalog\(\): array\s*\{[\s\S]*?\n\}/) || [''])[0];
-  const phpRechte = [...rumpf.matchAll(/'(\w+)' *=> '[^']+',/g)].map(m => m[1]);
-  // Zwoelf seit ENT-180 (drei Waechtersystem-Rechte) und ENT-181 ('offerten'),
-  // dreizehn seit ENT-421 ('mitteilungen').
-  // Die feste Zahl ist Absicht und keine Bequemlichkeit: Sie zwingt jeden,
-  // der ein Recht ergaenzt, hier vorbeizukommen und es bewusst zu tun -- die
-  // Regel aus ENT-077 lautet "grob geschnitten, nicht sechzig", und ein
-  // stillschweigend wachsender Katalog waere genau der Weg dorthin.
-  check('Der Server kennt genau die acht urspruenglichen plus drei Waechtersystem-, ein Offerten- und ein Mitteilungsrecht (ENT-169/ENT-180/ENT-181/ENT-421)',
-    phpRechte.length === 13 && phpRechte.includes('personal_vertraulich')
-    && phpRechte.includes('rundgang_verwalten') && phpRechte.includes('offerten')
-    && phpRechte.includes('mitteilungen'));
+  // Und der Rueckfall darf nicht die WAHRHEIT werden: Sobald der Server
+  // Profile mitschickt, muss die Oberflaeche diese benutzen -- sonst
+  // erschiene ein eigenes Profil nie.
+  check('KRITISCH: die Oberflaeche uebernimmt die Profile des Servers, statt bei der Rueckfallliste zu bleiben',
+    /function profileUebernehmen\(/.test(html) && (html.match(/profileUebernehmen\(/g) || []).length >= 4);
 } catch (e) { check('Katalogvergleich lief durch: ' + e.message, false); }
 
 // ══════════════ VOLLE RECHTE: ALLES DA
@@ -209,28 +276,63 @@ try {
 
 // ══════════════ ROLLE PLANUNG: WENIGER KNOEPFE
 try {
-  meineRechte = ['plan', 'kunden', 'abgleich', 'personal_lesen'];
+  meineRechte = ['einsaetze_lesen', 'einsaetze_schreiben', 'kunden_lesen', 'kunden_schreiben',
+                 'abgleich_lesen', 'abgleich_schreiben', 'personal_lesen', 'abwesenheiten_lesen',
+                 'verfuegbarkeit_lesen', 'auslagen_lesen'];
   meineRollen = ['planung'];
   check('Die Planung kommt ebenfalls ins Dashboard, nicht nur Admins', await anmelden());
   check('Die Kopfzeile nennt "Planung"', /Planung/.test(await page.textContent('#uRole')));
   check('Planung sieht die Einsatzplanung', await sichtbar('nav-planung'));
   check('Planung sieht die Mitarbeitendenliste', await sichtbar('nav-admin-mitarbeiter'));
-  check('KRITISCH: Planung sieht den Betrieb nicht', !(await sichtbar('nav-admin-betrieb')));
+  check('KRITISCH: Planung sieht die Einstellungen nicht', !(await sichtbar('nav-admin-betrieb')));
   check('KRITISCH: Planung sieht die Einrichtung nicht', !(await sichtbar('nav-einrichtung')));
   check('KRITISCH: Planung sieht den Verlaufs-Reiter nicht',
     !(await sichtbar('mdtab-verlauf')));
+  check('Planung sieht Pensen, Auslagen und Abwesenheiten',
+    await sichtbar('nav-kontrolle-pensen') && await sichtbar('nav-kontrolle-auslagen')
+    && await sichtbar('nav-kontrolle-abwesenheiten'));
+} catch (e) { check('Abschnitt Planung ohne Abbruch: ' + e.message, false); }
+
+// ══════════════ JEDES KIND DER RUBRIK "AUSWERTUNG" AN SEINER EIGENEN ZEILE
+// Bis ENT-440 hing die ganze Rubrik an einem einzigen Recht. Mit Stufen je
+// Bereich waere das eine Rubrik, die aufgeht und dahinter alles gesperrt
+// zeigt -- und ein Menuepunkt, der auf ein 403 fuehrt (genau so stand
+// "Auslagenersatz" bis dahin schon mit dem Planungsrecht da, obwohl der
+// Endpunkt dahinter das Abgleichsrecht verlangte).
+try {
+  meineRechte = ['abwesenheiten_lesen'];
+  meineRollen = ['personal'];
+  await anmelden();
+  check('KRITISCH: die Rubrik erscheint, sobald EIN Kind sichtbar ist',
+    await sichtbar('navg-kontrolle'));
+  check('KRITISCH: und zwar nur dieses eine — die anderen drei bleiben weg',
+    await sichtbar('nav-kontrolle-abwesenheiten')
+    && !(await sichtbar('nav-kontrolle-pensen'))
+    && !(await sichtbar('nav-kontrolle-auslagen'))
+    && !(await sichtbar('nav-kontrolle-arbeitsergebnisse')));
+
+  // Ohne ein einziges Kind darf die Rubrik gar nicht dastehen -- eine
+  // aufklappbare Rubrik ohne Inhalt ist schlimmer als keine.
+  meineRechte = ['kunden_lesen'];
+  await anmelden();
+  check('KRITISCH: ohne jedes Kind verschwindet die ganze Rubrik',
+    !(await sichtbar('navg-kontrolle')));
 
   await page.evaluate(() => { go('mitarbeiter'); openMaDetail('planer'); });
   await page.waitForTimeout(800);
   await page.evaluate(() => mdBearbeiten());
   await page.waitForTimeout(600);
-  check('KRITISCH: ohne Recht zur Rollenvergabe gibt es keine Rollenkästchen',
+  check('KRITISCH: ohne Recht zur Profilvergabe gibt es keine Profilkästchen in der Akte',
     await page.evaluate(() => !document.getElementById('maRolle_verwaltung')));
-  check('Aber die Rollen stehen trotzdem da — "darf ich nicht sehen" wäre etwas anderes als "keine"',
+  check('Aber die Profile stehen trotzdem da — "darf ich nicht sehen" wäre etwas anderes als "keine"',
     /Planung/.test(await page.textContent('#mv-bearbeiten')));
 } catch (e) { check('Abschnitt Planung ohne Abbruch: ' + e.message, false); }
 
-// ══════════════ ROLLEN VERGEBEN
+// ══════════════ DIE AKTE ZEIGT PROFILE, VERGIBT SIE ABER NICHT MEHR (ENT-440)
+// Der Kern der Umstellung: Bis ENT-440 wurden die Rollen hier vergeben
+// (ENT-077: "dort, wo man ohnehin ist"). Jetzt gibt es dafuer genau EINEN
+// Ort -- die zentrale Seite. Zwei Bedienwege fuer dieselbe Sache waeren
+// zwei Stellen zum Pflegen und zwei zum Pruefen.
 try {
   meineRechte = ALLE_RECHTE; meineRollen = ['verwaltung'];
   await anmelden();
@@ -238,59 +340,49 @@ try {
   await page.waitForTimeout(800);
   await page.evaluate(() => mdBearbeiten());
   await page.waitForTimeout(600);
-  // Seit ENT-287 liegen die Rollen im Bereich "Zugang" -- nicht mehr am Ende
-  // der Personalien. Der Weg dorthin ist ein Reiterklick, wie beim Planer.
   await page.click('#mbtab-zugang');
   await page.waitForTimeout(300);
 
-  check('KRITISCH: die Rollen werden in der Personalakte vergeben, nicht in einem eigenen Bereich',
-    await page.evaluate(() => !!document.getElementById('maRolle_verwaltung')
-      && !!document.getElementById('mv-bearbeiten').contains(document.getElementById('maRolle_verwaltung'))));
-  check('KRITISCH: die Rollen stehen im Bereich "Zugang", nicht bei den Personalien (ENT-287)',
-    await page.evaluate(() => document.getElementById('maRolle_verwaltung')
-      .closest('.mb-bereich').dataset.bereich === 'zugang'));
-  check('Alle fünf Rollen stehen zur Wahl, Wächtersystem eingeschlossen (ENT-285)',
+  check('KRITISCH: in der Akte gibt es keine Profilkästchen mehr, auch nicht für die Verwaltung',
     await page.evaluate(() => ['mitarbeitend', 'planung', 'personal', 'verwaltung', 'waechter']
-      .every(r => !!document.getElementById('maRolle_' + r))));
-  check('Die bestehende Rolle ist angehakt, die anderen nicht',
-    await page.evaluate(() => document.getElementById('maRolle_planung').checked
-      && !document.getElementById('maRolle_verwaltung').checked));
-  check('Zu jeder Rolle steht, was sie darf',
-    /AHV-Nummer/.test(await page.textContent('#mv-bearbeiten')));
+      .every(r => !document.getElementById('maRolle_' + r))));
+  const zugang = (await page.textContent('#mv-bearbeiten')).replace(/\s+/g, ' ');
+  check('KRITISCH: die zugeteilten Profile stehen trotzdem da — sonst sähe "kein Zugriff" wie "keine Rolle" aus',
+    /Planung/.test(zugang));
+  check('Und die Akte sagt, WO zugeteilt wird, statt es nur wegzulassen',
+    /zentral/i.test(zugang) && /Berechtigungen/.test(zugang));
 
-  // Mehrfachauswahl -- der Grund fuer das Datenmodell
+  // Speichern der Akte darf keine Profile mehr mitschicken -- sonst
+  // ueberschriebe ein Speichern still das, was zentral gesetzt wurde.
   gesendet = null;
-  await page.check('#maRolle_personal');
   await page.evaluate(() => mbSpeichern());
   await page.waitForTimeout(600);
-  check('KRITISCH: zwei Rollen lassen sich gleichzeitig setzen',
-    gesendet && Array.isArray(gesendet.rollen)
-    && gesendet.rollen.includes('planung') && gesendet.rollen.includes('personal'));
+  check('KRITISCH: ein Speichern aus der Akte schickt keine Profile mit',
+    gesendet !== null && !('rollen' in gesendet));
+} catch (e) { check('Abschnitt Akte zeigt nur ohne Abbruch: ' + e.message, false); }
 
-  // Keine Rolle -> Hinweis statt stiller Rechteverlust
-  await page.evaluate(() => { go('mitarbeiter'); openMaDetail('planer'); });
+// ══════════════ ANLEGEN: DIE PROFILWAHL BLEIBT IN DER MASKE
+// Bewusste Ausnahme (ENT-440): Ein neues Konto haette sonst bis zum ersten
+// Besuch der Zuteilungsseite einen unbestimmten Zustand.
+try {
+  meineRechte = ALLE_RECHTE; meineRollen = ['verwaltung'];
+  await anmelden();
+  await page.evaluate(() => { go('mitarbeiter'); mbNeu(); });
   await page.waitForTimeout(700);
-  await page.evaluate(() => mdBearbeiten());
-  await page.waitForTimeout(500);
-  await page.click('#mbtab-zugang');
-  await page.waitForTimeout(300);
-  gesendet = null;
-  await page.evaluate(() => {
-    ['mitarbeitend', 'planung', 'personal', 'verwaltung', 'waechter'].forEach(r => {
-      const k = document.getElementById('maRolle_' + r);
-      if (k) { k.checked = false; }
-    });
-    mbSpeichern();
-  });
-  await page.waitForTimeout(500);
-  check('KRITISCH: gar keine Rolle wird nicht gespeichert, sondern beanstandet',
-    gesendet === null);
-} catch (e) { check('Abschnitt Rollenvergabe ohne Abbruch: ' + e.message, false); }
+  check('KRITISCH: beim Anlegen stehen die Profile weiterhin zur Wahl',
+    await page.evaluate(() => !!document.getElementById('mbNeuRolle_mitarbeitend')
+      && !!document.getElementById('mbNeuRolle_verwaltung')));
+  check('KRITISCH: auch die EIGENEN Profile stehen zur Wahl, nicht nur die fünf Systemrollen',
+    await page.evaluate(() => !!document.getElementById('mbNeuRolle_dispo_ohne_kunden')));
+  check('Das kleinste Profil ist vorausgewählt — Rechte entstehen nie aus Versehen',
+    await page.isChecked('#mbNeuRolle_mitarbeitend')
+    && !(await page.isChecked('#mbNeuRolle_verwaltung')));
+} catch (e) { check('Abschnitt Anlegen ohne Abbruch: ' + e.message, false); }
 
 // ══════════════ LOGIN-NAME UND PERSONALNUMMER VON HAND AENDERN (ENT-393)
 // Beide sind fuer alle anderen gesperrt (ENT-376/381/387) -- diese Karte
 // prueft die eine Ausnahme: dieselbe Rechteschwelle wie Rollenvergabe
-// ('rechte', exklusiv Verwaltung), und dass eine falsche Eingabe gar nicht
+// ('rechte_schreiben', exklusiv Verwaltung), und dass eine falsche Eingabe gar nicht
 // erst zum Server geht.
 try {
   meineRechte = ALLE_RECHTE; meineRollen = ['verwaltung'];
@@ -348,7 +440,7 @@ try {
   check('Unveraendert gelassen wird kein "name_neu" mitgeschickt',
     gesendet && !('name_neu' in gesendet));
 
-  // Ohne das Recht "rechte" bleibt beides gesperrt wie bisher.
+  // Ohne das Recht "rechte_schreiben" bleibt beides gesperrt wie bisher.
   meineRechte = ['personal_lesen', 'personal_schreiben']; meineRollen = ['personal'];
   await anmelden();
   await page.evaluate(() => { go('mitarbeiter'); openMaDetail('planer'); });
@@ -357,19 +449,19 @@ try {
   await page.waitForTimeout(600);
   await page.click('#mbtab-zugang');
   await page.waitForTimeout(300);
-  check('KRITISCH: ohne das Recht "rechte" bleibt der Login-Name reiner Text, kein Eingabefeld',
+  check('KRITISCH: ohne das Recht "rechte_schreiben" bleibt der Login-Name reiner Text, kein Eingabefeld',
     (await page.$('#mbLoginNeu')) === null
     && (await page.textContent('#mbKarten')).includes('planer'));
   await page.click('#mbtab-anstellung');
   await page.waitForTimeout(300);
-  check('KRITISCH: ohne das Recht "rechte" bleibt die Personalnummer gesperrt',
+  check('KRITISCH: ohne das Recht "rechte_schreiben" bleibt die Personalnummer gesperrt',
     await page.isDisabled('#mb_personalnummer'));
 } catch (e) { check('Abschnitt Login-Name/Personalnummer von Hand ohne Abbruch: ' + e.message, false); }
 
-// ══════════════ WAECHTERSYSTEM: FUENFTE ROLLE STATT EIGENER REITER (ENT-285)
-// Bis ENT-285 hatte diese Rolle einen eigenen Reiter (ENT-169/ENT-186) --
-// hier wird geprueft, dass sie jetzt genau denselben Kaestchen-Weg nimmt
-// wie die anderen vier, und dass vom alten Reiter nichts liegen blieb.
+// ══════════════ WAECHTERSYSTEM: KEIN EIGENER REITER (ENT-285/ENT-440)
+// Bis ENT-285 hatte diese Rolle einen eigenen Reiter (ENT-169/ENT-186).
+// Hier wird geprueft, dass vom alten Reiter nichts liegen blieb -- vergeben
+// wird sie seit ENT-440 auf der zentralen Seite wie jedes andere Profil.
 try {
   meineRechte = ALLE_RECHTE; meineRollen = ['verwaltung']; dossierRollen = ['planung'];
   await anmelden();
@@ -382,45 +474,7 @@ try {
   check('KRITISCH: die alten Funktionen dafuer sind nicht mehr da (kein still liegen gebliebener Pfad)',
     await page.evaluate(() => typeof window.mdWaechter === 'undefined'
       && typeof window.mdWaechterSpeichern === 'undefined'));
-
-  await page.evaluate(() => mdBearbeiten());
-  await page.waitForTimeout(600);
-  await page.click('#mbtab-zugang');
-  await page.waitForTimeout(300);
-  check('KRITISCH: das Waechtersystem-Kaestchen steht in derselben Liste wie die anderen vier Rollen',
-    await page.evaluate(() => document.getElementById('mv-bearbeiten')
-      .contains(document.getElementById('maRolle_waechter'))));
-  check('Ohne die Rolle ist das Kaestchen leer', !(await page.isChecked('#maRolle_waechter')));
-  await page.screenshot({ path: `${OUT}/rollen-01-waechter-kaestchen.png` });
-
-  gesendet = null;
-  await page.check('#maRolle_waechter');
-  await page.evaluate(() => mbSpeichern());
-  await page.waitForTimeout(500);
-  check('KRITISCH: Vergeben sendet die BISHERIGEN Rollen plus waechter, ueber denselben Speichern-Weg wie alle anderen Rollen',
-    gesendet && Array.isArray(gesendet.rollen)
-    && gesendet.rollen.includes('planung') && gesendet.rollen.includes('waechter'));
-
-  // Jetzt hat die Person die Rolle bereits (dossierRollen entsprechend
-  // nachgezogen) -- das Kaestchen muss das beim erneuten Oeffnen zeigen.
-  dossierRollen = ['planung', 'waechter'];
-  await page.evaluate(() => { go('mitarbeiter'); openMaDetail('planer'); });
-  await page.waitForTimeout(700);
-  await page.evaluate(() => mdBearbeiten());
-  await page.waitForTimeout(500);
-  await page.click('#mbtab-zugang');
-  await page.waitForTimeout(300);
-  check('Mit der Rolle ist das Kaestchen angehakt', await page.isChecked('#maRolle_waechter'));
-
-  gesendet = null;
-  await page.uncheck('#maRolle_waechter');
-  await page.evaluate(() => mbSpeichern());
-  await page.waitForTimeout(500);
-  check('KRITISCH: Entziehen sendet die verbleibenden Rollen ohne waechter, nicht leer',
-    gesendet && Array.isArray(gesendet.rollen)
-    && gesendet.rollen.includes('planung') && !gesendet.rollen.includes('waechter'));
-  dossierRollen = ['planung'];
-} catch (e) { check('Abschnitt Waechtersystem als fuenfte Rolle ohne Abbruch: ' + e.message, false); }
+} catch (e) { check('Abschnitt Waechtersystem ohne Abbruch: ' + e.message, false); }
 
 // ══════════════ DER VERLAUF
 try {
@@ -468,29 +522,191 @@ try {
   logAntwort = null;
 } catch (e) { check('Abschnitt Verlauf ohne Abbruch: ' + e.message, false); }
 
-// ══════════════ ROLLENUEBERSICHT UNTER BETRIEB
+// ══════════════ DIE ZENTRALE SEITE: PROFILE (ENT-440)
 try {
   meineRechte = ALLE_RECHTE; meineRollen = ['verwaltung'];
   await anmelden();
   await page.evaluate(() => { go('betrieb'); bkAbschnittZeigen('rv'); });
   await page.waitForTimeout(900);
-  check('KRITISCH: die Karte heisst jetzt breiter, weil sie mehr als nur Rollen zeigt (ENT-285)',
-    /Berechtigungen/.test(await page.textContent('#rvKarte h3')));
   const r = (await page.textContent('#rvInhalt')).replace(/\s+/g, ' ');
-  check('Die Übersicht zeigt alle fünf Rollen, Wächtersystem eingeschlossen (ENT-285)',
+  check('Die Profilliste zeigt alle fünf Systemrollen, Wächtersystem eingeschlossen',
     /Mitarbeitend/.test(r) && /Planung/.test(r) && /Personal/.test(r) && /Verwaltung/.test(r)
     && /Wächtersystem/.test(r));
-  check('Und wer sie hat', /Eine Leitung/.test(r) && /Zwei Planung/.test(r));
-  check('KRITISCH: eine Rolle ohne Personen sagt "niemand" statt leer zu bleiben',
-    /niemand/.test(r));
-  check('Sie verweist auf die Personalakte zum Vergeben — nicht auf einen zweiten Bereich',
-    /Personalakte/.test(r) && /Zugang/.test(r));
-  check('KRITISCH: dieselbe Karte zeigt jetzt auch die Ja/Nein-Fähigkeitsmerkmale, nicht nur Rollen (ENT-285)',
-    /Diensthund/.test(r) && /Schusswaffe/.test(r) && /Revierdienst/.test(r));
-  const eineLeitungTreffer = (r.match(/Eine Leitung/g) || []).length;
-  check('KRITISCH: dieselbe Person erscheint sowohl bei ihrer Rolle (Verwaltung) als auch beim Merkmal (Diensthund) — zwei Zeilen, eine Person',
-    eineLeitungTreffer >= 2);
-} catch (e) { check('Abschnitt Rollenübersicht ohne Abbruch: ' + e.message, false); }
+  check('KRITISCH: und das eigene Profil daneben — sonst wäre "eigene Profile" nur eine Behauptung',
+    /Disposition ohne Kundenpflege/.test(r));
+  check('KRITISCH: Systemrollen sind als solche gekennzeichnet, nicht nur nicht änderbar',
+    (r.match(/Systemrolle/g) || []).length >= 5);
+  check('Zu jedem Profil steht, was es darf', /Personalakte/.test(r) || /AHV/.test(r) || /Einsätze/.test(r));
+  check('Die Trägerzahl steht am Profil — die Frage "wer kommt an die Personalakte" ohne Suchen',
+    await page.evaluate(() => document.querySelectorAll('#rvInhalt .chip').length >= 6));
+  await page.screenshot({ path: `${OUT}/rollen-01-profile.png` });
+
+  // ── Die Matrix
+  await page.evaluate(() => rvProfilOeffnen('dispo_ohne_kunden'));
+  await page.waitForTimeout(500);
+  check('Ein eigenes Profil lässt sich öffnen', await sichtbar('rvEditKarte'));
+  const m = (await page.textContent('#rvEditInhalt')).replace(/\s+/g, ' ');
+  check('KRITISCH: die Matrix zeigt alle 20 Bereiche',
+    await page.evaluate(() => document.querySelectorAll('#rvEditInhalt .rm-zeile').length) === 20);
+  check('Sie sind in die sechs Gruppen geteilt',
+    await page.evaluate(() => document.querySelectorAll('#rvEditInhalt .rm-gruppe-hd').length) === 6);
+  check('KRITISCH: Bereiche ohne Schreibweg zeigen zwei Schalter statt drei — ein Schreibschalter ohne Schreibweg wäre eine Behauptung',
+    await page.evaluate(() => {
+      const zeilen = [...document.querySelectorAll('#rvEditInhalt .rm-zeile')];
+      const logbuch = zeilen.find(z => /Logbuch/.test(z.textContent));
+      const kunden  = zeilen.find(z => /^Kunden/.test(z.querySelector('b').textContent));
+      return logbuch.querySelectorAll('.rm-stufe').length === 2
+          && kunden.querySelectorAll('.rm-stufe').length === 3;
+    }));
+  check('KRITISCH: die gesetzte Stufe ist erkennbar, nicht nur gespeichert',
+    await page.evaluate(() => {
+      const k = [...document.querySelectorAll('#rvEditInhalt .rm-stufe[data-bereich="kunden"]')];
+      return k.find(x => x.dataset.stufe === 'lesen').classList.contains('aktiv')
+          && !k.find(x => x.dataset.stufe === 'schreiben').classList.contains('aktiv');
+    }));
+  check('Die Stufen stehen ausgeschrieben da, nicht als zu erratendes Symbol',
+    /verborgen/.test(m) && /lesen/.test(m) && /schreiben/.test(m));
+
+  // GEMESSEN, nicht im Quelltext nachgelesen (CLAUDE.md). Beide Befunde hier
+  // waren in der ersten Fassung falsch und fielen erst am gerenderten Bild
+  // auf: (1) "verborgen" und "lesen" trugen im aktiven Zustand DIESELBE
+  // Farbe -- die Spalte liess sich nicht ueberfliegen; (2) zweistufige
+  // Zeilen dehnten ihre zwei Segmente auf die Breite von dreien, sodass
+  // "verborgen" je nach Zeile an einer anderen Stelle begann.
+  const gemessen = await page.evaluate(() => {
+    const zeilen = [...document.querySelectorAll('#rvEditInhalt .rm-zeile')];
+    const farbe = st => {
+      const k = document.querySelector(`.rm-stufe.aktiv.stufe-${st}`);
+      return k ? getComputedStyle(k).backgroundColor : null;
+    };
+    const spalte = st => new Set(zeilen
+      .map(z => z.querySelector(`.rm-stufe[data-stufe="${st}"]`))
+      .filter(Boolean)
+      .map(k => Math.round(k.getBoundingClientRect().left))).size;
+    return {
+      farben: [farbe('verborgen'), farbe('lesen'), farbe('schreiben')],
+      verborgenX: spalte('verborgen'), lesenX: spalte('lesen'),
+      hoehe: Math.round(zeilen[0].querySelector('.rm-stufe').getBoundingClientRect().height),
+    };
+  });
+  check('KRITISCH: die drei Stufen sehen im aktiven Zustand VERSCHIEDEN aus — sonst muss man jedes Wort lesen',
+    gemessen.farben.every(f => f) && new Set(gemessen.farben).size === 3);
+  check('KRITISCH: "verborgen" steht in jeder Zeile an derselben Stelle',
+    gemessen.verborgenX === 1);
+  check('KRITISCH: "lesen" ebenso — auch in Zeilen, die keine Schreibstufe haben',
+    gemessen.lesenX === 1);
+  check('Die Schalter sind hoch genug zum Treffen', gemessen.hoehe >= 30);
+  await page.screenshot({ path: `${OUT}/rollen-02-matrix.png` });
+
+  // Umschalten und speichern
+  profilGesendet = null;
+  await page.evaluate(() => rvStufeSetzen('kunden', 'schreiben'));
+  await page.waitForTimeout(200);
+  check('Ein Klick färbt die neue Stufe und nimmt die alte weg',
+    await page.evaluate(() => {
+      const k = [...document.querySelectorAll('#rvEditInhalt .rm-stufe[data-bereich="kunden"]')];
+      return k.find(x => x.dataset.stufe === 'schreiben').classList.contains('aktiv')
+          && !k.find(x => x.dataset.stufe === 'lesen').classList.contains('aktiv');
+    }));
+  await page.evaluate(() => rvProfilSpeichern());
+  await page.waitForTimeout(600);
+  check('KRITISCH: gespeichert wird der ganze Stufensatz, nicht nur die letzte Änderung',
+    profilGesendet && profilGesendet.stufen
+    && profilGesendet.stufen.kunden === 'schreiben' && profilGesendet.stufen.einsaetze === 'schreiben');
+  check('Der Schlüssel des bestehenden Profils geht mit — sonst entstünde ein zweites',
+    profilGesendet.schluessel === 'dispo_ohne_kunden');
+  check('KRITISCH: "verborgen" wird als FEHLENDE Zeile gesendet, nicht als Wert',
+    !Object.values(profilGesendet.stufen).includes('verborgen'));
+
+  // ── Systemrollen sind gesperrt
+  await page.evaluate(() => rvProfilOeffnen('verwaltung'));
+  await page.waitForTimeout(400);
+  check('KRITISCH: bei einer Systemrolle sind alle Schalter gesperrt',
+    await page.evaluate(() => [...document.querySelectorAll('#rvEditInhalt .rm-stufe')].every(b => b.disabled)));
+  check('KRITISCH: und es gibt keinen Speichern-Knopf',
+    await page.evaluate(() => !/Profil speichern/.test(document.getElementById('rvEditInhalt').textContent)));
+  check('Die Seite sagt WARUM, statt den Knopf nur wegzulassen',
+    /nicht änderbar/.test(await page.textContent('#rvEditInhalt')));
+  check('Und sie sagt, was man stattdessen tun kann',
+    /eigenes Profil/.test(await page.textContent('#rvEditInhalt')));
+} catch (e) { check('Abschnitt Profile ohne Abbruch: ' + e.message, false); }
+
+// ══════════════ DIE ZENTRALE SEITE: ZUTEILUNG (ENT-440)
+try {
+  meineRechte = ALLE_RECHTE; meineRollen = ['verwaltung'];
+  await anmelden();
+  await page.evaluate(() => { go('betrieb'); bkAbschnittZeigen('rv'); });
+  await page.waitForTimeout(900);
+  const z = (await page.textContent('#rzInhalt')).replace(/\s+/g, ' ');
+  check('KRITISCH: zugeteilt wird auf DIESER Seite, für alle Personen in einer Liste',
+    /Eine Leitung/.test(z) && /Zwei Planung/.test(z) && /Drei Mitarbeit/.test(z));
+  check('Jede Person zeigt alle Profile zur Wahl, nicht nur die gesetzten',
+    await page.evaluate(() => document.querySelectorAll('#rzInhalt tbody tr:first-child .rz-marke').length) === 6);
+  check('KRITISCH: die gesetzten Profile sind von den nicht gesetzten unterscheidbar',
+    await page.evaluate(() => {
+      const zeile = document.querySelectorAll('#rzInhalt tbody tr')[1];
+      const an = [...zeile.querySelectorAll('.rz-marke.an')].map(b => b.textContent.trim());
+      return an.length === 1 && an[0] === 'Planung';
+    }));
+  check('KRITISCH: die Folge der Zuteilung steht daneben — Cockpit oder nur App',
+    /Cockpit/.test(z) && /nur App/.test(z));
+  check('KRITISCH: die Zahl der Aktiven steht mit Bezug da, nicht nackt',
+    /3 von 3/.test(z));
+  await page.screenshot({ path: `${OUT}/rollen-03-zuteilung.png` });
+
+  // Umschalten speichert sofort
+  zuteilGesendet = null;
+  await page.evaluate(() => rzUmschalten(2, 'waechter'));
+  await page.waitForTimeout(600);
+  check('KRITISCH: ein Klick teilt zu und sendet die BISHERIGEN Profile plus das neue',
+    zuteilGesendet && zuteilGesendet.mitarbeiter_id === 2
+    && zuteilGesendet.rollen.includes('planung') && zuteilGesendet.rollen.includes('waechter'));
+
+  // Fehlschlag: der alte Stand kommt zurueck, statt auf dem Schirm zu luegen
+  rollenAntwortFehler = 'Das ist die letzte Person, die Rollen vergeben darf.';
+  await page.evaluate(() => rzUmschalten(1, 'verwaltung'));
+  await page.waitForTimeout(700);
+  check('KRITISCH: lehnt der Server ab, steht die Meldung da',
+    /letzte Person/.test(await page.textContent('#rzErr')));
+  check('KRITISCH: und die Marke springt zurück — eine Marke, die anbleibt, wäre eine Lüge auf dem Schirm',
+    await page.evaluate(() => {
+      const zeile = document.querySelectorAll('#rzInhalt tbody tr')[0];
+      return [...zeile.querySelectorAll('.rz-marke.an')].some(b => b.textContent.trim() === 'Verwaltung');
+    }));
+  rollenAntwortFehler = null;
+} catch (e) { check('Abschnitt Zuteilung ohne Abbruch: ' + e.message, false); }
+
+// ══════════════ DIE ZENTRALE SEITE: EINSATZMERKMALE (ENT-440)
+try {
+  meineRechte = ALLE_RECHTE; meineRollen = ['verwaltung'];
+  await anmelden();
+  await page.evaluate(() => { go('betrieb'); bkAbschnittZeigen('rv'); });
+  await page.waitForTimeout(900);
+  const e = (await page.textContent('#rmkInhalt')).replace(/\s+/g, ' ');
+  check('KRITISCH: die drei Einsatzmerkmale stehen auf derselben Seite, nicht in zwei anderen Reitern',
+    /Diensthund/.test(e) && /Schusswaffe/.test(e) && /Revierdienst/.test(e));
+  check('Sie sind als Eigenschaft der Person ausgewiesen, nicht als Profil',
+    /keine Profile/.test(e));
+  check('Die Seite sagt, wo das Bewilligungsdatum gepflegt wird', /Personalakte/.test(e));
+  check('KRITISCH: ein Häkchen mit abgelaufener Bewilligung wird beanstandet',
+    /abgelaufen am 31\.03\.2019/.test(e));
+  check('KRITISCH: "gar keine Bewilligung erfasst" ist eine ANDERE Aussage als "abgelaufen"',
+    /keine Bewilligung erfasst/.test(e));
+  check('KRITISCH: eine gültige Bewilligung wird NICHT beanstandet',
+    await page.evaluate(() => {
+      const zeile = document.querySelectorAll('#rmkInhalt tbody tr')[0];
+      return zeile.querySelectorAll('.rz-warn').length === 0;
+    }));
+  await page.screenshot({ path: `${OUT}/rollen-04-merkmale.png` });
+
+  gesendet = null;
+  await page.evaluate(() => rmkUmschalten(3, 'revierdienst_berechtigt'));
+  await page.waitForTimeout(600);
+  check('KRITISCH: ein Merkmal geht über den bestehenden Weg der Personalakte, nicht über einen zweiten',
+    gesendet && gesendet.name === 'hilfe' && gesendet.revierdienst_berechtigt === 0);
+  check('KRITISCH: und nur das eine Feld — sonst überschriebe ein Klick den Rest der Akte',
+    gesendet && Object.keys(gesendet).length === 2);
+} catch (e) { check('Abschnitt Einsatzmerkmale ohne Abbruch: ' + e.message, false); }
 
 // ══════════════ NICHT EINGERICHTET SIEHT NICHT WIE EINGERICHTET AUS
 // Genau das ist im Betrieb passiert: Die Zwei-Faktor-Karte meldete fehlende
@@ -504,27 +720,76 @@ try {
   await page.evaluate(() => { go('betrieb'); bkAbschnittZeigen('rv'); });
   await page.waitForTimeout(900);
   const r = (await page.textContent('#rvInhalt')).replace(/\s+/g, ' ');
-  check('KRITISCH: ohne Einrichtung sagt die Rollenkarte genau das',
+  check('KRITISCH: ohne Einrichtung sagt die Profilliste genau das',
     /[Nn]och nicht eingerichtet/.test(r));
   check('Und sie sagt, was zu tun ist', /Einrichtung/.test(r));
-  check('KRITISCH: sie zeigt KEINE Verteilung, die nach echten Rollen aussieht',
-    !/Eine Leitung/.test(r) && !/Zwei Planung/.test(r));
+  check('KRITISCH: sie sagt ausdrücklich, dass unten ein Notstand steht und kein gespeichertes Profil',
+    /kein gespeichertes Profil/.test(r));
+  check('KRITISCH: ohne Einrichtung lässt sich kein Profil anlegen, statt still zu scheitern',
+    !(await sichtbar('rvNeuKnopf')));
+  check('KRITISCH: und die Zuteilung ist gesperrt, nicht scheinbar bedienbar',
+    await page.evaluate(() => [...document.querySelectorAll('#rzInhalt .rz-marke')].every(b => b.disabled)));
   rollenEingerichtet = true;
 } catch (e) { check('Abschnitt ohne Einrichtung ohne Abbruch: ' + e.message, false); }
 
-// Ohne das Recht darf die Karte gar nicht dastehen
+// ══════════════ NUR ZUSEHEN IST ETWAS ANDERES ALS KEIN ZUGRIFF
 try {
-  meineRechte = ['plan', 'kunden', 'abgleich', 'personal_lesen', 'betrieb'];
+  meineRechte = ['rechte_lesen', 'betrieb_lesen'];
+  meineRollen = ['planung'];
+  await anmelden();
+  await page.evaluate(() => { go('betrieb'); bkAbschnittZeigen('rv'); });
+  await page.waitForTimeout(900);
+  check('Wer nur lesen darf, sieht die Seite', await sichtbar('rvKarte'));
+  check('KRITISCH: aber es gibt keinen Knopf zum Anlegen', !(await sichtbar('rvNeuKnopf')));
+  check('KRITISCH: und die Seite sagt WARUM, statt den Knopf nur wegzulassen',
+    /nicht ändern/.test(await page.textContent('#rvInhalt')));
+  check('KRITISCH: auch die Zuteilung ist gesperrt',
+    await page.evaluate(() => [...document.querySelectorAll('#rzInhalt .rz-marke')].every(b => b.disabled)));
+  check('KRITISCH: die Einsatzmerkmale ebenfalls — sie hängen an "Mitarbeitende: schreiben"',
+    await page.evaluate(() => [...document.querySelectorAll('#rmkInhalt .rz-marke')].every(b => b.disabled)));
+} catch (e) { check('Abschnitt nur lesen ohne Abbruch: ' + e.message, false); }
+
+// ══════════════ EINE UNVOLLSTAENDIGE ANTWORT IST NICHT "NICHTS VORHANDEN"
+// Genau dieser Fall hat beim Bauen von ENT-440 eine fremde Suite zum
+// Absturz gebracht: Der Versuchsaufbau antwortete mit status:'ok', aber
+// ohne die Listen -- und die Seite lief in `undefined.filter`. Ein
+// `data.profile || []` waere die falsche Behebung: Es machte aus einer
+// FEHLENDEN Liste eine LEERE, und die Seite behauptete "es gibt keine
+// Profile", wo in Wahrheit nichts geladen wurde. Dieselbe Regel wie bei
+// `data.rechte || []` in ENT-077.
+try {
+  meineRechte = ALLE_RECHTE; meineRollen = ['verwaltung'];
+  rollenAntwortUnvollstaendig = true;
+  await anmelden();
+  const fehler = [];
+  page.on('pageerror', e => fehler.push(e.message));
+  await page.evaluate(() => { go('betrieb'); bkAbschnittZeigen('rv'); });
+  await page.waitForTimeout(900);
+  const r = (await page.textContent('#rvInhalt')).replace(/\s+/g, ' ');
+  check('KRITISCH: eine Antwort ohne die Listen wirft keinen Skriptfehler',
+    fehler.length === 0);
+  check('KRITISCH: sie sagt "nicht geladen" — nicht "es gibt keine Profile"',
+    /[Nn]icht geladen/.test(r) && !/Systemrolle/.test(r));
+  check('KRITISCH: auch Zuteilung und Einsatzmerkmale sagen es, statt leer zu bleiben',
+    /[Nn]icht geladen/.test(await page.textContent('#rzInhalt'))
+    && /[Nn]icht geladen/.test(await page.textContent('#rmkInhalt')));
+  rollenAntwortUnvollstaendig = false;
+} catch (e) { check('Abschnitt unvollstaendige Antwort ohne Abbruch: ' + e.message, false); }
+
+// Ohne das Recht darf die Kachel gar nicht dastehen
+try {
+  meineRechte = ['einsaetze_lesen', 'kunden_lesen', 'abgleich_lesen', 'personal_lesen', 'betrieb_lesen'];
   meineRollen = ['planung'];
   await anmelden();
   await page.evaluate(() => go('betrieb'));
   await page.waitForTimeout(900);
-  check('KRITISCH: ohne Recht zur Rollenvergabe fehlt schon die Kachel dafuer (ENT-210)',
+  check('KRITISCH: ohne Recht auf die Rollenseite fehlt schon die Kachel dafuer (ENT-210)',
     !(await sichtbar('bkKachelRv')));
   await page.evaluate(() => bkAbschnittZeigen('rv'));
-  await page.waitForTimeout(200);
-  check('KRITISCH: ohne Recht zur Rollenvergabe fehlt die Rollenübersicht',
-    !(await sichtbar('rvKarte')));
+  await page.waitForTimeout(300);
+  check('KRITISCH: ohne Recht fehlt die Profilliste', !(await sichtbar('rvKarte')));
+  check('KRITISCH: und die Zuteilung ebenso', !(await sichtbar('rzKarte')));
+  check('KRITISCH: und die Einsatzmerkmale ebenso', !(await sichtbar('rmkKarte')));
 } catch (e) { check('Abschnitt ohne Recht ohne Abbruch: ' + e.message, false); }
 
 // ══════════════ LOGIN-NAMEN UMSTELLEN (ENT-381)
@@ -698,7 +963,7 @@ try {
   await page.waitForTimeout(900);
   check('KRITISCH: "personal_schreiben" allein reicht fuer die Personalnummern-Karte',
     await sichtbar('bkKachelPn'));
-  check('Ohne das Recht "rechte" bleibt die Login-Namen-Karte trotzdem verborgen',
+  check('Ohne das Recht "rechte_schreiben" bleibt die Login-Namen-Karte trotzdem verborgen',
     !(await sichtbar('bkKachelRv')));
   meineRechte = ALLE_RECHTE; meineRollen = ['verwaltung'];
 } catch (e) { check('Abschnitt Personalnummern-Recht ohne Abbruch: ' + e.message, false); }

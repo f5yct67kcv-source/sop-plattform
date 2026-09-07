@@ -30,7 +30,7 @@ $user = require_session();
 // Derselbe Massstab wie beim Rapport-Ausdruck: Wer Kundenberichte erzeugt,
 // sieht ohnehin alle Rapporte. Ein einzelner Mitarbeitender bekommt hier
 // nichts -- auf dem Blatt stehen die Zeiten der Kolleginnen und Kollegen.
-require_recht($user, 'abgleich');
+require_recht($user, 'abgleich_lesen');
 
 $einsatzId = (int)($_GET['einsatz_id'] ?? 0);
 if ($einsatzId <= 0) {

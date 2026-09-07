@@ -11,7 +11,7 @@ require_once __DIR__ . '/../rechte.php';
 require __DIR__ . '/../belege.php';
 
 $user = require_session();
-require_recht($user, 'offerten');
+require_recht($user, 'offerten_lesen');
 
 $art = (string)($_GET['art'] ?? 'offerte');
 if (!beleg_art_gueltig($art)) {

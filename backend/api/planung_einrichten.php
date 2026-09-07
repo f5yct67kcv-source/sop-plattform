@@ -29,7 +29,7 @@ require_once __DIR__ . '/../rundgang.php';
 require_once __DIR__ . '/../fahrzeug.php';
 
 $user = require_session();
-require_recht($user, 'betrieb');
+require_recht($user, 'betrieb_schreiben');
 $methode = $_SERVER['REQUEST_METHOD'];
 if ($methode !== 'GET' && $methode !== 'POST') {
     json_response(['status' => 'error', 'message' => 'nur GET oder POST'], 405);
@@ -569,13 +569,49 @@ CREATE TABLE IF NOT EXISTS kunden_kontaktweg (
   FOREIGN KEY (mitarbeiter_id) REFERENCES mitarbeiter(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+// Die Rollen selbst (ENT-440). Bis dahin standen sie ausschliesslich im
+// Code; seit ENT-440 gibt es neben den fuenf gesperrten SYSTEMROLLEN eigene
+// Profile. `system = 1` heisst: von hier gesaet, nicht aenderbar und nicht
+// loeschbar -- der geprueften Zustand aus ENT-077/ENT-180 bleibt damit
+// erhalten, auch wenn jemand daneben etwas Eigenes baut.
+'rollen' => "CREATE TABLE rollen (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  schluessel VARCHAR(30) NOT NULL,
+  titel VARCHAR(80) NOT NULL,
+  text VARCHAR(500) NOT NULL DEFAULT '',
+  system TINYINT(1) NOT NULL DEFAULT 0,
+  erstellt_am DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_schluessel (schluessel)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+// Was ein Profil je Bereich darf (ENT-440). Eine Zeile je Bereich, in dem es
+// UEBERHAUPT etwas darf -- "verborgen" ist die Abwesenheit einer Zeile und
+// kein eigener Wert. Zwei Schreibweisen fuer dasselbe (keine Zeile / Zeile
+// mit 'verborgen') liessen einen Vergleich zweier gleicher Rechtestaende
+// nach einem Unterschied aussehen.
+//
+// UNIQUE auf (rolle_id, bereich): Ein Bereich kann in einem Profil nicht
+// zwei Stufen zugleich haben -- sonst haenge die Wirkung davon ab, welche
+// Zeile zuerst gelesen wird.
+'rollen_rechte' => "CREATE TABLE rollen_rechte (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  rolle_id INT NOT NULL,
+  bereich VARCHAR(40) NOT NULL,
+  stufe VARCHAR(10) NOT NULL,
+  UNIQUE KEY uq_rolle_bereich (rolle_id, bereich),
+  FOREIGN KEY (rolle_id) REFERENCES rollen(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
 // Rollen je Person (ENT-077). Mehrere Zeilen je Mitarbeitendem sind der
 // Zweck der Tabelle, nicht ein Nebeneffekt: Planung und Personal sind zwei
 // verschiedene Arbeiten, keine Stufen uebereinander.
 //
-// Die Rollennamen stehen als Text, nicht als Fremdschluessel auf eine
-// Rollentabelle -- es gibt bewusst keine frei anlegbaren Rollen. Was eine
-// Rolle darf, steht in backend/rechte.php und im Entscheidungsprotokoll.
+// Der Rollenname steht weiterhin als TEXT und nicht als Fremdschluessel auf
+// `rollen`. Das ist seit ENT-440 eine bewusste Beibehaltung, keine
+// Nachlaessigkeit: Ein Umbau auf eine ID haette jede bestehende Zuteilung
+// wandern muessen, ohne dass sich an der Aussage etwas aendert. Der
+// Schluessel ist stabil -- ein Profil laesst sich umbenennen, ohne dass die
+// Zuteilungen ins Leere zeigen.
 'mitarbeiter_rollen' => "CREATE TABLE mitarbeiter_rollen (
   id INT AUTO_INCREMENT PRIMARY KEY,
   mitarbeiter_id INT NOT NULL,
@@ -2163,6 +2199,56 @@ if ($nullDatumSpalten) {
             $pdo->exec("UPDATE mitarbeiter SET $setzen WHERE $wo");
             $getan[] = "$betroffen Mitarbeitende(r): Nulldaten auf \"nicht erfasst\" gesetzt";
         }
+    }
+}
+
+// ── 2b4b. Die fuenf Systemrollen saeen und nachfuehren (ENT-440).
+//
+// Laeuft bei JEDEM Einrichten, nicht nur beim ersten: Die Systemrollen
+// stehen in backend/rechte.php, und der Code bleibt fuer sie die Wahrheit.
+// Waere die Datenbank-Fassung nach einer Codeaenderung stehengeblieben,
+// gaebe es zwei Wahrheiten -- genau das, was ENT-077 fuer darf()
+// abgeschafft hat. Eigene Profile werden dabei NICHT angeruehrt.
+if (hat_tabelle_jetzt($pdo, 'rollen') && hat_tabelle_jetzt($pdo, 'rollen_rechte')) {
+    $vorhanden = [];
+    foreach ($pdo->query('SELECT id, schluessel, titel, text FROM rollen WHERE system = 1')->fetchAll() as $r) {
+        $vorhanden[(string)$r['schluessel']] = $r;
+    }
+    $neu = 0; $angepasst = 0;
+    foreach (system_rollen() as $schluessel => $d) {
+        $sollStufen = $d['stufen'];
+        if (!isset($vorhanden[$schluessel])) {
+            if (!$nurPruefen) {
+                $pdo->prepare('INSERT INTO rollen (schluessel, titel, text, system) VALUES (?, ?, ?, 1)')
+                    ->execute([$schluessel, $d['titel'], $d['text']]);
+                $id = (int)$pdo->lastInsertId();
+                $ein = $pdo->prepare('INSERT INTO rollen_rechte (rolle_id, bereich, stufe) VALUES (?, ?, ?)');
+                foreach ($sollStufen as $bereich => $stufe) { $ein->execute([$id, $bereich, $stufe]); }
+            }
+            $neu++;
+            continue;
+        }
+        $id = (int)$vorhanden[$schluessel]['id'];
+        $ist = [];
+        $st = $pdo->prepare('SELECT bereich, stufe FROM rollen_rechte WHERE rolle_id = ?');
+        $st->execute([$id]);
+        foreach ($st->fetchAll() as $z) { $ist[(string)$z['bereich']] = (string)$z['stufe']; }
+        ksort($ist); $soll = $sollStufen; ksort($soll);
+        $textGleich = (string)$vorhanden[$schluessel]['titel'] === $d['titel']
+                   && (string)$vorhanden[$schluessel]['text']  === $d['text'];
+        if ($ist === $soll && $textGleich) { continue; }
+        if (!$nurPruefen) {
+            $pdo->prepare('UPDATE rollen SET titel = ?, text = ? WHERE id = ?')
+                ->execute([$d['titel'], $d['text'], $id]);
+            $pdo->prepare('DELETE FROM rollen_rechte WHERE rolle_id = ?')->execute([$id]);
+            $ein = $pdo->prepare('INSERT INTO rollen_rechte (rolle_id, bereich, stufe) VALUES (?, ?, ?)');
+            foreach ($sollStufen as $bereich => $stufe) { $ein->execute([$id, $bereich, $stufe]); }
+        }
+        $angepasst++;
+    }
+    if ($neu || $angepasst) {
+        $getan[] = ($nurPruefen ? 'Systemrollen: ' : 'Systemrollen gesetzt: ')
+                 . $neu . ' neu, ' . $angepasst . ' auf den Stand aus rechte.php nachgefuehrt';
     }
 }
 

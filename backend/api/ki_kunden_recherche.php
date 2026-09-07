@@ -9,7 +9,7 @@ require __DIR__ . '/../ai.php';
 require __DIR__ . '/../kunden.php'; // plz_ort_trennen()
 
 $user = require_session();
-require_recht($user, 'kunden');
+require_recht($user, 'kunden_schreiben');
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(['status' => 'error', 'message' => 'nur POST'], 405);
 }

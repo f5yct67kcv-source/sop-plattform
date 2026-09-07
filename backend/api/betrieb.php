@@ -95,7 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     json_response(['status' => 'ok', 'betrieb' => betrieb_lesen(true)]);
 }
 
-require_recht($user, 'betrieb');
+require_recht_nach_methode($user, 'betrieb');
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(['status' => 'error', 'message' => 'nur GET oder POST'], 405);
 }

@@ -42,7 +42,7 @@ $von = ' FROM rapporte r JOIN mitarbeiter m ON m.id = r.mitarbeiter_id';
 // Zugang, der ohnehin alle Rapporte sieht und Kundenberichte druckt. Ein
 // einzelner Mitarbeitender braucht die Rechnungsadresse seines Einsatzortes
 // nicht -- und was nicht ausgeliefert wird, kann auch nicht abfliessen.
-if (darf($user, 'abgleich')) {
+if (darf($user, 'abgleich_lesen')) {
     $rows = db()->query($basis . $kundenFelder . $von . $kundenJoin
         . ' ORDER BY r.datum DESC, r.id DESC')->fetchAll();
 } else {

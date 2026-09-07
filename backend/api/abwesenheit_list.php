@@ -9,7 +9,7 @@ require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../rechte.php';
 
 $user = require_session();
-require_recht($user, 'personal_lesen');
+require_recht($user, 'abwesenheiten_lesen');
 
 $von = trim((string)($_GET['von'] ?? ''));
 $bis = trim((string)($_GET['bis'] ?? ''));
@@ -35,4 +35,4 @@ $rows = array_map(function ($r) {
 }, $s->fetchAll());
 
 json_response(['status' => 'ok', 'von' => $von, 'bis' => $bis, 'abwesenheiten' => $rows,
-    'darf_entscheiden' => darf($user, 'personal_schreiben')]);
+    'darf_entscheiden' => darf($user, 'abwesenheiten_schreiben')]);

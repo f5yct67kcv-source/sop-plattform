@@ -121,8 +121,11 @@ if ($geraetMerken && zf_ist_an(db(), $person)) {
 // dem Anmelden sofort weiss, was sie zeigen darf -- ohne eine zweite
 // Anfrage, waehrend deren Laufzeit falsche Knoepfe dastuenden.
 $rollen = rechte_rollen(db(), (int)$user['id'], (bool)$user['ist_admin']);
+$rechte = rechte_aus_rollen($rollen, rollen_definitionen(db()));
 json_response(['status' => 'ok', 'token' => $token, 'name' => $name,
-    'ist_admin' => in_array(ROLLE_VERWALTUNG, $rollen, true),
+    // ist_admin spiegelt seit ENT-440 das Recht und nicht den Rollennamen --
+    // dieselbe Ableitung wie in require_session() und rechte_setzen().
+    'ist_admin' => in_array('rechte_' . STUFE_SCHREIBEN, $rechte, true),
     'rollen'    => $rollen,
-    'rechte'    => rechte_aus_rollen($rollen),
+    'rechte'    => $rechte,
     'geraet' => $geraetWert]);

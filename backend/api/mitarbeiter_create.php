@@ -20,12 +20,19 @@ $password = (string)($input['password'] ?? '');
 // sie nicht vergeben darf, legt eine mitarbeitende Person an -- die
 // kleinste Rolle. Rechte entstehen so nie aus Versehen, sondern nur, wenn
 // jemand sie ausdruecklich gibt.
+// Geprueft wird seit ENT-440 gegen die Definitionen aus der Datenbank, nicht
+// mehr gegen eine feste Liste im Code: Es gibt neben den Systemrollen eigene
+// Profile, und eine feste Liste wuerde sie stillschweigend verwerfen.
 $rollen = [];
-if (is_array($input['rollen'] ?? null) && darf($user, 'rechte')) {
-    $rollen = array_values(array_filter(array_map('strval', $input['rollen']), 'rolle_gueltig'));
+$rollenDefs = rollen_definitionen(db());
+if (is_array($input['rollen'] ?? null) && darf($user, 'rechte_' . STUFE_SCHREIBEN)) {
+    $rollen = array_values(array_filter(
+        array_map('strval', $input['rollen']),
+        fn($r) => isset($rollenDefs[$r])
+    ));
 }
 if (!$rollen) { $rollen = [ROLLE_MITARBEITEND]; }
-$istAdmin = in_array(ROLLE_VERWALTUNG, $rollen, true) ? 1 : 0;
+$istAdmin = in_array('rechte_' . STUFE_SCHREIBEN, rechte_aus_rollen($rollen, $rollenDefs), true) ? 1 : 0;
 
 // Der Login-Name kommt nicht mehr aus dem Formular, sondern wird hier
 // gebildet (ENT-376) -- ein mitgeschickter "name" wird ignoriert, sonst

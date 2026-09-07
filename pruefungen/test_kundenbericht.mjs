@@ -54,7 +54,7 @@ check('KRITISCH: am Rapport bleibt die Unterschrift zusaetzlich stehen — ein E
   /INSERT INTO rapporte[\s\S]{0,300}unterzeichner, unterschrift/.test(CRE));
 
 check('KRITISCH: der Bericht verlangt das Recht "abgleich" — auf dem Blatt stehen fremde Zeiten',
-  /require_recht\(\$user, 'abgleich'\)/.test(BER));
+  /require_recht\(\$user, 'abgleich_lesen'\)/.test(BER));
 check('KRITISCH: je Person zaehlt der NEUESTE Rapport (dieselbe Regel wie im Abgleich)',
   /ORDER BY r\.mitarbeiter_id, r\.erfasst_am DESC, r\.id DESC/.test(BER)
   && /if \(isset\(\$proPerson\[\$mid\]\)\) \{ continue; \}/.test(BER));
@@ -104,7 +104,9 @@ await page.route('**/api/**', route => {
   const u = route.request().url();
   const s = x => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(x) });
   if (u.includes('login')) return s({ status: 'ok', token: 't', name: 'adrian', ist_admin: true });
-  if (u.includes('me.php')) return s({ status: 'ok', name: 'adrian', ist_admin: true, rollen: [], rechte: ['abgleich', 'betrieb'] });
+  if (u.includes('me.php')) return s({ status: 'ok', name: 'adrian', ist_admin: true, rollen: [], rechte: ['abgleich_lesen', 'abgleich_schreiben', 'auslagen_lesen',
+      'betrieb_lesen', 'betrieb_schreiben', 'fahrzeuge_lesen',
+      'fahrzeuge_schreiben'] });
   if (u.includes('einsatz_bericht')) { berichtRufe++; return s({ status: 'ok', bericht: BERICHT }); }
   if (u.includes('betrieb.php')) return s({ status: 'ok', betrieb: { firma: 'CUPI 24 GmbH',
     zusatz: 'Sicherheits- und Verkehrsdienst', fusszeile: 'Musterweg 1 · 4600 Olten',

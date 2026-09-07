@@ -29,11 +29,13 @@ require_once __DIR__ . '/../logbuch.php';
 require_once __DIR__ . '/../fahrzeug.php';
 
 $user = require_session();
-// Lesen darf, wer plant ODER den Betrieb einrichtet. Heute traegt die
-// Verwaltung ohnehin beide Rechte -- geschrieben steht es trotzdem so, weil
-// sonst eine spaetere Rolle mit 'betrieb', aber ohne 'plan', an ihrer
-// eigenen Einstellungsseite abprallen wuerde.
-require_recht($user, darf($user, 'betrieb') ? 'betrieb' : 'plan');
+// Lesen darf, wer die Fahrzeuge verwaltet ODER plant: Wer einem Einsatz ein
+// Fahrzeug zuteilt, braucht die Liste, auch ohne die Fahrzeugstammdaten
+// pflegen zu duerfen. Seit ENT-440 traegt die Systemrolle "Planung" dafuer
+// ausdruecklich "Dienstfahrzeuge: lesen" -- vorher lief das ueber ihr
+// Planungsrecht mit. Ein "verborgen" in dieser Zeile muss die Fahrzeuge
+// auch wirklich verbergen, sonst waere der Schalter eine Behauptung.
+require_recht($user, 'fahrzeuge_lesen');
 
 // Die drei Listen stehen hier und nicht in der Oberflaeche: Der Server weist
 // ab, was er nicht kennt, und die Oberflaeche zeigt dieselben Werte an. Eine
@@ -100,10 +102,10 @@ if (!hat_tabelle($pdo, 'fahrzeuge')) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    json_response(['status' => 'ok', 'eingerichtet' => true, 'fahrzeuge' => fz_lesen($pdo, darf($user, 'betrieb'))]);
+    json_response(['status' => 'ok', 'eingerichtet' => true, 'fahrzeuge' => fz_lesen($pdo, darf($user, 'fahrzeuge_schreiben'))]);
 }
 
-require_recht($user, 'betrieb');
+require_recht($user, 'fahrzeuge_schreiben');
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(['status' => 'error', 'message' => 'nur GET oder POST'], 405);
 }
@@ -142,7 +144,7 @@ if (!empty($in['loeschen'])) {
     // verschwaende ein geloeschtes Fahrzeug spurlos, und genau das soll ein
     // Logbuch verhindern.
     logbuch_schreiben($pdo, $user, 'fahrzeug', $id, 'geloescht', $wegKz, null);
-    json_response(['status' => 'ok', 'eingerichtet' => true, 'fahrzeuge' => fz_lesen($pdo, darf($user, 'betrieb'))]);
+    json_response(['status' => 'ok', 'eingerichtet' => true, 'fahrzeuge' => fz_lesen($pdo, darf($user, 'fahrzeuge_schreiben'))]);
 }
 
 // Kontrollschild vereinheitlichen: Grossbuchstaben, genau ein Leerzeichen
@@ -299,4 +301,4 @@ if ($id > 0) {
     }
 }
 
-json_response(['status' => 'ok', 'id' => $id, 'eingerichtet' => true, 'fahrzeuge' => fz_lesen($pdo, darf($user, 'betrieb'))]);
+json_response(['status' => 'ok', 'id' => $id, 'eingerichtet' => true, 'fahrzeuge' => fz_lesen($pdo, darf($user, 'fahrzeuge_schreiben'))]);

@@ -8,7 +8,7 @@ require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../rechte.php';
 
 $user = require_session();
-require_recht($user, 'offerten');
+require_recht($user, 'leistungen_lesen');
 
 $rows = db()->query(
     'SELECT id, nummer, name, beschreibung, einzelpreis_rappen, einheit, mwst_satz_bp,

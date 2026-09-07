@@ -50,7 +50,8 @@ async function setup(page) {
     calls.push({ p, body });
     const send = b => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) });
     if (p.includes('login')) return send({ status: 'ok', token: 't', name: 'adrian', ist_admin: true });
-    if (p.includes('me.php')) return send({ status: 'ok', name: 'adrian', ist_admin: true, rollen: [], rechte: ['kunden', 'abgleich'] });
+    if (p.includes('me.php')) return send({ status: 'ok', name: 'adrian', ist_admin: true, rollen: [], rechte: ['kunden_lesen', 'kunden_schreiben', 'abgleich_lesen',
+      'abgleich_schreiben', 'auslagen_lesen'] });
     if (p.includes('einsatz_bericht')) {
       berichtRufe.push((req.url().split('einsatz_id=')[1] || '').split('&')[0]);
       return send({ status: 'ok', bericht: { einsatz: { id: 90, kunde_name: 'Muster Immobilien AG', datum: '2026-08-01' },
@@ -174,7 +175,9 @@ check('KRITISCH: ohne das Recht "offerten" gibt es keinen Offerten-Eintrag im Me
 check('KRITISCH: ohne das Recht "offerten" gibt es auch keinen Rechnungen-Eintrag im Menü',
   (await page.$$('#rowmenuPop button:has-text("Rechnung erstellen")')).length === 0);
 // Und mit dem Recht sind beide da und nutzbar.
-await page.evaluate(() => { me.rechte = ['kunden', 'abgleich', 'offerten']; kuMenuSchliessen(); });
+await page.evaluate(() => { me.rechte = ['kunden_lesen', 'kunden_schreiben', 'abgleich_lesen',
+  'abgleich_schreiben', 'auslagen_lesen', 'offerten_lesen',
+  'offerten_schreiben', 'leistungen_lesen', 'leistungen_schreiben']; kuMenuSchliessen(); });
 await page.click('#kuTable tbody tr:first-child .rowmenu-btn');
 await page.waitForTimeout(150);
 check('KRITISCH: mit dem Recht ist "Offerte erstellen" da und nicht ausgegraut',
@@ -183,7 +186,8 @@ check('KRITISCH: mit dem Recht ist "Offerte erstellen" da und nicht ausgegraut',
 check('KRITISCH: und "Rechnung erstellen" ebenfalls',
   (await page.$$('#rowmenuPop button:has-text("Rechnung erstellen")')).length === 1
   && !(await page.isDisabled('#rowmenuPop button:has-text("Rechnung erstellen")')));
-await page.evaluate(() => { me.rechte = ['kunden', 'abgleich']; kuMenuSchliessen(); });
+await page.evaluate(() => { me.rechte = ['kunden_lesen', 'kunden_schreiben', 'abgleich_lesen',
+  'abgleich_schreiben', 'auslagen_lesen']; kuMenuSchliessen(); });
 await page.click('#kuTable tbody tr:first-child .rowmenu-btn');
 await page.waitForTimeout(150);
 check('Archivieren ist da', await page.isVisible('#rowmenuPop button:has-text("Archivieren")'));
@@ -269,12 +273,13 @@ check('KRITISCH: und loest das Drucken aus', await page.evaluate(() => window.__
 
 // Gegenprobe fuer die Rechtegrenze: ohne "abgleich" gibt es weder Knopf noch
 // einen Aufruf des Endpunkts -- nur die leere Klammer-Zelle bleibt.
-await page.evaluate(() => { me.rechte = ['kunden']; renderKundeDetail(); });
+await page.evaluate(() => { me.rechte = ['kunden_lesen', 'kunden_schreiben']; renderKundeDetail(); });
 await page.waitForTimeout(150);
 check('KRITISCH: ohne das Recht "abgleich" gibt es keinen Knopf, nur die stumme Klammer',
   await page.evaluate(() => !document.querySelector('#kdRapporte .rapp-klammer button')
     && !!document.querySelector('#kdRapporte .rapp-klammer')));
-await page.evaluate(() => { me.rechte = ['kunden', 'abgleich']; renderKundeDetail(); });
+await page.evaluate(() => { me.rechte = ['kunden_lesen', 'kunden_schreiben', 'abgleich_lesen',
+  'abgleich_schreiben', 'auslagen_lesen']; renderKundeDetail(); });
 
 await page.click('#kdtab-offerten');
 await page.waitForTimeout(150);

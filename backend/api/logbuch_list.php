@@ -16,7 +16,7 @@ $user = require_session();
 // Das Logbuch sagt, wer wann welche Personendaten angefasst hat. Das ist
 // selbst wieder eine Auskunft ueber Personen -- darum das Recht "rechte",
 // nicht blosses "personal_lesen".
-require_recht($user, 'rechte');
+require_recht($user, 'logbuch_lesen');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     json_response(['status' => 'error', 'message' => 'nur GET'], 405);

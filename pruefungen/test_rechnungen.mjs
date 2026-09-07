@@ -78,7 +78,15 @@ await page.route('**/api/**', async route => {
   const send = b => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) });
   if (url.includes('login.php')) return send({ status: 'ok', token: 't', name: 'adrian', ist_admin: true });
   if (url.includes('me.php')) return send({ status: 'ok', name: 'adrian', ist_admin: true, rollen: [],
-    rechte: ['kunden', 'abgleich', 'personal_lesen', 'betrieb', 'plan', 'offerten', 'rechte'] });
+    rechte: ['kunden_lesen', 'kunden_schreiben', 'abgleich_lesen',
+      'abgleich_schreiben', 'auslagen_lesen', 'personal_lesen',
+      'abwesenheiten_lesen', 'betrieb_lesen', 'betrieb_schreiben',
+      'fahrzeuge_lesen', 'fahrzeuge_schreiben', 'einsaetze_lesen',
+      'einsaetze_schreiben', 'objekte_lesen', 'objekte_schreiben',
+      'masterschichten_lesen', 'masterschichten_schreiben',
+      'verfuegbarkeit_lesen', 'offerten_lesen', 'offerten_schreiben',
+      'leistungen_lesen', 'leistungen_schreiben', 'rechte_lesen',
+      'rechte_schreiben', 'logbuch_lesen'] });
   if (url.includes('produkt_list')) return send(PRODUKTE);
   if (url.includes('beleg_list')) {
     const art = new URLSearchParams(url.split('?')[1] || '').get('art') || 'offerte';
@@ -311,7 +319,15 @@ try {
     const send = b => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) });
     if (url.includes('login.php')) return send({ status: 'ok', token: 't', name: 'adrian', ist_admin: true });
     if (url.includes('me.php')) return send({ status: 'ok', name: 'adrian', ist_admin: true, rollen: [],
-      rechte: ['kunden', 'abgleich', 'personal_lesen', 'betrieb', 'plan', 'offerten', 'rechte'] });
+      rechte: ['kunden_lesen', 'kunden_schreiben', 'abgleich_lesen',
+      'abgleich_schreiben', 'auslagen_lesen', 'personal_lesen',
+      'abwesenheiten_lesen', 'betrieb_lesen', 'betrieb_schreiben',
+      'fahrzeuge_lesen', 'fahrzeuge_schreiben', 'einsaetze_lesen',
+      'einsaetze_schreiben', 'objekte_lesen', 'objekte_schreiben',
+      'masterschichten_lesen', 'masterschichten_schreiben',
+      'verfuegbarkeit_lesen', 'offerten_lesen', 'offerten_schreiben',
+      'leistungen_lesen', 'leistungen_schreiben', 'rechte_lesen',
+      'rechte_schreiben', 'logbuch_lesen'] });
     if (url.includes('beleg_list')) return send({ status: 'ok', naechste_nummer: 'RE-0001', belege: [] });
     if (url.includes('kunden_list')) return send(KU);
     if (url.includes('dashboard_stats')) return send(STATS);

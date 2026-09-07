@@ -16,7 +16,7 @@ require_once __DIR__ . '/../rechte.php';
 require __DIR__ . '/../planung.php';
 
 $user = require_session();
-require_recht($user, 'plan');
+require_recht($user, 'verfuegbarkeit_lesen');
 
 $jahr = (int)($_GET['jahr'] ?? date('Y'));
 if ($jahr < 2000 || $jahr > 2100) {

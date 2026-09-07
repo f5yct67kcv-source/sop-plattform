@@ -13,7 +13,7 @@ require_once __DIR__ . '/../rechte.php';
 require __DIR__ . '/../ai.php';
 
 $user = require_session();
-require_recht($user, 'plan');
+require_recht($user, 'einsaetze_schreiben');
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(['status' => 'error', 'message' => 'nur POST'], 405);
 }

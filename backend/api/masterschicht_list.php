@@ -6,7 +6,7 @@ require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../rechte.php';
 
 $user = require_session();
-require_recht($user, 'plan');
+require_recht($user, 'masterschichten_lesen');
 
 $objektId = (int)($_GET['objekt_id'] ?? 0);
 if ($objektId <= 0) {

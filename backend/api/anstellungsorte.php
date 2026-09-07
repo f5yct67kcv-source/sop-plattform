@@ -35,7 +35,7 @@ function orte_lesen(): array {
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     json_response(['status' => 'ok', 'orte' => orte_lesen()]);
 }
-require_recht($user, 'betrieb');
+require_recht($user, 'betrieb_schreiben');
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(['status' => 'error', 'message' => 'nur GET oder POST'], 405);
 }
