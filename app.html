@@ -6027,7 +6027,9 @@ function mdFormular() {
     ${mdFeld('notfallkontakt', 'notfallHilfe')}` : ''}
   <div class="f" id="mdPw" hidden>
     <label for="mdPwInp">${esc(w('datenPwLabel'))}</label>
-    <input class="inp" id="mdPwInp" type="password" autocomplete="current-password">
+    <div class="pw-feld"><input class="inp" id="mdPwInp" type="password" autocomplete="current-password">
+      <button type="button" class="pw-toggle" aria-label="Passwort anzeigen"
+              onclick="togglePw('mdPwInp', this)">&#128065;</button></div>
     <p class="md-hilfe" style="margin:8px 0 0">${esc(w('datenPwWarum'))}</p>
   </div>
   <div class="md-tat">

@@ -368,6 +368,24 @@ try {
   await page.waitForTimeout(120);
   check('KRITISCH: bei geaenderter privater E-Mail erscheint die Passwortfrage',
     (await formularLesen(page)).pwSichtbar);
+  // Gemessen, solange es SICHTBAR ist. Waere es hier zu, haette das Auge
+  // Hoehe 0 und jede Groessenpruefung ginge blind durch.
+  const auge = await page.evaluate(() => {
+    const b = document.querySelector('#mdPw .pw-toggle');
+    if (!b) return null;
+    const r = b.getBoundingClientRect();
+    return { hoehe: Math.round(r.height), breite: Math.round(r.width),
+             beschriftet: (b.getAttribute('aria-label') || '').length > 3 };
+  });
+  check('KRITISCH: das Passwortfeld hat ein Auge zum Aufdecken (ENT-291)', !!auge);
+  check('Das Auge ist gross genug zum Treffen und hat eine Beschriftung',
+    !!auge && auge.hoehe >= 40 && auge.breite >= 40 && auge.beschriftet);
+  const aufgedeckt = await page.evaluate(() => {
+    document.querySelector('#mdPw .pw-toggle').click();
+    return document.getElementById('mdPwInp').type;
+  });
+  check('Das Auge deckt wirklich auf', aufgedeckt === 'text');
+
   await page.fill('#md-email_privat', PROFIL.email_privat);
   await page.waitForTimeout(120);
   check('Wird die Adresse zurueckgesetzt, verschwindet sie wieder',
