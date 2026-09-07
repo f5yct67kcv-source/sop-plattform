@@ -87,13 +87,24 @@ check('Der Wechsel-Knopf zeigt auf die App',
   (await p5.getAttribute('#nav-zurapp', 'href')) === 'app.html');
 check('Der Wechsel-Knopf steht im Fuss der Seitenleiste, nicht in der Kopfzeile',
   await p5.evaluate(() => !!document.querySelector('.side-foot #nav-zurapp')));
-check('Der Wechsel-Knopf steht beim Benutzerblock, oberhalb von Abmelden',
+// Bis ENT-427 stand hier "iAus === iApp + 1" -- Abmelden als direkter
+// Nachbar. Seither liegt die Notfall-Desktopansicht dazwischen, und die Zeile
+// schlug an, ohne dass an der Ordnung etwas falsch gewesen waere: Ein starrer
+// Nachbarschaftstest verbietet jeden weiteren Eintrag im Fussteil.
+// Geprueft wird darum jetzt, was die Zeile behauptet -- der Wechsel-Knopf
+// gleich nach dem Benutzerblock, Abmelden darunter -- und zusaetzlich die
+// eigentliche Regel dahinter: Abmelden bleibt der LETZTE Eintrag. Das ist
+// schaerfer als vorher, nicht lockerer: Ein neuer Eintrag hinter Abmelden
+// faellt jetzt auf, frueher waere er durchgegangen.
+check('Der Wechsel-Knopf steht beim Benutzerblock, oberhalb von Abmelden -- und Abmelden bleibt der letzte Eintrag',
   await p5.evaluate(() => {
     const f = [...document.querySelectorAll('.side-foot > *')];
     const iUser = f.findIndex(e => e.classList.contains('side-user'));
     const iApp  = f.findIndex(e => e.id === 'nav-zurapp');
     const iAus  = f.findIndex(e => e.textContent.trim() === 'Abmelden');
-    return iUser >= 0 && iApp === iUser + 1 && iAus === iApp + 1;
+    const letzter = f.filter(e => e.classList.contains('nav-item')).pop();
+    return iUser >= 0 && iApp === iUser + 1 && iAus > iApp
+        && !!letzter && letzter.id === 'nav-abmelden';
   }));
 
 // Auf dem Handy ist die Seitenleiste eine Schublade. Der Knopf muss sofort

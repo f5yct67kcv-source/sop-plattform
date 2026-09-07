@@ -33,20 +33,30 @@ require_once __DIR__ . '/../push.php';
 // Beim Deploy ersetzt. Ungesetzt heisst: Der Zeitgeber-Weg ist zu.
 const PUSH_ZEITGEBER_SCHLUESSEL = '__PUSH_CRON_SCHLUESSEL__';
 
-function push_zeitgeber_offen(): bool
-{
-    $s = PUSH_ZEITGEBER_SCHLUESSEL;
-    return $s !== '' && !str_starts_with($s, '__PUSH_CRON');
+$mitgegeben = (string)($_GET['schluessel'] ?? '');
+$lage = push_zeitgeber_lage(PUSH_ZEITGEBER_SCHLUESSEL, $mitgegeben);
+
+// Die drei Fehlerlagen sagen, WAS zu tun ist -- jede verlangt einen
+// anderen Handgriff an einer anderen Stelle. Beim Einrichten kamen sie
+// alle als "kein Token" heraus (die Meldung der Sitzungspruefung, in die
+// der Aufruf hineinlief), und das Suchen ging in die falsche Richtung.
+//
+// Nur wer einen Schluessel MITGIBT, bekommt diese Antworten. Wer keinen
+// mitgibt, laeuft weiter in die Sitzungspruefung -- das ist der Weg fuer
+// die angemeldete Person aus dem Cockpit, und der darf nicht erfahren,
+// dass es einen zweiten Weg gibt.
+if ($lage === 'nicht_eingerichtet' && $mitgegeben !== '') {
+    json_response(['status' => 'error', 'zeitgeber' => $lage,
+        'message' => 'Der Zeitgeber-Zugang ist auf dem Server nicht eingerichtet — '
+            . 'das Secret PUSH_CRON_SCHLUESSEL fehlt, oder seit dem Setzen ist kein Deploy gelaufen.'], 401);
+}
+if ($lage === 'falscher_schluessel') {
+    json_response(['status' => 'error', 'zeitgeber' => $lage,
+        'message' => 'Der Schlüssel in der Adresse stimmt nicht mit dem hinterlegten überein.'], 401);
 }
 
-$mitgegeben = (string)($_GET['schluessel'] ?? '');
-// hash_equals statt === : Ein Vergleich, der beim ersten falschen Zeichen
-// abbricht, verraet ueber die Antwortzeit, wie viele Zeichen stimmen.
-$perZeitgeber = push_zeitgeber_offen() && $mitgegeben !== ''
-    && hash_equals(PUSH_ZEITGEBER_SCHLUESSEL, $mitgegeben);
-
-if (!$perZeitgeber) {
-    // Kein gueltiger Schluessel: dann muss es eine angemeldete Person mit
+if ($lage !== 'ok') {
+    // Kein Schluessel mitgegeben: dann muss es eine angemeldete Person mit
     // dem Recht sein. require_session() beendet mit 401, require_recht mit
     // 403 -- beides bevor irgendetwas verschickt wird.
     $user = require_session();

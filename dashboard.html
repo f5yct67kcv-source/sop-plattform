@@ -8,7 +8,11 @@
      ignoriert user-scalable=no aus Barrierefreiheitsgruenden -- gegen das
      versehentliche Doppeltippen und das Zoomen beim Feld-Fokus hilft
      zusaetzlich touch-action und eine Schriftgroesse ab 16px in Feldern. -->
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<!-- Die id ist kein Schmuck: Die Notfall-Desktopansicht (ENT-427) schaltet
+     genau diese Angabe um. Sie ist damit die EINZIGE Quelle fuer beide
+     Zustaende -- der Handy-Wert wird beim Laden von hier abgelesen und nicht
+     im Skript ein zweites Mal hingeschrieben. -->
+<meta name="viewport" id="metaViewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Cockpit</title>
 <link rel="icon" href="icons/icon-32.png" type="image/png">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
@@ -479,6 +483,57 @@ select.inp { padding-right: 30px; background-image: linear-gradient(45deg, trans
 /* Der Wechsel-Knopf ist ein echter Link (Seitenwechsel, kein Zustand im
    Fenster) und muss trotzdem wie die uebrigen Eintraege aussehen. */
 a.nav-item { text-decoration: none; }
+
+/* ══════════════════════════════════════════ DESKTOP-ANSICHT AM HANDY (ENT-427)
+   Eine Notfalloption, keine zweite Bedienung: Sie holt die am Handy bewusst
+   ausgeblendeten Bereiche (ENT-235: Abgleich, Stammdaten, Revierdienst,
+   Auswertung, Administration, Einrichtung) im Ausnahmefall auf das Geraet,
+   indem sie die Viewport-Angabe auf eine feste Breite stellt. Genau das tut
+   auch "Desktop-Website anfordern" im Browser -- nur dass es dort nach jedem
+   Neuladen wieder verloren geht und in einer installierten App gar nicht
+   erst zur Verfuegung steht.
+
+   Der Eintrag steht bewusst NICHT auf ".nur-desktop" und auch nicht auf
+   ".nur-schublade": Beide haengen an der Fensterbreite, und die ist nach dem
+   Umschalten 1280 px. Der Rueckweg waere damit genau dann verschwunden, wenn
+   man ihn braucht. Sichtbar macht ihn darum das Skript, anhand des GERAETS
+   (Beruehrung + schmaler Bildschirm) statt anhand der gesetzten Breite --
+   ueber style.display wie in rechteAnwenden(), nicht ueber eine Regel hier:
+   Eine Regel muesste den Anzeigewert von .nav-item ("flex") ein zweites Mal
+   hinschreiben und liefe beim naechsten Umbau daran vorbei. Bis das Skript
+   entschieden hat, ist die ganze Huelle ohnehin ausgeblendet (.shell). */
+
+/* Die Lupe rechnet die Verkleinerung heraus.
+   Bei 390 px Geraet auf 1280 px Seite steht alles auf 30 % -- ein 50 px
+   hoher Menueeintrag ist dann physisch 15 px hoch und mit dem Daumen kaum
+   zu treffen. Der Rueckweg darf daran nicht scheitern, sonst ist die
+   Notfalloption selbst der Notfall. Der Knopf wird deshalb um denselben
+   Faktor wieder aufgezogen, mit dem die Seite verkleinert wird: Was hier
+   in Pixeln steht, kommt auf dem Geraet auch in Pixeln an.
+   Reihenfolge im transform ist wichtig: erst skalieren, dann verschieben --
+   so wird auch der Abstand zum Rand mitgerechnet und der Knopf klebt nicht
+   in der Ecke. */
+:root { --desktop-lupe: 1; }
+.desktop-zurueck {
+  display: none;
+  position: fixed; right: 0; bottom: env(safe-area-inset-bottom, 0px);
+  transform-origin: bottom right;
+  transform: scale(var(--desktop-lupe)) translate(-14px, -14px);
+  /* Ueber den Dialogen (z-index 900). Ein Fluchtweg, den ein offener Dialog
+     verdeckt, ist keiner -- man kaeme sonst aus einer 30 % kleinen Ansicht
+     erst heraus, nachdem man den Dialog darin geschlossen hat. */
+  z-index: 950;
+  align-items: center; gap: 8px;
+  min-height: 44px; padding: 10px 16px;
+  border-radius: 999px; border: 1px solid var(--line);
+  background: var(--surface); color: var(--ink);
+  font: inherit; font-size: 14px; font-weight: 600;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .34), 0 2px 8px rgba(0, 0, 0, .2);
+  cursor: pointer;
+}
+.desktop-zurueck svg { width: 18px; height: 18px; flex: none;
+  fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+html[data-desktop="an"] .desktop-zurueck { display: inline-flex; }
 
 .main { margin-left: var(--side-w); min-height: 100vh; display: flex; flex-direction: column; }
 .topbar {
@@ -2290,8 +2345,79 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
 }
 
 /* ── Begrüssungs-Container mit Diktat-Router (ENT-032) */
-.begr-karte .card-bd { padding: 22px 24px; }
-.begr-kopf h2 { font-size: 21px; font-weight: 720; letter-spacing: -.3px; }
+/* Luft statt Enge (ENT-432). Der Projektinhaber: "es ist zu dicht".
+   Gemessen stimmte das genau: Der Inhalt brauchte 178 px bei 167 px
+   Innenhoehe und ragte oben aus der Karte heraus.
+   Zwei Griffe dagegen. Der eine ist der Innenabstand -- 22 auf 34 Pixel oben
+   und unten; das ist die Luft, die vorher fehlte. Der andere ist die
+   senkrechte Mitte: Die Karte ist so hoch wie ihre Nachbarin (ENT-410), und
+   was daran ueber den Inhalt hinausgeht, liegt jetzt zu gleichen Teilen
+   ueber und unter ihm statt als Rest am Fuss. */
+.begr-karte .card-bd { padding: 34px 24px; display: flex; flex-direction: column;
+  /* flex: 1 muss dabei sein, sonst ist der Rumpf nur so hoch wie sein Inhalt
+     und die Zentrierung hat nichts zu verteilen. Gemessen klebte der Block
+     bei gestreckter Nachbarkarte oben (35 px oben, 235 px unten) -- die
+     Regel stand da und tat nichts. */
+  flex: 1 1 auto; justify-content: center; }
+/* Der Gruss steht wieder auf seinem eigenen Abstand (ENT-432). Die elf
+   Pixel nach oben aus der Skizze (ENT-428) und die fuenf nach rechts
+   (entfallen mit ENT-430) waren beide Notloesungen gegen dieselbe Enge:
+   Der Inhalt brauchte gemessen 178 px bei 167 px Innenhoehe und ragte oben
+   heraus. Die Enge ist jetzt an der Wurzel weg -- das Eingabefeld ist
+   flacher, und was frei wird, liegt als Luft ueber und unter dem Block. */
+.begr-kopf h2 { font-size: 21px; font-weight: 720; letter-spacing: -.3px;
+  margin: 0; }
+
+/* Die Lesebreite von 640 px aus ENT-430 ist mit ENT-432 wieder entfallen.
+   Sie beruhte auf einem Missverstaendnis: Der Projektinhaber wollte die
+   Eingabespalte SENKRECHT kuerzen, nicht waagrecht. Zwei Dinge gingen dabei
+   auch messbar schief -- der Platzhaltertext brach auf 1.9 Zeilen um und
+   fuellte das flachere Feld randvoll, und .begr-kopf schrumpfte im
+   Flex-Container auf seine Textbreite (205 statt 640 px) und rutschte mit
+   margin-inline:auto aus der Flucht zum Feld darunter. Beides waere mit
+   width:100% zu haben gewesen; die Breite war aber gar nicht gemeint. */
+/* Die drei Abstaende im Block, aus der Skizze des Projektinhabers vom
+   2026-09-06 (ENT-434). Gemessen klebten Gruss und Eingabefeld mit NULL
+   Pixel aneinander: Der Innenabstand von .diktat-router zaehlt ab der
+   Unterkante von .begr-kopf, und dessen Zeilenbox reicht bereits bis dorthin.
+   Auf dem Bildschirm sah das aus wie ein Titel, der auf dem Feld aufsitzt.
+   Jetzt 16 px zwischen Gruss und Feld, 24 px zwischen Feld und Knopfreihe --
+   die Werte aus der Skizze, gerechnet aus ihren Zielpositionen und nicht
+   aus den Verschiebungen einzeln, weil die drei sich gegenseitig mitziehen.
+   Die 19 px an der Knopfreihe sind kein Tippfehler: Zwischen Eingabefeld und
+   dem Kasten darum liegen gemessen 5 px, und der Abstand SOLL zwischen dem
+   Feld und den Knoepfen stimmen, nicht zwischen den Kaesten.
+   Nur die Uebersicht: Derselbe Router steht in Planung/Einsaetze und in zwei
+   Dialogen, wo nichts beanstandet ist.
+
+   Die Selektoren sind absichtlich eine Stufe schaerfer als noetig: Weiter
+   unten stehen ".card-bd > .diktat-router { margin-top: 0 }" und
+   ".diktat-router .sprach { margin-top: 10px }" -- beide mit derselben
+   Eigenspezifitaet wie die naheliegende Fassung und SPAETER im Regelwerk.
+   Mit ".begr-karte .diktat-router" standen diese Zeilen hier und taten
+   nichts; gemessen blieb der Abstand bei 0 und 10 px. */
+.begr-karte .card-bd > .diktat-router { margin-top: 16px; }
+.begr-karte .diktat-router .sprach { margin-top: 19px; }
+/* Das Eingabefeld ist so hoch wie seine zwei Zeilen und keinen Pixel mehr
+   (ENT-432, auf Vorgabe des Projektinhabers). Gerechnet aus dem gerenderten
+   Zustand: 2 x 21.7 px Zeilenhoehe + 2 x 9 px Innenabstand + 2 px Rand =
+   64 px. Vorher waren es 91 -- die 27 Pixel Reserve darin hat nie jemand
+   gebraucht, und sie waren es, die die Karte randvoll machten.
+   Wer mehr Platz will, zieht das Feld am Griff unten rechts auf; es bleibt
+   resize: vertical.
+   Zwei Dinge muessen dabei stimmen: Die Mindesthoehe von textarea.inp
+   (92 px) muss mitgehen -- sie gewinnt sonst gegen jede Hoehe darunter, und
+   die Regel bliebe wirkungslos, ohne dass etwas kaputt aussieht. Und die
+   feste Hoehe gilt NUR bei ungezogener Karte: Wird die Begruessung hoeher
+   gezogen, nimmt das Feld die gewonnene Hoehe (so seit jeher, gemessen von
+   test_containergroesse.mjs). */
+.dash-item:not(.dh) .begr-karte #rtText { height: 64px; min-height: 64px; }
+/* Der Erklaersatz entfaellt hier. NUR er: Dieselbe Flaeche zeigt weiter
+   "Das Mikrofon liefert kein Signal", "Die Aufnahme liess sich nicht
+   starten" und "Aufnahme laeuft". Ein leeres Feld soll dabei keinen
+   Abstand halten, sonst bliebe eine Luecke ohne Aussage. */
+.begr-karte .sprach-hint.ruhe { display: none; }
+.sprach-hint:empty { margin-top: 0; }
 
 /* ── Datum & Zeit (ENT-410, Kacheln seit ENT-423)
    Weiterhin von der groben zur feinen Einheit: die Kalenderwoche als Band
@@ -2458,9 +2584,19 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
      Paar statt zwischen den drei Zonen. Gemessen bekam die Wochenzahl so
      720 px, waehrend die Kacheln in ihrer halben Karte stecken blieben. */
   .zeit-objekte { display: contents; padding-top: 0; gap: 0; }
-  .zeit-tag, .zeit-uhr { flex: 1 0 auto; padding-left: 30px;
-    border-left: 1px solid var(--line-soft);
+  /* Ohne senkrechte Trennstriche (Skizze des Projektinhabers, ENT-428): Die
+     Kacheln sind selbst schon Flaechen mit eigener Kante -- ein Strich
+     daneben teilt ein zweites Mal, was bereits geteilt aussieht.
+     Nur beim DATUM faellt mit dem Strich auch sein Einzug weg (30 auf 8, die
+     22 aus der Skizze). Die Uhrzeit behaelt ihn: Ohne Strich ist der Abstand
+     das Einzige, was Datum und Uhrzeit noch trennt, und mit 8 px standen die
+     drei Kacheln gemessen 11 px auseinander -- genauso weit wie die beiden
+     Uhrkacheln voneinander. Sie lasen sich dann als EINE Reihe aus drei
+     Kacheln statt als zwei verschiedene Angaben. */
+  .zeit-tag, .zeit-uhr { flex: 1 0 auto;
     display: flex; flex-direction: column; justify-content: center; align-items: flex-start; }
+  .zeit-tag { padding-left: 8px; }
+  .zeit-uhr { padding-left: 30px; }
 }
 /* Begruessung und Datum & Zeit stehen nebeneinander und bilden die erste
    Zeile der Uebersicht. Gemessen war die Begruessung 267 px hoch und die
@@ -2659,6 +2795,11 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
    ein Rest -- daneben klafft eine Luecke, die keine Aussage hat. Vier, zwei
    oder eine, nie drei. */
 .dash-item.dw-halb .g-kpi { grid-template-columns: repeat(2, 1fr); }
+/* Acht Pixel Abstand ueber den Kennzahlen (Skizze des Projektinhabers,
+   ENT-428). Der Container darueber waechst dadurch um dieselben acht -- in
+   der Skizze standen drei; beides zugleich ginge nur, wenn die Kacheln
+   flacher wuerden, und flacher waren sie dort nicht. */
+#kpiGrid { margin-top: 8px; }
 .dash-item.versteckt { display: none; }
 
 /* Bearbeitungsmodus */
@@ -4194,6 +4335,11 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
 .mtl-eintrag.aus { opacity: .6; }
 .mtl-marken { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
 .mtl-eintrag h4 { font-size: 14.5px; font-weight: 660; letter-spacing: -.2px; }
+/* Wann und wo (ENT-436) -- die Angabe, wegen der jemand zu- oder absagt,
+   steht über dem Text und nicht in der Fusszeile zwischen Verfasser und
+   Lesestand. */
+.mtl-eintrag .mtl-termin { font-size: 13px; font-weight: 640; color: var(--ink); margin-top: 4px; }
+.mtl-eintrag .mtl-antworten { font-weight: 620; color: var(--ink-2); }
 .mtl-eintrag .mtl-text { font-size: 13px; color: var(--ink-2); line-height: 1.5; margin-top: 4px; white-space: pre-wrap; }
 .mtl-meta { font-size: 12px; color: var(--ink-3); margin-top: 8px; }
 .mtl-akt { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
@@ -4201,6 +4347,12 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
    Sie ist eine Nachschlagsache, kein eigener Arbeitsschritt. */
 .mtl-leser { margin-top: 10px; padding: 10px 12px; background: var(--line-soft);
   border-radius: var(--r-sm); font-size: 12.5px; color: var(--ink-2); line-height: 1.7; }
+/* Endgueltig loeschen sieht anders aus als der Rest der Zeile (ENT-433):
+   nicht laut gefuellt -- der Knopf steht neben harmlosen --, aber auch
+   nicht gleich. Ein Handgriff ohne Rueckweg darf sich nicht wie
+   "Bearbeiten" anfuehlen. */
+.mtl-akt .mtl-loeschen { color: var(--neg); }
+.mtl-akt .mtl-loeschen:hover { background: var(--neg); color: #fff; border-color: var(--neg); }
 </style>
 <script src="gav.js"></script>
 <script src="zeitwahl.js"></script>
@@ -4230,6 +4382,39 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
   var g = 'an';
   try { g = localStorage.getItem('rv3_glas') === 'aus' ? 'aus' : 'an'; } catch (e) {}
   document.documentElement.setAttribute('data-glas', g);
+})();
+/* Desktop-Ansicht am Handy (ENT-427) -- die Notfalloption.
+   Auch dies muss VOR dem ersten Zeichnen laufen, aus einem staerkeren Grund
+   als bei hell/dunkel: Wer die Wahl getroffen hat und neu laedt, saehe sonst
+   erst die Handy-Ansicht, danach spraenge das ganze Raster um. Bei einer
+   Ansicht, die auf 30 % verkleinert steht, ist das kein Aufblitzen mehr,
+   sondern ein Sprung ueber den halben Bildschirm.
+
+   Was hier steht, ist bewusst das Minimum: den Wert lesen, die Angabe
+   setzen, die Kennzeichnung am <html> hinterlegen. Die Bedingungen (nur
+   Beruehrungsgeraet, nur schmal) prueft das Hauptskript spaeter -- sie
+   brauchen Funktionen, die es hier noch nicht gibt, und ein gespeicherter
+   Wert kann ohnehin nur von DIESEM Geraet stammen.
+
+   window.VP_HANDY liest den Ausgangswert aus dem Tag selbst statt ihn zu
+   wiederholen. Zwei Zeichenketten mit demselben Inhalt an zwei Stellen
+   laufen frueher oder spaeter auseinander -- und dann fuehrte der Rueckweg
+   auf eine Angabe, die es im Kopf der Datei gar nicht mehr gibt. */
+(function () {
+  var m = document.getElementById('metaViewport');
+  window.VP_HANDY = m ? m.getAttribute('content') : 'width=device-width, initial-scale=1.0';
+  window.DESKTOP_BREITE = 1280;
+  /* Kein "user-scalable=no" und kein "maximum-scale": Zoomen wird hier
+     ausdruecklich wieder ERLAUBT. Auf einem 390 px breiten Geraet steht die
+     Seite dann bei rund 30 % -- ohne Zoom waere sie zwar da, aber nicht
+     lesbar, und die Notfalloption liefe leer. */
+  window.VP_DESKTOP = 'width=' + window.DESKTOP_BREITE;
+  var an = false;
+  try { an = localStorage.getItem('rv3_desktop') === 'an'; } catch (e) {}
+  if (an && m) {
+    m.setAttribute('content', window.VP_DESKTOP);
+    document.documentElement.setAttribute('data-desktop', 'an');
+  }
 })();
 </script>
 </head>
@@ -4536,6 +4721,17 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
         <svg class="i" viewBox="0 0 24 24"><polyline points="16 3 20 7 16 11"/><line x1="20" y1="7" x2="9" y2="7"/><polyline points="8 13 4 17 8 21"/><line x1="4" y1="17" x2="15" y2="17"/></svg>
         <span class="lbl">Zur App</span>
       </a>
+      <!-- Desktop-Ansicht am Handy (ENT-427). Unter "Zur App" und ueber
+           "Abmelden": "Zur App" ist der Alltagsweg, dies hier der Ausnahmeweg,
+           und Abmelden bleibt der abgesetzte letzte Eintrag.
+           Beschriftung und Sinnbild wechseln mit dem Zustand (siehe
+           desktopKnopfBeschriften) -- der Eintrag ist derselbe Schalter in
+           beide Richtungen, kein zweiter Eintrag daneben, der irgendwann mit
+           dem ersten auseinanderlaeuft. -->
+      <button class="nav-item" id="nav-desktop" onclick="desktopUmschalten()">
+        <svg class="i" id="navDesktopBild" viewBox="0 0 24 24"><rect x="2.5" y="4" width="19" height="13" rx="2"/><line x1="8.5" y1="20.5" x2="15.5" y2="20.5"/><line x1="12" y1="17" x2="12" y2="20.5"/></svg>
+        <span class="lbl" id="navDesktopLbl">Desktop-Ansicht</span>
+      </button>
       <button class="nav-item" id="nav-abmelden" onclick="doLogout()">
         <svg class="i" viewBox="0 0 24 24"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
         <span class="lbl">Abmelden</span>
@@ -4684,10 +4880,12 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
           <!-- Datum & Zeit (ENT-410, seit ENT-423 als Klappuhr und Tageskachel).
                Steht neben der Begruessung und fuellt die Haelfte, die dort frei
                wurde, seit die Begruessung nicht mehr ueber die volle Breite
-               laeuft. Weiter von der groben zur feinen Einheit -- Woche, Tag,
-               Uhrzeit --, jeweils Ueberschrift oben, Wert darunter, wie ueberall
-               sonst. Die Wochenspanne steht dabei, weil eine nackte Wochenzahl
-               niemandem sagt, welche Tage gemeint sind.
+               laeuft. Weiter von der groben zur feinen Einheit: Woche, Tag,
+               Uhrzeit. Die Wochenzahl behaelt ihre Ueberschrift und ihre
+               Spanne -- eine nackte 36 sagt niemandem, was gemeint ist. Ueber
+               den beiden Kacheln steht seit ENT-430 keine mehr: Eine Klappuhr
+               und ein Kalenderblatt sagen von selbst, was sie zeigen, und den
+               ausgeschriebenen Wert traegt ohnehin das aria-label.
 
                Die beiden Kacheln tragen den Wert in ZIFFERN, nicht in Text: Was
                die Klappuhr zeigt, steht in vier Halbflaechen verteilt (zwei
@@ -4710,7 +4908,6 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
                   </div>
                   <div class="zeit-objekte">
                     <div class="zeit-zeile zeit-tag">
-                      <span class="lb">Datum</span>
                       <div class="zk-tag" id="zeitDatum" role="img" aria-label="–">
                         <span class="zk-tag-kopf">
                           <i class="zk-wt" id="zeitWt">–</i><i class="zk-mo" id="zeitMo">–</i>
@@ -4719,7 +4916,6 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
                       </div>
                     </div>
                     <div class="zeit-zeile zeit-uhr">
-                      <span class="lb">Uhrzeit</span>
                       <div class="zk-uhr" id="zeitUhr" role="img" aria-label="–">
                         <div class="zk-klapp" id="zeitStd">
                           <div class="zk-h zk-h-o"><span></span></div>
@@ -5839,6 +6035,17 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
             <div class="card-hd"><h3 id="mtlFormTitel">Neue Mitteilung</h3></div>
             <div id="mtlPushHinweis"></div>
             <div class="card-bd">
+              <!-- Die Art steht ganz oben (ENT-436): Sie entscheidet, welche
+                   Felder darunter überhaupt gelten. Ein Umschalter unter den
+                   Feldern liesse jemanden erst ausfüllen und dann umstellen. -->
+              <div class="f">
+                <label for="mtlArt">Art</label>
+                <div class="seg2" id="mtlArt">
+                  <button type="button" id="mtlArtInfo" class="on" onclick="mtlArtSetzen('info')">Mitteilung</button>
+                  <button type="button" id="mtlArtTermin" onclick="mtlArtSetzen('termin')">Termin</button>
+                </div>
+                <div class="f-hint" id="mtlArtHinweis">Eine Mitteilung teilt etwas mit. Ein Termin fragt zusätzlich nach Zu- oder Absage.</div>
+              </div>
               <div class="f">
                 <label for="mtlTitel">Titel</label>
                 <input class="inp" id="mtlTitel" maxlength="120" placeholder="z. B. Mitarbeitersitzung am 24.09.">
@@ -5869,6 +6076,33 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
                 der App über den Bildschirm und muss bestätigt werden. Sparsam
                 einsetzen — was täglich unterbricht, wird weggeklickt statt gelesen.
               </div>
+              <!-- Nur beim Termin (ENT-436). Ausgeblendet statt gesperrt: Ein
+                   graues Feld, das man nicht ausfüllen kann, wirft die Frage
+                   auf, warum nicht. -->
+              <div id="mtlTerminFelder" hidden>
+                <div class="mtl-zeile">
+                  <div class="f">
+                    <label for="mtlBeginn">Beginn</label>
+                    <input class="inp" id="mtlBeginn" type="datetime-local">
+                    <div class="f-hint">Pflicht beim Termin.</div>
+                  </div>
+                  <div class="f">
+                    <label for="mtlEnde">Ende</label>
+                    <input class="inp" id="mtlEnde" type="datetime-local">
+                    <div class="f-hint">Optional.</div>
+                  </div>
+                </div>
+                <div class="f">
+                  <label for="mtlOrt">Ort</label>
+                  <input class="inp" id="mtlOrt" maxlength="120" placeholder="z. B. Aufenthaltsraum">
+                  <div class="f-hint">Optional. Steht in der App unter der Zeitangabe.</div>
+                </div>
+                <div class="f-hint" style="margin:-8px 0 14px">
+                  Der Termin verschwindet von selbst aus der App, sobald er vorbei ist —
+                  „sichtbar bis" wird dann auf Ende oder Beginn gesetzt. Eine eigene
+                  Angabe unten überschreibt das.
+                </div>
+              </div>
               <div class="mtl-zeile">
                 <div class="f">
                   <label for="mtlAb">Sichtbar ab</label>
@@ -5889,7 +6123,16 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
           </div>
 
           <div class="card">
-            <div class="card-hd"><h3>Bestehende Mitteilungen</h3></div>
+            <div class="card-hd">
+              <h3>Bestehende Mitteilungen</h3>
+              <div class="sp"></div>
+              <!-- Beide Zahlen stehen immer da: Eine gefilterte Zahl allein
+                   sieht aus wie die Gesamtzahl (Hausregel). -->
+              <div class="seg2">
+                <button type="button" id="mtlAnsichtLaufend" class="on" onclick="mtlAnsichtSetzen('laufend')">Laufend</button>
+                <button type="button" id="mtlAnsichtArchiv" onclick="mtlAnsichtSetzen('archiv')">Archiv</button>
+              </div>
+            </div>
             <div class="card-bd" id="mtlListe"></div>
           </div>
         </div>
@@ -7234,6 +7477,21 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
     </div>
   </div>
 </div>
+
+<!-- Rueckweg aus der Desktop-Ansicht (ENT-427). Steht ausserhalb der Huelle
+     und nicht in ihr: "position: fixed" bezieht sich sonst auf den naechsten
+     Vorfahren mit transform/filter/backdrop-filter -- und mit Liquid Glass
+     (ENT-418) gibt es davon in der Huelle mehrere. Er waere dann nicht mehr
+     am Bildschirmrand, sondern irgendwo darin.
+     Sichtbar NUR, solange die Desktop-Ansicht laeuft (CSS am data-desktop),
+     und in der Grundfassung "display: none" -- ein Knopf, der am Desktop
+     dauerhaft in der Ecke klebt, waere aus einer Notfalloption ein
+     Dauergast. -->
+<button type="button" class="desktop-zurueck" id="desktopZurueck" onclick="desktopSetzen(false)"
+        title="Zurück zur Handy-Ansicht" aria-label="Zurück zur Handy-Ansicht">
+  <svg viewBox="0 0 24 24"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><line x1="10.5" y1="18.5" x2="13.5" y2="18.5"/></svg>
+  <span>Handy-Ansicht</span>
+</button>
 
 <!-- ══════════════════════════ DETAIL-SCHUBLADE ══════════════════════════ -->
 <div class="scrim" id="scrim" onclick="closeDrawer()"></div>
@@ -10265,6 +10523,128 @@ function topSubZeichnen() {
 }
 
 window.addEventListener('resize', () => { if (huelleKompakt()) { navGruppenZu(); } topSubZeichnen(); });
+
+// ══════════════════════════════════════════ DESKTOP-ANSICHT AM HANDY (ENT-427)
+// Die Notfalloption: Am Handy sind Abgleich, Stammdaten, Revierdienst,
+// Auswertung, Administration und Einrichtung bewusst ausgeblendet (ENT-235).
+// Wer unterwegs doch einmal an einen dieser Bereiche muss, stellt die Seite
+// hier auf eine feste Breite -- dieselbe Mechanik wie "Desktop-Website
+// anfordern" im Browser, nur dass sie das Neuladen ueberlebt und auch in
+// einer installierten App zur Verfuegung steht.
+//
+// Ausdruecklich KEIN mobiler Nachbau dieser Bereiche. Ob und wie sie am
+// Handy erscheinen, bleibt eine eigene Entscheidung (ENT-235); hier gibt es
+// nur den Weg auf die vorhandene Desktop-Fassung, verkleinert und zoombar.
+
+// Wie breit ist das GERAET -- unabhaengig davon, wie breit die Seite gerade
+// gesetzt ist. Genau darauf kommt es an: window.innerWidth meldet nach dem
+// Umschalten 1280 (gemessen) und waere als Mass damit untauglich; der
+// Rueckweg verschwaende in dem Moment, in dem man ihn braucht.
+// Zwei Quellen und davon die KLEINERE:
+//  - screen.width kennt die Viewport-Angabe nicht (gemessen: bleibt bei 390,
+//    waehrend innerWidth auf 1280 springt), dreht sich aber auf iOS nicht mit.
+//  - window.outerWidth folgt der Drehung, meldet auf manchen iOS-Fassungen
+//    aber dasselbe wie innerWidth -- dort waere es nach dem Umschalten 1280.
+// Das Minimum nimmt in beiden Faellen den brauchbaren Wert.
+function geraeteBreite() {
+  const quellen = [window.screen && window.screen.width, window.outerWidth].filter(w => w > 0);
+  return quellen.length ? Math.min(...quellen) : 390;
+}
+
+// Ein Zeigergeraet-Bildschirm ignoriert die Viewport-Angabe komplett. Ein
+// Knopf, der dort nichts bewirkt, wird darum gar nicht erst angeboten --
+// "tut nichts" ist schlimmer als "gibt es nicht".
+function beruehrungsgeraet() {
+  return (window.matchMedia && window.matchMedia('(pointer: coarse)').matches)
+      || (navigator.maxTouchPoints || 0) > 0;
+}
+
+// Auf einem breiten Tablet steht ohnehin die Desktop-Fassung -- dann gibt es
+// nichts umzuschalten. Die Grenze ist dieselbe wie im CSS (900 px).
+function desktopWahlMoeglich() { return beruehrungsgeraet() && geraeteBreite() <= 900; }
+
+function desktopAn() { return document.documentElement.getAttribute('data-desktop') === 'an'; }
+
+// Der Faktor, mit dem der Rueckweg-Knopf gegen die Verkleinerung aufgezogen
+// wird -- siehe .desktop-zurueck im CSS. In der Handy-Ansicht ist er 1: Dort
+// wird nichts verkleinert, und der Knopf ist ohnehin nicht zu sehen.
+function desktopLupeSetzen() {
+  const lupe = desktopAn() ? Math.max(1, DESKTOP_BREITE / geraeteBreite()) : 1;
+  document.documentElement.style.setProperty('--desktop-lupe', String(lupe));
+}
+
+// Ein Schalter, zwei Richtungen. Beschriftung, Titel und Sinnbild folgen dem
+// Zustand -- nicht zwei Eintraege nebeneinander, von denen einer immer der
+// falsche ist.
+function desktopKnopfBeschriften() {
+  const b = $('nav-desktop'), lbl = $('navDesktopLbl'), bild = $('navDesktopBild');
+  if (!b || !lbl || !bild) { return; }
+  const an = desktopAn();
+  lbl.textContent = an ? 'Handy-Ansicht' : 'Desktop-Ansicht';
+  b.title = an
+    ? 'Zurück zur Handy-Ansicht'
+    : 'Notfalloption: die Desktop-Fassung auf dem Handy — verkleinert, dafür mit allen Bereichen';
+  // Handy-Umriss statt Bildschirm-Umriss, sobald der Knopf zurueckfuehrt.
+  bild.innerHTML = an
+    ? '<rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><line x1="10.5" y1="18.5" x2="13.5" y2="18.5"/>'
+    : '<rect x="2.5" y="4" width="19" height="13" rx="2"/><line x1="8.5" y1="20.5" x2="15.5" y2="20.5"/><line x1="12" y1="17" x2="12" y2="20.5"/>';
+}
+
+// Sichtbarkeit des Menueeintrags. Bewusst ueber style.display und nicht ueber
+// eine CSS-Klasse an der Fensterbreite: Nach dem Umschalten ist das Fenster
+// 1280 px breit: jede breitenabhaengige Regel wuerde den Rueckweg genau dann
+// ausblenden, wenn er gebraucht wird.
+function desktopEintragZeigen() {
+  const b = $('nav-desktop');
+  if (b) { b.style.display = desktopWahlMoeglich() || desktopAn() ? '' : 'none'; }
+}
+
+function desktopSetzen(an, merken = true) {
+  const m = $('metaViewport');
+  if (!m) { return; }
+  // Die Schublade zuerst schliessen. Sie ist nur unter 900 px eine Schublade;
+  // bliebe "on" stehen, staende sie in der Desktop-Fassung als aufgeklappte
+  // Seitenleiste ueber dem Inhalt, und der gemerkte Scrollstand ginge mit.
+  toggleSide(false);
+  m.setAttribute('content', an ? VP_DESKTOP : VP_HANDY);
+  document.documentElement.setAttribute('data-desktop', an ? 'an' : 'aus');
+  if (merken) { try { localStorage.setItem('rv3_desktop', an ? 'an' : 'aus'); } catch (e) {} }
+  desktopLupeSetzen();
+  desktopKnopfBeschriften();
+  desktopEintragZeigen();
+  // Dasselbe Nachziehen wie in huelleSetzen(): Kopfleiste, Glocke und
+  // Unterreiter haengen alle an derselben 901-px-Bedingung, und die kippt
+  // hier gerade. Nicht auf das resize-Ereignis verlassen -- es deckt nur
+  // zwei der vier Punkte ab.
+  navGruppenZu();
+  markenMenuSchliessen();
+  glockeVerorten();
+  topSubZeichnen();
+}
+
+function desktopUmschalten() { desktopSetzen(!desktopAn()); }
+
+// Beim Start: Der Kopf der Datei hat die Angabe schon gesetzt, falls sie
+// gemerkt war -- hier kommt nur noch dazu, was Funktionen braucht.
+// Der Sonderfall ist die gemerkte Wahl auf einem Geraet, das sie gar nicht
+// umsetzen kann (Bildschirm ohne Beruehrung, breites Fenster). Dann wird sie
+// still zurueckgenommen statt stehengelassen: Sonst klebte auf einem
+// Schreibtisch-Bildschirm dauerhaft ein Knopf, der dort nichts bedeutet.
+function desktopStart() {
+  if (desktopAn() && !desktopWahlMoeglich()) { desktopSetzen(false); return; }
+  desktopLupeSetzen();
+  desktopKnopfBeschriften();
+  desktopEintragZeigen();
+}
+
+// Drehen aendert die Geraetebreite und damit die Lupe. Ohne dies bliebe der
+// Rueckweg-Knopf nach dem Drehen in der Groesse der vorherigen Lage stehen.
+window.addEventListener('resize', () => { desktopLupeSetzen(); desktopEintragZeigen(); });
+
+// Sofort und nicht erst in enter(): Wer abgemeldet in der Desktop-Ansicht
+// landet, sieht sonst eine auf 30 % verkleinerte Anmeldemaske ohne jeden
+// Rueckweg -- der Menueeintrag liegt hinter der Anmeldung.
+desktopStart();
 
 // Offerten haben keinen Rueckruf vom Kundenportal (ENT-192): eine
 // Annahme/Ablehnung dort aendert den Status sofort in der Datenbank, aber
@@ -13358,6 +13738,10 @@ let mtlPushGeraete = -1;   // -1 = unbekannt
 // verschiedenen Stellen.
 let mtlPushGrund = '';
 
+// Welche der beiden Ansichten offen ist (ENT-433). "laufend" ist der
+// Normalfall -- das Archiv sucht man auf, es draengt sich nicht auf.
+let mtlAnsicht = 'laufend';
+
 // Leerzustand in der Hausform (.empty) -- dieselbe Darstellung wie überall
 // sonst im Cockpit, statt einer eigenen Textzeile nur für diese Seite.
 function mtlLeerBlock(titel, text) {
@@ -13379,6 +13763,15 @@ function mtlLaden() {
   });
 }
 
+function mtlAnsichtSetzen(welche) {
+  mtlAnsicht = welche === 'archiv' ? 'archiv' : 'laufend';
+  // Die Leserliste gehoert zu einem Eintrag, nicht zur Seite -- beim
+  // Wechseln zu bleibt sie sonst zu einer Mitteilung offen, die gar nicht
+  // mehr angezeigt wird.
+  mtlLeserOffen = 0;
+  mtlZeichnen();
+}
+
 function mtlZeichnen() {
   const ziel = $('mtlListe');
   if (!ziel) { return; }
@@ -13395,14 +13788,44 @@ function mtlZeichnen() {
       'Die Liste liess sich nicht laden. Ob Mitteilungen bestehen, ist gerade unbekannt.');
     return;
   }
+  // Aufteilung nach der Grenze, die der Server zieht (im_archiv): nicht
+  // mehr in der App = zurueckgezogen oder abgelaufen. Hier wird sie NICHT
+  // aus den Marken nachgebaut -- eine zweite Fassung derselben Regel
+  // liefe irgendwann auseinander.
+  const archiv  = mtlListe.filter(m => m.im_archiv);
+  const laufend = mtlListe.filter(m => !m.im_archiv);
+  mtlUmschalterZeichnen(laufend.length, archiv.length);
+  const zeigen = mtlAnsicht === 'archiv' ? archiv : laufend;
+
+  // Vier verschiedene Nicht-Faelle, vier verschiedene Saetze. "Kein
+  // Treffer" und "nichts vorhanden" sind nicht dasselbe (Hausregel), und
+  // ein leeres Archiv heisst etwas anderes als eine leere Gegenwart.
   if (!mtlListe.length) {
     ziel.innerHTML = mtlLeerBlock('Keine Mitteilungen',
       'Es wurde noch keine Mitteilung verfasst.');
     return;
   }
+  if (!zeigen.length && mtlAnsicht === 'archiv') {
+    ziel.innerHTML = mtlLeerBlock('Archiv leer',
+      'Hier landet, was zurückgezogen oder abgelaufen ist — und nur hier lässt sich etwas '
+      + 'endgültig löschen. Bisher steht nichts darin; '
+      + (laufend.length === 1 ? 'die eine Mitteilung ist noch aktuell.'
+                              : `die ${laufend.length} bestehenden Mitteilungen sind noch aktuell.`));
+    return;
+  }
+  if (!zeigen.length) {
+    ziel.innerHTML = mtlLeerBlock('Nichts Laufendes',
+      'Zurzeit ist keine Mitteilung in der App zu sehen. '
+      + (archiv.length === 1 ? 'Eine liegt im Archiv.' : `${archiv.length} liegen im Archiv.`));
+    return;
+  }
 
-  ziel.innerHTML = mtlListe.map(m => {
+  ziel.innerHTML = zeigen.map(m => {
+    // Kommt vom Server (siehe mitteilung_list.php) und wird hier nicht aus
+    // den Marken erraten.
+    const abgelaufen = !!m.abgelaufen;
     const marken = [];
+    if (m.ist_termin) { marken.push('<span class="chip chip-a">Termin</span>'); }
     if (m.stufe === 'wichtig') { marken.push('<span class="chip chip-x">Wichtig</span>'); }
     marken.push(`<span class="chip chip-n">${m.zielgruppe === 'revier' ? 'Nur Revierdienst' : 'Alle'}</span>`);
     // Der Zustand: läuft / geplant / abgelaufen / zurückgezogen. Vier
@@ -13428,6 +13851,24 @@ function mtlZeichnen() {
     if (m.sichtbar_ab)  { zeit.push('ab ' + dmyZeit(m.sichtbar_ab)); }
     if (m.sichtbar_bis) { zeit.push('bis ' + dmyZeit(m.sichtbar_bis)); }
 
+    // ── Termin (ENT-436): wann, wo, und wer geantwortet hat.
+    let terminZeile = '';
+    let antwortZeile = '';
+    if (m.ist_termin) {
+      const wo = [];
+      if (m.beginn) { wo.push(dmyZeit(m.beginn) + (m.ende ? ' – ' + dmyZeit(m.ende) : '')); }
+      if (m.ort)    { wo.push(m.ort); }
+      terminZeile = wo.join(' · ');
+      // "Offen" wird aus dem Nenner gerechnet -- und NUR, wenn der bekannt
+      // ist. Bei unbekanntem Empfängerkreis (-1) wird keine Zahl behauptet;
+      // sonst stünde dort eine erfundene 0 (Hausregel).
+      const n = Number(m.empfaenger_anzahl);
+      const offen = n >= 0 ? n - Number(m.zugesagt_anzahl) - Number(m.abgesagt_anzahl) : -1;
+      antwortZeile = `${m.zugesagt_anzahl} zugesagt · ${m.abgesagt_anzahl} abgesagt · `
+        + (offen >= 0 ? `${offen} von ${n} noch offen`
+                      : 'wie viele noch offen sind: unbekannt');
+    }
+
     // Was die Benachrichtigung tatsächlich getan hat (ENT-424). Vier
     // verschiedene Sachverhalte, vier verschiedene Sätze -- "nicht
     // verschickt" darf nie wie "an null Geräte verschickt" aussehen.
@@ -13448,21 +13889,68 @@ function mtlZeichnen() {
     return `<div class="mtl-eintrag${m.archiviert ? ' aus' : ''}" data-id="${m.id}">
       <div class="mtl-marken">${marken.join('')}</div>
       <h4>${esc(m.titel)}</h4>
+      ${terminZeile ? `<div class="mtl-termin">${esc(terminZeile)}</div>` : ''}
       <div class="mtl-text">${esc(m.text)}</div>
+      ${antwortZeile ? `<div class="mtl-meta mtl-antworten">${esc(antwortZeile)}</div>` : ''}
       <div class="mtl-meta">${esc(m.verfasser_name || 'Verfasser unbekannt')} · ${dmyZeit(m.erstellt_am)}${
         zeit.length ? ' · ' + esc(zeit.join(', ')) : ''} · ${esc(gelesen)}${esc(bestaetigt)}</div>
       <div class="mtl-meta">${esc(push)}</div>
       <div class="mtl-akt">
         <button type="button" class="btn btn-plain btn-sm" onclick="mtlBearbeiten(${m.id})">Bearbeiten</button>
         <button type="button" class="btn btn-plain btn-sm" onclick="mtlLeserUm(${m.id})">Wer hat gelesen</button>
-        <button type="button" class="btn btn-plain btn-sm" onclick="mtlArchivieren(${m.id}, ${m.archiviert ? 'true' : 'false'})">${
-          m.archiviert ? 'Wieder aufnehmen' : 'Zurückziehen'}</button>
+        ${!m.im_archiv ? `<button type="button" class="btn btn-plain btn-sm" onclick="mtlArchivieren(${m.id}, false)">Zurückziehen</button>` : ''}
+        ${m.archiviert && !abgelaufen ? `<button type="button" class="btn btn-plain btn-sm" onclick="mtlArchivieren(${m.id}, true)">Wieder aufnehmen</button>` : ''}
+        ${m.im_archiv ? `<button type="button" class="btn btn-plain btn-sm mtl-loeschen" onclick="mtlLoeschen(${m.id})">Endgültig löschen</button>` : ''}
       </div>
       ${mtlLeserOffen === m.id ? `<div class="mtl-leser" id="mtlLeser${m.id}">Wird geladen …</div>` : ''}
     </div>`;
   }).join('');
 
   if (mtlLeserOffen) { mtlLeserLaden(mtlLeserOffen); }
+}
+
+// Der Umschalter traegt beide Zahlen. Eine gefilterte Liste ohne die
+// andere Zahl sieht aus wie die ganze (Hausregel: keine Zahl ohne Bezug,
+// sobald ein Filter greift). Beschriftet wird erst, wenn die Zahlen
+// bekannt sind -- vorher stehen die Woerter ohne Zahl da, nicht mit einer
+// erfundenen Null.
+function mtlUmschalterZeichnen(laufend, archiv) {
+  const a = $('mtlAnsichtLaufend'), b = $('mtlAnsichtArchiv');
+  if (!a || !b) { return; }
+  a.textContent = 'Laufend ' + laufend;
+  b.textContent = 'Archiv ' + archiv;
+  a.classList.toggle('on', mtlAnsicht !== 'archiv');
+  b.classList.toggle('on', mtlAnsicht === 'archiv');
+}
+
+// Endgültig löschen (ENT-433). Die Rückfrage benennt die FOLGE, nicht nur
+// die Handlung: Was mitgeht, ist der Lesestand -- also der Nachweis, wer
+// die Mitteilung gesehen und bestätigt hat. Wer nur "Wirklich löschen?"
+// liest, weiss das nicht.
+//
+// Die eigentliche Sperre steht im Server (api/mitteilung_loeschen.php);
+// dass dieser Knopf nur im Archiv steht, erspart bloss den Umweg.
+function mtlLoeschen(id) {
+  const m = mtlListe.find(x => Number(x.id) === Number(id));
+  if (!m) { return; }
+  const nachweis = Number(m.gelesen_anzahl) > 0
+    ? `\n\nDamit verschwindet auch der Lesestand: ${m.gelesen_anzahl} `
+      + (Number(m.gelesen_anzahl) === 1 ? 'Person hat' : 'Personen haben')
+      + ' gelesen, dass sie da war.'
+    : '\n\nGelesen hat sie niemand — es geht kein Nachweis verloren.';
+  if (!confirm(`„${m.titel}“ endgültig löschen?${nachweis}\n\nDas lässt sich nicht rückgängig machen.`)) {
+    return;
+  }
+  api('mitteilung_loeschen.php', { method: 'POST', body: { id: Number(id) } })
+    .then(({ ok, data }) => {
+      if (!ok || !data || data.status !== 'ok') {
+        toast((data && data.message) || 'Die Mitteilung liess sich nicht löschen.');
+        return;
+      }
+      toast('Mitteilung endgültig gelöscht.');
+      if (mtlLeserOffen === Number(id)) { mtlLeserOffen = 0; }
+      mtlLaden();
+    });
 }
 
 // Die Leserliste. Eigener Abruf und nicht Teil der Liste: Bei 40
@@ -13483,15 +13971,36 @@ function mtlLeserLaden(id) {
     }
     const leser = data.leser || [];
     if (!leser.length) {
-      // "Noch niemand" ist eine Aussage, "keine Daten" wäre keine.
-      ziel.textContent = 'Noch niemand hat diese Mitteilung geöffnet.';
+      // Drei verschiedene Nichts, drei verschiedene Sätze.
+      ziel.textContent = data.ist_termin
+        ? 'Für diesen Termin ist niemand als Empfänger eingetragen.'
+        : 'Noch niemand hat diese Mitteilung geöffnet.';
       return;
     }
-    ziel.innerHTML = leser.map(l => {
+    const zeilen = leser.map(l => {
       const name = [l.vorname, l.nachname].filter(Boolean).join(' ') || l.name || 'Ohne Namen';
-      return `${esc(name)} — ${dmyZeit(l.gelesen_am)}${
-        l.bestaetigt_am ? ' · bestätigt ' + dmyZeit(l.bestaetigt_am) : ''}`;
-    }).join('<br>');
+      // Bei einem Termin stehen ALLE Empfänger in der Liste, auch wer die
+      // App nie geöffnet hat -- dann gibt es keinen Lesezeitpunkt. "Noch
+      // nicht geöffnet" ist etwas anderes als ein leeres Feld.
+      const gelesen = l.gelesen_am ? dmyZeit(l.gelesen_am) : 'noch nicht geöffnet';
+      // Die Antwort steht dahinter. 'offen' wird ausgeschrieben statt
+      // weggelassen: Der Unterschied zwischen "hat geöffnet und nicht
+      // geantwortet" und "hat abgesagt" darf sich nicht aus dem Fehlen
+      // einer Angabe ergeben.
+      const antwort = l.antwort === 'zugesagt' ? ' · <b>zugesagt</b> ' + dmyZeit(l.antwort_am)
+                    : l.antwort === 'abgesagt' ? ' · <b>abgesagt</b> ' + dmyZeit(l.antwort_am)
+                    : (data.ist_termin ? ' · noch nicht geantwortet' : '');
+      return `${esc(name)} — ${gelesen}${
+        l.bestaetigt_am ? ' · bestätigt ' + dmyZeit(l.bestaetigt_am) : ''}${antwort}`;
+    });
+    // Steht der Empfängerkreis nicht fest, ist die Liste unvollständig --
+    // und sagt es. Eine unvollständige Liste, die vollständig aussieht,
+    // ist schlimmer als keine.
+    if (data.ist_termin && data.vollzaehlig === false) {
+      zeilen.unshift('<i>Der Empfängerkreis steht nicht fest — hier stehen nur die, '
+        + 'die den Termin geöffnet haben.</i>');
+    }
+    ziel.innerHTML = zeilen.join('<br>');
   });
 }
 
@@ -13545,6 +14054,22 @@ function mtlPushHinweisZeichnen() {
     ${mtlPushGeraete} ${mtlPushGeraete === 1 ? 'Gerät' : 'Geräten'}.</div></div>`;
 }
 
+// Welche Art gerade im Formular steht (ENT-436): 'info' oder 'termin'.
+let mtlArt = 'info';
+
+// Der Umschalter blendet die Termin-Felder ein und aus. Die Überschrift des
+// Formulars zieht mit -- auf einer Seite, die beides kann, muss oben stehen,
+// was man gerade tut.
+function mtlArtSetzen(art) {
+  mtlArt = art === 'termin' ? 'termin' : 'info';
+  $('mtlArtInfo').classList.toggle('on', mtlArt === 'info');
+  $('mtlArtTermin').classList.toggle('on', mtlArt === 'termin');
+  $('mtlTerminFelder').hidden = mtlArt !== 'termin';
+  if (!mtlBearbeitetId) {
+    $('mtlFormTitel').textContent = mtlArt === 'termin' ? 'Neuer Termin' : 'Neue Mitteilung';
+  }
+}
+
 function mtlFormLeeren() {
   mtlBearbeitetId = 0;
   $('mtlTitel').value = '';
@@ -13553,6 +14078,10 @@ function mtlFormLeeren() {
   $('mtlStufe').value = 'normal';
   $('mtlAb').value = '';
   $('mtlBis').value = '';
+  $('mtlBeginn').value = '';
+  $('mtlEnde').value = '';
+  $('mtlOrt').value = '';
+  mtlArtSetzen('info');
   $('mtlFormTitel').textContent = 'Neue Mitteilung';
   $('mtlSpeichern').textContent = 'Veröffentlichen';
   $('mtlAbbrechen').style.display = 'none';
@@ -13570,7 +14099,11 @@ function mtlBearbeiten(id) {
   // "JJJJ-MM-TT HH:MM:SS".
   $('mtlAb').value  = m.sichtbar_ab  ? String(m.sichtbar_ab).replace(' ', 'T').slice(0, 16) : '';
   $('mtlBis').value = m.sichtbar_bis ? String(m.sichtbar_bis).replace(' ', 'T').slice(0, 16) : '';
-  $('mtlFormTitel').textContent = 'Mitteilung bearbeiten';
+  $('mtlBeginn').value = m.beginn ? String(m.beginn).replace(' ', 'T').slice(0, 16) : '';
+  $('mtlEnde').value   = m.ende   ? String(m.ende).replace(' ', 'T').slice(0, 16) : '';
+  $('mtlOrt').value    = m.ort || '';
+  mtlArtSetzen(m.ist_termin ? 'termin' : 'info');
+  $('mtlFormTitel').textContent = m.ist_termin ? 'Termin bearbeiten' : 'Mitteilung bearbeiten';
   $('mtlSpeichern').textContent = 'Änderung speichern';
   $('mtlAbbrechen').style.display = '';
   window.scrollTo(0, 0);
@@ -13581,10 +14114,20 @@ function mtlSpeichern() {
   const text  = $('mtlText').value.trim();
   if (!titel || !text) { toast('Titel und Text sind nötig.'); return; }
 
+  // Beim Termin steht die Pflicht schon hier -- der Server weist es
+  // ebenfalls ab (mitteilung_save.php), aber die Meldung kommt so ohne
+  // Umweg über das Netz.
+  if (mtlArt === 'termin' && !$('mtlBeginn').value) {
+    toast('Ein Termin braucht einen Beginn.'); return;
+  }
   const koerper = {
     titel, text,
     zielgruppe: $('mtlZielgruppe').value,
     stufe: $('mtlStufe').value,
+    art: mtlArt,
+    beginn: mtlArt === 'termin' ? $('mtlBeginn').value : '',
+    ende:   mtlArt === 'termin' ? $('mtlEnde').value : '',
+    ort:    mtlArt === 'termin' ? $('mtlOrt').value.trim() : '',
     sichtbar_ab: $('mtlAb').value,
     sichtbar_bis: $('mtlBis').value,
   };
@@ -13601,7 +14144,9 @@ function mtlSpeichern() {
       toast((data && data.message) || 'Die Mitteilung liess sich nicht speichern.');
       return;
     }
-    toast(data.angelegt ? 'Mitteilung veröffentlicht.' : 'Änderung gespeichert.');
+    toast(data.angelegt
+      ? (mtlArt === 'termin' ? 'Termin veröffentlicht.' : 'Mitteilung veröffentlicht.')
+      : 'Änderung gespeichert.');
     mtlFormLeeren();
     mtlLaden();
   });
@@ -23622,7 +24167,12 @@ function sprachBereit(prefix) {
     return;
   }
   wrap.style.display = '';
-  hint.className = 'sprach-hint';
+  // "ruhe" markiert den ERKLAERSATZ, nicht das Feld: Auf der Uebersicht ist
+  // er auf Vorgabe des Projektinhabers ausgeblendet, waehrend Warnungen,
+  // Fehler und die Rueckmeldung der laufenden Aufnahme im selben Feld
+  // weiterhin erscheinen. Ohne diese Trennung waere ein stummgeschaltetes
+  // Mikrofon nicht mehr von einem stummen Programm zu unterscheiden.
+  hint.className = 'sprach-hint ruhe';
   // Wo die Erkennung stattfindet, wird gesagt und nicht verschwiegen -- der
   // Ton geht an den Browserhersteller (ENT-027, OP-28).
   hint.innerHTML = 'Sprich in ganzen Sätzen. Der Text erscheint im Feld und lässt sich vor dem Erkennen noch ändern. '
