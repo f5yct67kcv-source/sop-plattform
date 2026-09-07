@@ -301,6 +301,47 @@ try {
   await page.close();
 } catch (e) { check('Abschnitt Seiten ohne Abbruch: ' + e.message, false); }
 
+// ══════════════ HINTER DEN MITTEILUNGEN SCROLLT NICHTS
+// Vom Projektinhaber gemeldet: "Bei Mitteilungen scrollt der Hintergrund
+// weiter." Die Mitteilungen liegen als feste Ebene ueber der Seite --
+// scrollt die Seite darunter, wandern Kopfzeile und Leiste weg, waehrend
+// die Ebene stehenbleibt. Gemessen: nach 600 px Scrollen klaffte eine
+// 600-px-Luecke, durch die der Plan schaute.
+//
+// Geprueft wird die AUSSAGE, nicht der Weg dorthin: Nach dem Scrollen
+// sitzt die Ebene unveraendert an der Leiste, und die Kopfzeile steht
+// noch da. Wer das spaeter anders loest, bleibt zu Recht gruen.
+try {
+  const page = await seite(1440, 900, false);
+  await page.evaluate(() => zeigeTisch('plan'));
+  await page.waitForTimeout(500);
+  await page.evaluate(() => zeigeTisch('mitteilungen'));
+  await page.waitForTimeout(400);
+  const lage = () => page.evaluate(() => {
+    const m = document.querySelector('.mit-seite.on');
+    const leiste = [...document.querySelectorAll('.tabs')].find(n => n.getBoundingClientRect().height > 0);
+    const kopf = document.querySelector('.kopf');
+    return { luecke: Math.round(m.getBoundingClientRect().top - leiste.getBoundingClientRect().bottom),
+             kopfOben: Math.round(kopf.getBoundingClientRect().top) };
+  });
+  const vorher = await lage();
+  await page.mouse.move(1300, 500);          // ausserhalb der Ebene
+  await page.mouse.wheel(0, 600);
+  await page.waitForTimeout(400);
+  const nachher = await lage();
+  check('KRITISCH: hinter den Mitteilungen scrollt nichts weg',
+    nachher.luecke === vorher.luecke && Math.abs(nachher.luecke) <= 1);
+  check('KRITISCH: und die Kopfzeile bleibt dabei stehen', nachher.kopfOben >= -1);
+  if (nachher.luecke !== vorher.luecke) bad.push(`Luecke ${vorher.luecke} -> ${nachher.luecke} px`);
+  // Der Hintergrund muss zurueckkommen, sobald man die Seite verlaesst --
+  // sonst waere der Plan nach einem Besuch der Mitteilungen leer.
+  await page.evaluate(() => zeigeTisch('plan'));
+  await page.waitForTimeout(400);
+  check('KRITISCH: und er ist wieder da, sobald man die Seite verlaesst',
+    await page.evaluate(() => document.querySelector('main.inhalt').getBoundingClientRect().height > 0));
+  await page.close();
+} catch (e) { check('Abschnitt Hintergrund ohne Abbruch: ' + e.message, false); }
+
 // ══════════════ DIE KOPFZEILE STEHT AUF JEDEM REITER GLEICH
 // Zweimal hintereinander war der Konto-Knopf weg: erst ganz (kein
 // Menue-Reiter mehr), dann auf drei Reitern (im Menue faellt die

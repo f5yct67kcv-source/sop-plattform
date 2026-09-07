@@ -1619,6 +1619,13 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
      Betroffen sind nur die Seiten, die ein REITER oeffnet. Spesen und
      Einstellungen behalten ihren Kopf samt Rueckweg: Die erreicht man
      ueber "Konto", und dorthin muss man zurueckkommen. */
+  /* Kein Hintergrund hinter der Mitteilungs-Seite: Was nicht da ist, kann
+     nicht wegscrollen. Gesetzt wird die Klasse in tischMarkeSetzen(), nicht
+     ueber :has() -- der Kasten steht VOR der Ebene im Auszeichnungstext,
+     und eine Regel, die von einem spaeteren Geschwister abhaengt, ist
+     schwerer zu durchschauen als ein Umschalter an einer Stelle. */
+  .app.mit-offen main.inhalt { display: none; }
+
   .mit-seite .mit-kopf { display: none; }
   #mitBody { padding-top: 22px; }
   #pr-stunden > .seiten-kopf, #pr-daten > .seiten-kopf { display: none; }
@@ -3017,6 +3024,14 @@ function tischMarkeSetzen() {
   // uebernommen, nicht zweitgerechnet.
   const q = $('mitZahl'), z = $('tsZahl');
   if (q && z) { z.textContent = q.textContent; z.hidden = q.hidden; }
+  // Steht die Mitteilungs-Seite, hat sie keinen Hintergrund mehr. Sie liegt
+  // als feste Ebene ueber der Seite; scrollt die Seite darunter weiter,
+  // wandern Kopfzeile und Leiste weg, waehrend die Ebene stehenbleibt --
+  // und durch die entstehende Luecke schaut der Plan. Gemessen: nach 600 px
+  // Scrollen 600 px Luecke. Ohne Inhalt dahinter gibt es nichts zu
+  // scrollen; die Liste selbst scrollt in ihrem eigenen Kasten (.mit-bd).
+  const rumpf = $('app');
+  if (rumpf) rumpf.classList.toggle('mit-offen', a === 'mitteilungen' && amSchreibtisch());
   tischKopfMessen();
 }
 
