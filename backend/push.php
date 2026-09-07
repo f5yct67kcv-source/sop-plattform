@@ -270,6 +270,32 @@ function push_ursprung(string $endpunkt): ?string
     return $t['scheme'] . '://' . $t['host'];
 }
 
+/**
+ * Wie steht es um den Zeitgeber-Zugang? Vier verschiedene Antworten.
+ *
+ * Nachgetragen, weil beim Einrichten alle vier Faelle als "kein Token"
+ * herauskamen -- die Meldung der Sitzungspruefung, in die der Aufruf
+ * mangels gueltigem Schluessel hineinlief. "Nicht eingerichtet",
+ * "Schluessel fehlt in der Adresse", "Schluessel stimmt nicht" und "nicht
+ * angemeldet" verlangen vier verschiedene Handgriffe. Dieselbe Hausregel
+ * wie bei push_grund(): "unbekannt" darf nie wie "keine" aussehen.
+ *
+ * Reine Funktion mit beiden Werten als Parameter -- so laesst sich jeder
+ * Fall pruefen, ohne den Endpunkt aufzurufen.
+ *
+ * VERGLICHEN WIRD MIT hash_equals: Ein Vergleich, der beim ersten falschen
+ * Zeichen abbricht, verraet ueber die Antwortzeit, wie viele Zeichen
+ * stimmen.
+ */
+function push_zeitgeber_lage(string $erwartet, string $mitgegeben): string
+{
+    if ($erwartet === '' || str_starts_with($erwartet, '__PUSH_CRON')) {
+        return 'nicht_eingerichtet';
+    }
+    if ($mitgegeben === '') { return 'kein_schluessel_in_der_adresse'; }
+    return hash_equals($erwartet, $mitgegeben) ? 'ok' : 'falscher_schluessel';
+}
+
 // ── Der Versand ───────────────────────────────────────────────────────
 /**
  * Was mit einem Abo nach der Antwort des Push-Dienstes geschehen soll.
@@ -421,21 +447,24 @@ function push_empfaenger(PDO $pdo, string $zielgruppe): array
  * tatsaechlich hinausging -- "an 12 Geraete verschickt" darf keine
  * Behauptung sein.
  *
- * Die Person, die die Mitteilung VERFASST hat, bekommt selbst keine
- * Benachrichtigung: Wer gerade auf "Veroeffentlichen" gedrueckt hat, weiss
- * Bescheid, und ein vibrierendes Telefon in der eigenen Hand sieht wie ein
- * Fehler aus.
+ * DER VERFASSER BEKOMMT SIE AUCH -- seit dem ersten Einsatz geaendert.
+ * Zuerst war er ausgenommen ("wer veroeffentlicht, weiss Bescheid"). Beim
+ * Einrichten fiel auf, dass das ein Widerspruch war: Ueberall sonst ist er
+ * ein normaler Empfaenger. Seine eigene Mitteilung steht in seiner
+ * App-Liste, zaehlt bei ihm als ungelesen ("0 von 2 gelesen" zaehlt ihn
+ * mit), und bei "wichtig" legt sich das Bestaetigungsfenster auch ueber
+ * seinen Bildschirm. Nur der Push nahm ihn aus. Entweder Empfaenger oder
+ * nicht -- vom Projektinhaber so entschieden.
+ *
+ * Nebenwirkung, die dazugehoert: Nach dem Klick auf "Veroeffentlichen"
+ * meldet sich das eigene Telefon einmal.
  */
 function push_fuer_mitteilung(PDO $pdo, array $m, string $jetzt): array
 {
     $bilanz = ['geraete' => 0, 'zugestellt' => 0, 'entfernt' => 0, 'fehler' => 0];
     if (!push_konfiguriert() || !hat_tabelle($pdo, 'push_abo')) { return $bilanz; }
 
-    $personen = push_empfaenger($pdo, (string)($m['zielgruppe'] ?? ''));
-    $verfasser = (int)($m['verfasser_id'] ?? 0);
-    if ($verfasser > 0) { $personen = array_values(array_diff($personen, [$verfasser])); }
-
-    $abos = push_abos_fuer($pdo, $personen);
+    $abos = push_abos_fuer_mitteilung($pdo, $m);
     $wichtig = (string)($m['stufe'] ?? 'normal') === 'wichtig';
 
     foreach ($abos as $abo) {
@@ -453,6 +482,20 @@ function push_fuer_mitteilung(PDO $pdo, array $m, string $jetzt): array
         }
     }
     return $bilanz;
+}
+
+/**
+ * Welche Geraete diese Mitteilung anschreibt.
+ *
+ * Eigene Funktion und nicht in push_fuer_mitteilung() eingebaut, damit sich
+ * die Frage "wer bekommt sie?" ohne Netz pruefen laesst -- der Versand
+ * selbst braucht einen echten Push-Dienst, die Auswahl nicht.
+ *
+ * Der Verfasser ist NICHT ausgenommen, siehe push_fuer_mitteilung().
+ */
+function push_abos_fuer_mitteilung(PDO $pdo, array $m): array
+{
+    return push_abos_fuer($pdo, push_empfaenger($pdo, (string)($m['zielgruppe'] ?? '')));
 }
 
 /**

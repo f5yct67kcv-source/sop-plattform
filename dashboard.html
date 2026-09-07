@@ -2345,8 +2345,79 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
 }
 
 /* ── Begrüssungs-Container mit Diktat-Router (ENT-032) */
-.begr-karte .card-bd { padding: 22px 24px; }
-.begr-kopf h2 { font-size: 21px; font-weight: 720; letter-spacing: -.3px; }
+/* Luft statt Enge (ENT-432). Der Projektinhaber: "es ist zu dicht".
+   Gemessen stimmte das genau: Der Inhalt brauchte 178 px bei 167 px
+   Innenhoehe und ragte oben aus der Karte heraus.
+   Zwei Griffe dagegen. Der eine ist der Innenabstand -- 22 auf 34 Pixel oben
+   und unten; das ist die Luft, die vorher fehlte. Der andere ist die
+   senkrechte Mitte: Die Karte ist so hoch wie ihre Nachbarin (ENT-410), und
+   was daran ueber den Inhalt hinausgeht, liegt jetzt zu gleichen Teilen
+   ueber und unter ihm statt als Rest am Fuss. */
+.begr-karte .card-bd { padding: 34px 24px; display: flex; flex-direction: column;
+  /* flex: 1 muss dabei sein, sonst ist der Rumpf nur so hoch wie sein Inhalt
+     und die Zentrierung hat nichts zu verteilen. Gemessen klebte der Block
+     bei gestreckter Nachbarkarte oben (35 px oben, 235 px unten) -- die
+     Regel stand da und tat nichts. */
+  flex: 1 1 auto; justify-content: center; }
+/* Der Gruss steht wieder auf seinem eigenen Abstand (ENT-432). Die elf
+   Pixel nach oben aus der Skizze (ENT-428) und die fuenf nach rechts
+   (entfallen mit ENT-430) waren beide Notloesungen gegen dieselbe Enge:
+   Der Inhalt brauchte gemessen 178 px bei 167 px Innenhoehe und ragte oben
+   heraus. Die Enge ist jetzt an der Wurzel weg -- das Eingabefeld ist
+   flacher, und was frei wird, liegt als Luft ueber und unter dem Block. */
+.begr-kopf h2 { font-size: 21px; font-weight: 720; letter-spacing: -.3px;
+  margin: 0; }
+
+/* Die Lesebreite von 640 px aus ENT-430 ist mit ENT-432 wieder entfallen.
+   Sie beruhte auf einem Missverstaendnis: Der Projektinhaber wollte die
+   Eingabespalte SENKRECHT kuerzen, nicht waagrecht. Zwei Dinge gingen dabei
+   auch messbar schief -- der Platzhaltertext brach auf 1.9 Zeilen um und
+   fuellte das flachere Feld randvoll, und .begr-kopf schrumpfte im
+   Flex-Container auf seine Textbreite (205 statt 640 px) und rutschte mit
+   margin-inline:auto aus der Flucht zum Feld darunter. Beides waere mit
+   width:100% zu haben gewesen; die Breite war aber gar nicht gemeint. */
+/* Die drei Abstaende im Block, aus der Skizze des Projektinhabers vom
+   2026-09-06 (ENT-434). Gemessen klebten Gruss und Eingabefeld mit NULL
+   Pixel aneinander: Der Innenabstand von .diktat-router zaehlt ab der
+   Unterkante von .begr-kopf, und dessen Zeilenbox reicht bereits bis dorthin.
+   Auf dem Bildschirm sah das aus wie ein Titel, der auf dem Feld aufsitzt.
+   Jetzt 16 px zwischen Gruss und Feld, 24 px zwischen Feld und Knopfreihe --
+   die Werte aus der Skizze, gerechnet aus ihren Zielpositionen und nicht
+   aus den Verschiebungen einzeln, weil die drei sich gegenseitig mitziehen.
+   Die 19 px an der Knopfreihe sind kein Tippfehler: Zwischen Eingabefeld und
+   dem Kasten darum liegen gemessen 5 px, und der Abstand SOLL zwischen dem
+   Feld und den Knoepfen stimmen, nicht zwischen den Kaesten.
+   Nur die Uebersicht: Derselbe Router steht in Planung/Einsaetze und in zwei
+   Dialogen, wo nichts beanstandet ist.
+
+   Die Selektoren sind absichtlich eine Stufe schaerfer als noetig: Weiter
+   unten stehen ".card-bd > .diktat-router { margin-top: 0 }" und
+   ".diktat-router .sprach { margin-top: 10px }" -- beide mit derselben
+   Eigenspezifitaet wie die naheliegende Fassung und SPAETER im Regelwerk.
+   Mit ".begr-karte .diktat-router" standen diese Zeilen hier und taten
+   nichts; gemessen blieb der Abstand bei 0 und 10 px. */
+.begr-karte .card-bd > .diktat-router { margin-top: 16px; }
+.begr-karte .diktat-router .sprach { margin-top: 19px; }
+/* Das Eingabefeld ist so hoch wie seine zwei Zeilen und keinen Pixel mehr
+   (ENT-432, auf Vorgabe des Projektinhabers). Gerechnet aus dem gerenderten
+   Zustand: 2 x 21.7 px Zeilenhoehe + 2 x 9 px Innenabstand + 2 px Rand =
+   64 px. Vorher waren es 91 -- die 27 Pixel Reserve darin hat nie jemand
+   gebraucht, und sie waren es, die die Karte randvoll machten.
+   Wer mehr Platz will, zieht das Feld am Griff unten rechts auf; es bleibt
+   resize: vertical.
+   Zwei Dinge muessen dabei stimmen: Die Mindesthoehe von textarea.inp
+   (92 px) muss mitgehen -- sie gewinnt sonst gegen jede Hoehe darunter, und
+   die Regel bliebe wirkungslos, ohne dass etwas kaputt aussieht. Und die
+   feste Hoehe gilt NUR bei ungezogener Karte: Wird die Begruessung hoeher
+   gezogen, nimmt das Feld die gewonnene Hoehe (so seit jeher, gemessen von
+   test_containergroesse.mjs). */
+.dash-item:not(.dh) .begr-karte #rtText { height: 64px; min-height: 64px; }
+/* Der Erklaersatz entfaellt hier. NUR er: Dieselbe Flaeche zeigt weiter
+   "Das Mikrofon liefert kein Signal", "Die Aufnahme liess sich nicht
+   starten" und "Aufnahme laeuft". Ein leeres Feld soll dabei keinen
+   Abstand halten, sonst bliebe eine Luecke ohne Aussage. */
+.begr-karte .sprach-hint.ruhe { display: none; }
+.sprach-hint:empty { margin-top: 0; }
 
 /* ── Datum & Zeit (ENT-410, Kacheln seit ENT-423)
    Weiterhin von der groben zur feinen Einheit: die Kalenderwoche als Band
@@ -2513,9 +2584,19 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
      Paar statt zwischen den drei Zonen. Gemessen bekam die Wochenzahl so
      720 px, waehrend die Kacheln in ihrer halben Karte stecken blieben. */
   .zeit-objekte { display: contents; padding-top: 0; gap: 0; }
-  .zeit-tag, .zeit-uhr { flex: 1 0 auto; padding-left: 30px;
-    border-left: 1px solid var(--line-soft);
+  /* Ohne senkrechte Trennstriche (Skizze des Projektinhabers, ENT-428): Die
+     Kacheln sind selbst schon Flaechen mit eigener Kante -- ein Strich
+     daneben teilt ein zweites Mal, was bereits geteilt aussieht.
+     Nur beim DATUM faellt mit dem Strich auch sein Einzug weg (30 auf 8, die
+     22 aus der Skizze). Die Uhrzeit behaelt ihn: Ohne Strich ist der Abstand
+     das Einzige, was Datum und Uhrzeit noch trennt, und mit 8 px standen die
+     drei Kacheln gemessen 11 px auseinander -- genauso weit wie die beiden
+     Uhrkacheln voneinander. Sie lasen sich dann als EINE Reihe aus drei
+     Kacheln statt als zwei verschiedene Angaben. */
+  .zeit-tag, .zeit-uhr { flex: 1 0 auto;
     display: flex; flex-direction: column; justify-content: center; align-items: flex-start; }
+  .zeit-tag { padding-left: 8px; }
+  .zeit-uhr { padding-left: 30px; }
 }
 /* Begruessung und Datum & Zeit stehen nebeneinander und bilden die erste
    Zeile der Uebersicht. Gemessen war die Begruessung 267 px hoch und die
@@ -2714,6 +2795,11 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
    ein Rest -- daneben klafft eine Luecke, die keine Aussage hat. Vier, zwei
    oder eine, nie drei. */
 .dash-item.dw-halb .g-kpi { grid-template-columns: repeat(2, 1fr); }
+/* Acht Pixel Abstand ueber den Kennzahlen (Skizze des Projektinhabers,
+   ENT-428). Der Container darueber waechst dadurch um dieselben acht -- in
+   der Skizze standen drei; beides zugleich ginge nur, wenn die Kacheln
+   flacher wuerden, und flacher waren sie dort nicht. */
+#kpiGrid { margin-top: 8px; }
 .dash-item.versteckt { display: none; }
 
 /* Bearbeitungsmodus */
@@ -3860,6 +3946,20 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
    den Fall ab, dass spaeter eine noch laengere Beschriftung dazukommt. */
 .kk-koerper .dl dt { overflow-wrap: anywhere; }
 .kk-tasten { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 13px; }
+
+/* Belegvorschau (ENT-425). Das Blatt behaelt seine Dokumentbreite, der
+   Rahmen bekommt die verkleinerte Hoehe -- siehe Begruendung beim Markup.
+   Das Polster ist auf dem Handy schmaler: 32 px auf jeder Seite waren dort
+   ein Sechstel der Bildschirmbreite. */
+#ofVorschauInhalt { padding: 32px; }
+/* BEWUSST ohne overflow:hidden. Die Hoehe hier wird gerechnet (Blatthoehe mal
+   Massstab); waere sie einmal zu klein -- etwa weil das Logo im Briefkopf
+   beim Messen noch nicht geladen war --, verschwaende ein "hidden" den
+   unteren Teil des Dokuments spurlos. Ohne ihn ist der schlimmste Fall ein
+   zu enger Abstand nach unten, und der faellt auf, statt zu taeuschen. */
+#ofVorschauMass { }
+#ofVorschauBlatt { transform-origin: top left; }
+@media (max-width: 620px) { #ofVorschauInhalt { padding: 12px; } }
 /* Die Knoepfe im Koerper gehoeren zur Karte, nicht zum Aufklappen: Ein
    Klick auf sie darf die Karte nicht gleich wieder zuklappen (jedes
    onclick ruft darum stopPropagation). */
@@ -4235,6 +4335,11 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
 .mtl-eintrag.aus { opacity: .6; }
 .mtl-marken { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
 .mtl-eintrag h4 { font-size: 14.5px; font-weight: 660; letter-spacing: -.2px; }
+/* Wann und wo (ENT-436) -- die Angabe, wegen der jemand zu- oder absagt,
+   steht über dem Text und nicht in der Fusszeile zwischen Verfasser und
+   Lesestand. */
+.mtl-eintrag .mtl-termin { font-size: 13px; font-weight: 640; color: var(--ink); margin-top: 4px; }
+.mtl-eintrag .mtl-antworten { font-weight: 620; color: var(--ink-2); }
 .mtl-eintrag .mtl-text { font-size: 13px; color: var(--ink-2); line-height: 1.5; margin-top: 4px; white-space: pre-wrap; }
 .mtl-meta { font-size: 12px; color: var(--ink-3); margin-top: 8px; }
 .mtl-akt { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
@@ -4242,6 +4347,12 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
    Sie ist eine Nachschlagsache, kein eigener Arbeitsschritt. */
 .mtl-leser { margin-top: 10px; padding: 10px 12px; background: var(--line-soft);
   border-radius: var(--r-sm); font-size: 12.5px; color: var(--ink-2); line-height: 1.7; }
+/* Endgueltig loeschen sieht anders aus als der Rest der Zeile (ENT-433):
+   nicht laut gefuellt -- der Knopf steht neben harmlosen --, aber auch
+   nicht gleich. Ein Handgriff ohne Rueckweg darf sich nicht wie
+   "Bearbeiten" anfuehlen. */
+.mtl-akt .mtl-loeschen { color: var(--neg); }
+.mtl-akt .mtl-loeschen:hover { background: var(--neg); color: #fff; border-color: var(--neg); }
 </style>
 <script src="gav.js"></script>
 <script src="zeitwahl.js"></script>
@@ -4769,10 +4880,12 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
           <!-- Datum & Zeit (ENT-410, seit ENT-423 als Klappuhr und Tageskachel).
                Steht neben der Begruessung und fuellt die Haelfte, die dort frei
                wurde, seit die Begruessung nicht mehr ueber die volle Breite
-               laeuft. Weiter von der groben zur feinen Einheit -- Woche, Tag,
-               Uhrzeit --, jeweils Ueberschrift oben, Wert darunter, wie ueberall
-               sonst. Die Wochenspanne steht dabei, weil eine nackte Wochenzahl
-               niemandem sagt, welche Tage gemeint sind.
+               laeuft. Weiter von der groben zur feinen Einheit: Woche, Tag,
+               Uhrzeit. Die Wochenzahl behaelt ihre Ueberschrift und ihre
+               Spanne -- eine nackte 36 sagt niemandem, was gemeint ist. Ueber
+               den beiden Kacheln steht seit ENT-430 keine mehr: Eine Klappuhr
+               und ein Kalenderblatt sagen von selbst, was sie zeigen, und den
+               ausgeschriebenen Wert traegt ohnehin das aria-label.
 
                Die beiden Kacheln tragen den Wert in ZIFFERN, nicht in Text: Was
                die Klappuhr zeigt, steht in vier Halbflaechen verteilt (zwei
@@ -4795,7 +4908,6 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
                   </div>
                   <div class="zeit-objekte">
                     <div class="zeit-zeile zeit-tag">
-                      <span class="lb">Datum</span>
                       <div class="zk-tag" id="zeitDatum" role="img" aria-label="–">
                         <span class="zk-tag-kopf">
                           <i class="zk-wt" id="zeitWt">–</i><i class="zk-mo" id="zeitMo">–</i>
@@ -4804,7 +4916,6 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
                       </div>
                     </div>
                     <div class="zeit-zeile zeit-uhr">
-                      <span class="lb">Uhrzeit</span>
                       <div class="zk-uhr" id="zeitUhr" role="img" aria-label="–">
                         <div class="zk-klapp" id="zeitStd">
                           <div class="zk-h zk-h-o"><span></span></div>
@@ -5819,11 +5930,11 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
               </div>
               <label class="check">
                 <input type="checkbox" id="of_unterschriftsseite">
-                Unterschriftsseite hinzufügen
+                Unterschriftsfelder hinzufügen
               </label>
               <div class="sec" style="margin-top:8px">
-                Fügt dem Ausdruck eine zusätzliche Seite mit Feldern für Ort, Datum und
-                Unterschrift an.
+                Setzt Felder für Ort, Datum und Unterschrift ans Ende des Belegs — auf
+                dieselbe Seite, nicht auf ein eigenes Blatt (ENT-425).
               </div>
             </div></div>
           </div>
@@ -5924,6 +6035,17 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
             <div class="card-hd"><h3 id="mtlFormTitel">Neue Mitteilung</h3></div>
             <div id="mtlPushHinweis"></div>
             <div class="card-bd">
+              <!-- Die Art steht ganz oben (ENT-436): Sie entscheidet, welche
+                   Felder darunter überhaupt gelten. Ein Umschalter unter den
+                   Feldern liesse jemanden erst ausfüllen und dann umstellen. -->
+              <div class="f">
+                <label for="mtlArt">Art</label>
+                <div class="seg2" id="mtlArt">
+                  <button type="button" id="mtlArtInfo" class="on" onclick="mtlArtSetzen('info')">Mitteilung</button>
+                  <button type="button" id="mtlArtTermin" onclick="mtlArtSetzen('termin')">Termin</button>
+                </div>
+                <div class="f-hint" id="mtlArtHinweis">Eine Mitteilung teilt etwas mit. Ein Termin fragt zusätzlich nach Zu- oder Absage.</div>
+              </div>
               <div class="f">
                 <label for="mtlTitel">Titel</label>
                 <input class="inp" id="mtlTitel" maxlength="120" placeholder="z. B. Mitarbeitersitzung am 24.09.">
@@ -5954,6 +6076,33 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
                 der App über den Bildschirm und muss bestätigt werden. Sparsam
                 einsetzen — was täglich unterbricht, wird weggeklickt statt gelesen.
               </div>
+              <!-- Nur beim Termin (ENT-436). Ausgeblendet statt gesperrt: Ein
+                   graues Feld, das man nicht ausfüllen kann, wirft die Frage
+                   auf, warum nicht. -->
+              <div id="mtlTerminFelder" hidden>
+                <div class="mtl-zeile">
+                  <div class="f">
+                    <label for="mtlBeginn">Beginn</label>
+                    <input class="inp" id="mtlBeginn" type="datetime-local">
+                    <div class="f-hint">Pflicht beim Termin.</div>
+                  </div>
+                  <div class="f">
+                    <label for="mtlEnde">Ende</label>
+                    <input class="inp" id="mtlEnde" type="datetime-local">
+                    <div class="f-hint">Optional.</div>
+                  </div>
+                </div>
+                <div class="f">
+                  <label for="mtlOrt">Ort</label>
+                  <input class="inp" id="mtlOrt" maxlength="120" placeholder="z. B. Aufenthaltsraum">
+                  <div class="f-hint">Optional. Steht in der App unter der Zeitangabe.</div>
+                </div>
+                <div class="f-hint" style="margin:-8px 0 14px">
+                  Der Termin verschwindet von selbst aus der App, sobald er vorbei ist —
+                  „sichtbar bis" wird dann auf Ende oder Beginn gesetzt. Eine eigene
+                  Angabe unten überschreibt das.
+                </div>
+              </div>
               <div class="mtl-zeile">
                 <div class="f">
                   <label for="mtlAb">Sichtbar ab</label>
@@ -5974,7 +6123,16 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
           </div>
 
           <div class="card">
-            <div class="card-hd"><h3>Bestehende Mitteilungen</h3></div>
+            <div class="card-hd">
+              <h3>Bestehende Mitteilungen</h3>
+              <div class="sp"></div>
+              <!-- Beide Zahlen stehen immer da: Eine gefilterte Zahl allein
+                   sieht aus wie die Gesamtzahl (Hausregel). -->
+              <div class="seg2">
+                <button type="button" id="mtlAnsichtLaufend" class="on" onclick="mtlAnsichtSetzen('laufend')">Laufend</button>
+                <button type="button" id="mtlAnsichtArchiv" onclick="mtlAnsichtSetzen('archiv')">Archiv</button>
+              </div>
+            </div>
             <div class="card-bd" id="mtlListe"></div>
           </div>
         </div>
@@ -7541,8 +7699,18 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
       <h2>Vorschau</h2>
       <p>So sieht die Offerte für den Kunden aus.</p>
     </div>
+    <!-- Die Vorschau zeigt ein A4-Blatt fester Breite (ofBlatt: 700 px). Auf
+         dem Handy ist der Dialog 390 px breit -- das Blatt lief darum links
+         und rechts aus dem Bild, und man schob ein Dokument hin und her,
+         von dem man nie eine ganze Zeile sah (ENT-425).
+         Ein Dokument wird nicht umbrochen, es wird verkleinert: #ofVorschauBlatt
+         behaelt seine 700 px und wird per transform skaliert, #ofVorschauMass
+         traegt die daraus entstehende Hoehe -- transform aendert das Layout
+         sonst nicht, und unter dem Blatt bliebe ein leerer Streifen. -->
     <div class="dlg-bd" style="background:#F4F5F7">
-      <div id="ofVorschauInhalt" style="background:#fff;padding:32px;border-radius:8px"></div>
+      <div id="ofVorschauInhalt" style="background:#fff;border-radius:8px">
+        <div id="ofVorschauMass"><div id="ofVorschauBlatt"></div></div>
+      </div>
     </div>
     <div class="dlg-ft">
       <button class="btn btn-plain" onclick="closeDlg('dlgOfVorschau')">Schliessen</button>
@@ -12632,6 +12800,89 @@ function ofDateiname(b) {
   return (teil || 'Offerte') + '.pdf';
 }
 
+// ── Ein Blatt zu einem PDF machen, moeglichst auf EINER Seite (ENT-425) ────
+//
+// html2pdf schneidet ein zu hohes Blatt stumpf an der Seitengrenze ab und
+// setzt den Rest auf Seite 2. Bei einer Offerte mit einer einzigen Position
+// landete so der Unterschriftenblock allein auf der zweiten Seite, waehrend
+// die erste halb leer blieb -- vom Projektinhaber beanstandet.
+//
+// Darum: rendern, dann nachsehen, wie viele Seiten daraus geworden sind. Bei
+// mehr als einer wird dasselbe Bild auf eine Seite verkleinert -- aber nur,
+// solange es lesbar bleibt. Wer eine Offerte ueber zwanzig Positionen auf ein
+// A4 presst, macht sie unlesbar; unterhalb von PDF_MIN_MASSSTAB bleibt es
+// darum beim mehrseitigen Satz. "Nach Moeglichkeit auf eine Seite" heisst
+// nicht "um jeden Preis".
+const PDF_RAND = 10;            // mm, auf allen Seiten
+const PDF_MIN_MASSSTAB = 0.62;  // darunter lieber zwei Seiten als eine Lupe
+// A4 hoch in Millimetern. Muss zur jsPDF-Angabe in PDF_OPTIONEN passen
+// (format 'a4', orientation 'portrait'); test_offerten.mjs vergleicht beide
+// gegeneinander, damit die Zahlen nicht auseinanderlaufen.
+const PDF_SEITE = { breite: 210, hoehe: 297 };
+const PDF_OPTIONEN = {
+  margin: PDF_RAND,
+  image: { type: 'jpeg', quality: 0.95 },
+  html2canvas: { scale: 2, useCORS: true },
+  jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+  pagebreak: { mode: ['css', 'legacy'] },
+};
+
+// Ein AUSDRUECKLICH gewollter Seitenumbruch wird nie wegskaliert: Wer im
+// Blatt-HTML einen Umbruch setzt, will zwei Blaetter -- die zweite Seite ist
+// dann kein Fehler, sondern die Bestellung, und Wegskalieren hoebe eine
+// bewusst eingeschaltete Funktion auf. Derzeit setzt kein Blatt einen
+// solchen Umbruch (der Unterschriftsblock tat es bis ENT-425); die Weiche
+// bleibt, damit ein kuenftiger Umbruch nicht stillschweigend verschwindet.
+function blattHatSeitenumbruch(el) {
+  return !!el.querySelector('[style*="page-break-before"], [style*="break-before"], .html2pdf__page-break');
+}
+
+// Ein leeres A4-Blatt, in das sich zeichnen laesst.
+//
+// jsPDF liegt im html2pdf-Bundle NICHT global, und ein zweites Dokument
+// laesst sich auch nicht ueber `pdf.constructor` bauen: der ist schlicht
+// `Object` (gemessen). Genau daran ist der erste Anlauf dieser Funktion
+// gescheitert -- die Verkleinerung warf "Cannot read properties of undefined
+// (reading 'pageSize')" und die Offerte kam wortlos nie an. Ein leeres Blatt
+// entsteht darum ueber html2pdf selbst, aus einem winzigen Quellelement, und
+// wird danach geleert. Die Seiten zu loeschen statt sie zu uebermalen ist
+// Absicht: uebermalte Seiten blieben als unsichtbare Bilder in der Datei --
+// im Versuch 629 KB statt 317 KB.
+function leeresBlattPdf() {
+  const winzig = document.createElement('div');
+  winzig.style.cssText = 'width:10px;height:10px;background:#fff';
+  return html2pdf().set(PDF_OPTIONEN).from(winzig).toPdf().get('pdf').then(pdf => {
+    for (let i = pdf.internal.getNumberOfPages(); i >= 1; i--) { pdf.deletePage(i); }
+    pdf.addPage();
+    return pdf;
+  });
+}
+
+function blattPdfBlob(el) {
+  const arbeit = html2pdf().set(PDF_OPTIONEN).from(el);
+  const gewollt = blattHatSeitenumbruch(el);
+  // Der Canvas entsteht einmal; toPdf() weiter unten zeichnet das Blatt
+  // nicht neu, sondern nimmt genau diesen.
+  return arbeit.toCanvas().get('canvas').then(canvas => {
+    const alsSatz = () => arbeit.toPdf().get('pdf').then(pdf => pdf.output('blob'));
+    if (!canvas || !canvas.width || !canvas.height) { return alsSatz(); }
+    const maxB = PDF_SEITE.breite - 2 * PDF_RAND;
+    const maxH = PDF_SEITE.hoehe - 2 * PDF_RAND;
+    // Wie hoch das Blatt auf voller Seitenbreite waere -- daraus steht schon
+    // fest, ob es auf eine Seite passt. Dafuer muss das mehrseitige PDF gar
+    // nicht erst gebaut werden.
+    const volleHoehe = maxB * canvas.height / canvas.width;
+    const massstab = Math.min(1, maxH / volleHoehe);
+    if (massstab >= 1 || gewollt || massstab < PDF_MIN_MASSSTAB) { return alsSatz(); }
+    const b = maxB * massstab, h = volleHoehe * massstab;
+    return leeresBlattPdf().then(pdf => {
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG',
+        (PDF_SEITE.breite - b) / 2, PDF_RAND, b, h);
+      return pdf.output('blob');
+    });
+  });
+}
+
 function ofPdfBauen(id) {
   return api('beleg_lesen.php?id=' + Number(id)).then(({ ok, data }) => {
     if (!ok || !data || data.status !== 'ok') {
@@ -12639,13 +12890,7 @@ function ofPdfBauen(id) {
     }
     return html2pdfLaden().then(() => {
       $('rapportBlatt').innerHTML = ofBlatt(data.beleg, data.kunde, data.person);
-      return html2pdf().set({
-        margin: 10,
-        image: { type: 'jpeg', quality: 0.95 },
-        html2canvas: { scale: 2, useCORS: true },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['css', 'legacy'] },
-      }).from($('rapportBlatt')).outputPdf('blob').then(blob => ({ blob, beleg: data.beleg }));
+      return blattPdfBlob($('rapportBlatt')).then(blob => ({ blob, beleg: data.beleg }));
     });
   });
 }
@@ -12706,10 +12951,42 @@ function ofVorschau(id) {
     if (!ok || data.status !== 'ok') {
       toast(data.message || 'Der Beleg liess sich nicht laden.'); return;
     }
-    $('ofVorschauInhalt').innerHTML = ofBlatt(data.beleg, data.kunde, data.person);
+    $('ofVorschauBlatt').innerHTML = ofBlatt(data.beleg, data.kunde, data.person);
     openDlg('dlgOfVorschau');
+    // Erst nach dem Oeffnen einpassen: Vorher ist der Dialog verborgen und
+    // clientWidth 0 -- man wuerde durch Null teilen und auf Verdacht
+    // skalieren, statt am gerenderten Zustand zu messen (CLAUDE.md).
+    ofVorschauEinpassen();
+    // Und noch einmal, sobald das Logo des Briefkopfs steht: Vorher ist das
+    // Blatt niedriger, als es sein wird.
+    const bilder = [...$('ofVorschauBlatt').querySelectorAll('img')].filter(i => !i.complete);
+    let offen = bilder.length;
+    bilder.forEach(i => {
+      const fertig = () => { if (--offen <= 0) { ofVorschauEinpassen(); } };
+      i.addEventListener('load', fertig, { once: true });
+      i.addEventListener('error', fertig, { once: true });
+    });
   }).catch(() => toast('Der Beleg liess sich nicht laden.'));
 }
+
+// Das Blatt auf die verfuegbare Breite herunterrechnen. Nie vergroessern:
+// Ein A4-Blatt auf einem breiten Schirm aufzublasen macht es nicht lesbarer,
+// nur ungewohnt.
+const OF_VORSCHAU_BREITE = 700;   // Dokumentbreite aus ofBlatt()
+function ofVorschauEinpassen() {
+  const rahmen = $('ofVorschauInhalt'), mass = $('ofVorschauMass'), blatt = $('ofVorschauBlatt');
+  if (!rahmen || !mass || !blatt || !blatt.firstElementChild) { return; }
+  blatt.style.width = OF_VORSCHAU_BREITE + 'px';
+  const verfuegbar = rahmen.clientWidth - 2 * parseFloat(getComputedStyle(rahmen).paddingLeft || 0);
+  const k = Math.min(1, verfuegbar / OF_VORSCHAU_BREITE);
+  blatt.style.transform = k < 1 ? `scale(${k})` : '';
+  mass.style.height = Math.ceil(blatt.offsetHeight * k) + 'px';
+}
+// Dreht jemand das Geraet, aendert sich die verfuegbare Breite -- dann muss
+// neu gerechnet werden, sonst steht das Blatt schief im Rahmen.
+window.addEventListener('resize', () => {
+  if ($('dlgOfVorschau') && $('dlgOfVorschau').classList.contains('on')) { ofVorschauEinpassen(); }
+});
 
 // Per E-Mail versenden (ENT-192): verschickt keinen PDF-Anhang, sondern einen
 // Link auf eine unangemeldete Web-Ansicht (backend/api/beleg_oeffentlich.php),
@@ -12796,29 +13073,32 @@ function ofBlatt(b, kunde, person) {
         <div style="white-space:pre-line;line-height:1.5">${esc(text)}</div>
       </div>` : '';
 
-  // Zusaetzliche Seite mit Unterschriftsfeldern, nur wenn ausdruecklich
-  // angefordert (of_unterschriftsseite). Der erzwungene Seitenumbruch ist
-  // hier ABSICHT -- im Unterschied zu ENT-179, wo ein UNGEWOLLTER zweiter
-  // Blatt-Rand behoben wurde. Faellt briefkopf.firma leer aus, weil er noch
-  // nicht gepflegt ist, steht dort "Auftragnehmer" statt eines erfundenen
-  // Firmennamens.
+  // Unterschriftsblock, nur wenn ausdruecklich angefordert
+  // (of_unterschriftsseite). Steht seit ENT-425 im normalen Fluss am Ende
+  // des Blattes statt auf einer erzwungenen zweiten Seite -- ein kurzer
+  // Beleg passte sonst allein wegen dieses Blocks nie auf eine Seite. Der
+  // Haken entscheidet seither nur noch, OB der Block erscheint, nicht mehr
+  // WO. `page-break-inside:avoid` haelt ihn zusammen, falls ein langer Beleg
+  // ihn doch auf die naechste Seite schiebt -- eine halbe Unterschriftszeile
+  // am Seitenende waere unbrauchbar.
+  // Kein wiederholter "Offertennummer OF-xxxx"-Titel mehr: die Nummer steht
+  // auf derselben Seite bereits im Kopf. Stattdessen dieselbe Beschriftung
+  // wie bei Notizen und Bedingungen. Faellt briefkopf.firma leer aus, weil er
+  // noch nicht gepflegt ist, steht dort "Auftragnehmer" statt eines
+  // erfundenen Firmennamens.
   const unterschriftsseite = Number(b.unterschriftsseite) ? `
-    <div style="page-break-before:always;break-before:page;padding-top:60px;
-                font-family:-apple-system,Segoe UI,Arial,sans-serif;color:#14161A;
-                max-width:700px;margin:0 auto;font-size:12px">
-      <div style="font-size:15px;font-weight:700;margin-bottom:40px">
-        ${esc(BELEG_TITEL_FELD[b.art] || 'Offertennummer')} ${esc(b.nummer)}
-      </div>
-      <div style="color:#6B7280;margin-bottom:60px">Ort, Datum</div>
-      <div style="border-bottom:1px solid #14161A;width:260px;margin-bottom:60px"></div>
+    <div style="margin-top:34px;page-break-inside:avoid;break-inside:avoid">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#6B7280;margin-bottom:18px">Unterschriften</div>
+      <div style="color:#6B7280;margin-bottom:34px">Ort, Datum</div>
+      <div style="border-bottom:1px solid #14161A;width:260px;margin-bottom:40px"></div>
       <div style="display:flex;gap:60px">
         <div style="flex:1">
-          <div style="border-bottom:1px solid #14161A;height:60px"></div>
+          <div style="border-bottom:1px solid #14161A;height:46px"></div>
           <div style="margin-top:8px;font-size:11px;color:#6B7280">
             Unterschrift ${esc((kunde && kunde.name) || 'Auftraggeber')}</div>
         </div>
         <div style="flex:1">
-          <div style="border-bottom:1px solid #14161A;height:60px"></div>
+          <div style="border-bottom:1px solid #14161A;height:46px"></div>
           <div style="margin-top:8px;font-size:11px;color:#6B7280">
             Unterschrift ${esc(String(briefkopf.firma || '').trim() || 'Auftragnehmer')}</div>
         </div>
@@ -12861,9 +13141,10 @@ function ofBlatt(b, kunde, person) {
       <table style="margin-left:auto;margin-top:14px;border-collapse:collapse">${summen}</table>
       ${abschnitt('Notizen', b.oeffentliche_notizen)}
       ${abschnitt('Bedingungen', b.bedingungen)}
+      ${unterschriftsseite}
       ${b.fusszeile_text ? `<div style="margin-top:26px;padding-top:14px;border-top:1px solid #E5E8EC;white-space:pre-line;line-height:1.5">${esc(b.fusszeile_text)}</div>` : ''}
       ${bkFusszeile()}
-    </div>${unterschriftsseite}`;
+    </div>`;
 }
 
 // Wie die Nummer auf dem Blatt heisst. Je Belegart eigener Wortlaut --
@@ -13457,6 +13738,10 @@ let mtlPushGeraete = -1;   // -1 = unbekannt
 // verschiedenen Stellen.
 let mtlPushGrund = '';
 
+// Welche der beiden Ansichten offen ist (ENT-433). "laufend" ist der
+// Normalfall -- das Archiv sucht man auf, es draengt sich nicht auf.
+let mtlAnsicht = 'laufend';
+
 // Leerzustand in der Hausform (.empty) -- dieselbe Darstellung wie überall
 // sonst im Cockpit, statt einer eigenen Textzeile nur für diese Seite.
 function mtlLeerBlock(titel, text) {
@@ -13478,6 +13763,15 @@ function mtlLaden() {
   });
 }
 
+function mtlAnsichtSetzen(welche) {
+  mtlAnsicht = welche === 'archiv' ? 'archiv' : 'laufend';
+  // Die Leserliste gehoert zu einem Eintrag, nicht zur Seite -- beim
+  // Wechseln zu bleibt sie sonst zu einer Mitteilung offen, die gar nicht
+  // mehr angezeigt wird.
+  mtlLeserOffen = 0;
+  mtlZeichnen();
+}
+
 function mtlZeichnen() {
   const ziel = $('mtlListe');
   if (!ziel) { return; }
@@ -13494,14 +13788,44 @@ function mtlZeichnen() {
       'Die Liste liess sich nicht laden. Ob Mitteilungen bestehen, ist gerade unbekannt.');
     return;
   }
+  // Aufteilung nach der Grenze, die der Server zieht (im_archiv): nicht
+  // mehr in der App = zurueckgezogen oder abgelaufen. Hier wird sie NICHT
+  // aus den Marken nachgebaut -- eine zweite Fassung derselben Regel
+  // liefe irgendwann auseinander.
+  const archiv  = mtlListe.filter(m => m.im_archiv);
+  const laufend = mtlListe.filter(m => !m.im_archiv);
+  mtlUmschalterZeichnen(laufend.length, archiv.length);
+  const zeigen = mtlAnsicht === 'archiv' ? archiv : laufend;
+
+  // Vier verschiedene Nicht-Faelle, vier verschiedene Saetze. "Kein
+  // Treffer" und "nichts vorhanden" sind nicht dasselbe (Hausregel), und
+  // ein leeres Archiv heisst etwas anderes als eine leere Gegenwart.
   if (!mtlListe.length) {
     ziel.innerHTML = mtlLeerBlock('Keine Mitteilungen',
       'Es wurde noch keine Mitteilung verfasst.');
     return;
   }
+  if (!zeigen.length && mtlAnsicht === 'archiv') {
+    ziel.innerHTML = mtlLeerBlock('Archiv leer',
+      'Hier landet, was zurückgezogen oder abgelaufen ist — und nur hier lässt sich etwas '
+      + 'endgültig löschen. Bisher steht nichts darin; '
+      + (laufend.length === 1 ? 'die eine Mitteilung ist noch aktuell.'
+                              : `die ${laufend.length} bestehenden Mitteilungen sind noch aktuell.`));
+    return;
+  }
+  if (!zeigen.length) {
+    ziel.innerHTML = mtlLeerBlock('Nichts Laufendes',
+      'Zurzeit ist keine Mitteilung in der App zu sehen. '
+      + (archiv.length === 1 ? 'Eine liegt im Archiv.' : `${archiv.length} liegen im Archiv.`));
+    return;
+  }
 
-  ziel.innerHTML = mtlListe.map(m => {
+  ziel.innerHTML = zeigen.map(m => {
+    // Kommt vom Server (siehe mitteilung_list.php) und wird hier nicht aus
+    // den Marken erraten.
+    const abgelaufen = !!m.abgelaufen;
     const marken = [];
+    if (m.ist_termin) { marken.push('<span class="chip chip-a">Termin</span>'); }
     if (m.stufe === 'wichtig') { marken.push('<span class="chip chip-x">Wichtig</span>'); }
     marken.push(`<span class="chip chip-n">${m.zielgruppe === 'revier' ? 'Nur Revierdienst' : 'Alle'}</span>`);
     // Der Zustand: läuft / geplant / abgelaufen / zurückgezogen. Vier
@@ -13527,6 +13851,24 @@ function mtlZeichnen() {
     if (m.sichtbar_ab)  { zeit.push('ab ' + dmyZeit(m.sichtbar_ab)); }
     if (m.sichtbar_bis) { zeit.push('bis ' + dmyZeit(m.sichtbar_bis)); }
 
+    // ── Termin (ENT-436): wann, wo, und wer geantwortet hat.
+    let terminZeile = '';
+    let antwortZeile = '';
+    if (m.ist_termin) {
+      const wo = [];
+      if (m.beginn) { wo.push(dmyZeit(m.beginn) + (m.ende ? ' – ' + dmyZeit(m.ende) : '')); }
+      if (m.ort)    { wo.push(m.ort); }
+      terminZeile = wo.join(' · ');
+      // "Offen" wird aus dem Nenner gerechnet -- und NUR, wenn der bekannt
+      // ist. Bei unbekanntem Empfängerkreis (-1) wird keine Zahl behauptet;
+      // sonst stünde dort eine erfundene 0 (Hausregel).
+      const n = Number(m.empfaenger_anzahl);
+      const offen = n >= 0 ? n - Number(m.zugesagt_anzahl) - Number(m.abgesagt_anzahl) : -1;
+      antwortZeile = `${m.zugesagt_anzahl} zugesagt · ${m.abgesagt_anzahl} abgesagt · `
+        + (offen >= 0 ? `${offen} von ${n} noch offen`
+                      : 'wie viele noch offen sind: unbekannt');
+    }
+
     // Was die Benachrichtigung tatsächlich getan hat (ENT-424). Vier
     // verschiedene Sachverhalte, vier verschiedene Sätze -- "nicht
     // verschickt" darf nie wie "an null Geräte verschickt" aussehen.
@@ -13547,21 +13889,68 @@ function mtlZeichnen() {
     return `<div class="mtl-eintrag${m.archiviert ? ' aus' : ''}" data-id="${m.id}">
       <div class="mtl-marken">${marken.join('')}</div>
       <h4>${esc(m.titel)}</h4>
+      ${terminZeile ? `<div class="mtl-termin">${esc(terminZeile)}</div>` : ''}
       <div class="mtl-text">${esc(m.text)}</div>
+      ${antwortZeile ? `<div class="mtl-meta mtl-antworten">${esc(antwortZeile)}</div>` : ''}
       <div class="mtl-meta">${esc(m.verfasser_name || 'Verfasser unbekannt')} · ${dmyZeit(m.erstellt_am)}${
         zeit.length ? ' · ' + esc(zeit.join(', ')) : ''} · ${esc(gelesen)}${esc(bestaetigt)}</div>
       <div class="mtl-meta">${esc(push)}</div>
       <div class="mtl-akt">
         <button type="button" class="btn btn-plain btn-sm" onclick="mtlBearbeiten(${m.id})">Bearbeiten</button>
         <button type="button" class="btn btn-plain btn-sm" onclick="mtlLeserUm(${m.id})">Wer hat gelesen</button>
-        <button type="button" class="btn btn-plain btn-sm" onclick="mtlArchivieren(${m.id}, ${m.archiviert ? 'true' : 'false'})">${
-          m.archiviert ? 'Wieder aufnehmen' : 'Zurückziehen'}</button>
+        ${!m.im_archiv ? `<button type="button" class="btn btn-plain btn-sm" onclick="mtlArchivieren(${m.id}, false)">Zurückziehen</button>` : ''}
+        ${m.archiviert && !abgelaufen ? `<button type="button" class="btn btn-plain btn-sm" onclick="mtlArchivieren(${m.id}, true)">Wieder aufnehmen</button>` : ''}
+        ${m.im_archiv ? `<button type="button" class="btn btn-plain btn-sm mtl-loeschen" onclick="mtlLoeschen(${m.id})">Endgültig löschen</button>` : ''}
       </div>
       ${mtlLeserOffen === m.id ? `<div class="mtl-leser" id="mtlLeser${m.id}">Wird geladen …</div>` : ''}
     </div>`;
   }).join('');
 
   if (mtlLeserOffen) { mtlLeserLaden(mtlLeserOffen); }
+}
+
+// Der Umschalter traegt beide Zahlen. Eine gefilterte Liste ohne die
+// andere Zahl sieht aus wie die ganze (Hausregel: keine Zahl ohne Bezug,
+// sobald ein Filter greift). Beschriftet wird erst, wenn die Zahlen
+// bekannt sind -- vorher stehen die Woerter ohne Zahl da, nicht mit einer
+// erfundenen Null.
+function mtlUmschalterZeichnen(laufend, archiv) {
+  const a = $('mtlAnsichtLaufend'), b = $('mtlAnsichtArchiv');
+  if (!a || !b) { return; }
+  a.textContent = 'Laufend ' + laufend;
+  b.textContent = 'Archiv ' + archiv;
+  a.classList.toggle('on', mtlAnsicht !== 'archiv');
+  b.classList.toggle('on', mtlAnsicht === 'archiv');
+}
+
+// Endgültig löschen (ENT-433). Die Rückfrage benennt die FOLGE, nicht nur
+// die Handlung: Was mitgeht, ist der Lesestand -- also der Nachweis, wer
+// die Mitteilung gesehen und bestätigt hat. Wer nur "Wirklich löschen?"
+// liest, weiss das nicht.
+//
+// Die eigentliche Sperre steht im Server (api/mitteilung_loeschen.php);
+// dass dieser Knopf nur im Archiv steht, erspart bloss den Umweg.
+function mtlLoeschen(id) {
+  const m = mtlListe.find(x => Number(x.id) === Number(id));
+  if (!m) { return; }
+  const nachweis = Number(m.gelesen_anzahl) > 0
+    ? `\n\nDamit verschwindet auch der Lesestand: ${m.gelesen_anzahl} `
+      + (Number(m.gelesen_anzahl) === 1 ? 'Person hat' : 'Personen haben')
+      + ' gelesen, dass sie da war.'
+    : '\n\nGelesen hat sie niemand — es geht kein Nachweis verloren.';
+  if (!confirm(`„${m.titel}“ endgültig löschen?${nachweis}\n\nDas lässt sich nicht rückgängig machen.`)) {
+    return;
+  }
+  api('mitteilung_loeschen.php', { method: 'POST', body: { id: Number(id) } })
+    .then(({ ok, data }) => {
+      if (!ok || !data || data.status !== 'ok') {
+        toast((data && data.message) || 'Die Mitteilung liess sich nicht löschen.');
+        return;
+      }
+      toast('Mitteilung endgültig gelöscht.');
+      if (mtlLeserOffen === Number(id)) { mtlLeserOffen = 0; }
+      mtlLaden();
+    });
 }
 
 // Die Leserliste. Eigener Abruf und nicht Teil der Liste: Bei 40
@@ -13582,15 +13971,36 @@ function mtlLeserLaden(id) {
     }
     const leser = data.leser || [];
     if (!leser.length) {
-      // "Noch niemand" ist eine Aussage, "keine Daten" wäre keine.
-      ziel.textContent = 'Noch niemand hat diese Mitteilung geöffnet.';
+      // Drei verschiedene Nichts, drei verschiedene Sätze.
+      ziel.textContent = data.ist_termin
+        ? 'Für diesen Termin ist niemand als Empfänger eingetragen.'
+        : 'Noch niemand hat diese Mitteilung geöffnet.';
       return;
     }
-    ziel.innerHTML = leser.map(l => {
+    const zeilen = leser.map(l => {
       const name = [l.vorname, l.nachname].filter(Boolean).join(' ') || l.name || 'Ohne Namen';
-      return `${esc(name)} — ${dmyZeit(l.gelesen_am)}${
-        l.bestaetigt_am ? ' · bestätigt ' + dmyZeit(l.bestaetigt_am) : ''}`;
-    }).join('<br>');
+      // Bei einem Termin stehen ALLE Empfänger in der Liste, auch wer die
+      // App nie geöffnet hat -- dann gibt es keinen Lesezeitpunkt. "Noch
+      // nicht geöffnet" ist etwas anderes als ein leeres Feld.
+      const gelesen = l.gelesen_am ? dmyZeit(l.gelesen_am) : 'noch nicht geöffnet';
+      // Die Antwort steht dahinter. 'offen' wird ausgeschrieben statt
+      // weggelassen: Der Unterschied zwischen "hat geöffnet und nicht
+      // geantwortet" und "hat abgesagt" darf sich nicht aus dem Fehlen
+      // einer Angabe ergeben.
+      const antwort = l.antwort === 'zugesagt' ? ' · <b>zugesagt</b> ' + dmyZeit(l.antwort_am)
+                    : l.antwort === 'abgesagt' ? ' · <b>abgesagt</b> ' + dmyZeit(l.antwort_am)
+                    : (data.ist_termin ? ' · noch nicht geantwortet' : '');
+      return `${esc(name)} — ${gelesen}${
+        l.bestaetigt_am ? ' · bestätigt ' + dmyZeit(l.bestaetigt_am) : ''}${antwort}`;
+    });
+    // Steht der Empfängerkreis nicht fest, ist die Liste unvollständig --
+    // und sagt es. Eine unvollständige Liste, die vollständig aussieht,
+    // ist schlimmer als keine.
+    if (data.ist_termin && data.vollzaehlig === false) {
+      zeilen.unshift('<i>Der Empfängerkreis steht nicht fest — hier stehen nur die, '
+        + 'die den Termin geöffnet haben.</i>');
+    }
+    ziel.innerHTML = zeilen.join('<br>');
   });
 }
 
@@ -13644,6 +14054,22 @@ function mtlPushHinweisZeichnen() {
     ${mtlPushGeraete} ${mtlPushGeraete === 1 ? 'Gerät' : 'Geräten'}.</div></div>`;
 }
 
+// Welche Art gerade im Formular steht (ENT-436): 'info' oder 'termin'.
+let mtlArt = 'info';
+
+// Der Umschalter blendet die Termin-Felder ein und aus. Die Überschrift des
+// Formulars zieht mit -- auf einer Seite, die beides kann, muss oben stehen,
+// was man gerade tut.
+function mtlArtSetzen(art) {
+  mtlArt = art === 'termin' ? 'termin' : 'info';
+  $('mtlArtInfo').classList.toggle('on', mtlArt === 'info');
+  $('mtlArtTermin').classList.toggle('on', mtlArt === 'termin');
+  $('mtlTerminFelder').hidden = mtlArt !== 'termin';
+  if (!mtlBearbeitetId) {
+    $('mtlFormTitel').textContent = mtlArt === 'termin' ? 'Neuer Termin' : 'Neue Mitteilung';
+  }
+}
+
 function mtlFormLeeren() {
   mtlBearbeitetId = 0;
   $('mtlTitel').value = '';
@@ -13652,6 +14078,10 @@ function mtlFormLeeren() {
   $('mtlStufe').value = 'normal';
   $('mtlAb').value = '';
   $('mtlBis').value = '';
+  $('mtlBeginn').value = '';
+  $('mtlEnde').value = '';
+  $('mtlOrt').value = '';
+  mtlArtSetzen('info');
   $('mtlFormTitel').textContent = 'Neue Mitteilung';
   $('mtlSpeichern').textContent = 'Veröffentlichen';
   $('mtlAbbrechen').style.display = 'none';
@@ -13669,7 +14099,11 @@ function mtlBearbeiten(id) {
   // "JJJJ-MM-TT HH:MM:SS".
   $('mtlAb').value  = m.sichtbar_ab  ? String(m.sichtbar_ab).replace(' ', 'T').slice(0, 16) : '';
   $('mtlBis').value = m.sichtbar_bis ? String(m.sichtbar_bis).replace(' ', 'T').slice(0, 16) : '';
-  $('mtlFormTitel').textContent = 'Mitteilung bearbeiten';
+  $('mtlBeginn').value = m.beginn ? String(m.beginn).replace(' ', 'T').slice(0, 16) : '';
+  $('mtlEnde').value   = m.ende   ? String(m.ende).replace(' ', 'T').slice(0, 16) : '';
+  $('mtlOrt').value    = m.ort || '';
+  mtlArtSetzen(m.ist_termin ? 'termin' : 'info');
+  $('mtlFormTitel').textContent = m.ist_termin ? 'Termin bearbeiten' : 'Mitteilung bearbeiten';
   $('mtlSpeichern').textContent = 'Änderung speichern';
   $('mtlAbbrechen').style.display = '';
   window.scrollTo(0, 0);
@@ -13680,10 +14114,20 @@ function mtlSpeichern() {
   const text  = $('mtlText').value.trim();
   if (!titel || !text) { toast('Titel und Text sind nötig.'); return; }
 
+  // Beim Termin steht die Pflicht schon hier -- der Server weist es
+  // ebenfalls ab (mitteilung_save.php), aber die Meldung kommt so ohne
+  // Umweg über das Netz.
+  if (mtlArt === 'termin' && !$('mtlBeginn').value) {
+    toast('Ein Termin braucht einen Beginn.'); return;
+  }
   const koerper = {
     titel, text,
     zielgruppe: $('mtlZielgruppe').value,
     stufe: $('mtlStufe').value,
+    art: mtlArt,
+    beginn: mtlArt === 'termin' ? $('mtlBeginn').value : '',
+    ende:   mtlArt === 'termin' ? $('mtlEnde').value : '',
+    ort:    mtlArt === 'termin' ? $('mtlOrt').value.trim() : '',
     sichtbar_ab: $('mtlAb').value,
     sichtbar_bis: $('mtlBis').value,
   };
@@ -13700,7 +14144,9 @@ function mtlSpeichern() {
       toast((data && data.message) || 'Die Mitteilung liess sich nicht speichern.');
       return;
     }
-    toast(data.angelegt ? 'Mitteilung veröffentlicht.' : 'Änderung gespeichert.');
+    toast(data.angelegt
+      ? (mtlArt === 'termin' ? 'Termin veröffentlicht.' : 'Mitteilung veröffentlicht.')
+      : 'Änderung gespeichert.');
     mtlFormLeeren();
     mtlLaden();
   });
@@ -23721,7 +24167,12 @@ function sprachBereit(prefix) {
     return;
   }
   wrap.style.display = '';
-  hint.className = 'sprach-hint';
+  // "ruhe" markiert den ERKLAERSATZ, nicht das Feld: Auf der Uebersicht ist
+  // er auf Vorgabe des Projektinhabers ausgeblendet, waehrend Warnungen,
+  // Fehler und die Rueckmeldung der laufenden Aufnahme im selben Feld
+  // weiterhin erscheinen. Ohne diese Trennung waere ein stummgeschaltetes
+  // Mikrofon nicht mehr von einem stummen Programm zu unterscheiden.
+  hint.className = 'sprach-hint ruhe';
   // Wo die Erkennung stattfindet, wird gesagt und nicht verschwiegen -- der
   // Ton geht an den Browserhersteller (ENT-027, OP-28).
   hint.innerHTML = 'Sprich in ganzen Sätzen. Der Text erscheint im Feld und lässt sich vor dem Erkennen noch ändern. '
@@ -27311,13 +27762,10 @@ function kdRapportDateiname(r) {
 function kdRapportPdfBauen(r) {
   return html2pdfLaden().then(() => {
     $('rapportBlatt').innerHTML = kdBerichtBlatt(r);
-    return html2pdf().set({
-      margin: 10,
-      image: { type: 'jpeg', quality: 0.95 },
-      html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      pagebreak: { mode: ['css', 'legacy'] },
-    }).from($('rapportBlatt')).outputPdf('blob');
+    // Seit ENT-425 dieselbe Erzeugung wie bei der Offerte: moeglichst eine
+    // Seite. Der Rapport hatte dasselbe Problem -- Unterschriftenblock und
+    // Fusszeile kippten bei laengeren Bemerkungen auf Seite 2.
+    return blattPdfBlob($('rapportBlatt'));
   });
 }
 

@@ -1299,6 +1299,10 @@ CREATE TABLE IF NOT EXISTS mitteilungen (
   text TEXT NOT NULL,
   zielgruppe VARCHAR(10) NOT NULL DEFAULT 'alle',
   stufe VARCHAR(10) NOT NULL DEFAULT 'normal',
+  art VARCHAR(10) NOT NULL DEFAULT 'info',
+  beginn DATETIME NULL,
+  ende DATETIME NULL,
+  ort VARCHAR(120) NULL,
   sichtbar_ab DATETIME NULL,
   sichtbar_bis DATETIME NULL,
   verfasser_id INT NULL,
@@ -1319,12 +1323,19 @@ CREATE TABLE IF NOT EXISTS mitteilungen (
 // jemand ein Wichtig-Fenster ausdruecklich weggeklickt hat. Beides in einer
 // Spalte zusammenzufassen hiesse, "hat aufgeklappt" und "hat bestaetigt" als
 // dieselbe Aussage zu fuehren -- sie sind es nicht.
+//
+// antwort gehoert zum Termin (ENT-436) und steht aus demselben Grund hier
+// und nicht in einer eigenen Tabelle: Es gibt bereits genau eine Zeile je
+// Person und Mitteilung. 'offen' ist die Voreinstellung und heisst "hat
+// noch nicht geantwortet" -- nicht "abgesagt".
 'mitteilung_gelesen' => "
 CREATE TABLE IF NOT EXISTS mitteilung_gelesen (
   mitteilung_id INT NOT NULL,
   mitarbeiter_id INT NOT NULL,
   gelesen_am DATETIME NOT NULL,
   bestaetigt_am DATETIME NULL,
+  antwort VARCHAR(20) NOT NULL DEFAULT 'offen',
+  antwort_am DATETIME NULL,
   PRIMARY KEY (mitteilung_id, mitarbeiter_id),
   KEY idx_person (mitarbeiter_id),
   FOREIGN KEY (mitteilung_id) REFERENCES mitteilungen(id) ON DELETE CASCADE,
@@ -1446,6 +1457,17 @@ $spalten = [
     // Behauptung sein.
     ['mitteilungen', 'push_gesendet_am',
      'ALTER TABLE mitteilungen ADD COLUMN push_gesendet_am DATETIME NULL AFTER erstellt_am'],
+    // Termine (ENT-436). Bestehende Mitteilungen bleiben 'info' -- die
+    // Voreinstellung der Spalte macht sie nicht rueckwirkend zu Terminen.
+    ['mitteilungen', 'art',
+     "ALTER TABLE mitteilungen ADD COLUMN art VARCHAR(10) NOT NULL DEFAULT 'info' AFTER stufe"],
+    ['mitteilungen', 'beginn', 'ALTER TABLE mitteilungen ADD COLUMN beginn DATETIME NULL AFTER art'],
+    ['mitteilungen', 'ende',   'ALTER TABLE mitteilungen ADD COLUMN ende DATETIME NULL AFTER beginn'],
+    ['mitteilungen', 'ort',    'ALTER TABLE mitteilungen ADD COLUMN ort VARCHAR(120) NULL AFTER ende'],
+    ['mitteilung_gelesen', 'antwort',
+     "ALTER TABLE mitteilung_gelesen ADD COLUMN antwort VARCHAR(20) NOT NULL DEFAULT 'offen' AFTER bestaetigt_am"],
+    ['mitteilung_gelesen', 'antwort_am',
+     'ALTER TABLE mitteilung_gelesen ADD COLUMN antwort_am DATETIME NULL AFTER antwort'],
     ['mitteilungen', 'push_bilanz',
      'ALTER TABLE mitteilungen ADD COLUMN push_bilanz VARCHAR(200) NULL AFTER push_gesendet_am'],
     ['einsaetze', 'objekt_id',        'ALTER TABLE einsaetze ADD COLUMN objekt_id INT NULL AFTER kunde_name'],

@@ -361,6 +361,47 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     !/curl\s+[^\n]*(-L\b|--location)/.test(workflow));
 }
 
+// ── qa-version.json: Live-Version-Nachweis fuer den externen QA-Runner,
+// ausschliesslich Staging betreffend (ENT-435)
+// ────────────────────────────────────────────────────────────────────────
+//
+// Warum diese Prüfung: sop-qa-runner (getrenntes Repository) muss vor jedem
+// operativen Testlauf verifizieren können, dass Staging tatsächlich den
+// erwarteten qa_tag/commit_sha trägt -- sonst bewiese ein grüner Lauf nur,
+// dass IRGENDEINE Version antwortet. Drei Aussagen müssen gemeinsam gelten:
+// (1) die Datei entsteht NUR im Staging-Zweig, (2) ihre Werte kommen aus
+// github.ref_name/github.sha, nicht aus einem Secret oder einem festen Text,
+// (3) für Production läuft der erzeugende Schritt gar nicht -- Production
+// bleibt damit strukturell unverändert, nicht nur der Absicht nach.
+{
+  const versionSchritt = (/qa-version\.json erzeugen[\s\S]{0,700}/.exec(workflow) ?? [''])[0];
+
+  check('KRITISCH: der Schritt "qa-version.json erzeugen" existiert und läuft ausschliesslich für Staging (if env.UMGEBUNG == staging)',
+    /name:\s*qa-version\.json erzeugen[\s\S]{0,80}if:\s*\$\{\{\s*env\.UMGEBUNG\s*==\s*'staging'\s*\}\}/.test(workflow));
+
+  check('KRITISCH: qa_tag kommt aus github.ref_name, nicht aus einem Secret oder einem festen Text',
+    /"qa_tag":\s*"\$\{\{\s*github\.ref_name\s*\}\}"/.test(versionSchritt)
+    && !/"qa_tag":\s*"\$\{\{\s*secrets\./.test(versionSchritt));
+
+  check('KRITISCH: commit_sha kommt aus github.sha, nicht aus einem Secret oder einem festen Text',
+    /"commit_sha":\s*"\$\{\{\s*github\.sha\s*\}\}"/.test(versionSchritt)
+    && !/"commit_sha":\s*"\$\{\{\s*secrets\./.test(versionSchritt));
+
+  check('KRITISCH: qa-version.json wird VOR dem FTP-Upload erzeugt (sonst würde sie den Server nie erreichen)',
+    workflow.indexOf('qa-version.json erzeugen') > 0
+    && workflow.indexOf('qa-version.json erzeugen') < workflow.indexOf('Nach Hostpoint hochladen'));
+
+  check('KRITISCH: qa-version.json steht nicht in STAGING_EXCLUDE -- sonst würde sie beim Staging-Upload übersprungen',
+    !/STAGING_EXCLUDE=\$'[^']*qa-version\.json[^']*'/.test(workflow));
+
+  // Gegenprobe der Aussage selbst: Ein Muster, das nur "qa-version.json"
+  // irgendwo im Workflow verlangt, bliebe grün, auch wenn der Schritt
+  // unbedingt (auch für Production) liefe. Verlangt wird die tatsächliche
+  // Kopplung von Dateinamen UND if-Bedingung im selben Schritt.
+  check('KRITISCH: kein anderer, unbedingter Schritt erzeugt dist/qa-version.json ausserhalb des Staging-Zweigs',
+    (workflow.match(/>\s*dist\/qa-version\.json/g) ?? []).length === 1);
+}
+
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
 console.log('Alle Pruefungen bestanden.');

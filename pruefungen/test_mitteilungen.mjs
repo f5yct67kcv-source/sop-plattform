@@ -54,6 +54,23 @@ const MITTEILUNGEN = [
 // "gelesen" und "bestätigt".
 let gemeldet = [];
 let antwort = null;   // wird je Abschnitt gesetzt
+// Was die App als Zu-/Absage an den Server geschickt hat (ENT-436), und ob
+// der Server sie annimmt -- der Fehlerfall wird eigens geprueft.
+let geantwortet = [];
+let antwortEndpunktOk = true;
+
+// Ein Termin: dieselbe Mitteilung, nur mit Art, Zeit, Ort und eigener
+// Antwort. Beginn und Ende liegen weit in der Zukunft und werden nirgends
+// mit "heute" verglichen -- die Sichtbarkeit entscheidet der Server.
+const TERMIN = {
+  id: 9, titel: 'Mitarbeitersitzung', text: 'Traktanden folgen.',
+  zielgruppe: 'alle', stufe: 'normal', art: 'termin', ist_termin: true,
+  beginn: '2029-09-24 17:00:00', ende: '2029-09-24 19:00:00', ort: 'Aufenthaltsraum',
+  sichtbar_ab: null, sichtbar_bis: '2029-09-24 19:00:00',
+  erstellt_am: '2029-09-01 08:00:00', verfasser_name: 'Die Geschäftsleitung',
+  gelesen_am: null, bestaetigt_am: null, gelesen: false, bestaetigt: false,
+  antwort: 'offen',
+};
 
 const browser = await chromium.launch({ executablePath: EXE });
 const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
@@ -75,6 +92,14 @@ await page.route('**/api/**', route => {
       return send({ status: 'ok' });
     }
     return send(antwort);
+  }
+  if (p.includes('mitteilung_antwort')) {
+    geantwortet.push(JSON.parse(route.request().postData() || '{}'));
+    return antwortEndpunktOk
+      ? send({ status: 'ok', id: geantwortet[geantwortet.length - 1].id,
+               antwort: geantwortet[geantwortet.length - 1].antwort })
+      : route.fulfill({ status: 400, contentType: 'application/json',
+                        body: JSON.stringify({ status: 'error', message: 'geht gerade nicht' }) });
   }
   if (p.includes('meine_schichten')) return send({ status: 'ok', schichten: [] });
   if (p.includes('rapport_list')) return send({ status: 'ok', rapporte: [] });
@@ -333,6 +358,158 @@ check('KRITISCH: bei einem Abruffehler erscheint kein Fenster',
   !(await page.isVisible('#mitDlg')));
 check('Und kein Zaehler -- eine Zahl waere hier erfunden',
   !(await page.isVisible('#mitZahl')));
+
+// ══════════════ 10. TERMINE (ENT-436) ═════════════════════════════════
+// Ein Termin ist eine Mitteilung, die eine Antwort verlangt. Die
+// gefährliche Verwechslung ist "noch nicht geantwortet" mit "abgesagt" --
+// dieselbe Familie wie "unbekannt darf nie wie keine aussehen" (CLAUDE.md).
+antwort = { status: 'ok', eingerichtet: true, mitteilungen: [TERMIN],
+  ungelesen: 1, offen: 1, revier_ungelesen: 0, unterbrechen: [9] };
+geantwortet = []; antwortEndpunktOk = true;
+await anmelden();
+
+// Das Fenster: drei Knöpfe statt "Verstanden".
+check('KRITISCH: ein unbeantworteter Termin oeffnet das Fenster, auch mit Stufe normal',
+  await page.isVisible('#mitDlg'));
+check('KRITISCH: darin stehen Zusagen und Absagen',
+  (await page.isVisible('#mitDlgZu')) && (await page.isVisible('#mitDlgAb')));
+check('KRITISCH: "Verstanden" steht NICHT daneben -- ein Termin wird beantwortet, nicht bestaetigt',
+  !(await page.isVisible('#mitDlgOk')));
+check('"Später" ist der dritte Weg', await page.isVisible('#mitDlgSpaeter'));
+const dlgMeta = (await page.textContent('#mitDlgMeta').catch(() => '')) || '';
+check('KRITISCH: Datum und Zeit stehen im Fenster -- danach wird gefragt',
+  /24\.09\.2029/.test(dlgMeta) && /17:00/.test(dlgMeta));
+check('Der Ort steht dabei', /Aufenthaltsraum/.test(dlgMeta));
+
+// "Später": schliesst, speichert NICHTS.
+await klick('#mitDlgSpaeter');
+await page.waitForTimeout(400);
+check('Nach „Später" ist das Fenster zu', !(await page.isVisible('#mitDlg')));
+check('KRITISCH: „Später" speichert KEINE Antwort',
+  geantwortet.length === 0);
+check('KRITISCH: „Später" meldet auch keine Bestaetigung -- der Termin bleibt offen',
+  !gemeldet.some(g => Number(g.id) === 9 && g.bestaetigt === true));
+check('KRITISCH: der Zaehler steht weiterhin auf 1 -- ein offener Termin will noch etwas',
+  (await ev(() => document.getElementById('mitZahl')?.textContent)) === '1');
+
+// Der Fall, auf den es beim Zähler ankommt: GELESEN, aber unbeantwortet.
+// Ohne ihn bewiese die Zahl oben nichts -- ein ungelesener Termin wird von
+// jeder Zählweise erfasst, auch von einer, die Termine gar nicht kennt.
+antwort = { status: 'ok', eingerichtet: true,
+  mitteilungen: [{ ...TERMIN, gelesen: true, gelesen_am: '2029-09-02 10:00:00' }],
+  ungelesen: 0, offen: 1, revier_ungelesen: 0, unterbrechen: [9] };
+await anmelden();
+check('KRITISCH: ein GELESENER, aber unbeantworteter Termin zaehlt weiter an der Glocke',
+  (await ev(() => document.getElementById('mitZahl')?.textContent)) === '1');
+check('Und er fragt weiterhin im Fenster', await page.isVisible('#mitDlg'));
+await klick('#mitDlgZu');
+await page.waitForTimeout(500);
+check('KRITISCH: nach der Antwort ist die Glocke leer -- gelesen UND beantwortet',
+  !(await page.isVisible('#mitZahl')));
+
+// Zurück zum offenen Termin für die Karten-Prüfungen.
+antwort = { status: 'ok', eingerichtet: true, mitteilungen: [TERMIN],
+  ungelesen: 1, offen: 1, revier_ungelesen: 0, unterbrechen: [9] };
+geantwortet = [];
+await anmelden();
+await klick('#mitDlgSpaeter'); await page.waitForTimeout(300);
+
+// Die Karte in der Liste.
+await klick('#mitGlocke'); await page.waitForTimeout(500);
+const karte = await ev(() => {
+  const k = document.querySelector('#mitBody .mit-karte[data-id="9"]');
+  if (!k) { return null; }
+  const knoepfe = [...k.querySelectorAll('.mit-antwort .btn')];
+  return {
+    text: k.textContent.replace(/\s+/g, ' ').trim(),
+    marken: [...k.querySelectorAll('.mit-marken .marke')].map(m => m.textContent.trim()),
+    zeit: k.querySelector('.mit-termin-zeit')?.textContent || '',
+    ort: k.querySelector('.mit-termin-ort')?.textContent || '',
+    stand: k.querySelector('.mit-antwort-stand')?.textContent || '',
+    knopfZahl: knoepfe.length,
+    hoehen: knoepfe.map(b => b.getBoundingClientRect().height),
+    hervorgehoben: knoepfe.filter(b => b.classList.contains('an')).length,
+  };
+});
+check('Die Karte steht in der Liste', !!karte);
+check('Sie ist als Termin gekennzeichnet', !!karte && karte.marken.some(m => /Termin/.test(m)));
+check('KRITISCH: Datum und Uhrzeit stehen auf der Karte',
+  !!karte && /24\.09\.2029/.test(karte.zeit) && /17:00/.test(karte.zeit));
+check('Endet er am selben Tag, steht das Datum nur einmal',
+  !!karte && (karte.zeit.match(/24\.09\.2029/g) || []).length === 1 && /19:00/.test(karte.zeit));
+check('Der Ort steht darunter', !!karte && /Aufenthaltsraum/.test(karte.ort));
+check('KRITISCH: zwei Knoepfe -- zusagen und absagen',
+  !!karte && karte.knopfZahl === 2);
+check('KRITISCH: 44 px Trefferflaeche (CLAUDE.md)',
+  !!karte && karte.hoehen.every(h => h >= 44));
+check('KRITISCH: ohne Antwort ist KEIN Knopf hervorgehoben -- '
+  + 'sonst saehe "offen" aus wie eine Entscheidung',
+  !!karte && karte.hervorgehoben === 0);
+check('KRITISCH: und es steht ausdruecklich da, dass noch nicht geantwortet wurde',
+  !!karte && /noch nicht beantwortet/i.test(karte.stand));
+check('KRITISCH: "offen" sieht nicht wie eine Absage aus',
+  !!karte && !/abgesagt/i.test(karte.stand));
+
+// Zusagen aus der Liste.
+geantwortet = [];
+await klick('#mitBody .mit-karte[data-id="9"] .mit-antwort .btn.zu');
+await page.waitForTimeout(500);
+check('KRITISCH: die Zusage geht an den Server -- mit Nummer und Wort',
+  geantwortet.length === 1 && Number(geantwortet[0].id) === 9
+  && geantwortet[0].antwort === 'zugesagt');
+const terminNachher = await ev(() => {
+  const k = document.querySelector('#mitBody .mit-karte[data-id="9"]');
+  return k ? { stand: k.querySelector('.mit-antwort-stand')?.textContent || '',
+               an: [...k.querySelectorAll('.mit-antwort .btn')].map(b => b.classList.contains('an')) } : null;
+});
+check('KRITISCH: danach steht der eigene Stand als Satz da, nicht nur als Farbe',
+  !!terminNachher && /zugesagt/i.test(terminNachher.stand));
+check('Und der zugehoerige Knopf ist hervorgehoben',
+  !!terminNachher && terminNachher.an[0] === true && terminNachher.an[1] === false);
+check('KRITISCH: der Zaehler ist danach weg -- der Termin will nichts mehr',
+  !(await page.isVisible('#mitZahl')));
+
+// Die Meinung ändern.
+geantwortet = [];
+await klick('#mitBody .mit-karte[data-id="9"] .mit-antwort .btn.ab');
+await page.waitForTimeout(500);
+check('Eine Absage laesst sich nachtraeglich abgeben',
+  geantwortet.length === 1 && geantwortet[0].antwort === 'abgesagt');
+check('KRITISCH: der angezeigte Stand folgt der neuen Antwort',
+  /abgesagt/i.test((await ev(() => document.querySelector('#mitBody .mit-karte[data-id="9"] .mit-antwort-stand')?.textContent)) || ''));
+
+// Der Fehlerfall: Kommt die Antwort NICHT durch, darf die App sie nicht
+// trotzdem anzeigen -- eine Zusage, von der der Server nichts weiss, ist
+// die schlimmste Sorte Falschauskunft.
+antwortEndpunktOk = false;
+await klick('#mitBody .mit-karte[data-id="9"] .mit-antwort .btn.zu');
+await page.waitForTimeout(500);
+check('KRITISCH: eine misslungene Antwort wird NICHT als eigener Stand angezeigt',
+  /abgesagt/i.test((await ev(() => document.querySelector('#mitBody .mit-karte[data-id="9"] .mit-antwort-stand')?.textContent)) || ''));
+antwortEndpunktOk = true;
+
+// Aus dem Fenster heraus antworten.
+antwort = { status: 'ok', eingerichtet: true, mitteilungen: [TERMIN],
+  ungelesen: 1, offen: 1, revier_ungelesen: 0, unterbrechen: [9] };
+geantwortet = [];
+await anmelden();
+check('Das Fenster ist wieder da', await page.isVisible('#mitDlg'));
+await klick('#mitDlgAb');
+await page.waitForTimeout(500);
+check('KRITISCH: die Absage aus dem Fenster geht an den Server',
+  geantwortet.length === 1 && geantwortet[0].antwort === 'abgesagt');
+check('Danach ist das Fenster zu', !(await page.isVisible('#mitDlg')));
+
+// Eine Mitteilung bleibt eine Mitteilung: keine Antwortknoepfe.
+antwort = { status: 'ok', eingerichtet: true, mitteilungen: MITTEILUNGEN,
+  ungelesen: 2, offen: 2, revier_ungelesen: 0, unterbrechen: [3] };
+await anmelden();
+check('KRITISCH: bei einer wichtigen MITTEILUNG steht weiterhin "Verstanden"',
+  (await page.isVisible('#mitDlgOk')) && !(await page.isVisible('#mitDlgZu')));
+await klick('#mitDlgOk'); await page.waitForTimeout(300);
+await klick('#mitGlocke'); await page.waitForTimeout(500);
+check('KRITISCH: eine Mitteilung traegt keine Antwortknoepfe',
+  (await ev(() => document.querySelectorAll('#mitBody .mit-antwort').length)) === 0);
 
 await browser.close();
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden`);
