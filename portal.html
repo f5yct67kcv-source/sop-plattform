@@ -25,6 +25,10 @@ body{margin:0;background:var(--grund);color:var(--text);
       border-bottom:2px solid var(--dunkel);padding-bottom:14px;margin-bottom:22px;flex-wrap:wrap}
 .kopf h1{margin:0;font-size:21px;font-weight:800;letter-spacing:-.4px}
 .kopf .unter{font-size:13px;color:var(--grau);margin-top:3px}
+/* margin-left:auto statt space-between allein: Bricht die Kopfzeile auf dem
+   Handy um, landet der Knopf sonst links unter dem Titel -- er gehoert aber
+   auf beiden Breiten an dieselbe Stelle. */
+.kopf #abmelden{margin-left:auto}
 
 /* Beschriftung OBEN, Wert darunter -- nie umgekehrt (Hausregel). */
 .feld{display:block}
@@ -57,11 +61,23 @@ input:focus{outline:2px solid var(--dunkel);outline-offset:1px}
 
 /* ── Zeitraum ─────────────────────────────────────────────────────────── */
 .zeitraum{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
-.zeitraum .paar{flex:1 1 150px;min-width:0}
+/* Auf dem Handy fuellen die beiden Felder die Zeile, am Desktop bleiben sie
+   bei ihrer Inhaltsbreite: Ein Datumsfeld, das 380 px breit ist fuer acht
+   Zeichen, ist kein grosszuegiges Layout, sondern ein leeres. */
+.zeitraum .paar{flex:1 1 150px;min-width:0;max-width:220px}
 
 /* ── Liste ────────────────────────────────────────────────────────────── */
-.zeile{display:grid;grid-template-columns:1fr auto;gap:6px 16px;align-items:start;
+/* Zwei Spalten auf dem Handy, drei am Desktop -- aber in BEIDEN Faellen
+   steht der Zustand rechts und nicht unter dem Datum. Ein Block, der links
+   beginnt, und einer, der rechts endet, sind zwei Muster; mit dem
+   ausdruecklichen grid-row bleibt es eines. Ohne das rutschte das dritte
+   Kind in die naechste Zeile und stand linksbuendig da (gemessen am
+   gerenderten Zustand, nicht im Quelltext vermutet). */
+.zeile{display:grid;grid-template-columns:1fr auto;gap:2px 16px;align-items:start;
        padding:14px 0;border-bottom:1px solid var(--linie)}
+.zeile .datum{grid-column:1;grid-row:1}
+.zeile .haupt{grid-column:1;grid-row:2}
+.zeile .rechts{grid-column:2;grid-row:1 / span 2;align-self:start}
 .zeile:last-child{border-bottom:none}
 .zeile .datum{font-weight:700}
 .zeile .objekt{color:var(--grau);font-size:13.5px}
@@ -70,6 +86,7 @@ input:focus{outline:2px solid var(--dunkel);outline-offset:1px}
 .marke.gut{background:#E7F3EA;color:var(--gruen)}
 .marke.ab{background:#FBE9E7;color:var(--rot)}
 .punkte{font-size:13.5px;color:var(--grau);margin-top:4px}
+.zeile .dauer{font-size:13.5px;color:var(--grau);margin-top:4px}
 
 /* Ein leerer Zustand bekommt Text, nie eine leere Flaeche -- und der Text
    sagt, WELCHE der moeglichen Aussagen gilt (Hausregel: „unbekannt darf nie
@@ -84,7 +101,10 @@ input:focus{outline:2px solid var(--dunkel);outline-offset:1px}
 @media (min-width:640px){
   .buehne{padding:32px 24px 64px}
   .kopf h1{font-size:24px}
-  .zeile{grid-template-columns:120px 1fr auto}
+  .zeile{grid-template-columns:120px 1fr auto;gap:6px 16px}
+  .zeile .datum{grid-column:1;grid-row:1}
+  .zeile .haupt{grid-column:2;grid-row:1}
+  .zeile .rechts{grid-column:3;grid-row:1}
 }
 </style>
 </head>
@@ -326,10 +346,10 @@ function zeichnen(daten) {
     const erledigt = f.erledigt !== undefined ? Number(f.erledigt) : Number(f.bestaetigt || 0);
     return '<div class="zeile">'
       + '<div class="datum">' + esc(dmy(r.datum)) + '</div>'
-      + '<div><div>' + esc(r.objekt_name) + '</div>'
+      + '<div class="haupt"><div>' + esc(r.objekt_name) + '</div>'
       + '<div class="punkte">' + erledigt + ' von ' + gesamt + ' Kontrollpunkten erledigt</div></div>'
       + '<div class="rechts"><span class="marke ' + klasse + '">' + esc(wort) + '</span>'
-      + '<div class="objekt" style="margin-top:4px">' + esc(dauerText(r.dauer)) + '</div></div>'
+      + '<div class="dauer">' + esc(dauerText(r.dauer)) + '</div></div>'
       + '</div>';
   }).join('');
 }
