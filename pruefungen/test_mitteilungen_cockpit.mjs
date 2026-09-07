@@ -72,8 +72,17 @@ const LISTE = [
     archiviert: false, laeuft: true, geplant: false, im_archiv: false, abgelaufen: false },
 ];
 
-let meineRechte = ['plan', 'kunden', 'abgleich', 'personal_lesen', 'personal_schreiben',
-  'personal_vertraulich', 'betrieb', 'rechte', 'offerten', 'mitteilungen'];
+let meineRechte = ['einsaetze_lesen', 'einsaetze_schreiben', 'objekte_lesen',
+      'objekte_schreiben', 'masterschichten_lesen',
+      'masterschichten_schreiben', 'verfuegbarkeit_lesen', 'fahrzeuge_lesen',
+      'kunden_lesen', 'kunden_schreiben', 'abgleich_lesen',
+      'abgleich_schreiben', 'auslagen_lesen', 'personal_lesen',
+      'abwesenheiten_lesen', 'personal_schreiben', 'abwesenheiten_schreiben',
+      'personal_vertraulich_lesen', 'personal_vertraulich_schreiben',
+      'betrieb_lesen', 'betrieb_schreiben', 'fahrzeuge_schreiben',
+      'rechte_lesen', 'rechte_schreiben', 'logbuch_lesen', 'offerten_lesen',
+      'offerten_schreiben', 'leistungen_lesen', 'leistungen_schreiben',
+      'mitteilungen_lesen', 'mitteilungen_schreiben'];
 let meineRollen = ['verwaltung'];
 let listenAntwort = { status: 'ok', eingerichtet: true, mitteilungen: LISTE };
 let gesendet = null, archiviert = null, geloescht = null;
@@ -154,14 +163,21 @@ check('KRITISCH: mit dem Recht steht "Mitteilungen" in der Navigation',
   await ev(() => { const e = document.getElementById('nav-admin-mitteilungen');
     return !!e && e.style.display !== 'none'; }));
 
-meineRechte = ['plan', 'kunden', 'abgleich'];
+meineRechte = ['einsaetze_lesen', 'einsaetze_schreiben', 'objekte_lesen',
+      'objekte_schreiben', 'masterschichten_lesen',
+      'masterschichten_schreiben', 'verfuegbarkeit_lesen', 'fahrzeuge_lesen',
+      'kunden_lesen', 'kunden_schreiben', 'abgleich_lesen',
+      'abgleich_schreiben', 'auslagen_lesen'];
 meineRollen = ['planung'];
 await anmelden();
 check('KRITISCH: ohne das Recht steht der Eintrag NICHT da',
   await ev(() => { const e = document.getElementById('nav-admin-mitteilungen');
     return !e || e.style.display === 'none'; }));
 
-meineRechte = ['personal_lesen', 'personal_schreiben', 'personal_vertraulich', 'mitteilungen'];
+meineRechte = ['personal_lesen', 'abwesenheiten_lesen', 'personal_schreiben',
+      'abwesenheiten_schreiben', 'personal_vertraulich_lesen',
+      'personal_vertraulich_schreiben', 'mitteilungen_lesen',
+      'mitteilungen_schreiben'];
 meineRollen = ['personal'];
 await anmelden();
 check('KRITISCH: die Rolle Personal darf Mitteilungen verfassen (ENT-421)',
@@ -169,8 +185,17 @@ check('KRITISCH: die Rolle Personal darf Mitteilungen verfassen (ENT-421)',
     return !!e && e.style.display !== 'none'; }));
 
 // ══════════════ 2. DIE LISTE ══════════════════════════════════════════
-meineRechte = ['plan', 'kunden', 'abgleich', 'personal_lesen', 'personal_schreiben',
-  'personal_vertraulich', 'betrieb', 'rechte', 'offerten', 'mitteilungen'];
+meineRechte = ['einsaetze_lesen', 'einsaetze_schreiben', 'objekte_lesen',
+      'objekte_schreiben', 'masterschichten_lesen',
+      'masterschichten_schreiben', 'verfuegbarkeit_lesen', 'fahrzeuge_lesen',
+      'kunden_lesen', 'kunden_schreiben', 'abgleich_lesen',
+      'abgleich_schreiben', 'auslagen_lesen', 'personal_lesen',
+      'abwesenheiten_lesen', 'personal_schreiben', 'abwesenheiten_schreiben',
+      'personal_vertraulich_lesen', 'personal_vertraulich_schreiben',
+      'betrieb_lesen', 'betrieb_schreiben', 'fahrzeuge_schreiben',
+      'rechte_lesen', 'rechte_schreiben', 'logbuch_lesen', 'offerten_lesen',
+      'offerten_schreiben', 'leistungen_lesen', 'leistungen_schreiben',
+      'mitteilungen_lesen', 'mitteilungen_schreiben'];
 meineRollen = ['verwaltung'];
 await anmelden();
 await ev(() => go('mitteilungen'));

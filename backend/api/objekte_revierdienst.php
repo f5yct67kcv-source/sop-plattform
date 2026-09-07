@@ -33,7 +33,7 @@ require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../rechte.php';
 
 $user = require_session();
-require_recht($user, 'rundgang_verwalten');
+require_recht($user, 'kontrollpunkte_lesen');
 
 $objekte = db()->query(
     'SELECT id, kunde_id, kunde_name, name, strasse, plz, ort, kanton, einsatzart, sparte, aktiv, bemerkung, erstellt_am

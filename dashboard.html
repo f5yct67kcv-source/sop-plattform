@@ -3153,6 +3153,100 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 .rv-kopf b { font-size: 13px; font-weight: 650; }
 .rv-text { font-size: 12px; line-height: 1.45; color: var(--ink-3); margin-bottom: 7px; }
 
+/* ── Zentrale Rollenseite (ENT-440) ────────────────────────────────────
+   Alles an einem Ort: Profile bauen, Profile zuteilen, Einsatzmerkmale
+   setzen. Vorher lag das an drei Stellen -- die Uebersicht hier, die
+   Zuteilung in der Personalakte, die Merkmale in zwei weiteren Reitern
+   derselben Akte. */
+
+/* Eine Profilzeile. Raster statt Flex, damit Name, Traegerzahl und Knopf
+   in allen Zeilen auf derselben Linie stehen -- bei Flex wandert der Knopf
+   mit der Textlaenge. */
+.rp-zeile { display: grid; grid-template-columns: 1fr auto; align-items: start; gap: 12px;
+            padding: 12px 0; border-bottom: 1px solid var(--line); }
+.rp-zeile:last-child { border-bottom: 0; }
+.rp-kopf { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
+.rp-kopf b { font-size: 13.5px; font-weight: 650; }
+.rp-text { font-size: 12px; line-height: 1.45; color: var(--ink-3); max-width: 78ch; }
+/* Das Schloss der Systemrollen. Nicht nur ein Symbol: daneben steht das
+   Wort, sonst muss man es erraten. */
+.rp-schloss { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700;
+              letter-spacing: .4px; text-transform: uppercase; color: var(--ink-3); }
+.rp-schloss svg { width: 12px; height: 12px; }
+
+/* Die Matrix: eine Zeile je Bereich, Beschriftung links, Stufenwahl rechts.
+   Feste Spaltenbreite fuer die Wahl, damit die Schalter aller Zeilen
+   untereinander stehen -- ausgerichtete Schalter lassen sich mit einem
+   Blick lesen, versetzte nicht. */
+.rm-gruppe { margin-top: 18px; }
+.rm-gruppe:first-child { margin-top: 6px; }
+.rm-gruppe-hd { font-size: 11px; font-weight: 700; letter-spacing: .7px; text-transform: uppercase;
+                color: var(--ink-3); padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+.rm-zeile { display: grid; grid-template-columns: 1fr 258px; align-items: center; gap: 16px;
+            padding: 9px 0; border-bottom: 1px solid var(--line-soft); }
+.rm-zeile:last-child { border-bottom: 0; }
+.rm-zeile b { display: block; font-size: 13px; font-weight: 640; }
+.rm-zeile small { display: block; font-size: 11.5px; line-height: 1.4; color: var(--ink-3); margin-top: 2px; }
+
+/* Segmentschalter. Die Stufen stehen ausgeschrieben und nicht als Symbol:
+   Ein durchgestrichenes Auge muss man lernen, "verborgen" nicht. */
+/* Feste Segmentbreite statt 1fr, und der Schalter beginnt links buendig
+   (ENT-440, am gerenderten Zustand gemessen): Mit 1fr dehnten sich die zwei
+   Segmente einer Zeile ohne Schreibstufe auf dieselbe Gesamtbreite wie drei
+   -- "verborgen" begann dann je nach Zeile an einer anderen Stelle, und die
+   Spalte liess sich nicht mehr mit einem Blick lesen. Jetzt steht jede Stufe
+   immer an derselben Stelle; wo es keine Schreibstufe gibt, ist dort nichts
+   -- sichtbar, statt durch Dehnung verdeckt. */
+.rm-stufen { display: grid; grid-auto-flow: column; grid-auto-columns: 86px; justify-self: start;
+             border: 1px solid var(--line); border-radius: 7px; overflow: hidden; background: var(--surface-2); }
+.rm-stufe { appearance: none; border: 0; border-left: 1px solid var(--line); background: none;
+            font-family: inherit; font-size: 11.5px; font-weight: 650; color: var(--ink-3);
+            padding: 7px 4px; cursor: pointer; min-height: 32px; }
+.rm-stufe:first-child { border-left: 0; }
+.rm-stufe:hover:not(:disabled) { background: rgba(127,127,127,.10); }
+/* Drei Stufen, drei Erscheinungen -- gemessen am gerenderten Zustand und
+   nicht im Quelltext beschlossen: In der ersten Fassung sahen "verborgen"
+   und "lesen" im aktiven Zustand GLEICH aus (beide in der Akzentfarbe).
+   Beim Ueberfliegen der Spalte liess sich "kein Zugriff" damit nicht von
+   "darf lesen" unterscheiden, ohne jedes Wort zu lesen -- und genau das
+   soll eine Matrix ersparen.
+
+   Jetzt: verborgen bleibt STILL (es ist die Abwesenheit eines Rechts und
+   verdient keine Aufmerksamkeit), lesen traegt die Akzentfarbe, schreiben
+   die Warnfarbe. Wer die Spalte hinunterschaut, sieht ohne zu lesen, wo
+   etwas offen steht. */
+.rm-stufe.aktiv { background: var(--accent); color: #fff; }
+.rm-stufe.aktiv.stufe-verborgen { background: var(--line); color: var(--ink-2); }
+.rm-stufe.aktiv.stufe-schreiben { background: var(--warn); color: #1b1200; }
+.rm-stufe:disabled { cursor: default; opacity: .78; }
+/* Zeile mit vertraulichen Daten: der Rand sagt, dass hier Personendaten
+   haengen, bevor jemand den Schalter anfasst. */
+.rm-zeile.heikel { border-left: 3px solid var(--warn); padding-left: 10px; margin-left: -13px; }
+
+/* Zuteilung und Einsatzmerkmale: Person links, Schalter rechts. */
+.rz-tab { width: 100%; border-collapse: collapse; }
+.rz-tab th { text-align: left; font-size: 11px; font-weight: 700; letter-spacing: .7px;
+             text-transform: uppercase; color: var(--ink-3); padding: 0 10px 7px 0;
+             border-bottom: 1px solid var(--line); white-space: nowrap; }
+.rz-tab td { padding: 8px 10px 8px 0; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+.rz-tab tr:last-child td { border-bottom: 0; }
+.rz-name b { font-size: 13px; font-weight: 640; }
+.rz-name span { display: block; font-size: 11.5px; color: var(--ink-3); }
+.rz-marken { display: flex; flex-wrap: wrap; gap: 5px; }
+/* Ein zuteilbares Profil. Aus-Zustand bleibt sichtbar: Eine Liste, die nur
+   das Gesetzte zeigt, laesst nicht erkennen, was es sonst noch gaebe. */
+.rz-marke { appearance: none; font-family: inherit; font-size: 11.5px; font-weight: 640;
+            padding: 4px 9px; border-radius: 999px; cursor: pointer;
+            border: 1px solid var(--line); background: var(--surface-2); color: var(--ink-3); }
+.rz-marke:hover:not(:disabled) { border-color: var(--accent); }
+.rz-marke.an { background: var(--accent); border-color: var(--accent); color: #fff; }
+.rz-marke:disabled { cursor: default; }
+/* Ein Haekchen ohne gueltige Bewilligung. Nicht rot faerben und fertig --
+   daneben steht, WAS fehlt, sonst raet man. */
+.rz-warn { display: inline-flex; align-items: center; gap: 5px; margin-top: 3px;
+           font-size: 11.5px; font-weight: 600; color: var(--warn); }
+.rz-warn svg { width: 13px; height: 13px; flex: none; }
+
 /* Tageskopf im Tagesplan (ENT-068) -- als Klassen statt Inline-Stil, damit
    sich die Groesse mobil anheben laesst, ohne den Desktop anzutasten. */
 .tg-kopfkarte-card { margin-bottom: 16px; }
@@ -7038,21 +7132,78 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
         </div>
         </div>
 
-        <!-- Wer hat welche Rolle (ENT-077). Steht hier zum NACHSEHEN, nicht
-             zum Zuweisen -- die Zuweisung gehoert in die Personalakte, wo man
-             ohnehin ist, wenn man jemanden anlegt. Ohne diese Uebersicht
-             waeren die Rechte ueber alle Akten verstreut, und niemand koennte
-             die Frage beantworten, wer eigentlich an die AHV-Nummern kommt. -->
+        <!-- Rollen und Berechtigungen an EINEM Ort (ENT-440).
+             Bis dahin lag dasselbe Thema an drei Stellen: die Uebersicht
+             hier (nur zum Nachsehen), die Zuteilung in der Personalakte,
+             und die drei Einsatzmerkmale in zwei weiteren Reitern derselben
+             Akte. Wer wissen wollte, wer an die AHV-Nummern kommt, musste
+             das zusammensuchen -- und wer es aendern wollte, an drei Orte.
+             Jetzt: Profile bauen, Profile zuteilen, Merkmale setzen, alles
+             auf dieser Seite. Die Akte ZEIGT die Profile weiterhin, aendert
+             sie aber nicht mehr (ein Ort, an dem etwas geaendert wird). -->
         <div class="bk-abschnitt" id="bkAb-rv" style="display:none">
         <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="bkUebersichtZeigen()">Zurück</button>
         <div class="grid">
         <div class="card" id="rvKarte">
           <div class="card-hd">
-            <span class="card-ic"><svg class="i" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
-            <h3>Rollen & Berechtigungen</h3>
+            <span class="card-ic"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+            <h3>Profile</h3>
+            <div class="sp"></div>
+            <button type="button" class="btn btn-primary btn-sm" id="rvNeuKnopf"
+                    onclick="rvProfilOeffnen(null)">Profil anlegen</button>
           </div>
           <div class="card-bd">
             <div id="rvInhalt"><div style="color:var(--ink-3)">Wird geladen …</div></div>
+          </div>
+        </div>
+
+        <!-- Der Matrixteil steht in einer EIGENEN Karte und nicht aufgeklappt
+             in der Liste darueber: 20 Zeilen mit je drei Schaltern zwischen
+             zwei Profilzeilen liessen die Liste als Ganzes nicht mehr
+             ueberblicken -- und genau das ist ihr Zweck. -->
+        <div class="card" id="rvEditKarte" style="display:none">
+          <div class="card-hd">
+            <span class="card-ic"><svg class="i" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
+            <h3 id="rvEditTitel">Profil</h3>
+            <div class="sp"></div>
+            <button type="button" class="btn btn-plain btn-sm" onclick="rvProfilSchliessen()">Schliessen</button>
+          </div>
+          <div class="card-bd">
+            <div class="msg-err" id="rvEditErr" style="display:none"></div>
+            <div id="rvEditInhalt"></div>
+          </div>
+        </div>
+
+        <!-- Zuteilung: Person x Profil. Die Frage lautet hier "was darf diese
+             Person", darum die Person als Zeile -- die umgekehrte Frage
+             ("wer kommt an die Personalakte") beantwortet die Traegerzahl in
+             der Profilliste oben. -->
+        <div class="card" id="rzKarte">
+          <div class="card-hd">
+            <span class="card-ic"><svg class="i" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+            <h3>Zuteilung</h3>
+          </div>
+          <div class="card-bd">
+            <div class="msg-err" id="rzErr" style="display:none"></div>
+            <div id="rzInhalt"><div style="color:var(--ink-3)">Wird geladen …</div></div>
+          </div>
+        </div>
+
+        <!-- Einsatzmerkmale (ENT-440). KEINE Rollen, sondern Ja/Nein-Felder
+             an der Person -- und darum auch nicht im Profilteil oben. Sie
+             stehen trotzdem auf dieser Seite: Wer wissen will, wer was darf,
+             soll nicht suchen muessen, ob das eine Rolle ist oder nicht
+             (so schon ENT-285). Die Bewilligungsdaten bleiben in der
+             Personalakte bei den uebrigen Qualifikationen -- hier stehen sie
+             nur zur Kontrolle daneben. -->
+        <div class="card" id="rmkKarte">
+          <div class="card-hd">
+            <span class="card-ic"><svg class="i" viewBox="0 0 24 24"><path d="M12 2l3 6 6 .9-4.5 4.2 1.1 6.4L12 16.5 6.4 19.5l1.1-6.4L3 8.9 9 8z"/></svg></span>
+            <h3>Einsatzmerkmale</h3>
+          </div>
+          <div class="card-bd">
+            <div class="msg-err" id="rmkErr" style="display:none"></div>
+            <div id="rmkInhalt"><div style="color:var(--ink-3)">Wird geladen …</div></div>
           </div>
         </div>
         <!-- Login-Namen umstellen (ENT-381): eigene Karte, nicht Teil der
@@ -8851,67 +9002,69 @@ function enter() {
 // Anfrage von Hand stellt, umgeht jedes ausgeblendete Element. Entschieden
 // wird auf dem Server, in jedem einzelnen Endpunkt.
 const NAV_RECHTE = {
-  // Seit ENT-233 die ganze Gruppe (mit den neuen Reiter-Kindern), nicht mehr
-  // nur der Knopf selbst -- gleiches Prinzip wie bei 'navg-kunden'.
-  'navg-planung':           'plan',
-  'nav-abgleich':           'abgleich',
-  'navg-kunden':            'kunden',
-  'nav-admin-mitarbeiter':  'personal_lesen',
-  'nav-admin-produkte':     'offerten',
-  'nav-admin-betrieb':      'betrieb',
-  'nav-admin-mitteilungen': 'mitteilungen',
-  // Seit ENT-224 haengen die Kinder von Kontrolle (jetzt "Auswertung") am
-  // selben Recht 'plan' -- Rundgaenge als operativer Ablauf (das fruehere
-  // 'rundgang_einsehen'-Kind) lebt unter der eigenen Rubrik "Revierdienst",
-  // siehe deren beide Eintraege weiter unten. "Arbeitsergebnisse" (ENT-243)
-  // zeigt zwar teilweise Rundgang-Daten, aber als Fuehrungs-Auswertung fuer
-  // dieselbe Zielgruppe wie Pensen/Auslagenersatz -- bewusst am selben Recht,
-  // nicht an 'rundgang_einsehen'.
-  'nav-kontrolle-pensen':      'plan',
-  'nav-kontrolle-auslagen':    'plan',
-  'nav-kontrolle-arbeitsergebnisse': 'plan',
-  // Die Elterngruppe 'navg-revierdienst' hängt NICHT hier drin, sondern an
-  // einer ODER-Verknüpfung weiter unten (wie 'navg-admin') -- 'Einrichtung'
-  // braucht 'rundgang_verwalten', 'Übersicht' genügt bereits mit
-  // 'rundgang_einsehen' (ENT-193/ENT-224).
-  'nav-revierdienst-uebersicht':   'rundgang_einsehen',
-  'nav-revierdienst-einrichtung':  'rundgang_verwalten',
-  'nav-einrichtung':        'betrieb',
+  // Ein Wert = ein Recht. Eine Liste = ODER: Der Punkt steht, sobald EINES
+  // davon da ist. Gebraucht wird das nur dort, wo hinter einem Punkt mehrere
+  // Bereiche liegen -- etwa die Einstellungsseite, die Betrieb, Fahrzeuge
+  // und die Rollenseite traegt.
+  'navg-planung':           ['einsaetze_lesen', 'objekte_lesen', 'masterschichten_lesen'],
+  'nav-abgleich':           'abgleich_lesen',
+  'navg-kunden':            'kunden_lesen',
   // Offerten haengen am eigenen Recht, nicht an 'kunden' (ENT-181): Wer
-  // Adressen pflegt, sieht darum noch keine Preise. Die Elterngruppe
-  // "Kunden" bleibt an 'kunden' -- wer nur 'offerten' haette und keine
-  // Kunden, saehe eine leere Rubrik; diese Kombination gibt es aber nicht,
-  // weil beide Rechte heute nur zusammen (bei der Verwaltung) vorkommen.
-  'nav-kunden-offerten':    'offerten',
+  // Adressen pflegt, sieht darum noch keine Preise.
+  'nav-kunden-offerten':    'offerten_lesen',
+  'nav-admin-mitarbeiter':  'personal_lesen',
+  'nav-admin-produkte':     'leistungen_lesen',
+  'nav-admin-betrieb':      ['betrieb_lesen', 'fahrzeuge_lesen', 'rechte_lesen'],
+  'nav-admin-mitteilungen': 'mitteilungen_lesen',
+  // Seit ENT-440 haengt jedes Kind der Rubrik "Auswertung" an SEINER Zeile
+  // und nicht mehr die ganze Rubrik an einem einzigen Recht. Das behebt eine
+  // stille Ungereimtheit: "Auslagenersatz" stand bisher schon mit dem
+  // Planungsrecht im Menue, obwohl auslagen_list.php dahinter das
+  // Abgleichsrecht verlangte -- ein Menuepunkt, der auf ein 403 fuehrt.
+  //
+  // "Arbeitsergebnisse" bleibt AUSDRUECKLICH am Planungsrecht und wandert
+  // NICHT zum Revierdienst: ENT-243 hat das einzeln entschieden ("zeigt zwar
+  // teilweise Rundgang-Daten, aber als Fuehrungs-Auswertung fuer dieselbe
+  // Zielgruppe wie Pensen/Auslagenersatz -- bewusst am selben Recht"). Eine
+  // Umhaengung waere eine Rechteaenderung und braucht einen eigenen Entscheid.
+  'nav-kontrolle-pensen':            'verfuegbarkeit_lesen',
+  'nav-kontrolle-auslagen':          'auslagen_lesen',
+  'nav-kontrolle-abwesenheiten':     'abwesenheiten_lesen',
+  'nav-kontrolle-arbeitsergebnisse': 'einsaetze_lesen',
+  'nav-revierdienst-uebersicht':   'rundgaenge_lesen',
+  'nav-revierdienst-einrichtung':  'kontrollpunkte_lesen',
+  // Die Einrichtung legt Tabellen und Spalten an -- das ist Schreiben,
+  // auch wenn die Adresse mit GET aufgerufen wird.
+  'nav-einrichtung':        'betrieb_schreiben',
 };
+
+// Eine Rubrik steht, sobald eines ihrer Kinder steht. Aus DERSELBEN Zuordnung
+// oben abgeleitet und nicht aus einer zweiten Liste: Zwei Listen liefen beim
+// naechsten neuen Menuepunkt auseinander, und man saehe es erst, wenn jemand
+// vor einer leeren Rubrik steht.
+const NAV_GRUPPEN = {
+  'navg-admin': ['nav-admin-mitarbeiter', 'nav-admin-produkte',
+                 'nav-admin-betrieb', 'nav-admin-mitteilungen'],
+  'navg-kontrolle': ['nav-kontrolle-pensen', 'nav-kontrolle-auslagen',
+                     'nav-kontrolle-abwesenheiten', 'nav-kontrolle-arbeitsergebnisse'],
+  'navg-revierdienst': ['nav-revierdienst-uebersicht', 'nav-revierdienst-einrichtung'],
+};
+
+// Ein Recht oder eine Liste davon (ODER-verknuepft).
+function darfEines(recht) {
+  return Array.isArray(recht) ? recht.some(r => darf(r)) : darf(recht);
+}
 
 function rechteAnwenden() {
   Object.entries(NAV_RECHTE).forEach(([id, recht]) => {
     const el = $(id);
-    if (el) { el.style.display = darf(recht) ? '' : 'none'; }
+    if (el) { el.style.display = darfEines(recht) ? '' : 'none'; }
   });
-  // Die Elterngruppe "Administration" verschwindet, wenn ALLE Kinder weg
-  // sind -- eine aufklappbare Rubrik ohne Inhalt ist schlimmer als keine.
-  // Seit ENT-181 sind es drei Kinder, nicht zwei.
-  const admGruppe = $('navg-admin');
-  if (admGruppe) {
-    admGruppe.style.display =
-      (darf('personal_lesen') || darf('betrieb') || darf('offerten')
-       || darf('mitteilungen')) ? '' : 'none';
-  }
-  // Seit ENT-224 haengt "Kontrolle" nur noch an 'plan' -- Rundgaenge (das
-  // fruehere 'rundgang_einsehen'-Kind) lebt jetzt unter "Revierdienst".
-  const kontrGruppe = $('navg-kontrolle');
-  if (kontrGruppe) {
-    kontrGruppe.style.display = darf('plan') ? '' : 'none';
-  }
-  // "Revierdienst" (ENT-224): sichtbar mit 'rundgang_verwalten' ODER
-  // 'rundgang_einsehen' -- seit ENT-193 kann sie auch mit nur
-  // 'rundgang_einsehen' sichtbar sein (dann nur die Übersicht).
-  const revGruppe = $('navg-revierdienst');
-  if (revGruppe) {
-    revGruppe.style.display = (darf('rundgang_verwalten') || darf('rundgang_einsehen')) ? '' : 'none';
-  }
+  // Eine aufklappbare Rubrik ohne sichtbares Kind ist schlimmer als keine.
+  Object.entries(NAV_GRUPPEN).forEach(([gruppe, kinder]) => {
+    const el = $(gruppe);
+    if (el) { el.style.display = kinder.some(k => darfEines(NAV_RECHTE[k])) ? '' : 'none'; }
+  });
   mdReiterPruefen();
   // Der Schnellzugriff haengt an denselben Rechten wie die Navigation und
   // wird darum hier mitgezeichnet -- nicht beim Laden der Kennzahlen: Er
@@ -10459,6 +10612,9 @@ function loadMitarbeiter() {
     // Funktion und Abteilung kommen als Liste mit -- die Bearbeitungsflaeche
     // macht daraus Namen, ohne dafuer eine zweite Anfrage zu stellen.
     mbListen = data.listen || {};
+    // Und die Profilnamen (ENT-440): ohne sie zeigte die Liste eigene
+    // Profile als rohen Schluessel statt beim Namen.
+    profileUebernehmen(data.profile);
     maEingerichtet = data.eingerichtet !== false;
     renderMitarbeiter();
   });
@@ -10675,14 +10831,14 @@ const KW_IKONEN = {
 // Zeilenzahl. Bei zwei Spalten laeuft es abwechselnd, darum stehen die Paare
 // hier schon so, dass links immer ein "Neu" und rechts immer ein Weg steht.
 const KURZWAHL = [
-  { recht: 'plan',           ikone: 'plus',     titel: 'Einsatz erstellen',        tun: () => { go('planung'); goTab('einsaetze'); openEinsatzNeu(); } },
-  { recht: 'abgleich',       ikone: 'haken',    titel: 'Schichten abgleichen',     tun: () => go('abgleich') },
-  { recht: 'kunden',         ikone: 'firma',    titel: 'Kunde erfassen',           tun: () => { go('kunden'); kuGoTab('uebersicht'); openKundeNeu(); } },
-  { recht: 'plan',           ikone: 'kalender', titel: 'Tagesplan öffnen',         tun: () => { go('planung'); goTab('tag'); } },
-  { recht: 'kunden',         ikone: 'haus',     titel: 'Objekt erfassen',          tun: () => { go('kunden'); kuGoTab('objekte'); openObjektNeu(); } },
-  { recht: 'plan',           ikone: 'raster',   titel: 'Objektplanung öffnen',     tun: () => { go('planung'); goTab('objektplan'); } },
-  { recht: 'personal_lesen', ikone: 'person',   titel: 'Mitarbeitenden erfassen',  tun: () => { go('mitarbeiter'); maGoTab('liste'); mbNeu(); } },
-  { recht: 'kunden',         ikone: 'blatt',    titel: 'Rapporte ansehen',         tun: () => { go('kunden'); kuGoTab('rapporte'); } },
+  { recht: 'einsaetze_schreiben', ikone: 'plus',     titel: 'Einsatz erstellen',        tun: () => { go('planung'); goTab('einsaetze'); openEinsatzNeu(); } },
+  { recht: 'abgleich_lesen', ikone: 'haken',    titel: 'Schichten abgleichen',     tun: () => go('abgleich') },
+  { recht: 'kunden_schreiben', ikone: 'firma',    titel: 'Kunde erfassen',           tun: () => { go('kunden'); kuGoTab('uebersicht'); openKundeNeu(); } },
+  { recht: 'einsaetze_lesen', ikone: 'kalender', titel: 'Tagesplan öffnen',         tun: () => { go('planung'); goTab('tag'); } },
+  { recht: 'objekte_schreiben', ikone: 'haus',     titel: 'Objekt erfassen',          tun: () => { go('kunden'); kuGoTab('objekte'); openObjektNeu(); } },
+  { recht: 'objekte_lesen',  ikone: 'raster',   titel: 'Objektplanung öffnen',     tun: () => { go('planung'); goTab('objektplan'); } },
+  { recht: 'personal_schreiben', ikone: 'person',   titel: 'Mitarbeitenden erfassen',  tun: () => { go('mitarbeiter'); maGoTab('liste'); mbNeu(); } },
+  { recht: 'abgleich_lesen', ikone: 'blatt',    titel: 'Rapporte ansehen',         tun: () => { go('kunden'); kuGoTab('rapporte'); } },
 ];
 
 function kwStarten(i) {
@@ -11057,7 +11213,7 @@ function rKarte(r, gruppenGroesse) {
   // Knopf steht deshalb im aufgeklappten Koerper jeder beteiligten Karte --
   // sichtbar ist immer nur einer, weil er im zugeklappten Zustand nicht da
   // ist. Der Hinweis-Chip oben sagt, dass es die anderen auch noch gibt.
-  const kundenrapport = (r.einsatz_id && darf('abgleich'))
+  const kundenrapport = (r.einsatz_id && darf('abgleich_lesen'))
     ? `<button class="btn btn-plain btn-sm" onclick="event.stopPropagation(); epBerichtDrucken(${Number(r.einsatz_id)})">
          <svg class="i i-sm" viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
          Kundenrapport
@@ -13015,6 +13171,7 @@ function maAkteLaden(name) {
     }
     maAkte = data.mitarbeiter;
     maEingerichtet = data.eingerichtet !== false;
+    profileUebernehmen(data.profile);
     return maAkte;
   }).catch(e => { maAkteLaedt = null; throw e; });
 }
@@ -13068,8 +13225,12 @@ function mdGoTab(t) {
 // Den Verlaufs-Reiter nur zeigen, wenn die Rolle ihn lesen darf. Wird er
 // ausgeblendet, waehrend er offen ist, bliebe sonst eine leere Flaeche
 // stehen -- darum zurueck auf die Uebersicht.
+//
+// Seit ENT-440 haengt er am eigenen Bereich 'logbuch' und nicht mehr am
+// Recht, Rollen zu vergeben: Den Verlauf lesen und Rechte verteilen sind
+// zwei verschiedene Arbeiten.
 function mdReiterPruefen() {
-  const erlaubt = darf('rechte');
+  const erlaubt = darf('logbuch_lesen');
   const knopf = $('mdtab-verlauf');
   if (knopf) {
     knopf.style.display = erlaubt ? '' : 'none';
@@ -13405,8 +13566,8 @@ function mdVerlaufWert(w) {
 
 function mdVerlauf() {
   const ziel = $('mdVerlauf');
-  if (!darf('rechte')) {
-    ziel.innerHTML = EMPTY('Kein Zugriff', 'Der Verlauf ist der Verwaltung vorbehalten.');
+  if (!darf('logbuch_lesen')) {
+    ziel.innerHTML = EMPTY('Kein Zugriff', 'Für den Verlauf fehlt dir die Berechtigung „Logbuch: lesen“.');
     return;
   }
   if (mdVerlaufFuer !== mdName) {
@@ -14198,7 +14359,7 @@ function kuMenuOeffnen(ev, id) {
   if (pop.classList.contains('on') && pop.dataset.kundeId === String(id)) { kuMenuSchliessen(); return; }
   pop.innerHTML = `
     <button onclick="kuMenuSchliessen(); openKundeBearbeiten(${id})">Bearbeiten</button>
-    ${darf('offerten')
+    ${darf('offerten_lesen')
       ? `<button onclick="kuMenuSchliessen(); ofNeuFuerKunde(${id})">Offerte erstellen</button>
          <button onclick="kuMenuSchliessen(); reNeuFuerKunde(${id})">Rechnung erstellen</button>`
       : ''}
@@ -16179,7 +16340,7 @@ function rapporteGruppieren(zeilen) {
 // Funktion noch nicht kennen, nicht selbsterklaerend -- ein Tooltip hilft
 // nur, wer die Maus darueber haelt, auf dem Handy gar niemandem.
 function rapporteKlammerZelle(einsatzId, anzahl) {
-  if (!darf('abgleich')) {
+  if (!darf('abgleich_lesen')) {
     // Fehlt das Recht, entfaellt der Knopf, aber die Zellenzahl der Zeile
     // muss trotzdem stimmen -- eine leere Zelle statt gar keiner.
     return anzahl > 1 ? `<td class="rapp-klammer" rowspan="${anzahl}"></td>` : '<td class="rapp-klammer"></td>';
@@ -18500,7 +18661,7 @@ function revierdienstNavKlick() {
   // Entscheidung um, weil die Uebersicht seit ENT-225 der eigentliche
   // Informationsgehalt ist, nicht mehr die leere Einrichtung mit "Kein
   // Objekt gewaehlt".
-  const ziel = darf('rundgang_einsehen') ? 'rundgaenge' : 'revierdienst';
+  const ziel = darf('rundgaenge_lesen') ? 'rundgaenge' : 'revierdienst';
   if (navGruppeKompakt(ziel)) { return; }
   const offen = $('navg-revierdienst').classList.contains('offen');
   // "view-<ziel> ist on" allein reicht bei "rundgaenge" NICHT, um zu pruefen,
@@ -18527,7 +18688,7 @@ function revierdienstEinrichtungOeffnen() {
   // erst aufgerufen (ENT-169) -- der Reiter selbst ist ohnehin nur mit dem
   // Recht erreichbar, das ist die zusaetzliche Absicherung aus der Zeit, als
   // dasselbe schon fuer die Objekt-Reiter galt.
-  if (!darf('rundgang_verwalten')) { $('rdEinrichtungInhalt').innerHTML = ''; return; }
+  if (!darf('kontrollpunkte_lesen')) { $('rdEinrichtungInhalt').innerHTML = ''; return; }
   // NICHT loadObjekte(): Das holt objekt_list.php, und der verlangt 'plan'.
   // Die Rolle "Waechtersystem" hat ausdruecklich nur 'rundgang_verwalten',
   // 'rundgang_einsehen' und 'alarmempfaenger' -- ohne 'plan'. Sie kommt
@@ -18853,89 +19014,472 @@ function bkLogoWeg() {
 //   3. Notfallcodes zeigen -- einmal, im Klartext, zum Ausdrucken.
 let zfStand = null;
 
-// ── Rollen im Betrieb (ENT-077) ──────────────────────────────────────
-function rvLaden() {
-  const karte = $('rvKarte'), ziel = $('rvInhalt');
-  if (!karte || !ziel) { return; }
-  // Wer keine Rollen vergeben darf, braucht die Liste nicht -- sie sagt,
-  // wer an welche Personendaten kommt. Seit der Kachel-Uebersicht (ENT-210)
-  // steckt die Karte selbst erst hinter einem Klick -- ohne dieses Recht
-  // darf schon die KACHEL nicht erscheinen, sonst fuehrt sie auf eine leere
-  // Unteransicht statt schlicht zu fehlen.
-  const kachel = $('bkKachelRv');
-  if (kachel) { kachel.style.display = darf('rechte') ? '' : 'none'; }
-  karte.style.display = darf('rechte') ? '' : 'none';
-  if (!darf('rechte')) { return; }
+// ── Rollen & Berechtigungen: eine Seite für alles (ENT-440) ──────────
+//
+// Drei Blöcke, eine Ladung: Profile (was gibt es und was darf es),
+// Zuteilung (wer trägt was) und Einsatzmerkmale (Diensthund, Waffe,
+// Revierdienst). Vorher lagen die drei an drei Orten.
+//
+// Der Server bleibt die Wahrheit: Was hier ausgeblendet wird, ist
+// Bequemlichkeit -- jede Anfrage wird dort noch einmal geprüft.
+let rvStand = null;      // die letzte Antwort von rollen_list.php
+let rvOffen = null;      // Schlüssel des Profils im Matrixteil, oder null
+let rvEntwurf = null;    // { schluessel, titel, text, stufen } im Matrixteil
 
-  api('mitarbeiter_list.php').then(({ ok, data }) => {
-    if (!ok || data.status !== 'ok') {
-      ziel.innerHTML = EMPTY('Nicht geladen', 'Die Rollenübersicht liess sich nicht abrufen.');
+const RV_STUFEN_TEXT = { verborgen: 'verborgen', lesen: 'lesen', schreiben: 'schreiben' };
+// Zeilen, an denen Personendaten hängen -- sie bekommen in der Matrix einen
+// Rand. Nicht als Sperre gemeint, sondern damit ein versehentlich gesetztes
+// Häkchen beim Überfliegen auffällt.
+const RV_HEIKEL = ['personal', 'personal_vertraulich', 'logbuch'];
+
+// Die drei Einsatzmerkmale mit ihrem Bewilligungsfeld. Steht hier und nicht
+// in einer zweiten Wortliste: Die Beschriftungen kommen aus MB_ABSCHNITTE,
+// dieselbe Quelle wie die Personalakte.
+const RV_MERKMALE = [
+  ['diensthundefuehrer',      'diensthund_bewilligung_bis'],
+  ['waffentragberechtigt',    'waffe_bewilligung_bis'],
+  ['revierdienst_berechtigt', null],
+];
+
+function rvMerkmalLabel(feld) {
+  for (const a of MB_ABSCHNITTE) {
+    for (const [f, lang, kurz] of (a.janein || [])) {
+      if (f === feld) { return { kurz: kurz || lang, lang }; }
+    }
+  }
+  return { kurz: feld, lang: feld };
+}
+
+function rvFehler(id, text) {
+  const e = $(id);
+  if (!e) { return; }
+  e.textContent = text || '';
+  e.style.display = text ? '' : 'none';
+}
+
+function rvLaden() {
+  // Wer die Rollen nicht einmal ansehen darf, braucht die Kachel nicht --
+  // sonst führt sie auf eine leere Unteransicht statt schlicht zu fehlen.
+  const kachel = $('bkKachelRv');
+  const sichtbar = darf('rechte_lesen');
+  if (kachel) { kachel.style.display = sichtbar ? '' : 'none'; }
+  ['rvKarte', 'rzKarte', 'rmkKarte'].forEach(id => {
+    const k = $(id);
+    if (k) { k.style.display = sichtbar ? '' : 'none'; }
+  });
+  if (!sichtbar) { return; }
+
+  api('rollen_list.php').then(({ ok, data }) => {
+    // Nicht nur der Status zaehlt, sondern ob die drei Listen ueberhaupt da
+    // sind. Ein `data.profile || []` waere genau der Fehler, den ENT-077
+    // festgehalten hat: Es machte aus einer FEHLENDEN Liste eine LEERE --
+    // und die Seite behauptete "es gibt keine Profile", wo in Wahrheit
+    // nichts geladen wurde. Beides sieht sonst gleich aus.
+    const vollstaendig = data && Array.isArray(data.bereiche)
+      && Array.isArray(data.profile) && Array.isArray(data.personen);
+    if (!ok || data.status !== 'ok' || !vollstaendig) {
+      // "Nicht geladen" ist etwas anderes als "nichts vorhanden" -- und
+      // beides etwas anderes als "kein Zugriff". Drei Aussagen, drei Texte.
+      $('rvInhalt').innerHTML = EMPTY('Nicht geladen', 'Die Profile liessen sich nicht abrufen.');
+      $('rzInhalt').innerHTML = EMPTY('Nicht geladen', 'Die Zuteilung liess sich nicht abrufen.');
+      $('rmkInhalt').innerHTML = EMPTY('Nicht geladen', 'Die Einsatzmerkmale liessen sich nicht abrufen.');
       return;
     }
-    // Ohne die Rollentabelle stehen unten Rueckfallwerte, keine echten
-    // Rollen. Das muss dastehen: Sonst sieht eine nicht gelaufene
-    // Einrichtung genauso aus wie eine erledigte -- und man sucht den
-    // Fehler an der falschen Stelle. (Genau das ist am 21.08.2026
-    // passiert: Die Zwei-Faktor-Karte meldete fehlende Tabellen, diese
-    // Karte zeigte daneben eine saubere Rollenverteilung.)
-    if (data.rollen_eingerichtet === false) {
-      ziel.innerHTML = `<div class="ki-hint web on"><span><b>Noch nicht eingerichtet.</b>
-        Die Tabelle für die Rollen fehlt in der Datenbank — einmal unten links
-        „Einrichtung“ ausführen und dort auf <b>„Prüfen und einrichten“</b> klicken.
-        Bis dahin gilt für alle der bisherige Stand: Wer Admin war, darf alles,
-        alle anderen nichts. <b>Was unten steht, ist nur diese Notannahme und keine
-        vergebene Rolle.</b></span></div>`;
-      return;
-    }
-    const leute = (data.mitarbeiter || []).filter(m => m.aktiv !== false && Number(m.aktiv) !== 0);
-    // Nach Rolle gruppiert, nicht nach Person: Die Frage lautet "wer kommt
-    // an die Personalakte", nicht "was darf Frau Muster".
-    const gruppen = ROLLEN.map(([id, titel, text]) => ({
-      id, titel, text,
-      leute: leute.filter(m => (m.rollen || []).includes(id)),
-    }));
-    // Faehigkeits-Merkmale (janein-Felder aus MB_ABSCHNITTE: Diensthund,
-    // Waffe, Revierdienst-Berechtigung -- ENT-284) sind keine Rolle, sondern
-    // eine Eigenschaft der Person. Trotzdem dieselbe Karte statt eines
-    // dritten Orts (ENT-285): Wer wissen will, wer was darf, soll nicht
-    // suchen muessen, ob das eine Rolle ist oder nicht.
-    const merkmale = MB_ABSCHNITTE.flatMap(a => a.janein || []).map(([feld, lang, kurz]) => ({
-      id: feld, titel: kurz, text: lang,
-      leute: leute.filter(m => Number(m[feld]) === 1),
-    }));
-    const zeile = g => `
-        <div class="rv-zeile">
-          <div class="rv-kopf">
-            <b>${esc(g.titel)}</b>
-            <span class="chip ${g.leute.length ? 'chip-a' : 'chip-n'}">${g.leute.length}</span>
-          </div>
-          <div class="rv-text">${esc(g.text)}</div>
-          <div class="md-marken">${g.leute.length
-            ? g.leute.map(m => `<span class="chip chip-n">${esc(fullName(m) || m.name)}</span>`).join('')
-            : '<span style="color:var(--ink-3);font-size:12.5px">niemand</span>'}</div>
-        </div>`;
-    ziel.innerHTML = `
-      <div class="rv-liste">${gruppen.map(zeile).join('')}</div>
-      <div class="zone-hd" style="margin-top:18px">Weitere Berechtigungen</div>
-      <div class="rv-liste">${merkmale.map(zeile).join('')}</div>
-      <div class="ki-hint web on" style="margin-top:14px"><span>
-        Rollen werden in der <b>Personalakte</b> vergeben, Abschnitt „Zugang“ —
-        dort, wo man ohnehin ist, wenn man jemanden anlegt.
-        Es zählen nur aktive Konten.
-      </span></div>`;
+    rvStand = data;
+    profileUebernehmen(data.profile);
+    rvZeichnen();
   });
 }
 
+function rvZeichnen() {
+  const d = rvStand;
+  if (!d) { return; }
+  const neuKnopf = $('rvNeuKnopf');
+  if (neuKnopf) { neuKnopf.style.display = (d.darf_aendern && d.eingerichtet) ? '' : 'none'; }
+
+  // Ohne die Tabellen stehen unten Rückfallwerte aus dem Code, keine
+  // gespeicherten Profile. Das muss dastehen: Sonst sieht eine nicht
+  // gelaufene Einrichtung genauso aus wie eine erledigte -- und man sucht
+  // den Fehler an der falschen Stelle.
+  const hinweisNichtEingerichtet = d.eingerichtet ? '' : `
+    <div class="ki-hint web on" style="margin-bottom:14px"><span><b>Noch nicht eingerichtet.</b>
+      Die Tabellen für die Profile fehlen in der Datenbank — einmal unten links
+      „Einrichtung“ ausführen und dort auf <b>„Prüfen und einrichten“</b> klicken.
+      Bis dahin gelten die fünf Systemrollen aus dem Programmcode. <b>Was unten steht,
+      ist dieser Notstand und kein gespeichertes Profil</b>; anlegen und ändern
+      lässt sich hier vorher nichts.</span></div>`;
+
+  rvProfileZeichnen(hinweisNichtEingerichtet);
+  rvZuteilungZeichnen();
+  rvMerkmaleZeichnen();
+  if (rvOffen !== null) { rvMatrixZeichnen(); }
+}
+
+// ── Block 1: die Profile ─────────────────────────────────────────────
+function rvProfileZeichnen(hinweis) {
+  const d = rvStand;
+  const nurLesen = !d.darf_aendern;
+  const zeile = p => `
+    <div class="rp-zeile">
+      <div>
+        <div class="rp-kopf">
+          <b>${esc(p.titel)}</b>
+          ${p.system ? `<span class="rp-schloss" title="Systemrolle — nicht änderbar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+                 stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            Systemrolle</span>` : ''}
+          <span class="chip ${p.traeger ? 'chip-a' : 'chip-n'}">${p.traeger}</span>
+        </div>
+        <div class="rp-text">${esc(p.text) || '<i>ohne Beschreibung</i>'}</div>
+      </div>
+      <button type="button" class="btn btn-plain btn-sm" onclick="rvProfilOeffnen('${esc(p.schluessel)}')">
+        ${(p.system || nurLesen) ? 'Ansehen' : 'Bearbeiten'}</button>
+    </div>`;
+
+  // "Keine eigenen Profile" ist eine Aussage über den Bestand, nicht über
+  // den Zugriff -- darum steht sie als Satz da und nicht als leere Fläche.
+  const eigene = d.profile.filter(p => !p.system);
+  const eigenText = eigene.length
+    ? ''
+    : `<p class="zone-note" style="margin-top:12px">Es gibt noch kein eigenes Profil.
+        Die fünf Systemrollen oben decken den heutigen Betrieb ab; ein eigenes Profil
+        lohnt sich, wenn jemand genau dazwischen liegt — etwa „Kunden ansehen, aber
+        nicht ändern“.</p>`;
+
+  $('rvInhalt').innerHTML = hinweis + `
+    <div>${d.profile.map(zeile).join('')}</div>
+    ${eigenText}
+    ${nurLesen ? `<div class="ki-hint web on" style="margin-top:14px"><span>
+      Du darfst die Profile <b>ansehen</b>, aber nicht ändern — dafür braucht es
+      „Rollen &amp; Berechtigungen: schreiben“.</span></div>` : ''}`;
+}
+
+// ── Der Matrixteil ───────────────────────────────────────────────────
+function rvProfilOeffnen(schluessel) {
+  const d = rvStand;
+  if (!d) { return; }
+  rvFehler('rvEditErr', '');
+  if (schluessel === null) {
+    rvEntwurf = { schluessel: null, titel: '', text: '', stufen: {}, system: false };
+  } else {
+    const p = d.profile.find(x => x.schluessel === schluessel);
+    if (!p) { return; }
+    rvEntwurf = { schluessel: p.schluessel, titel: p.titel, text: p.text,
+                  stufen: Object.assign({}, p.stufen), system: p.system };
+  }
+  rvOffen = schluessel;
+  $('rvEditKarte').style.display = '';
+  rvMatrixZeichnen();
+  $('rvEditKarte').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function rvProfilSchliessen() {
+  rvOffen = null; rvEntwurf = null;
+  $('rvEditKarte').style.display = 'none';
+}
+
+function rvMatrixZeichnen() {
+  const e = rvEntwurf;
+  if (!e) { return; }
+  const d = rvStand;
+  // Gesperrt ist eine Systemrolle IMMER, auch für die Verwaltung: Sie trägt
+  // den geprüften Zustand aus ENT-077/ENT-180. Wer sie ändern könnte, könnte
+  // den Schutz aushebeln, ohne dass es jemandem auffällt.
+  const gesperrt = e.system || !d.darf_aendern || !d.eingerichtet;
+  $('rvEditTitel').textContent = e.schluessel === null
+    ? 'Neues Profil' : (e.system ? 'Systemrolle: ' : 'Profil: ') + e.titel;
+
+  const gruppen = [];
+  d.bereiche.forEach(b => {
+    const letzte = gruppen[gruppen.length - 1];
+    if (letzte && letzte.name === b.gruppe) { letzte.zeilen.push(b); }
+    else { gruppen.push({ name: b.gruppe, zeilen: [b] }); }
+  });
+
+  const schalter = b => {
+    const ist = e.stufen[b.schluessel] || 'verborgen';
+    // "verborgen" steht immer zur Wahl, die übrigen nur, wenn es sie in
+    // diesem Bereich gibt. Ein Schreibschalter ohne Schreibweg wäre eine
+    // Behauptung -- darum haben Logbuch, Auslagen und Verfügbarkeit nur zwei.
+    const stufen = ['verborgen'].concat(b.stufen);
+    return `<div class="rm-stufen" role="group" aria-label="Stufe für ${esc(b.titel)}">
+      ${stufen.map(st => `
+        <button type="button" class="rm-stufe stufe-${st}${ist === st ? ' aktiv' : ''}"
+          data-bereich="${esc(b.schluessel)}" data-stufe="${st}"
+          ${gesperrt ? 'disabled' : ''} aria-pressed="${ist === st}"
+          onclick="rvStufeSetzen('${esc(b.schluessel)}','${st}')">${RV_STUFEN_TEXT[st]}</button>`).join('')}
+    </div>`;
+  };
+
+  const zeile = b => `
+    <div class="rm-zeile${RV_HEIKEL.includes(b.schluessel) ? ' heikel' : ''}">
+      <div><b>${esc(b.titel)}</b><small>${esc(b.text)}</small></div>
+      ${schalter(b)}
+    </div>`;
+
+  $('rvEditInhalt').innerHTML = `
+    ${e.system ? `<div class="ki-hint web on" style="margin-bottom:14px"><span>
+      <b>Systemrolle.</b> Sie ist bewusst nicht änderbar: Was sie darf, steht im
+      Programmcode und im Entscheidungsprotokoll und ist dort geprüft. Wenn du
+      etwas anderes brauchst, lege daneben ein eigenes Profil an — die
+      Systemrolle bleibt, wie sie ist.</span></div>` : ''}
+    ${(!e.system && !d.eingerichtet) ? `<div class="ki-hint web on" style="margin-bottom:14px"><span>
+      Zum Anlegen und Ändern fehlen die Tabellen — zuerst die Einrichtung ausführen.</span></div>` : ''}
+    <div class="form-zeile">
+      <div class="f"><label for="rvTitel">Name des Profils</label>
+        <input class="inp" id="rvTitel" maxlength="60" value="${esc(e.titel)}"
+               placeholder="z. B. Disposition ohne Kundenpflege" ${gesperrt ? 'disabled' : ''}></div>
+      <div class="f"><label for="rvText">Beschreibung</label>
+        <input class="inp" id="rvText" maxlength="500" value="${esc(e.text)}"
+               placeholder="Wofür ist dieses Profil da?" ${gesperrt ? 'disabled' : ''}></div>
+    </div>
+    ${gruppen.map(g => `
+      <div class="rm-gruppe">
+        <div class="rm-gruppe-hd">${esc(g.name)}</div>
+        ${g.zeilen.map(zeile).join('')}
+      </div>`).join('')}
+    ${gesperrt ? '' : `
+      <div style="display:flex;gap:8px;margin-top:20px;flex-wrap:wrap">
+        <button type="button" class="btn btn-primary" onclick="rvProfilSpeichern()">Profil speichern</button>
+        ${e.schluessel ? `<button type="button" class="btn btn-plain"
+           onclick="rvProfilLoeschen()">Profil löschen</button>` : ''}
+      </div>`}`;
+}
+
+function rvStufeSetzen(bereich, stufe) {
+  if (!rvEntwurf) { return; }
+  if (stufe === 'verborgen') { delete rvEntwurf.stufen[bereich]; }
+  else { rvEntwurf.stufen[bereich] = stufe; }
+  // Nur die betroffene Zeile neu färben statt die ganze Matrix neu zu
+  // zeichnen: Ein Neuaufbau würde die beiden Textfelder oben zurücksetzen.
+  document.querySelectorAll(`.rm-stufe[data-bereich="${bereich}"]`).forEach(k => {
+    const an = k.dataset.stufe === stufe;
+    k.classList.toggle('aktiv', an);
+    k.setAttribute('aria-pressed', an ? 'true' : 'false');
+  });
+}
+
+function rvProfilSpeichern() {
+  if (!rvEntwurf) { return; }
+  rvFehler('rvEditErr', '');
+  const koerper = {
+    schluessel: rvEntwurf.schluessel,
+    titel: $('rvTitel').value,
+    text:  $('rvText').value,
+    stufen: rvEntwurf.stufen,
+  };
+  api('rolle_speichern.php', { method: 'POST', body: koerper }).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') {
+      rvFehler('rvEditErr', (data && data.message) || 'Nicht gespeichert.');
+      return;
+    }
+    rvOffen = data.schluessel;
+    rvLadenUndOeffnen(data.schluessel);
+  }).catch(() => rvFehler('rvEditErr', 'Netzwerkfehler.'));
+}
+
+// Nach dem Speichern neu laden und dasselbe Profil offen lassen -- sonst
+// klappt die Maske zu und man weiss nicht, ob es geklappt hat.
+function rvLadenUndOeffnen(schluessel) {
+  api('rollen_list.php').then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') { return; }
+    rvStand = data;
+    profileUebernehmen(data.profile);
+    rvZeichnen();
+    if (schluessel) { rvProfilOeffnen(schluessel); }
+  });
+}
+
+function rvProfilLoeschen() {
+  if (!rvEntwurf || !rvEntwurf.schluessel) { return; }
+  rvFehler('rvEditErr', '');
+  api('rolle_loeschen.php', { method: 'POST', body: { schluessel: rvEntwurf.schluessel } })
+    .then(({ ok, data }) => {
+      if (!ok || data.status !== 'ok') {
+        rvFehler('rvEditErr', (data && data.message) || 'Nicht gelöscht.');
+        return;
+      }
+      rvProfilSchliessen();
+      rvLaden();
+    }).catch(() => rvFehler('rvEditErr', 'Netzwerkfehler.'));
+}
+
+// ── Block 2: die Zuteilung ───────────────────────────────────────────
+function rvZuteilungZeichnen() {
+  const d = rvStand;
+  const aktive = d.personen.filter(p => Number(p.aktiv) === 1);
+  if (!aktive.length) {
+    $('rzInhalt').innerHTML = EMPTY('Niemand aktiv',
+      'Es gibt keine aktiven Konten, denen sich ein Profil zuteilen liesse.');
+    return;
+  }
+  const nurLesen = !d.darf_aendern || !d.eingerichtet;
+
+  const zeile = p => {
+    const rollen = p.rollen || [];
+    // Cockpit-Zugang wird abgeleitet, nicht gesetzt (ENT-440): Wer irgendwo
+    // mindestens "lesen" hat, kommt hinein. Steht als Spalte da, damit man
+    // die Folge einer Zuteilung sieht, ohne sie im Kopf nachzurechnen.
+    const hatRecht = rollen.some(r => {
+      const prof = d.profile.find(x => x.schluessel === r);
+      return prof && Object.keys(prof.stufen || {}).length > 0;
+    });
+    return `<tr>
+      <td class="rz-name"><b>${esc(fullName(p) || p.name)}</b>
+        <span>${esc(p.personalnummer || '–')} · ${esc(p.name)}</span></td>
+      <td><div class="rz-marken">${d.profile.map(prof => `
+        <button type="button" class="rz-marke${rollen.includes(prof.schluessel) ? ' an' : ''}"
+          ${nurLesen ? 'disabled' : ''} aria-pressed="${rollen.includes(prof.schluessel)}"
+          onclick="rzUmschalten(${Number(p.id)},'${esc(prof.schluessel)}')"
+          title="${esc(prof.titel)}${prof.system ? ' (Systemrolle)' : ''}">${esc(prof.titel)}</button>`).join('')}
+      </div></td>
+      <td style="white-space:nowrap">${hatRecht
+        ? '<span class="chip chip-a">Cockpit</span>'
+        : '<span class="chip chip-n">nur App</span>'}</td>
+    </tr>`;
+  };
+
+  $('rzInhalt').innerHTML = `
+    <div class="zone-note" style="margin-bottom:12px">Mehrere Profile je Person sind möglich —
+      sie addieren sich, und je Bereich gilt die höchste Stufe. Es zählen nur aktive Konten
+      (${aktive.length} von ${d.personen.length}).</div>
+    <div style="overflow:auto">
+      <table class="rz-tab">
+        <thead><tr><th>Person</th><th>Profile</th><th>Zugang</th></tr></thead>
+        <tbody>${aktive.map(zeile).join('')}</tbody>
+      </table>
+    </div>
+    ${nurLesen ? `<div class="ki-hint web on" style="margin-top:14px"><span>
+      ${d.eingerichtet
+        ? 'Du darfst die Zuteilung <b>ansehen</b>, aber nicht ändern.'
+        : 'Zuteilen lässt sich erst nach der Einrichtung.'}</span></div>` : ''}`;
+}
+
+function rzUmschalten(maId, schluessel) {
+  const d = rvStand;
+  const person = d.personen.find(p => Number(p.id) === Number(maId));
+  if (!person) { return; }
+  rvFehler('rzErr', '');
+  const vorher = (person.rollen || []).slice();
+  const neu = vorher.includes(schluessel)
+    ? vorher.filter(r => r !== schluessel)
+    : vorher.concat([schluessel]);
+
+  // Sofort speichern statt "Speichern"-Knopf je Zeile: Bei 40 Zeilen wüsste
+  // sonst niemand mehr, welche noch ungesichert sind. Geht es schief, wird
+  // der alte Stand wiederhergestellt -- eine Marke, die an bleibt, obwohl
+  // der Server abgelehnt hat, wäre eine Lüge auf dem Schirm.
+  person.rollen = neu;
+  rvZuteilungZeichnen();
+  api('rollen_zuteilen.php', { method: 'POST', body: { mitarbeiter_id: Number(maId), rollen: neu } })
+    .then(({ ok, data }) => {
+      if (!ok || data.status !== 'ok') {
+        person.rollen = vorher;
+        rvZuteilungZeichnen();
+        rvFehler('rzErr', (data && data.message) || 'Nicht gespeichert.');
+        return;
+      }
+      // Trägerzahlen oben stimmen sonst nicht mehr.
+      rvLaden();
+    }).catch(() => {
+      person.rollen = vorher;
+      rvZuteilungZeichnen();
+      rvFehler('rzErr', 'Netzwerkfehler.');
+    });
+}
+
+// ── Block 3: die Einsatzmerkmale ─────────────────────────────────────
+// Keine Rollen, sondern Ja/Nein-Felder an der Person. Sie stehen trotzdem
+// hier, weil "wer darf mit Hund raus" dieselbe Frage ist wie "wer darf an
+// die Personalakte" -- und niemand soll raten müssen, ob das eine Rolle ist.
+function rvMerkmaleZeichnen() {
+  const d = rvStand;
+  const aktive = d.personen.filter(p => Number(p.aktiv) === 1);
+  if (!aktive.length) {
+    $('rmkInhalt').innerHTML = EMPTY('Niemand aktiv', 'Es gibt keine aktiven Konten.');
+    return;
+  }
+  const nurLesen = !d.darf_merkmale;
+  const heute = new Date().toISOString().slice(0, 10);
+
+  // Sagt, WAS fehlt -- "abgelaufen" und "nie erfasst" sind verschiedene
+  // Aussagen und brauchen verschiedene Texte.
+  const warnung = (p, feld, datumFeld) => {
+    if (!datumFeld || Number(p[feld]) !== 1) { return ''; }
+    const bis = p[datumFeld];
+    let text = null;
+    if (!bis) { text = 'keine Bewilligung erfasst'; }
+    else if (String(bis) < heute) { text = 'Bewilligung abgelaufen am ' + dmy(bis); }
+    if (!text) { return ''; }
+    return `<div class="rz-warn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>${esc(text)}</div>`;
+  };
+
+  const zeile = p => `<tr>
+    <td class="rz-name"><b>${esc(fullName(p) || p.name)}</b>
+      <span>${esc(p.personalnummer || '–')}</span></td>
+    ${RV_MERKMALE.map(([feld, datumFeld]) => `<td>
+      <button type="button" class="rz-marke${Number(p[feld]) === 1 ? ' an' : ''}"
+        ${nurLesen ? 'disabled' : ''} aria-pressed="${Number(p[feld]) === 1}"
+        onclick="rmkUmschalten(${Number(p.id)},'${feld}')">${Number(p[feld]) === 1 ? 'ja' : 'nein'}</button>
+      ${warnung(p, feld, datumFeld)}</td>`).join('')}
+  </tr>`;
+
+  $('rmkInhalt').innerHTML = `
+    <div class="zone-note" style="margin-bottom:12px">Eigenschaften der Person, keine Profile:
+      Sie steuern, wofür jemand eingeteilt werden darf. Die Bewilligungsdaten selbst werden
+      weiter in der <b>Personalakte</b> gepflegt (Einsatz → Qualifikationen) — hier stehen sie
+      nur zur Kontrolle daneben.</div>
+    <div style="overflow:auto">
+      <table class="rz-tab">
+        <thead><tr><th>Person</th>${RV_MERKMALE
+          .map(([f]) => `<th title="${esc(rvMerkmalLabel(f).lang)}">${esc(rvMerkmalLabel(f).kurz)}</th>`)
+          .join('')}</tr></thead>
+        <tbody>${aktive.map(zeile).join('')}</tbody>
+      </table>
+    </div>
+    ${nurLesen ? `<div class="ki-hint web on" style="margin-top:14px"><span>
+      Du darfst die Einsatzmerkmale <b>ansehen</b>, aber nicht ändern — dafür braucht es
+      „Mitarbeitende: schreiben“.</span></div>` : ''}`;
+}
+
+function rmkUmschalten(maId, feld) {
+  const d = rvStand;
+  const person = d.personen.find(p => Number(p.id) === Number(maId));
+  if (!person) { return; }
+  rvFehler('rmkErr', '');
+  const vorher = Number(person[feld]) === 1 ? 1 : 0;
+  const neu = vorher ? 0 : 1;
+  person[feld] = neu;
+  rvMerkmaleZeichnen();
+
+  // Über den bestehenden Weg der Personalakte, nicht über einen zweiten:
+  // mitarbeiter_update.php lädt den Bestand und behält, was nicht
+  // mitgeschickt wird -- und schreibt dieselbe Zeile ins Logbuch wie eine
+  // Änderung in der Akte selbst.
+  api('mitarbeiter_update.php', { method: 'POST', body: { name: person.name, [feld]: neu } })
+    .then(({ ok, data }) => {
+      if (!ok || data.status !== 'ok') {
+        person[feld] = vorher;
+        rvMerkmaleZeichnen();
+        rvFehler('rmkErr', (data && data.message) || 'Nicht gespeichert.');
+      }
+    }).catch(() => {
+      person[feld] = vorher;
+      rvMerkmaleZeichnen();
+      rvFehler('rmkErr', 'Netzwerkfehler.');
+    });
+}
+
 // ── Login-Namen umstellen (ENT-381) ──────────────────────────────────────
-// Gleiche Berechtigung wie die Rollenvergabe (darf('rechte') == exklusiv
-// Verwaltung, siehe rollen_katalog() im Server) -- diese Karte aendert die
-// Anmeldung jeder Person, das ist kein geringeres Recht als Rollen zu
-// vergeben.
+// Gleiche Berechtigung wie die Rollenvergabe ('rechte_schreiben', siehe
+// bereiche_katalog() im Server) -- diese Karte aendert die Anmeldung jeder
+// Person, das ist kein geringeres Recht als Profile zu vergeben.
 let lmPlan = null;
 
 function lmSichtbarkeit() {
   const k = $('lmKarte');
-  if (k) { k.style.display = darf('rechte') ? '' : 'none'; }
+  if (k) { k.style.display = darf('rechte_schreiben') ? '' : 'none'; }
 }
 
 function lmFehler(text) {
@@ -26098,7 +26642,20 @@ const ROLLEN = [
   ['waechter', 'Wächtersystem',
    'Kontrollpunkte und Rundgang-Vorlagen pro Objekt pflegen, laufende und abgeschlossene Rundgänge einsehen, als Kontaktperson für den Alleinarbeiterschutz hinterlegbar.'],
 ];
-const rolleTitel = id => (ROLLEN.find(r => r[0] === id) || [id, id])[1];
+// Seit ENT-440 gibt es neben den fuenf Systemrollen eigene Profile. Sie
+// stehen in der Datenbank und koennen darum nicht in einer Liste im Browser
+// stehen -- PROFILE wird aus jeder Antwort nachgefuehrt, die sie mitliefert
+// (mitarbeiter_list.php, mitarbeiter_dossier.php, rollen_list.php).
+// ROLLEN oben bleibt der Rueckfall fuer den Zustand VOR der Einrichtung:
+// Dann gibt es die Tabellen noch nicht, und der Server antwortet mit genau
+// diesen fuenf.
+let PROFILE = ROLLEN.map(([schluessel, titel, text]) => ({ schluessel, titel, text, system: true }));
+function profileUebernehmen(liste) {
+  if (Array.isArray(liste) && liste.length) { PROFILE = liste; }
+}
+// Unbekannter Schluessel: den Schluessel zeigen, nicht nichts. Ein leeres
+// Feld saehe aus wie "keine Rolle" -- und das ist eine andere Aussage.
+const rolleTitel = id => (PROFILE.find(p => p.schluessel === id) || { titel: id }).titel;
 
 // Darf die angemeldete Person das? Spiegel von darf() auf dem Server --
 // AUSSCHLIESSLICH zum Ausblenden von Bedienelementen. Entschieden wird
@@ -26320,7 +26877,7 @@ function mbZeichnen() {
     // Nummer zu korrigieren, der Server zieht sie erst beim Speichern
     // (ma_personalnummer_generieren, ENT-387) und ein mitgeschicktes Feld
     // waere hier nur eine Eingabe, die still verworfen wuerde.
-    if (f === 'personalnummer' && !mbNeuModus && darf('rechte')) { gesperrt = false; }
+    if (f === 'personalnummer' && !mbNeuModus && darf('rechte_schreiben')) { gesperrt = false; }
     const id = 'mb_' + f;
     let steuer;
     if (typ === 'a') {
@@ -26421,11 +26978,14 @@ function mbNeuKonto() {
                       onclick="togglePw('mbNeuPass', this)">👁</button>
             </div></div>
         </div>
-        ${darf('rechte') ? `
+        ${darf('rechte_schreiben') ? `
         <div class="zone">
-          <div class="zone-hd">Rollen</div>
-          <div class="zone-note">Ohne Auswahl wird eine mitarbeitende Person angelegt —
-            die kleinste Rolle. Rechte entstehen nie aus Versehen.</div>
+          <div class="zone-hd">Profile</div>
+          <div class="zone-note">Die Profilwahl bleibt beim ANLEGEN hier stehen (ENT-440):
+            Ein neues Konto haette sonst bis zum ersten Besuch der Zuteilungsseite einen
+            unbestimmten Zustand. Ohne Auswahl wird eine mitarbeitende Person angelegt —
+            das kleinste Profil. Rechte entstehen nie aus Versehen. Geändert wird danach
+            zentral unter „Rollen &amp; Berechtigungen“.</div>
           <div class="ma-rollen">${mbRollenKaesten(['mitarbeitend'], 'mbNeuRolle_')}</div>
         </div>` : ''}
       </div>
@@ -26453,22 +27013,24 @@ function mbSpalten(bausteinFn, bereich) {
 // Der Kontoteil der Zugang-Karte. Er steht IN dieser Karte und nicht daneben:
 // Sprache, Ablaufdatum, Passwort und Abmeldung gehoeren zur selben Frage --
 // wer kommt hier womit rein.
-// Die Rollenkaestchen. Wer sie nicht vergeben darf, sieht die Rollen als
-// Marken -- nicht gar nichts: "keine Rolle" und "ich darf es nicht sehen"
-// sind verschiedene Aussagen.
+// Die Profile in der Akte -- seit ENT-440 nur noch als MARKEN, auch fuer
+// die Verwaltung. Zugeteilt wird zentral unter Einstellungen; ein zweiter
+// Bedienweg fuer dieselbe Sache waere eine zweite Stelle zum Pflegen und
+// zum Pruefen. Angezeigt bleibt es hier, weil man beim Oeffnen einer Akte
+// wissen will, was diese Person darf, ohne die Seite zu wechseln.
+//
+// Leer heisst nie leer: "keine Rolle" und "ich darf es nicht sehen" sind
+// verschiedene Aussagen und bekommen verschiedene Texte.
 function mbRollenBlock(gewaehlt, darfAendern, idVorsatz) {
-  if (!darfAendern) {
-    const marken = (gewaehlt.length ? gewaehlt : ['mitarbeitend'])
-      .map(r => `<span class="chip chip-n">${esc(rolleTitel(r))}</span>`).join(' ');
-    return `<dt>Rollen</dt><dd class="md-marken">${marken}</dd>`;
-  }
-  return '';
+  const marken = (gewaehlt.length ? gewaehlt : ['mitarbeitend'])
+    .map(r => `<span class="chip chip-n">${esc(rolleTitel(r))}</span>`).join(' ');
+  return `<dt>Profile</dt><dd class="md-marken">${marken}</dd>`;
 }
 
 function mbRollenKaesten(gewaehlt, idVorsatz) {
-  return ROLLEN.map(([id, titel, text]) => `
+  return PROFILE.map(({ schluessel, titel, text }) => `
     <label class="ma-rolle">
-      <input type="checkbox" id="${idVorsatz}${id}" ${gewaehlt.includes(id) ? 'checked' : ''}
+      <input type="checkbox" id="${idVorsatz}${schluessel}" ${gewaehlt.includes(schluessel) ? 'checked' : ''}
              onchange="mbRollenGeaendert()">
       <span><b>${esc(titel)}</b><small>${esc(text)}</small></span>
     </label>`).join('');
@@ -26476,7 +27038,7 @@ function mbRollenKaesten(gewaehlt, idVorsatz) {
 
 // Aus den Kaestchen die gewaehlten Rollen lesen.
 function mbRollenLesen(idVorsatz) {
-  return ROLLEN.map(r => r[0]).filter(id => {
+  return PROFILE.map(p => p.schluessel).filter(id => {
     const k = $(idVorsatz + id);
     return k && k.checked;
   });
@@ -26492,7 +27054,7 @@ function mbKonto(nachPasswort) {
   const selbst = m.name === (me && me.name);
   const rollen = Array.isArray(m.rollen) && m.rollen.length
     ? m.rollen : [Number(m.ist_admin) ? 'verwaltung' : 'mitarbeitend'];
-  const darfRollen = darf('rechte');
+  const darfRollen = darf('rechte_schreiben');
   return `
     <dl class="dl" style="margin-top:6px">
       <dt>Login-Name</dt><dd>${darfRollen ? `
@@ -26505,10 +27067,13 @@ function mbKonto(nachPasswort) {
     </dl>
     ${darfRollen ? `
     <div class="zone">
-      <div class="zone-hd">Rollen</div>
-      <div class="zone-note">Bestimmen, was diese Person im Werkzeug sehen und tun darf.
-        Mehrere sind möglich${selbst ? ' — die eigene Verwaltungsrolle lässt sich nicht wegnehmen, solange niemand sonst sie hat' : ''}.</div>
-      <div class="ma-rollen">${mbRollenKaesten(rollen, 'maRolle_')}</div>
+      <div class="zone-hd">Profile</div>
+      <div class="zone-note">Zugeteilt wird seit ENT-440 <b>zentral</b> unter
+        Administration → Einstellungen → „Rollen &amp; Berechtigungen“ — dort in einer Liste
+        für alle, statt in vierzig einzelnen Akten. Oben stehen sie zum Nachsehen.${selbst
+          ? ' Die eigene Berechtigung, Profile zu vergeben, lässt sich nicht wegnehmen, solange niemand sonst sie hat.' : ''}</div>
+      <button type="button" class="btn btn-plain btn-sm"
+              onclick="bkAbschnittZeigen('rv')">Zur zentralen Zuteilung</button>
     </div>` : ''}
     <div class="zone">
       <div class="zone-hd">Passwort</div>
@@ -26603,7 +27168,7 @@ function mbSpeichern() {
 
   if (mbNeuModus) {
     body.password = $('mbNeuPass').value || '';
-    if (darf('rechte')) { body.rollen = mbRollenLesen('mbNeuRolle_'); }
+    if (darf('rechte_schreiben')) { body.rollen = mbRollenLesen('mbNeuRolle_'); }
     // Der Login-Name kommt seit ENT-376 nicht mehr aus einem eigenen Feld,
     // sondern aus Vorname und Nachname -- der Server bildet ihn (und haengt
     // bei Namensgleichheit eine laufende Nummer an). Ohne beide laesst sich
@@ -26647,13 +27212,11 @@ function mbSpeichern() {
     // Rollen nur mitschicken, wenn die Kaestchen ueberhaupt dastehen --
     // sonst wuerde ein Speichern aus einer Rolle ohne Rechtevergabe die
     // vorhandenen Rollen mit einer leeren Liste ueberschreiben.
-    if (darf('rechte') && $('maRolle_mitarbeitend')) {
-      body.rollen = mbRollenLesen('maRolle_');
-      if (!body.rollen.length) {
-        scheitern('Mindestens eine Rolle muss gesetzt sein.', 'zugang');
-        return;
-      }
-    }
+    // Profile werden hier NICHT mehr mitgeschickt (ENT-440): Zugeteilt wird
+    // zentral unter Einstellungen. Der Server nimmt sie zwar weiterhin
+    // entgegen -- fuers Anlegen einer Person und fuer die zentrale Seite --,
+    // aber aus der Akte kommt nichts mehr, was hier still etwas anderes
+    // setzen koennte als das, was auf der Zuteilungsseite steht.
   }
 
   const knopf = $('mbSpeichern');

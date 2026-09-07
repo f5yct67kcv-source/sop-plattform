@@ -145,10 +145,20 @@ function require_session(): array {
     // Ohne die Tabelle -- Einrichtung noch nicht gelaufen -- faellt
     // rechte_rollen() auf den alten Stand zurueck, damit niemand ueber
     // Nacht ausgesperrt wird.
+    // Seit ENT-440 werden die Rollendefinitionen dazugeholt, statt sie aus
+    // dem Code zu nehmen: Es gibt neben den Systemrollen eigene Profile, und
+    // wer sie nicht mitliest, gaebe deren Traegern stillschweigend weniger
+    // Rechte, als ihnen zugeteilt wurde. Ohne die Tabellen liefert
+    // rollen_definitionen() genau den Code-Katalog zurueck -- derselbe
+    // Zustand wie vor dem Umbau.
     require_once __DIR__ . '/rechte.php';
     $row['rollen']    = rechte_rollen($pdo, (int)$row['id'], (bool)$row['ist_admin']);
-    $row['ist_admin'] = in_array(ROLLE_VERWALTUNG, $row['rollen'], true);
-    $row['rechte']    = rechte_aus_rollen($row['rollen']);
+    $rollenDefs       = rollen_definitionen($pdo);
+    $row['rechte']    = rechte_aus_rollen($row['rollen'], $rollenDefs);
+    // ist_admin spiegelt seit ENT-440 das Recht "Rollen vergeben" statt des
+    // Rollennamens -- ein eigenes Profil mit diesem Recht ist genauso
+    // Administration wie die Systemrolle Verwaltung (siehe rechte_setzen()).
+    $row['ist_admin'] = in_array('rechte_' . STUFE_SCHREIBEN, $row['rechte'], true);
 
     // Die kurzen Sitzungsfristen aus ENT-075 galten bisher nur fuer Admins.
     // Sie gehoeren aber an den Grund, aus dem sie kurz sind: Zugang zu

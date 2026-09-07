@@ -15,7 +15,15 @@ const EXE = browserPfad();
 const ok = [], bad = [];
 const check = (n, c) => (c ? ok : bad).push(n);
 
-const ALLE_RECHTE = ['plan', 'abgleich', 'kunden', 'personal_lesen', 'betrieb'];
+const ALLE_RECHTE = ['einsaetze_lesen', 'einsaetze_schreiben', 'objekte_lesen',
+      'objekte_schreiben', 'masterschichten_lesen',
+      'masterschichten_schreiben', 'verfuegbarkeit_lesen', 'fahrzeuge_lesen',
+      'abgleich_lesen', 'abgleich_schreiben', 'auslagen_lesen', 'kunden_lesen',
+      'kunden_schreiben', 'personal_lesen', 'personal_schreiben', 'abwesenheiten_lesen',
+      // Seit ENT-440 haengt "Mitarbeitenden erfassen" an der SCHREIB-Stufe:
+      // Der Weg oeffnet die Anlegemaske, und ein Weg, der auf eine gesperrte
+      // Maske fuehrt, ist schlimmer als keiner.
+      'betrieb_lesen', 'betrieb_schreiben', 'fahrzeuge_schreiben'];
 
 const browser = await chromium.launch({ executablePath: EXE });
 
@@ -121,7 +129,9 @@ for (const [titel, ziel, dialog] of ZIELE) {
 
 // ══════════════════════════════ RECHTE
 try {
-  const p = await seite(['plan']);
+  const p = await seite(['einsaetze_lesen', 'einsaetze_schreiben', 'objekte_lesen',
+  'objekte_schreiben', 'masterschichten_lesen',
+  'masterschichten_schreiben', 'verfuegbarkeit_lesen', 'fahrzeuge_lesen']);
   const b = await beschriftungen(p);
   check('KRITISCH: ohne das Recht "kunden" fehlt "Kunde erfassen"', !b.includes('Kunde erfassen'));
   check('KRITISCH: ohne das Recht "abgleich" fehlt "Schichten abgleichen"', !b.includes('Schichten abgleichen'));
@@ -131,7 +141,9 @@ try {
 
   // Auch der Aufruf von Hand darf nicht durch: Die Oberflaeche ist nicht die
   // Sperre, aber sie soll auch nicht daran vorbeiführen.
-  const q = await seite(['plan']);
+  const q = await seite(['einsaetze_lesen', 'einsaetze_schreiben', 'objekte_lesen',
+  'objekte_schreiben', 'masterschichten_lesen',
+  'masterschichten_schreiben', 'verfuegbarkeit_lesen', 'fahrzeuge_lesen']);
   const vorher = await q.textContent('#pgTitle');
   await q.evaluate(() => {
     const i = KURZWAHL.findIndex(e => e.recht === 'kunden');
@@ -146,7 +158,8 @@ try {
   // dem Recht "betrieb": Es oeffnet das Dashboard, traegt aber keinen der
   // acht Wege. Ein Konto ganz ohne Rechte kaeme hier gar nicht an -- enter()
   // leitet es in die App weiter.
-  const r = await seite(['betrieb']);
+  const r = await seite(['betrieb_lesen', 'betrieb_schreiben', 'fahrzeuge_lesen',
+  'fahrzeuge_schreiben']);
   const txt = (await r.textContent('#kwGrid')).replace(/\s+/g, ' ');
   check('KRITISCH: ohne jedes Recht steht da, dass es an der Rolle liegt',
     /Keine Kurzbefehle freigegeben/.test(txt) && /Rolle/.test(txt));

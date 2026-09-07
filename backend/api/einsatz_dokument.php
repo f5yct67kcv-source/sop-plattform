@@ -38,7 +38,7 @@ const DOK_MAX = 4 * 1024 * 1024;
  * geratener Nummer fremde Unterlagen abrufen.
  */
 function dok_zugriff(PDO $pdo, array $user, int $einsatzId): bool {
-    if (darf($user, 'plan')) { return true; }
+    if (darf($user, 'einsaetze_lesen')) { return true; }
     $s = $pdo->prepare('SELECT 1 FROM einsatz_zuteilung WHERE einsatz_id = ? AND mitarbeiter_id = ?');
     $s->execute([$einsatzId, (int)$user['id']]);
     return (bool)$s->fetchColumn();
@@ -90,7 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 // Anhaengen und Entfernen ist Planung, nicht Ansehen.
-require_recht($user, 'plan');
+require_recht_nach_methode($user, 'einsaetze');
 
 $in = json_decode(file_get_contents('php://input') ?: '[]', true) ?: [];
 $aktion = (string)($in['aktion'] ?? '');

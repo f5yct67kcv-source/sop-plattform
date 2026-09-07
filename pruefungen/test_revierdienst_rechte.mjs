@@ -71,7 +71,8 @@ const browser = await chromium.launch({ executablePath: browserPfad() });
 // ══════════ DER ENTSCHEIDENDE FALL: NUR WAECHTER-RECHTE
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 page.on('pageerror', e => bad.push('JS-Fehler: ' + e.message));
-await anmelden(page, ['rundgang_verwalten', 'rundgang_einsehen', 'alarmempfaenger']);
+await anmelden(page, ['kontrollpunkte_lesen', 'kontrollpunkte_schreiben', 'rundgaenge_lesen',
+  'rundgaenge_schreiben', 'alarmempfaenger_lesen']);
 
 // Die Rechte-Sichtbarkeit wird am Element gemessen, nicht am Klick: Die
 // Kinder liegen in einer eingeklappten Gruppe, ein fehlgeschlagener Klick

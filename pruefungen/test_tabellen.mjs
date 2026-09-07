@@ -93,8 +93,14 @@ const rundgaenge = Array.from({ length: 3 }, (_, i) => ({
 function antwort(pfad) {
   if (pfad.includes('login')) return { status: 'ok', token: 't', name: 'adrian', ist_admin: true };
   if (pfad.includes('me')) return { status: 'ok', name: 'adrian', ist_admin: true, rollen: [],
-    rechte: ['kunden', 'abgleich', 'plan', 'personal', 'personal_vertraulich', 'verwaltung',
-             'revierdienst', 'auswertung', 'betrieb'] };
+    rechte: ['kunden_lesen', 'kunden_schreiben', 'abgleich_lesen',
+      'abgleich_schreiben', 'auslagen_lesen', 'einsaetze_lesen',
+      'einsaetze_schreiben', 'objekte_lesen', 'objekte_schreiben',
+      'masterschichten_lesen', 'masterschichten_schreiben',
+      'verfuegbarkeit_lesen', 'fahrzeuge_lesen', 'personal_lesen',
+      'personal_schreiben', 'personal_vertraulich_lesen',
+      'personal_vertraulich_schreiben', 'revierdienst', 'auswertung',
+      'betrieb_lesen', 'betrieb_schreiben', 'fahrzeuge_schreiben'] };
   return { status: 'ok', kunden, objekte, mitarbeiter, rapporte, einsaetze, belege, rundgaenge,
     naechste_kundennummer: 'K0007', eingegrenzt: false,
     produkte: Array.from({ length: 3 }, (_, i) => ({ id: i + 1, nummer: 'L-' + (i + 1),

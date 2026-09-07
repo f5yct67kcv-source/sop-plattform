@@ -13,7 +13,7 @@ require_once __DIR__ . '/../mitteilungen.php';
 require_once __DIR__ . '/../push.php';
 
 $user = require_session();
-require_recht($user, 'mitteilungen');
+require_recht($user, 'mitteilungen_lesen');
 
 $pdo = db();
 if (!hat_tabelle($pdo, 'mitteilungen')) {

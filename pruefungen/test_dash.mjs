@@ -72,7 +72,11 @@ async function setup(page, { admin = true } = {}) {
     // unbeantwortet (me === null), rechteAnwenden() lief darum nie und die
     // Navigation stand offen -- der Mock muss das jetzt aktiv nachbilden.
     if (url.includes('me.php'))               return send({ status: 'ok', name: 'adrian', ist_admin: admin, rollen: [],
-      rechte: admin ? ['kunden', 'abgleich', 'personal_lesen', 'betrieb', 'plan'] : [] });
+      rechte: admin ? ['kunden_lesen', 'kunden_schreiben', 'abgleich_lesen', 'abgleich_schreiben',
+        'auslagen_lesen', 'personal_lesen', 'abwesenheiten_lesen', 'betrieb_lesen', 'betrieb_schreiben',
+        'fahrzeuge_lesen', 'fahrzeuge_schreiben', 'einsaetze_lesen', 'einsaetze_schreiben',
+        'objekte_lesen', 'objekte_schreiben', 'masterschichten_lesen', 'masterschichten_schreiben',
+        'verfuegbarkeit_lesen'] : [] });
     if (url.includes('dashboard_stats.php'))  return send(STATS);
     if (url.includes('rapport_list.php'))     return send(RAPPORTE);
     if (url.includes('mitarbeiter_list.php')) return send(MA);

@@ -56,11 +56,16 @@ $rows = array_map(function ($r) use ($rollenKarte) {
 
 json_response(['status' => 'ok', 'mitarbeiter' => $rows, 'listen' => $listen,
     'darf_aendern' => darf($user, 'personal_schreiben'),
-    'darf_rollen'  => darf($user, 'rechte'),
+    'darf_rollen'  => darf($user, 'rechte_schreiben'),
     // Ohne die Rollentabelle liefert rechte_rollen_alle() nichts, und jede
     // Person bekommt oben den Rueckfallwert aus ist_admin. Das SIEHT AUS
     // wie ein echter Rollenstand -- ist aber nur eine Notannahme. Die
     // Oberflaeche muss den Unterschied hinschreiben koennen, sonst wirkt
     // eine nicht gelaufene Einrichtung wie eine erledigte.
+    // Die Profile mit Namen (ENT-440). Ohne sie muesste die Oberflaeche die
+    // Titel aus einer eigenen Liste holen -- die kennt aber nur die fuenf
+    // Systemrollen und wuerde jedes eigene Profil als rohen Schluessel
+    // anzeigen ("disposition_2" statt "Disposition ohne Kundenpflege").
+    'profile' => rollen_kurzliste($pdo),
     'rollen_eingerichtet' => rechte_tabelle_da($pdo),
     'eingerichtet' => array_key_exists('ahv_nr', $vorhanden)]);

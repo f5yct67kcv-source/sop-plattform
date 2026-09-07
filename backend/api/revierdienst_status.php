@@ -31,7 +31,7 @@ require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../rechte.php';
 
 $user = require_session();
-require_recht($user, 'rundgang_einsehen');
+require_recht($user, 'rundgaenge_lesen');
 
 $heute = date('Y-m-d');
 $pdo = db();

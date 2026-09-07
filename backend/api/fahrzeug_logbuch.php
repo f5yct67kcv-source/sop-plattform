@@ -21,7 +21,7 @@ require_once __DIR__ . '/../rechte.php';
 require_once __DIR__ . '/../logbuch.php';
 
 $user = require_session();
-require_recht($user, 'betrieb');
+require_recht($user, 'fahrzeuge_lesen');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     json_response(['status' => 'error', 'message' => 'nur GET'], 405);

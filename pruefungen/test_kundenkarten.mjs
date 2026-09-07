@@ -66,7 +66,13 @@ const mock = page => page.route('**/api/**', r => {
   const send = x => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(x) });
   if (u.includes('login')) return send({ status: 'ok', token: 't', name: 'adrian', ist_admin: true });
   if (u.includes('me.php')) return send({ status: 'ok', name: 'adrian', ist_admin: true, rollen: [],
-    rechte: ['kunden', 'abgleich', 'personal_lesen', 'betrieb', 'plan'] });
+    rechte: ['kunden_lesen', 'kunden_schreiben', 'abgleich_lesen',
+      'abgleich_schreiben', 'auslagen_lesen', 'personal_lesen',
+      'abwesenheiten_lesen', 'betrieb_lesen', 'betrieb_schreiben',
+      'fahrzeuge_lesen', 'fahrzeuge_schreiben', 'einsaetze_lesen',
+      'einsaetze_schreiben', 'objekte_lesen', 'objekte_schreiben',
+      'masterschichten_lesen', 'masterschichten_schreiben',
+      'verfuegbarkeit_lesen'] });
   if (u.includes('rapport_list')) return send(RAP);
   if (u.includes('beleg_list')) return send(BEL);
   // Das PDF darf NICHT aus der Liste gebaut werden: belege[] traegt nur die

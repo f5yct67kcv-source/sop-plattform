@@ -20,7 +20,7 @@ require_once __DIR__ . '/../rechte.php';
 require __DIR__ . '/../mitarbeiter.php';
 
 $user = require_session();
-require_recht($user, 'rechte');
+require_recht($user, 'rechte_schreiben');
 $methode = $_SERVER['REQUEST_METHOD'];
 if ($methode !== 'GET' && $methode !== 'POST') {
     json_response(['status' => 'error', 'message' => 'nur GET oder POST'], 405);

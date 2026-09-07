@@ -5,7 +5,7 @@ require_once __DIR__ . '/../rechte.php';
 require_once __DIR__ . '/../planung.php';   // einsatz_vollstaendig_rapportiert()
 
 $user = require_session();
-require_recht($user, 'abgleich');
+require_recht($user, 'abgleich_schreiben');
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(['status' => 'error', 'message' => 'nur POST'], 405);
 }

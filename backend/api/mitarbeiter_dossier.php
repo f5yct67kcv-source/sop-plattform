@@ -54,7 +54,7 @@ unset($row['password_hash']);
 // leeres Feld sieht aus wie "nicht erfasst", und "unbekannt" darf nie
 // aussehen wie "keine". Die Oberflaeche erfaehrt ueber "vertraulich",
 // woran sie ist, und schreibt hin, dass etwas ausgeblendet wurde.
-$darfVertraulich = darf($user, 'personal_vertraulich');
+$darfVertraulich = darf($user, 'personal_vertraulich_lesen');
 if (!$darfVertraulich) {
     foreach (ma_vertrauliche_felder() as $feld) { unset($row[$feld]); }
 }
@@ -65,5 +65,10 @@ $row['rollen'] = rechte_rollen($pdo, (int)$row['id'], (bool)$row['ist_admin']);
 json_response(['status' => 'ok', 'mitarbeiter' => $row,
     'vertraulich' => $darfVertraulich,
     'darf_aendern' => darf($user, 'personal_schreiben'),
-    'darf_rollen'  => darf($user, 'rechte'),
+    'darf_rollen'  => darf($user, 'rechte_schreiben'),
+    // Die Profile mit Namen (ENT-440). Ohne sie muesste die Oberflaeche die
+    // Titel aus einer eigenen Liste holen -- die kennt aber nur die fuenf
+    // Systemrollen und wuerde jedes eigene Profil als rohen Schluessel
+    // anzeigen ("disposition_2" statt "Disposition ohne Kundenpflege").
+    'profile' => rollen_kurzliste($pdo),
     'eingerichtet' => in_array('ahv_nr', $felder, true)]);

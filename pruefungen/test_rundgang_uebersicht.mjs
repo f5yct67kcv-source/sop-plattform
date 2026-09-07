@@ -300,7 +300,7 @@ await page.screenshot({ path: `${OUT}/rg-uebersicht-02-mobil.png` });
 await page.setViewportSize({ width: 1440, height: 1000 });
 
 // ══════════ OHNE JEDES RECHT: WEDER "KONTROLLE" NOCH "REVIERDIENST"
-await setup(page, ['kunden']);
+await setup(page, ['kunden_lesen', 'kunden_schreiben']);
 await anmelden();
 check('KRITISCH: ohne plan erscheint die Gruppe "Kontrolle" gar nicht',
   !(await page.isVisible('#navg-kontrolle')));
@@ -311,7 +311,8 @@ check('KRITISCH: ohne rundgang_verwalten/-einsehen erscheint die Gruppe "Revierd
 // ABER NUR MIT DER KACHEL "ÜBERSICHT" -- "EINRICHTUNG" BLEIBT VERBORGEN,
 // UND "KONTROLLE" BLEIBT OHNE "PLAN" WEITERHIN GANZ VERBORGEN (ENT-224: das
 // war vorher anders, als Rundgaenge noch zu "Kontrolle" gehoerte, ENT-193).
-await setup(page, ['kunden', 'rundgang_einsehen']);
+await setup(page, ['kunden_lesen', 'kunden_schreiben', 'rundgaenge_lesen',
+  'rundgaenge_schreiben']);
 await anmelden();
 check('KRITISCH: ohne plan bleibt die Gruppe "Kontrolle" verborgen (seit ENT-224 kein Sonderfall mehr)',
   !(await page.isVisible('#navg-kontrolle')));
@@ -331,14 +332,31 @@ check('KRITISCH: "Einrichtung" bleibt ohne das Recht "rundgang_verwalten" verbor
 
 // ══════════ MIT plan, ABER OHNE rundgang_einsehen/-verwalten: WIE VORHER,
 // KEINE REGRESSION AN "KONTROLLE"; "REVIERDIENST" BLEIBT VERBORGEN
-await setup(page, ['plan', 'kunden']);
+await setup(page, ['einsaetze_lesen', 'einsaetze_schreiben', 'objekte_lesen',
+  'objekte_schreiben', 'masterschichten_lesen',
+  'masterschichten_schreiben', 'verfuegbarkeit_lesen', 'fahrzeuge_lesen',
+  'kunden_lesen', 'kunden_schreiben']);
 await anmelden();
 check('Mit plan bleibt "Kontrolle" sichtbar (bestehendes Verhalten unveraendert)',
   await page.isVisible('#navg-kontrolle'));
 await page.click('#nav-kontrolle');
 await page.waitForTimeout(150);
 check('"Pensen" bleibt wie bisher sichtbar', await page.isVisible('#nav-kontrolle-pensen'));
-check('"Auslagenersatz" bleibt wie bisher sichtbar', await page.isVisible('#nav-kontrolle-auslagen'));
+// "Auslagenersatz" haengt seit ENT-440 an SEINEM eigenen Recht statt am
+// Planungsrecht. Das ist keine Verschaerfung, sondern die Behebung einer
+// stillen Ungereimtheit: Der Menuepunkt stand bisher schon mit dem
+// Planungsrecht da, obwohl auslagen_list.php dahinter das Abgleichsrecht
+// verlangte -- wer nur plante, klickte auf einen Punkt, der ihn abwies.
+check('KRITISCH: "Auslagenersatz" braucht jetzt SEIN Recht, nicht mehr nur das Planungsrecht',
+  !(await page.isVisible('#nav-kontrolle-auslagen')));
+await setup(page, ['einsaetze_lesen', 'einsaetze_schreiben', 'objekte_lesen',
+  'objekte_schreiben', 'masterschichten_lesen', 'masterschichten_schreiben',
+  'verfuegbarkeit_lesen', 'fahrzeuge_lesen', 'kunden_lesen', 'kunden_schreiben',
+  'abgleich_lesen', 'auslagen_lesen']);
+await anmelden();
+await page.click('#nav-kontrolle');
+await page.waitForTimeout(150);
+check('Mit dem Auslagenrecht steht der Punkt da', await page.isVisible('#nav-kontrolle-auslagen'));
 check('KRITISCH: ohne rundgang_verwalten/-einsehen bleibt "Revierdienst" verborgen',
   !(await page.isVisible('#navg-revierdienst')));
 

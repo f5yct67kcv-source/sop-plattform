@@ -8,7 +8,7 @@ require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../rechte.php';
 
 $user = require_session();
-require_recht($user, 'rundgang_verwalten');
+require_recht($user, 'kontrollpunkte_lesen');
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     json_response(['status' => 'error', 'message' => 'nur GET'], 405);
 }

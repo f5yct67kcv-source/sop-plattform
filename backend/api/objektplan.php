@@ -13,7 +13,7 @@ require_once __DIR__ . '/../rechte.php';
 require __DIR__ . '/../planung.php';
 
 $user = require_session();
-require_recht($user, 'plan');
+require_recht($user, 'objekte_lesen');
 
 $objektId = (int)($_GET['objekt_id'] ?? 0);
 $von = trim((string)($_GET['von'] ?? ''));

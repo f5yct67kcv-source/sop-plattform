@@ -18,7 +18,7 @@ require_once __DIR__ . '/../rundgang.php';
 require __DIR__ . '/../mailer.php';
 
 $user = require_session();
-require_recht($user, 'rundgang_einsehen');
+require_recht($user, 'rundgaenge_schreiben');
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(['status' => 'error', 'message' => 'nur POST'], 405);
 }

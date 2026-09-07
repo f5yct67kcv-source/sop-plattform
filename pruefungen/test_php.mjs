@@ -194,8 +194,17 @@ check('KRITISCH: eine manuelle Personalnummer-Aenderung laeuft durch dieselbe Fo
   /ma_personalnummer_gueltig\s*\(/.test(updateOhneKommentar));
 check('KRITISCH: eine manuelle Login-Namen-Aenderung laeuft durch dieselbe Formpruefung wie die automatische Bildung',
   /ma_login_name_gueltig\s*\(/.test(updateOhneKommentar));
-check('KRITISCH: beide manuellen Aenderungen verlangen das Recht "rechte" (dieselbe Schwelle wie Rollenvergabe und "Login-Namen umstellen")',
-  (updateOhneKommentar.match(/darf\(\$user,\s*'rechte'\)/g) || []).length >= 3);
+// Geprueft wird die AUSSAGE, nicht der Wortlaut (ENT-440 hat die Rechte
+// umbenannt): Personalnummer, Login-Name und Profile haengen alle drei am
+// SELBEN Recht, und zwar an der Schreibstufe des Bereichs "Rollen &
+// Berechtigungen". Ein Test auf den festen Namen 'rechte' waere beim
+// naechsten Umbau gruen geblieben, waehrend die Sperre verschwindet.
+const updateRechte = [...updateOhneKommentar.matchAll(/darf\(\$user,\s*'([a-z_]+)'\)/g)].map(m => m[1]);
+const rollenRecht = updateRechte.filter(r => /^rechte_/.test(r));
+check('KRITISCH: alle drei manuellen Aenderungen haengen am selben Recht wie die Profilvergabe',
+  rollenRecht.length >= 3 && new Set(rollenRecht).size === 1);
+check('KRITISCH: und das ist eine SCHREIB-Stufe, nicht blosses Lesen',
+  /_schreiben$/.test(rollenRecht[0] || ''));
 check('KRITISCH: nach einer manuellen Login-Namen-Aenderung werden die Sitzungen dieser Person beendet -- wie bei "Login-Namen umstellen"',
   /DELETE FROM sessions WHERE mitarbeiter_id/.test(updateOhneKommentar));
 
@@ -619,7 +628,11 @@ const ohnePruefung = apiDateien.filter(f => {
   const q = ohneKommentar(f);
   if (!/require_session\s*\(/.test(q)) { return false; }   // login.php u.ae.
   if (NUR_EIGENE_DATEN.includes(f)) { return false; }
-  return !/(require_recht|require_verwaltung)\s*\(/.test(q);
+  // require_recht_nach_methode() (ENT-440) prueft je HTTP-Methode die
+  // Lese- oder die Schreibstufe -- es ist dieselbe Pruefstelle, nur mit
+  // der Stufe aus der Methode. Ohne den Namenszusatz hier haetten die
+  // vier Endpunkte, die lesen UND schreiben, als ungeprueft gegolten.
+  return !/(require_recht\w*|require_verwaltung)\s*\(/.test(q);
 });
 check('KRITISCH: jeder Endpunkt prueft Rechte oder steht als Ausnahme benannt da',
   ohnePruefung.length === 0);

@@ -10,7 +10,7 @@ require_once __DIR__ . '/../rechte.php';
 require __DIR__ . '/../mitarbeiter.php';
 
 $user = require_session();
-require_recht($user, 'betrieb');
+require_recht($user, 'betrieb_schreiben');
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(['status' => 'error', 'message' => 'nur POST'], 405);
 }

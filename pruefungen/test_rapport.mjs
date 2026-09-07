@@ -35,7 +35,7 @@ const LISTE = readFileSync(`${WURZEL}/backend/api/rundgang_liste.php`, 'utf8');
 const FOTO = readFileSync(`${WURZEL}/backend/api/rundgang_scan_foto.php`, 'utf8');
 const RG = readFileSync(`${WURZEL}/backend/rundgang.php`, 'utf8');
 check('KRITISCH: der Fotobeleg wird nur mit dem Auswertungsrecht ausgeliefert',
-  /require_recht\(\$user, 'rundgang_einsehen'\)/.test(FOTO));
+  /require_recht\(\$user, 'rundgaenge_lesen'\)/.test(FOTO));
 // Der Mimetyp stammt aus der Prüfung beim Speichern (erste Bytes), nicht aus
 // einer Angabe des Absenders -- er darf ohne weitere Prüfung gesetzt werden.
 check('Der Mimetyp kommt aus der Datenbank, nicht aus der Anfrage',
@@ -71,7 +71,7 @@ check('Die Detailansicht rechnet nach derselben Funktion',
 
 // ══════════ SERVER: DER VERSAND ═══════════════════════════════════════
 check('KRITISCH: der Versand prüft ein Recht',
-  /require_recht\(\$user, 'rundgang_einsehen'\)/.test(VERSAND));
+  /require_recht\(\$user, 'rundgaenge_schreiben'\)/.test(VERSAND));
 check('KRITISCH: die Empfängeradresse wird serverseitig geprüft',
   /FILTER_VALIDATE_EMAIL/.test(VERSAND));
 // Was der Client als Dateityp behauptet, laesst sich frei setzen -- was in

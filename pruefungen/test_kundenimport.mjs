@@ -220,7 +220,7 @@ check('KRITISCH: die gebaute Zeile hat einen Namen -- sonst weist der Server sie
 // ══════════════ SERVERSEITIGE ZUSICHERUNGEN
 const php = readFileSync(`${WURZEL}/backend/api/kunden_import.php`, 'utf8');
 check('SERVER: der Import braucht das Kundenrecht (ENT-077)',
-  /require_recht\(\$user, 'kunden'\)/.test(php));
+  /require_recht\(\$user, 'kunden_schreiben'\)/.test(php));
 check('SERVER: nur POST', /nur POST/.test(php) && /405/.test(php));
 check('KRITISCH: keine zweite Speicherlogik, dieselbe wie beim Anlegen von Hand',
   /kunden_eingabe_lesen/.test(php));

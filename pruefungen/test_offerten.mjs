@@ -116,7 +116,15 @@ await page.route('**/api/**', async route => {
   const send = b => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) });
   if (url.includes('login.php')) return send({ status: 'ok', token: 't', name: 'adrian', ist_admin: true });
   if (url.includes('me.php')) return send({ status: 'ok', name: 'adrian', ist_admin: true, rollen: [],
-    rechte: ['kunden', 'abgleich', 'personal_lesen', 'betrieb', 'plan', 'offerten', 'rechte'] });
+    rechte: ['kunden_lesen', 'kunden_schreiben', 'abgleich_lesen',
+      'abgleich_schreiben', 'auslagen_lesen', 'personal_lesen',
+      'abwesenheiten_lesen', 'betrieb_lesen', 'betrieb_schreiben',
+      'fahrzeuge_lesen', 'fahrzeuge_schreiben', 'einsaetze_lesen',
+      'einsaetze_schreiben', 'objekte_lesen', 'objekte_schreiben',
+      'masterschichten_lesen', 'masterschichten_schreiben',
+      'verfuegbarkeit_lesen', 'offerten_lesen', 'offerten_schreiben',
+      'leistungen_lesen', 'leistungen_schreiben', 'rechte_lesen',
+      'rechte_schreiben', 'logbuch_lesen'] });
   if (url.includes('produkt_list')) return send({ status: 'ok', produkte: produkteAktuell });
   if (url.includes('produkt_speichern')) {
     const body = JSON.parse(route.request().postData() || '{}');
@@ -593,7 +601,10 @@ check('KRITISCH: keine Element-Id kommt zweimal vor'
 // ══════════════════════════════════════════════════════════════════════════
 // TEIL 6 — Rechte und Handy
 // ══════════════════════════════════════════════════════════════════════════
-await page.evaluate(() => { me.rechte = ['kunden', 'plan']; rechteAnwenden(); });
+await page.evaluate(() => { me.rechte = ['kunden_lesen', 'kunden_schreiben', 'einsaetze_lesen',
+  'einsaetze_schreiben', 'objekte_lesen', 'objekte_schreiben',
+  'masterschichten_lesen', 'masterschichten_schreiben',
+  'verfuegbarkeit_lesen', 'fahrzeuge_lesen']; rechteAnwenden(); });
 await page.waitForTimeout(200);
 check('KRITISCH: ohne das Recht "offerten" verschwindet der Offerten-Eintrag',
   await page.evaluate(() => document.getElementById('nav-kunden-offerten').style.display === 'none'));
@@ -601,7 +612,13 @@ check('KRITISCH: ohne das Recht verschwindet auch der Produkte-Eintrag',
   await page.evaluate(() => document.getElementById('nav-admin-produkte').style.display === 'none'));
 check('Der Kundenstamm bleibt trotzdem erreichbar — die Trennung ist der Sinn des Rechts',
   await page.evaluate(() => document.getElementById('navg-kunden').style.display !== 'none'));
-await page.evaluate(() => { me.rechte = ['kunden', 'plan', 'offerten', 'betrieb', 'personal_lesen']; rechteAnwenden(); });
+await page.evaluate(() => { me.rechte = ['kunden_lesen', 'kunden_schreiben', 'einsaetze_lesen',
+  'einsaetze_schreiben', 'objekte_lesen', 'objekte_schreiben',
+  'masterschichten_lesen', 'masterschichten_schreiben',
+  'verfuegbarkeit_lesen', 'fahrzeuge_lesen', 'offerten_lesen',
+  'offerten_schreiben', 'leistungen_lesen', 'leistungen_schreiben',
+  'betrieb_lesen', 'betrieb_schreiben', 'fahrzeuge_schreiben',
+  'personal_lesen', 'abwesenheiten_lesen']; rechteAnwenden(); });
 await page.waitForTimeout(200);
 
 // Kein horizontaler Seiten-Scroll -- die Positionszeile hat sieben Felder
