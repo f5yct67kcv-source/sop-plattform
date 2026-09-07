@@ -292,6 +292,21 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
     <p class="fehler" id="fehler-passwort" hidden></p>
   </div>
 
+  <!-- Bestaetigung nach dem Setzen des Passworts. Sie steht ausdruecklich
+       zwischen Setzen und Uebersicht: Wer sein Passwort gerade festgelegt
+       hat, soll es bestaetigt bekommen und nicht raten muessen, ob es
+       gespeichert wurde -- die Uebersicht allein sagt darueber nichts. -->
+  <div class="karte" id="pw-fertig" hidden style="text-align:center">
+    <div style="font-size:34px;line-height:1;margin-bottom:12px" aria-hidden="true">✓</div>
+    <div class="wert" style="font-size:17px">Ihr Passwort ist gesetzt.</div>
+    <p class="hinweis" style="margin-top:8px">
+      Ab jetzt melden Sie sich mit Ihrer E-Mail-Adresse und diesem Passwort an —
+      ohne Code.</p>
+    <div class="knopfzeile" style="justify-content:center">
+      <button class="knopf" id="pw-weiter">Weiter zur Übersicht</button>
+    </div>
+  </div>
+
   <!-- Abmeldebestaetigung. Ohne sie stand nach dem Abmelden sofort wieder
        die Anmeldemaske da -- das sieht aus, als sei etwas schiefgegangen,
        und man weiss nicht, ob man die Seite jetzt schliessen kann. -->
@@ -359,7 +374,7 @@ const LEER = {
 let token = null;
 
 const SCHRITTE = ['schritt-adresse', 'schritt-code', 'schritt-passwort',
-                 'abgemeldet', 'inhalt'];
+                 'pw-fertig', 'abgemeldet', 'inhalt'];
 
 function zeige(welche) {
   for (const id of SCHRITTE) { $(id).hidden = (id !== welche); }
@@ -489,6 +504,12 @@ $('pw-speichern').addEventListener('click', async () => {
     return;
   }
   $('pw-neu').value = ''; $('pw-neu2').value = '';
+  // Erst die Bestaetigung, dann die Uebersicht -- nicht umgekehrt und nicht
+  // beides auf einmal.
+  zeige('pw-fertig');
+});
+
+$('pw-weiter').addEventListener('click', () => {
   zeige('inhalt');
   laden();
 });

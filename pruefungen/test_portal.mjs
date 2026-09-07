@@ -378,7 +378,20 @@ await page.waitForTimeout(300);
       && rumpf.zugang_id === undefined && rumpf.kunde_id === undefined);
   }
 }
-check('Nach dem Setzen geht es in die Liste', await page.isVisible('#inhalt'));
+// KRITISCH: Erst die Bestaetigung, dann die Uebersicht. Wer sein Passwort
+// gerade festgelegt hat, soll es bestaetigt bekommen -- die Uebersicht
+// allein sagt darueber nichts, und man wuesste nicht, ob es gespeichert ist.
+check('KRITISCH: nach dem Setzen kommt eine Bestätigung, nicht sofort die Liste',
+  await page.isVisible('#pw-fertig') && !(await page.isVisible('#inhalt')));
+const pwtext = await page.textContent('#pw-fertig');
+check('KRITISCH: die Bestätigung sagt, dass das Passwort gesetzt ist',
+  /Passwort ist gesetzt/.test(pwtext));
+check('Und sie sagt, was das für die nächste Anmeldung bedeutet',
+  /ohne Code/.test(pwtext));
+await page.screenshot({ path: `${OUT}/portal-06-passwort-gesetzt.png` });
+await klick('#pw-weiter');
+await page.waitForTimeout(250);
+check('Von dort geht es in die Liste', await page.isVisible('#inhalt'));
 passwortNoetig = false;
 
 calls = [];

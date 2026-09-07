@@ -6118,6 +6118,7 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
             Neuer Zugang
           </button>
         </div>
+        <div class="msg-err" id="kzHinweis" style="display:none;margin-bottom:12px"></div>
         <div class="card"><div class="card-bd flush"><div class="tw" id="kzTable"></div></div></div>
       </section>
 
@@ -10971,6 +10972,12 @@ let kundenzugaenge = [];
 // Drei Zustaende, nicht zwei: geladen, noch nicht geladen, und "Einrichtung
 // ist nicht gelaufen". Der letzte darf nie wie "keine Zugaenge" aussehen.
 let kzEingerichtet = null;
+// Und ein VIERTER, der beim Ausrollen von ENT-444 tatsaechlich aufgetreten
+// ist: Die Tabellen sind da, die Passwortspalte fehlt. Dann laeuft das
+// Portal -- aber jeder Kunde braucht weiterhin bei JEDER Anmeldung einen
+// Code, und im Cockpit war davon nichts zu sehen. Ein Zustand, den niemand
+// bemerkt, wird auch nicht behoben.
+let kzPasswortBereit = true;
 
 function kzLaden() {
   $('kzTable').innerHTML = '<div class="leer">…</div>';
@@ -10984,11 +10991,25 @@ function kzLaden() {
     }
     kundenzugaenge = data.zugaenge || [];
     kzEingerichtet = data.eingerichtet !== false;
+    kzPasswortBereit = data.passwort_bereit !== false;
     kzZeichnen();
   });
 }
 
 function kzZeichnen() {
+  // Der Hinweis steht UEBER der Liste und nicht als Fussnote: Er erklaert,
+  // warum Kunden weiterhin jedes Mal einen Code brauchen, und das ist die
+  // erste Frage, die jemand hier hat.
+  const hinweis = $('kzHinweis');
+  if (hinweis) {
+    const fehlt = kzEingerichtet && !kzPasswortBereit;
+    hinweis.style.display = fehlt ? '' : 'none';
+    if (fehlt) {
+      hinweis.textContent = 'Die Passwortvergabe ist noch nicht eingerichtet — '
+        + 'Kunden brauchen darum bei jeder Anmeldung einen Code. '
+        + 'Unten links „Einrichtung" öffnen und „Prüfen und einrichten" ausführen.';
+    }
+  }
   const q = ($('kzQ').value || '').trim().toLowerCase();
   const liste = kundenzugaenge.filter(z => !q
     || (z.kunde_name + ' ' + z.name + ' ' + z.email).toLowerCase().includes(q));
