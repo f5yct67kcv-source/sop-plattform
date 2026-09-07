@@ -82,6 +82,19 @@ const lage = page => page.evaluate(() => {
     // Richtungsangabe kann von einer spaeteren Regel ueberschrieben sein.
     untereinander: knoepfe[1].getBoundingClientRect().top > knoepfe[0].getBoundingClientRect().bottom - 1,
     quer: document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
+    // Reserviert der Inhalt unten Platz fuer die Reiterleiste? Am Handy MUSS
+    // er das (die Leiste liegt darueber), am Schreibtisch DARF er es nicht
+    // (dort steht sie links). Gegen die tatsaechliche Leistenhoehe gemessen
+    // und nicht gegen eine abgeschriebene Zahl -- sonst prueft der Test die
+    // Formulierung statt die Aussage.
+    polsterUnten: Math.round(parseFloat(getComputedStyle(main).paddingBottom)),
+    polsterSeite: Math.round(parseFloat(getComputedStyle(main).paddingLeft)),
+    // NICHT t.height: am Schreibtisch ist das die Hoehe der SPALTE, nicht die
+    // Dicke der Leiste -- eine Pruefung dagegen bliebe auch mit dem Fehler
+    // gruen (bei der Gegenprobe genau so passiert). --tab-h ist die Dicke
+    // der unteren Leiste und damit die richtige Bezugsgroesse.
+    leistenDicke: Math.round(parseFloat(
+      getComputedStyle(document.documentElement).getPropertyValue('--tab-h'))),
   };
 });
 
@@ -107,6 +120,17 @@ try {
   check('KRITISCH: auch am Schreibtisch bleiben die Reiter anfassbar hoch',
     d.knopfHoehe >= 36);
   check('KRITISCH: kein waagrechter Seiten-Scroll', d.quer);
+  // Diese beiden Zeilen sind nachtraeglich entstanden: Die Polsterungsregel
+  // im Schreibtisch-Block stand zuerst auf "main" und war damit wirkungslos
+  // -- ".inhalt" ist ein Klassenselektor und schlaegt jedes blosse "main",
+  // egal in welcher Media Query. Nichts ging kaputt, es blieb nur die
+  // Handy-Polsterung stehen: 88 px Leere unter dem Inhalt fuer eine Leiste,
+  // die am Schreibtisch links steht. Genau die Fehlerfamilie aus CLAUDE.md
+  // ("eine CSS-Regel kann wirkungslos bleiben, ohne dass etwas kaputtgeht").
+  check('KRITISCH: am Schreibtisch KEIN Platzhalter fuer die untere Leiste',
+    d.polsterUnten < d.leistenDicke);
+  check('Der Inhalt bekommt am Schreibtisch mehr seitliche Luft als am Handy',
+    d.polsterSeite > 16);
   await page.screenshot({ path: `${OUT}/ma-desktop-01-plan.png` });
   await page.close();
 } catch (e) { check('Abschnitt Schreibtisch ohne Abbruch: ' + e.message, false); }
@@ -124,6 +148,8 @@ try {
   check('KRITISCH: die Trefferflaeche bleibt bei mindestens 44 px (Projektregel)',
     h.knopfHoehe >= 44);
   check('KRITISCH: kein waagrechter Seiten-Scroll', h.quer);
+  check('KRITISCH: am Handy bleibt der Platz fuer die untere Leiste reserviert',
+    h.polsterUnten >= h.leistenDicke);
   await page.screenshot({ path: `${OUT}/ma-desktop-02-handy.png` });
   await page.close();
 } catch (e) { check('Abschnitt Handy ohne Abbruch: ' + e.message, false); }

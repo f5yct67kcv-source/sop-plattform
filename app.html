@@ -1389,7 +1389,12 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
                  font-size: 13.5px; font-weight: 620; }
   .tabs button.on { background: var(--accent-soft, rgba(127,127,255,.10)); }
   .tabs button .punkt { position: static; margin: 0 0 0 auto; }
-  main { grid-column: 2; grid-row: 2; padding: 22px 26px 40px; min-width: 0; }
+  /* main.inhalt, NICHT main: .inhalt ist ein Klassenselektor und schlaegt
+     jedes blosse "main" -- unabhaengig von Reihenfolge und Media Query.
+     Mit "main" allein blieb die Polsterung hier wirkungslos, und unten
+     stand weiter der Platz fuer die Reiterleiste, die am Schreibtisch
+     gar nicht mehr unten liegt (88 px Leere). Gemessen, nicht gelesen. */
+  main.inhalt { grid-column: 2; grid-row: 2; padding: 22px 26px 40px; min-width: 0; }
 }
 </style>
 </head>
