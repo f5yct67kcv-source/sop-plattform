@@ -145,6 +145,16 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
 .knopfzeile{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:18px}
 
 .hinweis{font-size:13.5px;color:var(--ink-3);margin:10px 0 0}
+/* Der zweite Weg steht in einem eigenen, ruhigen Kasten -- er gehoert nicht
+   zum Anmeldeformular darueber, sondern ist die Antwort auf eine andere
+   Frage. Nach einem Fehlversuch tritt er hervor, ohne die Stelle zu
+   wechseln: Ein Element, das erst beim Fehler ERSCHEINT, verschiebt alles
+   darunter und laesst den Blick suchen. */
+.code-weg{margin-top:22px;padding:14px 16px;border-radius:var(--r);
+          border:1px solid var(--line);background:rgba(var(--surface-rgb),.35);
+          transition:border-color .2s, background .2s}
+.code-weg.hervor{border-color:var(--accent);background:rgba(var(--surface-rgb),.7)}
+.code-weg.hervor .hinweis{color:var(--ink)}
 .fehler{font-size:14px;color:var(--rot);font-weight:600;margin:12px 0 0}
 
 /* ── Zeitraum ─────────────────────────────────────────────────────────── */
@@ -240,15 +250,27 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
     <div class="knopfzeile">
       <button class="knopf" id="anmelden-pw">Anmelden</button>
     </div>
+    <p class="fehler" id="fehler-adresse" hidden></p>
     <!-- Ein eigener Weg und kein versteckter Link: Beim ERSTEN Mal hat
          niemand ein Passwort, und wer eines vergessen hat, sucht genau
          hier. Beides fuehrt ueber denselben Einmal-Code -- damit geht nie
-         ein Passwort per Mail hinaus. -->
-    <p class="hinweis">Zum ersten Mal hier oder Passwort vergessen?</p>
-    <div class="knopfzeile" style="margin-top:8px">
-      <button class="knopf still" id="code-holen">Code per E-Mail anfordern</button>
+         ein Passwort per Mail hinaus.
+         "Passwort vergessen" steht VORNE: Sobald das Portal laeuft, ist das
+         der haeufigere der beiden Faelle -- eine Erstanmeldung hat jeder
+         Zugang genau einmal.
+         Der Kasten hebt sich hervor, sobald eine Anmeldung fehlgeschlagen
+         ist. Das entscheidet der BROWSER aus dem, was er ohnehin weiss --
+         der Server wird dafuer NICHT gefragt, ob zu dieser Adresse ein
+         Passwort hinterlegt ist. Eine solche Auskunft verriete, dass es die
+         Adresse gibt, und damit, dass diese Firma Kunde ist. -->
+    <div id="code-weg" class="code-weg">
+      <p class="hinweis" style="margin:0">
+        <strong>Passwort vergessen?</strong> Oder zum ersten Mal hier —
+        dann haben Sie noch keines.</p>
+      <div class="knopfzeile" style="margin-top:10px">
+        <button class="knopf still" id="code-holen">Code per E-Mail anfordern</button>
+      </div>
     </div>
-    <p class="fehler" id="fehler-adresse" hidden></p>
   </div>
 
   <!-- Schritt 2: Code -->
@@ -290,6 +312,21 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
       <button class="knopf" id="pw-speichern">Passwort speichern</button>
     </div>
     <p class="fehler" id="fehler-passwort" hidden></p>
+  </div>
+
+  <!-- Bestaetigung nach dem Setzen des Passworts. Sie steht ausdruecklich
+       zwischen Setzen und Uebersicht: Wer sein Passwort gerade festgelegt
+       hat, soll es bestaetigt bekommen und nicht raten muessen, ob es
+       gespeichert wurde -- die Uebersicht allein sagt darueber nichts. -->
+  <div class="karte" id="pw-fertig" hidden style="text-align:center">
+    <div style="font-size:34px;line-height:1;margin-bottom:12px" aria-hidden="true">✓</div>
+    <div class="wert" style="font-size:17px">Ihr Passwort ist gesetzt.</div>
+    <p class="hinweis" style="margin-top:8px">
+      Ab jetzt melden Sie sich mit Ihrer E-Mail-Adresse und diesem Passwort an —
+      ohne Code.</p>
+    <div class="knopfzeile" style="justify-content:center">
+      <button class="knopf" id="pw-weiter">Weiter zur Übersicht</button>
+    </div>
   </div>
 
   <!-- Abmeldebestaetigung. Ohne sie stand nach dem Abmelden sofort wieder
@@ -359,7 +396,7 @@ const LEER = {
 let token = null;
 
 const SCHRITTE = ['schritt-adresse', 'schritt-code', 'schritt-passwort',
-                 'abgemeldet', 'inhalt'];
+                 'pw-fertig', 'abgemeldet', 'inhalt'];
 
 function zeige(welche) {
   for (const id of SCHRITTE) { $(id).hidden = (id !== welche); }
@@ -418,6 +455,10 @@ $('anmelden-pw').addEventListener('click', async () => {
   $('anmelden-pw').disabled = false;
   if (!ok || !daten.token) {
     fehler('fehler-adresse', daten.message || 'Die Anmeldung hat nicht geklappt.');
+    // Jetzt ist der zweite Weg der wahrscheinlich gesuchte -- also tritt er
+    // hervor. Das folgt allein aus dem fehlgeschlagenen Versuch, nicht aus
+    // einer Auskunft des Servers.
+    $('code-weg').classList.add('hervor');
     return;
   }
   $('passwort').value = '';
@@ -489,6 +530,12 @@ $('pw-speichern').addEventListener('click', async () => {
     return;
   }
   $('pw-neu').value = ''; $('pw-neu2').value = '';
+  // Erst die Bestaetigung, dann die Uebersicht -- nicht umgekehrt und nicht
+  // beides auf einmal.
+  zeige('pw-fertig');
+});
+
+$('pw-weiter').addEventListener('click', () => {
   zeige('inhalt');
   laden();
 });
@@ -512,6 +559,7 @@ $('abmelden').addEventListener('click', async () => {
 
 $('wieder-anmelden').addEventListener('click', () => {
   fehler('fehler-adresse', '');
+  $('code-weg').classList.remove('hervor');
   zeige('schritt-adresse');
   $('email').focus();
 });

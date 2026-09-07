@@ -1577,8 +1577,14 @@ $spalten = [
     // Kundenportal: eigenes Passwort statt Einmal-Code bei jeder Anmeldung
     // (ENT-444). Bestehende Zugaenge bleiben NULL und gehen weiter ueber den
     // Code -- er verlangt beim naechsten Mal ein Passwort.
+    //
+    // OHNE "AFTER funktion": Die Stellung einer Spalte ist reine Kosmetik,
+    // aber sie ist die einzige Stelle in diesem ALTER, die fehlschlagen
+    // KANN -- naemlich dann, wenn die genannte Spalte in der produktiven
+    // Tabelle nicht so heisst wie hier erwartet. Ein Nachtrag, der aus
+    // kosmetischen Gruenden scheitert, ist ein schlechter Tausch.
     ['kundenzugang', 'password_hash',
-     'ALTER TABLE kundenzugang ADD COLUMN password_hash VARCHAR(255) NULL AFTER funktion'],
+     'ALTER TABLE kundenzugang ADD COLUMN password_hash VARCHAR(255) NULL'],
     // Push-Versand je Mitteilung (ENT-424). push_gesendet_am ist zugleich
     // die Sperre gegen ein zweites Mal: Ohne sie schickte jeder
     // Nachzuegler-Lauf dieselbe Meldung erneut. push_bilanz haelt fest,

@@ -62,4 +62,11 @@ foreach ($zeilen as $z) {
     ];
 }
 
-json_response(['status' => 'ok', 'zugaenge' => $zugaenge, 'eingerichtet' => true]);
+// Ob die Passwortvergabe bereitsteht, ist eine EIGENE Aussage neben
+// "eingerichtet" (ENT-444): Die Tabellen koennen da sein und die
+// Passwortspalte trotzdem fehlen -- genau dieser Zwischenzustand ist beim
+// Ausrollen von ENT-444 aufgetreten, und im Cockpit war er unsichtbar. Der
+// Betrieb sah ein funktionierendes Portal und wusste nicht, warum Kunden
+// weiterhin bei jeder Anmeldung einen Code brauchen.
+json_response(['status' => 'ok', 'zugaenge' => $zugaenge, 'eingerichtet' => true,
+    'passwort_bereit' => hat_spalte($pdo, 'kundenzugang', 'password_hash')]);
