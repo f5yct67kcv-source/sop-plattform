@@ -361,13 +361,24 @@ await page.waitForTimeout(250);
 check('Am Desktop bleibt die Seite vollständig bedienbar',
   await page.isVisible('#rgsStartBtn') && await page.isVisible('.rgs-objekt'));
 // Erste Fassung lief hier als EINZIGER Bereich der App über die volle
-// Bildschirmbreite -- mit einem 1400px breiten "Rundgang starten". Die App
-// hält sonst überall 560px zentriert (Media Query ab 700px).
-check('KRITISCH: am Desktop bleibt die Seite auf App-Breite und wird nicht in die Breite gezogen',
+// Bildschirmbreite -- mit einem 1400px breiten "Rundgang starten" (ENT-294).
+//
+// Bis hierher stand als Mass "so breit wie #app". Das war dasselbe wie
+// "560px", solange die App auf JEDER Breite eine 560px-Säule war. Seit dem
+// Schreibtisch-Zuschnitt für Mitarbeitende ist die Hülle am Desktop breiter
+// -- und das Hilfsmass wäre mitgewandert, obwohl die Absicht von ENT-294
+// unverändert gilt. Geprüft wird darum die ABSICHT: Der Einsatzmodus bleibt
+// eine schmale, mittige Säule, egal wie breit die Hülle wird. Er wird im
+// Feld am Telefon bedient; ein Knopf über die halbe Bildschirmbreite ist
+// dort nichts wert.
+check('KRITISCH: am Desktop bleibt der Einsatzmodus eine schmale Säule und wird nicht in die Breite gezogen',
+  await page.evaluate(() => document.getElementById('rgSeite').getBoundingClientRect().width <= 561));
+check('KRITISCH: und er folgt der Hülle NICHT, wenn die am Desktop breiter wird',
   await page.evaluate(() => {
     const s = document.getElementById('rgSeite').getBoundingClientRect();
     const app = document.getElementById('app').getBoundingClientRect();
-    return Math.abs(s.width - app.width) <= 1 && s.width <= 561;
+    // Ist die Hülle breiter als die Säule, muss die Säule stehen bleiben.
+    return app.width <= 561 ? Math.abs(s.width - app.width) <= 1 : s.width <= 561;
   }));
 check('Sie steht dabei mittig, nicht am linken Rand (CLAUDE.md: mittig heisst mittig)',
   await page.evaluate(() => {
