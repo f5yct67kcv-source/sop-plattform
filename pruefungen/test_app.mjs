@@ -829,6 +829,27 @@ await page.waitForTimeout(400);
 check('Ein zweites Öffnen meldet sich nicht erneut',
   rufe.filter(r => r.p.includes('meine_gesehen')).length === nachErstem);
 
+// ══════════════ DAS WOERTERBUCH DARF KEINEN SCHLUESSEL ZWEIMAL FUEHREN
+// Ein doppelter Schluessel in einem Objektliteral ist STILL: JavaScript
+// nimmt den spaeteren, nichts stuerzt ab, und irgendwo im Haus heisst ein
+// Knopf ploetzlich anders. Genau so passiert -- beim Bau der Monatstabelle
+// wurde "nochmal" ein zweites Mal vergeben und benannte den
+// Wiederholen-Knopf im Revierdienst um. Aufgefallen ist es nur, weil dort
+// zufaellig eine Pruefung auf den Text sah.
+{
+  const quelle = readFileSync(`${WURZEL}/app.html`, 'utf8');
+  const i = quelle.indexOf('const W = {');
+  const j = quelle.indexOf('\n};', i);
+  const block = quelle.slice(i, j);
+  const schluessel = [...block.matchAll(/^\s{4}([A-Za-z][A-Za-z0-9_]*)\s*:/gm)].map(m => m[1]);
+  const gezaehlt = {};
+  schluessel.forEach(k => { gezaehlt[k] = (gezaehlt[k] || 0) + 1; });
+  const doppelt = Object.keys(gezaehlt).filter(k => gezaehlt[k] > 1);
+  check('Das Woerterbuch wird ueberhaupt gefunden', i > 0 && schluessel.length > 100);
+  check('KRITISCH: kein Woerterbuch-Schluessel ist doppelt vergeben', doppelt.length === 0);
+  doppelt.forEach(k => bad.push(`doppelter Schluessel im Woerterbuch: ${k}`));
+}
+
 await browser.close();
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }

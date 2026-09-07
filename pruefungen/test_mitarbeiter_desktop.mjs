@@ -82,9 +82,15 @@ const lage = page => page.evaluate(() => {
     // Richtungsangabe kann von einer spaeteren Regel ueberschrieben sein.
     untereinander: knoepfe[1].getBoundingClientRect().top > knoepfe[0].getBoundingClientRect().bottom - 1,
     quer: document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
+    // Liegt die Leiste UEBER dem Inhalt? Am Schreibtisch ja -- sie steht
+    // oben quer. Am Handy nein: dort klebt sie unten und ueberlagert ihn.
+    ueberInhalt: t.bottom <= m.top + 1,
+    // Nutzt die Seite die Fensterbreite, oder sitzt sie in einem Korsett?
+    appBreite: Math.round(a.width),
+    fenster: window.innerWidth,
     // Reserviert der Inhalt unten Platz fuer die Reiterleiste? Am Handy MUSS
     // er das (die Leiste liegt darueber), am Schreibtisch DARF er es nicht
-    // (dort steht sie links). Gegen die tatsaechliche Leistenhoehe gemessen
+    // (dort steht sie oben). Gegen die tatsaechliche Leistendicke gemessen
     // und nicht gegen eine abgeschriebene Zahl -- sonst prueft der Test die
     // Formulierung statt die Aussage.
     polsterUnten: Math.round(parseFloat(getComputedStyle(main).paddingBottom)),
@@ -104,15 +110,23 @@ try {
   await page.evaluate(() => zeige('plan'));
   await page.waitForTimeout(300);
   const d = await lage(page);
-  check('KRITISCH: am Schreibtisch steht die Leiste links, nicht am unteren Rand',
-    d.leisteLinks === 0 && d.leisteOben > 0 && d.steht === 'static');
-  check('KRITISCH: die Knoepfe stehen untereinander', d.untereinander);
+  // Diese Zeilen waren zuvor auf eine LINKE Spalte formuliert und wurden
+  // durch den Umbau zu Recht rot. Die Leiste steht jetzt oben quer: eine
+  // linke Spalte kostet 236 px, und die braucht die Monatstabelle.
+  check('KRITISCH: am Schreibtisch steht die Leiste im Fluss, nicht am Fensterrand',
+    d.steht === 'static');
+  check('KRITISCH: und sie liegt OBEN -- ueber dem Inhalt, nicht darunter',
+    d.ueberInhalt && d.leisteOben > 0);
   check('Es sind dieselben fuenf Reiter wie am Handy -- keine zweite Navigation',
     d.knopfZahl === 5);
-  check('KRITISCH: der Inhalt bekommt die Breite und steht neben der Leiste',
-    d.inhaltBreite > 700 && d.inhaltLinks === d.leisteBreite);
-  check('Die Leiste bleibt schmal genug, dass der Inhalt der Hauptteil ist',
-    d.leisteBreite >= 180 && d.leisteBreite <= 280);
+  check('KRITISCH: die Leiste laeuft ueber die ganze Seitenbreite',
+    d.leisteBreite >= d.appBreite - 2);
+  // Der eigentliche Zweck des Umbaus: die Seite sitzt nicht mehr in einem
+  // 1180-px-Korsett. Gemessen am Fenster, nicht an einer Zahl im Regelwerk.
+  check('KRITISCH: die Seite nutzt die Fensterbreite statt eines festen Korsetts',
+    d.appBreite >= d.fenster - 2);
+  check('KRITISCH: der Inhalt bekommt die Breite',
+    d.inhaltBreite >= d.fenster - 2);
   // Die 44-px-Regel aus CLAUDE.md gilt dem Handy. Am Schreibtisch trifft
   // man mit der Maus genauer -- eine Zeile darf trotzdem nicht auf
   // Textzeilenhoehe zusammenfallen, sonst ist die Leiste eine Liste ohne
@@ -143,6 +157,8 @@ try {
   const h = await lage(page);
   check('KRITISCH: am Handy haengt die Leiste weiterhin unten am Bildschirm',
     h.steht === 'fixed');
+  check('KRITISCH: und sie liegt dort NICHT ueber dem Inhalt, sondern darunter',
+    !h.ueberInhalt);
   check('KRITISCH: und die Knoepfe stehen nebeneinander, nicht untereinander',
     !h.untereinander);
   check('KRITISCH: die Trefferflaeche bleibt bei mindestens 44 px (Projektregel)',
@@ -161,13 +177,16 @@ try {
 try {
   const knapp = await seite(GRENZE - 1, 800, false);
   const k = await lage(knapp);
+  // "untereinander" taugt hier nicht mehr als Unterscheidung: seit die
+  // Leiste oben quer steht, stehen die Knoepfe auf BEIDEN Seiten der
+  // Grenze nebeneinander. Unterschieden wird jetzt an Fluss und Lage.
   check(`KRITISCH: knapp unter ${GRENZE} px gilt noch der Handy-Zuschnitt`,
-    k.steht === 'fixed' && !k.untereinander);
+    k.steht === 'fixed' && !k.ueberInhalt);
   await knapp.close();
   const drueber = await seite(GRENZE, 800, false);
   const g = await lage(drueber);
   check(`KRITISCH: ab genau ${GRENZE} px greift der Schreibtisch-Zuschnitt`,
-    g.steht === 'static' && g.untereinander);
+    g.steht === 'static' && g.ueberInhalt);
   await drueber.close();
 } catch (e) { check('Abschnitt Grenze ohne Abbruch: ' + e.message, false); }
 

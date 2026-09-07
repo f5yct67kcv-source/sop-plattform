@@ -83,6 +83,10 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
   --sh-2: 0 10px 30px -10px rgba(16,18,22,.22);
   --sh-3: 0 -8px 32px -12px rgba(16,18,22,.24);
   --tab-h: 62px;
+  /* 0 am Handy, 1 am Schreibtisch -- umgeschaltet von der Media Query
+     ganz unten. Das Skript liest DIESEN Wert, statt die Grenze ein
+     zweites Mal als Zahl zu fuehren. */
+  --schreibtisch-an: 0;
 
   /* Der SOCKEL (ENT-429): wie viel sichtbarer Bildschirm UNTER dem liegt,
      was der Browser als unteren Rand kennt. Auf jedem gesunden Gerät 0 --
@@ -1368,33 +1372,122 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
    Die Grenze liegt bei 1080 px und nicht bei 900: Ein quergedrehtes Tablet
    (1024) soll die vertraute Handy-Bedienung behalten. */
 @media (min-width: 1080px) {
-  /* Zwei Spalten statt einer Saeule. Die Kopfzeile laeuft ueber beide --
-     sie gehoert zur Seite, nicht zum Inhalt. */
-  .app { max-width: 1180px; display: grid; grid-template-columns: 236px 1fr;
-         grid-template-rows: auto 1fr; align-content: start; }
-  .app.on { display: grid; }
-  .kopf { grid-column: 1 / -1; }
-  /* Reihenfolge im Auszeichnungstext ist kopf, main, tabs -- am Schreibtisch
-     soll die Leiste aber LINKS stehen. Darum werden beide ausdruecklich
-     gesetzt, statt sich auf die Reihenfolge zu verlassen. */
-  .tabs { grid-column: 1; grid-row: 2; position: static; transform: none;
-          max-width: none; flex-direction: column; align-items: stretch;
-          border-top: 0; border-right: 1px solid var(--line);
+  /* Ein Schalter, den auch das Skript lesen kann. Die Grenze steht damit
+     an EINER Stelle -- in der Media Query darueber. Eine zweite Zahl im
+     Skript wuerde beim naechsten Verschieben stillschweigend danebenliegen,
+     und niemand saehe es. */
+  :root { --schreibtisch-an: 1; }
+
+  /* Drei Zeilen uebereinander: Kopf, Reiterleiste, Inhalt. Die Leiste liegt
+     OBEN und ueber die volle Breite. Zuerst stand sie links -- das kostete
+     236 px, und die braucht die Monatstabelle. Oben kostet sie nur Hoehe,
+     und Hoehe ist reichlich da (gemessen: vier von fuenf Reitern liessen
+     660 bis 1300 px darunter leer). */
+  .app { max-width: none; }
+  .app.on { display: grid; grid-template-columns: 1fr;
+            grid-template-rows: auto auto 1fr; align-content: start; }
+  .kopf { grid-row: 1; }
+  /* Reihenfolge im Auszeichnungstext ist kopf, main, tabs -- die Zeilen
+     werden darum ausdruecklich gesetzt, statt sich auf sie zu verlassen. */
+  .tabs { grid-row: 2; }
+  main.inhalt { grid-row: 3; }
+
+  /* Die Leiste steht jetzt im Fluss, statt am Fensterrand zu kleben. Ohne
+     Milchglas: dahinter liegt nichts mehr, was durchscheinen koennte. */
+  .tabs { position: static; transform: none; bottom: auto; max-width: none;
+          border-top: 0; border-bottom: 1px solid var(--line);
           background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none;
-          padding: 14px 10px 20px; gap: 2px; }
-  /* Symbol links, Beschriftung daneben -- untereinander gelesen wird eine
-     Leiste zur Liste, und eine Liste liest man waagrecht. */
-  .tabs button { flex: none; flex-direction: row; justify-content: flex-start;
-                 gap: 12px; min-height: 44px; padding: 0 14px; border-radius: 10px;
-                 font-size: 13.5px; font-weight: 620; }
-  .tabs button.on { background: var(--accent-soft, rgba(127,127,255,.10)); }
-  .tabs button .punkt { position: static; margin: 0 0 0 auto; }
+          justify-content: center; gap: 6px; padding: 8px 26px 0; }
+  /* Symbol und Wort nebeneinander. Die Knoepfe teilen sich die Breite --
+     aber nur bis 220 px: auf einem sehr breiten Schirm haette ein Reiter
+     sonst die Flaeche einer Kachel. */
+  .tabs button { flex: 1 1 0; max-width: 220px; flex-direction: row;
+                 justify-content: center; gap: 9px; min-height: 46px;
+                 font-size: 13.5px; font-weight: 620; padding: 0 12px;
+                 border-radius: 10px 10px 0 0;
+                 border-bottom: 2px solid transparent; }
+  .tabs button.on { background: var(--accent-soft); border-bottom-color: var(--accent); }
+  .tabs button .punkt { position: static; margin: 0; }
+
   /* main.inhalt, NICHT main: .inhalt ist ein Klassenselektor und schlaegt
      jedes blosse "main" -- unabhaengig von Reihenfolge und Media Query.
      Mit "main" allein blieb die Polsterung hier wirkungslos, und unten
      stand weiter der Platz fuer die Reiterleiste, die am Schreibtisch
      gar nicht mehr unten liegt (88 px Leere). Gemessen, nicht gelesen. */
-  main.inhalt { grid-column: 2; grid-row: 2; padding: 22px 26px 40px; min-width: 0; }
+  main.inhalt { padding: 22px 26px 40px; min-width: 0; }
+  /* Dieselbe Falle eine Ebene tiefer: ".app.ohne-kopf .inhalt" traegt drei
+     Klassen und schlaegt "main.inhalt". Im Menue faellt die Kopfzeile weg
+     (ENT-402), und ohne diese Zeile bekaeme der Reiter dort wieder die
+     Handy-Polsterung. */
+  .app.ohne-kopf main.inhalt { padding-top: 22px; }
+
+  /* Lesbares Mass fuer alles, was Text ist: eine Zeile ueber 1200 px
+     verliert man beim Zeilenwechsel. Die Breite ist kein Selbstzweck. */
+  main.inhalt > .v { max-width: 1200px; margin-inline: auto; }
+  /* Die Ausnahme ist der Plan. Die Monatstabelle ist der Grund dafuer,
+     dass die Seite ueberhaupt breit sein soll. */
+  main.inhalt > #v-plan { max-width: none; }
+
+  /* Drei Knoepfe, die sich 1600 px teilen, sind keine Reiter mehr,
+     sondern Banner (gemessen: 536 px je Knopf). Am Handy fuellen sie die
+     Zeile zu Recht -- dort IST die Zeile schmal. Hier bekommen sie ihr
+     Mass: "ein Knopf wird nicht gestreckt, nur weil Platz da ist"
+     (CLAUDE.md). Links buendig, weil darunter eine Tabelle beginnt und
+     nicht ein zweiter mittiger Block. */
+  .unterreiter { max-width: 520px; margin-right: auto; }
+
+  /* ── Monatstabelle ─────────────────────────────────────────────────
+     Mittiges gehoert in die Mitte des CONTAINERS, nicht zwischen zwei
+     ungleich breite Nachbarn: darum 1fr auto 1fr und kein Flex-
+     Abstandhalter (CLAUDE.md). */
+  .mt-kopf { display: grid; grid-template-columns: 1fr auto 1fr;
+             align-items: center; gap: 12px; margin: 0 0 14px; }
+  .mt-kopf > b { font-size: 17px; font-weight: 700; letter-spacing: -.2px; }
+  .mt-kopf > button:first-child { justify-self: start; }
+  .mt-kopf > button:last-child { justify-self: end; }
+  .mt-pfeil { display: flex; align-items: center; justify-content: center;
+              width: 38px; height: 38px; border-radius: 10px; cursor: pointer;
+              border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); }
+  .mt-pfeil:hover { border-color: var(--accent-line); color: var(--accent); }
+
+  /* Die Tabelle scrollt in IHREM Kasten, nicht die Seite. Bei schmalem
+     Fenster und acht Spalten ist das der Unterschied zwischen "man kann
+     sie ansehen" und "die ganze Seite verrutscht". */
+  .mt-rahmen { overflow-x: auto; border: 1px solid var(--line);
+               border-radius: var(--r-sm); background: var(--surface); }
+  .mt { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .mt th { text-align: left; padding: 11px 12px; white-space: nowrap;
+           font-size: 11px; font-weight: 700; letter-spacing: .5px;
+           text-transform: uppercase; color: var(--ink-3);
+           border-bottom: 1px solid var(--line); background: var(--surface-2); }
+  .mt td { padding: 9px 12px; vertical-align: top; color: var(--ink);
+           border-bottom: 1px solid var(--line-soft); }
+  .mt tbody tr:last-child td { border-bottom: 0; }
+  .mt-datum { white-space: nowrap; font-weight: 620; }
+  .mt-weiter { border-bottom-color: transparent; }
+  .mt-zeit, .mt-dauer { white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .mt-dauer { color: var(--ink-2); }
+  .mt-neben { display: block; font-size: 12px; color: var(--ink-3); font-weight: 400; }
+  .mt-ft { display: inline-block; margin-left: 5px; font-size: 11px; color: var(--ink-3); }
+  .mt-status { white-space: nowrap; }
+
+  /* Ein Tag ohne Schicht ist eine Aussage, kein Loch. Er steht darum
+     ausgeschrieben da -- nur leiser als ein Tag mit Einsatz. */
+  .mt-ohne td { color: var(--ink-3); font-style: italic; }
+  .mt-wochenende td { background: var(--surface-2); }
+  .mt-heute td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+  .mt-heute .mt-datum { color: var(--accent); }
+  .mt-abgesagt td { text-decoration: line-through; color: var(--ink-3); }
+  .mt-zeile { cursor: pointer; }
+  .mt-zeile:hover td { background: var(--accent-soft); }
+  .mt-zeile:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+  .mt-summe-zelle { padding: 0; background: var(--surface-2); }
+  .mt-summe { display: flex; flex-wrap: wrap; align-items: baseline;
+              gap: 4px 14px; padding: 12px; }
+  .mt-summe b { font-size: 14.5px; }
+  .mt-summe .mt-neben { display: inline; }
+  .mt-warn { color: var(--warn); font-size: 12.5px; font-weight: 620; }
 }
 </style>
 </head>
@@ -2045,6 +2138,22 @@ const W = {
     evSpeichern: 'Ereignis melden',
     evGemeldet: 'Ereignis gemeldet.',
     evWartet: 'Gespeichert — wird übermittelt, sobald wieder Netz da ist.',
+
+    // Monatstabelle am Schreibtisch. Die drei Zustandstexte sind bewusst
+    // verschieden: "wird geladen", "ging schief" und "frei" sind drei
+    // Aussagen, nicht eine.
+    monatZurueck: 'Vorheriger Monat',
+    monatVor: 'Nächster Monat',
+    monatLaedt: 'Der Monat wird geladen …',
+    monatFehler: 'Der Monat konnte nicht geladen werden',
+    monatFehlerText: 'Ob in diesem Monat Schichten geplant sind, ist damit unbekannt — nicht etwa, dass keine da wären.',
+    keineSchichtGeplant: 'Keine Schicht geplant',
+    geplanteStunden: 'Geplante Stunden',
+    ohneZeitangabe: 'Schichten ohne Zeitangabe, nicht mitgerechnet',
+    ohneZeitangabe1: 'Schicht ohne Zeitangabe, nicht mitgerechnet',
+    planwertHinweis: 'Planwert aus den Schichtzeiten — keine Lohngrundlage.',
+    spDatum: 'Datum', spZeit: 'Zeit', spDauer: 'Dauer', spEinsatz: 'Einsatz',
+    spOrt: 'Ort', spTreffpunkt: 'Treffpunkt', spBemerkung: 'Bemerkung', spStatus: 'Status',
 };
 const w = k => W[k] || k;
 
@@ -2772,7 +2881,186 @@ function zeichnePlan() {
   zeichneSperren();
   zeichneAbwesenheiten();
 }
+// ══════════════════════════════════════════ MONATSTABELLE (Schreibtisch)
+// Am Handy bleibt der Plan eine Liste des Kommenden -- man scrollt mit dem
+// Daumen und will wissen, was als Naechstes ansteht. Am Schreibtisch ist
+// die Frage eine andere: "arbeite ich am 15.?" Darum eine Zeile pro TAG,
+// auch fuer Tage OHNE Schicht. Einen Monat mit Luecken sieht man nur,
+// wenn die Luecken auch dastehen.
+//
+// Nur hier, nicht am Handy: Was am Schreibtisch entsteht, wird nicht
+// automatisch auch fuers Handy gebaut (CLAUDE.md, so schon ENT-235).
+
+// Liest den Schalter, den die Media Query umlegt. Die Grenze steht damit
+// an genau EINER Stelle -- im Regelwerk. Eine zweite Zahl hier wuerde beim
+// naechsten Verschieben stillschweigend danebenliegen.
+const amSchreibtisch = () =>
+  getComputedStyle(document.documentElement).getPropertyValue('--schreibtisch-an').trim() === '1';
+
+const MONATSNAME = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
+  'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+
+let monatStand = '';        // 'JJJJ-MM' -- der angezeigte Monat
+// Eigener Bestand, NICHT "schichten" ueberschreiben: daran haengen Heute,
+// die Sperren und der Einsatzmodus. Ein Blick in den Mai darf nicht dazu
+// fuehren, dass die App den heutigen Einsatz vergisst.
+let monatSchichten = [];
+// leer = noch nie geladen, laedt, da, fehler. Vier Zustaende, weil sie
+// vier verschiedene Aussagen sind -- "wird geladen", "ging schief" und
+// "der Monat ist frei" duerfen einander nie sehen (CLAUDE.md).
+let monatZustand = 'leer';
+
+function monatTage(ym) {
+  const [j, m] = ym.split('-').map(Number);
+  const letzter = new Date(Date.UTC(j, m, 0)).getUTCDate();
+  return Array.from({ length: letzter }, (_, i) => `${ym}-${String(i + 1).padStart(2, '0')}`);
+}
+function monatVerschoben(ym, schritt) {
+  const [j, m] = ym.split('-').map(Number);
+  const d = new Date(Date.UTC(j, m - 1 + schritt, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+// Dauer in Minuten. Endet die Schicht rechnerisch vor ihrem Beginn, lief
+// sie ueber Mitternacht -- dieselbe Annahme wie ueberNacht(). Fehlt eine
+// Zeit, kommt null zurueck und nicht 0: eine unbekannte Dauer ist keine
+// Dauer von null.
+function schichtMinuten(e) {
+  const zu = t => {
+    const [h, m] = String(t || '').slice(0, 5).split(':').map(Number);
+    return (Number.isFinite(h) && Number.isFinite(m)) ? h * 60 + m : null;
+  };
+  const a = zu(e.von), b = zu(e.bis);
+  if (a === null || b === null) return null;
+  return b > a ? b - a : b + 1440 - a;
+}
+// Eine Dauer wird NICHT als "8:00" geschrieben. In einer Tabelle, in der
+// daneben "06:00-14:00" steht, liest sich das wie eine Uhrzeit -- und
+// Einheiten werden nicht vermischt (CLAUDE.md). "8 h" und "8 h 30" kann
+// man mit keiner Uhrzeit verwechseln.
+const dauerText = min => {
+  const h = Math.floor(min / 60), m = min % 60;
+  return m ? `${h} h ${String(m).padStart(2, '0')}` : `${h} h`;
+};
+
+function ladeMonat(ym) {
+  monatStand = ym;
+  monatZustand = 'laedt';
+  zeichnePlanListe();
+  const tage = monatTage(ym);
+  return api(`meine_schichten.php?von=${tage[0]}&bis=${tage[tage.length - 1]}`)
+    .then(({ ok, status, data }) => {
+      if (status === 401) return abmelden();
+      // Zwischenzeitlich weitergeblaettert? Dann gehoert diese Antwort zu
+      // einem Monat, der nicht mehr auf dem Schirm steht.
+      if (ym !== monatStand) return;
+      if (ok && data.status === 'ok') { monatSchichten = data.schichten || []; monatZustand = 'da'; }
+      else { monatSchichten = []; monatZustand = 'fehler'; }
+      zeichnePlanListe();
+    });
+}
+function monatWechsel(schritt) { ladeMonat(monatVerschoben(monatStand, schritt)); }
+function monatNochmal() { ladeMonat(monatStand); }
+
+function zeichnePlanMonat() {
+  if (!monatStand) { ladeMonat(isoTag().slice(0, 7)); return; }
+  const [j, m] = monatStand.split('-').map(Number);
+  const heute = isoTag();
+  const pfeil = (schritt, d, txt) => `<button class="mt-pfeil" onclick="monatWechsel(${schritt})"
+      aria-label="${esc(txt)}" title="${esc(txt)}">
+      <svg class="i i-sm" viewBox="0 0 24 24"><polyline points="${d}"/></svg></button>`;
+  const kopf = `<div class="mt-kopf">
+      ${pfeil(-1, '15 5 8 12 15 19', w('monatZurueck'))}
+      <b>${esc(MONATSNAME[m - 1])} ${j}</b>
+      ${pfeil(1, '9 5 16 12 9 19', w('monatVor'))}
+    </div>`;
+
+  // "wird geladen", "ging schief" und "der Monat ist frei" sind drei
+  // verschiedene Aussagen und bekommen drei verschiedene Texte. Ein Monat
+  // voller Zeilen "Keine Schicht geplant" waere bei einem Serverfehler
+  // eine Falschaussage -- genau die Verwechslung, vor der CLAUDE.md warnt.
+  if (monatZustand === 'laedt' || monatZustand === 'leer') {
+    $('plan-inhalt-plan').innerHTML = kopf +
+      `<div class="karte"><div class="leer"><b>${esc(w('monatLaedt'))}</b></div></div>`;
+    return;
+  }
+  if (monatZustand === 'fehler') {
+    $('plan-inhalt-plan').innerHTML = kopf +
+      `<div class="karte"><div class="leer">
+         <b>${esc(w('monatFehler'))}</b><p>${esc(w('monatFehlerText'))}</p>
+         <button class="btn" onclick="monatNochmal()">${esc(w('nochmal'))}</button>
+       </div></div>`;
+    return;
+  }
+
+  const proTag = {};
+  monatSchichten.forEach(e => { (proTag[tagVon(e)] = proTag[tagVon(e)] || []).push(e); });
+  let summe = 0, unbekannt = 0, zeilen = '';
+  monatTage(monatStand).forEach(t => {
+    const wd = new Date(t + 'T12:00:00').getDay();
+    const frei = wd === 0 || wd === 6;
+    const kl = `${frei ? ' mt-wochenende' : ''}${t === heute ? ' mt-heute' : ''}`;
+    const datum = `<td class="mt-datum">${esc(WOCHENTAG[wd].slice(0, 2))}. ${dmy(t)}</td>`;
+    const eintraege = (proTag[t] || []).sort((a, b) => String(a.von).localeCompare(String(b.von)));
+    if (!eintraege.length) {
+      zeilen += `<tr class="mt-ohne${kl}">${datum}<td colspan="7">${esc(w('keineSchichtGeplant'))}</td></tr>`;
+      return;
+    }
+    eintraege.forEach((e, i) => {
+      const min = schichtMinuten(e);
+      if (e.status !== 'abgesagt') { min === null ? unbekannt++ : summe += min; }
+      const st = STATUS_MARKE[e.status] || STATUS_MARKE.geplant;
+      const zu = ZUSAGE_MARKE[e.zusage] || ZUSAGE_MARKE.offen;
+      zeilen += `<tr class="mt-zeile${kl}${e.status === 'abgesagt' ? ' mt-abgesagt' : ''}"
+          tabindex="0" role="button" onclick="blattAuf(${Number(e.id)})"
+          onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();blattAuf(${Number(e.id)})}">
+        ${i === 0 ? datum : '<td class="mt-datum mt-weiter"></td>'}
+        <td class="mt-zeit">${esc(hm(e.von))}–${esc(hm(e.bis))}${ueberNacht(e) ? `<span class="mt-ft">${esc(w('folgetag'))}</span>` : ''}</td>
+        <td class="mt-dauer">${min === null ? '–' : esc(dauerText(min))}</td>
+        <td><b>${esc(e.titel || e.kunde_name || '')}</b>${e.objekt_name ? `<span class="mt-neben">${esc(e.objekt_name)}</span>` : ''}</td>
+        <td>${esc(e.ort || '')}${e.strasse ? `<span class="mt-neben">${esc(e.strasse)}</span>` : ''}</td>
+        <td>${esc(e.treffpunkt || '')}</td>
+        <td>${esc(e.bemerkung || '')}</td>
+        <td class="mt-status"><span class="marke ${st[1]}">${esc(w(st[0]))}</span>${e.status !== 'abgesagt' ? `<span class="marke ${zu[1]}">${esc(w(zu[0]))}</span>` : ''}</td>
+      </tr>`;
+    });
+  });
+
+  // Planwert aus den Schichtzeiten -- ausdruecklich KEINE Lohngrundlage.
+  // Rohzeit, bewertete Zeit, Bonus und Zuschlag bleiben getrennt (GAV,
+  // CLAUDE.md); hier steht nur die eine, unbewertete Groesse, und der Text
+  // sagt das auch. Eine Schicht ohne Zeitangabe wird MITGEZAEHLT als
+  // unbekannt und nicht stillschweigend als null verrechnet.
+  const fuss = `<tr><td colspan="8" class="mt-summe-zelle"><div class="mt-summe">
+      <b>${esc(w('geplanteStunden'))}: ${esc(dauerText(summe))}</b>
+      ${unbekannt ? `<span class="mt-warn">${unbekannt} ${esc(w(unbekannt === 1 ? 'ohneZeitangabe1' : 'ohneZeitangabe'))}</span>` : ''}
+      <span class="mt-neben">${esc(w('planwertHinweis'))}</span>
+    </div></td></tr>`;
+
+  $('plan-inhalt-plan').innerHTML = kopf + `<div class="mt-rahmen"><table class="mt">
+      <thead><tr>
+        <th>${esc(w('spDatum'))}</th><th>${esc(w('spZeit'))}</th><th>${esc(w('spDauer'))}</th>
+        <th>${esc(w('spEinsatz'))}</th><th>${esc(w('spOrt'))}</th><th>${esc(w('spTreffpunkt'))}</th>
+        <th>${esc(w('spBemerkung'))}</th><th>${esc(w('spStatus'))}</th>
+      </tr></thead>
+      <tbody>${zeilen}</tbody>
+      <tfoot>${fuss}</tfoot>
+    </table></div>`;
+}
+
+// Das Regelwerk wechselt beim Ziehen des Fensters von selbst -- der vom
+// Skript gebaute Inhalt nicht. Ohne diesen Umschalter bliebe nach dem
+// Ueberschreiten der Grenze die Darstellung der anderen Seite stehen.
+// Angehaengt an dieselbe Grenze wie das Regelwerk, damit beide nie
+// auseinanderlaufen koennen.
+matchMedia('(min-width: 1080px)').addEventListener('change', () => {
+  if (typeof reiter !== 'undefined' && reiter === 'plan') zeichnePlan();
+});
+
 function zeichnePlanListe() {
+  if (amSchreibtisch()) return zeichnePlanMonat();
+  return zeichnePlanListeHandy();
+}
+function zeichnePlanListeHandy() {
   const heute = isoTag();
   // ENT-134: der ganze laufende Monat, nicht nur ab heute -- sonst
   // verschwindet eine bereits abgeschlossene Schicht von vorhin aus dem Plan,
