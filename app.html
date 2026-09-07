@@ -441,6 +441,10 @@ svg.i-sm { width: 17px; height: 17px; }
 .tabs button.on { color: var(--accent); }
 /* Die Schreibtisch-Leiste gibt es am Handy nicht. Dort fuehrt die erste. */
 .tabs-tisch { display: none; }
+/* Am Handy fuellt "Neuer Antrag" die Zeile zu Recht -- dort IST sie schmal.
+   Stand vorher als Inline-Stil am Knopf und liess sich darum von keiner
+   Regel einfangen. */
+.aw-neu { width: 100%; }
 /* Der Konto-Knopf gehoert zum Schreibtisch. Am Handy fuehrt der Reiter
    "Menü" an dieselbe Stelle, und die Kopfzeile ist dort schmal. */
 .k-konto { display: none; }
@@ -1541,18 +1545,30 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
      stand weiter der Platz fuer die Reiterleiste, die am Schreibtisch
      gar nicht mehr unten liegt (88 px Leere). Gemessen, nicht gelesen. */
   main.inhalt { padding: 22px 26px 40px; min-width: 0; }
-  /* Dieselbe Falle eine Ebene tiefer: ".app.ohne-kopf .inhalt" traegt drei
-     Klassen und schlaegt "main.inhalt". Im Menue faellt die Kopfzeile weg
-     (ENT-402), und ohne diese Zeile bekaeme der Reiter dort wieder die
-     Handy-Polsterung. */
+  /* Die Kopfzeile bleibt am Schreibtisch IMMER stehen. Am Handy faellt
+     sie im Menue weg, weil dort die Profilkarte dasselbe sagt (ENT-402) --
+     am Schreibtisch traegt sie aber den Konto-Knopf, und der ist der
+     einzige Weg zu Spesen, Passwort, Einstellungen, Cockpit und
+     Abmelden. Ohne diese Zeile war er auf "Meine Stunden", "Meine Daten"
+     und "Mitteilungen" verschwunden -- gemessen, dieselbe Sackgasse wie
+     zuvor, nur eine Ebene tiefer. */
+  .app.ohne-kopf .kopf { display: flex; }
   .app.ohne-kopf main.inhalt { padding-top: 22px; }
 
   /* Lesbares Mass fuer alles, was Text ist: eine Zeile ueber 1200 px
-     verliert man beim Zeilenwechsel. Die Breite ist kein Selbstzweck. */
-  main.inhalt > .v { max-width: 1200px; margin-inline: auto; }
+     verliert man beim Zeilenwechsel. Die Breite ist kein Selbstzweck.
+     LINKSBUENDIG, nicht mittig: Beim Wechsel zwischen Plan (volle Breite)
+     und einer Textseite sprang die linke Kante sonst von 26 px auf 240 px
+     -- gemessen. Jede Seite beginnt jetzt an derselben Stelle, nur ihr
+     rechtes Ende ist verschieden. */
+  main.inhalt > .v { max-width: 1200px; margin-right: auto; }
   /* Die Ausnahme ist der Plan. Die Monatstabelle ist der Grund dafuer,
      dass die Seite ueberhaupt breit sein soll. */
   main.inhalt > #v-plan { max-width: none; }
+  /* ... aber nur die TABELLE. Sperren und Abwesenheit sind Listen und
+     Text; sie ueber 1590 px zu ziehen macht sie nicht lesbarer, nur
+     leerer. Dieselbe Grenze wie fuer jede andere Textseite. */
+  #plan-inhalt-sperren, #plan-inhalt-abwesenheit { max-width: 1200px; }
 
   /* ── Zweite Leiste (ENT-447) ────────────────────────────────────────
      Am Schreibtisch fuehrt die Schreibtisch-Leiste, die Handy-Leiste
@@ -1574,10 +1590,49 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
   /* Die Mitteilungen bleiben eine eigene Ebene, ruecken aber unter
      Kopfzeile und Leiste -- der gedrueckte Reiter bleibt sichtbar.
      --tisch-kopf ist gemessen, keine geratene Zahl. */
-  .mit-seite { top: var(--tisch-kopf); bottom: 0; }
-  .mit-seite .mit-kopf { max-width: 1200px; margin-inline: auto; width: 100%; }
+  /* Die Mitteilungen sind am Schreibtisch eine SEITE, keine Ueberlagerung.
+     Die 700-px-Query weiter oben haelt sie sonst in derselben 560-px-Saeule
+     wie am Tablet -- gemessen stand sie als 560 px breiter Streifen bei
+     x=560 mitten ueber der Monatstabelle, die dahinter sichtbar blieb.
+     Diese vier Zeilen heben genau das auf; ohne sie sieht der Reiter aus
+     wie ein Fehler. .blatt, .rgs und .toast bleiben bewusst schmal: Das
+     sind Dialoge, keine Seiten (fuer .rgs ausdruecklich ENT-294). */
+  .mit-seite { top: var(--tisch-kopf); bottom: 0; left: 0; right: 0;
+               max-width: none; transform: none; box-shadow: none;
+               border-top: 1px solid var(--line); }
+  /* Dieselbe linke Kante wie jede andere Seite -- 26 px, wie main.inhalt.
+     Springt die Kante beim Reiterwechsel, wirkt die Anwendung unruhig,
+     ohne dass man sagen koennte warum.
+
+     "width: 100%" und NICHT "margin-right: auto": .mit-seite ist ein
+     Spalten-Flex, und ein automatischer Rand in der Querachse hebt dort
+     das Strecken auf. Genau damit schrumpften Kopf und Inhalt auf ihren
+     Text zusammen -- gemessen 149 px fuer die Ueberschrift. Eine feste
+     Breite laesst den Kasten links beginnen, ohne das Strecken zu
+     brauchen. */
+  .mit-seite .mit-kopf, #mitBody { width: 100%; max-width: 1226px;
+                                   padding-left: 26px; padding-right: 26px; }
+  /* Kein Seitentitel, der den Reiter wiederholt. Der aktive Reiter steht
+     zwei Zentimeter darueber und sagt dasselbe -- eine Ueberschrift
+     daneben ist Wiederholung ohne neue Aussage. Ausserdem hatten drei von
+     fuenf Seiten eine und zwei keine; das war der eigentliche Fehler.
+     Betroffen sind nur die Seiten, die ein REITER oeffnet. Spesen und
+     Einstellungen behalten ihren Kopf samt Rueckweg: Die erreicht man
+     ueber "Konto", und dorthin muss man zurueckkommen. */
+  .mit-seite .mit-kopf { display: none; }
+  #mitBody { padding-top: 22px; }
+  #pr-stunden > .seiten-kopf, #pr-daten > .seiten-kopf { display: none; }
+
+  /* Ein Knopf wird nicht gestreckt, nur weil Platz da ist (CLAUDE.md).
+     "Neuer Antrag" lief ueber die vollen 1590 px. */
+  .aw-neu { width: auto; min-width: 220px; }
   .mit-seite .mit-zurueck { display: none; }   /* der Reiter IST der Weg zurueck */
-  #mitBody { max-width: 1200px; margin-inline: auto; width: 100%; }
+
+  /* Aus demselben Grund verschwinden die Zurueck-zum-Menue-Knoepfe: Am
+     Schreibtisch gibt es keinen Reiter "Menü" mehr, in den man
+     zurueckkoennte -- der Knopf zeigte auf einen Ort, den es dort nicht
+     gibt. Gemessen war er in "Meine Stunden" und "Meine Daten" sichtbar. */
+  .zur-menue { display: none; }
 
   /* Drei Knoepfe, die sich 1600 px teilen, sind keine Reiter mehr,
      sondern Banner (gemessen: 536 px je Knopf). Am Handy fuellen sie die
@@ -1693,6 +1748,9 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
       <svg class="i" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 6-2.5 7-2.5 7h17S18 14 18 8z"/><path d="M13.7 20a2 2 0 0 1-3.4 0"/></svg>
       <span class="mit-zahl" id="mitZahl" hidden>0</span>
     </button>
+    <button class="btn btn-plain" style="min-height:40px;padding:0 12px;background:var(--shell-hi);border-color:var(--shell-line);color:var(--shell-txt-hi)" onclick="allesLaden()" id="kLaden" aria-label="Aktualisieren">
+      <svg class="i i-sm" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+    </button>
     <!-- Konto: nur am Schreibtisch. Dort gibt es keinen Reiter "Menü"
          mehr (ENT-447) -- ohne diesen Knopf waeren Spesen, Passwort,
          Einstellungen, das Cockpit und sogar das ABMELDEN unerreichbar.
@@ -1701,9 +1759,6 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
             style="min-height:40px;padding:0 12px;background:var(--shell-hi);border-color:var(--shell-line);color:var(--shell-txt-hi)">
       <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       <span id="lb-konto">Konto</span>
-    </button>
-    <button class="btn btn-plain" style="min-height:40px;padding:0 12px;background:var(--shell-hi);border-color:var(--shell-line);color:var(--shell-txt-hi)" onclick="allesLaden()" id="kLaden" aria-label="Aktualisieren">
-      <svg class="i i-sm" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
     </button>
   </header>
 
@@ -3447,7 +3502,7 @@ function zeichneAbwesenheiten() {
   const el = $('plan-inhalt-abwesenheit');
   if (!el) { return; }
   let html = `<div style="padding:14px 16px 6px">
-    <button class="btn btn-primary" style="width:100%" onclick="awNeuerAntrag()">${esc(w('neuerAntrag'))}</button>
+    <button class="btn btn-primary aw-neu" onclick="awNeuerAntrag()">${esc(w('neuerAntrag'))}</button>
   </div>`;
   if (!meineAbwesenheiten.length) {
     html += LEER(w('keineAbwesenheiten'), w('keineAbwesenheitenText'),
@@ -4013,7 +4068,12 @@ function mitGlockeVerorten() {
   if (!glocke) { return; }
   const kopf = document.querySelector('.kopf');
   const karte = document.querySelector('#v-menu .pr-kopf');
-  const ziel = (reiter === 'menu' && karte) ? karte : kopf;
+  // Am Schreibtisch bleibt die Glocke IMMER in der Kopfzeile. Der Umzug in
+  // die Profilkarte ist eine Handy-Regel (ENT-402): Dort faellt die
+  // Kopfzeile im Menue weg. Am Schreibtisch steht sie -- und die
+  // Profilkarte ist auf einer Unterseite wie "Meine Stunden" verborgen,
+  // die Glocke waere also mitverschwunden. Gemessen: genau so passiert.
+  const ziel = (reiter === 'menu' && karte && !amSchreibtisch()) ? karte : kopf;
   if (!ziel || glocke.parentElement === ziel) { return; }
   // In der Kopfzeile vor dem Aktualisieren-Knopf, in der Profilkarte vor
   // dem Abmelden-Knopf -- beide Male links vom letzten Element.
@@ -5701,7 +5761,7 @@ function zeichneMenu() {
 
     <div id="pr-daten" style="display:none">
       <div class="seiten-kopf">
-        <button class="btn btn-plain" onclick="datenSeiteZu()" style="min-height:40px;padding:0 12px" aria-label="${esc(w('zurueckZumMenue'))}" title="${esc(w('zurueckZumMenue'))}">
+        <button class="btn btn-plain zur-menue" onclick="datenSeiteZu()" style="min-height:40px;padding:0 12px" aria-label="${esc(w('zurueckZumMenue'))}" title="${esc(w('zurueckZumMenue'))}">
           <svg class="i i-sm" viewBox="0 0 24 24"><polyline points="15 5 8 12 15 19"/></svg>
         </button>
         <h2>${esc(w('meineDaten'))}</h2>
@@ -5758,7 +5818,7 @@ function zeichneMenu() {
 
     <div id="pr-stunden" style="display:none">
       <div class="seiten-kopf">
-        <button class="btn btn-plain" onclick="stdSeiteZu()" style="min-height:40px;padding:0 12px" aria-label="${esc(w('zurueckZumMenue'))}" title="${esc(w('zurueckZumMenue'))}">
+        <button class="btn btn-plain zur-menue" onclick="stdSeiteZu()" style="min-height:40px;padding:0 12px" aria-label="${esc(w('zurueckZumMenue'))}" title="${esc(w('zurueckZumMenue'))}">
           <svg class="i i-sm" viewBox="0 0 24 24"><polyline points="15 5 8 12 15 19"/></svg>
         </button>
         <h2>${esc(w('meineStunden'))}</h2>
