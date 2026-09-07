@@ -14,9 +14,16 @@ kein Verkauf) — siehe Entscheidungsprotokoll im Projekt-Repository.
 |---|---|---|
 | Erfassung | https://rapport.itufeden.myhostpoint.ch | alle Mitarbeitenden, mobil |
 | Dashboard | https://rapport.itufeden.myhostpoint.ch/dashboard.html | nur Admin, Desktop |
+| Kundenportal | https://rapport.itufeden.myhostpoint.ch/portal.html | Kunden, Handy und Desktop |
 
-Beide Seiten teilen sich Anmeldung und Backend — wer angemeldet ist, bleibt es
-beim Wechsel. Nicht-Admins werden vom Dashboard abgewiesen.
+Erfassung und Dashboard teilen sich Anmeldung und Backend — wer angemeldet ist,
+bleibt es beim Wechsel. Nicht-Admins werden vom Dashboard abgewiesen.
+
+Das **Kundenportal** steht bewusst daneben und nicht dazwischen (ENT-441): Es hat
+eigene Tabellen, eine eigene Anmeldung und eine eigene Sitzungsprüfung. Ein
+Kundenzugang ist keine Zeile in `mitarbeiter` und erreicht darum keinen einzigen
+Verwaltungsendpunkt — `require_session()` findet ihn schlicht nicht. Angelegt
+werden die Zugänge im Cockpit unter **Administration → Kundenzugänge**.
 
 ## Aufbau
 
