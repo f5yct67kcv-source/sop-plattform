@@ -1,0 +1,306 @@
+// Der Lohnbereich im Cockpit (ENT-451).
+//
+// Worauf diese Pruefungen zielen -- in dieser Reihenfolge, weil so auch der
+// Schaden waere:
+//  1. Ein Reiter, hinter dem ein 403 wartet, darf gar nicht erst erscheinen.
+//     Der Lohn haengt am eigenen Recht, nicht am Personalrecht.
+//  2. Was der GAV ergibt, wird ABGELEITET gezeigt und nicht als Eingabefeld
+//     angeboten -- sonst driftet ein getippter Wert vom Anspruch weg.
+//  3. "Unbekannt" darf nie wie "keine" aussehen. Ein nicht ermittelbarer
+//     Mindestlohn zeigt den GRUND, kein Gedankenstrich und keine Null.
+//  4. Ein Ansatz unter dem GAV-Mindestlohn wird sichtbar, bevor jemand
+//     scrollt -- wer unter Tarif zahlt, soll es merken.
+//  5. Ein fehlender Abzugssatz wird namentlich benannt. Eine unvollstaendige
+//     Aufstellung darf nicht aussehen wie eine vollstaendige.
+//
+// Gemessen wird der gerenderte Zustand, nicht der Quelltext: eine Pruefung,
+// die ein Wort im Code sucht, bleibt gruen, wenn die Formulierung sich
+// aendert und die Sache verschwindet.
+import { WURZEL, browserPfad } from './pfade.mjs';
+import { chromium } from 'playwright';
+
+const EXE = browserPfad();
+const ok = [], bad = [];
+const check = (n, c) => (c ? ok : bad).push(n);
+
+// Datum bewusst weit weg von heute (CLAUDE.md / test_datumsfest.mjs): ein
+// Datum nahe am heutigen Tag kippt beim Datumswechsel.
+const STICHTAG = '2027-05-31';
+
+const DOSSIER = { id: 42, name: 'muster.person', vorname: 'Eine', nachname: 'Person',
+  personalnummer: 'P-0042', anstellungskategorie: 'C', eintritt: '2024-03-01', aktiv: 1 };
+
+// Zwei Antworten desselben Endpunkts: einmal vollstaendig, einmal mit
+// Luecken. Die zweite ist die eigentlich interessante -- sie prueft, dass
+// Unbekanntes benannt und nicht verschwiegen wird.
+const LOHN_VOLL = {
+  status: 'ok',
+  person: { id: 42, name: 'Eine Person', personalnummer: 'P-0042', kategorie: 'C',
+    pensum_stunden: 800, eintritt: '2024-03-01', austritt: null, ahv_erfasst: true },
+  abgeleitet: {
+    stichtag: STICHTAG, lohnform: 'stunde', lohnform_text: 'Stundenlohn (Art. 8: Kategorie C)',
+    dienstjahr: 4,
+    mindestlohn: { wert: 2495, einheit: 'stunde', dienstjahr: 4, grund: null,
+      text: 'Art. 16 i.V.m. Anhang 1, Kat. C, Dienstjahr 4, Gruppe uebrige — ohne Ferienentschaedigung' },
+    ferienentschaedigung: { bp: 833, annahme: false, grund: null,
+      text: 'Art. 20 Ziff. 2: 4 Wochen, Zuschlag 8,33 %' },
+    bvg_pflichtig_ab: '2025-01-01',
+  },
+  ansaetze: [{ id: 1, mitarbeiter_id: 42, gueltig_ab: '2024-03-01', kategorie: 'C',
+    ansatz_rappen: 2500, ferien_laufend: 1, ml13_bp: 833,
+    zuschlag_fachausweis_art: null, zuschlag_fachausweis_rappen: null,
+    zuschlag_hund_art: 'stunde', zuschlag_hund_rappen: 150,
+    zuschlag_waffe_art: null, zuschlag_waffe_rappen: null, bemerkung: null }],
+  ansatz_aktuell: { id: 1, gueltig_ab: '2024-03-01', ansatz_rappen: 2500 },
+  abzuege: [{ id: 5, mitarbeiter_id: 42, gueltig_ab: '2024-03-01', nbu_pflichtig: 1,
+    ktg_pflichtig: 1, bvg_angeschlossen: 0, bvg_beitrag_rappen: null,
+    qst_pflichtig: 0, qst_kanton: null, qst_tarifcode: null, qst_kinder: null }],
+  zahlungen: [{ id: 9, mitarbeiter_id: 42, reihenfolge: 1, art: 'rest', betrag_rappen: null,
+    iban: 'CH9300762011623852957', empfaenger: null, bank: null, aktiv: 1 }],
+  warnung: null,
+};
+
+// Dieselbe Person, aber ohne Kategorie und ohne Eintritt: Der Mindestlohn
+// ist dann NICHT null Franken, sondern nicht ermittelbar -- und der Ansatz
+// liegt unter Tarif.
+const LOHN_LUECKIG = {
+  status: 'ok',
+  person: { id: 42, name: 'Eine Person', personalnummer: 'P-0042', kategorie: null,
+    pensum_stunden: null, eintritt: null, austritt: null, ahv_erfasst: false },
+  abgeleitet: {
+    stichtag: STICHTAG, lohnform: null,
+    lohnform_text: 'Unbekannt — ohne Anstellungskategorie nach Art. 8 keine Lohnform',
+    dienstjahr: null,
+    mindestlohn: { wert: null, grund: 'keine_kategorie',
+      text: 'Ohne Anstellungskategorie nach Art. 8 kein Mindestlohn' },
+    ferienentschaedigung: { bp: 1064, annahme: true, grund: 'kein_geburtsdatum',
+      text: 'Ohne Geburtsdatum der hoehere Satz (10,64 %) — zugunsten der mitarbeitenden Person' },
+    bvg_pflichtig_ab: null,
+  },
+  ansaetze: [], ansatz_aktuell: null, abzuege: [], zahlungen: [],
+  warnung: { art: 'unter_mindestlohn', mindest_rappen: 2495,
+    text: 'Der erfasste Ansatz liegt unter dem GAV-Mindestlohn (24.95 CHF pro Stunde).' },
+};
+
+const LOHNARTEN = {
+  status: 'ok',
+  lohnarten: [
+    { id: 1, schluessel: 'grundlohn_stunde', bezeichnung: 'Grundlohn pro Stunde',
+      art: 'stundensatz', basis_schluessel: null, satz_bp: null,
+      ahv_pflichtig: 1, ferien_pflichtig: 1, ml13_pflichtig: 1, bvg_pflichtig: 1,
+      uvg_pflichtig: 1, qst_pflichtig: 1, gav_grundlage: 'Art. 16 i.V.m. Anhang 1 GAV',
+      system: 1, sortierung: 10, aktiv: 1 },
+    // Der Auslagenersatz traegt KEIN einziges Kennzeichen -- er ist kein
+    // Lohn (GAV-AUS-009, Art. 18 Ziff. 10). Genau das wird unten geprueft.
+    { id: 2, schluessel: 'auslagenersatz', bezeichnung: 'Auslagenersatz',
+      art: 'netto', basis_schluessel: null, satz_bp: null,
+      ahv_pflichtig: 0, ferien_pflichtig: 0, ml13_pflichtig: 0, bvg_pflichtig: 0,
+      uvg_pflichtig: 0, qst_pflichtig: 0, gav_grundlage: 'Art. 18 GAV',
+      system: 1, sortierung: 40, aktiv: 1 },
+    // Ohne GAV-Grundlage: betrieblich. Leer ist hier eine Aussage.
+    { id: 3, schluessel: 'anteil_13ml', bezeichnung: 'Anteil 13. Monatslohn',
+      art: 'prozent', basis_schluessel: 'grundlohn', satz_bp: null,
+      ahv_pflichtig: 1, ferien_pflichtig: 0, ml13_pflichtig: 0, bvg_pflichtig: 1,
+      uvg_pflichtig: 1, qst_pflichtig: 1, gav_grundlage: null,
+      system: 1, sortierung: 21, aktiv: 1 },
+  ],
+  kennzeichen: { ahv_pflichtig: 'AHV', ferien_pflichtig: 'Ferien', ml13_pflichtig: '13.',
+    bvg_pflichtig: 'BVG', uvg_pflichtig: 'UVG', qst_pflichtig: 'QSt' },
+  arten: { stundensatz: 'Betrag je Stunde', prozent: 'Prozentsatz', netto: 'Weder Lohn noch Abzug' },
+};
+
+// Zwei von fuenf Saetzen erfasst -- die uebrigen drei muessen namentlich
+// erscheinen, nicht stillschweigend fehlen.
+const ABZUEGE = {
+  status: 'ok',
+  abzuege: [
+    { id: 1, schluessel: 'ahv', bezeichnung: 'AHV/IV/EO — Arbeitnehmeranteil',
+      gueltig_ab: '2026-01-01', gueltig_bis: null, satz_bp: 530, fix_rappen: null,
+      hoechstlohn_rappen: null, quelle: 'Beitragsverfuegung Ausgleichskasse' },
+    { id: 2, schluessel: 'alv', bezeichnung: 'ALV — Arbeitnehmeranteil',
+      gueltig_ab: '2026-01-01', gueltig_bis: null, satz_bp: 110, fix_rappen: null,
+      hoechstlohn_rappen: null, quelle: 'Beitragsverfuegung Ausgleichskasse' },
+  ],
+  katalog: { ahv: 'AHV/IV/EO', alv: 'ALV', nbu: 'NBU (Nichtberufsunfall)',
+    ktg: 'Krankentaggeld', bvg: 'BVG' },
+  fehlend: ['nbu', 'ktg', 'bvg'],
+};
+
+let lohnAntwort = LOHN_VOLL;
+let rechte = ['personal_lesen', 'lohn_lesen', 'lohn_schreiben'];
+
+const browser = await chromium.launch({ executablePath: EXE });
+const page = await browser.newPage({ viewport: { width: 1600, height: 1100 } });
+page.setDefaultTimeout(5000);
+const jsFehler = [];
+page.on('pageerror', e => jsFehler.push(e.message));
+
+await page.route('**/api/**', async r => {
+  const u = r.request().url();
+  const send = x => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(x) });
+  if (u.includes('login')) return send({ status: 'ok', token: 't', name: 'a', rechte });
+  if (u.includes('me.php')) return send({ status: 'ok', name: 'a', rechte });
+  if (u.includes('lohn_person')) return send(lohnAntwort);
+  if (u.includes('lohnarten')) return send(LOHNARTEN);
+  if (u.includes('lohn_abzuege')) return send(ABZUEGE);
+  if (u.includes('mitarbeiter_dossier')) return send({ status: 'ok', eingerichtet: true, mitarbeiter: DOSSIER });
+  if (u.includes('mitarbeiter_list')) return send({ status: 'ok', mitarbeiter: [DOSSIER], listen: {}, eingerichtet: true });
+  return send({ status: 'ok', kpi: {}, verlauf: [], angemeldet: [], mitarbeiter: [], kunden: [],
+    einsaetze: [], objekte: [], rapporte: [], orte: [], feiertage: [], gepflegt: {},
+    lohnarten: [], abzuege: [], fehlend: [] });
+});
+
+// Vor jedem Anmelden den Speicher leeren: Sonst ist die zweite Anmeldung
+// gar keine -- die Seite kommt mit der alten Sitzung hoch, und die Pruefung
+// mit den ENTZOGENEN Rechten liefe gegen die alten weiter.
+const anmelden = async () => {
+  await page.goto(`file://${WURZEL}/dashboard.html`);
+  await page.evaluate(() => { localStorage.clear(); sessionStorage.clear(); });
+  await page.goto(`file://${WURZEL}/dashboard.html`);
+  await page.waitForSelector('#gName', { state: 'visible' });
+  await page.fill('#gName', 'a'); await page.fill('#gPass', 'x'); await page.click('#gBtn');
+  await page.waitForSelector('#shell.on');
+  await page.waitForTimeout(400);
+};
+const sichtbar = id => page.evaluate(i => {
+  const el = document.getElementById(i);
+  if (!el) { return false; }
+  const s = getComputedStyle(el);
+  return s.display !== 'none' && s.visibility !== 'hidden' && el.offsetParent !== null;
+}, id);
+
+await anmelden();
+
+// ── 1. Der Reiter haengt am eigenen Recht ────────────────────────────────
+check('Mit dem Recht "Lohn" steht die Rubrik in der Navigation', await sichtbar('navg-lohn'));
+// Die Unterpunkte liegen in der eingeklappten Rubrik -- gemessen wird
+// darum nicht, ob sie GERADE zu sehen sind, sondern ob rechteAnwenden()
+// sie freigegeben hat. Ein per style ausgeblendeter Knopf bliebe auch nach
+// dem Aufklappen fort.
+const freigegeben = id => page.evaluate(i =>
+  !!document.getElementById(i) && document.getElementById(i).style.display !== 'none', id);
+check('Mit dem Recht "Lohn" sind beide Unterpunkte freigegeben',
+  await freigegeben('nav-lohn-lohnarten') && await freigegeben('nav-lohn-saetze'));
+
+// ── 2. Lohnarten: die sechs Kennzeichen ──────────────────────────────────
+await page.evaluate(() => go('lohnarten'));
+await page.waitForTimeout(400);
+const laText = (await page.textContent('#view-lohnarten')).replace(/\s+/g, ' ');
+check('Die Lohnarten-Ansicht nennt jede erfasste Lohnart',
+  /Grundlohn pro Stunde/.test(laText) && /Auslagenersatz/.test(laText));
+// Gezaehlt werden die KENNZEICHEN-Spalten, nicht alle Spalten: Eine feste
+// Gesamtzahl braeche bei jeder kosmetischen Spalte, ohne dass die Aussage
+// sich aendert. Die sechs sind an ihrem Titel erkennbar -- er traegt die
+// Erklaerung aus lohnart_kennzeichen() vom Server.
+const kzSpalten = await page.evaluate(() =>
+  [...document.querySelectorAll('#laListe thead th')]
+    .filter(t => ['AHV', 'Ferien', '13.', 'BVG', 'UVG', 'QSt'].includes(t.textContent.trim())).length);
+check('KRITISCH: die Tabelle zeigt alle sechs Bemessungsgrundlagen als eigene Spalten',
+  kzSpalten === 6);
+// Der Auslagenersatz ist kein Lohn: keine einzige Bemessungsgrundlage.
+// GAV-AUS-009 und Art. 18 Ziff. 10 -- er gehoert in eine getrennte
+// Spesenabrechnung, nicht in die Arbeitszeitabrechnung.
+const auslagenPunkte = await page.evaluate(() => {
+  const zeile = [...document.querySelectorAll('#laListe tbody tr')]
+    .find(t => /Auslagenersatz/.test(t.textContent));
+  return zeile ? [...zeile.querySelectorAll('td')].filter(td => td.textContent.trim() === '●').length : -1;
+});
+check('KRITISCH: der Auslagenersatz zaehlt in keine einzige Bemessungsgrundlage (GAV-AUS-009)',
+  auslagenPunkte === 0);
+const grundlohnPunkte = await page.evaluate(() => {
+  const zeile = [...document.querySelectorAll('#laListe tbody tr')]
+    .find(t => /Grundlohn pro Stunde/.test(t.textContent));
+  return zeile ? [...zeile.querySelectorAll('td')].filter(td => td.textContent.trim() === '●').length : -1;
+});
+check('Der Grundlohn dagegen zaehlt in alle sechs -- die Spalten sagen also etwas aus',
+  grundlohnPunkte === 6);
+// Eine Lohnart ohne GAV-Artikel ist BETRIEBLICH -- das ist eine Aussage,
+// kein Gedankenstrich. Der 13. Monatslohn ist keine GAV-Pflicht.
+check('KRITISCH: eine Lohnart ohne GAV-Artikel wird als "betrieblich" benannt, nicht als Luecke',
+  /betrieblich/.test(laText));
+
+// ── 3. Abzugssaetze: fehlende werden namentlich benannt ──────────────────
+await page.evaluate(() => go('lohnsaetze'));
+await page.waitForTimeout(400);
+const lsText = (await page.textContent('#view-lohnsaetze')).replace(/\s+/g, ' ');
+check('KRITISCH: die drei noch nicht erfassten Abzuege stehen namentlich da',
+  /NBU/.test(lsText) && /Krankentaggeld/.test(lsText) && /BVG/.test(lsText));
+check('KRITISCH: und es steht dabei, dass fuer sie nicht gerechnet wird -- nicht mit null',
+  /nicht gerechnet/.test(lsText) && /unbekannt/i.test(lsText));
+check('Die Zahl der fehlenden steht im Verhaeltnis zur Gesamtzahl, nicht allein',
+  /3 von 5/.test(lsText));
+check('Die erfassten Saetze erscheinen mit ihrer Quelle',
+  /5.30 %/.test(lsText) && /Ausgleichskasse/.test(lsText));
+check('Was aus dem GAV kommt, steht getrennt und wird nicht als erfassbar ausgegeben',
+  /Aus dem GAV/.test(lsText) && /Anhang 1/.test(lsText) && /Art. 6 Ziff. 2/.test(lsText));
+
+// ── 4. Der Lohnbereich in der Personalakte ───────────────────────────────
+await page.evaluate(() => { go('mitarbeiter'); openMaDetail('muster.person'); });
+await page.waitForTimeout(400);
+check('In der Personalakte steht ein Reiter "Lohn"', await sichtbar('mdtab-lohn'));
+await page.evaluate(() => mdGoTab('lohn'));
+await page.waitForTimeout(500);
+const akte = (await page.textContent('#mdBereich_lohn')).replace(/\s+/g, ' ');
+check('Die abgeleiteten GAV-Groessen stehen als eigener Block',
+  /Aus dem GAV abgeleitet/.test(akte));
+check('Die Lohnform wird aus der Kategorie hergeleitet und benannt',
+  /Stundenlohn/.test(akte) && /Kategorie C/.test(akte));
+check('Der GAV-Mindestlohn steht mit seiner Fundstelle',
+  /24.95/.test(akte) && /Anhang 1/.test(akte));
+check('Die Ferienentschaedigung steht als abgeleiteter Satz, nicht als Eingabefeld',
+  /8.33 %/.test(akte) && /Art. 20 Ziff. 2/.test(akte));
+check('Der erfasste Ansatz erscheint mit seiner Gueltigkeit',
+  /25.00/.test(akte) && /gilt heute/.test(akte));
+check('Ein Zuschlag nach Art. 19 erscheint mit Betrag und Einheit',
+  /Diensthund/.test(akte) && /1.50/.test(akte));
+check('Die IBAN des Zahlungsempfaengers erscheint',
+  /CH9300762011623852957/.test(akte));
+
+// ── 5. Der eigentliche Kern: Unbekanntes sieht nicht aus wie Nichts ──────
+lohnAntwort = LOHN_LUECKIG;
+await page.evaluate(() => { lohnAkte = null; lohnAkteFuer = null; mdGoTab('lohn'); });
+await page.waitForTimeout(500);
+const luecke = (await page.textContent('#mdBereich_lohn')).replace(/\s+/g, ' ');
+check('KRITISCH: ein nicht ermittelbarer Mindestlohn zeigt den GRUND, keine Null und keinen Strich',
+  /Ohne Anstellungskategorie/.test(luecke) && !/0.00 CHF/.test(luecke));
+check('KRITISCH: eine fehlende Lohnform wird als unbekannt benannt, nicht als Stundenlohn geraten',
+  /Unbekannt/.test(luecke) && /keine Lohnform/.test(luecke));
+check('KRITISCH: ein fehlendes Dienstjahr nennt den Grund (Art. 16 Ziff. 2)',
+  /Ohne Eintrittsdatum/.test(luecke));
+check('KRITISCH: die fehlende AHV-Nummer wird als Hindernis benannt, nicht als leeres Feld',
+  /fehlt/.test(luecke) && /keine Abrechnung/.test(luecke));
+check('KRITISCH: der Ansatz unter dem GAV-Mindestlohn wird als Warnung sichtbar',
+  /unter dem GAV-Mindestlohn/.test(luecke));
+check('Die Warnung sagt zugleich, dass sie keine Sperre ist -- Anhang 1 laesst einen Fall zu',
+  /Warnung, keine Sperre/.test(luecke));
+check('Ein noch nicht erfasster Ansatz sagt, was daraus folgt',
+  /nicht abgerechnet werden/.test(luecke));
+// Der Betriebsentscheid aus ENT-451: im Zweifel zugunsten der Person. Ohne
+// Geburtsdatum gilt der HOEHERE Satz, und das wird gesagt.
+check('KRITISCH: ohne Geburtsdatum steht der hoehere Ferien-Satz da, mit Begruendung',
+  /10.64 %/.test(luecke) && /zugunsten/.test(luecke));
+
+// ── 6. Ohne das Recht ist nichts davon da ────────────────────────────────
+rechte = ['personal_lesen'];
+lohnAntwort = LOHN_VOLL;
+await anmelden();
+check('KRITISCH: ohne das Recht "Lohn" fehlt die Rubrik in der Navigation',
+  !(await sichtbar('navg-lohn')));
+await page.evaluate(() => { go('mitarbeiter'); openMaDetail('muster.person'); });
+await page.waitForTimeout(400);
+check('KRITISCH: ohne das Recht "Lohn" fehlt auch der Reiter in der Personalakte',
+  !(await sichtbar('mdtab-lohn')));
+// Wer die Personalakte lesen darf, sieht sie weiterhin -- die Sperre
+// betrifft den Lohn, nicht die Akte.
+check('Die uebrige Personalakte bleibt erreichbar', await sichtbar('mdtab-person'));
+
+check('Keine JavaScript-Fehler auf der Seite', jsFehler.length === 0);
+
+await browser.close();
+console.log(`${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
+if (bad.length) {
+  console.log('  ✗ ' + bad.join('\n  ✗ '));
+  if (jsFehler.length) { console.log('\nJS-Fehler:\n  ' + jsFehler.join('\n  ')); }
+  process.exit(1);
+}
+console.log('Alle Pruefungen bestanden.');
