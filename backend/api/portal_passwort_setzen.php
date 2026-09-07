@@ -45,6 +45,15 @@ if ($fehler !== null) {
 }
 
 $pdo = db();
+// Dieselbe Ruecksicht wie in portal_anmelden.php: Zwischen Deploy und
+// Einrichtung liegt eine Zeitspanne, und in der gibt es die Spalte noch
+// nicht. Dann sagt der Endpunkt das, statt an einem SQL-Fehler zu zerbrechen
+// -- "noch nicht eingerichtet" ist etwas anderes als "hat nicht geklappt".
+if (!hat_spalte($pdo, 'kundenzugang', 'password_hash')) {
+    json_response(['status' => 'error',
+        'message' => 'Die Passwortvergabe ist noch nicht eingerichtet. '
+                   . 'Bitte wenden Sie sich an Ihren Ansprechpartner.'], 503);
+}
 $pdo->prepare('UPDATE kundenzugang SET password_hash = ? WHERE id = ?')
     ->execute([password_hash($passwort, PASSWORD_DEFAULT, ['cost' => PASSWORT_KOSTEN]),
                (int)$zugang['id']]);

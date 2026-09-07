@@ -721,6 +721,45 @@ if (zugangOhnePortalrecht.length) {
   bad.push('Kundenzugang ohne Recht portal: ' + zugangOhnePortalrecht.join(', '));
 }
 
+// EINE NEUERUNG DARF DAS BESTEHENDE NICHT BRECHEN, BEVOR DIE EINRICHTUNG
+// GELAUFEN IST. Zwischen einem Deploy und dem Ausfuehren der Einrichtung
+// liegt immer eine Zeitspanne -- und genau in der ist das Portal einmal
+// gestanden: Die Passwortspalte aus ENT-444 war im Code vorausgesetzt, aber
+// noch nicht in der Datenbank, und jede Anmeldung endete an einem
+// SQL-Fehler. Wer eine Spalte liest, die aus einem Nachtrag stammt, muss
+// ihr Fehlen darum abfangen -- dasselbe Muster wie db.php seit ENT-075 fuer
+// sessions.letzte_nutzung.
+//
+// Geprueft wird gegen die Nachtragsliste selbst und nicht gegen eine
+// zweite, hier gepflegte Aufzaehlung: Eine solche waere beim naechsten
+// Nachtrag sofort veraltet.
+{
+  const einrichtung = readFileSync(`${WURZEL}/backend/api/planung_einrichten.php`, 'utf8');
+  const spaltenBlock = (einrichtung.match(/\$spalten = \[[\s\S]*?\n\];/) || [''])[0];
+  const nachtraege = [...spaltenBlock.matchAll(/\['kundenzugang',\s*'(\w+)'/g)].map(m => m[1]);
+  check('Die Nachtragsliste nennt Spalten der Kundenzugaenge', nachtraege.length > 0);
+  const ungeschuetzt = [];
+  for (const datei of portalDateien.concat(zugangDateien)) {
+    const q = ohneKommentar(datei);
+    for (const spalte of nachtraege) {
+      // Genannt, aber nicht abgesichert -- weder ueber hat_spalte() noch
+      // ueber eine Bedingung, die den Namen ueberhaupt erst einsetzt.
+      // Nicht von einer Klammer gefolgt -- sonst trifft der Name auch die
+      // gleichnamige PHP-Funktion password_hash(), und die hat mit der
+      // Spalte nichts zu tun. Genau daran ist die erste Fassung dieser
+      // Pruefung haengengeblieben.
+      if (new RegExp('\\b' + spalte + '\\b(?!\\s*\\()').test(q)
+          && !new RegExp("hat_spalte\\s*\\([^)]*'" + spalte + "'").test(q)) {
+        ungeschuetzt.push(datei + ' → ' + spalte);
+      }
+    }
+  }
+  check('KRITISCH: kein Portal-Endpunkt setzt eine nachgetragene Spalte voraus, ohne ihr Fehlen abzufangen',
+    ungeschuetzt.length === 0);
+  if (ungeschuetzt.length) { bad.push('ungeschuetzte Spalte: ' + ungeschuetzt.join(', ')); }
+}
+
+
 // Das Recht muss im Katalog stehen und darf NUR der Verwaltung gehoeren.
 // Stuende es bei 'Planung', koennte jede planende Person einem Dritten
 // Zugang verschaffen -- genau das war der Grund, es zu trennen.

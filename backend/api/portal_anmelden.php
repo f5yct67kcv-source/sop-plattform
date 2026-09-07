@@ -77,8 +77,17 @@ if ($sperre > 0) {
         'message' => "Zu viele Fehlversuche. Bitte $sperre Minuten warten."], 429);
 }
 
+// Die Passwortspalte kam mit ENT-444 dazu. Sie wird NICHT vorausgesetzt:
+// Zwischen einem Deploy und dem Ausfuehren der Einrichtung liegt immer eine
+// Zeitspanne, und in der muss das Portal weiterlaufen -- ueber den
+// Einmal-Code, wie vor ENT-444. Ohne diese Ruecksicht bricht eine Neuerung
+// das Bestehende in genau dem Moment, in dem sie live geht; dasselbe Muster
+// traegt db.php seit ENT-075 fuer sessions.letzte_nutzung.
+$hatPwSpalte = hat_spalte($pdo, 'kundenzugang', 'password_hash');
+
 $stmt = $pdo->prepare(
-    'SELECT z.id, z.name, z.kunde_id, z.password_hash, k.name AS kunde_name
+    'SELECT z.id, z.name, z.kunde_id, k.name AS kunde_name'
+    . ($hatPwSpalte ? ', z.password_hash' : '') . '
        FROM kundenzugang z JOIN kunden k ON k.id = z.kunde_id
       WHERE z.email = ? AND z.aktiv = 1'
 );
@@ -91,6 +100,14 @@ $hash     = (string)($zugang['password_hash'] ?? '');
 
 // ── Weg 1: eigenes Passwort (der Normalfall) ──────────────────────────
 if ($passwort !== '') {
+    if (!$hatPwSpalte) {
+        // Kein stilles "Passwort falsch": Die Einrichtung ist nicht gelaufen,
+        // und das ist etwas anderes als eine falsche Eingabe. Wer das
+        // verwechselt, sucht den Fehler bei sich statt dort, wo er ist.
+        json_response(['status' => 'error',
+            'message' => 'Die Anmeldung mit Passwort ist noch nicht eingerichtet. '
+                       . 'Bitte melden Sie sich mit einem Code an.'], 503);
+    }
     if ($hash === '' || !password_verify($passwort, $hash)) {
         anmeld_fehlversuch($pdo, $email, $adresse);
         // EINE Meldung fuer beides -- ob es zu dieser Adresse ueberhaupt
@@ -150,7 +167,10 @@ anmeld_zuruecksetzen($pdo, $email);
 // Nach dem Code verlangt das Portal ein Passwort, wenn noch keines steht.
 // Das ist der ganze Zweck des Umbaus aus ENT-444: Der Code ist der Weg
 // hinein, nicht der Weg fuer jeden Tag.
-kp_sitzung_eroeffnen($pdo, $zugangId, $zugang, $hash === '');
+// Ein Passwort verlangen kann das Portal nur, wenn es eines speichern
+// kann. Fehlt die Spalte noch, geht es wie vor ENT-444 direkt weiter --
+// nicht in eine Maske, die beim Speichern scheitern wuerde.
+kp_sitzung_eroeffnen($pdo, $zugangId, $zugang, $hatPwSpalte && $hash === '');
 
 // Beide Wege enden hier -- eine Stelle, damit sie nicht auseinanderlaufen.
 // Ein zweiter Ort, an dem eine Sitzung entsteht, waere ein zweiter Ort, an
