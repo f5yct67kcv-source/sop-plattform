@@ -266,6 +266,11 @@ jobs:
           cp index.html dist/index.html
           cp dashboard.html dist/dashboard.html
           cp app.html dist/app.html
+          # Kundenportal (ENT-441). Eigene Seite, bewusst getrennt von
+          # dashboard.html und app.html: Sie traegt weder Cockpit- noch
+          # Mitarbeiter-Code, also kann von dort auch nichts versehentlich
+          # an einen Kunden geraten.
+          cp portal.html dist/portal.html
           # gav.js traegt die GAV-Regeln fuer BEIDE Oberflaechen (ENT-049).
           # Fehlt sie hier, laden dashboard.html und app.html ins Leere und
           # rechnen gar nichts mehr -- derselbe Fallstrick wie bei ENT-040.
@@ -330,6 +335,10 @@ jobs:
           cp img/anmeldung-nacht.webm dist/img/anmeldung-nacht.webm
           cp img/anmeldung-nacht.mp4 dist/img/anmeldung-nacht.mp4
           cp backend/db.php dist/db.php
+          # Sitzungen und Einmal-Codes des Kundenportals (ENT-441).
+          # Wird nur von den portal_*-Endpunkten eingebunden, nie direkt
+          # aufgerufen -- steht darum auch in der Sperrliste der .htaccess.
+          cp backend/kundenportal.php dist/kundenportal.php
           cp backend/ai.php dist/ai.php
           cp backend/planung.php dist/planung.php
           cp backend/kunden.php dist/kunden.php

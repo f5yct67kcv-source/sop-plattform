@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Kundenportal</title>
+<style>
+/* Farben und Masse aus dem Cockpit uebernommen, nicht neu erfunden --
+   ein Kunde, der einen Rapport als PDF kennt, soll dieselbe Handschrift
+   sehen. */
+:root{
+  --grund:#F4F5F7; --flaeche:#FFFFFF; --text:#14161A; --grau:#6B7280;
+  --linie:#E5E8EC; --gruen:#1C7C3E; --rot:#B3261E; --dunkel:#16181D;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--grund);color:var(--text);
+     font-family:-apple-system,'Segoe UI',Arial,sans-serif;font-size:15px;line-height:1.5}
+.buehne{max-width:900px;margin:0 auto;padding:20px 16px 56px}
+
+/* ── Kopf ──────────────────────────────────────────────────────────────
+   Auf dem Handy ist die Kopfzeile der einzige Ort, der sagt, wo man ist:
+   Titel deutlich, Unterzeile lesbar (Hausregel). */
+.kopf{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;
+      border-bottom:2px solid var(--dunkel);padding-bottom:14px;margin-bottom:22px;flex-wrap:wrap}
+.kopf h1{margin:0;font-size:21px;font-weight:800;letter-spacing:-.4px}
+.kopf .unter{font-size:13px;color:var(--grau);margin-top:3px}
+/* margin-left:auto statt space-between allein: Bricht die Kopfzeile auf dem
+   Handy um, landet der Knopf sonst links unter dem Titel -- er gehoert aber
+   auf beiden Breiten an dieselbe Stelle. */
+.kopf #abmelden{margin-left:auto}
+
+/* Beschriftung OBEN, Wert darunter -- nie umgekehrt (Hausregel). */
+.feld{display:block}
+.feld .bez{font-size:11px;text-transform:uppercase;letter-spacing:.5px;
+           color:var(--grau);font-weight:700;margin-bottom:6px}
+.feld .wert{font-size:15px;font-weight:600}
+
+.karte{background:var(--flaeche);border-radius:12px;padding:20px;
+       box-shadow:0 1px 3px rgba(0,0,0,.08);margin-bottom:16px}
+
+/* Bedienelemente auf dem Handy mindestens 44 px hoch, Eingabefelder
+   mindestens 16 px Schrift -- darunter zoomt iOS hinein (Hausregel). */
+label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.5px;
+      color:var(--grau);font-weight:700;margin:0 0 6px}
+input{width:100%;min-height:44px;font-size:16px;padding:10px 12px;
+      border:1px solid var(--linie);border-radius:8px;background:#fff;color:var(--text);
+      font-family:inherit}
+input:focus{outline:2px solid var(--dunkel);outline-offset:1px}
+/* Ein Knopf wird NICHT ueber die volle Breite gestreckt, nur weil er allein
+   in seiner Zeile steht (Hausregel). */
+.knopf{display:inline-block;min-height:44px;padding:11px 22px;border-radius:8px;
+       font-size:15px;font-weight:700;border:none;cursor:pointer;font-family:inherit;
+       background:var(--dunkel);color:#fff}
+.knopf.still{background:#fff;color:var(--text);border:1px solid var(--linie)}
+.knopf:disabled{opacity:.5;cursor:default}
+.knopfzeile{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:18px}
+
+.hinweis{font-size:13.5px;color:var(--grau);margin:10px 0 0}
+.fehler{font-size:14px;color:var(--rot);font-weight:600;margin:12px 0 0}
+
+/* ── Zeitraum ─────────────────────────────────────────────────────────── */
+.zeitraum{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+/* Auf dem Handy fuellen die beiden Felder die Zeile, am Desktop bleiben sie
+   bei ihrer Inhaltsbreite: Ein Datumsfeld, das 380 px breit ist fuer acht
+   Zeichen, ist kein grosszuegiges Layout, sondern ein leeres. */
+.zeitraum .paar{flex:1 1 150px;min-width:0;max-width:220px}
+
+/* ── Liste ────────────────────────────────────────────────────────────── */
+/* Zwei Spalten auf dem Handy, drei am Desktop -- aber in BEIDEN Faellen
+   steht der Zustand rechts und nicht unter dem Datum. Ein Block, der links
+   beginnt, und einer, der rechts endet, sind zwei Muster; mit dem
+   ausdruecklichen grid-row bleibt es eines. Ohne das rutschte das dritte
+   Kind in die naechste Zeile und stand linksbuendig da (gemessen am
+   gerenderten Zustand, nicht im Quelltext vermutet). */
+.zeile{display:grid;grid-template-columns:1fr auto;gap:2px 16px;align-items:start;
+       padding:14px 0;border-bottom:1px solid var(--linie)}
+.zeile .datum{grid-column:1;grid-row:1}
+.zeile .haupt{grid-column:1;grid-row:2}
+.zeile .rechts{grid-column:2;grid-row:1 / span 2;align-self:start}
+.zeile:last-child{border-bottom:none}
+.zeile .datum{font-weight:700}
+.zeile .objekt{color:var(--grau);font-size:13.5px}
+.zeile .rechts{text-align:right;white-space:nowrap}
+.marke{display:inline-block;font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px}
+.marke.gut{background:#E7F3EA;color:var(--gruen)}
+.marke.ab{background:#FBE9E7;color:var(--rot)}
+.punkte{font-size:13.5px;color:var(--grau);margin-top:4px}
+.zeile .dauer{font-size:13.5px;color:var(--grau);margin-top:4px}
+
+/* Ein leerer Zustand bekommt Text, nie eine leere Flaeche -- und der Text
+   sagt, WELCHE der moeglichen Aussagen gilt (Hausregel: „unbekannt darf nie
+   wie keine aussehen"). */
+.leer{padding:28px 4px;text-align:center}
+.leer .titel{font-weight:700;margin-bottom:6px}
+.leer .text{color:var(--grau);font-size:14px}
+
+.zahl{font-size:13.5px;color:var(--grau);margin:0 0 4px}
+[hidden]{display:none!important}
+
+@media (min-width:640px){
+  .buehne{padding:32px 24px 64px}
+  .kopf h1{font-size:24px}
+  .zeile{grid-template-columns:120px 1fr auto;gap:6px 16px}
+  .zeile .datum{grid-column:1;grid-row:1}
+  .zeile .haupt{grid-column:2;grid-row:1}
+  .zeile .rechts{grid-column:3;grid-row:1}
+}
+</style>
+</head>
+<body>
+<div class="buehne">
+
+  <div class="kopf">
+    <div>
+      <h1 id="titel">Kundenportal</h1>
+      <div class="unter" id="unter">Nachweis der ausgeführten Rundgänge</div>
+    </div>
+    <button class="knopf still" id="abmelden" hidden>Abmelden</button>
+  </div>
+
+  <!-- Schritt 1: Adresse -->
+  <div class="karte" id="schritt-adresse" hidden>
+    <div class="feld" style="margin-bottom:16px">
+      <div class="bez">Anmeldung</div>
+      <div class="wert">Mit Ihrer hinterlegten E-Mail-Adresse</div>
+    </div>
+    <label for="email">E-Mail-Adresse</label>
+    <input id="email" type="email" autocomplete="email" inputmode="email"
+           placeholder="name@beispiel.ch">
+    <div class="knopfzeile">
+      <button class="knopf" id="code-holen">Code anfordern</button>
+    </div>
+    <p class="hinweis">Sie erhalten einen sechsstelligen Code per E-Mail.
+      Ein Passwort brauchen Sie nicht.</p>
+    <p class="fehler" id="fehler-adresse" hidden></p>
+  </div>
+
+  <!-- Schritt 2: Code -->
+  <div class="karte" id="schritt-code" hidden>
+    <div class="feld" style="margin-bottom:16px">
+      <div class="bez">Code eingeben</div>
+      <div class="wert" id="code-an"></div>
+    </div>
+    <label for="code">Sechsstelliger Code</label>
+    <input id="code" type="text" inputmode="numeric" autocomplete="one-time-code"
+           maxlength="6" placeholder="000000"
+           style="letter-spacing:6px;font-size:22px;font-weight:700;text-align:center">
+    <div class="knopfzeile">
+      <button class="knopf" id="anmelden">Anmelden</button>
+      <button class="knopf still" id="zurueck">Andere Adresse</button>
+    </div>
+    <p class="hinweis" id="code-hinweis"></p>
+    <p class="fehler" id="fehler-code" hidden></p>
+  </div>
+
+  <!-- Angemeldet -->
+  <div id="inhalt" hidden>
+    <div class="karte">
+      <div class="zeitraum">
+        <div class="paar">
+          <label for="von">Von</label>
+          <input id="von" type="date">
+        </div>
+        <div class="paar">
+          <label for="bis">Bis</label>
+          <input id="bis" type="date">
+        </div>
+        <div><button class="knopf" id="zeigen">Anzeigen</button></div>
+      </div>
+    </div>
+
+    <div class="karte">
+      <p class="zahl" id="anzahl"></p>
+      <div id="liste"></div>
+    </div>
+  </div>
+
+  <p class="fehler" id="fehler-global" hidden></p>
+</div>
+
+<script>
+'use strict';
+const API = 'api/';
+// Eigener Schluessel: Cockpit und Mitarbeiter-App liegen auf derselben
+// Adresse und wuerden sich sonst gegenseitig den Token ueberschreiben.
+const SCHLUESSEL = 'portal_token';
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, z =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[z]));
+
+// Dieselben Woerter wie im Cockpit (RGD_STATUS in dashboard.html). Ein
+// zweites Wort fuer denselben Zustand waere eine zweite Sprache.
+const STATUS = { abgeschlossen: ['gut', 'Abgeschlossen'], abgebrochen: ['ab', 'Abgebrochen'] };
+
+// Vier verschiedene Aussagen, vier verschiedene Texte. Der Server sagt,
+// welche gilt -- die Oberflaeche raet es nicht aus einer Anzahl 0.
+const LEER = {
+  kein_revierdienst: ['Kein Revierdienst eingerichtet',
+    'Für Ihre Objekte sind keine Kontrollrunden hinterlegt. Das heisst nicht, dass keine Leistung erbracht wurde — es wird hier nur nichts nachgewiesen.'],
+  noch_nichts_erfasst: ['Noch keine Rundgänge erfasst',
+    'Für Ihre Objekte ist der Revierdienst eingerichtet, es wurde aber noch keine Runde abgeschlossen.'],
+  kein_treffer_im_zeitraum: ['Keine Rundgänge im gewählten Zeitraum',
+    'Ausserhalb dieses Zeitraums liegen Rundgänge vor. Bitte den Zeitraum ändern.'],
+};
+
+let token = null;
+
+function zeige(welche) {
+  for (const id of ['schritt-adresse', 'schritt-code', 'inhalt']) {
+    $(id).hidden = (id !== welche);
+  }
+  $('abmelden').hidden = (welche !== 'inhalt');
+}
+
+function fehler(id, text) {
+  const el = $(id);
+  if (!text) { el.hidden = true; el.textContent = ''; return; }
+  el.textContent = text;
+  el.hidden = false;
+}
+
+async function ruf(pfad, optionen = {}) {
+  const kopf = { 'Content-Type': 'application/json' };
+  if (token) { kopf['X-Auth-Token'] = token; }
+  const antwort = await fetch(API + pfad, { ...optionen, headers: kopf });
+  let daten = {};
+  try { daten = await antwort.json(); } catch (e) { /* gleich behandelt */ }
+  return { ok: antwort.ok, code: antwort.status, daten };
+}
+
+// ── Anmeldung ─────────────────────────────────────────────────────────
+$('code-holen').addEventListener('click', async () => {
+  const email = $('email').value.trim();
+  fehler('fehler-adresse', '');
+  if (!email) { fehler('fehler-adresse', 'Bitte die E-Mail-Adresse eingeben.'); return; }
+  $('code-holen').disabled = true;
+  const { daten } = await ruf('portal_code_anfordern.php',
+    { method: 'POST', body: JSON.stringify({ email }) });
+  $('code-holen').disabled = false;
+  // Die Antwort ist immer dieselbe -- auch die Oberflaeche verraet darum
+  // nicht, ob es den Zugang gibt.
+  $('code-an').textContent = email;
+  $('code-hinweis').textContent = 'Der Code gilt '
+    + (daten.gueltig_minuten || 15) + ' Minuten und nur einmal. '
+    + 'Kommt keine E-Mail an, ist zu dieser Adresse kein Zugang hinterlegt.';
+  zeige('schritt-code');
+  $('code').focus();
+});
+
+$('zurueck').addEventListener('click', () => { fehler('fehler-code', ''); zeige('schritt-adresse'); });
+
+$('anmelden').addEventListener('click', async () => {
+  const email = $('email').value.trim();
+  const code = $('code').value.trim();
+  fehler('fehler-code', '');
+  if (!code) { fehler('fehler-code', 'Bitte den Code aus der E-Mail eingeben.'); return; }
+  $('anmelden').disabled = true;
+  const { ok, daten } = await ruf('portal_anmelden.php',
+    { method: 'POST', body: JSON.stringify({ email, code }) });
+  $('anmelden').disabled = false;
+  if (!ok || !daten.token) {
+    fehler('fehler-code', daten.message || 'Die Anmeldung hat nicht geklappt.');
+    return;
+  }
+  token = daten.token;
+  try { localStorage.setItem(SCHLUESSEL, token); } catch (e) { /* privates Fenster */ }
+  kopfSetzen(daten.kunde, daten.name);
+  zeige('inhalt');
+  laden();
+});
+
+$('abmelden').addEventListener('click', async () => {
+  await ruf('portal_abmelden.php', { method: 'POST' });
+  token = null;
+  try { localStorage.removeItem(SCHLUESSEL); } catch (e) { /* egal */ }
+  $('code').value = '';
+  kopfSetzen(null, null);
+  zeige('schritt-adresse');
+});
+
+function kopfSetzen(kunde, person) {
+  $('titel').textContent = kunde || 'Kundenportal';
+  $('unter').textContent = kunde
+    ? ('Nachweis der ausgeführten Rundgänge' + (person ? ' · ' + person : ''))
+    : 'Nachweis der ausgeführten Rundgänge';
+}
+
+// ── Inhalt ────────────────────────────────────────────────────────────
+$('zeigen').addEventListener('click', laden);
+
+function dmy(iso) {
+  if (!iso) { return '–'; }
+  const t = String(iso).slice(0, 10).split('-');
+  return t.length === 3 ? t[2] + '.' + t[1] + '.' + t[0] : String(iso);
+}
+
+function dauerText(d) {
+  if (!d || d.sekunden === null || d.sekunden === undefined) { return '–'; }
+  const s = Number(d.sekunden);
+  return Math.floor(s / 3600) + ':' + String(Math.floor(s / 60) % 60).padStart(2, '0') + ' h';
+}
+
+async function laden() {
+  const von = $('von').value, bis = $('bis').value;
+  const frage = (von && bis) ? ('?von=' + von + '&bis=' + bis) : '';
+  const { ok, code, daten } = await ruf('portal_rundgaenge.php' + frage);
+  if (code === 401) { abgemeldet(); return; }
+  if (!ok) {
+    fehler('fehler-global', daten.message || 'Die Daten liessen sich nicht laden.');
+    return;
+  }
+  fehler('fehler-global', '');
+  kopfSetzen(daten.kunde, daten.person);
+  if (daten.zeitraum) { $('von').value = daten.zeitraum.von; $('bis').value = daten.zeitraum.bis; }
+  zeichnen(daten);
+}
+
+function zeichnen(daten) {
+  const rg = daten.rundgaenge || [];
+  const liste = $('liste');
+
+  if (!rg.length) {
+    $('anzahl').textContent = '';
+    const [titel, text] = LEER[daten.leer_grund] || ['Keine Angabe',
+      'Zu diesem Zeitraum liegt keine Auskunft vor.'];
+    liste.innerHTML = '<div class="leer"><div class="titel">' + esc(titel)
+      + '</div><div class="text">' + esc(text) + '</div></div>';
+    return;
+  }
+
+  // Zahl mit Bezug, weil ein Filter greift: „12 Rundgänge" allein saehe aus
+  // wie die Gesamtzahl (Hausregel). Und „Rundgänge" zaehlt Runden -- die
+  // Kontrollpunkte darunter sind eine andere Einheit und stehen darum in
+  // einer eigenen Zeile, nicht unter derselben Ueberschrift.
+  const objekte = daten.objekte || [];
+  $('anzahl').textContent = rg.length + ' ' + (rg.length === 1 ? 'Rundgang' : 'Rundgänge')
+    + ' vom ' + dmy(daten.zeitraum.von) + ' bis ' + dmy(daten.zeitraum.bis)
+    + ' · ' + objekte.length + ' ' + (objekte.length === 1 ? 'Objekt' : 'Objekte');
+
+  liste.innerHTML = rg.map(r => {
+    const [klasse, wort] = STATUS[r.status] || ['', r.status];
+    const f = r.fortschritt || {};
+    const gesamt = Number(f.gesamt || 0);
+    const erledigt = f.erledigt !== undefined ? Number(f.erledigt) : Number(f.bestaetigt || 0);
+    return '<div class="zeile">'
+      + '<div class="datum">' + esc(dmy(r.datum)) + '</div>'
+      + '<div class="haupt"><div>' + esc(r.objekt_name) + '</div>'
+      + '<div class="punkte">' + erledigt + ' von ' + gesamt + ' Kontrollpunkten erledigt</div></div>'
+      + '<div class="rechts"><span class="marke ' + klasse + '">' + esc(wort) + '</span>'
+      + '<div class="dauer">' + esc(dauerText(r.dauer)) + '</div></div>'
+      + '</div>';
+  }).join('');
+}
+
+function abgemeldet() {
+  token = null;
+  try { localStorage.removeItem(SCHLUESSEL); } catch (e) { /* egal */ }
+  kopfSetzen(null, null);
+  zeige('schritt-adresse');
+  fehler('fehler-adresse', 'Die Anmeldung gilt nicht mehr. Bitte melden Sie sich neu an.');
+}
+
+// ── Start ─────────────────────────────────────────────────────────────
+(function start() {
+  try { token = localStorage.getItem(SCHLUESSEL); } catch (e) { token = null; }
+  if (token) { zeige('inhalt'); laden(); }
+  else { zeige('schritt-adresse'); }
+})();
+</script>
+</body>
+</html>

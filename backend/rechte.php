@@ -206,6 +206,19 @@ function bereiche_katalog(): array
             'text'   => 'Profile anlegen und zuteilen — also bestimmen, wer an welche Daten kommt.',
             'stufen' => [STUFE_LESEN, STUFE_SCHREIBEN],
         ],
+        // Kundenportal (ENT-441). Eigener Bereich und ausdruecklich NICHT
+        // unter 'kunden' mitgefuehrt -- dieselbe Trennung und derselbe Grund
+        // wie bei den Offerten: Wer Adressen pflegen darf, muss darum nicht
+        // einem BETRIEBSFREMDEN Einblick in Einsaetze oeffnen duerfen. Es
+        // ist der einzige Bereich im Katalog, der einen Zugang fuer Menschen
+        // ausserhalb des Betriebs oeffnet; darum steht er bei der
+        // Administration und nicht bei den Kunden.
+        'portal' => [
+            'gruppe' => 'Administration',
+            'titel'  => 'Kundenzugänge zum Portal',
+            'text'   => 'Wer von aussen die abgeschlossenen Rundgänge seiner Objekte einsehen darf. Lesen zeigt die Liste der Zugänge, Schreiben legt sie an und sperrt sie.',
+            'stufen' => [STUFE_LESEN, STUFE_SCHREIBEN],
+        ],
         // Nur lesen, und das ist keine Luecke: "Ein Logbuch, aus dem sich
         // Eintraege entfernen lassen, waere keines" (ENT-077). Es gibt
         // serverseitig weder POST noch DELETE darauf.
@@ -380,6 +393,12 @@ function system_rollen(): array
                 'fahrzeuge'            => STUFE_SCHREIBEN,
                 'rechte'               => STUFE_SCHREIBEN,
                 'logbuch'              => STUFE_LESEN,
+                // Kundenzugaenge (ENT-441) beim Verwalter und NICHT beim
+                // Administrator: Der traegt 'betrieb' nur lesend und keine
+                // Rollenvergabe. Einem Betriebsfremden Zugang zu geben liegt
+                // auf derselben Ebene wie diese beiden -- es ist eine
+                // Entscheidung ueber Zugang, nicht ueber Tagesgeschaeft.
+                'portal'               => STUFE_SCHREIBEN,
                 // Revierdienst seit ENT-442 dabei -- der Verwalter soll den
                 // Bereich verwalten koennen. ENT-169 ("nur ausgewaehlte
                 // Benutzer") ist damit im Kern revidiert, seine eigentliche
