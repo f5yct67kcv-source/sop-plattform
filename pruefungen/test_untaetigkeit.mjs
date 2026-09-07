@@ -11,6 +11,17 @@
 // dass an der Anmeldemaske steht, warum.
 import { WURZEL, browserPfad } from './pfade.mjs';
 import { chromium } from 'playwright';
+import { execFileSync } from 'child_process';
+
+// Die Feldrechte werden aus rechte.php GERECHNET, nicht abgeschrieben
+// (ENT-440). Vorher stand hier eine Liste von Hand -- und als der Umbau auf
+// Bereiche und Stufen die Namen aenderte, blieb sie stehen. Die Suite war
+// danach GRUEN AUS DEM FALSCHEN GRUND: Ihre alten Namen passten zu der
+// ebenfalls stehengebliebenen Liste im Browser, also sah alles stimmig aus,
+// waehrend im Betrieb der Waechter nach 30 Minuten hinausflog.
+const WAECHTER_RECHTE = JSON.parse(execFileSync('php', ['-r',
+  `require '${WURZEL}/backend/rechte.php'; echo json_encode(rechte_aus_rollen(['waechter']));`
+], { encoding: 'utf8' }));
 
 const URL = `file://${WURZEL}/dashboard.html`;
 const ok = [], bad = [];
@@ -200,7 +211,7 @@ await fall("Kein Lebenszeichen ohne Mensch", async () =>{
 
 // ══════════ Waechter im Feld: die kurze Frist gilt nicht
 await fall("Waechter im Feld", async () =>{
-  rechte = ['rundgang_einsehen', 'rundgang_verwalten', 'alarmempfaenger'];
+  rechte = WAECHTER_RECHTE;
   const page = await seite(browser);
   await page.clock.fastForward('45:00');
   const feldDa = await page.evaluate(

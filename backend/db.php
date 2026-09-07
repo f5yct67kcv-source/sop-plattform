@@ -93,7 +93,18 @@ const SITZUNG_BUERO_RUHE_MIN = 30;   // Bueroarbeitsplatz: ohne Nutzung (ENT-293
 // 30 Minuten nachts um drei mitten im Rundgang vor der Anmeldemaske
 // stehen -- eine Sicherheitsregel, die den Betrieb kaputtmacht, wird
 // umgangen und schuetzt danach gar nichts mehr.
-const SITZUNG_RECHTE_IM_FELD = ['rundgang_verwalten', 'rundgang_einsehen', 'alarmempfaenger'];
+// Namen aus ENT-440 (Bereich_Stufe). Beim Umbau auf Bereiche und Stufen ist
+// diese Liste zunaechst auf den ALTEN Namen stehengeblieben -- sie traf
+// danach kein einziges Recht mehr, und fuer einen Waechter galt die
+// 30-Minuten-Bueroschutzfrist statt der langen Feldfrist. Genau der Fall,
+// den ENT-293 verhindern wollte. Gefunden nicht durch die Pruefung, sondern
+// von Hand: pruef_sitzung.php verglich nur die beiden Listen MITEINANDER --
+// beide gleich falsch heisst gruen. Die Pruefung fragt jetzt zusaetzlich,
+// ob jeder Name hier ueberhaupt ein Recht IST, und rechnet die Frist gegen
+// die echte Waechterrolle statt gegen eine abgeschriebene Liste.
+const SITZUNG_RECHTE_IM_FELD = ['kontrollpunkte_lesen', 'kontrollpunkte_schreiben',
+                                'rundgaenge_lesen', 'rundgaenge_schreiben',
+                                'alarmempfaenger_lesen'];
 
 // Gilt fuer diese Rechte die kurze Bueroschutzfrist?
 // Ohne Rechte: nein (App-Nutzung, lange Frist). Nur Feldrechte: nein.

@@ -8979,7 +8979,8 @@ const UT_TAKT_MS    = 5 * 1000;         // so oft wird nachgesehen
 // Listen auseinander, warnt die Oberflaeche vor einer Abmeldung, die gar
 // nicht kommt -- oder schweigt vor einer, die kommt. pruef_sitzung.php
 // haelt sie zusammen.
-const UT_RECHTE_IM_FELD = ['rundgang_verwalten', 'rundgang_einsehen', 'alarmempfaenger'];
+const UT_RECHTE_IM_FELD = ['kontrollpunkte_lesen', 'kontrollpunkte_schreiben',
+  'rundgaenge_lesen', 'rundgaenge_schreiben', 'alarmempfaenger_lesen'];
 
 let utLetzte = 0, utGepingt = 0, utAktiv = false, utTakt = null;
 
