@@ -2220,6 +2220,9 @@ function abmelden() {
 function starten() {
   $('gate').style.display = 'none';
   $('app').classList.add('on');
+  // Erst jetzt hat die Reiterleiste ueberhaupt eine Lage -- vor der
+  // Anmeldung ist .app verborgen und am Bild ist nichts zu messen.
+  requestAnimationFrame(sockelSetzen);
   $('kName').textContent = ich.name;
   $('kKreis').textContent = initialen(ich.name);
   allesLaden();
@@ -2263,6 +2266,11 @@ function allesLaden() {
       // Erst NACH dem Zeichnen: Das Fenster legt sich ueber die fertige
       // Oberflaeche, nicht ueber einen halb aufgebauten Bildschirm.
       mitFensterPruefen();
+      // Noch einmal nachmessen: Die erste Messung laeuft unmittelbar nach
+      // der Anmeldung, bevor irgendetwas gezeichnet ist. Ist sie nicht
+      // messbar gewesen, bleibt der bisherige Wert stehen -- ein zweiter
+      // Lauf kostet nichts und kann nur genauer werden.
+      sockelSetzen();
     });
 }
 
@@ -2290,21 +2298,138 @@ function allesLaden() {
 // Alles ausserhalb dieses einen Falls bekommt 0 und bleibt unveraendert:
 // jeder Browser mit Adresszeile (dort ist die Differenz gross und gehoert
 // der Adresszeile, nicht uns), jedes Android-Geraet, jeder Desktop.
+// ZWEITER ANLAUF (ENT-439). Der erste rechnete screen.height minus
+// window.innerHeight. Auf dem Geraet des Projektinhabers sind beide Werte
+// GLEICH (852) -- der fehlende Streifen ist ueber sie nicht zu sehen, und
+// die Korrektur blieb wirkungslos. Nachgemessen an den Bildschirmfotos
+// nach dem Deploy: unveraendert 59 Punkte.
+//
+// Sichtbar wird der Unterschied nur dort, wo er entsteht: beim ZEICHNEN.
+// Wird die Leiste hoeher gezeichnet, als das Layout sie kennt, dann trifft
+// ein Punkt OBERHALB ihrer Layout-Oberkante sie trotzdem. Der Abstand
+// zwischen der Kante, die das Layout meldet, und der Kante, an der man sie
+// wirklich trifft, IST der Sockel.
+//
+// Findet der Browser keinen Unterschied -- jeder gesunde Fall --, kommt 0
+// heraus und nichts aendert sich.
+// Rueckgabe: eine Zahl, wenn sich etwas sagen laesst -- sonst null fuer
+// "nicht messbar". Der Unterschied ist wichtig: "kein Versatz" und "ich
+// kann gerade nicht hinsehen" sind zwei verschiedene Aussagen, und wer sie
+// gleich behandelt, loescht bei der naechsten Messung einen richtigen Wert
+// (CLAUDE.md: "unbekannt" darf nie wie "keine" aussehen). Genau das ist im
+// Prueflauf passiert -- ein noch ausfahrendes Blatt verdeckte die Leiste.
+function sockelAmBild() {
+  const leiste = document.querySelector('.tabs');
+  if (!leiste) { return null; }
+  const r = leiste.getBoundingClientRect();
+  if (r.height < 10 || r.width < 10 || r.top < 90) { return null; }
+  const x = Math.round(r.left + r.width / 2);
+  const inLeiste = y => {
+    if (y < 0) { return false; }
+    const e = document.elementFromPoint(x, Math.round(y));
+    return !!(e && (e === leiste || leiste.contains(e)));
+  };
+  // Erst die Gegenprobe zur Messung selbst: Trifft die Leiste ueberhaupt
+  // sich selbst? Wenn nicht, liegt etwas darueber, und die
+  // Trefferpruefung sagt hier gar nichts -- dann wird nichts angefasst.
+  //
+  // Geprueft wird dicht unter der OBERKANTE, nicht in der Mitte. Wandert
+  // das Bild nach oben, liegt die Mitte der Layout-Kante bereits unter
+  // dem gezeichneten Balken -- die Gegenprobe schluege dann genau in dem
+  // Fall fehl, den sie absichern soll, und die Messung waere immer 0.
+  // Ein Punkt dicht unter der Oberkante liegt in beiden Lagen im Balken --
+  // solange die beiden Lagen sich ueberhaupt noch ueberschneiden, und
+  // genau so weit reicht die Suche unten auch.
+  if (!inLeiste(r.top + 3)) { return null; }
+  // Liegt direkt ueber der Layout-Oberkante schon die Leiste?
+  if (!inLeiste(r.top - 4)) { return 0; }
+  // Ja -- also die gezeichnete Oberkante einkreisen. Zwei Grenzen: Mehr
+  // als 80 px waere etwas anderes als eine Statusleiste. Und mehr als die
+  // Hoehe der Leiste liesse sich gar nicht mehr messen -- dann ueberdeckt
+  // die gezeichnete Lage die gemeldete nicht mehr, und die Trefferpruefung
+  // koennte die Leiste nicht von irgendetwas anderem unterscheiden.
+  const grenze = Math.min(80, r.height - 6);
+  if (grenze < 8) { return null; }
+  let oben = r.top - grenze, unten = r.top - 4;
+  // Trifft schon der oberste Suchpunkt die Leiste, liegt die gezeichnete
+  // Kante noch weiter oben, als hier gesucht wird. Dann ist der Versatz
+  // NICHT MESSBAR -- nicht null. Er als 0 zu melden hiesse, einen
+  // ungeklaerten Zustand als geklaerten auszugeben.
+  if (inLeiste(oben)) { return null; }
+  for (let i = 0; i < 8; i++) {
+    const m = (oben + unten) / 2;
+    if (inLeiste(m)) { unten = m; } else { oben = m; }
+  }
+  return Math.round(r.top - unten);
+}
+
+// Rueckgabe wie oben: Zahl oder null fuer "nicht messbar".
 function sockelMessen() {
-  // navigator.standalone gibt es nur auf iOS und ist nur dann true, wenn
-  // die App vom Startbildschirm aus laeuft -- also genau im Vollbildfall.
-  if (window.navigator.standalone !== true) { return 0; }
-  const schirm = window.screen && window.screen.height;
-  const fenster = window.innerHeight;
-  if (!schirm || !fenster) { return 0; }
-  const fehlt = Math.round(schirm - fenster);
+  let fehlt = 0;
+  // 1. Was der Browser von sich aus sagt. navigator.standalone gibt es nur
+  //    auf iOS und ist nur dann true, wenn die App vom Startbildschirm
+  //    laeuft -- also genau im Vollbildfall. visualViewport ist dabei der
+  //    Bereich, den man SIEHT; er kann kleiner sein als innerHeight.
+  if (window.navigator.standalone === true) {
+    const schirm = (window.screen && window.screen.height) || 0;
+    if (schirm) {
+      fehlt = Math.max(fehlt, schirm - window.innerHeight);
+      if (window.visualViewport) {
+        fehlt = Math.max(fehlt, schirm - window.visualViewport.height);
+      }
+    }
+  }
+  // 2. Was am gezeichneten Bild zu messen ist. Kein Vollbild-Vorbehalt:
+  //    Das hier ist eine Messung, keine Annahme -- sie findet nur etwas,
+  //    wenn tatsaechlich etwas da ist.
+  const amBild = sockelAmBild();
+  if (amBild === null && !fehlt) { return null; }   // nichts gesehen, nichts zu sagen
+  fehlt = Math.round(Math.max(fehlt, amBild || 0));
   // Obergrenze 80: Eine Statusleiste ist hoechstens rund 60 px hoch. Was
   // darueber liegt, ist etwas anderes (aufgeklappte Tastatur, Querformat,
   // ein Geraet, das screen.height anders zaehlt) und wird nicht angefasst.
   return (fehlt > 0 && fehlt <= 80) ? fehlt : 0;
 }
+
 function sockelSetzen() {
-  document.documentElement.style.setProperty('--sockel', sockelMessen() + 'px');
+  const stil = document.documentElement.style;
+  // Gemessen wird am UNKORRIGIERTEN Zustand -- als Vorsichtsmassnahme.
+  // Ehrlich dazu: In der Gegenprobe liess sich KEIN Fall herstellen, in
+  // dem diese Zeile das Ergebnis aendert. Layout- und gezeichnete Kante
+  // wandern beide mit dem Sockel, ihr Abstand bleibt gleich, und die
+  // Werte aus dem Browser haengen ohnehin nicht am Sockel. Sie steht hier,
+  // weil das Messen an einem bereits korrigierten Zustand ein Fehler
+  // waere, sobald jemand die Rechnung oben aendert -- nicht, weil sie
+  // heute etwas verhindert. Die Prueflauf-Zusicherung dazu (zweimal messen
+  // ergibt denselben Sockel) gilt unabhaengig davon.
+  const vorher = stil.getPropertyValue('--sockel');
+  stil.setProperty('--sockel', '0px');
+  void document.documentElement.offsetHeight;
+  const wert = sockelMessen();
+  // Nicht messbar heisst: den bisherigen Wert behalten, nicht auf 0
+  // zuruecksetzen. Sonst nimmt ein offenes Blatt der Leiste ihren Sockel.
+  if (wert === null) { stil.setProperty('--sockel', vorher || '0px'); return; }
+  stil.setProperty('--sockel', wert + 'px');
+}
+
+// Die Zahlen, aus denen der Sockel entsteht -- als eine Zeile im Menue.
+// Ohne sie liesse sich aus der Ferne nicht entscheiden, warum eine
+// Korrektur nicht greift; genau daran ist der erste Anlauf gescheitert.
+function technikZeile() {
+  const r = document.querySelector('.tabs');
+  const lage = r ? r.getBoundingClientRect() : null;
+  const vv = window.visualViewport;
+  const gezeichnet = sockelAmBild();
+  return [
+    'Bildschirm ' + ((window.screen && window.screen.height) || '?'),
+    'Fenster ' + window.innerHeight,
+    'Sicht ' + (vv ? Math.round(vv.height) : '–'),
+    'Leiste ' + (lage ? Math.round(lage.top) + '–' + Math.round(lage.bottom) : '–'),
+    'gezeichnet ' + (gezeichnet === null ? 'nicht messbar'
+      : gezeichnet ? '−' + gezeichnet : 'deckungsgleich'),
+    'Sockel ' + (getComputedStyle(document.documentElement).getPropertyValue('--sockel') || '?').trim(),
+    'Vollbild ' + (window.navigator.standalone === true ? 'ja' : 'nein')
+  ].join(' · ');
 }
 
 // ══════════════════════════════════════════ ZIEHEN ZUM AKTUALISIEREN (ENT-438)
@@ -5033,6 +5158,7 @@ function zeichneMenu() {
       </div></div>
       <p style="font-size:12.5px;color:var(--ink-3);line-height:1.5;padding:0 2px">${esc(w('themaRundgangHinweis'))}</p>
       ${pushBlock()}
+      <p style="font-size:11px;color:var(--ink-3);line-height:1.5;padding:14px 2px 0;font-variant-numeric:tabular-nums">${esc(technikZeile())}</p>
     </div>
 
     <div id="pr-stunden" style="display:none">

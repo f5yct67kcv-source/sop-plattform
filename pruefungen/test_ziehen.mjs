@@ -299,6 +299,110 @@ await page.evaluate(() => document.documentElement.style.removeProperty('--socke
 await page.waitForTimeout(120);
 check('Ohne Sockel ist wieder alles wie vorher', (await lage('.tabs')).bottom === HOCH);
 
+// ══════════════ SOCKEL: die Messung am gezeichneten Bild
+// Der eigentliche Fall vom iPhone: Das Layout meldet die Leiste TIEFER,
+// als sie gezeichnet und getroffen wird. Genau so wird er nachgestellt --
+// getBoundingClientRect der Leiste liefert vorübergehend einen um N Punkte
+// nach unten verschobenen Wert, alles andere bleibt echt. Ein
+// Nachbau der Trefferpruefung waere hier wertlos: Sie ist das, was
+// geprueft wird.
+// Die Leiste bekommt dabei die Höhe, die sie auf dem iPhone hat (62 px
+// plus 34 px Sicherheitsabstand unten) -- ohne diese Höhe überschneiden
+// sich gemeldete und gezeichnete Lage kaum, und die Nachbildung prüfte
+// eine Enge, die es auf dem Gerät gar nicht gibt.
+const amBild = versatz => page.evaluate(v => {
+  const leiste = document.querySelector('.tabs');
+  const vorher = leiste.style.paddingBottom;
+  leiste.style.paddingBottom = '34px';
+  void leiste.offsetHeight;
+  const echt = Element.prototype.getBoundingClientRect;
+  leiste.getBoundingClientRect = function () {
+    const r = echt.call(this);
+    return { ...r.toJSON(), top: r.top + v, bottom: r.bottom + v,
+             left: r.left, right: r.right, width: r.width, height: r.height };
+  };
+  try { return sockelAmBild(); } finally {
+    delete leiste.getBoundingClientRect;
+    leiste.style.paddingBottom = vorher;
+  }
+}, versatz);
+
+// Das Blatt faehrt nach der Messung oben noch aus dem Bild -- solange es
+// unterwegs ist, verdeckt es die Leiste. Genau daran ist diese Prüfung
+// beim ersten Lauf gescheitert; das Warten gehört zur Nachbildung.
+await page.waitForTimeout(400);
+check('KRITISCH: deckungsgleich gezeichnet ergibt keinen Sockel', (await amBild(0)) === 0);
+check('KRITISCH: wird die Leiste 59 Punkte höher gezeichnet, misst der Sockel 59',
+  Math.abs((await amBild(59)) - 59) <= 1);
+check('Auch ein anderer Betrag wird richtig gemessen', Math.abs((await amBild(34)) - 34) <= 1);
+check('Ein unplausibel grosser Versatz gilt als nicht messbar', (await amBild(120)) === null);
+// Der Grenzfall dazwischen: gross genug, dass die Suche ihn nicht mehr
+// einkreist, aber klein genug, dass die Leiste sich noch selbst trifft.
+// Auch das ist "unbekannt" und darf nicht als "kein Versatz" durchgehen.
+check('KRITISCH: knapp über der Suchgrenze gilt als nicht messbar, nicht als 0',
+  (await amBild(85)) === null);
+
+// Liegt etwas über der Leiste, sagt die Trefferprüfung nichts -- dann
+// wird auch nichts korrigiert.
+await page.evaluate(() => { document.getElementById('mitSeite').classList.add('on'); });
+await page.waitForTimeout(120);
+check('KRITISCH: liegt eine Vollseite darüber, ist der Sockel NICHT messbar — und das ist etwas anderes als 0',
+  (await amBild(59)) === null);
+await page.evaluate(() => { document.getElementById('mitSeite').classList.remove('on'); });
+await page.waitForTimeout(120);
+
+// Der Fehler, den der erste Prüflauf aufgedeckt hat: Eine verdeckte
+// Leiste ist NICHT MESSBAR und darf einen bereits gefundenen Sockel nicht
+// auf 0 zurücksetzen.
+const behalten = await page.evaluate(() => {
+  const stil = document.documentElement.style;
+  stil.setProperty('--sockel', '59px');
+  document.getElementById('mitSeite').classList.add('on');
+  sockelSetzen();
+  const nachher = stil.getPropertyValue('--sockel');
+  document.getElementById('mitSeite').classList.remove('on');
+  stil.removeProperty('--sockel');
+  return nachher;
+});
+check('KRITISCH: eine verdeckte Leiste löscht den gefundenen Sockel nicht', behalten === '59px');
+
+// Und der Fehler, der am teuersten waere: zweimal messen darf nicht
+// zweimal verschieben. Geprüft wird das mit einem echten Sockel im Bild --
+// mit 0 wäre die Prüfung wertlos, weil doppelt 0 wieder 0 ist.
+const zweimal = await page.evaluate(() => {
+  const leiste = document.querySelector('.tabs');
+  const vorherP = leiste.style.paddingBottom;
+  leiste.style.paddingBottom = '34px'; void leiste.offsetHeight;
+  const echt = Element.prototype.getBoundingClientRect;
+  leiste.getBoundingClientRect = function () {
+    const r = echt.call(this);
+    return { ...r.toJSON(), top: r.top + 59, bottom: r.bottom + 59,
+             left: r.left, right: r.right, width: r.width, height: r.height };
+  };
+  const stil = document.documentElement.style;
+  sockelSetzen(); const a = stil.getPropertyValue('--sockel');
+  sockelSetzen(); const b = stil.getPropertyValue('--sockel');
+  delete leiste.getBoundingClientRect;
+  leiste.style.paddingBottom = vorherP;
+  stil.removeProperty('--sockel');
+  return [a, b];
+});
+check('Der Sockel wird beim Setzen auch wirklich gesetzt (Voraussetzung)', zweimal[0] === '59px');
+check('KRITISCH: zweimal messen ergibt denselben Sockel, nicht den doppelten',
+  zweimal[1] === zweimal[0]);
+
+// Die Technikzeile trägt die Zahlen, aus denen der Sockel entsteht.
+const technik = await page.evaluate(() => technikZeile());
+check('Die Technikzeile nennt Bildschirm, Fenster, Sicht und Sockel',
+  ['Bildschirm', 'Fenster', 'Sicht', 'Leiste', 'gezeichnet', 'Sockel', 'Vollbild']
+    .every(t => technik.includes(t)));
+check('Die Technikzeile steht im Menü', await page.evaluate(() => {
+  zeige('menu');
+  return (document.getElementById('v-menu').textContent || '').includes('Bildschirm');
+}));
+await page.evaluate(() => zeige('heute'));
+await page.waitForTimeout(200);
+
 await page.screenshot({ path: `${OUT}/ziehen-heute.png` });
 
 await browser.close();
