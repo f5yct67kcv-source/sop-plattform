@@ -22,10 +22,15 @@ const check = (n, c) => (c ? ok : bad).push(n);
 // auseinander. Die Ableitung ist dieselbe wie im Server: <bereich>_<stufe>.
 const { readFileSync: _lies } = await import('fs');
 const RECHTE_PHP = _lies(`${WURZEL}/backend/rechte.php`, 'utf8');
+// Auch der BESCHREIBUNGSTEXT kommt aus rechte.php und wird nicht erfunden:
+// Ein kurzer Platzhaltertext liesse die Matrix im Bildschirmfoto schmaler
+// aussehen, als sie im Betrieb ist -- und die Messung waere dann eine
+// Messung am Versuchsaufbau statt am Erzeugnis.
 const BEREICHE = [...(RECHTE_PHP.match(/function bereiche_katalog\(\): array\s*\{[\s\S]*?\n\}/) || [''])[0]
-  .matchAll(/'([a-z_]+)' => \[\s*\n\s*'gruppe'\s*=> '([^']+)',\s*\n\s*'titel'\s*=> '([^']+)',[\s\S]*?'stufen' => \[([^\]]*)\]/g)]
+  .matchAll(/'([a-z_]+)' => \[\s*\n\s*'gruppe'\s*=> '([^']+)',\s*\n\s*'titel'\s*=> '([^']+)',\s*\n\s*'text'\s*=> '((?:[^'\\]|\\.)*)',[\s\S]*?'stufen' => \[([^\]]*)\]/g)]
   .map(m => ({ schluessel: m[1], gruppe: m[2], titel: m[3],
-               stufen: (m[4].match(/STUFE_(LESEN|SCHREIBEN)/g) || []).map(x => x.split('_')[1].toLowerCase()) }));
+               text: m[4].replace(/\\'/g, "'"),
+               stufen: (m[5].match(/STUFE_(LESEN|SCHREIBEN)/g) || []).map(x => x.split('_')[1].toLowerCase()) }));
 const ALLE_RECHTE = BEREICHE.flatMap(b => b.stufen.map(st => b.schluessel + '_' + st));
 
 // Die Profile, wie rollen_list.php sie liefert: die fuenf Systemrollen plus
@@ -33,19 +38,28 @@ const ALLE_RECHTE = BEREICHE.flatMap(b => b.stufen.map(st => b.schluessel + '_' 
 // Oberflaeche die Sperre nur auf Systemrollen anwendet.
 const stufenVon = ist => Object.fromEntries(ist);
 let PROFILE = [
-  { schluessel: 'mitarbeitend', titel: 'Mitarbeitend', text: 'Nur die eigenen Daten in der App.',
-    system: true, stufen: {}, traeger: 1 },
+  { schluessel: 'mitarbeitend', titel: 'Personal', text: 'Die Belegschaft: eigene Schichten in der App.',
+    system: true, ikone: 'person', stufen: {}, traeger: 1 },
   { schluessel: 'planung', titel: 'Planung', text: 'Einsätze, Objekte, Kunden — nicht AHV-Nummer.',
-    system: true, stufen: stufenVon([['einsaetze','schreiben'],['kunden','schreiben'],['personal','lesen']]), traeger: 1 },
-  { schluessel: 'personal', titel: 'Personal', text: 'Die vollständige Personalakte.',
-    system: true, stufen: stufenVon([['personal','schreiben'],['personal_vertraulich','schreiben']]), traeger: 0 },
-  { schluessel: 'verwaltung', titel: 'Verwaltung', text: 'Alles, zusätzlich die Rollenvergabe selbst.',
-    system: true, stufen: stufenVon([['einsaetze','schreiben'],['personal','schreiben'],
-      ['personal_vertraulich','schreiben'],['betrieb','schreiben'],['rechte','schreiben'],['logbuch','lesen']]), traeger: 1 },
+    system: true, ikone: 'kalender',
+    stufen: stufenVon([['einsaetze','schreiben'],['kunden','schreiben'],['personal','lesen']]), traeger: 1 },
+  { schluessel: 'personal', titel: 'Personaladministration', text: 'Die vollständige Personalakte.',
+    system: true, ikone: 'akte',
+    stufen: stufenVon([['personal','schreiben'],['personal_vertraulich','schreiben']]), traeger: 0 },
+  { schluessel: 'administrator', titel: 'Administrator', text: 'Führt den Betrieb: Einsätze, Kunden, Offerten und Rechnungen.',
+    system: true, ikone: 'steuer',
+    stufen: stufenVon([['einsaetze','schreiben'],['kunden','schreiben'],['offerten','schreiben'],
+      ['personal','lesen'],['betrieb','lesen']]), traeger: 0 },
+  { schluessel: 'verwaltung', titel: 'Verwalter', text: 'Alles, zusätzlich die Rollenvergabe selbst.',
+    system: true, ikone: 'schluessel',
+    stufen: stufenVon([['einsaetze','schreiben'],['personal','schreiben'],
+      ['personal_vertraulich','schreiben'],['betrieb','schreiben'],['rechte','schreiben'],
+      ['kontrollpunkte','schreiben'],['rundgaenge','schreiben'],['logbuch','lesen']]), traeger: 1 },
   { schluessel: 'waechter', titel: 'Wächtersystem', text: 'Kontrollpunkte und Rundgänge.',
-    system: true, stufen: stufenVon([['kontrollpunkte','schreiben'],['rundgaenge','schreiben']]), traeger: 0 },
+    system: true, ikone: 'schild',
+    stufen: stufenVon([['kontrollpunkte','schreiben'],['rundgaenge','schreiben']]), traeger: 0 },
   { schluessel: 'dispo_ohne_kunden', titel: 'Disposition ohne Kundenpflege',
-    text: 'Plant Einsätze, sieht Kunden nur an.', system: false,
+    text: 'Plant Einsätze, sieht Kunden nur an.', system: false, ikone: 'profil',
     stufen: stufenVon([['einsaetze','schreiben'],['kunden','lesen']]), traeger: 0 },
 ];
 
@@ -143,7 +157,7 @@ await page.route('**/api/**', r => {
     if (!kann('rechte_lesen')) return send({ status: 'error', message: 'Dafür fehlt dir die Berechtigung.' }, 403);
     if (rollenAntwortUnvollstaendig) { return send({ status: 'ok', eingerichtet: true }); }
     return send({ status: 'ok', eingerichtet: rollenEingerichtet,
-      bereiche: BEREICHE.map(b => ({ ...b, text: 'Was ' + b.titel + ' umfasst.' })),
+      bereiche: BEREICHE,
       profile: PROFILE,
       personen: MA,
       darf_aendern: kann('rechte_schreiben'),
@@ -239,6 +253,18 @@ try {
   check('Der Rueckfall-Katalog der Oberflaeche ist ueberhaupt auffindbar', jsRollen.length > 0);
   check('KRITISCH: die Oberflaeche kennt als Rueckfall genau die Systemrollen des Servers',
     JSON.stringify(phpRollen) === JSON.stringify(jsRollen));
+  // Nicht nur die SCHLUESSEL, auch die NAMEN. Eine Gegenprobe hat gezeigt,
+  // dass ein in rechte.php geaenderter Titel hier unbemerkt durchging: Vor
+  // der Einrichtung stuende dann in den Kacheln ein Name, den der Server
+  // gar nicht mehr kennt -- und niemand saehe es, weil danach die echten
+  // Profile geladen werden und den Rueckfall ueberschreiben.
+  const phpTitel = [...(RECHTE_PHP.match(/function system_rollen\(\): array\s*\{[\s\S]*?\n\}/) || [''])[0]
+    .matchAll(/^\s{12}'titel'\s*=> '((?:[^'\\]|\\.)*)',$/gm)].map(m => m[1].replace(/\\'/g, "'"));
+  const jsTitel = [...rollenBlock.matchAll(/^  \['[a-z]+', '((?:[^'\\]|\\.)*)',$/gm)]
+    .map(m => m[1].replace(/\\'/g, "'"));
+  check('Die Rollennamen der Oberflaeche sind auffindbar', jsTitel.length === jsRollen.length);
+  check('KRITISCH: und sie heissen genau wie im Server -- auch der Rueckfall vor der Einrichtung',
+    JSON.stringify(phpTitel) === JSON.stringify(jsTitel));
   // Und der Rueckfall darf nicht die WAHRHEIT werden: Sobald der Server
   // Profile mitschickt, muss die Oberflaeche diese benutzen -- sonst
   // erschiene ein eigenes Profil nie.
@@ -251,7 +277,7 @@ try {
   meineRechte = ALLE_RECHTE; meineRollen = ['verwaltung'];
   check('Die Verwaltung kommt ins Dashboard', await anmelden());
   check('Die Kopfzeile nennt die Rolle statt immer "Administration"',
-    /Verwaltung/.test(await page.textContent('#uRole')));
+    /Verwalter/.test(await page.textContent('#uRole')));
   for (const [id, was] of [['nav-planung', 'Planung'], ['nav-abgleich', 'Abgleich'],
                            ['navg-kunden', 'Kunden'], ['nav-admin-mitarbeiter', 'Mitarbeitende'],
                            ['nav-admin-betrieb', 'Betrieb'], ['nav-einrichtung', 'Einrichtung']]) {
@@ -529,16 +555,29 @@ try {
   await page.evaluate(() => { go('betrieb'); bkAbschnittZeigen('rv'); });
   await page.waitForTimeout(900);
   const r = (await page.textContent('#rvInhalt')).replace(/\s+/g, ' ');
-  check('Die Profilliste zeigt alle fünf Systemrollen, Wächtersystem eingeschlossen',
-    /Mitarbeitend/.test(r) && /Planung/.test(r) && /Personal/.test(r) && /Verwaltung/.test(r)
-    && /Wächtersystem/.test(r));
+  // ── Kacheln statt Liste (ENT-442)
+  check('KRITISCH: die Profile stehen als Kacheln da, nicht als Liste',
+    await page.evaluate(() => document.querySelectorAll('#rvInhalt .rp-kachel').length) >= 7);
+  check('Die Kacheln zeigen alle sechs Systemrollen mit ihren neuen Namen',
+    /Personal/.test(r) && /Planung/.test(r) && /Personaladministration/.test(r)
+    && /Administrator/.test(r) && /Verwalter/.test(r) && /Wächtersystem/.test(r));
   check('KRITISCH: und das eigene Profil daneben — sonst wäre "eigene Profile" nur eine Behauptung',
     /Disposition ohne Kundenpflege/.test(r));
-  check('KRITISCH: Systemrollen sind als solche gekennzeichnet, nicht nur nicht änderbar',
-    (r.match(/Systemrolle/g) || []).length >= 5);
-  check('Zu jedem Profil steht, was es darf', /Personalakte/.test(r) || /AHV/.test(r) || /Einsätze/.test(r));
-  check('Die Trägerzahl steht am Profil — die Frage "wer kommt an die Personalakte" ohne Suchen',
-    await page.evaluate(() => document.querySelectorAll('#rvInhalt .chip').length >= 6));
+  check('KRITISCH: jede Kachel trägt ein Symbol — sonst wäre es eine Liste mit Rahmen',
+    await page.evaluate(() => [...document.querySelectorAll('#rvInhalt .rp-kachel .rp-kachel-ic svg')]
+      .every(sv => sv.innerHTML.trim().length > 0)));
+  check('KRITISCH: Systemrollen tragen ein Schloss, eigene Profile nicht',
+    await page.evaluate(() => {
+      const k = [...document.querySelectorAll('#rvInhalt .rp-kachel')];
+      return k.filter(x => x.querySelector('.rp-kachel-schloss')).length === 6;
+    }));
+  check('Auf jeder Kachel steht, wofür das Profil da ist', /Führt den Betrieb/.test(r));
+  check('KRITISCH: die Trägerzahl steht mit Einheit da, nicht als nackte Ziffer',
+    /2 Personen|1 Person/.test(r));
+  check('KRITISCH: "niemand zugeteilt" statt einer blossen Null — das ist eine andere Aussage',
+    /niemand zugeteilt/.test(r));
+  check('Die Kachel zum Anlegen steht in derselben Reihe, nicht als Knopf darüber',
+    await page.evaluate(() => !!document.querySelector('#rvInhalt .rp-kachel.neu')));
   await page.screenshot({ path: `${OUT}/rollen-01-profile.png` });
 
   // ── Die Matrix
@@ -579,22 +618,39 @@ try {
       const k = document.querySelector(`.rm-stufe.aktiv.stufe-${st}`);
       return k ? getComputedStyle(k).backgroundColor : null;
     };
-    const spalte = st => new Set(zeilen
-      .map(z => z.querySelector(`.rm-stufe[data-stufe="${st}"]`))
-      .filter(Boolean)
+    const erste = document.querySelector('#rvEditInhalt .rm-gruppe');
+    const inGruppe = st => new Set([...erste.querySelectorAll(`.rm-stufe[data-stufe="${st}"]`)]
       .map(k => Math.round(k.getBoundingClientRect().left))).size;
+    // Wie viele Spalten hat das Raster tatsaechlich? Ueber die
+    // x-Positionen der Gruppenbloecke gemessen, nicht aus dem CSS gelesen.
+    const spalten = new Set([...document.querySelectorAll('#rvEditInhalt .rm-gruppe')]
+      .map(g => Math.round(g.getBoundingClientRect().left))).size;
+    // Groesster Unterschied zwischen den Segmentbreiten EINER Zeile.
+    let abw = 0;
+    zeilen.forEach(z => {
+      const b = [...z.querySelectorAll('.rm-stufe')].map(k => k.getBoundingClientRect().width);
+      abw = Math.max(abw, Math.max(...b) - Math.min(...b));
+    });
     return {
       farben: [farbe('verborgen'), farbe('lesen'), farbe('schreiben')],
-      verborgenX: spalte('verborgen'), lesenX: spalte('lesen'),
+      gruppeVerborgenX: inGruppe('verborgen'), gruppeLesenX: inGruppe('lesen'),
+      spalten, breitenAbweichung: Math.round(abw),
       hoehe: Math.round(zeilen[0].querySelector('.rm-stufe').getBoundingClientRect().height),
     };
   });
   check('KRITISCH: die drei Stufen sehen im aktiven Zustand VERSCHIEDEN aus — sonst muss man jedes Wort lesen',
     gemessen.farben.every(f => f) && new Set(gemessen.farben).size === 3);
-  check('KRITISCH: "verborgen" steht in jeder Zeile an derselben Stelle',
-    gemessen.verborgenX === 1);
-  check('KRITISCH: "lesen" ebenso — auch in Zeilen, die keine Schreibstufe haben',
-    gemessen.lesenX === 1);
+  // Seit dem Spaltenlayout (ENT-442) stehen die Zeilen NICHT mehr alle
+  // untereinander -- gleiche x-Position fuer alle waere jetzt falsch.
+  // Geprueft wird darum, was die Aussage traegt: Innerhalb einer Gruppe
+  // stehen die Stufen untereinander, und die drei Segmente einer Zeile sind
+  // gleich breit (sonst zieht das breiteste Wort den Blick auf sich).
+  check('KRITISCH: innerhalb einer Gruppe steht jede Stufe an derselben Stelle',
+    gemessen.gruppeVerborgenX === 1 && gemessen.gruppeLesenX === 1);
+  check('KRITISCH: die Segmente einer Zeile sind gleich breit — sonst wiegt eine Stufe optisch schwerer',
+    gemessen.breitenAbweichung <= 1);
+  check('KRITISCH: die Zeilen verteilen sich wirklich auf mehrere Spalten',
+    gemessen.spalten >= 2);
   check('Die Schalter sind hoch genug zum Treffen', gemessen.hoehe >= 30);
   await page.screenshot({ path: `${OUT}/rollen-02-matrix.png` });
 
@@ -641,7 +697,8 @@ try {
   check('KRITISCH: zugeteilt wird auf DIESER Seite, für alle Personen in einer Liste',
     /Eine Leitung/.test(z) && /Zwei Planung/.test(z) && /Drei Mitarbeit/.test(z));
   check('Jede Person zeigt alle Profile zur Wahl, nicht nur die gesetzten',
-    await page.evaluate(() => document.querySelectorAll('#rzInhalt tbody tr:first-child .rz-marke').length) === 6);
+    await page.evaluate(() => document.querySelectorAll('#rzInhalt tbody tr:first-child .rz-marke').length)
+      === PROFILE.length);
   check('KRITISCH: die gesetzten Profile sind von den nicht gesetzten unterscheidbar',
     await page.evaluate(() => {
       const zeile = document.querySelectorAll('#rzInhalt tbody tr')[1];
@@ -671,7 +728,7 @@ try {
   check('KRITISCH: und die Marke springt zurück — eine Marke, die anbleibt, wäre eine Lüge auf dem Schirm',
     await page.evaluate(() => {
       const zeile = document.querySelectorAll('#rzInhalt tbody tr')[0];
-      return [...zeile.querySelectorAll('.rz-marke.an')].some(b => b.textContent.trim() === 'Verwaltung');
+      return [...zeile.querySelectorAll('.rz-marke.an')].some(b => b.textContent.trim() === 'Verwalter');
     }));
   rollenAntwortFehler = null;
 } catch (e) { check('Abschnitt Zuteilung ohne Abbruch: ' + e.message, false); }
@@ -725,8 +782,8 @@ try {
   check('Und sie sagt, was zu tun ist', /Einrichtung/.test(r));
   check('KRITISCH: sie sagt ausdrücklich, dass unten ein Notstand steht und kein gespeichertes Profil',
     /kein gespeichertes Profil/.test(r));
-  check('KRITISCH: ohne Einrichtung lässt sich kein Profil anlegen, statt still zu scheitern',
-    !(await sichtbar('rvNeuKnopf')));
+  check('KRITISCH: ohne Einrichtung fehlt die Kachel zum Anlegen, statt still zu scheitern',
+    await page.evaluate(() => !document.querySelector('#rvInhalt .rp-kachel.neu')));
   check('KRITISCH: und die Zuteilung ist gesperrt, nicht scheinbar bedienbar',
     await page.evaluate(() => [...document.querySelectorAll('#rzInhalt .rz-marke')].every(b => b.disabled)));
   rollenEingerichtet = true;
@@ -740,7 +797,8 @@ try {
   await page.evaluate(() => { go('betrieb'); bkAbschnittZeigen('rv'); });
   await page.waitForTimeout(900);
   check('Wer nur lesen darf, sieht die Seite', await sichtbar('rvKarte'));
-  check('KRITISCH: aber es gibt keinen Knopf zum Anlegen', !(await sichtbar('rvNeuKnopf')));
+  check('KRITISCH: aber es gibt keine Kachel zum Anlegen',
+    await page.evaluate(() => !document.querySelector('#rvInhalt .rp-kachel.neu')));
   check('KRITISCH: und die Seite sagt WARUM, statt den Knopf nur wegzulassen',
     /nicht ändern/.test(await page.textContent('#rvInhalt')));
   check('KRITISCH: auch die Zuteilung ist gesperrt',

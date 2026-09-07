@@ -183,7 +183,7 @@ function bereiche_katalog(): array
         'alarmempfaenger' => [
             'gruppe' => 'Revierdienst',
             'titel'  => 'Alarmempfänger',
-            'text'   => 'Als Kontaktperson für den Alleinarbeiterschutz hinterlegbar.',
+            'text'   => 'Darf als Kontaktperson für den Alleinarbeiterschutz hinterlegt werden — wer sie trägt, wird im Ernstfall angerufen. Kein Zugriffsrecht: Den Revierdienst verwaltet, wer „Kontrollpunkte" und „Rundgänge" hat.',
             'stufen' => [STUFE_LESEN],
         ],
 
@@ -263,19 +263,32 @@ function recht_gueltig(string $recht): bool
 const ROLLE_MITARBEITEND = 'mitarbeitend';
 const ROLLE_PLANUNG      = 'planung';
 const ROLLE_PERSONAL     = 'personal';
+// Sechste Systemrolle (ENT-442), zwischen Personaladministration und
+// Verwalter: fuehrt den Betrieb, richtet ihn nicht ein. Steht hier VOR dem
+// Verwalter, weil diese Reihenfolge zugleich die Anzeigereihenfolge ist --
+// vom kleinsten zum groessten Zugriff.
+const ROLLE_ADMINISTRATOR = 'administrator';
 const ROLLE_VERWALTUNG   = 'verwaltung';
 const ROLLE_WAECHTER     = 'waechter';
 
 function system_rollen(): array
 {
     return [
+        // Die Anzeigenamen sind mit ENT-442 gewechselt, die SCHLUESSEL nicht:
+        // 'mitarbeitend' heisst jetzt "Personal", 'personal' heisst
+        // "Personaladministration", 'verwaltung' heisst "Verwalter". Ein
+        // Wechsel der Schluessel haette jede Zeile in mitarbeiter_rollen
+        // wandern lassen muessen, ohne dass sich an der Aussage etwas
+        // aendert -- und waehrend der Wanderung waere unklar, wer was darf.
         ROLLE_MITARBEITEND => [
-            'titel'  => 'Mitarbeitend',
-            'text'   => 'Nur die eigenen Daten in der App: eigene Schichten, eigene Rapporte, eigene Sperrtage. Kein Zugang zum Cockpit.',
+            'titel'  => 'Personal',
+            'ikone'  => 'person',
+            'text'   => 'Die Belegschaft: eigene Schichten, eigene Rapporte, eigene Sperrtage in der App. Kein Zugang zum Cockpit.',
             'stufen' => [],
         ],
         ROLLE_PLANUNG => [
             'titel'  => 'Planung',
+            'ikone'  => 'kalender',
             'text'   => 'Einsätze, Objekte, Masterschichten, Kunden und der Abgleich der Ist-Zeiten. Sieht Mitarbeitende mit Name, Funktion und Berechtigungen — nicht AHV-Nummer, Aufenthaltsstatus oder Registerdaten.',
             'stufen' => [
                 'einsaetze'       => STUFE_SCHREIBEN,
@@ -293,8 +306,12 @@ function system_rollen(): array
                 'fahrzeuge'       => STUFE_LESEN,
             ],
         ],
+        // "Personaladministration" und nicht "Personal" (ENT-442): Diese Rolle
+        // VERWALTET Personen, sie IST nicht das Personal. Der Unterschied
+        // steht damit schon im Namen und nicht erst im Beschreibungstext.
         ROLLE_PERSONAL => [
-            'titel'  => 'Personal',
+            'titel'  => 'Personaladministration',
+            'ikone'  => 'akte',
             'text'   => 'Die vollständige Personalakte inklusive der vertraulichen Angaben, Anlegen und Ändern von Mitarbeitenden, Mitteilungen an die Belegschaft. Keine Einsatzplanung, keine Kunden.',
             'stufen' => [
                 'personal'             => STUFE_SCHREIBEN,
@@ -303,9 +320,48 @@ function system_rollen(): array
                 'mitteilungen'         => STUFE_SCHREIBEN,
             ],
         ],
+        // Fuehrt den Betrieb, richtet ihn aber nicht ein (ENT-442). Der
+        // Unterschied zum Verwalter in einem Satz: Der Administrator
+        // arbeitet TAEGLICH mit dem Werkzeug, der Verwalter bestimmt, WIE es
+        // eingerichtet ist und wer hineinkommt.
+        //
+        // Bewusst NICHT dabei:
+        //  - 'personal_vertraulich': AHV-Nummer, Bewilligungen, Register.
+        //    Wer disponiert und Rechnungen schreibt, braucht sie nicht
+        //    (derselbe Schnitt wie bei der Planung, ENT-077).
+        //  - 'betrieb' und 'fahrzeuge' auf Schreiben: Briefkopf,
+        //    Anstellungsorte, Einrichtung und der Fahrzeugbestand sind
+        //    Festlegungen des Betriebs, keine Tagesarbeit. Lesen ja.
+        //  - 'rechte' und 'logbuch': Wer Rollen vergeben darf, kann sich
+        //    jedes andere Recht selbst geben -- das ist die Grenze zwischen
+        //    den beiden Rollen und nicht eine Kleinigkeit mehr oder weniger.
+        //  - Revierdienst: haengt an der Waechterrolle, wie bei allen
+        //    anderen auch.
+        ROLLE_ADMINISTRATOR => [
+            'titel'  => 'Administrator',
+            'ikone'  => 'steuer',
+            'text'   => 'Führt den Betrieb: Einsätze, Objekte, Kunden, Offerten und Rechnungen, Abgleich, Abwesenheiten und Mitteilungen. Sieht Mitarbeitende ohne die vertraulichen Angaben. Keine Betriebseinstellungen, keine Einrichtung, keine Rollenvergabe.',
+            'stufen' => [
+                'einsaetze'            => STUFE_SCHREIBEN,
+                'objekte'              => STUFE_SCHREIBEN,
+                'masterschichten'      => STUFE_SCHREIBEN,
+                'verfuegbarkeit'       => STUFE_LESEN,
+                'abgleich'             => STUFE_SCHREIBEN,
+                'auslagen'             => STUFE_LESEN,
+                'kunden'               => STUFE_SCHREIBEN,
+                'offerten'             => STUFE_SCHREIBEN,
+                'leistungen'           => STUFE_SCHREIBEN,
+                'personal'             => STUFE_LESEN,
+                'abwesenheiten'        => STUFE_SCHREIBEN,
+                'mitteilungen'         => STUFE_SCHREIBEN,
+                'betrieb'              => STUFE_LESEN,
+                'fahrzeuge'            => STUFE_LESEN,
+            ],
+        ],
         ROLLE_VERWALTUNG => [
-            'titel'  => 'Verwaltung',
-            'text'   => 'Alles, zusätzlich die Betriebseinstellungen, die Einrichtung, die Offerten, die Mitteilungen und die Rollenvergabe selbst.',
+            'titel'  => 'Verwalter',
+            'ikone'  => 'schluessel',
+            'text'   => 'Alles: der ganze Betrieb, die Einstellungen, die Einrichtung, der Revierdienst und die Rollenvergabe selbst. Nicht dabei ist einzig „Alarmempfänger" — das ist kein Recht, sondern die Bereitschaft, im Ernstfall angerufen zu werden, und wird je Person vergeben.',
             'stufen' => [
                 'einsaetze'            => STUFE_SCHREIBEN,
                 'objekte'              => STUFE_SCHREIBEN,
@@ -324,6 +380,16 @@ function system_rollen(): array
                 'fahrzeuge'            => STUFE_SCHREIBEN,
                 'rechte'               => STUFE_SCHREIBEN,
                 'logbuch'              => STUFE_LESEN,
+                // Revierdienst seit ENT-442 dabei -- der Verwalter soll den
+                // Bereich verwalten koennen. ENT-169 ("nur ausgewaehlte
+                // Benutzer") ist damit im Kern revidiert, seine eigentliche
+                // Absicht aber gewahrt: 'alarmempfaenger' fehlt hier
+                // ABSICHTLICH. Das ist kein Zugriffsrecht, sondern heisst
+                // "darf als Kontaktperson hinterlegt werden" -- wer es
+                // traegt, wird nachts angerufen. Das gehoert einzeln
+                // vergeben und nicht als Nebenwirkung einer Verwaltungsrolle.
+                'kontrollpunkte'       => STUFE_SCHREIBEN,
+                'rundgaenge'           => STUFE_SCHREIBEN,
             ],
         ],
         // Bewusst NICHT in "Alles" bei Verwaltung enthalten (ENT-169: "nur
@@ -332,6 +398,7 @@ function system_rollen(): array
         // welche der vier Rollen oben sie/er sonst hat.
         ROLLE_WAECHTER => [
             'titel'  => 'Wächtersystem',
+            'ikone'  => 'schild',
             'text'   => 'Revierdienst: Kontrollpunkte und Rundgang-Vorlagen pro Objekt pflegen, laufende und abgeschlossene Rundgänge einsehen, als Kontaktperson für den Alleinarbeiterschutz hinterlegbar. Unabhängig von den anderen Rollen — wird zusätzlich vergeben.',
             'stufen' => [
                 'kontrollpunkte'  => STUFE_SCHREIBEN,
@@ -503,14 +570,19 @@ function rollen_definitionen(PDO $pdo): array
         }
         return $aus;
     }
+    // Die Symbole der Systemrollen stehen im Code und nicht in der
+    // Datenbank: Sie gehoeren zur Rolle selbst, nicht zu ihrer Vergabe.
+    // Eigene Profile bekommen weiter unten ein neutrales Symbol.
     $rollen = $pdo->query('SELECT id, schluessel, titel, text, system FROM rollen ORDER BY system DESC, titel')->fetchAll();
     $nachId = [];
     $aus    = [];
     foreach ($rollen as $r) {
-        $aus[(string)$r['schluessel']] = [
+        $schl = (string)$r['schluessel'];
+        $aus[$schl] = [
             'titel'  => (string)$r['titel'],
             'text'   => (string)$r['text'],
             'system' => (int)$r['system'] === 1,
+            'ikone'  => system_rollen()[$schl]['ikone'] ?? 'profil',
             'stufen' => [],
         ];
         $nachId[(int)$r['id']] = (string)$r['schluessel'];
@@ -537,6 +609,7 @@ function rollen_kurzliste(PDO $pdo): array
             'titel'      => $d['titel'],
             'text'       => $d['text'],
             'system'     => (bool)($d['system'] ?? ist_systemrolle($schluessel)),
+            'ikone'      => $d['ikone'] ?? 'profil',
         ];
     }
     return $aus;
