@@ -161,6 +161,25 @@ check('KRITISCH: das Passwortfeld verbirgt die Eingabe',
 // niemand ein Passwort, und wer eines vergessen hat, sucht genau hier.
 check('Der Weg ueber einen Code ist von der Anmeldemaske aus erreichbar',
   await page.isVisible('#code-holen'));
+// "Passwort vergessen" steht vorne: Sobald das Portal laeuft, ist das der
+// haeufigere der beiden Faelle.
+check('Der zweite Weg nennt zuerst das vergessene Passwort',
+  /Passwort vergessen/.test(await page.textContent('#code-weg')));
+check('Und er nennt auch den ersten Besuch, damit niemand ratlos bleibt',
+  /zum ersten Mal/.test(await page.textContent('#code-weg')));
+// KRITISCH: Die Seite fragt den Server NICHT, ob zu einer Adresse ein
+// Passwort hinterlegt ist. Eine solche Auskunft verriete, dass es die
+// Adresse gibt -- und damit, dass diese Firma Kunde ist.
+{
+  calls = [];
+  await fuell('#email', 'irgendwer@example.invalid');
+  await page.waitForTimeout(200);
+  check('KRITISCH: das Eintippen der Adresse loest keine Abfrage beim Server aus',
+    calls.length === 0);
+  await fuell('#email', '');
+}
+check('Vor einem Fehlversuch steht der zweite Weg ruhig da',
+  await page.evaluate(() => !document.getElementById('code-weg').classList.contains('hervor')));
 
 await fuell('#email', 'a.beispiel@example.invalid');
 await fuell('#passwort', 'ein sicheres langes wort');
@@ -180,6 +199,24 @@ await klick('#abmelden');
 await page.waitForTimeout(250);
 await klick('#wieder-anmelden');
 await page.waitForTimeout(150);
+
+// Nach einem fehlgeschlagenen Passwort-Versuch tritt der zweite Weg hervor --
+// aus dem, was der Browser ohnehin weiss, nicht aus einer Serverauskunft.
+{
+  anmeldeFehler = true;
+  await fuell('#email', 'a.beispiel@example.invalid');
+  await fuell('#passwort', 'falschesPasswort123');
+  await klick('#anmelden-pw');
+  await page.waitForTimeout(300);
+  check('KRITISCH: nach einem fehlgeschlagenen Passwort tritt der Weg zum Code hervor',
+    await page.evaluate(() => document.getElementById('code-weg').classList.contains('hervor')));
+  // Er WECHSELT dabei nicht die Stelle: Ein Element, das erst beim Fehler
+  // erscheint, verschiebt alles darunter und laesst den Blick suchen.
+  check('Und er stand vorher schon an derselben Stelle',
+    await page.isVisible('#code-weg'));
+  anmeldeFehler = false;
+  await fuell('#passwort', '');
+}
 
 // ── Anmeldeweg ueber den Einmal-Code ─────────────────────────────────
 await fuell('#email', 'a.beispiel@example.invalid');
@@ -206,6 +243,7 @@ await klick('#anmelden');
 await page.waitForTimeout(200);
 check('Ein falscher Code wird gemeldet und führt nicht weiter',
   await page.isVisible('#fehler-code') && await page.isVisible('#schritt-code'));
+
 
 anmeldeFehler = false;
 await fuell('#code', '123456');
