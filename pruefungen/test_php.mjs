@@ -692,6 +692,32 @@ if (portalMitAdminSitzung.length) {
   bad.push('Portal mit Verwaltungssitzung: ' + portalMitAdminSitzung.join(', '));
 }
 
+// Kein Personenname aus dem Personal verlaesst den Server ueber das Portal.
+// ENT-441 hat ihn aus der Portalliste herausgehalten, und WELCHE Fassung
+// (aus / nur Vorname / voll) im Detail erscheinen soll, ist Gegenstand von
+// OP-423 und nicht entschieden. Bis dahin gilt die sparsame Vorbelegung.
+//
+// Geprueft wird die MECHANIK, nicht ein Wortlaut: Ohne Verbund auf
+// `mitarbeiter` und ohne die beiden Spalten kann ein Name gar nicht erst in
+// die Antwort geraten. Faellt der Entscheid spaeter anders aus, wird diese
+// Pruefung bewusst angepasst -- dann steht es im Protokoll.
+const portalMitNamen = portalDateien.filter(f =>
+  /\bJOIN\s+mitarbeiter\b/i.test(ohneKommentar(f))
+  || /\b(?:vorname|nachname)\b/i.test(ohneKommentar(f)));
+check('KRITISCH: kein Portal-Endpunkt liest Namen von Mitarbeitenden — OP-423 ist offen',
+  portalMitNamen.length === 0);
+if (portalMitNamen.length) { bad.push('Portal mit Personennamen: ' + portalMitNamen.join(', ')); }
+
+// Die Bewegungsspur bleibt draussen. ENT-441 Punkt 3 schliesst sie
+// ausdruecklich aus, ENT-322 aus demselben Grund fuer den Rapport: Sie gaebe
+// dem Kunden Aufenthaltsdaten des Mitarbeitenden, die er zur
+// Leistungskontrolle nicht braucht. Auch hier die Mechanik: ohne Zugriff auf
+// `rundgang_position` gibt es nichts auszuliefern.
+const portalMitSpur = portalDateien.filter(f => /\brundgang_position\b/i.test(ohneKommentar(f)));
+check('KRITISCH: kein Portal-Endpunkt liest die Bewegungsspur (ENT-441 Punkt 3, ENT-322)',
+  portalMitSpur.length === 0);
+if (portalMitSpur.length) { bad.push('Portal mit Bewegungsspur: ' + portalMitSpur.join(', ')); }
+
 // DIE KERNREGEL. Ein Portal-Endpunkt, der eine kunde_id oder zugang_id aus
 // der Anfrage naehme, liesse jeden angemeldeten Kunden die Daten jedes
 // anderen lesen -- durch blosses Hochzaehlen einer Zahl. Beide Werte

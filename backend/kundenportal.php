@@ -92,6 +92,25 @@ function kp_code_erzeugen(): string
     return str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 }
 
+// Darf der Kunde diese Runde im Detail sehen? Zwei Bedingungen, und beide
+// muessen gelten:
+//
+//   (a) Die Runde gehoert zu einem SEINER Objekte. Die Liste der Objekte
+//       kommt aus kp_objekt_ids() und damit aus der Sitzung -- nie aus der
+//       Anfrage.
+//   (b) Die Runde ist beendet (ENT-441 Punkt 5). Was noch laeuft, ist kein
+//       Nachweis, sondern eine Beobachtung der Person bei der Arbeit.
+//
+// Bewusst eine reine Funktion ohne Datenbank: So kann `pruefungen/` sie
+// wirklich ausfuehren, statt eine Behauptung ueber sie aufzustellen. Und
+// bewusst EINE Stelle -- der Detail- und der Foto-Endpunkt fragen dieselbe
+// Regel, statt jeder seine eigene Fassung davon zu entwickeln.
+function kp_runde_sichtbar(int $objektId, array $objektIds, bool $laeuft): bool
+{
+    if ($laeuft) { return false; }
+    return in_array($objektId, $objektIds, true);
+}
+
 // E-Mail-Adressen werden zum Nachschlagen kleingeschrieben und beschnitten.
 // Ohne das meldet sich niemand an, der seine Adresse gross tippt -- und der
 // Fehler saehe aus wie "Zugang gibt es nicht".
