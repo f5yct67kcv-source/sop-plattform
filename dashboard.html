@@ -4809,6 +4809,7 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
           <svg class="i chev" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
         </button>
         <div class="nav-kinder">
+          <button class="nav-kind" id="nav-lohn-laeufe" onclick="go('lohnlaeufe')">Lohnläufe</button>
           <button class="nav-kind" id="nav-lohn-lohnarten" onclick="go('lohnarten')">Lohnarten</button>
           <button class="nav-kind" id="nav-lohn-saetze" onclick="go('lohnsaetze')">Sätze und Regelwerk</button>
         </div>
@@ -6173,6 +6174,27 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
            Bemessungsgrundlage auftaucht und in einer anderen nicht, und
            machen die Abrechnung damit nachvollziehbar statt zur Blackbox
            (Art. 12 Ziff. 5 GAV). -->
+      <!-- ══════════════════════ LOHNLÄUFE (ENT-451, Etappe 3) ═══════════
+           Die Vorschau rechnet, der gespeicherte Lauf wird gelesen. Zwei
+           verschiedene Wege, und das ist Absicht: Wäre es derselbe, würde
+           eine spätere Ansatz- oder Regeländerung abgeschlossene Monate
+           rückwirkend verändern.
+
+           Stunden und Franken stehen getrennt — „Einheiten nie vermischen“.
+           Und was gesperrt ist, steht mit Grund da, nicht als Null. -->
+      <section class="view" id="view-lohnlaeufe">
+        <div class="bar-tools">
+          <input class="inp" type="month" id="llMonat" style="width:auto" onchange="lohnVorschauLaden()" aria-label="Monat">
+          <button class="btn btn-quiet btn-sm" onclick="lohnVorschauLaden()">Vorschau rechnen</button>
+          <div class="sp" style="flex:1"></div>
+          <button class="btn btn-primary btn-sm" id="llErzeugen" onclick="lohnLaufErzeugen()" style="display:none">Lauf anlegen</button>
+        </div>
+        <div id="llHinweis"></div>
+        <div id="llVorschau"></div>
+        <h3 style="margin:26px 0 8px">Bisherige Läufe</h3>
+        <div id="llListe"></div>
+      </section>
+
       <section class="view" id="view-lohnarten">
         <div class="bar-tools">
           <button class="btn btn-primary btn-sm" id="laNeuKnopf" onclick="lohnartOeffnen(null)">Lohnart erfassen</button>
@@ -6195,7 +6217,7 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
            Vertrag stammt und welche jemand gesetzt hat. -->
       <section class="view" id="view-lohnsaetze">
         <div class="bar-tools">
-          <button class="btn btn-primary btn-sm" onclick="lohnSatzOeffnen(null)">Satz erfassen</button>
+          <button class="btn btn-primary btn-sm" id="lsNeuKnopf" onclick="lohnSatzOeffnen(null)">Satz erfassen</button>
         </div>
         <div id="lsFehlend"></div>
         <div id="lsListe"></div>
@@ -8844,6 +8866,22 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
   </div>
 </div>
 
+<!-- ══════════════════════ LOHNLAUF ANSEHEN (ENT-451) ══════════════════════
+     Die Knöpfe folgen dem Status: Was nicht geht, steht gar nicht erst da.
+     Die Grenze ist die Auszahlung — davor stornieren, danach nachtragen. -->
+<div class="dlg-scrim" id="dlgLohnlauf">
+  <div class="dlg" style="max-width:1200px">
+    <div class="dlg-hd"><h2 id="llDlgTitel">Lohnlauf</h2></div>
+    <div class="dlg-bd"><div id="llDlgInhalt"></div></div>
+    <div class="dlg-ft">
+      <button class="btn btn-plain" onclick="closeDlg('dlgLohnlauf')">Schliessen</button>
+      <button class="btn btn-quiet" id="llBtnStornieren" onclick="lohnLaufStornieren()">Stornieren</button>
+      <button class="btn btn-quiet" id="llBtnAusbezahlt" onclick="lohnLaufAktion('ausbezahlt')">Als ausbezahlt vermerken</button>
+      <button class="btn btn-primary" id="llBtnFreigeben" onclick="lohnLaufAktion('freigeben')">Freigeben</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══════════════════════ LOHNART ERFASSEN (ENT-451) ══════════════════════
      Die sechs Kennzeichen stehen ausgeschrieben und nicht als Kürzelreihe:
      Wer eine Lohnart anlegt, soll lesen, was er entscheidet. Sie sind der
@@ -9545,6 +9583,7 @@ const NAV_RECHTE = {
   // Lohn (ENT-451) haengt am eigenen Recht und nicht an 'personal_lesen':
   // Wer die Personalakte pflegt, muss darum nicht wissen, was jemand
   // verdient. Genau dafuer gibt es den eigenen Bereich.
+  'nav-lohn-laeufe':    'lohn_lesen',
   'nav-lohn-lohnarten': 'lohn_lesen',
   'nav-lohn-saetze':    'lohn_lesen',
   'nav-revierdienst-uebersicht':   'rundgaenge_lesen',
@@ -9565,7 +9604,7 @@ const NAV_GRUPPEN = {
   'navg-kontrolle': ['nav-kontrolle-pensen', 'nav-kontrolle-auslagen',
                      'nav-kontrolle-abwesenheiten', 'nav-kontrolle-arbeitsergebnisse'],
   'navg-revierdienst': ['nav-revierdienst-uebersicht', 'nav-revierdienst-einrichtung'],
-  'navg-lohn': ['nav-lohn-lohnarten', 'nav-lohn-saetze'],
+  'navg-lohn': ['nav-lohn-laeufe', 'nav-lohn-lohnarten', 'nav-lohn-saetze'],
 };
 
 // Ein Recht oder eine Liste davon (ODER-verknuepft).
@@ -9601,6 +9640,7 @@ const TITLES = {
   offerte:     ['Offerte', 'Positionen, Preise und Summen'],
   betrieb:     ['Einstellungen', 'Betrieb, Briefkopf, Zugang, Rollen und Dienstfahrzeuge'],
   pensen:      ['Pensen', 'Jahresstunden gegen die Anstellungskategorie'],
+  lohnlaeufe:  ['Lohnläufe', 'Aus abgeglichenen Ist-Zeiten wird der Bruttolohn'],
   lohnarten:   ['Lohnarten', 'Woraus eine Abrechnung besteht — und was in welche Bemessungsgrundlage zählt'],
   lohnsaetze:  ['Sätze und Regelwerk', 'Abzugssätze mit Gültigkeitszeitraum, GAV-Mindestlöhne'],
   abwesenheiten: ['Abwesenheiten', 'Ferien, Krankheit und weitere Abwesenheiten im Überblick'],
@@ -10762,11 +10802,13 @@ function go(view) {
   $('nav-kontrolle-arbeitsergebnisse').classList.toggle('on', view === 'arbeitsergebnisse');
   if (view === 'arbeitsergebnisse') { arbeitsergebnisseOeffnen(); }
   if (view === 'pensen') { ladePensen(); }
-  const lohnView = view === 'lohnarten' || view === 'lohnsaetze';
+  const lohnView = view === 'lohnarten' || view === 'lohnsaetze' || view === 'lohnlaeufe';
   $('navg-lohn').classList.toggle('offen', lohnView);
   if (lohnView) { $('nav-lohn').classList.add('on'); }
   $('nav-lohn-lohnarten').classList.toggle('on', view === 'lohnarten');
   $('nav-lohn-saetze').classList.toggle('on', view === 'lohnsaetze');
+  $('nav-lohn-laeufe').classList.toggle('on', view === 'lohnlaeufe');
+  if (view === 'lohnlaeufe') { lohnLaeufeLaden(); }
   if (view === 'lohnarten')  { lohnartenLaden(); }
   if (view === 'lohnsaetze') { lohnSaetzeLaden(); }
   if (view === 'auslagen') { auslagenVorgabe(); ladeAuslagen(); }
@@ -18435,7 +18477,9 @@ function kontrolleNavKlick() {
 // zwei Formulare fuer dieselben Daten waeren zwei Orte, an denen ein Feld
 // fehlen kann.
 function lohnNavKlick() {
-  const ziel = 'lohnarten';
+  // Der Einstieg sind die LAEUFE, nicht der Katalog: Sie sind der Vorgang,
+  // Lohnarten und Saetze die Einrichtung dahinter.
+  const ziel = 'lohnlaeufe';
   if (navGruppeKompakt(ziel)) { return; }
   const offen = $('navg-lohn').classList.contains('offen');
   if (offen && $('view-' + ziel).classList.contains('on')) {
@@ -18444,6 +18488,16 @@ function lohnNavKlick() {
   }
   go(ziel);
 }
+
+// Darf die angemeldete Person im Lohnbereich schreiben? EINE Stelle, an
+// der das entschieden wird -- verstreute Abfragen laufen beim naechsten
+// Knopf auseinander.
+//
+// Die eigentliche Sperre sitzt im Server: Alle drei Endpunkte verlangen
+// require_recht($user, 'lohn_schreiben'), bevor sie etwas schreiben. Was
+// hier geschieht, erspart nur den Umweg -- ein Knopf, der auf ein 403
+// fuehrt, ist schlimmer als keiner.
+const lohnSchreiben = () => darf('lohn_schreiben');
 
 // Franken aus Rappen. Immer zwei Nachkommastellen -- "25.-" und "25.00"
 // nebeneinander lesen sich wie zwei verschiedene Zahlen.
@@ -18484,6 +18538,266 @@ function lohnLeerArt(status, data) {
   return 'fehler';
 }
 
+// ── Lohnläufe ────────────────────────────────────────────────────────────
+// Die VORSCHAU rechnet auf dem Server und speichert nichts. Der GESPEICHERTE
+// Lauf wird gelesen, nie neu gerechnet -- sonst veraenderte eine spaetere
+// Ansatz- oder Regelaenderung abgeschlossene Monate rueckwirkend.
+let llDaten = { laeufe: [] };
+let llVorschau = null;
+let llOffen = null;
+
+// Minuten als "H:MM". Stunden und Franken werden NIE in dieselbe Spalte
+// gemischt -- "Einheiten nie vermischen" ist eine Hausregel, und bei einer
+// Lohnabrechnung ist sie keine Kosmetik.
+const lohnStd = min => {
+  const m = Math.max(0, Math.round(Number(min) || 0));
+  return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
+};
+
+const LL_STATUS = {
+  entwurf:     ['Entwurf', 'chip'],
+  freigegeben: ['Freigegeben', 'chip-ok'],
+  ausbezahlt:  ['Ausbezahlt', 'chip-ok'],
+  storniert:   ['Storniert', 'chip-x'],
+};
+
+// Alle festen Schreibknoepfe des Lohnbereichs auf einmal. Wird bei jedem
+// Laden aufgerufen -- die Rechte koennen sich zwischen zwei Ansichten
+// geaendert haben (neue Anmeldung, geaenderte Rolle).
+function lohnKnoepfePruefen() {
+  const zeigen = lohnSchreiben() ? '' : 'none';
+  ['laNeuKnopf', 'lsNeuKnopf', 'llErzeugen'].forEach(id => {
+    const el = $(id);
+    // llErzeugen wird zusaetzlich von der Vorschau gesteuert; hier wird nur
+    // ausgeblendet, nie eingeblendet.
+    if (el && !lohnSchreiben()) { el.style.display = 'none'; }
+    else if (el && id !== 'llErzeugen') { el.style.display = zeigen; }
+  });
+}
+
+function lohnLaeufeLaden() {
+  lohnKnoepfePruefen();
+  if (!$('llMonat').value) {
+    // Vorgabe: der zurueckliegende Monat. Der laufende ist noch nicht
+    // fertig abgeglichen, und ein Lauf darueber waere unvollstaendig.
+    const h = new Date();
+    const v = new Date(h.getFullYear(), h.getMonth() - 1, 1);
+    $('llMonat').value = `${v.getFullYear()}-${String(v.getMonth() + 1).padStart(2, '0')}`;
+  }
+  api('lohnlauf.php').then(({ ok, status, data }) => {
+    if (!ok) { $('llListe').innerHTML = lohnLeer(lohnLeerArt(status, data), data?.message); return; }
+    llDaten = data;
+    lohnLaeufeZeichnen();
+  });
+  lohnVorschauLaden();
+}
+
+function lohnLaeufeZeichnen() {
+  const l = llDaten.laeufe || [];
+  if (!l.length) {
+    $('llListe').innerHTML = lohnLeer('leer', 'Noch kein Lohnlauf angelegt.');
+    return;
+  }
+  $('llListe').innerHTML = `<div style="overflow-x:auto"><table class="tbl">
+    <thead><tr><th>Periode</th><th>Status</th><th style="text-align:right">Personen</th>
+      <th style="text-align:right">Brutto CHF</th><th>Angelegt</th><th></th></tr></thead>
+    <tbody>${l.map(x => {
+      const [txt, kl] = LL_STATUS[x.status] || [x.status, 'chip'];
+      return `<tr${x.status === 'storniert' ? ' style="opacity:.6"' : ''}>
+        <td>${dmy(x.periode_von)} – ${dmy(x.periode_bis)}</td>
+        <td><span class="chip ${kl}">${txt}</span>${x.ersetzt_lauf_id
+          ? ` <span class="zone-note">ersetzt Lauf ${x.ersetzt_lauf_id}</span>` : ''}</td>
+        <td style="text-align:right">${x.personen}</td>
+        <td style="text-align:right">${lohnFr(x.brutto_rappen)}</td>
+        <td>${x.erstellt_am ? dmy(String(x.erstellt_am).slice(0, 10)) : ''}</td>
+        <td style="text-align:right"><button class="btn btn-quiet btn-sm" onclick="lohnLaufOeffnen(${x.id})">Ansehen</button></td>
+      </tr>`;
+    }).join('')}</tbody></table></div>`;
+}
+
+function lohnVorschauLaden() {
+  const m = $('llMonat').value;
+  if (!m) { return; }
+  const von = m + '-01';
+  const bis = new Date(Number(m.slice(0, 4)), Number(m.slice(5, 7)), 0);
+  const bisStr = `${bis.getFullYear()}-${String(bis.getMonth() + 1).padStart(2, '0')}-${String(bis.getDate()).padStart(2, '0')}`;
+  $('llVorschau').innerHTML = '<div class="zone-note" style="padding:20px 4px">Wird gerechnet …</div>';
+  api(`lohnlauf.php?von=${von}&bis=${bisStr}`).then(({ ok, status, data }) => {
+    if (!ok) {
+      $('llVorschau').innerHTML = lohnLeer(lohnLeerArt(status, data), data?.message);
+      $('llErzeugen').style.display = 'none';
+      return;
+    }
+    llVorschau = data;
+    lohnVorschauZeichnen();
+  });
+}
+
+function lohnVorschauZeichnen() {
+  const d = llVorschau;
+  if (!d) { return; }
+  const p = d.vorschau || [];
+  // Besteht fuer diesen Zeitraum schon ein Lauf, wird das GESAGT, bevor
+  // jemand einen zweiten anlegt -- und der Knopf verschwindet.
+  const bestehend = (d.bestehend || [])[0];
+  $('llHinweis').innerHTML = bestehend
+    ? `<div class="hinweis-warn" style="margin-bottom:14px;padding:12px 14px;border-radius:8px">
+         <b>Für diesen Zeitraum besteht bereits ein Lauf.</b>
+         <div class="zone-note" style="margin:4px 0 0">Er muss storniert werden, bevor ein neuer
+           entsteht — zwei Läufe über denselben Monat wären zwei Wahrheiten.</div>
+         <button class="btn btn-quiet btn-sm" style="margin-top:8px" onclick="lohnLaufOeffnen(${bestehend.id})">Bestehenden Lauf ansehen</button>
+       </div>`
+    : '';
+  $('llErzeugen').style.display = (!bestehend && p.length && lohnSchreiben()) ? '' : 'none';
+
+  if (!p.length) {
+    $('llVorschau').innerHTML = lohnLeer('leer',
+      'In diesem Zeitraum gibt es keine abgeglichenen Schichten — es entstünde ein leerer Lauf.');
+    return;
+  }
+  $('llVorschau').innerHTML = lohnPersonenTabelle(p, d.sperrgruende || {}, true);
+}
+
+// EINE Tabelle fuer Vorschau und gespeicherten Lauf. Zwei Fassungen waeren
+// zwei Orte, an denen eine Spalte fehlen kann -- und der Betrachter muesste
+// zweimal lernen, wo was steht.
+function lohnPersonenTabelle(personen, gruende, vorschau) {
+  const zeilen = personen.map(x => {
+    const gesperrt = x.gesperrt_grund;
+    const summeGesperrt = Object.entries(x.gesperrt || {})
+      .map(([g, n]) => `${n}× ${g}`).join(', ');
+    return `<tr${gesperrt ? ' style="opacity:.7"' : ''}>
+      <td><b>${esc(x.name || '')}</b>${x.personalnummer
+        ? `<div class="zone-note" style="margin:2px 0 0">${esc(x.personalnummer)}</div>` : ''}</td>
+      <td>${x.kategorie ? 'Kat. ' + esc(x.kategorie)
+        : '<span class="zone-note" style="font-style:italic">ohne Kategorie</span>'}</td>
+      <td style="text-align:right">${lohnStd(x.roh_min)}</td>
+      <td style="text-align:right">${lohnStd(x.netto_min)}</td>
+      <td style="text-align:right">${lohnStd(x.bonus_min)}</td>
+      <td style="text-align:right"><b>${lohnStd(x.bewertet_min)}</b></td>
+      <td style="text-align:right">${gesperrt
+        ? '<span class="zone-note" style="font-style:italic">nicht gerechnet</span>'
+        : '<b>' + lohnFr(x.brutto_rappen) + '</b>'}</td>
+      <td>${gesperrt
+        ? `<span class="chip chip-x" title="${esc(gruende[gesperrt] || '')}">${esc(gesperrt)}</span>`
+        : (summeGesperrt ? `<span class="chip chip-w" title="Einzelne Schichten sind ausgenommen">${esc(summeGesperrt)}</span>` : '')}
+        ${x.nicht_abgeglichen ? `<span class="chip chip-w" title="Noch nicht abgeglichene Schichten zählen nicht mit — Planung bleibt Planung">${x.nicht_abgeglichen} offen</span>` : ''}
+        ${x.warnung ? `<span class="chip chip-w" title="${esc(x.warnung.text || '')}">unter Mindestlohn</span>` : ''}</td>
+      <td style="text-align:right">${vorschau ? '' :
+        `<button class="btn btn-quiet btn-sm" onclick="lohnZeilenZeigen(${x.mitarbeiter_id})">Zeilen</button>`}</td>
+    </tr>`;
+  }).join('');
+
+  // Die Summen zaehlen NUR, was gerechnet wurde. Eine gesperrte Person ist
+  // keine Null -- sie fehlt, und darunter steht, wie viele es sind.
+  const gerechnet = personen.filter(x => !x.gesperrt_grund);
+  const summeBrutto = gerechnet.reduce((a, x) => a + Number(x.brutto_rappen || 0), 0);
+  const summeStd = gerechnet.reduce((a, x) => a + Number(x.bewertet_min || 0), 0);
+
+  return `<div style="overflow-x:auto"><table class="tbl">
+    <thead><tr><th>Person</th><th>Kategorie</th>
+      <th style="text-align:right" title="bis minus von, ohne Pausenabzug">Rohzeit</th>
+      <th style="text-align:right" title="Rohzeit minus unbezahlter Pause">Nettozeit</th>
+      <th style="text-align:right" title="Art. 12 Ziff. 2: 10 % für Nacht- und Sonntagsarbeit">Zeitbonus</th>
+      <th style="text-align:right" title="Nettozeit plus Zeitbonus — die Zeit, auf der der Lohn beruht">Bewertet</th>
+      <th style="text-align:right">Brutto CHF</th><th></th><th></th></tr></thead>
+    <tbody>${zeilen}</tbody></table></div>
+    <p class="zone-note">${gerechnet.length === personen.length
+      ? `${personen.length} Personen`
+      : `${gerechnet.length} von ${personen.length} Personen gerechnet — bei den übrigen fehlt eine Grundlage`},
+      zusammen <b>${lohnStd(summeStd)} Stunden</b> bewertete Zeit und <b>${lohnFr(summeBrutto)} CHF</b> brutto.
+      Rohzeit, Nettozeit und Zeitbonus stehen einzeln, damit jede Zahl nachvollziehbar bleibt.</p>`;
+}
+
+function lohnLaufErzeugen() {
+  const m = $('llMonat').value;
+  if (!m || !llVorschau) { return; }
+  api('lohnlauf.php', { method: 'POST',
+    body: { aktion: 'erzeugen', von: llVorschau.von, bis: llVorschau.bis } })
+    .then(({ ok, data }) => {
+      if (!ok) { toast(data?.message || 'Lauf konnte nicht angelegt werden.'); return; }
+      llOffen = data;
+      lohnLaeufeLaden();
+      lohnLaufZeigen();
+      toast('Lauf als Entwurf angelegt.');
+    });
+}
+
+function lohnLaufOeffnen(id) {
+  api(`lohnlauf.php?lauf=${id}`).then(({ ok, data }) => {
+    if (!ok) { toast(data?.message || 'Lauf nicht gefunden.'); return; }
+    llOffen = data;
+    lohnLaufZeigen();
+  });
+}
+
+function lohnLaufZeigen() {
+  const d = llOffen;
+  if (!d || !d.lauf) { return; }
+  const l = d.lauf;
+  const [txt, kl] = LL_STATUS[l.status] || [l.status, 'chip'];
+  $('llDlgTitel').textContent = `Lohnlauf ${dmy(l.periode_von)} – ${dmy(l.periode_bis)}`;
+  // Die Knoepfe folgen dem Status: Was nicht geht, steht gar nicht erst da.
+  const darfSchreiben = lohnSchreiben();
+  $('llBtnFreigeben').style.display = (darfSchreiben && l.status === 'entwurf') ? '' : 'none';
+  $('llBtnAusbezahlt').style.display = (darfSchreiben && l.status === 'freigegeben') ? '' : 'none';
+  $('llBtnStornieren').style.display =
+    (darfSchreiben && (l.status === 'entwurf' || l.status === 'freigegeben')) ? '' : 'none';
+  const hinweis = l.status === 'ausbezahlt'
+    ? `<div class="zone-note" style="margin:0 0 12px">Dieser Lauf ist ausbezahlt und damit endgültig.
+        Eine Korrektur gehört als Zeile in den nächsten Lauf, mit Verweis auf diese Periode —
+        die ausbezahlte Abrechnung bleibt unverändert.</div>`
+    : (l.status === 'storniert'
+      ? `<div class="zone-note" style="margin:0 0 12px">Storniert${l.storno_grund
+          ? ': ' + esc(l.storno_grund) : ''}. Der Lauf bleibt vollständig stehen, damit
+          nachvollziehbar ist, was ersetzt wurde.</div>`
+      : '');
+  $('llDlgInhalt').innerHTML = `<p style="margin:0 0 12px"><span class="chip ${kl}">${txt}</span></p>
+    ${hinweis}${lohnPersonenTabelle(d.personen || [], d.sperrgruende || {}, false)}
+    <div id="llZeilen"></div>`;
+  openDlg('dlgLohnlauf');
+}
+
+// Die Zeilen einer Person -- die eigentliche Abrechnung. Sie stehen erst
+// auf Anforderung da: Bei zwanzig Personen waeren es sonst hundertfuenfzig
+// Zeilen auf einmal, und niemand faende die eine, die er sucht.
+function lohnZeilenZeigen(maId) {
+  const p = (llOffen.personen || []).find(x => Number(x.mitarbeiter_id) === maId);
+  if (!p) { return; }
+  const zeilen = (p.zeilen || []).map(z => `<tr>
+    <td>${esc(z.bezeichnung)}${z.annahme
+      ? ' <span class="chip chip-w" title="Beruht auf einer offenen GAV-Auslegung — im Zweifel zugunsten der mitarbeitenden Person (ENT-451)">Annahme</span>' : ''}</td>
+    <td style="text-align:right">${z.menge !== null ? Number(z.menge).toFixed(2) : ''}</td>
+    <td style="text-align:right">${z.basis_rappen !== null ? lohnFr(z.basis_rappen) : ''}</td>
+    <td style="text-align:right">${z.satz_bp !== null ? lohnPz(z.satz_bp) : ''}</td>
+    <td style="text-align:right">${z.betrag_rappen !== null ? '<b>' + lohnFr(z.betrag_rappen) + '</b>'
+      : `<span class="zone-note" style="font-style:italic" title="${esc((llOffen.sperrgruende || {})[z.gesperrt_grund] || '')}">gesperrt</span>`}</td>
+    </tr>${z.hinweis ? `<tr><td colspan="5" class="zone-note" style="padding-top:0">${esc(z.hinweis)}</td></tr>` : ''}`).join('');
+  $('llZeilen').innerHTML = `<h3 style="margin:22px 0 8px">${esc(p.name)}</h3>
+    <table class="tbl"><thead><tr><th>Position</th><th style="text-align:right">Menge</th>
+      <th style="text-align:right">Basis CHF</th><th style="text-align:right">Satz</th>
+      <th style="text-align:right">Betrag CHF</th></tr></thead><tbody>${zeilen}</tbody></table>`;
+  $('llZeilen').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function lohnLaufAktion(aktion, grund) {
+  if (!llOffen || !llOffen.lauf) { return; }
+  const body = { aktion, lauf: llOffen.lauf.id };
+  if (grund) { body.grund = grund; }
+  api('lohnlauf.php', { method: 'POST', body }).then(({ ok, data }) => {
+    if (!ok) { toast(data?.message || 'Nicht möglich.'); return; }
+    llOffen = data;
+    lohnLaufZeigen();
+    lohnLaeufeLaden();
+  });
+}
+
+function lohnLaufStornieren() {
+  const grund = prompt('Warum wird dieser Lauf storniert?');
+  if (grund === null || !grund.trim()) { return; }
+  lohnLaufAktion('stornieren', grund.trim());
+}
+
 // ── Lohnarten ────────────────────────────────────────────────────────────
 let laDaten = { lohnarten: [], kennzeichen: {}, arten: {} };
 // Die Kuerzel der Tabellenkoepfe. Reihenfolge und Zuordnung stammen aus dem
@@ -18493,6 +18807,7 @@ const LA_KURZ = { ahv_pflichtig: 'AHV', ferien_pflichtig: 'Ferien', ml13_pflicht
                   bvg_pflichtig: 'BVG', uvg_pflichtig: 'UVG', qst_pflichtig: 'QSt' };
 
 function lohnartenLaden() {
+  lohnKnoepfePruefen();
   $('laListe').innerHTML = '<div class="zone-note" style="padding:20px 4px">Lade …</div>';
   $('laHinweis').innerHTML = '';
   api('lohnarten.php').then(({ ok, status, data }) => {
@@ -18544,7 +18859,8 @@ function lohnartenZeichnen() {
       <td style="text-align:right">${satz}</td>
       ${haken}
       <td>${gav}</td>
-      <td style="text-align:right"><button class="btn btn-quiet btn-sm" onclick="lohnartOeffnen(${l.id})">Ändern</button></td>
+      <td style="text-align:right">${lohnSchreiben()
+        ? `<button class="btn btn-quiet btn-sm" onclick="lohnartOeffnen(${l.id})">Ändern</button>` : ''}</td>
     </tr>`;
   }).join('');
   $('laListe').innerHTML = `<div style="overflow-x:auto"><table class="tbl">
@@ -18622,6 +18938,7 @@ function lohnartLoeschen() {
 let lsDaten = { abzuege: [], katalog: {}, fehlend: [] };
 
 function lohnSaetzeLaden() {
+  lohnKnoepfePruefen();
   $('lsListe').innerHTML = '<div class="zone-note" style="padding:20px 4px">Lade …</div>';
   api('lohn_abzuege.php').then(({ ok, status, data }) => {
     if (!ok) {
@@ -18659,7 +18976,8 @@ function lohnSaetzeZeichnen() {
       <td style="text-align:right">${a.satz_bp !== null ? lohnPz(a.satz_bp) : ''}${a.fix_rappen !== null ? lohnFr(a.fix_rappen) + ' CHF' : ''}</td>
       <td style="text-align:right">${a.hoechstlohn_rappen !== null ? lohnFr(a.hoechstlohn_rappen) : '<span class="zone-note">keine</span>'}</td>
       <td>${a.quelle || ''}</td>
-      <td style="text-align:right"><button class="btn btn-quiet btn-sm" onclick="lohnSatzOeffnen(${a.id})">Ändern</button></td>
+      <td style="text-align:right">${lohnSchreiben()
+        ? `<button class="btn btn-quiet btn-sm" onclick="lohnSatzOeffnen(${a.id})">Ändern</button>` : ''}</td>
     </tr>`).join('');
     $('lsListe').innerHTML = `<div style="overflow-x:auto"><table class="tbl">
       <thead><tr><th>Abzug</th><th>Gültig</th><th style="text-align:right">Satz</th>
@@ -18855,12 +19173,13 @@ function lohnAkteZeichnen() {
       <td>${a.ml13_bp ? lohnPz(a.ml13_bp) : '<span class="zone-note" title="Kein 13. Monatslohn vereinbart — er ist keine GAV-Pflicht">keiner</span>'}</td>
       <td>${a.ferien_laufend ? 'laufend' : '<span title="Der Ferienlohn wird beim Bezug ausbezahlt, Art. 20 Ziff. 2">beim Bezug</span>'}</td>
       <td>${zus.length ? esc(zus.join(' · ')) : '<span class="zone-note">keine</span>'}</td>
-      <td style="text-align:right"><button class="btn btn-quiet btn-sm" onclick="lohnAnsatzOeffnen(${a.id})">Ändern</button></td>
+      <td style="text-align:right">${lohnSchreiben()
+        ? `<button class="btn btn-quiet btn-sm" onclick="lohnAnsatzOeffnen(${a.id})">Ändern</button>` : ''}</td>
     </tr>`;
   }).join('');
 
   const ansatzKarte = `<div class="card"><div class="card-hd"><h3>Lohnansatz</h3>
-      <button class="btn btn-primary btn-sm" onclick="lohnAnsatzOeffnen(null)">Ansatz erfassen</button></div>
+      ${lohnSchreiben() ? `<button class="btn btn-primary btn-sm" onclick="lohnAnsatzOeffnen(null)">Ansatz erfassen</button>` : ''}</div>
     <div class="card-bd">
       ${warnung}
       ${ansaetze ? `<div style="overflow-x:auto"><table class="tbl"><thead><tr>
@@ -18885,11 +19204,12 @@ function lohnAkteZeichnen() {
         ? esc((a.qst_kanton || '?') + ' · Tarif ' + (a.qst_tarifcode || '?')
               + (a.qst_kinder ? ' · ' + a.qst_kinder + ' Kind(er)' : ''))
         : 'nein'}</td>
-      <td style="text-align:right"><button class="btn btn-quiet btn-sm" onclick="lohnAbzugOeffnen(${a.id})">Ändern</button></td>
+      <td style="text-align:right">${lohnSchreiben()
+        ? `<button class="btn btn-quiet btn-sm" onclick="lohnAbzugOeffnen(${a.id})">Ändern</button>` : ''}</td>
     </tr>`).join('');
 
   const abzugKarte = `<div class="card"><div class="card-hd"><h3>Abzüge dieser Person</h3>
-      <button class="btn btn-primary btn-sm" onclick="lohnAbzugOeffnen(null)">Erfassen</button></div>
+      ${lohnSchreiben() ? `<button class="btn btn-primary btn-sm" onclick="lohnAbzugOeffnen(null)">Erfassen</button>` : ''}</div>
     <div class="card-bd">
       ${abz ? `<div style="overflow-x:auto"><table class="tbl"><thead><tr>
           <th>Gültig ab</th><th>NBU</th><th>KTG</th><th>BVG</th><th>Quellensteuer</th><th></th>
@@ -18907,11 +19227,12 @@ function lohnAkteZeichnen() {
       <td style="font-variant-numeric:tabular-nums">${esc(z.iban)}</td>
       <td>${esc(z.empfaenger || '')}${z.bank ? '<div class="zone-note">' + esc(z.bank) + '</div>' : ''}</td>
       <td>${Number(z.aktiv) ? 'aktiv' : 'inaktiv'}</td>
-      <td style="text-align:right"><button class="btn btn-quiet btn-sm" onclick="lohnZahlungOeffnen(${z.id})">Ändern</button></td>
+      <td style="text-align:right">${lohnSchreiben()
+        ? `<button class="btn btn-quiet btn-sm" onclick="lohnZahlungOeffnen(${z.id})">Ändern</button>` : ''}</td>
     </tr>`).join('');
 
   const zahlKarte = `<div class="card"><div class="card-hd"><h3>Auszahlung</h3>
-      <button class="btn btn-primary btn-sm" onclick="lohnZahlungOeffnen(null)">Empfänger erfassen</button></div>
+      ${lohnSchreiben() ? `<button class="btn btn-primary btn-sm" onclick="lohnZahlungOeffnen(null)">Empfänger erfassen</button>` : ''}</div>
     <div class="card-bd">
       ${zahl ? `<div style="overflow-x:auto"><table class="tbl"><thead><tr>
           <th>Nr.</th><th>Anteil</th><th>IBAN</th><th>Empfänger</th><th></th><th></th>

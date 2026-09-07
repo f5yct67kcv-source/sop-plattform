@@ -126,6 +126,27 @@ const ABZUEGE = {
   fehlend: ['nbu', 'ktg', 'bvg'],
 };
 
+// Vorschau eines Lohnlaufs: eine gerechnete Person, eine gesperrte. Die
+// zweite ist die eigentlich interessante -- sie darf nicht wie eine mit
+// null Franken aussehen.
+const LAUF_VORSCHAU = {
+  status: 'ok', von: '2026-07-01', bis: '2026-07-31', bestehend: [],
+  sperrgruende: {
+    keine_kategorie: 'Ohne Anstellungskategorie nach Art. 8 steht die Lohnform nicht fest.',
+    sparte_reinigung: 'Für Reinigungseinsätze gilt ein anderer, noch nicht geprüfter GAV (OP-32).',
+  },
+  vorschau: [
+    { mitarbeiter_id: 42, name: 'Eine Person', personalnummer: 'P-0042', kategorie: 'C',
+      lohnform: 'stunde', roh_min: 1080, netto_min: 1020, bonus_min: 42, bewertet_min: 1062,
+      brutto_rappen: 51613, gesperrt: { sparte_reinigung: 1 }, nicht_abgeglichen: 1,
+      gesperrt_grund: null, warnung: null, zeilen: [] },
+    { mitarbeiter_id: 43, name: 'Zweite Person', personalnummer: 'P-0043', kategorie: null,
+      lohnform: null, roh_min: 480, netto_min: 480, bonus_min: 0, bewertet_min: 480,
+      brutto_rappen: 0, gesperrt: {}, nicht_abgeglichen: 0,
+      gesperrt_grund: 'keine_kategorie', warnung: null, zeilen: [] },
+  ],
+};
+
 let lohnAntwort = LOHN_VOLL;
 let rechte = ['personal_lesen', 'lohn_lesen', 'lohn_schreiben'];
 
@@ -141,6 +162,10 @@ await page.route('**/api/**', async r => {
   if (u.includes('login')) return send({ status: 'ok', token: 't', name: 'a', rechte });
   if (u.includes('me.php')) return send({ status: 'ok', name: 'a', rechte });
   if (u.includes('lohn_person')) return send(lohnAntwort);
+  if (u.includes('lohnlauf')) {
+    // Ohne Zeitraum die Liste, mit Zeitraum die Vorschau.
+    return u.includes('von=') ? send(LAUF_VORSCHAU) : send({ status: 'ok', laeufe: [] });
+  }
   if (u.includes('lohnarten')) return send(LOHNARTEN);
   if (u.includes('lohn_abzuege')) return send(ABZUEGE);
   if (u.includes('mitarbeiter_dossier')) return send({ status: 'ok', eingerichtet: true, mitarbeiter: DOSSIER });
@@ -280,12 +305,90 @@ check('Ein noch nicht erfasster Ansatz sagt, was daraus folgt',
 check('KRITISCH: ohne Geburtsdatum steht der hoehere Ferien-Satz da, mit Begruendung',
   /10.64 %/.test(luecke) && /zugunsten/.test(luecke));
 
+// ── 5b. Der Lohnlauf: Stunden und Franken getrennt, Gesperrtes benannt ───
+await page.evaluate(() => go('lohnlaeufe'));
+await page.waitForTimeout(600);
+const lauf = (await page.textContent('#view-lohnlaeufe')).replace(/\s+/g, ' ');
+// "Einheiten nie vermischen": Rohzeit, Nettozeit, Zeitbonus und bewertete
+// Zeit stehen EINZELN -- nie nur ein fertiger Stundenwert (CLAUDE.md).
+check('KRITISCH: die Vorschau zeigt Rohzeit, Nettozeit, Zeitbonus und bewertete Zeit getrennt',
+  /Rohzeit/.test(lauf) && /Nettozeit/.test(lauf) && /Zeitbonus/.test(lauf) && /Bewertet/.test(lauf));
+check('Die Zeiten stehen als Stunden da, nicht als Minuten',
+  /18:00/.test(lauf) && /17:00/.test(lauf) && /17:42/.test(lauf));
+check('Der Bruttolohn der gerechneten Person erscheint', /516.13/.test(lauf));
+// Der Kern: Eine gesperrte Person darf NICHT wie eine mit null Franken
+// aussehen. "Unbekannt" und "keine" sind zwei Aussagen.
+check('KRITISCH: eine gesperrte Person zeigt "nicht gerechnet" statt eines Betrags',
+  /nicht gerechnet/.test(lauf) && !/0\.00/.test(lauf));
+check('KRITISCH: der Sperrgrund steht namentlich da, nicht nur als leere Zelle',
+  /keine_kategorie/.test(lauf));
+check('Ausgenommene Einzelschichten werden gezaehlt und benannt',
+  /sparte_reinigung/.test(lauf));
+check('KRITISCH: noch nicht abgeglichene Schichten werden als offen ausgewiesen, nicht verschwiegen',
+  /1 offen/.test(lauf));
+// Eine gefilterte Zahl allein sieht aus wie die Gesamtzahl.
+check('KRITISCH: die Summe sagt, wie viele Personen sie umfasst -- "1 von 2", nicht nur "1"',
+  /1 von 2 Personen/.test(lauf));
+
+// ── 5c. Nur lesen heisst: sehen ja, ändern nein ──────────────────────────
+// Der dritte Rechtezustand, und der leicht zu übersehende: Wer den
+// Lohnbereich lesen, aber nicht schreiben darf, hat bisher alle
+// Erfassen-Knöpfe gesehen und wäre beim Klick in ein 403 gelaufen.
+// Die eigentliche Sperre sitzt im Server -- das hier erspart den Umweg.
+rechte = ['personal_lesen', 'lohn_lesen'];
+// Zurueck auf die vollstaendige Antwort: Der Block davor hat den Mock auf
+// die lueckenhafte gestellt. Ohne das waere hier gar kein Ansatz zu sehen,
+// und die Pruefung "die Werte sind weiterhin da" haette nichts geprueft --
+// sie waere gruen geworden, weil nichts da ist, statt weil etwas fehlt.
+lohnAntwort = LOHN_VOLL;
+await anmelden();
+await page.evaluate(() => go('lohnarten'));
+await page.waitForTimeout(500);
+check('KRITISCH: mit reinem Leserecht ist "Lohnart erfassen" nicht sichtbar',
+  !(await sichtbar('laNeuKnopf')));
+check('Die Lohnarten selbst sind aber weiterhin zu sehen -- gesperrt ist das Ändern, nicht das Lesen',
+  /Grundlohn pro Stunde/.test(await page.textContent('#view-lohnarten')));
+check('KRITISCH: und auch kein "Ändern" an den einzelnen Zeilen',
+  !/Ändern/.test(await page.textContent('#laListe')));
+
+await page.evaluate(() => go('lohnsaetze'));
+await page.waitForTimeout(500);
+check('KRITISCH: mit reinem Leserecht ist "Satz erfassen" nicht sichtbar',
+  !(await sichtbar('lsNeuKnopf')));
+
+await page.evaluate(() => go('lohnlaeufe'));
+await page.waitForTimeout(600);
+check('KRITISCH: mit reinem Leserecht lässt sich kein Lauf anlegen',
+  !(await sichtbar('llErzeugen')));
+
+await page.evaluate(() => { go('mitarbeiter'); openMaDetail('muster.person'); });
+await page.waitForTimeout(400);
+await page.evaluate(() => { lohnAkte = null; lohnAkteFuer = null; mdGoTab('lohn'); });
+await page.waitForTimeout(500);
+const nurLesen = (await page.textContent('#mdBereich_lohn')).replace(/\s+/g, ' ');
+check('KRITISCH: in der Personalakte fehlen die Erfassen-Knöpfe',
+  !/Ansatz erfassen/.test(nurLesen) && !/Empfänger erfassen/.test(nurLesen));
+check('Die erfassten Werte sind aber weiterhin zu sehen',
+  /25.00/.test(nurLesen) && /Aus dem GAV abgeleitet/.test(nurLesen));
+
+// Und mit Schreibrecht sind sie wieder da -- sonst prüfte der Block oben
+// nur, dass irgendetwas fehlt.
+rechte = ['personal_lesen', 'lohn_lesen', 'lohn_schreiben'];
+await anmelden();
+await page.evaluate(() => go('lohnarten'));
+await page.waitForTimeout(500);
+check('KRITISCH: mit Schreibrecht ist der Knopf wieder da -- die Prüfung oben misst also etwas',
+  await sichtbar('laNeuKnopf'));
+
 // ── 6. Ohne das Recht ist nichts davon da ────────────────────────────────
 rechte = ['personal_lesen'];
 lohnAntwort = LOHN_VOLL;
 await anmelden();
 check('KRITISCH: ohne das Recht "Lohn" fehlt die Rubrik in der Navigation',
   !(await sichtbar('navg-lohn')));
+check('KRITISCH: auch der Lohnlauf-Eintrag ist ohne das Recht fort',
+  await page.evaluate(() => !document.getElementById('nav-lohn-laeufe')
+    || document.getElementById('nav-lohn-laeufe').style.display === 'none'));
 await page.evaluate(() => { go('mitarbeiter'); openMaDetail('muster.person'); });
 await page.waitForTimeout(400);
 check('KRITISCH: ohne das Recht "Lohn" fehlt auch der Reiter in der Personalakte',
