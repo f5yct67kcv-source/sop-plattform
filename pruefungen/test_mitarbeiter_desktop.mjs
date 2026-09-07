@@ -63,7 +63,12 @@ async function seite(breite, hoehe, mobil) {
 
 const lage = page => page.evaluate(() => {
   const app = document.getElementById('app');
-  const tabs = document.querySelector('.tabs');
+  // Es gibt ZWEI Leisten -- eine fuers Handy, eine fuer den Schreibtisch
+  // (ENT-447). Gemessen wird die, die tatsaechlich zu sehen ist; die
+  // verborgene hat weder Lage noch Groesse und wuerde jede Messung
+  // verfaelschen.
+  const tabs = [...document.querySelectorAll('.tabs')]
+    .find(n => n.getBoundingClientRect().height > 0) || document.querySelector('.tabs');
   const main = document.querySelector('main');
   const a = app.getBoundingClientRect(), t = tabs.getBoundingClientRect(), m = main.getBoundingClientRect();
   const knoepfe = [...tabs.querySelectorAll('button')];
@@ -82,6 +87,8 @@ const lage = page => page.evaluate(() => {
     // Richtungsangabe kann von einer spaeteren Regel ueberschrieben sein.
     untereinander: knoepfe[1].getBoundingClientRect().top > knoepfe[0].getBoundingClientRect().bottom - 1,
     quer: document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
+    sichtbareLeisten: [...document.querySelectorAll('.tabs')]
+      .filter(n => n.getBoundingClientRect().height > 0).length,
     // Liegt die Leiste UEBER dem Inhalt? Am Schreibtisch ja -- sie steht
     // oben quer. Am Handy nein: dort klebt sie unten und ueberlagert ihn.
     ueberInhalt: t.bottom <= m.top + 1,
@@ -117,8 +124,14 @@ try {
     d.steht === 'static');
   check('KRITISCH: und sie liegt OBEN -- ueber dem Inhalt, nicht darunter',
     d.ueberInhalt && d.leisteOben > 0);
-  check('Es sind dieselben fuenf Reiter wie am Handy -- keine zweite Navigation',
-    d.knopfZahl === 5);
+  // ENT-447 revidiert die fruehere Aussage "dieselben fuenf Reiter": Am
+  // Handy und am Schreibtisch wird NICHT dasselbe getan. Geblieben ist,
+  // dass beide Leisten auf dieselben Abschnitte fuehren -- eine Quelle,
+  // zwei Zugaenge. Geprueft wird darum die Anzahl und dass es genau EINE
+  // sichtbare Leiste gibt, nicht zwei uebereinander.
+  check('Am Schreibtisch fuehren fuenf Reiter', d.knopfZahl === 5);
+  check('KRITISCH: es ist genau EINE Leiste sichtbar, nicht beide',
+    d.sichtbareLeisten === 1);
   check('KRITISCH: die Leiste laeuft ueber die ganze Seitenbreite',
     d.leisteBreite >= d.appBreite - 2);
   // Der eigentliche Zweck des Umbaus: die Seite sitzt nicht mehr in einem
@@ -189,6 +202,70 @@ try {
     g.steht === 'static' && g.ueberInhalt);
   await drueber.close();
 } catch (e) { check('Abschnitt Grenze ohne Abbruch: ' + e.message, false); }
+
+// ══════════════ NICHTS DARF AM SCHREIBTISCH UNERREICHBAR WERDEN
+// ENT-447 nimmt den Reiter "Menü" aus der Schreibtisch-Leiste. Dahinter
+// liegen aber Spesen, Passwort, Einstellungen, das Cockpit und das
+// ABMELDEN. Ohne einen anderen Weg waeren sie schlicht weg -- gemessen
+// war das zwischenzeitlich der Fall: keine der fuenf Beschriftungen war
+// am Schreibtisch anklickbar, man konnte sich nicht einmal abmelden.
+//
+// Geprueft wird die Aussage "erreichbar", nicht ein bestimmter Knopf:
+// ueber den Konto-Knopf gehen und nachsehen, was dann sichtbar ist.
+try {
+  const page = await seite(1440, 900, false);
+  const kontoDa = await page.evaluate(() => {
+    const k = document.getElementById('kKonto');
+    return !!k && k.getBoundingClientRect().height > 0;
+  });
+  check('KRITISCH: am Schreibtisch gibt es einen Weg zum Konto', kontoDa);
+  if (kontoDa) await page.click('#kKonto');
+  await page.waitForTimeout(300);
+  const erreichbar = await page.evaluate(() => {
+    const sichtbar = e => { const r = e.getBoundingClientRect(); return r.height > 0 && r.width > 0; };
+    // Zuerst TRIMMEN, dann ausweichen: Ein reiner Symbolknopf hat als
+    // textContent Leerzeichen -- die sind "wahr", und mit "||" kaeme das
+    // aria-label nie zum Zug. Genau daran ist diese Pruefung zuerst
+    // falsch rot geworden, obwohl der Knopf sichtbar dastand.
+    const txt = [...document.querySelectorAll('button, a[href]')].filter(sichtbar)
+      .map(b => {
+        const t = (b.textContent || '').replace(/\s+/g, ' ').trim();
+        return t || (b.getAttribute('aria-label') || '').trim();
+      });
+    return ['Abmelden', 'Spesen', 'Passwort', 'Einstellungen']
+      .filter(k => !txt.some(t => new RegExp(k, 'i').test(t)));
+  });
+  check('KRITISCH: Abmelden, Spesen, Passwort und Einstellungen sind erreichbar',
+    erreichbar.length === 0);
+  erreichbar.forEach(k => bad.push('am Schreibtisch unerreichbar: ' + k));
+  // Und was oben ein Reiter ist, steht im Konto nicht noch einmal.
+  const doppelt = await page.evaluate(() => {
+    const sichtbar = e => { const r = e.getBoundingClientRect(); return r.height > 0 && r.width > 0; };
+    return ['mk-daten', 'mk-stunden', 'mk-abwesenheit']
+      .filter(id => { const e = document.getElementById(id); return e && sichtbar(e); });
+  });
+  check('Kein zweiter sichtbarer Weg zu dem, was schon ein Reiter ist',
+    doppelt.length === 0);
+  await page.close();
+} catch (e) { check('Abschnitt Erreichbarkeit ohne Abbruch: ' + e.message, false); }
+
+// ══════════════ [hidden] MUSS AUCH AM SCHREIBTISCH VERBERGEN
+// Dieselbe Wache steht in test_app -- aber die Suite laeuft bei 390 px,
+// wo die Schreibtisch-Leiste ohnehin verborgen ist. Die Marke im Reiter
+// hat dort keine Groesse, und die Pruefung konnte gar nicht anschlagen
+// (bei der Gegenprobe genau so herausgekommen: gruen trotz Fehler).
+// Geprueft wird darum HIER, wo die Elemente wirklich stehen.
+try {
+  const page = await seite(1440, 900, false);
+  const sichtbarTrotzHidden = await page.evaluate(() =>
+    [...document.querySelectorAll('[hidden]')]
+      .filter(e => { const r = e.getBoundingClientRect(); return r.height > 0 || r.width > 0; })
+      .map(e => e.id || e.className || e.tagName));
+  check('KRITISCH: am Schreibtisch ist nichts mit [hidden] sichtbar',
+    sichtbarTrotzHidden.length === 0);
+  sichtbarTrotzHidden.forEach(n => bad.push('trotz [hidden] sichtbar: ' + n));
+  await page.close();
+} catch (e) { check('Abschnitt [hidden] ohne Abbruch: ' + e.message, false); }
 
 check('Keine Skriptfehler', jsFehler.length === 0);
 jsFehler.forEach(f => bad.push('JS-Fehler: ' + f));

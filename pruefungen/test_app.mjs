@@ -677,9 +677,14 @@ check('Kein albanischer Text mehr in der App',
   await page.evaluate(() => !/Shqip|Punonjës|Raporti|Turni|Klienti/.test(document.body.innerHTML)));
 check('Das Menü hat keinen Sprachbereich mehr',
   !(await T('#v-menu')).includes('Sprache'));
+// Seit ENT-447 gibt es ZWEI Leisten; diese Suite laeuft bei 390 px, dort
+// fuehrt die Handy-Leiste. Nicht ueber display der KNOEPFE filtern: Die
+// zweite Leiste ist ueber ihr <nav> verborgen, ihre Knoepfe melden
+// trotzdem "flex". Der gerenderte Kasten ist null, sobald irgendein
+// Vorfahr verborgen ist -- und nur das heisst "sichtbar".
 check('Vier sichtbare Reiter unten (kein Revierdienst-Bezug in dieser Suite, ENT-234)',
   await page.evaluate(() => [...document.querySelectorAll('.tabs button')]
-    .filter(b => getComputedStyle(b).display !== 'none').length === 4));
+    .filter(b => b.getBoundingClientRect().height > 0).length === 4));
 
 // ══════════════ LEERER ZUSTAND
 schichtenDaten = { status: 'ok', von: GESTERN, bis: tag(90), schichten: [] };
@@ -828,6 +833,27 @@ await page.evaluate(() => blattAuf(42));
 await page.waitForTimeout(400);
 check('Ein zweites Öffnen meldet sich nicht erneut',
   rufe.filter(r => r.p.includes('meine_gesehen')).length === nachErstem);
+
+// ══════════════ [hidden] MUSS AUCH WIRKLICH VERBERGEN
+// Die Browser-Vorgabe [hidden]{display:none} verliert gegen JEDE
+// Autorenregel, die display setzt. Wer eine Klasse mit display:flex baut
+// und sie mit dem Attribut hidden schaltet, sieht sie trotzdem. Im Haus
+// steht die Gegenregel schon bei .mit-zahl, .rgs-dlg, .rgs-reiter und
+// .mit-dlg-fuss .btn -- und beim Bau der Schreibtisch-Leiste hat die neue
+// Klasse .ts-zahl sie prompt nicht geerbt: eine rote NULL als Alarmzeichen.
+//
+// Geprueft wird die Aussage, nicht die Liste der Klassen: Was das Attribut
+// hidden traegt, hat keine Groesse. Damit greift die Pruefung auch fuer
+// jede kuenftige Klasse, an die niemand gedacht hat.
+{
+  const sichtbarTrotzHidden = await page.evaluate(() =>
+    [...document.querySelectorAll('[hidden]')]
+      .filter(e => { const r = e.getBoundingClientRect(); return r.height > 0 || r.width > 0; })
+      .map(e => e.id || e.className || e.tagName));
+  check('KRITISCH: nichts mit dem Attribut [hidden] ist sichtbar',
+    sichtbarTrotzHidden.length === 0);
+  sichtbarTrotzHidden.forEach(n => bad.push(`trotz [hidden] sichtbar: ${n}`));
+}
 
 // ══════════════ DAS WOERTERBUCH DARF KEINEN SCHLUESSEL ZWEIMAL FUEHREN
 // Ein doppelter Schluessel in einem Objektliteral ist STILL: JavaScript

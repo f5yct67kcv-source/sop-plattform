@@ -122,9 +122,16 @@ try {
   // Die Tabelle darf die Breite nehmen, die Unterreiter darueber nicht:
   // drei Knoepfe zu je 536 px sind keine Reiter mehr, sondern Banner.
   const ur = await page.evaluate(() =>
-    [...document.querySelectorAll('.unterreiter button')].map(b => Math.round(b.getBoundingClientRect().width)));
+    [...document.querySelectorAll('.unterreiter button')]
+      .filter(b => b.getBoundingClientRect().height > 0)
+      .map(b => ({ t: b.textContent.trim(), w: Math.round(b.getBoundingClientRect().width) })));
   check('KRITISCH: die Unterreiter werden nicht ueber die ganze Breite gestreckt',
-    ur.length === 3 && Math.max(...ur) <= 200);
+    ur.length > 0 && Math.max(...ur.map(x => x.w)) <= 280);
+  // "Abwesenheit" ist am Schreibtisch ein eigener Reiter oben (ENT-447).
+  // Stuende sie zusaetzlich als Unterreiter da, gaebe es zwei Wege zum
+  // selben Ziel -- und der Reiter oben zeigte nicht, wo man ist.
+  check('KRITISCH: Abwesenheit steht am Schreibtisch NICHT doppelt (oben und unten)',
+    !ur.some(x => /abwesen/i.test(x.t)));
   await page.screenshot({ path: `${OUT}/monatstabelle-01-schreibtisch.png` });
   await page.close();
 } catch (e) { check('Abschnitt Tabelle ohne Abbruch: ' + e.message, false); }
@@ -228,7 +235,9 @@ try {
     const d = await page.evaluate(() => ({
       schalter: getComputedStyle(document.documentElement)
         .getPropertyValue('--schreibtisch-an').trim() === '1',
-      regelwerk: getComputedStyle(document.querySelector('.tabs')).position === 'static',
+      regelwerk: getComputedStyle([...document.querySelectorAll('.tabs')]
+        .find(n => n.getBoundingClientRect().height > 0) || document.querySelector('.tabs'))
+        .position === 'static',
       tabelle: !!document.querySelector('#plan-inhalt-plan table.mt'),
     }));
     if (!(d.schalter === d.regelwerk && d.regelwerk === d.tabelle))

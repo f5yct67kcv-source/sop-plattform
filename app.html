@@ -87,6 +87,10 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
      ganz unten. Das Skript liest DIESEN Wert, statt die Grenze ein
      zweites Mal als Zahl zu fuehren. */
   --schreibtisch-an: 0;
+  /* Hoehe von Kopfzeile plus Schreibtisch-Leiste. Am Handy 0. Wird
+     GEMESSEN (tischKopfMessen), nicht angenommen -- die Kopfzeile waechst
+     mit dem Namen, die Leiste mit der Schriftgroesse. */
+  --tisch-kopf: 0px;
 
   /* Der SOCKEL (ENT-429): wie viel sichtbarer Bildschirm UNTER dem liegt,
      was der Browser als unteren Rand kennt. Auf jedem gesunden Gerät 0 --
@@ -435,6 +439,11 @@ svg.i-sm { width: 17px; height: 17px; }
   color: var(--ink-3); font: inherit; font-size: 11px; font-weight: 620; padding: 6px 2px;
 }
 .tabs button.on { color: var(--accent); }
+/* Die Schreibtisch-Leiste gibt es am Handy nicht. Dort fuehrt die erste. */
+.tabs-tisch { display: none; }
+/* Der Konto-Knopf gehoert zum Schreibtisch. Am Handy fuehrt der Reiter
+   "Menü" an dieselbe Stelle, und die Kopfzeile ist dort schmal. */
+.k-konto { display: none; }
 .tabs button .punkt { width: 5px; height: 5px; border-radius: 50%; background: var(--neg); position: absolute; margin: -16px 0 0 18px; }
 
 /* ── Ziehen zum Aktualisieren (ENT-438)
@@ -1371,6 +1380,123 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
 
    Die Grenze liegt bei 1080 px und nicht bei 900: Ein quergedrehtes Tablet
    (1024) soll die vertraute Handy-Bedienung behalten. */
+/* ══ Monatstabelle (ENT-445) ══════════════════════════════════════════
+   ABSICHTLICH AUSSERHALB der Breitenabfrage. Zwei Gruende:
+   1. Die Auszeichnung entsteht ohnehin nur am Schreibtisch -- was es
+      nicht gibt, braucht keine Breitenbedingung.
+   2. A4 ist rund 794 px breit. Beim DRUCKEN greift "min-width: 1080px"
+      also nicht, und die Tabelle stuende ohne ihr Regelwerk auf dem
+      Papier. Gemessen und nicht vermutet: siehe test_drucken.
+*/
+/* ── Monatstabelle ─────────────────────────────────────────────────
+   Mittiges gehoert in die Mitte des CONTAINERS, nicht zwischen zwei
+   ungleich breite Nachbarn: darum 1fr auto 1fr und kein Flex-
+   Abstandhalter (CLAUDE.md). */
+.mt-kopf { display: grid; grid-template-columns: 1fr auto 1fr;
+           align-items: center; gap: 12px; margin: 0 0 14px; }
+.mt-kopf > b { font-size: 17px; font-weight: 700; letter-spacing: -.2px; }
+.mt-kopf > button:first-child { justify-self: start; }
+.mt-kopf > button:last-child { justify-self: end; }
+.mt-pfeil { display: flex; align-items: center; justify-content: center;
+            width: 38px; height: 38px; border-radius: 10px; cursor: pointer;
+            border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); }
+.mt-pfeil:hover { border-color: var(--accent-line); color: var(--accent); }
+
+/* Die Tabelle scrollt in IHREM Kasten, nicht die Seite. Bei schmalem
+   Fenster und acht Spalten ist das der Unterschied zwischen "man kann
+   sie ansehen" und "die ganze Seite verrutscht". */
+.mt-rahmen { overflow-x: auto; border: 1px solid var(--line);
+             border-radius: var(--r-sm); background: var(--surface); }
+.mt { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.mt th { text-align: left; padding: 11px 12px; white-space: nowrap;
+         font-size: 11px; font-weight: 700; letter-spacing: .5px;
+         text-transform: uppercase; color: var(--ink-3);
+         border-bottom: 1px solid var(--line); background: var(--surface-2); }
+.mt td { padding: 9px 12px; vertical-align: top; color: var(--ink);
+         border-bottom: 1px solid var(--line-soft); }
+.mt tbody tr:last-child td { border-bottom: 0; }
+.mt-datum { white-space: nowrap; font-weight: 620; }
+.mt-weiter { border-bottom-color: transparent; }
+.mt-zeit, .mt-dauer { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.mt-dauer { color: var(--ink-2); }
+.mt-neben { display: block; font-size: 12px; color: var(--ink-3); font-weight: 400; }
+.mt-ft { display: inline-block; margin-left: 5px; font-size: 11px; color: var(--ink-3); }
+.mt-status { white-space: nowrap; }
+
+/* Ein Tag ohne Schicht ist eine Aussage, kein Loch. Er steht darum
+   ausgeschrieben da -- nur leiser als ein Tag mit Einsatz. */
+.mt-ohne td { color: var(--ink-3); font-style: italic; }
+.mt-wochenende td { background: var(--surface-2); }
+.mt-heute td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+.mt-heute .mt-datum { color: var(--accent); }
+.mt-abgesagt td { text-decoration: line-through; color: var(--ink-3); }
+.mt-zeile { cursor: pointer; }
+.mt-zeile:hover td { background: var(--accent-soft); }
+.mt-zeile:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+.mt-summe-zelle { padding: 0; background: var(--surface-2); }
+.mt-summe { display: flex; flex-wrap: wrap; align-items: baseline;
+            gap: 4px 14px; padding: 12px; }
+.mt-summe b { font-size: 14.5px; }
+.mt-summe .mt-neben { display: inline; }
+.mt-warn { color: var(--warn); font-size: 12.5px; font-weight: 620; }
+
+/* Der Kopf der Monatstabelle: Pfeil links, Monat mittig, Pfeil und
+   Drucken rechts. 1fr auto 1fr haelt den Monat in der Mitte des
+   CONTAINERS, nicht zwischen zwei ungleich breiten Nachbarn. */
+.mt-kopf-rechts { display: flex; align-items: center; gap: 8px; justify-self: end; }
+.mt-drucken { display: inline-flex; align-items: center; gap: 7px; height: 38px;
+  padding: 0 14px; border-radius: 10px; cursor: pointer; font: inherit;
+  font-size: 13.5px; font-weight: 620;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); }
+.mt-drucken:hover { border-color: var(--accent-line); color: var(--accent); }
+.mt-papierkopf { display: none; }
+
+/* ══ PAPIER ═══════════════════════════════════════════════════════════
+   Gedruckt wird der Plan, nicht die Bedienung.
+
+   Wichtig: A4 ist rund 794 px breit, die Breitenabfrage fuer den
+   Schreibtisch greift hier also NICHT. Alles, was sonst dort verborgen
+   wird, muss hier eigens verborgen werden -- sonst kaeme die Handy-
+   Reiterleiste auf dem Papier zurueck. Genau das ist beim ersten Versuch
+   passiert und wird von test_drucken bewacht. */
+@media print {
+  .kopf, .tabs, .ptr, .unterreiter, .mt-pfeil, .mt-drucken,
+  .mit-seite, .blatt, .sperr-hinweis { display: none !important; }
+  html, body, .app, main.inhalt { background: #fff !important; color: #000 !important; }
+  .app.on { display: block !important; }
+  main.inhalt { padding: 0 !important; max-width: none !important; }
+  main.inhalt > .v { max-width: none !important; margin: 0 !important; }
+  /* Nur der Plan geht aufs Papier. Die anderen Abschnitte sind ohnehin
+     nicht "on", aber ein Ausdruck darf sich darauf nicht verlassen. */
+  .v:not(.on) { display: none !important; }
+  .mt-kopf { display: none !important; }
+  .mt-papierkopf { display: flex !important; justify-content: space-between;
+    align-items: baseline; gap: 12px; margin: 0 0 10px; font-size: 13pt; }
+  .mt-papierkopf span { font-size: 11pt; }
+  .mt-rahmen { overflow: visible !important; border: 0 !important; background: none !important; }
+  .mt { font-size: 9pt; }
+  /* Der Tabellenkopf wiederholt sich auf jeder Seite -- ohne ihn ist ab
+     Seite zwei nicht mehr zu erkennen, welche Spalte was ist. */
+  .mt thead { display: table-header-group; }
+  .mt tfoot { display: table-footer-group; }
+  .mt tr { break-inside: avoid; page-break-inside: avoid; }
+  .mt th { background: none !important; color: #000 !important;
+    border-bottom: 1pt solid #000 !important; padding: 4pt 5pt; }
+  .mt td { color: #000 !important; border-bottom: .5pt solid #999 !important; padding: 3pt 5pt; }
+  /* Auf Papier gibt es keine Farbe, auf die man sich verlassen kann.
+     Wochenende und heute stehen ohnehin im Datum -- die Flaechen fallen
+     weg, statt als grauer Schleier den Text zu schwaechen. */
+  .mt-wochenende td, .mt-heute td, .mt-summe-zelle { background: none !important; }
+  .mt-heute td:first-child { box-shadow: none !important; }
+  .mt-heute .mt-datum { color: #000 !important; font-weight: 700; }
+  .mt-ohne td { color: #555 !important; }
+  .mt-neben, .mt-ft { color: #444 !important; }
+  .mt-summe { padding: 6pt 5pt; border-top: 1pt solid #000; }
+  .marke { border: .5pt solid #999 !important; background: none !important; color: #000 !important; }
+  @page { margin: 12mm; }
+}
+
 @media (min-width: 1080px) {
   /* Ein Schalter, den auch das Skript lesen kann. Die Grenze steht damit
      an EINER Stelle -- in der Media Query darueber. Eine zweite Zahl im
@@ -1428,6 +1554,31 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
      dass die Seite ueberhaupt breit sein soll. */
   main.inhalt > #v-plan { max-width: none; }
 
+  /* ── Zweite Leiste (ENT-447) ────────────────────────────────────────
+     Am Schreibtisch fuehrt die Schreibtisch-Leiste, die Handy-Leiste
+     verschwindet. Nicht ".tabs" allein ausblenden: die zweite traegt
+     dieselbe Klasse und wuerde mit verschwinden. */
+  .tabs:not(.tabs-tisch) { display: none; }
+  .tabs-tisch { display: flex; }
+  /* Die Zahl ungelesener Mitteilungen sitzt im Reiter, nicht daneben. */
+  .ts-zahl { min-width: 19px; height: 19px; padding: 0 5px; border-radius: 10px;
+             background: var(--neg); color: #fff; font-size: 11px; font-weight: 700;
+             display: inline-flex; align-items: center; justify-content: center; }
+  /* Ohne diese Zeile macht das eigene "display" das Attribut [hidden]
+     wirkungslos -- die Browser-Vorgabe [hidden]{display:none} verliert
+     gegen jede Autorenregel. Eine rote NULL als Alarmzeichen war die
+     Folge. Dieselbe Falle wie bei .mit-zahl, .rgs-dlg und .rgs-reiter;
+     sie steht im Haus schon dreimal, und neuer Code erbt sie nicht. */
+  .ts-zahl[hidden] { display: none; }
+
+  /* Die Mitteilungen bleiben eine eigene Ebene, ruecken aber unter
+     Kopfzeile und Leiste -- der gedrueckte Reiter bleibt sichtbar.
+     --tisch-kopf ist gemessen, keine geratene Zahl. */
+  .mit-seite { top: var(--tisch-kopf); bottom: 0; }
+  .mit-seite .mit-kopf { max-width: 1200px; margin-inline: auto; width: 100%; }
+  .mit-seite .mit-zurueck { display: none; }   /* der Reiter IST der Weg zurueck */
+  #mitBody { max-width: 1200px; margin-inline: auto; width: 100%; }
+
   /* Drei Knoepfe, die sich 1600 px teilen, sind keine Reiter mehr,
      sondern Banner (gemessen: 536 px je Knopf). Am Handy fuellen sie die
      Zeile zu Recht -- dort IST die Zeile schmal. Hier bekommen sie ihr
@@ -1435,59 +1586,19 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
      (CLAUDE.md). Links buendig, weil darunter eine Tabelle beginnt und
      nicht ein zweiter mittiger Block. */
   .unterreiter { max-width: 520px; margin-right: auto; }
+  /* "Abwesenheit" ist am Schreibtisch ein eigener Reiter oben (ENT-447).
+     Unten stehenzulassen waere ein zweiter Weg zum selben Ziel -- und wer
+     ueber den oberen Reiter kommt, braucht darunter keine Auswahl mehr. */
+  #pu-abwesenheit { display: none; }
+  .unterreiter.abw-oben { display: none; }
 
-  /* ── Monatstabelle ─────────────────────────────────────────────────
-     Mittiges gehoert in die Mitte des CONTAINERS, nicht zwischen zwei
-     ungleich breite Nachbarn: darum 1fr auto 1fr und kein Flex-
-     Abstandhalter (CLAUDE.md). */
-  .mt-kopf { display: grid; grid-template-columns: 1fr auto 1fr;
-             align-items: center; gap: 12px; margin: 0 0 14px; }
-  .mt-kopf > b { font-size: 17px; font-weight: 700; letter-spacing: -.2px; }
-  .mt-kopf > button:first-child { justify-self: start; }
-  .mt-kopf > button:last-child { justify-self: end; }
-  .mt-pfeil { display: flex; align-items: center; justify-content: center;
-              width: 38px; height: 38px; border-radius: 10px; cursor: pointer;
-              border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); }
-  .mt-pfeil:hover { border-color: var(--accent-line); color: var(--accent); }
+  .k-konto { display: inline-flex; align-items: center; gap: 7px; }
+  /* Was oben schon ein Reiter ist, steht im Menue nicht noch einmal --
+     sonst gaebe es zwei sichtbare Wege zum selben Ziel. Uebrig bleiben
+     genau die Punkte ohne eigenen Reiter: Spesen, Passwort, Einstellungen,
+     Cockpit, Abmelden. */
+  #mk-daten, #mk-stunden, #mk-abwesenheit { display: none; }
 
-  /* Die Tabelle scrollt in IHREM Kasten, nicht die Seite. Bei schmalem
-     Fenster und acht Spalten ist das der Unterschied zwischen "man kann
-     sie ansehen" und "die ganze Seite verrutscht". */
-  .mt-rahmen { overflow-x: auto; border: 1px solid var(--line);
-               border-radius: var(--r-sm); background: var(--surface); }
-  .mt { width: 100%; border-collapse: collapse; font-size: 13.5px; }
-  .mt th { text-align: left; padding: 11px 12px; white-space: nowrap;
-           font-size: 11px; font-weight: 700; letter-spacing: .5px;
-           text-transform: uppercase; color: var(--ink-3);
-           border-bottom: 1px solid var(--line); background: var(--surface-2); }
-  .mt td { padding: 9px 12px; vertical-align: top; color: var(--ink);
-           border-bottom: 1px solid var(--line-soft); }
-  .mt tbody tr:last-child td { border-bottom: 0; }
-  .mt-datum { white-space: nowrap; font-weight: 620; }
-  .mt-weiter { border-bottom-color: transparent; }
-  .mt-zeit, .mt-dauer { white-space: nowrap; font-variant-numeric: tabular-nums; }
-  .mt-dauer { color: var(--ink-2); }
-  .mt-neben { display: block; font-size: 12px; color: var(--ink-3); font-weight: 400; }
-  .mt-ft { display: inline-block; margin-left: 5px; font-size: 11px; color: var(--ink-3); }
-  .mt-status { white-space: nowrap; }
-
-  /* Ein Tag ohne Schicht ist eine Aussage, kein Loch. Er steht darum
-     ausgeschrieben da -- nur leiser als ein Tag mit Einsatz. */
-  .mt-ohne td { color: var(--ink-3); font-style: italic; }
-  .mt-wochenende td { background: var(--surface-2); }
-  .mt-heute td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
-  .mt-heute .mt-datum { color: var(--accent); }
-  .mt-abgesagt td { text-decoration: line-through; color: var(--ink-3); }
-  .mt-zeile { cursor: pointer; }
-  .mt-zeile:hover td { background: var(--accent-soft); }
-  .mt-zeile:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-
-  .mt-summe-zelle { padding: 0; background: var(--surface-2); }
-  .mt-summe { display: flex; flex-wrap: wrap; align-items: baseline;
-              gap: 4px 14px; padding: 12px; }
-  .mt-summe b { font-size: 14.5px; }
-  .mt-summe .mt-neben { display: inline; }
-  .mt-warn { color: var(--warn); font-size: 12.5px; font-weight: 620; }
 }
 </style>
 </head>
@@ -1582,6 +1693,15 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
       <svg class="i" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 6-2.5 7-2.5 7h17S18 14 18 8z"/><path d="M13.7 20a2 2 0 0 1-3.4 0"/></svg>
       <span class="mit-zahl" id="mitZahl" hidden>0</span>
     </button>
+    <!-- Konto: nur am Schreibtisch. Dort gibt es keinen Reiter "Menü"
+         mehr (ENT-447) -- ohne diesen Knopf waeren Spesen, Passwort,
+         Einstellungen, das Cockpit und sogar das ABMELDEN unerreichbar.
+         Gemessen und nicht vermutet: siehe test_mitarbeiter_desktop. -->
+    <button class="btn btn-plain k-konto" id="kKonto" onclick="zeige('menu')"
+            style="min-height:40px;padding:0 12px;background:var(--shell-hi);border-color:var(--shell-line);color:var(--shell-txt-hi)">
+      <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <span id="lb-konto">Konto</span>
+    </button>
     <button class="btn btn-plain" style="min-height:40px;padding:0 12px;background:var(--shell-hi);border-color:var(--shell-line);color:var(--shell-txt-hi)" onclick="allesLaden()" id="kLaden" aria-label="Aktualisieren">
       <svg class="i i-sm" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
     </button>
@@ -1624,6 +1744,41 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
     <button id="t-menu" onclick="zeige('menu')">
       <svg class="i" viewBox="0 0 24 24"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
       <span id="lb-tab-menu">Menü</span>
+    </button>
+  </nav>
+
+  <!-- ══ Zweite Leiste, nur am Schreibtisch (ENT-447) ═══════════════════
+       Am Handy und am Schreibtisch werden NICHT dieselben Dinge getan.
+       "Heute", "Rapport" und "Wächter" sind Feldfunktionen: die Schicht,
+       in der man gerade steht; der Rapport, den man vor Ort schreibt; der
+       Rundgang mit Kontrollpunkten. Am Schreibtisch sitzt niemand, um
+       einen Rundgang zu quittieren -- gemessen belegten die drei dort
+       418, 347 und 132 px Höhe und sonst nichts.
+
+       Zwei Leisten, aber EINE Quelle: Beide führen auf dieselben
+       Abschnitte und dieselben Zeichenfunktionen. Was hier steht, ist
+       ein anderer ZUGANG, keine zweite Fassung der Inhalte. -->
+  <nav class="tabs tabs-tisch" id="tabsTisch" aria-label="Bereiche">
+    <button id="ts-mitteilungen" onclick="zeigeTisch('mitteilungen')">
+      <svg class="i" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 6-2.5 7-2.5 7h17S18 14 18 8z"/><path d="M13.7 20a2 2 0 0 1-3.4 0"/></svg>
+      <span id="lb-ts-mitteilungen">Mitteilungen</span>
+      <span class="ts-zahl" id="tsZahl" hidden>0</span>
+    </button>
+    <button id="ts-plan" onclick="zeigeTisch('plan')">
+      <svg class="i" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="17" rx="2"/><line x1="3" y1="9.5" x2="21" y2="9.5"/><line x1="8" y1="2.5" x2="8" y2="6.5"/><line x1="16" y1="2.5" x2="16" y2="6.5"/></svg>
+      <span id="lb-ts-plan">Plan</span>
+    </button>
+    <button id="ts-stunden" onclick="zeigeTisch('stunden')">
+      <svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>
+      <span id="lb-ts-stunden">Meine Stunden</span>
+    </button>
+    <button id="ts-abwesenheit" onclick="zeigeTisch('abwesenheit')">
+      <svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+      <span id="lb-ts-abwesenheit">Abwesenheit</span>
+    </button>
+    <button id="ts-daten" onclick="zeigeTisch('daten')">
+      <svg class="i" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <span id="lb-ts-daten">Meine Daten</span>
     </button>
   </nav>
 </div>
@@ -2154,6 +2309,8 @@ const W = {
     planwertHinweis: 'Planwert aus den Schichtzeiten — keine Lohngrundlage.',
     spDatum: 'Datum', spZeit: 'Zeit', spDauer: 'Dauer', spEinsatz: 'Einsatz',
     spOrt: 'Ort', spTreffpunkt: 'Treffpunkt', spBemerkung: 'Bemerkung', spStatus: 'Status',
+    drucken: 'Drucken',
+    dienstplan: 'Dienstplan',
 };
 const w = k => W[k] || k;
 
@@ -2384,6 +2541,11 @@ function starten() {
   requestAnimationFrame(sockelSetzen);
   $('kName').textContent = ich.name;
   $('kKreis').textContent = initialen(ich.name);
+  tischMarkeAnhaengen();
+  // Am Schreibtisch beginnt die App mit dem PLAN, nicht mit "Heute":
+  // "Heute" hat dort keinen Reiter, und ein Start auf einer Ansicht, zu
+  // der keine Leiste passt, sieht aus wie ein Fehler.
+  if (amSchreibtisch()) zeigeTisch('plan'); else tischMarkeSetzen();
   allesLaden();
   // Ueberlebt einen Geraeteneustart oder App-Neuinstallation zwischen den
   // Sitzungen: liegen aus einer frueheren, offline gebliebenen Rundgang-
@@ -2737,6 +2899,87 @@ function zeige(r) {
   // Kopfzeile stehen (ENT-421).
   mitGlockeVerorten();
 }
+// ══════════════════════════════════════════ SCHREIBTISCH-LEISTE (ENT-447)
+// Fuenf Zugaenge auf VORHANDENE Ansichten. Keine neuen Inhalte, keine
+// zweite Fassung -- nur ein anderer Weg dorthin, ohne den Umweg ueber das
+// Menue. Am Handy ruehrt nichts davon irgendetwas an.
+const TISCH_REITER = ['mitteilungen', 'plan', 'stunden', 'abwesenheit', 'daten'];
+
+function zeigeTisch(ziel) {
+  // Die Mitteilungen liegen in einer eigenen Ebene. Wer woanders hinwill,
+  // schliesst sie zuerst -- sonst laegen sie ueber dem neuen Reiter.
+  if (ziel !== 'mitteilungen') mitSeiteZu();
+  if (ziel === 'mitteilungen')     { mitSeiteAuf(); }
+  else if (ziel === 'plan')        { planUnter = 'plan';        zeige('plan'); }
+  else if (ziel === 'abwesenheit') { planUnter = 'abwesenheit'; zeige('plan'); }
+  else if (ziel === 'stunden')     { zeige('menu'); stdSeiteAuf(); }
+  else if (ziel === 'daten')       { zeige('menu'); datenSeiteAuf(); }
+  tischMarkeSetzen();
+}
+
+// ABGELEITET, nicht gespeichert. Ein zweiter Zustand neben reiter,
+// planUnter und der offenen Unterseite koennte von ihnen abweichen -- und
+// eine Leiste, die den falschen Reiter hervorhebt, ist schlimmer als eine,
+// die gar keinen hervorhebt.
+function tischAktiv() {
+  const mit = $('mitSeite');
+  if (mit && mit.classList.contains('on')) return 'mitteilungen';
+  if (reiter === 'plan') return planUnter === 'abwesenheit' ? 'abwesenheit' : 'plan';
+  if (reiter === 'menu') {
+    const st = $('pr-stunden'), da = $('pr-daten');
+    if (st && st.style.display !== 'none') return 'stunden';
+    if (da && da.style.display !== 'none') return 'daten';
+  }
+  // "Heute", "Rapport", "Waechter", die Sperren und das Menue selbst haben
+  // am Schreibtisch keinen eigenen Reiter. Dann ist KEINER hervorgehoben --
+  // einen falschen zu setzen waere eine Behauptung.
+  return '';
+}
+// Die Mitteilungen liegen als eigene Ebene ueber allem. Am Schreibtisch
+// sollen Kopfzeile und Leiste sichtbar bleiben -- sonst waere der Reiter,
+// den man gerade gedrueckt hat, verschwunden, und niemand saehe, wo er ist.
+// Wie hoch beides zusammen ist, wird gemessen: im Menue faellt die
+// Kopfzeile weg (ENT-402), dann ist es nur die Leiste.
+function tischKopfMessen() {
+  const kopf = document.querySelector('.kopf');
+  const leiste = $('tabsTisch');
+  if (!leiste) return;
+  const h = amSchreibtisch()
+    ? Math.round((kopf ? kopf.getBoundingClientRect().height : 0)
+               + leiste.getBoundingClientRect().height)
+    : 0;
+  document.documentElement.style.setProperty('--tisch-kopf', h + 'px');
+}
+
+function tischMarkeSetzen() {
+  const a = tischAktiv();
+  TISCH_REITER.forEach(r => {
+    const b = $('ts-' + r);
+    if (b) b.classList.toggle('on', r === a);
+  });
+  // Die Zahl ungelesener Mitteilungen steht am Schreibtisch im Reiter,
+  // nicht an der Glocke. EINE Quelle: was an der Glocke steht, wird
+  // uebernommen, nicht zweitgerechnet.
+  const q = $('mitZahl'), z = $('tsZahl');
+  if (q && z) { z.textContent = q.textContent; z.hidden = q.hidden; }
+  tischKopfMessen();
+}
+
+// Die Marke nach JEDEM Wechsel nachziehen, ohne acht Funktionen einzeln
+// anzufassen. Wer spaeter eine weitere Unterseite baut, muss daran nicht
+// denken -- genau die Sorte Regel, die sonst von neuem Code nicht geerbt
+// wird (CLAUDE.md). Laeuft erst beim Start, wenn alle Funktionen stehen.
+function tischMarkeAnhaengen() {
+  ['zeige', 'stdSeiteAuf', 'stdSeiteZu', 'datenSeiteAuf', 'datenSeiteZu',
+   'mitSeiteAuf', 'mitSeiteZu', 'abwesenheitAusMenue', 'planUnterWahl'].forEach(n => {
+    const f = window[n];
+    if (typeof f !== 'function' || f.tischMarke) return;
+    const g = function (...a) { const r = f.apply(this, a); tischMarkeSetzen(); return r; };
+    g.tischMarke = true;
+    window[n] = g;
+  });
+}
+
 function zeichne() {
   beschriften();
   if (reiter === 'heute') zeichneHeute();
@@ -2869,7 +3112,7 @@ function planUnterWahl(u) {
 }
 function zeichnePlan() {
   $('v-plan').innerHTML = `
-    <div class="unterreiter">
+    <div class="unterreiter${planUnter === 'abwesenheit' ? ' abw-oben' : ''}">
       <button id="pu-plan" class="${planUnter === 'plan' ? 'on' : ''}" onclick="planUnterWahl('plan')">${esc(w('plan'))}</button>
       <button id="pu-sperren" class="${planUnter === 'sperren' ? 'on' : ''}" onclick="planUnterWahl('sperren')">${esc(w('sperren'))}</button>
       <button id="pu-abwesenheit" class="${planUnter === 'abwesenheit' ? 'on' : ''}" onclick="planUnterWahl('abwesenheit')">${esc(w('abwesenheit'))}</button>
@@ -2971,7 +3214,21 @@ function zeichnePlanMonat() {
   const kopf = `<div class="mt-kopf">
       ${pfeil(-1, '15 5 8 12 15 19', w('monatZurueck'))}
       <b>${esc(MONATSNAME[m - 1])} ${j}</b>
-      ${pfeil(1, '9 5 16 12 9 19', w('monatVor'))}
+      <span class="mt-kopf-rechts">
+        ${pfeil(1, '9 5 16 12 9 19', w('monatVor'))}
+        <button class="mt-drucken" onclick="window.print()" title="${esc(w('drucken'))}">
+          <svg class="i i-sm" viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          <span>${esc(w('drucken'))}</span>
+        </button>
+      </span>
+    </div>
+    <!-- Nur auf dem Papier sichtbar. Ein ausgedruckter Dienstplan ohne
+         Namen und Monat ist ein Blatt Papier mit Zahlen darauf. -->
+    <div class="mt-papierkopf" aria-hidden="true">
+      <b>${esc(w('dienstplan'))} · ${esc(MONATSNAME[m - 1])} ${j}</b>
+      <span>${esc((profil && (profil.vorname || profil.nachname))
+        ? [profil.vorname, profil.nachname].filter(Boolean).join(' ')
+        : (ich && ich.name) || '')}</span>
     </div>`;
 
   // "wird geladen", "ging schief" und "der Monat ist frei" sind drei

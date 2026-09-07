@@ -61,9 +61,16 @@ async function neueSeite(schichten, extraRoutes, profilUeberschreibung) {
 {
   const { browser, page } = await neueSeite([schicht()]);
   check('Wächter-Reiter ist sichtbar', await page.isVisible('#t-waechter'));
+  // Seit ENT-447 gibt es ZWEI Leisten -- diese Suite prueft die des
+  // Handys (auch der "Desktop"-Durchgang laeuft bei 1024 px und damit
+  // unter der Grenze von 1080). Nicht ueber display der KNOEPFE filtern:
+  // Die zweite Leiste ist ueber ihr <nav> verborgen, ihre Knoepfe melden
+  // trotzdem "flex" und wurden mitgezaehlt. Der gerenderte Kasten ist
+  // null, sobald irgendein Vorfahr verborgen ist -- nur das heisst
+  // "sichtbar", und genau das behauptet diese Pruefung.
   check('Fünf sichtbare Reiter mit Revierdienst-Bezug',
     await page.evaluate(() => [...document.querySelectorAll('.tabs button')]
-      .filter(b => getComputedStyle(b).display !== 'none').length === 5));
+      .filter(b => b.getBoundingClientRect().height > 0).length === 5));
   await page.click('#t-waechter'); await page.waitForTimeout(250);
   check('Genau zwei Kacheln im Wächter-Bereich', await page.isVisible('#mk-rundgang') && await page.isVisible('#mk-schluessel'));
   await page.click('#mk-schluessel'); await page.waitForTimeout(200);
@@ -148,7 +155,7 @@ async function neueSeite(schichten, extraRoutes, profilUeberschreibung) {
     !(await page.isVisible('#t-waechter')));
   check('Vier sichtbare Reiter ohne Revierdienst-Bezug',
     await page.evaluate(() => [...document.querySelectorAll('.tabs button')]
-      .filter(b => getComputedStyle(b).display !== 'none').length === 4));
+      .filter(b => b.getBoundingClientRect().height > 0).length === 4));
   await browser.close();
 }
 
@@ -249,7 +256,7 @@ for (const [breite, bez] of [[360, 'Handy'], [1024, 'Desktop']]) {
     .map(b => b.getBoundingClientRect().height));
   check(`Menü-Kacheln mindestens 44px hoch @${bez}`, menuKacheln.every(h => h >= 44));
   const tabHoehen = await page.evaluate(() => [...document.querySelectorAll('.tabs button')]
-    .filter(b => getComputedStyle(b).display !== 'none').map(b => b.getBoundingClientRect().height));
+    .filter(b => b.getBoundingClientRect().height > 0).map(b => b.getBoundingClientRect().height));
   check(`Alle sichtbaren Reiter mindestens 44px hoch @${bez}`, tabHoehen.every(h => h >= 44));
   const scroll = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   check(`Kein Seiten-Scroll im Wächter/Menü-Bereich @${bez}`, scroll <= 1);
