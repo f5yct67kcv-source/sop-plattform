@@ -50,7 +50,7 @@ const ZUGAENGE = { status: 'ok', eingerichtet: true, zugaenge: [
 
 let calls = [];
 let zugangAntwort = ZUGAENGE;
-let rechte = ['plan', 'kunden', 'betrieb', 'portal'];
+let rechte = ['einsaetze_lesen', 'kunden_lesen', 'betrieb_lesen', 'portal_lesen', 'portal_schreiben'];
 
 function setup(page) {
   return page.route('**/api/**', async route => {
@@ -215,7 +215,7 @@ if (save) {
 // Der Server entscheidet; das hier erspart nur den Umweg. Trotzdem darf
 // jemand ohne das Recht den Punkt nicht sehen -- sonst klickt er auf eine
 // Seite, die ihm nichts liefert.
-rechte = ['plan', 'kunden', 'betrieb'];
+rechte = ['einsaetze_lesen', 'kunden_lesen', 'betrieb_lesen'];
 await page.evaluate(() => localStorage.clear());
 await page.goto(SEITE);
 await page.fill('#gName', 'adrian'); await page.fill('#gPass', 'x'); await page.click('#gBtn');
@@ -226,7 +226,7 @@ await page.evaluate(() => {
   }
 });
 await page.waitForTimeout(150);
-check("KRITISCH: ohne das Recht 'portal' ist der Menüpunkt nicht sichtbar",
+check("KRITISCH: ohne ein Recht aus dem Bereich 'portal' ist der Menüpunkt nicht sichtbar",
   !(await page.isVisible('#nav-admin-portal')));
 
 await browser.close();

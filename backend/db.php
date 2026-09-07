@@ -93,7 +93,18 @@ const SITZUNG_BUERO_RUHE_MIN = 30;   // Bueroarbeitsplatz: ohne Nutzung (ENT-293
 // 30 Minuten nachts um drei mitten im Rundgang vor der Anmeldemaske
 // stehen -- eine Sicherheitsregel, die den Betrieb kaputtmacht, wird
 // umgangen und schuetzt danach gar nichts mehr.
-const SITZUNG_RECHTE_IM_FELD = ['rundgang_verwalten', 'rundgang_einsehen', 'alarmempfaenger'];
+// Namen aus ENT-440 (Bereich_Stufe). Beim Umbau auf Bereiche und Stufen ist
+// diese Liste zunaechst auf den ALTEN Namen stehengeblieben -- sie traf
+// danach kein einziges Recht mehr, und fuer einen Waechter galt die
+// 30-Minuten-Bueroschutzfrist statt der langen Feldfrist. Genau der Fall,
+// den ENT-293 verhindern wollte. Gefunden nicht durch die Pruefung, sondern
+// von Hand: pruef_sitzung.php verglich nur die beiden Listen MITEINANDER --
+// beide gleich falsch heisst gruen. Die Pruefung fragt jetzt zusaetzlich,
+// ob jeder Name hier ueberhaupt ein Recht IST, und rechnet die Frist gegen
+// die echte Waechterrolle statt gegen eine abgeschriebene Liste.
+const SITZUNG_RECHTE_IM_FELD = ['kontrollpunkte_lesen', 'kontrollpunkte_schreiben',
+                                'rundgaenge_lesen', 'rundgaenge_schreiben',
+                                'alarmempfaenger_lesen'];
 
 // Gilt fuer diese Rechte die kurze Bueroschutzfrist?
 // Ohne Rechte: nein (App-Nutzung, lange Frist). Nur Feldrechte: nein.
@@ -145,10 +156,20 @@ function require_session(): array {
     // Ohne die Tabelle -- Einrichtung noch nicht gelaufen -- faellt
     // rechte_rollen() auf den alten Stand zurueck, damit niemand ueber
     // Nacht ausgesperrt wird.
+    // Seit ENT-440 werden die Rollendefinitionen dazugeholt, statt sie aus
+    // dem Code zu nehmen: Es gibt neben den Systemrollen eigene Profile, und
+    // wer sie nicht mitliest, gaebe deren Traegern stillschweigend weniger
+    // Rechte, als ihnen zugeteilt wurde. Ohne die Tabellen liefert
+    // rollen_definitionen() genau den Code-Katalog zurueck -- derselbe
+    // Zustand wie vor dem Umbau.
     require_once __DIR__ . '/rechte.php';
     $row['rollen']    = rechte_rollen($pdo, (int)$row['id'], (bool)$row['ist_admin']);
-    $row['ist_admin'] = in_array(ROLLE_VERWALTUNG, $row['rollen'], true);
-    $row['rechte']    = rechte_aus_rollen($row['rollen']);
+    $rollenDefs       = rollen_definitionen($pdo);
+    $row['rechte']    = rechte_aus_rollen($row['rollen'], $rollenDefs);
+    // ist_admin spiegelt seit ENT-440 das Recht "Rollen vergeben" statt des
+    // Rollennamens -- ein eigenes Profil mit diesem Recht ist genauso
+    // Administration wie die Systemrolle Verwaltung (siehe rechte_setzen()).
+    $row['ist_admin'] = in_array('rechte_' . STUFE_SCHREIBEN, $row['rechte'], true);
 
     // Die kurzen Sitzungsfristen aus ENT-075 galten bisher nur fuer Admins.
     // Sie gehoeren aber an den Grund, aus dem sie kurz sind: Zugang zu

@@ -35,10 +35,26 @@ $T = 86400; $H = 3600; $M = 60;
 $tot = fn(array $r, float $alter, float $ruhe) => sitzung_abgelaufen(
     $r, (int)round($jetzt - $alter * $T), (int)round($jetzt - $ruhe * $T), $jetzt);
 
-// Rechte, wie sie in rechte.php wirklich vorkommen.
-$feld  = ['rundgang_einsehen'];                    // Waechter im Revierdienst
-$buero = ['personal_lesen'];                       // Planung/Personal/Verwaltung
-$beides = ['rundgang_einsehen', 'personal_lesen']; // Waechter MIT Planungsrolle
+// Die Rechte werden aus rechte.php GERECHNET, nicht abgeschrieben (ENT-440).
+// Vorher standen hier von Hand gepflegte Listen -- und als der Umbau auf
+// Bereiche und Stufen die Rechtenamen aenderte, blieben sie stehen. Sie
+// waren dann genauso falsch wie SITZUNG_RECHTE_IM_FELD in db.php, und die
+// Pruefung verglich zwei gleich falsche Listen miteinander: gruen, waehrend
+// im Betrieb der Waechter nachts um drei vor der Anmeldemaske stand.
+require_once __DIR__ . '/../backend/rechte.php';
+$feld   = rechte_aus_rollen(['waechter']);             // Waechter im Revierdienst
+$buero  = rechte_aus_rollen(['personal']);             // Personaladministration
+$beides = rechte_aus_rollen(['waechter', 'planung']);  // Waechter MIT Planungsrolle
+
+// Der Fehler, den die alte Fassung nicht sehen konnte: ein Name in der
+// Liste, den es als Recht gar nicht gibt. So einer traegt nichts bei --
+// die Sitzung faellt still auf die kurze Frist.
+$unbekannt = array_values(array_filter(SITZUNG_RECHTE_IM_FELD,
+    fn($r) => !recht_gueltig($r)));
+pruef('KRITISCH: jedes Feldrecht in db.php gibt es auch wirklich (sonst wirkt die Liste leer)',
+    $unbekannt === []);
+pruef('KRITISCH: die Feldrechte decken die Waechterrolle vollstaendig ab',
+    array_diff(rechte_aus_rollen(['waechter']), SITZUNG_RECHTE_IM_FELD) === []);
 
 pruef('Es gibt ueberhaupt Fristen', defined('SITZUNG_MAX_TAGE') && SITZUNG_MAX_TAGE > 0);
 pruef('KRITISCH: wer Rechte hat, hat kuerzere Fristen als wer keine hat',

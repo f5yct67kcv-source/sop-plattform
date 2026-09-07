@@ -41,7 +41,7 @@ $s = $gelesen['spalten'];
 if (array_key_exists('personalnummer', $input)) {
     $neuePn = trim((string)$input['personalnummer']);
     if ($neuePn !== (string)($bestand['personalnummer'] ?? '')) {
-        if (!darf($user, 'rechte')) {
+        if (!darf($user, 'rechte_schreiben')) {
             json_response(['status' => 'error',
                 'message' => 'Die Personalnummer darf nur die Verwaltung ändern.'], 403);
         }
@@ -62,7 +62,7 @@ $nameNeu = null;
 if (array_key_exists('name_neu', $input)) {
     $roh = trim((string)$input['name_neu']);
     if ($roh !== '' && $roh !== $bestand['name']) {
-        if (!darf($user, 'rechte')) {
+        if (!darf($user, 'rechte_schreiben')) {
             json_response(['status' => 'error',
                 'message' => 'Der Login-Name darf nur die Verwaltung ändern.'], 403);
         }
@@ -88,7 +88,7 @@ if (!$s) {
 // aendern (ENT-077). Ohne diese Sperre koennte die Planung die AHV-Nummer
 // ueberschreiben, ohne sie je gesehen zu haben -- und das Logbuch haette
 // als alten Wert nichts stehen, weil ihr das Feld nie ausgeliefert wurde.
-if (!darf($user, 'personal_vertraulich')) {
+if (!darf($user, 'personal_vertraulich_schreiben')) {
     $verboten = array_intersect(array_keys($s), ma_vertrauliche_felder());
     foreach ($verboten as $feld) { unset($s[$feld]); }
     if (!$s) {
@@ -120,7 +120,7 @@ logbuch_vergleichen(db(), $user, 'mitarbeiter', (int)$bestand['id'],
 // Rollen, falls mitgeschickt und falls der Bedienende sie vergeben darf.
 $rollenFehler = null;
 if (array_key_exists('rollen', $input) && is_array($input['rollen'])) {
-    if (!darf($user, 'rechte')) {
+    if (!darf($user, 'rechte_schreiben')) {
         json_response(['status' => 'error',
             'message' => 'Rollen darf nur die Verwaltung vergeben.'], 403);
     }

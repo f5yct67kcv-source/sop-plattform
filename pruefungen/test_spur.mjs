@@ -71,7 +71,7 @@ check('KRITISCH: die Auswertung liefert die Spur NICHT mit — nur die Rundgang-
 check('Die Spur hat einen eigenen Endpunkt, der einzeln abgerufen wird',
   /rundgang_id = \?/.test(SPUR) && /ORDER BY p\.erfasst_am/.test(SPUR));
 check('KRITISCH: der Spur-Endpunkt verlangt dasselbe Recht wie die Auswertung',
-  /require_recht\(\$user, 'rundgang_einsehen'\)/.test(SPUR));
+  /require_recht\(\$user, 'rundgaenge_lesen'\)/.test(SPUR));
 // "Noch nicht eingerichtet" und "es gibt keine Spur" sind verschiedene
 // Aussagen -- die Oberflaeche muss sie unterscheiden koennen.
 check('KRITISCH: "nicht eingerichtet" ist von "keine Spur vorhanden" unterscheidbar',

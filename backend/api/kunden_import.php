@@ -23,7 +23,7 @@ require_once __DIR__ . '/../rechte.php';
 require __DIR__ . '/../kunden.php';
 
 $user = require_session();
-require_recht($user, 'kunden');
+require_recht($user, 'kunden_schreiben');
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(['status' => 'error', 'message' => 'nur POST'], 405);
 }

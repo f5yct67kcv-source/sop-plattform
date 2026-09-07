@@ -194,8 +194,17 @@ check('KRITISCH: eine manuelle Personalnummer-Aenderung laeuft durch dieselbe Fo
   /ma_personalnummer_gueltig\s*\(/.test(updateOhneKommentar));
 check('KRITISCH: eine manuelle Login-Namen-Aenderung laeuft durch dieselbe Formpruefung wie die automatische Bildung',
   /ma_login_name_gueltig\s*\(/.test(updateOhneKommentar));
-check('KRITISCH: beide manuellen Aenderungen verlangen das Recht "rechte" (dieselbe Schwelle wie Rollenvergabe und "Login-Namen umstellen")',
-  (updateOhneKommentar.match(/darf\(\$user,\s*'rechte'\)/g) || []).length >= 3);
+// Geprueft wird die AUSSAGE, nicht der Wortlaut (ENT-440 hat die Rechte
+// umbenannt): Personalnummer, Login-Name und Profile haengen alle drei am
+// SELBEN Recht, und zwar an der Schreibstufe des Bereichs "Rollen &
+// Berechtigungen". Ein Test auf den festen Namen 'rechte' waere beim
+// naechsten Umbau gruen geblieben, waehrend die Sperre verschwindet.
+const updateRechte = [...updateOhneKommentar.matchAll(/darf\(\$user,\s*'([a-z_]+)'\)/g)].map(m => m[1]);
+const rollenRecht = updateRechte.filter(r => /^rechte_/.test(r));
+check('KRITISCH: alle drei manuellen Aenderungen haengen am selben Recht wie die Profilvergabe',
+  rollenRecht.length >= 3 && new Set(rollenRecht).size === 1);
+check('KRITISCH: und das ist eine SCHREIB-Stufe, nicht blosses Lesen',
+  /_schreiben$/.test(rollenRecht[0] || ''));
 check('KRITISCH: nach einer manuellen Login-Namen-Aenderung werden die Sitzungen dieser Person beendet -- wie bei "Login-Namen umstellen"',
   /DELETE FROM sessions WHERE mitarbeiter_id/.test(updateOhneKommentar));
 
@@ -620,7 +629,11 @@ const ohnePruefung = apiDateien.filter(f => {
   const q = ohneKommentar(f);
   if (!/require_session\s*\(/.test(q)) { return false; }   // login.php u.ae.
   if (NUR_EIGENE_DATEN.includes(f)) { return false; }
-  return !/(require_recht|require_verwaltung)\s*\(/.test(q);
+  // require_recht_nach_methode() (ENT-440) prueft je HTTP-Methode die
+  // Lese- oder die Schreibstufe -- es ist dieselbe Pruefstelle, nur mit
+  // der Stufe aus der Methode. Ohne den Namenszusatz hier haetten die
+  // vier Endpunkte, die lesen UND schreiben, als ungeprueft gegolten.
+  return !/(require_recht\w*|require_verwaltung)\s*\(/.test(q);
 });
 check('KRITISCH: jeder Endpunkt prueft Rechte oder steht als Ausnahme benannt da',
   ohnePruefung.length === 0);
@@ -687,10 +700,20 @@ if (portalMitFremdId.length) { bad.push('Portal liest fremde Kennung: ' + portal
 // oeffnen koennen (ENT-441 Punkt 9, gleiche Trennung wie ENT-181).
 const zugangDateien = apiDateien.filter(f => f.startsWith('kundenzugang_'));
 check('Es gibt Verwaltungsendpunkte fuer Kundenzugaenge', zugangDateien.length > 0);
+// Seit ENT-440 tragen Rechte Stufen: <bereich>_lesen und
+// <bereich>_schreiben. Geprueft wird der BEREICH -- welche Stufe der
+// einzelne Endpunkt verlangt, entscheidet er selbst (list liest, save
+// schreibt), aber am Bereich 'portal' muessen beide haengen.
 const zugangOhnePortalrecht = zugangDateien.filter(f =>
-  !/require_recht\s*\(\s*\$user\s*,\s*'portal'\s*\)/.test(ohneKommentar(f)));
-check("KRITISCH: die Kundenzugang-Verwaltung verlangt das Recht 'portal'",
+  !/require_recht\w*\s*\(\s*\$user\s*,\s*'portal(_|'\s*\.\s*STUFE_)/.test(ohneKommentar(f)));
+check("KRITISCH: die Kundenzugang-Verwaltung verlangt ein Recht aus dem Bereich 'portal'",
   zugangOhnePortalrecht.length === 0);
+// Und die Stufen sind wirklich getrennt: Wuerde die Liste die Schreibstufe
+// verlangen, waere die Lesestufe wertlos -- und wuerde das Anlegen mit der
+// Lesestufe auskommen, waere sie gefaehrlich.
+check("KRITISCH: die Liste verlangt Lesen, das Anlegen und Sperren Schreiben",
+  /'portal_'\s*\.\s*STUFE_LESEN/.test(ohneKommentar('kundenzugang_list.php'))
+  && /'portal_'\s*\.\s*STUFE_SCHREIBEN/.test(ohneKommentar('kundenzugang_save.php')));
 if (zugangOhnePortalrecht.length) {
   bad.push('Kundenzugang ohne Recht portal: ' + zugangOhnePortalrecht.join(', '));
 }
@@ -698,7 +721,15 @@ if (zugangOhnePortalrecht.length) {
 // Das Recht muss im Katalog stehen und darf NUR der Verwaltung gehoeren.
 // Stuende es bei 'Planung', koennte jede planende Person einem Dritten
 // Zugang verschaffen -- genau das war der Grund, es zu trennen.
-check("KRITISCH: das Recht 'portal' steht im Rechtekatalog", /'portal'\s*=>/.test(rechteQuelle));
+// Der Bereich muss im Katalog stehen, mit BEIDEN Stufen: Ein Bereich ohne
+// Schreibstufe liesse sich nicht vergeben, einer ohne Lesestufe zwaenge
+// jeden Leser zum Schreibrecht.
+{
+  const portalBlock = (rechteQuelle.match(/'portal' *=> \[[\s\S]*?\],/) || [''])[0];
+  check("KRITISCH: der Bereich 'portal' steht im Bereichskatalog", portalBlock !== '');
+  check("KRITISCH: und er kennt beide Stufen",
+    /STUFE_LESEN/.test(portalBlock) && /STUFE_SCHREIBEN/.test(portalBlock));
+}
 
 // Die Anmeldung muss den zweiten Faktor auch VERLANGEN und Fehlversuche
 // zaehlen -- sonst laesst sich der sechsstellige Code durchprobieren.

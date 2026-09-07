@@ -60,7 +60,7 @@ if ($lage !== 'ok') {
     // dem Recht sein. require_session() beendet mit 401, require_recht mit
     // 403 -- beides bevor irgendetwas verschickt wird.
     $user = require_session();
-    require_recht($user, 'mitteilungen');
+    require_recht($user, 'mitteilungen_schreiben');
 }
 
 $pdo = db();

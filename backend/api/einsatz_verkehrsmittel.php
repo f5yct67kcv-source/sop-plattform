@@ -18,7 +18,7 @@ require_once __DIR__ . '/../planung.php';
 require_once __DIR__ . '/../mitarbeiter.php';   // MA_VERKEHRSMITTEL
 
 $user = require_session();
-require_recht($user, 'plan');
+require_recht($user, 'einsaetze_schreiben');
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(['status' => 'error', 'message' => 'nur POST'], 405);
 }

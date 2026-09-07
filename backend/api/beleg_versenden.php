@@ -14,7 +14,7 @@ require __DIR__ . '/../belege.php';
 require __DIR__ . '/../mailer.php';
 
 $user = require_session();
-require_recht($user, 'offerten');
+require_recht($user, 'offerten_schreiben');
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(['status' => 'error', 'message' => 'nur POST'], 405);
 }

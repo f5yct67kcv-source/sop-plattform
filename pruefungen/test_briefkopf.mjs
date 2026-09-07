@@ -53,9 +53,9 @@ check('Das Logo liegt als LONGBLOB in der Datenbank, nicht als Pfad im Dateisyst
 check('KRITISCH: die Betriebszeile wird LEER angelegt — keine erfundenen Firmenangaben',
   /INSERT INTO betrieb \(id, firma, zusatz\) VALUES \(1, '', ''\)/.test(EINR));
 
-check('KRITISCH: Aendern verlangt das Recht "betrieb"', /require_recht\(\$user, 'betrieb'\)/.test(BET));
+check('KRITISCH: Aendern verlangt das Recht "betrieb"', /require_recht_nach_methode\(\$user, 'betrieb'\)/.test(BET));
 check('KRITISCH: Lesen steht vor der Rechtepruefung — wer drucken darf, braucht den Kopf',
-  BET.indexOf("REQUEST_METHOD'] === 'GET'") < BET.indexOf("require_recht($user, 'betrieb')"));
+  BET.indexOf("REQUEST_METHOD'] === 'GET'") < BET.indexOf("require_recht_nach_methode($user, 'betrieb')"));
 check('KRITISCH: das Logo ist auf 512 KB begrenzt', /LOGO_MAX = 512 \* 1024/.test(BET));
 check('KRITISCH: nur Bildformate werden angenommen',
   /LOGO_MIME_ERLAUBT = \['image\/png', 'image\/jpeg', 'image\/svg\+xml', 'image\/webp'\]/.test(BET));
@@ -120,7 +120,7 @@ check('KRITISCH: der Server verknuepft den Kunden ueber die SCHICHT, nicht ueber
 check('KRITISCH: nirgends wird auf den Kundennamen verknuepft — Namen wiederholen und aendern sich',
   !/JOIN kunden[\s\S]{0,80}k\.name\s*=/.test(RLIST) && !/ON\s+k\.name/.test(RLIST));
 check('KRITISCH: die Kundenstammdaten gehen nur an den Zugang, der ohnehin alle Rapporte sieht',
-  /if \(darf\(\$user, 'abgleich'\)\)[\s\S]{0,200}\$kundenFelder/.test(RLIST)
+  /if \(darf\(\$user, 'abgleich_lesen'\)\)[\s\S]{0,200}\$kundenFelder/.test(RLIST)
   && /\} else \{[\s\S]{0,200}\$basis \. \$von/.test(RLIST));
 
 check('KRITISCH: die sechs Rechnungsadress-Spalten werden nachgetragen',
@@ -216,7 +216,7 @@ await page.route('**/api/**', route => {
   try { body = req.postData() ? JSON.parse(req.postData()) : null; } catch (e) {}
   const s = x => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(x) });
   if (u.includes('login')) return s({ status: 'ok', token: 't', name: 'adrian', ist_admin: true });
-  if (u.includes('me.php')) return s({ status: 'ok', name: 'adrian', ist_admin: true, rollen: [], rechte: ['betrieb'] });
+  if (u.includes('me.php')) return s({ status: 'ok', name: 'adrian', ist_admin: true, rollen: [], rechte: ['betrieb_lesen', 'betrieb_schreiben', 'fahrzeuge_lesen', 'fahrzeuge_schreiben'] });
   if (u.includes('betrieb.php')) {
     if (body) {
       gesendet.push(body);

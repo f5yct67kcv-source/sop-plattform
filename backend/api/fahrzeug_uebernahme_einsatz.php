@@ -38,7 +38,7 @@ require_once __DIR__ . '/../logbuch.php';
 require_once __DIR__ . '/../fahrzeug.php';
 
 $user = require_session();
-require_recht($user, 'betrieb');
+require_recht($user, 'fahrzeuge_schreiben');
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(['status' => 'error', 'message' => 'nur POST'], 405);
 }

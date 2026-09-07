@@ -19,7 +19,7 @@ require_once __DIR__ . '/../rechte.php';
 require_once __DIR__ . '/../rundgang.php';
 
 $user = require_session();
-require_recht($user, 'rundgang_einsehen');
+require_recht($user, 'rundgaenge_lesen');
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     json_response(['status' => 'error', 'message' => 'nur GET'], 405);
 }

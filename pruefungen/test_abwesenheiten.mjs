@@ -74,10 +74,10 @@ check('KRITISCH: Ferien lassen sich nicht rueckwirkend beantragen',
   /\$typ === 'ferien' && \$von < date\('Y-m-d'\)/.test(MEINE));
 
 check('KRITISCH: die Gesamtansicht verlangt das Recht personal_lesen',
-  /require_recht\(\$user, 'personal_lesen'\)/.test(LISTE));
+  /require_recht\(\$user, 'abwesenheiten_lesen'\)/.test(LISTE));
 
 check('KRITISCH: Genehmigen/Ablehnen verlangt personal_schreiben, nicht nur irgendein Recht',
-  /require_recht\(\$user, 'personal_schreiben'\)/.test(ENTSCHEIDEN));
+  /require_recht\(\$user, 'abwesenheiten_schreiben'\)/.test(ENTSCHEIDEN));
 check('KRITISCH: eine Ablehnung braucht zwingend eine Begruendung',
   /abgelehnt' && \$grund === ''/.test(ENTSCHEIDEN));
 
@@ -124,7 +124,9 @@ const browser = await chromium.launch({ executablePath: EXE });
     const s = x => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(x) });
     if (u.includes('login')) return s({ status: 'ok', token: 't', name: 'adrian', ist_admin: true });
     if (u.includes('me.php')) return s({ status: 'ok', name: 'adrian', ist_admin: true, rollen: [],
-      rechte: ['personal_lesen', 'personal_schreiben', 'betrieb'] });
+      rechte: ['personal_lesen', 'abwesenheiten_lesen', 'personal_schreiben',
+      'abwesenheiten_schreiben', 'betrieb_lesen', 'betrieb_schreiben',
+      'fahrzeuge_lesen', 'fahrzeuge_schreiben'] });
     if (u.includes('mitarbeiter_list')) return s({ status: 'ok', mitarbeiter: [
       { id: 1, name: 'adrian', vorname: 'Adrian', nachname: 'Muster', aktiv: 1, ist_admin: 1,
         funktion_id: null, abteilung_id: null, anstellungsort_id: null },

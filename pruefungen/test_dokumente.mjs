@@ -36,7 +36,7 @@ const EP = readFileSync(`${WURZEL}/backend/api/einsatz_dokument.php`, 'utf8');
 const EINR = readFileSync(`${WURZEL}/backend/api/planung_einrichten.php`, 'utf8');
 
 check('KRITISCH: das Anhängen verlangt das Planungsrecht',
-  /require_recht\(\$user,\s*'plan'\)/.test(EP));
+  /require_recht_nach_methode\(\$user,\s*'einsaetze'\)/.test(EP));
 check('KRITISCH: wer nicht plant, sieht nur die Einsätze, auf denen er eingeteilt ist',
   /FROM einsatz_zuteilung WHERE einsatz_id = \? AND mitarbeiter_id = \?/.test(EP));
 check('KRITISCH: die mitarbeiter_id kommt aus der Sitzung, nicht aus der Anfrage',

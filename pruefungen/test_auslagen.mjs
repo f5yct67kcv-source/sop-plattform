@@ -255,7 +255,7 @@ check('SERVER: die Strasse ist Pflicht (PAKO-Kommentar)',
 check('SERVER: Lesen braucht das Recht auf die Personalakte',
   /require_recht\(\$user, 'personal_lesen'\)/.test(anPhp));
 check('SERVER: Aendern braucht das Betriebsrecht',
-  /require_recht\(\$user, 'betrieb'\)/.test(anPhp));
+  /require_recht\(\$user, 'betrieb_schreiben'\)/.test(anPhp));
 
 const dPhp = readFileSync(`${WURZEL}/backend/api/objekt_distanz_save.php`, 'utf8');
 check('SERVER: leere Distanz loescht den Eintrag, statt 0 zu speichern',

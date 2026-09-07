@@ -21,7 +21,7 @@ require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../rechte.php';
 
 $user = require_session();
-require_recht($user, 'plan');
+require_recht_nach_methode($user, 'objekte');
 
 const OP_WEG_ARTEN = ['telefon', 'mobil', 'email', 'webseite', 'fax'];
 

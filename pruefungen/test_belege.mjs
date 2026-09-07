@@ -155,8 +155,24 @@ check('Der Beleg traegt die gerechneten Summen als abgeleitete Werte',
 check('Archivieren ist vorgesehen, Stornieren nicht',
   /aktiv TINYINT/.test(belegBlock) && !/storn/i.test(belegBlock.replace(/--[^\n]*/g, '')));
 
-check('KRITISCH: es gibt ein eigenes Recht "offerten"', /'offerten'\s*=>/.test(RECHTE));
-check('KRITISCH: die Verwaltung traegt es', /'betrieb', 'rechte', 'offerten'/.test(RECHTE));
+// Geprueft wird die WIRKUNG, nicht der Wortlaut (CLAUDE.md): Der Rechtekern
+// wird ausgefuehrt und gefragt, wer das Offertenrecht tatsaechlich hat. Die
+// frueheren Fassungen suchten die Zeichenfolge 'betrieb', 'rechte',
+// 'offerten' im Quelltext -- sie waeren beim Umbau auf Bereiche und Stufen
+// (ENT-440) rot geworden, obwohl sich an der Aussage nichts geaendert hat,
+// und umgekehrt gruen geblieben, wenn jemand die Reihenfolge beibehaelt und
+// die Wirkung wegnimmt.
+const offertenAntwort = execFileSync('php', ['-r',
+  `require '${WURZEL}/backend/rechte.php';`
+  + `echo json_encode(['bereich' => bereich_gueltig('offerten'),`
+  + ` 'verwaltung' => in_array('offerten_schreiben', rechte_aus_rollen(['verwaltung']), true),`
+  + ` 'planung' => in_array('offerten_lesen', rechte_aus_rollen(['planung']), true)]);`
+], { encoding: 'utf8' });
+const offertenRecht = JSON.parse(offertenAntwort);
+check('KRITISCH: es gibt einen eigenen Bereich "offerten"', offertenRecht.bereich === true);
+check('KRITISCH: die Verwaltung traegt ihn', offertenRecht.verwaltung === true);
+check('KRITISCH: die Planung traegt ihn NICHT -- eine Offerte zeigt die Kalkulation (ENT-181)',
+  offertenRecht.planung === false);
 // Der Sinn des eigenen Rechts: Die Rolle Planung hat Kundenzugang, soll aber
 // die Kalkulation nicht sehen. Bekaeme sie 'offerten', waere die Trennung
 // wieder aufgehoben -- diese Pruefung haelt genau das fest.

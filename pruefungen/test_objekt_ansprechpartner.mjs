@@ -45,7 +45,7 @@ check('KRITISCH: sie hängen am Objekt und verschwinden mit ihm',
 check('Die Funktion vor Ort ist ein eigenes Feld -- sie ist der Grund für diese Tabelle',
   /objekt_person \([\s\S]{0,400}funktion VARCHAR\(100\) NULL/.test(EINR));
 check('KRITISCH: Speichern verlangt ein Recht, es ist kein offener Endpunkt',
-  /require_recht\(\$user, 'plan'\)/.test(EP));
+  /require_recht_nach_methode\(\$user, 'objekte'\)/.test(EP));
 check('KRITISCH: der Bestand wird vollständig ersetzt -- die Maske schickt den Endzustand',
   /DELETE FROM objekt_kontaktweg WHERE objekt_id = \?/.test(EP)
   && /DELETE FROM objekt_person WHERE objekt_id = \?/.test(EP));
@@ -113,7 +113,9 @@ await dash.route('**/api/**', route => {
   dashRufe.push({ p, body, query: Object.fromEntries(url.searchParams) });
   const send = b => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) });
   if (p.includes('login')) return send({ status: 'ok', token: 't', name: 'adrian', ist_admin: true });
-  if (p.includes('me.php')) return send({ status: 'ok', name: 'adrian', ist_admin: true, rollen: [], rechte: ['plan'] });
+  if (p.includes('me.php')) return send({ status: 'ok', name: 'adrian', ist_admin: true, rollen: [], rechte: ['einsaetze_lesen', 'einsaetze_schreiben', 'objekte_lesen',
+      'objekte_schreiben', 'masterschichten_lesen',
+      'masterschichten_schreiben', 'verfuegbarkeit_lesen', 'fahrzeuge_lesen'] });
   if (p.includes('dashboard_stats')) return send({ status: 'ok',
     kpi: { rapporte_monat: 0, rapporte_vormonat: 0, stunden_monat: 0, stunden_vormonat: 0,
            mitarbeiter: 1, kunden: 1, rapporte_total: 0 },

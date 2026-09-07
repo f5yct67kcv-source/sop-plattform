@@ -7,7 +7,7 @@ require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../rechte.php';
 
 $user = require_session();
-require_recht($user, 'plan');
+require_recht($user, 'einsaetze_lesen');
 
 $von = trim((string)($_GET['von'] ?? ''));
 $bis = trim((string)($_GET['bis'] ?? ''));

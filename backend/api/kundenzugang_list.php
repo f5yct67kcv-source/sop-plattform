@@ -3,16 +3,18 @@
 //
 // GET -> { status, zugaenge: [...] }
 //
-// Recht 'portal' und nicht 'kunden': Wer Adressen pflegt, muss darum nicht
-// sehen und aendern koennen, wer von aussen ins System schauen darf
-// (Begruendung im Rechtekatalog, ENT-181-Logik).
+// Bereich 'portal' und nicht 'kunden': Wer Adressen pflegt, muss darum nicht
+// sehen koennen, wer von aussen ins System schauen darf (Begruendung im
+// Bereichskatalog). Stufe LESEN -- angelegt und gesperrt wird in
+// kundenzugang_save.php, das die Stufe SCHREIBEN verlangt. Ohne diese
+// Trennung waere die Lesestufe wertlos (siehe require_recht_nach_methode).
 declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../rechte.php';
 require_once __DIR__ . '/../kundenportal.php';
 
 $user = require_session();
-require_recht($user, 'portal');
+require_recht($user, 'portal_' . STUFE_LESEN);
 
 $pdo = db();
 if (!kp_tabellen_da($pdo)) {

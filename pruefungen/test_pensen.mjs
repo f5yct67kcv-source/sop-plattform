@@ -171,7 +171,7 @@ check('Der Wortlaut von Art. 8 Ziff. 1c ist als Beleg im Code zitiert',
 check('KRITISCH: der Endpunkt rechnet NICHT selbst, sondern liefert Rohdaten',
   !/gavBonusMin|bonus_min/.test(pensenPhp) && /schichten/.test(pensenPhp));
 check('SERVER: die Pensenuebersicht braucht das Planungsrecht (ENT-077)',
-  /require_recht\(\$user, 'plan'\)/.test(pensenPhp));
+  /require_recht\(\$user, 'verfuegbarkeit_lesen'\)/.test(pensenPhp));
 check('SERVER: nur abgeglichene Schichten zaehlen, offene werden gezaehlt',
   /ist_status/.test(pensenPhp) && /'offen'/.test(pensenPhp));
 check('EINRICHTUNG: die Kategoriespalten werden nachgetragen',

@@ -83,6 +83,15 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
   --sh-2: 0 10px 30px -10px rgba(16,18,22,.22);
   --sh-3: 0 -8px 32px -12px rgba(16,18,22,.24);
   --tab-h: 62px;
+
+  /* Der SOCKEL (ENT-429): wie viel sichtbarer Bildschirm UNTER dem liegt,
+     was der Browser als unteren Rand kennt. Auf jedem gesunden Gerät 0 --
+     dann rechnet jedes calc() unten unverändert weiter. Auf dem iPhone, wo
+     die App vom Startbildschirm aus im Vollbild läuft, ist er die Höhe der
+     Statusleiste: Dort endet der feste untere Rand um genau diesen Betrag
+     zu früh, und die Reiterleiste stand sichtbar über der Kante.
+     Gesetzt wird er gemessen, nicht geraten -- siehe sockelSetzen(). */
+  --sockel: 0px;
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -247,8 +256,8 @@ svg.i-sm { width: 17px; height: 17px; }
    eine einzige bestehende Regel angefasst werden muss -- und keine
    andere Ansicht der App aendert sich. */
 #gate {
-  position: fixed; inset: 0; z-index: 900; display: flex; overflow-y: auto;
-  padding: 32px 22px calc(32px + env(safe-area-inset-bottom));
+  position: fixed; inset: 0; bottom: calc(0px - var(--sockel)); z-index: 900; display: flex; overflow-y: auto;
+  padding: 32px 22px calc(32px + env(safe-area-inset-bottom) + var(--sockel));
   color: var(--ink);
   /* Ein sehr flacher Schein hinter dem Logo. Seit die Karte als
      Begrenzung fehlt, ist er das Einzige, was der Flaeche Tiefe gibt --
@@ -411,10 +420,10 @@ svg.i-sm { width: 17px; height: 17px; }
 
 /* ── Untere Reiterleiste */
 .tabs {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
+  position: fixed; left: 0; right: 0; bottom: calc(0px - var(--sockel)); z-index: 50;
   background: var(--glas); backdrop-filter: saturate(180%) blur(14px); -webkit-backdrop-filter: saturate(180%) blur(14px);
   border-top: 1px solid var(--line);
-  display: flex; padding-bottom: env(safe-area-inset-bottom);
+  display: flex; padding-bottom: calc(env(safe-area-inset-bottom) + var(--sockel));
 }
 .tabs button {
   flex: 1; min-height: var(--tab-h); border: none; background: transparent; cursor: pointer;
@@ -423,6 +432,39 @@ svg.i-sm { width: 17px; height: 17px; }
 }
 .tabs button.on { color: var(--accent); }
 .tabs button .punkt { width: 5px; height: 5px; border-radius: 50%; background: var(--neg); position: absolute; margin: -16px 0 0 18px; }
+
+/* ── Ziehen zum Aktualisieren (ENT-438)
+   Der Anzeiger haengt am Bildschirm, knapp unter der Kopfzeile -- der
+   Inhalt selbst wird NICHT verschoben: Waehrend des Ziehens federt die
+   Seite auf dem Telefon von sich aus mit, und verschoebe man den Inhalt
+   zusaetzlich, liefe beides gegeneinander.
+   Bewusst kein transform auf .app: Das machte .app zum Bezugsrahmen jedes
+   position:fixed darin -- die Reiterleiste hinge dann am Inhalt statt am
+   Bildschirm.
+   Der Kreis traegt die Bewegung, nicht der Streifen: So bleibt die
+   Mittelstellung des Streifens in der Desktop-Fassung (translateX)
+   unberuehrt. */
+.ptr { position: fixed; left: 0; right: 0; top: calc(env(safe-area-inset-top) + 76px);
+  display: flex; justify-content: center; z-index: 45; pointer-events: none; }
+/* Im Menue faellt die Kopfzeile weg (ENT-402) -- dann rueckt der Anzeiger
+   nach oben, sonst schwebte er mitten in der Profilkarte. */
+.app.ohne-kopf .ptr { top: calc(env(safe-area-inset-top) + 10px); }
+.ptr-kreis {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: var(--surface); border: 1px solid var(--line); box-shadow: var(--sh-2);
+  color: var(--ink-2); display: flex; align-items: center; justify-content: center;
+  opacity: 0; transform: translateY(-52px);   /* PTR_RUHE, siehe ptrZeichnen() */
+}
+/* Waehrend der Finger zieht, folgt der Kreis ohne Verzoegerung; beim
+   Loslassen und beim Laden laeuft er weich. */
+.ptr.zurueck .ptr-kreis { transition: opacity .22s, transform .3s cubic-bezier(.32,.72,0,1); }
+/* Weit genug gezogen: der Kreis nimmt die Akzentfarbe an. Das ist die
+   Rueckmeldung "jetzt loest es aus" -- ohne sie zieht man ins Ungewisse. */
+.ptr.reif .ptr-kreis { color: var(--accent); border-color: var(--accent-line); }
+.ptr.laedt .ptr-kreis { opacity: 1; transform: translateY(0); color: var(--accent); border-color: var(--accent-line); }
+.ptr.laedt svg { animation: ptrDreht .85s linear infinite; }
+@keyframes ptrDreht { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .ptr.laedt svg { animation-duration: 2.4s; } }
 
 /* ── Karten */
 .karte { position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--sh-1); margin-bottom: 12px; overflow: hidden; }
@@ -651,7 +693,7 @@ svg.i-sm { width: 17px; height: 17px; }
 .seiten-kopf h2 { font-size: 19px; font-weight: 700; letter-spacing: -.3px; }
 
 /* ── Blatt von unten (Schichtdetail, Passwort) */
-.abdunkeln { position: fixed; inset: 0; z-index: 60; background: var(--schleier); opacity: 0; pointer-events: none; transition: opacity .2s; }
+.abdunkeln { position: fixed; inset: 0; bottom: calc(0px - var(--sockel)); z-index: 60; background: var(--schleier); opacity: 0; pointer-events: none; transition: opacity .2s; }
 .abdunkeln.on { opacity: 1; pointer-events: auto; }
 /* Volle Hoehe seit ENT-121. Vorher standen oben rund 12 vh ungenutzt --
    ausgerechnet in der Ansicht, in der am meisten steht (Zeit, Kunde, Ort,
@@ -662,7 +704,7 @@ svg.i-sm { width: 17px; height: 17px; }
    bottom: 0 rechnet der Browser selbst.
    Die Polsterung oben haelt den Griff aus der Statusleiste und der Kamera. */
 .blatt {
-  position: fixed; left: 0; right: 0; top: 0; bottom: 0; z-index: 61;
+  position: fixed; left: 0; right: 0; top: 0; bottom: calc(0px - var(--sockel)); z-index: 61;
   padding-top: env(safe-area-inset-top);
   background: var(--surface); box-shadow: var(--sh-3);
   transform: translateY(100%); transition: transform .24s cubic-bezier(.32,.72,0,1);
@@ -674,7 +716,7 @@ svg.i-sm { width: 17px; height: 17px; }
 .blatt-kopf { display: flex; align-items: center; gap: 12px; padding: 6px 20px 14px; border-bottom: 1px solid var(--line-soft); flex: none; }
 .blatt-kopf h2 { font-size: 18px; font-weight: 680; letter-spacing: -.3px; flex: 1; min-width: 0; }
 .blatt-bd { padding: 18px 20px; overflow-y: auto; flex: 1; }
-.blatt-ft { padding: 14px 20px calc(14px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line-soft); display: flex; gap: 10px; flex: none; }
+.blatt-ft { padding: 14px 20px calc(14px + env(safe-area-inset-bottom) + var(--sockel)); border-top: 1px solid var(--line-soft); display: flex; gap: 10px; flex: none; }
 .blatt-ft .btn { flex: 1; }
 /* Beantworteter Zustand (ENT-120): erst die Aussage, darunter die Knoepfe.
    Ueberschrift oben, Wert darunter -- und die Knoepfe stehen nebeneinander,
@@ -703,7 +745,7 @@ svg.i-sm { width: 17px; height: 17px; }
    (60/61). Kurze Eingaben (Grund waehlen, Abbruch bestaetigen) erscheinen
    damit weiterhin als Schublade darueber, statt hier nachgebaut zu werden. */
 .rgs {
-  position: fixed; left: 0; right: 0; top: 0; bottom: 0; z-index: 55;
+  position: fixed; left: 0; right: 0; top: 0; bottom: calc(0px - var(--sockel)); z-index: 55;
   display: none; flex-direction: column;
   background: var(--bg); color: var(--ink);
   padding-top: env(safe-area-inset-top);
@@ -729,7 +771,7 @@ svg.i-sm { width: 17px; height: 17px; }
 /* 44px Trefferflaeche (CLAUDE.md), der negative Rand haelt das Symbol
    trotzdem buendig an der Kante -- sonst steht der Titel eingerueckt. */
 .rgs-zurueck { min-height: 44px; min-width: 44px; padding: 0; margin-left: -10px; display: flex; align-items: center; justify-content: center; background: none; border: 0; color: var(--ink); cursor: pointer; }
-.rgs-bd { padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); overflow-y: auto; flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 14px; }
+.rgs-bd { padding: 16px 16px calc(16px + env(safe-area-inset-bottom) + var(--sockel)); overflow-y: auto; flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 14px; }
 /* KEIN Bloecke-Zusammendruecken (ENT-335). Der Rumpf ist eine Flex-Spalte;
    Flex-Kinder duerfen von sich aus schrumpfen. Normalerweise schuetzt sie
    ihre automatische Mindesthoehe davor -- die faellt aber auf 0, sobald ein
@@ -998,14 +1040,14 @@ svg.i-sm { width: 17px; height: 17px; }
 /* Reiterleiste der laufenden Runde (ENT-306). Unten, wo der Daumen ist --
    dieselbe Stelle wie die Reiterleiste der App selbst, damit niemand zwei
    Bedienlogiken lernen muss. */
-.rgs-reiter { display: flex; flex: none; border-top: 1px solid var(--line); background: var(--surface); padding-bottom: env(safe-area-inset-bottom); }
+.rgs-reiter { display: flex; flex: none; border-top: 1px solid var(--line); background: var(--surface); padding-bottom: calc(env(safe-area-inset-bottom) + var(--sockel)); }
 .rgs-reiter[hidden] { display: none; }
 .rgs-reiter button { flex: 1; min-height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; background: none; border: 0; border-top: 2px solid transparent; margin-top: -1px; color: var(--ink-3); font: inherit; font-size: 11.5px; font-weight: 620; cursor: pointer; }
 /* Der aktive Reiter traegt Farbe UND einen Balken -- nicht nur Farbe. */
 .rgs-reiter button.an { color: var(--accent); border-top-color: var(--accent); }
 .rgs-reiter .zahl { position: absolute; transform: translate(14px, -10px); min-width: 17px; height: 17px; padding: 0 5px; border-radius: 9px; background: var(--warn); color: var(--auf-farbe); font-size: 10.5px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
 
-.rgs-fuss { padding: 14px 16px calc(16px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line-soft); background: var(--surface); flex: none; }
+.rgs-fuss { padding: 14px 16px calc(16px + env(safe-area-inset-bottom) + var(--sockel)); border-top: 1px solid var(--line-soft); background: var(--surface); flex: none; }
 .rgs-warn { display: flex; gap: 9px; font-size: 13.5px; line-height: 1.5; color: var(--warn); background: var(--warn-soft); border: 1px solid var(--warn); border-radius: var(--r-sm); padding: 11px 13px; }
 
 /* Zentrale und Notruf (ENT-299). Nicht ausklappbar, anders als der
@@ -1221,7 +1263,7 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
 /* Die Mitteilungsseite. Eigene Vollseite über der Reiterleiste, wie der
    Einsatzmodus (.rgs) -- nicht als Reiter-Ansicht: Sie gehört zu keinem
    Reiter, und der Weg zurück muss dorthin führen, wo man herkam. */
-.mit-seite { position: fixed; left: 0; right: 0; top: 0; bottom: 0; z-index: 56;
+.mit-seite { position: fixed; left: 0; right: 0; top: 0; bottom: calc(0px - var(--sockel)); z-index: 56;
   display: none; flex-direction: column; background: var(--bg); color: var(--ink);
   padding-top: env(safe-area-inset-top); }
 .mit-seite.on { display: flex; }
@@ -1230,7 +1272,7 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
 .mit-kopf h2 { font-size: 17px; font-weight: 680; letter-spacing: -.3px; flex: 1; min-width: 0; }
 .mit-zurueck { min-height: 44px; min-width: 44px; padding: 0; margin-left: -10px; display: flex;
   align-items: center; justify-content: center; background: none; border: 0; color: var(--ink); cursor: pointer; }
-.mit-bd { padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); overflow-y: auto; flex: 1; min-height: 0; }
+.mit-bd { padding: 16px 16px calc(16px + env(safe-area-inset-bottom) + var(--sockel)); overflow-y: auto; flex: 1; min-height: 0; }
 
 /* Eine Mitteilung in der Liste. Überschrift oben, Text darunter (CLAUDE.md:
    Überschrift oben, Wert darunter) -- die Zeile mit Absender und Datum
@@ -1268,8 +1310,8 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
    über allem, auch über dem Einsatzmodus, und lässt sich nicht durch einen
    Klick daneben schliessen: Genau das wäre das versehentliche Wegwischen,
    das der Bestätigung ihren Wert nähme. */
-.mit-dlg { position: fixed; inset: 0; z-index: 70; display: none;
-  align-items: center; justify-content: center; padding: 20px;
+.mit-dlg { position: fixed; inset: 0; bottom: calc(0px - var(--sockel)); z-index: 70; display: none;
+  align-items: center; justify-content: center; padding: 20px 20px calc(20px + var(--sockel));
   background: rgba(0,0,0,.55); }
 .mit-dlg.on { display: flex; }
 .mit-dlg-box { background: var(--surface); color: var(--ink); border-radius: var(--r);
@@ -1401,6 +1443,15 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
       <svg class="i i-sm" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
     </button>
   </header>
+
+  <!-- Ziehen zum Aktualisieren (ENT-438). aria-hidden: Der Kreis sagt nichts,
+       was nicht schon der Aktualisieren-Knopf in der Kopfzeile sagt -- er ist
+       die Rueckmeldung auf eine Geste, kein eigener Inhalt. -->
+  <div class="ptr" id="ptr" aria-hidden="true">
+    <div class="ptr-kreis" id="ptrKreis">
+      <svg class="i i-sm" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+    </div>
+  </div>
 
   <main class="inhalt">
     <section class="v on" id="v-heute"></section>
@@ -2169,6 +2220,9 @@ function abmelden() {
 function starten() {
   $('gate').style.display = 'none';
   $('app').classList.add('on');
+  // Erst jetzt hat die Reiterleiste ueberhaupt eine Lage -- vor der
+  // Anmeldung ist .app verborgen und am Bild ist nichts zu messen.
+  requestAnimationFrame(sockelSetzen);
   $('kName').textContent = ich.name;
   $('kKreis').textContent = initialen(ich.name);
   allesLaden();
@@ -2212,8 +2266,266 @@ function allesLaden() {
       // Erst NACH dem Zeichnen: Das Fenster legt sich ueber die fertige
       // Oberflaeche, nicht ueber einen halb aufgebauten Bildschirm.
       mitFensterPruefen();
+      // Noch einmal nachmessen: Die erste Messung laeuft unmittelbar nach
+      // der Anmeldung, bevor irgendetwas gezeichnet ist. Ist sie nicht
+      // messbar gewesen, bleibt der bisherige Wert stehen -- ein zweiter
+      // Lauf kostet nichts und kann nur genauer werden.
+      sockelSetzen();
     });
 }
+
+// ══════════════════════════════════════════ SOCKEL (ENT-429)
+// Auf dem iPhone stand die Reiterleiste sichtbar ueber dem unteren
+// Bildschirmrand -- aber nur auf "Heute" und "Wächter", nicht auf "Plan".
+// Der Unterschied ist nicht der Reiter, sondern die Laenge: Plan ist
+// laenger als der Bildschirm und scrollt, Heute und Wächter nicht.
+//
+// Gemessen an den Bildschirmfotos des Projektinhabers (iPhone, 393 x 852
+// Punkte): Die Leiste endete 59 px ueber der Kante -- genau die Hoehe der
+// Statusleiste. Die App laeuft dort vom Startbildschirm aus im Vollbild
+// (apple-mobile-web-app-capable + black-translucent + viewport-fit=cover);
+// der Bildschirmbereich, an dem "position: fixed; bottom: 0" haengt, ist
+// dabei um die Statusleiste kuerzer als das, was man sieht. Sobald die
+// Seite scrollt, rechnet iOS neu -- daher der Unterschied zwischen den
+// Reitern und daher auch das saubere Bild, solange man zieht.
+//
+// Gemessen, nicht geraten, und vor allem: NICHT ueberschiessend. Der feste
+// untere Rand liegt bei window.innerHeight, der sichtbare Bildschirm endet
+// bei screen.height. Die Differenz ist genau der Streifen, der uebrig
+// bleibt -- die Leiste kann durch diese Korrektur also nie tiefer rutschen
+// als bis an die Bildschirmkante.
+//
+// Alles ausserhalb dieses einen Falls bekommt 0 und bleibt unveraendert:
+// jeder Browser mit Adresszeile (dort ist die Differenz gross und gehoert
+// der Adresszeile, nicht uns), jedes Android-Geraet, jeder Desktop.
+// ZWEITER ANLAUF (ENT-439). Der erste rechnete screen.height minus
+// window.innerHeight. Auf dem Geraet des Projektinhabers sind beide Werte
+// GLEICH (852) -- der fehlende Streifen ist ueber sie nicht zu sehen, und
+// die Korrektur blieb wirkungslos. Nachgemessen an den Bildschirmfotos
+// nach dem Deploy: unveraendert 59 Punkte.
+//
+// Sichtbar wird der Unterschied nur dort, wo er entsteht: beim ZEICHNEN.
+// Wird die Leiste hoeher gezeichnet, als das Layout sie kennt, dann trifft
+// ein Punkt OBERHALB ihrer Layout-Oberkante sie trotzdem. Der Abstand
+// zwischen der Kante, die das Layout meldet, und der Kante, an der man sie
+// wirklich trifft, IST der Sockel.
+//
+// Findet der Browser keinen Unterschied -- jeder gesunde Fall --, kommt 0
+// heraus und nichts aendert sich.
+// Rueckgabe: eine Zahl, wenn sich etwas sagen laesst -- sonst null fuer
+// "nicht messbar". Der Unterschied ist wichtig: "kein Versatz" und "ich
+// kann gerade nicht hinsehen" sind zwei verschiedene Aussagen, und wer sie
+// gleich behandelt, loescht bei der naechsten Messung einen richtigen Wert
+// (CLAUDE.md: "unbekannt" darf nie wie "keine" aussehen). Genau das ist im
+// Prueflauf passiert -- ein noch ausfahrendes Blatt verdeckte die Leiste.
+function sockelAmBild() {
+  const leiste = document.querySelector('.tabs');
+  if (!leiste) { return null; }
+  const r = leiste.getBoundingClientRect();
+  if (r.height < 10 || r.width < 10 || r.top < 90) { return null; }
+  const x = Math.round(r.left + r.width / 2);
+  const inLeiste = y => {
+    if (y < 0) { return false; }
+    const e = document.elementFromPoint(x, Math.round(y));
+    return !!(e && (e === leiste || leiste.contains(e)));
+  };
+  // Erst die Gegenprobe zur Messung selbst: Trifft die Leiste ueberhaupt
+  // sich selbst? Wenn nicht, liegt etwas darueber, und die
+  // Trefferpruefung sagt hier gar nichts -- dann wird nichts angefasst.
+  //
+  // Geprueft wird dicht unter der OBERKANTE, nicht in der Mitte. Wandert
+  // das Bild nach oben, liegt die Mitte der Layout-Kante bereits unter
+  // dem gezeichneten Balken -- die Gegenprobe schluege dann genau in dem
+  // Fall fehl, den sie absichern soll, und die Messung waere immer 0.
+  // Ein Punkt dicht unter der Oberkante liegt in beiden Lagen im Balken --
+  // solange die beiden Lagen sich ueberhaupt noch ueberschneiden, und
+  // genau so weit reicht die Suche unten auch.
+  if (!inLeiste(r.top + 3)) { return null; }
+  // Liegt direkt ueber der Layout-Oberkante schon die Leiste?
+  if (!inLeiste(r.top - 4)) { return 0; }
+  // Ja -- also die gezeichnete Oberkante einkreisen. Zwei Grenzen: Mehr
+  // als 80 px waere etwas anderes als eine Statusleiste. Und mehr als die
+  // Hoehe der Leiste liesse sich gar nicht mehr messen -- dann ueberdeckt
+  // die gezeichnete Lage die gemeldete nicht mehr, und die Trefferpruefung
+  // koennte die Leiste nicht von irgendetwas anderem unterscheiden.
+  const grenze = Math.min(80, r.height - 6);
+  if (grenze < 8) { return null; }
+  let oben = r.top - grenze, unten = r.top - 4;
+  // Trifft schon der oberste Suchpunkt die Leiste, liegt die gezeichnete
+  // Kante noch weiter oben, als hier gesucht wird. Dann ist der Versatz
+  // NICHT MESSBAR -- nicht null. Er als 0 zu melden hiesse, einen
+  // ungeklaerten Zustand als geklaerten auszugeben.
+  if (inLeiste(oben)) { return null; }
+  for (let i = 0; i < 8; i++) {
+    const m = (oben + unten) / 2;
+    if (inLeiste(m)) { unten = m; } else { oben = m; }
+  }
+  return Math.round(r.top - unten);
+}
+
+// Rueckgabe wie oben: Zahl oder null fuer "nicht messbar".
+function sockelMessen() {
+  let fehlt = 0;
+  // 1. Was der Browser von sich aus sagt. navigator.standalone gibt es nur
+  //    auf iOS und ist nur dann true, wenn die App vom Startbildschirm
+  //    laeuft -- also genau im Vollbildfall. visualViewport ist dabei der
+  //    Bereich, den man SIEHT; er kann kleiner sein als innerHeight.
+  if (window.navigator.standalone === true) {
+    const schirm = (window.screen && window.screen.height) || 0;
+    if (schirm) {
+      fehlt = Math.max(fehlt, schirm - window.innerHeight);
+      if (window.visualViewport) {
+        fehlt = Math.max(fehlt, schirm - window.visualViewport.height);
+      }
+    }
+  }
+  // 2. Was am gezeichneten Bild zu messen ist. Kein Vollbild-Vorbehalt:
+  //    Das hier ist eine Messung, keine Annahme -- sie findet nur etwas,
+  //    wenn tatsaechlich etwas da ist.
+  const amBild = sockelAmBild();
+  if (amBild === null && !fehlt) { return null; }   // nichts gesehen, nichts zu sagen
+  fehlt = Math.round(Math.max(fehlt, amBild || 0));
+  // Obergrenze 80: Eine Statusleiste ist hoechstens rund 60 px hoch. Was
+  // darueber liegt, ist etwas anderes (aufgeklappte Tastatur, Querformat,
+  // ein Geraet, das screen.height anders zaehlt) und wird nicht angefasst.
+  return (fehlt > 0 && fehlt <= 80) ? fehlt : 0;
+}
+
+function sockelSetzen() {
+  const stil = document.documentElement.style;
+  // Gemessen wird am UNKORRIGIERTEN Zustand -- als Vorsichtsmassnahme.
+  // Ehrlich dazu: In der Gegenprobe liess sich KEIN Fall herstellen, in
+  // dem diese Zeile das Ergebnis aendert. Layout- und gezeichnete Kante
+  // wandern beide mit dem Sockel, ihr Abstand bleibt gleich, und die
+  // Werte aus dem Browser haengen ohnehin nicht am Sockel. Sie steht hier,
+  // weil das Messen an einem bereits korrigierten Zustand ein Fehler
+  // waere, sobald jemand die Rechnung oben aendert -- nicht, weil sie
+  // heute etwas verhindert. Die Prueflauf-Zusicherung dazu (zweimal messen
+  // ergibt denselben Sockel) gilt unabhaengig davon.
+  const vorher = stil.getPropertyValue('--sockel');
+  stil.setProperty('--sockel', '0px');
+  void document.documentElement.offsetHeight;
+  const wert = sockelMessen();
+  // Nicht messbar heisst: den bisherigen Wert behalten, nicht auf 0
+  // zuruecksetzen. Sonst nimmt ein offenes Blatt der Leiste ihren Sockel.
+  if (wert === null) { stil.setProperty('--sockel', vorher || '0px'); return; }
+  stil.setProperty('--sockel', wert + 'px');
+}
+
+// Die Zahlen, aus denen der Sockel entsteht -- als eine Zeile im Menue.
+// Ohne sie liesse sich aus der Ferne nicht entscheiden, warum eine
+// Korrektur nicht greift; genau daran ist der erste Anlauf gescheitert.
+function technikZeile() {
+  const r = document.querySelector('.tabs');
+  const lage = r ? r.getBoundingClientRect() : null;
+  const vv = window.visualViewport;
+  const gezeichnet = sockelAmBild();
+  return [
+    'Bildschirm ' + ((window.screen && window.screen.height) || '?'),
+    'Fenster ' + window.innerHeight,
+    'Sicht ' + (vv ? Math.round(vv.height) : '–'),
+    'Leiste ' + (lage ? Math.round(lage.top) + '–' + Math.round(lage.bottom) : '–'),
+    'gezeichnet ' + (gezeichnet === null ? 'nicht messbar'
+      : gezeichnet ? '−' + gezeichnet : 'deckungsgleich'),
+    'Sockel ' + (getComputedStyle(document.documentElement).getPropertyValue('--sockel') || '?').trim(),
+    'Vollbild ' + (window.navigator.standalone === true ? 'ja' : 'nein')
+  ].join(' · ');
+}
+
+// ══════════════════════════════════════════ ZIEHEN ZUM AKTUALISIEREN (ENT-438)
+// Kraeftig nach unten ziehen laedt neu -- dieselbe Geste wie in den
+// meisten Apps, und derselbe Vorgang wie der Knopf in der Kopfzeile.
+//
+// Bewusst OHNE preventDefault: Das Telefon federt die Seite von sich aus
+// mit, und dieses Mitfedern ist die halbe Rueckmeldung. Wer es abschaltet,
+// muss die Bewegung selbst nachbauen -- und faengt sich dabei jeden Fall
+// ein, in dem die Bedingungen unten daneben liegen: Dann scrollt gar
+// nichts mehr.
+const PTR_DAEMPFUNG = 0.55;   // Fingerweg -> gezaehlter Weg
+const PTR_SCHWELLE  = 62;     // ab hier loest das Loslassen aus
+const PTR_MAX       = 96;     // weiter wird nicht gezaehlt
+// Wie weit der Kreis dabei SICHTBAR wandert. Bewusst kuerzer als der
+// gezaehlte Weg und so gewaehlt, dass er dort stehen bleibt, wo er
+// anschliessend dreht (translateY(0), knapp unter der Kopfzeile): Sonst
+// wandert er beim Loslassen noch einmal ein Stueck zurueck -- und auf einem
+// kurzen Bildschirm stuende er mitten in der ersten Karte.
+const PTR_SICHT     = 58;
+const PTR_RUHE      = 52;     // Ruhelage: so weit oberhalb, ausserhalb des Bildes
+let ptrY0 = null, ptrWeg = 0, ptrLaedt = false;
+
+// Gezogen wird nur auf der Reiterflaeche selbst. Liegt etwas darueber --
+// Anmeldung, Blatt, Einsatzmodus, Mitteilungen --, hat das seinen eigenen
+// Rumpf mit eigenem Bildlauf; ein Zug dort ist ein Zug DORT.
+function ptrErlaubt() {
+  if (ptrLaedt) { return false; }
+  if (!$('app').classList.contains('on')) { return false; }
+  for (const id of ['blatt', 'rgSeite', 'mitSeite', 'mitDlg']) {
+    const e = document.getElementById(id);
+    if (e && e.classList.contains('on')) { return false; }
+  }
+  return window.scrollY <= 0;
+}
+
+function ptrZeichnen() {
+  const k = $('ptrKreis'), h = $('ptr');
+  const anteil = Math.min(ptrWeg / PTR_SCHWELLE, 1);
+  k.style.opacity = String(Math.min(ptrWeg / 26, 1));
+  k.style.transform = 'translateY(' + (Math.min(ptrWeg, PTR_SICHT) - PTR_RUHE) + 'px) '
+    + 'rotate(' + Math.round(anteil * 300) + 'deg)';
+  h.classList.toggle('reif', ptrWeg >= PTR_SCHWELLE);
+}
+function ptrZuruecksetzen() {
+  const k = $('ptrKreis'), h = $('ptr');
+  h.classList.add('zurueck');
+  h.classList.remove('reif', 'laedt');
+  k.style.opacity = '';
+  k.style.transform = '';
+  ptrY0 = null; ptrWeg = 0;
+}
+function ptrAusloesen() {
+  const k = $('ptrKreis'), h = $('ptr');
+  ptrLaedt = true; ptrY0 = null; ptrWeg = 0;
+  h.classList.add('zurueck', 'laedt');
+  h.classList.remove('reif');
+  // Die Klasse traegt Lage und Drehung -- die Angaben am Element selbst
+  // muessen weg, sonst schlagen sie die Klasse (Stil am Element vor jeder
+  // Regel im Stilteil).
+  k.style.opacity = '';
+  k.style.transform = '';
+  // Mindestens einen Moment sichtbar bleiben: Kommt die Antwort in 80 ms,
+  // blitzt der Kreis sonst nur auf, und die Geste sieht aus, als haette sie
+  // nichts getan.
+  Promise.all([Promise.resolve().then(allesLaden), new Promise(f => setTimeout(f, 550))])
+    .catch(() => {})
+    .then(() => { ptrLaedt = false; ptrZuruecksetzen(); });
+}
+
+document.addEventListener('touchstart', e => {
+  if (e.touches.length !== 1 || !ptrErlaubt()) { ptrY0 = null; return; }
+  ptrY0 = e.touches[0].clientY;
+  ptrWeg = 0;
+  $('ptr').classList.remove('zurueck');
+}, { passive: true });
+
+document.addEventListener('touchmove', e => {
+  if (ptrY0 === null || e.touches.length !== 1) { return; }
+  // Sobald die Seite doch scrollt oder der Finger nach oben geht, ist es
+  // kein Ziehen mehr, sondern ein Bildlauf.
+  if (window.scrollY > 0) { if (ptrWeg) { ptrZuruecksetzen(); } ptrY0 = null; return; }
+  const roh = e.touches[0].clientY - ptrY0;
+  if (roh <= 0) { if (ptrWeg) { ptrWeg = 0; ptrZeichnen(); } return; }
+  ptrWeg = Math.min(roh * PTR_DAEMPFUNG, PTR_MAX);
+  ptrZeichnen();
+}, { passive: true });
+
+document.addEventListener('touchend', () => {
+  if (ptrY0 === null) { return; }
+  if (ptrWeg >= PTR_SCHWELLE) { ptrAusloesen(); } else { ptrZuruecksetzen(); }
+}, { passive: true });
+
+document.addEventListener('touchcancel', () => {
+  if (ptrY0 !== null) { ptrZuruecksetzen(); }
+}, { passive: true });
 
 // ENT-234, seit ENT-284 umgestellt: "Wächter" erscheint nur mit der
 // ausdrücklich gesetzten Berechtigung (Mitarbeiter-Akte, Personal/
@@ -4846,6 +5158,7 @@ function zeichneMenu() {
       </div></div>
       <p style="font-size:12.5px;color:var(--ink-3);line-height:1.5;padding:0 2px">${esc(w('themaRundgangHinweis'))}</p>
       ${pushBlock()}
+      <p style="font-size:11px;color:var(--ink-3);line-height:1.5;padding:14px 2px 0;font-variant-numeric:tabular-nums">${esc(technikZeile())}</p>
     </div>
 
     <div id="pr-stunden" style="display:none">
@@ -7842,6 +8155,11 @@ $('gPass').addEventListener('keydown', e => { if (e.key === 'Enter') anmelden();
 $('gName').addEventListener('keydown', e => { if (e.key === 'Enter') $('gPass').focus(); });
 
 beschriften();
+sockelSetzen();
+// Beim Drehen aendert sich alles, was sockelMessen() liest. Die kurze
+// Verzoegerung ist noetig, weil innerHeight zum Zeitpunkt des Ereignisses
+// auf manchen Geraeten noch den alten Wert traegt.
+window.addEventListener('orientationchange', () => setTimeout(sockelSetzen, 350));
 // Ein Reset-Link geht immer vor der normalen Anmeldung -- auch wenn noch
 // eine gueltige Sitzung im Speicher liegt (siehe pwResetSpeichern: ein
 // erfolgreicher Reset raeumt ohnehin ALLE Sitzungen ab). Die Kennung wird

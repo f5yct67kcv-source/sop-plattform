@@ -22,7 +22,7 @@ require_once __DIR__ . '/../rechte.php';
 require_once __DIR__ . '/../planung.php';
 
 $user = require_session();
-require_recht($user, 'plan');
+require_recht_nach_methode($user, 'einsaetze');
 
 $pdo = db();
 
