@@ -657,6 +657,29 @@ await page.waitForTimeout(200);
 check('Alle Tafeln lassen sich wieder schliessen',
   await page.evaluate(() => document.querySelectorAll('#liste .detail').length === 0));
 
+// Unter dem letzten Eintrag der Liste haengt kein Trennstrich -- in BEIDEN
+// Zustaenden. Genau darum wird die Tafel beim Zuklappen entfernt und nicht
+// versteckt: Ein verstecktes Element zaehlt fuer :last-child weiter mit,
+// und die letzte Zeile behielte dann einen Strich ins Leere.
+const letzterStrich = () => page.evaluate(() => {
+  const k = document.querySelectorAll('#liste > *');
+  const e = k[k.length - 1];
+  return { was: e.className, strich: parseFloat(getComputedStyle(e).borderBottomWidth) };
+});
+const zuStand = await letzterStrich();
+check('KRITISCH: unter dem letzten Eintrag haengt kein Trennstrich (zugeklappt)',
+  zuStand.was.includes('zeile') && zuStand.strich === 0);
+await page.evaluate(() => {
+  const z = document.querySelectorAll('#liste .zeile');
+  z[z.length - 1].click();
+});
+await page.waitForTimeout(300);
+const aufStand = await letzterStrich();
+check('KRITISCH: und auch nicht, wenn die letzte Zeile offen ist',
+  aufStand.was.includes('detail') && aufStand.strich === 0);
+await page.evaluate(() => document.querySelectorAll('#liste .zeile.offen').forEach(z => z.click()));
+await page.waitForTimeout(200);
+
 // Zuklappen. Die Tafel wird ENTFERNT und nicht versteckt -- sonst zählte
 // sie für :last-child weiter mit und die letzte Zeile behielte einen Strich.
 await klick('#liste .zeile');
