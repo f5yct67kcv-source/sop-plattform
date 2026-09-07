@@ -30,6 +30,14 @@ declare(strict_types=1);
 // Postfach ist offen, solange jemand daran sitzt. Fuenfzehn Minuten reichen,
 // um eine Mail zu holen, und sind zu kurz, um einen alten Code spaeter noch
 // zu verwenden.
+// Der Link zum Passwortsetzen (ENT-448). Dreissig Minuten wie beim
+// Ruecksetzlink der Mitarbeitenden (ENT-373) -- er liegt in einem Postfach,
+// und ein Postfach ist offen, solange jemand daran sitzt.
+const KP_LINK_MINUTEN    = 30;
+// Wie viele Links je Zugang in einer Stunde. Schuetzt das Postfach des
+// Kunden davor, ueber diesen Weg zugemuellt zu werden.
+const KP_LINK_PRO_STUNDE = 5;
+
 const KP_CODE_MINUTEN  = 15;
 // Fehlversuche AUF DENSELBEN Code. Sechs Stellen sind eine Million
 // Moeglichkeiten; ohne Zaehler waeren sie in Minuten durchprobiert. Die
