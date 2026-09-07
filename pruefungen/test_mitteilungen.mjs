@@ -122,10 +122,15 @@ antwort = { status: 'ok', eingerichtet: true, mitteilungen: MITTEILUNGEN,
             ungelesen: 2, revier_ungelesen: 0, unterbrechen: [3] };
 await anmelden();
 
-// Die Reiterleiste bleibt bei fuenf. Gezaehlt wird, was SICHTBAR ist --
-// ein per style="display:none" verstecktes Element zaehlt nicht mit.
+// Die Reiterleiste bleibt bei fuenf. Gezaehlt wird, was SICHTBAR ist.
+//
+// Seit ENT-447 gibt es ZWEI Leisten -- diese Suite laeuft bei 390 px, dort
+// fuehrt die Handy-Leiste. Nicht mehr ueber display der KNOEPFE filtern:
+// Die zweite Leiste ist ueber ihr <nav> verborgen, ihre Knoepfe melden
+// trotzdem "flex" und wurden mitgezaehlt. Der gerenderte Kasten ist das
+// verlaessliche Mass -- er ist null, sobald irgendein Vorfahr verborgen ist.
 const reiter = await ev(() => [...document.querySelectorAll('.tabs button')]
-  .filter(b => getComputedStyle(b).display !== 'none')
+  .filter(b => b.getBoundingClientRect().height > 0)
   .map(b => b.textContent.trim()));
 check('KRITISCH: die Reiterleiste hat weiterhin fuenf Eintraege, keinen sechsten',
   Array.isArray(reiter) && reiter.length === 5);

@@ -51,9 +51,12 @@ await page.waitForSelector('#app.on'); await page.waitForTimeout(500);
 // ── Albanisch ist weg
 check('Kein Sprachumschalter mehr auf der Anmeldung',
   await page.evaluate(() => !document.getElementById('spSq')));
+// Seit ENT-447 gibt es zwei Leisten. Gezaehlt wird der gerenderte Kasten,
+// nicht display der Knoepfe: Die verborgene Leiste meldet an ihren
+// Knoepfen weiterhin "flex" und wurde mitgezaehlt.
 check('Vier sichtbare Reiter unten (kein Revierdienst-Bezug, ENT-234)',
   await page.evaluate(() => [...document.querySelectorAll('.tabs button')]
-    .filter(b => getComputedStyle(b).display !== 'none').length === 4));
+    .filter(b => b.getBoundingClientRect().height > 0).length === 4));
 check('Der Wächter-Reiter bleibt ohne Kontrollpunkte verborgen', !(await page.isVisible('#t-waechter')));
 await page.click('#t-menu'); await page.waitForTimeout(250);
 const menu = await page.textContent('#v-menu');
