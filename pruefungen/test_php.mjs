@@ -350,6 +350,7 @@ for (const [datei, titel] of [
   ['pruef_mitteilung_loeschen.php', 'KRITISCH: eine laufende Mitteilung laesst sich auch am Browser vorbei nicht loeschen (ENT-433)'],
   ['pruef_mitteilung_antwort.php', 'KRITISCH: auf einen fremden oder nicht sichtbaren Termin laesst sich nicht zusagen (ENT-436)'],
   ['pruef_mitteilung_liste.php', 'KRITISCH: die Antwortliste eines Termins nennt ALLE Empfaenger, auch die ohne Antwort (ENT-436)'],
+  ['pruef_kundenportal.php', 'KRITISCH: Sitzungsablauf, Einmal-Code und E-Mail-Abgleich des Kundenportals stimmen (ENT-441)'],
 ]) {
   let aus = '', code = 0;
   try {
@@ -644,6 +645,91 @@ if (ohnePruefung.length) { bad.push('ohne Rechtepruefung: ' + ohnePruefung.join(
 const totEintraege = NUR_EIGENE_DATEN.filter(f => !apiDateien.includes(f));
 check('Die Ausnahmeliste nennt nur Endpunkte, die es gibt', totEintraege.length === 0);
 if (totEintraege.length) { bad.push('Ausnahme ohne Datei: ' + totEintraege.join(', ')); }
+
+// ── Kundenportal (ENT-441) ────────────────────────────────────────────
+// Die Endpunkte des Portals gehen einen ANDEREN Weg als alle uebrigen: Sie
+// pruefen kein Recht aus rechte.php, weil ein Kundenzugang keine Rechte hat
+// -- er hat genau eine Eigenschaft, die kunde_id. Damit fallen sie aus der
+// Pruefung oben heraus (die greift nur bei require_session), und ohne die
+// folgenden Regeln waeren sie der eine Ort im Haus, an dem gar nichts
+// geprueft wird. Genau der Fall, vor dem CLAUDE.md warnt: etwas Neues, das
+// die Regel nicht geerbt hat.
+const portalDateien = apiDateien.filter(f => f.startsWith('portal_'));
+check('Es gibt ueberhaupt Portal-Endpunkte zu pruefen', portalDateien.length > 0);
+
+// Die beiden Eingaenge. Wer dort ankommt, ist noch niemand -- sie koennen
+// keine Sitzung verlangen, die erst bei ihnen entsteht. Namentlich benannt
+// und nicht ueber ein Muster erkannt: Ein dritter Eingang soll auffallen.
+const PORTAL_EINGAENGE = ['portal_code_anfordern.php', 'portal_anmelden.php'];
+
+const ohneKundensitzung = portalDateien.filter(f =>
+  !PORTAL_EINGAENGE.includes(f) && !/require_kundensession\s*\(/.test(ohneKommentar(f)));
+check('KRITISCH: jeder Portal-Endpunkt ausser den benannten Eingaengen verlangt eine Kundensitzung',
+  ohneKundensitzung.length === 0);
+if (ohneKundensitzung.length) { bad.push('ohne Kundensitzung: ' + ohneKundensitzung.join(', ')); }
+
+const toteEingaenge = PORTAL_EINGAENGE.filter(f => !apiDateien.includes(f));
+check('Die Eingangsliste des Portals nennt nur Endpunkte, die es gibt', toteEingaenge.length === 0);
+if (toteEingaenge.length) { bad.push('Portal-Eingang ohne Datei: ' + toteEingaenge.join(', ')); }
+
+// Ein Portal-Endpunkt, der require_session() aufruft, haette den falschen
+// Zugang: Das ist die Verwaltungssitzung. Beides in derselben Datei waere
+// eine Verwechslung, die niemandem auffiele -- sie funktioniert ja.
+const portalMitAdminSitzung = portalDateien.filter(f =>
+  /(?<!kunden)require_session\s*\(/.test(ohneKommentar(f)));
+check('KRITISCH: kein Portal-Endpunkt benutzt die Verwaltungssitzung',
+  portalMitAdminSitzung.length === 0);
+if (portalMitAdminSitzung.length) {
+  bad.push('Portal mit Verwaltungssitzung: ' + portalMitAdminSitzung.join(', '));
+}
+
+// DIE KERNREGEL. Ein Portal-Endpunkt, der eine kunde_id oder zugang_id aus
+// der Anfrage naehme, liesse jeden angemeldeten Kunden die Daten jedes
+// anderen lesen -- durch blosses Hochzaehlen einer Zahl. Beide Werte
+// stammen ausnahmslos aus require_kundensession(). Dieselbe Regel wie bei
+// den Zwei-Faktor-Endpunkten (die Person kommt aus der Sitzung, nie aus der
+// Anfrage), hier fuer den Kunden.
+const fremdSchluessel = /\$(?:_GET|_POST|_REQUEST|in|input|daten)\s*\[\s*['"](?:kunde_id|zugang_id|kundenzugang_id|mitarbeiter_id)['"]/;
+const portalMitFremdId = portalDateien.filter(f => fremdSchluessel.test(ohneKommentar(f)));
+check('KRITISCH: kein Portal-Endpunkt nimmt eine Kunden- oder Zugangsnummer aus der Anfrage',
+  portalMitFremdId.length === 0);
+if (portalMitFremdId.length) { bad.push('Portal liest fremde Kennung: ' + portalMitFremdId.join(', ')); }
+
+// Die Verwaltungsseite der Kundenzugaenge haengt am Recht 'portal' -- nicht
+// an 'kunden'. Wer Adressen pflegt, soll keinen Zugang fuer Betriebsfremde
+// oeffnen koennen (ENT-441 Punkt 9, gleiche Trennung wie ENT-181).
+const zugangDateien = apiDateien.filter(f => f.startsWith('kundenzugang_'));
+check('Es gibt Verwaltungsendpunkte fuer Kundenzugaenge', zugangDateien.length > 0);
+// Seit ENT-440 tragen Rechte Stufen: <bereich>_lesen und
+// <bereich>_schreiben. Geprueft wird der BEREICH -- welche Stufe der
+// einzelne Endpunkt verlangt, entscheidet er selbst (list liest, save
+// schreibt), aber am Bereich 'portal' muessen beide haengen.
+const zugangOhnePortalrecht = zugangDateien.filter(f =>
+  !/require_recht\w*\s*\(\s*\$user\s*,\s*'portal(_|'\s*\.\s*STUFE_)/.test(ohneKommentar(f)));
+check("KRITISCH: die Kundenzugang-Verwaltung verlangt ein Recht aus dem Bereich 'portal'",
+  zugangOhnePortalrecht.length === 0);
+// Und die Stufen sind wirklich getrennt: Wuerde die Liste die Schreibstufe
+// verlangen, waere die Lesestufe wertlos -- und wuerde das Anlegen mit der
+// Lesestufe auskommen, waere sie gefaehrlich.
+check("KRITISCH: die Liste verlangt Lesen, das Anlegen und Sperren Schreiben",
+  /'portal_'\s*\.\s*STUFE_LESEN/.test(ohneKommentar('kundenzugang_list.php'))
+  && /'portal_'\s*\.\s*STUFE_SCHREIBEN/.test(ohneKommentar('kundenzugang_save.php')));
+if (zugangOhnePortalrecht.length) {
+  bad.push('Kundenzugang ohne Recht portal: ' + zugangOhnePortalrecht.join(', '));
+}
+
+// Das Recht muss im Katalog stehen und darf NUR der Verwaltung gehoeren.
+// Stuende es bei 'Planung', koennte jede planende Person einem Dritten
+// Zugang verschaffen -- genau das war der Grund, es zu trennen.
+// Der Bereich muss im Katalog stehen, mit BEIDEN Stufen: Ein Bereich ohne
+// Schreibstufe liesse sich nicht vergeben, einer ohne Lesestufe zwaenge
+// jeden Leser zum Schreibrecht.
+{
+  const portalBlock = (rechteQuelle.match(/'portal' *=> \[[\s\S]*?\],/) || [''])[0];
+  check("KRITISCH: der Bereich 'portal' steht im Bereichskatalog", portalBlock !== '');
+  check("KRITISCH: und er kennt beide Stufen",
+    /STUFE_LESEN/.test(portalBlock) && /STUFE_SCHREIBEN/.test(portalBlock));
+}
 
 // Die Anmeldung muss den zweiten Faktor auch VERLANGEN und Fehlversuche
 // zaehlen -- sonst laesst sich der sechsstellige Code durchprobieren.

@@ -45,7 +45,10 @@ require __DIR__ . '/../backend/rechte.php';
 
 // ══════════════ DIE BEREICHE
 $bereiche = bereiche_katalog();
-pruef('Es gibt 20 Bereiche (ENT-440)', count($bereiche) === 20);
+// Feste Zahl und keine Selbstzaehlung: Sie zwingt jeden, der einen Bereich
+// ergaenzt, hier vorbeizukommen und es bewusst zu tun. Einundzwanzig seit
+// ENT-441 ('portal' -- Kundenzugaenge).
+pruef('Es gibt 21 Bereiche (ENT-440, ENT-441)', count($bereiche) === 21);
 pruef('Jeder Bereich nennt Gruppe, Titel, Text und Stufen',
     count(array_filter($bereiche, fn($b) => isset($b['gruppe'], $b['titel'], $b['text'], $b['stufen'])
         && $b['titel'] !== '' && $b['text'] !== '' && $b['stufen'] !== [])) === count($bereiche));
@@ -143,6 +146,25 @@ pruef('KRITISCH: Planung sieht Mitarbeitende, aber nie deren vertrauliche Angabe
     darf(['rollen' => ['planung']], 'personal_lesen')
     && !darf(['rollen' => ['planung']], 'personal_vertraulich_lesen')
     && !darf(['rollen' => ['planung']], 'personal_vertraulich_schreiben'));
+
+// Kundenportal (ENT-441). 'portal' ist der einzige Bereich im Katalog, der
+// einen Zugang fuer Menschen AUSSERHALB des Betriebs oeffnet. Er gehoert dem
+// Verwalter und ausdruecklich keiner anderen Rolle -- vor allem nicht
+// 'Planung', die ueber 'kunden' ohnehin am Kundenstamm sitzt, und auch nicht
+// dem Administrator, der 'betrieb' nur lesend traegt und keine Rollen
+// vergibt. Ohne diese Trennung koennte jemand einem Dritten Einblick in
+// Einsaetze verschaffen, ohne selbst ueber Zugaenge zu entscheiden.
+pruef('KRITISCH: der Verwalter darf Kundenzugaenge anlegen und sperren (ENT-441)',
+    darf(['rollen' => ['verwaltung']], 'portal_schreiben'));
+$portalFremd = [];
+foreach (['mitarbeitend', 'planung', 'personal', 'waechter', 'administrator'] as $rolle) {
+    $r = rechte_aus_rollen([$rolle]);
+    if (in_array('portal_lesen', $r, true) || in_array('portal_schreiben', $r, true)) {
+        $portalFremd[] = $rolle;
+    }
+}
+pruef('KRITISCH: ausser dem Verwalter oeffnet keine Rolle einen Kundenzugang (ENT-441)',
+    $portalFremd === []);
 pruef('KRITISCH: Planung darf Mitarbeitende nicht aendern',
     !darf(['rollen' => ['planung']], 'personal_schreiben'));
 pruef('KRITISCH: Personal plant nicht und kommt nicht an die Kunden (ENT-077)',
