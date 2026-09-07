@@ -19,7 +19,8 @@
 # ── OFFEN, Stand 2026-09-07 (ENT-451, OP-454) ────────────────────────────
 # Der Hash von htaccess-hostpoint wurde mitgezogen, BEVOR Schritt 2 erledigt
 # war -- vom Projektinhaber so entschieden. Die Datei hat mit ENT-451 einen
-# Eintrag mehr bekommen (lohn.php gehoert in die FilesMatch-Liste), und der
+# drei Eintraege mehr bekommen (lohn.php, gavzeit.php und lohnlauf.php
+# gehoeren in die FilesMatch-Liste), und der
 # manuelle Nachtrag in der Staging-.htaccess bei Hostpoint STEHT NOCH AUS.
 #
 # Was das heisst: Fuer genau diese eine Aenderung haelt der Drift-Guard den
@@ -32,6 +33,6 @@
 # Danach diesen Absatz loeschen -- er ist der einzige Hinweis darauf, dass
 # der Hash unten dem Nachtrag vorausgeeilt ist.
 
-htaccess-hostpoint:5031b42ffda0dd7197ceaf0b011dbb4368008cf6a3086f8642cafc19788cae3b
+htaccess-hostpoint:b8b9c4ea52497182842f57e7ae9243ae9d464592f7a867c51e60260925728ca6
 htaccess-staging-zusatz:7b6df04b9fd9decbeb68442a6080b3e39c384e31d59273e53f938549c8e26208
 robots-staging.txt:e120f27381f482e2de05b11355c7d1818e8266d282cec8cf04bc8b33916e7583

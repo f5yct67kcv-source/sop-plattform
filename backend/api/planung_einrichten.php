@@ -27,6 +27,9 @@ require_once __DIR__ . '/../kunden.php';
 require_once __DIR__ . '/../produkte.php';
 require_once __DIR__ . '/../rundgang.php';
 require_once __DIR__ . '/../fahrzeug.php';
+// Der Lohnartenkatalog steht in lohn.php, damit Pruefungen ihn erreichen
+// (ENT-451).
+require_once __DIR__ . '/../lohn.php';
 
 $user = require_session();
 require_recht($user, 'betrieb_schreiben');
@@ -1677,6 +1680,103 @@ CREATE TABLE IF NOT EXISTS lohn_zahlung (
   FOREIGN KEY (mitarbeiter_id) REFERENCES mitarbeiter(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+// ══ Lohnlauf (ENT-451, Etappe 3) ════════════════════════════════════════
+// Drei Ebenen, weil drei verschiedene Dinge: der LAUF (eine Periode ueber
+// alle Personen), die PERSON darin (Zeitsummen und Bruttolohn) und die
+// ZEILE (eine Position der Abrechnung). Eine flache Tabelle waere kuerzer
+// und liesse sich spaeter nicht mehr auseinandernehmen.
+//
+// ALLES IST SCHNAPPSCHUSS. Ein freigegebener Lauf wird nie neu gerechnet:
+// Ansatz, Regelwerk-Quelle und jede Zwischengroesse stehen in der Zeile
+// selbst. Eine spaetere GAV- oder Lohnrevision darf zurueckliegende Monate
+// nicht veraendern (Art. 12 Ziff. 5, CLAUDE.md Teil B).
+'lohnlauf' => "
+CREATE TABLE IF NOT EXISTS lohnlauf (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  periode_von DATE NOT NULL,
+  periode_bis DATE NOT NULL,
+  -- entwurf | freigegeben | ausbezahlt | storniert
+  -- Die Grenze ist die AUSZAHLUNG, nicht die Freigabe (ENT-451): Davor wird
+  -- storniert und neu gerechnet, danach im naechsten Lauf nachgetragen.
+  status VARCHAR(20) NOT NULL DEFAULT 'entwurf',
+  erstellt_am DATETIME DEFAULT CURRENT_TIMESTAMP,
+  erstellt_von INT NULL,
+  freigegeben_am DATETIME NULL,
+  freigegeben_von INT NULL,
+  ausbezahlt_am DATETIME NULL,
+  ausbezahlt_von INT NULL,
+  storniert_am DATETIME NULL,
+  storniert_von INT NULL,
+  storno_grund TEXT NULL,
+  -- Welchen Lauf dieser ersetzt. Storno und Neuberechnung bleiben BEIDE
+  -- erhalten -- ohne den Verweis waere spaeter nicht mehr zu sehen, dass
+  -- der eine aus dem anderen entstanden ist.
+  ersetzt_lauf_id INT NULL,
+  bemerkung TEXT NULL,
+  KEY idx_periode (periode_von, periode_bis, status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+// Je Person im Lauf. Rohzeit, Nettozeit, Zeitbonus und bewertete Zeit
+// stehen EINZELN -- nie nur ein fertiger Stundenwert (CLAUDE.md Teil B).
+// Wer spaeter fragt, wie eine Zahl zustande kam, muss es ablesen koennen.
+'lohnlauf_person' => "
+CREATE TABLE IF NOT EXISTS lohnlauf_person (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  lauf_id INT NOT NULL,
+  mitarbeiter_id INT NOT NULL,
+  kategorie CHAR(1) NULL,
+  lohnform VARCHAR(10) NULL,
+  roh_min INT NOT NULL DEFAULT 0,
+  netto_min INT NOT NULL DEFAULT 0,
+  -- Der Zeitbonus ist ein Produkt aus Minuten und 10 % und darum keine
+  -- ganze Zahl. Vier Nachkommastellen, damit die Summe nicht driftet.
+  bonus_min DECIMAL(12,4) NOT NULL DEFAULT 0,
+  bewertet_min DECIMAL(12,4) NOT NULL DEFAULT 0,
+  brutto_rappen INT NOT NULL DEFAULT 0,
+  -- Warum fuer diese Person nicht gerechnet wurde. NULL heisst gerechnet;
+  -- ein Betrag von 0 bei gesetztem Grund heisst NICHT null Franken.
+  gesperrt_grund VARCHAR(40) NULL,
+  -- Zaehler statt Text: wie viele Schichten aus welchem Grund draussen
+  -- blieben, und wie viele noch gar nicht abgeglichen waren.
+  gesperrt_zaehler TEXT NULL,
+  nicht_abgeglichen INT NOT NULL DEFAULT 0,
+  warnung TEXT NULL,
+  UNIQUE KEY uq_lauf_person (lauf_id, mitarbeiter_id),
+  KEY idx_person (mitarbeiter_id),
+  FOREIGN KEY (lauf_id) REFERENCES lohnlauf(id) ON DELETE CASCADE,
+  FOREIGN KEY (mitarbeiter_id) REFERENCES mitarbeiter(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+// Eine Zeile der Abrechnung. Bezeichnung und Satz stehen HIER und nicht
+// als Verweis auf lohnart: Wird eine Lohnart spaeter umbenannt oder ihr
+// Satz geaendert, darf eine abgeschlossene Abrechnung sich nicht mit
+// veraendern.
+'lohnlauf_zeile' => "
+CREATE TABLE IF NOT EXISTS lohnlauf_zeile (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  lauf_id INT NOT NULL,
+  mitarbeiter_id INT NOT NULL,
+  schluessel VARCHAR(40) NOT NULL,
+  bezeichnung VARCHAR(120) NOT NULL,
+  sortierung INT NOT NULL DEFAULT 100,
+  -- Die Bemessungsgrundlage der Zeile (Ansatz, Bruttostundenlohn ...).
+  basis_rappen INT NULL,
+  satz_bp INT NULL,
+  -- Stunden oder Stueck. NULL heisst 'nicht mengenbezogen'.
+  menge DECIMAL(12,4) NULL,
+  -- NULL heisst GESPERRT, nicht null Franken. Der Grund steht daneben.
+  betrag_rappen INT NULL,
+  gesperrt_grund VARCHAR(40) NULL,
+  -- Beruht diese Zeile auf einer offenen GAV-Auslegung? Nach ENT-451 wird
+  -- im Zweifel zugunsten der mitarbeitenden Person gerechnet -- aber jede
+  -- solche Zeile muss als annahmebasiert erkennbar bleiben.
+  annahme TINYINT(1) NOT NULL DEFAULT 0,
+  hinweis TEXT NULL,
+  KEY idx_lauf_person (lauf_id, mitarbeiter_id, sortierung),
+  FOREIGN KEY (lauf_id) REFERENCES lohnlauf(id) ON DELETE CASCADE,
+  FOREIGN KEY (mitarbeiter_id) REFERENCES mitarbeiter(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
 ];
 
 foreach ($tabellen as $name => $sql) {
@@ -1761,60 +1861,12 @@ if (!$nurPruefen && hat_tabelle_jetzt($pdo, 'ereignisart')) {
 if (!$nurPruefen && hat_tabelle_jetzt($pdo, 'lohnart')) {
     try {
         if ((int)$pdo->query('SELECT COUNT(*) FROM lohnart')->fetchColumn() === 0) {
-            $lohnarten = [
-                // [schluessel, bezeichnung, art, basis, satz_bp, 6 Kennzeichen, gav, sortierung]
-                ['grundlohn_stunde', 'Grundlohn pro Stunde', 'stundensatz', null, null,
-                 1,1,1,1,1,1, 'Art. 16 i.V.m. Anhang 1 GAV', 10],
-                ['grundlohn_monat', 'Monatslohn', 'monatslohn', null, null,
-                 1,0,1,1,1,1, 'Art. 16 i.V.m. Anhang 1 GAV', 11],
-                // Ferienentschaedigung traegt selbst keine Ferienentschaedigung
-                // und keinen 13. Monatslohn -- sonst rechnete sich ein Zuschlag
-                // auf einen Zuschlag. Der Satz steht bewusst NICHT hier: Er
-                // wird nach Art. 20 Ziff. 2 aus dem Alter abgeleitet
-                // (lohn_ferienentschaedigung_bp), nicht je Person eingetippt.
-                ['ferienentschaedigung', 'Ferienentschädigung', 'prozent', 'grundlohn', null,
-                 1,0,0,1,1,1, 'Art. 20 Ziff. 2 GAV', 20],
-                // KEINE GAV-Pflicht -- der GAV kennt den 13. Monatslohn nur in
-                // Art. 25 Ziff. 2 als Bestandteil der BVG-Bemessung. Darum
-                // steht bei gav_grundlage nichts, und das ist eine Aussage.
-                ['anteil_13ml', 'Anteil 13. Monatslohn', 'prozent', 'grundlohn', null,
-                 1,0,0,1,1,1, null, 21],
-                ['zuschlag_fachausweis', 'Zuschlag Fachausweis', 'stundensatz', null, null,
-                 1,1,1,1,1,1, 'Art. 19 Ziff. 1 GAV', 30],
-                ['zuschlag_hund', 'Zuschlag Diensthund', 'stundensatz', null, null,
-                 1,1,1,1,1,1, 'Art. 19 Ziff. 2 GAV', 31],
-                ['zuschlag_waffe', 'Zuschlag Schusswaffe', 'stundensatz', null, null,
-                 1,1,1,1,1,1, 'Art. 19 Ziff. 3 GAV', 32],
-                ['zeitzuschlag', 'Zeitzuschlag über 210 Stunden', 'prozent', 'grundlohn', 2500,
-                 1,1,1,1,1,1, 'Art. 14 Ziff. 3 GAV', 33],
-                // Auslagenersatz ist KEIN Lohn: nicht AHV-pflichtig, in keiner
-                // Bemessungsgrundlage, und nach GAV-AUS-009 gehoert er in eine
-                // getrennte Spesenabrechnung nach Art. 18 Ziff. 10 -- nicht in
-                // die Arbeitszeitabrechnung nach Art. 12 Ziff. 5. Er erscheint
-                // darum als eigener Block, nicht in der Stundensumme.
-                ['auslagenersatz', 'Auslagenersatz', 'netto', null, null,
-                 0,0,0,0,0,0, 'Art. 18 GAV', 40],
-                // Abzuege. Ihre SAETZE stehen in lohn_abzug mit
-                // Gueltigkeitszeitraum -- hier steht nur, dass es die Zeile
-                // gibt und wie sie heisst.
-                ['ahv', 'AHV-, IV-, EO-Beitrag', 'abzug', 'ahv_brutto', null,
-                 0,0,0,0,0,0, null, 50],
-                ['alv', 'ALV-Beitrag', 'abzug', 'ahv_brutto', null,
-                 0,0,0,0,0,0, null, 51],
-                ['nbu', 'NBU-Beitrag', 'abzug', 'uvg_brutto', null,
-                 0,0,0,0,0,0, null, 52],
-                ['ktg', 'Krankentaggeld-Beitrag', 'abzug', 'ahv_brutto', null,
-                 0,0,0,0,0,0, 'Art. 17 Ziff. 3 GAV', 53],
-                ['bvg', 'BVG-Beitrag', 'abzug', null, null,
-                 0,0,0,0,0,0, 'Art. 25 GAV', 54],
-                // Art. 6 Ziff. 2 verlangt ausdruecklich, dass dieser Abzug
-                // "bei der Lohnabrechnung aufzufuehren" ist -- er darf nie
-                // stillschweigend im Nettolohn verschwinden.
-                ['pako', 'Vollzugskostenbeitrag PaKo', 'abzug', null, null,
-                 0,0,0,0,0,0, 'Art. 6 Ziff. 2 GAV', 55],
-                ['quellensteuer', 'Quellensteuer', 'abzug', 'qst_brutto', null,
-                 0,0,0,0,0,0, null, 56],
-            ];
+            // Der Katalog steht in backend/lohn.php als lohnart_startbestand().
+            // Er stand frueher hier als Literal -- und weil ihn dort keine
+            // Pruefung erreichte, fehlten zwei Schluessel unbemerkt, die der
+            // Lohnlauf erzeugt. Einer davon traegt den gesamten
+            // AHV-pflichtigen Lohn.
+            $lohnarten = lohnart_startbestand();
             $ein = $pdo->prepare(
                 'INSERT IGNORE INTO lohnart
                  (schluessel, bezeichnung, art, basis_schluessel, satz_bp,
