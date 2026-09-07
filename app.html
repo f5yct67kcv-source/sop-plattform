@@ -433,7 +433,7 @@ svg.i-sm { width: 17px; height: 17px; }
 .tabs button.on { color: var(--accent); }
 .tabs button .punkt { width: 5px; height: 5px; border-radius: 50%; background: var(--neg); position: absolute; margin: -16px 0 0 18px; }
 
-/* ── Ziehen zum Aktualisieren (ENT-428)
+/* ── Ziehen zum Aktualisieren (ENT-438)
    Der Anzeiger haengt am Bildschirm, knapp unter der Kopfzeile -- der
    Inhalt selbst wird NICHT verschoben: Waehrend des Ziehens federt die
    Seite auf dem Telefon von sich aus mit, und verschoebe man den Inhalt
@@ -1444,7 +1444,7 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
     </button>
   </header>
 
-  <!-- Ziehen zum Aktualisieren (ENT-428). aria-hidden: Der Kreis sagt nichts,
+  <!-- Ziehen zum Aktualisieren (ENT-438). aria-hidden: Der Kreis sagt nichts,
        was nicht schon der Aktualisieren-Knopf in der Kopfzeile sagt -- er ist
        die Rueckmeldung auf eine Geste, kein eigener Inhalt. -->
   <div class="ptr" id="ptr" aria-hidden="true">
@@ -2307,7 +2307,7 @@ function sockelSetzen() {
   document.documentElement.style.setProperty('--sockel', sockelMessen() + 'px');
 }
 
-// ══════════════════════════════════════════ ZIEHEN ZUM AKTUALISIEREN (ENT-428)
+// ══════════════════════════════════════════ ZIEHEN ZUM AKTUALISIEREN (ENT-438)
 // Kraeftig nach unten ziehen laedt neu -- dieselbe Geste wie in den
 // meisten Apps, und derselbe Vorgang wie der Knopf in der Kopfzeile.
 //
