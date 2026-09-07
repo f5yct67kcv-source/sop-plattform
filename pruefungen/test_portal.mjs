@@ -11,6 +11,7 @@
 //      Zusätzlich am Desktop geprüft, wie CLAUDE.md es verlangt.
 import { WURZEL, OUT, browserPfad } from './pfade.mjs';
 import { chromium } from 'playwright';
+import { readFileSync } from 'node:fs';
 
 const SEITE = `file://${WURZEL}/portal.html`;
 const EXE = browserPfad();
@@ -68,6 +69,33 @@ function setup(page) {
     if (path.includes('portal_abmelden')) return send({ status: 'ok' });
     return send({ status: 'ok' });
   });
+}
+
+// ── Die Farbkopie darf nicht auslaufen ───────────────────────────────
+// portal.html traegt bewusst keinen Cockpit-Code (ENT-441 Punkt 8), die
+// Verlaufs- und Glaswerte stehen darum als Kopie darin. Eine Kopie, die
+// niemand vergleicht, laeuft beim naechsten Palettenwechsel auseinander --
+// und man sieht es erst beim Kunden. Verglichen werden die WERTE, nicht der
+// Wortlaut: Wo dashboard.html sie hinschreibt, ist ihm ueberlassen.
+{
+  const dash = readFileSync(`${WURZEL}/dashboard.html`, 'utf8');
+  const portal = readFileSync(`${WURZEL}/portal.html`, 'utf8');
+  const werte = (text, name) => {
+    const treffer = [...text.matchAll(new RegExp('--' + name + ':\\s*([^;]+);', 'g'))]
+      .map(m => m[1].trim().replace(/\s+/g, ''));
+    return [...new Set(treffer)].sort();
+  };
+  for (const name of ['glas-grund-1', 'glas-grund-2', 'glas-grund-3', 'glas-kachel',
+                      'accent', 'accent-hi']) {
+    const d = werte(dash, name), p = werte(portal, name);
+    check(`KRITISCH: --${name} ist im Portal derselbe Wert wie im Cockpit`,
+      p.length > 0 && d.length > 0 && JSON.stringify(d) === JSON.stringify(p));
+  }
+  // Und die drei Kreise selbst: Groesse und Lage machen den Verlauf aus, die
+  // Farbe allein waere ein anderer Grund.
+  const kreise = t => [...t.matchAll(/radial-gradient\((\d+px \d+px at [^,]+),/g)].map(m => m[1].replace(/\s+/g, ' '));
+  check('KRITISCH: die drei Verlaufskreise sitzen an derselben Stelle wie im Cockpit',
+    JSON.stringify(kreise(portal)) === JSON.stringify(kreise(dash).slice(0, 3)));
 }
 
 const browser = await chromium.launch({ executablePath: EXE });
@@ -247,6 +275,54 @@ check('KRITISCH: die Seite scrollt nicht waagrecht',
 check('KRITISCH: auch auf dem Handy scrollt sie nicht waagrecht',
   await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
 await gross.screenshot({ path: `${OUT}/portal-02-desktop.png` });
+
+// ══ Dunkle Fassung ══════════════════════════════════════════════════════
+// Die Seite folgt dem Geraet und hat keinen Umschalter -- also muessen
+// BEIDE Fassungen stimmen. Gemessen wird am gerenderten Zustand: ob die
+// Kachel wirklich durchscheint und die Schrift darauf noch traegt.
+const dunkel = await browser.newPage({ viewport: { width: 1440, height: 900 }, colorScheme: 'dark' });
+dunkel.on('pageerror', e => bad.push('JS-Fehler (dunkel): ' + e.message));
+await setup(dunkel);
+await dunkel.goto(SEITE);
+await dunkel.evaluate(() => localStorage.clear());
+await dunkel.goto(SEITE);
+check('Der Empfang steht auch in der dunklen Fassung', await dunkel.isVisible('#empfang'));
+await dunkel.screenshot({ path: `${OUT}/portal-04-empfang.png` });
+const dunkelWerte = await dunkel.evaluate(() => {
+  const koerper = getComputedStyle(document.body);
+  const vor = getComputedStyle(document.body, '::before');
+  return {
+    grund: koerper.backgroundColor,
+    tinte: koerper.color,
+    verlauf: vor.backgroundImage,
+    karte: getComputedStyle(document.querySelector('.karte')).backgroundColor,
+  };
+});
+// Der dunkle Grund ist wirklich dunkel -- und nicht der helle, weil eine
+// Medienabfrage danebengegriffen hat.
+const kanaele = t => (t.match(/\d+/g) || []).slice(0, 3).map(Number);
+const [gr, gg, gb] = kanaele(dunkelWerte.grund);
+check('KRITISCH: in der dunklen Fassung ist der Grund wirklich dunkel',
+  gr < 60 && gg < 60 && gb < 60);
+const [tr, tg, tb] = kanaele(dunkelWerte.tinte);
+check('KRITISCH: und die Schrift darauf hell', tr > 200 && tg > 200 && tb > 200);
+// Der Verlauf ist die halbe Miete: Ohne ihn gibt es nichts zu brechen, und
+// die Glaskante saehe bloss blass aus.
+check('KRITISCH: die Verlaufsebene liegt hinter der Seite (drei Kreise)',
+  (dunkelWerte.verlauf.match(/radial-gradient/g) || []).length === 3);
+// Und die Kachel scheint wirklich durch -- eine deckende Flaeche waere kein
+// Glas, sondern nur eine Karte mit runden Ecken.
+check('KRITISCH: die Kachel ist durchscheinend, nicht deckend',
+  /^rgba\(/.test(dunkelWerte.karte) && parseFloat(dunkelWerte.karte.split(',')[3]) < 0.95);
+await dunkel.fill('#email', 'a.beispiel@example.invalid');
+await dunkel.click('#code-holen');
+await dunkel.waitForTimeout(150);
+await dunkel.fill('#code', '123456');
+await dunkel.click('#anmelden');
+await dunkel.waitForTimeout(300);
+check('Die Liste erscheint auch in der dunklen Fassung', await dunkel.isVisible('#inhalt'));
+await dunkel.screenshot({ path: `${OUT}/portal-03-dunkel.png` });
+await dunkel.evaluate(() => localStorage.clear());
 
 await browser.close();
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);

@@ -6,57 +6,145 @@
 <meta name="robots" content="noindex, nofollow">
 <title>Kundenportal</title>
 <style>
-/* Farben und Masse aus dem Cockpit uebernommen, nicht neu erfunden --
-   ein Kunde, der einen Rapport als PDF kennt, soll dieselbe Handschrift
-   sehen. */
+/* Farben, Verlauf und Glasfassung sind aus dem Cockpit uebernommen und
+   nicht neu erfunden: Ein Kunde, der einen Rapport als PDF kennt, soll
+   dieselbe Handschrift sehen. Die Werte stehen hier als Kopie und nicht in
+   einer gemeinsamen Datei -- portal.html traegt bewusst keinen Cockpit-Code
+   (ENT-441 Punkt 8), damit von dort nichts versehentlich an einen Kunden
+   geraten kann. Damit die Kopie nicht auseinanderlaeuft, vergleicht
+   test_portal.mjs die Werte gegen dashboard.html.
+
+   Die Seite folgt dem GERAET (prefers-color-scheme) und hat keinen
+   Umschalter: Ein Kunde sieht sie selten und soll sie nicht einrichten
+   muessen. */
 :root{
-  --grund:#F4F5F7; --flaeche:#FFFFFF; --text:#14161A; --grau:#6B7280;
-  --linie:#E5E8EC; --gruen:#1C7C3E; --rot:#B3261E; --dunkel:#16181D;
+  --bg:#F7F8FA; --surface:#FFFFFF; --surface-rgb:255,255,255;
+  --line:#E5E8EC; --ink:#14161A; --ink-2:#4A5160; --ink-3:#868D9A;
+  --gruen:#1C7C3E; --gruen-soft:#E7F3EA;
+  --rot:#B3261E;   --rot-soft:#FBE9E7;
+  --dunkel:#16181D;
+  --accent:#2F5BD7; --accent-hi:#2549B0;
+  /* Glas: hell */
+  --glas-kachel:.54;
+  --glas-linie:rgba(255,255,255,.55);
+  --glas-kante-hell:rgba(255,255,255,.90);
+  --glas-kante-tief:rgba(16,18,22,.10);
+  --glas-abheben:0 10px 30px -14px rgba(16,18,22,.20);
+  --glas-grund-1:rgba(47,91,215,.22);
+  --glas-grund-2:rgba(107,79,168,.17);
+  --glas-grund-3:rgba(15,122,107,.13);
+  --r:15px; --r-lg:20px;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0F1117; --surface:#161B27; --surface-rgb:22,27,39;
+    --line:#2A3147; --ink:#F2F4F8; --ink-2:#B6BCC8; --ink-3:#868D9A;
+    --gruen:#4FCE96; --gruen-soft:#10281E;
+    --rot:#F27F70;   --rot-soft:#2E1A18;
+    --dunkel:#F2F4F8;
+    --accent:#7098F7; --accent-hi:#8DAEFA;
+    /* Im Dunkeln deckt die Kachel MEHR: Dort hellt der Verlauf sie auf und
+       der Text verliert Kontrast -- im Hellen toent er sie ab und der Text
+       gewinnt. Gemessen im Cockpit, hier uebernommen. */
+    --glas-kachel:.62;
+    --glas-linie:rgba(255,255,255,.09);
+    --glas-kante-hell:rgba(255,255,255,.15);
+    --glas-kante-tief:rgba(0,0,0,.38);
+    /* Im Dunkeln traegt die Kante, nicht der Schatten. */
+    --glas-abheben:0 0 0 0 rgba(0,0,0,0);
+    --glas-grund-1:rgba(112,152,247,.26);
+    --glas-grund-2:rgba(182,160,234,.18);
+    --glas-grund-3:rgba(79,217,195,.13);
+  }
+}
+/* Wer am Betriebssystem „weniger Transparenz" eingestellt hat, meint genau
+   das. Die Kante und der Grund bleiben, die Durchsicht geht fast ganz weg --
+   dieselbe Antwort wie im Cockpit, mit demselben Wert. */
+@media (prefers-reduced-transparency: reduce){
+  :root{ --glas-kachel: .96; }
 }
 *{box-sizing:border-box}
-body{margin:0;background:var(--grund);color:var(--text);
+body{margin:0;background:var(--bg);color:var(--ink);
      font-family:-apple-system,'Segoe UI',Arial,sans-serif;font-size:15px;line-height:1.5}
-.buehne{max-width:900px;margin:0 auto;padding:20px 16px 56px}
+
+/* Der Grund, auf den das Glas schaut. Ohne ihn gibt es nichts zu brechen --
+   Durchsicht auf einfarbigem Grund sieht aus wie kein Glas. Drei sehr weite,
+   flau gesetzte Kreise statt eines Verlaufs ueber die Diagonale: So bleibt
+   die Mitte, wo die Liste liegt, am ruhigsten, und die Farbe sammelt sich
+   dort, wo ohnehin Rand ist.
+   Als eigene, fest stehende Ebene und NICHT als background-attachment:fixed
+   -- sonst zeichnet der Browser den Verlauf bei jedem Bildaufbau neu. */
+body::before{
+  content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background-image:
+    radial-gradient(1500px 900px at  2% -18%, var(--glas-grund-1), transparent 66%),
+    radial-gradient(1250px 950px at 102%  6%, var(--glas-grund-2), transparent 64%),
+    radial-gradient(1400px 1000px at 46% 118%, var(--glas-grund-3), transparent 68%);
+  background-repeat:no-repeat;
+}
+
+.buehne{max-width:900px;margin:0 auto;padding:28px 16px 56px}
 
 /* ── Kopf ──────────────────────────────────────────────────────────────
    Auf dem Handy ist die Kopfzeile der einzige Ort, der sagt, wo man ist:
    Titel deutlich, Unterzeile lesbar (Hausregel). */
-.kopf{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;
-      border-bottom:2px solid var(--dunkel);padding-bottom:14px;margin-bottom:22px;flex-wrap:wrap}
-.kopf h1{margin:0;font-size:21px;font-weight:800;letter-spacing:-.4px}
-.kopf .unter{font-size:13px;color:var(--grau);margin-top:3px}
+.kopf{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+      padding:0 4px 18px;margin-bottom:18px;border-bottom:1px solid var(--line)}
+.kopf .marke{width:52px;height:52px;flex:none;border-radius:50%;
+             filter:drop-shadow(0 8px 20px rgba(0,0,0,.28))}
+.kopf h1{margin:0;font-size:20px;font-weight:800;letter-spacing:-.4px}
+.kopf .unter{font-size:13px;color:var(--ink-2);margin-top:2px}
 /* margin-left:auto statt space-between allein: Bricht die Kopfzeile auf dem
    Handy um, landet der Knopf sonst links unter dem Titel -- er gehoert aber
    auf beiden Breiten an dieselbe Stelle. */
 .kopf #abmelden{margin-left:auto}
 
+/* Der Empfang vor der Anmeldung: gross, mittig, mit dem Logo darueber --
+   dieselbe Ordnung wie die Anmeldeseite des Cockpits. */
+.empfang{text-align:center;padding:22px 4px 30px}
+.empfang img{width:104px;height:104px;border-radius:50%;
+             filter:drop-shadow(0 16px 32px rgba(0,0,0,.28))}
+.empfang h1{margin:18px 0 0;font-size:23px;font-weight:800;letter-spacing:-.4px}
+.empfang .sub{margin-top:6px;color:var(--ink-3);
+              font-size:12px;font-weight:640;letter-spacing:2px;text-transform:uppercase}
+
 /* Beschriftung OBEN, Wert darunter -- nie umgekehrt (Hausregel). */
 .feld{display:block}
 .feld .bez{font-size:11px;text-transform:uppercase;letter-spacing:.5px;
-           color:var(--grau);font-weight:700;margin-bottom:6px}
+           color:var(--ink-3);font-weight:700;margin-bottom:6px}
 .feld .wert{font-size:15px;font-weight:600}
 
-.karte{background:var(--flaeche);border-radius:12px;padding:20px;
-       box-shadow:0 1px 3px rgba(0,0,0,.08);margin-bottom:16px}
+/* Glaskachel: durchscheinend, mit Kante, OHNE Unschaerfe. Hinter einer
+   Kachel liegt nur der weiche Grund, und einen weichen Verlauf
+   weichzuzeichnen aendert am Bild nichts -- es kostet nur Rechenzeit.
+   Glasig macht sie die Durchsicht und die Kante, nicht die Unschaerfe. */
+.karte{background:rgba(var(--surface-rgb), var(--glas-kachel));
+       border:1px solid var(--glas-linie);border-radius:var(--r-lg);
+       padding:20px;margin-bottom:16px;
+       box-shadow:var(--glas-abheben),
+                  inset 0 1px 0 0 var(--glas-kante-hell),
+                  inset 0 -1px 0 0 var(--glas-kante-tief)}
 
 /* Bedienelemente auf dem Handy mindestens 44 px hoch, Eingabefelder
    mindestens 16 px Schrift -- darunter zoomt iOS hinein (Hausregel). */
 label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.5px;
-      color:var(--grau);font-weight:700;margin:0 0 6px}
+      color:var(--ink-3);font-weight:700;margin:0 0 6px}
 input{width:100%;min-height:44px;font-size:16px;padding:10px 12px;
-      border:1px solid var(--linie);border-radius:8px;background:#fff;color:var(--text);
-      font-family:inherit}
-input:focus{outline:2px solid var(--dunkel);outline-offset:1px}
+      border:1px solid var(--line);border-radius:10px;
+      background:var(--surface);color:var(--ink);font-family:inherit}
+input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
 /* Ein Knopf wird NICHT ueber die volle Breite gestreckt, nur weil er allein
    in seiner Zeile steht (Hausregel). */
-.knopf{display:inline-block;min-height:44px;padding:11px 22px;border-radius:8px;
-       font-size:15px;font-weight:700;border:none;cursor:pointer;font-family:inherit;
-       background:var(--dunkel);color:#fff}
-.knopf.still{background:#fff;color:var(--text);border:1px solid var(--linie)}
+.knopf{display:inline-block;min-height:44px;padding:11px 22px;border-radius:10px;
+       font-size:15px;font-weight:700;border:1px solid transparent;cursor:pointer;
+       font-family:inherit;color:#fff;
+       background:linear-gradient(135deg, var(--accent), var(--accent-hi))}
+.knopf.still{background:rgba(var(--surface-rgb),.6);color:var(--ink);
+             border-color:var(--glas-linie)}
 .knopf:disabled{opacity:.5;cursor:default}
 .knopfzeile{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:18px}
 
-.hinweis{font-size:13.5px;color:var(--grau);margin:10px 0 0}
+.hinweis{font-size:13.5px;color:var(--ink-3);margin:10px 0 0}
 .fehler{font-size:14px;color:var(--rot);font-weight:600;margin:12px 0 0}
 
 /* ── Zeitraum ─────────────────────────────────────────────────────────── */
@@ -70,37 +158,40 @@ input:focus{outline:2px solid var(--dunkel);outline-offset:1px}
 /* Zwei Spalten auf dem Handy, drei am Desktop -- aber in BEIDEN Faellen
    steht der Zustand rechts und nicht unter dem Datum. Ein Block, der links
    beginnt, und einer, der rechts endet, sind zwei Muster; mit dem
-   ausdruecklichen grid-row bleibt es eines. Ohne das rutschte das dritte
-   Kind in die naechste Zeile und stand linksbuendig da (gemessen am
-   gerenderten Zustand, nicht im Quelltext vermutet). */
+   ausdruecklichen grid-row bleibt es eines. */
 .zeile{display:grid;grid-template-columns:1fr auto;gap:2px 16px;align-items:start;
-       padding:14px 0;border-bottom:1px solid var(--linie)}
+       padding:14px 0;border-bottom:1px solid var(--line)}
 .zeile .datum{grid-column:1;grid-row:1}
 .zeile .haupt{grid-column:1;grid-row:2}
 .zeile .rechts{grid-column:2;grid-row:1 / span 2;align-self:start}
 .zeile:last-child{border-bottom:none}
 .zeile .datum{font-weight:700}
-.zeile .objekt{color:var(--grau);font-size:13.5px}
+.zeile .objekt{color:var(--ink-3);font-size:13.5px}
 .zeile .rechts{text-align:right;white-space:nowrap}
-.marke{display:inline-block;font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px}
-.marke.gut{background:#E7F3EA;color:var(--gruen)}
-.marke.ab{background:#FBE9E7;color:var(--rot)}
-.punkte{font-size:13.5px;color:var(--grau);margin-top:4px}
-.zeile .dauer{font-size:13.5px;color:var(--grau);margin-top:4px}
+.marke-zustand{display:inline-block;font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px}
+.marke-zustand.gut{background:var(--gruen-soft);color:var(--gruen)}
+.marke-zustand.ab{background:var(--rot-soft);color:var(--rot)}
+.punkte{font-size:13.5px;color:var(--ink-3);margin-top:4px}
+.zeile .dauer{font-size:13.5px;color:var(--ink-3);margin-top:4px}
 
 /* Ein leerer Zustand bekommt Text, nie eine leere Flaeche -- und der Text
    sagt, WELCHE der moeglichen Aussagen gilt (Hausregel: „unbekannt darf nie
    wie keine aussehen"). */
 .leer{padding:28px 4px;text-align:center}
 .leer .titel{font-weight:700;margin-bottom:6px}
-.leer .text{color:var(--grau);font-size:14px}
+.leer .text{color:var(--ink-3);font-size:14px}
 
-.zahl{font-size:13.5px;color:var(--grau);margin:0 0 4px}
+.zahl{font-size:13.5px;color:var(--ink-3);margin:0 0 4px}
 [hidden]{display:none!important}
 
 @media (min-width:640px){
-  .buehne{padding:32px 24px 64px}
+  .buehne{padding:40px 24px 64px}
   .kopf h1{font-size:24px}
+  .kopf .marke{width:60px;height:60px}
+  .empfang{padding:34px 4px 40px}
+  .empfang img{width:132px;height:132px}
+  .empfang h1{font-size:27px}
+  .karte{padding:26px}
   .zeile{grid-template-columns:120px 1fr auto;gap:6px 16px}
   .zeile .datum{grid-column:1;grid-row:1}
   .zeile .haupt{grid-column:2;grid-row:1}
@@ -111,12 +202,25 @@ input:focus{outline:2px solid var(--dunkel);outline-offset:1px}
 <body>
 <div class="buehne">
 
-  <div class="kopf">
+  <!-- Zwei Koepfe, nicht einer mit Fallunterscheidung: Vor der Anmeldung
+       empfaengt die Seite (Logo gross, mittig, Begruessung), danach sagt sie,
+       WO man ist (Kunde und Person, Logo klein daneben). Das sind zwei
+       verschiedene Aufgaben, und ein Kopf, der beides halb tut, tut keines
+       ganz. Das Logo ist dasselbe wie im Cockpit und in der Mitarbeiter-App
+       -- icons/icon-192.png, schon im Deploy. -->
+  <div class="empfang" id="empfang">
+    <img src="icons/icon-192.png" alt="">
+    <h1>Herzlich willkommen im Kundenportal</h1>
+    <div class="sub">CUPI 24 GmbH</div>
+  </div>
+
+  <div class="kopf" id="kopf" hidden>
+    <img class="marke" src="icons/icon-192.png" alt="">
     <div>
       <h1 id="titel">Kundenportal</h1>
       <div class="unter" id="unter">Nachweis der ausgeführten Rundgänge</div>
     </div>
-    <button class="knopf still" id="abmelden" hidden>Abmelden</button>
+    <button class="knopf still" id="abmelden">Abmelden</button>
   </div>
 
   <!-- Schritt 1: Adresse -->
@@ -211,7 +315,10 @@ function zeige(welche) {
   for (const id of ['schritt-adresse', 'schritt-code', 'inhalt']) {
     $(id).hidden = (id !== welche);
   }
-  $('abmelden').hidden = (welche !== 'inhalt');
+  // Empfang und Arbeitskopf schliessen einander aus -- nie beide, nie keiner.
+  const drin = (welche === 'inhalt');
+  $('empfang').hidden = drin;
+  $('kopf').hidden = !drin;
 }
 
 function fehler(id, text) {
@@ -348,7 +455,7 @@ function zeichnen(daten) {
       + '<div class="datum">' + esc(dmy(r.datum)) + '</div>'
       + '<div class="haupt"><div>' + esc(r.objekt_name) + '</div>'
       + '<div class="punkte">' + erledigt + ' von ' + gesamt + ' Kontrollpunkten erledigt</div></div>'
-      + '<div class="rechts"><span class="marke ' + klasse + '">' + esc(wort) + '</span>'
+      + '<div class="rechts"><span class="marke-zustand ' + klasse + '">' + esc(wort) + '</span>'
       + '<div class="dauer">' + esc(dauerText(r.dauer)) + '</div></div>'
       + '</div>';
   }).join('');
