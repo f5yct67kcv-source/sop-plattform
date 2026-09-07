@@ -50,6 +50,19 @@ const VOLL = {
       status: 'abgebrochen', beginn: `${vorTagen(5)} 21:30:00`,
       dauer: { sekunden: 600, quelle: 'ende' },
       fortschritt: { gesamt: 6, erledigt: 2, bestaetigt: 2, ersatzscan: 0 } },
+    // Vollstaendig, aber ein Punkt nur per Fotobeleg (ENT-329). Genau der
+    // Fall, in dem ein gruener Balken die Unwahrheit saegte.
+    { id: 12, datum: vorTagen(8), objekt_id: 1, objekt_name: 'Testliegenschaft Nord',
+      status: 'abgeschlossen', beginn: `${vorTagen(8)} 23:12:00`,
+      dauer: { sekunden: 1800, quelle: 'ende' },
+      fortschritt: { gesamt: 6, erledigt: 6, bestaetigt: 5, ersatzscan: 1 } },
+    // Runde ohne hinterlegte Kontrollpunkte: "0 von 0" mit leerem Balken
+    // saehe aus wie „nichts erledigt" -- es ist aber „nicht bekannt, wie
+    // viele es sein sollten".
+    { id: 13, datum: vorTagen(11), objekt_id: 1, objekt_name: 'Testliegenschaft Nord',
+      status: 'abgeschlossen', beginn: `${vorTagen(11)} 20:45:00`,
+      dauer: { sekunden: 900, quelle: 'ende' },
+      fortschritt: { gesamt: 0, erledigt: 0, bestaetigt: 0, ersatzscan: 0 } },
   ],
 };
 const leer = grund => ({
@@ -109,7 +122,7 @@ function setup(page) {
     return [...new Set(treffer)].sort();
   };
   for (const name of ['glas-grund-1', 'glas-grund-2', 'glas-grund-3', 'glas-kachel',
-                      'accent', 'accent-hi']) {
+                      'accent', 'accent-hi', 'warn']) {
     const d = werte(dash, name), p = werte(portal, name);
     check(`KRITISCH: --${name} ist im Portal derselbe Wert wie im Cockpit`,
       p.length > 0 && d.length > 0 && JSON.stringify(d) === JSON.stringify(p));
@@ -341,7 +354,93 @@ check('Die Kontrollpunkte stehen mit Bezug da, nicht als nackte Zahl',
 // zählt Punkte darin (Hausregel: Einheiten nie vermischen).
 const anzahl = await page.textContent('#anzahl');
 check('KRITISCH: die Zahl bekommt einen Bezug, weil ein Zeitraum greift',
-  /2 Rundgänge vom/.test(anzahl) && /1 Objekt/.test(anzahl));
+  /4 Rundgänge vom/.test(anzahl) && /1 Objekt/.test(anzahl));
+
+// ── Beginn und Dauer (ENT-449) ───────────────────────────────────────
+// Das Datum allein sagt nicht, dass nachts kontrolliert wurde -- der
+// Beginn sagt es. Beide Werte tragen eine Beschriftung: "22:04" ohne Wort
+// koennte auch das Ende sein.
+check('Der Beginn der Runde steht mit Beschriftung da', /Beginn 22:04 Uhr/.test(liste));
+check('Die Dauer ebenfalls', /Dauer 0:37 h/.test(liste));
+
+// ── Der Fortschrittsbalken (ENT-449) ─────────────────────────────────
+// Gemessen, nicht im Quelltext nachgelesen: Der Fuellstand muss dem
+// Verhaeltnis erledigt/gesamt entsprechen. Ein Balken, dessen Breite nicht
+// aus den Zahlen folgt, ist eine Verzierung.
+const balken = async (p) => p.evaluate(() => [...document.querySelectorAll('#liste .zeile')].map(z => {
+  const b = z.querySelector('.balken');
+  if (!b) { return null; }
+  const f = b.querySelector('.fuell');
+  return {
+    spur: Math.round(b.getBoundingClientRect().width),
+    gefuellt: Math.round(f.getBoundingClientRect().width),
+    farbe: getComputedStyle(f).backgroundColor,
+    grund: getComputedStyle(b).backgroundColor,
+  };
+}));
+const bHandy = await balken(page);
+check('KRITISCH: eine vollständige Runde füllt den Balken ganz',
+  bHandy[0] && bHandy[0].spur > 0 && bHandy[0].gefuellt >= bHandy[0].spur - 1);
+check('KRITISCH: eine Runde mit 2 von 6 füllt ihn zu einem Drittel — gemessen',
+  bHandy[1] && Math.abs(bHandy[1].gefuellt / bHandy[1].spur - 1 / 3) < 0.04);
+// Ein Balken ohne sichtbaren Grund waere bei 0 % gar kein Balken -- und
+// „nichts erledigt" saehe aus wie „keine Angabe" (Hausregel).
+const grundKanaele = (bHandy[0].grund.match(/[\d.]+/g) || []).map(Number);
+check('KRITISCH: der Balken hat einen sichtbaren Grund, nicht nur eine Füllung',
+  grundKanaele.length >= 4 ? grundKanaele[3] > 0.05 : grundKanaele.length === 3);
+
+// Die Farbe ist eine Aussage, keine Verzierung: Vollständig UND technisch
+// bestätigt ist grün. Vollständig mit Fotobeleg ist es NICHT -- sonst
+// verschwände der Unterschied, den ENT-329 gerade sichtbar machen wollte.
+check('KRITISCH: eine vollständige Runde MIT Fotobeleg ist anders eingefärbt als eine ohne',
+  bHandy[2] && bHandy[2].farbe !== bHandy[0].farbe);
+check('KRITISCH: und eine abgebrochene wieder anders als beide',
+  bHandy[1] && bHandy[1].farbe !== bHandy[0].farbe && bHandy[1].farbe !== bHandy[2].farbe);
+// Grün ist die einzige Farbe, in der der Grünanteil führt -- so bleibt die
+// Prüfung an der Aussage und nicht am Farbwert.
+const kanal = f => (f.match(/\d+/g) || []).slice(0, 3).map(Number);
+const [r0, g0, b0] = kanal(bHandy[0].farbe);
+check('KRITISCH: die vollständig bestätigte Runde ist wirklich grün', g0 > r0 && g0 > b0);
+const [r2, g2] = kanal(bHandy[2].farbe);
+check('KRITISCH: die Runde mit Fotobeleg ist es nicht', !(g2 > r2));
+
+// Der Fotobeleg steht sichtbar daneben und verschwindet nicht unter
+// „erledigt".
+check('KRITISCH: der Fotobeleg wird ausgewiesen, nicht unter „erledigt" versteckt',
+  /6 von 6 Kontrollpunkten erledigt/.test(liste) && /1 davon mit Fotobeleg/.test(liste));
+check('Und er ist farblich abgesetzt', await page.evaluate(() => {
+  const z = document.querySelectorAll('#liste .zeile')[2];
+  const p = z.querySelector('.punkte'), b = z.querySelector('.punkte .beleg');
+  return !!b && getComputedStyle(b).color !== getComputedStyle(p).color;
+}));
+
+// Ohne hinterlegte Kontrollpunkte gibt es keinen Fuellstand. Ein Balken bei
+// null waere hier die falsche Auskunft: „nichts erledigt" statt „nicht
+// bekannt, wie viele es sein sollten" (Hausregel: unbekannt ist nicht
+// keine).
+check('KRITISCH: ohne hinterlegte Kontrollpunkte steht kein Balken bei null da',
+  bHandy[3] === null);
+check('KRITISCH: sondern der Grund, warum es keine Zahl gibt',
+  /keine Kontrollpunkte hinterlegt/.test(liste) && !/0 von 0/.test(liste));
+
+// Auf dem Handy liegt der Fortschritt unter dem Objekt und ueber die volle
+// Breite -- rechts eingezwaengt waere der Balken 40 px breit und damit
+// nicht mehr ablesbar.
+check('KRITISCH: auf dem Handy steht der Balken über die volle Zeilenbreite',
+  await page.evaluate(() => {
+    const z = document.querySelector('#liste .zeile');
+    return z.querySelector('.fortschritt').getBoundingClientRect().width
+         >= z.getBoundingClientRect().width - 1;
+  }));
+// Beginn und Dauer sind zusammen eine feste, kurze Angabe -- sie darf auf
+// 390 px nicht umbrechen. Ein Umbruch laesst hier ein einzelnes "h" auf der
+// naechsten Zeile stehen; im Quelltext sieht man das nicht.
+check('KRITISCH: die Zeile mit Beginn und Dauer bricht auf dem Handy nicht um',
+  await page.evaluate(() => {
+    const m = document.querySelector('#liste .zeile .meta');
+    const eine = parseFloat(getComputedStyle(m).lineHeight);
+    return m.getBoundingClientRect().height < eine * 1.6;
+  }));
 
 // ── Gemessen: gleiches Muster auf beiden Seiten (CLAUDE.md) ──────────
 // Der Zustand gehoert RECHTS und nicht unter das Datum. Ohne die
@@ -484,6 +583,56 @@ check('KRITISCH: auch am Desktop steht der Zustand rechts vom Datum',
   lDesktop.markeLinks > lDesktop.datumRechts);
 check('KRITISCH: und dort ebenfalls auf derselben Hoehe -- dasselbe Muster auf beiden Breiten',
   lDesktop.datumMitte >= lDesktop.markeOben && lDesktop.datumMitte <= lDesktop.markeUnten);
+
+// ── Dieselben Angaben, andere Anordnung (ENT-449) ────────────────────
+// Am Desktop stehen die vier Bloecke nebeneinander statt untereinander.
+// Geprueft wird die ANORDNUNG am gerenderten Zustand: dass sie wirklich auf
+// einer Zeile liegen und in dieser Reihenfolge -- eine Rasterzuweisung, die
+// eine spaetere Regel ueberschreibt, faellt sonst nicht auf.
+const reihe = await gross.evaluate(() => {
+  const z = document.querySelector('#liste .zeile');
+  const kasten = k => { const e = z.querySelector(k); return e && e.getBoundingClientRect(); };
+  const a = kasten('.datum'), b = kasten('.haupt'), c = kasten('.fortschritt'), d = kasten('.rechts');
+  return { a, b, c, d,
+           schneiden: [b, c, d].every(x => x.top < a.bottom && x.bottom > a.top) };
+});
+check('KRITISCH: am Desktop liegen Datum, Objekt, Fortschritt und Zustand auf EINER Zeile',
+  reihe.schneiden);
+check('KRITISCH: und in dieser Reihenfolge von links nach rechts',
+  reihe.a.right <= reihe.b.left + 1 && reihe.b.right <= reihe.c.left + 1
+  && reihe.c.right <= reihe.d.left + 1);
+// Ein Balken, der von Zeile zu Zeile verschieden lang ist, laesst sich nicht
+// mit dem darueber vergleichen -- und genau das ist sein Zweck.
+const bDesk = (await balken(gross)).filter(Boolean);
+check('KRITISCH: alle Balken sind gleich breit und damit vergleichbar',
+  bDesk.length >= 3 && bDesk.every(x => Math.abs(x.spur - bDesk[0].spur) <= 1));
+// Gleich breit genügt nicht -- sie müssen auch an derselben Stelle beginnen.
+// Jede Zeile ist ein eigenes Raster; mit einer Spalte auf 'auto' schiebt das
+// längere Zustandswort die ganze Zeile, und die Balken stehen versetzt
+// untereinander. Sichtbar erst im Bild, nicht im Quelltext.
+check('KRITISCH: und sie beginnen an derselben Stelle — sonst sind sie nicht vergleichbar',
+  await gross.evaluate(() => {
+    const l = [...document.querySelectorAll('#liste .zeile .balken')]
+      .map(b => b.getBoundingClientRect().left);
+    return l.length >= 3 && l.every(x => Math.abs(x - l[0]) <= 1);
+  }));
+// Und die Zustandsmarken enden bündig an derselben Kante. Ohne die
+// Rechtsbündigkeit stehen sie je nach Wortlänge unterschiedlich weit innen --
+// eine ausgefranste rechte Kante, die man erst im Bild sieht.
+check('KRITISCH: die Zustandsmarken enden alle an derselben rechten Kante',
+  await gross.evaluate(() => {
+    const marken = [...document.querySelectorAll('#liste .zeile .marke-zustand')];
+    const kanten = marken.map(m => m.getBoundingClientRect().right);
+    const spalten = marken.map(m => m.parentElement.getBoundingClientRect().right);
+    return kanten.length >= 3
+      && kanten.every(x => Math.abs(x - kanten[0]) <= 1)
+      && kanten.every((x, i) => Math.abs(x - spalten[i]) <= 1);
+  }));
+check('KRITISCH: und der Füllstand stimmt auch am Desktop mit den Zahlen überein',
+  Math.abs(bDesk[1].gefuellt / bDesk[1].spur - 1 / 3) < 0.04);
+check('Der Fotobeleg-Hinweis steht auch am Desktop da',
+  /1 davon mit Fotobeleg/.test(await gross.textContent('#liste')));
+
 // Und nichts läuft seitlich aus dem Bild (weder hier noch auf dem Handy).
 check('KRITISCH: die Seite scrollt nicht waagrecht',
   await gross.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));

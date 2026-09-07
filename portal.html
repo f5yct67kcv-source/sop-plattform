@@ -22,6 +22,13 @@
   --line:#E5E8EC; --ink:#14161A; --ink-2:#4A5160; --ink-3:#868D9A;
   --gruen:#1C7C3E; --gruen-soft:#E7F3EA;
   --rot:#B3261E;   --rot-soft:#FBE9E7;
+  /* Der Ton fuer „belegt, aber nicht technisch bestaetigt" -- derselbe
+     Wert wie im Cockpit, test_portal.mjs vergleicht ihn mit. */
+  --warn:#9A6B08;
+  /* Der Grund des Fortschrittsbalkens. Er muss SICHTBAR sein: Eine Runde
+     mit 0 von 6 haette sonst gar keinen Balken und saehe aus wie „keine
+     Angabe" statt wie „nichts erledigt". */
+  --balken-grund:rgba(20,22,26,.13);
   --dunkel:#16181D;
   --accent:#2F5BD7; --accent-hi:#2549B0;
   /* Glas: hell */
@@ -41,6 +48,8 @@
     --line:#2A3147; --ink:#F2F4F8; --ink-2:#B6BCC8; --ink-3:#868D9A;
     --gruen:#4FCE96; --gruen-soft:#10281E;
     --rot:#F27F70;   --rot-soft:#2E1A18;
+    --warn:#E2B156;
+    --balken-grund:rgba(255,255,255,.16);
     --dunkel:#F2F4F8;
     --accent:#7098F7; --accent-hi:#8DAEFA;
     /* Im Dunkeln deckt die Kachel MEHR: Dort hellt der Verlauf sie auf und
@@ -180,24 +189,52 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
 .zeitraum .paar{flex:1 1 150px;min-width:0;max-width:220px}
 
 /* ── Liste ────────────────────────────────────────────────────────────── */
-/* Zwei Spalten auf dem Handy, drei am Desktop -- aber in BEIDEN Faellen
-   steht der Zustand rechts und nicht unter dem Datum. Ein Block, der links
-   beginnt, und einer, der rechts endet, sind zwei Muster; mit dem
-   ausdruecklichen grid-row bleibt es eines. */
+/* Vorbild ist die Cockpit-Tabelle (Revierdienst -> Letzte Rundgaenge), aber
+   ausdruecklich NICHT als Kopie: Ihre acht Spalten leben auf einem
+   Bildschirm, den das Cockpit am Handy gar nicht erst anbietet (ENT-235).
+   Das Portal wird ueberwiegend am Handy geoeffnet -- der Link kommt per
+   Mail --, also traegt es dieselben Angaben in einem Zuschnitt, der 390 px
+   ueberlebt.
+   In BEIDEN Breiten stehen dieselben vier Angaben: Datum, Objekt mit
+   Beginn und Dauer, der Fortschritt und der Zustand. Was sich aendert, ist
+   allein die Anordnung. Der Zustand steht in beiden Faellen rechts und nie
+   unter dem Datum: Ein Block, der links beginnt, und einer, der rechts
+   endet, sind zwei Muster; mit dem ausdruecklichen grid-row bleibt es
+   eines. */
 .zeile{display:grid;grid-template-columns:1fr auto;gap:2px 16px;align-items:start;
        padding:14px 0;border-bottom:1px solid var(--line)}
 .zeile .datum{grid-column:1;grid-row:1}
-.zeile .haupt{grid-column:1;grid-row:2}
-.zeile .rechts{grid-column:2;grid-row:1 / span 2;align-self:start}
+.zeile .rechts{grid-column:2;grid-row:1}
+.zeile .haupt{grid-column:1 / -1;grid-row:2;min-width:0}
+.zeile .fortschritt{grid-column:1 / -1;grid-row:3;margin-top:9px}
 .zeile:last-child{border-bottom:none}
 .zeile .datum{font-weight:700}
-.zeile .objekt{color:var(--ink-3);font-size:13.5px}
+.zeile .objekt{overflow-wrap:anywhere}
 .zeile .rechts{text-align:right;white-space:nowrap}
 .marke-zustand{display:inline-block;font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px}
 .marke-zustand.gut{background:var(--gruen-soft);color:var(--gruen)}
 .marke-zustand.ab{background:var(--rot-soft);color:var(--rot)}
-.punkte{font-size:13.5px;color:var(--ink-3);margin-top:4px}
-.zeile .dauer{font-size:13.5px;color:var(--ink-3);margin-top:4px}
+/* Beginn und Dauer als EINE beschriftete Zeile statt als zwei nackte
+   Spalten: Zwei Zahlen ohne Beschriftung sind am Handy nicht zuzuordnen,
+   und „22:04" allein koennte auch das Ende sein. */
+.zeile .meta{font-size:13.5px;color:var(--ink-3);margin-top:2px}
+
+/* Der Fortschrittsbalken -- die eigentliche Verbesserung gegenueber der
+   blossen Zahl: Ob eine Runde vollstaendig war, sieht man daran ohne
+   Rechnen. Die Farbe folgt derselben Lesart wie im Cockpit (ENT-329):
+   vollstaendig UND technisch bestaetigt ist gruen; vollstaendig mit
+   Fotobeleg bleibt gelb, weil gruen „technisch belegt" hiesse. */
+.balken{position:relative;height:7px;border-radius:4px;overflow:hidden;
+        background:var(--balken-grund)}
+.balken .fuell{position:absolute;left:0;top:0;bottom:0;border-radius:4px}
+.balken.voll .fuell{background:var(--gruen)}
+.balken.teil .fuell{background:var(--warn)}
+.balken.ab   .fuell{background:var(--rot)}
+.punkte{font-size:13.5px;color:var(--ink-3);margin-top:5px}
+/* Ein Fotobeleg ist kein bestaetigter Scan und wird darum auch nicht als
+   einer gezeigt -- er steht sichtbar daneben statt unter „erledigt" zu
+   verschwinden. */
+.punkte .beleg{display:block;color:var(--warn)}
 
 /* Ein leerer Zustand bekommt Text, nie eine leere Flaeche -- und der Text
    sagt, WELCHE der moeglichen Aussagen gilt (Hausregel: „unbekannt darf nie
@@ -217,10 +254,17 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
   .empfang img{width:132px;height:132px}
   .empfang h1{font-size:27px}
   .karte{padding:26px}
-  .zeile{grid-template-columns:120px 1fr auto;gap:6px 16px}
+  /* Am Desktop nebeneinander statt untereinander -- vier Spalten, dieselben
+     vier Angaben. Der Balken bekommt eine feste Spaltenbreite, sonst waere
+     er von Zeile zu Zeile verschieden lang und damit nicht vergleichbar:
+     Ein Balken, den man nicht mit dem darueber vergleichen kann, ist eine
+     Verzierung. */
+  .zeile{grid-template-columns:112px minmax(0,1fr) 190px minmax(124px,auto);
+         gap:6px 18px;align-items:center}
   .zeile .datum{grid-column:1;grid-row:1}
   .zeile .haupt{grid-column:2;grid-row:1}
-  .zeile .rechts{grid-column:3;grid-row:1}
+  .zeile .fortschritt{grid-column:3;grid-row:1;margin-top:0}
+  .zeile .rechts{grid-column:4;grid-row:1}
 }
 </style>
 </head>
@@ -625,10 +669,22 @@ function dmy(iso) {
   return t.length === 3 ? t[2] + '.' + t[1] + '.' + t[0] : String(iso);
 }
 
+// Gibt null zurueck, wenn keine Dauer vorliegt -- NICHT einen Strich. Ob
+// daraus „unbekannt" oder gar nichts wird, entscheidet die Stelle, die es
+// anzeigt; ein Strich mitten in einem Satz liest sich wie „keine".
 function dauerText(d) {
-  if (!d || d.sekunden === null || d.sekunden === undefined) { return '–'; }
+  if (!d || d.sekunden === null || d.sekunden === undefined) { return null; }
   const s = Number(d.sekunden);
   return Math.floor(s / 3600) + ':' + String(Math.floor(s / 60) % 60).padStart(2, '0') + ' h';
+}
+
+// "2026-09-05 22:04:00" -> "22:04". Der Beginn ist fuer den Kunden die
+// eigentliche Auskunft: Das Datum allein sagt nicht, dass nachts
+// kontrolliert wurde.
+function zeitText(iso) {
+  if (!iso) { return null; }
+  const t = String(iso).slice(11, 16);
+  return /^\d{2}:\d{2}$/.test(t) ? t : null;
 }
 
 async function laden() {
@@ -673,12 +729,38 @@ function zeichnen(daten) {
     const f = r.fortschritt || {};
     const gesamt = Number(f.gesamt || 0);
     const erledigt = f.erledigt !== undefined ? Number(f.erledigt) : Number(f.bestaetigt || 0);
+    // Der Fotobeleg (Ersatzscan, ENT-329) zaehlt in 'erledigt' mit, wird aber
+    // daneben ausgewiesen: Ein Punkt, der fotografiert statt per Chip belegt
+    // wurde, ist erledigt -- aber nicht auf demselben Weg. Das zu
+    // verschweigen waere derselbe Fehler wie den Abbruch zu verschweigen.
+    const beleg = Number(f.ersatzscan || 0);
+    const voll = gesamt > 0 && erledigt >= gesamt;
+    const anteil = gesamt > 0 ? Math.min(100, Math.round((erledigt / gesamt) * 100)) : 0;
+    // Gruen heisst „vollstaendig und technisch bestaetigt". Mit einem
+    // Fotobeleg stimmt der zweite Teil nicht, darum bleibt es gelb --
+    // dieselbe Lesart wie im Cockpit. Abgebrochen ist rot, unabhaengig vom
+    // Stand: Der Zustand der Runde schlaegt ihren Fuellstand.
+    const ton = r.status === 'abgebrochen' ? 'ab' : ((voll && beleg === 0) ? 'voll' : 'teil');
+    const zeit = zeitText(r.beginn);
+    const dauer = dauerText(r.dauer);
+    const meta = 'Beginn ' + (zeit ? zeit + ' Uhr' : 'unbekannt')
+      + ' · Dauer ' + (dauer || 'unbekannt');
+    // Ohne hinterlegte Kontrollpunkte gibt es keinen Fuellstand -- und "0 von
+    // 0 erledigt" mit leerem Balken saehe aus wie „nichts erledigt". Das sind
+    // zwei verschiedene Aussagen, also bekommen sie zwei verschiedene
+    // Darstellungen: Hier steht der Grund, nicht ein Balken bei null.
+    const fortschritt = gesamt > 0
+      ? '<div class="balken ' + ton + '"><div class="fuell" style="width:' + anteil + '%"></div></div>'
+        + '<div class="punkte">' + erledigt + ' von ' + gesamt + ' Kontrollpunkten erledigt'
+        + (beleg > 0 ? '<span class="beleg">' + beleg + ' davon mit Fotobeleg</span>' : '')
+        + '</div>'
+      : '<div class="punkte">Für dieses Objekt sind keine Kontrollpunkte hinterlegt</div>';
     return '<div class="zeile">'
       + '<div class="datum">' + esc(dmy(r.datum)) + '</div>'
-      + '<div class="haupt"><div>' + esc(r.objekt_name) + '</div>'
-      + '<div class="punkte">' + erledigt + ' von ' + gesamt + ' Kontrollpunkten erledigt</div></div>'
-      + '<div class="rechts"><span class="marke-zustand ' + klasse + '">' + esc(wort) + '</span>'
-      + '<div class="dauer">' + esc(dauerText(r.dauer)) + '</div></div>'
+      + '<div class="rechts"><span class="marke-zustand ' + klasse + '">' + esc(wort) + '</span></div>'
+      + '<div class="haupt"><div class="objekt">' + esc(r.objekt_name) + '</div>'
+      + '<div class="meta">' + esc(meta) + '</div></div>'
+      + '<div class="fortschritt">' + fortschritt + '</div>'
       + '</div>';
   }).join('');
 }
