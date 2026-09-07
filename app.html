@@ -1346,6 +1346,48 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
   .rgs { max-width: 560px; left: 50%; transform: translateX(-50%); box-shadow: 0 0 0 1px var(--line); }
   .mit-seite { max-width: 560px; left: 50%; transform: translateX(-50%); box-shadow: 0 0 0 1px var(--line); }
 }
+
+/* ── Schreibtisch-Zuschnitt fuer Mitarbeitende ────────────────────────
+   ENTWURF, noch nicht entschieden -- siehe Gespraech vom 2026-09-07.
+
+   Am Handy ist die Reiterleiste unten die richtige Bedienung: Daumen
+   erreichen sie. Ab Notebook-Breite ist sie es nicht mehr -- dort liegt der
+   Blick oben links, und unten am Fensterrand steht sonst eine Leiste, die
+   niemand ansieht. Die Leiste WANDERT deshalb, sie wird nicht ersetzt:
+   dasselbe Auszeichnungsgeruest, dieselben fuenf Knoepfe, dieselbe
+   zeige()-Funktion. Geaendert wird ausschliesslich, WO sie liegt.
+
+   Genau das ist der Grund fuer diese Bauweise: Es gibt weiterhin EINE
+   Quelle fuer die Mitarbeiter-Ansichten. Eine zweite Oberflaeche haette
+   "meine Schichten" ein zweites Mal -- und zwei Fassungen derselben Ansicht
+   laufen nach ein paar Monaten auseinander, ohne dass es jemandem auffaellt.
+
+   Die Grenze liegt bei 1080 px und nicht bei 900: Ein quergedrehtes Tablet
+   (1024) soll die vertraute Handy-Bedienung behalten. */
+@media (min-width: 1080px) {
+  /* Zwei Spalten statt einer Saeule. Die Kopfzeile laeuft ueber beide --
+     sie gehoert zur Seite, nicht zum Inhalt. */
+  .app { max-width: 1180px; display: grid; grid-template-columns: 236px 1fr;
+         grid-template-rows: auto 1fr; align-content: start; }
+  .app.on { display: grid; }
+  .kopf { grid-column: 1 / -1; }
+  /* Reihenfolge im Auszeichnungstext ist kopf, main, tabs -- am Schreibtisch
+     soll die Leiste aber LINKS stehen. Darum werden beide ausdruecklich
+     gesetzt, statt sich auf die Reihenfolge zu verlassen. */
+  .tabs { grid-column: 1; grid-row: 2; position: static; transform: none;
+          max-width: none; flex-direction: column; align-items: stretch;
+          border-top: 0; border-right: 1px solid var(--line);
+          background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none;
+          padding: 14px 10px 20px; gap: 2px; }
+  /* Symbol links, Beschriftung daneben -- untereinander gelesen wird eine
+     Leiste zur Liste, und eine Liste liest man waagrecht. */
+  .tabs button { flex: none; flex-direction: row; justify-content: flex-start;
+                 gap: 12px; min-height: 44px; padding: 0 14px; border-radius: 10px;
+                 font-size: 13.5px; font-weight: 620; }
+  .tabs button.on { background: var(--accent-soft, rgba(127,127,255,.10)); }
+  .tabs button .punkt { position: static; margin: 0 0 0 auto; }
+  main { grid-column: 2; grid-row: 2; padding: 22px 26px 40px; min-width: 0; }
+}
 </style>
 </head>
 <body>
