@@ -203,6 +203,129 @@ try {
   await drueber.close();
 } catch (e) { check('Abschnitt Grenze ohne Abbruch: ' + e.message, false); }
 
+// ══════════════ JEDER REITER IST EINE EIGENE SEITE
+// Vom Projektinhaber gemeldet: "Mitteilung ist buggy. laesst sich auch
+// nicht schliessen." Ursache war eine bestehende Regel bei 700 px, die
+// alle Ueberlagerungen in einer 560-px-Saeule haelt. Der Schreibtisch-
+// Block hob sie fuer die App auf, nicht fuer die Mitteilungen -- die
+// standen als 560 px breiter Streifen mitten ueber der Monatstabelle, die
+// dahinter sichtbar blieb, und sahen darum aus wie ein Fehler.
+//
+// Geprueft wird die AUSSAGE "jeder Reiter ist eine eigene Seite":
+// gleiche linke Kante, volle Breite fuer die Seite, genau ein Reiter
+// hervorgehoben, und man kommt wieder heraus.
+try {
+  const page = await seite(1440, 900, false);
+  const kanten = {}, breiten = {};
+  for (const t of ['plan', 'mitteilungen', 'stunden', 'abwesenheit', 'daten']) {
+    await page.evaluate(x => zeigeTisch(x), t);
+    await page.waitForTimeout(300);
+    const d = await page.evaluate(() => {
+      const sicht = e => { const r = e.getBoundingClientRect(); return r.height > 0 && r.width > 0; };
+      const mit = document.querySelector('.mit-seite.on');
+      const seite = mit && sicht(mit) ? mit : document.querySelector('main.inhalt .v.on');
+      const r = seite.getBoundingClientRect();
+      // Wo beginnt die INHALTSSPALTE? Zwei Anlaeufe waren daneben: die
+      // aeussere Huelle (bei den Mitteilungen laeuft sie ueber die volle
+      // Breite, die Polsterung sitzt im Kind) und der erste Textknoten
+      // (der steckt in Kaesten mit je eigener Innenpolsterung -- 30, 49,
+      // 26, 42, 43 px, also fuenf verschiedene Zahlen fuer dasselbe).
+      // Richtig ist die Polsterungskante des Kastens, der die
+      // SEITENpolsterung traegt.
+      // Wo beginnt der Inhalt? Gemessen als linkeste Kante aller sichtbaren
+      // Bloecke, die man als Flaeche wahrnimmt -- Karten, Knoepfe,
+      // Tabellen, also alles mit Hintergrund oder Rahmen. Drei feinere
+      // Anlaeufe (Huelle, erster Textknoten, Polsterungstraeger) lieferten
+      // je nach Seite verschiedene Zahlen fuer dasselbe, weil jeder Kasten
+      // seine eigene Innenpolsterung hat. Die linkeste Flaeche ist das,
+      // was das Auge als Seitenkante liest.
+      const bloecke = [...seite.querySelectorAll('*')].filter(e => {
+        if (!sicht(e)) return false;
+        const c = getComputedStyle(e);
+        const flaeche = c.backgroundColor && !/rgba\(0, 0, 0, 0\)|transparent/.test(c.backgroundColor);
+        const rahmen = parseFloat(c.borderLeftWidth) > 0 || parseFloat(c.borderTopWidth) > 0;
+        return (flaeche || rahmen) && e.getBoundingClientRect().width > 120;
+      });
+      return { links: bloecke.length
+                 ? Math.round(Math.min(...bloecke.map(e => e.getBoundingClientRect().left)))
+                 : Math.round(seite.getBoundingClientRect().left),
+               breite: Math.round(r.width), fenster: window.innerWidth,
+               aktiv: [...document.querySelectorAll('.tabs button.on')].filter(sicht).length };
+    });
+    kanten[t] = d.links; breiten[t] = d.breite;
+    check(`KRITISCH: auf "${t}" ist genau EIN Reiter hervorgehoben`, d.aktiv === 1);
+    // Kein Weg "zurueck zum Menü": Am Schreibtisch gibt es keinen
+    // Menue-Reiter, in den man zurueckkoennte -- der Knopf zeigte auf
+    // einen Ort, den es dort nicht gibt. Spesen und Einstellungen sind
+    // davon nicht betroffen; die oeffnet man ueber "Konto", nicht ueber
+    // einen Reiter, und dorthin muss man zurueckfinden.
+    const rueck = await page.evaluate(() => [...document.querySelectorAll('button')]
+      .filter(b => b.getBoundingClientRect().height > 0)
+      .filter(b => /men(ü|ue)/i.test(b.getAttribute('aria-label') || ''))
+      .map(b => b.getAttribute('aria-label')));
+    check(`KRITISCH: "${t}" zeigt keinen Rueckweg ins Menue`, rueck.length === 0);
+    rueck.forEach(r => bad.push(`Rueckweg auf "${t}": ${r}`));
+  }
+  const einzig = [...new Set(Object.values(kanten))];
+  check('KRITISCH: alle fuenf Seiten beginnen an derselben linken Kante',
+    einzig.length === 1);
+  if (einzig.length !== 1) bad.push('linke Kanten: ' + JSON.stringify(kanten));
+  check('KRITISCH: die Mitteilungen sind eine Seite, kein schmaler Streifen',
+    breiten.mitteilungen > 1000);
+  // "Ein Knopf wird nicht ueber die volle Breite gestreckt, nur weil er
+  // allein in seiner Zeile steht" (CLAUDE.md). "Neuer Antrag" lief ueber
+  // die vollen 1590 px, weil die Breite als Inline-Stil am Knopf stand
+  // und darum von keiner Regel einzufangen war.
+  await page.evaluate(() => zeigeTisch('abwesenheit'));
+  await page.waitForTimeout(300);
+  const gestreckt = await page.evaluate(() => {
+    const sicht = e => { const r = e.getBoundingClientRect(); return r.height > 0 && r.width > 0; };
+    const seite = document.querySelector('main.inhalt .v.on');
+    const b = seite.getBoundingClientRect().width;
+    return [...seite.querySelectorAll('button')].filter(sicht)
+      .filter(e => e.getBoundingClientRect().width > b * 0.6)
+      .map(e => `${e.textContent.trim().slice(0, 20)} (${Math.round(e.getBoundingClientRect().width)}px)`);
+  });
+  check('KRITISCH: kein Knopf ist ueber die Seitenbreite gestreckt',
+    gestreckt.length === 0);
+  gestreckt.forEach(g => bad.push('gestreckter Knopf: ' + g));
+  // Und man kommt wieder heraus: ein anderer Reiter schliesst sie.
+  await page.evaluate(() => zeigeTisch('mitteilungen'));
+  await page.waitForTimeout(250);
+  const offen = await page.evaluate(() => !!document.querySelector('.mit-seite.on'));
+  await page.evaluate(() => zeigeTisch('plan'));
+  await page.waitForTimeout(250);
+  const zu = await page.evaluate(() => !document.querySelector('.mit-seite.on'));
+  check('KRITISCH: die Mitteilungen lassen sich ueber einen anderen Reiter schliessen',
+    offen && zu);
+  await page.close();
+} catch (e) { check('Abschnitt Seiten ohne Abbruch: ' + e.message, false); }
+
+// ══════════════ DIE KOPFZEILE STEHT AUF JEDEM REITER GLEICH
+// Zweimal hintereinander war der Konto-Knopf weg: erst ganz (kein
+// Menue-Reiter mehr), dann auf drei Reitern (im Menue faellt die
+// Kopfzeile weg, ENT-402 -- eine Handy-Regel). Und die Glocke sprang je
+// nach Reiter vor oder hinter das Konto, weil beide Verort-Funktionen sie
+// vor denselben Anker setzen.
+try {
+  const page = await seite(1440, 900, false);
+  const folgen = [];
+  for (const t of ['plan', 'stunden', 'mitteilungen', 'daten', 'abwesenheit']) {
+    await page.evaluate(x => zeigeTisch(x), t);
+    await page.waitForTimeout(250);
+    folgen.push(await page.evaluate(() => [...document.querySelectorAll('.kopf button')]
+      .filter(b => b.getBoundingClientRect().height > 0)
+      .map(b => b.id || b.className.split(' ')[0]).join(',')));
+  }
+  const gleich = [...new Set(folgen)];
+  check('KRITISCH: die Kopfzeile sieht auf jedem Reiter gleich aus', gleich.length === 1);
+  if (gleich.length !== 1) bad.push('Kopfzeilen: ' + JSON.stringify(folgen));
+  check('KRITISCH: und sie traegt auf JEDEM Reiter den Weg zum Konto',
+    folgen.every(f => f.includes('kKonto')));
+  check('Die Glocke steht dabei ebenfalls ueberall', folgen.every(f => f.includes('mitGlocke')));
+  await page.close();
+} catch (e) { check('Abschnitt Kopfzeile ohne Abbruch: ' + e.message, false); }
+
 // ══════════════ NICHTS DARF AM SCHREIBTISCH UNERREICHBAR WERDEN
 // ENT-447 nimmt den Reiter "Menü" aus der Schreibtisch-Leiste. Dahinter
 // liegen aber Spesen, Passwort, Einstellungen, das Cockpit und das
