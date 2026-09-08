@@ -369,6 +369,7 @@ for (const [datei, titel] of [
   ['pruef_mitteilung_antwort.php', 'KRITISCH: auf einen fremden oder nicht sichtbaren Termin laesst sich nicht zusagen (ENT-436)'],
   ['pruef_mitteilung_liste.php', 'KRITISCH: die Antwortliste eines Termins nennt ALLE Empfaenger, auch die ohne Antwort (ENT-436)'],
   ['pruef_kundenportal.php', 'KRITISCH: Sitzungsablauf, Einmal-Code und E-Mail-Abgleich des Kundenportals stimmen (ENT-441)'],
+  ['pruef_wachbuch.php', 'KRITISCH: das Wachbuch fuehrt vier Quellen richtig zusammen, sortiert und kappt sie (ENT-480)'],
 ]) {
   let aus = '', code = 0;
   try {
@@ -748,8 +749,18 @@ if (portalMitVertraulichem.length) {
 //   - portal.html traegt KEINE eigene Kopie des Katalogs. Eine zweite Kopie
 //     liefe beim naechsten Grund auseinander, und der Kunde bekaeme dann ein
 //     Codewort zu lesen.
-check('KRITISCH: der Portal-Detailendpunkt loest den Abbruchgrund ueber den Katalog auf',
-  /RUNDGANG_ABBRUCH_GRUENDE\s*\[/.test(ohneKommentar('portal_rundgang_detail.php')));
+// Nicht nur das Detail: JEDER Portal-Endpunkt, der einen Abbruchgrund
+// weitergibt, muss ihn aufloesen. Mit dem Wachbuch (ENT-484) gibt es einen
+// zweiten -- und ein dritter soll nicht wieder einzeln nachgetragen werden
+// muessen, sondern von selbst auffallen.
+{
+  const mitGrund = portalDateien.filter(f => /\babbruch_grund\b/.test(ohneKommentar(f)));
+  const ohneKatalog = mitGrund.filter(f => !/RUNDGANG_ABBRUCH_GRUENDE\s*\[/.test(ohneKommentar(f)));
+  check('Es gibt ueberhaupt Portal-Endpunkte mit Abbruchgrund zu pruefen', mitGrund.length >= 2);
+  check('KRITISCH: jeder Portal-Endpunkt loest den Abbruchgrund ueber den Katalog auf',
+    ohneKatalog.length === 0);
+  if (ohneKatalog.length) { bad.push('Abbruchgrund ohne Katalog: ' + ohneKatalog.join(', ')); }
+}
 {
   const rd = readFileSync(`${WURZEL}/backend/rundgang.php`, 'utf8');
   const block = rd.slice(rd.indexOf('const RUNDGANG_ABBRUCH_GRUENDE'));

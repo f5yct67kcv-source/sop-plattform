@@ -31,7 +31,7 @@
      Angabe" statt wie „nichts erledigt". */
   --balken-grund:rgba(20,22,26,.13);
   --dunkel:#16181D;
-  --accent:#2F5BD7; --accent-hi:#2549B0;
+  --accent:#2F5BD7; --accent-hi:#2549B0; --accent-soft:#EDF2FE;
   /* Glas: hell */
   --glas-kachel:.54;
   --glas-linie:rgba(255,255,255,.55);
@@ -53,7 +53,7 @@
     --grau-soft:#212739;
     --balken-grund:rgba(255,255,255,.16);
     --dunkel:#F2F4F8;
-    --accent:#7098F7; --accent-hi:#8DAEFA;
+    --accent:#7098F7; --accent-hi:#8DAEFA; --accent-soft:#1A2440;
     /* Im Dunkeln deckt die Kachel MEHR: Dort hellt der Verlauf sie auf und
        der Text verliert Kontrast -- im Hellen toent er sie ab und der Text
        gewinnt. Gemessen im Cockpit, hier uebernommen. */
@@ -409,6 +409,75 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
 .leer .text{color:var(--ink-3);font-size:14px}
 
 .zahl{font-size:13.5px;color:var(--ink-3);margin:0 0 4px}
+/* Ueberschrift je Karte (ENT-484). Sie kommt erst mit der zweiten Karte --
+   eine allein braucht keinen Namen, zwei untereinander sehr wohl. Beide
+   bekommen sie, nicht nur die neue: Eine Karte mit Titel neben einer ohne
+   wirkt unruhig, ohne dass man sagen kann warum (Hausregel: gleiches
+   Muster auf beiden Seiten). */
+.karte-titel{font-size:15px;font-weight:700;margin:0 0 2px}
+
+/* ── Wachbuch (ENT-484) ──────────────────────────────────────────────── */
+/* Eine Zeitleiste, keine Tabelle: Vier Arten von Vorgaengen fuellen nicht
+   dieselben Spalten -- ein Rundgang hat keinen Kontrollpunkt, ein Ereignis
+   keinen Fuellstand. Leere Zellen saehen aus wie fehlende Angaben.
+   Zuschnitt wie die Rundgangliste daneben: Er muss 390 px ueberleben, das
+   Portal wird ueberwiegend am Handy geoeffnet. Darum drei Zeilen statt
+   drei Spalten -- Pfad und Zeit oben, Satz darunter, Zusatz zuunterst. */
+.wb-arten{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 4px}
+/* 44 px hoch, wie jedes Bedienelement am Handy (CLAUDE.md). Beim Messen
+   waren es zuerst 30 -- die Hausregel gilt auch fuer eine Filterreihe, die
+   dadurch zweizeilig wird. Was sie schmal haelt, ist nicht weniger Hoehe,
+   sondern die kurze Beschriftung: „Kontrollpunkte" statt „Kontrollpunkt-
+   scans". */
+.wb-a{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);
+      background:var(--surface);color:var(--ink-2);border-radius:999px;
+      min-height:44px;padding:0 14px;font-size:13.5px;font-weight:600;cursor:pointer;
+      -webkit-appearance:none;appearance:none}
+.wb-a .n{font-variant-numeric:tabular-nums;color:var(--ink-3)}
+.wb-a[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);
+      color:var(--accent)}
+.wb-a[aria-pressed="true"] .n{color:var(--accent)}
+.wb-a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.wb-tg{display:flex;align-items:center;gap:10px;padding:14px 0 8px}
+.wb-tg b{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+      color:var(--ink-2)}
+.wb-tg span{font-size:12.5px;color:var(--ink-3)}
+.wb-tg i{flex:1;height:1px;background:var(--line);font-style:normal}
+
+.wb-z{display:grid;grid-template-columns:30px 1fr auto;gap:2px 10px;
+      padding:12px 0;border-bottom:1px solid var(--line);align-items:start}
+.wb-z:last-child{border-bottom:none}
+.wb-z .wb-i{grid-column:1;grid-row:1 / span 3;width:30px;height:30px;border-radius:50%;
+      display:flex;align-items:center;justify-content:center}
+.wb-z .wb-i svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.9;
+      stroke-linecap:round;stroke-linejoin:round}
+/* Vier Arten, vier Farben. Die Abstufung traegt der Chip und der Satz, nicht
+   das Sinnbild -- sonst saehen vier Arten mit Vorbehalt alle gleich aus.
+   Einzige Umfaerbung ist der Abbruch: Eine abgebrochene Runde darf nicht
+   aussehen wie eine erledigte. Dieselbe Lesart wie im Cockpit. */
+.wb-z .wb-i.a-scan{color:var(--accent);background:var(--accent-soft)}
+.wb-z .wb-i.a-rundgang{color:var(--gruen);background:var(--gruen-soft)}
+.wb-z .wb-i.a-aufgabe{color:var(--ink-2);background:var(--line)}
+.wb-z .wb-i.a-ereignis{color:var(--rot);background:var(--rot-soft)}
+.wb-z .wb-i.schwer{color:var(--rot);background:var(--rot-soft)}
+.wb-z .wb-p{grid-column:2;grid-row:1;font-size:11px;font-weight:700;letter-spacing:.05em;
+      text-transform:uppercase;color:var(--ink-3);overflow-wrap:anywhere}
+.wb-z .wb-t{grid-column:3;grid-row:1;font-size:13.5px;font-weight:700;
+      font-variant-numeric:tabular-nums;white-space:nowrap}
+.wb-z .wb-s{grid-column:2 / -1;grid-row:2;font-size:14px;margin-top:2px;
+      overflow-wrap:anywhere}
+.wb-z .wb-s b{font-weight:700}
+.wb-z .wb-x{grid-column:2 / -1;grid-row:3;display:flex;flex-wrap:wrap;
+      align-items:center;gap:6px;margin-top:5px;font-size:13px;color:var(--ink-3)}
+/* Anklickbar ist nur, was auch irgendwohin fuehrt: eine Zeile mit Runde.
+   Eine Zeile, die auf einen Klick nichts tut, ist schlechter als eine, die
+   gar nicht erst danach aussieht. */
+.wb-z.fuehrt{cursor:pointer}
+.wb-z.fuehrt:hover .wb-s{text-decoration:underline}
+.wb-z.fuehrt:focus-visible{outline:2px solid var(--accent);outline-offset:2px;
+      border-radius:8px}
+.wb-hinweis{font-size:13px;color:var(--warn);margin:10px 0 0;font-weight:600}
 [hidden]{display:none!important}
 
 @media (min-width:640px){
@@ -610,12 +679,37 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
               role="tab" aria-selected="false">Einsätze</button>
     </div>
 
-    <div class="karte" id="bereich-rundgaenge">
-      <p class="zahl" id="anzahl"></p>
-      <div id="liste"></div>
+    <!-- Der Revierdienst-Bereich traegt seit ENT-484 ZWEI Karten: die
+         Rundgangliste und das Wachbuch dazu. Darum ist er selbst keine
+         Karte mehr, sondern deren Huelle -- so folgt das Wachbuch der
+         Sichtbarkeit des Bereichs, ohne dass reiterWaehlen() und
+         bereicheSetzen() einen Sonderfall dafuer brauchen. Ein Kunde mit
+         nur Verkehrsdienst sieht damit auch kein leeres Wachbuch; das ist
+         dieselbe Hausregel, die die Reiterleiste ueberhaupt erst
+         hervorgebracht hat. -->
+    <div id="bereich-rundgaenge">
+      <div class="karte">
+        <h2 class="karte-titel">Rundgänge</h2>
+        <p class="zahl" id="anzahl"></p>
+        <div id="liste"></div>
+      </div>
+
+      <!-- Wachbuch (ENT-484): die Chronik derselben Objekte im selben
+           Zeitraum. Eine zweite Karte und kein dritter Reiter -- die
+           Chronik ist nicht eine dritte Inhaltsart neben Rundgang und
+           Einsatz, sondern die Feinsicht auf die erste. Wer sie liest,
+           will meist die Runde daneben gleich mitsehen. -->
+      <div class="karte">
+        <h2 class="karte-titel">Wachbuch</h2>
+        <p class="zahl" id="wb-zahl"></p>
+        <div class="wb-arten" id="wb-arten"></div>
+        <div id="wb-liste"></div>
+        <p class="wb-hinweis" id="wb-hinweis" hidden></p>
+      </div>
     </div>
 
     <div class="karte" id="bereich-einsaetze" hidden>
+      <h2 class="karte-titel">Einsätze</h2>
       <p class="zahl" id="anzahl-e"></p>
       <div id="liste-e"></div>
     </div>
@@ -927,6 +1021,27 @@ async function laden() {
   // Rundgänge hat, soll sie sehen, auch wenn der andere Weg klemmt.
   if (vd.ok) { zeichnenEinsaetze(vd.daten); }
   bereicheSetzen(!!rd.daten.je_vorhanden, vd.ok && !!vd.daten.je_vorhanden);
+  // Die Chronik (ENT-484) kommt NACH den beiden -- nicht mit ihnen im
+  // Promise.all. Sie ist die laengste der drei Antworten, und die
+  // Rundgangliste soll nicht auf sie warten.
+  //
+  // Sie wird nur geholt, wenn es ueberhaupt einen Revierdienst gibt: Wer nur
+  // Verkehrsdienst bezieht, sieht den ganzen Bereich nicht, und eine Abfrage
+  // fuer eine verborgene Karte ist eine Abfrage zu viel.
+  //
+  // Der Zeitraum wird AUSDRUECKLICH weitergereicht statt noch einmal aus den
+  // Feldern gelesen. Heute kaeme dasselbe heraus -- die Felder tragen drei
+  // Zeilen weiter oben bereits den zurueckgemeldeten Zeitraum. Genau darin
+  // liegt der Grund: Die Gleichheit haengt dann an der REIHENFOLGE dieser
+  // Zeilen, und wer sie umstellt, bekommt zwei Karten mit zwei Zeitraeumen
+  // nebeneinander, ohne dass es irgendwo staende. Der Server meldet zurueck,
+  // welchen Zeitraum er wirklich benutzt hat (er tauscht verdrehte Angaben
+  // und faellt bei Unsinn auf seine Vorgabe zurueck); genau der gehoert in
+  // beide Karten.
+  if (rd.daten.je_vorhanden) {
+    wbLaden(rd.daten.zeitraum && rd.daten.zeitraum.von,
+            rd.daten.zeitraum && rd.daten.zeitraum.bis);
+  }
 }
 
 // Welcher Bereich erscheint. Drei Fälle, und der dritte ist der wichtige:
@@ -1113,6 +1228,279 @@ const D_AUFGABE = {
   // nicht, ob es getan wurde. Der stillere und darum gefährlichere Fall.
   unbeantwortet:  ['warn', 'Unbeantwortet'],
 };
+
+/* ══ WACHBUCH (ENT-484) ═══════════════════════════════════════════════
+   Die Chronik derselben Objekte im selben Zeitraum: Kontrollpunkt erfasst,
+   Rundgang erledigt oder abgebrochen, Aufgabe beantwortet, Ereignis
+   gemeldet -- nach Tagen gruppiert, neueste zuoberst.
+
+   Was hier NICHT steht: der Name der eingesetzten Person. Die Chronik ist
+   eine Liste und folgt damit derselben Abstufung wie die Rundgangliste
+   daneben -- sie beantwortet „was ist geschehen", nicht „wer war es". Der
+   Name steht seit ENT-481 im aufgeklappten Detail, einen Klick weiter.
+
+   Zusammengefuehrt, sortiert und gekappt wird im Server
+   (portal_wachbuch.php). Hier wird nur gezeichnet. */
+const WB_ARTEN = [
+  ['scan', 'Kontrollpunkte',
+    '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>'],
+  ['rundgang', 'Rundgänge',
+    '<circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M12 19h4a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2H8a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h4"/>'],
+  ['aufgabe', 'Aufgaben',
+    '<line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><polyline points="4 6 5 7 7 5"/><polyline points="4 12 5 13 7 11"/><polyline points="4 18 5 19 7 17"/>'],
+  ['ereignis', 'Ereignisse',
+    '<path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>'],
+];
+
+// Fuenf verschiedene Aussagen, fuenf verschiedene Texte. Der Server sagt,
+// welche gilt -- die Oberflaeche raet sie nicht aus einer Anzahl 0.
+const WB_LEER = {
+  kein_revierdienst: ['Kein Revierdienst eingerichtet',
+    'Für Ihre Objekte sind keine Kontrollrunden hinterlegt. Das heisst nicht, dass keine Leistung erbracht wurde — es wird hier nur nichts nachgewiesen.'],
+  noch_nichts_erfasst: ['Noch nichts erfasst',
+    'Für Ihre Objekte ist der Revierdienst eingerichtet, es wurde aber noch keine Runde abgeschlossen.'],
+  kein_treffer_im_zeitraum: ['Nichts im gewählten Zeitraum',
+    'Ausserhalb dieses Zeitraums liegen Einträge vor. Bitte den Zeitraum ändern.'],
+  kein_treffer_der_art: ['Kein Treffer',
+    'Im Zeitraum ist etwas geschehen, aber nichts von der gewählten Art. Ein anderer Filter zeigt es.'],
+  nicht_ladbar: ['Wachbuch nicht verfügbar',
+    'Die Chronik liess sich nicht laden. Die Rundgänge darüber sind davon nicht betroffen.'],
+};
+
+// Leer heisst „alle", nicht „keine": Wer keine Art waehlt, will die ganze
+// Chronik, nicht eine leere Seite.
+let wbFilter = [];
+
+// Ohne Angabe gelten die Felder -- so ruft die Filterreihe sie auf, und
+// dort ist das richtig: Die Felder tragen dann genau den Zeitraum, den die
+// Rundgangliste daneben gerade zeigt.
+async function wbLaden(vonAus, bisAus) {
+  const von = vonAus || $('von').value, bis = bisAus || $('bis').value;
+  const teile = [];
+  if (von && bis) { teile.push('von=' + von, 'bis=' + bis); }
+  if (wbFilter.length) { teile.push('arten=' + encodeURIComponent(wbFilter.join(','))); }
+  const { ok, code, daten } = await ruf('portal_wachbuch.php' + (teile.length ? '?' + teile.join('&') : ''));
+  if (code === 401) { abgemeldet(); return; }
+  wbZeichnen(ok && daten && daten.status === 'ok' ? daten : null);
+}
+
+/* Die Filterreihe. Jede Art traegt ihre WIRKLICHE Zahl im Zeitraum, auch
+   wenn der Filter sie gerade ausblendet -- sonst liesse sich nicht sehen,
+   dass hinter dem Filter noch etwas liegt. Eine Art mit null Vorgaengen
+   bleibt stehen und sagt „0"; sie zu verstecken hiesse, „im Zeitraum
+   nichts" wie „gibt es nicht" aussehen zu lassen. */
+function wbArtenZeichnen(d) {
+  const jeArt = (d && d.je_art) || {};
+  const quellen = (d && d.quellen) || {};
+  const quelleZuArt = { scan: 'scans', rundgang: 'runden', aufgabe: 'aufgaben', ereignis: 'ereignisse' };
+  $('wb-arten').innerHTML = WB_ARTEN.map(([art, lbl, ic]) => {
+    const an = wbFilter.includes(art);
+    const stand = quellen[quelleZuArt[art]];
+    // Drei Aussagen, drei Zeichen: eine Zahl, wenn die Quelle abfragbar war
+    // -- ein Fragezeichen, wenn nicht. „0" fuer eine Quelle, die gar nicht
+    // antwortet, waere eine Behauptung.
+    const zahl = stand === 'ok' ? String(jeArt[art] || 0) : '?';
+    const titel = stand === 'ok' ? lbl + ': ' + (jeArt[art] || 0) + ' im Zeitraum'
+      : lbl + ': nicht abfragbar — das ist nicht dasselbe wie „keine"';
+    return '<button type="button" class="wb-a" data-art="' + art + '"'
+      + ' aria-pressed="' + (an ? 'true' : 'false') + '" title="' + esc(titel) + '">'
+      + '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"'
+      + ' stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+      + ic + '</svg><span>' + esc(lbl) + '</span><span class="n">' + esc(zahl) + '</span></button>';
+  }).join('');
+}
+
+/* Was in einer Zeile steht. Die Aussage gehoert in den SATZ, nicht in eine
+   Farbe: Ein nicht verfuegbarer Kontrollpunkt darf nicht dastehen wie ein
+   erfasster, auch nicht fuer jemanden, der die Farbe nicht sieht.
+   „Fotobeleg" statt „Ersatzscan" -- derselbe Wortschatz wie im Detail
+   (D_SCAN), Hausjargon gehoert nicht ins Portal. */
+function wbSatz(e) {
+  // Ein Scan auf einen inzwischen entfernten Punkt behaelt seinen
+  // Nachweiswert -- der Punkt fehlt, die Durchfuehrung nicht. Der Ersatz
+  // steht an der Stelle des NAMENS und nicht an der des ganzen Satzteils,
+  // sonst stuende „Kontrollpunkt einen inzwischen entfernten Kontrollpunkt
+  // erfasst" da. Derselbe Wortlaut wie im Cockpit -- ein zweites Wort fuer
+  // denselben Zustand waere eine zweite Sprache.
+  const punkt = e.punkt_name ? '<b>' + esc(e.punkt_name) + '</b>'
+    : '<i>(inzwischen entfernt)</i>';
+  if (e.art === 'scan') {
+    if (e.status === 'nicht_verfuegbar') { return 'Kontrollpunkt ' + punkt + ' als nicht verfügbar gemeldet.'; }
+    if (e.status === 'ersatzscan') { return 'Kontrollpunkt ' + punkt + ' per Fotobeleg belegt.'; }
+    return 'Kontrollpunkt ' + punkt + ' erfasst.';
+  }
+  if (e.art === 'rundgang') {
+    // Ohne Vorlage laeuft die Runde ueber alle Kontrollpunkte des Objekts --
+    // das ist eine Aussage, kein fehlender Name.
+    const name = e.rundgang_name ? '<b>' + esc(e.rundgang_name) + '</b>'
+      : '<b>über alle Kontrollpunkte des Objekts</b>';
+    return e.status === 'abgebrochen'
+      ? 'Rundgang ' + name + ' abgebrochen.'
+      : 'Rundgang ' + name + ' erledigt.';
+  }
+  if (e.art === 'aufgabe') {
+    const a = '<b>' + esc(e.bezeichnung || 'ohne Bezeichnung') + '</b>';
+    return e.status === 'nicht_moeglich'
+      ? 'Aufgabe ' + a + ' als nicht möglich gemeldet.'
+      : 'Aufgabe ' + a + ' erledigt.';
+  }
+  return e.bezeichnung
+    ? 'Ereignis gemeldet: <b>' + esc(e.bezeichnung) + '</b>.'
+    // Keine erfundene Kategorie: „ohne hinterlegte Art" ist die Wahrheit,
+    // „Sonstiges" waere eine Einordnung, die niemand getroffen hat.
+    : 'Ereignis <b>ohne hinterlegte Art</b> gemeldet.';
+}
+
+const WB_MARKE = {
+  nicht_verfuegbar: ['ab', 'Nicht verfügbar'],
+  ersatzscan:       ['warn', 'Fotobeleg'],
+  nicht_moeglich:   ['ab', 'Nicht möglich'],
+  abgebrochen:      ['ab', 'Abgebrochen'],
+};
+
+function wbZusatz(e) {
+  const teile = [];
+  const m = WB_MARKE[e.status];
+  if (m) { teile.push('<span class="marke-zustand ' + m[0] + '">' + esc(m[1]) + '</span>'); }
+  if (e.art === 'rundgang') {
+    // „Kontrollpunkte" zaehlt erfasste Punkte -- eine Einheit, ausgeschrieben.
+    const n = Number(e.scans_anzahl || 0);
+    teile.push('<span>' + n + (n === 1 ? ' Kontrollpunkt' : ' Kontrollpunkte') + ' erfasst</span>');
+    // Der Grund steht in der Zeile, nicht erst im Detail: Wer eine Nacht
+    // durchliest, soll ihn sehen, ohne jede Runde einzeln zu oeffnen.
+    if (e.abbruch_grund) { teile.push('<span>Grund: ' + esc(e.abbruch_grund) + '</span>'); }
+  }
+  if (e.text) { teile.push('<span>' + esc(e.text) + '</span>'); }
+  if (e.hat_foto) { teile.push('<span>mit Foto</span>'); }
+  // Der Vorfallzeitpunkt ergaenzt den Erfassungszeitpunkt und ersetzt ihn
+  // nie: Einsortiert ist die Zeile nach dem Erfassen.
+  if (e.vorfall_am) {
+    teile.push('<span>Vorfall ' + esc(dmy(e.vorfall_am)) + ', ' + esc(uhr(e.vorfall_am) || '–') + '</span>');
+  }
+  return teile.length ? '<div class="wb-x">' + teile.join('') + '</div>' : '';
+}
+
+/* Der Pfad ueber der Zeile: Objekt und, wo der Satz ihn nicht schon nennt,
+   die Kontrollrunde. Kein Kunde -- er ist im Portal immer derselbe. Kein
+   Verweis: Das Portal hat keine Objekt- und keine Kundenansicht, und eine
+   unterstrichene Beschriftung, die nirgends hinfuehrt, waere schlechter als
+   reiner Text. Was fuehrt, ist die Zeile selbst -- zur Runde darueber. */
+function wbPfad(e) {
+  const teile = [];
+  if (e.objekt_name) { teile.push(esc(e.objekt_name)); }
+  if (e.art !== 'rundgang' && e.rundgang_name) { teile.push(esc(e.rundgang_name)); }
+  return teile.length ? '<div class="wb-p">' + teile.join(' · ') + '</div>' : '';
+}
+
+// Nur der Abbruch faerbt um -- die schwerste Stufe. Alles Uebrige behaelt
+// die Farbe seiner Art; die Abstufung traegt die Marke daneben.
+function wbArtKlasse(e) {
+  return 'a-' + e.art + (e.status === 'abgebrochen' ? ' schwer' : '');
+}
+
+function wbZeichnen(d) {
+  const ziel = $('wb-liste');
+  $('wb-hinweis').hidden = true;
+  wbArtenZeichnen(d);
+  const leer = (schluessel) => {
+    const [titel, text] = WB_LEER[schluessel] || WB_LEER.nicht_ladbar;
+    $('wb-zahl').textContent = '';
+    ziel.innerHTML = '<div class="leer"><div class="titel">' + esc(titel)
+      + '</div><div class="text">' + esc(text) + '</div></div>';
+  };
+  if (!d) { leer('nicht_ladbar'); return; }
+  const liste = d.eintraege || [];
+  if (!liste.length) { leer(d.leer_grund); return; }
+
+  // Zahl mit Bezug, weil ein Zeitraum und womoeglich ein Filter greift:
+  // „37 Vorgänge" allein saehe aus wie die Gesamtzahl.
+  $('wb-zahl').textContent = liste.length + ' ' + (liste.length === 1 ? 'Vorgang' : 'Vorgänge')
+    + (d.gekuerzt ? ' von ' + d.gesamt : '')
+    + ' vom ' + dmy(d.zeitraum.von) + ' bis ' + dmy(d.zeitraum.bis)
+    + (d.gekuerzt ? ' — bitte den Zeitraum eingrenzen' : '');
+
+  // Eine Quelle, die fehlt oder nicht antwortet, waehrend die uebrigen
+  // liefern: Die Liste sieht dann vollstaendig aus, ist es aber nicht.
+  const NAME = { scans: 'Kontrollpunkte', runden: 'Rundgänge', aufgaben: 'Aufgaben', ereignisse: 'Ereignisse' };
+  const luecke = Object.keys(d.quellen || {}).filter(k => d.quellen[k] !== 'ok').map(k => NAME[k] || k);
+  if (luecke.length) {
+    $('wb-hinweis').hidden = false;
+    $('wb-hinweis').textContent = 'Unvollständig: ' + luecke.join(', ')
+      + (luecke.length > 1 ? ' lassen' : ' lässt') + ' sich nicht abfragen.'
+      + ' Das ist nicht dasselbe wie „nichts geschehen".';
+  }
+
+  // Nach Tagen gruppieren. Die Reihenfolge kommt aus dem Server und wird
+  // hier NICHT nachsortiert -- zwei Sortierungen waeren zwei Wahrheiten.
+  const jeTag = {};
+  liste.forEach(e => { const t = String(e.zeit).slice(0, 10); jeTag[t] = (jeTag[t] || 0) + 1; });
+  let tag = null, html = '';
+  liste.forEach(e => {
+    const t = String(e.zeit).slice(0, 10);
+    if (t !== tag) {
+      tag = t;
+      html += '<div class="wb-tg"><b>' + esc(dmy(t)) + '</b><span>' + jeTag[t] + ' '
+        + (jeTag[t] === 1 ? 'Vorgang' : 'Vorgänge') + '</span><i></i></div>';
+    }
+    const ic = (WB_ARTEN.find(a => a[0] === e.art) || [, , ''])[2];
+    // Anklickbar nur, wo es eine Runde gibt, zu der der Klick fuehren kann.
+    const fuehrt = e.rundgang_id ? ' fuehrt' : '';
+    html += '<div class="wb-z' + fuehrt + '" data-rg="' + Number(e.rundgang_id || 0) + '"'
+      + (fuehrt ? ' role="button" tabindex="0" aria-label="' + esc(dmy(t)) + ', '
+          + esc(uhr(e.zeit) || '') + ' — zur zugehörigen Runde"' : '')
+      + '><span class="wb-i ' + wbArtKlasse(e) + '">'
+      + '<svg viewBox="0 0 24 24" aria-hidden="true">' + ic + '</svg></span>'
+      + wbPfad(e)
+      + '<div class="wb-t">' + esc(uhr(e.zeit) || '–') + '</div>'
+      + '<div class="wb-s">' + wbSatz(e) + '</div>'
+      + wbZusatz(e) + '</div>';
+  });
+  ziel.innerHTML = html;
+}
+
+$('wb-arten').addEventListener('click', ev => {
+  const knopf = ev.target.closest('.wb-a');
+  if (!knopf) { return; }
+  const art = knopf.dataset.art;
+  wbFilter = wbFilter.includes(art) ? wbFilter.filter(a => a !== art) : wbFilter.concat([art]);
+  wbLaden();
+});
+
+/* Ein Klick auf eine Chronikzeile fuehrt zur Runde darueber und klappt sie
+   auf. Das Portal hat keine zweite Detailansicht und bekommt hier auch
+   keine: Alles, was zu einer Runde zu sagen ist, steht bereits in ihrem
+   Aufklapper -- mit Kontrollpunkten, Karte und Rapport. Ein zweiter Ort
+   mit demselben Inhalt waere ein zweiter Ort, an dem sich dieselbe Angabe
+   unterschiedlich entwickeln kann. */
+function wbZurRunde(id) {
+  const zeile = $('liste').querySelector('.zeile[data-id="' + Number(id) + '"]');
+  if (!zeile) {
+    // Kann vorkommen: Die Rundgangliste filtert nach dem EINSATZTAG, die
+    // Chronik nach dem Zeitpunkt des Vorgangs. Eine Runde ueber Mitternacht
+    // steht darum unter Umstaenden nicht in beiden. Das zu sagen ist besser,
+    // als auf einen Klick nichts zu tun.
+    $('wb-hinweis').hidden = false;
+    $('wb-hinweis').textContent = 'Diese Runde liegt ausserhalb des gewählten Zeitraums '
+      + 'der Rundgangliste — sie begann an einem anderen Tag. Bitte den Zeitraum erweitern.';
+    return;
+  }
+  $('wb-hinweis').hidden = true;
+  if (!zeile.classList.contains('offen')) { detailUmschalten(zeile); }
+  zeile.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  zeile.focus();
+}
+
+$('wb-liste').addEventListener('click', ev => {
+  const z = ev.target.closest('.wb-z.fuehrt');
+  if (z) { wbZurRunde(z.dataset.rg); }
+});
+$('wb-liste').addEventListener('keydown', ev => {
+  if (ev.key !== 'Enter' && ev.key !== ' ') { return; }
+  const z = ev.target.closest('.wb-z.fuehrt');
+  if (!z) { return; }
+  ev.preventDefault();          // sonst rollt die Leertaste die Seite
+  wbZurRunde(z.dataset.rg);
+});
 
 // Beide Listen teilen sich dieselben Zuhörer -- eine zweite Fassung wäre
 // eine zweite Stelle, an der die Tastaturbedienung vergessen werden kann.

@@ -319,7 +319,7 @@ async function setup(page) {
     return [...new Set(treffer)].sort();
   };
   for (const name of ['glas-grund-1', 'glas-grund-2', 'glas-grund-3', 'glas-kachel',
-                      'accent', 'accent-hi', 'warn']) {
+                      'accent', 'accent-hi', 'accent-soft', 'warn']) {
     const d = werte(dash, name), p = werte(portal, name);
     check(`KRITISCH: --${name} ist im Portal derselbe Wert wie im Cockpit`,
       p.length > 0 && d.length > 0 && JSON.stringify(d) === JSON.stringify(p));
