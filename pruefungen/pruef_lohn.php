@@ -387,5 +387,74 @@ pruef('Der ALV-Jahrgang traegt seine Quelle mit Stand und Ziffern',
 pruef('Der Hoechstbetrag gilt je Arbeitsverhaeltnis, nicht je Person (Ziff. 1)',
     LOHN_ALV_JE_ARBEITSVERHAELTNIS === true);
 
+// ── UVG: Merkblatt 6.05, Stand 1. Januar 2025 ────────────────────────────
+$uvg = lohn_uvg('2025-06-30');
+pruef('UVG 2025 ist erfasst und nennt seine Quelle',
+    $uvg !== null && str_contains($uvg['quelle'], '6.05') && str_contains($uvg['quelle'], '2025'));
+pruef('Ziff. 5: Hoechstbetrag 148 200 im Jahr UND 406 am Tag, beide einzeln',
+    $uvg['hoechstbetrag_jahr_rappen'] === 14820000
+    && $uvg['hoechstbetrag_tag_rappen'] === 40600);
+// KRITISCH: Der Tagesbetrag ist KEINE Ableitung. Waere er es, muesste eine
+// der beiden Rechnungen aufgehen -- keine tut es. Diese Pruefung haelt fest,
+// dass hier nicht gerechnet werden darf.
+pruef('Der Tagesbetrag laesst sich aus dem Jahresbetrag NICHT herleiten',
+    lohn_rappen($uvg['hoechstbetrag_jahr_rappen'] / 360) !== $uvg['hoechstbetrag_tag_rappen']
+    && lohn_rappen($uvg['hoechstbetrag_jahr_rappen'] / 365) !== $uvg['hoechstbetrag_tag_rappen']
+    && $uvg['hoechstbetrag_tag_rappen'] * 365 !== $uvg['hoechstbetrag_jahr_rappen']);
+// Gleicher Betrag, zwei Gesetze: nachgewiesen aus zwei Merkblaettern, nicht
+// voneinander abgeleitet. Die Pruefung haelt die Gleichheit fest, damit ein
+// spaeteres Auseinanderlaufen auffaellt -- und nicht, weil eines das andere
+// bestimmt.
+pruef('UVG-Jahresbetrag und ALV-Obergrenze stimmen ueberein (zwei Quellen, keine Ableitung)',
+    $uvg['hoechstbetrag_jahr_rappen'] === LOHN_ALV[2025]['hoechstbetrag_jahr_rappen']);
+pruef('Die ALV-Zaehlung 30/360 gilt fuer das UVG nicht mit',
+    LOHN_ALV[2025]['tage_jahr'] === 360 && !array_key_exists('tage_jahr', $uvg));
+
+// Ziff. 5: wer welche Praemie traegt.
+pruef('Ziff. 5: den Berufsunfall traegt der Arbeitgeber, den Nichtberufsunfall der Mitarbeitende',
+    LOHN_BU_TRAEGT === 'arbeitgeber' && LOHN_NBU_TRAEGT === 'arbeitnehmer'
+    && LOHN_BU_TRAEGT !== LOHN_NBU_TRAEGT);
+pruef('Der Lohnartenkatalog kennt einen NBU-Abzug, aber KEINEN BU-Abzug',
+    count(array_filter(lohnart_startbestand(), fn($l) => $l[0] === 'nbu')) === 1
+    && count(array_filter(lohnart_startbestand(), fn($l) => $l[0] === 'bu')) === 0);
+
+// Ziff. 4: die Acht-Stunden-Schwelle. Vom Projektinhaber als Hinweis
+// eingebracht, hier aus der Primaerquelle bestaetigt.
+pruef('Ziff. 4: die Schwelle liegt bei acht Wochenstunden',
+    $uvg['nbu_schwelle_std_woche'] === 8);
+pruef('Acht Stunden genau genuegen -- "mindestens acht" schliesst die acht ein',
+    lohn_nbu_deckung(8.0, $uvg)['stand'] === LOHN_NBU_VERSICHERT);
+pruef('Knapp darunter besteht keine NBU-Deckung',
+    lohn_nbu_deckung(7.9, $uvg)['stand'] === LOHN_NBU_NICHT);
+pruef('Ein Aushilfseinsatz von vier Wochenstunden erzeugt keinen NBU-Abzug',
+    lohn_nbu_deckung(4.0, $uvg)['stand'] === LOHN_NBU_NICHT);
+// KRITISCH und die eigentliche Aussage dieses Blocks: Unbekannt ist nicht
+// "nicht versichert" und erst recht nicht "versichert". Beides waere geraten,
+// und beide Richtungen kosten jemanden Geld.
+pruef('Unbekannte Wochenarbeitszeit ergibt "unbekannt", nicht eine der beiden Antworten',
+    lohn_nbu_deckung(null, $uvg)['stand'] === LOHN_NBU_UNBEKANNT
+    && LOHN_NBU_UNBEKANNT !== LOHN_NBU_NICHT
+    && LOHN_NBU_UNBEKANNT !== LOHN_NBU_VERSICHERT);
+pruef('Jede der drei Antworten traegt einen erklaerenden Satz mit Fundstelle',
+    count(array_filter([lohn_nbu_deckung(null, $uvg), lohn_nbu_deckung(4.0, $uvg),
+                        lohn_nbu_deckung(9.0, $uvg)],
+        fn($d) => strlen($d['text']) > 40 && str_contains($d['text'], '6.05'))) === 3);
+// KRITISCH, und beim Bauen selbst aufgefallen: 'pensum_stunden' ist ein
+// JAHRESpensum von 1 bis 3000 Stunden (ENT-065). Wird es versehentlich als
+// Wochenarbeitszeit hereingereicht, antwortete die Funktion ohne Schutz brav
+// "versichert" -- fuer JEDE Person, auch die Aushilfe mit vier Wochenstunden.
+// Geprueft wird das VERHALTEN, nicht der Wortlaut des Quelltextes.
+pruef('Ein versehentlich uebergebenes Jahrespensum ergibt nicht "versichert"',
+    lohn_nbu_deckung(416.0, $uvg)['stand'] === LOHN_NBU_UNBEKANNT
+    && lohn_nbu_deckung(1800.0, $uvg)['stand'] === LOHN_NBU_UNBEKANNT
+    && lohn_nbu_deckung(3000.0, $uvg)['stand'] === LOHN_NBU_UNBEKANNT);
+pruef('Die Obergrenze ist die Woche selbst: 168 Stunden gelten noch, 169 nicht mehr',
+    lohn_nbu_deckung(168.0, $uvg)['stand'] === LOHN_NBU_VERSICHERT
+    && lohn_nbu_deckung(169.0, $uvg)['stand'] === LOHN_NBU_UNBEKANNT);
+pruef('Der Hinweis benennt den vermuteten Fehler, statt nur "unbekannt" zu sagen',
+    str_contains(lohn_nbu_deckung(416.0, $uvg)['text'], 'Jahrespensum'));
+pruef('Ein nicht erfasstes UVG-Jahr liefert null statt des Vorjahreswerts',
+    lohn_uvg('2026-07-15') === null && lohn_uvg('2024-07-15') === null);
+
 echo $ok . " Pruefungen bestanden\n";
 if ($bad) { echo count($bad) . " FEHLGESCHLAGEN:\n - " . implode("\n - ", $bad) . "\n"; exit(1); }

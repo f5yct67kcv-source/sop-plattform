@@ -516,6 +516,115 @@ function lohn_fuenfrappen(float $rappen): int
     return lohn_rappen($rappen / 5) * 5;
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+// BUNDESRECHT: die obligatorische Unfallversicherung (ENT-451, Etappe 4).
+//
+// Wieder ein eigenes Regelwerk, wieder aus demselben Grund: eigenes Gesetz,
+// eigener Stand, eigene Zaehlweise. Merkblatt 6.05 traegt Stand
+// 1. Januar 2025 -- wie die ALV, aber anders als AHV/IV/EO (2026).
+const LOHN_UVG = [
+    2025 => [
+        'quelle' => 'Merkblatt 6.05 "Obligatorische Unfallversicherung UVG", '
+                  . 'Stand am 1. Januar 2025 (Ausgabe November 2024), Ziffern 4 und 5',
+        // Ziff. 5, woertlich: "Der Hoechstbetrag des versicherten Verdienstes
+        // in der Unfallversicherung betraegt 148 200 Franken pro Jahr oder
+        // 406 Franken pro Tag."
+        //
+        // BEIDE Betraege stehen so im Merkblatt, und der Tagesbetrag ist
+        // NICHT aus dem Jahresbetrag abgeleitet: 148 200 / 360 waeren 411.67,
+        // / 365 waeren 406.03, und 406 x 365 ergibt 148 190, nicht 148 200.
+        // Wer den einen aus dem anderen rechnet, bekommt einen anderen Wert
+        // als den, der im Merkblatt steht. Darum stehen beide einzeln da.
+        'hoechstbetrag_jahr_rappen' => 14820000,
+        'hoechstbetrag_tag_rappen'  =>    40600,
+        // Ziff. 4: die Schwelle, unterhalb derer KEINE NBU-Deckung besteht.
+        'nbu_schwelle_std_woche' => 8,
+    ],
+];
+
+// ACHTUNG, eine Falle mit gleichem Betrag: Der UVG-Hoechstbetrag und die
+// ALV-Obergrenze lauten beide auf 148 200 Franken. Das ist nachgewiesen aus
+// ZWEI Merkblaettern und keine Ableitung -- die Gleichheit darf nicht als
+// Regel behandelt werden. Auch die unterjaehrige Zaehlung der ALV (30 Tage
+// je Monat, 360 im Jahr, Merkblatt 2.08 Ziff. 3) gilt hier NICHT mit: Das
+// UVG nennt einen eigenen Tagesbetrag.
+function lohn_uvg(string $stichtag): ?array
+{
+    if (strlen($stichtag) < 4) { return null; }
+    return LOHN_UVG[(int)substr($stichtag, 0, 4)] ?? null;
+}
+
+// Wer traegt welche Praemie -- Merkblatt 6.05 Ziff. 5.
+//
+//   "Sie tragen als Arbeitgeberin oder Arbeitgeber die Praemien fuer die
+//    obligatorische Versicherung der Berufsunfaelle und Berufskrankheiten.
+//    Die Arbeitnehmenden tragen die Praemien fuer die obligatorische
+//    Versicherung der Nichtberufsunfaelle. Abweichende Abreden zugunsten
+//    der Arbeitnehmenden bleiben vorbehalten."
+//
+// Der Berufsunfall erscheint darum NIE als Lohnabzug. Steht er je auf einer
+// Abrechnung, ist das ein Fehler und keine Einstellungssache.
+const LOHN_BU_TRAEGT  = 'arbeitgeber';
+const LOHN_NBU_TRAEGT = 'arbeitnehmer';
+
+// Ziff. 4: "Arbeitnehmende, deren woechentliche Arbeitszeit bei einem
+// Arbeitgeber nicht mindestens acht Stunden betraegt, sind jedoch nur gegen
+// Berufsunfaelle und Berufskrankheiten, nicht aber gegen Nichtberufsunfaelle
+// versichert. [...] In diesem Fall gelten Unfaelle auf dem Arbeitsweg als
+// Berufsunfaelle."
+//
+// WARUM DAS EINE EIGENE FUNKTION IST UND NICHT EIN BOOLEAN IRGENDWO:
+// Der NBU-Abzug ist damit KEINE Konstante je Person. Wer in einer Woche
+// sechs Stunden arbeitet, ist nicht gegen Nichtberufsunfaelle versichert --
+// ein Abzug waere Geld, das dem Mitarbeitenden zusteht. Umgekehrt faellt ein
+// fehlender Abzug dem Betrieb zur Last, denn die Praemie schuldet er nach
+// Ziff. 5 ohnehin ganz.
+//
+// WAS HIER BEWUSST NICHT PASSIERT: aus 'pensum_stunden' rechnen. Dieses Feld
+// ist ein JAHRESpensum (ENT-065, 1 bis 3000 Stunden). Es durch 52 zu teilen
+// waere eine Auslegung -- bei unregelmaessigem Einsatz hat dieselbe Person
+// Wochen mit zwanzig und Wochen mit null Stunden, und welche Zahl die
+// "woechentliche Arbeitszeit" im Sinne des UVG ist, sagt das Merkblatt
+// nicht. Ist sie nicht bekannt, wird GESPERRT statt geraten.
+const LOHN_NBU_VERSICHERT = 'versichert';
+const LOHN_NBU_NICHT      = 'nicht_versichert';
+const LOHN_NBU_UNBEKANNT  = 'unbekannt';
+
+function lohn_nbu_deckung(?float $stundenProWoche, array $uvg): array
+{
+    $schwelle = (int)$uvg['nbu_schwelle_std_woche'];
+    // Eine Woche hat 168 Stunden. Ein hoeherer Wert ist keine Wochenarbeits-
+    // zeit, sondern mit grosser Wahrscheinlichkeit ein JAHRESpensum, das an
+    // der falschen Stelle hereingereicht wurde -- 'pensum_stunden' laeuft
+    // nach ENT-065 von 1 bis 3000. Waere das nicht abgefangen, antwortete die
+    // Funktion bei jedem Jahrespensum brav "versichert", und der NBU-Abzug
+    // liefe auch fuer die Aushilfe mit vier Wochenstunden weiter. Darum:
+    // unbekannt, mit Benennung des vermuteten Fehlers.
+    if ($stundenProWoche !== null && $stundenProWoche > 168) {
+        return ['stand' => LOHN_NBU_UNBEKANNT, 'schwelle' => $schwelle,
+            'text' => 'Der uebergebene Wert ist keine woechentliche Arbeitszeit -- eine Woche '
+                . 'hat 168 Stunden. Vermutlich wurde ein Jahrespensum uebergeben. '
+                . 'Es wird keine Deckung gegen Nichtberufsunfaelle angenommen '
+                . '(Merkblatt 6.05 Ziff. 4).'];
+    }
+    if ($stundenProWoche === null || $stundenProWoche < 0) {
+        return ['stand' => LOHN_NBU_UNBEKANNT, 'schwelle' => $schwelle,
+            'text' => 'Die woechentliche Arbeitszeit ist nicht bekannt. Ohne sie steht '
+                . 'nicht fest, ob eine Deckung gegen Nichtberufsunfaelle besteht '
+                . '(Merkblatt 6.05 Ziff. 4: mindestens ' . $schwelle . ' Stunden). '
+                . 'Es wird kein NBU-Beitrag abgezogen und keine Deckung angenommen.'];
+    }
+    if ($stundenProWoche < $schwelle) {
+        return ['stand' => LOHN_NBU_NICHT, 'schwelle' => $schwelle,
+            'text' => 'Unter ' . $schwelle . ' Wochenstunden besteht keine Deckung gegen '
+                . 'Nichtberufsunfaelle (Merkblatt 6.05 Ziff. 4). Es darf kein NBU-Beitrag '
+                . 'abgezogen werden; Unfaelle auf dem Arbeitsweg gelten als Berufsunfaelle.'];
+    }
+    return ['stand' => LOHN_NBU_VERSICHERT, 'schwelle' => $schwelle,
+        'text' => 'Ab ' . $schwelle . ' Wochenstunden besteht Deckung gegen '
+            . 'Nichtberufsunfaelle (Merkblatt 6.05 Ziff. 4).'];
+}
+
 // Merkblatt 2.01 Ziff. 1: "Erwerbstaetige Personen sind ab dem 1. Januar
 // nach dem 17. Geburtstag beitragspflichtig."
 //
