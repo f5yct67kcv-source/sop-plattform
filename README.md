@@ -15,6 +15,7 @@ kein Verkauf) — siehe Entscheidungsprotokoll im Projekt-Repository.
 | Erfassung | https://rapport.itufeden.myhostpoint.ch | alle Mitarbeitenden, mobil |
 | Dashboard | https://rapport.itufeden.myhostpoint.ch/dashboard.html | nur Admin, Desktop |
 | Kundenportal | https://rapport.itufeden.myhostpoint.ch/portal.html | Kunden, Handy und Desktop |
+| Homepage | https://rapport.itufeden.myhostpoint.ch/homepage.html | öffentlich, Interessenten |
 
 Erfassung und Dashboard teilen sich Anmeldung und Backend — wer angemeldet ist,
 bleibt es beim Wechsel. Nicht-Admins werden vom Dashboard abgewiesen.
@@ -25,10 +26,21 @@ Kundenzugang ist keine Zeile in `mitarbeiter` und erreicht darum keinen einzigen
 Verwaltungsendpunkt — `require_session()` findet ihn schlicht nicht. Angelegt
 werden die Zugänge im Cockpit unter **Administration → Kundenzugänge**.
 
+Die **Homepage** (ENT-469) ist die öffentliche Verkaufsseite. Sie lädt
+keinen Produktcode; ihre einzige Verbindung zum Server ist das
+Demo-Formular (`backend/api/demo_anfrage.php`), das eine E-Mail an die
+Adresse des Betriebs schickt — Cockpit → Administration → Einstellungen →
+Betrieb. Fehlt die Adresse oder der SMTP-Zugang, sagt die Seite das beim
+Absenden. Produktname („Wachtwerk") und Logo sind Platzhalter (OP-18);
+Impressum, Datenschutz und AGB sind noch leere Verweise. Entwurf,
+Gestaltungsentscheide und Faktenbasis der Werbeaussagen: Projekt-Repository,
+`02-gate2-produkt-mvp/homepage-entwurf.md`.
+
 ## Aufbau
 
 ```
 index.html         Erfassung (mobil, PWA-installierbar)
+homepage.html      Oeffentliche Homepage (ENT-469), ohne Produktcode
 dashboard.html     Verwaltungsoberflaeche (Desktop, admin-only)
 manifest.json      PWA-Manifest
 sw.js              Service Worker (nur fuer die Installierbarkeit)

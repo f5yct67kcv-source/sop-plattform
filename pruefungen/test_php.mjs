@@ -224,6 +224,21 @@ check('KRITISCH: die Passwort-Ruecksetzung erfuellt alle eigenen Regeln (Admin-A
   prCode === 0 && prBeanstandet.length === 0);
 if (prBeanstandet.length) { prBeanstandet.forEach(z => bad.push('PHP-Reset: ' + z.trim())); }
 
+// ── Demo-Anfrage von der Homepage, ENT-469: der Rechenkern wird echt
+// ausgefuehrt (keine Datenbank noetig), der Endpunkt am Quelltext geprueft
+// -- derselbe Schnitt wie bei der Passwort-Ruecksetzung oben.
+let daAus = '', daCode = 0;
+try {
+  daAus = execFileSync('php', [`${HIER}/pruef_demo_anfrage.php`], { encoding: 'utf8' });
+} catch (e) {
+  daAus = String(e.stdout || '') + String(e.stderr || '');
+  daCode = e.status || 1;
+}
+const daBeanstandet = daAus.split('\n').filter(z => z.trim().startsWith('✗ '));
+check('KRITISCH: die Demo-Anfrage erfuellt alle eigenen Regeln (Bremse, Falle, Empfaenger aus Stammdaten, keine Kopfzeilen-Injektion)',
+  daCode === 0 && daBeanstandet.length === 0);
+if (daBeanstandet.length) { daBeanstandet.forEach(z => bad.push('PHP-Demo: ' + z.trim())); }
+
 // Alle DREI Stellen, an denen ein Passwort gesetzt wird, muessen die Regel
 // aufrufen -- eine vergessene Stelle waere ein offenes Hintertuerchen.
 // Seit ENT-444 auch das Kundenportal: Ein Kundenpasswort ist kein
@@ -710,17 +725,33 @@ check('KRITISCH: kein Portal-Endpunkt liest Namen von Mitarbeitenden — OP-423 
   portalMitNamen.length === 0);
 if (portalMitNamen.length) { bad.push('Portal mit Personennamen: ' + portalMitNamen.join(', ')); }
 
-// Die Bewegungsspur bleibt draussen. ENT-441 Punkt 3 schliesst sie
-// ausdruecklich aus, ENT-322 aus demselben Grund fuer den Rapport: Sie gaebe
-// dem Kunden Aufenthaltsdaten des Mitarbeitenden, die er zur
-// Leistungskontrolle nicht braucht. Auch hier die Mechanik: ohne Zugriff auf
-// `rundgang_position` gibt es nichts auszuliefern.
-const portalMitSpur = portalDateien.filter(f => /\brundgang_position\b/i.test(ohneKommentar(f)));
-check('KRITISCH: kein Portal-Endpunkt liest die Bewegungsspur (ENT-441 Punkt 3, ENT-322)',
+// Die Bewegungsspur geht seit ENT-474 zum Kunden -- aber ueber GENAU EINEN
+// Endpunkt, der sie erst auf einen Knopfdruck hin liefert.
+//
+// Bis dahin war sie ausgeschlossen (ENT-441 Punkt 3, ENT-322: sie gibt dem
+// Kunden Aufenthaltsdaten des Mitarbeitenden). Der Projektinhaber hat das
+// ausdruecklich revidiert. Die Pruefung ist darum nicht entfallen, sondern
+// enger geworden: Der eine erlaubte Weg steht NAMENTLICH da, damit ein
+// zweiter auffaellt -- dieselbe Bauart wie bei PORTAL_EINGAENGE. Wer die
+// Spur an einer weiteren Stelle liest, umgeht damit den Knopf.
+const PORTAL_SPUR_ERLAUBT = ['portal_rundgang_weg.php'];
+const portalMitSpur = portalDateien.filter(f =>
+  !PORTAL_SPUR_ERLAUBT.includes(f) && /\brundgang_position\b/i.test(ohneKommentar(f)));
+check('KRITISCH: nur der eine benannte Endpunkt liest die Bewegungsspur (ENT-474)',
   portalMitSpur.length === 0);
 if (portalMitSpur.length) { bad.push('Portal mit Bewegungsspur: ' + portalMitSpur.join(', ')); }
 
-// DIE KERNREGEL. Ein Portal-Endpunkt, der eine kunde_id oder zugang_id aus
+const toteSpur = PORTAL_SPUR_ERLAUBT.filter(f => !apiDateien.includes(f));
+check('Die Ausnahmeliste fuer die Spur nennt nur Endpunkte, die es gibt', toteSpur.length === 0);
+if (toteSpur.length) { bad.push('Spur-Ausnahme ohne Datei: ' + toteSpur.join(', ')); }
+
+// Und der eine erlaubte Weg fragt dieselbe Sichtbarkeitsregel wie das Detail
+// und das Foto. Ohne sie kaeme ein Kunde durch blosses Hochzaehlen an die
+// Aufenthaltsspur einer fremden Runde -- ausgerechnet am heikelsten Ort.
+check('KRITISCH: der Spur-Endpunkt fragt dieselbe Sichtbarkeitsregel wie Detail und Foto',
+  /kp_runde_sichtbar\s*\(/.test(ohneKommentar('portal_rundgang_weg.php')));
+
+// DIE KERNREGEL. Ein Portal-Endpunkt, der eine kunde_id oder zugang_id aus// DIE KERNREGEL. Ein Portal-Endpunkt, der eine kunde_id oder zugang_id aus
 // der Anfrage naehme, liesse jeden angemeldeten Kunden die Daten jedes
 // anderen lesen -- durch blosses Hochzaehlen einer Zahl. Beide Werte
 // stammen ausnahmslos aus require_kundensession(). Dieselbe Regel wie bei

@@ -323,6 +323,17 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
 .d-ereignis .e-bem{font-size:13px;color:var(--ink-2);margin-top:2px;overflow-wrap:anywhere}
 .d-hinweis{font-size:13px;color:var(--ink-3)}
 
+/* Der Weg auf der Karte (ENT-474). Er kommt erst auf einen Knopfdruck --
+   siehe die Begruendung bei wegZeigen(). Die Hoehe haengt am Fenster und
+   nicht an einer festen Zahl: Auf dem Handy ist eine 380 px hohe Karte
+   die halbe Seite, am Desktop verschwaende eine 200 px hohe den Platz. */
+/* NICHT .karte nennen -- so heisst in dieser Datei bereits die Glaskachel.
+   Der Name allein haette jeder Kachel der Seite einen deckenden Grund
+   verpasst; die Prüfung „die Kachel ist durchscheinend" hat es gefangen. */
+.weg-karte{height:min(46vh,380px);border:1px solid var(--line);
+           border-radius:var(--r);overflow:hidden;background:var(--grau-soft)}
+.weg-fuss{font-size:12.5px;color:var(--ink-3);margin-top:9px}
+
 /* Ein leerer Zustand bekommt Text, nie eine leere Flaeche -- und der Text
    sagt, WELCHE der moeglichen Aussagen gilt (Hausregel: „unbekannt darf nie
    wie keine aussehen"). */
@@ -991,7 +1002,19 @@ function detailZeichnen(d, tafel) {
     // keine (Hausregel: unbekannt darf nie wie keine aussehen).
     + (ereignisse.length ? ereignisse.map(eZeileHtml).join('')
       : '<div class="d-hinweis">Während dieser Runde wurde kein Ereignis gemeldet.</div>')
-    + '</div>';
+    + '</div>'
+    // Der Weg steht hinter einem Knopf und wird NICHT beim Aufklappen
+    // mitgeladen (ENT-474, ausdrückliche Wahl des Projektinhabers). Zwei
+    // Gründe tragen das: Es sind Aufenthaltsdaten einer Person und keine
+    // Kennzahl der Runde — wer sie sehen will, soll das tun, nicht
+    // beiläufig bekommen. Und eine Runde trägt leicht hundert Messpunkte.
+    + '<div class="d-abschnitt"><p class="d-titel">Weg während der Runde</p>'
+    + '<div class="weg-huelle">'
+    + '<button type="button" class="knopf still" data-weg="' + Number(d.id) + '">'
+    + 'Weg auf der Karte anzeigen</button>'
+    + '<p class="d-hinweis" style="margin-top:9px">Die Bewegungsdaten werden erst auf '
+    + 'diesen Knopf hin geladen. Dabei wird die Karte von Google bezogen.</p>'
+    + '</div></div>';
 
   // Die Fotobelege erst jetzt, einzeln und mit Token im Kopf -- der Token
   // darf nicht in eine Bild-Adresse (er landete sonst im Browserverlauf).
@@ -1045,6 +1068,111 @@ function eZeileHtml(e) {
     + (e.bemerkung ? '<div class="e-bem">' + esc(e.bemerkung) + '</div>' : '')
     + (e.hat_foto ? '<div class="e-bem">Mit Foto festgehalten</div>' : '')
     + '</div></div>';
+}
+
+// Google Maps wird erst geladen, wenn jemand einen Weg ansehen will -- nicht
+// beim Oeffnen der Seite. Der Schluessel ist ein clientseitiger
+// Maps-JS-Browserschluessel: Dass er im Quelltext steht, ist bei diesem
+// Schluesseltyp normal und unvermeidbar; der Schutz laeuft ueber die
+// HTTP-Referrer- und API-Einschraenkung in der Google-Konsole, nicht ueber
+// Geheimhaltung. Platzhalter, beim Deploy aus GitHub Secrets ersetzt
+// (ENT-341) -- derselbe Weg wie in dashboard.html und app.html.
+let kartenVersprechen = null;
+function kartenLaden() {
+  if (kartenVersprechen) { return kartenVersprechen; }
+  kartenVersprechen = new Promise((fertig, schief) => {
+    if (window.google && window.google.maps) { fertig(); return; }
+    const skript = document.createElement('script');
+    skript.src = 'https://maps.googleapis.com/maps/api/js?key=__MAPS_JS_KEY__';
+    skript.onload = fertig;
+    skript.onerror = () => schief(new Error('Google Maps konnte nicht geladen werden.'));
+    document.head.appendChild(skript);
+  });
+  return kartenVersprechen;
+}
+
+$('liste').addEventListener('click', ev => {
+  const knopf = ev.target.closest('[data-weg]');
+  if (knopf) { wegZeigen(Number(knopf.dataset.weg), knopf.closest('.weg-huelle')); }
+});
+
+async function wegZeigen(id, huelle) {
+  if (!huelle) { return; }
+  huelle.innerHTML = '<div class="d-hinweis">Der Weg wird geladen …</div>';
+  const { ok, code, daten } = await ruf('portal_rundgang_weg.php?rundgang_id=' + id);
+  if (!document.body.contains(huelle)) { return; }
+  if (code === 401) { abgemeldet(); return; }
+  if (!ok || !daten || daten.status !== 'ok') {
+    huelle.innerHTML = '<div class="d-hinweis">Der Weg liess sich nicht laden.</div>';
+    return;
+  }
+  // Drei verschiedene Aussagen, drei verschiedene Texte -- sie saehen sonst
+  // alle gleich aus wie „es gibt nichts" (Hausregel). Der erste Fall sagt
+  // dem Kunden bewusst NICHT, dass eine Einrichtung fehlt: Das ist eine
+  // Auskunft ueber den Betrieb und geht ihn nichts an.
+  if (daten.eingerichtet === false) {
+    huelle.innerHTML = '<div class="d-hinweis">Für Rundgänge wird der Weg noch nicht '
+      + 'aufgezeichnet.</div>';
+    return;
+  }
+  const punkte = (daten.punkte || []).map(p => ({
+    lat: Number(p.lat), lng: Number(p.lng),
+    gen: p.genauigkeit_m == null ? null : Number(p.genauigkeit_m),
+    am: p.erfasst_am,
+  })).filter(p => isFinite(p.lat) && isFinite(p.lng));
+  if (!punkte.length) {
+    huelle.innerHTML = '<div class="d-hinweis">Für diese Runde ist kein Weg aufgezeichnet — '
+      + 'entweder lief sie vor der Aufzeichnung, oder das Gerät hatte keinen Standort.</div>';
+    return;
+  }
+  huelle.innerHTML = '<div class="weg-karte"></div><p class="weg-fuss"></p>';
+  wegKarteBauen(punkte, huelle, Number(daten.aufbewahrung_tage));
+}
+
+function wegKarteBauen(punkte, huelle, tage) {
+  kartenLaden().then(() => {
+    // Inzwischen zugeklappt: Dann gibt es keinen Behaelter mehr, und
+    // google.maps.Map auf einem entfernten Knoten waere ein Fehler.
+    const behaelter = document.body.contains(huelle) && huelle.querySelector('.weg-karte');
+    if (!behaelter) { return; }
+    const karte = new google.maps.Map(behaelter, {
+      center: punkte[0], zoom: 17,
+      streetViewControl: false, mapTypeControl: false, fullscreenControl: false,
+    });
+    new google.maps.Polyline({
+      map: karte, path: punkte.map(p => ({ lat: p.lat, lng: p.lng })),
+      strokeColor: '#2F5BD7', strokeOpacity: 0.9, strokeWeight: 3,
+    });
+    // Anfang und Ende markieren -- eine Linie allein sagt nicht, in welche
+    // Richtung gelaufen wurde.
+    const marke = (p, farbe, titel) => new google.maps.Marker({
+      map: karte, position: { lat: p.lat, lng: p.lng }, title: titel,
+      icon: { path: google.maps.SymbolPath.CIRCLE, scale: 7, fillColor: farbe,
+        fillOpacity: 1, strokeColor: '#FFFFFF', strokeWeight: 2 },
+    });
+    marke(punkte[0], '#1C7C3E', 'Anfang');
+    marke(punkte[punkte.length - 1], '#9A6B08', 'Ende');
+    const rahmen = new google.maps.LatLngBounds();
+    punkte.forEach(p => rahmen.extend({ lat: p.lat, lng: p.lng }));
+    karte.fitBounds(rahmen, 40);
+    // Die Genauigkeit gehoert dazu: Ein Punkt mit 80 m Streuung sieht auf der
+    // Karte genauso scharf aus wie einer mit 5 m. Wer das nicht weiss, zieht
+    // Schluesse, die die Messung nicht hergibt.
+    const gen = punkte.map(p => p.gen).filter(x => x != null);
+    const schnitt = gen.length ? Math.round(gen.reduce((a, b) => a + b, 0) / gen.length) : null;
+    const fuss = huelle.querySelector('.weg-fuss');
+    if (fuss) {
+      // Die Frist kommt vom Server und steht nicht als Zahl im Text: Stuende
+      // sie an zwei Orten, liefen die beiden auseinander.
+      fuss.textContent = punkte.length + ' Messpunkte'
+        + (schnitt !== null ? ' · Genauigkeit im Schnitt ± ' + schnitt + ' m' : '')
+        + (tage > 0 ? ' · aufbewahrt für ' + tage + ' Tage' : '');
+    }
+  }).catch(() => {
+    if (document.body.contains(huelle)) {
+      huelle.innerHTML = '<div class="d-hinweis">Die Karte liess sich nicht laden.</div>';
+    }
+  });
 }
 
 async function fotoLaden(scanId, ziel) {

@@ -17,7 +17,7 @@ const ok = [], bad = [];
 const check = (n, c) => (c ? ok : bad).push(n);
 
 const workflow = readFileSync(`${WURZEL}/.github/workflows/deploy-hostpoint.yml`, 'utf8');
-const seiten = ['index.html', 'dashboard.html', 'app.html'];
+const seiten = ['index.html', 'dashboard.html', 'app.html', 'homepage.html'];
 
 // Nicht nur die drei bekannten HTML-Huellen: eine oeffentliche PHP-Seite
 // (z. B. beleg_oeffentlich.php, ENT-205) kann ein eigenes <script src>
@@ -84,6 +84,24 @@ for (const seite of [...seiten, ...phpDateien]) {
       + '($GITHUB_ENV) -- sonst ersetzt sed still durch nichts',
     fehlend.length === 0);
   if (fehlend.length) { bad.push('nicht weitergereicht: ' + fehlend.join(', ')); }
+}
+
+/* Der Google-Maps-Schluessel: WELCHE Oberflaechen ihn tragen, wird nicht
+   aufgezaehlt, sondern gefunden. Die Liste war zweimal die Fehlerquelle --
+   eine neue Seite laedt die Karte, niemand denkt an die Ersetzungszeile, und
+   Google Maps bekommt den woertlichen Platzhalter als Schluessel. Das ist
+   kein Absturz: Die Karte bleibt einfach leer. Seit ENT-474 traegt auch
+   portal.html den Schluessel. */
+{
+  const seitenMitKarte = ['dashboard.html', 'app.html', 'portal.html', 'index.html']
+    .filter(f => existsSync(`${WURZEL}/${f}`))
+    .filter(f => readFileSync(`${WURZEL}/${f}`, 'utf8').includes('__MAPS_JS_KEY__'));
+  check('Mindestens eine Oberflaeche traegt den Maps-Platzhalter', seitenMitKarte.length > 0);
+  for (const f of seitenMitKarte) {
+    check(`KRITISCH: __MAPS_JS_KEY__ wird in ${f} beim Deploy auch ersetzt`,
+      new RegExp(`sed -i "s\\|__MAPS_JS_KEY__\\|\\$EFF_MAPS_JS_KEY\\|g" dist/${f.replace('.', '\\.')}`)
+        .test(workflow));
+  }
 }
 
 /* Die Push-Dateien brauchen ihre Platzhalter -- und zwar in der Datei, die
