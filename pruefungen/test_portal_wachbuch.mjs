@@ -37,6 +37,9 @@ const dmy = t => t.split('-').reverse().join('.');
 // Erfundene Namen, keine echten Kunden oder Personen (CLAUDE.md).
 const RUNDGAENGE = {
   status: 'ok', kunde: 'Muster Liegenschaften AG', person: 'A. Beispielperson',
+  // je_vorhanden kam mit ENT-482 dazu und entscheidet, ob es den
+  // Revierdienst-Bereich ueberhaupt gibt. Das Wachbuch haengt darin.
+  je_vorhanden: true,
   zeitraum: { von: vorTagen(30), bis: T0 },
   objekte: [{ id: 4, name: 'Testliegenschaft Nord', strasse: 'Musterweg 1', ort: 'Musterort' }],
   rundgaenge: [
@@ -82,6 +85,10 @@ const WACHBUCH = {
 
 let calls = [];
 let wbAntwort = WACHBUCH;
+// Vorgabe: der Kunde bezieht NUR Revierdienst. Ein Fall weiter unten dreht
+// das um.
+let einsatzAntwort = { status: 'ok', je_vorhanden: false, einsaetze: [],
+  zeitraum: { von: vorTagen(30), bis: T0 }, leer_grund: 'kein_verkehrsdienst' };
 async function setup(seite) {
   await seite.route('**/api/**', route => {
     const u = new URL(route.request().url());
@@ -94,6 +101,9 @@ async function setup(seite) {
     }
     if (path.includes('portal_wachbuch')) return send(wbAntwort);
     if (path.includes('portal_rundgaenge')) return send(RUNDGAENGE);
+    // Der Verkehrsdienst-Bereich (ENT-482). Er gehoert nicht zum Pruefgegenstand,
+    // aber ohne ihn faellt laden() auf halbem Weg aus.
+    if (path.includes('portal_einsaetze')) return send(einsatzAntwort);
     if (path.includes('portal_rundgang_detail')) {
       return send({ status: 'ok', rundgang: {
         id: 201, datum: T1, objekt_name: 'Testliegenschaft Nord', strasse: 'Musterweg 1',
@@ -390,6 +400,56 @@ check('KRITISCH: eine gekappte Liste nennt beide Zahlen und sagt, was zu tun ist
     return t.includes('von 1238') && t.includes('Zeitraum eingrenzen');
   }));
 await neuLaden(WACHBUCH);
+
+// ══════════════ DAS WACHBUCH GEHOERT IN DEN REVIERDIENST-REITER (ENT-482)
+// Ein Kunde, der nur Verkehrsdienst bezieht, hat keine Kontrollpunkte, keine
+// Runden und keine Aufgaben. Ein leeres Wachbuch saehe bei ihm aus, als sei
+// nichts geschehen -- dieselbe Hausregel, die die Reiterleiste ueberhaupt
+// erst hervorgebracht hat.
+check('KRITISCH: das Wachbuch liegt im Revierdienst-Bereich und folgt dessen Sichtbarkeit',
+  await page.evaluate(() => {
+    const b = document.getElementById('bereich-rundgaenge');
+    return !!b && b.contains(document.getElementById('wb-liste'));
+  }));
+{
+  einsatzAntwort = { status: 'ok', je_vorhanden: true, einsaetze: [],
+    zeitraum: { von: vorTagen(30), bis: T0 }, leer_grund: 'kein_treffer_im_zeitraum' };
+  await page.evaluate(() => laden());
+  await page.waitForTimeout(500);
+  check('Bei beiden Inhaltsarten erscheint die Reiterleiste',
+    await page.evaluate(() => !document.getElementById('reiter').hidden));
+  check('KRITISCH: der Wechsel auf "Einsätze" nimmt das Wachbuch mit',
+    await page.evaluate(() => {
+      document.getElementById('reiter-einsaetze').click();
+      return document.getElementById('bereich-rundgaenge').hidden;
+    }));
+  await page.evaluate(() => document.getElementById('reiter-rundgaenge').click());
+  await page.waitForTimeout(150);
+  check('Und der Wechsel zurueck bringt es wieder',
+    await page.evaluate(() => !document.getElementById('bereich-rundgaenge').hidden
+      && document.getElementById('wb-liste').getClientRects().length > 0));
+
+  // Nur Verkehrsdienst: kein Wachbuch, und auch keine Abfrage dafuer.
+  wbAntwort = WACHBUCH;
+  calls = [];
+  einsatzAntwort = { ...einsatzAntwort, je_vorhanden: true };
+  const nurVerkehr = { ...RUNDGAENGE, je_vorhanden: false, rundgaenge: [],
+    leer_grund: 'kein_revierdienst' };
+  await page.route('**/api/portal_rundgaenge*', route => route.fulfill({ status: 200,
+    contentType: 'application/json', body: JSON.stringify(nurVerkehr) }));
+  await page.evaluate(() => laden());
+  await page.waitForTimeout(500);
+  check('KRITISCH: ohne Revierdienst ist das Wachbuch nicht sichtbar',
+    await page.evaluate(() => document.getElementById('bereich-rundgaenge').hidden));
+  check('KRITISCH: und es wird auch nicht abgefragt -- eine Abfrage fuer eine '
+    + 'verborgene Karte ist eine Abfrage zu viel',
+    !calls.some(c => c.path.includes('portal_wachbuch')));
+  await page.unroute('**/api/portal_rundgaenge*');
+  einsatzAntwort = { status: 'ok', je_vorhanden: false, einsaetze: [],
+    zeitraum: { von: vorTagen(30), bis: T0 }, leer_grund: 'kein_verkehrsdienst' };
+  await page.evaluate(() => laden());
+  await page.waitForTimeout(400);
+}
 
 // ══ Und dasselbe am Desktop (CLAUDE.md verlangt beides) ═════════════════
 const gross = await browser.newPage({ viewport: { width: 1280, height: 900 } });
