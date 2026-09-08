@@ -14,7 +14,7 @@
 -->
 <title>Wachtwerk – Betriebssoftware für Schweizer Sicherheitsdienste</title>
 <meta name="description" content="Einsatzplanung, Mitarbeiter-App, Revierdienst, Kundenportal, Offerten und Rechnungen in einer Software – für kleine und mittlere Sicherheitsdienste in der Schweiz, mit dem GAV Sicherheit im Kern.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230B1020'/%3E%3Ccircle cx='16' cy='16' r='10' fill='none' stroke='%23EEF1F7' stroke-width='2.4' stroke-dasharray='47 16' stroke-linecap='round' transform='rotate(20 16 16)'/%3E%3Ccircle cx='16' cy='16' r='3.4' fill='%23EEF1F7'/%3E%3Ccircle cx='25' cy='11.8' r='2.4' fill='%23F3B42B'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230F1117'/%3E%3Ccircle cx='16' cy='16' r='10' fill='none' stroke='%23EEF1F7' stroke-width='2.4' stroke-dasharray='47 16' stroke-linecap='round' transform='rotate(20 16 16)'/%3E%3Ccircle cx='16' cy='16' r='3.4' fill='%23EEF1F7'/%3E%3Ccircle cx='25' cy='11.8' r='2.4' fill='%23E2B156'/%3E%3C/svg%3E">
 <style>
 /* Schriften selbst ausgeliefert (wie Inter fuer das Cockpit, ENT-223/OP-224):
    Kein Abruf bei Google von der oeffentlichen Seite aus. Lateinischer
@@ -31,17 +31,22 @@
    zum Monatsende. Bernstein: die Rundumleuchte, sparsam gesetzt.
    ───────────────────────────────────────────────────────────── */
 :root{
-  --nacht:#0B1020; --nacht-2:#131A2C; --nacht-3:#1B2338; --nacht-linie:#26304A; --nacht-linie-2:#344060;
-  --nebel:#EEF1F6; --weiss:#FFFFFF; --linie:#D7DCE6; --linie-soft:#E6EAF1;
-  --tinte:#10141F; --tinte-2:#4B5468; --tinte-3:#7B8499;
-  --stahl:#98A2B8; --stahl-2:#C5CCDB; --stahl-hi:#EEF1F7;
-  --bernstein:#F3B42B; --bernstein-hi:#FFC94D; --bernstein-tief:#8F5E00;
-  /* Produktoberfläche in den Bildschirmen (eigene Farbwelt, bewusst blau) */
-  --p-shell:#16181D; --p-shell-hi:#1E2128; --p-shell-line:#272B33; --p-shell-txt:#9298A5; --p-shell-txt-hi:#F3F5F8;
-  --p-bg:#F7F8FA; --p-surface:#FFFFFF; --p-line:#E5E8EC; --p-line-soft:#EFF1F4;
-  --p-ink:#14161A; --p-ink2:#545B67; --p-ink3:#8B919D;
-  --p-accent:#2F5BD7; --p-accent-soft:#EDF2FE; --p-accent-line:#CBD9F9;
-  --p-pos:#0E7C55; --p-pos-soft:#E6F6EF; --p-neg:#C2382A; --p-neg-soft:#FCEDEB; --p-warn:#9A6B08; --p-warn-soft:#FBF3E0;
+  /* Dunkle Gruende = das dunkle Glas-Thema des Cockpits (dashboard.html, html[data-thema="dunkel"]),
+     helle Gruende = sein helles Thema. Dieselben Werte, nicht aehnliche -- test_homepage.mjs misst das. */
+  --nacht:#0F1117; --nacht-2:#161B27; --nacht-3:#1E2535; --nacht-linie:#2A3147; --nacht-linie-2:#3B4560;
+  --nebel:#F7F8FA; --weiss:#FFFFFF; --linie:#E5E8EC; --linie-soft:#EFF1F4;
+  --tinte:#14161A; --tinte-2:#545B67; --tinte-3:#8B919D;
+  --stahl:#B6BCC8; --stahl-2:#B6BCC8; --stahl-hi:#F2F4F8;
+  /* Blau bedient: Knoepfe, Verweise, Vorzeilen -- der Akzent des Cockpits (dunkel #7098F7, hell #2F5BD7). */
+  --blau:#7098F7; --blau-hi:#8DAEFA; --blau-tief:#2F5BD7; --knopf:#3B67E8; --knopf-hi:#2F5BD7;
+  /* Bernstein meldet: nur wo etwas laeuft oder Aufmerksamkeit will -- die Warnfarbe des Cockpits. */
+  --signal:#E2B156; --signal-tief:#9A6B08; --signal-soft:#2B2314;
+  /* Produktoberflaeche in den Bildschirmen: das dunkle Thema 1:1 */
+  --p-shell:#0B0D11; --p-shell-hi:#14171C; --p-shell-line:#23272F; --p-shell-txt:#8A919E; --p-shell-txt-hi:#F2F4F8;
+  --p-bg:#0F1117; --p-surface:#161B27; --p-surface-2:#1E2535; --p-surface-3:#242C3E; --p-line:#2A3147; --p-line-soft:#232A3B; --p-line-hi:#3B4560;
+  --p-ink:#F2F4F8; --p-ink2:#B6BCC8; --p-ink3:#868D9A;
+  --p-accent:#7098F7; --p-accent-hi:#8DAEFA; --p-accent-soft:#1A2440; --p-accent-line:#2D3D63; --p-knopf:#3B67E8;
+  --p-pos:#4FCE96; --p-pos-soft:#10281E; --p-neg:#F27F70; --p-neg-soft:#2E1A18; --p-warn:#E2B156; --p-warn-soft:#2B2314; --p-warn-line:#4A3C1C;
 
   --display:"Archivo","Arial Narrow","Helvetica Neue",Arial,sans-serif;
   --body:"IBM Plex Sans","Helvetica Neue",Arial,sans-serif;
@@ -52,7 +57,7 @@
   --abs:clamp(80px,10vw,136px);
 
   /* Abschnittsfarben, werden je Abschnitt neu gesetzt */
-  --g:var(--nacht); --t:var(--stahl-hi); --t2:var(--stahl); --t3:#6E7890; --rule:var(--nacht-linie); --acc:var(--bernstein); --acc-t:var(--bernstein);
+  --g:var(--nacht); --t:var(--stahl-hi); --t2:var(--stahl); --t3:#868D9A; --rule:var(--nacht-linie); --acc-t:var(--blau);
 }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
@@ -61,17 +66,17 @@ body{margin:0;background:var(--nacht);color:var(--stahl-hi);font-family:var(--bo
 img,svg{display:block;max-width:100%}
 a{color:inherit;text-decoration:none}
 button,input,select,textarea{font:inherit;color:inherit}
-:focus-visible{outline:2px solid var(--bernstein);outline-offset:3px;border-radius:2px}
-.skip{position:absolute;left:-999px;top:8px;background:var(--bernstein);color:var(--nacht);padding:8px 12px;z-index:100}
+:focus-visible{outline:2px solid var(--blau);outline-offset:3px;border-radius:2px}
+.skip{position:absolute;left:-999px;top:8px;background:var(--knopf);color:#fff;padding:8px 12px;z-index:100}
 .skip:focus{left:8px}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
 /* Abschnitte tragen ihre Farbwelt als Variablen — Bausteine lesen nur diese. */
 .abs{background:var(--g);color:var(--t);padding:var(--abs) 0;position:relative}
-.abs.nacht{--g:var(--nacht);--t:var(--stahl-hi);--t2:var(--stahl);--t3:#6E7890;--rule:var(--nacht-linie);--acc-t:var(--bernstein)}
-.abs.nacht-2{--g:var(--nacht-2);--t:var(--stahl-hi);--t2:var(--stahl);--t3:#7681A0;--rule:var(--nacht-linie-2);--acc-t:var(--bernstein)}
-.abs.hell{--g:var(--weiss);--t:var(--tinte);--t2:var(--tinte-2);--t3:var(--tinte-3);--rule:var(--linie);--acc-t:var(--bernstein-tief)}
-.abs.nebel{--g:var(--nebel);--t:var(--tinte);--t2:var(--tinte-2);--t3:var(--tinte-3);--rule:var(--linie);--acc-t:var(--bernstein-tief)}
+.abs.nacht{--g:var(--nacht);--t:var(--stahl-hi);--t2:var(--stahl);--t3:#868D9A;--rule:var(--nacht-linie);--acc-t:var(--blau)}
+.abs.nacht-2{--g:var(--nacht-2);--t:var(--stahl-hi);--t2:var(--stahl);--t3:#868D9A;--rule:var(--nacht-linie-2);--acc-t:var(--blau)}
+.abs.hell{--g:var(--weiss);--t:var(--tinte);--t2:var(--tinte-2);--t3:var(--tinte-3);--rule:var(--linie);--acc-t:var(--blau-tief)}
+.abs.nebel{--g:var(--nebel);--t:var(--tinte);--t2:var(--tinte-2);--t3:var(--tinte-3);--rule:var(--linie);--acc-t:var(--blau-tief)}
 .wrap{max-width:var(--w);margin:0 auto;padding:0 var(--pad)}
 
 /* Typografie */
@@ -93,8 +98,8 @@ p{margin:0 0 1em}
 /* Knöpfe */
 .btn{display:inline-flex;align-items:center;gap:10px;height:52px;padding:0 24px;border-radius:4px;font-weight:600;font-size:16px;border:1px solid transparent;cursor:pointer;transition:background .18s,border-color .18s,transform .18s;white-space:nowrap}
 .btn svg{width:18px;height:18px}
-.btn.primaer{background:var(--bernstein);color:var(--nacht);border-color:var(--bernstein)}
-.btn.primaer:hover{background:var(--bernstein-hi)}
+.btn.primaer{background:var(--knopf);color:#fff;border-color:var(--knopf)}
+.btn.primaer:hover{background:var(--knopf-hi)}
 .btn.sekundaer{background:transparent;color:var(--t);border-color:var(--rule)}
 .btn.sekundaer:hover{border-color:var(--t2)}
 .btn:active{transform:translateY(1px)}
@@ -102,7 +107,7 @@ p{margin:0 0 1em}
 /* ─────────────────────────────────────────────────────────────
    Kopfleiste
    ───────────────────────────────────────────────────────────── */
-.kopf{position:sticky;top:0;z-index:50;background:rgba(11,16,32,.72);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid transparent;transition:border-color .2s}
+.kopf{position:sticky;top:0;z-index:50;background:rgba(15,17,23,.78);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid transparent;transition:border-color .2s}
 .kopf.fest{border-bottom-color:var(--nacht-linie)}
 .kopf .wrap{display:flex;align-items:center;justify-content:space-between;height:72px;gap:24px}
 .marke{display:inline-flex;align-items:center;gap:12px;color:var(--stahl-hi)}
@@ -130,7 +135,7 @@ p{margin:0 0 1em}
    ───────────────────────────────────────────────────────────── */
 .held{overflow:hidden;padding-top:clamp(56px,8vw,112px);padding-bottom:0}
 .held::before{content:"";position:absolute;inset:-40% -20% auto -20%;height:140%;pointer-events:none;
-  background:conic-gradient(from 0deg at 50% 50%,transparent 0deg,rgba(243,180,43,.11) 22deg,transparent 48deg,transparent 360deg);
+  background:conic-gradient(from 0deg at 50% 50%,transparent 0deg,rgba(226,177,86,.10) 22deg,transparent 48deg,transparent 360deg);
   filter:blur(28px);animation:leuchte 46s linear infinite;opacity:.9}
 @media (prefers-reduced-motion:reduce){.held::before{animation:none;transform:rotate(-30deg)}}
 @keyframes leuchte{to{transform:rotate(360deg)}}
@@ -155,60 +160,74 @@ p{margin:0 0 1em}
 .held-bild::after{content:"";position:absolute;left:0;right:0;bottom:0;height:120px;background:linear-gradient(to bottom,transparent,var(--nacht));pointer-events:none}
 
 /* ─────────────────────────────────────────────────────────────
-   Bildschirme (Produkt-Mockups) — die einzigen gerundeten,
-   schattierten Objekte der Seite: sie sind Geräte.
+   Bildschirme (Produkt-Mockups) — das Cockpit im dunklen Glas-Thema,
+   so wie es der Betrieb sieht. Die einzigen gerundeten, schattierten
+   Objekte der Seite: sie sind Geräte.
    ───────────────────────────────────────────────────────────── */
-.cockpit{background:var(--p-bg);color:var(--p-ink);border-radius:10px;box-shadow:0 40px 90px -30px rgba(0,0,0,.7),0 0 0 1px rgba(255,255,255,.08);overflow:hidden;font-family:var(--body);font-size:12.5px;line-height:1.4;text-align:left}
-.ck-chrome{display:flex;align-items:center;gap:8px;height:38px;padding:0 14px;background:#0F1116;border-bottom:1px solid #1E2128}
+.cockpit{background:var(--p-bg);color:var(--p-ink);border-radius:12px;box-shadow:0 40px 90px -30px rgba(0,0,0,.8),0 0 0 1px var(--p-line-hi);overflow:hidden;font-family:var(--body);font-size:12.5px;line-height:1.4;text-align:left}
+.ck-chrome{display:flex;align-items:center;gap:8px;height:36px;padding:0 14px;background:#0B0D11;border-bottom:1px solid #23272F}
 .ck-chrome i{width:10px;height:10px;border-radius:50%;background:#2A2E37}
-.ck-chrome .url{margin-left:12px;flex:1;max-width:360px;height:24px;border-radius:5px;background:#1A1D24;color:#8B919D;font-family:var(--mono);font-size:11px;display:flex;align-items:center;padding:0 10px}
-.ck-body{display:grid;grid-template-columns:212px 1fr 292px;min-height:520px}
-.ck-side{background:var(--p-shell);color:var(--p-shell-txt);padding:16px 12px;border-right:1px solid var(--p-shell-line)}
-.ck-brand{display:flex;align-items:center;gap:8px;color:var(--p-shell-txt-hi);font-weight:600;font-size:13px;padding:4px 8px 14px}
-.ck-brand svg{width:18px;height:18px}
-.ck-brand small{display:block;font-weight:400;font-size:10.5px;color:var(--p-shell-txt);letter-spacing:.06em;text-transform:uppercase}
-.ck-grp{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#6E7480;padding:12px 8px 4px;font-weight:600}
-.ck-nav{display:block;padding:5px 8px;border-radius:5px;color:var(--p-shell-txt);font-size:12.5px}
-.ck-nav.on{background:var(--p-shell-hi);color:var(--p-shell-txt-hi)}
-.ck-main{padding:18px 22px;min-width:0}
-.ck-top{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:14px}
-.ck-titel{font-size:19px;font-weight:600;letter-spacing:-.01em}
-.ck-sub{color:var(--p-ink2);margin-top:2px}
-.ck-tools{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
-.ck-chip{border:1px solid var(--p-line);background:var(--p-surface);border-radius:999px;padding:3px 10px;font-size:11.5px;color:var(--p-ink2)}
-.ck-chip.on{background:var(--p-accent-soft);border-color:var(--p-accent-line);color:var(--p-accent)}
-.ck-btn{background:var(--p-accent);color:#fff;border:0;border-radius:6px;padding:6px 11px;font-weight:600;font-size:12px}
-.ck-tag{font-size:11.5px;color:var(--p-ink2);padding:12px 0 6px;display:flex;gap:10px;align-items:baseline}
+.ck-chrome .url{margin-left:12px;flex:1;max-width:360px;height:22px;border-radius:5px;background:#14171C;color:#8A919E;font-family:var(--mono);font-size:11px;display:flex;align-items:center;padding:0 10px}
+.ck-top{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;height:66px;padding:0 20px;background:var(--p-shell);border-bottom:1px solid var(--p-shell-line)}
+.ck-nav{grid-column:2;display:flex;gap:2px}
+.ck-nav span{display:flex;flex-direction:column;align-items:center;gap:5px;min-width:86px;padding:7px 8px;border-radius:9px;color:var(--p-shell-txt);font-size:11.5px;font-weight:600}
+.ck-nav span svg{width:20px;height:20px}
+.ck-nav span.on{background:var(--p-shell-hi);color:var(--p-shell-txt-hi)}
+.ck-nav span.on svg{color:var(--p-accent)}
+.ck-recht{grid-column:3;display:flex;justify-content:flex-end;align-items:center;gap:16px}
+.ck-glocke{position:relative;color:var(--p-ink2)}
+.ck-glocke svg{width:20px;height:20px}
+.ck-glocke b{position:absolute;top:-7px;right:-9px;background:var(--p-neg);color:#fff;font-size:9px;font-weight:700;border-radius:999px;min-width:16px;height:16px;display:flex;align-items:center;justify-content:center;padding:0 4px}
+.ck-avatar{width:30px;height:30px;border-radius:50%;background:var(--p-surface-2);border:1px solid var(--p-line-hi);color:var(--p-ink);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px}
+.ck-sub{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:13px 22px;background:var(--p-surface);border-bottom:1px solid var(--p-line)}
+.ck-titel{font-size:17px;font-weight:600;letter-spacing:-.01em}
+.ck-untertitel{color:var(--p-ink2);font-size:12px;margin-top:2px}
+.ck-werkzeuge{display:flex;align-items:center;gap:10px}
+.ck-sprechen{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 14px;border-radius:999px;background:linear-gradient(180deg,#4A78F2,#2F5BD7);color:#fff;font-weight:600;font-size:12.5px}
+.ck-sprechen svg{width:14px;height:14px}
+.ck-schalter{width:52px;height:30px;border-radius:999px;border:1px solid var(--p-accent-line);background:var(--p-accent-soft);position:relative}
+.ck-schalter::after{content:"";position:absolute;top:4px;left:26px;width:20px;height:20px;border-radius:50%;background:var(--p-accent)}
+.ck-body{padding:16px 22px 22px;display:grid;gap:14px}
+.ck-oben{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:14px}
+.ck-karte{background:var(--p-surface);border:1px solid var(--p-line);border-radius:12px;padding:14px 16px;min-width:0}
+.ck-karte h5{margin:0 0 6px;font-size:13px;font-weight:600;display:flex;justify-content:space-between;align-items:baseline}
+.ck-karte h5 span{font-size:11px;color:var(--p-ink3);font-weight:400}
+.ck-kpis{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.kpi{background:var(--p-surface);border:1px solid var(--p-line);border-radius:12px;padding:14px 16px;min-width:0}
+.kpi .l{display:flex;align-items:center;gap:6px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--p-ink3);font-weight:600;white-space:nowrap}
+.kpi .l svg{width:12px;height:12px;flex:none}
+.kpi .z{font-size:26px;font-weight:700;letter-spacing:-.02em;margin:10px 0 4px;font-variant-numeric:tabular-nums;line-height:1}
+.kpi .z small{font-size:13px;font-weight:500;color:var(--p-ink3);margin-left:2px}
+.kpi .u{font-size:11.5px;color:var(--p-ink2)}
+.ck-ereignis{display:grid;grid-template-columns:44px 1fr;gap:10px;padding:8px 0;border-bottom:1px solid var(--p-line-soft)}
+.ck-ereignis:last-child{border-bottom:0;padding-bottom:0}
+.ck-ereignis .zeit{font-family:var(--mono);font-size:11px;color:var(--p-ink3);padding-top:2px}
+.ck-ereignis b{display:block;font-weight:600;font-size:12.5px}
+.ck-ereignis span{color:var(--p-ink2);font-size:12px}
+.ck-ereignis.neu b::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--p-accent);margin-right:6px;vertical-align:middle}
+.ck-tabellen{overflow-x:auto}
+.ck-tag{font-size:11.5px;color:var(--p-ink2);display:flex;gap:10px;align-items:baseline;margin:0 0 6px}
 .ck-tag b{color:var(--p-ink);font-weight:600}
-.ck-tabelle{width:100%;border-collapse:collapse;background:var(--p-surface);border:1px solid var(--p-line);border-radius:8px;overflow:hidden}
-.ck-tabelle th{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--p-ink3);text-align:left;padding:8px 10px;border-bottom:1px solid var(--p-line);font-weight:600}
-.ck-tabelle td{padding:9px 10px;border-bottom:1px solid var(--p-line-soft);vertical-align:middle;white-space:nowrap}
+.ck-tabelle{width:100%;border-collapse:collapse}
+.ck-tabelle th{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--p-ink3);text-align:left;padding:6px 8px;border-bottom:1px solid var(--p-line);font-weight:600}
+.ck-tabelle td{padding:9px 8px;border-bottom:1px solid var(--p-line-soft);vertical-align:middle;white-space:nowrap}
 .ck-tabelle tr:last-child td{border-bottom:0}
 .ck-tabelle .zeit{font-family:var(--mono);font-size:11.5px;color:var(--p-ink)}
 .ck-tabelle .obj b{display:block;font-weight:600}
 .ck-tabelle .obj span{color:var(--p-ink2)}
 .ck-tabelle .sparte{color:var(--p-ink2)}
-.ck-team{display:flex;gap:-4px}
-.mono-chip{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:#E4E8EF;color:#3B4351;font-size:10px;font-weight:600;border:2px solid var(--p-surface);margin-left:-6px}
+.ck-team{display:flex}
+.mono-chip{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:var(--p-surface-3);color:var(--p-ink);font-size:10px;font-weight:600;border:2px solid var(--p-surface);margin-left:-6px}
 .mono-chip:first-child{margin-left:0}
-.mono-chip.offen{background:var(--p-warn-soft);color:var(--p-warn);border-style:dashed;border-color:var(--p-warn)}
+.mono-chip.offen{background:var(--p-warn-soft);color:var(--p-warn);border-style:dashed;border-color:var(--p-warn-line)}
 .pill{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:2px 9px;font-size:11px;font-weight:600}
 .pill.pos{background:var(--p-pos-soft);color:var(--p-pos)}
 .pill.warn{background:var(--p-warn-soft);color:var(--p-warn)}
-.pill.neutral{background:#EEF0F4;color:var(--p-ink2)}
-.pill.fest{background:#E9ECF2;color:#3B4351}
+.pill.neutral{background:var(--p-surface-2);color:var(--p-ink2)}
+.pill.fest{background:var(--p-surface-2);color:var(--p-ink2)}
 .pill svg{width:11px;height:11px}
-.ck-feed{background:var(--p-surface);border-left:1px solid var(--p-line);padding:18px 18px}
-.ck-feed-titel{font-weight:600;font-size:13px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:baseline}
-.ck-feed-titel span{font-size:11px;color:var(--p-ink3);font-weight:400}
-.ck-ereignis{display:grid;grid-template-columns:44px 1fr;gap:10px;padding:10px 0;border-bottom:1px solid var(--p-line-soft)}
-.ck-ereignis:last-child{border-bottom:0}
-.ck-ereignis .zeit{font-family:var(--mono);font-size:11px;color:var(--p-ink3);padding-top:2px}
-.ck-ereignis b{display:block;font-weight:600;font-size:12.5px}
-.ck-ereignis span{color:var(--p-ink2);font-size:12px}
-.ck-ereignis .neu b::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--p-accent);margin-right:6px;vertical-align:middle}
-@media (max-width:1100px){.ck-body{grid-template-columns:200px 1fr}.ck-feed{display:none}}
-@media (max-width:760px){.ck-body{grid-template-columns:minmax(0,1fr)}.ck-side{display:none}.ck-main{padding:14px;overflow-x:auto}.ck-tabelle{min-width:560px}.ck-chrome .url{max-width:none}.ck-top{flex-direction:column;align-items:flex-start;gap:10px}.ck-tools{justify-content:flex-start}}
+@media (max-width:1100px){.ck-oben{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:760px){.ck-top{grid-template-columns:minmax(0,1fr) auto;height:auto;padding:8px 12px}.ck-nav{grid-column:1;overflow-x:auto;scrollbar-width:none}.ck-nav span{min-width:72px}.ck-recht{grid-column:2;position:relative;z-index:1;background:var(--p-shell);padding-left:12px;box-shadow:-14px 0 12px -6px var(--p-shell)}.kpi .l{white-space:normal}.ck-sub{flex-direction:column;align-items:flex-start;gap:10px;padding:12px 14px}.ck-body{padding:12px 14px 16px}.ck-tabelle{min-width:560px}.ck-chrome .url{max-width:none}}
 
 /* Telefon */
 .phone{width:320px;max-width:100%;margin:0 auto;background:#0E1117;border-radius:40px;padding:12px;box-shadow:0 40px 90px -30px rgba(0,0,0,.8),0 0 0 1px rgba(255,255,255,.1),inset 0 0 0 2px #1E232D;color:var(--p-ink);font-family:var(--body);text-align:left}
@@ -223,7 +242,7 @@ p{margin:0 0 1em}
 .ph-titel{font-size:21px;font-weight:600;letter-spacing:-.01em;margin-top:4px}
 .ph-sub{font-size:12.5px;color:var(--p-ink2);margin-top:2px}
 .ph-progress{padding:0 20px 12px}
-.ph-bar{height:8px;border-radius:999px;background:#E3E7EE;overflow:hidden}
+.ph-bar{height:8px;border-radius:999px;background:var(--p-surface-3);overflow:hidden}
 .ph-bar i{display:block;height:100%;width:62.5%;background:var(--p-accent);border-radius:999px}
 .ph-prog-txt{display:flex;justify-content:space-between;font-size:12px;color:var(--p-ink2);margin-top:6px;font-variant-numeric:tabular-nums}
 .ph-liste{list-style:none;margin:0 14px;padding:0;background:var(--p-surface);border:1px solid var(--p-line);border-radius:12px;overflow:hidden}
@@ -238,7 +257,7 @@ p{margin:0 0 1em}
 .ph-liste .art{font-size:10.5px;color:var(--p-ink3);text-transform:uppercase;letter-spacing:.05em}
 .ph-aktionen{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px 14px 4px}
 .ph-aktionen button{height:46px;border-radius:10px;border:1px solid var(--p-line);background:var(--p-surface);font-weight:600;font-size:14px}
-.ph-aktionen button.prim{background:var(--p-accent);color:#fff;border-color:var(--p-accent)}
+.ph-aktionen button.prim{background:var(--p-knopf);color:#fff;border-color:var(--p-knopf)}
 .ph-notruf{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:8px 14px 16px;margin-top:auto}
 .ph-notruf a{min-height:56px;border-radius:10px;background:var(--p-surface);border:1px solid var(--p-line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
 .ph-notruf a b{font-size:16px;font-weight:700;letter-spacing:-.02em}
@@ -248,7 +267,7 @@ p{margin:0 0 1em}
 .ph-notruf a.notruf b{color:var(--p-neg)}
 
 /* Portal (Tablet-Karte) */
-.portal{background:var(--p-surface);color:var(--p-ink);border-radius:12px;box-shadow:0 30px 70px -30px rgba(16,20,31,.35),0 0 0 1px var(--p-line);overflow:hidden;font-family:var(--body);font-size:13px;text-align:left;max-width:100%}
+.portal{background:var(--p-surface);color:var(--p-ink);border-radius:12px;box-shadow:0 30px 70px -30px rgba(16,20,31,.45),0 0 0 1px var(--p-line-hi);overflow:hidden;font-family:var(--body);font-size:13px;text-align:left;max-width:100%}
 .po-scroll{overflow-x:auto}
 .po-scroll > *{min-width:560px}
 .po-kopf{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--p-line);background:var(--p-bg)}
@@ -263,7 +282,7 @@ p{margin:0 0 1em}
 .po-tabelle tr.offen td{border-bottom:0;background:var(--p-bg)}
 .po-tabelle .zeit{font-family:var(--mono);font-size:12px}
 .po-balken{display:flex;align-items:center;gap:10px}
-.po-balken i{display:block;width:120px;height:6px;border-radius:999px;background:#E3E7EE;overflow:hidden}
+.po-balken i{display:block;width:120px;height:6px;border-radius:999px;background:var(--p-surface-3);overflow:hidden}
 .po-balken i b{display:block;height:100%;background:var(--p-pos);border-radius:999px}
 .po-balken span{font-variant-numeric:tabular-nums;color:var(--p-ink2);font-size:12px}
 .po-foto{display:inline-flex;align-items:center;gap:5px;color:var(--p-ink2);font-size:12px}
@@ -276,36 +295,36 @@ p{margin:0 0 1em}
 @media (max-width:760px){.po-detail ol{grid-template-columns:repeat(2,minmax(0,1fr))}.po-balken i{width:90px}}
 
 /* Beleg (Rechnung mit QR-Zahlteil) */
-.beleg{background:#fff;color:var(--p-ink);border-radius:6px;box-shadow:0 30px 70px -30px rgba(16,20,31,.35),0 0 0 1px var(--p-line);padding:28px 30px;font-family:var(--body);font-size:12.5px;text-align:left;max-width:560px;margin:0 auto}
-.bl-kopf{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;padding-bottom:16px;border-bottom:1px solid var(--p-line)}
+.beleg{background:#fff;color:#14161A;border-radius:6px;box-shadow:0 30px 70px -30px rgba(16,20,31,.35),0 0 0 1px #E5E8EC;padding:28px 30px;font-family:var(--body);font-size:12.5px;text-align:left;max-width:560px;margin:0 auto}
+.bl-kopf{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;padding-bottom:16px;border-bottom:1px solid #E5E8EC}
 .bl-kopf .firma{font-weight:600;font-size:14px}
-.bl-kopf .firma small{display:block;font-weight:400;color:var(--p-ink2);font-size:11.5px;line-height:1.4}
-.bl-nr{text-align:right;font-family:var(--mono);font-size:11px;color:var(--p-ink2);line-height:1.6}
-.bl-nr b{display:block;font-family:var(--body);font-size:18px;color:var(--p-ink);font-weight:600;letter-spacing:-.01em}
-.bl-adresse{padding:14px 0;color:var(--p-ink2);line-height:1.45}
-.bl-adresse b{color:var(--p-ink);font-weight:600}
+.bl-kopf .firma small{display:block;font-weight:400;color:#545B67;font-size:11.5px;line-height:1.4}
+.bl-nr{text-align:right;font-family:var(--mono);font-size:11px;color:#545B67;line-height:1.6}
+.bl-nr b{display:block;font-family:var(--body);font-size:18px;color:#14161A;font-weight:600;letter-spacing:-.01em}
+.bl-adresse{padding:14px 0;color:#545B67;line-height:1.45}
+.bl-adresse b{color:#14161A;font-weight:600}
 .bl-pos{width:100%;border-collapse:collapse;margin-top:6px}
-.bl-pos th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--p-ink3);padding:6px 0;border-bottom:1px solid var(--p-line);font-weight:600}
-.bl-pos td{padding:8px 0;border-bottom:1px solid var(--p-line-soft);vertical-align:top}
-.bl-pos td small{display:block;color:var(--p-ink2);font-size:11px}
+.bl-pos th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:#8B919D;padding:6px 0;border-bottom:1px solid #E5E8EC;font-weight:600}
+.bl-pos td{padding:8px 0;border-bottom:1px solid #EFF1F4;vertical-align:top}
+.bl-pos td small{display:block;color:#545B67;font-size:11px}
 .bl-pos .r{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;padding-left:12px}
-.bl-pos tr.summe td{border-bottom:0;padding:5px 0;color:var(--p-ink2)}
-.bl-pos tr.total td{font-weight:600;color:var(--p-ink);border-top:1px solid var(--p-ink);padding-top:8px;font-size:14px}
-.bl-qr{margin-top:18px;border-top:1px dashed var(--p-line);padding-top:14px;display:grid;grid-template-columns:auto 1fr;gap:18px;align-items:start}
+.bl-pos tr.summe td{border-bottom:0;padding:5px 0;color:#545B67}
+.bl-pos tr.total td{font-weight:600;color:#14161A;border-top:1px solid #14161A;padding-top:8px;font-size:14px}
+.bl-qr{margin-top:18px;border-top:1px dashed #E5E8EC;padding-top:14px;display:grid;grid-template-columns:auto 1fr;gap:18px;align-items:start}
 .bl-qr .qr{width:104px;height:104px;background:
   repeating-linear-gradient(0deg,#14161A 0 4px,transparent 4px 8px),
-  repeating-linear-gradient(90deg,#14161A 0 4px,transparent 4px 8px);background-blend-mode:multiply;position:relative;border:6px solid #fff;outline:1px solid var(--p-line)}
+  repeating-linear-gradient(90deg,#14161A 0 4px,transparent 4px 8px);background-blend-mode:multiply;position:relative;border:6px solid #fff;outline:1px solid #E5E8EC}
 .bl-qr .qr::before,.bl-qr .qr::after{content:"";position:absolute;background:#fff}
 .bl-qr .qr::before{left:50%;top:50%;width:22px;height:22px;transform:translate(-50%,-50%);background:#14161A}
 .bl-qr .qr::after{left:50%;top:50%;width:12px;height:12px;transform:translate(-50%,-50%);background:#fff;clip-path:polygon(40% 0,60% 0,60% 40%,100% 40%,100% 60%,60% 60%,60% 100%,40% 100%,40% 60%,0 60%,0 40%,40% 40%)}
 .bl-qr dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:3px 14px;font-size:11.5px}
-.bl-qr dt{color:var(--p-ink3);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;padding-top:1px}
-.bl-qr dd{margin:0;font-family:var(--mono);font-size:11px;color:var(--p-ink)}
-.bl-qr .zahlteil{grid-column:1/-1;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--p-ink3);font-weight:600;margin-top:-6px}
+.bl-qr dt{color:#8B919D;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;padding-top:1px}
+.bl-qr dd{margin:0;font-family:var(--mono);font-size:11px;color:#14161A}
+.bl-qr .zahlteil{grid-column:1/-1;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:#8B919D;font-weight:600;margin-top:-6px}
 @media (max-width:560px){.beleg{padding:20px}.bl-qr{grid-template-columns:1fr}}
 
 /* Stundenkarte */
-.stunden{background:var(--p-surface);color:var(--p-ink);border-radius:12px;box-shadow:0 30px 70px -30px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.08);padding:22px 24px;font-family:var(--body);max-width:440px;margin:0 auto;text-align:left}
+.stunden{background:var(--p-surface);color:var(--p-ink);border-radius:12px;box-shadow:0 30px 70px -30px rgba(0,0,0,.6),0 0 0 1px var(--p-line-hi);padding:22px 24px;font-family:var(--body);max-width:440px;margin:0 auto;text-align:left}
 .st-kopf{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px}
 .st-kopf b{font-size:15px;font-weight:600}
 .st-kopf span{font-size:12px;color:var(--p-ink3)}
@@ -317,7 +336,7 @@ p{margin:0 0 1em}
 .stunden .ein dt{padding-left:16px}
 .stunden .plus dd{color:var(--p-pos)}
 .stunden .minus dd{color:var(--p-ink2)}
-.stunden .summe dt,.stunden .summe dd{border-bottom:0;border-top:1px solid var(--p-ink);font-weight:600;color:var(--p-ink);padding-top:10px;font-size:14.5px}
+.stunden .summe dt,.stunden .summe dd{border-bottom:0;border-top:1px solid var(--p-line-hi);font-weight:600;color:var(--p-ink);padding-top:10px;font-size:14.5px}
 .stunden .hinweis{margin:12px 0 0;font-size:11.5px;color:var(--p-ink3);line-height:1.45}
 
 /* ─────────────────────────────────────────────────────────────
@@ -342,7 +361,7 @@ p{margin:0 0 1em}
 /* Fahrplanraster: Zellen mit Haarlinien, keine Karten */
 .raster{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--rule);border-left:1px solid var(--rule)}
 .raster > div{padding:28px 26px 30px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);position:relative;transition:background .2s}
-.raster > div:hover{background:rgba(243,180,43,.06)}
+.raster > div:hover{background:rgba(112,152,247,.06)}
 .raster .nr{font-family:var(--mono);font-size:11.5px;color:var(--t3);letter-spacing:.08em;margin-bottom:22px;display:flex;justify-content:space-between}
 .raster h3{font-family:var(--display);font-stretch:80%;font-weight:700;text-transform:uppercase;font-size:24px;line-height:1;letter-spacing:.005em;margin:0 0 12px;color:var(--t)}
 .raster p{color:var(--t2);font-size:15px;line-height:1.55;margin:0 0 14px}
@@ -364,7 +383,7 @@ p{margin:0 0 1em}
 .vn-neu .marke{margin-bottom:14px}
 .vn-neu ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:6px 16px}
 .vn-neu li{font-size:14px;color:var(--stahl-2);padding-left:14px;position:relative}
-.vn-neu li::before{content:"";position:absolute;left:0;top:11px;width:6px;height:1px;background:var(--bernstein)}
+.vn-neu li::before{content:"";position:absolute;left:0;top:11px;width:6px;height:1px;background:var(--blau)}
 .vn-neu p{margin:14px 0 0;font-size:13px;color:var(--stahl);border-top:1px solid var(--nacht-linie);padding-top:12px}
 @media (max-width:760px){.vorher-nachher{grid-template-columns:minmax(0,1fr)}.vn-pfeil svg{transform:rotate(90deg);margin:0 auto}}
 
@@ -375,8 +394,9 @@ p{margin:0 0 1em}
 .protokoll .zeit small{display:block;font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--t3);margin-top:8px;font-weight:400}
 .protokoll .wo{font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--acc-t);padding-top:14px;display:flex;align-items:center;gap:10px}
 .protokoll .wo::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor;flex:none}
-.protokoll li.live .wo::before{box-shadow:0 0 0 0 rgba(243,180,43,.6);animation:ring 2.2s ease-out infinite}
-@keyframes ring{to{box-shadow:0 0 0 12px rgba(243,180,43,0)}}
+.protokoll li.live .wo{color:var(--signal)}
+.protokoll li.live .wo::before{box-shadow:0 0 0 0 rgba(226,177,86,.6);animation:ring 2.2s ease-out infinite}
+@keyframes ring{to{box-shadow:0 0 0 12px rgba(226,177,86,0)}}
 @media (prefers-reduced-motion:reduce){.protokoll li.live .wo::before{animation:none}}
 .protokoll .was{padding-top:10px}
 .protokoll .was b{display:block;color:var(--t);font-weight:600;font-size:18px;margin-bottom:6px}
@@ -393,14 +413,14 @@ p{margin:0 0 1em}
 .dk .satz small{display:block;font-family:var(--body);font-size:12.5px;color:var(--t3);margin-top:4px}
 .dk .pfeil{color:var(--t3)}
 .dk .pfeil svg{width:28px;height:28px;margin:0 auto}
-.dk .ergebnis{background:var(--p-surface);color:var(--p-ink);border:1px solid var(--p-line);border-radius:8px;padding:12px 14px;font-size:12.5px;box-shadow:0 12px 30px -20px rgba(16,20,31,.3)}
+.dk .ergebnis{background:var(--p-surface);color:var(--p-ink);border:1px solid var(--p-line-hi);border-radius:10px;padding:12px 14px;font-size:12.5px;box-shadow:0 12px 30px -20px rgba(16,20,31,.4)}
 .dk .ergebnis b{display:block;font-weight:600;margin-bottom:6px;font-size:13px}
 .dk .ergebnis dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:3px 12px}
 .dk .ergebnis dt{color:var(--p-ink3);font-size:11px;text-transform:uppercase;letter-spacing:.05em;padding-top:2px}
 .dk .ergebnis dd{margin:0}
 .dk .ergebnis .knoepfe{display:flex;gap:6px;margin-top:10px}
 .dk .ergebnis .knoepfe span{border-radius:5px;padding:4px 9px;font-size:11.5px;font-weight:600;border:1px solid var(--p-line)}
-.dk .ergebnis .knoepfe span.prim{background:var(--p-accent);border-color:var(--p-accent);color:#fff}
+.dk .ergebnis .knoepfe span.prim{background:var(--p-knopf);border-color:var(--p-knopf);color:#fff}
 @media (max-width:760px){.dk{grid-template-columns:minmax(0,1fr)}.dk .pfeil svg{transform:rotate(90deg)}}
 
 /* GAV-Artikel */
@@ -440,18 +460,19 @@ p{margin:0 0 1em}
 
 /* Schlussaufruf */
 .schluss .zwei{align-items:start}
-.formular{background:var(--nacht-2);border:1px solid var(--nacht-linie);border-radius:6px;padding:28px}
+.formular{background:var(--nacht-2);border:1px solid var(--nacht-linie);border-radius:12px;padding:28px}
 .formular .reihe{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .formular label{display:grid;gap:6px;font-size:13px;color:var(--stahl);margin-bottom:14px}
-.formular input,.formular select,.formular textarea{height:48px;border:1px solid var(--nacht-linie-2);background:var(--nacht);color:var(--stahl-hi);border-radius:4px;padding:0 12px;font-size:16px;width:100%}
+.formular input,.formular select,.formular textarea{height:48px;border:1px solid var(--nacht-linie);background:var(--nacht-3);color:var(--stahl-hi);border-radius:6px;padding:0 12px;font-size:16px;width:100%}
+.formular input:focus,.formular select:focus,.formular textarea:focus{border-color:var(--blau);outline:none}
 .formular textarea{height:96px;padding:12px;resize:vertical}
 .formular select{appearance:none;-webkit-appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--stahl) 50%),linear-gradient(135deg,var(--stahl) 50%,transparent 50%);background-position:calc(100% - 18px) 21px,calc(100% - 13px) 21px;background-size:5px 5px;background-repeat:no-repeat}
 .formular .btn{width:100%;justify-content:center;margin-top:4px}
 .formular .hinweis{margin:14px 0 0;font-size:13px;color:var(--stahl)}
-.formular .meldung{display:none;margin-top:14px;padding:12px 14px;border:1px solid var(--bernstein);border-radius:4px;color:var(--bernstein);font-size:14px;line-height:1.5}
+.formular .meldung{display:none;margin-top:14px;padding:12px 14px;border:1px solid var(--blau);border-radius:6px;color:var(--blau-hi);font-size:14px;line-height:1.5}
 .formular .meldung.zeigen{display:block}
-.formular .meldung.fehler{border-color:#F08A7E;color:#F5A79E}
-.formular [aria-invalid="true"]{border-color:#F08A7E}
+.formular .meldung.fehler{border-color:#F27F70;color:#FF9A8C}
+.formular [aria-invalid="true"]{border-color:#F27F70}
 .formular .btn[disabled]{opacity:.6;cursor:progress}
 /* Fallenfeld (siehe backend/demo_anfrage.php): fuer Menschen nicht erreichbar,
    fuer Skripte ein normales Feld. Bewusst nicht display:none. */
@@ -489,7 +510,7 @@ p{margin:0 0 1em}
     <symbol id="marke" viewBox="0 0 32 32">
       <circle cx="16" cy="16" r="12.5" fill="none" stroke="currentColor" stroke-width="2.7" stroke-dasharray="59 19.5" stroke-linecap="round" transform="rotate(20 16 16)"/>
       <circle cx="16" cy="16" r="4.3" fill="currentColor"/>
-      <circle cx="27.3" cy="10.7" r="2.9" fill="#F3B42B"/>
+      <circle cx="27.3" cy="10.7" r="2.9" fill="#E2B156"/>
     </symbol>
     <symbol id="i-haken" viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-pfeil" viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
@@ -504,6 +525,12 @@ p{margin:0 0 1em}
     <symbol id="i-glocke" viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M10 20a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
     <symbol id="i-trenn" viewBox="0 0 24 24"><rect x="3" y="5" width="7" height="14" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="14" y="5" width="7" height="14" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 3v18" stroke="currentColor" stroke-width="1.8" stroke-dasharray="2 3"/></symbol>
     <symbol id="i-server" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="6.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="4" y="13.5" width="16" height="6.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="8" cy="7.25" r="1" fill="currentColor"/><circle cx="8" cy="16.75" r="1" fill="currentColor"/></symbol>
+    <symbol id="i-raster" viewBox="0 0 24 24"><rect x="4" y="4" width="6.5" height="6.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+    <symbol id="i-kalender" viewBox="0 0 24 24"><rect x="4" y="5.5" width="16" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-abgleich" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8 12.5l2.7 2.7L16.5 9.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-koffer" viewBox="0 0 24 24"><rect x="3.5" y="7.5" width="17" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M9 7.5V5.5a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 5.5v2M3.5 12.5h17" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s-6.5-6-6.5-11a6.5 6.5 0 0 1 13 0c0 5-6.5 11-6.5 11z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="10" r="2.4" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+    <symbol id="i-zahnrad" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 3.5v2.5M12 18v2.5M3.5 12H6M18 12h2.5M6 6l1.8 1.8M16.2 16.2 18 18M6 18l1.8-1.8M16.2 7.8 18 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
     <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
   </defs>
 </svg>
@@ -546,25 +573,41 @@ p{margin:0 0 1em}
       <div><b>Portal</b><span>für Ihre Kunden: jeder Rundgang mit Zeit, Fortschritt und Fotobeleg.</span></div>
     </div>
     <div class="held-bild">
-      <div class="cockpit" role="img" aria-label="Cockpit: Einsatzplanung mit Wochenansicht, Zuteilung und Ereignis-Feed. Beispieldaten.">
+      <div class="cockpit" role="img" aria-label="Cockpit im dunklen Thema: Symbolleiste oben, Einsätze der Woche mit Kennzahlen, Ereignissen und Zuteilung. Beispieldaten.">
         <div class="ck-chrome"><i></i><i></i><i></i><div class="url">cockpit.wachtwerk.ch/planung</div></div>
+        <div class="ck-top">
+          <div class="ck-nav">
+            <span><svg><use href="#i-raster"/></svg>Übersicht</span>
+            <span class="on"><svg><use href="#i-kalender"/></svg>Planung</span>
+            <span><svg><use href="#i-abgleich"/></svg>Abgleich</span>
+            <span><svg><use href="#i-koffer"/></svg>Kunden</span>
+            <span><svg><use href="#i-pin"/></svg>Revierdienst</span>
+            <span><svg><use href="#i-schild"/></svg>Auswertung</span>
+            <span><svg><use href="#i-zahnrad"/></svg>Administration</span>
+          </div>
+          <div class="ck-recht"><span class="ck-glocke"><svg><use href="#i-glocke"/></svg><b>3</b></span><span class="ck-avatar">MS</span></div>
+        </div>
+        <div class="ck-sub">
+          <div><div class="ck-titel">Einsätze</div><div class="ck-untertitel">Woche 38 · 14 Einsätze · 3 offene Plätze</div></div>
+          <div class="ck-werkzeuge"><span class="ck-sprechen"><svg><use href="#i-mikro"/></svg>Sprechen</span><span class="ck-schalter" aria-hidden="true"></span></div>
+        </div>
         <div class="ck-body">
-          <aside class="ck-side">
-            <div class="ck-brand"><svg><use href="#marke"/></svg><div>Cockpit<small data-brand>Wachtwerk</small></div></div>
-            <div class="ck-grp">Betrieb</div>
-            <span class="ck-nav">Übersicht</span><span class="ck-nav on">Einsätze</span><span class="ck-nav">Objektplanung</span><span class="ck-nav">Tagesplan</span>
-            <div class="ck-grp">Stammdaten</div>
-            <span class="ck-nav">Adressen</span><span class="ck-nav">Objekte</span><span class="ck-nav">Rapporte</span><span class="ck-nav">Offerten</span><span class="ck-nav">Rechnungen</span>
-            <div class="ck-grp">Revierdienst</div>
-            <span class="ck-nav">Übersicht</span><span class="ck-nav">Einrichtung</span>
-            <div class="ck-grp">Auswertung</div>
-            <span class="ck-nav">Pensen</span><span class="ck-nav">Auslagenersatz</span><span class="ck-nav">Abwesenheiten</span>
-          </aside>
-          <div class="ck-main">
-            <div class="ck-top">
-              <div><div class="ck-titel">Einsätze</div><div class="ck-sub">Woche 38 · 14 Einsätze · 3 offene Plätze</div></div>
-              <div class="ck-tools"><span class="ck-chip on">Nur Einsätze</span><span class="ck-chip">Sicherheit</span><span class="ck-chip">Reinigung</span><span class="ck-btn">+ Einsatz</span></div>
+          <div class="ck-oben">
+            <div class="ck-karte">
+              <h5>Ereignisse <span>seit gestern 22:00</span></h5>
+              <div class="ck-ereignis neu"><div class="zeit">07:12</div><div><b>Verfügbarkeit gemeldet</b><span>2 Personen für Samstag und Sonntag</span></div></div>
+              <div class="ck-ereignis neu"><div class="zeit">06:48</div><div><b>Rapport eingegangen</b><span>Areal Süd, mit Unterschrift des Kunden</span></div></div>
+              <div class="ck-ereignis"><div class="zeit">05:31</div><div><b>Rundgang beendet</b><span>Logistikpark Ost · 8 von 8 Kontrollpunkten</span></div></div>
+              <div class="ck-ereignis"><div class="zeit">23:40</div><div><b>Ereignis gemeldet</b><span>Tor 3 offen vorgefunden · Foto liegt bei</span></div></div>
             </div>
+            <div class="ck-kpis">
+              <div class="kpi"><div class="l"><svg><use href="#i-kalender"/></svg>Einsätze heute</div><div class="z">4</div><div class="u">1 davon Revierdienst</div></div>
+              <div class="kpi"><div class="l"><svg><use href="#i-rollen"/></svg>Offene Plätze</div><div class="z">1</div><div class="u">in 1 Einsatz, heute 14:00</div></div>
+              <div class="kpi"><div class="l"><svg><use href="#i-haken"/></svg>Zusagen ausstehend</div><div class="z">2<small>/ 7</small></div><div class="u">angefragt für diese Woche</div></div>
+              <div class="kpi"><div class="l"><svg><use href="#i-pin"/></svg>Rundgänge heute</div><div class="z">1</div><div class="u">läuft · 5 von 8 Kontrollpunkten</div></div>
+            </div>
+          </div>
+          <div class="ck-karte ck-tabellen">
             <div class="ck-tag"><b>Montag 14.</b> 4 Einsätze · 1 offener Platz</div>
             <table class="ck-tabelle">
               <thead><tr><th>Zeit</th><th>Objekt</th><th>Sparte</th><th>Team</th><th>Status</th></tr></thead>
@@ -572,26 +615,10 @@ p{margin:0 0 1em}
                 <tr><td class="zeit">06:00–14:00</td><td class="obj"><b>Baustelle Areal Süd</b><span>Zugangskontrolle</span></td><td class="sparte">Sicherheit</td><td><span class="ck-team"><i class="mono-chip">LB</i><i class="mono-chip">SR</i></span></td><td><span class="pill fest"><svg><use href="#i-schloss"/></svg>Abgeglichen</span></td></tr>
                 <tr><td class="zeit">14:00–22:00</td><td class="obj"><b>Einkaufszentrum West</b><span>Bewachung</span></td><td class="sparte">Sicherheit</td><td><span class="ck-team"><i class="mono-chip">MF</i><i class="mono-chip offen">+1</i></span></td><td><span class="pill warn">1 Platz offen</span></td></tr>
                 <tr><td class="zeit">18:00–23:30</td><td class="obj"><b>Festgelände Stadtpark</b><span>Verkehrsdienst</span></td><td class="sparte">Sicherheit</td><td><span class="ck-team"><i class="mono-chip">DV</i><i class="mono-chip">NK</i><i class="mono-chip">AH</i></span></td><td><span class="pill pos">Zugesagt 3/3</span></td></tr>
-                <tr><td class="zeit">22:00–06:00</td><td class="obj"><b>Logistikpark Ost</b><span>Revierdienst · Runde Nacht A</span></td><td class="sparte">Sicherheit</td><td><span class="ck-team"><i class="mono-chip">RB</i></span></td><td><span class="pill neutral">Geplant</span></td></tr>
-              </tbody>
-            </table>
-            <div class="ck-tag"><b>Dienstag 15.</b> 3 Einsätze · 2 offene Plätze</div>
-            <table class="ck-tabelle">
-              <tbody>
-                <tr><td class="zeit">05:30–09:30</td><td class="obj"><b>Bürohaus Bahnhofstrasse</b><span>Unterhaltsreinigung</span></td><td class="sparte">Reinigung</td><td><span class="ck-team"><i class="mono-chip">EK</i><i class="mono-chip offen">+1</i></span></td><td><span class="pill warn">1 Platz offen</span></td></tr>
-                <tr><td class="zeit">07:00–17:00</td><td class="obj"><b>Baustelle Areal Süd</b><span>Zugangskontrolle</span></td><td class="sparte">Sicherheit</td><td><span class="ck-team"><i class="mono-chip">LB</i><i class="mono-chip offen">+1</i></span></td><td><span class="pill warn">1 Platz offen</span></td></tr>
                 <tr><td class="zeit">22:00–06:00</td><td class="obj"><b>Logistikpark Ost</b><span>Revierdienst · Runde Nacht A</span></td><td class="sparte">Sicherheit</td><td><span class="ck-team"><i class="mono-chip">RB</i></span></td><td><span class="pill pos">Zugesagt 1/1</span></td></tr>
               </tbody>
             </table>
           </div>
-          <aside class="ck-feed">
-            <div class="ck-feed-titel">Ereignisse <span>seit gestern 22:00</span></div>
-            <div class="ck-ereignis neu"><div class="zeit">07:12</div><div class="neu"><b>Verfügbarkeit gemeldet</b><span>2 Personen für Samstag und Sonntag</span></div></div>
-            <div class="ck-ereignis neu"><div class="zeit">06:48</div><div class="neu"><b>Rapport eingegangen</b><span>Areal Süd, mit Unterschrift des Kunden</span></div></div>
-            <div class="ck-ereignis"><div class="zeit">05:31</div><div><b>Rundgang beendet</b><span>Logistikpark Ost · 8 von 8 Kontrollpunkten</span></div></div>
-            <div class="ck-ereignis"><div class="zeit">23:40</div><div><b>Ereignis gemeldet</b><span>Tor 3 offen vorgefunden · Foto liegt bei</span></div></div>
-            <div class="ck-ereignis"><div class="zeit">22:04</div><div><b>Rundgang gestartet</b><span>Logistikpark Ost · Runde Nacht A</span></div></div>
-          </aside>
         </div>
       </div>
     </div>
@@ -825,7 +852,7 @@ p{margin:0 0 1em}
               <li><span class="zeit">22:11</span>Lager B</li>
               <li><span class="zeit">22:19</span>Parkdeck 2</li>
               <li><span class="zeit">22:27</span>Technikraum</li>
-              <li><span class="zeit">22:36</span>Tor 3 <em>Ersatzscan · Foto</em></li>
+              <li><span class="zeit">22:36</span>Tor 3 <em>Fotobeleg</em></li>
               <li><span class="zeit">22:44</span>Büro EG</li>
               <li><span class="zeit">22:52</span>Rampe Süd</li>
               <li><span class="zeit">23:01</span>Eingang Nord</li>

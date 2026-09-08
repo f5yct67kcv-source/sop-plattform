@@ -16,6 +16,7 @@
 //      "nicht eingerichtet" (503) sind zwei verschiedene Texte.
 import { WURZEL, OUT, browserPfad } from './pfade.mjs';
 import { chromium } from 'playwright';
+import { readFileSync } from 'node:fs';
 
 const SEITE = `file://${WURZEL}/homepage.html`;
 const EXE = browserPfad();
@@ -69,6 +70,43 @@ const h1 = await desktop.evaluate(() => {
 });
 check('Die Ueberschrift steht in schmalem Archivo in Versalien (die Westenaufschrift)',
   /Archivo/.test(h1.fam) && parseFloat(h1.stretch) < 80 && h1.gross === 'uppercase');
+
+// ── Dieselben Farben wie das Cockpit (Anordnung des Projektinhabers,
+// ENT-469-N1). Nicht der Wortlaut einer Hex-Zahl wird verglichen, sondern
+// die Aussage: Was die Homepage rendert, ist der Wert, den dashboard.html
+// fuer sein dunkles bzw. helles Thema traegt. Aendert jemand das Cockpit,
+// wird die Homepage hier rot -- und nicht still anders.
+const dash = readFileSync(`${WURZEL}/dashboard.html`, 'utf8');
+const block = (ab) => { const i = dash.indexOf(ab); return i < 0 ? '' : dash.slice(i, dash.indexOf('}', i)); };
+const marke = (b, name) => (b.match(new RegExp(`--${name}:\\s*(#[0-9A-Fa-f]{6})`)) || [])[1] || '';
+const dunkel = block('html[data-thema="dunkel"] {');
+const hell = block(':root {');
+const rgb = h => `rgb(${parseInt(h.slice(1, 3), 16)}, ${parseInt(h.slice(3, 5), 16)}, ${parseInt(h.slice(5, 7), 16)})`;
+check('Die Farbmarken des Cockpits sind lesbar (dunkel: bg, accent, warn; hell: bg, accent)',
+  !!marke(dunkel, 'bg') && !!marke(dunkel, 'accent') && !!marke(dunkel, 'warn') && !!marke(hell, 'bg') && !!marke(hell, 'accent'));
+const farben = await desktop.evaluate(() => {
+  const f = (sel, eig) => { const e = document.querySelector(sel); return e ? getComputedStyle(e)[eig] : ''; };
+  return {
+    grundDunkel: getComputedStyle(document.body).backgroundColor,
+    grundHell: f('#belege', 'backgroundColor'),
+    vorzeileDunkel: f('.abs.nacht .vorzeile', 'color'),
+    vorzeileHell: f('.abs.hell .vorzeile', 'color'),
+    knopf: f('.held .btn.primaer', 'backgroundColor'),
+    live: f('.protokoll li.live .wo', 'color'),
+    andereZeile: f('.protokoll li:not(.live) .wo', 'color'),
+    cockpitGrund: f('.cockpit', 'backgroundColor'),
+  };
+});
+check('KRITISCH: der dunkle Grund der Homepage ist der dunkle Grund des Cockpits', farben.grundDunkel === rgb(marke(dunkel, 'bg')));
+check('KRITISCH: der Cockpit-Bildschirm im Kopfbereich traegt den dunklen Cockpit-Grund', farben.cockpitGrund === rgb(marke(dunkel, 'bg')));
+check('Der helle Grund der Homepage ist der helle Grund des Cockpits', farben.grundHell === rgb(marke(hell, 'bg')));
+check('KRITISCH: Blau bedient -- die Vorzeile traegt auf dunklem Grund den dunklen, auf hellem den hellen Cockpit-Akzent',
+  farben.vorzeileDunkel === rgb(marke(dunkel, 'accent')) && farben.vorzeileHell === rgb(marke(hell, 'accent')));
+const kanal = t => (t.match(/\d+/g) || []).slice(0, 3).map(Number);
+const [kr, kg, kb] = kanal(farben.knopf);
+check('KRITISCH: der Demo-Knopf ist blau, nicht bernsteinfarben', kb > kr + 60 && kb > kg);
+check('Bernstein meldet -- nur der laufende Rundgang traegt die Warnfarbe des Cockpits, die uebrigen Zeilen Blau',
+  farben.live === rgb(marke(dunkel, 'warn')) && farben.andereZeile === rgb(marke(dunkel, 'accent')));
 
 const masseDesktop = await desktop.evaluate(() => ({
   ueberlauf: document.documentElement.scrollWidth - document.documentElement.clientWidth,
