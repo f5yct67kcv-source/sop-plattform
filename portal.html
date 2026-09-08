@@ -322,6 +322,15 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
 .d-ereignis .e-art{font-weight:600}
 .d-ereignis .e-bem{font-size:13px;color:var(--ink-2);margin-top:2px;overflow-wrap:anywhere}
 .d-hinweis{font-size:13px;color:var(--ink-3)}
+/* Kontrollrunde und eingesetzte Person, über dem Kennzahlenband. Beides
+   steht seit ENT-481 auch im Portal -- der Kunde bekommt dasselbe Blatt
+   ohnehin physisch. */
+.d-kopf{font-size:13.5px;color:var(--ink-2);margin:0 0 14px}
+/* Ein Abbruch ist die wichtigste Aussage über eine Runde und steht OBEN,
+   nicht als Fussnote. */
+.d-abbruch{border:1px solid var(--warn);background:var(--warn-soft);color:var(--warn);
+           border-radius:var(--r);padding:10px 13px;margin-bottom:16px;
+           font-size:13px;line-height:1.5}
 
 /* Der Weg auf der Karte (ENT-474). Er kommt erst auf einen Knopfdruck --
    siehe die Begruendung bei wegZeigen(). Die Hoehe haengt am Fenster und
@@ -1013,8 +1022,21 @@ function detailZeichnen(d, tafel) {
   const punkte = d.kontrollpunkte || [];
   const ereignisse = d.ereignisse || [];
 
-  tafel.innerHTML =
-    '<div class="kennzahlen">' + band.map(b => '<div>'
+  // Der Abbruch zuerst -- er ist die wichtigste Aussage über die Runde.
+  const abbruch = d.status === 'abgebrochen'
+    ? '<div class="d-abbruch"><strong>Abgebrochen</strong>'
+      + (d.abbruch_grund ? ' — ' + esc(d.abbruch_grund) : '')
+      + (d.abbruch_freitext ? ': ' + esc(d.abbruch_freitext) : '')
+      + '</div>'
+    : '';
+  // Kontrollrunde und Person. Fehlt eine Vorlage, ist das eine Aussage
+  // („alle Kontrollpunkte des Objekts") und kein leeres Feld.
+  const kopfzeile = [d.vorlage_name || 'Alle Kontrollpunkte des Objekts', d.person]
+    .filter(Boolean).map(esc).join(' · ');
+
+  tafel.innerHTML = abbruch
+    + (kopfzeile ? '<p class="d-kopf">' + kopfzeile + '</p>' : '')
+    + '<div class="kennzahlen">' + band.map(b => '<div>'
       + '<div class="k-l">' + esc(b.l) + '</div>'
       + '<div class="k-v">' + b.v + '</div>'
       + (b.f ? '<div class="k-f">' + esc(b.f) + '</div>' : '')
@@ -1272,6 +1294,7 @@ function blattFuellen(d, bk) {
   const kopf = [
     ['Objekt', esc(d.objekt_name || '') + (adresse ? ', ' + esc(adresse) : '')],
     ['Kontrollrunde', esc(d.vorlage_name || 'Alle Kontrollpunkte des Objekts')],
+    ['Mitarbeitende', esc(d.person || 'Ohne Namen')],
     ['Beginn / Ende', esc(uhr(d.rohzeit_start) || 'unbekannt') + ' – '
       + esc(uhr(endeRoh) || 'unbekannt')],
     ['Dauer', esc(dauer || 'unbekannt')
@@ -1283,6 +1306,12 @@ function blattFuellen(d, bk) {
           + ' per Fotobeleg)</span>' : '')
       : 'keine hinterlegt'],
     ['Status', esc(zustand)],
+    // Ein Abbruch steht im Kopf, nicht als Fussnote -- aber nur, wenn es
+    // einen gab.
+    ...(d.status === 'abgebrochen'
+      ? [['Abbruchgrund', esc([d.abbruch_grund, d.abbruch_freitext]
+          .filter(Boolean).join(' — ')) || '–']]
+      : []),
   ].map(x => kz(x[0], x[1])).join('');
 
   const th = 'padding:6px 8px;text-align:left;font-size:11px;text-transform:uppercase;'
