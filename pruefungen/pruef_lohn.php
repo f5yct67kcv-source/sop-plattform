@@ -530,5 +530,77 @@ pruef('Ein 20-Prozent-Pensum aendert nichts -- gerechnet wird aus geleisteten St
     $e([2,2,2,2])['stand'] === LOHN_NBU_NICHT
     && $e([20,20,20,20])['stand'] === LOHN_NBU_VERSICHERT);
 
+// ── Der entschiedene Fall selbst: BGer 8C_644/2025 ───────────────────────
+//
+// Die staerkste verfuegbare Pruefung -- ein realer Sachverhalt mit einem
+// gerichtlich bestaetigten Ergebnis, nicht ein selbst gewaehltes Beispiel.
+//
+// Sachverhalt (E. 2): befristete Anstellung vom 16. bis 31. August 2023,
+// gearbeitet 4 Std. am 16., 19., 20. und 25. August sowie 3,5 Std. am
+// 31. August, zusammen 19,5 Stunden in den Kalenderwochen 33, 34 und 35.
+// Ergebnis (E. 5.3.2): 19,5 geteilt durch DREI Kalenderwochen ergibt
+// 6,5 Stunden je Woche -- keine Deckung.
+$kw33 = 4.0 + 4.0 + 4.0;   // 16., 19., 20. August
+$kw34 = 4.0;               // 25. August
+$kw35 = 3.5;               // 31. August
+$fall = lohn_nbu_ermittlung([$kw33, $kw34, $kw35], $uvg);
+pruef('BGer 8C_644/2025: 19,5 Stunden auf drei Kalenderwochen ergeben 6,5 je Woche',
+    abs($kw33 + $kw34 + $kw35 - 19.5) < 0.001
+    && abs($fall['schnitt_std'] - 6.5) < 0.001);
+pruef('BGer 8C_644/2025: geteilt wird durch die drei Wochen, nicht durch die Arbeitstage',
+    $fall['wochen_total'] === 3 && $fall['basis'] === 'nur_arbeitswochen');
+pruef('BGer 8C_644/2025: das Ergebnis ist keine Deckung',
+    $fall['stand'] === LOHN_NBU_NICHT);
+// E. 5.3.1: "gemaess Ziff. 3 der Empfehlung reicht bereits eine
+// Arbeitsstunde in einer Woche fuer die Beruecksichtigung in der Berechnung".
+// Eine Woche mit einer Stunde ist eine Arbeitswoche und drueckt den Schnitt.
+pruef('Ziff. 3: schon eine einzige Stunde macht die Woche zur Arbeitswoche',
+    lohn_nbu_ermittlung([20.0, 20.0, 1.0], $uvg)['wochen_total'] === 3
+    && lohn_nbu_ermittlung([20.0, 20.0, 1.0], $uvg)['arbeitswochen'] === 3
+    && abs(lohn_nbu_ermittlung([20.0, 20.0, 1.0], $uvg)['schnitt_std'] - 41.0/3) < 0.001);
+// E. 5.3.1, Rechenbeispiel 3.2: neun Stunden an drei Tagen DERSELBEN Woche
+// ergeben neun Stunden je Woche -- nicht drei. Geteilt wird durch Wochen.
+pruef('Rechenbeispiel 3.2: neun Stunden in einer Woche sind neun je Woche, nicht drei',
+    abs(lohn_nbu_ermittlung([9.0], $uvg)['schnitt_std'] - 9.0) < 0.001
+    && lohn_nbu_ermittlung([9.0], $uvg)['stand'] === LOHN_NBU_VERSICHERT);
+
+// E. 5.5: Die guenstigere Variante gilt NUR fuer die Wahl des Fensters.
+// Das Bundesgericht verwirft ausdruecklich einen allgemeinen Grundsatz,
+// "es habe stets die fuer die versicherte Person guenstige Berechnungsweise
+// zur Anwendung zu gelangen".
+pruef('E. 5.5: der Fall des Urteils bleibt unversichert, obwohl das unguenstig ist',
+    $fall['stand'] !== LOHN_NBU_VERSICHERT && $fall['ausfalltage'] === 0);
+
+// ── Ziff. 4: zweite Stufe, bewusst NICHT gerechnet ───────────────────────
+//
+// "Laesst sich damit keine Deckung bewerkstelligen, werden tageweise
+// Ausfallstunden wegen Unfall oder Krankheit [...] ergaenzt."
+// Woraus sich die durchschnittliche taegliche Arbeitszeit bemisst, sagt
+// weder das Urteil noch Merkblatt 6.05. Statt sie zu erfinden, meldet das
+// Werkzeug 'pruefen'.
+pruef('Ohne Ausfalltage bleibt es bei "nicht versichert"',
+    lohn_nbu_ermittlung([6.0, 6.0, 6.0], $uvg, 0)['stand'] === LOHN_NBU_NICHT);
+// KRITISCH: Mit Ausfalltagen darf die Deckung NICHT verneint werden -- nach
+// Ziff. 4 koennte sie bestehen. Ein zu Unrecht verneinter Anspruch faellt
+// nirgends auf, weil ein fehlender Abzug niemanden stoert.
+pruef('Mit Ausfalltagen wegen Unfall oder Krankheit lautet die Antwort "pruefen"',
+    lohn_nbu_ermittlung([6.0, 6.0, 6.0], $uvg, 4)['stand'] === LOHN_NBU_PRUEFEN
+    && LOHN_NBU_PRUEFEN !== LOHN_NBU_NICHT
+    && LOHN_NBU_PRUEFEN !== LOHN_NBU_VERSICHERT);
+pruef('Reicht Stufe 1 bereits, spielen Ausfalltage keine Rolle',
+    lohn_nbu_ermittlung([20.0, 20.0], $uvg, 10)['stand'] === LOHN_NBU_VERSICHERT);
+pruef('Der Hinweis nennt Ziffer, Anzahl Ausfalltage und den Grund der Unklarheit',
+    str_contains(lohn_nbu_ermittlung([6.0,6.0,6.0], $uvg, 4)['text'], 'Ziff. 4')
+    && str_contains(lohn_nbu_ermittlung([6.0,6.0,6.0], $uvg, 4)['text'], '4 Ausfalltage'));
+// Ein 'pruefen' in einem Fenster darf vom anderen nicht ueberstimmt werden.
+pruef('Sagt ein Fenster "pruefen", ueberstimmt das andere es nicht mit "nicht versichert"',
+    lohn_nbu_unterstellung([3 => lohn_nbu_ermittlung([6.0,6.0,6.0], $uvg, 4),
+                            12 => lohn_nbu_ermittlung([6.0,6.0,6.0], $uvg, 0)], $uvg)['stand']
+        === LOHN_NBU_PRUEFEN);
+pruef('Deckung schlaegt "pruefen" -- ein sicheres Ja braucht keine Handpruefung',
+    lohn_nbu_unterstellung([3 => lohn_nbu_ermittlung([6.0,6.0,6.0], $uvg, 4),
+                            12 => lohn_nbu_ermittlung([20.0,20.0], $uvg, 0)], $uvg)['stand']
+        === LOHN_NBU_VERSICHERT);
+
 echo $ok . " Pruefungen bestanden\n";
 if ($bad) { echo count($bad) . " FEHLGESCHLAGEN:\n - " . implode("\n - ", $bad) . "\n"; exit(1); }

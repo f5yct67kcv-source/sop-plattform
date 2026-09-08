@@ -649,15 +649,47 @@ function lohn_nbu_deckung(?float $stundenProWoche, array $uvg): array
 //   4. Ueberwiegen sie nicht, zaehlen alle Kalenderwochen mit.
 const LOHN_NBU_FENSTER_MONATE = [3, 12];
 
-// Welche Variante ist "die guenstigere"? Die MIT Deckung.
+// Welche Variante ist "die guenstigere"? Die MIT Deckung -- aber NUR bei der
+// Wahl zwischen drei und zwoelf Monaten.
 //
-// Das ist keine Selbstverstaendlichkeit, denn Deckung kostet den
-// Mitarbeitenden eine Praemie. Das Merkblatt 6.05 beantwortet es aber
-// selbst: Zu Ziff. 4 steht in Klammern die Warnung "Unfalldeckung der
-// Krankenversicherung nicht sistieren!" -- ohne NBU-Deckung muss die Person
-// den Unfallschutz anderswo einkaufen, und zwar teurer. Der Schutz wiegt
-// schwerer als der Abzug.
+// Grundlage ist Ziff. 1 der Empfehlung 7/87, vom Bundesgericht in
+// 8C_644/2025 E. 3.3 wiedergegeben: "Die Berechnung erstreckt sich ueber die
+// letzten drei oder zwoelf Monate vor dem Unfall, wobei die fuer den
+// Versicherten guenstigere Variante zaehlt."
+//
+// ENGE GRENZE, ausdruecklich vom Bundesgericht gezogen (E. 5.5): Aus den
+// Berechnungsregeln laesst sich NICHT der allgemeine Grundsatz ableiten,
+// "es habe stets die fuer die versicherte Person guenstige Berechnungsweise
+// zur Anwendung zu gelangen". Das liefe auf eine Aushebelung des Grundsatzes
+// hinaus, dass bei Teilzeitbeschaeftigten nur unter Voraussetzungen Deckung
+// besteht.
+//
+// Diese Konstante gilt darum AUSSCHLIESSLICH fuer die Fensterwahl. Wer sie
+// je zu einem allgemeinen "im Zweifel fuer die Deckung" ausweitet, baut
+// genau das ein, was das Urteil verwirft. Eine frueher hier stehende
+// Begruendung ueber die Krankenkassen-Warnung in Merkblatt 6.05 war eine
+// eigene Herleitung und ist entfernt -- die Empfehlung sagt es selbst.
 const LOHN_NBU_GUENSTIGER = LOHN_NBU_VERSICHERT;
+
+// Ziff. 4 der Empfehlung, vom Bundesgericht wiedergegeben: "Vorab zaehlen die
+// effektiven Arbeitsstunden. Laesst sich damit keine Deckung fuer
+// Nichtberufsunfaelle bewerkstelligen, werden tageweise Ausfallstunden wegen
+// Unfall oder Krankheit durch die durchschnittliche taegliche Arbeitszeit --
+// aufgerundet auf die naechste volle Stunde -- ergaenzt. Weitere
+// Ergaenzungen, z.B. wegen Militaer, Feier- oder Urlaubstagen, sind nicht
+// zulaessig."
+//
+// DIESE ZWEITE STUFE IST NICHT GERECHNET, und das ist eine bewusste Grenze:
+// Woraus sich die "durchschnittliche taegliche Arbeitszeit" bemisst, sagt
+// weder das Urteil noch Merkblatt 6.05. Sie zu erfinden waere eigenstaendige
+// Auslegung an einer Stelle, die Deckung begruendet.
+//
+// WAS STATTDESSEN GESCHIEHT: Ergibt Stufe 1 keine Deckung UND liegen im
+// Zeitraum Ausfalltage wegen Unfall oder Krankheit, lautet die Antwort
+// 'pruefen' statt 'nicht_versichert'. Ohne das wuerde das Werkzeug eine
+// Deckung verneinen, die nach Ziff. 4 bestehen koennte -- ein Fehler, der
+// nirgends auffiele, weil ein fehlender Abzug keine Beschwerde ausloest.
+const LOHN_NBU_PRUEFEN = 'pruefen';
 
 // Ermittlung fuer EINEN Beobachtungszeitraum.
 //
@@ -667,12 +699,13 @@ const LOHN_NBU_GUENSTIGER = LOHN_NBU_VERSICHERT;
 //
 // Eine leere Liste ergibt "unbekannt", nicht "nicht versichert". Das ist der
 // Fall des Neueintritts ohne Stundenhistorie, und er ist offen (OP-473).
-function lohn_nbu_ermittlung(array $wochenStunden, array $uvg): array
+function lohn_nbu_ermittlung(array $wochenStunden, array $uvg, int $ausfalltage = 0): array
 {
     $schwelle = (float)$uvg['nbu_schwelle_std_woche'];
     $total    = count($wochenStunden);
     if ($total === 0) {
         return ['stand' => LOHN_NBU_UNBEKANNT, 'schwelle' => $schwelle,
+            'ausfalltage' => $ausfalltage,
             'wochen_total' => 0, 'arbeitswochen' => 0, 'nullwochen' => 0,
             'basis' => null, 'schnitt_std' => null,
             'wochen_ueber' => 0, 'wochen_unter' => 0,
@@ -704,7 +737,13 @@ function lohn_nbu_ermittlung(array $wochenStunden, array $uvg): array
     if ($ueberSchnitt)  { $wege[] = 'Durchschnitt ' . number_format($schnitt, 2, '.', "'") . ' Std.'; }
     if ($ueberMehrheit) { $wege[] = $ueber . ' von ' . $total . ' Wochen ab der Schwelle'; }
 
-    return ['stand' => $versichert ? LOHN_NBU_VERSICHERT : LOHN_NBU_NICHT,
+    // Stufe 2 nach Ziff. 4: nur wenn Stufe 1 keine Deckung ergibt UND es
+    // ueberhaupt Ausfalltage wegen Unfall oder Krankheit gibt.
+    $stand = $versichert ? LOHN_NBU_VERSICHERT
+           : ($ausfalltage > 0 ? LOHN_NBU_PRUEFEN : LOHN_NBU_NICHT);
+
+    return ['stand' => $stand,
+        'ausfalltage' => $ausfalltage,
         'schwelle' => $schwelle,
         'wochen_total' => $total,
         'arbeitswochen' => count($arbeitswochen),
@@ -715,11 +754,18 @@ function lohn_nbu_ermittlung(array $wochenStunden, array $uvg): array
         'ueber_schnitt' => $ueberSchnitt, 'ueber_mehrheit' => $ueberMehrheit,
         'text' => $versichert
             ? 'Versichert nach Empfehlung 7/87 (' . implode(', ', $wege) . ').'
+            : ($stand === LOHN_NBU_PRUEFEN
+            ? 'Die effektiven Stunden ergeben keine Deckung (Durchschnitt '
+              . number_format($schnitt, 2, '.', "'") . ' Std.), aber im Zeitraum liegen '
+              . $ausfalltage . ' Ausfalltage wegen Unfall oder Krankheit. Nach Ziff. 4 der '
+              . 'Empfehlung 7/87 koennen sie ergaenzt werden; wie die durchschnittliche '
+              . 'taegliche Arbeitszeit dafuer zu bemessen ist, ist nicht geklaert. '
+              . 'Von Hand pruefen statt die Deckung zu verneinen.'
             : 'Nicht versichert: Durchschnitt ' . number_format($schnitt, 2, '.', "'")
               . ' Std. je Woche ueber ' . count($basisWerte) . ' Wochen'
               . ($nurArbeitswochen ? ' (Nullwochen ausgenommen, weil die Arbeitswochen ueberwiegen)'
                                    : ' (alle Kalenderwochen)')
-              . ', und ' . $ueber . ' von ' . $total . ' Wochen erreichen die Schwelle.'];
+              . ', und ' . $ueber . ' von ' . $total . ' Wochen erreichen die Schwelle.')];
 }
 
 // Die guenstigere der beiden Varianten (drei oder zwoelf Monate).
@@ -747,6 +793,14 @@ function lohn_nbu_unterstellung(array $fenster, array $uvg): array
             'fenster' => $fenster,
             'text' => 'Keine der Varianten liefert ein Ergebnis -- keine Stundenhistorie. '
                 . 'Der Fall des Neueintritts ist nicht entschieden (OP-473).'];
+    }
+    // Sagt eine Variante 'pruefen', darf die andere sie nicht ueberstimmen:
+    // 'nicht versichert' waere dann eine Antwort, die Ziff. 4 noch offen hat.
+    foreach ($fenster as $monate => $e) {
+        if ($e['stand'] === LOHN_NBU_PRUEFEN) {
+            return ['stand' => LOHN_NBU_PRUEFEN, 'entschieden_durch' => (int)$monate,
+                'fenster' => $fenster, 'text' => $e['text']];
+        }
     }
     $erste = null;
     foreach ($fenster as $monate => $e) {

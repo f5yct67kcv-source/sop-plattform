@@ -289,8 +289,8 @@ $pdo->exec("INSERT INTO einsaetze VALUES
     (900,'2026-07-06','bewachung','Kunde',1,'geplant'),
     (901,'2026-07-13','reinigung','Kunde',1,'geplant'),
     (902,'2026-07-05','bewachung','Kunde',1,'geplant'),
-    (903,'2026-07-20','bewachung','Kunde',1,'abgesagt'),
-    (904,'2026-07-27','bewachung','Kunde',1,'geplant')");
+    (903,'2026-06-15','bewachung','Kunde',1,'abgesagt'),
+    (904,'2026-06-22','bewachung','Kunde',1,'geplant')");
 $pdo->exec("INSERT INTO einsatz_zuteilung VALUES
     (900,$mkw,'abgeglichen','08:00','18:00',60,0),
     (901,$mkw,'abgeglichen','08:00','18:00',0,0),
@@ -302,9 +302,22 @@ $w = lohnlauf_nbu_wochen($pdo, $mkw, '2026-07-31', 3);
 
 pruef('Das Fenster beginnt an einem Montag, nicht mitten in der Woche',
     date('N', strtotime($w['von'])) === '1');
-pruef('Das Fenster umfasst drei Monate und endet am Stichtag',
-    $w['bis'] === '2026-07-31' && $w['monate'] === 3
-    && strtotime($w['von']) < strtotime('2026-05-02'));
+// KRITISCH -- Ziff. 2 der Empfehlung 7/87: "Nur ganze Wochen sind zu
+// beachten. Faellt der Beginn bzw. das Ende der relevanten Periode zwischen
+// zwei Wochenenden, bleiben diese angebrochenen Wochen unberuehrt."
+// Beide Raender muessen NACH INNEN wandern. Wandert der Anfang nach aussen,
+// holt er Stunden von vor dem Zeitraum herein; bleibt die angebrochene
+// Schlusswoche drin, zaehlt sie mit zu wenigen Stunden als volle Woche und
+// drueckt den Durchschnitt gegen den Mitarbeitenden.
+pruef('Der Fensteranfang liegt NICHT vor dem Zeitraum, sondern auf dem Montag danach',
+    $w['monate'] === 3 && date('N', strtotime($w['von'])) === '1'
+    && strtotime($w['von']) >= strtotime('2026-05-02'));
+pruef('Das Fenster endet auf einem Sonntag, nicht am angebrochenen Stichtag',
+    date('N', strtotime($w['bis'])) === '7'
+    && strtotime($w['bis']) <= strtotime('2026-07-31')
+    && $w['bis'] !== '2026-07-31');
+pruef('Die angebrochene Schlusswoche kommt in der Liste gar nicht vor',
+    !array_key_exists(date('o-\WW', strtotime('2026-07-31')), $w['wochen']));
 // KRITISCH: Nullstundenwochen MUESSEN in der Liste stehen. Ohne sie sind die
 // Regeln 3 und 4 der Empfehlung nicht anwendbar, und der Durchschnitt waere
 // systematisch zu hoch.
@@ -330,9 +343,9 @@ pruef('Der Zeitbonus entsteht fuer diese Schicht wirklich',  $bonusSchicht > 0);
 pruef('Er wird trotzdem nicht mitgezaehlt: geleistet sind zehn Stunden, nicht mehr',
     abs($w['wochen'][date('o-\WW', strtotime('2026-07-05'))] - 10.0) < 0.001);
 pruef('Eine abgesagte Schicht zaehlt nicht mit',
-    abs($w['wochen'][date('o-\WW', strtotime('2026-07-20'))] - 0.0) < 0.001);
+    abs($w['wochen'][date('o-\WW', strtotime('2026-06-15'))] - 0.0) < 0.001);
 pruef('Eine nicht abgeglichene Schicht zaehlt nicht mit',
-    abs($w['wochen'][date('o-\WW', strtotime('2026-07-27'))] - 0.0) < 0.001);
+    abs($w['wochen'][date('o-\WW', strtotime('2026-06-22'))] - 0.0) < 0.001);
 
 // Und die Kette bis zum Ergebnis: aus den Wochen wird die Unterstellung.
 $uvgP = lohn_uvg('2025-06-30');
@@ -344,6 +357,37 @@ pruef('Aus den gezaehlten Wochen entsteht ein nachvollziehbares Ergebnis',
 pruef('Ein Mitarbeiter ganz ohne Einsaetze ergibt lauter Nullwochen, nicht eine leere Liste',
     count(lohnlauf_nbu_wochen($pdo, 999, '2026-07-31', 3)['liste']) > 10
     && array_sum(lohnlauf_nbu_wochen($pdo, 999, '2026-07-31', 3)['liste']) == 0.0);
+
+// ── Ziff. 4: Ausfalltage wegen Unfall oder Krankheit ─────────────────────
+$pdo->exec('CREATE TABLE abwesenheiten (id INTEGER PRIMARY KEY, mitarbeiter_id INT,
+            typ TEXT, von TEXT, bis TEXT, status TEXT)');
+$pdo->exec("INSERT INTO abwesenheiten VALUES
+    (1,$mkw,'krankheit','2026-06-01','2026-06-05','genehmigt'),
+    (2,$mkw,'unfall','2026-06-08','2026-06-09','genehmigt'),
+    (3,$mkw,'ferien','2026-06-15','2026-06-19','genehmigt'),
+    (4,$mkw,'militaer','2026-06-22','2026-06-26','genehmigt'),
+    (5,$mkw,'krankheit','2026-07-01','2026-07-03','beantragt'),
+    (6,$mkw,'krankheit','2026-04-01','2026-04-03','genehmigt')");
+$wa = lohnlauf_nbu_wochen($pdo, $mkw, '2026-07-31', 3);
+// 1. bis 5. Juni sind fuenf Tage, 8. bis 9. Juni zwei -- zusammen sieben.
+pruef('Krankheit und Unfall werden tageweise gezaehlt',
+    $wa['ausfalltage'] === 7);
+// KRITISCH: "Weitere Ergaenzungen, z.B. wegen Militaer, Feier- oder
+// Urlaubstagen, sind nicht zulaessig" (Ziff. 4). Ferien und Militaer duerfen
+// die Deckung nicht herbeirechnen -- das waeren zusammen zehn Tage mehr.
+pruef('Ferien und Militaer zaehlen ausdruecklich NICHT mit',
+    $wa['ausfalltage'] === 7 && $wa['ausfalltage'] !== 17);
+pruef('Eine nur beantragte Abwesenheit ist keine Abwesenheit',
+    $wa['ausfalltage'] === 7);
+pruef('Eine Abwesenheit vor dem Fenster zaehlt nicht mit',
+    strtotime('2026-04-03') < strtotime($wa['von']) && $wa['ausfalltage'] === 7);
+
+// Und die Kette bis zum Ergebnis, mit der zweiten Stufe.
+$ergA = lohn_nbu_ermittlung($wa['liste'], $uvgP, $wa['ausfalltage']);
+pruef('Reichen die Stunden nicht und gibt es Ausfalltage, lautet die Antwort "pruefen"',
+    $ergA['stand'] === LOHN_NBU_PRUEFEN && $ergA['ausfalltage'] === 7);
+pruef('Ohne die Ausfalltage waere daraus ein "nicht versichert" geworden',
+    lohn_nbu_ermittlung($wa['liste'], $uvgP, 0)['stand'] === LOHN_NBU_NICHT);
 
 echo $ok . " Pruefungen bestanden\n";
 if ($bad) { echo count($bad) . " FEHLGESCHLAGEN:\n - " . implode("\n - ", $bad) . "\n"; exit(1); }

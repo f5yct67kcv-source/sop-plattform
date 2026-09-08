@@ -149,8 +149,27 @@ function lohnlauf_zeiten(PDO $pdo, int $maId, string $von, string $bis): array
 // wenigen Stunden als volle Woche gegen den Mitarbeitenden.
 function lohnlauf_nbu_wochen(PDO $pdo, int $maId, string $bis, int $monate): array
 {
-    $roh   = date('Y-m-d', strtotime($bis . ' -' . $monate . ' months +1 day'));
-    $start = date('Y-m-d', strtotime('monday this week', strtotime($roh)));
+    $roh = date('Y-m-d', strtotime($bis . ' -' . $monate . ' months +1 day'));
+    // Ziff. 2 der Empfehlung 7/87, vom Bundesgericht in 8C_644/2025 E. 3.3
+    // wiedergegeben: "Nur ganze Wochen sind zu beachten. Faellt der Beginn
+    // bzw. das Ende der relevanten Periode zwischen zwei Wochenenden,
+    // bleiben diese angebrochenen Wochen unberuehrt."
+    //
+    // KORREKTUR einer eigenen Fehlbauart: Zuerst hatte ich den Anfang
+    // RUECKWAERTS auf den Montag gelegt und die angebrochene Schlusswoche
+    // voll mitgezaehlt. Beides ist falsch. Rueckwaerts holt Stunden von VOR
+    // dem Zeitraum herein; eine angebrochene Schlusswoche zaehlt mit zu
+    // wenigen Stunden als volle Woche und drueckt den Durchschnitt. Beide
+    // angebrochenen Wochen bleiben unberuehrt -- der Anfang wandert also
+    // VORWAERTS auf den naechsten Montag, das Ende auf den letzten Sonntag.
+    $start = date('N', strtotime($roh)) === '1'
+        ? $roh : date('Y-m-d', strtotime('next monday', strtotime($roh)));
+    $bis   = date('N', strtotime($bis)) === '7'
+        ? $bis : date('Y-m-d', strtotime('last sunday', strtotime($bis)));
+    if (strtotime($bis) < strtotime($start)) {
+        return ['von' => $start, 'bis' => $bis, 'monate' => $monate,
+                'wochen' => [], 'liste' => [], 'unbrauchbar' => 0, 'ausfalltage' => 0];
+    }
 
     $st = $pdo->prepare(
         "SELECT e.datum, z.ist_von, z.ist_bis, z.ist_pause_min, z.ist_pause_bezahlt_ma
@@ -177,10 +196,36 @@ function lohnlauf_nbu_wochen(PDO $pdo, int $maId, string $bis, int $monate): arr
         if (!array_key_exists($kw, $wochen)) { $wochen[$kw] = 0.0; }
         $wochen[$kw] += $netto / 60;
     }
+    // Ziff. 4: tageweise Ausfallstunden wegen Unfall ODER KRANKHEIT koennen
+    // ergaenzt werden, wenn die effektiven Stunden keine Deckung ergeben.
+    // "Weitere Ergaenzungen, z.B. wegen Militaer, Feier- oder Urlaubstagen,
+    // sind nicht zulaessig" -- darum genau diese zwei Arten und keine
+    // weitere. Gezaehlt werden nur genehmigte Abwesenheiten; eine beantragte
+    // ist keine.
+    $ausfalltage = 0;
+    try {
+        $sa = $pdo->prepare(
+            "SELECT von, bis FROM abwesenheiten
+              WHERE mitarbeiter_id = ? AND status = 'genehmigt'
+                AND typ IN ('krankheit','unfall')
+                AND von <= ? AND bis >= ?");
+        $sa->execute([$maId, $bis, $start]);
+        foreach ($sa->fetchAll() as $a) {
+            $v = max(strtotime((string)$a['von']),  strtotime($start));
+            $b = min(strtotime((string)$a['bis']), strtotime($bis));
+            if ($b >= $v) { $ausfalltage += (int)round(($b - $v) / 86400) + 1; }
+        }
+    } catch (Throwable $e) {
+        // Die Tabelle kann in einer aelteren Einrichtung fehlen. Dann bleibt
+        // es bei null Ausfalltagen -- das ist hier unschaedlich, weil null
+        // nur bedeutet, dass Stufe 2 nicht greift.
+        $ausfalltage = 0;
+    }
+
     ksort($wochen);
     return ['von' => $start, 'bis' => $bis, 'monate' => $monate,
             'wochen' => $wochen, 'liste' => array_values($wochen),
-            'unbrauchbar' => $unbrauchbar];
+            'unbrauchbar' => $unbrauchbar, 'ausfalltage' => $ausfalltage];
 }
 
 // ── Der zum Stichtag geltende Lohnansatz ─────────────────────────────────
