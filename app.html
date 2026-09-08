@@ -92,13 +92,25 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
      mit dem Namen, die Leiste mit der Schriftgroesse. */
   --tisch-kopf: 0px;
 
-  /* Der SOCKEL (ENT-429): wie viel sichtbarer Bildschirm UNTER dem liegt,
-     was der Browser als unteren Rand kennt. Auf jedem gesunden Gerät 0 --
-     dann rechnet jedes calc() unten unverändert weiter. Auf dem iPhone, wo
-     die App vom Startbildschirm aus im Vollbild läuft, ist er die Höhe der
+  /* Der SOCKEL (ENT-429/439, berichtigt mit ENT-475): wie viel sichtbarer
+     Bildschirm UNTER dem liegt, was "position: fixed; bottom: 0" als
+     unteren Rand kennt. Auf jedem gesunden Gerät 0 -- dann rechnet jedes
+     calc() unten unverändert weiter. Auf dem iPhone, wo die App vom
+     Startbildschirm aus im Vollbild läuft, ist er die Höhe der
      Statusleiste: Dort endet der feste untere Rand um genau diesen Betrag
      zu früh, und die Reiterleiste stand sichtbar über der Kante.
-     Gesetzt wird er gemessen, nicht geraten -- siehe sockelSetzen(). */
+     Gesetzt wird er gemessen, nicht geraten -- siehe sockelSetzen().
+
+     WAS ER TUT, und was er seit ENT-475 NICHT mehr tut: Er verschiebt die
+     ganze Fläche nach unten (bottom: calc(0px - var(--sockel))) -- Rahmen
+     UND Inhalt. Bis ENT-475 stand er zusätzlich im unteren Polster
+     derselben Flächen. Beides zusammen hob sich für den Inhalt auf: Die
+     Milchglasfläche reichte bis an die Kante, die Knöpfe darin blieben
+     stehen. Genau das war der Befund des Projektinhabers -- "Heute" und
+     "Wächter" sassen höher als "Plan". Der Sockel gehört an EINE Stelle,
+     nicht an zwei. Das untere Polster ist wieder allein der
+     Sicherheitsabstand des Geräts (env(safe-area-inset-bottom)), gemessen
+     ab der ECHTEN Bildschirmkante -- dort endet die Fläche jetzt. */
   --sockel: 0px;
 }
 
@@ -265,7 +277,7 @@ svg.i-sm { width: 17px; height: 17px; }
    andere Ansicht der App aendert sich. */
 #gate {
   position: fixed; inset: 0; bottom: calc(0px - var(--sockel)); z-index: 900; display: flex; overflow-y: auto;
-  padding: 32px 22px calc(32px + env(safe-area-inset-bottom) + var(--sockel));
+  padding: 32px 22px calc(32px + env(safe-area-inset-bottom));
   color: var(--ink);
   /* Ein sehr flacher Schein hinter dem Logo. Seit die Karte als
      Begrenzung fehlt, ist er das Einzige, was der Flaeche Tiefe gibt --
@@ -431,7 +443,7 @@ svg.i-sm { width: 17px; height: 17px; }
   position: fixed; left: 0; right: 0; bottom: calc(0px - var(--sockel)); z-index: 50;
   background: var(--glas); backdrop-filter: saturate(180%) blur(14px); -webkit-backdrop-filter: saturate(180%) blur(14px);
   border-top: 1px solid var(--line);
-  display: flex; padding-bottom: calc(env(safe-area-inset-bottom) + var(--sockel));
+  display: flex; padding-bottom: env(safe-area-inset-bottom);
 }
 .tabs button {
   flex: 1; min-height: var(--tab-h); border: none; background: transparent; cursor: pointer;
@@ -762,7 +774,7 @@ svg.i-sm { width: 17px; height: 17px; }
 .blatt-kopf { display: flex; align-items: center; gap: 12px; padding: 6px 20px 14px; border-bottom: 1px solid var(--line-soft); flex: none; }
 .blatt-kopf h2 { font-size: 18px; font-weight: 680; letter-spacing: -.3px; flex: 1; min-width: 0; }
 .blatt-bd { padding: 18px 20px; overflow-y: auto; flex: 1; }
-.blatt-ft { padding: 14px 20px calc(14px + env(safe-area-inset-bottom) + var(--sockel)); border-top: 1px solid var(--line-soft); display: flex; gap: 10px; flex: none; }
+.blatt-ft { padding: 14px 20px calc(14px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line-soft); display: flex; gap: 10px; flex: none; }
 .blatt-ft .btn { flex: 1; }
 /* Beantworteter Zustand (ENT-120): erst die Aussage, darunter die Knoepfe.
    Ueberschrift oben, Wert darunter -- und die Knoepfe stehen nebeneinander,
@@ -817,7 +829,7 @@ svg.i-sm { width: 17px; height: 17px; }
 /* 44px Trefferflaeche (CLAUDE.md), der negative Rand haelt das Symbol
    trotzdem buendig an der Kante -- sonst steht der Titel eingerueckt. */
 .rgs-zurueck { min-height: 44px; min-width: 44px; padding: 0; margin-left: -10px; display: flex; align-items: center; justify-content: center; background: none; border: 0; color: var(--ink); cursor: pointer; }
-.rgs-bd { padding: 16px 16px calc(16px + env(safe-area-inset-bottom) + var(--sockel)); overflow-y: auto; flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 14px; }
+.rgs-bd { padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); overflow-y: auto; flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 14px; }
 /* KEIN Bloecke-Zusammendruecken (ENT-335). Der Rumpf ist eine Flex-Spalte;
    Flex-Kinder duerfen von sich aus schrumpfen. Normalerweise schuetzt sie
    ihre automatische Mindesthoehe davor -- die faellt aber auf 0, sobald ein
@@ -1086,14 +1098,14 @@ svg.i-sm { width: 17px; height: 17px; }
 /* Reiterleiste der laufenden Runde (ENT-306). Unten, wo der Daumen ist --
    dieselbe Stelle wie die Reiterleiste der App selbst, damit niemand zwei
    Bedienlogiken lernen muss. */
-.rgs-reiter { display: flex; flex: none; border-top: 1px solid var(--line); background: var(--surface); padding-bottom: calc(env(safe-area-inset-bottom) + var(--sockel)); }
+.rgs-reiter { display: flex; flex: none; border-top: 1px solid var(--line); background: var(--surface); padding-bottom: env(safe-area-inset-bottom); }
 .rgs-reiter[hidden] { display: none; }
 .rgs-reiter button { flex: 1; min-height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; background: none; border: 0; border-top: 2px solid transparent; margin-top: -1px; color: var(--ink-3); font: inherit; font-size: 11.5px; font-weight: 620; cursor: pointer; }
 /* Der aktive Reiter traegt Farbe UND einen Balken -- nicht nur Farbe. */
 .rgs-reiter button.an { color: var(--accent); border-top-color: var(--accent); }
 .rgs-reiter .zahl { position: absolute; transform: translate(14px, -10px); min-width: 17px; height: 17px; padding: 0 5px; border-radius: 9px; background: var(--warn); color: var(--auf-farbe); font-size: 10.5px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
 
-.rgs-fuss { padding: 14px 16px calc(16px + env(safe-area-inset-bottom) + var(--sockel)); border-top: 1px solid var(--line-soft); background: var(--surface); flex: none; }
+.rgs-fuss { padding: 14px 16px calc(16px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line-soft); background: var(--surface); flex: none; }
 .rgs-warn { display: flex; gap: 9px; font-size: 13.5px; line-height: 1.5; color: var(--warn); background: var(--warn-soft); border: 1px solid var(--warn); border-radius: var(--r-sm); padding: 11px 13px; }
 
 /* Zentrale und Notruf (ENT-299). Nicht ausklappbar, anders als der
@@ -1318,7 +1330,7 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
 .mit-kopf h2 { font-size: 17px; font-weight: 680; letter-spacing: -.3px; flex: 1; min-width: 0; }
 .mit-zurueck { min-height: 44px; min-width: 44px; padding: 0; margin-left: -10px; display: flex;
   align-items: center; justify-content: center; background: none; border: 0; color: var(--ink); cursor: pointer; }
-.mit-bd { padding: 16px 16px calc(16px + env(safe-area-inset-bottom) + var(--sockel)); overflow-y: auto; flex: 1; min-height: 0; }
+.mit-bd { padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); overflow-y: auto; flex: 1; min-height: 0; }
 
 /* Eine Mitteilung in der Liste. Überschrift oben, Text darunter (CLAUDE.md:
    Überschrift oben, Wert darunter) -- die Zeile mit Absender und Datum
@@ -1357,7 +1369,7 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
    Klick daneben schliessen: Genau das wäre das versehentliche Wegwischen,
    das der Bestätigung ihren Wert nähme. */
 .mit-dlg { position: fixed; inset: 0; bottom: calc(0px - var(--sockel)); z-index: 70; display: none;
-  align-items: center; justify-content: center; padding: 20px 20px calc(20px + var(--sockel));
+  align-items: center; justify-content: center; padding: 20px;
   background: rgba(0,0,0,.55); }
 .mit-dlg.on { display: flex; }
 .mit-dlg-box { background: var(--surface); color: var(--ink); border-radius: var(--r);
@@ -2804,6 +2816,61 @@ function sockelAmBild() {
   return Math.round(r.top - unten);
 }
 
+// DRITTER ANLAUF (ENT-475). Auch ENT-439 hat nichts geaendert. Der
+// Befund vom Geraet ist unveraendert: "Heute" und "Wächter" 59 Punkte
+// ueber der Kante, "Plan" buendig.
+//
+// In der Begruendung von ENT-439 steckt ein Schluss, der nicht traegt:
+// Aus "screen.height und window.innerHeight sind gleich" wurde gefolgert,
+// das Layout sei nicht zu kurz -- und der Umbau der Leiste verworfen.
+// window.innerHeight ist aber NICHT der Bezugsrahmen eines
+// position:fixed-Elements. Der Bezugsrahmen ist der anfaengliche
+// Enthaltungsblock, und den hat bisher niemand gemessen. Beide Werte
+// koennen 852 melden, waehrend "bottom: 0" trotzdem bei 793 landet.
+//
+// Genau das wird hier nachgeholt, und zwar direkt: ein Probekoerper mit
+// "position: fixed; bottom: 0" wird eingehaengt, seine Unterkante
+// abgelesen und wieder entfernt. Was zwischen ihr und window.innerHeight
+// liegt, IST der Sockel -- ohne Annahme darueber, was iOS warum tut.
+//
+// Der Probekoerper ist unsichtbar, 1 x 1 Punkt gross und fest positioniert:
+// Er nimmt keinen Platz im Fluss ein, veraendert keine Bildlaufhoehe und
+// faengt keine Beruehrung ab. Gemessen wird an document.body -- kein
+// Vorfahr mit transform, filter oder will-change dazwischen, der ihn zu
+// einem anderen Bezugsrahmen umhaengen wuerde.
+//
+// Getrennt in zwei Teile, und der Grund ist die wichtigste Regel aus
+// CLAUDE.md: "unbekannt" darf nie wie "keine" aussehen. ankerVersatz()
+// ist der reine Messwert -- die Technikzeile zeigt ihn immer, auch wo er
+// nicht verwendet wird. sockelAmAnker() ist, was in die Rechnung eingeht,
+// und der traegt den Vorbehalt. Stuende nur der zweite da, meldete er
+// ausserhalb des Vollbilds 0 -- also "kein Versatz", obwohl gar nicht
+// hingesehen wurde. Genau darauf faellt die Fernsuche herein: Laeuft die
+// App wider Erwarten nicht vom Startbildschirm, saehe die Zeile aus, als
+// sei alles in Ordnung.
+function ankerVersatz() {
+  if (!document.body) { return 0; }
+  const probe = document.createElement('div');
+  probe.style.cssText = 'position:fixed;left:0;bottom:0;width:1px;height:1px;'
+    + 'visibility:hidden;pointer-events:none;margin:0;padding:0;border:0';
+  document.body.appendChild(probe);
+  let unten;
+  try { unten = probe.getBoundingClientRect().bottom; } finally { probe.remove(); }
+  const fenster = window.innerHeight || 0;
+  if (!fenster || !unten) { return 0; }
+  return Math.round(fenster - unten);
+}
+
+// Vorbehalt wie bei der ersten Quelle: nur im Vollbild vom
+// Startbildschirm. Auf Android waechst window.innerHeight waehrend die
+// Adresszeile einfaehrt, und die feste Ebene folgt erst danach -- dort
+// gaebe diese Rechnung einen Wert fuer einen Zwischenstand, der von selbst
+// vergeht. Jedes andere Geraet bekommt also weiterhin 0.
+function sockelAmAnker() {
+  if (window.navigator.standalone !== true) { return 0; }
+  return Math.max(0, ankerVersatz());
+}
+
 // Rueckgabe wie oben: Zahl oder null fuer "nicht messbar".
 function sockelMessen() {
   let fehlt = 0;
@@ -2820,7 +2887,10 @@ function sockelMessen() {
       }
     }
   }
-  // 2. Was am gezeichneten Bild zu messen ist. Kein Vollbild-Vorbehalt:
+  // 2. Wo "position: fixed; bottom: 0" wirklich landet (ENT-475). Die
+  //    Quelle, die in beiden Anlaeufen davor gefehlt hat.
+  fehlt = Math.max(fehlt, sockelAmAnker());
+  // 3. Was am gezeichneten Bild zu messen ist. Kein Vollbild-Vorbehalt:
   //    Das hier ist eine Messung, keine Annahme -- sie findet nur etwas,
   //    wenn tatsaechlich etwas da ist.
   const amBild = sockelAmBild();
@@ -2861,11 +2931,23 @@ function technikZeile() {
   const lage = r ? r.getBoundingClientRect() : null;
   const vv = window.visualViewport;
   const gezeichnet = sockelAmBild();
+  const anker = ankerVersatz();
   return [
     'Bildschirm ' + ((window.screen && window.screen.height) || '?'),
     'Fenster ' + window.innerHeight,
     'Sicht ' + (vv ? Math.round(vv.height) : '–'),
     'Leiste ' + (lage ? Math.round(lage.top) + '–' + Math.round(lage.bottom) : '–'),
+    // Die Zahl, an der ENT-475 haengt: Wo landet "bottom: 0" wirklich?
+    // Steht hier ein Wert, war der Bezugsrahmen zu kurz -- und die
+    // Begruendung von ENT-439 ("das Layout ist nicht zu kurz") war falsch.
+    // Steht hier "bündig" und der Streifen ist trotzdem da, bleibt nur das
+    // Zeichnen, und dann ist black-translucent zu entscheiden.
+    // "ungenutzt" heisst: gemessen schon, aber der Vollbild-Vorbehalt
+    // laesst den Wert nicht in die Rechnung -- etwas anderes als 0.
+    'Anker ' + (anker ? (anker > 0 ? '−' : '+') + Math.abs(anker) : 'bündig')
+      + (window.navigator.standalone === true ? '' : ', ungenutzt'),
+    'Blättert ' + (document.documentElement.scrollHeight
+      > document.documentElement.clientHeight ? 'ja' : 'nein'),
     'gezeichnet ' + (gezeichnet === null ? 'nicht messbar'
       : gezeichnet ? '−' + gezeichnet : 'deckungsgleich'),
     'Sockel ' + (getComputedStyle(document.documentElement).getPropertyValue('--sockel') || '?').trim(),
@@ -3118,6 +3200,17 @@ function zeichne() {
   if (reiter === 'rapport') zeichneRapport();
   if (reiter === 'waechter') zeichneWaechter();
   if (reiter === 'menu') zeichneMenu();
+  // Der Sockel wird NEU gemessen, nicht einmal beim Start (ENT-475).
+  // Das war der zweite Fehler der beiden Anlaeufe davor: Der Versatz ist
+  // nicht ueberall gleich gross -- er haengt daran, ob die Seite laenger
+  // ist als der Bildschirm. "Heute" und "Wächter" sind kuerzer, "Plan"
+  // nicht. Eine einmal gesetzte Zahl ist darum auf der einen Ansicht
+  // richtig und auf der anderen falsch; auf "Plan" schoebe ein Sockel von
+  // 59 die Beschriftungen unter die Bildschirmkante. Gemessen wird
+  // deshalb dort, wo sich die Laenge aendern kann: nach jedem Zeichnen --
+  // und damit nach jedem Reiterwechsel, der ueber zeige() hier
+  // vorbeikommt. Auf jedem gesunden Geraet kommt jedes Mal 0 heraus.
+  sockelSetzen();
 }
 
 const LEER = (t, p, ic) => `<div class="karte"><div class="leer">
