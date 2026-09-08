@@ -38,7 +38,10 @@ const iso = d => new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString
 const vorTagen = n => { const d = new Date(); d.setDate(d.getDate() - n); return iso(d); };
 
 const VOLL = {
-  status: 'ok', kunde: 'Muster Liegenschaften AG', person: 'A. Beispielperson',
+  // je_vorhanden schickt der echte Endpunkt seit ENT-482 immer mit -- daran
+  // entscheidet die Oberflaeche, ob sie den Bereich ueberhaupt anbietet.
+  status: 'ok', je_vorhanden: true,
+  kunde: 'Muster Liegenschaften AG', person: 'A. Beispielperson',
   zeitraum: { von: vorTagen(30), bis: vorTagen(0) },
   objekte: [{ id: 1, name: 'Testliegenschaft Nord', strasse: 'Musterweg 1', ort: 'Musterort' }],
   rundgaenge: [
@@ -163,6 +166,43 @@ const WEG_VOLL = {
 };
 let wegAntwort = WEG_VOLL;
 
+// ── Verkehrsdienst: Einsätze und Kundenrapporte (ENT-482) ────────────
+const EINSAETZE_VOLL = {
+  status: 'ok', je_vorhanden: true,
+  zeitraum: { von: vorTagen(30), bis: vorTagen(0) },
+  einsaetze: [
+    { id: 70, datum: vorTagen(3), strasse: 'Musterweg 4', ort: 'Musterort',
+      einsatzart: 'Verkehrsdienst', veranstaltung: 'Musterlauf 2026',
+      personen: 2, stunden: 12.5, von: '07:00:00', bis: '13:15:00' },
+    { id: 71, datum: vorTagen(9), strasse: 'Musterstrasse 12', ort: 'Musterort',
+      einsatzart: 'Verkehrsdienst', veranstaltung: null,
+      personen: 1, stunden: 4, von: '18:00:00', bis: '22:00:00' },
+  ],
+};
+const BERICHTE = {
+  70: {
+    einsatz: { id: 70, datum: vorTagen(3), strasse: 'Musterweg 4', ort: 'Musterort',
+               einsatzart: 'Verkehrsdienst', veranstaltung: 'Musterlauf 2026' },
+    kunde: { kunde_id: 1, kunde_nr: 'K-0001', k_name: 'Muster Liegenschaften AG',
+             k_strasse: 'Musterweg', k_hausnummer: '1', k_adresszusatz: null,
+             k_plz: '0000', k_ort: 'Musterort',
+             re_name: null, re_zusatz: null, re_strasse: null, re_hausnummer: null,
+             re_plz: null, re_ort: null },
+    unterschrift: { bild: 'data:image/png;base64,'
+        + 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+      name: 'B. Unterzeichnend', am: `${vorTagen(3)} 13:20:00`, holte: 'M. Musterperson' },
+    personen: [
+      { name: 'M. Musterperson', von: '07:00:00', bis: '13:15:00', pause_min: 30,
+        netto_h: 5.75, bemerkung: 'Umleitung länger als geplant' },
+      { name: 'T. Zweitperson', von: '07:00:00', bis: '13:45:00', pause_min: 30,
+        netto_h: 6.25, bemerkung: null },
+    ],
+  },
+};
+let einsatzAntwort = { status: 'ok', je_vorhanden: false,
+  zeitraum: { von: vorTagen(30), bis: vorTagen(0) }, einsaetze: [],
+  leer_grund: 'noch_nichts_unterschrieben' };
+
 // Der Briefkopf fuers Rapportblatt (ENT-478). Erfundene Firma, erfundenes
 // Logo -- echte Betriebsdaten haben in Testdaten nichts zu suchen.
 const BRIEFKOPF = {
@@ -227,6 +267,12 @@ async function setup(page) {
         kunde: 'Muster Liegenschaften AG' });
     }
     if (path.includes('portal_briefkopf')) return send(BRIEFKOPF);
+    if (path.includes('portal_einsatz_bericht')) {
+      const id = Number(new URL(req.url()).searchParams.get('einsatz_id'));
+      return BERICHTE[id] ? send({ status: 'ok', bericht: BERICHTE[id] })
+        : send({ status: 'error', message: 'Dieser Einsatz ist nicht abrufbar.' }, 404);
+    }
+    if (path.includes('portal_einsaetze')) return send(einsatzAntwort);
     if (path.includes('portal_rundgang_weg')) return send(wegAntwort);
     if (path.includes('portal_rundgang_detail')) {
       const id = Number(new URL(req.url()).searchParams.get('rundgang_id'));
@@ -897,6 +943,162 @@ await klick('[data-pdf="12"]');
 await dl2;
 check('KRITISCH: der Briefkopf wird nur einmal geholt, nicht bei jedem PDF',
   !calls.some(c => c.path.includes('portal_briefkopf')));
+
+// ══ Verkehrsdienst: Einsätze und Kundenrapporte (ENT-482) ═══════════════
+// Solange der Kunde keine unterschriebenen Einsätze hat, gibt es keine
+// Reiterleiste und keinen zweiten Bereich.
+check('KRITISCH: ohne Einsätze bleibt der zweite Bereich ganz weg',
+  await page.evaluate(() => document.getElementById('reiter').hidden
+    && document.getElementById('bereich-einsaetze').hidden
+    && !document.getElementById('bereich-rundgaenge').hidden));
+
+// ── Nur Verkehrsdienst: der Fall, der die Hausregel verletzen würde ──
+// Wer keine Rundgänge bezieht, darf KEINE leere Rundgang-Liste sehen --
+// sie sähe aus, als sei dort nichts passiert.
+antwort = { ...leer('kein_revierdienst'), je_vorhanden: false };
+einsatzAntwort = EINSAETZE_VOLL;
+await page.evaluate(() => laden());
+await page.waitForTimeout(400);
+check('KRITISCH: hat der Kunde NUR Einsätze, verschwindet der Rundgang-Bereich ganz',
+  await page.evaluate(() => document.getElementById('bereich-rundgaenge').hidden
+    && !document.getElementById('bereich-einsaetze').hidden));
+check('Und ohne zweite Art braucht es auch keine Reiterleiste',
+  await page.evaluate(() => document.getElementById('reiter').hidden));
+// „Nachweis der ausgeführten Rundgänge" bei einem reinen Verkehrsdienst-
+// Kunden wäre schlicht falsch -- die Unterzeile folgt dem, was er bezieht.
+check('KRITISCH: die Kopfzeile spricht von Einsätzen, nicht von Rundgängen',
+  /Einsätze/.test(await page.textContent('#unter'))
+  && !/Rundgänge/.test(await page.textContent('#unter')));
+
+const eListe = await page.textContent('#liste-e');
+check('KRITISCH: eine Einsatzzeile nennt Datum, Veranstaltung und Einsatzart',
+  /Musterlauf 2026/.test(eListe) && /Verkehrsdienst/.test(eListe));
+check('Ohne Veranstaltung trägt der Einsatzort die Zeile',
+  /Musterstrasse 12, Musterort/.test(eListe));
+// Zwei Einheiten, zwei Zeilen: „Personen" zählt Menschen, „Stunden" zählt
+// Zeit (Hausregel) -- gemessen, nicht im Text geraten.
+check('KRITISCH: Personen und Stunden stehen auf zwei Zeilen, nicht unter einer Überschrift',
+  /2 Personen/.test(eListe) && /12,50 Stunden/.test(eListe)
+  && await page.evaluate(() => {
+    const m = document.querySelectorAll('#liste-e .mass span');
+    return m.length >= 2
+      && Math.round(m[0].getBoundingClientRect().top) !== Math.round(m[1].getBoundingClientRect().top);
+  }));
+// Am Element gelesen und nicht am zusammengeklebten Text der Liste: Dort
+// steht "1 Person4,00 Stunden" ohne Trennzeichen, und eine Wortgrenze
+// zwischen "n" und "4" gibt es nicht.
+check('Ein Einsatz mit einer Person steht in der Einzahl da',
+  await page.evaluate(() => {
+    const zeilen = document.querySelectorAll('#liste-e .zeile');
+    const s = zeilen[1] && zeilen[1].querySelector('.mass span');
+    return !!s && s.textContent.trim() === '1 Person';
+  }));
+check('KRITISCH: die Einsatzliste scrollt die Seite nicht waagrecht',
+  await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
+
+// ── Der Kundenrapport in der Tafel ──────────────────────────────────
+await page.evaluate(() => document.querySelector('#liste-e .zeile').click());
+await page.waitForTimeout(400);
+const kr = await page.textContent('#liste-e .detail');
+check('KRITISCH: der Klick öffnet den Kundenrapport unter der Zeile',
+  await page.evaluate(() => {
+    const z = document.querySelector('#liste-e .zeile');
+    const t = z.nextElementSibling;
+    if (!t || !t.classList.contains('detail')) { return null; }
+    const a = z.getBoundingClientRect(), b = t.getBoundingClientRect();
+    return b.top >= a.bottom - 1 && Math.abs(a.width - b.width) <= 1;
+  }));
+// Das ist die Substanz des Blattes: jede Person mit IHREN Zeiten (ENT-160).
+check('KRITISCH: jede Person steht mit ihren eigenen Zeiten da (ENT-160)',
+  /M\. Musterperson/.test(kr) && /07:00 – 13:15/.test(kr)
+  && /T\. Zweitperson/.test(kr) && /07:00 – 13:45/.test(kr));
+check('KRITISCH: die Zeiten müssen NICHT übereinstimmen — und tun es hier auch nicht',
+  /13:15/.test(kr) && /13:45/.test(kr));
+check('Pause und Nettostunden je Person', /30′/.test(kr) && /5,75 h/.test(kr) && /6,25 h/.test(kr));
+check('KRITISCH: das Total steht darunter', /Total/.test(kr) && /12,00 h/.test(kr));
+check('Die Bemerkung einer Person erscheint mit ihrem Namen',
+  /Umleitung länger als geplant/.test(kr));
+check('KRITISCH: die Unterschrift des Kunden steht im Rapport, mit Name und Zeitpunkt',
+  /B\. Unterzeichnend/.test(kr) && /13:20/.test(kr) && /M\. Musterperson/.test(kr)
+  && await page.evaluate(() => !!document.querySelector('#liste-e .kr-unter img')));
+check('Kunden-Nr., Einsatzort und Einsatzart stehen im Kopf',
+  /K-0001/.test(kr) && /Musterweg 4, Musterort/.test(kr));
+// Vier Spalten passen auf 390 px nicht. Sie rollen in IHREM Behälter --
+// die SEITE bleibt stehen.
+// Die Tabelle ist breiter als der Bildschirm. Sie muss ERREICHBAR bleiben --
+// darum wird gemessen, dass ihr Behälter wirklich rollt (computed style,
+// nicht Quelltext) und dass die Seite selbst stehen bleibt. Ohne den ersten
+// Teil bewiese die Zusage nur, dass irgendwo abgeschnitten wird.
+check('KRITISCH: die breite Zeittabelle rollt in ihrem Behälter, die Seite nicht',
+  await page.evaluate(() => {
+    const w = document.querySelector('#liste-e .tw');
+    if (!w) { return false; }
+    const rollt = ['auto', 'scroll'].includes(getComputedStyle(w).overflowX);
+    return rollt && w.scrollWidth > w.clientWidth
+      && document.documentElement.scrollWidth <= window.innerWidth + 1;
+  }));
+await page.screenshot({ path: `${OUT}/portal-12-einsatz-handy.png` });
+
+// ── Das PDF des Einsatzes ───────────────────────────────────────────
+const dlE = page.waitForEvent('download', { timeout: 40000 }).catch(() => null);
+await klick('[data-art="einsatz"][data-pdf="70"]');
+const dateiE = await dlE;
+check('KRITISCH: auch der Einsatz lässt sich als PDF herunterladen', !!dateiE);
+check(`Und heisst wie das Rundgang-Blatt (${dateiE ? dateiE.suggestedFilename() : '–'})`,
+  !!dateiE && /^Rapport-.+\.pdf$/.test(dateiE.suggestedFilename()));
+const blattE = await page.textContent('#blatt');
+check('KRITISCH: das Blatt ist der Kundenrapport, nicht der Rundgang-Rapport',
+  /Kundenrapport/.test(blattE) && /Einsatz-Nr\. 70/.test(blattE)
+  && !/Rundgang-Rapport/.test(blattE));
+check('KRITISCH: mit allen Personenzeilen und dem Total',
+  /M\. Musterperson/.test(blattE) && /T\. Zweitperson/.test(blattE) && /12,00 h/.test(blattE));
+check('Und mit der Kundenadresse aus den Stammdaten',
+  /Muster Liegenschaften AG/.test(blattE) && /Musterweg 1/.test(blattE));
+check('Die Unterschrift steht auch auf dem Blatt',
+  /B\. Unterzeichnend/.test(blattE)
+  && await page.evaluate(() => !!document.querySelector('#blatt img[src^="data:image"]')));
+
+// ── Beide Arten: erst dann gibt es Reiter ───────────────────────────
+antwort = VOLL;
+await page.evaluate(() => laden());
+await page.waitForTimeout(500);
+check('KRITISCH: hat der Kunde BEIDES, erscheint die Reiterleiste',
+  await page.evaluate(() => !document.getElementById('reiter').hidden));
+check('Und die Kopfzeile nennt dann beides',
+  /Rundgänge und Einsätze/.test(await page.textContent('#unter')));
+check('Und die Rundgänge stehen zuerst',
+  await page.evaluate(() => !document.getElementById('bereich-rundgaenge').hidden
+    && document.getElementById('bereich-einsaetze').hidden
+    && document.getElementById('reiter-rundgaenge').getAttribute('aria-selected') === 'true'));
+check('KRITISCH: die Reiter sind auf dem Handy mindestens 44 px hoch',
+  await page.evaluate(() => [...document.querySelectorAll('.reiter-taste')]
+    .every(t => t.getBoundingClientRect().height >= 44)));
+await klick('#reiter-einsaetze');
+await page.waitForTimeout(250);
+check('KRITISCH: der Reiter schaltet um',
+  await page.evaluate(() => document.getElementById('bereich-rundgaenge').hidden
+    && !document.getElementById('bereich-einsaetze').hidden
+    && document.getElementById('reiter-einsaetze').getAttribute('aria-selected') === 'true'));
+await page.screenshot({ path: `${OUT}/portal-13-reiter-handy.png` });
+
+// ── Zwei leere Zustände, zwei Texte ─────────────────────────────────
+const eLeer = async (grund) => {
+  einsatzAntwort = { status: 'ok', je_vorhanden: true, einsaetze: [], leer_grund: grund,
+    zeitraum: { von: vorTagen(30), bis: vorTagen(0) } };
+  await page.evaluate(() => laden());
+  await page.waitForTimeout(350);
+  return page.textContent('#liste-e');
+};
+const nochNichts = await eLeer('noch_nichts_unterschrieben');
+const keinTreffer = await eLeer('kein_treffer_im_zeitraum');
+check('KRITISCH: „noch nicht unterschrieben" sagt, WORAUF es wartet',
+  /unterschrieben/.test(nochNichts) && /vor Ort/.test(nochNichts));
+check('KRITISCH: und ist ein ANDERER Text als „kein Treffer im Zeitraum"',
+  nochNichts !== keinTreffer && /Zeitraum/.test(keinTreffer));
+
+einsatzAntwort = EINSAETZE_VOLL;
+await klick('#reiter-rundgaenge');
+await page.waitForTimeout(200);
 
 await page.screenshot({ path: `${OUT}/portal-08-detail-handy.png` });
 

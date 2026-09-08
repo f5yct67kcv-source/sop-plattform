@@ -18,7 +18,7 @@ preg_match_all('/^const (KP_\w+)\s*=\s*(\d+);/m', $quelle, $k, PREG_SET_ORDER);
 foreach ($k as $c) { define($c[1], (int)$c[2]); }
 
 foreach (['kp_sitzung_abgelaufen', 'kp_code_zustand', 'kp_code_erzeugen', 'kp_email_normal',
-          'kp_runde_sichtbar'] as $fn) {
+          'kp_runde_sichtbar', 'kp_einsatz_sichtbar'] as $fn) {
     if (!preg_match('/function ' . $fn . '\(.*?\n\}/s', $quelle, $m)) {
         echo "- Funktion $fn nicht gefunden\n";
         exit(1);
@@ -125,6 +125,30 @@ pruef('KRITISCH: ohne eigene Objekte ist gar nichts sichtbar',
 // durchgehen -- und damit unter Umstaenden auch 12abc oder true.
 pruef('KRITISCH: der Vergleich der Objektnummer ist streng typisiert',
     kp_runde_sichtbar(0, [false, null], false) === false);
+
+// ── Welchen EINSATZ ein Kunde sehen darf (ENT-482) ────────────────────
+// Der Verkehrsdienst-Teil. Wieder wirklich ausgefuehrt: Diese Regel
+// entscheidet, ob ein Kunde durch Hochzaehlen an den Rapport eines anderen
+// kaeme -- mit Namen und Arbeitszeiten fremder Mitarbeitender darauf.
+$meineObjekte = [11, 12];
+// (a) Direkt ueber die Kunden-Nummer am Einsatz -- der Normalfall im
+//     Verkehrsdienst, wo gar kein Objekt hinterlegt ist.
+pruef('KRITISCH: ein unterschriebener Einsatz des eigenen Kunden ist sichtbar',
+    kp_einsatz_sichtbar(7, 7, null, $meineObjekte, true) === true);
+pruef('KRITISCH: ein Einsatz eines FREMDEN Kunden ist es nicht',
+    kp_einsatz_sichtbar(9, 7, null, $meineObjekte, true) === false);
+// (b) Ueber ein Objekt des Kunden -- der Revierdienst-Fall.
+pruef('KRITISCH: ein Einsatz an einem eigenen Objekt ist sichtbar, auch ohne kunde_id',
+    kp_einsatz_sichtbar(null, 7, 12, $meineObjekte, true) === true);
+pruef('KRITISCH: an einem fremden Objekt nicht',
+    kp_einsatz_sichtbar(null, 7, 99, $meineObjekte, true) === false);
+// Ohne beides bleibt nur der Freitext einsaetze.kunde_name -- und der wird
+// NIE zur Zuordnung benutzt (ENT-441 Punkt 4).
+pruef('KRITISCH: ohne kunde_id und ohne Objekt ist nichts sichtbar',
+    kp_einsatz_sichtbar(null, 7, null, $meineObjekte, true) === false);
+// Die Unterschrift ist der Freigabepunkt (ENT-441 Punkt 5).
+pruef('KRITISCH: ohne Unterschrift ist auch der eigene Einsatz nicht sichtbar',
+    kp_einsatz_sichtbar(7, 7, 12, $meineObjekte, false) === false);
 
 // ── Der Katalog der Abbruchgruende (ENT-481) ─────────────────────────
 // Der Kunde liest jetzt den Grund eines Abbruchs. Er muss ein Satz sein und
