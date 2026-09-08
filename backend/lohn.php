@@ -374,6 +374,7 @@ const LOHN_SV = [
     2026 => [
         'quelle' => 'Merkblatt 2.01 "Lohnbeitraege an die AHV, die IV und die EO", '
                   . 'Stand am 1. Januar 2026, Ziffern 1, 3, 15 und 17',
+        'gilt_fuer' => [2026],
         // Ziff. 3, Gesamtsaetze (Arbeitgeber und Arbeitnehmer zusammen).
         'ahv_bp' => 870, 'iv_bp' => 140, 'eo_bp' => 50, 'total_bp' => 1060,
         // Ziff. 3: "ziehen Sie 5,3 % des Lohns Ihrer Arbeitnehmenden fuer
@@ -390,10 +391,32 @@ const LOHN_SV = [
 // nichts erfasst" -- und das ist etwas anderes als "null Prozent". Der
 // Aufrufer sperrt dann, statt beitragsfrei zu rechnen. Dieselbe Regel wie
 // beim fehlenden Abzugssatz: eine fehlende Grundlage ist kein Nullwert.
-function lohn_sv(string $stichtag): ?array
+// Nachschlagen im Regelwerk -- fuer alle drei Sozialversicherungen gleich.
+//
+// EIN MERKBLATT KANN FUER MEHRERE JAHRE GELTEN. Die Informationsstelle
+// AHV/IV legt ein Merkblatt nur neu auf, wenn sich etwas geaendert hat: Fuer
+// AHV/IV/EO gibt es eine Ausgabe mit Stand 1. Januar 2026, fuer die ALV und
+// die Unfallversicherung ist die Ausgabe mit Stand 1. Januar 2025 die
+// aktuellste (vom Projektinhaber am 2026-09-08 bestaetigt).
+//
+// Deshalb traegt jeder Jahrgang eine AUSDRUECKLICHE Liste der Jahre, fuer
+// die er gilt -- und keinen stillen Rueckfall auf das juengste vorhandene
+// Jahr. Der Unterschied ist der ganze Zweck: Ein Rueckfall wuerde 2027
+// klaglos mit den Saetzen von 2026 weiterrechnen, wenn niemand nachtraegt.
+// Eine Jahresliste laeuft aus, und dann sperrt der Lauf und sagt es.
+function lohn_regelwerk(array $werk, string $stichtag): ?array
 {
     if (strlen($stichtag) < 4) { return null; }
-    return LOHN_SV[(int)substr($stichtag, 0, 4)] ?? null;
+    $jahr = (int)substr($stichtag, 0, 4);
+    foreach ($werk as $eintrag) {
+        if (in_array($jahr, $eintrag['gilt_fuer'] ?? [], true)) { return $eintrag; }
+    }
+    return null;
+}
+
+function lohn_sv(string $stichtag): ?array
+{
+    return lohn_regelwerk(LOHN_SV, $stichtag);
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -413,7 +436,11 @@ function lohn_sv(string $stichtag): ?array
 const LOHN_ALV = [
     2025 => [
         'quelle' => 'Merkblatt 2.08 "Beitraege an die Arbeitslosenversicherung", '
-                  . 'Stand am 1. Januar 2025 (Ausgabe November 2024), Ziffern 1 bis 5',
+                  . 'Stand am 1. Januar 2025 (Ausgabe November 2024), Ziffern 1 bis 5. '
+                  . 'Vom Projektinhaber am 2026-09-08 als AKTUELLSTE Ausgabe bestaetigt -- '
+                  . 'das Merkblatt wurde fuer 2026 nicht neu aufgelegt und gilt darum auch '
+                  . 'fuer dieses Jahr.',
+        'gilt_fuer' => [2025, 2026],
         // Ziff. 1: "Bis zu einem jaehrlichen Hoechstbetrag von 148 200 Franken
         // betraegt der Beitragssatz an die ALV 2,2 % des massgebenden
         // Jahreslohnes." Arbeitgebende und Arbeitnehmende tragen je die Haelfte.
@@ -439,8 +466,7 @@ const LOHN_ALV = [
 // heisst "fuer dieses Jahr nicht erfasst", nicht "beitragsfrei".
 function lohn_alv(string $stichtag): ?array
 {
-    if (strlen($stichtag) < 4) { return null; }
-    return LOHN_ALV[(int)substr($stichtag, 0, 4)] ?? null;
+    return lohn_regelwerk(LOHN_ALV, $stichtag);
 }
 
 // Merkblatt 2.08 Ziff. 1, woertlich: "Dieser Hoechstbetrag gilt fuer jedes
@@ -525,7 +551,11 @@ function lohn_fuenfrappen(float $rappen): int
 const LOHN_UVG = [
     2025 => [
         'quelle' => 'Merkblatt 6.05 "Obligatorische Unfallversicherung UVG", '
-                  . 'Stand am 1. Januar 2025 (Ausgabe November 2024), Ziffern 4 und 5',
+                  . 'Stand am 1. Januar 2025 (Ausgabe November 2024), Ziffern 4 und 5. '
+                  . 'Vom Projektinhaber am 2026-09-08 als AKTUELLSTE Ausgabe bestaetigt -- '
+                  . 'das Merkblatt wurde fuer 2026 nicht neu aufgelegt und gilt darum auch '
+                  . 'fuer dieses Jahr.',
+        'gilt_fuer' => [2025, 2026],
         // Ziff. 5, woertlich: "Der Hoechstbetrag des versicherten Verdienstes
         // in der Unfallversicherung betraegt 148 200 Franken pro Jahr oder
         // 406 Franken pro Tag."
@@ -550,8 +580,7 @@ const LOHN_UVG = [
 // UVG nennt einen eigenen Tagesbetrag.
 function lohn_uvg(string $stichtag): ?array
 {
-    if (strlen($stichtag) < 4) { return null; }
-    return LOHN_UVG[(int)substr($stichtag, 0, 4)] ?? null;
+    return lohn_regelwerk(LOHN_UVG, $stichtag);
 }
 
 // Wer traegt welche Praemie -- Merkblatt 6.05 Ziff. 5.

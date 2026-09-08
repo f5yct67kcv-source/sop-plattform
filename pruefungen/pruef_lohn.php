@@ -380,8 +380,23 @@ pruef('Ein umgekehrter Zeitraum ergibt null statt einer geratenen Zahl',
 // KRITISCH, gleiche Familie wie bei LOHN_SV: Das ALV-Merkblatt liegt nur im
 // Stand 2025 vor. Fuer 2026 darf NICHT stillschweigend derselbe Satz gelten
 // -- eine veraltete Grenze produziert weiterhin plausible Betraege.
-pruef('Ein nicht erfasstes ALV-Jahr liefert null statt des Vorjahressatzes',
-    lohn_alv('2026-07-15') === null && lohn_alv('2024-07-15') === null);
+// Ein Merkblatt kann fuer MEHRERE Jahre gelten -- es wird nur neu aufgelegt,
+// wenn sich etwas aendert. Die Jahre stehen darum ausdruecklich in einer
+// Liste. KRITISCH ist der Unterschied zu einem stillen Rueckfall: 2027 muss
+// weiterhin sperren, sonst rechnete es klaglos mit alten Saetzen weiter.
+pruef('Die Ausgabe 2025 gilt ausdruecklich auch fuer 2026',
+    lohn_alv('2026-07-15') !== null
+    && LOHN_ALV[2025]['gilt_fuer'] === [2025, 2026]);
+pruef('KRITISCH: ein Jahr ausserhalb der Liste liefert null -- kein Rueckfall aufs Vorjahr',
+    lohn_alv('2027-07-15') === null && lohn_alv('2024-07-15') === null);
+// Warum die Ausgabe 2025 fuer 2026 gilt, muss AN DER ZAHL stehen -- sonst
+// raet spaeter jemand, ob da einer nachlaessig war oder ob es so stimmt.
+// Gross- und Kleinschreibung darf dabei keine Rolle spielen.
+pruef('Beide Quellen nennen, dass die Ausgabe 2025 als aktuellste bestaetigt wurde',
+    stripos(LOHN_ALV[2025]['quelle'], 'aktuellste') !== false
+    && str_contains(LOHN_ALV[2025]['quelle'], '2026')
+    && stripos(LOHN_UVG[2025]['quelle'], 'aktuellste') !== false
+    && str_contains(LOHN_UVG[2025]['quelle'], '2026'));
 pruef('Der ALV-Jahrgang traegt seine Quelle mit Stand und Ziffern',
     count(array_filter(LOHN_ALV, fn($j) => trim($j['quelle'] ?? '') !== '')) === count(LOHN_ALV));
 pruef('Der Hoechstbetrag gilt je Arbeitsverhaeltnis, nicht je Person (Ziff. 1)',
@@ -453,8 +468,18 @@ pruef('Die Obergrenze ist die Woche selbst: 168 Stunden gelten noch, 169 nicht m
     && lohn_nbu_deckung(169.0, $uvg)['stand'] === LOHN_NBU_UNBEKANNT);
 pruef('Der Hinweis benennt den vermuteten Fehler, statt nur "unbekannt" zu sagen',
     str_contains(lohn_nbu_deckung(416.0, $uvg)['text'], 'Jahrespensum'));
-pruef('Ein nicht erfasstes UVG-Jahr liefert null statt des Vorjahreswerts',
-    lohn_uvg('2026-07-15') === null && lohn_uvg('2024-07-15') === null);
+pruef('Auch 6.05 in der Ausgabe 2025 gilt ausdruecklich fuer 2026',
+    lohn_uvg('2026-07-15') !== null && LOHN_UVG[2025]['gilt_fuer'] === [2025, 2026]);
+pruef('KRITISCH: auch hier kein Rueckfall -- 2027 und 2024 liefern null',
+    lohn_uvg('2027-07-15') === null && lohn_uvg('2024-07-15') === null);
+// KRITISCH: Die AHV wurde fuer 2026 NEU aufgelegt und gilt darum NUR fuer
+// 2026. Wer alle drei gleich behandelte, gaebe die Saetze von 2026 auch fuer
+// 2025 aus -- und dort galten andere.
+pruef('Die AHV-Ausgabe 2026 gilt NICHT rueckwaerts fuer 2025',
+    LOHN_SV[2026]['gilt_fuer'] === [2026] && lohn_sv('2025-07-15') === null);
+pruef('Jeder Jahrgang traegt eine ausdrueckliche Jahresliste',
+    count(array_filter(array_merge(array_values(LOHN_SV), array_values(LOHN_ALV),
+        array_values(LOHN_UVG)), fn($e) => !empty($e['gilt_fuer']))) === 3);
 
 // ── NBU-Unterstellung nach Empfehlung 7/87 ───────────────────────────────
 //

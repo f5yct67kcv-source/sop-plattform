@@ -427,6 +427,7 @@ pruef('Eine Lohnart, die der Katalog nicht kennt, wird namentlich gemeldet statt
         ['unbekannte_lohnarten'] === ['tippfehler']);
 
 // ── Der Weg mit Saetzen: 2026 rechnet die AHV ────────────────────────────
+// 2026 rechnet AHV UND ALV -- beide Merkblaetter gelten fuer dieses Jahr.
 $a26 = lohnlauf_abzuege($pdo, $refKopf, '2026-07-31', ['stand' => LOHN_NBU_UNBEKANNT]);
 $z26 = [];
 foreach ($a26['zeilen'] as $z) { $z26[$z['schluessel']] = $z; }
@@ -438,10 +439,17 @@ pruef('Der Abzug steht als NEGATIVER Betrag da, nicht als positiver mit Vorzeich
 // KRITISCH: Fuer 2026 ist kein ALV-Regelwerk erfasst. Die Zeile entsteht
 // trotzdem -- mit Grund und OHNE Betrag. Ein weggelassener Abzug faellt
 // niemandem auf, eine gesperrte Zeile schon.
-pruef('Fehlt das ALV-Regelwerk, entsteht die Zeile mit Grund und ohne Betrag',
-    $z26['alv']['betrag_rappen'] === null
-    && $z26['alv']['gesperrt_grund'] === 'kein_alv_regelwerk'
-    && strlen($z26['alv']['hinweis']) > 30);
+pruef('ALV 2026: 1,100 % von 291.60 ergeben die 3.21 der Referenzabrechnung',
+    $z26['alv']['betrag_rappen'] === -321);
+// Fuer ein Jahr OHNE Regelwerk muss die Zeile mit Grund und ohne Betrag
+// entstehen. 2027 ist ausdruecklich nicht erfasst.
+$a27 = lohnlauf_abzuege($pdo, $refKopf, '2027-07-31', ['stand' => LOHN_NBU_UNBEKANNT]);
+$z27 = []; foreach ($a27['zeilen'] as $z) { $z27[$z['schluessel']] = $z; }
+pruef('Fehlt das Regelwerk eines Jahres, entsteht die Zeile mit Grund und ohne Betrag',
+    $z27['alv']['betrag_rappen'] === null
+    && $z27['alv']['gesperrt_grund'] === 'kein_alv_regelwerk'
+    && $z27['ahv']['gesperrt_grund'] === 'kein_sv_regelwerk'
+    && strlen($z27['alv']['hinweis']) > 30);
 pruef('Ein fehlender Satz ergibt niemals einen Abzug von null',
     $z26['ktg']['betrag_rappen'] === null && $z26['ktg']['gesperrt_grund'] === 'kein_ktg_satz'
     && $z26['bvg']['betrag_rappen'] === null);
@@ -466,15 +474,15 @@ pruef('Fehlt das AHV-Regelwerk, sperrt umgekehrt die AHV-Zeile',
 // fehlte. Wer das ausbezahlt, zahlt zu viel und schuldet die Beitraege
 // trotzdem. Eine Summe ueber eine gesperrte Zeile ist keine Summe.
 pruef('KRITISCH: fehlt eine Abzugszeile, entsteht KEIN Nettolohn',
-    $z26['alv']['betrag_rappen'] === null
+    $z26['ktg']['betrag_rappen'] === null
     && $z26['nettolohn']['betrag_rappen'] === null
     && $z26['nettolohn']['gesperrt_grund'] === 'abzug_fehlt');
 pruef('KRITISCH: und erst recht kein Auszahlungsbetrag',
     $z26['auszahlung']['betrag_rappen'] === null
     && $z26['auszahlung']['gesperrt_grund'] === 'abzug_fehlt');
 pruef('Der Hinweis benennt die fehlenden Abzuege namentlich, nicht nur "gesperrt"',
-    str_contains($z26['nettolohn']['hinweis'], 'ALV')
-    && str_contains($z26['nettolohn']['hinweis'], 'Krankentaggeld'));
+    str_contains($z26['nettolohn']['hinweis'], 'Krankentaggeld')
+    && str_contains($z26['nettolohn']['hinweis'], 'BVG'));
 // Die Rechenvorschrift selbst, als Aussage die immer gilt: Steht ein
 // Nettolohn da, ist er die Summe -- steht keiner da, steht auch keine Zahl
 // da. Formuliert als Bedingung, damit sie auch dann noch prueft, wenn
