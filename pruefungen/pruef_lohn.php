@@ -456,5 +456,79 @@ pruef('Der Hinweis benennt den vermuteten Fehler, statt nur "unbekannt" zu sagen
 pruef('Ein nicht erfasstes UVG-Jahr liefert null statt des Vorjahreswerts',
     lohn_uvg('2026-07-15') === null && lohn_uvg('2024-07-15') === null);
 
+// ── NBU-Unterstellung nach Empfehlung 7/87 ───────────────────────────────
+//
+// Grundlage vom Projektinhaber: BGer 8C_644/2025 und Empfehlung 7/87.
+// Die ersten drei Faelle sind SEINE Beispiele, mit seinen Erwartungswerten.
+$e = fn(array $w) => lohn_nbu_ermittlung($w, $uvg);
+pruef('Beispiel 1: abwechselnd 20 und 0 Stunden ergibt Ø 10 und damit Deckung',
+    $e([20,0,20,0,20,0])['stand'] === LOHN_NBU_VERSICHERT
+    && abs($e([20,0,20,0,20,0])['schnitt_std'] - 10.0) < 0.001);
+pruef('Beispiel 2: eine Woche 20, dann zwei Wochen 0 ergibt Ø 6,67 und keine Deckung',
+    $e([20,0,0,20,0,0])['stand'] === LOHN_NBU_NICHT
+    && abs($e([20,0,0,20,0,0])['schnitt_std'] - 6.6667) < 0.001);
+pruef('Beispiel 3: mehr Arbeits- als Nullwochen, die Nullwochen fallen raus',
+    $e([20,20,0,20,20,0])['stand'] === LOHN_NBU_VERSICHERT
+    && $e([20,20,0,20,20,0])['basis'] === 'nur_arbeitswochen');
+
+// Die vier Regeln einzeln -- jede mit einem Fall, in dem NUR sie die
+// Entscheidung traegt. Ein Beispiel, das ueber zwei Wege zugleich zur
+// Deckung fuehrt, belegt keine der beiden Regeln.
+pruef('Regel 2 allein traegt: 8,8,8,1,1 hat Ø 5,2 aber die Mehrheit ab der Schwelle',
+    $e([8,8,8,1,1])['stand'] === LOHN_NBU_VERSICHERT
+    && $e([8,8,8,1,1])['ueber_schnitt'] === false
+    && $e([8,8,8,1,1])['ueber_mehrheit'] === true);
+pruef('Regel 3 allein traegt: 12,12,4,0,0 deckt nur, weil die Nullwochen rausfallen',
+    $e([12,12,4,0,0])['stand'] === LOHN_NBU_VERSICHERT
+    && $e([12,12,4,0,0])['basis'] === 'nur_arbeitswochen'
+    && $e([12,12,4,0,0])['ueber_mehrheit'] === false
+    && array_sum([12,12,4,0,0]) / 5 < 8.0);
+// KRITISCH: "ueberwiegen" heisst MEHR, nicht gleich viel. Bei Gleichstand
+// zaehlen alle Wochen -- sonst bekaeme jeder Zweiwochenrhythmus die
+// guenstigere Rechnung geschenkt.
+pruef('Bei Gleichstand von Arbeits- und Nullwochen zaehlen alle Kalenderwochen',
+    $e([8,0,8,0])['basis'] === 'alle_wochen'
+    && $e([8,0,8,0,8,0,8,0])['basis'] === 'alle_wochen');
+pruef('Genau acht Stunden im Schnitt genuegen -- die Schwelle ist eingeschlossen',
+    $e([8,8,8,8])['stand'] === LOHN_NBU_VERSICHERT
+    && $e([7.99,7.99,7.99,7.99])['stand'] === LOHN_NBU_NICHT);
+// KRITISCH und der Fall, den der Projektinhaber selbst als offen benannt
+// hat: Neueintritt ohne Stundenhistorie. Keine Historie ist NICHT
+// "nicht versichert".
+pruef('Ohne Stundenhistorie lautet die Antwort "unbekannt", nicht "nicht versichert"',
+    $e([])['stand'] === LOHN_NBU_UNBEKANNT && $e([])['schnitt_std'] === null);
+pruef('Jedes Ergebnis traegt seine Herleitung mit, nicht nur ein Ja oder Nein',
+    str_contains($e([20,0,20,0,20,0])['text'], '7/87')
+    && str_contains($e([12,12,4,0,0])['text'], '7/87')
+    && str_contains($e([20,0,0,20,0,0])['text'], 'Woche'));
+
+// Die guenstigere der beiden Varianten.
+pruef('Die guenstigere Variante ist die MIT Deckung',
+    LOHN_NBU_GUENSTIGER === LOHN_NBU_VERSICHERT);
+pruef('Empfehlung 7/87: geprueft werden drei und zwoelf Monate',
+    LOHN_NBU_FENSTER_MONATE === [3, 12]);
+// KRITISCH: Reicht EINE Variante, gilt Deckung. Waere es umgekehrt, verloere
+// die Aushilfe mit schwankendem Einsatz die Deckung, sobald ein einziges
+// Fenster ungluecklich liegt.
+pruef('Deckt nur die Zwoelfmonatsvariante, gilt trotzdem Deckung',
+    lohn_nbu_unterstellung([3 => $e([20,0,0,20,0,0]), 12 => $e([20,0,20,0,20,0])], $uvg)['stand']
+        === LOHN_NBU_VERSICHERT);
+pruef('Deckt nur die Dreimonatsvariante, gilt ebenfalls Deckung',
+    lohn_nbu_unterstellung([3 => $e([20,0,20,0,20,0]), 12 => $e([20,0,0,20,0,0])], $uvg)['stand']
+        === LOHN_NBU_VERSICHERT);
+pruef('Das Ergebnis nennt, welche Variante entschieden hat',
+    lohn_nbu_unterstellung([3 => $e([20,0,0,20,0,0]), 12 => $e([20,0,20,0,20,0])], $uvg)['entschieden_durch'] === 12);
+pruef('Deckt keine Variante, steht "nicht versichert" fest',
+    lohn_nbu_unterstellung([3 => $e([20,0,0,20,0,0]), 12 => $e([20,0,0,20,0,0])], $uvg)['stand']
+        === LOHN_NBU_NICHT);
+pruef('Sind alle Varianten ohne Historie, bleibt es unbekannt statt unversichert',
+    lohn_nbu_unterstellung([3 => $e([]), 12 => $e([])], $uvg)['stand'] === LOHN_NBU_UNBEKANNT);
+// Das vertragliche Pensum ist nach BGer 8C_644/2025 NICHT massgebend. Der
+// Rechenkern kennt darum ueberhaupt keinen Weg, es einzubringen: Er nimmt
+// nur geleistete Wochenstunden entgegen.
+pruef('Ein 20-Prozent-Pensum aendert nichts -- gerechnet wird aus geleisteten Stunden',
+    $e([2,2,2,2])['stand'] === LOHN_NBU_NICHT
+    && $e([20,20,20,20])['stand'] === LOHN_NBU_VERSICHERT);
+
 echo $ok . " Pruefungen bestanden\n";
 if ($bad) { echo count($bad) . " FEHLGESCHLAGEN:\n - " . implode("\n - ", $bad) . "\n"; exit(1); }

@@ -279,5 +279,71 @@ pruef('KRITISCH: zu jedem verwendeten Sperrgrund gibt es einen erklaerenden Satz
 pruef('Und keiner dieser Saetze ist leer',
     count(array_filter($gruende, fn($t) => strlen(trim($t)) > 20)) === count($gruende));
 
+// ── Wochenstunden fuer die NBU-Unterstellung (Empfehlung 7/87) ───────────
+//
+// Gegen eine echte Datenbank, weil sich genau hier die zwei Entscheidungen
+// entscheiden, die gegen die naheliegende Wahl getroffen wurden: dass die
+// Reinigungssparte MITzaehlt und der Zeitbonus NICHT.
+$mkw = 90;   // eigener Mitarbeiter, damit die anderen Faelle unberuehrt bleiben
+$pdo->exec("INSERT INTO einsaetze VALUES
+    (900,'2026-07-06','bewachung','Kunde',1,'geplant'),
+    (901,'2026-07-13','reinigung','Kunde',1,'geplant'),
+    (902,'2026-07-05','bewachung','Kunde',1,'geplant'),
+    (903,'2026-07-20','bewachung','Kunde',1,'abgesagt'),
+    (904,'2026-07-27','bewachung','Kunde',1,'geplant')");
+$pdo->exec("INSERT INTO einsatz_zuteilung VALUES
+    (900,$mkw,'abgeglichen','08:00','18:00',60,0),
+    (901,$mkw,'abgeglichen','08:00','18:00',0,0),
+    (902,$mkw,'abgeglichen','08:00','18:00',0,0),
+    (903,$mkw,'abgeglichen','08:00','18:00',0,0),
+    (904,$mkw,'offen','08:00','18:00',0,0)");
+
+$w = lohnlauf_nbu_wochen($pdo, $mkw, '2026-07-31', 3);
+
+pruef('Das Fenster beginnt an einem Montag, nicht mitten in der Woche',
+    date('N', strtotime($w['von'])) === '1');
+pruef('Das Fenster umfasst drei Monate und endet am Stichtag',
+    $w['bis'] === '2026-07-31' && $w['monate'] === 3
+    && strtotime($w['von']) < strtotime('2026-05-02'));
+// KRITISCH: Nullstundenwochen MUESSEN in der Liste stehen. Ohne sie sind die
+// Regeln 3 und 4 der Empfehlung nicht anwendbar, und der Durchschnitt waere
+// systematisch zu hoch.
+pruef('Wochen ohne Einsatz stehen als Nullstundenwochen in der Liste',
+    count($w['liste']) === count($w['wochen'])
+    && count(array_filter($w['liste'], fn($h) => $h == 0.0)) > 5
+    && count($w['liste']) > 10);
+
+// Die Pause geht ab: 08:00-18:00 mit 60 Minuten unbezahlter Pause sind neun
+// Stunden, nicht zehn.
+pruef('Gezaehlt wird die Nettozeit: zehn Stunden minus einer Stunde Pause sind neun',
+    abs($w['wochen'][date('o-\WW', strtotime('2026-07-06'))] - 9.0) < 0.001);
+// KRITISCH: Die Reinigungssparte ist fuer den GAV gesperrt (OP-32). Fuer die
+// Unfallversicherung ist das ohne Bedeutung -- wer dort arbeitet, arbeitet.
+pruef('Eine Schicht der Reinigungssparte zaehlt fuer die NBU-Unterstellung mit',
+    !gavzeit_gilt('reinigung')
+    && abs($w['wochen'][date('o-\WW', strtotime('2026-07-13'))] - 10.0) < 0.001);
+// KRITISCH: Der Zeitbonus ist eine tarifliche Gutschrift, keine geleistete
+// Arbeitszeit. Die Pruefung belegt beides: dass fuer diese Schicht ueberhaupt
+// ein Bonus entsteht, und dass er NICHT mitgezaehlt wird.
+$bonusSchicht = gavzeit_bonus_min('2026-07-05', '08:00', '18:00');
+pruef('Der Zeitbonus entsteht fuer diese Schicht wirklich',  $bonusSchicht > 0);
+pruef('Er wird trotzdem nicht mitgezaehlt: geleistet sind zehn Stunden, nicht mehr',
+    abs($w['wochen'][date('o-\WW', strtotime('2026-07-05'))] - 10.0) < 0.001);
+pruef('Eine abgesagte Schicht zaehlt nicht mit',
+    abs($w['wochen'][date('o-\WW', strtotime('2026-07-20'))] - 0.0) < 0.001);
+pruef('Eine nicht abgeglichene Schicht zaehlt nicht mit',
+    abs($w['wochen'][date('o-\WW', strtotime('2026-07-27'))] - 0.0) < 0.001);
+
+// Und die Kette bis zum Ergebnis: aus den Wochen wird die Unterstellung.
+$uvgP = lohn_uvg('2025-06-30');
+$erg  = lohn_nbu_ermittlung($w['liste'], $uvgP);
+pruef('Aus den gezaehlten Wochen entsteht ein nachvollziehbares Ergebnis',
+    in_array($erg['stand'], [LOHN_NBU_VERSICHERT, LOHN_NBU_NICHT], true)
+    && $erg['wochen_total'] === count($w['liste'])
+    && $erg['schnitt_std'] !== null);
+pruef('Ein Mitarbeiter ganz ohne Einsaetze ergibt lauter Nullwochen, nicht eine leere Liste',
+    count(lohnlauf_nbu_wochen($pdo, 999, '2026-07-31', 3)['liste']) > 10
+    && array_sum(lohnlauf_nbu_wochen($pdo, 999, '2026-07-31', 3)['liste']) == 0.0);
+
 echo $ok . " Pruefungen bestanden\n";
 if ($bad) { echo count($bad) . " FEHLGESCHLAGEN:\n - " . implode("\n - ", $bad) . "\n"; exit(1); }

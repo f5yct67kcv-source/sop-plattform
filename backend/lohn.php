@@ -625,6 +625,139 @@ function lohn_nbu_deckung(?float $stundenProWoche, array $uvg): array
             . 'Nichtberufsunfaelle (Merkblatt 6.05 Ziff. 4).'];
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+// NBU-UNTERSTELLUNG BEI UNREGELMAESSIGEM EINSATZ (ENT-451, Etappe 4).
+//
+// GRUNDLAGE, vom Projektinhaber am 2026-09-08 eingebracht: Bundesgericht
+// 8C_644/2025 vom 25. Maerz 2026 und Empfehlung 7/87 der Ad-hoc-Kommission
+// Schaden UVG. Danach ist das VERTRAGLICHE Pensum fuer die Acht-Stunden-
+// Grenze nicht massgebend; es zaehlen die effektiv geleisteten Stunden im
+// Durchschnitt ueber die letzten drei oder zwoelf Monate, und es gilt die
+// fuer den Mitarbeitenden guenstigere Variante.
+//
+// NICHT VON MIR NACHGEPRUEFT: Beide Fundstellen waren aus der
+// Arbeitsumgebung nicht erreichbar. Sie stehen hier als vom Projektinhaber
+// belegte Grundlage, wie ein Eintrag im Auslegungsregister -- nicht als von
+// mir verifiziertes Recht.
+//
+// Das Verfahren nach Empfehlung 7/87:
+//   1. Durchschnittlich mindestens acht Stunden je Woche -> versichert.
+//   2. ODER: die Wochen mit mindestens acht Stunden ueberwiegen gegenueber
+//      den Wochen darunter -> ebenfalls versichert.
+//   3. Ueberwiegen im Zeitraum die Wochen MIT Einsatz, fallen die
+//      Nullstundenwochen aus der Durchschnittsrechnung.
+//   4. Ueberwiegen sie nicht, zaehlen alle Kalenderwochen mit.
+const LOHN_NBU_FENSTER_MONATE = [3, 12];
+
+// Welche Variante ist "die guenstigere"? Die MIT Deckung.
+//
+// Das ist keine Selbstverstaendlichkeit, denn Deckung kostet den
+// Mitarbeitenden eine Praemie. Das Merkblatt 6.05 beantwortet es aber
+// selbst: Zu Ziff. 4 steht in Klammern die Warnung "Unfalldeckung der
+// Krankenversicherung nicht sistieren!" -- ohne NBU-Deckung muss die Person
+// den Unfallschutz anderswo einkaufen, und zwar teurer. Der Schutz wiegt
+// schwerer als der Abzug.
+const LOHN_NBU_GUENSTIGER = LOHN_NBU_VERSICHERT;
+
+// Ermittlung fuer EINEN Beobachtungszeitraum.
+//
+// $wochenStunden ist eine Liste geleisteter Stunden je Kalenderwoche,
+// Nullwochen ausdruecklich eingeschlossen -- ohne sie waeren die Regeln 3
+// und 4 nicht anwendbar.
+//
+// Eine leere Liste ergibt "unbekannt", nicht "nicht versichert". Das ist der
+// Fall des Neueintritts ohne Stundenhistorie, und er ist offen (OP-473).
+function lohn_nbu_ermittlung(array $wochenStunden, array $uvg): array
+{
+    $schwelle = (float)$uvg['nbu_schwelle_std_woche'];
+    $total    = count($wochenStunden);
+    if ($total === 0) {
+        return ['stand' => LOHN_NBU_UNBEKANNT, 'schwelle' => $schwelle,
+            'wochen_total' => 0, 'arbeitswochen' => 0, 'nullwochen' => 0,
+            'basis' => null, 'schnitt_std' => null,
+            'wochen_ueber' => 0, 'wochen_unter' => 0,
+            'ueber_schnitt' => false, 'ueber_mehrheit' => false,
+            'text' => 'Keine Stundenhistorie im Beobachtungszeitraum. Ohne sie laesst sich '
+                . 'die Unterstellung nach Empfehlung 7/87 nicht ermitteln.'];
+    }
+
+    $arbeitswochen = array_values(array_filter($wochenStunden, fn($h) => $h > 0));
+    $nullwochen    = $total - count($arbeitswochen);
+
+    // Regel 3 und 4: Nur wenn die Arbeitswochen ueberwiegen, fallen die
+    // Nullwochen aus der Durchschnittsrechnung. Bei Gleichstand zaehlen alle
+    // Wochen -- "ueberwiegen" heisst mehr, nicht gleich viel.
+    $nurArbeitswochen = count($arbeitswochen) > $nullwochen;
+    $basisWerte = $nurArbeitswochen ? $arbeitswochen : $wochenStunden;
+    $schnitt    = array_sum($basisWerte) / count($basisWerte);
+
+    // Regel 2 zaehlt IMMER ueber alle Kalenderwochen des Zeitraums -- sie ist
+    // ein eigener Weg zur Deckung, keine Variante des Durchschnitts.
+    $ueber = count(array_filter($wochenStunden, fn($h) => $h >= $schwelle));
+    $unter = $total - $ueber;
+
+    $ueberSchnitt   = $schnitt >= $schwelle;
+    $ueberMehrheit  = $ueber > $unter;
+    $versichert     = $ueberSchnitt || $ueberMehrheit;
+
+    $wege = [];
+    if ($ueberSchnitt)  { $wege[] = 'Durchschnitt ' . number_format($schnitt, 2, '.', "'") . ' Std.'; }
+    if ($ueberMehrheit) { $wege[] = $ueber . ' von ' . $total . ' Wochen ab der Schwelle'; }
+
+    return ['stand' => $versichert ? LOHN_NBU_VERSICHERT : LOHN_NBU_NICHT,
+        'schwelle' => $schwelle,
+        'wochen_total' => $total,
+        'arbeitswochen' => count($arbeitswochen),
+        'nullwochen' => $nullwochen,
+        'basis' => $nurArbeitswochen ? 'nur_arbeitswochen' : 'alle_wochen',
+        'schnitt_std' => round($schnitt, 4),
+        'wochen_ueber' => $ueber, 'wochen_unter' => $unter,
+        'ueber_schnitt' => $ueberSchnitt, 'ueber_mehrheit' => $ueberMehrheit,
+        'text' => $versichert
+            ? 'Versichert nach Empfehlung 7/87 (' . implode(', ', $wege) . ').'
+            : 'Nicht versichert: Durchschnitt ' . number_format($schnitt, 2, '.', "'")
+              . ' Std. je Woche ueber ' . count($basisWerte) . ' Wochen'
+              . ($nurArbeitswochen ? ' (Nullwochen ausgenommen, weil die Arbeitswochen ueberwiegen)'
+                                   : ' (alle Kalenderwochen)')
+              . ', und ' . $ueber . ' von ' . $total . ' Wochen erreichen die Schwelle.'];
+}
+
+// Die guenstigere der beiden Varianten (drei oder zwoelf Monate).
+//
+// $fenster ist eine Abbildung Monatszahl -> Ergebnis von
+// lohn_nbu_ermittlung(). Reicht EINE Variante zur Deckung, gilt Deckung.
+// Nur wenn KEINE reicht und mindestens eine ein belastbares Ergebnis hat,
+// steht "nicht versichert" fest. Sind alle unbekannt, bleibt es unbekannt.
+function lohn_nbu_unterstellung(array $fenster, array $uvg): array
+{
+    $guenstig = null; $belastbar = false;
+    foreach ($fenster as $monate => $e) {
+        if ($e['stand'] === LOHN_NBU_UNBEKANNT) { continue; }
+        $belastbar = true;
+        if ($e['stand'] === LOHN_NBU_GUENSTIGER) { $guenstig = $monate; break; }
+    }
+    if ($guenstig !== null) {
+        return ['stand' => LOHN_NBU_VERSICHERT, 'entschieden_durch' => (int)$guenstig,
+            'fenster' => $fenster,
+            'text' => 'Versichert aufgrund der guenstigeren Variante ueber ' . $guenstig
+                . ' Monate. ' . $fenster[$guenstig]['text']];
+    }
+    if (!$belastbar) {
+        return ['stand' => LOHN_NBU_UNBEKANNT, 'entschieden_durch' => null,
+            'fenster' => $fenster,
+            'text' => 'Keine der Varianten liefert ein Ergebnis -- keine Stundenhistorie. '
+                . 'Der Fall des Neueintritts ist nicht entschieden (OP-473).'];
+    }
+    $erste = null;
+    foreach ($fenster as $monate => $e) {
+        if ($e['stand'] !== LOHN_NBU_UNBEKANNT) { $erste = $monate; break; }
+    }
+    return ['stand' => LOHN_NBU_NICHT, 'entschieden_durch' => (int)$erste,
+        'fenster' => $fenster,
+        'text' => 'Keine der geprueften Varianten ergibt eine Deckung. '
+            . $fenster[$erste]['text']];
+}
+
 // Merkblatt 2.01 Ziff. 1: "Erwerbstaetige Personen sind ab dem 1. Januar
 // nach dem 17. Geburtstag beitragspflichtig."
 //

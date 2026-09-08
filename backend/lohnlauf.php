@@ -120,6 +120,69 @@ function lohnlauf_zeiten(PDO $pdo, int $maId, string $von, string $bis): array
             'gesperrt' => $gesperrt, 'nicht_abgeglichen' => $offen];
 }
 
+// ── Wochenstunden fuer die NBU-Unterstellung (ENT-451, Etappe 4) ─────────
+//
+// Liefert die effektiv geleisteten Stunden je Kalenderwoche ueber die
+// letzten $monate Monate. Grundlage der Ermittlung nach Empfehlung 7/87;
+// gerechnet wird sie im Kern (lohn_nbu_ermittlung), hier wird nur gezaehlt.
+//
+// ZWEI ENTSCHEIDUNGEN, DIE DAS ERGEBNIS VERAENDERN -- beide gegen die
+// naheliegende Wahl:
+//
+// 1. GEZAEHLT WIRD DIE NETTOZEIT, NICHT DIE BEWERTETE. Die bewertete Zeit
+//    enthaelt den Zeitbonus nach Art. 12 Ziff. 2 GAV -- eine tarifliche
+//    Gutschrift, keine geleistete Arbeitszeit. Wer sie mitzaehlt, hebt
+//    jemanden mit sieben tatsaechlichen Stunden ueber die Acht-Stunden-
+//    Schwelle und begruendet einen Abzug auf Stunden, die nie gearbeitet
+//    wurden. Das UVG fragt nach Arbeitszeit, nicht nach Lohnwert.
+//
+// 2. GEZAEHLT WERDEN AUCH SCHICHTEN, DIE DER LOHNLAUF SPERRT. Die
+//    Reinigungssparte ist fuer den GAV gesperrt (OP-32) und ein fehlendes
+//    GAV-Regelwerk sperrt den Lohn -- fuer die Unfallversicherung ist beides
+//    ohne Bedeutung. Wer dort arbeitet, arbeitet. Diese Schichten
+//    auszulassen, senkte die Wochenstunden und koennte die Deckung zu
+//    Unrecht verneinen. Darum laeuft diese Zaehlung ausdruecklich NICHT
+//    durch gavzeit_gilt() und gavzeit_regel().
+//
+// Das Fenster beginnt am MONTAG der Kalenderwoche, in die der Fensteranfang
+// faellt -- sonst waere die erste Woche angebrochen und zaehlte mit zu
+// wenigen Stunden als volle Woche gegen den Mitarbeitenden.
+function lohnlauf_nbu_wochen(PDO $pdo, int $maId, string $bis, int $monate): array
+{
+    $roh   = date('Y-m-d', strtotime($bis . ' -' . $monate . ' months +1 day'));
+    $start = date('Y-m-d', strtotime('monday this week', strtotime($roh)));
+
+    $st = $pdo->prepare(
+        "SELECT e.datum, z.ist_von, z.ist_bis, z.ist_pause_min, z.ist_pause_bezahlt_ma
+           FROM einsatz_zuteilung z
+           JOIN einsaetze e ON e.id = z.einsatz_id
+          WHERE z.mitarbeiter_id = ? AND e.datum BETWEEN ? AND ?
+            AND e.status <> 'abgesagt' AND z.ist_status = 'abgeglichen'");
+    $st->execute([$maId, $start, $bis]);
+
+    // Erst alle Kalenderwochen des Fensters mit null anlegen. Eine Woche
+    // ohne Einsatz ist eine Nullstundenwoche und wird gebraucht -- ohne sie
+    // waeren die Regeln 3 und 4 der Empfehlung nicht anwendbar.
+    $wochen = [];
+    for ($t = strtotime($start); $t <= strtotime($bis); $t += 7 * 86400) {
+        $wochen[date('o-\WW', $t)] = 0.0;
+    }
+
+    $unbrauchbar = 0;
+    foreach ($st->fetchAll() as $r) {
+        $netto = gavzeit_netto_min($r['ist_von'], $r['ist_bis'],
+            $r['ist_pause_min'], $r['ist_pause_bezahlt_ma']);
+        if ($netto === null) { $unbrauchbar++; continue; }
+        $kw = date('o-\WW', strtotime((string)$r['datum']));
+        if (!array_key_exists($kw, $wochen)) { $wochen[$kw] = 0.0; }
+        $wochen[$kw] += $netto / 60;
+    }
+    ksort($wochen);
+    return ['von' => $start, 'bis' => $bis, 'monate' => $monate,
+            'wochen' => $wochen, 'liste' => array_values($wochen),
+            'unbrauchbar' => $unbrauchbar];
+}
+
 // ── Der zum Stichtag geltende Lohnansatz ─────────────────────────────────
 // Die juengste Zeile, die nicht in der Zukunft liegt. Ein kuenftiger Ansatz
 // ist erfasst, aber noch nicht gueltig.
