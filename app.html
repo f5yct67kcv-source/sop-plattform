@@ -2221,12 +2221,12 @@ const W = {
     hausnummer: 'Hausnummer', adresszusatz: 'Adresszusatz', plz: 'PLZ', land: 'Land',
     emailPrivat: 'E-Mail', emailWdh: 'E-Mail wiederholen',
     emailWdhFalsch: 'Die beiden E-Mail-Adressen stimmen nicht überein.',
-    notfallkontakt: 'Notfallkontakt',
+    notfallkontakt: 'Notfallkontakt', notfallTel: 'Notfall-Telefon',
     datenFreiwillig: 'freiwillig',
     datenFehltEine: 'Eine Angabe fehlt noch. Ohne sie lässt sich nicht speichern.',
     datenFehltMehrere: 'Angaben fehlen noch. Ohne sie lässt sich nicht speichern.',
     datenPflichtLeer: 'Diese Angabe ist nötig:',
-    notfallHilfe: 'Wen sollen wir anrufen, wenn dir auf Schicht etwas zustösst?',
+    notfallHilfe: 'Wen sollen wir anrufen, wenn dir auf Schicht etwas zustösst? Name und Nummer bitte getrennt.',
     emailPrivatHilfe: 'An diese Adresse geht der Link, wenn du dein Passwort vergisst.',
     emailWdhHilfe: 'Ein Zahlendreher fällt sonst erst auf, wenn du das Passwort wirklich brauchst — darum zweimal.',
     datenPwLabel: 'Dein Passwort',
@@ -5951,12 +5951,12 @@ const MD_ADRESSE = ['strasse', 'hausnummer', 'adresszusatz', 'plz', 'ort', 'land
 // statt privat und geschaeftlich. 'telefon' steht hier nicht mehr: Der
 // Server darf die alte Festnetzspalte noch leeren, ein Eingabefeld hat sie
 // nicht mehr (ma_selbst_sichtbare_felder).
-const MD_KONTAKT = ['mobil', 'email_privat', 'notfallkontakt'];
+const MD_KONTAKT = ['mobil', 'email_privat', 'notfallkontakt', 'notfallkontakt_tel'];
 // Muss zu SELBST_PFLICHT in backend/api/mein_profil_speichern.php passen.
 // Der Server sperrt; das hier erspart nur den vergeblichen Weg dorthin.
 // test_meine_daten_bearbeiten.mjs haelt beide Listen zusammen.
 const MD_PFLICHT = ['strasse', 'hausnummer', 'plz', 'ort', 'land',
-  'mobil', 'email_privat', 'notfallkontakt'];
+  'mobil', 'email_privat', 'notfallkontakt', 'notfallkontakt_tel'];
 // Beschriftungen ueber das Woerterbuch, damit sie an einer Stelle stehen.
 const MD_BESCHRIFTUNG = {
   strasse: 'strasse', hausnummer: 'hausnummer', adresszusatz: 'adresszusatz',
@@ -5964,7 +5964,8 @@ const MD_BESCHRIFTUNG = {
   // Die eine Nummer heisst auf dem Bildschirm schlicht "Telefon" -- das
   // Wort, das alle sagen --, liegt aber in der Spalte 'mobil' (ENT-466).
   mobil: 'telefon', telefon: 'telefon',
-  email_privat: 'emailPrivat', notfallkontakt: 'notfallkontakt'
+  email_privat: 'emailPrivat',
+  notfallkontakt: 'notfallkontakt', notfallkontakt_tel: 'notfallTel'
 };
 // Muss zu SELBST_MAXLAENGE in backend/api/mein_profil_speichern.php passen.
 // Das Feld hier begrenzt nur die Eingabe und erspart den vergeblichen Weg
@@ -5972,12 +5973,14 @@ const MD_BESCHRIFTUNG = {
 // beide Listen zusammen, damit sie nicht auseinanderlaufen.
 const MD_MAXLAENGE = {
   strasse: 200, hausnummer: 20, adresszusatz: 200, plz: 10, ort: 200,
-  land: 100, telefon: 50, mobil: 50, email_privat: 200, notfallkontakt: 200
+  land: 100, telefon: 50, mobil: 50, email_privat: 200,
+  notfallkontakt: 200, notfallkontakt_tel: 50
 };
 const MD_AUTO = {
   strasse: 'address-line1', hausnummer: 'off', adresszusatz: 'address-line2',
   plz: 'postal-code', ort: 'address-level2', land: 'country-name',
-  telefon: 'tel', mobil: 'tel', email_privat: 'email', notfallkontakt: 'off'
+  telefon: 'tel', mobil: 'tel', email_privat: 'email',
+  notfallkontakt: 'off', notfallkontakt_tel: 'off'
 };
 
 const mdDarf = f => selbstAenderbar.indexOf(f) >= 0;
@@ -6033,6 +6036,7 @@ function mdAnzeige() {
     ${mdZeile(w('telefon'), mdNummer())}
     ${mdDarf('email_privat') ? mdZeile(w('emailPrivat'), p.email_privat) : ''}
     ${mdDarf('notfallkontakt') ? mdZeile(w('notfallkontakt'), p.notfallkontakt) : ''}
+    ${mdDarf('notfallkontakt_tel') ? mdZeile(w('notfallTel'), p.notfallkontakt_tel) : ''}
   </dl>
   ${kann ? `<div class="md-tat"><button class="btn btn-primary" id="mdKnopfAuf"
       onclick="mdBearbeitenAuf()">${esc(w('datenBearbeiten'))}</button></div>` : ''}
@@ -6043,7 +6047,8 @@ function mdFeld(f, hilfe) {
   if (!mdDarf(f)) return '';
   const p = profil || {};
   const id = 'md-' + f;
-  const typ = f === 'email_privat' ? 'email' : f === 'mobil' ? 'tel' : 'text';
+  const typ = f === 'email_privat' ? 'email'
+            : (f === 'mobil' || f === 'notfallkontakt_tel') ? 'tel' : 'text';
   // Wiederholung und Passwortfrage tauchen auf, sobald die Adresse sich
   // wirklich unterscheidet -- nicht erst nach vergeblichem Speichern.
   const zusatz = f === 'email_privat' ? ' oninput="mdMailGeprueft()"' : '';
@@ -6083,7 +6088,9 @@ function mdFormular() {
         <p class="md-hilfe" style="margin:8px 0 0">${esc(w('datenPwWarum'))}</p>
       </div>
     </div>
-    ${mdFeld('notfallkontakt', 'notfallHilfe')}` : ''}
+    <div class="md-paar md-paar-gleich">${mdFeld('notfallkontakt')}${mdFeld('notfallkontakt_tel')}</div>
+    ${(mdDarf('notfallkontakt') || mdDarf('notfallkontakt_tel'))
+      ? `<p class="md-hilfe">${esc(w('notfallHilfe'))}</p>` : ''}` : ''}
   <div class="md-tat">
     <button class="btn btn-primary" id="mdKnopfSpeichern"
       onclick="mdSpeichern()">${esc(w('speichern'))}</button>

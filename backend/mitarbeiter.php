@@ -110,7 +110,8 @@ function ma_felder(): array
         'mobil_geschaeft'   => 'text',
         'email'             => 'text',
         'email_privat'      => 'text',
-        'notfallkontakt'    => 'text',
+        'notfallkontakt'     => 'text',
+        'notfallkontakt_tel' => 'text',
         // Betriebliches
         'kurzzeichen'          => 'text',
         'funktion_id'          => 'id',
@@ -235,7 +236,8 @@ function ma_selbst_aenderbare_felder(): array
 {
     return [
         'strasse', 'hausnummer', 'adresszusatz', 'plz', 'ort', 'land',
-        'telefon', 'mobil', 'email_privat', 'notfallkontakt',
+        'telefon', 'mobil', 'email_privat',
+        'notfallkontakt', 'notfallkontakt_tel',
     ];
 }
 
