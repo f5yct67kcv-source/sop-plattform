@@ -1657,6 +1657,12 @@ $spalten = [
     // gleichwertige Zweck ein Notfallkontakt: wen man anruft, wenn auf Schicht
     // etwas passiert. Bewusst umbenannt statt woertlich uebernommen.
     ['mitarbeiter', 'notfallkontakt',   "ALTER TABLE mitarbeiter ADD COLUMN notfallkontakt VARCHAR(200) NULL"],
+    // Getrennt von Anfang an waere besser gewesen (ENT-471): Bis dahin stand
+    // "Name, Nummer" als freier Text in einem Feld -- unsuchbar, nicht
+    // waehlbar, und beim Notfall muss jemand die Nummer erst herauslesen.
+    // Altbestaende bleiben im Namensfeld stehen; getrennt wird beim ersten
+    // Speichern durch die Person selbst, nicht geraten.
+    ['mitarbeiter', 'notfallkontakt_tel', "ALTER TABLE mitarbeiter ADD COLUMN notfallkontakt_tel VARCHAR(50) NULL AFTER notfallkontakt"],
     //
     // Betriebliches. Funktion und Abteilung verweisen auf pflegbare Listen,
     // der Standort auf die ohnehin vorhandenen Anstellungsorte -- eine zweite
