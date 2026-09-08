@@ -212,5 +212,101 @@ pruef('Jedes Kennzeichen traegt eine Erklaerung, keine leere Zeichenkette',
 pruef('Es gibt eine Lohnart-Art fuer Betraege, die weder Lohn noch Abzug sind',
     array_key_exists('netto', lohnart_arten()));
 
+// ══════════════════════════════════════════════════════════════════════════
+// BUNDESRECHT AHV/IV/EO (Etappe 4).
+//
+// Diese Pruefungen rechnen die BEISPIELE DES MERKBLATTS nach, nicht meine
+// eigenen. Das ist der Unterschied zwischen "der Code tut, was ich dachte"
+// und "der Code tut, was die Quelle sagt". Merkblatt 2.01, Stand am
+// 1. Januar 2026 -- vom Projektinhaber als Dokument beigebracht, nachdem
+// eine Websuche fuer dieselbe Frage veraltete Werte geliefert hatte.
+
+// ── Ziff. 1: die Jahrgangstabelle des Merkblatts ─────────────────────────
+// "Erwerbstaetige Personen sind ab dem 1. Januar nach dem 17. Geburtstag
+// beitragspflichtig." Das Merkblatt fuehrt die Jahrgaenge 2007 bis 2010
+// einzeln auf -- genau die werden hier nachgerechnet.
+foreach ([2007 => 2025, 2008 => 2026, 2009 => 2027, 2010 => 2028] as $jg => $ab) {
+    pruef("AHV-pflichtig: Jahrgang $jg ab $ab (Merkblatt 2.01 Ziff. 1)",
+        lohn_ahv_pflichtig_ab("$jg-08-15") === "$ab-01-01");
+}
+// Das TAGESDATUM darf nichts aendern -- das Merkblatt kennt nur Jahrgaenge.
+pruef('AHV-Pflicht haengt am Jahrgang, nicht am Geburtstag im Jahr',
+    lohn_ahv_pflichtig_ab('2008-01-01') === lohn_ahv_pflichtig_ab('2008-12-31'));
+pruef('Ohne Geburtsdatum keine geratene Beitragspflicht',
+    lohn_ahv_pflichtig_ab(null) === null);
+
+// ── Ziff. 2: Referenzalter samt Uebergangsjahrgaengen ────────────────────
+// Das Merkblatt fuehrt eine Tabelle: Frauen der Jahrgaenge 1960 bis 1963
+// haben ein tieferes Referenzalter, ab 1964 sind es 65 Jahre.
+foreach ([1960 => 768, 1961 => 771, 1962 => 774, 1963 => 777, 1964 => 780] as $jg => $soll) {
+    pruef("Referenzalter Frau Jahrgang $jg: $soll Monate (Merkblatt 2.01 Ziff. 2)",
+        lohn_referenzalter("$jg-03-10", 'weiblich')['monate'] === $soll);
+}
+pruef('Referenzalter Mann Jahrgang 1960: 65 Jahre, die Uebergangsregel gilt nur fuer Frauen',
+    lohn_referenzalter('1960-03-10', 'maennlich')['monate'] === 780);
+// KRITISCH: Bei einem Uebergangsjahrgang ohne gesichertes Geschlecht wird
+// NICHT auf 65 geraten. Fuer eine Frau des Jahrgangs 1960 waere das ein
+// Jahr zu spaet -- ein Jahr ALV-Abzug zuviel, den niemand bemerkt.
+$unbestimmt = lohn_referenzalter('1961-03-10', 'unbestimmt');
+pruef('Uebergangsjahrgang ohne Geschlecht: unbekannt statt geraten',
+    $unbestimmt['unbekannt'] === true && $unbestimmt['grund'] === 'geschlecht_unbestimmt'
+    && $unbestimmt['erreicht_am'] === null);
+// Umgekehrt: Ausserhalb der Uebergangsjahrgaenge wird das Geschlecht gar
+// nicht gebraucht -- dort waere eine Sperre falsch.
+$ohne = lohn_referenzalter('1975-03-10', null);
+pruef('Jahrgang 1975 braucht kein Geschlecht: 65 Jahre, keine Sperre',
+    $ohne['unbekannt'] === false && $ohne['monate'] === 780);
+pruef('Ohne Geburtsdatum kein geratenes Referenzalter',
+    lohn_referenzalter(null, 'weiblich')['grund'] === 'kein_geburtsdatum');
+
+// ── Ziff. 17 und 18: der Freibetrag und seine Monatszaehlung ─────────────
+// Das Merkblatt rechnet vor: 30. Maerz bis 6. Juni sind VIER Monate, weil
+// Anfangs- und Endmonat je ganz zaehlen. Taggenau waeren es gut zwei --
+// wer so rechnet, zieht zu wenig ab und belastet den Mitarbeitenden mit
+// Beitraegen, die er nicht schuldet.
+pruef('Angebrochene Monate: 30. Maerz bis 6. Juni sind 4 (Merkblatt 2.01 Ziff. 17)',
+    lohn_angebrochene_monate('2026-03-30', '2026-06-06') === 4);
+pruef('Freibetrag 4 Monate = 5600.00 CHF (Merkblatt 2.01 Ziff. 17, Beispiel)',
+    lohn_ahv_freibetrag_rappen(4, '2026-06-06') === 560000);
+// Beispiel 2 des Merkblatts, beide Arbeitsverhaeltnisse.
+pruef('Merkblatt Ziff. 18 Beispiel 2, Firma C: 1. Maerz bis 6. April = 2800.00 CHF',
+    lohn_ahv_freibetrag_rappen(
+        lohn_angebrochene_monate('2026-03-01', '2026-04-06'), '2026-04-06') === 280000);
+pruef('Merkblatt Ziff. 18 Beispiel 2, Firma D: 23. bis 30. April = 1400.00 CHF',
+    lohn_ahv_freibetrag_rappen(
+        lohn_angebrochene_monate('2026-04-23', '2026-04-30'), '2026-04-30') === 140000);
+pruef('Ein voller Monat zaehlt als einer, nicht als zwei',
+    lohn_angebrochene_monate('2026-04-01', '2026-04-30') === 1);
+pruef('Ein einziger Tag ist ein angebrochener Monat',
+    lohn_angebrochene_monate('2026-04-15', '2026-04-15') === 1);
+pruef('Verdrehter Zeitraum ergibt 0 Monate, keinen negativen Freibetrag',
+    lohn_angebrochene_monate('2026-06-01', '2026-03-01') === 0);
+pruef('Freibetrag ist auf den Jahresbetrag gedeckelt (Merkblatt 2.01 Ziff. 15)',
+    lohn_ahv_freibetrag_rappen(14, '2026-12-31') === 1680000);
+pruef('Zwoelf Monate ergeben genau den Jahresfreibetrag',
+    lohn_ahv_freibetrag_rappen(12, '2026-12-31') === 1680000);
+pruef('Null Monate ergeben keinen Freibetrag von null, sondern gar keinen',
+    lohn_ahv_freibetrag_rappen(0, '2026-12-31') === null);
+
+// ── Ziff. 3: die Beitragssaetze ──────────────────────────────────────────
+$sv = lohn_sv('2026-07-15');
+pruef('Arbeitnehmeranteil 5,30 % (Merkblatt 2.01 Ziff. 3)', $sv['an_bp'] === 530);
+pruef('AHV 8,7 + IV 1,4 + EO 0,5 ergibt die ausgewiesenen 10,6 %',
+    $sv['ahv_bp'] + $sv['iv_bp'] + $sv['eo_bp'] === $sv['total_bp']);
+// Der Arbeitnehmeranteil ist die HAELFTE des Gesamtsatzes -- steht so im
+// Merkblatt und ist die Probe darauf, dass keine der vier Zahlen verrutscht.
+pruef('Der Arbeitnehmeranteil ist genau die Haelfte des Gesamtsatzes',
+    $sv['an_bp'] * 2 === $sv['total_bp']);
+pruef('Jeder Jahrgang des Regelwerks fuehrt seine Quelle mit',
+    count(array_filter(LOHN_SV, fn($j) => trim($j['quelle'] ?? '') !== '')) === count(LOHN_SV));
+// KRITISCH: Ein nicht erfasstes Jahr liefert NULL, nicht stillschweigend
+// das naechstgelegene. Sonst rechnete 2027 weiter mit den Saetzen von 2026,
+// ohne dass etwas kaputtgeht -- genau die Fehlerfamilie, wegen der die
+// Quellensteuer in Etappe 5 gesperrt statt genullt wird.
+pruef('Ein nicht erfasstes Beitragsjahr liefert null statt der Vorjahressaetze',
+    lohn_sv('2025-07-15') === null && lohn_sv('2027-07-15') === null);
+pruef('Der Anteil rechnet aus dem Regelwerk korrekt: 5,30 % von 291.60 sind 15.45',
+    lohn_anteil(29160, $sv['an_bp']) === 1545);
+
 echo $ok . " Pruefungen bestanden\n";
 if ($bad) { echo count($bad) . " FEHLGESCHLAGEN:\n - " . implode("\n - ", $bad) . "\n"; exit(1); }

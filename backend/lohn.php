@@ -353,6 +353,143 @@ function lohn_bvg_pflichtig_ab(?string $geburtsdatum): ?string
     return ((int)substr($geburtsdatum, 0, 4) + 25) . '-01-01';
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+// BUNDESRECHT: AHV, IV und EO (ENT-451, Etappe 4).
+//
+// Diese Saetze sind KEIN Betriebswert. Sie gelten fuer jeden Arbeitgeber in
+// der Schweiz gleich und werden haelftig zwischen Arbeitgeber und
+// Mitarbeitendem getragen. Darum stehen sie hier als versioniertes
+// Regelwerk mit Gueltigkeitsjahr -- gleiche Bauform wie LOHN_MINDESTLOHN
+// fuer Anhang 1 -- und NICHT in der Tabelle lohn_abzug, wo die
+// betriebseigenen Saetze liegen (NBU, KTG, BVG, Quellensteuer). Wer einen
+// Bundeswert von Hand eintippt, kann ihn falsch eintippen; das ist eine
+// Fehlerquelle ohne Gegenwert.
+//
+// WARUM DIE QUELLE MITLAEUFT: Fuer dieselbe Frage lieferte eine Websuche
+// 5,05 Prozent und eine ALV-Obergrenze von 126 000 Franken -- Werte aus der
+// Zeit vor 2016. Ungeprueft uebernommen haette das jede Abrechnung falsch
+// gemacht, ohne dass irgendetwas kaputtgeht. An diesen Zahlen haengt Geld:
+// Da darf spaeter niemand raten muessen, woher sie stammen.
+const LOHN_SV = [
+    2026 => [
+        'quelle' => 'Merkblatt 2.01 "Lohnbeitraege an die AHV, die IV und die EO", '
+                  . 'Stand am 1. Januar 2026, Ziffern 1, 3, 15 und 17',
+        // Ziff. 3, Gesamtsaetze (Arbeitgeber und Arbeitnehmer zusammen).
+        'ahv_bp' => 870, 'iv_bp' => 140, 'eo_bp' => 50, 'total_bp' => 1060,
+        // Ziff. 3: "ziehen Sie 5,3 % des Lohns Ihrer Arbeitnehmenden fuer
+        // deren Anteil an den Beitraegen ab".
+        'an_bp' => 530,
+        // Ziff. 15 und 17: Freibetrag fuer Erwerbstaetige ueber dem
+        // Referenzalter.
+        'freibetrag_jahr_rappen'  => 1680000,
+        'freibetrag_monat_rappen' =>  140000,
+    ],
+];
+
+// Welches Regelwerk gilt am Stichtag? NULL heisst "fuer dieses Jahr ist
+// nichts erfasst" -- und das ist etwas anderes als "null Prozent". Der
+// Aufrufer sperrt dann, statt beitragsfrei zu rechnen. Dieselbe Regel wie
+// beim fehlenden Abzugssatz: eine fehlende Grundlage ist kein Nullwert.
+function lohn_sv(string $stichtag): ?array
+{
+    if (strlen($stichtag) < 4) { return null; }
+    return LOHN_SV[(int)substr($stichtag, 0, 4)] ?? null;
+}
+
+// Merkblatt 2.01 Ziff. 1: "Erwerbstaetige Personen sind ab dem 1. Januar
+// nach dem 17. Geburtstag beitragspflichtig."
+//
+// Das Merkblatt fuehrt dazu eine Jahrgangstabelle: Jahrgang 2007 ist 2025
+// pflichtig, Jahrgang 2008 erst 2026. Beides ist Geburtsjahr + 18 -- das
+// Tagesdatum spielt keine Rolle, nur das Jahr. Wer taggenau rechnet, macht
+// jemanden ein halbes Jahr zu frueh beitragspflichtig.
+function lohn_ahv_pflichtig_ab(?string $geburtsdatum): ?string
+{
+    if (!$geburtsdatum || strlen($geburtsdatum) < 10) { return null; }
+    return ((int)substr($geburtsdatum, 0, 4) + 18) . '-01-01';
+}
+
+// Merkblatt 2.01 Ziff. 2: Das Referenzalter liegt bei 65 Jahren; fuer Frauen
+// mit Jahrgang vor 1964 gelten Uebergangsregelungen (Zuschlag in Monaten).
+const LOHN_REFERENZALTER_UEBERGANG = [1960 => 0, 1961 => 3, 1962 => 6, 1963 => 9];
+
+// Wann erreicht diese Person das Referenzalter?
+//
+// WARUM DAS MEHR IST ALS EINE ZAHL: Ab dem Referenzalter faellt nach
+// Ziff. 14 KEIN ALV-Beitrag mehr an, und es entsteht ein Freibetrag auf
+// AHV, IV und EO. Beides bewegt Geld, und zwar in beide Richtungen.
+//
+// Die Uebergangsjahrgaenge brauchen das Geschlecht. Fehlt es, oder steht es
+// auf "unbestimmt", wird NICHT geraten: Die Funktion meldet 'unbekannt',
+// und der Aufrufer sperrt. Einfach 65 anzunehmen waere fuer eine Frau des
+// Jahrgangs 1960 ein Jahr zu spaet -- ein Jahr ALV-Abzug zuviel und ein
+// Jahr Freibetrag zuwenig, und es faellt niemandem auf. Genau die Sorte
+// Fehler, gegen die die Hausregel "unbekannt darf nie wie keine aussehen"
+// geschrieben wurde.
+function lohn_referenzalter(?string $geburtsdatum, ?string $geschlecht): array
+{
+    $leer = ['erreicht_am' => null, 'monate' => null, 'unbekannt' => true, 'text' => null];
+    if (!$geburtsdatum || strlen($geburtsdatum) < 10) {
+        return $leer + ['grund' => 'kein_geburtsdatum'];
+    }
+    $jahrgang  = (int)substr($geburtsdatum, 0, 4);
+    $uebergang = LOHN_REFERENZALTER_UEBERGANG[$jahrgang] ?? null;
+    $monate    = 65 * 12;
+    if ($uebergang !== null) {
+        // Nur Frauen dieser Jahrgaenge haben ein tieferes Referenzalter.
+        // Ohne gesichertes Geschlecht ist die Frage nicht beantwortbar.
+        if ($geschlecht === 'weiblich') {
+            $monate = 64 * 12 + $uebergang;
+        } elseif ($geschlecht !== 'maennlich') {
+            return $leer + ['grund' => 'geschlecht_unbestimmt'];
+        }
+    }
+    $d = new DateTimeImmutable($geburtsdatum);
+    $erreicht = $d->add(new DateInterval('P' . $monate . 'M'));
+    $jahre = intdiv($monate, 12);
+    $rest  = $monate % 12;
+    return [
+        'erreicht_am' => $erreicht->format('Y-m-d'),
+        'monate' => $monate,
+        'unbekannt' => false,
+        'grund' => null,
+        'text' => 'Referenzalter ' . $jahre . ($rest ? ' Jahre und ' . $rest . ' Monate' : ' Jahre')
+                . ' (Merkblatt 2.01 Ziff. 2)',
+    ];
+}
+
+// Merkblatt 2.01 Ziff. 15 und 17: 16 800 Franken im Jahr; bei unterjaehriger
+// Taetigkeit "1 400 Franken pro vollem ODER ANGEBROCHENEM Kalendermonat".
+//
+// Das Wort "angebrochen" ist der ganze Punkt. Das Merkblatt rechnet im
+// eigenen Beispiel den 30. Maerz bis 6. Juni als VIER Monate -- Maerz und
+// Juni zaehlen je ganz. Wer hier taggenau rechnet, zieht zu wenig ab und
+// belastet den Mitarbeitenden mit Beitraegen, die er nicht schuldet.
+//
+// Der Freibetrag gilt "fuer jedes einzelne Arbeitsverhaeltnis separat"
+// (Ziff. 12) -- fuer dieses Werkzeug also je Person und Betrieb, nicht
+// aufgeteilt auf mehrere Arbeitgeber. Und er ist nach Ziff. 16 verzichtbar;
+// der Verzicht gilt fuer das ganze Kalenderjahr. Ob er vorliegt, ist eine
+// Angabe je Person und Jahr, keine Rechengroesse -- sie kommt nicht von
+// hier.
+function lohn_ahv_freibetrag_rappen(int $monate, string $stichtag): ?int
+{
+    $sv = lohn_sv($stichtag);
+    if ($sv === null || $monate <= 0) { return null; }
+    $betrag = $monate * $sv['freibetrag_monat_rappen'];
+    return min($betrag, $sv['freibetrag_jahr_rappen']);
+}
+
+// Angebrochene Kalendermonate zwischen zwei Daten -- die Zaehlweise aus
+// Ziff. 17, nicht die kaufmaennische. Anfangs- und Endmonat zaehlen je ganz.
+function lohn_angebrochene_monate(string $von, string $bis): int
+{
+    if (strlen($von) < 7 || strlen($bis) < 7) { return 0; }
+    $a = (int)substr($von, 0, 4) * 12 + (int)substr($von, 5, 2);
+    $b = (int)substr($bis, 0, 4) * 12 + (int)substr($bis, 5, 2);
+    return $b < $a ? 0 : $b - $a + 1;
+}
+
 // ── Lohnart-Kennzeichen ──────────────────────────────────────────────────
 // Die sechs Kennzeichen sind der Unterschied zwischen einer
 // nachvollziehbaren Abrechnung und einer Blackbox: Sie erklaeren, warum
