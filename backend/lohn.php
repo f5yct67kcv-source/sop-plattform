@@ -1061,6 +1061,27 @@ function lohnart_startbestand(): array
          0,0,0,0,0,0, 'Art. 6 Ziff. 2 GAV', 55, 0],
         ['quellensteuer', 'Quellensteuer', 'abzug', 'qst_brutto', null,
          0,0,0,0,0,0, null, 56, 0],
+        // ── Abschlusszeilen ──────────────────────────────────────────────
+        // Sie ENTSTEHEN im Lauf und standen bis 2026-09-08 nicht im Katalog.
+        // Die Kreuzpruefung, die genau das verhindern soll, sah nur die
+        // Bruttozeilen -- das Sicherheitsnetz war nicht auf den neuen Teil
+        // mitgezogen worden. Dieselbe Fehlerfamilie wie beim ersten Mal.
+        //
+        // Alle drei zaehlen in KEINE Bemessungsgrundlage und tragen keinen
+        // Periodenbetrag: Sie fassen zusammen, was schon gezaehlt ist.
+        ['nettolohn', 'Nettolohn', 'zwischensumme', null, null,
+         0,0,0,0,0,0, null, 60, 0],
+        // Entsteht nur, wenn die Rundung des Auszahlungsbetrags auf 5 Rappen
+        // ueberhaupt eine Differenz ergibt. Der Projektinhaber am
+        // 2026-09-08: eigene Zeile statt stillschweigend im Betrag.
+        // Art. 12 Ziff. 5 verlangt eine nachvollziehbare Abrechnung -- ohne
+        // diese Zeile ginge "Nettolohn minus PaKo = Auszahlung" auf dem
+        // Papier um bis zu zwei Rappen nicht auf, und niemand koennte sagen
+        // warum.
+        ['rundungsdifferenz', 'Rundung auf 5 Rappen', 'fixbetrag', null, null,
+         0,0,0,0,0,0, null, 65, 0],
+        ['auszahlung', 'Auszahlungsbetrag', 'zwischensumme', null, null,
+         0,0,0,0,0,0, null, 70, 0],
     ];
 }
 

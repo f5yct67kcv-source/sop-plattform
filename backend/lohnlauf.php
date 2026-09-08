@@ -388,6 +388,19 @@ function lohnlauf_grundlagen(array $zeilen, array $katalog): array
     return $g;
 }
 
+// Die Abzugsparameter DIESER Person zum Stichtag (lohn_person, historisiert).
+// Getrennt von lohnlauf_nbu(), das nur die Unterstellung braucht.
+function lohnlauf_person_parameter(PDO $pdo, int $maId, string $bis): ?array
+{
+    try {
+        $st = $pdo->prepare(
+            'SELECT * FROM lohn_person WHERE mitarbeiter_id = ? AND gueltig_ab <= ?
+              ORDER BY gueltig_ab DESC LIMIT 1');
+        $st->execute([$maId, $bis]);
+        return $st->fetch() ?: null;
+    } catch (Throwable $e) { return null; }
+}
+
 // Der zum Stichtag geltende Betriebssatz aus lohn_abzug. NULL heisst
 // "nicht erfasst" -- nicht "null Prozent".
 function lohnlauf_abzugsatz(PDO $pdo, string $schluessel, string $bis): ?array
@@ -413,16 +426,24 @@ function lohnlauf_abzugsatz(PDO $pdo, string $schluessel, string $bis): ?array
 // NACH dem Nettolohn -- das ist nicht bloss Darstellung, sondern bestimmt,
 // was "Nettolohn" auf dem Papier bedeutet.
 //
-// ZWEI FESTLEGUNGEN, DIE OFFEN SIND (OP-465) und darum hier benannt statt
-// versteckt:
-//   * Gerundet wird JE ABZUG auf den Rappen, nicht auf die Summe. Art. 12
-//     Ziff. 5 GAV verlangt, dass jede Position als Betrag darstellbar ist.
-//   * Auf 5 Rappen wird NICHT gerundet. lohn_fuenfrappen() ist gebaut und
-//     belegt, aber wo sie greift, hat niemand entschieden.
-// Beide stehen als Konstante da, damit die Entscheidung ein Wert bleibt und
-// keine Suche durch den Quelltext.
+// ZWEI FESTLEGUNGEN, beide am 2026-09-08 vom Projektinhaber entschieden
+// (OP-465). Sie stehen als Konstante da und nicht im Rechenweg versteckt,
+// damit die Entscheidung ein Wert bleibt und keine Suche durch den Quelltext.
+//
+//   * GERUNDET WIRD JE ABZUG auf den Rappen, nicht auf die Summe. Art. 12
+//     Ziff. 5 GAV verlangt, dass jede Position der Abrechnung als Betrag
+//     darstellbar ist -- ein Abzug, der nur in der Summe aufgeht, ist das
+//     nicht, und der Mitarbeitende koennte seinen AHV-Abzug nicht
+//     nachrechnen. Bei vier Abzuegen gehen die beiden Wege in rund 41 % der
+//     Bruttobetraege auseinander, jedes Mal um einen oder zwei Rappen.
+//
+//   * DER AUSZAHLUNGSBETRAG WIRD AUF 5 RAPPEN GERUNDET, und zwar genau
+//     einmal, ganz am Schluss. Belegt durch die Referenzabrechnung des
+//     Projektinhabers: Sie weist den Nettolohn UNGERUNDET aus (272.94) und
+//     den Auszahlungsbetrag GERUNDET (272.80 statt exakt 272.79). Merkblatt
+//     2.08 Ziff. 4 rundet ebenso. Zwischensummen bleiben rappengenau.
 const LOHNLAUF_RUNDUNG_JE_ABZUG = true;
-const LOHNLAUF_AUSZAHLUNG_AUF_5_RAPPEN = false;
+const LOHNLAUF_AUSZAHLUNG_AUF_5_RAPPEN = true;
 
 function lohnlauf_abzuege(PDO $pdo, array $kopf, string $bis, ?array $nbu = null): array
 {
@@ -570,7 +591,16 @@ function lohnlauf_abzuege(PDO $pdo, array $kopf, string $bis, ?array $nbu = null
     // 7. Quellensteuer -- Etappe 5. AUSDRUECKLICH GESPERRT und nicht still
     //    abzugsfrei: Ein nicht nachgefuehrter kantonaler Tarif produziert
     //    weiter plausible Zahlen (ENT-451, Risiken).
-    if ($g['qst'] > 0) {
+    //
+    //    SIE HAENGT AN DER PERSON, nicht an der Bemessungsgrundlage. Das war
+    //    hier zuerst falsch: Die Zeile entstand, sobald ein
+    //    quellensteuerpflichtiger LOHNBESTANDTEIL vorlag -- also bei jedem
+    //    normalen Lohn. Damit haette JEDE Abrechnung bis Etappe 5 gesperrt,
+    //    obwohl die allermeisten Mitarbeitenden gar nicht
+    //    quellensteuerpflichtig sind. Massgebend ist das erfasste Merkmal
+    //    lohn_person.qst_pflichtig.
+    $pp = lohnlauf_person_parameter($pdo, (int)($kopf['mitarbeiter_id'] ?? 0), $bis);
+    if ($g['qst'] > 0 && !empty($pp['qst_pflichtig'])) {
         $zeile('quellensteuer', 'Quellensteuer', $g['qst'], null, null, 62, 'quellensteuer_offen',
             'Die Quellensteuer ist Etappe 5 und bewusst gesperrt statt mit null gerechnet. '
             . 'Betroffene Personen werden von Hand abgerechnet.');
@@ -592,7 +622,27 @@ function lohnlauf_abzuege(PDO $pdo, array $kopf, string $bis, ?array $nbu = null
         foreach ($zeilen as $z) {
             if ((int)($z['sortierung'] ?? 0) > 60) { $aus += (int)($z['betrag_rappen'] ?? 0); }
         }
-        if (LOHNLAUF_AUSZAHLUNG_AUF_5_RAPPEN) { $aus = lohn_fuenfrappen($aus); }
+        if (LOHNLAUF_AUSZAHLUNG_AUF_5_RAPPEN) {
+            $gerundet = lohn_fuenfrappen($aus);
+            // Die Differenz als EIGENE ZEILE, entschieden vom Projektinhaber
+            // am 2026-09-08. Ohne sie ginge die Rechnung auf dem Papier um
+            // bis zu zwei Rappen nicht auf, und niemand koennte sagen warum
+            // -- Art. 12 Ziff. 5 verlangt eine nachvollziehbare Abrechnung.
+            //
+            // Nur wenn es wirklich eine Differenz GIBT. Eine Zeile mit 0.00
+            // waere in rund einem Fuenftel aller Abrechnungen zu sehen und
+            // sagte nichts; fehlt sie, geht die Rechnung ohnehin auf.
+            if ($gerundet !== $aus) {
+                $zeilen[] = ['schluessel' => 'rundungsdifferenz',
+                    'bezeichnung' => 'Rundung auf 5 Rappen',
+                    'basis_rappen' => null, 'satz_bp' => null, 'menge' => null,
+                    'betrag_rappen' => $gerundet - $aus, 'sortierung' => 65,
+                    'annahme' => 0, 'gesperrt_grund' => null,
+                    'hinweis' => 'Der Auszahlungsbetrag wird auf 5 Rappen gerundet. Diese Zeile '
+                        . 'haelt die Differenz fest, damit die Abrechnung aufgeht.'];
+            }
+            $aus = $gerundet;
+        }
     }
     $zeilen[] = ['schluessel' => 'auszahlung', 'bezeichnung' => 'Auszahlungsbetrag',
         'basis_rappen' => null, 'satz_bp' => null, 'menge' => null,

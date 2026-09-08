@@ -244,12 +244,28 @@ $erzeugt = [];
 foreach ([$p, $viel, $tief] as $fall) {
     foreach ($fall['zeilen'] as $z) { $erzeugt[$z['schluessel']] = true; }
 }
+// KRITISCH: Auch die ABZUGSZEILEN. Diese Pruefung entstand, weil zwei
+// Lohnarten im Katalog fehlten -- und sah danach nur die Bruttoseite an.
+// Als die Abzugsseite dazukam, fehlten 'nettolohn' und 'auszahlung'
+// prompt wieder im Katalog, und die Pruefung blieb gruen. Das
+// Sicherheitsnetz war nicht auf den neuen Teil mitgezogen worden.
+foreach (['2026-07-31', '2027-07-31'] as $stichtagK) {
+    foreach ([LOHN_NBU_VERSICHERT, LOHN_NBU_NICHT, LOHN_NBU_PRUEFEN] as $standK) {
+        $abK = lohnlauf_abzuege($pdo, ['mitarbeiter_id' => 1, 'brutto_rappen' => 500000,
+            'kategorie' => 'C', 'bewertet_min' => 12000,
+            'zeilen' => [['schluessel' => 'geleistete_stunden', 'betrag_rappen' => 500000]]],
+            $stichtagK, ['stand' => $standK]);
+        foreach ($abK['zeilen'] as $z) { $erzeugt[$z['schluessel']] = true; }
+    }
+}
 $fehlend = array_diff(array_keys($erzeugt), $katalog);
 pruef('KRITISCH: jeder Schluessel, den der Lohnlauf erzeugt, steht im Lohnartenkatalog',
     $fehlend === []);
 if ($fehlend) { echo "  fehlend: " . implode(', ', $fehlend) . "\n"; }
 pruef('Die Pruefung sieht ueberhaupt Schluessel -- sonst waere sie leer und gruen',
     count($erzeugt) >= 7);
+pruef('Und sie sieht auch die Zeilen der ABZUGSSEITE, nicht nur die Bruttoseite',
+    isset($erzeugt['ahv']) && isset($erzeugt['nettolohn']) && isset($erzeugt['auszahlung']));
 
 // Die Zwischensumme darf in KEINE Bemessungsgrundlage zaehlen: Sonst
 // staende derselbe Lohn zweimal darin, einmal als Stundenansatz und einmal
@@ -394,7 +410,7 @@ $pdo->exec('CREATE TABLE lohn_abzug (id INTEGER PRIMARY KEY, schluessel TEXT, be
             gueltig_ab TEXT, gueltig_bis TEXT, satz_bp INT, fix_rappen INT,
             hoechstlohn_rappen INT, quelle TEXT)');
 $pdo->exec('CREATE TABLE lohn_person (id INTEGER PRIMARY KEY, mitarbeiter_id INT, gueltig_ab TEXT,
-            nbu_pflichtig INT, nbu_grund TEXT, nbu_von INT, nbu_am TEXT)');
+            nbu_pflichtig INT, nbu_grund TEXT, nbu_von INT, nbu_am TEXT, qst_pflichtig INT)');
 
 // Die Zeilen der Referenzabrechnung: 25.00/h + 8.33 % + 8.33 % = 29.16,
 // mal zehn Stunden = 291.60.
@@ -514,8 +530,9 @@ pruef('Der PaKo-Betrag steht trotzdem da -- er ist gerechnet, nur die Summe nich
 // Arbeitgeber. Er darf auf keiner Abrechnung als Abzug erscheinen.
 pruef('Ein BU-Abzug erscheint auf keiner Abrechnung',
     !array_key_exists('bu', $z26));
-pruef('Auf 5 Rappen wird nicht gerundet, solange das nicht entschieden ist',
-    LOHNLAUF_AUSZAHLUNG_AUF_5_RAPPEN === false);
+// Beide Rundungen sind am 2026-09-08 entschieden (OP-465).
+pruef('Der Auszahlungsbetrag wird auf 5 Rappen gerundet',
+    LOHNLAUF_AUSZAHLUNG_AUF_5_RAPPEN === true);
 pruef('Gerundet wird je Abzug, nicht auf die Summe',
     LOHNLAUF_RUNDUNG_JE_ABZUG === true);
 
@@ -539,7 +556,7 @@ pruef('Der Hinweis nennt die Quelle des Satzes',
     str_contains((string)$zS['nbu']['hinweis'], 'Police'));
 
 // Uebersteuerung: von Hand gesetzt schlaegt die Rechnung.
-$pdo->exec("INSERT INTO lohn_person VALUES (1,$mkw,'2026-01-01',0,'Vom Versicherer bestaetigt',7,'2026-01-05 10:00')");
+$pdo->exec("INSERT INTO lohn_person VALUES (1,$mkw,'2026-01-01',0,'Vom Versicherer bestaetigt',7,'2026-01-05 10:00',0)");
 $u = lohnlauf_nbu($pdo, $mkw, '2026-07-31');
 pruef('Eine Uebersteuerung schlaegt die Rechnung',
     $u['stand'] === LOHN_NBU_NICHT && $u['quelle'] === 'uebersteuert');
@@ -553,6 +570,61 @@ pruef('Ohne Uebersteuerung wird gerechnet und der Zeitraum mitgeliefert',
 // stillschweigend auf "versichert" gesetzt -- in Richtung Abzug.
 pruef('Ohne Eintrag ist die Uebersteuerung leer, nicht auf "versichert" vorbelegt',
     lohnlauf_nbu($pdo, 999, '2025-07-31')['uebersteuert'] === null);
+
+// ── Rundung auf 5 Rappen mit eigener Zeile (OP-465, entschieden) ─────────
+$pdo->exec("INSERT INTO lohn_abzug VALUES (10,'ktg','Krankentaggeld','2020-01-01',NULL,70,NULL,NULL,'Police')");
+$pdo->exec("INSERT INTO lohn_abzug VALUES (11,'bvg','BVG','2020-01-01',NULL,NULL,4500,NULL,'PK-Meldung')");
+$voll = lohnlauf_abzuege($pdo, ['mitarbeiter_id' => $mkw] + $refKopf, '2026-07-31',
+    ['stand' => LOHN_NBU_VERSICHERT]);
+$zv = []; foreach ($voll['zeilen'] as $z) { $zv[$z['schluessel']] = $z; }
+pruef('Mit allen Saetzen entsteht eine vollstaendige Abrechnung',
+    $voll['vollstaendig'] === true && $zv['auszahlung']['betrag_rappen'] !== null);
+// KRITISCH: Der Auszahlungsbetrag ist durch 5 teilbar -- sonst ist nicht
+// gerundet worden.
+pruef('Der Auszahlungsbetrag geht auf 5 Rappen auf',
+    $zv['auszahlung']['betrag_rappen'] % 5 === 0);
+// KRITISCH und der Kern der Entscheidung: Die Rechnung muss auf dem Papier
+// AUFGEHEN. Nettolohn plus alle Zeilen danach ergibt den Auszahlungsbetrag
+// -- die Rundungszeile ist genau das Glied, das sonst fehlte.
+$summeNach = $zv['nettolohn']['betrag_rappen'];
+foreach ($voll['zeilen'] as $z) {
+    if ((int)$z['sortierung'] > 60 && $z['schluessel'] !== 'auszahlung') {
+        $summeNach += (int)($z['betrag_rappen'] ?? 0);
+    }
+}
+pruef('KRITISCH: die Abrechnung geht auf -- Nettolohn plus alle Zeilen danach ist der Auszahlungsbetrag',
+    $summeNach === $zv['auszahlung']['betrag_rappen']);
+pruef('Gibt es eine Rundungsdifferenz, steht sie als eigene Zeile da',
+    !isset($zv['rundungsdifferenz'])
+    || (abs($zv['rundungsdifferenz']['betrag_rappen']) <= 2
+        && $zv['rundungsdifferenz']['betrag_rappen'] !== 0));
+pruef('Die Rundungszeile steht zwischen dem Nettolohn und dem Auszahlungsbetrag',
+    !isset($zv['rundungsdifferenz'])
+    || ($zv['rundungsdifferenz']['sortierung'] > $zv['nettolohn']['sortierung']
+        && $zv['rundungsdifferenz']['sortierung'] < $zv['auszahlung']['sortierung']));
+// Eine Zeile mit 0.00 waere in rund einem Fuenftel aller Abrechnungen zu
+// sehen und sagte nichts. Fehlt sie, geht die Rechnung ohnehin auf.
+pruef('Ohne Differenz entsteht keine Rundungszeile mit 0.00',
+    count(array_filter($voll['zeilen'],
+        fn($z) => $z['schluessel'] === 'rundungsdifferenz' && $z['betrag_rappen'] === 0)) === 0);
+
+// ── Die Quellensteuer haengt an der PERSON, nicht am Lohn ────────────────
+// KRITISCH: Zuerst entstand die gesperrte Zeile, sobald ein
+// quellensteuerpflichtiger Lohnbestandteil vorlag -- also bei JEDEM
+// normalen Lohn. Damit haette jede Abrechnung bis Etappe 5 gesperrt,
+// obwohl die allermeisten Mitarbeitenden nicht quellensteuerpflichtig sind.
+pruef('KRITISCH: ohne das Merkmal entsteht keine Quellensteuerzeile',
+    !isset($zv['quellensteuer']) && $zv['auszahlung']['betrag_rappen'] !== null);
+$pdo->exec("INSERT INTO lohn_person (id, mitarbeiter_id, gueltig_ab, nbu_pflichtig, qst_pflichtig)
+            VALUES (3, 91, '2020-01-01', 1, 1)");
+$qst = lohnlauf_abzuege($pdo, ['mitarbeiter_id' => 91] + $refKopf, '2026-07-31',
+    ['stand' => LOHN_NBU_VERSICHERT]);
+$zq = []; foreach ($qst['zeilen'] as $z) { $zq[$z['schluessel']] = $z; }
+pruef('Mit dem Merkmal entsteht sie und sperrt -- Etappe 5, nicht stiller Nullabzug',
+    isset($zq['quellensteuer']) && $zq['quellensteuer']['betrag_rappen'] === null
+    && $zq['quellensteuer']['gesperrt_grund'] === 'quellensteuer_offen');
+pruef('Und dann gibt es folgerichtig auch keinen Auszahlungsbetrag',
+    $zq['auszahlung']['betrag_rappen'] === null);
 
 echo $ok . " Pruefungen bestanden\n";
 if ($bad) { echo count($bad) . " FEHLGESCHLAGEN:\n - " . implode("\n - ", $bad) . "\n"; exit(1); }
