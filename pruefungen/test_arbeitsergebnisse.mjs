@@ -1,10 +1,19 @@
 // Auswertung > "Arbeitsergebnisse" (ENT-243, umgebaut in ENT-325): eine
 // eigene Ansicht mit derselben Kachelreihe wie "Kontrollrunde ändern"
 // (.rdkr-reiter/.rdkr-tab), nicht mehr eine Schublade mit einer senkrechten
-// Reiterliste. Volles Gerüst, aber nur "Kontrollpunktscans",
-// "Rundgangerledigung" und "Fahrzeugübernahmen" (ENT-346) tatsächlich
-// verdrahtet; die übrigen fünf haben noch kein Datenmodell und sagen das
-// sichtbar, statt auszusehen wie die anderen und dann nichts zu zeigen.
+// Reiterliste. Volles Gerüst, aber nur verdrahtet, was eine Datengrundlage
+// hat: "Wachbuch" (ENT-480), "Kontrollpunktscans", "Rundgangerledigung" und
+// "Fahrzeugübernahmen" (ENT-346).
+//
+// Die vier übrigen sagen sichtbar, dass sie folgen, statt auszusehen wie die
+// anderen und dann nichts zu zeigen. Zwei davon haben wirklich kein
+// Datenmodell (Alarme, Schlüsselprotokoll — OP-426); "Ereignisse" und
+// "Aufgabenerledigung" haben eines, stehen aber seit ENT-480 im Wachbuch und
+// bekommen erst mit einer eigenen Entscheidung eine eigene Vollansicht.
+//
+// Das Wachbuch selbst prüft test_wachbuch.mjs — hier geht es nur um die
+// Kachelreihe und darum, dass die vier verdrahteten Reiter ihren Endpunkt
+// rufen.
 import { WURZEL, OUT, browserPfad } from './pfade.mjs';
 import { chromium } from 'playwright';
 
@@ -38,6 +47,12 @@ const SCANS = { status: 'ok', scans: [
     kontrollpunkt_name: 'Garage', kunde_name: 'Beispiel Immobilien GmbH', objekt_name: 'Testliegenschaft Süd',
     titel: null, vorname: 'Hans', nachname: 'Beispiel' },
 ]};
+
+// Das Wachbuch startet die Ansicht (ENT-480). Hier reicht eine magere
+// Antwort -- die Zeitleiste selbst prüft test_wachbuch.mjs.
+const WACHBUCH = { status: 'ok', gezeigt: 0, gesamt: 0, gekuerzt: false,
+  je_art: { scan: 0, rundgang: 0, aufgabe: 0, ereignis: 0 },
+  quellen: { scans: 'ok', runden: 'ok', aufgaben: 'ok', ereignisse: 'ok' }, eintraege: [] };
 
 const RUNDGAENGE = { status: 'ok', rundgaenge: [
   { id: 10, einsatz_id: 1, objekt_id: 1, mitarbeiter_id: 5, status: 'abgeschlossen',
@@ -146,6 +161,7 @@ function setup(page) {
     const send = b => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) });
     if (path.includes('login')) return send({ status: 'ok', token: 't', name: 'adrian', ist_admin: true });
     if (path.includes('dashboard_stats')) return send({ status: 'ok', kpi: {}, verlauf: [], angemeldet: [], pro_mitarbeiter: [], letzte_rapporte: [] });
+    if (path.includes('wachbuch_liste')) return send(WACHBUCH);
     if (path.includes('rundgang_scan_liste')) return send(SCANS);
     if (path.includes('rundgang_liste')) return send(RUNDGAENGE);
     if (path.includes('fahrzeug_uebernahme_liste')) return send(UEBERNAHMEN);
@@ -221,7 +237,7 @@ check('Jede Kachel trägt ein Sinnbild',
 // „classList of null" abzustürzen -- beim Gegenprobieren aufgefallen.
 check('KRITISCH: die Ansicht startet auf einem verdrahteten Reiter',
   await page.evaluate(() => {
-    const e = document.getElementById('ae-tab-scans');
+    const e = document.getElementById('ae-tab-wachbuch');
     return !!e && e.classList.contains('aktiv');
   }));
 // „Unbekannt darf nie wie keine aussehen": Ein Reiter, der aussieht wie die
@@ -232,13 +248,13 @@ check('KRITISCH: die Ansicht startet auf einem verdrahteten Reiter',
 // gerenderten Farbe, nicht an einer Klasse allein.
 check('KRITISCH: die noch nicht verdrahteten Reiter sind schon an der Kachel zu erkennen',
   await page.evaluate(() => {
-    const mit = ['wachbuch', 'ereignisse', 'aufgaben', 'alarme', 'schluessel'];
-    const ohne = ['scans', 'erledigung', 'fahrzeuguebernahmen'];
+    const mit = ['ereignisse', 'aufgaben', 'alarme', 'schluessel'];
+    const ohne = ['wachbuch', 'scans', 'erledigung', 'fahrzeuguebernahmen'];
     const farbe = t => {
       const e = document.getElementById('ae-tab-' + t);
       return e ? getComputedStyle(e.querySelector('.rdkr-tab-lbl')).color : null;
     };
-    const gedaempft = farbe('wachbuch'), normal = farbe('erledigung');
+    const gedaempft = farbe('alarme'), normal = farbe('erledigung');
     return !!gedaempft && !!normal && gedaempft !== normal
       && mit.every(t => farbe(t) === gedaempft)
       && ohne.every(t => farbe(t) === normal);
@@ -246,7 +262,7 @@ check('KRITISCH: die noch nicht verdrahteten Reiter sind schon an der Kachel zu 
 // Und dort, wo Farbe allein nicht ankommt -- Vorleseprogramm, Mauszeiger.
 check('KRITISCH: die Aussage steht auch im Text, nicht nur in der Farbe',
   await page.evaluate(() => {
-    const e = document.getElementById('ae-tab-wachbuch');
+    const e = document.getElementById('ae-tab-alarme');
     const f = document.getElementById('ae-tab-erledigung');
     return !!e && (e.getAttribute('title') || '').includes('folgt später')
       && (e.getAttribute('aria-label') || '').includes('folgt später')
@@ -255,13 +271,22 @@ check('KRITISCH: die Aussage steht auch im Text, nicht nur in der Farbe',
 
 // ══════════ UNVERDRAHTETE REITER: BLEIBENDER HINWEIS, KEIN TOAST
 calls = [];
-await klick('#ae-tab-wachbuch');
+await klick('#ae-tab-alarme');
 await page.waitForTimeout(150);
 // Der Name steht im Hinweis: Zwei Reiter hintereinander angetippt zeigten
 // sonst zweimal denselben Satz, und man wüsste nicht, ob sich etwas tat.
-check('KRITISCH: "Wachbuch" zeigt einen bleibenden Hinweis statt nichts zu tun',
-  (await page.textContent('#aeInhalt')).includes('Wachbuch folgt später'));
+check('KRITISCH: "Alarme" zeigt einen bleibenden Hinweis statt nichts zu tun',
+  (await page.textContent('#aeInhalt')).includes('Alarme folgt später'));
 check('Kein API-Aufruf fuer einen unverdrahteten Reiter', calls.length === 0);
+
+// Und das Gegenstueck: der verdrahtete Reiter ruft wirklich seinen Endpunkt.
+// Ohne diese Aussage bliebe die Suite gruen, wenn "Wachbuch" nur so AUSSAEHE
+// wie verdrahtet und in Wirklichkeit nichts täte.
+calls = [];
+await klick('#ae-tab-wachbuch');
+await page.waitForTimeout(200);
+check('KRITISCH: "Wachbuch" ruft wachbuch_liste.php auf',
+  calls.some(c => c.path.includes('wachbuch_liste')));
 
 // ══════════ KONTROLLPUNKTSCANS: ECHTE DATEN, DREI STATUS-ARTEN
 await klick('#ae-tab-scans');

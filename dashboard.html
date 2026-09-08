@@ -1139,6 +1139,116 @@ tbody tr.status-abgeschlossen td { opacity: .55; }
    das die Tabelle deshalb ueberhaupt zu Karten gemacht hat). */
 .ae-aufgabe { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
 .ae-aufgabe .ae-grund { flex-basis: 100%; color: var(--ink-3); }
+
+/* ══ WACHBUCH (ENT-480) ══════════════════════════════════════════════
+   Eine Zeitleiste, keine Tabelle: Der Reiter fuehrt vier Arten von
+   Vorgaengen zusammen, und eine Tabelle muesste fuer jede Art dieselben
+   Spalten fuellen -- ein Rundgang hat keinen Kontrollpunkt, ein Ereignis
+   keinen Status. Leere Zellen sahen dort aus wie fehlende Angaben.
+
+   Aufbau je Zeile: senkrechte Spur mit Sinnbild | Pfad oben, Satz darunter
+   | Zeit rechts. Die Ueberschrift (der Pfad) steht ueber dem Wert (dem
+   Satz), nicht darunter -- Hausregel, und auf beiden Seiten dasselbe
+   Muster. */
+.wb-kopf { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 14px; }
+.wb-kopf .wb-zahl { margin-left: auto; font-size: 12px; color: var(--ink-3); font-weight: 550; }
+/* Eine Art ohne einen einzigen Vorgang im Zeitraum bleibt anklickbar und
+   sagt es mit der Zahl. Sie auszublenden hiesse, "im Zeitraum nichts" wie
+   "gibt es nicht" aussehen zu lassen. */
+.wb-art { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line);
+  background: var(--surface); color: var(--ink-2); border-radius: 999px; padding: 5px 12px;
+  font-size: 12.5px; font-weight: 600; cursor: pointer; transition: background .12s, border-color .12s; }
+.wb-art:hover { background: var(--surface-3); }
+.wb-art .n { font-variant-numeric: tabular-nums; color: var(--ink-3); font-weight: 600; }
+.wb-art.on { background: var(--accent-soft); border-color: var(--accent-line); color: var(--accent); }
+.wb-art.on .n { color: var(--accent); }
+
+.wb-liste { position: relative; }
+/* Der Tagestrenner klebt beim Blaettern oben fest: In einer langen Nacht
+   verliert man sonst, welcher Tag gerade laeuft. */
+.wb-tag { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 10px;
+  padding: 10px 0 8px; background: var(--bg); }
+.wb-tag b { font-size: 12px; font-weight: 680; letter-spacing: .5px; text-transform: uppercase;
+  color: var(--ink-2); background: var(--surface-2); border: 1px solid var(--line);
+  border-radius: 999px; padding: 4px 12px; }
+.wb-tag span { font-size: 12px; color: var(--ink-3); }
+.wb-tag i { flex: 1; height: 1px; background: var(--line-soft); font-style: normal; }
+
+.wb-zeile { position: relative; display: grid; grid-template-columns: 34px 1fr auto;
+  align-items: start; gap: 0 12px; padding: 11px 12px 11px 0; border-radius: var(--r-sm);
+  cursor: pointer; text-align: left; width: 100%; background: none; border: none;
+  font: inherit; color: inherit; }
+.wb-zeile:hover, .wb-zeile:focus-visible { background: var(--surface-3); }
+/* Die Spur laeuft durch die Zeile, nicht ueber die ganze Liste: So endet sie
+   von selbst am letzten Eintrag eines Tages und faengt am naechsten wieder
+   an, ohne dass jemand Randfaelle zaehlen muss. */
+.wb-zeile::before { content: ''; position: absolute; left: 16px; top: 0; bottom: 0;
+  width: 1px; background: var(--line); }
+.wb-zeile:first-child::before { top: 17px; }
+.wb-zeile:last-child::before { bottom: auto; height: 17px; }
+.wb-ic { position: relative; z-index: 1; width: 34px; height: 34px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; flex: none;
+  border: 1px solid var(--line); background: var(--surface); }
+.wb-ic svg { width: 16px; height: 16px; stroke-width: 1.9; fill: none;
+  stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; }
+/* Vier Arten, vier Farben -- dieselben, die im Haus schon fuer dieselbe
+   Sache stehen: Blau fuer den Kontrollpunkt (wie chip-a), Gruen fuer die
+   erledigte Runde (wie chip-p), Grau fuer die Aufgabe, Rot fuer das
+   Ereignis. Die Farbe ist die Zugabe; die Aussage steht im Satz.
+
+   ".schwer" ist die einzige Umfaerbung und gilt nur fuer die schwerste
+   Stufe (chip-x, heute der Abbruch) -- siehe wbArtKlasse().
+
+   Bewusst KEIN farbiger Rand und kein neuer Farbwert: Fuer Gruen gibt es
+   im Haus kein "--pos-line" wie fuer die uebrigen drei, und ein neues
+   globales Farbtoken anzulegen waere eine querliegende Aenderung (CLAUDE.md)
+   -- die gehoert nicht in eine Bereichsaufgabe. Die weiche Flaeche traegt
+   die Farbe, der Grundrand bleibt nur dort sichtbar, wo eine Art nicht
+   erkannt wurde. */
+.wb-ic.a-scan      { color: var(--accent); background: var(--accent-soft); border-color: transparent; }
+.wb-ic.a-rundgang  { color: var(--pos);    background: var(--pos-soft);    border-color: transparent; }
+.wb-ic.a-aufgabe   { color: var(--ink-2);  background: var(--surface-2);   border-color: transparent; }
+.wb-ic.a-ereignis  { color: var(--neg);    background: var(--neg-soft);    border-color: transparent; }
+.wb-ic.schwer      { color: var(--neg);    background: var(--neg-soft);    border-color: transparent; }
+
+.wb-pfad { display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 650; letter-spacing: .3px; text-transform: uppercase;
+  color: var(--ink-3); margin-bottom: 3px; }
+.wb-pfad .tr { color: var(--line-hi); }
+/* Ein Verweis sieht aus wie ein Verweis -- auch ohne Mauszeiger. Eine
+   unterstrichene Beschriftung, die nirgends hinfuehrt, waere schlimmer als
+   gar keine. */
+.wb-pfad a { color: var(--ink-2); text-decoration: none; border-bottom: 1px solid transparent;
+  cursor: pointer; }
+.wb-pfad a:hover, .wb-pfad a:focus-visible { color: var(--accent); border-bottom-color: var(--accent-line); }
+.wb-satz { font-size: 13.5px; font-weight: 500; color: var(--ink); line-height: 1.45; }
+.wb-satz b { font-weight: 660; }
+.wb-satz a { color: inherit; font-weight: 660; text-decoration: none;
+  border-bottom: 1px solid var(--line-hi); cursor: pointer; }
+.wb-satz a:hover, .wb-satz a:focus-visible { color: var(--accent); border-bottom-color: var(--accent-line); }
+.wb-zusatz { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 5px;
+  font-size: 12.5px; color: var(--ink-2); }
+.wb-zusatz .grund { color: var(--ink-3); }
+.wb-zeit { text-align: right; flex: none; padding-top: 1px; }
+.wb-zeit b { display: block; font-size: 13.5px; font-weight: 620; font-variant-numeric: tabular-nums; }
+.wb-zeit span { display: block; font-size: 11px; color: var(--ink-3); margin-top: 2px; white-space: nowrap; }
+/* Eine lange Offline-Phase (ENT-132) ist eine eigene Aussage und keine
+   Nebensache: Der Vorgang geschah um 22:05, der Server erfuhr es um 06:40.
+   Wer das nicht sieht, haelt den Nachweis fuer zeitnah. */
+.wb-zeit span.spaet { color: var(--warn); }
+
+/* Die Schublade: Pfad oben, Angaben darunter -- dasselbe Muster wie die
+   Zeile, damit beide nicht wie zwei Systeme wirken. */
+.wb-dr-pfad { font-size: 11px; font-weight: 650; letter-spacing: .3px; text-transform: uppercase;
+  color: var(--ink-3); margin-bottom: 6px; display: flex; flex-wrap: wrap; gap: 4px; }
+.wb-dr-satz { font-size: 14px; font-weight: 560; line-height: 1.45; margin-bottom: 16px; }
+.wb-dr-kopf { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+/* Ein Verweis in der Angabenliste. Eigene Regel statt einer allgemeinen fuer
+   ".dl a": Die Angabenliste steht im ganzen Haus, und eine Regel dort haette
+   Wirkung an Stellen, die diese Aufgabe nicht kennt. */
+.wb-lnk { color: var(--accent); text-decoration: none; cursor: pointer;
+  border-bottom: 1px solid var(--accent-line); }
+.wb-lnk:hover, .wb-lnk:focus-visible { border-bottom-color: var(--accent); }
 /* Abgeglichene Zeile in Planung/Tagesplan (ENT-136): eigene, kraeftigere
    Kennzeichnung als das allgemeine ".zu" (das anderswo "gesperrt/blockiert"
    bedeutet, z. B. bei Sperrtagen, und darum Warnfarbe traegt). Hier ist Gruen
@@ -18108,12 +18218,27 @@ function kontrolleNavKlick() {
 }
 
 // ══════════════════════ AUSWERTUNG: ARBEITSERGEBNISSE (ENT-243) ══════════
-// Schublade mit sieben Reitern unter "Auswertung", analog zur Kachel
-// "Rundgaenge" (ENT-242): erst das volle Geruest, aber nur verdrahtet, was
-// bereits eine Datengrundlage hat. Fuenf der sieben Reiter (Wachbuch,
-// Ereignisse, Aufgabenerledigung, Alarme, Schluesselprotokoll) haben noch
-// kein Datenmodell -- sie zeigen einen Hinweis statt nichts zu tun, bis eine
-// eigene Entscheidung sie verdrahtet.
+// Acht Reiter unter "Auswertung", analog zur Kachel "Rundgaenge" (ENT-242):
+// erst das volle Geruest, aber nur verdrahtet, was bereits eine
+// Datengrundlage hat.
+//
+// BERICHTIGT MIT ENT-480 (Befund OP-427): Hier stand bis dahin, fuenf Reiter
+// haetten "noch kein Datenmodell" -- Wachbuch, Ereignisse, Aufgabenerledigung,
+// Alarme, Schluesselprotokoll. Fuer die ersten drei stimmte das schon lange
+// nicht mehr: ereignis_meldung/ereignisart (ENT-295/ENT-297) und
+// rundgang_aufgabe (ENT-302/ENT-305) gibt es, und das Wachbuch braucht
+// ueberhaupt keinen eigenen Bestand -- es fuehrt vorhandene zusammen. Ein
+// Kommentar, der das Gegenteil behauptet, fuehrt jeden in die Irre, der hier
+// weiterbaut; genau das ist passiert.
+//
+// Wirklich ohne Datengrundlage sind noch zwei: Alarme und
+// Schluesselprotokoll (OP-426) -- fuer beide gibt es keine Tabelle. Sie
+// zeigen einen bleibenden Hinweis statt nichts zu tun.
+//
+// "Ereignisse" und "Aufgabenerledigung" haben ihre Grundlage, sind aber
+// weiterhin nicht einzeln verdrahtet: Ihre Inhalte stehen seit ENT-480 im
+// Wachbuch. Ob sie daneben noch je eine eigene, filterbare Vollansicht
+// bekommen, ist eine eigene Entscheidung und nicht Teil von ENT-480.
 // Jeder Reiter mit seinem Sinnbild: [Kennung, Beschriftung, SVG-Inhalt].
 // Die Sinnbilder sind dieselben, die im Haus schon fuer dieselbe Sache
 // stehen -- Karte fuer Kontrollpunkte, Weg fuer Rundgaenge, Warndreieck fuer
@@ -18140,8 +18265,11 @@ const AE_REITER = [
   ['fahrzeuguebernahmen', 'Fahrzeugübernahmen',
     '<path d="M3 13l2-5.5A2 2 0 0 1 6.9 6h10.2a2 2 0 0 1 1.9 1.5L21 13"/><path d="M3 13h18v4a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1v-1H6v1a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><circle cx="7" cy="15" r="1"/><circle cx="17" cy="15" r="1"/>'],
 ];
-const AE_VERDRAHTET = ['scans', 'erledigung', 'fahrzeuguebernahmen'];
-let aeTab = 'scans';
+const AE_VERDRAHTET = ['wachbuch', 'scans', 'erledigung', 'fahrzeuguebernahmen'];
+// Startreiter ist das Wachbuch (ENT-480): Es fuehrt zusammen, was die
+// uebrigen Reiter einzeln zeigen -- wer die Ansicht oeffnet, will zuerst
+// wissen, was ueberhaupt geschehen ist, und erst danach eine Art einzeln.
+let aeTab = 'wachbuch';
 
 /* Seit ENT-325 eine eigene Ansicht statt einer Schublade, mit derselben
    Kachelreihe wie "Kontrollrunde ändern" (ENT-261) -- Vorgabe des
@@ -18191,6 +18319,7 @@ function aeRenderTab() {
       'Für diese Auswertung gibt es noch keine Datengrundlage. Sie wird verdrahtet, sobald dafür entschieden ist.');
     return;
   }
+  if (aeTab === 'wachbuch') { aeRenderWachbuch(); return; }
   if (aeTab === 'scans') { aeRenderScans(); return; }
   if (aeTab === 'erledigung') { aeRenderErledigung(); return; }
   if (aeTab === 'fahrzeuguebernahmen') { aeRenderUebernahmen(); return; }
@@ -18203,6 +18332,469 @@ function aeRenderTab() {
 function aeVormonatBisHeute() {
   const h = new Date();
   return [isoTag(new Date(h.getFullYear(), h.getMonth() - 1, h.getDate())), isoTag(h)];
+}
+
+// ══ WACHBUCH (ENT-480) ═══════════════════════════════════════════════
+// Die Chronik des Revierdienstes: was in einem Zeitraum tatsaechlich
+// geschehen ist, nach Tagen gruppiert, neueste zuoberst.
+//
+// Vier Arten in EINER Zeitleiste statt vier Listen -- der Reiter beantwortet
+// die Frage "was war letzte Nacht?", und die beantwortet keine der vier
+// Einzelansichten. Zusammengefuehrt wird im Server (wachbuch_liste.php),
+// nicht hier: Sortieren und Kappen ueber vier Quellen laesst sich nur dort
+// richtig machen, wo alle vier vollstaendig vorliegen.
+//
+// Vorlage waren die Bildschirmfotos des Fremdsystems (Projektinhaber,
+// 2026-09-08). Uebernommen ist der Aufbau -- Pfad, Satz, Zeit, Tagestrenner,
+// Seitenfenster. NICHT uebernommen ist die Spalte "Geraet": Wir speichern
+// kein Geraetemodell, und eine leere Spalte, die dort etwas verspricht, ist
+// schlechter als keine.
+const WB_ARTEN = [
+  // Dieselben Sinnbilder wie in AE_REITER -- ein zweites Bild fuer denselben
+  // Begriff waere eine zweite Sprache.
+  ['scan', 'Kontrollpunkte',
+    '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>'],
+  ['rundgang', 'Rundgänge',
+    '<circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M12 19h4a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2H8a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h4"/>'],
+  ['aufgabe', 'Aufgaben',
+    '<line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><polyline points="4 6 5 7 7 5"/><polyline points="4 12 5 13 7 11"/><polyline points="4 18 5 19 7 17"/>'],
+  ['ereignis', 'Ereignisse',
+    '<path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>'],
+];
+const WB_ART_NAME = { scan: 'Kontrollpunkt', rundgang: 'Rundgang', aufgabe: 'Aufgabe', ereignis: 'Ereignis' };
+// Leer heisst "alle" -- nicht "keine". Ein Filter, der nichts durchlaesst,
+// waere ein leerer Bildschirm ohne Anlass.
+let wbFilter = [];
+let wbDaten = null;
+
+// Ab wann eine Uebermittlung als "spaeter" gilt (ENT-132: geraeteseitig
+// erfasst, offline zwischengespeichert). Fuenfzehn Minuten sind gross genug,
+// dass ein normaler Versand nicht darunter faellt, und klein genug, dass eine
+// Nacht ohne Netz auffaellt.
+const WB_SPAET_MIN = 15;
+
+function aeRenderWachbuch() {
+  const [von, bis] = aeVormonatBisHeute();
+  $('aeInhalt').innerHTML = `
+    <div class="bar-tools">
+      <div class="tool-gruppe">
+        <input class="inp" type="date" id="aeWbVon" style="width:auto" value="${von}" onchange="aeLadeWachbuch()" aria-label="Zeitraum von">
+        <span class="tool-bis">bis</span>
+        <input class="inp" type="date" id="aeWbBis" style="width:auto" value="${bis}" onchange="aeLadeWachbuch()" aria-label="Zeitraum bis">
+      </div>
+    </div>
+    <div class="wb-kopf" id="aeWbArten"></div>
+    <div id="aeWbListe"><div class="sk" style="height:52px"></div></div>`;
+  aeLadeWachbuch();
+}
+
+function aeLadeWachbuch() {
+  // Die Felder gibt es nur, solange dieser Reiter gezeichnet ist -- gleiche
+  // Absicherung wie bei aeLadeScans.
+  const vonEl = $('aeWbVon'), bisEl = $('aeWbBis');
+  if (!vonEl || !bisEl) { return; }
+  const von = vonEl.value, bis = bisEl.value;
+  if (!von || !bis) { return; }
+  const arten = wbFilter.length ? '&arten=' + encodeURIComponent(wbFilter.join(',')) : '';
+  api(`wachbuch_liste.php?von=${encodeURIComponent(von)}&bis=${encodeURIComponent(bis)}${arten}`)
+    .then(({ ok, data }) => {
+      if (!$('aeWbListe')) { return; }        // Reiter inzwischen gewechselt
+      wbDaten = (ok && data && data.status === 'ok') ? data : null;
+      aeZeichneWachbuch(wbDaten);
+    });
+}
+
+function wbArtUmschalten(art) {
+  wbFilter = wbFilter.includes(art) ? wbFilter.filter(a => a !== art) : wbFilter.concat([art]);
+  aeLadeWachbuch();
+}
+
+/* Die Filterreihe. Jede Art traegt ihre WIRKLICHE Zahl im Zeitraum, auch
+   wenn der Filter sie gerade ausblendet -- sonst liesse sich nicht sehen,
+   dass hinter dem Filter noch etwas liegt. Eine Art mit null Vorgaengen
+   bleibt stehen und sagt "0"; sie zu verstecken hiesse, "im Zeitraum nichts"
+   wie "gibt es nicht" aussehen zu lassen. */
+function wbArtenZeichnen(d) {
+  const ziel = $('aeWbArten');
+  if (!ziel) { return; }
+  const jeArt = (d && d.je_art) || {};
+  const quellen = (d && d.quellen) || {};
+  const quelleZuArt = { scan: 'scans', rundgang: 'runden', aufgabe: 'aufgaben', ereignis: 'ereignisse' };
+  ziel.innerHTML = WB_ARTEN.map(([art, lbl, ic]) => {
+    const an = wbFilter.includes(art);
+    const stand = quellen[quelleZuArt[art]];
+    // Drei verschiedene Aussagen, drei verschiedene Zeichen: eine Zahl, wenn
+    // die Quelle abfragbar war -- ein Fragezeichen, wenn nicht. "0" fuer eine
+    // Quelle, die gar nicht antwortet, waere eine Behauptung.
+    const zahl = stand === 'ok' ? nf(jeArt[art] || 0) : '?';
+    const titel = stand === 'ok' ? `${lbl}: ${nf(jeArt[art] || 0)} im Zeitraum`
+      : `${lbl}: nicht abfragbar — das ist nicht dasselbe wie „keine"`;
+    return `<button type="button" class="wb-art${an ? ' on' : ''}" data-art="${art}"
+        onclick="wbArtUmschalten('${art}')" aria-pressed="${an ? 'true' : 'false'}" title="${esc(titel)}">
+      <svg class="i i-sm" viewBox="0 0 24 24">${ic}</svg>
+      <span>${esc(lbl)}</span><span class="n">${esc(zahl)}</span>
+    </button>`;
+  }).join('')
+  // Die Zahl steht nur da, wenn sie etwas erklaert: gefiltert oder gekappt.
+  // Eine Zahl ohne Bezug sieht aus wie die Gesamtzahl.
+  + (d && (d.gekuerzt || wbFilter.length)
+    ? `<span class="wb-zahl">${nf(d.gezeigt)} von ${nf(d.gesamt)}${
+        d.gekuerzt && !wbFilter.length ? ' — Zeitraum eingrenzen' : ''}</span>`
+    : '');
+}
+
+/* Was in einer Zeile steht. Die Aussage gehoert in den SATZ, nicht in eine
+   Farbe: Ein nicht verfuegbarer Kontrollpunkt darf nicht dastehen wie ein
+   erfasster, auch nicht fuer jemanden, der die Farbe nicht sieht. Darum je
+   Status ein eigener Satz und nicht ein Satz mit einem Chip daneben. */
+function wbSatz(e) {
+  const punkt = e.punkt_name
+    ? `<b>${esc(e.punkt_name)}</b>`
+    // Ein Scan auf einen inzwischen entfernten Punkt behaelt seinen
+    // Nachweiswert. "Einen entfernten Kontrollpunkt" sagt das; ein leerer
+    // Name saehe aus, als fehlte die Angabe.
+    : 'einen inzwischen entfernten Kontrollpunkt';
+  if (e.art === 'scan') {
+    if (e.status === 'nicht_verfuegbar') { return `hat ${punkt} als nicht verfügbar gemeldet.`; }
+    if (e.status === 'ersatzscan') { return `hat ${punkt} per Ersatzscan belegt.`; }
+    return `hat den Kontrollpunkt ${punkt} erfasst.`;
+  }
+  if (e.art === 'rundgang') {
+    // Ohne Vorlage laeuft die Runde ueber alle Kontrollpunkte des Objekts
+    // (rundgang_punkte_der_runde) -- das ist eine Aussage, kein fehlender Name.
+    const name = e.rundgang_name
+      ? `<a onclick="event.stopPropagation(); rgdZeigen(${Number(e.rundgang_id)})"
+             tabindex="0" role="link">${esc(e.rundgang_name)}</a>`
+      : `<a onclick="event.stopPropagation(); rgdZeigen(${Number(e.rundgang_id)})"
+             tabindex="0" role="link">über alle Kontrollpunkte</a>`;
+    return e.status === 'abgebrochen'
+      ? `hat den Rundgang ${name} abgebrochen.`
+      : `hat den Rundgang ${name} erledigt.`;
+  }
+  if (e.art === 'aufgabe') {
+    const a = `<b>${esc(e.bezeichnung || 'ohne Bezeichnung')}</b>`;
+    if (e.status === 'nicht_moeglich') { return `hat die Aufgabe ${a} als nicht möglich gemeldet.`; }
+    return `hat die Aufgabe ${a} erledigt.`;
+  }
+  return e.bezeichnung
+    ? `hat ein Ereignis gemeldet: <b>${esc(e.bezeichnung)}</b>.`
+    // Keine erfundene Kategorie: "ohne hinterlegte Art" ist die Wahrheit,
+    // "Sonstiges" waere eine Einordnung, die niemand getroffen hat.
+    : 'hat ein Ereignis <b>ohne hinterlegte Art</b> gemeldet.';
+}
+
+/* Die Abstufung eines Status. Dieselbe Zuordnung wie in AE_SCAN_STATUS,
+   AE_AUFGABE_STATUS und RGD_STATUS -- nicht eine zweite: "nicht verfuegbar"
+   ist im Haus neutral, ein Ersatzscan eine Warnung, ein Abbruch die
+   schwerste Stufe. Haette das Wachbuch eine eigene Bewertung, saehe
+   derselbe Vorgang je nach Ansicht verschieden schlimm aus. */
+const WB_STATUS_CHIP = {
+  nicht_verfuegbar: ['chip-n', 'Nicht verfügbar'],
+  ersatzscan:       ['chip-w', 'Ersatzscan'],
+  nicht_moeglich:   ['chip-n', 'Nicht möglich'],
+  abgebrochen:      ['chip-x', 'Abgebrochen'],
+};
+
+/* Das Sinnbild und seine Farbe. Die Farbe sagt die ART -- vier Arten, vier
+   Farben. Sie zusaetzlich fuer jeden Vorbehalt umzufaerben war ein Fehler
+   und ist am gerenderten Zustand aufgefallen: Ersatzscan, nicht verfuegbar,
+   nicht moeglich und Abbruch wurden dabei alle gleich orange, vier Arten
+   sahen aus wie eine. Die Abstufung traegt der Chip daneben und der Satz
+   selbst, genau wie in den Scan-Karten.
+
+   Eine einzige Ausnahme: die schwerste Stufe des Hauses (chip-x, heute der
+   Abbruch). Ein abgebrochener Rundgang darf nicht dieselbe Farbe tragen wie
+   ein erledigter -- das waere nicht eine Abstufung zu wenig, sondern eine
+   falsche Aussage. */
+function wbArtKlasse(e) {
+  const [ck] = WB_STATUS_CHIP[e.status] || [];
+  return 'a-' + e.art + (ck === 'chip-x' ? ' schwer' : '');
+}
+
+// Die Uhrzeit aus einem vollen Zeitstempel. Eigener Name, weil "hm" im Haus
+// schon vergeben ist -- dort schneidet es eine reine Uhrzeit ("07:00:00") zu,
+// hier holt es sie aus einem Zeitstempel. Zwei Aufgaben, zwei Namen.
+const wbHm = z => (z ? String(z).slice(11, 16) : '–');
+
+// Minuten zwischen Erfassung und Uebermittlung. Beide Zeitangaben sind
+// Zeichenketten aus der Datenbank; ohne das "T" liest Safari sie nicht.
+/* Ein Verzug in lesbarer Form. "500 Min. später" ist richtig und trotzdem
+   unbrauchbar -- niemand rechnet das im Kopf in acht Stunden um. Ab einer
+   Stunde darum Stunden und Minuten. */
+function wbVerzugText(min) {
+  if (min < 60) { return nf(min) + ' Min.'; }
+  const std = Math.floor(min / 60), rest = min % 60;
+  return nf(std) + ' Std.' + (rest ? ' ' + nf(rest) + ' Min.' : '');
+}
+
+function wbVerzugMin(e) {
+  if (!e.zeit || !e.uebermittelt_am) { return 0; }
+  const a = Date.parse(String(e.zeit).replace(' ', 'T'));
+  const b = Date.parse(String(e.uebermittelt_am).replace(' ', 'T'));
+  if (isNaN(a) || isNaN(b)) { return 0; }
+  return Math.round((b - a) / 60000);
+}
+
+// Die zweite Zeile unter dem Satz: was die Zeile sonst noch zu sagen hat.
+// Bewusst hier und nicht erst im Seitenfenster -- wer eine Nacht durchliest,
+// soll den Grund eines Abbruchs sehen, ohne jede Zeile einzeln zu oeffnen.
+function wbZusatz(e) {
+  const teile = [];
+  const [ck, ct] = WB_STATUS_CHIP[e.status] || [];
+  if (ck) { teile.push(`<span class="chip ${ck}">${esc(ct)}</span>`); }
+  if (e.art === 'rundgang') {
+    // "Kontrollpunkte" zaehlt erfasste Punkte -- eine Einheit, ausgeschrieben.
+    // Wie viele die Runde HAETTE haben sollen, steht hier bewusst nicht: Das
+    // ist eine zweite Einheit und gehoert in die Rundgang-Detailansicht, die
+    // sie kennt.
+    teile.push(`<span>${nf(e.scans_anzahl)} ${e.scans_anzahl === 1 ? 'Kontrollpunkt' : 'Kontrollpunkte'} erfasst</span>`);
+    if (e.fenster_von && e.fenster_bis) {
+      teile.push(`<span class="grund">Fenster ${esc(String(e.fenster_von).slice(0, 5))}–${esc(String(e.fenster_bis).slice(0, 5))}</span>`);
+    }
+    if (e.abbruch_grund) { teile.push(`<span class="grund">Grund: ${esc(e.abbruch_grund)}</span>`); }
+  }
+  if (e.text) { teile.push(`<span class="grund">${esc(e.text)}</span>`); }
+  if (e.hat_foto) { teile.push('<span class="grund">mit Foto</span>'); }
+  // Der Vorfallzeitpunkt ergaenzt den Erfassungszeitpunkt, er ersetzt ihn nie
+  // (ENT-295): einsortiert ist die Zeile nach dem Erfassen.
+  if (e.vorfall_am) { teile.push(`<span class="grund">Vorfall ${esc(dmy(e.vorfall_am))}, ${esc(wbHm(e.vorfall_am))}</span>`); }
+  return teile.length ? `<div class="wb-zusatz">${teile.join('')}</div>` : '';
+}
+
+// Der Pfad ueber der Zeile: Kunde › Objekt › Rundgang. Verlinkt ist, wozu es
+// eine Kennung gibt; ohne Kennung steht der Name als reiner Text da statt als
+// Verweis, der nirgends hinfuehrt. Der Rundgang faellt weg, wo ihn der Satz
+// schon nennt -- zweimal derselbe Name in zwei Zeilen liest sich wie zwei
+// verschiedene Dinge.
+function wbPfad(e, klasse) {
+  const teile = [];
+  if (e.kunde_name) {
+    teile.push(e.kunde_id
+      ? `<a onclick="event.stopPropagation(); wbZuKunde(${Number(e.kunde_id)})" tabindex="0" role="link">${esc(e.kunde_name)}</a>`
+      : `<span>${esc(e.kunde_name)}</span>`);
+  }
+  if (e.objekt_name) {
+    teile.push(e.objekt_id
+      ? `<a onclick="event.stopPropagation(); wbZuObjekt(${Number(e.objekt_id)})" tabindex="0" role="link">${esc(e.objekt_name)}</a>`
+      : `<span>${esc(e.objekt_name)}</span>`);
+  }
+  if (e.art !== 'rundgang' && e.rundgang_id && e.rundgang_name) {
+    teile.push(`<a onclick="event.stopPropagation(); rgdZeigen(${Number(e.rundgang_id)})" tabindex="0" role="link">${esc(e.rundgang_name)}</a>`);
+  }
+  if (!teile.length) { return ''; }
+  // Die Klasse kommt von aussen, statt sie im Ergebnis zu ersetzen: Ein
+  // Kundenname, der zufaellig "wb-pfad" enthaelt, wuerde sonst mitgeaendert.
+  return `<div class="${klasse || 'wb-pfad'}">${teile.join('<span class="tr">›</span>')}</div>`;
+}
+
+function aeZeichneWachbuch(d) {
+  const ziel = $('aeWbListe');
+  if (!ziel) { return; }
+  wbArtenZeichnen(d);
+  // ── Vier verschiedene Lagen, vier verschiedene Texte ────────────────
+  // "nicht ladbar", "nicht eingerichtet", "im Zeitraum nichts" und "kein
+  // Treffer" sind vier Aussagen. Sie unter einem Satz zusammenzufassen ist
+  // der Fehler, vor dem CLAUDE.md am ausdruecklichsten warnt.
+  if (!d) {
+    ziel.innerHTML = EMPTY('Wachbuch nicht verfügbar', 'Die Chronik konnte nicht geladen werden.');
+    return;
+  }
+  const stand = Object.values(d.quellen || {});
+  if (stand.length && stand.every(q => q === 'fehlt')) {
+    ziel.innerHTML = EMPTY('Noch nicht eingerichtet',
+      'Der Revierdienst ist in der Datenbank noch nicht eingerichtet. Das ist etwas anderes als „im Zeitraum ist nichts geschehen".');
+    return;
+  }
+  // Eine Quelle, die fehlt oder nicht antwortet, waehrend die uebrigen
+  // liefern: Die Liste sieht dann vollstaendig aus, ist es aber nicht. Der
+  // Hinweis bekommt darum eine eigene Zeile ganz oben, nicht eine graue
+  // Notiz -- dieselbe Lehre wie beim Ereignis-Feed (ENT-090).
+  const NAME = { scans: 'Kontrollpunkte', runden: 'Rundgänge', aufgaben: 'Aufgaben', ereignisse: 'Ereignisse' };
+  const luecke = Object.keys(d.quellen || {}).filter(k => d.quellen[k] !== 'ok').map(k => NAME[k] || k);
+  const hinweis = luecke.length ? `
+    <div class="erg-luecke">
+      <b>Unvollständig — hier fehlt etwas.</b>
+      <span>${esc(luecke.join(', '))} ${luecke.length > 1 ? 'lassen' : 'lässt'} sich nicht abfragen.
+      Das ist <b>nicht</b> dasselbe wie „nichts geschehen". Seitenleiste → Einrichtung ausführen.</span>
+    </div>` : '';
+
+  const liste = d.eintraege || [];
+  if (!liste.length) {
+    ziel.innerHTML = hinweis + (wbFilter.length
+      ? EMPTY('Kein Treffer',
+          'Im Zeitraum liegen ' + nf(d.gesamt || 0) + ' Vorgänge, aber keiner der gewählten Art. Ein anderer Filter zeigt sie.')
+      : EMPTY('Nichts geschehen',
+          'Im gewählten Zeitraum ist im Revierdienst nichts erfasst worden.'));
+    return;
+  }
+
+  // Nach Tagen gruppieren. Die Reihenfolge kommt aus dem Server und wird hier
+  // NICHT nachsortiert -- zwei Sortierungen waeren zwei Wahrheiten.
+  let html = hinweis, tag = null, offen = false;
+  const jeTag = {};
+  liste.forEach(e => { const t = String(e.zeit).slice(0, 10); jeTag[t] = (jeTag[t] || 0) + 1; });
+  liste.forEach(e => {
+    const t = String(e.zeit).slice(0, 10);
+    if (t !== tag) {
+      if (offen) { html += '</div>'; }
+      tag = t; offen = true;
+      html += `<div class="wb-tag"><b>${esc(dmy(t))}</b>`
+        + `<span>${nf(jeTag[t])} ${jeTag[t] === 1 ? 'Vorgang' : 'Vorgänge'}</span><i></i></div><div class="wb-gruppe">`;
+    }
+    const verzug = wbVerzugMin(e);
+    const ic = (WB_ARTEN.find(a => a[0] === e.art) || [, , ''])[2];
+    html += `
+      <div class="wb-zeile" data-wb="${esc(e.id)}" tabindex="0" role="button"
+           aria-label="${esc(WB_ART_NAME[e.art] || e.art)} um ${esc(wbHm(e.zeit))} — Einzelheiten anzeigen">
+        <span class="wb-ic ${wbArtKlasse(e)}"><svg viewBox="0 0 24 24">${ic}</svg></span>
+        <div>
+          ${wbPfad(e)}
+          <div class="wb-satz">${esc(e.person)} ${wbSatz(e)}</div>
+          ${wbZusatz(e)}
+        </div>
+        <div class="wb-zeit"><b>${esc(wbHm(e.zeit))}</b>${verzug >= WB_SPAET_MIN
+          ? `<span class="spaet" title="Geräteseitig erfasst, erst ${esc(wbVerzugText(verzug))} später übermittelt (ENT-132)">übermittelt ${
+              // Das Datum nur, wenn die Uebermittlung an einem ANDEREN Tag
+              // liegt: Unter der Ueberschrift "07.09." waere ein blosses
+              // "06:40" sonst zweideutig -- es ist der Morgen danach.
+              String(e.uebermittelt_am).slice(0, 10) !== String(e.zeit).slice(0, 10)
+                ? esc(dmy(e.uebermittelt_am)) + ', ' : ''}${esc(wbHm(e.uebermittelt_am))}</span>`
+          : ''}</div>
+      </div>`;
+  });
+  if (offen) { html += '</div>'; }
+  ziel.innerHTML = html;
+  wbListeVerdrahten();
+}
+
+/* Ein Klick auf die Zeile oeffnet das Seitenfenster, ein Klick auf einen
+   Verweis darin fuehrt in die Rubrik. Beides ueber EINEN Zuhoerer an der
+   Liste statt eines Aufrufs je Zeile: Bei mehreren hundert Zeilen waeren das
+   mehrere hundert Funktionen, die alle dasselbe tun. Die Verweise stoppen
+   den Klick selbst (event.stopPropagation), sonst oeffnete sich zusaetzlich
+   die Schublade. */
+function wbListeVerdrahten() {
+  const ziel = $('aeWbListe');
+  if (!ziel || ziel.dataset.verdrahtet) { return; }
+  ziel.dataset.verdrahtet = '1';
+  ziel.addEventListener('click', ev => {
+    const zeile = ev.target.closest('.wb-zeile');
+    if (zeile) { wbOeffnen(zeile.dataset.wb); }
+  });
+  // Mit der Tastatur genau wie mit der Maus -- eine Zeile, die nur der
+  // Mauszeiger erreicht, ist fuer ein Vorleseprogramm keine.
+  ziel.addEventListener('keydown', ev => {
+    if (ev.key !== 'Enter' && ev.key !== ' ') { return; }
+    const ziel2 = ev.target.closest('a[role="link"]');
+    if (ziel2) { ev.preventDefault(); ziel2.click(); return; }
+    const zeile = ev.target.closest('.wb-zeile');
+    if (zeile) { ev.preventDefault(); wbOeffnen(zeile.dataset.wb); }
+  });
+}
+
+// ── In die Rubrik springen ──────────────────────────────────────────────
+// Kunden und Objekte liegen erst vor, wenn ihre Ansicht einmal offen war.
+// Wer direkt hierher gesprungen ist, hat sie nicht -- dann erst laden
+// (gleiches Muster wie bei den Kundenzugaengen).
+function wbZuKunde(id) {
+  closeDrawer();
+  const vorlauf = kunden.length ? Promise.resolve() : loadKunden();
+  vorlauf.then(() => {
+    if (!kunden.some(k => Number(k.id) === Number(id))) {
+      // Der Kunde ist weg (geloescht), der Beleg bleibt. Das zu sagen ist
+      // ehrlicher, als wortlos auf einer fremden Liste zu landen.
+      toast('Dieser Kunde ist nicht mehr vorhanden.');
+      return;
+    }
+    go('kunden');
+    openKundeDetail(Number(id));
+  });
+}
+
+function wbZuObjekt(id) {
+  closeDrawer();
+  const vorlauf = objekte.length ? Promise.resolve() : loadObjekte();
+  vorlauf.then(() => {
+    if (!objekte.some(o => Number(o.id) === Number(id))) {
+      toast('Dieses Objekt ist nicht mehr vorhanden.');
+      return;
+    }
+    openObjekt(Number(id));
+  });
+}
+
+/* Das Seitenfenster (Hausschublade, dieselbe wie beim Rapport). Es zeigt den
+   EINEN Vorgang, nicht die ganze Runde: Wer die Runde will, findet sie einen
+   Knopf weiter in der Detailansicht, die Karte und Rapport mitbringt. Zwei
+   Fenster mit demselben Inhalt waeren zwei Orte, an denen sich dieselbe
+   Angabe unterschiedlich entwickeln kann. */
+function wbOeffnen(id) {
+  const e = ((wbDaten && wbDaten.eintraege) || []).find(x => x.id === id);
+  if (!e) { toast('Der Eintrag ist nicht mehr vorhanden — bitte aktualisieren.'); return; }
+  $('drTitle').textContent = WB_ART_NAME[e.art] || 'Eintrag';
+  const ic = (WB_ARTEN.find(a => a[0] === e.art) || [, , ''])[2];
+  const [ck, ct] = WB_STATUS_CHIP[e.status] || [];
+  const verzug = wbVerzugMin(e);
+
+  const zeilen = [
+    ['Zeitpunkt', `${esc(dmy(e.zeit))}, <b>${esc(wbHm(e.zeit))}</b>`],
+    // Der Unterschied zwischen Erfassen und Uebermitteln ist der Kern des
+    // Offline-Prinzips (ENT-132) und steht darum immer da, nicht nur wenn er
+    // gross ist. "Sofort" ist eine Aussage, ein leeres Feld ist keine.
+    ['Übermittelt', e.uebermittelt_am
+      ? `${esc(dmy(e.uebermittelt_am))}, ${esc(wbHm(e.uebermittelt_am))}`
+        + (verzug >= WB_SPAET_MIN ? ` <span style="color:var(--warn)">— ${esc(wbVerzugText(verzug))} später</span>` : '')
+      : '<span style="color:var(--ink-3)">nicht festgehalten</span>'],
+  ];
+  if (e.art === 'scan' || e.art === 'aufgabe') {
+    zeilen.push(['Kontrollpunkt', e.punkt_name ? esc(e.punkt_name)
+      : '<span style="color:var(--ink-3)">inzwischen entfernt</span>']);
+  }
+  if (e.art === 'aufgabe') { zeilen.push(['Aufgabe', esc(e.bezeichnung || '–')]); }
+  if (e.art === 'ereignis') {
+    zeilen.push(['Ereignisart', e.bezeichnung ? esc(e.bezeichnung)
+      : '<span style="color:var(--ink-3)">keine hinterlegt</span>']);
+    zeilen.push(['Vorfall', e.vorfall_am
+      ? `${esc(dmy(e.vorfall_am))}, ${esc(wbHm(e.vorfall_am))}`
+      : '<span style="color:var(--ink-3)">gleich dem Zeitpunkt</span>']);
+  }
+  if (e.art === 'rundgang') {
+    zeilen.push(['Start', e.rohzeit_start ? esc(wbHm(e.rohzeit_start))
+      : '<span style="color:var(--ink-3)">nicht erfasst</span>']);
+    zeilen.push(['Ende', e.rohzeit_ende ? esc(wbHm(e.rohzeit_ende))
+      : '<span style="color:var(--ink-3)">nicht erfasst — gilt der letzte Scan</span>']);
+    if (e.pause_minuten) { zeilen.push(['Pause', nf(e.pause_minuten) + ' Min.']); }
+    zeilen.push(['Erfasste Punkte', nf(e.scans_anzahl)]);
+    if (e.abbruch_grund) { zeilen.push(['Abbruchgrund', esc(e.abbruch_grund)]); }
+  }
+  zeilen.push(['Rundgang', e.rundgang_id
+    ? `<a class="wb-lnk" onclick="rgdZeigen(${Number(e.rundgang_id)})" tabindex="0" role="link">${esc(e.rundgang_name || 'über alle Kontrollpunkte')}</a>`
+    : '<span style="color:var(--ink-3)">ohne Rundgang erfasst</span>']);
+  zeilen.push(['Einsatz', e.einsatz_id
+    ? esc(e.einsatz_titel || 'Einsatz Nr. ' + e.einsatz_id)
+    : '<span style="color:var(--ink-3)">keinem Einsatz zugeordnet</span>']);
+  zeilen.push(['Mitarbeitende', esc(e.person)]);
+  if (e.text) { zeilen.push([e.art === 'ereignis' ? 'Bemerkung' : 'Angabe', esc(e.text)]); }
+  // Das Bild selbst holt diese Ansicht NICHT: Ein Foto je Eintrag waere ein
+  // Vielfaches der uebrigen Daten, und wer es sehen will, findet es in der
+  // Rundgang-Detailansicht bzw. bei den Ereignissen. Dass eines da ist, gehoert
+  // trotzdem hierher -- sonst wuesste niemand, dass es zu holen gibt.
+  if (e.hat_foto) { zeilen.push(['Foto', 'vorhanden']); }
+
+  $('drBody').innerHTML =
+    `<div class="wb-dr-kopf">
+       <span class="wb-ic ${wbArtKlasse(e)}"><svg viewBox="0 0 24 24">${ic}</svg></span>
+       ${ck ? `<span class="chip ${ck}">${esc(ct)}</span>` : ''}
+     </div>`
+    + wbPfad(e, 'wb-dr-pfad')
+    + `<div class="wb-dr-satz">${esc(e.person)} ${wbSatz(e)}</div>`
+    + '<dl class="dl">' + zeilen.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('') + '</dl>';
+
+  $('drFoot').innerHTML =
+    (e.rundgang_id ? `<button class="btn btn-primary btn-sm" onclick="rgdZeigen(${Number(e.rundgang_id)})">Rundgang ansehen</button>` : '')
+    + (e.objekt_id ? `<button class="btn btn-plain btn-sm" onclick="wbZuObjekt(${Number(e.objekt_id)})">Zum Objekt</button>` : '')
+    + (e.kunde_id ? `<button class="btn btn-plain btn-sm" onclick="wbZuKunde(${Number(e.kunde_id)})">Zum Kunden</button>` : '');
+  showDrawer();
 }
 
 function aeRenderScans() {
