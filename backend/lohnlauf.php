@@ -228,6 +228,336 @@ function lohnlauf_nbu_wochen(PDO $pdo, int $maId, string $bis, int $monate): arr
             'unbrauchbar' => $unbrauchbar, 'ausfalltage' => $ausfalltage];
 }
 
+// Die NBU-Unterstellung einer Person zum Stichtag -- gerechnet, oder von
+// Hand gesetzt.
+//
+// REIHENFOLGE: Erst wird nachgesehen, ob jemand von Hand entschieden hat.
+// Nur wenn nicht, wird gerechnet. Eine Uebersteuerung, die von der Rechnung
+// ueberstimmt wuerde, waere keine.
+//
+// Die Uebersteuerung liegt in lohn_person und ist HISTORISIERT wie alles
+// dort: Wer sie im Maerz setzt, aendert damit den Februar nicht.
+//
+// WAS MITGELIEFERT WIRD, weil ohne das niemand die Zahl nachvollziehen kann:
+// der Beobachtungszeitraum beider Fenster, die gezaehlten Wochen, der
+// Durchschnitt, und bei einer Uebersteuerung Grund, Person und Zeitpunkt.
+// Das ist der "gespeicherte Berechnungsstichtag" -- er entsteht hier und
+// wird vom Lauf in den Schnappschuss uebernommen.
+function lohnlauf_nbu(PDO $pdo, int $maId, string $bis): array
+{
+    // 1. Uebersteuerung ZUERST -- vor dem Regelwerk.
+    //
+    // Eine von Hand getroffene Entscheidung braucht die Acht-Stunden-Schwelle
+    // nicht: Sie ersetzt die Rechnung, statt auf ihr aufzubauen. Stuende die
+    // Regelwerkspruefung davor, verschwaende ein fehlender Jahrgang eine
+    // Antwort, die laengst vorliegt -- und der Lohnlauf sperrte eine Person,
+    // ueber die jemand bereits entschieden hat.
+    try {
+        $st = $pdo->prepare(
+            "SELECT nbu_pflichtig, nbu_grund, nbu_von, nbu_am, gueltig_ab
+               FROM lohn_person
+              WHERE mitarbeiter_id = ? AND gueltig_ab <= ?
+              ORDER BY gueltig_ab DESC LIMIT 1");
+        $st->execute([$maId, $bis]);
+        $r = $st->fetch();
+    } catch (Throwable $e) { $r = null; }
+
+    if ($r && $r['nbu_pflichtig'] !== null && $r['nbu_pflichtig'] !== '') {
+        $ja = (int)$r['nbu_pflichtig'] === 1;
+        return [
+            'stand' => $ja ? LOHN_NBU_VERSICHERT : LOHN_NBU_NICHT,
+            'quelle' => 'uebersteuert',
+            'uebersteuert' => ['auf' => $ja ? LOHN_NBU_VERSICHERT : LOHN_NBU_NICHT,
+                'grund' => $r['nbu_grund'] ?? null, 'von' => $r['nbu_von'] ?? null,
+                'am' => $r['nbu_am'] ?? null, 'gueltig_ab' => $r['gueltig_ab'] ?? null],
+            'fenster' => [],
+            'text' => 'Von Hand auf ' . ($ja ? 'versichert' : 'nicht versichert') . ' gesetzt'
+                . (trim((string)($r['nbu_grund'] ?? '')) !== ''
+                   ? ': ' . trim((string)$r['nbu_grund']) : ' — ohne Begruendung.')];
+    }
+
+    // 2. Sonst rechnen -- und DAFUER braucht es das Regelwerk.
+    $uvg = lohn_uvg($bis);
+    if ($uvg === null) {
+        return ['stand' => LOHN_NBU_UNBEKANNT, 'quelle' => 'kein_regelwerk',
+            'text' => 'Fuer ' . substr($bis, 0, 4) . ' ist kein UVG-Regelwerk erfasst. '
+                . 'Ohne die Schwelle laesst sich die Unterstellung nicht ermitteln.',
+            'fenster' => [], 'uebersteuert' => null];
+    }
+    $fenster = [];
+    foreach (LOHN_NBU_FENSTER_MONATE as $monate) {
+        $w = lohnlauf_nbu_wochen($pdo, $maId, $bis, $monate);
+        $e = lohn_nbu_ermittlung($w['liste'], $uvg, (int)($w['ausfalltage'] ?? 0));
+        $e['zeitraum'] = ['von' => $w['von'], 'bis' => $w['bis'], 'monate' => $monate];
+        $fenster[$monate] = $e;
+    }
+    $erg = lohn_nbu_unterstellung($fenster, $uvg);
+    $erg['quelle'] = 'gerechnet';
+    $erg['uebersteuert'] = null;
+    $erg['stichtag'] = $bis;
+    return $erg;
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// DIE ABZUGSSEITE (ENT-451, Etappe 4).
+//
+// AUFBAU IN ZWEI SCHRITTEN, und die Trennung ist der Kern:
+//   1. lohnlauf_grundlagen() bildet aus den Bruttozeilen und den SECHS
+//      KENNZEICHEN des Lohnartenkatalogs die Bemessungsgrundlagen. Welche
+//      Zeile in welche Grundlage zaehlt, steht damit an EINER Stelle -- im
+//      Katalog -- und nicht verstreut in der Abzugsrechnung.
+//   2. lohnlauf_abzuege() rechnet je Abzug seinen Betrag aus der zugehoerigen
+//      Grundlage.
+//
+// WAS HIER NIE PASSIERT: mit null rechnen. Fehlt ein Satz, entsteht die
+// Zeile trotzdem -- mit Sperrgrund und ohne Betrag. Ein stillschweigend
+// weggelassener Abzug faellt niemandem auf; eine gesperrte Zeile schon.
+// Dieselbe Regel wie auf der Bruttoseite beim Zeitzuschlag.
+
+// Der Katalog als Abbildung Schluessel -> Kennzeichen. Aus dem Startbestand,
+// damit Pruefungen ihn erreichen; die Tabelle kann ihn ueberschreiben.
+function lohnlauf_katalog(?PDO $pdo = null): array
+{
+    // Einmal je Lauf gelesen, nicht je Person: Bei fuenfzig Mitarbeitenden
+    // waeren es sonst fuenfzig gleiche Abfragen.
+    static $merker = null;
+    if ($pdo !== null && $merker !== null) { return $merker; }
+
+    $k = [];
+    foreach (lohnart_startbestand() as $z) {
+        $k[$z[0]] = ['ahv' => (int)$z[5], 'ferien' => (int)$z[6], 'ml13' => (int)$z[7],
+                     'bvg' => (int)$z[8], 'uvg' => (int)$z[9], 'qst' => (int)$z[10],
+                     'bemessung' => lohnart_ist_bemessung($z) ? 1 : 0];
+    }
+    if ($pdo === null) { return $k; }
+    try {
+        $st = $pdo->query("SELECT schluessel, ahv_pflichtig, ferien_pflichtig, ml13_pflichtig,
+                                  bvg_pflichtig, uvg_pflichtig, qst_pflichtig, bemessung
+                             FROM lohnart");
+        foreach ($st->fetchAll() as $r) {
+            $k[(string)$r['schluessel']] = [
+                'ahv' => (int)$r['ahv_pflichtig'], 'ferien' => (int)$r['ferien_pflichtig'],
+                'ml13' => (int)$r['ml13_pflichtig'], 'bvg' => (int)$r['bvg_pflichtig'],
+                'uvg' => (int)$r['uvg_pflichtig'], 'qst' => (int)$r['qst_pflichtig'],
+                'bemessung' => (int)$r['bemessung']];
+        }
+    } catch (Throwable $e) { /* vor der Einrichtung gibt es die Tabelle nicht */ }
+    $merker = $k;
+    return $k;
+}
+
+// Bemessungsgrundlagen aus den Bruttozeilen.
+//
+// Eine Zeile OHNE Betrag zaehlt nirgends mit -- sie ist gesperrt, und eine
+// gesperrte Zeile ist keine Null. Eine Zeile, deren Lohnart der Katalog
+// nicht kennt, zaehlt ebenfalls nicht mit, wird aber NAMENTLICH gemeldet:
+// Sonst verschwaende ein Tippfehler im Schluessel stillschweigend Lohn aus
+// jeder Bemessungsgrundlage. Genau dieser Fehler ist in diesem Baustein
+// schon einmal passiert (`geleistete_stunden` fehlte im Katalog).
+function lohnlauf_grundlagen(array $zeilen, array $katalog): array
+{
+    $g = ['ahv' => 0, 'bvg' => 0, 'uvg' => 0, 'qst' => 0];
+    $unbekannt = [];
+    foreach ($zeilen as $z) {
+        if (($z['betrag_rappen'] ?? null) === null) { continue; }
+        $k = $katalog[$z['schluessel']] ?? null;
+        if ($k === null) { $unbekannt[] = $z['schluessel']; continue; }
+        // Nur Zeilen, die einen Betrag der PERIODE tragen. Grundlohn,
+        // Ferienentschaedigung und 13.-Anteil sind Bestandteile eines
+        // STUNDENSATZES -- sie mitzuzaehlen ergaebe den Stundenlohn zweimal.
+        if (!(int)($k['bemessung'] ?? 0)) { continue; }
+        foreach (['ahv', 'bvg', 'uvg', 'qst'] as $art) {
+            if ($k[$art]) { $g[$art] += (int)$z['betrag_rappen']; }
+        }
+    }
+    $g['unbekannte_lohnarten'] = array_values(array_unique($unbekannt));
+    return $g;
+}
+
+// Der zum Stichtag geltende Betriebssatz aus lohn_abzug. NULL heisst
+// "nicht erfasst" -- nicht "null Prozent".
+function lohnlauf_abzugsatz(PDO $pdo, string $schluessel, string $bis): ?array
+{
+    try {
+        $st = $pdo->prepare(
+            "SELECT satz_bp, fix_rappen, hoechstlohn_rappen, quelle
+               FROM lohn_abzug
+              WHERE schluessel = ? AND gueltig_ab <= ?
+                AND (gueltig_bis IS NULL OR gueltig_bis >= ?)
+              ORDER BY gueltig_ab DESC LIMIT 1");
+        $st->execute([$schluessel, $bis, $bis]);
+        $r = $st->fetch();
+        return $r ?: null;
+    } catch (Throwable $e) { return null; }
+}
+
+// Die Abzugszeilen einer Person.
+//
+// REIHENFOLGE wie in der heute eingesetzten Fremdloesung: erst die
+// Sozialversicherungsabzuege, dann der Nettolohn als Zwischensumme, dann der
+// PaKo-Beitrag, dann der Auszahlungsbetrag. Der PaKo steht dort ausdruecklich
+// NACH dem Nettolohn -- das ist nicht bloss Darstellung, sondern bestimmt,
+// was "Nettolohn" auf dem Papier bedeutet.
+//
+// ZWEI FESTLEGUNGEN, DIE OFFEN SIND (OP-465) und darum hier benannt statt
+// versteckt:
+//   * Gerundet wird JE ABZUG auf den Rappen, nicht auf die Summe. Art. 12
+//     Ziff. 5 GAV verlangt, dass jede Position als Betrag darstellbar ist.
+//   * Auf 5 Rappen wird NICHT gerundet. lohn_fuenfrappen() ist gebaut und
+//     belegt, aber wo sie greift, hat niemand entschieden.
+// Beide stehen als Konstante da, damit die Entscheidung ein Wert bleibt und
+// keine Suche durch den Quelltext.
+const LOHNLAUF_RUNDUNG_JE_ABZUG = true;
+const LOHNLAUF_AUSZAHLUNG_AUF_5_RAPPEN = false;
+
+function lohnlauf_abzuege(PDO $pdo, array $kopf, string $bis, ?array $nbu = null): array
+{
+    $katalog = lohnlauf_katalog($pdo);
+    $g = lohnlauf_grundlagen($kopf['zeilen'] ?? [], $katalog);
+    $zeilen = [];
+    $sperren = [];
+
+    // Kleiner Helfer: eine Abzugszeile, entweder mit Betrag oder mit Grund.
+    $zeile = function (string $sl, string $bez, ?int $basis, ?int $satzBp, ?int $betrag,
+                       int $sort, ?string $grund, string $hinweis) use (&$zeilen, &$sperren) {
+        if ($grund !== null) { $sperren[$grund] = ($sperren[$grund] ?? 0) + 1; }
+        $zeilen[] = ['schluessel' => $sl, 'bezeichnung' => $bez, 'basis_rappen' => $basis,
+            'satz_bp' => $satzBp, 'menge' => null, 'betrag_rappen' => $betrag,
+            'sortierung' => $sort, 'annahme' => 0,
+            'gesperrt_grund' => $grund, 'hinweis' => $hinweis];
+    };
+
+    // 1. AHV, IV, EO -- Bundesrecht aus dem Regelwerk, nicht aus lohn_abzug.
+    $sv = lohn_sv($bis);
+    if ($sv === null) {
+        $zeile('ahv', 'AHV-, IV-, EO-Beitrag', $g['ahv'], null, null, 50, 'kein_sv_regelwerk',
+            'Fuer ' . substr($bis, 0, 4) . ' ist kein AHV-Regelwerk erfasst. Es wird nicht '
+            . 'mit den Saetzen des Vorjahres gerechnet.');
+    } else {
+        $zeile('ahv', 'AHV-, IV-, EO-Beitrag', $g['ahv'], $sv['an_bp'],
+            -lohn_anteil($g['ahv'], (int)$sv['an_bp']), 50, null, $sv['quelle']);
+    }
+
+    // 2. ALV -- eigenes Regelwerk, eigener Stand, und eine Obergrenze.
+    //    Merkblatt 2.08 Ziff. 5: In der monatlichen Abrechnung gilt ein
+    //    provisorischer Hoechstbetrag von einem Zwoelftel des Jahresbetrags.
+    $alv = lohn_alv($bis);
+    if ($alv === null) {
+        $zeile('alv', 'ALV-Beitrag', $g['ahv'], null, null, 51, 'kein_alv_regelwerk',
+            'Fuer ' . substr($bis, 0, 4) . ' ist kein ALV-Regelwerk erfasst.');
+    } else {
+        $grenze = lohn_alv_monatsgrenze($alv);
+        $basis  = min($g['ahv'], $grenze);
+        $zeile('alv', 'ALV-Beitrag', $basis, $alv['an_bp'],
+            -lohn_anteil($basis, (int)$alv['an_bp']), 51, null,
+            $g['ahv'] > $grenze
+                ? 'Begrenzt auf den provisorischen Monatshoechstbetrag (Merkblatt 2.08 Ziff. 5).'
+                : $alv['quelle']);
+    }
+
+    // 3. NBU -- zwei Bedingungen, und beide koennen einzeln fehlen: die
+    //    Unterstellung nach Empfehlung 7/87 und der Praemiensatz des
+    //    Versicherers. Der Berufsunfall erscheint NIE als Abzug (Merkblatt
+    //    6.05 Ziff. 5) -- darum gibt es hier nur den NBU.
+    $uvg  = lohn_uvg($bis);
+    $satz = lohnlauf_abzugsatz($pdo, 'nbu', $bis);
+    $stand = $nbu['stand'] ?? LOHN_NBU_UNBEKANNT;
+    $uvgBasis = $g['uvg'];
+    if ($uvg !== null) {
+        // Der Hoechstbetrag ist ein JAHRESwert; monatlich gilt ein Zwoelftel.
+        // Dieselbe Bauart wie bei der ALV, aber aus dem eigenen Regelwerk --
+        // die Betraege stimmen ueberein, hergeleitet wird nichts.
+        $uvgBasis = min($uvgBasis, lohn_rappen((int)$uvg['hoechstbetrag_jahr_rappen'] / 12));
+    }
+    if ($stand === LOHN_NBU_NICHT) {
+        $zeile('nbu', 'NBU-Beitrag', $uvgBasis, null, null, 52, 'nbu_keine_deckung',
+            $nbu['text'] ?? 'Keine Deckung gegen Nichtberufsunfaelle -- es darf kein Beitrag '
+            . 'abgezogen werden.');
+    } elseif ($stand !== LOHN_NBU_VERSICHERT) {
+        $zeile('nbu', 'NBU-Beitrag', $uvgBasis, null, null, 52,
+            $stand === LOHN_NBU_PRUEFEN ? 'nbu_pruefen' : 'nbu_unbekannt',
+            $nbu['text'] ?? 'Die Unterstellung ist nicht ermittelt.');
+    } elseif ($satz === null || $satz['satz_bp'] === null) {
+        $zeile('nbu', 'NBU-Beitrag', $uvgBasis, null, null, 52, 'kein_nbu_satz',
+            'Deckung besteht, aber der Praemiensatz des Versicherers ist nicht erfasst.');
+    } else {
+        $zeile('nbu', 'NBU-Beitrag', $uvgBasis, (int)$satz['satz_bp'],
+            -lohn_anteil($uvgBasis, (int)$satz['satz_bp']), 52, null,
+            (string)($satz['quelle'] ?? ''));
+    }
+
+    // 4. KTG und BVG -- reine Betriebswerte. Art. 17 Ziff. 3 und Art. 25
+    //    Ziff. 3 GAV begrenzen den Anteil, den der Betrieb abziehen darf;
+    //    die Aufteilung selbst steht im erfassten Satz.
+    foreach ([['ktg', 'Krankentaggeld-Beitrag', 'ahv', 53, 'Art. 17 Ziff. 3 GAV: der Arbeitgeber '
+              . 'traegt mindestens die Haelfte.'],
+              ['bvg', 'BVG-Beitrag', 'bvg', 54, 'Art. 25 Ziff. 3 GAV: hoechstens die Haelfte '
+              . 'darf abgezogen werden. Der Betrag stammt aus der Meldung der Pensionskasse.'],
+             ] as [$sl, $bez, $grund, $sort, $hinweis]) {
+        $s = lohnlauf_abzugsatz($pdo, $sl, $bis);
+        $basis = $g[$grund];
+        if ($s === null) {
+            $zeile($sl, $bez, $basis, null, null, $sort, 'kein_' . $sl . '_satz',
+                'Kein Satz erfasst. Solange er fehlt, wird nicht gerechnet -- auch nicht mit null.');
+        } elseif ($s['satz_bp'] !== null) {
+            $zeile($sl, $bez, $basis, (int)$s['satz_bp'],
+                -lohn_anteil($basis, (int)$s['satz_bp']), $sort, null,
+                (string)($s['quelle'] ?? $hinweis));
+        } else {
+            $zeile($sl, $bez, null, null, -(int)$s['fix_rappen'], $sort, null,
+                (string)($s['quelle'] ?? $hinweis));
+        }
+    }
+
+    // 5. Nettolohn als Zwischensumme -- alles bis hierher.
+    $netto = (int)$kopf['brutto_rappen'];
+    foreach ($zeilen as $z) { $netto += (int)($z['betrag_rappen'] ?? 0); }
+    $zeilen[] = ['schluessel' => 'nettolohn', 'bezeichnung' => 'Nettolohn',
+        'basis_rappen' => null, 'satz_bp' => null, 'menge' => null,
+        'betrag_rappen' => $netto, 'sortierung' => 60, 'annahme' => 0,
+        'gesperrt_grund' => null,
+        'hinweis' => 'Bruttolohn abzueglich der Sozialversicherungsbeitraege'];
+
+    // 6. PaKo NACH dem Nettolohn -- so weist es die Fremdloesung aus, und
+    //    Art. 6 Ziff. 2 verlangt ausdruecklich, dass er auf der Abrechnung
+    //    erscheint. Er darf nie stillschweigend im Nettolohn verschwinden.
+    $stunden = ($kopf['bewertet_min'] ?? 0) / 60;
+    $pako = lohn_pako_beitrag_rappen($kopf['kategorie'] ?? null, $stunden);
+    if (($pako['rappen'] ?? null) === null) {
+        $zeile('pako', 'Vollzugskostenbeitrag PaKo', null, null, null, 61, 'kein_pako',
+            $pako['text'] ?? 'Ohne Anstellungskategorie laesst sich der Beitrag nicht bestimmen.');
+    } else {
+        $zeile('pako', 'Vollzugskostenbeitrag PaKo', null, null, -(int)$pako['rappen'], 61, null,
+            $pako['text'] ?? 'Art. 6 Ziff. 2 GAV');
+    }
+
+    // 7. Quellensteuer -- Etappe 5. AUSDRUECKLICH GESPERRT und nicht still
+    //    abzugsfrei: Ein nicht nachgefuehrter kantonaler Tarif produziert
+    //    weiter plausible Zahlen (ENT-451, Risiken).
+    if ($g['qst'] > 0) {
+        $zeile('quellensteuer', 'Quellensteuer', $g['qst'], null, null, 62, 'quellensteuer_offen',
+            'Die Quellensteuer ist Etappe 5 und bewusst gesperrt statt mit null gerechnet. '
+            . 'Betroffene Personen werden von Hand abgerechnet.');
+    }
+
+    // 8. Auszahlungsbetrag.
+    $aus = $netto;
+    foreach ($zeilen as $z) {
+        if ((int)($z['sortierung'] ?? 0) > 60) { $aus += (int)($z['betrag_rappen'] ?? 0); }
+    }
+    if (LOHNLAUF_AUSZAHLUNG_AUF_5_RAPPEN) { $aus = lohn_fuenfrappen($aus); }
+    $zeilen[] = ['schluessel' => 'auszahlung', 'bezeichnung' => 'Auszahlungsbetrag',
+        'basis_rappen' => null, 'satz_bp' => null, 'menge' => null,
+        'betrag_rappen' => $aus, 'sortierung' => 70, 'annahme' => 0,
+        'gesperrt_grund' => null,
+        'hinweis' => 'Nettolohn abzueglich der Beitraege, die nach ihm ausgewiesen werden'];
+
+    usort($zeilen, fn($a, $b) => $a['sortierung'] <=> $b['sortierung']);
+    return ['zeilen' => $zeilen, 'grundlagen' => $g, 'sperren' => $sperren,
+            'netto_rappen' => $netto, 'auszahlung_rappen' => $aus,
+            'vollstaendig' => empty($sperren)];
+}
+
 // ── Der zum Stichtag geltende Lohnansatz ─────────────────────────────────
 // Die juengste Zeile, die nicht in der Zukunft liegt. Ein kuenftiger Ansatz
 // ist erfasst, aber noch nicht gueltig.
@@ -392,12 +722,17 @@ function lohnlauf_person(PDO $pdo, array $ma, string $von, string $bis): array
     $kopf['zeilen'] = $zeilen;
     // Die Bruttosumme zaehlt NUR Zeilen mit Betrag. Eine gesperrte Zeile
     // ist keine Null -- sie fehlt, und das steht daneben.
+    // Der Bruttolohn zaehlt dieselben Zeilen wie die Bemessungsgrundlagen:
+    // die mit einem Betrag der Periode. Vorher stand hier eine Namensliste
+    // ('geleistete_stunden' plus alles, was mit 'zuschlag_' beginnt) -- eine
+    // zweite Wahrheit neben dem Katalog, die beim naechsten neuen Lohnart
+    // auseinanderlaufen musste. Jetzt entscheidet der Katalog, und zwar
+    // einmal.
+    $kat = lohnlauf_katalog($pdo);
     $kopf['brutto_rappen'] = array_sum(array_map(
-        fn($z) => in_array($z['schluessel'], ['geleistete_stunden'], true)
-                  ? (int)($z['betrag_rappen'] ?? 0) : 0, $zeilen))
-        + array_sum(array_map(
-            fn($z) => str_starts_with($z['schluessel'], 'zuschlag_') && $z['betrag_rappen'] !== null
-                      ? (int)$z['betrag_rappen'] : 0, $zeilen));
+        fn($z) => ($z['betrag_rappen'] !== null
+                   && (int)(($kat[$z['schluessel']] ?? [])['bemessung'] ?? 0) === 1)
+                  ? (int)$z['betrag_rappen'] : 0, $zeilen));
 
     // Mindestlohnpruefung gegen Anhang 1. Warnt, sperrt nicht -- Anhang 1
     // laesst fuer unter 25-Jaehrige in Kategorie A einen Fall zu, den das

@@ -6191,6 +6191,12 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
         </div>
         <div id="llHinweis"></div>
         <div id="llVorschau"></div>
+        <!-- Die Abrechnung EINER Person, in einer eigenen Karte statt
+             aufgeklappt in der Liste. Gleicher Grund wie bei den Profilen
+             in Rollen & Berechtigungen: Zwanzig Positionen zwischen zwei
+             Personenzeilen liessen die Liste als Ganzes nicht mehr
+             ueberblicken -- und genau das ist ihr Zweck. -->
+        <div id="llAbrechnung"></div>
         <h3 style="margin:26px 0 8px">Bisherige Läufe</h3>
         <div id="llListe"></div>
       </section>
@@ -18671,20 +18677,23 @@ function lohnPersonenTabelle(personen, gruende, vorschau) {
         ? `<div class="zone-note" style="margin:2px 0 0">${esc(x.personalnummer)}</div>` : ''}</td>
       <td>${x.kategorie ? 'Kat. ' + esc(x.kategorie)
         : '<span class="zone-note" style="font-style:italic">ohne Kategorie</span>'}</td>
-      <td style="text-align:right">${lohnStd(x.roh_min)}</td>
-      <td style="text-align:right">${lohnStd(x.netto_min)}</td>
-      <td style="text-align:right">${lohnStd(x.bonus_min)}</td>
       <td style="text-align:right"><b>${lohnStd(x.bewertet_min)}</b></td>
       <td style="text-align:right">${gesperrt
         ? '<span class="zone-note" style="font-style:italic">nicht gerechnet</span>'
-        : '<b>' + lohnFr(x.brutto_rappen) + '</b>'}</td>
+        : lohnFr(x.brutto_rappen)}</td>
+      <td style="text-align:right">${gesperrt || x.auszahlung_rappen === null || x.auszahlung_rappen === undefined
+        ? '<span class="zone-note" style="font-style:italic" title="Solange ein Satz fehlt, wird nicht gerechnet — auch nicht mit null">offen</span>'
+        : lohnFr(Number(x.brutto_rappen) - Number(x.auszahlung_rappen))}</td>
+      <td style="text-align:right">${gesperrt || x.auszahlung_rappen === null || x.auszahlung_rappen === undefined
+        ? '<span class="zone-note" style="font-style:italic">offen</span>'
+        : '<b>' + lohnFr(x.auszahlung_rappen) + '</b>'}</td>
       <td>${gesperrt
         ? `<span class="chip chip-x" title="${esc(gruende[gesperrt] || '')}">${esc(gesperrt)}</span>`
         : (summeGesperrt ? `<span class="chip chip-w" title="Einzelne Schichten sind ausgenommen">${esc(summeGesperrt)}</span>` : '')}
         ${x.nicht_abgeglichen ? `<span class="chip chip-w" title="Noch nicht abgeglichene Schichten zählen nicht mit — Planung bleibt Planung">${x.nicht_abgeglichen} offen</span>` : ''}
         ${x.warnung ? `<span class="chip chip-w" title="${esc(x.warnung.text || '')}">unter Mindestlohn</span>` : ''}</td>
-      <td style="text-align:right">${vorschau ? '' :
-        `<button class="btn btn-quiet btn-sm" onclick="lohnZeilenZeigen(${x.mitarbeiter_id})">Zeilen</button>`}</td>
+      <td style="text-align:right">${gesperrt ? '' :
+        `<button class="btn btn-quiet btn-sm" onclick="lohnAbrechnungZeigen(${x.mitarbeiter_id}, ${vorschau ? 'true' : 'false'})">Abrechnung</button>`}</td>
     </tr>`;
   }).join('');
 
@@ -18696,17 +18705,17 @@ function lohnPersonenTabelle(personen, gruende, vorschau) {
 
   return `<div style="overflow-x:auto"><table class="tbl">
     <thead><tr><th>Person</th><th>Kategorie</th>
-      <th style="text-align:right" title="bis minus von, ohne Pausenabzug">Rohzeit</th>
-      <th style="text-align:right" title="Rohzeit minus unbezahlter Pause">Nettozeit</th>
-      <th style="text-align:right" title="Art. 12 Ziff. 2: 10 % für Nacht- und Sonntagsarbeit">Zeitbonus</th>
-      <th style="text-align:right" title="Nettozeit plus Zeitbonus — die Zeit, auf der der Lohn beruht">Bewertet</th>
-      <th style="text-align:right">Brutto CHF</th><th></th><th></th></tr></thead>
+      <th style="text-align:right" title="Nettozeit plus Zeitbonus — die Zeit, auf der der Lohn beruht. Rohzeit, Nettozeit und Zeitbonus stehen einzeln in der Abrechnung.">Bewertet</th>
+      <th style="text-align:right">Brutto CHF</th>
+      <th style="text-align:right" title="Bruttolohn minus Auszahlungsbetrag">Abzüge CHF</th>
+      <th style="text-align:right">Auszahlung CHF</th><th></th><th></th></tr></thead>
     <tbody>${zeilen}</tbody></table></div>
     <p class="zone-note">${gerechnet.length === personen.length
       ? `${personen.length} Personen`
       : `${gerechnet.length} von ${personen.length} Personen gerechnet — bei den übrigen fehlt eine Grundlage`},
       zusammen <b>${lohnStd(summeStd)} Stunden</b> bewertete Zeit und <b>${lohnFr(summeBrutto)} CHF</b> brutto.
-      Rohzeit, Nettozeit und Zeitbonus stehen einzeln, damit jede Zahl nachvollziehbar bleibt.</p>`;
+      Rohzeit, Nettozeit und Zeitbonus stehen einzeln in der Abrechnung der jeweiligen Person —
+      hier steht die Zeit, auf der der Lohn beruht.</p>`;
 }
 
 function lohnLaufErzeugen() {
@@ -18761,23 +18770,124 @@ function lohnLaufZeigen() {
 // Die Zeilen einer Person -- die eigentliche Abrechnung. Sie stehen erst
 // auf Anforderung da: Bei zwanzig Personen waeren es sonst hundertfuenfzig
 // Zeilen auf einmal, und niemand faende die eine, die er sucht.
-function lohnZeilenZeigen(maId) {
-  const p = (llOffen.personen || []).find(x => Number(x.mitarbeiter_id) === maId);
-  if (!p) { return; }
-  const zeilen = (p.zeilen || []).map(z => `<tr>
+function lohnPersonFinden(maId, vorschau) {
+  const quelle = vorschau ? (llVorschau && llVorschau.vorschau) : (llOffen && llOffen.personen);
+  return (quelle || []).find(x => Number(x.mitarbeiter_id) === Number(maId)) || null;
+}
+
+function lohnAbrechnungSchliessen(vorschau) {
+  const ziel = $(vorschau ? 'llAbrechnung' : 'llZeilen');
+  if (ziel) { ziel.innerHTML = ''; }
+}
+
+// Eine Abrechnung in VIER Bloecken statt in einer langen Tabelle.
+//
+// Der Grund steht in Rollen & Berechtigungen schon einmal: Zwanzig Positionen
+// am Stueck kann man lesen, aber nicht ueberblicken. Die Bloecke folgen der
+// Reihenfolge, in der die Zahlen entstehen -- Zeit, Bruttoseite, Abzuege,
+// Auszahlung -- und jeder beantwortet genau eine Frage.
+//
+// Die Unterstellung steht als FUENFTER Block unten und nicht als Chip in der
+// Liste: Sie ist eine Herleitung ueber Wochen und Monate, und eine
+// Herleitung gehoert nicht in eine Tabellenzelle.
+function lohnAbrechnungZeigen(maId, vorschau) {
+  const p = lohnPersonFinden(maId, vorschau);
+  const ziel = $(vorschau ? 'llAbrechnung' : 'llZeilen');
+  if (!p || !ziel) { return; }
+  const gruende = (vorschau ? llVorschau : llOffen)?.sperrgruende || {};
+  const zeilen = p.zeilen || [];
+  const teil = (von, bis) => zeilen.filter(z => Number(z.sortierung) >= von
+                                             && Number(z.sortierung) < bis);
+
+  // Eine Positionszeile. Ein gesperrter Betrag wird NICHT als 0.00
+  // ausgegeben, sondern benannt -- "nicht gerechnet" und "null Franken" sind
+  // verschiedene Aussagen.
+  const pos = z => `<tr>
     <td>${esc(z.bezeichnung)}${z.annahme
-      ? ' <span class="chip chip-w" title="Beruht auf einer offenen GAV-Auslegung — im Zweifel zugunsten der mitarbeitenden Person (ENT-451)">Annahme</span>' : ''}</td>
-    <td style="text-align:right">${z.menge !== null ? Number(z.menge).toFixed(2) : ''}</td>
-    <td style="text-align:right">${z.basis_rappen !== null ? lohnFr(z.basis_rappen) : ''}</td>
-    <td style="text-align:right">${z.satz_bp !== null ? lohnPz(z.satz_bp) : ''}</td>
-    <td style="text-align:right">${z.betrag_rappen !== null ? '<b>' + lohnFr(z.betrag_rappen) + '</b>'
-      : `<span class="zone-note" style="font-style:italic" title="${esc((llOffen.sperrgruende || {})[z.gesperrt_grund] || '')}">gesperrt</span>`}</td>
-    </tr>${z.hinweis ? `<tr><td colspan="5" class="zone-note" style="padding-top:0">${esc(z.hinweis)}</td></tr>` : ''}`).join('');
-  $('llZeilen').innerHTML = `<h3 style="margin:22px 0 8px">${esc(p.name)}</h3>
-    <table class="tbl"><thead><tr><th>Position</th><th style="text-align:right">Menge</th>
-      <th style="text-align:right">Basis CHF</th><th style="text-align:right">Satz</th>
-      <th style="text-align:right">Betrag CHF</th></tr></thead><tbody>${zeilen}</tbody></table>`;
-  $('llZeilen').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        ? ' <span class="chip chip-w" title="Beruht auf einer offenen GAV-Auslegung — im Zweifel zugunsten der mitarbeitenden Person (ENT-451)">Annahme</span>' : ''}</td>
+    <td style="text-align:right">${z.menge !== null && z.menge !== undefined ? Number(z.menge).toFixed(2) : ''}</td>
+    <td style="text-align:right">${z.basis_rappen !== null && z.basis_rappen !== undefined ? lohnFr(z.basis_rappen) : ''}</td>
+    <td style="text-align:right">${z.satz_bp !== null && z.satz_bp !== undefined ? lohnPz(z.satz_bp) : ''}</td>
+    <td style="text-align:right">${z.betrag_rappen !== null && z.betrag_rappen !== undefined
+        ? (Number(z.betrag_rappen) < 0 ? '<span style="color:var(--ink-2)">' + lohnFr(z.betrag_rappen) + '</span>'
+                                       : '<b>' + lohnFr(z.betrag_rappen) + '</b>')
+        : `<span class="chip chip-x" title="${esc(gruende[z.gesperrt_grund] || z.hinweis || '')}">nicht gerechnet</span>`}</td>
+    </tr>${z.hinweis ? `<tr><td colspan="5" class="zone-note" style="padding-top:0">${esc(z.hinweis)}</td></tr>` : ''}`;
+
+  const block = (titel, frage, liste) => !liste.length ? '' : `
+    <div style="margin:0 0 22px">
+      <div class="zone-note" style="text-transform:uppercase;letter-spacing:.04em;margin:0 0 2px">${titel}</div>
+      <div class="zone-note" style="margin:0 0 8px">${frage}</div>
+      <table class="tbl"><thead><tr><th>Position</th>
+        <th style="text-align:right">Menge</th><th style="text-align:right">Basis CHF</th>
+        <th style="text-align:right">Satz</th><th style="text-align:right">Betrag CHF</th></tr></thead>
+        <tbody>${liste.map(pos).join('')}</tbody></table>
+    </div>`;
+
+  // Block 1: die Zeit. Vier Groessen, einzeln -- so verlangt es ENT-451,
+  // und in der Liste oben steht nur die letzte davon.
+  const zeit = `<div style="margin:0 0 22px">
+    <div class="zone-note" style="text-transform:uppercase;letter-spacing:.04em;margin:0 0 2px">Zeit</div>
+    <div class="zone-note" style="margin:0 0 8px">Worauf der Lohn beruht — die vier Grössen einzeln.</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px">
+      ${[['Rohzeit', p.roh_min, 'bis minus von, ohne Pausenabzug'],
+         ['Nettozeit', p.netto_min, 'Rohzeit minus unbezahlter Pause'],
+         ['Zeitbonus', p.bonus_min, 'Art. 12 Ziff. 2: 10 % für Nacht- und Sonntagsarbeit'],
+         ['Bewertet', p.bewertet_min, 'Nettozeit plus Zeitbonus']].map(([t, v, h]) => `
+        <div title="${esc(h)}">
+          <div class="zone-note" style="text-transform:uppercase;letter-spacing:.04em">${t}</div>
+          <div style="font-size:19px;font-weight:600">${lohnStd(v)}</div>
+        </div>`).join('')}
+    </div></div>`;
+
+  // Block 5: die NBU-Unterstellung mit ihrer Herleitung.
+  const n = p.nbu;
+  let nbuHtml = '';
+  if (n) {
+    const wie = { versichert: ['chip-ok', 'versichert'], nicht_versichert: ['chip-x', 'nicht versichert'],
+                  pruefen: ['chip-w', 'von Hand prüfen'], unbekannt: ['chip-w', 'unbekannt'] }[n.stand]
+                || ['chip', n.stand];
+    const f = n.fenster || {};
+    const fensterHtml = Object.keys(f).length ? `<table class="tbl" style="margin-top:8px">
+      <thead><tr><th>Zeitraum</th><th style="text-align:right">Wochen</th>
+        <th style="text-align:right">davon mit Einsatz</th><th style="text-align:right">Ø Std./Woche</th>
+        <th>Grundlage</th></tr></thead><tbody>
+      ${Object.entries(f).map(([m, e]) => `<tr>
+        <td>${m} Monate${e.zeitraum ? `<div class="zone-note">${dmy(e.zeitraum.von)} – ${dmy(e.zeitraum.bis)}</div>` : ''}</td>
+        <td style="text-align:right">${e.wochen_total}</td>
+        <td style="text-align:right">${e.arbeitswochen}</td>
+        <td style="text-align:right"><b>${e.schnitt_std === null ? '—' : Number(e.schnitt_std).toFixed(2)}</b></td>
+        <td class="zone-note">${e.basis === 'nur_arbeitswochen'
+            ? 'nur Wochen mit Einsatz (Ziff. 3)' : 'alle Kalenderwochen'}</td></tr>`).join('')}
+      </tbody></table>` : '';
+    nbuHtml = `<div style="margin:0 0 6px">
+      <div class="zone-note" style="text-transform:uppercase;letter-spacing:.04em;margin:0 0 2px">Nichtberufsunfall</div>
+      <div class="zone-note" style="margin:0 0 8px">Ob überhaupt ein Beitrag abgezogen werden darf — nach
+        Empfehlung 7/87 aus den geleisteten Stunden, nicht aus dem Pensum (BGer 8C_644/2025).</div>
+      <p style="margin:0 0 6px"><span class="chip ${wie[0]}">${wie[1]}</span>
+        ${n.quelle === 'uebersteuert' ? '<span class="chip chip-w" title="Von Hand gesetzt — die Rechnung wurde nicht angewandt">übersteuert</span>' : ''}</p>
+      <div class="zone-note">${esc(n.text || '')}</div>
+      ${n.uebersteuert && n.uebersteuert.am
+        ? `<div class="zone-note">Gesetzt am ${dmy(String(n.uebersteuert.am).slice(0, 10))}${
+             n.uebersteuert.gueltig_ab ? `, gültig ab ${dmy(n.uebersteuert.gueltig_ab)}` : ''}.</div>` : ''}
+      ${fensterHtml}</div>`;
+  }
+
+  ziel.innerHTML = `<div class="card" style="margin-top:18px">
+    <div class="card-hd">
+      <span class="card-ic"><svg class="i" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg></span>
+      <h3>${esc(p.name || '')}</h3>
+      <div class="sp" style="flex:1"></div>
+      <button type="button" class="btn btn-plain btn-sm" onclick="lohnAbrechnungSchliessen(${vorschau ? 'true' : 'false'})">Schliessen</button>
+    </div>
+    <div class="card-bd">
+      ${zeit}
+      ${block('Bruttoseite', 'Wie der Bruttolohn entsteht.', teil(0, 50))}
+      ${block('Abzüge', 'Was vom Bruttolohn abgeht — und was nicht gerechnet werden konnte.', teil(50, 60))}
+      ${block('Auszahlung', 'Nettolohn, der Vollzugskostenbeitrag danach, und was ausbezahlt wird.', teil(60, 100))}
+      ${nbuHtml}
+    </div></div>`;
+  ziel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function lohnLaufAktion(aktion, grund) {

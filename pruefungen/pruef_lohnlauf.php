@@ -389,5 +389,130 @@ pruef('Reichen die Stunden nicht und gibt es Ausfalltage, lautet die Antwort "pr
 pruef('Ohne die Ausfalltage waere daraus ein "nicht versichert" geworden',
     lohn_nbu_ermittlung($wa['liste'], $uvgP, 0)['stand'] === LOHN_NBU_NICHT);
 
+// ══════════════════════ DIE ABZUGSSEITE (Etappe 4) ═══════════════════════
+$pdo->exec('CREATE TABLE lohn_abzug (id INTEGER PRIMARY KEY, schluessel TEXT, bezeichnung TEXT,
+            gueltig_ab TEXT, gueltig_bis TEXT, satz_bp INT, fix_rappen INT,
+            hoechstlohn_rappen INT, quelle TEXT)');
+$pdo->exec('CREATE TABLE lohn_person (id INTEGER PRIMARY KEY, mitarbeiter_id INT, gueltig_ab TEXT,
+            nbu_pflichtig INT, nbu_grund TEXT, nbu_von INT, nbu_am TEXT)');
+
+// Die Zeilen der Referenzabrechnung: 25.00/h + 8.33 % + 8.33 % = 29.16,
+// mal zehn Stunden = 291.60.
+$refZeilen = [
+    ['schluessel' => 'grundlohn_stunde',     'betrag_rappen' => 2500],
+    ['schluessel' => 'ferienentschaedigung', 'betrag_rappen' => 208],
+    ['schluessel' => 'anteil_13ml',          'betrag_rappen' => 208],
+    ['schluessel' => 'brutto_stundenlohn',   'betrag_rappen' => 2916],
+    ['schluessel' => 'geleistete_stunden',   'betrag_rappen' => 29160],
+];
+$refKopf = ['brutto_rappen' => 29160, 'kategorie' => 'C', 'bewertet_min' => 600,
+            'zeilen' => $refZeilen];
+$kat = lohnlauf_katalog(null);
+$grund = lohnlauf_grundlagen($refZeilen, $kat);
+
+// KRITISCH -- der Fehler, der beim Bauen auffiel und sonst live gegangen
+// waere: Grundlohn, Ferienentschaedigung und 13.-Anteil sind Bestandteile
+// eines STUNDENSATZES. Zaehlt man sie mit, steht der Stundenlohn zweimal in
+// der Grundlage: 32 076 statt 29 160 Rappen, zehn Prozent zu hoch -- und
+// jeder Abzug entsprechend zu gross, zulasten des Mitarbeitenden.
+pruef('Die AHV-Grundlage ist der Periodenbetrag, nicht die Summe aller Kennzeichen-Zeilen',
+    $grund['ahv'] === 29160);
+pruef('Der Stundenlohn wird nicht doppelt gezaehlt',
+    $grund['ahv'] !== 2500 + 208 + 208 + 29160);
+pruef('Zwischensummen zaehlen in keine Grundlage',
+    lohnart_ist_bemessung(array_values(array_filter(lohnart_startbestand(),
+        fn($z) => $z[0] === 'brutto_stundenlohn'))[0]) === false);
+pruef('Eine Lohnart, die der Katalog nicht kennt, wird namentlich gemeldet statt verschluckt',
+    lohnlauf_grundlagen([['schluessel' => 'tippfehler', 'betrag_rappen' => 5000]], $kat)
+        ['unbekannte_lohnarten'] === ['tippfehler']);
+
+// ── Der Weg mit Saetzen: 2026 rechnet die AHV ────────────────────────────
+$a26 = lohnlauf_abzuege($pdo, $refKopf, '2026-07-31', ['stand' => LOHN_NBU_UNBEKANNT]);
+$z26 = [];
+foreach ($a26['zeilen'] as $z) { $z26[$z['schluessel']] = $z; }
+// Referenzabrechnung: 5,300 % von 291.60 sind 15.45.
+pruef('AHV: 5,300 % von 291.60 ergeben die 15.45 der Referenzabrechnung',
+    $z26['ahv']['betrag_rappen'] === -1545);
+pruef('Der Abzug steht als NEGATIVER Betrag da, nicht als positiver mit Vorzeichen im Kopf',
+    $z26['ahv']['betrag_rappen'] < 0);
+// KRITISCH: Fuer 2026 ist kein ALV-Regelwerk erfasst. Die Zeile entsteht
+// trotzdem -- mit Grund und OHNE Betrag. Ein weggelassener Abzug faellt
+// niemandem auf, eine gesperrte Zeile schon.
+pruef('Fehlt das ALV-Regelwerk, entsteht die Zeile mit Grund und ohne Betrag',
+    $z26['alv']['betrag_rappen'] === null
+    && $z26['alv']['gesperrt_grund'] === 'kein_alv_regelwerk'
+    && strlen($z26['alv']['hinweis']) > 30);
+pruef('Ein fehlender Satz ergibt niemals einen Abzug von null',
+    $z26['ktg']['betrag_rappen'] === null && $z26['ktg']['gesperrt_grund'] === 'kein_ktg_satz'
+    && $z26['bvg']['betrag_rappen'] === null);
+pruef('Der Lauf meldet sich als unvollstaendig, solange etwas gesperrt ist',
+    $a26['vollstaendig'] === false && count($a26['sperren']) > 0);
+
+// ── Der Weg mit Saetzen: 2025 rechnet die ALV ────────────────────────────
+$a25 = lohnlauf_abzuege($pdo, $refKopf, '2025-07-31', ['stand' => LOHN_NBU_UNBEKANNT]);
+$z25 = [];
+foreach ($a25['zeilen'] as $z) { $z25[$z['schluessel']] = $z; }
+pruef('ALV: 1,100 % von 291.60 ergeben die 3.21 der Referenzabrechnung',
+    $z25['alv']['betrag_rappen'] === -321);
+pruef('Fehlt das AHV-Regelwerk, sperrt umgekehrt die AHV-Zeile',
+    $z25['ahv']['betrag_rappen'] === null
+    && $z25['ahv']['gesperrt_grund'] === 'kein_sv_regelwerk');
+
+// ── Aufbau der Abrechnung ────────────────────────────────────────────────
+pruef('Der Nettolohn ist der Bruttolohn zuzueglich aller Abzugszeilen darueber',
+    $z26['nettolohn']['betrag_rappen'] === 29160 - 1545);
+// Referenzabrechnung: PaKo 10 Stunden x 0.015 = 0.15, NACH dem Nettolohn.
+pruef('PaKo: zehn Stunden mal 1,5 Rappen ergeben die 0.15 der Referenzabrechnung',
+    $z26['pako']['betrag_rappen'] === -15);
+pruef('Der PaKo steht NACH dem Nettolohn, so wie ihn die Referenzabrechnung ausweist',
+    $z26['pako']['sortierung'] > $z26['nettolohn']['sortierung']
+    && $z26['ahv']['sortierung'] < $z26['nettolohn']['sortierung']);
+pruef('Der Auszahlungsbetrag ist der Nettolohn abzueglich der Zeilen nach ihm',
+    $z26['auszahlung']['betrag_rappen'] === 29160 - 1545 - 15);
+// KRITISCH (Merkblatt 6.05 Ziff. 5): Der Berufsunfall traegt der
+// Arbeitgeber. Er darf auf keiner Abrechnung als Abzug erscheinen.
+pruef('Ein BU-Abzug erscheint auf keiner Abrechnung',
+    !array_key_exists('bu', $z26));
+pruef('Auf 5 Rappen wird nicht gerundet, solange das nicht entschieden ist',
+    LOHNLAUF_AUSZAHLUNG_AUF_5_RAPPEN === false
+    && $z26['auszahlung']['betrag_rappen'] === 27600);
+pruef('Gerundet wird je Abzug, nicht auf die Summe',
+    LOHNLAUF_RUNDUNG_JE_ABZUG === true);
+
+// ── NBU: Unterstellung, Satz, Uebersteuerung ─────────────────────────────
+$aN = lohnlauf_abzuege($pdo, $refKopf, '2026-07-31', ['stand' => LOHN_NBU_NICHT,
+    'text' => 'Unter acht Wochenstunden.']);
+$zN = []; foreach ($aN['zeilen'] as $z) { $zN[$z['schluessel']] = $z; }
+pruef('Ohne Deckung entsteht KEIN NBU-Abzug, sondern eine Zeile mit Grund',
+    $zN['nbu']['betrag_rappen'] === null && $zN['nbu']['gesperrt_grund'] === 'nbu_keine_deckung');
+$aV = lohnlauf_abzuege($pdo, $refKopf, '2026-07-31', ['stand' => LOHN_NBU_VERSICHERT]);
+$zV = []; foreach ($aV['zeilen'] as $z) { $zV[$z['schluessel']] = $z; }
+pruef('Mit Deckung, aber ohne erfassten Praemiensatz: eigener Grund, nicht derselbe',
+    $zV['nbu']['gesperrt_grund'] === 'kein_nbu_satz'
+    && $zV['nbu']['gesperrt_grund'] !== $zN['nbu']['gesperrt_grund']);
+$pdo->exec("INSERT INTO lohn_abzug VALUES (1,'nbu','NBU','2020-01-01',NULL,160,NULL,NULL,'Police')");
+$aS = lohnlauf_abzuege($pdo, $refKopf, '2026-07-31', ['stand' => LOHN_NBU_VERSICHERT]);
+$zS = []; foreach ($aS['zeilen'] as $z) { $zS[$z['schluessel']] = $z; }
+pruef('Mit Deckung und Satz wird gerechnet: 1,60 % von 291.60 sind 4.67',
+    $zS['nbu']['betrag_rappen'] === -467);
+pruef('Der Hinweis nennt die Quelle des Satzes',
+    str_contains((string)$zS['nbu']['hinweis'], 'Police'));
+
+// Uebersteuerung: von Hand gesetzt schlaegt die Rechnung.
+$pdo->exec("INSERT INTO lohn_person VALUES (1,$mkw,'2026-01-01',0,'Vom Versicherer bestaetigt',7,'2026-01-05 10:00')");
+$u = lohnlauf_nbu($pdo, $mkw, '2026-07-31');
+pruef('Eine Uebersteuerung schlaegt die Rechnung',
+    $u['stand'] === LOHN_NBU_NICHT && $u['quelle'] === 'uebersteuert');
+pruef('Die Uebersteuerung fuehrt Grund, Person und Zeitpunkt mit',
+    $u['uebersteuert']['grund'] === 'Vom Versicherer bestaetigt'
+    && (int)$u['uebersteuert']['von'] === 7 && $u['uebersteuert']['am'] !== null);
+pruef('Ohne Uebersteuerung wird gerechnet und der Zeitraum mitgeliefert',
+    lohnlauf_nbu($pdo, 999, '2025-07-31')['quelle'] === 'gerechnet'
+    && isset(lohnlauf_nbu($pdo, 999, '2025-07-31')['fenster'][3]['zeitraum']['von']));
+// KRITISCH: Der frueher hier stehende Vorgabewert 1 haette bei JEDER Person
+// stillschweigend auf "versichert" gesetzt -- in Richtung Abzug.
+pruef('Ohne Eintrag ist die Uebersteuerung leer, nicht auf "versichert" vorbelegt',
+    lohnlauf_nbu($pdo, 999, '2025-07-31')['uebersteuert'] === null);
+
 echo $ok . " Pruefungen bestanden\n";
 if ($bad) { echo count($bad) . " FEHLGESCHLAGEN:\n - " . implode("\n - ", $bad) . "\n"; exit(1); }

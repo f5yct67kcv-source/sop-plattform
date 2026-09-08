@@ -1541,6 +1541,10 @@ CREATE TABLE IF NOT EXISTS lohnart (
   bvg_pflichtig TINYINT(1) NOT NULL DEFAULT 0,
   uvg_pflichtig TINYINT(1) NOT NULL DEFAULT 0,
   qst_pflichtig TINYINT(1) NOT NULL DEFAULT 0,
+  -- Traegt die Zeile einen Betrag der Abrechnungsperiode? Siehe den
+  -- ausfuehrlichen Kommentar bei lohnart_startbestand() in backend/lohn.php:
+  -- Ohne diese Spalte zaehlte der Stundenlohn zweimal.
+  bemessung TINYINT(1) NOT NULL DEFAULT 0,
   -- Der Artikel, auf dem die Lohnart beruht. Leer heisst 'betrieblich' --
   -- das ist eine Aussage, keine Luecke: Der 13. Monatslohn etwa ist KEINE
   -- GAV-Pflicht (er kommt nur in Art. 25 Ziff. 2 als BVG-Bemessung vor).
@@ -1604,7 +1608,24 @@ CREATE TABLE IF NOT EXISTS lohn_person (
   id INT AUTO_INCREMENT PRIMARY KEY,
   mitarbeiter_id INT NOT NULL,
   gueltig_ab DATE NOT NULL,
-  nbu_pflichtig TINYINT(1) NOT NULL DEFAULT 1,
+  -- UEBERSTEUERUNG der NBU-Unterstellung, dreiwertig.
+  --   NULL = automatisch nach Empfehlung 7/87 aus den geleisteten Stunden
+  --   1    = von Hand auf 'versichert' gesetzt
+  --   0    = von Hand auf 'nicht versichert' gesetzt
+  --
+  -- WARUM NICHT MEHR 'NOT NULL DEFAULT 1': In Etappe 2 stand hier ein fest
+  -- gespeichertes Ja/Nein je Person. Genau dieses Denken verwirft BGer
+  -- 8C_644/2025 (E. 5.4): Massgebend sind nicht die vertraglichen
+  -- Vereinbarungen, sondern die konkret geleisteten Arbeitsstunden. Ein
+  -- Vorgabewert 1 haette die Berechnung bei JEDER Person stillschweigend
+  -- ueberstimmt -- und zwar in Richtung Abzug.
+  nbu_pflichtig TINYINT(1) NULL DEFAULT NULL,
+  -- Eine Uebersteuerung ohne Begruendung ist spaeter nicht nachvollziehbar.
+  -- Art. 12 Ziff. 5 GAV verlangt eine nachvollziehbare Abrechnung; wer eine
+  -- gerechnete Unterstellung von Hand aendert, schuldet den Grund.
+  nbu_grund TEXT NULL,
+  nbu_von INT NULL,
+  nbu_am DATETIME NULL,
   ktg_pflichtig TINYINT(1) NOT NULL DEFAULT 1,
   bvg_angeschlossen TINYINT(1) NOT NULL DEFAULT 0,
   -- Monatlicher Arbeitnehmer-Anteil aus der Meldung der Pensionskasse.
@@ -1733,6 +1754,17 @@ CREATE TABLE IF NOT EXISTS lohnlauf_person (
   bonus_min DECIMAL(12,4) NOT NULL DEFAULT 0,
   bewertet_min DECIMAL(12,4) NOT NULL DEFAULT 0,
   brutto_rappen INT NOT NULL DEFAULT 0,
+  -- Die Abzugsseite (Etappe 4). Beide NULL, solange die Bruttoseite gesperrt
+  -- ist -- eine Null waere hier eine Aussage, die nicht stimmt.
+  netto_rappen INT NULL,
+  auszahlung_rappen INT NULL,
+  -- Die NBU-Unterstellung samt ihrer HERLEITUNG als Schnappschuss:
+  -- Beobachtungszeitraum, gezaehlte Wochen, Durchschnitt und, falls von Hand
+  -- gesetzt, Grund und Person. Art. 12 Ziff. 5 GAV verlangt eine
+  -- nachvollziehbare Abrechnung; ein spaeter neu gerechneter Wert waere
+  -- keine Nachvollziehbarkeit, sondern eine zweite Rechnung.
+  nbu_stand VARCHAR(20) NULL,
+  nbu_herleitung TEXT NULL,
   -- Warum fuer diese Person nicht gerechnet wurde. NULL heisst gerechnet;
   -- ein Betrag von 0 bei gesetztem Grund heisst NICHT null Franken.
   gesperrt_grund VARCHAR(40) NULL,
@@ -1964,6 +1996,15 @@ $spalten = [
     // vergleichen liessen -- 900, 1'800 oder 2'300 ist ein Unterschied.
     // Bewusst NULL als Vorgabe und nicht 'C': Eine geratene Kategorie waere
     // schlimmer als eine fehlende, weil sie eine Grenze behauptet.
+    // Lohn, Etappe 4: die Bemessungsspalte und die NBU-Uebersteuerung.
+    ['lohnart',     'bemessung',  "ALTER TABLE lohnart ADD COLUMN bemessung TINYINT(1) NOT NULL DEFAULT 0"],
+    ['lohnlauf_person', 'netto_rappen',      "ALTER TABLE lohnlauf_person ADD COLUMN netto_rappen INT NULL"],
+    ['lohnlauf_person', 'auszahlung_rappen', "ALTER TABLE lohnlauf_person ADD COLUMN auszahlung_rappen INT NULL"],
+    ['lohnlauf_person', 'nbu_stand',         "ALTER TABLE lohnlauf_person ADD COLUMN nbu_stand VARCHAR(20) NULL"],
+    ['lohnlauf_person', 'nbu_herleitung',    "ALTER TABLE lohnlauf_person ADD COLUMN nbu_herleitung TEXT NULL"],
+    ['lohn_person', 'nbu_grund',  "ALTER TABLE lohn_person ADD COLUMN nbu_grund TEXT NULL"],
+    ['lohn_person', 'nbu_von',    "ALTER TABLE lohn_person ADD COLUMN nbu_von INT NULL"],
+    ['lohn_person', 'nbu_am',     "ALTER TABLE lohn_person ADD COLUMN nbu_am DATETIME NULL"],
     ['mitarbeiter', 'anstellungskategorie', "ALTER TABLE mitarbeiter ADD COLUMN anstellungskategorie CHAR(1) NULL"],
     ['mitarbeiter', 'pensum_stunden',      "ALTER TABLE mitarbeiter ADD COLUMN pensum_stunden INT NULL"],
     // Eintrittsdatum fuer die Pro-rata-Regel aus Art. 8 Ziff. 1b.

@@ -912,6 +912,14 @@ function lohn_angebrochene_monate(string $von, string $bis): int
 // eine Position in einer Bemessungsgrundlage auftaucht und in einer anderen
 // nicht. Ausdruecklich benannt statt "alles ausser" -- wer eine Lohnart
 // anlegt, entscheidet jedes einzelne bewusst.
+// Traegt diese Lohnart einen Betrag der Abrechnungsperiode? Eigene Funktion
+// statt einer Spaltennummer im Aufrufer -- wer [13] schreibt, merkt beim
+// naechsten Feld nichts davon.
+function lohnart_ist_bemessung(array $zeile): bool
+{
+    return (int)($zeile[13] ?? 0) === 1;
+}
+
 function lohnart_kennzeichen(): array
 {
     return [
@@ -944,68 +952,86 @@ function lohnart_kennzeichen(): array
 function lohnart_startbestand(): array
 {
     // [schluessel, bezeichnung, art, basis, satz_bp,
-    //  ahv, ferien, ml13, bvg, uvg, qst, gav_grundlage, sortierung]
+    //  ahv, ferien, ml13, bvg, uvg, qst, gav_grundlage, sortierung, bemessung]
+    //
+    // BEMESSUNG ist die letzte Spalte und beantwortet eine andere Frage als
+    // die sechs Kennzeichen davor. Die sechs sagen, in WELCHE Grundlage ein
+    // Betrag zaehlt. 'bemessung' sagt, OB die Zeile ueberhaupt einen Betrag
+    // der Abrechnungsperiode traegt.
+    //
+    // WARUM DAS NOETIG WURDE -- ein Fehler, der beim Bauen der Abzugsseite
+    // auffiel und sonst live gegangen waere: Grundlohn, Ferienentschaedigung
+    // und 13.-Anteil sind STUNDENSAETZE, ihre Betraege sind Bestandteile
+    // eines Stundenlohns. Sie tragen alle das Kennzeichen ahv_pflichtig --
+    // richtig, denn der daraus gebildete Stundenlohn IST AHV-pflichtig.
+    // Summiert man aber alle Zeilen mit diesem Kennzeichen, zaehlt man den
+    // Stundenlohn ZWEIMAL: einmal als Bestandteile und einmal in
+    // 'geleistete_stunden', wo er mit den Stunden multipliziert steht.
+    // Am Referenzbeispiel: 32 076 statt 29 160 Rappen -- zehn Prozent zu
+    // hoch, und jeder Abzug entsprechend zu gross, zulasten des
+    // Mitarbeitenden. Das Feld 'art' half nicht: 'grundlohn_stunde' und
+    // 'geleistete_stunden' sind BEIDE 'stundensatz'.
     return [
         ['grundlohn_stunde', 'Grundlohn pro Stunde', 'stundensatz', null, null,
-         1,1,1,1,1,1, 'Art. 16 i.V.m. Anhang 1 GAV', 10],
+         1,1,1,1,1,1, 'Art. 16 i.V.m. Anhang 1 GAV', 10, 0],
         ['grundlohn_monat', 'Monatslohn', 'monatslohn', null, null,
-         1,0,1,1,1,1, 'Art. 16 i.V.m. Anhang 1 GAV', 11],
+         1,0,1,1,1,1, 'Art. 16 i.V.m. Anhang 1 GAV', 11, 1],
         // Traegt selbst keine Ferienentschaedigung und keinen 13.
         // Monatslohn -- sonst rechnete sich ein Zuschlag auf einen
         // Zuschlag. Der Satz steht bewusst nicht hier: Er wird nach
         // Art. 20 Ziff. 2 aus dem Alter abgeleitet.
         ['ferienentschaedigung', 'Ferienentschädigung', 'prozent', 'grundlohn', null,
-         1,0,0,1,1,1, 'Art. 20 Ziff. 2 GAV', 20],
+         1,0,0,1,1,1, 'Art. 20 Ziff. 2 GAV', 20, 0],
         // KEINE GAV-Pflicht -- der Vertrag kennt den 13. Monatslohn nur in
         // Art. 25 Ziff. 2 als Bestandteil der BVG-Bemessung. Darum steht
         // bei der Grundlage nichts, und das ist eine Aussage.
         ['anteil_13ml', 'Anteil 13. Monatslohn', 'prozent', 'grundlohn', null,
-         1,0,0,1,1,1, null, 21],
+         1,0,0,1,1,1, null, 21, 0],
         // Eine ZWISCHENSUMME, kein Lohnbestandteil: Sie fasst Grundlohn,
         // Ferienentschaedigung und 13.-Anteil zusammen und wird danach mit
         // den Stunden multipliziert. Zaehlt in KEINE Bemessungsgrundlage --
         // sonst staende derselbe Lohn zweimal darin.
         ['brutto_stundenlohn', 'Brutto Stundenlohn', 'zwischensumme', null, null,
-         0,0,0,0,0,0, 'Art. 16 i.V.m. Art. 20 Ziff. 2 GAV', 25],
+         0,0,0,0,0,0, 'Art. 16 i.V.m. Art. 20 Ziff. 2 GAV', 25, 0],
         // DIE Zeile mit dem tatsaechlichen Lohnbetrag. Nicht ferien- und
         // nicht 13.-ML-pflichtig: Beide stecken bereits im
         // Bruttostundenlohn. Waeren sie hier gesetzt, gaebe es
         // Ferienentschaedigung auf die Ferienentschaedigung.
         ['geleistete_stunden', 'Total geleistete Stunden', 'stundensatz', null, null,
-         1,0,0,1,1,1, 'Art. 12 Ziff. 2 GAV', 30],
+         1,0,0,1,1,1, 'Art. 12 Ziff. 2 GAV', 30, 1],
         ['zuschlag_fachausweis', 'Zuschlag Fachausweis', 'stundensatz', null, null,
-         1,1,1,1,1,1, 'Art. 19 Ziff. 1 GAV', 31],
+         1,1,1,1,1,1, 'Art. 19 Ziff. 1 GAV', 31, 1],
         ['zuschlag_hund', 'Zuschlag Diensthund', 'stundensatz', null, null,
-         1,1,1,1,1,1, 'Art. 19 Ziff. 2 GAV', 32],
+         1,1,1,1,1,1, 'Art. 19 Ziff. 2 GAV', 32, 1],
         ['zuschlag_waffe', 'Zuschlag Schusswaffe', 'stundensatz', null, null,
-         1,1,1,1,1,1, 'Art. 19 Ziff. 3 GAV', 33],
+         1,1,1,1,1,1, 'Art. 19 Ziff. 3 GAV', 33, 1],
         ['zeitzuschlag', 'Zeitzuschlag über 210 Stunden', 'prozent', 'grundlohn', 2500,
-         1,1,1,1,1,1, 'Art. 14 Ziff. 3 GAV', 35],
+         1,1,1,1,1,1, 'Art. 14 Ziff. 3 GAV', 35, 1],
         // Auslagenersatz ist KEIN Lohn: nicht AHV-pflichtig, in keiner
         // Bemessungsgrundlage. Nach GAV-AUS-009 gehoert er in eine
         // getrennte Spesenabrechnung nach Art. 18 Ziff. 10 -- nicht in die
         // Arbeitszeitabrechnung nach Art. 12 Ziff. 5.
         ['auslagenersatz', 'Auslagenersatz', 'netto', null, null,
-         0,0,0,0,0,0, 'Art. 18 GAV', 40],
+         0,0,0,0,0,0, 'Art. 18 GAV', 40, 0],
         // Abzuege. Ihre SAETZE stehen in lohn_abzug mit
         // Gueltigkeitszeitraum -- hier steht nur, dass es die Zeile gibt.
         ['ahv', 'AHV-, IV-, EO-Beitrag', 'abzug', 'ahv_brutto', null,
-         0,0,0,0,0,0, null, 50],
+         0,0,0,0,0,0, null, 50, 0],
         ['alv', 'ALV-Beitrag', 'abzug', 'ahv_brutto', null,
-         0,0,0,0,0,0, null, 51],
+         0,0,0,0,0,0, null, 51, 0],
         ['nbu', 'NBU-Beitrag', 'abzug', 'uvg_brutto', null,
-         0,0,0,0,0,0, null, 52],
+         0,0,0,0,0,0, null, 52, 0],
         ['ktg', 'Krankentaggeld-Beitrag', 'abzug', 'ahv_brutto', null,
-         0,0,0,0,0,0, 'Art. 17 Ziff. 3 GAV', 53],
+         0,0,0,0,0,0, 'Art. 17 Ziff. 3 GAV', 53, 0],
         ['bvg', 'BVG-Beitrag', 'abzug', null, null,
-         0,0,0,0,0,0, 'Art. 25 GAV', 54],
+         0,0,0,0,0,0, 'Art. 25 GAV', 54, 0],
         // Art. 6 Ziff. 2 verlangt ausdruecklich, dass dieser Abzug "bei der
         // Lohnabrechnung aufzufuehren" ist -- er darf nie stillschweigend
         // im Nettolohn verschwinden.
         ['pako', 'Vollzugskostenbeitrag PaKo', 'abzug', null, null,
-         0,0,0,0,0,0, 'Art. 6 Ziff. 2 GAV', 55],
+         0,0,0,0,0,0, 'Art. 6 Ziff. 2 GAV', 55, 0],
         ['quellensteuer', 'Quellensteuer', 'abzug', 'qst_brutto', null,
-         0,0,0,0,0,0, null, 56],
+         0,0,0,0,0,0, null, 56, 0],
     ];
 }
 

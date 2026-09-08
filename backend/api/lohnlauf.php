@@ -65,6 +65,24 @@ function lauf_vorschau(PDO $pdo, string $von, string $bis): array
             && $p['nicht_abgeglichen'] === 0) { continue; }
         $p['name'] = trim(($ma['vorname'] ?? '') . ' ' . ($ma['nachname'] ?? '')) ?: $ma['name'];
         $p['personalnummer'] = $ma['personalnummer'];
+
+        // Die Abzugsseite. Sie entsteht NUR, wenn die Bruttoseite ueberhaupt
+        // gerechnet wurde -- Abzuege auf einen nicht gerechneten Lohn waeren
+        // Zahlen ohne Grundlage.
+        if (!$p['gesperrt_grund']) {
+            $p['nbu'] = lohnlauf_nbu($pdo, (int)$ma['id'], $bis);
+            $ab = lohnlauf_abzuege($pdo, $p, $bis, $p['nbu']);
+            $p['zeilen'] = array_merge($p['zeilen'], $ab['zeilen']);
+            $p['netto_rappen']      = $ab['netto_rappen'];
+            $p['auszahlung_rappen'] = $ab['auszahlung_rappen'];
+            $p['abzug_sperren']     = $ab['sperren'];
+            $p['grundlagen']        = $ab['grundlagen'];
+            $p['vollstaendig']      = $ab['vollstaendig'];
+        } else {
+            $p['nbu'] = null;
+            $p['netto_rappen'] = null; $p['auszahlung_rappen'] = null;
+            $p['abzug_sperren'] = []; $p['vollstaendig'] = false;
+        }
         $ergebnis[] = $p;
     }
     return $ergebnis;
@@ -181,8 +199,9 @@ if ($aktion === 'erzeugen') {
             'INSERT INTO lohnlauf_person
                (lauf_id, mitarbeiter_id, kategorie, lohnform, roh_min, netto_min, bonus_min,
                 bewertet_min, brutto_rappen, gesperrt_grund, gesperrt_zaehler,
-                nicht_abgeglichen, warnung)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)'
+                nicht_abgeglichen, warnung, netto_rappen, auszahlung_rappen,
+                nbu_stand, nbu_herleitung)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
         );
         $zIn = $pdo->prepare(
             'INSERT INTO lohnlauf_zeile
@@ -196,7 +215,16 @@ if ($aktion === 'erzeugen') {
                 $p['brutto_rappen'], $p['gesperrt_grund'],
                 $p['gesperrt'] ? json_encode($p['gesperrt']) : null,
                 $p['nicht_abgeglichen'],
-                isset($p['warnung']) ? json_encode($p['warnung']) : null]);
+                isset($p['warnung']) ? json_encode($p['warnung']) : null,
+                // SCHNAPPSCHUSS, nicht Verweis: Die Herleitung der
+                // NBU-Unterstellung wird mitgespeichert -- Beobachtungs-
+                // zeitraum, gezaehlte Wochen, Durchschnitt und, falls von
+                // Hand gesetzt, Grund und Person. Wer in zwei Jahren fragt,
+                // warum abgezogen wurde, findet die Antwort in der
+                // Abrechnung und nicht in neu gerechneten Zahlen.
+                $p['netto_rappen'], $p['auszahlung_rappen'],
+                $p['nbu']['stand'] ?? null,
+                isset($p['nbu']) ? json_encode($p['nbu']) : null]);
             foreach ($p['zeilen'] as $z) {
                 $zIn->execute([$laufId, $p['mitarbeiter_id'], $z['schluessel'], $z['bezeichnung'],
                     $z['sortierung'], $z['basis_rappen'], $z['satz_bp'], $z['menge'],

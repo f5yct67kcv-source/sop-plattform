@@ -139,7 +139,33 @@ const LAUF_VORSCHAU = {
     { mitarbeiter_id: 42, name: 'Eine Person', personalnummer: 'P-0042', kategorie: 'C',
       lohnform: 'stunde', roh_min: 1080, netto_min: 1020, bonus_min: 42, bewertet_min: 1062,
       brutto_rappen: 51613, gesperrt: { sparte_reinigung: 1 }, nicht_abgeglichen: 1,
-      gesperrt_grund: null, warnung: null, zeilen: [] },
+      gesperrt_grund: null, warnung: null,
+      netto_rappen: 48879, auszahlung_rappen: 48853,
+      nbu: { stand: 'versichert', quelle: 'gerechnet', text: 'Versichert nach Empfehlung 7/87.',
+             uebersteuert: null,
+             fenster: { 3: { wochen_total: 13, arbeitswochen: 9, schnitt_std: 11.5,
+                             basis: 'nur_arbeitswochen',
+                             zeitraum: { von: '2026-05-04', bis: '2026-07-26', monate: 3 } } } },
+      zeilen: [
+        { schluessel: 'geleistete_stunden', bezeichnung: 'Total geleistete Stunden', sortierung: 30,
+          basis_rappen: 2916, satz_bp: null, menge: 17.7, betrag_rappen: 51613,
+          gesperrt_grund: null, annahme: 0, hinweis: 'Bewertete Zeit nach Art. 12 Ziff. 2' },
+        { schluessel: 'ahv', bezeichnung: 'AHV-, IV-, EO-Beitrag', sortierung: 50,
+          basis_rappen: 51613, satz_bp: 530, menge: null, betrag_rappen: -2735,
+          gesperrt_grund: null, annahme: 0, hinweis: 'Merkblatt 2.01' },
+        { schluessel: 'ktg', bezeichnung: 'Krankentaggeld-Beitrag', sortierung: 53,
+          basis_rappen: 51613, satz_bp: null, menge: null, betrag_rappen: null,
+          gesperrt_grund: 'kein_ktg_satz', annahme: 0, hinweis: 'Kein Satz erfasst.' },
+        { schluessel: 'nettolohn', bezeichnung: 'Nettolohn', sortierung: 60,
+          basis_rappen: null, satz_bp: null, menge: null, betrag_rappen: 48879,
+          gesperrt_grund: null, annahme: 0, hinweis: null },
+        { schluessel: 'pako', bezeichnung: 'Vollzugskostenbeitrag PaKo', sortierung: 61,
+          basis_rappen: null, satz_bp: null, menge: null, betrag_rappen: -26,
+          gesperrt_grund: null, annahme: 0, hinweis: 'Art. 6 Ziff. 2 GAV' },
+        { schluessel: 'auszahlung', bezeichnung: 'Auszahlungsbetrag', sortierung: 70,
+          basis_rappen: null, satz_bp: null, menge: null, betrag_rappen: 48853,
+          gesperrt_grund: null, annahme: 0, hinweis: null },
+      ] },
     { mitarbeiter_id: 43, name: 'Zweite Person', personalnummer: 'P-0043', kategorie: null,
       lohnform: null, roh_min: 480, netto_min: 480, bonus_min: 0, bewertet_min: 480,
       brutto_rappen: 0, gesperrt: {}, nicht_abgeglichen: 0,
@@ -309,12 +335,52 @@ check('KRITISCH: ohne Geburtsdatum steht der hoehere Ferien-Satz da, mit Begruen
 await page.evaluate(() => go('lohnlaeufe'));
 await page.waitForTimeout(600);
 const lauf = (await page.textContent('#view-lohnlaeufe')).replace(/\s+/g, ' ');
+// Die LISTE beantwortet die Frage des Laufs: was kostet der Monat. Darum
+// stehen dort Brutto, Abzuege und Auszahlung -- und von der Zeit nur die
+// Groesse, auf der der Lohn beruht.
+check('Die Liste zeigt Brutto, Abzuege und Auszahlung nebeneinander',
+  /Brutto CHF/.test(lauf) && /Abzüge CHF/.test(lauf) && /Auszahlung CHF/.test(lauf));
+check('Die Auszahlung der gerechneten Person erscheint', /488.53/.test(lauf));
 // "Einheiten nie vermischen": Rohzeit, Nettozeit, Zeitbonus und bewertete
 // Zeit stehen EINZELN -- nie nur ein fertiger Stundenwert (CLAUDE.md).
-check('KRITISCH: die Vorschau zeigt Rohzeit, Nettozeit, Zeitbonus und bewertete Zeit getrennt',
-  /Rohzeit/.test(lauf) && /Nettozeit/.test(lauf) && /Zeitbonus/.test(lauf) && /Bewertet/.test(lauf));
+// Seit Etappe 4 stehen sie in der ABRECHNUNG statt in der Liste; die Aussage
+// ist dieselbe, der Ort ein anderer. Darum wird sie hier auch dort geprueft
+// und nicht bloss im Text der Seite gesucht -- die Woerter stehen inzwischen
+// auch in einem Erklaersatz, und eine Pruefung, die den findet, prueft nichts.
+await page.click('#view-lohnlaeufe button:has-text("Abrechnung")');
+await page.waitForTimeout(300);
+const abr = (await page.textContent('#llAbrechnung')).replace(/\s+/g, ' ');
+check('KRITISCH: die Abrechnung zeigt Rohzeit, Nettozeit, Zeitbonus und bewertete Zeit getrennt',
+  /Rohzeit/.test(abr) && /Nettozeit/.test(abr) && /Zeitbonus/.test(abr) && /Bewertet/.test(abr));
 check('Die Zeiten stehen als Stunden da, nicht als Minuten',
-  /18:00/.test(lauf) && /17:00/.test(lauf) && /17:42/.test(lauf));
+  /18:00/.test(abr) && /17:00/.test(abr) && /17:42/.test(abr));
+check('Die Abrechnung trennt Bruttoseite, Abzuege und Auszahlung in eigene Bloecke',
+  /Bruttoseite/.test(abr) && /Abzüge/.test(abr) && /Auszahlung/.test(abr));
+// KRITISCH: Ein nicht gerechneter Abzug darf nicht als 0.00 dastehen.
+//
+// Diese Pruefung stand zuerst als Textsuche nach "nicht gerechnet" da -- und
+// blieb in der Gegenprobe GRUEN, weil dieselbe Wortfolge im Erklaersatz des
+// Abzugsblocks steht ("was nicht gerechnet werden konnte"). Sie prueft jetzt
+// die ZELLE: ein Merkzeichen in der Betragsspalte, und nirgends ein Nullwert.
+const ktgZelle = await page.evaluate(() => {
+  const tr = [...document.querySelectorAll('#llAbrechnung tr')]
+    .find(r => /Krankentaggeld/.test(r.textContent));
+  const td = tr && tr.querySelectorAll('td')[4];
+  return { text: td ? td.textContent.trim() : null,
+           merkzeichen: !!(td && td.querySelector('.chip')) };
+});
+check('KRITISCH: der fehlende KTG-Satz steht als Merkzeichen in der Betragsspalte',
+  ktgZelle.merkzeichen === true && ktgZelle.text === 'nicht gerechnet');
+check('KRITISCH: nirgends in der Abrechnung steht ein Abzug von 0.00',
+  !/\b0\.00\b/.test(abr));
+check('Die Herleitung der NBU-Unterstellung steht dabei, nicht nur das Ergebnis',
+  /Empfehlung 7\/87/.test(abr) && /11.50/.test(abr) && /nur Wochen mit Einsatz/.test(abr));
+check('Die Abrechnung laesst sich wieder schliessen',
+  await page.isVisible('#llAbrechnung button:has-text("Schliessen")'));
+await page.click('#llAbrechnung button:has-text("Schliessen")');
+await page.waitForTimeout(200);
+check('Nach dem Schliessen ist die Liste wieder allein da',
+  (await page.textContent('#llAbrechnung')).trim() === '');
 check('Der Bruttolohn der gerechneten Person erscheint', /516.13/.test(lauf));
 // Der Kern: Eine gesperrte Person darf NICHT wie eine mit null Franken
 // aussehen. "Unbekannt" und "keine" sind zwei Aussagen.
