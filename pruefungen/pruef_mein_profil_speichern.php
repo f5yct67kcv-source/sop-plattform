@@ -28,7 +28,7 @@ $pdo->exec('CREATE TABLE mitarbeiter (
     personalnummer TEXT, geburtsdatum TEXT, ahv_nr TEXT, zivilstand TEXT,
     strasse TEXT, hausnummer TEXT, adresszusatz TEXT, plz TEXT, ort TEXT, land TEXT,
     telefon TEXT, telefon_geschaeft TEXT, mobil TEXT, mobil_geschaeft TEXT,
-    email TEXT, email_privat TEXT, notfallkontakt TEXT,
+    email TEXT, email_privat TEXT, notfallkontakt TEXT, notfallkontakt_tel TEXT,
     ist_admin INTEGER DEFAULT 0, aktiv INTEGER DEFAULT 1,
     revierdienst_berechtigt INTEGER DEFAULT 0, erstellt_am TEXT)');
 $pdo->exec('CREATE TABLE aenderungslog (id INTEGER PRIMARY KEY, zeitpunkt TEXT,
@@ -49,18 +49,20 @@ $hash = '$2y$04$kv7/UP97CyQLhIGsM8/tw.wzWMXAq48lAMBVGpL4Iat/ymujXJJJS';
 // scheitern und verdeckte damit, was eigentlich geprueft werden soll.
 $einf = $pdo->prepare('INSERT INTO mitarbeiter (id, name, password_hash, personalnummer,
     geburtsdatum, ahv_nr, zivilstand, strasse, hausnummer, plz, ort, land, telefon, mobil,
-    email, email_privat, notfallkontakt, ist_admin, aktiv, erstellt_am)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?)');
+    email, email_privat, notfallkontakt, notfallkontakt_tel, ist_admin, aktiv, erstellt_am)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?)');
 // Erfundene Angaben, keine echten Personen (CLAUDE.md, Vertraulichkeit).
 $einf->execute([1, 'muster.person', $hash, '1001', '1980-02-03', '756.0000.0000.00',
     'ledig', 'Musterweg', '1', '9999', 'Musterstadt', 'Musterland',
     '000 000 00 01', '000 000 00 02',
-    'muster.person@beispiel.invalid', 'privat@beispiel.invalid', 'Muster Notfall',
+    'muster.person@beispiel.invalid', 'privat@beispiel.invalid',
+    'Muster Notfall', '000 000 00 11',
     0, '2025-01-01 00:00:00']);
 $einf->execute([2, 'zweite.person', $hash, '1002', '1975-04-05', '756.1111.1111.11',
     'ledig', 'Andersweg', '9', '1111', 'Andersstadt', 'Anderland',
     '000 000 00 03', '000 000 00 04',
-    'zweite.person@beispiel.invalid', 'zweite@beispiel.invalid', 'Anderer Notfall',
+    'zweite.person@beispiel.invalid', 'zweite@beispiel.invalid',
+    'Anderer Notfall', '000 000 00 12',
     0, '2025-01-01 00:00:00']);
 
 function hat_tabelle(PDO $pdo, string $t, bool $frisch = false): bool {

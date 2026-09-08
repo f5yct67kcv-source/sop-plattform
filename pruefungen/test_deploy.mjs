@@ -86,6 +86,24 @@ for (const seite of [...seiten, ...phpDateien]) {
   if (fehlend.length) { bad.push('nicht weitergereicht: ' + fehlend.join(', ')); }
 }
 
+/* Der Google-Maps-Schluessel: WELCHE Oberflaechen ihn tragen, wird nicht
+   aufgezaehlt, sondern gefunden. Die Liste war zweimal die Fehlerquelle --
+   eine neue Seite laedt die Karte, niemand denkt an die Ersetzungszeile, und
+   Google Maps bekommt den woertlichen Platzhalter als Schluessel. Das ist
+   kein Absturz: Die Karte bleibt einfach leer. Seit ENT-474 traegt auch
+   portal.html den Schluessel. */
+{
+  const seitenMitKarte = ['dashboard.html', 'app.html', 'portal.html', 'index.html']
+    .filter(f => existsSync(`${WURZEL}/${f}`))
+    .filter(f => readFileSync(`${WURZEL}/${f}`, 'utf8').includes('__MAPS_JS_KEY__'));
+  check('Mindestens eine Oberflaeche traegt den Maps-Platzhalter', seitenMitKarte.length > 0);
+  for (const f of seitenMitKarte) {
+    check(`KRITISCH: __MAPS_JS_KEY__ wird in ${f} beim Deploy auch ersetzt`,
+      new RegExp(`sed -i "s\\|__MAPS_JS_KEY__\\|\\$EFF_MAPS_JS_KEY\\|g" dist/${f.replace('.', '\\.')}`)
+        .test(workflow));
+  }
+}
+
 /* Die Push-Dateien brauchen ihre Platzhalter -- und zwar in der Datei, die
    auch kopiert wird (ENT-424). Ein Platzhalter, den niemand ersetzt, waere
    ein Schluessel, der nie ankommt; eine Ersetzung ohne Platzhalter waere

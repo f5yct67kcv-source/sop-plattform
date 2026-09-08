@@ -13842,6 +13842,7 @@ const MD_ZUSAMMEN = {
   dienstausweis_nr:       { mit: ['dienstausweis_gueltig_bis'], label: 'Dienstausweis',   vor: 'gültig bis ' },
   telefon:                { mit: ['telefon_geschaeft'],      label: 'Telefon',            vor: 'geschäftlich ' },
   mobil:                  { mit: ['mobil_geschaeft'],        label: 'Mobil',              vor: 'geschäftlich ' },
+  notfallkontakt:         { mit: ['notfallkontakt_tel'],     label: 'Notfallkontakt' },
 };
 
 // Felder, die auf die UEBERSICHT gehoeren. Der Projektinhaber hat am
@@ -13856,7 +13857,8 @@ const MD_ZUSAMMEN = {
 const MD_WICHTIG = [
   'personalnummer', 'anrede', 'vorname', 'nachname', 'geburtsdatum',
   'strasse', 'hausnummer', 'plz', 'ort', 'land',
-  'telefon', 'mobil', 'email', 'email_privat', 'notfallkontakt',
+  'telefon', 'mobil', 'email', 'email_privat',
+  'notfallkontakt', 'notfallkontakt_tel',
 ];
 
 // Container der Uebersicht (ENT-073). Ein Eintrag fasst einen oder mehrere
@@ -27064,6 +27066,10 @@ const MB_ABSCHNITTE = [
     ['mobil_geschaeft',   'Mobil Geschäft',   'f'],
     ['notfallkontakt',    'Notfallkontakt',   'f', null,
       'Wen anrufen, wenn auf Schicht etwas passiert', true],
+    // Getrennt seit ENT-471. Vorher stand "Name, Nummer" als freier Text in
+    // einem Feld -- im Notfall muss niemand mehr eine Nummer aus einem Satz
+    // herauslesen, und sie laesst sich anwaehlen.
+    ['notfallkontakt_tel', 'Notfall-Telefon', 'f'],
     // Seit ENT-289 hier und nicht mehr beim Zugang: Die Sprache sagt, WIE
     // man mit dieser Person spricht -- eine Frage der Verstaendigung, keine
     // des Zugriffs. Sie steuert die App-Oberflaeche, aber das tut die

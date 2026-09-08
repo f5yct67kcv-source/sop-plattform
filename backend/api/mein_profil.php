@@ -26,7 +26,8 @@ $user = require_session();
 $immer   = ['name', 'ist_admin', 'personalnummer', 'anrede', 'vorname', 'nachname',
             'geburtsdatum', 'strasse', 'ort', 'telefon', 'mobil', 'email',
             'erstellt_am', 'revierdienst_berechtigt'];
-$moeglich = ['hausnummer', 'adresszusatz', 'plz', 'land', 'email_privat', 'notfallkontakt'];
+$moeglich = ['hausnummer', 'adresszusatz', 'plz', 'land', 'email_privat',
+             'notfallkontakt', 'notfallkontakt_tel'];
 $vorhanden = ma_vorhandene_felder(db());
 $spalten = array_merge($immer, array_values(array_filter(
     $moeglich, fn($f) => array_key_exists($f, $vorhanden)

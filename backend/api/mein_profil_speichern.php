@@ -74,7 +74,7 @@ const SELBST_MAXLAENGE = [
     'strasse' => 200, 'hausnummer' => 20, 'adresszusatz' => 200,
     'plz' => 10, 'ort' => 200, 'land' => 100,
     'telefon' => 50, 'mobil' => 50,
-    'email_privat' => 200, 'notfallkontakt' => 200,
+    'email_privat' => 200, 'notfallkontakt' => 200, 'notfallkontakt_tel' => 50,
 ];
 
 // Beschriftungen fuer die Rueckmeldung. Eine Fehlermeldung "strasse:
@@ -91,7 +91,8 @@ const SELBST_BESCHRIFTUNG = [
     // alle sagen. 'telefon' ist die alte Festnetzspalte; sie taucht in
     // keiner Eingabe mehr auf und wird nur noch geleert.
     'telefon' => 'Festnetz (alt)', 'mobil' => 'Telefon',
-    'email_privat' => 'E-Mail', 'notfallkontakt' => 'Notfallkontakt',
+    'email_privat' => 'E-Mail',
+    'notfallkontakt' => 'Notfallkontakt', 'notfallkontakt_tel' => 'Notfall-Telefon',
 ];
 
 // Pflichtangaben (ENT-466). Der Projektinhaber: *"Ich würde zudem alle
@@ -110,7 +111,7 @@ const SELBST_BESCHRIFTUNG = [
 // Eine Teilanfrage darf durch, solange der Datensatz danach vollstaendig
 // ist. Sonst scheiterte ein Formular, das nur einen Abschnitt sendet.
 const SELBST_PFLICHT = ['strasse', 'hausnummer', 'plz', 'ort', 'land',
-    'mobil', 'email_privat', 'notfallkontakt'];
+    'mobil', 'email_privat', 'notfallkontakt', 'notfallkontakt_tel'];
 
 $input = json_decode(file_get_contents('php://input'), true) ?? [];
 if (!is_array($input)) { $input = []; }

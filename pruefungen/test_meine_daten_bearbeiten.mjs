@@ -172,7 +172,7 @@ try {
 // ── Pflichtangaben (ENT-466) ─────────────────────────────────────────────
 try {
   const pflicht = ['strasse', 'hausnummer', 'plz', 'ort', 'land', 'mobil',
-    'email_privat', 'notfallkontakt'];
+    'email_privat', 'notfallkontakt', 'notfallkontakt_tel'];
   const durchgelassen = [];
   for (const f of pflicht) {
     const koerper = { [f]: '' };
@@ -315,12 +315,31 @@ const PROFIL = {
   strasse: 'Musterweg', hausnummer: '1', adresszusatz: '', plz: '9999',
   ort: 'Musterstadt', land: '', telefon: '000 000 00 01', mobil: '',
   email: 'muster.person@beispiel.invalid', email_privat: 'privat@beispiel.invalid',
-  notfallkontakt: '', revierdienst_berechtigt: 0,
+  notfallkontakt: '', notfallkontakt_tel: '', revierdienst_berechtigt: 0,
 };
 // Was der Server als BEARBEITBAR meldet (ma_selbst_sichtbare_felder): ohne
 // die alte Festnetzspalte, seit ENT-466 gibt es nur noch eine Nummer.
 const AENDERBAR = ['strasse', 'hausnummer', 'adresszusatz', 'plz', 'ort', 'land',
-  'mobil', 'email_privat', 'notfallkontakt'];
+  'mobil', 'email_privat', 'notfallkontakt', 'notfallkontakt_tel'];
+
+// Die Nachbildung oben BEHAUPTET, der Server gebe genau diese Felder frei.
+// Stimmt das nicht mehr, prueft der ganze Oberflaechenteil eine Seite, die
+// es so gar nicht gibt -- und bliebe dabei gruen. Genau das ist beim
+// Trennen des Notfallkontakts passiert: Das Feld aus der weissen Liste zu
+// nehmen machte NICHTS rot. Darum wird die Nachbildung hier gegen die
+// Quelle gehalten.
+{
+  const serverAenderbar = namen(maQuelle, 'function ma_selbst_aenderbare_felder');
+  const serverVerborgen = namen(maQuelle, 'function ma_selbst_sichtbare_felder');
+  const serverSichtbar = serverAenderbar.filter(f => !serverVerborgen.includes(f));
+  check('KRITISCH: die Nachbildung deckt sich mit dem, was der Server wirklich freigibt',
+    serverSichtbar.length > 0
+    && JSON.stringify([...serverSichtbar].sort()) === JSON.stringify([...AENDERBAR].sort()));
+  const zuviel = AENDERBAR.filter(f => !serverSichtbar.includes(f));
+  const zuwenig = serverSichtbar.filter(f => !AENDERBAR.includes(f));
+  zuviel.forEach(f => bad.push('Nachbildung kennt ein Feld, das der Server nicht freigibt: ' + f));
+  zuwenig.forEach(f => bad.push('Server gibt ein Feld frei, das die Nachbildung nicht prueft: ' + f));
+}
 
 // art: 'normal' | 'ohne' (der Server gibt nichts frei) | 'fehler'
 async function seite(breite, hoehe, art = 'normal') {
@@ -385,8 +404,14 @@ try {
   // Eine Nummer, eine Adresse (ENT-466): kein zweites Telefonfeld, keine
   // Geschaeftsadresse mehr auf diesem Bildschirm.
   const titel = a.zeilen.map(z => z.titel.toLowerCase());
-  check('KRITISCH: es steht genau EINE Telefonzeile da',
-    titel.filter(t => /telefon|mobil/.test(t)).length === 1);
+  // Gemeint ist die EIGENE Nummer (ENT-466). Die Notfallnummer ist seit
+  // ENT-471 eine eigene Zeile und zaehlt hier nicht mit.
+  check('KRITISCH: die eigene Nummer steht genau EINMAL da',
+    titel.filter(t => /telefon|mobil/.test(t) && !/notfall/.test(t)).length === 1);
+  // Name und Nummer des Notfallkontakts sind zwei Zeilen, damit jede fuer
+  // sich "nicht erfasst" sagen kann (ENT-471).
+  check('KRITISCH: Notfallkontakt und Notfallnummer stehen getrennt',
+    titel.filter(t => /notfall/.test(t)).length === 2);
   check('KRITISCH: es steht genau EINE E-Mail-Zeile da',
     titel.filter(t => /mail/.test(t)).length === 1);
   // Die Nummer steht im Muster noch in der alten Festnetzspalte -- sie
@@ -463,6 +488,22 @@ try {
     f.knoepfe.every(b => b.breit < f.breite - 8));
 
   check('Das Passwortfeld ist anfangs verborgen', !f.pwSichtbar);
+
+  // Notfallkontakt getrennt (ENT-471): Im Notfall muss niemand eine Nummer
+  // aus einem Satz herauslesen, und sie laesst sich anwaehlen.
+  const notfall = await page.evaluate(() => {
+    const nm = document.getElementById('md-notfallkontakt');
+    const tl = document.getElementById('md-notfallkontakt_tel');
+    return { beide: !!nm && !!tl,
+             typ: tl ? tl.getAttribute('type') : null,
+             nebeneinander: !!nm && !!tl
+               && Math.abs(nm.getBoundingClientRect().top - tl.getBoundingClientRect().top) < 2
+               || (window.innerWidth < 700) };
+  });
+  check('KRITISCH: Notfallkontakt hat ein eigenes Feld fuer Name und fuer Nummer',
+    notfall.beide);
+  check('Die Notfallnummer ist als Telefonnummer ausgezeichnet -- sie laesst sich anwaehlen',
+    notfall.typ === 'tel');
   await page.close();
 } catch (e) { check('Abschnitt Formular ohne Abbruch: ' + e.message, false); }
 
@@ -506,7 +547,8 @@ try {
   await page.click('#mdKnopfAuf');
   await page.waitForTimeout(150);
   await page.fill('#md-strasse', 'Neuweg');
-  await page.fill('#md-notfallkontakt', 'Zweite Person, 000 000 00 05');
+  await page.fill('#md-notfallkontakt', 'Eine Person');
+  await page.fill('#md-notfallkontakt_tel', '000 000 00 05');
   // Seit ENT-466 Pflicht und im Muster leer -- ohne sie sperrt schon der
   // Browser, und der Server bekaeme die Anfrage nie zu sehen.
   await page.fill('#md-land', 'Musterland');
@@ -517,7 +559,8 @@ try {
   check('KRITISCH: abgeschickt wird nur, was der Server freigegeben hat', zuviel.length === 0);
   if (zuviel.length) { bad.push('mitgeschickt, obwohl nicht freigegeben: ' + zuviel.join(', ')); }
   check('Die Eingaben kommen wirklich an',
-    g.strasse === 'Neuweg' && /Zweite Person/.test(g.notfallkontakt || ''));
+    g.strasse === 'Neuweg' && g.notfallkontakt === 'Eine Person'
+    && g.notfallkontakt_tel === '000 000 00 05');
   check('Ohne E-Mail-Aenderung wird kein Passwort mitgeschickt', !('passwort' in g));
   const zurueck = await page.evaluate(() =>
     !!document.getElementById('mdKnopfAuf') && !document.getElementById('mdKnopfSpeichern'));
@@ -543,11 +586,12 @@ try {
   const hinweis = await page.evaluate(() =>
     (document.querySelector('#md-bd .md-fehlt') || { innerText: '' }).innerText.trim());
   check('KRITISCH: fehlende Pflichtangaben stehen OBEN im Formular, nicht erst nach dem Speichern',
-    hinweis.length > 10 && hinweis.startsWith('2'));
+    hinweis.length > 10 && hinweis.startsWith('3'));
 
   // Ein geleertes Pflichtfeld kommt gar nicht erst zum Server.
   await page.fill('#md-land', 'Musterland');
-  await page.fill('#md-notfallkontakt', 'Jemand, 000 000 00 05');
+  await page.fill('#md-notfallkontakt', 'Jemand');
+  await page.fill('#md-notfallkontakt_tel', '000 000 00 05');
   await page.fill('#md-ort', '');
   await page.click('#mdKnopfSpeichern');
   await page.waitForTimeout(300);
@@ -563,7 +607,8 @@ try {
   await page.click('#mdKnopfAuf');
   await page.waitForTimeout(150);
   await page.fill('#md-land', 'Musterland');
-  await page.fill('#md-notfallkontakt', 'Jemand, 000 000 00 05');
+  await page.fill('#md-notfallkontakt', 'Jemand');
+  await page.fill('#md-notfallkontakt_tel', '000 000 00 05');
 
   const wdhDa = () => page.evaluate(() => {
     const el = document.getElementById('md-email_privat2');
@@ -604,7 +649,8 @@ try {
   await page.waitForTimeout(150);
   await page.fill('#md-strasse', 'Bleibtstehen');
   await page.fill('#md-land', 'Musterland');
-  await page.fill('#md-notfallkontakt', 'Zweite Person, 000 000 00 05');
+  await page.fill('#md-notfallkontakt', 'Eine Person');
+  await page.fill('#md-notfallkontakt_tel', '000 000 00 05');
   await page.click('#mdKnopfSpeichern');
   await page.waitForTimeout(400);
   const zustand = await page.evaluate(() => ({

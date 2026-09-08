@@ -437,8 +437,13 @@ jobs:
           # fragt die Testadresse in diesem Zweig gar nicht erst ab.
           sed -i "s|__STAGING_TESTMAIL__|$EFF_STAGING_TESTMAIL|g" dist/mailer.php
           # Google-Maps-Browserschluessel (ENT-341): eigener Schluessel je
-          # Umgebung, in BEIDEN Oberflaechen, die die Karte laden.
+          # Umgebung, in ALLEN Oberflaechen, die die Karte laden -- seit
+          # ENT-474 auch im Kundenportal (Weg waehrend der Runde, hinter
+          # einem Knopf). Fehlt die Ersetzung fuer eine davon, laedt Google
+          # Maps dort mit dem woertlichen Platzhalter als Schluessel und die
+          # Karte bleibt leer; test_deploy.mjs prueft das darum je Datei.
           sed -i "s|__MAPS_JS_KEY__|$EFF_MAPS_JS_KEY|g" dist/dashboard.html
+          sed -i "s|__MAPS_JS_KEY__|$EFF_MAPS_JS_KEY|g" dist/portal.html
           # Push-Benachrichtigungen (ENT-424). Wie bei SMTP bewusst NICHT
           # erforderlich: Bleiben die Secrets ungesetzt, steht weiterhin
           # woertlich "__VAPID_PRIVATE_PEM_B64__" in dist/push.php --
