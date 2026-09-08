@@ -52,9 +52,21 @@ const LOHN_VOLL = {
     zuschlag_hund_art: 'stunde', zuschlag_hund_rappen: 150,
     zuschlag_waffe_art: null, zuschlag_waffe_rappen: null, bemerkung: null }],
   ansatz_aktuell: { id: 1, gueltig_ab: '2024-03-01', ansatz_rappen: 2500 },
-  abzuege: [{ id: 5, mitarbeiter_id: 42, gueltig_ab: '2024-03-01', nbu_pflichtig: 1,
-    ktg_pflichtig: 1, bvg_angeschlossen: 0, bvg_beitrag_rappen: null,
-    qst_pflichtig: 0, qst_kanton: null, qst_tarifcode: null, qst_kinder: null }],
+  abzuege: [
+    { id: 5, mitarbeiter_id: 42, gueltig_ab: '2026-01-01', nbu_pflichtig: null,
+      nbu_grund: null, nbu_von: null, nbu_am: null,
+      ktg_pflichtig: 1, bvg_angeschlossen: 0, bvg_beitrag_rappen: null,
+      qst_pflichtig: 0, qst_kanton: null, qst_tarifcode: null, qst_kinder: null },
+    { id: 6, mitarbeiter_id: 42, gueltig_ab: '2024-03-01', nbu_pflichtig: 0,
+      nbu_grund: 'Vom Versicherer schriftlich bestätigt', nbu_von: 3,
+      nbu_am: '2024-03-02 09:15:00',
+      ktg_pflichtig: 1, bvg_angeschlossen: 0, bvg_beitrag_rappen: null,
+      qst_pflichtig: 0, qst_kanton: null, qst_tarifcode: null, qst_kinder: null }],
+  // Was die Rechnung heute sagt -- steht NEBEN der Uebersteuerung, damit
+  // niemand blind uebersteuert.
+  nbu: { stand: 'versichert', quelle: 'gerechnet',
+         text: 'Versichert nach Empfehlung 7/87 (Durchschnitt 11.50 Std.).',
+         uebersteuert: null, fenster: {} },
   zahlungen: [{ id: 9, mitarbeiter_id: 42, reihenfolge: 1, art: 'rest', betrag_rappen: null,
     iban: 'CH9300762011623852957', empfaenger: null, bank: null, aktiv: 1 }],
   warnung: null,
@@ -332,6 +344,56 @@ check('Ein noch nicht erfasster Ansatz sagt, was daraus folgt',
 // Geburtsdatum gilt der HOEHERE Satz, und das wird gesagt.
 check('KRITISCH: ohne Geburtsdatum steht der hoehere Ferien-Satz da, mit Begruendung',
   /10.64 %/.test(luecke) && /zugunsten/.test(luecke));
+
+// ── 5c. Die NBU-Uebersteuerung: dreiwertig, begruendet, vergleichbar ─────
+//
+// Bis Etappe 4 war das ein Haken mit Vorgabewert "gesetzt". Der haette die
+// Berechnung nach Empfehlung 7/87 bei JEDER Person still ueberstimmt, und
+// zwar in Richtung Abzug -- genau das Denken, das BGer 8C_644/2025 verwirft.
+// Der vorige Abschnitt hat auf die Lueckenfassung umgeschaltet -- und die
+// Akte merkt sich, was sie geladen hat. Ohne Zuruecksetzen praefte diese
+// Suite die Daten des vorigen Abschnitts.
+lohnAntwort = LOHN_VOLL;
+await page.evaluate(() => { go('mitarbeiter'); openMaDetail('muster.person'); });
+await page.waitForTimeout(400);
+await page.evaluate(() => { lohnAkte = null; lohnAkteFuer = null; mdGoTab('lohn'); });
+await page.waitForTimeout(500);
+const nbuAkte = (await page.textContent('#mdBereich_lohn')).replace(/\s+/g, ' ');
+check('KRITISCH: ein Zeitraum ohne Uebersteuerung steht als "automatisch" da, nicht als ja/nein',
+  /automatisch/.test(nbuAkte));
+check('Eine Uebersteuerung steht als solche da, mit ihrer Begruendung',
+  /nicht versichert/.test(nbuAkte) && /Vom Versicherer schriftlich bestätigt/.test(nbuAkte)
+  && /von Hand/.test(nbuAkte));
+
+await page.evaluate(() => lohnAbzugOeffnen(5));
+await page.waitForTimeout(300);
+check('Die Maske bietet drei Zustaende, nicht zwei',
+  (await page.locator('#lpbNbu option').count()) === 3);
+check('KRITISCH: ohne Eintrag ist "automatisch" vorgewaehlt, nicht "versichert"',
+  (await page.inputValue('#lpbNbu')) === 'automatisch');
+check('Bei "automatisch" ist kein Begruendungsfeld da -- es gaebe nichts zu begruenden',
+  !(await page.isVisible('#lpbNbuGrundFeld')));
+// KRITISCH: Der gerechnete Stand steht DANEBEN. Ohne ihn uebersteuert man
+// blind -- man sieht nicht, ob man der Rechnung widerspricht.
+const standText = (await page.textContent('#lpbNbuStand')).replace(/\s+/g, ' ');
+check('KRITISCH: was die Rechnung heute sagt, steht in der Maske daneben',
+  /Die Rechnung sagt heute/.test(standText) && /versichert/.test(standText)
+  && /7\/87/.test(standText));
+
+await page.selectOption('#lpbNbu', 'nicht');
+await page.waitForTimeout(200);
+check('Wird von Hand entschieden, verlangt die Maske eine Begruendung',
+  await page.isVisible('#lpbNbuGrundFeld'));
+// KRITISCH: Wer der Rechnung widerspricht, soll es sehen. Die Rechnung sagt
+// "versichert", von Hand gewaehlt ist "nicht versichert".
+check('KRITISCH: ein Widerspruch zur Rechnung wird benannt, nicht verschwiegen',
+  /widersprechen/.test((await page.textContent('#lpbNbuStand')).replace(/\s+/g, ' ')));
+await page.selectOption('#lpbNbu', 'versichert');
+await page.waitForTimeout(200);
+check('Stimmt die Wahl mit der Rechnung ueberein, steht kein Widerspruch da',
+  !/widersprechen/.test((await page.textContent('#lpbNbuStand')).replace(/\s+/g, ' ')));
+await page.evaluate(() => closeDlg('dlgLohnAbzug'));
+await page.waitForTimeout(200);
 
 // ── 5b. Der Lohnlauf: Stunden und Franken getrennt, Gesperrtes benannt ───
 await page.evaluate(() => go('lohnlaeufe'));

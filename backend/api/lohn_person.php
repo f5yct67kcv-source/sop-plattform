@@ -26,6 +26,12 @@ require_once __DIR__ . '/../rechte.php';
 require_once __DIR__ . '/../planung.php';
 require_once __DIR__ . '/../mitarbeiter.php';
 require_once __DIR__ . '/../lohn.php';
+// Fuer die GERECHNETE NBU-Unterstellung (Empfehlung 7/87). Sie steht neben
+// der erfassten Uebersteuerung, damit niemand blind uebersteuert: Ohne den
+// Vergleich sieht man nicht, ob man der Rechnung widerspricht oder ihr
+// zustimmt.
+require_once __DIR__ . '/../gavzeit.php';
+require_once __DIR__ . '/../lohnlauf.php';
 
 $user = require_session();
 require_recht($user, 'lohn_lesen');
@@ -121,8 +127,27 @@ function lohn_person_lesen(int $id, string $stichtag): array
         }
     }
 
+    // Die Unterstellung, wie sie das Werkzeug HEUTE rechnet -- unabhaengig
+    // davon, ob jemand sie uebersteuert hat. lohnlauf_nbu() liefert bei
+    // gesetzter Uebersteuerung diese zurueck; fuer den Vergleich in der
+    // Maske wird darum die reine Rechnung gebraucht. Sie entsteht nur, wenn
+    // es fuer das Jahr ein UVG-Regelwerk gibt.
+    $nbuGerechnet = null;
+    $uvgRw = lohn_uvg($stichtag);
+    if ($uvgRw !== null) {
+        $fenster = [];
+        foreach (LOHN_NBU_FENSTER_MONATE as $monate) {
+            $w = lohnlauf_nbu_wochen($pdo, $id, $stichtag, $monate);
+            $e = lohn_nbu_ermittlung($w['liste'], $uvgRw, (int)($w['ausfalltage'] ?? 0));
+            $e['zeitraum'] = ['von' => $w['von'], 'bis' => $w['bis'], 'monate' => $monate];
+            $fenster[$monate] = $e;
+        }
+        $nbuGerechnet = lohn_nbu_unterstellung($fenster, $uvgRw);
+    }
+
     return [
         'status' => 'ok',
+        'nbu' => $nbuGerechnet,
         'person' => [
             'id' => (int)$ma['id'],
             'name' => trim(($ma['vorname'] ?? '') . ' ' . ($ma['nachname'] ?? '')) ?: $ma['name'],
@@ -268,13 +293,40 @@ if ($was === 'abzug') {
         json_response(['status' => 'error',
             'message' => 'Quellensteuerpflichtig: Kanton und Tarifcode sind erforderlich'], 400);
     }
+    // Die NBU-Unterstellung ist DREIWERTIG: null heisst "automatisch nach
+    // Empfehlung 7/87 aus den geleisteten Stunden", 1 und 0 sind eine
+    // Uebersteuerung von Hand.
+    //
+    // Bis Etappe 4 stand hier ein blosses Haekchen mit `!empty(...) ? 1 : 0`.
+    // Das schrieb bei JEDEM Speichern eine Uebersteuerung, vorbelegt auf
+    // "versichert" -- also in Richtung Abzug, bei jeder Person, ohne dass es
+    // jemand gewollt haette. Genau das Denken, das BGer 8C_644/2025 E. 5.4
+    // verwirft: nicht die Vereinbarung zaehlt, sondern die geleisteten
+    // Stunden.
+    $nbuWahl = (string)($input['nbu_pflichtig'] ?? 'automatisch');
+    $nbuGrund = trim((string)($input['nbu_grund'] ?? ''));
+    if (!in_array($nbuWahl, ['automatisch', 'versichert', 'nicht'], true)) {
+        json_response(['status' => 'error',
+            'message' => 'Unterstellung: automatisch, versichert oder nicht'], 400);
+    }
+    // Eine Uebersteuerung ohne Begruendung ist spaeter nicht nachvollziehbar.
+    // Art. 12 Ziff. 5 GAV verlangt eine nachvollziehbare Abrechnung -- und
+    // wer eine gerechnete Unterstellung von Hand aendert, schuldet den Grund.
+    if ($nbuWahl !== 'automatisch' && $nbuGrund === '') {
+        json_response(['status' => 'error',
+            'message' => 'Wer die Unterstellung von Hand setzt, muss sie begründen'], 400);
+    }
+    $nbuWert = $nbuWahl === 'automatisch' ? null : ($nbuWahl === 'versichert' ? 1 : 0);
+
     $sql = 'INSERT INTO lohn_person
-              (mitarbeiter_id, gueltig_ab, nbu_pflichtig, ktg_pflichtig,
-               bvg_angeschlossen, bvg_beitrag_rappen,
+              (mitarbeiter_id, gueltig_ab, nbu_pflichtig, nbu_grund, nbu_von, nbu_am,
+               ktg_pflichtig, bvg_angeschlossen, bvg_beitrag_rappen,
                qst_pflichtig, qst_kanton, qst_tarifcode, qst_kinder, bemerkung, erfasst_von)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             ON DUPLICATE KEY UPDATE
-              nbu_pflichtig = VALUES(nbu_pflichtig), ktg_pflichtig = VALUES(ktg_pflichtig),
+              nbu_pflichtig = VALUES(nbu_pflichtig), nbu_grund = VALUES(nbu_grund),
+              nbu_von = VALUES(nbu_von), nbu_am = VALUES(nbu_am),
+              ktg_pflichtig = VALUES(ktg_pflichtig),
               bvg_angeschlossen = VALUES(bvg_angeschlossen),
               bvg_beitrag_rappen = VALUES(bvg_beitrag_rappen),
               qst_pflichtig = VALUES(qst_pflichtig), qst_kanton = VALUES(qst_kanton),
@@ -282,7 +334,13 @@ if ($was === 'abzug') {
               bemerkung = VALUES(bemerkung), erfasst_von = VALUES(erfasst_von)';
     $pdo->prepare($sql)->execute([
         $id, $ab,
-        !empty($input['nbu_pflichtig']) ? 1 : 0,
+        $nbuWert,
+        // Wer automatisch waehlt, loescht die Begruendung samt Protokoll mit
+        // -- ein stehengebliebener Grund ohne Uebersteuerung waere eine
+        // Aussage ueber etwas, das nicht mehr gilt.
+        $nbuWert === null ? null : $nbuGrund,
+        $nbuWert === null ? null : (int)$user['id'],
+        $nbuWert === null ? null : date('Y-m-d H:i:s'),
         !empty($input['ktg_pflichtig']) ? 1 : 0,
         !empty($input['bvg_angeschlossen']) ? 1 : 0,
         lohn_rappen_aus($input['bvg_beitrag'] ?? null),

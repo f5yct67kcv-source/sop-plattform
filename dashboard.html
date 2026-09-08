@@ -8793,9 +8793,36 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
       <input type="hidden" id="lpbId">
       <div class="feld"><label for="lpbAb">Gültig ab</label>
         <input class="inp" type="date" id="lpbAb"></div>
+      <!-- Die NBU-Unterstellung ist KEIN Haken mehr.
+           Bis Etappe 4 stand hier ein Ja/Nein je Person. Genau dieses Denken
+           verwirft BGer 8C_644/2025: Nicht die vertragliche Vereinbarung
+           zaehlt, sondern die konkret geleisteten Stunden. Das Werkzeug
+           rechnet sie nach Empfehlung 7/87 aus der Zeiterfassung -- und
+           "automatisch" ist darum die Vorgabe, nicht eine von drei
+           gleichrangigen Wahlen.
+           Ein Haken mit Vorgabewert "gesetzt" haette die Rechnung bei JEDER
+           Person still ueberstimmt, und zwar in Richtung Abzug. -->
       <div class="feld">
-        <label class="check" style="min-height:24px"><input type="checkbox" id="lpbNbu"> NBU-pflichtig (Nichtberufsunfall)</label>
-        <div class="zone-note">Ab 8 Wochenstunden. Darunter trägt der Betrieb nur die Berufsunfallversicherung.</div></div>
+        <label for="lpbNbu">Nichtberufsunfall — Unterstellung</label>
+        <select class="inp" id="lpbNbu" onchange="lohnNbuUmschalten()">
+          <option value="automatisch">Automatisch aus den geleisteten Stunden (empfohlen)</option>
+          <option value="versichert">Von Hand: versichert</option>
+          <option value="nicht">Von Hand: nicht versichert</option>
+        </select>
+        <div class="zone-note">Automatisch heisst: nach Empfehlung 7/87 aus der Zeiterfassung —
+          Durchschnitt über die letzten drei oder zwölf Monate, günstigere Variante,
+          Schwelle 8 Wochenstunden (Merkblatt 6.05 Ziff. 4). Das vertragliche Pensum ist
+          <b>nicht</b> massgebend (BGer 8C_644/2025).</div>
+        <div id="lpbNbuStand" class="zone-note" style="margin-top:6px"></div>
+      </div>
+      <!-- Der Grund ist Pflicht, sobald von Hand entschieden wird. Eine
+           Uebersteuerung ohne Begruendung ist spaeter nicht nachvollziehbar,
+           und Art. 12 Ziff. 5 GAV verlangt eine nachvollziehbare Abrechnung. -->
+      <div class="feld" id="lpbNbuGrundFeld" style="display:none">
+        <label for="lpbNbuGrund">Begründung der Übersteuerung</label>
+        <input class="inp" id="lpbNbuGrund" placeholder="z. B. vom Versicherer schriftlich bestätigt">
+        <div class="zone-note">Pflicht: Wer die gerechnete Unterstellung von Hand ändert, schuldet
+          den Grund. Er steht später auf der Abrechnung, zusammen mit Person und Zeitpunkt.</div></div>
       <div class="feld">
         <label class="check" style="min-height:24px"><input type="checkbox" id="lpbKtg"> Krankentaggeld-Beitrag</label>
         <div class="zone-note">Art. 17 Ziff. 3: Der Betrieb übernimmt mindestens die Hälfte der Prämie.</div></div>
@@ -19306,7 +19333,12 @@ function lohnAkteZeichnen() {
   // ── Abzugsparameter je Person ──────────────────────────────────────────
   const abz = (lohnAkte.abzuege || []).map(a => `<tr>
       <td>${dmy(a.gueltig_ab)}</td>
-      <td>${Number(a.nbu_pflichtig) ? 'ja' : 'nein'}</td>
+      <td>${a.nbu_pflichtig === null || a.nbu_pflichtig === undefined
+        ? '<span class="zone-note">automatisch</span>'
+        : `<span class="chip ${Number(a.nbu_pflichtig) ? 'chip-ok' : 'chip-x'}">${
+             Number(a.nbu_pflichtig) ? 'versichert' : 'nicht versichert'}</span>
+           <div class="zone-note">von Hand${a.nbu_grund ? ': ' + esc(a.nbu_grund) : ' — ohne Begründung'}${
+             a.nbu_am ? ', ' + dmy(String(a.nbu_am).slice(0, 10)) : ''}</div>`}</td>
       <td>${Number(a.ktg_pflichtig) ? 'ja' : 'nein'}</td>
       <td>${Number(a.bvg_angeschlossen)
         ? (a.bvg_beitrag_rappen !== null ? lohnFr(a.bvg_beitrag_rappen) + ' CHF/Monat'
@@ -19405,7 +19437,11 @@ function lohnAbzugOeffnen(id) {
   $('lpbTitel').textContent = a ? 'Abzüge ändern' : 'Abzüge erfassen';
   $('lpbId').value = a ? a.id : '';
   $('lpbAb').value = a ? a.gueltig_ab : '';
-  $('lpbNbu').checked = a ? !!Number(a.nbu_pflichtig) : true;
+  // null heisst automatisch -- und ohne Eintrag ist automatisch die Vorgabe.
+  $('lpbNbu').value = !a || a.nbu_pflichtig === null || a.nbu_pflichtig === undefined
+    ? 'automatisch' : (Number(a.nbu_pflichtig) ? 'versichert' : 'nicht');
+  $('lpbNbuGrund').value = a ? (a.nbu_grund || '') : '';
+  lohnNbuUmschalten();
   $('lpbKtg').checked = a ? !!Number(a.ktg_pflichtig) : true;
   $('lpbBvg').checked = a ? !!Number(a.bvg_angeschlossen) : false;
   $('lpbBvgBetrag').value = a && a.bvg_beitrag_rappen !== null ? (a.bvg_beitrag_rappen / 100).toFixed(2) : '';
@@ -19427,12 +19463,40 @@ function lohnQstUmschalten() {
   $('lpbQstFelder').style.display = $('lpbQst').checked ? '' : 'none';
 }
 
+// Das Begruendungsfeld erscheint nur, wenn von Hand entschieden wird --
+// und daneben steht, WAS die Rechnung sagt. Ohne diesen Vergleich
+// uebersteuert man blind: Man sieht nicht, ob man der Rechnung widerspricht
+// oder ihr nur zustimmt.
+function lohnNbuUmschalten() {
+  const uebersteuert = $('lpbNbu').value !== 'automatisch';
+  $('lpbNbuGrundFeld').style.display = uebersteuert ? '' : 'none';
+  const n = lohnAkte && lohnAkte.nbu;
+  const e = $('lpbNbuStand');
+  if (!e) { return; }
+  if (!n) {
+    e.innerHTML = '';
+    return;
+  }
+  const wie = { versichert: ['chip-ok', 'versichert'], nicht_versichert: ['chip-x', 'nicht versichert'],
+                pruefen: ['chip-w', 'von Hand prüfen'], unbekannt: ['chip-w', 'unbekannt'] }[n.stand]
+              || ['chip', n.stand];
+  const widerspruch = uebersteuert
+    && ((($('lpbNbu').value === 'versichert') && n.stand === 'nicht_versichert')
+     || (($('lpbNbu').value === 'nicht') && n.stand === 'versichert'));
+  e.innerHTML = `Die Rechnung sagt heute: <span class="chip ${wie[0]}">${wie[1]}</span>`
+    + (widerspruch
+       ? ' <span class="chip chip-w" title="Die Übersteuerung widerspricht der Rechnung — das ist zulässig, sollte aber begründet sein">Sie widersprechen dem</span>'
+       : '')
+    + (n.text ? `<div style="margin-top:2px">${esc(n.text)}</div>` : '');
+}
+
 function lohnAbzugSpeichern() {
   const body = {
     id: lohnAkte.person.id, was: 'abzug',
     eintrag_id: $('lpbId').value ? Number($('lpbId').value) : 0,
     gueltig_ab: $('lpbAb').value,
-    nbu_pflichtig: $('lpbNbu').checked,
+    nbu_pflichtig: $('lpbNbu').value,
+    nbu_grund: $('lpbNbuGrund').value.trim(),
     ktg_pflichtig: $('lpbKtg').checked,
     bvg_angeschlossen: $('lpbBvg').checked,
     bvg_beitrag: $('lpbBvgBetrag').value.trim(),
