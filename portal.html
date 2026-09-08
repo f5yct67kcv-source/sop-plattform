@@ -557,7 +557,7 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
 </div>
 
 
-<!-- Das Blatt für das PDF (ENT-477). Eigener Aufbau, nicht die Tafel
+<!-- Das Blatt für das PDF (ENT-478). Eigener Aufbau, nicht die Tafel
      abfotografiert: Die Tafel trägt Knöpfe, eine Karte und Glaskanten; ein
      Abzug davon wäre ein Bildschirmfoto, kein Rapport. -->
 <div id="blattHuelle" aria-hidden="true"><div id="blatt"></div></div>
@@ -1046,7 +1046,7 @@ function detailZeichnen(d, tafel) {
     + 'diesen Knopf hin geladen. Dabei wird die Karte von Google bezogen.</p>'
     + '</div></div>'
     // Dasselbe Blatt, das der Kunde heute per Mail bekommt -- nur holt er es
-    // hier selbst (ENT-477).
+    // hier selbst (ENT-478).
     + '<div class="d-fuss"><button type="button" class="knopf" data-pdf="'
     + Number(d.id) + '">Als PDF herunterladen</button></div>';
 
@@ -1209,7 +1209,7 @@ function wegKarteBauen(punkte, huelle, tage) {
   });
 }
 
-// ── Das Rapportblatt als PDF (ENT-477) ───────────────────────────────
+// ── Das Rapportblatt als PDF (ENT-478) ───────────────────────────────
 // html2pdf wiegt rund 950 KB und wird darum erst BEIM KLICK nachgeladen --
 // dasselbe Muster wie im Cockpit (ENT-322) und bei der Karte. Wer nur die
 // Liste ansieht, laedt es nie.

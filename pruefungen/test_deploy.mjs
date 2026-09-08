@@ -18,7 +18,7 @@ const check = (n, c) => (c ? ok : bad).push(n);
 
 const workflow = readFileSync(`${WURZEL}/.github/workflows/deploy-hostpoint.yml`, 'utf8');
 // portal.html gehoert dazu, seit es ein Skript nachlaedt (html2pdf,
-// ENT-477). Bis dahin fehlte es hier -- und damit galt fuer diese eine
+// ENT-478). Bis dahin fehlte es hier -- und damit galt fuer diese eine
 // Oberflaeche die Regel nicht, dass jedes geladene Skript auch
 // ausgeliefert wird. Genau die Luecke, die qrcode.js schon einmal aus dem
 // Deploy fallen liess.

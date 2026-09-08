@@ -160,7 +160,7 @@ const WEG_VOLL = {
 };
 let wegAntwort = WEG_VOLL;
 
-// Der Briefkopf fuers Rapportblatt (ENT-477). Erfundene Firma, erfundenes
+// Der Briefkopf fuers Rapportblatt (ENT-478). Erfundene Firma, erfundenes
 // Logo -- echte Betriebsdaten haben in Testdaten nichts zu suchen.
 const BRIEFKOPF = {
   status: 'ok',
@@ -794,7 +794,7 @@ check('KRITISCH: und er verrät dem Kunden nichts über den Zustand des Betriebs
   !/Einrichtung|einrichten|Datenbank|Tabelle/i.test(nichtEing));
 wegAntwort = WEG_VOLL;
 
-// ══ Das Rapportblatt als PDF (ENT-477) ══════════════════════════════════
+// ══ Das Rapportblatt als PDF (ENT-478) ══════════════════════════════════
 // Der Kunde holt sich hier dasselbe Blatt, das er heute per Mail bekommt.
 calls = [];
 // Den Zwischenspeicher des Briefkopfs leeren: Ohne das kann die Zusage

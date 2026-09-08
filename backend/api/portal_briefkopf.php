@@ -1,5 +1,5 @@
 <?php
-// Kundenportal: der Briefkopf fuer das Rapport-PDF (ENT-477).
+// Kundenportal: der Briefkopf fuer das Rapport-PDF (ENT-478).
 //
 // GET -> { status, briefkopf: { firma, zusatz, fusszeile, fusszeile2, logo } }
 //
