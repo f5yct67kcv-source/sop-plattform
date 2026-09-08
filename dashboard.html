@@ -18448,15 +18448,22 @@ function wbArtenZeichnen(d) {
    erfasster, auch nicht fuer jemanden, der die Farbe nicht sieht. Darum je
    Status ein eigener Satz und nicht ein Satz mit einem Chip daneben. */
 function wbSatz(e) {
+  /* Ein Scan auf einen inzwischen entfernten Punkt behaelt seinen
+     Nachweiswert -- der Punkt fehlt, die Durchfuehrung nicht. Der fehlende
+     Name wird darum ERSETZT und nicht weggelassen: Ein leerer Name saehe aus,
+     als fehlte die Angabe.
+
+     Der Ersatz steht an der Stelle des NAMENS, nicht an der des ganzen
+     Satzteils. Das war er bis zum 08.09.2026 nicht, und der Fehler ist erst
+     am gerenderten Zustand aufgefallen: „hat den Kontrollpunkt einen
+     inzwischen entfernten Kontrollpunkt erfasst." Die Pruefung deckte nur
+     „nicht verfügbar" ab, wo es zufaellig aufging. */
   const punkt = e.punkt_name
     ? `<b>${esc(e.punkt_name)}</b>`
-    // Ein Scan auf einen inzwischen entfernten Punkt behaelt seinen
-    // Nachweiswert. "Einen entfernten Kontrollpunkt" sagt das; ein leerer
-    // Name saehe aus, als fehlte die Angabe.
-    : 'einen inzwischen entfernten Kontrollpunkt';
+    : '<i>(inzwischen entfernt)</i>';
   if (e.art === 'scan') {
-    if (e.status === 'nicht_verfuegbar') { return `hat ${punkt} als nicht verfügbar gemeldet.`; }
-    if (e.status === 'ersatzscan') { return `hat ${punkt} per Ersatzscan belegt.`; }
+    if (e.status === 'nicht_verfuegbar') { return `hat den Kontrollpunkt ${punkt} als nicht verfügbar gemeldet.`; }
+    if (e.status === 'ersatzscan') { return `hat den Kontrollpunkt ${punkt} per Ersatzscan belegt.`; }
     return `hat den Kontrollpunkt ${punkt} erfasst.`;
   }
   if (e.art === 'rundgang') {

@@ -173,8 +173,18 @@ check('KRITISCH: ein nicht verfügbarer Punkt sagt NICHT "erfasst" -- das wäre 
   && !saetze.some(t => t.includes('nicht verfügbar') && t.includes('erfasst.')));
 check('KRITISCH: ein Ersatzscan sagt "per Ersatzscan belegt", nicht "erfasst"',
   saetze.some(t => t.includes('per Ersatzscan belegt')));
+// Der Nachweis bleibt, der Name des Punktes nicht. Geprüft wird die
+// Aussage, nicht der Wortlaut: Der Satz muss sagen, DASS der Punkt entfernt
+// wurde -- und er muss ein Satz bleiben. Bis zum 08.09.2026 stand der Ersatz
+// an der Stelle des ganzen Satzteils statt an der des Namens, und der Satz
+// las sich „den Kontrollpunkt einen inzwischen entfernten Kontrollpunkt
+// erfasst". Die alte Prüfung deckte nur den Fall ab, in dem das zufällig
+// aufging.
 check('KRITISCH: ein entfernter Kontrollpunkt wird benannt, nicht weggelassen',
-  saetze.some(t => t.includes('einen inzwischen entfernten Kontrollpunkt')));
+  saetze.some(t => /inzwischen entfernt/.test(t)));
+check('KRITISCH: der Satz bleibt dabei ein Satz -- "Kontrollpunkt" steht nur einmal darin',
+  saetze.filter(t => /inzwischen entfernt/.test(t))
+    .every(t => (t.match(/Kontrollpunkt/g) || []).length === 1));
 check('KRITISCH: eine erledigte Runde und eine abgebrochene haben verschiedene Sätze',
   saetze.some(t => t.includes('hat den Rundgang Schliessrunde erledigt'))
   && saetze.some(t => t.includes('hat den Rundgang Schliessrunde abgebrochen')));

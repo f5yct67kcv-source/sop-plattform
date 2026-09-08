@@ -707,12 +707,44 @@ function wachbuch_quelle(PDO $pdo, string $sql, string $zaehlSql, array $werte,
     }
 }
 
+/* $objekte: null = kein Zuschnitt, eine Zahl = ein Objekt, ein Feld =
+   mehrere. Die Liste braucht das Kundenportal (ENT-484): Dort ist der
+   Zuschnitt nicht EIN Objekt, sondern alles, was dem angemeldeten Kunden
+   gehoert -- und nichts sonst.
+
+   $optionen kennt zwei Schalter, beide fuer das Portal, beide bewusst
+   einzeln benannt statt hinter einem Wort "portal" versteckt:
+
+     'nur_beendete_runden'      -- Vorgaenge einer noch laufenden Runde
+                                   bleiben draussen. Ein Kunde soll den
+                                   Nachweis sehen, nicht die Person bei der
+                                   Arbeit (ENT-441 Punkt 5). Im Cockpit gilt
+                                   das NICHT: Die Einsatzleitung soll gerade
+                                   sehen, was gerade laeuft.
+     'nur_ereignisse_mit_runde' -- nur Meldungen, die an einer Runde
+                                   haengen. Meldungen ausserhalb einer Runde
+                                   hat ein Kunde noch nie gesehen; sie hier
+                                   mitzuliefern waere ein neuer Datenfluss
+                                   und keine Darstellungsfrage. */
 function wachbuch_eintraege(PDO $pdo, string $von, string $bis,
-                            ?int $objektId = null, int $grenze = WACHBUCH_GRENZE,
-                            ?array $arten = null): array
+                            $objekte = null, int $grenze = WACHBUCH_GRENZE,
+                            ?array $arten = null, array $optionen = []): array
 {
     $abVon = $von . ' 00:00:00';
     $bisEnde = $bis . ' 23:59:59';
+    $objektIds = $objekte === null ? null
+        : array_values(array_map('intval', is_array($objekte) ? $objekte : [$objekte]));
+    // Eine LEERE Liste ist etwas anderes als gar kein Zuschnitt: Sie heisst
+    // „dieser Zugang hat kein einziges Objekt" und muss NICHTS liefern. Ohne
+    // diese Unterscheidung ergaebe ein leeres Feld eine Abfrage ohne
+    // Einschraenkung -- ein Kundenzugang ohne Objekte saehe die Chronik
+    // aller. Das ist keine Randbedingung, das ist die Grenze selbst.
+    if ($objektIds !== null && !$objektIds) {
+        return ['eintraege' => [], 'gezeigt' => 0, 'gesamt' => 0, 'gekuerzt' => false,
+                'grenze' => $grenze, 'je_art' => [], 'quellen' => []];
+    }
+    $nurBeendet = !empty($optionen['nur_beendete_runden']);
+    $nurEreignisMitRunde = !empty($optionen['nur_ereignisse_mit_runde']);
     // Ein leeres Filterfeld heisst "alles", nicht "nichts": Wer keine Art
     // waehlt, will die ganze Chronik, nicht eine leere Seite.
     $will = static function (string $art) use ($arten): bool {
@@ -729,10 +761,31 @@ function wachbuch_eintraege(PDO $pdo, string $von, string $bis,
     // abfragbar. "Unbekannt" darf nie wie "keine" aussehen.
     $quellen = [];
 
-    $objektWo = $objektId !== null ? ' AND {T}.objekt_id = ?' : '';
-    $mitObjekt = static function (array $w) use ($objektId) {
-        if ($objektId !== null) { $w[] = $objektId; }
-        return $w;
+    /* Der gemeinsame Zusatz zur WHERE-Bedingung: Objektzuschnitt und, wo
+       verlangt, die Beschraenkung auf beendete Runden. Text UND Werte kommen
+       aus DERSELBEN Funktion und in derselben Reihenfolge -- getrennt
+       gepflegt liefen sie irgendwann auseinander, und eine verschobene
+       Reihenfolge der Platzhalter ist der Fehler, den niemand sieht: Die
+       Abfrage laeuft, sie filtert nur nach dem Falschen.
+
+       $rundgangAlias ist null, wo die Quelle ohnehin nur beendete Runden
+       kennt (die Runden selbst) oder wo die Runde nur per LEFT JOIN
+       danebensteht (Ereignisse) -- dort wuerde die Bedingung jede Zeile
+       ohne Runde stillschweigend mitloeschen. */
+    $zusatz = static function (string $objektAlias, ?string $rundgangAlias)
+            use ($objektIds, $nurBeendet): array {
+        $wo = ''; $werte = [];
+        if ($objektIds !== null) {
+            $wo .= " AND $objektAlias.objekt_id IN ("
+                . implode(',', array_fill(0, count($objektIds), '?')) . ')';
+            $werte = array_merge($werte, $objektIds);
+        }
+        if ($nurBeendet && $rundgangAlias !== null) {
+            $wo .= " AND $rundgangAlias.status NOT IN ("
+                . implode(',', array_fill(0, count(RUNDGANG_OFFENE_STATUS), '?')) . ')';
+            $werte = array_merge($werte, RUNDGANG_OFFENE_STATUS);
+        }
+        return [$wo, $werte];
     };
 
     // ── 1. Kontrollpunkt erfasst ──────────────────────────────────────
@@ -740,6 +793,7 @@ function wachbuch_eintraege(PDO $pdo, string $von, string $bis,
         $quellen['scans'] = 'fehlt';
     } else {
         $foto = hat_spalte($pdo, 'rundgang_scan', 'foto_mime') ? 's.foto_mime' : 'NULL';
+        [$zWo, $zWerte] = $zusatz('r', 'r');
         $rumpf = "FROM rundgang_scan s
                   JOIN rundgang r ON r.id = s.rundgang_id
                   JOIN einsaetze e ON e.id = r.einsatz_id
@@ -747,8 +801,7 @@ function wachbuch_eintraege(PDO $pdo, string $von, string $bis,
                   JOIN mitarbeiter m ON m.id = r.mitarbeiter_id
                   LEFT JOIN kontrollpunkt k ON k.id = s.kontrollpunkt_id
                   LEFT JOIN rundgang_vorlage rv ON rv.id = r.rundgang_vorlage_id
-                 WHERE s.erfasst_am >= ? AND s.erfasst_am <= ?"
-                 . str_replace('{T}', 'r', $objektWo);
+                 WHERE s.erfasst_am >= ? AND s.erfasst_am <= ?" . $zWo;
         $t = wachbuch_quelle($pdo,
             "SELECT s.id, s.erfasst_am AS zeit, s.uebermittelt_am, s.status, s.beschreibung,
                     s.kontrollpunkt_id, k.bezeichnung AS punkt_name, $foto AS foto_mime,
@@ -760,7 +813,7 @@ function wachbuch_eintraege(PDO $pdo, string $von, string $bis,
                     COALESCE(e.kunde_name, o.kunde_name) AS kunde_name,
                     m.vorname, m.nachname
              $rumpf ORDER BY s.erfasst_am DESC, s.id DESC",
-            "SELECT COUNT(*) $rumpf", $mitObjekt([$abVon, $bisEnde]), $grenze, $will('scan'));
+            "SELECT COUNT(*) $rumpf", array_merge([$abVon, $bisEnde], $zWerte), $grenze, $will('scan'));
         if ($t === null) { $quellen['scans'] = 'fehler'; } else {
             $quellen['scans'] = 'ok';
             $jeArt['scan'] = $t['anzahl'];
@@ -789,14 +842,17 @@ function wachbuch_eintraege(PDO $pdo, string $von, string $bis,
         $quellen['runden'] = 'fehlt';
     } else {
         $zeit = WACHBUCH_RUNDE_ZEIT;
+        // Kein Rundgang-Alias fuer den Zusatz: Diese Quelle kennt ohnehin nur
+        // beendete Runden, eine zweite Statusbedingung waere eine zweite
+        // Wahrheit ueber denselben Sachverhalt.
+        [$zWo, $zWerte] = $zusatz('r', null);
         $rumpf = "FROM rundgang r
                   JOIN einsaetze e ON e.id = r.einsatz_id
                   JOIN objekte o ON o.id = r.objekt_id
                   JOIN mitarbeiter m ON m.id = r.mitarbeiter_id
                   LEFT JOIN rundgang_vorlage rv ON rv.id = r.rundgang_vorlage_id
                  WHERE r.status IN ('abgeschlossen', 'abgebrochen')
-                   AND $zeit >= ? AND $zeit <= ?"
-                 . str_replace('{T}', 'r', $objektWo);
+                   AND $zeit >= ? AND $zeit <= ?" . $zWo;
         $t = wachbuch_quelle($pdo,
             "SELECT r.id, $zeit AS zeit, r.status, r.rohzeit_start, r.rohzeit_ende,
                     r.pause_minuten, r.abbruch_grund, r.abbruch_freitext,
@@ -809,7 +865,7 @@ function wachbuch_eintraege(PDO $pdo, string $von, string $bis,
                     COALESCE(e.kunde_name, o.kunde_name) AS kunde_name,
                     m.vorname, m.nachname
              $rumpf ORDER BY zeit DESC, r.id DESC",
-            "SELECT COUNT(*) $rumpf", $mitObjekt([$abVon, $bisEnde]), $grenze, $will('rundgang'));
+            "SELECT COUNT(*) $rumpf", array_merge([$abVon, $bisEnde], $zWerte), $grenze, $will('rundgang'));
         if ($t === null) { $quellen['runden'] = 'fehler'; } else {
             $quellen['runden'] = 'ok';
             $jeArt['rundgang'] = $t['anzahl'];
@@ -841,6 +897,7 @@ function wachbuch_eintraege(PDO $pdo, string $von, string $bis,
     if (!hat_tabelle($pdo, 'rundgang_aufgabe')) {
         $quellen['aufgaben'] = 'fehlt';
     } else {
+        [$zWo, $zWerte] = $zusatz('r', 'r');
         $rumpf = "FROM rundgang_aufgabe ra
                   JOIN rundgang r ON r.id = ra.rundgang_id
                   JOIN einsaetze e ON e.id = r.einsatz_id
@@ -848,8 +905,7 @@ function wachbuch_eintraege(PDO $pdo, string $von, string $bis,
                   JOIN mitarbeiter m ON m.id = r.mitarbeiter_id
                   LEFT JOIN kontrollpunkt k ON k.id = ra.kontrollpunkt_id
                   LEFT JOIN rundgang_vorlage rv ON rv.id = r.rundgang_vorlage_id
-                 WHERE ra.erfasst_am >= ? AND ra.erfasst_am <= ?"
-                 . str_replace('{T}', 'r', $objektWo);
+                 WHERE ra.erfasst_am >= ? AND ra.erfasst_am <= ?" . $zWo;
         $t = wachbuch_quelle($pdo,
             "SELECT ra.id, ra.erfasst_am AS zeit, ra.uebermittelt_am, ra.status,
                     ra.grund, ra.bezeichnung,
@@ -862,7 +918,7 @@ function wachbuch_eintraege(PDO $pdo, string $von, string $bis,
                     COALESCE(e.kunde_name, o.kunde_name) AS kunde_name,
                     m.vorname, m.nachname
              $rumpf ORDER BY ra.erfasst_am DESC, ra.id DESC",
-            "SELECT COUNT(*) $rumpf", $mitObjekt([$abVon, $bisEnde]), $grenze, $will('aufgabe'));
+            "SELECT COUNT(*) $rumpf", array_merge([$abVon, $bisEnde], $zWerte), $grenze, $will('aufgabe'));
         if ($t === null) { $quellen['aufgaben'] = 'fehler'; } else {
             $quellen['aufgaben'] = 'ok';
             $jeArt['aufgabe'] = $t['anzahl'];
@@ -892,6 +948,18 @@ function wachbuch_eintraege(PDO $pdo, string $von, string $bis,
     if (!hat_tabelle($pdo, 'ereignis_meldung')) {
         $quellen['ereignisse'] = 'fehlt';
     } else {
+        // Der Rundgang haengt hier nur per LEFT JOIN daneben -- eine Meldung
+        // kann ohne laufende Runde entstehen. Darum die beiden Bedingungen
+        // von Hand statt ueber den Zusatz: "r.status NOT IN (...)" allein
+        // waere bei fehlender Runde NULL und loeschte jede runden-lose
+        // Meldung still mit, auch wenn sie erlaubt waere.
+        [$zWo, $zWerte] = $zusatz('v', null);
+        if ($nurEreignisMitRunde) { $zWo .= ' AND v.rundgang_id IS NOT NULL'; }
+        if ($nurBeendet) {
+            $zWo .= ' AND (v.rundgang_id IS NULL OR r.status NOT IN ('
+                . implode(',', array_fill(0, count(RUNDGANG_OFFENE_STATUS), '?')) . '))';
+            $zWerte = array_merge($zWerte, RUNDGANG_OFFENE_STATUS);
+        }
         $rumpf = "FROM ereignis_meldung v
                   JOIN objekte o ON o.id = v.objekt_id
                   JOIN mitarbeiter m ON m.id = v.mitarbeiter_id
@@ -899,8 +967,7 @@ function wachbuch_eintraege(PDO $pdo, string $von, string $bis,
                   LEFT JOIN einsaetze e ON e.id = v.einsatz_id
                   LEFT JOIN rundgang r ON r.id = v.rundgang_id
                   LEFT JOIN rundgang_vorlage rv ON rv.id = r.rundgang_vorlage_id
-                 WHERE v.erfasst_am >= ? AND v.erfasst_am <= ?"
-                 . str_replace('{T}', 'v', $objektWo);
+                 WHERE v.erfasst_am >= ? AND v.erfasst_am <= ?" . $zWo;
         $t = wachbuch_quelle($pdo,
             "SELECT v.id, v.erfasst_am AS zeit, v.vorfall_am, v.uebermittelt_am,
                     v.bemerkung, v.foto_mime, v.lat, v.lng,
@@ -913,7 +980,7 @@ function wachbuch_eintraege(PDO $pdo, string $von, string $bis,
                     COALESCE(e.kunde_name, o.kunde_name) AS kunde_name,
                     m.vorname, m.nachname
              $rumpf ORDER BY v.erfasst_am DESC, v.id DESC",
-            "SELECT COUNT(*) $rumpf", $mitObjekt([$abVon, $bisEnde]), $grenze, $will('ereignis'));
+            "SELECT COUNT(*) $rumpf", array_merge([$abVon, $bisEnde], $zWerte), $grenze, $will('ereignis'));
         if ($t === null) { $quellen['ereignisse'] = 'fehler'; } else {
             $quellen['ereignisse'] = 'ok';
             $jeArt['ereignis'] = $t['anzahl'];

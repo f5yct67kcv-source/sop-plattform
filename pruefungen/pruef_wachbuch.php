@@ -288,6 +288,87 @@ pruef('KRITISCH: eine nicht abfragbare Quelle meldet "fehler", nicht stillschwei
     $kaputt['quellen']['ereignisse'] === 'fehler');
 $pdo->exec('ALTER TABLE ereignis_meldung_weg RENAME TO ereignis_meldung');
 
+// ══════════════ OBJEKTZUSCHNITT ALS LISTE (ENT-484, Kundenportal)
+// Das Portal schneidet nicht auf EIN Objekt zu, sondern auf alle Objekte des
+// angemeldeten Kunden.
+$pdo->exec("INSERT INTO rundgang (id, einsatz_id, mitarbeiter_id, objekt_id, status, rohzeit_start, rohzeit_ende)
+            VALUES (210, 102, 5, 2, 'abgeschlossen', '$T1 03:00:00', '$T1 03:20:00')");
+$beide = wachbuch_eintraege($pdo, $T2, $T0, [1, 2]);
+$nurZwei = wachbuch_eintraege($pdo, $T2, $T0, [2]);
+pruef('KRITISCH: eine Objektliste schneidet auf genau diese Objekte zu',
+    count($beide['eintraege']) === count($voll['eintraege']) + 1
+    && count($nurZwei['eintraege']) === 1
+    && $nurZwei['eintraege'][0]['id'] === 'rundgang-210');
+pruef('Eine Zahl und eine einelementige Liste bedeuten dasselbe',
+    count(wachbuch_eintraege($pdo, $T2, $T0, 2)['eintraege']) === 1);
+
+// Der gefaehrlichste Fall des ganzen Portals: Ein Zugang OHNE Objekte darf
+// nicht die Chronik aller sehen. Eine leere Liste heisst "nichts", nicht
+// "keine Einschraenkung" -- in SQL waere ein leeres IN() ein Syntaxfehler
+// oder, schlimmer, eine weggelassene Bedingung.
+$keine = wachbuch_eintraege($pdo, $T2, $T0, []);
+pruef('KRITISCH: eine LEERE Objektliste liefert nichts -- nicht alles',
+    count($keine['eintraege']) === 0 && $keine['gesamt'] === 0
+    && $keine['gezeigt'] === 0);
+
+// ══════════════ NUR BEENDETE RUNDEN (Portal, ENT-441 Punkt 5)
+// Ein Kunde soll den Nachweis sehen, nicht die Person bei der Arbeit. Runde
+// 205 laeuft und traegt den Scan 304.
+$mitLaufend = wachbuch_eintraege($pdo, $T2, $T0);
+$ohneLaufend = wachbuch_eintraege($pdo, $T2, $T0, null, WACHBUCH_GRENZE, null,
+    ['nur_beendete_runden' => true]);
+pruef('KRITISCH: mit dem Portal-Schalter faellt der Scan einer noch LAUFENDEN Runde weg',
+    in_array('scan-304', array_column($mitLaufend['eintraege'], 'id'), true)
+    && !in_array('scan-304', array_column($ohneLaufend['eintraege'], 'id'), true));
+pruef('KRITISCH: die Vorgaenge BEENDETER Runden bleiben vollstaendig da',
+    in_array('scan-301', array_column($ohneLaufend['eintraege'], 'id'), true)
+    && in_array('aufgabe-401', array_column($ohneLaufend['eintraege'], 'id'), true)
+    && in_array('rundgang-204', array_column($ohneLaufend['eintraege'], 'id'), true));
+// Auch die Zahl je Art muss den Schalter kennen -- sonst stuende neben einer
+// gekuerzten Chronik eine Zahl, die mehr verspricht, als sie zeigt.
+pruef('KRITISCH: die Zahl je Art zaehlt dasselbe, was die Liste zeigt',
+    $ohneLaufend['je_art']['scan'] === $mitLaufend['je_art']['scan'] - 1);
+
+// Eine Aufgabe an einer laufenden Runde faellt ebenso weg.
+$pdo->exec("INSERT INTO rundgang_aufgabe (id, rundgang_id, kontrollpunkt_id, aufgabe_id, bezeichnung, status, erfasst_am, uebermittelt_am)
+            VALUES (402, 205, 11, 62, 'Tuer pruefen', 'erledigt', '$T0 02:06:00', '$T0 02:07:00')");
+$ohneLaufend2 = wachbuch_eintraege($pdo, $T2, $T0, null, WACHBUCH_GRENZE, null,
+    ['nur_beendete_runden' => true]);
+pruef('KRITISCH: auch die Aufgabe einer laufenden Runde bleibt draussen',
+    !in_array('aufgabe-402', array_column($ohneLaufend2['eintraege'], 'id'), true)
+    && in_array('aufgabe-402',
+        array_column(wachbuch_eintraege($pdo, $T2, $T0)['eintraege'], 'id'), true));
+
+// ══════════════ EREIGNISSE NUR MIT RUNDE (Portal)
+// 501 haengt an Runde 201 (beendet), 503 an gar keiner, 504 an der laufenden 205.
+$pdo->exec("INSERT INTO ereignis_meldung (id, objekt_id, mitarbeiter_id, ereignisart_id,
+            erfasst_am, uebermittelt_am, bemerkung)
+            VALUES (503, 1, 5, 31, '$T1 20:00:00', '$T1 20:01:00', 'Ohne Runde gemeldet')");
+$pdo->exec("INSERT INTO ereignis_meldung (id, objekt_id, rundgang_id, mitarbeiter_id, ereignisart_id,
+            erfasst_am, uebermittelt_am, bemerkung)
+            VALUES (504, 1, 205, 5, 31, '$T0 02:10:00', '$T0 02:11:00', 'Waehrend der laufenden Runde')");
+$alle = array_column(wachbuch_eintraege($pdo, $T2, $T0)['eintraege'], 'id');
+pruef('Ohne Schalter stehen alle drei Meldungen da',
+    in_array('ereignis-501', $alle, true) && in_array('ereignis-503', $alle, true)
+    && in_array('ereignis-504', $alle, true));
+$portal = array_column(wachbuch_eintraege($pdo, $T2, $T0, null, WACHBUCH_GRENZE, null,
+    ['nur_beendete_runden' => true, 'nur_ereignisse_mit_runde' => true])['eintraege'], 'id');
+pruef('KRITISCH: mit Schalter bleibt nur die Meldung an einer BEENDETEN Runde',
+    in_array('ereignis-501', $portal, true)
+    && !in_array('ereignis-503', $portal, true)
+    && !in_array('ereignis-504', $portal, true));
+// Die beiden Schalter sind getrennt und duerfen sich nicht gegenseitig
+// erledigen: "nur beendete Runden" allein darf eine Meldung OHNE Runde nicht
+// mitloeschen -- sie haengt an keiner, also kann keine von ihr laufen.
+$nurBeendet = array_column(wachbuch_eintraege($pdo, $T2, $T0, null, WACHBUCH_GRENZE, null,
+    ['nur_beendete_runden' => true])['eintraege'], 'id');
+pruef('KRITISCH: "nur beendete Runden" allein loescht eine Meldung OHNE Runde nicht mit',
+    in_array('ereignis-503', $nurBeendet, true)
+    && !in_array('ereignis-504', $nurBeendet, true));
+$pdo->exec('DELETE FROM ereignis_meldung WHERE id IN (503, 504)');
+$pdo->exec('DELETE FROM rundgang_aufgabe WHERE id = 402');
+$pdo->exec('DELETE FROM rundgang WHERE id = 210');
+
 // ══════════════ OHNE FOTO-SPALTE (VOR DER EINRICHTUNG)
 $GLOBALS['spalten']['rundgang_scan.foto_mime'] = false;
 $pdo->exec('ALTER TABLE rundgang_scan RENAME COLUMN foto_mime TO foto_mime_weg');
