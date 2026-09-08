@@ -148,13 +148,44 @@ const leer = grund => ({
   objekte: [], rundgaenge: [], leer_grund: grund,
 });
 
+// Der Weg einer Runde (ENT-474). Veraenderlich, weil drei verschiedene
+// Antworten drei verschiedene Texte ergeben muessen.
+const WEG_VOLL = {
+  status: 'ok', eingerichtet: true, aufbewahrung_tage: 90,
+  punkte: [
+    { lat: 47.05, lng: 7.62, genauigkeit_m: 6, erfasst_am: `${vorTagen(8)} 23:14:00` },
+    { lat: 47.0505, lng: 7.6208, genauigkeit_m: 9, erfasst_am: `${vorTagen(8)} 23:20:00` },
+    { lat: 47.0511, lng: 7.6215, genauigkeit_m: 9, erfasst_am: `${vorTagen(8)} 23:33:00` },
+  ],
+};
+let wegAntwort = WEG_VOLL;
+// Wie oft Google Maps angefragt wurde. Die Kernzusage von ENT-474 ist, dass
+// das VOR dem Knopfdruck NIE passiert -- ein Zaehler ist dafuer der einzige
+// belastbare Nachweis.
+let kartenRufe = 0;
+
 let antwort = VOLL;
 let anmeldeFehler = false;
 let pwFehler = null;
 let calls = [];
 
-function setup(page) {
-  return page.route('**/api/**', async route => {
+// Attrappe fuer Google Maps. Ohne sie liefe die Pruefung ins Netz -- und
+// eine Pruefung, die vom Netz abhaengt, prueft das Netz. Sie ahmt genau die
+// vier Bausteine nach, die wegKarteBauen() benutzt, und haelt fest, was
+// ankam: die Zahl der Punkte in der Linie und dass die Karte gebaut wurde.
+const MAPS_ATTRAPPE = `
+  window.__karteGebaut = 0; window.__pfadPunkte = 0; window.__marken = 0;
+  window.google = { maps: {
+    Map: function (el) { window.__karteGebaut++; el.dataset.karte = '1';
+                         this.fitBounds = function () {}; },
+    Polyline: function (o) { window.__pfadPunkte = (o.path || []).length; },
+    Marker: function () { window.__marken++; },
+    LatLngBounds: function () { this.extend = function () {}; },
+    SymbolPath: { CIRCLE: 0 },
+  } };`;
+
+async function setup(page) {
+  await page.route('**/api/**', async route => {
     const req = route.request();
     const path = new URL(req.url()).pathname.split('/api/')[1];
     calls.push({ path, rumpf: req.postData() });
@@ -178,6 +209,7 @@ function setup(page) {
       return send({ status: 'ok', token: 't', name: 'A. Beispielperson',
         kunde: 'Muster Liegenschaften AG' });
     }
+    if (path.includes('portal_rundgang_weg')) return send(wegAntwort);
     if (path.includes('portal_rundgang_detail')) {
       const id = Number(new URL(req.url()).searchParams.get('rundgang_id'));
       const d = DETAILS[id];
@@ -193,6 +225,18 @@ function setup(page) {
     if (path.includes('portal_rundgaenge')) return send(antwort);
     if (path.includes('portal_abmelden')) return send({ status: 'ok' });
     return send({ status: 'ok' });
+  });
+  // NACH der API-Route registriert, und das ist keine Geschmacksfrage:
+  // Playwright nimmt bei mehreren Treffern die ZULETZT gesetzte Route, und
+  // das Muster "**/api/**" passt auch auf
+  // maps.googleapis.com/maps/**api**/js. In der anderen Reihenfolge bekommt
+  // das Maps-Skript JSON geliefert und stirbt mit "Unexpected token ':'" --
+  // die Karte sieht dann aus, als liesse sie sich nicht laden, und man sucht
+  // den Fehler im Portal statt in der Attrappe.
+  await page.route('https://maps.googleapis.com/**', route => {
+    kartenRufe++;
+    return route.fulfill({ status: 200, contentType: 'application/javascript',
+      body: MAPS_ATTRAPPE });
   });
 }
 
@@ -649,6 +693,91 @@ check('KRITISCH: der Fotobeleg erscheint als Bild, nicht als Platzhaltertext',
 // zuklappt, nimmt gerade das weg, wofür man ihn öffnet.
 check('Ein zweiter und dritter Aufklapper schliessen die vorigen nicht',
   await page.evaluate(() => document.querySelectorAll('#liste .detail').length === 3));
+
+// ══ Der Weg auf der Karte (ENT-474) ═════════════════════════════════════
+// DIE KERNZUSAGE: Er kommt erst auf den Knopf. Das ist keine Bequemlichkeit,
+// sondern der Grund, aus dem der Projektinhaber ENT-441 Punkt 3 überhaupt
+// nur so weit revidiert hat. Drei Runden sind hier aufgeklappt — wäre die
+// Spur Teil des Details, stünde sie längst dreifach geladen da.
+check('KRITISCH: das Aufklappen lädt die Bewegungsspur NICHT',
+  !calls.some(c => c.path.includes('portal_rundgang_weg')));
+check('KRITISCH: und Google wird dabei überhaupt nicht angefragt', kartenRufe === 0);
+check('Der Hinweis sagt vorher, dass die Karte von Google kommt',
+  /von Google/.test(detail3));
+// Auf dem Handy gilt dasselbe Mass wie für jedes andere Bedienelement.
+// Ohne Null-Absicherung stuerzt diese Zusage ab, statt sich zu melden, wenn
+// der Knopf fehlt -- und dann kommt die Zusammenfassung mit den BENANNTEN
+// Aussagen nie. Bei der Gegenprobe genau so passiert.
+check('KRITISCH: der Knopf ist auf dem Handy mindestens 44 px hoch',
+  await page.evaluate(() => {
+    const k = document.querySelector('[data-weg]');
+    return !!k && k.getBoundingClientRect().height >= 44;
+  }));
+
+await klick('[data-weg="12"]');
+await page.waitForTimeout(500);
+check('KRITISCH: erst der Knopf holt den Weg',
+  calls.some(c => c.path.includes('portal_rundgang_weg')));
+check('KRITISCH: und erst dann wird Google angefragt', kartenRufe === 1);
+const karte = await page.evaluate(() => ({
+  gebaut: window.__karteGebaut, punkte: window.__pfadPunkte, marken: window.__marken,
+  behaelter: !!document.querySelector('#liste .detail .weg-karte[data-karte]'),
+  fuss: (document.querySelector('#liste .detail .weg-fuss') || {}).textContent || '',
+}));
+check('KRITISCH: die Karte wird gebaut und der Weg als Linie darauf gezeichnet',
+  karte.gebaut === 1 && karte.behaelter && karte.punkte === 3);
+// Eine Linie allein sagt nicht, in welche Richtung gelaufen wurde.
+check('Anfang und Ende sind markiert', karte.marken === 2);
+// Die Genauigkeit gehört dazu: Ein Punkt mit 80 m Streuung sieht auf der
+// Karte genauso scharf aus wie einer mit 5 m.
+check('KRITISCH: der Fuss nennt Messpunkte UND Genauigkeit — ohne sie zieht man Schlüsse, die die Messung nicht hergibt',
+  /3 Messpunkte/.test(karte.fuss) && /± 8 m/.test(karte.fuss));
+check('Und die Aufbewahrungsfrist', /90 Tage/.test(karte.fuss));
+await page.screenshot({ path: `${OUT}/portal-10-weg-handy.png` });
+
+// Die Frist steht NICHT als Zahl im Anzeigetext: Stünde sie an zwei Orten,
+// liefen Server und Oberfläche auseinander und die Seite behauptete eine
+// Frist, die nicht gilt.
+wegAntwort = { ...WEG_VOLL, aufbewahrung_tage: 45 };
+await page.evaluate(() => document.querySelectorAll('#liste .zeile')[2].click());
+await page.waitForTimeout(200);
+await page.evaluate(() => document.querySelectorAll('#liste .zeile')[2].click());
+await page.waitForTimeout(400);
+await klick('[data-weg="12"]');
+await page.waitForTimeout(400);
+check('KRITISCH: die Aufbewahrungsfrist kommt vom Server, nicht aus dem Text',
+  /45 Tage/.test(await page.evaluate(() => {
+    const f = document.querySelector('#liste .detail .weg-fuss');
+    return f ? f.textContent : '';
+  })));
+
+// Drei verschiedene Aussagen, drei verschiedene Texte (Hausregel).
+const wegText = async (fall) => {
+  wegAntwort = fall;
+  await page.evaluate(() => document.querySelectorAll('#liste .zeile')[2].click());
+  await page.waitForTimeout(200);
+  await page.evaluate(() => document.querySelectorAll('#liste .zeile')[2].click());
+  await page.waitForTimeout(400);
+  await klick('[data-weg="12"]');
+  await page.waitForTimeout(400);
+  return page.evaluate(() => {
+    const t = document.querySelectorAll('#liste .zeile')[2].nextElementSibling;
+    const h = t && t.querySelector('.weg-huelle');
+    return h ? h.textContent : '(keine Weg-Hülle)';
+  });
+};
+const ohnePunkte = await wegText({ status: 'ok', eingerichtet: true, aufbewahrung_tage: 90, punkte: [] });
+check('KRITISCH: „kein Weg aufgezeichnet" sagt auch, warum das sein kann',
+  /kein Weg aufgezeichnet/.test(ohnePunkte)
+  && /vor der Aufzeichnung|keinen Standort/.test(ohnePunkte));
+const nichtEing = await wegText({ status: 'ok', eingerichtet: false, aufbewahrung_tage: 90, punkte: [] });
+check('KRITISCH: „noch nicht eingerichtet" ist ein ANDERER Text als „kein Weg vorhanden"',
+  nichtEing !== ohnePunkte && /noch nicht\s+aufgezeichnet/.test(nichtEing));
+// Dem Kunden wird nicht erzählt, dass im Betrieb eine Einrichtung fehlt --
+// das ist eine Auskunft über den Betrieb und geht ihn nichts an.
+check('KRITISCH: und er verrät dem Kunden nichts über den Zustand des Betriebs',
+  !/Einrichtung|einrichten|Datenbank|Tabelle/i.test(nichtEing));
+wegAntwort = WEG_VOLL;
 await page.screenshot({ path: `${OUT}/portal-08-detail-handy.png` });
 
 // Erst alles zuklappen, damit die naechste Zusage bei null anfaengt.
