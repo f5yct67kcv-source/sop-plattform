@@ -56,7 +56,7 @@ $m['revierdienst_berechtigt'] = (bool)$m['revierdienst_berechtigt'];
 // waere ein Eingabefeld fuer eine fehlende Spalte ein Versprechen, das der
 // Server beim Speichern nicht halten kann.
 $aenderbar = array_values(array_filter(
-    ma_selbst_aenderbare_felder(), fn($f) => array_key_exists($f, $vorhanden)
+    ma_selbst_sichtbare_felder(), fn($f) => array_key_exists($f, $vorhanden)
 ));
 
 json_response([

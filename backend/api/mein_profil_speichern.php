@@ -85,9 +85,32 @@ const SELBST_MAXLAENGE = [
 const SELBST_BESCHRIFTUNG = [
     'strasse' => 'Strasse', 'hausnummer' => 'Hausnummer',
     'adresszusatz' => 'Adresszusatz', 'plz' => 'PLZ', 'ort' => 'Ort',
-    'land' => 'Land', 'telefon' => 'Telefon', 'mobil' => 'Mobil',
-    'email_privat' => 'Private E-Mail', 'notfallkontakt' => 'Notfallkontakt',
+    'land' => 'Land',
+    // Seit ENT-466 gibt es EINE private Nummer, und sie steht in 'mobil'.
+    // Auf dem Bildschirm heisst sie schlicht "Telefon" -- das Wort, das
+    // alle sagen. 'telefon' ist die alte Festnetzspalte; sie taucht in
+    // keiner Eingabe mehr auf und wird nur noch geleert.
+    'telefon' => 'Festnetz (alt)', 'mobil' => 'Telefon',
+    'email_privat' => 'E-Mail', 'notfallkontakt' => 'Notfallkontakt',
 ];
+
+// Pflichtangaben (ENT-466). Der Projektinhaber: *"Ich würde zudem alle
+// Felder als Pflichtfeld erfassen."* Zwei Felder stehen bewusst NICHT
+// darin:
+//
+//   * adresszusatz -- die meisten haben keinen. Erzwungen traegt jemand
+//     "-" oder "keiner" ein, und das steht danach dauerhaft in der
+//     Adresszeile ("Musterweg 1, -, 9999 Musterstadt"). Ein erfundener
+//     Wert ist schlechter als ein leerer, weil er wie eine Angabe aussieht.
+//   * telefon -- die alte Festnetzspalte, seit ENT-466 nicht mehr auf dem
+//     Bildschirm. Ein Pflichtfeld, das niemand sehen kann, waere eine
+//     Sperre ohne Ausweg.
+//
+// Geprueft wird der Zustand NACH dem Speichern, nicht der Anfragerumpf:
+// Eine Teilanfrage darf durch, solange der Datensatz danach vollstaendig
+// ist. Sonst scheiterte ein Formular, das nur einen Abschnitt sendet.
+const SELBST_PFLICHT = ['strasse', 'hausnummer', 'plz', 'ort', 'land',
+    'mobil', 'email_privat', 'notfallkontakt'];
 
 $input = json_decode(file_get_contents('php://input'), true) ?? [];
 if (!is_array($input)) { $input = []; }
@@ -119,13 +142,25 @@ foreach ($erlaubt as $feld) {
     $s[$feld] = $wert;
 }
 
-// Strasse und Ort sind der Kern einer Adresse. Wer sie leert, hat sich
-// nicht "entschieden, keine Adresse zu haben" -- er hat sich vertippt oder
-// das Feld versehentlich geleert. Alle uebrigen Felder duerfen leer sein:
-// Ein Adresszusatz faellt beim Umzug tatsaechlich weg, und nicht jede
-// Person hat eine private E-Mail-Adresse.
-foreach (['strasse', 'ort'] as $pflicht) {
-    if (array_key_exists($pflicht, $s) && $s[$pflicht] === '') {
+// Eine private Nummer, nicht zwei (ENT-466). Bis dahin fuehrte die Akte
+// Festnetz und Mobil getrennt; der Projektinhaber: *"2026 hat fast niemand
+// mehr ein Festnetz."* Geschrieben wird nur noch 'mobil'. Steht in der
+// alten Festnetzspalte noch etwas, wird sie beim ersten Speichern geleert
+// -- sonst stuende dieselbe Nummer an zwei Stellen, genau der Zustand, der
+// weggeraeumt werden sollte. Das Logbuch haelt beide Schritte fest.
+if (array_key_exists('mobil', $s) && array_key_exists('telefon', $vorhanden)
+    && trim((string)($bestand['telefon'] ?? '')) !== '') {
+    $s['telefon'] = '';
+}
+
+// Pflichtangaben. Geprueft wird der Wert, der NACH dem Speichern in der
+// Akte steht -- der neue, falls mitgeschickt, sonst der bestehende.
+foreach (SELBST_PFLICHT as $pflicht) {
+    if (!array_key_exists($pflicht, $vorhanden)) { continue; }
+    $danach = array_key_exists($pflicht, $s)
+        ? $s[$pflicht]
+        : trim((string)($bestand[$pflicht] ?? ''));
+    if ($danach === '') {
         $fehler[] = (SELBST_BESCHRIFTUNG[$pflicht] ?? $pflicht) . ' darf nicht leer sein';
     }
 }
@@ -135,7 +170,7 @@ foreach (['strasse', 'ort'] as $pflicht) {
 // dann, wenn er sie am dringendsten braucht.
 if (array_key_exists('email_privat', $s) && $s['email_privat'] !== ''
     && !filter_var($s['email_privat'], FILTER_VALIDATE_EMAIL)) {
-    $fehler[] = 'Private E-Mail: keine gültige Adresse';
+    $fehler[] = 'E-Mail: keine gültige Adresse';
 }
 
 // Beanstandungen VOR dem Hinweis auf eine leere Anfrage. Eine zu lange
@@ -159,12 +194,30 @@ if (!$s) {
 // waere Theater.
 $mailNeu = array_key_exists('email_privat', $s)
     && $s['email_privat'] !== trim((string)($bestand['email_privat'] ?? ''));
+// Die Wiederholung wird HIER geprueft, nicht nur im Browser (ENT-466).
+// Anlass ist ein tatsaechlicher Vorfall: ein Zahlendreher in der Adresse,
+// und das Passwort liess sich danach nicht mehr zuruecksetzen. Eine
+// Sperre, die nur im Browser sitzt, ist keine -- und der Browser ist
+// genau die Stelle, an der ein Fehler den Vorfall ueberhaupt erst
+// ermoeglicht hat.
+//
+// EHRLICHE GRENZE: Das faengt den Vertipper, nicht die gueltige, aber
+// falsche Adresse. Dagegen hilft nur eine Bestaetigungsmail -- als
+// eigener Punkt festgehalten, nicht hier angehaengt.
+if ($mailNeu) {
+    $wdh = trim((string)($input['email_privat2'] ?? ''));
+    if ($wdh !== $s['email_privat']) {
+        json_response(['status' => 'error', 'mail_wiederholung' => true,
+            'message' => 'Die beiden E-Mail-Adressen stimmen nicht überein.'], 400);
+    }
+}
+
 if ($mailNeu) {
     $pw = (string)($input['passwort'] ?? '');
     $hash = (string)($bestand['password_hash'] ?? '');
     if ($pw === '' || $hash === '' || !password_verify($pw, $hash)) {
         json_response(['status' => 'error', 'passwort_noetig' => true,
-            'message' => 'Zum Ändern der privaten E-Mail-Adresse ist dein Passwort nötig.'], 401);
+            'message' => 'Zum Ändern deiner E-Mail-Adresse ist dein Passwort nötig.'], 401);
     }
 }
 

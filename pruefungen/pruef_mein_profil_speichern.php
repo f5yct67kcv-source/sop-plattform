@@ -44,17 +44,22 @@ const PW_ECHT = 'richtig-langes-testpasswort';
 // angeruehrt wurde -- der Vergleich zweier Laeufe scheiterte immer am Hash.
 // Erfundenes Testpasswort, kein Zugang zu irgendetwas.
 $hash = '$2y$04$kv7/UP97CyQLhIGsM8/tw.wzWMXAq48lAMBVGpL4Iat/ymujXJJJS';
+// 'land' ist seit ENT-466 Pflicht und darum hier gesetzt -- ein
+// unvollstaendiges Testkonto liesse jede gewoehnliche Speicherung
+// scheitern und verdeckte damit, was eigentlich geprueft werden soll.
 $einf = $pdo->prepare('INSERT INTO mitarbeiter (id, name, password_hash, personalnummer,
-    geburtsdatum, ahv_nr, zivilstand, strasse, hausnummer, plz, ort, telefon, mobil,
+    geburtsdatum, ahv_nr, zivilstand, strasse, hausnummer, plz, ort, land, telefon, mobil,
     email, email_privat, notfallkontakt, ist_admin, aktiv, erstellt_am)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?)');
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?)');
 // Erfundene Angaben, keine echten Personen (CLAUDE.md, Vertraulichkeit).
 $einf->execute([1, 'muster.person', $hash, '1001', '1980-02-03', '756.0000.0000.00',
-    'ledig', 'Musterweg', '1', '9999', 'Musterstadt', '000 000 00 01', '000 000 00 02',
+    'ledig', 'Musterweg', '1', '9999', 'Musterstadt', 'Musterland',
+    '000 000 00 01', '000 000 00 02',
     'muster.person@beispiel.invalid', 'privat@beispiel.invalid', 'Muster Notfall',
     0, '2025-01-01 00:00:00']);
 $einf->execute([2, 'zweite.person', $hash, '1002', '1975-04-05', '756.1111.1111.11',
-    'ledig', 'Andersweg', '9', '1111', 'Andersstadt', '000 000 00 03', '000 000 00 04',
+    'ledig', 'Andersweg', '9', '1111', 'Andersstadt', 'Anderland',
+    '000 000 00 03', '000 000 00 04',
     'zweite.person@beispiel.invalid', 'zweite@beispiel.invalid', 'Anderer Notfall',
     0, '2025-01-01 00:00:00']);
 

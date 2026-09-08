@@ -73,7 +73,23 @@ try {
 
 // ── Die private E-Mail haengt am Passwort-Ruecksetzweg ────────────────────
 try {
-  const ohne = aufruf({ email_privat: 'neu@beispiel.invalid', strasse: 'Mitgeschmuggelt' });
+  // Die Wiederholung fehlt ganz -- der Server laesst die Aenderung nicht
+  // durch, obwohl der Browser sie geschickt haben koennte (ENT-466).
+  const ohneWdh = aufruf({ email_privat: 'neu@beispiel.invalid' });
+  check('KRITISCH: neue E-Mail ohne Wiederholung wird abgelehnt',
+    ohneWdh.pruefung.http === 400 && ohneWdh.mail_wiederholung === true
+    && ohneWdh.pruefung.ich.email_privat === 'privat@beispiel.invalid');
+
+  // Der Zahlendreher, der den Vorfall ausgeloest hat: zwei Adressen, die
+  // sich um zwei Zeichen unterscheiden.
+  const dreher = aufruf({ email_privat: 'neu@beispiel.invalid',
+    email_privat2: 'nue@beispiel.invalid', passwort: PW });
+  check('KRITISCH: ein Zahlendreher in der Wiederholung wird erkannt',
+    dreher.pruefung.http === 400 && dreher.mail_wiederholung === true
+    && dreher.pruefung.ich.email_privat === 'privat@beispiel.invalid');
+
+  const ohne = aufruf({ email_privat: 'neu@beispiel.invalid',
+    email_privat2: 'neu@beispiel.invalid', strasse: 'Mitgeschmuggelt' });
   check('KRITISCH: neue private E-Mail ohne Passwort wird abgelehnt',
     ohne.pruefung.http === 401 && ohne.passwort_noetig === true);
   check('KRITISCH: dabei wird die Adresse NICHT geaendert',
@@ -81,12 +97,14 @@ try {
   check('KRITISCH: und auch sonst nichts aus derselben Anfrage',
     ohne.pruefung.ich.strasse === 'Musterweg' && ohne.pruefung.logbuch.length === 0);
 
-  const falsch = aufruf({ email_privat: 'neu@beispiel.invalid', passwort: 'falsch' });
+  const falsch = aufruf({ email_privat: 'neu@beispiel.invalid',
+    email_privat2: 'neu@beispiel.invalid', passwort: 'falsch' });
   check('KRITISCH: falsches Passwort wird abgelehnt',
     falsch.pruefung.http === 401
     && falsch.pruefung.ich.email_privat === 'privat@beispiel.invalid');
 
-  const richtig = aufruf({ email_privat: 'neu@beispiel.invalid', passwort: PW });
+  const richtig = aufruf({ email_privat: 'neu@beispiel.invalid',
+    email_privat2: 'neu@beispiel.invalid', passwort: PW });
   check('Mit richtigem Passwort geht die neue Adresse durch',
     richtig.status === 'ok' && richtig.pruefung.ich.email_privat === 'neu@beispiel.invalid');
 
@@ -114,21 +132,66 @@ try {
   check('KRITISCH: zu lange Eingabe wird als ZU LANG gemeldet, nicht als leere Anfrage',
     lang.pruefung.http === 400 && /200/.test(lang.message) && !/nichts/i.test(lang.message));
 
-  const mail = aufruf({ email_privat: 'keineadresse', passwort: PW });
+  const mail = aufruf({ email_privat: 'keineadresse',
+    email_privat2: 'keineadresse', passwort: PW });
   check('Eine E-Mail ohne @ wird abgelehnt', mail.pruefung.http === 400);
 
   const nichts = aufruf({ ahv_nr: '756.9999.9999.99' });
   check('Eine Anfrage ganz ohne erlaubtes Feld wird als solche gemeldet',
     nichts.pruefung.http === 400 && /nichts/i.test(nichts.message));
 
-  const frei = aufruf({ notfallkontakt: '', adresszusatz: '' });
-  check('Freiwillige Felder duerfen geleert werden',
-    frei.status === 'ok' && frei.pruefung.ich.notfallkontakt === '');
+  const frei = aufruf({ adresszusatz: '' });
+  check('Der Adresszusatz darf geleert werden -- er ist das einzige freiwillige Feld',
+    frei.status === 'ok' && frei.pruefung.ich.adresszusatz === '');
 
   const get = aufruf({ strasse: 'Egal' }, 'get');
   check('Ohne POST passiert nichts',
     get.pruefung.http === 405 && get.pruefung.ich.strasse === 'Musterweg');
 } catch (e) { check('Abschnitt Eingabepruefung ohne Abbruch: ' + e.message, false); }
+
+// ── Eine Nummer statt zwei (ENT-466) ─────────────────────────────────────
+try {
+  const a = aufruf({ mobil: '000 000 00 09' });
+  check('KRITISCH: die eine Nummer landet in der Mobil-Spalte',
+    a.status === 'ok' && a.pruefung.ich.mobil === '000 000 00 09');
+  check('KRITISCH: die alte Festnetzspalte wird dabei geleert',
+    a.pruefung.ich.telefon === '');
+  const log = a.pruefung.logbuch;
+  check('Beide Schritte stehen im Logbuch, nicht nur der eine',
+    log.length === 2 && log.some(e => e.feld === 'mobil')
+    && log.some(e => e.feld === 'telefon' && e.wert_neu === ''));
+  check('Die Nummer der anderen Person bleibt unangetastet',
+    a.pruefung.andere.telefon === '000 000 00 03'
+    && a.pruefung.andere.mobil === '000 000 00 04');
+  // Wer die Nummer nicht anfasst, dem wird auch nichts geleert.
+  const b = aufruf({ strasse: 'Nurdieadresse' });
+  check('Ohne Nummernaenderung bleibt die Festnetzspalte, wie sie war',
+    b.pruefung.ich.telefon === '000 000 00 01');
+} catch (e) { check('Abschnitt eine Nummer ohne Abbruch: ' + e.message, false); }
+
+// ── Pflichtangaben (ENT-466) ─────────────────────────────────────────────
+try {
+  const pflicht = ['strasse', 'hausnummer', 'plz', 'ort', 'land', 'mobil',
+    'email_privat', 'notfallkontakt'];
+  const durchgelassen = [];
+  for (const f of pflicht) {
+    const koerper = { [f]: '' };
+    // Die E-Mail braucht zusaetzlich die Wiederholung, sonst greift die
+    // andere Sperre zuerst und die Pflichtpruefung bliebe ungetestet.
+    if (f === 'email_privat') { koerper.email_privat2 = ''; koerper.passwort = PW; }
+    const r = aufruf(koerper);
+    if (r.pruefung.http === 200) { durchgelassen.push(f); }
+  }
+  check('KRITISCH: kein Pflichtfeld laesst sich leeren', durchgelassen.length === 0);
+  durchgelassen.forEach(f => bad.push('leerbar, obwohl Pflicht: ' + f));
+
+  // Die Pflicht gilt fuer den Zustand NACH dem Speichern, nicht fuer den
+  // Anfragerumpf: Ein Formular, das nur einen Abschnitt sendet, muss
+  // durchkommen, solange der Datensatz danach vollstaendig ist.
+  const teil = aufruf({ strasse: 'Nureinabschnitt' });
+  check('Eine Teilanfrage geht durch, wenn der Datensatz danach vollstaendig ist',
+    teil.status === 'ok' && teil.pruefung.ich.strasse === 'Nureinabschnitt');
+} catch (e) { check('Abschnitt Pflichtangaben ohne Abbruch: ' + e.message, false); }
 
 // ── Logbuch: die Verwaltung sieht die Aenderung, ohne freigeben zu muessen ─
 try {
@@ -206,6 +269,36 @@ try {
   if (fehlend.length) { bad.push('ohne Hoechstlaenge im Server: ' + fehlend.join(', ')); }
   const uneins = aenderbar.filter(f => f in server && f in browser && server[f] !== browser[f]);
   check('KRITISCH: Browser- und Serverlaengen stimmen ueberein', uneins.length === 0);
+
+  // Sichtbar ist eine Untermenge von aenderbar, und der Unterschied ist
+  // genau die alte Festnetzspalte (ENT-466). Waere sie auch sichtbar,
+  // stuenden zwei Nummernfelder da; fehlte sie oben, koennte der Server
+  // sie nicht mehr leeren.
+  const sichtbar = namen(maQuelle, 'function ma_selbst_sichtbare_felder');
+  const abgeleitet = rumpf(maQuelle, 'function ma_selbst_sichtbare_felder');
+  check('KRITISCH: die sichtbaren Felder werden aus den aenderbaren ABGELEITET',
+    /ma_selbst_aenderbare_felder\s*\(\)/.test(abgeleitet));
+  check('KRITISCH: genau die alte Festnetzspalte ist nicht mehr sichtbar',
+    sichtbar.length === 1 && sichtbar[0] === 'telefon');
+
+  // Pflichtliste: der Server sperrt, der Browser erspart den Weg dorthin.
+  // Laufen sie auseinander, blockiert einer von beiden etwas, das der
+  // andere durchlaesst.
+  // Eine const-Liste endet mit "];", nicht mit "\n}" -- rumpf() taugt hier
+  // nicht und zoege sonst Namen aus dem halben Endpunkt mit herein.
+  const listeAus = (text, name) => [...((text.match(
+    new RegExp('const ' + name + '\\s*=\\s*\\[[^\\]]*\\]')) || [''])[0])
+    .matchAll(/'([a-z_]+)'/g)].map(m => m[1]);
+  const pflichtServer = listeAus(epQuelle, 'SELBST_PFLICHT');
+  const pflichtBrowser = listeAus(appQuelle, 'MD_PFLICHT');
+  check('Beide Pflichtlisten sind ueberhaupt lesbar',
+    pflichtServer.length >= 6 && pflichtBrowser.length >= 6);
+  check('KRITISCH: Pflichtliste im Server und im Browser sind dieselbe',
+    JSON.stringify([...pflichtServer].sort()) === JSON.stringify([...pflichtBrowser].sort()));
+  check('KRITISCH: der Adresszusatz ist in keiner der beiden Pflichtlisten',
+    !pflichtServer.includes('adresszusatz') && !pflichtBrowser.includes('adresszusatz'));
+  check('KRITISCH: die alte Festnetzspalte ist kein Pflichtfeld -- sie hat kein Eingabefeld mehr',
+    !pflichtServer.includes('telefon'));
   if (uneins.length) {
     uneins.forEach(f => bad.push(`Laenge uneins bei ${f}: Server ${server[f]}, Browser ${browser[f]}`));
   }
@@ -224,8 +317,10 @@ const PROFIL = {
   email: 'muster.person@beispiel.invalid', email_privat: 'privat@beispiel.invalid',
   notfallkontakt: '', revierdienst_berechtigt: 0,
 };
+// Was der Server als BEARBEITBAR meldet (ma_selbst_sichtbare_felder): ohne
+// die alte Festnetzspalte, seit ENT-466 gibt es nur noch eine Nummer.
 const AENDERBAR = ['strasse', 'hausnummer', 'adresszusatz', 'plz', 'ort', 'land',
-  'telefon', 'mobil', 'email_privat', 'notfallkontakt'];
+  'mobil', 'email_privat', 'notfallkontakt'];
 
 // art: 'normal' | 'ohne' (der Server gibt nichts frei) | 'fehler'
 async function seite(breite, hoehe, art = 'normal') {
@@ -286,7 +381,19 @@ try {
   if (stumm.length) { bad.push('wortlos leer: ' + stumm.map(z => z.titel).join(', ')); }
   const leere = a.zeilen.filter(z => z.alsLeerAusgewiesen);
   check('KRITISCH: leere Angaben sind ausdruecklich als nicht erfasst gekennzeichnet',
-    leere.length >= 2 && leere.every(z => z.wert.length > 3));
+    leere.length >= 1 && leere.every(z => z.wert.length > 3));
+  // Eine Nummer, eine Adresse (ENT-466): kein zweites Telefonfeld, keine
+  // Geschaeftsadresse mehr auf diesem Bildschirm.
+  const titel = a.zeilen.map(z => z.titel.toLowerCase());
+  check('KRITISCH: es steht genau EINE Telefonzeile da',
+    titel.filter(t => /telefon|mobil/.test(t)).length === 1);
+  check('KRITISCH: es steht genau EINE E-Mail-Zeile da',
+    titel.filter(t => /mail/.test(t)).length === 1);
+  // Die Nummer steht im Muster noch in der alten Festnetzspalte -- sie
+  // muss trotzdem erscheinen, sonst waere sie fuer die Person verschwunden.
+  const nummer = a.zeilen.find(z => /telefon/.test(z.titel.toLowerCase()));
+  check('KRITISCH: eine Nummer aus der alten Spalte verschwindet nicht',
+    !!nummer && nummer.wert.includes('000 000 00 01'));
   check('Der Knopf zum Bearbeiten ist da', a.knopf);
   await page.close();
 } catch (e) { check('Abschnitt Anzeige ohne Abbruch: ' + e.message, false); }
@@ -400,6 +507,9 @@ try {
   await page.waitForTimeout(150);
   await page.fill('#md-strasse', 'Neuweg');
   await page.fill('#md-notfallkontakt', 'Zweite Person, 000 000 00 05');
+  // Seit ENT-466 Pflicht und im Muster leer -- ohne sie sperrt schon der
+  // Browser, und der Server bekaeme die Anfrage nie zu sehen.
+  await page.fill('#md-land', 'Musterland');
   await page.click('#mdKnopfSpeichern');
   await page.waitForTimeout(400);
   const g = page.gesendet[0] || {};
@@ -415,12 +525,86 @@ try {
   await page.close();
 } catch (e) { check('Abschnitt Absenden ohne Abbruch: ' + e.message, false); }
 
+// ── Pflicht, Freiwilligkeit und die Wiederholung (ENT-466) ───────────────
+try {
+  const page = await seite(390, 844);
+  await page.click('#mdKnopfAuf');
+  await page.waitForTimeout(150);
+
+  const marken = await page.evaluate(() => [...document.querySelectorAll('#md-bd .f label')]
+    .map(l => ({ fuer: l.getAttribute('for') || '',
+                 frei: !!l.querySelector('.md-frei') })));
+  const freie = marken.filter(m => m.frei).map(m => m.fuer);
+  check('KRITISCH: genau ein Feld ist als freiwillig ausgewiesen -- der Adresszusatz',
+    freie.length === 1 && freie[0] === 'md-adresszusatz');
+
+  // Im Muster fehlen Land und Notfallkontakt. Wer das erst beim Speichern
+  // erfaehrt, haelt das Formular fuer kaputt.
+  const hinweis = await page.evaluate(() =>
+    (document.querySelector('#md-bd .md-fehlt') || { innerText: '' }).innerText.trim());
+  check('KRITISCH: fehlende Pflichtangaben stehen OBEN im Formular, nicht erst nach dem Speichern',
+    hinweis.length > 10 && hinweis.startsWith('2'));
+
+  // Ein geleertes Pflichtfeld kommt gar nicht erst zum Server.
+  await page.fill('#md-land', 'Musterland');
+  await page.fill('#md-notfallkontakt', 'Jemand, 000 000 00 05');
+  await page.fill('#md-ort', '');
+  await page.click('#mdKnopfSpeichern');
+  await page.waitForTimeout(300);
+  check('KRITISCH: ein geleertes Pflichtfeld wird gar nicht erst abgeschickt',
+    page.gesendet.length === 0);
+  check('Die Meldung nennt das Feld, um das es geht',
+    /ort/i.test(await page.evaluate(() => document.getElementById('toast').textContent)));
+  await page.close();
+} catch (e) { check('Abschnitt Pflicht/Freiwillig ohne Abbruch: ' + e.message, false); }
+
+try {
+  const page = await seite(390, 844);
+  await page.click('#mdKnopfAuf');
+  await page.waitForTimeout(150);
+  await page.fill('#md-land', 'Musterland');
+  await page.fill('#md-notfallkontakt', 'Jemand, 000 000 00 05');
+
+  const wdhDa = () => page.evaluate(() => {
+    const el = document.getElementById('md-email_privat2');
+    return !!el && el.getBoundingClientRect().height > 0;
+  });
+  check('Das Wiederholfeld ist anfangs verborgen', !(await wdhDa()));
+  await page.fill('#md-email_privat', 'anders@beispiel.invalid');
+  await page.waitForTimeout(120);
+  check('KRITISCH: bei geaenderter E-Mail erscheint das Wiederholfeld', await wdhDa());
+
+  // Der Zahlendreher, der den Vorfall ausgeloest hat.
+  await page.fill('#md-email_privat2', 'andrs@beispiel.invalid');
+  await page.click('#mdKnopfSpeichern');
+  await page.waitForTimeout(300);
+  check('KRITISCH: bei abweichender Wiederholung wird nichts abgeschickt',
+    page.gesendet.length === 0);
+  check('Die Meldung sagt, dass die beiden nicht uebereinstimmen',
+    /überein|uberein/i.test(await page.evaluate(() =>
+      document.getElementById('toast').textContent)));
+
+  await page.fill('#md-email_privat2', 'anders@beispiel.invalid');
+  await page.fill('#mdPwInp', 'irgendein-passwort');
+  await page.click('#mdKnopfSpeichern');
+  await page.waitForTimeout(400);
+  const g = page.gesendet[0] || {};
+  check('Stimmen beide ueberein, geht die Anfrage raus', page.gesendet.length === 1);
+  check('KRITISCH: die Wiederholung wird mitgeschickt -- der Server prueft sie noch einmal',
+    g.email_privat2 === 'anders@beispiel.invalid' && g.email_privat === 'anders@beispiel.invalid');
+  check('Das Passwort geht mit, weil die Adresse sich aendert', !!g.passwort);
+  check('KRITISCH: die alte Festnetzspalte wird nie mitgeschickt', !('telefon' in g));
+  await page.close();
+} catch (e) { check('Abschnitt Wiederholung ohne Abbruch: ' + e.message, false); }
+
 // ── Weist der Server ab, bleibt die Eingabe stehen ────────────────────────
 try {
   const page = await seite(390, 844, 'fehler');
   await page.click('#mdKnopfAuf');
   await page.waitForTimeout(150);
   await page.fill('#md-strasse', 'Bleibtstehen');
+  await page.fill('#md-land', 'Musterland');
+  await page.fill('#md-notfallkontakt', 'Zweite Person, 000 000 00 05');
   await page.click('#mdKnopfSpeichern');
   await page.waitForTimeout(400);
   const zustand = await page.evaluate(() => ({

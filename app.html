@@ -605,6 +605,13 @@ svg.i-sm { width: 17px; height: 17px; }
 .md-tat { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 20px; }
 .md-hinweis { font-size: 13px; color: var(--ink-3); margin-top: 14px; line-height: 1.5; }
 .md-hilfe { font-size: 12.5px; color: var(--ink-3); margin: -10px 0 16px; line-height: 1.45; }
+/* Markiert wird die AUSNAHME, nicht die Regel: acht Sternchen neben acht
+   Pflichtfeldern sind Rauschen, ein Wort neben dem einen freiwilligen Feld
+   ist eine Auskunft. */
+.md-frei { text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--ink-3); }
+.md-fehlt { font-size: 13px; color: var(--warn); background: var(--warn-soft);
+  border: 1px solid var(--warn-line); border-radius: var(--r-sm);
+  padding: 10px 12px; margin: 0 0 18px; line-height: 1.45; }
 /* Zusammengehörende Felder. Am Handy untereinander: die volle Breite je
    Feld ist mehr wert als die gesparte Zeile, und 48 px Trefferfläche
    bleiben so unangetastet. */
@@ -2205,17 +2212,23 @@ const W = {
     offenMehrere: 'Schichten in diesem Monat sind noch nicht abgeglichen und darum hier nicht enthalten.',
     speichern: 'Speichern', abbrechen: 'Abbrechen', schliessen: 'Schliessen',
     // ══ Meine Daten selbst pflegen (ENT-460) ══
-    datenHinweis: 'Personalnummer, Geburtsdatum und die Geschäftsadresse ändert die Verwaltung. Alles Übrige trägst du bei einer Änderung selbst ein.',
+    datenHinweis: 'Personalnummer, Geburtsdatum und die Geschäftsadresse ändert die Verwaltung. Alles Übrige trägst du bei einer Änderung selbst ein — bis auf den Adresszusatz sind alle Felder Pflicht.',
     datenHinweisAus: 'Das Bearbeiten der eigenen Angaben ist auf diesem Server noch nicht eingerichtet. Änderungen macht bis dahin die Verwaltung.',
     datenBearbeiten: 'Angaben bearbeiten',
     datenGespeichert: 'Angaben gespeichert.',
     datenNichtErfasst: 'nicht erfasst',
     datenAdresse: 'Adresse', datenKontakt: 'Kontakt', datenPersonalien: 'Personalien',
     hausnummer: 'Hausnummer', adresszusatz: 'Adresszusatz', plz: 'PLZ', land: 'Land',
-    emailPrivat: 'Private E-Mail', emailGeschaeft: 'E-Mail Geschäft',
+    emailPrivat: 'E-Mail', emailWdh: 'E-Mail wiederholen',
+    emailWdhFalsch: 'Die beiden E-Mail-Adressen stimmen nicht überein.',
     notfallkontakt: 'Notfallkontakt',
+    datenFreiwillig: 'freiwillig',
+    datenFehltEine: 'Eine Angabe fehlt noch. Ohne sie lässt sich nicht speichern.',
+    datenFehltMehrere: 'Angaben fehlen noch. Ohne sie lässt sich nicht speichern.',
+    datenPflichtLeer: 'Diese Angabe ist nötig:',
     notfallHilfe: 'Wen sollen wir anrufen, wenn dir auf Schicht etwas zustösst?',
     emailPrivatHilfe: 'An diese Adresse geht der Link, wenn du dein Passwort vergisst.',
+    emailWdhHilfe: 'Ein Zahlendreher fällt sonst erst auf, wenn du das Passwort wirklich brauchst — darum zweimal.',
     datenPwLabel: 'Dein Passwort',
     datenPwWarum: 'Weil an der privaten E-Mail-Adresse das Zurücksetzen des Passworts hängt, ist zum Ändern dein Passwort nötig.',
     netzfehler: 'Keine Verbindung. Bitte nochmals versuchen.',
@@ -5934,11 +5947,23 @@ function datenSeiteZu() {
 // Dieselbe Ueberlegung wie bei der Sperre selbst: Was hier steht, erspart
 // den Umweg; verboten wird im Server.
 const MD_ADRESSE = ['strasse', 'hausnummer', 'adresszusatz', 'plz', 'ort', 'land'];
-const MD_KONTAKT = ['telefon', 'mobil', 'email_privat', 'notfallkontakt'];
+// Seit ENT-466 EINE Nummer statt Festnetz und Mobil, und EINE Adresse
+// statt privat und geschaeftlich. 'telefon' steht hier nicht mehr: Der
+// Server darf die alte Festnetzspalte noch leeren, ein Eingabefeld hat sie
+// nicht mehr (ma_selbst_sichtbare_felder).
+const MD_KONTAKT = ['mobil', 'email_privat', 'notfallkontakt'];
+// Muss zu SELBST_PFLICHT in backend/api/mein_profil_speichern.php passen.
+// Der Server sperrt; das hier erspart nur den vergeblichen Weg dorthin.
+// test_meine_daten_bearbeiten.mjs haelt beide Listen zusammen.
+const MD_PFLICHT = ['strasse', 'hausnummer', 'plz', 'ort', 'land',
+  'mobil', 'email_privat', 'notfallkontakt'];
 // Beschriftungen ueber das Woerterbuch, damit sie an einer Stelle stehen.
 const MD_BESCHRIFTUNG = {
   strasse: 'strasse', hausnummer: 'hausnummer', adresszusatz: 'adresszusatz',
-  plz: 'plz', ort: 'ort', land: 'land', telefon: 'telefon', mobil: 'mobil',
+  plz: 'plz', ort: 'ort', land: 'land',
+  // Die eine Nummer heisst auf dem Bildschirm schlicht "Telefon" -- das
+  // Wort, das alle sagen --, liegt aber in der Spalte 'mobil' (ENT-466).
+  mobil: 'telefon', telefon: 'telefon',
   email_privat: 'emailPrivat', notfallkontakt: 'notfallkontakt'
 };
 // Muss zu SELBST_MAXLAENGE in backend/api/mein_profil_speichern.php passen.
@@ -5956,6 +5981,24 @@ const MD_AUTO = {
 };
 
 const mdDarf = f => selbstAenderbar.indexOf(f) >= 0;
+
+// Die EINE private Nummer. Bis zum ersten Speichern kann sie noch in der
+// alten Festnetzspalte stehen -- dann wird sie von dort gezeigt und beim
+// Speichern nach 'mobil' geschrieben, wo der Server 'telefon' leert
+// (ENT-466). So verschwindet niemandem seine Nummer vor dem Umzug.
+function mdNummer() {
+  const p = profil || {};
+  return String(p.mobil || p.telefon || '').trim();
+}
+
+// Welche Pflichtangaben heute noch leer sind. Fuer den Hinweis OBEN im
+// Formular: Wer erst beim Speichern erfaehrt, dass drei Felder fehlen,
+// haelt das Formular fuer kaputt.
+function mdFehlend() {
+  const p = profil || {};
+  return MD_PFLICHT.filter(f => mdDarf(f)
+    && !(f === 'mobil' ? mdNummer() : String(p[f] || '').trim()));
+}
 
 // Ein leerer Wert verschwindet NICHT, er wird als "nicht erfasst"
 // ausgewiesen. Die fruehere Zeile blendete sich bei leerem Wert aus -- wer
@@ -5987,9 +6030,7 @@ function mdAnzeige() {
     ${mdZeile(w('persNr'), p.personalnummer)}
     ${mdZeile(w('geburtsdatum'), p.geburtsdatum ? dmy(p.geburtsdatum) : '')}
     ${mdZeile(w('adresse'), adresse)}
-    ${mdZeile(w('telefon'), p.telefon)}
-    ${mdZeile(w('mobil'), p.mobil)}
-    ${mdZeile(w('emailGeschaeft'), p.email)}
+    ${mdZeile(w('telefon'), mdNummer())}
     ${mdDarf('email_privat') ? mdZeile(w('emailPrivat'), p.email_privat) : ''}
     ${mdDarf('notfallkontakt') ? mdZeile(w('notfallkontakt'), p.notfallkontakt) : ''}
   </dl>
@@ -6002,36 +6043,47 @@ function mdFeld(f, hilfe) {
   if (!mdDarf(f)) return '';
   const p = profil || {};
   const id = 'md-' + f;
-  const typ = f === 'email_privat' ? 'email'
-            : (f === 'telefon' || f === 'mobil') ? 'tel' : 'text';
-  // Die Passwortfrage taucht auf, sobald die Adresse sich wirklich
-  // unterscheidet -- nicht erst nach einem vergeblichen Speichern.
+  const typ = f === 'email_privat' ? 'email' : f === 'mobil' ? 'tel' : 'text';
+  // Wiederholung und Passwortfrage tauchen auf, sobald die Adresse sich
+  // wirklich unterscheidet -- nicht erst nach vergeblichem Speichern.
   const zusatz = f === 'email_privat' ? ' oninput="mdMailGeprueft()"' : '';
-  return `<div class="f"><label for="${id}">${esc(w(MD_BESCHRIFTUNG[f]))}</label>
+  const wert = f === 'mobil' ? mdNummer() : String(p[f] || '');
+  const frei = MD_PFLICHT.indexOf(f) < 0
+    ? ` <span class="md-frei">(${esc(w('datenFreiwillig'))})</span>` : '';
+  return `<div class="f"><label for="${id}">${esc(w(MD_BESCHRIFTUNG[f]))}${frei}</label>
     <input class="inp" id="${id}" type="${typ}" maxlength="${MD_MAXLAENGE[f]}"
-      autocomplete="${MD_AUTO[f] || 'off'}" value="${esc(p[f] || '')}"${zusatz}></div>`
+      autocomplete="${MD_AUTO[f] || 'off'}" value="${esc(wert)}"${zusatz}></div>`
     + (hilfe ? `<p class="md-hilfe">${esc(w(hilfe))}</p>` : '');
 }
 
 function mdFormular() {
   const adr = MD_ADRESSE.filter(mdDarf), kon = MD_KONTAKT.filter(mdDarf);
+  const fehlt = mdFehlend().length;
   return `
+  ${fehlt ? `<p class="md-fehlt">${fehlt === 1 ? esc(w('datenFehltEine'))
+      : fehlt + ' ' + esc(w('datenFehltMehrere'))}</p>` : ''}
   ${adr.length ? `<div class="md-abschnitt">${esc(w('datenAdresse'))}</div>
     <div class="md-paar md-paar-sh">${mdFeld('strasse')}${mdFeld('hausnummer')}</div>
     ${mdFeld('adresszusatz')}
     <div class="md-paar md-paar-po">${mdFeld('plz')}${mdFeld('ort')}</div>
     ${mdFeld('land')}` : ''}
   ${kon.length ? `<div class="md-abschnitt">${esc(w('datenKontakt'))}</div>
-    <div class="md-paar md-paar-gleich">${mdFeld('telefon')}${mdFeld('mobil')}</div>
+    <div class="md-paar md-paar-gleich">${mdFeld('mobil')}</div>
     ${mdFeld('email_privat', 'emailPrivatHilfe')}
+    <div id="mdMailBlock" hidden>
+      <div class="f"><label for="md-email_privat2">${esc(w('emailWdh'))}</label>
+        <input class="inp" id="md-email_privat2" type="email" maxlength="200"
+               autocomplete="off" spellcheck="false"></div>
+      <p class="md-hilfe">${esc(w('emailWdhHilfe'))}</p>
+      <div class="f" id="mdPw">
+        <label for="mdPwInp">${esc(w('datenPwLabel'))}</label>
+        <div class="pw-feld"><input class="inp" id="mdPwInp" type="password" autocomplete="current-password">
+          <button type="button" class="pw-toggle" aria-label="Passwort anzeigen"
+                  onclick="togglePw('mdPwInp', this)">&#128065;</button></div>
+        <p class="md-hilfe" style="margin:8px 0 0">${esc(w('datenPwWarum'))}</p>
+      </div>
+    </div>
     ${mdFeld('notfallkontakt', 'notfallHilfe')}` : ''}
-  <div class="f" id="mdPw" hidden>
-    <label for="mdPwInp">${esc(w('datenPwLabel'))}</label>
-    <div class="pw-feld"><input class="inp" id="mdPwInp" type="password" autocomplete="current-password">
-      <button type="button" class="pw-toggle" aria-label="Passwort anzeigen"
-              onclick="togglePw('mdPwInp', this)">&#128065;</button></div>
-    <p class="md-hilfe" style="margin:8px 0 0">${esc(w('datenPwWarum'))}</p>
-  </div>
   <div class="md-tat">
     <button class="btn btn-primary" id="mdKnopfSpeichern"
       onclick="mdSpeichern()">${esc(w('speichern'))}</button>
@@ -6044,7 +6096,7 @@ function mdBearbeitenAuf() { mdBearbeitung = true;  mdZeichnen(); }
 function mdBearbeitenZu()  { mdBearbeitung = false; mdZeichnen(); }
 
 function mdMailGeprueft() {
-  const el = $('md-email_privat'), block = $('mdPw');
+  const el = $('md-email_privat'), block = $('mdMailBlock');
   if (!el || !block) return;
   const bisher = String((profil && profil.email_privat) || '').trim();
   block.hidden = el.value.trim() === bisher;
@@ -6056,8 +6108,33 @@ function mdSpeichern() {
     const el = $('md-' + f);
     if (el) rumpf[f] = el.value.trim();
   });
-  const block = $('mdPw'), pwInp = $('mdPwInp');
-  if (block && !block.hidden && pwInp) { rumpf.passwort = pwInp.value; }
+
+  // Pflichtangaben (ENT-466). Der Server sperrt ohnehin -- das hier
+  // erspart nur den vergeblichen Weg dorthin und zeigt gleich, WELCHES
+  // Feld gemeint ist, statt einer Liste am Seitenrand.
+  const leer = MD_PFLICHT.filter(f => Object.prototype.hasOwnProperty.call(rumpf, f) && !rumpf[f]);
+  if (leer.length) {
+    const el = $('md-' + leer[0]);
+    if (el) { el.focus(); }
+    toast(w('datenPflichtLeer') + ' ' + w(MD_BESCHRIFTUNG[leer[0]] || leer[0]));
+    return;
+  }
+
+  // Wiederholung der E-Mail. Anlass ist ein tatsaechlicher Vorfall: ein
+  // Zahlendreher, und danach liess sich das Passwort nicht mehr
+  // zuruecksetzen. Der Server prueft dasselbe noch einmal -- eine Sperre,
+  // die nur hier sitzt, ist keine.
+  const block = $('mdMailBlock'), wdh = $('md-email_privat2'), pwInp = $('mdPwInp');
+  if (block && !block.hidden) {
+    const zweite = wdh ? wdh.value.trim() : '';
+    if (zweite !== (rumpf.email_privat || '')) {
+      if (wdh) { wdh.focus(); }
+      toast(w('emailWdhFalsch'));
+      return;
+    }
+    rumpf.email_privat2 = zweite;
+    if (pwInp) { rumpf.passwort = pwInp.value; }
+  }
   const knopf = $('mdKnopfSpeichern');
   if (knopf) knopf.disabled = true;
   api('mein_profil_speichern.php', { method: 'POST', body: rumpf }).then(({ ok, data }) => {
@@ -6065,9 +6142,10 @@ function mdSpeichern() {
     if (!ok || !data || data.status !== 'ok') {
       // Der Server verlangt das Passwort nur, wenn die private E-Mail sich
       // wirklich aendert. Kommt diese Antwort, stand das Feld noch zu.
-      if (data && data.passwort_noetig && block) {
+      if (data && (data.passwort_noetig || data.mail_wiederholung) && block) {
         block.hidden = false;
-        if (pwInp) pwInp.focus();
+        const ziel = data.mail_wiederholung ? $('md-email_privat2') : pwInp;
+        if (ziel) ziel.focus();
       }
       toast((data && data.message) || w('netzfehler'));
       return;

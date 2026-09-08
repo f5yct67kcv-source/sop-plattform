@@ -239,6 +239,21 @@ function ma_selbst_aenderbare_felder(): array
     ];
 }
 
+// Was die Person auf dem BILDSCHIRM bearbeitet -- eine Untermenge der
+// Liste oben, abgeleitet statt danebengelegt (ENT-466).
+//
+// 'telefon' fehlt hier. Bis ENT-466 fuehrte die Akte Festnetz und Mobil
+// getrennt; der Projektinhaber: *"2026 hat fast niemand mehr ein
+// Festnetz."* Seither gibt es EIN Feld, und es steht in 'mobil'. Die alte
+// Spalte bleibt oben stehen, weil der Endpunkt sie noch LEEREN darf, wenn
+// die eine Nummer hinueberwandert -- aber ein Eingabefeld hat sie nicht
+// mehr. Ohne diese Trennung meldete der Server der Oberflaeche ein Feld,
+// das sie gar nicht anbietet.
+function ma_selbst_sichtbare_felder(): array
+{
+    return array_values(array_diff(ma_selbst_aenderbare_felder(), ['telefon']));
+}
+
 // Welche der Felder gibt es in der Datenbank wirklich? Der Nachtrag laeuft
 // erst, wenn der Projektinhaber "Einrichtung" drueckt -- bis dahin fehlen die
 // neuen Spalten. Ohne diese Pruefung wuerde ein INSERT ueber die volle
