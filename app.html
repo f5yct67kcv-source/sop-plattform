@@ -2858,7 +2858,16 @@ function ankerVersatz() {
   try { unten = probe.getBoundingClientRect().bottom; } finally { probe.remove(); }
   const fenster = window.innerHeight || 0;
   if (!fenster || !unten) { return 0; }
-  return Math.round(fenster - unten);
+  // Zweite Quelle fuer DIESELBE Groesse, ueber einen anderen Weg:
+  // documentElement.clientHeight ist der Bereich, gegen den das Layout
+  // rechnet. Beide muessen dasselbe sagen; tun sie es nicht, zaehlt der
+  // groessere Fehlbetrag. Das ist keine zweite Vermutung, sondern eine
+  // Absicherung: Repariert WebKit eine der beiden Auskuenfte und die
+  // andere nicht, faellt die Messung nicht aus.
+  const layout = document.documentElement.clientHeight || 0;
+  const ueberAnker  = Math.round(fenster - unten);
+  const ueberLayout = layout ? Math.round(fenster - layout) : 0;
+  return Math.max(ueberAnker, ueberLayout);
 }
 
 // Vorbehalt wie bei der ersten Quelle: nur im Vollbild vom
@@ -2902,6 +2911,26 @@ function sockelMessen() {
   return (fehlt > 0 && fehlt <= 80) ? fehlt : 0;
 }
 
+// Was auf WELCHEM Reiter gemessen wurde.
+//
+// Der Grund ist der teuerste Befund aus drei Anlaeufen, und er lag nicht
+// im Code, sondern im Weg dorthin: Die Technikzeile steht im Menue unter
+// "Einstellungen". Um sie zu lesen, tippt man auf "Menü" und dann auf
+// "Einstellungen" -- beides Ansichten, die LAENGER sind als der
+// Bildschirm. Genau dort ist der Fehler weg. An den Bildschirmfotos vom
+// 08.09. nachgemessen: Auf "Wächter" sitzt die Leiste bei 696-793, im
+// Menue bei 755-852, in derselben Sitzung, eine Minute auseinander.
+//
+// Alle bisherigen Zahlen ueber den "kranken" Zustand stammen also aus dem
+// GESUNDEN. Auf ihnen beruhte der Schluss von ENT-439, das Layout sei
+// nicht zu kurz -- und damit die Verwerfung des richtigen Wegs.
+//
+// Darum merkt sich jeder Reiter seine eigenen Zahlen im Moment des
+// Zeichnens. Die Technikzeile zeigt sie spaeter im Menue an. Ein
+// Bildschirmfoto beantwortet damit, was drei Anlaeufe lang nicht
+// beantwortbar war.
+const sockelSpur = {};
+
 function sockelSetzen() {
   const stil = document.documentElement.style;
   // Gemessen wird am UNKORRIGIERTEN Zustand -- als Vorsichtsmassnahme.
@@ -2919,13 +2948,52 @@ function sockelSetzen() {
   const wert = sockelMessen();
   // Nicht messbar heisst: den bisherigen Wert behalten, nicht auf 0
   // zuruecksetzen. Sonst nimmt ein offenes Blatt der Leiste ihren Sockel.
-  if (wert === null) { stil.setProperty('--sockel', vorher || '0px'); return; }
+  if (wert === null) { stil.setProperty('--sockel', vorher || '0px'); sockelSpurSetzen(null); return; }
   stil.setProperty('--sockel', wert + 'px');
+  sockelSpurSetzen(wert);
+}
+
+// Aufgezeichnet wird im UNkorrigierten Zustand -- sockelSetzen() ruft dies
+// direkt nach der Messung, --sockel steht dann noch auf dem eben
+// gefundenen Wert. Die Lage der Leiste wird darum eigens abgelesen und
+// nicht aus der Spur hergeleitet.
+function sockelSpurSetzen(wert) {
+  const leiste = document.querySelector('.tabs');
+  const r = leiste ? leiste.getBoundingClientRect() : null;
+  const d = document.documentElement;
+  sockelSpur[reiter] = {
+    fenster: window.innerHeight,
+    layout: d.clientHeight,
+    anker: ankerVersatz(),
+    blaettert: d.scrollHeight > d.clientHeight,
+    leiste: r ? Math.round(r.top) + '–' + Math.round(r.bottom) : '–',
+    sockel: wert
+  };
 }
 
 // Die Zahlen, aus denen der Sockel entsteht -- als eine Zeile im Menue.
 // Ohne sie liesse sich aus der Ferne nicht entscheiden, warum eine
 // Korrektur nicht greift; genau daran ist der erste Anlauf gescheitert.
+// Eine Zeile je besuchtem Reiter, aus der Spur oben. Das ist die Zeile,
+// die den Fall entscheidet: Steht bei einem NICHT blaetternden Reiter ein
+// Rahmen, der kuerzer ist als das Fenster, war das Layout zu kurz -- und
+// die Korrektur greift dort. Stehen ueberall dieselben Zahlen und die
+// Leiste sitzt trotzdem verschieden, bleibt nur das Zeichnen.
+const SPUR_NAME = { heute: 'Heute', plan: 'Plan', rapport: 'Rapport',
+                    waechter: 'Wächter', menu: 'Menü' };
+function technikSpur() {
+  return Object.keys(SPUR_NAME)
+    .filter(r => sockelSpur[r])
+    .map(r => {
+      const m = sockelSpur[r];
+      return SPUR_NAME[r] + ': Fenster ' + m.fenster + ' · Rahmen ' + m.layout
+        + ' · Anker ' + (m.anker ? (m.anker > 0 ? '−' : '+') + Math.abs(m.anker) : 'bündig')
+        + ' · Leiste ' + m.leiste
+        + ' · blättert ' + (m.blaettert ? 'ja' : 'nein')
+        + ' · Sockel ' + (m.sockel === null ? 'nicht messbar' : m.sockel);
+    });
+}
+
 function technikZeile() {
   const r = document.querySelector('.tabs');
   const lage = r ? r.getBoundingClientRect() : null;
@@ -5974,6 +6042,11 @@ function zeichneMenu() {
       <p style="font-size:12.5px;color:var(--ink-3);line-height:1.5;padding:0 2px">${esc(w('themaRundgangHinweis'))}</p>
       ${pushBlock()}
       <p style="font-size:11px;color:var(--ink-3);line-height:1.5;padding:14px 2px 0;font-variant-numeric:tabular-nums">${esc(technikZeile())}</p>
+      <!-- Je Reiter, was DORT gemessen wurde. Muss getrennt stehen: Die
+           Zeile darueber gilt fuer das Menue, und im Menue ist der Fehler
+           nicht da (siehe sockelSpur). -->
+      <p style="font-size:11px;color:var(--ink-3);line-height:1.6;padding:8px 2px 0;font-variant-numeric:tabular-nums">${
+        technikSpur().map(z => esc(z)).join('<br>')}</p>
     </div>
 
     <div id="pr-stunden" style="display:none">
