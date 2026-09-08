@@ -17,7 +17,8 @@ $quelle = file_get_contents(__DIR__ . '/../backend/kundenportal.php');
 preg_match_all('/^const (KP_\w+)\s*=\s*(\d+);/m', $quelle, $k, PREG_SET_ORDER);
 foreach ($k as $c) { define($c[1], (int)$c[2]); }
 
-foreach (['kp_sitzung_abgelaufen', 'kp_code_zustand', 'kp_code_erzeugen', 'kp_email_normal'] as $fn) {
+foreach (['kp_sitzung_abgelaufen', 'kp_code_zustand', 'kp_code_erzeugen', 'kp_email_normal',
+          'kp_runde_sichtbar'] as $fn) {
     if (!preg_match('/function ' . $fn . '\(.*?\n\}/s', $quelle, $m)) {
         echo "- Funktion $fn nicht gefunden\n";
         exit(1);
@@ -104,6 +105,26 @@ pruef('KRITISCH: Grossschreibung verhindert die Anmeldung nicht',
     kp_email_normal('Name@Beispiel.CH') === 'name@beispiel.ch');
 pruef('Leerzeichen aus der Zwischenablage stoeren nicht',
     kp_email_normal('  name@beispiel.ch  ') === 'name@beispiel.ch');
+
+// ── Welche Runde ein Kunde sehen darf (ENT-455) ───────────────────────
+// Die Regel wird hier WIRKLICH AUSGEFUEHRT und nicht behauptet: Sie
+// entscheidet, ob ein Kunde durch blosses Hochzaehlen einer Nummer an die
+// Runden eines anderen Kunden kaeme.
+$meine = [11, 12, 13];
+pruef('KRITISCH: eine beendete Runde an einem eigenen Objekt ist sichtbar',
+    kp_runde_sichtbar(12, $meine, false) === true);
+pruef('KRITISCH: eine Runde an einem FREMDEN Objekt ist es nicht',
+    kp_runde_sichtbar(99, $meine, false) === false);
+// ENT-441 Punkt 5: Der Kunde sieht den Nachweis, nicht die Person bei der
+// Arbeit.
+pruef('KRITISCH: eine noch laufende Runde ist nicht sichtbar — auch am eigenen Objekt',
+    kp_runde_sichtbar(12, $meine, true) === false);
+pruef('KRITISCH: ohne eigene Objekte ist gar nichts sichtbar',
+    kp_runde_sichtbar(12, [], false) === false);
+// Ein Vergleich mit lockerer Typenpruefung liesse "12" und 12 als dasselbe
+// durchgehen -- und damit unter Umstaenden auch 12abc oder true.
+pruef('KRITISCH: der Vergleich der Objektnummer ist streng typisiert',
+    kp_runde_sichtbar(0, [false, null], false) === false);
 
 foreach ($bad as $b) { echo "- $b\n"; }
 echo "geprueft: $ok, beanstandet: " . count($bad) . "\n";

@@ -24,7 +24,8 @@
   --rot:#B3261E;   --rot-soft:#FBE9E7;
   /* Der Ton fuer „belegt, aber nicht technisch bestaetigt" -- derselbe
      Wert wie im Cockpit, test_portal.mjs vergleicht ihn mit. */
-  --warn:#9A6B08;
+  --warn:#9A6B08; --warn-soft:#FBF3E0;
+  --grau-soft:#EEF0F3;
   /* Der Grund des Fortschrittsbalkens. Er muss SICHTBAR sein: Eine Runde
      mit 0 von 6 haette sonst gar keinen Balken und saehe aus wie „keine
      Angabe" statt wie „nichts erledigt". */
@@ -48,7 +49,8 @@
     --line:#2A3147; --ink:#F2F4F8; --ink-2:#B6BCC8; --ink-3:#868D9A;
     --gruen:#4FCE96; --gruen-soft:#10281E;
     --rot:#F27F70;   --rot-soft:#2E1A18;
-    --warn:#E2B156;
+    --warn:#E2B156; --warn-soft:#2B2314;
+    --grau-soft:#212739;
     --balken-grund:rgba(255,255,255,.16);
     --dunkel:#F2F4F8;
     --accent:#7098F7; --accent-hi:#8DAEFA;
@@ -236,6 +238,91 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
    verschwinden. */
 .punkte .beleg{display:block;color:var(--warn)}
 
+/* ── Aufklappbares Detail je Runde (ENT-455) ─────────────────────────── */
+/* Aufklappen statt Fenster: Ein Kunde vergleicht Runden untereinander, und
+   ein Fenster nimmt ihm dafuer jedes Mal die Liste weg. Das Detail steht
+   darum auf DERSELBEN Zeilenbreite unter seiner Zeile -- wie ein
+   FAQ-Aufklapper, ausdruecklicher Wunsch des Projektinhabers.
+   Mehrere duerfen offen sein: Ein Aufklapper, der beim Oeffnen einen
+   anderen zuklappt, nimmt gerade das weg, wofuer man ihn oeffnet. */
+.zeile{cursor:pointer}
+.zeile:hover .objekt{text-decoration:underline}
+.zeile:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:8px}
+/* Der Pfeil sagt, dass hier etwas aufgeht -- ohne ihn ist eine anklickbare
+   Zeile nicht von einer unbeweglichen zu unterscheiden. */
+.zeile .pfeil{width:11px;height:11px;flex:none;margin-left:8px;display:inline-block;
+              border-right:2px solid var(--ink-3);border-bottom:2px solid var(--ink-3);
+              transform:rotate(45deg);transition:transform .18s;
+              position:relative;top:-3px}
+.zeile.offen .pfeil{transform:rotate(-135deg);top:1px}
+.zeile.offen{border-bottom-color:transparent}
+
+.detail{padding:4px 0 18px;border-bottom:1px solid var(--line)}
+.detail:last-child{border-bottom:none}
+/* Kennzahlenband: Beschriftung OBEN, Wert darunter -- dasselbe Muster wie
+   im Cockpit und wie es die Hausregel verlangt. Auf dem Handy zwei Spalten
+   statt vier: Vier Bloecke auf 390 px waeren 80 px breit und die
+   Beschriftung braeche in jedem einzeln um. */
+.kennzahlen{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;
+            background:var(--line);border:1px solid var(--line);
+            border-radius:var(--r);overflow:hidden;margin-bottom:18px}
+.kennzahlen>div{background:var(--surface);padding:12px 14px}
+.kennzahlen .k-l{font-size:11px;font-weight:700;letter-spacing:.06em;
+                 text-transform:uppercase;color:var(--ink-3)}
+.kennzahlen .k-v{font-size:20px;font-weight:700;margin-top:3px}
+.kennzahlen .k-v .einheit{font-size:13px;font-weight:600;color:var(--ink-3)}
+.kennzahlen .k-f{font-size:12px;color:var(--ink-3);margin-top:2px}
+
+.d-titel{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+         color:var(--ink-3);margin:0 0 10px}
+.d-abschnitt{margin-top:20px}
+
+/* Der Verlauf. Die Zeit steht in einer eigenen schmalen Spalte, damit die
+   Uhrzeiten untereinander stehen -- genau das ist die Auskunft, die der
+   Kunde hier sucht. Der Faden dazwischen macht aus Zeilen eine Abfolge. */
+.v-zeile{display:grid;grid-template-columns:46px 12px 1fr;gap:0 8px;align-items:start}
+.v-zeile .v-zeit{font-size:13px;font-weight:700;padding-top:1px;font-variant-numeric:tabular-nums}
+.v-zeile .v-faden{position:relative;justify-self:center;align-self:stretch;
+                  width:2px;background:var(--line)}
+.v-zeile:first-child .v-faden{margin-top:8px}
+.v-zeile:last-child .v-faden{margin-bottom:8px}
+.v-zeile .v-faden::before{content:'';position:absolute;top:5px;left:50%;
+    width:9px;height:9px;margin-left:-4.5px;border-radius:50%;background:var(--gruen)}
+.v-zeile.warn .v-faden::before{background:var(--warn)}
+/* Ein nicht besuchter Punkt bekommt einen HOHLEN Knoten -- er ist Teil der
+   Abfolge, aber nichts ist dort passiert. Ihn wegzulassen hiesse, dass das
+   Fehlende im Nachweis nicht vorkommt. */
+.v-zeile.offen-punkt .v-faden::before{background:var(--bg);
+    box-shadow:inset 0 0 0 2px var(--ink-3)}
+.v-zeile .v-inhalt{padding-bottom:14px;min-width:0}
+.v-zeile:last-child .v-inhalt{padding-bottom:0}
+.v-name{display:flex;flex-wrap:wrap;gap:6px;align-items:center;overflow-wrap:anywhere}
+.v-text{font-size:13px;color:var(--ink-2);margin-top:4px;overflow-wrap:anywhere}
+.v-aufgaben{margin-top:6px;display:flex;flex-direction:column;gap:4px}
+.v-aufgabe{display:flex;flex-wrap:wrap;gap:6px;align-items:center;
+           font-size:13px;color:var(--ink-2)}
+.v-foto{margin-top:8px}
+.v-foto img{max-width:220px;max-height:170px;border-radius:10px;
+            border:1px solid var(--line);display:block}
+
+/* Kleine Marken im Verlauf. Eigene Klasse und nicht .marke-zustand: Die
+   dort steht fuer den Zustand der ganzen Runde, diese fuer einen einzelnen
+   Punkt -- zwei Aussagen, zwei Groessen. */
+.mk{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;
+    border-radius:999px;white-space:nowrap}
+.mk.gut{background:var(--gruen-soft);color:var(--gruen)}
+.mk.warn{background:var(--warn-soft);color:var(--warn)}
+.mk.schlecht{background:var(--rot-soft);color:var(--rot)}
+.mk.grau{background:var(--grau-soft);color:var(--ink-3)}
+
+.d-ereignis{display:grid;grid-template-columns:46px 1fr;gap:0 8px;
+            padding:8px 0;border-top:1px solid var(--line)}
+.d-ereignis:first-of-type{border-top:none}
+.d-ereignis .e-zeit{font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
+.d-ereignis .e-art{font-weight:600}
+.d-ereignis .e-bem{font-size:13px;color:var(--ink-2);margin-top:2px;overflow-wrap:anywhere}
+.d-hinweis{font-size:13px;color:var(--ink-3)}
+
 /* Ein leerer Zustand bekommt Text, nie eine leere Flaeche -- und der Text
    sagt, WELCHE der moeglichen Aussagen gilt (Hausregel: „unbekannt darf nie
    wie keine aussehen"). */
@@ -259,12 +346,14 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
      er von Zeile zu Zeile verschieden lang und damit nicht vergleichbar:
      Ein Balken, den man nicht mit dem darueber vergleichen kann, ist eine
      Verzierung. */
-  .zeile{grid-template-columns:112px minmax(0,1fr) 190px minmax(124px,auto);
+  .zeile{grid-template-columns:112px minmax(0,1fr) 190px minmax(132px,auto);
          gap:6px 18px;align-items:center}
   .zeile .datum{grid-column:1;grid-row:1}
   .zeile .haupt{grid-column:2;grid-row:1}
   .zeile .fortschritt{grid-column:3;grid-row:1;margin-top:0}
   .zeile .rechts{grid-column:4;grid-row:1}
+  .kennzahlen{grid-template-columns:repeat(4,1fr)}
+  .v-zeile{grid-template-columns:56px 12px 1fr}
 }
 </style>
 </head>
@@ -755,14 +844,231 @@ function zeichnen(daten) {
         + (beleg > 0 ? '<span class="beleg">' + beleg + ' davon mit Fotobeleg</span>' : '')
         + '</div>'
       : '<div class="punkte">Für dieses Objekt sind keine Kontrollpunkte hinterlegt</div>';
-    return '<div class="zeile">'
+    // Anklickbar UND mit der Tastatur bedienbar: Eine Zeile, die nur die
+    // Maus oeffnet, ist fuer die Tastatur eine Sackgasse. role/aria sagen
+    // dem Vorleseprogramm, dass hier etwas aufgeht und ob es offen ist.
+    return '<div class="zeile" data-id="' + Number(r.id) + '" role="button" tabindex="0"'
+      + ' aria-expanded="false" aria-label="Rundgang vom ' + esc(dmy(r.datum))
+      + ', ' + esc(r.objekt_name) + ' — Einzelheiten anzeigen">'
       + '<div class="datum">' + esc(dmy(r.datum)) + '</div>'
-      + '<div class="rechts"><span class="marke-zustand ' + klasse + '">' + esc(wort) + '</span></div>'
+      + '<div class="rechts"><span class="marke-zustand ' + klasse + '">' + esc(wort) + '</span>'
+      + '<span class="pfeil" aria-hidden="true"></span></div>'
       + '<div class="haupt"><div class="objekt">' + esc(r.objekt_name) + '</div>'
       + '<div class="meta">' + esc(meta) + '</div></div>'
       + '<div class="fortschritt">' + fortschritt + '</div>'
       + '</div>';
   }).join('');
+}
+
+// ── Aufklappbares Detail je Runde (ENT-455) ──────────────────────────
+// Die Antwort wird je Runde einmal geholt und behalten: Wer eine Zeile
+// zu- und wieder aufklappt, soll nicht jedes Mal warten.
+const detailZwischen = {};
+
+// Wortlaut fuer den Kunden, nicht fuer den Betrieb: „Ersatzscan" ist
+// Hausjargon. Was er bedeutet -- Foto statt technischer Bestaetigung --
+// steht als Hinweis darunter.
+const D_SCAN = {
+  bestaetigt:       ['gut', 'Bestätigt'],
+  ersatzscan:       ['warn', 'Fotobeleg'],
+  nicht_verfuegbar: ['schlecht', 'Nicht verfügbar'],
+};
+const D_AUFGABE = {
+  erledigt:       ['gut', 'Erledigt'],
+  nicht_moeglich: ['schlecht', 'Nicht möglich'],
+  // Eigener Ton, nicht derselbe wie „nicht möglich": Dort hat jemand
+  // hingeschaut und geantwortet. Hier hat niemand etwas gesagt — man weiss
+  // nicht, ob es getan wurde. Der stillere und darum gefährlichere Fall.
+  unbeantwortet:  ['warn', 'Unbeantwortet'],
+};
+
+$('liste').addEventListener('click', ev => {
+  const zeile = ev.target.closest('.zeile');
+  if (zeile) { detailUmschalten(zeile); }
+});
+$('liste').addEventListener('keydown', ev => {
+  if (ev.key !== 'Enter' && ev.key !== ' ') { return; }
+  const zeile = ev.target.closest('.zeile');
+  if (!zeile) { return; }
+  ev.preventDefault();          // sonst rollt die Leertaste die Seite
+  detailUmschalten(zeile);
+});
+
+function detailUmschalten(zeile) {
+  const id = Number(zeile.dataset.id);
+  if (!id) { return; }
+  // Die Tafel wird beim Zuklappen ENTFERNT, nicht bloss versteckt: Ein
+  // verstecktes Element zaehlt fuer :last-child weiter mit, und die letzte
+  // Zeile behielte dann einen Trennstrich unter sich.
+  if (zeile.classList.contains('offen')) {
+    zeile.classList.remove('offen');
+    zeile.setAttribute('aria-expanded', 'false');
+    const alt = zeile.nextElementSibling;
+    if (alt && alt.classList.contains('detail')) { alt.remove(); }
+    return;
+  }
+  zeile.classList.add('offen');
+  zeile.setAttribute('aria-expanded', 'true');
+  const tafel = document.createElement('div');
+  tafel.className = 'detail';
+  tafel.innerHTML = '<div class="d-hinweis">Einzelheiten werden geladen …</div>';
+  zeile.after(tafel);
+  detailLaden(id, tafel);
+}
+
+async function detailLaden(id, tafel) {
+  if (detailZwischen[id]) { detailZeichnen(detailZwischen[id], tafel); return; }
+  const { ok, code, daten } = await ruf('portal_rundgang_detail.php?rundgang_id=' + id);
+  // Inzwischen wieder zugeklappt oder die Liste neu geladen -- dann gibt es
+  // nichts mehr zu fuellen.
+  if (!document.body.contains(tafel)) { return; }
+  if (code === 401) { abgemeldet(); return; }
+  if (!ok || !daten || daten.status !== 'ok' || !daten.rundgang) {
+    tafel.innerHTML = '<div class="d-hinweis">'
+      + esc((daten && daten.message) || 'Die Einzelheiten liessen sich nicht laden.')
+      + '</div>';
+    return;
+  }
+  detailZwischen[id] = daten.rundgang;
+  detailZeichnen(daten.rundgang, tafel);
+}
+
+function uhr(wert) {
+  const t = wert ? String(wert).slice(11, 16) : '';
+  return /^\d{2}:\d{2}$/.test(t) ? t : null;
+}
+
+function detailZeichnen(d, tafel) {
+  const f = d.fortschritt || {};
+  const gesamt = Number(f.gesamt || 0);
+  const erledigt = f.erledigt !== undefined ? Number(f.erledigt) : Number(f.bestaetigt || 0);
+  const beleg = Number(f.ersatzscan || 0);
+  // Dieselbe Dreier-Regel wie im Cockpit (ENT-321): Steht kein Ende, ist die
+  // Runde aber beendet, gilt der letzte Scan. Sonst zeigte eine
+  // abgeschlossene Runde „Ende unbekannt", obwohl das Ende bekannt ist.
+  const endeRoh = d.rohzeit_ende
+    || (d.dauer && d.dauer.quelle === 'letzter_scan' ? d.letzter_scan : null);
+  const dauer = dauerText(d.dauer);
+  const pause = Number(d.pause_minuten || 0);
+  const fehlt = '<span class="einheit">unbekannt</span>';
+
+  const band = [
+    { l: 'Start', v: uhr(d.rohzeit_start) || fehlt, f: dmy(d.datum) },
+    { l: 'Ende', v: uhr(endeRoh) || fehlt, f: uhr(endeRoh) ? '' : 'nicht erfasst' },
+    { l: 'Dauer', v: dauer ? esc(dauer) : fehlt,
+      f: pause > 0 ? pause + ' Min. Pause abgezogen' : '' },
+    // Zwei Einheiten nie unter einer Ueberschrift: Hier stehen Punkte, und
+    // die Fusszeile sagt, WIE erledigt -- sonst verschwaende der Fotobeleg
+    // unter „bestätigt" und der Nachweis behauptete eine technische
+    // Prüfung, die es nicht gab.
+    { l: 'Kontrollpunkte',
+      v: gesamt > 0 ? erledigt + '<span class="einheit"> / ' + gesamt + '</span>' : fehlt,
+      f: gesamt > 0
+        ? Math.round((erledigt / gesamt) * 100) + ' % erledigt'
+          + (beleg > 0 ? ' · davon ' + beleg + ' per Fotobeleg' : '')
+        : 'keine hinterlegt' },
+  ];
+
+  const punkte = d.kontrollpunkte || [];
+  const ereignisse = d.ereignisse || [];
+
+  tafel.innerHTML =
+    '<div class="kennzahlen">' + band.map(b => '<div>'
+      + '<div class="k-l">' + esc(b.l) + '</div>'
+      + '<div class="k-v">' + b.v + '</div>'
+      + (b.f ? '<div class="k-f">' + esc(b.f) + '</div>' : '')
+      + '</div>').join('') + '</div>'
+    + '<p class="d-titel">Verlauf</p>'
+    + (punkte.length
+      ? punkte.map(vZeileHtml).join('')
+      : '<div class="d-hinweis">Für diese Runde sind keine Kontrollpunkte hinterlegt.</div>')
+    + (beleg > 0 ? '<div class="d-abschnitt d-hinweis">'
+      + (beleg === 1 ? 'Ein Kontrollpunkt wurde ' : beleg + ' Kontrollpunkte wurden ')
+      + 'mit einem <strong>Fotobeleg</strong> belegt statt technisch per Chip oder Standort '
+      + 'bestätigt.</div>' : '')
+    + '<div class="d-abschnitt"><p class="d-titel">Ereignisse</p>'
+    // „Kein Ereignis gemeldet" ist eine Aussage, ein fehlender Abschnitt
+    // keine (Hausregel: unbekannt darf nie wie keine aussehen).
+    + (ereignisse.length ? ereignisse.map(eZeileHtml).join('')
+      : '<div class="d-hinweis">Während dieser Runde wurde kein Ereignis gemeldet.</div>')
+    + '</div>';
+
+  // Die Fotobelege erst jetzt, einzeln und mit Token im Kopf -- der Token
+  // darf nicht in eine Bild-Adresse (er landete sonst im Browserverlauf).
+  punkte.forEach(k => {
+    const e = k.erledigt;
+    if (!e || !e.hat_foto || !e.scan_id) { return; }
+    const ziel = tafel.querySelector('#pf' + Number(e.scan_id));
+    if (ziel) { fotoLaden(Number(e.scan_id), ziel); }
+  });
+}
+
+function vZeileHtml(k) {
+  const e = k.erledigt;
+  // Drei Zustaende, drei Darstellungen. Der dritte ist der wichtige: Ein
+  // nicht besuchter Punkt MUSS in der Liste stehen und als solcher zu
+  // erkennen sein -- ein Nachweis, in dem das Fehlende fehlt, ist keiner.
+  let klasse = 'offen-punkt';
+  let marke = '<span class="mk grau">Nicht besucht</span>';
+  let zeit = '—';
+  if (e) {
+    const [mk, wort] = D_SCAN[e.status] || ['grau', e.status];
+    klasse = e.status === 'bestaetigt' ? '' : 'warn';
+    marke = '<span class="mk ' + mk + '">' + esc(wort) + '</span>';
+    zeit = uhr(e.erfasst_am) || '—';
+  }
+  const aufgaben = (k.aufgaben || []).map(a => {
+    const [mk, wort] = a.erledigt
+      ? (D_AUFGABE[a.erledigt.status] || ['grau', a.erledigt.status])
+      : D_AUFGABE.unbeantwortet;
+    const grund = a.erledigt && a.erledigt.grund ? ' — ' + a.erledigt.grund : '';
+    return '<div class="v-aufgabe"><span class="mk ' + mk + '">' + esc(wort) + '</span>'
+      + '<span>' + esc(a.bezeichnung) + esc(grund) + '</span></div>';
+  }).join('');
+  return '<div class="v-zeile ' + klasse + '">'
+    + '<div class="v-zeit">' + esc(zeit) + '</div>'
+    + '<div class="v-faden"></div>'
+    + '<div class="v-inhalt">'
+      + '<div class="v-name"><span>' + esc(k.bezeichnung) + '</span>' + marke + '</div>'
+      + (e && e.beschreibung ? '<div class="v-text">' + esc(e.beschreibung) + '</div>' : '')
+      + (e && e.hat_foto && e.scan_id
+        ? '<div class="v-foto" id="pf' + Number(e.scan_id) + '">'
+          + '<span class="d-hinweis">Fotobeleg wird geladen …</span></div>' : '')
+      + (aufgaben ? '<div class="v-aufgaben">' + aufgaben + '</div>' : '')
+    + '</div></div>';
+}
+
+function eZeileHtml(e) {
+  return '<div class="d-ereignis">'
+    + '<div class="e-zeit">' + esc(uhr(e.erfasst_am) || '—') + '</div>'
+    + '<div><div class="e-art">' + esc(e.art || 'Ohne Art') + '</div>'
+    + (e.bemerkung ? '<div class="e-bem">' + esc(e.bemerkung) + '</div>' : '')
+    + (e.hat_foto ? '<div class="e-bem">Mit Foto festgehalten</div>' : '')
+    + '</div></div>';
+}
+
+async function fotoLaden(scanId, ziel) {
+  try {
+    const kopf = {};
+    if (token) { kopf['X-Auth-Token'] = token; }
+    const antwort = await fetch(API + 'portal_rundgang_foto.php?scan_id=' + scanId, { headers: kopf });
+    if (!antwort.ok) { throw new Error('nicht abrufbar'); }
+    const bild = await antwort.blob();
+    if (!document.body.contains(ziel)) { return; }
+    const adresse = URL.createObjectURL(bild);
+    ziel.innerHTML = '<img alt="Fotobeleg zu diesem Kontrollpunkt">';
+    const img = ziel.querySelector('img');
+    // Erst nach dem Zeichnen freigeben -- sonst haelt jede zugeklappte
+    // Tafel ihr Bild bis zum Neuladen der Seite im Speicher.
+    img.addEventListener('load', () => URL.revokeObjectURL(adresse));
+    img.src = adresse;
+  } catch (fehler) {
+    // „Vorhanden, aber nicht abrufbar" ist etwas anderes als „kein Foto" --
+    // der Satz sagt darum nicht, es gebe keines.
+    if (document.body.contains(ziel)) {
+      ziel.innerHTML = '<span class="d-hinweis">Der Fotobeleg liess sich nicht laden.</span>';
+    }
+  }
 }
 
 function abgemeldet() {

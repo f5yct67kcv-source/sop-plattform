@@ -592,6 +592,35 @@ svg.i-sm { width: 17px; height: 17px; }
 .dl { display: grid; grid-template-columns: 40% 1fr; gap: 0 12px; }
 .dl dt { font-size: 12px; font-weight: 650; letter-spacing: .3px; text-transform: uppercase; color: var(--ink-3); padding: 11px 0; border-bottom: 1px solid var(--line-soft); }
 .dl dd { font-size: 15px; font-weight: 550; padding: 11px 0; border-bottom: 1px solid var(--line-soft); word-break: break-word; }
+
+/* ══ Meine Daten selbst pflegen (ENT-460) ══
+   Ein leeres Feld verschwindet hier NICHT. Die frühere Zeile blendete sich
+   bei leerem Wert aus -- wer keinen Notfallkontakt erfasst hatte, sah gar
+   keine Zeile und damit auch keinen Anlass, einen einzutragen. „Nicht
+   erfasst" und „gibt es nicht" sind zwei verschiedene Aussagen. */
+.md-leer { color: var(--ink-3); font-style: italic; font-weight: 500; }
+.md-abschnitt { font-size: 12px; font-weight: 660; letter-spacing: .4px;
+  text-transform: uppercase; color: var(--ink-3); margin: 24px 0 12px; }
+.md-abschnitt:first-child { margin-top: 0; }
+.md-tat { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 20px; }
+.md-hinweis { font-size: 13px; color: var(--ink-3); margin-top: 14px; line-height: 1.5; }
+.md-hilfe { font-size: 12.5px; color: var(--ink-3); margin: -10px 0 16px; line-height: 1.45; }
+/* Markiert wird die AUSNAHME, nicht die Regel: acht Sternchen neben acht
+   Pflichtfeldern sind Rauschen, ein Wort neben dem einen freiwilligen Feld
+   ist eine Auskunft. */
+.md-frei { text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--ink-3); }
+.md-fehlt { font-size: 13px; color: var(--warn); background: var(--warn-soft);
+  border: 1px solid var(--warn-line); border-radius: var(--r-sm);
+  padding: 10px 12px; margin: 0 0 18px; line-height: 1.45; }
+/* Zusammengehörende Felder. Am Handy untereinander: die volle Breite je
+   Feld ist mehr wert als die gesparte Zeile, und 48 px Trefferfläche
+   bleiben so unangetastet. */
+.md-paar { display: grid; grid-template-columns: 1fr; gap: 0 12px; }
+/* Lesebreite. Ohne sie wird am Schreibtisch aus dem Telefonfeld ein 1166 px
+   breiter Streifen und aus der Beschriftungsspalte der Anzeige eine halbe
+   Bildschirmbreite -- der Wert begaenne erst bei 520 px. Beides ist kein
+   Entwurf, sondern ein Rest. Am Handy greift die Grenze nicht. */
+#pr-daten > .karte { max-width: 760px; }
 .dl dt:last-of-type, .dl dd:last-of-type { border-bottom: none; }
 
 /* Unterlagen zur Schicht (ENT-117). Ganze Zeile als Trefferfläche und
@@ -1350,6 +1379,9 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
 .mit-dlg-fuss .btn[hidden] { display: none; }
 
 @media (min-width: 700px) {
+  .md-paar-sh { grid-template-columns: 3fr 1fr; }
+  .md-paar-po { grid-template-columns: 1fr 3fr; }
+  .md-paar-gleich { grid-template-columns: 1fr 1fr; }
   /* Auf grösseren Geräten mittig halten statt in die Breite ziehen */
   .app { max-width: 560px; margin: 0 auto; box-shadow: 0 0 0 1px var(--line); min-height: 100vh; }
   .tabs { max-width: 560px; left: 50%; transform: translateX(-50%); }
@@ -1619,6 +1651,13 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
      Betroffen sind nur die Seiten, die ein REITER oeffnet. Spesen und
      Einstellungen behalten ihren Kopf samt Rueckweg: Die erreicht man
      ueber "Konto", und dorthin muss man zurueckkommen. */
+  /* Kein Hintergrund hinter der Mitteilungs-Seite: Was nicht da ist, kann
+     nicht wegscrollen. Gesetzt wird die Klasse in tischMarkeSetzen(), nicht
+     ueber :has() -- der Kasten steht VOR der Ebene im Auszeichnungstext,
+     und eine Regel, die von einem spaeteren Geschwister abhaengt, ist
+     schwerer zu durchschauen als ein Umschalter an einer Stelle. */
+  .app.mit-offen main.inhalt { display: none; }
+
   .mit-seite .mit-kopf { display: none; }
   #mitBody { padding-top: 22px; }
   #pr-stunden > .seiten-kopf, #pr-daten > .seiten-kopf { display: none; }
@@ -2172,7 +2211,26 @@ const W = {
     offenEine: 'Eine Schicht in diesem Monat ist noch nicht abgeglichen und darum hier nicht enthalten.',
     offenMehrere: 'Schichten in diesem Monat sind noch nicht abgeglichen und darum hier nicht enthalten.',
     speichern: 'Speichern', abbrechen: 'Abbrechen', schliessen: 'Schliessen',
-    datenHinweis: 'Änderungen an deinen Daten macht die Verwaltung.',
+    // ══ Meine Daten selbst pflegen (ENT-460) ══
+    datenHinweis: 'Personalnummer, Geburtsdatum und die Geschäftsadresse ändert die Verwaltung. Alles Übrige trägst du bei einer Änderung selbst ein — bis auf den Adresszusatz sind alle Felder Pflicht.',
+    datenHinweisAus: 'Das Bearbeiten der eigenen Angaben ist auf diesem Server noch nicht eingerichtet. Änderungen macht bis dahin die Verwaltung.',
+    datenBearbeiten: 'Angaben bearbeiten',
+    datenGespeichert: 'Angaben gespeichert.',
+    datenNichtErfasst: 'nicht erfasst',
+    datenAdresse: 'Adresse', datenKontakt: 'Kontakt', datenPersonalien: 'Personalien',
+    hausnummer: 'Hausnummer', adresszusatz: 'Adresszusatz', plz: 'PLZ', land: 'Land',
+    emailPrivat: 'E-Mail', emailWdh: 'E-Mail wiederholen',
+    emailWdhFalsch: 'Die beiden E-Mail-Adressen stimmen nicht überein.',
+    notfallkontakt: 'Notfallkontakt',
+    datenFreiwillig: 'freiwillig',
+    datenFehltEine: 'Eine Angabe fehlt noch. Ohne sie lässt sich nicht speichern.',
+    datenFehltMehrere: 'Angaben fehlen noch. Ohne sie lässt sich nicht speichern.',
+    datenPflichtLeer: 'Diese Angabe ist nötig:',
+    notfallHilfe: 'Wen sollen wir anrufen, wenn dir auf Schicht etwas zustösst?',
+    emailPrivatHilfe: 'An diese Adresse geht der Link, wenn du dein Passwort vergisst.',
+    emailWdhHilfe: 'Ein Zahlendreher fällt sonst erst auf, wenn du das Passwort wirklich brauchst — darum zweimal.',
+    datenPwLabel: 'Dein Passwort',
+    datenPwWarum: 'Weil an der privaten E-Mail-Adresse das Zurücksetzen des Passworts hängt, ist zum Ändern dein Passwort nötig.',
     netzfehler: 'Keine Verbindung. Bitte nochmals versuchen.',
     folgetag: 'bis Folgetag',
     // ══ Rundgang (Revierdienst-Tool V3, ENT-180/182/145) ══
@@ -2387,6 +2445,13 @@ let rapporte = [];
 let sperrtage = {};   // Datum -> Bemerkung (ENT-028)
 let meineAbwesenheiten = [];   // eigene Abwesenheitsantraege (ENT-255)
 let profil = null;
+// Welche Felder die Person selbst pflegen darf, entscheidet der Server
+// (ENT-460, ma_selbst_aenderbare_felder). Hier wird die Antwort nur
+// verwahrt: Eine zweite Liste im Browser liefe irgendwann auseinander --
+// und dann stuende ein Eingabefeld da, das der Server beim Speichern
+// zurueckweist.
+let selbstAenderbar = [];
+let mdBearbeitung = false;
 // ── Mitteilungen (ENT-421).
 // mitStand ist bewusst KEIN Boolean: Es gibt vier Zustaende, und drei davon
 // duerfen nicht wie "keine Mitteilungen" aussehen (CLAUDE.md, meistverletzte
@@ -2927,7 +2992,10 @@ function ladeSchichten() {
 }
 function ladeProfil() {
   return api('mein_profil.php').then(({ ok, data }) => {
-    if (ok && data.status === 'ok') { profil = data.profil; }
+    if (ok && data.status === 'ok') {
+      profil = data.profil;
+      selbstAenderbar = Array.isArray(data.selbst_aenderbar) ? data.selbst_aenderbar : [];
+    }
   });
 }
 function ladeRapporte() {
@@ -3017,6 +3085,14 @@ function tischMarkeSetzen() {
   // uebernommen, nicht zweitgerechnet.
   const q = $('mitZahl'), z = $('tsZahl');
   if (q && z) { z.textContent = q.textContent; z.hidden = q.hidden; }
+  // Steht die Mitteilungs-Seite, hat sie keinen Hintergrund mehr. Sie liegt
+  // als feste Ebene ueber der Seite; scrollt die Seite darunter weiter,
+  // wandern Kopfzeile und Leiste weg, waehrend die Ebene stehenbleibt --
+  // und durch die entstehende Luecke schaut der Plan. Gemessen: nach 600 px
+  // Scrollen 600 px Luecke. Ohne Inhalt dahinter gibt es nichts zu
+  // scrollen; die Liste selbst scrollt in ihrem eigenen Kasten (.mit-bd).
+  const rumpf = $('app');
+  if (rumpf) rumpf.classList.toggle('mit-offen', a === 'mitteilungen' && amSchreibtisch());
   tischKopfMessen();
 }
 
@@ -5766,16 +5842,7 @@ function zeichneMenu() {
         </button>
         <h2>${esc(w('meineDaten'))}</h2>
       </div>
-      <div class="karte"><div class="karte-bd"><dl class="dl">
-        ${zeile(w('persNr'), p.personalnummer)}
-        ${zeile(w('geburtsdatum'), p.geburtsdatum ? dmy(p.geburtsdatum) : '')}
-        ${zeile(w('adresse'), [p.strasse, p.ort].filter(Boolean).join(', '))}
-        ${zeile(w('telefon'), p.telefon)}
-        ${zeile(w('mobil'), p.mobil)}
-        ${zeile(w('email'), p.email)}
-      </dl>
-      <p style="font-size:13px;color:var(--ink-3);margin-top:14px">${esc(w('datenHinweis'))}</p>
-      </div></div>
+      <div class="karte"><div class="karte-bd" id="md-bd"></div></div>
     </div>
 
     <div id="pr-spesen" style="display:none">
@@ -5827,6 +5894,10 @@ function zeichneMenu() {
     </div>`;
   // Der Schalter wird mit dem Menue neu gebaut -- sein Zustand steht im
   // Bauplan nur als Ausgangswert und muss hier nachgestellt werden.
+  // Der Inhalt der Karte "Meine Daten" wird eigens gezeichnet (ENT-460) --
+  // er wechselt zwischen Anzeige und Formular, ohne dass dafuer das ganze
+  // Menue neu aufgebaut wird (das schloesse die Unterseite).
+  mdZeichnen();
   themaSchalterStellen();
   // Und die Glocke zurueck an ihren Platz in der frisch gebauten Karte.
   mitGlockeVerorten();
@@ -5861,6 +5932,230 @@ function datenSeiteZu() {
   u.style.display = 'none';
   h.style.display = '';
   window.scrollTo(0, 0);
+}
+
+// ══════════════════════════════════════════ MEINE DATEN SELBST PFLEGEN (ENT-460)
+// Der Projektinhaber: *"Ich moechte, dass man im Bereich meine Daten die
+// wichtigsten Angaben selbst bearbeiten kann. Dies erspart vor allem mit der
+// Administration Zeit. Und der Mitarbeiter ist verpflichtet, bei Aenderungen
+// die Angaben selbst einzutragen."*
+//
+// WELCHE Felder das sind, steht NICHT hier, sondern im Server
+// (ma_selbst_aenderbare_felder). Diese Oberflaeche fragt die Liste ab und
+// zeichnet, was darin steht -- sonst gaebe es zwei Wahrheiten, und die
+// zweite waere die falsche, sobald jemand nur eine von beiden anfasst.
+// Dieselbe Ueberlegung wie bei der Sperre selbst: Was hier steht, erspart
+// den Umweg; verboten wird im Server.
+const MD_ADRESSE = ['strasse', 'hausnummer', 'adresszusatz', 'plz', 'ort', 'land'];
+// Seit ENT-466 EINE Nummer statt Festnetz und Mobil, und EINE Adresse
+// statt privat und geschaeftlich. 'telefon' steht hier nicht mehr: Der
+// Server darf die alte Festnetzspalte noch leeren, ein Eingabefeld hat sie
+// nicht mehr (ma_selbst_sichtbare_felder).
+const MD_KONTAKT = ['mobil', 'email_privat', 'notfallkontakt'];
+// Muss zu SELBST_PFLICHT in backend/api/mein_profil_speichern.php passen.
+// Der Server sperrt; das hier erspart nur den vergeblichen Weg dorthin.
+// test_meine_daten_bearbeiten.mjs haelt beide Listen zusammen.
+const MD_PFLICHT = ['strasse', 'hausnummer', 'plz', 'ort', 'land',
+  'mobil', 'email_privat', 'notfallkontakt'];
+// Beschriftungen ueber das Woerterbuch, damit sie an einer Stelle stehen.
+const MD_BESCHRIFTUNG = {
+  strasse: 'strasse', hausnummer: 'hausnummer', adresszusatz: 'adresszusatz',
+  plz: 'plz', ort: 'ort', land: 'land',
+  // Die eine Nummer heisst auf dem Bildschirm schlicht "Telefon" -- das
+  // Wort, das alle sagen --, liegt aber in der Spalte 'mobil' (ENT-466).
+  mobil: 'telefon', telefon: 'telefon',
+  email_privat: 'emailPrivat', notfallkontakt: 'notfallkontakt'
+};
+// Muss zu SELBST_MAXLAENGE in backend/api/mein_profil_speichern.php passen.
+// Das Feld hier begrenzt nur die Eingabe und erspart den vergeblichen Weg
+// zum Server -- gepruefet wird dort. test_meine_daten_bearbeiten.mjs haelt
+// beide Listen zusammen, damit sie nicht auseinanderlaufen.
+const MD_MAXLAENGE = {
+  strasse: 200, hausnummer: 20, adresszusatz: 200, plz: 10, ort: 200,
+  land: 100, telefon: 50, mobil: 50, email_privat: 200, notfallkontakt: 200
+};
+const MD_AUTO = {
+  strasse: 'address-line1', hausnummer: 'off', adresszusatz: 'address-line2',
+  plz: 'postal-code', ort: 'address-level2', land: 'country-name',
+  telefon: 'tel', mobil: 'tel', email_privat: 'email', notfallkontakt: 'off'
+};
+
+const mdDarf = f => selbstAenderbar.indexOf(f) >= 0;
+
+// Die EINE private Nummer. Bis zum ersten Speichern kann sie noch in der
+// alten Festnetzspalte stehen -- dann wird sie von dort gezeigt und beim
+// Speichern nach 'mobil' geschrieben, wo der Server 'telefon' leert
+// (ENT-466). So verschwindet niemandem seine Nummer vor dem Umzug.
+function mdNummer() {
+  const p = profil || {};
+  return String(p.mobil || p.telefon || '').trim();
+}
+
+// Welche Pflichtangaben heute noch leer sind. Fuer den Hinweis OBEN im
+// Formular: Wer erst beim Speichern erfaehrt, dass drei Felder fehlen,
+// haelt das Formular fuer kaputt.
+function mdFehlend() {
+  const p = profil || {};
+  return MD_PFLICHT.filter(f => mdDarf(f)
+    && !(f === 'mobil' ? mdNummer() : String(p[f] || '').trim()));
+}
+
+// Ein leerer Wert verschwindet NICHT, er wird als "nicht erfasst"
+// ausgewiesen. Die fruehere Zeile blendete sich bei leerem Wert aus -- wer
+// keinen Notfallkontakt hatte, sah keine Zeile und damit auch keinen Anlass,
+// einen einzutragen.
+const mdZeile = (k, v) => `<dt>${esc(k)}</dt><dd>${v
+  ? esc(v)
+  : `<span class="md-leer">${esc(w('datenNichtErfasst'))}</span>`}</dd>`;
+
+function mdZeichnen() {
+  const bd = $('md-bd');
+  if (!bd) return;
+  bd.innerHTML = (mdBearbeitung && selbstAenderbar.length) ? mdFormular() : mdAnzeige();
+}
+
+function mdAnzeige() {
+  const p = profil || {};
+  const adresse = [
+    [p.strasse, p.hausnummer].filter(Boolean).join(' '),
+    p.adresszusatz,
+    [p.plz, p.ort].filter(Boolean).join(' '),
+    p.land
+  ].filter(Boolean).join(', ');
+  // Fehlt die Spalte in der Datenbank noch (vor dem Einrichtungslauf), wird
+  // die Zeile gar nicht gezeigt: "nicht erfasst" wuerde behaupten, es gebe
+  // das Feld und es sei bloss leer.
+  const kann = selbstAenderbar.length > 0;
+  return `<dl class="dl">
+    ${mdZeile(w('persNr'), p.personalnummer)}
+    ${mdZeile(w('geburtsdatum'), p.geburtsdatum ? dmy(p.geburtsdatum) : '')}
+    ${mdZeile(w('adresse'), adresse)}
+    ${mdZeile(w('telefon'), mdNummer())}
+    ${mdDarf('email_privat') ? mdZeile(w('emailPrivat'), p.email_privat) : ''}
+    ${mdDarf('notfallkontakt') ? mdZeile(w('notfallkontakt'), p.notfallkontakt) : ''}
+  </dl>
+  ${kann ? `<div class="md-tat"><button class="btn btn-primary" id="mdKnopfAuf"
+      onclick="mdBearbeitenAuf()">${esc(w('datenBearbeiten'))}</button></div>` : ''}
+  <p class="md-hinweis">${esc(w(kann ? 'datenHinweis' : 'datenHinweisAus'))}</p>`;
+}
+
+function mdFeld(f, hilfe) {
+  if (!mdDarf(f)) return '';
+  const p = profil || {};
+  const id = 'md-' + f;
+  const typ = f === 'email_privat' ? 'email' : f === 'mobil' ? 'tel' : 'text';
+  // Wiederholung und Passwortfrage tauchen auf, sobald die Adresse sich
+  // wirklich unterscheidet -- nicht erst nach vergeblichem Speichern.
+  const zusatz = f === 'email_privat' ? ' oninput="mdMailGeprueft()"' : '';
+  const wert = f === 'mobil' ? mdNummer() : String(p[f] || '');
+  const frei = MD_PFLICHT.indexOf(f) < 0
+    ? ` <span class="md-frei">(${esc(w('datenFreiwillig'))})</span>` : '';
+  return `<div class="f"><label for="${id}">${esc(w(MD_BESCHRIFTUNG[f]))}${frei}</label>
+    <input class="inp" id="${id}" type="${typ}" maxlength="${MD_MAXLAENGE[f]}"
+      autocomplete="${MD_AUTO[f] || 'off'}" value="${esc(wert)}"${zusatz}></div>`
+    + (hilfe ? `<p class="md-hilfe">${esc(w(hilfe))}</p>` : '');
+}
+
+function mdFormular() {
+  const adr = MD_ADRESSE.filter(mdDarf), kon = MD_KONTAKT.filter(mdDarf);
+  const fehlt = mdFehlend().length;
+  return `
+  ${fehlt ? `<p class="md-fehlt">${fehlt === 1 ? esc(w('datenFehltEine'))
+      : fehlt + ' ' + esc(w('datenFehltMehrere'))}</p>` : ''}
+  ${adr.length ? `<div class="md-abschnitt">${esc(w('datenAdresse'))}</div>
+    <div class="md-paar md-paar-sh">${mdFeld('strasse')}${mdFeld('hausnummer')}</div>
+    ${mdFeld('adresszusatz')}
+    <div class="md-paar md-paar-po">${mdFeld('plz')}${mdFeld('ort')}</div>
+    ${mdFeld('land')}` : ''}
+  ${kon.length ? `<div class="md-abschnitt">${esc(w('datenKontakt'))}</div>
+    <div class="md-paar md-paar-gleich">${mdFeld('mobil')}</div>
+    ${mdFeld('email_privat', 'emailPrivatHilfe')}
+    <div id="mdMailBlock" hidden>
+      <div class="f"><label for="md-email_privat2">${esc(w('emailWdh'))}</label>
+        <input class="inp" id="md-email_privat2" type="email" maxlength="200"
+               autocomplete="off" spellcheck="false"></div>
+      <p class="md-hilfe">${esc(w('emailWdhHilfe'))}</p>
+      <div class="f" id="mdPw">
+        <label for="mdPwInp">${esc(w('datenPwLabel'))}</label>
+        <div class="pw-feld"><input class="inp" id="mdPwInp" type="password" autocomplete="current-password">
+          <button type="button" class="pw-toggle" aria-label="Passwort anzeigen"
+                  onclick="togglePw('mdPwInp', this)">&#128065;</button></div>
+        <p class="md-hilfe" style="margin:8px 0 0">${esc(w('datenPwWarum'))}</p>
+      </div>
+    </div>
+    ${mdFeld('notfallkontakt', 'notfallHilfe')}` : ''}
+  <div class="md-tat">
+    <button class="btn btn-primary" id="mdKnopfSpeichern"
+      onclick="mdSpeichern()">${esc(w('speichern'))}</button>
+    <button class="btn btn-plain" id="mdKnopfAbbrechen"
+      onclick="mdBearbeitenZu()">${esc(w('abbrechen'))}</button>
+  </div>`;
+}
+
+function mdBearbeitenAuf() { mdBearbeitung = true;  mdZeichnen(); }
+function mdBearbeitenZu()  { mdBearbeitung = false; mdZeichnen(); }
+
+function mdMailGeprueft() {
+  const el = $('md-email_privat'), block = $('mdMailBlock');
+  if (!el || !block) return;
+  const bisher = String((profil && profil.email_privat) || '').trim();
+  block.hidden = el.value.trim() === bisher;
+}
+
+function mdSpeichern() {
+  const rumpf = {};
+  selbstAenderbar.forEach(f => {
+    const el = $('md-' + f);
+    if (el) rumpf[f] = el.value.trim();
+  });
+
+  // Pflichtangaben (ENT-466). Der Server sperrt ohnehin -- das hier
+  // erspart nur den vergeblichen Weg dorthin und zeigt gleich, WELCHES
+  // Feld gemeint ist, statt einer Liste am Seitenrand.
+  const leer = MD_PFLICHT.filter(f => Object.prototype.hasOwnProperty.call(rumpf, f) && !rumpf[f]);
+  if (leer.length) {
+    const el = $('md-' + leer[0]);
+    if (el) { el.focus(); }
+    toast(w('datenPflichtLeer') + ' ' + w(MD_BESCHRIFTUNG[leer[0]] || leer[0]));
+    return;
+  }
+
+  // Wiederholung der E-Mail. Anlass ist ein tatsaechlicher Vorfall: ein
+  // Zahlendreher, und danach liess sich das Passwort nicht mehr
+  // zuruecksetzen. Der Server prueft dasselbe noch einmal -- eine Sperre,
+  // die nur hier sitzt, ist keine.
+  const block = $('mdMailBlock'), wdh = $('md-email_privat2'), pwInp = $('mdPwInp');
+  if (block && !block.hidden) {
+    const zweite = wdh ? wdh.value.trim() : '';
+    if (zweite !== (rumpf.email_privat || '')) {
+      if (wdh) { wdh.focus(); }
+      toast(w('emailWdhFalsch'));
+      return;
+    }
+    rumpf.email_privat2 = zweite;
+    if (pwInp) { rumpf.passwort = pwInp.value; }
+  }
+  const knopf = $('mdKnopfSpeichern');
+  if (knopf) knopf.disabled = true;
+  api('mein_profil_speichern.php', { method: 'POST', body: rumpf }).then(({ ok, data }) => {
+    if (knopf) knopf.disabled = false;
+    if (!ok || !data || data.status !== 'ok') {
+      // Der Server verlangt das Passwort nur, wenn die private E-Mail sich
+      // wirklich aendert. Kommt diese Antwort, stand das Feld noch zu.
+      if (data && (data.passwort_noetig || data.mail_wiederholung) && block) {
+        block.hidden = false;
+        const ziel = data.mail_wiederholung ? $('md-email_privat2') : pwInp;
+        if (ziel) ziel.focus();
+      }
+      toast((data && data.message) || w('netzfehler'));
+      return;
+    }
+    toast(w('datenGespeichert'));
+    mdBearbeitung = false;
+    // Neu laden statt den eingetippten Wert zu glauben: Was gilt, sagt der
+    // Server -- er trennt PLZ und Ort und weist Ungueltiges zurueck.
+    ladeProfil().then(() => { zeichneMenu(); datenSeiteAuf(); });
+  });
 }
 
 // ══════════════════════════════════════════ SPESEN (ENT-402)
