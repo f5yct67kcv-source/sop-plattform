@@ -140,7 +140,7 @@ const LAUF_VORSCHAU = {
       lohnform: 'stunde', roh_min: 1080, netto_min: 1020, bonus_min: 42, bewertet_min: 1062,
       brutto_rappen: 51613, gesperrt: { sparte_reinigung: 1 }, nicht_abgeglichen: 1,
       gesperrt_grund: null, warnung: null,
-      netto_rappen: 48879, auszahlung_rappen: 48853,
+      netto_rappen: null, auszahlung_rappen: null,
       nbu: { stand: 'versichert', quelle: 'gerechnet', text: 'Versichert nach Empfehlung 7/87.',
              uebersteuert: null,
              fenster: { 3: { wochen_total: 13, arbeitswochen: 9, schnitt_std: 11.5,
@@ -157,14 +157,16 @@ const LAUF_VORSCHAU = {
           basis_rappen: 51613, satz_bp: null, menge: null, betrag_rappen: null,
           gesperrt_grund: 'kein_ktg_satz', annahme: 0, hinweis: 'Kein Satz erfasst.' },
         { schluessel: 'nettolohn', bezeichnung: 'Nettolohn', sortierung: 60,
-          basis_rappen: null, satz_bp: null, menge: null, betrag_rappen: 48879,
-          gesperrt_grund: null, annahme: 0, hinweis: null },
+          basis_rappen: null, satz_bp: null, menge: null, betrag_rappen: null,
+          gesperrt_grund: 'abzug_fehlt', annahme: 0,
+          hinweis: 'Kein Nettolohn, solange ein Abzug fehlt: Krankentaggeld-Beitrag.' },
         { schluessel: 'pako', bezeichnung: 'Vollzugskostenbeitrag PaKo', sortierung: 61,
           basis_rappen: null, satz_bp: null, menge: null, betrag_rappen: -26,
           gesperrt_grund: null, annahme: 0, hinweis: 'Art. 6 Ziff. 2 GAV' },
         { schluessel: 'auszahlung', bezeichnung: 'Auszahlungsbetrag', sortierung: 70,
-          basis_rappen: null, satz_bp: null, menge: null, betrag_rappen: 48853,
-          gesperrt_grund: null, annahme: 0, hinweis: null },
+          basis_rappen: null, satz_bp: null, menge: null, betrag_rappen: null,
+          gesperrt_grund: 'abzug_fehlt', annahme: 0,
+          hinweis: 'Kein Auszahlungsbetrag ohne Nettolohn.' },
       ] },
     { mitarbeiter_id: 43, name: 'Zweite Person', personalnummer: 'P-0043', kategorie: null,
       lohnform: null, roh_min: 480, netto_min: 480, bonus_min: 0, bewertet_min: 480,
@@ -340,7 +342,19 @@ const lauf = (await page.textContent('#view-lohnlaeufe')).replace(/\s+/g, ' ');
 // Groesse, auf der der Lohn beruht.
 check('Die Liste zeigt Brutto, Abzuege und Auszahlung nebeneinander',
   /Brutto CHF/.test(lauf) && /Abzüge CHF/.test(lauf) && /Auszahlung CHF/.test(lauf));
-check('Die Auszahlung der gerechneten Person erscheint', /488.53/.test(lauf));
+// KRITISCH: Fehlt ein Abzug, darf in der Liste KEINE Auszahlungssumme
+// stehen. Eine Zahl, die den fehlenden Abzug als null behandelt, waere
+// plausibel und zu hoch -- und wer sie ausbezahlt, zahlt zu viel.
+const auszSpalte = await page.evaluate(() => {
+  const tr = [...document.querySelectorAll('#llVorschau tbody tr')]
+    .find(r => /Eine Person/.test(r.textContent));
+  const td = tr && tr.querySelectorAll('td');
+  return td ? { abzuege: td[4].textContent.trim(), auszahlung: td[5].textContent.trim() } : null;
+});
+check('KRITISCH: ohne vollstaendige Abzuege steht in der Liste "offen", keine Summe',
+  auszSpalte.abzuege === 'offen' && auszSpalte.auszahlung === 'offen');
+check('KRITISCH: und dort steht auch keine 0.00',
+  !/0\.00/.test(auszSpalte.abzuege) && !/0\.00/.test(auszSpalte.auszahlung));
 // "Einheiten nie vermischen": Rohzeit, Nettozeit, Zeitbonus und bewertete
 // Zeit stehen EINZELN -- nie nur ein fertiger Stundenwert (CLAUDE.md).
 // Seit Etappe 4 stehen sie in der ABRECHNUNG statt in der Liste; die Aussage

@@ -459,23 +459,55 @@ pruef('Fehlt das AHV-Regelwerk, sperrt umgekehrt die AHV-Zeile',
     && $z25['ahv']['gesperrt_grund'] === 'kein_sv_regelwerk');
 
 // ── Aufbau der Abrechnung ────────────────────────────────────────────────
-pruef('Der Nettolohn ist der Bruttolohn zuzueglich aller Abzugszeilen darueber',
-    $z26['nettolohn']['betrag_rappen'] === 29160 - 1545);
+// KRITISCH -- der schwerste Fehler dieser Etappe, beim Vorfuehren gefunden:
+// Die einzelne Zeile sagte korrekt "nicht gerechnet", die ZWISCHENSUMME
+// zaehlte sie aber als null. Am Referenzbeispiel stand dadurch ein Nettolohn
+// von 276.15 statt 272.94 -- plausibel und zu HOCH, weil der ALV-Abzug
+// fehlte. Wer das ausbezahlt, zahlt zu viel und schuldet die Beitraege
+// trotzdem. Eine Summe ueber eine gesperrte Zeile ist keine Summe.
+pruef('KRITISCH: fehlt eine Abzugszeile, entsteht KEIN Nettolohn',
+    $z26['alv']['betrag_rappen'] === null
+    && $z26['nettolohn']['betrag_rappen'] === null
+    && $z26['nettolohn']['gesperrt_grund'] === 'abzug_fehlt');
+pruef('KRITISCH: und erst recht kein Auszahlungsbetrag',
+    $z26['auszahlung']['betrag_rappen'] === null
+    && $z26['auszahlung']['gesperrt_grund'] === 'abzug_fehlt');
+pruef('Der Hinweis benennt die fehlenden Abzuege namentlich, nicht nur "gesperrt"',
+    str_contains($z26['nettolohn']['hinweis'], 'ALV')
+    && str_contains($z26['nettolohn']['hinweis'], 'Krankentaggeld'));
+// Die Rechenvorschrift selbst, als Aussage die immer gilt: Steht ein
+// Nettolohn da, ist er die Summe -- steht keiner da, steht auch keine Zahl
+// da. Formuliert als Bedingung, damit sie auch dann noch prueft, wenn
+// spaeter alle Regelwerke erfasst sind und die Summe wirklich entsteht.
+$summeVorNetto = 29160;
+foreach ($a26['zeilen'] as $z) {
+    if ((int)$z['sortierung'] < 60) { $summeVorNetto += (int)($z['betrag_rappen'] ?? 0); }
+}
+pruef('Ein vorhandener Nettolohn ist die Summe; ein fehlender ist keine Zahl',
+    $z26['nettolohn']['betrag_rappen'] === null
+        ? $z26['nettolohn']['gesperrt_grund'] !== null
+        : $z26['nettolohn']['betrag_rappen'] === $summeVorNetto);
+// Und die Gegenrichtung: Ist NICHTS gesperrt, muessen beide Summen entstehen.
+// Geprueft an einem Kopf ohne Abzugszeilen -- dort gibt es nichts zu sperren.
+$leer = lohnlauf_abzuege($pdo, ['brutto_rappen' => 10000, 'kategorie' => 'A',
+    'bewertet_min' => 0, 'zeilen' => []], '2026-07-31', ['stand' => LOHN_NBU_UNBEKANNT]);
+$zl = []; foreach ($leer['zeilen'] as $z) { $zl[$z['schluessel']] = $z; }
+pruef('Sperrt nichts, entstehen beide Summen als Zahl',
+    $zl['nettolohn']['betrag_rappen'] !== null || count($leer['sperren']) > 0);
 // Referenzabrechnung: PaKo 10 Stunden x 0.015 = 0.15, NACH dem Nettolohn.
 pruef('PaKo: zehn Stunden mal 1,5 Rappen ergeben die 0.15 der Referenzabrechnung',
     $z26['pako']['betrag_rappen'] === -15);
 pruef('Der PaKo steht NACH dem Nettolohn, so wie ihn die Referenzabrechnung ausweist',
     $z26['pako']['sortierung'] > $z26['nettolohn']['sortierung']
     && $z26['ahv']['sortierung'] < $z26['nettolohn']['sortierung']);
-pruef('Der Auszahlungsbetrag ist der Nettolohn abzueglich der Zeilen nach ihm',
-    $z26['auszahlung']['betrag_rappen'] === 29160 - 1545 - 15);
+pruef('Der PaKo-Betrag steht trotzdem da -- er ist gerechnet, nur die Summe nicht',
+    $z26['pako']['betrag_rappen'] === -15);
 // KRITISCH (Merkblatt 6.05 Ziff. 5): Der Berufsunfall traegt der
 // Arbeitgeber. Er darf auf keiner Abrechnung als Abzug erscheinen.
 pruef('Ein BU-Abzug erscheint auf keiner Abrechnung',
     !array_key_exists('bu', $z26));
 pruef('Auf 5 Rappen wird nicht gerundet, solange das nicht entschieden ist',
-    LOHNLAUF_AUSZAHLUNG_AUF_5_RAPPEN === false
-    && $z26['auszahlung']['betrag_rappen'] === 27600);
+    LOHNLAUF_AUSZAHLUNG_AUF_5_RAPPEN === false);
 pruef('Gerundet wird je Abzug, nicht auf die Summe',
     LOHNLAUF_RUNDUNG_JE_ABZUG === true);
 

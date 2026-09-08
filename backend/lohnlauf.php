@@ -42,6 +42,20 @@ function lohnlauf_sperrgruende(): array
         'monatslohn_offen'   => 'Für den Monatslohn (Kategorie A und B) ist der Rechenweg noch nicht gebaut — Etappe 3 deckt den Stundenlohn ab.',
         'anordnung_fehlt'    => 'Der Zuschlag ist als Stundenentschädigung vereinbart. Nach Art. 19 entsteht er aus dem angeordneten Einsatz — die Anordnung je Schicht führt das Datenmodell noch nicht.',
         'ausgleich_offen'    => 'Art. 14 Ziff. 3 lässt für die Mehrstunden über 210 die Auszahlung ODER den Ausgleich als Freizeit innerhalb von drei Monaten zu. Welches von beidem gilt, ist nicht festgelegt — bis dahin entsteht kein Betrag.',
+        // ── Abzugsseite (Etappe 4) ──────────────────────────────────────
+        'kein_sv_regelwerk'  => 'Für dieses Beitragsjahr sind die Sätze für AHV, IV und EO nicht erfasst. Es wird nicht mit den Sätzen eines anderen Jahres gerechnet.',
+        'kein_alv_regelwerk' => 'Für dieses Beitragsjahr ist der ALV-Satz nicht erfasst. Es wird nicht mit den Sätzen eines anderen Jahres gerechnet.',
+        'kein_nbu_satz'      => 'Es besteht Deckung gegen Nichtberufsunfälle, aber der Prämiensatz des Versicherers ist nicht erfasst.',
+        'kein_ktg_satz'      => 'Der Krankentaggeld-Satz ist nicht erfasst. Solange er fehlt, wird nicht gerechnet — auch nicht mit null.',
+        'kein_bvg_satz'      => 'Der BVG-Beitrag aus der Meldung der Pensionskasse ist nicht erfasst.',
+        'nbu_keine_deckung'  => 'Unter acht Wochenstunden besteht keine Deckung gegen Nichtberufsunfälle (Merkblatt 6.05 Ziff. 4). Es darf kein Beitrag abgezogen werden.',
+        'nbu_unbekannt'      => 'Ob eine Deckung gegen Nichtberufsunfälle besteht, ist nicht ermittelt — es fehlt die Stundenhistorie oder das UVG-Regelwerk des Jahres.',
+        'nbu_pruefen'        => 'Die geleisteten Stunden ergeben keine Deckung, aber im Zeitraum liegen Ausfalltage wegen Unfall oder Krankheit. Ziff. 4 der Empfehlung 7/87 lässt sie ergänzen; wie, ist nicht geklärt. Von Hand prüfen.',
+        'kein_pako'          => 'Ohne Anstellungskategorie lässt sich der Vollzugskostenbeitrag nach Art. 6 Ziff. 2 nicht bestimmen.',
+        'quellensteuer_offen' => 'Die Quellensteuer ist Etappe 5 und bewusst gesperrt statt mit null gerechnet — ein nicht nachgeführter kantonaler Tarif produziert weiter plausible Zahlen. Betroffene Personen werden von Hand abgerechnet.',
+        // Die wichtigste der Abzugsseite: Eine Summe ueber eine nicht
+        // gerechnete Zeile ist keine Summe, sondern eine zu hohe Zahl.
+        'abzug_fehlt'        => 'Solange ein Abzug fehlt, entsteht weder ein Nettolohn noch ein Auszahlungsbetrag. Eine Summe, die den fehlenden Abzug als null behandelt, wäre plausibel und zu hoch — und wer sie ausbezahlt, zahlt zu viel und schuldet die Beiträge trotzdem.',
     ];
 }
 
@@ -509,14 +523,36 @@ function lohnlauf_abzuege(PDO $pdo, array $kopf, string $bis, ?array $nbu = null
         }
     }
 
-    // 5. Nettolohn als Zwischensumme -- alles bis hierher.
-    $netto = (int)$kopf['brutto_rappen'];
-    foreach ($zeilen as $z) { $netto += (int)($z['betrag_rappen'] ?? 0); }
+    // 5. Nettolohn als Zwischensumme.
+    //
+    // KRITISCH: Fehlt EINE Abzugszeile, gibt es KEINEN Nettolohn.
+    //
+    // Das war hier zuerst falsch gebaut, und der Fehler ist die gefaehrlichste
+    // Sorte: Die einzelne Zeile sagte korrekt "nicht gerechnet", die Summe
+    // zaehlte sie aber als null. Am Referenzbeispiel stand dann ein Nettolohn
+    // von 276.15 statt 272.94 -- eine plausible Zahl, die zu HOCH ist, weil
+    // ein Abzug fehlt. Wer sie ausbezahlt, zahlt zu viel aus und schuldet die
+    // Beitraege trotzdem. Eine gesperrte Zeile ist keine Null, und eine Summe
+    // ueber eine gesperrte Zeile ist keine Summe.
+    $fehlend = [];
+    foreach ($zeilen as $z) {
+        if (($z['betrag_rappen'] ?? null) === null && ($z['gesperrt_grund'] ?? null) !== null) {
+            $fehlend[] = $z['bezeichnung'];
+        }
+    }
+    $netto = null;
+    if (!$fehlend) {
+        $netto = (int)$kopf['brutto_rappen'];
+        foreach ($zeilen as $z) { $netto += (int)($z['betrag_rappen'] ?? 0); }
+    }
     $zeilen[] = ['schluessel' => 'nettolohn', 'bezeichnung' => 'Nettolohn',
         'basis_rappen' => null, 'satz_bp' => null, 'menge' => null,
         'betrag_rappen' => $netto, 'sortierung' => 60, 'annahme' => 0,
-        'gesperrt_grund' => null,
-        'hinweis' => 'Bruttolohn abzueglich der Sozialversicherungsbeitraege'];
+        'gesperrt_grund' => $fehlend ? 'abzug_fehlt' : null,
+        'hinweis' => $fehlend
+            ? 'Kein Nettolohn, solange ein Abzug fehlt: ' . implode(', ', $fehlend)
+              . '. Eine Summe ueber eine nicht gerechnete Zeile waere zu hoch.'
+            : 'Bruttolohn abzueglich der Sozialversicherungsbeitraege'];
 
     // 6. PaKo NACH dem Nettolohn -- so weist es die Fremdloesung aus, und
     //    Art. 6 Ziff. 2 verlangt ausdruecklich, dass er auf der Abrechnung
@@ -540,17 +576,34 @@ function lohnlauf_abzuege(PDO $pdo, array $kopf, string $bis, ?array $nbu = null
             . 'Betroffene Personen werden von Hand abgerechnet.');
     }
 
-    // 8. Auszahlungsbetrag.
-    $aus = $netto;
+    // 8. Auszahlungsbetrag -- dieselbe Regel, eine Stufe weiter. Ohne
+    //    Nettolohn kein Auszahlungsbetrag, und eine gesperrte Zeile NACH dem
+    //    Nettolohn (etwa die Quellensteuer) sperrt ihn ebenso.
+    $fehlendNach = [];
     foreach ($zeilen as $z) {
-        if ((int)($z['sortierung'] ?? 0) > 60) { $aus += (int)($z['betrag_rappen'] ?? 0); }
+        if ((int)($z['sortierung'] ?? 0) > 60 && ($z['betrag_rappen'] ?? null) === null
+            && ($z['gesperrt_grund'] ?? null) !== null) {
+            $fehlendNach[] = $z['bezeichnung'];
+        }
     }
-    if (LOHNLAUF_AUSZAHLUNG_AUF_5_RAPPEN) { $aus = lohn_fuenfrappen($aus); }
+    $aus = null;
+    if ($netto !== null && !$fehlendNach) {
+        $aus = $netto;
+        foreach ($zeilen as $z) {
+            if ((int)($z['sortierung'] ?? 0) > 60) { $aus += (int)($z['betrag_rappen'] ?? 0); }
+        }
+        if (LOHNLAUF_AUSZAHLUNG_AUF_5_RAPPEN) { $aus = lohn_fuenfrappen($aus); }
+    }
     $zeilen[] = ['schluessel' => 'auszahlung', 'bezeichnung' => 'Auszahlungsbetrag',
         'basis_rappen' => null, 'satz_bp' => null, 'menge' => null,
         'betrag_rappen' => $aus, 'sortierung' => 70, 'annahme' => 0,
-        'gesperrt_grund' => null,
-        'hinweis' => 'Nettolohn abzueglich der Beitraege, die nach ihm ausgewiesen werden'];
+        'gesperrt_grund' => $aus === null ? 'abzug_fehlt' : null,
+        'hinweis' => $aus === null
+            ? ($netto === null
+               ? 'Kein Auszahlungsbetrag ohne Nettolohn.'
+               : 'Kein Auszahlungsbetrag, solange nach dem Nettolohn etwas fehlt: '
+                 . implode(', ', $fehlendNach) . '.')
+            : 'Nettolohn abzueglich der Beitraege, die nach ihm ausgewiesen werden'];
 
     usort($zeilen, fn($a, $b) => $a['sortierung'] <=> $b['sortierung']);
     return ['zeilen' => $zeilen, 'grundlagen' => $g, 'sperren' => $sperren,
