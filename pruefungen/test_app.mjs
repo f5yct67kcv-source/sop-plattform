@@ -79,7 +79,7 @@ const SCHICHTEN = () => ({ status: 'ok', von: GESTERN, bis: tag(90), schichten: 
 const PROFIL = { status: 'ok', monat: { anzahl: 3, stunden: 22.5 }, profil: {
   name: 'dario.beispiel', ist_admin: false, personalnummer: 'P-014', anrede: 'Herr',
   vorname: 'Dario', nachname: 'Beispiel', geburtsdatum: '1988-04-12', strasse: 'Musterweg 3',
-  ort: '4600 Olten', telefon: null, mobil: '079 000 00 00', email: 'd@example.ch',
+  ort: '4600 Olten', telefon: null, mobil: null, email: 'd@example.ch',
   erstellt_am: '2026-01-04 10:00:00' }};
 
 const RAP = { status: 'ok', rapporte: [{ id: 1, datum: GESTERN, mitarbeiter: 'dario.beispiel',
@@ -596,9 +596,27 @@ await page.waitForTimeout(150);
 const datenText = await T('#pr-daten');
 check('Meine Daten zeigt die Personalnummer', datenText.includes('P-014'));
 check('Meine Daten zeigt die Adresse', datenText.includes('4600 Olten'));
-check('Meine Daten zeigt leere Felder nicht an', !datenText.includes('Telefon'));
-check('Meine Daten ist nur lesend',
-  await page.evaluate(() => document.querySelectorAll('#pr-daten input, #pr-daten textarea').length === 0));
+// Umgekehrt seit ENT-460: Ein leeres Feld verschwindet NICHT mehr, es wird
+// benannt. Zuvor sah, wer keine Telefonnummer erfasst hatte, gar keine
+// Zeile -- und damit auch keinen Anlass, eine einzutragen. "Nicht erfasst"
+// und "gibt es nicht" sind zwei verschiedene Aussagen (CLAUDE.md).
+// Seit ENT-466 zeigt die Karte EINE Nummer: mobil, ersatzweise telefon.
+// Im Muster ist BEIDES leer -- waere eines gesetzt, gaebe es hier kein
+// leeres Feld mehr, und diese Pruefung haette nichts zu beobachten.
+const datenLeer = await page.evaluate(() =>
+  [...document.querySelectorAll('#pr-daten dl.dl dd')]
+    .map(d => ({ leer: !!d.querySelector('.md-leer'), text: d.innerText.trim() })));
+check('Meine Daten benennt leere Felder, statt sie zu verschweigen',
+  datenText.includes('Telefon') && datenLeer.some(d => d.leer));
+check('Der Ersatztext fuer ein leeres Feld ist ein Wort, keine leere Zelle',
+  datenLeer.filter(d => d.leer).every(d => d.text.length > 3));
+check('Keine Zelle bleibt wortlos', datenLeer.every(d => d.text.length > 0));
+// Gibt der Server keine Felder frei -- dieses Muster schickt kein
+// selbst_aenderbar mit --, bleibt die Seite reine Anzeige. Bearbeitet wird
+// erst, wenn der Server sagt, was bearbeitet werden darf.
+check('Ohne freigegebene Felder bleibt Meine Daten reine Anzeige',
+  await page.evaluate(() => document.querySelectorAll('#pr-daten input, #pr-daten textarea').length === 0
+    && !document.getElementById('mdKnopfAuf')));
 check('Meine Daten erklaert, wie Daten geaendert werden', datenText.length > 100);
 await page.evaluate(() => datenSeiteZu());
 await page.waitForTimeout(150);

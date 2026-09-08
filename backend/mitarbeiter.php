@@ -208,6 +208,52 @@ function ma_vertrauliche_felder(): array
     ];
 }
 
+// Angaben, die Mitarbeitende in der App SELBST pflegen (ENT-460). Der
+// Projektinhaber: *"Ich moechte, dass man im Bereich meine Daten die
+// wichtigsten Angaben selbst bearbeiten kann. Dies erspart vor allem mit der
+// Administration Zeit. Und der Mitarbeiter ist verpflichtet, bei Aenderungen
+// die Angaben selbst einzutragen."*
+//
+// Der Zuschnitt folgt einer Linie, nicht einem Gefuehl. Hier steht, was NUR
+// die Person selbst weiss und was die Verwaltung heute abtippt, nachdem es
+// ihr jemand mitgeteilt hat. Nicht hier steht:
+//
+//   * was der Betrieb VERGIBT -- Personalnummer (ENT-393), Geschaeftsadresse
+//     und Geschaeftsnummern. Wer sie selbst setzen koennte, koennte sich eine
+//     fremde Zustaendigkeit geben.
+//   * was IDENTITAET oder LOHN beruehrt -- Geburtsdatum, Zivilstand,
+//     Heiratsdatum. Die stehen ohnehin in ma_vertrauliche_felder(); eine
+//     Aenderung daran hat Folgen fuer Zulagen und gehoert geprueft, nicht
+//     getippt.
+//
+// Diese Liste ist die einzige Wahrheit dazu: mein_profil.php liefert sie mit,
+// mein_profil_speichern.php schreibt ausschliesslich, was hier steht, und die
+// Oberflaeche fragt sie ab, statt sie ein zweites Mal danebenzulegen. Wer hier
+// ein Feld ergaenzt, oeffnet es damit ueberall zugleich -- das ist der Zweck
+// der einen Stelle und der Grund, warum keine zweite existiert.
+function ma_selbst_aenderbare_felder(): array
+{
+    return [
+        'strasse', 'hausnummer', 'adresszusatz', 'plz', 'ort', 'land',
+        'telefon', 'mobil', 'email_privat', 'notfallkontakt',
+    ];
+}
+
+// Was die Person auf dem BILDSCHIRM bearbeitet -- eine Untermenge der
+// Liste oben, abgeleitet statt danebengelegt (ENT-466).
+//
+// 'telefon' fehlt hier. Bis ENT-466 fuehrte die Akte Festnetz und Mobil
+// getrennt; der Projektinhaber: *"2026 hat fast niemand mehr ein
+// Festnetz."* Seither gibt es EIN Feld, und es steht in 'mobil'. Die alte
+// Spalte bleibt oben stehen, weil der Endpunkt sie noch LEEREN darf, wenn
+// die eine Nummer hinueberwandert -- aber ein Eingabefeld hat sie nicht
+// mehr. Ohne diese Trennung meldete der Server der Oberflaeche ein Feld,
+// das sie gar nicht anbietet.
+function ma_selbst_sichtbare_felder(): array
+{
+    return array_values(array_diff(ma_selbst_aenderbare_felder(), ['telefon']));
+}
+
 // Welche der Felder gibt es in der Datenbank wirklich? Der Nachtrag laeuft
 // erst, wenn der Projektinhaber "Einrichtung" drueckt -- bis dahin fehlen die
 // neuen Spalten. Ohne diese Pruefung wuerde ein INSERT ueber die volle
