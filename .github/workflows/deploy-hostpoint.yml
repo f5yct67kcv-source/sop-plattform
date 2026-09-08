@@ -271,6 +271,12 @@ jobs:
           # Mitarbeiter-Code, also kann von dort auch nichts versehentlich
           # an einen Kunden geraten.
           cp portal.html dist/portal.html
+          # Oeffentliche Homepage (ENT-469). Eigene Seite ohne jeden
+          # Produktcode -- sie laedt weder gav.js noch eine Sitzung; ihre
+          # einzige Verbindung zum Server ist das Demo-Formular
+          # (api/demo_anfrage.php). Bewusst NICHT index.html: Die Wurzel
+          # bleibt die Erfassung der Mitarbeitenden (Startadresse der PWA).
+          cp homepage.html dist/homepage.html
           # gav.js traegt die GAV-Regeln fuer BEIDE Oberflaechen (ENT-049).
           # Fehlt sie hier, laden dashboard.html und app.html ins Leere und
           # rechnen gar nichts mehr -- derselbe Fallstrick wie bei ENT-040.
@@ -321,6 +327,12 @@ jobs:
           # verlangt, dass die Lizenz die Schrift begleitet.
           cp fonts/*.woff2 dist/fonts/
           cp fonts/inter-LICENSE.txt dist/fonts/inter-LICENSE.txt
+          # Archivo und IBM Plex (Homepage, ENT-469): selbst ausgeliefert
+          # wie Inter -- kein Abruf bei Google von der oeffentlichen Seite
+          # aus. Die woff2-Dateien nimmt die Zeile oben mit; die Lizenzen
+          # muessen ebenso begleiten (SIL OFL 1.1).
+          cp fonts/archivo-OFL.txt dist/fonts/archivo-OFL.txt
+          cp fonts/ibm-plex-LICENSE.txt dist/fonts/ibm-plex-LICENSE.txt
           # Hintergrundfoto der Anmeldemaske auf dem Desktop (ENT-392) --
           # per CSS-url() aus app.html geholt, genau derselbe Fallstrick
           # wie bei den Schriftschnitten oben: fehlt die Datei auf dem
@@ -339,6 +351,9 @@ jobs:
           # Wird nur von den portal_*-Endpunkten eingebunden, nie direkt
           # aufgerufen -- steht darum auch in der Sperrliste der .htaccess.
           cp backend/kundenportal.php dist/kundenportal.php
+          # Pruefung und Mailtext der Demo-Anfrage (ENT-469), eingebunden
+          # von api/demo_anfrage.php -- steht darum auch in der Sperrliste.
+          cp backend/demo_anfrage.php dist/demo_anfrage.php
           cp backend/ai.php dist/ai.php
           cp backend/planung.php dist/planung.php
           cp backend/kunden.php dist/kunden.php

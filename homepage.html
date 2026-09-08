@@ -1,0 +1,1193 @@
+<!DOCTYPE html>
+<html lang="de-CH">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!--
+  OEFFENTLICHE HOMEPAGE (ENT-469). Entwurf und Begleitnotiz liegen im
+  Projekt-Repository unter 02-gate2-produkt-mvp/homepage-entwurf*.
+  Produktname und Logo sind PLATZHALTER (OP-18): Der Name steht in der
+  Konstante BRAND am Dateiende und in allen <span data-brand>-Stellen, das
+  Logo als <symbol id="marke">. Alle Personen, Kunden und Objekte in den
+  Bildschirmen sind erfunden. Diese Seite laedt keinen Produktcode; ihre
+  einzige Verbindung zum Server ist das Demo-Formular (api/demo_anfrage.php).
+-->
+<title>Wachtwerk – Betriebssoftware für Schweizer Sicherheitsdienste</title>
+<meta name="description" content="Einsatzplanung, Mitarbeiter-App, Revierdienst, Kundenportal, Offerten und Rechnungen in einer Software – für kleine und mittlere Sicherheitsdienste in der Schweiz, mit dem GAV Sicherheit im Kern.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230B1020'/%3E%3Ccircle cx='16' cy='16' r='10' fill='none' stroke='%23EEF1F7' stroke-width='2.4' stroke-dasharray='47 16' stroke-linecap='round' transform='rotate(20 16 16)'/%3E%3Ccircle cx='16' cy='16' r='3.4' fill='%23EEF1F7'/%3E%3Ccircle cx='25' cy='11.8' r='2.4' fill='%23F3B42B'/%3E%3C/svg%3E">
+<style>
+/* Schriften selbst ausgeliefert (wie Inter fuer das Cockpit, ENT-223/OP-224):
+   Kein Abruf bei Google von der oeffentlichen Seite aus. Lateinischer
+   Zeichenvorrat genuegt (Umlaute, «», –, ' liegen darin); fuer alles
+   andere greift der Rueckfall-Stapel. Lizenzen: fonts/archivo-OFL.txt,
+   fonts/ibm-plex-LICENSE.txt (SIL OFL 1.1). */
+@font-face{font-family:"Archivo";font-style:normal;font-weight:100 900;font-stretch:62% 125%;font-display:swap;src:url(fonts/archivo-variable-latin.woff2) format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:"IBM Plex Sans";font-style:normal;font-weight:100 700;font-display:swap;src:url(fonts/plex-sans-variable-latin.woff2) format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:"IBM Plex Mono";font-style:normal;font-weight:400;font-display:swap;src:url(fonts/plex-mono-400-latin.woff2) format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:"IBM Plex Mono";font-style:normal;font-weight:500;font-display:swap;src:url(fonts/plex-mono-500-latin.woff2) format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+/* ─────────────────────────────────────────────────────────────
+   Farben, Schrift, Raster
+   Nacht/Nebel: der Tag eines Sicherheitsdienstes, von 22:00 bis
+   zum Monatsende. Bernstein: die Rundumleuchte, sparsam gesetzt.
+   ───────────────────────────────────────────────────────────── */
+:root{
+  --nacht:#0B1020; --nacht-2:#131A2C; --nacht-3:#1B2338; --nacht-linie:#26304A; --nacht-linie-2:#344060;
+  --nebel:#EEF1F6; --weiss:#FFFFFF; --linie:#D7DCE6; --linie-soft:#E6EAF1;
+  --tinte:#10141F; --tinte-2:#4B5468; --tinte-3:#7B8499;
+  --stahl:#98A2B8; --stahl-2:#C5CCDB; --stahl-hi:#EEF1F7;
+  --bernstein:#F3B42B; --bernstein-hi:#FFC94D; --bernstein-tief:#8F5E00;
+  /* Produktoberfläche in den Bildschirmen (eigene Farbwelt, bewusst blau) */
+  --p-shell:#16181D; --p-shell-hi:#1E2128; --p-shell-line:#272B33; --p-shell-txt:#9298A5; --p-shell-txt-hi:#F3F5F8;
+  --p-bg:#F7F8FA; --p-surface:#FFFFFF; --p-line:#E5E8EC; --p-line-soft:#EFF1F4;
+  --p-ink:#14161A; --p-ink2:#545B67; --p-ink3:#8B919D;
+  --p-accent:#2F5BD7; --p-accent-soft:#EDF2FE; --p-accent-line:#CBD9F9;
+  --p-pos:#0E7C55; --p-pos-soft:#E6F6EF; --p-neg:#C2382A; --p-neg-soft:#FCEDEB; --p-warn:#9A6B08; --p-warn-soft:#FBF3E0;
+
+  --display:"Archivo","Arial Narrow","Helvetica Neue",Arial,sans-serif;
+  --body:"IBM Plex Sans","Helvetica Neue",Arial,sans-serif;
+  --mono:"IBM Plex Mono","SFMono-Regular",Menlo,Consolas,monospace;
+
+  --w:1240px;
+  --pad:clamp(20px,4vw,48px);
+  --abs:clamp(80px,10vw,136px);
+
+  /* Abschnittsfarben, werden je Abschnitt neu gesetzt */
+  --g:var(--nacht); --t:var(--stahl-hi); --t2:var(--stahl); --t3:#6E7890; --rule:var(--nacht-linie); --acc:var(--bernstein); --acc-t:var(--bernstein);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{margin:0;background:var(--nacht);color:var(--stahl-hi);font-family:var(--body);font-size:17px;line-height:1.6;font-feature-settings:"ss01";-webkit-font-smoothing:antialiased;overflow-x:hidden}
+img,svg{display:block;max-width:100%}
+a{color:inherit;text-decoration:none}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--bernstein);outline-offset:3px;border-radius:2px}
+.skip{position:absolute;left:-999px;top:8px;background:var(--bernstein);color:var(--nacht);padding:8px 12px;z-index:100}
+.skip:focus{left:8px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* Abschnitte tragen ihre Farbwelt als Variablen — Bausteine lesen nur diese. */
+.abs{background:var(--g);color:var(--t);padding:var(--abs) 0;position:relative}
+.abs.nacht{--g:var(--nacht);--t:var(--stahl-hi);--t2:var(--stahl);--t3:#6E7890;--rule:var(--nacht-linie);--acc-t:var(--bernstein)}
+.abs.nacht-2{--g:var(--nacht-2);--t:var(--stahl-hi);--t2:var(--stahl);--t3:#7681A0;--rule:var(--nacht-linie-2);--acc-t:var(--bernstein)}
+.abs.hell{--g:var(--weiss);--t:var(--tinte);--t2:var(--tinte-2);--t3:var(--tinte-3);--rule:var(--linie);--acc-t:var(--bernstein-tief)}
+.abs.nebel{--g:var(--nebel);--t:var(--tinte);--t2:var(--tinte-2);--t3:var(--tinte-3);--rule:var(--linie);--acc-t:var(--bernstein-tief)}
+.wrap{max-width:var(--w);margin:0 auto;padding:0 var(--pad)}
+
+/* Typografie */
+.vorzeile{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--acc-t);margin:0 0 20px;display:flex;align-items:center;gap:12px}
+.vorzeile::before{content:"";width:22px;height:1px;background:currentColor;opacity:.8}
+.display{font-family:var(--display);font-stretch:72%;font-weight:700;text-transform:uppercase;line-height:.94;letter-spacing:-.005em;margin:0;text-wrap:balance;color:var(--t);overflow-wrap:anywhere;min-width:0}
+h1.display{font-size:clamp(52px,6.9vw,100px);letter-spacing:-.012em}
+h2.display{font-size:clamp(36px,4.7vw,68px)}
+.zwei h2.display{font-size:clamp(36px,4vw,58px)}
+h3.display{font-size:clamp(28px,3vw,40px);font-stretch:78%}
+.lead{font-size:clamp(18px,1.5vw,21px);line-height:1.55;color:var(--t2);max-width:62ch;margin:0}
+p{margin:0 0 1em}
+.text p{color:var(--t2);max-width:60ch}
+.text p strong{color:var(--t);font-weight:600}
+.mono{font-family:var(--mono)}
+.tab{font-variant-numeric:tabular-nums}
+.hervor{color:var(--acc-t)}
+
+/* Knöpfe */
+.btn{display:inline-flex;align-items:center;gap:10px;height:52px;padding:0 24px;border-radius:4px;font-weight:600;font-size:16px;border:1px solid transparent;cursor:pointer;transition:background .18s,border-color .18s,transform .18s;white-space:nowrap}
+.btn svg{width:18px;height:18px}
+.btn.primaer{background:var(--bernstein);color:var(--nacht);border-color:var(--bernstein)}
+.btn.primaer:hover{background:var(--bernstein-hi)}
+.btn.sekundaer{background:transparent;color:var(--t);border-color:var(--rule)}
+.btn.sekundaer:hover{border-color:var(--t2)}
+.btn:active{transform:translateY(1px)}
+
+/* ─────────────────────────────────────────────────────────────
+   Kopfleiste
+   ───────────────────────────────────────────────────────────── */
+.kopf{position:sticky;top:0;z-index:50;background:rgba(11,16,32,.72);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid transparent;transition:border-color .2s}
+.kopf.fest{border-bottom-color:var(--nacht-linie)}
+.kopf .wrap{display:flex;align-items:center;justify-content:space-between;height:72px;gap:24px}
+.marke{display:inline-flex;align-items:center;gap:12px;color:var(--stahl-hi)}
+.marke svg{width:30px;height:30px}
+.wortmarke{font-family:var(--display);font-stretch:115%;font-weight:700;letter-spacing:.16em;font-size:15px;text-transform:uppercase}
+.kopf nav{display:flex;align-items:center;gap:4px}
+.kopf nav a{font-size:15px;color:var(--stahl-2);padding:10px 14px;border-radius:4px;transition:color .15s;white-space:nowrap}
+.kopf nav .btn{display:none}
+.kopf nav a:hover{color:var(--stahl-hi)}
+.kopf .btn{height:44px;padding:0 18px;font-size:15px}
+.menu-knopf{display:none;width:44px;height:44px;border:1px solid var(--nacht-linie);background:transparent;border-radius:4px;color:var(--stahl-hi);align-items:center;justify-content:center;cursor:pointer}
+.menu-knopf svg{width:20px;height:20px}
+@media (max-width:900px){
+  .kopf nav{display:none;position:absolute;left:0;right:0;top:72px;background:var(--nacht-2);border-bottom:1px solid var(--nacht-linie);flex-direction:column;align-items:stretch;padding:8px var(--pad) 16px}
+  .kopf nav.offen{display:flex}
+  .kopf nav a{min-height:48px;display:flex;align-items:center;font-size:17px;border-bottom:1px solid var(--nacht-linie)}
+  .kopf nav a:last-of-type{border-bottom:0}
+  .kopf nav .btn{display:inline-flex;margin-top:12px;justify-content:center;height:50px}
+  .menu-knopf{display:inline-flex}
+  .kopf .cta-desktop{display:none}
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Held: Nacht, 22:00
+   ───────────────────────────────────────────────────────────── */
+.held{overflow:hidden;padding-top:clamp(56px,8vw,112px);padding-bottom:0}
+.held::before{content:"";position:absolute;inset:-40% -20% auto -20%;height:140%;pointer-events:none;
+  background:conic-gradient(from 0deg at 50% 50%,transparent 0deg,rgba(243,180,43,.11) 22deg,transparent 48deg,transparent 360deg);
+  filter:blur(28px);animation:leuchte 46s linear infinite;opacity:.9}
+@media (prefers-reduced-motion:reduce){.held::before{animation:none;transform:rotate(-30deg)}}
+@keyframes leuchte{to{transform:rotate(360deg)}}
+.held .wrap{position:relative}
+.held-text{max-width:1100px}
+.held h1{margin:0 0 28px}
+.held h1 .z2{display:block;color:var(--stahl-2)}
+.held-aktionen{display:flex;flex-wrap:wrap;gap:12px;margin:36px 0 0}
+.held-fakten{display:grid;grid-template-columns:repeat(3,1fr);margin:64px 0 0;border-top:1px solid var(--rule)}
+.held-fakten div{padding:20px 24px 20px 0;border-right:1px solid var(--rule)}
+.held-fakten div:nth-child(n+2){padding-left:24px}
+.held-fakten div:last-child{border-right:0}
+.held-fakten b{display:block;font-family:var(--display);font-stretch:80%;font-weight:600;font-size:22px;text-transform:uppercase;letter-spacing:.02em;color:var(--stahl-hi);margin-bottom:4px}
+.held-fakten span{font-size:15px;color:var(--t2)}
+@media (max-width:700px){
+  .held-fakten{grid-template-columns:1fr}
+  .held-fakten div{border-right:0;border-bottom:1px solid var(--rule);padding:16px 0}
+  .held-fakten div:nth-child(n+2){padding-left:0}
+  .held-fakten div:last-child{border-bottom:0}
+}
+.held-bild{margin:64px auto 0;position:relative}
+.held-bild::after{content:"";position:absolute;left:0;right:0;bottom:0;height:120px;background:linear-gradient(to bottom,transparent,var(--nacht));pointer-events:none}
+
+/* ─────────────────────────────────────────────────────────────
+   Bildschirme (Produkt-Mockups) — die einzigen gerundeten,
+   schattierten Objekte der Seite: sie sind Geräte.
+   ───────────────────────────────────────────────────────────── */
+.cockpit{background:var(--p-bg);color:var(--p-ink);border-radius:10px;box-shadow:0 40px 90px -30px rgba(0,0,0,.7),0 0 0 1px rgba(255,255,255,.08);overflow:hidden;font-family:var(--body);font-size:12.5px;line-height:1.4;text-align:left}
+.ck-chrome{display:flex;align-items:center;gap:8px;height:38px;padding:0 14px;background:#0F1116;border-bottom:1px solid #1E2128}
+.ck-chrome i{width:10px;height:10px;border-radius:50%;background:#2A2E37}
+.ck-chrome .url{margin-left:12px;flex:1;max-width:360px;height:24px;border-radius:5px;background:#1A1D24;color:#8B919D;font-family:var(--mono);font-size:11px;display:flex;align-items:center;padding:0 10px}
+.ck-body{display:grid;grid-template-columns:212px 1fr 292px;min-height:520px}
+.ck-side{background:var(--p-shell);color:var(--p-shell-txt);padding:16px 12px;border-right:1px solid var(--p-shell-line)}
+.ck-brand{display:flex;align-items:center;gap:8px;color:var(--p-shell-txt-hi);font-weight:600;font-size:13px;padding:4px 8px 14px}
+.ck-brand svg{width:18px;height:18px}
+.ck-brand small{display:block;font-weight:400;font-size:10.5px;color:var(--p-shell-txt);letter-spacing:.06em;text-transform:uppercase}
+.ck-grp{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#6E7480;padding:12px 8px 4px;font-weight:600}
+.ck-nav{display:block;padding:5px 8px;border-radius:5px;color:var(--p-shell-txt);font-size:12.5px}
+.ck-nav.on{background:var(--p-shell-hi);color:var(--p-shell-txt-hi)}
+.ck-main{padding:18px 22px;min-width:0}
+.ck-top{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:14px}
+.ck-titel{font-size:19px;font-weight:600;letter-spacing:-.01em}
+.ck-sub{color:var(--p-ink2);margin-top:2px}
+.ck-tools{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.ck-chip{border:1px solid var(--p-line);background:var(--p-surface);border-radius:999px;padding:3px 10px;font-size:11.5px;color:var(--p-ink2)}
+.ck-chip.on{background:var(--p-accent-soft);border-color:var(--p-accent-line);color:var(--p-accent)}
+.ck-btn{background:var(--p-accent);color:#fff;border:0;border-radius:6px;padding:6px 11px;font-weight:600;font-size:12px}
+.ck-tag{font-size:11.5px;color:var(--p-ink2);padding:12px 0 6px;display:flex;gap:10px;align-items:baseline}
+.ck-tag b{color:var(--p-ink);font-weight:600}
+.ck-tabelle{width:100%;border-collapse:collapse;background:var(--p-surface);border:1px solid var(--p-line);border-radius:8px;overflow:hidden}
+.ck-tabelle th{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--p-ink3);text-align:left;padding:8px 10px;border-bottom:1px solid var(--p-line);font-weight:600}
+.ck-tabelle td{padding:9px 10px;border-bottom:1px solid var(--p-line-soft);vertical-align:middle;white-space:nowrap}
+.ck-tabelle tr:last-child td{border-bottom:0}
+.ck-tabelle .zeit{font-family:var(--mono);font-size:11.5px;color:var(--p-ink)}
+.ck-tabelle .obj b{display:block;font-weight:600}
+.ck-tabelle .obj span{color:var(--p-ink2)}
+.ck-tabelle .sparte{color:var(--p-ink2)}
+.ck-team{display:flex;gap:-4px}
+.mono-chip{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:#E4E8EF;color:#3B4351;font-size:10px;font-weight:600;border:2px solid var(--p-surface);margin-left:-6px}
+.mono-chip:first-child{margin-left:0}
+.mono-chip.offen{background:var(--p-warn-soft);color:var(--p-warn);border-style:dashed;border-color:var(--p-warn)}
+.pill{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:2px 9px;font-size:11px;font-weight:600}
+.pill.pos{background:var(--p-pos-soft);color:var(--p-pos)}
+.pill.warn{background:var(--p-warn-soft);color:var(--p-warn)}
+.pill.neutral{background:#EEF0F4;color:var(--p-ink2)}
+.pill.fest{background:#E9ECF2;color:#3B4351}
+.pill svg{width:11px;height:11px}
+.ck-feed{background:var(--p-surface);border-left:1px solid var(--p-line);padding:18px 18px}
+.ck-feed-titel{font-weight:600;font-size:13px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:baseline}
+.ck-feed-titel span{font-size:11px;color:var(--p-ink3);font-weight:400}
+.ck-ereignis{display:grid;grid-template-columns:44px 1fr;gap:10px;padding:10px 0;border-bottom:1px solid var(--p-line-soft)}
+.ck-ereignis:last-child{border-bottom:0}
+.ck-ereignis .zeit{font-family:var(--mono);font-size:11px;color:var(--p-ink3);padding-top:2px}
+.ck-ereignis b{display:block;font-weight:600;font-size:12.5px}
+.ck-ereignis span{color:var(--p-ink2);font-size:12px}
+.ck-ereignis .neu b::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--p-accent);margin-right:6px;vertical-align:middle}
+@media (max-width:1100px){.ck-body{grid-template-columns:200px 1fr}.ck-feed{display:none}}
+@media (max-width:760px){.ck-body{grid-template-columns:minmax(0,1fr)}.ck-side{display:none}.ck-main{padding:14px;overflow-x:auto}.ck-tabelle{min-width:560px}.ck-chrome .url{max-width:none}.ck-top{flex-direction:column;align-items:flex-start;gap:10px}.ck-tools{justify-content:flex-start}}
+
+/* Telefon */
+.phone{width:320px;max-width:100%;margin:0 auto;background:#0E1117;border-radius:40px;padding:12px;box-shadow:0 40px 90px -30px rgba(0,0,0,.8),0 0 0 1px rgba(255,255,255,.1),inset 0 0 0 2px #1E232D;color:var(--p-ink);font-family:var(--body);text-align:left}
+.ph-screen{background:var(--p-bg);border-radius:30px;overflow:hidden;min-height:620px;display:flex;flex-direction:column}
+.ph-status{display:flex;justify-content:space-between;align-items:center;padding:14px 22px 6px;font-size:12px;font-weight:600;font-family:var(--mono)}
+.ph-status span:last-child{letter-spacing:.06em;font-size:10px}
+.ph-kopf{padding:8px 20px 12px}
+.ph-eyebrow{font-size:11px;color:var(--p-pos);font-weight:600;letter-spacing:.04em;text-transform:uppercase;display:flex;align-items:center;gap:6px}
+.ph-eyebrow::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--p-pos);animation:puls 2s ease-in-out infinite}
+@keyframes puls{0%,100%{opacity:1}50%{opacity:.35}}
+@media (prefers-reduced-motion:reduce){.ph-eyebrow::before{animation:none}}
+.ph-titel{font-size:21px;font-weight:600;letter-spacing:-.01em;margin-top:4px}
+.ph-sub{font-size:12.5px;color:var(--p-ink2);margin-top:2px}
+.ph-progress{padding:0 20px 12px}
+.ph-bar{height:8px;border-radius:999px;background:#E3E7EE;overflow:hidden}
+.ph-bar i{display:block;height:100%;width:62.5%;background:var(--p-accent);border-radius:999px}
+.ph-prog-txt{display:flex;justify-content:space-between;font-size:12px;color:var(--p-ink2);margin-top:6px;font-variant-numeric:tabular-nums}
+.ph-liste{list-style:none;margin:0 14px;padding:0;background:var(--p-surface);border:1px solid var(--p-line);border-radius:12px;overflow:hidden}
+.ph-liste li{display:grid;grid-template-columns:44px 1fr auto;gap:8px;align-items:center;padding:9px 12px;border-bottom:1px solid var(--p-line-soft);font-size:13px;min-height:44px}
+.ph-liste li:last-child{border-bottom:0}
+.ph-liste .zeit{font-family:var(--mono);font-size:11.5px;color:var(--p-ink3)}
+.ph-liste li.ok .zeit{color:var(--p-pos)}
+.ph-liste li.ok .name::before{content:"✓";color:var(--p-pos);font-weight:700;margin-right:6px}
+.ph-liste li.jetzt{background:var(--p-accent-soft)}
+.ph-liste li.jetzt .name{font-weight:600;color:var(--p-accent)}
+.ph-liste small{display:block;font-size:11px;color:var(--p-ink2);font-weight:400}
+.ph-liste .art{font-size:10.5px;color:var(--p-ink3);text-transform:uppercase;letter-spacing:.05em}
+.ph-aktionen{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px 14px 4px}
+.ph-aktionen button{height:46px;border-radius:10px;border:1px solid var(--p-line);background:var(--p-surface);font-weight:600;font-size:14px}
+.ph-aktionen button.prim{background:var(--p-accent);color:#fff;border-color:var(--p-accent)}
+.ph-notruf{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:8px 14px 16px;margin-top:auto}
+.ph-notruf a{min-height:56px;border-radius:10px;background:var(--p-surface);border:1px solid var(--p-line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
+.ph-notruf a b{font-size:16px;font-weight:700;letter-spacing:-.02em}
+.ph-notruf a small{font-size:10px;color:var(--p-ink2)}
+.ph-notruf a.zentrale{background:var(--p-accent-soft);border-color:var(--p-accent-line)}
+.ph-notruf a.zentrale b{color:var(--p-accent);font-size:13px}
+.ph-notruf a.notruf b{color:var(--p-neg)}
+
+/* Portal (Tablet-Karte) */
+.portal{background:var(--p-surface);color:var(--p-ink);border-radius:12px;box-shadow:0 30px 70px -30px rgba(16,20,31,.35),0 0 0 1px var(--p-line);overflow:hidden;font-family:var(--body);font-size:13px;text-align:left;max-width:100%}
+.po-scroll{overflow-x:auto}
+.po-scroll > *{min-width:560px}
+.po-kopf{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--p-line);background:var(--p-bg)}
+.po-kopf b{font-weight:600;display:flex;align-items:center;gap:8px}
+.po-kopf b svg{width:16px;height:16px;color:var(--p-accent)}
+.po-kopf span{font-size:12px;color:var(--p-ink2)}
+.po-titel{padding:16px 18px 6px;font-weight:600;font-size:14px;display:flex;justify-content:space-between;align-items:baseline}
+.po-titel span{font-weight:400;font-size:12px;color:var(--p-ink3)}
+.po-tabelle{width:100%;border-collapse:collapse}
+.po-tabelle th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--p-ink3);padding:6px 18px;border-bottom:1px solid var(--p-line);font-weight:600}
+.po-tabelle td{padding:10px 18px;border-bottom:1px solid var(--p-line-soft);vertical-align:middle;white-space:nowrap}
+.po-tabelle tr.offen td{border-bottom:0;background:var(--p-bg)}
+.po-tabelle .zeit{font-family:var(--mono);font-size:12px}
+.po-balken{display:flex;align-items:center;gap:10px}
+.po-balken i{display:block;width:120px;height:6px;border-radius:999px;background:#E3E7EE;overflow:hidden}
+.po-balken i b{display:block;height:100%;background:var(--p-pos);border-radius:999px}
+.po-balken span{font-variant-numeric:tabular-nums;color:var(--p-ink2);font-size:12px}
+.po-foto{display:inline-flex;align-items:center;gap:5px;color:var(--p-ink2);font-size:12px}
+.po-foto svg{width:14px;height:14px}
+.po-detail{padding:4px 18px 16px;background:var(--p-bg);border-bottom:1px solid var(--p-line)}
+.po-detail ol{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(4,1fr);gap:0 16px}
+.po-detail li{display:grid;grid-template-columns:44px minmax(0,1fr);gap:0 8px;align-items:baseline;padding:6px 0;border-bottom:1px solid var(--p-line-soft);font-size:12.5px}
+.po-detail li .zeit{color:var(--p-pos)}
+.po-detail li em{display:block;grid-column:2;font-style:normal;color:var(--p-ink2);font-size:11px}
+@media (max-width:760px){.po-detail ol{grid-template-columns:repeat(2,minmax(0,1fr))}.po-balken i{width:90px}}
+
+/* Beleg (Rechnung mit QR-Zahlteil) */
+.beleg{background:#fff;color:var(--p-ink);border-radius:6px;box-shadow:0 30px 70px -30px rgba(16,20,31,.35),0 0 0 1px var(--p-line);padding:28px 30px;font-family:var(--body);font-size:12.5px;text-align:left;max-width:560px;margin:0 auto}
+.bl-kopf{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;padding-bottom:16px;border-bottom:1px solid var(--p-line)}
+.bl-kopf .firma{font-weight:600;font-size:14px}
+.bl-kopf .firma small{display:block;font-weight:400;color:var(--p-ink2);font-size:11.5px;line-height:1.4}
+.bl-nr{text-align:right;font-family:var(--mono);font-size:11px;color:var(--p-ink2);line-height:1.6}
+.bl-nr b{display:block;font-family:var(--body);font-size:18px;color:var(--p-ink);font-weight:600;letter-spacing:-.01em}
+.bl-adresse{padding:14px 0;color:var(--p-ink2);line-height:1.45}
+.bl-adresse b{color:var(--p-ink);font-weight:600}
+.bl-pos{width:100%;border-collapse:collapse;margin-top:6px}
+.bl-pos th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--p-ink3);padding:6px 0;border-bottom:1px solid var(--p-line);font-weight:600}
+.bl-pos td{padding:8px 0;border-bottom:1px solid var(--p-line-soft);vertical-align:top}
+.bl-pos td small{display:block;color:var(--p-ink2);font-size:11px}
+.bl-pos .r{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;padding-left:12px}
+.bl-pos tr.summe td{border-bottom:0;padding:5px 0;color:var(--p-ink2)}
+.bl-pos tr.total td{font-weight:600;color:var(--p-ink);border-top:1px solid var(--p-ink);padding-top:8px;font-size:14px}
+.bl-qr{margin-top:18px;border-top:1px dashed var(--p-line);padding-top:14px;display:grid;grid-template-columns:auto 1fr;gap:18px;align-items:start}
+.bl-qr .qr{width:104px;height:104px;background:
+  repeating-linear-gradient(0deg,#14161A 0 4px,transparent 4px 8px),
+  repeating-linear-gradient(90deg,#14161A 0 4px,transparent 4px 8px);background-blend-mode:multiply;position:relative;border:6px solid #fff;outline:1px solid var(--p-line)}
+.bl-qr .qr::before,.bl-qr .qr::after{content:"";position:absolute;background:#fff}
+.bl-qr .qr::before{left:50%;top:50%;width:22px;height:22px;transform:translate(-50%,-50%);background:#14161A}
+.bl-qr .qr::after{left:50%;top:50%;width:12px;height:12px;transform:translate(-50%,-50%);background:#fff;clip-path:polygon(40% 0,60% 0,60% 40%,100% 40%,100% 60%,60% 60%,60% 100%,40% 100%,40% 60%,0 60%,0 40%,40% 40%)}
+.bl-qr dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:3px 14px;font-size:11.5px}
+.bl-qr dt{color:var(--p-ink3);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;padding-top:1px}
+.bl-qr dd{margin:0;font-family:var(--mono);font-size:11px;color:var(--p-ink)}
+.bl-qr .zahlteil{grid-column:1/-1;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--p-ink3);font-weight:600;margin-top:-6px}
+@media (max-width:560px){.beleg{padding:20px}.bl-qr{grid-template-columns:1fr}}
+
+/* Stundenkarte */
+.stunden{background:var(--p-surface);color:var(--p-ink);border-radius:12px;box-shadow:0 30px 70px -30px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.08);padding:22px 24px;font-family:var(--body);max-width:440px;margin:0 auto;text-align:left}
+.st-kopf{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px}
+.st-kopf b{font-size:15px;font-weight:600}
+.st-kopf span{font-size:12px;color:var(--p-ink3)}
+.stunden dl{margin:0;display:grid;grid-template-columns:1fr auto;gap:0}
+.stunden dt,.stunden dd{padding:9px 0;border-bottom:1px solid var(--p-line-soft);margin:0;font-size:13.5px}
+.stunden dt{color:var(--p-ink2)}
+.stunden dt small{display:block;font-size:11px;color:var(--p-ink3)}
+.stunden dd{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right;font-size:13.5px}
+.stunden .ein dt{padding-left:16px}
+.stunden .plus dd{color:var(--p-pos)}
+.stunden .minus dd{color:var(--p-ink2)}
+.stunden .summe dt,.stunden .summe dd{border-bottom:0;border-top:1px solid var(--p-ink);font-weight:600;color:var(--p-ink);padding-top:10px;font-size:14.5px}
+.stunden .hinweis{margin:12px 0 0;font-size:11.5px;color:var(--p-ink3);line-height:1.45}
+
+/* ─────────────────────────────────────────────────────────────
+   Zweispaltige Abschnitte, Fahrplanraster, Bausteine
+   ───────────────────────────────────────────────────────────── */
+.zwei{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:clamp(40px,6vw,96px);align-items:center}
+.zwei > *,.kopfzeile > *,.dk > *,.vorher-nachher > *,.protokoll li > *{min-width:0}
+.zwei.tausch{grid-template-columns:minmax(0,7fr) minmax(0,5fr)}
+.zwei.tausch > :first-child{order:2}
+.zwei.tausch > :last-child{order:1}
+.zwei .display{margin-bottom:24px}
+@media (max-width:900px){.zwei,.zwei.tausch{grid-template-columns:minmax(0,1fr)}.zwei.tausch > :first-child{order:1}.zwei.tausch > :last-child{order:2}}
+.kopfzeile{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:clamp(24px,5vw,80px);align-items:end;margin-bottom:clamp(40px,5vw,64px)}
+@media (max-width:900px){.kopfzeile{grid-template-columns:minmax(0,1fr)}}
+
+.punkte{list-style:none;margin:28px 0 0;padding:0;display:grid;gap:0}
+.punkte li{display:grid;grid-template-columns:22px 1fr;gap:14px;padding:14px 0;border-top:1px solid var(--rule);color:var(--t2);font-size:16px;line-height:1.5}
+.punkte li:last-child{border-bottom:1px solid var(--rule)}
+.punkte li b{color:var(--t);font-weight:600}
+.punkte li svg{width:20px;height:20px;color:var(--acc-t);margin-top:3px}
+
+/* Fahrplanraster: Zellen mit Haarlinien, keine Karten */
+.raster{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--rule);border-left:1px solid var(--rule)}
+.raster > div{padding:28px 26px 30px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);position:relative;transition:background .2s}
+.raster > div:hover{background:rgba(243,180,43,.06)}
+.raster .nr{font-family:var(--mono);font-size:11.5px;color:var(--t3);letter-spacing:.08em;margin-bottom:22px;display:flex;justify-content:space-between}
+.raster h3{font-family:var(--display);font-stretch:80%;font-weight:700;text-transform:uppercase;font-size:24px;line-height:1;letter-spacing:.005em;margin:0 0 12px;color:var(--t)}
+.raster p{color:var(--t2);font-size:15px;line-height:1.55;margin:0 0 14px}
+.raster ul{list-style:none;margin:0;padding:0}
+.raster li{font-size:13.5px;color:var(--t2);padding:5px 0 5px 16px;position:relative;line-height:1.4}
+.raster li::before{content:"";position:absolute;left:0;top:12px;width:7px;height:1px;background:var(--acc-t)}
+@media (max-width:1100px){.raster{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:600px){.raster{grid-template-columns:minmax(0,1fr)}}
+
+/* Ausgangslage: verstreut → vereint */
+.vorher-nachher{display:grid;grid-template-columns:1fr auto 1fr;gap:24px;align-items:center;margin-top:8px}
+.vn-titel{font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--t3);margin-bottom:14px}
+.vn-heute{display:flex;flex-wrap:wrap;gap:10px}
+.vn-heute span{border:1px dashed var(--t3);color:var(--t2);padding:10px 14px;font-size:14px;border-radius:2px;transform:rotate(var(--r,0deg))}
+.vn-heute span:nth-child(1){--r:-2deg}.vn-heute span:nth-child(2){--r:1.5deg}.vn-heute span:nth-child(3){--r:-1deg}.vn-heute span:nth-child(4){--r:2deg}.vn-heute span:nth-child(5){--r:-1.5deg}.vn-heute span:nth-child(6){--r:1deg}
+.vn-pfeil{color:var(--acc-t)}
+.vn-pfeil svg{width:44px;height:44px}
+.vn-neu{background:var(--nacht);color:var(--stahl-hi);padding:22px 24px;border-radius:4px;position:relative;box-shadow:0 30px 60px -30px rgba(11,16,32,.55)}
+.vn-neu .marke{margin-bottom:14px}
+.vn-neu ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:6px 16px}
+.vn-neu li{font-size:14px;color:var(--stahl-2);padding-left:14px;position:relative}
+.vn-neu li::before{content:"";position:absolute;left:0;top:11px;width:6px;height:1px;background:var(--bernstein)}
+.vn-neu p{margin:14px 0 0;font-size:13px;color:var(--stahl);border-top:1px solid var(--nacht-linie);padding-top:12px}
+@media (max-width:760px){.vorher-nachher{grid-template-columns:minmax(0,1fr)}.vn-pfeil svg{transform:rotate(90deg);margin:0 auto}}
+
+/* Ein Tag: Protokoll */
+.protokoll{list-style:none;margin:0;padding:0;border-top:1px solid var(--rule)}
+.protokoll li{display:grid;grid-template-columns:150px 170px 1fr;gap:24px;padding:26px 0;border-bottom:1px solid var(--rule);align-items:start}
+.protokoll .zeit{font-family:var(--display);font-stretch:70%;font-weight:600;font-size:44px;line-height:1;color:var(--t);letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+.protokoll .zeit small{display:block;font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--t3);margin-top:8px;font-weight:400}
+.protokoll .wo{font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--acc-t);padding-top:14px;display:flex;align-items:center;gap:10px}
+.protokoll .wo::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor;flex:none}
+.protokoll li.live .wo::before{box-shadow:0 0 0 0 rgba(243,180,43,.6);animation:ring 2.2s ease-out infinite}
+@keyframes ring{to{box-shadow:0 0 0 12px rgba(243,180,43,0)}}
+@media (prefers-reduced-motion:reduce){.protokoll li.live .wo::before{animation:none}}
+.protokoll .was{padding-top:10px}
+.protokoll .was b{display:block;color:var(--t);font-weight:600;font-size:18px;margin-bottom:6px}
+.protokoll .was p{margin:0;color:var(--t2);max-width:60ch}
+.protokoll .was q{font-family:var(--mono);font-size:14px;color:var(--t);quotes:"„" "“"}
+@media (max-width:900px){.protokoll li{grid-template-columns:minmax(0,1fr);gap:6px;padding:22px 0}.protokoll .zeit{font-size:38px}.protokoll .zeit small{display:inline;margin-left:10px}.protokoll .wo{padding-top:4px}.protokoll .was{padding-top:4px}}
+
+/* Diktat */
+.diktat{display:grid;gap:16px}
+.dk{display:grid;grid-template-columns:minmax(0,1fr) 40px minmax(0,1fr);gap:14px;align-items:center;padding:18px 0;border-top:1px solid var(--rule)}
+.dk:last-child{border-bottom:1px solid var(--rule)}
+.dk .satz{font-family:var(--mono);font-size:14.5px;line-height:1.5;color:var(--t);display:flex;gap:12px;align-items:flex-start}
+.dk .satz svg{width:20px;height:20px;flex:none;color:var(--acc-t);margin-top:2px}
+.dk .satz small{display:block;font-family:var(--body);font-size:12.5px;color:var(--t3);margin-top:4px}
+.dk .pfeil{color:var(--t3)}
+.dk .pfeil svg{width:28px;height:28px;margin:0 auto}
+.dk .ergebnis{background:var(--p-surface);color:var(--p-ink);border:1px solid var(--p-line);border-radius:8px;padding:12px 14px;font-size:12.5px;box-shadow:0 12px 30px -20px rgba(16,20,31,.3)}
+.dk .ergebnis b{display:block;font-weight:600;margin-bottom:6px;font-size:13px}
+.dk .ergebnis dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:3px 12px}
+.dk .ergebnis dt{color:var(--p-ink3);font-size:11px;text-transform:uppercase;letter-spacing:.05em;padding-top:2px}
+.dk .ergebnis dd{margin:0}
+.dk .ergebnis .knoepfe{display:flex;gap:6px;margin-top:10px}
+.dk .ergebnis .knoepfe span{border-radius:5px;padding:4px 9px;font-size:11.5px;font-weight:600;border:1px solid var(--p-line)}
+.dk .ergebnis .knoepfe span.prim{background:var(--p-accent);border-color:var(--p-accent);color:#fff}
+@media (max-width:760px){.dk{grid-template-columns:minmax(0,1fr)}.dk .pfeil svg{transform:rotate(90deg)}}
+
+/* GAV-Artikel */
+.artikel{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-top:1px solid var(--rule);border-left:1px solid var(--rule);margin-top:48px}
+.artikel > div{padding:28px 26px 30px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule)}
+.artikel .art{font-family:var(--display);font-stretch:66%;font-weight:700;font-size:64px;line-height:.9;color:var(--acc-t);letter-spacing:-.01em;margin-bottom:12px}
+.artikel .art small{display:block;font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--t3);margin-bottom:10px;font-weight:400}
+.artikel h3{font-family:var(--body);font-size:17px;font-weight:600;margin:0 0 8px;color:var(--t)}
+.artikel p{font-size:14.5px;color:var(--t2);margin:0;line-height:1.55}
+@media (max-width:900px){.artikel{grid-template-columns:minmax(0,1fr)}}
+
+/* Sicherheit */
+.sicher{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--rule);border-left:1px solid var(--rule)}
+.sicher > div{padding:26px 24px 28px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule)}
+.sicher svg{width:26px;height:26px;color:var(--acc-t);margin-bottom:18px}
+.sicher h3{font-size:16px;font-weight:600;margin:0 0 8px;color:var(--t)}
+.sicher p{font-size:14px;color:var(--t2);margin:0;line-height:1.5}
+@media (max-width:1000px){.sicher{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:560px){.sicher{grid-template-columns:minmax(0,1fr)}}
+
+/* Haltung */
+.haltung .display{max-width:1100px}
+.haltung p.lead{margin-top:28px}
+.haltung .unter{display:flex;gap:40px;flex-wrap:wrap;margin-top:40px;padding-top:24px;border-top:1px solid var(--rule)}
+.haltung .unter div{font-size:14.5px;color:var(--t2);max-width:32ch}
+.haltung .unter b{display:block;font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--acc-t);margin-bottom:8px;font-weight:500}
+
+/* FAQ */
+.faq{max-width:860px;margin:0 auto;border-top:1px solid var(--rule)}
+.faq details{border-bottom:1px solid var(--rule)}
+.faq summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:20px;padding:22px 0;font-weight:600;font-size:18px;color:var(--t);min-height:44px}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary .frage{flex:1}
+.faq summary::after{content:"+";font-family:var(--mono);font-size:22px;color:var(--acc-t);flex:none;width:28px;text-align:center;transition:transform .2s}
+.faq details[open] summary::after{transform:rotate(45deg)}
+.faq details p{color:var(--t2);max-width:66ch;margin:0 0 22px;font-size:16px}
+
+/* Schlussaufruf */
+.schluss .zwei{align-items:start}
+.formular{background:var(--nacht-2);border:1px solid var(--nacht-linie);border-radius:6px;padding:28px}
+.formular .reihe{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.formular label{display:grid;gap:6px;font-size:13px;color:var(--stahl);margin-bottom:14px}
+.formular input,.formular select,.formular textarea{height:48px;border:1px solid var(--nacht-linie-2);background:var(--nacht);color:var(--stahl-hi);border-radius:4px;padding:0 12px;font-size:16px;width:100%}
+.formular textarea{height:96px;padding:12px;resize:vertical}
+.formular select{appearance:none;-webkit-appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--stahl) 50%),linear-gradient(135deg,var(--stahl) 50%,transparent 50%);background-position:calc(100% - 18px) 21px,calc(100% - 13px) 21px;background-size:5px 5px;background-repeat:no-repeat}
+.formular .btn{width:100%;justify-content:center;margin-top:4px}
+.formular .hinweis{margin:14px 0 0;font-size:13px;color:var(--stahl)}
+.formular .meldung{display:none;margin-top:14px;padding:12px 14px;border:1px solid var(--bernstein);border-radius:4px;color:var(--bernstein);font-size:14px;line-height:1.5}
+.formular .meldung.zeigen{display:block}
+.formular .meldung.fehler{border-color:#F08A7E;color:#F5A79E}
+.formular [aria-invalid="true"]{border-color:#F08A7E}
+.formular .btn[disabled]{opacity:.6;cursor:progress}
+/* Fallenfeld (siehe backend/demo_anfrage.php): fuer Menschen nicht erreichbar,
+   fuer Skripte ein normales Feld. Bewusst nicht display:none. */
+.formular .falle{position:absolute;left:-9999px;top:0;width:1px;height:1px;overflow:hidden}
+.formular.gesendet .felder{display:none}
+.formular .danke{display:none}
+.formular.gesendet .danke{display:block}
+.formular .danke b{display:block;font-family:var(--display);font-stretch:76%;font-weight:700;text-transform:uppercase;font-size:34px;line-height:1;color:var(--stahl-hi);margin-bottom:12px}
+.formular .danke p{margin:0;color:var(--stahl);font-size:15px}
+@media (max-width:560px){.formular .reihe{grid-template-columns:minmax(0,1fr)}.formular{padding:20px}}
+
+/* Fuss */
+.fuss{background:var(--nacht);color:var(--stahl);border-top:1px solid var(--nacht-linie);padding:64px 0 32px;font-size:14px}
+.fuss .oben{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:40px;padding-bottom:40px;border-bottom:1px solid var(--nacht-linie)}
+.fuss .oben p{max-width:36ch;margin:16px 0 0;line-height:1.55}
+.fuss h4{font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--stahl-2);margin:0 0 14px;font-weight:500}
+.fuss ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.fuss ul a{color:var(--stahl);transition:color .15s}
+.fuss ul a:hover{color:var(--stahl-hi)}
+.fuss .unten{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;padding-top:24px;font-size:13px;color:var(--t3)}
+.fuss .ch{display:inline-flex;align-items:center;gap:8px}
+.fuss .ch i{display:inline-block;width:14px;height:14px;background:#D52B1E;position:relative;border-radius:1px}
+.fuss .ch i::before,.fuss .ch i::after{content:"";position:absolute;background:#fff;left:50%;top:50%;transform:translate(-50%,-50%)}
+.fuss .ch i::before{width:8px;height:2.4px}.fuss .ch i::after{width:2.4px;height:8px}
+@media (max-width:800px){.fuss .oben{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:480px){.fuss .oben{grid-template-columns:minmax(0,1fr)}}
+</style>
+</head>
+<body>
+<a class="skip" href="#inhalt">Zum Inhalt</a>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <!-- Platzhalter-Marke: Kontrollpunkt-Ring mit Leuchte -->
+    <symbol id="marke" viewBox="0 0 32 32">
+      <circle cx="16" cy="16" r="12.5" fill="none" stroke="currentColor" stroke-width="2.7" stroke-dasharray="59 19.5" stroke-linecap="round" transform="rotate(20 16 16)"/>
+      <circle cx="16" cy="16" r="4.3" fill="currentColor"/>
+      <circle cx="27.3" cy="10.7" r="2.9" fill="#F3B42B"/>
+    </symbol>
+    <symbol id="i-haken" viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-pfeil" viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-schloss" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8 10V7a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+    <symbol id="i-kamera" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.2" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+    <symbol id="i-mikro" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4M9 21h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-bild" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M6 16l4-4 3 3 2-2 3 3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="15.5" cy="9.5" r="1.3" fill="currentColor"/></symbol>
+    <symbol id="i-schild" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.5-3.2 8-8 9-4.8-1-8-4.5-8-9V6z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8.5 12l2.5 2.5 4.5-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-rollen" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="17" cy="9" r="2.4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M16.5 14c2.5.2 4 1.8 4 4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-auge-zu" viewBox="0 0 24 24"><path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="2.6" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M4 20L20 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-buch" viewBox="0 0 24 24"><path d="M4 5h6a3 3 0 0 1 3 3v11a2 2 0 0 0-2-2H4zM20 5h-6a3 3 0 0 0-3 3v11a2 2 0 0 1 2-2h7z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-glocke" viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M10 20a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+    <symbol id="i-trenn" viewBox="0 0 24 24"><rect x="3" y="5" width="7" height="14" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="14" y="5" width="7" height="14" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 3v18" stroke="currentColor" stroke-width="1.8" stroke-dasharray="2 3"/></symbol>
+    <symbol id="i-server" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="6.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="4" y="13.5" width="16" height="6.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="8" cy="7.25" r="1" fill="currentColor"/><circle cx="8" cy="16.75" r="1" fill="currentColor"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  </defs>
+</svg>
+
+<header class="kopf" id="kopf">
+  <div class="wrap">
+    <a class="marke" href="#" aria-label="Wachtwerk – Startseite"><svg><use href="#marke"/></svg><span class="wortmarke" data-brand>Wachtwerk</span></a>
+    <nav id="nav" aria-label="Hauptnavigation">
+      <a href="#ein-tag">Ein Tag</a>
+      <a href="#module">Module</a>
+      <a href="#revierdienst">Revierdienst</a>
+      <a href="#portal">Kundenportal</a>
+      <a href="#gav">GAV</a>
+      <a href="#sicherheit">Sicherheit</a>
+      <a href="#faq">Fragen</a>
+      <a class="btn primaer" href="#demo">Demo anfragen</a>
+    </nav>
+    <a class="btn primaer cta-desktop" href="#demo">Demo anfragen</a>
+    <button class="menu-knopf" id="menuKnopf" aria-expanded="false" aria-controls="nav" aria-label="Menü öffnen"><svg><use href="#i-menu"/></svg></button>
+  </div>
+</header>
+
+<main id="inhalt">
+
+<!-- ═══════════════ HELD ═══════════════ -->
+<section class="abs nacht held">
+  <div class="wrap">
+    <div class="held-text">
+      <p class="vorzeile">Betriebssoftware für Sicherheitsdienste · Schweiz</p>
+      <h1 class="display">Der ganze Betrieb.<span class="z2">Eine Software.</span></h1>
+      <p class="lead">Einsatzplanung, Mitarbeiter-App, Revierdienst, Kundenportal, Offerten und Rechnungen – an einem Ort, mit dem GAV Sicherheit im Kern. Gebaut im Alltag eines Schweizer Sicherheitsdienstes, nicht am Reissbrett.</p>
+      <div class="held-aktionen">
+        <a class="btn primaer" href="#demo">Demo anfragen <svg><use href="#i-pfeil"/></svg></a>
+        <a class="btn sekundaer" href="#module">Module ansehen</a>
+      </div>
+    </div>
+    <div class="held-fakten">
+      <div><b>Cockpit</b><span>für die Einsatzleitung am Schreibtisch: planen, abgleichen, abrechnen.</span></div>
+      <div><b>App</b><span>für die Mitarbeitenden auf dem eigenen Handy: Schichten, Rapport, Rundgang.</span></div>
+      <div><b>Portal</b><span>für Ihre Kunden: jeder Rundgang mit Zeit, Fortschritt und Fotobeleg.</span></div>
+    </div>
+    <div class="held-bild">
+      <div class="cockpit" role="img" aria-label="Cockpit: Einsatzplanung mit Wochenansicht, Zuteilung und Ereignis-Feed. Beispieldaten.">
+        <div class="ck-chrome"><i></i><i></i><i></i><div class="url">cockpit.wachtwerk.ch/planung</div></div>
+        <div class="ck-body">
+          <aside class="ck-side">
+            <div class="ck-brand"><svg><use href="#marke"/></svg><div>Cockpit<small data-brand>Wachtwerk</small></div></div>
+            <div class="ck-grp">Betrieb</div>
+            <span class="ck-nav">Übersicht</span><span class="ck-nav on">Einsätze</span><span class="ck-nav">Objektplanung</span><span class="ck-nav">Tagesplan</span>
+            <div class="ck-grp">Stammdaten</div>
+            <span class="ck-nav">Adressen</span><span class="ck-nav">Objekte</span><span class="ck-nav">Rapporte</span><span class="ck-nav">Offerten</span><span class="ck-nav">Rechnungen</span>
+            <div class="ck-grp">Revierdienst</div>
+            <span class="ck-nav">Übersicht</span><span class="ck-nav">Einrichtung</span>
+            <div class="ck-grp">Auswertung</div>
+            <span class="ck-nav">Pensen</span><span class="ck-nav">Auslagenersatz</span><span class="ck-nav">Abwesenheiten</span>
+          </aside>
+          <div class="ck-main">
+            <div class="ck-top">
+              <div><div class="ck-titel">Einsätze</div><div class="ck-sub">Woche 38 · 14 Einsätze · 3 offene Plätze</div></div>
+              <div class="ck-tools"><span class="ck-chip on">Nur Einsätze</span><span class="ck-chip">Sicherheit</span><span class="ck-chip">Reinigung</span><span class="ck-btn">+ Einsatz</span></div>
+            </div>
+            <div class="ck-tag"><b>Montag 14.</b> 4 Einsätze · 1 offener Platz</div>
+            <table class="ck-tabelle">
+              <thead><tr><th>Zeit</th><th>Objekt</th><th>Sparte</th><th>Team</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td class="zeit">06:00–14:00</td><td class="obj"><b>Baustelle Areal Süd</b><span>Zugangskontrolle</span></td><td class="sparte">Sicherheit</td><td><span class="ck-team"><i class="mono-chip">LB</i><i class="mono-chip">SR</i></span></td><td><span class="pill fest"><svg><use href="#i-schloss"/></svg>Abgeglichen</span></td></tr>
+                <tr><td class="zeit">14:00–22:00</td><td class="obj"><b>Einkaufszentrum West</b><span>Bewachung</span></td><td class="sparte">Sicherheit</td><td><span class="ck-team"><i class="mono-chip">MF</i><i class="mono-chip offen">+1</i></span></td><td><span class="pill warn">1 Platz offen</span></td></tr>
+                <tr><td class="zeit">18:00–23:30</td><td class="obj"><b>Festgelände Stadtpark</b><span>Verkehrsdienst</span></td><td class="sparte">Sicherheit</td><td><span class="ck-team"><i class="mono-chip">DV</i><i class="mono-chip">NK</i><i class="mono-chip">AH</i></span></td><td><span class="pill pos">Zugesagt 3/3</span></td></tr>
+                <tr><td class="zeit">22:00–06:00</td><td class="obj"><b>Logistikpark Ost</b><span>Revierdienst · Runde Nacht A</span></td><td class="sparte">Sicherheit</td><td><span class="ck-team"><i class="mono-chip">RB</i></span></td><td><span class="pill neutral">Geplant</span></td></tr>
+              </tbody>
+            </table>
+            <div class="ck-tag"><b>Dienstag 15.</b> 3 Einsätze · 2 offene Plätze</div>
+            <table class="ck-tabelle">
+              <tbody>
+                <tr><td class="zeit">05:30–09:30</td><td class="obj"><b>Bürohaus Bahnhofstrasse</b><span>Unterhaltsreinigung</span></td><td class="sparte">Reinigung</td><td><span class="ck-team"><i class="mono-chip">EK</i><i class="mono-chip offen">+1</i></span></td><td><span class="pill warn">1 Platz offen</span></td></tr>
+                <tr><td class="zeit">07:00–17:00</td><td class="obj"><b>Baustelle Areal Süd</b><span>Zugangskontrolle</span></td><td class="sparte">Sicherheit</td><td><span class="ck-team"><i class="mono-chip">LB</i><i class="mono-chip offen">+1</i></span></td><td><span class="pill warn">1 Platz offen</span></td></tr>
+                <tr><td class="zeit">22:00–06:00</td><td class="obj"><b>Logistikpark Ost</b><span>Revierdienst · Runde Nacht A</span></td><td class="sparte">Sicherheit</td><td><span class="ck-team"><i class="mono-chip">RB</i></span></td><td><span class="pill pos">Zugesagt 1/1</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <aside class="ck-feed">
+            <div class="ck-feed-titel">Ereignisse <span>seit gestern 22:00</span></div>
+            <div class="ck-ereignis neu"><div class="zeit">07:12</div><div class="neu"><b>Verfügbarkeit gemeldet</b><span>2 Personen für Samstag und Sonntag</span></div></div>
+            <div class="ck-ereignis neu"><div class="zeit">06:48</div><div class="neu"><b>Rapport eingegangen</b><span>Areal Süd, mit Unterschrift des Kunden</span></div></div>
+            <div class="ck-ereignis"><div class="zeit">05:31</div><div><b>Rundgang beendet</b><span>Logistikpark Ost · 8 von 8 Kontrollpunkten</span></div></div>
+            <div class="ck-ereignis"><div class="zeit">23:40</div><div><b>Ereignis gemeldet</b><span>Tor 3 offen vorgefunden · Foto liegt bei</span></div></div>
+            <div class="ck-ereignis"><div class="zeit">22:04</div><div><b>Rundgang gestartet</b><span>Logistikpark Ost · Runde Nacht A</span></div></div>
+          </aside>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ AUSGANGSLAGE ═══════════════ -->
+<section class="abs hell" id="ausgangslage">
+  <div class="wrap">
+    <div class="kopfzeile">
+      <div>
+        <p class="vorzeile">Ausgangslage</p>
+        <h2 class="display">Vier Systeme, ein Gruppenchat und ein Stapel Papier.</h2>
+      </div>
+      <div class="text">
+        <p>So läuft ein Sicherheitsdienst heute oft: Der Dienstplan entsteht in einer Tabelle und geht per Chat hinaus. Die Stunden kommen auf Papier zurück und werden abgetippt. Der Rundgang läuft in einem eigenen Tool, das von Planung und Kunden nichts weiss. Am Monatsende entsteht die Rechnung noch einmal von Hand.</p>
+        <p><strong>Der Aufwand entsteht nicht in den Programmen. Er entsteht an den Schnittstellen dazwischen.</strong></p>
+      </div>
+    </div>
+    <div class="vorher-nachher">
+      <div>
+        <div class="vn-titel">Heute</div>
+        <div class="vn-heute">
+          <span>Dienstplan in Excel</span><span>Gruppenchat</span><span>Papierrapport</span><span>Rundgang-App</span><span>Buchhaltung</span><span>Ferienliste</span>
+        </div>
+      </div>
+      <div class="vn-pfeil" aria-hidden="true"><svg><use href="#i-pfeil"/></svg></div>
+      <div class="vn-neu">
+        <div class="marke"><svg><use href="#marke"/></svg><span class="wortmarke" data-brand>Wachtwerk</span></div>
+        <ul>
+          <li>Einsatzplanung</li><li>Mitarbeiter-App</li><li>Rapport &amp; Abgleich</li><li>Revierdienst</li><li>Kundenportal</li><li>Offerten &amp; Rechnungen</li><li>Personal &amp; Abwesenheiten</li><li>Fahrzeuge &amp; Auslagen</li>
+        </ul>
+        <p>Eine Datenbasis: Kunde → Objekt → Schicht → Person. Was hier eingetragen ist, muss nirgends ein zweites Mal erfasst werden.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ EIN TAG ═══════════════ -->
+<section class="abs nacht" id="ein-tag">
+  <div class="wrap">
+    <div class="kopfzeile">
+      <div>
+        <p class="vorzeile">Ein Tag mit <span data-brand>Wachtwerk</span></p>
+        <h2 class="display">Von 06:40 bis zur Rechnung.</h2>
+      </div>
+      <p class="lead">Von der Planung am Morgen über den Rundgang in der Nacht bis zur Rechnung am Monatsende: Jede Station schreibt in dieselbe Datenbasis. Nichts wird abgetippt, nichts geht per Chat verloren.</p>
+    </div>
+    <ol class="protokoll">
+      <li>
+        <div class="zeit">06:40<small>Cockpit</small></div>
+        <div class="wo">Einsatzleitung</div>
+        <div class="was"><b>Planung per Diktat</b><p><q>Setze die Schliessrunde jeden Tag auf den August.</q> Die Software zeigt eine Vorschau mit 31 Schichten. Ein Klick, und sie stehen im Plan – Feiertage nach Kanton markiert, Doppelbelegungen gesperrt.</p></div>
+      </li>
+      <li>
+        <div class="zeit">07:05<small>App</small></div>
+        <div class="wo">Mitarbeitende</div>
+        <div class="was"><b>Zusagen statt Rückfragen</b><p>Push auf das Handy: «Neue Mitteilung». Zwei Personen sagen ihre Schicht zu, eine meldet Verfügbarkeit fürs Wochenende. Die Einsatzleitung sieht es sofort im Ereignis-Feed.</p></div>
+      </li>
+      <li>
+        <div class="zeit">09:30<small>Cockpit</small></div>
+        <div class="wo">Verkauf</div>
+        <div class="was"><b>Neuer Kunde, fertige Offerte</b><p>Ein Satz genügt, die Recherche ergänzt Adresse, UID und Webseite aus dem Handelsregister. Die Offerte entsteht aus dem Leistungsstamm und geht per Mail hinaus – Rappen-genau gerechnet.</p></div>
+      </li>
+      <li>
+        <div class="zeit">14:00<small>App</small></div>
+        <div class="wo">Vor Ort</div>
+        <div class="was"><b>Fahrzeug übernommen, Rapport unterschrieben</b><p>Übernahme des Dienstfahrzeugs mit Tachofoto. Am Schichtende der Rapport – der Kunde unterschreibt direkt auf dem Handy, bildschirmfüllend.</p></div>
+      </li>
+      <li class="live">
+        <div class="zeit">22:00<small>App</small></div>
+        <div class="wo">Revierdienst</div>
+        <div class="was"><b>Der Rundgang läuft</b><p>Kontrollpunkte per NFC oder Geofence, Aufgaben je Punkt, Ereignis mit Foto. Die Zentrale ist einen Tipp entfernt. Ortung nur, solange die Runde läuft.</p></div>
+      </li>
+      <li>
+        <div class="zeit">23:12<small>Portal</small></div>
+        <div class="wo">Kunde</div>
+        <div class="was"><b>Der Kunde sieht es selbst</b><p>Rundgang beendet, 8 von 8. Im Kundenportal stehen Beginn, Fortschritt, Zeit je Kontrollpunkt und der Fotobeleg – ohne dass jemand einen Bericht schreiben muss.</p></div>
+      </li>
+      <li>
+        <div class="zeit">31.<small>Monatsende · Cockpit</small></div>
+        <div class="wo">Abrechnung</div>
+        <div class="was"><b>Abgleich, Stunden, Rechnung</b><p>Soll gegen Ist, Schicht für Schicht, danach festgeschrieben. Stunden mit Zeitbonus, Auslagenersatz nach Zone, Rechnung mit Schweizer QR-Zahlteil. Alles aus denselben Daten, die um 06:40 entstanden sind.</p></div>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<!-- ═══════════════ MODULE ═══════════════ -->
+<section class="abs hell" id="module">
+  <div class="wrap">
+    <div class="kopfzeile">
+      <div>
+        <p class="vorzeile">Module</p>
+        <h2 class="display">Acht Module. Eine Datenbasis.</h2>
+      </div>
+      <p class="lead">Alles, was ein Sicherheitsdienst braucht – und nichts, was er nicht braucht. Jedes Modul ist da, weil es im Alltag gefehlt hat, nicht weil ein Prospekt es verlangt.</p>
+    </div>
+    <div class="raster">
+      <div>
+        <div class="nr"><span>Cockpit</span><span>Planung</span></div>
+        <h3>Einsatzplanung</h3>
+        <p>Masterschichten je Objekt, daraus die Schichten des Monats. Objektplanung, Tagesplan, Reihen über Wochen.</p>
+        <ul><li>Doppelbelegung wird gesperrt, nicht nur gemeldet</li><li>Ruhezeiten und Pensen im Blick</li><li>Feiertage nach Kanton, einmal pro Jahr eingetragen</li><li>Mehrere Sparten, z. B. Sicherheit und Reinigung, strikt getrennt</li></ul>
+      </div>
+      <div>
+        <div class="nr"><span>App</span><span>iOS · Android</span></div>
+        <h3>Mitarbeiter-App</h3>
+        <p>Auf dem eigenen Handy: eigene Schichten sehen und zusagen, Verfügbarkeit melden, Abwesenheit beantragen.</p>
+        <ul><li>Rapport mit Unterschrift des Kunden</li><li>Eigene Stunden mit Zeitbonus, getrennt ausgewiesen</li><li>Mitteilungen mit Push, ohne Gruppenchat</li><li>Jede Person sieht nur die eigenen Daten</li></ul>
+      </div>
+      <div>
+        <div class="nr"><span>Cockpit</span><span>Kontrolle</span></div>
+        <h3>Rapport &amp; Abgleich</h3>
+        <p>Soll gegen Ist, Schicht für Schicht. Einmal abgeglichen, ist eine Schicht festgeschrieben.</p>
+        <ul><li>Abweichungen sichtbar, bevor sie auf der Lohnabrechnung landen</li><li>Arbeitsergebnisse und Pensen pro Person</li><li>Auslagenersatz entsteht beim Abgleich, serverseitig</li></ul>
+      </div>
+      <div>
+        <div class="nr"><span>App · Cockpit</span><span>Nacht</span></div>
+        <h3>Revierdienst</h3>
+        <p>Kontrollpunkte per NFC-Chip oder Geofence, Runden mit Zeitfenster, Aufgaben je Kontrollpunkt.</p>
+        <ul><li>Ereignis melden mit Foto</li><li>Ersatzscan mit Foto, wenn ein Chip fehlt</li><li>Zentrale und Notruf mit einem Tipp</li><li>Verbunden mit Kunde, Objekt und Schicht – keine Insel</li></ul>
+      </div>
+      <div>
+        <div class="nr"><span>Portal</span><span>Kunde</span></div>
+        <h3>Kundenportal</h3>
+        <p>Ihre Kunden sehen ihre Rundgänge selbst: Beginn, Fortschritt, Zeit je Kontrollpunkt, Fotobeleg.</p>
+        <ul><li>Eigener Zugang per Link und eigenem Passwort</li><li>Nur die eigenen Objekte</li><li>Technisch getrennt von der Verwaltung</li></ul>
+      </div>
+      <div>
+        <div class="nr"><span>Cockpit</span><span>Verkauf</span></div>
+        <h3>Offerten &amp; Rechnungen</h3>
+        <p>Leistungen mit Preisstamm, Offerte per Mail, Rechnung mit Schweizer QR-Zahlteil.</p>
+        <ul><li>Öffentliche Belegseite für den Kunden</li><li>Rappen-genau gerechnet, MWST exakt</li><li>Eigener Briefkopf</li></ul>
+      </div>
+      <div>
+        <div class="nr"><span>Cockpit</span><span>Personal</span></div>
+        <h3>Personal &amp; Abwesenheiten</h3>
+        <p>Personalakte mit Dossier und Verlauf. Vertrauliche Angaben nur mit eigenem Recht.</p>
+        <ul><li>Ferienanspruch nach Art. 20 GAV</li><li>Abwesenheiten beantragen und entscheiden</li><li>Rollen statt Admin-Schalter</li></ul>
+      </div>
+      <div>
+        <div class="nr"><span>App · Cockpit</span><span>Betrieb</span></div>
+        <h3>Fahrzeuge &amp; Auslagen</h3>
+        <p>Dienstfahrzeuge mit Übernahme, Tachofoto und Logbuch. Wegstrecken je Objekt.</p>
+        <ul><li>Auslagenersatz nach Art. 18 GAV aus der Wegstrecke</li><li>Zone und Betrag entstehen beim Abgleich, nicht im Kopf</li><li>Unplausible Kilometersprünge werden benannt</li></ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ REVIERDIENST ═══════════════ -->
+<section class="abs nacht-2" id="revierdienst">
+  <div class="wrap">
+    <div class="zwei">
+      <div>
+        <p class="vorzeile">22:00 · Revierdienst</p>
+        <h2 class="display">Der Rundgang weiss, wohin er gehört.</h2>
+        <p class="lead">Rundgang-Apps gibt es viele. Der Unterschied liegt nicht im Scannen, sondern in der Verbindung: Jede Runde hängt an Kunde, Objekt und Schicht. Die Einsatzleitung sieht sie live, der Kunde danach im Portal, die Abrechnung am Monatsende.</p>
+        <ul class="punkte">
+          <li><svg><use href="#i-haken"/></svg><span><b>NFC-Chip oder Geofence.</b> Ein Kontrollpunkt ist ein Chip an der Wand oder ein Radius von 20 bis 25 Metern – je Punkt wählbar.</span></li>
+          <li><svg><use href="#i-haken"/></svg><span><b>Aufgaben am Kontrollpunkt.</b> «Fenster prüfen», «Tor verriegeln». Was nicht geht, wird als Ereignis gemeldet, nicht stillschweigend übersprungen.</span></li>
+          <li><svg><use href="#i-haken"/></svg><span><b>Ereignis mit Foto, Ersatzscan mit Foto.</b> Ein fehlender Chip bricht die Runde nicht ab – er hinterlässt einen Beleg.</span></li>
+          <li><svg><use href="#i-haken"/></svg><span><b>Zentrale und Notruf.</b> Pikettnummer des Betriebs zuoberst, 117, 118 und 144 darunter. Einen Tipp entfernt, auch mit Handschuhen.</span></li>
+          <li><svg><use href="#i-haken"/></svg><span><b>Ortung nur während der Runde.</b> Nach dem Beenden nimmt der Server keine Position mehr an – die App hört auf, und der Server verlässt sich nicht darauf.</span></li>
+        </ul>
+      </div>
+      <div>
+        <div class="phone" role="img" aria-label="Mitarbeiter-App: laufender Rundgang mit Kontrollpunkten, Aufgabe, Ereignis-Knopf und Notrufkacheln. Beispieldaten.">
+          <div class="ph-screen">
+            <div class="ph-status"><span>22:41</span><span>●●● ◔ ▮</span></div>
+            <div class="ph-kopf">
+              <div class="ph-eyebrow">Rundgang läuft · 41 min</div>
+              <div class="ph-titel">Logistikpark Ost</div>
+              <div class="ph-sub">Runde Nacht A · Zeitfenster bis 23:30</div>
+            </div>
+            <div class="ph-progress"><div class="ph-bar"><i></i></div><div class="ph-prog-txt"><span>5 von 8 Kontrollpunkten</span><span>im Rahmen</span></div></div>
+            <ul class="ph-liste">
+              <li class="ok"><span class="zeit">22:03</span><span class="name">Eingang Nord</span><span class="art">NFC</span></li>
+              <li class="ok"><span class="zeit">22:11</span><span class="name">Lager B</span><span class="art">NFC</span></li>
+              <li class="ok"><span class="zeit">22:19</span><span class="name">Parkdeck 2</span><span class="art">Geofence</span></li>
+              <li class="ok"><span class="zeit">22:27</span><span class="name">Technikraum</span><span class="art">NFC</span></li>
+              <li class="ok"><span class="zeit">22:36</span><span class="name">Tor 3</span><span class="art">Ersatzscan</span></li>
+              <li class="jetzt"><span class="zeit">→</span><span class="name">Büro EG<small>Aufgabe: Fenster prüfen</small></span><span class="art">nächster</span></li>
+              <li><span class="zeit">–</span><span class="name">Rampe Süd</span><span class="art">NFC</span></li>
+              <li><span class="zeit">–</span><span class="name">Eingang Nord</span><span class="art">NFC</span></li>
+            </ul>
+            <div class="ph-aktionen"><button class="prim" type="button">Ereignis melden</button><button type="button">Pause</button></div>
+            <div class="ph-notruf">
+              <a class="zentrale" href="#revierdienst" tabindex="-1"><b>Zentrale</b><small>Pikett</small></a>
+              <a class="notruf" href="#revierdienst" tabindex="-1"><b>117</b><small>Polizei</small></a>
+              <a class="notruf" href="#revierdienst" tabindex="-1"><b>118</b><small>Feuerwehr</small></a>
+              <a class="notruf" href="#revierdienst" tabindex="-1"><b>144</b><small>Sanität</small></a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ KUNDENPORTAL ═══════════════ -->
+<section class="abs hell" id="portal">
+  <div class="wrap">
+    <div class="zwei tausch">
+      <div>
+        <p class="vorzeile">23:12 · Kundenportal</p>
+        <h2 class="display">Der Kunde sieht, was er bezahlt.</h2>
+        <p class="lead">Kein Wochenbericht, kein Telefonat, kein «war jemand da?». Jeder Rundgang steht im Portal, sobald er beendet ist – mit Beginn, Fortschritt, Zeit je Kontrollpunkt und Fotobeleg.</p>
+        <ul class="punkte">
+          <li><svg><use href="#i-haken"/></svg><span><b>Eigener Zugang.</b> Der Kunde bekommt einen Link, setzt sein Passwort und meldet sich damit an. Keine Codes, die niemand findet.</span></li>
+          <li><svg><use href="#i-haken"/></svg><span><b>Nur die eigenen Objekte.</b> Welcher Kunde was sieht, entscheidet die Sitzung auf dem Server – nie die Anfrage aus dem Browser.</span></li>
+          <li><svg><use href="#i-haken"/></svg><span><b>Getrennt gebaut.</b> Eigene Tabellen, eigene Anmeldung. Ein Kundenzugang erreicht keinen einzigen Verwaltungsendpunkt – technisch, nicht nur ausgeblendet.</span></li>
+          <li><svg><use href="#i-haken"/></svg><span><b>Rundgang-Rapport per Mail.</b> Für Kunden, die lieber ein Dokument ablegen als ein Portal öffnen.</span></li>
+        </ul>
+      </div>
+      <div>
+        <div class="portal" role="img" aria-label="Kundenportal: Liste der Rundgänge mit Fortschrittsbalken, Beginn und Fotobeleg, ein Rundgang aufgeklappt mit Zeit je Kontrollpunkt. Beispieldaten.">
+          <div class="po-kopf"><b><svg><use href="#marke"/></svg>Kundenportal</b><span>Logistikpark Ost · Abmelden</span></div>
+          <div class="po-titel">Rundgänge <span>letzte 7 Nächte</span></div>
+          <div class="po-scroll"><div>
+          <table class="po-tabelle">
+            <thead><tr><th>Nacht</th><th>Beginn</th><th>Kontrollpunkte</th><th>Beleg</th></tr></thead>
+            <tbody>
+              <tr class="offen"><td>Mo → Di</td><td class="zeit">22:03</td><td><div class="po-balken"><i><b style="width:100%"></b></i><span>8 von 8</span></div></td><td><span class="po-foto"><svg><use href="#i-kamera"/></svg>1 Foto</span></td></tr>
+            </tbody>
+          </table>
+          <div class="po-detail">
+            <ol>
+              <li><span class="zeit">22:03</span>Eingang Nord</li>
+              <li><span class="zeit">22:11</span>Lager B</li>
+              <li><span class="zeit">22:19</span>Parkdeck 2</li>
+              <li><span class="zeit">22:27</span>Technikraum</li>
+              <li><span class="zeit">22:36</span>Tor 3 <em>Ersatzscan · Foto</em></li>
+              <li><span class="zeit">22:44</span>Büro EG</li>
+              <li><span class="zeit">22:52</span>Rampe Süd</li>
+              <li><span class="zeit">23:01</span>Eingang Nord</li>
+            </ol>
+          </div>
+          <table class="po-tabelle">
+            <tbody>
+              <tr><td>So → Mo</td><td class="zeit">22:07</td><td><div class="po-balken"><i><b style="width:100%"></b></i><span>8 von 8</span></div></td><td><span class="po-foto">–</span></td></tr>
+              <tr><td>Sa → So</td><td class="zeit">22:01</td><td><div class="po-balken"><i><b style="width:100%"></b></i><span>8 von 8</span></div></td><td><span class="po-foto"><svg><use href="#i-kamera"/></svg>2 Fotos</span></td></tr>
+              <tr><td>Fr → Sa</td><td class="zeit">22:14</td><td><div class="po-balken"><i><b style="width:87.5%"></b></i><span>7 von 8</span></div></td><td><span class="po-foto"><svg><use href="#i-kamera"/></svg>1 Foto</span></td></tr>
+              <tr><td>Do → Fr</td><td class="zeit">22:02</td><td><div class="po-balken"><i><b style="width:100%"></b></i><span>8 von 8</span></div></td><td><span class="po-foto">–</span></td></tr>
+            </tbody>
+          </table>
+          </div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ OFFERTE BIS ZAHLUNG ═══════════════ -->
+<section class="abs nebel" id="belege">
+  <div class="wrap">
+    <div class="zwei">
+      <div>
+        <p class="vorzeile">Offerten und Rechnungen</p>
+        <h2 class="display">Von der Offerte bis zur Zahlung.</h2>
+        <p class="lead">Leistungen einmal mit Preis hinterlegen. Daraus entstehen Offerte und Rechnung – mit Ihrem Briefkopf, per Mail versandt, mit einer Belegseite, die der Kunde ohne Anmeldung öffnet.</p>
+        <ul class="punkte">
+          <li><svg><use href="#i-haken"/></svg><span><b>Schweizer QR-Zahlteil.</b> QR-IBAN und QR-Referenz nach den Richtlinien von SIX. Solange keine echte QR-IBAN hinterlegt ist, wird lieber kein Zahlteil gezeigt als ein falscher.</span></li>
+          <li><svg><use href="#i-haken"/></svg><span><b>Rappen-genau.</b> Beträge werden ganzzahlig in Rappen gerechnet, Prozentsätze in Basispunkten. Keine Rundungsdrift über viele Positionen.</span></li>
+          <li><svg><use href="#i-haken"/></svg><span><b>Auf dem Server gerechnet.</b> Was auf einem Dokument an den Kunden steht, entsteht nicht im Browser – der Browser zeigt nur die Vorschau.</span></li>
+          <li><svg><use href="#i-haken"/></svg><span><b>Offerte auf dem Handy.</b> Herunterladen und teilen, direkt beim Kunden vor Ort.</span></li>
+        </ul>
+      </div>
+      <div>
+        <div class="beleg" role="img" aria-label="Rechnung mit Positionen, Mehrwertsteuer, Total und Schweizer QR-Zahlteil. Beispieldaten, erfundene Firma.">
+          <div class="bl-kopf">
+            <div class="firma">Muster Sicherheitsdienst AG<small>Bahnhofstrasse 1 · 4600 Olten<br>CHE-000.000.000 MWST</small></div>
+            <div class="bl-nr"><b>Rechnung</b>R-0142<br>Datum 30.09.<br>Fällig 30.10.</div>
+          </div>
+          <div class="bl-adresse"><b>Beispiel Logistik AG</b><br>Industriestrasse 12<br>4600 Olten</div>
+          <table class="bl-pos">
+            <thead><tr><th>Leistung</th><th class="r">Menge</th><th class="r">Preis</th><th class="r">Betrag</th></tr></thead>
+            <tbody>
+              <tr><td>P0007 Bewachung Nacht 22–06<small>Logistikpark Ost · 8 Nächte</small></td><td class="r">64.00 h</td><td class="r">50.00</td><td class="r">3'200.00</td></tr>
+              <tr><td>P0012 Revierdienst Runde Nacht A<small>Logistikpark Ost · September</small></td><td class="r">30 Runden</td><td class="r">40.00</td><td class="r">1'200.00</td></tr>
+              <tr class="summe"><td colspan="3">Zwischentotal</td><td class="r">4'400.00</td></tr>
+              <tr class="summe"><td colspan="3">MWST 8.1 %</td><td class="r">356.40</td></tr>
+              <tr class="total"><td colspan="3">Total CHF</td><td class="r">4'756.40</td></tr>
+            </tbody>
+          </table>
+          <div class="bl-qr">
+            <div class="zahlteil">Zahlteil</div>
+            <div class="qr" aria-hidden="true"></div>
+            <dl>
+              <dt>Konto / Zahlbar an</dt><dd>CH00 0000 0000 0000 0000 0<br>Muster Sicherheitsdienst AG</dd>
+              <dt>Referenz</dt><dd>00 00000 00000 00000 00000 01427</dd>
+              <dt>Währung · Betrag</dt><dd>CHF · 4 756.40</dd>
+            </dl>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ GAV ═══════════════ -->
+<section class="abs nacht" id="gav">
+  <div class="wrap">
+    <div class="zwei tausch">
+      <div>
+        <p class="vorzeile">GAV Sicherheit</p>
+        <h2 class="display">Der GAV ist eingebaut, nicht angehängt.</h2>
+        <p class="lead">Ein versioniertes Regelwerk mit Gültigkeitszeitraum. Eine Revision ändert alte Abrechnungen nie rückwirkend. Und keine Zahl ist eine Blackbox: Rohzeit, Pause, Nettozeit und Zeitbonus bleiben getrennt nachvollziehbar – so, wie Art. 12 Ziff. 5 die Abrechnung verlangt.</p>
+        <ul class="punkte">
+          <li><svg><use href="#i-haken"/></svg><span><b>Getrennt, nie nur eine Summe.</b> Der Zeitbonus für Nacht und Sonntag steht neben der Nettozeit, nicht darin versteckt.</span></li>
+          <li><svg><use href="#i-haken"/></svg><span><b>Dieselbe Regel auf beiden Seiten.</b> Cockpit und App rechnen aus derselben Datei. Dieselbe Schicht ergibt an beiden Orten dieselbe Zahl.</span></li>
+          <li><svg><use href="#i-haken"/></svg><span><b>Keine stillen Annahmen.</b> Wo der Wortlaut des GAV nicht eindeutig ist, rechnet die Software nicht auf Verdacht – sie markiert und sagt es.</span></li>
+        </ul>
+      </div>
+      <div>
+        <div class="stunden" role="img" aria-label="Stundenkarte einer Person: Rohzeit, unbezahlte Pause, Nettozeit, Zeitbonus Nacht und Sonntag, bewertete Zeit. Beispielwerte.">
+          <div class="st-kopf"><b>Meine Stunden</b><span>September · 22 Schichten</span></div>
+          <dl>
+            <div style="display:contents"><dt>Rohzeit</dt><dd>172:00</dd></div>
+            <div class="minus" style="display:contents"><dt>Unbezahlte Pause</dt><dd>−6:00</dd></div>
+            <div style="display:contents"><dt>Nettozeit</dt><dd>166:00</dd></div>
+            <div class="plus ein" style="display:contents"><dt>Zeitbonus Nacht<small>Art. 12 Ziff. 2</small></dt><dd>+4:10</dd></div>
+            <div class="plus ein" style="display:contents"><dt>Zeitbonus Sonntag<small>Art. 12 Ziff. 2</small></dt><dd>+1:30</dd></div>
+            <div class="summe" style="display:contents"><dt>Bewertete Zeit</dt><dd>171:40</dd></div>
+          </dl>
+          <p class="hinweis">Fahrzeit-Schichten sind ausgenommen und als «keine Arbeitszeit» markiert. Auslagenersatz nach Art. 18 steht auf einer eigenen Karte.</p>
+        </div>
+      </div>
+    </div>
+    <div class="artikel">
+      <div>
+        <div class="art"><small>Arbeitszeit</small>Art. 12</div>
+        <h3>Zeitbonus Nacht und Sonntag</h3>
+        <p>Automatisch aus der Schichtzeit, minutengenau über Mitternacht hinweg. Als eigene Position sichtbar – im Cockpit wie in der App der Person.</p>
+      </div>
+      <div>
+        <div class="art"><small>Auslagenersatz</small>Art. 18</div>
+        <h3>Zonen aus der Wegstrecke</h3>
+        <p>Die Wegstrecke je Objekt entscheidet über Pauschalzone 1, 2 oder Regiezone. Die Zone erscheint schon beim Planen, der Betrag entsteht beim Abgleich – vor der Offerte statt nach der Rechnung.</p>
+      </div>
+      <div>
+        <div class="art"><small>Ferien</small>Art. 20</div>
+        <h3>Ferienanspruch nach Alters- und Dienstjahr</h3>
+        <p>Saldo pro Person, Anträge in der App, Entscheid im Cockpit. Was der GAV offen lässt, ist als Annahme gekennzeichnet, nicht als Tatsache.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ KI ═══════════════ -->
+<section class="abs hell" id="diktat">
+  <div class="wrap">
+    <div class="kopfzeile">
+      <div>
+        <p class="vorzeile">Diktat und Recherche</p>
+        <h2 class="display">Sagen statt tippen. Bestätigen statt hoffen.</h2>
+      </div>
+      <p class="lead">KI dort, wo sie Zeit spart – beim Anlegen von Einsätzen, Kunden und Mitarbeitenden. Und bewusst nicht dort, wo Sorgfalt zählt: Der Rapport wird von Hand ausgefüllt. Nichts wird gespeichert, bevor ein Mensch es bestätigt.</p>
+    </div>
+    <div class="diktat">
+      <div class="dk">
+        <div class="satz"><svg><use href="#i-mikro"/></svg><div>«Setze die Schliessrunde jeden Tag auf den August.»<small>Diktat im Bereich Planung, Objekt aus dem Bildschirm</small></div></div>
+        <div class="pfeil" aria-hidden="true"><svg><use href="#i-pfeil"/></svg></div>
+        <div class="ergebnis"><b>Vorschau: 31 Schichten</b><dl><dt>Objekt</dt><dd>Logistikpark Ost</dd><dt>Vorlage</dt><dd>Schliessrunde 22:00–23:00</dd><dt>Zeitraum</dt><dd>1. – 31. August, täglich</dd><dt>Feiertag</dt><dd>1. August markiert</dd></dl><div class="knoepfe"><span class="prim">Anwenden</span><span>Verwerfen</span></div></div>
+      </div>
+      <div class="dk">
+        <div class="satz"><svg><use href="#i-mikro"/></svg><div>«Neuer Kunde: Beispiel Logistik AG in Olten.»<small>Recherche im Handelsregister ergänzt, was fehlt</small></div></div>
+        <div class="pfeil" aria-hidden="true"><svg><use href="#i-pfeil"/></svg></div>
+        <div class="ergebnis"><b>Kunde anlegen</b><dl><dt>Firma</dt><dd>Beispiel Logistik AG</dd><dt>Adresse</dt><dd>Industriestrasse 12, 4600 Olten</dd><dt>UID</dt><dd>CHE-000.000.000</dd><dt>Webseite</dt><dd>beispiel-logistik.example</dd></dl><div class="knoepfe"><span class="prim">Speichern</span><span>Bearbeiten</span></div></div>
+      </div>
+      <div class="dk">
+        <div class="satz"><svg><use href="#i-bild"/></svg><div>Foto einer Auftragsmail<small>Screenshot oder Auftragszettel, aus der App oder dem Cockpit</small></div></div>
+        <div class="pfeil" aria-hidden="true"><svg><use href="#i-pfeil"/></svg></div>
+        <div class="ergebnis"><b>Einsatz-Entwurf</b><dl><dt>Kunde</dt><dd>Beispiel Logistik AG</dd><dt>Datum</dt><dd>Sa 27., 18:00–02:00</dd><dt>Art</dt><dd>Bewachung, 2 Personen</dd><dt>Ort</dt><dd>Industriestrasse 12, Olten</dd></dl><div class="knoepfe"><span class="prim">Übernehmen</span><span>Verwerfen</span></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ SICHERHEIT ═══════════════ -->
+<section class="abs nacht-2" id="sicherheit">
+  <div class="wrap">
+    <div class="kopfzeile">
+      <div>
+        <p class="vorzeile">Vertrauen</p>
+        <h2 class="display">Sicherheit auch hinter dem Bildschirm.</h2>
+      </div>
+      <p class="lead">Wer Personaldaten, Kundenobjekte und Aufenthaltsspuren verwaltet, braucht mehr als ein Passwortfeld. Diese Regeln stehen im Server, nicht in der Oberfläche – eine Sperre, die man am Browser vorbei umgehen könnte, wäre keine.</p>
+    </div>
+    <div class="sicher">
+      <div><svg><use href="#i-schild"/></svg><h3>Zwei-Faktor-Anmeldung</h3><p>Zeitbasierter Code (TOTP) für Verwaltungszugänge – mit jeder gängigen Authenticator-App.</p></div>
+      <div><svg><use href="#i-rollen"/></svg><h3>Rollen statt Admin-Schalter</h3><p>Sechs Systemrollen, von «Mitarbeitend» bis «Verwaltung». Eine einzige Stelle im Server entscheidet, wer was darf.</p></div>
+      <div><svg><use href="#i-auge-zu"/></svg><h3>Vertrauliche Personaldaten</h3><p>AHV-Nummer, Aufenthaltsstatus und Registerdaten verlassen den Server nur mit eigenem Recht. Wer sie nicht sehen darf, kann sie auch nicht ändern.</p></div>
+      <div><svg><use href="#i-schloss"/></svg><h3>Festgeschrieben nach dem Abgleich</h3><p>Eine abgeglichene Schicht ändert sich nicht mehr still. Die Zahl auf der Lohnabrechnung bleibt die Zahl vom Abgleich.</p></div>
+      <div><svg><use href="#i-buch"/></svg><h3>Logbuch</h3><p>Wer hat wann was geändert – bei Vertrags- und Personaldaten mit Zeitstempel und Person.</p></div>
+      <div><svg><use href="#i-glocke"/></svg><h3>Push ohne Inhalt</h3><p>Auf dem Sperrbildschirm steht «Neue Mitteilung», nie der Text. Kein Mitteilungsinhalt läuft über die Server von Apple und Google.</p></div>
+      <div><svg><use href="#i-trenn"/></svg><h3>Kundenportal getrennt</h3><p>Eigene Tabellen, eigene Anmeldung, eigene Sitzungsprüfung. Ein Kundenzugang erreicht keinen Verwaltungsendpunkt.</p></div>
+      <div><svg><use href="#i-server"/></svg><h3>Betrieb in der Schweiz</h3><p>Gehostet bei einem Schweizer Anbieter, verschlüsselt übertragen (HTTPS, HSTS). Diktat und Recherche sind optionale Zusatzfunktionen.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ HALTUNG ═══════════════ -->
+<section class="abs hell haltung" id="haltung">
+  <div class="wrap">
+    <p class="vorzeile">Warum es das gibt</p>
+    <h2 class="display">Gebaut im Betrieb, nicht am Reissbrett.</h2>
+    <p class="lead"><span data-brand>Wachtwerk</span> ist im laufenden Betrieb eines Schweizer Sicherheitsdienstes entstanden – mit zwei Sparten, Nachtschichten, Verkehrsdiensten und einem GAV, der keine Annahmen verzeiht. Jede Funktion ist da, weil sie im Alltag gefehlt hat. Und jede, die niemand brauchte, ist weggeblieben.</p>
+    <div class="unter">
+      <div><b>Kleinstmögliche Software</b>Nicht möglichst viel Software, sondern die kleinste, die ein echtes Problem zuverlässig löst.</div>
+      <div><b>Unbekannt ist nicht «keine»</b>Nicht eingerichtet, kein Zugriff, nichts vorhanden und kein Treffer sind vier verschiedene Aussagen – und bekommen vier verschiedene Texte.</div>
+      <div><b>Gemessen, nicht angenommen</b>Jede Regel im Server, jede Berechnung als Protokoll darstellbar, jede Oberfläche am gerenderten Zustand geprüft.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ FAQ ═══════════════ -->
+<section class="abs nebel" id="faq">
+  <div class="wrap">
+    <div class="kopfzeile">
+      <div>
+        <p class="vorzeile">Fragen</p>
+        <h2 class="display">Was Betriebe zuerst wissen wollen.</h2>
+      </div>
+    </div>
+    <div class="faq">
+      <details open>
+        <summary><span class="frage">Für welche Betriebe ist <span data-brand>Wachtwerk</span> gedacht?</span></summary>
+        <p>Für kleine und mittlere Sicherheitsdienste in der Schweiz: Bewachung, Veranstaltungs- und Verkehrsdienst, Revierdienst. Betriebe mit einer zweiten Sparte, etwa Reinigung, planen beide getrennt in derselben Software.</p>
+      </details>
+      <details>
+        <summary><span class="frage">Brauchen unsere Mitarbeitenden Firmengeräte?</span></summary>
+        <p>Nein. Die App läuft auf dem eigenen Handy, iOS und Android. Für Kontrollpunkte genügen günstige NFC-Chips am Objekt – oder ein Geofence, der ganz ohne Chip auskommt.</p>
+      </details>
+      <details>
+        <summary><span class="frage">Wie kommen unsere bestehenden Kunden hinein?</span></summary>
+        <p>Per Sammelimport aus einer CSV-Datei. Jede Zeile läuft durch dieselbe Prüfung wie das Anlegen von Hand. Was fehlt, ergänzt die Recherche aus dem Handelsregister: Adresse, UID, Webseite.</p>
+      </details>
+      <details>
+        <summary><span class="frage">Rechnet die Software unseren Lohn?</span></summary>
+        <p>Nein, und das ist Absicht. Sie führt Rohzeit, Nettozeit, Zeitbonus und Auslagenersatz getrennt und nachvollziehbar – als Grundlage für Ihr Lohnprogramm oder Ihre Treuhandstelle. Frankenbeträge für den Lohn entstehen dort, nicht hier.</p>
+      </details>
+      <details>
+        <summary><span class="frage">Ersetzt <span data-brand>Wachtwerk</span> unser Rundgang-System?</span></summary>
+        <p>Ja. Kontrollpunkte per NFC oder Geofence, Runden mit Zeitfenster, Aufgaben, Ereignisse mit Foto – und im Unterschied zur Insellösung mit Verbindung zu Planung, Kundenportal und Abrechnung.</p>
+      </details>
+      <details>
+        <summary><span class="frage">Wo liegen unsere Daten?</span></summary>
+        <p>Auf Servern in der Schweiz, verschlüsselt übertragen, mit Zwei-Faktor-Anmeldung für Verwaltungszugänge. Für die optionalen Diktat- und Recherchefunktionen wird ein externer KI-Anbieter angebunden – wer sie nicht will, betreibt die Software ohne.</p>
+      </details>
+      <details>
+        <summary><span class="frage">Was kostet <span data-brand>Wachtwerk</span>?</span></summary>
+        <p>Das hängt von der Zahl der Mitarbeitenden und den gewählten Modulen ab. Wir zeigen es Ihnen an Ihrem eigenen Beispiel – fragen Sie eine Demo an.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ SCHLUSS ═══════════════ -->
+<section class="abs nacht schluss" id="demo">
+  <div class="wrap">
+    <div class="zwei">
+      <div>
+        <p class="vorzeile">Demo</p>
+        <h2 class="display">Sehen Sie Ihren Betrieb in einer Software.</h2>
+        <p class="lead">Eine Stunde, Ihre Objekte, Ihre Schichten. Wir richten ein Beispiel mit Ihren Begriffen ein und gehen den Tag von der Planung bis zur Rechnung durch – am Bildschirm und auf dem Handy.</p>
+        <ul class="punkte">
+          <li><svg><use href="#i-haken"/></svg><span><b>Unverbindlich.</b> Keine Einrichtungsgebühr für die Demo, keine Laufzeit.</span></li>
+          <li><svg><use href="#i-haken"/></svg><span><b>Mit Ihren Daten.</b> Kundenstamm per CSV, in einer Stunde eingerichtet.</span></li>
+          <li><svg><use href="#i-haken"/></svg><span><b>Von Praktikern.</b> Sie sprechen mit Leuten, die selbst Dienstpläne geschrieben haben.</span></li>
+        </ul>
+      </div>
+      <form class="formular" id="demoFormular" novalidate action="backend/api/demo_anfrage.php" method="post">
+        <div class="felder">
+        <div class="falle" aria-hidden="true"><label>Webseite (bitte leer lassen)<input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>
+        <div class="reihe">
+          <label>Firma<input type="text" name="firma" autocomplete="organization" placeholder="Muster Sicherheitsdienst AG"></label>
+          <label>Name<input type="text" name="name" autocomplete="name" placeholder="Vor- und Nachname"></label>
+        </div>
+        <div class="reihe">
+          <label>E-Mail<input type="email" name="email" autocomplete="email" placeholder="name@firma.ch"></label>
+          <label>Mitarbeitende<select name="groesse"><option>bis 10</option><option>11 – 30</option><option>31 – 80</option><option>über 80</option></select></label>
+        </div>
+        <label>Was beschäftigt Sie am meisten?<textarea name="nachricht" placeholder="z. B. Revierdienst mit Kundenportal, GAV-Stunden, Offerten"></textarea></label>
+        <button class="btn primaer" type="submit" id="demoKnopf">Demo anfragen <svg><use href="#i-pfeil"/></svg></button>
+        <p class="hinweis">Wir melden uns innert eines Arbeitstages. Keine Newsletter, keine Weitergabe.</p>
+        <div class="meldung" id="demoMeldung" role="status" aria-live="polite"></div>
+        </div>
+        <div class="danke" id="demoDanke" role="status"><b>Anfrage erhalten.</b><p id="demoDankeText">Vielen Dank. Wir melden uns innert eines Arbeitstages.</p></div>
+      </form>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="fuss">
+  <div class="wrap">
+    <div class="oben">
+      <div>
+        <a class="marke" href="#"><svg><use href="#marke"/></svg><span class="wortmarke" data-brand>Wachtwerk</span></a>
+        <p>Betriebssoftware für Sicherheitsdienste. Einsatzplanung, Mitarbeiter-App, Revierdienst, Kundenportal, Offerten und Rechnungen – in der Schweiz gebaut und betrieben.</p>
+      </div>
+      <div>
+        <h4>Produkt</h4>
+        <ul><li><a href="#module">Module</a></li><li><a href="#revierdienst">Revierdienst</a></li><li><a href="#portal">Kundenportal</a></li><li><a href="#gav">GAV Sicherheit</a></li><li><a href="#sicherheit">Sicherheit</a></li></ul>
+      </div>
+      <div>
+        <h4>Unternehmen</h4>
+        <ul><li><a href="#haltung">Warum es das gibt</a></li><li><a href="#demo">Demo anfragen</a></li><li><a href="#faq">Fragen</a></li></ul>
+      </div>
+      <div>
+        <h4>Rechtliches</h4>
+        <ul><li><a href="#">Impressum</a></li><li><a href="#">Datenschutz</a></li><li><a href="#">AGB</a></li></ul>
+      </div>
+    </div>
+    <div class="unten">
+      <span>© 2026 <span data-brand>Wachtwerk</span> · Alle Angaben ohne Gewähr</span>
+      <span class="ch"><i aria-hidden="true"></i>Entwickelt und betrieben in der Schweiz</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  // Platzhalter-Name: hier einmal ändern.
+  var BRAND = 'Wachtwerk';
+  var stellen = document.querySelectorAll('[data-brand]');
+  for (var i = 0; i < stellen.length; i++) stellen[i].textContent = BRAND;
+
+  var kopf = document.getElementById('kopf');
+  var nav = document.getElementById('nav');
+  var knopf = document.getElementById('menuKnopf');
+  function scrollStand(){ kopf.classList.toggle('fest', window.scrollY > 8); }
+  window.addEventListener('scroll', scrollStand, {passive:true}); scrollStand();
+
+  knopf.addEventListener('click', function(){
+    var offen = nav.classList.toggle('offen');
+    knopf.setAttribute('aria-expanded', offen ? 'true' : 'false');
+    knopf.setAttribute('aria-label', offen ? 'Menü schliessen' : 'Menü öffnen');
+  });
+  nav.addEventListener('click', function(e){
+    if (e.target.tagName === 'A') { nav.classList.remove('offen'); knopf.setAttribute('aria-expanded','false'); }
+  });
+
+  // Demo-Formular (ENT-469): Pruefung im Browser erspart nur den Umweg --
+  // massgeblich prueft der Server (backend/demo_anfrage.php) noch einmal.
+  var formular = document.getElementById('demoFormular');
+  var meldung = document.getElementById('demoMeldung');
+  var demoKnopf = document.getElementById('demoKnopf');
+  function melde(text, fehler){
+    meldung.textContent = text;
+    meldung.classList.add('zeigen');
+    meldung.classList.toggle('fehler', !!fehler);
+  }
+  function feld(name){ return formular.elements[name]; }
+  formular.addEventListener('submit', function(e){
+    e.preventDefault();
+    var daten = {
+      firma: feld('firma').value.trim(), name: feld('name').value.trim(),
+      email: feld('email').value.trim(), groesse: feld('groesse').value,
+      nachricht: feld('nachricht').value.trim(), website: feld('website').value
+    };
+    var fehlend = [];
+    ['firma','name','email'].forEach(function(n){
+      var leer = daten[n] === '' || (n === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(daten[n]));
+      feld(n).setAttribute('aria-invalid', leer ? 'true' : 'false');
+      if (leer) fehlend.push(n);
+    });
+    if (fehlend.length) {
+      melde('Bitte Firma, Name und eine gültige E-Mail-Adresse angeben.', true);
+      feld(fehlend[0]).focus();
+      return;
+    }
+    demoKnopf.disabled = true;
+    meldung.classList.remove('zeigen');
+    fetch(formular.getAttribute('action'), {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(daten)
+    }).then(function(r){
+      return r.json().then(function(j){ return {ok: r.ok, json: j}; });
+    }).then(function(a){
+      if (a.ok && a.json && a.json.status === 'ok') {
+        if (a.json.message) document.getElementById('demoDankeText').textContent = a.json.message;
+        formular.classList.add('gesendet');
+        return;
+      }
+      if (a.json && a.json.felder) {
+        Object.keys(a.json.felder).forEach(function(n){ if (feld(n)) feld(n).setAttribute('aria-invalid','true'); });
+      }
+      melde((a.json && a.json.message) || 'Die Anfrage konnte nicht übermittelt werden.', true);
+    }).catch(function(){
+      melde('Keine Verbindung zum Server. Bitte versuchen Sie es später noch einmal oder rufen Sie uns an.', true);
+    }).then(function(){ demoKnopf.disabled = false; });
+  });
+})();
+</script>
+</body>
+</html>
