@@ -88,7 +88,9 @@ const punkt = (id, name, zustand, zeit, zusatz = {}) => ({
 });
 const rumpf = (id, tag, zusatz) => ({
   id, datum: tag, objekt_name: 'Testliegenschaft Nord',
-  vorname: 'Vorname', nachname: 'Nachnamenstest',
+  // Seit ENT-481 gehoert die Person dazu -- der Server setzt den Namen
+  // zusammen, die Oberflaeche zeigt ihn.
+  vorlage_name: 'Schlusskontrolle Nacht', person: 'M. Musterperson',
   rohzeit_start: `${tag} 22:04:00`, rohzeit_ende: `${tag} 22:41:00`,
   letzter_scan: `${tag} 22:39:00`, pause_minuten: 0,
   dauer: { sekunden: 2220, quelle: 'rohzeit_ende' },
@@ -113,6 +115,7 @@ const DETAILS = {
   // Runde 11: abgebrochen nach zwei Punkten -- vier wurden nie besucht.
   11: rumpf(11, vorTagen(5), {
     status: 'abgebrochen',
+    abbruch_grund: 'Stelle nicht gefunden', abbruch_freitext: 'Zugang war verschlossen',
     fortschritt: { gesamt: 6, erledigt: 2, bestaetigt: 2, ersatzscan: 0, nicht_verfuegbar: 0 },
     kontrollpunkte: [
       punkt(1, 'Eingang Nord', 'bestaetigt', `${vorTagen(5)} 21:33:00`),
@@ -672,11 +675,11 @@ check('KRITISCH: der Faden zwischen den Kontrollpunkten ist wirklich zu sehen',
   await page.evaluate(() => [...document.querySelectorAll('#liste .detail .v-faden')]
     .every(f => f.getBoundingClientRect().height > 10)));
 
-// Der Name der eingesetzten Person bleibt draussen, solange OP-423 offen ist
-// -- und zwar AUCH DANN, wenn der Server ihn mitschicken sollte. Der Beleg
-// trägt ihn absichtlich.
-check('KRITISCH: kein Personenname im Detail — auch wenn die Antwort einen trägt (OP-423)',
-  !/Nachnamenstest/.test(detail) && !/Vorname/.test(detail));
+// Seit ENT-481 wird 1:1 gezeigt: Der Kunde bekommt dasselbe Blatt ohnehin
+// physisch, also ist der Name kein neuer Datenfluss.
+check('KRITISCH: die eingesetzte Person steht im Detail (ENT-481)',
+  /M\. Musterperson/.test(detail));
+check('Und die Kontrollrunde daneben', /Schlusskontrolle Nacht/.test(detail));
 
 // ── Zweite Runde: abgebrochen, vier Punkte nie besucht ───────────────
 await page.evaluate(() => document.querySelectorAll('#liste .zeile')[1].click());
@@ -688,6 +691,25 @@ check('KRITISCH: nicht besuchte Punkte erscheinen ebenfalls und sind als solche 
   /Waschküche/.test(detail2) && /Nicht besucht/.test(detail2));
 check('KRITISCH: ein gemeldetes Ereignis erscheint mit Zeit und Art',
   /21:36/.test(detail2) && /Sachbeschädigung/.test(detail2));
+// Der Abbruchgrund im KLARTEXT, nicht als Codewort -- und oben, nicht als
+// Fussnote: Er ist die wichtigste Aussage über die Runde.
+// Der Klartext SELBST wird serverseitig geprueft (test_php.mjs und
+// pruef_kundenportal.php) -- hier kaeme er aus der Attrappe, die Zusage
+// koennte gar nicht anschlagen. Geprueft wird, dass die Tafel ihn zeigt.
+check('KRITISCH: Abbruchgrund und Zusatztext stehen in der Tafel (ENT-481)',
+  /Stelle nicht gefunden/.test(detail2) && /Zugang war verschlossen/.test(detail2));
+check('KRITISCH: und zwar ganz oben in der Tafel, vor den Kennzahlen',
+  await page.evaluate(() => {
+    const t = document.querySelectorAll('#liste .zeile')[1].nextElementSibling;
+    const a = t.querySelector('.d-abbruch'), k = t.querySelector('.kennzahlen');
+    return !!a && !!k && a.getBoundingClientRect().bottom <= k.getBoundingClientRect().top + 1;
+  }));
+// Eine abgeschlossene Runde bekommt keinen leeren Abbruch-Kasten.
+check('KRITISCH: eine abgeschlossene Runde zeigt keinen Abbruch-Hinweis',
+  await page.evaluate(() => {
+    const t = document.querySelectorAll('#liste .zeile')[0].nextElementSibling;
+    return !t.querySelector('.d-abbruch');
+  }));
 
 // ── Dritte Runde: vollständig, aber mit Fotobeleg ────────────────────
 await page.evaluate(() => document.querySelectorAll('#liste .zeile')[2].click());
@@ -852,9 +874,8 @@ check('Der Fotobeleg wird im Blatt ausgewiesen und erklärt',
   /Fotobeleg/.test(blatt) && /statt technischer Bestätigung/.test(blatt));
 check('KRITISCH: „kein Ereignis gemeldet" steht auch im Blatt, nicht ein fehlender Abschnitt',
   /kein Ereignis gemeldet/.test(blatt));
-// Der Beleg trägt absichtlich einen Namen. Er darf im Blatt nicht auftauchen.
-check('KRITISCH: KEIN Personenname im Blatt — auch wenn die Antwort einen trägt (OP-423)',
-  !/Nachnamenstest/.test(blatt) && !/Vorname/.test(blatt));
+check('KRITISCH: die eingesetzte Person steht auch im Blatt (ENT-481)',
+  /Mitarbeitende/.test(blatt) && /M\. Musterperson/.test(blatt));
 // ENT-322 gilt unverändert: Der Weg gehört ins Portal, wo der Kunde ihn
 // ausdrücklich aufruft — nicht auf ein Blatt, das er beiläufig mitbekommt.
 check('KRITISCH: KEINE Karte im Blatt (ENT-322 bleibt)',
@@ -1115,8 +1136,8 @@ check('KRITISCH: am Desktop stehen die vier Kennzahlen auf EINER Zeile',
 const detailD = await gross.textContent('#liste .detail');
 check('Auch am Desktop stehen die Kontrollpunkte mit ihren Uhrzeiten da',
   /22:07/.test(detailD) && /Eingang Nord/.test(detailD));
-check('KRITISCH: und auch am Desktop kein Personenname (OP-423)',
-  !/Nachnamenstest/.test(detailD) && !/Vorname/.test(detailD));
+check('KRITISCH: und auch am Desktop steht die Person da (ENT-481)',
+  /M\. Musterperson/.test(detailD));
 // Der nicht besuchte Punkt gehört auch hier ins Bild.
 await gross.evaluate(() => document.querySelectorAll('#liste .zeile')[1].click());
 await gross.waitForTimeout(300);

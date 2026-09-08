@@ -707,21 +707,58 @@ if (portalMitAdminSitzung.length) {
   bad.push('Portal mit Verwaltungssitzung: ' + portalMitAdminSitzung.join(', '));
 }
 
-// Kein Personenname aus dem Personal verlaesst den Server ueber das Portal.
-// ENT-441 hat ihn aus der Portalliste herausgehalten, und WELCHE Fassung
-// (aus / nur Vorname / voll) im Detail erscheinen soll, ist Gegenstand von
-// OP-423 und nicht entschieden. Bis dahin gilt die sparsame Vorbelegung.
+// Namen von Mitarbeitenden gehen seit ENT-481 ueber das Portal hinaus -- der
+// Projektinhaber hat entschieden, den Rapport „1:1" zu zeigen, weil der Kunde
+// ohnehin schon eine physische Kopie davon bekommt. Die fruehere Pruefung
+// („kein Portal-Endpunkt liest Namen") ist damit gegenstandslos und wurde
+// ENTFERNT statt aufgeweicht -- eine Pruefung, deren Grundlage weggefallen
+// ist, taeuscht Schutz vor.
 //
-// Geprueft wird die MECHANIK, nicht ein Wortlaut: Ohne Verbund auf
-// `mitarbeiter` und ohne die beiden Spalten kann ein Name gar nicht erst in
-// die Antwort geraten. Faellt der Entscheid spaeter anders aus, wird diese
-// Pruefung bewusst angepasst -- dann steht es im Protokoll.
-const portalMitNamen = portalDateien.filter(f =>
-  /\bJOIN\s+mitarbeiter\b/i.test(ohneKommentar(f))
-  || /\b(?:vorname|nachname)\b/i.test(ohneKommentar(f)));
-check('KRITISCH: kein Portal-Endpunkt liest Namen von Mitarbeitenden — OP-423 ist offen',
-  portalMitNamen.length === 0);
-if (portalMitNamen.length) { bad.push('Portal mit Personennamen: ' + portalMitNamen.join(', ')); }
+// Was an ihre Stelle tritt, gilt weiter und ist die eigentliche Grenze: Die
+// VERTRAULICHEN Personalfelder (ma_vertrauliche_felder(), CLAUDE.md) haben in
+// keinem Portal-Endpunkt etwas zu suchen. Ein Name auf einem Rapport ist
+// etwas anderes als eine AHV-Nummer.
+const VERTRAULICH = ['ahv_nr', 'nationalitaet', 'heimatort', 'geburtsort', 'zivilstand',
+  'heiratsdatum', 'geburtsdatum', 'geschlecht', 'aufenthaltsbewilligung',
+  'aufenthalt_gueltig_bis', 'arbeitsbewilligung', 'arbeit_gueltig_bis', 'zemis_nr',
+  'strafregister_datum', 'betreibung_datum', 'dienstausweis_nr', 'dienstausweis_gueltig_bis'];
+// Die Liste wird gegen die Quelle geprueft, statt sie zu behaupten: Kommt in
+// mitarbeiter.php ein Feld dazu, faellt es hier auf, statt still unbewacht
+// zu bleiben.
+{
+  const quelle = readFileSync(`${WURZEL}/backend/mitarbeiter.php`, 'utf8');
+  const block = quelle.slice(quelle.indexOf('function ma_vertrauliche_felder'));
+  const echt = [...block.slice(0, block.indexOf('}')).matchAll(/'([a-z_]+)'/g)].map(m => m[1]);
+  check('KRITISCH: die Liste der vertraulichen Felder stimmt mit mitarbeiter.php ueberein',
+    echt.length > 0 && JSON.stringify([...echt].sort()) === JSON.stringify([...VERTRAULICH].sort()));
+}
+const portalMitVertraulichem = portalDateien.filter(f => {
+  const text = ohneKommentar(f);
+  return VERTRAULICH.some(feld => new RegExp('\\b' + feld + '\\b').test(text));
+});
+check('KRITISCH: kein Portal-Endpunkt liest vertrauliche Personalfelder',
+  portalMitVertraulichem.length === 0);
+if (portalMitVertraulichem.length) {
+  bad.push('Portal mit vertraulichen Feldern: ' + portalMitVertraulichem.join(', '));
+}
+
+// Der Abbruchgrund verlaesst den Server als KLARTEXT, nicht als Codewort
+// (ENT-324, jetzt auch fuers Portal). Zwei Seiten derselben Regel:
+//   - Der Endpunkt schlaegt im Katalog nach.
+//   - portal.html traegt KEINE eigene Kopie des Katalogs. Eine zweite Kopie
+//     liefe beim naechsten Grund auseinander, und der Kunde bekaeme dann ein
+//     Codewort zu lesen.
+check('KRITISCH: der Portal-Detailendpunkt loest den Abbruchgrund ueber den Katalog auf',
+  /RUNDGANG_ABBRUCH_GRUENDE\s*\[/.test(ohneKommentar('portal_rundgang_detail.php')));
+{
+  const rd = readFileSync(`${WURZEL}/backend/rundgang.php`, 'utf8');
+  const block = rd.slice(rd.indexOf('const RUNDGANG_ABBRUCH_GRUENDE'));
+  const codes = [...block.slice(0, block.indexOf('];')).matchAll(/'([a-z_]+)'\s*=>/g)].map(m => m[1]);
+  const portalText = readFileSync(`${WURZEL}/portal.html`, 'utf8');
+  check('Der Katalog der Abbruchgruende ist ueberhaupt gefunden', codes.length >= 3);
+  check('KRITISCH: portal.html traegt keine eigene Kopie des Abbruchgrund-Katalogs',
+    !codes.some(c => portalText.includes(c)));
+}
 
 // Die Bewegungsspur geht seit ENT-474 zum Kunden -- aber ueber GENAU EINEN
 // Endpunkt, der sie erst auf einen Knopfdruck hin liefert.

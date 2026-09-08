@@ -126,6 +126,22 @@ pruef('KRITISCH: ohne eigene Objekte ist gar nichts sichtbar',
 pruef('KRITISCH: der Vergleich der Objektnummer ist streng typisiert',
     kp_runde_sichtbar(0, [false, null], false) === false);
 
+// ── Der Katalog der Abbruchgruende (ENT-481) ─────────────────────────
+// Der Kunde liest jetzt den Grund eines Abbruchs. Er muss ein Satz sein und
+// kein Codewort -- ein Eintrag, dessen Text gleich seinem Schluessel waere,
+// haette den Kunden „stelle_nicht_gefunden" lesen lassen. Hier wirklich
+// ausgefuehrt statt behauptet.
+require_once __DIR__ . '/../backend/rundgang.php';
+pruef('Der Katalog der Abbruchgruende ist nicht leer', count(RUNDGANG_ABBRUCH_GRUENDE) >= 3);
+$schlecht = [];
+foreach (RUNDGANG_ABBRUCH_GRUENDE as $code => $text) {
+    if ($text === $code || trim((string)$text) === '' || preg_match('/^[a-z_]+$/', (string)$text)) {
+        $schlecht[] = $code;
+    }
+}
+pruef('KRITISCH: jeder Abbruchgrund traegt einen lesbaren Satz, kein Codewort',
+    $schlecht === []);
+
 foreach ($bad as $b) { echo "- $b\n"; }
 echo "geprueft: $ok, beanstandet: " . count($bad) . "\n";
 exit($bad ? 1 : 0);
