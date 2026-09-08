@@ -224,6 +224,21 @@ check('KRITISCH: die Passwort-Ruecksetzung erfuellt alle eigenen Regeln (Admin-A
   prCode === 0 && prBeanstandet.length === 0);
 if (prBeanstandet.length) { prBeanstandet.forEach(z => bad.push('PHP-Reset: ' + z.trim())); }
 
+// ── Demo-Anfrage von der Homepage, ENT-469: der Rechenkern wird echt
+// ausgefuehrt (keine Datenbank noetig), der Endpunkt am Quelltext geprueft
+// -- derselbe Schnitt wie bei der Passwort-Ruecksetzung oben.
+let daAus = '', daCode = 0;
+try {
+  daAus = execFileSync('php', [`${HIER}/pruef_demo_anfrage.php`], { encoding: 'utf8' });
+} catch (e) {
+  daAus = String(e.stdout || '') + String(e.stderr || '');
+  daCode = e.status || 1;
+}
+const daBeanstandet = daAus.split('\n').filter(z => z.trim().startsWith('✗ '));
+check('KRITISCH: die Demo-Anfrage erfuellt alle eigenen Regeln (Bremse, Falle, Empfaenger aus Stammdaten, keine Kopfzeilen-Injektion)',
+  daCode === 0 && daBeanstandet.length === 0);
+if (daBeanstandet.length) { daBeanstandet.forEach(z => bad.push('PHP-Demo: ' + z.trim())); }
+
 // Alle DREI Stellen, an denen ein Passwort gesetzt wird, muessen die Regel
 // aufrufen -- eine vergessene Stelle waere ein offenes Hintertuerchen.
 // Seit ENT-444 auch das Kundenportal: Ein Kundenpasswort ist kein
