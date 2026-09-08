@@ -334,6 +334,21 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
            border-radius:var(--r);overflow:hidden;background:var(--grau-soft)}
 .weg-fuss{font-size:12.5px;color:var(--ink-3);margin-top:9px}
 
+/* Die Fusszeile der Tafel: eine einzige Handlung, rechts. Ein Knopf wird
+   NICHT über die volle Breite gestreckt, nur weil er allein in seiner Zeile
+   steht (Hausregel) -- auf beiden Breiten dasselbe Muster. */
+.d-fuss{display:flex;justify-content:flex-end;margin-top:22px}
+
+/* Das Rapportblatt für das PDF. Es steht ausserhalb des Bildes, nicht auf
+   display:none -- html2canvas misst einen versteckten Knoten als 0 hoch und
+   erzeugt eine leere Seite. Die Positionierung liegt an der HÜLLE und nicht
+   am Blatt selbst: Trüge das Blatt sie, wirkte sie im Klon weiter, den
+   html2canvas anfertigt, und man bekäme dasselbe leere Blatt (im Cockpit
+   gemessen, hier von Anfang an vermieden). */
+#blattHuelle{position:absolute;left:-10000px;top:0;width:820px}
+#blatt{width:760px;background:#FFFFFF;color:#14161A;padding:36px 40px;
+       font:13px/1.5 -apple-system,'Segoe UI',Arial,sans-serif}
+
 /* Ein leerer Zustand bekommt Text, nie eine leere Flaeche -- und der Text
    sagt, WELCHE der moeglichen Aussagen gilt (Hausregel: „unbekannt darf nie
    wie keine aussehen"). */
@@ -541,6 +556,11 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
   <p class="fehler" id="fehler-global" hidden></p>
 </div>
 
+
+<!-- Das Blatt für das PDF (ENT-477). Eigener Aufbau, nicht die Tafel
+     abfotografiert: Die Tafel trägt Knöpfe, eine Karte und Glaskanten; ein
+     Abzug davon wäre ein Bildschirmfoto, kein Rapport. -->
+<div id="blattHuelle" aria-hidden="true"><div id="blatt"></div></div>
 <script>
 'use strict';
 const API = 'api/';
@@ -753,7 +773,13 @@ $('wieder-anmelden').addEventListener('click', () => {
   $('email').focus();
 });
 
+// Der Kundenname kommt aus der Sitzung (portal_rundgaenge.php) und wird
+// hier gemerkt: Das Rapportblatt braucht ihn, und der Detail-Endpunkt
+// liefert ihn bewusst nicht mit -- im Portal ist er in jeder Zeile derselbe.
+let kundeName = '';
+
 function kopfSetzen(kunde, person) {
+  kundeName = kunde || '';
   $('titel').textContent = kunde || 'Kundenportal';
   $('unter').textContent = kunde
     ? ('Nachweis der ausgeführten Rundgänge' + (person ? ' · ' + person : ''))
@@ -875,6 +901,10 @@ function zeichnen(daten) {
 // Die Antwort wird je Runde einmal geholt und behalten: Wer eine Zeile
 // zu- und wieder aufklappt, soll nicht jedes Mal warten.
 const detailZwischen = {};
+// Die Fotobelege, je Scan einmal geholt. Sie werden zweimal gebraucht -- in
+// der Tafel und im PDF -- und ein zweites Holen waere ein zweiter Weg zu
+// demselben Bild.
+const fotoZwischen = {};
 
 // Wortlaut fuer den Kunden, nicht fuer den Betrieb: „Ersatzscan" ist
 // Hausjargon. Was er bedeutet -- Foto statt technischer Bestaetigung --
@@ -1014,7 +1044,11 @@ function detailZeichnen(d, tafel) {
     + 'Weg auf der Karte anzeigen</button>'
     + '<p class="d-hinweis" style="margin-top:9px">Die Bewegungsdaten werden erst auf '
     + 'diesen Knopf hin geladen. Dabei wird die Karte von Google bezogen.</p>'
-    + '</div></div>';
+    + '</div></div>'
+    // Dasselbe Blatt, das der Kunde heute per Mail bekommt -- nur holt er es
+    // hier selbst (ENT-477).
+    + '<div class="d-fuss"><button type="button" class="knopf" data-pdf="'
+    + Number(d.id) + '">Als PDF herunterladen</button></div>';
 
   // Die Fotobelege erst jetzt, einzeln und mit Token im Kopf -- der Token
   // darf nicht in eine Bild-Adresse (er landete sonst im Browserverlauf).
@@ -1175,21 +1209,237 @@ function wegKarteBauen(punkte, huelle, tage) {
   });
 }
 
+// ── Das Rapportblatt als PDF (ENT-477) ───────────────────────────────
+// html2pdf wiegt rund 950 KB und wird darum erst BEIM KLICK nachgeladen --
+// dasselbe Muster wie im Cockpit (ENT-322) und bei der Karte. Wer nur die
+// Liste ansieht, laedt es nie.
+let pdfVersprechen = null;
+function pdfLaden() {
+  if (pdfVersprechen) { return pdfVersprechen; }
+  pdfVersprechen = new Promise((fertig, schief) => {
+    if (typeof html2pdf !== 'undefined') { fertig(); return; }
+    const skript = document.createElement('script');
+    skript.src = 'html2pdf.bundle.min.js';
+    skript.onload = () => (typeof html2pdf !== 'undefined'
+      ? fertig() : schief(new Error('html2pdf nicht geladen')));
+    skript.onerror = () => schief(new Error('html2pdf konnte nicht geladen werden.'));
+    document.head.appendChild(skript);
+  });
+  return pdfVersprechen;
+}
+
+// Der Briefkopf wird EINMAL geholt und behalten. Er unterscheidet sich nicht
+// je Runde, und das Logo wiegt mehr als die ganze uebrige Antwort.
+let briefkopf = null;
+async function briefkopfHolen() {
+  if (briefkopf) { return briefkopf; }
+  const { ok, daten } = await ruf('portal_briefkopf.php');
+  // Ohne Briefkopf entsteht das Blatt trotzdem -- es traegt dann eben
+  // keinen. Ein fehlendes Logo ist kein Grund, den Nachweis zu verweigern.
+  briefkopf = (ok && daten && daten.briefkopf) ? daten.briefkopf
+    : { firma: '', zusatz: '', fusszeile: '', fusszeile2: '', logo: null };
+  return briefkopf;
+}
+
+function pdfDateiname(d) {
+  const teil = String(d.objekt_name || 'Rundgang').replace(/[^A-Za-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+  return 'Rapport-' + (teil || 'Rundgang') + '-' + String(d.datum).slice(0, 10) + '.pdf';
+}
+
+// Das Blatt wird EIGENS gebaut und nicht aus der Tafel abfotografiert: Die
+// Tafel traegt Knoepfe, eine Karte und Glaskanten. Es traegt dieselben
+// Angaben wie die Tafel -- also KEINEN Personennamen (OP-423 ist offen) und
+// KEINE Karte (ENT-322 gilt unveraendert: ein Bewegungsweg im Rapport gaebe
+// dem Kunden Aufenthaltsdaten, die er zur Leistungskontrolle nicht braucht;
+// im Portal ruft er sie ausdruecklich auf, ein Blatt bekaeme sie beilaeufig
+// mit).
+function blattFuellen(d, bk) {
+  const f = d.fortschritt || {};
+  const gesamt = Number(f.gesamt || 0);
+  const erledigt = f.erledigt !== undefined ? Number(f.erledigt) : Number(f.bestaetigt || 0);
+  const beleg = Number(f.ersatzscan || 0);
+  const endeRoh = d.rohzeit_ende
+    || (d.dauer && d.dauer.quelle === 'letzter_scan' ? d.letzter_scan : null);
+  const dauer = dauerText(d.dauer);
+  const pause = Number(d.pause_minuten || 0);
+  const adresse = [d.strasse, d.ort].filter(Boolean).join(', ');
+  const [, zustand] = STATUS[d.status] || ['', d.status];
+
+  const kz = (a, v) => '<tr><td style="padding:7px 0;color:#6B7280;width:170px;'
+    + 'border-bottom:1px solid #E5E8EC">' + a + '</td>'
+    + '<td style="padding:7px 0;font-weight:600;border-bottom:1px solid #E5E8EC">' + v + '</td></tr>';
+  const kopf = [
+    ['Objekt', esc(d.objekt_name || '') + (adresse ? ', ' + esc(adresse) : '')],
+    ['Kontrollrunde', esc(d.vorlage_name || 'Alle Kontrollpunkte des Objekts')],
+    ['Beginn / Ende', esc(uhr(d.rohzeit_start) || 'unbekannt') + ' – '
+      + esc(uhr(endeRoh) || 'unbekannt')],
+    ['Dauer', esc(dauer || 'unbekannt')
+      + (pause > 0 ? ' <span style="font-weight:400;color:#6B7280">(ohne ' + pause
+        + ' Min. Pause)</span>' : '')],
+    ['Kontrollpunkte', gesamt > 0
+      ? erledigt + ' von ' + gesamt + ' erledigt'
+        + (beleg > 0 ? ' <span style="font-weight:400;color:#6B7280">(davon ' + beleg
+          + ' per Fotobeleg)</span>' : '')
+      : 'keine hinterlegt'],
+    ['Status', esc(zustand)],
+  ].map(x => kz(x[0], x[1])).join('');
+
+  const th = 'padding:6px 8px;text-align:left;font-size:11px;text-transform:uppercase;'
+    + 'letter-spacing:.4px;color:#6B7280;border-bottom:1.5px solid #16181D';
+  const td = 'padding:7px 8px;border-bottom:1px solid #E5E8EC;font-size:13.5px;vertical-align:top';
+  const lbl = 'font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#6B7280;'
+    + 'font-weight:700;margin-bottom:6px';
+
+  const zeilen = (d.kontrollpunkte || []).map(k => {
+    const e = k.erledigt;
+    // Drei Zustände, drei Texte. Der dritte ist der wichtige: Ein nicht
+    // besuchter Punkt MUSS im Blatt stehen -- ein Nachweis, in dem das
+    // Fehlende fehlt, ist keiner.
+    const wort = e ? (D_SCAN[e.status] || ['', e.status])[1] : 'Nicht besucht';
+    const aufg = (k.aufgaben || []).map(a => {
+      const at = a.erledigt ? (D_AUFGABE[a.erledigt.status] || ['', a.erledigt.status])[1]
+        : D_AUFGABE.unbeantwortet[1];
+      const grund = a.erledigt && a.erledigt.grund ? ' — ' + a.erledigt.grund : '';
+      return '<div style="font-size:12px;color:#6B7280;margin-top:3px">' + esc(a.bezeichnung)
+        + ': <b style="color:#14161A;font-weight:600">' + esc(at) + '</b>' + esc(grund) + '</div>';
+    }).join('');
+    const foto = e && e.hat_foto
+      ? (fotoZwischen[e.scan_id]
+        ? '<img src="' + fotoZwischen[e.scan_id] + '" alt="" style="max-width:200px;'
+          + 'max-height:150px;border:1px solid #E5E8EC;border-radius:4px;display:block;margin-top:6px">'
+        // Ist der Beleg nicht geladen, steht wenigstens da, DASS einer
+        // vorliegt -- ein stillschweigend fehlendes Foto wäre schlimmer.
+        : '<div style="font-size:12px;color:#6B7280;margin-top:3px">Fotobeleg vorhanden</div>')
+      : '';
+    return '<tr>'
+      + '<td style="' + td + ';white-space:nowrap;width:58px' + (e ? '' : ';color:#8B919D') + '">'
+      + esc(e ? (uhr(e.erfasst_am) || '—') : '—') + '</td>'
+      + '<td style="' + td + '">' + esc(k.bezeichnung)
+      + (e && e.beschreibung ? '<div style="font-size:12px;color:#6B7280;margin-top:3px">'
+        + esc(e.beschreibung) + '</div>' : '')
+      + foto + aufg + '</td>'
+      + '<td style="' + td + ';white-space:nowrap;width:112px'
+      + (e && e.status === 'bestaetigt' ? '' : ';font-weight:600') + '">' + esc(wort) + '</td>'
+      + '</tr>';
+  }).join('');
+
+  const ereignisse = (d.ereignisse || []).map(e => '<tr>'
+    + '<td style="' + td + ';white-space:nowrap;width:58px">' + esc(uhr(e.erfasst_am) || '—') + '</td>'
+    + '<td style="' + td + '"><b style="font-weight:600">' + esc(e.art || 'Ohne Art') + '</b>'
+    + (e.bemerkung ? '<div style="font-size:12px;color:#6B7280;margin-top:3px">'
+      + esc(e.bemerkung) + '</div>' : '')
+    + (e.hat_foto ? '<div style="font-size:12px;color:#6B7280;margin-top:3px">Mit Foto</div>' : '')
+    + '</td></tr>').join('');
+
+  const logo = bk.logo
+    ? '<img src="' + bk.logo + '" alt="" style="max-height:88px;max-width:260px;display:block;'
+      + 'margin:0 auto 8px">' : '';
+  const bkText = (bk.firma
+      ? '<div style="font-weight:700;color:#14161A;font-size:13px">' + esc(bk.firma) + '</div>' : '')
+    + (bk.zusatz ? esc(bk.zusatz) : '');
+  const fuss = (bk.fusszeile || bk.fusszeile2)
+    ? '<div style="margin-top:30px;padding-top:10px;border-top:1px solid #E5E8EC;display:flex;'
+      + 'align-items:center;justify-content:space-between;gap:32px;font-size:10.5px;color:#6B7280;'
+      + 'line-height:1.5">'
+      + (bk.fusszeile ? '<div style="white-space:pre-line">' + esc(bk.fusszeile) + '</div>' : '')
+      + (bk.fusszeile2 ? '<div style="white-space:pre-line">' + esc(bk.fusszeile2) + '</div>' : '')
+      + '</div>' : '';
+  const heute = new Date();
+  const heuteText = String(heute.getDate()).padStart(2, '0') + '.'
+    + String(heute.getMonth() + 1).padStart(2, '0') + '.' + heute.getFullYear();
+
+  $('blatt').innerHTML =
+    '<div style="font-family:-apple-system,Segoe UI,Arial,sans-serif;color:#14161A">'
+    + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:24px;'
+    + 'border-bottom:2px solid #16181D;padding-bottom:14px;margin-bottom:22px">'
+    + '<div><div style="font-size:21px;font-weight:800;letter-spacing:-.4px">Rundgang-Rapport</div>'
+    + '<div style="font-size:12px;color:#6B7280;margin-top:3px">Rundgang-Nr. ' + Number(d.id)
+    + ' · ' + esc(dmy(d.datum)) + '</div></div>'
+    + '<div style="text-align:center;font-size:12px;color:#6B7280;line-height:1.5">'
+    + logo + bkText + '</div></div>'
+    + (kundeName ? '<div style="margin-bottom:20px"><div style="' + lbl + '">Kunde</div>'
+      + '<div style="font-size:14px;line-height:1.5">' + esc(kundeName) + '</div></div>' : '')
+    + '<table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:24px">'
+    + kopf + '</table>'
+    + (beleg > 0 ? '<div style="border:1px solid #E2B156;background:#FBF3E0;color:#9A6B08;'
+      + 'border-radius:6px;padding:9px 12px;margin-bottom:18px;font-size:12.5px;line-height:1.5">'
+      + '<strong>Hinweis:</strong> ' + (beleg === 1
+        ? 'Ein Kontrollpunkt wurde mit einem Fotobeleg belegt'
+        : beleg + ' Kontrollpunkte wurden mit einem Fotobeleg belegt')
+      + ' — statt technischer Bestätigung per Chip oder Standort. '
+      + 'Der Beleg steht bei der jeweiligen Zeile.</div>' : '')
+    + '<div style="' + lbl + '">Kontrollpunkte</div>'
+    + (zeilen ? '<table style="width:100%;border-collapse:collapse"><thead><tr>'
+      + '<th style="' + th + '">Zeit</th><th style="' + th + '">Kontrollpunkt</th>'
+      + '<th style="' + th + '">Status</th></tr></thead><tbody>' + zeilen + '</tbody></table>'
+      : '<div style="font-size:13.5px">Für diese Runde sind keine Kontrollpunkte hinterlegt.</div>')
+    + '<div style="' + lbl + ';margin-top:24px">Ereignisse</div>'
+    // „Kein Ereignis" ist eine Aussage, ein fehlender Abschnitt keine.
+    + (ereignisse ? '<table style="width:100%;border-collapse:collapse"><tbody>'
+      + ereignisse + '</tbody></table>'
+      : '<div style="font-size:13.5px">Während dieser Runde wurde kein Ereignis gemeldet.</div>')
+    + '<div style="margin-top:24px;font-size:11px;color:#8B919D;line-height:1.5">'
+    + 'Erstellt am ' + heuteText + '. Die Zeiten stammen aus den Erfassungen des Geräts; '
+    + 'abweichende Übermittlungszeiten ändern sie nicht.</div>'
+    + fuss + '</div>';
+}
+
+$('liste').addEventListener('click', ev => {
+  const knopf = ev.target.closest('[data-pdf]');
+  if (knopf) { pdfHerunterladen(Number(knopf.dataset.pdf), knopf); }
+});
+
+async function pdfHerunterladen(id, knopf) {
+  const d = detailZwischen[id];
+  if (!d) { return; }
+  const alt = knopf.textContent;
+  knopf.disabled = true;
+  knopf.textContent = 'Wird erstellt …';
+  try {
+    const [, bk] = await Promise.all([pdfLaden(), briefkopfHolen()]);
+    blattFuellen(d, bk);
+    const blob = await html2pdf().set({
+      margin: 10,
+      image: { type: 'jpeg', quality: 0.95 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['css', 'legacy'] },
+    }).from($('blatt')).outputPdf('blob');
+    const adresse = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = adresse; a.download = pdfDateiname(d);
+    document.body.appendChild(a); a.click(); a.remove();
+    // Erst freigeben, wenn der Browser die Datei geholt hat.
+    setTimeout(() => URL.revokeObjectURL(adresse), 4000);
+  } catch (fehler) {
+    fehler('fehler-global', 'Der Rapport liess sich nicht erzeugen.');
+  } finally {
+    knopf.disabled = false;
+    knopf.textContent = alt;
+  }
+}
+
 async function fotoLaden(scanId, ziel) {
+  if (fotoZwischen[scanId]) { fotoEinsetzen(ziel, fotoZwischen[scanId]); return; }
   try {
     const kopf = {};
     if (token) { kopf['X-Auth-Token'] = token; }
     const antwort = await fetch(API + 'portal_rundgang_foto.php?scan_id=' + scanId, { headers: kopf });
     if (!antwort.ok) { throw new Error('nicht abrufbar'); }
     const bild = await antwort.blob();
-    if (!document.body.contains(ziel)) { return; }
-    const adresse = URL.createObjectURL(bild);
-    ziel.innerHTML = '<img alt="Fotobeleg zu diesem Kontrollpunkt">';
-    const img = ziel.querySelector('img');
-    // Erst nach dem Zeichnen freigeben -- sonst haelt jede zugeklappte
-    // Tafel ihr Bild bis zum Neuladen der Seite im Speicher.
-    img.addEventListener('load', () => URL.revokeObjectURL(adresse));
-    img.src = adresse;
+    // Als DATEN-Adresse und nicht als Objekt-Adresse: Eine Objekt-Adresse
+    // muesste freigegeben werden, sobald die Tafel zuklappt -- und dann
+    // faende html2pdf sie beim Bauen des Blattes nicht mehr. Eine
+    // Daten-Adresse ueberlebt beides und laesst sich zwischenspeichern.
+    const adresse = await new Promise((fertig, schief) => {
+      const leser = new FileReader();
+      leser.onload = () => fertig(String(leser.result));
+      leser.onerror = () => schief(new Error('nicht lesbar'));
+      leser.readAsDataURL(bild);
+    });
+    fotoZwischen[scanId] = adresse;
+    fotoEinsetzen(ziel, adresse);
   } catch (fehler) {
     // „Vorhanden, aber nicht abrufbar" ist etwas anderes als „kein Foto" --
     // der Satz sagt darum nicht, es gebe keines.
@@ -1197,6 +1447,12 @@ async function fotoLaden(scanId, ziel) {
       ziel.innerHTML = '<span class="d-hinweis">Der Fotobeleg liess sich nicht laden.</span>';
     }
   }
+}
+
+function fotoEinsetzen(ziel, adresse) {
+  if (!document.body.contains(ziel)) { return; }
+  ziel.innerHTML = '<img alt="Fotobeleg zu diesem Kontrollpunkt">';
+  ziel.querySelector('img').src = adresse;
 }
 
 function abgemeldet() {

@@ -96,6 +96,18 @@ foreach ($scans->fetchAll(PDO::FETCH_ASSOC) as $s) {
     }
 }
 
+// Der Name der Kontrollrunde gehoert dazu -- er steht im Rapport, den der
+// Kunde heute per Mail bekommt ("Runde: Schlusskontrolle" sagt etwas,
+// "Runde: 3 von 12 Punkten des Objekts" nicht). Anders als
+// `einsaetze.titel` ist er kein interner Planungstitel.
+$vorlageName = null;
+if ($vorlageId !== null) {
+    $v = $pdo->prepare('SELECT name FROM rundgang_vorlage WHERE id = ?');
+    $v->execute([$vorlageId]);
+    $name = $v->fetchColumn();
+    if ($name !== false) { $vorlageName = (string)$name; }
+}
+
 $rohPunkte = rundgang_punkte_der_runde($pdo, $objektId, $vorlageId);
 $rohPunkte = array_map(static function ($k) use ($erledigtNach) {
     $k['id'] = (int)$k['id'];
@@ -147,6 +159,7 @@ json_response(['status' => 'ok', 'rundgang' => [
     'strasse'        => (string)($r['strasse'] ?? ''),
     'ort'            => (string)($r['ort'] ?? ''),
     'status'         => (string)$r['status'],
+    'vorlage_name'   => $vorlageName,
     'rohzeit_start'  => $r['rohzeit_start'],
     'rohzeit_ende'   => $r['rohzeit_ende'],
     'letzter_scan'   => $r['letzter_scan'],

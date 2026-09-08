@@ -159,6 +159,20 @@ const WEG_VOLL = {
   ],
 };
 let wegAntwort = WEG_VOLL;
+
+// Der Briefkopf fuers Rapportblatt (ENT-477). Erfundene Firma, erfundenes
+// Logo -- echte Betriebsdaten haben in Testdaten nichts zu suchen.
+const BRIEFKOPF = {
+  status: 'ok',
+  briefkopf: {
+    firma: 'Musterfirma Sicherheitsdienst GmbH',
+    zusatz: 'Musterweg 1 · 0000 Musterort',
+    fusszeile: 'Musterfirma Sicherheitsdienst GmbH\nMusterweg 1, 0000 Musterort',
+    fusszeile2: 'Telefon 000 000 00 00\ninfo@example.invalid',
+    logo: 'data:image/png;base64,'
+      + 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+  },
+};
 // Wie oft Google Maps angefragt wurde. Die Kernzusage von ENT-474 ist, dass
 // das VOR dem Knopfdruck NIE passiert -- ein Zaehler ist dafuer der einzige
 // belastbare Nachweis.
@@ -209,6 +223,7 @@ async function setup(page) {
       return send({ status: 'ok', token: 't', name: 'A. Beispielperson',
         kunde: 'Muster Liegenschaften AG' });
     }
+    if (path.includes('portal_briefkopf')) return send(BRIEFKOPF);
     if (path.includes('portal_rundgang_weg')) return send(wegAntwort);
     if (path.includes('portal_rundgang_detail')) {
       const id = Number(new URL(req.url()).searchParams.get('rundgang_id'));
@@ -778,6 +793,90 @@ check('KRITISCH: „noch nicht eingerichtet" ist ein ANDERER Text als „kein We
 check('KRITISCH: und er verrät dem Kunden nichts über den Zustand des Betriebs',
   !/Einrichtung|einrichten|Datenbank|Tabelle/i.test(nichtEing));
 wegAntwort = WEG_VOLL;
+
+// ══ Das Rapportblatt als PDF (ENT-477) ══════════════════════════════════
+// Der Kunde holt sich hier dasselbe Blatt, das er heute per Mail bekommt.
+calls = [];
+// Den Zwischenspeicher des Briefkopfs leeren: Ohne das kann die Zusage
+// „beim Aufklappen wird er nicht geholt" gar nicht anschlagen -- ein früherer
+// Aufruf hätte ihn längst abgelegt, und die Prüfung wäre eine Behauptung.
+await page.evaluate(() => { briefkopf = null; });
+await page.evaluate(() => document.querySelectorAll('#liste .zeile')[2].click());
+await page.waitForTimeout(200);
+await page.evaluate(() => document.querySelectorAll('#liste .zeile')[2].click());
+await page.waitForTimeout(500);
+
+// html2pdf wiegt rund 950 KB. Wer nur liest, soll es nie laden -- dasselbe
+// Muster wie bei der Karte, und aus demselben Grund gemessen statt behauptet.
+check('KRITISCH: html2pdf wird beim Aufklappen NICHT geladen',
+  await page.evaluate(() =>
+    !document.querySelector('script[src*="html2pdf"]')));
+check('KRITISCH: und der Briefkopf ebenso wenig',
+  !calls.some(c => c.path.includes('portal_briefkopf')));
+check('KRITISCH: der PDF-Knopf ist auf dem Handy mindestens 44 px hoch',
+  await page.evaluate(() => {
+    const k = document.querySelector('[data-pdf]');
+    return !!k && k.getBoundingClientRect().height >= 44;
+  }));
+// Ein Knopf wird NICHT über die volle Breite gestreckt, nur weil er allein
+// in seiner Zeile steht (Hausregel) -- gemessen, nicht nachgelesen.
+check('KRITISCH: und er ist nicht über die volle Breite gestreckt',
+  await page.evaluate(() => {
+    const k = document.querySelector('[data-pdf]');
+    const t = k.closest('.detail');
+    return k.getBoundingClientRect().width < t.getBoundingClientRect().width - 40;
+  }));
+
+// html2pdf wird hier WIRKLICH geladen und erzeugt ein echtes PDF -- eine
+// Attrappe prüfte nur, dass wir sie richtig aufrufen, nicht dass am Ende
+// eine Datei herauskommt.
+const dlVersprechen = page.waitForEvent('download', { timeout: 40000 }).catch(() => null);
+await klick('[data-pdf="12"]');
+const datei = await dlVersprechen;
+check('KRITISCH: der Knopf erzeugt tatsächlich eine Datei', !!datei);
+check(`Und zwar ein PDF mit sprechendem Namen (${datei ? datei.suggestedFilename() : '–'})`,
+  !!datei && /^Rapport-.+-\d{4}-\d{2}-\d{2}\.pdf$/.test(datei.suggestedFilename()));
+check('KRITISCH: erst der Klick lädt html2pdf nach',
+  await page.evaluate(() => !!document.querySelector('script[src*="html2pdf"]')));
+check('Und holt den Briefkopf', calls.some(c => c.path.includes('portal_briefkopf')));
+
+const blatt = await page.textContent('#blatt');
+check('Das Blatt trägt den Briefkopf des Betriebs',
+  /Musterfirma Sicherheitsdienst/.test(blatt));
+check('KRITISCH: es nennt Objekt, Kontrollrunde, Zeiten und Zustand',
+  /Testliegenschaft Nord/.test(blatt) && /Kontrollrunde/.test(blatt)
+  && /23:15/.test(blatt) && /Abgeschlossen/.test(blatt));
+check('KRITISCH: jeder Kontrollpunkt steht mit seiner Uhrzeit im Blatt',
+  /Eingang Nord/.test(blatt) && /Aussenbereich/.test(blatt) && /23:40/.test(blatt));
+check('Der Fotobeleg wird im Blatt ausgewiesen und erklärt',
+  /Fotobeleg/.test(blatt) && /statt technischer Bestätigung/.test(blatt));
+check('KRITISCH: „kein Ereignis gemeldet" steht auch im Blatt, nicht ein fehlender Abschnitt',
+  /kein Ereignis gemeldet/.test(blatt));
+// Der Beleg trägt absichtlich einen Namen. Er darf im Blatt nicht auftauchen.
+check('KRITISCH: KEIN Personenname im Blatt — auch wenn die Antwort einen trägt (OP-423)',
+  !/Nachnamenstest/.test(blatt) && !/Vorname/.test(blatt));
+// ENT-322 gilt unverändert: Der Weg gehört ins Portal, wo der Kunde ihn
+// ausdrücklich aufruft — nicht auf ein Blatt, das er beiläufig mitbekommt.
+check('KRITISCH: KEINE Karte im Blatt (ENT-322 bleibt)',
+  !/Weg während der Runde/.test(blatt)
+  && await page.evaluate(() => !document.querySelector('#blatt .weg-karte, #blatt iframe')));
+// Das Blatt entsteht in einem eigenen Behälter, nicht als Abzug der Tafel.
+check('KRITISCH: das Blatt steht ausserhalb des Bildes, aber nicht auf display:none',
+  await page.evaluate(() => {
+    const h = document.getElementById('blattHuelle');
+    return getComputedStyle(h).display !== 'none'
+        && h.getBoundingClientRect().right < 0
+        && document.getElementById('blatt').getBoundingClientRect().height > 100;
+  }));
+
+// Der Briefkopf wird EINMAL geholt, nicht bei jedem Blatt.
+calls = [];
+const dl2 = page.waitForEvent('download', { timeout: 40000 }).catch(() => null);
+await klick('[data-pdf="12"]');
+await dl2;
+check('KRITISCH: der Briefkopf wird nur einmal geholt, nicht bei jedem PDF',
+  !calls.some(c => c.path.includes('portal_briefkopf')));
+
 await page.screenshot({ path: `${OUT}/portal-08-detail-handy.png` });
 
 // Erst alles zuklappen, damit die naechste Zusage bei null anfaengt.
