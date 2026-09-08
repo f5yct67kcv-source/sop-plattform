@@ -10,7 +10,41 @@
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <meta name="theme-color" content="#161B27">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<!-- ══ ENT-477: "black" statt "black-translucent" ═══════════════════
+     Die eine Zeile, um die es nach drei Anläufen geht (ENT-429, ENT-439,
+     ENT-475 -- alle drei deployt, alle drei wirkungslos oder schlimmer).
+
+     Mit "black-translucent" läuft die Kopfzeile unter die Uhr, und iOS
+     gibt der App im Vollbild einen Bereich, der auf nicht blätternden
+     Ansichten um die Höhe der Statusleiste (59 Punkte) ZU KURZ ist. Die
+     Reiterleiste stand darum sichtbar über der Bildschirmkante -- aber
+     nur auf "Heute" und "Wächter", nicht auf "Plan".
+
+     Warum es keinen Weg über CSS gab, und das ist der Befund, der die
+     Sache entschieden hat: Der fehlende Streifen ist NICHT BEMALBAR. Was
+     unterhalb des Bereichs liegt, gehört nicht zur Seite; iOS schneidet
+     dort ab. ENT-475 hat den Versatz erstmals richtig gemessen (59) und
+     die Leiste auch wirklich verschoben -- sichtbar blieb nur der Teil
+     oberhalb der Kante, die Beschriftungen lagen darunter und waren weg.
+     Zurückgerechnet aus den Bildschirmfotos, beide Oberkanten auf den
+     Punkt: "Heute" 755, "Plan" 814. Die Zahl war nie das Problem.
+
+     Mit "black" beginnt der Bereich der App UNTER der Statusleiste, und
+     iOS malt dort seinen eigenen schwarzen Balken. Damit entsteht der
+     Streifen gar nicht erst. Der Preis ist genau dieser Balken: Die
+     Kopfzeile (--shell: #16181D) reicht nicht mehr bis unter die Uhr.
+     Bei einer ohnehin fast schwarzen Kopfzeile ist der Unterschied
+     klein; entschieden hat das der Projektinhaber.
+
+     viewport-fit=cover BLEIBT: Es sorgt weiterhin dafür, dass der Inhalt
+     unten bis an die Kante reicht und env(safe-area-inset-bottom) den
+     Home-Balken freihält. Betroffen ist nur der obere Rand.
+
+     env(safe-area-inset-top) wird damit 0. Jede Regel, die ihn addiert
+     (.kopf, .app.ohne-kopf .inhalt, .ptr), rechnet unverändert weiter --
+     sie hält dann eben nichts mehr frei, weil nichts mehr freizuhalten
+     ist. -->
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="CUPI 24">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <!-- Eigenes Manifest (ENT-424), nicht das von index.html: Dort steht
@@ -2725,6 +2759,12 @@ function allesLaden() {
 // Punkte): Die Leiste endete 59 px ueber der Kante -- genau die Hoehe der
 // Statusleiste. Die App laeuft dort vom Startbildschirm aus im Vollbild
 // (apple-mobile-web-app-capable + black-translucent + viewport-fit=cover);
+// -- black-translucent ist seit ENT-477 weg, siehe der Kopf der Datei.
+// Damit ist der ganze Sockel GEGENSTANDSLOS: Er misst dann ueberall 0.
+// Er bleibt vorerst stehen, weil ENT-477 bewusst NUR die eine Zeile
+// aendert -- eine Sache pro Deploy, die Lehre aus dem Zwischenfall vom
+// 08.09. Ausgebaut wird er, sobald am Geraet bestaetigt ist, dass der
+// Streifen weg ist.
 // der Bildschirmbereich, an dem "position: fixed; bottom: 0" haengt, ist
 // dabei um die Statusleiste kuerzer als das, was man sieht. Sobald die
 // Seite scrollt, rechnet iOS neu -- daher der Unterschied zwischen den
