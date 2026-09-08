@@ -308,5 +308,84 @@ pruef('Ein nicht erfasstes Beitragsjahr liefert null statt der Vorjahressaetze',
 pruef('Der Anteil rechnet aus dem Regelwerk korrekt: 5,30 % von 291.60 sind 15.45',
     lohn_anteil(29160, $sv['an_bp']) === 1545);
 
+// ── ALV: Merkblatt 2.08, Stand 1. Januar 2025 ────────────────────────────
+//
+// Nachgerechnet werden die Beispiele DES MERKBLATTS, nicht selbst
+// ausgedachte. Ein selbst gewaehltes Beispiel prueft nur, ob der Code tut,
+// was ich beim Schreiben dachte; das Merkblattbeispiel prueft, ob er tut,
+// was der Bund vorschreibt.
+$alv = lohn_alv('2025-06-30');
+pruef('ALV 2025 ist erfasst und nennt seine Quelle',
+    $alv !== null && str_contains($alv['quelle'], '2.08') && str_contains($alv['quelle'], '2025'));
+pruef('Ziff. 1: Gesamtsatz 2,2 %, Arbeitnehmeranteil die Haelfte davon',
+    $alv['total_bp'] === 220 && $alv['an_bp'] === 110
+    && $alv['an_bp'] * 2 === $alv['total_bp']);
+pruef('Ziff. 1: Jahreshoechstbetrag 148 200 Franken',
+    $alv['hoechstbetrag_jahr_rappen'] === 14820000);
+// KRITISCH: Oberhalb der Grenze faellt seit 2023 GAR NICHTS mehr an. Stuende
+// hier versehentlich ein Satz, zoege das Werkzeug von hohen Loehnen einen
+// Beitrag ab, den es nicht mehr gibt.
+pruef('Ziff. 1: oberhalb der Grenze kein zweiter Satz mehr (seit 2023)',
+    $alv['ueber_grenze_bp'] === 0);
+
+// Ziff. 2 als Gegenprobe ueber beide Regelwerke hinweg: Das Merkblatt nennt
+// 12,8 % fuer AHV, IV, EO UND ALV zusammen. Unsere beiden Quellen muessen
+// sich zu genau diesem Wert addieren -- sonst widerspricht eine der anderen.
+pruef('Ziff. 2: AHV/IV/EO 10,6 % plus ALV 2,2 % ergeben die genannten 12,8 %',
+    LOHN_SV[2026]['total_bp'] + $alv['total_bp'] === 1280);
+
+// Ziff. 4, das durchgerechnete Beispiel: 15. April bis 29. Dezember.
+pruef('Ziff. 4: 15. April bis 29. Dezember sind 255 angerechnete Tage',
+    lohn_alv_tage('2025-04-15', '2025-12-29') === 255);
+// Gegenprobe zur Zaehlweise: taggenau waeren es 259. Wer Kalendertage
+// nimmt, bekommt eine hoehere Grenze und zieht zu lange ALV ab.
+pruef('Die 30-Tage-Zaehlung ist nicht die Kalendertagzaehlung',
+    lohn_alv_tage('2025-04-15', '2025-12-29')
+    !== (int)((new DateTime('2025-12-29'))->diff(new DateTime('2025-04-15'))->days) + 1);
+pruef('Ziff. 4: der unterjaehrige Hoechstbetrag betraegt 104 975 Franken',
+    lohn_alv_hoechstbetrag('2025-04-15', '2025-12-29', $alv) === 10497500);
+pruef('Ziff. 4: auf den darueber liegenden Lohnanteil entfallen 11 225 Franken',
+    11620000 - lohn_alv_hoechstbetrag('2025-04-15', '2025-12-29', $alv) === 1122500);
+pruef('Ziff. 4: 12,8 % von 104 975 sind 13 436.80',
+    lohn_anteil(10497500, 1280) === 1343680);
+pruef('Ziff. 4: 10,6 % von 11 225 sind 1 189.85',
+    lohn_anteil(1122500, 1060) === 118985);
+pruef('Ziff. 4: die Beitraege zusammen ergeben 14 626.65',
+    lohn_anteil(10497500, 1280) + lohn_anteil(1122500, 1060) === 1462665);
+// KRITISCH und zugleich der Beleg fuer die 5-Rappen-Rundung: Die Haelfte von
+// 14 626.65 ist exakt 7 313.325. Das Merkblatt weist 7 313.35 aus. Auf
+// Rappen gerundet waeren es 7 313.33 -- der Wert des Merkblatts ist nur mit
+// Rundung auf 5 Rappen erreichbar.
+pruef('Ziff. 4: die Haelfte von 14 626.65 ergibt auf 5 Rappen die 7 313.35 des Merkblatts',
+    lohn_fuenfrappen(1462665 / 2) === 731335);
+pruef('Rappenrundung wuerde den Merkblattwert VERFEHLEN (7 313.33)',
+    lohn_rappen(1462665 / 2) === 731333 && lohn_rappen(1462665 / 2) !== 731335);
+
+// Ziff. 5: die Monatsgrenze der laufenden Abrechnung.
+pruef('Ziff. 5: der provisorische Monatshoechstbetrag ist ein Zwoelftel, also 12 350',
+    lohn_alv_monatsgrenze($alv) === 1235000 && 1235000 * 12 === 14820000);
+
+// Ziff. 2: ein volles Jahr ergibt genau den Jahresbetrag, nicht mehr.
+pruef('Ein volles Jahr ergibt genau den Jahreshoechstbetrag',
+    lohn_alv_hoechstbetrag('2025-01-01', '2025-12-31', $alv) === 14820000);
+pruef('Ein Zeitraum ueber zwoelf Monate hinaus hebt die Jahresgrenze nicht an',
+    lohn_alv_hoechstbetrag('2025-01-01', '2026-06-30', $alv) === 14820000);
+pruef('Ein Monat innerhalb desselben Kalendermonats zaehlt taggenau bis 30',
+    lohn_alv_tage('2025-04-15', '2025-04-20') === 6
+    && lohn_alv_tage('2025-04-01', '2025-04-30') === 30
+    && lohn_alv_tage('2025-01-01', '2025-01-31') === 30);
+pruef('Ein umgekehrter Zeitraum ergibt null statt einer geratenen Zahl',
+    lohn_alv_tage('2025-12-29', '2025-04-15') === null);
+
+// KRITISCH, gleiche Familie wie bei LOHN_SV: Das ALV-Merkblatt liegt nur im
+// Stand 2025 vor. Fuer 2026 darf NICHT stillschweigend derselbe Satz gelten
+// -- eine veraltete Grenze produziert weiterhin plausible Betraege.
+pruef('Ein nicht erfasstes ALV-Jahr liefert null statt des Vorjahressatzes',
+    lohn_alv('2026-07-15') === null && lohn_alv('2024-07-15') === null);
+pruef('Der ALV-Jahrgang traegt seine Quelle mit Stand und Ziffern',
+    count(array_filter(LOHN_ALV, fn($j) => trim($j['quelle'] ?? '') !== '')) === count(LOHN_ALV));
+pruef('Der Hoechstbetrag gilt je Arbeitsverhaeltnis, nicht je Person (Ziff. 1)',
+    LOHN_ALV_JE_ARBEITSVERHAELTNIS === true);
+
 echo $ok . " Pruefungen bestanden\n";
 if ($bad) { echo count($bad) . " FEHLGESCHLAGEN:\n - " . implode("\n - ", $bad) . "\n"; exit(1); }

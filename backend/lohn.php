@@ -396,6 +396,126 @@ function lohn_sv(string $stichtag): ?array
     return LOHN_SV[(int)substr($stichtag, 0, 4)] ?? null;
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+// BUNDESRECHT: die Arbeitslosenversicherung (ENT-451, Etappe 4).
+//
+// EIGENES Regelwerk statt zusaetzlicher Felder in LOHN_SV, aus einem
+// nachpruefbaren Grund: Die beiden Merkblaetter haben VERSCHIEDENE STAENDE.
+// AHV, IV und EO liegen als "Stand am 1. Januar 2026" vor, die ALV nur als
+// "Stand am 1. Januar 2025". Beide in denselben Jahrgang zu schreiben hiesse,
+// den aelteren Wert stillschweigend als den neueren auszugeben.
+//
+// Darum ist LOHN_ALV nach dem Jahr gekeyt, fuer das das Merkblatt GILT.
+// Fehlt ein Jahr, liefert lohn_alv() null und der Aufrufer sperrt mit Namen
+// und Fundstelle -- er rechnet NICHT mit dem Vorjahressatz weiter. Eine
+// veraltete ALV-Grenze faellt sonst nirgends auf: Sie produziert weiterhin
+// plausible Betraege, nur die falschen.
+const LOHN_ALV = [
+    2025 => [
+        'quelle' => 'Merkblatt 2.08 "Beitraege an die Arbeitslosenversicherung", '
+                  . 'Stand am 1. Januar 2025 (Ausgabe November 2024), Ziffern 1 bis 5',
+        // Ziff. 1: "Bis zu einem jaehrlichen Hoechstbetrag von 148 200 Franken
+        // betraegt der Beitragssatz an die ALV 2,2 % des massgebenden
+        // Jahreslohnes." Arbeitgebende und Arbeitnehmende tragen je die Haelfte.
+        'total_bp' => 220,
+        'an_bp'    => 110,
+        'hoechstbetrag_jahr_rappen' => 14820000,
+        // Ziff. 1: "Seit dem 1. Januar 2023 sind auf Lohnanteile, die diesen
+        // Betrag uebersteigen, keine ALV-Beitraege mehr zu entrichten."
+        // Oberhalb der Grenze gibt es KEINEN zweiten Satz -- der frueher
+        // erhobene Solidaritaetsbeitrag ist weg. Das war eine der offenen
+        // Fragen aus OP-465 und ist damit beantwortet.
+        'ueber_grenze_bp' => 0,
+        // Ziff. 3: Der unterjaehrige Hoechstbetrag entsteht ueber einen
+        // TAGESSATZ von Jahresbetrag geteilt durch 360, mit 30 angerechneten
+        // Tagen je Monat -- Samstage und Sonntage eingeschlossen. Nicht ueber
+        // Kalendertage: Wer durch 365 teilt, bekommt eine andere Grenze.
+        'tage_jahr'  => 360,
+        'tage_monat' => 30,
+    ],
+];
+
+// Welches ALV-Regelwerk gilt am Stichtag? Siehe den Kommentar oben: null
+// heisst "fuer dieses Jahr nicht erfasst", nicht "beitragsfrei".
+function lohn_alv(string $stichtag): ?array
+{
+    if (strlen($stichtag) < 4) { return null; }
+    return LOHN_ALV[(int)substr($stichtag, 0, 4)] ?? null;
+}
+
+// Merkblatt 2.08 Ziff. 1, woertlich: "Dieser Hoechstbetrag gilt fuer jedes
+// einzelne Arbeitsverhaeltnis."
+//
+// DAS ENTLASTET DAS DATENMODELL, und zwar an der Stelle, an der ich einen
+// Umbau befuerchtet hatte: Der Hoechstbetrag ist KEINE personenbezogene
+// Jahresgrenze ueber alle Arbeitgeber hinweg. Wer im selben Jahr anderswo
+// gearbeitet hat, bringt dort bezahlte Loehne NICHT mit -- das Werkzeug muss
+// sie also weder erfragen noch fuehren. Zu summieren ist ausschliesslich,
+// was in DIESEM Arbeitsverhaeltnis gezahlt wurde.
+const LOHN_ALV_JE_ARBEITSVERHAELTNIS = true;
+
+// Angerechnete Beschaeftigungstage nach Merkblatt 2.08 Ziff. 3 und 4.
+//
+// Die Regel ist nicht "Kalendertage", sondern 30 Tage je Monat. Das Beispiel
+// in Ziff. 4 rechnet den 15. April bis 29. Dezember als 255 Tage: 16 Tage im
+// April, sieben volle Monate zu 30 Tagen, 29 Tage im Dezember. Taggenau
+// waeren es 259 -- und der Hoechstbetrag entsprechend hoeher.
+//
+// Ein Eintritt am 31. wird wie der 30. gerechnet; ein Monat hat in dieser
+// Zaehlung nie mehr als 30 angerechnete Tage.
+function lohn_alv_tage(string $von, string $bis): ?int
+{
+    if (strlen($von) < 10 || strlen($bis) < 10 || $bis < $von) { return null; }
+    $vj = (int)substr($von, 0, 4); $vm = (int)substr($von, 5, 2); $vt = (int)substr($von, 8, 2);
+    $bj = (int)substr($bis, 0, 4); $bm = (int)substr($bis, 5, 2); $bt = (int)substr($bis, 8, 2);
+    if ($vt > 30) { $vt = 30; }
+    if ($bt > 30) { $bt = 30; }
+    $monate = ($bj - $vj) * 12 + ($bm - $vm);
+    if ($monate === 0) { return max(0, $bt - $vt + 1); }
+    return (30 - $vt + 1) + ($monate - 1) * 30 + $bt;
+}
+
+// Unterjaehriger Hoechstbetrag nach Ziff. 3: Jahresbetrag geteilt durch 360,
+// mal die angerechneten Tage. Nie mehr als der Jahresbetrag -- ein Zeitraum
+// ueber zwoelf Monate hinaus hebt die Jahresgrenze nicht an (Ziff. 2).
+function lohn_alv_hoechstbetrag(string $von, string $bis, array $alv): ?int
+{
+    $tage = lohn_alv_tage($von, $bis);
+    if ($tage === null) { return null; }
+    $jahr = (int)$alv['hoechstbetrag_jahr_rappen'];
+    return min($jahr, lohn_rappen($jahr * $tage / (int)$alv['tage_jahr']));
+}
+
+// Merkblatt 2.08 Ziff. 5: "Der provisorische monatliche Hoechstbetrag wird
+// bei der monatlichen Abrechnung als ein Zwoelftel des jaehrlichen
+// Hoechstbetrags festgelegt."
+//
+// Das beantwortet die Frage, die ich fuer datenmodell-relevant gehalten
+// hatte: Die MONATLICHE Abrechnung braucht KEINEN mitlaufenden Jahresstand.
+// Sie wendet die Zwoelftelgrenze an; der Ausgleich geschieht nach Ziff. 6
+// "spaetestens am Jahresende oder bei Dienstaustritt" in einer eigenen
+// Schlussabrechnung. Der Jahresstand wird also erst dort gebraucht, nicht
+// in jedem Lauf.
+function lohn_alv_monatsgrenze(array $alv): int
+{
+    return lohn_rappen((int)$alv['hoechstbetrag_jahr_rappen'] / 12);
+}
+
+// Rundung auf 5 Rappen -- BELEGT, nicht angenommen.
+//
+// Merkblatt 2.08 Ziff. 4 weist die Haelfte von 14 626.65 als 7 313.35 aus.
+// Exakt sind es 7 313.325; auf Rappen gerundet ergaebe das 7 313.33. Nur die
+// Rundung auf 5 Rappen trifft den Wert des Merkblatts.
+//
+// WO sie angewandt wird, ist damit ausdruecklich NICHT entschieden. Die Frage
+// nach der Rundung des Auszahlungsbetrags steht als OP-465 beim
+// Projektinhaber. Diese Funktion stellt die Rundung bereit; sie wendet sie
+// von sich aus an keiner Stelle an.
+function lohn_fuenfrappen(float $rappen): int
+{
+    return lohn_rappen($rappen / 5) * 5;
+}
+
 // Merkblatt 2.01 Ziff. 1: "Erwerbstaetige Personen sind ab dem 1. Januar
 // nach dem 17. Geburtstag beitragspflichtig."
 //
