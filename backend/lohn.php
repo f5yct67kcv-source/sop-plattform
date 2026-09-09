@@ -583,6 +583,86 @@ function lohn_uvg(string $stichtag): ?array
     return lohn_regelwerk(LOHN_UVG, $stichtag);
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+// WAS IST FEST, WAS IST VARIABEL? (ENT-451, Etappe 4)
+//
+// Diese Funktion beantwortet genau eine Frage, und zwar fuer die Anzeige:
+// Welche Rechengrundlagen stehen fest, weil sie aus einem Merkblatt des
+// Bundes stammen -- und fuer welche Jahre sind sie erfasst?
+//
+// SIE RECHNET NICHTS. Der Lauf fragt weiter lohn_sv(), lohn_alv() und
+// lohn_uvg() einzeln; wuerde hier gerechnet, gaebe es zwei Wege zu
+// derselben Zahl und einer davon liefe irgendwann auseinander.
+//
+// WARUM DAS GEBRAUCHT WIRD: Bis hierher stand nirgends auf dem Bildschirm,
+// welche Zahl woher kommt. Der Betrieb sah eine Liste erfasster Saetze und
+// musste raten, ob die AHV dazugehoert. Sie gehoert nicht dazu -- sie steht
+// im Code, weil sie fuer alle gleich ist. Umgekehrt kann der NBU-Satz
+// nirgends im Code stehen: Ihn setzt der Versicherer je Betrieb.
+//
+// Der 'fehlt_ab'-Wert ist der eigentliche Zweck. Ein Merkblatt gilt fuer
+// eine ABGESCHLOSSENE Liste von Jahren; laeuft sie aus, sperrt der Lauf ab
+// dem 1. Januar. Das soll man im September vorher sehen und nicht am
+// Neujahrsmorgen.
+function lohn_bundesgrundlagen(string $stichtag): array
+{
+    $jahr = strlen($stichtag) >= 4 ? (int)substr($stichtag, 0, 4) : 0;
+
+    $bau = function (string $sl, string $bez, array $werk, string $traegt,
+                     callable $satzText) use ($jahr, $stichtag): array {
+        $gilt = lohn_regelwerk($werk, $stichtag);
+        // Alle Jahre, die irgendein Jahrgang dieses Werks abdeckt.
+        $jahre = [];
+        foreach ($werk as $eintrag) {
+            foreach (($eintrag['gilt_fuer'] ?? []) as $j) { $jahre[] = (int)$j; }
+        }
+        sort($jahre);
+        $jahre = array_values(array_unique($jahre));
+        // Ab welchem Jahr ist nichts mehr erfasst? Nur vorwaerts gesucht --
+        // ein Loch in der Vergangenheit ist eine andere Aussage und wuerde
+        // hier faelschlich wie das Auslaufen aussehen.
+        $fehltAb = null;
+        if ($jahre) {
+            $j = max($jahr, $jahre[0]);
+            while (in_array($j, $jahre, true)) { $j++; }
+            $fehltAb = $j;
+        }
+        return [
+            'schluessel' => $sl,
+            'bezeichnung' => $bez,
+            'traegt' => $traegt,
+            'erfasst' => $gilt !== null,
+            'satz_text' => $gilt !== null ? $satzText($gilt) : null,
+            'quelle' => $gilt['quelle'] ?? null,
+            'jahre' => $jahre,
+            'fehlt_ab' => $fehltAb,
+        ];
+    };
+
+    return [
+        $bau('ahv', 'AHV-, IV- und EO-Beitrag', LOHN_SV, 'je zur Haelfte',
+            fn (array $r) => lohn_bp_text((int)$r['an_bp']) . ' vom AHV-pflichtigen Lohn'),
+        $bau('alv', 'ALV-Beitrag', LOHN_ALV, 'je zur Haelfte',
+            fn (array $r) => lohn_bp_text((int)$r['an_bp']) . ' bis '
+                . number_format($r['hoechstbetrag_jahr_rappen'] / 100, 0, '.', "'")
+                . ' Franken im Jahr; darueber kein Beitrag'),
+        $bau('uvg', 'Unfallversicherung — Hoechstbetrag und NBU-Schwelle', LOHN_UVG,
+            'Berufsunfall Arbeitgeber, Nichtberufsunfall Arbeitnehmer',
+            fn (array $r) => number_format($r['hoechstbetrag_jahr_rappen'] / 100, 0, '.', "'")
+                . ' Franken im Jahr, '
+                . number_format($r['hoechstbetrag_tag_rappen'] / 100, 0, '.', "'")
+                . ' Franken im Tag; NBU erst ab '
+                . (int)$r['nbu_schwelle_std_woche'] . ' Wochenstunden'),
+    ];
+}
+
+// Basispunkte als Prozenttext. Eine Stelle, damit 530 nicht an drei Orten
+// verschieden formatiert wird.
+function lohn_bp_text(int $bp): string
+{
+    return rtrim(rtrim(number_format($bp / 100, 2, '.', ''), '0'), '.') . ' %';
+}
+
 // Wer traegt welche Praemie -- Merkblatt 6.05 Ziff. 5.
 //
 //   "Sie tragen als Arbeitgeberin oder Arbeitgeber die Praemien fuer die

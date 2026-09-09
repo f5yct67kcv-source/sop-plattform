@@ -627,5 +627,45 @@ pruef('Deckung schlaegt "pruefen" -- ein sicheres Ja braucht keine Handpruefung'
                             12 => lohn_nbu_ermittlung([20.0,20.0], $uvg, 0)], $uvg)['stand']
         === LOHN_NBU_VERSICHERT);
 
+// ── Was fest steht und was der Betrieb setzt (ENT-451, Etappe 4) ────────
+//
+// lohn_bundesgrundlagen() beantwortet fuer die Anzeige: Welche Grundlagen
+// stehen fest, und fuer welche Jahre sind sie erfasst? Sie RECHNET nicht --
+// geprueft wird darum ihre Aussage, nicht ein Betrag.
+$bg2026 = [];
+foreach (lohn_bundesgrundlagen('2026-06-30') as $g) { $bg2026[$g['schluessel']] = $g; }
+pruef('Alle drei Bundesgrundlagen werden gemeldet',
+    count($bg2026) === 3 && isset($bg2026['ahv'], $bg2026['alv'], $bg2026['uvg']));
+pruef('Fuer 2026 sind alle drei erfasst und nennen ihr Merkblatt',
+    $bg2026['ahv']['erfasst'] && $bg2026['alv']['erfasst'] && $bg2026['uvg']['erfasst']
+    && str_contains($bg2026['ahv']['quelle'], '2.01')
+    && str_contains($bg2026['alv']['quelle'], '2.08')
+    && str_contains($bg2026['uvg']['quelle'], '6.05'));
+pruef('Der AHV-Satz erscheint als Arbeitnehmeranteil, nicht als Gesamtsatz',
+    str_contains($bg2026['ahv']['satz_text'], '5.3 %')
+    && !str_contains($bg2026['ahv']['satz_text'], '10.6'));
+pruef('Die ALV nennt ihre Obergrenze, das UVG seine NBU-Schwelle',
+    str_contains($bg2026['alv']['satz_text'], "148'200")
+    && str_contains($bg2026['uvg']['satz_text'], '8 Wochenstunden'));
+
+// KRITISCH: Das Auslaufen muss VORHER sichtbar sein. Ein Merkblatt gilt
+// fuer eine abgeschlossene Liste von Jahren; laeuft sie aus, sperrt jeder
+// Lauf ab dem 1. Januar. Wer das erst am Neujahrsmorgen erfaehrt, steht
+// mit einem gesperrten Lohnlauf da.
+pruef('KRITISCH: schon 2026 wird gemeldet, ab wann nichts mehr erfasst ist',
+    $bg2026['ahv']['fehlt_ab'] === 2027 && $bg2026['alv']['fehlt_ab'] === 2027);
+$bg2027 = [];
+foreach (lohn_bundesgrundlagen('2027-01-31') as $g) { $bg2027[$g['schluessel']] = $g; }
+pruef('KRITISCH: fuer ein nicht erfasstes Jahr gilt "nicht erfasst", kein Rueckfall aufs Vorjahr',
+    !$bg2027['ahv']['erfasst'] && $bg2027['ahv']['satz_text'] === null
+    && $bg2027['alv']['satz_text'] === null);
+pruef('Die abgedeckten Jahre werden genannt -- "unbekannt" ist nicht "keine"',
+    $bg2026['alv']['jahre'] === [2025, 2026] && $bg2026['ahv']['jahre'] === [2026]);
+
+// Prozenttext: 530 Basispunkte sind 5.3 %, nicht 5.30 % und nicht 530 %.
+pruef('Basispunkte werden ohne nachlaufende Nullen als Prozent geschrieben',
+    lohn_bp_text(530) === '5.3 %' && lohn_bp_text(110) === '1.1 %'
+    && lohn_bp_text(1060) === '10.6 %' && lohn_bp_text(160) === '1.6 %');
+
 echo $ok . " Pruefungen bestanden\n";
 if ($bad) { echo count($bad) . " FEHLGESCHLAGEN:\n - " . implode("\n - ", $bad) . "\n"; exit(1); }

@@ -626,5 +626,34 @@ pruef('Mit dem Merkmal entsteht sie und sperrt -- Etappe 5, nicht stiller Nullab
 pruef('Und dann gibt es folgerichtig auch keinen Auszahlungsbetrag',
     $zq['auszahlung']['betrag_rappen'] === null);
 
+// ── AHV und ALV stehen im Regelwerk, nicht in lohn_abzug ────────────────
+//
+// KRITISCH, und bis 2026-09-09 falsch: Der Katalog von lohn_abzuege.php bot
+// 'ahv' und 'alv' zur Erfassung an, gelesen wurden sie dort nie. Ein
+// eingetragener Satz war tote Zahl -- die Warnung "noch nicht erfasst"
+// verschwand, die Rechnung blieb gleich. Das ist die gefaehrlichere
+// Schwester von "unbekannt sieht aus wie keine": ERFASST SIEHT AUS WIE
+// WIRKSAM.
+//
+// Geprueft wird das VERHALTEN, nicht der Katalog: Ein absichtlich falscher
+// AHV-Satz in lohn_abzug darf den Betrag nicht bewegen. Eine Pruefung, die
+// nur nachsieht, ob 'ahv' im Katalog fehlt, bliebe gruen, wenn jemand ihn
+// wieder eintraegt UND gleichzeitig auslesen laesst.
+$ahvVorher = $zv['ahv']['betrag_rappen'];
+pruef('Der AHV-Abzug kommt aus dem Merkblatt: 5,30 % von 291.60 sind 15.45',
+    $ahvVorher === -1545);
+$pdo->exec("INSERT INTO lohn_abzug VALUES (20,'ahv','AHV','2020-01-01',NULL,9900,NULL,NULL,'erfunden')");
+$pdo->exec("INSERT INTO lohn_abzug VALUES (21,'alv','ALV','2020-01-01',NULL,9900,NULL,NULL,'erfunden')");
+$nachher = lohnlauf_abzuege($pdo, ['mitarbeiter_id' => $mkw] + $refKopf, '2026-07-31',
+    ['stand' => LOHN_NBU_VERSICHERT]);
+$zn = []; foreach ($nachher['zeilen'] as $z) { $zn[$z['schluessel']] = $z; }
+pruef('KRITISCH: ein in lohn_abzug erfasster AHV-Satz aendert den Abzug NICHT',
+    $zn['ahv']['betrag_rappen'] === $ahvVorher);
+pruef('KRITISCH: dasselbe fuer die ALV -- 99 % im Satz bleiben wirkungslos',
+    $zn['alv']['betrag_rappen'] === $zv['alv']['betrag_rappen']);
+pruef('Und der Hinweis nennt weiterhin das Merkblatt, nicht die erfasste Quelle',
+    str_contains((string)$zn['ahv']['hinweis'], 'Merkblatt 2.01')
+    && !str_contains((string)$zn['ahv']['hinweis'], 'erfunden'));
+
 echo $ok . " Pruefungen bestanden\n";
 if ($bad) { echo count($bad) . " FEHLGESCHLAGEN:\n - " . implode("\n - ", $bad) . "\n"; exit(1); }

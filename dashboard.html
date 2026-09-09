@@ -413,6 +413,7 @@ select.inp { padding-right: 30px; background-image: linear-gradient(45deg, trans
    auffallen, bevor gespeichert wird (ENT-111). Darum die Warnfarbe und nicht
    die des Fehlers, die ein "geht nicht" verspricht. */
 .msg-warn { font-size: 12.5px; color: var(--warn); background: var(--warn-soft); border-radius: var(--r-xs); padding: 8px 11px; margin: 12px 0 0; line-height: 1.5; }
+.msg-ok { font-size: 12.5px; color: var(--pos); background: var(--pos-soft); border-radius: var(--r-xs); padding: 8px 11px; margin: 12px 0 0; line-height: 1.5; }
 
 /* ══════════════════════════════════════════ SHELL */
 .shell { display: none; min-height: 100vh; }
@@ -6226,7 +6227,9 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
           <button class="btn btn-primary btn-sm" id="lsNeuKnopf" onclick="lohnSatzOeffnen(null)">Satz erfassen</button>
         </div>
         <div id="lsFehlend"></div>
+        <div id="lsBundesrecht"></div>
         <div id="lsListe"></div>
+        <div id="lsWirkungslos"></div>
         <div id="lsRegelwerk"></div>
       </section>
 
@@ -8986,9 +8989,14 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
           Hälfte trägt.</div></div>
       <div class="feld"><label for="lsFix">Oder fester Betrag in Franken</label>
         <input class="inp" id="lsFix" placeholder="statt eines Prozentsatzes"></div>
-      <div class="feld"><label for="lsHoechst">Höchstlohn in Franken</label>
-        <input class="inp" id="lsHoechst" placeholder="leer = keine Obergrenze">
-        <div class="zone-note">Für den UVG-Höchstlohn. Über diesem Jahresbetrag wird nichts mehr abgezogen.</div></div>
+      <!-- KEIN Feld "Höchstlohn" mehr (entfernt 2026-09-09). Es stand hier
+           mit dem Versprechen "über diesem Jahresbetrag wird nichts mehr
+           abgezogen" und hielt es nicht: hoechstlohn_rappen wurde
+           gespeichert, angezeigt und von keiner Rechnung gelesen. Die
+           UVG-Obergrenze kommt aus LOHN_UVG (Merkblatt 6.05 Ziff. 5), die
+           der ALV aus LOHN_ALV -- beide je Jahr, nicht je Betrieb. Wer hier
+           eine tiefere Grenze eintrug, bekam sie nie angewendet.
+           Dieselbe Falle wie beim AHV-Satz: erfasst sieht aus wie wirksam. -->
       <div class="feld"><label for="lsQuelle">Quelle</label>
         <input class="inp" id="lsQuelle" placeholder="z. B. Beitragsverfügung Ausgleichskasse 2026">
         <div class="zone-note">Erforderlich. Woher stammt dieser Satz?</div></div>
@@ -18676,7 +18684,7 @@ function lohnVorschauZeichnen() {
   // jemand einen zweiten anlegt -- und der Knopf verschwindet.
   const bestehend = (d.bestehend || [])[0];
   $('llHinweis').innerHTML = bestehend
-    ? `<div class="hinweis-warn" style="margin-bottom:14px;padding:12px 14px;border-radius:8px">
+    ? `<div class="msg-warn" style="margin:0 0 14px">
          <b>Für diesen Zeitraum besteht bereits ein Lauf.</b>
          <div class="zone-note" style="margin:4px 0 0">Er muss storniert werden, bevor ein neuer
            entsteht — zwei Läufe über denselben Monat wären zwei Wahrheiten.</div>
@@ -19081,9 +19089,12 @@ function lohnSaetzeLaden() {
   $('lsListe').innerHTML = '<div class="zone-note" style="padding:20px 4px">Lade …</div>';
   api('lohn_abzuege.php').then(({ ok, status, data }) => {
     if (!ok) {
+      // ALLE Bloecke leeren, nicht nur die alten drei: Ein stehen
+      // gebliebener Regelwerk-Block neben einer Fehlermeldung sagt
+      // "das hier gilt noch", und das weiss niemand.
       $('lsListe').innerHTML = lohnLeer(lohnLeerArt(status, data), data?.message);
-      $('lsFehlend').innerHTML = '';
-      $('lsRegelwerk').innerHTML = '';
+      ['lsFehlend', 'lsBundesrecht', 'lsWirkungslos', 'lsRegelwerk']
+        .forEach(id => { $(id).innerHTML = ''; });
       return;
     }
     lsDaten = data;
@@ -19091,38 +19102,137 @@ function lohnSaetzeLaden() {
   });
 }
 
+// Die Seite beantwortet EINE Frage, und danach ist sie gegliedert: Wer legt
+// diesen Wert fest? Darum drei Blöcke statt einer Liste.
+//
+//   1. Bundesrecht -- gilt für jeden Betrieb der Schweiz gleich, steht
+//      versioniert im Code und lässt sich hier nicht ändern.
+//   2. Betrieblich -- Versicherer, Pensionskasse, Police. Muss erfasst
+//      werden, und was fehlt, steht als eigene Zeile da.
+//   3. GAV -- abgeleitet aus dem Vertragswerk.
+//
+// WARUM DIE FEHLENDEN ALS ZEILE UND NICHT NUR ALS WARNUNG OBEN: Eine Liste
+// der erfassten Sätze mit einem Banner darüber liest sich als "hier ist,
+// was da ist". Eine Tabelle mit drei Zeilen, von denen zwei „fehlt“ sagen,
+// liest sich als "hier ist, was gebraucht wird". Nur die zweite Fassung
+// zeigt eine unvollständige Aufstellung als unvollständig.
 function lohnSaetzeZeichnen() {
   const liste = lsDaten.abzuege || [];
-  // Ein fehlender Satz ist NICHT "kein Abzug". Er wird namentlich benannt,
-  // bevor die Liste kommt -- sonst sieht eine unvollstaendige Aufstellung
-  // aus wie eine vollstaendige.
+  const katalog = lsDaten.katalog || {};
+  const woher = lsDaten.woher || {};
   const fehlt = lsDaten.fehlend || [];
-  $('lsFehlend').innerHTML = fehlt.length
-    ? `<div class="hinweis-warn" style="margin-bottom:14px;padding:12px 14px;border-radius:8px">
-         <b>${fehlt.length} von ${Object.keys(lsDaten.katalog || {}).length} Abzügen sind noch nicht erfasst:</b>
-         ${fehlt.map(f => (lsDaten.katalog || {})[f] || f).join(' · ')}
-         <div class="zone-note" style="margin:6px 0 0">Solange ein Satz fehlt, wird für ihn nicht gerechnet — nicht mit null.
+  const jahr = lsDaten.jahr || new Date().getFullYear();
+
+  // ── Kopf: ein Satz, der sagt, woran es steht.
+  const bg = lsDaten.bundesgrundlagen || [];
+  const bgFehlt = bg.filter(g => !g.erfasst);
+  const teile = [];
+  if (fehlt.length) {
+    teile.push(`<b>${fehlt.length} von ${Object.keys(katalog).length} betrieblichen Sätzen fehlen.</b>`);
+  }
+  if (bgFehlt.length) {
+    teile.push(`<b>Für ${jahr} fehlt das Regelwerk zu ${bgFehlt.map(g => g.schluessel.toUpperCase()).join(', ')}.</b>`);
+  }
+  $('lsFehlend').innerHTML = teile.length
+    ? `<div class="msg-warn" style="margin:0 0 16px">
+         ${teile.join(' ')}
+         <div class="zone-note" style="margin:6px 0 0">Solange eine Grundlage fehlt, wird für sie
+         nicht gerechnet — nicht mit null. Der Lohnlauf sperrt und nennt sie beim Namen.
          Das ist der Unterschied zwischen „kein Abzug“ und „Abzug unbekannt“.</div>
        </div>`
-    : '';
-  if (!liste.length) {
-    $('lsListe').innerHTML = lohnLeer('leer',
-      'Noch kein Abzugssatz erfasst. AHV, ALV, NBU, KTG und BVG werden einmalig eingetragen — mit Angabe der Quelle.');
-  } else {
-    const zeilen = liste.map(a => `<tr>
-      <td><b>${a.bezeichnung}</b><div class="zone-note" style="margin:2px 0 0">${a.schluessel}</div></td>
-      <td>${a.gueltig_ab}${a.gueltig_bis ? ' bis ' + a.gueltig_bis : '<span class="zone-note"> — offen</span>'}</td>
-      <td style="text-align:right">${a.satz_bp !== null ? lohnPz(a.satz_bp) : ''}${a.fix_rappen !== null ? lohnFr(a.fix_rappen) + ' CHF' : ''}</td>
-      <td style="text-align:right">${a.hoechstlohn_rappen !== null ? lohnFr(a.hoechstlohn_rappen) : '<span class="zone-note">keine</span>'}</td>
-      <td>${a.quelle || ''}</td>
+    : `<div class="msg-ok" style="margin:0 0 16px">
+         <b>Alle Rechengrundlagen für ${jahr} sind erfasst.</b>
+         <div class="zone-note" style="margin:6px 0 0">Das heisst nicht, dass die Beträge geprüft sind —
+         nur, dass keiner fehlt.</div>
+       </div>`;
+
+  // ── Block 1: Bundesrecht. Nicht änderbar, darum ohne Knöpfe.
+  const bgZeilen = bg.map(g => {
+    const marke = g.erfasst
+      ? `<span class="chip chip-p">belegt für ${jahr}</span>`
+      : `<span class="chip chip-x">für ${jahr} nicht erfasst</span>`;
+    // Das Auslaufen ist die eigentliche Nachricht dieses Blocks: Ein
+    // Merkblatt gilt für eine abgeschlossene Liste von Jahren. Läuft sie
+    // aus, sperrt jeder Lauf ab dem 1. Januar -- das soll man vorher sehen.
+    // ZEITFORM NACH LAGE: Ist das Jahr schon erreicht, sperrt der Lauf
+    // JETZT. Der Satz "sperrt ab dem 1. Januar 2027" im Jahr 2027 liest
+    // sich als künftiges Risiko und lässt eine bestehende Sperre wie eine
+    // Vorwarnung aussehen -- dieselbe Familie wie „unbekannt sieht aus wie
+    // keine“.
+    const auslauf = !g.fehlt_ab ? ''
+      : g.fehlt_ab > jahr
+        ? `<div class="zone-note" style="margin:3px 0 0">Erfasst für ${g.jahre.join(', ')} —
+             <b>ab ${g.fehlt_ab} nicht mehr.</b> Ohne Nachtrag sperrt der Lauf ab dem
+             1. Januar ${g.fehlt_ab}.</div>`
+        : `<div class="zone-note" style="margin:3px 0 0">Erfasst für ${g.jahre.join(', ')} —
+             <b>für ${jahr} nicht.</b> Der Lohnlauf sperrt, bis das Merkblatt nachgetragen ist.</div>`;
+    return `<tr>
+      <td><b>${g.bezeichnung}</b>
+        <div class="zone-note" style="margin:2px 0 0">${g.quelle || 'Für dieses Jahr ist kein Merkblatt erfasst.'}</div>
+        ${auslauf}</td>
+      <td style="white-space:nowrap">${g.satz_text || '<span class="zone-note">—</span>'}</td>
+      <td style="text-align:right;white-space:nowrap">${marke}</td>
+    </tr>`;
+  }).join('');
+  $('lsBundesrecht').innerHTML = `
+    <h3 style="margin:0 0 6px">Was fest steht — für jeden Betrieb gleich</h3>
+    <p class="zone-note" style="margin:0 0 12px">Diese Sätze legt der Bund fest. Sie werden
+      <b>nicht hier erfasst</b>, sondern versioniert im Werkzeug geführt, mit dem Merkblatt als Quelle.
+      Ein Eingabefeld dafür wäre eine Falle: Der eingetippte Wert stünde auf dem Bildschirm, gerechnet
+      würde weiter mit dem hinterlegten.</p>
+    <div style="overflow-x:auto"><table class="tbl">
+      <thead><tr><th>Grundlage</th><th>Satz</th><th style="text-align:right">Stand</th></tr></thead>
+      <tbody>${bgZeilen}</tbody></table></div>`;
+
+  // ── Block 2: betriebliche Sätze. Jeder Schlüssel bekommt eine Zeile,
+  //    auch der noch nicht erfasste -- sonst fehlt er auch auf dem Schirm.
+  const zeilen = Object.keys(katalog).map(sl => {
+    const eintraege = liste.filter(a => a.schluessel === sl);
+    if (!eintraege.length) {
+      return `<tr>
+        <td><b>${katalog[sl]}</b>
+          <div class="zone-note" style="margin:2px 0 0">${woher[sl] || ''}</div></td>
+        <td colspan="3"><span class="chip chip-x">fehlt</span></td>
+        <td style="text-align:right">${lohnSchreiben()
+          ? `<button class="btn btn-quiet btn-sm" onclick="lohnSatzOeffnen(null, '${sl}')">Erfassen</button>` : ''}</td>
+      </tr>`;
+    }
+    return eintraege.map((a, i) => `<tr>
+      <td>${i === 0 ? `<b>${katalog[sl]}</b>
+          <div class="zone-note" style="margin:2px 0 0">${woher[sl] || ''}</div>`
+        : '<span class="zone-note">— frühere Fassung</span>'}</td>
+      <td style="white-space:nowrap">${a.gueltig_ab}${a.gueltig_bis ? ' bis ' + a.gueltig_bis
+        : '<span class="zone-note"> — offen</span>'}</td>
+      <td style="text-align:right;white-space:nowrap">${a.satz_bp !== null ? lohnPz(a.satz_bp) : ''}${
+        a.fix_rappen !== null ? lohnFr(a.fix_rappen) + ' CHF' : ''}</td>
+      <td>${a.quelle || '<span class="chip chip-w">ohne Quelle</span>'}</td>
       <td style="text-align:right">${lohnSchreiben()
         ? `<button class="btn btn-quiet btn-sm" onclick="lohnSatzOeffnen(${a.id})">Ändern</button>` : ''}</td>
     </tr>`).join('');
-    $('lsListe').innerHTML = `<div style="overflow-x:auto"><table class="tbl">
+  }).join('');
+  $('lsListe').innerHTML = `
+    <h3 style="margin:26px 0 6px">Was Ihr Betrieb festlegt — muss erfasst werden</h3>
+    <p class="zone-note" style="margin:0 0 12px">Diese drei Werte stehen in keinem Gesetz und in keinem
+      Merkblatt: Sie stammen aus der Police des Versicherers, der Krankentaggeld-Versicherung und der
+      Meldung der Pensionskasse. Ohne sie rechnet der Lohnlauf nicht.</p>
+    <div style="overflow-x:auto"><table class="tbl">
       <thead><tr><th>Abzug</th><th>Gültig</th><th style="text-align:right">Satz</th>
-      <th style="text-align:right">Höchstlohn</th><th>Quelle</th><th></th></tr></thead>
+      <th>Quelle</th><th></th></tr></thead>
       <tbody>${zeilen}</tbody></table></div>`;
-  }
+
+  // ── Zeilen, die nicht mehr gelesen werden. Nur sichtbar, wenn es sie
+  //    gibt -- ein leerer Block wäre eine Behauptung über nichts.
+  const tot = lsDaten.wirkungslos || [];
+  $('lsWirkungslos').innerHTML = tot.length
+    ? `<div class="msg-warn" style="margin:20px 0 0">
+         <b>${tot.length} erfasste${tot.length === 1 ? 'r Satz wird' : ' Sätze werden'} nicht mehr gelesen:</b>
+         ${tot.map(t => t.schluessel.toUpperCase() + ' ab ' + t.gueltig_ab).join(' · ')}
+         <div class="zone-note" style="margin:6px 0 0">AHV und ALV wurden früher hier erfasst. Sie stehen
+         heute im Regelwerk oben und werden von dort gerechnet. Diese Zeilen wirken nicht mehr —
+         sie bleiben sichtbar, damit niemand annimmt, sein Eintrag sei noch in Kraft.</div>
+       </div>`
+    : '';
+
   // Was aus dem GAV kommt, wird nicht eingetippt -- und steht darum
   // getrennt darunter. Wer die beiden vermischt, kann spaeter nicht mehr
   // sagen, welche Zahl aus dem Vertrag stammt und welche jemand gesetzt hat.
@@ -19150,18 +19260,20 @@ function lohnSaetzeZeichnen() {
     </tbody></table>`;
 }
 
-function lohnSatzOeffnen(id) {
+function lohnSatzOeffnen(id, vorauswahl) {
   const a = id ? (lsDaten.abzuege || []).find(x => x.id === id) : null;
   $('lsDlgTitel').textContent = a ? 'Satz ändern' : 'Satz erfassen';
   $('lsId').value = a ? a.id : '';
   $('lsSchluessel').innerHTML = Object.entries(lsDaten.katalog || {})
     .map(([k, t]) => `<option value="${k}">${t}</option>`).join('');
-  $('lsSchluessel').value = a ? a.schluessel : 'ahv';
+  // Erste Wahl des Katalogs statt eines fest getippten Schlüssels: 'ahv'
+  // stand hier und gibt es nicht mehr -- die Auswahl wäre leer geblieben.
+  $('lsSchluessel').value = a ? a.schluessel
+    : (vorauswahl || Object.keys(lsDaten.katalog || {})[0] || '');
   $('lsAb').value = a ? a.gueltig_ab : '';
   $('lsBis').value = a && a.gueltig_bis ? a.gueltig_bis : '';
   $('lsSatz').value = a && a.satz_bp !== null ? (a.satz_bp / 100).toFixed(2) : '';
   $('lsFix').value = a && a.fix_rappen !== null ? (a.fix_rappen / 100).toFixed(2) : '';
-  $('lsHoechst').value = a && a.hoechstlohn_rappen !== null ? (a.hoechstlohn_rappen / 100).toFixed(2) : '';
   $('lsQuelle').value = a ? (a.quelle || '') : '';
   $('lsLoeschKnopf').style.display = a ? '' : 'none';
   $('lsFehler').style.display = 'none';
@@ -19176,7 +19288,6 @@ function lohnSatzSpeichern() {
     gueltig_bis: $('lsBis').value,
     satz_prozent: $('lsSatz').value.trim(),
     fix_franken: $('lsFix').value.trim(),
-    hoechstlohn_franken: $('lsHoechst').value.trim(),
     quelle: $('lsQuelle').value.trim(),
   };
   api('lohn_abzuege.php', { method: 'POST', body }).then(({ ok, data }) => {
@@ -19186,6 +19297,7 @@ function lohnSatzSpeichern() {
       return;
     }
     lsDaten.abzuege = data.abzuege; lsDaten.fehlend = data.fehlend;
+    lsDaten.wirkungslos = data.wirkungslos || [];
     closeDlg('dlgLohnsatz');
     lohnSaetzeZeichnen();
     toast('Satz gespeichert.');
@@ -19202,6 +19314,7 @@ function lohnSatzLoeschen() {
       return;
     }
     lsDaten.abzuege = data.abzuege; lsDaten.fehlend = data.fehlend;
+    lsDaten.wirkungslos = data.wirkungslos || [];
     closeDlg('dlgLohnsatz');
     lohnSaetzeZeichnen();
     toast('Satz gelöscht.');
@@ -19283,7 +19396,7 @@ function lohnAkteZeichnen() {
   // Die Mindestlohnwarnung steht OBEN und nicht bei der Ansatzzeile: Wer
   // unter Tarif zahlt, soll es sehen, bevor er scrollt.
   const w = lohnAkte.warnung;
-  const warnung = w ? `<div class="hinweis-warn" style="margin-bottom:14px;padding:12px 14px;border-radius:8px">
+  const warnung = w ? `<div class="msg-warn" style="margin:0 0 14px">
       <b>Der Ansatz liegt unter dem GAV-Mindestlohn.</b>
       <div style="margin:4px 0 0">${esc(w.text)}</div>
       <div class="zone-note" style="margin:6px 0 0">Das ist eine Warnung, keine Sperre — Anhang 1

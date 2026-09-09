@@ -121,21 +121,45 @@ const LOHNARTEN = {
   arten: { stundensatz: 'Betrag je Stunde', prozent: 'Prozentsatz', netto: 'Weder Lohn noch Abzug' },
 };
 
-// Zwei von fuenf Saetzen erfasst -- die uebrigen drei muessen namentlich
-// erscheinen, nicht stillschweigend fehlen.
+// Die Antwort deckt bewusst ALLE VIER Zustaende ab, die die Seite
+// unterscheiden muss -- eine Antwort, in der alles vorhanden ist, prueft
+// die Markierungen nicht:
+//   * erfasst und wirksam            -> NBU
+//   * gebraucht, aber nicht erfasst  -> KTG und BVG
+//   * frueher erfasst, heute tot     -> die AHV-Zeile (wirkungslos)
+//   * Bundesrecht ohne Merkblatt     -> die ALV im Jahr 2027
 const ABZUEGE = {
   status: 'ok',
+  jahr: 2027,
   abzuege: [
-    { id: 1, schluessel: 'ahv', bezeichnung: 'AHV/IV/EO — Arbeitnehmeranteil',
+    { id: 1, schluessel: 'nbu', bezeichnung: 'NBU — Arbeitnehmeranteil',
+      gueltig_ab: '2026-01-01', gueltig_bis: null, satz_bp: 160, fix_rappen: null,
+      hoechstlohn_rappen: null, quelle: 'Praemienrechnung des Versicherers' },
+    // Eine Zeile aus der Zeit, als AHV noch hier erfasst wurde. Sie darf
+    // NICHT stillschweigend verschwinden und nicht wie ein gueltiger Satz
+    // aussehen.
+    { id: 9, schluessel: 'ahv', bezeichnung: 'AHV/IV/EO — Arbeitnehmeranteil',
       gueltig_ab: '2026-01-01', gueltig_bis: null, satz_bp: 530, fix_rappen: null,
-      hoechstlohn_rappen: null, quelle: 'Beitragsverfuegung Ausgleichskasse' },
-    { id: 2, schluessel: 'alv', bezeichnung: 'ALV — Arbeitnehmeranteil',
-      gueltig_ab: '2026-01-01', gueltig_bis: null, satz_bp: 110, fix_rappen: null,
-      hoechstlohn_rappen: null, quelle: 'Beitragsverfuegung Ausgleichskasse' },
+      hoechstlohn_rappen: null, quelle: 'alte Erfassung' },
   ],
-  katalog: { ahv: 'AHV/IV/EO', alv: 'ALV', nbu: 'NBU (Nichtberufsunfall)',
-    ktg: 'Krankentaggeld', bvg: 'BVG' },
-  fehlend: ['nbu', 'ktg', 'bvg'],
+  katalog: { nbu: 'NBU (Nichtberufsunfall) — Arbeitnehmeranteil',
+    ktg: 'Krankentaggeld — Arbeitnehmeranteil', bvg: 'BVG — Vorgabe' },
+  woher: { nbu: 'Praemiensatz des UVG-Versicherers',
+    ktg: 'Krankentaggeld-Police', bvg: 'Meldung der Pensionskasse' },
+  fehlend: ['ktg', 'bvg'],
+  wirkungslos: [
+    { id: 9, schluessel: 'ahv', gueltig_ab: '2026-01-01' },
+  ],
+  bundesgrundlagen: [
+    { schluessel: 'ahv', bezeichnung: 'AHV-, IV- und EO-Beitrag', traegt: 'je zur Haelfte',
+      erfasst: true, satz_text: '5.3 % vom AHV-pflichtigen Lohn',
+      quelle: 'Merkblatt 2.01, Stand am 1. Januar 2026', jahre: [2026, 2027], fehlt_ab: 2028 },
+    { schluessel: 'alv', bezeichnung: 'ALV-Beitrag', traegt: 'je zur Haelfte',
+      erfasst: false, satz_text: null, quelle: null, jahre: [2025, 2026], fehlt_ab: 2027 },
+    { schluessel: 'uvg', bezeichnung: 'Unfallversicherung', traegt: 'NBU Arbeitnehmer',
+      erfasst: true, satz_text: "148'200 Franken im Jahr; NBU erst ab 8 Wochenstunden",
+      quelle: 'Merkblatt 6.05, Stand am 1. Januar 2025', jahre: [2025, 2026, 2027], fehlt_ab: 2028 },
+  ],
 };
 
 // Vorschau eines Lohnlaufs: eine gerechnete Person, eine gesperrte. Die
@@ -284,18 +308,91 @@ check('Der Grundlohn dagegen zaehlt in alle sechs -- die Spalten sagen also etwa
 check('KRITISCH: eine Lohnart ohne GAV-Artikel wird als "betrieblich" benannt, nicht als Luecke',
   /betrieblich/.test(laText));
 
-// ── 3. Abzugssaetze: fehlende werden namentlich benannt ──────────────────
+// ── 3. Saetze und Regelwerk: was fehlt, muss man SEHEN ───────────────────
+//
+// Die Seite trennt nach der einzigen Frage, die zaehlt: Wer legt den Wert
+// fest? Bundesrecht steht im Code, Betriebliches wird erfasst. Wer die
+// beiden vermischt, baut eine Falle -- ein Eingabefeld fuer die AHV nimmt
+// den getippten Wert an, zeigt ihn und rechnet weiter mit dem hinterlegten.
 await page.evaluate(() => go('lohnsaetze'));
 await page.waitForTimeout(400);
 const lsText = (await page.textContent('#view-lohnsaetze')).replace(/\s+/g, ' ');
-check('KRITISCH: die drei noch nicht erfassten Abzuege stehen namentlich da',
-  /NBU/.test(lsText) && /Krankentaggeld/.test(lsText) && /BVG/.test(lsText));
+
+// Die betriebliche Seite: jeder gebrauchte Satz hat eine Zeile, auch der
+// fehlende. Eine Liste nur der vorhandenen liest sich als vollstaendig.
+const lsListe = (await page.textContent('#lsListe')).replace(/\s+/g, ' ');
+check('KRITISCH: die drei betrieblichen Saetze stehen alle da, auch die nicht erfassten',
+  /NBU/.test(lsListe) && /Krankentaggeld/.test(lsListe) && /BVG/.test(lsListe));
+check('KRITISCH: die nicht erfassten sind als "fehlt" markiert, nicht bloss abwesend',
+  (await page.locator('#lsListe .chip-x').count()) === 2);
+check('Der erfasste Satz erscheint mit Wert und Quelle',
+  /1.60 %/.test(lsListe) && /Praemienrechnung/.test(lsListe));
+check('Die Zahl der fehlenden steht im Verhaeltnis zur Gesamtzahl, nicht allein',
+  /2 von 3/.test(lsText));
 check('KRITISCH: und es steht dabei, dass fuer sie nicht gerechnet wird -- nicht mit null',
   /nicht gerechnet/.test(lsText) && /unbekannt/i.test(lsText));
-check('Die Zahl der fehlenden steht im Verhaeltnis zur Gesamtzahl, nicht allein',
-  /3 von 5/.test(lsText));
-check('Die erfassten Saetze erscheinen mit ihrer Quelle',
-  /5.30 %/.test(lsText) && /Ausgleichskasse/.test(lsText));
+
+// Die Bundesseite: belegt heisst belegt, mit Fundstelle.
+const lsBund = (await page.textContent('#lsBundesrecht')).replace(/\s+/g, ' ');
+check('Das Bundesrecht steht als eigener Block mit dem Merkblatt als Quelle',
+  /Merkblatt 2.01/.test(lsBund) && /Merkblatt 6.05/.test(lsBund));
+check('KRITISCH: eine belegte Grundlage ist als belegt markiert',
+  (await page.locator('#lsBundesrecht .chip-p').count()) === 2);
+check('KRITISCH: fehlt das Merkblatt fuers laufende Jahr, ist die Zeile rot markiert und benannt',
+  (await page.locator('#lsBundesrecht .chip-x').count()) === 1
+  && /ALV/.test(lsText) && /nicht erfasst/.test(lsBund));
+check('KRITISCH: das Auslaufen wird mit Jahr angekuendigt, nicht erst beim Sperren gemeldet',
+  /ab 2028 nicht mehr/i.test(lsBund) && /1. Januar 2028/.test(lsBund));
+// KRITISCH: Ist das Jahr schon da, sperrt der Lauf JETZT. Ein "sperrt ab
+// dem 1. Januar 2027" im Jahr 2027 macht aus einer bestehenden Sperre eine
+// Vorwarnung -- die ALV im Mock ist genau dieser Fall.
+check('KRITISCH: eine bereits bestehende Sperre wird nicht als kuenftige angekuendigt',
+  /sperrt, bis das Merkblatt nachgetragen ist/.test(lsBund)
+  && !/sperrt der Lauf ab dem 1. Januar 2027/.test(lsBund));
+
+// Die AHV darf hier NICHT erfassbar sein -- das ist der ganze Punkt der
+// Trennung. Geprueft wird die Auswahl im Dialog, nicht der Quelltext.
+const schluesselWerte = await page.evaluate(() => {
+  lohnSatzOeffnen(null);
+  return [...document.getElementById('lsSchluessel').options].map(o => o.value);
+});
+check('KRITISCH: AHV und ALV lassen sich hier gar nicht erst erfassen',
+  !schluesselWerte.includes('ahv') && !schluesselWerte.includes('alv')
+  && schluesselWerte.includes('nbu'));
+check('Die Vorauswahl im Dialog trifft einen Schluessel, den es gibt',
+  schluesselWerte.includes(await page.evaluate(() => document.getElementById('lsSchluessel').value)));
+// KRITISCH: Das Feld "Hoechstlohn" versprach "ueber diesem Jahresbetrag
+// wird nichts mehr abgezogen" und hielt es nicht -- hoechstlohn_rappen
+// wurde gespeichert und von keiner Rechnung gelesen. Dieselbe Falle wie
+// beim AHV-Satz. Geprueft wird der Dialog, nicht der Quelltext.
+const dlgFelder = await page.evaluate(() =>
+  [...document.querySelectorAll('#dlgLohnsatz input, #dlgLohnsatz select')].map(e => e.id));
+check('KRITISCH: kein Eingabefeld fuer eine Obergrenze, die nicht gerechnet wird',
+  !dlgFelder.includes('lsHoechst')
+  && !/Höchstlohn/.test(await page.textContent('#dlgLohnsatz')));
+await page.evaluate(() => closeDlg('dlgLohnsatz'));
+
+// Eine alte AHV-Zeile bleibt sichtbar und wird als wirkungslos benannt.
+// Stilles Loeschen waere schlimmer: Wer sie eingetragen hat, glaubte, sie
+// wirke -- und faende sie einfach nicht mehr.
+const lsTot = (await page.textContent('#lsWirkungslos')).replace(/\s+/g, ' ');
+check('KRITISCH: ein frueher erfasster AHV-Satz wird als "wird nicht mehr gelesen" benannt',
+  /nicht mehr gelesen/.test(lsTot) && /AHV/.test(lsTot));
+
+// GEMESSEN, NICHT NACHGELESEN: Die Warnung trug bis 2026-09-09 die Klasse
+// "hinweis-warn", die es im Stylesheet nie gab. Sie rendete als grauer
+// Fliesstext -- die Markierung stand im Quelltext und war auf dem Schirm
+// nicht zu sehen. Darum wird hier die tatsaechliche Flaeche gemessen.
+const warnFlaeche = await page.evaluate(() => {
+  const el = document.querySelector('#lsFehlend > div');
+  if (!el) { return null; }
+  const s = getComputedStyle(el);
+  return { bg: s.backgroundColor, farbe: s.color };
+});
+const durchsichtig = f => !f || f.bg === 'rgba(0, 0, 0, 0)' || f.bg === 'transparent';
+check('KRITISCH: die Warnung hat eine sichtbare Flaeche -- gemessen, nicht im Quelltext gesucht',
+  !durchsichtig(warnFlaeche));
+
 check('Was aus dem GAV kommt, steht getrennt und wird nicht als erfassbar ausgegeben',
   /Aus dem GAV/.test(lsText) && /Anhang 1/.test(lsText) && /Art. 6 Ziff. 2/.test(lsText));
 

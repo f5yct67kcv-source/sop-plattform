@@ -1918,11 +1918,16 @@ if (!$nurPruefen && hat_tabelle_jetzt($pdo, 'lohnart')) {
 
 // ── 1d. lohn_abzug bekommt BEWUSST keinen Startbestand (ENT-451).
 //
-// AHV-, ALV-, NBU-, KTG- und BVG-Saetze sind gesetzliche bzw. vertragliche
-// Werte, die jaehrlich aendern und nirgends im Projekt als Quelle erfasst
-// sind. Ein vorbelegter Satz saehe aus wie eine gepruefte Zahl und wuerde
-// weiterrechnen, wenn er veraltet -- ohne dass etwas kaputtginge. Er muss
-// darum einmal von Hand erfasst werden, mit Angabe der Quelle.
+// NBU-, KTG- und BVG-Saetze sind vertragliche Werte, die jaehrlich aendern
+// und nirgends im Projekt als Quelle erfasst sind. Ein vorbelegter Satz
+// saehe aus wie eine gepruefte Zahl und wuerde weiterrechnen, wenn er
+// veraltet -- ohne dass etwas kaputtginge. Er muss darum einmal von Hand
+// erfasst werden, mit Angabe der Quelle.
+//
+// AHV UND ALV STEHEN NICHT IN DIESER TABELLE (korrigiert 2026-09-09). Ihr
+// Satz gilt fuer jeden Betrieb gleich und lebt versioniert in LOHN_SV und
+// LOHN_ALV. Dieser Hinweis hat sie frueher mit aufgezaehlt und damit zu
+// einer Eingabe aufgefordert, die nichts bewirkt haette.
 //
 // Die Ausnahme ist der PaKo-Beitrag: Er steht woertlich im GAV (Art. 6
 // Ziff. 2, CHF 0.015 je Stunde bzw. CHF 2.50 pro Monat) und lebt darum als
@@ -1935,7 +1940,8 @@ if (hat_tabelle_jetzt($pdo, 'lohn_abzug')) {
     try {
         if ((int)$pdo->query('SELECT COUNT(*) FROM lohn_abzug')->fetchColumn() === 0) {
             $getan[] = 'Abzugssätze (lohn_abzug) sind noch nicht erfasst — '
-                     . 'AHV, ALV, NBU, KTG und BVG einmalig unter Lohn → Sätze eintragen';
+                     . 'NBU, KTG und BVG einmalig unter Lohn → Sätze und Regelwerk '
+                     . 'eintragen. AHV und ALV nicht: die stehen im Regelwerk.';
         }
     } catch (Throwable $e) {
         $fehler[] = 'Abzugssätze prüfen — ' . $e->getMessage();
