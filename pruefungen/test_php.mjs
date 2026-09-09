@@ -8,7 +8,7 @@
 // hochgegangen. Diese Suite schliesst genau diese Luecke.
 import { WURZEL, HIER, OUT, browserPfad } from './pfade.mjs';
 import { execFileSync } from 'child_process';
-import { readFileSync } from 'fs';
+import { readFileSync, readdirSync } from 'fs';
 import { dirname, resolve } from 'path';
 
 const ok = [], bad = [];
@@ -294,6 +294,34 @@ const ungesperrt = imWurzel.filter(n => !new RegExp('[(|]' + n + '[)|]').test(ht
 check('KRITISCH: alle Hilfsdateien im Web-Verzeichnis sind gegen direkten Abruf gesperrt',
   imWurzel.length > 0 && ungesperrt.length === 0);
 if (ungesperrt.length) { bad.push('nicht gesperrt: ' + ungesperrt.join(', ')); }
+
+// DIE KEHRSEITE, und sie hat 2026-09-09 im Livesystem zugeschlagen:
+// <FilesMatch> greift auf den DATEINAMEN, nicht auf den Pfad. Der Deploy
+// legt Hilfsdateien nach dist/ und Endpunkte nach dist/api/ -- traegt ein
+// ENDPUNKT denselben Namen wie eine gesperrte Hilfsdatei, sperrt die Regel
+// ihn mit. So war api/lohnlauf.php im Betrieb nicht erreichbar: Der
+// Webserver antwortete 403, BEVOR PHP startete. Im PHP war nichts zu
+// finden -- Rechte und Sitzung stimmten, der Bereich blieb leer.
+//
+// Geprueft wird die Kollision selbst, nicht ein Dateiname: Die Namensliste
+// kommt aus der echten FilesMatch-Zeile, die Endpunkte aus dem echten
+// Verzeichnis.
+const gesperrteNamen = ((ht.match(/<FilesMatch "\^\(([^)]*)\)\\\.php\$">/) || [])[1] || '').split('|');
+const endpunkte = readdirSync(`${WURZEL}/backend/api`)
+  .filter(f => f.endsWith('.php')).map(f => f.slice(0, -4));
+// GRUNDSTAND 2026-09-09, gleiche Haltung wie in test_datumsfest.mjs:
+// demo_anfrage.php gehoert zur Homepage und damit in einen fremden
+// Bereich. Nach CLAUDE.md wird das gemeldet, nicht heimlich repariert --
+// und eine dauerhaft rote Pruefung ist schlimmer als keine. Wer den
+// Endpunkt umbenennt, streicht ihn hier.
+const KOLLISION_BEKANNT = ['demo_anfrage'];
+const kollisionen = endpunkte.filter(n => gesperrteNamen.includes(n));
+check('KRITISCH: kein Endpunkt traegt den Namen einer gesperrten Hilfsdatei',
+  gesperrteNamen.length > 3
+  && kollisionen.filter(n => !KOLLISION_BEKANNT.includes(n)).length === 0);
+kollisionen.filter(n => KOLLISION_BEKANNT.includes(n)).forEach(n => {
+  console.log(`  ! api/${n}.php traegt einen gesperrten Namen — im Betrieb 403, fremder Bereich, gemeldet`);
+});
 
 check('Kein Einbetten in fremde Seiten (Clickjacking)',
   /X-Frame-Options *"DENY"/.test(ht) && /frame-ancestors 'none'/.test(ht));

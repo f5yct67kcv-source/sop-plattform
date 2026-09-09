@@ -170,7 +170,7 @@ check('KRITISCH: der Lohnlauf nimmt keine fertigen Stunden aus der Anfrage entge
 // Dieselbe Haltung an einer zweiten Stelle: Welchen Lauf ein neuer ersetzt,
 // ermittelt der Server aus dem Bestand -- nicht der Browser. Sonst stuende
 // in der Verkettung, was jemand behauptet, statt was gilt.
-const endpunkt = readFileSync(`${WURZEL}/backend/api/lohnlauf.php`, 'utf8');
+const endpunkt = readFileSync(`${WURZEL}/backend/api/lohnlaeufe.php`, 'utf8');
 check('KRITISCH: die Storno-Verkettung kommt aus der Datenbank, nicht aus der Anfrage',
   !/\$input\s*\[\s*['"]ersetzt_lauf_id/.test(endpunkt)
   && /status = 'storniert'/.test(endpunkt));
