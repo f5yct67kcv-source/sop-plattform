@@ -53,6 +53,20 @@ und eine Lücke bei den festgeschriebenen Schichten blieb produktiv wirksam.
   Fassung gleich sind.
 - **`test_datumsfest.mjs`** verhindert Prüfungen, die am Kalender hängen.
 
+## Was hier NICHT geprüft wird: Belastbarkeit
+
+Alle Suiten oben laufen gegen eine Handvoll Datensätze. Sie sagen, ob eine
+Regel gilt — nicht, ob sie bei 32 000 Rapporten und 6 Millionen
+Standortpunkten noch in vertretbarer Zeit gilt.
+
+Dafür gibt es [`last/`](last/README.md): ein Lasttest gegen den echten
+Quelltext mit einem vollen Jahrgang Daten. Er läuft **nicht** bei jedem
+Push mit — `alle.mjs` findet nur `test_*.mjs` direkt in diesem Ordner. Er
+wird gefahren, wenn eine Frage nach der Belastbarkeit ansteht.
+
+Der Befund des ersten Laufs (09.09.2026) steht in
+[`last/BEFUND-2026-09-09.md`](last/BEFUND-2026-09-09.md).
+
 ## Zwei Regeln beim Ergänzen
 
 1. **Nicht den Quelltext abschreiben.** Eine Prüfung, die nachsieht, ob ein

@@ -1,0 +1,8 @@
+# Die Arbeitskopie traegt die ersetzten Zugangsdaten der Testdatenbank --
+# sie gehoert nie ins Repository.
+arbeitskopie/
+php-server.log
+einrichtung.json
+runden.json
+ergebnis-*.json
+db-*.txt
