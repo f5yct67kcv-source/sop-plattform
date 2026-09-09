@@ -505,6 +505,63 @@ function ma_personalnummer_migrieren(PDO $pdo, array $akteur): array
     return $plan;
 }
 
+// ── AHV-Nummer (ENT-451, revidiert ENT-348) ──────────────────────────────
+// Die schweizerische Versichertennummer ist 13-stellig, beginnt mit dem
+// Laenderpraefix 756 und traegt an letzter Stelle eine EAN-13-Pruefziffer.
+// Geschrieben wird sie als 756.XXXX.XXXX.XX.
+//
+// Warum gerechnet und nicht nur die Laenge gezaehlt: Der haeufigste Fehler
+// ist eine vertauschte Ziffer, und die aendert die Laenge nicht. Die
+// Pruefziffer faengt genau das ab. Sie ist kein Beweis, dass die Nummer der
+// richtigen Person gehoert -- nur, dass sie in sich stimmt.
+//
+// Rueckgabe: normalisierte Nummer mit Punkten, oder null bei Unstimmigkeit.
+// Punkte, Leerzeichen und Bindestriche der Eingabe werden verworfen, damit
+// niemand an der Schreibweise scheitert.
+function ahv_nr_pruefen(string $roh): ?string
+{
+    $z = preg_replace('/\D/', '', $roh);
+    if (strlen($z) !== 13 || substr($z, 0, 3) !== '756') { return null; }
+    // EAN-13: Ziffern 1..12 abwechselnd mit 1 und 3 gewichtet, die
+    // Pruefziffer ergaenzt die Summe auf das naechste Vielfache von 10.
+    $summe = 0;
+    for ($i = 0; $i < 12; $i++) {
+        $summe += (int)$z[$i] * ($i % 2 === 0 ? 1 : 3);
+    }
+    if ((10 - $summe % 10) % 10 !== (int)$z[12]) { return null; }
+    return substr($z, 0, 3) . '.' . substr($z, 3, 4) . '.'
+         . substr($z, 7, 4) . '.' . substr($z, 11, 2);
+}
+
+// ── IBAN (ENT-451) ───────────────────────────────────────────────────────
+// Wohin der Lohn geht. Geprueft wird nach ISO 13616 (Modulo-97-Rest 1) --
+// aus demselben Grund wie bei der AHV-Nummer: Eine vertauschte Ziffer ist
+// die haeufigste Fehleingabe und aendert die Laenge nicht. Eine falsche
+// IBAN heisst, dass jemand seinen Lohn nicht bekommt.
+//
+// Bewusst KEINE Beschraenkung auf CH/LI: Wer im Grenzgebiet wohnt, hat
+// unter Umstaenden ein Konto im Ausland, und eine Sperre daraufhin waere
+// eine Annahme ueber die Belegschaft. Die Laenge wird je Land nicht
+// geprueft -- dafuer braeuchte es eine Laendertabelle, die veraltet.
+function iban_pruefen(string $roh): ?string
+{
+    $x = strtoupper(preg_replace('/\s/', '', $roh));
+    if (!preg_match('/^[A-Z]{2}[0-9]{2}[A-Z0-9]{10,30}$/', $x)) { return null; }
+    // Die ersten vier Zeichen ans Ende, Buchstaben zu Zahlen (A=10 .. Z=35),
+    // dann Rest bei Division durch 97. Stueckweise gerechnet, weil die Zahl
+    // sonst jede Ganzzahl sprengt.
+    $um = substr($x, 4) . substr($x, 0, 4);
+    $rest = 0;
+    for ($i = 0, $n = strlen($um); $i < $n; $i++) {
+        $c = $um[$i];
+        $wert = ctype_digit($c) ? $c : (string)(ord($c) - 55);
+        for ($j = 0, $m = strlen($wert); $j < $m; $j++) {
+            $rest = ($rest * 10 + (int)$wert[$j]) % 97;
+        }
+    }
+    return $rest === 1 ? $x : null;
+}
+
 // ── Eingabe lesen ────────────────────────────────────────────────────────
 // Gibt die Spaltenwerte zurueck, die geschrieben werden sollen, sowie eine
 // Liste von Beanstandungen. Nicht mitgeschickte Felder bleiben beim
@@ -523,10 +580,9 @@ function ma_eingabe_lesen(array $input, array $bestand = [], ?PDO $pdo = null): 
         // nicht mehr aendern (ENT-387) -- weder beim Anlegen (das setzt
         // mitarbeiter_create.php separat ueber ma_personalnummer_generieren())
         // noch beim Bearbeiten. Ein mitgeschickter Wert wird stillschweigend
-        // uebergangen statt einen Fehler zu werfen: Anders als bei ahv_nr
-        // (ENT-348, die nie erfasst werden soll) schickt ein gewoehnliches
-        // Formular hier den unveraenderten Bestandswert bei jedem Speichern
-        // mit -- ein Fehler dabei bräche jedes normale Speichern.
+        // uebergangen statt einen Fehler zu werfen: Ein gewoehnliches
+        // Formular schickt hier den unveraenderten Bestandswert bei jedem
+        // Speichern mit -- ein Fehler dabei bräche jedes normale Speichern.
         //
         // Diese Funktion kennt keine Rechte -- die eine Ausnahme (Verwaltung
         // darf von Hand korrigieren, ENT-393) lebt darum bewusst NICHT hier,
@@ -616,14 +672,29 @@ function ma_eingabe_lesen(array $input, array $bestand = [], ?PDO $pdo = null): 
         }
     }
 
-    // AHV-Nummer: wird bis auf Weiteres nicht erfasst (ENT-348). Datenminimierung
-    // statt Verschluesselung -- die Nummer liegt heute im Klartext in der
-    // Datenbank (OP-62) und wird fuer keine aktive Funktion gebraucht. Erst eine
-    // kuenftige Lohnbuchhaltung (Lohnausweise aus der Software) braucht sie
-    // wieder; bis dahin blockt dieser zentrale Einlesepunkt jeden Schreibweg --
-    // ein Verbot nur in der Oberflaeche liesse sich am Browser vorbei umgehen.
+    // AHV-Nummer: wird seit ENT-451 wieder erfasst -- ENT-348 hatte sie aus
+    // Datenminimierung ausgeschlossen und dabei ausdruecklich vermerkt, dass
+    // eine kuenftige Lohnbuchhaltung sie braucht. Dieser Fall ist mit dem
+    // Lohnbaustein eingetreten: Ohne AHV-Nummer keine
+    // Sozialversicherungsabrechnung und kein Lohnausweis.
+    //
+    // Sie bleibt in ma_vertrauliche_felder() -- erfasst heisst nicht frei
+    // sichtbar. Die Aufbewahrungsfrist bleibt als OP-61 offen, und die
+    // Klartext-Ablage als OP-62; beide werden durch diese Freigabe nicht
+    // beantwortet, nur dringlicher.
+    //
+    // GEPRUEFT wird sie, statt sie einfach durchzulassen: Eine falsch
+    // getippte AHV-Nummer wandert sonst in eine Meldung an die
+    // Ausgleichskasse und faellt dort erst Monate spaeter auf. Das Format
+    // ist eindeutig (13 Ziffern, Laenderpraefix 756, EAN-13-Pruefziffer) --
+    // es laesst sich rechnen, nicht nur behaupten.
     if (array_key_exists('ahv_nr', $spalten) && (string)$spalten['ahv_nr'] !== '') {
-        $fehler[] = 'AHV-Nummer: wird zurzeit nicht erfasst (ENT-348)';
+        $norm = ahv_nr_pruefen((string)$spalten['ahv_nr']);
+        if ($norm === null) {
+            $fehler[] = 'AHV-Nummer: erwartet wird 756.XXXX.XXXX.XX mit gültiger Prüfziffer';
+        } else {
+            $spalten['ahv_nr'] = $norm;
+        }
     }
 
     // Art. 10 Ziff. 4 GAV: "Mitarbeitende mit einem eidgenoessischen

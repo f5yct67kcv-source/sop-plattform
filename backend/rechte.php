@@ -150,6 +150,24 @@ function bereiche_katalog(): array
             'text'   => 'AHV-Nummer, Bewilligungen, Register-, Herkunfts- und Familienangaben.',
             'stufen' => [STUFE_LESEN, STUFE_SCHREIBEN],
         ],
+        // Lohn (ENT-451). EIGENER Bereich und ausdruecklich NICHT unter
+        // 'personal_vertraulich' mitgefuehrt: Ein Lohnansatz und eine
+        // AHV-Nummer sind verschiedene Vertraulichkeiten. Die Rolle
+        // "Personal" traegt 'personal_vertraulich' auf Schreiben und
+        // haette sonst schreibenden Zugriff auf alle Loehne, ohne dass das
+        // je entschieden worden waere.
+        //
+        // Das Freigeben eines Lohnlaufs haengt an der Stufe Schreiben --
+        // kein eigenes drittes Recht. Der Projektinhaber hat die Variante
+        // mit getrenntem Freigaberecht (Vier-Augen-Prinzip) ausdruecklich
+        // nicht gewaehlt; in einem Betrieb dieser Groesse staende am Ende
+        // beides bei derselben Person.
+        'lohn' => [
+            'gruppe' => 'Personal',
+            'titel'  => 'Lohn',
+            'text'   => 'Lohnansätze, Lohnarten, Abzugssätze, Zahlungsverbindungen und die Lohnläufe. Lesen zeigt sie, Schreiben ändert sie und gibt einen Lohnlauf frei.',
+            'stufen' => [STUFE_LESEN, STUFE_SCHREIBEN],
+        ],
         'abwesenheiten' => [
             'gruppe' => 'Personal',
             'titel'  => 'Abwesenheiten & Ferien',
@@ -387,6 +405,12 @@ function system_rollen(): array
                 'leistungen'           => STUFE_SCHREIBEN,
                 'personal'             => STUFE_SCHREIBEN,
                 'personal_vertraulich' => STUFE_SCHREIBEN,
+                // Der Lohn liegt beim Verwalter und BEWUSST nicht bei der
+                // Rolle "Personal" (ENT-451): Wer die Akte pflegt, muss
+                // darum nicht wissen, was jemand verdient. Derselbe Schnitt
+                // wie bei 'portal' -- eine Entscheidung ueber Zugang, nicht
+                // ueber Tagesgeschaeft.
+                'lohn'                 => STUFE_SCHREIBEN,
                 'abwesenheiten'        => STUFE_SCHREIBEN,
                 'mitteilungen'         => STUFE_SCHREIBEN,
                 'betrieb'              => STUFE_SCHREIBEN,

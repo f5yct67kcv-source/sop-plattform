@@ -16,6 +16,35 @@
 # 2. Die geaenderte Datei wie oben beschrieben erneut manuell bei Hostpoint
 #    eintragen (Explorer -> www/staging).
 # 3. Den neuen Hash unten in der passenden Zeile eintragen und committen.
-htaccess-hostpoint:f6655b8d3d7e1cc198678fc1066a71aff64e34e540554b7d54162dc23b04db05
+# ── OFFEN, Stand 2026-09-08 (ENT-451/OP-454 und der Merge von main) ──────
+# Der Hash unten gehoert zur ZUSAMMENGEFUEHRTEN Fassung von
+# htaccess-hostpoint. Er ist neu berechnet, weil nach dem Merge WEDER der
+# Hash dieses Branches NOCH der von main zur Datei passt -- beide Seiten
+# hatten je eigene Eintraege ergaenzt.
+#
+# Zwei Nachtraege bei Hostpoint stehen aus oder sind ungeklaert:
+#
+#  (a) lohn.php, gavzeit.php und lohnlauf.php (ENT-451). Der Hash wurde
+#      mitgezogen, BEVOR der manuelle Nachtrag erledigt war -- vom
+#      Projektinhaber am 2026-09-07 so entschieden, festgehalten als OP-454.
+#      Der Nachtrag STEHT WEITERHIN AUS.
+#
+#  (b) demo_anfrage.php, aus main uebernommen. Ob der Eintrag dort bereits
+#      manuell bei Hostpoint nachgetragen wurde, ist NICHT dokumentiert --
+#      die Fassung auf main traegt keinen Hinweis dazu. Ich habe es weder
+#      geprueft noch behaupte ich das eine oder andere; wer den Nachtrag
+#      macht, prueft diesen Eintrag mit.
+#
+# Was das heisst: Fuer diese Aenderungen haelt der Drift-Guard den
+# Staging-Deploy NICHT an. Production ist nicht betroffen -- dort laedt der
+# Deploy die .htaccess selbst hoch. In Staging schuetzt bis zum Nachtrag die
+# Basic-Auth-Schicht (ENT-384), nicht die FilesMatch-Sperre.
+#
+# Zu tun: die vollstaendige FilesMatch-Zeile bei Hostpoint eintragen
+# (Explorer -> www/staging -> Web-Einstellungen -> Passwortschutz, unterhalb
+# von #@__HCP_END__@#). Danach diesen Absatz loeschen -- er ist der einzige
+# Hinweis darauf, dass der Hash dem Nachtrag vorausgeeilt ist.
+
+htaccess-hostpoint:ec713b8db0345235ec6ca0556454db2f92f8d7ad13f1f7f1840734a1f85cd23e
 htaccess-staging-zusatz:7b6df04b9fd9decbeb68442a6080b3e39c384e31d59273e53f938549c8e26208
 robots-staging.txt:e120f27381f482e2de05b11355c7d1818e8266d282cec8cf04bc8b33916e7583

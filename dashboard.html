@@ -413,6 +413,7 @@ select.inp { padding-right: 30px; background-image: linear-gradient(45deg, trans
    auffallen, bevor gespeichert wird (ENT-111). Darum die Warnfarbe und nicht
    die des Fehlers, die ein "geht nicht" verspricht. */
 .msg-warn { font-size: 12.5px; color: var(--warn); background: var(--warn-soft); border-radius: var(--r-xs); padding: 8px 11px; margin: 12px 0 0; line-height: 1.5; }
+.msg-ok { font-size: 12.5px; color: var(--pos); background: var(--pos-soft); border-radius: var(--r-xs); padding: 8px 11px; margin: 12px 0 0; line-height: 1.5; }
 
 /* ══════════════════════════════════════════ SHELL */
 .shell { display: none; min-height: 100vh; }
@@ -4923,6 +4924,29 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
         </div>
       </div>
 
+      <!-- Lohn (ENT-451). Eigene Rubrik und ausdruecklich NICHT unter
+           "Auswertung": Dort wird gelesen, hier entsteht ein Dokument mit
+           Rechtswirkung. Auch nicht "Buchhaltung" -- der Name verspraeche
+           Debitoren, Kreditoren und Hauptbuch; Rechnungen und Offerten
+           liegen unter "Kunden", eine Finanzbuchhaltung gibt es nicht.
+           Ein Reiter, der mehr ankuendigt als dahintersteht, ist dieselbe
+           Fehlerfamilie wie "unbekannt sieht aus wie keine".
+           Die Lohnstammdaten JE PERSON stehen nicht hier, sondern in der
+           Personalakte -- zwei Formulare fuer dieselben Daten waeren zwei
+           Orte, an denen ein Feld fehlen kann. -->
+      <div class="nav-gruppe nur-desktop" id="navg-lohn">
+        <button class="nav-item nav-eltern" id="nav-lohn" title="Lohn" onclick="lohnNavKlick()">
+          <svg class="i" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/></svg>
+          <span class="lbl">Lohn</span>
+          <svg class="i chev" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="nav-kinder">
+          <button class="nav-kind" id="nav-lohn-laeufe" onclick="go('lohnlaeufe')">Lohnläufe</button>
+          <button class="nav-kind" id="nav-lohn-lohnarten" onclick="go('lohnarten')">Lohnarten</button>
+          <button class="nav-kind" id="nav-lohn-saetze" onclick="go('lohnsaetze')">Sätze und Regelwerk</button>
+        </div>
+      </div>
+
       <!-- Administration (ENT-056, Reihenfolge ENT-221). Die Mitarbeitenden
            sind hierher gezogen: Sie sind zwar auch Stammdaten, aber der
            Bereich verwaltet Personen und nicht Auftraggeber -- und er teilt
@@ -5688,6 +5712,10 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
             <button class="tab" id="mdtab-anstellung" onclick="mdGoTab('anstellung')">Anstellung</button>
             <button class="tab" id="mdtab-einsatz" onclick="mdGoTab('einsatz')">Einsatz</button>
             <button class="tab" id="mdtab-zugang" onclick="mdGoTab('zugang')">Zugang</button>
+            <!-- Lohn (ENT-451). Verborgen bis das Recht da ist, gleiches
+                 Muster wie der Verlauf-Reiter: Ein Reiter, der auf ein 403
+                 fuehrt, ist schlimmer als keiner. -->
+            <button class="tab" id="mdtab-lohn" onclick="mdGoTab('lohn')" style="display:none">Lohn</button>
             <button class="tab" id="mdtab-dienstplaene" onclick="mdGoTab('dienstplaene')">Dienstpläne</button>
             <button class="tab" id="mdtab-verlauf" onclick="mdGoTab('verlauf')" style="display:none">Verlauf</button>
             <div style="flex:1"></div>
@@ -5723,6 +5751,7 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
           <div class="md-tab" id="md-anstellung"><div id="mdBereich_anstellung"></div></div>
           <div class="md-tab" id="md-einsatz"><div id="mdBereich_einsatz"></div></div>
           <div class="md-tab" id="md-zugang"><div id="mdBereich_zugang"></div></div>
+          <div class="md-tab" id="md-lohn"><div id="mdBereich_lohn"></div></div>
           <!-- Verlauf: wer wann was geaendert hat (ENT-077). Nur lesend --
                ein Logbuch, aus dem sich Eintraege entfernen lassen, waere
                keines. -->
@@ -6268,6 +6297,71 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
         <div id="pnKopf"></div>
         <div id="pnListe"></div>
         <div id="pnHinweis"></div>
+      </section>
+
+      <!-- ══════════════════════ LOHNARTEN (ENT-451) ══════════════════════
+           Der Katalog ist eine Tabelle und kein Quelltext: Jede neue Zulage
+           waere sonst ein Deploy. Die sechs Kennzeichen sind der Kern der
+           Ansicht -- sie erklaeren, warum eine Position in einer
+           Bemessungsgrundlage auftaucht und in einer anderen nicht, und
+           machen die Abrechnung damit nachvollziehbar statt zur Blackbox
+           (Art. 12 Ziff. 5 GAV). -->
+      <!-- ══════════════════════ LOHNLÄUFE (ENT-451, Etappe 3) ═══════════
+           Die Vorschau rechnet, der gespeicherte Lauf wird gelesen. Zwei
+           verschiedene Wege, und das ist Absicht: Wäre es derselbe, würde
+           eine spätere Ansatz- oder Regeländerung abgeschlossene Monate
+           rückwirkend verändern.
+
+           Stunden und Franken stehen getrennt — „Einheiten nie vermischen“.
+           Und was gesperrt ist, steht mit Grund da, nicht als Null. -->
+      <section class="view" id="view-lohnlaeufe">
+        <div class="bar-tools">
+          <input class="inp" type="month" id="llMonat" style="width:auto" onchange="lohnVorschauLaden()" aria-label="Monat">
+          <button class="btn btn-quiet btn-sm" onclick="lohnVorschauLaden()">Vorschau rechnen</button>
+          <div class="sp" style="flex:1"></div>
+          <button class="btn btn-primary btn-sm" id="llErzeugen" onclick="lohnLaufErzeugen()" style="display:none">Lauf anlegen</button>
+        </div>
+        <div id="llHinweis"></div>
+        <div id="llVorschau"></div>
+        <!-- Die Abrechnung EINER Person, in einer eigenen Karte statt
+             aufgeklappt in der Liste. Gleicher Grund wie bei den Profilen
+             in Rollen & Berechtigungen: Zwanzig Positionen zwischen zwei
+             Personenzeilen liessen die Liste als Ganzes nicht mehr
+             ueberblicken -- und genau das ist ihr Zweck. -->
+        <div id="llAbrechnung"></div>
+        <h3 style="margin:26px 0 8px">Bisherige Läufe</h3>
+        <div id="llListe"></div>
+      </section>
+
+      <section class="view" id="view-lohnarten">
+        <div class="bar-tools">
+          <button class="btn btn-primary btn-sm" id="laNeuKnopf" onclick="lohnartOeffnen(null)">Lohnart erfassen</button>
+          <div class="sp" style="flex:1"></div>
+          <label class="check" style="font-size:12.5px"><input type="checkbox" id="laNurAktiv" checked onchange="lohnartenZeichnen()"> nur aktive</label>
+        </div>
+        <div id="laListe"></div>
+        <div id="laHinweis"></div>
+      </section>
+
+      <!-- ══════════════════════ SÄTZE UND REGELWERK (ENT-451) ════════════
+           Zwei Dinge nebeneinander, und der Unterschied ist wichtig:
+           OBEN die Abzugssaetze, die der Betrieb selbst erfasst (AHV, ALV,
+           NBU, KTG, BVG) -- gesetzliche und vertragliche Werte, die
+           jaehrlich aendern und nirgends im Projekt als Quelle stehen.
+           UNTEN das, was aus dem GAV kommt und darum nicht eingetippt wird:
+           Mindestloehne nach Anhang 1, Ferienentschaedigung nach Art. 20
+           Ziff. 2, PaKo-Beitrag nach Art. 6 Ziff. 2. Wer die beiden
+           vermischt, kann spaeter nicht mehr sagen, welche Zahl aus dem
+           Vertrag stammt und welche jemand gesetzt hat. -->
+      <section class="view" id="view-lohnsaetze">
+        <div class="bar-tools">
+          <button class="btn btn-primary btn-sm" id="lsNeuKnopf" onclick="lohnSatzOeffnen(null)">Satz erfassen</button>
+        </div>
+        <div id="lsFehlend"></div>
+        <div id="lsBundesrecht"></div>
+        <div id="lsListe"></div>
+        <div id="lsWirkungslos"></div>
+        <div id="lsRegelwerk"></div>
       </section>
 
       <!-- ══════════════════════ ABWESENHEITEN (ENT-255) ══════════════════
@@ -8764,6 +8858,289 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
   </div>
 </div>
 
+<!-- ══════════════════════ LOHNANSATZ JE PERSON (ENT-451) ══════════════════
+     Ein neuer Ansatz wird ZUSÄTZLICH erfasst, nie überschreibend: Eine
+     Lohnerhöhung darf abgeschlossene Abrechnungen nicht rückwirkend
+     verändern. Ein zweites Speichern zum selben Datum korrigiert die
+     bestehende Zeile — das ist die Tippfehlerkorrektur. -->
+<div class="dlg-scrim" id="dlgLohnAnsatz">
+  <div class="dlg">
+    <div class="dlg-hd">
+      <h2 id="lpaTitel">Lohnansatz erfassen</h2>
+      <p>Der Grundlohn <b>ohne</b> Ferienentschädigung — der Zuschlag nach Art. 20 Ziff. 2 kommt
+         obendrauf und wird aus dem Alter abgeleitet, nicht hier eingetragen.</p>
+    </div>
+    <div class="dlg-bd">
+      <input type="hidden" id="lpaId">
+      <div class="feld"><label for="lpaAb">Gültig ab</label>
+        <input class="inp" type="date" id="lpaAb"></div>
+      <div class="feld"><label for="lpaAnsatz">Ansatz</label>
+        <input class="inp" id="lpaAnsatz" placeholder="z. B. 25.00">
+        <div class="zone-note" id="lpaEinheit"></div></div>
+      <div class="feld"><label for="lpaMl13">Anteil 13. Monatslohn in Prozent</label>
+        <input class="inp" id="lpaMl13" placeholder="leer = kein 13. Monatslohn vereinbart">
+        <div class="zone-note">Keine GAV-Pflicht — der Vertrag kennt ihn nur in Art. 25 Ziff. 2 als
+          Bestandteil der BVG-Bemessung. Leer heisst „nicht vereinbart“, nicht „null Prozent“.</div></div>
+      <div class="feld">
+        <label class="check" style="min-height:24px"><input type="checkbox" id="lpaFerienLaufend"> Ferienlohn laufend auszahlen</label>
+        <div class="zone-note">Nach Art. 20 Ziff. 2 nur zulässig bei unregelmässiger Teilzeit oder
+          kurzen Einsätzen, wenn es <b>schriftlich im Vertrag</b> steht und in <b>jeder</b> Abrechnung
+          separat ausgewiesen wird. Ohne diesen Haken wird der Anspruch als Guthaben geführt und beim
+          Bezug ausbezahlt.</div></div>
+      <h3 style="margin:22px 0 4px">Zuschläge nach Art. 19</h3>
+      <p class="zone-note" style="margin:0 0 10px">Der GAV nennt je Zuschlag eine Monatspauschale
+        <b>oder</b> eine Stundenentschädigung und lässt offen, wer wählt (GAV-AUS-014). Erfasst wird
+        darum, was im Vertrag steht. Der Zuschlag entsteht aus dem <b>angeordneten</b> Einsatz, nicht
+        aus der Berechtigung in der Akte.</p>
+      <div class="feld"><label for="lpaZFach">Fachausweis (mind. 200.– / Monat oder 1.20 / Stunde)</label>
+        <div style="display:flex;gap:8px"><input class="inp" id="lpaZFach" placeholder="Betrag" style="flex:1">
+          <select class="inp" id="lpaZFachArt" style="width:auto"><option value="stunde">pro Stunde</option><option value="monat">pro Monat</option></select></div></div>
+      <div class="feld"><label for="lpaZHund">Diensthund (mind. 150.– / Monat oder 1.50 / Stunde)</label>
+        <div style="display:flex;gap:8px"><input class="inp" id="lpaZHund" placeholder="Betrag" style="flex:1">
+          <select class="inp" id="lpaZHundArt" style="width:auto"><option value="stunde">pro Stunde</option><option value="monat">pro Monat</option></select></div></div>
+      <div class="feld"><label for="lpaZWaffe">Schusswaffe (2.– / Stunde bzw. max. 150.– / Monat)</label>
+        <div style="display:flex;gap:8px"><input class="inp" id="lpaZWaffe" placeholder="Betrag" style="flex:1">
+          <select class="inp" id="lpaZWaffeArt" style="width:auto"><option value="stunde">pro Stunde</option><option value="monat">pro Monat</option></select></div></div>
+      <div class="feld"><label for="lpaBemerkung">Bemerkung</label>
+        <textarea class="inp" id="lpaBemerkung" rows="2"></textarea></div>
+      <p class="err" id="lpaFehler" style="display:none"></p>
+    </div>
+    <div class="dlg-ft">
+      <button class="btn btn-plain" onclick="closeDlg('dlgLohnAnsatz')">Abbrechen</button>
+      <button class="btn btn-quiet" id="lpaLoeschKnopf" onclick="lohnAkteLoeschen('ansatz', Number($('lpaId').value), 'dlgLohnAnsatz', 'lpaFehler')">Löschen</button>
+      <button class="btn btn-primary" onclick="lohnAnsatzSpeichern()">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════ ABZÜGE JE PERSON (ENT-451) ══════════════════════
+     Was hier NICHT steht: die Sätze. Die sind betriebsweit und stehen unter
+     Lohn → Sätze. Hier steht nur, WER wovon betroffen ist. -->
+<div class="dlg-scrim" id="dlgLohnAbzug">
+  <div class="dlg">
+    <div class="dlg-hd">
+      <h2 id="lpbTitel">Abzüge erfassen</h2>
+      <p>Wovon diese Person betroffen ist. Die <b>Sätze</b> gelten betriebsweit und stehen unter
+         Lohn → Sätze und Regelwerk.</p>
+    </div>
+    <div class="dlg-bd">
+      <input type="hidden" id="lpbId">
+      <div class="feld"><label for="lpbAb">Gültig ab</label>
+        <input class="inp" type="date" id="lpbAb"></div>
+      <!-- Die NBU-Unterstellung ist KEIN Haken mehr.
+           Bis Etappe 4 stand hier ein Ja/Nein je Person. Genau dieses Denken
+           verwirft BGer 8C_644/2025: Nicht die vertragliche Vereinbarung
+           zaehlt, sondern die konkret geleisteten Stunden. Das Werkzeug
+           rechnet sie nach Empfehlung 7/87 aus der Zeiterfassung -- und
+           "automatisch" ist darum die Vorgabe, nicht eine von drei
+           gleichrangigen Wahlen.
+           Ein Haken mit Vorgabewert "gesetzt" haette die Rechnung bei JEDER
+           Person still ueberstimmt, und zwar in Richtung Abzug. -->
+      <div class="feld">
+        <label for="lpbNbu">Nichtberufsunfall — Unterstellung</label>
+        <select class="inp" id="lpbNbu" onchange="lohnNbuUmschalten()">
+          <option value="automatisch">Automatisch aus den geleisteten Stunden (empfohlen)</option>
+          <option value="versichert">Von Hand: versichert</option>
+          <option value="nicht">Von Hand: nicht versichert</option>
+        </select>
+        <div class="zone-note">Automatisch heisst: nach Empfehlung 7/87 aus der Zeiterfassung —
+          Durchschnitt über die letzten drei oder zwölf Monate, günstigere Variante,
+          Schwelle 8 Wochenstunden (Merkblatt 6.05 Ziff. 4). Das vertragliche Pensum ist
+          <b>nicht</b> massgebend (BGer 8C_644/2025).</div>
+        <div id="lpbNbuStand" class="zone-note" style="margin-top:6px"></div>
+      </div>
+      <!-- Der Grund ist Pflicht, sobald von Hand entschieden wird. Eine
+           Uebersteuerung ohne Begruendung ist spaeter nicht nachvollziehbar,
+           und Art. 12 Ziff. 5 GAV verlangt eine nachvollziehbare Abrechnung. -->
+      <div class="feld" id="lpbNbuGrundFeld" style="display:none">
+        <label for="lpbNbuGrund">Begründung der Übersteuerung</label>
+        <input class="inp" id="lpbNbuGrund" placeholder="z. B. vom Versicherer schriftlich bestätigt">
+        <div class="zone-note">Pflicht: Wer die gerechnete Unterstellung von Hand ändert, schuldet
+          den Grund. Er steht später auf der Abrechnung, zusammen mit Person und Zeitpunkt.</div></div>
+      <div class="feld">
+        <label class="check" style="min-height:24px"><input type="checkbox" id="lpbKtg"> Krankentaggeld-Beitrag</label>
+        <div class="zone-note">Art. 17 Ziff. 3: Der Betrieb übernimmt mindestens die Hälfte der Prämie.</div></div>
+      <div class="feld">
+        <label class="check" style="min-height:24px"><input type="checkbox" id="lpbBvg"> Bei der Pensionskasse angeschlossen</label></div>
+      <div class="feld"><label for="lpbBvgBetrag">BVG-Beitrag der Person, CHF pro Monat</label>
+        <input class="inp" id="lpbBvgBetrag" placeholder="aus der Meldung der Pensionskasse">
+        <div class="zone-note">Wird <b>übernommen</b>, nicht gerechnet: Die Skala der Kasse ist deren
+          Vertragswerk. Art. 25 Ziff. 3 gibt nur die Untergrenze — mindestens 9 % des koordinierten
+          Lohnes, höchstens die Hälfte davon zulasten der Person.</div></div>
+      <div class="feld">
+        <label class="check" style="min-height:24px"><input type="checkbox" id="lpbQst" onchange="lohnQstUmschalten()"> Quellensteuerpflichtig</label></div>
+      <div id="lpbQstFelder">
+        <div class="feld"><label for="lpbQstKanton">Kanton</label>
+          <input class="inp" id="lpbQstKanton" maxlength="2" placeholder="z. B. SO"></div>
+        <div class="feld"><label for="lpbQstTarif">Tarifcode</label>
+          <input class="inp" id="lpbQstTarif" placeholder="z. B. A0N"></div>
+        <div class="feld"><label for="lpbQstKinder">Anzahl Kinder</label>
+          <input class="inp" id="lpbQstKinder" placeholder="0"></div>
+        <div class="zone-note">Kanton und Tarifcode sind erforderlich. Ohne sie lässt sich die
+          Quellensteuer nicht berechnen — und ein fehlender Abzug sähe aus wie kein Abzug.</div>
+      </div>
+      <div class="feld"><label for="lpbBemerkung">Bemerkung</label>
+        <textarea class="inp" id="lpbBemerkung" rows="2"></textarea></div>
+      <p class="err" id="lpbFehler" style="display:none"></p>
+    </div>
+    <div class="dlg-ft">
+      <button class="btn btn-plain" onclick="closeDlg('dlgLohnAbzug')">Abbrechen</button>
+      <button class="btn btn-quiet" id="lpbLoeschKnopf" onclick="lohnAkteLoeschen('abzug', Number($('lpbId').value), 'dlgLohnAbzug', 'lpbFehler')">Löschen</button>
+      <button class="btn btn-primary" onclick="lohnAbzugSpeichern()">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════ ZAHLUNGSEMPFÄNGER (ENT-451) ═════════════════════
+     Mehrere Empfänger je Person, weil der Auszahlungsbetrag aufteilbar sein
+     muss. Genau einer bekommt den Rest — zwei Rest-Zeilen liessen offen,
+     wohin das Geld geht, und das fiele erst beim Zahlungslauf auf. -->
+<div class="dlg-scrim" id="dlgLohnZahlung">
+  <div class="dlg">
+    <div class="dlg-hd">
+      <h2 id="lpzTitel">Empfänger erfassen</h2>
+      <p>Wohin der Lohn überwiesen wird. Die IBAN wird auf ihre Prüfsumme geprüft.</p>
+    </div>
+    <div class="dlg-bd">
+      <input type="hidden" id="lpzId">
+      <div class="feld"><label for="lpzReihenfolge">Reihenfolge</label>
+        <input class="inp" id="lpzReihenfolge" placeholder="1"></div>
+      <div class="feld"><label for="lpzArt">Anteil</label>
+        <select class="inp" id="lpzArt" onchange="lohnZahlArtUmschalten()">
+          <option value="rest">Restbetrag</option>
+          <option value="fix">fester Betrag</option>
+        </select></div>
+      <div class="feld" id="lpzBetragFeld"><label for="lpzBetrag">Fester Betrag in CHF</label>
+        <input class="inp" id="lpzBetrag" placeholder="z. B. 50.00">
+        <div class="zone-note">Wird vom Auszahlungsbetrag vorweg abgezogen; der Rest geht an den
+          Empfänger mit „Restbetrag“.</div></div>
+      <div class="feld"><label for="lpzIban">IBAN</label>
+        <input class="inp" id="lpzIban" placeholder="CH.. .... .... .... .... ."></div>
+      <div class="feld"><label for="lpzEmpfaenger">Empfänger</label>
+        <input class="inp" id="lpzEmpfaenger" placeholder="leer = die mitarbeitende Person selbst"></div>
+      <div class="feld"><label for="lpzBank">Bank</label>
+        <input class="inp" id="lpzBank"></div>
+      <div class="feld"><label class="check" style="min-height:24px"><input type="checkbox" id="lpzAktiv"> aktiv</label>
+        <div class="zone-note">Ein nicht mehr genutzter Empfänger wird deaktiviert statt gelöscht —
+          sonst fehlte er in älteren Abrechnungen.</div></div>
+      <p class="err" id="lpzFehler" style="display:none"></p>
+    </div>
+    <div class="dlg-ft">
+      <button class="btn btn-plain" onclick="closeDlg('dlgLohnZahlung')">Abbrechen</button>
+      <button class="btn btn-quiet" id="lpzLoeschKnopf" onclick="lohnAkteLoeschen('zahlung', Number($('lpzId').value), 'dlgLohnZahlung', 'lpzFehler')">Löschen</button>
+      <button class="btn btn-primary" onclick="lohnZahlungSpeichern()">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════ LOHNLAUF ANSEHEN (ENT-451) ══════════════════════
+     Die Knöpfe folgen dem Status: Was nicht geht, steht gar nicht erst da.
+     Die Grenze ist die Auszahlung — davor stornieren, danach nachtragen. -->
+<div class="dlg-scrim" id="dlgLohnlauf">
+  <div class="dlg" style="max-width:1200px">
+    <div class="dlg-hd"><h2 id="llDlgTitel">Lohnlauf</h2></div>
+    <div class="dlg-bd"><div id="llDlgInhalt"></div></div>
+    <div class="dlg-ft">
+      <button class="btn btn-plain" onclick="closeDlg('dlgLohnlauf')">Schliessen</button>
+      <button class="btn btn-quiet" id="llBtnStornieren" onclick="lohnLaufStornieren()">Stornieren</button>
+      <button class="btn btn-quiet" id="llBtnAusbezahlt" onclick="lohnLaufAktion('ausbezahlt')">Als ausbezahlt vermerken</button>
+      <button class="btn btn-primary" id="llBtnFreigeben" onclick="lohnLaufAktion('freigeben')">Freigeben</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════ LOHNART ERFASSEN (ENT-451) ══════════════════════
+     Die sechs Kennzeichen stehen ausgeschrieben und nicht als Kürzelreihe:
+     Wer eine Lohnart anlegt, soll lesen, was er entscheidet. Sie sind der
+     Unterschied zwischen einer nachvollziehbaren Abrechnung und einer
+     Blackbox — Art. 12 Ziff. 5 GAV verlangt Ersteres. -->
+<div class="dlg-scrim" id="dlgLohnart">
+  <div class="dlg">
+    <div class="dlg-hd">
+      <h2 id="laDlgTitel">Lohnart erfassen</h2>
+      <p>Eine Zeile, wie sie später auf der Abrechnung erscheint. Die Kennzeichen unten bestimmen,
+         in welche Bemessungsgrundlage der Betrag zählt.</p>
+    </div>
+    <div class="dlg-bd">
+      <input type="hidden" id="laId">
+      <div class="feld"><label for="laBezeichnung">Bezeichnung</label>
+        <input class="inp" id="laBezeichnung" placeholder="z. B. Pikettzulage"></div>
+      <div class="feld"><label for="laSchluessel">Schlüssel</label>
+        <input class="inp" id="laSchluessel" placeholder="wird aus der Bezeichnung gebildet">
+        <div class="zone-note">Die stabile Kennung, unter der eine Abrechnungszeile wiedergefunden wird.
+          Einmal vergeben, bleibt sie — eine Umbenennung träfe alte Abrechnungen.</div></div>
+      <div class="feld"><label for="laArt">Art</label>
+        <select class="inp" id="laArt"></select></div>
+      <div class="feld"><label for="laSatz">Satz in Prozent</label>
+        <input class="inp" id="laSatz" placeholder="leer lassen, wenn der Satz aus dem GAV kommt">
+        <div class="zone-note">Nur bei prozentualen Lohnarten. Die Ferienentschädigung braucht keinen —
+          sie wird nach Art. 20 Ziff. 2 aus dem Alter abgeleitet.</div></div>
+      <div class="feld"><label for="laGav">GAV-Grundlage</label>
+        <input class="inp" id="laGav" placeholder="leer = betrieblich vereinbart, keine GAV-Pflicht">
+        <div class="zone-note">Leer ist hier eine Aussage, keine Lücke: Der 13. Monatslohn etwa steht
+          in keinem GAV-Artikel.</div></div>
+      <h3 style="margin:22px 0 4px">Zählt in welche Bemessungsgrundlage?</h3>
+      <div id="laKennzeichen"></div>
+      <div class="feld"><label class="check" style="min-height:24px"><input type="checkbox" id="laAktiv"> aktiv</label></div>
+      <p class="err" id="laFehler" style="display:none"></p>
+    </div>
+    <div class="dlg-ft">
+      <button class="btn btn-plain" onclick="closeDlg('dlgLohnart')">Abbrechen</button>
+      <button class="btn btn-quiet" id="laLoeschKnopf" onclick="lohnartLoeschen()">Löschen</button>
+      <button class="btn btn-primary" onclick="lohnartSpeichern()">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════ ABZUGSSATZ ERFASSEN (ENT-451) ═══════════════════
+     Ohne Quelle wird nicht gespeichert. An dieser Zahl hängt Geld — da darf
+     später niemand raten müssen, ob sie jemand eingetippt oder aus einer
+     Verfügung übernommen hat. Gleiche Haltung wie bei der Wegstrecke
+     (objekt_distanz.quelle, ENT-116). -->
+<div class="dlg-scrim" id="dlgLohnsatz">
+  <div class="dlg">
+    <div class="dlg-hd">
+      <h2 id="lsDlgTitel">Satz erfassen</h2>
+      <p>Gilt ab dem angegebenen Datum. Ein späterer Satz wird <b>zusätzlich</b> erfasst — der alte
+         bleibt stehen, damit abgeschlossene Abrechnungen sich nicht rückwirkend ändern.</p>
+    </div>
+    <div class="dlg-bd">
+      <input type="hidden" id="lsId">
+      <div class="feld"><label for="lsSchluessel">Abzug</label>
+        <select class="inp" id="lsSchluessel"></select></div>
+      <div class="feld"><label for="lsAb">Gültig ab</label>
+        <input class="inp" type="date" id="lsAb"></div>
+      <div class="feld"><label for="lsBis">Gültig bis</label>
+        <input class="inp" type="date" id="lsBis">
+        <div class="zone-note">Leer lassen, solange kein Ende feststeht.</div></div>
+      <div class="feld"><label for="lsSatz">Satz in Prozent</label>
+        <input class="inp" id="lsSatz" placeholder="z. B. 5.3">
+        <div class="zone-note">Der Anteil, der der mitarbeitenden Person abgezogen wird — nicht der
+          Gesamtbeitrag. Beim Krankentaggeld verlangt Art. 17 Ziff. 3, dass der Betrieb mindestens die
+          Hälfte trägt.</div></div>
+      <div class="feld"><label for="lsFix">Oder fester Betrag in Franken</label>
+        <input class="inp" id="lsFix" placeholder="statt eines Prozentsatzes"></div>
+      <!-- KEIN Feld "Höchstlohn" mehr (entfernt 2026-09-09). Es stand hier
+           mit dem Versprechen "über diesem Jahresbetrag wird nichts mehr
+           abgezogen" und hielt es nicht: hoechstlohn_rappen wurde
+           gespeichert, angezeigt und von keiner Rechnung gelesen. Die
+           UVG-Obergrenze kommt aus LOHN_UVG (Merkblatt 6.05 Ziff. 5), die
+           der ALV aus LOHN_ALV -- beide je Jahr, nicht je Betrieb. Wer hier
+           eine tiefere Grenze eintrug, bekam sie nie angewendet.
+           Dieselbe Falle wie beim AHV-Satz: erfasst sieht aus wie wirksam. -->
+      <div class="feld"><label for="lsQuelle">Quelle</label>
+        <input class="inp" id="lsQuelle" placeholder="z. B. Beitragsverfügung Ausgleichskasse 2026">
+        <div class="zone-note">Erforderlich. Woher stammt dieser Satz?</div></div>
+      <p class="err" id="lsFehler" style="display:none"></p>
+    </div>
+    <div class="dlg-ft">
+      <button class="btn btn-plain" onclick="closeDlg('dlgLohnsatz')">Abbrechen</button>
+      <button class="btn btn-quiet" id="lsLoeschKnopf" onclick="lohnSatzLoeschen()">Löschen</button>
+      <button class="btn btn-primary" onclick="lohnSatzSpeichern()">Speichern</button>
+    </div>
+  </div>
+</div>
+
 <!-- Rückfrage vor folgenreichen Schritten -->
 <!-- Vorwarnung vor der automatischen Abmeldung (ENT-293).
      Die Sperre selbst steht im Server; dieser Dialog sorgt nur dafuer, dass
@@ -9375,6 +9752,12 @@ const NAV_RECHTE = {
   'nav-kontrolle-auslagen':          'auslagen_lesen',
   'nav-kontrolle-abwesenheiten':     'abwesenheiten_lesen',
   'nav-kontrolle-arbeitsergebnisse': 'einsaetze_lesen',
+  // Lohn (ENT-451) haengt am eigenen Recht und nicht an 'personal_lesen':
+  // Wer die Personalakte pflegt, muss darum nicht wissen, was jemand
+  // verdient. Genau dafuer gibt es den eigenen Bereich.
+  'nav-lohn-laeufe':    'lohn_lesen',
+  'nav-lohn-lohnarten': 'lohn_lesen',
+  'nav-lohn-saetze':    'lohn_lesen',
   'nav-revierdienst-uebersicht':   'rundgaenge_lesen',
   'nav-revierdienst-einrichtung':  'kontrollpunkte_lesen',
   // Die Einrichtung legt Tabellen und Spalten an -- das ist Schreiben,
@@ -9393,6 +9776,7 @@ const NAV_GRUPPEN = {
   'navg-kontrolle': ['nav-kontrolle-pensen', 'nav-kontrolle-auslagen',
                      'nav-kontrolle-abwesenheiten', 'nav-kontrolle-arbeitsergebnisse'],
   'navg-revierdienst': ['nav-revierdienst-uebersicht', 'nav-revierdienst-einrichtung'],
+  'navg-lohn': ['nav-lohn-laeufe', 'nav-lohn-lohnarten', 'nav-lohn-saetze'],
 };
 
 // Ein Recht oder eine Liste davon (ODER-verknuepft).
@@ -9428,6 +9812,9 @@ const TITLES = {
   offerte:     ['Offerte', 'Positionen, Preise und Summen'],
   betrieb:     ['Einstellungen', 'Betrieb, Briefkopf, Zugang, Rollen und Dienstfahrzeuge'],
   pensen:      ['Pensen', 'Jahresstunden gegen die Anstellungskategorie'],
+  lohnlaeufe:  ['Lohnläufe', 'Aus abgeglichenen Ist-Zeiten wird der Bruttolohn'],
+  lohnarten:   ['Lohnarten', 'Woraus eine Abrechnung besteht — und was in welche Bemessungsgrundlage zählt'],
+  lohnsaetze:  ['Sätze und Regelwerk', 'Abzugssätze mit Gültigkeitszeitraum, GAV-Mindestlöhne'],
   abwesenheiten: ['Abwesenheiten', 'Ferien, Krankheit und weitere Abwesenheiten im Überblick'],
   auslagen:    ['Auslagenersatz', 'Chronologisches Protokoll je Mitarbeitendem — Art. 18 Ziff. 10'],
   arbeitsergebnisse: ['Arbeitsergebnisse', 'Wachbuch, Kontrollpunktscans, Ereignisse, Rundgänge und Fahrzeugübernahmen im Zeitraum'],
@@ -10587,6 +10974,15 @@ function go(view) {
   $('nav-kontrolle-arbeitsergebnisse').classList.toggle('on', view === 'arbeitsergebnisse');
   if (view === 'arbeitsergebnisse') { arbeitsergebnisseOeffnen(); }
   if (view === 'pensen') { ladePensen(); }
+  const lohnView = view === 'lohnarten' || view === 'lohnsaetze' || view === 'lohnlaeufe';
+  $('navg-lohn').classList.toggle('offen', lohnView);
+  if (lohnView) { $('nav-lohn').classList.add('on'); }
+  $('nav-lohn-lohnarten').classList.toggle('on', view === 'lohnarten');
+  $('nav-lohn-saetze').classList.toggle('on', view === 'lohnsaetze');
+  $('nav-lohn-laeufe').classList.toggle('on', view === 'lohnlaeufe');
+  if (view === 'lohnlaeufe') { lohnLaeufeLaden(); }
+  if (view === 'lohnarten')  { lohnartenLaden(); }
+  if (view === 'lohnsaetze') { lohnSaetzeLaden(); }
   if (view === 'auslagen') { auslagenVorgabe(); ladeAuslagen(); }
   if (view === 'abwesenheiten') { awLaden(); }
   // Revierdienst (ENT-224): Uebersicht (Rundgaenge, Durchfuehrung) und
@@ -13883,6 +14279,16 @@ function mdReiterPruefen() {
     knopf.style.display = erlaubt ? '' : 'none';
     if (!erlaubt && mdTab === 'verlauf') { mdGoTab('uebersicht'); }
   }
+  // Lohn (ENT-451) am eigenen Recht -- wer die Akte pflegt, muss darum
+  // nicht wissen, was jemand verdient. Gleiche Bauart wie oben, gleicher
+  // Grund: Ein sichtbarer Reiter, hinter dem ein 403 wartet, ist schlimmer
+  // als keiner.
+  const lohnErlaubt = darf('lohn_lesen');
+  const lohnKnopf = $('mdtab-lohn');
+  if (lohnKnopf) {
+    lohnKnopf.style.display = lohnErlaubt ? '' : 'none';
+    if (!lohnErlaubt && mdTab === 'lohn') { mdGoTab('uebersicht'); }
+  }
 }
 function mdMonatUm(n) {
   const m = $('mdMonat').value || isoTag().slice(0, 7);
@@ -13951,6 +14357,7 @@ function renderMaDetail() {
 
   if (mdTab === 'uebersicht') { mdUebersicht(); return; }
   if (MB_BEREICHE.some(b => b[0] === mdTab)) { mdDossier(mdTab); return; }
+  if (mdTab === 'lohn') { lohnAkteLaden(); return; }
   if (mdTab === 'verlauf') { mdVerlauf(); return; }
   mdDienstplaene();
 }
@@ -18236,6 +18643,1173 @@ function kontrolleNavKlick() {
     return;
   }
   go(ziel);
+}
+
+// ══════════════════════ LOHN (ENT-451) ═══════════════════════════════════
+// Zwei Ansichten: der Lohnartenkatalog und die Abzugssaetze. Die
+// Lohnstammdaten JE PERSON stehen nicht hier, sondern in der Personalakte --
+// zwei Formulare fuer dieselben Daten waeren zwei Orte, an denen ein Feld
+// fehlen kann.
+function lohnNavKlick() {
+  // Der Einstieg sind die LAEUFE, nicht der Katalog: Sie sind der Vorgang,
+  // Lohnarten und Saetze die Einrichtung dahinter.
+  const ziel = 'lohnlaeufe';
+  if (navGruppeKompakt(ziel)) { return; }
+  const offen = $('navg-lohn').classList.contains('offen');
+  if (offen && $('view-' + ziel).classList.contains('on')) {
+    $('navg-lohn').classList.toggle('offen');
+    return;
+  }
+  go(ziel);
+}
+
+// Darf die angemeldete Person im Lohnbereich schreiben? EINE Stelle, an
+// der das entschieden wird -- verstreute Abfragen laufen beim naechsten
+// Knopf auseinander.
+//
+// Die eigentliche Sperre sitzt im Server: Alle drei Endpunkte verlangen
+// require_recht($user, 'lohn_schreiben'), bevor sie etwas schreiben. Was
+// hier geschieht, erspart nur den Umweg -- ein Knopf, der auf ein 403
+// fuehrt, ist schlimmer als keiner.
+const lohnSchreiben = () => darf('lohn_schreiben');
+
+// Franken aus Rappen. Immer zwei Nachkommastellen -- "25.-" und "25.00"
+// nebeneinander lesen sich wie zwei verschiedene Zahlen.
+const lohnFr = rappen => rappen === null || rappen === undefined
+  ? '—' : (rappen / 100).toFixed(2);
+// Basispunkte als Prozent. 833 -> "8.33 %".
+const lohnPz = bp => bp === null || bp === undefined ? '—' : (bp / 100).toFixed(2) + ' %';
+
+// Der Leerzustand einer Liste. VIER verschiedene Aussagen, vier verschiedene
+// Texte -- "nicht eingerichtet", "kein Zugriff", "nichts vorhanden" und
+// "kein Treffer" duerfen nie gleich aussehen. Das ist im Haus mehrfach
+// verletzt worden und ist die wichtigste Regel der Gestaltungsliste.
+function lohnLeer(art, zusatz) {
+  const texte = {
+    nicht_eingerichtet: ['Der Lohnbereich ist auf dem Server noch nicht eingerichtet.',
+      'Einmalig unter „Einrichtung“ ausführen — dabei entstehen die Lohntabellen.'],
+    kein_zugriff: ['Kein Zugriff auf den Lohnbereich.',
+      'Dafür braucht es das Recht „Lohn“. Wer es vergibt, steht unter Administration → Rollen.'],
+    leer: ['Noch nichts erfasst.', zusatz || ''],
+    kein_treffer: ['Kein Treffer.', zusatz || 'Der Filter blendet alles aus — es ist etwas vorhanden.'],
+    fehler: ['Die Daten liessen sich nicht laden.', zusatz || ''],
+  };
+  const [t, u] = texte[art] || texte.fehler;
+  return `<div class="leer-zustand" style="padding:28px 4px;text-align:center">
+    <div style="font-weight:600;margin-bottom:6px">${t}</div>
+    ${u ? `<div class="zone-note" style="margin:0">${u}</div>` : ''}
+  </div>`;
+}
+
+// Aus einer Antwort die Leerzustands-Art ableiten. Ein 403 ist etwas
+// anderes als eine leere Tabelle, und eine fehlende Tabelle etwas anderes
+// als beides.
+function lohnLeerArt(status, data) {
+  if (status === 403) { return 'kein_zugriff'; }
+  if (status >= 500 && /doesn't exist|Base table|no such table/i.test(data?.message || '')) {
+    return 'nicht_eingerichtet';
+  }
+  return 'fehler';
+}
+
+// ── Lohnläufe ────────────────────────────────────────────────────────────
+// Die VORSCHAU rechnet auf dem Server und speichert nichts. Der GESPEICHERTE
+// Lauf wird gelesen, nie neu gerechnet -- sonst veraenderte eine spaetere
+// Ansatz- oder Regelaenderung abgeschlossene Monate rueckwirkend.
+let llDaten = { laeufe: [] };
+let llVorschau = null;
+let llOffen = null;
+
+// Minuten als "H:MM". Stunden und Franken werden NIE in dieselbe Spalte
+// gemischt -- "Einheiten nie vermischen" ist eine Hausregel, und bei einer
+// Lohnabrechnung ist sie keine Kosmetik.
+const lohnStd = min => {
+  const m = Math.max(0, Math.round(Number(min) || 0));
+  return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
+};
+
+const LL_STATUS = {
+  entwurf:     ['Entwurf', 'chip'],
+  freigegeben: ['Freigegeben', 'chip-ok'],
+  ausbezahlt:  ['Ausbezahlt', 'chip-ok'],
+  storniert:   ['Storniert', 'chip-x'],
+};
+
+// Alle festen Schreibknoepfe des Lohnbereichs auf einmal. Wird bei jedem
+// Laden aufgerufen -- die Rechte koennen sich zwischen zwei Ansichten
+// geaendert haben (neue Anmeldung, geaenderte Rolle).
+function lohnKnoepfePruefen() {
+  const zeigen = lohnSchreiben() ? '' : 'none';
+  ['laNeuKnopf', 'lsNeuKnopf', 'llErzeugen'].forEach(id => {
+    const el = $(id);
+    // llErzeugen wird zusaetzlich von der Vorschau gesteuert; hier wird nur
+    // ausgeblendet, nie eingeblendet.
+    if (el && !lohnSchreiben()) { el.style.display = 'none'; }
+    else if (el && id !== 'llErzeugen') { el.style.display = zeigen; }
+  });
+}
+
+function lohnLaeufeLaden() {
+  lohnKnoepfePruefen();
+  if (!$('llMonat').value) {
+    // Vorgabe: der zurueckliegende Monat. Der laufende ist noch nicht
+    // fertig abgeglichen, und ein Lauf darueber waere unvollstaendig.
+    const h = new Date();
+    const v = new Date(h.getFullYear(), h.getMonth() - 1, 1);
+    $('llMonat').value = `${v.getFullYear()}-${String(v.getMonth() + 1).padStart(2, '0')}`;
+  }
+  api('lohnlauf.php').then(({ ok, status, data }) => {
+    if (!ok) { $('llListe').innerHTML = lohnLeer(lohnLeerArt(status, data), data?.message); return; }
+    llDaten = data;
+    lohnLaeufeZeichnen();
+  });
+  lohnVorschauLaden();
+}
+
+function lohnLaeufeZeichnen() {
+  const l = llDaten.laeufe || [];
+  if (!l.length) {
+    $('llListe').innerHTML = lohnLeer('leer', 'Noch kein Lohnlauf angelegt.');
+    return;
+  }
+  $('llListe').innerHTML = `<div style="overflow-x:auto"><table class="tbl">
+    <thead><tr><th>Periode</th><th>Status</th><th style="text-align:right">Personen</th>
+      <th style="text-align:right">Brutto CHF</th><th>Angelegt</th><th></th></tr></thead>
+    <tbody>${l.map(x => {
+      const [txt, kl] = LL_STATUS[x.status] || [x.status, 'chip'];
+      return `<tr${x.status === 'storniert' ? ' style="opacity:.6"' : ''}>
+        <td>${dmy(x.periode_von)} – ${dmy(x.periode_bis)}</td>
+        <td><span class="chip ${kl}">${txt}</span>${x.ersetzt_lauf_id
+          ? ` <span class="zone-note">ersetzt Lauf ${x.ersetzt_lauf_id}</span>` : ''}</td>
+        <td style="text-align:right">${x.personen}</td>
+        <td style="text-align:right">${lohnFr(x.brutto_rappen)}</td>
+        <td>${x.erstellt_am ? dmy(String(x.erstellt_am).slice(0, 10)) : ''}</td>
+        <td style="text-align:right"><button class="btn btn-quiet btn-sm" onclick="lohnLaufOeffnen(${x.id})">Ansehen</button></td>
+      </tr>`;
+    }).join('')}</tbody></table></div>`;
+}
+
+function lohnVorschauLaden() {
+  const m = $('llMonat').value;
+  if (!m) { return; }
+  const von = m + '-01';
+  const bis = new Date(Number(m.slice(0, 4)), Number(m.slice(5, 7)), 0);
+  const bisStr = `${bis.getFullYear()}-${String(bis.getMonth() + 1).padStart(2, '0')}-${String(bis.getDate()).padStart(2, '0')}`;
+  $('llVorschau').innerHTML = '<div class="zone-note" style="padding:20px 4px">Wird gerechnet …</div>';
+  api(`lohnlauf.php?von=${von}&bis=${bisStr}`).then(({ ok, status, data }) => {
+    if (!ok) {
+      $('llVorschau').innerHTML = lohnLeer(lohnLeerArt(status, data), data?.message);
+      $('llErzeugen').style.display = 'none';
+      return;
+    }
+    llVorschau = data;
+    lohnVorschauZeichnen();
+  });
+}
+
+function lohnVorschauZeichnen() {
+  const d = llVorschau;
+  if (!d) { return; }
+  const p = d.vorschau || [];
+  // Besteht fuer diesen Zeitraum schon ein Lauf, wird das GESAGT, bevor
+  // jemand einen zweiten anlegt -- und der Knopf verschwindet.
+  const bestehend = (d.bestehend || [])[0];
+  $('llHinweis').innerHTML = bestehend
+    ? `<div class="msg-warn" style="margin:0 0 14px">
+         <b>Für diesen Zeitraum besteht bereits ein Lauf.</b>
+         <div class="zone-note" style="margin:4px 0 0">Er muss storniert werden, bevor ein neuer
+           entsteht — zwei Läufe über denselben Monat wären zwei Wahrheiten.</div>
+         <button class="btn btn-quiet btn-sm" style="margin-top:8px" onclick="lohnLaufOeffnen(${bestehend.id})">Bestehenden Lauf ansehen</button>
+       </div>`
+    : '';
+  $('llErzeugen').style.display = (!bestehend && p.length && lohnSchreiben()) ? '' : 'none';
+
+  if (!p.length) {
+    $('llVorschau').innerHTML = lohnLeer('leer',
+      'In diesem Zeitraum gibt es keine abgeglichenen Schichten — es entstünde ein leerer Lauf.');
+    return;
+  }
+  $('llVorschau').innerHTML = lohnPersonenTabelle(p, d.sperrgruende || {}, true);
+}
+
+// EINE Tabelle fuer Vorschau und gespeicherten Lauf. Zwei Fassungen waeren
+// zwei Orte, an denen eine Spalte fehlen kann -- und der Betrachter muesste
+// zweimal lernen, wo was steht.
+function lohnPersonenTabelle(personen, gruende, vorschau) {
+  const zeilen = personen.map(x => {
+    const gesperrt = x.gesperrt_grund;
+    const summeGesperrt = Object.entries(x.gesperrt || {})
+      .map(([g, n]) => `${n}× ${g}`).join(', ');
+    return `<tr${gesperrt ? ' style="opacity:.7"' : ''}>
+      <td><b>${esc(x.name || '')}</b>${x.personalnummer
+        ? `<div class="zone-note" style="margin:2px 0 0">${esc(x.personalnummer)}</div>` : ''}</td>
+      <td>${x.kategorie ? 'Kat. ' + esc(x.kategorie)
+        : '<span class="zone-note" style="font-style:italic">ohne Kategorie</span>'}</td>
+      <td style="text-align:right"><b>${lohnStd(x.bewertet_min)}</b></td>
+      <td style="text-align:right">${gesperrt
+        ? '<span class="zone-note" style="font-style:italic">nicht gerechnet</span>'
+        : lohnFr(x.brutto_rappen)}</td>
+      <td style="text-align:right">${gesperrt || x.auszahlung_rappen === null || x.auszahlung_rappen === undefined
+        ? '<span class="zone-note" style="font-style:italic" title="Solange ein Satz fehlt, wird nicht gerechnet — auch nicht mit null">offen</span>'
+        : lohnFr(Number(x.brutto_rappen) - Number(x.auszahlung_rappen))}</td>
+      <td style="text-align:right">${gesperrt || x.auszahlung_rappen === null || x.auszahlung_rappen === undefined
+        ? '<span class="zone-note" style="font-style:italic">offen</span>'
+        : '<b>' + lohnFr(x.auszahlung_rappen) + '</b>'}</td>
+      <td>${gesperrt
+        ? `<span class="chip chip-x" title="${esc(gruende[gesperrt] || '')}">${esc(gesperrt)}</span>`
+        : (summeGesperrt ? `<span class="chip chip-w" title="Einzelne Schichten sind ausgenommen">${esc(summeGesperrt)}</span>` : '')}
+        ${x.nicht_abgeglichen ? `<span class="chip chip-w" title="Noch nicht abgeglichene Schichten zählen nicht mit — Planung bleibt Planung">${x.nicht_abgeglichen} offen</span>` : ''}
+        ${x.warnung ? `<span class="chip chip-w" title="${esc(x.warnung.text || '')}">unter Mindestlohn</span>` : ''}</td>
+      <td style="text-align:right">${gesperrt ? '' :
+        `<button class="btn btn-quiet btn-sm" onclick="lohnAbrechnungZeigen(${x.mitarbeiter_id}, ${vorschau ? 'true' : 'false'})">Abrechnung</button>`}</td>
+    </tr>`;
+  }).join('');
+
+  // Die Summen zaehlen NUR, was gerechnet wurde. Eine gesperrte Person ist
+  // keine Null -- sie fehlt, und darunter steht, wie viele es sind.
+  const gerechnet = personen.filter(x => !x.gesperrt_grund);
+  const summeBrutto = gerechnet.reduce((a, x) => a + Number(x.brutto_rappen || 0), 0);
+  const summeStd = gerechnet.reduce((a, x) => a + Number(x.bewertet_min || 0), 0);
+
+  return `<div style="overflow-x:auto"><table class="tbl">
+    <thead><tr><th>Person</th><th>Kategorie</th>
+      <th style="text-align:right" title="Nettozeit plus Zeitbonus — die Zeit, auf der der Lohn beruht. Rohzeit, Nettozeit und Zeitbonus stehen einzeln in der Abrechnung.">Bewertet</th>
+      <th style="text-align:right">Brutto CHF</th>
+      <th style="text-align:right" title="Bruttolohn minus Auszahlungsbetrag">Abzüge CHF</th>
+      <th style="text-align:right">Auszahlung CHF</th><th></th><th></th></tr></thead>
+    <tbody>${zeilen}</tbody></table></div>
+    <p class="zone-note">${gerechnet.length === personen.length
+      ? `${personen.length} Personen`
+      : `${gerechnet.length} von ${personen.length} Personen gerechnet — bei den übrigen fehlt eine Grundlage`},
+      zusammen <b>${lohnStd(summeStd)} Stunden</b> bewertete Zeit und <b>${lohnFr(summeBrutto)} CHF</b> brutto.
+      Rohzeit, Nettozeit und Zeitbonus stehen einzeln in der Abrechnung der jeweiligen Person —
+      hier steht die Zeit, auf der der Lohn beruht.</p>`;
+}
+
+function lohnLaufErzeugen() {
+  const m = $('llMonat').value;
+  if (!m || !llVorschau) { return; }
+  api('lohnlauf.php', { method: 'POST',
+    body: { aktion: 'erzeugen', von: llVorschau.von, bis: llVorschau.bis } })
+    .then(({ ok, data }) => {
+      if (!ok) { toast(data?.message || 'Lauf konnte nicht angelegt werden.'); return; }
+      llOffen = data;
+      lohnLaeufeLaden();
+      lohnLaufZeigen();
+      toast('Lauf als Entwurf angelegt.');
+    });
+}
+
+function lohnLaufOeffnen(id) {
+  api(`lohnlauf.php?lauf=${id}`).then(({ ok, data }) => {
+    if (!ok) { toast(data?.message || 'Lauf nicht gefunden.'); return; }
+    llOffen = data;
+    lohnLaufZeigen();
+  });
+}
+
+function lohnLaufZeigen() {
+  const d = llOffen;
+  if (!d || !d.lauf) { return; }
+  const l = d.lauf;
+  const [txt, kl] = LL_STATUS[l.status] || [l.status, 'chip'];
+  $('llDlgTitel').textContent = `Lohnlauf ${dmy(l.periode_von)} – ${dmy(l.periode_bis)}`;
+  // Die Knoepfe folgen dem Status: Was nicht geht, steht gar nicht erst da.
+  const darfSchreiben = lohnSchreiben();
+  $('llBtnFreigeben').style.display = (darfSchreiben && l.status === 'entwurf') ? '' : 'none';
+  $('llBtnAusbezahlt').style.display = (darfSchreiben && l.status === 'freigegeben') ? '' : 'none';
+  $('llBtnStornieren').style.display =
+    (darfSchreiben && (l.status === 'entwurf' || l.status === 'freigegeben')) ? '' : 'none';
+  const hinweis = l.status === 'ausbezahlt'
+    ? `<div class="zone-note" style="margin:0 0 12px">Dieser Lauf ist ausbezahlt und damit endgültig.
+        Eine Korrektur gehört als Zeile in den nächsten Lauf, mit Verweis auf diese Periode —
+        die ausbezahlte Abrechnung bleibt unverändert.</div>`
+    : (l.status === 'storniert'
+      ? `<div class="zone-note" style="margin:0 0 12px">Storniert${l.storno_grund
+          ? ': ' + esc(l.storno_grund) : ''}. Der Lauf bleibt vollständig stehen, damit
+          nachvollziehbar ist, was ersetzt wurde.</div>`
+      : '');
+  $('llDlgInhalt').innerHTML = `<p style="margin:0 0 12px"><span class="chip ${kl}">${txt}</span></p>
+    ${hinweis}${lohnPersonenTabelle(d.personen || [], d.sperrgruende || {}, false)}
+    <div id="llZeilen"></div>`;
+  openDlg('dlgLohnlauf');
+}
+
+// Die Zeilen einer Person -- die eigentliche Abrechnung. Sie stehen erst
+// auf Anforderung da: Bei zwanzig Personen waeren es sonst hundertfuenfzig
+// Zeilen auf einmal, und niemand faende die eine, die er sucht.
+function lohnPersonFinden(maId, vorschau) {
+  const quelle = vorschau ? (llVorschau && llVorschau.vorschau) : (llOffen && llOffen.personen);
+  return (quelle || []).find(x => Number(x.mitarbeiter_id) === Number(maId)) || null;
+}
+
+function lohnAbrechnungSchliessen(vorschau) {
+  const ziel = $(vorschau ? 'llAbrechnung' : 'llZeilen');
+  if (ziel) { ziel.innerHTML = ''; }
+}
+
+// Eine Abrechnung in VIER Bloecken statt in einer langen Tabelle.
+//
+// Der Grund steht in Rollen & Berechtigungen schon einmal: Zwanzig Positionen
+// am Stueck kann man lesen, aber nicht ueberblicken. Die Bloecke folgen der
+// Reihenfolge, in der die Zahlen entstehen -- Zeit, Bruttoseite, Abzuege,
+// Auszahlung -- und jeder beantwortet genau eine Frage.
+//
+// Die Unterstellung steht als FUENFTER Block unten und nicht als Chip in der
+// Liste: Sie ist eine Herleitung ueber Wochen und Monate, und eine
+// Herleitung gehoert nicht in eine Tabellenzelle.
+function lohnAbrechnungZeigen(maId, vorschau) {
+  const p = lohnPersonFinden(maId, vorschau);
+  const ziel = $(vorschau ? 'llAbrechnung' : 'llZeilen');
+  if (!p || !ziel) { return; }
+  const gruende = (vorschau ? llVorschau : llOffen)?.sperrgruende || {};
+  const zeilen = p.zeilen || [];
+  const teil = (von, bis) => zeilen.filter(z => Number(z.sortierung) >= von
+                                             && Number(z.sortierung) < bis);
+
+  // Eine Positionszeile. Ein gesperrter Betrag wird NICHT als 0.00
+  // ausgegeben, sondern benannt -- "nicht gerechnet" und "null Franken" sind
+  // verschiedene Aussagen.
+  const pos = z => `<tr>
+    <td>${esc(z.bezeichnung)}${z.annahme
+        ? ' <span class="chip chip-w" title="Beruht auf einer offenen GAV-Auslegung — im Zweifel zugunsten der mitarbeitenden Person (ENT-451)">Annahme</span>' : ''}</td>
+    <td style="text-align:right">${z.menge !== null && z.menge !== undefined ? Number(z.menge).toFixed(2) : ''}</td>
+    <td style="text-align:right">${z.basis_rappen !== null && z.basis_rappen !== undefined ? lohnFr(z.basis_rappen) : ''}</td>
+    <td style="text-align:right">${z.satz_bp !== null && z.satz_bp !== undefined ? lohnPz(z.satz_bp) : ''}</td>
+    <td style="text-align:right">${z.betrag_rappen !== null && z.betrag_rappen !== undefined
+        ? (Number(z.betrag_rappen) < 0 ? '<span style="color:var(--ink-2)">' + lohnFr(z.betrag_rappen) + '</span>'
+                                       : '<b>' + lohnFr(z.betrag_rappen) + '</b>')
+        : `<span class="chip chip-x" title="${esc(gruende[z.gesperrt_grund] || z.hinweis || '')}">nicht gerechnet</span>`}</td>
+    </tr>${z.hinweis ? `<tr><td colspan="5" class="zone-note" style="padding-top:0">${esc(z.hinweis)}</td></tr>` : ''}`;
+
+  const block = (titel, frage, liste) => !liste.length ? '' : `
+    <div style="margin:0 0 22px">
+      <div class="zone-note" style="text-transform:uppercase;letter-spacing:.04em;margin:0 0 2px">${titel}</div>
+      <div class="zone-note" style="margin:0 0 8px">${frage}</div>
+      <table class="tbl"><thead><tr><th>Position</th>
+        <th style="text-align:right">Menge</th><th style="text-align:right">Basis CHF</th>
+        <th style="text-align:right">Satz</th><th style="text-align:right">Betrag CHF</th></tr></thead>
+        <tbody>${liste.map(pos).join('')}</tbody></table>
+    </div>`;
+
+  // Block 1: die Zeit. Vier Groessen, einzeln -- so verlangt es ENT-451,
+  // und in der Liste oben steht nur die letzte davon.
+  const zeit = `<div style="margin:0 0 22px">
+    <div class="zone-note" style="text-transform:uppercase;letter-spacing:.04em;margin:0 0 2px">Zeit</div>
+    <div class="zone-note" style="margin:0 0 8px">Worauf der Lohn beruht — die vier Grössen einzeln.</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px">
+      ${[['Rohzeit', p.roh_min, 'bis minus von, ohne Pausenabzug'],
+         ['Nettozeit', p.netto_min, 'Rohzeit minus unbezahlter Pause'],
+         ['Zeitbonus', p.bonus_min, 'Art. 12 Ziff. 2: 10 % für Nacht- und Sonntagsarbeit'],
+         ['Bewertet', p.bewertet_min, 'Nettozeit plus Zeitbonus']].map(([t, v, h]) => `
+        <div title="${esc(h)}">
+          <div class="zone-note" style="text-transform:uppercase;letter-spacing:.04em">${t}</div>
+          <div style="font-size:19px;font-weight:600">${lohnStd(v)}</div>
+        </div>`).join('')}
+    </div></div>`;
+
+  // Block 5: die NBU-Unterstellung mit ihrer Herleitung.
+  const n = p.nbu;
+  let nbuHtml = '';
+  if (n) {
+    const wie = { versichert: ['chip-ok', 'versichert'], nicht_versichert: ['chip-x', 'nicht versichert'],
+                  pruefen: ['chip-w', 'von Hand prüfen'], unbekannt: ['chip-w', 'unbekannt'] }[n.stand]
+                || ['chip', n.stand];
+    const f = n.fenster || {};
+    const fensterHtml = Object.keys(f).length ? `<table class="tbl" style="margin-top:8px">
+      <thead><tr><th>Zeitraum</th><th style="text-align:right">Wochen</th>
+        <th style="text-align:right">davon mit Einsatz</th><th style="text-align:right">Ø Std./Woche</th>
+        <th>Grundlage</th></tr></thead><tbody>
+      ${Object.entries(f).map(([m, e]) => `<tr>
+        <td>${m} Monate${e.zeitraum ? `<div class="zone-note">${dmy(e.zeitraum.von)} – ${dmy(e.zeitraum.bis)}</div>` : ''}</td>
+        <td style="text-align:right">${e.wochen_total}</td>
+        <td style="text-align:right">${e.arbeitswochen}</td>
+        <td style="text-align:right"><b>${e.schnitt_std === null ? '—' : Number(e.schnitt_std).toFixed(2)}</b></td>
+        <td class="zone-note">${e.basis === 'nur_arbeitswochen'
+            ? 'nur Wochen mit Einsatz (Ziff. 3)' : 'alle Kalenderwochen'}</td></tr>`).join('')}
+      </tbody></table>` : '';
+    nbuHtml = `<div style="margin:0 0 6px">
+      <div class="zone-note" style="text-transform:uppercase;letter-spacing:.04em;margin:0 0 2px">Nichtberufsunfall</div>
+      <div class="zone-note" style="margin:0 0 8px">Ob überhaupt ein Beitrag abgezogen werden darf — nach
+        Empfehlung 7/87 aus den geleisteten Stunden, nicht aus dem Pensum (BGer 8C_644/2025).</div>
+      <p style="margin:0 0 6px"><span class="chip ${wie[0]}">${wie[1]}</span>
+        ${n.quelle === 'uebersteuert' ? '<span class="chip chip-w" title="Von Hand gesetzt — die Rechnung wurde nicht angewandt">übersteuert</span>' : ''}</p>
+      <div class="zone-note">${esc(n.text || '')}</div>
+      ${n.uebersteuert && n.uebersteuert.am
+        ? `<div class="zone-note">Gesetzt am ${dmy(String(n.uebersteuert.am).slice(0, 10))}${
+             n.uebersteuert.gueltig_ab ? `, gültig ab ${dmy(n.uebersteuert.gueltig_ab)}` : ''}.</div>` : ''}
+      ${fensterHtml}</div>`;
+  }
+
+  ziel.innerHTML = `<div class="card" style="margin-top:18px">
+    <div class="card-hd">
+      <span class="card-ic"><svg class="i" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg></span>
+      <h3>${esc(p.name || '')}</h3>
+      <div class="sp" style="flex:1"></div>
+      <button type="button" class="btn btn-plain btn-sm" onclick="lohnAbrechnungSchliessen(${vorschau ? 'true' : 'false'})">Schliessen</button>
+    </div>
+    <div class="card-bd">
+      ${zeit}
+      ${block('Bruttoseite', 'Wie der Bruttolohn entsteht.', teil(0, 50))}
+      ${block('Abzüge', 'Was vom Bruttolohn abgeht — und was nicht gerechnet werden konnte.', teil(50, 60))}
+      ${block('Auszahlung', 'Nettolohn, der Vollzugskostenbeitrag danach, und was ausbezahlt wird.', teil(60, 100))}
+      ${nbuHtml}
+    </div></div>`;
+  ziel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function lohnLaufAktion(aktion, grund) {
+  if (!llOffen || !llOffen.lauf) { return; }
+  const body = { aktion, lauf: llOffen.lauf.id };
+  if (grund) { body.grund = grund; }
+  api('lohnlauf.php', { method: 'POST', body }).then(({ ok, data }) => {
+    if (!ok) { toast(data?.message || 'Nicht möglich.'); return; }
+    llOffen = data;
+    lohnLaufZeigen();
+    lohnLaeufeLaden();
+  });
+}
+
+function lohnLaufStornieren() {
+  const grund = prompt('Warum wird dieser Lauf storniert?');
+  if (grund === null || !grund.trim()) { return; }
+  lohnLaufAktion('stornieren', grund.trim());
+}
+
+// ── Lohnarten ────────────────────────────────────────────────────────────
+let laDaten = { lohnarten: [], kennzeichen: {}, arten: {} };
+// Die Kuerzel der Tabellenkoepfe. Reihenfolge und Zuordnung stammen aus dem
+// Server (lohnart_kennzeichen()) -- hier steht nur die Kurzform, damit die
+// Spalte schmal bleibt. Der volle Text steht als Titel am Kopf.
+const LA_KURZ = { ahv_pflichtig: 'AHV', ferien_pflichtig: 'Ferien', ml13_pflichtig: '13.',
+                  bvg_pflichtig: 'BVG', uvg_pflichtig: 'UVG', qst_pflichtig: 'QSt' };
+
+function lohnartenLaden() {
+  lohnKnoepfePruefen();
+  $('laListe').innerHTML = '<div class="zone-note" style="padding:20px 4px">Lade …</div>';
+  $('laHinweis').innerHTML = '';
+  api('lohnarten.php').then(({ ok, status, data }) => {
+    if (!ok) {
+      $('laListe').innerHTML = lohnLeer(lohnLeerArt(status, data), data?.message);
+      $('laNeuKnopf').disabled = true;
+      return;
+    }
+    $('laNeuKnopf').disabled = false;
+    laDaten = data;
+    lohnartenZeichnen();
+  });
+}
+
+function lohnartenZeichnen() {
+  const alle = laDaten.lohnarten || [];
+  const nurAktiv = $('laNurAktiv').checked;
+  const liste = nurAktiv ? alle.filter(l => l.aktiv) : alle;
+  if (!alle.length) {
+    $('laListe').innerHTML = lohnLeer('leer',
+      'Der Katalog ist leer. Beim Einrichten entstehen die Lohnarten aus dem GAV.');
+    $('laHinweis').innerHTML = '';
+    return;
+  }
+  if (!liste.length) {
+    $('laListe').innerHTML = lohnLeer('kein_treffer',
+      `Alle ${alle.length} Lohnarten sind deaktiviert — sie werden vom Filter ausgeblendet.`);
+    $('laHinweis').innerHTML = '';
+    return;
+  }
+  const kz = Object.keys(LA_KURZ);
+  const kopf = kz.map(k =>
+    `<th style="text-align:center" title="${(laDaten.kennzeichen || {})[k] || ''}">${LA_KURZ[k]}</th>`).join('');
+  const zeilen = liste.map(l => {
+    const haken = kz.map(k =>
+      `<td style="text-align:center">${l[k] ? '<span title="zählt dazu">●</span>' : '<span class="zone-note" title="zählt nicht dazu">·</span>'}</td>`).join('');
+    // Leere GAV-Grundlage ist eine AUSSAGE, keine Luecke: Die Lohnart ist
+    // betrieblich, nicht tariflich. Darum steht dort ein Wort und kein
+    // Gedankenstrich.
+    const gav = l.gav_grundlage
+      ? `<span>${l.gav_grundlage}</span>`
+      : '<span class="zone-note" title="Keine GAV-Pflicht — betrieblich vereinbart">betrieblich</span>';
+    const satz = l.satz_bp !== null && l.satz_bp !== undefined ? lohnPz(l.satz_bp)
+      : (l.art === 'prozent' ? '<span class="zone-note" title="Der Satz wird aus dem GAV abgeleitet">abgeleitet</span>' : '—');
+    return `<tr${l.aktiv ? '' : ' style="opacity:.55"'}>
+      <td><b>${l.bezeichnung}</b>${l.system ? ' <span class="zone-note" title="Vom Werkzeug angelegt, nicht löschbar">System</span>' : ''}
+        <div class="zone-note" style="margin:2px 0 0">${l.schluessel}</div></td>
+      <td>${(laDaten.arten || {})[l.art] || l.art}</td>
+      <td style="text-align:right">${satz}</td>
+      ${haken}
+      <td>${gav}</td>
+      <td style="text-align:right">${lohnSchreiben()
+        ? `<button class="btn btn-quiet btn-sm" onclick="lohnartOeffnen(${l.id})">Ändern</button>` : ''}</td>
+    </tr>`;
+  }).join('');
+  $('laListe').innerHTML = `<div style="overflow-x:auto"><table class="tbl">
+    <thead><tr><th>Lohnart</th><th>Art</th><th style="text-align:right">Satz</th>${kopf}<th>Grundlage</th><th></th></tr></thead>
+    <tbody>${zeilen}</tbody></table></div>`;
+  // Eine gefilterte Zahl allein sieht aus wie die Gesamtzahl.
+  $('laHinweis').innerHTML = liste.length === alle.length
+    ? `<p class="zone-note">${alle.length} Lohnarten. Die Punkte zeigen, in welche Bemessungsgrundlage eine Position zählt.</p>`
+    : `<p class="zone-note">${liste.length} von ${alle.length} Lohnarten — ${alle.length - liste.length} deaktivierte ausgeblendet.</p>`;
+}
+
+function lohnartOeffnen(id) {
+  const l = id ? (laDaten.lohnarten || []).find(x => x.id === id) : null;
+  $('laDlgTitel').textContent = l ? 'Lohnart ändern' : 'Lohnart erfassen';
+  $('laId').value = l ? l.id : '';
+  $('laSchluessel').value = l ? l.schluessel : '';
+  $('laSchluessel').disabled = !!l;
+  $('laBezeichnung').value = l ? l.bezeichnung : '';
+  $('laArt').innerHTML = Object.entries(laDaten.arten || {})
+    .map(([k, t]) => `<option value="${k}">${t}</option>`).join('');
+  $('laArt').value = l ? l.art : 'stundensatz';
+  $('laSatz').value = l && l.satz_bp !== null ? (l.satz_bp / 100).toFixed(2) : '';
+  $('laGav').value = l ? (l.gav_grundlage || '') : '';
+  $('laAktiv').checked = l ? !!l.aktiv : true;
+  $('laKennzeichen').innerHTML = Object.entries(laDaten.kennzeichen || {}).map(([k, t]) =>
+    `<label class="check" style="display:block;margin:6px 0;min-height:24px">
+       <input type="checkbox" id="la_${k}"${l && l[k] ? ' checked' : ''}> <b>${LA_KURZ[k]}</b> — ${t}
+     </label>`).join('');
+  $('laLoeschKnopf').style.display = l && !l.system ? '' : 'none';
+  $('laFehler').style.display = 'none';
+  openDlg('dlgLohnart');
+}
+
+function lohnartSpeichern() {
+  const body = {
+    id: $('laId').value ? Number($('laId').value) : 0,
+    schluessel: $('laSchluessel').value.trim(),
+    bezeichnung: $('laBezeichnung').value.trim(),
+    art: $('laArt').value,
+    satz_bp: $('laSatz').value.trim() === '' ? '' : Math.round(parseFloat($('laSatz').value.replace(',', '.')) * 100),
+    gav_grundlage: $('laGav').value.trim(),
+    aktiv: $('laAktiv').checked,
+  };
+  Object.keys(LA_KURZ).forEach(k => { body[k] = $('la_' + k).checked; });
+  api('lohnarten.php', { method: 'POST', body }).then(({ ok, data }) => {
+    if (!ok) {
+      $('laFehler').textContent = data?.message || 'Speichern fehlgeschlagen.';
+      $('laFehler').style.display = '';
+      return;
+    }
+    laDaten.lohnarten = data.lohnarten;
+    closeDlg('dlgLohnart');
+    lohnartenZeichnen();
+    toast('Lohnart gespeichert.');
+  });
+}
+
+function lohnartLoeschen() {
+  const id = Number($('laId').value);
+  if (!id) { return; }
+  api('lohnarten.php', { method: 'POST', body: { id, loeschen: true } }).then(({ ok, data }) => {
+    if (!ok) {
+      $('laFehler').textContent = data?.message || 'Löschen fehlgeschlagen.';
+      $('laFehler').style.display = '';
+      return;
+    }
+    laDaten.lohnarten = data.lohnarten;
+    closeDlg('dlgLohnart');
+    lohnartenZeichnen();
+    toast('Lohnart gelöscht.');
+  });
+}
+
+// ── Abzugssätze ──────────────────────────────────────────────────────────
+let lsDaten = { abzuege: [], katalog: {}, fehlend: [] };
+
+function lohnSaetzeLaden() {
+  lohnKnoepfePruefen();
+  $('lsListe').innerHTML = '<div class="zone-note" style="padding:20px 4px">Lade …</div>';
+  api('lohn_abzuege.php').then(({ ok, status, data }) => {
+    if (!ok) {
+      // ALLE Bloecke leeren, nicht nur die alten drei: Ein stehen
+      // gebliebener Regelwerk-Block neben einer Fehlermeldung sagt
+      // "das hier gilt noch", und das weiss niemand.
+      $('lsListe').innerHTML = lohnLeer(lohnLeerArt(status, data), data?.message);
+      ['lsFehlend', 'lsBundesrecht', 'lsWirkungslos', 'lsRegelwerk']
+        .forEach(id => { $(id).innerHTML = ''; });
+      return;
+    }
+    lsDaten = data;
+    lohnSaetzeZeichnen();
+  });
+}
+
+// Die Seite beantwortet EINE Frage, und danach ist sie gegliedert: Wer legt
+// diesen Wert fest? Darum drei Blöcke statt einer Liste.
+//
+//   1. Bundesrecht -- gilt für jeden Betrieb der Schweiz gleich, steht
+//      versioniert im Code und lässt sich hier nicht ändern.
+//   2. Betrieblich -- Versicherer, Pensionskasse, Police. Muss erfasst
+//      werden, und was fehlt, steht als eigene Zeile da.
+//   3. GAV -- abgeleitet aus dem Vertragswerk.
+//
+// WARUM DIE FEHLENDEN ALS ZEILE UND NICHT NUR ALS WARNUNG OBEN: Eine Liste
+// der erfassten Sätze mit einem Banner darüber liest sich als "hier ist,
+// was da ist". Eine Tabelle mit drei Zeilen, von denen zwei „fehlt“ sagen,
+// liest sich als "hier ist, was gebraucht wird". Nur die zweite Fassung
+// zeigt eine unvollständige Aufstellung als unvollständig.
+function lohnSaetzeZeichnen() {
+  const liste = lsDaten.abzuege || [];
+  const katalog = lsDaten.katalog || {};
+  const woher = lsDaten.woher || {};
+  const fehlt = lsDaten.fehlend || [];
+  const jahr = lsDaten.jahr || new Date().getFullYear();
+
+  // ── Kopf: ein Satz, der sagt, woran es steht.
+  const bg = lsDaten.bundesgrundlagen || [];
+  const bgFehlt = bg.filter(g => !g.erfasst);
+  const teile = [];
+  if (fehlt.length) {
+    teile.push(`<b>${fehlt.length} von ${Object.keys(katalog).length} betrieblichen Sätzen fehlen.</b>`);
+  }
+  if (bgFehlt.length) {
+    teile.push(`<b>Für ${jahr} fehlt das Regelwerk zu ${bgFehlt.map(g => g.schluessel.toUpperCase()).join(', ')}.</b>`);
+  }
+  $('lsFehlend').innerHTML = teile.length
+    ? `<div class="msg-warn" style="margin:0 0 16px">
+         ${teile.join(' ')}
+         <div class="zone-note" style="margin:6px 0 0">Solange eine Grundlage fehlt, wird für sie
+         nicht gerechnet — nicht mit null. Der Lohnlauf sperrt und nennt sie beim Namen.
+         Das ist der Unterschied zwischen „kein Abzug“ und „Abzug unbekannt“.</div>
+       </div>`
+    : `<div class="msg-ok" style="margin:0 0 16px">
+         <b>Alle Rechengrundlagen für ${jahr} sind erfasst.</b>
+         <div class="zone-note" style="margin:6px 0 0">Das heisst nicht, dass die Beträge geprüft sind —
+         nur, dass keiner fehlt.</div>
+       </div>`;
+
+  // ── Block 1: Bundesrecht. Nicht änderbar, darum ohne Knöpfe.
+  const bgZeilen = bg.map(g => {
+    const marke = g.erfasst
+      ? `<span class="chip chip-p">belegt für ${jahr}</span>`
+      : `<span class="chip chip-x">für ${jahr} nicht erfasst</span>`;
+    // Das Auslaufen ist die eigentliche Nachricht dieses Blocks: Ein
+    // Merkblatt gilt für eine abgeschlossene Liste von Jahren. Läuft sie
+    // aus, sperrt jeder Lauf ab dem 1. Januar -- das soll man vorher sehen.
+    // ZEITFORM NACH LAGE: Ist das Jahr schon erreicht, sperrt der Lauf
+    // JETZT. Der Satz "sperrt ab dem 1. Januar 2027" im Jahr 2027 liest
+    // sich als künftiges Risiko und lässt eine bestehende Sperre wie eine
+    // Vorwarnung aussehen -- dieselbe Familie wie „unbekannt sieht aus wie
+    // keine“.
+    const auslauf = !g.fehlt_ab ? ''
+      : g.fehlt_ab > jahr
+        ? `<div class="zone-note" style="margin:3px 0 0">Erfasst für ${g.jahre.join(', ')} —
+             <b>ab ${g.fehlt_ab} nicht mehr.</b> Ohne Nachtrag sperrt der Lauf ab dem
+             1. Januar ${g.fehlt_ab}.</div>`
+        : `<div class="zone-note" style="margin:3px 0 0">Erfasst für ${g.jahre.join(', ')} —
+             <b>für ${jahr} nicht.</b> Der Lohnlauf sperrt, bis das Merkblatt nachgetragen ist.</div>`;
+    return `<tr>
+      <td><b>${g.bezeichnung}</b>
+        <div class="zone-note" style="margin:2px 0 0">${g.quelle || 'Für dieses Jahr ist kein Merkblatt erfasst.'}</div>
+        ${auslauf}</td>
+      <td style="white-space:nowrap">${g.satz_text || '<span class="zone-note">—</span>'}</td>
+      <td style="text-align:right;white-space:nowrap">${marke}</td>
+    </tr>`;
+  }).join('');
+  $('lsBundesrecht').innerHTML = `
+    <h3 style="margin:0 0 6px">Was fest steht — für jeden Betrieb gleich</h3>
+    <p class="zone-note" style="margin:0 0 12px">Diese Sätze legt der Bund fest. Sie werden
+      <b>nicht hier erfasst</b>, sondern versioniert im Werkzeug geführt, mit dem Merkblatt als Quelle.
+      Ein Eingabefeld dafür wäre eine Falle: Der eingetippte Wert stünde auf dem Bildschirm, gerechnet
+      würde weiter mit dem hinterlegten.</p>
+    <div style="overflow-x:auto"><table class="tbl">
+      <thead><tr><th>Grundlage</th><th>Satz</th><th style="text-align:right">Stand</th></tr></thead>
+      <tbody>${bgZeilen}</tbody></table></div>`;
+
+  // ── Block 2: betriebliche Sätze. Jeder Schlüssel bekommt eine Zeile,
+  //    auch der noch nicht erfasste -- sonst fehlt er auch auf dem Schirm.
+  const zeilen = Object.keys(katalog).map(sl => {
+    const eintraege = liste.filter(a => a.schluessel === sl);
+    if (!eintraege.length) {
+      return `<tr>
+        <td><b>${katalog[sl]}</b>
+          <div class="zone-note" style="margin:2px 0 0">${woher[sl] || ''}</div></td>
+        <td colspan="3"><span class="chip chip-x">fehlt</span></td>
+        <td style="text-align:right">${lohnSchreiben()
+          ? `<button class="btn btn-quiet btn-sm" onclick="lohnSatzOeffnen(null, '${sl}')">Erfassen</button>` : ''}</td>
+      </tr>`;
+    }
+    return eintraege.map((a, i) => `<tr>
+      <td>${i === 0 ? `<b>${katalog[sl]}</b>
+          <div class="zone-note" style="margin:2px 0 0">${woher[sl] || ''}</div>`
+        : '<span class="zone-note">— frühere Fassung</span>'}</td>
+      <td style="white-space:nowrap">${a.gueltig_ab}${a.gueltig_bis ? ' bis ' + a.gueltig_bis
+        : '<span class="zone-note"> — offen</span>'}</td>
+      <td style="text-align:right;white-space:nowrap">${a.satz_bp !== null ? lohnPz(a.satz_bp) : ''}${
+        a.fix_rappen !== null ? lohnFr(a.fix_rappen) + ' CHF' : ''}</td>
+      <td>${a.quelle || '<span class="chip chip-w">ohne Quelle</span>'}</td>
+      <td style="text-align:right">${lohnSchreiben()
+        ? `<button class="btn btn-quiet btn-sm" onclick="lohnSatzOeffnen(${a.id})">Ändern</button>` : ''}</td>
+    </tr>`).join('');
+  }).join('');
+  $('lsListe').innerHTML = `
+    <h3 style="margin:26px 0 6px">Was Ihr Betrieb festlegt — muss erfasst werden</h3>
+    <p class="zone-note" style="margin:0 0 12px">Diese drei Werte stehen in keinem Gesetz und in keinem
+      Merkblatt: Sie stammen aus der Police des Versicherers, der Krankentaggeld-Versicherung und der
+      Meldung der Pensionskasse. Ohne sie rechnet der Lohnlauf nicht.</p>
+    <div style="overflow-x:auto"><table class="tbl">
+      <thead><tr><th>Abzug</th><th>Gültig</th><th style="text-align:right">Satz</th>
+      <th>Quelle</th><th></th></tr></thead>
+      <tbody>${zeilen}</tbody></table></div>`;
+
+  // ── Zeilen, die nicht mehr gelesen werden. Nur sichtbar, wenn es sie
+  //    gibt -- ein leerer Block wäre eine Behauptung über nichts.
+  const tot = lsDaten.wirkungslos || [];
+  $('lsWirkungslos').innerHTML = tot.length
+    ? `<div class="msg-warn" style="margin:20px 0 0">
+         <b>${tot.length} erfasste${tot.length === 1 ? 'r Satz wird' : ' Sätze werden'} nicht mehr gelesen:</b>
+         ${tot.map(t => t.schluessel.toUpperCase() + ' ab ' + t.gueltig_ab).join(' · ')}
+         <div class="zone-note" style="margin:6px 0 0">AHV und ALV wurden früher hier erfasst. Sie stehen
+         heute im Regelwerk oben und werden von dort gerechnet. Diese Zeilen wirken nicht mehr —
+         sie bleiben sichtbar, damit niemand annimmt, sein Eintrag sei noch in Kraft.</div>
+       </div>`
+    : '';
+
+  // Was aus dem GAV kommt, wird nicht eingetippt -- und steht darum
+  // getrennt darunter. Wer die beiden vermischt, kann spaeter nicht mehr
+  // sagen, welche Zahl aus dem Vertrag stammt und welche jemand gesetzt hat.
+  $('lsRegelwerk').innerHTML = `
+    <h3 style="margin:26px 0 8px">Aus dem GAV — nicht erfasst, sondern abgeleitet</h3>
+    <p class="zone-note" style="margin:0 0 12px">Diese Werte stehen wörtlich im Gesamtarbeitsvertrag
+      und werden im Werkzeug versioniert geführt (Ausgabe 2026, gültig bis 31.12.2026). Sie lassen sich
+      hier nicht ändern — eine spätere Ausgabe wird angehängt, die alte bleibt stehen.</p>
+    <table class="tbl"><tbody>
+      <tr><td><b>Mindestlöhne</b><div class="zone-note">Anhang 1, je Kategorie, Dienstjahr und Kantonsgruppe;
+        eigene Tabelle für Geld- und Werttransport. Bei Kategorie C <em>ohne</em> Ferienentschädigung.</div></td>
+        <td style="text-align:right;white-space:nowrap">Art. 16, Anhang 1</td></tr>
+      <tr><td><b>Ferienentschädigung</b><div class="zone-note">10.64 % bis zum 20. Altersjahr, danach 8.33 % —
+        abgeleitet aus dem Alter, nicht je Person erfasst.</div></td>
+        <td style="text-align:right;white-space:nowrap">Art. 20 Ziff. 2</td></tr>
+      <tr><td><b>Vollzugskostenbeitrag PaKo</b><div class="zone-note">Kategorie A: 2.50 CHF im Monat.
+        Kategorien B und C: 0.015 CHF je geleistete Stunde. Muss auf der Abrechnung ausgewiesen werden.</div></td>
+        <td style="text-align:right;white-space:nowrap">Art. 6 Ziff. 2</td></tr>
+      <tr><td><b>Zeitzuschlag</b><div class="zone-note">25 % auf den Stunden über 210 im Monat.</div></td>
+        <td style="text-align:right;white-space:nowrap">Art. 14 Ziff. 3</td></tr>
+      <tr><td><b>BVG-Eintritt</b><div class="zone-note">Ab 1. Januar nach dem 24. Altersjahr, mindestens 9 % des
+        koordinierten Lohnes, höchstens die Hälfte davon zulasten der Person. Der <em>Betrag</em> kommt aus der
+        Meldung der Pensionskasse und wird je Person erfasst — die Skala der Kasse ist deren Vertragswerk.</div></td>
+        <td style="text-align:right;white-space:nowrap">Art. 25</td></tr>
+    </tbody></table>`;
+}
+
+function lohnSatzOeffnen(id, vorauswahl) {
+  const a = id ? (lsDaten.abzuege || []).find(x => x.id === id) : null;
+  $('lsDlgTitel').textContent = a ? 'Satz ändern' : 'Satz erfassen';
+  $('lsId').value = a ? a.id : '';
+  $('lsSchluessel').innerHTML = Object.entries(lsDaten.katalog || {})
+    .map(([k, t]) => `<option value="${k}">${t}</option>`).join('');
+  // Erste Wahl des Katalogs statt eines fest getippten Schlüssels: 'ahv'
+  // stand hier und gibt es nicht mehr -- die Auswahl wäre leer geblieben.
+  $('lsSchluessel').value = a ? a.schluessel
+    : (vorauswahl || Object.keys(lsDaten.katalog || {})[0] || '');
+  $('lsAb').value = a ? a.gueltig_ab : '';
+  $('lsBis').value = a && a.gueltig_bis ? a.gueltig_bis : '';
+  $('lsSatz').value = a && a.satz_bp !== null ? (a.satz_bp / 100).toFixed(2) : '';
+  $('lsFix').value = a && a.fix_rappen !== null ? (a.fix_rappen / 100).toFixed(2) : '';
+  $('lsQuelle').value = a ? (a.quelle || '') : '';
+  $('lsLoeschKnopf').style.display = a ? '' : 'none';
+  $('lsFehler').style.display = 'none';
+  openDlg('dlgLohnsatz');
+}
+
+function lohnSatzSpeichern() {
+  const body = {
+    id: $('lsId').value ? Number($('lsId').value) : 0,
+    schluessel: $('lsSchluessel').value,
+    gueltig_ab: $('lsAb').value,
+    gueltig_bis: $('lsBis').value,
+    satz_prozent: $('lsSatz').value.trim(),
+    fix_franken: $('lsFix').value.trim(),
+    quelle: $('lsQuelle').value.trim(),
+  };
+  api('lohn_abzuege.php', { method: 'POST', body }).then(({ ok, data }) => {
+    if (!ok) {
+      $('lsFehler').textContent = data?.message || 'Speichern fehlgeschlagen.';
+      $('lsFehler').style.display = '';
+      return;
+    }
+    lsDaten.abzuege = data.abzuege; lsDaten.fehlend = data.fehlend;
+    lsDaten.wirkungslos = data.wirkungslos || [];
+    closeDlg('dlgLohnsatz');
+    lohnSaetzeZeichnen();
+    toast('Satz gespeichert.');
+  });
+}
+
+function lohnSatzLoeschen() {
+  const id = Number($('lsId').value);
+  if (!id) { return; }
+  api('lohn_abzuege.php', { method: 'POST', body: { id, loeschen: true } }).then(({ ok, data }) => {
+    if (!ok) {
+      $('lsFehler').textContent = data?.message || 'Löschen fehlgeschlagen.';
+      $('lsFehler').style.display = '';
+      return;
+    }
+    lsDaten.abzuege = data.abzuege; lsDaten.fehlend = data.fehlend;
+    lsDaten.wirkungslos = data.wirkungslos || [];
+    closeDlg('dlgLohnsatz');
+    lohnSaetzeZeichnen();
+    toast('Satz gelöscht.');
+  });
+}
+
+// ══════════════════════ LOHN IN DER PERSONALAKTE (ENT-451) ═══════════════
+// Der fuenfte Bereich der Akte, neben Person, Anstellung, Einsatz und
+// Zugang. Er steht HIER und nicht im Reiter "Lohn": Die Stammdaten haengen
+// an einer Person, und zwei Formulare fuer dieselben Daten waeren zwei
+// Orte, an denen ein Feld fehlen kann.
+//
+// Die Ansicht trennt sichtbar drei Dinge, die leicht durcheinandergeraten:
+//   ABGELEITET  — was der GAV aus Kategorie, Eintritt und Alter ergibt.
+//                 Nicht erfassbar, nur nachvollziehbar.
+//   ERFASST     — Ansatz, Abzugsparameter, Zahlungswege. Historisiert.
+//   FEHLT       — was noch nicht da ist, namentlich benannt. Ein leeres
+//                 Feld darf nie wie eine Null aussehen.
+let lohnAkte = null;
+let lohnAkteFuer = null;
+
+function lohnAkteLaden() {
+  const ziel = $('mdBereich_lohn');
+  if (!ziel) { return; }
+  const id = maAkte && maAkte.id;
+  if (!id) { ziel.innerHTML = '<div style="color:var(--ink-3)">Wird geladen …</div>'; return; }
+  if (lohnAkteFuer === id && lohnAkte) { lohnAkteZeichnen(); return; }
+  ziel.innerHTML = '<div style="color:var(--ink-3)">Wird geladen …</div>';
+  api('lohn_person.php?id=' + encodeURIComponent(id)).then(({ ok, status, data }) => {
+    if (!ok) { ziel.innerHTML = lohnLeer(lohnLeerArt(status, data), data?.message); return; }
+    lohnAkte = data; lohnAkteFuer = id;
+    lohnAkteZeichnen();
+  });
+}
+
+// Ein abgeleiteter Wert, der nicht berechenbar war. Der GRUND steht da,
+// nicht ein Gedankenstrich -- "unbekannt" und "keine" sind zwei Aussagen.
+const lohnUnbekannt = text =>
+  `<span class="zone-note" style="font-style:italic">${esc(text || 'nicht ermittelbar')}</span>`;
+
+function lohnAkteZeichnen() {
+  const ziel = $('mdBereich_lohn');
+  if (!ziel || !lohnAkte) { return; }
+  const d = lohnAkte.abgeleitet || {};
+  const p = lohnAkte.person || {};
+  const ml = d.mindestlohn || {};
+  const fe = d.ferienentschaedigung || {};
+
+  const mlText = ml.wert === null || ml.wert === undefined
+    ? lohnUnbekannt(ml.text)
+    : `<b>${lohnFr(ml.wert)} CHF</b> ${ml.einheit === 'stunde' ? 'pro Stunde' : 'pro Jahr'}
+       <div class="zone-note" style="margin:2px 0 0">${esc(ml.text || '')}</div>`;
+
+  // Die Ferienentschaedigung wird ABGELEITET und nicht eingetippt: Ein frei
+  // erfasster Prozentsatz driftet vom Anspruch weg, und dann stimmt der
+  // Feriensaldo nicht mehr mit dem ausbezahlten Betrag ueberein.
+  const feText = `<b>${lohnPz(fe.bp)}</b>
+    <div class="zone-note" style="margin:2px 0 0">${esc(fe.text || '')}</div>`;
+
+  const abgeleitet = `<div class="card"><div class="card-hd"><h3>Aus dem GAV abgeleitet</h3></div>
+    <div class="card-bd">
+      <p class="zone-note" style="margin:0 0 12px">Diese Werte entstehen aus Anstellungskategorie,
+        Eintritt und Alter. Sie lassen sich hier nicht erfassen — wer sie ändern will, ändert die
+        Angabe, aus der sie entstehen.</p>
+      <dl class="ku-detail-info">
+        <dt>Lohnform</dt><dd>${d.lohnform ? esc(d.lohnform_text) : lohnUnbekannt(d.lohnform_text)}</dd>
+        <dt>Dienstjahr</dt><dd>${d.dienstjahr ? esc(String(d.dienstjahr)) + '. Dienstjahr'
+          : lohnUnbekannt('Ohne Eintrittsdatum kein Dienstjahr (Art. 16 Ziff. 2)')}</dd>
+        <dt>GAV-Mindestlohn</dt><dd>${mlText}</dd>
+        <dt>Ferienentschädigung</dt><dd>${feText}</dd>
+        <dt>BVG-pflichtig ab</dt><dd>${d.bvg_pflichtig_ab ? dmy(d.bvg_pflichtig_ab)
+          : lohnUnbekannt('Ohne Geburtsdatum keine Eintrittsschwelle (Art. 25 Ziff. 3)')}</dd>
+        <dt>AHV-Nummer</dt><dd>${p.ahv_erfasst
+          ? 'erfasst'
+          : '<span class="chip chip-w">fehlt — ohne sie ist keine Abrechnung möglich</span>'}</dd>
+      </dl>
+    </div></div>`;
+
+  // Die Mindestlohnwarnung steht OBEN und nicht bei der Ansatzzeile: Wer
+  // unter Tarif zahlt, soll es sehen, bevor er scrollt.
+  const w = lohnAkte.warnung;
+  const warnung = w ? `<div class="msg-warn" style="margin:0 0 14px">
+      <b>Der Ansatz liegt unter dem GAV-Mindestlohn.</b>
+      <div style="margin:4px 0 0">${esc(w.text)}</div>
+      <div class="zone-note" style="margin:6px 0 0">Das ist eine Warnung, keine Sperre — Anhang 1
+        lässt für unter 25-Jährige in Kategorie A bis 150 CHF im Monat weniger zu. Das Werkzeug
+        wendet diese Kann-Bestimmung nie von sich aus an.</div>
+    </div>` : '';
+
+  // ── Ansätze, neueste zuerst. Der heute geltende ist markiert; ein
+  //    künftiger ist erfasst, aber noch nicht gültig, und darf nicht
+  //    aussehen wie der aktuelle.
+  const aktuellId = lohnAkte.ansatz_aktuell ? lohnAkte.ansatz_aktuell.id : null;
+  const heute = d.stichtag || '';
+  const ansaetze = (lohnAkte.ansaetze || []).map(a => {
+    const kuenftig = a.gueltig_ab > heute;
+    const marke = a.id === aktuellId
+      ? ' <span class="chip chip-ok">gilt heute</span>'
+      : (kuenftig ? ' <span class="chip">ab ' + dmy(a.gueltig_ab) + '</span>' : '');
+    const zus = [];
+    if (a.zuschlag_fachausweis_rappen) { zus.push(`Fachausweis ${lohnFr(a.zuschlag_fachausweis_rappen)} / ${a.zuschlag_fachausweis_art === 'monat' ? 'Monat' : 'Stunde'}`); }
+    if (a.zuschlag_hund_rappen) { zus.push(`Diensthund ${lohnFr(a.zuschlag_hund_rappen)} / ${a.zuschlag_hund_art === 'monat' ? 'Monat' : 'Stunde'}`); }
+    if (a.zuschlag_waffe_rappen) { zus.push(`Schusswaffe ${lohnFr(a.zuschlag_waffe_rappen)} / ${a.zuschlag_waffe_art === 'monat' ? 'Monat' : 'Stunde'}`); }
+    return `<tr${kuenftig ? ' style="opacity:.7"' : ''}>
+      <td>${dmy(a.gueltig_ab)}${marke}</td>
+      <td style="text-align:right"><b>${lohnFr(a.ansatz_rappen)}</b></td>
+      <td>${a.kategorie ? 'Kat. ' + esc(a.kategorie) : lohnUnbekannt('ohne Kategorie')}</td>
+      <td>${a.ml13_bp ? lohnPz(a.ml13_bp) : '<span class="zone-note" title="Kein 13. Monatslohn vereinbart — er ist keine GAV-Pflicht">keiner</span>'}</td>
+      <td>${a.ferien_laufend ? 'laufend' : '<span title="Der Ferienlohn wird beim Bezug ausbezahlt, Art. 20 Ziff. 2">beim Bezug</span>'}</td>
+      <td>${zus.length ? esc(zus.join(' · ')) : '<span class="zone-note">keine</span>'}</td>
+      <td style="text-align:right">${lohnSchreiben()
+        ? `<button class="btn btn-quiet btn-sm" onclick="lohnAnsatzOeffnen(${a.id})">Ändern</button>` : ''}</td>
+    </tr>`;
+  }).join('');
+
+  const ansatzKarte = `<div class="card"><div class="card-hd"><h3>Lohnansatz</h3>
+      ${lohnSchreiben() ? `<button class="btn btn-primary btn-sm" onclick="lohnAnsatzOeffnen(null)">Ansatz erfassen</button>` : ''}</div>
+    <div class="card-bd">
+      ${warnung}
+      ${ansaetze ? `<div style="overflow-x:auto"><table class="tbl"><thead><tr>
+          <th>Gültig ab</th><th style="text-align:right">Ansatz CHF</th><th>Kategorie</th>
+          <th>13. ML</th><th>Ferienlohn</th><th>Zuschläge Art. 19</th><th></th>
+        </tr></thead><tbody>${ansaetze}</tbody></table></div>
+        <p class="zone-note">Ein neuer Ansatz wird <b>zusätzlich</b> erfasst — der alte bleibt stehen,
+          damit abgeschlossene Abrechnungen sich nicht rückwirkend ändern.</p>`
+        : lohnLeer('leer', 'Noch kein Lohnansatz erfasst. Ohne ihn kann für diese Person nicht abgerechnet werden.')}
+    </div></div>`;
+
+  // ── Abzugsparameter je Person ──────────────────────────────────────────
+  const abz = (lohnAkte.abzuege || []).map(a => `<tr>
+      <td>${dmy(a.gueltig_ab)}</td>
+      <td>${a.nbu_pflichtig === null || a.nbu_pflichtig === undefined
+        ? '<span class="zone-note">automatisch</span>'
+        : `<span class="chip ${Number(a.nbu_pflichtig) ? 'chip-ok' : 'chip-x'}">${
+             Number(a.nbu_pflichtig) ? 'versichert' : 'nicht versichert'}</span>
+           <div class="zone-note">von Hand${a.nbu_grund ? ': ' + esc(a.nbu_grund) : ' — ohne Begründung'}${
+             a.nbu_am ? ', ' + dmy(String(a.nbu_am).slice(0, 10)) : ''}</div>`}</td>
+      <td>${Number(a.ktg_pflichtig) ? 'ja' : 'nein'}</td>
+      <td>${Number(a.bvg_angeschlossen)
+        ? (a.bvg_beitrag_rappen !== null ? lohnFr(a.bvg_beitrag_rappen) + ' CHF/Monat'
+           : lohnUnbekannt('angeschlossen, Betrag fehlt'))
+        : 'nicht angeschlossen'}</td>
+      <td>${Number(a.qst_pflichtig)
+        ? esc((a.qst_kanton || '?') + ' · Tarif ' + (a.qst_tarifcode || '?')
+              + (a.qst_kinder ? ' · ' + a.qst_kinder + ' Kind(er)' : ''))
+        : 'nein'}</td>
+      <td style="text-align:right">${lohnSchreiben()
+        ? `<button class="btn btn-quiet btn-sm" onclick="lohnAbzugOeffnen(${a.id})">Ändern</button>` : ''}</td>
+    </tr>`).join('');
+
+  const abzugKarte = `<div class="card"><div class="card-hd"><h3>Abzüge dieser Person</h3>
+      ${lohnSchreiben() ? `<button class="btn btn-primary btn-sm" onclick="lohnAbzugOeffnen(null)">Erfassen</button>` : ''}</div>
+    <div class="card-bd">
+      ${abz ? `<div style="overflow-x:auto"><table class="tbl"><thead><tr>
+          <th>Gültig ab</th><th>NBU</th><th>KTG</th><th>BVG</th><th>Quellensteuer</th><th></th>
+        </tr></thead><tbody>${abz}</tbody></table></div>
+        <p class="zone-note">Der BVG-Betrag kommt aus der Meldung der Pensionskasse und wird nicht
+          hergeleitet — die Skala der Kasse ist deren Vertragswerk, nicht der GAV.</p>`
+        : lohnLeer('leer', 'Noch nichts erfasst. Ohne diese Angaben ist offen, was abgezogen wird — '
+                 + 'und offen ist nicht dasselbe wie null.')}
+    </div></div>`;
+
+  // ── Zahlungswege ───────────────────────────────────────────────────────
+  const zahl = (lohnAkte.zahlungen || []).map(z => `<tr${Number(z.aktiv) ? '' : ' style="opacity:.55"'}>
+      <td>${z.reihenfolge}</td>
+      <td>${z.art === 'fix' ? lohnFr(z.betrag_rappen) + ' CHF fest' : 'Restbetrag'}</td>
+      <td style="font-variant-numeric:tabular-nums">${esc(z.iban)}</td>
+      <td>${esc(z.empfaenger || '')}${z.bank ? '<div class="zone-note">' + esc(z.bank) + '</div>' : ''}</td>
+      <td>${Number(z.aktiv) ? 'aktiv' : 'inaktiv'}</td>
+      <td style="text-align:right">${lohnSchreiben()
+        ? `<button class="btn btn-quiet btn-sm" onclick="lohnZahlungOeffnen(${z.id})">Ändern</button>` : ''}</td>
+    </tr>`).join('');
+
+  const zahlKarte = `<div class="card"><div class="card-hd"><h3>Auszahlung</h3>
+      ${lohnSchreiben() ? `<button class="btn btn-primary btn-sm" onclick="lohnZahlungOeffnen(null)">Empfänger erfassen</button>` : ''}</div>
+    <div class="card-bd">
+      ${zahl ? `<div style="overflow-x:auto"><table class="tbl"><thead><tr>
+          <th>Nr.</th><th>Anteil</th><th>IBAN</th><th>Empfänger</th><th></th><th></th>
+        </tr></thead><tbody>${zahl}</tbody></table></div>
+        <p class="zone-note">Genau ein Empfänger bekommt den Restbetrag. Weitere brauchen einen festen
+          Betrag — so lässt sich der Lohn auf mehrere Konten aufteilen.</p>`
+        : lohnLeer('leer', 'Noch kein Empfänger erfasst. Ohne IBAN lässt sich der Lohn nicht auszahlen.')}
+    </div></div>`;
+
+  ziel.innerHTML = `<div class="ma-lohn" style="display:grid;gap:16px">
+    ${abgeleitet}${ansatzKarte}${abzugKarte}${zahlKarte}</div>`;
+}
+
+// ── Dialog: Lohnansatz ───────────────────────────────────────────────────
+function lohnAnsatzOeffnen(id) {
+  const a = id ? (lohnAkte.ansaetze || []).find(x => x.id === id) : null;
+  $('lpaTitel').textContent = a ? 'Lohnansatz ändern' : 'Lohnansatz erfassen';
+  $('lpaId').value = a ? a.id : '';
+  $('lpaAb').value = a ? a.gueltig_ab : '';
+  $('lpaAnsatz').value = a ? (a.ansatz_rappen / 100).toFixed(2) : '';
+  $('lpaMl13').value = a && a.ml13_bp ? (a.ml13_bp / 100).toFixed(2) : '';
+  $('lpaFerienLaufend').checked = a ? !!Number(a.ferien_laufend) : false;
+  [['Fach', 'fachausweis'], ['Hund', 'hund'], ['Waffe', 'waffe']].forEach(([kurz, feld]) => {
+    $('lpaZ' + kurz).value = a && a['zuschlag_' + feld + '_rappen']
+      ? (a['zuschlag_' + feld + '_rappen'] / 100).toFixed(2) : '';
+    $('lpaZ' + kurz + 'Art').value = a && a['zuschlag_' + feld + '_art'] ? a['zuschlag_' + feld + '_art'] : 'stunde';
+  });
+  $('lpaBemerkung').value = a ? (a.bemerkung || '') : '';
+  $('lpaLoeschKnopf').style.display = a ? '' : 'none';
+  // Die Lohnform steht im Dialog, damit klar ist, WORAUF sich der Betrag
+  // bezieht -- 25.00 heisst je nach Kategorie pro Stunde oder pro Monat.
+  const form = (lohnAkte.abgeleitet || {}).lohnform;
+  $('lpaEinheit').textContent = form === 'monat' ? 'CHF pro Monat'
+    : (form === 'stunde' ? 'CHF pro Stunde' : 'Einheit unbekannt — ohne Anstellungskategorie');
+  $('lpaFehler').style.display = 'none';
+  openDlg('dlgLohnAnsatz');
+}
+
+function lohnAnsatzSpeichern() {
+  const body = {
+    id: lohnAkte.person.id, was: 'ansatz',
+    eintrag_id: $('lpaId').value ? Number($('lpaId').value) : 0,
+    gueltig_ab: $('lpaAb').value,
+    ansatz: $('lpaAnsatz').value.trim(),
+    ml13_bp: $('lpaMl13').value.trim() === '' ? '' : Math.round(parseFloat($('lpaMl13').value.replace(',', '.')) * 100),
+    ferien_laufend: $('lpaFerienLaufend').checked,
+    zuschlag_fachausweis: $('lpaZFach').value.trim(), zuschlag_fachausweis_art: $('lpaZFachArt').value,
+    zuschlag_hund: $('lpaZHund').value.trim(), zuschlag_hund_art: $('lpaZHundArt').value,
+    zuschlag_waffe: $('lpaZWaffe').value.trim(), zuschlag_waffe_art: $('lpaZWaffeArt').value,
+    bemerkung: $('lpaBemerkung').value.trim(),
+  };
+  lohnAkteSchreiben(body, 'dlgLohnAnsatz', 'lpaFehler', 'Lohnansatz gespeichert.');
+}
+
+// ── Dialog: Abzüge der Person ────────────────────────────────────────────
+function lohnAbzugOeffnen(id) {
+  const a = id ? (lohnAkte.abzuege || []).find(x => Number(x.id) === id) : null;
+  $('lpbTitel').textContent = a ? 'Abzüge ändern' : 'Abzüge erfassen';
+  $('lpbId').value = a ? a.id : '';
+  $('lpbAb').value = a ? a.gueltig_ab : '';
+  // null heisst automatisch -- und ohne Eintrag ist automatisch die Vorgabe.
+  $('lpbNbu').value = !a || a.nbu_pflichtig === null || a.nbu_pflichtig === undefined
+    ? 'automatisch' : (Number(a.nbu_pflichtig) ? 'versichert' : 'nicht');
+  $('lpbNbuGrund').value = a ? (a.nbu_grund || '') : '';
+  lohnNbuUmschalten();
+  $('lpbKtg').checked = a ? !!Number(a.ktg_pflichtig) : true;
+  $('lpbBvg').checked = a ? !!Number(a.bvg_angeschlossen) : false;
+  $('lpbBvgBetrag').value = a && a.bvg_beitrag_rappen !== null ? (a.bvg_beitrag_rappen / 100).toFixed(2) : '';
+  $('lpbQst').checked = a ? !!Number(a.qst_pflichtig) : false;
+  $('lpbQstKanton').value = a ? (a.qst_kanton || '') : '';
+  $('lpbQstTarif').value = a ? (a.qst_tarifcode || '') : '';
+  $('lpbQstKinder').value = a && a.qst_kinder !== null ? a.qst_kinder : '';
+  $('lpbBemerkung').value = a ? (a.bemerkung || '') : '';
+  $('lpbLoeschKnopf').style.display = a ? '' : 'none';
+  $('lpbFehler').style.display = 'none';
+  lohnQstUmschalten();
+  openDlg('dlgLohnAbzug');
+}
+
+// Quellensteuerfelder nur zeigen, wenn sie gebraucht werden. Ein leeres
+// Tarifcode-Feld neben einem nicht gesetzten Haken sieht aus wie eine
+// vergessene Eingabe.
+function lohnQstUmschalten() {
+  $('lpbQstFelder').style.display = $('lpbQst').checked ? '' : 'none';
+}
+
+// Das Begruendungsfeld erscheint nur, wenn von Hand entschieden wird --
+// und daneben steht, WAS die Rechnung sagt. Ohne diesen Vergleich
+// uebersteuert man blind: Man sieht nicht, ob man der Rechnung widerspricht
+// oder ihr nur zustimmt.
+function lohnNbuUmschalten() {
+  const uebersteuert = $('lpbNbu').value !== 'automatisch';
+  $('lpbNbuGrundFeld').style.display = uebersteuert ? '' : 'none';
+  const n = lohnAkte && lohnAkte.nbu;
+  const e = $('lpbNbuStand');
+  if (!e) { return; }
+  if (!n) {
+    e.innerHTML = '';
+    return;
+  }
+  const wie = { versichert: ['chip-ok', 'versichert'], nicht_versichert: ['chip-x', 'nicht versichert'],
+                pruefen: ['chip-w', 'von Hand prüfen'], unbekannt: ['chip-w', 'unbekannt'] }[n.stand]
+              || ['chip', n.stand];
+  const widerspruch = uebersteuert
+    && ((($('lpbNbu').value === 'versichert') && n.stand === 'nicht_versichert')
+     || (($('lpbNbu').value === 'nicht') && n.stand === 'versichert'));
+  e.innerHTML = `Die Rechnung sagt heute: <span class="chip ${wie[0]}">${wie[1]}</span>`
+    + (widerspruch
+       ? ' <span class="chip chip-w" title="Die Übersteuerung widerspricht der Rechnung — das ist zulässig, sollte aber begründet sein">Sie widersprechen dem</span>'
+       : '')
+    + (n.text ? `<div style="margin-top:2px">${esc(n.text)}</div>` : '');
+}
+
+function lohnAbzugSpeichern() {
+  const body = {
+    id: lohnAkte.person.id, was: 'abzug',
+    eintrag_id: $('lpbId').value ? Number($('lpbId').value) : 0,
+    gueltig_ab: $('lpbAb').value,
+    nbu_pflichtig: $('lpbNbu').value,
+    nbu_grund: $('lpbNbuGrund').value.trim(),
+    ktg_pflichtig: $('lpbKtg').checked,
+    bvg_angeschlossen: $('lpbBvg').checked,
+    bvg_beitrag: $('lpbBvgBetrag').value.trim(),
+    qst_pflichtig: $('lpbQst').checked,
+    qst_kanton: $('lpbQstKanton').value.trim(),
+    qst_tarifcode: $('lpbQstTarif').value.trim(),
+    qst_kinder: $('lpbQstKinder').value.trim(),
+    bemerkung: $('lpbBemerkung').value.trim(),
+  };
+  lohnAkteSchreiben(body, 'dlgLohnAbzug', 'lpbFehler', 'Abzüge gespeichert.');
+}
+
+// ── Dialog: Zahlungsempfänger ────────────────────────────────────────────
+function lohnZahlungOeffnen(id) {
+  const z = id ? (lohnAkte.zahlungen || []).find(x => Number(x.id) === id) : null;
+  $('lpzTitel').textContent = z ? 'Empfänger ändern' : 'Empfänger erfassen';
+  $('lpzId').value = z ? z.id : '';
+  $('lpzReihenfolge').value = z ? z.reihenfolge : ((lohnAkte.zahlungen || []).length + 1);
+  $('lpzArt').value = z ? z.art : 'rest';
+  $('lpzBetrag').value = z && z.betrag_rappen !== null ? (z.betrag_rappen / 100).toFixed(2) : '';
+  $('lpzIban').value = z ? z.iban : '';
+  $('lpzEmpfaenger').value = z ? (z.empfaenger || '') : '';
+  $('lpzBank').value = z ? (z.bank || '') : '';
+  $('lpzAktiv').checked = z ? !!Number(z.aktiv) : true;
+  $('lpzLoeschKnopf').style.display = z ? '' : 'none';
+  $('lpzFehler').style.display = 'none';
+  lohnZahlArtUmschalten();
+  openDlg('dlgLohnZahlung');
+}
+
+function lohnZahlArtUmschalten() {
+  $('lpzBetragFeld').style.display = $('lpzArt').value === 'fix' ? '' : 'none';
+}
+
+function lohnZahlungSpeichern() {
+  const body = {
+    id: lohnAkte.person.id, was: 'zahlung',
+    eintrag_id: $('lpzId').value ? Number($('lpzId').value) : 0,
+    reihenfolge: Number($('lpzReihenfolge').value) || 1,
+    art: $('lpzArt').value,
+    betrag: $('lpzBetrag').value.trim(),
+    iban: $('lpzIban').value.trim(),
+    empfaenger: $('lpzEmpfaenger').value.trim(),
+    bank: $('lpzBank').value.trim(),
+    aktiv: $('lpzAktiv').checked,
+  };
+  lohnAkteSchreiben(body, 'dlgLohnZahlung', 'lpzFehler', 'Empfänger gespeichert.');
+}
+
+// EIN Schreibweg fuer alle drei Dialoge. Drei Kopien waeren drei Stellen,
+// an denen die Fehlerbehandlung auseinanderlaufen kann.
+function lohnAkteSchreiben(body, dialog, fehlerId, meldung) {
+  api('lohn_person.php', { method: 'POST', body }).then(({ ok, data }) => {
+    if (!ok) {
+      $(fehlerId).textContent = data?.message || 'Speichern fehlgeschlagen.';
+      $(fehlerId).style.display = '';
+      return;
+    }
+    lohnAkte = data;
+    closeDlg(dialog);
+    lohnAkteZeichnen();
+    toast(meldung);
+  });
+}
+
+function lohnAkteLoeschen(was, eintragId, dialog, fehlerId) {
+  if (!eintragId) { return; }
+  lohnAkteSchreiben({ id: lohnAkte.person.id, was, eintrag_id: eintragId, loeschen: true },
+    dialog, fehlerId, 'Eintrag entfernt.');
 }
 
 // ══════════════════════ AUSWERTUNG: ARBEITSERGEBNISSE (ENT-243) ══════════

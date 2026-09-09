@@ -48,7 +48,7 @@ $bereiche = bereiche_katalog();
 // Feste Zahl und keine Selbstzaehlung: Sie zwingt jeden, der einen Bereich
 // ergaenzt, hier vorbeizukommen und es bewusst zu tun. Einundzwanzig seit
 // ENT-441 ('portal' -- Kundenzugaenge).
-pruef('Es gibt 21 Bereiche (ENT-440, ENT-441)', count($bereiche) === 21);
+pruef('Es gibt 22 Bereiche (ENT-440, ENT-441, ENT-451)', count($bereiche) === 22);
 pruef('Jeder Bereich nennt Gruppe, Titel, Text und Stufen',
     count(array_filter($bereiche, fn($b) => isset($b['gruppe'], $b['titel'], $b['text'], $b['stufen'])
         && $b['titel'] !== '' && $b['text'] !== '' && $b['stufen'] !== [])) === count($bereiche));

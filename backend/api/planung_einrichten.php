@@ -27,6 +27,9 @@ require_once __DIR__ . '/../kunden.php';
 require_once __DIR__ . '/../produkte.php';
 require_once __DIR__ . '/../rundgang.php';
 require_once __DIR__ . '/../fahrzeug.php';
+// Der Lohnartenkatalog steht in lohn.php, damit Pruefungen ihn erreichen
+// (ENT-451).
+require_once __DIR__ . '/../lohn.php';
 
 $user = require_session();
 require_recht($user, 'betrieb_schreiben');
@@ -1545,6 +1548,308 @@ CREATE TABLE IF NOT EXISTS kunden_sessions (
   FOREIGN KEY (zugang_id) REFERENCES kundenzugang(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+// ══ Lohn (ENT-451) ══════════════════════════════════════════════════════
+// Vier Tabellen, weil vier verschiedene Dinge: WAS eine Person verdient
+// (lohn_ansatz), WAS ihr abgezogen wird (lohn_person), WELCHE Saetze der
+// Betrieb anwendet (lohn_abzug) und WELCHE Zeilen eine Abrechnung ueberhaupt
+// kennt (lohnart). Eine gemeinsame Tabelle waere kuerzer und liesse sich
+// spaeter nicht mehr auseinandernehmen.
+//
+// ALLE Personen-Tabellen sind HISTORISIERT: eine Zeile je Gueltigkeitsdatum,
+// nie ein Ueberschreiben. Sonst veraendert eine Ansatzerhoehung rueckwirkend
+// abgeschlossene Abrechnungen -- genau das, was CLAUDE.md Teil B ausschliesst.
+// Betraege durchgehend in RAPPEN, Prozentsaetze in Basispunkten (833 = 8,33 %).
+
+// Der Lohnartenkatalog. Eine Tabelle und kein Quelltext (ENT-451): Jede
+// neue Zulage waere sonst ein Deploy. Die sechs *_pflichtig-Kennzeichen
+// sind der Kern -- sie erklaeren, warum eine Position in einer
+// Bemessungsgrundlage auftaucht und in einer anderen nicht.
+'lohnart' => "
+CREATE TABLE IF NOT EXISTS lohnart (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  schluessel VARCHAR(40) NOT NULL,
+  bezeichnung VARCHAR(120) NOT NULL,
+  -- stundensatz | prozent | fixbetrag | monatslohn | abzug | netto
+  -- VARCHAR statt ENUM, gleiche Wahl wie bei objekte.sparte: eine siebte
+  -- Art soll keine Tabellenaenderung brauchen.
+  art VARCHAR(20) NOT NULL,
+  -- Bei art='prozent': worauf sich der Satz bezieht.
+  basis_schluessel VARCHAR(40) NULL,
+  satz_bp INT NULL,
+  ahv_pflichtig TINYINT(1) NOT NULL DEFAULT 0,
+  ferien_pflichtig TINYINT(1) NOT NULL DEFAULT 0,
+  ml13_pflichtig TINYINT(1) NOT NULL DEFAULT 0,
+  bvg_pflichtig TINYINT(1) NOT NULL DEFAULT 0,
+  uvg_pflichtig TINYINT(1) NOT NULL DEFAULT 0,
+  qst_pflichtig TINYINT(1) NOT NULL DEFAULT 0,
+  -- Traegt die Zeile einen Betrag der Abrechnungsperiode? Siehe den
+  -- ausfuehrlichen Kommentar bei lohnart_startbestand() in backend/lohn.php:
+  -- Ohne diese Spalte zaehlte der Stundenlohn zweimal.
+  bemessung TINYINT(1) NOT NULL DEFAULT 0,
+  -- Der Artikel, auf dem die Lohnart beruht. Leer heisst 'betrieblich' --
+  -- das ist eine Aussage, keine Luecke: Der 13. Monatslohn etwa ist KEINE
+  -- GAV-Pflicht (er kommt nur in Art. 25 Ziff. 2 als BVG-Bemessung vor).
+  gav_grundlage VARCHAR(120) NULL,
+  -- Vom Werkzeug angelegt und nicht loeschbar. Wer den Grundlohn loescht,
+  -- haette eine Abrechnung ohne Lohn.
+  system TINYINT(1) NOT NULL DEFAULT 0,
+  sortierung INT NOT NULL DEFAULT 100,
+  aktiv TINYINT(1) NOT NULL DEFAULT 1,
+  bemerkung TEXT NULL,
+  geaendert_am DATETIME NULL,
+  geaendert_von INT NULL,
+  UNIQUE KEY uq_schluessel (schluessel),
+  KEY idx_aktiv (aktiv, sortierung)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+// Was eine Person verdient, ab wann. Die LOHNFORM steht hier NICHT als
+// eigenes Feld -- sie folgt nach Art. 8 Ziff. 1a aus der Kategorie und wird
+// in lohn.php abgeleitet. Die Kategorie selbst wird mitgeschrieben, damit
+// eine spaetere Umstufung den alten Ansatz nicht umdeutet.
+'lohn_ansatz' => "
+CREATE TABLE IF NOT EXISTS lohn_ansatz (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  mitarbeiter_id INT NOT NULL,
+  gueltig_ab DATE NOT NULL,
+  -- Schnappschuss der Kategorie nach Art. 8 zum Zeitpunkt der Erfassung.
+  kategorie CHAR(1) NULL,
+  -- Stundenlohn (Kat. C) oder Monatslohn (Kat. A/B) -- welches von beidem,
+  -- sagt die Kategorie. Ohne Ferienentschaedigung: der Zuschlag nach
+  -- Art. 20 Ziff. 2 kommt obendrauf und wird abgeleitet, nicht erfasst.
+  ansatz_rappen INT NOT NULL,
+  -- Art. 20 Ziff. 2: Die laufende Auszahlung des Ferienlohnes ist NUR
+  -- zulaessig bei unregelmaessiger Teilzeit oder kurzen Einsaetzen, wenn es
+  -- im Vertrag schriftlich steht und in jeder Abrechnung separat
+  -- ausgewiesen wird. Fehlt das Kennzeichen, wird der Anspruch als Guthaben
+  -- gefuehrt statt laufend ausbezahlt (GAV-AUS-016).
+  ferien_laufend TINYINT(1) NOT NULL DEFAULT 0,
+  -- Anteil 13. Monatslohn in Basispunkten. BETRIEBLICH, keine GAV-Pflicht --
+  -- NULL heisst 'kein 13. Monatslohn vereinbart', nicht '0 %'.
+  ml13_bp INT NULL,
+  -- Art. 19: je Zuschlag entweder 'monat' oder 'stunde' und der Betrag.
+  -- Wer waehlt und wie 'pro rata' bemisst, ist GAV-AUS-014; erfasst wird
+  -- darum, was im Vertrag steht, statt es herzuleiten.
+  zuschlag_fachausweis_art VARCHAR(10) NULL,
+  zuschlag_fachausweis_rappen INT NULL,
+  zuschlag_hund_art VARCHAR(10) NULL,
+  zuschlag_hund_rappen INT NULL,
+  zuschlag_waffe_art VARCHAR(10) NULL,
+  zuschlag_waffe_rappen INT NULL,
+  bemerkung TEXT NULL,
+  erfasst_am DATETIME DEFAULT CURRENT_TIMESTAMP,
+  erfasst_von INT NULL,
+  UNIQUE KEY uq_person_ab (mitarbeiter_id, gueltig_ab),
+  FOREIGN KEY (mitarbeiter_id) REFERENCES mitarbeiter(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+// Was einer Person abgezogen wird, ab wann. Getrennt vom Ansatz, weil sich
+// beides unabhaengig aendert: Eine Lohnerhoehung ist kein Kassenwechsel.
+'lohn_person' => "
+CREATE TABLE IF NOT EXISTS lohn_person (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  mitarbeiter_id INT NOT NULL,
+  gueltig_ab DATE NOT NULL,
+  -- UEBERSTEUERUNG der NBU-Unterstellung, dreiwertig.
+  --   NULL = automatisch nach Empfehlung 7/87 aus den geleisteten Stunden
+  --   1    = von Hand auf 'versichert' gesetzt
+  --   0    = von Hand auf 'nicht versichert' gesetzt
+  --
+  -- WARUM NICHT MEHR 'NOT NULL DEFAULT 1': In Etappe 2 stand hier ein fest
+  -- gespeichertes Ja/Nein je Person. Genau dieses Denken verwirft BGer
+  -- 8C_644/2025 (E. 5.4): Massgebend sind nicht die vertraglichen
+  -- Vereinbarungen, sondern die konkret geleisteten Arbeitsstunden. Ein
+  -- Vorgabewert 1 haette die Berechnung bei JEDER Person stillschweigend
+  -- ueberstimmt -- und zwar in Richtung Abzug.
+  nbu_pflichtig TINYINT(1) NULL DEFAULT NULL,
+  -- Eine Uebersteuerung ohne Begruendung ist spaeter nicht nachvollziehbar.
+  -- Art. 12 Ziff. 5 GAV verlangt eine nachvollziehbare Abrechnung; wer eine
+  -- gerechnete Unterstellung von Hand aendert, schuldet den Grund.
+  nbu_grund TEXT NULL,
+  nbu_von INT NULL,
+  nbu_am DATETIME NULL,
+  ktg_pflichtig TINYINT(1) NOT NULL DEFAULT 1,
+  bvg_angeschlossen TINYINT(1) NOT NULL DEFAULT 0,
+  -- Monatlicher Arbeitnehmer-Anteil aus der Meldung der Pensionskasse.
+  -- BEWUSST erfasst und NICHT hergeleitet (ENT-451): Die Skala der Kasse
+  -- ist deren Vertragswerk, nicht der GAV. Art. 25 Ziff. 3 gibt nur die
+  -- Untergrenze (9 % des koordinierten Lohnes, hoechstens die Haelfte
+  -- davon zulasten der Person) -- eine selbst gerechnete Altersgutschrift
+  -- waere eine Behauptung ueber einen fremden Vertrag.
+  bvg_beitrag_rappen INT NULL,
+  qst_pflichtig TINYINT(1) NOT NULL DEFAULT 0,
+  qst_kanton VARCHAR(2) NULL,
+  qst_tarifcode VARCHAR(10) NULL,
+  qst_kinder INT NULL,
+  bemerkung TEXT NULL,
+  erfasst_am DATETIME DEFAULT CURRENT_TIMESTAMP,
+  erfasst_von INT NULL,
+  UNIQUE KEY uq_person_ab (mitarbeiter_id, gueltig_ab),
+  FOREIGN KEY (mitarbeiter_id) REFERENCES mitarbeiter(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+// Betriebsweite Abzugssaetze mit Gueltigkeitszeitraum -- gleiche Bauart wie
+// GAV_REGELWERK in gav.js. Beim Fortschreiben wird ANGEHAENGT, der alte
+// Eintrag bleibt stehen: Eine Satzaenderung per 1.1. darf den Dezember
+// nicht rueckwirkend neu rechnen.
+'lohn_abzug' => "
+CREATE TABLE IF NOT EXISTS lohn_abzug (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  schluessel VARCHAR(20) NOT NULL,
+  bezeichnung VARCHAR(120) NOT NULL,
+  gueltig_ab DATE NOT NULL,
+  gueltig_bis DATE NULL,
+  -- Arbeitnehmer-Anteil in Basispunkten (530 = 5,30 %).
+  satz_bp INT NULL,
+  -- Nur wo der Satz nicht prozentual ist: PaKo Kat. A ist ein Monatsbetrag.
+  fix_rappen INT NULL,
+  -- UVG-Hoechstlohn je Jahr; NULL heisst 'keine Obergrenze'.
+  hoechstlohn_rappen INT NULL,
+  -- Woher der Wert stammt. An dieser Zahl haengt Geld -- da darf spaeter
+  -- niemand raten muessen, ob sie jemand eingetippt oder aus einer
+  -- Verfuegung uebernommen hat.
+  quelle VARCHAR(200) NULL,
+  bemerkung TEXT NULL,
+  geaendert_am DATETIME NULL,
+  geaendert_von INT NULL,
+  UNIQUE KEY uq_schluessel_ab (schluessel, gueltig_ab)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+// Wohin der Auszahlungsbetrag geht. Eine Zeile je Empfaenger, weil eine
+// Person mehr als einen haben kann -- eine Lohnpfaendung teilt den Betrag,
+// und ein einzelnes IBAN-Feld am Personalstamm koennte das nie abbilden.
+//
+// art='fix' nimmt einen festen Betrag vorweg, art='rest' bekommt, was
+// uebrig bleibt. Genau EINE Zeile je Person darf 'rest' sein; das prueft
+// der Endpunkt, nicht die Tabelle.
+//
+// Die IBAN ist ein vertrauliches Personenfeld und wird wie ahv_nr
+// behandelt: Sie verlaesst den Server nur mit dem Recht lohn_lesen.
+'lohn_zahlung' => "
+CREATE TABLE IF NOT EXISTS lohn_zahlung (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  mitarbeiter_id INT NOT NULL,
+  reihenfolge INT NOT NULL DEFAULT 1,
+  art VARCHAR(10) NOT NULL DEFAULT 'rest',
+  betrag_rappen INT NULL,
+  iban VARCHAR(34) NOT NULL,
+  empfaenger VARCHAR(200) NULL,
+  bank VARCHAR(200) NULL,
+  aktiv TINYINT(1) NOT NULL DEFAULT 1,
+  bemerkung TEXT NULL,
+  geaendert_am DATETIME NULL,
+  geaendert_von INT NULL,
+  KEY idx_person (mitarbeiter_id, aktiv, reihenfolge),
+  FOREIGN KEY (mitarbeiter_id) REFERENCES mitarbeiter(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+// ══ Lohnlauf (ENT-451, Etappe 3) ════════════════════════════════════════
+// Drei Ebenen, weil drei verschiedene Dinge: der LAUF (eine Periode ueber
+// alle Personen), die PERSON darin (Zeitsummen und Bruttolohn) und die
+// ZEILE (eine Position der Abrechnung). Eine flache Tabelle waere kuerzer
+// und liesse sich spaeter nicht mehr auseinandernehmen.
+//
+// ALLES IST SCHNAPPSCHUSS. Ein freigegebener Lauf wird nie neu gerechnet:
+// Ansatz, Regelwerk-Quelle und jede Zwischengroesse stehen in der Zeile
+// selbst. Eine spaetere GAV- oder Lohnrevision darf zurueckliegende Monate
+// nicht veraendern (Art. 12 Ziff. 5, CLAUDE.md Teil B).
+'lohnlauf' => "
+CREATE TABLE IF NOT EXISTS lohnlauf (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  periode_von DATE NOT NULL,
+  periode_bis DATE NOT NULL,
+  -- entwurf | freigegeben | ausbezahlt | storniert
+  -- Die Grenze ist die AUSZAHLUNG, nicht die Freigabe (ENT-451): Davor wird
+  -- storniert und neu gerechnet, danach im naechsten Lauf nachgetragen.
+  status VARCHAR(20) NOT NULL DEFAULT 'entwurf',
+  erstellt_am DATETIME DEFAULT CURRENT_TIMESTAMP,
+  erstellt_von INT NULL,
+  freigegeben_am DATETIME NULL,
+  freigegeben_von INT NULL,
+  ausbezahlt_am DATETIME NULL,
+  ausbezahlt_von INT NULL,
+  storniert_am DATETIME NULL,
+  storniert_von INT NULL,
+  storno_grund TEXT NULL,
+  -- Welchen Lauf dieser ersetzt. Storno und Neuberechnung bleiben BEIDE
+  -- erhalten -- ohne den Verweis waere spaeter nicht mehr zu sehen, dass
+  -- der eine aus dem anderen entstanden ist.
+  ersetzt_lauf_id INT NULL,
+  bemerkung TEXT NULL,
+  KEY idx_periode (periode_von, periode_bis, status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+// Je Person im Lauf. Rohzeit, Nettozeit, Zeitbonus und bewertete Zeit
+// stehen EINZELN -- nie nur ein fertiger Stundenwert (CLAUDE.md Teil B).
+// Wer spaeter fragt, wie eine Zahl zustande kam, muss es ablesen koennen.
+'lohnlauf_person' => "
+CREATE TABLE IF NOT EXISTS lohnlauf_person (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  lauf_id INT NOT NULL,
+  mitarbeiter_id INT NOT NULL,
+  kategorie CHAR(1) NULL,
+  lohnform VARCHAR(10) NULL,
+  roh_min INT NOT NULL DEFAULT 0,
+  netto_min INT NOT NULL DEFAULT 0,
+  -- Der Zeitbonus ist ein Produkt aus Minuten und 10 % und darum keine
+  -- ganze Zahl. Vier Nachkommastellen, damit die Summe nicht driftet.
+  bonus_min DECIMAL(12,4) NOT NULL DEFAULT 0,
+  bewertet_min DECIMAL(12,4) NOT NULL DEFAULT 0,
+  brutto_rappen INT NOT NULL DEFAULT 0,
+  -- Die Abzugsseite (Etappe 4). Beide NULL, solange die Bruttoseite gesperrt
+  -- ist -- eine Null waere hier eine Aussage, die nicht stimmt.
+  netto_rappen INT NULL,
+  auszahlung_rappen INT NULL,
+  -- Die NBU-Unterstellung samt ihrer HERLEITUNG als Schnappschuss:
+  -- Beobachtungszeitraum, gezaehlte Wochen, Durchschnitt und, falls von Hand
+  -- gesetzt, Grund und Person. Art. 12 Ziff. 5 GAV verlangt eine
+  -- nachvollziehbare Abrechnung; ein spaeter neu gerechneter Wert waere
+  -- keine Nachvollziehbarkeit, sondern eine zweite Rechnung.
+  nbu_stand VARCHAR(20) NULL,
+  nbu_herleitung TEXT NULL,
+  -- Warum fuer diese Person nicht gerechnet wurde. NULL heisst gerechnet;
+  -- ein Betrag von 0 bei gesetztem Grund heisst NICHT null Franken.
+  gesperrt_grund VARCHAR(40) NULL,
+  -- Zaehler statt Text: wie viele Schichten aus welchem Grund draussen
+  -- blieben, und wie viele noch gar nicht abgeglichen waren.
+  gesperrt_zaehler TEXT NULL,
+  nicht_abgeglichen INT NOT NULL DEFAULT 0,
+  warnung TEXT NULL,
+  UNIQUE KEY uq_lauf_person (lauf_id, mitarbeiter_id),
+  KEY idx_person (mitarbeiter_id),
+  FOREIGN KEY (lauf_id) REFERENCES lohnlauf(id) ON DELETE CASCADE,
+  FOREIGN KEY (mitarbeiter_id) REFERENCES mitarbeiter(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+// Eine Zeile der Abrechnung. Bezeichnung und Satz stehen HIER und nicht
+// als Verweis auf lohnart: Wird eine Lohnart spaeter umbenannt oder ihr
+// Satz geaendert, darf eine abgeschlossene Abrechnung sich nicht mit
+// veraendern.
+'lohnlauf_zeile' => "
+CREATE TABLE IF NOT EXISTS lohnlauf_zeile (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  lauf_id INT NOT NULL,
+  mitarbeiter_id INT NOT NULL,
+  schluessel VARCHAR(40) NOT NULL,
+  bezeichnung VARCHAR(120) NOT NULL,
+  sortierung INT NOT NULL DEFAULT 100,
+  -- Die Bemessungsgrundlage der Zeile (Ansatz, Bruttostundenlohn ...).
+  basis_rappen INT NULL,
+  satz_bp INT NULL,
+  -- Stunden oder Stueck. NULL heisst 'nicht mengenbezogen'.
+  menge DECIMAL(12,4) NULL,
+  -- NULL heisst GESPERRT, nicht null Franken. Der Grund steht daneben.
+  betrag_rappen INT NULL,
+  gesperrt_grund VARCHAR(40) NULL,
+  -- Beruht diese Zeile auf einer offenen GAV-Auslegung? Nach ENT-451 wird
+  -- im Zweifel zugunsten der mitarbeitenden Person gerechnet -- aber jede
+  -- solche Zeile muss als annahmebasiert erkennbar bleiben.
+  annahme TINYINT(1) NOT NULL DEFAULT 0,
+  hinweis TEXT NULL,
+  KEY idx_lauf_person (lauf_id, mitarbeiter_id, sortierung),
+  FOREIGN KEY (lauf_id) REFERENCES lohnlauf(id) ON DELETE CASCADE,
+  FOREIGN KEY (mitarbeiter_id) REFERENCES mitarbeiter(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
 ];
 
 foreach ($tabellen as $name => $sql) {
@@ -1613,6 +1918,83 @@ if (!$nurPruefen && hat_tabelle_jetzt($pdo, 'ereignisart')) {
     }
 }
 
+// ── 1c. Startbestand des Lohnartenkatalogs (ENT-451). Nur wenn die Tabelle
+// LEER ist -- sonst kaeme eine bewusst geloeschte Lohnart beim naechsten
+// Einrichten zurueck. Dasselbe Muster wie bei den Ereignisarten.
+//
+// Angelegt werden ausschliesslich Lohnarten, die auf einem erfassten
+// GAV-Artikel beruhen oder strukturell noetig sind. Sie tragen system=1 und
+// lassen sich nicht loeschen -- wer den Grundlohn loescht, haette eine
+// Abrechnung ohne Lohn. Betriebliche Zulagen legt die Verwaltung selbst an.
+//
+// Die sechs *_pflichtig-Kennzeichen sind je Zeile einzeln gesetzt, nicht
+// ueber eine Voreinstellung: Wer eine Lohnart anlegt, entscheidet jedes
+// bewusst. Reihenfolge der Werte:
+//   ahv, ferien, ml13, bvg, uvg, qst
+if (!$nurPruefen && hat_tabelle_jetzt($pdo, 'lohnart')) {
+    try {
+        if ((int)$pdo->query('SELECT COUNT(*) FROM lohnart')->fetchColumn() === 0) {
+            // Der Katalog steht in backend/lohn.php als lohnart_startbestand().
+            // Er stand frueher hier als Literal -- und weil ihn dort keine
+            // Pruefung erreichte, fehlten zwei Schluessel unbemerkt, die der
+            // Lohnlauf erzeugt. Einer davon traegt den gesamten
+            // AHV-pflichtigen Lohn.
+            $lohnarten = lohnart_startbestand();
+            $ein = $pdo->prepare(
+                // REIHENFOLGE UND ANZAHL muessen zu lohnart_startbestand()
+                // passen. Sie taten es nicht: Mit der Spalte 'bemessung'
+                // bekam jede Zeile ein 14. Feld, die Platzhalterliste blieb
+                // bei 13 -- SQLSTATE[HY093], und der ganze Schritt brach ab.
+                // Der Katalog entstand dadurch gar nicht. pruef_lohn.php
+                // vergleicht die beiden jetzt gegeneinander.
+                'INSERT IGNORE INTO lohnart
+                 (schluessel, bezeichnung, art, basis_schluessel, satz_bp,
+                  ahv_pflichtig, ferien_pflichtig, ml13_pflichtig,
+                  bvg_pflichtig, uvg_pflichtig, qst_pflichtig,
+                  gav_grundlage, system, sortierung, bemessung)
+                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)'
+            );
+            $n = 0;
+            foreach ($lohnarten as $la) { $ein->execute($la); $n += $ein->rowCount(); }
+            if ($n > 0) { $getan[] = "Lohnartenkatalog angelegt ($n Lohnarten, ENT-451)"; }
+        }
+    } catch (Throwable $e) {
+        $fehler[] = 'Lohnarten-Startbestand — ' . $e->getMessage();
+    }
+}
+
+// ── 1d. lohn_abzug bekommt BEWUSST keinen Startbestand (ENT-451).
+//
+// NBU-, KTG- und BVG-Saetze sind vertragliche Werte, die jaehrlich aendern
+// und nirgends im Projekt als Quelle erfasst sind. Ein vorbelegter Satz
+// saehe aus wie eine gepruefte Zahl und wuerde weiterrechnen, wenn er
+// veraltet -- ohne dass etwas kaputtginge. Er muss darum einmal von Hand
+// erfasst werden, mit Angabe der Quelle.
+//
+// AHV UND ALV STEHEN NICHT IN DIESER TABELLE (korrigiert 2026-09-09). Ihr
+// Satz gilt fuer jeden Betrieb gleich und lebt versioniert in LOHN_SV und
+// LOHN_ALV. Dieser Hinweis hat sie frueher mit aufgezaehlt und damit zu
+// einer Eingabe aufgefordert, die nichts bewirkt haette.
+//
+// Die Ausnahme ist der PaKo-Beitrag: Er steht woertlich im GAV (Art. 6
+// Ziff. 2, CHF 0.015 je Stunde bzw. CHF 2.50 pro Monat) und lebt darum als
+// versionierte Konstante in backend/lohn.php -- dieselbe Stelle und
+// dieselbe Bauart wie die Mindestloehne aus Anhang 1.
+//
+// Fehlt ein Satz, wird NICHT mit 0 gerechnet, sondern gesperrt. Das ist der
+// Unterschied zwischen "kein Abzug" und "Abzug unbekannt".
+if (hat_tabelle_jetzt($pdo, 'lohn_abzug')) {
+    try {
+        if ((int)$pdo->query('SELECT COUNT(*) FROM lohn_abzug')->fetchColumn() === 0) {
+            $getan[] = 'Abzugssätze (lohn_abzug) sind noch nicht erfasst — '
+                     . 'NBU, KTG und BVG einmalig unter Lohn → Sätze und Regelwerk '
+                     . 'eintragen. AHV und ALV nicht: die stehen im Regelwerk.';
+        }
+    } catch (Throwable $e) {
+        $fehler[] = 'Abzugssätze prüfen — ' . $e->getMessage();
+    }
+}
+
 // ── 2. Spalten nachtragen, falls die erste Fassung schon lief
 $spalten = [
     // Kundenportal: eigenes Passwort statt Einmal-Code bei jeder Anmeldung
@@ -1667,6 +2049,15 @@ $spalten = [
     // vergleichen liessen -- 900, 1'800 oder 2'300 ist ein Unterschied.
     // Bewusst NULL als Vorgabe und nicht 'C': Eine geratene Kategorie waere
     // schlimmer als eine fehlende, weil sie eine Grenze behauptet.
+    // Lohn, Etappe 4: die Bemessungsspalte und die NBU-Uebersteuerung.
+    ['lohnart',     'bemessung',  "ALTER TABLE lohnart ADD COLUMN bemessung TINYINT(1) NOT NULL DEFAULT 0"],
+    ['lohnlauf_person', 'netto_rappen',      "ALTER TABLE lohnlauf_person ADD COLUMN netto_rappen INT NULL"],
+    ['lohnlauf_person', 'auszahlung_rappen', "ALTER TABLE lohnlauf_person ADD COLUMN auszahlung_rappen INT NULL"],
+    ['lohnlauf_person', 'nbu_stand',         "ALTER TABLE lohnlauf_person ADD COLUMN nbu_stand VARCHAR(20) NULL"],
+    ['lohnlauf_person', 'nbu_herleitung',    "ALTER TABLE lohnlauf_person ADD COLUMN nbu_herleitung TEXT NULL"],
+    ['lohn_person', 'nbu_grund',  "ALTER TABLE lohn_person ADD COLUMN nbu_grund TEXT NULL"],
+    ['lohn_person', 'nbu_von',    "ALTER TABLE lohn_person ADD COLUMN nbu_von INT NULL"],
+    ['lohn_person', 'nbu_am',     "ALTER TABLE lohn_person ADD COLUMN nbu_am DATETIME NULL"],
     ['mitarbeiter', 'anstellungskategorie', "ALTER TABLE mitarbeiter ADD COLUMN anstellungskategorie CHAR(1) NULL"],
     ['mitarbeiter', 'pensum_stunden',      "ALTER TABLE mitarbeiter ADD COLUMN pensum_stunden INT NULL"],
     // Eintrittsdatum fuer die Pro-rata-Regel aus Art. 8 Ziff. 1b.
