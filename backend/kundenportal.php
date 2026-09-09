@@ -111,6 +111,31 @@ function kp_runde_sichtbar(int $objektId, array $objektIds, bool $laeuft): bool
     return in_array($objektId, $objektIds, true);
 }
 
+// Darf der Kunde diesen EINSATZ sehen? (Verkehrsdienst-Teil, ENT-482.)
+//
+//   (a) Der Einsatz gehoert ihm -- entweder direkt ueber einsaetze.kunde_id
+//       oder ueber ein Objekt aus kp_objekt_ids(). BEIDE Wege, nicht einer:
+//       Ein Verkehrsdienst-Einsatz hat meistens gar kein Objekt
+//       (einsaetze.objekt_id darf NULL sein, "freier Einsatz ohne Objekt"),
+//       ein Revierdienst-Einsatz hat eines. Nur ueber Objekte zu gehen --
+//       wie ENT-441 Punkt 4 es beschrieb -- liesse die Liste ausgerechnet
+//       beim Verkehrsdienst leer.
+//   (b) Der Kunde hat unterschrieben. Was er selbst gegengezeichnet hat,
+//       darf er nachlesen (ENT-441 Punkt 5); die Unterschrift haengt seit
+//       ENT-160 am Einsatz, nicht am einzelnen Rapport.
+//
+// KEIN Rueckgriff auf einsaetze.kunde_name: Das ist Freitext, genau wie
+// rapporte.kunde. Ein Tippfehler zeigte einem Kunden ein fremdes Blatt.
+//
+// Reine Funktion ohne Datenbank, damit `pruefungen/` sie ausfuehren kann.
+function kp_einsatz_sichtbar(?int $einsatzKundeId, int $sitzungKundeId,
+                             ?int $objektId, array $objektIds, bool $unterschrieben): bool
+{
+    if (!$unterschrieben) { return false; }
+    if ($einsatzKundeId !== null && $einsatzKundeId === $sitzungKundeId) { return true; }
+    return $objektId !== null && in_array($objektId, $objektIds, true);
+}
+
 // E-Mail-Adressen werden zum Nachschlagen kleingeschrieben und beschnitten.
 // Ohne das meldet sich niemand an, der seine Adresse gross tippt -- und der
 // Fehler saehe aus wie "Zugang gibt es nicht".

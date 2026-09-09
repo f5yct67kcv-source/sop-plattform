@@ -63,6 +63,12 @@ $antwort = [
 // Liste leer ist -- die Oberflaeche soll das nicht aus einer Anzahl 0
 // erraten muessen, denn dabei entsteht regelmaessig der Satz „keine
 // Rundgaenge", wo „kein Revierdienst eingerichtet" richtig waere.
+// „Gibt es ueberhaupt je einen" wird OHNE Zeitraum gefragt. Die Oberflaeche
+// entscheidet daran, ob sie den Revierdienst-Teil ueberhaupt anbietet
+// (ENT-482) -- und das darf sich nicht aendern, nur weil jemand den Zeitraum
+// verstellt.
+$antwort['je_vorhanden'] = false;
+
 if (!$objektIds) {
     $antwort['leer_grund'] = 'kein_revierdienst';
     json_response($antwort);
@@ -80,6 +86,12 @@ $antwort['objekte'] = array_map(static fn(array $o): array => [
 ], $os->fetchAll(PDO::FETCH_ASSOC));
 
 $offen = implode(',', array_fill(0, count(RUNDGANG_OFFENE_STATUS), '?'));
+
+$je = $pdo->prepare("SELECT 1 FROM rundgang WHERE objekt_id IN ($platz)
+                       AND status NOT IN ($offen) LIMIT 1");
+$je->execute([...$objektIds, ...RUNDGANG_OFFENE_STATUS]);
+$antwort['je_vorhanden'] = (bool)$je->fetchColumn();
+
 $sql = "SELECT r.id, r.objekt_id, r.status, r.rundgang_vorlage_id,
                r.rohzeit_start, r.rohzeit_ende, r.pause_minuten,
                e.datum, o.name AS objekt_name,
@@ -115,9 +127,8 @@ if (!$antwort['rundgaenge']) {
     // Zwei verschiedene Gruende, zwei verschiedene Texte: Hat es je einen
     // Rundgang gegeben, ist der Zeitraum schuld -- dann darf dort nicht
     // stehen, es sei nie etwas erfasst worden.
-    $je = $pdo->prepare("SELECT 1 FROM rundgang WHERE objekt_id IN ($platz) LIMIT 1");
-    $je->execute($objektIds);
-    $antwort['leer_grund'] = $je->fetchColumn() ? 'kein_treffer_im_zeitraum' : 'noch_nichts_erfasst';
+    $antwort['leer_grund'] = $antwort['je_vorhanden']
+        ? 'kein_treffer_im_zeitraum' : 'noch_nichts_erfasst';
 }
 
 json_response($antwort);

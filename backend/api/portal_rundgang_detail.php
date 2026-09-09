@@ -9,19 +9,23 @@
 // entscheiden. Ein Kundenzugang und ein Verwaltungszugang trennen sich hier
 // genauso wie in kundenportal.php begruendet.
 //
-// WAS AUSDRUECKLICH NICHT MITGEHT -- und warum:
+// WAS MITGEHT UND WAS NICHT:
 //
-//   - Der NAME der eingesetzten Person. ENT-441 hat ihn aus der Portalliste
-//     herausgehalten; welche Fassung (aus / nur Vorname / voll) im Detail
-//     erscheint, ist Gegenstand von OP-423 und noch nicht entschieden. Bis
-//     dahin gilt die sparsame Vorbelegung -- er verlaesst den Server nicht.
-//   - Der KUNDENNAME und der interne Einsatztitel (einsaetze.titel). Der
-//     erste ist im Portal immer derselbe, der zweite ist fuer Disponenten
-//     geschrieben.
-//   - Der ABBRUCHGRUND. Ebenfalls OP-423. Dass abgebrochen wurde, steht da;
-//     warum, ist noch nicht entschieden.
-//   - Die BEWEGUNGSSPUR (rundgang_spur.php). ENT-441 Punkt 3 schliesst sie
-//     ausdruecklich aus, ENT-322 aus demselben Grund fuer den Rapport.
+//   - Der NAME der eingesetzten Person geht MIT (ENT-481). OP-423 war lange
+//     offen; der Projektinhaber hat am 2026-09-08 entschieden, den Rapport
+//     „1:1" zu zeigen, mit der Begruendung, der Kunde bekomme ohnehin schon
+//     eine physische Kopie davon. Damit ist der Name kein neuer Datenfluss,
+//     sondern derselbe auf einem zweiten Weg -- die tragende Ueberlegung
+//     hinter ENT-441.
+//   - Der ABBRUCHGRUND ebenso, und zwar als KLARTEXT aus dem Katalog, nicht
+//     als Codewort (dieselbe Regel wie im Cockpit, ENT-324). Die Zuordnung
+//     bleibt hier im Server; eine zweite Kopie des Katalogs in portal.html
+//     liefe beim naechsten Grund auseinander.
+//   - Der KUNDENNAME und der interne Einsatztitel (einsaetze.titel) bleiben
+//     draussen. Der erste ist im Portal immer derselbe, der zweite ist fuer
+//     Disponenten geschrieben -- er steht auf keinem Blatt an den Kunden.
+//   - Die BEWEGUNGSSPUR bleibt in portal_rundgang_weg.php und kommt erst auf
+//     einen Knopfdruck (ENT-474).
 //
 // Die kunde_id kommt aus der Sitzung, nie aus der Anfrage.
 declare(strict_types=1);
@@ -56,11 +60,14 @@ if (!$objektIds) { $nichtAbrufbar(); }
 $stmt = $pdo->prepare(
     'SELECT r.id, r.objekt_id, r.status, r.rundgang_vorlage_id,
             r.rohzeit_start, r.rohzeit_ende, r.pause_minuten,
+            r.abbruch_grund, r.abbruch_freitext,
             e.datum, o.name AS objekt_name, o.strasse, o.ort,
+            m.vorname, m.nachname,
             (SELECT MAX(s.erfasst_am) FROM rundgang_scan s WHERE s.rundgang_id = r.id) AS letzter_scan
        FROM rundgang r
        JOIN einsaetze e ON e.id = r.einsatz_id
        JOIN objekte o ON o.id = r.objekt_id
+       JOIN mitarbeiter m ON m.id = r.mitarbeiter_id
       WHERE r.id = ?'
 );
 $stmt->execute([$rundgangId]);
@@ -94,6 +101,18 @@ foreach ($scans->fetchAll(PDO::FETCH_ASSOC) as $s) {
             'hat_foto'     => (bool)$s['hat_foto'],
         ];
     }
+}
+
+// Der Name der Kontrollrunde gehoert dazu -- er steht im Rapport, den der
+// Kunde heute per Mail bekommt ("Runde: Schlusskontrolle" sagt etwas,
+// "Runde: 3 von 12 Punkten des Objekts" nicht). Anders als
+// `einsaetze.titel` ist er kein interner Planungstitel.
+$vorlageName = null;
+if ($vorlageId !== null) {
+    $v = $pdo->prepare('SELECT name FROM rundgang_vorlage WHERE id = ?');
+    $v->execute([$vorlageId]);
+    $name = $v->fetchColumn();
+    if ($name !== false) { $vorlageName = (string)$name; }
 }
 
 $rohPunkte = rundgang_punkte_der_runde($pdo, $objektId, $vorlageId);
@@ -147,6 +166,18 @@ json_response(['status' => 'ok', 'rundgang' => [
     'strasse'        => (string)($r['strasse'] ?? ''),
     'ort'            => (string)($r['ort'] ?? ''),
     'status'         => (string)$r['status'],
+    'vorlage_name'   => $vorlageName,
+    // Vor- und Nachname zusammengesetzt und nicht als zwei Felder: Wie ein
+    // Name geschrieben wird, entscheidet der Server -- sonst tut es jede
+    // Oberflaeche anders.
+    'person'         => trim(((string)$r['vorname']) . ' ' . ((string)$r['nachname'])),
+    // Klartext statt Codewort (ENT-324). Ohne Abbruch bleibt beides null --
+    // ein leerer Grund an einer abgeschlossenen Runde waere eine Aussage
+    // ueber nichts.
+    'abbruch_grund'  => $r['abbruch_grund'] !== null
+        ? (RUNDGANG_ABBRUCH_GRUENDE[$r['abbruch_grund']] ?? (string)$r['abbruch_grund'])
+        : null,
+    'abbruch_freitext' => $r['abbruch_freitext'],
     'rohzeit_start'  => $r['rohzeit_start'],
     'rohzeit_ende'   => $r['rohzeit_ende'],
     'letzter_scan'   => $r['letzter_scan'],

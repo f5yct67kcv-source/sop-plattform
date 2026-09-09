@@ -38,7 +38,10 @@ const iso = d => new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString
 const vorTagen = n => { const d = new Date(); d.setDate(d.getDate() - n); return iso(d); };
 
 const VOLL = {
-  status: 'ok', kunde: 'Muster Liegenschaften AG', person: 'A. Beispielperson',
+  // je_vorhanden schickt der echte Endpunkt seit ENT-482 immer mit -- daran
+  // entscheidet die Oberflaeche, ob sie den Bereich ueberhaupt anbietet.
+  status: 'ok', je_vorhanden: true,
+  kunde: 'Muster Liegenschaften AG', person: 'A. Beispielperson',
   zeitraum: { von: vorTagen(30), bis: vorTagen(0) },
   objekte: [{ id: 1, name: 'Testliegenschaft Nord', strasse: 'Musterweg 1', ort: 'Musterort' }],
   rundgaenge: [
@@ -88,7 +91,9 @@ const punkt = (id, name, zustand, zeit, zusatz = {}) => ({
 });
 const rumpf = (id, tag, zusatz) => ({
   id, datum: tag, objekt_name: 'Testliegenschaft Nord',
-  vorname: 'Vorname', nachname: 'Nachnamenstest',
+  // Seit ENT-481 gehoert die Person dazu -- der Server setzt den Namen
+  // zusammen, die Oberflaeche zeigt ihn.
+  vorlage_name: 'Schlusskontrolle Nacht', person: 'M. Musterperson',
   rohzeit_start: `${tag} 22:04:00`, rohzeit_ende: `${tag} 22:41:00`,
   letzter_scan: `${tag} 22:39:00`, pause_minuten: 0,
   dauer: { sekunden: 2220, quelle: 'rohzeit_ende' },
@@ -113,6 +118,7 @@ const DETAILS = {
   // Runde 11: abgebrochen nach zwei Punkten -- vier wurden nie besucht.
   11: rumpf(11, vorTagen(5), {
     status: 'abgebrochen',
+    abbruch_grund: 'Stelle nicht gefunden', abbruch_freitext: 'Zugang war verschlossen',
     fortschritt: { gesamt: 6, erledigt: 2, bestaetigt: 2, ersatzscan: 0, nicht_verfuegbar: 0 },
     kontrollpunkte: [
       punkt(1, 'Eingang Nord', 'bestaetigt', `${vorTagen(5)} 21:33:00`),
@@ -159,6 +165,57 @@ const WEG_VOLL = {
   ],
 };
 let wegAntwort = WEG_VOLL;
+
+// ── Verkehrsdienst: Einsätze und Kundenrapporte (ENT-482) ────────────
+const EINSAETZE_VOLL = {
+  status: 'ok', je_vorhanden: true,
+  zeitraum: { von: vorTagen(30), bis: vorTagen(0) },
+  einsaetze: [
+    { id: 70, datum: vorTagen(3), strasse: 'Musterweg 4', ort: 'Musterort',
+      einsatzart: 'Verkehrsdienst', veranstaltung: 'Musterlauf 2026',
+      personen: 2, stunden: 12.5, von: '07:00:00', bis: '13:15:00' },
+    { id: 71, datum: vorTagen(9), strasse: 'Musterstrasse 12', ort: 'Musterort',
+      einsatzart: 'Verkehrsdienst', veranstaltung: null,
+      personen: 1, stunden: 4, von: '18:00:00', bis: '22:00:00' },
+  ],
+};
+const BERICHTE = {
+  70: {
+    einsatz: { id: 70, datum: vorTagen(3), strasse: 'Musterweg 4', ort: 'Musterort',
+               einsatzart: 'Verkehrsdienst', veranstaltung: 'Musterlauf 2026' },
+    kunde: { kunde_id: 1, kunde_nr: 'K-0001', k_name: 'Muster Liegenschaften AG',
+             k_strasse: 'Musterweg', k_hausnummer: '1', k_adresszusatz: null,
+             k_plz: '0000', k_ort: 'Musterort',
+             re_name: null, re_zusatz: null, re_strasse: null, re_hausnummer: null,
+             re_plz: null, re_ort: null },
+    unterschrift: { bild: 'data:image/png;base64,'
+        + 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+      name: 'B. Unterzeichnend', am: `${vorTagen(3)} 13:20:00`, holte: 'M. Musterperson' },
+    personen: [
+      { name: 'M. Musterperson', von: '07:00:00', bis: '13:15:00', pause_min: 30,
+        netto_h: 5.75, bemerkung: 'Umleitung länger als geplant' },
+      { name: 'T. Zweitperson', von: '07:00:00', bis: '13:45:00', pause_min: 30,
+        netto_h: 6.25, bemerkung: null },
+    ],
+  },
+};
+let einsatzAntwort = { status: 'ok', je_vorhanden: false,
+  zeitraum: { von: vorTagen(30), bis: vorTagen(0) }, einsaetze: [],
+  leer_grund: 'noch_nichts_unterschrieben' };
+
+// Der Briefkopf fuers Rapportblatt (ENT-478). Erfundene Firma, erfundenes
+// Logo -- echte Betriebsdaten haben in Testdaten nichts zu suchen.
+const BRIEFKOPF = {
+  status: 'ok',
+  briefkopf: {
+    firma: 'Musterfirma Sicherheitsdienst GmbH',
+    zusatz: 'Musterweg 1 · 0000 Musterort',
+    fusszeile: 'Musterfirma Sicherheitsdienst GmbH\nMusterweg 1, 0000 Musterort',
+    fusszeile2: 'Telefon 000 000 00 00\ninfo@example.invalid',
+    logo: 'data:image/png;base64,'
+      + 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+  },
+};
 // Wie oft Google Maps angefragt wurde. Die Kernzusage von ENT-474 ist, dass
 // das VOR dem Knopfdruck NIE passiert -- ein Zaehler ist dafuer der einzige
 // belastbare Nachweis.
@@ -209,6 +266,13 @@ async function setup(page) {
       return send({ status: 'ok', token: 't', name: 'A. Beispielperson',
         kunde: 'Muster Liegenschaften AG' });
     }
+    if (path.includes('portal_briefkopf')) return send(BRIEFKOPF);
+    if (path.includes('portal_einsatz_bericht')) {
+      const id = Number(new URL(req.url()).searchParams.get('einsatz_id'));
+      return BERICHTE[id] ? send({ status: 'ok', bericht: BERICHTE[id] })
+        : send({ status: 'error', message: 'Dieser Einsatz ist nicht abrufbar.' }, 404);
+    }
+    if (path.includes('portal_einsaetze')) return send(einsatzAntwort);
     if (path.includes('portal_rundgang_weg')) return send(wegAntwort);
     if (path.includes('portal_rundgang_detail')) {
       const id = Number(new URL(req.url()).searchParams.get('rundgang_id'));
@@ -255,7 +319,7 @@ async function setup(page) {
     return [...new Set(treffer)].sort();
   };
   for (const name of ['glas-grund-1', 'glas-grund-2', 'glas-grund-3', 'glas-kachel',
-                      'accent', 'accent-hi', 'warn']) {
+                      'accent', 'accent-hi', 'accent-soft', 'warn']) {
     const d = werte(dash, name), p = werte(portal, name);
     check(`KRITISCH: --${name} ist im Portal derselbe Wert wie im Cockpit`,
       p.length > 0 && d.length > 0 && JSON.stringify(d) === JSON.stringify(p));
@@ -657,11 +721,11 @@ check('KRITISCH: der Faden zwischen den Kontrollpunkten ist wirklich zu sehen',
   await page.evaluate(() => [...document.querySelectorAll('#liste .detail .v-faden')]
     .every(f => f.getBoundingClientRect().height > 10)));
 
-// Der Name der eingesetzten Person bleibt draussen, solange OP-423 offen ist
-// -- und zwar AUCH DANN, wenn der Server ihn mitschicken sollte. Der Beleg
-// trägt ihn absichtlich.
-check('KRITISCH: kein Personenname im Detail — auch wenn die Antwort einen trägt (OP-423)',
-  !/Nachnamenstest/.test(detail) && !/Vorname/.test(detail));
+// Seit ENT-481 wird 1:1 gezeigt: Der Kunde bekommt dasselbe Blatt ohnehin
+// physisch, also ist der Name kein neuer Datenfluss.
+check('KRITISCH: die eingesetzte Person steht im Detail (ENT-481)',
+  /M\. Musterperson/.test(detail));
+check('Und die Kontrollrunde daneben', /Schlusskontrolle Nacht/.test(detail));
 
 // ── Zweite Runde: abgebrochen, vier Punkte nie besucht ───────────────
 await page.evaluate(() => document.querySelectorAll('#liste .zeile')[1].click());
@@ -673,6 +737,25 @@ check('KRITISCH: nicht besuchte Punkte erscheinen ebenfalls und sind als solche 
   /Waschküche/.test(detail2) && /Nicht besucht/.test(detail2));
 check('KRITISCH: ein gemeldetes Ereignis erscheint mit Zeit und Art',
   /21:36/.test(detail2) && /Sachbeschädigung/.test(detail2));
+// Der Abbruchgrund im KLARTEXT, nicht als Codewort -- und oben, nicht als
+// Fussnote: Er ist die wichtigste Aussage über die Runde.
+// Der Klartext SELBST wird serverseitig geprueft (test_php.mjs und
+// pruef_kundenportal.php) -- hier kaeme er aus der Attrappe, die Zusage
+// koennte gar nicht anschlagen. Geprueft wird, dass die Tafel ihn zeigt.
+check('KRITISCH: Abbruchgrund und Zusatztext stehen in der Tafel (ENT-481)',
+  /Stelle nicht gefunden/.test(detail2) && /Zugang war verschlossen/.test(detail2));
+check('KRITISCH: und zwar ganz oben in der Tafel, vor den Kennzahlen',
+  await page.evaluate(() => {
+    const t = document.querySelectorAll('#liste .zeile')[1].nextElementSibling;
+    const a = t.querySelector('.d-abbruch'), k = t.querySelector('.kennzahlen');
+    return !!a && !!k && a.getBoundingClientRect().bottom <= k.getBoundingClientRect().top + 1;
+  }));
+// Eine abgeschlossene Runde bekommt keinen leeren Abbruch-Kasten.
+check('KRITISCH: eine abgeschlossene Runde zeigt keinen Abbruch-Hinweis',
+  await page.evaluate(() => {
+    const t = document.querySelectorAll('#liste .zeile')[0].nextElementSibling;
+    return !t.querySelector('.d-abbruch');
+  }));
 
 // ── Dritte Runde: vollständig, aber mit Fotobeleg ────────────────────
 await page.evaluate(() => document.querySelectorAll('#liste .zeile')[2].click());
@@ -778,6 +861,301 @@ check('KRITISCH: „noch nicht eingerichtet" ist ein ANDERER Text als „kein We
 check('KRITISCH: und er verrät dem Kunden nichts über den Zustand des Betriebs',
   !/Einrichtung|einrichten|Datenbank|Tabelle/i.test(nichtEing));
 wegAntwort = WEG_VOLL;
+
+// ══ Das Rapportblatt als PDF (ENT-478) ══════════════════════════════════
+// Der Kunde holt sich hier dasselbe Blatt, das er heute per Mail bekommt.
+calls = [];
+// Den Zwischenspeicher des Briefkopfs leeren: Ohne das kann die Zusage
+// „beim Aufklappen wird er nicht geholt" gar nicht anschlagen -- ein früherer
+// Aufruf hätte ihn längst abgelegt, und die Prüfung wäre eine Behauptung.
+await page.evaluate(() => { briefkopf = null; });
+await page.evaluate(() => document.querySelectorAll('#liste .zeile')[2].click());
+await page.waitForTimeout(200);
+await page.evaluate(() => document.querySelectorAll('#liste .zeile')[2].click());
+await page.waitForTimeout(500);
+
+// html2pdf wiegt rund 950 KB. Wer nur liest, soll es nie laden -- dasselbe
+// Muster wie bei der Karte, und aus demselben Grund gemessen statt behauptet.
+check('KRITISCH: html2pdf wird beim Aufklappen NICHT geladen',
+  await page.evaluate(() =>
+    !document.querySelector('script[src*="html2pdf"]')));
+check('KRITISCH: und der Briefkopf ebenso wenig',
+  !calls.some(c => c.path.includes('portal_briefkopf')));
+check('KRITISCH: der PDF-Knopf ist auf dem Handy mindestens 44 px hoch',
+  await page.evaluate(() => {
+    const k = document.querySelector('[data-pdf]');
+    return !!k && k.getBoundingClientRect().height >= 44;
+  }));
+// Ein Knopf wird NICHT über die volle Breite gestreckt, nur weil er allein
+// in seiner Zeile steht (Hausregel) -- gemessen, nicht nachgelesen.
+check('KRITISCH: und er ist nicht über die volle Breite gestreckt',
+  await page.evaluate(() => {
+    const k = document.querySelector('[data-pdf]');
+    const t = k.closest('.detail');
+    return k.getBoundingClientRect().width < t.getBoundingClientRect().width - 40;
+  }));
+
+// html2pdf wird hier WIRKLICH geladen und erzeugt ein echtes PDF -- eine
+// Attrappe prüfte nur, dass wir sie richtig aufrufen, nicht dass am Ende
+// eine Datei herauskommt.
+const dlVersprechen = page.waitForEvent('download', { timeout: 40000 }).catch(() => null);
+await klick('[data-pdf="12"]');
+const datei = await dlVersprechen;
+check('KRITISCH: der Knopf erzeugt tatsächlich eine Datei', !!datei);
+check(`Und zwar ein PDF mit sprechendem Namen (${datei ? datei.suggestedFilename() : '–'})`,
+  !!datei && /^Rapport-.+-\d{4}-\d{2}-\d{2}\.pdf$/.test(datei.suggestedFilename()));
+check('KRITISCH: erst der Klick lädt html2pdf nach',
+  await page.evaluate(() => !!document.querySelector('script[src*="html2pdf"]')));
+check('Und holt den Briefkopf', calls.some(c => c.path.includes('portal_briefkopf')));
+
+const blatt = await page.textContent('#blatt');
+check('Das Blatt trägt den Briefkopf des Betriebs',
+  /Musterfirma Sicherheitsdienst/.test(blatt));
+check('KRITISCH: es nennt Objekt, Kontrollrunde, Zeiten und Zustand',
+  /Testliegenschaft Nord/.test(blatt) && /Kontrollrunde/.test(blatt)
+  && /23:15/.test(blatt) && /Abgeschlossen/.test(blatt));
+check('KRITISCH: jeder Kontrollpunkt steht mit seiner Uhrzeit im Blatt',
+  /Eingang Nord/.test(blatt) && /Aussenbereich/.test(blatt) && /23:40/.test(blatt));
+check('Der Fotobeleg wird im Blatt ausgewiesen und erklärt',
+  /Fotobeleg/.test(blatt) && /statt technischer Bestätigung/.test(blatt));
+check('KRITISCH: „kein Ereignis gemeldet" steht auch im Blatt, nicht ein fehlender Abschnitt',
+  /kein Ereignis gemeldet/.test(blatt));
+check('KRITISCH: die eingesetzte Person steht auch im Blatt (ENT-481)',
+  /Mitarbeitende/.test(blatt) && /M\. Musterperson/.test(blatt));
+// ENT-322 gilt unverändert: Der Weg gehört ins Portal, wo der Kunde ihn
+// ausdrücklich aufruft — nicht auf ein Blatt, das er beiläufig mitbekommt.
+check('KRITISCH: KEINE Karte im Blatt (ENT-322 bleibt)',
+  !/Weg während der Runde/.test(blatt)
+  && await page.evaluate(() => !document.querySelector('#blatt .weg-karte, #blatt iframe')));
+// Das Blatt entsteht in einem eigenen Behälter, nicht als Abzug der Tafel.
+check('KRITISCH: das Blatt steht ausserhalb des Bildes, aber nicht auf display:none',
+  await page.evaluate(() => {
+    const h = document.getElementById('blattHuelle');
+    return getComputedStyle(h).display !== 'none'
+        && h.getBoundingClientRect().right < 0
+        && document.getElementById('blatt').getBoundingClientRect().height > 100;
+  }));
+
+// Der Briefkopf wird EINMAL geholt, nicht bei jedem Blatt.
+calls = [];
+const dl2 = page.waitForEvent('download', { timeout: 40000 }).catch(() => null);
+await klick('[data-pdf="12"]');
+await dl2;
+check('KRITISCH: der Briefkopf wird nur einmal geholt, nicht bei jedem PDF',
+  !calls.some(c => c.path.includes('portal_briefkopf')));
+
+// ══ Verkehrsdienst: Einsätze und Kundenrapporte (ENT-482) ═══════════════
+// Solange der Kunde keine unterschriebenen Einsätze hat, gibt es weder den
+// Einsatz-Bereich noch seine Kachel.
+//
+// GEÄNDERT MIT ENT-486: Die Leiste ist deshalb nicht mehr weg. Ein Kunde
+// mit Revierdienst hat jetzt ZWEI Reiter -- Rundgänge und Wachbuch --, und
+// zwei sind eine Wahl. Was unverändert gilt, ist die Zusage dahinter: keine
+// Kachel und kein Bereich für etwas, das der Kunde nicht bezieht.
+check('KRITISCH: ohne Einsätze bleibt der zweite Bereich ganz weg -- samt seiner Kachel',
+  await page.evaluate(() => document.getElementById('bereich-einsaetze').hidden
+    && document.getElementById('reiter-einsaetze').hidden
+    && !document.getElementById('bereich-rundgaenge').hidden));
+check('Die Leiste steht trotzdem da -- Rundgänge und Wachbuch sind zwei Reiter (ENT-486)',
+  await page.evaluate(() => !document.getElementById('reiter').hidden
+    && !document.getElementById('reiter-rundgaenge').hidden
+    && !document.getElementById('reiter-wachbuch').hidden));
+
+// ── Nur Verkehrsdienst: der Fall, der die Hausregel verletzen würde ──
+// Wer keine Rundgänge bezieht, darf KEINE leere Rundgang-Liste sehen --
+// sie sähe aus, als sei dort nichts passiert.
+antwort = { ...leer('kein_revierdienst'), je_vorhanden: false };
+einsatzAntwort = EINSAETZE_VOLL;
+await page.evaluate(() => laden());
+await page.waitForTimeout(400);
+check('KRITISCH: hat der Kunde NUR Einsätze, verschwindet der Rundgang-Bereich ganz',
+  await page.evaluate(() => document.getElementById('bereich-rundgaenge').hidden
+    && !document.getElementById('bereich-einsaetze').hidden));
+check('Und ohne zweite Art braucht es auch keine Reiterleiste',
+  await page.evaluate(() => document.getElementById('reiter').hidden));
+// „Nachweis der ausgeführten Rundgänge" bei einem reinen Verkehrsdienst-
+// Kunden wäre schlicht falsch -- die Unterzeile folgt dem, was er bezieht.
+check('KRITISCH: die Kopfzeile spricht von Einsätzen, nicht von Rundgängen',
+  /Einsätze/.test(await page.textContent('#unter'))
+  && !/Rundgänge/.test(await page.textContent('#unter')));
+
+const eListe = await page.textContent('#liste-e');
+check('KRITISCH: eine Einsatzzeile nennt Datum, Veranstaltung und Einsatzart',
+  /Musterlauf 2026/.test(eListe) && /Verkehrsdienst/.test(eListe));
+check('Ohne Veranstaltung trägt der Einsatzort die Zeile',
+  /Musterstrasse 12, Musterort/.test(eListe));
+// Zwei Einheiten, zwei Zeilen: „Personen" zählt Menschen, „Stunden" zählt
+// Zeit (Hausregel) -- gemessen, nicht im Text geraten.
+check('KRITISCH: Personen und Stunden stehen auf zwei Zeilen, nicht unter einer Überschrift',
+  /2 Personen/.test(eListe) && /12,50 Stunden/.test(eListe)
+  && await page.evaluate(() => {
+    const m = document.querySelectorAll('#liste-e .mass span');
+    return m.length >= 2
+      && Math.round(m[0].getBoundingClientRect().top) !== Math.round(m[1].getBoundingClientRect().top);
+  }));
+// Am Element gelesen und nicht am zusammengeklebten Text der Liste: Dort
+// steht "1 Person4,00 Stunden" ohne Trennzeichen, und eine Wortgrenze
+// zwischen "n" und "4" gibt es nicht.
+check('Ein Einsatz mit einer Person steht in der Einzahl da',
+  await page.evaluate(() => {
+    const zeilen = document.querySelectorAll('#liste-e .zeile');
+    const s = zeilen[1] && zeilen[1].querySelector('.mass span');
+    return !!s && s.textContent.trim() === '1 Person';
+  }));
+check('KRITISCH: die Einsatzliste scrollt die Seite nicht waagrecht',
+  await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
+
+// ── Der Kundenrapport in der Tafel ──────────────────────────────────
+await page.evaluate(() => document.querySelector('#liste-e .zeile').click());
+await page.waitForTimeout(400);
+const kr = await page.textContent('#liste-e .detail');
+check('KRITISCH: der Klick öffnet den Kundenrapport unter der Zeile',
+  await page.evaluate(() => {
+    const z = document.querySelector('#liste-e .zeile');
+    const t = z.nextElementSibling;
+    if (!t || !t.classList.contains('detail')) { return null; }
+    const a = z.getBoundingClientRect(), b = t.getBoundingClientRect();
+    return b.top >= a.bottom - 1 && Math.abs(a.width - b.width) <= 1;
+  }));
+// Das ist die Substanz des Blattes: jede Person mit IHREN Zeiten (ENT-160).
+check('KRITISCH: jede Person steht mit ihren eigenen Zeiten da (ENT-160)',
+  /M\. Musterperson/.test(kr) && /07:00 – 13:15/.test(kr)
+  && /T\. Zweitperson/.test(kr) && /07:00 – 13:45/.test(kr));
+check('KRITISCH: die Zeiten müssen NICHT übereinstimmen — und tun es hier auch nicht',
+  /13:15/.test(kr) && /13:45/.test(kr));
+check('Pause und Nettostunden je Person', /30′/.test(kr) && /5,75 h/.test(kr) && /6,25 h/.test(kr));
+check('KRITISCH: das Total steht darunter', /Total/.test(kr) && /12,00 h/.test(kr));
+check('Die Bemerkung einer Person erscheint mit ihrem Namen',
+  /Umleitung länger als geplant/.test(kr));
+check('KRITISCH: die Unterschrift des Kunden steht im Rapport, mit Name und Zeitpunkt',
+  /B\. Unterzeichnend/.test(kr) && /13:20/.test(kr) && /M\. Musterperson/.test(kr)
+  && await page.evaluate(() => !!document.querySelector('#liste-e .kr-unter img')));
+check('Kunden-Nr., Einsatzort und Einsatzart stehen im Kopf',
+  /K-0001/.test(kr) && /Musterweg 4, Musterort/.test(kr));
+// Vier Spalten passen auf 390 px nicht. Sie rollen in IHREM Behälter --
+// die SEITE bleibt stehen.
+// Die Tabelle ist breiter als der Bildschirm. Sie muss ERREICHBAR bleiben --
+// darum wird gemessen, dass ihr Behälter wirklich rollt (computed style,
+// nicht Quelltext) und dass die Seite selbst stehen bleibt. Ohne den ersten
+// Teil bewiese die Zusage nur, dass irgendwo abgeschnitten wird.
+check('KRITISCH: die breite Zeittabelle rollt in ihrem Behälter, die Seite nicht',
+  await page.evaluate(() => {
+    const w = document.querySelector('#liste-e .tw');
+    if (!w) { return false; }
+    const rollt = ['auto', 'scroll'].includes(getComputedStyle(w).overflowX);
+    return rollt && w.scrollWidth > w.clientWidth
+      && document.documentElement.scrollWidth <= window.innerWidth + 1;
+  }));
+await page.screenshot({ path: `${OUT}/portal-12-einsatz-handy.png` });
+
+// ── Das PDF des Einsatzes ───────────────────────────────────────────
+const dlE = page.waitForEvent('download', { timeout: 40000 }).catch(() => null);
+await klick('[data-art="einsatz"][data-pdf="70"]');
+const dateiE = await dlE;
+check('KRITISCH: auch der Einsatz lässt sich als PDF herunterladen', !!dateiE);
+check(`Und heisst wie das Rundgang-Blatt (${dateiE ? dateiE.suggestedFilename() : '–'})`,
+  !!dateiE && /^Rapport-.+\.pdf$/.test(dateiE.suggestedFilename()));
+const blattE = await page.textContent('#blatt');
+check('KRITISCH: das Blatt ist der Kundenrapport, nicht der Rundgang-Rapport',
+  /Kundenrapport/.test(blattE) && /Einsatz-Nr\. 70/.test(blattE)
+  && !/Rundgang-Rapport/.test(blattE));
+check('KRITISCH: mit allen Personenzeilen und dem Total',
+  /M\. Musterperson/.test(blattE) && /T\. Zweitperson/.test(blattE) && /12,00 h/.test(blattE));
+check('Und mit der Kundenadresse aus den Stammdaten',
+  /Muster Liegenschaften AG/.test(blattE) && /Musterweg 1/.test(blattE));
+check('Die Unterschrift steht auch auf dem Blatt',
+  /B\. Unterzeichnend/.test(blattE)
+  && await page.evaluate(() => !!document.querySelector('#blatt img[src^="data:image"]')));
+
+// ── Beide Arten: erst dann gibt es Reiter ───────────────────────────
+antwort = VOLL;
+await page.evaluate(() => laden());
+await page.waitForTimeout(500);
+check('KRITISCH: hat der Kunde BEIDES, erscheint die Reiterleiste',
+  await page.evaluate(() => !document.getElementById('reiter').hidden));
+check('Und die Kopfzeile nennt dann beides',
+  /Rundgänge und Einsätze/.test(await page.textContent('#unter')));
+check('Und die Rundgänge stehen zuerst -- die beiden anderen Bereiche liegen dahinter',
+  await page.evaluate(() => !document.getElementById('bereich-rundgaenge').hidden
+    && document.getElementById('bereich-einsaetze').hidden
+    && document.getElementById('bereich-wachbuch').hidden
+    && document.getElementById('reiter-rundgaenge').getAttribute('aria-selected') === 'true'));
+// Drei Bereiche, drei Kacheln (ENT-486) -- und genau EINER ist offen.
+check('KRITISCH: nie mehr als ein Bereich zugleich sichtbar',
+  await page.evaluate(() => ['rundgaenge', 'wachbuch', 'einsaetze']
+    .filter(b => !document.getElementById('bereich-' + b).hidden).length === 1));
+
+// ── Die Kachelreihe, gemessen (ENT-486) ─────────────────────────────
+// Der Projektinhaber hat ausdrücklich die grossen Kacheln der
+// Revierdienst-Übersicht im Cockpit verlangt, nicht die bisherigen Pillen.
+// Geprüft wird das Gemeinte, nicht der Klassenname: ein Sinnbild-Quadrat
+// über einer Beschriftung, gross genug zum Antippen.
+check('KRITISCH: jeder Reiter ist eine Kachel -- Sinnbild oben, Beschriftung darunter',
+  await page.evaluate(() => [...document.querySelectorAll('.reiter-taste')]
+    .filter(b => !b.hidden).every(b => {
+      const ic = b.querySelector('.r-ic'), lbl = b.querySelector('.r-lbl');
+      if (!ic || !lbl || !ic.querySelector('svg')) { return false; }
+      const i = ic.getBoundingClientRect(), l = lbl.getBoundingClientRect();
+      return i.width >= 40 && Math.abs(i.width - i.height) < 2 && i.bottom <= l.top + 1;
+    })));
+// Am Handy nebeneinander, nicht übereinander. Mit Grid und einer oberen
+// Schranke standen sie gestapelt -- 354 px Leiste vor dem ersten Inhalt.
+check('KRITISCH: am Handy stehen alle Kacheln in EINER Zeile',
+  await page.evaluate(() => {
+    const b = [...document.querySelectorAll('.reiter-taste')].filter(x => !x.hidden);
+    const oben = b.map(x => Math.round(x.getBoundingClientRect().top));
+    return b.length === 3 && new Set(oben).size === 1;
+  }));
+check('KRITISCH: und die Leiste bleibt dabei im Bildschirm',
+  await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
+check('KRITISCH: eine Kachel ist mindestens 44 px hoch (Handy-Trefferfläche)',
+  await page.evaluate(() => [...document.querySelectorAll('.reiter-taste')]
+    .filter(b => !b.hidden).every(b => b.getBoundingClientRect().height >= 44)));
+// Eine Reiterleiste, an der man nicht sieht, welcher Reiter offen ist, ist
+// keine. Gemessen an der gerenderten Farbe, nicht an einer Klasse allein.
+check('KRITISCH: der offene Reiter hebt sich sichtbar von den übrigen ab',
+  await page.evaluate(() => {
+    const an = document.getElementById('reiter-rundgaenge');
+    const aus = document.getElementById('reiter-wachbuch');
+    const f = e => getComputedStyle(e);
+    return f(an).backgroundColor !== f(aus).backgroundColor
+      && f(an).borderTopColor !== f(aus).borderTopColor;
+  }));
+// „Ganz oben" -- Vorgabe des Projektinhabers: erst wird entschieden,
+// WORAUF man sieht, dann WORIN.
+check('KRITISCH: die Kachelreihe steht über der Zeitraumwahl',
+  await page.evaluate(() => document.getElementById('reiter').getBoundingClientRect().bottom
+    <= document.getElementById('von').closest('.karte').getBoundingClientRect().top + 1));
+check('KRITISCH: die Reiter sind auf dem Handy mindestens 44 px hoch',
+  await page.evaluate(() => [...document.querySelectorAll('.reiter-taste')]
+    .every(t => t.getBoundingClientRect().height >= 44)));
+await klick('#reiter-einsaetze');
+await page.waitForTimeout(250);
+check('KRITISCH: der Reiter schaltet um',
+  await page.evaluate(() => document.getElementById('bereich-rundgaenge').hidden
+    && !document.getElementById('bereich-einsaetze').hidden
+    && document.getElementById('reiter-einsaetze').getAttribute('aria-selected') === 'true'));
+await page.screenshot({ path: `${OUT}/portal-13-reiter-handy.png` });
+
+// ── Zwei leere Zustände, zwei Texte ─────────────────────────────────
+const eLeer = async (grund) => {
+  einsatzAntwort = { status: 'ok', je_vorhanden: true, einsaetze: [], leer_grund: grund,
+    zeitraum: { von: vorTagen(30), bis: vorTagen(0) } };
+  await page.evaluate(() => laden());
+  await page.waitForTimeout(350);
+  return page.textContent('#liste-e');
+};
+const nochNichts = await eLeer('noch_nichts_unterschrieben');
+const keinTreffer = await eLeer('kein_treffer_im_zeitraum');
+check('KRITISCH: „noch nicht unterschrieben" sagt, WORAUF es wartet',
+  /unterschrieben/.test(nochNichts) && /vor Ort/.test(nochNichts));
+check('KRITISCH: und ist ein ANDERER Text als „kein Treffer im Zeitraum"',
+  nochNichts !== keinTreffer && /Zeitraum/.test(keinTreffer));
+
+einsatzAntwort = EINSAETZE_VOLL;
+await klick('#reiter-rundgaenge');
+await page.waitForTimeout(200);
+
 await page.screenshot({ path: `${OUT}/portal-08-detail-handy.png` });
 
 // Erst alles zuklappen, damit die naechste Zusage bei null anfaengt.
@@ -1016,8 +1394,8 @@ check('KRITISCH: am Desktop stehen die vier Kennzahlen auf EINER Zeile',
 const detailD = await gross.textContent('#liste .detail');
 check('Auch am Desktop stehen die Kontrollpunkte mit ihren Uhrzeiten da',
   /22:07/.test(detailD) && /Eingang Nord/.test(detailD));
-check('KRITISCH: und auch am Desktop kein Personenname (OP-423)',
-  !/Nachnamenstest/.test(detailD) && !/Vorname/.test(detailD));
+check('KRITISCH: und auch am Desktop steht die Person da (ENT-481)',
+  /M\. Musterperson/.test(detailD));
 // Der nicht besuchte Punkt gehört auch hier ins Bild.
 await gross.evaluate(() => document.querySelectorAll('#liste .zeile')[1].click());
 await gross.waitForTimeout(300);

@@ -31,7 +31,7 @@
      Angabe" statt wie „nichts erledigt". */
   --balken-grund:rgba(20,22,26,.13);
   --dunkel:#16181D;
-  --accent:#2F5BD7; --accent-hi:#2549B0;
+  --accent:#2F5BD7; --accent-hi:#2549B0; --accent-soft:#EDF2FE;
   /* Glas: hell */
   --glas-kachel:.54;
   --glas-linie:rgba(255,255,255,.55);
@@ -53,7 +53,7 @@
     --grau-soft:#212739;
     --balken-grund:rgba(255,255,255,.16);
     --dunkel:#F2F4F8;
-    --accent:#7098F7; --accent-hi:#8DAEFA;
+    --accent:#7098F7; --accent-hi:#8DAEFA; --accent-soft:#1A2440;
     /* Im Dunkeln deckt die Kachel MEHR: Dort hellt der Verlauf sie auf und
        der Text verliert Kontrast -- im Hellen toent er sie ab und der Text
        gewinnt. Gemessen im Cockpit, hier uebernommen. */
@@ -190,6 +190,55 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
    Zeichen, ist kein grosszuegiges Layout, sondern ein leeres. */
 .zeitraum .paar{flex:1 1 150px;min-width:0;max-width:220px}
 
+/* ── Reiterleiste (ENT-482) ────────────────────────────────────────────── */
+/* Nur zwei Reiter, und nur wenn der Kunde beides hat. Sie sind Knöpfe und
+   keine Verweise: Es wird nichts geladen, sondern umgeschaltet. Auf dem
+   Handy dieselbe 44-px-Trefferfläche wie jedes andere Bedienelement. */
+/* Kachelreihe statt Pillen (ENT-486, Vorgabe des Projektinhabers anhand
+   der Revierdienst-Uebersicht im Cockpit). Bildsprache uebernommen:
+   farbiges Sinnbild-Quadrat oben, Beschriftung darunter, Karte drumherum --
+   dieselben Masse wie ".bk-kachel"/".bk-kachel-ic" dort (56 px Quadrat,
+   28 px Sinnbild, Radius 14).
+
+   EINE Sache kommt dazu, die es im Cockpit nicht gibt: ein Aktiv-Zustand.
+   Dort sind die Kacheln Navigation und verschwinden beim Klick; hier sind
+   sie Reiter und bleiben stehen. Eine Reiterleiste, an der man nicht sieht,
+   welcher Reiter offen ist, ist keine. Der Aktiv-Zustand folgt dem, was das
+   Haus dafuer schon benutzt (".rdkr-tab.aktiv"): Akzentrand auf weicher
+   Akzentflaeche, nicht eine volle Farbfuellung.
+
+   Am Handy drei nebeneinander statt zwei plus eine: Eine allein stehende
+   dritte Kachel in einer zweiten Zeile sieht aus wie ein Nachtrag, nicht
+   wie ein gleichwertiger Reiter.
+
+   FLEX und nicht Grid, und das ist am gerenderten Zustand entschieden
+   worden: Mit "repeat(auto-fit, minmax(104px, 220px))" bildet Grid die
+   Spaltenzahl aus der OBEREN Schranke, nicht aus der unteren -- auf 390 px
+   ergab das EINE Spalte und damit 354 px Leiste, bevor der erste Inhalt
+   kam. Mit "flex:1 1 104px; max-width:220px" wachsen die Kacheln stattdessen
+   in den vorhandenen Platz: drei nebeneinander am Handy, gedeckelt und
+   mittig am Desktop. Nebenbei loest das den zweiten Fall gleich mit -- sind
+   nur zwei Kacheln da, teilen sie sich die Breite, statt eine Luecke zu
+   lassen, wo die dritte stuende. */
+.reiter{display:flex;flex-wrap:wrap;justify-content:center;gap:12px;margin-bottom:16px}
+.reiter-taste{flex:1 1 104px;max-width:220px;
+              display:flex;flex-direction:column;align-items:center;gap:10px;
+              text-align:center;min-height:110px;padding:16px 10px;
+              border:1px solid var(--line);border-radius:var(--r-lg);
+              background:rgba(var(--surface-rgb), var(--glas-kachel));
+              color:var(--ink);font:inherit;cursor:pointer;
+              transition:background .15s,border-color .15s}
+.reiter-taste:hover{border-color:var(--accent)}
+.reiter-taste .r-ic{width:56px;height:56px;border-radius:14px;flex:none;
+              background:var(--accent-soft);color:var(--accent);
+              display:inline-flex;align-items:center;justify-content:center}
+.reiter-taste .r-ic svg{width:28px;height:28px;fill:none;stroke:currentColor;
+              stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.reiter-taste .r-lbl{font-size:13.5px;font-weight:600;line-height:1.35}
+.reiter-taste.an{border-color:var(--accent);background:var(--accent-soft)}
+.reiter-taste.an .r-lbl{color:var(--accent)}
+.reiter-taste:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
 /* ── Liste ────────────────────────────────────────────────────────────── */
 /* Vorbild ist die Cockpit-Tabelle (Revierdienst -> Letzte Rundgaenge), aber
    ausdruecklich NICHT als Kopie: Ihre acht Spalten leben auf einem
@@ -237,6 +286,12 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
    einer gezeigt -- er steht sichtbar daneben statt unter „erledigt" zu
    verschwinden. */
 .punkte .beleg{display:block;color:var(--warn)}
+
+/* Personen und Stunden in der dritten Spalte -- zwei EINHEITEN, zwei Zeilen.
+   Unter einer Überschrift gäben sie sich als dasselbe aus (Hausregel). */
+.mass{font-size:13.5px;color:var(--ink-3)}
+.mass b{color:var(--ink);font-weight:700}
+.mass span{display:block}
 
 /* ── Aufklappbares Detail je Runde (ENT-455) ─────────────────────────── */
 /* Aufklappen statt Fenster: Ein Kunde vergleicht Runden untereinander, und
@@ -323,6 +378,39 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
 .d-ereignis .e-bem{font-size:13px;color:var(--ink-2);margin-top:2px;overflow-wrap:anywhere}
 .d-hinweis{font-size:13px;color:var(--ink-3)}
 
+/* Der Kundenrapport in der aufgeklappten Tafel (ENT-482). Dieselbe Ordnung
+   wie auf dem Blatt: Kopfangaben, dann die Personenzeilen, dann Bemerkungen
+   und die Unterschrift. */
+.kr-kopf{width:100%;border-collapse:collapse;font-size:13.5px;margin-bottom:18px}
+.kr-kopf td{padding:6px 0;border-bottom:1px solid var(--line);vertical-align:top}
+.kr-kopf td:first-child{color:var(--ink-3);width:132px;padding-right:12px}
+.kr-kopf td:last-child{font-weight:600;overflow-wrap:anywhere}
+/* Die Zeittabelle hat vier Spalten und passt auf 390 px nicht. Sie rollt
+   in IHREM Behälter, damit die SEITE nicht waagrecht rollt -- das ist der
+   Unterschied zwischen einer breiten Tabelle und einem kaputten Layout. */
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.kr-zeit{width:100%;min-width:340px;border-collapse:collapse;font-size:13.5px}
+.kr-zeit th{padding:5px 6px;text-align:left;font-size:11px;font-weight:700;
+            letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);
+            border-bottom:1.5px solid var(--ink-2)}
+.kr-zeit td{padding:7px 6px;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
+.kr-zeit .num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.kr-zeit tfoot td{font-weight:800;border-bottom:none;padding-top:9px}
+.kr-zeit tfoot .l{font-weight:400;color:var(--ink-3);text-align:right}
+.kr-bem{font-size:13px;margin-top:5px;overflow-wrap:anywhere}
+.kr-unter img{max-height:96px;max-width:260px;display:block;
+              background:#FFFFFF;border-radius:8px;padding:6px}
+.kr-unter .wer{font-size:13px;margin-top:7px}
+/* Kontrollrunde und eingesetzte Person, über dem Kennzahlenband. Beides
+   steht seit ENT-481 auch im Portal -- der Kunde bekommt dasselbe Blatt
+   ohnehin physisch. */
+.d-kopf{font-size:13.5px;color:var(--ink-2);margin:0 0 14px}
+/* Ein Abbruch ist die wichtigste Aussage über eine Runde und steht OBEN,
+   nicht als Fussnote. */
+.d-abbruch{border:1px solid var(--warn);background:var(--warn-soft);color:var(--warn);
+           border-radius:var(--r);padding:10px 13px;margin-bottom:16px;
+           font-size:13px;line-height:1.5}
+
 /* Der Weg auf der Karte (ENT-474). Er kommt erst auf einen Knopfdruck --
    siehe die Begruendung bei wegZeigen(). Die Hoehe haengt am Fenster und
    nicht an einer festen Zahl: Auf dem Handy ist eine 380 px hohe Karte
@@ -334,6 +422,21 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
            border-radius:var(--r);overflow:hidden;background:var(--grau-soft)}
 .weg-fuss{font-size:12.5px;color:var(--ink-3);margin-top:9px}
 
+/* Die Fusszeile der Tafel: eine einzige Handlung, rechts. Ein Knopf wird
+   NICHT über die volle Breite gestreckt, nur weil er allein in seiner Zeile
+   steht (Hausregel) -- auf beiden Breiten dasselbe Muster. */
+.d-fuss{display:flex;justify-content:flex-end;margin-top:22px}
+
+/* Das Rapportblatt für das PDF. Es steht ausserhalb des Bildes, nicht auf
+   display:none -- html2canvas misst einen versteckten Knoten als 0 hoch und
+   erzeugt eine leere Seite. Die Positionierung liegt an der HÜLLE und nicht
+   am Blatt selbst: Trüge das Blatt sie, wirkte sie im Klon weiter, den
+   html2canvas anfertigt, und man bekäme dasselbe leere Blatt (im Cockpit
+   gemessen, hier von Anfang an vermieden). */
+#blattHuelle{position:absolute;left:-10000px;top:0;width:820px}
+#blatt{width:760px;background:#FFFFFF;color:#14161A;padding:36px 40px;
+       font:13px/1.5 -apple-system,'Segoe UI',Arial,sans-serif}
+
 /* Ein leerer Zustand bekommt Text, nie eine leere Flaeche -- und der Text
    sagt, WELCHE der moeglichen Aussagen gilt (Hausregel: „unbekannt darf nie
    wie keine aussehen"). */
@@ -342,6 +445,75 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
 .leer .text{color:var(--ink-3);font-size:14px}
 
 .zahl{font-size:13.5px;color:var(--ink-3);margin:0 0 4px}
+/* Ueberschrift je Karte (ENT-484). Sie kommt erst mit der zweiten Karte --
+   eine allein braucht keinen Namen, zwei untereinander sehr wohl. Beide
+   bekommen sie, nicht nur die neue: Eine Karte mit Titel neben einer ohne
+   wirkt unruhig, ohne dass man sagen kann warum (Hausregel: gleiches
+   Muster auf beiden Seiten). */
+.karte-titel{font-size:15px;font-weight:700;margin:0 0 2px}
+
+/* ── Wachbuch (ENT-484) ──────────────────────────────────────────────── */
+/* Eine Zeitleiste, keine Tabelle: Vier Arten von Vorgaengen fuellen nicht
+   dieselben Spalten -- ein Rundgang hat keinen Kontrollpunkt, ein Ereignis
+   keinen Fuellstand. Leere Zellen saehen aus wie fehlende Angaben.
+   Zuschnitt wie die Rundgangliste daneben: Er muss 390 px ueberleben, das
+   Portal wird ueberwiegend am Handy geoeffnet. Darum drei Zeilen statt
+   drei Spalten -- Pfad und Zeit oben, Satz darunter, Zusatz zuunterst. */
+.wb-arten{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 4px}
+/* 44 px hoch, wie jedes Bedienelement am Handy (CLAUDE.md). Beim Messen
+   waren es zuerst 30 -- die Hausregel gilt auch fuer eine Filterreihe, die
+   dadurch zweizeilig wird. Was sie schmal haelt, ist nicht weniger Hoehe,
+   sondern die kurze Beschriftung: „Kontrollpunkte" statt „Kontrollpunkt-
+   scans". */
+.wb-a{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);
+      background:var(--surface);color:var(--ink-2);border-radius:999px;
+      min-height:44px;padding:0 14px;font-size:13.5px;font-weight:600;cursor:pointer;
+      -webkit-appearance:none;appearance:none}
+.wb-a .n{font-variant-numeric:tabular-nums;color:var(--ink-3)}
+.wb-a[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);
+      color:var(--accent)}
+.wb-a[aria-pressed="true"] .n{color:var(--accent)}
+.wb-a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.wb-tg{display:flex;align-items:center;gap:10px;padding:14px 0 8px}
+.wb-tg b{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+      color:var(--ink-2)}
+.wb-tg span{font-size:12.5px;color:var(--ink-3)}
+.wb-tg i{flex:1;height:1px;background:var(--line);font-style:normal}
+
+.wb-z{display:grid;grid-template-columns:30px 1fr auto;gap:2px 10px;
+      padding:12px 0;border-bottom:1px solid var(--line);align-items:start}
+.wb-z:last-child{border-bottom:none}
+.wb-z .wb-i{grid-column:1;grid-row:1 / span 3;width:30px;height:30px;border-radius:50%;
+      display:flex;align-items:center;justify-content:center}
+.wb-z .wb-i svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.9;
+      stroke-linecap:round;stroke-linejoin:round}
+/* Vier Arten, vier Farben. Die Abstufung traegt der Chip und der Satz, nicht
+   das Sinnbild -- sonst saehen vier Arten mit Vorbehalt alle gleich aus.
+   Einzige Umfaerbung ist der Abbruch: Eine abgebrochene Runde darf nicht
+   aussehen wie eine erledigte. Dieselbe Lesart wie im Cockpit. */
+.wb-z .wb-i.a-scan{color:var(--accent);background:var(--accent-soft)}
+.wb-z .wb-i.a-rundgang{color:var(--gruen);background:var(--gruen-soft)}
+.wb-z .wb-i.a-aufgabe{color:var(--ink-2);background:var(--line)}
+.wb-z .wb-i.a-ereignis{color:var(--rot);background:var(--rot-soft)}
+.wb-z .wb-i.schwer{color:var(--rot);background:var(--rot-soft)}
+.wb-z .wb-p{grid-column:2;grid-row:1;font-size:11px;font-weight:700;letter-spacing:.05em;
+      text-transform:uppercase;color:var(--ink-3);overflow-wrap:anywhere}
+.wb-z .wb-t{grid-column:3;grid-row:1;font-size:13.5px;font-weight:700;
+      font-variant-numeric:tabular-nums;white-space:nowrap}
+.wb-z .wb-s{grid-column:2 / -1;grid-row:2;font-size:14px;margin-top:2px;
+      overflow-wrap:anywhere}
+.wb-z .wb-s b{font-weight:700}
+.wb-z .wb-x{grid-column:2 / -1;grid-row:3;display:flex;flex-wrap:wrap;
+      align-items:center;gap:6px;margin-top:5px;font-size:13px;color:var(--ink-3)}
+/* Anklickbar ist nur, was auch irgendwohin fuehrt: eine Zeile mit Runde.
+   Eine Zeile, die auf einen Klick nichts tut, ist schlechter als eine, die
+   gar nicht erst danach aussieht. */
+.wb-z.fuehrt{cursor:pointer}
+.wb-z.fuehrt:hover .wb-s{text-decoration:underline}
+.wb-z.fuehrt:focus-visible{outline:2px solid var(--accent);outline-offset:2px;
+      border-radius:8px}
+.wb-hinweis{font-size:13px;color:var(--warn);margin:10px 0 0;font-weight:600}
 [hidden]{display:none!important}
 
 @media (min-width:640px){
@@ -518,6 +690,33 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
 
   <!-- Angemeldet -->
   <div id="inhalt" hidden>
+    <!-- Drei Bereiche, drei Reiter (ENT-486). Die Leiste erscheint ab ZWEI
+         verfuegbaren Bereichen: Eine Reihe mit einer einzigen Kachel waere
+         eine Wahl ohne Alternative. Welche Kachel dasteht, entscheidet
+         allein, was der Kunde wirklich bezieht -- eine Kachel fuer etwas,
+         das er nicht hat, waere ein Versprechen, das die Seite dahinter
+         nicht einloest (dieselbe Hausregel, die die Leiste mit ENT-482
+         ueberhaupt hervorgebracht hat).
+
+         Die Leiste steht GANZ OBEN, vor der Zeitraumwahl: Erst wird
+         entschieden, WORAUF man sieht, dann WORIN. -->
+    <div class="reiter" id="reiter" hidden role="tablist">
+      <button type="button" class="reiter-taste an" id="reiter-rundgaenge"
+              role="tab" aria-selected="true">
+        <span class="r-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M12 19h4a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2H8a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h4"/></svg></span>
+        <span class="r-lbl">Rundgänge</span>
+      </button>
+      <button type="button" class="reiter-taste" id="reiter-wachbuch"
+              role="tab" aria-selected="false">
+        <span class="r-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></span>
+        <span class="r-lbl">Wachbuch</span>
+      </button>
+      <button type="button" class="reiter-taste" id="reiter-einsaetze"
+              role="tab" aria-selected="false">
+        <span class="r-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="16" y1="3" x2="16" y2="7"/></svg></span>
+        <span class="r-lbl">Einsätze</span>
+      </button>
+    </div>
     <div class="karte">
       <div class="zeitraum">
         <div class="paar">
@@ -532,15 +731,42 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
       </div>
     </div>
 
-    <div class="karte">
+
+    <div class="karte" id="bereich-rundgaenge">
+      <h2 class="karte-titel">Rundgänge</h2>
       <p class="zahl" id="anzahl"></p>
       <div id="liste"></div>
+    </div>
+
+    <!-- Wachbuch: seit ENT-486 ein EIGENER Reiter, nicht mehr die zweite
+         Karte unter den Rundgaengen (ENT-484 Punkt 9, damit revidiert). Die
+         Chronik ist am echten Datenbestand laenger als gedacht -- neunzehn
+         Vorgaenge auf neun Tage, und das bei einem Objekt; untereinander
+         mit der Rundgangliste ergab das eine Seite, auf der man scrollt,
+         um von der einen Aussage zur anderen zu kommen. -->
+    <div class="karte" id="bereich-wachbuch" hidden>
+      <h2 class="karte-titel">Wachbuch</h2>
+      <p class="zahl" id="wb-zahl"></p>
+      <div class="wb-arten" id="wb-arten"></div>
+      <div id="wb-liste"></div>
+      <p class="wb-hinweis" id="wb-hinweis" hidden></p>
+    </div>
+
+    <div class="karte" id="bereich-einsaetze" hidden>
+      <h2 class="karte-titel">Einsätze</h2>
+      <p class="zahl" id="anzahl-e"></p>
+      <div id="liste-e"></div>
     </div>
   </div>
 
   <p class="fehler" id="fehler-global" hidden></p>
 </div>
 
+
+<!-- Das Blatt für das PDF (ENT-478). Eigener Aufbau, nicht die Tafel
+     abfotografiert: Die Tafel trägt Knöpfe, eine Karte und Glaskanten; ein
+     Abzug davon wäre ein Bildschirmfoto, kein Rapport. -->
+<div id="blattHuelle" aria-hidden="true"><div id="blatt"></div></div>
 <script>
 'use strict';
 const API = 'api/';
@@ -565,6 +791,15 @@ const LEER = {
     'Für Ihre Objekte ist der Revierdienst eingerichtet, es wurde aber noch keine Runde abgeschlossen.'],
   kein_treffer_im_zeitraum: ['Keine Rundgänge im gewählten Zeitraum',
     'Ausserhalb dieses Zeitraums liegen Rundgänge vor. Bitte den Zeitraum ändern.'],
+};
+
+// Zwei Gründe, zwei Texte -- und keiner davon sagt „keine Einsätze", wenn in
+// Wahrheit nur noch keiner unterschrieben ist.
+const LEER_E = {
+  noch_nichts_unterschrieben: ['Noch keine unterschriebenen Einsätze',
+    'Ein Einsatz erscheint hier, sobald der Rapport vor Ort unterschrieben ist.'],
+  kein_treffer_im_zeitraum: ['Keine Einsätze im gewählten Zeitraum',
+    'Ausserhalb dieses Zeitraums liegen Einsätze vor. Bitte den Zeitraum ändern.'],
 };
 
 let token = null;
@@ -753,11 +988,31 @@ $('wieder-anmelden').addEventListener('click', () => {
   $('email').focus();
 });
 
+// Der Kundenname kommt aus der Sitzung (portal_rundgaenge.php) und wird
+// hier gemerkt: Das Rapportblatt braucht ihn, und der Detail-Endpunkt
+// liefert ihn bewusst nicht mit -- im Portal ist er in jeder Zeile derselbe.
+let kundeName = '';
+
 function kopfSetzen(kunde, person) {
+  kundeName = kunde || '';
   $('titel').textContent = kunde || 'Kundenportal';
-  $('unter').textContent = kunde
-    ? ('Nachweis der ausgeführten Rundgänge' + (person ? ' · ' + person : ''))
-    : 'Nachweis der ausgeführten Rundgänge';
+  kopfPerson = person || '';
+  unterzeileSetzen();
+}
+
+// Die Unterzeile sagt, WOFUER dieses Portal der Nachweis ist -- und das
+// haengt davon ab, was der Kunde bezieht. „Nachweis der ausgefuehrten
+// Rundgaenge" bei einem reinen Verkehrsdienst-Kunden waere schlicht falsch
+// (ENT-482).
+let kopfPerson = '';
+let kopfArten = { rundgaenge: false, einsaetze: false };
+function unterzeileSetzen() {
+  const teile = [];
+  if (kopfArten.rundgaenge) { teile.push('Rundgänge'); }
+  if (kopfArten.einsaetze) { teile.push('Einsätze'); }
+  const was = teile.length ? teile.join(' und ') : 'Leistungen';
+  $('unter').textContent = 'Nachweis der ausgeführten ' + was
+    + (kopfPerson ? ' · ' + kopfPerson : '');
 }
 
 // ── Inhalt ────────────────────────────────────────────────────────────
@@ -790,16 +1045,100 @@ function zeitText(iso) {
 async function laden() {
   const von = $('von').value, bis = $('bis').value;
   const frage = (von && bis) ? ('?von=' + von + '&bis=' + bis) : '';
-  const { ok, code, daten } = await ruf('portal_rundgaenge.php' + frage);
-  if (code === 401) { abgemeldet(); return; }
-  if (!ok) {
-    fehler('fehler-global', daten.message || 'Die Daten liessen sich nicht laden.');
+  // Beide Bereiche zusammen holen (ENT-482). Welcher angeboten wird,
+  // entscheidet je_vorhanden -- eine Frage OHNE Zeitraum: Die Reiterleiste
+  // darf nicht verschwinden, nur weil jemand den Zeitraum verstellt.
+  const [rd, vd] = await Promise.all([
+    ruf('portal_rundgaenge.php' + frage),
+    ruf('portal_einsaetze.php' + frage),
+  ]);
+  if (rd.code === 401 || vd.code === 401) { abgemeldet(); return; }
+  if (!rd.ok) {
+    fehler('fehler-global', rd.daten.message || 'Die Daten liessen sich nicht laden.');
     return;
   }
   fehler('fehler-global', '');
-  kopfSetzen(daten.kunde, daten.person);
-  if (daten.zeitraum) { $('von').value = daten.zeitraum.von; $('bis').value = daten.zeitraum.bis; }
-  zeichnen(daten);
+  kopfSetzen(rd.daten.kunde, rd.daten.person);
+  if (rd.daten.zeitraum) { $('von').value = rd.daten.zeitraum.von; $('bis').value = rd.daten.zeitraum.bis; }
+  zeichnen(rd.daten);
+  // Ein Fehler im zweiten Bereich darf den ersten nicht mitnehmen: Wer nur
+  // Rundgänge hat, soll sie sehen, auch wenn der andere Weg klemmt.
+  if (vd.ok) { zeichnenEinsaetze(vd.daten); }
+  bereicheSetzen(!!rd.daten.je_vorhanden, vd.ok && !!vd.daten.je_vorhanden);
+  // Die Chronik (ENT-484) kommt NACH den beiden -- nicht mit ihnen im
+  // Promise.all. Sie ist die laengste der drei Antworten, und die
+  // Rundgangliste soll nicht auf sie warten.
+  //
+  // Sie wird nur geholt, wenn es ueberhaupt einen Revierdienst gibt: Wer nur
+  // Verkehrsdienst bezieht, sieht den ganzen Bereich nicht, und eine Abfrage
+  // fuer eine verborgene Karte ist eine Abfrage zu viel.
+  //
+  // Der Zeitraum wird AUSDRUECKLICH weitergereicht statt noch einmal aus den
+  // Feldern gelesen. Heute kaeme dasselbe heraus -- die Felder tragen drei
+  // Zeilen weiter oben bereits den zurueckgemeldeten Zeitraum. Genau darin
+  // liegt der Grund: Die Gleichheit haengt dann an der REIHENFOLGE dieser
+  // Zeilen, und wer sie umstellt, bekommt zwei Karten mit zwei Zeitraeumen
+  // nebeneinander, ohne dass es irgendwo staende. Der Server meldet zurueck,
+  // welchen Zeitraum er wirklich benutzt hat (er tauscht verdrehte Angaben
+  // und faellt bei Unsinn auf seine Vorgabe zurueck); genau der gehoert in
+  // beide Karten.
+  if (rd.daten.je_vorhanden) {
+    wbLaden(rd.daten.zeitraum && rd.daten.zeitraum.von,
+            rd.daten.zeitraum && rd.daten.zeitraum.bis);
+  }
+}
+
+/* Welcher Bereich erscheint (ENT-482, erweitert mit ENT-486).
+   Drei Bereiche, aber nur zwei Bedingungen: Rundgaenge UND Wachbuch leben
+   beide vom Revierdienst -- das Wachbuch chronisiert genau das, was die
+   Rundgangliste zusammenfasst. Ohne Revierdienst gibt es beide nicht.
+
+   Der wichtigste Fall ist der dritte: Hat der Kunde nur Verkehrsdienst,
+   sieht er KEINE leere Rundgang-Liste und kein leeres Wachbuch -- sie
+   saehen aus, als sei dort nichts passiert (Hausregel). */
+const BEREICHE = ['rundgaenge', 'wachbuch', 'einsaetze'];
+let hatEinsaetze = false;
+let bereichDa = { rundgaenge: false, wachbuch: false, einsaetze: false };
+
+function bereicheSetzen(jeRundgaenge, jeEinsaetze) {
+  hatEinsaetze = jeEinsaetze;
+  kopfArten = { rundgaenge: jeRundgaenge, einsaetze: jeEinsaetze };
+  unterzeileSetzen();
+  bereichDa = { rundgaenge: jeRundgaenge, wachbuch: jeRundgaenge, einsaetze: jeEinsaetze };
+  const offen = BEREICHE.filter(b => bereichDa[b]);
+  // Eine Kachelreihe mit einer einzigen Kachel waere eine Wahl ohne
+  // Alternative -- sie erscheint ab zwei.
+  $('reiter').hidden = offen.length < 2;
+  // Gar nichts vorhanden: Der Rundgang-Bereich zeigt seine eigene,
+  // sprechende Leermeldung. Eine Seite, die dann ueberhaupt nichts zeigt,
+  // liesse den Kunden mit der Frage allein, ob etwas kaputt ist.
+  // Gezeigt wird die Wahl des Kunden, SOLANGE es sie noch gibt -- sonst der
+  // erste verfuegbare Bereich. Der Rueckfall wird ausdruecklich NICHT
+  // gemerkt: Wer eine Woche ohne Rundgaenge ansieht, landet zwangsweise bei
+  // den Einsaetzen; das ist keine Wahl, und beim naechsten Zeitraum mit
+  // Rundgaengen soll er wieder dort stehen, wo er stand. Genau dieser
+  // Unterschied ist beim Messen aufgefallen.
+  bereichZeigen(bereichDa[gewaehlterBereich] ? gewaehlterBereich : (offen[0] || 'rundgaenge'));
+}
+
+// Was der Kunde zuletzt GEWAEHLT hat -- nicht, was gerade zu sehen ist.
+let gewaehlterBereich = 'rundgaenge';
+function bereichZeigen(welcher) {
+  for (const art of BEREICHE) {
+    const an = art === welcher;
+    $('bereich-' + art).hidden = !an;
+    const taste = $('reiter-' + art);
+    // Eine Kachel fuer einen Bereich, den es nicht gibt, waere ein
+    // Versprechen, das die Seite dahinter nicht einloest.
+    taste.hidden = !bereichDa[art];
+    taste.classList.toggle('an', an);
+    taste.setAttribute('aria-selected', an ? 'true' : 'false');
+  }
+}
+// Der Klick ist die Wahl -- er wird gemerkt, der Rueckfall oben nicht.
+function reiterWaehlen(welcher) { gewaehlterBereich = welcher; bereichZeigen(welcher); }
+for (const art of BEREICHE) {
+  $('reiter-' + art).addEventListener('click', () => reiterWaehlen(art));
 }
 
 function zeichnen(daten) {
@@ -858,7 +1197,7 @@ function zeichnen(daten) {
     // Anklickbar UND mit der Tastatur bedienbar: Eine Zeile, die nur die
     // Maus oeffnet, ist fuer die Tastatur eine Sackgasse. role/aria sagen
     // dem Vorleseprogramm, dass hier etwas aufgeht und ob es offen ist.
-    return '<div class="zeile" data-id="' + Number(r.id) + '" role="button" tabindex="0"'
+    return '<div class="zeile" data-art="rundgang" data-id="' + Number(r.id) + '" role="button" tabindex="0"'
       + ' aria-expanded="false" aria-label="Rundgang vom ' + esc(dmy(r.datum))
       + ', ' + esc(r.objekt_name) + ' — Einzelheiten anzeigen">'
       + '<div class="datum">' + esc(dmy(r.datum)) + '</div>'
@@ -871,10 +1210,73 @@ function zeichnen(daten) {
   }).join('');
 }
 
+// ── Die Einsätze (Verkehrsdienst, ENT-482) ───────────────────────────
+// Eine Zeile ist ein EINSATZ, nicht ein Rapport: Das Dokument ist der
+// Kundenrapport nach ENT-160 -- ein Blatt je Einsatz, auf dem jede Person
+// mit ihren eigenen Zeiten steht. Dieselbe Zeilenbauart wie bei den
+// Rundgängen; es gibt im Portal EIN Zeilenmuster und nicht zwei.
+function zeichnenEinsaetze(daten) {
+  const liste = $('liste-e');
+  const es = daten.einsaetze || [];
+  if (!es.length) {
+    $('anzahl-e').textContent = '';
+    const [titel, text] = LEER_E[daten.leer_grund] || ['Keine Angabe',
+      'Zu diesem Zeitraum liegt keine Auskunft vor.'];
+    liste.innerHTML = '<div class="leer"><div class="titel">' + esc(titel)
+      + '</div><div class="text">' + esc(text) + '</div></div>';
+    return;
+  }
+  $('anzahl-e').textContent = es.length + ' ' + (es.length === 1 ? 'Einsatz' : 'Einsätze')
+    + ' vom ' + dmy(daten.zeitraum.von) + ' bis ' + dmy(daten.zeitraum.bis);
+
+  liste.innerHTML = es.map(e => {
+    const ort = [e.strasse, e.ort].filter(Boolean).join(', ');
+    // Die Veranstaltung ist der sprechende Titel, wo es eine gibt; sonst
+    // trägt der Einsatzort die Zeile. Ein leerer Titel wäre eine Lücke,
+    // wo eine Auskunft hingehört.
+    const titel = e.veranstaltung || ort || 'Einsatz';
+    const zeit = (e.von && e.bis) ? (uhr2(e.von) + ' – ' + uhr2(e.bis)) : null;
+    const meta = [e.veranstaltung && ort ? ort : null, zeit].filter(Boolean).join(' · ');
+    return '<div class="zeile" data-art="einsatz" data-id="' + Number(e.id) + '"'
+      + ' role="button" tabindex="0" aria-expanded="false"'
+      + ' aria-label="Einsatz vom ' + esc(dmy(e.datum)) + ', ' + esc(titel)
+      + ' — Einzelheiten anzeigen">'
+      + '<div class="datum">' + esc(dmy(e.datum)) + '</div>'
+      + '<div class="rechts"><span class="marke-zustand gut">'
+      + esc(e.einsatzart || 'Einsatz') + '</span>'
+      + '<span class="pfeil" aria-hidden="true"></span></div>'
+      + '<div class="haupt"><div class="objekt">' + esc(titel) + '</div>'
+      + (meta ? '<div class="meta">' + esc(meta) + '</div>' : '') + '</div>'
+      // Zwei Einheiten, zwei Zeilen: „Personen" zählt Menschen, „Stunden"
+      // zählt Zeit. Sie stehen nie unter einer Überschrift.
+      + '<div class="fortschritt"><div class="mass">'
+      + '<span><b>' + Number(e.personen) + '</b> '
+      + (Number(e.personen) === 1 ? 'Person' : 'Personen') + '</span>'
+      + '<span><b>' + zahl2(e.stunden) + '</b> Stunden</span>'
+      + '</div></div>'
+      + '</div>';
+  }).join('');
+}
+
+// "22:04:00" -> "22:04". Eine Uhrzeit aus einer TIME-Spalte, nicht aus
+// einem Zeitstempel -- darum ein eigener Schnitt.
+function uhr2(t) {
+  const x = String(t || '').slice(0, 5);
+  return /^\d{2}:\d{2}$/.test(x) ? x : '–';
+}
+// Zwei Nachkommastellen mit Komma, wie überall im Haus.
+function zahl2(n) {
+  return Number(n || 0).toFixed(2).replace('.', ',');
+}
+
 // ── Aufklappbares Detail je Runde (ENT-455) ──────────────────────────
 // Die Antwort wird je Runde einmal geholt und behalten: Wer eine Zeile
 // zu- und wieder aufklappt, soll nicht jedes Mal warten.
 const detailZwischen = {};
+// Die Fotobelege, je Scan einmal geholt. Sie werden zweimal gebraucht -- in
+// der Tafel und im PDF -- und ein zweites Holen waere ein zweiter Weg zu
+// demselben Bild.
+const fotoZwischen = {};
 
 // Wortlaut fuer den Kunden, nicht fuer den Betrieb: „Ersatzscan" ist
 // Hausjargon. Was er bedeutet -- Foto statt technischer Bestaetigung --
@@ -893,17 +1295,299 @@ const D_AUFGABE = {
   unbeantwortet:  ['warn', 'Unbeantwortet'],
 };
 
-$('liste').addEventListener('click', ev => {
-  const zeile = ev.target.closest('.zeile');
-  if (zeile) { detailUmschalten(zeile); }
+/* ══ WACHBUCH (ENT-484) ═══════════════════════════════════════════════
+   Die Chronik derselben Objekte im selben Zeitraum: Kontrollpunkt erfasst,
+   Rundgang erledigt oder abgebrochen, Aufgabe beantwortet, Ereignis
+   gemeldet -- nach Tagen gruppiert, neueste zuoberst.
+
+   Was hier NICHT steht: der Name der eingesetzten Person. Die Chronik ist
+   eine Liste und folgt damit derselben Abstufung wie die Rundgangliste
+   daneben -- sie beantwortet „was ist geschehen", nicht „wer war es". Der
+   Name steht seit ENT-481 im aufgeklappten Detail, einen Klick weiter.
+
+   Zusammengefuehrt, sortiert und gekappt wird im Server
+   (portal_wachbuch.php). Hier wird nur gezeichnet. */
+const WB_ARTEN = [
+  ['scan', 'Kontrollpunkte',
+    '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>'],
+  ['rundgang', 'Rundgänge',
+    '<circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M12 19h4a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2H8a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h4"/>'],
+  ['aufgabe', 'Aufgaben',
+    '<line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><polyline points="4 6 5 7 7 5"/><polyline points="4 12 5 13 7 11"/><polyline points="4 18 5 19 7 17"/>'],
+  ['ereignis', 'Ereignisse',
+    '<path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>'],
+];
+
+// Fuenf verschiedene Aussagen, fuenf verschiedene Texte. Der Server sagt,
+// welche gilt -- die Oberflaeche raet sie nicht aus einer Anzahl 0.
+const WB_LEER = {
+  kein_revierdienst: ['Kein Revierdienst eingerichtet',
+    'Für Ihre Objekte sind keine Kontrollrunden hinterlegt. Das heisst nicht, dass keine Leistung erbracht wurde — es wird hier nur nichts nachgewiesen.'],
+  noch_nichts_erfasst: ['Noch nichts erfasst',
+    'Für Ihre Objekte ist der Revierdienst eingerichtet, es wurde aber noch keine Runde abgeschlossen.'],
+  kein_treffer_im_zeitraum: ['Nichts im gewählten Zeitraum',
+    'Ausserhalb dieses Zeitraums liegen Einträge vor. Bitte den Zeitraum ändern.'],
+  kein_treffer_der_art: ['Kein Treffer',
+    'Im Zeitraum ist etwas geschehen, aber nichts von der gewählten Art. Ein anderer Filter zeigt es.'],
+  nicht_ladbar: ['Wachbuch nicht verfügbar',
+    'Die Chronik liess sich nicht laden. Die Rundgänge darüber sind davon nicht betroffen.'],
+};
+
+// Leer heisst „alle", nicht „keine": Wer keine Art waehlt, will die ganze
+// Chronik, nicht eine leere Seite.
+let wbFilter = [];
+
+// Ohne Angabe gelten die Felder -- so ruft die Filterreihe sie auf, und
+// dort ist das richtig: Die Felder tragen dann genau den Zeitraum, den die
+// Rundgangliste daneben gerade zeigt.
+async function wbLaden(vonAus, bisAus) {
+  const von = vonAus || $('von').value, bis = bisAus || $('bis').value;
+  const teile = [];
+  if (von && bis) { teile.push('von=' + von, 'bis=' + bis); }
+  if (wbFilter.length) { teile.push('arten=' + encodeURIComponent(wbFilter.join(','))); }
+  const { ok, code, daten } = await ruf('portal_wachbuch.php' + (teile.length ? '?' + teile.join('&') : ''));
+  if (code === 401) { abgemeldet(); return; }
+  wbZeichnen(ok && daten && daten.status === 'ok' ? daten : null);
+}
+
+/* Die Filterreihe. Jede Art traegt ihre WIRKLICHE Zahl im Zeitraum, auch
+   wenn der Filter sie gerade ausblendet -- sonst liesse sich nicht sehen,
+   dass hinter dem Filter noch etwas liegt. Eine Art mit null Vorgaengen
+   bleibt stehen und sagt „0"; sie zu verstecken hiesse, „im Zeitraum
+   nichts" wie „gibt es nicht" aussehen zu lassen. */
+function wbArtenZeichnen(d) {
+  const jeArt = (d && d.je_art) || {};
+  const quellen = (d && d.quellen) || {};
+  const quelleZuArt = { scan: 'scans', rundgang: 'runden', aufgabe: 'aufgaben', ereignis: 'ereignisse' };
+  $('wb-arten').innerHTML = WB_ARTEN.map(([art, lbl, ic]) => {
+    const an = wbFilter.includes(art);
+    const stand = quellen[quelleZuArt[art]];
+    // Drei Aussagen, drei Zeichen: eine Zahl, wenn die Quelle abfragbar war
+    // -- ein Fragezeichen, wenn nicht. „0" fuer eine Quelle, die gar nicht
+    // antwortet, waere eine Behauptung.
+    const zahl = stand === 'ok' ? String(jeArt[art] || 0) : '?';
+    const titel = stand === 'ok' ? lbl + ': ' + (jeArt[art] || 0) + ' im Zeitraum'
+      : lbl + ': nicht abfragbar — das ist nicht dasselbe wie „keine"';
+    return '<button type="button" class="wb-a" data-art="' + art + '"'
+      + ' aria-pressed="' + (an ? 'true' : 'false') + '" title="' + esc(titel) + '">'
+      + '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"'
+      + ' stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+      + ic + '</svg><span>' + esc(lbl) + '</span><span class="n">' + esc(zahl) + '</span></button>';
+  }).join('');
+}
+
+/* Was in einer Zeile steht. Die Aussage gehoert in den SATZ, nicht in eine
+   Farbe: Ein nicht verfuegbarer Kontrollpunkt darf nicht dastehen wie ein
+   erfasster, auch nicht fuer jemanden, der die Farbe nicht sieht.
+   „Fotobeleg" statt „Ersatzscan" -- derselbe Wortschatz wie im Detail
+   (D_SCAN), Hausjargon gehoert nicht ins Portal. */
+function wbSatz(e) {
+  // Ein Scan auf einen inzwischen entfernten Punkt behaelt seinen
+  // Nachweiswert -- der Punkt fehlt, die Durchfuehrung nicht. Der Ersatz
+  // steht an der Stelle des NAMENS und nicht an der des ganzen Satzteils,
+  // sonst stuende „Kontrollpunkt einen inzwischen entfernten Kontrollpunkt
+  // erfasst" da. Derselbe Wortlaut wie im Cockpit -- ein zweites Wort fuer
+  // denselben Zustand waere eine zweite Sprache.
+  const punkt = e.punkt_name ? '<b>' + esc(e.punkt_name) + '</b>'
+    : '<i>(inzwischen entfernt)</i>';
+  if (e.art === 'scan') {
+    if (e.status === 'nicht_verfuegbar') { return 'Kontrollpunkt ' + punkt + ' als nicht verfügbar gemeldet.'; }
+    if (e.status === 'ersatzscan') { return 'Kontrollpunkt ' + punkt + ' per Fotobeleg belegt.'; }
+    return 'Kontrollpunkt ' + punkt + ' erfasst.';
+  }
+  if (e.art === 'rundgang') {
+    // Ohne Vorlage laeuft die Runde ueber alle Kontrollpunkte des Objekts --
+    // das ist eine Aussage, kein fehlender Name.
+    const name = e.rundgang_name ? '<b>' + esc(e.rundgang_name) + '</b>'
+      : '<b>über alle Kontrollpunkte des Objekts</b>';
+    return e.status === 'abgebrochen'
+      ? 'Rundgang ' + name + ' abgebrochen.'
+      : 'Rundgang ' + name + ' erledigt.';
+  }
+  if (e.art === 'aufgabe') {
+    const a = '<b>' + esc(e.bezeichnung || 'ohne Bezeichnung') + '</b>';
+    return e.status === 'nicht_moeglich'
+      ? 'Aufgabe ' + a + ' als nicht möglich gemeldet.'
+      : 'Aufgabe ' + a + ' erledigt.';
+  }
+  return e.bezeichnung
+    ? 'Ereignis gemeldet: <b>' + esc(e.bezeichnung) + '</b>.'
+    // Keine erfundene Kategorie: „ohne hinterlegte Art" ist die Wahrheit,
+    // „Sonstiges" waere eine Einordnung, die niemand getroffen hat.
+    : 'Ereignis <b>ohne hinterlegte Art</b> gemeldet.';
+}
+
+const WB_MARKE = {
+  nicht_verfuegbar: ['ab', 'Nicht verfügbar'],
+  ersatzscan:       ['warn', 'Fotobeleg'],
+  nicht_moeglich:   ['ab', 'Nicht möglich'],
+  abgebrochen:      ['ab', 'Abgebrochen'],
+};
+
+function wbZusatz(e) {
+  const teile = [];
+  const m = WB_MARKE[e.status];
+  if (m) { teile.push('<span class="marke-zustand ' + m[0] + '">' + esc(m[1]) + '</span>'); }
+  if (e.art === 'rundgang') {
+    // „Kontrollpunkte" zaehlt erfasste Punkte -- eine Einheit, ausgeschrieben.
+    const n = Number(e.scans_anzahl || 0);
+    teile.push('<span>' + n + (n === 1 ? ' Kontrollpunkt' : ' Kontrollpunkte') + ' erfasst</span>');
+    // Der Grund steht in der Zeile, nicht erst im Detail: Wer eine Nacht
+    // durchliest, soll ihn sehen, ohne jede Runde einzeln zu oeffnen.
+    if (e.abbruch_grund) { teile.push('<span>Grund: ' + esc(e.abbruch_grund) + '</span>'); }
+  }
+  if (e.text) { teile.push('<span>' + esc(e.text) + '</span>'); }
+  if (e.hat_foto) { teile.push('<span>mit Foto</span>'); }
+  // Der Vorfallzeitpunkt ergaenzt den Erfassungszeitpunkt und ersetzt ihn
+  // nie: Einsortiert ist die Zeile nach dem Erfassen.
+  if (e.vorfall_am) {
+    teile.push('<span>Vorfall ' + esc(dmy(e.vorfall_am)) + ', ' + esc(uhr(e.vorfall_am) || '–') + '</span>');
+  }
+  return teile.length ? '<div class="wb-x">' + teile.join('') + '</div>' : '';
+}
+
+/* Der Pfad ueber der Zeile: Objekt und, wo der Satz ihn nicht schon nennt,
+   die Kontrollrunde. Kein Kunde -- er ist im Portal immer derselbe. Kein
+   Verweis: Das Portal hat keine Objekt- und keine Kundenansicht, und eine
+   unterstrichene Beschriftung, die nirgends hinfuehrt, waere schlechter als
+   reiner Text. Was fuehrt, ist die Zeile selbst -- zur Runde darueber. */
+function wbPfad(e) {
+  const teile = [];
+  if (e.objekt_name) { teile.push(esc(e.objekt_name)); }
+  if (e.art !== 'rundgang' && e.rundgang_name) { teile.push(esc(e.rundgang_name)); }
+  return teile.length ? '<div class="wb-p">' + teile.join(' · ') + '</div>' : '';
+}
+
+// Nur der Abbruch faerbt um -- die schwerste Stufe. Alles Uebrige behaelt
+// die Farbe seiner Art; die Abstufung traegt die Marke daneben.
+function wbArtKlasse(e) {
+  return 'a-' + e.art + (e.status === 'abgebrochen' ? ' schwer' : '');
+}
+
+function wbZeichnen(d) {
+  const ziel = $('wb-liste');
+  $('wb-hinweis').hidden = true;
+  wbArtenZeichnen(d);
+  const leer = (schluessel) => {
+    const [titel, text] = WB_LEER[schluessel] || WB_LEER.nicht_ladbar;
+    $('wb-zahl').textContent = '';
+    ziel.innerHTML = '<div class="leer"><div class="titel">' + esc(titel)
+      + '</div><div class="text">' + esc(text) + '</div></div>';
+  };
+  if (!d) { leer('nicht_ladbar'); return; }
+  const liste = d.eintraege || [];
+  if (!liste.length) { leer(d.leer_grund); return; }
+
+  // Zahl mit Bezug, weil ein Zeitraum und womoeglich ein Filter greift:
+  // „37 Vorgänge" allein saehe aus wie die Gesamtzahl.
+  $('wb-zahl').textContent = liste.length + ' ' + (liste.length === 1 ? 'Vorgang' : 'Vorgänge')
+    + (d.gekuerzt ? ' von ' + d.gesamt : '')
+    + ' vom ' + dmy(d.zeitraum.von) + ' bis ' + dmy(d.zeitraum.bis)
+    + (d.gekuerzt ? ' — bitte den Zeitraum eingrenzen' : '');
+
+  // Eine Quelle, die fehlt oder nicht antwortet, waehrend die uebrigen
+  // liefern: Die Liste sieht dann vollstaendig aus, ist es aber nicht.
+  const NAME = { scans: 'Kontrollpunkte', runden: 'Rundgänge', aufgaben: 'Aufgaben', ereignisse: 'Ereignisse' };
+  const luecke = Object.keys(d.quellen || {}).filter(k => d.quellen[k] !== 'ok').map(k => NAME[k] || k);
+  if (luecke.length) {
+    $('wb-hinweis').hidden = false;
+    $('wb-hinweis').textContent = 'Unvollständig: ' + luecke.join(', ')
+      + (luecke.length > 1 ? ' lassen' : ' lässt') + ' sich nicht abfragen.'
+      + ' Das ist nicht dasselbe wie „nichts geschehen".';
+  }
+
+  // Nach Tagen gruppieren. Die Reihenfolge kommt aus dem Server und wird
+  // hier NICHT nachsortiert -- zwei Sortierungen waeren zwei Wahrheiten.
+  const jeTag = {};
+  liste.forEach(e => { const t = String(e.zeit).slice(0, 10); jeTag[t] = (jeTag[t] || 0) + 1; });
+  let tag = null, html = '';
+  liste.forEach(e => {
+    const t = String(e.zeit).slice(0, 10);
+    if (t !== tag) {
+      tag = t;
+      html += '<div class="wb-tg"><b>' + esc(dmy(t)) + '</b><span>' + jeTag[t] + ' '
+        + (jeTag[t] === 1 ? 'Vorgang' : 'Vorgänge') + '</span><i></i></div>';
+    }
+    const ic = (WB_ARTEN.find(a => a[0] === e.art) || [, , ''])[2];
+    // Anklickbar nur, wo es eine Runde gibt, zu der der Klick fuehren kann.
+    const fuehrt = e.rundgang_id ? ' fuehrt' : '';
+    html += '<div class="wb-z' + fuehrt + '" data-rg="' + Number(e.rundgang_id || 0) + '"'
+      + (fuehrt ? ' role="button" tabindex="0" aria-label="' + esc(dmy(t)) + ', '
+          + esc(uhr(e.zeit) || '') + ' — zur zugehörigen Runde"' : '')
+      + '><span class="wb-i ' + wbArtKlasse(e) + '">'
+      + '<svg viewBox="0 0 24 24" aria-hidden="true">' + ic + '</svg></span>'
+      + wbPfad(e)
+      + '<div class="wb-t">' + esc(uhr(e.zeit) || '–') + '</div>'
+      + '<div class="wb-s">' + wbSatz(e) + '</div>'
+      + wbZusatz(e) + '</div>';
+  });
+  ziel.innerHTML = html;
+}
+
+$('wb-arten').addEventListener('click', ev => {
+  const knopf = ev.target.closest('.wb-a');
+  if (!knopf) { return; }
+  const art = knopf.dataset.art;
+  wbFilter = wbFilter.includes(art) ? wbFilter.filter(a => a !== art) : wbFilter.concat([art]);
+  wbLaden();
 });
-$('liste').addEventListener('keydown', ev => {
+
+/* Ein Klick auf eine Chronikzeile fuehrt zur Runde darueber und klappt sie
+   auf. Das Portal hat keine zweite Detailansicht und bekommt hier auch
+   keine: Alles, was zu einer Runde zu sagen ist, steht bereits in ihrem
+   Aufklapper -- mit Kontrollpunkten, Karte und Rapport. Ein zweiter Ort
+   mit demselben Inhalt waere ein zweiter Ort, an dem sich dieselbe Angabe
+   unterschiedlich entwickeln kann. */
+function wbZurRunde(id) {
+  const zeile = $('liste').querySelector('.zeile[data-id="' + Number(id) + '"]');
+  if (!zeile) {
+    // Kann vorkommen: Die Rundgangliste filtert nach dem EINSATZTAG, die
+    // Chronik nach dem Zeitpunkt des Vorgangs. Eine Runde ueber Mitternacht
+    // steht darum unter Umstaenden nicht in beiden. Das zu sagen ist besser,
+    // als auf einen Klick nichts zu tun.
+    $('wb-hinweis').hidden = false;
+    $('wb-hinweis').textContent = 'Diese Runde liegt ausserhalb des gewählten Zeitraums '
+      + 'der Rundgangliste — sie begann an einem anderen Tag. Bitte den Zeitraum erweitern.';
+    return;
+  }
+  $('wb-hinweis').hidden = true;
+  // Die Runde steht seit ENT-486 in einem ANDEREN Reiter. Ohne den Wechsel
+  // klappte hier eine Zeile auf, die niemand sieht -- der Klick sähe aus,
+  // als täte er nichts.
+  reiterWaehlen('rundgaenge');
+  if (!zeile.classList.contains('offen')) { detailUmschalten(zeile); }
+  zeile.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  zeile.focus();
+}
+
+$('wb-liste').addEventListener('click', ev => {
+  const z = ev.target.closest('.wb-z.fuehrt');
+  if (z) { wbZurRunde(z.dataset.rg); }
+});
+$('wb-liste').addEventListener('keydown', ev => {
   if (ev.key !== 'Enter' && ev.key !== ' ') { return; }
-  const zeile = ev.target.closest('.zeile');
-  if (!zeile) { return; }
+  const z = ev.target.closest('.wb-z.fuehrt');
+  if (!z) { return; }
   ev.preventDefault();          // sonst rollt die Leertaste die Seite
-  detailUmschalten(zeile);
+  wbZurRunde(z.dataset.rg);
 });
+
+// Beide Listen teilen sich dieselben Zuhörer -- eine zweite Fassung wäre
+// eine zweite Stelle, an der die Tastaturbedienung vergessen werden kann.
+const LISTEN = ['liste', 'liste-e'];
+for (const wo of LISTEN) {
+  $(wo).addEventListener('click', ev => {
+    const zeile = ev.target.closest('.zeile');
+    if (zeile) { detailUmschalten(zeile); }
+  });
+  $(wo).addEventListener('keydown', ev => {
+    if (ev.key !== 'Enter' && ev.key !== ' ') { return; }
+    const zeile = ev.target.closest('.zeile');
+    if (!zeile) { return; }
+    ev.preventDefault();          // sonst rollt die Leertaste die Seite
+    detailUmschalten(zeile);
+  });
+}
 
 function detailUmschalten(zeile) {
   const id = Number(zeile.dataset.id);
@@ -924,7 +1608,8 @@ function detailUmschalten(zeile) {
   tafel.className = 'detail';
   tafel.innerHTML = '<div class="d-hinweis">Einzelheiten werden geladen …</div>';
   zeile.after(tafel);
-  detailLaden(id, tafel);
+  if (zeile.dataset.art === 'einsatz') { berichtLaden(id, tafel); }
+  else { detailLaden(id, tafel); }
 }
 
 async function detailLaden(id, tafel) {
@@ -983,8 +1668,21 @@ function detailZeichnen(d, tafel) {
   const punkte = d.kontrollpunkte || [];
   const ereignisse = d.ereignisse || [];
 
-  tafel.innerHTML =
-    '<div class="kennzahlen">' + band.map(b => '<div>'
+  // Der Abbruch zuerst -- er ist die wichtigste Aussage über die Runde.
+  const abbruch = d.status === 'abgebrochen'
+    ? '<div class="d-abbruch"><strong>Abgebrochen</strong>'
+      + (d.abbruch_grund ? ' — ' + esc(d.abbruch_grund) : '')
+      + (d.abbruch_freitext ? ': ' + esc(d.abbruch_freitext) : '')
+      + '</div>'
+    : '';
+  // Kontrollrunde und Person. Fehlt eine Vorlage, ist das eine Aussage
+  // („alle Kontrollpunkte des Objekts") und kein leeres Feld.
+  const kopfzeile = [d.vorlage_name || 'Alle Kontrollpunkte des Objekts', d.person]
+    .filter(Boolean).map(esc).join(' · ');
+
+  tafel.innerHTML = abbruch
+    + (kopfzeile ? '<p class="d-kopf">' + kopfzeile + '</p>' : '')
+    + '<div class="kennzahlen">' + band.map(b => '<div>'
       + '<div class="k-l">' + esc(b.l) + '</div>'
       + '<div class="k-v">' + b.v + '</div>'
       + (b.f ? '<div class="k-f">' + esc(b.f) + '</div>' : '')
@@ -1014,7 +1712,11 @@ function detailZeichnen(d, tafel) {
     + 'Weg auf der Karte anzeigen</button>'
     + '<p class="d-hinweis" style="margin-top:9px">Die Bewegungsdaten werden erst auf '
     + 'diesen Knopf hin geladen. Dabei wird die Karte von Google bezogen.</p>'
-    + '</div></div>';
+    + '</div></div>'
+    // Dasselbe Blatt, das der Kunde heute per Mail bekommt -- nur holt er es
+    // hier selbst (ENT-478).
+    + '<div class="d-fuss"><button type="button" class="knopf" data-art="rundgang" data-pdf="'
+    + Number(d.id) + '">Als PDF herunterladen</button></div>';
 
   // Die Fotobelege erst jetzt, einzeln und mit Token im Kopf -- der Token
   // darf nicht in eine Bild-Adresse (er landete sonst im Browserverlauf).
@@ -1094,7 +1796,7 @@ function kartenLaden() {
 $('liste').addEventListener('click', ev => {
   const knopf = ev.target.closest('[data-weg]');
   if (knopf) { wegZeigen(Number(knopf.dataset.weg), knopf.closest('.weg-huelle')); }
-});
+});   // nur Rundgänge -- ein Einsatz hat keinen aufgezeichneten Weg
 
 async function wegZeigen(id, huelle) {
   if (!huelle) { return; }
@@ -1175,21 +1877,421 @@ function wegKarteBauen(punkte, huelle, tage) {
   });
 }
 
+// ── Der Kundenrapport eines Einsatzes (ENT-482) ──────────────────────
+// Inhalt 1:1 wie das Blatt, das der Kunde heute schon physisch bekommt --
+// Entscheidung des Projektinhabers. Namen und Zeiten der eingesetzten
+// Personen sind hier nicht ein Detail, sie sind die Substanz des Blattes.
+const berichtZwischen = {};
+
+async function berichtLaden(id, tafel) {
+  if (berichtZwischen[id]) { berichtZeichnen(berichtZwischen[id], tafel); return; }
+  const { ok, code, daten } = await ruf('portal_einsatz_bericht.php?einsatz_id=' + id);
+  if (!document.body.contains(tafel)) { return; }
+  if (code === 401) { abgemeldet(); return; }
+  if (!ok || !daten || daten.status !== 'ok' || !daten.bericht) {
+    tafel.innerHTML = '<div class="d-hinweis">'
+      + esc((daten && daten.message) || 'Die Einzelheiten liessen sich nicht laden.')
+      + '</div>';
+    return;
+  }
+  berichtZwischen[id] = daten.bericht;
+  berichtZeichnen(daten.bericht, tafel);
+}
+
+// Rechnungsadresse, wenn eine abweichende hinterlegt ist -- sonst die
+// Kundenadresse. Dieselbe Unterscheidung wie im Cockpit: Zwei Adressen ohne
+// Beschriftung wären eine Einladung zum Verwechseln.
+function rechnungsadresse(k) {
+  if (!k || !k.kunde_id) { return null; }
+  const abw = [k.re_name, k.re_strasse, k.re_plz, k.re_ort]
+    .some(v => String(v || '').trim());
+  const zeilen = abw
+    ? [k.re_name || k.k_name, k.re_zusatz,
+       [k.re_strasse, k.re_hausnummer].filter(Boolean).join(' '),
+       [k.re_plz, k.re_ort].filter(Boolean).join(' ')]
+    : [k.k_name, k.k_adresszusatz,
+       [k.k_strasse, k.k_hausnummer].filter(Boolean).join(' '),
+       [k.k_plz, k.k_ort].filter(Boolean).join(' ')];
+  const sauber = zeilen.map(z => String(z || '').trim()).filter(Boolean);
+  return sauber.length ? { zeilen: sauber, abweichend: abw } : null;
+}
+
+function krTeile(b) {
+  const e = b.einsatz, u = b.unterschrift || {}, personen = b.personen || [];
+  const ort = [e.strasse, e.ort].filter(Boolean).join(', ');
+  const kopf = [
+    ['Datum', esc(dmy(e.datum))],
+    ...(b.kunde && b.kunde.kunde_nr ? [['Kunden-Nr.', esc(b.kunde.kunde_nr)]] : []),
+    ['Einsatzort', esc(ort || 'nicht erfasst')],
+    ['Einsatzart', esc(e.einsatzart || 'nicht erfasst')],
+    ...(e.veranstaltung ? [['Veranstaltung', esc(e.veranstaltung)]] : []),
+  ];
+  const summe = personen.reduce((x, p) => x + (Number(p.netto_h) || 0), 0);
+  const bemerkungen = personen.filter(p => p.bemerkung);
+  return { e, u, personen, kopf, summe, bemerkungen, re: rechnungsadresse(b.kunde) };
+}
+
+function berichtZeichnen(b, tafel) {
+  const t = krTeile(b);
+  const zeilen = t.personen.map(p => '<tr>'
+    + '<td>' + esc(p.name) + '</td>'
+    + '<td class="num">' + esc(uhr2(p.von)) + ' – ' + esc(uhr2(p.bis)) + '</td>'
+    + '<td class="num">' + Number(p.pause_min || 0) + '′</td>'
+    + '<td class="num"><b>' + zahl2(p.netto_h) + ' h</b></td>'
+    + '</tr>').join('');
+
+  tafel.innerHTML =
+    '<table class="kr-kopf"><tbody>'
+    + t.kopf.map(x => '<tr><td>' + x[0] + '</td><td>' + x[1] + '</td></tr>').join('')
+    + '</tbody></table>'
+    + '<p class="d-titel">Geleistete Einsatzzeit</p>'
+    // Ein Blatt ohne Personenzeilen wäre kein Rapport -- und „keine" ist
+    // hier eine Aussage, keine leere Tabelle.
+    + (t.personen.length
+      ? '<div class="tw"><table class="kr-zeit">'
+        + '<thead><tr><th>Mitarbeitende</th><th class="num">Arbeitszeit</th>'
+        + '<th class="num">Pause</th><th class="num">Netto</th></tr></thead>'
+        + '<tbody>' + zeilen + '</tbody>'
+        + '<tfoot><tr><td class="l" colspan="3">Total</td>'
+        + '<td class="num">' + zahl2(t.summe) + ' h</td></tr></tfoot>'
+        + '</table></div>'
+      : '<div class="d-hinweis">Zu diesem Einsatz liegt keine erfasste Zeit vor.</div>')
+    + (t.bemerkungen.length
+      ? '<div class="d-abschnitt"><p class="d-titel">Bemerkungen</p>'
+        + t.bemerkungen.map(p => '<div class="kr-bem"><strong>' + esc(p.name)
+          + ':</strong> ' + esc(p.bemerkung) + '</div>').join('') + '</div>'
+      : '')
+    + '<div class="d-abschnitt kr-unter"><p class="d-titel">Unterschrift Kunde</p>'
+    + (t.u.bild ? '<img src="' + esc(t.u.bild) + '" alt="Unterschrift des Kunden">'
+      : '<div class="d-hinweis">Keine Unterschrift hinterlegt.</div>')
+    + (t.u.name ? '<div class="wer">' + esc(t.u.name) + '</div>' : '')
+    + (t.u.am ? '<div class="d-hinweis" style="margin-top:5px">Erfasst am '
+      + esc(dmy(t.u.am)) + ' um ' + esc(uhr(t.u.am) || '–')
+      + (t.u.holte ? ' durch ' + esc(t.u.holte) : '') + '</div>' : '')
+    + '</div>'
+    + '<div class="d-fuss"><button type="button" class="knopf" data-art="einsatz" data-pdf="'
+    + Number(t.e.id) + '">Als PDF herunterladen</button></div>';
+}
+
+// Das Blatt für das PDF -- eigener Aufbau wie beim Rundgang, in derselben
+// Ordnung wie im Cockpit (ENT-160). Es gibt im Haus EIN Kundenrapport-
+// Aussehen.
+function blattEinsatzFuellen(b, bk) {
+  const t = krTeile(b);
+  const kz = (a, v) => '<tr><td style="padding:7px 0;color:#6B7280;width:170px;'
+    + 'border-bottom:1px solid #E5E8EC">' + a + '</td>'
+    + '<td style="padding:7px 0;font-weight:600;border-bottom:1px solid #E5E8EC">' + v + '</td></tr>';
+  const th = 'padding:6px 8px;text-align:left;font-size:11px;text-transform:uppercase;'
+    + 'letter-spacing:.4px;color:#6B7280;border-bottom:1.5px solid #16181D';
+  const td = 'padding:7px 8px;border-bottom:1px solid #E5E8EC;font-size:13.5px';
+  const lbl = 'font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#6B7280;'
+    + 'font-weight:700;margin-bottom:6px';
+  const zeilen = t.personen.map(p => '<tr>'
+    + '<td style="' + td + '">' + esc(p.name) + '</td>'
+    + '<td style="' + td + '">' + esc(uhr2(p.von)) + ' – ' + esc(uhr2(p.bis)) + '</td>'
+    + '<td style="' + td + ';text-align:right">' + Number(p.pause_min || 0) + '′</td>'
+    + '<td style="' + td + ';text-align:right;font-weight:600">' + zahl2(p.netto_h) + ' h</td>'
+    + '</tr>').join('');
+  const logo = bk.logo
+    ? '<img src="' + bk.logo + '" alt="" style="max-height:88px;max-width:260px;display:block;'
+      + 'margin:0 auto 8px">' : '';
+  const bkText = (bk.firma
+      ? '<div style="font-weight:700;color:#14161A;font-size:13px">' + esc(bk.firma) + '</div>' : '')
+    + (bk.zusatz ? esc(bk.zusatz) : '');
+  const fuss = (bk.fusszeile || bk.fusszeile2)
+    ? '<div style="margin-top:30px;padding-top:10px;border-top:1px solid #E5E8EC;display:flex;'
+      + 'align-items:center;justify-content:space-between;gap:32px;font-size:10.5px;color:#6B7280;'
+      + 'line-height:1.5">'
+      + (bk.fusszeile ? '<div style="white-space:pre-line">' + esc(bk.fusszeile) + '</div>' : '')
+      + (bk.fusszeile2 ? '<div style="white-space:pre-line">' + esc(bk.fusszeile2) + '</div>' : '')
+      + '</div>' : '';
+
+  $('blatt').innerHTML =
+    '<div style="font-family:-apple-system,Segoe UI,Arial,sans-serif;color:#14161A">'
+    + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:24px;'
+    + 'border-bottom:2px solid #16181D;padding-bottom:14px;margin-bottom:22px">'
+    + '<div><div style="font-size:21px;font-weight:800;letter-spacing:-.4px">Kundenrapport</div>'
+    + '<div style="font-size:12px;color:#6B7280;margin-top:3px">Einsatz-Nr. ' + Number(t.e.id)
+    + ' · ' + esc(dmy(t.e.datum)) + '</div></div>'
+    + '<div style="text-align:center;font-size:12px;color:#6B7280;line-height:1.5">'
+    + logo + bkText + '</div></div>'
+    + (t.re ? '<div style="margin-bottom:20px"><div style="' + lbl + '">'
+      + (t.re.abweichend ? 'Rechnungsadresse' : 'Kunde') + '</div>'
+      + '<div style="font-size:14px;line-height:1.5">'
+      + t.re.zeilen.map(z => esc(z)).join('<br>') + '</div></div>' : '')
+    + '<table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:24px">'
+    + t.kopf.map(x => kz(x[0], x[1])).join('') + '</table>'
+    + '<div style="' + lbl + '">Geleistete Einsatzzeit</div>'
+    + (t.personen.length
+      ? '<table style="width:100%;border-collapse:collapse"><thead><tr>'
+        + '<th style="' + th + '">Mitarbeitende</th><th style="' + th + '">Arbeitszeit</th>'
+        + '<th style="' + th + ';text-align:right">Pause</th>'
+        + '<th style="' + th + ';text-align:right">Netto</th></tr></thead>'
+        + '<tbody>' + zeilen + '</tbody>'
+        + '<tfoot><tr><td colspan="3" style="padding:9px 8px;text-align:right;font-size:13px;'
+        + 'color:#6B7280">Total</td><td style="padding:9px 8px;text-align:right;font-weight:800;'
+        + 'font-size:14.5px">' + zahl2(t.summe) + ' h</td></tr></tfoot></table>'
+      : '<div style="font-size:13.5px">Zu diesem Einsatz liegt keine erfasste Zeit vor.</div>')
+    + (t.bemerkungen.length ? '<div style="margin-top:20px"><div style="' + lbl + '">Bemerkungen</div>'
+      + t.bemerkungen.map(p => '<div style="font-size:13.5px;margin-bottom:4px"><b>'
+        + esc(p.name) + ':</b> ' + esc(p.bemerkung) + '</div>').join('') + '</div>' : '')
+    + '<div style="margin-top:38px;padding-top:16px;border-top:1px solid #E5E8EC">'
+    + '<div style="' + lbl + ';margin-bottom:8px">Unterschrift Kunde</div>'
+    + (t.u.bild ? '<img src="' + esc(t.u.bild) + '" style="max-height:100px;max-width:280px;display:block">'
+      : '<div style="height:58px;border-bottom:1px solid #14161A;max-width:280px"></div>')
+    + (t.u.name ? '<div style="font-size:13px;margin-top:7px">' + esc(t.u.name) + '</div>'
+      + '<div style="font-size:10.5px;color:#6B7280;margin-top:1px">Name in Blockschrift</div>' : '')
+    + (t.u.am ? '<div style="font-size:10.5px;color:#6B7280;margin-top:6px">Unterschrift erfasst am '
+      + esc(dmy(t.u.am)) + ' um ' + esc(uhr(t.u.am) || '–')
+      + (t.u.holte ? ' durch ' + esc(t.u.holte) : '') + '</div>' : '')
+    + '</div>' + fuss + '</div>';
+}
+
+// ── Das Rapportblatt als PDF (ENT-478) ───────────────────────────────
+// html2pdf wiegt rund 950 KB und wird darum erst BEIM KLICK nachgeladen --
+// dasselbe Muster wie im Cockpit (ENT-322) und bei der Karte. Wer nur die
+// Liste ansieht, laedt es nie.
+let pdfVersprechen = null;
+function pdfLaden() {
+  if (pdfVersprechen) { return pdfVersprechen; }
+  pdfVersprechen = new Promise((fertig, schief) => {
+    if (typeof html2pdf !== 'undefined') { fertig(); return; }
+    const skript = document.createElement('script');
+    skript.src = 'html2pdf.bundle.min.js';
+    skript.onload = () => (typeof html2pdf !== 'undefined'
+      ? fertig() : schief(new Error('html2pdf nicht geladen')));
+    skript.onerror = () => schief(new Error('html2pdf konnte nicht geladen werden.'));
+    document.head.appendChild(skript);
+  });
+  return pdfVersprechen;
+}
+
+// Der Briefkopf wird EINMAL geholt und behalten. Er unterscheidet sich nicht
+// je Runde, und das Logo wiegt mehr als die ganze uebrige Antwort.
+let briefkopf = null;
+async function briefkopfHolen() {
+  if (briefkopf) { return briefkopf; }
+  const { ok, daten } = await ruf('portal_briefkopf.php');
+  // Ohne Briefkopf entsteht das Blatt trotzdem -- es traegt dann eben
+  // keinen. Ein fehlendes Logo ist kein Grund, den Nachweis zu verweigern.
+  briefkopf = (ok && daten && daten.briefkopf) ? daten.briefkopf
+    : { firma: '', zusatz: '', fusszeile: '', fusszeile2: '', logo: null };
+  return briefkopf;
+}
+
+function pdfDateiname(d) {
+  // Beide Blätter heissen "Rapport-…": Der Kunde legt sie im selben Ordner
+  // ab, und zwei Namensschemata wären dort zwei Sortierungen.
+  const roh = d.objekt_name
+    || (d.einsatz && (d.einsatz.veranstaltung || d.einsatz.ort))
+    || 'Rapport';
+  const teil = String(roh).replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const tag = String(d.datum || (d.einsatz && d.einsatz.datum) || '').slice(0, 10);
+  return 'Rapport-' + (teil || 'Rapport') + '-' + tag + '.pdf';
+}
+
+// Das Blatt wird EIGENS gebaut und nicht aus der Tafel abfotografiert: Die
+// Tafel traegt Knoepfe, eine Karte und Glaskanten. Es traegt dieselben
+// Angaben wie die Tafel -- also KEINEN Personennamen (OP-423 ist offen) und
+// KEINE Karte (ENT-322 gilt unveraendert: ein Bewegungsweg im Rapport gaebe
+// dem Kunden Aufenthaltsdaten, die er zur Leistungskontrolle nicht braucht;
+// im Portal ruft er sie ausdruecklich auf, ein Blatt bekaeme sie beilaeufig
+// mit).
+function blattFuellen(d, bk) {
+  const f = d.fortschritt || {};
+  const gesamt = Number(f.gesamt || 0);
+  const erledigt = f.erledigt !== undefined ? Number(f.erledigt) : Number(f.bestaetigt || 0);
+  const beleg = Number(f.ersatzscan || 0);
+  const endeRoh = d.rohzeit_ende
+    || (d.dauer && d.dauer.quelle === 'letzter_scan' ? d.letzter_scan : null);
+  const dauer = dauerText(d.dauer);
+  const pause = Number(d.pause_minuten || 0);
+  const adresse = [d.strasse, d.ort].filter(Boolean).join(', ');
+  const [, zustand] = STATUS[d.status] || ['', d.status];
+
+  const kz = (a, v) => '<tr><td style="padding:7px 0;color:#6B7280;width:170px;'
+    + 'border-bottom:1px solid #E5E8EC">' + a + '</td>'
+    + '<td style="padding:7px 0;font-weight:600;border-bottom:1px solid #E5E8EC">' + v + '</td></tr>';
+  const kopf = [
+    ['Objekt', esc(d.objekt_name || '') + (adresse ? ', ' + esc(adresse) : '')],
+    ['Kontrollrunde', esc(d.vorlage_name || 'Alle Kontrollpunkte des Objekts')],
+    ['Mitarbeitende', esc(d.person || 'Ohne Namen')],
+    ['Beginn / Ende', esc(uhr(d.rohzeit_start) || 'unbekannt') + ' – '
+      + esc(uhr(endeRoh) || 'unbekannt')],
+    ['Dauer', esc(dauer || 'unbekannt')
+      + (pause > 0 ? ' <span style="font-weight:400;color:#6B7280">(ohne ' + pause
+        + ' Min. Pause)</span>' : '')],
+    ['Kontrollpunkte', gesamt > 0
+      ? erledigt + ' von ' + gesamt + ' erledigt'
+        + (beleg > 0 ? ' <span style="font-weight:400;color:#6B7280">(davon ' + beleg
+          + ' per Fotobeleg)</span>' : '')
+      : 'keine hinterlegt'],
+    ['Status', esc(zustand)],
+    // Ein Abbruch steht im Kopf, nicht als Fussnote -- aber nur, wenn es
+    // einen gab.
+    ...(d.status === 'abgebrochen'
+      ? [['Abbruchgrund', esc([d.abbruch_grund, d.abbruch_freitext]
+          .filter(Boolean).join(' — ')) || '–']]
+      : []),
+  ].map(x => kz(x[0], x[1])).join('');
+
+  const th = 'padding:6px 8px;text-align:left;font-size:11px;text-transform:uppercase;'
+    + 'letter-spacing:.4px;color:#6B7280;border-bottom:1.5px solid #16181D';
+  const td = 'padding:7px 8px;border-bottom:1px solid #E5E8EC;font-size:13.5px;vertical-align:top';
+  const lbl = 'font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#6B7280;'
+    + 'font-weight:700;margin-bottom:6px';
+
+  const zeilen = (d.kontrollpunkte || []).map(k => {
+    const e = k.erledigt;
+    // Drei Zustände, drei Texte. Der dritte ist der wichtige: Ein nicht
+    // besuchter Punkt MUSS im Blatt stehen -- ein Nachweis, in dem das
+    // Fehlende fehlt, ist keiner.
+    const wort = e ? (D_SCAN[e.status] || ['', e.status])[1] : 'Nicht besucht';
+    const aufg = (k.aufgaben || []).map(a => {
+      const at = a.erledigt ? (D_AUFGABE[a.erledigt.status] || ['', a.erledigt.status])[1]
+        : D_AUFGABE.unbeantwortet[1];
+      const grund = a.erledigt && a.erledigt.grund ? ' — ' + a.erledigt.grund : '';
+      return '<div style="font-size:12px;color:#6B7280;margin-top:3px">' + esc(a.bezeichnung)
+        + ': <b style="color:#14161A;font-weight:600">' + esc(at) + '</b>' + esc(grund) + '</div>';
+    }).join('');
+    const foto = e && e.hat_foto
+      ? (fotoZwischen[e.scan_id]
+        ? '<img src="' + fotoZwischen[e.scan_id] + '" alt="" style="max-width:200px;'
+          + 'max-height:150px;border:1px solid #E5E8EC;border-radius:4px;display:block;margin-top:6px">'
+        // Ist der Beleg nicht geladen, steht wenigstens da, DASS einer
+        // vorliegt -- ein stillschweigend fehlendes Foto wäre schlimmer.
+        : '<div style="font-size:12px;color:#6B7280;margin-top:3px">Fotobeleg vorhanden</div>')
+      : '';
+    return '<tr>'
+      + '<td style="' + td + ';white-space:nowrap;width:58px' + (e ? '' : ';color:#8B919D') + '">'
+      + esc(e ? (uhr(e.erfasst_am) || '—') : '—') + '</td>'
+      + '<td style="' + td + '">' + esc(k.bezeichnung)
+      + (e && e.beschreibung ? '<div style="font-size:12px;color:#6B7280;margin-top:3px">'
+        + esc(e.beschreibung) + '</div>' : '')
+      + foto + aufg + '</td>'
+      + '<td style="' + td + ';white-space:nowrap;width:112px'
+      + (e && e.status === 'bestaetigt' ? '' : ';font-weight:600') + '">' + esc(wort) + '</td>'
+      + '</tr>';
+  }).join('');
+
+  const ereignisse = (d.ereignisse || []).map(e => '<tr>'
+    + '<td style="' + td + ';white-space:nowrap;width:58px">' + esc(uhr(e.erfasst_am) || '—') + '</td>'
+    + '<td style="' + td + '"><b style="font-weight:600">' + esc(e.art || 'Ohne Art') + '</b>'
+    + (e.bemerkung ? '<div style="font-size:12px;color:#6B7280;margin-top:3px">'
+      + esc(e.bemerkung) + '</div>' : '')
+    + (e.hat_foto ? '<div style="font-size:12px;color:#6B7280;margin-top:3px">Mit Foto</div>' : '')
+    + '</td></tr>').join('');
+
+  const logo = bk.logo
+    ? '<img src="' + bk.logo + '" alt="" style="max-height:88px;max-width:260px;display:block;'
+      + 'margin:0 auto 8px">' : '';
+  const bkText = (bk.firma
+      ? '<div style="font-weight:700;color:#14161A;font-size:13px">' + esc(bk.firma) + '</div>' : '')
+    + (bk.zusatz ? esc(bk.zusatz) : '');
+  const fuss = (bk.fusszeile || bk.fusszeile2)
+    ? '<div style="margin-top:30px;padding-top:10px;border-top:1px solid #E5E8EC;display:flex;'
+      + 'align-items:center;justify-content:space-between;gap:32px;font-size:10.5px;color:#6B7280;'
+      + 'line-height:1.5">'
+      + (bk.fusszeile ? '<div style="white-space:pre-line">' + esc(bk.fusszeile) + '</div>' : '')
+      + (bk.fusszeile2 ? '<div style="white-space:pre-line">' + esc(bk.fusszeile2) + '</div>' : '')
+      + '</div>' : '';
+  const heute = new Date();
+  const heuteText = String(heute.getDate()).padStart(2, '0') + '.'
+    + String(heute.getMonth() + 1).padStart(2, '0') + '.' + heute.getFullYear();
+
+  $('blatt').innerHTML =
+    '<div style="font-family:-apple-system,Segoe UI,Arial,sans-serif;color:#14161A">'
+    + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:24px;'
+    + 'border-bottom:2px solid #16181D;padding-bottom:14px;margin-bottom:22px">'
+    + '<div><div style="font-size:21px;font-weight:800;letter-spacing:-.4px">Rundgang-Rapport</div>'
+    + '<div style="font-size:12px;color:#6B7280;margin-top:3px">Rundgang-Nr. ' + Number(d.id)
+    + ' · ' + esc(dmy(d.datum)) + '</div></div>'
+    + '<div style="text-align:center;font-size:12px;color:#6B7280;line-height:1.5">'
+    + logo + bkText + '</div></div>'
+    + (kundeName ? '<div style="margin-bottom:20px"><div style="' + lbl + '">Kunde</div>'
+      + '<div style="font-size:14px;line-height:1.5">' + esc(kundeName) + '</div></div>' : '')
+    + '<table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:24px">'
+    + kopf + '</table>'
+    + (beleg > 0 ? '<div style="border:1px solid #E2B156;background:#FBF3E0;color:#9A6B08;'
+      + 'border-radius:6px;padding:9px 12px;margin-bottom:18px;font-size:12.5px;line-height:1.5">'
+      + '<strong>Hinweis:</strong> ' + (beleg === 1
+        ? 'Ein Kontrollpunkt wurde mit einem Fotobeleg belegt'
+        : beleg + ' Kontrollpunkte wurden mit einem Fotobeleg belegt')
+      + ' — statt technischer Bestätigung per Chip oder Standort. '
+      + 'Der Beleg steht bei der jeweiligen Zeile.</div>' : '')
+    + '<div style="' + lbl + '">Kontrollpunkte</div>'
+    + (zeilen ? '<table style="width:100%;border-collapse:collapse"><thead><tr>'
+      + '<th style="' + th + '">Zeit</th><th style="' + th + '">Kontrollpunkt</th>'
+      + '<th style="' + th + '">Status</th></tr></thead><tbody>' + zeilen + '</tbody></table>'
+      : '<div style="font-size:13.5px">Für diese Runde sind keine Kontrollpunkte hinterlegt.</div>')
+    + '<div style="' + lbl + ';margin-top:24px">Ereignisse</div>'
+    // „Kein Ereignis" ist eine Aussage, ein fehlender Abschnitt keine.
+    + (ereignisse ? '<table style="width:100%;border-collapse:collapse"><tbody>'
+      + ereignisse + '</tbody></table>'
+      : '<div style="font-size:13.5px">Während dieser Runde wurde kein Ereignis gemeldet.</div>')
+    + '<div style="margin-top:24px;font-size:11px;color:#8B919D;line-height:1.5">'
+    + 'Erstellt am ' + heuteText + '. Die Zeiten stammen aus den Erfassungen des Geräts; '
+    + 'abweichende Übermittlungszeiten ändern sie nicht.</div>'
+    + fuss + '</div>';
+}
+
+for (const wo of LISTEN) {
+  $(wo).addEventListener('click', ev => {
+    const knopf = ev.target.closest('[data-pdf]');
+    if (knopf) { pdfHerunterladen(knopf.dataset.art, Number(knopf.dataset.pdf), knopf); }
+  });
+}
+
+async function pdfHerunterladen(art, id, knopf) {
+  const d = art === 'einsatz' ? berichtZwischen[id] : detailZwischen[id];
+  if (!d) { return; }
+  const alt = knopf.textContent;
+  knopf.disabled = true;
+  knopf.textContent = 'Wird erstellt …';
+  try {
+    const [, bk] = await Promise.all([pdfLaden(), briefkopfHolen()]);
+    if (art === 'einsatz') { blattEinsatzFuellen(d, bk); } else { blattFuellen(d, bk); }
+    const blob = await html2pdf().set({
+      margin: 10,
+      image: { type: 'jpeg', quality: 0.95 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['css', 'legacy'] },
+    }).from($('blatt')).outputPdf('blob');
+    const adresse = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = adresse; a.download = pdfDateiname(d);
+    document.body.appendChild(a); a.click(); a.remove();
+    // Erst freigeben, wenn der Browser die Datei geholt hat.
+    setTimeout(() => URL.revokeObjectURL(adresse), 4000);
+  } catch (fehler) {
+    fehler('fehler-global', 'Der Rapport liess sich nicht erzeugen.');
+  } finally {
+    knopf.disabled = false;
+    knopf.textContent = alt;
+  }
+}
+
 async function fotoLaden(scanId, ziel) {
+  if (fotoZwischen[scanId]) { fotoEinsetzen(ziel, fotoZwischen[scanId]); return; }
   try {
     const kopf = {};
     if (token) { kopf['X-Auth-Token'] = token; }
     const antwort = await fetch(API + 'portal_rundgang_foto.php?scan_id=' + scanId, { headers: kopf });
     if (!antwort.ok) { throw new Error('nicht abrufbar'); }
     const bild = await antwort.blob();
-    if (!document.body.contains(ziel)) { return; }
-    const adresse = URL.createObjectURL(bild);
-    ziel.innerHTML = '<img alt="Fotobeleg zu diesem Kontrollpunkt">';
-    const img = ziel.querySelector('img');
-    // Erst nach dem Zeichnen freigeben -- sonst haelt jede zugeklappte
-    // Tafel ihr Bild bis zum Neuladen der Seite im Speicher.
-    img.addEventListener('load', () => URL.revokeObjectURL(adresse));
-    img.src = adresse;
+    // Als DATEN-Adresse und nicht als Objekt-Adresse: Eine Objekt-Adresse
+    // muesste freigegeben werden, sobald die Tafel zuklappt -- und dann
+    // faende html2pdf sie beim Bauen des Blattes nicht mehr. Eine
+    // Daten-Adresse ueberlebt beides und laesst sich zwischenspeichern.
+    const adresse = await new Promise((fertig, schief) => {
+      const leser = new FileReader();
+      leser.onload = () => fertig(String(leser.result));
+      leser.onerror = () => schief(new Error('nicht lesbar'));
+      leser.readAsDataURL(bild);
+    });
+    fotoZwischen[scanId] = adresse;
+    fotoEinsetzen(ziel, adresse);
   } catch (fehler) {
     // „Vorhanden, aber nicht abrufbar" ist etwas anderes als „kein Foto" --
     // der Satz sagt darum nicht, es gebe keines.
@@ -1197,6 +2299,12 @@ async function fotoLaden(scanId, ziel) {
       ziel.innerHTML = '<span class="d-hinweis">Der Fotobeleg liess sich nicht laden.</span>';
     }
   }
+}
+
+function fotoEinsetzen(ziel, adresse) {
+  if (!document.body.contains(ziel)) { return; }
+  ziel.innerHTML = '<img alt="Fotobeleg zu diesem Kontrollpunkt">';
+  ziel.querySelector('img').src = adresse;
 }
 
 function abgemeldet() {

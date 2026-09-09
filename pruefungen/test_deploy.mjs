@@ -17,7 +17,12 @@ const ok = [], bad = [];
 const check = (n, c) => (c ? ok : bad).push(n);
 
 const workflow = readFileSync(`${WURZEL}/.github/workflows/deploy-hostpoint.yml`, 'utf8');
-const seiten = ['index.html', 'dashboard.html', 'app.html', 'homepage.html'];
+// portal.html gehoert dazu, seit es ein Skript nachlaedt (html2pdf,
+// ENT-478). Bis dahin fehlte es hier -- und damit galt fuer diese eine
+// Oberflaeche die Regel nicht, dass jedes geladene Skript auch
+// ausgeliefert wird. Genau die Luecke, die qrcode.js schon einmal aus dem
+// Deploy fallen liess.
+const seiten = ['index.html', 'dashboard.html', 'app.html', 'homepage.html', 'portal.html'];
 
 // Nicht nur die drei bekannten HTML-Huellen: eine oeffentliche PHP-Seite
 // (z. B. beleg_oeffentlich.php, ENT-205) kann ein eigenes <script src>
