@@ -18737,7 +18737,7 @@ function lohnLaeufeLaden() {
     const v = new Date(h.getFullYear(), h.getMonth() - 1, 1);
     $('llMonat').value = `${v.getFullYear()}-${String(v.getMonth() + 1).padStart(2, '0')}`;
   }
-  api('lohnlauf.php').then(({ ok, status, data }) => {
+  api('lohnlaeufe.php').then(({ ok, status, data }) => {
     if (!ok) { $('llListe').innerHTML = lohnLeer(lohnLeerArt(status, data), data?.message); return; }
     llDaten = data;
     lohnLaeufeZeichnen();
@@ -18775,7 +18775,7 @@ function lohnVorschauLaden() {
   const bis = new Date(Number(m.slice(0, 4)), Number(m.slice(5, 7)), 0);
   const bisStr = `${bis.getFullYear()}-${String(bis.getMonth() + 1).padStart(2, '0')}-${String(bis.getDate()).padStart(2, '0')}`;
   $('llVorschau').innerHTML = '<div class="zone-note" style="padding:20px 4px">Wird gerechnet …</div>';
-  api(`lohnlauf.php?von=${von}&bis=${bisStr}`).then(({ ok, status, data }) => {
+  api(`lohnlaeufe.php?von=${von}&bis=${bisStr}`).then(({ ok, status, data }) => {
     if (!ok) {
       $('llVorschau').innerHTML = lohnLeer(lohnLeerArt(status, data), data?.message);
       $('llErzeugen').style.display = 'none';
@@ -18868,7 +18868,7 @@ function lohnPersonenTabelle(personen, gruende, vorschau) {
 function lohnLaufErzeugen() {
   const m = $('llMonat').value;
   if (!m || !llVorschau) { return; }
-  api('lohnlauf.php', { method: 'POST',
+  api('lohnlaeufe.php', { method: 'POST',
     body: { aktion: 'erzeugen', von: llVorschau.von, bis: llVorschau.bis } })
     .then(({ ok, data }) => {
       if (!ok) { toast(data?.message || 'Lauf konnte nicht angelegt werden.'); return; }
@@ -18880,7 +18880,7 @@ function lohnLaufErzeugen() {
 }
 
 function lohnLaufOeffnen(id) {
-  api(`lohnlauf.php?lauf=${id}`).then(({ ok, data }) => {
+  api(`lohnlaeufe.php?lauf=${id}`).then(({ ok, data }) => {
     if (!ok) { toast(data?.message || 'Lauf nicht gefunden.'); return; }
     llOffen = data;
     lohnLaufZeigen();
@@ -19041,7 +19041,7 @@ function lohnLaufAktion(aktion, grund) {
   if (!llOffen || !llOffen.lauf) { return; }
   const body = { aktion, lauf: llOffen.lauf.id };
   if (grund) { body.grund = grund; }
-  api('lohnlauf.php', { method: 'POST', body }).then(({ ok, data }) => {
+  api('lohnlaeufe.php', { method: 'POST', body }).then(({ ok, data }) => {
     if (!ok) { toast(data?.message || 'Nicht möglich.'); return; }
     llOffen = data;
     lohnLaufZeigen();

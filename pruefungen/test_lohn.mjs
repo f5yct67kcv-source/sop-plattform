@@ -226,7 +226,7 @@ await page.route('**/api/**', async r => {
   if (u.includes('login')) return send({ status: 'ok', token: 't', name: 'a', rechte });
   if (u.includes('me.php')) return send({ status: 'ok', name: 'a', rechte });
   if (u.includes('lohn_person')) return send(lohnAntwort);
-  if (u.includes('lohnlauf')) {
+  if (u.includes('lohnlaeufe')) {
     // Ohne Zeitraum die Liste, mit Zeitraum die Vorschau.
     return u.includes('von=') ? send(LAUF_VORSCHAU) : send({ status: 'ok', laeufe: [] });
   }

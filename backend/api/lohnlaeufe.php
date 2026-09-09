@@ -1,6 +1,21 @@
 <?php
 // Lohnlauf, Bruttoseite (ENT-451, Etappe 3).
 //
+// DIESE DATEI HIESS BIS 2026-09-09 lohnlauf.php -- genau wie der Helfer
+// backend/lohnlauf.php. Der Deploy legt beide flach ab (dist/lohnlauf.php
+// und dist/api/lohnlauf.php), und die Schutzregel in htaccess-hostpoint
+// greift ueber <FilesMatch> auf den DATEINAMEN, nicht auf den Pfad. Sie
+// sperrte damit nicht nur den Helfer, sondern auch diesen Endpunkt: Jeder
+// Aufruf des Lohnbereichs endete im Livesystem an einem 403 des
+// Webservers, bevor PHP ueberhaupt startete. Im PHP war davon nichts zu
+// sehen -- die Rechte stimmten, die Sitzung stimmte, der Bereich blieb
+// leer.
+//
+// Der Endpunkt traegt darum jetzt den Namen seiner Ansicht (lohnlaeufe,
+// wie go('lohnlaeufe')). Der Helfer behaelt seinen Namen und bleibt
+// gesperrt -- er gehoert dorthin. pruef_htaccess.php erzwingt, dass kein
+// Endpunkt je wieder einen geschuetzten Dateinamen traegt.
+//
 // GET                     -> Liste der Laeufe
 // GET ?lauf=<id>          -> ein gespeicherter Lauf mit Personen und Zeilen
 // GET ?von=&bis=          -> VORSCHAU: rechnet, speichert nichts
