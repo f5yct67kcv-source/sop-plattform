@@ -41,6 +41,11 @@ const VOLL = {
   // je_vorhanden schickt der echte Endpunkt seit ENT-482 immer mit -- daran
   // entscheidet die Oberflaeche, ob sie den Bereich ueberhaupt anbietet.
   status: 'ok', je_vorhanden: true,
+  // Kennzahlen (ENT-490). Die Zahlen passen zu den vier Runden unten:
+  // 24 Punkte hinterlegt, 20 erledigt, 1 davon per Fotobeleg, 1 Abbruch.
+  // Ein Beleg, dessen Band der Liste widerspricht, prueft nichts.
+  kennzahlen: { runden: 4, abgebrochen: 1, punkte_gesamt: 24,
+                punkte_erledigt: 20, punkte_fotobeleg: 1 },
   kunde: 'Muster Liegenschaften AG', person: 'A. Beispielperson',
   zeitraum: { von: vorTagen(30), bis: vorTagen(0) },
   objekte: [{ id: 1, name: 'Testliegenschaft Nord', strasse: 'Musterweg 1', ort: 'Musterort' }],
@@ -1414,6 +1419,122 @@ await page.waitForTimeout(250);
       .every(i => document.getElementById(i).value === '')));
   await klick('#pw-a-schliessen');
   await page.waitForTimeout(150);
+}
+
+// ══ Kennzahlenband (ENT-490) ════════════════════════════════════════════
+// Vier Stat-Kacheln über der Rundgangliste. Kein Diagramm -- vier Zahlen
+// sind keine Kurve.
+{
+  // Hier ist der Kunde angemeldet (der Block davor endet so) und die
+  // Attrappe steht auf VOLL.
+  antwort = VOLL;
+  await page.evaluate(() => laden());
+  await page.waitForTimeout(500);
+  // In den Rundgang-Reiter wechseln. OHNE das misst alles Folgende an einem
+  // verborgenen Element: getBoundingClientRect() liefert dann lauter Nullen,
+  // und jeder Lagevergleich wird wahr, ohne etwas zu prüfen. Genau so war
+  // die erste Fassung dieser Prüfungen -- beim Gegenprobieren aufgefallen,
+  // weil eine vertauschte Beschriftung sie nicht rot bekam.
+  await klick('#reiter-rundgaenge');
+  await page.waitForTimeout(250);
+
+  check('KRITISCH: das Band ist WIRKLICH zu sehen und trägt vier Kacheln',
+    await page.evaluate(() => {
+      const b = document.getElementById('kz-band');
+      return b.getClientRects().length > 0
+        && b.querySelectorAll(':scope > div').length === 4;
+    }));
+  // Hausregel und Stat-Kachel-Bauform sind hier dasselbe: Beschriftung oben,
+  // Wert darunter. Gemessen, nicht am Klassennamen abgelesen -- und zuerst
+  // geprüft, dass überhaupt etwas gerendert ist.
+  check('KRITISCH: in jeder Kachel steht die Beschriftung ÜBER dem Wert',
+    await page.evaluate(() => {
+      const k = [...document.querySelectorAll('#kz-band > div')];
+      return k.length === 4 && k.every(d => {
+        const l = d.querySelector('.k-l').getBoundingClientRect();
+        const v = d.querySelector('.k-v').getBoundingClientRect();
+        return l.height > 0 && v.height > 0 && l.bottom <= v.top + 1;
+      });
+    }));
+  check('Das Band steht über der Liste, nicht darunter',
+    await page.evaluate(() => {
+      const b = document.getElementById('kz-band').getBoundingClientRect();
+      const l = document.getElementById('liste').getBoundingClientRect();
+      return b.height > 0 && l.height > 0 && b.bottom <= l.top + 1;
+    }));
+
+  const bandText = await page.textContent('#kz-band');
+  check('KRITISCH: der Erledigungsgrad nennt Prozent UND die Rohzahlen',
+    /83\s*%/.test(bandText) && bandText.includes('20 von 24 Kontrollpunkten'));
+  // Bei vier Runden wäre ein Abbruch "25 %" -- das klingt nach System und ist
+  // ein Einzelfall. Über Runden wird darum gezählt, nicht gerechnet.
+  check('KRITISCH: Abbrüche stehen als ZAHL da, nicht als Prozent',
+    /Abgebrochen/.test(bandText) && bandText.includes('von 4 Rundgängen')
+    && !/Abgebrochen\s*\d+\s*%/.test(bandText.replace(/\s+/g, ' ')));
+  // Der Kunde LIEST diese Zeilen. "von 4 Rundgänge" stand hier schon einmal
+  // und fiel im Quelltext nicht auf, sondern erst am Bild.
+  check('Die Fusszeilen stehen im Dativ, nicht im Nominativ',
+    !/von \d+ Rundgänge(?!n)/.test(bandText)
+    && !/von \d+ (?:erledigten )?Kontrollpunkte(?!n)/.test(bandText));
+  check('Der Fotobeleg wird ausgewiesen, statt unter "erledigt" zu verschwinden',
+    bandText.includes('von 20 erledigten Kontrollpunkten'));
+  check('Jede Kachel nennt ihre eigene Einheit in der Fusszeile',
+    await page.evaluate(() => [...document.querySelectorAll('#kz-band .k-f')]
+      .every(f => f.textContent.trim().length > 0)));
+
+  // 0 von 0 ist NICHT 100 % und nicht 0 %. Es wurde nichts gemessen.
+  antwort = { ...VOLL, kennzahlen: { runden: 2, abgebrochen: 0, punkte_gesamt: 0,
+                                     punkte_erledigt: 0, punkte_fotobeleg: 0 } };
+  await page.evaluate(() => laden());
+  await page.waitForTimeout(400);
+  {
+    const t = await page.textContent('#kz-band');
+    check('KRITISCH: ohne hinterlegte Kontrollpunkte gibt es keinen Erledigungsgrad',
+      t.includes('nicht messbar') && t.includes('keine Kontrollpunkte hinterlegt')
+      && !/%/.test(t));
+    check('Ohne Abbruch sagt die Kachel das, statt eine nackte Null zu zeigen',
+      t.includes('alle 2 Rundgänge beendet'));
+  }
+
+  // Genau EINE Runde: "alle 1 Rundgänge beendet" wäre Unsinn, "alle Rundgang
+  // beendet" auch. Die Einzahl ist der Fall, den man beim Bauen nicht sieht,
+  // weil die Beleg-Daten immer mehrere Runden haben.
+  antwort = { ...VOLL, rundgaenge: [VOLL.rundgaenge[0]],
+              kennzahlen: { runden: 1, abgebrochen: 0, punkte_gesamt: 6,
+                            punkte_erledigt: 6, punkte_fotobeleg: 0 } };
+  await page.evaluate(() => laden());
+  await page.waitForTimeout(400);
+  {
+    const t = (await page.textContent('#kz-band')).replace(/\s+/g, ' ');
+    check('Bei genau einer Runde steht dort ein Satz und keine kaputte Mehrzahl',
+      !/alle 1 Rundgänge/.test(t) && !/alle Rundgang\b/.test(t)
+      && t.includes('der Rundgang wurde beendet'));
+  }
+
+  // Kein Rundgang im Zeitraum: Ein Band aus lauter Nullen behauptete eine
+  // Messung, die es nicht gab.
+  antwort = { ...VOLL, rundgaenge: [], leer_grund: 'kein_treffer_im_zeitraum',
+              kennzahlen: { runden: 0, abgebrochen: 0, punkte_gesamt: 0,
+                            punkte_erledigt: 0, punkte_fotobeleg: 0 } };
+  await page.evaluate(() => laden());
+  await page.waitForTimeout(400);
+  check('KRITISCH: ohne Rundgang im Zeitraum bleibt das Band ganz weg',
+    await page.evaluate(() => document.getElementById('kz-band').hidden));
+
+  // Eine Antwort ohne das Feld (alter Server, halber Deploy) ist etwas
+  // anderes als eine mit Nullen -- auch dann kein Band aus Nullen.
+  {
+    const ohne = { ...VOLL };
+    delete ohne.kennzahlen;
+    antwort = ohne;
+    await page.evaluate(() => laden());
+    await page.waitForTimeout(400);
+    check('KRITISCH: eine Antwort ohne Kennzahlen erfindet keine',
+      await page.evaluate(() => document.getElementById('kz-band').hidden));
+  }
+  antwort = VOLL;
+  await page.evaluate(() => laden());
+  await page.waitForTimeout(400);
 }
 
 // ══ Desktop ═════════════════════════════════════════════════════════════

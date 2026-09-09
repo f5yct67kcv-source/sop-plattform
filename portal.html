@@ -779,6 +779,11 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
     <div class="karte" id="bereich-rundgaenge">
       <h2 class="karte-titel">Rundgänge</h2>
       <p class="zahl" id="anzahl"></p>
+      <!-- Kennzahlenband (ENT-490). Dieselbe Bauform wie im aufgeklappten
+           Detail: Beschriftung oben, Wert darunter, Fusszeile mit dem Bezug.
+           Kein Diagramm -- vier Zahlen sind keine Kurve, und ein Balken für
+           EINEN Wert ist ein Balken zu viel. -->
+      <div class="kennzahlen" id="kz-band" hidden></div>
       <div id="liste"></div>
     </div>
 
@@ -1247,9 +1252,73 @@ for (const art of BEREICHE) {
   $('reiter-' + art).addEventListener('click', () => reiterWaehlen(art));
 }
 
+/* ── Kennzahlenband (ENT-490) ─────────────────────────────────────────
+   Vier Kacheln über der Rundgangliste. Vier verschiedene Einheiten --
+   Runden, Kontrollpunkte, Runden, Kontrollpunkte --, und jede Kachel nennt
+   ihre eigene in der Fusszeile. Unter EINER Überschrift stehen sie nie.
+
+   PROZENT NUR DORT, WO DER NENNER GROSS GENUG IST. Der Erledigungsgrad
+   rechnet über Kontrollpunkte -- das sind im Zeitraum Dutzende bis
+   Hunderte. Abbrüche rechnen über Runden, und da sind es eine Handvoll:
+   Bei sechs Runden wäre eine abgebrochene "17 %", was nach System klingt
+   und ein Einzelfall ist. Darum steht dort eine ZAHL, kein Prozent.
+
+   Und: 0 von 0 ist nicht 100 %. Ein Objekt ohne hinterlegte Kontrollpunkte
+   hat keinen Erledigungsgrad -- die Kachel sagt das, statt einen Wert zu
+   erfinden. Dieselbe Regel, die die Liste darunter schon befolgt. */
+function kzBand(daten) {
+  const ziel = $('kz-band');
+  const k = daten.kennzahlen;
+  // Eine Antwort ohne Kennzahlen ist etwas anderes als eine mit Nullen --
+  // dann bleibt das Band weg, statt Nullen zu behaupten.
+  if (!k || !Number(k.runden)) { ziel.hidden = true; ziel.innerHTML = ''; return; }
+
+  const gesamt = Number(k.punkte_gesamt || 0);
+  const erledigt = Number(k.punkte_erledigt || 0);
+  const foto = Number(k.punkte_fotobeleg || 0);
+  const runden = Number(k.runden);
+  const ab = Number(k.abgebrochen || 0);
+  // Beide Wortformen im DATIV -- die Fusszeilen sagen durchweg "von N ...".
+  // "von 4 Rundgänge" stand hier schon einmal; aufgefallen ist es erst am
+  // Bild, nicht am Quelltext.
+  const rundenWort = n => n === 1 ? 'Rundgang' : 'Rundgängen';
+  const punkteWort = n => n === 1 ? 'Kontrollpunkt' : 'Kontrollpunkten';
+
+  const band = [
+    { l: 'Rundgänge', v: String(runden), f: 'im gewählten Zeitraum' },
+    gesamt > 0
+      ? { l: 'Erledigungsgrad', v: Math.round((erledigt / gesamt) * 100) + '<span class="einheit"> %</span>',
+          f: erledigt + ' von ' + gesamt + ' ' + punkteWort(gesamt) }
+      // Kein Wert ist hier die richtige Auskunft. "0 %" hiesse, es sei
+      // nichts erledigt worden; "100 %", es sei alles erledigt. Beides wäre
+      // falsch -- es wurde nichts gemessen.
+      : { l: 'Erledigungsgrad', v: '<span class="einheit">nicht messbar</span>',
+          f: 'keine Kontrollpunkte hinterlegt' },
+    { l: 'Abgebrochen', v: String(ab),
+      // Bei genau einer Runde ergäbe "alle 1 Rundgänge beendet" Unsinn --
+      // darum ein eigener Satz statt einer Wortform.
+      f: ab === 0
+        ? (runden === 1 ? 'der Rundgang wurde beendet' : 'alle ' + runden + ' Rundgänge beendet')
+        : 'von ' + runden + ' ' + rundenWort(runden) },
+    // Ein Fotobeleg ist erledigt, aber nicht technisch bestätigt (ENT-329).
+    // Das verschweigt die Liste darunter nicht, und das Band tut es auch nicht.
+    { l: 'Fotobeleg', v: String(foto),
+      f: foto === 0 ? 'alle technisch bestätigt'
+                    : 'von ' + erledigt + ' erledigten ' + punkteWort(erledigt) },
+  ];
+
+  ziel.hidden = false;
+  ziel.innerHTML = band.map(b => '<div>'
+    + '<div class="k-l">' + esc(b.l) + '</div>'
+    + '<div class="k-v">' + b.v + '</div>'
+    + '<div class="k-f">' + esc(b.f) + '</div>'
+    + '</div>').join('');
+}
+
 function zeichnen(daten) {
   const rg = daten.rundgaenge || [];
   const liste = $('liste');
+  kzBand(daten);
 
   if (!rg.length) {
     $('anzahl').textContent = '';
