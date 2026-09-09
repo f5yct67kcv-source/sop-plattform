@@ -743,6 +743,29 @@ if (portalMitVertraulichem.length) {
   bad.push('Portal mit vertraulichen Feldern: ' + portalMitVertraulichem.join(', '));
 }
 
+// Wer im Portal ein Passwort SETZT, muss sich ausgewiesen haben (ENT-488).
+// Zwei Wege sind erlaubt und nur zwei: das bisherige Passwort vorzeigen, oder
+// den zugeschickten Link -- der IST der Ausweis (ENT-448). Ein dritter
+// Endpunkt, der password_hash schreibt, ohne eines von beidem zu verlangen,
+// waere die Uebernahme eines fremden Zugangs per Anfrage.
+//
+// Namentlich benannt und nicht ueber ein Muster erkannt: Ein dritter Weg
+// soll auffallen, nicht durchrutschen -- dieselbe Bauart wie bei
+// PORTAL_EINGAENGE.
+{
+  const PW_OHNE_ALTES = ['portal_neues_passwort.php'];   // der Link ist der Ausweis
+  const setzen = portalDateien.filter(f => /password_hash\s*=\s*\?/.test(ohneKommentar(f)));
+  const ohneNachweis = setzen.filter(f => !PW_OHNE_ALTES.includes(f)
+    && !/password_verify\s*\(/.test(ohneKommentar(f)));
+  check('Es gibt ueberhaupt Portal-Endpunkte zu pruefen, die ein Passwort setzen',
+    setzen.length >= 2);
+  check('KRITISCH: jeder Portal-Endpunkt, der ein Passwort setzt, verlangt einen Ausweis',
+    ohneNachweis.length === 0);
+  if (ohneNachweis.length) { bad.push('Passwort ohne Ausweis: ' + ohneNachweis.join(', ')); }
+  const totePw = PW_OHNE_ALTES.filter(f => !apiDateien.includes(f));
+  check('Die Ausnahmeliste fuer den Linkweg nennt nur Endpunkte, die es gibt', totePw.length === 0);
+}
+
 // Der Abbruchgrund verlaesst den Server als KLARTEXT, nicht als Codewort
 // (ENT-324, jetzt auch fuers Portal). Zwei Seiten derselben Regel:
 //   - Der Endpunkt schlaegt im Katalog nach.

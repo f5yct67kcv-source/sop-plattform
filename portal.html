@@ -553,6 +553,49 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
        kein weiterer Schritt: Die Anmeldemaske bleibt sichtbar dahinter, und
        wer versehentlich geklickt hat, ist mit einem Schliessen zurueck --
        ohne dass die Seite den Zustand gewechselt haette. -->
+  <!-- Passwort ändern (ENT-488). Bis hierher konnte ein Kunde sein Passwort
+       genau EINMAL setzen, beim ersten Besuch über den zugeschickten Link.
+       Wer es weitergegeben hat oder verdächtigt, kam ohne Anruf beim Betrieb
+       nicht mehr heraus.
+
+       Dasselbe Fenster-Muster wie die Link-Anforderung daneben -- ein
+       zweites Aussehen für dieselbe Sache wäre eine zweite Sprache. -->
+  <div class="fenster-grund" id="pw-fenster" hidden>
+    <div class="fenster" role="dialog" aria-modal="true" aria-labelledby="pw-a-titel">
+      <div class="feld" style="margin-bottom:16px">
+        <div class="bez">Anmeldung</div>
+        <div class="wert" id="pw-a-titel">Passwort ändern</div>
+      </div>
+      <div id="pw-a-formular">
+        <label for="pw-a-alt">Bisheriges Passwort</label>
+        <input id="pw-a-alt" type="password" autocomplete="current-password">
+        <div style="margin-top:14px">
+          <label for="pw-a-neu">Neues Passwort</label>
+          <input id="pw-a-neu" type="password" autocomplete="new-password"
+                 placeholder="mindestens 6 Zeichen">
+        </div>
+        <div style="margin-top:14px">
+          <label for="pw-a-neu2">Zur Bestätigung noch einmal</label>
+          <input id="pw-a-neu2" type="password" autocomplete="new-password">
+        </div>
+        <div class="knopfzeile">
+          <button class="knopf" id="pw-a-speichern">Passwort speichern</button>
+          <button class="knopf still" id="pw-a-schliessen">Abbrechen</button>
+        </div>
+        <p class="hinweis">Andere Geräte, auf denen Sie angemeldet sind, werden
+          dabei abgemeldet. Dieses hier bleibt offen.</p>
+        <p class="fehler" id="fehler-pw-a" hidden></p>
+      </div>
+      <div id="pw-a-fertig" hidden style="text-align:center">
+        <div style="font-size:34px;line-height:1;margin-bottom:12px" aria-hidden="true">✓</div>
+        <div class="wert" style="font-size:17px">Ihr Passwort ist geändert.</div>
+        <div class="knopfzeile" style="justify-content:center">
+          <button class="knopf" id="pw-a-zu">Schliessen</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="fenster-grund" id="anfrage-fenster" hidden>
     <div class="fenster" role="dialog" aria-modal="true" aria-labelledby="anfrage-titel">
       <div class="feld" style="margin-bottom:16px">
@@ -594,6 +637,7 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
       <h1 id="titel">Kundenportal</h1>
       <div class="unter" id="unter">Nachweis der ausgeführten Rundgänge</div>
     </div>
+    <button class="knopf still" id="pw-aendern-oeffnen">Passwort ändern</button>
     <button class="knopf still" id="abmelden">Abmelden</button>
   </div>
 
@@ -893,6 +937,68 @@ function anfrageOeffnen() {
 function anfrageSchliessen() {
   $('anfrage-fenster').hidden = true;
 }
+
+/* ── Passwort ändern (ENT-488) ────────────────────────────────────────
+   Das Gegenstück zu mein_passwort.php für Mitarbeitende: Das BISHERIGE
+   Passwort wird verlangt. Ein offenes Gerät soll nicht zum Kontodiebstahl
+   werden -- wer kurz am fremden Bildschirm sitzt, könnte den Zugang sonst
+   übernehmen, ohne das alte Passwort je gekannt zu haben.
+
+   Die zweite Eingabe wird HIER verglichen und nicht im Server: Ein
+   Vertipper in der Bestätigung ist keine Serverfrage, und ein Weg zum
+   Server, der zwei Passwörter entgegennimmt, wäre einer zu viel. */
+function pwAendernOeffnen() {
+  fehler('fehler-pw-a', '');
+  $('pw-a-formular').hidden = false;
+  $('pw-a-fertig').hidden = true;
+  for (const f of ['pw-a-alt', 'pw-a-neu', 'pw-a-neu2']) { $(f).value = ''; }
+  $('pw-fenster').hidden = false;
+  $('pw-a-alt').focus();
+}
+
+function pwAendernSchliessen() {
+  $('pw-fenster').hidden = true;
+  // Die Felder nicht stehen lassen: Ein Passwort, das in einem geschlossenen
+  // Fenster im Speicher der Seite bleibt, ist eines zu viel.
+  for (const f of ['pw-a-alt', 'pw-a-neu', 'pw-a-neu2']) { $(f).value = ''; }
+}
+
+$('pw-aendern-oeffnen').addEventListener('click', pwAendernOeffnen);
+$('pw-a-schliessen').addEventListener('click', pwAendernSchliessen);
+$('pw-a-zu').addEventListener('click', pwAendernSchliessen);
+
+$('pw-a-speichern').addEventListener('click', async () => {
+  const alt = $('pw-a-alt').value, neu = $('pw-a-neu').value, neu2 = $('pw-a-neu2').value;
+  fehler('fehler-pw-a', '');
+  if (!alt || !neu) {
+    fehler('fehler-pw-a', 'Bitte beide Felder ausfüllen.');
+    return;
+  }
+  if (neu !== neu2) {
+    fehler('fehler-pw-a', 'Die beiden neuen Passwörter stimmen nicht überein.');
+    return;
+  }
+  const knopf = $('pw-a-speichern');
+  knopf.disabled = true;
+  const { ok, code, daten } = await ruf('portal_passwort_aendern.php',
+    { method: 'POST', body: JSON.stringify({ alt, neu }) });
+  knopf.disabled = false;
+  // 401 heisst hier NICHT „abgemeldet", sondern „das bisherige Passwort
+  // stimmt nicht" -- die Sitzung steht ja. Wer das verwechselt, wirft den
+  // Kunden bei jedem Vertipper hinaus.
+  if (!ok) {
+    fehler('fehler-pw-a', (daten && daten.message) || 'Das Ändern hat nicht geklappt.');
+    return;
+  }
+  for (const f of ['pw-a-alt', 'pw-a-neu', 'pw-a-neu2']) { $(f).value = ''; }
+  $('pw-a-formular').hidden = true;
+  $('pw-a-fertig').hidden = false;
+});
+
+// Eingabetaste im letzten Feld speichert -- wie überall sonst auf dieser Seite.
+$('pw-a-neu2').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { $('pw-a-speichern').click(); }
+});
 
 $('link-holen').addEventListener('click', anfrageOeffnen);
 $('anfrage-schliessen').addEventListener('click', anfrageSchliessen);

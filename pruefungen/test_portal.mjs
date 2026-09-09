@@ -225,6 +225,8 @@ let antwort = VOLL;
 let anmeldeFehler = false;
 let pwFehler = null;
 let calls = [];
+// Antwort des Passwort-Endpunkts (ENT-488), von den Pruefungen gesetzt.
+let pwAendernAntwort = null;
 
 // Attrappe fuer Google Maps. Ohne sie liefe die Pruefung ins Netz -- und
 // eine Pruefung, die vom Netz abhaengt, prueft das Netz. Sie ahmt genau die
@@ -287,6 +289,12 @@ async function setup(page) {
       return route.fulfill({ status: 200, contentType: 'image/png', body: FOTO_PNG });
     }
     if (path.includes('portal_rundgaenge')) return send(antwort);
+    if (path.includes('portal_passwort_aendern')) {
+      // Der Fehlerfall wird von aussen gesetzt -- so laesst sich pruefen,
+      // dass ein 401 hier NICHT als "abgemeldet" gedeutet wird.
+      if (pwAendernAntwort) { return send(pwAendernAntwort.body, pwAendernAntwort.code); }
+      return send({ status: 'ok' });
+    }
     if (path.includes('portal_abmelden')) return send({ status: 'ok' });
     return send({ status: 'ok' });
   });
@@ -1298,6 +1306,115 @@ await page.waitForTimeout(250);
 calls = [];
 await klick('#abmelden');
 await page.waitForTimeout(250);
+
+// ══ Passwort ändern (ENT-488) ═══════════════════════════════════════════
+// Bis dahin konnte ein Kunde sein Passwort genau EINMAL setzen -- beim
+// ersten Besuch über den zugeschickten Link. Wer es weitergegeben hat oder
+// verdächtigt, kam ohne Anruf beim Betrieb nicht mehr heraus.
+{
+  // Das Prüfstück davor meldet ab und lässt die Abmeldebestätigung stehen --
+  // hier wird darum erst zurück auf die Maske und dann neu angemeldet.
+  // "Passwort ändern" gibt es NUR für einen angemeldeten Kunden; ohne die
+  // Anmeldung würde diese Suite eine Maske messen, die niemand sieht.
+  antwort = VOLL;
+  // Erst die Gegenrichtung: Die Kopfzeile mit dem Knopf gehört einem
+  // angemeldeten Kunden. Vorher darf sie gar nicht dastehen.
+  check('KRITISCH: vor der Anmeldung gibt es "Passwort ändern" nicht',
+    !(await page.isVisible('#pw-aendern-oeffnen')));
+  await klick('#wieder-anmelden');
+  await page.waitForTimeout(200);
+  await fuell('#email', 'a.beispiel@example.invalid');
+  await fuell('#passwort', 'ein sicheres langes wort');
+  await klick('#anmelden-pw');
+  await page.waitForSelector('#inhalt:not([hidden])', { timeout: 4000 })
+    .catch(() => bad.push('Die erneute Anmeldung führt nicht in die Liste'));
+  await page.waitForTimeout(300);
+
+  check('KRITISCH: ein angemeldeter Kunde kommt an "Passwort ändern"',
+    await page.isVisible('#pw-aendern-oeffnen'));
+  check('Der Knopf ist auf dem Handy mindestens 44 px hoch',
+    await page.evaluate(() =>
+      document.getElementById('pw-aendern-oeffnen').getBoundingClientRect().height >= 44));
+
+  await klick('#pw-aendern-oeffnen');
+  await page.waitForTimeout(200);
+  check('Der Klick öffnet das Fenster', await page.isVisible('#pw-fenster'));
+  check('KRITISCH: alle drei Felder verbergen die Eingabe',
+    await page.evaluate(() => ['pw-a-alt', 'pw-a-neu', 'pw-a-neu2']
+      .every(i => document.getElementById(i).type === 'password')));
+
+  // Ein Vertipper in der Bestätigung ist keine Serverfrage. Er darf gar
+  // nicht erst hinausgehen -- sonst wanderte ein Passwort über die Leitung,
+  // das der Kunde so nie wollte.
+  calls = [];
+  await fuell('#pw-a-alt', 'das bisherige lange wort');
+  await fuell('#pw-a-neu', 'ein neues langes wort');
+  await fuell('#pw-a-neu2', 'ein anderes langes wort');
+  await klick('#pw-a-speichern');
+  await page.waitForTimeout(250);
+  check('KRITISCH: zwei verschiedene neue Passwörter erreichen den Server gar nicht',
+    !calls.some(c => c.path.includes('portal_passwort_aendern')));
+  check('Und die Seite sagt, woran es liegt',
+    /stimmen nicht überein/.test(await page.textContent('#fehler-pw-a')));
+
+  // Das bisherige Passwort stimmt nicht: Der Server antwortet mit 401.
+  // ÜBERALL SONST heisst 401 auf dieser Seite „abgemeldet" -- hier nicht.
+  // Wer das verwechselt, wirft den Kunden bei jedem Vertipper hinaus.
+  pwAendernAntwort = { code: 401,
+    body: { status: 'error', message: 'Das bisherige Passwort stimmt nicht.' } };
+  await fuell('#pw-a-neu2', 'ein neues langes wort');
+  calls = [];
+  await klick('#pw-a-speichern');
+  await page.waitForTimeout(300);
+  {
+    const ruf = calls.find(c => c.path.includes('portal_passwort_aendern'));
+    const rumpf = JSON.parse((ruf && ruf.rumpf) || '{}');
+    check('KRITISCH: alt und neu gehen an den Server -- die Bestätigung nicht',
+      rumpf.alt === 'das bisherige lange wort' && rumpf.neu === 'ein neues langes wort'
+      && rumpf.neu2 === undefined);
+  }
+  check('KRITISCH: ein falsches bisheriges Passwort meldet das SICHTBAR',
+    await page.evaluate(() => {
+      const f = document.getElementById('fehler-pw-a');
+      return f.getClientRects().length > 0 && /bisherige Passwort stimmt nicht/.test(f.textContent);
+    }));
+  check('KRITISCH: und wirft den Kunden dabei NICHT hinaus -- 401 heisst hier nicht "abgemeldet"',
+    await page.isVisible('#inhalt') && !(await page.isVisible('#abgemeldet')));
+
+  // Der gute Fall.
+  pwAendernAntwort = null;
+  await klick('#pw-a-speichern');
+  await page.waitForTimeout(300);
+  check('KRITISCH: nach dem Ändern steht eine Bestätigung da',
+    await page.isVisible('#pw-a-fertig') && !(await page.isVisible('#pw-a-formular')));
+
+  await klick('#pw-a-zu');
+  await page.waitForTimeout(200);
+  check('Schliessen beendet das Fenster', !(await page.isVisible('#pw-fenster')));
+
+  // Der Fall, auf den es ankommt, ist ABBRECHEN -- nicht der Erfolg. Nach
+  // einem erfolgreichen Wechsel sind die Felder ohnehin leer; wer mitten im
+  // Tippen abbricht, liesse sonst sein Passwort im geschlossenen Fenster
+  // stehen. Beim Gegenprobieren aufgefallen: Die erste Fassung dieser
+  // Prüfung lief nur über den Erfolgsweg und wäre nie rot geworden.
+  await klick('#pw-aendern-oeffnen');
+  await page.waitForTimeout(200);
+  await fuell('#pw-a-alt', 'ein Passwort das niemand sehen soll');
+  await fuell('#pw-a-neu', 'noch eines davon');
+  await klick('#pw-a-schliessen');
+  await page.waitForTimeout(200);
+  check('KRITISCH: nach dem Abbrechen steht kein Passwort mehr im Fenster',
+    await page.evaluate(() => ['pw-a-alt', 'pw-a-neu', 'pw-a-neu2']
+      .every(i => document.getElementById(i).value === '')));
+  // Und beim nächsten Öffnen ist es auch nicht wieder da.
+  await klick('#pw-aendern-oeffnen');
+  await page.waitForTimeout(200);
+  check('KRITISCH: und beim nächsten Öffnen ebenso wenig',
+    await page.evaluate(() => ['pw-a-alt', 'pw-a-neu', 'pw-a-neu2']
+      .every(i => document.getElementById(i).value === '')));
+  await klick('#pw-a-schliessen');
+  await page.waitForTimeout(150);
+}
 
 // ══ Desktop ═════════════════════════════════════════════════════════════
 // Jede Änderung am Handy-Layout wird zusätzlich am Desktop geprüft, und
