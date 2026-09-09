@@ -61,6 +61,13 @@ $antwort = [
     // Oberflaeche muesste sein Fehlen von einer Null unterscheiden.
     'kennzahlen' => ['runden' => 0, 'abgebrochen' => 0,
                      'punkte_gesamt' => 0, 'punkte_erledigt' => 0, 'punkte_fotobeleg' => 0],
+    // Der Verlauf (ENT-500): je Zeitabschnitt die Zahl der Runden, fuer die
+    // kleine Kurve in der Kachel. Aus demselben Grund wie die Kennzahlen im
+    // SERVER gebuendelt und nicht im Browser aus der Liste gerechnet: Die
+    // Liste ist der gewaehlte Zeitraum, und wuerde sie je gekuerzt, zeigte
+    // eine im Browser gerechnete Kurve die gekuerzte Menge und saehe aus wie
+    // das Ganze (ENT-490).
+    'verlauf' => ['einheit' => null, 'punkte' => []],
 ];
 
 // Vier verschiedene Aussagen, vier verschiedene Antworten (Hausregel:
@@ -128,6 +135,32 @@ $zeilen = $stmt->fetchAll(PDO::FETCH_ASSOC);
    Sache zu haben. */
 $kz = $antwort['kennzahlen'];
 
+/* Der Verlauf (ENT-500).
+   TAGE ODER WOCHEN, entschieden am Zeitraum und nicht am Geschmack: Bis
+   einschliesslich 31 Tagen je Tag, darueber je Woche. Andernfalls haette
+   ein Jahresbereich 365 Striche (unlesbar) und eine Woche einen einzigen
+   (keine Kurve).
+   LUECKEN GEHOEREN DAZU: Vorbelegt wird JEDER Abschnitt mit null, auch der
+   ohne Runde. Nur die vorhandenen aneinanderzureihen ergaebe eine Kurve
+   ohne Zeitachse -- drei Runden an drei aufeinanderfolgenden Tagen saehen
+   aus wie drei Runden ueber drei Monate. */
+$vonTag = new DateTimeImmutable($von);
+$bisTag = new DateTimeImmutable($bis);
+$tage   = (int)$vonTag->diff($bisTag)->days + 1;
+$jeTag  = $tage <= 31;
+$schluessel = static function (string $datum) use ($jeTag): string {
+    $d = new DateTimeImmutable($datum);
+    // Wochen beginnen am Montag (ISO 8601) -- die Schweiz zaehlt so, und
+    // eine Woche, die am Erfassungstag beginnt, waere bei jedem Aufruf eine
+    // andere.
+    return $jeTag ? $d->format('Y-m-d')
+                  : $d->modify('monday this week')->format('Y-m-d');
+};
+$eimer = [];
+for ($t = $vonTag; $t <= $bisTag; $t = $t->modify('+1 day')) {
+    $eimer[$schluessel($t->format('Y-m-d'))] = 0;
+}
+
 foreach ($zeilen as $r) {
     $vorlageId = $r['rundgang_vorlage_id'] !== null ? (int)$r['rundgang_vorlage_id'] : null;
     $dauer = rundgang_dauer($r['rohzeit_start'], $r['rohzeit_ende'], $r['letzter_scan'],
@@ -153,8 +186,21 @@ foreach ($zeilen as $r) {
     $kz['punkte_gesamt']    += (int)$fortschritt['gesamt'];
     $kz['punkte_erledigt']  += (int)$fortschritt['erledigt'];
     $kz['punkte_fotobeleg'] += (int)$fortschritt['ersatzscan'];
+
+    $k = $schluessel((string)$r['datum']);
+    // Sollte eine Runde ausserhalb des Zeitraums stehen, waere das ein
+    // Fehler in der Abfrage -- sie bekommt dann KEINEN eigenen Eimer,
+    // sondern faellt auf. Ein stillschweigend angelegter Eimer verschoebe
+    // die Zeitachse.
+    if (isset($eimer[$k])) { $eimer[$k]++; }
 }
 $antwort['kennzahlen'] = $kz;
+$antwort['verlauf'] = [
+    'einheit' => $jeTag ? 'tag' : 'woche',
+    'punkte'  => array_map(
+        static fn(string $ab, int $n): array => ['ab' => $ab, 'runden' => $n],
+        array_keys($eimer), array_values($eimer)),
+];
 
 if (!$antwort['rundgaenge']) {
     // Zwei verschiedene Gruende, zwei verschiedene Texte: Hat es je einen

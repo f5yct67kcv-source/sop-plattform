@@ -94,7 +94,11 @@ body::before{
   background-repeat:no-repeat;
 }
 
-.buehne{max-width:900px;margin:0 auto;padding:28px 16px 56px}
+/* Dieselbe Breite wie das Cockpit (.content in dashboard.html). Bis
+   ENT-500 standen hier 900px -- auf einem breiten Bildschirm blieb die
+   Haelfte leer, waehrend die Rundgangzeilen sich draengten. Kein
+   drittes Hausmass: eine Zahl, zwei Oberflaechen. */
+.buehne{max-width:1440px;margin:0 auto;padding:28px 16px 56px}
 
 /* ── Kopf ──────────────────────────────────────────────────────────────
    Auf dem Handy ist die Kopfzeile der einzige Ort, der sagt, wo man ist:
@@ -108,7 +112,12 @@ body::before{
 /* margin-left:auto statt space-between allein: Bricht die Kopfzeile auf dem
    Handy um, landet der Knopf sonst links unter dem Titel -- er gehoert aber
    auf beiden Breiten an dieselbe Stelle. */
-.kopf #abmelden{margin-left:auto}
+/* Der Abstandhalter gehoert an den ERSTEN Knopf, nicht an den letzten:
+   Sonst schiebt er nur den letzten nach rechts, und der erste haengt
+   am Titel -- er wandert dann mit dessen Laenge mit. Beide zusammen
+   an den rechten Rand, mit festem Abstand untereinander. */
+.kopf #pw-aendern-oeffnen{margin-left:auto}
+.kopf #pw-aendern-oeffnen + #abmelden{margin-left:0}
 
 /* Der Empfang vor der Anmeldung: gross, mittig, mit dem Logo darueber --
    dieselbe Ordnung wie die Anmeldeseite des Cockpits. */
@@ -160,7 +169,7 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
 /* Fusszeile mit dem Datenschutzhinweis (ENT-491). Ruhig, aber auffindbar --
    ein Hinweis, den man nicht findet, ist keiner. Als <button> und nicht als
    <a href="#">: Es fuehrt nirgendwohin, es oeffnet etwas. */
-.seiten-fuss{max-width:900px;margin:0 auto 34px;padding:0 16px;
+.seiten-fuss{max-width:1440px;margin:0 auto 34px;padding:0 16px;
              text-align:center}
 .verweis{background:none;border:0;padding:12px 14px;cursor:pointer;
          font:inherit;font-size:13.5px;color:var(--ink-3);
@@ -367,6 +376,43 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
 .kennzahlen .k-v{font-size:20px;font-weight:700;margin-top:3px}
 .kennzahlen .k-v .einheit{font-size:13px;font-weight:600;color:var(--ink-3)}
 .kennzahlen .k-f{font-size:12px;color:var(--ink-3);margin-top:2px}
+
+/* Die Karte, die NUR das Band trägt (ENT-500). Das Band bringt seinen
+   eigenen Rahmen mit; in einer Karte säßen sonst zwei Rahmen ineinander.
+   Darum hier ohne Innenabstand und ohne den unteren Abstand des Bandes. */
+.karte-band{padding:0;overflow:hidden}
+.karte-band .kennzahlen{margin-bottom:0;border:0;border-radius:0}
+
+/* Platz für Meter und Kurve. Zwischen Wert und Fusszeile, beide gleich
+   hoch -- sonst stünden die Fusszeilen der vier Kacheln auf verschiedenen
+   Höhen und die Reihe wirkte schief. */
+.k-bild{height:20px;margin:7px 0 5px;display:flex;align-items:center}
+/* Ein LEERER Bildplatz hält die Fusszeilen auf einer Höhe -- aber nur dort,
+   wo Kacheln mit und ohne Bild wirklich nebeneinander stehen. Auf dem Handy
+   ist das Band 2x2: Oben haben beide ein Bild, unten keines. Der leere Platz
+   schöbe dort nur die untere Zeile um 22 px auf, ohne etwas auszurichten.
+   Gemessen, nicht überlegt: 116/116/134/134 mit, 116/116/112/112 ohne. */
+.k-bild:empty{display:none}
+.k-bild .balken{width:100%;height:7px}
+/* Die Kurve zeigt die FORM des Zeitraums, nicht Werte -- darum ohne Achsen
+   und bewusst flach. preserveAspectRatio="none" im Markup: Sie soll die
+   Kachelbreite füllen, die Höhe bleibt fest. */
+/* Dünne Säulen, nicht Klötze: Ohne die Deckelung wurden sie bei sieben
+   Tagen 48 px breit. Bei vielen Abschnitten schrumpfen sie stattdessen,
+   bis alle hineinpassen. */
+.k-kurve{display:flex;align-items:flex-end;gap:2px;height:20px;width:100%}
+.k-saeule{flex:1 1 auto;min-width:2px;max-width:12px;
+          border-radius:2px 2px 0 0;background:var(--accent)}
+/* Ein Abschnitt ohne Runde: ein flacher Sockel, nicht nichts. Eine Lücke
+   sähe aus wie „hier fehlt eine Angabe" -- „hier war keine Runde" ist etwas
+   anderes (Hausregel: unbekannt darf nie wie keine aussehen). */
+/* NICHT ".leer": Diesen Namen trägt im Portal schon der Leerzustand einer
+   Liste (.leer{padding:28px 4px}), und diese Regel steht weiter unten --
+   sie gewann. Die Säulen wurden dadurch 56 px hoch und legten sich über
+   den Wert darüber. Am gerenderten Bild aufgefallen, nicht im Quelltext:
+   genau der Fall, vor dem die Hausregel "gemessen, nicht nachgelesen"
+   warnt. */
+.k-saeule.k-null{height:2px;background:var(--ink-3);opacity:.4;border-radius:1px}
 
 .d-titel{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
          color:var(--ink-3);margin:0 0 10px}
@@ -576,6 +622,10 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
   .zeile .fortschritt{grid-column:3;grid-row:1;margin-top:0}
   .zeile .rechts{grid-column:4;grid-row:1}
   .kennzahlen{grid-template-columns:repeat(4,1fr)}
+  /* Ab hier stehen alle vier in EINER Zeile -- jetzt braucht es den
+     leeren Platz, sonst sitzen die Fusszeilen der Kacheln ohne Bild
+     22 px höher als die der anderen. */
+  .k-bild:empty{display:block}
   .v-zeile{grid-template-columns:56px 12px 1fr}
 }
 </style>
@@ -666,6 +716,17 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
           <li><b>Kein Verlauf einzelner Besuche.</b> Je Rapport steht eine Zeile,
               nicht eine je Aufruf. Wann Sie ins Portal sehen, lässt sich daraus
               nicht ablesen.</li>
+        </ul>
+      </div>
+
+      <div class="ds-block">
+        <h3>Was Ihr Browser an Dritte sendet</h3>
+        <ul>
+          <li><b>Die Karte kommt von Google.</b> Öffnen Sie einen Rundgang, wird
+              der zurückgelegte Weg auf einer Google-Karte gezeigt. Ihr Browser
+              lädt sie dabei direkt bei Google; dass Sie die Karte abrufen,
+              erfährt damit auch Google. Der Weg selbst stammt von uns, nicht
+              von dort.</li>
         </ul>
       </div>
 
@@ -870,15 +931,22 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
     </div>
 
 
-    <div class="karte" id="bereich-rundgaenge">
-      <h2 class="karte-titel">Rundgänge</h2>
-      <p class="zahl" id="anzahl"></p>
-      <!-- Kennzahlenband (ENT-490). Dieselbe Bauform wie im aufgeklappten
-           Detail: Beschriftung oben, Wert darunter, Fusszeile mit dem Bezug.
-           Kein Diagramm -- vier Zahlen sind keine Kurve, und ein Balken für
-           EINEN Wert ist ein Balken zu viel. -->
-      <div class="kennzahlen" id="kz-band" hidden></div>
-      <div id="liste"></div>
+    <!-- Der Bereich ist seit ENT-500 eine reine Hülle und selbst KEINE
+         Karte mehr: Das Kennzahlenband steht als eigener Block über der
+         Liste, nicht in derselben Karte wie sie. Die Kennung bleibt am
+         äusseren Element, damit die Reiter-Umschaltung (ENT-486)
+         unverändert weiterarbeitet. -->
+    <div id="bereich-rundgaenge">
+      <!-- Kennzahlenband (ENT-490, seit ENT-500 mit Meter und Verlauf).
+           Beschriftung oben, Wert darunter, Fusszeile mit dem Bezug. -->
+      <div class="karte karte-band" id="kz-karte" hidden>
+        <div class="kennzahlen" id="kz-band"></div>
+      </div>
+      <div class="karte">
+        <h2 class="karte-titel">Rundgänge</h2>
+        <p class="zahl" id="anzahl"></p>
+        <div id="liste"></div>
+      </div>
     </div>
 
     <!-- Wachbuch: seit ENT-486 ein EIGENER Reiter, nicht mehr die zweite
@@ -1396,10 +1464,12 @@ for (const art of BEREICHE) {
    erfinden. Dieselbe Regel, die die Liste darunter schon befolgt. */
 function kzBand(daten) {
   const ziel = $('kz-band');
+  const karte = $('kz-karte');
   const k = daten.kennzahlen;
   // Eine Antwort ohne Kennzahlen ist etwas anderes als eine mit Nullen --
-  // dann bleibt das Band weg, statt Nullen zu behaupten.
-  if (!k || !Number(k.runden)) { ziel.hidden = true; ziel.innerHTML = ''; return; }
+  // dann bleibt das Band weg, statt Nullen zu behaupten. Verborgen wird die
+  // KARTE, nicht nur das Band: Sonst bliebe ein leerer Kasten stehen.
+  if (!k || !Number(k.runden)) { karte.hidden = true; ziel.innerHTML = ''; return; }
 
   const gesamt = Number(k.punkte_gesamt || 0);
   const erledigt = Number(k.punkte_erledigt || 0);
@@ -1412,11 +1482,19 @@ function kzBand(daten) {
   const rundenWort = n => n === 1 ? 'Rundgang' : 'Rundgängen';
   const punkteWort = n => n === 1 ? 'Kontrollpunkt' : 'Kontrollpunkten';
 
+  const grad = gesamt > 0 ? Math.round((erledigt / gesamt) * 100) : null;
+
   const band = [
-    { l: 'Rundgänge', v: String(runden), f: 'im gewählten Zeitraum' },
+    { l: 'Rundgänge', v: String(runden), f: 'im gewählten Zeitraum',
+      bild: kzVerlauf(daten.verlauf) },
     gesamt > 0
-      ? { l: 'Erledigungsgrad', v: Math.round((erledigt / gesamt) * 100) + '<span class="einheit"> %</span>',
-          f: erledigt + ' von ' + gesamt + ' ' + punkteWort(gesamt) }
+      ? { l: 'Erledigungsgrad', v: grad + '<span class="einheit"> %</span>',
+          f: erledigt + ' von ' + gesamt + ' ' + punkteWort(gesamt),
+          // Derselbe Balken wie in der Liste darunter (.balken/.fuell) --
+          // kein zweites Bauteil für dieselbe Aussage. Die Füllung trägt den
+          // Schweregrad, der Grund bleibt sichtbar, damit "wenig erledigt"
+          // nicht wie "keine Angabe" aussieht.
+          bild: kzMeter(grad) }
       // Kein Wert ist hier die richtige Auskunft. "0 %" hiesse, es sei
       // nichts erledigt worden; "100 %", es sei alles erledigt. Beides wäre
       // falsch -- es wurde nichts gemessen.
@@ -1435,12 +1513,99 @@ function kzBand(daten) {
                     : 'von ' + erledigt + ' erledigten ' + punkteWort(erledigt) },
   ];
 
-  ziel.hidden = false;
+  karte.hidden = false;
+  // Reihenfolge fest: Beschriftung, Wert, BILD, Fusszeile. Das Bild steht
+  // zwischen Wert und Bezugstext, weil es denselben Wert zeigt -- die
+  // Fusszeile nennt die Rohzahlen und gehört darum ans Ende.
   ziel.innerHTML = band.map(b => '<div>'
     + '<div class="k-l">' + esc(b.l) + '</div>'
     + '<div class="k-v">' + b.v + '</div>'
+    // Der Bildplatz steht in JEDER Kachel, auch leer. Gemessen: Ohne ihn
+    // sind die Kacheln mit Bild vier Pixel höher, und die Fusszeilen der
+    // vier stehen auf verschiedenen Höhen -- nebeneinander wirkt das
+    // unruhig, ohne dass man sagen kann warum (Hausregel Gestaltung).
+    //
+    // Warum "Abgebrochen" und "Fotobeleg" KEINEN Balken bekommen, obwohl
+    // Platz da ist: Ein Balken zeigt einen Anteil. Bei vier Runden sähe
+    // ein Abbruch aus wie ein Viertel des Bildes -- genau der Eindruck
+    // "das ist System", den ENT-490 mit der nackten Zahl vermeidet.
+    + (b.bild || '<div class="k-bild"></div>')
     + '<div class="k-f">' + esc(b.f) + '</div>'
     + '</div>').join('');
+}
+
+/* Der Meter zum Erledigungsgrad.
+
+   Ein Ring oder Kuchen aus zwei Stücken wäre hier die falsche Form: Ein
+   Verhältnis gegen eine Grenze liest man an einer Strecke ab, nicht an
+   einem Winkel. Der Balken ist ausserdem schon da -- die Liste darunter
+   benutzt ihn für dieselbe Aussage je Runde.
+
+   Die Farbe ist NIE die einzige Auskunft: Daneben stehen der Prozentwert
+   und die Rohzahlen. Das ist hier keine Feinheit, sondern nötig -- gemessen
+   liegen Grün und Bernstein unter Protanopie nur ΔE 3.6 auseinander (siehe
+   OP-501), sind also für manche Augen dieselbe Farbe. */
+function kzMeter(grad) {
+  if (grad === null) { return ''; }
+  const klasse = grad >= 100 ? 'voll' : (grad > 0 ? 'teil' : 'ab');
+  return '<div class="k-bild"><div class="balken ' + klasse + '" role="img"'
+    + ' aria-label="' + grad + ' Prozent erledigt">'
+    + '<div class="fuell" style="width:' + Math.max(0, Math.min(100, grad)) + '%"></div>'
+    + '</div></div>';
+}
+
+/* Der kleine Verlauf zur Zahl der Rundgänge — SÄULEN, keine Linie.
+
+   Eine Linie verbindet ihre Punkte und behauptet damit die Werte
+   dazwischen. Zwischen „Dienstag 0 Runden" und „Donnerstag 2 Runden"
+   zeichnete sie den Mittwoch auf 1 — eine Zahl, die niemand gemessen hat.
+   Runden je Tag sind abzählbare Mengen, kein stetiger Verlauf; Mengen liest
+   man an Säulen ab. (Am gerenderten Bild aufgefallen: Die Linie sah bei
+   Höchstwert 2 ausserdem nach nichts aus.)
+
+   MINDESTENS VIER ABSCHNITTE, sonst gar keiner: Zwei Säulen sind ein
+   Vergleich, kein Verlauf. Lieber keine Grafik als eine, die mehr sagt als
+   die Daten hergeben.
+
+   Ohne Achsen und ohne Zahlen an den Säulen — der Verlauf zeigt die FORM
+   des Zeitraums, die Zahl darüber sagt die Summe. Der Titel nennt Zeitraum
+   und Höchstwert, damit er auch dem etwas sagt, der ihn nicht sehen kann. */
+const KZ_VERLAUF_MIN = 4;
+function kzVerlauf(verlauf) {
+  const p = (verlauf && Array.isArray(verlauf.punkte)) ? verlauf.punkte : [];
+  if (p.length < KZ_VERLAUF_MIN) { return ''; }
+  const werte = p.map(x => Number(x.runden) || 0);
+  const hoch = Math.max(...werte);
+  // Lauter Nullen ergäben eine Reihe leerer Stellen, die wie "nichts
+  // gemessen" aussieht. Dann lieber nichts — die Zahl darüber sagt es schon.
+  if (hoch <= 0) { return ''; }
+
+  const einheit = verlauf.einheit === 'woche' ? 'Woche' : 'Tag';
+  const titel = p.length + ' ' + (einheit === 'Woche' ? 'Wochen' : 'Tage')
+    + ', höchstens ' + hoch + ' ' + (hoch === 1 ? 'Rundgang' : 'Rundgänge')
+    + ' je ' + einheit;
+
+  // Als CSS-Säulen und NICHT als gedehntes SVG: Mit
+  // preserveAspectRatio="none" zieht der Browser die Balken auf die
+  // Kachelbreite: Bei sieben Tagen wurden sie 48 px breit und 20 px hoch
+  // und lasen sich als Klötze, nicht als Säulen. Am Bild aufgefallen. So
+  // bleibt die Breite in Pixeln steuerbar und die Marke dünn.
+  //
+  // Ein Abschnitt OHNE Runde bekommt einen flachen Sockel statt gar nichts:
+  // Eine Lücke im Bild sähe aus wie "hier fehlt eine Angabe", und das ist
+  // etwas anderes als "hier war keine Runde" (Hausregel).
+  const saeulen = werte.map(w => {
+    // Für den Sockel KEINE Höhe ins Markup: Ein Inline-Stil schlägt die
+    // Klasse (ohne !important), und "height:0%" liess den Sockel
+    // verschwinden -- die Lücke, die er gerade verhindern soll.
+    if (w === 0) { return '<span class="k-saeule k-null"></span>'; }
+    const anteil = Math.max(12, (w / hoch) * 100);
+    return '<span class="k-saeule" style="height:' + anteil.toFixed(1) + '%"></span>';
+  }).join('');
+
+  return '<div class="k-bild"><div class="k-kurve" role="img"'
+    + ' aria-label="' + esc(titel) + '" title="' + esc(titel) + '">'
+    + saeulen + '</div></div>';
 }
 
 function zeichnen(daten) {
@@ -1916,7 +2081,11 @@ function detailUmschalten(zeile) {
 }
 
 async function detailLaden(id, tafel) {
-  if (detailZwischen[id]) { detailZeichnen(detailZwischen[id], tafel); return; }
+  if (detailZwischen[id]) {
+    detailZeichnen(detailZwischen[id], tafel);
+    wegAutomatisch(tafel);
+    return;
+  }
   const { ok, code, daten } = await ruf('portal_rundgang_detail.php?rundgang_id=' + id);
   // Inzwischen wieder zugeklappt oder die Liste neu geladen -- dann gibt es
   // nichts mehr zu fuellen.
@@ -1930,6 +2099,24 @@ async function detailLaden(id, tafel) {
   }
   detailZwischen[id] = daten.rundgang;
   detailZeichnen(daten.rundgang, tafel);
+  wegAutomatisch(tafel);
+}
+
+/* Den Weg holen, sobald eine Runde aufgeklappt ist (ENT-500).
+
+   An EINER Stelle, gleich nach dem Zeichnen -- und nicht im Zeichnen
+   selbst: detailZeichnen() baut nur Markup und wird auch aus dem
+   Zwischenspeicher heraus aufgerufen. Stünde der Aufruf dort, holte jedes
+   Auf- und Zuklappen den Weg erneut.
+
+   wegZeigen() ersetzt den Inhalt der Hülle vollständig; die Kennung
+   data-weg-auto verschwindet damit von selbst, sobald geladen wurde. Ein
+   zweiter Aufruf findet dann nichts mehr -- das ist die Bremse, und sie
+   braucht keinen eigenen Merker. */
+function wegAutomatisch(tafel) {
+  const huelle = tafel.querySelector('.weg-huelle[data-weg-auto]');
+  if (!huelle) { return; }
+  wegZeigen(Number(huelle.dataset.wegAuto), huelle);
 }
 
 function uhr(wert) {
@@ -2004,17 +2191,17 @@ function detailZeichnen(d, tafel) {
     + (ereignisse.length ? ereignisse.map(eZeileHtml).join('')
       : '<div class="d-hinweis">Während dieser Runde wurde kein Ereignis gemeldet.</div>')
     + '</div>'
-    // Der Weg steht hinter einem Knopf und wird NICHT beim Aufklappen
-    // mitgeladen (ENT-474, ausdrückliche Wahl des Projektinhabers). Zwei
-    // Gründe tragen das: Es sind Aufenthaltsdaten einer Person und keine
-    // Kennzahl der Runde — wer sie sehen will, soll das tun, nicht
-    // beiläufig bekommen. Und eine Runde trägt leicht hundert Messpunkte.
+    // Der Weg kommt seit ENT-500 BEIM AUFKLAPPEN, nicht mehr erst auf einen
+    // Knopf (ENT-474 damit revidiert, auf ausdrücklichen Wunsch des
+    // Projektinhabers). Der Knopf bleibt als Rückfall im Markup: Schlägt
+    // das automatische Laden fehl, steht er wieder da -- ohne ihn wäre der
+    // Weg dann gar nicht erreichbar.
     + '<div class="d-abschnitt"><p class="d-titel">Weg während der Runde</p>'
-    + '<div class="weg-huelle">'
+    + '<div class="weg-huelle" data-weg-auto="' + Number(d.id) + '">'
     + '<button type="button" class="knopf still" data-weg="' + Number(d.id) + '">'
     + 'Weg auf der Karte anzeigen</button>'
-    + '<p class="d-hinweis" style="margin-top:9px">Die Bewegungsdaten werden erst auf '
-    + 'diesen Knopf hin geladen. Dabei wird die Karte von Google bezogen.</p>'
+    + '<p class="d-hinweis" style="margin-top:9px">Die Bewegungsdaten werden geladen. '
+    + 'Dabei wird die Karte von Google bezogen.</p>'
     + '</div></div>'
     // Dasselbe Blatt, das der Kunde heute per Mail bekommt -- nur holt er es
     // hier selbst (ENT-478).
@@ -2101,8 +2288,21 @@ $('liste').addEventListener('click', ev => {
   if (knopf) { wegZeigen(Number(knopf.dataset.weg), knopf.closest('.weg-huelle')); }
 });   // nur Rundgänge -- ein Einsatz hat keinen aufgezeichneten Weg
 
+/* Der Weg je Runde, einmal geholt (ENT-500).
+
+   Solange der Weg erst auf einen Knopf kam, brauchte es das nicht -- wer
+   nicht klickt, lädt nicht. Jetzt lädt das Aufklappen, und detailZeichnen()
+   baut das Markup bei jedem Aufklappen NEU. Ohne diesen Speicher holte ein
+   Kunde, der eine Runde dreimal ansieht, dreimal seine Bewegungsdaten.
+
+   Gespeichert wird die ANTWORT, nicht ein Merker „schon geladen": Beim
+   zweiten Aufklappen ist die Hülle wieder leer und muss neu gezeichnet
+   werden -- ein blosser Merker liesse sie leer. */
+const wegZwischen = {};
+
 async function wegZeigen(id, huelle) {
   if (!huelle) { return; }
+  if (wegZwischen[id]) { wegZeichnen(wegZwischen[id], huelle); return; }
   huelle.innerHTML = '<div class="d-hinweis">Der Weg wird geladen …</div>';
   const { ok, code, daten } = await ruf('portal_rundgang_weg.php?rundgang_id=' + id);
   if (!document.body.contains(huelle)) { return; }
@@ -2111,6 +2311,13 @@ async function wegZeigen(id, huelle) {
     huelle.innerHTML = '<div class="d-hinweis">Der Weg liess sich nicht laden.</div>';
     return;
   }
+  // Erst NACH dem geglückten Abruf merken -- ein Fehlschlag darf sich nicht
+  // festsetzen, sonst bliebe die Runde bis zum Neuladen ohne Weg.
+  wegZwischen[id] = daten;
+  wegZeichnen(daten, huelle);
+}
+
+async function wegZeichnen(daten, huelle) {
   // Drei verschiedene Aussagen, drei verschiedene Texte -- sie saehen sonst
   // alle gleich aus wie „es gibt nichts" (Hausregel). Der erste Fall sagt
   // dem Kunden bewusst NICHT, dass eine Einrichtung fehlt: Das ist eine
@@ -2169,9 +2376,16 @@ function wegKarteBauen(punkte, huelle, tage) {
     if (fuss) {
       // Die Frist kommt vom Server und steht nicht als Zahl im Text: Stuende
       // sie an zwei Orten, liefen die beiden auseinander.
+      // „Karte von Google" steht seit ENT-500 HIER und nicht mehr nur im
+      // Platzhalter davor: Solange der Weg erst auf einen Knopf kam, war der
+      // Hinweis vor dem Klick zu lesen und die Entscheidung lag beim Kunden.
+      // Jetzt lädt die Karte von selbst -- ein Hinweis, der dabei kurz
+      // aufblitzt und von der Karte überschrieben wird, ist keiner. Er
+      // bleibt darum stehen, solange die Karte steht.
       fuss.textContent = punkte.length + ' Messpunkte'
         + (schnitt !== null ? ' · Genauigkeit im Schnitt ± ' + schnitt + ' m' : '')
-        + (tage > 0 ? ' · aufbewahrt für ' + tage + ' Tage' : '');
+        + (tage > 0 ? ' · aufbewahrt für ' + tage + ' Tage' : '')
+        + ' · Karte von Google';
     }
   }).catch(() => {
     if (document.body.contains(huelle)) {

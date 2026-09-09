@@ -46,6 +46,17 @@ const VOLL = {
   // Ein Beleg, dessen Band der Liste widerspricht, prueft nichts.
   kennzahlen: { runden: 4, abgebrochen: 1, punkte_gesamt: 24,
                 punkte_erledigt: 20, punkte_fotobeleg: 1 },
+  // Verlauf (ENT-500). Sieben Tage, damit die Kurve ueberhaupt erscheint
+  // (unter vier Abschnitten wird bewusst keine gezeichnet), und mit einer
+  // LUECKE in der Mitte: Ein Tag ohne Runde gehoert zur Zeitachse, sonst
+  // saehen drei Runden an drei Tagen aus wie drei Runden ueber drei
+  // Monate. Die Summe ist 4 und passt damit zu kennzahlen.runden.
+  verlauf: { einheit: 'tag', punkte: [
+    { ab: vorTagen(6), runden: 0 }, { ab: vorTagen(5), runden: 1 },
+    { ab: vorTagen(4), runden: 0 }, { ab: vorTagen(3), runden: 0 },
+    { ab: vorTagen(2), runden: 1 }, { ab: vorTagen(1), runden: 0 },
+    { ab: vorTagen(0), runden: 2 },
+  ] },
   kunde: 'Muster Liegenschaften AG', person: 'A. Beispielperson',
   zeitraum: { von: vorTagen(30), bis: vorTagen(0) },
   objekte: [{ id: 1, name: 'Testliegenschaft Nord', strasse: 'Musterweg 1', ort: 'Musterort' }],
@@ -790,40 +801,70 @@ check('KRITISCH: der Fotobeleg erscheint als Bild, nicht als Platzhaltertext',
 check('Ein zweiter und dritter Aufklapper schliessen die vorigen nicht',
   await page.evaluate(() => document.querySelectorAll('#liste .detail').length === 3));
 
-// ══ Der Weg auf der Karte (ENT-474) ═════════════════════════════════════
-// DIE KERNZUSAGE: Er kommt erst auf den Knopf. Das ist keine Bequemlichkeit,
-// sondern der Grund, aus dem der Projektinhaber ENT-441 Punkt 3 überhaupt
-// nur so weit revidiert hat. Drei Runden sind hier aufgeklappt — wäre die
-// Spur Teil des Details, stünde sie längst dreifach geladen da.
-check('KRITISCH: das Aufklappen lädt die Bewegungsspur NICHT',
-  !calls.some(c => c.path.includes('portal_rundgang_weg')));
-check('KRITISCH: und Google wird dabei überhaupt nicht angefragt', kartenRufe === 0);
-check('Der Hinweis sagt vorher, dass die Karte von Google kommt',
-  /von Google/.test(detail3));
-// Auf dem Handy gilt dasselbe Mass wie für jedes andere Bedienelement.
-// Ohne Null-Absicherung stuerzt diese Zusage ab, statt sich zu melden, wenn
-// der Knopf fehlt -- und dann kommt die Zusammenfassung mit den BENANNTEN
-// Aussagen nie. Bei der Gegenprobe genau so passiert.
-check('KRITISCH: der Knopf ist auf dem Handy mindestens 44 px hoch',
+// ══ Der Weg auf der Karte (ENT-474, revidiert durch ENT-500) ════════════
+// UMGEKEHRTE ZUSAGE, ausdrücklich gewünscht: Der Weg kommt jetzt BEIM
+// AUFKLAPPEN, nicht mehr erst auf einen Knopf. Die alten Prüfungen standen
+// hier bis ENT-500 mit dem genauen Gegenteil ("das Aufklappen lädt die
+// Spur NICHT"). Sie sind umgeschrieben und nicht gelöscht: Was damals
+// geschützt war, ist heute die Zusage — dass der Weg wirklich von selbst
+// kommt, dass der Kunde VORHER weiss, dass Google dabei angefragt wird,
+// und dass es bei EINEM Abruf je Runde bleibt.
+//
+// Drei Runden sind hier aufgeklappt.
+check('KRITISCH: das Aufklappen holt die Bewegungsspur von selbst',
+  calls.filter(c => c.path.includes('portal_rundgang_weg')).length === 3);
+// EINMAL, nicht dreimal: Das Maps-Skript wird über ein gemeinsames
+// Versprechen geholt (kartenLaden()). Drei offene Runden ergeben drei
+// Karten, aber nur einen Bezug bei Google.
+check('KRITISCH: dafür wird Google angefragt', kartenRufe >= 1);
+check('Aber nur EINMAL je Seite, nicht je Runde', kartenRufe === 1);
+// Das ist der Preis der Bequemlichkeit, und er gehört benannt. Solange der
+// Weg erst auf einen Knopf kam, stand der Hinweis VOR dem Klick. Jetzt
+// lädt die Karte von selbst -- ein Hinweis, der dabei nur aufblitzt und
+// von der Karte überschrieben wird, ist keiner.
+check('KRITISCH: „Karte von Google" steht dauerhaft an der geladenen Karte',
   await page.evaluate(() => {
-    const k = document.querySelector('[data-weg]');
-    return !!k && k.getBoundingClientRect().height >= 44;
+    const f = document.querySelector('#liste .detail .weg-fuss');
+    return !!f && /Karte von Google/.test(f.textContent);
   }));
 
-await klick('[data-weg="12"]');
-await page.waitForTimeout(500);
-check('KRITISCH: erst der Knopf holt den Weg',
-  calls.some(c => c.path.includes('portal_rundgang_weg')));
-check('KRITISCH: und erst dann wird Google angefragt', kartenRufe === 1);
 const karte = await page.evaluate(() => ({
   gebaut: window.__karteGebaut, punkte: window.__pfadPunkte, marken: window.__marken,
   behaelter: !!document.querySelector('#liste .detail .weg-karte[data-karte]'),
   fuss: (document.querySelector('#liste .detail .weg-fuss') || {}).textContent || '',
 }));
+
+// Neu und ohne Gegenstück im alten Bau: Auf- und Zuklappen darf den Weg
+// NICHT erneut holen. Beim Knopf gab es dieses Risiko nicht -- wer nicht
+// klickt, lädt nicht. Jetzt lädt das Aufklappen, und ein Kunde, der eine
+// Runde dreimal ansieht, dürfte trotzdem nur einen Abruf auslösen.
+{
+  const vorher = calls.filter(c => c.path.includes('portal_rundgang_weg')).length;
+  const vorherKarte = kartenRufe;
+  await page.evaluate(() => document.querySelectorAll('#liste .zeile')[2].click());
+  await page.waitForTimeout(200);
+  await page.evaluate(() => document.querySelectorAll('#liste .zeile')[2].click());
+  await page.waitForTimeout(600);
+  const nachher = calls.filter(c => c.path.includes('portal_rundgang_weg')).length;
+  check('KRITISCH: Zuklappen und wieder Aufklappen holt den Weg NICHT erneut',
+    nachher === vorher);
+  if (nachher !== vorher) { bad.push(`Weg-Abrufe: ${vorher} -> ${nachher}`); }
+  check('KRITISCH: und fragt Google kein zweites Mal',
+    kartenRufe === vorherKarte);
+}
+
+// Der Knopf bleibt als Rückfall im Markup -- schlägt das automatische
+// Laden fehl, ist der Weg sonst gar nicht mehr erreichbar. Solange es
+// klappt, ist er durch die Karte ersetzt und darum nicht mehr da.
+check('Nach dem automatischen Laden steht kein Knopf mehr da',
+  await page.evaluate(() => !document.querySelector('#liste .detail [data-weg]')));
+
+// Drei offene Runden, drei Karten -- vor ENT-500 war es genau eine, weil
+// nur eine angeklickt wurde.
 check('KRITISCH: die Karte wird gebaut und der Weg als Linie darauf gezeichnet',
-  karte.gebaut === 1 && karte.behaelter && karte.punkte === 3);
+  karte.gebaut === 3 && karte.behaelter && karte.punkte === 3);
 // Eine Linie allein sagt nicht, in welche Richtung gelaufen wurde.
-check('Anfang und Ende sind markiert', karte.marken === 2);
+check('Anfang und Ende sind markiert', karte.marken === 6);
 // Die Genauigkeit gehört dazu: Ein Punkt mit 80 m Streuung sieht auf der
 // Karte genauso scharf aus wie einer mit 5 m.
 check('KRITISCH: der Fuss nennt Messpunkte UND Genauigkeit — ohne sie zieht man Schlüsse, die die Messung nicht hergibt',
@@ -835,12 +876,19 @@ await page.screenshot({ path: `${OUT}/portal-10-weg-handy.png` });
 // liefen Server und Oberfläche auseinander und die Seite behauptete eine
 // Frist, die nicht gilt.
 wegAntwort = { ...WEG_VOLL, aufbewahrung_tage: 45 };
+// Der Zwischenspeicher haelt die Runde fest -- ohne ihn zu leeren zeigte
+// das Aufklappen den alten Weg, und diese Zusage pruefte nichts.
+await page.evaluate(() => {
+  // BEIDE Speicher: Seit ENT-500 haelt wegZwischen die Bewegungsspur fest.
+  // Nur detailZwischen zu leeren zeigte weiterhin den alten Weg, und die
+  // Zusage darunter pruefte nichts.
+  Object.keys(detailZwischen).forEach(k => delete detailZwischen[k]);
+  Object.keys(wegZwischen).forEach(k => delete wegZwischen[k]);
+  laden();
+});
+await page.waitForTimeout(600);
 await page.evaluate(() => document.querySelectorAll('#liste .zeile')[2].click());
-await page.waitForTimeout(200);
-await page.evaluate(() => document.querySelectorAll('#liste .zeile')[2].click());
-await page.waitForTimeout(400);
-await klick('[data-weg="12"]');
-await page.waitForTimeout(400);
+await page.waitForTimeout(700);
 check('KRITISCH: die Aufbewahrungsfrist kommt vom Server, nicht aus dem Text',
   /45 Tage/.test(await page.evaluate(() => {
     const f = document.querySelector('#liste .detail .weg-fuss');
@@ -850,12 +898,17 @@ check('KRITISCH: die Aufbewahrungsfrist kommt vom Server, nicht aus dem Text',
 // Drei verschiedene Aussagen, drei verschiedene Texte (Hausregel).
 const wegText = async (fall) => {
   wegAntwort = fall;
+  await page.evaluate(() => {
+  // BEIDE Speicher: Seit ENT-500 haelt wegZwischen die Bewegungsspur fest.
+  // Nur detailZwischen zu leeren zeigte weiterhin den alten Weg, und die
+  // Zusage darunter pruefte nichts.
+  Object.keys(detailZwischen).forEach(k => delete detailZwischen[k]);
+  Object.keys(wegZwischen).forEach(k => delete wegZwischen[k]);
+  laden();
+});
+  await page.waitForTimeout(600);
   await page.evaluate(() => document.querySelectorAll('#liste .zeile')[2].click());
-  await page.waitForTimeout(200);
-  await page.evaluate(() => document.querySelectorAll('#liste .zeile')[2].click());
-  await page.waitForTimeout(400);
-  await klick('[data-weg="12"]');
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(700);
   return page.evaluate(() => {
     const t = document.querySelectorAll('#liste .zeile')[2].nextElementSibling;
     const h = t && t.querySelector('.weg-huelle');
@@ -1519,7 +1572,7 @@ await page.waitForTimeout(250);
   await page.evaluate(() => laden());
   await page.waitForTimeout(400);
   check('KRITISCH: ohne Rundgang im Zeitraum bleibt das Band ganz weg',
-    await page.evaluate(() => document.getElementById('kz-band').hidden));
+    await page.evaluate(() => document.getElementById('kz-karte').hidden));
 
   // Eine Antwort ohne das Feld (alter Server, halber Deploy) ist etwas
   // anderes als eine mit Nullen -- auch dann kein Band aus Nullen.
@@ -1530,8 +1583,180 @@ await page.waitForTimeout(250);
     await page.evaluate(() => laden());
     await page.waitForTimeout(400);
     check('KRITISCH: eine Antwort ohne Kennzahlen erfindet keine',
-      await page.evaluate(() => document.getElementById('kz-band').hidden));
+      await page.evaluate(() => document.getElementById('kz-karte').hidden));
   }
+  antwort = VOLL;
+  await page.evaluate(() => laden());
+  await page.waitForTimeout(400);
+}
+
+// ══ Kopfzeile, Meter und Verlauf (ENT-500) ══════════════════════════════
+{
+  await klick('#reiter-rundgaenge');
+  await page.waitForTimeout(250);
+
+  // ── Die beiden Knöpfe im Kopf gehören zusammen ──────────────────────
+  // Bis ENT-500 sass der Abstandhalter am ZWEITEN Knopf. Dadurch klebte
+  // "Passwort ändern" am Titel und wanderte mit dessen Länge mit, während
+  // "Abmelden" allein am rechten Rand stand.
+  const kopf = await page.evaluate(() => {
+    const k = document.getElementById('kopf').getBoundingClientRect();
+    const p = document.getElementById('pw-aendern-oeffnen').getBoundingClientRect();
+    const a = document.getElementById('abmelden').getBoundingClientRect();
+    const t = document.getElementById('titel').getBoundingClientRect();
+    return { kopfRechts: k.right, pw: { l: p.left, r: p.right, h: p.height },
+             ab: { l: a.left, r: a.right }, titelRechts: t.right,
+             gleicheZeile: Math.abs(p.top - a.top) <= 1,
+             // Auf dem Handy bricht die Kopfzeile um: Die Knöpfe stehen
+             // dann UNTER dem Titel, und ein Abstand zu dessen rechter
+             // Kante wäre sinnlos. Die Zusage gilt nur, wo beide wirklich
+             // in einer Zeile stehen.
+             beimTitel: Math.abs(p.top - t.top) <= 8 };
+  });
+  check('Die beiden Kopfknöpfe stehen überhaupt nebeneinander',
+    kopf.pw.h > 0 && kopf.gleicheZeile);
+  check('KRITISCH: die Kopfknöpfe stehen als Paar beieinander, nicht auseinandergerissen',
+    kopf.ab.l - kopf.pw.r <= 24);
+  check('Auf dem Handy stehen sie unter dem Titel, nicht neben ihm',
+    kopf.beimTitel === false);
+
+  // ── Das Band steht AUSSERHALB der Rundgangkarte ─────────────────────
+  // Ausdrücklich verlangt: nicht in derselben Karte wie die Liste.
+  check('KRITISCH: das Kennzahlenband liegt nicht in der Karte der Rundgangliste',
+    await page.evaluate(() => {
+      const band = document.getElementById('kz-band');
+      const liste = document.getElementById('liste');
+      const bandKarte = band.closest('.karte');
+      const listeKarte = liste.closest('.karte');
+      return !!bandKarte && !!listeKarte && bandKarte !== listeKarte;
+    }));
+  check('Und steht darüber, nicht darunter',
+    await page.evaluate(() => {
+      const b = document.getElementById('kz-band').getBoundingClientRect();
+      const l = document.getElementById('liste').getBoundingClientRect();
+      return b.height > 0 && l.height > 0 && b.bottom <= l.top + 1;
+    }));
+
+  // ── Der Meter zum Erledigungsgrad ───────────────────────────────────
+  // Derselbe Balken wie in der Liste darunter, kein zweites Bauteil.
+  const meter = await page.evaluate(() => {
+    const k = [...document.querySelectorAll('#kz-band > div')]
+      .find(d => /Erledigungsgrad/.test(d.textContent));
+    if (!k) { return null; }
+    const b = k.querySelector('.balken');
+    const f = b && b.querySelector('.fuell');
+    if (!b || !f) { return { balken: false }; }
+    const br = b.getBoundingClientRect(), fr = f.getBoundingClientRect();
+    const v = k.querySelector('.k-v').getBoundingClientRect();
+    return { balken: true, anteil: fr.width / br.width,
+             sichtbar: br.height > 0 && br.width > 0,
+             // Der Grund muss SICHTBAR bleiben -- sonst sähe "wenig
+             // erledigt" aus wie "keine Angabe" (Hausregel, gilt für den
+             // Balken der Liste schon).
+             grund: getComputedStyle(b).backgroundColor,
+             unterDemWert: br.top >= v.bottom - 1,
+             text: k.textContent };
+  });
+  check('KRITISCH: der Erledigungsgrad trägt einen Balken', !!meter && meter.balken);
+  check('Er ist wirklich gerendert', !!meter && meter.sichtbar);
+  // 20 von 24 = 83 %. Am gerenderten Verhältnis gemessen, nicht am Stil.
+  check('KRITISCH: die Füllung entspricht dem Prozentwert',
+    !!meter && Math.abs(meter.anteil - 0.83) < 0.03);
+  check('Der Grund des Balkens ist sichtbar, nicht durchsichtig',
+    !!meter && meter.grund !== 'rgba(0, 0, 0, 0)' && meter.grund !== 'transparent');
+  check('Der Balken steht unter dem Wert, nicht darüber',
+    !!meter && meter.unterDemWert);
+  // Die Farbe ist NIE die einzige Auskunft -- gemessen liegen Grün und
+  // Bernstein unter Protanopie nur ΔE 3.6 auseinander (OP-501).
+  //
+  // Der Text wird EIGENSTÄNDIG gelesen und nicht aus der Messung oben:
+  // Sonst fällt diese Zusage schon mit, wenn nur der Balken fehlt -- sie
+  // kann dann nie aus eigenem Recht anschlagen. Beim Gegenprobieren genau
+  // so aufgefallen.
+  const gradText = await page.evaluate(() => {
+    const k = [...document.querySelectorAll('#kz-band > div')]
+      .find(d => /Erledigungsgrad/.test(d.textContent));
+    return k ? k.textContent.replace(/\s+/g, ' ') : '';
+  });
+  check('KRITISCH: die Farbe steht nie allein — Prozentwert UND Rohzahlen daneben',
+    /83/.test(gradText) && /20 von 24/.test(gradText));
+
+  // ── Die Verlaufskurve ───────────────────────────────────────────────
+  const kurve = await page.evaluate(() => {
+    const k = [...document.querySelectorAll('#kz-band > div')]
+      .find(d => /RUNDGÄNGE/i.test(d.querySelector('.k-l').textContent));
+    const s = k && k.querySelector('.k-kurve');
+    if (!s) { return { da: false }; }
+    const r = s.getBoundingClientRect();
+    const saeulen = [...s.querySelectorAll('.k-saeule')];
+    const br = saeulen.map(x => x.getBoundingClientRect().width);
+    return { da: true, hoehe: r.height, breite: r.width,
+             titel: s.getAttribute('title') || '',
+             beschriftung: s.getAttribute('aria-label') || '',
+             linie: saeulen.length > 0, anzahl: saeulen.length,
+             saeuleBreit: Math.max(...br, 0),
+             leere: saeulen.filter(x => x.classList.contains('k-null')).length,
+             hoehen: saeulen.map(x => Math.round(x.getBoundingClientRect().height)),
+             // Keine Säule darf über ihren Platz hinauswachsen. Genau das
+             // ist passiert: Die Klasse ".leer" trägt im Portal schon der
+             // Leerzustand einer Liste (padding:28px), seine Regel steht
+             // weiter unten und gewann -- die Säulen wurden 56 px hoch und
+             // legten sich über den Wert. Nur am Bild zu sehen.
+             ueber: saeulen.filter(x =>
+               x.getBoundingClientRect().top < r.top - 0.5
+               || x.getBoundingClientRect().bottom > r.bottom + 0.5).length };
+  });
+  check('KRITISCH: die Rundgang-Kachel trägt einen Verlauf', kurve.da && kurve.linie);
+  check('Er ist wirklich gerendert', kurve.da && kurve.hoehe > 0 && kurve.breite > 0);
+  check('Je Abschnitt eine Säule -- sieben Tage, sieben Säulen', kurve.anzahl === 7);
+  // Dünne Marken (Gestaltungsregel für Diagramme). Ohne Deckelung wurden
+  // die Säulen bei sieben Tagen 48 px breit und lasen sich als Klötze --
+  // am gerenderten Bild aufgefallen, nicht im Quelltext.
+  check('KRITISCH: die Säulen bleiben schmal und werden nicht zu Klötzen',
+    kurve.saeuleBreit > 0 && kurve.saeuleBreit <= 14);
+  // Ein Tag ohne Runde ist ein flacher Sockel, keine Lücke: "hier fehlt
+  // eine Angabe" und "hier war keine Runde" sind zwei Aussagen.
+  check('KRITISCH: Tage ohne Runde stehen als flacher Sockel da, nicht als Lücke',
+    kurve.leere === 4 && kurve.hoehen.every(h => h > 0));
+  check('KRITISCH: keine Säule wächst aus ihrem Platz heraus über den Wert',
+    kurve.ueber === 0);
+  check('Der Sockel bleibt flach und wird nicht zur vollen Säule',
+    Math.max(...kurve.hoehen) <= 20 && Math.min(...kurve.hoehen) <= 4);
+  // Der Höchstwert (2) muss höher stehen als der kleinere (1).
+  check('Die Säulen bilden die Werte ab, nicht alle dieselbe Höhe',
+    new Set(kurve.hoehen).size >= 3);
+  // Eine Kurve ohne Achsen muss sagen, worüber sie läuft -- sonst ist sie
+  // Zierrat. Und wer sie nicht sehen kann, braucht denselben Satz.
+  check('KRITISCH: sie nennt Zeitraum und Höchstwert im Titel',
+    /Tage|Wochen/.test(kurve.titel) && /Rundg/.test(kurve.titel));
+  check('Der Titel steht auch als Beschriftung für Vorleseprogramme da',
+    !!kurve.beschriftung && kurve.beschriftung === kurve.titel
+    && kurve.beschriftung.length > 10);
+
+  // ── Zu wenige Abschnitte: lieber keine Kurve als eine erfundene ─────
+  // Eine Kurve durch zwei Punkte ist eine Gerade und behauptet einen
+  // Verlauf, den niemand gemessen hat.
+  const kurveBei = async (verlauf) => {
+    antwort = { ...VOLL, verlauf };
+    await page.evaluate(() => laden());
+    await page.waitForTimeout(400);
+    return page.evaluate(() => !!document.querySelector('#kz-band .k-kurve'));
+  };
+  check('KRITISCH: bei nur zwei Abschnitten wird keine Kurve gezeichnet',
+    (await kurveBei({ einheit: 'tag', punkte: [
+      { ab: '2026-01-01', runden: 2 }, { ab: '2026-01-02', runden: 4 }] })) === false);
+  check('KRITISCH: bei lauter Nullen ebenfalls nicht — eine Linie am Boden sieht aus wie „nichts gemessen"',
+    (await kurveBei({ einheit: 'tag', punkte: [
+      { ab: '2026-01-01', runden: 0 }, { ab: '2026-01-02', runden: 0 },
+      { ab: '2026-01-03', runden: 0 }, { ab: '2026-01-04', runden: 0 },
+      { ab: '2026-01-05', runden: 0 }] })) === false);
+  check('Eine Antwort ganz ohne Verlauf erfindet keinen',
+    (await kurveBei(undefined)) === false);
+  check('Ab vier Abschnitten mit Inhalt erscheint sie',
+    (await kurveBei({ einheit: 'woche', punkte: [
+      { ab: '2026-01-05', runden: 3 }, { ab: '2026-01-12', runden: 0 },
+      { ab: '2026-01-19', runden: 5 }, { ab: '2026-01-26', runden: 2 }] })) === true);
+
   antwort = VOLL;
   await page.evaluate(() => laden());
   await page.waitForTimeout(400);
@@ -1577,6 +1802,13 @@ await page.waitForTimeout(250);
   check('KRITISCH: er sagt, dass kein Verlauf einzelner Besuche entsteht',
     /Verlauf einzelner Besuche/i.test(ds) && /nicht eine je Aufruf/i.test(ds));
   check('Er sagt, wie lange der Nachweis bleibt', /gelöscht/.test(ds));
+  // Seit ENT-500 lädt die Karte beim Aufklappen von selbst -- der Browser
+  // des Kunden fragt dabei bei Google an, ohne dass er etwas anklickt.
+  // Ein Hinweis, der das verschweigt, wäre nach der Umstellung falsch.
+  check('KRITISCH: er sagt, dass der Browser die Karte bei Google holt',
+    /Google/.test(ds) && /Browser/.test(ds));
+  check('Und stellt klar, dass der Weg selbst NICHT von Google kommt',
+    /nicht\s+von dort|stammt von uns/.test(ds));
   check('Er nennt einen Weg für Auskunft und Löschung',
     /Auskunft/.test(ds) && /Löschung/.test(ds));
 
@@ -1632,11 +1864,60 @@ await fuell('#passwort', 'ein sicheres langes wort', gross);
 await klick('#anmelden-pw', gross);
 await gross.waitForTimeout(300);
 check('Die Liste erscheint auch am Desktop', await gross.isVisible('#inhalt'));
-// Die Seite darf am breiten Bildschirm nicht über die volle Breite laufen --
-// eine Textzeile über 1440 px ist unlesbar.
+// Bis ENT-500 stand hier eine Obergrenze von 940 px. Der Projektinhaber
+// hat sie ausdrücklich aufgehoben: Auf einem breiten Bildschirm blieb die
+// Hälfte leer, während die Rundgangzeilen sich drängten.
+//
+// Der Grund hinter der alten Grenze bleibt aber richtig -- eine Textzeile
+// über die volle Breite ist unlesbar. Er gilt jetzt dort, wo wirklich
+// Fliesstext steht (der Datenschutzhinweis), nicht für die ganze Seite:
+// Die Rundgangliste ist eine Tabelle aus Datum, Objekt, Fortschritt und
+// Zustand, kein Fliesstext.
 const breite = await gross.evaluate(() =>
   Math.round(document.querySelector('.buehne').getBoundingClientRect().width));
-check('KRITISCH: der Inhalt bleibt am Desktop auf lesbarer Breite', breite <= 940);
+check('KRITISCH: die Seite nutzt die Breite des Bildschirms', breite >= 1200);
+
+// Die Kopfzeile steht am Desktop in EINER Zeile -- hier greift die Zusage,
+// die auf dem Handy sinnlos wäre. Bis ENT-500 sass der Abstandhalter am
+// zweiten Knopf: "Passwort ändern" klebte am Titel und wanderte mit dessen
+// Länge mit, während "Abmelden" allein am rechten Rand stand.
+{
+  const k = await gross.evaluate(() => {
+    const kopf = document.getElementById('kopf').getBoundingClientRect();
+    const p = document.getElementById('pw-aendern-oeffnen').getBoundingClientRect();
+    const a = document.getElementById('abmelden').getBoundingClientRect();
+    const t = document.getElementById('titel').getBoundingClientRect();
+    return { kopfRechts: kopf.right, pl: p.left, pr: p.right, pt: p.top,
+             al: a.left, ar: a.right, tr: t.right, tt: t.top };
+  });
+  check('Am Desktop steht die Kopfzeile in einer Zeile',
+    Math.abs(k.pt - k.tt) <= 24);
+  check('KRITISCH: die beiden Knöpfe stehen als Paar zusammen',
+    k.al - k.pr <= 24);
+  check('KRITISCH: das Paar steht am rechten Rand, nicht am Titel',
+    k.kopfRechts - k.ar <= 8 && k.pl - k.tr > 100);
+}
+// Dieselbe Zahl wie im Cockpit, aus dessen Quelle gelesen statt
+// abgeschrieben -- zwei Hausmasse, die auseinanderlaufen, sieht niemand.
+{
+  const dash = readFileSync(`${WURZEL}/dashboard.html`, 'utf8');
+  const cockpit = Number((dash.match(/\.content \{[^}]*max-width:\s*(\d+)px/) || [])[1]);
+  const portalQuelle = readFileSync(`${WURZEL}/portal.html`, 'utf8');
+  const portal = Number((portalQuelle.match(/\.buehne\{max-width:(\d+)px/) || [])[1]);
+  check('Das Breitenmass ist in beiden Oberflächen auffindbar',
+    cockpit > 0 && portal > 0);
+  check('KRITISCH: Portal und Cockpit tragen dasselbe Breitenmass',
+    cockpit === portal);
+}
+const dsBreite = await gross.evaluate(async () => {
+  document.getElementById('ds-oeffnen').click();
+  await new Promise(f => setTimeout(f, 250));
+  const w = document.querySelector('#ds-fenster .fenster').getBoundingClientRect().width;
+  document.getElementById('ds-zu').click();
+  return Math.round(w);
+});
+check('KRITISCH: der Fliesstext des Hinweises bleibt auf lesbarer Zeilenlänge',
+  dsBreite > 0 && dsBreite <= 620);
 const lDesktop = await lage(gross);
 check('KRITISCH: auch am Desktop steht der Zustand rechts vom Datum',
   lDesktop.markeLinks > lDesktop.datumRechts);
