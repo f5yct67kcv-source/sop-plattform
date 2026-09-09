@@ -4108,6 +4108,27 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 .rgd-band .v .unit { font-size: 13px; font-weight: 560; color: var(--ink-3); letter-spacing: 0; }
 .rgd-band .f { font-size: 11.5px; color: var(--ink-3); margin-top: 5px; }
 
+/* Der Zustellnachweis (ENT-491) hat dieselbe Bildsprache wie das
+   Kennzahlenband darueber, aber eine EIGENE Klasse: .rgd-band steht fuer
+   die vier Kennzahlen der Runde, und eine Pruefung, die deren Bloecke
+   zaehlt, darf nicht ueber einen zweiten Kasten stolpern. (Genau das ist
+   beim Bau passiert -- vier bestehende Pruefungen wurden rot.)
+   Zwei Spalten statt vier: Es sind zwei Zeitpunkte, und vier Felder mit
+   zwei Inhalten saehen aus, als fehlte etwas. */
+.rgd-zu { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px;
+  background: var(--line); border: 1px solid var(--line); border-radius: var(--r);
+  overflow: hidden; margin: 0 0 10px; }
+.rgd-zu > div { background: var(--surface); padding: 12px 14px 13px; min-width: 0; }
+.rgd-zu .l { font-size: 10.5px; font-weight: 640; letter-spacing: .6px;
+  text-transform: uppercase; color: var(--ink-3); margin-bottom: 7px; }
+.rgd-zu .v { font-size: 15px; font-weight: 620; letter-spacing: -.2px;
+  color: var(--ink); line-height: 1.2; font-variant-numeric: tabular-nums; }
+.rgd-zu .f { font-size: 11.5px; color: var(--ink-3); margin-top: 5px; }
+/* Die PDF-Meldung steht UNTER dem Kasten und nicht darin: Sie ist eine
+   schwaechere Aussage (der Server hat nur die Meldung des Browsers), und
+   eine schwaechere Aussage gehoert nicht neben zwei belastbare. */
+.rgd-zu-pdf { font-size: 11.5px; color: var(--ink-3); margin: 0; }
+
 .rgd-titel { font-size: 10.5px; font-weight: 640; letter-spacing: .6px;
   text-transform: uppercase; color: var(--ink-3); margin: 0 0 10px; }
 
@@ -19005,11 +19026,69 @@ function rgdZeichnen(d) {
       : '<p class="mut" style="font-size:13px">Für diese Runde sind keine Kontrollpunkte hinterlegt.</p>')
     + (ereignisse.length ? '<div class="rgd-abschnitt"><p class="rgd-titel">Ereignisse</p>'
       + ereignisse.map(rgdEreignisHtml).join('') + '</div>' : '')
+    + rgdZustellungHtml(d.zustellung)
     + '<div class="rgd-abschnitt"><p class="rgd-titel">Weg während der Runde</p>'
       + '<div id="rgdWegHuelle"><button class="btn btn-plain btn-sm" onclick="rgdWegZeigen()">'
       + 'Weg auf der Karte anzeigen</button>'
       + '<p class="mut" style="margin-top:8px;font-size:12.5px">Die Bewegungsdaten werden erst auf '
       + 'diesen Knopf hin geladen und für 90 Tage aufbewahrt.</p></div></div>';
+}
+
+/* Zustellnachweis (ENT-491): Hat der Kunde diesen Rapport gesehen?
+
+   VIER Zustaende, vier verschiedene Texte -- die Hausregel, die hier im
+   Haus am haeufigsten verletzt worden ist. Der teuerste Fehler waere,
+   „kein Kundenzugang eingerichtet" wie „noch nicht abgerufen" aussehen zu
+   lassen: Dann wartet man auf einen Kunden, der den Rapport gar nicht
+   sehen KANN.
+
+   Was hier bewusst NICHT steht: welche Person des Kunden ihn geholt hat.
+   Fuer „ist er angekommen" ist das ohne Belang, und ein Name mehr waere
+   ein Personendatum ohne Zweck. */
+function rgdZustellungHtml(z) {
+  const kopf = '<div class="rgd-abschnitt"><p class="rgd-titel">Zustellung an den Kunden</p>';
+  const satz = (t, mut) => kopf + '<p class="' + (mut ? 'mut' : '')
+    + '" style="font-size:13px;margin:0">' + t + '</p></div>';
+
+  // Eine Antwort ohne das Feld ist ein alter Server, kein „nie abgerufen".
+  if (!z || !z.stand) {
+    return satz('Ob dieser Rapport beim Kunden angekommen ist, ist hier nicht bekannt.', true);
+  }
+  if (z.stand === 'nicht_eingerichtet') {
+    return satz('Der Zustellnachweis ist auf dieser Anlage noch nicht eingerichtet. '
+      + 'Bis dahin wird nicht mitgeschrieben, wer welchen Rapport abgerufen hat.', true);
+  }
+  if (z.stand === 'kein_zugang') {
+    return satz('Für dieses Objekt besteht kein Kundenzugang. '
+      + 'Der Rapport kann über das Portal nicht abgerufen werden.', true);
+  }
+  if (z.stand === 'nicht_abgerufen') {
+    const n = Number(z.zugaenge || 0);
+    // Der Relativsatz muss mitziehen: "2 Kundenzugänge, über DEN" stand hier
+    // schon einmal. Darum beide Haelften zusammen und nicht eine Wortform
+    // in einem festen Satz.
+    return satz('Noch nicht abgerufen. Es ' + (n === 1
+      ? 'besteht ein Kundenzugang, über den der Rapport erreichbar wäre.'
+      : 'bestehen ' + nf(n) + ' Kundenzugänge, über die der Rapport erreichbar wäre.'), true);
+  }
+
+  const n = Number(z.anzahl || 0);
+  const oft = n <= 1 ? '' : nf(n) + '-mal geöffnet';
+  // Das PDF entsteht im Browser des Kunden (ENT-478) -- der Server hat nur
+  // dessen Meldung. Eigener Satz und eigenes Wort („gemeldet"), damit die
+  // schwaechere Aussage nicht wie die staerkere aussieht.
+  const pdf = z.pdf_erstmals_am
+    ? '<p class="rgd-zu-pdf">Als PDF gespeichert, gemeldet am '
+      + esc(dmyZeit(z.pdf_erstmals_am)) + '</p>'
+    : '';
+  return kopf
+    + '<div class="rgd-zu">'
+    + '<div><div class="l">Erstmals abgerufen</div>'
+    + '<div class="v">' + esc(dmyZeit(z.erstmals_am)) + '</div></div>'
+    + '<div><div class="l">Zuletzt</div>'
+    + '<div class="v">' + esc(dmyZeit(z.zuletzt_am)) + '</div>'
+    + (oft ? '<div class="f">' + esc(oft) + '</div>' : '')
+    + '</div></div>' + pdf + '</div>';
 }
 
 // Ein Abbruch ist die wichtigste Aussage ueber eine Runde -- er steht oben,

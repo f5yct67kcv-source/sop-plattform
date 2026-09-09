@@ -157,6 +157,46 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
 
 .hinweis{font-size:13.5px;color:var(--ink-3);margin:10px 0 0}
 
+/* Fusszeile mit dem Datenschutzhinweis (ENT-491). Ruhig, aber auffindbar --
+   ein Hinweis, den man nicht findet, ist keiner. Als <button> und nicht als
+   <a href="#">: Es fuehrt nirgendwohin, es oeffnet etwas. */
+.seiten-fuss{max-width:900px;margin:0 auto 34px;padding:0 16px;
+             text-align:center}
+.verweis{background:none;border:0;padding:12px 14px;cursor:pointer;
+         font:inherit;font-size:13.5px;color:var(--ink-3);
+         text-decoration:underline;text-underline-offset:3px;
+         border-radius:var(--r);
+         /* 44 px Trefferflaeche auch hier -- ein Verweis auf dem Handy ist
+            genauso schwer zu treffen wie ein Knopf. */
+         min-height:44px}
+.verweis:hover{color:var(--ink-1)}
+.verweis:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* Der Datenschutzhinweis traegt mehr Text als die anderen Fenster. Er darf
+   darum breiter und, wenn noetig, scrollbar sein -- abgeschnittener Text
+   waere hier ein Hinweis, der die Haelfte verschweigt. */
+#ds-fenster .fenster{max-width:560px;max-height:calc(100vh - 32px);
+                     overflow-y:auto}
+.ds-block{margin-top:18px}
+.ds-block h3{margin:0 0 8px;font-size:12px;font-weight:700;
+             letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3)}
+.ds-block ul{margin:0;padding-left:20px}
+.ds-block li{font-size:14px;line-height:1.55;color:var(--ink-2);
+             margin-bottom:7px}
+.ds-block li b{color:var(--ink-1);font-weight:600}
+/* Der Ausweg bleibt im Bild. Gemessen aufgefallen: Auf einem 390er Gerät
+   steht der Text über die volle Höhe, und der einzige Schliessen-Knopf lag
+   darunter -- also erst nach dem Scrollen erreichbar. Ein Fenster, dessen
+   Ausweg man suchen muss, ist eine Falle (dieselbe Begründung wie beim
+   Escape-Ausstieg weiter unten). */
+.ds-fuss{position:sticky;bottom:-24px;justify-content:flex-end;
+         margin:18px -24px -24px;padding:14px 24px;
+         /* VOLL deckend, nicht .97: Das Fenster darunter ist selbst
+            durchscheinend, und beim Messen las man die Überschrift des
+            letzten Abschnitts durch die Leiste hindurch. */
+         background:rgb(var(--surface-rgb));
+         border-top:1px solid var(--glas-linie)}
+
 /* Das kleine Fenster. Deckt mehr als eine Kachel (es liegt UEBER Inhalt und
    muss ihn verdecken, sonst liest man zwei Ebenen gleichzeitig) und hat als
    einziges Element der Seite eine Unschaerfe -- hier laeuft tatsaechlich
@@ -596,6 +636,60 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
     </div>
   </div>
 
+  <div class="fenster-grund" id="ds-fenster" hidden>
+    <div class="fenster" role="dialog" aria-modal="true" aria-labelledby="ds-titel">
+      <div class="feld" style="margin-bottom:16px">
+        <div class="bez">Ihre Daten in diesem Portal</div>
+        <div class="wert" id="ds-titel">Datenschutzhinweis</div>
+      </div>
+
+      <div class="ds-block">
+        <h3>Was gespeichert wird</h3>
+        <ul>
+          <li><b>Name, E-Mail-Adresse und Funktion.</b> Damit Sie sich anmelden
+              können und nachvollziehbar bleibt, wer Zugang zu Ihren Nachweisen
+              hat.</li>
+          <li><b>Der Zeitpunkt Ihrer letzten Anmeldung.</b></li>
+          <li><b>Welchen Rapport Sie abgerufen haben</b> — erstmals, zuletzt und
+              wie oft. Das ist der Zustellnachweis: Er belegt, dass ein Nachweis
+              bei Ihnen angekommen ist.</li>
+          <li><b>Ob Sie zu einem Rapport ein PDF erstellt haben.</b> Das PDF
+              entsteht in Ihrem Browser; gespeichert wird nur, dass es erstellt
+              wurde.</li>
+        </ul>
+      </div>
+
+      <div class="ds-block">
+        <h3>Was ausdrücklich nicht gespeichert wird</h3>
+        <ul>
+          <li><b>Keine IP-Adresse, kein Gerät, kein Browser.</b></li>
+          <li><b>Kein Verlauf einzelner Besuche.</b> Je Rapport steht eine Zeile,
+              nicht eine je Aufruf. Wann Sie ins Portal sehen, lässt sich daraus
+              nicht ablesen.</li>
+        </ul>
+      </div>
+
+      <div class="ds-block">
+        <h3>Wie lange</h3>
+        <ul>
+          <li>Der Zustellnachweis wird zusammen mit dem Rapport gelöscht, den er
+              belegt.</li>
+          <li>Ihre Zugangsdaten, solange der Zugang besteht.</li>
+        </ul>
+      </div>
+
+      <div class="ds-block">
+        <h3>Auskunft, Berichtigung, Löschung</h3>
+        <p class="hinweis" id="ds-kontakt">Wenden Sie sich an den Betrieb, der
+          Ihnen diesen Zugang eingerichtet hat.</p>
+      </div>
+
+      <div class="knopfzeile ds-fuss">
+        <button class="knopf" id="ds-zu">Schliessen</button>
+      </div>
+    </div>
+  </div>
+
   <div class="fenster-grund" id="anfrage-fenster" hidden>
     <div class="fenster" role="dialog" aria-modal="true" aria-labelledby="anfrage-titel">
       <div class="feld" style="margin-bottom:16px">
@@ -811,6 +905,14 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
   <p class="fehler" id="fehler-global" hidden></p>
 </div>
 
+<!-- Der Datenschutzhinweis (ENT-491) steht AUSSERHALB von #inhalt: Er gilt
+     auch vor der Anmeldung, denn schon die Anmeldung verarbeitet Daten.
+     Eine Fusszeile und kein dritter Knopf im Kopf -- dort stehen bereits
+     zwei, und ein Hinweis ist keine Handlung. -->
+<footer class="seiten-fuss">
+  <button type="button" class="verweis" id="ds-oeffnen">Datenschutzhinweis</button>
+</footer>
+
 
 <!-- Das Blatt für das PDF (ENT-478). Eigener Aufbau, nicht die Tafel
      abfotografiert: Die Tafel trägt Knöpfe, eine Karte und Glaskanten; ein
@@ -968,6 +1070,31 @@ function pwAendernSchliessen() {
   for (const f of ['pw-a-alt', 'pw-a-neu', 'pw-a-neu2']) { $(f).value = ''; }
 }
 
+// ── Datenschutzhinweis (ENT-491) ────────────────────────────────────
+// Der Hinweis steht als fester Text in der Seite und nicht in der
+// Datenbank: Er beschreibt, was DIESE Software tut, und das aendert sich
+// mit der Software, nicht mit dem Betrieb. Nur die Anlaufstelle kommt von
+// aussen -- und auch die nur, wenn der Kunde angemeldet ist.
+async function dsOeffnen() {
+  $('ds-fenster').hidden = false;
+  // Ohne Anmeldung gibt es keinen Briefkopf (portal_briefkopf.php verlangt
+  // eine Kundensitzung). Dann bleibt der allgemeine Satz stehen -- er ist
+  // richtig, nur weniger genau. Ein Fenster, das auf den Namen wartet,
+  // waere schlechter als eines, das ihn nicht nennt.
+  if (!token) { return; }
+  try {
+    const bk = await briefkopfHolen();
+    const firma = (bk.firma || '').trim();
+    if (!firma) { return; }
+    const zeilen = [bk.fusszeile, bk.fusszeile2]
+      .map(z => String(z || '').trim()).filter(Boolean);
+    $('ds-kontakt').innerHTML = 'Wenden Sie sich an <b>' + esc(firma) + '</b>.'
+      + (zeilen.length ? '<br>' + zeilen.map(esc).join('<br>') : '');
+  } catch (e) { /* der allgemeine Satz bleibt stehen */ }
+}
+$('ds-oeffnen').addEventListener('click', dsOeffnen);
+$('ds-zu').addEventListener('click', () => { $('ds-fenster').hidden = true; });
+
 $('pw-aendern-oeffnen').addEventListener('click', pwAendernOeffnen);
 $('pw-a-schliessen').addEventListener('click', pwAendernSchliessen);
 $('pw-a-zu').addEventListener('click', pwAendernSchliessen);
@@ -1011,6 +1138,7 @@ $('anfrage-zu').addEventListener('click', anfrageSchliessen);
 // Escape schliesst -- ein Fenster ohne Ausweg ist eine Falle.
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && !$('anfrage-fenster').hidden) { anfrageSchliessen(); }
+  if (e.key === 'Escape' && !$('ds-fenster').hidden) { $('ds-fenster').hidden = true; }
 });
 
 $('anfrage-senden').addEventListener('click', async () => {
@@ -2439,6 +2567,12 @@ async function pdfHerunterladen(art, id, knopf) {
     document.body.appendChild(a); a.click(); a.remove();
     // Erst freigeben, wenn der Browser die Datei geholt hat.
     setTimeout(() => URL.revokeObjectURL(adresse), 4000);
+    // Zustellnachweis (ENT-491): NACH dem Herunterladen und bewusst ohne
+    // await -- die Datei ist beim Kunden, ob der Vermerk ankommt, ist
+    // seine Sache nicht. Ein Fehler hier darf den Rapport nicht
+    // beeinträchtigen, darum der leere catch.
+    ruf('portal_abruf_pdf.php', { method: 'POST',
+      body: JSON.stringify({ art, id }) }).catch(() => {});
   } catch (fehler) {
     fehler('fehler-global', 'Der Rapport liess sich nicht erzeugen.');
   } finally {

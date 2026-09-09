@@ -159,6 +159,12 @@ if (hat_tabelle($pdo, 'ereignis_meldung')) {
     }
 }
 
+// Zustellnachweis (ENT-491). ERST HIER, nach allen Zuschnittspruefungen:
+// Vermerkt wird nur, was auch wirklich ausgeliefert wird. Ein Vermerk
+// vor der Pruefung hielte fest, dass jemand nach einer fremden Nummer
+// gefragt hat -- das ist keine Zustellung, sondern eine Beobachtung.
+kp_abruf_vermerken($pdo, (int)$zugang['id'], 'rundgang', $rundgangId);
+
 json_response(['status' => 'ok', 'rundgang' => [
     'id'             => (int)$r['id'],
     'datum'          => (string)$r['datum'],

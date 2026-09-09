@@ -109,6 +109,12 @@ foreach ($r->fetchAll(PDO::FETCH_ASSOC) as $zeile) {
 $personen = array_values($jePerson);
 usort($personen, static fn(array $a, array $b): int => strcmp((string)$a['von'], (string)$b['von']));
 
+// Zustellnachweis (ENT-491). ERST HIER, nach allen Zuschnittspruefungen:
+// Vermerkt wird nur, was auch wirklich ausgeliefert wird. Ein Vermerk
+// vor der Pruefung hielte fest, dass jemand nach einer fremden Nummer
+// gefragt hat -- das ist keine Zustellung, sondern eine Beobachtung.
+kp_abruf_vermerken($pdo, (int)$zugang['id'], 'einsatz', $einsatzId);
+
 json_response(['status' => 'ok', 'bericht' => [
     'einsatz' => [
         'id'            => (int)$einsatz['id'],

@@ -1537,6 +1537,87 @@ await page.waitForTimeout(250);
   await page.waitForTimeout(400);
 }
 
+// ══ Datenschutzhinweis und Zustellnachweis (ENT-491) ════════════════════
+// Der Hinweis ist die Bedingung dafür, dass überhaupt mitgeschrieben werden
+// darf. Geprüft wird darum beides zusammen -- und der Hinweis zuerst.
+{
+  // Der Verweis steht in der Fusszeile, also unten. Sichtbar heisst hier:
+  // wirklich gerendert, nicht nur im Baum vorhanden.
+  check('KRITISCH: der Datenschutzhinweis ist von der Seite aus erreichbar',
+    await page.evaluate(() => {
+      const k = document.getElementById('ds-oeffnen');
+      return !!k && k.getClientRects().length > 0;
+    }));
+  // Hausregel Handy: mindestens 44 px. Ein Verweis ist genauso schwer zu
+  // treffen wie ein Knopf.
+  check('Der Verweis ist auf dem Handy gross genug zum Treffen',
+    await page.evaluate(() =>
+      document.getElementById('ds-oeffnen').getBoundingClientRect().height >= 44));
+
+  await klick('#ds-oeffnen');
+  await page.waitForTimeout(300);
+  check('KRITISCH: der Klick öffnet den Hinweis wirklich',
+    await page.evaluate(() =>
+      document.getElementById('ds-fenster').getClientRects().length > 0));
+
+  const ds = (await page.textContent('#ds-fenster')).replace(/\s+/g, ' ');
+  // Der Hinweis muss jede Sache benennen, die tatsächlich gespeichert wird.
+  // Ein Hinweis, der die Hälfte verschweigt, ist schlechter als keiner --
+  // er behauptet Vollständigkeit.
+  check('KRITISCH: der Hinweis nennt den Zustellnachweis beim Namen',
+    /Zustellnachweis/.test(ds) && /abgerufen/.test(ds));
+  check('Er nennt die Stammangaben des Zugangs',
+    /Name/.test(ds) && /E-Mail/.test(ds) && /Funktion/.test(ds));
+  check('Er nennt die Anmeldung', /Anmeldung/.test(ds));
+  check('Er nennt die PDF-Meldung und sagt, dass das PDF im Browser entsteht',
+    /PDF/.test(ds) && /Browser/.test(ds));
+  // Und das Gegenstück: Was NICHT erhoben wird, ist die eigentliche Zusage.
+  check('KRITISCH: er sagt ausdrücklich, dass keine IP-Adresse gespeichert wird',
+    /IP-Adresse/.test(ds) && /nicht gespeichert/.test(ds));
+  check('KRITISCH: er sagt, dass kein Verlauf einzelner Besuche entsteht',
+    /Verlauf einzelner Besuche/i.test(ds) && /nicht eine je Aufruf/i.test(ds));
+  check('Er sagt, wie lange der Nachweis bleibt', /gelöscht/.test(ds));
+  check('Er nennt einen Weg für Auskunft und Löschung',
+    /Auskunft/.test(ds) && /Löschung/.test(ds));
+
+  // Angemeldet nennt der Hinweis den Betrieb -- ein „wenden Sie sich an
+  // jemanden" ohne Namen ist keine Anlaufstelle.
+  check('KRITISCH: angemeldet nennt der Hinweis den Betrieb namentlich',
+    /Musterfirma Sicherheitsdienst GmbH/.test(await page.textContent('#ds-kontakt')));
+
+  await klick('#ds-zu');
+  await page.waitForTimeout(200);
+  check('Der Hinweis lässt sich wieder schliessen',
+    await page.evaluate(() => document.getElementById('ds-fenster').hidden));
+
+  // ── Der Zustellnachweis wird gemeldet ────────────────────────────────
+  // Erst die Tafel öffnen (dort steht der PDF-Knopf), dann herunterladen.
+  calls.length = 0;
+  await klick('#reiter-rundgaenge');
+  await page.waitForTimeout(200);
+  await klick('#liste .zeile[data-art="rundgang"]');
+  await page.waitForTimeout(700);
+  const pdfKnopf = await page.$('[data-pdf]');
+  check('Der PDF-Knopf steht in der aufgeklappten Tafel', !!pdfKnopf);
+  if (pdfKnopf) {
+    await pdfKnopf.click();
+    // html2pdf wird erst beim Klick nachgeladen und braucht danach Zeit.
+    await page.waitForTimeout(4000);
+    const meldung = calls.find(c => c.path.includes('portal_abruf_pdf'));
+    check('KRITISCH: nach dem Herunterladen wird der Zustellnachweis gemeldet', !!meldung);
+    if (meldung) {
+      const rumpf = JSON.parse(meldung.rumpf || '{}');
+      check('Die Meldung nennt Art und Nummer des Rapports',
+        rumpf.art === 'rundgang' && Number(rumpf.id) === 10);
+      // Keine kunde_id, kein Name, keine Kennung des Geräts: Der Server
+      // kennt den Zugang aus der Sitzung (ENT-441), alles andere wäre eine
+      // Angabe, die er nicht braucht und nicht prüfen kann.
+      check('KRITISCH: die Meldung schickt NICHTS ausser Art und Nummer',
+        Object.keys(rumpf).sort().join(',') === 'art,id');
+    }
+  }
+}
+
 // ══ Desktop ═════════════════════════════════════════════════════════════
 // Jede Änderung am Handy-Layout wird zusätzlich am Desktop geprüft, und
 // umgekehrt (CLAUDE.md).

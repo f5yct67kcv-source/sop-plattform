@@ -251,3 +251,95 @@ function kp_objekt_ids(PDO $pdo, int $kundeId): array
     $stmt->execute([$kundeId]);
     return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
 }
+
+// ── Zustellnachweis (ENT-491) ─────────────────────────────────────────
+//
+// WAS HIER FESTGEHALTEN WIRD UND WAS NICHT
+//
+// Festgehalten wird: dieser Zugang hat diesen Rapport bekommen, erstmals
+// dann, zuletzt dann, so oft. Das beantwortet die Frage, um die es geht --
+// "ist der Nachweis beim Kunden angekommen".
+//
+// NICHT festgehalten wird eine Zeile je Abruf. Die waere ein
+// Bewegungsprofil: man koennte nachlesen, an welchem Abend ein
+// Betriebsfremder was gelesen hat. Fuer den Zustellnachweis braucht es das
+// nicht, und was man nicht braucht, speichert man nicht.
+//
+// Ebenfalls NICHT festgehalten: IP-Adresse, Geraet, Browser. Keines davon
+// belegt eine Zustellung besser, jedes davon macht aus dem Nachweis eine
+// Beobachtung.
+//
+// DIE TABELLE IST NACHGETRAGEN. Fehlt sie, wird nichts vermerkt und nichts
+// geworfen: Ein Rapport, der sich nicht abrufen laesst, weil der
+// Nachweisvermerk scheitert, waere der Fehler in der falschen Richtung --
+// der Nachweis dient dem Kunden, er darf ihm den Zugang nicht nehmen.
+// Aus demselben Grund faengt der Schreibweg jeden Fehler ab.
+function kp_abruf_vermerken(PDO $pdo, int $zugangId, string $art, int $bezugId): void
+{
+    if (!in_array($art, ['rundgang', 'einsatz'], true)) { return; }
+    if ($zugangId <= 0 || $bezugId <= 0) { return; }
+    if (!hat_tabelle($pdo, 'portal_abruf')) { return; }
+
+    $spalte = $art === 'rundgang' ? 'rundgang_id' : 'einsatz_id';
+    try {
+        // Kein INSERT ... ON DUPLICATE KEY: Das gibt es in SQLite nicht, und
+        // die Pruefungen laufen dort. Erst suchen, dann schreiben -- der
+        // Wettlauf zweier gleichzeitiger Abrufe desselben Zugangs kostet
+        // hier schlimmstenfalls einen Zaehlschritt, keinen Nachweis.
+        $stmt = $pdo->prepare("SELECT id FROM portal_abruf
+                                WHERE zugang_id = ? AND $spalte = ?");
+        $stmt->execute([$zugangId, $bezugId]);
+        $id = $stmt->fetchColumn();
+        if ($id) {
+            $pdo->prepare('UPDATE portal_abruf
+                              SET zuletzt_am = ?, anzahl = anzahl + 1
+                            WHERE id = ?')
+                ->execute([date('Y-m-d H:i:s'), (int)$id]);
+            return;
+        }
+        $jetzt = date('Y-m-d H:i:s');
+        $pdo->prepare("INSERT INTO portal_abruf
+                        (zugang_id, $spalte, erstmals_am, zuletzt_am, anzahl)
+                       VALUES (?, ?, ?, ?, 1)")
+            ->execute([$zugangId, $bezugId, $jetzt, $jetzt]);
+    } catch (Throwable $e) {
+        // Absichtlich still. Siehe oben: Der Vermerk darf den Abruf nicht
+        // verhindern.
+    }
+}
+
+// Das PDF entsteht im BROWSER (ENT-478) -- der Server sieht es nie. Er
+// erfaehrt nur, dass die Seite eine Erstellung gemeldet hat. Das ist eine
+// schwaechere Aussage als "der Server hat den Inhalt ausgeliefert", und
+// darum steht sie in eigenen Spalten und traegt im Cockpit einen eigenen
+// Text. Eine schwache Aussage, die wie eine starke aussieht, ist schlimmer
+// als gar keine.
+//
+// NUR UPDATE, NIE INSERT: Ohne vorherigen Abruf gibt es keine Zeile, und
+// dann passiert nichts. Damit kann dieser Weg fuer einen Rapport, den der
+// Kunde nie geholt hat, auch nichts anlegen -- und verraet nebenbei nicht,
+// welche Nummern es gibt.
+function kp_abruf_pdf_vermerken(PDO $pdo, int $zugangId, string $art, int $bezugId): bool
+{
+    if (!in_array($art, ['rundgang', 'einsatz'], true)) { return false; }
+    if ($zugangId <= 0 || $bezugId <= 0) { return false; }
+    if (!hat_tabelle($pdo, 'portal_abruf')) { return false; }
+
+    $spalte = $art === 'rundgang' ? 'rundgang_id' : 'einsatz_id';
+    try {
+        $stmt = $pdo->prepare("SELECT id, pdf_erstmals_am FROM portal_abruf
+                                WHERE zugang_id = ? AND $spalte = ?");
+        $stmt->execute([$zugangId, $bezugId]);
+        $z = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$z) { return false; }
+        $jetzt = date('Y-m-d H:i:s');
+        $pdo->prepare('UPDATE portal_abruf
+                          SET pdf_erstmals_am = COALESCE(pdf_erstmals_am, ?),
+                              pdf_anzahl = pdf_anzahl + 1
+                        WHERE id = ?')
+            ->execute([$jetzt, (int)$z['id']]);
+        return true;
+    } catch (Throwable $e) {
+        return false;
+    }
+}

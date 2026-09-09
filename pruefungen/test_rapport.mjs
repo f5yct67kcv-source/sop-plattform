@@ -168,6 +168,11 @@ const DETAIL41 = { status: 'ok', rundgang: {
     { id: 77, erfasst_am: heute + ' 22:55:00', vorfall_am: null,
       bemerkung: 'Scheibe beschädigt', hat_foto: true, art: 'Sachbeschädigung' },
   ],
+  // Zustellnachweis (ENT-491). Veraenderlich, weil VIER Zustaende vier
+  // verschiedene Texte ergeben muessen -- unten wird jeder einzeln gesetzt.
+  zustellung: { stand: 'abgerufen', erstmals_am: heute + ' 08:14:00',
+                zuletzt_am: heute + ' 09:02:00', anzahl: 3,
+                pdf_erstmals_am: heute + ' 08:15:00', pdf_anzahl: 1, personen: 1 },
 } };
 
 const gerufen = [];
@@ -649,6 +654,124 @@ const leerBild = await page.evaluate(async () => {
 });
 check('Die Messung unterscheidet wirklich zwischen vollem und leerem Blatt',
   !bild.fehler && (leerBild.fehler !== undefined || leerBild.anteil < 0.5 || leerBild.h < 400));
+
+// ══════════ ZUSTELLNACHWEIS AN DEN KUNDEN (ENT-491) ═══════════════════
+// Vier Zustaende, vier verschiedene Texte. Das ist die Hausregel, die hier
+// im Haus am haeufigsten verletzt worden ist -- „unbekannt darf nie wie
+// keine aussehen". Der teuerste Fehler waere, „kein Kundenzugang" wie
+// „noch nicht abgerufen" aussehen zu lassen: Dann wartet man auf einen
+// Kunden, der den Rapport gar nicht sehen KANN.
+//
+// Gemessen wird am gerenderten Text der Detailansicht, nicht am Quelltext.
+{
+  const zeichne = async z => {
+    await page.evaluate(zz => { rgdDaten = { ...rgdDaten, zustellung: zz }; rgdZeichnen(rgdDaten); }, z);
+    await page.waitForTimeout(120);
+    return (await page.textContent('#rgdBody')).replace(/\s+/g, ' ');
+  };
+
+  const abgerufen = await zeichne({ stand: 'abgerufen', erstmals_am: heute + ' 08:14:00',
+    zuletzt_am: heute + ' 09:02:00', anzahl: 3,
+    pdf_erstmals_am: heute + ' 08:15:00', pdf_anzahl: 1, personen: 1 });
+  check('KRITISCH: ein abgerufener Rapport nennt den ERSTEN Zeitpunkt -- er ist der Nachweis',
+    /Erstmals abgerufen/.test(abgerufen) && /08:14/.test(abgerufen));
+  check('Er nennt auch den letzten Zeitpunkt', /Zuletzt/.test(abgerufen) && /09:02/.test(abgerufen));
+  check('Mehrfaches Öffnen wird als Zahl ausgewiesen', /3-mal geöffnet/.test(abgerufen));
+  // Das PDF entsteht im Browser des Kunden -- der Server hat nur dessen
+  // Meldung. Die schwaechere Aussage darf nicht wie die staerkere klingen.
+  check('KRITISCH: die PDF-Angabe sagt „gemeldet" und behauptet keine Gewissheit',
+    /gemeldet/.test(abgerufen) && /PDF/.test(abgerufen));
+
+  // Gemessen, nicht im Quelltext nachgelesen (CLAUDE.md): Beschriftung
+  // ÜBER dem Wert, zwei Spalten für zwei Zeitpunkte, und die schwächere
+  // PDF-Aussage steht UNTER dem Kasten statt darin.
+  const mass = await page.evaluate(() => {
+    const zu = document.querySelector('#rgdBody .rgd-zu');
+    const pdf = document.querySelector('#rgdBody .rgd-zu-pdf');
+    if (!zu || !pdf) { return null; }
+    const k = [...zu.children];
+    return {
+      kacheln: k.length,
+      spalten: getComputedStyle(zu).gridTemplateColumns.split(' ').length,
+      lageOk: k.every(d => {
+        const l = d.querySelector('.l').getBoundingClientRect();
+        const v = d.querySelector('.v').getBoundingClientRect();
+        return l.height > 0 && v.height > 0 && l.bottom <= v.top + 1;
+      }),
+      pdfUnten: pdf.getBoundingClientRect().top >= zu.getBoundingClientRect().bottom - 1,
+      // Das Kennzahlenband der Runde bleibt für sich -- eine Prüfung, die
+      // dessen Blöcke zählt, darf nicht über diesen Kasten stolpern.
+      baender: document.querySelectorAll('#rgdBody .rgd-band').length,
+    };
+  });
+  check('Der Zustellkasten ist überhaupt gerendert und messbar', !!mass);
+  check('KRITISCH: im Zustellkasten steht die Beschriftung ÜBER dem Wert',
+    !!mass && mass.lageOk);
+  check('Zwei Zeitpunkte, zwei Spalten -- keine leeren Felder',
+    !!mass && mass.kacheln === 2 && mass.spalten === 2);
+  check('KRITISCH: die PDF-Meldung steht UNTER dem Kasten, nicht neben den belastbaren Werten',
+    !!mass && mass.pdfUnten);
+  check('Der Zustellkasten ist kein zweites Kennzahlenband',
+    !!mass && mass.baender === 1);
+
+  const einmal = await zeichne({ stand: 'abgerufen', erstmals_am: heute + ' 08:14:00',
+    zuletzt_am: heute + ' 08:14:00', anzahl: 1, pdf_erstmals_am: null, pdf_anzahl: 0, personen: 1 });
+  check('Bei einem einzigen Abruf steht kein „1-mal geöffnet" da',
+    !/1-mal geöffnet/.test(einmal));
+  check('Ohne PDF-Meldung wird keine behauptet', !/gemeldet/.test(einmal));
+
+  const nichtAbgerufen = await zeichne({ stand: 'nicht_abgerufen', zugaenge: 2 });
+  const keinZugang = await zeichne({ stand: 'kein_zugang' });
+  const nichtEingerichtet = await zeichne({ stand: 'nicht_eingerichtet' });
+  const ohneFeld = await zeichne(undefined);
+
+  const texte = { nichtAbgerufen, keinZugang, nichtEingerichtet, ohneFeld };
+  // Jeder Zustand nennt seine eigene Ursache, und keiner klingt wie ein
+  // anderer. Der Vergleich auf Verschiedenheit ist der Kern: Ein Text, der
+  // fuer zwei Faelle derselbe ist, ist der Fehler, um den es geht.
+  const kern = Object.fromEntries(Object.entries(texte).map(([k, t]) =>
+    // KEIN erzwungenes Leerzeichen hinter der Ueberschrift: Zwischen zwei
+    // <p> steht im textContent keines, und die erste Fassung dieser Zeile
+    // fand darum NICHTS -- vier leere Zeichenketten sind alle gleich, und
+    // die Pruefung darunter war stillschweigend wahr.
+    [k, (t.match(/Zustellung an den Kunden\s*(.*?)Weg während/) || [, ''])[1].trim()]));
+  check('Die Textentnahme greift überhaupt -- sonst wäre alles darunter leer und gleich',
+    Object.values(kern).every(t => t.length > 20));
+  check('KRITISCH: „noch nicht abgerufen" und „kein Kundenzugang" sagen NICHT dasselbe',
+    kern.nichtAbgerufen.length > 0 && kern.keinZugang.length > 0
+    && kern.nichtAbgerufen !== kern.keinZugang);
+  check('KRITISCH: alle vier Nicht-Zustände haben vier verschiedene Texte',
+    new Set(Object.values(kern)).size === 4);
+  // Ungleich reicht NICHT: „Noch nicht abgerufen." und „Noch nicht
+  // abgerufen. Es bestehen 2 Kundenzugänge …" sind zwei verschiedene
+  // Zeichenketten und trotzdem dieselbe Aussage. Beim Gegenprobieren
+  // aufgefallen -- die Fassung davor blieb dabei grün.
+  const werte = Object.values(kern);
+  const verschluckt = werte.filter((a, i) =>
+    werte.some((b, j) => i !== j && (a.startsWith(b) || b.startsWith(a))));
+  check('KRITISCH: kein Zustandstext ist der Anfang eines anderen',
+    verschluckt.length === 0);
+  check('„Noch nicht abgerufen" sagt, dass es einen Zugang GIBT',
+    /Noch nicht abgerufen/.test(nichtAbgerufen) && /2 Kundenzugänge/.test(nichtAbgerufen));
+  // Der Kunde liest das nicht, der Disponent schon -- und "2 Kundenzugänge,
+  // über den" stand hier bereits.
+  check('Der Relativsatz zieht mit der Zahl mit',
+    /Kundenzugänge, über die/.test(nichtAbgerufen)
+    && /Kundenzugang, über den/.test(await zeichne({ stand: 'nicht_abgerufen', zugaenge: 1 })));
+  check('„Kein Kundenzugang" sagt, dass der Rapport dort gar nicht erreichbar ist',
+    /kein Kundenzugang/i.test(keinZugang) && /nicht abgerufen werden/.test(keinZugang));
+  check('„Nicht eingerichtet" sagt, dass gar nicht mitgeschrieben wird',
+    /nicht eingerichtet/i.test(nichtEingerichtet) && /mitgeschrieben/.test(nichtEingerichtet));
+  check('KRITISCH: eine Antwort OHNE das Feld behauptet kein „nie abgerufen"',
+    /nicht bekannt/.test(ohneFeld) && !/Noch nicht abgerufen/.test(ohneFeld));
+  // Keiner der vier darf eine Uhrzeit zeigen -- es gibt keine.
+  check('Kein Nicht-Zustand nennt einen Zeitpunkt',
+    Object.values(kern).every(t => !/\d{2}:\d{2}/.test(t)));
+
+  // Zurueck auf den vollen Stand, damit das Aufraeumen unten misst, was es
+  // messen soll.
+  await zeichne(DETAIL41.rundgang.zustellung);
+}
 
 // ══════════ SCHLIESSEN RÄUMT AUF ══════════════════════════════════════
 await page.evaluate(() => rgdZu());

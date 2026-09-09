@@ -124,4 +124,63 @@ if (hat_tabelle($pdo, 'ereignis_meldung')) {
 }
 $rundgang['ereignisse'] = $ereignisse;
 
+// ── Zustellnachweis (ENT-491) ─────────────────────────────────────────
+// Hat der Kunde diesen Rapport gesehen? VIER verschiedene Antworten, und
+// keine darf wie eine andere aussehen (CLAUDE.md: „unbekannt darf nie wie
+// keine aussehen"):
+//
+//   nicht_eingerichtet — die Tabelle fehlt, es wird gar nicht mitgeschrieben
+//   kein_zugang        — dieses Objekt hat keinen Kundenzugang; es KANN
+//                        niemand abgerufen haben
+//   nicht_abgerufen    — es gibt einen Zugang, er war nur noch nicht dran
+//   abgerufen          — mit Zeitpunkt
+//
+// „kein_zugang" und „nicht_abgerufen" als dasselbe auszugeben waere der
+// schlimmste der vier Fehler: Man wartet auf einen Kunden, der den Rapport
+// nie zu sehen bekommen kann.
+$zustellung = ['stand' => 'nicht_eingerichtet'];
+if (hat_tabelle($pdo, 'portal_abruf')) {
+    $kundeStmt = $pdo->prepare(
+        'SELECT COUNT(*) FROM kundenzugang z
+           JOIN objekte o ON o.kunde_id = z.kunde_id
+          WHERE o.id = ? AND z.aktiv = 1'
+    );
+    $kundeStmt->execute([$objektId]);
+    $zugaenge = (int)$kundeStmt->fetchColumn();
+
+    if ($zugaenge === 0) {
+        $zustellung = ['stand' => 'kein_zugang'];
+    } else {
+        // Der frueheste Abruf ueber ALLE Zugaenge dieses Kunden. Wer von
+        // mehreren Ansprechpersonen ihn geholt hat, ist fuer die Frage
+        // „ist er angekommen" ohne Belang -- und ein Name mehr in der
+        // Antwort waere ein Personendatum ohne Zweck.
+        $aStmt = $pdo->prepare(
+            'SELECT MIN(a.erstmals_am) AS erstmals, MAX(a.zuletzt_am) AS zuletzt,
+                    SUM(a.anzahl) AS anzahl, MIN(a.pdf_erstmals_am) AS pdf_erstmals,
+                    SUM(a.pdf_anzahl) AS pdf_anzahl, COUNT(*) AS zugaenge
+               FROM portal_abruf a
+              WHERE a.rundgang_id = ?'
+        );
+        $aStmt->execute([$rundgangId]);
+        $a = $aStmt->fetch(PDO::FETCH_ASSOC);
+        if (!$a || $a['erstmals'] === null) {
+            $zustellung = ['stand' => 'nicht_abgerufen', 'zugaenge' => $zugaenge];
+        } else {
+            $zustellung = [
+                'stand'        => 'abgerufen',
+                'erstmals_am'  => (string)$a['erstmals'],
+                'zuletzt_am'   => (string)$a['zuletzt'],
+                'anzahl'       => (int)$a['anzahl'],
+                // Getrennt ausgewiesen, weil es SCHWAECHER wiegt: Das PDF
+                // entsteht im Browser, der Server hat nur die Meldung.
+                'pdf_erstmals_am' => $a['pdf_erstmals'] === null ? null : (string)$a['pdf_erstmals'],
+                'pdf_anzahl'      => (int)$a['pdf_anzahl'],
+                'personen'        => (int)$a['zugaenge'],
+            ];
+        }
+    }
+}
+$rundgang['zustellung'] = $zustellung;
+
 json_response(['status' => 'ok', 'rundgang' => $rundgang]);
