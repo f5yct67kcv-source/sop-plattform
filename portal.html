@@ -194,14 +194,50 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
 /* Nur zwei Reiter, und nur wenn der Kunde beides hat. Sie sind Knöpfe und
    keine Verweise: Es wird nichts geladen, sondern umgeschaltet. Auf dem
    Handy dieselbe 44-px-Trefferfläche wie jedes andere Bedienelement. */
-.reiter{display:flex;gap:8px;margin-bottom:16px}
-.reiter-taste{flex:0 1 auto;min-height:44px;padding:10px 18px;border-radius:999px;
-              border:1px solid var(--line);background:rgba(var(--surface-rgb),.55);
-              color:var(--ink-2);font:inherit;font-size:14.5px;font-weight:600;
-              cursor:pointer;transition:background .15s,color .15s,border-color .15s}
-.reiter-taste:hover{border-color:var(--ink-3)}
-.reiter-taste.an{background:var(--accent);border-color:var(--accent);color:#FFFFFF}
-.reiter-taste:focus-visible{outline:2px solid var(--ink-3);outline-offset:2px}
+/* Kachelreihe statt Pillen (ENT-486, Vorgabe des Projektinhabers anhand
+   der Revierdienst-Uebersicht im Cockpit). Bildsprache uebernommen:
+   farbiges Sinnbild-Quadrat oben, Beschriftung darunter, Karte drumherum --
+   dieselben Masse wie ".bk-kachel"/".bk-kachel-ic" dort (56 px Quadrat,
+   28 px Sinnbild, Radius 14).
+
+   EINE Sache kommt dazu, die es im Cockpit nicht gibt: ein Aktiv-Zustand.
+   Dort sind die Kacheln Navigation und verschwinden beim Klick; hier sind
+   sie Reiter und bleiben stehen. Eine Reiterleiste, an der man nicht sieht,
+   welcher Reiter offen ist, ist keine. Der Aktiv-Zustand folgt dem, was das
+   Haus dafuer schon benutzt (".rdkr-tab.aktiv"): Akzentrand auf weicher
+   Akzentflaeche, nicht eine volle Farbfuellung.
+
+   Am Handy drei nebeneinander statt zwei plus eine: Eine allein stehende
+   dritte Kachel in einer zweiten Zeile sieht aus wie ein Nachtrag, nicht
+   wie ein gleichwertiger Reiter.
+
+   FLEX und nicht Grid, und das ist am gerenderten Zustand entschieden
+   worden: Mit "repeat(auto-fit, minmax(104px, 220px))" bildet Grid die
+   Spaltenzahl aus der OBEREN Schranke, nicht aus der unteren -- auf 390 px
+   ergab das EINE Spalte und damit 354 px Leiste, bevor der erste Inhalt
+   kam. Mit "flex:1 1 104px; max-width:220px" wachsen die Kacheln stattdessen
+   in den vorhandenen Platz: drei nebeneinander am Handy, gedeckelt und
+   mittig am Desktop. Nebenbei loest das den zweiten Fall gleich mit -- sind
+   nur zwei Kacheln da, teilen sie sich die Breite, statt eine Luecke zu
+   lassen, wo die dritte stuende. */
+.reiter{display:flex;flex-wrap:wrap;justify-content:center;gap:12px;margin-bottom:16px}
+.reiter-taste{flex:1 1 104px;max-width:220px;
+              display:flex;flex-direction:column;align-items:center;gap:10px;
+              text-align:center;min-height:110px;padding:16px 10px;
+              border:1px solid var(--line);border-radius:var(--r-lg);
+              background:rgba(var(--surface-rgb), var(--glas-kachel));
+              color:var(--ink);font:inherit;cursor:pointer;
+              transition:background .15s,border-color .15s}
+.reiter-taste:hover{border-color:var(--accent)}
+.reiter-taste .r-ic{width:56px;height:56px;border-radius:14px;flex:none;
+              background:var(--accent-soft);color:var(--accent);
+              display:inline-flex;align-items:center;justify-content:center}
+.reiter-taste .r-ic svg{width:28px;height:28px;fill:none;stroke:currentColor;
+              stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.reiter-taste .r-lbl{font-size:13.5px;font-weight:600;line-height:1.35}
+.reiter-taste.an{border-color:var(--accent);background:var(--accent-soft)}
+.reiter-taste.an .r-lbl{color:var(--accent)}
+.reiter-taste:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 /* ── Liste ────────────────────────────────────────────────────────────── */
 /* Vorbild ist die Cockpit-Tabelle (Revierdienst -> Letzte Rundgaenge), aber
@@ -654,6 +690,33 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
 
   <!-- Angemeldet -->
   <div id="inhalt" hidden>
+    <!-- Drei Bereiche, drei Reiter (ENT-486). Die Leiste erscheint ab ZWEI
+         verfuegbaren Bereichen: Eine Reihe mit einer einzigen Kachel waere
+         eine Wahl ohne Alternative. Welche Kachel dasteht, entscheidet
+         allein, was der Kunde wirklich bezieht -- eine Kachel fuer etwas,
+         das er nicht hat, waere ein Versprechen, das die Seite dahinter
+         nicht einloest (dieselbe Hausregel, die die Leiste mit ENT-482
+         ueberhaupt hervorgebracht hat).
+
+         Die Leiste steht GANZ OBEN, vor der Zeitraumwahl: Erst wird
+         entschieden, WORAUF man sieht, dann WORIN. -->
+    <div class="reiter" id="reiter" hidden role="tablist">
+      <button type="button" class="reiter-taste an" id="reiter-rundgaenge"
+              role="tab" aria-selected="true">
+        <span class="r-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M12 19h4a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2H8a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h4"/></svg></span>
+        <span class="r-lbl">Rundgänge</span>
+      </button>
+      <button type="button" class="reiter-taste" id="reiter-wachbuch"
+              role="tab" aria-selected="false">
+        <span class="r-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></span>
+        <span class="r-lbl">Wachbuch</span>
+      </button>
+      <button type="button" class="reiter-taste" id="reiter-einsaetze"
+              role="tab" aria-selected="false">
+        <span class="r-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="16" y1="3" x2="16" y2="7"/></svg></span>
+        <span class="r-lbl">Einsätze</span>
+      </button>
+    </div>
     <div class="karte">
       <div class="zeitraum">
         <div class="paar">
@@ -668,44 +731,25 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
       </div>
     </div>
 
-    <!-- Zwei Inhaltsarten (ENT-441 Punkt 4, gebaut mit ENT-482). Die
-         Reiterleiste erscheint NUR, wenn der Kunde wirklich beides hat --
-         wer nur Verkehrsdienst bezieht, soll keine leere Rundgang-Liste
-         sehen und daraus schliessen, es sei nichts passiert. -->
-    <div class="reiter" id="reiter" hidden role="tablist">
-      <button type="button" class="reiter-taste an" id="reiter-rundgaenge"
-              role="tab" aria-selected="true">Rundgänge</button>
-      <button type="button" class="reiter-taste" id="reiter-einsaetze"
-              role="tab" aria-selected="false">Einsätze</button>
+
+    <div class="karte" id="bereich-rundgaenge">
+      <h2 class="karte-titel">Rundgänge</h2>
+      <p class="zahl" id="anzahl"></p>
+      <div id="liste"></div>
     </div>
 
-    <!-- Der Revierdienst-Bereich traegt seit ENT-484 ZWEI Karten: die
-         Rundgangliste und das Wachbuch dazu. Darum ist er selbst keine
-         Karte mehr, sondern deren Huelle -- so folgt das Wachbuch der
-         Sichtbarkeit des Bereichs, ohne dass reiterWaehlen() und
-         bereicheSetzen() einen Sonderfall dafuer brauchen. Ein Kunde mit
-         nur Verkehrsdienst sieht damit auch kein leeres Wachbuch; das ist
-         dieselbe Hausregel, die die Reiterleiste ueberhaupt erst
-         hervorgebracht hat. -->
-    <div id="bereich-rundgaenge">
-      <div class="karte">
-        <h2 class="karte-titel">Rundgänge</h2>
-        <p class="zahl" id="anzahl"></p>
-        <div id="liste"></div>
-      </div>
-
-      <!-- Wachbuch (ENT-484): die Chronik derselben Objekte im selben
-           Zeitraum. Eine zweite Karte und kein dritter Reiter -- die
-           Chronik ist nicht eine dritte Inhaltsart neben Rundgang und
-           Einsatz, sondern die Feinsicht auf die erste. Wer sie liest,
-           will meist die Runde daneben gleich mitsehen. -->
-      <div class="karte">
-        <h2 class="karte-titel">Wachbuch</h2>
-        <p class="zahl" id="wb-zahl"></p>
-        <div class="wb-arten" id="wb-arten"></div>
-        <div id="wb-liste"></div>
-        <p class="wb-hinweis" id="wb-hinweis" hidden></p>
-      </div>
+    <!-- Wachbuch: seit ENT-486 ein EIGENER Reiter, nicht mehr die zweite
+         Karte unter den Rundgaengen (ENT-484 Punkt 9, damit revidiert). Die
+         Chronik ist am echten Datenbestand laenger als gedacht -- neunzehn
+         Vorgaenge auf neun Tage, und das bei einem Objekt; untereinander
+         mit der Rundgangliste ergab das eine Seite, auf der man scrollt,
+         um von der einen Aussage zur anderen zu kommen. -->
+    <div class="karte" id="bereich-wachbuch" hidden>
+      <h2 class="karte-titel">Wachbuch</h2>
+      <p class="zahl" id="wb-zahl"></p>
+      <div class="wb-arten" id="wb-arten"></div>
+      <div id="wb-liste"></div>
+      <p class="wb-hinweis" id="wb-hinweis" hidden></p>
     </div>
 
     <div class="karte" id="bereich-einsaetze" hidden>
@@ -1044,36 +1088,58 @@ async function laden() {
   }
 }
 
-// Welcher Bereich erscheint. Drei Fälle, und der dritte ist der wichtige:
-// Hat der Kunde nur Verkehrsdienst, sieht er KEINE leere Rundgang-Liste --
-// sie sähe aus, als sei dort nichts passiert (Hausregel).
+/* Welcher Bereich erscheint (ENT-482, erweitert mit ENT-486).
+   Drei Bereiche, aber nur zwei Bedingungen: Rundgaenge UND Wachbuch leben
+   beide vom Revierdienst -- das Wachbuch chronisiert genau das, was die
+   Rundgangliste zusammenfasst. Ohne Revierdienst gibt es beide nicht.
+
+   Der wichtigste Fall ist der dritte: Hat der Kunde nur Verkehrsdienst,
+   sieht er KEINE leere Rundgang-Liste und kein leeres Wachbuch -- sie
+   saehen aus, als sei dort nichts passiert (Hausregel). */
+const BEREICHE = ['rundgaenge', 'wachbuch', 'einsaetze'];
 let hatEinsaetze = false;
+let bereichDa = { rundgaenge: false, wachbuch: false, einsaetze: false };
+
 function bereicheSetzen(jeRundgaenge, jeEinsaetze) {
   hatEinsaetze = jeEinsaetze;
   kopfArten = { rundgaenge: jeRundgaenge, einsaetze: jeEinsaetze };
   unterzeileSetzen();
-  const beides = jeRundgaenge && jeEinsaetze;
-  $('reiter').hidden = !beides;
-  if (beides) { reiterWaehlen(aktiverBereich); return; }
-  // Nur eine Art -- oder gar keine: Dann zeigt der Rundgang-Bereich seine
-  // eigene, sprechende Leermeldung.
-  $('bereich-rundgaenge').hidden = jeEinsaetze && !jeRundgaenge;
-  $('bereich-einsaetze').hidden = !jeEinsaetze || jeRundgaenge;
+  bereichDa = { rundgaenge: jeRundgaenge, wachbuch: jeRundgaenge, einsaetze: jeEinsaetze };
+  const offen = BEREICHE.filter(b => bereichDa[b]);
+  // Eine Kachelreihe mit einer einzigen Kachel waere eine Wahl ohne
+  // Alternative -- sie erscheint ab zwei.
+  $('reiter').hidden = offen.length < 2;
+  // Gar nichts vorhanden: Der Rundgang-Bereich zeigt seine eigene,
+  // sprechende Leermeldung. Eine Seite, die dann ueberhaupt nichts zeigt,
+  // liesse den Kunden mit der Frage allein, ob etwas kaputt ist.
+  // Gezeigt wird die Wahl des Kunden, SOLANGE es sie noch gibt -- sonst der
+  // erste verfuegbare Bereich. Der Rueckfall wird ausdruecklich NICHT
+  // gemerkt: Wer eine Woche ohne Rundgaenge ansieht, landet zwangsweise bei
+  // den Einsaetzen; das ist keine Wahl, und beim naechsten Zeitraum mit
+  // Rundgaengen soll er wieder dort stehen, wo er stand. Genau dieser
+  // Unterschied ist beim Messen aufgefallen.
+  bereichZeigen(bereichDa[gewaehlterBereich] ? gewaehlterBereich : (offen[0] || 'rundgaenge'));
 }
 
-let aktiverBereich = 'rundgaenge';
-function reiterWaehlen(welcher) {
-  aktiverBereich = welcher;
-  for (const art of ['rundgaenge', 'einsaetze']) {
+// Was der Kunde zuletzt GEWAEHLT hat -- nicht, was gerade zu sehen ist.
+let gewaehlterBereich = 'rundgaenge';
+function bereichZeigen(welcher) {
+  for (const art of BEREICHE) {
     const an = art === welcher;
     $('bereich-' + art).hidden = !an;
     const taste = $('reiter-' + art);
+    // Eine Kachel fuer einen Bereich, den es nicht gibt, waere ein
+    // Versprechen, das die Seite dahinter nicht einloest.
+    taste.hidden = !bereichDa[art];
     taste.classList.toggle('an', an);
     taste.setAttribute('aria-selected', an ? 'true' : 'false');
   }
 }
-$('reiter-rundgaenge').addEventListener('click', () => reiterWaehlen('rundgaenge'));
-$('reiter-einsaetze').addEventListener('click', () => reiterWaehlen('einsaetze'));
+// Der Klick ist die Wahl -- er wird gemerkt, der Rueckfall oben nicht.
+function reiterWaehlen(welcher) { gewaehlterBereich = welcher; bereichZeigen(welcher); }
+for (const art of BEREICHE) {
+  $('reiter-' + art).addEventListener('click', () => reiterWaehlen(art));
+}
 
 function zeichnen(daten) {
   const rg = daten.rundgaenge || [];
@@ -1485,6 +1551,10 @@ function wbZurRunde(id) {
     return;
   }
   $('wb-hinweis').hidden = true;
+  // Die Runde steht seit ENT-486 in einem ANDEREN Reiter. Ohne den Wechsel
+  // klappte hier eine Zeile auf, die niemand sieht -- der Klick sähe aus,
+  // als täte er nichts.
+  reiterWaehlen('rundgaenge');
   if (!zeile.classList.contains('offen')) { detailUmschalten(zeile); }
   zeile.scrollIntoView({ behavior: 'smooth', block: 'center' });
   zeile.focus();

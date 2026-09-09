@@ -945,12 +945,21 @@ check('KRITISCH: der Briefkopf wird nur einmal geholt, nicht bei jedem PDF',
   !calls.some(c => c.path.includes('portal_briefkopf')));
 
 // ══ Verkehrsdienst: Einsätze und Kundenrapporte (ENT-482) ═══════════════
-// Solange der Kunde keine unterschriebenen Einsätze hat, gibt es keine
-// Reiterleiste und keinen zweiten Bereich.
-check('KRITISCH: ohne Einsätze bleibt der zweite Bereich ganz weg',
-  await page.evaluate(() => document.getElementById('reiter').hidden
-    && document.getElementById('bereich-einsaetze').hidden
+// Solange der Kunde keine unterschriebenen Einsätze hat, gibt es weder den
+// Einsatz-Bereich noch seine Kachel.
+//
+// GEÄNDERT MIT ENT-486: Die Leiste ist deshalb nicht mehr weg. Ein Kunde
+// mit Revierdienst hat jetzt ZWEI Reiter -- Rundgänge und Wachbuch --, und
+// zwei sind eine Wahl. Was unverändert gilt, ist die Zusage dahinter: keine
+// Kachel und kein Bereich für etwas, das der Kunde nicht bezieht.
+check('KRITISCH: ohne Einsätze bleibt der zweite Bereich ganz weg -- samt seiner Kachel',
+  await page.evaluate(() => document.getElementById('bereich-einsaetze').hidden
+    && document.getElementById('reiter-einsaetze').hidden
     && !document.getElementById('bereich-rundgaenge').hidden));
+check('Die Leiste steht trotzdem da -- Rundgänge und Wachbuch sind zwei Reiter (ENT-486)',
+  await page.evaluate(() => !document.getElementById('reiter').hidden
+    && !document.getElementById('reiter-rundgaenge').hidden
+    && !document.getElementById('reiter-wachbuch').hidden));
 
 // ── Nur Verkehrsdienst: der Fall, der die Hausregel verletzen würde ──
 // Wer keine Rundgänge bezieht, darf KEINE leere Rundgang-Liste sehen --
@@ -1066,10 +1075,57 @@ check('KRITISCH: hat der Kunde BEIDES, erscheint die Reiterleiste',
   await page.evaluate(() => !document.getElementById('reiter').hidden));
 check('Und die Kopfzeile nennt dann beides',
   /Rundgänge und Einsätze/.test(await page.textContent('#unter')));
-check('Und die Rundgänge stehen zuerst',
+check('Und die Rundgänge stehen zuerst -- die beiden anderen Bereiche liegen dahinter',
   await page.evaluate(() => !document.getElementById('bereich-rundgaenge').hidden
     && document.getElementById('bereich-einsaetze').hidden
+    && document.getElementById('bereich-wachbuch').hidden
     && document.getElementById('reiter-rundgaenge').getAttribute('aria-selected') === 'true'));
+// Drei Bereiche, drei Kacheln (ENT-486) -- und genau EINER ist offen.
+check('KRITISCH: nie mehr als ein Bereich zugleich sichtbar',
+  await page.evaluate(() => ['rundgaenge', 'wachbuch', 'einsaetze']
+    .filter(b => !document.getElementById('bereich-' + b).hidden).length === 1));
+
+// ── Die Kachelreihe, gemessen (ENT-486) ─────────────────────────────
+// Der Projektinhaber hat ausdrücklich die grossen Kacheln der
+// Revierdienst-Übersicht im Cockpit verlangt, nicht die bisherigen Pillen.
+// Geprüft wird das Gemeinte, nicht der Klassenname: ein Sinnbild-Quadrat
+// über einer Beschriftung, gross genug zum Antippen.
+check('KRITISCH: jeder Reiter ist eine Kachel -- Sinnbild oben, Beschriftung darunter',
+  await page.evaluate(() => [...document.querySelectorAll('.reiter-taste')]
+    .filter(b => !b.hidden).every(b => {
+      const ic = b.querySelector('.r-ic'), lbl = b.querySelector('.r-lbl');
+      if (!ic || !lbl || !ic.querySelector('svg')) { return false; }
+      const i = ic.getBoundingClientRect(), l = lbl.getBoundingClientRect();
+      return i.width >= 40 && Math.abs(i.width - i.height) < 2 && i.bottom <= l.top + 1;
+    })));
+// Am Handy nebeneinander, nicht übereinander. Mit Grid und einer oberen
+// Schranke standen sie gestapelt -- 354 px Leiste vor dem ersten Inhalt.
+check('KRITISCH: am Handy stehen alle Kacheln in EINER Zeile',
+  await page.evaluate(() => {
+    const b = [...document.querySelectorAll('.reiter-taste')].filter(x => !x.hidden);
+    const oben = b.map(x => Math.round(x.getBoundingClientRect().top));
+    return b.length === 3 && new Set(oben).size === 1;
+  }));
+check('KRITISCH: und die Leiste bleibt dabei im Bildschirm',
+  await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
+check('KRITISCH: eine Kachel ist mindestens 44 px hoch (Handy-Trefferfläche)',
+  await page.evaluate(() => [...document.querySelectorAll('.reiter-taste')]
+    .filter(b => !b.hidden).every(b => b.getBoundingClientRect().height >= 44)));
+// Eine Reiterleiste, an der man nicht sieht, welcher Reiter offen ist, ist
+// keine. Gemessen an der gerenderten Farbe, nicht an einer Klasse allein.
+check('KRITISCH: der offene Reiter hebt sich sichtbar von den übrigen ab',
+  await page.evaluate(() => {
+    const an = document.getElementById('reiter-rundgaenge');
+    const aus = document.getElementById('reiter-wachbuch');
+    const f = e => getComputedStyle(e);
+    return f(an).backgroundColor !== f(aus).backgroundColor
+      && f(an).borderTopColor !== f(aus).borderTopColor;
+  }));
+// „Ganz oben" -- Vorgabe des Projektinhabers: erst wird entschieden,
+// WORAUF man sieht, dann WORIN.
+check('KRITISCH: die Kachelreihe steht über der Zeitraumwahl',
+  await page.evaluate(() => document.getElementById('reiter').getBoundingClientRect().bottom
+    <= document.getElementById('von').closest('.karte').getBoundingClientRect().top + 1));
 check('KRITISCH: die Reiter sind auf dem Handy mindestens 44 px hoch',
   await page.evaluate(() => [...document.querySelectorAll('.reiter-taste')]
     .every(t => t.getBoundingClientRect().height >= 44)));

@@ -118,6 +118,15 @@ async function setup(seite) {
   });
 }
 
+// Seit ENT-486 ist das Wachbuch ein EIGENER Reiter und beim Laden nicht
+// offen. Ohne diesen Wechsel misst die Suite ein verborgenes Element, und
+// jede Groesse waere null -- eine Messung, die nichts aussagt.
+async function zumWachbuch(seite) {
+  await (seite || page).click('#reiter-wachbuch', { timeout: 3000 })
+    .catch(() => bad.push('Die Kachel "Wachbuch" ist nicht anklickbar'));
+  await (seite || page).waitForTimeout(200);
+}
+
 async function anmelden(seite) {
   await seite.goto(SEITE);
   await seite.evaluate(() => localStorage.clear());
@@ -128,6 +137,7 @@ async function anmelden(seite) {
   await seite.waitForSelector('#inhalt:not([hidden])', { timeout: 4000 })
     .catch(() => bad.push('Die Anmeldung führt nicht in die Liste'));
   await seite.waitForTimeout(300);
+  await zumWachbuch(seite);
 }
 
 const browser = await chromium.launch({ executablePath: EXE });
@@ -176,6 +186,11 @@ check('KRITISCH: die Chronik uebernimmt den Zeitraum, den die Rundgangliste zuru
     wb.query.von === RUNDGAENGE.zeitraum.von && wb.query.bis === RUNDGAENGE.zeitraum.bis);
   check('Und die Rundgangliste hat wirklich das Eingetippte gefragt',
     (calls.find(c => c.path.includes('portal_rundgaenge')) || { query: {} }).query.von === vorTagen(9));
+  // Ein neuer Zeitraum stellt den gewaehlten Reiter nicht um -- geprueft,
+  // weil ein Rueckfall auf die Rundgaenge hier genau so aussaehe wie ein
+  // Fehler beim Laden.
+  check('KRITISCH: ein neuer Zeitraum laesst den gewählten Reiter stehen',
+    await page.evaluate(() => !document.getElementById('bereich-wachbuch').hidden));
 }
 
 // ══════════════ ZWEI KARTEN, BEIDE BENANNT
@@ -313,23 +328,34 @@ await page.evaluate(() => {
   [...document.querySelectorAll('#wb-liste .wb-z')].find(z => z.dataset.rg === '201').click();
 });
 await page.waitForTimeout(400);
-check('KRITISCH: der Klick klappt die zugehörige Runde in der Liste darüber auf',
+check('KRITISCH: der Klick wechselt in den Rundgang-Reiter und klappt die Runde auf',
   await page.evaluate(() => {
     const z = document.querySelector('#liste .zeile[data-id="201"]');
-    return !!z && z.classList.contains('offen') && z.getAttribute('aria-expanded') === 'true';
+    return !!z && z.classList.contains('offen') && z.getAttribute('aria-expanded') === 'true'
+      // Seit ENT-486 steht die Runde in einem anderen Reiter. Ohne den
+      // Wechsel klappte hier eine Zeile auf, die niemand sieht.
+      && !document.getElementById('bereich-rundgaenge').hidden
+      && z.getClientRects().length > 0;
   })
   && calls.some(c => c.path.includes('portal_rundgang_detail')));
 // Eine Runde, die in der Liste gar nicht steht (Runde über Mitternacht,
-// andere Filtergrundlage), darf nicht wortlos nichts tun.
+// andere Filtergrundlage), darf nicht wortlos nichts tun. Vorher zurück in
+// den Wachbuch-Reiter -- der Sprung eben hat auf die Rundgänge gewechselt.
+await zumWachbuch();
 await page.evaluate(() => {
   [...document.querySelectorAll('#wb-liste .wb-z')].find(z => z.dataset.rg === '202').click();
 });
 await page.waitForTimeout(250);
-check('KRITISCH: eine Runde ausserhalb der Liste sagt das, statt nichts zu tun',
+// Gemessen, nicht an einem Attribut abgelesen: Ein Hinweis in einer
+// geschlossenen Karte ist kein Hinweis.
+check('KRITISCH: eine Runde ausserhalb der Liste sagt das SICHTBAR, statt nichts zu tun',
   await page.evaluate(() => {
     const h = document.getElementById('wb-hinweis');
-    return !h.hidden && /ausserhalb des gewählten Zeitraums/.test(h.textContent);
+    return h.getClientRects().length > 0
+      && /ausserhalb des gewählten Zeitraums/.test(h.textContent);
   }));
+check('Und der Reiter bleibt dabei stehen -- es gibt ja nichts zu springen',
+  await page.evaluate(() => !document.getElementById('bereich-wachbuch').hidden));
 
 // ══════════════ DER ART-FILTER LÄUFT IM SERVER
 calls = [];
@@ -406,27 +432,40 @@ await neuLaden(WACHBUCH);
 // Runden und keine Aufgaben. Ein leeres Wachbuch saehe bei ihm aus, als sei
 // nichts geschehen -- dieselbe Hausregel, die die Reiterleiste ueberhaupt
 // erst hervorgebracht hat.
-check('KRITISCH: das Wachbuch liegt im Revierdienst-Bereich und folgt dessen Sichtbarkeit',
+// GEÄNDERT MIT ENT-486: Das Wachbuch lag bis dahin IM Rundgang-Bereich und
+// erbte dessen Sichtbarkeit. Jetzt ist es ein eigener Reiter -- die Zusage
+// dahinter gilt unverändert und wird nur anders eingelöst: kein Wachbuch
+// für einen Kunden ohne Revierdienst.
+check('KRITISCH: Wachbuch und Rundgänge sind eigene, getrennte Bereiche',
   await page.evaluate(() => {
-    const b = document.getElementById('bereich-rundgaenge');
-    return !!b && b.contains(document.getElementById('wb-liste'));
+    const w = document.getElementById('bereich-wachbuch');
+    const r = document.getElementById('bereich-rundgaenge');
+    return !!w && !!r && w !== r && !w.contains(r) && !r.contains(w)
+      && w.contains(document.getElementById('wb-liste'))
+      && r.contains(document.getElementById('liste'));
   }));
+check('KRITISCH: nie beide zugleich offen -- sonst wäre es keine Reiterleiste',
+  await page.evaluate(() => ['rundgaenge', 'wachbuch', 'einsaetze']
+    .filter(b => !document.getElementById('bereich-' + b).hidden).length === 1));
 {
   einsatzAntwort = { status: 'ok', je_vorhanden: true, einsaetze: [],
     zeitraum: { von: vorTagen(30), bis: T0 }, leer_grund: 'kein_treffer_im_zeitraum' };
   await page.evaluate(() => laden());
   await page.waitForTimeout(500);
-  check('Bei beiden Inhaltsarten erscheint die Reiterleiste',
-    await page.evaluate(() => !document.getElementById('reiter').hidden));
-  check('KRITISCH: der Wechsel auf "Einsätze" nimmt das Wachbuch mit',
+  check('Bei beiden Inhaltsarten stehen alle drei Kacheln da',
+    await page.evaluate(() => !document.getElementById('reiter').hidden
+      && ['rundgaenge', 'wachbuch', 'einsaetze']
+        .every(b => !document.getElementById('reiter-' + b).hidden)));
+  check('KRITISCH: der Wechsel auf "Einsätze" schliesst das Wachbuch',
     await page.evaluate(() => {
       document.getElementById('reiter-einsaetze').click();
-      return document.getElementById('bereich-rundgaenge').hidden;
+      return document.getElementById('bereich-wachbuch').hidden
+        && document.getElementById('bereich-rundgaenge').hidden;
     }));
-  await page.evaluate(() => document.getElementById('reiter-rundgaenge').click());
+  await page.evaluate(() => document.getElementById('reiter-wachbuch').click());
   await page.waitForTimeout(150);
   check('Und der Wechsel zurueck bringt es wieder',
-    await page.evaluate(() => !document.getElementById('bereich-rundgaenge').hidden
+    await page.evaluate(() => !document.getElementById('bereich-wachbuch').hidden
       && document.getElementById('wb-liste').getClientRects().length > 0));
 
   // Nur Verkehrsdienst: kein Wachbuch, und auch keine Abfrage dafuer.
@@ -439,8 +478,10 @@ check('KRITISCH: das Wachbuch liegt im Revierdienst-Bereich und folgt dessen Sic
     contentType: 'application/json', body: JSON.stringify(nurVerkehr) }));
   await page.evaluate(() => laden());
   await page.waitForTimeout(500);
-  check('KRITISCH: ohne Revierdienst ist das Wachbuch nicht sichtbar',
-    await page.evaluate(() => document.getElementById('bereich-rundgaenge').hidden));
+  check('KRITISCH: ohne Revierdienst sind Wachbuch-Bereich UND -Kachel weg',
+    await page.evaluate(() => document.getElementById('bereich-wachbuch').hidden
+      && document.getElementById('reiter-wachbuch').hidden
+      && document.getElementById('bereich-rundgaenge').hidden));
   check('KRITISCH: und es wird auch nicht abgefragt -- eine Abfrage fuer eine '
     + 'verborgene Karte ist eine Abfrage zu viel',
     !calls.some(c => c.path.includes('portal_wachbuch')));
