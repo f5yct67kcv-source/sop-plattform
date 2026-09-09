@@ -125,6 +125,119 @@ pruef('KRITISCH: ohne die Tabelle wird nichts geworfen -- der Abruf laeuft weite
 pruef('Und es wird auch nichts geschrieben', $zeilen($pdo) === $vorPdf);
 $GLOBALS['tabellen']['portal_abruf'] = true;
 
+// ── Das ECHTE Schema und die ECHTEN Abfragen (nicht abgeschrieben) ────
+//
+// Bis hierher lief alles gegen eine von Hand getippte Tabelle. Damit
+// bliebe diese Suite gruen, wenn planung_einrichten.php und der Code
+// auseinanderlaufen -- eine Absprache zwischen zwei Dateien, die niemand
+// einhaelt. Genau diese Fehlerfamilie hat am 2026-09-09 einen Livefehler
+// verursacht (ENT-451: 14 Felder, 13 Platzhalter; keine Pruefung fuehrte
+// den INSERT aus). Ab hier wird darum das echte CREATE TABLE aus dem
+// Einrichtungslauf geholt und die echte Abfrage aus rundgang_detail.php.
+{
+    $einr = file_get_contents(__DIR__ . '/../backend/api/planung_einrichten.php');
+    preg_match("/'portal_abruf' => \"(.*?)\",\n/s", $einr, $mSchema);
+    pruef('Das Schema fuer portal_abruf ist im Einrichtungslauf auffindbar',
+        !empty($mSchema[1]));
+
+    $det = file_get_contents(__DIR__ . '/../backend/api/rundgang_detail.php');
+    preg_match("/'(SELECT COUNT\(\*\) FROM kundenzugang z.*?)'/s", $det, $mZ);
+    preg_match("/'(SELECT MIN\(a\.erstmals_am\).*?)'/s", $det, $mA);
+    pruef('Beide Abfragen des Cockpits sind in rundgang_detail.php auffindbar',
+        !empty($mZ[1]) && !empty($mA[1]));
+
+    if (!empty($mSchema[1]) && !empty($mZ[1]) && !empty($mA[1])) {
+        // Nur so viel umschreiben, wie SQLite braucht. Spalten, Reihenfolge
+        // und Anzahl bleiben unangetastet -- sonst pruefte man die Umschrift.
+        $ddl = $mSchema[1];
+        $ddl = preg_replace('/\bINT AUTO_INCREMENT PRIMARY KEY\b/', 'INTEGER PRIMARY KEY', $ddl);
+        $ddl = preg_replace('/,\s*UNIQUE KEY \w+ \(([^)]*)\)/', ', UNIQUE ($1)', $ddl);
+        $ddl = preg_replace('/,\s*KEY \w+ \([^)]*\)/', '', $ddl);
+        $ddl = preg_replace('/,\s*FOREIGN KEY \([^)]*\) REFERENCES \w+\([^)]*\)[^,)]*/', '', $ddl);
+        $ddl = preg_replace('/\) ENGINE=\w+ DEFAULT CHARSET=\w+/', ')', $ddl);
+
+        $q = new PDO('sqlite::memory:', null, null,
+            [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]);
+        $fehler = null;
+        try { $q->exec($ddl); } catch (Throwable $e) { $fehler = $e->getMessage(); }
+        pruef('KRITISCH: das echte Schema laesst sich anlegen', $fehler === null);
+
+        if ($fehler === null) {
+            kp_abruf_vermerken($q, 5, 'rundgang', 10);
+            kp_abruf_vermerken($q, 5, 'rundgang', 10);
+            kp_abruf_pdf_vermerken($q, 5, 'rundgang', 10);
+            kp_abruf_vermerken($q, 6, 'rundgang', 10);
+            kp_abruf_vermerken($q, 5, 'einsatz', 10);
+
+            // Am ERGEBNIS geprueft, nicht am ausbleibenden Fehler: Beide
+            // Schreibfunktionen schlucken jeden Fehler absichtlich (der
+            // Vermerk darf den Rapport nicht verhindern). Ein try/catch um
+            // sie herum kann darum NIE anschlagen -- die erste Fassung
+            // dieser Zeile war genau so und hat beim Gegenprobieren
+            // nichts gemeldet, waehrend die Suite an anderer Stelle starb.
+            $wirklich = $q->query('SELECT COUNT(*) FROM portal_abruf')->fetchColumn();
+            pruef('KRITISCH: der echte Schreibweg passt zum echten Schema -- die Zeilen sind wirklich da',
+                (int)$wirklich === 3);
+
+            $q->exec('CREATE TABLE kunden (id INTEGER PRIMARY KEY)');
+            $q->exec('CREATE TABLE objekte (id INTEGER PRIMARY KEY, kunde_id INT)');
+            $q->exec('CREATE TABLE kundenzugang (id INTEGER PRIMARY KEY, kunde_id INT, aktiv INT)');
+            $q->exec('INSERT INTO objekte (id, kunde_id) VALUES (1, 7), (2, 8)');
+            // Ein GESPERRTER Zugang gehoert in den Beleg: Ohne ihn bliebe
+            // die Pruefung auf "z.aktiv = 1" wirkungslos -- beim
+            // Gegenprobieren blieb sie gruen, als der Filter entfiel.
+            $q->exec('INSERT INTO kundenzugang (id, kunde_id, aktiv)
+                      VALUES (5, 7, 1), (6, 7, 1), (9, 7, 0)');
+
+            // Abfrage 1: Gibt es ueberhaupt einen Kundenzugang zu diesem Objekt?
+            $z1 = $q->prepare($mZ[1]); $z1->execute([1]);
+            $z2 = $q->prepare($mZ[1]); $z2->execute([2]);
+            pruef('KRITISCH: die echte Abfrage findet die zwei OFFENEN Zugaenge und nicht den gesperrten',
+                (int)$z1->fetchColumn() === 2);
+            pruef('KRITISCH: und fuer ein Objekt ohne Zugang liefert sie null -- daran haengt "kein_zugang"',
+                (int)$z2->fetchColumn() === 0);
+
+            // Abfrage 2: die Zusammenfassung ueber ALLE Zugaenge des Kunden.
+            // Mit Auffangnetz: Passt die Abfrage nicht mehr zum Schema, soll
+            // das eine BENANNTE rote Aussage sein und nicht ein Absturz, der
+            // die Zusammenfassung nie ausgibt (gleicher Grund wie beim
+            // klick()-Umweg in den Browser-Suiten).
+            $a = false; $abfrageFehler = null;
+            try {
+                $a1 = $q->prepare($mA[1]); $a1->execute([10]);
+                $a = $a1->fetch(PDO::FETCH_ASSOC);
+            } catch (Throwable $e) { $abfrageFehler = $e->getMessage(); }
+            pruef('KRITISCH: die Zusammenfassung des Cockpits passt zum echten Schema',
+                $abfrageFehler === null && is_array($a));
+            if (!is_array($a)) { $a = ['anzahl' => -1, 'zugaenge' => -1, 'erstmals' => null,
+                                       'zuletzt' => null, 'pdf_anzahl' => -1, 'pdf_erstmals' => null]; }
+            pruef('KRITISCH: die echte Abfrage summiert ueber beide Zugaenge',
+                (int)$a['anzahl'] === 3 && (int)$a['zugaenge'] === 2);
+            pruef('Sie liefert den fruehesten Zeitpunkt als Zustellnachweis',
+                $a['erstmals'] !== null && $a['erstmals'] <= $a['zuletzt']);
+            pruef('Die PDF-Meldung bleibt getrennt gezaehlt',
+                (int)$a['pdf_anzahl'] === 1 && $a['pdf_erstmals'] !== null);
+
+            // Der Zustand "nicht_abgerufen" haengt daran, dass erstmals NULL
+            // ist -- nicht daran, dass keine Zeile kommt. MIN() ueber eine
+            // leere Menge liefert EINE Zeile voller NULL. Genau darauf
+            // prueft rundgang_detail.php, und genau das wird hier belegt.
+            $leer = false;
+            try {
+                $a2 = $q->prepare($mA[1]); $a2->execute([999]);
+                $leer = $a2->fetch(PDO::FETCH_ASSOC);
+            } catch (Throwable $e) { /* oben schon benannt */ }
+            pruef('KRITISCH: fuer eine nie abgerufene Runde kommt eine Zeile mit erstmals = NULL',
+                is_array($leer) && $leer['erstmals'] === null);
+
+            // Der Einsatz mit derselben Nummer darf NICHT mitzaehlen.
+            pruef('KRITISCH: die Rundgang-Abfrage zaehlt den gleichnamigen Einsatz nicht mit',
+                (int)$a['anzahl'] === 3);
+        }
+    }
+}
+
 // ── Ein Schreibfehler bleibt still ────────────────────────────────────
 // Dieselbe Begruendung: lieber ein fehlender Vermerk als ein verweigerter
 // Rapport. Nachgestellt, indem die Tabelle unter der Funktion wegfaellt.
