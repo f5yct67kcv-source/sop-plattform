@@ -419,11 +419,27 @@ check('Der Anzahl-Chip zeigt wieder 2', (await page.textContent('#rdKrRoutenBadg
 // Einer der noch unverdrahteten Reiter stichprobenartig geprüft --
 // bleibender Hinweis statt erfundenem Inhalt (gleiches Vorgehen wie
 // ENT-225/ENT-243), Inhalt wird gemäss Projektinhaber einzeln besprochen.
-await page.click('#rdKrReiter .rdkr-tab:has-text("Aufgaben")');
+await page.click('#rdKrReiter .rdkr-tab:has-text("Berichte")');
 check('Ein noch unverdrahteter Reiter zeigt einen bleibenden Hinweis statt erfundenem Inhalt',
-  (await page.textContent('#rdKrAb-aufgaben')).includes('Folgt in einem späteren Schritt.'));
+  (await page.textContent('#rdKrAb-berichte')).includes('Folgt in einem späteren Schritt.'));
 check('KRITISCH: ein unverdrahteter Reiter trägt bewusst KEINEN Anzahl-Chip ("0" hiesse fälschlich „keine")',
-  await page.evaluate(() => !document.querySelector('#rdKrReiter .rdkr-tab[data-reiter="aufgaben"] .chip')));
+  await page.evaluate(() => !document.querySelector('#rdKrReiter .rdkr-tab[data-reiter="berichte"] .chip')));
+
+// ENT-487: An der Kontrollrunde gibt es KEINEN Aufgaben-Reiter. Aufgaben haengen
+// am Kontrollpunkt (Katalog je Objekt und Zuordnung je Punkt, ENT-302; beantwortet
+// wird beim Scan, ENT-305) -- die Runde waehlt nur Punkte aus. Der Reiter hier war
+// leer und versprach rundenindividuelle Aufgaben, die es im Datenmodell nicht gibt.
+// Geprüft wird die Aussage, nicht der Wortlaut: weder ein Reiter mit diesem
+// Schluessel noch einer, dessen Beschriftung Aufgaben verspricht, und kein Panel
+// dazu -- sonst stuende die Maske wieder da, nur anders benannt. Dass die Pflege
+// am Punkt weiterhin steht, prueft test_rundgang_kontrollpunkte_tab.mjs.
+check('KRITISCH: die Kontrollrunde bietet keinen Aufgaben-Reiter (Aufgaben haengen am Kontrollpunkt)',
+  await page.evaluate(() => {
+    const tabs = [...document.querySelectorAll('#rdKrReiter .rdkr-tab')];
+    const versprichtAufgaben = tabs.some(t => t.dataset.reiter === 'aufgaben'
+      || /aufgab/i.test(t.querySelector('.rdkr-tab-lbl')?.textContent || ''));
+    return !versprichtAufgaben && !document.getElementById('rdKrAb-aufgaben');
+  }));
 await page.click('#rdKrReiter .rdkr-tab:has-text("Allgemeines")');
 check('Über den Reiter "Allgemeines" kommt man zum Formular zurück',
   await page.isVisible('#rdKrAb-allgemeines') && await page.isVisible('#rdAb-kr'));
