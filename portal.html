@@ -157,6 +157,46 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
 
 .hinweis{font-size:13.5px;color:var(--ink-3);margin:10px 0 0}
 
+/* Fusszeile mit dem Datenschutzhinweis (ENT-491). Ruhig, aber auffindbar --
+   ein Hinweis, den man nicht findet, ist keiner. Als <button> und nicht als
+   <a href="#">: Es fuehrt nirgendwohin, es oeffnet etwas. */
+.seiten-fuss{max-width:900px;margin:0 auto 34px;padding:0 16px;
+             text-align:center}
+.verweis{background:none;border:0;padding:12px 14px;cursor:pointer;
+         font:inherit;font-size:13.5px;color:var(--ink-3);
+         text-decoration:underline;text-underline-offset:3px;
+         border-radius:var(--r);
+         /* 44 px Trefferflaeche auch hier -- ein Verweis auf dem Handy ist
+            genauso schwer zu treffen wie ein Knopf. */
+         min-height:44px}
+.verweis:hover{color:var(--ink-1)}
+.verweis:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* Der Datenschutzhinweis traegt mehr Text als die anderen Fenster. Er darf
+   darum breiter und, wenn noetig, scrollbar sein -- abgeschnittener Text
+   waere hier ein Hinweis, der die Haelfte verschweigt. */
+#ds-fenster .fenster{max-width:560px;max-height:calc(100vh - 32px);
+                     overflow-y:auto}
+.ds-block{margin-top:18px}
+.ds-block h3{margin:0 0 8px;font-size:12px;font-weight:700;
+             letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3)}
+.ds-block ul{margin:0;padding-left:20px}
+.ds-block li{font-size:14px;line-height:1.55;color:var(--ink-2);
+             margin-bottom:7px}
+.ds-block li b{color:var(--ink-1);font-weight:600}
+/* Der Ausweg bleibt im Bild. Gemessen aufgefallen: Auf einem 390er Gerät
+   steht der Text über die volle Höhe, und der einzige Schliessen-Knopf lag
+   darunter -- also erst nach dem Scrollen erreichbar. Ein Fenster, dessen
+   Ausweg man suchen muss, ist eine Falle (dieselbe Begründung wie beim
+   Escape-Ausstieg weiter unten). */
+.ds-fuss{position:sticky;bottom:-24px;justify-content:flex-end;
+         margin:18px -24px -24px;padding:14px 24px;
+         /* VOLL deckend, nicht .97: Das Fenster darunter ist selbst
+            durchscheinend, und beim Messen las man die Überschrift des
+            letzten Abschnitts durch die Leiste hindurch. */
+         background:rgb(var(--surface-rgb));
+         border-top:1px solid var(--glas-linie)}
+
 /* Das kleine Fenster. Deckt mehr als eine Kachel (es liegt UEBER Inhalt und
    muss ihn verdecken, sonst liest man zwei Ebenen gleichzeitig) und hat als
    einziges Element der Seite eine Unschaerfe -- hier laeuft tatsaechlich
@@ -553,6 +593,103 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
        kein weiterer Schritt: Die Anmeldemaske bleibt sichtbar dahinter, und
        wer versehentlich geklickt hat, ist mit einem Schliessen zurueck --
        ohne dass die Seite den Zustand gewechselt haette. -->
+  <!-- Passwort ändern (ENT-488). Bis hierher konnte ein Kunde sein Passwort
+       genau EINMAL setzen, beim ersten Besuch über den zugeschickten Link.
+       Wer es weitergegeben hat oder verdächtigt, kam ohne Anruf beim Betrieb
+       nicht mehr heraus.
+
+       Dasselbe Fenster-Muster wie die Link-Anforderung daneben -- ein
+       zweites Aussehen für dieselbe Sache wäre eine zweite Sprache. -->
+  <div class="fenster-grund" id="pw-fenster" hidden>
+    <div class="fenster" role="dialog" aria-modal="true" aria-labelledby="pw-a-titel">
+      <div class="feld" style="margin-bottom:16px">
+        <div class="bez">Anmeldung</div>
+        <div class="wert" id="pw-a-titel">Passwort ändern</div>
+      </div>
+      <div id="pw-a-formular">
+        <label for="pw-a-alt">Bisheriges Passwort</label>
+        <input id="pw-a-alt" type="password" autocomplete="current-password">
+        <div style="margin-top:14px">
+          <label for="pw-a-neu">Neues Passwort</label>
+          <input id="pw-a-neu" type="password" autocomplete="new-password"
+                 placeholder="mindestens 6 Zeichen">
+        </div>
+        <div style="margin-top:14px">
+          <label for="pw-a-neu2">Zur Bestätigung noch einmal</label>
+          <input id="pw-a-neu2" type="password" autocomplete="new-password">
+        </div>
+        <div class="knopfzeile">
+          <button class="knopf" id="pw-a-speichern">Passwort speichern</button>
+          <button class="knopf still" id="pw-a-schliessen">Abbrechen</button>
+        </div>
+        <p class="hinweis">Andere Geräte, auf denen Sie angemeldet sind, werden
+          dabei abgemeldet. Dieses hier bleibt offen.</p>
+        <p class="fehler" id="fehler-pw-a" hidden></p>
+      </div>
+      <div id="pw-a-fertig" hidden style="text-align:center">
+        <div style="font-size:34px;line-height:1;margin-bottom:12px" aria-hidden="true">✓</div>
+        <div class="wert" style="font-size:17px">Ihr Passwort ist geändert.</div>
+        <div class="knopfzeile" style="justify-content:center">
+          <button class="knopf" id="pw-a-zu">Schliessen</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="fenster-grund" id="ds-fenster" hidden>
+    <div class="fenster" role="dialog" aria-modal="true" aria-labelledby="ds-titel">
+      <div class="feld" style="margin-bottom:16px">
+        <div class="bez">Ihre Daten in diesem Portal</div>
+        <div class="wert" id="ds-titel">Datenschutzhinweis</div>
+      </div>
+
+      <div class="ds-block">
+        <h3>Was gespeichert wird</h3>
+        <ul>
+          <li><b>Name, E-Mail-Adresse und Funktion.</b> Damit Sie sich anmelden
+              können und nachvollziehbar bleibt, wer Zugang zu Ihren Nachweisen
+              hat.</li>
+          <li><b>Der Zeitpunkt Ihrer letzten Anmeldung.</b></li>
+          <li><b>Welchen Rapport Sie abgerufen haben</b> — erstmals, zuletzt und
+              wie oft. Das ist der Zustellnachweis: Er belegt, dass ein Nachweis
+              bei Ihnen angekommen ist.</li>
+          <li><b>Ob Sie zu einem Rapport ein PDF erstellt haben.</b> Das PDF
+              entsteht in Ihrem Browser; gespeichert wird nur, dass es erstellt
+              wurde.</li>
+        </ul>
+      </div>
+
+      <div class="ds-block">
+        <h3>Was ausdrücklich nicht gespeichert wird</h3>
+        <ul>
+          <li><b>Keine IP-Adresse, kein Gerät, kein Browser.</b></li>
+          <li><b>Kein Verlauf einzelner Besuche.</b> Je Rapport steht eine Zeile,
+              nicht eine je Aufruf. Wann Sie ins Portal sehen, lässt sich daraus
+              nicht ablesen.</li>
+        </ul>
+      </div>
+
+      <div class="ds-block">
+        <h3>Wie lange</h3>
+        <ul>
+          <li>Der Zustellnachweis wird zusammen mit dem Rapport gelöscht, den er
+              belegt.</li>
+          <li>Ihre Zugangsdaten, solange der Zugang besteht.</li>
+        </ul>
+      </div>
+
+      <div class="ds-block">
+        <h3>Auskunft, Berichtigung, Löschung</h3>
+        <p class="hinweis" id="ds-kontakt">Wenden Sie sich an den Betrieb, der
+          Ihnen diesen Zugang eingerichtet hat.</p>
+      </div>
+
+      <div class="knopfzeile ds-fuss">
+        <button class="knopf" id="ds-zu">Schliessen</button>
+      </div>
+    </div>
+  </div>
+
   <div class="fenster-grund" id="anfrage-fenster" hidden>
     <div class="fenster" role="dialog" aria-modal="true" aria-labelledby="anfrage-titel">
       <div class="feld" style="margin-bottom:16px">
@@ -594,6 +731,7 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
       <h1 id="titel">Kundenportal</h1>
       <div class="unter" id="unter">Nachweis der ausgeführten Rundgänge</div>
     </div>
+    <button class="knopf still" id="pw-aendern-oeffnen">Passwort ändern</button>
     <button class="knopf still" id="abmelden">Abmelden</button>
   </div>
 
@@ -735,6 +873,11 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
     <div class="karte" id="bereich-rundgaenge">
       <h2 class="karte-titel">Rundgänge</h2>
       <p class="zahl" id="anzahl"></p>
+      <!-- Kennzahlenband (ENT-490). Dieselbe Bauform wie im aufgeklappten
+           Detail: Beschriftung oben, Wert darunter, Fusszeile mit dem Bezug.
+           Kein Diagramm -- vier Zahlen sind keine Kurve, und ein Balken für
+           EINEN Wert ist ein Balken zu viel. -->
+      <div class="kennzahlen" id="kz-band" hidden></div>
       <div id="liste"></div>
     </div>
 
@@ -761,6 +904,14 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
 
   <p class="fehler" id="fehler-global" hidden></p>
 </div>
+
+<!-- Der Datenschutzhinweis (ENT-491) steht AUSSERHALB von #inhalt: Er gilt
+     auch vor der Anmeldung, denn schon die Anmeldung verarbeitet Daten.
+     Eine Fusszeile und kein dritter Knopf im Kopf -- dort stehen bereits
+     zwei, und ein Hinweis ist keine Handlung. -->
+<footer class="seiten-fuss">
+  <button type="button" class="verweis" id="ds-oeffnen">Datenschutzhinweis</button>
+</footer>
 
 
 <!-- Das Blatt für das PDF (ENT-478). Eigener Aufbau, nicht die Tafel
@@ -894,12 +1045,100 @@ function anfrageSchliessen() {
   $('anfrage-fenster').hidden = true;
 }
 
+/* ── Passwort ändern (ENT-488) ────────────────────────────────────────
+   Das Gegenstück zu mein_passwort.php für Mitarbeitende: Das BISHERIGE
+   Passwort wird verlangt. Ein offenes Gerät soll nicht zum Kontodiebstahl
+   werden -- wer kurz am fremden Bildschirm sitzt, könnte den Zugang sonst
+   übernehmen, ohne das alte Passwort je gekannt zu haben.
+
+   Die zweite Eingabe wird HIER verglichen und nicht im Server: Ein
+   Vertipper in der Bestätigung ist keine Serverfrage, und ein Weg zum
+   Server, der zwei Passwörter entgegennimmt, wäre einer zu viel. */
+function pwAendernOeffnen() {
+  fehler('fehler-pw-a', '');
+  $('pw-a-formular').hidden = false;
+  $('pw-a-fertig').hidden = true;
+  for (const f of ['pw-a-alt', 'pw-a-neu', 'pw-a-neu2']) { $(f).value = ''; }
+  $('pw-fenster').hidden = false;
+  $('pw-a-alt').focus();
+}
+
+function pwAendernSchliessen() {
+  $('pw-fenster').hidden = true;
+  // Die Felder nicht stehen lassen: Ein Passwort, das in einem geschlossenen
+  // Fenster im Speicher der Seite bleibt, ist eines zu viel.
+  for (const f of ['pw-a-alt', 'pw-a-neu', 'pw-a-neu2']) { $(f).value = ''; }
+}
+
+// ── Datenschutzhinweis (ENT-491) ────────────────────────────────────
+// Der Hinweis steht als fester Text in der Seite und nicht in der
+// Datenbank: Er beschreibt, was DIESE Software tut, und das aendert sich
+// mit der Software, nicht mit dem Betrieb. Nur die Anlaufstelle kommt von
+// aussen -- und auch die nur, wenn der Kunde angemeldet ist.
+async function dsOeffnen() {
+  $('ds-fenster').hidden = false;
+  // Ohne Anmeldung gibt es keinen Briefkopf (portal_briefkopf.php verlangt
+  // eine Kundensitzung). Dann bleibt der allgemeine Satz stehen -- er ist
+  // richtig, nur weniger genau. Ein Fenster, das auf den Namen wartet,
+  // waere schlechter als eines, das ihn nicht nennt.
+  if (!token) { return; }
+  try {
+    const bk = await briefkopfHolen();
+    const firma = (bk.firma || '').trim();
+    if (!firma) { return; }
+    const zeilen = [bk.fusszeile, bk.fusszeile2]
+      .map(z => String(z || '').trim()).filter(Boolean);
+    $('ds-kontakt').innerHTML = 'Wenden Sie sich an <b>' + esc(firma) + '</b>.'
+      + (zeilen.length ? '<br>' + zeilen.map(esc).join('<br>') : '');
+  } catch (e) { /* der allgemeine Satz bleibt stehen */ }
+}
+$('ds-oeffnen').addEventListener('click', dsOeffnen);
+$('ds-zu').addEventListener('click', () => { $('ds-fenster').hidden = true; });
+
+$('pw-aendern-oeffnen').addEventListener('click', pwAendernOeffnen);
+$('pw-a-schliessen').addEventListener('click', pwAendernSchliessen);
+$('pw-a-zu').addEventListener('click', pwAendernSchliessen);
+
+$('pw-a-speichern').addEventListener('click', async () => {
+  const alt = $('pw-a-alt').value, neu = $('pw-a-neu').value, neu2 = $('pw-a-neu2').value;
+  fehler('fehler-pw-a', '');
+  if (!alt || !neu) {
+    fehler('fehler-pw-a', 'Bitte beide Felder ausfüllen.');
+    return;
+  }
+  if (neu !== neu2) {
+    fehler('fehler-pw-a', 'Die beiden neuen Passwörter stimmen nicht überein.');
+    return;
+  }
+  const knopf = $('pw-a-speichern');
+  knopf.disabled = true;
+  const { ok, code, daten } = await ruf('portal_passwort_aendern.php',
+    { method: 'POST', body: JSON.stringify({ alt, neu }) });
+  knopf.disabled = false;
+  // 401 heisst hier NICHT „abgemeldet", sondern „das bisherige Passwort
+  // stimmt nicht" -- die Sitzung steht ja. Wer das verwechselt, wirft den
+  // Kunden bei jedem Vertipper hinaus.
+  if (!ok) {
+    fehler('fehler-pw-a', (daten && daten.message) || 'Das Ändern hat nicht geklappt.');
+    return;
+  }
+  for (const f of ['pw-a-alt', 'pw-a-neu', 'pw-a-neu2']) { $(f).value = ''; }
+  $('pw-a-formular').hidden = true;
+  $('pw-a-fertig').hidden = false;
+});
+
+// Eingabetaste im letzten Feld speichert -- wie überall sonst auf dieser Seite.
+$('pw-a-neu2').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { $('pw-a-speichern').click(); }
+});
+
 $('link-holen').addEventListener('click', anfrageOeffnen);
 $('anfrage-schliessen').addEventListener('click', anfrageSchliessen);
 $('anfrage-zu').addEventListener('click', anfrageSchliessen);
 // Escape schliesst -- ein Fenster ohne Ausweg ist eine Falle.
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && !$('anfrage-fenster').hidden) { anfrageSchliessen(); }
+  if (e.key === 'Escape' && !$('ds-fenster').hidden) { $('ds-fenster').hidden = true; }
 });
 
 $('anfrage-senden').addEventListener('click', async () => {
@@ -1141,9 +1380,73 @@ for (const art of BEREICHE) {
   $('reiter-' + art).addEventListener('click', () => reiterWaehlen(art));
 }
 
+/* ── Kennzahlenband (ENT-490) ─────────────────────────────────────────
+   Vier Kacheln über der Rundgangliste. Vier verschiedene Einheiten --
+   Runden, Kontrollpunkte, Runden, Kontrollpunkte --, und jede Kachel nennt
+   ihre eigene in der Fusszeile. Unter EINER Überschrift stehen sie nie.
+
+   PROZENT NUR DORT, WO DER NENNER GROSS GENUG IST. Der Erledigungsgrad
+   rechnet über Kontrollpunkte -- das sind im Zeitraum Dutzende bis
+   Hunderte. Abbrüche rechnen über Runden, und da sind es eine Handvoll:
+   Bei sechs Runden wäre eine abgebrochene "17 %", was nach System klingt
+   und ein Einzelfall ist. Darum steht dort eine ZAHL, kein Prozent.
+
+   Und: 0 von 0 ist nicht 100 %. Ein Objekt ohne hinterlegte Kontrollpunkte
+   hat keinen Erledigungsgrad -- die Kachel sagt das, statt einen Wert zu
+   erfinden. Dieselbe Regel, die die Liste darunter schon befolgt. */
+function kzBand(daten) {
+  const ziel = $('kz-band');
+  const k = daten.kennzahlen;
+  // Eine Antwort ohne Kennzahlen ist etwas anderes als eine mit Nullen --
+  // dann bleibt das Band weg, statt Nullen zu behaupten.
+  if (!k || !Number(k.runden)) { ziel.hidden = true; ziel.innerHTML = ''; return; }
+
+  const gesamt = Number(k.punkte_gesamt || 0);
+  const erledigt = Number(k.punkte_erledigt || 0);
+  const foto = Number(k.punkte_fotobeleg || 0);
+  const runden = Number(k.runden);
+  const ab = Number(k.abgebrochen || 0);
+  // Beide Wortformen im DATIV -- die Fusszeilen sagen durchweg "von N ...".
+  // "von 4 Rundgänge" stand hier schon einmal; aufgefallen ist es erst am
+  // Bild, nicht am Quelltext.
+  const rundenWort = n => n === 1 ? 'Rundgang' : 'Rundgängen';
+  const punkteWort = n => n === 1 ? 'Kontrollpunkt' : 'Kontrollpunkten';
+
+  const band = [
+    { l: 'Rundgänge', v: String(runden), f: 'im gewählten Zeitraum' },
+    gesamt > 0
+      ? { l: 'Erledigungsgrad', v: Math.round((erledigt / gesamt) * 100) + '<span class="einheit"> %</span>',
+          f: erledigt + ' von ' + gesamt + ' ' + punkteWort(gesamt) }
+      // Kein Wert ist hier die richtige Auskunft. "0 %" hiesse, es sei
+      // nichts erledigt worden; "100 %", es sei alles erledigt. Beides wäre
+      // falsch -- es wurde nichts gemessen.
+      : { l: 'Erledigungsgrad', v: '<span class="einheit">nicht messbar</span>',
+          f: 'keine Kontrollpunkte hinterlegt' },
+    { l: 'Abgebrochen', v: String(ab),
+      // Bei genau einer Runde ergäbe "alle 1 Rundgänge beendet" Unsinn --
+      // darum ein eigener Satz statt einer Wortform.
+      f: ab === 0
+        ? (runden === 1 ? 'der Rundgang wurde beendet' : 'alle ' + runden + ' Rundgänge beendet')
+        : 'von ' + runden + ' ' + rundenWort(runden) },
+    // Ein Fotobeleg ist erledigt, aber nicht technisch bestätigt (ENT-329).
+    // Das verschweigt die Liste darunter nicht, und das Band tut es auch nicht.
+    { l: 'Fotobeleg', v: String(foto),
+      f: foto === 0 ? 'alle technisch bestätigt'
+                    : 'von ' + erledigt + ' erledigten ' + punkteWort(erledigt) },
+  ];
+
+  ziel.hidden = false;
+  ziel.innerHTML = band.map(b => '<div>'
+    + '<div class="k-l">' + esc(b.l) + '</div>'
+    + '<div class="k-v">' + b.v + '</div>'
+    + '<div class="k-f">' + esc(b.f) + '</div>'
+    + '</div>').join('');
+}
+
 function zeichnen(daten) {
   const rg = daten.rundgaenge || [];
   const liste = $('liste');
+  kzBand(daten);
 
   if (!rg.length) {
     $('anzahl').textContent = '';
@@ -2264,6 +2567,12 @@ async function pdfHerunterladen(art, id, knopf) {
     document.body.appendChild(a); a.click(); a.remove();
     // Erst freigeben, wenn der Browser die Datei geholt hat.
     setTimeout(() => URL.revokeObjectURL(adresse), 4000);
+    // Zustellnachweis (ENT-491): NACH dem Herunterladen und bewusst ohne
+    // await -- die Datei ist beim Kunden, ob der Vermerk ankommt, ist
+    // seine Sache nicht. Ein Fehler hier darf den Rapport nicht
+    // beeinträchtigen, darum der leere catch.
+    ruf('portal_abruf_pdf.php', { method: 'POST',
+      body: JSON.stringify({ art, id }) }).catch(() => {});
   } catch (fehler) {
     fehler('fehler-global', 'Der Rapport liess sich nicht erzeugen.');
   } finally {

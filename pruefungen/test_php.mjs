@@ -400,6 +400,7 @@ for (const [datei, titel] of [
   ['pruef_mitteilung_liste.php', 'KRITISCH: die Antwortliste eines Termins nennt ALLE Empfaenger, auch die ohne Antwort (ENT-436)'],
   ['pruef_kundenportal.php', 'KRITISCH: Sitzungsablauf, Einmal-Code und E-Mail-Abgleich des Kundenportals stimmen (ENT-441)'],
   ['pruef_wachbuch.php', 'KRITISCH: das Wachbuch fuehrt vier Quellen richtig zusammen, sortiert und kappt sie (ENT-480)'],
+  ['pruef_zustellnachweis.php', 'KRITISCH: der Zustellnachweis fuehrt EINE Zeile je Rapport, kein Bewegungsprofil (ENT-491)'],
 ]) {
   let aus = '', code = 0;
   try {
@@ -771,6 +772,63 @@ check('KRITISCH: kein Portal-Endpunkt liest vertrauliche Personalfelder',
   portalMitVertraulichem.length === 0);
 if (portalMitVertraulichem.length) {
   bad.push('Portal mit vertraulichen Feldern: ' + portalMitVertraulichem.join(', '));
+}
+
+// Wer im Portal ein Passwort SETZT, muss sich ausgewiesen haben (ENT-488).
+// Zwei Wege sind erlaubt und nur zwei: das bisherige Passwort vorzeigen, oder
+// den zugeschickten Link -- der IST der Ausweis (ENT-448). Ein dritter
+// Endpunkt, der password_hash schreibt, ohne eines von beidem zu verlangen,
+// waere die Uebernahme eines fremden Zugangs per Anfrage.
+//
+// Namentlich benannt und nicht ueber ein Muster erkannt: Ein dritter Weg
+// soll auffallen, nicht durchrutschen -- dieselbe Bauart wie bei
+// ── Zustellnachweis: was das Portal ueber den Kunden festhaelt (ENT-491) ──
+//
+// Der Datenschutzhinweis im Portal sagt dem Kunden zu: keine IP-Adresse,
+// kein Geraet, kein Browser. Eine Zusage, die nur im Text steht, ist eine
+// Behauptung -- hier wird sie pruefbar. Geprueft wird die AUSSAGE (es wird
+// nicht danach gegriffen), nicht der Wortlaut des Hinweises.
+{
+  const GREIFT_NACH = /\$_SERVER\s*\[\s*['"](?:REMOTE_ADDR|HTTP_USER_AGENT|HTTP_X_FORWARDED_FOR|HTTP_REFERER)['"]\s*\]/;
+  const neugierig = portalDateien.filter(f => GREIFT_NACH.test(ohneKommentar(f)));
+  check('KRITISCH: kein Portal-Endpunkt greift nach IP-Adresse, Geraet oder Browser',
+    neugierig.length === 0);
+  if (neugierig.length) { bad.push('greift nach Geraetedaten: ' + neugierig.join(', ')); }
+
+  // Der Vermerk gehoert HINTER die Zuschnittspruefung. Davor hielte er
+  // fest, dass jemand nach einer FREMDEN Nummer gefragt hat -- das ist
+  // keine Zustellung, sondern eine Beobachtung, und sie stuende in einer
+  // Tabelle, die es dafuer nicht gibt.
+  const vermerker = portalDateien.filter(f => /kp_abruf_vermerken\s*\(/.test(ohneKommentar(f)));
+  check('Es gibt ueberhaupt Endpunkte, die einen Zustellnachweis schreiben',
+    vermerker.length >= 2);
+  const zuFrueh = vermerker.filter(f => {
+    const t = ohneKommentar(f);
+    const vermerk = t.search(/kp_abruf_vermerken\s*\(/);
+    // Die letzte Stelle, an der der Endpunkt den Zuschnitt durchsetzt:
+    // entweder eine Sichtbarkeitsfrage oder der gemeinsame Abbruch.
+    const wachen = [...t.matchAll(/kp_\w*sichtbar\s*\(|nichtAbrufbar\s*\(\s*\)/g)]
+      .map(m => m.index);
+    return !wachen.length || vermerk < Math.max(...wachen);
+  });
+  check('KRITISCH: der Zustellnachweis wird erst NACH der Zuschnittspruefung geschrieben',
+    zuFrueh.length === 0);
+  if (zuFrueh.length) { bad.push('vermerkt zu frueh: ' + zuFrueh.join(', ')); }
+}
+
+// PORTAL_EINGAENGE.
+{
+  const PW_OHNE_ALTES = ['portal_neues_passwort.php'];   // der Link ist der Ausweis
+  const setzen = portalDateien.filter(f => /password_hash\s*=\s*\?/.test(ohneKommentar(f)));
+  const ohneNachweis = setzen.filter(f => !PW_OHNE_ALTES.includes(f)
+    && !/password_verify\s*\(/.test(ohneKommentar(f)));
+  check('Es gibt ueberhaupt Portal-Endpunkte zu pruefen, die ein Passwort setzen',
+    setzen.length >= 2);
+  check('KRITISCH: jeder Portal-Endpunkt, der ein Passwort setzt, verlangt einen Ausweis',
+    ohneNachweis.length === 0);
+  if (ohneNachweis.length) { bad.push('Passwort ohne Ausweis: ' + ohneNachweis.join(', ')); }
+  const totePw = PW_OHNE_ALTES.filter(f => !apiDateien.includes(f));
+  check('Die Ausnahmeliste fuer den Linkweg nennt nur Endpunkte, die es gibt', totePw.length === 0);
 }
 
 // Der Abbruchgrund verlaesst den Server als KLARTEXT, nicht als Codewort

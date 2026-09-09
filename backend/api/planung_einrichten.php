@@ -1497,6 +1497,47 @@ CREATE TABLE IF NOT EXISTS kundenzugang_code (
 // Fremdschluessel auf mitarbeiter -- ein Kundenzugang passt dort nicht
 // hinein, und genau das ist erwuenscht: Zwei getrennte Tabellen sind zwei
 // getrennte Wege, die sich nicht versehentlich kreuzen koennen.
+// Zustellnachweis (ENT-491): WELCHER Zugang hat WELCHEN Rapport wann
+// bekommen. Zweck ist der Nachweis der Zustellung -- nicht ein Verlauf
+// darueber, wann jemand ins Portal sieht.
+//
+// DARUM EINE ZEILE JE (Zugang, Rapport) UND NICHT JE ABRUF: Eine Zeile je
+// Abruf waere ein Bewegungsprofil -- man koennte nachlesen, an welchem
+// Abend jemand was gelesen hat. Erstmals/zuletzt/Anzahl beantwortet die
+// Frage "ist es angekommen" vollstaendig und die Frage "wann sitzt der
+// Kunde am Rechner" gar nicht. Datensparsamkeit ist hier keine Zierde:
+// Das sind Personendaten eines Betriebsfremden.
+//
+// ZWEI NULLBARE FREMDSCHLUESSEL statt eines Paares art/bezug_id: So loescht
+// die Datenbank den Nachweis mit dem Rapport, den er belegt. Ein
+// Nachweis, der seinen Rapport ueberlebt, ist ein Personendatum ohne
+// Zweck. Genau eine der beiden Spalten ist gesetzt.
+//
+// pdf_* steht getrennt und heisst etwas SCHWAECHERES: Das PDF entsteht im
+// Browser (ENT-478), der Server sieht es nie -- er erfaehrt nur, dass die
+// Seite es gemeldet hat. erstmals_am/zuletzt_am dagegen sind serverfest:
+// Der Server hat den Rapportinhalt selbst ausgeliefert. Zwei verschieden
+// belastbare Aussagen gehoeren in zwei Spalten, nicht in eine.
+'portal_abruf' => "
+CREATE TABLE IF NOT EXISTS portal_abruf (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  zugang_id INT NOT NULL,
+  rundgang_id INT NULL,
+  einsatz_id INT NULL,
+  erstmals_am DATETIME NOT NULL,
+  zuletzt_am DATETIME NOT NULL,
+  anzahl INT NOT NULL DEFAULT 1,
+  pdf_erstmals_am DATETIME NULL,
+  pdf_anzahl INT NOT NULL DEFAULT 0,
+  UNIQUE KEY uq_rundgang (zugang_id, rundgang_id),
+  UNIQUE KEY uq_einsatz (zugang_id, einsatz_id),
+  KEY idx_rundgang (rundgang_id),
+  KEY idx_einsatz (einsatz_id),
+  FOREIGN KEY (zugang_id) REFERENCES kundenzugang(id) ON DELETE CASCADE,
+  FOREIGN KEY (rundgang_id) REFERENCES rundgang(id) ON DELETE CASCADE,
+  FOREIGN KEY (einsatz_id) REFERENCES einsaetze(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
 'kunden_sessions' => "
 CREATE TABLE IF NOT EXISTS kunden_sessions (
   token VARCHAR(64) PRIMARY KEY,

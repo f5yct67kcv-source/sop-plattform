@@ -41,6 +41,11 @@ const VOLL = {
   // je_vorhanden schickt der echte Endpunkt seit ENT-482 immer mit -- daran
   // entscheidet die Oberflaeche, ob sie den Bereich ueberhaupt anbietet.
   status: 'ok', je_vorhanden: true,
+  // Kennzahlen (ENT-490). Die Zahlen passen zu den vier Runden unten:
+  // 24 Punkte hinterlegt, 20 erledigt, 1 davon per Fotobeleg, 1 Abbruch.
+  // Ein Beleg, dessen Band der Liste widerspricht, prueft nichts.
+  kennzahlen: { runden: 4, abgebrochen: 1, punkte_gesamt: 24,
+                punkte_erledigt: 20, punkte_fotobeleg: 1 },
   kunde: 'Muster Liegenschaften AG', person: 'A. Beispielperson',
   zeitraum: { von: vorTagen(30), bis: vorTagen(0) },
   objekte: [{ id: 1, name: 'Testliegenschaft Nord', strasse: 'Musterweg 1', ort: 'Musterort' }],
@@ -225,6 +230,8 @@ let antwort = VOLL;
 let anmeldeFehler = false;
 let pwFehler = null;
 let calls = [];
+// Antwort des Passwort-Endpunkts (ENT-488), von den Pruefungen gesetzt.
+let pwAendernAntwort = null;
 
 // Attrappe fuer Google Maps. Ohne sie liefe die Pruefung ins Netz -- und
 // eine Pruefung, die vom Netz abhaengt, prueft das Netz. Sie ahmt genau die
@@ -287,6 +294,12 @@ async function setup(page) {
       return route.fulfill({ status: 200, contentType: 'image/png', body: FOTO_PNG });
     }
     if (path.includes('portal_rundgaenge')) return send(antwort);
+    if (path.includes('portal_passwort_aendern')) {
+      // Der Fehlerfall wird von aussen gesetzt -- so laesst sich pruefen,
+      // dass ein 401 hier NICHT als "abgemeldet" gedeutet wird.
+      if (pwAendernAntwort) { return send(pwAendernAntwort.body, pwAendernAntwort.code); }
+      return send({ status: 'ok' });
+    }
     if (path.includes('portal_abmelden')) return send({ status: 'ok' });
     return send({ status: 'ok' });
   });
@@ -1298,6 +1311,312 @@ await page.waitForTimeout(250);
 calls = [];
 await klick('#abmelden');
 await page.waitForTimeout(250);
+
+// ══ Passwort ändern (ENT-488) ═══════════════════════════════════════════
+// Bis dahin konnte ein Kunde sein Passwort genau EINMAL setzen -- beim
+// ersten Besuch über den zugeschickten Link. Wer es weitergegeben hat oder
+// verdächtigt, kam ohne Anruf beim Betrieb nicht mehr heraus.
+{
+  // Das Prüfstück davor meldet ab und lässt die Abmeldebestätigung stehen --
+  // hier wird darum erst zurück auf die Maske und dann neu angemeldet.
+  // "Passwort ändern" gibt es NUR für einen angemeldeten Kunden; ohne die
+  // Anmeldung würde diese Suite eine Maske messen, die niemand sieht.
+  antwort = VOLL;
+  // Erst die Gegenrichtung: Die Kopfzeile mit dem Knopf gehört einem
+  // angemeldeten Kunden. Vorher darf sie gar nicht dastehen.
+  check('KRITISCH: vor der Anmeldung gibt es "Passwort ändern" nicht',
+    !(await page.isVisible('#pw-aendern-oeffnen')));
+  await klick('#wieder-anmelden');
+  await page.waitForTimeout(200);
+  await fuell('#email', 'a.beispiel@example.invalid');
+  await fuell('#passwort', 'ein sicheres langes wort');
+  await klick('#anmelden-pw');
+  await page.waitForSelector('#inhalt:not([hidden])', { timeout: 4000 })
+    .catch(() => bad.push('Die erneute Anmeldung führt nicht in die Liste'));
+  await page.waitForTimeout(300);
+
+  check('KRITISCH: ein angemeldeter Kunde kommt an "Passwort ändern"',
+    await page.isVisible('#pw-aendern-oeffnen'));
+  check('Der Knopf ist auf dem Handy mindestens 44 px hoch',
+    await page.evaluate(() =>
+      document.getElementById('pw-aendern-oeffnen').getBoundingClientRect().height >= 44));
+
+  await klick('#pw-aendern-oeffnen');
+  await page.waitForTimeout(200);
+  check('Der Klick öffnet das Fenster', await page.isVisible('#pw-fenster'));
+  check('KRITISCH: alle drei Felder verbergen die Eingabe',
+    await page.evaluate(() => ['pw-a-alt', 'pw-a-neu', 'pw-a-neu2']
+      .every(i => document.getElementById(i).type === 'password')));
+
+  // Ein Vertipper in der Bestätigung ist keine Serverfrage. Er darf gar
+  // nicht erst hinausgehen -- sonst wanderte ein Passwort über die Leitung,
+  // das der Kunde so nie wollte.
+  calls = [];
+  await fuell('#pw-a-alt', 'das bisherige lange wort');
+  await fuell('#pw-a-neu', 'ein neues langes wort');
+  await fuell('#pw-a-neu2', 'ein anderes langes wort');
+  await klick('#pw-a-speichern');
+  await page.waitForTimeout(250);
+  check('KRITISCH: zwei verschiedene neue Passwörter erreichen den Server gar nicht',
+    !calls.some(c => c.path.includes('portal_passwort_aendern')));
+  check('Und die Seite sagt, woran es liegt',
+    /stimmen nicht überein/.test(await page.textContent('#fehler-pw-a')));
+
+  // Das bisherige Passwort stimmt nicht: Der Server antwortet mit 401.
+  // ÜBERALL SONST heisst 401 auf dieser Seite „abgemeldet" -- hier nicht.
+  // Wer das verwechselt, wirft den Kunden bei jedem Vertipper hinaus.
+  pwAendernAntwort = { code: 401,
+    body: { status: 'error', message: 'Das bisherige Passwort stimmt nicht.' } };
+  await fuell('#pw-a-neu2', 'ein neues langes wort');
+  calls = [];
+  await klick('#pw-a-speichern');
+  await page.waitForTimeout(300);
+  {
+    const ruf = calls.find(c => c.path.includes('portal_passwort_aendern'));
+    const rumpf = JSON.parse((ruf && ruf.rumpf) || '{}');
+    check('KRITISCH: alt und neu gehen an den Server -- die Bestätigung nicht',
+      rumpf.alt === 'das bisherige lange wort' && rumpf.neu === 'ein neues langes wort'
+      && rumpf.neu2 === undefined);
+  }
+  check('KRITISCH: ein falsches bisheriges Passwort meldet das SICHTBAR',
+    await page.evaluate(() => {
+      const f = document.getElementById('fehler-pw-a');
+      return f.getClientRects().length > 0 && /bisherige Passwort stimmt nicht/.test(f.textContent);
+    }));
+  check('KRITISCH: und wirft den Kunden dabei NICHT hinaus -- 401 heisst hier nicht "abgemeldet"',
+    await page.isVisible('#inhalt') && !(await page.isVisible('#abgemeldet')));
+
+  // Der gute Fall.
+  pwAendernAntwort = null;
+  await klick('#pw-a-speichern');
+  await page.waitForTimeout(300);
+  check('KRITISCH: nach dem Ändern steht eine Bestätigung da',
+    await page.isVisible('#pw-a-fertig') && !(await page.isVisible('#pw-a-formular')));
+
+  await klick('#pw-a-zu');
+  await page.waitForTimeout(200);
+  check('Schliessen beendet das Fenster', !(await page.isVisible('#pw-fenster')));
+
+  // Der Fall, auf den es ankommt, ist ABBRECHEN -- nicht der Erfolg. Nach
+  // einem erfolgreichen Wechsel sind die Felder ohnehin leer; wer mitten im
+  // Tippen abbricht, liesse sonst sein Passwort im geschlossenen Fenster
+  // stehen. Beim Gegenprobieren aufgefallen: Die erste Fassung dieser
+  // Prüfung lief nur über den Erfolgsweg und wäre nie rot geworden.
+  await klick('#pw-aendern-oeffnen');
+  await page.waitForTimeout(200);
+  await fuell('#pw-a-alt', 'ein Passwort das niemand sehen soll');
+  await fuell('#pw-a-neu', 'noch eines davon');
+  await klick('#pw-a-schliessen');
+  await page.waitForTimeout(200);
+  check('KRITISCH: nach dem Abbrechen steht kein Passwort mehr im Fenster',
+    await page.evaluate(() => ['pw-a-alt', 'pw-a-neu', 'pw-a-neu2']
+      .every(i => document.getElementById(i).value === '')));
+  // Und beim nächsten Öffnen ist es auch nicht wieder da.
+  await klick('#pw-aendern-oeffnen');
+  await page.waitForTimeout(200);
+  check('KRITISCH: und beim nächsten Öffnen ebenso wenig',
+    await page.evaluate(() => ['pw-a-alt', 'pw-a-neu', 'pw-a-neu2']
+      .every(i => document.getElementById(i).value === '')));
+  await klick('#pw-a-schliessen');
+  await page.waitForTimeout(150);
+}
+
+// ══ Kennzahlenband (ENT-490) ════════════════════════════════════════════
+// Vier Stat-Kacheln über der Rundgangliste. Kein Diagramm -- vier Zahlen
+// sind keine Kurve.
+{
+  // Hier ist der Kunde angemeldet (der Block davor endet so) und die
+  // Attrappe steht auf VOLL.
+  antwort = VOLL;
+  await page.evaluate(() => laden());
+  await page.waitForTimeout(500);
+  // In den Rundgang-Reiter wechseln. OHNE das misst alles Folgende an einem
+  // verborgenen Element: getBoundingClientRect() liefert dann lauter Nullen,
+  // und jeder Lagevergleich wird wahr, ohne etwas zu prüfen. Genau so war
+  // die erste Fassung dieser Prüfungen -- beim Gegenprobieren aufgefallen,
+  // weil eine vertauschte Beschriftung sie nicht rot bekam.
+  await klick('#reiter-rundgaenge');
+  await page.waitForTimeout(250);
+
+  check('KRITISCH: das Band ist WIRKLICH zu sehen und trägt vier Kacheln',
+    await page.evaluate(() => {
+      const b = document.getElementById('kz-band');
+      return b.getClientRects().length > 0
+        && b.querySelectorAll(':scope > div').length === 4;
+    }));
+  // Hausregel und Stat-Kachel-Bauform sind hier dasselbe: Beschriftung oben,
+  // Wert darunter. Gemessen, nicht am Klassennamen abgelesen -- und zuerst
+  // geprüft, dass überhaupt etwas gerendert ist.
+  check('KRITISCH: in jeder Kachel steht die Beschriftung ÜBER dem Wert',
+    await page.evaluate(() => {
+      const k = [...document.querySelectorAll('#kz-band > div')];
+      return k.length === 4 && k.every(d => {
+        const l = d.querySelector('.k-l').getBoundingClientRect();
+        const v = d.querySelector('.k-v').getBoundingClientRect();
+        return l.height > 0 && v.height > 0 && l.bottom <= v.top + 1;
+      });
+    }));
+  check('Das Band steht über der Liste, nicht darunter',
+    await page.evaluate(() => {
+      const b = document.getElementById('kz-band').getBoundingClientRect();
+      const l = document.getElementById('liste').getBoundingClientRect();
+      return b.height > 0 && l.height > 0 && b.bottom <= l.top + 1;
+    }));
+
+  const bandText = await page.textContent('#kz-band');
+  check('KRITISCH: der Erledigungsgrad nennt Prozent UND die Rohzahlen',
+    /83\s*%/.test(bandText) && bandText.includes('20 von 24 Kontrollpunkten'));
+  // Bei vier Runden wäre ein Abbruch "25 %" -- das klingt nach System und ist
+  // ein Einzelfall. Über Runden wird darum gezählt, nicht gerechnet.
+  check('KRITISCH: Abbrüche stehen als ZAHL da, nicht als Prozent',
+    /Abgebrochen/.test(bandText) && bandText.includes('von 4 Rundgängen')
+    && !/Abgebrochen\s*\d+\s*%/.test(bandText.replace(/\s+/g, ' ')));
+  // Der Kunde LIEST diese Zeilen. "von 4 Rundgänge" stand hier schon einmal
+  // und fiel im Quelltext nicht auf, sondern erst am Bild.
+  check('Die Fusszeilen stehen im Dativ, nicht im Nominativ',
+    !/von \d+ Rundgänge(?!n)/.test(bandText)
+    && !/von \d+ (?:erledigten )?Kontrollpunkte(?!n)/.test(bandText));
+  check('Der Fotobeleg wird ausgewiesen, statt unter "erledigt" zu verschwinden',
+    bandText.includes('von 20 erledigten Kontrollpunkten'));
+  check('Jede Kachel nennt ihre eigene Einheit in der Fusszeile',
+    await page.evaluate(() => [...document.querySelectorAll('#kz-band .k-f')]
+      .every(f => f.textContent.trim().length > 0)));
+
+  // 0 von 0 ist NICHT 100 % und nicht 0 %. Es wurde nichts gemessen.
+  antwort = { ...VOLL, kennzahlen: { runden: 2, abgebrochen: 0, punkte_gesamt: 0,
+                                     punkte_erledigt: 0, punkte_fotobeleg: 0 } };
+  await page.evaluate(() => laden());
+  await page.waitForTimeout(400);
+  {
+    const t = await page.textContent('#kz-band');
+    check('KRITISCH: ohne hinterlegte Kontrollpunkte gibt es keinen Erledigungsgrad',
+      t.includes('nicht messbar') && t.includes('keine Kontrollpunkte hinterlegt')
+      && !/%/.test(t));
+    check('Ohne Abbruch sagt die Kachel das, statt eine nackte Null zu zeigen',
+      t.includes('alle 2 Rundgänge beendet'));
+  }
+
+  // Genau EINE Runde: "alle 1 Rundgänge beendet" wäre Unsinn, "alle Rundgang
+  // beendet" auch. Die Einzahl ist der Fall, den man beim Bauen nicht sieht,
+  // weil die Beleg-Daten immer mehrere Runden haben.
+  antwort = { ...VOLL, rundgaenge: [VOLL.rundgaenge[0]],
+              kennzahlen: { runden: 1, abgebrochen: 0, punkte_gesamt: 6,
+                            punkte_erledigt: 6, punkte_fotobeleg: 0 } };
+  await page.evaluate(() => laden());
+  await page.waitForTimeout(400);
+  {
+    const t = (await page.textContent('#kz-band')).replace(/\s+/g, ' ');
+    check('Bei genau einer Runde steht dort ein Satz und keine kaputte Mehrzahl',
+      !/alle 1 Rundgänge/.test(t) && !/alle Rundgang\b/.test(t)
+      && t.includes('der Rundgang wurde beendet'));
+  }
+
+  // Kein Rundgang im Zeitraum: Ein Band aus lauter Nullen behauptete eine
+  // Messung, die es nicht gab.
+  antwort = { ...VOLL, rundgaenge: [], leer_grund: 'kein_treffer_im_zeitraum',
+              kennzahlen: { runden: 0, abgebrochen: 0, punkte_gesamt: 0,
+                            punkte_erledigt: 0, punkte_fotobeleg: 0 } };
+  await page.evaluate(() => laden());
+  await page.waitForTimeout(400);
+  check('KRITISCH: ohne Rundgang im Zeitraum bleibt das Band ganz weg',
+    await page.evaluate(() => document.getElementById('kz-band').hidden));
+
+  // Eine Antwort ohne das Feld (alter Server, halber Deploy) ist etwas
+  // anderes als eine mit Nullen -- auch dann kein Band aus Nullen.
+  {
+    const ohne = { ...VOLL };
+    delete ohne.kennzahlen;
+    antwort = ohne;
+    await page.evaluate(() => laden());
+    await page.waitForTimeout(400);
+    check('KRITISCH: eine Antwort ohne Kennzahlen erfindet keine',
+      await page.evaluate(() => document.getElementById('kz-band').hidden));
+  }
+  antwort = VOLL;
+  await page.evaluate(() => laden());
+  await page.waitForTimeout(400);
+}
+
+// ══ Datenschutzhinweis und Zustellnachweis (ENT-491) ════════════════════
+// Der Hinweis ist die Bedingung dafür, dass überhaupt mitgeschrieben werden
+// darf. Geprüft wird darum beides zusammen -- und der Hinweis zuerst.
+{
+  // Der Verweis steht in der Fusszeile, also unten. Sichtbar heisst hier:
+  // wirklich gerendert, nicht nur im Baum vorhanden.
+  check('KRITISCH: der Datenschutzhinweis ist von der Seite aus erreichbar',
+    await page.evaluate(() => {
+      const k = document.getElementById('ds-oeffnen');
+      return !!k && k.getClientRects().length > 0;
+    }));
+  // Hausregel Handy: mindestens 44 px. Ein Verweis ist genauso schwer zu
+  // treffen wie ein Knopf.
+  check('Der Verweis ist auf dem Handy gross genug zum Treffen',
+    await page.evaluate(() =>
+      document.getElementById('ds-oeffnen').getBoundingClientRect().height >= 44));
+
+  await klick('#ds-oeffnen');
+  await page.waitForTimeout(300);
+  check('KRITISCH: der Klick öffnet den Hinweis wirklich',
+    await page.evaluate(() =>
+      document.getElementById('ds-fenster').getClientRects().length > 0));
+
+  const ds = (await page.textContent('#ds-fenster')).replace(/\s+/g, ' ');
+  // Der Hinweis muss jede Sache benennen, die tatsächlich gespeichert wird.
+  // Ein Hinweis, der die Hälfte verschweigt, ist schlechter als keiner --
+  // er behauptet Vollständigkeit.
+  check('KRITISCH: der Hinweis nennt den Zustellnachweis beim Namen',
+    /Zustellnachweis/.test(ds) && /abgerufen/.test(ds));
+  check('Er nennt die Stammangaben des Zugangs',
+    /Name/.test(ds) && /E-Mail/.test(ds) && /Funktion/.test(ds));
+  check('Er nennt die Anmeldung', /Anmeldung/.test(ds));
+  check('Er nennt die PDF-Meldung und sagt, dass das PDF im Browser entsteht',
+    /PDF/.test(ds) && /Browser/.test(ds));
+  // Und das Gegenstück: Was NICHT erhoben wird, ist die eigentliche Zusage.
+  check('KRITISCH: er sagt ausdrücklich, dass keine IP-Adresse gespeichert wird',
+    /IP-Adresse/.test(ds) && /nicht gespeichert/.test(ds));
+  check('KRITISCH: er sagt, dass kein Verlauf einzelner Besuche entsteht',
+    /Verlauf einzelner Besuche/i.test(ds) && /nicht eine je Aufruf/i.test(ds));
+  check('Er sagt, wie lange der Nachweis bleibt', /gelöscht/.test(ds));
+  check('Er nennt einen Weg für Auskunft und Löschung',
+    /Auskunft/.test(ds) && /Löschung/.test(ds));
+
+  // Angemeldet nennt der Hinweis den Betrieb -- ein „wenden Sie sich an
+  // jemanden" ohne Namen ist keine Anlaufstelle.
+  check('KRITISCH: angemeldet nennt der Hinweis den Betrieb namentlich',
+    /Musterfirma Sicherheitsdienst GmbH/.test(await page.textContent('#ds-kontakt')));
+
+  await klick('#ds-zu');
+  await page.waitForTimeout(200);
+  check('Der Hinweis lässt sich wieder schliessen',
+    await page.evaluate(() => document.getElementById('ds-fenster').hidden));
+
+  // ── Der Zustellnachweis wird gemeldet ────────────────────────────────
+  // Erst die Tafel öffnen (dort steht der PDF-Knopf), dann herunterladen.
+  calls.length = 0;
+  await klick('#reiter-rundgaenge');
+  await page.waitForTimeout(200);
+  await klick('#liste .zeile[data-art="rundgang"]');
+  await page.waitForTimeout(700);
+  const pdfKnopf = await page.$('[data-pdf]');
+  check('Der PDF-Knopf steht in der aufgeklappten Tafel', !!pdfKnopf);
+  if (pdfKnopf) {
+    await pdfKnopf.click();
+    // html2pdf wird erst beim Klick nachgeladen und braucht danach Zeit.
+    await page.waitForTimeout(4000);
+    const meldung = calls.find(c => c.path.includes('portal_abruf_pdf'));
+    check('KRITISCH: nach dem Herunterladen wird der Zustellnachweis gemeldet', !!meldung);
+    if (meldung) {
+      const rumpf = JSON.parse(meldung.rumpf || '{}');
+      check('Die Meldung nennt Art und Nummer des Rapports',
+        rumpf.art === 'rundgang' && Number(rumpf.id) === 10);
+      // Keine kunde_id, kein Name, keine Kennung des Geräts: Der Server
+      // kennt den Zugang aus der Sitzung (ENT-441), alles andere wäre eine
+      // Angabe, die er nicht braucht und nicht prüfen kann.
+      check('KRITISCH: die Meldung schickt NICHTS ausser Art und Nummer',
+        Object.keys(rumpf).sort().join(',') === 'art,id');
+    }
+  }
+}
 
 // ══ Desktop ═════════════════════════════════════════════════════════════
 // Jede Änderung am Handy-Layout wird zusätzlich am Desktop geprüft, und

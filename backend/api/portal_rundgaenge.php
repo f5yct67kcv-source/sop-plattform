@@ -56,6 +56,11 @@ $antwort = [
     'zeitraum' => ['von' => $von, 'bis' => $bis],
     'objekte'  => [],
     'rundgaenge' => [],
+    // Von Anfang an dabei, nicht erst nach der Schleife: Der fruehe Ausstieg
+    // "kein Revierdienst" antwortet sonst ohne dieses Feld, und die
+    // Oberflaeche muesste sein Fehlen von einer Null unterscheiden.
+    'kennzahlen' => ['runden' => 0, 'abgebrochen' => 0,
+                     'punkte_gesamt' => 0, 'punkte_erledigt' => 0, 'punkte_fotobeleg' => 0],
 ];
 
 // Vier verschiedene Aussagen, vier verschiedene Antworten (Hausregel:
@@ -107,10 +112,27 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute([...$objektIds, ...RUNDGANG_OFFENE_STATUS, $von, $bis]);
 $zeilen = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+/* Kennzahlen zum Zeitraum (ENT-490). Fuenf ROHE Zahlen, keine fertigen
+   Prozente: Wie sie dargestellt werden -- und ob ueberhaupt, wenn der
+   Nenner null ist -- entscheidet die Oberflaeche. Ein Prozentwert aus dem
+   Server waere eine zweite Stelle, an der ueber "0 von 0" befunden wird.
+
+   Alles stammt aus DENSELBEN Zeilen, die unten die Liste fuellen. Eine
+   eigene Abfrage waere eine zweite Wahrheit ueber denselben Zeitraum, und
+   sie liefe irgendwann auseinander -- der Kunde saehe dann ein Band, das
+   der Liste darunter widerspricht.
+
+   BEWUSST OHNE Ereignisse: Die zaehlt das Wachbuch bereits, und zwar nach
+   einer eigenen Regel (nur Meldungen an einer beendeten Runde, ENT-484).
+   Sie hier ein zweites Mal zu zaehlen hiesse, zwei Zahlen fuer dieselbe
+   Sache zu haben. */
+$kz = $antwort['kennzahlen'];
+
 foreach ($zeilen as $r) {
     $vorlageId = $r['rundgang_vorlage_id'] !== null ? (int)$r['rundgang_vorlage_id'] : null;
     $dauer = rundgang_dauer($r['rohzeit_start'], $r['rohzeit_ende'], $r['letzter_scan'],
         (int)$r['pause_minuten'], (string)$r['status']);
+    $fortschritt = rundgang_fortschritt($pdo, (int)$r['id'], (int)$r['objekt_id'], $vorlageId);
     $antwort['rundgaenge'][] = [
         'id'           => (int)$r['id'],
         'datum'        => (string)$r['datum'],
@@ -119,9 +141,20 @@ foreach ($zeilen as $r) {
         'status'       => (string)$r['status'],
         'beginn'       => $r['rohzeit_start'],
         'dauer'        => $dauer,
-        'fortschritt'  => rundgang_fortschritt($pdo, (int)$r['id'], (int)$r['objekt_id'], $vorlageId),
+        'fortschritt'  => $fortschritt,
     ];
+
+    $kz['runden']++;
+    if ((string)$r['status'] === 'abgebrochen') { $kz['abgebrochen']++; }
+    // Punkte einer Runde OHNE hinterlegte Kontrollpunkte zaehlen mit null
+    // mit -- sie druecken den Erledigungsgrad nicht, sie sind schlicht nicht
+    // gemessen. Genau darum liefert der Server den Nenner mit: Ist er null,
+    // gibt es keinen Grad, und die Oberflaeche sagt das statt "100 %".
+    $kz['punkte_gesamt']    += (int)$fortschritt['gesamt'];
+    $kz['punkte_erledigt']  += (int)$fortschritt['erledigt'];
+    $kz['punkte_fotobeleg'] += (int)$fortschritt['ersatzscan'];
 }
+$antwort['kennzahlen'] = $kz;
 
 if (!$antwort['rundgaenge']) {
     // Zwei verschiedene Gruende, zwei verschiedene Texte: Hat es je einen
