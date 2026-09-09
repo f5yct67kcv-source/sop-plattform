@@ -1900,12 +1900,18 @@ if (!$nurPruefen && hat_tabelle_jetzt($pdo, 'lohnart')) {
             // AHV-pflichtigen Lohn.
             $lohnarten = lohnart_startbestand();
             $ein = $pdo->prepare(
+                // REIHENFOLGE UND ANZAHL muessen zu lohnart_startbestand()
+                // passen. Sie taten es nicht: Mit der Spalte 'bemessung'
+                // bekam jede Zeile ein 14. Feld, die Platzhalterliste blieb
+                // bei 13 -- SQLSTATE[HY093], und der ganze Schritt brach ab.
+                // Der Katalog entstand dadurch gar nicht. pruef_lohn.php
+                // vergleicht die beiden jetzt gegeneinander.
                 'INSERT IGNORE INTO lohnart
                  (schluessel, bezeichnung, art, basis_schluessel, satz_bp,
                   ahv_pflichtig, ferien_pflichtig, ml13_pflichtig,
                   bvg_pflichtig, uvg_pflichtig, qst_pflichtig,
-                  gav_grundlage, system, sortierung)
-                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,1,?)'
+                  gav_grundlage, system, sortierung, bemessung)
+                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)'
             );
             $n = 0;
             foreach ($lohnarten as $la) { $ein->execute($la); $n += $ein->rowCount(); }

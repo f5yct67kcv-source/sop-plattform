@@ -667,5 +667,72 @@ pruef('Basispunkte werden ohne nachlaufende Nullen als Prozent geschrieben',
     lohn_bp_text(530) === '5.3 %' && lohn_bp_text(110) === '1.1 %'
     && lohn_bp_text(1060) === '10.6 %' && lohn_bp_text(160) === '1.6 %');
 
+// ── Der Startbestand muss sich wirklich einfuegen lassen ─────────────────
+//
+// KRITISCH, und am 2026-09-09 im Livesystem aufgeschlagen: Mit der Spalte
+// 'bemessung' bekam jede Zeile aus lohnart_startbestand() ein 14. Feld. Die
+// Platzhalterliste im INSERT von planung_einrichten.php blieb bei 13.
+// Ergebnis: SQLSTATE[HY093], der Schritt brach ab, und der Lohnartenkatalog
+// entstand gar nicht.
+//
+// WARUM KEINE PRUEFUNG DAS FAND: Es gab keine, die den INSERT ausfuehrte.
+// Die Feldzahl stand an zwei Orten und musste uebereinstimmen -- eine
+// Absprache zwischen zwei Dateien, die niemand einhielt. Genau das ist die
+// Fehlerfamilie dieser Etappe: eine Regel an einer Stelle richtig gesetzt
+// und an der Nachbarstelle nicht.
+//
+// Diese Pruefung schreibt NICHTS ab. Sie holt das echte CREATE TABLE und
+// den echten INSERT aus planung_einrichten.php, legt die Tabelle in SQLite
+// an und fuehrt jede echte Zeile ein. Aendert jemand eine der beiden
+// Stellen ohne die andere, wird sie rot.
+$einr = file_get_contents(__DIR__ . '/../backend/api/planung_einrichten.php');
+
+// Das Schema und die Anweisung aus dem Quelltext holen.
+preg_match("/'lohnart' => \"(.*?)\" ?,\n/s", $einr, $mSchema);
+preg_match('/(INSERT IGNORE INTO lohnart.*?VALUES \([^)]*\))/s', $einr, $mIns);
+pruef('Schema und INSERT fuer lohnart sind im Einrichtungslauf auffindbar',
+    !empty($mSchema[1]) && !empty($mIns[1]));
+
+if (!empty($mSchema[1]) && !empty($mIns[1])) {
+    // Nur so viel umschreiben, wie SQLite braucht -- Spalten, Reihenfolge
+    // und Anzahl bleiben unangetastet, sonst pruefte man die Umschrift.
+    $ddl = $mSchema[1];
+    $ddl = preg_replace('/\bINT AUTO_INCREMENT PRIMARY KEY\b/', 'INTEGER PRIMARY KEY', $ddl);
+    $ddl = preg_replace('/,\s*UNIQUE KEY \w+ \(([^)]*)\)/', ', UNIQUE ($1)', $ddl);
+    $ddl = preg_replace('/,\s*KEY \w+ \([^)]*\)/', '', $ddl);
+    $ddl = preg_replace('/\) ENGINE=\w+ DEFAULT CHARSET=\w+/', ')', $ddl);
+    $sql = str_replace('INSERT IGNORE INTO', 'INSERT OR IGNORE INTO', $mIns[1]);
+
+    $p = new PDO('sqlite::memory:');
+    $p->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $fehler = null;
+    $zeilen = lohnart_startbestand();
+    try {
+        $p->exec($ddl);
+        $st = $p->prepare($sql);
+        foreach ($zeilen as $z) { $st->execute($z); }
+    } catch (Throwable $e) { $fehler = $e->getMessage(); }
+
+    pruef('KRITISCH: der echte Startbestand laesst sich mit dem echten INSERT einfuegen',
+        $fehler === null);
+    if ($fehler === null) {
+        $n = (int)$p->query('SELECT COUNT(*) FROM lohnart')->fetchColumn();
+        pruef('Alle Lohnarten des Startbestands landen in der Tabelle',
+            $n === count($zeilen) && $n === 21);
+
+        // Die Anzahl allein genuegt nicht: Bei vertauschter Reihenfolge
+        // passte sie weiterhin, und der Katalog waere still falsch. Darum
+        // werden die beiden zuletzt angehaengten Spalten am Wert geprueft.
+        $g = $p->query("SELECT sortierung, bemessung, system, art
+                          FROM lohnart WHERE schluessel = 'grundlohn_stunde'")->fetch();
+        pruef('KRITISCH: die Werte landen in den richtigen Spalten, nicht nur in der richtigen Zahl',
+            (int)$g['sortierung'] === 10 && (int)$g['bemessung'] === 0
+            && (int)$g['system'] === 1 && $g['art'] === 'stundensatz');
+        $b = (int)$p->query('SELECT COUNT(*) FROM lohnart WHERE bemessung = 1')->fetchColumn();
+        pruef('Die Bemessungszeilen kommen als solche an -- sonst rechnete der Lauf doppelt',
+            $b === count(array_filter($zeilen, fn ($z) => (int)$z[13] === 1)) && $b === 6);
+    }
+}
+
 echo $ok . " Pruefungen bestanden\n";
 if ($bad) { echo count($bad) . " FEHLGESCHLAGEN:\n - " . implode("\n - ", $bad) . "\n"; exit(1); }
