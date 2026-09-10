@@ -124,38 +124,61 @@ function anmeld_fehlversuch(PDO $pdo, string $name, string $adresse): void
 // kuerzeres Passwort hat, kommt weiterhin rein; er wird nur beim naechsten
 // Wechsel auf die neue Laenge verpflichtet. Sonst waeren mit dem Deploy
 // schlagartig alle Konten ausgesperrt.
-// ── Die Erprobungs-Absenkung ist beendet (ENT-502, 2026-09-10) ────────
+// ── Neu bemessen: 10 und 12 (ENT-519, 2026-09-10) ─────────────────────
 //
-// ENT-289 hatte beide Laengen am 2026-09-01 auf 6 gesenkt, auf Anordnung
-// des Projektinhabers und ausdruecklich nur fuer die Erprobung ("die
-// software laeuft noch nicht in einem echten betrieb"). Die Auflage lautete:
-// vor der ersten produktiven Nutzung auf 12 bzw. 16 zurueckdrehen. Das ist
-// hiermit geschehen.
+// Die Vorgeschichte in zwei Saetzen: ENT-289 senkte beide Laengen am
+// 2026-09-01 fuer die Erprobung auf 6, ENT-502 drehte sie am 2026-09-10
+// auf 12 und 16 zurueck. ENT-519 setzt sie am selben Tag auf 10 und 12 --
+// nicht als Rueckzug, sondern nach einer Rechnung, die vorher so nicht
+// gemacht worden war.
 //
-// Die Marke PASSWORT_ERPROBUNG ist damit ERSATZLOS WEG, nicht auf false
-// gesetzt. Sie war die Anmeldung einer Ausnahme; eine Ausnahme, die es
-// nicht mehr gibt, braucht keinen Schalter, den jemand zurueckstellen
-// koennte. pruef_passwort.php verlangt ohne sie die produktiven Werte und
-// wird rot, sobald jemand die Laengen wieder senkt, ohne die Marke bewusst
-// zu setzen -- der Weg zurueck steht also offen, aber nur sichtbar.
+// WAS DIE RECHNUNG ERGAB. Bei bcrypt mit diesen Kosten (siehe
+// PASSWORT_KOSTEN) schafft ein ernsthafter Rechner rund 10'000 Versuche
+// je Sekunde. Zehn Kleinbuchstaben sind damit rund 450 Jahre, zwoelf rund
+// 300'000. Beide Zahlen liegen jenseits jeder Relevanz -- gegen blosses
+// Durchprobieren entscheidet die Laenge hier nichts mehr. Sie entscheidet
+// nur noch gegen WORTLISTEN, und dort zaehlt nicht die Zeichenzahl,
+// sondern ob das Passwort aus einem bekannten Wort besteht. Genau das
+// pruefen die Regeln in passwort_pruefen() weiter unten -- direkt, statt
+// ueber die Laenge als Hilfsgroesse.
 //
-// WAS DAMIT NICHT ERLEDIGT IST (OP-283, zweiter Teil): passwort_pruefen()
-// laeuft ausschliesslich beim SETZEN, nie beim Anmelden. Wer sich in der
-// Erprobung ein sechsstelliges Passwort gesetzt hat, kommt damit weiterhin
-// hinein. Die Zahl hier stimmt ab sofort wieder, das tatsaechliche
-// Schutzniveau der BESTEHENDEN Konten nicht -- dafuer muss jedes einzelne
-// einmal neu gesetzt werden. Es gibt keine Stelle, an der ein zu kurzes
-// Passwort nachtraeglich auffiele.
+// Dazu die Bremse oben in dieser Datei: fuenf Fehlversuche je Name in 15
+// Minuten. Wer von aussen raet, kommt gar nicht erst in die
+// Groessenordnung, in der eine Laenge etwas entscheidet.
+//
+// WARUM DIE VERWALTUNG TROTZDEM MEHR BRAUCHT: Ein Verwaltungszugang
+// oeffnet die ganze Personalakte -- AHV-Nummern, Aufenthaltsstatus,
+// Registerdaten. Ein Mitarbeitenden-Zugang oeffnet die eigenen Schichten
+// und die Kundenliste mit Adressen (kunden_list.php). Beides ist
+// schuetzenswert, aber nicht gleich viel.
+//
+// DIE 12 STEHEN AUF EINEM VERSPRECHEN, DAS NOCH NICHT EINGELOEST IST.
+// Vorgeschlagen waren 12 fuer die Verwaltung ZUSAMMEN MIT einer Pflicht
+// zur Zwei-Faktor-Anmeldung; ohne sie waeren es 14 gewesen. Die Pflicht
+// braucht zuerst zwei Dinge, die es nicht gibt: eine Uebersicht, wer sie
+// eingeschaltet hat, und einen Ruecksetzweg fuer ein verlorenes Geraet
+// (OP-520). Bis dahin gelten hier 12 OHNE Pflicht. Das ist bei einer
+// Handvoll Konten vertretbar und steht ausdruecklich als Zwischenzustand
+// hier, damit es niemand fuer den fertigen Tausch haelt.
+//
+// KEINE ZEICHENVORSCHRIFT, auch nicht als Ausgleich fuer die kuerzere
+// Laenge -- die Begruendung steht bei passwort_pruefen() unten.
+//
+// DIE REGEL GILT BEIM SETZEN, NICHT BEIM ANMELDEN (siehe oben). Ein
+// Senken sperrt niemanden aus, ein Erhoehen wirkt erst beim naechsten
+// Wechsel. Fuer die BESTEHENDEN, in der Erprobung gesetzten Passwoerter
+// aendert auch das hier nichts: OP-283 zweiter Teil bleibt offen, jedes
+// Konto muss einmal von Hand neu gesetzt werden.
+//
+// Die Marke PASSWORT_ERPROBUNG bleibt ERSATZLOS WEG (so schon ENT-502).
+// pruef_passwort.php verlangt ohne sie eine Untergrenze und wird rot,
+// sobald jemand die Laengen darunter senkt -- der Weg zurueck steht
+// offen, aber nur sichtbar.
 
-const PASSWORT_MIN = 12;
+const PASSWORT_MIN = 10;
 
-// Fuer Verwaltungszugaenge mehr. Dieselbe Ueberlegung wie bei den
-// Sitzungsfristen: Ein Admin-Zugang oeffnet die ganze Personalakte, ein
-// Mitarbeitenden-Zugang die eigenen Schichten. Unterschiedliches Risiko,
-// unterschiedliche Anforderung. Solange es kein Rollenmodell gibt (OP-59),
-// haengt am Admin-Passwort buchstaeblich alles.
-// Seit ENT-502 wieder auf dem urspruenglichen Wert, siehe oben.
-const PASSWORT_MIN_ADMIN = 16;
+// Fuer Verwaltungszugaenge mehr -- Begruendung und Vorbehalt oben.
+const PASSWORT_MIN_ADMIN = 12;
 
 // Wie aufwendig das Verschluesseln des Passworts ist. Jede Stufe verdoppelt
 // den Aufwand -- fuer das Anmelden ein paar Hundertstelsekunden, fuer
@@ -258,14 +281,33 @@ function passwort_wiederholung(string $klein): bool
 // Grund im Klartext -- der Grund geht an die Oberflaeche und muss ohne
 // Nachschlagen verstaendlich sein.
 //
-// BEWUSST KEINE ZEICHENVORSCHRIFT (kein Zwang zu Grossbuchstabe und Zahl):
-// Sie erzeugt fast immer dasselbe Muster -- Grossbuchstabe vorne, Zahl
-// hinten, "Sommer2026" -- und genau das probieren Knackwerkzeuge zuerst.
-// Der rechnerische Zugewinn ist gross, der tatsaechliche klein. Zwoelf
-// Kleinbuchstaben haben rund 400-mal mehr Moeglichkeiten als acht Zeichen
-// mit Gross, Klein und Zahl. Laenge schlaegt Zeichensalat -- solange die
-// Laenge nicht aus EINEM bekannten Wort oder einer Tastaturreihe kommt,
-// und dagegen laufen die Pruefungen unten.
+// BEWUSST KEINE ZEICHENVORSCHRIFT (kein Zwang zu Grossbuchstabe und Zahl),
+// und mit ENT-519 auch dann nicht, als die Laengen sanken -- der Vorschlag
+// lag ausdruecklich auf dem Tisch ("statt 16 Zeichen: zwei Grossbuchstaben,
+// eine Zahl und mindestens 10").
+//
+// EHRLICH GERECHNET SPRICHT DIE ARITHMETIK SOGAR DAFUER: Zehn Zeichen aus
+// 62 moeglichen sind rund 59 Bit, zehn Kleinbuchstaben rund 47. Auf dem
+// Papier ist die Vorschrift also der Gewinner. (Der frueher hier stehende
+// Vergleich "zwoelf Kleinbuchstaben gegen acht gemischte" stimmte zwar,
+// beantwortete aber eine andere Frage -- 12 gegen 8, nicht 10 gegen 10.)
+//
+// SIE VERLIERT TROTZDEM, aus zwei Gruenden:
+//   1. Eine VERLANGTE Vorschrift kennt der Angreifer auch. Sie verkleinert
+//      seinen Kandidatensatz, statt ihn zu vergroessern -- alles, was der
+//      Vorschrift nicht genuegt, muss er gar nicht erst probieren.
+//   2. Menschen erfuellen sie fast immer gleich: Grossbuchstabe vorne,
+//      Zahl oder Jahr hinten. Genau diese Umformungen sind der Inhalt der
+//      Standard-Regelsaetze der Knackwerkzeuge. Der rechnerische Zugewinn
+//      ist damit im Angriff nicht vorhanden.
+// Deshalb raten NIST SP 800-63B ("SHALL NOT") und das BSI seit 2020
+// ausdruecklich davon ab.
+//
+// WAS STATTDESSEN WIRKT, steht unten in dieser Funktion: kein Login-Name,
+// keine Sperrliste, mindestens fuenf verschiedene Zeichen, kein
+// wiederholter Block, keine Tastaturreihe. Das sind dieselben Schwaechen,
+// gegen die eine Zeichenvorschrift ein Ersatz waere -- hier aber direkt
+// benannt statt ueber eine Hilfsgroesse erraten.
 function passwort_pruefen(string $passwort, string $loginName = '', bool $istAdmin = false): ?string
 {
     $min = $istAdmin ? PASSWORT_MIN_ADMIN : PASSWORT_MIN;
