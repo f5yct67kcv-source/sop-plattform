@@ -891,6 +891,21 @@ if (portalMitVertraulichem.length) {
   bad.push('Portal mit vertraulichen Feldern: ' + portalMitVertraulichem.join(', '));
 }
 
+// Dieselbe Grenze fuer den Freitext eines Rundgang-Abbruchs. ENT-481 gibt den
+// Abbruchgrund als Klartext AUS DEM KATALOG frei -- eine geschlossene Liste,
+// ueber die jemand entschieden hat. Das freie Feld daneben ist genau das
+// nicht: Wer eine Runde abbricht, tippt dort im Moment und ungeprueft, was
+// ihn aufhaelt. Es ging auf ZWEI unabhaengigen Wegen hinaus (Detailansicht
+// und Chronik) -- den einen zu schliessen half nicht. Der Schalter
+// 'ohne_abbruch_freitext' IST die Sperre und darum erlaubt.
+const portalMitFreitext = portalDateien.filter(f =>
+  /\babbruch_freitext\b/.test(ohneKommentar(f).split('ohne_abbruch_freitext').join('')));
+check('KRITISCH: kein Portal-Endpunkt fuehrt den Freitext eines Abbruchs',
+  portalMitFreitext.length === 0);
+if (portalMitFreitext.length) {
+  bad.push('Portal mit Abbruch-Freitext: ' + portalMitFreitext.join(', '));
+}
+
 // Die andere Richtung derselben Regel: Wer vertrauliche Felder nicht sehen
 // darf, darf sie auch nicht SETZEN (CLAUDE.md, ENT-077). Geprueft wird die
 // Verbindung zweier Tatsachen, nicht ein Wort: Wer die Fachlogik zum
