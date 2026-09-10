@@ -2162,7 +2162,6 @@ function detailZeichnen(d, tafel) {
   const abbruch = d.status === 'abgebrochen'
     ? '<div class="d-abbruch"><strong>Abgebrochen</strong>'
       + (d.abbruch_grund ? ' — ' + esc(d.abbruch_grund) : '')
-      + (d.abbruch_freitext ? ': ' + esc(d.abbruch_freitext) : '')
       + '</div>'
     : '';
   // Kontrollrunde und Person. Fehlt eine Vorlage, ist das eine Aussage
@@ -2646,9 +2645,10 @@ function blattFuellen(d, bk) {
     ['Status', esc(zustand)],
     // Ein Abbruch steht im Kopf, nicht als Fussnote -- aber nur, wenn es
     // einen gab.
+    // Nur der Grund aus dem Katalog, nie der Freitext daneben: Der Server
+    // liefert ihn seit ENT-481 gar nicht mehr ins Portal.
     ...(d.status === 'abgebrochen'
-      ? [['Abbruchgrund', esc([d.abbruch_grund, d.abbruch_freitext]
-          .filter(Boolean).join(' — ')) || '–']]
+      ? [['Abbruchgrund', d.abbruch_grund ? esc(d.abbruch_grund) : 'kein Grund erfasst']]
       : []),
   ].map(x => kz(x[0], x[1])).join('');
 

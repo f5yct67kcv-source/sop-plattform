@@ -60,7 +60,9 @@ if (!$objektIds) { $nichtAbrufbar(); }
 $stmt = $pdo->prepare(
     'SELECT r.id, r.objekt_id, r.status, r.rundgang_vorlage_id,
             r.rohzeit_start, r.rohzeit_ende, r.pause_minuten,
-            r.abbruch_grund, r.abbruch_freitext,
+            // abbruch_freitext wird BEWUSST NICHT geholt: Was nicht geholt
+            // wird, kann auch nicht versehentlich mitgeschickt werden.
+            r.abbruch_grund,
             e.datum, o.name AS objekt_name, o.strasse, o.ort,
             m.vorname, m.nachname,
             (SELECT MAX(s.erfasst_am) FROM rundgang_scan s WHERE s.rundgang_id = r.id) AS letzter_scan
@@ -183,7 +185,13 @@ json_response(['status' => 'ok', 'rundgang' => [
     'abbruch_grund'  => $r['abbruch_grund'] !== null
         ? (RUNDGANG_ABBRUCH_GRUENDE[$r['abbruch_grund']] ?? (string)$r['abbruch_grund'])
         : null,
-    'abbruch_freitext' => $r['abbruch_freitext'],
+    // Der FREITEXT des Abbruchs geht NICHT hinaus. ENT-481 hat den Grund
+    // als Klartext AUS DEM KATALOG freigegeben -- eine geschlossene Liste,
+    // ueber die jemand entschieden hat. Das freie Feld daneben ist genau
+    // das nicht: Wer eine Runde abbricht, tippt dort im Moment und
+    // ungeprueft, was ihn aufhaelt -- Gesundheitliches, Persoenliches, den
+    // Namen eines Dritten. Fuer die Einsatzleitung gehoert das ins
+    // Cockpit, fuer den Kunden nicht ins Portal.
     'rohzeit_start'  => $r['rohzeit_start'],
     'rohzeit_ende'   => $r['rohzeit_ende'],
     'letzter_scan'   => $r['letzter_scan'],

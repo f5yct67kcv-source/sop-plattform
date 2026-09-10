@@ -725,7 +725,16 @@ function wachbuch_quelle(PDO $pdo, string $sql, string $zaehlSql, array $werte,
                                    haengen. Meldungen ausserhalb einer Runde
                                    hat ein Kunde noch nie gesehen; sie hier
                                    mitzuliefern waere ein neuer Datenfluss
-                                   und keine Darstellungsfrage. */
+                                   und keine Darstellungsfrage.
+
+     'ohne_abbruch_freitext'    -- der FREITEXT eines Abbruchs bleibt
+                                   draussen. ENT-481 hat den Abbruchgrund als
+                                   Klartext AUS DEM KATALOG freigegeben; das
+                                   freie Feld daneben ist eine andere Sache.
+                                   Wer eine Runde abbricht, tippt dort im
+                                   Moment und ungeprueft, was ihn aufhaelt.
+                                   Fuers Cockpit ist genau das der Zweck --
+                                   fuer den Kunden nicht. */
 function wachbuch_eintraege(PDO $pdo, string $von, string $bis,
                             $objekte = null, int $grenze = WACHBUCH_GRENZE,
                             ?array $arten = null, array $optionen = []): array
@@ -745,6 +754,7 @@ function wachbuch_eintraege(PDO $pdo, string $von, string $bis,
     }
     $nurBeendet = !empty($optionen['nur_beendete_runden']);
     $nurEreignisMitRunde = !empty($optionen['nur_ereignisse_mit_runde']);
+    $ohneAbbruchFreitext = !empty($optionen['ohne_abbruch_freitext']);
     // Ein leeres Filterfeld heisst "alles", nicht "nichts": Wer keine Art
     // waehlt, will die ganze Chronik, nicht eine leere Seite.
     $will = static function (string $art) use ($arten): bool {
@@ -884,8 +894,10 @@ function wachbuch_eintraege(PDO $pdo, string $von, string $bis,
                     // Der Freitext eines Abbruchs steht IM Eintrag, nicht nur
                     // in der Detailansicht: Wer die Nacht durchliest, soll den
                     // Grund sehen, ohne jede abgebrochene Runde einzeln zu
-                    // oeffnen.
-                    'text'            => $z['abbruch_freitext'],
+                    // oeffnen. Das gilt fuers COCKPIT -- im Portal bleibt er
+                    // draussen, siehe 'ohne_abbruch_freitext' oben. Der
+                    // codierte Abbruchgrund geht in beiden Faellen mit.
+                    'text'            => $ohneAbbruchFreitext ? null : $z['abbruch_freitext'],
                     'scans_anzahl'    => (int)($z['scans_anzahl'] ?? 0),
                     'hat_foto'        => false,
                 ];

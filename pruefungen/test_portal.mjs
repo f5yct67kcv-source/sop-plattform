@@ -134,7 +134,10 @@ const DETAILS = {
   // Runde 11: abgebrochen nach zwei Punkten -- vier wurden nie besucht.
   11: rumpf(11, vorTagen(5), {
     status: 'abgebrochen',
-    abbruch_grund: 'Stelle nicht gefunden', abbruch_freitext: 'Zugang war verschlossen',
+    // Kein abbruch_freitext: Der Server liefert ihn seit der Sperre in
+    // portal_rundgang_detail.php nicht mehr ins Portal. Eine Attrappe, die
+    // mehr liefert als der Server, prueft eine Lage, die es nicht gibt.
+    abbruch_grund: 'Stelle nicht gefunden',
     fortschritt: { gesamt: 6, erledigt: 2, bestaetigt: 2, ersatzscan: 0, nicht_verfuegbar: 0 },
     kontrollpunkte: [
       punkt(1, 'Eingang Nord', 'bestaetigt', `${vorTagen(5)} 21:33:00`),
@@ -766,8 +769,19 @@ check('KRITISCH: ein gemeldetes Ereignis erscheint mit Zeit und Art',
 // Der Klartext SELBST wird serverseitig geprueft (test_php.mjs und
 // pruef_kundenportal.php) -- hier kaeme er aus der Attrappe, die Zusage
 // koennte gar nicht anschlagen. Geprueft wird, dass die Tafel ihn zeigt.
-check('KRITISCH: Abbruchgrund und Zusatztext stehen in der Tafel (ENT-481)',
-  /Stelle nicht gefunden/.test(detail2) && /Zugang war verschlossen/.test(detail2));
+//
+// Der ZUSATZTEXT stand hier bis zur Sperre des Abbruch-Freitexts mit drin.
+// Er ist NICHT aufgeweicht worden, sondern seine Grundlage ist weggefallen:
+// ENT-481 gibt den Abbruchgrund als Klartext AUS DEM KATALOG frei -- eine
+// geschlossene Liste, ueber die jemand entschieden hat. Das freie Feld
+// daneben nennt die Entscheidung nicht, und der versendete Rapport, auf den
+// sich ihr "1:1" beruft, fuehrt weder Grund noch Freitext. Wo die Sperre
+// wirklich sitzt, prueft der Server: pruef_wachbuch.php fuer die Chronik,
+// test_php.mjs fuer jeden Portal-Endpunkt.
+check('KRITISCH: der Abbruchgrund steht in der Tafel (ENT-481)',
+  /Stelle nicht gefunden/.test(detail2));
+check('KRITISCH: der Freitext des Abbruchs steht NICHT in der Tafel',
+  !/Zugang war verschlossen/.test(detail2));
 check('KRITISCH: und zwar ganz oben in der Tafel, vor den Kennzahlen',
   await page.evaluate(() => {
     const t = document.querySelectorAll('#liste .zeile')[1].nextElementSibling;

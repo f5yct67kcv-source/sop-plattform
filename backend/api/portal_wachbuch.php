@@ -101,6 +101,7 @@ if (!$objektIds) {
 $roh = wachbuch_eintraege($pdo, $von, $bis, $objektIds, WACHBUCH_GRENZE, $arten, [
     'nur_beendete_runden'      => true,
     'nur_ereignisse_mit_runde' => true,
+    'ohne_abbruch_freitext'    => true,
 ]);
 
 // Die Antwort wird STUECK FUER STUECK zusammengesetzt und nicht durchgereicht:

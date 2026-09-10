@@ -160,6 +160,25 @@ foreach ($mitAbbruch['eintraege'] as $e) { if ($e['id'] === 'rundgang-204') { $a
 pruef('KRITISCH: ein Abbruch steht mit Zeitpunkt, Grund und Freitext in der Chronik',
     $ab !== null && $ab['zeit'] === "$T0 01:12:00" && $ab['status'] === 'abgebrochen'
     && $ab['abbruch_grund'] === 'notfall' && $ab['text'] === 'Alarm am Nachbarobjekt');
+
+// ── Und dieselbe Runde aus Kundensicht ───────────────────────────────────
+// Der codierte Abbruchgrund ist fuers Portal freigegeben (ENT-481), der
+// FREITEXT daneben nicht: Wer eine Runde abbricht, tippt dort im Moment und
+// ungeprueft, was ihn aufhaelt. Der Schalter entscheidet das an der Quelle
+// -- nicht die Oberflaeche, und nicht ein unset() beim Hinausgeben.
+$portalSicht = wachbuch_eintraege($pdo, $T2, $T0, null, WACHBUCH_GRENZE, null,
+    ['ohne_abbruch_freitext' => true]);
+$abP = null;
+foreach ($portalSicht['eintraege'] as $e) { if ($e['id'] === 'rundgang-204') { $abP = $e; } }
+pruef('KRITISCH: mit dem Portal-Schalter traegt der Abbruch KEINEN Freitext mehr',
+    $abP !== null && ($abP['text'] ?? null) === null);
+pruef('KRITISCH: der Freitext steht auch in keinem anderen Feld des Eintrags',
+    $abP !== null && !in_array('Alarm am Nachbarobjekt', array_map(
+        static fn($v) => is_scalar($v) ? (string)$v : '', $abP), true));
+pruef('Der codierte Grund geht weiterhin mit -- gesperrt ist der Freitext, nicht die Aussage',
+    $abP !== null && $abP['abbruch_grund'] === 'notfall');
+pruef('Und der Vorgang selbst bleibt sichtbar, nicht etwa die ganze Runde',
+    $abP !== null && $abP['status'] === 'abgebrochen' && $abP['zeit'] === "$T0 01:12:00");
 // Eine LAUFENDE Runde ist kein Vorgang -- sie ist Arbeit, die noch aussteht.
 $pdo->exec("INSERT INTO rundgang (id, einsatz_id, mitarbeiter_id, objekt_id, status, rohzeit_start)
             VALUES (205, 101, 5, 1, 'laeuft', '$T0 02:00:00')");
