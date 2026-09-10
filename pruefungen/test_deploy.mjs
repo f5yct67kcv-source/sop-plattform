@@ -125,6 +125,41 @@ for (const [datei, platzhalter] of [
   }
 }
 
+/* Die eigene Adresse der Anlage (ENT-501).
+
+   Sie steckt in jedem Link, den der Server per E-Mail verschickt -- Passwort
+   zuruecksetzen, Portalzugang, Beleg. Bis ENT-501 kam sie aus dem Host-Kopf
+   DER ANFRAGE; wer die unangemeldeten Endpunkte mit einem fremden Host-Kopf
+   aufrief, liess den Server einen Link auf die eigene Adresse verschicken.
+
+   Zwei Aussagen sind hier zu sichern, und die zweite ist die
+   sicherheitsrelevante: */
+{
+  const dbInhalt = readFileSync(`${WURZEL}/backend/db.php`, 'utf8');
+  check('db.php traegt den Platzhalter __APP_BASIS_URL__',
+    dbInhalt.includes('__APP_BASIS_URL__'));
+  check('KRITISCH: __APP_BASIS_URL__ wird beim Deploy auch ersetzt',
+    /sed -i "s\|__APP_BASIS_URL__\|\$EFF_APP_BASIS_URL\|g" dist\/db\.php/.test(workflow));
+
+  // Der Production-Zweig hat einen Rueckfall, damit ein Deploy nicht an
+  // einer nicht gesetzten Variablen scheitert und die Links dabei wortlos
+  // verschwinden.
+  const zweige = workflow.split('UMGEBUNG=staging');
+  check('Der Production-Zweig setzt eine Basisadresse',
+    /EFF_APP_BASIS_URL=/.test(zweige[0]) && /https:\/\//.test(zweige[0]));
+
+  // KRITISCH und der eigentliche Punkt: Staging darf NICHT auf die
+  // produktive Adresse zurueckfallen. Ein Staging-Link, der auf Production
+  // zeigt, waere genau der Fehler, den die urspruengliche
+  // HTTP_HOST-Loesung vermeiden wollte -- und ein Kunde bekaeme aus einem
+  // Test eine Nachricht mit einem Link in die echte Anlage.
+  const stagingZweig = (zweige[1] || '').split('fi\n')[0];
+  check('KRITISCH: Staging faellt fuer die Basisadresse NICHT auf Production zurueck',
+    /EFF_APP_BASIS_URL=""/.test(stagingZweig)
+    && /STAGING_DOMAIN/.test(stagingZweig)
+    && !/rapport\./.test(stagingZweig));
+}
+
 // Dasselbe für Dateien, die das CSS per url(...) holt -- Schriften, Bilder,
 // Hintergründe. Bis ENT-223 gab es hier gar keine solche Datei, seither
 // liegen zwei Schriftschnitte unter fonts/ (Inter, selbst ausgeliefert statt

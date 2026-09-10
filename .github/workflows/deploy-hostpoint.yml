@@ -126,6 +126,25 @@ jobs:
             EFF_VAPID_PRIVATE_PEM_B64="$P_VAPID_PRIVATE_PEM_B64"
             EFF_VAPID_KONTAKT="$P_VAPID_KONTAKT"
             EFF_PUSH_CRON_SCHLUESSEL="$P_PUSH_CRON_SCHLUESSEL"
+            # Eigene Adresse der Anlage (ENT-501). Sie steckt in jedem Link,
+            # den der Server per E-Mail verschickt -- Passwort zuruecksetzen,
+            # Portalzugang, Beleg. Bis ENT-501 kam sie aus dem Host-Kopf DER
+            # ANFRAGE; wer die unangemeldeten Endpunkte mit einem fremden
+            # Host-Kopf aufrief, liess den Server einen Link auf die eigene
+            # Adresse verschicken. Jetzt weiss der Deploy-Lauf, wohin er
+            # deployt, und traegt es ein -- dieselbe Ueberlegung wie bei
+            # APP_ENV.
+            #
+            # Kein Secret: Die Adresse ist oeffentlich und steht in README.md.
+            # Ueber die Environment-Variable APP_BASIS_URL ueberschreibbar,
+            # falls die Anlage einmal unter einer anderen Adresse laeuft --
+            # ohne sie gilt die heutige, damit ein Deploy nicht an einer
+            # nicht gesetzten Variablen scheitert und die Links dabei
+            # wortlos verschwinden.
+            EFF_APP_BASIS_URL="${{ vars.APP_BASIS_URL }}"
+            if [ -z "$EFF_APP_BASIS_URL" ]; then
+              EFF_APP_BASIS_URL="https://rapport.itufeden.myhostpoint.ch"
+            fi
 
             PFLICHT_FEHLT=""
             [ -z "$EFF_DB_HOST" ]                && PFLICHT_FEHLT="$PFLICHT_FEHLT DB_HOST"
@@ -152,6 +171,20 @@ jobs:
             EFF_VAPID_PRIVATE_PEM_B64="$S_VAPID_PRIVATE_PEM_B64"
             EFF_VAPID_KONTAKT="$S_VAPID_KONTAKT"
             EFF_PUSH_CRON_SCHLUESSEL="$S_PUSH_CRON_SCHLUESSEL"
+            # Eigene Adresse (ENT-501), siehe Begruendung im Production-Zweig.
+            # Fuer Staging steht die Domain bereits als Environment-Variable
+            # STAGING_DOMAIN bereit -- dieselbe, mit der die beiden
+            # Verifikationsschritte weiter unten die Seite abrufen. KEIN
+            # Rueckfall auf die produktive Adresse: Ein Staging-Link, der auf
+            # Produktion zeigt, waere genau der Fehler, den die urspruengliche
+            # HTTP_HOST-Loesung vermeiden wollte. Fehlt die Variable, bleibt
+            # der Platzhalter stehen, basis_url() liefert null und die
+            # betroffenen Endpunkte verschicken keinen Link, statt einen
+            # falschen.
+            EFF_APP_BASIS_URL=""
+            if [ -n "${{ vars.STAGING_DOMAIN }}" ]; then
+              EFF_APP_BASIS_URL="https://${{ vars.STAGING_DOMAIN }}"
+            fi
 
             PFLICHT_FEHLT=""
             [ -z "$EFF_DB_HOST" ]                && PFLICHT_FEHLT="$PFLICHT_FEHLT STAGING_DB_HOST"
@@ -249,6 +282,7 @@ jobs:
             echo "EFF_VAPID_PRIVATE_PEM_B64=$EFF_VAPID_PRIVATE_PEM_B64"
             echo "EFF_VAPID_KONTAKT=$EFF_VAPID_KONTAKT"
             echo "EFF_PUSH_CRON_SCHLUESSEL=$EFF_PUSH_CRON_SCHLUESSEL"
+            echo "EFF_APP_BASIS_URL=$EFF_APP_BASIS_URL"
           } >> "$GITHUB_ENV"
 
           # Mehrzeiliger Wert -- eigener Heredoc-Block statt einer einfachen
@@ -405,6 +439,13 @@ jobs:
           # Quelle der Wahrheit verwenden.
           sed -i "s|__APP_ENV__|$UMGEBUNG|g" dist/db.php
           sed -i "s|__APP_ENV__|$UMGEBUNG|g" dist/testumgebung.js
+          # Eigene Adresse (ENT-501). Bleibt sie leer -- bei Staging ohne
+          # gesetzte STAGING_DOMAIN --, steht weiterhin woertlich
+          # "__APP_BASIS_URL__" in dist/db.php; basis_url() erkennt das und
+          # liefert null, und die betroffenen Endpunkte verschicken dann
+          # keinen Link statt eines falschen (dieselbe Bauart wie bei SMTP
+          # und Push oben).
+          sed -i "s|__APP_BASIS_URL__|$EFF_APP_BASIS_URL|g" dist/db.php
           sed -i "s|__ANTHROPIC_API_KEY__|$EFF_ANTHROPIC_API_KEY|g" dist/ai.php
           # SMTP fuer den Offert-Versand (ENT-192). Bleiben die Secrets ungesetzt,
           # steht weiterhin woertlich "__SMTP_HOST__" usw. in dist/mailer.php --

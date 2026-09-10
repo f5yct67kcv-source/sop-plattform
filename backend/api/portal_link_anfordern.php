@@ -25,6 +25,7 @@ declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../kundenportal.php';
 require __DIR__ . '/../mailer.php';
+require_once __DIR__ . '/../anmeldung.php';   // Bremse je Absender-Adresse (ENT-501)
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(['status' => 'error', 'message' => 'nur POST'], 405);
@@ -46,6 +47,39 @@ if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
 
 $pdo = db();
 if (!kp_tabellen_da($pdo)) { $immerGleich(); }
+
+// Ohne eigene Adresse kein Link (ENT-501) -- geprueft vor allem anderen,
+// damit kein Token entsteht, das niemand bekommt. Die Antwort bleibt
+// gleichlautend; der Grund geht ins Serverprotokoll, nicht an den Browser.
+$basis = basis_url();
+if ($basis === null) {
+    error_log('Kundenportal: APP_BASIS_URL ist nicht gesetzt — kein Link verschickt.');
+    $immerGleich();
+}
+
+// ── Bremse je Absender-Adresse (ENT-501) ──────────────────────────────
+//
+// Bis hierher gab es nur die Stundengrenze weiter unten, und die haengt an
+// einem BEREITS BESTEHENDEN Zugang: Fuer eine Adresse, die es gar nicht
+// gibt, war dieser Endpunkt unbegrenzt aufrufbar. Zusammen mit dem
+// Zeitunterschied (bei einem Treffer laeuft ein vollstaendiger
+// SMTP-Handshake, bei einem Fehlschlag nicht) liess sich damit
+// durchprobieren, welche E-Mail-Adressen Kunden des Betriebs sind.
+//
+// Eigener Namensraum "portallink:", damit diese Zaehlung weder die
+// Portal-Anmeldung noch die Ruecksetzung der Mitarbeitenden sperrt --
+// dieselbe Ueberlegung wie bei "reset:" in passwort_vergessen.php.
+// Gezaehlt wird JEDE Anfrage, nicht nur eine erfolglose: Es gibt hier kein
+// "falsch", das sich unterscheiden liesse, ohne die Existenz zu verraten.
+$adresse   = anmeld_adresse();
+$bremsName = 'portallink:' . $email;
+[$fehlerName, $fehlerAdresse] = anmeld_zaehlen($pdo, $bremsName, $adresse);
+if (anmeld_sperre($fehlerName, $fehlerAdresse) > 0) {
+    // Auch hier dieselbe Antwort wie sonst: Eine 429 nur fuer bestehende
+    // Adressen waere wieder ein Unterschied, den es nicht geben darf.
+    $immerGleich();
+}
+anmeld_fehlversuch($pdo, $bremsName, $adresse);
 
 $stmt = $pdo->prepare('SELECT id, name FROM kundenzugang WHERE email = ? AND aktiv = 1');
 $stmt->execute([$email]);
@@ -89,12 +123,13 @@ $betrieb = $pdo->query('SELECT firma FROM betrieb WHERE id = 1')->fetch();
 $firma   = trim((string)($betrieb['firma'] ?? ''));
 $absender = $firma !== '' ? $firma : 'Ihr Ansprechpartner';
 
-// Der Host kommt aus der Anfrage und nicht aus einer Einstellung: Die
-// Seite, von der die Anforderung kam, ist die Seite, auf die der Link
-// zeigen muss -- sonst schickt ein Test auf der Staging-Adresse Links auf
-// die produktive (gleiches Vorgehen wie passwort_vergessen.php).
-$host = (string)($_SERVER['HTTP_HOST'] ?? '');
-$link = 'https://' . $host . '/portal.html?neu=' . urlencode($tokenRoh);
+// Die Basisadresse kommt aus dem DEPLOY und nicht mehr aus dem Host-Kopf
+// der Anfrage (ENT-501). Das Anliegen der urspruenglichen Fassung bleibt
+// erfuellt -- ein Test auf der Staging-Adresse schickt weiterhin Links auf
+// Staging --, nur ist die Quelle jetzt der Deploy-Lauf, der die Umgebung
+// zweifelsfrei kennt, statt der Anfrage, die jeder frei setzen kann. Dieser
+// Endpunkt braucht keine Anmeldung: Der Host-Kopf kam hier von aussen.
+$link = $basis . '/portal.html?neu=' . urlencode($tokenRoh);
 
 // Betreff und Text formuliert der SERVER. Nichts aus der Anfrage geht in
 // die Nachricht ein -- sonst waere dieser Endpunkt ein Weg, ueber die

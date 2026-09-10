@@ -40,6 +40,12 @@ $stmt = db()->prepare('SELECT id, password_hash, ist_admin FROM mitarbeiter WHER
 $stmt->execute([$name]);
 $user = $stmt->fetch();
 
+// Gibt es das Konto nicht, wird trotzdem gerechnet (ENT-501): Sonst
+// unterscheidet die ANTWORTZEIT, was die Meldung absichtlich nicht
+// unterscheidet. Siehe passwort_blindpruefung() in anmeldung.php.
+if (!$user) {
+    passwort_blindpruefung($password);
+}
 if (!$user || !password_verify($password, $user['password_hash'])) {
     anmeld_fehlversuch(db(), $name, $adresse);
     json_response(['status' => 'error', 'message' => 'Name oder Passwort falsch'], 401);
@@ -97,7 +103,9 @@ if (hat_spalte(db(), 'sessions', 'letzte_nutzung')) {
 } else {
     $stmt = db()->prepare('INSERT INTO sessions (token, mitarbeiter_id) VALUES (?, ?)');
 }
-$stmt->execute([$token, $user['id']]);
+// Gespeichert wird nur der Abdruck (ENT-501) -- der Rohwert geht an den
+// Browser und steht danach nirgends mehr auf dem Server.
+$stmt->execute([sitzung_abdruck($token), $user['id']]);
 
 // Geraet merken, wenn gewuenscht und die Zwei-Faktor-Anmeldung an ist.
 // Ohne zweiten Faktor waere ein gemerktes Geraet sinnlos -- es wuerde

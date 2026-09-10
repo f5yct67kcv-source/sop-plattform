@@ -84,6 +84,10 @@ $stmt = $pdo->prepare(
 $stmt->execute([$email]);
 $zugang = $stmt->fetch(PDO::FETCH_ASSOC);
 if (!$zugang) {
+    // Gerechnet wird trotzdem (ENT-501): Ohne das verriete die
+    // ANTWORTZEIT, was die Meldung absichtlich verschweigt -- und hier
+    // waere die Auskunft, welche E-Mail-Adressen Kunden des Betriebs sind.
+    passwort_blindpruefung($passwort);
     anmeld_fehlversuch($pdo, $email, $adresse);
     $abweisen();
 }
@@ -91,6 +95,11 @@ if (!$zugang) {
 $zugangId = (int)$zugang['id'];
 $hash     = (string)($zugang['password_hash'] ?? '');
 
+// Auch der Fall "Zugang da, aber noch kein Passwort gesetzt" darf sich
+// nicht ueber die Zeit verraten -- er ist von aussen dieselbe Aussage.
+if ($hash === '') {
+    passwort_blindpruefung($passwort);
+}
 if ($hash === '' || !password_verify($passwort, $hash)) {
     anmeld_fehlversuch($pdo, $email, $adresse);
     $abweisen();
@@ -108,7 +117,7 @@ $token = bin2hex(random_bytes(32));
 $pdo->prepare(
     'INSERT INTO kunden_sessions (token, zugang_id, erstellt_am, letzte_nutzung)
      VALUES (?, ?, NOW(), NOW())'
-)->execute([$token, $zugangId]);
+)->execute([sitzung_abdruck($token), $zugangId]);
 
 // Wann war dieser Zugang zuletzt da? Die einzige Spur, ob ein Portalzugang
 // ueberhaupt genutzt wird -- und damit die Antwort auf die Frage aus

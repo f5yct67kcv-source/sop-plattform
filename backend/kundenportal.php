@@ -164,6 +164,10 @@ function require_kundensession(): array
     if (!$token) {
         json_response(['status' => 'error', 'message' => 'kein Token'], 401);
     }
+    // Verglichen wird der Abdruck, nicht der Rohwert (ENT-501) -- wie bei
+    // der Verwaltungssitzung in db.php. In kunden_sessions.token steht
+    // seither nur noch SHA-256.
+    $abdruck = sitzung_abdruck((string)$token);
     $pdo = db();
     if (!kp_tabellen_da($pdo)) {
         // Kein stilles "nicht angemeldet": Die Einrichtung ist nicht
@@ -179,7 +183,7 @@ function require_kundensession(): array
            JOIN kunden k ON k.id = z.kunde_id
           WHERE s.token = ? AND z.aktiv = 1'
     );
-    $stmt->execute([$token]);
+    $stmt->execute([$abdruck]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$row) {
         json_response(['status' => 'error',
@@ -190,7 +194,7 @@ function require_kundensession(): array
     $geboren = strtotime((string)$row['erstellt_am']) ?: $jetzt;
     $gesehen = strtotime((string)$row['letzte_nutzung']) ?: $geboren;
     if (kp_sitzung_abgelaufen($geboren, $gesehen, $jetzt)) {
-        $pdo->prepare('DELETE FROM kunden_sessions WHERE token = ?')->execute([$token]);
+        $pdo->prepare('DELETE FROM kunden_sessions WHERE token = ?')->execute([$abdruck]);
         json_response(['status' => 'error',
             'message' => 'Die Anmeldung ist abgelaufen — bitte neu anmelden.'], 401);
     }
@@ -199,7 +203,7 @@ function require_kundensession(): array
     // mehrere Endpunkte auf einmal (gleiche Ueberlegung wie in db.php).
     if ($jetzt - $gesehen > 300) {
         $pdo->prepare('UPDATE kunden_sessions SET letzte_nutzung = NOW() WHERE token = ?')
-            ->execute([$token]);
+            ->execute([$abdruck]);
     }
 
     // Gelegentlich aufraeumen -- jede tote Sitzung ist ein Token, der

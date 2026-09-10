@@ -5260,9 +5260,25 @@ function rgSeiteZeichnen(d) {
 function rgsKontakteHtml(d) {
   const leute = (d && d.ansprechpartner) || [];
   const z = d && d.zentrale && d.zentrale.telefon ? d.zentrale : null;
+  // 'webseite' ist der einzige Kontaktweg OHNE festes Schema davor -- bei
+  // 'email' steht "mailto:" davor, bei 'telefon'/'mobil' "tel:". Ohne diese
+  // Pruefung wurde aus einem gespeicherten "javascript:..." ein Link, den
+  // ein Antippen ausfuehrt, und zwar hier: in der Kontaktliste WAEHREND der
+  // laufenden Runde (ENT-501). esc() faengt das nicht ab -- in
+  // "javascript:" steht keines der Zeichen, die es ersetzt.
+  //
+  // Der Server laesst seit ENT-501 nichts anderes mehr herein
+  // (web_adresse_sicher() in db.php). Diese Zeile ist trotzdem noetig, und
+  // zwar nicht als Doppelung: Sie deckt ab, was VOR der Sperre schon in der
+  // Datenbank stand. Was nicht folgt, wird als Text angezeigt statt als
+  // toter Link -- sichtbar bleibt der Wert in jedem Fall.
+  const webZiel = wert => {
+    const t = String(wert == null ? '' : wert).replace(/[\u0000-\u0020\u007F]/g, '');
+    return /^https?:\/\//i.test(t) ? t : null;
+  };
   const wegZiel = we => we.art === 'email' ? 'mailto:' + we.wert
     : (we.art === 'telefon' || we.art === 'mobil') ? 'tel:' + we.wert.replace(/\s/g, '')
-    : we.art === 'webseite' ? we.wert : null;
+    : we.art === 'webseite' ? webZiel(we.wert) : null;
   return `
     <div class="rgs-klapp" id="rgsKlappAp">
       <button type="button" class="rgs-klapp-kopf" onclick="rgSeiteKlapp('rgsKlappAp')" aria-expanded="false">

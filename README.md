@@ -83,6 +83,16 @@ in `dashboard.html` — eine Zeile aendern genuegt.
 
 ## Deploy
 
+> **Einmalig beim naechsten Deploy (ENT-501): Alle muessen sich neu
+> anmelden.** Sitzungs-Token stehen seither nur noch als SHA-256-Abdruck in
+> der Datenbank statt im Klartext — wer je Lesezugriff darauf bekam (eine
+> Sicherungskopie, ein phpMyAdmin-Zugang), konnte damit vorher jede offene
+> Sitzung uebernehmen, ohne Passwort und ohne zweiten Faktor. Die
+> bestehenden Eintraege passen danach nicht mehr; betroffen sind
+> Mitarbeitende **und** Kundenzugaenge. Ein Uebergang, der beides annimmt,
+> haette den Klartext noch bis zu 30 Tage stehen lassen — also genau das
+> Problem behalten. Nichts geht dabei verloren, es ist eine Neuanmeldung.
+
 Jeder Push auf `main` loest den Workflow
 `.github/workflows/deploy-hostpoint.yml` aus (ENT-341) und deployt nach
 Produktion: Platzhalter (`__DB_HOST__`, `__ANTHROPIC_API_KEY__` usw.)
@@ -140,6 +150,33 @@ unten).
 | `VAPID_PRIVATE_PEM_B64` | `STAGING_VAPID_PRIVATE_PEM_B64` | Signierschluessel fuer Push-Benachrichtigungen (ENT-424) | selbst erzeugen, siehe unten — je Umgebung ein **eigener**, sonst klingeln Testversande auf den echten Telefonen |
 | `VAPID_KONTAKT` | `STAGING_VAPID_KONTAKT` | Absenderkontakt im Push-JWT, `mailto:…` oder `https://…` (RFC 8292 verlangt ihn) | frei waehlbar, muss erreichbar sein |
 | `PUSH_CRON_SCHLUESSEL` | `STAGING_PUSH_CRON_SCHLUESSEL` | Schluessel, mit dem der Hostpoint-Zeitgeber den Nachzuegler-Versand aufruft | selbst erzeugen: `openssl rand -hex 24` |
+
+### Environment-Variablen (keine Secrets)
+
+Zwei Werte sind **nicht** vertraulich und stehen darum als
+Environment-Variable statt als Secret (`Settings → Environments → …
+→ Variables`):
+
+| Variable | Umgebung | Wofuer |
+|---|---|---|
+| `STAGING_DOMAIN` | staging | Adresse, unter der die Verifikationsschritte die Staging-Seite abrufen (ENT-384/ENT-387) |
+| `APP_BASIS_URL` | production (optional) | Adresse der Anlage, aus der jeder per E-Mail verschickte Link gebaut wird (ENT-501) |
+
+**Zu `APP_BASIS_URL` (ENT-501):** Bis dahin kam diese Adresse aus dem
+`Host`-Kopf der Anfrage — und der laesst sich frei setzen. Wer die
+unangemeldeten Endpunkte (`passwort_vergessen.php`,
+`portal_link_anfordern.php`) mit einem fremden `Host`-Kopf aufrief, liess
+den Server einen Ruecksetz-Link auf die eigene Adresse verschicken. Jetzt
+traegt der Deploy die Adresse ein.
+
+- **Production:** Ist die Variable nicht gesetzt, gilt die heutige Adresse
+  als Vorgabe — es ist also nichts zu tun. Setzen muss man sie erst, wenn
+  die Anlage einmal unter einer anderen Adresse laeuft.
+- **Staging:** Kommt aus `STAGING_DOMAIN`. **Kein Rueckfall auf
+  Production** — ein Staging-Link, der in die echte Anlage zeigt, waere
+  genau der Fehler, den die alte Loesung vermeiden wollte. Fehlt
+  `STAGING_DOMAIN`, verschicken die betroffenen Endpunkte dort **keinen**
+  Link (und sagen das im Serverprotokoll), statt einen falschen.
 
 **Erforderlich, sonst bricht der Deploy ab** (siehe Workflow-Schritt „Umgebung
 waehlen und erforderliche Secrets pruefen"): `DB_*`, `HOSTPOINT_FTP_*` und
