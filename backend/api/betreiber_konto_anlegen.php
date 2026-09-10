@@ -31,7 +31,7 @@ if ($vorhanden === 0) {
     $user = require_session();
     require_verwaltung($user);
 } else {
-    require_betreiber();
+    require_betreiber_voll();
 }
 
 $daten = json_decode(file_get_contents('php://input') ?: '', true) ?: [];

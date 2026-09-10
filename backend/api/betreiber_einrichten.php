@@ -89,6 +89,26 @@ $tabellen = [
   angelegt_am DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   geaendert_am DATETIME NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+// Zweiter Faktor je Betreiber-Konto (OP-517). Getrennt von `zwei_faktor`,
+// weil jene Tabelle an `mitarbeiter` haengt und ein Betreiber-Konto keine
+// Zeile darin ist -- das Verfahren (TOTP) ist dasselbe, nur die Speicherung
+// getrennt.
+//
+// `bestaetigt_am` ist der eigentliche Schalter: Ein eingerichtetes, aber nie
+// gegengeprueftes Geheimnis zaehlt nicht, sonst sperrte sich aus, wer den
+// QR-Code abgebrochen hat, bevor seine App ihn gelesen hatte.
+//
+// `notfallcodes` haelt ausschliesslich HASHES, nie die Codes selbst -- ein
+// Notfallcode ist ein Passwortersatz und wird wie eines verwahrt.
+'betreiber_zwei_faktor' => "CREATE TABLE IF NOT EXISTS betreiber_zwei_faktor (
+  betreiber_id INT UNSIGNED NOT NULL PRIMARY KEY,
+  geheim VARCHAR(64) NOT NULL,
+  bestaetigt_am DATETIME NULL,
+  letztes_fenster BIGINT NULL,
+  notfallcodes TEXT NULL,
+  angelegt_am DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 ];
 
 foreach ($tabellen as $name => $sql) {

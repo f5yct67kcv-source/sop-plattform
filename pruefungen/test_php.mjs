@@ -808,8 +808,12 @@ const OHNE_ANMELDUNG = [
   'beleg_oeffentlich.php',
   'beleg_entscheidung.php',
 ];
+// Drei Anmeldewege, drei Pruefstellen: die Verwaltung (require_session),
+// das Kundenportal (require_kundensession, ENT-441) und die Betreiber-Ebene
+// (require_betreiber, ENT-519). Wer einen davon ruft, ist angemeldet -- wer
+// keinen ruft, steht unten namentlich mit Grund.
 const ohneAnmeldung = apiDateien.filter(f =>
-  !/require_session\s*\(|require_kundensession\s*\(/.test(ohneKommentar(f)));
+  !/require_session\s*\(|require_kundensession\s*\(|require_betreiber(?:_voll)?\s*\(/.test(ohneKommentar(f)));
 const unbenannt = ohneAnmeldung.filter(f => !OHNE_ANMELDUNG.includes(f));
 check('KRITISCH: jeder Endpunkt ganz ohne Anmeldung steht namentlich da',
   unbenannt.length === 0);

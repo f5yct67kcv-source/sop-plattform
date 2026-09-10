@@ -77,6 +77,40 @@ $pruef('KRITISCH: freier Text ist kein gueltiger Status',
 $pruef('leerer Status ist ungueltig',
     be_mandant_status_gueltig('') === false);
 
+// ── 4. Kanton wird normalisiert, nicht geraten ────────────────────────
+$pruef('Kanton wird gross geschrieben', be_kanton_normal(' be ') === 'BE');
+$pruef('leerer Kanton ist null, nicht ein leerer String', be_kanton_normal('  ') === null);
+// Gegenprobe: Was nicht wie ein Kuerzel aussieht, wird nicht durchgereicht.
+$pruef('KRITISCH: Unsinn wird nicht als Kanton uebernommen',
+    be_kanton_normal('Bern') === null && be_kanton_normal('B') === null
+    && be_kanton_normal('B3') === null);
+
+// ── 5. Verbindungslage unterscheidet drei Faelle ──────────────────────
+//
+// Der wichtige ist der dritte: Halb ausgefuellte Angaben sind etwas anderes
+// als "nutzt die Standardverbindung". Wer beide zusammenzieht, zeigt einen
+// unerreichbaren Mandanten als eingerichtet an.
+$leer = ['db_host' => '', 'db_name' => '', 'db_user' => ''];
+$voll = ['db_host' => 'h', 'db_name' => 'n', 'db_user' => 'u'];
+$halb = ['db_host' => 'h', 'db_name' => '',  'db_user' => ''];
+$pruef('alles leer heisst Standardverbindung',
+    be_verbindung_lage($leer) === 'standardverbindung');
+$pruef('alles gefuellt heisst eigene Datenbank',
+    be_verbindung_lage($voll) === 'eigene_datenbank');
+$pruef('KRITISCH: halb ausgefuellt ist ein eigener Fall, nicht Standardverbindung',
+    be_verbindung_lage($halb) === 'unvollstaendig');
+$pruef('fehlende Schluessel zaehlen wie leer',
+    be_verbindung_lage([]) === 'standardverbindung');
+
+// ── 6. Der Schreibweg des Mandanten ist eine geschlossene Liste ───────
+$pruef('KRITISCH: Status und GAV stehen nicht im Sammel-Schreibweg',
+    !in_array('status', BE_MANDANT_FELDER, true)
+    && !in_array('gav_unterstellt', BE_MANDANT_FELDER, true)
+    && !in_array('gav_bestaetigt_am', BE_MANDANT_FELDER, true));
+$pruef('KRITISCH: kein Passwortfeld im Schreibweg',
+    count(array_filter(BE_MANDANT_FELDER,
+        static fn($f) => str_contains($f, 'pass') || $f === 'secret')) === 0);
+
 echo count($bad) === 0
     ? "$ok bestanden, 0 nicht bestanden\n"
     : "$ok bestanden, " . count($bad) . " nicht bestanden\n";

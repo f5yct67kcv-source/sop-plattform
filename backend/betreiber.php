@@ -214,3 +214,236 @@ function be_gav_lage(?int $unterstellt, ?string $bestaetigtAm): string
     if ($bestaetigtAm === null || $bestaetigtAm === '') { return 'unbestaetigt'; }
     return $unterstellt === 1 ? 'unterstellt' : 'nicht_unterstellt';
 }
+
+// ── Aussperrschutz ────────────────────────────────────────────────────
+//
+// Dieselbe Falle wie OP-505 in der Verwaltung: Dort liess sich der letzte
+// Verwalter deaktivieren, und danach konnte niemand mehr Rollen vergeben --
+// der Weg zurueck war phpMyAdmin. Auf der Betreiber-Ebene waere es
+// schlimmer, weil es hier keine zweite Ebene darueber gibt, die einen
+// wieder hereinliesse.
+//
+// Gezaehlt werden AKTIVE Konten ausser dem genannten. Wer wissen will, ob
+// er sich selbst deaktivieren darf, fragt mit der eigenen Id -- kommt 0
+// zurueck, ist er der letzte.
+function be_konten_zahl(PDO $pdo, int $ausser = 0): int
+{
+    if (!be_tabellen_da($pdo)) { return 0; }
+    $s = $pdo->prepare('SELECT COUNT(*) FROM betreiber WHERE aktiv = 1 AND id <> ?');
+    $s->execute([$ausser]);
+    return (int)$s->fetchColumn();
+}
+
+// ── Mandant: was von aussen geschrieben werden darf ───────────────────
+//
+// Eine geschlossene Liste statt "alles, was ankommt". Ohne sie traegt der
+// naechste, der ein Feld ergaenzt, es versehentlich in den Schreibweg --
+// und dazu gehoeren hier Felder, die NIEMAND ueber die Oberflaeche setzen
+// soll (angelegt_am) oder die eine eigene Bestaetigung brauchen
+// (gav_bestaetigt_am/-von, siehe be_gav_bestaetigen()).
+const BE_MANDANT_FELDER = ['name', 'kanton', 'db_host', 'db_name', 'db_user', 'secret_name'];
+
+// Der Kanton steuert den Feiertagskalender. Zwei Buchstaben, gross --
+// mehr wird hier nicht geprueft: Eine Liste der 26 Kantone waere eine
+// zweite Wahrheit neben dem Feiertagskalender, und ein Tippfehler faellt
+// dort auf, wo er wirkt.
+function be_kanton_normal(string $roh): ?string
+{
+    $k = strtoupper(trim($roh));
+    if ($k === '') { return null; }
+    return preg_match('/^[A-Z]{2}$/', $k) === 1 ? $k : null;
+}
+
+// Die GAV-Unterstellung wird BESTAETIGT, nicht gesetzt.
+//
+// Warum das ein eigener Weg ist und nicht ein Feld unter anderen: Die
+// Antwort auf diese Frage entscheidet, gegen welches Regelwerk der Betrieb
+// spaeter rechnet. Sie gehoert festgehalten mit dem Zeitpunkt und der
+// Person, die sie gegeben hat -- so wie das Auslegungsregister jede
+// Annahme mit Herkunft fuehrt. Ein stilles Umschalten in einer
+// Sammel-Speicherung waere hier der Fehler.
+//
+// KEINE eigenstaendige Auslegung: Das System stellt die Frage und haelt die
+// Antwort fest. Es leitet die Unterstellung NICHT selbst her -- weder aus
+// dem Kanton noch aus der Betriebsgroesse noch aus der Branche. Wo der
+// Wortlaut des GAV nicht eindeutig ist, gehoert ein Eintrag ins
+// Auslegungsregister, nicht eine Annahme in dieses Feld.
+function be_gav_bestaetigen(PDO $pdo, int $mandantId, bool $unterstellt, string $wer): bool
+{
+    $s = $pdo->prepare(
+        'UPDATE mandant
+            SET gav_unterstellt = ?, gav_bestaetigt_am = NOW(), gav_bestaetigt_von = ?,
+                geaendert_am = NOW()
+          WHERE id = ?'
+    );
+    $s->execute([$unterstellt ? 1 : 0, mb_substr($wer, 0, 200), $mandantId]);
+    return $s->rowCount() > 0;
+}
+
+// Ein Mandant, dessen Verbindungsangaben unvollstaendig sind, ist nicht
+// erreichbar -- und das ist etwas anderes als "gesperrt" oder "leer".
+// Die Oberflaeche muss die drei Faelle auseinanderhalten koennen
+// (Hausregel: unbekannt darf nie wie keine aussehen), darum sagt der
+// Server es, statt es die Oberflaeche raten zu lassen.
+//
+// Alle drei Felder leer = Bestandsmandant auf der Standardverbindung, das
+// ist vollstaendig. Teilweise gefuellt = jemand hat angefangen und nicht
+// zu Ende gebracht.
+function be_verbindung_lage(array $m): string
+{
+    $teile = [trim((string)($m['db_host'] ?? '')),
+              trim((string)($m['db_name'] ?? '')),
+              trim((string)($m['db_user'] ?? ''))];
+    $gefuellt = array_filter($teile, static fn($t) => $t !== '');
+    if (count($gefuellt) === 0) { return 'standardverbindung'; }
+    if (count($gefuellt) === 3) { return 'eigene_datenbank'; }
+    return 'unvollstaendig';
+}
+
+// ── Zwei-Faktor für Betreiber-Konten (OP-517) ─────────────────────────
+//
+// WARUM HIER UND NICHT IN zweifaktor.php: Das Verfahren ist dasselbe --
+// TOTP nach RFC 6238, und die reinen Funktionen dort (zf_code, zf_pruefen,
+// zf_geheimnis_erzeugen, zf_notfallcode) werden hier unveraendert benutzt
+// statt nachgebaut. Getrennt ist nur die SPEICHERUNG: `zwei_faktor` haengt
+// an `mitarbeiter`, und ein Betreiber-Konto ist keine Zeile darin. Die
+// Trennung der Ebenen waere sonst genau an der Stelle durchbrochen, an der
+// sie am meisten zaehlt.
+//
+// WARUM ZWINGEND, anders als in der Verwaltung (dort Entscheid des
+// Projektinhabers, freiwillig): Am Verwaltungszugang haengt die
+// Personalakte EINES Betriebs. An diesem Konto haengt jeder Betrieb --
+// und es gibt keine Ebene darueber, die einen Missbrauch bemerken oder
+// rueckgaengig machen koennte.
+require_once __DIR__ . '/zweifaktor.php';
+
+function be_zf_tabelle_da(PDO $pdo): bool
+{
+    return hat_tabelle($pdo, 'betreiber_zwei_faktor');
+}
+
+// Bestaetigt heisst: Das Geheimnis ist eingerichtet UND einmal mit einem
+// gueltigen Code gegengeprueft worden. Ein eingerichtetes, nie bestaetigtes
+// Geheimnis zaehlt NICHT -- sonst sperrte sich aus, wer den QR-Code
+// abgebrochen hat, bevor seine App ihn gelesen hatte.
+function be_zf_ist_an(PDO $pdo, int $betreiberId): bool
+{
+    if (!be_zf_tabelle_da($pdo)) { return false; }
+    $s = $pdo->prepare('SELECT bestaetigt_am FROM betreiber_zwei_faktor WHERE betreiber_id = ?');
+    $s->execute([$betreiberId]);
+    $r = $s->fetch(PDO::FETCH_ASSOC);
+    return $r !== false && $r['bestaetigt_am'] !== null;
+}
+
+function be_zf_geheim(PDO $pdo, int $betreiberId): ?string
+{
+    if (!be_zf_tabelle_da($pdo)) { return null; }
+    $s = $pdo->prepare('SELECT geheim FROM betreiber_zwei_faktor WHERE betreiber_id = ?');
+    $s->execute([$betreiberId]);
+    $g = $s->fetchColumn();
+    return $g === false ? null : (string)$g;
+}
+
+// ── Die zweite Wache: angemeldet UND zweiter Faktor bestaetigt ─────────
+//
+// Zwei Wachen statt einer Fallunterscheidung, aus demselben Grund wie die
+// Trennung der Anmeldewege selbst: require_betreiber() sagt "wer bist du",
+// require_betreiber_voll() sagt zusaetzlich "und bist du vollstaendig
+// abgesichert". Nur die Endpunkte, die den zweiten Faktor EINRICHTEN,
+// duerfen mit der ersten auskommen -- alles andere verlangt die zweite.
+//
+// Damit ist die Pflicht im Server durchgesetzt und nicht in der
+// Oberflaeche: Eine Sperre, die man am Browser vorbei umgehen kann, ist
+// keine (CLAUDE.md).
+const BE_ZF_EINRICHTUNG = 'zwei_faktor_einrichten';
+
+function require_betreiber_voll(): array
+{
+    $ich = require_betreiber();
+    $pdo = betreiber_db();
+
+    if (be_zf_ist_an($pdo, (int)$ich['id'])) {
+        // Der Faktor ist eingerichtet -- geprueft wurde er bei der
+        // Anmeldung. Die Sitzung entsteht erst danach.
+        $ich['zwei_faktor'] = true;
+        return $ich;
+    }
+
+    // Kein bestaetigter zweiter Faktor: Die Sitzung reicht nur bis zur
+    // Einrichtung. Eigener Statuscode und eigener Hinweis -- "noch nicht
+    // eingerichtet" ist etwas anderes als "keine Berechtigung", und die
+    // Oberflaeche muss die beiden auseinanderhalten koennen.
+    json_response([
+        'status'  => 'error',
+        'grund'   => BE_ZF_EINRICHTUNG,
+        'message' => 'Für dieses Konto ist die Zwei-Faktor-Anmeldung noch nicht eingerichtet. '
+                   . 'Sie ist im Betreiber-Bereich zwingend — bitte zuerst einrichten.',
+    ], 403);
+}
+
+// Einen Code einloesen: erst der Zeitcode, dann die Notfallcodes -- der
+// Normalfall zuerst.
+//
+// Der Wiederverwendungsschutz (letztes_fenster) ist der wichtige Teil und
+// aus zf_code_einloesen() uebernommen: Ohne ihn bliebe ein einmal
+// mitgelesener Code die vollen dreissig Sekunden plus Toleranz gueltig, und
+// genau das ist das Fenster, in dem ein abgefangener Code benutzt wird.
+function be_zf_code_einloesen(PDO $pdo, int $betreiberId, string $eingabe, int $jetzt): bool
+{
+    if (!be_zf_tabelle_da($pdo)) { return false; }
+    $s = $pdo->prepare('SELECT geheim, letztes_fenster, notfallcodes
+                          FROM betreiber_zwei_faktor WHERE betreiber_id = ?');
+    $s->execute([$betreiberId]);
+    $st = $s->fetch(PDO::FETCH_ASSOC);
+    if (!$st) { return false; }
+
+    $fenster = zf_pruefen((string)$st['geheim'], $eingabe, $jetzt);
+    if ($fenster !== null) {
+        if ($st['letztes_fenster'] !== null && (int)$st['letztes_fenster'] >= $fenster) {
+            return false;                 // dieser Code war schon dran
+        }
+        $pdo->prepare('UPDATE betreiber_zwei_faktor SET letztes_fenster = ? WHERE betreiber_id = ?')
+            ->execute([$fenster, $betreiberId]);
+        return true;
+    }
+
+    return be_zf_notfallcode_einloesen($pdo, $betreiberId, $eingabe);
+}
+
+// Notfallcodes liegen als Hashes. Ein eingeloester Code wird aus der Liste
+// entfernt und nicht als "benutzt" markiert -- er ist danach wertlos, und
+// was wertlos ist, muss nicht aufbewahrt werden.
+function be_zf_notfallcode_einloesen(PDO $pdo, int $betreiberId, string $eingabe): bool
+{
+    $code = zf_code_normalisieren($eingabe);
+    if (preg_match('/^[a-z2-9]{4}-[a-z2-9]{4}$/', $code) !== 1) { return false; }
+
+    $s = $pdo->prepare('SELECT notfallcodes FROM betreiber_zwei_faktor WHERE betreiber_id = ?');
+    $s->execute([$betreiberId]);
+    $roh = $s->fetchColumn();
+    if ($roh === false || $roh === null || $roh === '') { return false; }
+
+    $hashes = json_decode((string)$roh, true);
+    if (!is_array($hashes)) { return false; }
+
+    foreach ($hashes as $i => $hash) {
+        if (password_verify($code, (string)$hash)) {
+            unset($hashes[$i]);
+            $pdo->prepare('UPDATE betreiber_zwei_faktor SET notfallcodes = ? WHERE betreiber_id = ?')
+                ->execute([json_encode(array_values($hashes)), $betreiberId]);
+            return true;
+        }
+    }
+    return false;
+}
+
+function be_zf_notfallcodes_offen(PDO $pdo, int $betreiberId): int
+{
+    if (!be_zf_tabelle_da($pdo)) { return 0; }
+    $s = $pdo->prepare('SELECT notfallcodes FROM betreiber_zwei_faktor WHERE betreiber_id = ?');
+    $s->execute([$betreiberId]);
+    $roh = $s->fetchColumn();
+    if ($roh === false || $roh === null || $roh === '') { return 0; }
+    $h = json_decode((string)$roh, true);
+    return is_array($h) ? count($h) : 0;
+}

@@ -27,6 +27,7 @@ require_once __DIR__ . '/../betreiber.php';
 $daten = json_decode(file_get_contents('php://input') ?: '', true) ?: [];
 $email = mb_strtolower(trim((string)($daten['email'] ?? '')));
 $pass  = (string)($daten['passwort'] ?? '');
+$code  = zf_code_normalisieren((string)($daten['code'] ?? ''));
 
 // Eigener Namensraum in der Bremse -- siehe Kopf.
 $bremsName = 'betreiber:' . $email;
@@ -65,6 +66,32 @@ if (!password_verify($pass, (string)$konto['passwort_hash'])) {
     json_response(['status' => 'error', 'message' => 'Anmeldung nicht möglich.'], 401);
 }
 
+// ── Zweiter Faktor (OP-517) ───────────────────────────────────────────
+//
+// AB HIER ist das Passwort richtig. Die Fehlversuche werden aber noch NICHT
+// zurueckgesetzt -- ein sechsstelliger Code liesse sich sonst unbegrenzt
+// durchprobieren, weil jeder Versuch die Zaehlung loeschte. Uebernommen aus
+// login.php, wo dieselbe Ueberlegung steht.
+//
+// KEIN GEMERKTES GERAET, anders als in der Verwaltung (ZF_GERAET_TAGE).
+// Ein vierzehn Tage vertrautes Geraet ist ein guter Tausch, wenn dahinter
+// die Personalakte eines Betriebs liegt. Hinter diesem Konto liegt jeder
+// Betrieb, und es gibt keine Ebene darueber, die einen Missbrauch bemerken
+// wuerde -- hier wird jedes Mal gefragt.
+$kontoId = (int)$konto['id'];
+if (be_zf_ist_an($pdo, $kontoId)) {
+    if ($code === '') {
+        // Kein Fehlversuch: Es wurde noch nichts geraten. Sonst liessen
+        // sich fremde Zugaenge allein durch Anmeldeversuche aussperren.
+        json_response(['status' => 'zweifaktor',
+            'message' => 'Bitte den sechsstelligen Code aus der Authenticator-App eingeben.'], 200);
+    }
+    if (!be_zf_code_einloesen($pdo, $kontoId, $code, time())) {
+        anmeld_fehlversuch(db(), $bremsName, $adresse);
+        json_response(['status' => 'error', 'message' => 'Der Code stimmt nicht.'], 401);
+    }
+}
+
 // Der Rohwert geht einmal an den Aufrufer und wird nie gespeichert --
 // in der Tabelle steht ausschliesslich der Abdruck (ENT-501).
 $token = bin2hex(random_bytes(32));
@@ -82,4 +109,9 @@ json_response([
     // Nutzer von einem stillen Abmelden ueberraschen zu lassen.
     'sitzung_ruhe_minuten' => BE_SITZUNG_RUHE_MIN,
     'sitzung_max_stunden'  => BE_SITZUNG_MAX_STUNDEN,
+    // Damit die Oberflaeche sofort zur Einrichtung fuehren kann, statt den
+    // Nutzer am ersten Endpunkt in einen 403 laufen zu lassen. Die Sperre
+    // selbst sitzt im Server (require_betreiber_voll) -- das hier erspart
+    // nur den Umweg.
+    'zwei_faktor'          => be_zf_ist_an($pdo, $kontoId),
 ]);

@@ -58,8 +58,11 @@ const EINSTIEG = {
   // darum an der Verwaltung dieses Betriebs.
   'betreiber_einrichten.php': 'Einrichtung, abgesichert ueber require_verwaltung',
 };
+// Beide Formen zaehlen: require_betreiber() weist aus, wer jemand ist,
+// require_betreiber_voll() zusaetzlich, dass sein zweiter Faktor steht.
+const WACHE = /require_betreiber(?:_voll)?\s*\(/;
 const ohneWache = endpunkte.filter(f =>
-  !EINSTIEG[f] && !lies(`backend/api/${f}`).includes('require_betreiber('));
+  !EINSTIEG[f] && !WACHE.test(nurCode(lies(`backend/api/${f}`))));
 check('KRITISCH: jeder betreiber_*-Endpunkt ruft require_betreiber() oder steht namentlich da',
   ohneWache.length === 0);
 if (ohneWache.length) { bad.push('ohne Wache: ' + ohneWache.join(', ')); }
@@ -68,7 +71,7 @@ if (ohneWache.length) { bad.push('ohne Wache: ' + ohneWache.join(', ')); }
 // spaeter doch eine Wache, gehoert er aus der Liste heraus -- sonst waechst
 // eine Ausnahmeliste, die niemand mehr aufraeumt.
 const unnoetigBefreit = Object.keys(EINSTIEG).filter(f =>
-  endpunkte.includes(f) && lies(`backend/api/${f}`).includes('require_betreiber('));
+  endpunkte.includes(f) && WACHE.test(nurCode(lies(`backend/api/${f}`))));
 check('kein Einstiegspunkt steht unnoetig in der Ausnahmeliste',
   unnoetigBefreit.length === 0);
 
@@ -85,14 +88,25 @@ check('KRITISCH: die Einrichtung haengt an der Verwaltung, nicht an einer leeren
 // betreiber_sessions muss der Wert, der mit token verglichen oder dort
 // eingetragen wird, durch sitzung_abdruck() gegangen sein.
 const alleQuellen = [modul, ...endpunkte.map(f => lies(`backend/api/${f}`))].join('\n');
-// Eine Abfrage ist etwas anderes als ein CREATE TABLE: Die Einrichtung
-// LEGT die Tabelle an und liest sie nie -- sie braucht keinen Abdruck.
-const ABFRAGE = /(?:SELECT|INSERT INTO|UPDATE|DELETE FROM)[\s\S]{0,200}betreiber_sessions/;
-const beruehrt = [modul, ...endpunkte.map(f => lies(`backend/api/${f}`))]
-  .map(nurCode).filter(q => ABFRAGE.test(q));
-check('es gibt ueberhaupt Abfragen auf betreiber_sessions', beruehrt.length > 0);
-check('KRITISCH: wer betreiber_sessions abfragt, benutzt sitzung_abdruck()',
-  beruehrt.every(q => q.includes('sitzung_abdruck(')));
+// Die Aussage betrifft die SPALTE token, nicht die Tabelle: Ein CREATE
+// TABLE legt sie nur an, und ein Loeschen nach betreiber_id braucht keinen
+// Abdruck. Geprueft wird, wer den Token als Ausweis benutzt.
+const UEBER_TOKEN = /(?:SELECT|INSERT INTO|UPDATE|DELETE FROM)[\s\S]{0,240}betreiber_sessions[\s\S]{0,240}\btoken\b|\btoken\b[\s\S]{0,120}betreiber_sessions/;
+const ueberToken = [['modul', modul], ...endpunkte.map(f => [f, lies(`backend/api/${f}`)])]
+  .map(([n, q]) => [n, nurCode(q)])
+  .filter(([, q]) => UEBER_TOKEN.test(q) && !/CREATE TABLE[\s\S]{0,400}betreiber_sessions/.test(q));
+check('es gibt ueberhaupt Zugriffe ueber den Sitzungstoken', ueberToken.length > 0);
+const ohneAbdruck = ueberToken.filter(([, q]) => !q.includes('sitzung_abdruck('));
+check('KRITISCH: wer betreiber_sessions ueber den token anspricht, benutzt sitzung_abdruck()',
+  ohneAbdruck.length === 0);
+if (ohneAbdruck.length) { bad.push('ohne Abdruck: ' + ohneAbdruck.map(([n]) => n).join(', ')); }
+// Zweite, unabhaengige Aussage: Der Rohwert darf nirgends direkt in eine
+// Abfrage wandern. Genau das war der Fehler, den ENT-501 aufgeraeumt hat.
+const rohDurchgereicht = [['modul', modul], ...endpunkte.map(f => [f, lies(`backend/api/${f}`)])]
+  .filter(([, q]) => /execute\(\s*\[\s*\$token\b/.test(nurCode(q)));
+check('KRITISCH: der Rohtoken wird nie direkt in eine Abfrage gegeben',
+  rohDurchgereicht.length === 0);
+if (rohDurchgereicht.length) { bad.push('Rohtoken in Abfrage: ' + rohDurchgereicht.map(([n]) => n).join(', ')); }
 // Gegenprobe in Form einer zweiten, unabhaengigen Aussage: Der erzeugte
 // Rohtoken darf die Anmeldung nur als Antwort verlassen, nie in ein INSERT.
 const anm = lies('backend/api/betreiber_anmelden.php');
@@ -139,9 +153,18 @@ check('KRITISCH: Blindpruefung gegen Zeitmessung bei unbekannter Adresse',
   anm.includes('passwort_blindpruefung('));
 // Dieselbe Antwort fuer "gibt es nicht" und "Passwort falsch" -- sonst
 // verraet die Meldung, welche Adressen es gibt.
-const meldungen = [...anm.matchAll(/'message' => '([^']*)'\]\s*,\s*401\)/g)].map(m => m[1]);
+// Nur die Stufe VOR dem zweiten Faktor: Dort entscheidet sich, ob die
+// Antwort verraet, welche Adressen es gibt. Was danach kommt ("Der Code
+// stimmt nicht"), setzt ein richtiges Passwort bereits voraus und darf
+// deshalb eine eigene Aussage sein.
+const vorZweitemFaktor = anm.split('── Zweiter Faktor')[0];
+const meldungen = [...vorZweitemFaktor.matchAll(/'message' => '([^']*)'\]\s*,\s*401\)/g)].map(m => m[1]);
+check('beide Fehlerwege der Passwortstufe sind da', meldungen.length >= 2);
 check('KRITISCH: unbekannte Adresse und falsches Passwort antworten gleichlautend',
   meldungen.length >= 2 && new Set(meldungen).size === 1);
+// Und die gemeinsame Meldung darf nicht doch verraten, worum es ging.
+check('KRITISCH: die Meldung nennt weder Adresse noch Konto',
+  meldungen.every(m => !/adresse|konto|benutzer|unbekannt|existiert|passwort/i.test(m)));
 // Das maechtigste Konto der Anlage traegt mindestens die Verwaltungsschwelle.
 const konto = lies('backend/api/betreiber_konto_anlegen.php');
 check('KRITISCH: das Betreiber-Passwort wird auf Verwaltungsniveau geprueft',
@@ -173,6 +196,123 @@ check('KRITISCH: der Name des Bestandsbetriebs wird gelesen, nicht einprogrammie
   && !/VALUES\s*\([^)]*['"][A-Za-zÄÖÜäöü][^)]*GmbH/i.test(insMandant));
 check('der Platzhalter greift nur, wenn kein Briefkopf hinterlegt ist',
   /trim\(\$name\)\s*===\s*''/.test(einr));
+
+// ── 9. Aussperrschutz und Datensparsamkeit der neuen Endpunkte ───────
+const kontoStatus = nurCode(lies('backend/api/betreiber_konto_status.php'));
+check('KRITISCH: das letzte aktive Betreiber-Konto laesst sich nicht stilllegen',
+  kontoStatus.includes('be_konten_zahl('));
+check('beim Stilllegen verfallen die Sitzungen des Kontos mit',
+  /DELETE FROM betreiber_sessions[\s\S]{0,80}betreiber_id/.test(kontoStatus));
+
+// Der Passworthash verlaesst den Server nie -- auch nicht gegenueber
+// jemandem, der ohnehin alles darf.
+const kontoListe = nurCode(lies('backend/api/betreiber_konto_list.php'));
+check('KRITISCH: die Kontenliste liefert keinen Passworthash',
+  !/SELECT[\s\S]{0,200}passwort_hash/.test(kontoListe));
+
+// Der Mandantenstamm nimmt kein Passwort entgegen -- und verschluckt es
+// nicht still, sondern sagt es.
+const save = nurCode(lies('backend/api/betreiber_mandant_save.php'));
+check('KRITISCH: ein mitgesendetes Datenbank-Passwort wird abgewiesen, nicht verschluckt',
+  /db_pass|db_passwort/.test(save) && /400/.test(save));
+check('der Sammel-Schreibweg fasst weder Status noch GAV an',
+  !/SET[\s\S]{0,200}\bstatus\s*=/.test(save) && !/gav_unterstellt\s*=/.test(save));
+
+// Die GAV-Angabe wird bestaetigt, nicht gesetzt: ohne ausdrueckliche
+// Bestaetigung passiert nichts, und wer bestaetigt hat, kommt aus der
+// Sitzung -- nie aus der Anfrage.
+const gav = nurCode(lies('backend/api/betreiber_mandant_gav.php'));
+check('KRITISCH: ohne ausdrueckliche Bestaetigung wird die GAV-Angabe nicht geschrieben',
+  /bestaetigt/.test(gav) && /400/.test(gav));
+check('KRITISCH: der Bestaetigende kommt aus der Sitzung, nicht aus der Anfrage',
+  /\$ich\['name'\]/.test(gav) && !/\$daten\['bestaetigt_von'\]|\$daten\['wer'\]/.test(gav));
+check('die Frage kennt kein Ja als Vorgabewert',
+  /is_bool\(\$daten\['unterstellt'\]\)/.test(gav));
+// Der Hinweistext steht an EINER Stelle -- eine zweite Fassung in der
+// Oberflaeche waere eine zweite Wahrheit darueber, was bestaetigt wurde.
+check('der Hinweistext wird vom Server geliefert', gav.includes('GAV_HINWEIS'));
+check('KRITISCH: der Hinweistext legt den GAV nicht selbst aus',
+  /nicht nach einer Einschätzung dieser Software|nicht hergeleitet/.test(lies('backend/api/betreiber_mandant_gav.php')));
+
+// Kein Betreiber-Endpunkt liefert Betriebsdaten mit. Der Bereich sieht
+// Vertrag und Zustand eines Betriebs, nicht seinen Inhalt.
+const BETRIEBSTABELLEN = /\bFROM (?:mitarbeiter|einsaetze|rapporte|lohnlauf|lohn_person|objekte|kunden)\b/;
+const zuViel = endpunkte.filter(f => BETRIEBSTABELLEN.test(nurCode(lies(`backend/api/${f}`))));
+check('KRITISCH: kein Betreiber-Endpunkt liefert Betriebsdaten',
+  zuViel.length === 0);
+if (zuViel.length) { bad.push('liest Betriebsdaten: ' + zuViel.join(', ')); }
+
+// ── 10. Der zweite Faktor ist Pflicht, und zwar im Server (OP-517) ───
+//
+// Die Pflicht steht und faellt damit, dass die Vollwache tatsaechlich vor
+// jedem Endpunkt sitzt, der etwas kann. Nur vier duerfen mit der einfachen
+// Wache auskommen -- und der Grund steht bei jedem: Wer den Faktor erst
+// einrichten muss, muss das erfahren, tun und bestaetigen koennen, und
+// abmelden muss immer gehen. Alles andere verlangt die Vollwache.
+const NUR_EINFACHE_WACHE = {
+  'betreiber_zf_status.php':      'muss sagen duerfen, dass eingerichtet werden muss',
+  'betreiber_zf_einrichten.php':  'richtet den Faktor ein',
+  'betreiber_zf_bestaetigen.php': 'bestaetigt ihn',
+  'betreiber_abmelden.php':       'abmelden muss immer moeglich sein',
+};
+const VOLLWACHE = /require_betreiber_voll\s*\(/;
+const brauchtVoll = endpunkte.filter(f => !EINSTIEG[f] && !NUR_EINFACHE_WACHE[f]);
+const ohneVoll = brauchtVoll.filter(f => !VOLLWACHE.test(nurCode(lies(`backend/api/${f}`))));
+check('KRITISCH: jeder Betreiber-Endpunkt verlangt den zweiten Faktor oder steht namentlich da',
+  ohneVoll.length === 0);
+if (ohneVoll.length) { bad.push('ohne Vollwache: ' + ohneVoll.join(', ')); }
+check('es gibt ueberhaupt Endpunkte hinter der Vollwache', brauchtVoll.length > 0);
+// Kehrseite: Bekommt einer der vier spaeter doch die Vollwache, gehoert er
+// aus der Liste heraus -- sonst waechst eine Ausnahmeliste, die niemand
+// mehr aufraeumt.
+const unnoetigEinfach = Object.keys(NUR_EINFACHE_WACHE).filter(f =>
+  endpunkte.includes(f) && VOLLWACHE.test(nurCode(lies(`backend/api/${f}`))));
+check('kein Endpunkt steht unnoetig in der Vollwache-Ausnahmeliste',
+  unnoetigEinfach.length === 0);
+
+// Die Wache selbst muss die Pflicht auch durchsetzen und nicht nur melden.
+check('KRITISCH: require_betreiber_voll bricht ohne bestaetigten Faktor ab',
+  /function require_betreiber_voll[\s\S]{0,1200}be_zf_ist_an\([\s\S]{0,600}json_response\([\s\S]{0,400}403/.test(modulCode));
+// "Noch nicht eingerichtet" ist etwas anderes als "keine Berechtigung" --
+// die Oberflaeche muss die beiden auseinanderhalten koennen.
+check('der Abbruch nennt einen eigenen Grund statt nur "verboten"',
+  modulCode.includes('BE_ZF_EINRICHTUNG'));
+
+// Ein eingerichtetes, nie bestaetigtes Geheimnis zaehlt NICHT.
+check('KRITISCH: erst die Bestaetigung schaltet den Faktor scharf',
+  /function be_zf_ist_an[\s\S]{0,500}bestaetigt_am[\s\S]{0,200}!== null/.test(modulCode));
+
+// Wiederverwendungsschutz: Ohne ihn bliebe ein mitgelesener Code die vollen
+// dreissig Sekunden plus Toleranz gueltig.
+check('KRITISCH: ein einmal benutzter Code gilt nicht noch einmal',
+  /letztes_fenster[\s\S]{0,200}>=\s*\$fenster[\s\S]{0,80}return false/.test(modulCode));
+
+// Notfallcodes liegen als Hash, nie im Klartext.
+const zfBest = nurCode(lies('backend/api/betreiber_zf_bestaetigen.php'));
+check('KRITISCH: Notfallcodes werden gehasht gespeichert',
+  /password_hash\(/.test(zfBest) && !/notfallcodes = \?[\s\S]{0,120}json_encode\(\$codes\)/.test(zfBest));
+check('die Notfallcodes gehen genau einmal hinaus, beim Bestaetigen',
+  endpunkte.filter(f => /'notfallcodes'\s*=>\s*\$codes/.test(lies(`backend/api/${f}`))).length === 1);
+
+// Zuruecksetzen ist der Weg zurueck ueber ein ZWEITES Konto, keine
+// Hintertuer am eigenen.
+const zfReset = nurCode(lies('backend/api/betreiber_zf_zuruecksetzen.php'));
+check('KRITISCH: zuruecksetzen verlangt selbst einen bestaetigten Faktor',
+  VOLLWACHE.test(zfReset));
+check('KRITISCH: der eigene Faktor laesst sich so nicht abraeumen',
+  /\$ziel === \(int\)\$ich\['id'\]/.test(zfReset));
+check('beim Zuruecksetzen enden die Sitzungen des Ziels',
+  /DELETE FROM betreiber_sessions[\s\S]{0,60}betreiber_id/.test(zfReset));
+
+// Kein gemerktes Geraet auf dieser Ebene -- bewusst anders als in der
+// Verwaltung, weil hinter diesem Konto jeder Betrieb liegt.
+check('KRITISCH: kein vertrauenswuerdiges Geraet umgeht den Faktor',
+  !/zf_geraet_gilt\(|ZF_GERAET_TAGE/.test(nurCode(anm)));
+
+// Und die Anmeldung darf die Fehlversuche erst zuruecksetzen, wenn auch der
+// Code stimmt -- sonst liesse er sich unbegrenzt durchprobieren.
+check('KRITISCH: der Code wird vor der Sitzung geprueft, nicht danach',
+  anm.indexOf('be_zf_code_einloesen') < anm.indexOf('INSERT INTO betreiber_sessions'));
 
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
