@@ -390,12 +390,28 @@ $felder = [
     (int)$user['id'],
 ];
 if ($eintragId > 0) {
+    // Eine Zahlungszeile wechselt nie den Besitzer. Ohne mitarbeiter_id in
+    // der Bedingung haengt eine veraltete eintrag_id aus dem Formular -- etwa
+    // nach einem Wechsel der ausgewaehlten Person ohne Neuladen -- die Zeile
+    // einer ANDEREN Person auf diese um und ueberschreibt deren IBAN. Beim
+    // naechsten Zahlungslauf ginge der Lohn auf ein fremdes Konto. Der
+    // Loeschweg oben bindet aus demselben Grund an beide Werte.
+    $gehoert = $pdo->prepare('SELECT COUNT(*) FROM lohn_zahlung WHERE id = ? AND mitarbeiter_id = ?');
+    $gehoert->execute([$eintragId, $id]);
+    if ((int)$gehoert->fetchColumn() === 0) {
+        json_response(['status' => 'error',
+            'message' => 'Diese Zahlungsangabe gehört nicht zu dieser Person — '
+                       . 'bitte die Seite neu laden und noch einmal versuchen'], 400);
+    }
     $felder[] = $eintragId;
+    $felder[] = $id;
+    // Zweite Sperre neben der Pruefung oben, absichtlich doppelt: Was die
+    // Bedingung nicht trifft, wird auch nicht geschrieben.
     $pdo->prepare(
         'UPDATE lohn_zahlung SET mitarbeiter_id = ?, reihenfolge = ?, art = ?, betrag_rappen = ?,
              iban = ?, empfaenger = ?, bank = ?, aktiv = ?, bemerkung = ?,
              geaendert_von = ?, geaendert_am = NOW()
-         WHERE id = ?'
+         WHERE id = ? AND mitarbeiter_id = ?'
     )->execute($felder);
 } else {
     $pdo->prepare(
