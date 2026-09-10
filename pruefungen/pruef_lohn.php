@@ -19,6 +19,7 @@ function pruef(string $name, bool $c) { global $ok, $bad; if ($c) { $ok++; } els
 
 // planung.php zieht db.php nach; hier wird keine Datenbank gebraucht.
 function json_response($data, int $status = 200): void {}
+require __DIR__ . '/schema_echt.php';
 require_once __DIR__ . '/../backend/lohn.php';
 require_once __DIR__ . '/../backend/mitarbeiter.php';
 
@@ -704,31 +705,27 @@ pruef('Ein unbekannter Schluessel wird nicht stillschweigend eingeschraenkt',
 // Stellen ohne die andere, wird sie rot.
 $einr = file_get_contents(__DIR__ . '/../backend/api/planung_einrichten.php');
 
-// Das Schema und die Anweisung aus dem Quelltext holen.
-preg_match("/'lohnart' => \"(.*?)\" ?,\n/s", $einr, $mSchema);
+// Die Anweisung aus dem Quelltext holen; das Schema kommt ueber
+// schema_echt.php -- dort steht die Umschrift nach SQLite an einer Stelle
+// statt in jeder Pruefdatei kopiert, und dort kommen auch die
+// ADD-COLUMN-Nachtraege des Einrichtungslaufs mit.
 preg_match('/(INSERT IGNORE INTO lohnart.*?VALUES \([^)]*\))/s', $einr, $mIns);
 pruef('Schema und INSERT fuer lohnart sind im Einrichtungslauf auffindbar',
-    !empty($mSchema[1]) && !empty($mIns[1]));
+    schema_create('lohnart') !== null && !empty($mIns[1]));
 
-if (!empty($mSchema[1]) && !empty($mIns[1])) {
-    // Nur so viel umschreiben, wie SQLite braucht -- Spalten, Reihenfolge
-    // und Anzahl bleiben unangetastet, sonst pruefte man die Umschrift.
-    $ddl = $mSchema[1];
-    $ddl = preg_replace('/\bINT AUTO_INCREMENT PRIMARY KEY\b/', 'INTEGER PRIMARY KEY', $ddl);
-    $ddl = preg_replace('/,\s*UNIQUE KEY \w+ \(([^)]*)\)/', ', UNIQUE ($1)', $ddl);
-    $ddl = preg_replace('/,\s*KEY \w+ \([^)]*\)/', '', $ddl);
-    $ddl = preg_replace('/\) ENGINE=\w+ DEFAULT CHARSET=\w+/', ')', $ddl);
+if (schema_create('lohnart') !== null && !empty($mIns[1])) {
     $sql = str_replace('INSERT IGNORE INTO', 'INSERT OR IGNORE INTO', $mIns[1]);
 
     $p = new PDO('sqlite::memory:');
     $p->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    $fehler = null;
     $zeilen = lohnart_startbestand();
-    try {
-        $p->exec($ddl);
-        $st = $p->prepare($sql);
-        foreach ($zeilen as $z) { $st->execute($z); }
-    } catch (Throwable $e) { $fehler = $e->getMessage(); }
+    $fehler = schema_anlegen($p, 'lohnart');
+    if ($fehler === null) {
+        try {
+            $st = $p->prepare($sql);
+            foreach ($zeilen as $z) { $st->execute($z); }
+        } catch (Throwable $e) { $fehler = $e->getMessage(); }
+    }
 
     pruef('KRITISCH: der echte Startbestand laesst sich mit dem echten INSERT einfuegen',
         $fehler === null);

@@ -13,33 +13,27 @@ declare(strict_types=1);
 // gegangen. Der Loeschweg derselben Datei band von Anfang an an beide
 // Werte; nur der Schreibweg tat es nicht.
 
+require __DIR__ . '/schema_echt.php';
+
 $ok = 0; $bad = [];
 function pruef(string $name, bool $c) { global $ok, $bad; if ($c) { $ok++; } else { $bad[] = $name; } }
 
-$einr = file_get_contents(__DIR__ . '/../backend/api/planung_einrichten.php');
-preg_match("/'lohn_zahlung' => \"(.*?)\",\n/s", $einr, $mSchema);
-pruef('Das Schema fuer lohn_zahlung ist im Einrichtungslauf auffindbar', !empty($mSchema[1]));
+pruef('Das Schema fuer lohn_zahlung ist im Einrichtungslauf auffindbar', schema_create('lohn_zahlung') !== null);
 
 $quelle = file_get_contents(__DIR__ . '/../backend/api/lohn_person.php');
 preg_match("/'(UPDATE lohn_zahlung SET.*?)'/s", $quelle, $mUpd);
 pruef('Der Schreibweg fuer Zahlungsangaben ist in lohn_person.php auffindbar', !empty($mUpd[1]));
 
-if (!empty($mSchema[1]) && !empty($mUpd[1])) {
-    // Nur so viel umschreiben, wie SQLite braucht -- Spalten und Reihenfolge
-    // bleiben unangetastet, sonst pruefte man die Umschrift.
-    $ddl = $mSchema[1];
-    $ddl = preg_replace('/\bINT AUTO_INCREMENT PRIMARY KEY\b/', 'INTEGER PRIMARY KEY', $ddl);
-    $ddl = preg_replace('/,\s*KEY \w+ \([^)]*\)/', '', $ddl);
-    $ddl = preg_replace('/,\s*FOREIGN KEY \([^)]*\) REFERENCES \w+\([^)]*\)[^,)]*/', '', $ddl);
-    $ddl = preg_replace('/\) ENGINE=\w+ DEFAULT CHARSET=\w+/', ')', $ddl);
+if (schema_create('lohn_zahlung') !== null && !empty($mUpd[1])) {
 
     $sql = str_replace('NOW()', "datetime('now')", $mUpd[1]);
 
     $q = new PDO('sqlite::memory:', null, null,
         [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
          PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]);
-    $fehler = null;
-    try { $q->exec($ddl); } catch (Throwable $e) { $fehler = $e->getMessage(); }
+    // Anlegen ueber schema_echt.php: CREATE plus die Nachtraege des
+    // Einrichtungslaufs, an einer Stelle gepflegt statt je Datei kopiert.
+    $fehler = schema_anlegen($q, 'lohn_zahlung');
     pruef('KRITISCH: das echte Schema laesst sich anlegen', $fehler === null);
 
     if ($fehler === null) {

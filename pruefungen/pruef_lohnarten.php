@@ -18,12 +18,12 @@ declare(strict_types=1);
 // Platzhalter", ENT-451) -- eine falsche Zahl faellt hier sofort auf, weil
 // die echte Anweisung sonst gar nicht laeuft.
 
+require __DIR__ . '/schema_echt.php';
+
 $ok = 0; $bad = [];
 function pruef(string $name, bool $c) { global $ok, $bad; if ($c) { $ok++; } else { $bad[] = $name; } }
 
-$einr = file_get_contents(__DIR__ . '/../backend/api/planung_einrichten.php');
-preg_match("/'lohnart' => \"(.*?)\",\n/s", $einr, $mSchema);
-pruef('Das Schema fuer lohnart ist im Einrichtungslauf auffindbar', !empty($mSchema[1]));
+pruef('Das Schema fuer lohnart ist im Einrichtungslauf auffindbar', schema_create('lohnart') !== null);
 
 $quelle = file_get_contents(__DIR__ . '/../backend/api/lohnarten.php');
 preg_match("/'(INSERT INTO lohnart\s.*?)'/s", $quelle, $mIns);
@@ -31,19 +31,14 @@ preg_match("/'(UPDATE lohnart SET.*?)'/s", $quelle, $mUpd);
 pruef('Beide Schreibwege sind in lohnarten.php auffindbar',
     !empty($mIns[1]) && !empty($mUpd[1]));
 
-if (!empty($mSchema[1]) && !empty($mIns[1]) && !empty($mUpd[1])) {
-    $ddl = $mSchema[1];
-    $ddl = preg_replace('/\bINT AUTO_INCREMENT PRIMARY KEY\b/', 'INTEGER PRIMARY KEY', $ddl);
-    $ddl = preg_replace('/,\s*UNIQUE KEY \w+ \(([^)]*)\)/', ', UNIQUE ($1)', $ddl);
-    $ddl = preg_replace('/,\s*KEY \w+ \([^)]*\)/', '', $ddl);
-    $ddl = preg_replace('/,\s*FOREIGN KEY \([^)]*\) REFERENCES \w+\([^)]*\)[^,)]*/', '', $ddl);
-    $ddl = preg_replace('/\) ENGINE=\w+ DEFAULT CHARSET=\w+/', ')', $ddl);
+if (schema_create('lohnart') !== null && !empty($mIns[1]) && !empty($mUpd[1])) {
 
     $q = new PDO('sqlite::memory:', null, null,
         [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
          PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]);
-    $fehler = null;
-    try { $q->exec($ddl); } catch (Throwable $e) { $fehler = $e->getMessage(); }
+    // Anlegen ueber schema_echt.php: CREATE plus die Nachtraege des
+    // Einrichtungslaufs, an einer Stelle gepflegt statt je Datei kopiert.
+    $fehler = schema_anlegen($q, 'lohnart');
     pruef('KRITISCH: das echte Schema laesst sich anlegen', $fehler === null);
 
     if ($fehler === null) {

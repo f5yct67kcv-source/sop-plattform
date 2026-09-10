@@ -18,6 +18,8 @@ function hat_spalte(PDO $pdo, string $t, string $s): bool { return true; }
 // oben sind alles, was es aus db.php braucht.
 require __DIR__ . '/../backend/kundenportal.php';
 
+require __DIR__ . '/schema_echt.php';
+
 $ok = 0; $bad = [];
 function pruef(string $name, bool $c) { global $ok, $bad; if ($c) { $ok++; } else { $bad[] = $name; } }
 
@@ -135,10 +137,8 @@ $GLOBALS['tabellen']['portal_abruf'] = true;
 // den INSERT aus). Ab hier wird darum das echte CREATE TABLE aus dem
 // Einrichtungslauf geholt und die echte Abfrage aus rundgang_detail.php.
 {
-    $einr = file_get_contents(__DIR__ . '/../backend/api/planung_einrichten.php');
-    preg_match("/'portal_abruf' => \"(.*?)\",\n/s", $einr, $mSchema);
     pruef('Das Schema fuer portal_abruf ist im Einrichtungslauf auffindbar',
-        !empty($mSchema[1]));
+        schema_create('portal_abruf') !== null);
 
     $det = file_get_contents(__DIR__ . '/../backend/api/rundgang_detail.php');
     preg_match("/'(SELECT COUNT\(\*\) FROM kundenzugang z.*?)'/s", $det, $mZ);
@@ -146,21 +146,14 @@ $GLOBALS['tabellen']['portal_abruf'] = true;
     pruef('Beide Abfragen des Cockpits sind in rundgang_detail.php auffindbar',
         !empty($mZ[1]) && !empty($mA[1]));
 
-    if (!empty($mSchema[1]) && !empty($mZ[1]) && !empty($mA[1])) {
-        // Nur so viel umschreiben, wie SQLite braucht. Spalten, Reihenfolge
-        // und Anzahl bleiben unangetastet -- sonst pruefte man die Umschrift.
-        $ddl = $mSchema[1];
-        $ddl = preg_replace('/\bINT AUTO_INCREMENT PRIMARY KEY\b/', 'INTEGER PRIMARY KEY', $ddl);
-        $ddl = preg_replace('/,\s*UNIQUE KEY \w+ \(([^)]*)\)/', ', UNIQUE ($1)', $ddl);
-        $ddl = preg_replace('/,\s*KEY \w+ \([^)]*\)/', '', $ddl);
-        $ddl = preg_replace('/,\s*FOREIGN KEY \([^)]*\) REFERENCES \w+\([^)]*\)[^,)]*/', '', $ddl);
-        $ddl = preg_replace('/\) ENGINE=\w+ DEFAULT CHARSET=\w+/', ')', $ddl);
+    if (schema_create('portal_abruf') !== null && !empty($mZ[1]) && !empty($mA[1])) {
 
         $q = new PDO('sqlite::memory:', null, null,
             [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
              PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]);
-        $fehler = null;
-        try { $q->exec($ddl); } catch (Throwable $e) { $fehler = $e->getMessage(); }
+        // Anlegen ueber schema_echt.php: CREATE plus die Nachtraege des
+        // Einrichtungslaufs, an einer Stelle gepflegt statt je Datei kopiert.
+        $fehler = schema_anlegen($q, 'portal_abruf');
         pruef('KRITISCH: das echte Schema laesst sich anlegen', $fehler === null);
 
         if ($fehler === null) {
