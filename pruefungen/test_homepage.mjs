@@ -11,7 +11,7 @@
 //      felder mindestens 16 px Schrift. Der Demo-Knopf steht in der
 //      Kopfleiste genau einmal.
 //   4. Das Formular: Ohne Pflichtangaben geht nichts zum Server; mit ihnen
-//      geht genau EIN JSON-Aufruf an api/demo_anfrage.php, das Fallenfeld
+//      geht genau EIN JSON-Aufruf an api/demo_senden.php, das Fallenfeld
 //      bleibt leer, und die Antwort des Servers erscheint -- Erfolg wie
 //      "nicht eingerichtet" (503) sind zwei verschiedene Texte.
 import { WURZEL, OUT, browserPfad } from './pfade.mjs';
@@ -42,7 +42,7 @@ desktop.on('request', r => { if (/^https?:/.test(r.url())) { fremdeAbrufe.push(r
 // Browser weist den Aufruf vorher als Cross-Origin ab).
 const aufrufe = [];
 let antwort = { status: 200, body: { status: 'ok', message: 'Vielen Dank. Wir melden uns innert eines Arbeitstages.' } };
-await desktop.route('**/backend/api/demo_anfrage.php', async route => {
+await desktop.route('**/api/demo_senden.php', async route => {
   const r = route.request();
   aufrufe.push({ methode: r.method(), typ: r.headers()['content-type'] || '', daten: r.postDataJSON() });
   await route.fulfill({ status: antwort.status, contentType: 'application/json', body: JSON.stringify(antwort.body) });

@@ -10,7 +10,7 @@
   Konstante BRAND am Dateiende und in allen <span data-brand>-Stellen, das
   Logo als <symbol id="marke">. Alle Personen, Kunden und Objekte in den
   Bildschirmen sind erfunden. Diese Seite laedt keinen Produktcode; ihre
-  einzige Verbindung zum Server ist das Demo-Formular (api/demo_anfrage.php).
+  einzige Verbindung zum Server ist das Demo-Formular (api/demo_senden.php).
 -->
 <title>Wachtwerk – Betriebssoftware für Schweizer Sicherheitsdienste</title>
 <meta name="description" content="Einsatzplanung, Mitarbeiter-App, Revierdienst, Kundenportal, Offerten und Rechnungen in einer Software – für kleine und mittlere Sicherheitsdienste in der Schweiz, mit dem GAV Sicherheit im Kern.">
@@ -1092,7 +1092,7 @@ p{margin:0 0 1em}
           <li><svg><use href="#i-haken"/></svg><span><b>Von Praktikern.</b> Sie sprechen mit Leuten, die selbst Dienstpläne geschrieben haben.</span></li>
         </ul>
       </div>
-      <form class="formular" id="demoFormular" novalidate action="backend/api/demo_anfrage.php" method="post">
+      <form class="formular" id="demoFormular" novalidate action="api/demo_senden.php" method="post">
         <div class="felder">
         <div class="falle" aria-hidden="true"><label>Webseite (bitte leer lassen)<input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>
         <div class="reihe">

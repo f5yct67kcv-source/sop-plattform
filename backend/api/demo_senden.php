@@ -2,6 +2,13 @@
 declare(strict_types=1);
 // Demo-Anfrage von der oeffentlichen Homepage entgegennehmen (ENT-469).
 //
+// DIESE DATEI HIESS BIS 2026-09-10 demo_anfrage.php -- genau wie der
+// Rechenkern backend/demo_anfrage.php. Der Deploy legt beide flach ab, und
+// die Sperrliste in htaccess-hostpoint greift ueber <FilesMatch> auf den
+// DATEINAMEN, nicht auf den Pfad: Sie haette damit auch diesen Endpunkt
+// gesperrt. Derselbe Fall wie bei api/lohnlauf.php (ENT-451). Der
+// Rechenkern behaelt seinen Namen und bleibt gesperrt -- er gehoert dorthin.
+//
 // OEFFENTLICH, OHNE SITZUNG -- bewusst, wie login.php und
 // passwort_vergessen.php: Wer hier ankommt, ist ein Interessent, kein Konto.
 // Darum stehen statt eines Rechts drei Riegel:
