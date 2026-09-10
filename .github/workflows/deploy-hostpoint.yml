@@ -308,7 +308,7 @@ jobs:
           # Oeffentliche Homepage (ENT-469). Eigene Seite ohne jeden
           # Produktcode -- sie laedt weder gav.js noch eine Sitzung; ihre
           # einzige Verbindung zum Server ist das Demo-Formular
-          # (api/demo_anfrage.php). Bewusst NICHT index.html: Die Wurzel
+          # (api/demo_senden.php). Bewusst NICHT index.html: Die Wurzel
           # bleibt die Erfassung der Mitarbeitenden (Startadresse der PWA).
           cp homepage.html dist/homepage.html
           # gav.js traegt die GAV-Regeln fuer BEIDE Oberflaechen (ENT-049).
@@ -386,7 +386,8 @@ jobs:
           # aufgerufen -- steht darum auch in der Sperrliste der .htaccess.
           cp backend/kundenportal.php dist/kundenportal.php
           # Pruefung und Mailtext der Demo-Anfrage (ENT-469), eingebunden
-          # von api/demo_anfrage.php -- steht darum auch in der Sperrliste.
+          # von api/demo_senden.php -- steht darum auch in der Sperrliste.
+          # Der ENDPUNKT heisst bewusst anders: gleicher Name hiesse mitgesperrt.
           cp backend/demo_anfrage.php dist/demo_anfrage.php
           cp backend/ai.php dist/ai.php
           cp backend/planung.php dist/planung.php
