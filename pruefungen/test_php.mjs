@@ -891,6 +891,28 @@ if (portalMitVertraulichem.length) {
   bad.push('Portal mit vertraulichen Feldern: ' + portalMitVertraulichem.join(', '));
 }
 
+// Die andere Richtung derselben Regel: Wer vertrauliche Felder nicht sehen
+// darf, darf sie auch nicht SETZEN (CLAUDE.md, ENT-077). Geprueft wird die
+// Verbindung zweier Tatsachen, nicht ein Wort: Wer die Fachlogik zum
+// Schreiben von Personaldaten aufruft, muss die vertrauliche Feldliste
+// ueberhaupt in die Hand nehmen. WIE er sie sperrt, entscheidet er selbst:
+// mitarbeiter_update.php und mitarbeiter_create.php filtern gegen das Recht.
+// (mein_profil_speichern.php schreibt auf anderem Weg und verbietet sie ganz
+// -- es faellt darum nicht unter diesen Filter, sperrt aber ebenfalls.)
+//
+// Warum es diese Pruefung gibt: mitarbeiter_create.php hatte die Sperre nie.
+// Das fiel nicht auf, solange ma_eingabe_lesen() die AHV-Nummer fuer jeden
+// Aufrufer ablehnte (ENT-348) -- seit ENT-451 nimmt sie sie an. Genau die
+// Fehlerfamilie aus CLAUDE.md: etwas Neues, das die Regel nicht geerbt hat.
+const schreibtPersonal = apiDateien.filter(f => /ma_eingabe_lesen\s*\(/.test(ohneKommentar(f)));
+const ohneFeldsperre = schreibtPersonal.filter(f =>
+  !/ma_vertrauliche_felder\s*\(/.test(ohneKommentar(f)));
+check('KRITISCH: jeder Endpunkt, der Personaldaten schreibt, nimmt die vertrauliche Feldliste in die Hand',
+  schreibtPersonal.length >= 2 && ohneFeldsperre.length === 0);
+if (ohneFeldsperre.length) {
+  bad.push('schreibt Personaldaten ohne Feldsperre: ' + ohneFeldsperre.join(', '));
+}
+
 // Wer im Portal ein Passwort SETZT, muss sich ausgewiesen haben (ENT-488).
 // Zwei Wege sind erlaubt und nur zwei: das bisherige Passwort vorzeigen, oder
 // den zugeschickten Link -- der IST der Ausweis (ENT-448). Ein dritter
