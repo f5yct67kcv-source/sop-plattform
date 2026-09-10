@@ -164,6 +164,65 @@ check('Sie sagt auch, dass die Antwort selbst das Problem ist',
 check('Der Knopf bleibt auch danach bedienbar',
   !(await page.evaluate(() => $('eiBtn').disabled)));
 
+// ══════════ EIN HINWEIS IST KEIN AUSSTEHENDER EINRICHTUNGSPUNKT
+//
+// Befund des Projektinhabers vom 10.09.2026: Der Punkt blieb gelb, egal wie
+// oft die Einrichtung lief. Der Endpunkt meldete die noch nicht erfassten
+// Abzugssaetze (lohn_abzug) als ausstehenden Punkt -- aber die Einrichtung
+// legt dort BEWUSST nichts an (ENT-451), sie kann ihn also nie abarbeiten.
+// Ein Punkt, den der Knopf, auf den er zeigt, nicht loeschen kann, gewoehnt
+// einen daran, ihn zu uebersehen.
+//
+// Hier steht die Oberflaechen-Haelfte: Sie darf sich nur an 'ausstehend'
+// haengen. Ob der Server richtig einordnet, prueft pruef_einrichtung.php am
+// echten Lauf.
+ROH = null;
+const HINWEIS = 'Abzugssätze (lohn_abzug) sind noch nicht erfasst — NBU, KTG und BVG '
+  + 'einmalig unter Lohn → Sätze und Regelwerk eintragen.';
+PRUEFUNG = { status: 'ok', message: 'Alles ist eingerichtet.', getan: [], unveraendert: [],
+  hinweise: [HINWEIS], ausstehend: 0 };
+await page.evaluate(() => pruefeUpdate());
+await page.waitForTimeout(300);
+check('KRITISCH: ein Hinweis allein macht den Update-Punkt NICHT gelb',
+  !(await page.evaluate(() => document.getElementById('nav-einrichtung').classList.contains('hat-update'))));
+check('Und die Beschriftung bleibt „Einrichtung“, nicht „Update“',
+  (await page.textContent('#navEinrichtungLbl')) === 'Einrichtung');
+
+// Verschwiegen wird der Hinweis trotzdem nicht -- er steht nur unter der
+// richtigen Ueberschrift. Unter "Jetzt ergänzt" waere eine Aufforderung als
+// erledigte Handlung ausgegeben.
+ANTWORT = { status: 'ok', message: 'Alles war bereits eingerichtet.', getan: [],
+  unveraendert: ['Tabelle objekte war bereits vorhanden'], hinweise: [HINWEIS] };
+await page.evaluate(() => openDlg('dlgEinrichtung'));
+await page.click('#eiBtn');
+await page.waitForTimeout(500);
+const listen = await page.evaluate(() => [...document.querySelectorAll('#eiInhalt [data-ei-liste]')]
+  .map(t => ({ titel: t.textContent.trim(),
+               eintraege: [...(t.nextElementSibling?.querySelectorAll('li') || [])].map(li => li.textContent) })));
+const wo = listen.find(l => l.eintraege.some(e => e.includes('lohn_abzug')));
+check('KRITISCH: der Hinweis geht nicht verloren -- er steht im Dialog', !!wo);
+check('KRITISCH: er steht NICHT unter dem, was die Einrichtung getan hat',
+  !!wo && wo.titel !== 'Jetzt ergänzt');
+check('Seine Ueberschrift sagt, dass er von Hand zu erledigen ist',
+  !!wo && /hand/i.test(wo.titel));
+
+// ══════════ DER PUNKT SAGT AUCH, WAS ANSTEHT
+//
+// Vorher sagte er nur DASS etwas aussteht. Der einzige Weg zum WAS fuehrte
+// ueber einen Knopf, der zugleich schreibt -- also gar kein Weg zum blossen
+// Nachsehen.
+PRUEFUNG = { status: 'ok', message: '2 Punkt(e) stehen noch aus.',
+  getan: ['Tabelle lohnlauf fehlt noch', 'Spalte mitarbeiter.plz fehlt noch'],
+  unveraendert: [], hinweise: [], ausstehend: 2 };
+await page.evaluate(() => pruefeUpdate());
+await page.waitForTimeout(300);
+const titel = await page.getAttribute('#nav-einrichtung', 'title');
+check('Der Punkt ist wieder gelb, wenn wirklich etwas aussteht',
+  await page.evaluate(() => document.getElementById('nav-einrichtung').classList.contains('hat-update')));
+check('Was aussteht, laesst sich lesen, ohne den Knopf zu druecken',
+  titel.includes('lohnlauf') && titel.includes('mitarbeiter.plz'));
+await page.evaluate(() => closeDlg('dlgEinrichtung'));
+
 // ══════════ SCHMALE SEITENLEISTE
 await page.evaluate(() => closeDlg('dlgEinrichtung'));
 await page.evaluate(() => { if (!document.querySelector('.shell').classList.contains('schmal')) seiteUm(); });

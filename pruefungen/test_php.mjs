@@ -446,6 +446,7 @@ for (const [datei, titel] of [
   ['pruef_zustellnachweis.php', 'KRITISCH: der Zustellnachweis fuehrt EINE Zeile je Rapport, kein Bewegungsprofil (ENT-491)'],
   ['pruef_portal_verlauf.php', 'KRITISCH: die Verlaufskurve buendelt nach Tagen/Wochen und laesst keine Luecke weg (ENT-500)'],
   ['pruef_sicherheit.php', 'KRITISCH: die Sicherheitsregeln aus ENT-501 werden WIRKLICH ausgefuehrt -- Basisadresse, Link-Schema, Push-Dienst, Sitzungs-Abdruck, Blindpruefung, Bildtyp'],
+  ['pruef_einrichtung.php', 'KRITISCH: der Einrichtungslauf meldet als "ausstehend" nur, was er selbst erledigen kann -- sonst klebt der Update-Punkt'],
 ]) {
   let aus = '', code = 0;
   try {

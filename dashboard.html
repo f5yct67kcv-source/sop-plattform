@@ -26815,11 +26815,24 @@ function ladeFeiertagMap() {
 // Stiller Hintergrund-Check, ob die Einrichtung etwas nachzutragen hat --
 // derselbe Endpunkt wie planungEinrichten(), nur als GET ohne Ausfuehrung.
 // Kein Toast bei Fehlern: das ist ein Hinweis-Punkt, kein Vorgang.
+//
+// 'ausstehend' und NICHT die Laenge einer der Listen: Der Endpunkt meldet
+// unter 'hinweise' auch, was nur von Hand zu erledigen ist (Abzugssaetze).
+// Das gehoert nicht an diesen Punkt -- er zeigt auf einen Knopf, der es
+// nicht erledigen kann, und bliebe darum fuer immer gelb. Genau das war der
+// Befund vom 10.09.2026.
 function pruefeUpdate() {
   api('planung_einrichten.php').then(({ ok, data }) => {
     const hat = ok && Number(data.ausstehend) > 0;
     $('nav-einrichtung').classList.toggle('hat-update', hat);
-    $('nav-einrichtung').title = hat ? 'Update verfügbar: neue Einrichtung steht aus' : 'Einrichtung';
+    // Was ansteht, steht im Tooltip. Sonst sagt der Punkt nur DASS etwas
+    // aussteht, und der einzige Weg zum WAS fuehrt ueber einen Knopf, der
+    // zugleich schreibt.
+    const offen = Array.isArray(data && data.getan) ? data.getan : [];
+    $('nav-einrichtung').title = hat
+      ? 'Update verfügbar: neue Einrichtung steht aus'
+        + (offen.length ? '\n\n• ' + offen.join('\n• ') : '')
+      : 'Einrichtung';
     $('navEinrichtungLbl').textContent = hat ? 'Update' : 'Einrichtung';
   }).catch(() => {});
 }
@@ -26854,6 +26867,11 @@ function planungEinrichten() {
       // Fehlgeschlagenes zuerst: Wer den Dialog oeffnet, weil etwas nicht
       // geht, soll den Grund lesen, ohne an zwei gruenen Listen vorbeizurollen.
       + zeile('Fehlgeschlagen', data.fehler, 'var(--neg)')
+      // Eigene Liste, nicht unter "Jetzt ergänzt": Das hier hat die
+      // Einrichtung NICHT getan und kann sie auch nicht tun. Unter der
+      // falschen Überschrift stünde eine Aufforderung als erledigte
+      // Handlung da.
+      + zeile('Von Hand zu erfassen', data.hinweise, 'var(--warn)')
       + zeile('Jetzt ergänzt', data.getan)
       + zeile('War schon vorhanden', data.unveraendert);
     const erste = $('eiInhalt').querySelector('[data-ei-liste]');
