@@ -236,8 +236,14 @@ check('Zu kurzes Passwort wird abgewiesen', !calls.some(c => c.path.includes('re
 
 // Gegenbestaetigung (ENT-289): Ein vertipptes Passwort sperrt die Person aus
 // ihrem eigenen Konto aus, und gemerkt wird es erst beim naechsten Anmelden.
-await page.fill('#maPw', 'blauerstuhl');
-await page.fill('#maPw2', 'blauerstuhI');   // grosses i statt l -- der klassische Vertipper
+//
+// 16 Zeichen und nicht mehr 11 (ENT-502): Mit dem Zurueckdrehen der
+// Erprobungs-Absenkung verlangt der Server 12, fuer Verwaltungszugaenge 16.
+// Das Beispiel muss BEIDE Schwellen nehmen -- sonst prueft dieser Abschnitt
+// die Laenge statt der Abweichung, und zwar ohne dass man es der Meldung
+// ansieht.
+await page.fill('#maPw', 'blauerstuhlgruen');
+await page.fill('#maPw2', 'blauerstuhIgruen');   // grosses i statt l -- der klassische Vertipper
 await page.waitForTimeout(150);
 check('KRITISCH: eine Abweichung wird schon beim Tippen benannt, nicht erst beim Setzen',
   await page.isVisible('#maPwErr')
@@ -247,14 +253,14 @@ await page.waitForTimeout(250);
 check('KRITISCH: bei Abweichung wird NICHTS gesendet -- sonst haette die Person ein Passwort, das sie nicht kennt',
   !calls.some(c => c.path.includes('reset_password')));
 
-await page.fill('#maPw2', 'blauerstuhl');
+await page.fill('#maPw2', 'blauerstuhlgruen');
 await page.waitForTimeout(150);
 check('Stimmen beide ueberein, verschwindet die Meldung wieder',
   !(await page.isVisible('#maPwErr')));
 await setzen();
 await page.waitForTimeout(300);
 const pw = calls.find(c => c.path.includes('reset_password'));
-check('Gueltiges Passwort wird gesendet', pw && pw.body.password === 'blauerstuhl' && pw.body.name === 'dario.beispiel');
+check('Gueltiges Passwort wird gesendet', pw && pw.body.password === 'blauerstuhlgruen' && pw.body.name === 'dario.beispiel');
 check('Beide Passwortfelder danach geleert',
   (await page.inputValue('#maPw')) === '' && (await page.inputValue('#maPw2')) === '');
 

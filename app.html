@@ -1791,7 +1791,7 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
     <div id="grErr" class="msg-err" style="display:none"></div>
     <p class="gate-hinweis">Neues Passwort für dieses Konto festlegen.</p>
     <div class="f"><label for="grNeu" id="lb-grneu">Neues Passwort</label>
-      <div class="pw-feld"><input class="inp" id="grNeu" type="password" placeholder="mind. 6 Zeichen" autocomplete="new-password">
+      <div class="pw-feld"><input class="inp" id="grNeu" type="password" placeholder="mind. 12 Zeichen" autocomplete="new-password">
         <button type="button" class="pw-toggle" aria-label="Passwort anzeigen"
                 onclick="togglePw('grNeu', this)">👁</button></div></div>
     <!-- Wiederholung (ENT-379, Wunsch des Projektinhabers): Ohne sie faellt
@@ -2207,7 +2207,7 @@ const W = {
     persNr: 'Personalnummer', geburtsdatum: 'Geburtsdatum', adresse: 'Adresse',
     telefon: 'Telefon', mobil: 'Mobil', email: 'E-Mail', anmeldename: 'Anmeldename',
     passwortAendern: 'Passwort ändern', altesPasswort: 'Bisheriges Passwort',
-    neuesPasswort: 'Neues Passwort', mind6: 'mindestens 6 Zeichen',
+    neuesPasswort: 'Neues Passwort', mindPw: 'mindestens 12 Zeichen',
     pwZeigen: 'Passwort anzeigen', pwVerbergen: 'Passwort verbergen',
     passwortOk: 'Passwort geändert.', abmelden: 'Abmelden',
     zumCockpit: 'Zum Cockpit',
@@ -2462,11 +2462,12 @@ const W = {
 const w = k => W[k] || k;
 
 // Muss zu PASSWORT_MIN in backend/anmeldung.php passen -- und zu der Zahl,
-// die W.mind6 dem Nutzer nennt. test_passwortfelder.mjs vergleicht alle
+// die W.mindPw dem Nutzer nennt. test_passwortfelder.mjs vergleicht alle
 // drei. Die Zahl steht in dashboard.html, index.html und hier je einmal;
 // eine gemeinsame Datei gaebe es nur fuer zwei der drei Oberflaechen,
 // darum haelt die Pruefung sie zusammen statt der Ladereihenfolge.
-const PW_MIN = 6;
+// Die Erprobungs-Absenkung auf 6 (ENT-289) ist mit ENT-502 zurueckgenommen.
+const PW_MIN = 12;
 
 const WOCHENTAG = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
 
@@ -9118,7 +9119,7 @@ function passwortBlatt() {
         <button type="button" class="pw-toggle" aria-label="${esc(w('pwZeigen'))}"
                 onclick="togglePw('pwAlt', this)">👁</button></div></div>
     <div class="f"><label for="pwNeu">${esc(w('neuesPasswort'))}</label>
-      <div class="pw-feld"><input class="inp" id="pwNeu" type="password" placeholder="${esc(w('mind6'))}" autocomplete="new-password">
+      <div class="pw-feld"><input class="inp" id="pwNeu" type="password" placeholder="${esc(w('mindPw'))}" autocomplete="new-password">
         <button type="button" class="pw-toggle" aria-label="${esc(w('pwZeigen'))}"
                 onclick="togglePw('pwNeu', this)">👁</button></div></div>`;
   $('blFuss').innerHTML = `
@@ -9129,7 +9130,7 @@ function passwortBlatt() {
 function passwortSpeichern() {
   const err = $('pwErr'); err.style.display = 'none';
   const alt = $('pwAlt').value, neu = $('pwNeu').value;
-  if (neu.length < PW_MIN) { err.textContent = w('mind6'); err.style.display = ''; return; }
+  if (neu.length < PW_MIN) { err.textContent = w('mindPw'); err.style.display = ''; return; }
   const b = $('pwBtn'); b.disabled = true;
   api('mein_passwort.php', { method: 'POST', body: { alt, neu } }).then(({ ok, data }) => {
     b.disabled = false;

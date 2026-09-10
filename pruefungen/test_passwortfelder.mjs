@@ -25,6 +25,21 @@ const OBERFLAECHEN = ['dashboard.html', 'app.html', 'index.html'];
 // Anlage offen auf dem Bildschirm.
 const NUR_MASKIERT = ['backend/setup.html'];
 
+// Nur der Zahlenabgleich, nicht die Auge-Pflicht (ENT-502).
+//
+// portal.html hat kein Auge -- das ist als OP-489 offen und eine eigene
+// Entscheidung, keine, die hier nebenbei erzwungen werden soll. Die
+// Mindestlaenge muss dort aber trotzdem stimmen: Das Portal ruft
+// passwort_pruefen() ueber portal_neues_passwort.php und
+// portal_passwort_aendern.php auf, unterliegt also derselben Regel.
+//
+// Genau hier lag eine Luecke: portal.html stand in KEINER dieser Listen
+// und versprach bis ENT-502 "mindestens 6 Zeichen", waehrend der Server
+// laengst mehr verlangte. Dieselbe Sorte Fehler wie bei index.html nach
+// ENT-289 -- nur diesmal in der Datei, die Betriebsfremde zu sehen
+// bekommen.
+const NUR_LAENGE = ['portal.html'];
+
 // Ein Eingabefeld gilt als Passwortfeld, wenn seine id danach aussieht.
 // Absichtlich ueber die id und nicht ueber type="password": Wer type
 // abschreibt, findet nur die Felder, die schon richtig sind.
@@ -67,20 +82,38 @@ check(`Geprueft: ${gezaehlt} Passwortfelder in ${OBERFLAECHEN.length + NUR_MASKI
 // verlangte nach ENT-289 noch 12, waehrend der Server 6 nahm.
 const php = readFileSync(`${WURZEL}/backend/anmeldung.php`, 'utf8');
 const serverMin = Number((php.match(/const PASSWORT_MIN\s*=\s*(\d+)/) || [])[1]);
+const serverMinAdmin = Number((php.match(/const PASSWORT_MIN_ADMIN\s*=\s*(\d+)/) || [])[1]);
 check('Die Mindestlaenge des Servers ist ueberhaupt auffindbar', serverMin > 0);
+check('Die laengere Mindestlaenge fuer Verwaltungszugaenge ist auffindbar', serverMinAdmin > 0);
+
+// setup.html legt das ERSTE Konto der Anlage an, und das ist per Definition
+// ein Verwaltungszugang (setup.php setzt ist_admin = 1). Dort gilt darum
+// die laengere Zahl (ENT-502). Bis dahin verglich diese Pruefung stur gegen
+// PASSWORT_MIN und haette eine korrekte 16 dort als Abweichung gemeldet --
+// eine Pruefung, die den richtigen Zustand beanstandet, wird irgendwann
+// weggeklickt.
+const ERWARTET = datei => datei === 'backend/setup.html' ? serverMinAdmin : serverMin;
 
 const zahlen = [];
-for (const datei of [...OBERFLAECHEN, ...NUR_MASKIERT]) {
+for (const datei of [...OBERFLAECHEN, ...NUR_MASKIERT, ...NUR_LAENGE]) {
   const text = readFileSync(`${WURZEL}/${datei}`, 'utf8');
   // Sowohl die Konstante als auch jeder Text, der dem Nutzer eine Zahl nennt.
   for (const m of text.matchAll(/const PW_MIN\s*=\s*(\d+)/g))              { zahlen.push([datei, 'PW_MIN', +m[1]]); }
   for (const m of text.matchAll(/mind(?:\.|estens)?\s+(\d+)\s+Zeichen/g))  { zahlen.push([datei, 'Text', +m[1]]); }
   for (const m of text.matchAll(/min\.\s+(\d+)\s+Zeichen/g))               { zahlen.push([datei, 'Text', +m[1]]); }
 }
-const abweichend = zahlen.filter(([, , n]) => n !== serverMin);
-check(`KRITISCH: alle Oberflaechen nennen dieselbe Mindestlaenge wie der Server (${serverMin})`,
+const abweichend = zahlen.filter(([d, , n]) => n !== ERWARTET(d));
+check(`KRITISCH: alle Oberflaechen nennen dieselbe Mindestlaenge wie der Server (${serverMin}, Verwaltung ${serverMinAdmin})`,
   abweichend.length === 0);
-abweichend.forEach(([d, art, n]) => bad.push(`${d}: ${art} sagt ${n}, der Server verlangt ${serverMin}`));
+abweichend.forEach(([d, art, n]) => bad.push(`${d}: ${art} sagt ${n}, der Server verlangt ${ERWARTET(d)}`));
+
+// Und die Stelle, die das erste Konto anlegt, muss die Regel ueberhaupt
+// AUFRUFEN. setup.php hatte bis ENT-502 ein eigenes "strlen < 6" -- der
+// erste Verwaltungszugang der Anlage entstand damit an der Passwortregel
+// vorbei, und der Text im Formular war das einzige, was davon zu sehen war.
+const setupPhp = readFileSync(`${WURZEL}/backend/setup.php`, 'utf8');
+check('KRITISCH: setup.php prueft das erste Passwort mit der gemeinsamen Regel',
+  /passwort_pruefen\s*\([^)]*true\s*\)/.test(setupPhp) && !/strlen\(\$password\)\s*</.test(setupPhp));
 
 // Die Schwelle war 6, solange index.html den Verwaltungsbereich trug: Dort
 // standen drei der Angaben (Passwort beim Anlegen, PIN, Zuruecksetzen). Mit

@@ -382,11 +382,13 @@ tr:hover td { background: var(--accent-light); }
 <script src="testumgebung.js"></script>
 <script>
 // Muss zu PASSWORT_MIN in backend/anmeldung.php passen. Bis ENT-291 stand
-// hier dreimal die 12, waehrend der Server seit ENT-289 nur noch 6 verlangt
+// hier dreimal die 12, waehrend der Server seit ENT-289 nur noch 6 verlangte
 // -- diese Maske versprach damit eine Strenge, die es nicht gab, und liess
 // gleichzeitig kein kuerzeres Passwort mehr zu, obwohl der Server es
-// annimmt. test_passwortfelder.mjs vergleicht die beiden Zahlen.
-const PW_MIN = 6;
+// annahm. test_passwortfelder.mjs vergleicht die beiden Zahlen.
+// Mit ENT-502 ist die Erprobungs-Absenkung zurueckgenommen: wieder 12,
+// diesmal auf beiden Seiten zugleich.
+const PW_MIN = 12;
 
 // ── STATE
 let rapports       = [];
