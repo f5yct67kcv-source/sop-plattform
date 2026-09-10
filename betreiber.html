@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Betreiber-Bereich</title>
+<style>
+/* Betreiber-Bereich (ENT-519 bis ENT-521).
+   Eigene Seite neben dashboard.html und portal.html -- dieselbe Trennung
+   wie bei der Anmeldung: getrennte Ebenen bekommen getrennte Oberflaechen.
+   Farben und Schrift sind aus dem Cockpit uebernommen, damit derselbe
+   Betrieb nicht nach zwei Herstellern aussieht. */
+@font-face {
+  font-family: 'Inter'; font-style: normal; font-weight: 400 700; font-display: swap;
+  src: url(fonts/inter-latin.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2212, U+FEFF, U+FFFD;
+}
+:root {
+  --bg:#F7F8FA; --surface:#FFFFFF; --surface-2:#FBFCFD;
+  --line:#E5E8EC; --line-soft:#EFF1F4; --line-hi:#D6DAE1;
+  --ink:#14161A; --ink-2:#545B67; --ink-3:#8B919D;
+  --accent:#2F5BD7; --accent-hi:#2549B0; --accent-soft:#EDF2FE; --accent-line:#CBD9F9;
+  --pos:#0E7C55; --pos-soft:#E6F6EF;
+  --neg:#C2382A; --neg-soft:#FCEDEB;
+  --warn:#9A6B08; --warn-soft:#FBF3E0;
+  --shell:#16181D; --shell-txt:#9298A5; --shell-txt-hi:#F3F5F8;
+  --nix:#D8DCE2;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 15px; line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Kopf ────────────────────────────────────────────────────────────
+   Drei Spalten als Raster 1fr auto 1fr, nicht als Flex mit Abstandhalter:
+   Mittiges gehoert in die Mitte des Containers, nicht zwischen zwei
+   ungleich lange Texte (Hausregel). */
+.kopf {
+  background: var(--shell); color: var(--shell-txt-hi);
+  padding: 18px 24px;
+  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px;
+}
+.kopf .titel { font-size: 16px; font-weight: 650; letter-spacing: -.01em; }
+.kopf .unter { font-size: 12.5px; color: var(--shell-txt); margin-top: 2px; }
+.kopf .mitte { text-align: center; font-size: 12px; color: var(--shell-txt); }
+.kopf .rechts { justify-self: end; display: flex; gap: 10px; align-items: center; }
+
+.huelle { max-width: 1120px; margin: 0 auto; padding: 28px 24px 64px; }
+
+/* ── Karten ───────────────────────────────────────────────────────── */
+.karte {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 12px; margin-bottom: 20px; overflow: hidden;
+}
+.karte-kopf {
+  padding: 18px 22px 14px; border-bottom: 1px solid var(--line-soft);
+  display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 14px;
+}
+.karte-kopf h2 { margin: 0; font-size: 15.5px; font-weight: 650; letter-spacing: -.01em; }
+.karte-kopf .sub { font-size: 12.5px; color: var(--ink-3); margin-top: 3px; }
+.karte-leib { padding: 20px 22px; }
+
+/* ── Kennzahlen: Ueberschrift OBEN, Wert darunter (Hausregel) ─────── */
+.zahlen { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 2px;
+          background: var(--line-soft); border-bottom: 1px solid var(--line-soft); }
+.zahl { background: var(--surface); padding: 16px 22px; }
+.zahl .lab {
+  font-size: 10.5px; font-weight: 650; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--ink-3);
+}
+.zahl .wert { font-size: 25px; font-weight: 640; letter-spacing: -.02em; margin-top: 5px; }
+.zahl .wert.leer { color: var(--nix); }
+.zahl .bezug { font-size: 11.5px; color: var(--ink-3); margin-top: 2px; }
+
+/* ── Tabellen ─────────────────────────────────────────────────────── */
+.tab-huelle { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th {
+  text-align: left; padding: 11px 14px; background: var(--surface-2);
+  font-size: 10.5px; font-weight: 650; letter-spacing: .07em; text-transform: uppercase;
+  color: var(--ink-3); border-bottom: 1px solid var(--line); white-space: nowrap;
+}
+td { padding: 13px 14px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+td .zweit { font-size: 12.5px; color: var(--ink-3); margin-top: 2px; }
+
+/* ── Merker ───────────────────────────────────────────────────────── */
+.merker {
+  display: inline-block; padding: 3px 9px; border-radius: 999px;
+  font-size: 11.5px; font-weight: 600; white-space: nowrap;
+}
+.m-pos  { background: var(--pos-soft);  color: var(--pos); }
+.m-neg  { background: var(--neg-soft);  color: var(--neg); }
+.m-warn { background: var(--warn-soft); color: var(--warn); }
+.m-ruhe { background: var(--line-soft); color: var(--ink-2); }
+
+/* ── Bedienelemente: mindestens 44 px hoch (Hausregel) ────────────── */
+button, .knopf {
+  min-height: 44px; padding: 0 18px; border-radius: 9px;
+  border: 1px solid var(--line-hi); background: var(--surface);
+  color: var(--ink); font: inherit; font-size: 14px; font-weight: 560;
+  cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+}
+button:hover { border-color: var(--ink-3); }
+button.haupt { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.haupt:hover { background: var(--accent-hi); border-color: var(--accent-hi); }
+button.gefahr { color: var(--neg); border-color: #F0CFCA; }
+button.gefahr:hover { background: var(--neg-soft); }
+button:disabled { opacity: .45; cursor: not-allowed; }
+button.klein { min-height: 36px; padding: 0 12px; font-size: 13px; }
+/* Ein Knopf wird NICHT ueber die volle Breite gestreckt, nur weil er
+   allein in seiner Zeile steht (Hausregel). */
+.knopfzeile { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+
+label { display: block; font-size: 12.5px; font-weight: 600; color: var(--ink-2); margin-bottom: 6px; }
+input, select {
+  width: 100%; min-height: 44px; padding: 0 13px;
+  border: 1px solid var(--line-hi); border-radius: 9px;
+  background: var(--surface); color: var(--ink);
+  /* 16 px, sonst zoomt iOS beim Hineintippen hinein und bleibt dort. */
+  font: inherit; font-size: 16px;
+}
+input:focus, select:focus { outline: 2px solid var(--accent-line); outline-offset: 1px; border-color: var(--accent); }
+.feld { margin-bottom: 16px; }
+.feld .hinweis { font-size: 12px; color: var(--ink-3); margin-top: 5px; }
+.raster2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 0 16px; }
+
+/* ── Leerzustaende: vier verschiedene Aussagen, vier Texte ────────── */
+.leer { padding: 40px 24px; text-align: center; }
+.leer .ic {
+  width: 40px; height: 40px; border-radius: 11px; background: var(--line-soft);
+  display: grid; place-items: center; margin: 0 auto 12px; font-size: 18px;
+}
+.leer .t { font-size: 14.5px; font-weight: 600; }
+.leer .u { font-size: 13px; color: var(--ink-3); margin-top: 5px; max-width: 42ch; margin-inline: auto; }
+
+.meldung { padding: 13px 16px; border-radius: 9px; font-size: 13.5px; margin-bottom: 16px; }
+.meldung.fehler { background: var(--neg-soft); color: var(--neg); }
+.meldung.gut { background: var(--pos-soft); color: var(--pos); }
+.meldung.warn { background: var(--warn-soft); color: var(--warn); }
+.versteckt { display: none !important; }
+
+/* ── Anmeldung ────────────────────────────────────────────────────── */
+.tor { min-height: 100dvh; display: grid; place-items: center; padding: 24px; }
+.tor-karte { width: 100%; max-width: 420px; }
+.code-feld { letter-spacing: .35em; text-align: center; font-size: 22px; font-variant-numeric: tabular-nums; }
+.geheim {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 15px;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 9px;
+  padding: 13px; word-break: break-all; user-select: all;
+}
+.codeliste {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14.5px;
+  margin: 14px 0;
+}
+.codeliste span { background: var(--surface-2); border: 1px solid var(--line); border-radius: 7px; padding: 9px; text-align: center; user-select: all; }
+
+@media (max-width: 700px) {
+  .huelle { padding: 20px 16px 48px; }
+  .kopf { padding: 14px 16px; grid-template-columns: 1fr auto; }
+  .kopf .mitte { display: none; }
+  .karte-leib { padding: 16px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── Anmeldung ─────────────────────────────────────────────────── -->
+<div id="tor" class="tor">
+  <div class="karte tor-karte">
+    <div class="karte-kopf">
+      <div>
+        <h2>Betreiber-Bereich</h2>
+        <div class="sub">Verwaltung der Mandanten</div>
+      </div>
+    </div>
+    <div class="karte-leib">
+      <div id="tor-meldung" class="meldung fehler versteckt"></div>
+
+      <div id="tor-pass">
+        <div class="feld">
+          <label for="e-mail">E-Mail</label>
+          <input id="e-mail" type="email" autocomplete="username" autocapitalize="off" spellcheck="false">
+        </div>
+        <div class="feld">
+          <label for="e-pass">Passwort</label>
+          <input id="e-pass" type="password" autocomplete="current-password">
+        </div>
+      </div>
+
+      <div id="tor-code" class="versteckt">
+        <div class="feld">
+          <label for="e-code">Code aus der Authenticator-App</label>
+          <input id="e-code" class="code-feld" inputmode="numeric" autocomplete="one-time-code" maxlength="9">
+          <div class="hinweis">Sechs Ziffern, oder ein Notfallcode in der Form abcd-efgh.</div>
+        </div>
+      </div>
+
+      <div class="knopfzeile">
+        <button id="knopf-anmelden" class="haupt">Anmelden</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Zwei-Faktor einrichten ────────────────────────────────────── -->
+<div id="zf-tor" class="tor versteckt">
+  <div class="karte tor-karte">
+    <div class="karte-kopf">
+      <div>
+        <h2>Zwei-Faktor einrichten</h2>
+        <div class="sub">Für diesen Bereich zwingend</div>
+      </div>
+    </div>
+    <div class="karte-leib">
+      <div id="zf-meldung" class="meldung versteckt"></div>
+
+      <div id="zf-schritt1">
+        <p style="margin-top:0;font-size:13.5px;color:var(--ink-2)">
+          Wer dieses Konto hat, erreicht jeden Mandanten. Deshalb ist der zweite Faktor
+          hier Pflicht und nicht freiwillig wie im Cockpit.
+        </p>
+        <div class="knopfzeile"><button id="knopf-zf-start" class="haupt">Geheimnis erzeugen</button></div>
+      </div>
+
+      <div id="zf-schritt2" class="versteckt">
+        <label>Diesen Schlüssel in der Authenticator-App eintragen</label>
+        <div class="geheim" id="zf-lesbar"></div>
+        <div class="feld" style="margin-top:16px">
+          <label for="zf-code">Code aus der App zur Bestätigung</label>
+          <input id="zf-code" class="code-feld" inputmode="numeric" maxlength="6">
+          <div class="hinweis">Erst nach dieser Bestätigung gilt der zweite Faktor.</div>
+        </div>
+        <div class="knopfzeile"><button id="knopf-zf-fertig" class="haupt">Bestätigen</button></div>
+      </div>
+
+      <div id="zf-schritt3" class="versteckt">
+        <div class="meldung warn">
+          Diese Notfallcodes werden <strong>nur jetzt</strong> angezeigt. Jeder ist einmal
+          verwendbar. Bitte ausserhalb dieses Geräts aufbewahren.
+        </div>
+        <div class="codeliste" id="zf-codes"></div>
+        <div class="knopfzeile"><button id="knopf-zf-weiter" class="haupt">Weiter zum Bereich</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Hauptansicht ──────────────────────────────────────────────── -->
+<div id="haus" class="versteckt">
+  <div class="kopf">
+    <div>
+      <div class="titel">Betreiber-Bereich</div>
+      <div class="unter" id="kopf-wer"></div>
+    </div>
+    <div class="mitte" id="kopf-mitte"></div>
+    <div class="rechts">
+      <button class="klein" id="knopf-abmelden">Abmelden</button>
+    </div>
+  </div>
+
+  <div class="huelle">
+    <div id="haus-meldung" class="meldung versteckt"></div>
+
+    <!-- Mandanten -->
+    <div class="karte">
+      <div class="karte-kopf">
+        <div>
+          <h2>Mandanten</h2>
+          <div class="sub">Betriebe, die diese Plattform nutzen</div>
+        </div>
+        <button class="klein" id="knopf-neu">Mandant anlegen</button>
+      </div>
+      <div class="zahlen" id="m-zahlen"></div>
+      <div id="m-inhalt"></div>
+    </div>
+
+    <!-- Formular -->
+    <div class="karte versteckt" id="m-form-karte">
+      <div class="karte-kopf">
+        <div>
+          <h2 id="m-form-titel">Mandant anlegen</h2>
+          <div class="sub">Das Datenbank-Passwort wird hier nicht gespeichert — es kommt aus dem Deploy</div>
+        </div>
+      </div>
+      <div class="karte-leib">
+        <input type="hidden" id="m-id">
+        <div class="raster2">
+          <div class="feld">
+            <label for="m-name">Firmenname</label>
+            <input id="m-name">
+          </div>
+          <div class="feld">
+            <label for="m-kanton">Kanton</label>
+            <input id="m-kanton" maxlength="2" autocapitalize="characters">
+            <div class="hinweis">Zweistellig, steuert den Feiertagskalender.</div>
+          </div>
+        </div>
+        <div class="raster2">
+          <div class="feld">
+            <label for="m-host">Datenbank-Server</label>
+            <input id="m-host">
+          </div>
+          <div class="feld">
+            <label for="m-db">Datenbankname</label>
+            <input id="m-db">
+          </div>
+          <div class="feld">
+            <label for="m-user">Datenbank-Benutzer</label>
+            <input id="m-user">
+          </div>
+          <div class="feld">
+            <label for="m-secret">Name des Secrets</label>
+            <input id="m-secret" placeholder="z. B. DB_PASS_MANDANT_2">
+            <div class="hinweis">Nur der Name. Der Wert liegt in den Deploy-Secrets.</div>
+          </div>
+        </div>
+        <div class="meldung m-ruhe" style="background:var(--surface-2);color:var(--ink-2)">
+          Bleiben Server, Datenbankname und Benutzer leer, nutzt der Mandant die
+          Standardverbindung. Das ist der Bestandsbetrieb.
+        </div>
+        <div class="knopfzeile">
+          <button class="haupt" id="knopf-speichern">Speichern</button>
+          <button id="knopf-abbrechen">Abbrechen</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Konten -->
+    <div class="karte">
+      <div class="karte-kopf">
+        <div>
+          <h2>Betreiber-Konten</h2>
+          <div class="sub">Wer diesen Bereich öffnen darf</div>
+        </div>
+      </div>
+      <div id="k-inhalt"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* Betreiber-Bereich (ENT-519 bis ENT-521).
+   Der Token liegt im sessionStorage und nicht im localStorage: Die Sitzung
+   dieses Bereichs laeuft nach 30 Minuten Ruhe ohnehin ab, und ein Token,
+   der einen geschlossenen Tab ueberlebt, waere laenger da als die Sitzung,
+   zu der er gehoert. */
+/* Der Endpunktpfad der AUSGELIEFERTEN Seite. Der Deploy kopiert
+   backend/api/*.php nach dist/api/ -- eine Seite, die den Repo-Pfad
+   benutzt, ruft im Betrieb ins Leere. test_php.mjs wacht darueber, und
+   genau hier hat sie es beim ersten Anlauf auch getan. */
+const API = 'api/';
+const SCHLUESSEL = 'betreiber-token';
+let token = sessionStorage.getItem(SCHLUESSEL) || '';
+let ich = null;
+
+const $ = id => document.getElementById(id);
+const zeig = (el, ja) => el.classList.toggle('versteckt', !ja);
+const text = s => String(s == null ? '' : s).replace(/[&<>"']/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function melde(el, art, txt) {
+  el.className = 'meldung ' + art;
+  el.textContent = txt;
+  zeig(el, true);
+}
+function stumm(el) { zeig(el, false); }
+
+async function ruf(pfad, daten, methode) {
+  const opt = { method: methode || (daten ? 'POST' : 'GET'), headers: {} };
+  if (token) { opt.headers['X-Auth-Token'] = token; }
+  if (daten) { opt.headers['Content-Type'] = 'application/json'; opt.body = JSON.stringify(daten); }
+  const antwort = await fetch(API + pfad, opt);
+  let inhalt = {};
+  try { inhalt = await antwort.json(); } catch (e) { /* leere Antwort */ }
+  return { code: antwort.status, ...inhalt };
+}
+
+/* ── Anmeldung ──────────────────────────────────────────────────── */
+async function anmelden() {
+  const knopf = $('knopf-anmelden');
+  knopf.disabled = true;
+  stumm($('tor-meldung'));
+  try {
+    const a = await ruf('betreiber_anmelden.php', {
+      email: $('e-mail').value,
+      passwort: $('e-pass').value,
+      code: $('e-code').value,
+    });
+    if (a.status === 'zweifaktor') {
+      zeig($('tor-code'), true);
+      $('e-code').focus();
+      melde($('tor-meldung'), 'warn', a.message);
+      return;
+    }
+    if (a.status !== 'ok') {
+      melde($('tor-meldung'), 'fehler', a.message || 'Anmeldung nicht möglich.');
+      return;
+    }
+    token = a.token;
+    sessionStorage.setItem(SCHLUESSEL, token);
+    ich = { name: a.name, email: a.email };
+    await nachAnmeldung(a.zwei_faktor === true);
+  } finally {
+    knopf.disabled = false;
+  }
+}
+
+async function nachAnmeldung(zfSteht) {
+  zeig($('tor'), false);
+  if (!zfSteht) { zeig($('zf-tor'), true); return; }
+  zeig($('zf-tor'), false);
+  zeig($('haus'), true);
+  await ladeAlles();
+}
+
+/* ── Zwei-Faktor ────────────────────────────────────────────────── */
+async function zfStart() {
+  stumm($('zf-meldung'));
+  const a = await ruf('betreiber_zf_einrichten.php', {});
+  if (a.status !== 'ok') { melde($('zf-meldung'), 'fehler', a.message); return; }
+  $('zf-lesbar').textContent = a.lesbar;
+  zeig($('zf-schritt1'), false);
+  zeig($('zf-schritt2'), true);
+  $('zf-code').focus();
+}
+
+async function zfFertig() {
+  stumm($('zf-meldung'));
+  const a = await ruf('betreiber_zf_bestaetigen.php', { code: $('zf-code').value });
+  if (a.status !== 'ok') { melde($('zf-meldung'), 'fehler', a.message); return; }
+  $('zf-codes').innerHTML = a.notfallcodes.map(c => '<span>' + text(c) + '</span>').join('');
+  zeig($('zf-schritt2'), false);
+  zeig($('zf-schritt3'), true);
+}
+
+/* ── Mandanten ──────────────────────────────────────────────────── */
+const GAV_TEXT = {
+  unbestaetigt:      ['m-warn', 'nicht bestätigt'],
+  unterstellt:       ['m-pos',  'unterstellt'],
+  nicht_unterstellt: ['m-ruhe', 'nicht unterstellt'],
+};
+const VERB_TEXT = {
+  standardverbindung: ['m-ruhe', 'Standardverbindung'],
+  eigene_datenbank:   ['m-pos',  'eigene Datenbank'],
+  unvollstaendig:     ['m-neg',  'unvollständig'],
+};
+const STATUS_TEXT = {
+  aktiv:      ['m-pos',  'aktiv'],
+  gesperrt:   ['m-warn', 'gesperrt'],
+  gekuendigt: ['m-neg',  'gekündigt'],
+};
+function merker(karte, schluessel) {
+  const [klasse, wort] = karte[schluessel] || ['m-ruhe', schluessel];
+  return '<span class="merker ' + klasse + '">' + text(wort) + '</span>';
+}
+
+async function ladeMandanten() {
+  const a = await ruf('betreiber_mandant_list.php');
+  const inhalt = $('m-inhalt'), zahlen = $('m-zahlen');
+
+  if (a.code === 503) {
+    // Nicht eingerichtet ist etwas anderes als "keine vorhanden".
+    zahlen.innerHTML = '';
+    inhalt.innerHTML = leerBlock('⚙', 'Noch nicht eingerichtet',
+      'Der Mandantenstamm ist auf diesem Server noch nicht angelegt. '
+      + 'Die Einrichtung läuft einmalig über das Cockpit.');
+    return;
+  }
+  if (a.status !== 'ok') {
+    zahlen.innerHTML = '';
+    inhalt.innerHTML = leerBlock('⚠', 'Nicht abrufbar', text(a.message || 'Unbekannter Fehler.'));
+    return;
+  }
+
+  const liste = a.mandanten || [];
+  const aktiv = liste.filter(m => m.status === 'aktiv').length;
+  const offen = liste.filter(m => m.gav_lage === 'unbestaetigt').length;
+  const kaputt = liste.filter(m => m.verbindung_lage === 'unvollstaendig').length;
+
+  /* Einheiten nicht vermischen: "Mandanten" zaehlt Betriebe, "aktiv" zaehlt
+     Betriebe mit Status aktiv, "GAV offen" zaehlt Bestaetigungen. Jede Zahl
+     bekommt ihren Bezug, sobald sie eine Teilmenge ist (Hausregel). */
+  zahlen.innerHTML =
+      zahlBlock('Mandanten', liste.length, null)
+    + zahlBlock('Aktiv', aktiv, liste.length ? aktiv + ' von ' + liste.length : null)
+    + zahlBlock('GAV offen', offen, offen ? 'Bestätigung fehlt' : 'alle bestätigt')
+    + zahlBlock('Verbindung unvollständig', kaputt, kaputt ? 'nicht erreichbar' : 'keine');
+
+  if (!liste.length) {
+    inhalt.innerHTML = leerBlock('◇', 'Noch kein Mandant eingetragen',
+      'Sobald ein Betrieb angelegt ist, erscheint er hier.');
+    return;
+  }
+
+  inhalt.innerHTML = '<div class="tab-huelle"><table><thead><tr>'
+    + '<th>Mandant</th><th>Status</th><th>GAV</th><th>Verbindung</th><th></th>'
+    + '</tr></thead><tbody>'
+    + liste.map(m => '<tr>'
+        + '<td><strong>' + text(m.name) + '</strong>'
+          + '<div class="zweit">' + (m.kanton ? 'Kanton ' + text(m.kanton) : 'Kanton nicht gesetzt') + '</div></td>'
+        + '<td>' + merker(STATUS_TEXT, m.status) + '</td>'
+        + '<td>' + merker(GAV_TEXT, m.gav_lage)
+          + (m.gav_bestaetigt_am ? '<div class="zweit">' + text(m.gav_bestaetigt_am.slice(0, 10)) + '</div>' : '')
+          + '</td>'
+        + '<td>' + merker(VERB_TEXT, m.verbindung_lage) + '</td>'
+        + '<td style="text-align:right;white-space:nowrap">'
+          + '<button class="klein" data-bearbeiten="' + m.id + '">Ändern</button> '
+          + '<button class="klein" data-gav="' + m.id + '">GAV</button>'
+          + '</td>'
+      + '</tr>').join('')
+    + '</tbody></table></div>';
+
+  inhalt.querySelectorAll('[data-bearbeiten]').forEach(b =>
+    b.onclick = () => formularOeffnen(liste.find(m => m.id === +b.dataset.bearbeiten)));
+  inhalt.querySelectorAll('[data-gav]').forEach(b =>
+    b.onclick = () => gavFragen(liste.find(m => m.id === +b.dataset.gav)));
+}
+
+function zahlBlock(lab, wert, bezug) {
+  const leer = wert === 0 ? ' leer' : '';
+  return '<div class="zahl"><div class="lab">' + text(lab) + '</div>'
+       + '<div class="wert' + leer + '">' + wert + '</div>'
+       + (bezug ? '<div class="bezug">' + text(bezug) + '</div>' : '') + '</div>';
+}
+function leerBlock(zeichen, titel, unter) {
+  return '<div class="leer"><div class="ic">' + zeichen + '</div>'
+       + '<div class="t">' + text(titel) + '</div>'
+       + '<div class="u">' + text(unter) + '</div></div>';
+}
+
+function formularOeffnen(m) {
+  $('m-form-titel').textContent = m ? 'Mandant ändern' : 'Mandant anlegen';
+  $('m-id').value     = m ? m.id : '';
+  $('m-name').value   = m ? m.name : '';
+  $('m-kanton').value = m && m.kanton ? m.kanton : '';
+  $('m-host').value   = m ? m.db_host : '';
+  $('m-db').value     = m ? m.db_name : '';
+  $('m-user').value   = m ? m.db_user : '';
+  $('m-secret').value = m ? m.secret_name : '';
+  zeig($('m-form-karte'), true);
+  $('m-name').focus();
+}
+
+async function mandantSpeichern() {
+  stumm($('haus-meldung'));
+  const id = $('m-id').value;
+  const a = await ruf('betreiber_mandant_save.php', {
+    id: id ? +id : 0,
+    name: $('m-name').value,
+    kanton: $('m-kanton').value,
+    db_host: $('m-host').value,
+    db_name: $('m-db').value,
+    db_user: $('m-user').value,
+    secret_name: $('m-secret').value,
+  });
+  if (a.status !== 'ok') { melde($('haus-meldung'), 'fehler', a.message); return; }
+  zeig($('m-form-karte'), false);
+  melde($('haus-meldung'), 'gut', a.angelegt ? 'Mandant angelegt.' : 'Änderungen gespeichert.');
+  await ladeMandanten();
+}
+
+async function gavFragen(m) {
+  const h = await ruf('betreiber_mandant_gav.php');
+  const antwort = window.prompt(
+    (h.hinweis || '') + '\n\nBezugsfassung: ' + (h.bezugsfassung || '') +
+    '\n\nIst „' + m.name + '" dem GAV unterstellt? Bitte ja oder nein eingeben.', '');
+  if (antwort === null) { return; }
+  const wort = antwort.trim().toLowerCase();
+  if (wort !== 'ja' && wort !== 'nein') {
+    melde($('haus-meldung'), 'fehler', 'Bitte ja oder nein — die Angabe bleibt sonst unbestätigt.');
+    return;
+  }
+  const a = await ruf('betreiber_mandant_gav.php',
+    { id: m.id, unterstellt: wort === 'ja', bestaetigt: true });
+  if (a.status !== 'ok') { melde($('haus-meldung'), 'fehler', a.message); return; }
+  melde($('haus-meldung'), 'gut', 'Bestätigt und mit Zeitpunkt festgehalten.');
+  await ladeMandanten();
+}
+
+/* ── Konten ─────────────────────────────────────────────────────── */
+async function ladeKonten() {
+  const a = await ruf('betreiber_konto_list.php');
+  const inhalt = $('k-inhalt');
+  if (a.status !== 'ok') {
+    inhalt.innerHTML = leerBlock('⚠', 'Nicht abrufbar', text(a.message || 'Unbekannter Fehler.'));
+    return;
+  }
+  const liste = a.konten || [];
+  inhalt.innerHTML = '<div class="tab-huelle"><table><thead><tr>'
+    + '<th>Konto</th><th>Zustand</th><th>Zuletzt angemeldet</th><th></th>'
+    + '</tr></thead><tbody>'
+    + liste.map(k => '<tr>'
+        + '<td><strong>' + text(k.name) + '</strong>'
+          + '<div class="zweit">' + text(k.email) + (k.ich ? ' · das bin ich' : '') + '</div></td>'
+        + '<td>' + (k.aktiv
+            ? '<span class="merker m-pos">aktiv</span>'
+            : '<span class="merker m-ruhe">stillgelegt</span>') + '</td>'
+        /* "Noch nie angemeldet" ist etwas anderes als ein leeres Feld. */
+        + '<td>' + (k.nie_angemeldet
+            ? '<span style="color:var(--ink-3)">noch nie</span>'
+            : text(String(k.letzte_anmeldung).slice(0, 16))) + '</td>'
+        + '<td style="text-align:right">'
+          + (k.aktiv && a.aktive > 1
+              ? '<button class="klein gefahr" data-still="' + k.id + '">Stilllegen</button>'
+              : (k.aktiv
+                  ? '<span class="zweit">letztes aktives Konto</span>'
+                  : '<button class="klein" data-an="' + k.id + '">Aktivieren</button>'))
+          + '</td>'
+      + '</tr>').join('')
+    + '</tbody></table></div>';
+
+  inhalt.querySelectorAll('[data-still]').forEach(b =>
+    b.onclick = () => kontoSchalten(+b.dataset.still, false));
+  inhalt.querySelectorAll('[data-an]').forEach(b =>
+    b.onclick = () => kontoSchalten(+b.dataset.an, true));
+}
+
+async function kontoSchalten(id, aktiv) {
+  stumm($('haus-meldung'));
+  const a = await ruf('betreiber_konto_status.php', { id: id, aktiv: aktiv });
+  if (a.status !== 'ok') { melde($('haus-meldung'), 'fehler', a.message); return; }
+  if (a.selbst && !aktiv) { abmelden(); return; }
+  await ladeKonten();
+}
+
+/* ── Rahmen ─────────────────────────────────────────────────────── */
+async function ladeAlles() {
+  if (ich) { $('kopf-wer').textContent = ich.name + ' · ' + ich.email; }
+  $('kopf-mitte').textContent = 'Sitzung endet nach 30 Minuten ohne Nutzung';
+  await ladeMandanten();
+  await ladeKonten();
+}
+
+async function abmelden() {
+  try { await ruf('betreiber_abmelden.php', {}); } catch (e) { /* egal */ }
+  sessionStorage.removeItem(SCHLUESSEL);
+  token = ''; ich = null;
+  zeig($('haus'), false); zeig($('zf-tor'), false); zeig($('tor'), true);
+  $('e-pass').value = ''; $('e-code').value = '';
+  zeig($('tor-code'), false);
+}
+
+$('knopf-anmelden').onclick = anmelden;
+$('e-pass').onkeydown = e => { if (e.key === 'Enter') anmelden(); };
+$('e-code').onkeydown = e => { if (e.key === 'Enter') anmelden(); };
+$('knopf-zf-start').onclick  = zfStart;
+$('knopf-zf-fertig').onclick = zfFertig;
+$('knopf-zf-weiter').onclick = async () => {
+  zeig($('zf-tor'), false); zeig($('haus'), true); await ladeAlles();
+};
+$('knopf-neu').onclick        = () => formularOeffnen(null);
+$('knopf-speichern').onclick  = mandantSpeichern;
+$('knopf-abbrechen').onclick  = () => zeig($('m-form-karte'), false);
+$('knopf-abmelden').onclick   = abmelden;
+
+/* Beim Laden: Liegt ein Token in dieser Registerkarte, wird er benutzt.
+   Traegt er nicht mehr, faellt die Seite auf die Anmeldung zurueck --
+   ohne Fehlermeldung, denn eine abgelaufene Sitzung ist kein Fehler. */
+(async function start() {
+  if (!token) { return; }
+  const a = await ruf('betreiber_zf_status.php');
+  if (a.status !== 'ok') { sessionStorage.removeItem(SCHLUESSEL); token = ''; return; }
+  await nachAnmeldung(a.eingerichtet === true);
+})();
+</script>
+</body>
+</html>

@@ -311,6 +311,12 @@ jobs:
           # (api/demo_senden.php). Bewusst NICHT index.html: Die Wurzel
           # bleibt die Erfassung der Mitarbeitenden (Startadresse der PWA).
           cp homepage.html dist/homepage.html
+          # Betreiber-Bereich (ENT-519 bis ENT-521). Eigene Seite neben
+          # dashboard.html und portal.html, mit eigener Anmeldung gegen die
+          # betreiber_*-Endpunkte. Sie traegt weder Cockpit- noch
+          # Mitarbeiter- noch Portalcode -- dieselbe Trennung wie bei den
+          # Anmeldewegen selbst.
+          cp betreiber.html dist/betreiber.html
           # gav.js traegt die GAV-Regeln fuer BEIDE Oberflaechen (ENT-049).
           # Fehlt sie hier, laden dashboard.html und app.html ins Leere und
           # rechnen gar nichts mehr -- derselbe Fallstrick wie bei ENT-040.
