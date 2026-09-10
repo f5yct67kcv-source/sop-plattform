@@ -66,6 +66,14 @@ function kontaktwege_bereinigen(array $roh): array
         $art = strtolower(trim((string)($z['art'] ?? '')));
         $wert = trim((string)($z['wert'] ?? ''));
         if ($wert === '' || !in_array($art, KONTAKT_ARTEN, true)) { continue; }
+        // Eine Webseite wird in der App zu einem anklickbaren Link und
+        // braucht darum ein Schema, dem man folgen darf (ENT-501, siehe
+        // web_adresse_sicher() in db.php). Was das nicht ist, wird
+        // verworfen statt als toter Link gespeichert.
+        if ($art === 'webseite') {
+            $wert = web_adresse_sicher($wert) ?? '';
+            if ($wert === '') { continue; }
+        }
         $sauber[] = ['art' => $art, 'wert' => mb_substr($wert, 0, 255)];
     }
     return $sauber;
@@ -234,7 +242,18 @@ function kunden_eingabe_lesen(array $input, array $bestand = []): array
         'uid' => $wert('uid'),
         'mwst_nr' => $wert('mwst_nr'),
         'telefon' => $wert('telefon'),
-        'email' => $wert('email'),
+        // Steuerzeichen raus (ENT-501). Eine Adresse mit einem
+        // Zeilenumbruch darin ist keine Adresse, sondern ein Versuch, beim
+        // spaeteren Versand eine zweite SMTP-Zeile einzuschleusen
+        // (beleg_versenden.php liest genau dieses Feld). Bewusst nur hier
+        // und nicht fuer alle Felder: 'notiz' darf Zeilenumbrueche tragen.
+        //
+        // Gesaeubert und nicht abgewiesen, weil diese Funktion keinen
+        // Fehlerkanal hat und ein Umbau aller Aufrufer fuer diesen einen
+        // Fall zu viel waere. Eine trotzdem unbrauchbare Adresse faellt
+        // beim Versand auf: smtp_senden() prueft seit ENT-501 selbst und
+        // verweigert mit klarer Meldung, statt still etwas zu verschicken.
+        'email' => preg_replace('/[\x00-\x1F\x7F]/u', '', $wert('email')) ?? '',
         'kontaktperson' => $wert('kontaktperson'),
         'notiz' => $wert('notiz'),
         // Abweichende Rechnungsadresse (ENT-155). Bewusst OHNE Schalter

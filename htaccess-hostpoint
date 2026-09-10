@@ -58,8 +58,23 @@
   # aus -- die Adresse kann Hinweise auf den Betrieb enthalten.
   Header always set Referrer-Policy "strict-origin-when-cross-origin"
 
-  # Kamera und Standort aus, Mikrofon bleibt: Das Diktat braucht es.
-  Header always set Permissions-Policy "camera=(self), microphone=(self), geolocation=()"
+  # Was diese Seite selbst benutzen darf -- und sonst niemand.
+  #
+  # "(self)" heisst: nur diese Seite, kein eingebetteter fremder Rahmen.
+  # "()" waere eine LEERE Liste und heisst: niemand, auch diese Seite nicht.
+  #
+  # Der Standort stand bis ENT-501 auf "()" -- aus ENT-075, also aus der
+  # Zeit VOR dem Revierdienst, und er ist danach nie nachgezogen worden.
+  # app.html braucht navigator.geolocation inzwischen an neun Stellen:
+  # Rundgang starten, Position mitschreiben, Wegstrecke, Naehe zum
+  # Kontrollpunkt. Am Standort haengt damit auch der
+  # Alleinarbeiterschutz -- eine Schutzeinstellung, die eine
+  # Sicherheitsfunktion abschaltet, schuetzt niemanden.
+  #
+  # Keine Prueflauf sieht diese Datei (die Browser-Suiten bilden die
+  # Serverantwort nach) -- test_deploy.mjs gleicht die hier genannten
+  # Funktionen darum gegen die tatsaechlich in den Oberflaechen benutzten ab.
+  Header always set Permissions-Policy "camera=(self), microphone=(self), geolocation=(self)"
 
   # HSTS: Der Browser merkt sich, dass diese Seite nur verschluesselt zu
   # erreichen ist. Wirkt ERST, wenn die Seite ueber HTTPS ausgeliefert wird.

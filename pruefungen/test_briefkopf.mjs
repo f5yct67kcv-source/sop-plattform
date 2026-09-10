@@ -57,8 +57,23 @@ check('KRITISCH: Aendern verlangt das Recht "betrieb"', /require_recht_nach_meth
 check('KRITISCH: Lesen steht vor der Rechtepruefung — wer drucken darf, braucht den Kopf',
   BET.indexOf("REQUEST_METHOD'] === 'GET'") < BET.indexOf("require_recht_nach_methode($user, 'betrieb')"));
 check('KRITISCH: das Logo ist auf 512 KB begrenzt', /LOGO_MAX = 512 \* 1024/.test(BET));
+// Bis ENT-501 stand hier die Liste woertlich abgeschrieben. Das ist genau
+// der Fall, vor dem CLAUDE.md warnt: Die Pruefung hielt eine BESTIMMTE
+// Aufzaehlung fest statt die Aussage dahinter -- und als SVG aus guten
+// Gruenden herausfiel, wurde sie rot, obwohl die Sache besser geworden war.
+// Geprueft wird jetzt, was gelten soll.
+const logoListe = [...(((BET.match(/LOGO_MIME_ERLAUBT\s*=\s*\[([^\]]*)\]/) || [null, ''])[1])
+  .matchAll(/'([^']+)'/g))].map(m => m[1]);
 check('KRITISCH: nur Bildformate werden angenommen',
-  /LOGO_MIME_ERLAUBT = \['image\/png', 'image\/jpeg', 'image\/svg\+xml', 'image\/webp'\]/.test(BET));
+  logoListe.length > 0 && logoListe.every(m => m.startsWith('image/')));
+// SVG ist kein Bild, sondern ein Dokument -- es darf <script> tragen
+// (ENT-501). Fuer ein Logo im Briefkopf verliert PNG/JPEG/WebP nichts.
+check('KRITISCH: kein Format, das Skript tragen kann',
+  !logoListe.includes('image/svg+xml'));
+// Und die Angabe des Browsers ist nur ein Vorschlag: Bis ENT-501 war das
+// Logo der einzige Upload im Haus ohne Pruefung am Inhalt.
+check('KRITISCH: der Bildtyp wird an den Bytes geprueft, nicht an der Angabe der Anfrage',
+  /logo_mime_am_inhalt\s*\(/.test(BET));
 check('Ein unerlaubtes Format wird abgewiesen, nicht gespeichert',
   /!in_array\(\$mime, LOGO_MIME_ERLAUBT, true\)/.test(BET));
 check('KRITISCH: die Groesse wird gegen die ROHE Datei geprueft, nicht gegen base64',
