@@ -80,8 +80,15 @@ TRUNCATE TABLE objekt_person;
 TRUNCATE TABLE objekte;
 
 -- ── Belege ───────────────────────────────────────────────────────────
--- Die Nummernvergabe (beleg_naechste_nummer) leitet sich aus dem Bestand
--- ab. Nach dem Leeren beginnt die naechste Offerte wieder bei OF-0001.
+-- Alle elf gehen weg. Acht trugen einen Versandlink, sechs den Status
+-- 'angeschaut' -- der wird aber bei JEDEM Abruf des oeffentlichen Links
+-- gesetzt (beleg_oeffentlich.php, Zeile 190), auch beim eigenen
+-- Nachsehen im Browser. Er sagt nichts darueber, WER geoeffnet hat.
+-- Der Projektinhaber hat am 2026-09-10 ausdruecklich bestaetigt, dass
+-- jeder einzelne Eintrag zu Testzwecken entstand. Damit ist keine dieser
+-- Nummern ausser Haus, und die Nummernkreise duerfen wieder bei OF-0001
+-- und RE-0001 beginnen: beleg_naechste_nummer() leitet sie aus dem
+-- Bestand ab, nicht aus einem Zaehler.
 TRUNCATE TABLE beleg_positionen;
 TRUNCATE TABLE belege;
 TRUNCATE TABLE produkte;
