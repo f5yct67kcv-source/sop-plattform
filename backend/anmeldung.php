@@ -124,35 +124,38 @@ function anmeld_fehlversuch(PDO $pdo, string $name, string $adresse): void
 // kuerzeres Passwort hat, kommt weiterhin rein; er wird nur beim naechsten
 // Wechsel auf die neue Laenge verpflichtet. Sonst waeren mit dem Deploy
 // schlagartig alle Konten ausgesperrt.
-// ┌──────────────────────────────────────────────────────────────────────┐
-// │ VORUEBERGEHEND HERABGESETZT -- ENT-289, 2026-09-01.                  │
-// │ Auf Anordnung des Projektinhabers fuer die Erprobungsphase auf 6     │
-// │ gesenkt ("die software laeuft noch nicht in einem echten betrieb").  │
-// │ VOR DER ERSTEN PRODUKTIVEN NUTZUNG mit echten Mitarbeitenden auf     │
-// │ 12 bzw. 16 zurueckdrehen -- die Begruendung oben gilt unveraendert   │
-// │ und ist mit 6 Zeichen nicht erfuellt.                                │
-// │ Die uebrigen Sperren (Login-Name, Wortliste, Tastaturreihen) bleiben │
-// │ aktiv; "123456" und "abcdef" werden weiterhin abgewiesen.            │
-// └──────────────────────────────────────────────────────────────────────┘
+// ── Die Erprobungs-Absenkung ist beendet (ENT-502, 2026-09-10) ────────
 //
-// Diese Marke ist die Anmeldung der Ausnahme, nicht bloss ein Kommentar:
-// pruef_passwort.php laesst die verkuerzten Laengen NUR durch, solange sie
-// hier auf true steht. Wer sie entfernt, bekommt von der Pruefung die
-// produktiven Werte zurueckverlangt -- und wer die Laengen senkt, ohne sie
-// zu setzen, wird rot. Damit kann die Absenkung nicht stillschweigend
-// bestehen bleiben, wenn der Betrieb aufgenommen wird.
-const PASSWORT_ERPROBUNG = true;
+// ENT-289 hatte beide Laengen am 2026-09-01 auf 6 gesenkt, auf Anordnung
+// des Projektinhabers und ausdruecklich nur fuer die Erprobung ("die
+// software laeuft noch nicht in einem echten betrieb"). Die Auflage lautete:
+// vor der ersten produktiven Nutzung auf 12 bzw. 16 zurueckdrehen. Das ist
+// hiermit geschehen.
+//
+// Die Marke PASSWORT_ERPROBUNG ist damit ERSATZLOS WEG, nicht auf false
+// gesetzt. Sie war die Anmeldung einer Ausnahme; eine Ausnahme, die es
+// nicht mehr gibt, braucht keinen Schalter, den jemand zurueckstellen
+// koennte. pruef_passwort.php verlangt ohne sie die produktiven Werte und
+// wird rot, sobald jemand die Laengen wieder senkt, ohne die Marke bewusst
+// zu setzen -- der Weg zurueck steht also offen, aber nur sichtbar.
+//
+// WAS DAMIT NICHT ERLEDIGT IST (OP-283, zweiter Teil): passwort_pruefen()
+// laeuft ausschliesslich beim SETZEN, nie beim Anmelden. Wer sich in der
+// Erprobung ein sechsstelliges Passwort gesetzt hat, kommt damit weiterhin
+// hinein. Die Zahl hier stimmt ab sofort wieder, das tatsaechliche
+// Schutzniveau der BESTEHENDEN Konten nicht -- dafuer muss jedes einzelne
+// einmal neu gesetzt werden. Es gibt keine Stelle, an der ein zu kurzes
+// Passwort nachtraeglich auffiele.
 
-const PASSWORT_MIN = 6;
+const PASSWORT_MIN = 12;
 
 // Fuer Verwaltungszugaenge mehr. Dieselbe Ueberlegung wie bei den
 // Sitzungsfristen: Ein Admin-Zugang oeffnet die ganze Personalakte, ein
 // Mitarbeitenden-Zugang die eigenen Schichten. Unterschiedliches Risiko,
 // unterschiedliche Anforderung. Solange es kein Rollenmodell gibt (OP-59),
 // haengt am Admin-Passwort buchstaeblich alles.
-// Ebenfalls voruebergehend herabgesetzt, siehe Kasten oben (ENT-289).
-// Urspruenglich 16.
-const PASSWORT_MIN_ADMIN = 6;
+// Seit ENT-502 wieder auf dem urspruenglichen Wert, siehe oben.
+const PASSWORT_MIN_ADMIN = 16;
 
 // Wie aufwendig das Verschluesseln des Passworts ist. Jede Stufe verdoppelt
 // den Aufwand -- fuer das Anmelden ein paar Hundertstelsekunden, fuer

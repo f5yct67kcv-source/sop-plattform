@@ -29528,12 +29528,11 @@ function mbNeu(felder) {
 // Ein Verwaltungszugang braucht ein laengeres Passwort (ENT-075). Das muss
 // man sehen, BEVOR man abgewiesen wird -- eine Regel, die erst beim Klick
 // auftaucht, wirkt wie ein Fehler.
-// VORUEBERGEHEND HERABGESETZT (ENT-289, 2026-09-01): Spiegel der Werte in
-// backend/anmeldung.php -- dort steht der Kasten mit der Begruendung und
-// der Auflage, vor der ersten produktiven Nutzung auf 12/16 zurueckzudrehen.
-// Aendert jemand nur hier, laesst die Oberflaeche etwas zu, das der Server
-// abweist; darum immer beide Stellen zusammen.
-const PW_MIN = 6, PW_MIN_ADMIN = 6;
+// Spiegel der Werte in backend/anmeldung.php. Die Absenkung auf 6 aus der
+// Erprobung (ENT-289) ist mit ENT-502 zurueckgenommen -- dort steht die
+// Begruendung. Aendert jemand nur hier, laesst die Oberflaeche etwas zu,
+// das der Server abweist; darum immer beide Stellen zusammen.
+const PW_MIN = 12, PW_MIN_ADMIN = 16;
 function mbPwMin() {
   // Massgeblich ist jetzt die Rolle, nicht mehr ein Admin-Haekchen. Auch
   // Planung und Personal sehen fremde Personendaten und brauchen darum das
