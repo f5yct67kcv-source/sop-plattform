@@ -50,7 +50,18 @@ const LOHN_VOLL = {
     ansatz_rappen: 2500, ferien_laufend: 1, ml13_bp: 833,
     zuschlag_fachausweis_art: null, zuschlag_fachausweis_rappen: null,
     zuschlag_hund_art: 'stunde', zuschlag_hund_rappen: 150,
-    zuschlag_waffe_art: null, zuschlag_waffe_rappen: null, bemerkung: null }],
+    zuschlag_waffe_art: null, zuschlag_waffe_rappen: null, bemerkung: null },
+    // Ein zweiter Ansatz mit AUSDRUECKLICHER Null: 0 % 13. Monatslohn
+    // vereinbart und ein Waffenzuschlag von 0.00. Beides ist etwas anderes
+    // als "nicht vereinbart" -- so steht es im Schema und in
+    // lohn_rappen_aus(). Die Oberflaeche fragte auf Wahrheit und zeigte
+    // darum ein leeres Feld; wer danach speicherte, loeschte die
+    // Vereinbarung stillschweigend.
+    { id: 2, mitarbeiter_id: 42, gueltig_ab: '2023-01-01', kategorie: 'C',
+      ansatz_rappen: 2400, ferien_laufend: 0, ml13_bp: 0,
+      zuschlag_fachausweis_art: null, zuschlag_fachausweis_rappen: null,
+      zuschlag_hund_art: null, zuschlag_hund_rappen: null,
+      zuschlag_waffe_art: 'monat', zuschlag_waffe_rappen: 0, bemerkung: null }],
   ansatz_aktuell: { id: 1, gueltig_ab: '2024-03-01', ansatz_rappen: 2500 },
   abzuege: [
     { id: 5, mitarbeiter_id: 42, gueltig_ab: '2026-01-01', nbu_pflichtig: null,
@@ -441,6 +452,39 @@ check('Ein Zuschlag nach Art. 19 erscheint mit Betrag und Einheit',
   /Diensthund/.test(akte) && /1.50/.test(akte));
 check('Die IBAN des Zahlungsempfaengers erscheint',
   /CH9300762011623852957/.test(akte));
+
+// Null ist ein Wert, keine Leere. Ein ausdruecklich vereinbarter Anteil von
+// 0 % ist etwas anderes als "kein 13. Monatslohn vereinbart" -- und der
+// Unterschied ist nicht kosmetisch: Wer die leere Anzeige speichert, schickt
+// einen Leerstring, und der Server macht daraus NULL. Die Vereinbarung waere
+// weg, ohne Meldung und ohne Spur.
+const nullzeile = await page.evaluate(() => {
+  const t = [...document.querySelectorAll('#mdBereich_lohn tbody tr')]
+    .find(x => /01\.01\.2023/.test(x.textContent));
+  return t ? [...t.querySelectorAll('td')].map(td => td.textContent.trim()) : null;
+});
+check('KRITISCH: ein vereinbarter Anteil von 0 % steht als 0 %, nicht als "keiner"',
+  nullzeile !== null && nullzeile.some(z => /^0\.00 %$/.test(z))
+  && !nullzeile.some(z => /keiner/.test(z)));
+check('KRITISCH: ein Zuschlag von 0.00 wird ebenfalls als erfasst gezeigt, nicht als "keine"',
+  nullzeile !== null && nullzeile.some(z => /Schusswaffe/.test(z))
+  && !nullzeile.some(z => /^keine$/.test(z)));
+
+// Und der Ort, an dem der Verlust tatsaechlich entstand: der Dialog. Ein
+// leeres Feld sendet einen Leerstring, und lohn_person.php macht daraus
+// NULL. Wer den Ansatz oeffnete, um NUR den Betrag zu korrigieren, loeschte
+// damit die 0-%-Vereinbarung mit.
+const dialogfelder = await page.evaluate(() => {
+  lohnAnsatzOeffnen(2);
+  return { ml13: document.getElementById('lpaMl13').value,
+           waffe: document.getElementById('lpaZWaffe').value,
+           hund: document.getElementById('lpaZHund').value };
+});
+check('KRITISCH: der Dialog zeigt die erfasste Null als 0.00, nicht als leeres Feld',
+  dialogfelder.ml13 === '0.00' && dialogfelder.waffe === '0.00');
+check('Ein wirklich nicht erfasster Zuschlag bleibt leer -- beides sieht weiterhin verschieden aus',
+  dialogfelder.hund === '');
+await page.evaluate(() => closeDlg('dlgLohnAnsatz'));
 
 // ── 5. Der eigentliche Kern: Unbekanntes sieht nicht aus wie Nichts ──────
 lohnAntwort = LOHN_LUECKIG;

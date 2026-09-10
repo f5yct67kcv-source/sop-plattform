@@ -18783,6 +18783,18 @@ const lohnSchreiben = () => darf('lohn_schreiben');
 
 // Franken aus Rappen. Immer zwei Nachkommastellen -- "25.-" und "25.00"
 // nebeneinander lesen sich wie zwei verschiedene Zahlen.
+// Ist der Wert ERFASST -- im Unterschied zu "nicht erfasst"? Null ist ein
+// Wert, keine Leere. So steht es im Server (lohn_rappen_aus(): "Leer und
+// null bleiben null; 0 ist ein Wert, keine Leere") und im Schema ("NULL
+// heisst 'kein 13. Monatslohn vereinbart', nicht '0 %'").
+//
+// Die Oberflaeche konnte beides nicht auseinanderhalten: Sie fragte auf
+// Wahrheit, und eine erfasste Null ist falsch. Ein ausdruecklich
+// vereinbarter Anteil von 0 % zeigte darum ein LEERES Feld -- und wer den
+// Dialog danach speicherte, etwa um nur den Ansatz zu korrigieren, schickte
+// einen Leerstring und machte daraus stillschweigend "nicht vereinbart".
+// Die Vereinbarung war weg, ohne Meldung und ohne Spur.
+const lohnErfasst = w => w !== null && w !== undefined && w !== '';
 const lohnFr = rappen => rappen === null || rappen === undefined
   ? '—' : (rappen / 100).toFixed(2);
 // Basispunkte als Prozent. 833 -> "8.33 %".
@@ -19676,14 +19688,14 @@ function lohnAkteZeichnen() {
       ? ' <span class="chip chip-ok">gilt heute</span>'
       : (kuenftig ? ' <span class="chip">ab ' + dmy(a.gueltig_ab) + '</span>' : '');
     const zus = [];
-    if (a.zuschlag_fachausweis_rappen) { zus.push(`Fachausweis ${lohnFr(a.zuschlag_fachausweis_rappen)} / ${a.zuschlag_fachausweis_art === 'monat' ? 'Monat' : 'Stunde'}`); }
-    if (a.zuschlag_hund_rappen) { zus.push(`Diensthund ${lohnFr(a.zuschlag_hund_rappen)} / ${a.zuschlag_hund_art === 'monat' ? 'Monat' : 'Stunde'}`); }
-    if (a.zuschlag_waffe_rappen) { zus.push(`Schusswaffe ${lohnFr(a.zuschlag_waffe_rappen)} / ${a.zuschlag_waffe_art === 'monat' ? 'Monat' : 'Stunde'}`); }
+    if (lohnErfasst(a.zuschlag_fachausweis_rappen)) { zus.push(`Fachausweis ${lohnFr(a.zuschlag_fachausweis_rappen)} / ${a.zuschlag_fachausweis_art === 'monat' ? 'Monat' : 'Stunde'}`); }
+    if (lohnErfasst(a.zuschlag_hund_rappen)) { zus.push(`Diensthund ${lohnFr(a.zuschlag_hund_rappen)} / ${a.zuschlag_hund_art === 'monat' ? 'Monat' : 'Stunde'}`); }
+    if (lohnErfasst(a.zuschlag_waffe_rappen)) { zus.push(`Schusswaffe ${lohnFr(a.zuschlag_waffe_rappen)} / ${a.zuschlag_waffe_art === 'monat' ? 'Monat' : 'Stunde'}`); }
     return `<tr${kuenftig ? ' style="opacity:.7"' : ''}>
       <td>${dmy(a.gueltig_ab)}${marke}</td>
       <td style="text-align:right"><b>${lohnFr(a.ansatz_rappen)}</b></td>
       <td>${a.kategorie ? 'Kat. ' + esc(a.kategorie) : lohnUnbekannt('ohne Kategorie')}</td>
-      <td>${a.ml13_bp ? lohnPz(a.ml13_bp) : '<span class="zone-note" title="Kein 13. Monatslohn vereinbart — er ist keine GAV-Pflicht">keiner</span>'}</td>
+      <td>${lohnErfasst(a.ml13_bp) ? lohnPz(a.ml13_bp) : '<span class="zone-note" title="Kein 13. Monatslohn vereinbart — er ist keine GAV-Pflicht">keiner</span>'}</td>
       <td>${a.ferien_laufend ? 'laufend' : '<span title="Der Ferienlohn wird beim Bezug ausbezahlt, Art. 20 Ziff. 2">beim Bezug</span>'}</td>
       <td>${zus.length ? esc(zus.join(' · ')) : '<span class="zone-note">keine</span>'}</td>
       <td style="text-align:right">${lohnSchreiben()
@@ -19771,10 +19783,10 @@ function lohnAnsatzOeffnen(id) {
   $('lpaId').value = a ? a.id : '';
   $('lpaAb').value = a ? a.gueltig_ab : '';
   $('lpaAnsatz').value = a ? (a.ansatz_rappen / 100).toFixed(2) : '';
-  $('lpaMl13').value = a && a.ml13_bp ? (a.ml13_bp / 100).toFixed(2) : '';
+  $('lpaMl13').value = a && lohnErfasst(a.ml13_bp) ? (a.ml13_bp / 100).toFixed(2) : '';
   $('lpaFerienLaufend').checked = a ? !!Number(a.ferien_laufend) : false;
   [['Fach', 'fachausweis'], ['Hund', 'hund'], ['Waffe', 'waffe']].forEach(([kurz, feld]) => {
-    $('lpaZ' + kurz).value = a && a['zuschlag_' + feld + '_rappen']
+    $('lpaZ' + kurz).value = a && lohnErfasst(a['zuschlag_' + feld + '_rappen'])
       ? (a['zuschlag_' + feld + '_rappen'] / 100).toFixed(2) : '';
     $('lpaZ' + kurz + 'Art').value = a && a['zuschlag_' + feld + '_art'] ? a['zuschlag_' + feld + '_art'] : 'stunde';
   });
