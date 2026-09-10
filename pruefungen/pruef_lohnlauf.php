@@ -17,19 +17,22 @@ $ok = 0; $bad = [];
 function pruef(string $name, bool $c) { global $ok, $bad; if ($c) { $ok++; } else { $bad[] = $name; } }
 function json_response($data, int $status = 200): void {}
 
+require __DIR__ . '/schema_echt.php';
 require_once __DIR__ . '/../backend/lohnlauf.php';
 
 $pdo = new PDO('sqlite::memory:', null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                                                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]);
-$pdo->exec('CREATE TABLE einsaetze (id INTEGER PRIMARY KEY, datum TEXT, sparte TEXT,
-            kunde_name TEXT, objekt_id INT, status TEXT)');
-$pdo->exec('CREATE TABLE einsatz_zuteilung (einsatz_id INT, mitarbeiter_id INT, ist_status TEXT,
-            ist_von TEXT, ist_bis TEXT, ist_pause_min INT, ist_pause_bezahlt_ma INT)');
-$pdo->exec('CREATE TABLE lohn_ansatz (id INTEGER PRIMARY KEY, mitarbeiter_id INT, gueltig_ab TEXT,
-            kategorie TEXT, ansatz_rappen INT, ferien_laufend INT, ml13_bp INT,
-            zuschlag_fachausweis_art TEXT, zuschlag_fachausweis_rappen INT,
-            zuschlag_hund_art TEXT, zuschlag_hund_rappen INT,
-            zuschlag_waffe_art TEXT, zuschlag_waffe_rappen INT)');
+// Die Tabellen mit dem ECHTEN Schema, nicht von Hand getippt. Von Hand
+// getippt fehlten hier sechs Spalten, die es in Wirklichkeit gibt --
+// zusage, position_id, ist_pause_von, ist_pause_bezahlt_kunde, ist_bemerkung
+// und abgeglichen_von. Eine Lohnaenderung, die eine davon liest, waere
+// gruen durchgelaufen und im Betrieb falsch gewesen. Genau diese
+// Fehlerfamilie hat am 2026-09-09 einen Livefehler verursacht (ENT-451).
+foreach (['einsaetze', 'einsatz_zuteilung', 'lohn_ansatz'] as $t) {
+    $fehler = schema_anlegen($pdo, $t);
+    pruef("KRITISCH: das echte Schema fuer $t laesst sich anlegen", $fehler === null);
+    if ($fehler !== null) { echo "  $t: $fehler\n"; }
+}
 
 // Datum bewusst weit weg von heute (CLAUDE.md / test_datumsfest.mjs).
 $VON = '2026-07-01'; $BIS = '2026-07-31';
@@ -38,15 +41,15 @@ $VON = '2026-07-01'; $BIS = '2026-07-31';
 //  - Mi 01.07., 08:00-18:00, 60 Min unbezahlte Pause  -> 540 Min netto, kein Bonus
 //  - So 05.07., 08:00-12:00, ohne Pause               -> 240 Min netto, Sonntagsbonus
 //  - Fr 10.07., 22:00-02:00, ohne Pause               -> 240 Min, 3 h davon Nachtfenster
-$pdo->exec("INSERT INTO einsaetze VALUES
-  (1,'2026-07-01','sicherheit','Kunde',NULL,'geplant'),
-  (2,'2026-07-05','sicherheit','Kunde',NULL,'geplant'),
-  (3,'2026-07-10','sicherheit','Kunde',NULL,'geplant'),
-  (4,'2026-07-15','reinigung','Kunde',NULL,'geplant'),
-  (5,'2026-07-16','sicherheit','Kunde',NULL,'geplant'),
-  (6,'2026-07-17','sicherheit','Kunde',NULL,'abgesagt'),
-  (7,'2026-07-20','sicherheit','Kunde',NULL,'geplant')");
-$pdo->exec("INSERT INTO einsatz_zuteilung VALUES
+$pdo->exec("INSERT INTO einsaetze (id, datum, sparte, kunde_name, objekt_id, status, ort, von, bis) VALUES
+  (1,'2026-07-01','sicherheit','Kunde',NULL,'geplant','4600 Testort','08:00','18:00'),
+  (2,'2026-07-05','sicherheit','Kunde',NULL,'geplant','4600 Testort','08:00','18:00'),
+  (3,'2026-07-10','sicherheit','Kunde',NULL,'geplant','4600 Testort','08:00','18:00'),
+  (4,'2026-07-15','reinigung','Kunde',NULL,'geplant','4600 Testort','08:00','18:00'),
+  (5,'2026-07-16','sicherheit','Kunde',NULL,'geplant','4600 Testort','08:00','18:00'),
+  (6,'2026-07-17','sicherheit','Kunde',NULL,'abgesagt','4600 Testort','08:00','18:00'),
+  (7,'2026-07-20','sicherheit','Kunde',NULL,'geplant','4600 Testort','08:00','18:00')");
+$pdo->exec("INSERT INTO einsatz_zuteilung (einsatz_id, mitarbeiter_id, ist_status, ist_von, ist_bis, ist_pause_min, ist_pause_bezahlt_ma) VALUES
   (1,1,'abgeglichen','08:00','18:00',60,0),
   (2,1,'abgeglichen','08:00','12:00',0,0),
   (3,1,'abgeglichen','22:00','02:00',0,0),
@@ -54,7 +57,7 @@ $pdo->exec("INSERT INTO einsatz_zuteilung VALUES
   (5,1,'offen','08:00','12:00',0,0),
   (6,1,'abgeglichen','08:00','12:00',0,0),
   (7,1,'abgeglichen','08:00','12:00',300,0)");
-$pdo->exec("INSERT INTO lohn_ansatz VALUES
+$pdo->exec("INSERT INTO lohn_ansatz (id, mitarbeiter_id, gueltig_ab, kategorie, ansatz_rappen, ferien_laufend, ml13_bp, zuschlag_fachausweis_art, zuschlag_fachausweis_rappen, zuschlag_hund_art, zuschlag_hund_rappen, zuschlag_waffe_art, zuschlag_waffe_rappen) VALUES
   (1,1,'2024-01-01','C',2500,1,833,NULL,NULL,'monat',15000,'stunde',200)");
 
 $MA1 = ['id' => 1, 'anstellungskategorie' => 'C', 'eintritt' => '2024-03-01',
@@ -156,7 +159,7 @@ pruef('KRITISCH: ohne Lohnansatz wird nicht mit null gerechnet, sondern gesperrt
 
 // Ein Ansatz, der erst NACH dem Zeitraum gilt, darf nicht rueckwirkend
 // greifen -- sonst rechnete eine Lohnerhoehung alte Monate neu.
-$pdo->exec("INSERT INTO lohn_ansatz VALUES
+$pdo->exec("INSERT INTO lohn_ansatz (id, mitarbeiter_id, gueltig_ab, kategorie, ansatz_rappen, ferien_laufend, ml13_bp, zuschlag_fachausweis_art, zuschlag_fachausweis_rappen, zuschlag_hund_art, zuschlag_hund_rappen, zuschlag_waffe_art, zuschlag_waffe_rappen) VALUES
   (2,3,'2027-01-01','C',3000,1,833,NULL,NULL,NULL,NULL,NULL,NULL)");
 $kuenftig = lohnlauf_person($pdo, ['id' => 3, 'anstellungskategorie' => 'C',
     'eintritt' => '2024-03-01', 'geburtsdatum' => '2000-05-04'], $VON, $BIS);
@@ -170,9 +173,9 @@ pruef('KRITISCH: ein erst kuenftig gueltiger Ansatz greift nicht rueckwirkend',
 // STUNDENansatz: bei den 9 bewerteten Stunden dieser Schicht ergaebe das
 // gut CHF 40'000 Bruttolohn fuer einen Arbeitstag. lohn_mindestlohn()
 // schlaegt nur nach UNTEN an und faengt es nicht.
-$pdo->exec("INSERT INTO lohn_ansatz VALUES
+$pdo->exec("INSERT INTO lohn_ansatz (id, mitarbeiter_id, gueltig_ab, kategorie, ansatz_rappen, ferien_laufend, ml13_bp, zuschlag_fachausweis_art, zuschlag_fachausweis_rappen, zuschlag_hund_art, zuschlag_hund_rappen, zuschlag_waffe_art, zuschlag_waffe_rappen) VALUES
   (5,6,'2024-01-01','B',450000,1,NULL,NULL,NULL,NULL,NULL,NULL,NULL)");
-$pdo->exec("INSERT INTO einsatz_zuteilung VALUES (1,6,'abgeglichen','08:00','18:00',60,0)");
+$pdo->exec("INSERT INTO einsatz_zuteilung (einsatz_id, mitarbeiter_id, ist_status, ist_von, ist_bis, ist_pause_min, ist_pause_bezahlt_ma) VALUES (1,6,'abgeglichen','08:00','18:00',60,0)");
 $umgestuft = lohnlauf_person($pdo, ['id' => 6, 'anstellungskategorie' => 'C',
     'eintritt' => '2024-03-01', 'geburtsdatum' => '2000-05-04'], $VON, $BIS);
 pruef('KRITISCH: ein Monatsansatz wird nach Umstufung nicht als Stundenansatz gerechnet',
@@ -186,9 +189,9 @@ pruef('Die Zeiten sind auch hier gerechnet -- gesperrt ist der Lohn, nicht die S
 
 // Ein Ansatz aus der Zeit vor dem Schnappschuss: ohne Kategorie steht nicht
 // fest, ob der Betrag pro Stunde oder pro Monat gilt. Nicht raten.
-$pdo->exec("INSERT INTO lohn_ansatz VALUES
+$pdo->exec("INSERT INTO lohn_ansatz (id, mitarbeiter_id, gueltig_ab, kategorie, ansatz_rappen, ferien_laufend, ml13_bp, zuschlag_fachausweis_art, zuschlag_fachausweis_rappen, zuschlag_hund_art, zuschlag_hund_rappen, zuschlag_waffe_art, zuschlag_waffe_rappen) VALUES
   (6,7,'2024-01-01',NULL,3000,1,NULL,NULL,NULL,NULL,NULL,NULL,NULL)");
-$pdo->exec("INSERT INTO einsatz_zuteilung VALUES (1,7,'abgeglichen','08:00','18:00',60,0)");
+$pdo->exec("INSERT INTO einsatz_zuteilung (einsatz_id, mitarbeiter_id, ist_status, ist_von, ist_bis, ist_pause_min, ist_pause_bezahlt_ma) VALUES (1,7,'abgeglichen','08:00','18:00',60,0)");
 $ohneSchnapp = lohnlauf_person($pdo, ['id' => 7, 'anstellungskategorie' => 'C',
     'eintritt' => '2024-03-01', 'geburtsdatum' => '2000-05-04'], $VON, $BIS);
 pruef('KRITISCH: fehlt dem Ansatz die Kategorie, wird gesperrt statt geraten',
@@ -197,9 +200,9 @@ pruef('Und dieser Fall ist von der Umstufung unterscheidbar -- vier Lagen, vier 
     $ohneSchnapp['gesperrt_grund'] !== $umgestuft['gesperrt_grund']);
 
 // ── Mindestlohnwarnung ───────────────────────────────────────────────────
-$pdo->exec("INSERT INTO lohn_ansatz VALUES
+$pdo->exec("INSERT INTO lohn_ansatz (id, mitarbeiter_id, gueltig_ab, kategorie, ansatz_rappen, ferien_laufend, ml13_bp, zuschlag_fachausweis_art, zuschlag_fachausweis_rappen, zuschlag_hund_art, zuschlag_hund_rappen, zuschlag_waffe_art, zuschlag_waffe_rappen) VALUES
   (3,4,'2024-01-01','C',2000,1,NULL,NULL,NULL,NULL,NULL,NULL,NULL)");
-$pdo->exec("INSERT INTO einsatz_zuteilung VALUES (1,4,'abgeglichen','08:00','18:00',60,0)");
+$pdo->exec("INSERT INTO einsatz_zuteilung (einsatz_id, mitarbeiter_id, ist_status, ist_von, ist_bis, ist_pause_min, ist_pause_bezahlt_ma) VALUES (1,4,'abgeglichen','08:00','18:00',60,0)");
 $tief = lohnlauf_person($pdo, ['id' => 4, 'anstellungskategorie' => 'C',
     'eintritt' => '2024-03-01', 'geburtsdatum' => '2000-05-04'], $VON, $BIS);
 pruef('KRITISCH: ein Grundlohn unter dem GAV-Mindestlohn erzeugt eine Warnung',
@@ -217,13 +220,13 @@ pruef('Ein Ansatz ueber dem Mindestlohn erzeugt keine Warnung', !isset($p['warnu
 $id = 100;
 for ($t = 1; $t <= 22; $t++) {
     $datum = sprintf('2026-07-%02d', $t);
-    $pdo->exec("INSERT INTO einsaetze VALUES ($id,'$datum','sicherheit','Kunde',NULL,'geplant')");
+    $pdo->exec("INSERT INTO einsaetze (id, datum, sparte, kunde_name, objekt_id, status, ort, von, bis) VALUES ($id,'$datum','sicherheit','Kunde',NULL,'geplant','4600 Testort','08:00','18:00')");
     // 08:00-18:00 mit 0 Pause: 600 Minuten, kein Nacht- oder Sonntagsfenster,
     // damit die Schwelle ohne Bonusanteil erreicht wird.
-    $pdo->exec("INSERT INTO einsatz_zuteilung VALUES ($id,5,'abgeglichen','08:00','18:00',0,0)");
+    $pdo->exec("INSERT INTO einsatz_zuteilung (einsatz_id, mitarbeiter_id, ist_status, ist_von, ist_bis, ist_pause_min, ist_pause_bezahlt_ma) VALUES ($id,5,'abgeglichen','08:00','18:00',0,0)");
     $id++;
 }
-$pdo->exec("INSERT INTO lohn_ansatz VALUES
+$pdo->exec("INSERT INTO lohn_ansatz (id, mitarbeiter_id, gueltig_ab, kategorie, ansatz_rappen, ferien_laufend, ml13_bp, zuschlag_fachausweis_art, zuschlag_fachausweis_rappen, zuschlag_hund_art, zuschlag_hund_rappen, zuschlag_waffe_art, zuschlag_waffe_rappen) VALUES
   (4,5,'2024-01-01','C',2500,1,NULL,NULL,NULL,NULL,NULL,NULL,NULL)");
 $viel = lohnlauf_person($pdo, ['id' => 5, 'anstellungskategorie' => 'C',
     'eintritt' => '2024-03-01', 'geburtsdatum' => '2000-05-04'], $VON, $BIS);
@@ -335,13 +338,13 @@ pruef('Und keiner dieser Saetze ist leer',
 // entscheiden, die gegen die naheliegende Wahl getroffen wurden: dass die
 // Reinigungssparte MITzaehlt und der Zeitbonus NICHT.
 $mkw = 90;   // eigener Mitarbeiter, damit die anderen Faelle unberuehrt bleiben
-$pdo->exec("INSERT INTO einsaetze VALUES
-    (900,'2026-07-06','bewachung','Kunde',1,'geplant'),
-    (901,'2026-07-13','reinigung','Kunde',1,'geplant'),
-    (902,'2026-07-05','bewachung','Kunde',1,'geplant'),
-    (903,'2026-06-15','bewachung','Kunde',1,'abgesagt'),
-    (904,'2026-06-22','bewachung','Kunde',1,'geplant')");
-$pdo->exec("INSERT INTO einsatz_zuteilung VALUES
+$pdo->exec("INSERT INTO einsaetze (id, datum, sparte, kunde_name, objekt_id, status, ort, von, bis) VALUES
+    (900,'2026-07-06','bewachung','Kunde',1,'geplant','4600 Testort','08:00','18:00'),
+    (901,'2026-07-13','reinigung','Kunde',1,'geplant','4600 Testort','08:00','18:00'),
+    (902,'2026-07-05','bewachung','Kunde',1,'geplant','4600 Testort','08:00','18:00'),
+    (903,'2026-06-15','bewachung','Kunde',1,'abgesagt','4600 Testort','08:00','18:00'),
+    (904,'2026-06-22','bewachung','Kunde',1,'geplant','4600 Testort','08:00','18:00')");
+$pdo->exec("INSERT INTO einsatz_zuteilung (einsatz_id, mitarbeiter_id, ist_status, ist_von, ist_bis, ist_pause_min, ist_pause_bezahlt_ma) VALUES
     (900,$mkw,'abgeglichen','08:00','18:00',60,0),
     (901,$mkw,'abgeglichen','08:00','18:00',0,0),
     (902,$mkw,'abgeglichen','08:00','18:00',0,0),
@@ -409,15 +412,15 @@ pruef('Ein Mitarbeiter ganz ohne Einsaetze ergibt lauter Nullwochen, nicht eine 
     && array_sum(lohnlauf_nbu_wochen($pdo, 999, '2026-07-31', 3)['liste']) == 0.0);
 
 // ── Ziff. 4: Ausfalltage wegen Unfall oder Krankheit ─────────────────────
-$pdo->exec('CREATE TABLE abwesenheiten (id INTEGER PRIMARY KEY, mitarbeiter_id INT,
-            typ TEXT, von TEXT, bis TEXT, status TEXT)');
-$pdo->exec("INSERT INTO abwesenheiten VALUES
-    (1,$mkw,'krankheit','2026-06-01','2026-06-05','genehmigt'),
-    (2,$mkw,'unfall','2026-06-08','2026-06-09','genehmigt'),
-    (3,$mkw,'ferien','2026-06-15','2026-06-19','genehmigt'),
-    (4,$mkw,'militaer','2026-06-22','2026-06-26','genehmigt'),
-    (5,$mkw,'krankheit','2026-07-01','2026-07-03','beantragt'),
-    (6,$mkw,'krankheit','2026-04-01','2026-04-03','genehmigt')");
+$fehler = schema_anlegen($pdo, 'abwesenheiten');
+pruef('KRITISCH: das echte Schema fuer abwesenheiten laesst sich anlegen', $fehler === null);
+$pdo->exec("INSERT INTO abwesenheiten (id, mitarbeiter_id, typ, von, bis, status, beantragt_von) VALUES
+    (1,$mkw,'krankheit','2026-06-01','2026-06-05','genehmigt',7),
+    (2,$mkw,'unfall','2026-06-08','2026-06-09','genehmigt',7),
+    (3,$mkw,'ferien','2026-06-15','2026-06-19','genehmigt',7),
+    (4,$mkw,'militaer','2026-06-22','2026-06-26','genehmigt',7),
+    (5,$mkw,'krankheit','2026-07-01','2026-07-03','beantragt',7),
+    (6,$mkw,'krankheit','2026-04-01','2026-04-03','genehmigt',7)");
 $wa = lohnlauf_nbu_wochen($pdo, $mkw, '2026-07-31', 3);
 // 1. bis 5. Juni sind fuenf Tage, 8. bis 9. Juni zwei -- zusammen sieben.
 pruef('Krankheit und Unfall werden tageweise gezaehlt',
@@ -440,11 +443,10 @@ pruef('Ohne die Ausfalltage waere daraus ein "nicht versichert" geworden',
     lohn_nbu_ermittlung($wa['liste'], $uvgP, 0)['stand'] === LOHN_NBU_NICHT);
 
 // ══════════════════════ DIE ABZUGSSEITE (Etappe 4) ═══════════════════════
-$pdo->exec('CREATE TABLE lohn_abzug (id INTEGER PRIMARY KEY, schluessel TEXT, bezeichnung TEXT,
-            gueltig_ab TEXT, gueltig_bis TEXT, satz_bp INT, fix_rappen INT,
-            hoechstlohn_rappen INT, quelle TEXT)');
-$pdo->exec('CREATE TABLE lohn_person (id INTEGER PRIMARY KEY, mitarbeiter_id INT, gueltig_ab TEXT,
-            nbu_pflichtig INT, nbu_grund TEXT, nbu_von INT, nbu_am TEXT, qst_pflichtig INT)');
+$fehler = schema_anlegen($pdo, 'lohn_abzug');
+pruef('KRITISCH: das echte Schema fuer lohn_abzug laesst sich anlegen', $fehler === null);
+$fehler = schema_anlegen($pdo, 'lohn_person');
+pruef('KRITISCH: das echte Schema fuer lohn_person laesst sich anlegen', $fehler === null);
 
 // Die Zeilen der Referenzabrechnung: 25.00/h + 8.33 % + 8.33 % = 29.16,
 // mal zehn Stunden = 291.60.
@@ -581,7 +583,7 @@ $zV = []; foreach ($aV['zeilen'] as $z) { $zV[$z['schluessel']] = $z; }
 pruef('Mit Deckung, aber ohne erfassten Praemiensatz: eigener Grund, nicht derselbe',
     $zV['nbu']['gesperrt_grund'] === 'kein_nbu_satz'
     && $zV['nbu']['gesperrt_grund'] !== $zN['nbu']['gesperrt_grund']);
-$pdo->exec("INSERT INTO lohn_abzug VALUES (1,'nbu','NBU','2020-01-01',NULL,160,NULL,NULL,'Police')");
+$pdo->exec("INSERT INTO lohn_abzug (id, schluessel, bezeichnung, gueltig_ab, gueltig_bis, satz_bp, fix_rappen, hoechstlohn_rappen, quelle) VALUES (1,'nbu','NBU','2020-01-01',NULL,160,NULL,NULL,'Police')");
 $aS = lohnlauf_abzuege($pdo, $refKopf, '2026-07-31', ['stand' => LOHN_NBU_VERSICHERT]);
 $zS = []; foreach ($aS['zeilen'] as $z) { $zS[$z['schluessel']] = $z; }
 pruef('Mit Deckung und Satz wird gerechnet: 1,60 % von 291.60 sind 4.67',
@@ -595,7 +597,7 @@ pruef('Der Hinweis nennt die Quelle des Satzes',
 // einen Wert, der bereits dasteht -- und findet ihn nicht, weil er anders
 // heisst. Seit lohn_abzug_nur_satz() nimmt lohn_abzuege.php so eine Zeile
 // nicht mehr an; dieser Zweig faengt, was vorher entstanden ist.
-$pdo->exec("INSERT INTO lohn_abzug VALUES (9,'nbu','NBU','2026-06-01',NULL,NULL,500,NULL,'Police')");
+$pdo->exec("INSERT INTO lohn_abzug (id, schluessel, bezeichnung, gueltig_ab, gueltig_bis, satz_bp, fix_rappen, hoechstlohn_rappen, quelle) VALUES (9,'nbu','NBU','2026-06-01',NULL,NULL,500,NULL,'Police')");
 $aF = lohnlauf_abzuege($pdo, $refKopf, '2026-07-31', ['stand' => LOHN_NBU_VERSICHERT]);
 $zF = []; foreach ($aF['zeilen'] as $z) { $zF[$z['schluessel']] = $z; }
 pruef('KRITISCH: ein Fixbetrag beim NBU wird NICHT als Abzug verrechnet',
@@ -608,7 +610,7 @@ pruef('Der Grund sagt, dass etwas erfasst IST -- nur in der falschen Form',
 $pdo->exec("DELETE FROM lohn_abzug WHERE id = 9");
 
 // Uebersteuerung: von Hand gesetzt schlaegt die Rechnung.
-$pdo->exec("INSERT INTO lohn_person VALUES (1,$mkw,'2026-01-01',0,'Vom Versicherer bestaetigt',7,'2026-01-05 10:00',0)");
+$pdo->exec("INSERT INTO lohn_person (id, mitarbeiter_id, gueltig_ab, nbu_pflichtig, nbu_grund, nbu_von, nbu_am, qst_pflichtig) VALUES (1,$mkw,'2026-01-01',0,'Vom Versicherer bestaetigt',7,'2026-01-05 10:00',0)");
 $u = lohnlauf_nbu($pdo, $mkw, '2026-07-31');
 pruef('Eine Uebersteuerung schlaegt die Rechnung',
     $u['stand'] === LOHN_NBU_NICHT && $u['quelle'] === 'uebersteuert');
@@ -624,8 +626,8 @@ pruef('Ohne Eintrag ist die Uebersteuerung leer, nicht auf "versichert" vorbeleg
     lohnlauf_nbu($pdo, 999, '2025-07-31')['uebersteuert'] === null);
 
 // ── Rundung auf 5 Rappen mit eigener Zeile (OP-465, entschieden) ─────────
-$pdo->exec("INSERT INTO lohn_abzug VALUES (10,'ktg','Krankentaggeld','2020-01-01',NULL,70,NULL,NULL,'Police')");
-$pdo->exec("INSERT INTO lohn_abzug VALUES (11,'bvg','BVG','2020-01-01',NULL,NULL,4500,NULL,'PK-Meldung')");
+$pdo->exec("INSERT INTO lohn_abzug (id, schluessel, bezeichnung, gueltig_ab, gueltig_bis, satz_bp, fix_rappen, hoechstlohn_rappen, quelle) VALUES (10,'ktg','Krankentaggeld','2020-01-01',NULL,70,NULL,NULL,'Police')");
+$pdo->exec("INSERT INTO lohn_abzug (id, schluessel, bezeichnung, gueltig_ab, gueltig_bis, satz_bp, fix_rappen, hoechstlohn_rappen, quelle) VALUES (11,'bvg','BVG','2020-01-01',NULL,NULL,4500,NULL,'PK-Meldung')");
 $voll = lohnlauf_abzuege($pdo, ['mitarbeiter_id' => $mkw] + $refKopf, '2026-07-31',
     ['stand' => LOHN_NBU_VERSICHERT]);
 $zv = []; foreach ($voll['zeilen'] as $z) { $zv[$z['schluessel']] = $z; }
@@ -694,8 +696,8 @@ pruef('Und dann gibt es folgerichtig auch keinen Auszahlungsbetrag',
 $ahvVorher = $zv['ahv']['betrag_rappen'];
 pruef('Der AHV-Abzug kommt aus dem Merkblatt: 5,30 % von 291.60 sind 15.45',
     $ahvVorher === -1545);
-$pdo->exec("INSERT INTO lohn_abzug VALUES (20,'ahv','AHV','2020-01-01',NULL,9900,NULL,NULL,'erfunden')");
-$pdo->exec("INSERT INTO lohn_abzug VALUES (21,'alv','ALV','2020-01-01',NULL,9900,NULL,NULL,'erfunden')");
+$pdo->exec("INSERT INTO lohn_abzug (id, schluessel, bezeichnung, gueltig_ab, gueltig_bis, satz_bp, fix_rappen, hoechstlohn_rappen, quelle) VALUES (20,'ahv','AHV','2020-01-01',NULL,9900,NULL,NULL,'erfunden')");
+$pdo->exec("INSERT INTO lohn_abzug (id, schluessel, bezeichnung, gueltig_ab, gueltig_bis, satz_bp, fix_rappen, hoechstlohn_rappen, quelle) VALUES (21,'alv','ALV','2020-01-01',NULL,9900,NULL,NULL,'erfunden')");
 $nachher = lohnlauf_abzuege($pdo, ['mitarbeiter_id' => $mkw] + $refKopf, '2026-07-31',
     ['stand' => LOHN_NBU_VERSICHERT]);
 $zn = []; foreach ($nachher['zeilen'] as $z) { $zn[$z['schluessel']] = $z; }

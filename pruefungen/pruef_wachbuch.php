@@ -18,6 +18,7 @@ function hat_spalte(PDO $pdo, string $t, string $s): bool {
     return $GLOBALS['spalten'][$t . '.' . $s] ?? false;
 }
 
+require __DIR__ . '/schema_echt.php';
 require __DIR__ . '/../backend/rundgang.php';
 
 $ok = 0; $bad = [];
@@ -25,28 +26,22 @@ function pruef(string $name, bool $c) { global $ok, $bad; if ($c) { $ok++; } els
 
 $pdo = new PDO('sqlite::memory:', null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                                                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]);
-$pdo->exec('CREATE TABLE kunden (id INTEGER PRIMARY KEY, name TEXT)');
-$pdo->exec('CREATE TABLE objekte (id INTEGER PRIMARY KEY, kunde_id INT, kunde_name TEXT, name TEXT)');
-$pdo->exec('CREATE TABLE einsaetze (id INTEGER PRIMARY KEY, kunde_id INT, kunde_name TEXT,
-            objekt_id INT, titel TEXT, datum TEXT)');
-$pdo->exec('CREATE TABLE mitarbeiter (id INTEGER PRIMARY KEY, vorname TEXT, nachname TEXT)');
-$pdo->exec('CREATE TABLE kontrollpunkt (id INTEGER PRIMARY KEY, objekt_id INT, bezeichnung TEXT)');
-$pdo->exec('CREATE TABLE rundgang_vorlage (id INTEGER PRIMARY KEY, objekt_id INT, name TEXT,
-            fenster_von TEXT, fenster_bis TEXT)');
-$pdo->exec('CREATE TABLE rundgang (id INTEGER PRIMARY KEY, einsatz_id INT, mitarbeiter_id INT,
-            objekt_id INT, rundgang_vorlage_id INT, status TEXT, rohzeit_start TEXT,
-            rohzeit_ende TEXT, pause_minuten INT DEFAULT 0, abbruch_grund TEXT,
-            abbruch_freitext TEXT, abgebrochen_am TEXT)');
-$pdo->exec('CREATE TABLE rundgang_scan (id INTEGER PRIMARY KEY, rundgang_id INT, kontrollpunkt_id INT,
-            status TEXT, erfasst_am TEXT, uebermittelt_am TEXT, beschreibung TEXT, foto_mime TEXT)');
-$pdo->exec('CREATE TABLE rundgang_aufgabe (id INTEGER PRIMARY KEY, rundgang_id INT, kontrollpunkt_id INT,
-            aufgabe_id INT, bezeichnung TEXT, status TEXT, grund TEXT, erfasst_am TEXT,
-            uebermittelt_am TEXT)');
-$pdo->exec('CREATE TABLE ereignisart (id INTEGER PRIMARY KEY, bezeichnung TEXT)');
-$pdo->exec('CREATE TABLE ereignis_meldung (id INTEGER PRIMARY KEY, objekt_id INT, rundgang_id INT,
-            einsatz_id INT, mitarbeiter_id INT, ereignisart_id INT, erfasst_am TEXT,
-            vorfall_am TEXT, uebermittelt_am TEXT, bemerkung TEXT, foto_mime TEXT,
-            lat REAL, lng REAL)');
+// Die elf Tabellen mit dem ECHTEN Schema, nicht von Hand getippt. Von Hand
+// getippt blieb diese Suite gruen, wenn eine der elf sich aenderte -- eine
+// Absprache zwischen zwei Dateien, die niemand einhaelt. Dieselbe
+// Fehlerfamilie hat am 2026-09-09 einen Livefehler verursacht (ENT-451);
+// pruef_zustellnachweis.php zog daraus als erste die Folgerung.
+//
+// Die Chronik zieht aus vier Quellen; ihre Abfragen sind der ganze Inhalt
+// dieser Suite. Laeuft eine Spalte weg, soll das HIER auffallen und nicht im
+// Betrieb.
+foreach (['kunden', 'objekte', 'einsaetze', 'mitarbeiter', 'kontrollpunkt',
+          'rundgang_vorlage', 'rundgang', 'rundgang_scan', 'rundgang_aufgabe',
+          'ereignisart', 'ereignis_meldung'] as $t) {
+    $fehler = schema_anlegen($pdo, $t);
+    pruef("KRITISCH: das echte Schema fuer $t laesst sich anlegen", $fehler === null);
+    if ($fehler !== null) { echo "  $t: $fehler\n"; }
+}
 
 // Erfundene Stammdaten, keine echten Kunden- oder Personennamen (CLAUDE.md).
 // Relative Daten statt fester Werte -- ein festes Datum nahe beim heutigen
@@ -55,25 +50,38 @@ $T0 = date('Y-m-d');
 $T1 = date('Y-m-d', strtotime('-1 day'));
 $T2 = date('Y-m-d', strtotime('-2 day'));
 
-$pdo->exec("INSERT INTO kunden (id, name) VALUES (7, 'Muster Liegenschaften AG')");
-$pdo->exec("INSERT INTO kunden (id, name) VALUES (8, 'Beispiel Immobilien GmbH')");
-$pdo->exec("INSERT INTO objekte (id, kunde_id, kunde_name, name)
-            VALUES (1, 7, 'Muster Liegenschaften AG', 'Testliegenschaft Nord')");
-$pdo->exec("INSERT INTO objekte (id, kunde_id, kunde_name, name)
-            VALUES (2, 8, 'Beispiel Immobilien GmbH', 'Testliegenschaft Sued')");
-$pdo->exec("INSERT INTO mitarbeiter (id, vorname, nachname) VALUES (5, 'Erika', 'Muster')");
-$pdo->exec("INSERT INTO kontrollpunkt (id, objekt_id, bezeichnung) VALUES (11, 1, 'Eingang')");
-$pdo->exec("INSERT INTO kontrollpunkt (id, objekt_id, bezeichnung) VALUES (12, 1, 'Keller')");
+// Das echte Schema verlangt mehr als den Namen. Die Pflichtfelder werden
+// gefuellt statt weggeschnitten: Was die Tabelle fordert, fordert sie auch
+// im Betrieb. Erfundene Angaben, keine echten (CLAUDE.md).
+$pdo->exec("INSERT INTO kunden (id, name, strasse, ort, telefon)
+            VALUES (7, 'Muster Liegenschaften AG', 'Musterweg 1', '4600 Testort', '000 000 00 00')");
+$pdo->exec("INSERT INTO kunden (id, name, strasse, ort, telefon)
+            VALUES (8, 'Beispiel Immobilien GmbH', 'Beispielgasse 2', '4600 Testort', '000 000 00 01')");
+$pdo->exec("INSERT INTO objekte (id, kunde_id, kunde_name, name, ort)
+            VALUES (1, 7, 'Muster Liegenschaften AG', 'Testliegenschaft Nord', '4600 Testort')");
+$pdo->exec("INSERT INTO objekte (id, kunde_id, kunde_name, name, ort)
+            VALUES (2, 8, 'Beispiel Immobilien GmbH', 'Testliegenschaft Sued', '4600 Testort')");
+// name ist der Anmeldename, password_hash ein sichtbarer Platzhalter --
+// niemals ein echter Hash und kein echtes Passwort (CLAUDE.md).
+$pdo->exec("INSERT INTO mitarbeiter (id, vorname, nachname, name, password_hash)
+            VALUES (5, 'Erika', 'Muster', 'mitarbeiter-a', 'PLATZHALTER-KEIN-HASH')");
+$pdo->exec("INSERT INTO kontrollpunkt (id, objekt_id, bezeichnung, typ)
+            VALUES (11, 1, 'Eingang', 'qr')");
+$pdo->exec("INSERT INTO kontrollpunkt (id, objekt_id, bezeichnung, typ)
+            VALUES (12, 1, 'Keller', 'qr')");
 $pdo->exec("INSERT INTO rundgang_vorlage (id, objekt_id, name, fenster_von, fenster_bis)
             VALUES (21, 1, 'Schliessrunde', '22:00:00', '06:00:00')");
 $pdo->exec("INSERT INTO ereignisart (id, bezeichnung) VALUES (31, 'Feststellung')");
 
 // Einsatz 101 traegt die Kundenkopie, Einsatz 102 NICHT -- der zweite Fall
 // prueft den Rueckfall auf objekte.kunde_id.
-$pdo->exec("INSERT INTO einsaetze (id, kunde_id, kunde_name, objekt_id, titel, datum)
-            VALUES (101, 7, 'Muster Liegenschaften AG', 1, 'Nachtdienst', '$T1')");
-$pdo->exec("INSERT INTO einsaetze (id, kunde_id, kunde_name, objekt_id, titel, datum)
-            VALUES (102, NULL, NULL, 2, NULL, '$T1')");
+$pdo->exec("INSERT INTO einsaetze (id, kunde_id, kunde_name, objekt_id, titel, datum, ort, von, bis)
+            VALUES (101, 7, 'Muster Liegenschaften AG', 1, 'Nachtdienst', '$T1', '4600 Testort', '20:00', '06:00')");
+// kunde_id darf NULL sein, kunde_name NICHT -- so steht es im echten Schema.
+// Der Einsatz traegt darum einen abweichenden Kundennamen: So laesst sich
+// zeigen, welcher der beiden Rueckfaelle wirklich greift.
+$pdo->exec("INSERT INTO einsaetze (id, kunde_id, kunde_name, objekt_id, titel, datum, ort, von, bis)
+            VALUES (102, NULL, 'Kopie am Einsatz', 2, NULL, '$T1', '4600 Testort', '20:00', '06:00')");
 
 // Runde 201: regulaer beendet, mit zwei Scans und einer Aufgabe.
 $pdo->exec("INSERT INTO rundgang (id, einsatz_id, mitarbeiter_id, objekt_id, rundgang_vorlage_id,
@@ -212,15 +220,25 @@ pruef('Die Person steht als "Nachname, Vorname" da',
 pruef('Die Bemerkung und das Foto eines Ersatzscans gehen nicht verloren',
     $scan !== null && $scan['text'] === 'Chip defekt' && $scan['hat_foto'] === true);
 
-// Fehlt die Kundenkopie am Einsatz, gilt die des Objekts -- sonst zeigte die
-// Zeile keinen Kunden, obwohl einer bekannt ist.
+// Fehlt die KundenKENNUNG am Einsatz, gilt die des Objekts -- sonst zeigte
+// die Zeile keinen Kunden, obwohl einer bekannt ist.
+//
+// Diese Stelle prueft seit der Umstellung auf das echte Schema nur noch den
+// Rueckfall auf kunde_id, und das ist der einzige, den es geben kann:
+// einsaetze.kunde_id ist NULL erlaubt, einsaetze.kunde_name aber NOT NULL.
+// Das COALESCE auf kunde_name in rundgang.php kann darum nie greifen --
+// gemeldet, nicht hier repariert; es liegt im Rechenkern, nicht in der
+// Pruefung. Vorher setzte diese Stelle beide Felder auf NULL und pruefte
+// damit einen Zustand, den die Tabelle gar nicht zulaesst.
 $pdo->exec("INSERT INTO rundgang (id, einsatz_id, mitarbeiter_id, objekt_id, status, rohzeit_start, rohzeit_ende)
             VALUES (206, 102, 5, 2, 'abgeschlossen', '$T1 05:00:00', '$T1 05:20:00')");
 $rueck = wachbuch_eintraege($pdo, $T1, $T1);
 $r3 = null;
 foreach ($rueck['eintraege'] as $e) { if ($e['id'] === 'rundgang-206') { $r3 = $e; } }
-pruef('KRITISCH: ohne Kundenkopie am Einsatz gilt der Kunde des Objekts',
-    $r3 !== null && $r3['kunde_id'] === 8 && $r3['kunde_name'] === 'Beispiel Immobilien GmbH');
+pruef('KRITISCH: ohne Kundenkennung am Einsatz gilt der Kunde des Objekts',
+    $r3 !== null && $r3['kunde_id'] === 8);
+pruef('Der Kundenname dagegen kommt vom Einsatz -- er ist dort Pflichtfeld',
+    $r3 !== null && $r3['kunde_name'] === 'Kopie am Einsatz');
 $pdo->exec('DELETE FROM rundgang WHERE id = 206');
 
 // ══════════════ OBJEKTFILTER
