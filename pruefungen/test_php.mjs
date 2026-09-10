@@ -309,12 +309,11 @@ if (ungesperrt.length) { bad.push('nicht gesperrt: ' + ungesperrt.join(', ')); }
 const gesperrteNamen = ((ht.match(/<FilesMatch "\^\(([^)]*)\)\\\.php\$">/) || [])[1] || '').split('|');
 const endpunkte = readdirSync(`${WURZEL}/backend/api`)
   .filter(f => f.endsWith('.php')).map(f => f.slice(0, -4));
-// GRUNDSTAND 2026-09-09, gleiche Haltung wie in test_datumsfest.mjs:
-// demo_anfrage.php gehoert zur Homepage und damit in einen fremden
-// Bereich. Nach CLAUDE.md wird das gemeldet, nicht heimlich repariert --
-// und eine dauerhaft rote Pruefung ist schlimmer als keine. Wer den
-// Endpunkt umbenennt, streicht ihn hier.
-const KOLLISION_BEKANNT = ['demo_anfrage'];
+// Am 2026-09-10 auf Weisung des Projektinhabers geleert: demo_anfrage.php
+// war die letzte bekannte Kollision und ist umbenannt (api/demo_senden.php).
+// Die Liste bleibt stehen, damit ein kuenftiger Fall aus einem fremden
+// Bereich gemeldet werden kann, ohne die Suite dauerhaft rot zu faerben.
+const KOLLISION_BEKANNT = [];
 const kollisionen = endpunkte.filter(n => gesperrteNamen.includes(n));
 check('KRITISCH: kein Endpunkt traegt den Namen einer gesperrten Hilfsdatei',
   gesperrteNamen.length > 3
@@ -322,6 +321,26 @@ check('KRITISCH: kein Endpunkt traegt den Namen einer gesperrten Hilfsdatei',
 kollisionen.filter(n => KOLLISION_BEKANNT.includes(n)).forEach(n => {
   console.log(`  ! api/${n}.php traegt einen gesperrten Namen — im Betrieb 403, fremder Bereich, gemeldet`);
 });
+
+// DER ZWEITE FEHLER AM DEMO-FORMULAR, und er wog schwerer als die
+// Namenskollision: homepage.html rief "backend/api/demo_anfrage.php" auf --
+// den Pfad im REPOSITORY. Der Deploy legt die Endpunkte aber nach dist/api/
+// und erzeugt gar kein dist/backend/ (mkdir -p dist/api ...). Im Betrieb
+// lief die Anfrage damit in ein 404, noch bevor die Sperrliste ueberhaupt
+// zum Zug kam. Der Browsertest fiel darauf nicht herein: Er faengt die
+// Anfrage per Route ab und traf denselben falschen Pfad.
+//
+// Geprueft wird deshalb die ausgelieferte Datei selbst: Kein Aufruf darf
+// den Repo-Pfad tragen. Kommentare duerfen backend/... nennen -- gesucht
+// wird nur, wo der Pfad als WERT steht (nach Anfuehrungszeichen oder =).
+const seiten = [...deploy.matchAll(/cp (\w+\.html) dist\//g)].map(m => m[1]);
+const mitRepoPfad = seiten.filter(f => {
+  try { return /["'=]backend\/api\//.test(readFileSync(`${WURZEL}/${f}`, 'utf8')); }
+  catch { return false; }
+});
+check('KRITISCH: keine ausgelieferte Seite ruft einen Endpunkt ueber den Repo-Pfad auf',
+  seiten.length > 0 && mitRepoPfad.length === 0);
+if (mitRepoPfad.length) { bad.push('ruft backend/api/ auf: ' + mitRepoPfad.join(', ')); }
 
 check('Kein Einbetten in fremde Seiten (Clickjacking)',
   /X-Frame-Options *"DENY"/.test(ht) && /frame-ancestors 'none'/.test(ht));
@@ -772,7 +791,7 @@ const OHNE_ANMELDUNG = [
   // Formular der oeffentlichen Homepage (ENT-469). Empfaenger fest aus den
   // Betriebsstammdaten, Honigtopf-Feld, eigene Bremse. Eigene Pruefung:
   // pruef_demo_anfrage.php.
-  'demo_anfrage.php',
+  'demo_senden.php',
   // Die drei Eingaenge des Kundenportals -- stehen zusaetzlich in
   // PORTAL_EINGAENGE weiter unten, weil dort die Portal-Regel greift.
   'portal_anmelden.php',
