@@ -2903,11 +2903,25 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
    ein Rest -- daneben klafft eine Luecke, die keine Aussage hat. Vier, zwei
    oder eine, nie drei. */
 .dash-item.dw-halb .g-kpi { grid-template-columns: repeat(2, 1fr); }
-/* Acht Pixel Abstand ueber den Kennzahlen (Skizze des Projektinhabers,
-   ENT-428). Der Container darueber waechst dadurch um dieselben acht -- in
-   der Skizze standen drei; beides zugleich ginge nur, wenn die Kacheln
-   flacher wuerden, und flacher waren sie dort nicht. */
-#kpiGrid { margin-top: 8px; }
+/* Hier standen bis zum 10.09.2026 acht Pixel Abstand ueber den Kennzahlen
+   (Skizze des Projektinhabers, ENT-428). Sie sind weg -- auf seine
+   Rueckmeldung vom selben Tag, mit rot eingekringeltem Bereich: "noch immer
+   nicht 100% exakt".
+
+   Warum sie erst jetzt gestoert haben: Solange die Karten ihre Zeile nicht
+   fuellten, war ohnehin alles krumm, und acht Pixel gingen darin unter. Seit
+   jede Zeile unten buendig abschliesst, waren sie der EINZIGE verbliebene
+   Versatz -- und damit der einzige, den man noch sieht. Gemessen bei 2000 px
+   in der Huelle "aus":
+
+     Oberkanten Zeile 2   Kennzahlen 440 gegen Schnellzugriff 432   -> 8 px
+     Abstand Zeile 1 -> 2 links 24 px gegen rechts 16 px            -> 8 px
+
+   Es ist derselbe Fehler, zweimal gesehen: Das Raster begann acht Pixel zu
+   tief, also stand oben eine zu grosse Luecke und die Kachelspalte war um
+   dieselben acht kuerzer als ihr Nachbar. Der Abstand zwischen den Zeilen
+   kommt aus der gap des Flusses (16 px); ein eigener Aussenrand daneben ist
+   ein zweiter Abstand fuer dieselbe Sache. */
 .dash-item.versteckt { display: none; }
 
 /* Bearbeitungsmodus */

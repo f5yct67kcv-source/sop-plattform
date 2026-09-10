@@ -117,11 +117,13 @@ try {
       if (!karte) { continue; }
       const y = Math.round(el.getBoundingClientRect().top);
       if (!zeilen.has(y)) { zeilen.set(y, []); }
-      zeilen.get(y).push({ id: el.dataset.widget, unten: karte.getBoundingClientRect().bottom });
+      const kr = karte.getBoundingClientRect();
+      zeilen.get(y).push({ id: el.dataset.widget, unten: kr.bottom, oben: kr.top });
     }
     return [...zeilen.values()].filter(z => z.length > 1).map(z => ({
       ids: z.map(x => x.id).join(' + '),
       versatz: Math.round(Math.max(...z.map(x => x.unten)) - Math.min(...z.map(x => x.unten))),
+      versatzOben: Math.round(Math.max(...z.map(x => x.oben)) - Math.min(...z.map(x => x.oben))),
     }));
   });
   // Ein gemeinsamer Takt fuer die Zeilen (Entscheid Projektinhaber,
@@ -178,6 +180,47 @@ try {
     gezogen.einzeln.karte === 120);
 
   const schief = unterkanten.filter(z => z.versatz > 1);
+  // Auch die OBERKANTEN. Bis zum 10.09.2026 hat diese Pruefung nur unten
+  // gemessen -- und blieb gruen, waehrend das Kennzahlenraster mit seinem
+  // eigenen margin-top von 8 px (ENT-428) acht Pixel zu tief begann. Der
+  // Projektinhaber hat genau diese Stelle rot eingekringelt: "noch immer
+  // nicht 100% exakt". Eine Kante ist kein halbes Ding; wer nur unten misst,
+  // sieht die Haelfte.
+  const schiefOben = unterkanten.filter(z => z.versatzOben > 1);
+  check('KRITISCH: in jeder Zeile beginnen die Karten auf gleicher Höhe'
+    + (schiefOben.length ? ' — ' + schiefOben.map(z => `${z.ids}: ${z.versatzOben} px`).join(', ') : ''),
+    unterkanten.length >= 3 && schiefOben.length === 0);
+
+  // Und der Abstand ZWISCHEN den Zeilen muss links wie rechts derselbe sein.
+  // Derselbe Fehler von der anderen Seite gesehen: Ein eigener Aussenrand an
+  // einem Container addiert sich zur gap des Flusses, und die Spalte daneben
+  // hat ihn nicht. Gemessen war der Abstand von Zeile 1 zu Zeile 2 links
+  // 24 px und rechts 16.
+  const abstaende = await page.evaluate(() => {
+    const spalten = { links: [], rechts: [] };
+    for (const el of document.querySelectorAll('#dashFlow .dash-item')) {
+      if (getComputedStyle(el).display === 'none') { continue; }
+      const karte = el.querySelector(':scope > .card, :scope > .grid');
+      if (!karte) { continue; }
+      const r = karte.getBoundingClientRect();
+      const cr = el.getBoundingClientRect();
+      // Volle Breite gehoert keiner Spalte -- sie hat keinen Nachbarn, mit
+      // dem sich ein Abstand vergleichen liesse.
+      if (cr.width > document.getElementById('dashFlow').getBoundingClientRect().width - 20) { continue; }
+      (cr.left < document.getElementById('dashFlow').getBoundingClientRect().left + cr.width / 2
+        ? spalten.links : spalten.rechts).push({ id: el.dataset.widget, oben: r.top, unten: r.bottom });
+    }
+    const luecken = s => s.sort((a, b) => a.oben - b.oben)
+      .slice(1).map((x, i) => ({ zwischen: `${s[i].id}→${x.id}`, luecke: Math.round(x.oben - s[i].unten) }));
+    return { links: luecken(spalten.links), rechts: luecken(spalten.rechts) };
+  });
+  const ungleich = abstaende.links
+    .map((l, i) => ({ l, r: abstaende.rechts[i] }))
+    .filter(p => p.r && Math.abs(p.l.luecke - p.r.luecke) > 1);
+  check('KRITISCH: der Abstand zwischen zwei Zeilen ist links wie rechts gleich'
+    + (ungleich.length ? ' — ' + ungleich.map(p => `${p.l.zwischen}: ${p.l.luecke} px vs ${p.r.zwischen}: ${p.r.luecke} px`).join(', ') : ''),
+    abstaende.links.length >= 2 && ungleich.length === 0);
+
   // Die Zahl der Zeilen wird mitgeprueft: Ohne sie bestuende die Pruefung
   // auch dann, wenn gar nichts mehr nebeneinander steht und die Liste leer
   // bleibt -- eine Pruefung, die nie etwas zu pruefen hat, ist keine.
