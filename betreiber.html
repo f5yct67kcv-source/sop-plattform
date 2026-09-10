@@ -159,6 +159,12 @@ input:focus, select:focus { outline: 2px solid var(--accent-line); outline-offse
   margin: 14px 0;
 }
 .codeliste span { background: var(--surface-2); border: 1px solid var(--line); border-radius: 7px; padding: 9px; text-align: center; user-select: all; }
+/* Der QR-Code bekommt eine weisse Flaeche und Luft um sich: Ein Code, der
+   bis an eine farbige Kante reicht, wird von manchen Kameras nicht
+   erkannt. */
+.qr { display: grid; place-items: center; padding: 16px; background: #fff;
+      border: 1px solid var(--line); border-radius: 9px; margin-bottom: 16px; }
+.qr svg { display: block; width: 180px; height: 180px; }
 
 @media (max-width: 700px) {
   .huelle { padding: 20px 16px 48px; }
@@ -229,7 +235,12 @@ input:focus, select:focus { outline: 2px solid var(--accent-line); outline-offse
       </div>
 
       <div id="zf-schritt2" class="versteckt">
-        <label>Diesen Schlüssel in der Authenticator-App eintragen</label>
+        <label>Diesen Code mit der Authenticator-App scannen</label>
+        <div class="qr" id="zf-qr"></div>
+        <div id="zf-qr-fehler" class="hinweis versteckt" style="text-align:center;margin-bottom:12px">
+          Der QR-Code liess sich nicht erzeugen. Der Schlüssel unten lässt sich von Hand eintragen.
+        </div>
+        <label>Oder diesen Schlüssel von Hand eintragen</label>
         <div class="geheim" id="zf-lesbar"></div>
         <div class="feld" style="margin-top:16px">
           <label for="zf-code">Code aus der App zur Bestätigung</label>
@@ -421,6 +432,26 @@ async function nachAnmeldung(zfSteht) {
 }
 
 /* ── Zwei-Faktor ────────────────────────────────────────────────── */
+/* qrcode.js wird ERST BEI BEDARF geladen -- 57 KB fuer etwas, das einmal je
+   Konto gebraucht wird, zahlt sonst jeder Seitenaufruf mit. Dieselbe
+   Bibliothek und dasselbe Vorgehen wie im Cockpit (ENT-205), kein zweiter
+   Weg fuer dieselbe Sache und nichts von einem fremden Server. */
+let qrGeladen = null;
+function qrLaden() {
+  if (qrGeladen) { return qrGeladen; }
+  qrGeladen = new Promise((fertig, fehler) => {
+    if (typeof qrcode === 'function') { fertig(); return; }
+    const skript = document.createElement('script');
+    skript.src = 'qrcode.js';
+    skript.onload  = () => (typeof qrcode === 'function' ? fertig() : fehler(new Error('qrcode fehlt')));
+    skript.onerror = () => fehler(new Error('qrcode.js nicht ladbar'));
+    document.head.appendChild(skript);
+  });
+  // Ein einmal gescheiterter Versuch darf nicht fuer immer scheitern.
+  qrGeladen.catch(() => { qrGeladen = null; });
+  return qrGeladen;
+}
+
 async function zfStart() {
   stumm($('zf-meldung'));
   const a = await ruf('betreiber_zf_einrichten.php', {});
@@ -429,6 +460,20 @@ async function zfStart() {
   zeig($('zf-schritt1'), false);
   zeig($('zf-schritt2'), true);
   $('zf-code').focus();
+
+  /* Der QR-Code ist eine Ergaenzung, kein Ersatz: Der abtippbare Schluessel
+     steht darunter und bleibt stehen. Scheitert das Zeichnen, wird das
+     gesagt -- ein leeres weisses Feld saehe aus wie ein Ladefehler der
+     Seite und nicht wie "hier fehlt der Code". */
+  qrLaden().then(() => {
+    const q = qrcode(0, 'M');
+    q.addData(a.adresse);
+    q.make();
+    $('zf-qr').innerHTML = q.createSvgTag({ cellSize: 5, margin: 0 });
+  }).catch(() => {
+    zeig($('zf-qr'), false);
+    zeig($('zf-qr-fehler'), true);
+  });
 }
 
 async function zfFertig() {

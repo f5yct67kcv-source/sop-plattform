@@ -119,6 +119,53 @@ for (const [wie, breite, hoehe] of [['Desktop', 1500, 900], ['Handy', 390, 844]]
   await seite.close();
 }
 
+// ── Der QR-Code der Zwei-Faktor-Einrichtung ──────────────────────────
+//
+// Gemessen und nicht angenommen: Ob qrcode.js beim Nachladen tatsaechlich
+// ein SVG mit sichtbarer Groesse erzeugt, sieht man dem Quelltext nicht an.
+// Ein leeres weisses Feld saehe aus wie ein Ladefehler der Seite.
+{
+  const seite = await browser.newPage({ viewport: { width: 1500, height: 900 } });
+  await seite.goto(ADRESSE);
+  const gezeichnet = await seite.evaluate(async () => {
+    document.getElementById('tor').classList.add('versteckt');
+    document.getElementById('zf-tor').classList.remove('versteckt');
+    document.getElementById('zf-schritt1').classList.add('versteckt');
+    document.getElementById('zf-schritt2').classList.remove('versteckt');
+    await new Promise((fertig, fehler) => {
+      const sk = document.createElement('script');
+      sk.src = 'qrcode.js'; sk.onload = fertig; sk.onerror = fehler;
+      document.head.appendChild(sk);
+    });
+    const q = qrcode(0, 'M');
+    q.addData('otpauth://totp/Betreiber-Bereich:test@example.invalid?secret=JBSWY3DPEHPK3PXP&issuer=Betreiber-Bereich');
+    q.make();
+    document.getElementById('zf-qr').innerHTML = q.createSvgTag({ cellSize: 5, margin: 0 });
+    const svg = document.querySelector('#zf-qr svg');
+    const r = svg ? svg.getBoundingClientRect() : null;
+    return {
+      svgDa: !!svg,
+      breite: r ? r.width : 0,
+      hoehe: r ? r.height : 0,
+      // Ein QR-Code besteht aus vielen Rechtecken oder einem Pfad. Ein SVG
+      // ohne Inhalt waere ein leerer Rahmen.
+      inhalt: svg ? svg.querySelectorAll('rect, path, use').length : 0,
+      schluesselDa: document.getElementById('zf-lesbar') !== null,
+    };
+  });
+  check('KRITISCH: qrcode.js laesst sich nachladen und erzeugt ein SVG', gezeichnet.svgDa);
+  check('KRITISCH: der QR-Code hat eine sichtbare Groesse',
+    gezeichnet.breite >= 120 && gezeichnet.hoehe >= 120);
+  check('KRITISCH: das SVG ist kein leerer Rahmen', gezeichnet.inhalt > 0);
+  // Der Code ist eine Ergaenzung, kein Ersatz -- der abtippbare Schluessel
+  // bleibt daneben stehen, sonst haengt fest, wessen Kamera nichts liest.
+  check('der abtippbare Schluessel bleibt zusaetzlich stehen', gezeichnet.schluesselDa);
+  if (!gezeichnet.svgDa) { bad.push('QR: kein SVG erzeugt'); }
+  else if (gezeichnet.inhalt === 0) { bad.push('QR: SVG ohne Inhalt'); }
+  else { console.log(`QR-Code: ${gezeichnet.breite.toFixed(0)}x${gezeichnet.hoehe.toFixed(0)}px, ${gezeichnet.inhalt} Elemente`); }
+  await seite.close();
+}
+
 await browser.close();
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
