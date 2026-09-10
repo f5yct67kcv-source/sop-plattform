@@ -26,7 +26,7 @@ function lohnarten_lesen(): array
     return array_map(function ($r) {
         foreach (['id','satz_bp','system','sortierung','aktiv','ahv_pflichtig',
                   'ferien_pflichtig','ml13_pflichtig','bvg_pflichtig',
-                  'uvg_pflichtig','qst_pflichtig'] as $f) {
+                  'uvg_pflichtig','qst_pflichtig','bemessung'] as $f) {
             if (isset($r[$f]) && $r[$f] !== null) { $r[$f] = (int)$r[$f]; }
         }
         return $r;
@@ -94,6 +94,16 @@ if (!preg_match('/^[a-z][a-z0-9_]{1,39}$/', $schluessel)) {
 
 $kz = [];
 foreach (array_keys(lohnart_kennzeichen()) as $f) { $kz[] = !empty($input[$f]) ? 1 : 0; }
+// Traegt die Zeile einen Betrag DIESER Abrechnungsperiode? Kein siebtes
+// Kennzeichen, sondern die Frage DAVOR: Ist sie aus, bleiben die sechs
+// wirkungslos, denn lohnlauf_grundlagen() ueberspringt die Zeile ganz.
+//
+// Sie wurde bisher weder gelesen noch geschrieben. Jede selbst angelegte
+// Lohnart bekam damit den Schemawert 0 und fiel still aus AHV-, BVG-, UVG-
+// und Quellensteuergrundlage -- eine Zulage war erfasst, sichtbar, und in
+// keiner Bemessungsgrundlage. Genau die Fehlerfamilie, die die Kommentare
+// dieses Bausteins als "erfasst sieht aus wie wirksam" beschreiben.
+$bemessung = !empty($input['bemessung']) ? 1 : 0;
 $satzBp = isset($input['satz_bp']) && $input['satz_bp'] !== '' ? (int)$input['satz_bp'] : null;
 $basis  = trim((string)($input['basis_schluessel'] ?? '')) ?: null;
 $gav    = trim((string)($input['gav_grundlage'] ?? '')) ?: null;
@@ -107,24 +117,24 @@ if ($id > 0) {
     $pdo->prepare(
         'UPDATE lohnart SET bezeichnung = ?, art = ?, basis_schluessel = ?, satz_bp = ?,
              ahv_pflichtig = ?, ferien_pflichtig = ?, ml13_pflichtig = ?,
-             bvg_pflichtig = ?, uvg_pflichtig = ?, qst_pflichtig = ?,
+             bvg_pflichtig = ?, uvg_pflichtig = ?, qst_pflichtig = ?, bemessung = ?,
              gav_grundlage = ?, sortierung = ?, aktiv = ?, bemerkung = ?,
              geaendert_von = ?, geaendert_am = NOW()
          WHERE id = ?'
     )->execute(array_merge([$bezeichnung, $art, $basis, $satzBp], $kz,
-        [$gav, $sortierung, $aktiv, $bem, (int)$user['id'], $id]));
+        [$bemessung, $gav, $sortierung, $aktiv, $bem, (int)$user['id'], $id]));
 } else {
     try {
         $pdo->prepare(
             'INSERT INTO lohnart
                (schluessel, bezeichnung, art, basis_schluessel, satz_bp,
                 ahv_pflichtig, ferien_pflichtig, ml13_pflichtig,
-                bvg_pflichtig, uvg_pflichtig, qst_pflichtig,
+                bvg_pflichtig, uvg_pflichtig, qst_pflichtig, bemessung,
                 gav_grundlage, system, sortierung, aktiv, bemerkung,
                 geaendert_von, geaendert_am)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,0,?,?,?,?,NOW())'
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,0,?,?,?,?,NOW())'
         )->execute(array_merge([$schluessel, $bezeichnung, $art, $basis, $satzBp], $kz,
-            [$gav, $sortierung, $aktiv, $bem, (int)$user['id']]));
+            [$bemessung, $gav, $sortierung, $aktiv, $bem, (int)$user['id']]));
     } catch (Throwable $e) {
         json_response(['status' => 'error',
             'message' => 'Den Schlüssel „' . $schluessel . '" gibt es bereits'], 400);

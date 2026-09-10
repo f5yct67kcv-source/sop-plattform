@@ -450,6 +450,7 @@ for (const [datei, titel] of [
   ['pruef_lohn.php', 'KRITISCH: Lohnform, Mindestlohn, Ferienentschaedigung und PaKo-Beitrag stimmen mit dem GAV ueberein (ENT-451)'],
   ['pruef_lohnlauf.php', 'KRITISCH: der Lohnlauf zaehlt nur abgeglichene Schichten, sperrt Reinigung und rechnet nichts auf fehlender Grundlage (ENT-451)'],
   ['pruef_lohn_zahlung.php', 'KRITISCH: die Zahlungsangaben einer Person lassen sich nicht auf eine andere umhaengen (ENT-451)'],
+  ['pruef_lohnarten.php', 'KRITISCH: die Kennzeichen einer Lohnart kommen wirklich in der Datenbank an, Bemessung eingeschlossen (ENT-451)'],
   ['pruef_logbuch.php', 'KRITISCH: das Logbuch haelt fest, wer was geaendert hat'],
   ['pruef_einsatz_abgeschlossen.php', 'KRITISCH: "abgeschlossen" verlangt ALLE zugesagten Rapporte (ENT-128)'],
   ['pruef_rundgang.php', 'KRITISCH: Geofence-Pruefung und Restliste der Kontrollpunkte stimmen (ENT-132/ENT-145/ENT-180)'],

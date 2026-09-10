@@ -101,20 +101,32 @@ const LOHNARTEN = {
       art: 'stundensatz', basis_schluessel: null, satz_bp: null,
       ahv_pflichtig: 1, ferien_pflichtig: 1, ml13_pflichtig: 1, bvg_pflichtig: 1,
       uvg_pflichtig: 1, qst_pflichtig: 1, gav_grundlage: 'Art. 16 i.V.m. Anhang 1 GAV',
-      system: 1, sortierung: 10, aktiv: 1 },
+      // Wie im echten Startbestand: Der Grundlohn pro Stunde traegt KEINEN
+      // Periodenbetrag -- er ist Bestandteil des Stundensatzes, gezaehlt wird
+      // ueber geleistete_stunden. Die sechs Kennzeichen beschreiben hier.
+      bemessung: 0, system: 1, sortierung: 10, aktiv: 1 },
     // Der Auslagenersatz traegt KEIN einziges Kennzeichen -- er ist kein
     // Lohn (GAV-AUS-009, Art. 18 Ziff. 10). Genau das wird unten geprueft.
     { id: 2, schluessel: 'auslagenersatz', bezeichnung: 'Auslagenersatz',
       art: 'netto', basis_schluessel: null, satz_bp: null,
       ahv_pflichtig: 0, ferien_pflichtig: 0, ml13_pflichtig: 0, bvg_pflichtig: 0,
       uvg_pflichtig: 0, qst_pflichtig: 0, gav_grundlage: 'Art. 18 GAV',
-      system: 1, sortierung: 40, aktiv: 1 },
+      bemessung: 0, system: 1, sortierung: 40, aktiv: 1 },
     // Ohne GAV-Grundlage: betrieblich. Leer ist hier eine Aussage.
     { id: 3, schluessel: 'anteil_13ml', bezeichnung: 'Anteil 13. Monatslohn',
       art: 'prozent', basis_schluessel: 'grundlohn', satz_bp: null,
       ahv_pflichtig: 1, ferien_pflichtig: 0, ml13_pflichtig: 0, bvg_pflichtig: 1,
       uvg_pflichtig: 1, qst_pflichtig: 1, gav_grundlage: null,
-      system: 1, sortierung: 21, aktiv: 1 },
+      bemessung: 0, system: 1, sortierung: 21, aktiv: 1 },
+    // Eine SELBST angelegte Zulage mit gesetzten Kennzeichen, die trotzdem
+    // keinen Periodenbetrag traegt. Bis bemessung gespeichert wurde, war das
+    // der Zwangszustand jeder betrieblichen Lohnart: erfasst, sichtbar, mit
+    // Kennzeichen -- und in keiner einzigen Bemessungsgrundlage.
+    { id: 4, schluessel: 'pikettzulage', bezeichnung: 'Pikettzulage',
+      art: 'fixbetrag', basis_schluessel: null, satz_bp: null,
+      ahv_pflichtig: 1, ferien_pflichtig: 0, ml13_pflichtig: 0, bvg_pflichtig: 1,
+      uvg_pflichtig: 1, qst_pflichtig: 1, gav_grundlage: null,
+      bemessung: 0, system: 0, sortierung: 50, aktiv: 1 },
   ],
   kennzeichen: { ahv_pflichtig: 'AHV', ferien_pflichtig: 'Ferien', ml13_pflichtig: '13.',
     bvg_pflichtig: 'BVG', uvg_pflichtig: 'UVG', qst_pflichtig: 'QSt' },
@@ -303,6 +315,18 @@ const grundlohnPunkte = await page.evaluate(() => {
 });
 check('Der Grundlohn dagegen zaehlt in alle sechs -- die Spalten sagen also etwas aus',
   grundlohnPunkte === 6);
+// Kennzeichen gesetzt, aber kein Periodenbetrag: Bei den SYSTEM-Lohnarten
+// ist das Absicht (der Grundlohn pro Stunde ist Bestandteil des
+// Stundensatzes). Bei einer SELBST angelegten Lohnart ist es fast immer ein
+// Versehen -- und war bis zum Speichern von `bemessung` unvermeidlich. Nur
+// dieser Fall wird benannt, sonst ginge er im Rauschen unter.
+const vermerke = await page.evaluate(() => [...document.querySelectorAll('#laListe tbody tr')]
+  .filter(t => /zählt nirgends/.test(t.textContent))
+  .map(t => t.querySelector('td b')?.textContent || ''));
+check('KRITISCH: eine selbst angelegte Lohnart, die in keine Grundlage zaehlt, wird benannt',
+  vermerke.length === 1 && vermerke[0] === 'Pikettzulage');
+check('KRITISCH: und die System-Lohnarten bekommen den Vermerk NICHT -- dort ist es Absicht',
+  !vermerke.includes('Grundlohn pro Stunde') && !vermerke.includes('Anteil 13. Monatslohn'));
 // Eine Lohnart ohne GAV-Artikel ist BETRIEBLICH -- das ist eine Aussage,
 // kein Gedankenstrich. Der 13. Monatslohn ist keine GAV-Pflicht.
 check('KRITISCH: eine Lohnart ohne GAV-Artikel wird als "betrieblich" benannt, nicht als Luecke',

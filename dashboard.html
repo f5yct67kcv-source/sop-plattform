@@ -9180,6 +9180,13 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
         <input class="inp" id="laGav" placeholder="leer = betrieblich vereinbart, keine GAV-Pflicht">
         <div class="zone-note">Leer ist hier eine Aussage, keine Lücke: Der 13. Monatslohn etwa steht
           in keinem GAV-Artikel.</div></div>
+      <h3 style="margin:22px 0 4px">Trägt die Zeile einen Betrag dieser Periode?</h3>
+      <div class="feld"><label class="check" style="min-height:24px">
+        <input type="checkbox" id="laBemessung"> <b>Betrag der Abrechnungsperiode</b></label>
+        <div class="zone-note">Für betriebliche Zulagen fast immer ja. Aus ist es nur bei Zeilen, die
+          Bestandteil eines <em>Stundensatzes</em> sind — Ferienentschädigung und 13.-Anteil etwa werden
+          in den Stundenlohn eingerechnet; sie zusätzlich zu zählen ergäbe ihn zweimal. Ist es aus,
+          bleiben die Kennzeichen unten wirkungslos: Die Zeile zählt dann in gar keine Grundlage.</div></div>
       <h3 style="margin:22px 0 4px">Zählt in welche Bemessungsgrundlage?</h3>
       <div id="laKennzeichen"></div>
       <div class="feld"><label class="check" style="min-height:24px"><input type="checkbox" id="laAktiv"> aktiv</label></div>
@@ -19221,6 +19228,21 @@ function lohnartenZeichnen() {
   const kopf = kz.map(k =>
     `<th style="text-align:center" title="${(laDaten.kennzeichen || {})[k] || ''}">${LA_KURZ[k]}</th>`).join('');
   const zeilen = liste.map(l => {
+    // Traegt die Zeile keinen Betrag der Periode, ueberspringt der Lohnlauf
+    // sie ganz -- die Kennzeichen daneben rechnen dann nicht mit.
+    //
+    // Bei den SYSTEM-Lohnarten ist genau das Absicht: Beim Grundlohn pro
+    // Stunde etwa stehen alle sechs Kennzeichen, und er traegt trotzdem
+    // keinen Periodenbetrag -- er ist Bestandteil des Stundensatzes, gezaehlt
+    // wird ueber geleistete_stunden. Die Kennzeichen sagen dort, WELCHER Art
+    // der Lohnbestandteil ist; sie beschreiben, statt zu rechnen.
+    //
+    // Bei einer SELBST angelegten Lohnart ist dieselbe Kombination dagegen
+    // fast immer ein Versehen -- und war es bis zu diesem Schritt zwangslaeufig,
+    // weil bemessung gar nicht erst gespeichert wurde. Nur dieser Fall wird
+    // benannt; ein Vermerk an jeder Systemzeile waere Rauschen, in dem der
+    // eine Fall untergeht, auf den es ankommt.
+    const widerspruch = !l.system && !l.bemessung && kz.some(k => l[k]);
     const haken = kz.map(k =>
       `<td style="text-align:center">${l[k] ? '<span title="zählt dazu">●</span>' : '<span class="zone-note" title="zählt nicht dazu">·</span>'}</td>`).join('');
     // Leere GAV-Grundlage ist eine AUSSAGE, keine Luecke: Die Lohnart ist
@@ -19232,7 +19254,8 @@ function lohnartenZeichnen() {
     const satz = l.satz_bp !== null && l.satz_bp !== undefined ? lohnPz(l.satz_bp)
       : (l.art === 'prozent' ? '<span class="zone-note" title="Der Satz wird aus dem GAV abgeleitet">abgeleitet</span>' : '—');
     return `<tr${l.aktiv ? '' : ' style="opacity:.55"'}>
-      <td><b>${l.bezeichnung}</b>${l.system ? ' <span class="zone-note" title="Vom Werkzeug angelegt, nicht löschbar">System</span>' : ''}
+      <td><b>${l.bezeichnung}</b>${l.system ? ' <span class="zone-note" title="Vom Werkzeug angelegt, nicht löschbar">System</span>' : ''}${widerspruch
+        ? ' <span class="chip chip-w" title="Die Kennzeichen sind gesetzt, aber die Zeile trägt keinen Betrag der Periode — sie zählt in gar keine Bemessungsgrundlage. Zum Ändern öffnen.">zählt nirgends</span>' : ''}
         <div class="zone-note" style="margin:2px 0 0">${l.schluessel}</div></td>
       <td>${(laDaten.arten || {})[l.art] || l.art}</td>
       <td style="text-align:right">${satz}</td>
@@ -19264,6 +19287,11 @@ function lohnartOeffnen(id) {
   $('laSatz').value = l && l.satz_bp !== null ? (l.satz_bp / 100).toFixed(2) : '';
   $('laGav').value = l ? (l.gav_grundlage || '') : '';
   $('laAktiv').checked = l ? !!l.aktiv : true;
+  // Beim Anlegen vorbelegt: Eine betriebliche Zulage traegt einen Betrag
+  // der Periode. Das nicht angekreuzte Kaestchen war bisher der
+  // Vorgabewert -- und genau der Wert, mit dem die Zulage still aus jeder
+  // Bemessungsgrundlage fiel.
+  $('laBemessung').checked = l ? !!l.bemessung : true;
   $('laKennzeichen').innerHTML = Object.entries(laDaten.kennzeichen || {}).map(([k, t]) =>
     `<label class="check" style="display:block;margin:6px 0;min-height:24px">
        <input type="checkbox" id="la_${k}"${l && l[k] ? ' checked' : ''}> <b>${LA_KURZ[k]}</b> — ${t}
@@ -19282,6 +19310,7 @@ function lohnartSpeichern() {
     satz_bp: $('laSatz').value.trim() === '' ? '' : Math.round(parseFloat($('laSatz').value.replace(',', '.')) * 100),
     gav_grundlage: $('laGav').value.trim(),
     aktiv: $('laAktiv').checked,
+    bemessung: $('laBemessung').checked,
   };
   Object.keys(LA_KURZ).forEach(k => { body[k] = $('la_' + k).checked; });
   api('lohnarten.php', { method: 'POST', body }).then(({ ok, data }) => {
