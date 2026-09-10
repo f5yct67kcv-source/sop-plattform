@@ -29331,10 +29331,11 @@ const MB_ABSCHNITTE = [
 
   // ── Anstellung ───────────────────────────────────────────────────────
   { id: 'betrieb', bereich: 'anstellung', spalte: 1, titel: 'Betriebliches', felder: [
-    // Automatisch vergeben und nicht mehr aenderbar (ENT-387) -- gesperrt
-    // wie ahv_nr (ENT-348), gleiche Bauart. Anders als ahv_nr traegt das
-    // Feld aber einen echten Wert, der beim Anlegen erst noch entsteht --
-    // der Hinweis dient bis dahin als Platzhaltertext.
+    // Automatisch vergeben und nicht mehr aenderbar (ENT-387). Gleiche
+    // Bauart wie bei ahv_nr: gesperrt als Vorgabe, entsperrt in feld() gegen
+    // ein Recht -- hier 'rechte_schreiben' (ENT-393), dort
+    // 'personal_vertraulich_schreiben'. Anders als die AHV-Nummer entsteht
+    // dieser Wert erst beim Speichern; der Hinweis ist bis dahin Platzhalter.
     ['personalnummer',    'Personalnummer', 'f', null, 'wird automatisch vergeben', false, true],
     ['kurzzeichen',       'Kurzzeichen',    'f'],
     ['funktion_id',       'Funktion',       'a', 'funktion'],
@@ -29357,13 +29358,13 @@ const MB_ABSCHNITTE = [
   // "Versicherungsdaten" führt. Es ist dieselbe Frage: was liegt über
   // diese Person amtlich vor.
   { id: 'personendaten', bereich: 'person', spalte: 2, titel: 'Personendaten und Bewilligungen', felder: [
-    // Bewusst weiterhin deaktiviert statt entfernt (ENT-348): Die Nummer
-    // wird erst mit einer kuenftigen Lohnbuchhaltung wieder erfasst. Die
-    // eigentliche Sperre sitzt serverseitig in mitarbeiter.php; das Feld
-    // bleibt aber in dieser Liste stehen, weil mbLabel() von hier aus auch
-    // die Beschriftung fuer AELTERE Logbuch-Eintraege holt -- ein Entfernen
-    // liesse "AHV-Nummer geaendert" in alten Eintraegen zu "ahv_nr" verkommen.
-    ['ahv_nr',         'AHV-Nummer',     'f', null, 'wird zurzeit nicht erfasst (ENT-348)', true, true],
+    // ENT-348 hatte die Nummer aus Datenminimierung ausgeschlossen und dabei
+    // vermerkt, dass eine kuenftige Lohnbuchhaltung sie braucht. Dieser Fall
+    // ist mit ENT-451 eingetreten: Der Server nimmt sie wieder an, und ohne
+    // sie ist keine Sozialversicherungsabrechnung moeglich. Vorgabe bleibt
+    // gesperrt -- entsperrt wird in feld() gegen 'personal_vertraulich',
+    // denn die Nummer bleibt ein vertrauliches Feld (ENT-451, ENT-077).
+    ['ahv_nr',         'AHV-Nummer',     'f', null, '756.XXXX.XXXX.XX', true, true],
     ['geburtsdatum',   'Geburtsdatum',   'd'],
     ['nationalitaet',  'Nationalität',   'f'],
     ['heimatort',      'Heimatort',      'f'],
@@ -29686,6 +29687,13 @@ function mbZeichnen() {
     // (ma_personalnummer_generieren, ENT-387) und ein mitgeschicktes Feld
     // waere hier nur eine Eingabe, die still verworfen wuerde.
     if (f === 'personalnummer' && !mbNeuModus && darf('rechte_schreiben')) { gesperrt = false; }
+    // Die AHV-Nummer wird seit ENT-451 wieder erfasst -- ohne sie laeuft
+    // keine Abrechnung. Anders als die Personalnummer auch beim ANLEGEN:
+    // Der Server nimmt sie dort an und prueft dasselbe Recht. Wer sie
+    // nicht sehen darf, darf sie auch nicht aendern (CLAUDE.md) -- die
+    // eigentliche Sperre sitzt weiterhin im Server, das hier erspart nur
+    // eine Eingabe, die dort abgelehnt wuerde.
+    if (f === 'ahv_nr' && darf('personal_vertraulich_schreiben')) { gesperrt = false; }
     const id = 'mb_' + f;
     let steuer;
     if (typ === 'a') {
@@ -29698,11 +29706,9 @@ function mbZeichnen() {
     } else {
       const t = typ === 'd' ? 'date' : typ === 'z' ? 'number' : 'text';
       const horcher = (f === 'vorname' || f === 'nachname') ? ' oninput="mbNameVorschlag()"' : '';
-      // gesperrt (ENT-348): Feld bleibt in der Liste fuer die Beschriftung
-      // aelterer Logbuch-Eintraege, laesst sich aber nicht mehr befuellen --
-      // die serverseitige Ablehnung in mitarbeiter.php ist die eigentliche
-      // Sperre, das hier ist nur die Vermeidung einer Eingabe, die ohnehin
-      // verworfen wuerde.
+      // gesperrt: nur die Vermeidung einer Eingabe, die der Server ohnehin
+      // ablehnen wuerde -- die eigentliche Sperre sitzt dort. Welche Felder
+      // das betrifft, steht oben je Descriptor.
       steuer = `<input class="inp${mark(f)}" id="${id}" type="${t}" value="${esc(wert(f))}"`
              + (hinweis ? ` placeholder="${esc(hinweis)}"` : '') + (gesperrt ? ' disabled' : '')
              + horcher + '>';

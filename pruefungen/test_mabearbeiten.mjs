@@ -192,11 +192,45 @@ check('Ja/Nein steht als Haken, nicht als 1',
     && document.getElementById('mb_waffentragberechtigt').checked === false));
 check('Die Revierdienst-Berechtigung ebenso, im eigenen Abschnitt (ENT-284)',
   await page.evaluate(() => document.getElementById('mb_revierdienst_berechtigt').checked === true));
-check('KRITISCH: die AHV-Nummer laesst sich nicht mehr erfassen (ENT-348) -- Feld ist gesperrt',
+// ENT-348 hatte die AHV-Nummer aus Datenminimierung ausgeschlossen und dabei
+// vermerkt, dass eine kuenftige Lohnbuchhaltung sie braucht. Mit ENT-451 ist
+// der Fall eingetreten: Der Server nimmt sie wieder an, und der Lohnbereich
+// meldet "fehlt -- ohne sie ist keine Abrechnung moeglich". Die Zusage von
+// damals ist nicht aufgeweicht, sondern REVIDIERT; sie stand hier zuletzt
+// als KRITISCH und haette die Sackgasse sonst weiter beglaubigt.
+check('KRITISCH: die AHV-Nummer laesst sich wieder erfassen (ENT-451 revidiert ENT-348)',
   await page.evaluate(() => {
     const e = document.getElementById('mb_ahv_nr');
-    return !!e && e.disabled && e.value === '';
+    return !!e && !e.disabled;
   }));
+check('Und das Feld behauptet nicht mehr, sie werde nicht erfasst',
+  await page.evaluate(() => {
+    const e = document.getElementById('mb_ahv_nr');
+    return !!e && !/nicht erfasst/i.test(e.placeholder || '');
+  }));
+
+// Die andere Seite derselben Regel: Wer die vertraulichen Felder nicht
+// schreiben darf, wird gar nicht erst zur Eingabe eingeladen. Die eigentliche
+// Sperre sitzt im Server (mitarbeiter_create.php und mitarbeiter_update.php,
+// gegen 'personal_vertraulich_schreiben') -- das hier erspart nur den Umweg.
+{
+  await page.evaluate(() => {
+    window.__rechteVorher = me.rechte;
+    me.rechte = ['personal_lesen', 'personal_schreiben'];   // ohne _vertraulich_
+    mbOeffnen('mitarbeiter-a');
+  });
+  await page.waitForTimeout(400);
+  check('KRITISCH: ohne das Recht auf vertrauliche Felder bleibt die AHV-Nummer gesperrt',
+    await page.evaluate(() => {
+      const e = document.getElementById('mb_ahv_nr');
+      return !!e && e.disabled;
+    }));
+  await page.evaluate(() => {
+    me.rechte = window.__rechteVorher;
+    mbOeffnen('mitarbeiter-a');
+  });
+  await page.waitForTimeout(400);
+}
 
 // ══════════════ GAV-HINWEISE SAGEN, SIE SETZEN NICHT
 {
@@ -446,7 +480,13 @@ check('KRITISCH: die AHV-Nummer laesst sich nicht mehr erfassen (ENT-348) -- Fel
   });
   check('KRITISCH: die Detailseite zeigt das Geburtsdatum, statt "–" wie vor ENT-072',
     d.geburt === '05.05.1990');
-  check('KRITISCH: die AHV-Nummer erscheint auch auf der Detailseite nirgends mehr (ENT-348)',
+  // Die Aussage gilt weiter, ihre Begruendung nicht mehr: ENT-348 ist mit
+  // ENT-451 revidiert, die Nummer WIRD wieder erfasst. Dass die Detailseite
+  // sie trotzdem nicht anzeigt, ist eine eigene Frage -- erfassen und
+  // ausstellen sind zweierlei, und niemand hat entschieden, dass sie in der
+  // Uebersicht stehen soll. Bis dahin bleibt es, wie es ist; der Lohn-Reiter
+  // sagt bereits, OB sie erfasst ist.
+  check('KRITISCH: die AHV-Nummer steht nicht in der Uebersicht der Personalakte',
     !d.ahvLabel);
   check('Eine Adresse liest sich als Adresse, nicht als fuenf Zeilen',
     d.strasse === 'Musterweg 3' && d.ort === '4600 Testort');
