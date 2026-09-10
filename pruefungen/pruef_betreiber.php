@@ -1,5 +1,5 @@
 <?php
-// Die reinen Funktionen der Betreiber-Ebene (backend/betreiber.php, ENT-518)
+// Die reinen Funktionen der Betreiber-Ebene (backend/betreiber.php, ENT-524)
 // wirklich ausfuehren -- nicht ihren Quelltext lesen.
 //
 // Warum diese Datei: Drei Aussagen der Betreiber-Ebene sind Entscheidungen
@@ -110,6 +110,46 @@ $pruef('KRITISCH: Status und GAV stehen nicht im Sammel-Schreibweg',
 $pruef('KRITISCH: kein Passwortfeld im Schreibweg',
     count(array_filter(BE_MANDANT_FELDER,
         static fn($f) => str_contains($f, 'pass') || $f === 'secret')) === 0);
+
+// ── 7. Verbindungsaufloesung je Mandant ───────────────────────────────
+//
+// In dieser Umgebung ist der Deploy-Platzhalter __MANDANT_SECRETS__
+// unersetzt -- der heutige Normalfall, solange es keine fremden Mandanten
+// gibt. mandant_secret() muss das als "kein Secret" behandeln und nicht als
+// Secret mit dem Namen des Platzhalters.
+$pruef('KRITISCH: unersetzter Platzhalter liefert kein Secret',
+    mandant_secret('DB_PASS_MANDANT_2') === null);
+$pruef('leerer Name liefert kein Secret', mandant_secret('') === null);
+
+// Vier Lagen, vier Handlungen. Die dritte ist die wichtige: Angaben
+// vollstaendig, aber das Deploy-Secret fehlt -- das ist etwas anderes als
+// "unvollstaendig ausgefuellt" und etwas anderes als "bereit".
+$standard = ['db_host' => '', 'db_name' => '', 'db_user' => '', 'secret_name' => ''];
+$halb     = ['db_host' => 'h', 'db_name' => '', 'db_user' => '', 'secret_name' => ''];
+$ganz     = ['db_host' => 'h', 'db_name' => 'n', 'db_user' => 'u', 'secret_name' => 'DB_PASS_X'];
+$pruef('leere Angaben heissen Standardverbindung',
+    mandant_verbindung_bereit($standard) === 'standardverbindung');
+$pruef('halb ausgefuellt bleibt unvollstaendig',
+    mandant_verbindung_bereit($halb) === 'unvollstaendig');
+$pruef('KRITISCH: vollstaendige Angaben ohne Secret sind nicht bereit',
+    mandant_verbindung_bereit($ganz) === 'secret_fehlt');
+
+// mandant_db() wirft, statt eine Antwort zu schicken: Der Aufrufer
+// entscheidet, wie ein nicht erreichbarer Mandant gemeldet wird.
+$geworfen = false;
+try { mandant_db($ganz); } catch (Throwable $e) { $geworfen = true; }
+$pruef('KRITISCH: mandant_db wirft bei fehlendem Secret, statt zu verbinden', $geworfen);
+// Die Standardverbindung ist der Bestandsmandant -- sie darf NICHT werfen.
+// Geprueft wird ueber die Lage, ohne eine Datenbank zu brauchen.
+$pruef('die Standardverbindung gilt als bereit',
+    mandant_verbindung_bereit($standard) === 'standardverbindung');
+
+// mandant_stand() meldet die Lage, ohne dass eine Verbindung noetig ist.
+$st = mandant_stand($ganz);
+$pruef('KRITISCH: nicht erreichbar wird als solches gemeldet',
+    $st['erreichbar'] === false && $st['lage'] === 'secret_fehlt');
+$pruef('ohne Verbindung wird keine Tabellenzahl behauptet',
+    $st['tabellen'] === null);
 
 echo count($bad) === 0
     ? "$ok bestanden, 0 nicht bestanden\n"

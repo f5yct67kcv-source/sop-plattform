@@ -1,5 +1,5 @@
 <?php
-// Legt die Tabellen der Betreiber-Ebene an (ENT-518).
+// Legt die Tabellen der Betreiber-Ebene an (ENT-524).
 //
 // Ergaenzt nur Fehlendes, loescht nichts, leert nichts -- gefahrlos
 // mehrfach aufrufbar, dasselbe Muster wie planung_einrichten.php.

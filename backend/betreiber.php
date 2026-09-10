@@ -1,5 +1,5 @@
 <?php
-// Betreiber-Ebene: Konten, Sitzungen, Mandantenstamm (ENT-518).
+// Betreiber-Ebene: Konten, Sitzungen, Mandantenstamm (ENT-524).
 //
 // WARUM DIESE DATEI GETRENNT VON db.php, rechte.php UND kundenportal.php STEHT
 //
@@ -446,4 +446,124 @@ function be_zf_notfallcodes_offen(PDO $pdo, int $betreiberId): int
     if ($roh === false || $roh === null || $roh === '') { return 0; }
     $h = json_decode((string)$roh, true);
     return is_array($h) ? count($h) : 0;
+}
+
+// ── Verbindung zu einem Mandanten ─────────────────────────────────────
+//
+// WOHER DAS PASSWORT KOMMT, und warum nicht aus der Tabelle:
+//
+// Der Mandantenstamm trägt Host, Datenbankname, Benutzer und den NAMEN des
+// Secrets -- nie den Wert (ENT-519). Der Wert kommt wie jede andere
+// Zugangsangabe aus dem Deploy.
+//
+// Ein eigener Platzhalter je Mandant (__DB_PASS_MANDANT_2__ und so fort)
+// skaliert nicht: Der Deploy müsste für jeden neuen Kunden geändert werden.
+// Stattdessen EIN Platzhalter, der ein JSON-Objekt trägt --
+// {"DB_PASS_MANDANT_2":"...", ...}. Ein neuer Mandant heisst dann: einen
+// Eintrag im Secret ergänzen, kein Codeeingriff.
+//
+// Der Unterschied zur Tabelle bleibt bestehen und ist der Punkt: Diese
+// Angaben liegen auf dem SERVER, nicht in der Datenbank. Ein
+// Datenbank-Backup, ein Datenbankwerkzeug oder eine versehentlich offene
+// Ansicht enthält sie nicht.
+function mandant_secret(string $name): ?string
+{
+    static $tafel = null;
+    if ($tafel === null) {
+        $roh = '__MANDANT_SECRETS__';
+        // Unersetzt oder leer: Es gibt noch keine fremden Mandanten. Das
+        // ist der heutige Normalfall und kein Fehler.
+        if ($roh === '' || $roh === '__MANDANT' . '_SECRETS__') {
+            $tafel = [];
+        } else {
+            $d = json_decode($roh, true);
+            $tafel = is_array($d) ? $d : [];
+        }
+    }
+    if ($name === '' || !array_key_exists($name, $tafel)) { return null; }
+    return (string)$tafel[$name];
+}
+
+// Die Lage einer Mandantenverbindung, bevor sie versucht wird.
+//
+// Vier Antworten statt "geht/geht nicht", weil sie zu vier verschiedenen
+// Handlungen führen -- und weil "nicht eingerichtet" nie wie "kaputt"
+// aussehen darf (Hausregel):
+//
+//   standardverbindung -- der Bestandsmandant, nichts zu tun
+//   unvollstaendig     -- jemand hat angefangen und nicht zu Ende gebracht
+//   secret_fehlt       -- die Angaben stehen, aber das Deploy-Secret nicht
+//   bereit             -- kann verbunden werden
+function mandant_verbindung_bereit(array $m): string
+{
+    $lage = be_verbindung_lage($m);
+    if ($lage !== 'eigene_datenbank') { return $lage; }
+    if (mandant_secret((string)($m['secret_name'] ?? '')) === null) { return 'secret_fehlt'; }
+    return 'bereit';
+}
+
+// Verbindung zur Datenbank EINES Mandanten.
+//
+// AUSDRÜCKLICH KEIN SUPPORT-ZUGRIFF. Diese Funktion stellt eine Verbindung
+// her; sie öffnet keinen Weg in die Betriebsdaten. Der Support-Zugriff ist
+// als "nur auf Freigabe des Mandanten, befristet, protokolliert"
+// vorgesehen und bewusst noch nicht gebaut. Wer diese Funktion für
+// Betriebsdaten benutzt, umgeht eine Entscheidung, die noch aussteht --
+// die Prüfung in test_betreiber.mjs wacht darüber, welche Endpunkte sie
+// überhaupt aufrufen dürfen.
+//
+// Wirft statt json_response(), damit der Aufrufer entscheidet, wie ein
+// nicht erreichbarer Mandant gemeldet wird. Ein Verbindungsfehler ist hier
+// ein erwartbarer Zustand, kein Absturz.
+function mandant_db(array $m): PDO
+{
+    $lage = mandant_verbindung_bereit($m);
+    if ($lage === 'standardverbindung') { return db(); }
+    if ($lage !== 'bereit') {
+        throw new RuntimeException('Verbindung nicht möglich: ' . $lage);
+    }
+    $dsn = 'mysql:host=' . (string)$m['db_host']
+         . ';dbname=' . (string)$m['db_name'] . ';charset=utf8mb4';
+    return new PDO($dsn, (string)$m['db_user'], (string)mandant_secret((string)$m['secret_name']), [
+        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        PDO::ATTR_TIMEOUT            => 5,
+    ]);
+}
+
+// Ist die Anlage eines Mandanten eingerichtet? Zählt Tabellen, liest KEINE
+// Daten -- das ist die Grenze zwischen "erreichbar und eingerichtet" und
+// dem Support-Zugriff, den es noch nicht gibt.
+//
+// Schema-Drift ist das Hauptrisiko der getrennten Datenhaltung (ENT-519):
+// Läuft ein Update bei neunzehn Mandanten durch und beim zwanzigsten
+// nicht, arbeitet dieser mit neuem Code auf altem Schema. Der
+// Einrichtungsknopf meldet sich heute im Cockpit DES MANDANTEN; der
+// Betreiber braucht dieselbe Meldung über alle hinweg.
+const MANDANT_KERNTABELLEN = ['mitarbeiter', 'kunden', 'objekte', 'einsaetze', 'rapporte'];
+
+function mandant_stand(array $m): array
+{
+    $lage = mandant_verbindung_bereit($m);
+    if ($lage !== 'bereit' && $lage !== 'standardverbindung') {
+        return ['erreichbar' => false, 'lage' => $lage, 'tabellen' => null, 'fehlend' => null];
+    }
+    try {
+        $pdo = mandant_db($m);
+        $fehlend = [];
+        foreach (MANDANT_KERNTABELLEN as $t) {
+            if (!hat_tabelle($pdo, $t)) { $fehlend[] = $t; }
+        }
+        return [
+            'erreichbar' => true,
+            'lage'       => $lage,
+            'tabellen'   => count(MANDANT_KERNTABELLEN) - count($fehlend),
+            'fehlend'    => $fehlend,
+        ];
+    } catch (Throwable $e) {
+        // Der Fehlertext des Treibers kann Host und Benutzer enthalten und
+        // geht darum nicht nach aussen -- gemeldet wird die Lage.
+        return ['erreichbar' => false, 'lage' => 'nicht_erreichbar',
+                'tabellen' => null, 'fehlend' => null];
+    }
 }

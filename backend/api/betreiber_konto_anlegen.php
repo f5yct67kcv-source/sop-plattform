@@ -1,5 +1,5 @@
 <?php
-// Legt ein Konto der Betreiber-Ebene an (ENT-518).
+// Legt ein Konto der Betreiber-Ebene an (ENT-524).
 //
 // WER DARF DAS -- zwei Faelle, und der Unterschied ist der Einstieg:
 //

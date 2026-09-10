@@ -1,5 +1,5 @@
 <?php
-// Eingang der Betreiber-Ebene (ENT-518).
+// Eingang der Betreiber-Ebene (ENT-524).
 //
 // Steht namentlich in OHNE_ANMELDUNG (pruefungen/test_php.mjs): Er kann
 // keine Sitzung verlangen, die er erst erzeugt -- dieselbe Begruendung wie

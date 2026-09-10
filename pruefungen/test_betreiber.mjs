@@ -1,4 +1,4 @@
-// Betreiber-Ebene (ENT-518): Trennung, Sitzungen, Mandantenstamm.
+// Betreiber-Ebene (ENT-524): Trennung, Sitzungen, Mandantenstamm.
 //
 // WARUM DIESE SUITE
 //
@@ -313,6 +313,45 @@ check('KRITISCH: kein vertrauenswuerdiges Geraet umgeht den Faktor',
 // Code stimmt -- sonst liesse er sich unbegrenzt durchprobieren.
 check('KRITISCH: der Code wird vor der Sitzung geprueft, nicht danach',
   anm.indexOf('be_zf_code_einloesen') < anm.indexOf('INSERT INTO betreiber_sessions'));
+
+// ── 11. mandant_db() ist keine Hintertuer zum Support-Zugriff ────────
+//
+// DIE WICHTIGSTE WACHE DIESES ABSCHNITTS. Der Support-Zugriff auf
+// Betriebsdaten ist als "nur auf Freigabe des Mandanten, befristet,
+// protokolliert" vorgesehen und bewusst NOCH NICHT gebaut. Mit
+// mandant_db() liesse er sich versehentlich nachbauen, ohne dass jemand
+// die Entscheidung dazu trifft -- eine Abfrage auf eine Mandantentabelle,
+// und der Zugriff existiert.
+//
+// Erlaubt ist darum genau eines: die Erreichbarkeit und den
+// Einrichtungsstand pruefen. Wer mandant_db() fuer etwas anderes benutzt,
+// faellt hier durch.
+const MANDANT_VERBINDER = /mandant_db\s*\(|mandant_stand\s*\(/;
+const nutztMandantDb = endpunkte.filter(f => MANDANT_VERBINDER.test(nurCode(lies(`backend/api/${f}`))));
+check('es gibt ueberhaupt einen Endpunkt, der die Mandantenlage prueft',
+  nutztMandantDb.length > 0);
+// Erlaubt sind nur Endpunkte, die den STAND melden -- namentlich.
+const STAND_ENDPUNKTE = ['betreiber_mandant_stand.php'];
+const heimlich = nutztMandantDb.filter(f => !STAND_ENDPUNKTE.includes(f));
+check('KRITISCH: nur der Stand-Endpunkt verbindet zu einer Mandantendatenbank',
+  heimlich.length === 0);
+if (heimlich.length) { bad.push('verbindet zum Mandanten: ' + heimlich.join(', ')); }
+
+// Und auch der Stand-Endpunkt liest keine Betriebsdaten -- er zaehlt
+// Tabellen. Ein SELECT auf eine Kerntabelle waere der Support-Zugriff.
+const standCode = nurCode(lies('backend/api/betreiber_mandant_stand.php'));
+check('KRITISCH: der Stand-Endpunkt liest keine Betriebsdaten',
+  !/SELECT[\s\S]{0,120}FROM (?:mitarbeiter|einsaetze|rapporte|lohnlauf|kunden|objekte)\b/.test(standCode));
+check('der Stand-Endpunkt haengt hinter der Vollwache', VOLLWACHE.test(standCode));
+
+// Das Passwort kommt aus dem Deploy, nicht aus der Tabelle -- auch hier.
+check('KRITISCH: die Verbindung holt das Passwort aus dem Deploy-Secret',
+  /mandant_secret\(/.test(modulCode) && !/SELECT[\s\S]{0,120}db_pass/.test(modulCode));
+// Ein Treiberfehler kann Host und Benutzer enthalten und darf nicht nach
+// aussen gehen.
+check('KRITISCH: Treiberfehler werden nicht weitergereicht',
+  /catch \(Throwable \$e\)[\s\S]{0,400}nicht_erreichbar/.test(modulCode)
+  && !/getMessage\(\)[\s\S]{0,120}json_response/.test(modulCode));
 
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }

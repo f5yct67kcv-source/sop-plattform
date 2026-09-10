@@ -451,6 +451,16 @@ const VERB_TEXT = {
   eigene_datenbank:   ['m-pos',  'eigene Datenbank'],
   unvollstaendig:     ['m-neg',  'unvollständig'],
 };
+/* Fuenf Lagen, fuenf Texte. "Nicht eingerichtet", "nicht erreichbar" und
+   "Schema veraltet" fuehren zu drei verschiedenen Handlungen und duerfen
+   nicht wie dasselbe aussehen (Hausregel). */
+const STAND_TEXT = {
+  standardverbindung: ['m-ruhe', 'Standardverbindung'],
+  unvollstaendig:     ['m-neg',  'Angaben unvollständig'],
+  secret_fehlt:       ['m-warn', 'Zugangsdaten fehlen im Deploy'],
+  nicht_erreichbar:   ['m-neg',  'nicht erreichbar'],
+  bereit:             ['m-pos',  'erreichbar'],
+};
 const STATUS_TEXT = {
   aktiv:      ['m-pos',  'aktiv'],
   gesperrt:   ['m-warn', 'gesperrt'],
@@ -480,9 +490,23 @@ async function ladeMandanten() {
   }
 
   const liste = a.mandanten || [];
+  /* Der Einrichtungsstand kommt aus einem eigenen Endpunkt, weil er
+     Verbindungen zu fremden Datenbanken aufbaut -- das darf die Liste
+     nicht bei jedem Aufruf mitschleppen. Schlaegt er fehl, bleibt die
+     Liste trotzdem stehen; ein unbekannter Stand ist kein Grund, gar
+     nichts zu zeigen. */
+  let stand = {};
+  try {
+    const st = await ruf('betreiber_mandant_stand.php');
+    if (st.status === 'ok') { (st.mandanten || []).forEach(m => { stand[m.id] = m; }); }
+  } catch (e) { /* Stand bleibt unbekannt */ }
+
   const aktiv = liste.filter(m => m.status === 'aktiv').length;
   const offen = liste.filter(m => m.gav_lage === 'unbestaetigt').length;
-  const kaputt = liste.filter(m => m.verbindung_lage === 'unvollstaendig').length;
+  const kaputt = liste.filter(m => {
+    const st = stand[m.id];
+    return st ? !st.erreichbar : m.verbindung_lage === 'unvollstaendig';
+  }).length;
 
   /* Einheiten nicht vermischen: "Mandanten" zaehlt Betriebe, "aktiv" zaehlt
      Betriebe mit Status aktiv, "GAV offen" zaehlt Bestaetigungen. Jede Zahl
@@ -491,7 +515,7 @@ async function ladeMandanten() {
       zahlBlock('Mandanten', liste.length, null)
     + zahlBlock('Aktiv', aktiv, liste.length ? aktiv + ' von ' + liste.length : null)
     + zahlBlock('GAV offen', offen, offen ? 'Bestätigung fehlt' : 'alle bestätigt')
-    + zahlBlock('Verbindung unvollständig', kaputt, kaputt ? 'nicht erreichbar' : 'keine');
+    + zahlBlock('Nicht erreichbar', kaputt, kaputt ? 'Einrichtung prüfen' : 'alle erreichbar');
 
   if (!liste.length) {
     inhalt.innerHTML = leerBlock('◇', 'Noch kein Mandant eingetragen',
@@ -500,7 +524,7 @@ async function ladeMandanten() {
   }
 
   inhalt.innerHTML = '<div class="tab-huelle"><table><thead><tr>'
-    + '<th>Mandant</th><th>Status</th><th>GAV</th><th>Verbindung</th><th></th>'
+    + '<th>Mandant</th><th>Status</th><th>GAV</th><th>Einrichtung</th><th></th>'
     + '</tr></thead><tbody>'
     + liste.map(m => '<tr>'
         + '<td><strong>' + text(m.name) + '</strong>'
@@ -509,7 +533,7 @@ async function ladeMandanten() {
         + '<td>' + merker(GAV_TEXT, m.gav_lage)
           + (m.gav_bestaetigt_am ? '<div class="zweit">' + text(m.gav_bestaetigt_am.slice(0, 10)) + '</div>' : '')
           + '</td>'
-        + '<td>' + merker(VERB_TEXT, m.verbindung_lage) + '</td>'
+        + '<td>' + standZelle(stand[m.id], m.verbindung_lage) + '</td>'
         + '<td style="text-align:right;white-space:nowrap">'
           + '<button class="klein" data-bearbeiten="' + m.id + '">Ändern</button> '
           + '<button class="klein" data-gav="' + m.id + '">GAV</button>'
@@ -521,6 +545,23 @@ async function ladeMandanten() {
     b.onclick = () => formularOeffnen(liste.find(m => m.id === +b.dataset.bearbeiten)));
   inhalt.querySelectorAll('[data-gav]').forEach(b =>
     b.onclick = () => gavFragen(liste.find(m => m.id === +b.dataset.gav)));
+}
+
+/* Unbekannt darf nie wie "keine" aussehen: Kommt der Stand nicht, sagt die
+   Zelle das -- statt stillschweigend die Verbindungsangaben als Stand
+   auszugeben. */
+function standZelle(st, verbLage) {
+  if (!st) {
+    return merker(VERB_TEXT, verbLage)
+         + '<div class="zweit">Stand nicht abgerufen</div>';
+  }
+  const kopf = merker(STAND_TEXT, st.erreichbar ? 'bereit' : st.lage);
+  if (!st.erreichbar) { return kopf; }
+  if (st.fehlend && st.fehlend.length) {
+    return '<span class="merker m-warn">Schema unvollständig</span>'
+         + '<div class="zweit">' + st.tabellen + ' von ' + st.gesamt + ' Tabellen</div>';
+  }
+  return kopf + '<div class="zweit">' + st.tabellen + ' von ' + st.gesamt + ' Tabellen</div>';
 }
 
 function zahlBlock(lab, wert, bezug) {
