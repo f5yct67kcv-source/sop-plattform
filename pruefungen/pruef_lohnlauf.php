@@ -163,6 +163,39 @@ $kuenftig = lohnlauf_person($pdo, ['id' => 3, 'anstellungskategorie' => 'C',
 pruef('KRITISCH: ein erst kuenftig gueltiger Ansatz greift nicht rueckwirkend',
     $kuenftig['gesperrt_grund'] === 'kein_ansatz');
 
+// ── Umstufung: der alte Ansatz wird nicht umgedeutet ─────────────────────
+// Person 6 war Kategorie B (Monatslohn, CHF 4500 = 450000 Rappen) und ist
+// jetzt C (Stundenlohn); ein neuer Ansatz fehlt noch. Ohne Pruefung des
+// Kategorie-Schnappschusses laese der Lauf die 450000 Rappen als
+// STUNDENansatz: bei den 9 bewerteten Stunden dieser Schicht ergaebe das
+// gut CHF 40'000 Bruttolohn fuer einen Arbeitstag. lohn_mindestlohn()
+// schlaegt nur nach UNTEN an und faengt es nicht.
+$pdo->exec("INSERT INTO lohn_ansatz VALUES
+  (5,6,'2024-01-01','B',450000,1,NULL,NULL,NULL,NULL,NULL,NULL,NULL)");
+$pdo->exec("INSERT INTO einsatz_zuteilung VALUES (1,6,'abgeglichen','08:00','18:00',60,0)");
+$umgestuft = lohnlauf_person($pdo, ['id' => 6, 'anstellungskategorie' => 'C',
+    'eintritt' => '2024-03-01', 'geburtsdatum' => '2000-05-04'], $VON, $BIS);
+pruef('KRITISCH: ein Monatsansatz wird nach Umstufung nicht als Stundenansatz gerechnet',
+    $umgestuft['brutto_rappen'] === 0 && $umgestuft['zeilen'] === []);
+pruef('KRITISCH: der Grundlohn traegt nie den Monatsbetrag als Stundenwert',
+    $umgestuft['brutto_rappen'] < 450000);
+pruef('Die Umstufung bekommt einen EIGENEN Grund -- nicht denselben wie ein fehlender Ansatz',
+    $umgestuft['gesperrt_grund'] !== null && $umgestuft['gesperrt_grund'] !== 'kein_ansatz');
+pruef('Die Zeiten sind auch hier gerechnet -- gesperrt ist der Lohn, nicht die Stunde',
+    $umgestuft['netto_min'] === 540);
+
+// Ein Ansatz aus der Zeit vor dem Schnappschuss: ohne Kategorie steht nicht
+// fest, ob der Betrag pro Stunde oder pro Monat gilt. Nicht raten.
+$pdo->exec("INSERT INTO lohn_ansatz VALUES
+  (6,7,'2024-01-01',NULL,3000,1,NULL,NULL,NULL,NULL,NULL,NULL,NULL)");
+$pdo->exec("INSERT INTO einsatz_zuteilung VALUES (1,7,'abgeglichen','08:00','18:00',60,0)");
+$ohneSchnapp = lohnlauf_person($pdo, ['id' => 7, 'anstellungskategorie' => 'C',
+    'eintritt' => '2024-03-01', 'geburtsdatum' => '2000-05-04'], $VON, $BIS);
+pruef('KRITISCH: fehlt dem Ansatz die Kategorie, wird gesperrt statt geraten',
+    $ohneSchnapp['brutto_rappen'] === 0 && $ohneSchnapp['gesperrt_grund'] !== null);
+pruef('Und dieser Fall ist von der Umstufung unterscheidbar -- vier Lagen, vier Texte',
+    $ohneSchnapp['gesperrt_grund'] !== $umgestuft['gesperrt_grund']);
+
 // ── Mindestlohnwarnung ───────────────────────────────────────────────────
 $pdo->exec("INSERT INTO lohn_ansatz VALUES
   (3,4,'2024-01-01','C',2000,1,NULL,NULL,NULL,NULL,NULL,NULL,NULL)");
@@ -289,7 +322,8 @@ pruef('KRITISCH: aber weder ferien- noch 13.-ML-pflichtig -- sonst gaebe es Feri
 $gruende = lohnlauf_sperrgruende();
 $benutzt = ['sparte_reinigung', 'kein_regelwerk', 'kein_ansatz', 'keine_kategorie',
             'zeiten_unvollstaendig', 'pause_laenger_als_schicht', 'monatslohn_offen',
-            'anordnung_fehlt', 'ausgleich_offen'];
+            'anordnung_fehlt', 'ausgleich_offen',
+            'ansatz_ohne_kategorie', 'ansatz_andere_lohnform'];
 pruef('KRITISCH: zu jedem verwendeten Sperrgrund gibt es einen erklaerenden Satz',
     count(array_diff($benutzt, array_keys($gruende))) === 0);
 pruef('Und keiner dieser Saetze ist leer',

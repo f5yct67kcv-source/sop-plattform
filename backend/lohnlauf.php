@@ -36,6 +36,8 @@ function lohnlauf_sperrgruende(): array
         'sparte_reinigung'   => 'Für Reinigungseinsätze gilt ein anderer, noch nicht geprüfter GAV (OP-32). Diese Stunden fliessen in keine Lohnzeile.',
         'kein_regelwerk'     => 'Für dieses Datum ist kein GAV-Regelwerk hinterlegt — es wird nicht gerechnet, statt auf abgelaufener Grundlage.',
         'kein_ansatz'        => 'Für diesen Zeitraum ist kein Lohnansatz erfasst.',
+        'ansatz_ohne_kategorie' => 'Beim erfassten Lohnansatz fehlt die Anstellungskategorie. Ohne sie steht nicht fest, ob der Betrag pro Stunde oder pro Monat gilt — es wird nicht geraten.',
+        'ansatz_andere_lohnform' => 'Der jüngste Lohnansatz wurde für die andere Lohnform erfasst (Monat statt Stunde oder umgekehrt). Nach einer Umstufung nach Art. 8 braucht es einen neuen Ansatz — der alte Betrag wird nicht umgedeutet.',
         'keine_kategorie'    => 'Ohne Anstellungskategorie nach Art. 8 steht die Lohnform nicht fest.',
         'zeiten_unvollstaendig' => 'Die Ist-Zeiten der Schicht sind unvollständig erfasst.',
         'pause_laenger_als_schicht' => 'Die erfasste Pause ist länger als die Schicht — das ist ein Erfassungsfehler, keine Zeit.',
@@ -716,6 +718,17 @@ function lohnlauf_person(PDO $pdo, array $ma, string $von, string $bis): array
 
     $ansatz = lohnlauf_ansatz($pdo, $maId, $bis);
     if (!$ansatz) { $kopf['gesperrt_grund'] = 'kein_ansatz'; return $kopf; }
+
+    // Der Ansatz traegt einen Schnappschuss der Kategorie, die bei seiner
+    // Erfassung galt -- genau dafuer steht die Spalte da ("damit eine spaetere
+    // Umstufung den alten Ansatz nicht umdeutet"). Sie wurde geschrieben, aber
+    // nie gelesen: Ohne diese Pruefung liest ein Wechsel von A/B nach C den
+    // alten MONATSbetrag als STUNDENansatz -- aus CHF 4500 im Monat werden
+    // CHF 4500 in der Stunde. lohn_mindestlohn() schlaegt nur nach unten an,
+    // faengt das also nicht. Gesperrt statt gerechnet, wie ueberall hier.
+    $ansatzForm = lohn_form($ansatz['kategorie'] ?? null);
+    if ($ansatzForm === null) { $kopf['gesperrt_grund'] = 'ansatz_ohne_kategorie'; return $kopf; }
+    if ($ansatzForm !== $form) { $kopf['gesperrt_grund'] = 'ansatz_andere_lohnform'; return $kopf; }
 
     $grund = (int)$ansatz['ansatz_rappen'];
     $stunden = $kopf['bewertet_min'] / 60;
