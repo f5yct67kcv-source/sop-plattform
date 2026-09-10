@@ -46,6 +46,18 @@
 #      also keine Position erfassen -- auf Production greift die neue
 #      Zeile mit dem naechsten Deploy von selbst.
 #
+#  (d) betreiber.php in die FilesMatch-Sperre aufgenommen (ENT-519,
+#      2026-09-10). Das Modul der Betreiber-Ebene wird nur von den
+#      betreiber_*-Endpunkten eingebunden und nie direkt aufgerufen --
+#      dieselbe Begruendung wie bei kundenportal.php. Auch dieser Hash ist
+#      dem manuellen Nachtrag vorausgeeilt, aus demselben Grund wie (a) und
+#      (c). STEHT AUS. Bis zum Nachtrag ist betreiber.php auf Staging per
+#      URL erreichbar; die Datei enthaelt ausschliesslich
+#      Funktionsdefinitionen und gibt bei direktem Aufruf nichts aus, und
+#      Staging liegt zusaetzlich hinter der Basic-Auth-Schicht (ENT-384).
+#      Auf Production greift die neue Zeile mit dem naechsten Deploy von
+#      selbst.
+#
 # Was das heisst: Fuer diese Aenderungen haelt der Drift-Guard den
 # Staging-Deploy NICHT an. Production ist nicht betroffen -- dort laedt der
 # Deploy die .htaccess selbst hoch. In Staging schuetzt bis zum Nachtrag die
@@ -56,6 +68,6 @@
 # von #@__HCP_END__@#). Danach diesen Absatz loeschen -- er ist der einzige
 # Hinweis darauf, dass der Hash dem Nachtrag vorausgeeilt ist.
 
-htaccess-hostpoint:13e3aff422b037e8d3cf72f55aec9756ce0db9932e4688a87725583bced3ae0e
+htaccess-hostpoint:0e27a3633b001370554419ab98683cc563f3d3a28693083d8b9b33ecd6a98cc9
 htaccess-staging-zusatz:7b6df04b9fd9decbeb68442a6080b3e39c384e31d59273e53f938549c8e26208
 robots-staging.txt:e120f27381f482e2de05b11355c7d1818e8266d282cec8cf04bc8b33916e7583

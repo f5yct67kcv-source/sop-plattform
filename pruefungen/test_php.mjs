@@ -791,6 +791,12 @@ const OHNE_ANMELDUNG = [
   // Betriebsstammdaten, Honigtopf-Feld, eigene Bremse. Eigene Pruefung:
   // pruef_demo_anfrage.php.
   'demo_senden.php',
+  // Der Eingang der Betreiber-Ebene (ENT-518). Kann keine Sitzung
+  // verlangen, die er erst erzeugt -- dieselbe Begruendung wie login.php.
+  // Erbt Bremse (eigener Namensraum "betreiber:"), Blindpruefung gegen
+  // Zeitmessung und die gleichlautende Antwort fuer "gibt es nicht" und
+  // "Passwort falsch". Eigene Pruefung: test_betreiber.mjs.
+  'betreiber_anmelden.php',
   // Die drei Eingaenge des Kundenportals -- stehen zusaetzlich in
   // PORTAL_EINGAENGE weiter unten, weil dort die Portal-Regel greift.
   'portal_anmelden.php',
