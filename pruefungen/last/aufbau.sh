@@ -47,12 +47,15 @@ sed -n "1,$(($(grep -n 'TEIL B -- nur ausfuehren' "$ARBEIT/backend/schema_planun
   "$ARBEIT/backend/schema_planung.sql" | $DB
 
 echo "── Verwaltungszugang und Sitzung ───────────────────────────────────"
+# In sessions.token steht seit ENT-501 nur noch der Abdruck (sha256), nie
+# der Rohwert. Der Lastgenerator schickt den Rohwert im Kopf -- gespeichert
+# wird, was require_session() dort auch sucht.
 php -r '
 $pdo = new PDO("mysql:host=127.0.0.1;dbname='"$DB_NAME"';charset=utf8mb4","'"$DB_USER"'","'"$DB_PASS"'");
 $pdo->prepare("INSERT INTO mitarbeiter (id,name,password_hash,ist_admin,aktiv,vorname,nachname) VALUES (1,?,?,1,1,?,?)")
     ->execute(["chef", password_hash(bin2hex(random_bytes(12)), PASSWORD_DEFAULT), "Test", "Verwaltung"]);
 $pdo->prepare("INSERT INTO sessions (token,mitarbeiter_id,erstellt_am) VALUES (?,1,NOW())")
-    ->execute(["tok-admin-lasttest-0001"]);
+    ->execute([hash("sha256", "tok-admin-lasttest-0001")]);
 '
 
 echo "── PHP-Server starten (Port $PORT, $ARBEITER Arbeitsprozesse) ──────"

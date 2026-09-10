@@ -5904,7 +5904,7 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
               <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
               <input class="inp" type="search" id="rQ" placeholder="Mitarbeitende, Kunde oder Ort …" oninput="renderRapporte()">
             </div>
-            <input class="inp" type="month" id="rM" style="width:auto" onchange="renderRapporte()">
+            <input class="inp" type="month" id="rM" style="width:auto" onchange="rMonatGewechselt()">
             <button class="btn btn-quiet btn-sm" onclick="rClear()">Zurücksetzen</button>
             <!-- Sortierung nur auf dem Handy (ENT-400): Am Desktop sortiert
                  man ueber die Spaltenkoepfe der Tabelle, die es auf dem Handy
@@ -11004,10 +11004,12 @@ function go(view) {
       $('agBis').value = isoTag();
     }
     // Die Rapporte gehoeren dazu, seit ein Schicht-Rapport an der Zeile
-    // haengen kann (ENT-082) -- ohne sie faende die Ansicht nie einen.
+    // haengen kann (ENT-082) -- ohne sie faende die Ansicht nie einen. Sie
+    // kommen seit dem Lasttest (09.09.2026) nicht mehr aus der allgemeinen
+    // Rapportliste, sondern als eigener Ausschnitt genau dieses Zeitraums;
+    // renderAbgleich() holt ihn selbst nach, sobald der Zeitraum feststeht.
     Promise.all([
       einsaetze.length ? Promise.resolve() : loadEinsaetze(),
-      rapporte.length ? Promise.resolve() : loadRapporte(),
     ]).then(renderAbgleich);
   }
   // Gleiches Prinzip fuer Planung (ENT-233): das Untermenue bleibt nur
@@ -11461,11 +11463,25 @@ function loadStats() {
   });
 }
 
+// Was gerade geladen ist, und was es insgesamt gibt. Beides getrennt, weil
+// die Ansicht den Unterschied hinschreiben muss (Lasttest 09.09.2026).
+let rapporteGesamt = 0;
+let rapporteGekuerzt = false;
+
 function loadRapporte() {
-  return api('rapport_list.php').then(({ ok, status, data }) => {
+  // Ist ein Monat gewaehlt, holt der Server genau ihn -- sonst die neuesten.
+  const m = $('rM') ? ($('rM').value || '') : '';
+  const frage = m ? `?von=${m}-01&bis=${rMonatsEnde(m)}` : '';
+  return api('rapport_list.php' + frage).then(({ ok, status, data }) => {
     if (status === 401) return doLogout();
     if (!ok || data.status !== 'ok') return;
     rapporte = data.rapporte || [];
+    // Fehlt die Gesamtzahl (aeltere Serverfassung waehrend eines Deploys),
+    // ist das Bekannte die geladene Menge -- nicht null. Eine 0 daneben
+    // saehe aus wie "es gibt keine", und genau das ist sie nicht.
+    rapporteGesamt = data.gesamt !== undefined && data.gesamt !== null
+      ? Number(data.gesamt) : rapporte.length;
+    rapporteGekuerzt = !!data.gekuerzt;
     renderRapporte();
   });
 }
@@ -12204,16 +12220,34 @@ function renderProMa() {
 }
 
 // ══════════════════════════════════════════ RAPPORTE
+//
+// Seit dem Lasttest (09.09.2026) liefert rapport_list.php nicht mehr jeden
+// Rapport, den es je gab (108 MB, HTTP 500), sondern die neuesten 2000 --
+// oder genau einen Monat, wenn einer gewaehlt ist. Der Monatsfilter ist
+// darum keine Auswahl mehr aus dem, was schon da ist, sondern eine Frage an
+// den Server: Nur so ist auch ein Monat erreichbar, der laenger zurueckliegt
+// als die 2000 neuesten Zeilen.
+//
+// Die Textsuche bleibt im Browser -- sie sucht in dem, was geladen ist, und
+// die Ansicht schreibt darum hin, worin gesucht wurde.
 function rFiltered() {
   const q = ($('rQ').value || '').toLowerCase().trim();
-  const m = $('rM').value || '';
-  return rapporte.filter(r => {
-    const hit = !q || [r.mitarbeiter, r.kunde, r.ort, r.strasse, r.auftrag_nr]
-      .some(f => String(f || '').toLowerCase().includes(q));
-    return hit && (!m || String(r.datum).startsWith(m));
-  });
+  return rapporte.filter(r => !q || [r.mitarbeiter, r.kunde, r.ort, r.strasse, r.auftrag_nr]
+    .some(f => String(f || '').toLowerCase().includes(q)));
 }
-function rClear() { $('rQ').value = ''; $('rM').value = ''; renderRapporte(); }
+// Letzter Tag eines Monats "YYYY-MM" -- Tag 0 des Folgemonats.
+function rMonatsEnde(m) {
+  const [j, mo] = m.split('-').map(Number);
+  return isoTag(new Date(j, mo, 0));
+}
+// Monat gewechselt: neu holen, nicht neu filtern.
+function rMonatGewechselt() { loadRapporte().then(renderRapporte); }
+function rClear() {
+  $('rQ').value = '';
+  const hatteMonat = !!$('rM').value;
+  $('rM').value = '';
+  if (hatteMonat) { loadRapporte().then(renderRapporte); } else { renderRapporte(); }
+}
 
 // ── Handy: Rapporte als aufklappbare Karten (ENT-400) ─────────────────────
 //
@@ -12270,7 +12304,10 @@ function rKarte(r, gruppenGroesse) {
     ['Pause', nf(r.pause_min) + ' Min.'],
     ['Nettostunden', '<strong>' + nf(r.netto_h, 2) + ' h</strong>'],
     ['Unterzeichner', dash(r.unterzeichner)],
-    ['Unterschrift', r.unterschrift ? 'erfasst' : '<span style="color:var(--ink-3)">keine erfasst</span>'],
+    // hat_unterschrift statt der Unterschrift selbst -- das Bild kommt seit
+    // dem Lasttest (09.09.2026) nicht mehr mit der Liste, und gebraucht wird
+    // hier ohnehin nur das Ja/Nein.
+    ['Unterschrift', r.hat_unterschrift ? 'erfasst' : '<span style="color:var(--ink-3)">keine erfasst</span>'],
     ['Bemerkung', dash(r.bemerkung)],
     ['Erfasst am', r.erfasst_am ? dmy(r.erfasst_am) + ', ' + String(r.erfasst_am).slice(11, 16) : '–'],
   ];
@@ -12318,12 +12355,19 @@ function renderRapporte() {
   }
   if ($('kv-rapporte').classList.contains('on')) {
     const h = d.reduce((s, r) => s + Number(r.netto_h), 0);
-    $('pgCrumb').textContent = `${nf(d.length)} von ${nf(rapporte.length)} Rapporten · ${nf(h, 2)} h`;
+    // Die Bezugsgroesse ist, was der Server im gewaehlten Ausschnitt HAT --
+    // nicht, was gerade geladen ist. Eine gefilterte Zahl allein sieht aus
+    // wie die Gesamtzahl (Hausregel), und eine gekuerzte Liste erst recht.
+    $('pgCrumb').textContent = `${nf(d.length)} von ${nf(rapporteGesamt)} Rapporten · ${nf(h, 2)} h`;
   }
   if (!d.length) {
     $('rapporteTable').innerHTML = rapporte.length
       ? EMPTY('Keine Treffer', 'Für diese Suche gibt es keine Rapporte. Filter zurücksetzen und erneut versuchen.')
-      : EMPTY('Noch keine Rapporte', 'Sobald Einsätze in der Erfassung gespeichert werden, erscheinen sie hier.');
+      : ($('rM').value
+        // Vier verschiedene Aussagen, vier verschiedene Texte: kein Treffer
+        // in der Suche, nichts in DIESEM Monat, und noch gar nichts erfasst.
+        ? EMPTY('Nichts in diesem Monat', 'Für den gewählten Monat liegt kein Rapport vor. Anderen Monat wählen oder das Feld leeren.')
+        : EMPTY('Noch keine Rapporte', 'Sobald Einsätze in der Erfassung gespeichert werden, erscheinen sie hier.'));
     return;
   }
   // Klammer und Knopf wie im Kunden-Detail (ENT-173), hier seit ENT-178
@@ -12350,11 +12394,18 @@ function renderRapporte() {
   const karten = rapporteGruppieren(d)
     .map(g => g.zeilen.map(r => rKarte(r, g.zeilen.length)).join(''))
     .join('');
+  // Eine gekuerzte Liste darf nie wie eine vollstaendige aussehen -- und die
+  // Textsuche sucht nur in dem, was geladen ist. Beides gehoert hingeschrieben,
+  // samt dem Weg zu den aelteren Zeilen (Monat waehlen).
+  const gekuerztHinweis = rapporteGekuerzt
+    ? `<p class="zone-note">Es werden die neuesten ${nf(rapporte.length)} von ${nf(rapporteGesamt)} Rapporten gezeigt${$('rM').value ? ' — auch innerhalb des gewählten Monats' : ''}. Die Suche greift nur in diesen. Für ältere oben einen Monat wählen.</p>`
+    : '';
   $('rapporteTable').innerHTML = `<div class="nur-schmal">${karten}</div>`
     + `<table class="nur-breit"><thead><tr>
       <th class="rapp-klammer"></th><th>Datum</th><th>Mitarbeitende</th><th>Kunde</th><th>Ort</th>
       <th>Einsatzart</th><th>Zeit</th><th class="num">Pause</th><th class="num">Netto</th><th>Unterzeichner</th>
-    </tr></thead><tbody>${rapporteZeilenMitKlammer(d, zelle)}</tbody></table>`;
+    </tr></thead><tbody>${rapporteZeilenMitKlammer(d, zelle)}</tbody></table>`
+    + gekuerztHinweis;
 }
 
 function exportCSV() {
@@ -12368,7 +12419,13 @@ function exportCSV() {
   a.href = URL.createObjectURL(new Blob(['﻿' + [hdr.map(cell).join(';'), ...rows].join('\r\n')], { type: 'text/csv;charset=utf-8' }));
   a.download = 'rapporte_' + new Date().toISOString().slice(0, 10) + '.csv';
   a.click();
-  toast(d.length + ' Rapporte exportiert.');
+  // Der Export enthaelt, was geladen ist -- seit dem Lasttest (09.09.2026)
+  // sind das hoechstens die neuesten 2000. Wer die Datei fuer eine
+  // Abrechnung nimmt, muss wissen, ob sie vollstaendig ist: eine Datei mit
+  // 2000 Zeilen sieht sonst aus wie alles, was es gibt.
+  toast(rapporteGekuerzt
+    ? `${d.length} von ${nf(rapporteGesamt)} Rapporten exportiert — für den Rest oben einen Monat wählen.`
+    : d.length + ' Rapporte exportiert.');
 }
 
 // ══════════════════════════════════════════ PRODUKTE UND OFFERTEN (ENT-181)
@@ -12624,6 +12681,12 @@ function loadBelege() {
     if (status === 403) return;
     if (!ok || data.status !== 'ok') { toast(data.message || 'Offerten konnten nicht geladen werden.'); return; }
     belege = data.belege || [];
+    // Seit dem Lasttest (09.09.2026) liefert beleg_list.php hoechstens 2000
+    // Belege. Heute reicht das um Groessenordnungen -- aber wenn es einmal
+    // nicht reicht, muss es dastehen und nicht stillschweigend fehlen.
+    if (data.gekuerzt) {
+      toast(`Es werden die neuesten ${nf(belege.length)} von ${nf(Number(data.gesamt) || belege.length)} Belegen gezeigt.`);
+    }
     ofNaechsteNummer = data.naechste_nummer || '';
     renderOfferten();
   });
@@ -14735,7 +14798,15 @@ function mtlLaden() {
   return api('mitteilung_list.php').then(({ ok, data }) => {
     if (!ok || !data || data.status !== 'ok') { mtlStand = 'fehler'; mtlListe = []; }
     else if (data.eingerichtet === false) { mtlStand = 'uneingerichtet'; mtlListe = []; }
-    else { mtlStand = 'ok'; mtlListe = data.mitteilungen || []; }
+    else {
+      mtlStand = 'ok'; mtlListe = data.mitteilungen || [];
+      // Wie bei den Belegen: Die Liste ist seit dem Lasttest (09.09.2026)
+      // begrenzt. Wird die Grenze je erreicht, sagt es die Ansicht -- eine
+      // gekuerzte Liste darf nicht wie eine vollstaendige aussehen.
+      if (data.gekuerzt) {
+        toast(`Es werden die neuesten ${nf(mtlListe.length)} von ${nf(Number(data.gesamt) || mtlListe.length)} Mitteilungen gezeigt.`);
+      }
+    }
     mtlPushEingerichtet = !!(data && data.push_eingerichtet);
     mtlPushGeraete = (data && typeof data.push_geraete === 'number') ? data.push_geraete : -1;
     mtlPushGrund = (data && data.push_grund) || '';
@@ -15301,6 +15372,19 @@ function kuWahlZeile(wert, art) {
   return `<a href="${esc(ziel)}" onclick="event.stopPropagation()">${esc(wert)}</a>`;
 }
 
+// Drei Zustaende, nicht zwei: eine Zahl, "noch keine" (echte Null) und
+// "nicht geladen" (der Server hat die Zahl gar nicht mitgeschickt, weil der
+// Zugang das Kundenrecht nicht hat). Der dritte Fall darf nicht wie der
+// zweite aussehen -- Hausregel, und genau hier war es bis zum Lasttest eine
+// aus der Rapportliste gezaehlte Zahl, die mit einer begrenzten Liste
+// stillschweigend falsch geworden waere.
+function kuRapporteZelle(zahl) {
+  if (zahl === undefined || zahl === null) {
+    return '<span style="color:var(--ink-3)" title="Diese Zahl wurde nicht mitgeliefert">nicht geladen</span>';
+  }
+  return zahl ? nf(zahl) : '<span style="color:var(--ink-3)">–</span>';
+}
+
 function kuKarte(k, rapporteZahl) {
   const id = Number(k.id);
   const offen = kuOffen.has(id);
@@ -15313,7 +15397,9 @@ function kuKarte(k, rapporteZahl) {
     ['Telefon', kuWahlZeile(k.telefon, 'tel')],
     ['E-Mail', kuWahlZeile(k.email, 'mail')],
     ['Kontaktperson', dash(k.kontaktperson)],
-    ['Rapporte', rapporteZahl ? nf(rapporteZahl) : '<span style="color:var(--ink-3)">noch keine</span>'],
+    ['Rapporte', rapporteZahl === undefined || rapporteZahl === null
+      ? '<span style="color:var(--ink-3)">nicht geladen</span>'
+      : (rapporteZahl ? nf(rapporteZahl) : '<span style="color:var(--ink-3)">noch keine</span>')],
     ['Notiz', dash(k.notiz)],
   ];
   const koerper = offen ? `
@@ -15380,8 +15466,16 @@ function renderKunden() {
       : EMPTY('Noch keine Kunden', 'Über „Neuer Kunde“ oben rechts anlegen.');
     return;
   }
+  // Die Rapportzahl je Kunde kommt seit dem Lasttest (09.09.2026) vom Server
+  // (kunden_list.php). Sie wurde hier aus der vollstaendig geladenen
+  // Rapportliste gezaehlt -- seit die begrenzt ist, waere das eine Zahl, die
+  // stillschweigend zu klein ist, und eine zu kleine Zahl sieht aus wie eine
+  // richtige. Fehlt das Feld (Zugang ohne Kundenrecht), bleibt es undefined
+  // und kuKarte()/die Spalte zeigen nichts -- nicht 0.
   const zaehl = {};
-  rapporte.forEach(r => { zaehl[r.kunde] = (zaehl[r.kunde] || 0) + 1; });
+  kunden.forEach(k => {
+    if (k.rapporte_anzahl !== undefined) { zaehl[k.name] = Number(k.rapporte_anzahl); }
+  });
   // Handy: dieselben Kunden als Karten (ENT-401), Desktop unveraendert die
   // Tabelle -- beide aus demselben gefilterten und sortierten d[].
   $('kuTable').innerHTML = `<div class="nur-schmal">${d.map(k => kuKarte(k, zaehl[k.name])).join('')}</div>`
@@ -15395,7 +15489,7 @@ function renderKunden() {
         <td class="nowrap">${dash(kuPlzOrt(k))}</td>
         <td class="nowrap">${dash(k.telefon)}</td>
         <td>${dash(k.email)}</td>
-        <td class="num">${zaehl[k.name] ? nf(zaehl[k.name]) : '<span style="color:var(--ink-3)">–</span>'}</td>
+        <td class="num">${kuRapporteZelle(zaehl[k.name])}</td>
         <td class="num" onclick="event.stopPropagation()">
           <button class="btn btn-quiet btn-sm rowmenu-btn" onclick="kuMenuOeffnen(event, ${Number(k.id)})" aria-label="Aktionen">
             <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
@@ -17258,7 +17352,7 @@ function kuGoTab(t) {
   else { const f = $('kutab-uebersicht'); if (f) { f.classList.add('on'); } }
   topSubZeichnen();
   $('pgCrumb').textContent = t === 'objekte' ? 'Daueraufträge und ihre Masterschichten'
-    : t === 'rapporte' ? 'Alle erfassten Einsätze'
+    : t === 'rapporte' ? 'Erfasste Einsätze'
     : t === 'offerten' ? 'Angebote an Kunden'
     : t === 'rechnungen' ? 'Rechnungen an Kunden'
     : t === 'detail' ? 'Kundendetails' : 'Stammdaten';
@@ -17327,13 +17421,16 @@ function renderKundeDetail() {
       </dl>`;
   }
   if (kdTab === 'rapporte') {
-    // Verknuepfung ueber den Kundennamen, wie schon beim Rapport-Zaehler in
-    // der Übersicht (ENT-040) -- rapporte.kunde ist ein Textfeld ohne echten
-    // Verweis, siehe Risiko in ENT-040.
-    const treffer = rapporte.filter(r => r.kunde === k.name);
-    $('kdRapporte').innerHTML = treffer.length
-      ? kdRapporteTabelle(treffer)
-      : EMPTY('Keine Rapporte', 'Für diesen Kunden liegt noch kein Rapport vor.');
+    // Die Rapporte DIESES Kunden holt der Server (Lasttest 09.09.2026).
+    // Vorher wurde die vollstaendig geladene Rapportliste hier gefiltert --
+    // seit sie begrenzt ist, waere daraus stillschweigend ein Ausschnitt
+    // geworden, und "die letzten 2000 enthalten keinen von diesem Kunden"
+    // saehe aus wie "dieser Kunde hat keine Rapporte".
+    //
+    // Verknuepft wird weiterhin ueber den Kundennamen (ENT-040): kunde ist am
+    // Rapport ein Textfeld ohne echten Verweis. Der Vorbehalt bleibt, nur
+    // steht die Verknuepfung jetzt dort, wo sie auch begrenzen kann.
+    kdRapporteLaden(k.name);
   }
   if (kdTab === 'offerten') {
     // Anders als die Rapporte haengen Offerten ueber kunde_id am Kunden,
@@ -17430,6 +17527,40 @@ function rapporteZeilenMitKlammer(treffer, zelle) {
     const r = g.zeilen[0];
     return `<tr class="click" onclick="openDrawer(${Number(r.id)})">${rapporteKlammerZelle(null, 1)}${zelle(r)}</tr>`;
   }).join('');
+}
+
+// Rapporte eines einzelnen Kunden nachladen. Gemerkt wird je Kundenname,
+// damit ein Hin- und Herklicken zwischen den Reitern nicht jedes Mal fragt;
+// nach dem Loeschen eines Rapports wird der Merker geleert (siehe dort).
+let kdRapporteCache = {};
+function kdRapporteLaden(name) {
+  const treffer = kdRapporteCache[name];
+  if (treffer !== undefined) {
+    // Vier verschiedene Aussagen, vier verschiedene Texte -- "noch nicht
+    // geladen", "keine vorhanden" und "gekuerzt" sind nicht dasselbe.
+    $('kdRapporte').innerHTML = treffer.liste.length
+      ? kdRapporteTabelle(treffer.liste)
+        + (treffer.gekuerzt
+          ? `<p class="zone-note">Es werden die neuesten ${nf(treffer.liste.length)} von ${nf(treffer.gesamt)} Rapporten dieses Kunden gezeigt.</p>`
+          : '')
+      : EMPTY('Keine Rapporte', 'Für diesen Kunden liegt noch kein Rapport vor.');
+    return;
+  }
+  $('kdRapporte').innerHTML = EMPTY('Wird geladen …', 'Die Rapporte dieses Kunden werden geholt.');
+  api('rapport_list.php?kunde=' + encodeURIComponent(name)).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') {
+      // Ein Fehlschlag ist etwas anderes als "keine Rapporte" und wird auch
+      // so hingeschrieben.
+      $('kdRapporte').innerHTML = EMPTY('Nicht geladen', 'Die Rapporte dieses Kunden liessen sich nicht holen.');
+      return;
+    }
+    kdRapporteCache[name] = { liste: data.rapporte || [], gesamt: Number(data.gesamt) || 0,
+                              gekuerzt: !!data.gekuerzt };
+    // Nur zeichnen, wenn immer noch DERSELBE Kunde und derselbe Reiter offen
+    // sind -- sonst schreibt eine spaete Antwort in eine fremde Ansicht.
+    const offen = kunden.find(x => Number(x.id) === Number(kdId));
+    if (kdTab === 'rapporte' && offen && offen.name === name) { kdRapporteLaden(name); }
+  });
 }
 
 function kdRapporteTabelle(treffer) {
@@ -28274,9 +28405,57 @@ function renderTagesplan() {
 }
 
 // ══════════════════════════════════════════ SCHUBLADE + DRUCK
+//
+// Das Unterschriftsbild kommt seit dem Lasttest (09.09.2026) NICHT mehr mit
+// der Liste: Es ist im Mittel 2,8 kB Base64 je Rapport und machte 88 der
+// 108 MB aus, an denen rapport_list.php erstickt ist. Gebraucht wird es an
+// drei Stellen -- Schublade, Ausdruck, PDF -- und alle drei betreffen genau
+// einen Rapport. Der wird hier einzeln nachgeholt und gemerkt, damit
+// Ansehen, Drucken und Teilen desselben Rapports nicht dreimal fragen.
+// Seit die Rapportliste begrenzt ist, gibt es MEHRERE geladene Ausschnitte:
+// die Rapportansicht, die Rapporte eines Kunden und die des Abgleichs. Eine
+// Zeile, die man anklickt, kann aus jedem davon stammen -- "steht in
+// rapporte[]" ist darum keine gueltige Frage mehr. Diese hier ist es.
+// Alles, was gerade an Rapporten geladen ist -- aus welcher Ansicht auch
+// immer. Doppelte sind moeglich und stoeren nicht; wer eine EINDEUTIGE
+// Aussage braucht ("es gibt keinen"), fragt den Server (siehe
+// agRapporteSicherstellen und kdRapporteLaden).
+function rapporteAlleGeladen() {
+  return rapporte
+    .concat(agRapporte)
+    .concat(...Object.values(kdRapporteCache).map(e => e.liste));
+}
+
+function rapportAusListen(id) {
+  const k = Number(id);
+  const gleich = x => Number(x.id) === k;
+  return rapporteAlleGeladen().find(gleich) || rapportVollCache[k] || null;
+}
+
+const rapportVollCache = {};
+function rapportVoll(id) {
+  const k = Number(id);
+  if (rapportVollCache[k]) { return Promise.resolve(rapportVollCache[k]); }
+  return api('rapport_lesen.php?id=' + k).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok' || !data.rapport) { return null; }
+    rapportVollCache[k] = data.rapport;
+    return data.rapport;
+  });
+}
+
 function openDrawer(id) {
-  const r = rapporte.find(x => Number(x.id) === Number(id));
-  if (!r) { toast('Rapport nicht gefunden — bitte aktualisieren.'); return; }
+  const bekannt = rapportAusListen(id);
+  // Nicht in einem der geladenen Ausschnitte: einzeln holen statt "nicht
+  // gefunden" zu behaupten. Die Nummer stammt aus einer angeklickten Zeile,
+  // es gibt sie also.
+  if (!bekannt) {
+    rapportVoll(id).then(voll => {
+      if (!voll) { toast('Rapport nicht gefunden — bitte aktualisieren.'); return; }
+      openDrawer(id);
+    });
+    return;
+  }
+  const r = bekannt;
   drawerId = Number(id);
   $('drTitle').textContent = 'Rapport Nr. ' + r.id;
   const rows = [
@@ -28293,11 +28472,17 @@ function openDrawer(id) {
     ['Bemerkung', dash(r.bemerkung)],
     ['Erfasst am', r.erfasst_am ? dmy(r.erfasst_am) + ', ' + String(r.erfasst_am).slice(11, 16) : '–']
   ];
+  // Drei Zustaende, nicht zwei: es gibt keine, es gibt eine (wird geholt),
+  // und das Holen ist schiefgegangen. "Wird geladen" darf nicht wie "keine
+  // erfasst" aussehen -- der Rapport ginge sonst mit einem falschen "ohne
+  // Unterschrift" in den Druck.
   $('drBody').innerHTML =
     '<dl class="dl">' + rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('') + '</dl>' +
-    (r.unterschrift
-      ? `<div class="sig-box"><div class="lb">Unterschrift Kunde</div><img src="${esc(r.unterschrift)}" alt="Unterschrift"></div>`
-      : `<div class="sig-box"><div class="lb">Unterschrift Kunde</div><p style="font-size:12.5px;color:var(--ink-3)">Keine Unterschrift erfasst.</p></div>`) +
+    `<div class="sig-box" id="drSig"><div class="lb">Unterschrift Kunde</div>` +
+    (r.hat_unterschrift
+      ? `<p style="font-size:12.5px;color:var(--ink-3)">Wird geladen …</p>`
+      : `<p style="font-size:12.5px;color:var(--ink-3)">Keine Unterschrift erfasst.</p>`) +
+    `</div>` +
     `<p class="zone-note" style="margin-top:20px">Direkt als PDF: „Herunterladen“ oder „Teilen“ unten. Für den Ausdruck selbst „Kundenbericht drucken“, im Druckdialog lässt sich dort auch „Als PDF sichern“ wählen.</p>`;
   // Herunterladen/Teilen (ENT-399): direkter Weg zum PDF, ohne den Umweg
   // ueber den System-Druckdialog -- Anruf-Szenario, der Kunde am Telefon
@@ -28318,6 +28503,17 @@ function openDrawer(id) {
      <div style="flex:1"></div>
      <button class="btn btn-plain" id="drDeleteBtn" onclick="askDeleteRapport(${Number(id)})">Löschen</button>`;
   showDrawer();
+  // Das Bild kommt nach. Geprueft wird beim Eintreffen, ob die Schublade
+  // ueberhaupt noch denselben Rapport zeigt -- wer schnell weiterklickt,
+  // bekaeme sonst die Unterschrift des vorigen.
+  if (r.hat_unterschrift) {
+    rapportVoll(id).then(voll => {
+      if (drawerId !== Number(id) || !$('drSig')) { return; }
+      $('drSig').innerHTML = '<div class="lb">Unterschrift Kunde</div>' + (voll && voll.unterschrift
+        ? `<img src="${esc(voll.unterschrift)}" alt="Unterschrift">`
+        : `<p style="font-size:12.5px;color:var(--ink-3)">Die Unterschrift liess sich nicht laden.</p>`);
+    });
+  }
 }
 
 function showDrawer() {
@@ -28340,7 +28536,14 @@ function askDeleteRapport(id) {
     () => api('rapport_delete.php', { method: 'POST', body: { id } }).then(({ ok, data }) => {
       if (!ok || data.status !== 'ok') { toast(data.message || 'Löschen fehlgeschlagen.'); return; }
       closeDrawer();
-      Promise.all([loadRapporte(), loadStats()]).then(() => toast('Rapport gelöscht.'));
+      // Die nachgeladenen Merker gehen mit: eine geloeschte Nummer darf
+      // weder in der Kundenansicht noch beim Drucken wieder auftauchen.
+      // Auch die Kundenliste wird neu geholt -- die Rapportzahl je Kunde
+      // kommt seit dem Lasttest vom Server und waere sonst eine Zahl, die
+      // eine Zeile zu viel zaehlt.
+      kdRapporteCache = {};
+      delete rapportVollCache[Number(id)];
+      Promise.all([loadRapporte(), loadStats(), loadKunden()]).then(() => toast('Rapport gelöscht.'));
     }));
 }
 
@@ -28623,7 +28826,20 @@ function agZeilenBauen() {
 // selben Zuteilung sind moeglich -- massgeblich ist der zuletzt erfasste.
 function agRapport(z) {
   if (!z.mitarbeiter_id) return null;
-  const treffer = rapporte.filter(r =>
+  // Gesucht wird in ALLEN geladenen Ausschnitten, nicht nur in einem.
+  //
+  // Der Abgleich hat seinen eigenen, fuer den angezeigten Zeitraum
+  // vollstaendigen (agRapporteSicherstellen()) -- dort ist "kein Rapport
+  // gefunden" eine belastbare Aussage. Dieselbe Funktion bedient aber auch
+  // den Einsatzplan und die Tagesuebersicht, und die zeigen einen gefundenen
+  // Rapport als Zugabe an: Findet sich keiner, steht dort nichts, und der
+  // Abgleich bleibt der Ort, an dem Fehlendes auffaellt (siehe
+  // epRapportBlock). Fuer diese beiden waere es falsch, nur im
+  // Abgleich-Ausschnitt zu suchen -- sie haben gar keinen.
+  //
+  // Doppelte schaden nicht: Es wird ohnehin nach erfasst_am sortiert und der
+  // neueste genommen; derselbe Rapport aus zwei Quellen liefert denselben.
+  const treffer = rapporteAlleGeladen().filter(r =>
     Number(r.einsatz_id) === Number(z.einsatz_id) && Number(r.mitarbeiter_id) === Number(z.mitarbeiter_id));
   if (!treffer.length) return null;
   return treffer.slice().sort((a, b) => String(b.erfasst_am).localeCompare(String(a.erfasst_am)))[0];
@@ -28689,7 +28905,63 @@ function agPauseTitel(soll, vorgeschlagen, sparte) {
     : basis;
 }
 
+// ── Rapporte fuer den Abgleich (Lasttest 09.09.2026) ────────────────────
+//
+// Der Abgleich sucht zu jeder Zeile den Schicht-Rapport (ENT-082). Bis zum
+// Lasttest filterte er dafuer die vollstaendig geladene Rapportliste. Seit
+// die begrenzt ist, waere das der gefaehrlichste der fuenf Faelle gewesen:
+// Eine Zeile ohne gefundenen Rapport sieht aus wie "hat nicht rapportiert" --
+// und danach richtet sich, was der Planer eintraegt.
+//
+// Darum holt der Abgleich seinen eigenen Ausschnitt: genau den Zeitraum, den
+// er anzeigt. Einen Tag Rand auf jeder Seite, weil eine Nachtschicht ueber
+// Mitternacht laeuft und ihr Rapport dann auf dem Nachbartag liegen kann.
+let agRapporte = [];
+let agRapporteBereich = null;   // welcher Ausschnitt geladen ist ("von|bis")
+let agRapporteLaeuft = false;
+let agRapporteGekuerzt = false;
+
+// Drei Antworten, nicht zwei: 'bereit', 'laedt' und 'kein_zeitraum'. Wer
+// die Datumsfelder leert, wartet sonst auf etwas, das nie kommt -- und
+// "wird geladen" waere dann schlicht falsch.
+function agRapporteSicherstellen() {
+  const von = $('agVon').value, bis = $('agBis').value;
+  if (!von || !bis) { return 'kein_zeitraum'; }
+  const schluessel = von + '|' + bis;
+  if (agRapporteBereich === schluessel) { return 'bereit'; }
+  if (agRapporteLaeuft) { return 'laedt'; }
+  agRapporteLaeuft = true;
+  api(`rapport_list.php?von=${plusTage(von, -1)}&bis=${plusTage(bis, 1)}&grenze=5000`)
+    .then(({ ok, data }) => {
+      agRapporteLaeuft = false;
+      if (!ok || data.status !== 'ok') {
+        // Nicht geladen ist nicht dasselbe wie "keine Rapporte". Der Bereich
+        // bleibt ungesetzt, damit der naechste Anlauf es erneut versucht,
+        // und die Ansicht sagt es unten ausdruecklich.
+        agRapporte = []; agRapporteBereich = null; agRapporteGekuerzt = false;
+        toast('Die Rapporte zum Abgleich liessen sich nicht laden.');
+        return;
+      }
+      agRapporte = data.rapporte || [];
+      agRapporteGekuerzt = !!data.gekuerzt;
+      agRapporteBereich = schluessel;
+      renderAbgleich();
+    });
+  return 'laedt';
+}
+
 function renderAbgleich() {
+  // Ohne die Rapporte des Zeitraums wird NICHT gezeichnet: "keine Meldung
+  // vorhanden" ist eine Aussage, nach der der Planer handelt, und sie darf
+  // nicht bloss heissen "die Antwort ist noch unterwegs".
+  const stand = agRapporteSicherstellen();
+  if (stand !== 'bereit') {
+    $('agTable').innerHTML = stand === 'kein_zeitraum'
+      ? EMPTY('Kein Zeitraum gewählt', 'Oben „von“ und „bis“ setzen — der Abgleich zeigt immer einen Zeitraum, nie alles.')
+      : EMPTY('Wird geladen …', 'Schichten und gemeldete Rapporte des Zeitraums werden geholt.');
+    agSammelLeiste();
+    return;
+  }
   agZeilen = agGefiltert();
   // Auswahl auf das beschränken, was noch sichtbar ist -- sonst bestätigt ein
   // Sammelklick Zeilen, die niemand mehr vor Augen hat.
@@ -28698,9 +28970,15 @@ function renderAbgleich() {
 
   const alle = agZeilenBauen();
   const offen = alle.filter(z => (z.ist_status || 'offen') === 'offen').length;
-  $('agInfo').innerHTML = offen
+  // Sind mehr Rapporte im Zeitraum, als der Server auf einmal liefert, kann
+  // die Spalte "gemeldet" unvollstaendig sein. Das gehoert hingeschrieben --
+  // eine fehlende Meldung sieht sonst aus wie keine.
+  const agHinweis = agRapporteGekuerzt
+    ? ' <b style="color:var(--warn,#b45309)">Achtung:</b> Für diesen Zeitraum gibt es mehr Rapporte, als auf einmal geladen werden — bitte den Zeitraum verkleinern.'
+    : '';
+  $('agInfo').innerHTML = (offen
     ? `<b>${nf(offen)}</b> ${offen === 1 ? 'Zeile wartet' : 'Zeilen warten'} auf den Abgleich. Angezeigt: <b>${nf(agZeilen.length)}</b>.`
-    : `Nichts offen — alles Vergangene ist abgeglichen. Angezeigt: <b>${nf(agZeilen.length)}</b>.`;
+    : `Nichts offen — alles Vergangene ist abgeglichen. Angezeigt: <b>${nf(agZeilen.length)}</b>.`) + agHinweis;
   $('pgCrumb').textContent = `${nf(agZeilen.length)} ${agZeilen.length === 1 ? 'Zeile' : 'Zeilen'} · ${nf(offen)} offen`;
 
   if (!agZeilen.length) {
@@ -30876,11 +31154,18 @@ function kdBerichtBlatt(r) {
     </div>`;
 }
 
+// Erst den vollstaendigen Rapport holen, dann drucken: Auf dem Blatt steht
+// die Unterschrift, und die kommt seit dem Lasttest (09.09.2026) nicht mehr
+// mit der Liste. Ein Blatt ohne Unterschrift zu drucken, weil sie noch nicht
+// da war, waere ein falscher Beleg -- darum wartet der Druck darauf.
 function printReport() {
-  const r = rapporte.find(x => Number(x.id) === drawerId);
-  if (!r) return;
-  $('printArea').innerHTML = kdBerichtBlatt(r);
-  window.print();
+  const id = drawerId;
+  if (!rapportAusListen(id)) return;
+  rapportVoll(id).then(r => {
+    if (!r) { toast('Der Rapport liess sich nicht laden.'); return; }
+    $('printArea').innerHTML = kdBerichtBlatt(r);
+    window.print();
+  });
 }
 
 function kdRapportDateiname(r) {
@@ -30911,8 +31196,7 @@ function kdRapportPdfBauen(r) {
 // "Als PDF sichern" waehlen, aber das ist auf dem Handy ein Umweg ueber
 // mehrere Dialoge); diese beiden Knoepfe erzeugen die Datei direkt.
 function kdRapportHerunterladen(id, knopf) {
-  const r = rapporte.find(x => Number(x.id) === Number(id));
-  if (!r) { return; }
+  if (!rapportAusListen(id)) { return; }
   // Reine Icon-Knoepfe (kein Text -- die feste Drawer-Breite von 420 px
   // liesse fuer vier Fusszeilen-Knoepfe sonst keinen Platz, gemessen bei
   // ENT-399), darum genuegt "disabled" waehrend der Erzeugung als Rueck-
@@ -30922,7 +31206,12 @@ function kdRapportHerunterladen(id, knopf) {
   // haengen, die auf dem Handy gar nicht offen ist.
   const btn = knopf || $('drDlBtn');
   if (btn) { btn.disabled = true; }
-  kdRapportPdfBauen(r).then(blob => {
+  // Der vollstaendige Rapport (mit Unterschrift) kommt einzeln nach -- siehe
+  // rapportVoll(). Ohne ihn stuende auf dem PDF keine Unterschrift.
+  rapportVoll(id).then(r => {
+    if (!r) { return Promise.reject(new Error('nicht ladbar')); }
+    return kdRapportPdfBauen(r).then(blob => ({ blob, r }));
+  }).then(({ blob, r }) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = kdRapportDateiname(r);
@@ -30936,11 +31225,14 @@ function kdRapportHerunterladen(id, knopf) {
 }
 
 function kdRapportTeilen(id, knopf) {
-  const r = rapporte.find(x => Number(x.id) === Number(id));
-  if (!r) { return; }
+  if (!rapportAusListen(id)) { return; }
   const btn = knopf || $('drTeilenBtn');
   if (btn) { btn.disabled = true; }
-  kdRapportPdfBauen(r).then(blob => {
+  // Wie beim Herunterladen: erst den vollstaendigen Rapport, dann das PDF.
+  rapportVoll(id).then(r => {
+    if (!r) { return Promise.reject(new Error('nicht ladbar')); }
+    return kdRapportPdfBauen(r).then(blob => ({ blob, r }));
+  }).then(({ blob, r }) => {
     const datei = new File([blob], kdRapportDateiname(r), { type: 'application/pdf' });
     if (navigator.canShare && navigator.canShare({ files: [datei] })) {
       return navigator.share({ files: [datei], title: 'Rapport Nr. ' + r.id });

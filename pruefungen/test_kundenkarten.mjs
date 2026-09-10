@@ -28,23 +28,25 @@ const T = n => `2026-03-${String(n).padStart(2, '0')}`;
 
 // Zwei Rapporte gehoeren zum selben Einsatz (501) -- das ist der Fall, den
 // die Tabelle mit einer Klammer zeigt und die Karte mit einem Hinweis.
-const RAP = { status: 'ok', rapporte: [
+// Aufbau von rapport_list.php seit dem Lasttest (09.09.2026): ohne das
+// Unterschriftsbild, dafuer mit hat_unterschrift, gesamt und gekuerzt.
+const RAP = { status: 'ok', gesamt: 4, grenze: 2000, gekuerzt: false, rapporte: [
   { id: 284, einsatz_id: 501, datum: T(26), mitarbeiter: 'dario.beispiel', kunde: 'Beispiel Consulting GmbH',
     strasse: 'Mustergasse 2', ort: '4600 Olten', auftrag_nr: 'A-118', einsatzart: 'Verkehrsdienst',
     von: '07:00:00', bis: '16:00:00', pause_min: 30, netto_h: '8.50', unterzeichner: 'R. Muster',
-    unterschrift: null, bemerkung: 'Baustellenverkehr geregelt.', erfasst_am: T(26) + ' 16:12:00' },
+    hat_unterschrift: false, bemerkung: 'Baustellenverkehr geregelt.', erfasst_am: T(26) + ' 16:12:00' },
   { id: 283, einsatz_id: 501, datum: T(26), mitarbeiter: 'anna.beispiel', kunde: 'Beispiel Consulting GmbH',
     strasse: 'Mustergasse 2', ort: '4600 Olten', auftrag_nr: 'A-118', einsatzart: 'Verkehrsdienst',
     von: '07:00:00', bis: '16:00:00', pause_min: 30, netto_h: '8.50', unterzeichner: null,
-    unterschrift: null, bemerkung: null, erfasst_am: T(26) + ' 16:20:00' },
+    hat_unterschrift: false, bemerkung: null, erfasst_am: T(26) + ' 16:20:00' },
   { id: 282, einsatz_id: 502, datum: T(25), mitarbeiter: 'anna.beispiel', kunde: 'Muster AG',
     strasse: 'Beispielweg 7', ort: '4632 Trimbach', auftrag_nr: null, einsatzart: 'Revierdienst',
     von: '22:00:00', bis: '04:00:00', pause_min: 0, netto_h: '6.00', unterzeichner: null,
-    unterschrift: null, bemerkung: null, erfasst_am: T(25) + ' 04:20:00' },
+    hat_unterschrift: false, bemerkung: null, erfasst_am: T(25) + ' 04:20:00' },
   { id: 281, einsatz_id: 503, datum: T(23), mitarbeiter: 'anna.beispiel', kunde: 'Muster AG',
     strasse: 'Beispielstrasse 23', ort: '4632 Trimbach', auftrag_nr: 'A-117', einsatzart: 'Verkehrsdienst',
     von: '08:00:00', bis: '15:45:00', pause_min: 30, netto_h: '7.25', unterzeichner: 'M. Frei',
-    unterschrift: null, bemerkung: null, erfasst_am: T(23) + ' 16:02:00' },
+    hat_unterschrift: false, bemerkung: null, erfasst_am: T(23) + ' 16:02:00' },
 ]};
 
 const BEL = { status: 'ok', belege: [
@@ -74,6 +76,14 @@ const mock = page => page.route('**/api/**', r => {
       'masterschichten_lesen', 'masterschichten_schreiben',
       'verfuegbarkeit_lesen'] });
   if (u.includes('rapport_list')) return send(RAP);
+  // Der Einzelabruf, aus dem Schublade, Druck und PDF das Unterschriftsbild
+  // holen -- aus der Liste kommt es seit dem Lasttest nicht mehr mit.
+  if (u.includes('rapport_lesen')) {
+    const id = Number((u.split('id=')[1] || '').split('&')[0]);
+    const r = RAP.rapporte.find(x => Number(x.id) === id);
+    if (!r) { return send({ status: 'error', message: 'nicht gefunden' }); }
+    return send({ status: 'ok', rapport: { ...r, unterschrift: null } });
+  }
   if (u.includes('beleg_list')) return send(BEL);
   // Das PDF darf NICHT aus der Liste gebaut werden: belege[] traegt nur die
   // Kopfdaten, beleg_lesen.php rechnet Positionen und Summen frisch. Der

@@ -88,7 +88,9 @@ log_schritt('  aktive Mitarbeitende: ' . count($maIds));
 // ── Sitzungen fuer alle aktiven Mitarbeitenden (fuer den Lasttest) ────
 $pdo->beginTransaction();
 $zeilen = [];
-foreach ($maIds as $id) { $zeilen[] = ['tok-ma-' . $id, (int)$id]; }
+// Seit ENT-501 steht in sessions.token nur der Abdruck, nie der Rohwert --
+// der Lastgenerator schickt den Rohwert im Kopf, gesucht wird der Abdruck.
+foreach ($maIds as $id) { $zeilen[] = [hash('sha256', 'tok-ma-' . $id), (int)$id]; }
 einfuegen($pdo, 'INSERT INTO sessions (token,mitarbeiter_id)', $zeilen, 2);
 $pdo->commit();
 
@@ -140,7 +142,7 @@ $pdo->commit();
 $zgIds = $pdo->query('SELECT id FROM kundenzugang')->fetchAll(PDO::FETCH_COLUMN);
 $pdo->beginTransaction();
 $zeilen = [];
-foreach ($zgIds as $z) { $zeilen[] = ['tok-portal-' . $z, (int)$z, date('Y-m-d H:i:s'), date('Y-m-d H:i:s')]; }
+foreach ($zgIds as $z) { $zeilen[] = [hash('sha256', 'tok-portal-' . $z), (int)$z, date('Y-m-d H:i:s'), date('Y-m-d H:i:s')]; }
 einfuegen($pdo, 'INSERT INTO kunden_sessions (token,zugang_id,erstellt_am,letzte_nutzung)', $zeilen, 4);
 $pdo->commit();
 

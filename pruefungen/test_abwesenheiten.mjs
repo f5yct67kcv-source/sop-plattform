@@ -88,8 +88,16 @@ check('KRITISCH: Kategorie C bekommt ausdruecklich keinen Saldo angezeigt (Lohnz
 
 check('KRITISCH: "abwesenheit" ist NICHT ueber ereignis_erledigt.php abhakbar (dessen Recht ist nur "plan")',
   !/'abwesenheit'\s*=>\s*\[/.test(EREIGNISSE.split('function ereignisse_sammeln')[0]));
-check('KRITISCH: ein offener Abwesenheitsantrag erscheint trotzdem im Ereignis-Feed',
-  /status = 'beantragt' AND a\.gesehen_am IS NULL/.test(EREIGNISSE));
+// Dass ein offener Antrag im Feed erscheint und ein entschiedener oder
+// abgehakter nicht, wird seit dem 10.09.2026 in pruef_ereignisse.php
+// AUSGEFUEHRT statt hier im Quelltext gesucht: Die frühere Fassung suchte
+// die Zeichenfolge "status = 'beantragt' AND a.gesehen_am IS NULL" und wurde
+// rot, als die Bedingung beim Umbau der Feed-Abfragen (Lasttest) ihr
+// Tabellenkuerzel verlor -- richtig geblieben, aber anders geschrieben.
+// Hier bleibt nur die Frage, die sich am Wortlaut sinnvoll stellen laesst:
+// dass beide Bedingungen ueberhaupt vorkommen.
+check('Die Abwesenheits-Abfrage im Feed nennt beide Bedingungen (Verhalten: pruef_ereignisse.php)',
+  /status = 'beantragt'/.test(EREIGNISSE) && /gesehen_am IS NULL/.test(EREIGNISSE));
 
 check('KRITISCH: die Kuerzungsregel ist im Rechenkern ausdruecklich als ANNAHME gekennzeichnet',
   /ANNAHME[\s\S]{0,200}GAV-AUS-012/.test(FERIEN));

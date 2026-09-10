@@ -49,9 +49,17 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $rundgaenge = $stmt->fetchAll();
 
+// Fortschritt fuer alle Runden auf einmal (Lasttest 09.09.2026): drei
+// Abfragen statt zwei je Zeile. Gemessen 371 Abfragen fuer einen Tag und
+// 2 451 fuer einen Monat -- jetzt sind es drei, unabhaengig vom Zeitraum.
+$fortschritte = rundgang_fortschritt_viele($pdo, array_map(fn($r) => [
+    'id'         => (int)$r['id'],
+    'objekt_id'  => (int)$r['objekt_id'],
+    'vorlage_id' => $r['rundgang_vorlage_id'] !== null ? (int)$r['rundgang_vorlage_id'] : null,
+], $rundgaenge));
+
 foreach ($rundgaenge as &$r) {
-    $vorlageId = $r['rundgang_vorlage_id'] !== null ? (int)$r['rundgang_vorlage_id'] : null;
-    $r['fortschritt'] = rundgang_fortschritt($pdo, (int)$r['id'], (int)$r['objekt_id'], $vorlageId);
+    $r['fortschritt'] = $fortschritte[(int)$r['id']];
     // Die Dauer wird HIER gerechnet und nicht in der Oberflaeche: Die App
     // rechnet sie seit ENT-321 nach derselben Dreier-Regel, und zwei
     // Rechnungen an zwei Orten laufen frueher oder spaeter auseinander.

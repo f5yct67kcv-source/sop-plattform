@@ -183,6 +183,44 @@ pruef('KRITISCH: ohne Vorlage (null) bleibt das alte Verhalten -- alle drei Punk
     count(rundgang_kontrollpunkte_uebrig($pdo, 300, 1)) === 2 // Eingang schon bestaetigt, 2 von 3 offen
     && rundgang_fortschritt($pdo, 300, 1)['gesamt'] === 3);
 
+// ══════════════ GEBUENDELT MUSS DASSELBE HERAUSKOMMEN (Lasttest 09.09.2026)
+//
+// rundgang_liste.php und portal_rundgaenge.php holen den Fortschritt seit
+// dem Lasttest fuer ALLE Runden mit drei Abfragen statt mit zwei je Zeile
+// (vorher 2 451 Abfragen fuer einen Monat). Eine Beschleunigung ist nur dann
+// eine, wenn dabei dasselbe herauskommt -- und "dasselbe" heisst hier nicht
+// "sieht aehnlich aus", sondern Zeichen fuer Zeichen dieselbe Struktur.
+//
+// Verglichen wird darum gegen die Einzelfassung selbst, nicht gegen
+// abgeschriebene Erwartungswerte: Aendert sich die Rechnung irgendwann, muss
+// sie sich an BEIDEN Stellen aendern, sonst wird das hier rot.
+//
+// Die Auswahl deckt die drei Faelle ab, in denen sich die beiden Wege
+// unterscheiden koennten: mit Vorlage, ohne Vorlage, und eine Runde ganz
+// ohne Scans (200).
+$gemischt = [
+    ['id' => 100, 'objekt_id' => 1, 'vorlage_id' => null],
+    ['id' => 200, 'objekt_id' => 1, 'vorlage_id' => null],
+    ['id' => 300, 'objekt_id' => 1, 'vorlage_id' => $kurzrundeId],
+];
+$gebuendelt = rundgang_fortschritt_viele($pdo, $gemischt);
+$einzeln = [];
+foreach ($gemischt as $g) {
+    $einzeln[$g['id']] = rundgang_fortschritt($pdo, $g['id'], $g['objekt_id'], $g['vorlage_id']);
+}
+pruef('KRITISCH: gebuendelt liefert genau dasselbe wie einzeln -- mit Vorlage, ohne Vorlage, ohne Scans',
+    $gebuendelt === $einzeln);
+pruef('Und die Vorlagen-Runde behaelt dabei ihren eigenen Nenner (2, nicht 3)',
+    ($gebuendelt[300]['gesamt'] ?? null) === 2 && ($gebuendelt[100]['gesamt'] ?? null) === 3);
+pruef('Dieselbe Runde ohne Vorlage gerechnet zaehlt wieder alle drei Punkte',
+    rundgang_fortschritt_viele($pdo, [['id' => 300, 'objekt_id' => 1, 'vorlage_id' => null]])[300]
+        === rundgang_fortschritt($pdo, 300, 1));
+// Eine leere Liste darf keine Abfrage mit "IN ()" bauen -- das ist in SQL
+// ein Syntaxfehler, und die Liste ist leer, sobald ein Zeitraum keine Runde
+// enthaelt. Das ist der Normalfall, nicht der Sonderfall.
+pruef('KRITISCH: eine leere Liste liefert leer, statt an einem "IN ()" zu scheitern',
+    rundgang_fortschritt_viele($pdo, []) === []);
+
 // ══════════════ ERSATZSCAN -- FOTOBELEG STATT TECHNISCHER PRUEFUNG (Q-22)
 pruef('KRITISCH: ein JPEG wird an den Magic Bytes erkannt',
     ersatzscan_foto_mime("\xFF\xD8\xFF\xE0Rest eines Fotos") === 'image/jpeg');

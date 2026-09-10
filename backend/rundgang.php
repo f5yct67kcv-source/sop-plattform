@@ -422,15 +422,27 @@ function rundgang_fortschritt(PDO $pdo, int $rundgangId, int $objektId, ?int $vo
 
     $s = $pdo->prepare('SELECT status, COUNT(*) AS n FROM rundgang_scan WHERE rundgang_id = ? GROUP BY status');
     $s->execute([$rundgangId]);
-    $bestaetigt = 0; $nichtVerfuegbar = 0; $ersatzscan = 0;
+    $zaehler = [];
     foreach ($s->fetchAll(PDO::FETCH_ASSOC) as $z) {
-        if ($z['status'] === 'bestaetigt') { $bestaetigt = (int)$z['n']; }
-        if ($z['status'] === 'nicht_verfuegbar') { $nichtVerfuegbar = (int)$z['n']; }
-        // Ersatzscan (Q-22): zaehlt separat, nicht einfach zu "bestaetigt"
-        // dazu -- sonst waere ein Foto-Beleg von einem echten NFC-/Geofence-
-        // Scan nicht mehr unterscheidbar (Einheiten nie vermischen).
-        if ($z['status'] === 'ersatzscan') { $ersatzscan = (int)$z['n']; }
+        $zaehler[(string)$z['status']] = (int)$z['n'];
     }
+    return rundgang_fortschritt_werte($gesamt, $zaehler);
+}
+
+/* Aus "wie viele Punkte gibt es" und "wie viele Scans welcher Art" die
+   Fortschrittszahlen bauen. Eigene, reine Funktion, damit die Einzel- und
+   die Sammelfassung darunter NICHT zwei Rechnungen sind: Zwei Stellen, die
+   dasselbe ausrechnen, laufen frueher oder spaeter auseinander -- und dann
+   zeigt die Liste einen anderen Fortschritt als die Einzelansicht derselben
+   Runde, ohne dass jemand sagen kann warum. */
+function rundgang_fortschritt_werte(int $gesamt, array $zaehler): array
+{
+    $bestaetigt      = (int)($zaehler['bestaetigt'] ?? 0);
+    $nichtVerfuegbar = (int)($zaehler['nicht_verfuegbar'] ?? 0);
+    // Ersatzscan (Q-22): zaehlt separat, nicht einfach zu "bestaetigt"
+    // dazu -- sonst waere ein Foto-Beleg von einem echten NFC-/Geofence-
+    // Scan nicht mehr unterscheidbar (Einheiten nie vermischen).
+    $ersatzscan      = (int)($zaehler['ersatzscan'] ?? 0);
     /* 'erledigt' fasst zusammen, was als KONTROLLIERT gilt (ENT-329):
        bestaetigt + ersatzscan. Ein Ersatzscan ist ein Fotobeleg statt einer
        technischen Prüfung -- der Punkt wurde aufgesucht, nur liess er sich
@@ -447,6 +459,98 @@ function rundgang_fortschritt(PDO $pdo, int $rundgangId, int $objektId, ?int $vo
        statt ihn unter 'bestätigt' verschwinden zu lassen. */
     return ['gesamt' => $gesamt, 'bestaetigt' => $bestaetigt, 'nicht_verfuegbar' => $nichtVerfuegbar,
             'ersatzscan' => $ersatzscan, 'erledigt' => $bestaetigt + $ersatzscan];
+}
+
+/* Derselbe Fortschritt fuer VIELE Runden auf einmal (Lasttest 09.09.2026).
+
+   Anlass: rundgang_liste.php rief rundgang_fortschritt() in einer Schleife
+   ueber alle gefundenen Runden auf -- zwei Abfragen je Zeile. Gemessen 371
+   Abfragen fuer einen einzigen Tag und 2 451 fuer einen Monat; auf ein Jahr
+   hochgerechnet waeren es rund 150 000 fuer EINEN Seitenaufruf.
+
+   Hier sind es drei Abfragen, egal wie viele Runden es sind: die Scans, die
+   Punktzahl je Vorlage und die Punktzahl je Objekt. Gerechnet wird danach
+   mit derselben Funktion wie oben.
+
+   $runden: Liste von ['id' => int, 'objekt_id' => int, 'vorlage_id' => ?int].
+   Zurueck kommt eine Zuordnung rundgang_id => Fortschritt. */
+function rundgang_fortschritt_viele(PDO $pdo, array $runden): array
+{
+    if (!$runden) { return []; }
+
+    $ids       = [];
+    $vorlagen  = [];   // [vorlage_id, objekt_id] -- die Paare, die vorkommen
+    $objekte   = [];   // Objekte OHNE Vorlage
+    foreach ($runden as $r) {
+        $ids[] = (int)$r['id'];
+        if ($r['vorlage_id'] !== null) {
+            $vorlagen[(int)$r['vorlage_id']] = true;
+        } else {
+            $objekte[(int)$r['objekt_id']] = true;
+        }
+    }
+
+    // ── 1. Scans je Runde und Art
+    $marken = implode(',', array_fill(0, count($ids), '?'));
+    $s = $pdo->prepare(
+        "SELECT rundgang_id, status, COUNT(*) AS n
+           FROM rundgang_scan WHERE rundgang_id IN ($marken)
+          GROUP BY rundgang_id, status"
+    );
+    $s->execute($ids);
+    $scans = [];
+    foreach ($s->fetchAll(PDO::FETCH_ASSOC) as $z) {
+        $scans[(int)$z['rundgang_id']][(string)$z['status']] = (int)$z['n'];
+    }
+
+    // ── 2. Punktzahl je Vorlage. Nach Vorlage UND Objekt gruppiert, weil die
+    // Einzelfassung oben beides verlangt (k.objekt_id = ?) -- ein Punkt einer
+    // fremden Vorlage zaehlt dort nicht mit, und das soll hier genauso sein.
+    $proVorlage = [];
+    if ($vorlagen) {
+        $vids = array_keys($vorlagen);
+        $m = implode(',', array_fill(0, count($vids), '?'));
+        $v = $pdo->prepare(
+            "SELECT p.vorlage_id, k.objekt_id, COUNT(*) AS n
+               FROM kontrollpunkt k
+               JOIN rundgang_vorlage_punkt p ON p.kontrollpunkt_id = k.id
+              WHERE p.vorlage_id IN ($m) AND k.aktiv = 1
+              GROUP BY p.vorlage_id, k.objekt_id"
+        );
+        $v->execute($vids);
+        foreach ($v->fetchAll(PDO::FETCH_ASSOC) as $z) {
+            $proVorlage[(int)$z['vorlage_id'] . ':' . (int)$z['objekt_id']] = (int)$z['n'];
+        }
+    }
+
+    // ── 3. Punktzahl je Objekt, fuer Runden ohne Vorlage
+    $proObjekt = [];
+    if ($objekte) {
+        $oids = array_keys($objekte);
+        $m = implode(',', array_fill(0, count($oids), '?'));
+        $o = $pdo->prepare(
+            "SELECT objekt_id, COUNT(*) AS n FROM kontrollpunkt
+              WHERE objekt_id IN ($m) AND aktiv = 1 GROUP BY objekt_id"
+        );
+        $o->execute($oids);
+        foreach ($o->fetchAll(PDO::FETCH_ASSOC) as $z) {
+            $proObjekt[(int)$z['objekt_id']] = (int)$z['n'];
+        }
+    }
+
+    $aus = [];
+    foreach ($runden as $r) {
+        $id   = (int)$r['id'];
+        $obj  = (int)$r['objekt_id'];
+        $vid  = $r['vorlage_id'] !== null ? (int)$r['vorlage_id'] : null;
+        // Kein Eintrag heisst null Punkte -- genau das liefert COUNT(*) in
+        // der Einzelfassung, wenn nichts passt.
+        $gesamt = $vid !== null
+            ? ($proVorlage[$vid . ':' . $obj] ?? 0)
+            : ($proObjekt[$obj] ?? 0);
+        $aus[$id] = rundgang_fortschritt_werte($gesamt, $scans[$id] ?? []);
+    }
+    return $aus;
 }
 
 // Erkennt JPEG/PNG anhand der Magic Bytes, nicht anhand einer vom Client

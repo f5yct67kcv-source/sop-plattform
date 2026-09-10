@@ -40,10 +40,26 @@ $rows = $pdo->query(
 // Vorbehalt wie in OP-31.
 if ($vollerZugriff) {
     $kinder = kunden_kinder_laden($pdo);
+    // Wie viele Rapporte auf diesen Kunden lauten (Lasttest 09.09.2026).
+    // Diese Zahl hat die Kundenliste bis dahin selbst gebildet, indem sie
+    // SAEMTLICHE Rapporte in den Browser geladen und dort gezaehlt hat.
+    // Seit rapport_list.php begrenzt liefert, waere daraus eine Zahl
+    // geworden, die stillschweigend zu klein ist -- und eine zu kleine Zahl
+    // sieht aus wie eine richtige. Gezaehlt wird darum hier, wo alle Zeilen
+    // stehen.
+    //
+    // Ueber den NAMEN, weil rapporte.kunde ein Textfeld ohne echten Verweis
+    // ist -- dieselbe Verknuepfung mit demselben Vorbehalt wie bisher
+    // (ENT-040), nur an der richtigen Stelle.
+    $zaehler = [];
+    foreach ($pdo->query('SELECT kunde, COUNT(*) AS n FROM rapporte GROUP BY kunde')->fetchAll() as $z) {
+        $zaehler[(string)$z['kunde']] = (int)$z['n'];
+    }
     foreach ($rows as &$k) {
         $eigen = $kinder[(int)$k['id']] ?? [];
         $k['kontaktwege'] = $eigen['kontaktwege'] ?? [];
         $k['personen'] = $eigen['personen'] ?? [];
+        $k['rapporte_anzahl'] = $zaehler[(string)$k['name']] ?? 0;
     }
     unset($k);
 } else {

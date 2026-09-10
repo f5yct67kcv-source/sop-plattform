@@ -657,6 +657,12 @@ const NUR_EIGENE_DATEN = [
   'meine_gesehen.php',         // eigene Schicht als angesehen vermerken
   'rapport_create.php',        // eigenen Rapport erfassen
   'rapport_list.php',          // eigene Rapporte -- mehr nur mit Recht "abgleich"
+  // Ein einzelner Rapport samt Unterschriftsbild (Lasttest 09.09.2026).
+  // Dieselbe Grenze wie in der Liste, nur fuer eine Zeile: ohne das Recht
+  // "abgleich" traegt die Abfrage ein zusaetzliches
+  // "AND r.mitarbeiter_id = <eigene>", und ein fremder Rapport ist von einem
+  // nicht vorhandenen nicht zu unterscheiden.
+  'rapport_lesen.php',
   'kunden_list.php',           // Kundenliste fuer die App; Zusatzangaben nur mit Recht
   'layout_get.php',            // eigene Fensteranordnung
   'layout_save.php',

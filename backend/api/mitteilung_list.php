@@ -15,6 +15,15 @@ require_once __DIR__ . '/../push.php';
 $user = require_session();
 require_recht($user, 'mitteilungen_lesen');
 
+// ── Obergrenze (Lasttest 09.09.2026) ──────────────────────────────────
+// Diese Liste holt ausdruecklich ALLES, auch Abgelaufenes und Archiviertes.
+// Das ist richtig so -- aber ohne Obergrenze waechst sie mit jedem Jahr, und
+// zwar mit vier Unterabfragen je Zeile. Dieselbe Bauart hat die Rapportliste
+// im Lasttest mit HTTP 500 sterben lassen. Die Zahlen 'gesamt' und
+// 'gekuerzt' daneben sind der wichtigere Teil: Eine gekuerzte Liste darf nie
+// wie eine vollstaendige aussehen.
+const MITTEILUNG_GRENZE = 2000;
+
 $pdo = db();
 if (!hat_tabelle($pdo, 'mitteilungen')) {
     // Nicht eingerichtet ist etwas anderes als "keine Mitteilungen" --
@@ -108,9 +117,11 @@ $st = $pdo->query(
             (SELECT COUNT(*) FROM mitteilung_gelesen g WHERE g.mitteilung_id = m.id AND g.antwort = \'abgesagt\') AS abgesagt_anzahl,
             m.push_gesendet_am, m.push_bilanz
        FROM mitteilungen m
-      ORDER BY m.erstellt_am DESC, m.id DESC'
+      ORDER BY m.erstellt_am DESC, m.id DESC
+      LIMIT ' . MITTEILUNG_GRENZE
 );
 $liste = $st->fetchAll();
+$gesamt = (int)$pdo->query('SELECT COUNT(*) FROM mitteilungen')->fetchColumn();
 
 // Der Nenner zu "12 von 18". Zwei Werte, einer je Zielgruppe -- einmal
 // gezaehlt statt einmal je Zeile.
@@ -165,6 +176,9 @@ foreach ($liste as &$m) {
 unset($m);
 
 json_response(['status' => 'ok', 'eingerichtet' => true, 'mitteilungen' => $liste, 'jetzt' => $jetzt,
+    'gesamt' => $gesamt,
+    'grenze' => MITTEILUNG_GRENZE,
+    'gekuerzt' => $gesamt > count($liste),
     // Damit die Verwaltungsseite den Unterschied zwischen "niemand hat
     // Benachrichtigungen eingeschaltet" und "Push ist gar nicht
     // eingerichtet" zeigen kann (ENT-424).

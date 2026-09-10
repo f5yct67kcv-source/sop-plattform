@@ -60,6 +60,22 @@ function hat_fremdschluessel(PDO $pdo, string $tabelle, string $spalte): bool {
     return (bool)$s->fetchColumn();
 }
 
+// Gibt es diesen Index? Gefragt wird nach dem NAMEN, nicht nach der Spalte:
+// Auf derselben Spalte koennen mehrere Indizes liegen, und ein
+// zusammengesetzter Index, der die Spalte an zweiter Stelle fuehrt, taugt
+// fuer eine Bedingung ueber diese Spalte allein nicht (genau daran ist die
+// Bewegungsspur haengengeblieben -- siehe idx_erfasst unten). Nach dem
+// Namen zu fragen ist darum die einzige Frage, die die richtige Antwort
+// gibt.
+function hat_index(PDO $pdo, string $tabelle, string $name): bool {
+    $s = $pdo->prepare(
+        'SELECT 1 FROM information_schema.STATISTICS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?'
+    );
+    $s->execute([$tabelle, $name]);
+    return (bool)$s->fetchColumn();
+}
+
 $getan = [];
 $schon = [];
 // Was nicht durchging. Bis hierher riss der erste fehlgeschlagene Schritt den
@@ -849,6 +865,13 @@ CREATE TABLE IF NOT EXISTS kunden_kontaktweg (
   erfasst_am DATETIME NOT NULL,
   uebermittelt_am DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   KEY idx_rundgang (rundgang_id, erfasst_am),
+  -- Fuer das Abraeumen der abgelaufenen Spur, NICHT fuer eine Anzeige
+  -- (Lasttest 09.09.2026). idx_rundgang traegt es nicht: Die
+  -- Aufraeumbedingung nennt nur erfasst_am, und ein zusammengesetzter
+  -- Index laesst sich nicht ab der zweiten Spalte benutzen.
+  -- Ohne diesen Index liest jede einzelne Positionsuebermittlung die ganze
+  -- Tabelle -- gemessen 610-690 ms bei 1,47 Mio. Zeilen, 2,55 s bei 6 Mio.
+  KEY idx_erfasst (erfasst_am),
   FOREIGN KEY (rundgang_id) REFERENCES rundgang(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
@@ -2911,6 +2934,87 @@ foreach ($verweise as [$tabelle, $spalte, $sql]) {
     // arbeitet auch ohne ihn. Scheitert er -- etwa weil eine Tabelle noch
     // MyISAM ist --, darf das den Rest nicht aufhalten.
     schritt($pdo, $sql, "Verweis $tabelle.$spalte", $getan, $fehler);
+}
+
+// ── 3a. Indizes nachtragen (Lasttest 09.09.2026) ───────────────────────
+//
+// Ein Index in einem CREATE TABLE weiter oben hilft nur einer NEUEN
+// Datenbank. Die bestehende hat die Tabelle laengst -- sie bekommt ihn nur
+// hier. Genau derselbe Gedanke wie bei den Spalten unter Punkt 2.
+//
+// Warum das hier steht und nicht als Handgriff in phpMyAdmin: Der Lasttest
+// hat gezeigt, dass EIN fehlender Index die Nachtspitze eines Betriebs mit
+// 50 Kunden bereits nicht mehr traegt (p95 von 190 ms auf 10,5 s). Ein
+// Schritt, den jemand von Hand machen muss, wird irgendwann nicht gemacht.
+//
+// Die Liste ist [Tabelle, Indexname, SQL]. Gefragt wird nach dem NAMEN --
+// siehe hat_index() oben.
+//
+// Zur Laufzeit: ADD KEY laeuft bei InnoDB ohne Kopie der Tabelle und ohne
+// Schreibsperre. Gemessen 0,8 s auf 1,47 Mio. Zeilen. Die Einrichtung
+// laeuft trotzdem nicht im Alltag, sondern wenn jemand sie ausloest.
+$indizes = [
+    // ── Der Befund, der den Lasttest ausgeloest hat ────────────────────
+    // mein_rundgang_position.php raeumt bei JEDEM uebermittelten Punkt
+    // abgelaufene Spur ab (DELETE ... WHERE erfasst_am < ... LIMIT 500).
+    // idx_rundgang (rundgang_id, erfasst_am) traegt das nicht: Die
+    // Bedingung nennt rundgang_id gar nicht, und ein zusammengesetzter
+    // Index ist ab der zweiten Spalte nicht benutzbar. Ohne diesen Index
+    // liest jede Uebermittlung die ganze Tabelle.
+    ['rundgang_position', 'idx_erfasst', 'ALTER TABLE rundgang_position ADD KEY idx_erfasst (erfasst_am)'],
+
+    // ── Ereignis-Feed (backend/ereignisse.php) ─────────────────────────
+    // Alle sieben Arten fragen nach demselben Muster: "was ist noch nicht
+    // gesehen worden", sortiert nach Zeit, LIMIT 20. Ohne Index liest jede
+    // davon ihre ganze Tabelle und sortiert sie, um 20 Zeilen zu liefern --
+    // gemessen 156 156 gelesene Zeilen fuer 20 zurueckgegebene.
+    // Reihenfolge der Spalten: erst die Bedingung (IS NULL, Gleichheit),
+    // dann die Sortierspalte. Nur so laesst sich der Index auch fuer das
+    // ORDER BY benutzen und nicht bloss fuer das Filtern.
+    ['rapporte',          'idx_gesehen', 'ALTER TABLE rapporte ADD KEY idx_gesehen (gesehen_am, erfasst_am)'],
+    ['verfuegbarkeiten',  'idx_gesehen', 'ALTER TABLE verfuegbarkeiten ADD KEY idx_gesehen (gesehen_am, erfasst_am)'],
+    ['einsatz_zuteilung', 'idx_zusage_gesehen', 'ALTER TABLE einsatz_zuteilung ADD KEY idx_zusage_gesehen (zusage_gesehen_am, zugeteilt_am)'],
+    ['belege',            'idx_entscheidung_gesehen', 'ALTER TABLE belege ADD KEY idx_entscheidung_gesehen (entscheidung_gesehen_am, entscheidung_am)'],
+    // Drei Spalten, weil hier neben "nicht gesehen" auch der Status eine
+    // Gleichheit ist -- die Sortierspalte gehoert dahinter, nicht davor.
+    ['abwesenheiten',     'idx_gesehen', 'ALTER TABLE abwesenheiten ADD KEY idx_gesehen (gesehen_am, status, beantragt_am)'],
+    ['rundgang',          'idx_gesehen', 'ALTER TABLE rundgang ADD KEY idx_gesehen (gesehen_am, vorbereitet_am)'],
+    ['ereignis_meldung',  'idx_gesehen', 'ALTER TABLE ereignis_meldung ADD KEY idx_gesehen (gesehen_am, erfasst_am)'],
+    // Der spontane Rundgang ist der Sonderfall im Feed: Seine Bedingung
+    // steht am EINSATZ. Die Abfrage geht darum von den wenigen spontanen
+    // Einsaetzen aus statt von den vielen Runden -- dieser Index ist, was
+    // "die wenigen" ueberhaupt erst schnell findet.
+    ['einsaetze',         'idx_spontan', 'ALTER TABLE einsaetze ADD KEY idx_spontan (spontan_erzeugt)'],
+
+    // ── Kennzahlen (backend/api/dashboard_stats.php) ───────────────────
+    // Monatszahlen, Wochenverlauf und "die letzten acht Rapporte" laufen
+    // alle ueber das Datum. Ein Index (datum, id) traegt beides: den
+    // Bereich (datum >= ...) und die Sortierung (datum DESC, id DESC).
+    ['rapporte', 'idx_datum_id', 'ALTER TABLE rapporte ADD KEY idx_datum_id (datum, id)'],
+    // Stunden je Mitarbeitende im laufenden Monat: Der Verbund geht ueber
+    // mitarbeiter_id, gefiltert wird zusaetzlich ueber das Datum. Der
+    // bestehende Einzelindex auf mitarbeiter_id (aus dem Fremdschluessel)
+    // fuehrt zu einem Zugriff je Rapport der Person, dieser hier grenzt
+    // vorher schon auf den Monat ein.
+    ['rapporte', 'idx_ma_datum', 'ALTER TABLE rapporte ADD KEY idx_ma_datum (mitarbeiter_id, datum)'],
+    // Rapporte je Kunde: die Zahl in der Kundenliste und die Rapportliste
+    // der Kundendetailseite. Beides lief bis zum Lasttest ueber die
+    // vollstaendig in den Browser geladene Rapportliste; seit sie begrenzt
+    // ist, fragt der Server danach -- und zwar ueber den Kundennamen, weil
+    // rapporte.kunde ein Textfeld ohne echten Verweis ist (ENT-040).
+    ['rapporte', 'idx_kunde', 'ALTER TABLE rapporte ADD KEY idx_kunde (kunde)'],
+];
+foreach ($indizes as [$tabelle, $name, $sql]) {
+    // Fehlt die Tabelle noch, ist der Index nicht "fehlend", sondern
+    // gegenstandslos -- das CREATE TABLE weiter oben bringt ihn mit.
+    if (!hat_tabelle_jetzt($pdo, $tabelle) || hat_index($pdo, $tabelle, $name)) {
+        continue;
+    }
+    if ($nurPruefen) { $getan[] = "Index $tabelle.$name fehlt noch"; continue; }
+    // Wie beim Verweis: Ein Index ist eine Beschleunigung, keine
+    // Voraussetzung. Scheitert er, arbeitet die Abfrage weiter -- langsam,
+    // aber richtig. Das darf den Rest der Einrichtung nicht aufhalten.
+    schritt($pdo, $sql, "Index $tabelle.$name", $getan, $fehler);
 }
 
 // ── 4. Ergebnis. Fehlt am Schluss etwas, wird das gesagt statt verschwiegen.

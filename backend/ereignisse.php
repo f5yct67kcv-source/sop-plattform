@@ -81,6 +81,31 @@ function ereignis_lesen(PDO $pdo, string $sql, array &$fehler, string $art): arr
     }
 }
 
+// Warum jede Abfrage hier unten die grosse Tabelle in eine Unterabfrage mit
+// eigenem LIMIT packt (Lasttest 09.09.2026):
+//
+// Geschrieben stand hier "verbinde die grosse Tabelle mit mitarbeiter, sortiere,
+// nimm 20". Gemeint war "nimm 20 aus der grossen Tabelle, hole die Namen dazu".
+// Beides liefert dasselbe Ergebnis -- aber MariaDB hat die erste Fassung
+// woertlich genommen: Es begann bei mitarbeiter (gut 200 Zeilen), zog die
+// grosse Tabelle dazu und sortierte das Ganze in einer Hilfstabelle. Gemessen
+// wurden fuer 20 zurueckgegebene Zeilen 156 156 gelesene, und das bei jedem
+// Oeffnen des Cockpits.
+//
+// Ein Index allein hat daran NICHTS geaendert -- er lag auf der falschen Seite
+// des Verbunds und kam gar nicht zum Zug. Erst die Unterabfrage schreibt die
+// Reihenfolge hin: erst filtern und begrenzen, dann verbinden. Danach: 1-2 ms.
+//
+// Dass das Ergebnis gleich bleibt, ist keine Hoffnung, sondern eine
+// Eigenschaft des Schemas: Jede hier verbundene Spalte (mitarbeiter_id,
+// einsatz_id, objekt_id) ist NOT NULL und traegt einen Fremdschluessel. Zu
+// jeder Zeile der grossen Tabelle gibt es also genau einen Verbundpartner --
+// ein Verbund kann hier weder Zeilen verlieren noch welche verdoppeln, und
+// darum ist es gleichgueltig, ob vor oder nach ihm begrenzt wird. Bei einem
+// LEFT JOIN (kunden bei der Offerte) gilt das ohnehin.
+//
+// Das aeussere ORDER BY bleibt noetig: Die Reihenfolge einer Unterabfrage
+// ueberlebt den Verbund nicht garantiert.
 function ereignisse_sammeln(PDO $pdo, int $grenze = 12): array
 {
     $fehler = [];
@@ -91,9 +116,12 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12): array
     foreach (ereignis_lesen($pdo,
         "SELECT r.id, r.datum, r.kunde, r.ort, r.einsatzart, r.netto_h, r.erfasst_am,
                 m.id AS mitarbeiter_id, m.name, m.vorname, m.nachname
-           FROM rapporte r JOIN mitarbeiter m ON m.id = r.mitarbeiter_id
-          WHERE r.gesehen_am IS NULL
-          ORDER BY r.erfasst_am DESC, r.id DESC LIMIT 20", $fehler, 'rapport') as $r) {
+           FROM (SELECT id, datum, kunde, ort, einsatzart, netto_h, erfasst_am, mitarbeiter_id
+                   FROM rapporte
+                  WHERE gesehen_am IS NULL
+                  ORDER BY erfasst_am DESC, id DESC LIMIT 20) r
+           JOIN mitarbeiter m ON m.id = r.mitarbeiter_id
+          ORDER BY r.erfasst_am DESC, r.id DESC", $fehler, 'rapport') as $r) {
         $liste[] = [
             'typ' => 'rapport', 'id' => (int)$r['id'], 'zeit' => $r['erfasst_am'],
             'person' => ['id' => (int)$r['mitarbeiter_id'], 'name' => $r['name'],
@@ -109,9 +137,12 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12): array
     foreach (ereignis_lesen($pdo,
         "SELECT v.id, v.datum, v.bemerkung, v.erfasst_am,
                 m.id AS mitarbeiter_id, m.name, m.vorname, m.nachname
-           FROM verfuegbarkeiten v JOIN mitarbeiter m ON m.id = v.mitarbeiter_id
-          WHERE v.datum >= CURDATE() AND v.gesehen_am IS NULL
-          ORDER BY v.erfasst_am DESC LIMIT 20", $fehler, 'sperrtag') as $v) {
+           FROM (SELECT id, datum, bemerkung, erfasst_am, mitarbeiter_id
+                   FROM verfuegbarkeiten
+                  WHERE datum >= CURDATE() AND gesehen_am IS NULL
+                  ORDER BY erfasst_am DESC LIMIT 20) v
+           JOIN mitarbeiter m ON m.id = v.mitarbeiter_id
+          ORDER BY v.erfasst_am DESC", $fehler, 'sperrtag') as $v) {
         $liste[] = [
             'typ' => 'sperrtag', 'id' => (int)$v['id'], 'zeit' => $v['erfasst_am'],
             'person' => ['id' => (int)$v['mitarbeiter_id'], 'name' => $v['name'],
@@ -126,11 +157,13 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12): array
         "SELECT z.einsatz_id, z.mitarbeiter_id, z.zusage, z.zugeteilt_am,
                 e.datum, e.von, e.bis, e.kunde_name, e.titel AS einsatz_titel, e.ort,
                 m.name, m.vorname, m.nachname
-           FROM einsatz_zuteilung z
+           FROM (SELECT einsatz_id, mitarbeiter_id, zusage, zugeteilt_am
+                   FROM einsatz_zuteilung
+                  WHERE zusage <> 'offen' AND zusage_gesehen_am IS NULL
+                  ORDER BY zugeteilt_am DESC LIMIT 20) z
            JOIN einsaetze e   ON e.id = z.einsatz_id
            JOIN mitarbeiter m ON m.id = z.mitarbeiter_id
-          WHERE z.zusage <> 'offen' AND z.zusage_gesehen_am IS NULL
-          ORDER BY z.zugeteilt_am DESC LIMIT 20", $fehler, 'zusage') as $z) {
+          ORDER BY z.zugeteilt_am DESC", $fehler, 'zusage') as $z) {
         $liste[] = [
             'typ' => 'zusage', 'id' => (int)$z['einsatz_id'],
             'mitarbeiter_id' => (int)$z['mitarbeiter_id'], 'zeit' => $z['zugeteilt_am'],
@@ -153,9 +186,12 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12): array
     foreach (ereignis_lesen($pdo,
         "SELECT b.id, b.nummer, b.status, b.entscheidung_am,
                 k.name AS kunde_name
-           FROM belege b LEFT JOIN kunden k ON k.id = b.kunde_id
-          WHERE b.entscheidung_am IS NOT NULL AND b.entscheidung_gesehen_am IS NULL
-          ORDER BY b.entscheidung_am DESC LIMIT 20", $fehler, 'offerte') as $o) {
+           FROM (SELECT id, nummer, status, entscheidung_am, kunde_id
+                   FROM belege
+                  WHERE entscheidung_am IS NOT NULL AND entscheidung_gesehen_am IS NULL
+                  ORDER BY entscheidung_am DESC LIMIT 20) b
+           LEFT JOIN kunden k ON k.id = b.kunde_id
+          ORDER BY b.entscheidung_am DESC", $fehler, 'offerte') as $o) {
         $liste[] = [
             'typ' => 'offerte', 'id' => (int)$o['id'], 'zeit' => $o['entscheidung_am'],
             'titel' => $o['status'] === 'abgelehnt' ? 'Offerte abgelehnt' : 'Offerte angenommen',
@@ -169,9 +205,12 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12): array
     foreach (ereignis_lesen($pdo,
         "SELECT a.id, a.typ, a.von, a.bis, a.bemerkung, a.beantragt_am,
                 m.id AS mitarbeiter_id, m.name, m.vorname, m.nachname
-           FROM abwesenheiten a JOIN mitarbeiter m ON m.id = a.mitarbeiter_id
-          WHERE a.status = 'beantragt' AND a.gesehen_am IS NULL
-          ORDER BY a.beantragt_am DESC LIMIT 20", $fehler, 'abwesenheit') as $a) {
+           FROM (SELECT id, typ, von, bis, bemerkung, beantragt_am, mitarbeiter_id
+                   FROM abwesenheiten
+                  WHERE status = 'beantragt' AND gesehen_am IS NULL
+                  ORDER BY beantragt_am DESC LIMIT 20) a
+           JOIN mitarbeiter m ON m.id = a.mitarbeiter_id
+          ORDER BY a.beantragt_am DESC", $fehler, 'abwesenheit') as $a) {
         $liste[] = [
             'typ' => 'abwesenheit', 'id' => (int)$a['id'], 'zeit' => $a['beantragt_am'],
             'person' => ['id' => (int)$a['mitarbeiter_id'], 'name' => $a['name'],
@@ -188,14 +227,32 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12): array
     // unabhaengig davon, ob dabei ein Ausnahme-Grund noetig war (ausdrueckliche
     // Vorgabe Projektinhaber: "alle spontanen", nicht nur die Grenzfaelle).
     foreach (ereignis_lesen($pdo,
+        // Der einzige Fall hier, dessen Bedingung NICHT auf der grossen
+        // Tabelle liegt: "spontan erzeugt" steht am Einsatz, nicht an der
+        // Runde. Bei den uebrigen Arten ist die grosse Tabelle die richtige,
+        // hier ist sie die falsche -- gesucht wird eine Ausnahme, und
+        // gezaehlt werden muesste sonst der Normalfall.
+        //
+        // Gemessen: von den Runden her sind es 100 784 gelesene Zeilen und
+        // 210 ms fuer null Treffer -- "gesehen_am IS NULL" trifft naemlich
+        // fast jede Runde (abgehakt wird nur, was im Feed auftaucht, und
+        // dort taucht nur die spontane auf). Von den Einsaetzen her, ueber
+        // idx_spontan, sind es 2 ms.
+        //
+        // Darum steht einsaetze hier vorn und nicht in der Unterabfrage:
+        // erst die wenigen spontanen Einsaetze, dann ihre Runden.
         "SELECT r.id, r.ausnahme_grund, r.vorbereitet_am,
                 e.datum, e.von, e.bis, e.kunde_name, e.titel AS einsatz_titel, e.ort,
                 m.id AS mitarbeiter_id, m.name, m.vorname, m.nachname
-           FROM rundgang r
+           FROM (SELECT r2.id, r2.ausnahme_grund, r2.vorbereitet_am,
+                        r2.einsatz_id, r2.mitarbeiter_id
+                   FROM einsaetze e2
+                   JOIN rundgang r2 ON r2.einsatz_id = e2.id
+                  WHERE e2.spontan_erzeugt = 1 AND r2.gesehen_am IS NULL
+                  ORDER BY r2.vorbereitet_am DESC LIMIT 20) r
            JOIN einsaetze e   ON e.id = r.einsatz_id
            JOIN mitarbeiter m ON m.id = r.mitarbeiter_id
-          WHERE e.spontan_erzeugt = 1 AND r.gesehen_am IS NULL
-          ORDER BY r.vorbereitet_am DESC LIMIT 20", $fehler, 'rundgang_spontan') as $r) {
+          ORDER BY r.vorbereitet_am DESC", $fehler, 'rundgang_spontan') as $r) {
         $liste[] = [
             'typ' => 'rundgang_spontan', 'id' => (int)$r['id'], 'zeit' => $r['vorbereitet_am'],
             'person' => ['id' => (int)$r['mitarbeiter_id'], 'name' => $r['name'],
@@ -224,12 +281,15 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12): array
                 v.objekt_id, o.name AS objekt_name, o.kunde_name,
                 a.bezeichnung AS art,
                 m.id AS mitarbeiter_id, m.name, m.vorname, m.nachname
-           FROM ereignis_meldung v
+           FROM (SELECT id, erfasst_am, vorfall_am, bemerkung, foto_mime,
+                        objekt_id, mitarbeiter_id, ereignisart_id
+                   FROM ereignis_meldung
+                  WHERE gesehen_am IS NULL
+                  ORDER BY erfasst_am DESC LIMIT 20) v
            JOIN objekte o     ON o.id = v.objekt_id
            JOIN mitarbeiter m ON m.id = v.mitarbeiter_id
            LEFT JOIN ereignisart a ON a.id = v.ereignisart_id
-          WHERE v.gesehen_am IS NULL
-          ORDER BY v.erfasst_am DESC LIMIT 20", $fehler, 'vorfall') as $r) {
+          ORDER BY v.erfasst_am DESC", $fehler, 'vorfall') as $r) {
         $liste[] = [
             'typ' => 'vorfall', 'id' => (int)$r['id'], 'zeit' => $r['erfasst_am'],
             'person' => ['id' => (int)$r['mitarbeiter_id'], 'name' => $r['name'],

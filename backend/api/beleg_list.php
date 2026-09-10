@@ -19,6 +19,21 @@ if (!beleg_art_gueltig($art)) {
 }
 
 $pdo = db();
+
+// ── Obergrenze (Lasttest 09.09.2026) ──────────────────────────────────
+// Diese Liste hatte bis dahin keine: Sie lieferte jede Offerte und jede
+// Rechnung, die es je gab. Heute sind das wenige hundert Zeilen -- aber sie
+// waechst mit der Zeit und mit nichts sonst, genau wie die Rapportliste, die
+// im Lasttest bei 32 108 Zeilen mit HTTP 500 gestorben ist.
+//
+// Die Zahlen daneben sind wichtiger als die Grenze selbst: Eine gekuerzte
+// Liste darf nie wie eine vollstaendige aussehen.
+const BELEG_GRENZE = 2000;
+
+$z = $pdo->prepare('SELECT COUNT(*) FROM belege WHERE art = ? AND ist_vorlage = 0');
+$z->execute([$art]);
+$gesamt = (int)$z->fetchColumn();
+
 // Aktive UND archivierte in einem Zug, wie bei kunden_list.php -- die
 // Oberflaeche hat einen Alle/Archiviert-Umschalter und soll dafuer nicht
 // zweimal fragen muessen. Vorlagen bleiben draussen: Sie sind kein Beleg,
@@ -33,12 +48,17 @@ $s = $pdo->prepare(
        FROM belege b
        LEFT JOIN kunden k ON k.id = b.kunde_id
       WHERE b.art = ? AND b.ist_vorlage = 0
-      ORDER BY b.datum DESC, b.id DESC'
+      ORDER BY b.datum DESC, b.id DESC
+      LIMIT ' . BELEG_GRENZE
 );
 $s->execute([$art]);
+$belege = $s->fetchAll();
 
 json_response([
     'status'          => 'ok',
-    'belege'          => $s->fetchAll(),
+    'belege'          => $belege,
+    'gesamt'          => $gesamt,
+    'grenze'          => BELEG_GRENZE,
+    'gekuerzt'        => $gesamt > count($belege),
     'naechste_nummer' => beleg_naechste_nummer($pdo, $art),
 ]);

@@ -29,9 +29,16 @@ check('KRITISCH: es gibt eine eigene Tabelle für die Spur',
   /CREATE TABLE rundgang_position/.test(EINR));
 // Die Spur haengt am RUNDGANG, nicht am Mitarbeitenden -- es soll keine
 // Spur ausserhalb einer Runde geben koennen.
+// Geprüft wird IM Block dieser einen Tabelle, nicht über einen Abstand in
+// Zeichen. Die frühere Fassung suchte "ON DELETE CASCADE" innerhalb von 700
+// Zeichen nach "rundgang_position" und wurde rot, als der Block am
+// 10.09.2026 einen zusätzlichen Index samt Begründung bekam (Lasttest) --
+// die Sache war unverändert richtig, nur stand sie ein paar Zeilen weiter
+// unten. Ein Abstand in Zeichen ist keine Aussage über ein Schema.
+const spurBlock = (EINR.match(/CREATE TABLE rundgang_position[\s\S]*?\)\s*ENGINE/) || [''])[0];
 check('KRITISCH: die Spur hängt am Rundgang und verschwindet mit ihm',
-  /rundgang_id INT NOT NULL/.test(EINR)
-  && /FOREIGN KEY \(rundgang_id\) REFERENCES rundgang\(id\) ON DELETE CASCADE[\s\S]{0,200}rundgang_position|rundgang_position[\s\S]{0,700}ON DELETE CASCADE/.test(EINR));
+  /rundgang_id INT NOT NULL/.test(spurBlock)
+  && /FOREIGN KEY \(rundgang_id\) REFERENCES rundgang\(id\) ON DELETE CASCADE/.test(spurBlock));
 check('KRITISCH: die Genauigkeit wird mitgeschrieben — ohne sie sieht ungenau aus wie genau',
   /genauigkeit_m INT NULL/.test(EINR));
 check('Geräte- und Serverzeit bleiben getrennt, wie bei den Scans (ENT-132)',

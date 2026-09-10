@@ -37,12 +37,20 @@ const STATS = {
 
 const SIG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAAAyCAYAAACqNX6+AAAAOklEQVR4nO3BAQEAAACCIP+vbkhAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHwbXwAAAd0i9wAAAAAASUVORK5CYII=';
 
+// Der Antwortaufbau von rapport_list.php seit dem Lasttest (09.09.2026):
+// OHNE das Unterschriftsbild (das holt die Schublade einzeln ueber
+// rapport_lesen.php), dafuer mit hat_unterschrift, gesamt und gekuerzt.
+// Der Mock bildet den echten Aufbau nach -- ein Mock, der eine Antwortform
+// nachbaut, die es nicht mehr gibt, prueft nichts.
 const RAPPORTE = {
   status: 'ok',
+  gesamt: 3,
+  grenze: 2000,
+  gekuerzt: false,
   rapporte: [
-    { id: 284, einsatz_id: 501, datum: '2026-08-17', mitarbeiter: 'dario.beispiel', kunde: 'Muster Immobilien AG', strasse: 'Musterstrasse 12', ort: '4632 Trimbach', auftrag_nr: 'A-2026-118', einsatzart: 'Verkehrsdienst', von: '07:00:00', bis: '16:00:00', pause_min: 30, netto_h: '8.50', unterzeichner: 'R. Muster', unterschrift: SIG, bemerkung: 'Baustellenverkehr wie vereinbart geregelt.', erfasst_am: '2026-08-17 16:12:00' },
-    { id: 283, einsatz_id: 502, datum: '2026-08-16', mitarbeiter: 'adrian', kunde: 'Einwohnergemeinde Musterdorf', strasse: 'Dorfstrasse 4', ort: '5013 Musterdorf', auftrag_nr: null, einsatzart: 'Revierdienst', von: '22:00:00', bis: '04:00:00', pause_min: 0, netto_h: '6.00', unterzeichner: null, unterschrift: null, bemerkung: null, erfasst_am: '2026-08-16 04:20:00' },
-    { id: 282, einsatz_id: 503, datum: '2026-08-15', mitarbeiter: 'm.muster', kunde: 'Muster Immobilien AG', strasse: 'Musterstrasse 12', ort: '4632 Trimbach', auftrag_nr: 'A-2026-117', einsatzart: 'Verkehrsdienst', von: '08:00:00', bis: '15:45:00', pause_min: 30, netto_h: '7.25', unterzeichner: 'M. Frei', unterschrift: null, bemerkung: null, erfasst_am: '2026-08-15 16:02:00' }
+    { id: 284, einsatz_id: 501, datum: '2026-08-17', mitarbeiter: 'dario.beispiel', kunde: 'Muster Immobilien AG', strasse: 'Musterstrasse 12', ort: '4632 Trimbach', auftrag_nr: 'A-2026-118', einsatzart: 'Verkehrsdienst', von: '07:00:00', bis: '16:00:00', pause_min: 30, netto_h: '8.50', unterzeichner: 'R. Muster', hat_unterschrift: true, bemerkung: 'Baustellenverkehr wie vereinbart geregelt.', erfasst_am: '2026-08-17 16:12:00' },
+    { id: 283, einsatz_id: 502, datum: '2026-08-16', mitarbeiter: 'adrian', kunde: 'Einwohnergemeinde Musterdorf', strasse: 'Dorfstrasse 4', ort: '5013 Musterdorf', auftrag_nr: null, einsatzart: 'Revierdienst', von: '22:00:00', bis: '04:00:00', pause_min: 0, netto_h: '6.00', unterzeichner: null, hat_unterschrift: false, bemerkung: null, erfasst_am: '2026-08-16 04:20:00' },
+    { id: 282, einsatz_id: 503, datum: '2026-08-15', mitarbeiter: 'm.muster', kunde: 'Muster Immobilien AG', strasse: 'Musterstrasse 12', ort: '4632 Trimbach', auftrag_nr: 'A-2026-117', einsatzart: 'Verkehrsdienst', von: '08:00:00', bis: '15:45:00', pause_min: 30, netto_h: '7.25', unterzeichner: 'M. Frei', hat_unterschrift: false, bemerkung: null, erfasst_am: '2026-08-15 16:02:00' }
   ]
 };
 
@@ -79,6 +87,14 @@ async function setup(page, { admin = true } = {}) {
         'verfuegbarkeit_lesen'] : [] });
     if (url.includes('dashboard_stats.php'))  return send(STATS);
     if (url.includes('rapport_list.php'))     return send(RAPPORTE);
+    // Einzelabruf mit Unterschriftsbild -- Schublade, Druck und PDF holen
+    // ihn seit dem Lasttest von hier statt aus der Liste.
+    if (url.includes('rapport_lesen.php')) {
+      const id = Number((url.split('id=')[1] || '').split('&')[0]);
+      const r = RAPPORTE.rapporte.find(x => x.id === id);
+      if (!r) { return send({ status: 'error', message: 'nicht gefunden' }); }
+      return send({ status: 'ok', rapport: { ...r, unterschrift: r.hat_unterschrift ? SIG : null } });
+    }
     if (url.includes('mitarbeiter_list.php')) return send(MA);
     if (url.includes('kunden_list.php'))      return send(KU);
     if (url.includes('logout.php'))           return send({ status: 'ok' });
@@ -152,6 +168,30 @@ await page.fill('#rQ', 'zzzz');
 await page.waitForTimeout(120);
 check('Leerzustand bei 0 Treffern', await page.isVisible('#rapporteTable .empty'));
 await page.click('#kv-rapporte button:has-text("Zurücksetzen")');
+
+// ── 6a. Eine GEKUERZTE Liste darf nie wie eine vollstaendige aussehen
+//
+// Seit dem Lasttest (09.09.2026) liefert rapport_list.php hoechstens die
+// neuesten 2000 Rapporte und sagt mit gesamt/gekuerzt, wie viel es wirklich
+// gibt. Genau das ist die Stelle, an der eine Beschleunigung zur
+// Falschauskunft werden kann: "3 Rapporte" statt "3 von 12 gezeigt".
+//
+// Der Mock tut so, als gaebe es 12 und liefere 3. Erwartet wird beides --
+// die richtige Bezugsgroesse im Kruemel UND ein sichtbarer Hinweis.
+await page.route('**/rapport_list.php*', r => r.fulfill({ status: 200,
+  contentType: 'application/json',
+  body: JSON.stringify({ ...RAPPORTE, gesamt: 12, gekuerzt: true }) }));
+await page.evaluate(() => loadRapporte());
+await page.waitForTimeout(200);
+check('KRITISCH: der Kruemel nennt die echte Gesamtzahl, nicht die geladene',
+  /3 von 12 Rapporten/.test(await page.textContent('#pgCrumb')));
+check('KRITISCH: dass gekuerzt wurde, steht sichtbar in der Liste',
+  /neuesten 3 von 12/.test(await page.textContent('#rapporteTable')));
+await page.unroute('**/rapport_list.php*');
+await page.evaluate(() => loadRapporte());
+await page.waitForTimeout(200);
+check('Ohne Kuerzung steht der Hinweis nicht da',
+  !/neuesten 3 von/.test(await page.textContent('#rapporteTable')));
 await page.waitForTimeout(120);
 check('Zurücksetzen stellt 3 Zeilen her', (await page.$$('#rapporteTable tbody tr')).length === 3);
 await page.screenshot({ path: `${OUT}/03-rapporte.png`, fullPage: true });

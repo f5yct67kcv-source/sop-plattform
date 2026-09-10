@@ -134,9 +134,29 @@ check('KRITISCH: der Server verknuepft den Kunden ueber die SCHICHT, nicht ueber
   && /LEFT JOIN kunden k ON k\.id = e\.kunde_id/.test(RLIST));
 check('KRITISCH: nirgends wird auf den Kundennamen verknuepft — Namen wiederholen und aendern sich',
   !/JOIN kunden[\s\S]{0,80}k\.name\s*=/.test(RLIST) && !/ON\s+k\.name/.test(RLIST));
+// Geprueft wird der ZUSAMMENHANG, nicht eine bestimmte Schreibweise: Die
+// Kundenfelder und der Kundenverbund haengen an demselben Wert, der aus
+// darf($user, 'abgleich_lesen') kommt -- wie die Variable heisst, ist egal.
+//
+// Die frueheren Fassung suchte woertlich nach
+// "if (darf($user, 'abgleich_lesen')) { ... $kundenFelder }" und wurde rot,
+// als der Endpunkt am 10.09.2026 umgebaut wurde (Lasttest): Die Bedingung
+// steht seither in einer Variablen und wird zweimal benutzt. Die Sache blieb
+// dieselbe, der Wortlaut nicht -- genau der Fall, vor dem die Hausregel
+// warnt.
 check('KRITISCH: die Kundenstammdaten gehen nur an den Zugang, der ohnehin alle Rapporte sieht',
-  /if \(darf\(\$user, 'abgleich_lesen'\)\)[\s\S]{0,200}\$kundenFelder/.test(RLIST)
-  && /\} else \{[\s\S]{0,200}\$basis \. \$von/.test(RLIST));
+  (() => {
+    // Entweder direkt in einem if, oder ueber eine Variable -- beides zaehlt.
+    const direkt = /if \(darf\(\$user, 'abgleich_lesen'\)\)[\s\S]{0,200}\$kundenFelder/.test(RLIST);
+    const name = (RLIST.match(/\$(\w+)\s*=\s*darf\(\$user,\s*'abgleich_lesen'\)/) || [])[1];
+    if (!direkt && !name) { return false; }
+    if (direkt) { return true; }
+    const bedingt = t => new RegExp('\\$' + name + '\\s*\\?\\s*\\$' + t).test(RLIST);
+    // Und: sie duerfen NIRGENDS unbedingt angehaengt werden.
+    const unbedingt = new RegExp('\\.\\s*\\$kunden(Felder|Join)(?!\\s*:)').test(
+      RLIST.replace(new RegExp('\\$' + name + '\\s*\\?\\s*\\$kunden(Felder|Join)\\s*:\\s*\'\'', 'g'), ''));
+    return bedingt('kundenFelder') && bedingt('kundenJoin') && !unbedingt;
+  })());
 
 check('KRITISCH: die sechs Rechnungsadress-Spalten werden nachgetragen',
   ['re_name', 're_zusatz', 're_strasse', 're_hausnummer', 're_plz', 're_ort']
@@ -267,7 +287,15 @@ await page.route('**/api/**', route => {
   if (u.includes('mitarbeiter_list')) return s({ status: 'ok', mitarbeiter: MA });
   if (u.includes('kunden_list')) return s({ status: 'ok', kunden: KUNDEN });
   if (u.includes('einsatz_list')) return s({ status: 'ok', einsaetze: EINSAETZE });
-  if (u.includes('rapport_list')) return s({ status: 'ok', rapporte: RAPPORTE });
+  if (u.includes('rapport_list')) return s({ status: 'ok', rapporte: RAPPORTE,
+    gesamt: RAPPORTE.length, grenze: 2000, gekuerzt: false });
+  // Seit dem Lasttest (09.09.2026) holt der Druck den vollstaendigen Rapport
+  // einzeln -- das Unterschriftsbild kommt nicht mehr mit der Liste.
+  if (u.includes('rapport_lesen')) {
+    const id = Number((u.split('id=')[1] || '').split('&')[0]);
+    const r = RAPPORTE.find(x => Number(x.id) === id);
+    return r ? s({ status: 'ok', rapport: r }) : s({ status: 'error', message: 'nicht gefunden' });
+  }
   if (u.includes('dashboard_stats')) return s({ status: 'ok', kpi: {}, verlauf: [], angemeldet: [],
     pro_mitarbeiter: [], letzte_rapporte: [], sperr_ereignisse: [] });
   return s({ status: 'ok', einsaetze: [], rapporte: [], objekte: [], feiertage: [], gepflegt: {},
@@ -281,7 +309,16 @@ await page.waitForSelector('#shell.on'); await page.waitForTimeout(600);
 // Drucken darf die Suite nicht wirklich -- window.print() haelt den Browser an.
 await page.evaluate(() => { window.__gedruckt = 0; window.print = () => { window.__gedruckt++; }; });
 
-const drucken = id => page.evaluate(i => { drawerId = i; printReport(); return $('printArea').innerHTML; }, id);
+// printReport() holt den Rapport seit dem Lasttest (09.09.2026) erst einzeln
+// nach (rapport_lesen.php) und druckt danach -- das Blatt steht also nicht
+// mehr im selben Zug da. Erst leeren, dann anstossen, dann warten, bis es
+// gefuellt ist: Ein sofortiges Auslesen bekaeme das Blatt des VORIGEN
+// Aufrufs zu sehen und pruefte damit nichts.
+const drucken = async id => {
+  await page.evaluate(i => { $('printArea').innerHTML = ''; drawerId = i; printReport(); }, id);
+  await page.waitForFunction(() => $('printArea').innerHTML.length > 0, null, { timeout: 5000 });
+  return page.evaluate(() => $('printArea').innerHTML);
+};
 
 // ── Leerer Briefkopf: nichts erfinden
 let html = await drucken(10);

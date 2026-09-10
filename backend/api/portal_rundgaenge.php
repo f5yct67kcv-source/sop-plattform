@@ -161,11 +161,20 @@ for ($t = $vonTag; $t <= $bisTag; $t = $t->modify('+1 day')) {
     $eimer[$schluessel($t->format('Y-m-d'))] = 0;
 }
 
+// Fortschritt fuer alle Runden auf einmal statt zwei Abfragen je Zeile
+// (Lasttest 09.09.2026) -- dieselbe Umstellung wie in rundgang_liste.php.
+// Hier faellt sie noch staerker ins Gewicht: Das Portal zeigt Zeitraeume
+// ueber Wochen, nicht einen Tag.
+$fortschritte = rundgang_fortschritt_viele($pdo, array_map(fn($r) => [
+    'id'         => (int)$r['id'],
+    'objekt_id'  => (int)$r['objekt_id'],
+    'vorlage_id' => $r['rundgang_vorlage_id'] !== null ? (int)$r['rundgang_vorlage_id'] : null,
+], $zeilen));
+
 foreach ($zeilen as $r) {
-    $vorlageId = $r['rundgang_vorlage_id'] !== null ? (int)$r['rundgang_vorlage_id'] : null;
     $dauer = rundgang_dauer($r['rohzeit_start'], $r['rohzeit_ende'], $r['letzter_scan'],
         (int)$r['pause_minuten'], (string)$r['status']);
-    $fortschritt = rundgang_fortschritt($pdo, (int)$r['id'], (int)$r['objekt_id'], $vorlageId);
+    $fortschritt = $fortschritte[(int)$r['id']];
     $antwort['rundgaenge'][] = [
         'id'           => (int)$r['id'],
         'datum'        => (string)$r['datum'],

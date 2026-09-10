@@ -12,15 +12,24 @@ $monatStart    = date('Y-m-01');
 $vormonatStart = date('Y-m-01', strtotime('first day of last month'));
 
 // ── Kennzahlen laufender Monat vs. Vormonat
+// Das WHERE am Schluss ist nicht bloss Kosmetik (Lasttest 09.09.2026): Ohne
+// es liest diese Abfrage JEDEN Rapport, den es je gab, um vier Zahlen ueber
+// zwei Monate zu bilden -- gemessen 32 108 gelesene Zeilen und 176 ms, mit
+// jedem Betriebsjahr mehr. Am Ergebnis aendert es nichts: Alle vier
+// CASE-Zweige zaehlen ohnehin nur Zeilen ab dem Vormonatsanfang, alles davor
+// steuert 0 bei. Mit dem Index (datum, id) ist es jetzt ein Bereich statt
+// eines Tabellenscans.
 $stmt = db()->prepare(
     'SELECT
         COALESCE(SUM(CASE WHEN datum >= ? THEN 1 ELSE 0 END), 0)        AS rapporte_monat,
         COALESCE(SUM(CASE WHEN datum >= ? THEN netto_h ELSE 0 END), 0)  AS stunden_monat,
         COALESCE(SUM(CASE WHEN datum >= ? AND datum < ? THEN 1 ELSE 0 END), 0)       AS rapporte_vormonat,
         COALESCE(SUM(CASE WHEN datum >= ? AND datum < ? THEN netto_h ELSE 0 END), 0) AS stunden_vormonat
-     FROM rapporte'
+     FROM rapporte
+     WHERE datum >= ?'
 );
-$stmt->execute([$monatStart, $monatStart, $vormonatStart, $monatStart, $vormonatStart, $monatStart]);
+$stmt->execute([$monatStart, $monatStart, $vormonatStart, $monatStart,
+                $vormonatStart, $monatStart, $vormonatStart]);
 $kpi = $stmt->fetch() ?: [];
 
 $counts = db()->query(
@@ -62,13 +71,22 @@ $angemeldet = db()->query(
 )->fetchAll();
 
 // ── Stunden je Mitarbeitende im laufenden Monat
+// Erst die Rapporte des Monats zusammenzaehlen, dann die Namen dazuholen --
+// nicht umgekehrt (Lasttest 09.09.2026). Die frueher hier stehende Fassung
+// verband den ganzen Personalstamm mit der ganzen Rapporttabelle und
+// gruppierte danach: 0,34 s, und der Aufwand wuchs mit jedem Betriebsjahr.
+// So gerechnet sind es 1,5 ms. Das Ergebnis ist dasselbe: eine Zeile je
+// aktivem Mitarbeitenden, 0 Stunden fuer wen im Monat nichts hat -- dafuer
+// sorgt der LEFT JOIN samt COALESCE wie zuvor.
 $stmt = db()->prepare(
     'SELECT m.name, m.vorname, m.nachname,
-            COALESCE(SUM(r.netto_h), 0) AS stunden, COUNT(r.id) AS anzahl
+            COALESCE(s.stunden, 0) AS stunden, COALESCE(s.anzahl, 0) AS anzahl
      FROM mitarbeiter m
-     LEFT JOIN rapporte r ON r.mitarbeiter_id = m.id AND r.datum >= ?
+     LEFT JOIN (SELECT mitarbeiter_id, SUM(netto_h) AS stunden, COUNT(*) AS anzahl
+                  FROM rapporte
+                 WHERE datum >= ?
+                 GROUP BY mitarbeiter_id) s ON s.mitarbeiter_id = m.id
      WHERE m.aktiv = 1
-     GROUP BY m.id, m.name, m.vorname, m.nachname
      ORDER BY stunden DESC, m.name'
 );
 $stmt->execute([$monatStart]);
@@ -80,11 +98,20 @@ $proMitarbeiter = $stmt->fetchAll();
 $ereignisse = ereignisse_sammeln(db());
 
 // ── Letzte Rapporte
+// Dieselbe Umstellung wie im Ereignis-Feed (siehe backend/ereignisse.php):
+// erst die acht neuesten Rapporte holen, dann die Namen dazu. In der frueheren
+// Fassung begann MariaDB beim Personalstamm, zog alle Rapporte dazu und
+// sortierte sie -- 64 425 gelesene Zeilen fuer acht ausgegebene, 510 ms.
+// Das Ergebnis bleibt gleich: mitarbeiter_id ist NOT NULL und traegt einen
+// Fremdschluessel, der Verbund findet zu jeder Zeile genau einen Partner.
 $letzte = db()->query(
     'SELECT r.id, r.datum, m.name AS mitarbeiter, r.kunde, r.ort, r.einsatzart, r.netto_h
-     FROM rapporte r JOIN mitarbeiter m ON m.id = r.mitarbeiter_id
-     ORDER BY r.datum DESC, r.id DESC
-     LIMIT 8'
+     FROM (SELECT id, datum, kunde, ort, einsatzart, netto_h, mitarbeiter_id
+             FROM rapporte
+             ORDER BY datum DESC, id DESC
+             LIMIT 8) r
+     JOIN mitarbeiter m ON m.id = r.mitarbeiter_id
+     ORDER BY r.datum DESC, r.id DESC'
 )->fetchAll();
 
 json_response([

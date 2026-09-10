@@ -106,11 +106,69 @@ $pdo2->exec("INSERT INTO einsaetze (id, spontan_erzeugt, datum, von, bis, kunde_
 $pdo2->exec("INSERT INTO rundgang (id, einsatz_id, mitarbeiter_id, objekt_id, status, vorbereitet_am, ausnahme_grund, gesehen_am)
              VALUES (102, 12, 1, 1, 'vorbereitet', '2026-09-01 14:00:00', NULL, NULL)");
 
+// ══════════════ DER SPONTANE DARF NICHT HINTER DEN NORMALEN VERSCHWINDEN
+//
+// Anlass: Der Lasttest vom 09.09.2026 hat die Feed-Abfragen umgestellt --
+// erst begrenzen, dann verbinden. Fuer sechs der sieben Arten ist das
+// gleichbedeutend. Bei dieser einen NICHT: Ihre Bedingung ("spontan
+// erzeugt") steht am Einsatz, nicht an der Runde. Wer hier die 20 neuesten
+// ungesehenen RUNDEN nimmt und erst danach auf spontan filtert, verliert
+// jeden spontanen Rundgang, vor dem 20 gewoehnliche liegen -- und
+// "gesehen_am IS NULL" trifft fast jede Runde, weil abgehakt nur wird, was
+// im Feed ueberhaupt auftaucht.
+//
+// Darum 25 gewoehnliche, ungesehene, NEUERE Runden vor den spontanen von
+// oben. Ist die Abfrage falsch herum gebaut, faellt Runde 100 heraus und
+// die Pruefung darunter wird rot. Gegenprobe gemacht: mit der Fassung
+// "LIMIT 20 auf rundgang, danach JOIN einsaetze" schlaegt sie an.
+for ($i = 1; $i <= 25; $i++) {
+    $eid = 200 + $i;
+    $rid = 300 + $i;
+    $pdo2->exec("INSERT INTO einsaetze (id, spontan_erzeugt, datum, von, bis, kunde_name, titel, ort)
+                 VALUES ($eid, 0, '2026-09-02', '08:00:00', '12:00:00', 'Muster AG', NULL, 'Musterstadt')");
+    $pdo2->exec("INSERT INTO rundgang (id, einsatz_id, mitarbeiter_id, objekt_id, status, vorbereitet_am, ausnahme_grund, gesehen_am)
+                 VALUES ($rid, $eid, 1, 1, 'vorbereitet', '2026-09-02 " . sprintf('%02d', $i) . ":00:00', NULL, NULL)");
+}
+
+// ══════════════ ABWESENHEITSANTRAEGE IM FEED (ENT-255)
+//
+// Bis zum 10.09.2026 stand diese Zusage nur als Textmuster in
+// test_abwesenheiten.mjs: gesucht wurde die Zeichenfolge
+// "status = 'beantragt' AND a.gesehen_am IS NULL" im Quelltext. Beim Umbau
+// der Feed-Abfragen (Lasttest) verlor die Bedingung ihr Tabellenkuerzel --
+// die Sache blieb richtig, die Pruefung wurde rot. Genau der Fall, vor dem
+// die Hausregel warnt: Geprueft wird die Aussage, nicht der Wortlaut.
+//
+// Hier laeuft die Abfrage darum wirklich. Drei Zeilen decken die ganze
+// Abgrenzung ab.
+$pdo2->exec("INSERT INTO abwesenheiten (id, mitarbeiter_id, typ, von, bis, bemerkung, status, beantragt_am, gesehen_am)
+             VALUES (1, 1, 'ferien', '2026-10-01', '2026-10-05', NULL, 'beantragt', '2026-09-01 09:00:00', NULL)");
+// Schon entschieden -- kein Ereignis mehr, egal ob jemand hingesehen hat.
+$pdo2->exec("INSERT INTO abwesenheiten (id, mitarbeiter_id, typ, von, bis, bemerkung, status, beantragt_am, gesehen_am)
+             VALUES (2, 1, 'ferien', '2026-11-01', '2026-11-05', NULL, 'genehmigt', '2026-09-02 09:00:00', NULL)");
+// Beantragt, aber bereits abgehakt -- ebenfalls keins mehr.
+$pdo2->exec("INSERT INTO abwesenheiten (id, mitarbeiter_id, typ, von, bis, bemerkung, status, beantragt_am, gesehen_am)
+             VALUES (3, 1, 'unbezahlt', '2026-12-01', '2026-12-02', NULL, 'beantragt', '2026-09-03 09:00:00', '2026-09-04 08:00:00')");
+
 $ergebnis = ereignisse_sammeln($pdo2);
+
+$abw = array_values(array_filter($ergebnis['ereignisse'], fn($x) => $x['typ'] === 'abwesenheit'));
+pruef('KRITISCH: ein offener, ungesehener Abwesenheitsantrag steht im Feed (ENT-255)',
+    count($abw) === 1 && $abw[0]['id'] === 1);
+pruef('KRITISCH: ein bereits entschiedener steht NICHT darin',
+    !in_array(2, array_column($abw, 'id'), true));
+pruef('KRITISCH: ein beantragter, aber abgehakter ebenfalls nicht',
+    !in_array(3, array_column($abw, 'id'), true));
+pruef('Die Zeile traegt Person, Typ und Zeitraum aus der echten Abfrage',
+    $abw !== [] && $abw[0]['person']['name'] === 'anna'
+    && $abw[0]['abwesenheitstyp'] === 'ferien' && $abw[0]['von'] === '2026-10-01');
 pruef('KRITISCH: die Abfrage laeuft ueberhaupt durch -- keine unvollstaendige Art gemeldet',
     !in_array('rundgang_spontan', $ergebnis['unvollstaendig'], true));
 $treffer = array_values(array_filter($ergebnis['ereignisse'], fn($x) => $x['typ'] === 'rundgang_spontan'));
 pruef('KRITISCH: genau der eine ungesehene spontane Rundgang erscheint -- nicht der abgehakte, nicht der normal geplante',
+    count($treffer) === 1 && $treffer[0]['id'] === 100);
+pruef('KRITISCH: und er erscheint auch, wenn 25 neuere gewoehnliche Runden davorliegen '
+    . '-- die Begrenzung darf nicht vor dem Filter greifen',
     count($treffer) === 1 && $treffer[0]['id'] === 100);
 pruef('Die Zeile traegt Person, Kunde, Zeiten und Ausnahme-Grund aus der echten Abfrage',
     $treffer !== [] && $treffer[0]['person']['name'] === 'anna'

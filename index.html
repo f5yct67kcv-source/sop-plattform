@@ -467,7 +467,10 @@ function mapRapport(r) {
     id: r.id, datum: r.datum, ma: r.mitarbeiter, kunde: r.kunde, strasse: r.strasse, ort: r.ort,
     auftragNr: r.auftrag_nr, einsatzart: r.einsatzart, von: r.von.slice(0, 5), bis: r.bis.slice(0, 5),
     pause: r.pause_min, netH: parseFloat(r.netto_h), bemerkung: r.bemerkung, sigName: r.unterzeichner,
-    sig: r.unterschrift, ts: r.erfasst_am
+    // Das Unterschriftsbild kommt seit dem Lasttest (09.09.2026) nicht mehr
+    // mit der Liste -- nur noch das Ja/Nein. Wer es braucht (Detailansicht,
+    // Ausdruck), holt den einen Rapport ueber rapport_lesen.php nach.
+    hatSig: !!r.hat_unterschrift, sig: null, ts: r.erfasst_am
   };
 }
 
@@ -712,6 +715,18 @@ function confirmDelete(){
 }
 
 // ── DETAIL / KUNDEN-BERICHT
+//
+// Das Unterschriftsbild wird einzeln nachgeholt (rapport_lesen.php) und
+// gemerkt: Ansehen und Drucken desselben Rapports fragen sonst zweimal.
+const sigCache = {};
+function rapportSig(id) {
+  if (sigCache[id] !== undefined) { return Promise.resolve(sigCache[id]); }
+  return apiCall('rapport_lesen.php?id=' + Number(id)).then(({ ok, data }) => {
+    sigCache[id] = (ok && data.status === 'ok' && data.rapport) ? (data.rapport.unterschrift || null) : null;
+    return sigCache[id];
+  }).catch(() => null);
+}
+
 function showDetail(id) {
   const r = rapports.find(x => x.id === id);
   if (!r) return;
@@ -730,7 +745,18 @@ function showDetail(id) {
   ];
   document.getElementById('detailBody').innerHTML =
     rows.map(([k,v]) => `<div class="detail-row"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('') +
-    (r.sig ? `<div style="margin-top:10px"><div style="color:var(--sub);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px">Unterschrift</div><img class="detail-sig-img" src="${r.sig}"></div>` : '');
+    (r.hatSig ? `<div style="margin-top:10px" id="detailSig"><div style="color:var(--sub);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px">Unterschrift</div><div style="font-size:12px;color:var(--sub)">Wird geladen …</div></div>` : '');
+  // Drei Zustaende, nicht zwei: keine erfasst, wird geladen, liess sich
+  // nicht laden. "Wird geladen" darf nicht wie "keine" aussehen.
+  if (r.hatSig) {
+    rapportSig(id).then(sig => {
+      const kasten = document.getElementById('detailSig');
+      if (!kasten || detailTargetId !== id) { return; }
+      kasten.innerHTML = '<div style="color:var(--sub);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px">Unterschrift</div>'
+        + (sig ? `<img class="detail-sig-img" src="${sig}">`
+               : '<div style="font-size:12px;color:var(--sub)">Die Unterschrift liess sich nicht laden.</div>');
+    });
+  }
   const isAdmin = !!(currentUser && currentUser.ist_admin);
   document.getElementById('btn-print-report').style.display = isAdmin ? '' : 'none';
   document.getElementById('print-hint').style.display = isAdmin ? '' : 'none';
@@ -741,6 +767,14 @@ function closeDetailModal(){document.getElementById('detailModal').classList.rem
 function printReport(id) {
   const r = rapports.find(x => x.id === id);
   if (!r) return;
+  // Auf dem Blatt steht die Unterschrift -- erst holen, dann drucken. Ein
+  // Blatt ohne Unterschrift, weil sie noch unterwegs war, waere ein
+  // falscher Beleg.
+  if (r.hatSig && sigCache[id] === undefined) {
+    rapportSig(id).then(() => printReport(id));
+    return;
+  }
+  r.sig = r.hatSig ? (sigCache[id] || null) : null;
   const rowsHtml = [
     ['Datum', fmtDate(r.datum)],
     ['Mitarbeiter', r.ma],
