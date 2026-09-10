@@ -62,6 +62,21 @@ function hat_fremdschluessel(PDO $pdo, string $tabelle, string $spalte): bool {
 
 $getan = [];
 $schon = [];
+// Was die Einrichtung NICHT selbst herstellen kann, sondern nur melden.
+//
+// ANLASS (2026-09-10, Befund des Projektinhabers): Der Update-Punkt in der
+// Seitenleiste blieb gelb, egal wie oft die Einrichtung lief. Grund war der
+// Hinweis auf die fehlenden Abzugssaetze weiter unten -- er landete in
+// $getan, und das Dashboard liest 'ausstehend' = count($getan). Ein Hinweis
+// auf etwas, das nur von Hand erfasst werden kann, sah damit aus wie ein
+// Einrichtungsschritt, der noch aussteht. Die Einrichtung konnte ihn nie
+// abarbeiten, also ging der Punkt nie aus.
+//
+// Ein Signal, das die Handlung, auf die es zeigt, nicht loeschen kann, ist
+// kaputt: Es gewoehnt einen daran, es zu uebersehen. Darum ein eigener
+// Eimer. Er wird angezeigt -- verschwiegen wird nichts --, aber er zaehlt
+// nicht als ausstehender Einrichtungspunkt.
+$hinweise = [];
 // Was nicht durchging. Bis hierher riss der erste fehlgeschlagene Schritt den
 // ganzen Lauf mit: Die Ausnahme lief in den Handler in db.php, der Endpunkt
 // antwortete mit 500, und im Dialog stand "Einrichtung fehlgeschlagen." ohne
@@ -1986,9 +2001,12 @@ if (!$nurPruefen && hat_tabelle_jetzt($pdo, 'lohnart')) {
 if (hat_tabelle_jetzt($pdo, 'lohn_abzug')) {
     try {
         if ((int)$pdo->query('SELECT COUNT(*) FROM lohn_abzug')->fetchColumn() === 0) {
-            $getan[] = 'Abzugssätze (lohn_abzug) sind noch nicht erfasst — '
-                     . 'NBU, KTG und BVG einmalig unter Lohn → Sätze und Regelwerk '
-                     . 'eintragen. AHV und ALV nicht: die stehen im Regelwerk.';
+            // HINWEIS, nicht $getan: Die Einrichtung legt hier bewusst
+            // nichts an (siehe oben). Ein Eintrag in $getan haette den
+            // Update-Punkt dauerhaft gelb gehalten.
+            $hinweise[] = 'Abzugssätze (lohn_abzug) sind noch nicht erfasst — '
+                        . 'NBU, KTG und BVG einmalig unter Lohn → Sätze und Regelwerk '
+                        . 'eintragen. AHV und ALV nicht: die stehen im Regelwerk.';
         }
     } catch (Throwable $e) {
         $fehler[] = 'Abzugssätze prüfen — ' . $e->getMessage();
@@ -2939,5 +2957,11 @@ json_response([
     'getan' => $getan,
     'unveraendert' => $schon,
     'fehler' => $fehler,
+    'hinweise' => $hinweise,
+    // ZAEHLT NUR $getan. 'ausstehend' ist die Zahl der Schritte, die dieser
+    // Endpunkt beim naechsten Druck auf "Prüfen und einrichten" selbst
+    // erledigt -- nicht die Zahl der offenen Aufgaben ueberhaupt. Das
+    // Dashboard haengt den Update-Punkt daran; alles, was hier mitzaehlt,
+    // ohne durch den Knopf zu verschwinden, macht den Punkt unloeschbar.
     'ausstehend' => count($getan),
 ]);
