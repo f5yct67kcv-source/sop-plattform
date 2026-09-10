@@ -57,6 +57,28 @@ if ($gelesen['fehler']) {
 }
 $s = $gelesen['spalten'];
 
+// Wer die vertraulichen Angaben nicht sehen darf, darf sie auch nicht
+// setzen (ENT-077) -- auch nicht beim Anlegen. mitarbeiter_update.php sperrt
+// das seit jeher, hier fehlte die Sperre. Sie fiel nicht auf, solange
+// ma_eingabe_lesen() die AHV-Nummer fuer JEDEN Aufrufer ablehnte (ENT-348).
+// Seit ENT-451 nimmt sie sie an -- damit stand der Weg offen, und zwar fuer
+// das empfindlichste Feld der Akte. Ein eigenes Rollenprofil mit
+// 'personal_schreiben' ohne 'personal_vertraulich_schreiben' ist genau die
+// Kombination, zu der die Rechteverwaltung ausdruecklich einlaedt.
+//
+// Anders als beim Bearbeiten wird hier nicht still entfernt, sondern
+// abgelehnt: Beim Anlegen gibt es keinen Bestand, aus dem ein Feld
+// versehentlich mitkaeme -- wer es mitschickt, will es setzen. Ein stilles
+// Verwerfen saehe fuer die aufrufende Stelle aus wie gespeichert.
+if (!darf($user, 'personal_vertraulich_schreiben')) {
+    $verboten = array_intersect(array_keys($s), ma_vertrauliche_felder());
+    foreach ($verboten as $feld) { unset($s[$feld]); }
+    if ($verboten) {
+        json_response(['status' => 'error',
+            'message' => 'Dafür fehlt dir die Berechtigung.'], 403);
+    }
+}
+
 // Das SQL wird aus der Feldliste gebaut und nicht von Hand geschrieben:
 // Spaltenzahl, Platzhalterzahl und Wertezahl koennen so nicht mehr
 // auseinanderlaufen. Genau dieser Fehler ist beim Kundenstamm zweimal
