@@ -124,6 +124,59 @@ try {
       versatz: Math.round(Math.max(...z.map(x => x.unten)) - Math.min(...z.map(x => x.unten))),
     }));
   });
+  // Ein gemeinsamer Takt fuer die Zeilen (Entscheid Projektinhaber,
+  // 10.09.2026). Buendig in sich war jede Zeile schon; ueber die Seite
+  // hinweg blieben die Baender ungleich hoch -- gemessen 246 / 314 / 224 /
+  // 253 / 262 px, fuenf Masse ohne Rhythmus. Eine Untergrenze von 260 px
+  // macht daraus 260 / 314 / 260 / 260 / 262.
+  //
+  // Geprueft wird die Untergrenze, nicht die Liste der Hoehen: Waechst ein
+  // Container durch mehr Inhalt ueber 260, ist das richtig und soll nicht
+  // rot werden. Und nicht die CSS-Zahl abgelesen, sondern der gerenderte
+  // Container gemessen -- eine min-height kann wirkungslos bleiben.
+  const zuFlach = await page.evaluate(() =>
+    [...document.querySelectorAll('#dashFlow .dash-item')]
+      .filter(el => getComputedStyle(el).display !== 'none' && !el.classList.contains('dh'))
+      .map(el => ({ id: el.dataset.widget, h: Math.round(el.getBoundingClientRect().height) }))
+      .filter(x => x.h < 260));
+  check('KRITISCH: keine Zeile faellt unter das gemeinsame Mass von 260 px'
+    + (zuFlach.length ? ' — ' + zuFlach.map(x => `${x.id}: ${x.h} px`).join(', ') : ''),
+    zuFlach.length === 0);
+
+  // Die Untergrenze darf die gezogene Hoehe nicht aushebeln: Wer eine Karte
+  // auf 120 px zieht, will 120 px.
+  //
+  // Zwei Faelle, und sie sind NICHT dasselbe -- gemessen, nicht vermutet:
+  //   a) Beide Container der Zeile gezogen -> die Zeile folgt auf 120 px.
+  //      Hier muss die Untergrenze weichen, sonst bliebe die Zeile auf 260
+  //      und beide Karten stuenden wieder in einer Leerflaeche. Das leistet
+  //      das :not(.dh) im Regelwerk.
+  //   b) Nur EINE gezogen, die Nachbarin frei -> die Zeile bleibt so hoch,
+  //      wie die Nachbarin sie braucht (260), und unter der gezogenen Karte
+  //      bleibt Platz. Das ist keine Panne, sondern die Rechnung einer Zeile:
+  //      Sie kann nicht flacher sein als ihr hoechster Inhalt. Was zaehlt,
+  //      ist dass die KARTE dem Zug folgt.
+  const gezogen = await page.evaluate(() => {
+    const g = id => document.querySelector(`#dashFlow [data-widget="${id}"]`);
+    const mass = id => ({ container: Math.round(g(id).getBoundingClientRect().height),
+      karte: Math.round(g(id).querySelector(':scope > .card').getBoundingClientRect().height) });
+    const zieh = (id, h) => { g(id).classList.add('dh'); g(id).style.setProperty('--dh', h + 'px'); };
+    const los  = id => { g(id).classList.remove('dh'); g(id).style.removeProperty('--dh'); };
+    zieh('angemeldet', 120);
+    const einzeln = mass('angemeldet');
+    zieh('verlauf', 120);
+    const beide = { a: mass('angemeldet'), v: mass('verlauf') };
+    los('angemeldet'); los('verlauf');
+    return { einzeln, beide };
+  });
+  check(`KRITISCH: sind beide Container einer Zeile gezogen, weicht das gemeinsame `
+    + `Mass (auf 120 px gezogen: ${gezogen.beide.a.container} / ${gezogen.beide.v.container} px)`,
+    gezogen.beide.a.container === 120 && gezogen.beide.v.container === 120
+      && gezogen.beide.a.karte === 120 && gezogen.beide.v.karte === 120);
+  check(`Ist nur einer gezogen, folgt wenigstens die Karte dem Zug `
+    + `(Karte ${gezogen.einzeln.karte} px in einer ${gezogen.einzeln.container} px hohen Zeile)`,
+    gezogen.einzeln.karte === 120);
+
   const schief = unterkanten.filter(z => z.versatz > 1);
   // Die Zahl der Zeilen wird mitgeprueft: Ohne sie bestuende die Pruefung
   // auch dann, wenn gar nichts mehr nebeneinander steht und die Liste leer
@@ -355,6 +408,18 @@ check('KRITISCH: "Mitarbeitende" und "Kunden" verschwinden auf dem Handy -- Best
   kachelnMobil[2].label === 'Mitarbeitende' && !kachelnMobil[2].sichtbar
     && kachelnMobil[3].label === 'Kunden' && !kachelnMobil[3].sichtbar);
 check('Alle vier Kacheln bleiben trotzdem im DOM', kachelnMobil.length === 4);
+
+// Das gemeinsame Zeilenmass gilt NUR am Schreibtisch. Untereinander gibt es
+// keine Zeile, deren Takt man halten koennte -- eine kurze Karte auf 260 px
+// zu heben waere allein Leerlauf. Geprueft daran, dass wirklich noch eine
+// flacher ist: Eine Pruefung, die auch dann bestuende, wenn alle ueber 260
+// liegen, sagt nichts ueber die Medienabfrage aus.
+const flachMobil = await page.evaluate(() =>
+  [...document.querySelectorAll('#dashFlow .dash-item')]
+    .filter(el => getComputedStyle(el).display !== 'none')
+    .map(el => Math.round(el.getBoundingClientRect().height)));
+check(`KRITISCH: auf dem Handy greift das Zeilenmass nicht (flachster Container `
+  + `${Math.min(...flachMobil)} px)`, Math.min(...flachMobil) < 260);
 
 await browser.close();
 
