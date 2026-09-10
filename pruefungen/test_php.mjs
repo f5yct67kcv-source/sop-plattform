@@ -332,6 +332,49 @@ check('KRITISCH: gegen alte Apache-Fassungen abgesichert -- ein Fehler hier legt
 check('Kopfzeilen nur, wenn das Modul da ist', /IfModule mod_headers\.c/.test(ht));
 check('Das Mikrofon bleibt erlaubt -- das Diktat braucht es',
   /microphone=\(self\)/.test(ht));
+
+// ── Permissions-Policy gegen das, was die Oberflaechen wirklich benutzen
+//    (ENT-501) ───────────────────────────────────────────────────────────
+//
+// ANLASS: Die Kopfzeile stand seit ENT-075 auf "geolocation=()" -- eine
+// LEERE Erlaubnisliste, die den Standort auch fuer die eigene Seite sperrt.
+// Sie stammt aus der Zeit VOR dem Revierdienst und ist nie nachgezogen
+// worden. app.html braucht navigator.geolocation inzwischen an neun
+// Stellen; am Standort haengt damit auch der Alleinarbeiterschutz.
+//
+// Warum das niemandem auffiel: Die Browser-Suiten bilden die Serverantwort
+// nach und sehen die .htaccess nie. Eine Schutzeinstellung, die eine
+// Funktion des Betriebs abschaltet, sieht im Quelltext richtig aus.
+//
+// Geprueft wird die AUSSAGE: Keine Funktion, die eine der Oberflaechen
+// tatsaechlich aufruft, darf in der Kopfzeile auf einer leeren Liste
+// stehen. Die Zuordnung Funktion -> Aufrufmuster steht hier, damit eine
+// kuenftig ergaenzte Sperre denselben Abgleich bekommt.
+const BROWSERFUNKTION = {
+  geolocation: /navigator\.geolocation\b/,
+  camera:      /getUserMedia\s*\(/,
+  microphone:  /getUserMedia\s*\(|webkitSpeechRecognition|\bSpeechRecognition\b/,
+};
+const oberflaechen = ['app.html', 'dashboard.html', 'portal.html', 'index.html']
+  .map(n => readFileSync(`${WURZEL}/${n}`, 'utf8')).join('\n');
+const policy = (ht.match(/Permissions-Policy\s+"([^"]*)"/) || [null, ''])[1];
+check('Es gibt ueberhaupt eine Permissions-Policy zu pruefen', policy.trim() !== '');
+const gesperrtObwohlBenutzt = Object.entries(BROWSERFUNKTION)
+  .filter(([funktion, muster]) => {
+    const leer = new RegExp(funktion + '\\s*=\\s*\\(\\s*\\)').test(policy);
+    return leer && muster.test(oberflaechen);
+  })
+  .map(([funktion]) => funktion);
+check('KRITISCH: keine Browserfunktion ist gesperrt, die eine Oberflaeche tatsaechlich benutzt',
+  gesperrtObwohlBenutzt.length === 0);
+if (gesperrtObwohlBenutzt.length) {
+  bad.push('per Kopfzeile gesperrt, aber benutzt: ' + gesperrtObwohlBenutzt.join(', '));
+}
+// Gegenrichtung: Die Zuordnung oben darf nicht ins Leere laufen. Trifft
+// KEIN Muster mehr, prueft der Abgleich nichts mehr und ist gruen, ohne
+// etwas zu wissen -- dieselbe Falle wie eine Ausnahmeliste ohne Datei.
+check('Die Zuordnung Browserfunktion -> Aufrufmuster trifft ueberhaupt etwas',
+  Object.values(BROWSERFUNKTION).some(m => m.test(oberflaechen)));
 check('Die HTTPS-Umleitung ist NICHT scharf geschaltet -- sie kann die Seite unerreichbar machen',
   /# *RewriteRule \^ https/.test(ht));
 check('Es steht drin, wie man die Datei wieder loswird, wenn sie Aerger macht',
@@ -402,6 +445,7 @@ for (const [datei, titel] of [
   ['pruef_wachbuch.php', 'KRITISCH: das Wachbuch fuehrt vier Quellen richtig zusammen, sortiert und kappt sie (ENT-480)'],
   ['pruef_zustellnachweis.php', 'KRITISCH: der Zustellnachweis fuehrt EINE Zeile je Rapport, kein Bewegungsprofil (ENT-491)'],
   ['pruef_portal_verlauf.php', 'KRITISCH: die Verlaufskurve buendelt nach Tagen/Wochen und laesst keine Luecke weg (ENT-500)'],
+  ['pruef_sicherheit.php', 'KRITISCH: die Sicherheitsregeln aus ENT-501 werden WIRKLICH ausgefuehrt -- Basisadresse, Link-Schema, Push-Dienst, Sitzungs-Abdruck, Blindpruefung, Bildtyp'],
 ]) {
   let aus = '', code = 0;
   try {
@@ -697,6 +741,77 @@ if (ohnePruefung.length) { bad.push('ohne Rechtepruefung: ' + ohnePruefung.join(
 const totEintraege = NUR_EIGENE_DATEN.filter(f => !apiDateien.includes(f));
 check('Die Ausnahmeliste nennt nur Endpunkte, die es gibt', totEintraege.length === 0);
 if (totEintraege.length) { bad.push('Ausnahme ohne Datei: ' + totEintraege.join(', ')); }
+
+// ── Endpunkte ganz OHNE Anmeldung (ENT-501) ───────────────────────────
+//
+// DIE LUECKE, die diese Liste schliesst: Die Rechtepruefung oben steigt in
+// ihrer ersten Zeile aus, sobald eine Datei kein require_session() enthaelt
+// ("login.php u.ae."). Das ist fuer den Anmelde-Endpunkt richtig -- es hiess
+// aber auch, dass ein NEUER Endpunkt, der require_session() schlicht
+// VERGISST, nirgends auffaellt: Er wird uebersprungen, nicht gemeldet, und
+// steht in keiner Ausnahmeliste. Genau die Sorte Fehler, vor der CLAUDE.md
+// warnt -- etwas Neues, das die Regel nicht erbt.
+//
+// Darum eine zweite Liste, und sie ist absichtlich vollstaendig: JEDER
+// Endpunkt, der weder eine Verwaltungs- noch eine Kundensitzung verlangt,
+// steht hier namentlich mit dem Grund. Kommt ein elfter dazu, wird die
+// Pruefung rot.
+const OHNE_ANMELDUNG = [
+  // Der Eingang selbst -- er kann keine Sitzung verlangen, die er erst
+  // erzeugt. Eigene Pruefungen: Bremse, zweiter Faktor, Notfallcodes.
+  'login.php',
+  // Loeschen der eigenen Sitzung. Wirkt nur mit dem Token, den man ohnehin
+  // schon hat, und kann nichts ausser dem eigenen Eintrag treffen.
+  'logout.php',
+  // Ruecksetzung per Mail (ENT-373). Verwaltungskonten sind ausdruecklich
+  // ausgenommen, die Antwort ist immer gleichlautend, eigene Bremse unter
+  // dem Namensraum "reset:". Eigene Pruefung: pruef_passwort_reset.php.
+  'passwort_vergessen.php',
+  'passwort_zuruecksetzen.php',
+  // Formular der oeffentlichen Homepage (ENT-469). Empfaenger fest aus den
+  // Betriebsstammdaten, Honigtopf-Feld, eigene Bremse. Eigene Pruefung:
+  // pruef_demo_anfrage.php.
+  'demo_anfrage.php',
+  // Die drei Eingaenge des Kundenportals -- stehen zusaetzlich in
+  // PORTAL_EINGAENGE weiter unten, weil dort die Portal-Regel greift.
+  'portal_anmelden.php',
+  'portal_link_anfordern.php',
+  'portal_neues_passwort.php',
+  // Beleg-Ansicht und Kundenentscheid am oeffentlichen Link (ENT-192/205).
+  // Der Ausweis ist ein versand_token mit 256 Bit -- ein Kunde hat kein
+  // Konto. Bis ENT-501 standen diese beiden nirgends benannt.
+  'beleg_oeffentlich.php',
+  'beleg_entscheidung.php',
+];
+const ohneAnmeldung = apiDateien.filter(f =>
+  !/require_session\s*\(|require_kundensession\s*\(/.test(ohneKommentar(f)));
+const unbenannt = ohneAnmeldung.filter(f => !OHNE_ANMELDUNG.includes(f));
+check('KRITISCH: jeder Endpunkt ganz ohne Anmeldung steht namentlich da',
+  unbenannt.length === 0);
+if (unbenannt.length) { bad.push('ohne Anmeldung und unbenannt: ' + unbenannt.join(', ')); }
+
+// Die Kehrseite, und sie ist der wichtigere Teil: Bekommt einer dieser
+// Endpunkte spaeter eine Sitzungspruefung, muss er hier VERSCHWINDEN. Sonst
+// deckt ein veralteter Eintrag den naechsten Endpunkt gleichen Namens zu --
+// dieselbe Ueberlegung wie bei totEintraege oben.
+const toteOhneAnmeldung = OHNE_ANMELDUNG.filter(f => !ohneAnmeldung.includes(f));
+check('Die Liste "ohne Anmeldung" nennt nur Endpunkte, die es auch wirklich sind',
+  toteOhneAnmeldung.length === 0);
+if (toteOhneAnmeldung.length) {
+  bad.push('steht als "ohne Anmeldung", prueft aber doch: ' + toteOhneAnmeldung.join(', '));
+}
+
+// Zwei weitere Regeln aus ENT-501 -- "die eigene Adresse kommt nie aus der
+// Anfrage" und "eine Sitzung wird nur ueber ihren Abdruck angesprochen" --
+// stehen BEWUSST NICHT hier, sondern in pruef_sicherheit.php.
+//
+// Grund, und er ist beim Schreiben dieser Pruefung aufgefallen: Der
+// Kommentarfilter oben (ohneKommentar) ist ein Muster, kein Zerteiler. Er
+// haelt die beiden Schraegstriche in der Zeichenkette 'https://' fuer einen
+// Kommentarbeginn und loescht den Rest der Zeile -- ausgerechnet die Zeile,
+// in der ein wieder eingebautes HTTP_HOST staende. Die Gegenprobe blieb
+// dadurch gruen. Fuer diese beiden Regeln zerteilt darum PHP selbst
+// (token_get_all), genau wie es pruef_sql.php aus demselben Grund tut.
 
 // ── Kundenportal (ENT-441) ────────────────────────────────────────────
 // Die Endpunkte des Portals gehen einen ANDEREN Weg als alle uebrigen: Sie

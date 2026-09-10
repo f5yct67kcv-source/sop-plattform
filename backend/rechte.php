@@ -706,6 +706,58 @@ function rechte_verwaltung_zahl(PDO $pdo, int $ausser = 0): int
     return $zahl;
 }
 
+// ── Augenhoehe: Wer darf an WESSEN Konto? (ENT-501) ───────────────────
+//
+// ANLASS, und er ist keine Theorie: Die Sicherheitspruefung vom 2026-09-09
+// hat einen Weg gefunden, der die Grenze zwischen "Personaladministration"
+// und "Verwalter" vollstaendig aufhebt. Wer 'personal_schreiben' hat,
+// konnte das Passwort JEDES Kontos setzen -- auch des Verwalters --, sich
+// danach als er anmelden und sich ueber rollen_zuteilen.php jedes Recht
+// selbst geben. Die Rollen aller Personen stehen ihm in
+// mitarbeiter_list.php ohnehin zur Verfuegung, das Ziel war also bekannt.
+//
+// Das widerspricht dem, was system_rollen() weiter oben ausdruecklich
+// festhaelt: *"Wer Rollen vergeben darf, kann sich jedes andere Recht
+// selbst geben -- das ist die Grenze zwischen den beiden Rollen und nicht
+// eine Kleinigkeit mehr oder weniger."* Die Grenze stand im Rollenmodell,
+// aber nicht im Endpunkt.
+//
+// DIE REGEL: An ein Konto, das Rollen vergeben darf, kommt nur heran, wer
+// das selbst darf. Sie gilt fuer jeden Weg, der ein fremdes Konto
+// uebernehmbar oder unbrauchbar macht -- heute Passwort zuruecksetzen und
+// deaktivieren.
+//
+// BEWUSST NICHT eine allgemeine Rangordnung ("wer mehr Rechte hat, darf an
+// wen mit weniger"): Die waere bei frei zusammenstellbaren Profilen
+// (ENT-440) nicht entscheidbar, weil zwei Profile sich ueberschneiden
+// koennen, ohne dass eines das andere enthaelt. Geprueft wird das EINE
+// Recht, an dem alle anderen haengen.
+function konto_vergibt_rollen(PDO $pdo, int $zielId, bool $istAdminSpalte = false): bool
+{
+    if ($zielId <= 0) { return false; }
+    $rollen = rechte_rollen($pdo, $zielId, $istAdminSpalte);
+    return in_array('rechte_' . STUFE_SCHREIBEN,
+        rechte_aus_rollen($rollen, rollen_definitionen($pdo)), true);
+}
+
+// Weist ab, wenn das Ziel Rollen vergeben darf und der Handelnde nicht.
+// $handlung geht in die Meldung ein -- "Dafuer fehlt dir die Berechtigung"
+// waere hier die falsche Auskunft: Das Recht fuer den Endpunkt HAT die
+// Person ja, es fehlt nur fuer DIESES Konto. Ein Text, der den Grund
+// verschweigt, schickt sie auf die Suche nach dem falschen Fehler.
+function require_augenhoehe(PDO $pdo, array $akteur, int $zielId,
+                            bool $istAdminSpalte, string $handlung): void
+{
+    if (!konto_vergibt_rollen($pdo, $zielId, $istAdminSpalte)) { return; }
+    if (darf($akteur, 'rechte_' . STUFE_SCHREIBEN)) { return; }
+    json_response([
+        'status'  => 'error',
+        'recht'   => 'rechte_' . STUFE_SCHREIBEN,
+        'message' => 'Dieses Konto darf Rollen vergeben. ' . $handlung
+                   . ' kann nur, wer das ebenfalls darf.',
+    ], 403);
+}
+
 // Setzt die Rollen einer Person. Gibt eine Meldung zurueck, wenn es nicht
 // geht -- oder null bei Erfolg.
 //

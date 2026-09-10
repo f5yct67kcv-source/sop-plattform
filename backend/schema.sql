@@ -65,3 +65,25 @@ CREATE TABLE rapporte (
   erfasst_am DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (mitarbeiter_id) REFERENCES mitarbeiter(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Kurzzeitgedaechtnis der Anmeldebremse (ENT-075, hier nachgetragen mit
+-- ENT-501). Sie stand bisher NUR im Einrichtungslauf
+-- (api/planung_einrichten.php) -- eine frisch angelegte Datenbank hatte sie
+-- also nicht, und ohne sie ist der Schutz gegen Passwort-Raten
+-- vollstaendig aus, ohne dass irgendwo etwas davon zu sehen waere.
+-- Der Einrichtungslauf legt sie weiterhin an, falls sie fehlt; beides
+-- nebeneinander ist kein Widerspruch, sondern zwei Wege zum selben Zustand.
+--
+-- Bewusst KEIN dauerhaftes Protokoll: Der Inhalt wird nach einem Tag
+-- geleert und nach einer erfolgreichen Anmeldung fuer diesen Namen
+-- geloescht. Eine Sammlung darueber, wer wann von wo aus etwas versucht
+-- hat, waere selbst wieder ein Bestand mit Personenbezug.
+CREATE TABLE anmeldeversuche (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  login_name VARCHAR(100) NOT NULL,
+  adresse VARCHAR(45) NOT NULL,
+  zeitpunkt DATETIME DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_zeitpunkt (zeitpunkt),
+  KEY idx_name (login_name, zeitpunkt),
+  KEY idx_adresse (adresse, zeitpunkt)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

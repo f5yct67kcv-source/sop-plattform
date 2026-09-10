@@ -31,11 +31,40 @@ function anmeld_adresse(): string
     return substr((string)($_SERVER['REMOTE_ADDR'] ?? 'unbekannt'), 0, 45);
 }
 
+// Fehlt die Tabelle, gibt es keine Bremse -- und das ist der gefaehrlichste
+// Zustand dieser Datei (ENT-501).
+//
+// ANLASS: Die Sicherheitspruefung vom 2026-09-09. Ohne die Tabelle liefert
+// anmeld_zaehlen() [0, 0], anmeld_fehlversuch() tut nichts, und
+// anmeld_sperre(0, 0) ist 0 -- also FREI. Der Schutz gegen Passwort-Raten
+// ist dann vollstaendig aus, und an der Oberflaeche ist davon nichts zu
+// sehen. Die Tabelle steht nicht in schema.sql (das ist mit ENT-501
+// nachgeholt), sondern entstand bis dahin erst beim Einrichtungslauf: Eine
+// frische Datenbank, eine wiederhergestellte Sicherung oder eine neue
+// Staging-Instanz lief also ungebremst.
+//
+// Das verstoesst gegen zwei Hausregeln auf einmal -- fail-safe (das
+// Versehen faellt hier auf die UNSICHERE Seite) und "«unbekannt» darf nie
+// wie «keine» aussehen": "Tabelle fehlt" sah exakt aus wie "keine
+// Fehlversuche".
+//
+// Warum trotzdem nicht abgewiesen wird: Eine Anmeldung zu verweigern, weil
+// eine Hilfstabelle fehlt, sperrte den ganzen Betrieb aus seinem eigenen
+// Werkzeug aus -- und zwar in genau dem Moment, in dem jemand eine
+// Sicherung zurueckgespielt hat und dringend hineinmuss. Der Ausfall wird
+// darum LAUT, aber er haelt niemanden auf. Sichtbar wird er im
+// Serverprotokoll; einmal je Prozess, damit ein Anmeldesturm es nicht
+// zuschuettet.
 function hat_tabelle_anmeldung(PDO $pdo): bool
 {
     static $da = null;
     if ($da === null) {
         $da = (bool)$pdo->query("SHOW TABLES LIKE 'anmeldeversuche'")->fetchColumn();
+        if (!$da) {
+            error_log('SICHERHEIT: Tabelle "anmeldeversuche" fehlt — die Bremse gegen '
+                . 'Passwort-Raten ist AUSSER BETRIEB. Im Cockpit unten links '
+                . '„Einrichtung" ausfuehren.');
+        }
     }
     return $da;
 }
@@ -136,6 +165,40 @@ const PASSWORT_MIN_ADMIN = 6;
 // waere derselbe Code je nach Hoster verschieden gut verwahrt.
 // Gemessene Dauer bei 12: rund 0,2 Sekunden je Anmeldung.
 const PASSWORT_KOSTEN = 12;
+
+// ── Blindpruefung gegen die Uhr (ENT-501) ─────────────────────────────
+//
+// ANLASS: Die Sicherheitspruefung vom 2026-09-09. login.php und
+// portal_anmelden.php geben bei unbekanntem Namen dieselbe MELDUNG aus wie
+// bei falschem Passwort -- das ist ausdrueckliche Absicht und steht in
+// beiden Dateien als Begruendung. Die ANTWORTZEIT verriet es trotzdem:
+//
+//     if (!$user || !password_verify($password, $user['password_hash']))
+//
+// PHP bricht bei || ab. Gibt es das Konto nicht, wird password_verify()
+// gar nicht erst gerufen und die Antwort kommt sofort; gibt es das Konto,
+// dauert sie rund 0,2 Sekunden. Der Unterschied ist ueber das Netz gut
+// messbar (CWE-208).
+//
+// Bei den Mitarbeitenden ist der Gewinn fuer einen Angreifer klein -- die
+// Login-Namen folgen ohnehin dem Muster vorname.nachname. Beim
+// KUNDENPORTAL wiegt es mehr: Dort verraet die Zeit, welche
+// E-Mail-Adressen Kunden des Betriebs sind, und das ist eine Aussage ueber
+// die Kundenliste, die von aussen sonst niemand bekommt.
+//
+// Der Hash unten ist ein fester, absichtlich unerreichbarer bcrypt-Wert mit
+// denselben Kosten wie die echten -- er gehoert zu keinem Konto und zu
+// keinem Passwort (erzeugt aus 32 Byte Zufall, der danach weggeworfen
+// wurde). Er ist KEIN Geheimnis: Sein einziger Zweck ist, gleich lange zu
+// rechnen wie eine echte Pruefung.
+const PASSWORT_BLIND_HASH = '$2y$12$N7O0FDJdFPart9JX55ONQOcU1x7xL6dANH3OlQtldLC9jvPDy9rHy';
+
+// Rechnet so lange wie eine echte Passwortpruefung und verwirft das
+// Ergebnis. Aufzurufen genau dort, wo es KEIN Konto zu pruefen gibt.
+function passwort_blindpruefung(string $eingabe): void
+{
+    password_verify($eingabe, PASSWORT_BLIND_HASH);
+}
 
 // Tastaturreihen und Folgen. Wer zwoelf Zeichen braucht, nimmt sonst gern
 // die naechstliegende Reihe -- "qwertzuiop" ist lang und trotzdem in

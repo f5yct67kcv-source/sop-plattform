@@ -110,7 +110,7 @@ $sitzung = bin2hex(random_bytes(32));
 $pdo->prepare(
     'INSERT INTO kunden_sessions (token, zugang_id, erstellt_am, letzte_nutzung)
      VALUES (?, ?, NOW(), NOW())'
-)->execute([$sitzung, $zugangId]);
+)->execute([sitzung_abdruck($sitzung), $zugangId]);
 $pdo->prepare('UPDATE kundenzugang SET letzter_zugriff = NOW() WHERE id = ?')
     ->execute([$zugangId]);
 

@@ -35,6 +35,17 @@
 #      geprueft noch behaupte ich das eine oder andere; wer den Nachtrag
 #      macht, prueft diesen Eintrag mit.
 #
+#  (c) Permissions-Policy: geolocation von "()" auf "(self)" (ENT-501,
+#      2026-09-10). Die leere Liste sperrte den Standort auch fuer die
+#      eigene Seite -- app.html braucht ihn an neun Stellen, und am
+#      Standort haengt der Alleinarbeiterschutz. Auch dieser Hash ist dem
+#      manuellen Nachtrag vorausgeeilt, aus demselben Grund wie (a): Ohne
+#      ihn waere die Regression dauerhaft rot und nichts liesse sich mehr
+#      schieben. STEHT AUS. Fuer Staging heisst das bis zum Nachtrag: Die
+#      Ortung bleibt dort gesperrt, ein Rundgangstest auf Staging kann
+#      also keine Position erfassen -- auf Production greift die neue
+#      Zeile mit dem naechsten Deploy von selbst.
+#
 # Was das heisst: Fuer diese Aenderungen haelt der Drift-Guard den
 # Staging-Deploy NICHT an. Production ist nicht betroffen -- dort laedt der
 # Deploy die .htaccess selbst hoch. In Staging schuetzt bis zum Nachtrag die
@@ -45,6 +56,6 @@
 # von #@__HCP_END__@#). Danach diesen Absatz loeschen -- er ist der einzige
 # Hinweis darauf, dass der Hash dem Nachtrag vorausgeeilt ist.
 
-htaccess-hostpoint:ec713b8db0345235ec6ca0556454db2f92f8d7ad13f1f7f1840734a1f85cd23e
+htaccess-hostpoint:13e3aff422b037e8d3cf72f55aec9756ce0db9932e4688a87725583bced3ae0e
 htaccess-staging-zusatz:7b6df04b9fd9decbeb68442a6080b3e39c384e31d59273e53f938549c8e26208
 robots-staging.txt:e120f27381f482e2de05b11355c7d1818e8266d282cec8cf04bc8b33916e7583

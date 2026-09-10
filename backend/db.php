@@ -60,6 +60,50 @@ function ist_produktion(): bool
     return umgebung_ist_produktion(APP_ENV);
 }
 
+// ── Die eigene Adresse (ENT-501) ──────────────────────────────────────
+//
+// ANLASS: Die Sicherheitspruefung vom 2026-09-09. Drei Stellen bauten einen
+// Link, den der Server per E-Mail verschickt, aus $_SERVER['HTTP_HOST'] --
+// und das ist der Host-Kopf AUS DER ANFRAGE, also ein Wert, den der
+// Aufrufer frei setzt. Bei zwei davon (passwort_vergessen.php,
+// portal_link_anfordern.php) braucht der Aufrufer nicht einmal eine
+// Anmeldung. Wer sie mit einem fremden Host-Kopf aufrief, liess den Server
+// eine Nachricht vom ECHTEN Absender an die ECHTE Person schicken -- mit
+// einem Link auf die eigene Adresse. Ein Klick, und das Ruecksetz-Token lag
+// beim Angreifer.
+//
+// Der urspruengliche Grund fuer HTTP_HOST steht in
+// portal_link_anfordern.php und ist richtig: Ein Test auf der
+// Staging-Adresse soll keine Links auf die produktive Seite verschicken.
+// Nur ist die Anfrage die falsche Quelle dafuer. Der Deploy-Lauf weiss
+// zweifelsfrei, fuer welche Umgebung er laeuft -- genau wie bei APP_ENV
+// darueber, und mit demselben Platzhalter-Mechanismus.
+const APP_BASIS_URL = '__APP_BASIS_URL__';
+
+// Reine Funktion, damit sie sich mit einem frei gewaehlten Wert pruefen
+// laesst -- eine PHP-Konstante laesst sich nach der Definition nicht mehr
+// aendern, ein Test kaeme sonst nur an EINEM Zustand vorbei (dieselbe
+// Ueberlegung wie bei umgebung_ist_produktion()).
+//
+// Gibt null zurueck, wenn nichts Brauchbares dasteht: ein unersetzter
+// Platzhalter, etwas ohne https, etwas mit Zeilenumbruch. NULL heisst
+// "nicht eingerichtet" und nicht "nimm irgendetwas" -- die Aufrufer
+// verschicken dann keinen Link und sagen das. Ein falscher Link ist
+// schlimmer als kein Link.
+function basis_url_pruefen(string $wert): ?string
+{
+    $wert = trim($wert);
+    if ($wert === '' || str_contains($wert, '__APP_BASIS_URL')) { return null; }
+    if (preg_match('/[\x00-\x20\x7F]/', $wert)) { return null; }
+    if (!preg_match('~^https://[A-Za-z0-9.-]+(:\d+)?(/[^\s]*)?$~', $wert)) { return null; }
+    return rtrim($wert, '/');
+}
+
+function basis_url(): ?string
+{
+    return basis_url_pruefen(APP_BASIS_URL);
+}
+
 // ── Sitzungsdauer (ENT-075) ───────────────────────────────────────────
 // Bis hierher lief eine Sitzung NIE ab: Ein einmal abgegriffener Token galt
 // fuer immer. Jetzt gelten zwei Grenzen gleichzeitig -- ein absolutes Alter
@@ -128,6 +172,37 @@ function sitzung_abgelaufen(array $rechte, int $geboren, int $gesehen, int $jetz
     return ($jetzt - $geboren) > $maxAlt || ($jetzt - $gesehen) > $maxRuhe;
 }
 
+// ── Sitzungs-Token werden gehasht abgelegt (ENT-501) ──────────────────
+//
+// ANLASS: Die Sicherheitspruefung vom 2026-09-09. Der Token wurde richtig
+// erzeugt (bin2hex(random_bytes(32)), 256 Bit) -- aber unveraendert in
+// `sessions.token` bzw. `kunden_sessions.token` abgelegt. Wer je Lesezugriff
+// auf die Datenbank bekommt (eine Sicherungskopie, ein phpMyAdmin-Zugang,
+// ein spaeter woanders eingesetzter Datenbankbenutzer), konnte damit JEDE
+// offene Sitzung uebernehmen -- ohne Passwort und ohne zweiten Faktor.
+//
+// Auffaellig war der Gegensatz: Passwoerter, Ruecksetz-Token, Notfallcodes,
+// Portal-Links und gemerkte Geraete liegen in diesem Haus alle gehasht.
+// Nur die Sitzung nicht.
+//
+// SHA-256 und nicht bcrypt -- dieselbe Ueberlegung wie bei
+// passwort_reset.token_hash und zwei_faktor_geraete.merkmal_hash: Ein
+// Zufallswert dieser Laenge ist nicht zu erraten, ein langsames Verfahren
+// braeuchte es also nicht, und es liefe bei JEDER Anfrage.
+//
+// Die Ablage passt ohne Schemaaenderung: Der Abdruck ist 64 Zeichen lang,
+// die Spalte ist VARCHAR(64).
+//
+// PREIS DES UMBAUS, und er ist gewollt: Bestehende Sitzungen gelten nicht
+// mehr -- in der Datenbank steht der alte Rohwert, verglichen wird gegen
+// den Abdruck. Alle melden sich einmal neu an. Ein Uebergang, der beides
+// annimmt, haette den Rohwert noch bis zu 30 Tage stehen lassen, also
+// genau das Problem behalten, das behoben werden soll.
+function sitzung_abdruck(string $token): string
+{
+    return hash('sha256', $token);
+}
+
 function require_session(): array {
     // NUR aus dem Kopfbereich (ENT-075). In der URL landet ein Token in
     // Server-Protokollen, im Browserverlauf und in der Adresszeile, die
@@ -136,6 +211,9 @@ function require_session(): array {
     if (!$token) {
         json_response(['status' => 'error', 'message' => 'kein Token'], 401);
     }
+    // Ab hier wird nur noch mit dem Abdruck gearbeitet (ENT-501) -- der
+    // Rohwert kommt in keine Abfrage mehr.
+    $abdruck = sitzung_abdruck((string)$token);
     $pdo = db();
     $hatStempel = hat_spalte($pdo, 'sessions', 'letzte_nutzung');
     $stmt = $pdo->prepare(
@@ -145,7 +223,7 @@ function require_session(): array {
          JOIN mitarbeiter m ON m.id = s.mitarbeiter_id
          WHERE s.token = ? AND m.aktiv = 1'
     );
-    $stmt->execute([$token]);
+    $stmt->execute([$abdruck]);
     $row = $stmt->fetch();
     if (!$row) {
         json_response(['status' => 'error', 'message' => 'ungueltige oder abgelaufene Sitzung'], 401);
@@ -189,7 +267,7 @@ function require_session(): array {
 
     if (sitzung_abgelaufen($row['rechte'], $geboren, $gesehen, $jetzt)) {
         // Die abgelaufene Sitzung wird gleich entfernt, nicht nur abgelehnt.
-        $pdo->prepare('DELETE FROM sessions WHERE token = ?')->execute([$token]);
+        $pdo->prepare('DELETE FROM sessions WHERE token = ?')->execute([$abdruck]);
         json_response(['status' => 'error',
             'message' => 'Die Sitzung ist abgelaufen — bitte neu anmelden.'], 401);
     }
@@ -198,7 +276,7 @@ function require_session(): array {
     // laedt ein Dutzend Endpunkte auf einmal, das waere ein Dutzend
     // Schreibvorgaenge fuer dieselbe Minute.
     if ($hatStempel && $jetzt - $gesehen > 300) {
-        $pdo->prepare('UPDATE sessions SET letzte_nutzung = NOW() WHERE token = ?')->execute([$token]);
+        $pdo->prepare('UPDATE sessions SET letzte_nutzung = NOW() WHERE token = ?')->execute([$abdruck]);
     }
 
     // Gelegentlich aufraeumen. Ohne das waechst die Tabelle mit toten
@@ -319,6 +397,51 @@ if (!function_exists('hat_tabelle')) {
             $bekannt[$tabelle] = (bool)$s->fetchColumn();
         }
         return $bekannt[$tabelle];
+    }
+}
+
+// ── Kontaktweg "Webseite" (ENT-501) ───────────────────────────────────
+//
+// ANLASS: Die Sicherheitspruefung vom 2026-09-09 hat gefunden, dass dieser
+// eine Wert als einziger Kontaktweg OHNE festes Schema in ein href geht
+// (app.html, rgsKontakteHtml -> wegZiel). Bei 'email' steht "mailto:"
+// davor, bei 'telefon' und 'mobil' "tel:" -- bei 'webseite' nichts. Ein
+// eingetragenes "javascript:..." wurde damit zu einem Link, der beim
+// Antippen fremden Code mit der Sitzung der antippenden Person ausfuehrt.
+// Angezeigt wird diese Liste dem Waechter WAEHREND der laufenden Runde.
+//
+// Das HTML-Escapen faengt das nicht: esc() ersetzt & < > " ' -- in
+// "javascript:" steht keines dieser Zeichen.
+//
+// Die Sperre steht hier im Server und zusaetzlich in der Oberflaeche
+// (CLAUDE.md: "Sperren gehoeren in den Server, nicht in die Oberflaeche.
+// Was im Browser steht, erspart nur den Umweg"). Bestehende Werte in der
+// Datenbank sind damit nicht geheilt -- darum muss die Oberflaeche beim
+// Anzeigen ebenfalls pruefen und nicht nur beim Speichern.
+//
+// EINE Stelle fuer beide Wege (Kundenkontakte in kunden.php und
+// Objekt-Ansprechpartner in api/objekt_personen.php): Zwei Fassungen
+// derselben Regel laufen frueher oder spaeter auseinander, und die
+// vergessene ist dann die offene.
+//
+// Ohne Schema wird https:// ergaenzt statt abgewiesen -- "www.beispiel.ch"
+// ist die uebliche Eingabe und wuerde sonst als relativer Pfad im Browser
+// enden. Alles andere als http/https gibt null: unbekanntes Schema heisst
+// hier "kein Link", nicht "irgendein Link".
+if (!function_exists('web_adresse_sicher')) {
+    function web_adresse_sicher(string $wert): ?string {
+        $wert = trim($wert);
+        if ($wert === '') { return null; }
+        // Steuerzeichen raus, bevor irgendetwas geprueft wird: Ein
+        // eingebettetes Tabulator- oder Zeilenumbruchzeichen laesst manche
+        // Browser "java\nscript:" wieder zu "javascript:" zusammenziehen.
+        $wert = preg_replace('/[\x00-\x20\x7F]/u', '', $wert) ?? '';
+        if ($wert === '') { return null; }
+        if (!preg_match('~^[A-Za-z][A-Za-z0-9+.-]*:~', $wert)) {
+            $wert = 'https://' . $wert;          // gaengige Eingabe ohne Schema
+        }
+        if (!preg_match('~^https?://[^/?#]+~i', $wert)) { return null; }
+        return $wert;
     }
 }
 

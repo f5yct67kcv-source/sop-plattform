@@ -6,6 +6,6 @@ require __DIR__ . '/../db.php';
 $token = $_SERVER['HTTP_X_AUTH_TOKEN'] ?? '';
 if ($token) {
     $stmt = db()->prepare('DELETE FROM sessions WHERE token = ?');
-    $stmt->execute([$token]);
+    $stmt->execute([sitzung_abdruck((string)$token)]);
 }
 json_response(['status' => 'ok']);

@@ -158,6 +158,39 @@ function smtp_senden(string $anEmail, string $anName, string $betreff, string $h
         throw new RuntimeException('Der E-Mail-Versand ist noch nicht eingerichtet (SMTP-Zugangsdaten fehlen).');
     }
 
+    // ── Kein Zeilenumbruch in Adresse, Name oder Betreff (ENT-501) ─────
+    //
+    // ANLASS: Die Sicherheitspruefung vom 2026-09-09. Diese Funktion hat
+    // bis hierher NICHTS selbst geprueft -- smtp_befehl() haengt an jeden
+    // Befehl ein CRLF an, und die Empfaengeradresse ging roh in
+    // "RCPT TO:<...>" und in den "To:"-Kopf. Ob das gutgeht, entschieden
+    // ausschliesslich die Aufrufer.
+    //
+    // Fuenf von sechs prueften: demo_anfrage.php entfernt Steuerzeichen,
+    // portal_link_anfordern.php und rundgang_rapport_versenden.php nutzen
+    // FILTER_VALIDATE_EMAIL, passwort_vergessen.php liest aus der
+    // Mitarbeitertabelle. beleg_versenden.php prueft nicht -- dort steht
+    // nur trim(), und trim() entfernt Umbrueche nur am Rand, nicht in der
+    // Mitte. Eine als Kundenadresse gespeicherte Zeichenkette mit CRLF
+    // haette dort eine zweite SMTP-Zeile einschleusen koennen.
+    //
+    // DIE PRUEFUNG GEHOERT HIERHER und nicht in sechs Aufrufer: Sie ist
+    // einmal richtig statt sechsmal, und der siebte Aufrufer erbt sie von
+    // selbst -- genau die Sorte Regel, die in diesem Haus schon mehrfach
+    // gebrochen wurde, weil etwas NEUES sie nicht geerbt hat.
+    //
+    // Sie steht VOR dem Staging-Zweig: Dort wandert $anEmail in den
+    // Betreff, ein ungeprueftes Feld waere also auch dort ein Weg.
+    foreach (['Empfaengeradresse' => $anEmail, 'Empfaengername' => $anName,
+              'Betreff' => $betreff] as $was => $wert) {
+        if (preg_match('/[\r\n]/', $wert)) {
+            throw new RuntimeException($was . ' enthaelt einen Zeilenumbruch — nicht versendet.');
+        }
+    }
+    if (!filter_var($anEmail, FILTER_VALIDATE_EMAIL)) {
+        throw new RuntimeException('Keine gueltige Empfaengeradresse — nicht versendet.');
+    }
+
     // Staging-Mailmodus (ENT-341): ausserhalb der Produktion geht JEDE Mail
     // ausschliesslich an die konfigurierte Testadresse, nie an den
     // eingegebenen Empfaenger. Bewusst vor jedem Verbindungsaufbau geprueft,
@@ -200,7 +233,15 @@ function smtp_senden(string $anEmail, string $anName, string $betreff, string $h
 
     try {
         smtp_lesen($fp); // Begruessung (220)
-        $ehloName = $_SERVER['HTTP_HOST'] ?? 'localhost';
+        // Der EHLO-Name benennt den ABSENDENDEN Rechner. Er kam bis
+        // ENT-501 aus dem Host-Kopf der Anfrage -- ein Wert von aussen in
+        // einer SMTP-Befehlszeile, und damit dieselbe Familie wie die
+        // Links oben. Jetzt aus der beim Deploy gesetzten Adresse; ist
+        // keine hinterlegt, bleibt "localhost" wie bisher.
+        $basisEhlo = basis_url();
+        $ehloName = $basisEhlo !== null
+            ? (string)(parse_url($basisEhlo, PHP_URL_HOST) ?: 'localhost')
+            : 'localhost';
         smtp_befehl($fp, 'EHLO ' . $ehloName, [250]);
 
         if ($verschluesselung === 'tls') {

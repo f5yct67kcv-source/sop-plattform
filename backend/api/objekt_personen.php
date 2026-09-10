@@ -39,6 +39,14 @@ function op_wege_saeubern(array $roh): array {
         $art = (string)($w['art'] ?? '');
         $wert = trim((string)($w['wert'] ?? ''));
         if ($wert === '' || !in_array($art, OP_WEG_ARTEN, true)) { continue; }
+        // Dieselbe Regel wie bei den Kundenkontakten (ENT-501): Eine
+        // Webseite wird in der App zu einem Link und braucht ein Schema,
+        // dem man folgen darf. Genau diese Liste zeigt die App dem
+        // Waechter waehrend der laufenden Runde.
+        if ($art === 'webseite') {
+            $wert = web_adresse_sicher($wert) ?? '';
+            if ($wert === '') { continue; }
+        }
         if (mb_strlen($wert) > 255) { $wert = mb_substr($wert, 0, 255); }
         $sauber[] = ['art' => $art, 'wert' => $wert];
     }

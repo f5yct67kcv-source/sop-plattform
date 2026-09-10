@@ -87,7 +87,7 @@ try {
     // ist -- sich selbst aber nicht.
     $token = $_SERVER['HTTP_X_AUTH_TOKEN'] ?? '';
     $pdo->prepare('DELETE FROM kunden_sessions WHERE zugang_id = ? AND token <> ?')
-        ->execute([$zugangId, $token]);
+        ->execute([$zugangId, sitzung_abdruck((string)$token)]);
     // Und offene Links entwerten. Einer, der noch im Postfach liegt, waere
     // sonst ein Weg an dem eben gesetzten Passwort vorbei -- dieselbe
     // Ueberlegung wie beim Erstsetzen.
