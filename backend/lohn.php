@@ -347,6 +347,28 @@ function lohn_pako_beitrag_rappen(?string $kategorie, float $stunden): array
 // GAV. Er wird je Person aus der PK-Meldung erfasst (ENT-451) und NICHT
 // hergeleitet -- eine selbst gerechnete Altersgutschrift waere eine
 // Behauptung ueber einen fremden Vertrag.
+// ── In welcher Form ein Abzug erfasst wird ───────────────────────────────
+//
+// Der NBU kennt nur den SATZ. Ein UVG-Versicherer legt die Praemie als Satz
+// des versicherten Verdienstes fest -- ein fester Frankenbetrag ist dort
+// systemfremd, und lohnlauf.php rechnet folgerichtig nur mit dem Satz. Bis
+// diese Regel benannt war, liess sich fuer den NBU trotzdem ein Fixbetrag
+// speichern: Die Abrechnung sperrte dann mit "Praemiensatz ist nicht
+// erfasst", obwohl etwas erfasst WAR -- und zwar fuer jede NBU-versicherte
+// Person im Lauf.
+//
+// KTG und BVG kennen beide Formen. Beim BVG ist der Frankenbetrag sogar der
+// Normalfall: Er kommt aus der Meldung der Pensionskasse, nicht aus einem
+// Satz, den der Betrieb selbst rechnen duerfte.
+//
+// Benannt statt in zwei if-Bedingungen versteckt, weil zwei Stellen sie
+// brauchen -- das Speichern und das Rechnen -- und zwei Kopien irgendwann
+// zwei verschiedene Antworten geben.
+function lohn_abzug_nur_satz(string $schluessel): bool
+{
+    return $schluessel === 'nbu';
+}
+
 function lohn_bvg_pflichtig_ab(?string $geburtsdatum): ?string
 {
     if (!$geburtsdatum || strlen($geburtsdatum) < 10) { return null; }

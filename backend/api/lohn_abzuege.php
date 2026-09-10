@@ -187,6 +187,22 @@ if ($satzBp === null && $fix === null) {
     json_response(['status' => 'error',
         'message' => 'Entweder ein Satz in Prozent oder ein Fixbetrag ist erforderlich'], 400);
 }
+// Der NBU kennt nur den Satz. Ein UVG-Versicherer legt die Praemie als Satz
+// des versicherten Verdienstes fest (siehe lohn_abzug_woher(): "Praemiensatz
+// des UVG-Versicherers, aus der Praemienrechnung oder Police"), und
+// lohnlauf.php rechnet folgerichtig nur damit. Ein Fixbetrag liess sich hier
+// trotzdem speichern -- das Ergebnis war eine Abrechnung, die mit
+// "Praemiensatz ist nicht erfasst" sperrte, obwohl etwas erfasst WAR, und
+// zwar fuer JEDE NBU-versicherte Person im Lauf. Erfasst und wirksam fallen
+// hier wieder zusammen, statt auseinanderzulaufen.
+//
+// KTG und BVG bleiben unberuehrt: Dort ist ein Frankenbetrag der Normalfall
+// -- der BVG-Beitrag kommt als Betrag aus der Meldung der Pensionskasse.
+if (lohn_abzug_nur_satz($schluessel) && $fix !== null) {
+    json_response(['status' => 'error',
+        'message' => 'NBU braucht einen Prämiensatz in Prozent, keinen Fixbetrag — '
+                   . 'der Versicherer legt ihn als Satz des versicherten Verdienstes fest'], 400);
+}
 // KEIN Hoechstlohn mehr entgegennehmen (2026-09-09). Die Spalte
 // hoechstlohn_rappen wurde gespeichert und von keiner Rechnung gelesen --
 // die UVG-Obergrenze steht in LOHN_UVG, die der ALV in LOHN_ALV, beide je

@@ -667,6 +667,23 @@ pruef('Basispunkte werden ohne nachlaufende Nullen als Prozent geschrieben',
     lohn_bp_text(530) === '5.3 %' && lohn_bp_text(110) === '1.1 %'
     && lohn_bp_text(1060) === '10.6 %' && lohn_bp_text(160) === '1.6 %');
 
+// In welcher FORM ein Abzug erfasst wird, ist ebenfalls keine freie Wahl.
+// Der NBU ist ein Praemiensatz des UVG-Versicherers -- ein Satz des
+// versicherten Verdienstes, kein Frankenbetrag. Beim BVG ist es umgekehrt:
+// Dort kommt der Betrag aus der Meldung der Pensionskasse, und ein selbst
+// gerechneter Satz waere eine Behauptung ueber einen fremden Vertrag.
+//
+// Geprueft wird die Aussage, nicht die Bedingung: Bis diese Regel benannt
+// war, liess sich fuer den NBU ein Fixbetrag speichern -- die Abrechnung
+// sperrte dann fuer JEDE versicherte Person mit "Praemiensatz ist nicht
+// erfasst", obwohl etwas erfasst war.
+pruef('KRITISCH: der NBU kennt nur den Praemiensatz, keinen Fixbetrag',
+    lohn_abzug_nur_satz('nbu') === true);
+pruef('KRITISCH: KTG und BVG kennen beide Formen -- der BVG-Betrag kommt als Betrag von der PK',
+    lohn_abzug_nur_satz('ktg') === false && lohn_abzug_nur_satz('bvg') === false);
+pruef('Ein unbekannter Schluessel wird nicht stillschweigend eingeschraenkt',
+    lohn_abzug_nur_satz('gibtsnicht') === false);
+
 // ── Der Startbestand muss sich wirklich einfuegen lassen ─────────────────
 //
 // KRITISCH, und am 2026-09-09 im Livesystem aufgeschlagen: Mit der Spalte

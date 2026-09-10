@@ -48,6 +48,7 @@ function lohnlauf_sperrgruende(): array
         'kein_sv_regelwerk'  => 'Für dieses Beitragsjahr sind die Sätze für AHV, IV und EO nicht erfasst. Es wird nicht mit den Sätzen eines anderen Jahres gerechnet.',
         'kein_alv_regelwerk' => 'Für dieses Beitragsjahr ist der ALV-Satz nicht erfasst. Es wird nicht mit den Sätzen eines anderen Jahres gerechnet.',
         'kein_nbu_satz'      => 'Es besteht Deckung gegen Nichtberufsunfälle, aber der Prämiensatz des Versicherers ist nicht erfasst.',
+        'nbu_fixbetrag'      => 'Für den NBU ist ein Fixbetrag erfasst statt eines Prämiensatzes. Der Versicherer legt die Prämie als Satz des versicherten Verdienstes fest — ein fester Frankenbetrag wird nicht verrechnet. Der Satz ist in den Abzugssätzen nachzutragen.',
         'kein_ktg_satz'      => 'Der Krankentaggeld-Satz ist nicht erfasst. Solange er fehlt, wird nicht gerechnet — auch nicht mit null.',
         'kein_bvg_satz'      => 'Der BVG-Beitrag aus der Meldung der Pensionskasse ist nicht erfasst.',
         'nbu_keine_deckung'  => 'Unter acht Wochenstunden besteht keine Deckung gegen Nichtberufsunfälle (Merkblatt 6.05 Ziff. 4). Es darf kein Beitrag abgezogen werden.',
@@ -514,9 +515,18 @@ function lohnlauf_abzuege(PDO $pdo, array $kopf, string $bis, ?array $nbu = null
         $zeile('nbu', 'NBU-Beitrag', $uvgBasis, null, null, 52,
             $stand === LOHN_NBU_PRUEFEN ? 'nbu_pruefen' : 'nbu_unbekannt',
             $nbu['text'] ?? 'Die Unterstellung ist nicht ermittelt.');
-    } elseif ($satz === null || $satz['satz_bp'] === null) {
+    } elseif ($satz === null) {
         $zeile('nbu', 'NBU-Beitrag', $uvgBasis, null, null, 52, 'kein_nbu_satz',
             'Deckung besteht, aber der Praemiensatz des Versicherers ist nicht erfasst.');
+    } elseif ($satz['satz_bp'] === null) {
+        // Getrennt vom Fall darueber, weil es eine ANDERE Aussage ist: Hier
+        // ist etwas erfasst, nur in der Form, die der NBU nicht kennt (ein
+        // Fixbetrag). "Nicht erfasst" haette den Bedienenden an die falsche
+        // Stelle geschickt -- er haette einen Wert gesucht, der bereits
+        // dasteht. lohn_abzuege.php nimmt so eine Zeile seit demselben
+        // Schritt nicht mehr an; dieser Zweig faengt, was vorher entstand.
+        $zeile('nbu', 'NBU-Beitrag', $uvgBasis, null, null, 52, 'nbu_fixbetrag',
+            'Erfasst ist ein Fixbetrag, kein Praemiensatz -- so wird der NBU nicht gerechnet.');
     } else {
         $zeile('nbu', 'NBU-Beitrag', $uvgBasis, (int)$satz['satz_bp'],
             -lohn_anteil($uvgBasis, (int)$satz['satz_bp']), 52, null,

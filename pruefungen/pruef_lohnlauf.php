@@ -323,7 +323,7 @@ $gruende = lohnlauf_sperrgruende();
 $benutzt = ['sparte_reinigung', 'kein_regelwerk', 'kein_ansatz', 'keine_kategorie',
             'zeiten_unvollstaendig', 'pause_laenger_als_schicht', 'monatslohn_offen',
             'anordnung_fehlt', 'ausgleich_offen',
-            'ansatz_ohne_kategorie', 'ansatz_andere_lohnform'];
+            'ansatz_ohne_kategorie', 'ansatz_andere_lohnform', 'nbu_fixbetrag'];
 pruef('KRITISCH: zu jedem verwendeten Sperrgrund gibt es einen erklaerenden Satz',
     count(array_diff($benutzt, array_keys($gruende))) === 0);
 pruef('Und keiner dieser Saetze ist leer',
@@ -588,6 +588,24 @@ pruef('Mit Deckung und Satz wird gerechnet: 1,60 % von 291.60 sind 4.67',
     $zS['nbu']['betrag_rappen'] === -467);
 pruef('Der Hinweis nennt die Quelle des Satzes',
     str_contains((string)$zS['nbu']['hinweis'], 'Police'));
+
+// Ein FIXBETRAG statt eines Praemiensatzes ist eine DRITTE Lage, nicht
+// dieselbe wie "nicht erfasst": Es steht etwas da, nur in der Form, die der
+// NBU nicht kennt. Wer "der Praemiensatz ist nicht erfasst" liest, sucht
+// einen Wert, der bereits dasteht -- und findet ihn nicht, weil er anders
+// heisst. Seit lohn_abzug_nur_satz() nimmt lohn_abzuege.php so eine Zeile
+// nicht mehr an; dieser Zweig faengt, was vorher entstanden ist.
+$pdo->exec("INSERT INTO lohn_abzug VALUES (9,'nbu','NBU','2026-06-01',NULL,NULL,500,NULL,'Police')");
+$aF = lohnlauf_abzuege($pdo, $refKopf, '2026-07-31', ['stand' => LOHN_NBU_VERSICHERT]);
+$zF = []; foreach ($aF['zeilen'] as $z) { $zF[$z['schluessel']] = $z; }
+pruef('KRITISCH: ein Fixbetrag beim NBU wird NICHT als Abzug verrechnet',
+    $zF['nbu']['betrag_rappen'] === null);
+pruef('KRITISCH: und er bekommt einen EIGENEN Grund, nicht denselben wie ein fehlender Satz',
+    $zF['nbu']['gesperrt_grund'] === 'nbu_fixbetrag'
+    && $zF['nbu']['gesperrt_grund'] !== 'kein_nbu_satz');
+pruef('Der Grund sagt, dass etwas erfasst IST -- nur in der falschen Form',
+    str_contains(lohnlauf_sperrgruende()['nbu_fixbetrag'] ?? '', 'Fixbetrag'));
+$pdo->exec("DELETE FROM lohn_abzug WHERE id = 9");
 
 // Uebersteuerung: von Hand gesetzt schlaegt die Rechnung.
 $pdo->exec("INSERT INTO lohn_person VALUES (1,$mkw,'2026-01-01',0,'Vom Versicherer bestaetigt',7,'2026-01-05 10:00',0)");
