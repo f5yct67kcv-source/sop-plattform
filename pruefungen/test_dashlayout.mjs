@@ -91,16 +91,46 @@ try {
     Math.abs(m.begr.top - m.zeit.top) < 1 && m.zeit.left >= m.begr.right - 1);
   check('Und die beiden füllen die Zeile zusammen aus',
     Math.abs((m.begr.width + m.zeit.width + 16) - m.flow) < 1.5);
-  // Gleich hohe Karten in der ersten Zeile: Die Begruessung war gemessen
-  // 267 px hoch, die Zeitkarte 308 -- nebeneinander sah das aus, als sei
-  // eine abgeschnitten. Geprueft an der KARTE, nicht am Container: Der
-  // Container ist durch den Flex-Fluss ohnehin immer gleich hoch, die Karte
-  // darin war es nicht.
-  check('KRITISCH: beide Karten der ersten Zeile sind gleich hoch',
-    await page.evaluate(() => {
-      const h = w => document.querySelector(`[data-widget="${w}"] > .card`).getBoundingClientRect().height;
-      return Math.abs(h('begruessung') - h('zeit')) < 1;
+  // Gleich hohe Karten in JEDER Zeile, nicht nur in der ersten.
+  //
+  // Geprueft an der KARTE, nicht am Container: Der Container ist durch den
+  // Flex-Fluss ohnehin immer gleich hoch -- genau das war die Falle. Zu sehen
+  // ist die Karte darin, und die behielt ihr eigenes Inhaltsmass.
+  //
+  // Bis zum 10.09.2026 stand hier dieselbe Pruefung nur fuer die erste Zeile
+  // (Begruessung 267 px neben Zeitkarte 308 px). Sie blieb gruen, waehrend
+  // die Zeilen darunter auseinanderliefen -- die erste Zeile war die
+  // einzige mit einer Ausnahmeregel. Gemessen bei 1500 px, bevor die Regel
+  // fuer alle galt:
+  //     Kennzahlen neben Schnellzugriff          51 px zu hoch
+  //     Angemeldete Benutzer neben Stundenverlauf 105 px zu hoch
+  //     Stunden je Mitarbeitende neben Rapporten  11 px zu hoch
+  //
+  // Nicht an einer Zahl festgemacht und nicht an bestimmten Containern: Die
+  // Aussage ist "was nebeneinander steht, endet gleich" -- die haelt auch,
+  // wenn jemand die Reihenfolge aendert oder ein Container dazukommt.
+  const unterkanten = await page.evaluate(() => {
+    const zeilen = new Map();
+    for (const el of document.querySelectorAll('#dashFlow .dash-item')) {
+      if (getComputedStyle(el).display === 'none') { continue; }
+      const karte = el.querySelector(':scope > .card, :scope > .grid');
+      if (!karte) { continue; }
+      const y = Math.round(el.getBoundingClientRect().top);
+      if (!zeilen.has(y)) { zeilen.set(y, []); }
+      zeilen.get(y).push({ id: el.dataset.widget, unten: karte.getBoundingClientRect().bottom });
+    }
+    return [...zeilen.values()].filter(z => z.length > 1).map(z => ({
+      ids: z.map(x => x.id).join(' + '),
+      versatz: Math.round(Math.max(...z.map(x => x.unten)) - Math.min(...z.map(x => x.unten))),
     }));
+  });
+  const schief = unterkanten.filter(z => z.versatz > 1);
+  // Die Zahl der Zeilen wird mitgeprueft: Ohne sie bestuende die Pruefung
+  // auch dann, wenn gar nichts mehr nebeneinander steht und die Liste leer
+  // bleibt -- eine Pruefung, die nie etwas zu pruefen hat, ist keine.
+  check('KRITISCH: in jeder Zeile enden die Karten auf gleicher Höhe'
+    + (schief.length ? ' — ' + schief.map(z => `${z.ids}: ${z.versatz} px`).join(', ') : ''),
+    unterkanten.length >= 3 && schief.length === 0);
   check('Die Kennzahlen rücken in die zweite Zeile', m.kpi.top > m.begr.bottom - 1);
   check('KRITISCH: die Ereignisse bleiben auf voller Breite',
     Math.abs(m.erg.width - m.flow) < 1.5);
@@ -145,6 +175,26 @@ check('Zurücksetzen, Abbrechen, Speichern in dieser Reihenfolge',
 check('Jeder Container zeigt jetzt sein Werkzeug',
   await page.evaluate(n => document.querySelectorAll('.dash-werk').length === n &&
     [...document.querySelectorAll('.dash-werk')].every(w => getComputedStyle(w).display !== 'none'), STANDARD.length));
+
+// Der gestrichelte Rahmen zeigt den Container. Wenn die Karte darin nicht bis
+// an seine Unterkante reicht, verspricht der Bearbeitungsmodus eine
+// Ausrichtung, die die normale Ansicht nicht liefert -- man sieht dort eine
+// saubere Reihe und danach wieder eine krumme. Genau das war die Rückmeldung
+// des Projektinhabers vom 10.09.2026: "auch die bearbeitungsfenster löst das
+// problem nicht sauber". Gemessen vor der Behebung bis zu 105 px Luft
+// zwischen Karte und Rahmen.
+const rahmenLuft = await page.evaluate(() =>
+  [...document.querySelectorAll('#dashFlow .dash-item')]
+    .filter(el => getComputedStyle(el).display !== 'none')
+    .map(el => {
+      const karte = el.querySelector(':scope > .card, :scope > .grid');
+      return { id: el.dataset.widget,
+               luft: karte ? Math.round(el.getBoundingClientRect().bottom - karte.getBoundingClientRect().bottom) : 0 };
+    }).filter(x => x.luft > 1));
+check('KRITISCH: der gestrichelte Rahmen endet dort, wo die Karte endet'
+  + (rahmenLuft.length ? ' — ' + rahmenLuft.map(x => `${x.id}: ${x.luft} px`).join(', ') : ''),
+  rahmenLuft.length === 0);
+
 await page.screenshot({ path: OUT + '/71-bearbeiten.png' });
 
 // ══════════ MIT PFEILEN VERSCHIEBEN

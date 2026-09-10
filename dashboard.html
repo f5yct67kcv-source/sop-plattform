@@ -2716,20 +2716,10 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
   .zeit-tag { padding-left: 8px; }
   .zeit-uhr { padding-left: 30px; }
 }
-/* Begruessung und Datum & Zeit stehen nebeneinander und bilden die erste
-   Zeile der Uebersicht. Gemessen war die Begruessung 267 px hoch und die
-   Zeitkarte 308 -- nebeneinander sieht das aus, als sei eine der beiden
-   abgeschnitten. Beide fuellen darum ihren Container, die hoehere gibt die
-   Zeilenhoehe vor.
-   Bewusst nur diese zwei und nicht alle Karten: Weiter unten stehen Listen
-   sehr verschiedener Laenge nebeneinander, und eine auf fremde Hoehe
-   gestreckte Liste erzeugt eine Leerflaeche, die nichts aussagt.
-   Die Regel steht VOR .dash-item.dh > .card (gleiche Eigenspezifitaet),
-   damit eine von Hand gezogene Hoehe weiterhin gewinnt. */
-.dash-item[data-widget="begruessung"] > .card,
-.dash-item[data-widget="zeit"] > .card {
-  height: 100%; display: flex; flex-direction: column;
-}
+/* Begruessung und Datum & Zeit fuellen ihren Container -- wie inzwischen JEDE
+   Karte der Uebersicht. Bis zum 10.09.2026 stand hier eine Ausnahme nur fuer
+   diese beiden; die Regel und der Grund, warum sie fuer alle gilt, stehen
+   jetzt bei den Container-Hoehen (".dash-item > .card" weiter unten). */
 
 /* ── Diktat-Router (ENT-032), seit ENT-107 mit Prefix mehrfach einsetzbar --
    auf der Übersicht als Teil der Begrüssung, in Planung/Einsätze als eigene
@@ -2927,7 +2917,9 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
 .dash-flow.bearb .dash-item { padding-top: 38px; border-radius: var(--r-lg); outline: 1.5px dashed var(--line-hi); outline-offset: 3px; transition: outline-color .15s; }
 .dash-flow.bearb .dash-item:hover { outline-color: var(--accent-line); }
 .dash-flow.bearb .dash-item.dash-ziel { outline-color: var(--accent); outline-style: solid; }
-.dash-flow.bearb .dash-item.versteckt { display: block; opacity: .4; }
+/* display:flex, nicht block: Der Platzhalter soll aussehen wie der Container,
+   den er vertritt -- mit block fuellte die Karte darin nicht. */
+.dash-flow.bearb .dash-item.versteckt { display: flex; opacity: .4; }
 .dash-flow.bearb .dash-item.versteckt .dash-werk { opacity: 1; }
 .dash-werk {
   position: absolute; top: 0; right: 0; z-index: 5; display: none; align-items: center; gap: 2px;
@@ -2964,14 +2956,84 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
 .dash-griff-h::after { content: ''; position: absolute; left: 50%; bottom: 4px; transform: translateX(-50%);
   width: 46px; height: 4px; border-radius: 2px; background: var(--line-hi); transition: background .15s; }
 .dash-griff-h:hover::after { background: var(--accent); }
-/* Eine gesetzte Hoehe muss bis in den INHALT durchschlagen, sonst waechst nur
-   der Rahmen und darunter steht Leere. Darum height statt min-height und eine
-   Spalte: Kopf und Fuss bleiben, der Rumpf nimmt den Rest.
-   min-height 0 ist noetig, weil ein Flex-Kind sonst nicht unter seinen Inhalt
-   schrumpfen kann und der Rumpf statt zu rollen ueber die Karte hinauswaechst. */
-.dash-item.dh > .card { height: var(--dh); display: flex; flex-direction: column; }
-.dash-item.dh > .card > .card-bd { flex: 1 1 auto; min-height: 0; overflow: auto;
-  display: flex; flex-direction: column; }
+/* ── Wie hoch eine Karte ist
+   Zwei Wege fuehren zu einer Hoehe: die Zeile, in der die Karte steht, und
+   der Griff. Der erste gilt immer, der zweite ueberschreibt ihn.
+
+   ERSTER WEG -- die Zeile. Der Fluss ist ein Flex-Fluss, und zwei halbe
+   Container in derselben Zeile sind darin von Haus aus gleich hoch: Der
+   hoehere gibt das Mass vor. Zu SEHEN war davon bis zum 10.09.2026 nichts,
+   weil die Karte im Container ihr eigenes Inhaltsmass behielt und der Rest
+   des Containers leer blieb. Gemessen bei 1500 px Fensterbreite:
+
+     Zeile 2  Kennzahlen      Container 314 / Karte 263  ->   51 px darunter
+     Zeile 3  Angemeldete     Container 224 / Karte 119  ->  105 px darunter
+     Zeile 4  Stunden je MA   Container 253 / Karte 242  ->   11 px darunter
+
+   Die Leerflaeche war also schon da. Sie stand nur AUSSERHALB der Karte, wo
+   sie nicht wie Rand in einer Karte aussieht, sondern wie eine abgesackte
+   Unterkante. Im Bearbeitungsmodus fiel derselbe Fehler doppelt auf: Der
+   gestrichelte Rahmen zeigt den Container und war groesser als die Karte
+   darin -- die Vorschau versprach eine Ausrichtung, die die normale Ansicht
+   nicht lieferte.
+
+   Hier stand frueher die Ueberlegung, eine kurze Liste duerfe nicht auf
+   fremde Hoehe gezogen werden, weil das eine nichtssagende Leerflaeche
+   erzeuge. Der Einwand griff an der falschen Stelle an: Nicht das Fuellen
+   erzeugt die Flaeche, die Zeilenhoehe tut es -- und die entsteht ohnehin.
+   Zu entscheiden war nur, ob die Flaeche INNERHALB oder AUSSERHALB der Karte
+   liegt. Innerhalb ist sie Rand, ausserhalb ist sie ein Bruch in der Kante.
+
+   Der CONTAINER traegt die Spalte, nicht die Karte: Ein Container haelt
+   entweder eine .card oder -- bei den Kennzahlen -- ein blankes .grid, und
+   beide sollen fuellen. Ueber den Container statt ueber height:100% je Kind,
+   damit Aussenabstaende mitgerechnet werden: .grid bringt von Haus aus 16 px
+   margin-bottom mit, die eine Prozenthoehe uebersehen haette. */
+.dash-item { display: flex; flex-direction: column; }
+.dash-item > .card, .dash-item > .grid { flex: 1 1 auto; min-height: 0; }
+/* Der Abstand zwischen den Zeilen kommt aus der gap des Flusses. Der eigene
+   Aussenrand des Rasters waere ein zweiter und liesse die Kennzahlen 16 px
+   ueber der Unterkante ihres Nachbarn enden. */
+.dash-item > .grid { margin-bottom: 0; }
+/* Die Detailseite der Mitarbeitenden benutzt dieselben Klassen, richtet ihre
+   Container aber bewusst oben aus (#mdFlow, align-items:flex-start). Ohne
+   gemeinsame Zeilenhoehe gibt es dort nichts zu fuellen -- die Karte behaelt
+   ihr Inhaltsmass. */
+#mdFlow .dash-item > .card { flex: 0 0 auto; }
+/* Die Hoehe muss bis in den RUMPF durchschlagen, sonst waechst nur der Rahmen
+   und darunter steht Leere. Kopf und Fuss behalten ihr Mass, der Rumpf nimmt
+   den Rest. min-height 0 ist noetig, weil ein Flex-Kind sonst nicht unter
+   seinen Inhalt schrumpfen kann. */
+.dash-item > .card { display: flex; flex-direction: column; }
+.dash-item > .card > .card-bd { flex: 1 1 auto; min-height: 0; }
+/* WAS im gewonnenen Raum geschieht, entscheidet die Karte selbst -- hier wird
+   nur der Raum bereitgestellt. Die Begruessung setzt ihren Block mittig
+   (.begr-karte .card-bd, ENT-432), Listen bleiben oben und lassen den Rest
+   Rand sein. Eine allgemeine Regel "der letzte Teil fuellt" waere hier
+   falsch: Sie nimmt der Mitte, was sie verteilen soll, und der Gruss klebte
+   damit gemessen bei 35 px oben und 210 px unten. Bei GEZOGENER Hoehe gilt
+   sie trotzdem -- siehe unten, dort ist sie gewollt. */
+/* Die Kennzahlen sind kein Karteninhalt, sondern selbst das Raster. Ihre
+   Zeilen wachsen mit (align-content ist bei Rastern von Haus aus stretch),
+   und in der hoeheren Kachel verteilt sich der Inhalt: Beschriftung oben,
+   Zahl darunter, Vergleich unten -- dieselbe Ordnung wie vorher, nur ueber
+   die ganze Hoehe. Dasselbe Muster wie #rdKpiGrid im Revierdienst; EIN
+   Muster im Haus, nicht zwei. */
+.dash-item .kpi { display: flex; flex-direction: column; justify-content: space-between; }
+.dash-item .kpi-foot { margin-top: 0; }
+
+/* ZWEITER WEG -- der Griff (ENT-098). Er setzt das Mass fest, statt es aus
+   der Zeile zu nehmen, und darf dabei auch KLEINER werden als der Inhalt;
+   genau dafuer gibt es ihn. Zwei Dinge folgen daraus und gelten nur hier:
+   Der Rumpf rollt, und der letzte Teil des Rumpfes nimmt die gewonnene
+   Hoehe. Ein Rollbereich auf Vorrat waere nicht neutral -- er beschneidet
+   Schatten und alles, was aus der Karte herausragt.
+   Eigenspezifitaet (0,3,0) gegen (0,2,0) der Regeln oben: Von Hand gezogen
+   gewinnt damit unabhaengig von der Reihenfolge im Blatt. Die alte Ausnahme
+   fuer Begruessung und Zeit lag mit ihrem [data-widget=...] gleichauf und
+   musste deshalb vorher stehen; diese Abhaengigkeit ist mit ihr weg. */
+.dash-item.dh > .card, .dash-item.dh > .grid { flex: 0 0 var(--dh); height: var(--dh); }
+.dash-item.dh > .card > .card-bd { overflow: auto; display: flex; flex-direction: column; }
 /* NUR DER LETZTE Teil nimmt die zusaetzliche Hoehe. Waechst jeder mit, reisst
    es zusammengehoerende Zeilen auseinander -- in der Begruessung stand
    ploetzlich Luft zwischen "Kein anstehender Einsatz geplant." und dem
@@ -2980,14 +3042,6 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
    der Rumpf rollt. */
 .dash-item.dh > .card > .card-bd > * { flex: 0 0 auto; min-width: 0; }
 .dash-item.dh > .card > .card-bd > :last-child { flex: 1 0 auto; }
-/* Die Kennzahlen sind kein Karteninhalt, sondern selbst das Raster. Ihre
-   Zeilen wachsen mit (align-content ist bei Rastern von Haus aus stretch),
-   und in der hoeheren Kachel verteilt sich der Inhalt: Beschriftung oben,
-   Zahl darunter, Vergleich unten -- dieselbe Ordnung wie vorher, nur ueber
-   die ganze Hoehe. */
-.dash-item.dh > .grid { height: var(--dh); }
-.dash-item.dh .kpi { display: flex; flex-direction: column; justify-content: space-between; }
-.dash-item.dh .kpi-foot { margin-top: 0; }
 /* Freie Flaeche als Ablageziel: Bis zum 23.08.2026 liess sich dorthin nichts
    ziehen -- ein Container konnte nur AUF einen anderen fallen. Die Luecke
    neben einem halben Container sah aus wie ein Platz und war keiner. */
