@@ -194,6 +194,39 @@ td .zweit { font-size: 12.5px; color: var(--ink-3); margin-top: 2px; }
 .m-warn { background: var(--warn-soft); color: var(--warn); }
 .m-ruhe { background: var(--line-soft); color: var(--ink-2); }
 
+/* ── Supportvorgaenge (ENT-538) ─────────────────────────────────────
+   Das Abzeichen am Reiter ist der eigentliche Melder: Es steht in JEDEM
+   Bereich im Blick, nicht nur auf der Uebersicht. Wer an den Rechnungen
+   sitzt, soll trotzdem sehen, dass eine Anfrage wartet.
+
+   Es zeigt NUR, was auf uns wartet (neu + in Arbeit). 'wartet auf Kunde'
+   ist absichtlich nicht dabei -- ein Abzeichen, das auch fremde Bringschuld
+   mitzaehlt, steht dauerhaft da und wird dann nicht mehr gelesen. */
+.nav-item { position: relative; }
+.nav-item .abz {
+  position: absolute; top: 2px; right: 2px;
+  min-width: 17px; height: 17px; padding: 0 4px;
+  border-radius: 999px; background: var(--neg); color: #fff;
+  font-size: 10.5px; font-weight: 700; line-height: 17px; text-align: center;
+}
+/* Der Verlauf. Zwei Seiten, zwei Ausrichtungen -- damit auf einen Blick
+   erkennbar ist, wer zuletzt geschrieben hat, ohne den Namen zu lesen. */
+.sv-verlauf { display: flex; flex-direction: column; gap: 10px; }
+.sv-n {
+  max-width: 78%; padding: 10px 13px; border-radius: 12px;
+  border: 1px solid var(--line); background: var(--surface);
+}
+.sv-n .wer { font-size: 11px; text-transform: uppercase; letter-spacing: .04em;
+             color: var(--ink-3); margin-bottom: 4px; }
+.sv-n .txt { font-size: 13.5px; color: var(--ink); white-space: pre-wrap;
+             overflow-wrap: anywhere; }
+.sv-kunde     { align-self: flex-start; }
+.sv-betreiber { align-self: flex-end; background: var(--line-soft); }
+/* Am Handy ist die Breitenbegrenzung keine Hilfe mehr, sondern nur noch
+   eine schmale Spalte -- die Ausrichtung allein traegt die Unterscheidung. */
+@media (max-width: 640px) { .sv-n { max-width: 92%; } }
+.sv-kontext { font-size: 12px; color: var(--ink-3); margin-top: 6px; }
+
 /* ── Bedienelemente: mindestens 44 px hoch (Hausregel) ────────────── */
 button, .knopf {
   min-height: 44px; padding: 0 18px; border-radius: 9px;
@@ -261,7 +294,16 @@ input, select {
   /* 16 px, sonst zoomt iOS beim Hineintippen hinein und bleibt dort. */
   font: inherit; font-size: 16px;
 }
-input:focus, select:focus { outline: 2px solid var(--accent-line); outline-offset: 1px; border-color: var(--accent); }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent-line); outline-offset: 1px; border-color: var(--accent); }
+/* Dieselben Kanten wie bei input, aber ohne dessen min-height -- die
+   bestimmt bei einem mehrzeiligen Feld die Zeilenzahl, und 44 px waeren
+   eine Zeile. 16 px Schrift aus demselben Grund wie oben: darunter zoomt
+   iOS hinein und bleibt dort. */
+textarea {
+  width: 100%; padding: 11px 13px; border: 1px solid var(--line-hi);
+  border-radius: 9px; background: var(--surface); color: var(--ink);
+  font: inherit; font-size: 16px; line-height: 1.45; resize: vertical;
+}
 .feld { margin-bottom: 16px; }
 .feld .hinweis { font-size: 12px; color: var(--ink-3); margin-top: 5px; }
 .raster2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 0 16px; }
@@ -462,6 +504,11 @@ ul.fehlt b { color: var(--ink); font-weight: 620; }
         <svg viewBox="0 0 24 24"><path d="M4 3h16v18l-2.5-1.5L15 21l-2.5-1.5L10 21l-2.5-1.5L5 21 4 21z"/><path d="M8 8h8"/><path d="M8 12h8"/><path d="M8 16h4"/></svg>
         <span class="lbl">Rechnungen</span>
       </button>
+      <button type="button" class="nav-item" data-bereich="support" aria-current="false">
+        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span class="lbl">Support</span>
+        <span class="abz" id="nav-sv-abz" hidden>0</span>
+      </button>
       <button type="button" class="nav-item" data-bereich="konten" aria-current="false">
         <svg viewBox="0 0 24 24"><path d="M12 2l8 4v6c0 5-3.4 8.6-8 10-4.6-1.4-8-5-8-10V6z"/><path d="M12 11a2.4 2.4 0 1 0 0-4.8 2.4 2.4 0 0 0 0 4.8z"/><path d="M8 16.5c.9-1.6 2.3-2.4 4-2.4s3.1.8 4 2.4"/></svg>
         <span class="lbl">Konten</span>
@@ -498,6 +545,25 @@ ul.fehlt b { color: var(--ink); font-weight: 620; }
           </div>
         </div>
         <div class="zahlen" id="u-zahlen"></div>
+      </div>
+
+      <!-- Support gleich unter der Lage, nicht am Ende: Eine Anfrage, die
+           seit gestern wartet, ist dringender als die Frage, wie viele
+           Mandanten es gibt. -->
+      <div class="karte">
+        <div class="karte-kopf">
+          <div>
+            <h2>Support</h2>
+            <div class="sub">Anfragen der Mandanten aus der Plattform</div>
+          </div>
+        </div>
+        <div class="zahlen" id="u-sv-zahlen"></div>
+        <div class="karte-leib">
+          <div id="u-sv-hinweis" class="zone-note"></div>
+          <div class="knopfzeile" style="margin-top:10px">
+            <button type="button" class="haupt" data-springe="support">Zum Arbeitsvorrat</button>
+          </div>
+        </div>
       </div>
 
       <div class="karte">
@@ -623,6 +689,54 @@ ul.fehlt b { color: var(--ink); font-weight: 620; }
     </section>
 
 
+    <!-- ══ Support ════════════════════════════════════════════ -->
+    <section class="bereich versteckt" id="b-support">
+      <div class="karte">
+        <div class="karte-kopf">
+          <div>
+            <h2>Arbeitsvorrat</h2>
+            <div class="sub">Was die Mandanten gemeldet haben</div>
+          </div>
+          <div class="knopfzeile" style="margin-top:0">
+            <button type="button" class="klein" id="knopf-sv-neu">Nur offene</button>
+            <button type="button" class="klein" id="knopf-sv-alle">Alle</button>
+          </div>
+        </div>
+        <div id="sv-inhalt"></div>
+      </div>
+
+      <!-- Der einzelne Vorgang. Steht als eigene Karte UNTER der Liste und
+           nicht in einem Fenster darueber: Wer antwortet, will die Liste
+           daneben behalten -- und ein Fenster, das man wegklicken muss, um
+           nachzusehen, kostet genau den Blick, den man gerade braucht. -->
+      <div class="karte versteckt" id="sv-karte">
+        <div class="karte-kopf">
+          <div>
+            <h2 id="sv-titel">Vorgang</h2>
+            <div class="sub" id="sv-unter"></div>
+          </div>
+          <div class="knopfzeile" style="margin-top:0">
+            <button type="button" class="klein" id="knopf-sv-zu">Schliessen</button>
+          </div>
+        </div>
+        <div class="karte-leib">
+          <div class="sv-kontext" id="sv-kontext"></div>
+          <div class="sv-verlauf" id="sv-verlauf" style="margin-top:14px"></div>
+
+          <div style="margin-top:16px">
+            <label for="sv-antwort">Antwort</label>
+            <textarea id="sv-antwort" rows="4"
+                      placeholder="Antwort an den Betrieb — sie erscheint in dessen Plattform."></textarea>
+          </div>
+          <div class="knopfzeile">
+            <button type="button" class="haupt" id="knopf-sv-senden">Antworten</button>
+            <button type="button" id="knopf-sv-arbeit">In Arbeit</button>
+            <button type="button" id="knopf-sv-erledigt">Erledigt</button>
+          </div>
+          <div id="sv-meldung" class="meldung versteckt"></div>
+        </div>
+      </div>
+    </section>
     <section class="bereich versteckt" id="b-konten">
     <!-- Konten -->
     <div class="karte">
@@ -702,6 +816,7 @@ const BEREICHE = {
   mandanten:  ['Mandanten',  'Betriebe, die diese Plattform nutzen'],
   offerten:   ['Offerten',   'Angebote an künftige Mandanten'],
   rechnungen: ['Rechnungen', 'Was die Mandanten für die Nutzung zahlen'],
+  support:    ['Support',    'Anfragen der Mandanten, die auf eine Antwort warten'],
   konten:     ['Konten',     'Wer diesen Bereich öffnen darf'],
 };
 
@@ -726,6 +841,9 @@ function bereichZeigen(welcher) {
     zeig($('m-form-karte'), false);
     zeig($('sup-karte'), false);
   }
+  // Derselbe Grund: Ein halb getippter Antworttext beim naechsten Besuch
+  // waere ein Raetsel.
+  if (welcher !== 'support') { zeig($('sv-karte'), false); }
   window.scrollTo({ top: 0 });
 }
 
@@ -1203,6 +1321,237 @@ function geruestZeigen(id, was, warum) {
   if (el) { el.innerHTML = leerBlock('◷', was, warum); }
 }
 
+
+/* ── Supportvorgaenge (ENT-538) ─────────────────────────────────────
+   Der Arbeitsvorrat. Die Zahlen kommen vom Server, nicht aus der Liste --
+   der Zaehler oben zaehlt ueber ALLE Vorgaenge, die Liste zeigt je nach
+   Filter nur einen Teil. Beides aus derselben Liste zu rechnen hiesse:
+   Sobald ein Filter greift, zaehlt der Zaehler etwas anderes, als er sagt.
+
+   SV_STATUS_TEXT bildet die vier Status ab. Vier, nicht zwei -- 'wartet
+   auf Kunde' ist weder offen noch erledigt, und genau das ist der Grund,
+   warum es ihn gibt. */
+const SV_STATUS_TEXT = {
+  neu:              ['m-neg',  'Neu'],
+  in_arbeit:        ['m-warn', 'In Arbeit'],
+  wartet_auf_kunde: ['m-ruhe', 'Wartet auf Kunde'],
+  erledigt:         ['m-pos',  'Erledigt'],
+};
+let svNurOffen = true;
+let svAktuell  = 0;
+
+function svAbzeichenSetzen(offen) {
+  const el = $('nav-sv-abz');
+  if (!el) { return; }
+  el.hidden = !offen;
+  el.textContent = offen > 99 ? '99+' : String(offen);
+  /* Angesagt, nicht nur eingefaerbt: Wer die Seite hoert statt sieht,
+     erfaehrt aus einer roten Scheibe nichts. */
+  const knopf = el.closest('.nav-item');
+  if (knopf) {
+    knopf.setAttribute('aria-label', offen
+      ? 'Support — ' + offen + ' ' + (offen === 1 ? 'Anfrage wartet' : 'Anfragen warten')
+      : 'Support');
+  }
+}
+
+async function ladeSupport() {
+  const inhalt = $('sv-inhalt');
+  const a = await ruf('betreiber_support_vorgang.php');
+
+  /* Vier Aussagen, vier Texte (Hausregel). Nicht eingerichtet, nicht
+     abrufbar, nichts vorhanden und kein Treffer sind verschiedene Dinge --
+     hier sind alle vier moeglich, und drei davon waeren als "keine
+     Anfragen" eine Falschaussage. */
+  if (a.lage === 'nicht_eingerichtet' || a.code === 503) {
+    svAbzeichenSetzen(0);
+    uebersichtSupportSetzen(null, 'nicht_eingerichtet');
+    /* Nicht nur sagen, dass etwas fehlt, sondern den Handgriff anbieten:
+       Der Einrichtungsknopf des Cockpits erscheint nur, SOLANGE der
+       Bootstrap offen ist (ENT-529) -- auf einer Anlage mit bestehendem
+       Betreiber-Konto gäbe es sonst keinen Weg mehr, eine neu
+       dazugekommene Tabelle anzulegen. */
+    inhalt.innerHTML = leerBlock('⚙', 'Noch nicht eingerichtet',
+      'Die Tabellen für den Supportkanal fehlen auf diesem Server. '
+      + 'Das Einrichten legt an, was fehlt — es löscht und leert nichts.')
+      + '<div class="knopfzeile" style="justify-content:center">'
+      + '<button type="button" class="haupt" id="knopf-sv-einrichten">Jetzt einrichten</button>'
+      + '</div>';
+    const k = $('knopf-sv-einrichten');
+    if (k) { k.onclick = svEinrichten; }
+    return;
+  }
+  if (a.status !== 'ok') {
+    svAbzeichenSetzen(0);
+    uebersichtSupportSetzen(null, 'fehler');
+    inhalt.innerHTML = leerBlock('⚠', 'Nicht abrufbar',
+      text(a.message || 'Unbekannter Fehler.'));
+    return;
+  }
+
+  const alle = a.vorgaenge || [];
+  svAbzeichenSetzen(a.offen || 0);
+  uebersichtSupportSetzen(alle, 'ok', a.offen || 0);
+
+  const liste = svNurOffen
+    ? alle.filter(v => v.status === 'neu' || v.status === 'in_arbeit')
+    : alle;
+
+  if (!alle.length) {
+    inhalt.innerHTML = leerBlock('◇', 'Noch keine Anfrage',
+      'Sobald ein Mandant etwas meldet, erscheint es hier.');
+    return;
+  }
+  /* "Kein Treffer" und "nichts vorhanden" sind verschiedene Aussagen --
+     ein Filter, der alles ausblendet, darf nie wie ein leerer Vorrat
+     aussehen (Hausregel). */
+  if (!liste.length) {
+    inhalt.innerHTML = leerBlock('◔', 'Nichts Offenes',
+      'Alle ' + alle.length + ' Vorgänge sind erledigt oder warten auf den Kunden. '
+      + 'Mit „Alle" sind sie weiterhin einsehbar.');
+    return;
+  }
+
+  inhalt.innerHTML = '<div class="tab-huelle"><table><thead><tr>'
+    + '<th>Betrieb</th><th>Anliegen</th><th>Status</th><th>Eingegangen</th><th></th>'
+    + '</tr></thead><tbody>'
+    + liste.map(v => '<tr>'
+        + '<td><strong>' + text(v.mandant) + '</strong>'
+          + '<div class="zweit">' + text(v.art_wort) + '</div></td>'
+        + '<td><strong>' + text(v.betreff) + '</strong>'
+          + '<div class="zweit">' + text(v.melder_name || 'Ohne Namen')
+          + ' · ' + v.nachrichten + (v.nachrichten === 1 ? ' Nachricht' : ' Nachrichten')
+          /* Wer zuletzt geschrieben hat, ist die Information, die sagt, ob
+             hier noch etwas von uns erwartet wird. */
+          + (v.letzte_seite === 'kunde' ? ' · zuletzt der Betrieb' : '')
+          + '</div></td>'
+        + '<td>' + merker(SV_STATUS_TEXT, v.status) + '</td>'
+        + '<td>' + text(svDatum(v.eroeffnet_am)) + '</td>'
+        + '<td style="text-align:right;white-space:nowrap">'
+          + '<button class="klein" data-sv="' + v.id + '">Öffnen</button></td>'
+      + '</tr>').join('')
+    + '</tbody></table></div>';
+
+  inhalt.querySelectorAll('[data-sv]').forEach(b =>
+    b.onclick = () => svOeffnen(+b.dataset.sv));
+}
+
+/* Datum ohne Uhrzeit-Genauigkeit, die niemand braucht -- aber MIT dem
+   Hinweis, wenn es heute war: "heute" liest sich schneller als ein
+   Datum, das man erst mit dem Kalender vergleichen muss. */
+function svDatum(roh) {
+  if (!roh) { return 'unbekannt'; }
+  const d = String(roh).slice(0, 10);
+  const heute = new Date().toISOString().slice(0, 10);
+  if (d === heute) { return 'heute'; }
+  const teile = d.split('-');
+  return teile.length === 3 ? teile[2] + '.' + teile[1] + '.' + teile[0] : d;
+}
+
+/* Die Karte auf der Uebersicht. Eigener Zahlenblock statt Anhaengsel an
+   u-zahlen: Jene Zahlen zaehlen Betriebe, diese zaehlen Vorgaenge --
+   Einheiten werden nicht vermischt (Hausregel). */
+function uebersichtSupportSetzen(liste, lage, offen) {
+  const zahlen  = $('u-sv-zahlen');
+  const hinweis = $('u-sv-hinweis');
+  if (!zahlen) { return; }
+
+  if (lage !== 'ok') {
+    zahlen.innerHTML = '';
+    hinweis.textContent = lage === 'nicht_eingerichtet'
+      ? 'Der Supportkanal ist auf diesem Server noch nicht eingerichtet.'
+      : 'Der Stand liess sich nicht abrufen.';
+    return;
+  }
+
+  const zaehl = st => (liste || []).filter(v => v.status === st).length;
+  const wartet = zaehl('wartet_auf_kunde');
+  zahlen.innerHTML =
+      zahlBlock('Wartet auf uns', offen, (liste || []).length
+        ? offen + ' von ' + liste.length : null)
+    + zahlBlock('Neu', zaehl('neu'), null)
+    + zahlBlock('In Arbeit', zaehl('in_arbeit'), null)
+    + zahlBlock('Beim Kunden', wartet, wartet ? 'Antwort steht aus' : null);
+
+  hinweis.textContent = offen
+    ? (offen === 1 ? 'Eine Anfrage wartet auf eine Antwort.'
+                   : offen + ' Anfragen warten auf eine Antwort.')
+    : 'Nichts offen.';
+}
+
+/* Legt an, was fehlt. Derselbe Endpunkt, den das Cockpit beim Bootstrap
+   ruft -- er ist gefahrlos mehrfach aufrufbar und löscht nichts. */
+async function svEinrichten() {
+  const k = $('knopf-sv-einrichten');
+  if (k) { k.disabled = true; k.textContent = 'Wird eingerichtet …'; }
+  const a = await ruf('betreiber_einrichten.php', {});
+  if (a.status !== 'ok') {
+    /* Der Grund gehört hierher, nicht in ein allgemeines "ging nicht": Wer
+       das liest, muss wissen, ob er selbst etwas tun kann. Der Endpunkt
+       meldet in 'fehler', eine abgelehnte Anfrage in 'message'. */
+    const grund = (a.fehler && a.fehler.length) ? a.fehler.join(' · ')
+                : (a.message || 'Der Server hat die Einrichtung abgelehnt.');
+    $('sv-inhalt').innerHTML = leerBlock('⚠', 'Einrichtung nicht möglich', text(grund));
+    return;
+  }
+  await ladeSupport();
+}
+
+async function svOeffnen(id) {
+  svAktuell = id;
+  const a = await ruf('betreiber_support_vorgang.php?id=' + id);
+  if (a.status !== 'ok') {
+    melde($('sv-meldung'), 'fehler', a.message || 'Der Vorgang liess sich nicht laden.');
+    return;
+  }
+  const v = a.vorgang;
+  zeig($('sv-karte'), true);
+  $('sv-titel').textContent = v.betreff;
+  $('sv-unter').textContent = sv_wort(v) ;
+  /* Der Kontext, den die Anfrage selbst mitgebracht hat -- er erspart die
+     Rueckfrage, mit der ein Supportfall sonst beginnt. Jede Angabe, die
+     fehlt, wird als fehlend benannt statt weggelassen. */
+  $('sv-kontext').innerHTML =
+      '<b>Bildschirm:</b> ' + text(v.bildschirm || 'nicht mitgeschickt')
+    + ' &nbsp;·&nbsp; <b>Umgebung:</b> ' + text(v.umgebung || 'nicht mitgeschickt')
+    + ' &nbsp;·&nbsp; <b>Rolle:</b> ' + text(v.melder_rolle || 'nicht mitgeschickt');
+
+  $('sv-verlauf').innerHTML = (a.nachrichten || []).map(n =>
+      '<div class="sv-n ' + (n.seite === 'kunde' ? 'sv-kunde' : 'sv-betreiber') + '">'
+    + '<div class="wer">' + text(n.autor || (n.seite === 'kunde' ? 'Betrieb' : 'Support'))
+    + ' · ' + text(svDatum(n.erstellt_am)) + '</div>'
+    + '<div class="txt">' + text(n.text) + '</div></div>').join('');
+  $('sv-antwort').value = '';
+  stumm($('sv-meldung'));
+  $('sv-karte').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function sv_wort(v) {
+  const st = SV_STATUS_TEXT[v.status];
+  return (st ? st[1] : 'Unbekannt') + ' · eingegangen ' + svDatum(v.eroeffnet_am);
+}
+
+async function svAntworten() {
+  const txt = $('sv-antwort').value.trim();
+  if (!txt) { melde($('sv-meldung'), 'fehler', 'Bitte etwas schreiben.'); return; }
+  const a = await ruf('betreiber_support_vorgang.php', { id: svAktuell, text: txt });
+  if (a.status !== 'ok') {
+    melde($('sv-meldung'), 'fehler', a.message || 'Nicht gespeichert.'); return;
+  }
+  melde($('sv-meldung'), 'gut', 'Antwort gespeichert — der Vorgang wartet jetzt auf den Betrieb.');
+  await svOeffnen(svAktuell);
+  await ladeSupport();
+}
+
+async function svStatus(status) {
+  const a = await ruf('betreiber_support_vorgang.php', { id: svAktuell, status: status });
+  if (a.status !== 'ok') {
+    melde($('sv-meldung'), 'fehler', a.message || 'Nicht gespeichert.'); return;
+  }
+  await svOeffnen(svAktuell);
+  await ladeSupport();
+}
+
 /* ── Rahmen ─────────────────────────────────────────────────────── */
 async function ladeAlles() {
   /* Name und Adresse nur dann beide, wenn sie sich unterscheiden. Wer beim
@@ -1230,6 +1579,9 @@ async function ladeAlles() {
 
   await ladeMandanten();
   await ladeKonten();
+  /* Zuletzt, aber auf jeder Seite sichtbar: Das Abzeichen am Reiter steht
+     auch dann im Blick, wenn gerade ein anderer Bereich offen ist. */
+  await ladeSupport();
 }
 
 async function abmelden() {
@@ -1254,6 +1606,12 @@ $('knopf-neu').onclick        = () => formularOeffnen(null);
 $('knopf-speichern').onclick  = mandantSpeichern;
 $('knopf-abbrechen').onclick  = () => zeig($('m-form-karte'), false);
 $('knopf-sup-zu').onclick      = () => zeig($('sup-karte'), false);
+$('knopf-sv-zu').onclick       = () => zeig($('sv-karte'), false);
+$('knopf-sv-senden').onclick   = svAntworten;
+$('knopf-sv-arbeit').onclick   = () => svStatus('in_arbeit');
+$('knopf-sv-erledigt').onclick = () => svStatus('erledigt');
+$('knopf-sv-neu').onclick      = () => { svNurOffen = true;  ladeSupport(); };
+$('knopf-sv-alle').onclick     = () => { svNurOffen = false; ladeSupport(); };
 $('knopf-abmelden').onclick   = abmelden;
 $('btn-thema').onclick        = themaUm;
 document.querySelectorAll('#kopf-nav .nav-item').forEach(b => {
