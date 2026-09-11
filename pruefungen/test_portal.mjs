@@ -1637,35 +1637,78 @@ await page.waitForTimeout(250);
       return b.height > 0 && l.height > 0 && b.bottom <= l.top + 1;
     }));
 
-  // ── Der Meter zum Erledigungsgrad ───────────────────────────────────
-  // Derselbe Balken wie in der Liste darunter, kein zweites Bauteil.
-  const meter = await page.evaluate(() => {
+  // ── Der Ring zum Erledigungsgrad (ENT-527) ──────────────────────────
+  // Bis ENT-500 stand hier ein Balken; der Projektinhaber hat den Ring
+  // verlangt, nachdem ihm der Balken vorgelegt worden war. Die Prüfungen
+  // sind UMGESCHRIEBEN, nicht gelöscht: Was sie geschützt haben -- der
+  // Anteil ist wirklich der Wert, die Spur bleibt sichtbar, die Farbe
+  // steht nie allein -- gilt für den Ring genauso.
+  const ring = await page.evaluate(() => {
     const k = [...document.querySelectorAll('#kz-band > div')]
       .find(d => /Erledigungsgrad/.test(d.textContent));
     if (!k) { return null; }
-    const b = k.querySelector('.balken');
-    const f = b && b.querySelector('.fuell');
-    if (!b || !f) { return { balken: false }; }
-    const br = b.getBoundingClientRect(), fr = f.getBoundingClientRect();
-    const v = k.querySelector('.k-v').getBoundingClientRect();
-    return { balken: true, anteil: fr.width / br.width,
-             sichtbar: br.height > 0 && br.width > 0,
-             // Der Grund muss SICHTBAR bleiben -- sonst sähe "wenig
-             // erledigt" aus wie "keine Angabe" (Hausregel, gilt für den
-             // Balken der Liste schon).
-             grund: getComputedStyle(b).backgroundColor,
-             unterDemWert: br.top >= v.bottom - 1,
-             text: k.textContent };
+    const r = k.querySelector('svg.k-ring');
+    if (!r) { return { ring: false }; }
+    const spur = r.querySelector('.k-ring-spur');
+    const wert = r.querySelector('.k-ring-wert');
+    const rr = r.getBoundingClientRect();
+    const kr = k.getBoundingClientRect();
+    const karte = document.getElementById('kz-karte').getBoundingClientRect();
+    const strich = wert ? (wert.getAttribute('stroke-dasharray') || '') : '';
+    return { ring: true, sichtbar: rr.height > 0 && rr.width > 0,
+             rund: Math.abs(rr.width - rr.height) <= 1,
+             strich,
+             // Der Bogen ist die Länge selbst: Radius 15.9155 ergibt
+             // Umfang 100, also ist der erste Strichwert der Prozentwert.
+             bogen: Number(strich.split(/\s+/)[0] || -1),
+             spurFarbe: spur ? getComputedStyle(spur).stroke : '',
+             wertFarbe: wert ? getComputedStyle(wert).stroke : '',
+             // Oben beginnen, im Uhrzeigersinn: Ohne die Drehung startet
+             // ein SVG-Kreis auf drei Uhr und der Ring ist nicht ablesbar.
+             gedreht: getComputedStyle(r).transform,
+             // Nichts darf aus der KARTE laufen. Genau das ist beim Bauen
+             // passiert: Ohne min-width:0 an den Rasterfeldern schob der
+             // Ring die Kachel auf, sie wuchs über die Karte hinaus, und
+             // Ring wie Fusszeile wurden abgeschnitten.
+             //
+             // Gemessen wird Kachel gegen KARTE, nicht Ring gegen Kachel:
+             // Der Ring bleibt in seiner Kachel, die Kachel wächst. Die
+             // erste Fassung mass die falsche Ebene und blieb beim
+             // Gegenprobieren grün.
+             ueber: kr.right > karte.right + 0.5 || kr.left < karte.left - 0.5 };
   });
-  check('KRITISCH: der Erledigungsgrad trägt einen Balken', !!meter && meter.balken);
-  check('Er ist wirklich gerendert', !!meter && meter.sichtbar);
-  // 20 von 24 = 83 %. Am gerenderten Verhältnis gemessen, nicht am Stil.
-  check('KRITISCH: die Füllung entspricht dem Prozentwert',
-    !!meter && Math.abs(meter.anteil - 0.83) < 0.03);
-  check('Der Grund des Balkens ist sichtbar, nicht durchsichtig',
-    !!meter && meter.grund !== 'rgba(0, 0, 0, 0)' && meter.grund !== 'transparent');
-  check('Der Balken steht unter dem Wert, nicht darüber',
-    !!meter && meter.unterDemWert);
+  check('KRITISCH: der Erledigungsgrad trägt einen Ring', !!ring && ring.ring);
+  check('Er ist wirklich gerendert', !!ring && ring.sichtbar);
+  check('Und rund, nicht zum Ei gequetscht', !!ring && ring.rund);
+  // 20 von 24 = 83 %.
+  check('KRITISCH: der Bogen entspricht dem Prozentwert',
+    !!ring && Math.abs(ring.bogen - 83) < 1);
+  // Die ungefüllte Spur ist ein heller Ton DERSELBEN Farbe, nicht Grau --
+  // so liest sich der Zustand über den ganzen Ring. Und sie muss überhaupt
+  // sichtbar sein: Ohne sie sähe "wenig erledigt" aus wie "keine Angabe".
+  check('KRITISCH: die Spur ist sichtbar und nicht durchsichtig',
+    !!ring && ring.spurFarbe && !/rgba\(0, 0, 0, 0\)|transparent|none/.test(ring.spurFarbe));
+  check('KRITISCH: Spur und Bogen sind verschiedene Töne derselben Farbe',
+    !!ring && ring.spurFarbe !== ring.wertFarbe);
+  check('KRITISCH: der Ring beginnt oben und nicht auf drei Uhr',
+    !!ring && /matrix/.test(ring.gedreht) && ring.gedreht !== 'none');
+  check('KRITISCH: das Band läuft nicht aus seiner Karte heraus',
+    !!ring && ring.ueber === false);
+  // Und derselbe Blick auf ALLE vier Kacheln, nicht nur auf die mit Ring.
+  check('KRITISCH: keine Kachel des Bandes ragt über die Karte hinaus',
+    await page.evaluate(() => {
+      const karte = document.getElementById('kz-karte').getBoundingClientRect();
+      return [...document.querySelectorAll('#kz-band > div')].every(d => {
+        const r = d.getBoundingClientRect();
+        return r.right <= karte.right + 0.5 && r.left >= karte.left - 0.5;
+      });
+    }));
+  // Und nichts wird abgeschnitten: Der Inhalt jeder Kachel muss in sie
+  // hineinpassen, sonst steht die Fusszeile halb ausserhalb.
+  check('KRITISCH: der Inhalt bleibt in seiner Kachel, nichts wird beschnitten',
+    await page.evaluate(() =>
+      [...document.querySelectorAll('#kz-band > div')].every(d =>
+        d.scrollWidth <= d.clientWidth + 1)));
   // Die Farbe ist NIE die einzige Auskunft -- gemessen liegen Grün und
   // Bernstein unter Protanopie nur ΔE 3.6 auseinander (OP-501).
   //
@@ -1720,8 +1763,11 @@ await page.waitForTimeout(250);
     kurve.leere === 4 && kurve.hoehen.every(h => h > 0));
   check('KRITISCH: keine Säule wächst aus ihrem Platz heraus über den Wert',
     kurve.ueber === 0);
+  // Gegen die GEMESSENE Höhe des Platzes, nicht gegen eine abgeschriebene
+  // Zahl: Die Säulen sind mit ENT-527 höher geworden, und eine feste 20
+  // hätte hier nur den alten Stand festgehalten.
   check('Der Sockel bleibt flach und wird nicht zur vollen Säule',
-    Math.max(...kurve.hoehen) <= 20 && Math.min(...kurve.hoehen) <= 4);
+    Math.max(...kurve.hoehen) <= kurve.hoehe && Math.min(...kurve.hoehen) <= 4);
   // Der Höchstwert (2) muss höher stehen als der kleinere (1).
   check('Die Säulen bilden die Werte ab, nicht alle dieselbe Höhe',
     new Set(kurve.hoehen).size >= 3);
