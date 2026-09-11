@@ -127,6 +127,38 @@ check('KRITISCH: unter der Mindeststrecke bleibt die alte Richtung -- kein Kreis
   quelle.wackler === 42);
 check('KRITISCH: die allererste Messung hat keine Richtung', quelle.ersteMessung === null);
 
+// ══════════ GEHTEMPO: DIE STRECKE SUMMIERT SICH ══════════════════════
+// Ein Mensch geht rund 1,4 m/s, ein Gerät meldet alle paar Sekunden --
+// zwischen zwei Meldungen liegen oft nur drei bis sechs Meter. Würde
+// jeweils nur das letzte Paar verglichen, käme bei normalem Gehen NIE eine
+// Richtung zustande und der Pfeil hinge allein am Kurs des Geräts. Beim
+// Bauen der Vorschauseite genau so aufgefallen.
+const gehen = await page.evaluate(() => {
+  const jetzt = Date.now();
+  // Fünf Schritte von je rund 5 m nach Norden, im Abstand von 2,5 s.
+  let stand = { lat: 47.3500, lng: 7.9000, zeit: jetzt, richtung: null, richtungZeit: 0 };
+  const verlauf = [];
+  for (let i = 1; i <= 5; i++) {
+    const neu = { lat: 47.3500 + i * 0.000045, lng: 7.9000, zeit: jetzt + i * 2500 };
+    rgRichtungBestimmen(stand, neu, null);
+    verlauf.push(neu.richtung);
+    stand = neu;
+  }
+  // Und danach eine Pause: der Anker darf nicht ewig gelten.
+  const nachPause = { lat: stand.lat, lng: stand.lng, zeit: stand.zeit + 45000 };
+  rgRichtungBestimmen(stand, nachPause, null);
+  return { verlauf, ankerNachPause: !!nachPause.anker,
+           ankerFrisch: nachPause.anker
+             ? Math.abs(nachPause.anker.lat - nachPause.lat) < 1e-9 : false };
+});
+check('KRITISCH: bei normalem Gehtempo entsteht eine Richtung, sobald die Strecke reicht -- nicht nie',
+  gehen.verlauf.slice(0, 2).every(r => r === null)
+  && gehen.verlauf.slice(2).some(r => r !== null));
+check('Und sie zeigt in die gegangene Richtung (Norden)',
+  gehen.verlauf.filter(r => r !== null).every(r => r < 0.5 || r > 359.5));
+check('KRITISCH: nach einer Pause gilt der alte Anker nicht mehr -- sonst zeigte er auf die Stelle von vorhin',
+  gehen.ankerNachPause === true && gehen.ankerFrisch === true);
+
 // ══════════ AUF DER KARTE, GEMESSEN ══════════════════════════════════
 await page.evaluate(() => ladeSchichten().then(() => rundgangFortsetzen(71)));
 await page.waitForTimeout(1600);

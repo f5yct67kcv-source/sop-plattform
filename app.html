@@ -8198,7 +8198,7 @@ function rgKartePunkteZeichnen(punkte) {
    nicht beendet, nicht im Hintergrund. Das hat der Projektinhaber
    ausdruecklich so verlangt. */
 let rgsOrtWache = null;       // Kennung von watchPosition
-let rgsMeinOrt = null;        // { lat, lng, genauigkeit, zeit, richtung, richtungZeit } -- nur im Speicher
+let rgsMeinOrt = null;        // { lat, lng, genauigkeit, zeit, richtung, richtungZeit, anker } -- nur im Speicher
 /* Warum KEIN Standort da ist (ENT-320). Drei Zustaende, die sich
    unterscheiden muessen:
      null            -- noch keine Antwort, es laeuft
@@ -8268,13 +8268,36 @@ function rgRichtungBestimmen(vorher, neu, geraeteKurs) {
   if (Number.isFinite(geraeteKurs)) {
     neu.richtung = ((geraeteKurs % 360) + 360) % 360;
     neu.richtungZeit = neu.zeit;
+    neu.anker = { lat: neu.lat, lng: neu.lng, zeit: neu.zeit };
     return;
   }
-  if (vorher && rgDistanzMeter(vorher.lat, vorher.lng, neu.lat, neu.lng) >= RG_RICHTUNG_MIN_M) {
-    neu.richtung = rgPeilung(vorher.lat, vorher.lng, neu.lat, neu.lng);
+  /* Gemessen wird gegen einen ANKER, nicht gegen die unmittelbar vorige
+     Meldung.
+
+     Der Grund ist Gehtempo: Ein Mensch geht rund 1,4 m/s, und ein Geraet
+     meldet alle paar Sekunden. Zwischen zwei Meldungen liegen damit oft
+     nur drei bis sechs Meter -- unter der Mindeststrecke. Wuerde jeweils
+     nur das letzte Paar verglichen, kaeme NIE eine Richtung zustande, und
+     der Pfeil haenge allein am Kurs des Geraets. Beim Bauen der
+     Vorschauseite genau so aufgefallen: ein simulierter Spaziergang ohne
+     Geraetekurs zeigte gar keinen Pfeil.
+
+     Mit einem Anker summiert sich die Strecke, bis sie reicht; dann rueckt
+     der Anker nach. Ein Anker, der aelter ist als die Richtung gelten darf,
+     wird verworfen -- sonst zeigte er nach einer Pause noch auf die Stelle
+     von vorhin. */
+  var anker = (vorher && vorher.anker)
+    || (vorher ? { lat: vorher.lat, lng: vorher.lng, zeit: vorher.zeit } : null);
+  if (!anker || (neu.zeit - anker.zeit) > RG_RICHTUNG_ALT_MS) {
+    anker = { lat: neu.lat, lng: neu.lng, zeit: neu.zeit };
+  }
+  if (rgDistanzMeter(anker.lat, anker.lng, neu.lat, neu.lng) >= RG_RICHTUNG_MIN_M) {
+    neu.richtung = rgPeilung(anker.lat, anker.lng, neu.lat, neu.lng);
     neu.richtungZeit = neu.zeit;
+    neu.anker = { lat: neu.lat, lng: neu.lng, zeit: neu.zeit };
     return;
   }
+  neu.anker = anker;
   neu.richtung = vorher ? (vorher.richtung != null ? vorher.richtung : null) : null;
   neu.richtungZeit = vorher ? (vorher.richtungZeit || 0) : 0;
 }
