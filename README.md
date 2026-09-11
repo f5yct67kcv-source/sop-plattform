@@ -16,6 +16,7 @@ kein Verkauf) — siehe Entscheidungsprotokoll im Projekt-Repository.
 | Dashboard | https://rapport.itufeden.myhostpoint.ch/dashboard.html | nur Admin, Desktop |
 | Kundenportal | https://rapport.itufeden.myhostpoint.ch/portal.html | Kunden, Handy und Desktop |
 | Homepage | https://rapport.itufeden.myhostpoint.ch/homepage.html | öffentlich, Interessenten |
+| Betreiber-Bereich | https://rapport.itufeden.myhostpoint.ch/betreiber.html | nur der Plattform-Betreiber, Desktop |
 
 Erfassung und Dashboard teilen sich Anmeldung und Backend — wer angemeldet ist,
 bleibt es beim Wechsel. Nicht-Admins werden vom Dashboard abgewiesen.
@@ -35,6 +36,18 @@ Absenden. Produktname („Wachtwerk") und Logo sind Platzhalter (OP-18);
 Impressum, Datenschutz und AGB sind noch leere Verweise. Entwurf,
 Gestaltungsentscheide und Faktenbasis der Werbeaussagen: Projekt-Repository,
 `02-gate2-produkt-mvp/homepage-entwurf.md`.
+
+Der **Betreiber-Bereich** (ENT-519) steht noch einmal daneben und gehört nicht
+diesem Betrieb, sondern dem Betreiber der Plattform. Eigene Tabellen (`betreiber`,
+`betreiber_sessions`), eigene Anmeldung, eigener Wächter `require_betreiber()` —
+und als einziger der drei Wege ein **zwingender zweiter Faktor**, serverseitig
+durchgesetzt (`require_betreiber_voll()`). Vom Cockpit führt bewusst kein Link
+dorthin; die Adresse wird direkt aufgerufen. Zwei Dinge liegen trotzdem im
+Cockpit, beide mit Absicht: das **erste Betreiber-Konto** (Einrichtung — solange
+kein Mandant eingetragen ist, siehe ENT-528/ENT-529) und die
+**Support-Freigabe** (Administration), die in der Datenbank des Mandanten lebt,
+damit der Betreiber sie sich nicht selbst erteilen kann (ENT-526). Inbetriebnahme
+Schritt für Schritt: Abschnitt „Betreiber-Bereich in Betrieb nehmen“ weiter unten.
 
 ## Aufbau
 
