@@ -914,7 +914,7 @@ function merker(karte, schluessel) {
   return '<span class="merker ' + klasse + '">' + text(wort) + '</span>';
 }
 
-/* Wie gross ein Betrieb ist (ENT-537).
+/* Wie gross ein Betrieb ist (ENT-539).
 
    VIER AUSSAGEN, VIER TEXTE -- die Hausregel, die hier am haeufigsten
    verletzt wurde:
@@ -977,7 +977,7 @@ async function ladeMandanten() {
      Monats fest. Das geschieht hoechstens einmal je Mandant und Monat,
      der erste Eintrag gewinnt. Warum ueberhaupt: Wie gross ein Betrieb im
      September war, laesst sich im Dezember nicht mehr feststellen, und
-     eine Staffelung nach Groesse braucht genau das (ENT-537). */
+     eine Staffelung nach Groesse braucht genau das (ENT-539). */
   let groesse = {};
   try {
     const gr = await ruf('betreiber_zaehlstand.php', null, 'POST');

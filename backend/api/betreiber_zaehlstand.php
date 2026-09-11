@@ -1,5 +1,5 @@
 <?php
-// Wie gross ist ein Mandant, und wie gross war er? (ENT-537)
+// Wie gross ist ein Mandant, und wie gross war er? (ENT-539)
 //
 // GET  -- die heutigen Zahlen aller Mandanten, live aus deren Datenbanken,
 //         dazu die festgehaltenen Staende der letzten Monate.
@@ -22,7 +22,7 @@ if (!hat_tabelle($pdo, 'mandant')) {
     json_response(['status' => 'error',
         'message' => 'Der Mandantenstamm ist noch nicht eingerichtet.'], 503);
 }
-// Die Tabelle kann fehlen, wenn die Einrichtung vor ENT-537 gelaufen ist.
+// Die Tabelle kann fehlen, wenn die Einrichtung vor ENT-539 gelaufen ist.
 // "Noch nicht eingerichtet" ist etwas anderes als "keine Staende vorhanden"
 // und bekommt einen eigenen Text (Hausregel).
 $tabelleDa = hat_tabelle($pdo, 'mandant_zaehlstand');

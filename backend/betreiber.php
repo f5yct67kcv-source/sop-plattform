@@ -605,7 +605,7 @@ function mandant_stand(array $m): array
 }
 
 
-// ── Wie gross ist ein Mandant? (ENT-537) ──────────────────────────────
+// ── Wie gross ist ein Mandant? (ENT-539) ──────────────────────────────
 //
 // WARUM MEHRERE ZAHLEN UND NICHT EINE: Der Projektinhaber erwägt eine
 // Staffelung nach Betriebsgrösse ("bis 10 dieser Preis, ab 11 dieser").
@@ -750,7 +750,7 @@ function be_tabellen(): array
 // ist der Bestandsmandant, dessen Daten schon da waren, bevor es einen
 // Mandantenstamm gab -- kein Sonderfall, sondern die dokumentierte
 // Bedeutung von "leer".
-// Der Zaehlstand je Mandant und Monat (ENT-537).
+// Der Zaehlstand je Mandant und Monat (ENT-539).
 //
 // EINE ZEILE JE MONAT, nicht je Tag: Abgerechnet wird monatlich, und ein
 // Tagesstand waere dreissigmal so viel Zeile fuer dieselbe Auskunft.

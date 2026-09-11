@@ -354,7 +354,7 @@ for (const [wie, breite, hoehe] of [['Desktop', 1500, 900], ['Handy', 390, 844]]
   await seite.close();
 }
 
-// ── Wie gross ist ein Mandant: vier Aussagen, vier Texte (ENT-537) ───
+// ── Wie gross ist ein Mandant: vier Aussagen, vier Texte (ENT-539) ───
 //
 // Die Hausregel, die hier am haeufigsten verletzt wurde. "Nicht
 // feststellbar" als 0 auszugeben waere die schlimmste Variante: Sie sieht

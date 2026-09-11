@@ -169,7 +169,7 @@ $pruef('KRITISCH: ab dem zweiten Mandanten ist der Bootstrap zu',
 $pruef('KRITISCH: auch bei vielen Mandanten bleibt er zu',
     be_bootstrap_grenze(20) === false);
 
-// ── Der Zaehlstand (ENT-537) ──────────────────────────────────────────
+// ── Der Zaehlstand (ENT-539) ──────────────────────────────────────────
 //
 // Die Entscheidung, die hier geprueft wird: HOECHSTENS EINMAL je Mandant
 // und Monat, und der ERSTE Eintrag gewinnt. Ohne diese Regel verschoebe
