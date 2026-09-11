@@ -101,6 +101,29 @@ def main() -> None:
     zeilen = alt.splitlines()
     kopf = '\n'.join(zeilen[:treffer[0] + 1])
 
+    # DIREKT NACH DER MARKE KANN NOCH ETWAS VON HOSTPOINT STEHEN. In der
+    # Praxis ist das die Zeile "# Anything after the comment above is left
+    # alone" -- Hostpoints eigener Hinweis darauf, dass es ab hier nichts
+    # mehr anfasst. Sie gehoert nicht uns, also ersetzen wir sie auch nicht.
+    #
+    # Erkannt wird sie daran, WO sie steht, nicht an ihrem Wortlaut -- ein
+    # Wortlautvergleich verlöre sie stillschweigend, sobald Hostpoint sie
+    # umformuliert.
+    #
+    # DIE GRENZE IST DIE ERSTE LEERZEILE, und das ist nicht willkuerlich:
+    # Hostpoints Zeile klebt unmittelbar an der Marke, ohne Leerzeile
+    # dazwischen. Alles, was WIR schreiben, setzt dieses Skript durch eine
+    # Leerzeile ab. Ohne diese enge Grenze hielte die Schleife auch alte
+    # Kommentare aus einem frueheren eigenen Block fuer fremd und liesse
+    # sie stehen -- der alte Stand waere dann ergaenzt statt ersetzt.
+    fremd = []
+    for z in zeilen[treffer[0] + 1:]:
+        if z.strip() == '' or not z.lstrip().startswith('#'):
+            break
+        fremd.append(z)
+    if fremd:
+        kopf = kopf + '\n' + '\n'.join(fremd)
+
     neu = kopf.rstrip('\n') + '\n\n' + unten
     AUSGABE.write_text(neu, encoding='utf-8')
 

@@ -130,6 +130,36 @@ check('Die Meldung sagt, woran es liegen kann (Production-Datei erwischt)',
     (wieder.match(/X-Robots-Tag/g) || []).length === 1);
 }
 
+// HOSTPOINT SCHREIBT SELBST ETWAS UNTER DIE MARKE: die Zeile "# Anything
+// after the comment above is left alone". Sie gehoert nicht uns, also wird
+// sie nicht ersetzt -- erkannt an ihrer STELLE (Kommentarzeilen direkt nach
+// der Marke), nicht an ihrem Wortlaut. Ein Wortlautvergleich verloere sie
+// stillschweigend, sobald Hostpoint sie umformuliert.
+{
+  const HP = '# Anything after the comment above is left alone';
+  const mitHp = join(tmp, 'mit-hostpoint-zeile');
+  writeFileSync(mitHp, KOPF + '\n' + HP + '\n', 'utf8');
+  rmSync(AUSGABE, { force: true });
+  const rh = lauf(mitHp);
+  const g = existsSync(AUSGABE) ? readFileSync(AUSGABE, 'utf8') : '';
+  check('KRITISCH: eine Zeile, die Hostpoint selbst unter die Marke schreibt, bleibt erhalten',
+    rh.code === 0 && g.includes(HP));
+  check('Sie steht weiterhin VOR unserem eigenen Block',
+    g.indexOf(HP) < g.indexOf(hostpoint));
+
+  // Zweimal laufen lassen heisst nicht zweimal anhaengen: Beim naechsten
+  // Nachtrag ist die Ausgabe von heute die Vorlage von morgen.
+  const runde1 = join(tmp, 'runde1');
+  writeFileSync(runde1, g, 'utf8');
+  rmSync(AUSGABE, { force: true });
+  lauf(runde1);
+  const g2 = existsSync(AUSGABE) ? readFileSync(AUSGABE, 'utf8') : '';
+  check('KRITISCH: ein zweiter Lauf liefert dasselbe Ergebnis, nichts verdoppelt sich',
+    g2 === g);
+  check('KRITISCH: auch die Hostpoint-Zeile steht danach genau einmal da',
+    (g2.match(/Anything after the comment/g) || []).length === 1);
+}
+
 const doppelt = join(tmp, 'doppelt');
 writeFileSync(doppelt, `A\n${MARKE}\nB\n${MARKE}\nC\n`, 'utf8');
 rmSync(AUSGABE, { force: true });
