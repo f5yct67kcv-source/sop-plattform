@@ -89,6 +89,15 @@ function ki_fehler_einordnen(int $curlFehler, int $httpCode, string $rumpf): str
     // haeufigste Betriebsfall aus wie ein Programmfehler, und man suchte im
     // Quelltext statt in der Abrechnung.
     if ($httpCode === 402) { return 'guthaben_leer'; }
+    // 404 heisst bei dieser Schnittstelle NICHT "Endpunkt vertippt", sondern
+    // "Modell gibt es nicht ODER dieser Zugang darf es nicht" -- die API
+    // unterscheidet die beiden bewusst nicht, um Aussenstehenden nicht zu
+    // verraten, welche Modelle existieren. Das ist keine Frage an den
+    // Quelltext, sondern an den Zugang, und braucht darum einen eigenen Satz.
+    if ($httpCode === 404) { return 'modell_nicht_verfuegbar'; }
+    // 413 ist eine Groessenfrage und damit etwas, das der Bediener selbst
+    // loesen kann -- als "Programmfehler" waere sie an ihm vorbeigemeldet.
+    if ($httpCode === 413) { return 'anfrage_zu_gross'; }
     if ($httpCode === 400) {
         $r = strtolower($rumpf);
         return (str_contains($r, 'credit balance') || str_contains($r, 'billing'))
@@ -96,6 +105,34 @@ function ki_fehler_einordnen(int $curlFehler, int $httpCode, string $rumpf): str
     }
     if ($httpCode !== 200) { return 'anfrage_abgelehnt'; }
     return 'kein_ergebnis';
+}
+
+// Die Einzelheit zum letzten Fehlschlag -- ein Satz der Schnittstelle selbst,
+// kein Rumpf. Ohne Argument nur lesen.
+//
+// Wozu: Zwei der Gruende unten sagen "das gehoert gemeldet" bzw. "der Zugang
+// darf dieses Modell nicht". Ohne die Begruendung der Gegenseite hat der
+// Bediener nichts in der Hand, was er melden oder nachsehen koennte -- der
+// Satz waere eine Aufforderung ohne Inhalt.
+function ki_fehler_einzelheit(?string $neu = null): string
+{
+    static $text = '';
+    if ($neu !== null) { $text = $neu; }
+    return $text;
+}
+
+// Den erklaerenden Satz aus einer Fehlerantwort holen. Bewusst NUR das Feld
+// error.message und nichts sonst: Es beschreibt die Zurueckweisung (etwa
+// "model: ..." oder "max_tokens: ..."), nennt keine uebermittelten Werte und
+// enthaelt den Schluessel nicht -- der geht im Kopf hinaus, nicht im Rumpf
+// zurueck. Gekappt und von Steuerzeichen befreit, damit nichts die Anzeige
+// zerlegt.
+function ki_fehler_einzelheit_lesen(string $rumpf): string
+{
+    $data = json_decode($rumpf, true);
+    $satz = is_array($data) ? (string)($data['error']['message'] ?? '') : '';
+    $satz = trim(preg_replace('/[\x00-\x1F\x7F]+/u', ' ', $satz) ?? '');
+    return mb_substr($satz, 0, 200);
 }
 
 // Was der Bediener liest, und mit welchem Statuscode. Verschiedene
@@ -119,6 +156,10 @@ function ki_fehler_text(?string $grund = null): array
             'Die Erkennung hat zu lange gebraucht und wurde abgebrochen. Nochmals versuchen, bei einem Bild mit einem kleineren Ausschnitt.'],
         'nicht_erreichbar' => [502,
             'Der Server hat die Erkennung nicht erreicht. Das liegt am Server, nicht an Ihrem Gerät.'],
+        'modell_nicht_verfuegbar' => [502,
+            'Das angeforderte KI-Modell ist über diesen Zugang nicht erreichbar — entweder stimmt die Modellkennung nicht, oder der hinterlegte Schlüssel darf dieses Modell nicht verwenden.'],
+        'anfrage_zu_gross' => [413,
+            'Die Anfrage ist zu gross. Bei einem Bild einen kleineren Ausschnitt wählen oder es vorher verkleinern.'],
         'anfrage_abgelehnt' => [502,
             'Die Erkennung hat die Anfrage zurückgewiesen. Das ist ein Programmfehler und gehört gemeldet.'],
         'inhalt_abgelehnt' => [422,
@@ -127,6 +168,13 @@ function ki_fehler_text(?string $grund = null): array
             'Die Erkennung hat kein verwertbares Ergebnis geliefert.'],
     ];
     [$code, $satz] = $texte[$grund] ?? [502, 'Die Erkennung ist fehlgeschlagen.'];
+    // Nur bei den beiden Gruenden, die ohne die Begruendung der Gegenseite
+    // nicht handhabbar sind. Bei allen uebrigen sagt der Satz schon alles,
+    // und ein englischer Anhang waere nur Laerm.
+    $einzelheit = ki_fehler_einzelheit();
+    if ($einzelheit !== '' && in_array($grund, ['anfrage_abgelehnt', 'modell_nicht_verfuegbar'], true)) {
+        $satz .= ' Die Schnittstelle sagt dazu: „' . $einzelheit . '"';
+    }
     return ['grund' => $grund, 'code' => $code, 'message' => $satz];
 }
 
@@ -145,14 +193,44 @@ function ki_fehler_melden(?string $eigenerText = null): void
     ], $f['code']);
 }
 
+// Den Rumpf bauen. Eigene Funktion, damit der Fehlerfall ohne Netz und ohne
+// Schluessel pruefbar ist -- in ki_aufruf greift die Schluesselpruefung
+// vorher, und der Fall waere dort nie erreichbar.
+//
+// Wozu ueberhaupt: json_encode scheitert stillschweigend an ungueltigem UTF-8
+// und gibt dann false zurueck. In diese Anfrage gehen Kunden- und
+// Mitarbeitendennamen aus der Datenbank ein. Ohne die Pruefung setzte curl
+// das false in einen LEEREN Rumpf um, die Schnittstelle antwortete mit 400,
+// und die Suche begaenne beim Bild statt bei einem Namen.
+function ki_koerper(array $payload): ?string
+{
+    $koerper = json_encode($payload);
+    if ($koerper === false) {
+        ki_fehlergrund('anfrage_abgelehnt');
+        ki_fehler_einzelheit('Die Anfrage liess sich nicht als JSON kodieren: ' . json_last_error_msg());
+        error_log('KI-Aufruf: json_encode fehlgeschlagen -- ' . json_last_error_msg());
+        return null;
+    }
+    return $koerper;
+}
+
 // Ein Aufruf an die Nachrichten-Schnittstelle. Alle Funktionen dieser Datei
 // gehen hier durch: EINE Stelle, die den Schluessel setzt, EINE, die einen
 // Fehlschlag einordnet.
 function ki_aufruf(array $payload, int $timeout): ?array
 {
+    // Zuruecksetzen, bevor irgendetwas passiert: Sonst haengt die Begruendung
+    // des VORIGEN Aufrufs an einem neuen Fehlschlag und erklaert das Falsche.
+    ki_fehler_einzelheit('');
+
     $schluessel = ki_schluessel();
     if (ki_schluessel_fehlt($schluessel)) {
         ki_fehlergrund('nicht_eingerichtet');
+        return null;
+    }
+
+    $koerper = ki_koerper($payload);
+    if ($koerper === null) {
         return null;
     }
 
@@ -165,7 +243,7 @@ function ki_aufruf(array $payload, int $timeout): ?array
             'x-api-key: ' . $schluessel,
             'anthropic-version: 2023-06-01',
         ],
-        CURLOPT_POSTFIELDS => json_encode($payload),
+        CURLOPT_POSTFIELDS => $koerper,
         CURLOPT_TIMEOUT => $timeout,
     ]);
     $antwort    = curl_exec($ch);
@@ -175,6 +253,7 @@ function ki_aufruf(array $payload, int $timeout): ?array
 
     if ($antwort === false || $httpCode !== 200) {
         ki_fehlergrund(ki_fehler_einordnen($curlFehler, $httpCode, (string)$antwort));
+        ki_fehler_einzelheit(ki_fehler_einzelheit_lesen((string)$antwort));
         // Der Rumpf der Fehlerantwort gehoert ins Serverprotokoll, nicht auf
         // den Bildschirm: Er hilft beim Nachsehen, und der Bediener kann
         // damit nichts anfangen. Der Schluessel steht nicht darin -- er geht
@@ -610,9 +689,14 @@ function anthropic_extract_einsatz_bild(string $bildBase64, string $mimeType, ar
         . "aus dem Bild hervorgeht, laesst du weg. Ist kein Auftrag erkennbar, setze unsicher auf true "
         . "und fuelle so viel wie moeglich trotzdem aus.";
 
+    // max_tokens deckt bei diesem Modell auch das Nachdenken ab: Sonnet 5
+    // denkt standardmaessig adaptiv, und diese Token zaehlen mit. Mit den
+    // frueheren 1024 konnte die Antwort mitten in der Feldliste abbrechen --
+    // das Ergebnis waere dann nicht "Fehler", sondern eine STILL unvollstaendig
+    // ausgefuellte Maske gewesen, und das faellt erst beim Speichern auf.
     $data = ki_aufruf([
         'model' => 'claude-sonnet-5',
-        'max_tokens' => 1024,
+        'max_tokens' => 4096,
         'system' => $system,
         'tools' => [$tool],
         'tool_choice' => ['type' => 'tool', 'name' => 'extract_einsatz_bild'],
