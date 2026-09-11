@@ -1803,6 +1803,26 @@ const detailZwischen = {};
 // demselben Bild.
 const fotoZwischen = {};
 
+/* Die Fotogroesse im Blatt (ENT-544). Das Blatt ist 760 px breit und wird
+   auf A4 mit 10 mm Rand gesetzt -- 190 mm Nutzbreite, also rund 0,25 mm je
+   Pixel. 440 px ergeben damit etwa 11 cm Bildbreite.
+
+   Vorgabe des Projektinhabers: „Der Kunde will nicht in ein PDF hineinzoomen
+   müssen, um was zu erkennen." Bis hierher waren es 200 px -- gut 5 cm.
+
+   Gilt fuer BEIDE Bilder, Fotobeleg wie Ereignisfoto. Dieselben Werte stehen
+   im Cockpit (dashboard.html, blattFoto in rapportBlattFuellen): Es ist
+   dasselbe Blatt, nur von der anderen Seite geholt, und zwei Groessen waeren
+   zwei verschiedene Rapporte ueber denselben Rundgang. test_portal.mjs
+   vergleicht die beiden Stellen gegeneinander. */
+const BLATT_FOTO = 'max-width:440px;max-height:320px;border:1px solid #E5E8EC;'
+  + 'border-radius:4px;display:block;margin-top:8px';
+/* Ein Bild, das die Seitengrenze kreuzt, wird von html2pdf stumpf
+   zerschnitten -- bei 200 px fiel das kaum auf, bei 440 px halbiert es das
+   Beweisstueck. Die Optionen enthalten den Modus "css", also wirkt
+   page-break-inside: Die ganze Zeile wandert auf die naechste Seite. */
+const ZEILE_GANZ = 'page-break-inside:avoid;break-inside:avoid';
+
 // Wortlaut fuer den Kunden, nicht fuer den Betrieb: „Ersatzscan" ist
 // Hausjargon. Was er bedeutet -- Foto statt technischer Bestaetigung --
 // steht als Hinweis darunter.
@@ -2271,7 +2291,14 @@ function detailZeichnen(d, tafel) {
     const e = k.erledigt;
     if (!e || !e.hat_foto || !e.scan_id) { return; }
     const ziel = tafel.querySelector('#pf' + Number(e.scan_id));
-    if (ziel) { fotoLaden(Number(e.scan_id), ziel); }
+    if (ziel) { fotoLaeuft.push(fotoLaden('scan', Number(e.scan_id), ziel)); }
+  });
+  // Dasselbe fuer die Ereignisfotos (ENT-544). Eigener Endpunkt, eigener
+  // Nummernkreis -- darum zwei Aufrufe und nicht eine Schleife ueber beides.
+  (d.ereignisse || []).forEach(e => {
+    if (!e.hat_foto || !e.id) { return; }
+    const ziel = tafel.querySelector('#ef' + Number(e.id));
+    if (ziel) { fotoLaeuft.push(fotoLaden('ereignis', Number(e.id), ziel)); }
   });
 }
 
@@ -2315,7 +2342,13 @@ function eZeileHtml(e) {
     + '<div class="e-zeit">' + esc(uhr(e.erfasst_am) || '—') + '</div>'
     + '<div><div class="e-art">' + esc(e.art || 'Ohne Art') + '</div>'
     + (e.bemerkung ? '<div class="e-bem">' + esc(e.bemerkung) + '</div>' : '')
-    + (e.hat_foto ? '<div class="e-bem">Mit Foto festgehalten</div>' : '')
+    // Das Bild selbst statt des Satzes „Mit Foto festgehalten" (ENT-544).
+    // Derselbe Platz und dieselbe Groesse wie der Fotobeleg ein paar Zeilen
+    // weiter oben -- es ist dieselbe Art von Nachweis.
+    + (e.hat_foto
+      ? '<div class="v-foto" id="ef' + Number(e.id) + '">'
+        + '<span class="d-hinweis">Foto wird geladen …</span></div>'
+      : '')
     + '</div></div>';
 }
 
@@ -2729,14 +2762,14 @@ function blattFuellen(d, bk) {
         + ': <b style="color:#14161A;font-weight:600">' + esc(at) + '</b>' + esc(grund) + '</div>';
     }).join('');
     const foto = e && e.hat_foto
-      ? (fotoZwischen[e.scan_id]
-        ? '<img src="' + fotoZwischen[e.scan_id] + '" alt="" style="max-width:200px;'
-          + 'max-height:150px;border:1px solid #E5E8EC;border-radius:4px;display:block;margin-top:6px">'
+      ? (fotoZwischen['scan-' + e.scan_id]
+        ? '<img src="' + fotoZwischen['scan-' + e.scan_id] + '" alt="Fotobeleg zum Ersatzscan"'
+          + ' style="' + BLATT_FOTO + '">'
         // Ist der Beleg nicht geladen, steht wenigstens da, DASS einer
         // vorliegt -- ein stillschweigend fehlendes Foto wäre schlimmer.
         : '<div style="font-size:12px;color:#6B7280;margin-top:3px">Fotobeleg vorhanden</div>')
       : '';
-    return '<tr>'
+    return '<tr style="' + (e && e.hat_foto ? ZEILE_GANZ : '') + '">'
       + '<td style="' + td + ';white-space:nowrap;width:58px' + (e ? '' : ';color:#8B919D') + '">'
       + esc(e ? (uhr(e.erfasst_am) || '—') : '—') + '</td>'
       + '<td style="' + td + '">' + esc(k.bezeichnung)
@@ -2748,12 +2781,23 @@ function blattFuellen(d, bk) {
       + '</tr>';
   }).join('');
 
-  const ereignisse = (d.ereignisse || []).map(e => '<tr>'
+  /* Das Ereignisfoto gehoert ins Blatt (ENT-544, ausdrueckliche Ansage des
+     Projektinhabers). Bis hierher stand nur das Wort „Mit Foto" da -- der
+     Kunde wusste damit, dass es ein Bild gibt, das er nicht sieht. Das ist
+     schlechter als beides: schlechter als das Bild und schlechter als
+     Schweigen. */
+  const ereignisse = (d.ereignisse || []).map(e =>
+    '<tr style="' + (e.hat_foto ? ZEILE_GANZ : '') + '">'
     + '<td style="' + td + ';white-space:nowrap;width:58px">' + esc(uhr(e.erfasst_am) || '—') + '</td>'
     + '<td style="' + td + '"><b style="font-weight:600">' + esc(e.art || 'Ohne Art') + '</b>'
     + (e.bemerkung ? '<div style="font-size:12px;color:#6B7280;margin-top:3px">'
       + esc(e.bemerkung) + '</div>' : '')
-    + (e.hat_foto ? '<div style="font-size:12px;color:#6B7280;margin-top:3px">Mit Foto</div>' : '')
+    + (e.hat_foto
+      ? (fotoZwischen['ereignis-' + e.id]
+        ? '<img src="' + fotoZwischen['ereignis-' + e.id] + '" alt="Foto zur Ereignismeldung"'
+          + ' style="' + BLATT_FOTO + '">'
+        : '<div style="font-size:12px;color:#6B7280;margin-top:3px">Foto vorhanden</div>')
+      : '')
     + '</td></tr>').join('');
 
   const logo = bk.logo
@@ -2823,7 +2867,13 @@ async function pdfHerunterladen(art, id, knopf) {
   knopf.disabled = true;
   knopf.textContent = 'Wird erstellt …';
   try {
+    // Auf die Bilder warten, bevor das Blatt gebaut wird -- sonst rastert
+    // html2pdf ein Blatt, in dem sie noch fehlen. allSettled und nicht all:
+    // Ein Bild, das sich nicht holen laesst, darf das PDF nicht verhindern;
+    // an seiner Stelle steht dann „Foto vorhanden".
     const [, bk] = await Promise.all([pdfLaden(), briefkopfHolen()]);
+    await Promise.allSettled(fotoLaeuft);
+    fotoLaeuft = [];
     if (art === 'einsatz') { blattEinsatzFuellen(d, bk); } else { blattFuellen(d, bk); }
     const blob = await html2pdf().set({
       margin: 10,
@@ -2852,12 +2902,36 @@ async function pdfHerunterladen(art, id, knopf) {
   }
 }
 
-async function fotoLaden(scanId, ziel) {
-  if (fotoZwischen[scanId]) { fotoEinsetzen(ziel, fotoZwischen[scanId]); return; }
+/* Zwei Arten von Bild, zwei Endpunkte, EIN Weg (ENT-544): der Fotobeleg
+   eines Ersatzscans und das Foto einer Ereignismeldung.
+
+   Der Schluessel traegt die Art mit. Scan-Nummern und Ereignis-Nummern sind
+   zwei Nummernkreise -- ohne das Praefix ueberschriebe das Foto von Scan 7
+   das von Ereignis 7, und im Blatt staende ein VERTAUSCHTES Bild. Das faellt
+   niemandem auf, weil es kein fehlendes ist. */
+const FOTO_WEG = {
+  scan:     ['portal_rundgang_foto.php?scan_id=', 'Der Fotobeleg liess sich nicht laden.'],
+  ereignis: ['portal_ereignis_foto.php?ereignis_id=', 'Das Foto liess sich nicht laden.'],
+};
+
+/* Die noch laufenden Bildabrufe. Das Blatt wartet auf sie, bevor es gebaut
+   wird (ENT-544): html2pdf rastert in dem Moment, in dem es gerufen wird --
+   ein Bild, das dann noch laedt, fehlt im PDF, und zwar STILL. Wer die Runde
+   aufklappt und sofort auf „Als PDF herunterladen" tippt, bekam bis hierher
+   ein Blatt ohne Bilder, ohne dass irgendetwas darauf hinwies. Bei einem
+   Daumennagel fiel das kaum auf; bei einem Beweisstueck ueber die halbe
+   Seite ist es der Unterschied zwischen Nachweis und Behauptung. */
+let fotoLaeuft = [];
+
+async function fotoLaden(art, nummer, ziel) {
+  const weg = FOTO_WEG[art];
+  if (!weg) { return; }
+  const schluessel = art + '-' + nummer;
+  if (fotoZwischen[schluessel]) { fotoEinsetzen(ziel, fotoZwischen[schluessel]); return; }
   try {
     const kopf = {};
     if (token) { kopf['X-Auth-Token'] = token; }
-    const antwort = await fetch(API + 'portal_rundgang_foto.php?scan_id=' + scanId, { headers: kopf });
+    const antwort = await fetch(API + weg[0] + nummer, { headers: kopf });
     if (!antwort.ok) { throw new Error('nicht abrufbar'); }
     const bild = await antwort.blob();
     // Als DATEN-Adresse und nicht als Objekt-Adresse: Eine Objekt-Adresse
@@ -2870,13 +2944,13 @@ async function fotoLaden(scanId, ziel) {
       leser.onerror = () => schief(new Error('nicht lesbar'));
       leser.readAsDataURL(bild);
     });
-    fotoZwischen[scanId] = adresse;
+    fotoZwischen[schluessel] = adresse;
     fotoEinsetzen(ziel, adresse);
   } catch (fehler) {
     // „Vorhanden, aber nicht abrufbar" ist etwas anderes als „kein Foto" --
     // der Satz sagt darum nicht, es gebe keines.
     if (document.body.contains(ziel)) {
-      ziel.innerHTML = '<span class="d-hinweis">Der Fotobeleg liess sich nicht laden.</span>';
+      ziel.innerHTML = '<span class="d-hinweis">' + esc(weg[1]) + '</span>';
     }
   }
 }
