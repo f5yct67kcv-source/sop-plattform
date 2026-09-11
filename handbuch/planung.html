@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Planung – Handbuch Cockpit</title>
+<link rel="stylesheet" href="handbuch.css">
+</head>
+<body>
+<div class="hb-shell">
+  <aside class="hb-side" id="hbSide">
+    <div class="hb-brand">
+      <a href="index.html" style="text-decoration:none">
+        <span class="titel">Handbuch</span>
+        <span class="unter">Cockpit der CUPI&nbsp;24</span>
+      </a>
+      <button class="hb-menu-btn" id="hbMenuBtn" aria-label="Menü" aria-expanded="false">☰</button>
+    </div>
+    <div class="hb-nav-wrap">
+      <div class="hb-gruppe">Einstieg</div>
+      <ul class="hb-nav">
+        <li><a href="index.html">Übersicht</a></li>
+        <li><a href="erste-schritte.html">Erste Schritte</a></li>
+      </ul>
+      <div class="hb-gruppe">Erfassung (App)</div>
+      <ul class="hb-nav">
+        <li><a href="erfassung.html">Erfassung</a></li>
+      </ul>
+      <div class="hb-gruppe">Cockpit</div>
+      <ul class="hb-nav">
+        <li><a href="planung.html" class="aktiv">Planung</a></li>
+        <li><a href="kunden.html">Kunden</a></li>
+        <li><a href="personal.html">Personal</a></li>
+        <li><a href="abgleich.html">Abgleich</a></li>
+        <li><a href="betrieb.html">Betrieb</a></li>
+      </ul>
+      <div class="hb-gruppe">Weitere Oberflächen</div>
+      <ul class="hb-nav">
+        <li><a href="kundenportal.html">Kundenportal</a></li>
+      </ul>
+      <div class="hb-gruppe">Nachschlagen</div>
+      <ul class="hb-nav">
+        <li><a href="glossar.html">Glossar</a></li>
+      </ul>
+    </div>
+    <div class="hb-side-fuss">
+      Aus dem Quelltext zusammengestellt, siehe Hinweis auf der <a href="index.html">Übersicht</a>.
+    </div>
+  </aside>
+
+  <div class="hb-main">
+    <div class="hb-content">
+
+      <p class="hb-kicker">Cockpit</p>
+      <h1>Planung</h1>
+      <p class="hb-lead">Einsätze anlegen, Objekte über Masterschichten mit Bedarf
+      versehen, Mitarbeitende zuteilen. Fünf Ansichten plus ein Dialog (Feiertage);
+      <b>Objekte</b> selbst werden, obwohl inhaltlich Planung, unter
+      <a href="kunden.html">Kunden</a> verwaltet — hier nur, was daran anschliesst.</p>
+
+      <h2>Übersicht (Monatsmatrix)</h2>
+      <p>Ein Raster: eine Zeile je Objekt (bei gemischter Sparte auch zweimal, je mit
+      eigenem Sparten-Chip), Spalten = Tage. Eine Zelle zeigt die Anzahl eingeteilter
+      Personen, farbcodiert nach „voll besetzt" / „teilweise besetzt" / „niemand
+      eingeteilt" / „provisorisch" / „abgesagt". Auf den Objektnamen klicken springt
+      in die Objektplanung, auf eine Tageszelle in den Tagesplan dieses Tages.</p>
+
+      <h2>Einsätze</h2>
+      <p>Vier Kennzahlen oben, darunter eine nach Tag gruppierte Liste. Wichtig für
+      die Kennzahl „Offene Schichten": Sie zählt <b>unbesetzte Plätze</b>, nicht
+      Einsätze — an einem Tag können 5&nbsp;Einsätze durchaus 6&nbsp;offene Plätze
+      ergeben.</p>
+
+      <ol class="hb-schritte">
+        <li>„Neuer Einsatz": Kunde, Einsatzart, Sparte, Zeitraum (ein Bis-Datum
+        erzeugt <b>einen Einsatz je Tag</b>, keinen Mehrtages-Datensatz),
+        Arbeitsort (Strasse, PLZ, Ort, Kanton — Pflicht), benötigte Mitarbeitende.</li>
+        <li>Bei Sparte Sicherheit: Wegstrecke ab Hauptanstellungsort und Fahrzeit
+        (Art. 18 GAV) — die Route öffnet sich nur als Link in Google Maps, ohne
+        automatische Übernahme, weil der GAV die kürzeste, nicht die schnellste
+        Strecke verlangt.</li>
+        <li>Kontaktperson vor Ort, Zuteilung, Angaben für die Eingeteilten
+        (Treffpunkt, Qualifikation, Tätigkeit, Bemerkung, Dokumente).</li>
+        <li>„Einsatz anlegen".</li>
+      </ol>
+
+      <p>Ein bestehender Einsatz wird über seinen <b>Einsatzplan</b> geöffnet (siehe
+      unten), dort „Einsatz bearbeiten" für dieselben Stammdaten in einer
+      Schublade, oder „Löschen" (entfernt Einsatz und Zuteilung, bereits erfasste
+      Rapporte bleiben unberührt). Ein Diktatfeld oben in der Liste nimmt auch
+      Text/Diktat/Bilder entgegen und legt daraus direkt einen Einsatz an.</p>
+
+      <div class="hb-kasten hb-regel">
+        <p class="hb-kasten-titel">Zwei Sperren, unabhängig voneinander</p>
+        <p><b>Abgeglichen und festgeschrieben (ENT-045):</b> Sobald zu einer Schicht
+        irgendwo ein Ist-Stand erfasst ist, lässt sie sich in der Planung nicht mehr
+        ändern, löschen oder umbesetzen — nur unter <a href="abgleich.html">Abgleich</a>
+        über „Sperre aufheben" wieder freigeben. <b>Doppelbelegung:</b> Eine im
+        selben Zeitfenster bereits andernorts eingeteilte Person lässt sich nicht
+        zusätzlich wählen — auch nicht am Browser vorbei, die Sperre greift beim
+        Speichern auf dem Server. Ruhezeiten und Höchstarbeitszeiten selbst prüft
+        das Werkzeug dabei nicht.</p>
+      </div>
+
+      <h2>Objektplanung</h2>
+      <p>Monatsraster <b>eines</b> gewählten Objekts: eine Zeile „Alle Schichten"
+      (Tagessumme), eine Zeile je Masterschicht (Ist/Soll je Tag), eine Zeile je
+      Mitarbeitendem (tatsächlich zugeteilte Einsätze). Kennzahlen oben: Soll-,
+      besetzte und offene Stunden.</p>
+
+      <h3>Schichten setzen</h3>
+      <p>Erzeugt Einsätze aus den Masterschichten eines Objekts für einen
+      Zeitraum — und setzt dabei zugleich den dauerhaften Wochentags-Bedarf an der
+      Masterschicht selbst.</p>
+      <ol class="hb-schritte">
+        <li>„Schichten setzen", Zeitraum wählen.</li>
+        <li>Je Masterschicht und Wochentag (inkl. Feiertag) die benötigte
+        Personenzahl eintragen — Schnellknöpfe („Jeden Tag 1", „Mo–Fr 1" …)
+        beschleunigen das.</li>
+        <li>Vorschau prüfen (neu / schon vorhanden / neue Fassung), „Übernehmen".</li>
+      </ol>
+
+      <h3>Einteilen</h3>
+      <ol class="hb-schritte">
+        <li>„Einteilen" (nur bei mindestens einer Masterschicht am Objekt aktiv):
+        Schicht, Zeitraum, Personen ankreuzen.</li>
+        <li>Vorschau zeigt neu / schon eingeteilt / nicht möglich (Konflikt) / gegen
+        eine Sperre (wird trotzdem eingeteilt — die Sperre ist eine Mitteilung,
+        kein Verbot) / bereits festgeschrieben (wird übersprungen).</li>
+        <li>„Einteilungen speichern". Fehlt einer gewählten Person die
+        Revierdienst-Berechtigung, fragt das Werkzeug vor dem endgültigen
+        Speichern noch einmal nach.</li>
+      </ol>
+      <p>Ein Klick direkt auf eine Tageszelle in einer Masterschicht-Zeile öffnet
+      denselben Dialog nur für diesen einen Tag.</p>
+
+      <h2>Masterschichten</h2>
+      <p>Verwaltet auf dem Reiter „Masterschichten" der Objekt-Detailseite (unter
+      Kunden → Objekte). Vorlagen, aus denen Einsätze entstehen — „eine Änderung
+      gilt immer ab einem Stichtag, bereits erzeugte Schichten bleiben
+      unverändert".</p>
+
+      <ol class="hb-schritte">
+        <li>„Masterschicht hinzufügen": Bezeichnung, Kürzel, Art (Arbeit/Fahrtzeit),
+        Sparte, Zeiten, Pause, Wochenmuster (Bedarf je Wochentag <i>und</i>
+        Feiertag getrennt — am Feiertag gilt dessen Wert statt des
+        Wochentagswerts) oder ein festes Intervall („jeden n-ten Tag").</li>
+        <li>Gültig ab (Pflicht) / Gültig bis (leer = offen) — für saisonale
+        Muster hier eingrenzen.</li>
+        <li>„Speichern".</li>
+      </ol>
+
+      <p><b>„Ändern ab …"</b> legt für einen gewählten Stichtag eine neue Fassung an
+      (die alte endet automatisch am Vortag) und lässt die Vergangenheit unberührt.
+      <b>„Beschriftung"</b> ändert nur Name/Kürzel/Farbe, ohne Zeiten oder Bedarf
+      anzufassen.</p>
+
+      <h2>Tagesplan</h2>
+      <p>Tagesansicht mit denselben Filtern wie „Einsätze". Zwei unterschiedliche
+      Leertexte: „Kein Treffer" (es gibt Einsätze an diesem Tag, aber keiner passt
+      zum Filter) gegenüber „Nichts geplant" (an diesem Tag ist tatsächlich nichts
+      geplant) — zwei verschiedene Aussagen, entsprechend unterschieden.</p>
+
+      <h2>Feiertage</h2>
+      <p>Eigener Dialog, kein Reiter. Zeigt Datum, Feiertag und Umfang („ganzer
+      Tag" oder „ab HH:MM") mit Quellenangabe — ausdrücklich <b>keine</b> Aussage
+      über Zuschläge oder Entschädigung, nur eine Markierung. „Jahr eintragen"
+      legt die Feiertage einmal pro Jahr an, ohne Bestehendes zu überschreiben.</p>
+
+      <h2>Zuteilung</h2>
+      <p>Kein eigener Bildschirm, drei gleichwertige Wege: die Massen-Einteilung in
+      der Objektplanung (oben), ein Klick auf eine einzelne Tageszelle dort, oder
+      Klick-für-Klick im Einsatzplan (unten) — Person anklicken, sofort
+      gespeichert.</p>
+
+      <h2>Einsatzplan</h2>
+      <p>Die Detailansicht <b>eines</b> Einsatzes: links eine Personenliste mit
+      Ampel-Filter (grün frei, gelb knappe Ruhezeit, rot Konflikt — mit
+      Begründung), rechts ein Zeitraster im 15-Minuten-Takt mit einer Zeile je
+      Position.</p>
+      <ul>
+        <li>Position anklicken, dann Person anklicken → Zuteilung ist sofort
+        gespeichert.</li>
+        <li>Je Position: Stift zum Bearbeiten (Zeit, Funktion, Bezeichnung,
+        Stundenansatz), Klon-Symbol zum Duplizieren, ein manuelles Schloss
+        🔒/🔓 „Einteilung steht" (unabhängig von der automatischen
+        Abgleich-Sperre).</li>
+        <li>Ist der Einsatz abgeschlossen: zusätzlich „Kundenrapport drucken" und
+        „Rechnung erstellen" direkt aus dieser Ansicht.</li>
+      </ul>
+      <p>Fahrzeit-Positionen zählen in der Soll/Ist-Summe bewusst nicht mit — Fahrzeit
+      ist nach Art. 18 Ziff. 2 GAV keine Arbeitszeit.</p>
+
+      <div class="hb-begriffe">
+        <a href="glossar.html#einsatz">Einsatz</a>
+        <a href="glossar.html#masterschicht">Masterschicht</a>
+        <a href="glossar.html#position">Position</a>
+        <a href="glossar.html#zuteilung">Zuteilung</a>
+        <a href="glossar.html#festgeschrieben">Festgeschrieben / abgeglichen</a>
+        <a href="glossar.html#provisorisch">Provisorisch</a>
+      </div>
+
+      <p class="hb-fussnote">Quelle: <code>dashboard.html</code>
+      (<code>view-planung</code>, <code>view-einsatzplan</code> u.&nbsp;a.), Stand
+      11.09.2026. Nicht am laufenden Cockpit nachgeprüft — siehe Hinweis auf der
+      <a href="index.html">Übersicht</a>.</p>
+
+    </div>
+  </div>
+</div>
+<script src="handbuch.js"></script>
+</body>
+</html>

@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Erste Schritte – Handbuch Cockpit</title>
+<link rel="stylesheet" href="handbuch.css">
+</head>
+<body>
+<div class="hb-shell">
+  <aside class="hb-side" id="hbSide">
+    <div class="hb-brand">
+      <a href="index.html" style="text-decoration:none">
+        <span class="titel">Handbuch</span>
+        <span class="unter">Cockpit der CUPI&nbsp;24</span>
+      </a>
+      <button class="hb-menu-btn" id="hbMenuBtn" aria-label="Menü" aria-expanded="false">☰</button>
+    </div>
+    <div class="hb-nav-wrap">
+      <div class="hb-gruppe">Einstieg</div>
+      <ul class="hb-nav">
+        <li><a href="index.html">Übersicht</a></li>
+        <li><a href="erste-schritte.html" class="aktiv">Erste Schritte</a></li>
+      </ul>
+      <div class="hb-gruppe">Erfassung (App)</div>
+      <ul class="hb-nav">
+        <li><a href="erfassung.html">Erfassung</a></li>
+      </ul>
+      <div class="hb-gruppe">Cockpit</div>
+      <ul class="hb-nav">
+        <li><a href="planung.html">Planung</a></li>
+        <li><a href="kunden.html">Kunden</a></li>
+        <li><a href="personal.html">Personal</a></li>
+        <li><a href="abgleich.html">Abgleich</a></li>
+        <li><a href="betrieb.html">Betrieb</a></li>
+      </ul>
+      <div class="hb-gruppe">Weitere Oberflächen</div>
+      <ul class="hb-nav">
+        <li><a href="kundenportal.html">Kundenportal</a></li>
+      </ul>
+      <div class="hb-gruppe">Nachschlagen</div>
+      <ul class="hb-nav">
+        <li><a href="glossar.html">Glossar</a></li>
+      </ul>
+    </div>
+    <div class="hb-side-fuss">
+      Aus dem Quelltext zusammengestellt, siehe Hinweis auf der <a href="index.html">Übersicht</a>.
+    </div>
+  </aside>
+
+  <div class="hb-main">
+    <div class="hb-content">
+
+      <p class="hb-kicker">Einstieg</p>
+      <h1>Erste Schritte</h1>
+      <p class="hb-lead">Wer meldet sich wo an, wie funktioniert die Zwei-Faktor-Anmeldung,
+      und wer darf im Cockpit eigentlich was? Dieses Kapitel klärt das einmal gründlich,
+      damit die anderen Kapitel nicht bei jedem Punkt neu darauf verweisen müssen.</p>
+
+      <h2>Wer arbeitet wo</h2>
+      <p>Das Werkzeug ist kein einzelner Bildschirm, sondern mehrere getrennte
+      Oberflächen mit je eigenem Zweck. Dieses Handbuch deckt die drei ab, mit
+      denen CUPI&nbsp;24 selbst und ihre Kundschaft täglich arbeiten:</p>
+
+      <div class="hb-tabelle-wrap"><table>
+        <tr><th>Oberfläche</th><th>Für wen</th><th>Gerät</th></tr>
+        <tr>
+          <td><b>Erfassung</b> (die App)</td>
+          <td>Alle Mitarbeitenden — eigene Einsätze, Rapporte, Rundgänge, Aufgaben</td>
+          <td>Handy, als App installierbar</td>
+        </tr>
+        <tr>
+          <td><b>Cockpit</b> (<code>dashboard.html</code>)</td>
+          <td>Personen mit mindestens einem Verwaltungsrecht — Planung, Personal-
+          und Kundenadministration, Abgleich, Betrieb</td>
+          <td>Desktop</td>
+        </tr>
+        <tr>
+          <td><b>Kundenportal</b></td>
+          <td>Kundinnen und Kunden von CUPI&nbsp;24 — Einblick in die eigenen Objekte</td>
+          <td>Handy und Desktop</td>
+        </tr>
+      </table></div>
+
+      <div class="hb-kasten hb-hinweis">
+        <p class="hb-kasten-titel">Zwei weitere Oberflächen, ausserhalb dieses Handbuchs</p>
+        <p>Die öffentliche <b>Homepage</b> (Verkaufsseite ohne Anmeldung) und der
+        <b>Betreiber-Bereich</b> (Mandantenverwaltung, nur für den Plattform-Betreiber
+        selbst) gehören nicht zur täglichen Arbeit von CUPI&nbsp;24 als Betrieb und
+        werden hier darum nicht behandelt. Beschrieben sind sie in
+        <code>README.md</code> im Repository.</p>
+      </div>
+
+      <h2>Anmelden</h2>
+      <p>Erfassung und Cockpit teilen sich dieselbe Anmeldung — wer in der App
+      angemeldet ist, ist es beim Wechsel ins Cockpit ebenfalls (sofern die
+      Berechtigung dafür besteht). Das Kundenportal hat eine eigene, davon
+      unabhängige Anmeldung.</p>
+
+      <ol class="hb-schritte">
+        <li>Benutzername und Passwort eingeben — angemeldet wird mit dem
+        Namen, nicht mit einer E-Mail-Adresse.</li>
+        <li>Ist die Zwei-Faktor-Anmeldung für dieses Konto eingeschaltet, folgt
+        eine zweite Eingabe: der sechsstellige Code aus der Authenticator-App
+        (siehe unten).</li>
+        <li>Optional: „Dieses Gerät merken" — dann fragt das Werkzeug auf
+        genau diesem Gerät 14 Tage lang keinen zweiten Faktor mehr ab.</li>
+      </ol>
+
+      <div class="hb-kasten hb-achtung">
+        <p class="hb-kasten-titel">Nach mehreren Fehlversuchen gesperrt</p>
+        <p>Nach zu vielen falschen Anmeldeversuchen sperrt das Werkzeug für eine
+        gewisse Zeit (Meldung nennt die Minutenzahl) — unabhängig davon, ob der
+        Name überhaupt existiert. Das ist kein Fehler, sondern Schutz gegen
+        automatisiertes Passwort-Raten. Abwarten oder „Passwort vergessen"
+        nutzen.</p>
+      </div>
+
+      <p>Passwort vergessen? Über den entsprechenden Link auf der Anmeldeseite
+      lässt sich ein neues setzen.</p>
+
+      <h2>Zwei-Faktor-Anmeldung einrichten</h2>
+      <p>Freiwillig, aber empfohlen für jedes Konto mit Zugang zum Cockpit — sie
+      lässt sich für das eigene Konto unter <b>Betrieb → Mein Zugang:
+      Zwei-Faktor-Anmeldung</b> einschalten.</p>
+
+      <ol class="hb-schritte">
+        <li>Einrichtung starten — das Werkzeug zeigt einen QR-Code und den
+        zugehörigen Schlüssel zum Abtippen.</li>
+        <li>QR-Code mit einer Authenticator-App scannen (z.&nbsp;B. Google
+        Authenticator, Microsoft Authenticator, 1Password) oder den Schlüssel
+        von Hand eintragen.</li>
+        <li>Den sechsstelligen Code, den die App jetzt anzeigt, zur Bestätigung
+        eingeben. Stimmt er nicht: meist liegt es an der Uhrzeit auf dem
+        Telefon, nicht am Schlüssel.</li>
+        <li>Danach erscheinen <b>zehn Notfallcodes</b> — jeder einmal
+        verwendbar, falls das Telefon einmal nicht zur Hand ist.</li>
+      </ol>
+
+      <div class="hb-kasten hb-achtung">
+        <p class="hb-kasten-titel">Die Notfallcodes jetzt sichern, nicht später</p>
+        <p>Sie werden <b>genau einmal</b> im Klartext angezeigt. Wer sie nicht
+        an dieser Stelle sichert (ausdrucken, in einen Passwortmanager legen),
+        kann sie sich später nicht mehr anzeigen lassen — nur komplett neu
+        erzeugen. Gehen <b>sowohl</b> das Telefon <b>als auch</b> die
+        Notfallcodes verloren, gibt es für ein normales Cockpit-Konto heute
+        keinen Selbstbedienungsweg zurück (anders als beim separaten
+        Betreiber-Bereich) — das erfordert dann einen Eingriff direkt in der
+        Datenbank. Notfallcodes sind also keine Formalie.</p>
+      </div>
+
+      <p>Abschalten lässt sich die Zwei-Faktor-Anmeldung jederzeit unter
+      demselben Menüpunkt — verlangt wird dafür ausdrücklich noch einmal das
+      eigene Passwort, auch bei laufender Sitzung. Das verhindert, dass an
+      einem unbeaufsichtigten Bildschirm der Schutz mit einem Klick verschwindet.</p>
+
+      <h2>Rollen und Rechte — wer darf was</h2>
+      <p>Es gibt keine einzelne „Admin ja/nein"-Schaltung. Zugriff ist in
+      <b>20&nbsp;Bereiche</b> aufgeteilt (Einsätze, Objekte, Kunden, Personal,
+      Lohn, Betrieb, Rollen …), und jeder Bereich kennt bis zu drei Stufen:</p>
+
+      <div class="hb-tabelle-wrap"><table>
+        <tr><th>Stufe</th><th>Bedeutung</th></tr>
+        <tr><td><b>verborgen</b></td><td>Kein Zugriff — der Bereich erscheint im Cockpit gar nicht erst.</td></tr>
+        <tr><td><b>lesen</b></td><td>Ansehen, nichts ändern.</td></tr>
+        <tr><td><b>schreiben</b></td><td>Ansehen <i>und</i> ändern — schliesst „lesen" ein.</td></tr>
+      </table></div>
+
+      <p>Für den täglichen Gebrauch reichen fünf feste Systemrollen plus eine
+      zusätzliche, unabhängig vergebene Rolle für den Revierdienst. Sie lassen
+      sich nicht verändern — wer eine andere Kombination braucht, bekommt ein
+      eigenes, frei zusammengestelltes Profil (siehe unten).</p>
+
+      <div class="hb-tabelle-wrap"><table>
+        <tr><th>Rolle</th><th>Wofür</th></tr>
+        <tr>
+          <td><b>Personal</b></td>
+          <td>Die Belegschaft selbst: eigene Schichten, eigene Rapporte, eigene
+          Abwesenheitsanträge — <i>in der App</i>. Kein Zugang zum Cockpit.</td>
+        </tr>
+        <tr>
+          <td><b>Planung</b></td>
+          <td>Einsätze, Objekte, Masterschichten, Kunden, Abgleich. Sieht
+          Mitarbeitende mit Namen und Funktion, aber ohne vertrauliche Angaben.</td>
+        </tr>
+        <tr>
+          <td><b>Personaladministration</b></td>
+          <td>Die vollständige Personalakte inklusive vertraulicher Angaben,
+          Mitteilungen an die Belegschaft. Keine Einsatzplanung, keine Kunden.</td>
+        </tr>
+        <tr>
+          <td><b>Administrator</b></td>
+          <td>Führt den Betrieb im Tagesgeschäft: Einsätze, Objekte, Kunden,
+          Offerten/Rechnungen, Abgleich, Abwesenheiten, Mitteilungen. Keine
+          Betriebseinstellungen, keine Einrichtung, keine Rollenvergabe.</td>
+        </tr>
+        <tr>
+          <td><b>Verwalter</b></td>
+          <td>Alles — inklusive Betriebseinstellungen, Einrichtung, Revierdienst
+          und Rollenvergabe selbst.</td>
+        </tr>
+        <tr>
+          <td><b>Wächtersystem</b></td>
+          <td>Zusatzrolle, unabhängig von den fünf oben: Kontrollpunkte,
+          Rundgang-Vorlagen und laufende Rundgänge verwalten. Wird zusätzlich
+          vergeben, nicht anstelle einer anderen Rolle.</td>
+        </tr>
+      </table></div>
+
+      <p>Rollen vergeben lassen sich unter <b>Betrieb → Rollen &amp;
+      Berechtigungen</b> — dort auch die 20 Bereiche einzeln einsehbar und,
+      für eigene Profile, einzeln setzbar.</p>
+
+      <div class="hb-kasten hb-regel">
+        <p class="hb-kasten-titel">Zwei Sicherheitsregeln, die im Cockpit sichtbar werden</p>
+        <p><b>403 statt 401:</b> Verlangt eine Aktion ein Recht, das fehlt,
+        meldet das Cockpit „Dafür fehlt dir die Berechtigung" — anders als bei
+        einer abgelaufenen Sitzung, die zur Anmeldeseite zurückschickt. Wer das
+        unterscheidet, weiss sofort, ob ein erneutes Anmelden überhaupt hilft.</p>
+        <p><b>Augenhöhe:</b> An ein Konto, das selbst Rollen vergeben darf, kommt
+        nur heran (Passwort zurücksetzen, deaktivieren), wer dieses Recht
+        („Rollen &amp; Berechtigungen: schreiben") ebenfalls besitzt. Eine
+        Personaladministration kann also nicht über den Umweg „Passwort setzen"
+        einen Verwalter-Zugang übernehmen.</p>
+      </div>
+
+      <p>Eigene, frei zusammengestellte Profile sind zusätzlich zu den fünf
+      Systemrollen möglich — für den Fall, dass der Betrieb eine andere
+      Kombination braucht, ohne dass die geprüften Systemrollen selbst
+      verändert werden können.</p>
+
+      <div class="hb-begriffe">
+        <a href="glossar.html#rolle">Rolle</a>
+        <a href="glossar.html#recht">Recht</a>
+        <a href="glossar.html#bereich-recht">Bereich (Rechte)</a>
+        <a href="glossar.html#stufe">Stufe</a>
+        <a href="glossar.html#zwei-faktor">Zwei-Faktor-Anmeldung</a>
+        <a href="glossar.html#sitzung">Sitzung</a>
+      </div>
+
+      <p class="hb-fussnote">Quelle: <code>backend/rechte.php</code>,
+      <code>backend/api/login.php</code>, <code>backend/zweifaktor.php</code>
+      und die zugehörigen Endpunkte, gelesen am 11.09.2026. Nicht am
+      laufenden Cockpit nachgeprüft — siehe Hinweis auf der
+      <a href="index.html">Übersicht</a>.</p>
+
+    </div>
+  </div>
+</div>
+<script src="handbuch.js"></script>
+</body>
+</html>

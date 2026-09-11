@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Glossar – Handbuch Cockpit</title>
+<link rel="stylesheet" href="handbuch.css">
+</head>
+<body>
+<div class="hb-shell">
+  <aside class="hb-side" id="hbSide">
+    <div class="hb-brand">
+      <a href="index.html" style="text-decoration:none">
+        <span class="titel">Handbuch</span>
+        <span class="unter">Cockpit der CUPI&nbsp;24</span>
+      </a>
+      <button class="hb-menu-btn" id="hbMenuBtn" aria-label="Menü" aria-expanded="false">☰</button>
+    </div>
+    <div class="hb-nav-wrap">
+      <div class="hb-gruppe">Einstieg</div>
+      <ul class="hb-nav">
+        <li><a href="index.html">Übersicht</a></li>
+        <li><a href="erste-schritte.html">Erste Schritte</a></li>
+      </ul>
+      <div class="hb-gruppe">Erfassung (App)</div>
+      <ul class="hb-nav">
+        <li><a href="erfassung.html">Erfassung</a></li>
+      </ul>
+      <div class="hb-gruppe">Cockpit</div>
+      <ul class="hb-nav">
+        <li><a href="planung.html">Planung</a></li>
+        <li><a href="kunden.html">Kunden</a></li>
+        <li><a href="personal.html">Personal</a></li>
+        <li><a href="abgleich.html">Abgleich</a></li>
+        <li><a href="betrieb.html">Betrieb</a></li>
+      </ul>
+      <div class="hb-gruppe">Weitere Oberflächen</div>
+      <ul class="hb-nav">
+        <li><a href="kundenportal.html">Kundenportal</a></li>
+      </ul>
+      <div class="hb-gruppe">Nachschlagen</div>
+      <ul class="hb-nav">
+        <li><a href="glossar.html" class="aktiv">Glossar</a></li>
+      </ul>
+    </div>
+    <div class="hb-side-fuss">
+      Aus dem Quelltext zusammengestellt, siehe Hinweis auf der <a href="index.html">Übersicht</a>.
+    </div>
+  </aside>
+
+  <div class="hb-main">
+    <div class="hb-content">
+
+      <p class="hb-kicker">Nachschlagen</p>
+      <h1>Glossar</h1>
+      <p class="hb-lead">Begriffe, wie sie im Cockpit tatsächlich verwendet werden —
+      keine GAV-Auslegung. Wo ein Begriff an eine GAV-Regel anschliesst, steht die
+      Auslegung im Auslegungsregister des Projekt-Repositoriums, nicht hier.</p>
+
+      <p class="hb-az">A</p>
+      <div class="hb-eintrag" id="abgeglichen">
+        <h3>Abgeglichen <span class="hb-eintrag-kapitel">→ Planung, Abgleich, Personal</span></h3>
+        <p>Zustand einer Schicht, sobald unter „Abgleich" ein Ist-Stand erfasst
+        wurde (anwesend/abwesend/ausgefallen). Gleichbedeutend mit
+        <a href="#festgeschrieben">festgeschrieben</a>: Die Schicht lässt sich in
+        der Planung danach nicht mehr ändern, löschen oder umbesetzen, bis die
+        Sperre unter Abgleich ausdrücklich wieder aufgehoben wird (ENT-045).</p>
+      </div>
+      <div class="hb-eintrag" id="anstellungsort">
+        <h3>Anstellungsort (HAO / NAO) <span class="hb-eintrag-kapitel">→ Betrieb</span></h3>
+        <p>Vertraglich vereinbarter Ort nach Art. 18 Ziff. 2 GAV, ab dem
+        Wegstrecken zu Einsätzen gemessen werden. Höchstens zwei — ein
+        Hauptanstellungsort (HAO) und höchstens ein Nebenanstellungsort (NAO).</p>
+      </div>
+      <div class="hb-eintrag" id="auslagenersatz">
+        <h3>Auslagenersatz <span class="hb-eintrag-kapitel">→ Kunden, Planung</span></h3>
+        <p>Fahrzeit-/Fahrkostenersatz nach Art. 18 GAV, abhängig von der
+        Wegstrecke zwischen Anstellungsort und Einsatzort. Gilt nur für die Sparte
+        Sicherheit — bei Reinigung entfällt die Frage, weil der GAV für private
+        Sicherheitsdienstleistungen dort nicht gilt.</p>
+      </div>
+
+      <p class="hb-az">B</p>
+      <div class="hb-eintrag" id="bereich-recht">
+        <h3>Bereich (Recht) <span class="hb-eintrag-kapitel">→ Erste Schritte</span></h3>
+        <p>Einer von 20 Zugriffs-Bereichen (Einsätze, Objekte, Kunden, Personal,
+        Lohn, Betrieb, Rollen …), je mit bis zu drei <a href="#stufe">Stufen</a>.
+        Ein <a href="#recht">Recht</a> setzt sich aus Bereich und Stufe zusammen.</p>
+      </div>
+      <div class="hb-eintrag" id="beleg">
+        <h3>Beleg <span class="hb-eintrag-kapitel">→ Kunden</span></h3>
+        <p>Sammelbegriff für Offerte und Rechnung: gemeinsames Formular,
+        gemeinsame Datengrundlage, getrennte Listen und Nummernkreise.</p>
+      </div>
+      <div class="hb-eintrag" id="betreiber">
+        <h3>Betreiber <span class="hb-eintrag-kapitel">→ Betrieb</span></h3>
+        <p>Die Stelle, die die Plattform selbst betreibt — verschieden vom
+        einzelnen Betrieb (hier: CUPI&nbsp;24). Zuständig für Support-Freigabe und
+        Supportanfragen; hat einen eigenen, vom Cockpit getrennten
+        Betreiber-Bereich (ausserhalb dieses Handbuchs, siehe README.md).</p>
+      </div>
+
+      <p class="hb-az">E</p>
+      <div class="hb-eintrag" id="einsatz">
+        <h3>Einsatz <span class="hb-eintrag-kapitel">→ Planung</span></h3>
+        <p>Ein geplanter Arbeitseinsatz an einem Tag (Kunde, Arbeitsort, Zeit,
+        Bedarf). Entsteht frei per Formular oder automatisch aus einer
+        <a href="#masterschicht">Masterschicht</a>.</p>
+      </div>
+      <div class="hb-eintrag" id="einsatzmerkmal">
+        <h3>Einsatzmerkmal <span class="hb-eintrag-kapitel">→ Betrieb, Personal</span></h3>
+        <p>Eine von drei Ja/Nein-Eigenschaften an einer Person (Diensthundeführer,
+        Waffentragberechtigt, Revierdienst-berechtigt) — keine Rolle und kein
+        Zugriffsrecht.</p>
+      </div>
+
+      <p class="hb-az">F</p>
+      <div class="hb-eintrag" id="festgeschrieben">
+        <h3>Festgeschrieben <span class="hb-eintrag-kapitel">→ Planung, Abgleich</span></h3>
+        <p>Siehe <a href="#abgeglichen">Abgeglichen</a> — derselbe Zustand, aus
+        Sicht der Planung beschrieben statt aus Sicht des Abgleichs.</p>
+      </div>
+      <div class="hb-eintrag" id="fotobeleg">
+        <h3>Fotobeleg / Ersatzscan <span class="hb-eintrag-kapitel">→ Erfassung, Kundenportal</span></h3>
+        <p>Ausweichweg zur normalen Bestätigung eines <a href="#kontrollpunkt">Kontrollpunkts</a>:
+        ein Pflichtfoto plus Begründungstext statt Standort- oder Chip-Scan. In der
+        App „Ersatzscan" genannt, im Kundenportal „Fotobeleg" — derselbe
+        Vorgang.</p>
+      </div>
+
+      <p class="hb-az">I</p>
+      <div class="hb-eintrag" id="ist-status">
+        <h3>Ist-Status <span class="hb-eintrag-kapitel">→ Abgleich</span></h3>
+        <p>Der unter „Abgleich" erfasste tatsächliche Zustand einer Schicht: offen,
+        anwesend, abwesend oder ausgefallen (die Schicht fand gar nicht statt).</p>
+      </div>
+
+      <p class="hb-az">K</p>
+      <div class="hb-eintrag" id="kontrollpunkt">
+        <h3>Kontrollpunkt <span class="hb-eintrag-kapitel">→ Erfassung</span></h3>
+        <p>Einzelne Station eines <a href="#rundgang">Rundgangs</a>, technisch per
+        NFC oder Geofence (Standort) bestätigt — in der Praxis meist per Geofence,
+        da Web-NFC auf iPhones nicht funktioniert. Ausweichwege: siehe
+        <a href="#fotobeleg">Fotobeleg</a> oder „Nicht verfügbar" melden.</p>
+      </div>
+      <div class="hb-eintrag" id="kundennummer">
+        <h3>Kundennummer <span class="hb-eintrag-kapitel">→ Kunden</span></h3>
+        <p>Systemvergebene, fortlaufende Nummer (<code>K0001</code>, <code>K0002</code> …).
+        Nicht von Hand editierbar und nicht importierbar — aus einem Vorsystem
+        mitgebrachte Nummern gehören ins Notizfeld.</p>
+      </div>
+      <div class="hb-eintrag" id="kundenrapport">
+        <h3>Kundenrapport <span class="hb-eintrag-kapitel">→ Kunden, Kundenportal</span></h3>
+        <p>Zusammengeführtes Dokument aus allen Einzel-<a href="#rapport">Rapporten</a>
+        eines Einsatzes (bei mehreren eingesetzten Personen je eine Position),
+        1:1 wie das physische Blatt — auch im Kundenportal.</p>
+      </div>
+      <div class="hb-eintrag" id="kundenzugang">
+        <h3>Kundenzugang <span class="hb-eintrag-kapitel">→ Kundenportal</span></h3>
+        <p>Login-Konto einer Person bei einem Kunden für das Kundenportal. Kein
+        <a href="#recht">Recht</a> im Sinne des Cockpits — nur eine Verknüpfung zu
+        genau einem Kunden.</p>
+      </div>
+
+      <p class="hb-az">L</p>
+      <div class="hb-eintrag" id="logbuch">
+        <h3>Logbuch / Änderungsverlauf <span class="hb-eintrag-kapitel">→ Personal, Betrieb</span></h3>
+        <p>Zentraler, nur lesbarer Protokollmechanismus — erscheint u.&nbsp;a. an der
+        Personalakte und an Fahrzeugen. „Ein Logbuch, aus dem sich Einträge
+        entfernen lassen, wäre keines": Es gibt serverseitig keinen Lösch- oder
+        Änderungsweg dafür.</p>
+      </div>
+
+      <p class="hb-az">M</p>
+      <div class="hb-eintrag" id="masterschicht">
+        <h3>Masterschicht <span class="hb-eintrag-kapitel">→ Planung</span></h3>
+        <p>Vorlage an einem <a href="#objekt">Objekt</a>, aus der einzelne Einsätze
+        entstehen — Zeiten, Pause, Rhythmus und Bedarf je Wochentag. Änderungen
+        wirken ab einem gewählten Stichtag als neue Fassung, ohne bereits
+        erzeugte Einsätze zu verändern.</p>
+      </div>
+
+      <p class="hb-az">N</p>
+      <div class="hb-eintrag" id="netto">
+        <h3>Netto <span class="hb-eintrag-kapitel">→ Abgleich</span></h3>
+        <p>Im Abgleich eine reine Differenz: tatsächliche Zeit minus Pause.
+        Ausdrücklich <b>keine</b> bewertete Arbeitszeit und keine GAV-Berechnung —
+        die Seite „Abgleich" hält nur fest, sie rechnet nicht.</p>
+      </div>
+
+      <p class="hb-az">O</p>
+      <div class="hb-eintrag" id="objekt">
+        <h3>Objekt <span class="hb-eintrag-kapitel">→ Kunden, Planung</span></h3>
+        <p>Der feste Einsatzort eines Dauerauftrags bei einem Kunden. Verwaltet
+        unter „Kunden", trägt die <a href="#masterschicht">Masterschichten</a> und
+        erscheint nicht auf der Kunden-Detailseite selbst, sondern nur in der
+        eigenen Objektliste.</p>
+      </div>
+
+      <p class="hb-az">P</p>
+      <div class="hb-eintrag" id="pensum">
+        <h3>Pensum / Kategorie <span class="hb-eintrag-kapitel">→ Abgleich</span></h3>
+        <p>Jahresstunden einer Person gegen die Grenze ihrer Anstellungskategorie
+        (A/B/C nach Art. 8 GAV). Reine Auswertung unter „Abgleich → Pensen",
+        nichts lässt sich dort ändern.</p>
+      </div>
+      <div class="hb-eintrag" id="personaldossier">
+        <h3>Personaldossier <span class="hb-eintrag-kapitel">→ Personal</span></h3>
+        <p>Die vollständige Datensicht einer Person: acht Reiter, davon vier
+        (Person, Anstellung, Einsatz, Zugang) die eigentliche, nicht
+        konfigurierbare Personalakte.</p>
+      </div>
+      <div class="hb-eintrag" id="position">
+        <h3>Position <span class="hb-eintrag-kapitel">→ Planung</span></h3>
+        <p>Ein einzelner Platz mit eigener Zeit innerhalb <b>eines</b> Einsatzes,
+        im Einsatzplan verwaltet. Nicht zu verwechseln mit einer aus einer
+        Masterschicht erzeugten „Schicht" (einem Einsatz-Tag) — beide werden im
+        Cockpit gelegentlich „Schicht" genannt, sind aber verschiedene
+        Datensätze.</p>
+      </div>
+      <div class="hb-eintrag" id="produkt-leistung">
+        <h3>Produkt / Leistung <span class="hb-eintrag-kapitel">→ Kunden</span></h3>
+        <p>Preis-Stammdatensatz unter Administration/Betrieb, aus dem eine
+        Offerten- oder Rechnungsposition als Kopie befüllt wird. Spätere
+        Preisänderungen am Produkt wirken nur auf künftige Belege.</p>
+      </div>
+      <div class="hb-eintrag" id="profil">
+        <h3>Profil <span class="hb-eintrag-kapitel">→ Erste Schritte, Betrieb</span></h3>
+        <p>Frei zusammengestelltes Bündel aus Bereich+Stufe, zusätzlich zu den
+        sechs festen Systemrollen. Wird unter „Betrieb → Rollen &amp;
+        Berechtigungen" angelegt und Personen zugeteilt; mehrere Profile je
+        Person sind möglich und addieren sich.</p>
+      </div>
+      <div class="hb-eintrag" id="provisorisch">
+        <h3>Provisorisch <span class="hb-eintrag-kapitel">→ Planung</span></h3>
+        <p>Status eines automatisch aus einer „auf Abruf"-Masterschicht (z.&nbsp;B.
+        wetterabhängig) erzeugten Einsatzes.</p>
+      </div>
+
+      <p class="hb-az">R</p>
+      <div class="hb-eintrag" id="rapport">
+        <h3>Rapport <span class="hb-eintrag-kapitel">→ Kunden, Erfassung</span></h3>
+        <p>Ein von einer Person zu einer Schicht erfasster Bericht (Zeit, Pause,
+        Bemerkung), meist mit Kundenunterschrift. Die kundenübergreifende Liste
+        liegt im Cockpit unter „Kunden", obwohl sie rechtemässig zum Bereich
+        „Abgleich" gehört.</p>
+      </div>
+      <div class="hb-eintrag" id="recht">
+        <h3>Recht <span class="hb-eintrag-kapitel">→ Erste Schritte</span></h3>
+        <p>Kombination aus <a href="#bereich-recht">Bereich</a> und
+        <a href="#stufe">Stufe</a> (z.&nbsp;B. „Personal: schreiben"). Die einzige
+        Grundlage, auf der das Cockpit eine Handlung erlaubt oder mit „Dafür fehlt
+        dir die Berechtigung" verweigert.</p>
+      </div>
+      <div class="hb-eintrag" id="revierdienst">
+        <h3>Revierdienst <span class="hb-eintrag-kapitel">→ Kundenportal, Erfassung</span></h3>
+        <p>Leistungsart, die im Kundenportal die Reiter „Rundgänge" und
+        „Wachbuch" erscheinen lässt; in der App die Berechtigung, die den Reiter
+        „Wächter" freischaltet.</p>
+      </div>
+      <div class="hb-eintrag" id="rolle">
+        <h3>Rolle (Systemrolle) <span class="hb-eintrag-kapitel">→ Erste Schritte</span></h3>
+        <p>Eine der sechs festen, nicht änderbaren Grundrollen: Personal, Planung,
+        Personaladministration, Administrator, Verwalter, Wächtersystem. Für
+        andere Kombinationen: siehe <a href="#profil">Profil</a>.</p>
+      </div>
+      <div class="hb-eintrag" id="ruhezeit">
+        <h3>Ruhezeit <span class="hb-eintrag-kapitel">→ Abgleich</span></h3>
+        <p>Mindestabstand zwischen zwei Schichten derselben Person. Im Cockpit
+        (Stand heute) nur als Warnung beim Einteilen in der Planung sichtbar,
+        keine eigene Übersicht, keine Sperrwirkung.</p>
+      </div>
+      <div class="hb-eintrag" id="rundgang">
+        <h3>Rundgang / Kontrollrunde <span class="hb-eintrag-kapitel">→ Erfassung, Kundenportal</span></h3>
+        <p>Eine geführte Runde entlang festgelegter <a href="#kontrollpunkt">Kontrollpunkte</a>
+        auf einem Objekt. Im Kundenportal sichtbar, sobald sie abgeschlossen oder
+        abgebrochen ist — nie während sie noch läuft.</p>
+      </div>
+
+      <p class="hb-az">S</p>
+      <div class="hb-eintrag" id="sitzung">
+        <h3>Sitzung <span class="hb-eintrag-kapitel">→ Erste Schritte</span></h3>
+        <p>Der angemeldete Zustand nach dem Login. Wird serverseitig nur über
+        ihren Abdruck (einen Hashwert) geführt — der Rohwert des Anmelde-Tokens
+        steht nirgends in der Datenbank.</p>
+      </div>
+      <div class="hb-eintrag" id="sperren">
+        <h3>Sperren (Tage) <span class="hb-eintrag-kapitel">→ Erfassung</span></h3>
+        <p>Eigene Meldung einer Person in der App, an welchen Tagen sie nicht
+        eingeteilt werden kann. Eine Mitteilung an die Planung, kein
+        verbindliches Verbot — eine Einteilung trotz Sperre bleibt möglich.</p>
+      </div>
+      <div class="hb-eintrag" id="stufe">
+        <h3>Stufe <span class="hb-eintrag-kapitel">→ Erste Schritte</span></h3>
+        <p>Verborgen, lesen oder schreiben. „Schreiben" schliesst „lesen" immer
+        mit ein — wer speichern darf, darf auch ansehen.</p>
+      </div>
+
+      <p class="hb-az">V</p>
+      <div class="hb-eintrag" id="verkehrsdienst">
+        <h3>Verkehrsdienst <span class="hb-eintrag-kapitel">→ Kundenportal</span></h3>
+        <p>Leistungsart, die im Kundenportal den Reiter „Einsätze" erscheinen
+        lässt — Gegenstück zu <a href="#revierdienst">Revierdienst</a>.</p>
+      </div>
+      <div class="hb-eintrag" id="vertrauliche-felder">
+        <h3>Vertrauliche Personalfelder <span class="hb-eintrag-kapitel">→ Personal</span></h3>
+        <p>16 besonders geschützte Felder der Personalakte: AHV-Nummer,
+        Nationalität, Heimat-/Geburtsort, Zivilstand, Geburtsdatum, Geschlecht,
+        Aufenthalts-/Arbeitsbewilligung, ZEMIS-Nummer, Straf-/Betreibungsregister,
+        Dienstausweis. Nur mit eigenem Recht sicht- und änderbar.</p>
+      </div>
+
+      <p class="hb-az">W</p>
+      <div class="hb-eintrag" id="wachbuch">
+        <h3>Wachbuch <span class="hb-eintrag-kapitel">→ Kundenportal</span></h3>
+        <p>Tagesweise gruppierte Chronik aller Vorgänge (Kontrollpunkt-Scans,
+        Rundgänge, Aufgaben, Ereignisse) an den Objekten eines Kunden, im
+        Kundenportal einsehbar.</p>
+      </div>
+
+      <p class="hb-az">Z</p>
+      <div class="hb-eintrag" id="zeitbonus">
+        <h3>Zeitbonus <span class="hb-eintrag-kapitel">→ Personal, Abgleich, Erfassung</span></h3>
+        <p>GAV-Zuschlag in Zeit statt Geld für Nacht- und Sonntagsarbeit (Art. 12
+        Ziff. 2 GAV), im Cockpit durchgehend getrennt von der geleisteten Zeit
+        ausgewiesen — nie in einen einzigen Stundenwert vermischt.</p>
+      </div>
+      <div class="hb-eintrag" id="zustellnachweis">
+        <h3>Zustellnachweis <span class="hb-eintrag-kapitel">→ Kundenportal</span></h3>
+        <p>Belegt im Kundenportal, dass ein Rapport beim Kunden angekommen ist
+        (erster/letzter Abruf, PDF-Erzeugung) — ausdrücklich ohne Bewegungsprofil
+        (keine IP-Adresse, kein Gerät, kein Einzelbesuchsverlauf).</p>
+      </div>
+      <div class="hb-eintrag" id="zuteilung">
+        <h3>Zuteilung <span class="hb-eintrag-kapitel">→ Planung</span></h3>
+        <p>Das Zuweisen einer oder mehrerer Personen zu einer Schicht. Drei
+        gleichwertige Wege im Cockpit: Massen-Zuteilung, Einzelzell-Zuteilung
+        und Klick-Zuteilung im Einsatzplan.</p>
+      </div>
+      <div class="hb-eintrag" id="zwei-faktor">
+        <h3>Zwei-Faktor-Anmeldung <span class="hb-eintrag-kapitel">→ Erste Schritte</span></h3>
+        <p>Zweite Anmeldestufe per Authenticator-App (6-stelliger Code, 30
+        Sekunden gültig). Für jedes Cockpit-Konto freiwillig einschaltbar, mit
+        zehn einmalig angezeigten Notfallcodes.</p>
+      </div>
+
+      <p class="hb-fussnote">Begriffe aus allen Kapiteln dieses Handbuchs, Stand
+      11.09.2026. Fehlt ein Begriff oder wirkt eine Erklärung ungenau: siehe
+      Hinweis auf der <a href="index.html">Übersicht</a> — dieses Glossar ist
+      Werkzeug-Sprache, keine GAV-Auslegung.</p>
+
+    </div>
+  </div>
+</div>
+<script src="handbuch.js"></script>
+</body>
+</html>

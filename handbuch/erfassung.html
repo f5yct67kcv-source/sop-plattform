@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Erfassung – Handbuch Cockpit</title>
+<link rel="stylesheet" href="handbuch.css">
+</head>
+<body>
+<div class="hb-shell">
+  <aside class="hb-side" id="hbSide">
+    <div class="hb-brand">
+      <a href="index.html" style="text-decoration:none">
+        <span class="titel">Handbuch</span>
+        <span class="unter">Cockpit der CUPI&nbsp;24</span>
+      </a>
+      <button class="hb-menu-btn" id="hbMenuBtn" aria-label="Menü" aria-expanded="false">☰</button>
+    </div>
+    <div class="hb-nav-wrap">
+      <div class="hb-gruppe">Einstieg</div>
+      <ul class="hb-nav">
+        <li><a href="index.html">Übersicht</a></li>
+        <li><a href="erste-schritte.html">Erste Schritte</a></li>
+      </ul>
+      <div class="hb-gruppe">Erfassung (App)</div>
+      <ul class="hb-nav">
+        <li><a href="erfassung.html" class="aktiv">Erfassung</a></li>
+      </ul>
+      <div class="hb-gruppe">Cockpit</div>
+      <ul class="hb-nav">
+        <li><a href="planung.html">Planung</a></li>
+        <li><a href="kunden.html">Kunden</a></li>
+        <li><a href="personal.html">Personal</a></li>
+        <li><a href="abgleich.html">Abgleich</a></li>
+        <li><a href="betrieb.html">Betrieb</a></li>
+      </ul>
+      <div class="hb-gruppe">Weitere Oberflächen</div>
+      <ul class="hb-nav">
+        <li><a href="kundenportal.html">Kundenportal</a></li>
+      </ul>
+      <div class="hb-gruppe">Nachschlagen</div>
+      <ul class="hb-nav">
+        <li><a href="glossar.html">Glossar</a></li>
+      </ul>
+    </div>
+    <div class="hb-side-fuss">
+      Aus dem Quelltext zusammengestellt, siehe Hinweis auf der <a href="index.html">Übersicht</a>.
+    </div>
+  </aside>
+
+  <div class="hb-main">
+    <div class="hb-content">
+
+      <p class="hb-kicker">Erfassung (App)</p>
+      <h1>Erfassung</h1>
+      <p class="hb-lead">Die mobile App, mit der die ganze Belegschaft täglich arbeitet —
+      installierbar auf dem Home-Bildschirm. Fünf Reiter unten: Heute, Plan, Rapport,
+      Wächter (nur mit Revierdienst-Berechtigung) und Menü.</p>
+
+      <div class="hb-kasten hb-hinweis">
+        <p class="hb-kasten-titel">Zwei Dateien, eine Anmeldung</p>
+        <p>Die eigentliche App ist <code>app.html</code>. Für den manuellen
+        Verkehrsdienst-Rapport gibt es daneben ein eigenständiges, schlankeres
+        Werkzeug (<code>index.html</code>) mit nur zwei Reitern „Erfassen" und
+        „Übersicht" — erreichbar über „Neuer Rapport" im Reiter Rapport. Beide
+        teilen sich dieselbe Anmeldung: Wer in der App angemeldet ist, ist es dort
+        automatisch auch.</p>
+      </div>
+
+      <h2>Anmelden</h2>
+      <p>Name und Passwort, siehe <a href="erste-schritte.html">Erste Schritte</a>.
+      „Passwort vergessen?" führt in der App zu einem echten Ablauf: Anmeldename
+      eingeben → Link anfordern → E-Mail mit Reset-Link → neues Passwort setzen
+      (mindestens 12&nbsp;Zeichen).</p>
+
+      <h2>Heute</h2>
+      <p>Karten der heute laufenden oder beginnenden Einsätze (inklusive einer über
+      Mitternacht laufenden Nachtschicht von gestern), mit Kennzeichnung „Läuft
+      jetzt" bzw. „Beginnt bald". Kein Einsatz heute: „Für heute bist du nicht
+      eingeteilt", zusätzlich eine Karte mit dem nächsten kommenden Einsatz.</p>
+
+      <ol class="hb-schritte">
+        <li>Karte antippen → Detailblatt: Zeit, Kunde/Objekt, Arbeitsort mit
+        Routenlink, Treffpunkt, Kontaktperson vor Ort, Tätigkeit, Team (nur Namen —
+        keine Telefonnummern oder Rückmeldestatus anderer), Bemerkung, Unterlagen
+        der Planung.</li>
+        <li>„Zusagen" oder „Ablehnen" — bleibt jederzeit über „Antwort ändern"
+        korrigierbar, solange der Einsatz nicht vorbei ist.</li>
+        <li>Bei einem zugesagten, bereits begonnenen Verkehrsdienst-Einsatz:
+        zusätzlich „Schicht rapportieren" (siehe unten).</li>
+        <li>Erfüllt der Einsatz die Voraussetzungen für einen Rundgang: „Rundgang
+        starten"/„Rundgang fortsetzen" (siehe „Wächter").</li>
+      </ol>
+
+      <div class="hb-kasten hb-hinweis">
+        <p class="hb-kasten-titel">„Entfallen" statt einer Rückmeldung</p>
+        <p>Wer zeitgleich anderswo einen Rundgang startet, wird aus der Einteilung
+        genommen — die Zusage-Knöpfe verschwinden, ein Hinweistext erklärt, dass
+        die Einsatzleitung die Schicht jetzt als unbesetzt sieht.</p>
+      </div>
+
+      <h2>Plan</h2>
+      <p>Drei Unterreiter.</p>
+
+      <h3>Plan</h3>
+      <p>Liste der kommenden eigenen Schichten.</p>
+
+      <h3>Sperren</h3>
+      <p>Auf einen Tag tippen, an dem eine Einteilung nicht möglich ist — nochmals
+      tippen hebt es auf, eine Notiz ist optional. Ausdrücklich <b>keine Zusage
+      oder Ablehnung</b> zu einer konkreten Schicht: Die Planung sieht die Sperre,
+      eine Einteilung trotz Sperre bleibt möglich (die Sperre ist eine Mitteilung,
+      kein Verbot). Ein bereits eingeteilter Tag lässt sich nicht sperren.</p>
+
+      <h3>Abwesenheit</h3>
+      <ol class="hb-schritte">
+        <li>„Neuer Antrag": Art (Ferien/Krankheit/Unfall/Militär- oder
+        Zivildienst/Schwangerschaft), Von, Bis, Bemerkung.</li>
+        <li>„Senden" — erscheint als „Beantragt", bleibt bis zur Entscheidung über
+        „Zurückziehen" korrigierbar.</li>
+      </ol>
+      <p>Ferien lassen sich nicht rückwirkend beantragen. Ein abgelehnter Antrag
+      zeigt die Begründung.</p>
+
+      <h2>Rapport</h2>
+      <p>Zwei Wege zum selben Datensatz:</p>
+
+      <h3>Aus der laufenden Schicht heraus</h3>
+      <p>Nur für zugesagte, bereits begonnene Verkehrsdienst-Einsätze: Kunde, Ort,
+      Zeiten und Pause sind vorbefüllt. Hat der Kunde für diesen Einsatz schon bei
+      einer anderen Person unterschrieben, entfällt die eigene Unterschrift — pro
+      Einsatz zählt eine. Erneutes Senden korrigiert den bereits erfassten
+      Eintrag.</p>
+
+      <h3>„Neuer Rapport" (manuell)</h3>
+      <ol class="hb-schritte">
+        <li>Kunde aus der Liste wählen oder Name/Adresse frei eintragen, Datum,
+        optional Auftragsnummer.</li>
+        <li>Arbeitsbeginn, Arbeitsende, Pause (Auswahlliste) — Nettostunden werden
+        laufend berechnet.</li>
+        <li>Kundenunterschrift optional: Name der unterzeichnenden Person, dann auf
+        dem ganzen Bildschirm unterschreiben (Gerät quer halten).</li>
+        <li>Bemerkung, Pflicht-Häkchen „Angaben korrekt und vollständig".</li>
+        <li>„Rapport speichern".</li>
+      </ol>
+      <p>Die eigene Rapport-Übersicht (im Werkzeug „Erfassen"/„Übersicht") zeigt
+      Statistiken, Suche, Monatsfilter und einen CSV-Export. Löschen und Drucken
+      eines fremden Rapports sind dort nur für Admin-Konten sichtbar.</p>
+
+      <h2>Wächter <span class="hb-status kurz">nur mit Revierdienst-Berechtigung</span></h2>
+      <p>Vier Kacheln: Rundgänge, Fahrzeugübernahme, Revier-Infos, Schlüsselverwaltung
+      (noch nicht gebaut — „folgt in einem späteren Schritt").</p>
+
+      <h3>Rundgänge (Kontrollrunden)</h3>
+      <p>Vor dem ersten Zugriff auf diesen Bereich fragt die App einmal täglich, ob
+      heute ein Dienstfahrzeug übernommen wird (siehe „Fahrzeugübernahme" unten) —
+      erst danach geht es weiter.</p>
+
+      <ol class="hb-schritte">
+        <li>Kontrollrunden-Vorlage wählen (direkt über die Kachel, oder aus einem
+        Einsatzblatt heraus mit „Rundgang starten").</li>
+        <li>Vorschau: Objekt, Zeitfenster, Anzahl Kontrollpunkte, Ansprechpartner.</li>
+        <li>Ausserhalb des üblichen Zeitfensters oder bei einer gleichzeitigen
+        anderen Einteilung fragt die App vorher nach einem Grund.</li>
+        <li>„Rundgang starten" — Vollbild mit Reitern Karte/Kontrollpunkte/Funktionen,
+        Laufzeit-Timer, Knopf „Zentrale und Notruf" (117 Polizei, 118 Feuerwehr,
+        144 Sanität, plus die eigene Pikettnummer, falls hinterlegt).</li>
+        <li>Jeden Kontrollpunkt bestätigen: normal (im Bereich, per Standort/Chip),
+        per <b>Ersatzscan</b> (Foto + Pflicht-Begründung) oder als
+        <b>„Nicht verfügbar"</b> (Pflicht-Begründung). Hinterlegte Aufgaben je Punkt
+        werden als „Erledigt" oder „Nicht möglich" beantwortet.</li>
+        <li>Unterwegs jederzeit möglich: „Ereignis erfassen" — Ereignisart,
+        Beschreibung, optionales Foto; der Zeitpunkt wird automatisch festgehalten
+        und lässt sich nicht ändern.</li>
+        <li>„Rundgang pausieren"/„fortsetzen", oder „Rundgang abbrechen"
+        (endgültig, mit Pflicht-Grund — bereits erfasste Kontrollpunkte bleiben
+        erhalten).</li>
+      </ol>
+
+      <div class="hb-kasten hb-hinweis">
+        <p class="hb-kasten-titel">Funktioniert auch ohne Netz</p>
+        <p>Kontrollpunkt- und Ereignismeldungen werden bei fehlender Verbindung
+        lokal zwischengespeichert und automatisch nachgesendet, sobald wieder Netz
+        da ist — als einzige Funktion in der App mit dieser Absicherung. Alle
+        anderen Aktionen melden bei fehlendem Netz nur „Keine Verbindung. Bitte
+        nochmals versuchen." ohne automatische Wiederholung.</p>
+      </div>
+
+      <h3>Fahrzeugübernahme</h3>
+      <ol class="hb-schritte">
+        <li>„Ja, Fahrzeug übernehmen" — Fahrzeug wählen, Kilometerstand eintragen,
+        <b>Foto vom Tacho ist Pflicht</b> („sonst ist ein Zahlenverdreher nicht mehr
+        zu erkennen"). Alternativ den QR-Aufkleber im Fahrzeug scannen, dann ist
+        das Fahrzeug schon vorgewählt.</li>
+        <li>„Nein, kein Dienstfahrzeug" — wird ebenfalls festgehalten, der Tag gilt
+        damit als beantwortet.</li>
+        <li>Ist bereits ein Fahrzeug aktiv: „Fahrzeug abgeben" oder „Weiteres
+        Fahrzeug erfassen".</li>
+      </ol>
+
+      <h3>Revier-Infos</h3>
+      <p>Dieselbe Mitteilungsliste wie über die Glocke (siehe unten), gefiltert auf
+      die Zielgruppe „Revier".</p>
+
+      <h2>Mitteilungen</h2>
+      <p>Glocke oben in jeder Ansicht, mit Zähler. Markierungen „Wichtig", „Revier",
+      „Neu". Eine als „Wichtig" markierte Mitteilung erscheint zusätzlich beim
+      Öffnen der App als Dialog, der erst mit „Verstanden" verschwindet. Ein
+      <b>Termin</b> (Mitteilung mit Antwortpflicht) lässt sich mit
+      Zusagen/Absagen/Später beantworten, änderbar solange er läuft.</p>
+      <p>Push-Benachrichtigungen: Menü → Einstellungen. Auf dem iPhone funktionieren
+      sie ausschliesslich, wenn die App über „Teilen → Zum Home-Bildschirm"
+      installiert wurde — im Safari-Tab nicht, unabhängig von jeder Erlaubnis. Der
+      Schalter selbst zeigt bei Bedarf die nötigen Schritte an.</p>
+
+      <h2>Menü</h2>
+      <ul>
+        <li><b>Meine Daten</b> — Personalnummer, Geburtsdatum und Geschäftsadresse
+        sind nicht selbst änderbar; Adresse und Kontaktangaben schon, über
+        „Angaben bearbeiten". Eine Änderung der privaten E-Mail verlangt zusätzlich
+        das eigene Passwort, weil das Zurücksetzen des Passworts daran hängt.</li>
+        <li><b>Meine Stunden</b> — nur abgeglichene Schichten, mit denselben drei
+        getrennten Werten wie im Personaldossier (Geleistet/Zeitbonus/Total) und
+        demselben Hinweis „Das ist keine Lohnabrechnung".</li>
+        <li><b>Passwort ändern</b>, <b>Einstellungen</b> (Hell/Dunkel,
+        Benachrichtigungen).</li>
+        <li><b>Zum Cockpit</b> — nur für Admin-Konten sichtbar.</li>
+      </ul>
+
+      <div class="hb-begriffe">
+        <a href="glossar.html#rundgang">Rundgang / Kontrollrunde</a>
+        <a href="glossar.html#kontrollpunkt">Kontrollpunkt</a>
+        <a href="glossar.html#fotobeleg">Ersatzscan</a>
+        <a href="glossar.html#sperren">Sperren</a>
+        <a href="glossar.html#zeitbonus">Zeitbonus</a>
+        <a href="glossar.html#abgeglichen">Abgeglichen</a>
+      </div>
+
+      <p class="hb-fussnote">Quelle: <code>index.html</code>, <code>app.html</code>,
+      <code>unterschrift.js</code>, Stand 11.09.2026. Nicht am laufenden Gerät
+      nachgeprüft — siehe Hinweis auf der <a href="index.html">Übersicht</a>.</p>
+
+    </div>
+  </div>
+</div>
+<script src="handbuch.js"></script>
+</body>
+</html>

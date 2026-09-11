@@ -1,0 +1,267 @@
+/* ══════════════════════════════════════════════════════════════════
+   HANDBUCH — gemeinsames Stylesheet für alle Kapitel.
+   Design-Tokens bewusst von dashboard.html übernommen (nicht neu
+   erfunden), damit das Handbuch wie ein Teil desselben Werkzeugs
+   aussieht. Eigene Quelle, weil das Handbuch (noch) nicht Teil des
+   Deploys ist und dashboard.html nicht mitschleppen soll.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* Inter, selbst ausgeliefert — wie in dashboard.html (ENT-223/OP-224):
+   kein Google-Fonts-Verweis, der bei jedem Öffnen die IP-Adresse der
+   lesenden Person verrät. */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url(../fonts/inter-latin-ext.woff2) format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url(../fonts/inter-latin.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+:root {
+  /* Seitenleiste (Graphit) — dieselben Werte wie im Cockpit */
+  --shell:        #16181D;
+  --shell-hi:     #1E2128;
+  --shell-line:   #272B33;
+  --shell-txt:    #9298A5;
+  --shell-txt-hi: #F3F5F8;
+
+  /* Arbeitsfläche */
+  --bg:           #F7F8FA;
+  --surface:      #FFFFFF;
+  --line:         #E5E8EC;
+  --line-soft:    #EFF1F4;
+
+  /* Text */
+  --ink:          #14161A;
+  --ink-2:        #545B67;
+  --ink-3:        #8B919D;
+
+  /* Akzent */
+  --accent:       #2F5BD7;
+  --accent-hi:    #2549B0;
+  --accent-soft:  #EDF2FE;
+  --accent-line:  #CBD9F9;
+
+  /* Semantik */
+  --pos:      #0E7C55;  --pos-soft:  #E6F6EF;  --pos-line: #BFE6D4;
+  --neg:      #C2382A;  --neg-soft:  #FCEDEB;  --neg-line: #F3C8C2;
+  --warn:     #9A6B08;  --warn-soft: #FBF3E0;  --warn-line: #EFDCAE;
+
+  --r-xs: 6px; --r-sm: 8px; --r: 12px; --r-lg: 16px;
+  --sh-1: 0 1px 2px rgba(16,18,22,.06);
+  --sh-2: 0 8px 28px -8px rgba(16,18,22,.18);
+
+  --side-w: 264px;
+  --content-w: 760px;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+code, kbd, .hb-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+  font-size: .92em;
+  background: var(--line-soft);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: .05em .4em;
+}
+a { color: var(--accent); text-decoration-color: var(--accent-line); text-underline-offset: 2px; }
+a:hover { color: var(--accent-hi); }
+
+/* ── Gesamtlayout: Seitenleiste + Inhalt ─────────────────────────── */
+.hb-shell { display: grid; grid-template-columns: var(--side-w) 1fr; min-height: 100vh; }
+
+.hb-side {
+  background: var(--shell);
+  color: var(--shell-txt);
+  padding: 22px 16px 32px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+.hb-brand {
+  display: block;
+  color: var(--shell-txt-hi);
+  text-decoration: none;
+  padding: 6px 10px 16px;
+  border-bottom: 1px solid var(--shell-line);
+  margin-bottom: 14px;
+}
+.hb-brand .titel { display: block; font-weight: 700; font-size: 17px; letter-spacing: .01em; }
+.hb-brand .unter { display: block; font-size: 12.5px; color: var(--shell-txt); margin-top: 3px; }
+
+.hb-gruppe { margin: 18px 0 6px; padding: 0 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #6B7180; }
+.hb-nav { list-style: none; margin: 0; padding: 0; }
+.hb-nav li { margin: 1px 0; }
+.hb-nav a {
+  display: flex; align-items: baseline; gap: 9px;
+  color: var(--shell-txt);
+  text-decoration: none;
+  font-size: 14.5px;
+  padding: 9px 10px;
+  border-radius: var(--r-sm);
+  min-height: 40px;
+  align-items: center;
+}
+.hb-nav a:hover { background: var(--shell-hi); color: var(--shell-txt-hi); }
+.hb-nav a.aktiv { background: var(--accent); color: #fff; font-weight: 600; }
+
+.hb-side-fuss { margin-top: 22px; padding: 12px 10px 0; border-top: 1px solid var(--shell-line); font-size: 12px; color: #6B7180; line-height: 1.5; }
+.hb-side-fuss a { color: #9298A5; }
+
+/* ── Inhalt ───────────────────────────────────────────────────────── */
+.hb-main { padding: 48px clamp(20px, 5vw, 64px) 96px; }
+.hb-content { max-width: var(--content-w); margin: 0 auto; }
+
+.hb-kicker { font-size: 12.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--accent); margin: 0 0 10px; }
+.hb-content h1 { font-size: 32px; line-height: 1.2; margin: 0 0 6px; letter-spacing: -.01em; }
+.hb-lead { font-size: 17.5px; color: var(--ink-2); margin: 0 0 36px; max-width: 62ch; }
+
+.hb-content h2 { font-size: 22px; margin: 46px 0 14px; padding-top: 18px; border-top: 1px solid var(--line); letter-spacing: -.005em; }
+.hb-content h2:first-of-type { border-top: none; padding-top: 0; margin-top: 28px; }
+.hb-content h3 { font-size: 17px; margin: 26px 0 10px; color: var(--ink); }
+.hb-content { overflow-wrap: break-word; }
+.hb-content p { margin: 0 0 14px; max-width: 68ch; }
+.hb-content ul, .hb-content ol { margin: 0 0 16px; padding-left: 1.4em; max-width: 66ch; }
+.hb-content li { margin: 5px 0; }
+.hb-content table { border-collapse: collapse; width: 100%; margin: 8px 0 22px; font-size: 14.5px; }
+/* Auf schmalen Bildschirmen scrollt die Tabelle selbst, nie die ganze Seite. */
+.hb-tabelle-wrap { overflow-x: auto; margin: 8px 0 22px; -webkit-overflow-scrolling: touch; }
+.hb-tabelle-wrap table { margin: 0; }
+.hb-content th, .hb-content td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.hb-content th { color: var(--ink-2); font-weight: 600; font-size: 12.5px; text-transform: uppercase; letter-spacing: .04em; border-bottom: 2px solid var(--line-hi, var(--line)); }
+.hb-content tr:last-child td { border-bottom: none; }
+
+/* Schritte: nummerierte Arbeitsabläufe, deutlich von Fliesstext abgesetzt */
+.hb-schritte { list-style: none; margin: 0 0 22px; padding: 0; counter-reset: schritt; max-width: 66ch; }
+.hb-schritte li {
+  counter-increment: schritt;
+  position: relative;
+  padding: 2px 0 2px 40px;
+  margin: 0 0 14px;
+  min-height: 28px;
+}
+.hb-schritte li::before {
+  content: counter(schritt);
+  position: absolute; left: 0; top: 0;
+  width: 26px; height: 26px;
+  background: var(--accent-soft);
+  color: var(--accent-hi);
+  border: 1px solid var(--accent-line);
+  border-radius: 50%;
+  font-size: 13px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* Kästen: Hinweis / Achtung / Regel */
+.hb-kasten { border-radius: var(--r); padding: 14px 16px; margin: 0 0 20px; font-size: 14.5px; max-width: 66ch; border: 1px solid var(--line); }
+.hb-kasten > :first-child { margin-top: 0; }
+.hb-kasten > :last-child { margin-bottom: 0; }
+.hb-kasten-titel { font-weight: 700; font-size: 12.5px; text-transform: uppercase; letter-spacing: .05em; margin: 0 0 6px; display: flex; align-items: center; gap: 6px; }
+.hb-hinweis { background: var(--accent-soft); border-color: var(--accent-line); }
+.hb-hinweis .hb-kasten-titel { color: var(--accent-hi); }
+.hb-achtung { background: var(--warn-soft); border-color: var(--warn-line); }
+.hb-achtung .hb-kasten-titel { color: var(--warn); }
+.hb-regel { background: var(--surface); border-color: var(--line); border-left: 3px solid var(--ink-3); }
+.hb-regel .hb-kasten-titel { color: var(--ink-2); }
+.hb-luecke { background: var(--surface); border: 1px dashed var(--ink-3); color: var(--ink-2); }
+.hb-luecke .hb-kasten-titel { color: var(--ink-2); }
+
+/* Rechte-Hinweis: "wer darf das" — kleine Randnotiz im Kastenformat */
+.hb-recht { font-size: 13.5px; color: var(--ink-2); background: var(--surface-2, #FBFCFD); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 8px 12px; margin: 0 0 22px; max-width: 66ch; }
+.hb-recht b { color: var(--ink); }
+
+/* Begriffs-Chips (verlinken ins Glossar) */
+.hb-begriffe { display: flex; flex-wrap: wrap; gap: 7px; margin: 0 0 26px; }
+.hb-begriffe a {
+  display: inline-block;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+  border-radius: 999px;
+  padding: 5px 13px;
+  font-size: 13px;
+  text-decoration: none;
+}
+.hb-begriffe a:hover { border-color: var(--accent-line); color: var(--accent-hi); background: var(--accent-soft); }
+
+/* Statuszeichen für Kapitel-Reife (Startseite + Kapitelkopf) */
+.hb-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; padding: 3px 10px; border-radius: 999px; }
+.hb-status.voll { background: var(--pos-soft); color: var(--pos); }
+.hb-status.erste-fassung { background: var(--warn-soft); color: var(--warn); }
+.hb-status.kurz { background: var(--line-soft); color: var(--ink-2); }
+
+/* Karten auf der Startseite */
+.hb-karten { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; margin: 0 0 8px; }
+.hb-karte { display: block; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px 18px; text-decoration: none; color: var(--ink); box-shadow: var(--sh-1); }
+.hb-karte:hover { border-color: var(--accent-line); box-shadow: var(--sh-2); }
+.hb-karte .titel { font-weight: 700; font-size: 15.5px; margin: 0 0 4px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.hb-karte .text { font-size: 13.5px; color: var(--ink-2); margin: 0; line-height: 1.5; }
+
+.hb-fussnote { margin-top: 56px; padding-top: 18px; border-top: 1px solid var(--line); font-size: 13px; color: var(--ink-3); max-width: 66ch; }
+
+/* Glossareintrag, per #anker direkt verlinkbar */
+[id] { scroll-margin-top: 20px; }
+.hb-eintrag { padding-top: 16px; margin-top: 16px; border-top: 1px solid var(--line); max-width: 66ch; }
+.hb-eintrag:first-child { border-top: none; margin-top: 0; padding-top: 0; }
+.hb-eintrag h3 { margin: 0 0 6px; font-size: 16.5px; }
+.hb-eintrag-kapitel { font-weight: 400; font-size: 12px; color: var(--ink-3); margin-left: 8px; white-space: nowrap; }
+.hb-eintrag p { margin: 0; }
+.hb-az { font-size: 12.5px; font-weight: 700; color: var(--ink-3); text-transform: uppercase; letter-spacing: .06em; margin: 34px 0 4px; }
+.hb-az:first-of-type { margin-top: 4px; }
+
+/* Sidebar-Umschalter, nur auf dem Handy sichtbar */
+.hb-menu-btn { display: none; }
+
+/* ── Handy: Seitenleiste wird zur zuklappbaren Kopfleiste ─────────── */
+@media (max-width: 860px) {
+  .hb-shell { display: block; }
+  .hb-side {
+    position: sticky; top: 0; height: auto; max-height: 100vh;
+    overflow-y: auto;
+    z-index: 20;
+  }
+  .hb-side:not(.offen) .hb-nav-wrap { display: none; }
+  .hb-brand { display: flex; align-items: center; justify-content: space-between; border-bottom: none; padding: 4px 4px 4px 10px; margin-bottom: 0; }
+  .hb-menu-btn {
+    display: flex; align-items: center; justify-content: center;
+    width: 44px; height: 44px;
+    background: var(--shell-hi);
+    border: 1px solid var(--shell-line);
+    border-radius: var(--r-sm);
+    color: var(--shell-txt-hi);
+    font-size: 20px;
+    flex: none;
+  }
+  .hb-side.offen { padding-bottom: 16px; }
+  .hb-side.offen .hb-brand { border-bottom: 1px solid var(--shell-line); margin-bottom: 14px; padding-bottom: 14px; }
+  .hb-main { padding: 28px 18px 72px; }
+  .hb-content h1 { font-size: 26px; }
+  .hb-karten { grid-template-columns: 1fr; }
+}
+
+@media print {
+  .hb-side { display: none; }
+  .hb-shell { display: block; }
+  .hb-main { padding: 0; }
+  a { color: var(--ink); text-decoration: none; }
+}

@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kunden – Handbuch Cockpit</title>
+<link rel="stylesheet" href="handbuch.css">
+</head>
+<body>
+<div class="hb-shell">
+  <aside class="hb-side" id="hbSide">
+    <div class="hb-brand">
+      <a href="index.html" style="text-decoration:none">
+        <span class="titel">Handbuch</span>
+        <span class="unter">Cockpit der CUPI&nbsp;24</span>
+      </a>
+      <button class="hb-menu-btn" id="hbMenuBtn" aria-label="Menü" aria-expanded="false">☰</button>
+    </div>
+    <div class="hb-nav-wrap">
+      <div class="hb-gruppe">Einstieg</div>
+      <ul class="hb-nav">
+        <li><a href="index.html">Übersicht</a></li>
+        <li><a href="erste-schritte.html">Erste Schritte</a></li>
+      </ul>
+      <div class="hb-gruppe">Erfassung (App)</div>
+      <ul class="hb-nav">
+        <li><a href="erfassung.html">Erfassung</a></li>
+      </ul>
+      <div class="hb-gruppe">Cockpit</div>
+      <ul class="hb-nav">
+        <li><a href="planung.html">Planung</a></li>
+        <li><a href="kunden.html" class="aktiv">Kunden</a></li>
+        <li><a href="personal.html">Personal</a></li>
+        <li><a href="abgleich.html">Abgleich</a></li>
+        <li><a href="betrieb.html">Betrieb</a></li>
+      </ul>
+      <div class="hb-gruppe">Weitere Oberflächen</div>
+      <ul class="hb-nav">
+        <li><a href="kundenportal.html">Kundenportal</a></li>
+      </ul>
+      <div class="hb-gruppe">Nachschlagen</div>
+      <ul class="hb-nav">
+        <li><a href="glossar.html">Glossar</a></li>
+      </ul>
+    </div>
+    <div class="hb-side-fuss">
+      Aus dem Quelltext zusammengestellt, siehe Hinweis auf der <a href="index.html">Übersicht</a>.
+    </div>
+  </aside>
+
+  <div class="hb-main">
+    <div class="hb-content">
+
+      <p class="hb-kicker">Cockpit</p>
+      <h1>Kunden</h1>
+      <p class="hb-lead">Kundenstamm, Objekte, Rapporte, Offerten und Rechnungen — fünf
+      Reiter in derselben Ansicht. Adressen und Objekte sind dabei zwei getrennte Listen:
+      Objekte erscheinen <b>nicht</b> auf der Kunden-Detailseite, sondern nur in der
+      eigenen Objektliste.</p>
+
+      <div class="hb-kasten hb-achtung">
+        <p class="hb-kasten-titel">Ein Reiter, fünf verschiedene Rechte</p>
+        <p>Die fünf Reiter liegen zwar sichtbar nebeneinander, gehören aber
+        <b>unterschiedlichen</b> Rechte-Bereichen an: „Adressen" gehört zu „Kunden",
+        „Objekte" gehört zu „Planung", „Rapporte" gehört zu „Abgleich", „Offerten" und
+        „Rechnungen" gehören gemeinsam zu „Offerten &amp; Rechnungen". Jemand kann also
+        Adressen sehen und gleichzeitig vor einem leeren oder gesperrten Reiter
+        „Objekte" stehen — das ist keine Fehlfunktion, sondern Absicht (siehe
+        <a href="erste-schritte.html">Erste Schritte</a>).</p>
+      </div>
+
+      <h2>Adressen (Kundenstamm)</h2>
+      <p>Umschalter „Alle"/„Archiviert", Suche über Name, Nummer, Kontaktperson und
+      Notiz zugleich.</p>
+
+      <ol class="hb-schritte">
+        <li>„Neuer Kunde" klicken, Art wählen: <b>Unternehmen</b> oder
+        <b>Privatperson</b> — steuert, welche Namensfelder erscheinen.</li>
+        <li>Pflichtfelder ausfüllen: Name (Unternehmensname bzw. Vor-/Nachname), PLZ,
+        Ort. Die Kundennummer selbst vergibt das System fortlaufend (<code>K0001</code>,
+        <code>K0002</code> …) und ist nicht editierbar.</li>
+        <li>Bei Unternehmen optional <b>„Im Web nachschlagen"</b> (siehe unten), um
+        fehlende Angaben per KI-Recherche zu ergänzen.</li>
+        <li>Reiter „Kommunikation" (Telefon/E-Mail/Website …) und „Kontaktpersonen"
+        füllen, optional Notiz.</li>
+        <li>Eine <b>abweichende Rechnungsadresse</b> nur ausfüllen, wenn sie tatsächlich
+        abweicht — leer bedeutet „gleiche Adresse wie oben", es gibt bewusst keinen
+        separaten Ja/Nein-Schalter dafür.</li>
+        <li>„Kunden anlegen".</li>
+      </ol>
+
+      <div class="hb-kasten hb-hinweis">
+        <p class="hb-kasten-titel">Im Web nachschlagen (KI-Recherche)</p>
+        <p>Nur bei Unternehmen, nur wenn schon ein Name eingetragen ist. Durchsucht
+        Handelsregister/Zefix und das Web (max. 1 Minute), füllt aber <b>ausschliesslich
+        leere Felder</b> — Bestehendes bleibt unangetastet. Neu ergänzte Felder werden
+        gelb markiert mit dem Hinweis „aus dem Netz ergänzt … niemand hat das bestätigt,
+        bitte prüfen" plus bis zu drei Quellenlinks. Kontaktpersonen, Rechnungsadresse
+        und Notizen füllt sie nie, und sie speichert selbst nichts — nur eine
+        Formularvorbefüllung zum Prüfen.</p>
+      </div>
+
+      <p><b>Archivieren</b> statt Löschen: Ein archivierter Kunde verschwindet aus der
+      aktiven Auswahl, Objekte, Einsätze und Rapporte bleiben unverändert erhalten — es
+      gibt keinen Löschweg für Kunden im eigentlichen Sinn.</p>
+
+      <h3>Kunden importieren (CSV)</h3>
+      <ol class="hb-schritte">
+        <li>„Importieren" → CSV-Datei wählen (aus Excel: „Datei → Speichern unter" →
+        Format CSV; Trennzeichen und Umlaute erkennt das Werkzeug selbst).</li>
+        <li><b>Zuordnung:</b> Spalten werden nach Möglichkeit automatisch den Zielfeldern
+        zugeordnet, falsch erkannte von Hand korrigieren. Eine Kundennummer aus einem
+        Vorsystem lässt sich nicht importieren (die Nummer vergibt ausschliesslich das
+        System) — soll sie erhalten bleiben, der Spalte „Notiz" zuordnen.</li>
+        <li>„Prüfen" — ein Trockenlauf, der <b>nichts speichert</b>: zeigt neue Zeilen,
+        übersprungene Dubletten (Erkennung über Name + PLZ) und nicht übernommene Zeilen
+        mit Grund.</li>
+        <li>Passt der Bericht: „Jetzt anlegen" — alles oder nichts, in einem Schritt.
+        Höchstens 2000 Zeilen je Durchgang.</li>
+      </ol>
+
+      <h2>Objekte</h2>
+      <p>Der feste Einsatzort eines Dauerauftrags bei einem Kunden. Erscheint mindestens
+      ein aktives Objekt in einer entschädigungspflichtigen Zone, zeigt die Liste einen
+      durchgehenden Hinweisbalken „Auslagenersatz betrifft N Objekt(e) …" — auch bei
+      aktivem Suchfilter.</p>
+
+      <ol class="hb-schritte">
+        <li>„Neues Objekt": Bezeichnung, Kunde (mit Autovervollständigung aus dem
+        Kundenstamm) und Ort sind Pflicht.</li>
+        <li>Sparte (Sicherheit/Reinigung) und Einsatzart (Standard: Revierdienst)
+        wählen.</li>
+        <li><b>Wegstrecke ab Anstellungsort (Art. 18 GAV):</b> je hinterlegtem
+        Anstellungsort die Distanz in km eintragen. Fehlt sie, zeigt das Werkzeug
+        ausdrücklich „Wegstrecke fehlt — nicht beurteilbar, ob Auslagenersatz anfällt"
+        (nicht „keine Entschädigung"). Bei Sparte „Reinigung" entfällt die Frage: Der
+        GAV für private Sicherheitsdienstleistungen gilt dort nicht.</li>
+        <li>Speichern — bei Neuanlage direkter Sprung zur neuen Objekt-Detailseite
+        (Masterschichten).</li>
+      </ol>
+
+      <div class="hb-kasten hb-achtung">
+        <p class="hb-kasten-titel">Der Kundenname im Objekt-Dialog wird nicht geprüft</p>
+        <p>Weicht der eingetippte Kundenname auch nur geringfügig vom Kundenstamm ab
+        (Tippfehler, Freitext), speichert das Werkzeug das Objekt trotzdem — nur ohne
+        echte Verknüpfung zum Kundendatensatz, und ohne jede Warnung. Beim Eintippen
+        lohnt sich darum ein zweiter Blick auf den Autovervollständigungs-Vorschlag.</p>
+      </div>
+
+      <p>Ein Objekt lässt sich nur dann wirklich löschen, wenn noch keine Schichten
+      daraus entstanden sind — sonst wird es beim „Entfernen" lediglich stillgelegt,
+      nicht gelöscht.</p>
+
+      <h2>Rapporte</h2>
+      <p>Eine reine, kundenübergreifende Leseliste bereits signierter Einsatzrapporte —
+      hier lässt sich nichts anlegen oder ändern, das geschieht in der Erfassung. Filter
+      nach Monat und Freitext, CSV-Export der gefilterten Liste. Auf dem Handy zeigt das
+      Aufklappen zusätzlich Einsatzort, Pause, Unterschriftsstatus und Downloads.</p>
+
+      <div class="hb-kasten hb-regel">
+        <p class="hb-kasten-titel">Zwei verschiedene Verknüpfungen zum Kunden</p>
+        <p>Offerten und Rechnungen hängen technisch fest an einer Kunden-ID — ein
+        umbenannter Kunde bleibt korrekt verknüpft. Rapporte dagegen hängen am
+        <b>Namenstext</b>. Wird ein Kunde umbenannt, verschwinden seine bisherigen
+        Rapporte optisch aus seiner Detailseite, ohne Fehlermeldung. Bei
+        Umbenennungen lohnt sich darum Vorsicht.</p>
+      </div>
+
+      <h2>Offerten &amp; Rechnungen</h2>
+      <p>Gemeinsames Formular, getrennte Listen. Status einer Offerte: Entwurf →
+      Versendet → Angeschaut → Bestätigt/Abgelehnt. Eine Rechnung zeigt zusätzlich
+      „Fällig" und „Offener Betrag"; abgelaufene Fristen erscheinen automatisch als
+      „Überfällig", bezahlte als „Bezahlt" — unabhängig vom ursprünglichen Status.</p>
+
+      <ol class="hb-schritte">
+        <li>„Offerte erstellen" bzw. „Rechnung erstellen" — oder aus dem Zeilenmenü eines
+        Kunden, dann mit vorausgewähltem Empfänger.</li>
+        <li>Empfänger aus dem Kundenstamm wählen (Pflicht), optional Ansprechperson.</li>
+        <li>Datum, Nummer (vergibt das System beim ersten Speichern), Gültig-bis bzw.
+        Fällig-Datum (Schnellwahl „+10"/„+30" Tage).</li>
+        <li>Positionen erfassen — „Position hinzufügen" für eine leere Zeile oder „Neue
+        Leistung" für einen neuen Katalogeintrag zugleich.</li>
+        <li>Speichern (Diskette-Symbol). Erst danach sind Vorschau, Druck und das
+        ⋮-Menü (Versand per E-Mail, Status setzen, Duplizieren, Archivieren)
+        verfügbar.</li>
+      </ol>
+
+      <p>Eine „Interne Bemerkung" erscheint nie auf dem Dokument; „Öffentliche
+      Notizen", „Bedingungen" und „Fusszeile" dagegen schon. Eine Rechnung kennt nur
+      „bezahlt" oder „unbezahlt" als Ganzes — keine Teilzahlungen.</p>
+
+      <div class="hb-begriffe">
+        <a href="glossar.html#kundennummer">Kundennummer</a>
+        <a href="glossar.html#objekt">Objekt</a>
+        <a href="glossar.html#auslagenersatz">Auslagenersatz</a>
+        <a href="glossar.html#rapport">Rapport</a>
+        <a href="glossar.html#beleg">Beleg</a>
+        <a href="glossar.html#produkt-leistung">Produkt / Leistung</a>
+      </div>
+
+      <p class="hb-fussnote">Quelle: <code>dashboard.html</code> (<code>view-kunden</code>,
+      Markup ab Zeile 5969), <code>backend/kunden.php</code>,
+      <code>backend/api/kunden_*.php</code>, <code>backend/api/objekt_*.php</code>,
+      <code>backend/api/ki_kunden_recherche.php</code>, Stand 11.09.2026. Nicht am
+      laufenden Cockpit nachgeprüft — siehe Hinweis auf der
+      <a href="index.html">Übersicht</a>.</p>
+
+    </div>
+  </div>
+</div>
+<script src="handbuch.js"></script>
+</body>
+</html>
