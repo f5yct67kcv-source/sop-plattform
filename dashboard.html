@@ -27158,10 +27158,10 @@ function eiBetreiberKonto() {
   if (name === null || !name.trim()) { return; }
   const email = window.prompt('E-Mail-Adresse:', '');
   if (email === null || !email.trim()) { return; }
-  /* Mindestens 16 Zeichen -- dasselbe Mass wie fuer Verwaltungskonten
+  /* Mindestens 12 Zeichen -- dasselbe Mass wie fuer Verwaltungskonten
      (PASSWORT_MIN_ADMIN). Der Server prueft es ohnehin; der Hinweis hier
      erspart den Fehlversuch. */
-  const pass = window.prompt('Passwort (mindestens 16 Zeichen, es ist das mächtigste Konto der Anlage):', '');
+  const pass = window.prompt('Passwort (mindestens 12 Zeichen, es ist das mächtigste Konto der Anlage):', '');
   if (pass === null || !pass) { return; }
   api('betreiber_konto_anlegen.php', { method: 'POST', body: { name, email, passwort: pass } })
     .then(({ ok, data }) => {
@@ -29883,7 +29883,7 @@ function mbNeu(felder) {
 // Erprobung (ENT-289) ist mit ENT-502 zurueckgenommen -- dort steht die
 // Begruendung. Aendert jemand nur hier, laesst die Oberflaeche etwas zu,
 // das der Server abweist; darum immer beide Stellen zusammen.
-const PW_MIN = 12, PW_MIN_ADMIN = 16;
+const PW_MIN = 10, PW_MIN_ADMIN = 12;
 function mbPwMin() {
   // Massgeblich ist jetzt die Rolle, nicht mehr ein Admin-Haekchen. Auch
   // Planung und Personal sehen fremde Personendaten und brauchen darum das
