@@ -25,7 +25,13 @@ if ($text === '') {
 
 $ergebnis = anthropic_recherche_kunde($text);
 if ($ergebnis === null) {
-    json_response(['status' => 'error', 'message' => 'Recherche nicht verfuegbar oder ohne Ergebnis'], 502);
+    // „Kein Ergebnis" heisst hier etwas anderes als bei der Erkennung: Der
+    // Aufruf lief, es liess sich nur keine Firma zuordnen. Alle uebrigen
+    // Gruende (kein Schluessel, abgelehnt, Guthaben, Stoerung) sind dieselben
+    // und bleiben beim gemeinsamen Text.
+    ki_fehler_melden(ki_fehlergrund() === 'kein_ergebnis'
+        ? 'Zu dieser Angabe liess sich keine Firma ermitteln. Bitte die Felder von Hand eintragen.'
+        : null);
 }
 
 $felder = [];

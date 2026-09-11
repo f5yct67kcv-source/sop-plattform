@@ -7,21 +7,147 @@ declare(strict_types=1);
 // strukturierte Mitarbeiter-Felder. Schreibt nie selbst in die Datenbank --
 // nur Extraktion, das Speichern bleibt beim Admin.
 
-function anthropic_tool_call(array $tool, string $userContent): ?array {
-    $apiKey = '__ANTHROPIC_API_KEY__';
-    if ($apiKey === '' || str_contains($apiKey, '__ANTHROPIC_API_KEY')) {
-        return null; // nicht konfiguriert
-    }
+// ══════════════════════════════════════════ WARUM ES NICHT GING (ENT-529)
+//
+// Bis hierher gab jede Funktion dieser Datei bei JEDEM Fehlschlag dasselbe
+// zurueck: null. Die vier Endpunkte machten daraus denselben einen Satz
+// ("Erkennung nicht verfuegbar") -- gleichgueltig, ob gar kein Schluessel
+// hinterlegt war, ob er abgelehnt wurde, ob das Guthaben aufgebraucht war
+// oder ob der Anbieter gerade stoerte.
+//
+// Das ist genau der Fall, den CLAUDE.md als wichtigsten seiner Liste fuehrt:
+// „Unbekannt" darf nie wie „keine" aussehen. Praktisch hiess es, dass sich
+// nicht einmal mehr feststellen liess, OB ueberhaupt noch ein Schluessel
+// hinterlegt ist -- weder am Bildschirm noch beim Nachsehen im Quelltext.
+//
+// Der Rueckgabewert bleibt null, jeder Aufrufer prueft weiterhin darauf. Der
+// Grund steht daneben bereit und wird von den Endpunkten in einen eigenen
+// Satz uebersetzt.
 
-    $payload = [
-        'model' => 'claude-haiku-4-5-20251001',
-        'max_tokens' => 512,
-        'tools' => [$tool],
-        'tool_choice' => ['type' => 'tool', 'name' => $tool['name']],
-        'messages' => [
-            ['role' => 'user', 'content' => $userContent],
-        ],
+// Der Schluessel. EINE Stelle statt bisher drei -- der Deploy ersetzt den
+// Platzhalter hier (.github/workflows/deploy-hostpoint.yml, Schritt
+// „Platzhalter durch echte Werte ersetzen"). Ist das Secret
+// ANTHROPIC_API_KEY nicht gesetzt, bricht der Deploy bewusst NICHT ab: Er
+// setzt einen leeren Wert ein, und diese Datei erkennt das selbst.
+function ki_schluessel(): string
+{
+    return '__ANTHROPIC_API_KEY__';
+}
+
+// Ist gar kein Schluessel hinterlegt? Eigene, reine Funktion, damit sich auch
+// der Fall „ist hinterlegt" mit einem frei gewaehlten Testwert pruefen laesst
+// -- nicht nur der eine Zustand, den diese Umgebung herstellt.
+//
+// Der Vergleichstext steht bewusst OHNE den abschliessenden doppelten
+// Unterstrich da: Der Deploy-sed ersetzt in dieser Datei JEDES Vorkommen des
+// vollstaendigen Platzhalters (also mit beiden Schlussstrichen) -- auch eines,
+// das nur als Vergleich dienen soll, und auch eines in einem Kommentar. Dann
+// verglichen sich echter Wert und Vergleichstext miteinander, und die Stelle
+// loeste immer aus, egal was im Secret stand. Genau dieser Fehler ist in
+// mailer.php schon passiert (ENT-192, dort platzhalter_offen()).
+function ki_schluessel_fehlt(string $schluessel): bool
+{
+    return $schluessel === '' || str_contains($schluessel, '__ANTHROPIC_API_KEY');
+}
+
+// Grund des letzten Fehlschlags. Ohne Argument nur lesen.
+function ki_fehlergrund(?string $neu = null): string
+{
+    static $grund = 'kein_ergebnis';
+    if ($neu !== null) { $grund = $neu; }
+    return $grund;
+}
+
+// Aus Netz- und HTTP-Ergebnis einen Grund machen. Reine Funktion mit
+// uebergebenen Werten statt einer Auswertung mitten im Aufruf -- so laesst
+// sich JEDER Fall pruefen, nicht nur der, den diese Umgebung gerade herstellt.
+//
+// $curlFehler ist curl_errno(): 0 heisst „Antwort erhalten", 28 heisst „Zeit
+// abgelaufen" (CURLE_OPERATION_TIMEDOUT). Als Zahl und nicht als Konstante,
+// damit die Pruefung auch ohne geladene curl-Erweiterung laeuft.
+function ki_fehler_einordnen(int $curlFehler, int $httpCode, string $rumpf): string
+{
+    if ($curlFehler !== 0) {
+        return $curlFehler === 28 ? 'zeit_abgelaufen' : 'nicht_erreichbar';
+    }
+    // Gar kein HTTP-Code heisst: Es kam keine Antwort. Ohne diese Zeile fiele
+    // der Fall ans Ende durch und saehe aus wie eine zurueckgewiesene Anfrage
+    // -- also wie ein Programmfehler statt wie ein Netzproblem.
+    if ($httpCode === 0) { return 'nicht_erreichbar'; }
+    if ($httpCode === 401 || $httpCode === 403) { return 'schluessel_abgelehnt'; }
+    if ($httpCode === 429)                      { return 'zu_viele_anfragen'; }
+    if ($httpCode >= 500)                       { return 'dienst_gestoert'; }
+    // Ein aufgebrauchtes Guthaben meldet die Schnittstelle als 400 mit dem
+    // Hinweis „credit balance is too low". Ohne diese Unterscheidung saehe der
+    // haeufigste Betriebsfall aus wie ein Programmfehler, und man suchte im
+    // Quelltext statt in der Abrechnung.
+    if ($httpCode === 402) { return 'guthaben_leer'; }
+    if ($httpCode === 400) {
+        $r = strtolower($rumpf);
+        return (str_contains($r, 'credit balance') || str_contains($r, 'billing'))
+            ? 'guthaben_leer' : 'anfrage_abgelehnt';
+    }
+    if ($httpCode !== 200) { return 'anfrage_abgelehnt'; }
+    return 'kein_ergebnis';
+}
+
+// Was der Bediener liest, und mit welchem Statuscode. Verschiedene
+// Sachverhalte bekommen verschiedene Saetze -- nicht einer fuer alles. Der
+// Schluessel selbst kommt in keinem dieser Texte vor, auch nicht in Teilen.
+function ki_fehler_text(?string $grund = null): array
+{
+    $grund = $grund ?? ki_fehlergrund();
+    $texte = [
+        'nicht_eingerichtet' => [503,
+            'Die KI-Erkennung ist nicht eingerichtet: Auf diesem Server ist kein Anthropic-Schlüssel hinterlegt.'],
+        'schluessel_abgelehnt' => [502,
+            'Der hinterlegte Anthropic-Schlüssel wird nicht akzeptiert — abgelaufen, widerrufen oder falsch eingetragen.'],
+        'guthaben_leer' => [502,
+            'Das Anthropic-Guthaben ist aufgebraucht. Die Erkennung läuft erst wieder, wenn es aufgeladen ist.'],
+        'zu_viele_anfragen' => [502,
+            'Zu viele Anfragen in kurzer Zeit. In ein bis zwei Minuten nochmals versuchen.'],
+        'dienst_gestoert' => [502,
+            'Die Erkennung antwortet gerade nicht — eine Störung beim Anbieter. Später nochmals versuchen.'],
+        'zeit_abgelaufen' => [504,
+            'Die Erkennung hat zu lange gebraucht und wurde abgebrochen. Nochmals versuchen, bei einem Bild mit einem kleineren Ausschnitt.'],
+        'nicht_erreichbar' => [502,
+            'Der Server hat die Erkennung nicht erreicht. Das liegt am Server, nicht an Ihrem Gerät.'],
+        'anfrage_abgelehnt' => [502,
+            'Die Erkennung hat die Anfrage zurückgewiesen. Das ist ein Programmfehler und gehört gemeldet.'],
+        'inhalt_abgelehnt' => [422,
+            'Die Erkennung hat die Verarbeitung dieses Inhalts abgelehnt.'],
+        'kein_ergebnis' => [422,
+            'Die Erkennung hat kein verwertbares Ergebnis geliefert.'],
     ];
+    [$code, $satz] = $texte[$grund] ?? [502, 'Die Erkennung ist fehlgeschlagen.'];
+    return ['grund' => $grund, 'code' => $code, 'message' => $satz];
+}
+
+// Den Fehlschlag an die Oberflaeche geben und den Ablauf beenden. Viermal
+// derselbe Rumpf in den Endpunkten waeren vier Stellen, an denen ein
+// kuenftiger fuenfter Endpunkt wieder beim einen Satz fuer alles landet.
+// $eigenerText nur dort, wo ein Grund im jeweiligen Bereich wirklich etwas
+// anderes bedeutet (siehe ki_kunden_recherche.php).
+function ki_fehler_melden(?string $eigenerText = null): void
+{
+    $f = ki_fehler_text();
+    json_response([
+        'status'  => 'error',
+        'message' => $eigenerText ?? $f['message'],
+        'grund'   => $f['grund'],
+    ], $f['code']);
+}
+
+// Ein Aufruf an die Nachrichten-Schnittstelle. Alle Funktionen dieser Datei
+// gehen hier durch: EINE Stelle, die den Schluessel setzt, EINE, die einen
+// Fehlschlag einordnet.
+function ki_aufruf(array $payload, int $timeout): ?array
+{
+    $schluessel = ki_schluessel();
+    if (ki_schluessel_fehlt($schluessel)) {
+        ki_fehlergrund('nicht_eingerichtet');
+        return null;
+    }
 
     $ch = curl_init('https://api.anthropic.com/v1/messages');
     curl_setopt_array($ch, [
@@ -29,27 +155,71 @@ function anthropic_tool_call(array $tool, string $userContent): ?array {
         CURLOPT_POST => true,
         CURLOPT_HTTPHEADER => [
             'content-type: application/json',
-            'x-api-key: ' . $apiKey,
+            'x-api-key: ' . $schluessel,
             'anthropic-version: 2023-06-01',
         ],
         CURLOPT_POSTFIELDS => json_encode($payload),
-        CURLOPT_TIMEOUT => 20,
+        CURLOPT_TIMEOUT => $timeout,
     ]);
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $antwort    = curl_exec($ch);
+    $httpCode   = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlFehler = curl_errno($ch);
     curl_close($ch);
 
-    if ($response === false || $httpCode !== 200) {
+    if ($antwort === false || $httpCode !== 200) {
+        ki_fehlergrund(ki_fehler_einordnen($curlFehler, $httpCode, (string)$antwort));
+        // Der Rumpf der Fehlerantwort gehoert ins Serverprotokoll, nicht auf
+        // den Bildschirm: Er hilft beim Nachsehen, und der Bediener kann
+        // damit nichts anfangen. Der Schluessel steht nicht darin -- er geht
+        // im Kopf hinaus, nicht im Rumpf zurueck.
+        error_log('KI-Aufruf fehlgeschlagen (' . ki_fehlergrund() . ', HTTP ' . $httpCode
+            . ', curl ' . $curlFehler . '): ' . substr((string)$antwort, 0, 500));
         return null;
     }
 
-    $data = json_decode($response, true);
+    $data = json_decode((string)$antwort, true);
+    if (!is_array($data)) {
+        ki_fehlergrund('kein_ergebnis');
+        return null;
+    }
+    // Sicherheitsklassifikatoren koennen ablehnen -- das kommt als HTTP 200
+    // zurueck, nicht als Fehler.
+    if (($data['stop_reason'] ?? '') === 'refusal') {
+        ki_fehlergrund('inhalt_abgelehnt');
+        return null;
+    }
+    return $data;
+}
+
+// Die Eingabe des erwarteten Werkzeugs aus einer Antwort holen. Fehlt sie,
+// hat das Modell geantwortet, aber nichts Brauchbares geliefert -- das ist
+// etwas anderes als ein Fehlschlag des Aufrufs und bekommt seinen eigenen
+// Grund.
+function ki_werkzeug_eingabe(array $data, string $werkzeug): ?array
+{
     foreach (($data['content'] ?? []) as $block) {
-        if (($block['type'] ?? '') === 'tool_use' && ($block['name'] ?? '') === $tool['name']) {
+        if (($block['type'] ?? '') === 'tool_use' && ($block['name'] ?? '') === $werkzeug) {
             return $block['input'] ?? [];
         }
     }
+    ki_fehlergrund('kein_ergebnis');
     return null;
+}
+
+function anthropic_tool_call(array $tool, string $userContent): ?array {
+    $data = ki_aufruf([
+        'model' => 'claude-haiku-4-5-20251001',
+        'max_tokens' => 512,
+        'tools' => [$tool],
+        'tool_choice' => ['type' => 'tool', 'name' => $tool['name']],
+        'messages' => [
+            ['role' => 'user', 'content' => $userContent],
+        ],
+    ], 20);
+    if ($data === null) {
+        return null;
+    }
+    return ki_werkzeug_eingabe($data, $tool['name']);
 }
 
 // Kunden-Recherche (ENT-019). Anders als die Funktionen oben: hier darf das
@@ -62,11 +232,6 @@ function anthropic_tool_call(array $tool, string $userContent): ?array {
 // hier bewusst nicht ermittelt.
 function anthropic_recherche_kunde(string $text): ?array
 {
-    $apiKey = '__ANTHROPIC_API_KEY__';
-    if ($apiKey === '' || str_contains($apiKey, '__ANTHROPIC_API_KEY')) {
-        return null;
-    }
-
     // Seit ENT-044 fuehrt der Kundenstamm PLZ, Ort und Hausnummer getrennt und
     // kennt UID und Webseite. Genau diese Angaben stehen im Handelsregister --
     // die Recherche liefert sie darum gleich mit, statt dass sie hinterher von
@@ -121,7 +286,7 @@ function anthropic_recherche_kunde(string $text): ?array
     // brechen mit stop_reason "pause_turn" ab und muessen erneut angestossen
     // werden.
     for ($runde = 0; $runde < 4; $runde++) {
-        $payload = [
+        $data = ki_aufruf([
             'model' => 'claude-sonnet-5',
             'max_tokens' => 8000,
             'system' => $system,
@@ -130,33 +295,8 @@ function anthropic_recherche_kunde(string $text): ?array
                 $uebernehmen,
             ],
             'messages' => $messages,
-        ];
-
-        $ch = curl_init('https://api.anthropic.com/v1/messages');
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST => true,
-            CURLOPT_HTTPHEADER => [
-                'content-type: application/json',
-                'x-api-key: ' . $apiKey,
-                'anthropic-version: 2023-06-01',
-            ],
-            CURLOPT_POSTFIELDS => json_encode($payload),
-            CURLOPT_TIMEOUT => 120,
-        ]);
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-
-        if ($response === false || $httpCode !== 200) {
-            return null;
-        }
-
-        $data = json_decode($response, true);
-
-        // Sicherheitsklassifikatoren koennen ablehnen -- das kommt als HTTP 200
-        // zurueck, nicht als Fehler.
-        if (($data['stop_reason'] ?? '') === 'refusal') {
+        ], 120);
+        if ($data === null) {
             return null;
         }
 
@@ -175,6 +315,8 @@ function anthropic_recherche_kunde(string $text): ?array
         break;
     }
 
+    // Vier Runden ohne Uebergabe: Der Aufruf lief, aber es kam nichts heraus.
+    ki_fehlergrund('kein_ergebnis');
     return null;
 }
 
@@ -424,11 +566,6 @@ function anthropic_route_diktat(string $text, array $kunden, array $mitarbeiter,
 // einen bereits sauberen Satz zu zerlegen.
 function anthropic_extract_einsatz_bild(string $bildBase64, string $mimeType, array $kunden, array $mitarbeiter, string $heute): ?array
 {
-    $apiKey = '__ANTHROPIC_API_KEY__';
-    if ($apiKey === '' || str_contains($apiKey, '__ANTHROPIC_API_KEY')) {
-        return null;
-    }
-
     $tool = [
         'name' => 'extract_einsatz_bild',
         'description' => 'Extrahiert einen geplanten Einsatz aus einem Bild.',
@@ -466,7 +603,7 @@ function anthropic_extract_einsatz_bild(string $bildBase64, string $mimeType, ar
         . "aus dem Bild hervorgeht, laesst du weg. Ist kein Auftrag erkennbar, setze unsicher auf true "
         . "und fuelle so viel wie moeglich trotzdem aus.";
 
-    $payload = [
+    $data = ki_aufruf([
         'model' => 'claude-sonnet-5',
         'max_tokens' => 1024,
         'system' => $system,
@@ -479,35 +616,9 @@ function anthropic_extract_einsatz_bild(string $bildBase64, string $mimeType, ar
                 ['type' => 'text', 'text' => 'Lies den Auftrag aus diesem Bild.'],
             ],
         ]],
-    ];
-
-    $ch = curl_init('https://api.anthropic.com/v1/messages');
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_POST => true,
-        CURLOPT_HTTPHEADER => [
-            'content-type: application/json',
-            'x-api-key: ' . $apiKey,
-            'anthropic-version: 2023-06-01',
-        ],
-        CURLOPT_POSTFIELDS => json_encode($payload),
-        CURLOPT_TIMEOUT => 45,
-    ]);
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-
-    if ($response === false || $httpCode !== 200) {
+    ], 45);
+    if ($data === null) {
         return null;
     }
-    $data = json_decode($response, true);
-    if (($data['stop_reason'] ?? '') === 'refusal') {
-        return null;
-    }
-    foreach (($data['content'] ?? []) as $block) {
-        if (($block['type'] ?? '') === 'tool_use' && ($block['name'] ?? '') === 'extract_einsatz_bild') {
-            return $block['input'] ?? [];
-        }
-    }
-    return null;
+    return ki_werkzeug_eingabe($data, 'extract_einsatz_bild');
 }
