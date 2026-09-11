@@ -5127,6 +5127,29 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
         </span>
         <span class="lbl" id="navEinrichtungLbl">Einrichtung</span>
       </button>
+      <!-- Supportanfrage (ENT-538). Neben der Einrichtung und nicht bei "Zur
+           App": Beides sind Wege zur ANLAGE, "Zur App" und "Desktop-Ansicht"
+           sind Ortswechsel. Der Fussteil folgt damit weiter seiner Ordnung --
+           Werkzeuge, wer bin ich, wohin gehe ich, wie gehe ich raus.
+
+           WARUM HIER UND NICHT NUR IN DEN EINSTELLUNGEN: Die Kachel unter
+           Administration → Einstellungen bleibt der Ort, an dem der Vorgang
+           wohnt. Aber wer gerade nicht weiterkommt, sucht Hilfe dort, wo er
+           steht -- und nicht in einem Einstellungsbereich, den er in dem
+           Moment erst finden muss. Derselbe Griff wie beim Logo-Menü der
+           Anwendung, die der Projektinhaber als Vorbild gezeigt hat.
+
+           NUR AUF DEM DESKTOP, wie die Einrichtung darüber: Der Supportbereich
+           liegt in der Administration, und die ist am Handy seit ENT-235
+           bewusst ausgeblendet. Ein Eintrag, der dort ins Leere führte, wäre
+           schlechter als keiner. Ob es ihn am Handy geben soll, ist eine
+           eigene Entscheidung des Projektinhabers (Hausregel). -->
+      <button class="nav-item nur-desktop" id="nav-support"
+              title="Anliegen an den Betreiber der Plattform melden"
+              onclick="go('betrieb'); bkAbschnittZeigen('sa'); saLaden();">
+        <svg class="i" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span class="lbl">Support</span>
+      </button>
       <div class="side-user">
         <div class="avatar" id="uAvatar">–</div>
         <div class="who">
