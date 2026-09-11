@@ -425,6 +425,57 @@ async function vorratSeite(antwort, breite = 1500) {
     kachel && !kachel.versteckt);
   check('Die Kachel fuehrt in den Supportabschnitt', kachel && /bkAb|sa/.test(kachel.ruft));
 
+  // ── Der kurze Weg aus dem Kontomenue (ENT-538) ────────────────────
+  //
+  // Wer nicht weiterkommt, sucht Hilfe dort, wo er steht -- nicht in einem
+  // Einstellungsbereich, den er in dem Moment erst finden muss. Geprueft
+  // wird, dass der Eintrag da ist, gross genug und WIRKLICH im Supportteil
+  // landet: Ein Menuepunkt, der die Ansicht wechselt und dann doch auf der
+  // Uebersicht stehen bleibt, sieht aus wie ein Fehler der Seite.
+  {
+    await seite.evaluate(() => { document.getElementById('shell').classList.remove('aus'); });
+    const m = await seite.evaluate(() => {
+      const k = document.getElementById('nav-support');
+      if (!k) { return null; }
+      const r = k.getBoundingClientRect();
+      const ein = document.getElementById('nav-einrichtung');
+      return { hoehe: r.height, sichtbar: k.offsetParent !== null,
+               einrichtungHoehe: ein ? ein.getBoundingClientRect().height : 0,
+               beschriftung: (k.querySelector('.lbl') || {}).textContent,
+               // Neben der Einrichtung, nicht zwischen den Ortswechseln.
+               unterEinrichtung: !!ein && (ein.compareDocumentPosition(k)
+                 & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+               vorAbmelden: (document.getElementById('nav-abmelden')
+                 .compareDocumentPosition(k) & Node.DOCUMENT_POSITION_PRECEDING) !== 0 };
+    });
+    check('KRITISCH: das Kontomenue traegt einen Eintrag "Support"',
+      !!m && /Support/.test(m.beschriftung || ''));
+    // NICHT die 44-px-Schwelle: Die gilt laut CLAUDE.md fuer das HANDY, und
+    // dort erscheint dieser Eintrag gar nicht (nur-desktop). Am Desktop
+    // misst der ganze Fussteil 38 px -- eine 44er-Schwelle haette hier
+    // gemeldet, dass der Bestand die Regel bricht, statt zu pruefen, was
+    // gemeint ist. Die Aussage lautet: gleiches Muster wie die Nachbarn.
+    check('Er ist sichtbar', m && m.sichtbar && m.hoehe > 0);
+    check('KRITISCH: er ist genauso gross wie der Eintrag daneben (gleiches Muster)',
+      m && Math.abs(m.hoehe - m.einrichtungHoehe) < 1);
+    check('Er steht bei der Einrichtung und vor dem Abmelden',
+      m && m.unterEinrichtung && m.vorAbmelden);
+
+    // Und er fuehrt wirklich hin -- gemessen am gerenderten Zustand, nicht
+    // am onclick-Text.
+    await seite.evaluate(() => { document.getElementById('nav-support').click(); });
+    await seite.waitForTimeout(250);
+    const angekommen = await seite.evaluate(() => {
+      const ab = document.getElementById('bkAb-sa');
+      const view = document.getElementById('view-betrieb');
+      return { abschnittOffen: !!ab && getComputedStyle(ab).display !== 'none',
+               ansichtOffen: !!view && getComputedStyle(view).display !== 'none' };
+    });
+    check('KRITISCH: der Eintrag oeffnet die Administration', angekommen.ansichtOffen);
+    check('KRITISCH: und landet im Supportteil, nicht auf der Uebersicht',
+      angekommen.abschnittOffen);
+  }
+
   // Die Statuswoerter des Betriebs: "wartet auf Kunde" heisst aus seiner
   // Sicht "Antwort erhalten" -- derselbe Zustand, die andere Blickrichtung.
   await seite.evaluate(() => go('betrieb'));
