@@ -1244,6 +1244,13 @@ tbody tr.status-abgeschlossen td { opacity: .55; }
   color: var(--ink-3); margin-bottom: 6px; display: flex; flex-wrap: wrap; gap: 4px; }
 .wb-dr-satz { font-size: 14px; font-weight: 560; line-height: 1.45; margin-bottom: 16px; }
 .wb-dr-kopf { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+/* Der Fotokasten im Seitenfenster. Eigene Huelle statt ".sig-box": Dort
+   deckelt ".sig-box img" die Hoehe auf 110 px und legt einen weissen Grund
+   unter -- beides richtig fuer eine Unterschrift, beides falsch fuer ein
+   Foto. Das Bild selbst traegt ".rgd-foto", dieselbe Groesse wie im
+   Rundgang-Dialog; zwei Groessen fuer dasselbe Foto waeren zwei Aussagen
+   darueber, wie wichtig es ist. */
+.wb-dr-foto { margin-top: 18px; }
 /* Ein Verweis in der Angabenliste. Eigene Regel statt einer allgemeinen fuer
    ".dl a": Die Angabenliste steht im ganzen Haus, und eine Regel dort haette
    Wirkung an Stellen, die diese Aufgabe nicht kennt. */
@@ -1650,7 +1657,7 @@ th.sortbar.aktiv .pf { opacity: 1; color: var(--accent); }
 .dl dt { border-bottom: 1px solid var(--line-soft); }
 .dl dt:last-of-type, .dl dd:last-of-type { border-bottom: none; }
 .sig-box { margin-top: 18px; }
-.sig-box .lb { font-size: 11px; font-weight: 650; letter-spacing: .4px; text-transform: uppercase; color: var(--ink-3); margin-bottom: 7px; }
+.sig-box .lb, .wb-dr-foto .lb { font-size: 11px; font-weight: 650; letter-spacing: .4px; text-transform: uppercase; color: var(--ink-3); margin-bottom: 7px; }
 .sig-box img { max-width: 100%; max-height: 110px; border: 1px solid var(--line); border-radius: var(--r-sm); background: #fff; display: block; }
 
 /* Formular im Schubladen-/Dialogkontext */
@@ -20478,11 +20485,18 @@ function wbOeffnen(id) {
     : '<span style="color:var(--ink-3)">keinem Einsatz zugeordnet</span>']);
   zeilen.push(['Mitarbeitende', esc(e.person)]);
   if (e.text) { zeilen.push([e.art === 'ereignis' ? 'Bemerkung' : 'Angabe', esc(e.text)]); }
-  // Das Bild selbst holt diese Ansicht NICHT: Ein Foto je Eintrag waere ein
-  // Vielfaches der uebrigen Daten, und wer es sehen will, findet es in der
-  // Rundgang-Detailansicht bzw. bei den Ereignissen. Dass eines da ist, gehoert
-  // trotzdem hierher -- sonst wuesste niemand, dass es zu holen gibt.
-  if (e.hat_foto) { zeilen.push(['Foto', 'vorhanden']); }
+  /* Bis ENT-530 stand hier nur das Wort „vorhanden", mit dem Verweis, das
+     Bild sei in der Rundgang-Detailansicht zu finden. Dort stand es nicht --
+     der Knopf „Rundgang ansehen" gleich darunter führte zu genau demselben
+     Wort. Jetzt holt das Seitenfenster das Bild selbst, und zwar erst beim
+     Öffnen: EIN Foto für den EINEN Vorgang, der offen ist. Der alte Einwand
+     („ein Foto je Eintrag wäre ein Vielfaches der übrigen Daten") galt der
+     LISTE und gilt dort unverändert -- die lädt weiterhin kein Bild.
+
+     Kennt eine Art keinen Abrufweg, bleibt es beim Wort: „es gibt eines, ich
+     komme nur nicht heran" ist etwas anderes als „es gibt keines". */
+  const fotoQuelle = e.hat_foto ? (WB_FOTO_QUELLE[e.art] || null) : null;
+  if (e.hat_foto && !fotoQuelle) { zeilen.push(['Foto', 'vorhanden']); }
 
   $('drBody').innerHTML =
     `<div class="wb-dr-kopf">
@@ -20491,13 +20505,62 @@ function wbOeffnen(id) {
      </div>`
     + wbPfad(e, 'wb-dr-pfad')
     + `<div class="wb-dr-satz">${esc(e.person)} ${wbSatz(e)}</div>`
-    + '<dl class="dl">' + zeilen.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('') + '</dl>';
+    + '<dl class="dl">' + zeilen.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('') + '</dl>'
+    + (fotoQuelle
+      ? '<div class="wb-dr-foto"><div class="lb">Foto</div>'
+        + '<div id="wbDrFoto"><span class="zone-note">wird geladen …</span></div></div>'
+      : '');
 
   $('drFoot').innerHTML =
     (e.rundgang_id ? `<button class="btn btn-primary btn-sm" onclick="rgdZeigen(${Number(e.rundgang_id)})">Rundgang ansehen</button>` : '')
     + (e.objekt_id ? `<button class="btn btn-plain btn-sm" onclick="wbZuObjekt(${Number(e.objekt_id)})">Zum Objekt</button>` : '')
     + (e.kunde_id ? `<button class="btn btn-plain btn-sm" onclick="wbZuKunde(${Number(e.kunde_id)})">Zum Kunden</button>` : '');
   showDrawer();
+  if (fotoQuelle) { wbFotoLaden(fotoQuelle[0], e.quelle_id, fotoQuelle[1]); }
+}
+
+/* Woher das Foto einer Art kommt. EINE Liste: Dass ein Eintrag „hat_foto"
+   sagt, heisst noch nicht, dass es einen Weg gibt, es zu holen -- Runden und
+   Aufgaben tragen nie eines. Eine Art, die hier fehlt, bekommt das Wort
+   „vorhanden" statt eines leeren Kastens. */
+const WB_FOTO_QUELLE = {
+  ereignis: ['ereignis_foto.php', 'Foto zur Ereignismeldung'],
+  scan:     ['rundgang_scan_foto.php', 'Fotobeleg zum Ersatzscan'],
+};
+
+// Die zuletzt gezeigte Objekt-URL. Ohne sie hielte der Browser jedes im
+// Seitenfenster angesehene Foto bis zum Neuladen der Seite fest -- derselbe
+// Grund wie bei rgdFotos, nur dass hier immer genau eines offen ist.
+let wbFotoUrl = null;
+
+function wbFotoFreigeben() {
+  if (!wbFotoUrl) { return; }
+  try { URL.revokeObjectURL(wbFotoUrl); } catch (e) {}
+  wbFotoUrl = null;
+}
+
+/* Das Bild wird per fetch() samt Token geholt und als Objekt-URL gesetzt.
+   Ein schlichtes <img src="...php?id="> ginge nicht: Der Browser schickt
+   dabei keine eigenen Kopfzeilen mit, und der Token darf nicht in die URL
+   (test_php.mjs prüft das). */
+function wbFotoLaden(pfad, id, alt) {
+  wbFotoFreigeben();
+  const nummer = Number(id);
+  if (!nummer) { return; }
+  fetch(API + pfad + '?id=' + nummer, { headers: { 'X-Auth-Token': token } })
+    .then(r => (r.ok ? r.blob() : Promise.reject(new Error('foto'))))
+    .then(b => {
+      const ziel = $('wbDrFoto');
+      if (!ziel) { return; }   // Seitenfenster zwischenzeitlich geschlossen
+      wbFotoUrl = URL.createObjectURL(b);
+      ziel.innerHTML = `<a href="${wbFotoUrl}" target="_blank" rel="noopener">`
+        + `<img src="${wbFotoUrl}" alt="${esc(alt)}" class="rgd-foto"></a>`;
+    })
+    .catch(() => {
+      const ziel = $('wbDrFoto');
+      // Ein fehlgeschlagenes Foto darf nicht wie „kein Foto" aussehen.
+      if (ziel) { ziel.innerHTML = '<span class="zone-note">Das Foto liess sich nicht laden.</span>'; }
+    });
 }
 
 function aeRenderScans() {
@@ -20576,6 +20639,11 @@ let rgdKarte = null, rgdLinie = null, rgdMarken = [], rgdDaten = null;
    mit Kopfzeile statt <img src>. Dasselbe Vorgehen wie bei den
    Ereignisfotos (ENT-297). */
 let rgdFotos = {};
+/* Eine ZWEITE Ablage, nicht dieselbe: Scan-Nummern und Ereignis-Nummern sind
+   zwei Nummernkreise. In einer gemeinsamen Ablage ueberschriebe das Foto von
+   Scan 7 das von Ereignis 7 -- ein Fehler, der erst im Betrieb auffiele und
+   dann wie ein vertauschtes Bild aussaehe, nicht wie ein fehlendes. */
+let rgdEreignisFotos = {};
 
 const RGD_STATUS = {
   vorbereitet:   ['chip-n', 'Vorbereitet'],
@@ -20611,8 +20679,9 @@ function rgdZu() {
   rgdLinie = null; rgdMarken = []; rgdKarte = null; rgdDaten = null;
   // Objekt-URLs wieder freigeben -- sonst hält der Browser jedes Foto jeder
   // angesehenen Runde bis zum Neuladen der Seite fest.
-  Object.values(rgdFotos).forEach(u => { try { URL.revokeObjectURL(u); } catch (e) {} });
-  rgdFotos = {};
+  [rgdFotos, rgdEreignisFotos].forEach(ablage =>
+    Object.values(ablage).forEach(u => { try { URL.revokeObjectURL(u); } catch (e) {} }));
+  rgdFotos = {}; rgdEreignisFotos = {};
 }
 
 function rgdZeigen(rundgangId) {
@@ -20797,31 +20866,51 @@ function rgdErsatzHtml(ersatz) {
     + ' Der Fotobeleg steht beim jeweiligen Punkt.</div>';
 }
 
-/* Holt die Ersatzscan-Fotos, sobald die Runde offen ist. Erst danach
-   zeichnet die Zeile das Bild -- vorher steht dort ein Platzhalter, kein
-   leerer Rahmen: „wird geladen" und „kein Foto" sind verschiedene Aussagen. */
+/* Holt EIN Bild in seinen Platzhalter. Zwei Quellen benutzen es -- der
+   Fotobeleg eines Ersatzscans und das Foto einer Ereignismeldung --, darum
+   steht es einmal hier statt zweimal untereinander. Genau an dieser
+   Doppelung ist es vorher auseinandergelaufen: Der Scan bekam sein Bild,
+   das Ereignis blieb beim Wort „Mit Foto" (ENT-530).
+
+   Der Token darf nicht in die URL (test_php.mjs prüft das), darum fetch()
+   mit Kopfzeile statt <img src>. */
+function rgdFotoHolen(d, pfad, zielId, ablage, schluessel, alt, fehlertext) {
+  fetch(API + pfad, { headers: { 'X-Auth-Token': token } })
+    .then(r => (r.ok ? r.blob() : Promise.reject(new Error('foto'))))
+    .then(b => {
+      if (!rgdDaten || Number(rgdDaten.id) !== Number(d.id)) { return; }  // inzwischen andere Runde
+      ablage[schluessel] = URL.createObjectURL(b);
+      const ziel = $(zielId);
+      if (ziel) {
+        ziel.innerHTML = `<a href="${ablage[schluessel]}" target="_blank" rel="noopener">`
+          + `<img src="${ablage[schluessel]}" alt="${esc(alt)}" class="rgd-foto"></a>`;
+      }
+    })
+    .catch(() => {
+      const ziel = $(zielId);
+      // Ein fehlgeschlagenes Foto darf nicht wie „kein Foto" aussehen --
+      // der Beleg ist da, nur die Übertragung ging schief.
+      if (ziel) { ziel.innerHTML = '<span class="mut" style="font-size:12.5px">' + esc(fehlertext) + '</span>'; }
+    });
+}
+
+/* Holt die Fotos der Runde, sobald sie offen ist: den Fotobeleg jedes
+   Ersatzscans und das Foto jeder Ereignismeldung. Erst danach zeichnet die
+   Zeile das Bild -- vorher steht dort ein Platzhalter, kein leerer Rahmen:
+   „wird geladen" und „kein Foto" sind verschiedene Aussagen. */
 function rgdFotosLaden(d) {
   (d.kontrollpunkte || []).forEach(k => {
     const e = k.erledigt;
     if (!e || !e.hat_foto || !e.scan_id) { return; }
-    fetch(API + 'rundgang_scan_foto.php?id=' + Number(e.scan_id),
-      { headers: { 'X-Auth-Token': token } })
-      .then(r => (r.ok ? r.blob() : Promise.reject(new Error('foto'))))
-      .then(b => {
-        if (!rgdDaten || Number(rgdDaten.id) !== Number(d.id)) { return; }  // inzwischen andere Runde
-        rgdFotos[e.scan_id] = URL.createObjectURL(b);
-        const ziel = $('rgdFoto' + e.scan_id);
-        if (ziel) {
-          ziel.innerHTML = `<a href="${rgdFotos[e.scan_id]}" target="_blank" rel="noopener">`
-            + `<img src="${rgdFotos[e.scan_id]}" alt="Fotobeleg zum Ersatzscan" class="rgd-foto"></a>`;
-        }
-      })
-      .catch(() => {
-        const ziel = $('rgdFoto' + e.scan_id);
-        // Ein fehlgeschlagenes Foto darf nicht wie „kein Foto" aussehen --
-        // der Beleg ist da, nur die Übertragung ging schief.
-        if (ziel) { ziel.innerHTML = '<span class="mut" style="font-size:12.5px">Der Fotobeleg liess sich nicht laden.</span>'; }
-      });
+    rgdFotoHolen(d, 'rundgang_scan_foto.php?id=' + Number(e.scan_id),
+      'rgdFoto' + Number(e.scan_id), rgdFotos, e.scan_id,
+      'Fotobeleg zum Ersatzscan', 'Der Fotobeleg liess sich nicht laden.');
+  });
+  (d.ereignisse || []).forEach(e => {
+    if (!e.hat_foto || !e.id) { return; }
+    rgdFotoHolen(d, 'ereignis_foto.php?id=' + Number(e.id),
+      'rgdEvFoto' + Number(e.id), rgdEreignisFotos, e.id,
+      'Foto zur Ereignismeldung', 'Das Foto liess sich nicht laden.');
   });
 }
 
@@ -20866,7 +20955,15 @@ function rgdEreignisHtml(e) {
     + '<div class="zeit">' + esc(String(e.erfasst_am).slice(11, 16)) + '</div>'
     + '<div><div class="art">' + esc(e.art || 'Ohne Art') + '</div>'
     + (e.bemerkung ? '<div class="bem">' + esc(e.bemerkung) + '</div>' : '')
-    + (e.hat_foto ? '<div class="bem">Mit Foto</div>' : '')
+    // Das Bild selbst statt des Wortes „Mit Foto" (ENT-530) -- dieselbe
+    // Entscheidung wie beim Ersatzscan ein paar Zeilen weiter oben
+    // (ENT-329): Das Foto IST der Inhalt der Meldung, nicht eine
+    // Eigenschaft davon. Bis hierher stand im selben Dialog das eine Foto
+    // als Bild und das andere als Wort.
+    + (e.hat_foto && e.id
+      ? '<div class="rgd-foto-huelle" id="rgdEvFoto' + Number(e.id) + '">'
+        + '<span class="mut" style="font-size:12.5px">Foto wird geladen …</span></div>'
+      : '')
     + '</div></div>';
 }
 
@@ -28432,6 +28529,7 @@ function closeDrawer() {
   $('drawer').classList.remove('on');
   $('drawer').setAttribute('aria-hidden', 'true');
   drawerId = null; enTarget = null;
+  wbFotoFreigeben();
 }
 
 function askDeleteRapport(id) {

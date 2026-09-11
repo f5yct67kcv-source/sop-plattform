@@ -40,33 +40,33 @@ const rahmen = {
 const EINTRAEGE = [
   // Neuester zuoberst -- so liefert es der Server, und die Oberflaeche
   // sortiert bewusst nicht nach.
-  { ...rahmen, art: 'rundgang', id: 'rundgang-202', zeit: `${T0} 02:40:00`,
+  { ...rahmen, art: 'rundgang', id: 'rundgang-202', quelle_id: 202, zeit: `${T0} 02:40:00`,
     status: 'abgebrochen', rundgang_id: 202, rohzeit_start: `${T0} 02:00:00`,
     rohzeit_ende: null, pause_minuten: 0, abbruch_grund: 'notfall',
     text: 'Alarm am Nachbarobjekt', scans_anzahl: 2, hat_foto: false,
     uebermittelt_am: null },
-  { ...rahmen, art: 'ereignis', id: 'ereignis-501', zeit: `${T1} 23:10:00`,
+  { ...rahmen, art: 'ereignis', id: 'ereignis-501', quelle_id: 501, zeit: `${T1} 23:10:00`,
     status: null, bezeichnung: 'Feststellung', vorfall_am: `${T1} 22:50:00`,
     text: 'Tür stand offen', hat_foto: true, uebermittelt_am: `${T1} 23:11:00` },
-  { ...rahmen, art: 'rundgang', id: 'rundgang-201', zeit: `${T1} 22:40:00`,
+  { ...rahmen, art: 'rundgang', id: 'rundgang-201', quelle_id: 201, zeit: `${T1} 22:40:00`,
     status: 'abgeschlossen', rohzeit_start: `${T1} 22:05:00`,
     rohzeit_ende: `${T1} 22:40:00`, pause_minuten: 4, abbruch_grund: null,
     text: null, scans_anzahl: 3, hat_foto: false, uebermittelt_am: null },
-  { ...rahmen, art: 'aufgabe', id: 'aufgabe-401', zeit: `${T1} 22:22:00`,
+  { ...rahmen, art: 'aufgabe', id: 'aufgabe-401', quelle_id: 401, zeit: `${T1} 22:22:00`,
     status: 'nicht_moeglich', bezeichnung: 'Licht löschen', punkt_name: 'Keller',
     punkt_id: 12, text: 'Schalter defekt', hat_foto: false,
     uebermittelt_am: `${T1} 22:23:00` },
   // Ersatzscan mit langer Offline-Phase: erfasst um 22:20, uebermittelt erst
   // am Morgen. Genau der Fall, den ENT-132 sichtbar halten will.
-  { ...rahmen, art: 'scan', id: 'scan-302', zeit: `${T1} 22:20:00`,
+  { ...rahmen, art: 'scan', id: 'scan-302', quelle_id: 302, zeit: `${T1} 22:20:00`,
     status: 'ersatzscan', punkt_name: 'Keller', punkt_id: 12,
     text: 'Chip defekt', hat_foto: true, uebermittelt_am: `${T0} 06:40:00` },
-  { ...rahmen, art: 'scan', id: 'scan-301', zeit: `${T1} 22:05:00`,
+  { ...rahmen, art: 'scan', id: 'scan-301', quelle_id: 301, zeit: `${T1} 22:05:00`,
     status: 'bestaetigt', punkt_name: 'Eingang', punkt_id: 11,
     text: null, hat_foto: false, uebermittelt_am: `${T1} 22:06:00` },
   // Ein Scan auf einen inzwischen entfernten Kontrollpunkt, ohne Kunden-
   // kennung: der Nachweis bleibt, der Verweis kann es nicht.
-  { ...rahmen, art: 'scan', id: 'scan-300', zeit: `${T1} 21:55:00`,
+  { ...rahmen, art: 'scan', id: 'scan-300', quelle_id: 300, zeit: `${T1} 21:55:00`,
     status: 'nicht_verfuegbar', punkt_name: null, punkt_id: null,
     kunde_id: null, text: null, hat_foto: false,
     uebermittelt_am: `${T1} 21:56:00` },
@@ -80,6 +80,21 @@ const WACHBUCH = {
 
 let calls = [];
 let antwort = WACHBUCH;
+// Ein WIRKLICHES PNG. Eine JSON-Antwort mit Bildkopfzeile wuerde als <img>
+// stumm nicht dekodieren -- und die Pruefung "ein Bild ist da" bliebe gruen,
+// obwohl nichts zu sehen ist. Gemessen wird darum an naturalWidth, und dafuer
+// muss das Bild echt sein.
+//
+// 400x300, also GROESSER als die Huelle: Ein 4x4-Bild wuerde nie gedeckelt
+// und liesse die Frage offen, ob der Deckel ueberhaupt greift. Ein echtes
+// Handyfoto ist immer groesser.
+const PNG_BREIT = 400, PNG_HOCH = 300;
+const PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAZAAAAEsCAIAAABi1XKVAAAC90lEQVR42u3UQQ0AAAgDsWmafwHIQgekSRXc4zItwAmRADAsAMMCDAvAsAAMCzAsAMMCMCzAsAAMC8CwAMMCMCwAwwIMC8CwAAwLMCwAwwIwLMCwAAwLwLAAwwIwLADDAgwLwLAAw1IBMCwAwwIMC8CwAAwLMCwAwwIwLMCwAAwLwLAAwwIwLADDAgwLwLAADAswLADDAjAswLAADAvAsADDAjAsAMMCDAvAsADDUgEwLADDAgwLwLAADAswLADDAjAswLAADAvAsADDAjAsAMMCDAvAsAAMCzAsAMMCMCzAsAAMC8CwAMMCMCwAwwIMC8CwAMMCMCwAwwIMC8CwAAwLMCwAwwIwLMCwAAwLwLAAwwIwLADDAgwLwLAADAswLADDAjAswLAADAvAsADDAjAsAMMCDAvAsADDAjAsAMMCDAvAsAAMCzAsAMMCMCzAsAAMC8CwAMMCMCwAwwIMC8CwAAwLMCwAwwIwLMCwAAwLwLAAwwIwLADDAgwLwLAAwwIwLADDAgwLwLAADAswLADDAjAswLAADAvAsADDAjAsAMMCDAvAsAAMCzAsAMMCMCzAsAAMC8CwAMMCMCwAwwIMC8CwAMMCMCwAwwIMC8CwAAwLMCwAwwIwLMCwAAwLwLAAwwIwLADDAgwLwLAADAswLADDAjAswLAADAvAsADDAjAsAMMCDAvAsADDAjAsAMMCDAvAsAAMCzAsAMMCMCzAsAAMC8CwAMMCMCwAwwIMC8CwAAwLMCwAwwIwLMCwAAwLwLAAwwIwLADDAgwLwLAAwwIwLADDAgwLwLAADAswLADDAjAswLAADAvAsADDAjAsAMMCDAvAsAAMCzAsAMMCMCzAsAAMC8CwAMMCMCzAsCQADAvAsADDAjAsAMMCDAvAsAAMCzAsAMMCMCzAsAAMC8CwAMMCMCwAwwIMC8CwAAwLMCwAwwIwLMCwAAwLwLAAwwIwLMCwVAAMC8CwAMMCMCwAwwIMC8CwAAwLMCwAwwIwLOCzBf0vcSw0UxrUAAAAAElFTkSuQmCC',
+  'base64');
+// Die Ereignisse, die rundgang_detail.php zur Runde meldet. Veraenderbar,
+// weil dieselbe Suite die Runde mit und ohne Foto ansieht.
+let rundgangEreignisse = [];
 async function mock(p) {
   await p.route('**/api/*', route => {
     const req = route.request();
@@ -90,6 +105,9 @@ async function mock(p) {
     if (path.includes('login')) return send({ status: 'ok', token: 't', name: 'adrian', ist_admin: true });
     if (path.includes('dashboard_stats')) return send({ status: 'ok', kpi: {}, verlauf: [], angemeldet: [], pro_mitarbeiter: [], letzte_rapporte: [] });
     if (path.includes('wachbuch_liste')) return send(antwort);
+    if (path.includes('ereignis_foto') || path.includes('rundgang_scan_foto')) {
+      return route.fulfill({ status: 200, contentType: 'image/png', body: PNG });
+    }
     if (path.includes('kunden_list')) return send({ status: 'ok', kunden: [
       { id: 7, name: 'Muster Liegenschaften AG', kundennummer: 'K-0007', aktiv: 1,
         art: 'firma', kontaktwege: [], personen: [] }] });
@@ -103,7 +121,7 @@ async function mock(p) {
       vorname: 'Erika', nachname: 'Muster', rohzeit_start: `${T1} 22:05:00`,
       rohzeit_ende: `${T1} 22:40:00`, pause_minuten: 4,
       fortschritt: { gesamt: 3, bestaetigt: 3, erledigt: 3, ersatzscan: 1 },
-      kontrollpunkte: [], ereignisse: [] } });
+      kontrollpunkte: [], ereignisse: rundgangEreignisse } });
     if (path.includes('pensen.php')) return send({ status: 'ok', jahr: 2026, mitarbeiter: [] });
     if (path.includes('mitarbeiter_list')) return send({ status: 'ok', mitarbeiter: [] });
     return send({ status: 'ok' });
@@ -352,8 +370,80 @@ check('Es zeigt Kontrollpunkt, Rundgang, Einsatz und Person',
   dr.includes('Keller') && dr.includes('Schliessrunde') && dr.includes('Nachtdienst')
   && dr.includes('Muster, Erika'));
 check('Ein vorhandenes Foto wird erwähnt, statt stillschweigend zu fehlen', dr.includes('Foto'));
+// ── Das Foto selbst (ENT-530) ──────────────────────────────────────────
+// Geprüft wird die Sache, nicht der Wortlaut: Bis hierher stand im Fenster
+// nur das Wort „vorhanden", und genau darum blieb die Zeile darüber grün,
+// während nie ein Bild zu sehen war.
+await page.waitForTimeout(250);
+check('KRITISCH: beim Ersatzscan holt das Fenster das Bild vom Scan-Endpunkt',
+  calls.some(c => c.path.startsWith('rundgang_scan_foto') && c.query.id === '302'));
+check('KRITISCH: das Bild ist wirklich dekodiert, nicht nur ein leerer Rahmen',
+  await page.evaluate(() => {
+    const i = document.querySelector('#wbDrFoto img');
+    // naturalWidth ist der einzige Wert, der sagt, dass der Browser das Bild
+    // auch lesen konnte -- ein <img> mit kaputter Quelle steht sonst genauso da.
+    return !!i && i.naturalWidth > 0 && i.getBoundingClientRect().width > 0;
+  }));
+check('Der Sitzungs-Token steht nicht in der Bild-Adresse',
+  calls.filter(c => c.path.includes('_foto')).every(c => !('token' in c.query)));
 check('KRITISCH: aus dem Fenster führt ein Knopf in die Rundgang-Ansicht',
   await page.evaluate(() => (document.getElementById('drFoot').textContent || '').includes('Rundgang ansehen')));
+
+// Der gemeldete Fall: ein Ereignis MIT Foto. Es holt sein Bild von einem
+// anderen Endpunkt als der Scan -- eine Verwechslung liefert entweder nichts
+// oder, schlimmer, das Bild eines fremden Vorgangs mit derselben Nummer.
+await page.evaluate(() => { closeDrawer(); });
+calls = [];
+await page.evaluate(() => {
+  [...document.querySelectorAll('.wb-zeile')].find(x => x.dataset.wb === 'ereignis-501').click();
+});
+await page.waitForTimeout(300);
+check('KRITISCH: beim Ereignis holt das Fenster das Bild vom Ereignis-Endpunkt',
+  calls.some(c => c.path.startsWith('ereignis_foto') && c.query.id === '501'));
+check('KRITISCH: und nicht vom Scan-Endpunkt -- zwei Nummernkreise, zwei Wege',
+  !calls.some(c => c.path.startsWith('rundgang_scan_foto')));
+check('KRITISCH: das Ereignisfoto ist im Fenster wirklich zu sehen',
+  await page.evaluate(() => {
+    const i = document.querySelector('#wbDrFoto img');
+    return !!i && i.naturalWidth > 0 && i.getBoundingClientRect().width > 0;
+  }));
+check('Das Wort „vorhanden" ersetzt das Bild nicht mehr',
+  !(await page.textContent('#drawer')).includes('vorhanden'));
+// Gemessen, nicht im Quelltext nachgelesen (CLAUDE.md): ".sig-box img"
+// deckelt im selben Haus auf 110 px und legt einen weissen Grund unter --
+// richtig fuer eine Unterschrift, falsch fuer ein Foto. Darum eine eigene
+// Huelle; ob sie greift, sagt nur der gerenderte Zustand.
+check('KRITISCH: das Bild bleibt im Fenster, statt seitlich hinauszuragen',
+  await page.evaluate(() => {
+    const i = document.querySelector('#wbDrFoto img');
+    const d = document.getElementById('drawer');
+    if (!i) { return false; }
+    const bi = i.getBoundingClientRect(), bd = d.getBoundingClientRect();
+    return bi.right <= bd.right + 1 && bi.left >= bd.left - 1
+      // Gedeckelt, aber nicht verschwunden -- und nicht verzerrt: Ein Foto,
+      // das breiter gestaucht als gekuerzt wird, sagt etwas anderes aus als
+      // das aufgenommene.
+      && bi.width > 100 && bi.width <= 220 && bi.height <= 160
+      && Math.abs((bi.width / bi.height) - (400 / 300)) < 0.05;
+  }));
+// Die Masse merken: Dasselbe Foto darf im Seitenfenster nicht anders gross
+// sein als im Rundgang-Dialog. Zwei Groessen fuer dasselbe Bild sind zwei
+// Aussagen darueber, wie wichtig es ist -- und genau so eine stille
+// Abweichung entsteht, wenn eine zweite Stelle ihre eigene Huelle bekommt.
+const fotoMassFenster = await page.evaluate(() => {
+  const i = document.querySelector('#wbDrFoto img');
+  if (!i) { return null; }
+  const b = i.getBoundingClientRect();
+  return { w: Math.round(b.width), h: Math.round(b.height) };
+});
+check('Die Überschrift steht ÜBER dem Bild, nicht darunter',
+  await page.evaluate(() => {
+    const k = document.querySelector('.wb-dr-foto .lb');
+    const i = document.querySelector('#wbDrFoto img');
+    return !!k && !!i
+      && k.getBoundingClientRect().bottom <= i.getBoundingClientRect().top + 1;
+  }));
+await page.evaluate(() => { closeDrawer(); });
 // Eine Runde ohne Endzeit: "nicht erfasst" ist eine Aussage, ein leeres Feld
 // wäre keine.
 await page.evaluate(() => { closeDrawer(); });
@@ -366,6 +456,51 @@ check('KRITISCH: eine Runde ohne Endzeit sagt das, statt das Feld leer zu lassen
   dr2.includes('nicht erfasst'));
 check('Der Abbruchgrund steht auch im Fenster', dr2.includes('notfall'));
 await page.evaluate(() => { closeDrawer(); });
+
+// ══════════════ DAS FOTO IN DER RUNDGANG-DETAILANSICHT (ENT-530)
+// Der Weg, den das Seitenfenster anbietet: „Rundgang ansehen". Dort stand das
+// Ereignisfoto bis hierher als Wort „Mit Foto" da -- im SELBEN Dialog, in dem
+// der Fotobeleg eines Ersatzscans längst als Bild erscheint.
+rundgangEreignisse = [
+  { id: 501, erfasst_am: `${T1} 23:10:00`, vorfall_am: `${T1} 22:50:00`,
+    bemerkung: 'Tür stand offen', hat_foto: true, art: 'Feststellung' },
+  // Eine zweite Meldung OHNE Foto: Sie darf keinen leeren Rahmen bekommen.
+  { id: 502, erfasst_am: `${T1} 23:20:00`, vorfall_am: null,
+    bemerkung: 'Nichts Besonderes', hat_foto: false, art: 'Feststellung' },
+];
+await zumWachbuch();
+calls = [];
+check('Die LISTE selbst lädt weiterhin kein einziges Bild',
+  !calls.some(c => c.path.includes('_foto')));
+await page.evaluate(() => {
+  const z = [...document.querySelectorAll('.wb-zeile')].find(x => x.dataset.wb === 'rundgang-201');
+  z.querySelector('.wb-satz a').click();
+});
+await page.waitForTimeout(400);
+check('KRITISCH: das Ereignisfoto erscheint im Rundgang-Dialog als BILD',
+  await page.evaluate(() => {
+    const i = document.querySelector('#rgdEvFoto501 img');
+    return !!i && i.naturalWidth > 0 && i.getBoundingClientRect().width > 0;
+  }));
+check('KRITISCH: geholt wird es beim Ereignis-Endpunkt, mit der Ereignisnummer',
+  calls.some(c => c.path.startsWith('ereignis_foto') && c.query.id === '501'));
+check('KRITISCH: dasselbe Foto ist hier genauso gross wie im Seitenfenster',
+  !!fotoMassFenster && await page.evaluate(m => {
+    const i = document.querySelector('#rgdEvFoto501 img');
+    if (!i) { return false; }
+    const b = i.getBoundingClientRect();
+    return Math.abs(Math.round(b.width) - m.w) <= 1
+      && Math.abs(Math.round(b.height) - m.h) <= 1;
+  }, fotoMassFenster));
+check('Das Wort „Mit Foto" steht nicht mehr anstelle des Bildes',
+  !(await page.textContent('#rgdBody')).includes('Mit Foto'));
+check('KRITISCH: eine Meldung ohne Foto bekommt keinen leeren Rahmen',
+  await page.evaluate(() => !document.getElementById('rgdEvFoto502')));
+await page.evaluate(() => rgdZu());
+await page.waitForTimeout(150);
+check('Beim Schliessen wird die Objekt-URL wieder freigegeben',
+  await page.evaluate(() => Object.keys(rgdEreignisFotos).length === 0));
+rundgangEreignisse = [];
 
 // Mit der Tastatur genauso wie mit der Maus.
 await page.evaluate(() => {
