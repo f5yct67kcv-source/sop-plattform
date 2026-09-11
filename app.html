@@ -7711,6 +7711,27 @@ let rgsKarte = null, rgsKartenMarken = [], rgsKartenKreise = [], rgsStandortMark
 // Der Richtungspfeil (ENT-542) haengt an derselben Karte wie die
 // Standortmarke und wird ueberall zusammen mit ihr vergessen.
 let rgsRichtungsMarke = null;
+/* An WELCHES Element die Karte gebaut wurde (ENT-543). Daran, und nicht an
+   rgsKarte allein, erkennt man, ob die stehende Karte noch die im Dokument
+   ist: Nach einem Reiterwechsel wird der Rumpf ersetzt, rgsKarte zeigt dann
+   auf eine Karte in einem Knoten, den es nicht mehr gibt. */
+let rgsKarteEl = null;
+/* Zoom, Ausschnitt und Drehung, die ein Neubau uebernehmen soll -- heute nur
+   beim Umschalten der Nachtsicht, die sich nicht ohne Neubau aendern laesst. */
+let rgsKarteAnsicht = null;
+/* Woran sich erkennen laesst, ob sich an den Kontrollpunkten etwas geaendert
+   hat. Ohne diesen Vergleich wuerden bei jeder Positionsmeldung alle Marken
+   abgeraeumt und neu gebaut -- sichtbar als Flackern. */
+let rgsKartenSignatur = null;
+/* Welcher Aufbau der aktuelle ist (ENT-543). Zwischen dem Aufbau des Rumpfs
+   und dem fertig geladenen Kartenskript liegt ein Wartepunkt; wird in dieser
+   Zeit ein zweiter Aufbau angestossen, kommen BEIDE Rueckrufe an und bauen
+   nacheinander in dasselbe Element. Ergebnis: zwei Karten uebereinander,
+   jede mit eigenem Schild und eigenen Kontrollpunkt-Marken. Gemessen: fuenf
+   Marken, wo drei hingehoeren -- und die App versetzte danach die falsche,
+   sodass das Waechter-Schild auf der alten Stelle stehenblieb.
+   Nur der juengste Aufbau darf zu Ende gehen. */
+let rgsKarteBauLauf = 0;
 // Der Schluessel wurde vom Kartenanbieter abgelehnt (ENT-309). Eigener
 // Zustand, weil dieser Fall NICHT ueber das Versprechen laeuft: Das Skript
 // laedt, google.maps ist da, `new google.maps.Map` gelingt -- und erst
@@ -7765,6 +7786,9 @@ function rgKarteGesperrtZeigen() {
   karte.innerHTML = '';
   rgsKartenMarken = []; rgsKartenKreise = []; rgsStandortMarke = null;
   rgsRichtungsMarke = null;
+  // Die Karte selbst gilt damit ebenfalls als weg (ENT-543) -- sonst hielte
+  // der Aktualisierungsweg eine Karte fuer stehend, die es nicht mehr gibt.
+  rgsKarte = null; rgsKarteEl = null; rgsKartenSignatur = null;
   let stand = $('rgsKarteStand');
   if (!stand) {
     stand = document.createElement('div');
@@ -7837,29 +7861,46 @@ function rgKarteDaten(kontrollpunkte) {
    finden muss -- abschaltbar bleibt sie trotzdem, für den seltenen Fall
    einer Tagesrunde. Die Wahl überdauert die Sitzung (localStorage). */
 const RG_NACHT_SCHLUESSEL = 'sop_rundgang_nachtsicht';
-const RG_NACHT_STIL = [
-  { elementType: 'geometry', stylers: [{ color: '#1B2230' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#9AA3B2' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#0F1117' }] },
-  { featureType: 'poi', stylers: [{ visibility: 'off' }] },
-  { featureType: 'transit', stylers: [{ visibility: 'off' }] },
-  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#2A3147' }] },
-  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#151B27' }] },
-  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#3A4360' }] },
-  { featureType: 'road.local', elementType: 'labels.text.fill', stylers: [{ color: '#7E8798' }] },
-  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#101725' }] },
-  { featureType: 'landscape.man_made', elementType: 'geometry', stylers: [{ color: '#202838' }] },
-];
+/* Die fruehere Nachtsicht-Stilvorschrift (RG_NACHT_STIL) ist mit ENT-543
+   entfallen: Eine Vektorkarte ignoriert Stilvorschriften aus dem Code, sie
+   faerbt ueber colorScheme oder ueber einen Stil in der Google-Cloud-
+   Konsole. Die frueheren Farbwerte stehen im Entscheidungsprotokoll
+   (ENT-543) -- wer spaeter einen Cloud-Stil anlegt, hat sie dort. */
 
 function rgNachtAn() {
   try { return localStorage.getItem(RG_NACHT_SCHLUESSEL) !== 'aus'; }
   catch (e) { return true; }   // kein Speicher: die Vorgabe gilt trotzdem
 }
 
+/* Zoom, Mitte und Drehung der stehenden Karte -- oder null. Gekapselt,
+   weil getHeading() nur auf einer Vektorkarte existiert und eine aeltere
+   API-Fassung sonst hier abbraeche. */
+function rgKarteAnsichtLesen() {
+  if (!rgsKarte) { return null; }
+  try {
+    const z = rgsKarte.getZoom(), m = rgsKarte.getCenter();
+    if (typeof z !== 'number' || !m) { return null; }
+    return { zoom: z, lat: m.lat(), lng: m.lng(),
+      heading: typeof rgsKarte.getHeading === 'function' ? (rgsKarte.getHeading() || 0) : 0 };
+  } catch (e) { return null; }
+}
+
 function rgNachtUm() {
   const neu = rgNachtAn() ? 'aus' : 'an';
   try { localStorage.setItem(RG_NACHT_SCHLUESSEL, neu); } catch (e) {}
-  if (rgsKarte) { rgsKarte.setOptions({ styles: neu === 'an' ? RG_NACHT_STIL : [] }); }
+  /* Seit ENT-543 ist die Karte eine Vektorkarte, und dort faerbt das
+     eingebaute Farbschema statt einer Stilvorschrift. Das Farbschema laesst
+     sich nur beim Bauen setzen -- der Schalter baut die Karte also neu.
+
+     Das ist der eine Neubau, der bleibt: Er geschieht auf ausdrueckliches
+     Tippen, nicht im Sekundentakt. Und er nimmt Zoom, Ausschnitt und
+     Drehung mit, damit der Schalter nicht nebenbei die Ansicht wegwirft. */
+  if (rgsKarte) {
+    rgsKarteAnsicht = rgKarteAnsichtLesen();
+    rgsKarte = null; rgsKarteEl = null; rgsKartenSignatur = null;
+    rgsStandortMarke = null; rgsRichtungsMarke = null;
+    try { rgKarteZeichnen(); } catch (e) {}
+  }
   const btn = $('rgsNachtsicht');
   if (btn) {
     btn.classList.toggle('an', neu === 'an');
@@ -7945,6 +7986,26 @@ function rgKarteZeichnen() {
   // solange die Verfolgung laeuft, und verschwindet mit ihr.
   const ortungHinweis = rgOrtungHinweisHtml(true);
   rgVollflaeche(true);
+  /* Steht die Karte schon, wird sie NICHT neu gebaut (ENT-543).
+
+     Vom Projektinhaber gemeldet, dass sich die Karte nicht drehen laesst --
+     beim Nachmessen kam heraus, dass eine Drehung ohnehin nichts genuetzt
+     haette: Diese Stelle hat bis hierher bei JEDEM Aufruf den ganzen Rumpf
+     ersetzt und eine neue Karte gebaut. Gemessen: Zoomstufe 19 und ein
+     selbst gewaehlter Ausschnitt waren nach einer einzigen neuen Position
+     wieder auf Stufe 16 und auf der Uebersicht.
+
+     Ausgeloest wurde das nicht von der Position selbst, sondern vom Wechsel
+     des Ortungszustands: Ein kurzer Aussetzer setzt rgsOrtFehler, die
+     naechste Position raeumt ihn weg, und BEIDE zeichnen neu. Draussen
+     zwischen Haeusern passiert das dauernd.
+
+     Der Aufruf ist trotzdem berechtigt -- der Hinweis unter der Karte muss
+     sich ja aendern. Falsch war nur, dafuer alles wegzuwerfen. */
+  if (rgsKarte && rgsKarteEl && rgsKarteEl === $('rgsKarte')) {
+    rgKarteAktualisieren(d, ortungHinweis, hinweis);
+    return;
+  }
   $('rgsBody').innerHTML = `
     <div class="rgs-karte-huelle">
       <div class="rgs-karte" id="rgsKarte"></div>
@@ -7968,7 +8029,11 @@ function rgKarteZeichnen() {
   // sie laengst wieder ginge. Es wird jetzt jedes Mal gebaut; scheitert es
   // erneut, meldet sich der Anbieter von selbst wieder.
 
+  const bauLauf = ++rgsKarteBauLauf;
   rgsMapsLaden().then(() => {
+    // Ein neuerer Aufbau hat inzwischen uebernommen -- dieser hier ist
+    // ueberholt und darf nichts mehr in die Karte schreiben.
+    if (bauLauf !== rgsKarteBauLauf) { return; }
     // Der Reiter kann waehrend des Ladens gewechselt worden sein.
     if (!$('rgsKarte')) { return; }
     // Die alte Standortmarke haengt an der eben ersetzten Karte und ist
@@ -7978,14 +8043,53 @@ function rgKarteZeichnen() {
     // verdeckt davon, dass der Zentrieren-Knopf jedes Mal eine neue baute).
     rgsStandortMarke = null;
     rgsRichtungsMarke = null;   // haengt an derselben, eben ersetzten Karte
-    rgsKarte = new google.maps.Map($('rgsKarte'), {
+    rgsKarteEl = $('rgsKarte');
+    rgsKarte = new google.maps.Map(rgsKarteEl, {
       center: { lat: d.zeigbar[0].lat, lng: d.zeigbar[0].lng }, zoom: 17,
       streetViewControl: false, mapTypeControl: false, fullscreenControl: false,
-      styles: rgNachtAn() ? RG_NACHT_STIL : [],
+      /* Vektorkarte statt Rasterkarte (ENT-543), Wunsch des Projektinhabers:
+         „Die Karte kann man zwar zoomen, jedoch nicht rotieren."
+
+         Drehen kann Google Maps NUR auf einer Vektorkarte -- auf einer
+         Rasterkarte gibt es ueberhaupt keinen Kartenwinkel. Der
+         renderingType laesst sich direkt setzen; eine Kennung aus der
+         Google-Cloud-Konsole braucht es dafuer nicht.
+
+         Neigen bleibt AUS. Gefragt war Drehen, und eine gekippte Karte
+         macht Beschriftungen und Kontrollpunkt-Kreise schlechter lesbar --
+         auf einer Nachtrunde genau das Falsche. */
+      renderingType: 'VECTOR',
+      headingInteractionEnabled: true,
+      tiltInteractionEnabled: false,
+      /* Die Nachtsicht war bis hierher eine Stilvorschrift im Code
+         (RG_NACHT_STIL). Auf einer Vektorkarte wird die IGNORIERT -- der
+         Schalter waere ab sofort wirkungslos gewesen, ohne dass etwas
+         kaputtgeht. Statt dessen das eingebaute Farbschema. Es laesst sich
+         nur beim Bauen setzen; darum baut rgNachtUm() die Karte neu. */
+      colorScheme: rgNachtAn() ? 'DARK' : 'LIGHT',
     });
+    /* Dreht der Waechter die Karte, zeigt der Richtungspfeil noch in die
+       alte Richtung: Marken drehen sich NICHT mit der Karte mit, ihre
+       Drehung gilt gegenueber dem Bildschirm. Der Pfeil muss darum
+       gegenhalten -- siehe rgRichtungAufKarte(). */
+    try { rgsKarte.addListener('heading_changed', () => rgRichtungMarkeNachfuehren()); } catch (e) {}
+    rgsKartenSignatur = rgKartenSignatur(d.zeigbar);
     rgKartePunkteZeichnen(d.zeigbar);
     rgStandortZeichnen();   // eine bereits bekannte Position sofort wieder zeigen
-    rgKarteZentrieren();
+    /* Beim Neubau nach einem Nachtsicht-Wechsel bleibt die Ansicht stehen.
+       Sonst spraenge die Karte bei jedem Tippen auf den Schalter auf die
+       Uebersicht zurueck -- dieselbe Sorte Aerger, gegen die dieser Umbau
+       ueberhaupt entstanden ist. */
+    if (rgsKarteAnsicht) {
+      const a = rgsKarteAnsicht; rgsKarteAnsicht = null;
+      try {
+        rgsKarte.setCenter({ lat: a.lat, lng: a.lng });
+        rgsKarte.setZoom(a.zoom);
+        if (a.heading && typeof rgsKarte.setHeading === 'function') { rgsKarte.setHeading(a.heading); }
+      } catch (e) { rgKarteZentrieren(); }
+    } else {
+      rgKarteZentrieren();
+    }
     // Den Hinweis erst entfernen, wenn die Karte wirklich steht. Wird er
     // vorher weggeraeumt und das Bauen scheitert, bleibt eine graue Flaeche
     // ohne Erklaerung zurueck.
@@ -7994,6 +8098,49 @@ function rgKarteZeichnen() {
     const stand = $('rgsKarteStand');
     if (stand) { stand.textContent = w('rgsKarteFehler'); stand.classList.add('fehler'); }
   });
+}
+
+/* Was sich ohne Neubau aendern kann (ENT-543).
+
+   Genau die vier Dinge, die an der Karte haengen und nicht die Karte selbst
+   sind. Alles andere -- Zoom, Ausschnitt, Drehung, geladene Kacheln --
+   bleibt unberuehrt, und genau darum geht es. */
+function rgKarteAktualisieren(d, ortungHinweis, hinweis) {
+  // 1. Der Hinweis UNTER der Karte (Ortungszustand) und der Vermerk ueber
+  //    Punkte ohne Koordinaten. Beide stehen als Geschwister nach der
+  //    Huelle -- sie werden zusammen ersetzt, mit demselben HTML wie beim
+  //    Aufbau. Zwei Wege, die dasselbe erzeugen, laufen sonst auseinander.
+  const huelle = $('rgsBody') ? $('rgsBody').querySelector('.rgs-karte-huelle') : null;
+  if (huelle) {
+    while (huelle.nextSibling) { huelle.nextSibling.remove(); }
+    huelle.insertAdjacentHTML('afterend', ortungHinweis + hinweis);
+  }
+  // 2. Die Ortungsmarke AUF der Karte. Sie kann neu dazukommen oder
+  //    wegfallen -- sie sitzt vor dem Zentrieren-Knopf.
+  const chipAlt = $('rgsOrtChip');
+  const chipNeu = rgOrtChipHtml();
+  if (chipAlt && !chipNeu) { chipAlt.remove(); }
+  else if (!chipAlt && chipNeu && $('rgsZentrieren')) {
+    $('rgsZentrieren').insertAdjacentHTML('beforebegin', chipNeu);
+  }
+  rgOrtChipZeichnen();
+  // 3. Die Kontrollpunkt-Marken, aber nur wenn sich an ihnen etwas geaendert
+  //    hat. Sonst flackerten sie bei jeder Positionsmeldung.
+  const sig = rgKartenSignatur(d.zeigbar);
+  if (sig !== rgsKartenSignatur) {
+    rgsKartenSignatur = sig;
+    rgKartePunkteZeichnen(d.zeigbar);
+  }
+  // 4. Der eigene Standort samt Richtungspfeil.
+  rgStandortZeichnen();
+}
+
+/* Woran sich eine Aenderung an den Kontrollpunkten erkennen laesst: Nummer,
+   Ort, Radius und Zustand. Bewusst nicht die Bezeichnung -- die steht nur im
+   Titel der Marke und aendert sich waehrend einer Runde nicht. */
+function rgKartenSignatur(punkte) {
+  return (punkte || []).map(p =>
+    `${p.nr}:${p.lat}:${p.lng}:${p.radius}:${p.erledigt || ''}`).join('|');
 }
 
 // Farbe UND Form: erledigt ist gefuellt-gruen mit Haken, offen ist blau mit
@@ -8789,6 +8936,26 @@ function rgStandortZeichnen() {
 
    Ohne bekannte Richtung wird die Marke ENTFERNT, nicht versteckt und nicht
    auf einem alten Wert stehen gelassen. */
+/* Die Drehung, mit der der Pfeil auf dem BILDSCHIRM gezeichnet wird
+   (ENT-543).
+
+   Eine Marke dreht sich nicht mit der Karte mit -- ihre Drehung gilt
+   gegenueber dem Bildschirm, damit Beschriftungen lesbar bleiben. Seit die
+   Karte drehbar ist, sind Nordrichtung und Bildschirm-Oben darum nicht mehr
+   dasselbe: Ist die Karte um 90 Grad gedreht, zeigt Norden nach links.
+
+   Der Pfeil haelt dagegen. Solange niemand dreht (Kartenwinkel 0) ist das
+   Ergebnis unveraendert die Bewegungsrichtung selbst. */
+function rgRichtungAufKarte(richtung) {
+  let winkel = 0;
+  try {
+    if (rgsKarte && typeof rgsKarte.getHeading === 'function') {
+      winkel = rgsKarte.getHeading() || 0;
+    }
+  } catch (e) { winkel = 0; }
+  return ((richtung - winkel) % 360 + 360) % 360;
+}
+
 function rgRichtungMarkeSetzen(ort, richtung) {
   if (!rgsKarte || !window.google) { return; }
   if (richtung === null || richtung === undefined) {
@@ -8801,7 +8968,7 @@ function rgRichtungMarkeSetzen(ort, richtung) {
     path: 'M12 1.5 17 10.5 12 8.2 7 10.5z',
     fillColor: '#F2F4F8', fillOpacity: 1,
     strokeColor: '#0F1117', strokeWeight: 1.2,
-    scale: 1.35, rotation: richtung,
+    scale: 1.35, rotation: rgRichtungAufKarte(richtung),
     anchor: new google.maps.Point(12, 24),
   };
   if (rgsRichtungsMarke) {

@@ -101,7 +101,20 @@ export const GOOGLE_MAPS_MOCK = `
       this._center = opts && opts.center ? alsLiteral(opts.center) : { lat: 0, lng: 0 };
       this._zoom = (opts && opts.zoom) || 8;
       this._objekte = new Set();
-      this._stilAnwenden(opts && opts.styles);
+      /* Darstellungsart, Drehbarkeit und Farbschema (ENT-543). Sie stehen
+         als Angaben AM CONTAINER, damit sich am gerenderten Zustand messen
+         laesst, in welchem Modus die Karte gebaut wurde -- und nicht nur im
+         Quelltext nachlesbar ist, ob die Optionen uebergeben wurden.
+
+         Die Attrappe zeichnet keine echten Kacheln und kann darum auch
+         nicht beweisen, dass sich eine echte Google-Karte am Geraet mit zwei
+         Fingern drehen laesst. Was sie beweisen kann: dass die Karte in
+         genau dem Modus gebaut wird, in dem Google das erlaubt. */
+      this._winkel = (opts && Number(opts.heading)) || 0;
+      this.container.dataset.darstellung = (opts && opts.renderingType) || 'RASTER';
+      this.container.dataset.drehbar = (opts && opts.headingInteractionEnabled) ? 'ja' : 'nein';
+      this.container.dataset.neigbar = (opts && opts.tiltInteractionEnabled) ? 'ja' : 'nein';
+      this._stilAnwenden(opts && opts.styles, opts && opts.colorScheme);
       this.controls = new Proxy({}, { get: (t, k) => (t[k] = t[k] || makeControlArray(this)) });
       container.addEventListener('click', e => {
         if (e.target !== container) return; // Marker/Kreis stoppen die Ausbreitung selbst
@@ -123,17 +136,44 @@ export const GOOGLE_MAPS_MOCK = `
     // keine Kacheln hat. Der leere Stil ('[]' = Standardkarte) faellt auf
     // die helle Grundfarbe zurueck -- sonst bliebe die Karte nach dem
     // Abschalten dunkel und das Ausschalten waere nicht pruefbar.
-    _stilAnwenden(styles) {
+    _stilAnwenden(styles, farbschema) {
       this._styles = Array.isArray(styles) ? styles : [];
+      /* Zwei Wege zur dunklen Karte, und beide muessen hier ankommen:
+         Die Rasterkarte (dashboard.html) faerbt ueber eine Stilvorschrift,
+         die Rundgang-Vektorkarte seit ENT-543 ueber colorScheme. Wuerde die
+         Attrappe nur den alten Weg kennen, waere die Nachtsicht der Runde
+         ab sofort ungeprueft -- und zwar gruen. */
+      if (farbschema) {
+        const dunkel = String(farbschema).toUpperCase() === 'DARK';
+        this._farbschema = String(farbschema).toUpperCase();
+        // Als FARBWERT, nicht als Wort: Die Pruefung rechnet die Helligkeit
+        // daraus aus und belegt damit, dass die Karte wirklich dunkel wird.
+        this.container.dataset.kartenstil = dunkel ? '#1B2230' : 'standard';
+        this.container.style.background = dunkel ? '#1B2230' : '#E5E3DF';
+        return;
+      }
       const farbe = stilGrundfarbe(this._styles);
       this.container.dataset.kartenstil = farbe || 'standard';
       this.container.style.background = farbe || '#E5E3DF';
     }
     setOptions(opts) {
       if (!opts) return;
-      if ('styles' in opts) { this._stilAnwenden(opts.styles); }
+      if ('styles' in opts || 'colorScheme' in opts) {
+        this._stilAnwenden(opts.styles, opts.colorScheme);
+      }
       if (opts.center) { this.setCenter(opts.center); }
       if (opts.zoom != null) { this.setZoom(opts.zoom); }
+      if (opts.heading != null) { this.setHeading(opts.heading); }
+    }
+    /* Kartenwinkel (ENT-543). Auf einer Rasterkarte gibt es ihn nicht; die
+       Attrappe bietet ihn an, weil die App ihn nur auf der Vektorkarte
+       abfragt und sich das Gegenhalten des Richtungspfeils sonst nicht
+       pruefen liesse. */
+    getHeading() { return this._winkel; }
+    setHeading(w) {
+      this._winkel = ((Number(w) || 0) % 360 + 360) % 360;
+      this.container.dataset.winkel = String(this._winkel);
+      this._feuern('heading_changed');
     }
     getStyles() { return this._styles; }
     setCenter(c) { this._center = alsLiteral(c); this._neuPositionieren(); }
