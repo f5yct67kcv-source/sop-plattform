@@ -5,6 +5,33 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
 <title>Betreiber-Bereich</title>
+<meta name="theme-color" content="#16181D">
+<script>
+/* Muss VOR dem ersten Zeichnen laufen, sonst blitzt die helle Fassung kurz
+   auf, bevor die dunkle greift (ENT-029, gleiche Bauart wie im Cockpit).
+
+   BEWUSST DERSELBE SPEICHERSCHLUESSEL wie dashboard.html: Es ist dasselbe
+   Geraet und derselbe Mensch. Wer im Cockpit auf dunkel gestellt hat,
+   erwartet nicht, dass die Ebene darueber wieder hell aufgeht -- genau das
+   war die Beanstandung. Ohne gespeicherte Wahl entscheidet die Einstellung
+   des Betriebssystems.
+
+   Eigener try: Ein Speicher, der nicht lesbar ist (privates Fenster),
+   darf nicht die ganze Seite mitreissen. */
+(function () {
+  var w = '';
+  try { w = localStorage.getItem('rv3_thema') || ''; } catch (e) { /* egal */ }
+  if (!w) {
+    w = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+      ? 'dunkel' : 'hell';
+  }
+  document.documentElement.setAttribute('data-thema', w);
+  if (w === 'dunkel') {
+    var m = document.querySelector('meta[name="theme-color"]');
+    if (m) { m.setAttribute('content', '#0B0D11'); }
+  }
+})();
+</script>
 <style>
 /* Betreiber-Bereich (ENT-519 bis ENT-521).
    Eigene Seite neben dashboard.html und portal.html -- dieselbe Trennung
@@ -27,6 +54,36 @@
   --shell:#16181D; --shell-txt:#9298A5; --shell-txt-hi:#F3F5F8;
   --nix:#D8DCE2;
 }
+
+/* Dieselben Werte wie im Cockpit (dashboard.html). Sie stehen hier als
+   Kopie und nicht in einer gemeinsamen Datei, weil der Deploy nur
+   namentlich gelistete Dateien kopiert und jede weitere Datei ein weiterer
+   Weg ist, auf dem etwas fehlen kann. test_betreiber_ansicht.mjs misst am
+   gerenderten Zustand, dass beide Seiten dieselbe Flaeche und dieselbe
+   Schriftfarbe zeigen -- auseinanderlaufen koennen sie also nicht
+   unbemerkt. */
+html[data-thema="dunkel"] {
+  --bg:#0F1117; --surface:#161B27; --surface-2:#1E2535;
+  --line:#2A3147; --line-soft:#232A3B; --line-hi:#3B4560;
+  --ink:#F2F4F8; --ink-2:#B6BCC8; --ink-3:#868D9A;
+  --accent:#7098F7; --accent-hi:#8DAEFA; --accent-soft:#1A2440; --accent-line:#2D3D63;
+  --pos:#4FCE96; --pos-soft:#10281E;
+  --neg:#F27F70; --neg-soft:#2E1A18;
+  --warn:#E2B156; --warn-soft:#2B2314;
+  --shell:#0B0D11; --shell-txt:#8A919E; --shell-txt-hi:#F2F4F8;
+  --nix:#3B4560;
+  /* Damit der Browser Bildlaufleisten und eingebaute Bedienelemente dunkel
+     zeichnet -- sonst steht ein weisses Auswahlmenue im dunklen Formular. */
+  color-scheme: dark;
+}
+/* Randfaelle, die sich nicht ueber einen Wert loesen lassen -- dieselben
+   wie im Cockpit. Ein Eingabefeld auf --surface waere im Dunkeln nicht von
+   der Karte zu unterscheiden, auf der es liegt. */
+html[data-thema="dunkel"] input,
+html[data-thema="dunkel"] select { background: var(--surface-2); }
+html[data-thema="dunkel"] input:focus,
+html[data-thema="dunkel"] select:focus { background: var(--surface); }
+html[data-thema="dunkel"] button.gefahr { border-color: #4A2823; }
 * { box-sizing: border-box; }
 body {
   margin: 0; background: var(--bg); color: var(--ink);
@@ -115,6 +172,47 @@ button.klein { min-height: 36px; padding: 0 12px; font-size: 13px; }
 /* Ein Knopf wird NICHT ueber die volle Breite gestreckt, nur weil er
    allein in seiner Zeile steht (Hausregel). */
 .knopfzeile { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+
+/* ── Umschalter hell/dunkel ───────────────────────────────────────
+   Dasselbe Bedienelement wie im Cockpit (ENT-029), mit einem
+   Unterschied: Der Knopf ist 44 px hoch, die sichtbare Bahn liegt mit
+   ihren 30 px mittig darin. Im Cockpit sitzt der Schalter in einer
+   Werkzeugleiste, hier in der Kopfzeile -- und die Hausregel
+   "mindestens 44 px" gilt fuer den Knopf, nicht fuer das Bild darauf.
+   Die Trefferflaeche waechst, das Aussehen bleibt gleich.
+
+   Eigene Farben statt --bg/--surface: Diese Kopfzeile ist in BEIDEN
+   Themen dunkel (--shell). Ein Schalter auf --bg waere im hellen Thema
+   eine grelle Kachel auf grauem Grund. */
+.thema-schalter {
+  min-height: 44px; width: 52px; padding: 0; border: 0; background: none;
+  display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.thema-schalter:hover { border-color: transparent; }
+.ts-bahn {
+  width: 52px; height: 30px; border-radius: 999px; position: relative;
+  border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.08);
+  transition: background .18s, border-color .18s;
+}
+.thema-schalter:hover .ts-bahn { border-color: rgba(255,255,255,.34); }
+.ts-schieber {
+  position: absolute; top: 2px; left: 2px; width: 24px; height: 24px; border-radius: 50%;
+  background: #F3F5F8; display: flex; align-items: center; justify-content: center;
+  transition: transform .2s;
+}
+.ts-schieber svg {
+  width: 14px; height: 14px; fill: none; stroke-width: 2.1;
+  stroke-linecap: round; stroke-linejoin: round; position: absolute; transition: opacity .16s;
+}
+.ts-schieber .i-sonne { stroke: #9A6B08; opacity: 1; }
+.ts-schieber .i-mond  { stroke: #2F5BD7; opacity: 0; }
+html[data-thema="dunkel"] .ts-bahn { background: var(--accent-soft); border-color: var(--accent-line); }
+html[data-thema="dunkel"] .ts-schieber { transform: translateX(22px); }
+html[data-thema="dunkel"] .ts-schieber .i-sonne { opacity: 0; }
+html[data-thema="dunkel"] .ts-schieber .i-mond  { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .ts-bahn, .ts-schieber, .ts-schieber svg { transition: none; }
+}
 
 label { display: block; font-size: 12.5px; font-weight: 600; color: var(--ink-2); margin-bottom: 6px; }
 input, select {
@@ -271,6 +369,14 @@ input:focus, select:focus { outline: 2px solid var(--accent-line); outline-offse
     </div>
     <div class="mitte" id="kopf-mitte"></div>
     <div class="rechts">
+      <button class="thema-schalter" id="btn-thema" role="switch" aria-checked="false"
+              title="Hell oder dunkel"
+              aria-label="Zwischen heller und dunkler Darstellung wechseln">
+        <span class="ts-bahn"><span class="ts-schieber">
+          <svg class="i-sonne" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><line x1="12" y1="1.5" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22.5"/><line x1="4.2" y1="4.2" x2="5.9" y2="5.9"/><line x1="18.1" y1="18.1" x2="19.8" y2="19.8"/><line x1="1.5" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22.5" y2="12"/><line x1="4.2" y1="19.8" x2="5.9" y2="18.1"/><line x1="18.1" y1="5.9" x2="19.8" y2="4.2"/></svg>
+          <svg class="i-mond" viewBox="0 0 24 24"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11z"/></svg>
+        </span></span>
+      </button>
       <button class="klein" id="knopf-abmelden">Abmelden</button>
     </div>
   </div>
@@ -398,6 +504,27 @@ function melde(el, art, txt) {
 }
 function stumm(el) { zeig(el, false); }
 
+/* ── Hell oder dunkel ────────────────────────────────────────────
+   Der Wert steht schon im Kopf der Seite am Dokument; hier wird nur noch
+   umgeschaltet und gespeichert. Derselbe Speicherschluessel wie im
+   Cockpit -- Begruendung oben beim Vorab-Skript. */
+function themaSetzen(w) {
+  const dunkel = w === 'dunkel';
+  document.documentElement.setAttribute('data-thema', dunkel ? 'dunkel' : 'hell');
+  try { localStorage.setItem('rv3_thema', dunkel ? 'dunkel' : 'hell'); } catch (e) { /* egal */ }
+  const b = $('btn-thema');
+  if (b) {
+    b.setAttribute('aria-checked', dunkel ? 'true' : 'false');
+    b.title = dunkel ? 'Auf helle Darstellung wechseln' : 'Auf dunkle Darstellung wechseln';
+  }
+  // Die Farbe der Systemleiste am Telefon mitziehen.
+  const m = document.querySelector('meta[name="theme-color"]');
+  if (m) { m.setAttribute('content', dunkel ? '#0B0D11' : '#16181D'); }
+}
+function themaUm() {
+  themaSetzen(document.documentElement.getAttribute('data-thema') === 'dunkel' ? 'hell' : 'dunkel');
+}
+
 async function ruf(pfad, daten, methode) {
   const opt = { method: methode || (daten ? 'POST' : 'GET'), headers: {} };
   if (token) { opt.headers['X-Auth-Token'] = token; }
@@ -405,7 +532,37 @@ async function ruf(pfad, daten, methode) {
   const antwort = await fetch(API + pfad, opt);
   let inhalt = {};
   try { inhalt = await antwort.json(); } catch (e) { /* leere Antwort */ }
+
+  /* Eine Sitzung, die nicht mehr traegt, ist kein Ladefehler.
+     Bis hierher malte jede Liste fuer sich "Nicht abrufbar" -- der
+     Bildschirm stand voller Fehlerkaesten, obwohl nur die Anmeldung
+     abgelaufen war, und daneben ein Knopf "Abmelden" fuer eine Sitzung,
+     die es nicht mehr gab. Dieselbe Aussage wie beim Laden der Seite:
+     zurueck zur Anmeldung, ohne Fehlermeldung.
+
+     Nur mit gesendetem Token: betreiber_anmelden.php antwortet auf ein
+     falsches Passwort ebenfalls mit 401, und das gehoert in die Meldung
+     des Anmeldefensters, nicht in einen Rueckwurf.
+     403 bleibt ausgenommen -- "Zwei-Faktor noch nicht eingerichtet" ist
+     etwas anderes als "nicht mehr angemeldet". */
+  if (antwort.status === 401 && token) { zurueckZurAnmeldung(); }
+
   return { code: antwort.status, ...inhalt };
+}
+
+/* Token wegwerfen und die Anmeldemaske zeigen. Kein Neuladen der Seite:
+   Ein halb ausgefuelltes Mandantenformular waere sonst weg, und der Grund
+   dafuer stuende nirgends. */
+function zurueckZurAnmeldung() {
+  try { sessionStorage.removeItem(SCHLUESSEL); } catch (e) { /* egal */ }
+  token = '';
+  zeig($('haus'), false);
+  zeig($('zf-tor'), false);
+  zeig($('tor'), true);
+  melde($('tor-meldung'), 'warn', 'Die Anmeldung ist abgelaufen — bitte neu anmelden.');
+  const f = $('e-pass'); if (f) { f.value = ''; }
+  const c = $('e-code'); if (c) { c.value = ''; }
+  zeig($('tor-code'), false);
 }
 
 /* ── Anmeldung ──────────────────────────────────────────────────── */
@@ -803,7 +960,14 @@ async function kontoSchalten(id, aktiv) {
 
 /* ── Rahmen ─────────────────────────────────────────────────────── */
 async function ladeAlles() {
-  if (ich) { $('kopf-wer').textContent = ich.name + ' · ' + ich.email; }
+  /* Name und Adresse nur dann beide, wenn sie sich unterscheiden. Wer beim
+     Anlegen seine E-Mail auch als Namen eingetragen hat, sah sie hier sonst
+     zweimal nebeneinander. */
+  if (ich) {
+    const gleich = String(ich.name || '').trim().toLowerCase()
+                === String(ich.email || '').trim().toLowerCase();
+    $('kopf-wer').textContent = gleich ? ich.email : ich.name + ' · ' + ich.email;
+  }
   $('kopf-mitte').textContent = 'Sitzung endet nach 30 Minuten ohne Nutzung';
   await ladeMandanten();
   await ladeKonten();
@@ -831,6 +995,9 @@ $('knopf-speichern').onclick  = mandantSpeichern;
 $('knopf-abbrechen').onclick  = () => zeig($('m-form-karte'), false);
 $('knopf-sup-zu').onclick      = () => zeig($('sup-karte'), false);
 $('knopf-abmelden').onclick   = abmelden;
+$('btn-thema').onclick        = themaUm;
+// Den Schalter auf den Stand bringen, den das Vorab-Skript gesetzt hat.
+themaSetzen(document.documentElement.getAttribute('data-thema') || 'hell');
 
 /* Beim Laden: Liegt ein Token in dieser Registerkarte, wird er benutzt.
    Traegt er nicht mehr, faellt die Seite auf die Anmeldung zurueck --

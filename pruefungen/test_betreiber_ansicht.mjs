@@ -119,6 +119,156 @@ for (const [wie, breite, hoehe] of [['Desktop', 1500, 900], ['Handy', 390, 844]]
   await seite.close();
 }
 
+// ── Dieselbe Gestaltung wie das Cockpit, in BEIDEN Themen ────────────
+//
+// Der Anlass: Das Cockpit stand beim Projektinhaber auf dunkel, der
+// Betreiber-Bereich ging hell auf. Beanstandung im Wortlaut: "halte dich
+// bitte an ein einheitlich design". Zwei Seiten desselben Betriebs sahen
+// aus wie zwei Hersteller.
+//
+// Verglichen wird der GEMESSENE Zustand beider Seiten, nicht der Quelltext.
+// Eine Pruefung, die nachsaehe, ob eine Farbe im CSS steht, bliebe gruen,
+// wenn eine spaetere Regel sie ueberschreibt -- und vor allem auch dann,
+// wenn das Cockpit seine Palette aendert und diese Seite nicht mitzieht.
+// Genau dieser zweite Fall ist der wahrscheinlichere.
+//
+// Aufgezaehlt wird, was betreiber.html selbst setzt: Kommt dort ein Wert
+// dazu, ist er von selbst mitgeprueft, sobald das Cockpit ihn auch kennt.
+{
+  const COCKPIT = pathToFileURL(join(WURZEL, 'dashboard.html')).href;
+
+  const WERTE = () => {
+    const cs = getComputedStyle(document.documentElement);
+    const werte = {};
+    for (const name of Array.from(cs)) {
+      if (name.startsWith('--')) { werte[name] = cs.getPropertyValue(name).trim(); }
+    }
+    const kb = getComputedStyle(document.body);
+    return { thema: document.documentElement.getAttribute('data-thema'),
+             werte, bodyBg: kb.backgroundColor, bodyInk: kb.color };
+  };
+
+  async function laden(adresse, thema) {
+    const seite = await browser.newPage({ viewport: { width: 1500, height: 900 } });
+    await seite.addInitScript(t => {
+      try { localStorage.setItem('rv3_thema', t); } catch (e) { /* egal */ }
+    }, thema);
+    await seite.goto(adresse);
+    await seite.waitForTimeout(80);
+    const m = await seite.evaluate(WERTE);
+    await seite.close();
+    return m;
+  }
+
+  for (const thema of ['hell', 'dunkel']) {
+    const be = await laden(ADRESSE, thema);
+    const co = await laden(COCKPIT, thema);
+
+    check(`KRITISCH ${thema}: der Betreiber-Bereich uebernimmt die Wahl aus dem Cockpit`,
+      be.thema === thema);
+
+    // Der eigentliche Punkt: nicht "es ist dunkel", sondern "es ist
+    // DASSELBE dunkel". Ein eigener, aehnlicher Farbsatz waere genau der
+    // Fehler, um den es geht.
+    const gemeinsam = Object.keys(be.werte).filter(n => co.werte[n] !== undefined && co.werte[n] !== '');
+    const anders = gemeinsam.filter(n => be.werte[n] !== co.werte[n]);
+    check(`KRITISCH ${thema}: jeder Farbwert stimmt mit dem Cockpit ueberein (${gemeinsam.length} verglichen)`,
+      gemeinsam.length >= 15 && anders.length === 0);
+    if (anders.length) {
+      bad.push(thema + ': ' + anders.slice(0, 6)
+        .map(n => `${n} ${be.werte[n]} statt ${co.werte[n]}`).join(', '));
+    }
+
+    // Und dass die Werte auch ankommen: Ein richtiger Wert in einer
+    // Regel, die nichts einfaerbt, waere unsichtbar richtig.
+    check(`KRITISCH ${thema}: die Flaeche der Seite ist auch wirklich eingefaerbt`,
+      be.bodyBg === co.bodyBg && be.bodyInk === co.bodyInk);
+  }
+
+  // Der Umschalter: dass er da ist, gross genug, und dass er wirkt.
+  {
+    const seite = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    await seite.addInitScript(() => {
+      try { localStorage.setItem('rv3_thema', 'hell'); } catch (e) { /* egal */ }
+    });
+    await seite.goto(ADRESSE);
+    await seite.evaluate(AUFBAU);
+    await seite.waitForTimeout(80);
+    const vorher = await seite.evaluate(() => ({
+      thema: document.documentElement.getAttribute('data-thema'),
+      hoehe: document.getElementById('btn-thema').getBoundingClientRect().height,
+      gemerkt: localStorage.getItem('rv3_thema'),
+    }));
+    await seite.click('#btn-thema');
+    await seite.waitForTimeout(120);
+    const nachher = await seite.evaluate(() => ({
+      thema: document.documentElement.getAttribute('data-thema'),
+      gemerkt: localStorage.getItem('rv3_thema'),
+      bodyBg: getComputedStyle(document.body).backgroundColor,
+      gedrueckt: document.getElementById('btn-thema').getAttribute('aria-checked'),
+    }));
+    await seite.close();
+
+    check('KRITISCH Handy: der Umschalter ist mindestens 44px hoch', vorher.hoehe >= 44);
+    check('Der Umschalter wechselt das Thema', vorher.thema === 'hell' && nachher.thema === 'dunkel');
+    check('KRITISCH: die Wahl wird fuer das Cockpit mitgespeichert (derselbe Schluessel)',
+      vorher.gemerkt === 'hell' && nachher.gemerkt === 'dunkel');
+    check('Die Flaeche folgt dem Umschalten auch wirklich',
+      nachher.bodyBg === 'rgb(15, 17, 23)');
+    check('Der Umschalter meldet seinen Zustand den Hilfsmitteln', nachher.gedrueckt === 'true');
+  }
+}
+
+// ── Eine abgelaufene Sitzung ist kein Ladefehler ─────────────────────
+//
+// Was der Projektinhaber sah: zwei Karten mit "Nicht abrufbar", daneben
+// ein Knopf "Abmelden" fuer eine Sitzung, die es nicht mehr gab. Jede
+// Liste meldete fuer sich einen Fehler, obwohl nur die Anmeldung
+// abgelaufen war -- "kein Zugriff" als "nichts vorhanden" dargestellt,
+// dieselbe Familie wie "unbekannt darf nie wie keine aussehen".
+//
+// Geprueft wird die Aussage am Verhalten: Der Server wird durch eine
+// Attrappe ersetzt, die 401 antwortet. Kein PHP noetig.
+{
+  const seite = await browser.newPage({ viewport: { width: 1500, height: 900 } });
+  await seite.goto(ADRESSE);
+  const lage = await seite.evaluate(async () => {
+    window.fetch = async () => new Response('{"status":"error","message":"Die Anmeldung gilt nicht mehr."}',
+      { status: 401, headers: { 'Content-Type': 'application/json' } });
+
+    // Fall 1: angemeldet, Sitzung traegt nicht mehr.
+    token = 'abgelaufener-token';
+    document.getElementById('tor').classList.add('versteckt');
+    document.getElementById('haus').classList.remove('versteckt');
+    await ruf('betreiber_mandant_list.php');
+    const sichtbar = el => !el.classList.contains('versteckt');
+    const nachAblauf = {
+      tor:  sichtbar(document.getElementById('tor')),
+      haus: sichtbar(document.getElementById('haus')),
+      meldung: document.getElementById('tor-meldung').textContent,
+      tokenWeg: token === '',
+      speicherWeg: !sessionStorage.getItem('betreiber-token'),
+    };
+
+    // Fall 2: NICHT angemeldet -- ein falsches Passwort antwortet ebenfalls
+    // mit 401 und gehoert in die Meldung des Anmeldefensters, nicht in
+    // einen Rueckwurf.
+    document.getElementById('tor-meldung').textContent = 'unberuehrt';
+    await ruf('betreiber_anmelden.php', { email: 'x@y.z', passwort: 'falsch' });
+    return { nachAblauf, ohneToken: document.getElementById('tor-meldung').textContent };
+  });
+  await seite.close();
+
+  check('KRITISCH: eine abgelaufene Sitzung fuehrt zurueck zur Anmeldung',
+    lage.nachAblauf.tor === true && lage.nachAblauf.haus === false);
+  check('KRITISCH: der tote Token wird dabei weggeworfen',
+    lage.nachAblauf.tokenWeg && lage.nachAblauf.speicherWeg);
+  check('Der Grund steht da, statt dass die Seite kommentarlos zurueckspringt',
+    /abgelaufen/i.test(lage.nachAblauf.meldung));
+  check('KRITISCH: ein 401 OHNE Anmeldung wirft nicht zurueck (falsches Passwort)',
+    lage.ohneToken === 'unberuehrt');
+}
+
 // ── Der QR-Code der Zwei-Faktor-Einrichtung ──────────────────────────
 //
 // Gemessen und nicht angenommen: Ob qrcode.js beim Nachladen tatsaechlich
