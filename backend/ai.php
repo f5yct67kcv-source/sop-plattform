@@ -100,8 +100,22 @@ function ki_fehler_einordnen(int $curlFehler, int $httpCode, string $rumpf): str
     if ($httpCode === 413) { return 'anfrage_zu_gross'; }
     if ($httpCode === 400) {
         $r = strtolower($rumpf);
-        return (str_contains($r, 'credit balance') || str_contains($r, 'billing'))
-            ? 'guthaben_leer' : 'anfrage_abgelehnt';
+        if (str_contains($r, 'credit balance') || str_contains($r, 'billing')) {
+            return 'guthaben_leer';
+        }
+        // Ein Schluessel, der fuer die ganze Organisation gilt statt fuer einen
+        // Workspace, muss bei JEDER Anfrage zusaetzlich sagen, welcher
+        // Workspace gemeint ist. Fehlt das, kommt ein 400 -- und der saehe
+        // ohne diese Zeile aus wie ein Programmfehler im Rumpf. Genau das ist
+        // am 11.09.2026 passiert und hat einen halben Vormittag gekostet: Der
+        // Rumpf war in Ordnung, der Schluessel war es nicht.
+        //
+        // Erkannt am Namen des verlangten Kopfes, nicht am ganzen Satz -- der
+        // Wortlaut der Meldung darf sich aendern, der Kopfname nicht.
+        if (str_contains($r, 'anthropic-workspace-id') || str_contains($r, 'scoped to a workspace')) {
+            return 'schluessel_ohne_workspace';
+        }
+        return 'anfrage_abgelehnt';
     }
     if ($httpCode !== 200) { return 'anfrage_abgelehnt'; }
     return 'kein_ergebnis';
@@ -144,6 +158,8 @@ function ki_fehler_text(?string $grund = null): array
     $texte = [
         'nicht_eingerichtet' => [503,
             'Die KI-Erkennung ist nicht eingerichtet: Auf diesem Server ist kein Anthropic-Schlüssel hinterlegt.'],
+        'schluessel_ohne_workspace' => [503,
+            'Der hinterlegte Anthropic-Schlüssel gilt für die ganze Organisation und nicht für einen Workspace — dann verlangt die Schnittstelle bei jeder Anfrage zusätzlich die Angabe des Workspace. Abhilfe: in der Anthropic Console einen Schlüssel MIT Workspace anlegen und als Secret hinterlegen.'],
         'schluessel_abgelehnt' => [502,
             'Der hinterlegte Anthropic-Schlüssel wird nicht akzeptiert — abgelaufen, widerrufen oder falsch eingetragen.'],
         'guthaben_leer' => [502,
