@@ -9019,6 +9019,28 @@ function rgRichtungMarkeNachfuehren() {
    dazuholen. Einmalig, nicht laufend -- ENT-131. */
 function rgKarteZentrieren() {
   if (!rgsKarte || !window.google) { return; }
+  /* Zurueck nach Norden (ENT-546). Vom Projektinhaber gemeldet: „Zentrieren
+     geht nicht."
+
+     Es ging schon -- nur unsichtbar. Zoom und Ausschnitt wurden
+     zurueckgesetzt, die DREHUNG nicht. Wer auf seinem einzigen
+     Kontrollpunkt steht, sieht vom Zentrieren ohnehin nichts; das Einzige,
+     was sichtbar gewesen waere, blieb liegen. Gemessen: Winkel vor dem
+     Tippen 40 Grad, danach unveraendert 40 Grad.
+
+     Entstanden ist das erst mit ENT-543: Vorher wurde die Karte bei jeder
+     Positionsmeldung neu gebaut, eine Drehung konnte also gar nicht
+     stehenbleiben. Der Knopf war nie dafuer zustaendig, weil es nichts
+     zurueckzusetzen gab.
+
+     Das Zurueckdrehen steht ganz oben, noch vor der Frage, ob es ueberhaupt
+     darstellbare Punkte gibt. Das ist reine Vorsicht und verhindert heute
+     nichts: Gibt es keine darstellbaren Punkte, zeigt der Reiter statt der
+     Karte einen Hinweis -- dann existiert der Knopf gar nicht. Die
+     Gegenprobe dazu blieb folgerichtig gruen. */
+  if (typeof rgsKarte.setHeading === 'function') {
+    try { rgsKarte.setHeading(0); } catch (e) {}
+  }
   const d = rgKarteDaten(rundgangAktiv ? rundgangAktiv.kontrollpunkte : []);
   if (!d.zeigbar.length) { return; }
   const grenzen = new google.maps.LatLngBounds();

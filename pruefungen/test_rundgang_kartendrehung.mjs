@@ -190,6 +190,33 @@ check('Zurück auf dunkel geht ebenso', await page.evaluate(() =>
   && document.getElementById('rgsNachtsicht').getAttribute('aria-pressed') === 'true'));
 await page.screenshot({ path: `${OUT}/kartendrehung-01.png` });
 
+// ══════════ ZURÜCK NACH NORDEN ══════════════════════════════════════
+// Vom Projektinhaber gemeldet: „Zentrieren geht nicht." Es ging schon —
+// Zoom und Ausschnitt wurden zurückgesetzt, die Drehung nicht. Wer auf
+// seinem einzigen Kontrollpunkt steht, sieht vom Zentrieren ohnehin nichts;
+// das Einzige, was sichtbar gewesen wäre, blieb liegen.
+await page.evaluate(() => {
+  rgsKarte.setHeading(40);
+  rgsKarte.setZoom(19);
+  rgsKarte.setCenter({ lat: 47.3590, lng: 7.9090 });
+});
+const verdreht = await page.evaluate(() => ({
+  zoom: rgsKarte.getZoom(), winkel: rgsKarte.getHeading(),
+  lat: +rgsKarte.getCenter().lat().toFixed(4),
+}));
+check('Vorbereitung: die Karte ist gedreht, gezoomt und verschoben',
+  verdreht.winkel === 40 && verdreht.zoom === 19);
+await page.click('#rgsZentrieren');
+await page.waitForTimeout(900);
+const zentriert = await page.evaluate(() => ({
+  zoom: rgsKarte.getZoom(), winkel: rgsKarte.getHeading(),
+  lat: +rgsKarte.getCenter().lat().toFixed(4),
+}));
+check('KRITISCH: „Zentrieren" dreht die Karte zurück nach Norden',
+  zentriert.winkel === 0);
+check('Und setzt weiterhin Zoom und Ausschnitt zurück',
+  zentriert.zoom !== 19 && zentriert.lat !== verdreht.lat);
+
 // ══════════ DER RICHTUNGSPFEIL HÄLT GEGEN DIE DREHUNG ════════════════
 // Eine Marke dreht sich NICHT mit der Karte mit — ihre Drehung gilt
 // gegenüber dem Bildschirm. Ist die Karte um 90 Grad gedreht, zeigt Norden
