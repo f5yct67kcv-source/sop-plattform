@@ -401,6 +401,11 @@ jobs:
           # api/betreiber_support.php -- und nie direkt aufgerufen; steht
           # darum auch in der Sperrliste der .htaccess.
           cp backend/support.php dist/support.php
+          # Supportvorgaenge (ENT-538). Die Gegenstuecke sind die Endpunkte
+          # support_anfrage.php (Kundenseite) und
+          # betreiber_support_vorgang.php (Vorrat) -- die kommen ueber
+          # backend/api/*.php mit.
+          cp backend/supportvorgang.php dist/supportvorgang.php
           # Pruefung und Mailtext der Demo-Anfrage (ENT-469), eingebunden
           # von api/demo_senden.php -- steht darum auch in der Sperrliste.
           # Der ENDPUNKT heisst bewusst anders: gleicher Name hiesse mitgesperrt.

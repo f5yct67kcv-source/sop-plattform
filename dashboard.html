@@ -1798,6 +1798,33 @@ tbody tr.heute td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
 
 .chip-w { background: var(--warn-soft); color: var(--warn); }
 .chip-x { background: var(--neg-soft); color: var(--neg); }
+
+/* ── Supportanfrage (ENT-538) ────────────────────────────────────────
+   Eine Zeile je Vorgang, als Knopf: Der ganze Streifen ist die
+   Trefferflaeche, nicht nur der Betreff. 44 px Mindesthoehe, weil dieselbe
+   Ansicht am Telefon steht (Hausregel). */
+.sa-zeile {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  width: 100%; min-height: 44px; padding: 10px 12px; margin-bottom: 8px;
+  border: 1px solid var(--line); border-radius: var(--r-sm);
+  background: var(--surface); color: inherit; text-align: left; cursor: pointer;
+}
+.sa-zeile:hover { border-color: var(--line-hi); }
+.sa-z-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.sa-z-txt strong { overflow-wrap: anywhere; }
+.sa-z-unter { font-size: 12px; color: var(--ink-3); }
+/* Der Verlauf. Zwei Seiten, zwei Ausrichtungen -- wer zuletzt geschrieben
+   hat, ist so ohne Lesen erkennbar. */
+.sa-n {
+  max-width: 82%; padding: 10px 13px; margin-bottom: 10px;
+  border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface);
+}
+.sa-ich     { margin-right: auto; }
+.sa-support { margin-left: auto; background: var(--line-soft); }
+.sa-n-wer { font-size: 11px; text-transform: uppercase; letter-spacing: .04em;
+            color: var(--ink-3); margin-bottom: 4px; }
+.sa-n-txt { font-size: 13.5px; white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 640px) { .sa-n { max-width: 92%; } }
 .crew { display: flex; flex-wrap: wrap; gap: 4px; }
 .crew .nm { font-size: 11.5px; font-weight: 600; background: var(--line-soft); color: var(--ink-2); border-radius: var(--r-xs); padding: 2px 7px; white-space: nowrap; }
 .crew .off { background: var(--warn-soft); color: var(--warn); }
@@ -7529,6 +7556,16 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
               <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg></span>
               <span class="bk-kachel-lbl">Support-Freigabe</span>
             </button>
+            <!-- Supportanfrage (ENT-538). Neben der Freigabe, weil beides
+                 denselben Gegenueber betrifft -- aber OHNE die Rechtehuerde
+                 der Freigabe: Wer fragt, oeffnet niemandem die Tuer. Die
+                 Grenze sitzt im Server (require_verwaltung); wer in die
+                 Administration kommt, darf auch fragen. -->
+            <button type="button" class="bk-kachel"
+                    onclick="bkAbschnittZeigen('sa'); saLaden();">
+              <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+              <span class="bk-kachel-lbl">Supportanfrage</span>
+            </button>
           </div>
 
           <div class="card">
@@ -7642,6 +7679,61 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
           </div>
           <div class="card-bd">
             <div id="sfProtokoll"><div style="color:var(--ink-3)">Wird geladen …</div></div>
+          </div>
+        </div>
+        </div>
+        </div>
+
+        <!-- Supportanfrage (ENT-538). Der Weg vom Betrieb zum Betreiber:
+             ein Anliegen schildern, das nicht dringend genug fuer einen
+             Anruf ist, und den Verlauf dazu nachlesen.
+
+             Die Vorgaenge liegen in der Datenbank des BETREIBERS, nicht in
+             dieser -- anders als die Freigabe eine Zeile weiter oben.
+             Begruendung in backend/supportvorgang.php: Der Betreiber
+             braucht eine Arbeitsliste ueber alle Betriebe, und eine nicht
+             erreichbare Datenbank duerfte daraus nicht lautlos
+             herausfallen. Der Preis steht im Hinweis am Eingabefeld: Was
+             hier getippt wird, liegt beim Betreiber. -->
+        <div class="bk-abschnitt" id="bkAb-sa" style="display:none">
+        <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="bkUebersichtZeigen()">Zurück</button>
+        <div class="grid">
+        <div class="card" id="saNeuKarte">
+          <div class="card-hd">
+            <span class="card-ic"><svg class="i" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+            <h3>Anliegen melden</h3>
+          </div>
+          <div class="card-bd">
+            <div class="msg-err" id="saErr" style="display:none"></div>
+            <p class="zone-note" id="saHinweis" style="margin-top:0"></p>
+            <div id="saFormular"></div>
+          </div>
+        </div>
+        <div class="card" id="saListeKarte">
+          <div class="card-hd">
+            <span class="card-ic gedaempft"><svg class="i" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
+            <h3>Meine Anfragen</h3>
+          </div>
+          <div class="card-bd">
+            <div id="saListe"><div style="color:var(--ink-3)">Wird geladen …</div></div>
+          </div>
+        </div>
+        <div class="card" id="saVorgangKarte" style="display:none">
+          <div class="card-hd">
+            <span class="card-ic"><svg class="i" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+            <h3 id="saVorgangTitel">Vorgang</h3>
+          </div>
+          <div class="card-bd">
+            <div id="saVerlauf"></div>
+            <div style="margin-top:16px">
+              <label for="saAntwort">Nachricht</label>
+              <textarea class="inp" id="saAntwort" rows="3" maxlength="4000"
+                        placeholder="Rückfrage oder Ergänzung zu diesem Vorgang"></textarea>
+            </div>
+            <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
+              <button type="button" class="btn btn-sm btn-primary" onclick="saAntworten()">Senden</button>
+              <button type="button" class="btn btn-sm" onclick="saSchliessen()">Schliessen</button>
+            </div>
           </div>
         </div>
         </div>
@@ -21889,6 +21981,187 @@ function bkUebersichtZeigen() {
   $('bkUebersicht').style.display = '';
   document.querySelectorAll('#view-betrieb .bk-abschnitt').forEach(a => { a.style.display = 'none'; });
   bkKachelSfSetzen();
+}
+
+
+/* ── Supportanfrage (ENT-538) ────────────────────────────────────────
+ *
+ * Der Weg vom Betrieb zum Plattform-Betreiber. Anders als die
+ * Support-Freigabe eine Zeile darueber gibt es hier keine Rechtehuerde
+ * ueber require_verwaltung hinaus: Wer fragt, oeffnet niemandem die Tuer.
+ *
+ * WAS HIER GETIPPT WIRD, LIEGT BEIM BETREIBER -- nicht in der Datenbank
+ * dieses Betriebs. Das ist der bewusste Unterschied zur Freigabe, und
+ * darum steht der Hinweis am Feld und nicht im Kleingedruckten.
+ *
+ * Der Kontext (Bildschirm, Umgebung) wird MITGESCHICKT statt erfragt: Er
+ * erspart die Rueckfrage, mit der ein Supportfall sonst beginnt. Er
+ * enthaelt nichts Personenbezogenes -- welcher Abschnitt offen war und
+ * welcher Browser laeuft, mehr nicht.
+ */
+const SA_STATUS = {
+  neu:              ['chip-n', 'Eingegangen'],
+  in_arbeit:        ['chip-w', 'In Arbeit'],
+  /* Aus Sicht des Betriebs heisst "wartet auf Kunde": Es liegt eine
+     Antwort vor. Derselbe Zustand, zwei Blickrichtungen -- und der Betrieb
+     liest hier seine, nicht die des Betreibers. */
+  wartet_auf_kunde: ['chip-p', 'Antwort erhalten'],
+  erledigt:         ['chip-n', 'Erledigt'],
+};
+let saVorgang = 0;
+
+/* Welcher Abschnitt gerade offen war. Kein Verlauf und keine Historie --
+   nur die eine Angabe, die beim Nachstellen hilft. Faellt sie leer aus,
+   wird das als "nicht mitgeschickt" angezeigt, nicht als leeres Feld. */
+function saBildschirm() {
+  const offen = document.querySelector('.bk-abschnitt:not([style*="none"])');
+  const titel = offen && offen.querySelector('h3');
+  return titel ? titel.textContent.trim().slice(0, 120) : 'Administration';
+}
+
+/* Browser und Bildschirmbreite, gekuerzt. Genau die zwei Angaben, mit
+   denen sich "bei mir sieht das anders aus" am haeufigsten aufklaert.
+   BEWUSST NICHT der volle User-Agent: Der ist lang, unleserlich und
+   traegt mehr ueber das Geraet mit, als zum Nachstellen noetig ist. */
+function saUmgebung() {
+  const ua = navigator.userAgent || '';
+  const name = /Edg\//.test(ua)     ? 'Edge'
+             : /Chrome\//.test(ua)  ? 'Chrome'
+             : /Firefox\//.test(ua) ? 'Firefox'
+             : /Safari\//.test(ua)  ? 'Safari'
+             : 'Browser unbekannt';
+  return name + ' · ' + window.innerWidth + '×' + window.innerHeight;
+}
+
+function saLaden() {
+  $('saErr').style.display = 'none';
+  saSchliessen();
+  api('support_anfrage.php').then(({ ok, data }) => {
+    if (!ok || !data) {
+      $('saListe').innerHTML = '<div style="color:var(--ink-3)">Nicht abrufbar.</div>';
+      $('saFormular').innerHTML = '';
+      return;
+    }
+    /* Vier Aussagen, vier Texte. "Nicht eingerichtet" und "keine Anfragen"
+       verlangen verschiedene Handgriffe -- und "nicht zuordenbar" ist ein
+       Fall fuer den Betreiber, keiner fuer den Betrieb. */
+    if (data.lage === 'nicht_eingerichtet') {
+      $('saHinweis').textContent = data.message || '';
+      $('saFormular').innerHTML = '';
+      $('saListe').innerHTML = '<div style="color:var(--ink-3)">Noch nicht eingerichtet.</div>';
+      return;
+    }
+    if (data.status !== 'ok') {
+      $('saHinweis').textContent = '';
+      $('saFormular').innerHTML = '';
+      $('saErr').textContent = data.message || 'Nicht abrufbar.';
+      $('saErr').style.display = '';
+      $('saListe').innerHTML = '<div style="color:var(--ink-3)">Nicht abrufbar.</div>';
+      return;
+    }
+    $('saHinweis').textContent = data.hinweis || '';
+    saFormularZeichnen();
+    saListeZeichnen(data.vorgaenge || []);
+  }).catch(() => {
+    $('saListe').innerHTML = '<div style="color:var(--ink-3)">Nicht abrufbar.</div>';
+  });
+}
+
+function saFormularZeichnen() {
+  $('saFormular').innerHTML =
+      '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">'
+    + '<label style="flex:1 1 260px">Worum geht es?'
+    + '<input class="inp" id="saBetreff" type="text" maxlength="200" '
+    + 'placeholder="z. B. Rundgang lässt sich nicht abschliessen"></label>'
+    + '<label style="width:150px">Art'
+    + '<select class="inp" id="saArt">'
+    + '<option value="stoerung">Störung</option>'
+    + '<option value="frage" selected>Frage</option>'
+    + '<option value="wunsch">Wunsch</option>'
+    + '</select></label>'
+    + '</div>'
+    + '<label for="saText">Schilderung</label>'
+    + '<textarea class="inp" id="saText" rows="4" maxlength="4000" '
+    + 'placeholder="Was ist passiert, und was haben Sie erwartet?"></textarea>'
+    + '<div style="margin-top:12px">'
+    + '<button type="button" class="btn btn-sm btn-primary" onclick="saSenden()">Anfrage senden</button>'
+    + '</div>';
+}
+
+function saSenden() {
+  const betreff = ($('saBetreff') && $('saBetreff').value || '').trim();
+  const text    = ($('saText') && $('saText').value || '').trim();
+  if (!betreff) { toast('Bitte kurz sagen, worum es geht.'); return; }
+  if (!text)    { toast('Bitte das Anliegen beschreiben.'); return; }
+
+  api('support_anfrage.php', { method: 'POST', body: {
+    betreff, text,
+    art:        ($('saArt') && $('saArt').value) || 'frage',
+    bildschirm: saBildschirm(),
+    umgebung:   saUmgebung(),
+  }}).then(({ ok, data }) => {
+    if (!ok || !data || data.status !== 'ok') {
+      toast((data && data.message) || 'Die Anfrage konnte nicht gesendet werden.'); return;
+    }
+    /* "Eingegangen" und "der Betreiber ist benachrichtigt" sind zwei
+       verschiedene Aussagen. Ging die Post nicht raus, steht die Anfrage
+       trotzdem in seinem Vorrat -- das wird gesagt, statt es zu
+       verschweigen oder als Fehler auszugeben. */
+    toast(data.post === 'ok'
+      ? 'Anfrage gesendet — der Betreiber ist benachrichtigt.'
+      : 'Anfrage gesendet. Sie steht im Vorrat des Betreibers; eine E-Mail ging nicht hinaus.');
+    saLaden();
+  }).catch(() => toast('Die Anfrage konnte nicht gesendet werden.'));
+}
+
+function saListeZeichnen(liste) {
+  if (!liste.length) {
+    $('saListe').innerHTML = '<div style="color:var(--ink-3)">Noch keine Anfrage gestellt.</div>';
+    return;
+  }
+  $('saListe').innerHTML = liste.map(v => {
+    const [farbe, wort] = SA_STATUS[v.status] || ['chip-n', v.status];
+    return '<button type="button" class="sa-zeile" onclick="saOeffnen(' + v.id + ')">'
+      + '<span class="sa-z-txt"><strong>' + esc(v.betreff) + '</strong>'
+      + '<span class="sa-z-unter">' + esc(String(v.eroeffnet_am || '').slice(0, 10))
+      + ' · ' + v.nachrichten + (v.nachrichten === 1 ? ' Nachricht' : ' Nachrichten') + '</span></span>'
+      + '<span class="chip ' + farbe + '">' + esc(wort) + '</span></button>';
+  }).join('');
+}
+
+function saOeffnen(id) {
+  saVorgang = id;
+  api('support_anfrage.php?id=' + id).then(({ ok, data }) => {
+    if (!ok || !data || data.status !== 'ok') { toast('Nicht abrufbar.'); return; }
+    $('saVorgangKarte').style.display = '';
+    $('saVorgangTitel').textContent = data.vorgang.betreff;
+    $('saVerlauf').innerHTML = (data.nachrichten || []).map(n =>
+        '<div class="sa-n ' + (n.seite === 'kunde' ? 'sa-ich' : 'sa-support') + '">'
+      + '<div class="sa-n-wer">' + esc(n.seite === 'kunde' ? (n.autor || 'Wir') : 'Support')
+      + ' · ' + esc(String(n.erstellt_am || '').slice(0, 10)) + '</div>'
+      + '<div class="sa-n-txt">' + esc(n.text) + '</div></div>').join('');
+    $('saAntwort').value = '';
+    $('saVorgangKarte').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }).catch(() => toast('Nicht abrufbar.'));
+}
+
+function saSchliessen() {
+  saVorgang = 0;
+  const k = $('saVorgangKarte');
+  if (k) { k.style.display = 'none'; }
+}
+
+function saAntworten() {
+  const text = ($('saAntwort') && $('saAntwort').value || '').trim();
+  if (!text) { toast('Bitte etwas schreiben.'); return; }
+  api('support_anfrage.php', { method: 'POST', body: { id: saVorgang, text } })
+    .then(({ ok, data }) => {
+      if (!ok || !data || data.status !== 'ok') {
+        toast((data && data.message) || 'Nicht gesendet.'); return;
+      }
+      toast('Gesendet.');
+      saOeffnen(saVorgang);
+    }).catch(() => toast('Nicht gesendet.'));
 }
 
 /* ── Support-Freigabe (ENT-526) ──────────────────────────────────────

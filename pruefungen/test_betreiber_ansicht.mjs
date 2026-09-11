@@ -97,6 +97,10 @@ const MESSEN = () => {
       return n ? n.scrollWidth > n.clientWidth + 1 : null;
     })(),
     bandUeberlauf: getComputedStyle(document.getElementById('kopf-nav')).overflowX,
+    // Der Katalog der Seite selbst -- nicht eine hier nachgefuehrte Zahl.
+    katalog: Object.keys(BEREICHE),
+    reiterSchluessel: [...document.querySelectorAll('#kopf-nav .nav-item')]
+      .map(b => b.dataset.bereich),
     reiter: [...document.querySelectorAll('#kopf-nav .nav-item')].map(b => ({
       wort: b.querySelector('.lbl').textContent.trim(),
       h: R(b).height,
@@ -167,7 +171,11 @@ for (const [wie, breite, hoehe] of [['Desktop', 1500, 900], ['Handy', 390, 844]]
   check(`${wie}: der Inhalt beginnt auch tatsaechlich dahinter`, m.inhaltLinks >= 16);
 
   // ── Das Navigationsband (ENT-536) ──────────────────────────────────
-  check(`${wie}: alle fuenf Bereiche stehen im Band`, m.reiter.length === 5);
+  check(`${wie}: jeder Bereich des Katalogs hat einen Reiter im Band`,
+    m.katalog.length >= 5 && m.katalog.every(k => m.reiterSchluessel.includes(k)));
+  check(`${wie}: jeder Reiter fuehrt in einen Bereich, den es gibt`,
+    m.reiterSchluessel.length === m.katalog.length
+    && m.reiterSchluessel.every(k => m.katalog.includes(k)));
   check(`KRITISCH ${wie}: jeder Reiter ist mindestens 44px hoch`,
     m.reiter.every(r => r.h >= 44));
   if (m.reiter.some(r => r.h < 44)) {
