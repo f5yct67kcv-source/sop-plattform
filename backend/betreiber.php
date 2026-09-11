@@ -692,6 +692,55 @@ function be_tabellen(): array
   notfallcodes TEXT NULL,
   angelegt_am DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+// ── Supportvorgaenge (ENT-538) ────────────────────────────────────────
+//
+// WARUM HIER UND NICHT BEIM MANDANTEN, wo die Support-Freigabe liegt: Die
+// Freigabe muss beim Mandanten liegen, sonst koennte der Betreiber sie sich
+// selbst ausstellen. Beim Vorgang gibt es nichts auszustellen, dafuer etwas
+// zu verlieren -- der Betreiber braucht EINE Arbeitsliste ueber alle
+// Mandanten, und eine nicht erreichbare Mandantendatenbank wuerde sonst
+// lautlos aus ihr herausfallen. Ausfuehrlich in backend/supportvorgang.php.
+//
+// `erinnert_am` ist nicht nur ein Vermerk, sondern die Sperre gegen
+// doppelten Versand: Gesetzt wird es mit "WHERE erinnert_am IS NULL",
+// womit auch bei mehreren gleichzeitig laufenden Zeitgebern genau einer
+// zum Zug kommt.
+'support_vorgang' => "CREATE TABLE IF NOT EXISTS support_vorgang (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  mandant_id INT UNSIGNED NOT NULL,
+  betreff VARCHAR(200) NOT NULL,
+  art ENUM('stoerung','frage','wunsch') NOT NULL DEFAULT 'frage',
+  status ENUM('neu','in_arbeit','wartet_auf_kunde','erledigt') NOT NULL DEFAULT 'neu',
+  melder_name VARCHAR(200) NOT NULL DEFAULT '',
+  melder_rolle VARCHAR(200) NOT NULL DEFAULT '',
+  bildschirm VARCHAR(200) NOT NULL DEFAULT '',
+  umgebung VARCHAR(200) NOT NULL DEFAULT '',
+  eroeffnet_am DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  geaendert_am DATETIME NULL,
+  erledigt_am DATETIME NULL,
+  erinnert_am DATETIME NULL,
+  KEY idx_support_vorgang_mandant (mandant_id),
+  KEY idx_support_vorgang_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+// Der Verlauf. Die erste Zeile ist die Schilderung des Kunden -- kein
+// zweites Textfeld am Vorgang, sonst gaebe es zwei Orte fuer dieselbe
+// Sache und die Frage, welcher gilt.
+//
+// `seite` statt einer Personen-Id: Ein Betreiber-Konto und ein
+// Mitarbeiterkonto stehen in verschiedenen Tabellen verschiedener Ebenen,
+// eine gemeinsame Fremdschluesselspalte gaebe es dafuer nicht. Wer
+// geschrieben hat, steht als Name daneben.
+'support_nachricht' => "CREATE TABLE IF NOT EXISTS support_nachricht (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  vorgang_id INT UNSIGNED NOT NULL,
+  seite ENUM('kunde','betreiber') NOT NULL,
+  autor VARCHAR(200) NOT NULL DEFAULT '',
+  text TEXT NOT NULL,
+  erstellt_am DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_support_nachricht_vorgang (vorgang_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
     ];
 }
 
