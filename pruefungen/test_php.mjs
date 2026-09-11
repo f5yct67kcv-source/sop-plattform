@@ -1059,11 +1059,28 @@ const toteSpur = PORTAL_SPUR_ERLAUBT.filter(f => !apiDateien.includes(f));
 check('Die Ausnahmeliste fuer die Spur nennt nur Endpunkte, die es gibt', toteSpur.length === 0);
 if (toteSpur.length) { bad.push('Spur-Ausnahme ohne Datei: ' + toteSpur.join(', ')); }
 
-// Und der eine erlaubte Weg fragt dieselbe Sichtbarkeitsregel wie das Detail
-// und das Foto. Ohne sie kaeme ein Kunde durch blosses Hochzaehlen an die
-// Aufenthaltsspur einer fremden Runde -- ausgerechnet am heikelsten Ort.
-check('KRITISCH: der Spur-Endpunkt fragt dieselbe Sichtbarkeitsregel wie Detail und Foto',
-  /kp_runde_sichtbar\s*\(/.test(ohneKommentar('portal_rundgang_weg.php')));
+/* Jeder Portal-Endpunkt, der den Inhalt EINER Runde nach ihrer Nummer
+   herausgibt, fragt dieselbe Sichtbarkeitsregel. Ohne sie kaeme ein Kunde
+   durch blosses Hochzaehlen einer Zahl an den Nachweis einer fremden Runde.
+
+   Namentlich und nicht ueber ein Muster -- gleiche Begruendung wie bei
+   PORTAL_EINGAENGE: Ein vierter Weg soll auffallen, statt stillschweigend
+   durch eine Regel zu rutschen, die ihn zufaellig nicht erfasst. Die
+   Listenansichten (portal_rundgaenge, portal_wachbuch) stehen bewusst NICHT
+   hier: Sie schneiden ueber kp_objekt_ids() zu und geben nie eine einzelne
+   fremde Nummer heraus.
+
+   portal_ereignis_foto.php ist mit ENT-544 dazugekommen. */
+const PORTAL_NACH_NUMMER = ['portal_rundgang_detail.php', 'portal_rundgang_foto.php',
+  'portal_rundgang_weg.php', 'portal_ereignis_foto.php'];
+const ohneSichtbarkeit = PORTAL_NACH_NUMMER.filter(f =>
+  !/kp_runde_sichtbar\s*\(/.test(ohneKommentar(f)));
+check('KRITISCH: jeder Weg zu EINER Runde fragt dieselbe Sichtbarkeitsregel',
+  ohneSichtbarkeit.length === 0);
+if (ohneSichtbarkeit.length) { bad.push('ohne kp_runde_sichtbar: ' + ohneSichtbarkeit.join(', ')); }
+const toteNachNummer = PORTAL_NACH_NUMMER.filter(f => !apiDateien.includes(f));
+check('Die Liste nennt nur Endpunkte, die es gibt', toteNachNummer.length === 0);
+if (toteNachNummer.length) { bad.push('Sichtbarkeits-Liste ohne Datei: ' + toteNachNummer.join(', ')); }
 
 // DIE KERNREGEL. Ein Portal-Endpunkt, der eine kunde_id oder zugang_id aus// DIE KERNREGEL. Ein Portal-Endpunkt, der eine kunde_id oder zugang_id aus
 // der Anfrage naehme, liesse jeden angemeldeten Kunden die Daten jedes
