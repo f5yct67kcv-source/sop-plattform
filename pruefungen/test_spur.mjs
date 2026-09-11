@@ -62,8 +62,23 @@ check('KRITISCH: alte Spuren werden auch tatsächlich gelöscht',
 // Ein Loeschauftrag, den jemand von Hand starten muss, wird nie gestartet.
 check('Das Aufräumen läuft von selbst mit, nicht auf Zuruf',
   POS.indexOf('DELETE FROM rundgang_position') > POS.indexOf('INSERT INTO rundgang_position'));
+/* Bis ENT-545 pruefte diese Zeile, ob das catch UNMITTELBAR vor der
+   Erfolgsmeldung steht. Das ist die Form des Quelltexts, nicht seine
+   Aussage: Sie ging rot, als eine zweite Aufraeum-Zeile dazwischenkam --
+   obwohl nichts unsicher geworden war. Genau davor warnt CLAUDE.md („nicht
+   den Quelltext abschreiben"). Jetzt stehen die beiden Aussagen einzeln da,
+   die wirklich gemeint sind. */
 check('Ein Fehler beim Aufräumen lässt die Übermittlung nicht scheitern',
-  /catch \(Throwable \$e\) \{[\s\S]{0,200}\}\s*\n\s*json_response\(\['status' => 'ok', 'gespeichert'/.test(POS));
+  /DELETE FROM rundgang_position[\s\S]{0,400}?catch \(Throwable \$e\) \{/.test(POS)
+  && POS.indexOf("json_response(['status' => 'ok', 'gespeichert'")
+     > POS.lastIndexOf('catch (Throwable $e)'));
+/* Seit ENT-545 raeumt derselbe Endpunkt auch die abgelaufenen Ereignisfotos
+   weg -- zwei Aufbewahrungsfristen, ein Takt. Dass AUCH dieses Aufraeumen
+   nichts mitreissen kann, ist nicht hier nachgelesen, sondern in
+   pruef_ereignis_foto_frist.php WIRKLICH ausgefuehrt: Dort wird die Tabelle
+   unter der Funktion weggezogen, und sie darf trotzdem nicht werfen. */
+check('Die zweite Aufbewahrungsfrist (Ereignisfotos) läuft im selben Takt mit',
+  /ereignis_fotos_aufraeumen\s*\(/.test(POS));
 
 // ══════════ DIE SPUR WIRD NICHT NEBENBEI MITGELIEFERT ═════════════════
 check('KRITISCH: die Auswertung liefert die Spur NICHT mit — nur die Rundgang-Nummer',

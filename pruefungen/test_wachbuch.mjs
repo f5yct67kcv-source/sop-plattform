@@ -47,7 +47,14 @@ const EINTRAEGE = [
     uebermittelt_am: null },
   { ...rahmen, art: 'ereignis', id: 'ereignis-501', quelle_id: 501, zeit: `${T1} 23:10:00`,
     status: null, bezeichnung: 'Feststellung', vorfall_am: `${T1} 22:50:00`,
-    text: 'Tür stand offen', hat_foto: true, uebermittelt_am: `${T1} 23:11:00` },
+    text: 'Tür stand offen', hat_foto: true, foto_geloescht: false,
+    uebermittelt_am: `${T1} 23:11:00` },
+  // Eine Meldung, deren Foto nach der Aufbewahrungsfrist entfernt wurde
+  // (ENT-545). Sie darf NICHT aussehen wie eine ohne Foto.
+  { ...rahmen, art: 'ereignis', id: 'ereignis-503', quelle_id: 503, zeit: `${T1} 23:05:00`,
+    status: null, bezeichnung: 'Feststellung', vorfall_am: null,
+    text: 'Ältere Meldung', hat_foto: false, foto_geloescht: true,
+    uebermittelt_am: `${T1} 23:06:00` },
   { ...rahmen, art: 'rundgang', id: 'rundgang-201', quelle_id: 201, zeit: `${T1} 22:40:00`,
     status: 'abgeschlossen', rohzeit_start: `${T1} 22:05:00`,
     rohzeit_ende: `${T1} 22:40:00`, pause_minuten: 4, abbruch_grund: null,
@@ -74,7 +81,7 @@ const EINTRAEGE = [
 const WACHBUCH = {
   status: 'ok', eintraege: EINTRAEGE, gezeigt: EINTRAEGE.length, gesamt: EINTRAEGE.length,
   gekuerzt: false, grenze: 400,
-  je_art: { scan: 3, rundgang: 2, aufgabe: 1, ereignis: 1 },
+  je_art: { scan: 3, rundgang: 2, aufgabe: 1, ereignis: 2 },
   quellen: { scans: 'ok', runden: 'ok', aufgaben: 'ok', ereignisse: 'ok' },
 };
 
@@ -174,12 +181,13 @@ check('KRITISCH: der neueste Tag steht zuoberst', tage[0] === dmy(T0));
 const zeiten = await page.$$eval('.wb-zeile .wb-zeit b', els => els.map(e => e.textContent.trim()));
 check('KRITISCH: innerhalb des Tages läuft die Zeit abwärts -- die Oberfläche '
   + 'sortiert die Serverantwort nicht um',
-  JSON.stringify(zeiten) === JSON.stringify(['02:40', '23:10', '22:40', '22:22', '22:20', '22:05', '21:55']));
-// Zwei Tage, sieben Vorgänge -- die Zahl am Tagestrenner zählt Vorgänge, und
+  JSON.stringify(zeiten) === JSON.stringify(
+    ['02:40', '23:10', '23:05', '22:40', '22:22', '22:20', '22:05', '21:55']));
+// Zwei Tage, acht Vorgänge -- die Zahl am Tagestrenner zählt Vorgänge, und
 // zwar nur die dieses Tages.
 const tagZahl = await page.$$eval('.wb-tag span', els => els.map(e => e.textContent.trim()));
 check('Jeder Tag nennt, wie viele Vorgänge auf ihn entfallen',
-  tagZahl[0] === '1 Vorgang' && tagZahl[1] === '6 Vorgänge');
+  tagZahl[0] === '1 Vorgang' && tagZahl[1] === '7 Vorgänge');
 
 // ══════════════ DIE AUSSAGE STEHT IM SATZ, NICHT NUR IN DER FARBE
 const saetze = await page.$$eval('.wb-zeile .wb-satz', els => els.map(e => e.textContent.replace(/\s+/g, ' ').trim()));
@@ -407,6 +415,20 @@ check('KRITISCH: das Ereignisfoto ist im Fenster wirklich zu sehen',
     const i = document.querySelector('#wbDrFoto img');
     return !!i && i.naturalWidth > 0 && i.getBoundingClientRect().width > 0;
   }));
+/* Die wichtigste Hausregel an dieser Stelle (ENT-545): „entfernt" und „gab
+   es nie" duerfen nicht gleich aussehen. Ohne diesen Satz waere die Zeile
+   einer Meldung, deren Foto die Frist erreicht hat, von einer ohne Foto
+   nicht zu unterscheiden. */
+check('KRITISCH: ein nach der Frist entferntes Foto wird in der Zeile benannt',
+  await page.evaluate(() => {
+    const z = [...document.querySelectorAll('.wb-zeile')].find(x => x.dataset.wb === 'ereignis-503');
+    return !!z && /Aufbewahrungsfrist/.test(z.textContent);
+  }));
+check('KRITISCH: eine Meldung ganz ohne Foto sagt dagegen gar nichts dazu',
+  await page.evaluate(() => {
+    const z = [...document.querySelectorAll('.wb-zeile')].find(x => x.dataset.wb === 'aufgabe-401');
+    return !!z && !/Foto/.test(z.textContent);
+  }));
 check('Das Wort „vorhanden" ersetzt das Bild nicht mehr',
   !(await page.textContent('#drawer')).includes('vorhanden'));
 // Gemessen, nicht im Quelltext nachgelesen (CLAUDE.md): ".sig-box img"
@@ -530,7 +552,7 @@ check('KRITISCH: jede Art nennt ihre WIRKLICHE Zahl im Zeitraum, auch die '
   + 'ausgeblendete -- sonst sähe man nicht, dass hinter dem Filter etwas liegt',
   await page.evaluate(() => {
     const n = a => document.querySelector(`.wb-art[data-art="${a}"] .n`).textContent.trim();
-    return n('scan') === '3' && n('rundgang') === '2' && n('aufgabe') === '1' && n('ereignis') === '1';
+    return n('scan') === '3' && n('rundgang') === '2' && n('aufgabe') === '1' && n('ereignis') === '2';
   }));
 
 // ══════════════ VIER LEERE ZUSTÄNDE, VIER VERSCHIEDENE TEXTE

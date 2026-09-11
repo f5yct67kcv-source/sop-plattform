@@ -45,6 +45,76 @@ const EREIGNISART_PARALLELRUNDE = 'Rundgang trotz anderer Einteilung';
    gelten fuer die Lohnabrechnung, nicht fuer Aufenthaltsdaten. */
 const RUNDGANG_SPUR_TAGE = 90;
 
+/* Wie lange das Foto einer Ereignismeldung aufbewahrt wird (ENT-545).
+   Vorgabe des Projektinhabers: „Aufbewahrungsfrist fuer Ereignisfotos auf
+   90 Tage wie die Spur." Dieselbe Zahl, derselbe Gedanke -- und trotzdem
+   zwei Konstanten und nicht eine: Es sind zwei Entscheidungen ueber zwei
+   verschiedene Daten. Wuerde die eine spaeter geaendert, aenderte eine
+   gemeinsame Konstante stillschweigend auch die andere mit.
+
+   ZWEI Unterschiede zur Spur, beide wesentlich:
+
+   1. Geloescht wird das FOTO, nicht die MELDUNG. Die Meldung ist der
+      Nachweis -- was beobachtet wurde, wann, von wem, an welchem Objekt.
+      Sie bleibt. Nur das Bild verschwindet, und das ist der Teil, der
+      Personen, fremdes Eigentum oder ein Kennzeichen zeigen kann (OP-544).
+
+   2. Dass es EINES GAB, bleibt stehen (foto_geloescht_am). Ohne diese
+      Spalte saehe eine Meldung nach 90 Tagen genauso aus wie eine, zu der
+      nie jemand ein Foto gemacht hat -- „geloescht" und „gab es nie" waeren
+      dieselbe Anzeige. Das ist die Hausregel, die hier am oeftesten
+      gebrochen wurde: „unbekannt darf nie wie keine aussehen". */
+const EREIGNIS_FOTO_TAGE = 90;
+
+/* Abgelaufene Ereignisfotos wegraeumen.
+
+   Bewusst am Schreibweg und nicht in einem separaten Aufraeumlauf --
+   gleiche Begruendung wie bei der Spur (ENT-318): Ein Loeschauftrag, den
+   jemand von Hand starten muss, wird nie gestartet, und dann liegen Bilder
+   jahrelang herum, obwohl ihre Frist laengst um ist. Bei einer
+   Aufbewahrungsfrist ist das kein Schoenheitsfehler, sondern der Verlust
+   der Frist selbst.
+
+   UPDATE und nicht DELETE: siehe oben, Punkt 1.
+
+   LIMIT, damit ein einzelner Aufruf nicht in eine lange Sperre laeuft --
+   Fotos sind LONGBLOBs, und ein Rundumschlag ueber Jahre haenge an einer
+   Tabelle, auf die gleichzeitig gemeldet wird.
+
+   Der Aufrufer bekommt nichts zurueck und darf nicht scheitern: Das
+   Aufraeumen ist Beiwerk seines eigentlichen Auftrags. */
+function ereignis_fotos_aufraeumen(PDO $pdo): void
+{
+    try {
+        if (!hat_tabelle($pdo, 'ereignis_meldung')
+            || !hat_spalte($pdo, 'ereignis_meldung', 'foto_geloescht_am')) { return; }
+        // Die Grenze wird in PHP gerechnet und nicht mit DATE_SUB(NOW())
+        // im SQL: So laesst sich diese Funktion WIRKLICH ausfuehren und
+        // pruefen (pruef_ereignis_foto_frist.php laeuft gegen SQLite), statt
+        // dass eine Pruefung nur nachliest, dass der Code dasteht.
+        $grenze = date('Y-m-d H:i:s', strtotime('-' . EREIGNIS_FOTO_TAGE . ' days'));
+        // Erst suchen, dann leeren -- statt "UPDATE ... LIMIT", das es nur in
+        // MySQL gibt. Die Begrenzung bleibt: Fotos sind LONGBLOBs, und ein
+        // Rundumschlag ueber Jahre haenge an einer Tabelle, auf die
+        // gleichzeitig gemeldet wird.
+        $suchen = $pdo->prepare(
+            'SELECT id FROM ereignis_meldung
+              WHERE foto IS NOT NULL AND erfasst_am < ?
+              ORDER BY erfasst_am LIMIT 200'
+        );
+        $suchen->execute([$grenze]);
+        $faellig = $suchen->fetchAll(PDO::FETCH_COLUMN);
+        if (!$faellig) { return; }
+        $pdo->prepare(
+            'UPDATE ereignis_meldung
+                SET foto = NULL, foto_mime = NULL, foto_geloescht_am = ?
+              WHERE id IN (' . implode(',', array_fill(0, count($faellig), '?')) . ')'
+        )->execute(array_merge([date('Y-m-d H:i:s')], $faellig));
+    } catch (Throwable $e) {
+        // Das Aufraeumen darf den Aufrufer nicht scheitern lassen.
+    }
+}
+
 // Haversine-Distanz in Metern zwischen zwei Koordinaten.
 function geo_distanz_meter(float $lat1, float $lng1, float $lat2, float $lng2): float
 {
@@ -984,6 +1054,11 @@ function wachbuch_eintraege(PDO $pdo, string $von, string $bis,
                 . implode(',', array_fill(0, count(RUNDGANG_OFFENE_STATUS), '?')) . '))';
             $zWerte = array_merge($zWerte, RUNDGANG_OFFENE_STATUS);
         }
+        // Die Spalte kommt mit ENT-545 dazu; fehlt sie noch, gilt „nicht
+        // geloescht" -- dieselbe Vorsicht wie bei rundgang_scan.foto_mime
+        // weiter oben. Eine fehlende Spalte darf die Chronik nicht abwerfen.
+        $weg = hat_spalte($pdo, 'ereignis_meldung', 'foto_geloescht_am')
+            ? 'v.foto_geloescht_am' : 'NULL';
         $rumpf = "FROM ereignis_meldung v
                   JOIN objekte o ON o.id = v.objekt_id
                   JOIN mitarbeiter m ON m.id = v.mitarbeiter_id
@@ -994,7 +1069,7 @@ function wachbuch_eintraege(PDO $pdo, string $von, string $bis,
                  WHERE v.erfasst_am >= ? AND v.erfasst_am <= ?" . $zWo;
         $t = wachbuch_quelle($pdo,
             "SELECT v.id, v.erfasst_am AS zeit, v.vorfall_am, v.uebermittelt_am,
-                    v.bemerkung, v.foto_mime, v.lat, v.lng,
+                    v.bemerkung, v.foto_mime, $weg AS foto_geloescht_am, v.lat, v.lng,
                     ea.bezeichnung AS art_name,
                     v.rundgang_id, rv.name AS rundgang_name,
                     rv.fenster_von, rv.fenster_bis,
@@ -1027,6 +1102,9 @@ function wachbuch_eintraege(PDO $pdo, string $von, string $bis,
                     'vorfall_am'      => $z['vorfall_am'],
                     'text'            => $z['bemerkung'],
                     'hat_foto'        => $z['foto_mime'] !== null,
+                    // „Es gab eines, die Frist ist um" ist etwas anderes als
+                    // „es gab nie eines" (ENT-545).
+                    'foto_geloescht'  => $z['foto_geloescht_am'] !== null,
                 ];
             }
         }

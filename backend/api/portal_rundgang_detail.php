@@ -139,9 +139,14 @@ $punkte = array_map(static fn(array $k): array => [
 // Das Foto selbst bleibt draussen -- es waere ein LONGBLOB je Zeile.
 $ereignisse = [];
 if (hat_tabelle($pdo, 'ereignis_meldung')) {
+    // ENT-545: Auch der Kunde soll „Foto nach 90 Tagen entfernt" sehen und
+    // nicht denselben leeren Platz wie bei einer Meldung ohne Foto.
+    $weg = hat_spalte($pdo, 'ereignis_meldung', 'foto_geloescht_am')
+        ? 'em.foto_geloescht_am IS NOT NULL' : '0';
     $eStmt = $pdo->prepare(
         'SELECT em.id, em.erfasst_am, em.bemerkung,
-                em.foto_mime IS NOT NULL AS hat_foto, ea.bezeichnung AS art
+                em.foto_mime IS NOT NULL AS hat_foto,
+                ' . $weg . ' AS foto_geloescht, ea.bezeichnung AS art
            FROM ereignis_meldung em
            LEFT JOIN ereignisart ea ON ea.id = em.ereignisart_id
           WHERE em.rundgang_id = ?
@@ -155,6 +160,7 @@ if (hat_tabelle($pdo, 'ereignis_meldung')) {
             'art'        => $e['art'],
             'bemerkung'  => $e['bemerkung'],
             'hat_foto'   => (bool)$e['hat_foto'],
+            'foto_geloescht' => (bool)$e['foto_geloescht'],
         ];
     }
 }

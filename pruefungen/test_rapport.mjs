@@ -166,7 +166,15 @@ const DETAIL41 = { status: 'ok', rundgang: {
   ],
   ereignisse: [
     { id: 77, erfasst_am: heute + ' 22:55:00', vorfall_am: null,
-      bemerkung: 'Scheibe beschädigt', hat_foto: true, art: 'Sachbeschädigung' },
+      bemerkung: 'Scheibe beschädigt', hat_foto: true, foto_geloescht: false,
+      art: 'Sachbeschädigung' },
+    // Eine Meldung, deren Foto nach der Aufbewahrungsfrist entfernt wurde
+    // (ENT-545). Sie darf im Rapport NICHT aussehen wie eine, zu der nie
+    // jemand fotografiert hat -- sonst liest der Kunde aus demselben leeren
+    // Platz zwei verschiedene Sachverhalte.
+    { id: 78, erfasst_am: heute + ' 23:05:00', vorfall_am: null,
+      bemerkung: 'Aeltere Meldung', hat_foto: false, foto_geloescht: true,
+      art: 'Feststellung' },
   ],
   // Zustellnachweis (ENT-491). Veraenderlich, weil VIER Zustaende vier
   // verschiedene Texte ergeben muessen -- unten wird jeder einzeln gesetzt.
@@ -465,6 +473,14 @@ check('KRITISCH: und nicht verzerrt -- ein gestauchtes Beweisstück sagt etwas a
   blattBilder.every(b => Math.abs((b.breite / b.hoehe) - (400 / 300)) < 0.05));
 check('Beide Bilder sind gleich gross -- zwei Grössen wären zwei Aussagen darüber, welches zählt',
   blattBilder.length === 2 && blattBilder[0].breite === blattBilder[1].breite);
+/* Die wichtigste Hausregel an dieser Stelle (ENT-545): Ein Foto, das wegen
+   der Aufbewahrungsfrist entfernt wurde, darf im Rapport nicht denselben
+   leeren Platz hinterlassen wie eine Meldung ohne Foto. Sonst liest der
+   Kunde aus demselben Nichts zwei verschiedene Sachverhalte. */
+check('KRITISCH: ein nach der Frist entferntes Foto wird im Rapport benannt, nicht verschwiegen',
+  /Aufbewahrungsfrist/.test(blatt));
+check('KRITISCH: und die Meldung selbst steht weiterhin im Rapport',
+  /Aeltere Meldung/.test(blatt));
 // Der Entscheid des Projektinhabers zu ENT-322: keine KARTE im Rapport.
 // Beim ersten Anlauf verbot diese Prüfung jedes Bild -- und schlug damit an,
 // als in ENT-329 der Fotobeleg dazukam, der ausdrücklich gewollt ist. Eine

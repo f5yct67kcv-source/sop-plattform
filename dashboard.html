@@ -20251,6 +20251,16 @@ function wbSatz(e) {
    ist im Haus neutral, ein Ersatzscan eine Warnung, ein Abbruch die
    schwerste Stufe. Haette das Wachbuch eine eigene Bewertung, saehe
    derselbe Vorgang je nach Ansicht verschieden schlimm aus. */
+/* Was dasteht, wenn das Foto wegen der Aufbewahrungsfrist entfernt wurde
+   (ENT-545). Eigener Satz und nicht einfach nichts: „geloescht" und „gab es
+   nie" duerfen nicht gleich aussehen -- die Hausregel, die hier am oeftesten
+   gebrochen wurde.
+
+   Die ZAHL steht bewusst nicht im Text. Sie lebt in EREIGNIS_FOTO_TAGE
+   (backend/rundgang.php); zweimal geschrieben liefe sie irgendwann
+   auseinander, und der Satz bliebe stehen und waere falsch. */
+const FOTO_WEG_TEXT = 'Foto wegen der Aufbewahrungsfrist entfernt';
+
 const WB_STATUS_CHIP = {
   nicht_verfuegbar: ['chip-n', 'Nicht verfügbar'],
   ersatzscan:       ['chip-w', 'Ersatzscan'],
@@ -20318,6 +20328,7 @@ function wbZusatz(e) {
   }
   if (e.text) { teile.push(`<span class="grund">${esc(e.text)}</span>`); }
   if (e.hat_foto) { teile.push('<span class="grund">mit Foto</span>'); }
+  else if (e.foto_geloescht) { teile.push(`<span class="grund">${esc(FOTO_WEG_TEXT)}</span>`); }
   // Der Vorfallzeitpunkt ergaenzt den Erfassungszeitpunkt, er ersetzt ihn nie
   // (ENT-295): einsortiert ist die Zeile nach dem Erfassen.
   if (e.vorfall_am) { teile.push(`<span class="grund">Vorfall ${esc(dmy(e.vorfall_am))}, ${esc(wbHm(e.vorfall_am))}</span>`); }
@@ -20550,6 +20561,9 @@ function wbOeffnen(id) {
      komme nur nicht heran" ist etwas anderes als „es gibt keines". */
   const fotoQuelle = e.hat_foto ? (WB_FOTO_QUELLE[e.art] || null) : null;
   if (e.hat_foto && !fotoQuelle) { zeilen.push(['Foto', 'vorhanden']); }
+  if (!e.hat_foto && e.foto_geloescht) {
+    zeilen.push(['Foto', `<span style="color:var(--ink-3)">${esc(FOTO_WEG_TEXT)}</span>`]);
+  }
 
   $('drBody').innerHTML =
     `<div class="wb-dr-kopf">
@@ -21024,7 +21038,9 @@ function rgdEreignisHtml(e) {
     + (e.hat_foto && e.id
       ? '<div class="rgd-foto-huelle" id="rgdEvFoto' + Number(e.id) + '">'
         + '<span class="mut" style="font-size:12.5px">Foto wird geladen …</span></div>'
-      : '')
+      : (e.foto_geloescht
+        ? '<div class="bem">' + esc(FOTO_WEG_TEXT) + '</div>'
+        : ''))
     + '</div></div>';
 }
 
@@ -21220,7 +21236,11 @@ function rapportBlattFuellen(d) {
           ? `<img src="${rgdEreignisFotos[e.id]}" alt="Foto zur Ereignismeldung" style="${blattFoto}">`
           // „Vorhanden, aber nicht abrufbar" ist etwas anderes als „kein
           // Foto" -- der Satz sagt darum nicht, es gebe keines.
-          : '<div style="font-size:12px;color:#6B7280;margin-top:3px">Foto vorhanden (nicht abrufbar)</div>') : ''}</td>
+          : '<div style="font-size:12px;color:#6B7280;margin-top:3px">Foto vorhanden (nicht abrufbar)</div>')
+          // Und „nach der Frist entfernt" ist eine dritte Aussage (ENT-545).
+          : (e.foto_geloescht
+            ? `<div style="font-size:12px;color:#6B7280;margin-top:3px">${esc(FOTO_WEG_TEXT)}</div>`
+            : '')}</td>
     </tr>`).join('');
 
   $('rapportBlatt').innerHTML = `
@@ -26814,7 +26834,11 @@ function evfZeichnen(liste) {
         <td>${esc(e.person || '')}</td>
         <td style="text-align:right">${e.hat_foto
           ? '<svg class="i i-sm" viewBox="0 0 24 24" aria-label="mit Foto"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'
-          : ''}</td>
+          // Ein leeres Feld hiesse „hatte nie eines" -- das Kuerzel sagt,
+          // dass die Frist um ist (ENT-545). Der volle Satz steht im Detail.
+          : (e.foto_geloescht
+            ? `<span class="mut" style="font-size:11.5px" title="${esc(FOTO_WEG_TEXT)}">Foto entfernt</span>`
+            : '')}</td>
       </tr>`).join('')}</tbody></table>`;
   evfListeDaten = liste;
 }
@@ -26845,7 +26869,9 @@ function evfDetail(id) {
     '<dl class="dl">' + zeilen.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('') + '</dl>'
     + (e.hat_foto
       ? '<div class="sig-box"><div class="lb">Foto</div><div id="evfFoto"><span class="zone-note">wird geladen …</span></div></div>'
-      : '');
+      : (e.foto_geloescht
+        ? `<div class="sig-box"><div class="lb">Foto</div><div class="zone-note">${esc(FOTO_WEG_TEXT)}</div></div>`
+        : ''));
   $('drFoot').innerHTML = e.gesehen_am
     ? `<div class="zone-note">Als gesehen vermerkt am ${esc(dmyZeit(e.gesehen_am))}</div>`
     : '';

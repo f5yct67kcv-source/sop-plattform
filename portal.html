@@ -1817,6 +1817,11 @@ const fotoZwischen = {};
    vergleicht die beiden Stellen gegeneinander. */
 const BLATT_FOTO = 'max-width:440px;max-height:320px;border:1px solid #E5E8EC;'
   + 'border-radius:4px;display:block;margin-top:8px';
+/* Was dasteht, wenn das Foto wegen der Aufbewahrungsfrist entfernt wurde
+   (ENT-545). Eigener Satz und nicht einfach nichts: „entfernt" und „gab es
+   nie" duerfen nicht gleich aussehen. Die ZAHL steht bewusst nicht im Text
+   -- sie lebt in EREIGNIS_FOTO_TAGE im Server. */
+const FOTO_WEG_TEXT = 'Foto wegen der Aufbewahrungsfrist entfernt';
 /* Ein Bild, das die Seitengrenze kreuzt, wird von html2pdf stumpf
    zerschnitten -- bei 200 px fiel das kaum auf, bei 440 px halbiert es das
    Beweisstueck. Die Optionen enthalten den Modus "css", also wirkt
@@ -2348,7 +2353,9 @@ function eZeileHtml(e) {
     + (e.hat_foto
       ? '<div class="v-foto" id="ef' + Number(e.id) + '">'
         + '<span class="d-hinweis">Foto wird geladen …</span></div>'
-      : '')
+      : (e.foto_geloescht
+        ? '<div class="e-bem">' + esc(FOTO_WEG_TEXT) + '</div>'
+        : ''))
     + '</div></div>';
 }
 
@@ -2797,7 +2804,10 @@ function blattFuellen(d, bk) {
         ? '<img src="' + fotoZwischen['ereignis-' + e.id] + '" alt="Foto zur Ereignismeldung"'
           + ' style="' + BLATT_FOTO + '">'
         : '<div style="font-size:12px;color:#6B7280;margin-top:3px">Foto vorhanden</div>')
-      : '')
+      // Dritte Aussage: nach der Frist entfernt (ENT-545).
+      : (e.foto_geloescht
+        ? '<div style="font-size:12px;color:#6B7280;margin-top:3px">' + esc(FOTO_WEG_TEXT) + '</div>'
+        : ''))
     + '</td></tr>').join('');
 
   const logo = bk.logo

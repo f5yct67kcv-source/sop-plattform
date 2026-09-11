@@ -149,9 +149,16 @@ const DETAILS = {
       punkt(5, 'Waschküche', null, null),
       punkt(6, 'Rückseite Veloraum', null, null),
     ],
-    ereignisse: [{ id: 77, erfasst_am: `${vorTagen(5)} 21:36:00`,
-                   art: 'Sachbeschädigung', bemerkung: 'Scheibe im Treppenhaus beschädigt',
-                   hat_foto: true }],
+    ereignisse: [
+      { id: 77, erfasst_am: `${vorTagen(5)} 21:36:00`,
+        art: 'Sachbeschädigung', bemerkung: 'Scheibe im Treppenhaus beschädigt',
+        hat_foto: true, foto_geloescht: false },
+      // Eine Meldung, deren Foto nach der Aufbewahrungsfrist entfernt wurde
+      // (ENT-545). Beim Kunden darf sie NICHT aussehen wie eine ohne Foto.
+      { id: 78, erfasst_am: `${vorTagen(5)} 21:44:00`,
+        art: 'Feststellung', bemerkung: 'Ältere Meldung',
+        hat_foto: false, foto_geloescht: true },
+    ],
   }),
   // Runde 12: vollstaendig, aber ein Punkt nur per Fotobeleg.
   12: rumpf(12, vorTagen(8), {
@@ -787,6 +794,12 @@ check('KRITISCH: es kommt vom Ereignis-Endpunkt, mit der Ereignisnummer',
   calls.some(c => c.path.includes('portal_ereignis_foto') && /ereignis_id=77/.test(c.suche || '')));
 check('Der Satz „Mit Foto festgehalten" steht nicht mehr anstelle des Bildes',
   !/Mit Foto festgehalten/.test(detail2));
+/* Die wichtigste Hausregel an dieser Stelle (ENT-545): „entfernt" und „gab
+   es nie" duerfen beim Kunden nicht gleich aussehen. */
+check('KRITISCH: ein nach der Frist entferntes Foto wird benannt, nicht verschwiegen',
+  /Aufbewahrungsfrist/.test(detail2));
+check('KRITISCH: und die Meldung selbst bleibt sichtbar',
+  /Ältere Meldung/.test(detail2));
 // Der Abbruchgrund im KLARTEXT, nicht als Codewort -- und oben, nicht als
 // Fussnote: Er ist die wichtigste Aussage über die Runde.
 // Der Klartext SELBST wird serverseitig geprueft (test_php.mjs und
@@ -1045,6 +1058,9 @@ await page.waitForTimeout(300);
 const bilder11 = await blattBilderMessen();
 check('KRITISCH: das Ereignisfoto steht im Blatt des Kunden, nicht nur das Wort „Mit Foto"',
   bilder11.some(b => /Ereignismeldung/.test(b.alt) && b.dekodiert));
+const blatt11 = await page.textContent('#blatt');
+check('KRITISCH: ein nach der Frist entferntes Foto wird auch im Blatt benannt',
+  /Aufbewahrungsfrist/.test(blatt11) && /Ältere Meldung/.test(blatt11));
 
 /* Gemessen, nicht nachgelesen. Das Blatt ist 760 px breit und wird auf
    190 mm Nutzbreite gesetzt -- rund 0,25 mm je Pixel. Unter 300 px waere das

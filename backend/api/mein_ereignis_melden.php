@@ -123,4 +123,10 @@ foreach ($meldungen as $m) {
     }
 }
 
+// Abgelaufene Fotos wegraeumen (ENT-545). Auch hier und nicht nur im
+// Positions-Endpunkt: Dies ist die Stelle, an der Ereignisfotos ENTSTEHEN.
+// Ein Betrieb, der meldet aber keine Ortung laufen laesst, raeumte sonst nie
+// auf -- und haette eine Aufbewahrungsfrist nur auf dem Papier.
+ereignis_fotos_aufraeumen($pdo);
+
 json_response(['status' => 'ok', 'ergebnisse' => $ergebnisse]);

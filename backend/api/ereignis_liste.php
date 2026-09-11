@@ -46,9 +46,14 @@ if ($objektId > 0) { $wo[] = 'v.objekt_id = ?'; $werte[] = $objektId; }
 $artId = (int)($_GET['ereignisart_id'] ?? 0);
 if ($artId > 0) { $wo[] = 'v.ereignisart_id = ?'; $werte[] = $artId; }
 
+// ENT-545: „Foto nach der Aufbewahrungsfrist entfernt" ist eine andere
+// Aussage als „es gab keines". Die Spalte kann auf einer noch nicht
+// eingerichteten Datenbank fehlen, darum der Vorabtest.
+$weg = hat_spalte($pdo, 'ereignis_meldung', 'foto_geloescht_am')
+    ? 'v.foto_geloescht_am' : 'NULL';
 $sql =
     'SELECT v.id, v.erfasst_am, v.vorfall_am, v.uebermittelt_am, v.bemerkung,
-            v.lat, v.lng, v.gesehen_am, v.foto_mime,
+            v.lat, v.lng, v.gesehen_am, v.foto_mime, ' . $weg . ' AS foto_geloescht_am,
             v.objekt_id, o.name AS objekt_name, o.kunde_name, o.ort,
             v.ereignisart_id, a.bezeichnung AS art,
             v.rundgang_id, v.einsatz_id,
@@ -83,6 +88,7 @@ $liste = array_map(static function (array $r): array {
         'rundgang_id'     => $r['rundgang_id'] !== null ? (int)$r['rundgang_id'] : null,
         'einsatz_id'      => $r['einsatz_id'] !== null ? (int)$r['einsatz_id'] : null,
         'hat_foto'        => $r['foto_mime'] !== null,
+        'foto_geloescht'  => $r['foto_geloescht_am'] !== null,
         'lat'             => $r['lat'] !== null ? (float)$r['lat'] : null,
         'lng'             => $r['lng'] !== null ? (float)$r['lng'] : null,
     ];

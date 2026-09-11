@@ -901,6 +901,10 @@ CREATE TABLE IF NOT EXISTS kunden_kontaktweg (
   bemerkung TEXT NULL,
   foto LONGBLOB NULL,
   foto_mime VARCHAR(50) NULL,
+  -- Wann das Foto wegen der Aufbewahrungsfrist entfernt wurde (ENT-545).
+  -- Ohne diese Spalte saehe eine Meldung nach 90 Tagen aus wie eine, zu der
+  -- nie jemand ein Foto gemacht hat.
+  foto_geloescht_am DATETIME NULL,
   lat DECIMAL(10,7) NULL,
   lng DECIMAL(10,7) NULL,
   KEY idx_objekt (objekt_id, erfasst_am),
@@ -2581,6 +2585,11 @@ $spalten = [
     // Dasselbe fuer Vorfallmeldungen (ENT-297): Sie erscheinen im Feed und
     // muessen sich dort abhaken lassen wie alles andere auch.
     ['ereignis_meldung', 'gesehen_am', 'ALTER TABLE ereignis_meldung ADD COLUMN gesehen_am DATETIME NULL'],
+    // Aufbewahrungsfrist fuer Ereignisfotos (ENT-545): Nach 90 Tagen wird das
+    // Bild entfernt, die Meldung bleibt. Der Zeitpunkt haelt fest, DASS es
+    // eines gab -- „geloescht" und „gab es nie" duerfen nicht gleich aussehen.
+    ['ereignis_meldung', 'foto_geloescht_am',
+     'ALTER TABLE ereignis_meldung ADD COLUMN foto_geloescht_am DATETIME NULL'],
 
     // Explizite Berechtigung "macht Revierdienst" (ENT-284) -- ersetzt die
     // bisherige Herleitung aus der Schicht-Historie (ENT-234) als einzige
