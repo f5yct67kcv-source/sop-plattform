@@ -53,6 +53,24 @@ $vorlageId = $rundgang['rundgang_vorlage_id'] !== null ? (int)$rundgang['rundgan
 // Wiedereinstieg nur deren Punkte, in ihrer eigenen Reihenfolge -- sonst
 // saehe der Wiedereinstieg nach dem Reload wieder alle Objekt-Punkte, obwohl
 // nur die Runde begonnen wurde.
+// Name und Zeitfenster der gewaehlten Kontrollrunde (ENT-541). Der Kopf der
+// laufenden Runde nennt beides; bis hierher kannte der Wiedereinstieg nur
+// die Punkte. Ohne Vorlage bleiben beide null -- die Runde umfasst dann alle
+// aktiven Punkte des Objekts, und die App sagt genau DAS, statt die Zeile
+// leer zu lassen ("unbekannt" darf nie wie "keine" aussehen).
+$rundgang['vorlage_name'] = null;
+$rundgang['fenster_von']  = null;
+$rundgang['fenster_bis']  = null;
+if ($vorlageId !== null) {
+    $vStmt = $pdo->prepare('SELECT name, fenster_von, fenster_bis FROM rundgang_vorlage WHERE id = ?');
+    $vStmt->execute([$vorlageId]);
+    $v = $vStmt->fetch(PDO::FETCH_ASSOC);
+    if ($v) {
+        $rundgang['vorlage_name'] = $v['name'];
+        $rundgang['fenster_von']  = $v['fenster_von'];
+        $rundgang['fenster_bis']  = $v['fenster_bis'];
+    }
+}
 if ($vorlageId !== null) {
     $alle = $pdo->prepare(
         'SELECT k.id, k.bezeichnung, p.reihenfolge, k.typ, k.lat, k.lng, k.geofence_radius_m FROM kontrollpunkt k

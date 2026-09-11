@@ -29,6 +29,9 @@ declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../rechte.php';
 require_once __DIR__ . '/../push.php';
+require_once __DIR__ . '/../betreiber.php';
+require_once __DIR__ . '/../mailer.php';
+require_once __DIR__ . '/../supportvorgang.php';
 
 // Beim Deploy ersetzt. Ungesetzt heisst: Der Zeitgeber-Weg ist zu.
 const PUSH_ZEITGEBER_SCHLUESSEL = '__PUSH_CRON_SCHLUESSEL__';
@@ -66,8 +69,38 @@ if ($lage !== 'ok') {
 $pdo = db();
 $jetzt = date('Y-m-d H:i:s');
 
+/* ── Zweite Aufgabe desselben Zeitgebers: Supportvorgaenge (ENT-538) ──
+
+   WARUM HIER UND NICHT IN EINEM EIGENEN ENDPUNKT: Ein zweiter Endpunkt
+   braeuchte einen zweiten Cronjob -- und der Kommentar oben nennt den
+   Grund, warum das schlecht waere: Ein Zeitgeber, den niemand eingerichtet
+   hat, ist eine stille Luecke. Einen einzurichten ist ein Handgriff, an
+   den sich jemand erinnern muss; zwei sind zwei.
+
+   WARUM VOR DEN PUSH-AUSSTEIGERN: Direkt darunter beendet der Endpunkt
+   sich, wenn die Push-Tabellen fehlen oder der Push-Schluessel nicht
+   gesetzt ist. Beides sagt nichts ueber den Support aus. Stuende der
+   Nachlauf weiter unten, liefe er auf jeder Anlage ohne Push nie -- und
+   das faellt nicht auf, weil nichts rot wird. Es passiert einfach nichts.
+
+   Der Nachlauf schreibt in die BETREIBER-Datenbank, nicht in die des
+   Mandanten. Fehlt sie oder fehlen die Tabellen, meldet er das und bricht
+   nichts ab. */
+$supportNachlauf = ['eingerichtet' => false, 'erinnert' => 0];
+try {
+    $supportNachlauf = sv_erinnerungen_versenden(betreiber_db(), basis_url());
+} catch (Throwable $e) {
+    // Ein Fehler im Support-Nachlauf darf den Push-Versand nicht aufhalten
+    // -- die beiden haben nichts miteinander zu tun ausser der Uhr. Was
+    // schiefging, steht in der Antwort, nicht in der Mitteilung an
+    // irgendjemanden.
+    $supportNachlauf = ['eingerichtet' => false, 'erinnert' => 0,
+                        'fehler' => db_fehlermeldung($e)];
+}
+
 if (!hat_tabelle($pdo, 'mitteilungen') || !hat_tabelle($pdo, 'push_abo')) {
     json_response(['status' => 'ok', 'eingerichtet' => false, 'verschickt' => 0,
+        'support' => $supportNachlauf,
         'meldung' => 'Die Tabellen fehlen — einmal „Einrichtung" ausführen.']);
 }
 if (!push_konfiguriert()) {
@@ -76,6 +109,7 @@ if (!push_konfiguriert()) {
     // Aber auch nicht als Erfolg -- die Antwort sagt ausdruecklich, dass
     // nichts eingerichtet ist.
     json_response(['status' => 'ok', 'eingerichtet' => false, 'verschickt' => 0,
+        'support' => $supportNachlauf,
         'meldung' => 'Auf dem Server fehlt der Push-Schlüssel.']);
 }
 
@@ -95,4 +129,5 @@ json_response([
     'eingerichtet' => true,
     'verschickt'   => count($bilanzen),
     'mitteilungen' => $bilanzen,
+    'support'      => $supportNachlauf,
 ]);

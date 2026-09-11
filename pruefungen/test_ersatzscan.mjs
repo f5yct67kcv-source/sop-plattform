@@ -93,6 +93,17 @@ await page.click('#blRundgang button');
 await page.waitForTimeout(300);
 
 // ══════════ NFC-PUNKT: ERSATZSCAN IST DIE EINZIGE ALTERNATIVE ZU "NICHT VERFUEGBAR"
+// Seit ENT-541 zeigt eine Zeile ihre Knoepfe erst, wenn sie an der Reihe
+// ist oder angetippt wurde. Punkt 1 ist hier der naechste, Punkt 2 also
+// zugeklappt -- ein Tipp auf die Zeile bringt dieselben Knoepfe wie zuvor.
+check('KRITISCH: die zugeklappte Zeile zeigt keine Knöpfe, aber ihre Bezeichnung',
+  await page.evaluate(() => {
+    const z = document.querySelectorAll('#rdListe .rd-zeile')[1];
+    return !!z && z.querySelectorAll('.rd-akt button').length === 0
+      && (z.querySelector('.rd-bez') || {}).textContent === 'Kellerraum';
+  }));
+await page.click('#rdKopf2');
+await page.waitForTimeout(250);
 check('NFC-Punkt (Kellerraum) hat keinen Bestaetigen-Knopf', !(await page.isVisible('#rdBtn2')));
 check('KRITISCH: NFC-Punkt bietet trotzdem einen Ersatzscan-Knopf an',
   await page.isVisible('#rdListe .rd-zeile:nth-child(2) button:has-text("Ersatzscan")'));
