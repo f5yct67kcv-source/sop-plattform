@@ -58,6 +58,9 @@ dashboard.html     Verwaltungsoberflaeche (Desktop, admin-only)
 manifest.json      PWA-Manifest
 sw.js              Service Worker (nur fuer die Installierbarkeit)
 icons/             App-Symbole
+handbuch/          Bedienungsanleitung fuers Cockpit (Erste Fassung, 11.09.2026).
+                   Eigenstaendige, noch NICHT deployte Dateisammlung -- steht
+                   nicht in deploy-hostpoint.yml. Siehe handbuch/index.html.
 
 backend/
   db.php              PDO-Verbindung + require_session()
