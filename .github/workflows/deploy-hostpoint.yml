@@ -311,6 +311,12 @@ jobs:
           # (api/demo_senden.php). Bewusst NICHT index.html: Die Wurzel
           # bleibt die Erfassung der Mitarbeitenden (Startadresse der PWA).
           cp homepage.html dist/homepage.html
+          # Betreiber-Bereich (ENT-519 bis ENT-521). Eigene Seite neben
+          # dashboard.html und portal.html, mit eigener Anmeldung gegen die
+          # betreiber_*-Endpunkte. Sie traegt weder Cockpit- noch
+          # Mitarbeiter- noch Portalcode -- dieselbe Trennung wie bei den
+          # Anmeldewegen selbst.
+          cp betreiber.html dist/betreiber.html
           # gav.js traegt die GAV-Regeln fuer BEIDE Oberflaechen (ENT-049).
           # Fehlt sie hier, laden dashboard.html und app.html ins Leere und
           # rechnen gar nichts mehr -- derselbe Fallstrick wie bei ENT-040.
@@ -385,6 +391,16 @@ jobs:
           # Wird nur von den portal_*-Endpunkten eingebunden, nie direkt
           # aufgerufen -- steht darum auch in der Sperrliste der .htaccess.
           cp backend/kundenportal.php dist/kundenportal.php
+          # Konten, Sitzungen und Mandantenstamm der Betreiber-Ebene
+          # (ENT-524). Wird nur von den betreiber_*-Endpunkten
+          # eingebunden, nie direkt aufgerufen -- steht darum auch in
+          # der Sperrliste der .htaccess.
+          cp backend/betreiber.php dist/betreiber.php
+          # Support-Freigabe (ENT-526). Wird von BEIDEN Seiten eingebunden --
+          # von den support_*-Endpunkten des Betriebs und von
+          # api/betreiber_support.php -- und nie direkt aufgerufen; steht
+          # darum auch in der Sperrliste der .htaccess.
+          cp backend/support.php dist/support.php
           # Pruefung und Mailtext der Demo-Anfrage (ENT-469), eingebunden
           # von api/demo_senden.php -- steht darum auch in der Sperrliste.
           # Der ENDPUNKT heisst bewusst anders: gleicher Name hiesse mitgesperrt.

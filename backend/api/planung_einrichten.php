@@ -27,6 +27,12 @@ require_once __DIR__ . '/../kunden.php';
 require_once __DIR__ . '/../produkte.php';
 require_once __DIR__ . '/../rundgang.php';
 require_once __DIR__ . '/../fahrzeug.php';
+// Betreiber-Ebene (ENT-529): Ihre Tabellen laufen beim Einrichtungsknopf
+// mit, solange der Bootstrap offen ist -- auf Wunsch des Projektinhabers,
+// weil zwei getrennte Knoepfe fuer einen einmaligen Vorgang einer zu viel
+// sind. Die Definitionen stehen im Modul, nicht hier: Sie werden auch vom
+// eigenen Endpunkt api/betreiber_einrichten.php benutzt.
+require_once __DIR__ . '/../betreiber.php';
 // Der Lohnartenkatalog steht in lohn.php, damit Pruefungen ihn erreichen
 // (ENT-451).
 require_once __DIR__ . '/../lohn.php';
@@ -1850,6 +1856,45 @@ CREATE TABLE IF NOT EXISTS lohnlauf_zeile (
   FOREIGN KEY (mitarbeiter_id) REFERENCES mitarbeiter(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+// ── Support-Freigabe (ENT-526) ────────────────────────────────────────
+//
+// Diese beiden Tabellen stehen hier -- in der Datenbank des BETRIEBS -- und
+// nicht beim Plattform-Betreiber. Der Grund steht ausfuehrlich im Kopf von
+// backend/support.php und ist der Kern der ganzen Sache: Laege die Freigabe
+// beim Betreiber, koennte er sie sich selbst ausstellen. Eine Sperre, die
+// der Gesperrte selbst oeffnet, ist keine.
+//
+// Dasselbe gilt fuer das Protokoll: Es gehoert dem Betrieb, der eingesehen
+// wurde. Er muss nachlesen koennen, wer wann was gesehen hat, ohne dafuer
+// jemanden fragen zu muessen.
+'support_freigabe' => "CREATE TABLE IF NOT EXISTS support_freigabe (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  -- Wer freigegeben hat: Name und Rolle aus der Sitzung, nie aus der
+  -- Anfrage.
+  freigegeben_von VARCHAR(200) NOT NULL,
+  freigegeben_am DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  -- Befristet. Eine Freigabe ohne Ende waere keine Freigabe, sondern ein
+  -- Dauerzugang.
+  gilt_bis DATETIME NOT NULL,
+  -- Wozu. Macht spaeter nachvollziehbar, warum jemand hineinsehen durfte.
+  zweck VARCHAR(500) NOT NULL DEFAULT '',
+  -- Widerruf wirkt sofort; die Zeile bleibt stehen, damit die Historie
+  -- vollstaendig ist.
+  widerrufen_am DATETIME NULL,
+  KEY idx_support_freigabe_lauf (widerrufen_am, gilt_bis)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+// Das Zugriffsprotokoll. Geschrieben wird VOR der Auslieferung, damit ein
+// Abbruch mitten im Ausliefern keine Luecke hinterlaesst.
+'support_zugriff' => "CREATE TABLE IF NOT EXISTS support_zugriff (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  freigabe_id INT UNSIGNED NOT NULL,
+  zeitpunkt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  wer VARCHAR(200) NOT NULL,
+  was VARCHAR(200) NOT NULL,
+  KEY idx_support_zugriff_freigabe (freigabe_id, zeitpunkt)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
 ];
 
 foreach ($tabellen as $name => $sql) {
@@ -2911,6 +2956,36 @@ foreach ($verweise as [$tabelle, $spalte, $sql]) {
     // arbeitet auch ohne ihn. Scheitert er -- etwa weil eine Tabelle noch
     // MyISAM ist --, darf das den Rest nicht aufhalten.
     schritt($pdo, $sql, "Verweis $tabelle.$spalte", $getan, $fehler);
+}
+
+// ── 3b. Betreiber-Ebene (ENT-529) ─────────────────────────────────────
+//
+// Laeuft NUR, solange der Bootstrap offen ist -- also bis das erste
+// Betreiber-Konto steht oder ein zweiter Mandant eingetragen ist. Danach
+// gehoert die Ebene nicht mehr in den Einrichtungsknopf eines Betriebs:
+// Ein zweiter Mandant darf sie nicht anlegen (be_bootstrap_offen, ENT-528).
+//
+// Ein Fehlschlag hier bricht die uebrige Einrichtung NICHT ab. Die
+// Betriebstabellen sind das Wichtigere; was hier schiefgeht, wird gemeldet
+// und laesst sich ueber api/betreiber_einrichten.php nachholen.
+try {
+    $stamm = betreiber_db();
+    if (be_bootstrap_offen($stamm)) {
+        $beErgebnis = be_tabellen_anlegen($stamm, $nurPruefen);
+        foreach ($beErgebnis['getan'] as $g)  { $getan[]  = 'Betreiber-Bereich: ' . $g; }
+        foreach ($beErgebnis['offen'] as $o)  { $getan[]  = 'Betreiber-Bereich: ' . $o; }
+        foreach ($beErgebnis['fehler'] as $f) { $fehler[] = 'Betreiber-Bereich: ' . $f; }
+
+        if (!$nurPruefen) {
+            $beName = be_bestandsmandant_eintragen($stamm, $pdo);
+            if ($beName !== null) { $getan[] = 'Betreiber-Bereich: dieser Betrieb als Mandant 1 eingetragen'; }
+        } elseif (hat_tabelle($stamm, 'mandant')
+               && (int)$stamm->query('SELECT COUNT(*) FROM mandant')->fetchColumn() === 0) {
+            $getan[] = 'Betreiber-Bereich: dieser Betrieb als Mandant 1';
+        }
+    }
+} catch (Throwable $e) {
+    $fehler[] = 'Betreiber-Bereich — ' . $e->getMessage();
 }
 
 // ── 4. Ergebnis. Fehlt am Schluss etwas, wird das gesagt statt verschwiegen.

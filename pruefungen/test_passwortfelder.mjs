@@ -92,20 +92,45 @@ check('Die laengere Mindestlaenge fuer Verwaltungszugaenge ist auffindbar', serv
 // PASSWORT_MIN und haette eine korrekte 16 dort als Abweichung gemeldet --
 // eine Pruefung, die den richtigen Zustand beanstandet, wird irgendwann
 // weggeklickt.
-const ERWARTET = datei => datei === 'backend/setup.html' ? serverMinAdmin : serverMin;
+// Welche Zahl an einer Fundstelle richtig ist, haengt nicht nur an der
+// DATEI, sondern am Konto, um das es dort geht:
+//
+//   - backend/setup.html legt das erste Konto der Anlage an, und das ist
+//     per Definition ein Verwaltungszugang (setup.php setzt ist_admin = 1).
+//   - dashboard.html traegt BEIDE Faelle: gewoehnliche Passwoerter und --
+//     seit ENT-528 -- das erste Betreiber-Konto. Fuer dieses gilt die
+//     laengere Zahl, weil betreiber_konto_anlegen.php passwort_pruefen()
+//     mit istAdmin = true aufruft.
+//
+// Darum entscheidet der Kontext der Fundstelle mit. Bis ENT-502 verglich
+// diese Pruefung stur gegen PASSWORT_MIN und haette eine korrekte 16 als
+// Abweichung gemeldet -- eine Pruefung, die den richtigen Zustand
+// beanstandet, wird irgendwann weggeklickt. Dieselbe Ueberlegung gilt hier.
+// Umlaute in beiden Schreibweisen: Der Quelltext dieses Hauses schreibt
+// Kommentare in ae/oe/ue, sichtbare Texte dagegen mit Umlaut. Wer nur eine
+// Fassung sucht, findet die andere nicht -- genau daran ist der erste
+// Versuch dieser Regel gescheitert.
+const VERWALTUNGSNIVEAU = /betreiber|m(?:ä|ae)chtigste[ns]? Konto/i;
+const ERWARTET = (datei, umfeld) =>
+  (datei === 'backend/setup.html' || VERWALTUNGSNIVEAU.test(umfeld || ''))
+    ? serverMinAdmin : serverMin;
 
 const zahlen = [];
 for (const datei of [...OBERFLAECHEN, ...NUR_MASKIERT, ...NUR_LAENGE]) {
   const text = readFileSync(`${WURZEL}/${datei}`, 'utf8');
+  // Das Umfeld der Fundstelle entscheidet mit, welches Konto gemeint ist.
+  // Grosszuegig nach hinten: Der Funktionsname, der das Konto benennt, steht
+  // oft mehrere Zeilen ueber der Textstelle.
+  const umfeldVon = i => text.slice(Math.max(0, i - 900), i + 150);
   // Sowohl die Konstante als auch jeder Text, der dem Nutzer eine Zahl nennt.
-  for (const m of text.matchAll(/const PW_MIN\s*=\s*(\d+)/g))              { zahlen.push([datei, 'PW_MIN', +m[1]]); }
-  for (const m of text.matchAll(/mind(?:\.|estens)?\s+(\d+)\s+Zeichen/g))  { zahlen.push([datei, 'Text', +m[1]]); }
-  for (const m of text.matchAll(/min\.\s+(\d+)\s+Zeichen/g))               { zahlen.push([datei, 'Text', +m[1]]); }
+  for (const m of text.matchAll(/const PW_MIN\s*=\s*(\d+)/g))              { zahlen.push([datei, 'PW_MIN', +m[1], umfeldVon(m.index)]); }
+  for (const m of text.matchAll(/mind(?:\.|estens)?\s+(\d+)\s+Zeichen/g))  { zahlen.push([datei, 'Text', +m[1], umfeldVon(m.index)]); }
+  for (const m of text.matchAll(/min\.\s+(\d+)\s+Zeichen/g))               { zahlen.push([datei, 'Text', +m[1], umfeldVon(m.index)]); }
 }
-const abweichend = zahlen.filter(([d, , n]) => n !== ERWARTET(d));
+const abweichend = zahlen.filter(([d, , n, u]) => n !== ERWARTET(d, u));
 check(`KRITISCH: alle Oberflaechen nennen dieselbe Mindestlaenge wie der Server (${serverMin}, Verwaltung ${serverMinAdmin})`,
   abweichend.length === 0);
-abweichend.forEach(([d, art, n]) => bad.push(`${d}: ${art} sagt ${n}, der Server verlangt ${ERWARTET(d)}`));
+abweichend.forEach(([d, art, n, u]) => bad.push(`${d}: ${art} sagt ${n}, der Server verlangt ${ERWARTET(d, u)}`));
 
 // Und die Stelle, die das erste Konto anlegt, muss die Regel ueberhaupt
 // AUFRUFEN. setup.php hatte bis ENT-502 ein eigenes "strlen < 6" -- der
