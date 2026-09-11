@@ -517,6 +517,77 @@ async function vorratSeite(antwort, breite = 1500) {
   check('KRITISCH: der Status ist eingefaerbt und nicht nur Text',
     zeilen.every(z => z.chip && z.chipFarbe && z.chipFarbe !== 'rgba(0, 0, 0, 0)'));
 
+  // ── Am Handy (ENT-538, auf Wunsch des Projektinhabers) ───────────
+  //
+  // Der mobile Zuschnitt ist eine eigene Entscheidung, keine Folge davon,
+  // dass es die Funktion am Desktop gibt (Hausregel). Er ist getroffen --
+  // und damit gehoert geprueft, dass er traegt UND dass er nicht als
+  // Nebenwirkung die Administration oeffnet, die dort seit ENT-235 zu ist.
+  {
+    await seite.setViewportSize({ width: 390, height: 844 });
+    await seite.evaluate(() => { go('uebersicht'); });
+    await seite.waitForTimeout(200);
+
+    const eintrag = await seite.evaluate(() => {
+      document.getElementById('btnMarke').click();
+      const k = document.getElementById('nav-support');
+      return { sichtbar: k.offsetParent !== null,
+               display: getComputedStyle(k).display,
+               hoehe: k.getBoundingClientRect().height };
+    });
+    await seite.waitForTimeout(200);
+    check('KRITISCH: am Handy ist der Support-Eintrag sichtbar',
+      eintrag.sichtbar && eintrag.display !== 'none');
+    check('KRITISCH: am Handy erreicht er die 44-px-Trefferflaeche', eintrag.hoehe >= 44);
+
+    await seite.evaluate(() => { document.getElementById('nav-support').click(); });
+    await seite.waitForTimeout(350);
+    const mobil = await seite.evaluate(() => {
+      const ab = document.getElementById('bkAb-sa');
+      const btr = document.getElementById('saBetreff');
+      const txt = document.getElementById('saText');
+      return {
+        offen: !!ab && getComputedStyle(ab).display !== 'none',
+        querlauf: document.documentElement.scrollWidth - window.innerWidth,
+        betreffSchrift: btr ? parseFloat(getComputedStyle(btr).fontSize) : 0,
+        textSchrift: txt ? parseFloat(getComputedStyle(txt).fontSize) : 0,
+        schubladeZu: !document.getElementById('side').classList.contains('auf'),
+      };
+    });
+    check('KRITISCH: am Handy landet der Eintrag im Supportteil', mobil.offen);
+    check('KRITISCH: am Handy laeuft nichts seitlich ueber', mobil.querlauf <= 0);
+    check('KRITISCH: die Eingabefelder tragen 16 px (sonst zoomt iOS hinein)',
+      mobil.betreffSchrift >= 16 && mobil.textSchrift >= 16);
+    check('Die Schublade ist danach zu -- man steht im Inhalt, nicht im Menue',
+      mobil.schubladeZu);
+
+    // DIE NEBENWIRKUNG, die es zu vermeiden galt: Ueber "Zurueck" darf man
+    // am Handy NICHT in die Kacheluebersicht der Administration geraten --
+    // die ist dort nach ENT-235 bewusst nicht erreichbar.
+    await seite.evaluate(() => {
+      document.querySelector('#bkAb-sa .bk-zurueck').click();
+    });
+    await seite.waitForTimeout(350);
+    const danach = await seite.evaluate(() => ({
+      adminOffen: getComputedStyle(document.getElementById('view-betrieb')).display !== 'none',
+      kachelnSichtbar: [...document.querySelectorAll('.bk-kachel')]
+        .filter(e => e.offsetParent !== null).length,
+    }));
+    check('KRITISCH: "Zurueck" fuehrt am Handy NICHT in die Administration',
+      !danach.adminOffen && danach.kachelnSichtbar === 0);
+
+    // Am Desktop bleibt es beim gewohnten Weg: zurueck in die Kacheln.
+    await seite.setViewportSize({ width: 1400, height: 900 });
+    await seite.evaluate(() => { go('betrieb'); bkAbschnittZeigen('sa'); });
+    await seite.waitForTimeout(250);
+    await seite.evaluate(() => { document.querySelector('#bkAb-sa .bk-zurueck').click(); });
+    await seite.waitForTimeout(250);
+    const desktopZurueck = await seite.evaluate(() =>
+      [...document.querySelectorAll('.bk-kachel')].filter(e => e.offsetParent !== null).length);
+    check('KRITISCH: am Desktop fuehrt "Zurueck" weiterhin in die Kacheluebersicht',
+      desktopZurueck > 0);
+  }
+
   // Leer ist etwas anderes als nicht abrufbar.
   await seite.evaluate(() => saListeZeichnen([]));
   const leerText = await seite.evaluate(() => document.getElementById('saListe').textContent);

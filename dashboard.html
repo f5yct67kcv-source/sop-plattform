@@ -5139,12 +5139,21 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
            Moment erst finden muss. Derselbe Griff wie beim Logo-Menü der
            Anwendung, die der Projektinhaber als Vorbild gezeigt hat.
 
-           NUR AUF DEM DESKTOP, wie die Einrichtung darüber: Der Supportbereich
-           liegt in der Administration, und die ist am Handy seit ENT-235
-           bewusst ausgeblendet. Ein Eintrag, der dort ins Leere führte, wäre
-           schlechter als keiner. Ob es ihn am Handy geben soll, ist eine
-           eigene Entscheidung des Projektinhabers (Hausregel). -->
-      <button class="nav-item nur-desktop" id="nav-support"
+           AUCH AM HANDY, auf ausdrücklichen Wunsch des Projektinhabers
+           (Hausregel: der mobile Zuschnitt ist seine Entscheidung, nicht die
+           Folge davon, dass es die Funktion am Desktop gibt). Gemessen wurde
+           vorher, dass der Supportabschnitt dort trägt: kein Querlauf,
+           16-px-Felder, 44-px-Knöpfe. Ein eigener mobiler Zuschnitt war
+           deshalb nicht nötig -- und zwei Zuschnitte für dieselbe Sache wären
+           zwei Stellen, die auseinanderlaufen können.
+
+           WAS DABEI ZU LÖSEN WAR: Der Abschnitt liegt in der Administration,
+           und die ist am Handy nach ENT-235 bewusst nicht erreichbar. Über
+           den Zurück-Knopf käme man von hier aus in ihre Kachelübersicht und
+           damit doch hinein -- eine Tür, die jemand absichtlich zugemacht
+           hat, als Nebenwirkung wieder offen. Darum führt Zurück am Handy
+           dorthin, wo man herkam (siehe saZurueck). -->
+      <button class="nav-item" id="nav-support"
               title="Anliegen an den Betreiber der Plattform melden"
               onclick="go('betrieb'); bkAbschnittZeigen('sa'); saLaden();">
         <svg class="i" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
@@ -7719,7 +7728,7 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
              herausfallen. Der Preis steht im Hinweis am Eingabefeld: Was
              hier getippt wird, liegt beim Betreiber. -->
         <div class="bk-abschnitt" id="bkAb-sa" style="display:none">
-        <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="bkUebersichtZeigen()">Zurück</button>
+        <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="saZurueck()">Zurück</button>
         <div class="grid">
         <div class="card" id="saNeuKarte">
           <div class="card-hd">
@@ -22054,6 +22063,25 @@ function saUmgebung() {
              : /Safari\//.test(ua)  ? 'Safari'
              : 'Browser unbekannt';
   return name + ' · ' + window.innerWidth + '×' + window.innerHeight;
+}
+
+/* Zurück aus dem Supportteil.
+ *
+ * Am Desktop wie bei jedem anderen Abschnitt: zur Kachelübersicht der
+ * Einstellungen, aus der man gekommen ist.
+ *
+ * AM HANDY NICHT. Dorthin führt kein Weg über die Navigation -- die
+ * Administration ist dort seit ENT-235 bewusst ausgeblendet, und der
+ * einzige Zugang zu diesem Abschnitt ist das Kontomenü. Ein Zurück in die
+ * Kachelübersicht öffnete genau die Tür wieder, die jemand absichtlich
+ * zugemacht hat. Zurück heisst hier darum: dahin, wo man herkam.
+ *
+ * Dieselbe Schwelle wie ".nur-desktop" im Stylesheet (900 px) -- zwei
+ * verschiedene Grenzen für dasselbe "am Handy" liefen irgendwann
+ * auseinander. */
+function saZurueck() {
+  if (window.matchMedia('(max-width: 900px)').matches) { go('uebersicht'); return; }
+  bkUebersichtZeigen();
 }
 
 function saLaden() {
