@@ -36,8 +36,14 @@ try {
 }
 const phpAnzahl = Number((phpAus.match(/^(\d+) bestanden/m) || [0, 0])[1]);
 check('die PHP-Pruefungen der Betreiber-Funktionen laufen durch', phpAnzahl > 0);
-check('KRITISCH: alle PHP-Faelle bestehen (Fristen, GAV-Lage, Status)',
-  phpCode === 0 && !phpAus.includes('\nx '));
+// phpAnzahl > 0 gehoert MIT in die kritische Bedingung: Stuerzt die
+// PHP-Datei ab, bevor sie ihre Zusammenfassung druckt, ist phpCode 0 und
+// kein "x " im Auswurf -- die Pruefung waere gruen, obwohl nichts gelaufen
+// ist. Gemessen bei der Gegenprobe zu ENT-537: Ein Verstoss gegen den
+// UNIQUE-Schluessel liess die Datei mit Ende-Code 0 sterben, und nur die
+// weichere Pruefung darueber schlug an.
+check('KRITISCH: alle PHP-Faelle bestehen (Fristen, GAV-Lage, Status, Zaehlstand)',
+  phpCode === 0 && phpAnzahl > 0 && !phpAus.includes('\nx '));
 phpAus.split('\n').filter(z => z.startsWith('x ')).forEach(z => bad.push('PHP: ' + z.slice(2)));
 
 // ── 2. Jeder Betreiber-Endpunkt ruft die Wache ────────────────────────

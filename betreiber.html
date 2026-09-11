@@ -914,6 +914,30 @@ function merker(karte, schluessel) {
   return '<span class="merker ' + klasse + '">' + text(wort) + '</span>';
 }
 
+/* Wie gross ein Betrieb ist (ENT-537).
+
+   VIER AUSSAGEN, VIER TEXTE -- die Hausregel, die hier am haeufigsten
+   verletzt wurde:
+     - nicht erhoben   : der Zaehlstand ist auf diesem Server noch nicht da
+     - nicht feststellbar : der Mandant ist gerade nicht erreichbar
+     - 0 Mitarbeitende : erreichbar, gezaehlt, und es sind wirklich keine
+     - eine Zahl       : der Normalfall
+   "Nicht feststellbar" als "0" auszugeben waere die schlimmste Variante:
+   Sie sieht aus wie eine Auskunft und ist eine Erfindung. */
+function groesseZelle(g) {
+  if (g === undefined) { return '<span class="merker m-ruhe">nicht erhoben</span>'; }
+  if (g === null)      { return '<span class="merker m-warn">nicht feststellbar</span>'; }
+  const zweit = g.im_einsatz === null || g.im_einsatz === undefined
+    ? 'diesen Monat nicht feststellbar'
+    : g.im_einsatz + ' diesen Monat im Einsatz';
+  /* "aktiv" und "gesamt" sind zwei Einheiten und stehen darum nicht unter
+     einer Ueberschrift zusammengezaehlt. Die zweite Zeile nennt den Bezug,
+     sobald die Zahl eine Teilmenge ist (Hausregel). */
+  return '<strong>' + g.aktiv + '</strong>'
+       + (g.gesamt !== g.aktiv ? ' <span style="color:var(--ink-3)">von ' + g.gesamt + '</span>' : '')
+       + '<div class="zweit">' + text(zweit) + '</div>';
+}
+
 async function ladeMandanten() {
   const a = await ruf('betreiber_mandant_list.php');
   const inhalt = $('m-inhalt');
@@ -944,6 +968,22 @@ async function ladeMandanten() {
     if (st.status === 'ok') { (st.mandanten || []).forEach(m => { stand[m.id] = m; }); }
   } catch (e) { /* Stand bleibt unbekannt */ }
 
+  /* Die Groessen kommen aus demselben Grund aus einem eigenen Endpunkt:
+     Er verbindet sich zu jeder Mandantendatenbank. Schlaegt er fehl,
+     bleibt die Liste stehen -- eine unbekannte Groesse ist kein Grund,
+     gar nichts zu zeigen.
+
+     POST und nicht GET: Derselbe Aufruf haelt den Stand des laufenden
+     Monats fest. Das geschieht hoechstens einmal je Mandant und Monat,
+     der erste Eintrag gewinnt. Warum ueberhaupt: Wie gross ein Betrieb im
+     September war, laesst sich im Dezember nicht mehr feststellen, und
+     eine Staffelung nach Groesse braucht genau das (ENT-537). */
+  let groesse = {};
+  try {
+    const gr = await ruf('betreiber_zaehlstand.php', null, 'POST');
+    if (gr.status === 'ok') { (gr.heute || []).forEach(m => { groesse[m.id] = m.zahlen; }); }
+  } catch (e) { /* Groesse bleibt unbekannt */ }
+
   const aktiv = liste.filter(m => m.status === 'aktiv').length;
   const offen = liste.filter(m => m.gav_lage === 'unbestaetigt').length;
   const kaputt = liste.filter(m => {
@@ -967,11 +1007,12 @@ async function ladeMandanten() {
   }
 
   inhalt.innerHTML = '<div class="tab-huelle"><table><thead><tr>'
-    + '<th>Mandant</th><th>Status</th><th>GAV</th><th>Einrichtung</th><th></th>'
+    + '<th>Mandant</th><th>Grösse</th><th>Status</th><th>GAV</th><th>Einrichtung</th><th></th>'
     + '</tr></thead><tbody>'
     + liste.map(m => '<tr>'
         + '<td><strong>' + text(m.name) + '</strong>'
           + '<div class="zweit">' + (m.kanton ? 'Kanton ' + text(m.kanton) : 'Kanton nicht gesetzt') + '</div></td>'
+        + '<td>' + groesseZelle(groesse[m.id]) + '</td>'
         + '<td>' + merker(STATUS_TEXT, m.status) + '</td>'
         + '<td>' + merker(GAV_TEXT, m.gav_lage)
           + (m.gav_bestaetigt_am ? '<div class="zweit">' + text(m.gav_bestaetigt_am.slice(0, 10)) + '</div>' : '')

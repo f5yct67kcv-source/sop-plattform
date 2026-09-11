@@ -652,6 +652,16 @@ try {
 // Merker blockierte den Umzug, und "Datum & Zeit" fiel ans Ende der Liste.
 // Eine Pruefung, die nur den ersten Aufruf ansieht, ist an genau dieser
 // Stelle blind.
+//
+// OP-527: Dieser Block ist am 2026-09-11 im vollen Regressionslauf
+// gefallen -- nicht an einer Behauptung, sondern an einem Zeitablauf beim
+// Warten auf "#shell.on" nach dem Neuladen (60 s). Allein und unter
+// gezielter Last fuenfmal nicht nachstellbar. Damit die naechste
+// Wiederkehr entscheidbar wird, meldet der Faenger unten AUCH, in welchem
+// Zustand die Seite dabei stand: Steht die Anmeldemaske da, ist es ein
+// Fehler der Anwendung; steht die Schale halb aufgebaut da, war es die
+// Maschine. Ohne diese Auskunft bleibt beides gleich wahrscheinlich.
+let neuladenSeite = null;
 try {
   const alt = JSON.stringify([
     { id: 'begruessung', sichtbar: true, breite: 'voll' },
@@ -659,6 +669,7 @@ try {
     { id: 'letzte', sichtbar: true },
   ]);
   const p = await seite(1600, alt);
+  neuladenSeite = p;
   const lage = async () => p.evaluate(() => {
     const stand = ordStand('uebersicht');
     const i = stand.findIndex(x => x.id === 'begruessung');
@@ -682,7 +693,30 @@ try {
   check('KRITISCH: und die Begrüssung springt nicht auf volle Breite zurück',
     nachher.breite === 'halb');
   await p.close();
-} catch (e) { bad.push('Neuladen: ' + String(e).split('\n')[0].slice(0, 120)); }
+} catch (e) {
+  bad.push('Neuladen: ' + String(e).split('\n')[0].slice(0, 120));
+  // Der Zustand der Seite im Moment des Scheiterns. Er kostet nichts,
+  // solange nichts scheitert, und ist das Einzige, was beim naechsten Mal
+  // die Frage beantwortet.
+  if (neuladenSeite) {
+    try {
+      const z = await neuladenSeite.evaluate(() => ({
+        schale:    !!document.querySelector('#shell.on'),
+        // Vorhandensein sagt nichts -- #gBtn liegt immer im DOM, nur
+        // verborgen. Gefragt ist, ob die Anmeldemaske SICHTBAR ist; das
+        // unterscheidet "die Anwendung hat uns rausgeworfen" von "die
+        // Maschine war zu langsam". In der Gegenprobe meldete die erste
+        // Fassung hier true, waehrend die Schale stand.
+        anmeldung: (() => { const b = document.querySelector('#gBtn');
+                            return !!(b && b.offsetParent !== null); })(),
+        bereit:    document.readyState,
+        widgets:   document.querySelectorAll('[data-widget]').length,
+      }));
+      bad.push('Neuladen, Zustand: ' + JSON.stringify(z));
+    } catch (e2) { bad.push('Neuladen, Zustand nicht abfragbar: ' + String(e2).slice(0, 80)); }
+    try { await neuladenSeite.close(); } catch (e3) { /* egal */ }
+  }
+}
 
 // ══════════════════════════════ EIN ALTER, FEHLERHAFTER MERKER WIRD NACHGEHOLT
 //

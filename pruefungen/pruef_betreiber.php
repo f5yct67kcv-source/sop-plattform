@@ -169,6 +169,65 @@ $pruef('KRITISCH: ab dem zweiten Mandanten ist der Bootstrap zu',
 $pruef('KRITISCH: auch bei vielen Mandanten bleibt er zu',
     be_bootstrap_grenze(20) === false);
 
+// ── Der Zaehlstand (ENT-537) ──────────────────────────────────────────
+//
+// Die Entscheidung, die hier geprueft wird: HOECHSTENS EINMAL je Mandant
+// und Monat, und der ERSTE Eintrag gewinnt. Ohne diese Regel verschoebe
+// sich der festgehaltene Stand mit jedem Seitenaufruf, und wovon eine
+// Rechnung ausgeht, haenge davon ab, wann jemand zuletzt hingeschaut hat.
+{
+    $be = new PDO('sqlite::memory:', null, null,
+        [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]);
+    $be->exec('CREATE TABLE mandant_zaehlstand (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, mandant_id INTEGER NOT NULL,
+        monat TEXT NOT NULL, stichtag TEXT NOT NULL,
+        ma_gesamt INTEGER NOT NULL, ma_aktiv INTEGER NOT NULL, ma_im_einsatz INTEGER NULL,
+        erfasst_am TEXT DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (mandant_id, monat))');
+
+    $erst  = ['gesamt' => 12, 'aktiv' => 9, 'im_einsatz' => 7];
+    $spaet = ['gesamt' => 40, 'aktiv' => 38, 'im_einsatz' => 30];
+
+    $a = zaehlstand_festhalten($be, 1, $erst, '2026-09', '2026-09-11');
+    $pruef('der erste Aufruf haelt fest', $a !== null && $a['neu'] === true);
+
+    $b = zaehlstand_festhalten($be, 1, $spaet, '2026-09', '2026-09-28');
+    $pruef('ein zweiter Aufruf im selben Monat schreibt nicht', $b !== null && $b['neu'] === false);
+
+    $zeilen = $be->query('SELECT * FROM mandant_zaehlstand WHERE mandant_id = 1')->fetchAll();
+    $pruef('KRITISCH: es steht genau eine Zeile je Mandant und Monat', count($zeilen) === 1);
+    // Das ist die eigentliche Aussage: NICHT der zuletzt gesehene Stand.
+    $pruef('KRITISCH: der ERSTE Stand bleibt stehen, nicht der spaetere',
+        (int)$zeilen[0]['ma_aktiv'] === 9 && (int)$zeilen[0]['ma_gesamt'] === 12);
+    $pruef('der Stichtag des ersten Aufrufs bleibt stehen',
+        $zeilen[0]['stichtag'] === '2026-09-11');
+
+    // Ein anderer Monat ist ein anderer Stand.
+    $c = zaehlstand_festhalten($be, 1, $spaet, '2026-10', '2026-10-01');
+    $pruef('ein anderer Monat wird eigenstaendig festgehalten', $c !== null && $c['neu'] === true);
+    $pruef('danach stehen zwei Monate da',
+        (int)$be->query('SELECT COUNT(*) FROM mandant_zaehlstand WHERE mandant_id = 1')->fetchColumn() === 2);
+
+    // Ein anderer Mandant im selben Monat ebenfalls.
+    zaehlstand_festhalten($be, 2, $erst, '2026-09', '2026-09-11');
+    $pruef('zwei Mandanten teilen sich keinen Stand',
+        (int)$be->query('SELECT COUNT(*) FROM mandant_zaehlstand WHERE monat = \'2026-09\'')->fetchColumn() === 2);
+
+    // Nicht erreichbar heisst NICHTS festhalten -- nicht "null Mitarbeitende".
+    // Eine Null waere eine Erfindung, die wie eine Auskunft aussieht.
+    $d = zaehlstand_festhalten($be, 3, null, '2026-09', '2026-09-11');
+    $pruef('KRITISCH: ohne Zahlen wird nichts festgehalten', $d === null);
+    $pruef('KRITISCH: und schon gar keine Null',
+        (int)$be->query('SELECT COUNT(*) FROM mandant_zaehlstand WHERE mandant_id = 3')->fetchColumn() === 0);
+
+    // "Nicht feststellbar" bei einer einzelnen Zahl bleibt NULL und wird
+    // nicht zu 0 gerechnet.
+    zaehlstand_festhalten($be, 4, ['gesamt' => 5, 'aktiv' => 5, 'im_einsatz' => null], '2026-09', '2026-09-11');
+    $r = $be->query('SELECT ma_im_einsatz FROM mandant_zaehlstand WHERE mandant_id = 4')->fetch();
+    $pruef('KRITISCH: eine nicht feststellbare Teilzahl bleibt unbekannt, nicht null',
+        $r['ma_im_einsatz'] === null);
+}
+
 echo count($bad) === 0
     ? "$ok bestanden, 0 nicht bestanden\n"
     : "$ok bestanden, " . count($bad) . " nicht bestanden\n";
