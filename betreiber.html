@@ -725,7 +725,12 @@ async function supportHolen(m) {
       '<div class="meldung gut" style="margin-bottom:16px">Freigegeben von '
     + text(a.freigabe.von) + ' bis ' + text(String(a.freigabe.gilt_bis).slice(0, 16))
     + (a.freigabe.zweck ? ' · ' + text(a.freigabe.zweck) : '')
-    + '<br><span style="opacity:.85">' + text(a.umfang) + '</span></div>';
+    /* Zwei verschiedene Aussagen -- wer freigegeben hat, und was der Zugriff
+       umfasst. Ein Zeilenumbruch allein lässt sie ineinanderlaufen; die
+       zweite bekommt eine eigene, abgesetzte Zeile. */
+    + '<div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(14,124,85,.2);'
+    + 'opacity:.85;font-size:12.5px;line-height:1.45">' + text(a.umfang) + '</div>'
+    + '</div>';
 
   const fehlend = (a.fehlend || []).length;
   $('sup-inhalt').innerHTML =
