@@ -465,7 +465,7 @@ for (const [datei, titel] of [
   ['pruef_zustellnachweis.php', 'KRITISCH: der Zustellnachweis fuehrt EINE Zeile je Rapport, kein Bewegungsprofil (ENT-491)'],
   ['pruef_portal_verlauf.php', 'KRITISCH: die Verlaufskurve buendelt nach Tagen/Wochen und laesst keine Luecke weg (ENT-500)'],
   ['pruef_sicherheit.php', 'KRITISCH: die Sicherheitsregeln aus ENT-501 werden WIRKLICH ausgefuehrt -- Basisadresse, Link-Schema, Push-Dienst, Sitzungs-Abdruck, Blindpruefung, Bildtyp'],
-  ['pruef_ki.php', 'KRITISCH: die KI-Erkennung sagt, WARUM sie nicht ging -- kein Schluessel, abgelehnt, Guthaben und Stoerung sind verschiedene Aussagen (ENT-529)'],
+  ['pruef_ki.php', 'KRITISCH: die KI-Erkennung sagt, WARUM sie nicht ging -- kein Schluessel, abgelehnt, Guthaben und Stoerung sind verschiedene Aussagen (ENT-530)'],
 ]) {
   let aus = '', code = 0;
   try {
@@ -507,7 +507,7 @@ check('KRITISCH: jeder Endpunkt mit Rechtepruefung bindet rechte.php ein',
 if (ohneEinbindung.length) { bad.push('ohne rechte.php: ' + ohneEinbindung.join(', ')); }
 
 // Jeder KI-Endpunkt muss den GRUND weitergeben, nicht einen Satz fuer alles
-// (ENT-529). Vier Endpunkte antworteten bis dahin auf jeden Fehlschlag mit
+// (ENT-530). Vier Endpunkte antworteten bis dahin auf jeden Fehlschlag mit
 // "Erkennung nicht verfuegbar" -- kein Schluessel, abgelehnter Schluessel,
 // leeres Guthaben und Stoerung sahen identisch aus, und damit liess sich
 // nicht einmal feststellen, ob ueberhaupt ein Schluessel hinterlegt ist.

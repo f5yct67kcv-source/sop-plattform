@@ -7,7 +7,14 @@ declare(strict_types=1);
 // strukturierte Mitarbeiter-Felder. Schreibt nie selbst in die Datenbank --
 // nur Extraktion, das Speichern bleibt beim Admin.
 
-// ══════════════════════════════════════════ WARUM ES NICHT GING (ENT-529)
+// ══════════════════════════════════════════ WARUM ES NICHT GING (ENT-530)
+//
+// Die Nummer: Dieser Vorgang trug zunaechst ENT-529. Eine parallel laufende
+// Sitzung hatte dieselbe Nummer elf Minuten frueher vergeben (dort: die
+// Betreiber-Tabellen am Einrichtungsknopf), also wurde dieser Eintrag nach
+// der Regel in CLAUDE.md auf ENT-530 umgehaengt. Die Commit-Nachricht im
+// Verlauf nennt noch ENT-529 -- sie steht auf main und wird nicht
+// nachtraeglich umgeschrieben.
 //
 // Bis hierher gab jede Funktion dieser Datei bei JEDEM Fehlschlag dasselbe
 // zurueck: null. Die vier Endpunkte machten daraus denselben einen Satz

@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
-// KI-Erkennung: WARUM sie nicht ging, nicht nur DASS (ENT-529).
+// KI-Erkennung: WARUM sie nicht ging, nicht nur DASS (ENT-530 -- zunaechst
+// als ENT-529 angelegt, wegen einer Nummernkollision umgehaengt).
 //
 // Geprueft wird die Aussage, nicht der Wortlaut: Es steht nirgends, wie ein
 // Satz zu lauten hat. Geprueft wird, dass verschiedene Sachverhalte
