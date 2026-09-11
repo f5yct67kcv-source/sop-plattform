@@ -55,10 +55,19 @@ if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     json_response(['status' => 'error', 'message' => 'Diese E-Mail-Adresse ist nicht gültig.'], 400);
 }
 
-// istAdmin = true, also 16 Zeichen (PASSWORT_MIN_ADMIN). Das ist keine
-// Uebervorsicht: Wer dieses Konto hat, hat jeden Mandanten -- es ist das
-// maechtigste der ganzen Anlage und traegt darum mindestens die
-// Verwaltungsschwelle.
+// istAdmin = true, also PASSWORT_MIN_ADMIN -- die Verwaltungsschwelle.
+// Wer dieses Konto hat, hat jeden Mandanten; es ist das maechtigste der
+// ganzen Anlage und faellt darum nie unter diese Schwelle.
+//
+// KEINE ZAHL AN DIESER STELLE: Hier stand "16 Zeichen", und die Zahl war
+// falsch, sobald ENT-533 sie auf 12 setzte -- ein Kommentar, der eine
+// Konstante abschreibt, wird beim naechsten Bemessen zur Falschaussage.
+// Die Zahl steht in backend/anmeldung.php, und nur dort.
+//
+// Die 12 tragen hier besser als auf der Mandantenseite: ENT-533 hat sie
+// ausdruecklich unter dem Vorbehalt einer Zwei-Faktor-Pflicht gewaehlt,
+// die dort noch offen ist (OP-534). Auf dieser Ebene besteht sie seit
+// ENT-521 und wird im Server durchgesetzt (require_betreiber_voll()).
 $fehler = passwort_pruefen($pass, $email, true);
 if ($fehler !== null) {
     json_response(['status' => 'error', 'message' => $fehler], 400);
