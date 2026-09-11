@@ -1791,7 +1791,7 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
     <div id="grErr" class="msg-err" style="display:none"></div>
     <p class="gate-hinweis">Neues Passwort für dieses Konto festlegen.</p>
     <div class="f"><label for="grNeu" id="lb-grneu">Neues Passwort</label>
-      <div class="pw-feld"><input class="inp" id="grNeu" type="password" placeholder="mind. 12 Zeichen" autocomplete="new-password">
+      <div class="pw-feld"><input class="inp" id="grNeu" type="password" placeholder="mind. 10 Zeichen" autocomplete="new-password">
         <button type="button" class="pw-toggle" aria-label="Passwort anzeigen"
                 onclick="togglePw('grNeu', this)">👁</button></div></div>
     <!-- Wiederholung (ENT-379, Wunsch des Projektinhabers): Ohne sie faellt
@@ -2207,7 +2207,7 @@ const W = {
     persNr: 'Personalnummer', geburtsdatum: 'Geburtsdatum', adresse: 'Adresse',
     telefon: 'Telefon', mobil: 'Mobil', email: 'E-Mail', anmeldename: 'Anmeldename',
     passwortAendern: 'Passwort ändern', altesPasswort: 'Bisheriges Passwort',
-    neuesPasswort: 'Neues Passwort', mindPw: 'mindestens 12 Zeichen',
+    neuesPasswort: 'Neues Passwort', mindPw: 'mindestens 10 Zeichen',
     pwZeigen: 'Passwort anzeigen', pwVerbergen: 'Passwort verbergen',
     passwortOk: 'Passwort geändert.', abmelden: 'Abmelden',
     zumCockpit: 'Zum Cockpit',
@@ -2479,7 +2479,7 @@ const w = k => W[k] || k;
 // eine gemeinsame Datei gaebe es nur fuer zwei der drei Oberflaechen,
 // darum haelt die Pruefung sie zusammen statt der Ladereihenfolge.
 // Die Erprobungs-Absenkung auf 6 (ENT-289) ist mit ENT-502 zurueckgenommen.
-const PW_MIN = 12;
+const PW_MIN = 10;
 
 const WOCHENTAG = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
 

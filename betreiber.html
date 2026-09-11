@@ -5,6 +5,33 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
 <title>Betreiber-Bereich</title>
+<meta name="theme-color" content="#16181D">
+<script>
+/* Muss VOR dem ersten Zeichnen laufen, sonst blitzt die helle Fassung kurz
+   auf, bevor die dunkle greift (ENT-029, gleiche Bauart wie im Cockpit).
+
+   BEWUSST DERSELBE SPEICHERSCHLUESSEL wie dashboard.html: Es ist dasselbe
+   Geraet und derselbe Mensch. Wer im Cockpit auf dunkel gestellt hat,
+   erwartet nicht, dass die Ebene darueber wieder hell aufgeht -- genau das
+   war die Beanstandung. Ohne gespeicherte Wahl entscheidet die Einstellung
+   des Betriebssystems.
+
+   Eigener try: Ein Speicher, der nicht lesbar ist (privates Fenster),
+   darf nicht die ganze Seite mitreissen. */
+(function () {
+  var w = '';
+  try { w = localStorage.getItem('rv3_thema') || ''; } catch (e) { /* egal */ }
+  if (!w) {
+    w = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+      ? 'dunkel' : 'hell';
+  }
+  document.documentElement.setAttribute('data-thema', w);
+  if (w === 'dunkel') {
+    var m = document.querySelector('meta[name="theme-color"]');
+    if (m) { m.setAttribute('content', '#0B0D11'); }
+  }
+})();
+</script>
 <style>
 /* Betreiber-Bereich (ENT-519 bis ENT-521).
    Eigene Seite neben dashboard.html und portal.html -- dieselbe Trennung
@@ -24,9 +51,41 @@
   --pos:#0E7C55; --pos-soft:#E6F6EF;
   --neg:#C2382A; --neg-soft:#FCEDEB;
   --warn:#9A6B08; --warn-soft:#FBF3E0;
-  --shell:#16181D; --shell-txt:#9298A5; --shell-txt-hi:#F3F5F8;
+  --shell:#16181D; --shell-hi:#1E2128; --shell-line:#272B33;
+  --shell-txt:#9298A5; --shell-txt-hi:#F3F5F8;
   --nix:#D8DCE2;
 }
+
+/* Dieselben Werte wie im Cockpit (dashboard.html). Sie stehen hier als
+   Kopie und nicht in einer gemeinsamen Datei, weil der Deploy nur
+   namentlich gelistete Dateien kopiert und jede weitere Datei ein weiterer
+   Weg ist, auf dem etwas fehlen kann. test_betreiber_ansicht.mjs misst am
+   gerenderten Zustand, dass beide Seiten dieselbe Flaeche und dieselbe
+   Schriftfarbe zeigen -- auseinanderlaufen koennen sie also nicht
+   unbemerkt. */
+html[data-thema="dunkel"] {
+  --bg:#0F1117; --surface:#161B27; --surface-2:#1E2535;
+  --line:#2A3147; --line-soft:#232A3B; --line-hi:#3B4560;
+  --ink:#F2F4F8; --ink-2:#B6BCC8; --ink-3:#868D9A;
+  --accent:#7098F7; --accent-hi:#8DAEFA; --accent-soft:#1A2440; --accent-line:#2D3D63;
+  --pos:#4FCE96; --pos-soft:#10281E;
+  --neg:#F27F70; --neg-soft:#2E1A18;
+  --warn:#E2B156; --warn-soft:#2B2314;
+  --shell:#0B0D11; --shell-hi:#14171C; --shell-line:#23272F;
+  --shell-txt:#8A919E; --shell-txt-hi:#F2F4F8;
+  --nix:#3B4560;
+  /* Damit der Browser Bildlaufleisten und eingebaute Bedienelemente dunkel
+     zeichnet -- sonst steht ein weisses Auswahlmenue im dunklen Formular. */
+  color-scheme: dark;
+}
+/* Randfaelle, die sich nicht ueber einen Wert loesen lassen -- dieselben
+   wie im Cockpit. Ein Eingabefeld auf --surface waere im Dunkeln nicht von
+   der Karte zu unterscheiden, auf der es liegt. */
+html[data-thema="dunkel"] input,
+html[data-thema="dunkel"] select { background: var(--surface-2); }
+html[data-thema="dunkel"] input:focus,
+html[data-thema="dunkel"] select:focus { background: var(--surface); }
+html[data-thema="dunkel"] button.gefahr { border-color: #4A2823; }
 * { box-sizing: border-box; }
 body {
   margin: 0; background: var(--bg); color: var(--ink);
@@ -46,8 +105,45 @@ body {
 }
 .kopf .titel { font-size: 16px; font-weight: 650; letter-spacing: -.01em; }
 .kopf .unter { font-size: 12.5px; color: var(--shell-txt); margin-top: 2px; }
-.kopf .mitte { text-align: center; font-size: 12px; color: var(--shell-txt); }
 .kopf .rechts { justify-self: end; display: flex; gap: 10px; align-items: center; }
+
+/* ── Navigationsband ──────────────────────────────────────────────
+   Dieselbe Bauart wie die Kopfleiste des Cockpits, wenn dort die
+   Seitenleiste eingeklappt ist: Symbol oben, Beschriftung darunter --
+   "Ueberschrift oben, Wert darunter" gilt auch hier. Symbole allein
+   sagen nicht, was sie sind.
+
+   Es steht in Spalte 2 des Rasters 1fr auto 1fr und damit in der Mitte
+   des FENSTERS, nicht in der Mitte des Rests zwischen Titel und
+   Abmelden-Knopf. Die beiden Aussenspalten sind verschieden breit; mit
+   einem Abstandhalter saesse die Navigation sichtbar daneben. */
+.kopf-nav { display: flex; align-items: center; gap: 2px; }
+.kopf-nav .nav-item {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 4px; min-width: 84px; min-height: 44px; padding: 5px 10px;
+  border: 0; background: transparent; border-radius: 8px;
+  color: var(--shell-txt); font: inherit; cursor: pointer;
+  transition: background .13s, color .13s;
+}
+.kopf-nav .nav-item .lbl {
+  font-size: 12px; font-weight: 650; letter-spacing: .2px;
+  line-height: 1.1; white-space: nowrap;
+}
+.kopf-nav .nav-item svg { width: 19px; height: 19px; fill: none; stroke: currentColor;
+  stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.kopf-nav .nav-item:hover { background: var(--shell-hi); color: var(--shell-txt-hi); border-color: transparent; }
+.kopf-nav .nav-item.on { background: var(--shell-hi); color: var(--shell-txt-hi); }
+.kopf-nav .nav-item.on svg { stroke: var(--accent); }
+
+/* ── Titelleiste ──────────────────────────────────────────────────
+   Auf dem Handy ist sie der einzige Ort, der sagt, wo man ist
+   (Hausregel): Titel deutlich, Unterzeile lesbar. */
+.leiste {
+  background: var(--surface); border-bottom: 1px solid var(--line);
+  padding: 16px 24px;
+}
+.leiste h1 { margin: 0; font-size: 19px; font-weight: 700; letter-spacing: -.02em; }
+.leiste .crumb { font-size: 12.5px; color: var(--ink-2); margin-top: 2px; }
 
 .huelle { max-width: 1120px; margin: 0 auto; padding: 28px 24px 64px; }
 
@@ -116,6 +212,47 @@ button.klein { min-height: 36px; padding: 0 12px; font-size: 13px; }
    allein in seiner Zeile steht (Hausregel). */
 .knopfzeile { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
 
+/* ── Umschalter hell/dunkel ───────────────────────────────────────
+   Dasselbe Bedienelement wie im Cockpit (ENT-029), mit einem
+   Unterschied: Der Knopf ist 44 px hoch, die sichtbare Bahn liegt mit
+   ihren 30 px mittig darin. Im Cockpit sitzt der Schalter in einer
+   Werkzeugleiste, hier in der Kopfzeile -- und die Hausregel
+   "mindestens 44 px" gilt fuer den Knopf, nicht fuer das Bild darauf.
+   Die Trefferflaeche waechst, das Aussehen bleibt gleich.
+
+   Eigene Farben statt --bg/--surface: Diese Kopfzeile ist in BEIDEN
+   Themen dunkel (--shell). Ein Schalter auf --bg waere im hellen Thema
+   eine grelle Kachel auf grauem Grund. */
+.thema-schalter {
+  min-height: 44px; width: 52px; padding: 0; border: 0; background: none;
+  display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.thema-schalter:hover { border-color: transparent; }
+.ts-bahn {
+  width: 52px; height: 30px; border-radius: 999px; position: relative;
+  border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.08);
+  transition: background .18s, border-color .18s;
+}
+.thema-schalter:hover .ts-bahn { border-color: rgba(255,255,255,.34); }
+.ts-schieber {
+  position: absolute; top: 2px; left: 2px; width: 24px; height: 24px; border-radius: 50%;
+  background: #F3F5F8; display: flex; align-items: center; justify-content: center;
+  transition: transform .2s;
+}
+.ts-schieber svg {
+  width: 14px; height: 14px; fill: none; stroke-width: 2.1;
+  stroke-linecap: round; stroke-linejoin: round; position: absolute; transition: opacity .16s;
+}
+.ts-schieber .i-sonne { stroke: #9A6B08; opacity: 1; }
+.ts-schieber .i-mond  { stroke: #2F5BD7; opacity: 0; }
+html[data-thema="dunkel"] .ts-bahn { background: var(--accent-soft); border-color: var(--accent-line); }
+html[data-thema="dunkel"] .ts-schieber { transform: translateX(22px); }
+html[data-thema="dunkel"] .ts-schieber .i-sonne { opacity: 0; }
+html[data-thema="dunkel"] .ts-schieber .i-mond  { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .ts-bahn, .ts-schieber, .ts-schieber svg { transition: none; }
+}
+
 label { display: block; font-size: 12.5px; font-weight: 600; color: var(--ink-2); margin-bottom: 6px; }
 input, select {
   width: 100%; min-height: 44px; padding: 0 13px;
@@ -129,14 +266,39 @@ input:focus, select:focus { outline: 2px solid var(--accent-line); outline-offse
 .feld .hinweis { font-size: 12px; color: var(--ink-3); margin-top: 5px; }
 .raster2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 0 16px; }
 
-/* ── Leerzustaende: vier verschiedene Aussagen, vier Texte ────────── */
-.leer { padding: 40px 24px; text-align: center; }
-.leer .ic {
+/* ── Leerzustaende: vier verschiedene Aussagen, vier Texte ──────────
+   Die Klasse hiess "leer" und kollidierte damit mit ".wert.leer" (eine
+   Kennzahl steht auf null). Gemessen war ein Nullwert dadurch 118 px hoch
+   statt 38 und mittig statt links: Er erbte das 40-px-Polster und die
+   Zentrierung des Leerzustands. Im Quelltext sah beides richtig aus --
+   zwei voneinander unabhaengige Regeln, die zufaellig denselben Namen
+   tragen. Genau der Fall, fuer den die Hausregel "gemessen, nicht
+   nachgelesen" da ist. */
+.leerblock { padding: 40px 24px; text-align: center; }
+.leerblock .ic {
   width: 40px; height: 40px; border-radius: 11px; background: var(--line-soft);
   display: grid; place-items: center; margin: 0 auto 12px; font-size: 18px;
 }
-.leer .t { font-size: 14.5px; font-weight: 600; }
-.leer .u { font-size: 13px; color: var(--ink-3); margin-top: 5px; max-width: 42ch; margin-inline: auto; }
+.leerblock .t { font-size: 14.5px; font-weight: 600; }
+.leerblock .u { font-size: 13px; color: var(--ink-3); margin-top: 5px; max-width: 42ch; margin-inline: auto; }
+
+/* Ein Bereich ist eine Gruppe von Karten; sichtbar ist immer genau einer. */
+.bereich > .karte:last-child { margin-bottom: 0; }
+
+/* "Was hier noch fehlt": keine Aufzaehlungspunkte, dafuer Luft zwischen
+   den Zeilen -- es sind Saetze, keine Stichworte. */
+ul.fehlt { margin: 0; padding: 0; list-style: none; }
+ul.fehlt li {
+  font-size: 13.5px; color: var(--ink-2); line-height: 1.55;
+  padding-left: 16px; position: relative; margin-bottom: 12px;
+}
+ul.fehlt li:last-child { margin-bottom: 0; }
+ul.fehlt li::before {
+  content: ''; position: absolute; left: 0; top: 8px;
+  width: 6px; height: 6px; border-radius: 50%; background: var(--nix);
+}
+ul.fehlt b { color: var(--ink); font-weight: 620; }
+.zone-note { font-size: 12.5px; color: var(--ink-3); margin: 16px 0 0; }
 
 .meldung { padding: 13px 16px; border-radius: 9px; font-size: 13.5px; margin-bottom: 16px; }
 .meldung.fehler { background: var(--neg-soft); color: var(--neg); }
@@ -166,10 +328,24 @@ input:focus, select:focus { outline: 2px solid var(--accent-line); outline-offse
       border: 1px solid var(--line); border-radius: 9px; margin-bottom: 16px; }
 .qr svg { display: block; width: 180px; height: 180px; }
 
+/* Fuenf Reiter zu je 84 px passen unter rund 900 px nicht mehr neben
+   Titel und Abmelden-Knopf. Sie bekommen dann eine eigene Zeile ueber die
+   ganze Breite und scrollen darin waagrecht -- die SEITE selbst scrollt
+   nie quer, das ist der Unterschied (Hausregel). */
+@media (max-width: 900px) {
+  .kopf { grid-template-columns: 1fr auto; row-gap: 10px; }
+  .kopf-nav {
+    grid-row: 2; grid-column: 1 / -1; justify-content: flex-start;
+    overflow-x: auto; scrollbar-width: none; margin: 0 -4px; padding: 0 4px;
+  }
+  .kopf-nav::-webkit-scrollbar { display: none; }
+  .kopf-nav .nav-item { min-width: 76px; flex: none; }
+}
 @media (max-width: 700px) {
   .huelle { padding: 20px 16px 48px; }
-  .kopf { padding: 14px 16px; grid-template-columns: 1fr auto; }
-  .kopf .mitte { display: none; }
+  .kopf { padding: 14px 16px; }
+  .leiste { padding: 14px 16px; }
+  .leiste h1 { font-size: 17px; }
   .karte-leib { padding: 16px; }
 }
 </style>
@@ -269,15 +445,104 @@ input:focus, select:focus { outline: 2px solid var(--accent-line); outline-offse
       <div class="titel">Betreiber-Bereich</div>
       <div class="unter" id="kopf-wer"></div>
     </div>
-    <div class="mitte" id="kopf-mitte"></div>
+    <nav class="kopf-nav" id="kopf-nav" aria-label="Bereiche">
+      <button type="button" class="nav-item on" data-bereich="uebersicht" aria-current="page">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+        <span class="lbl">Übersicht</span>
+      </button>
+      <button type="button" class="nav-item" data-bereich="mandanten" aria-current="false">
+        <svg viewBox="0 0 24 24"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-5h6v5"/><path d="M9 10h.01"/><path d="M15 10h.01"/></svg>
+        <span class="lbl">Mandanten</span>
+      </button>
+      <button type="button" class="nav-item" data-bereich="offerten" aria-current="false">
+        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h5"/></svg>
+        <span class="lbl">Offerten</span>
+      </button>
+      <button type="button" class="nav-item" data-bereich="rechnungen" aria-current="false">
+        <svg viewBox="0 0 24 24"><path d="M4 3h16v18l-2.5-1.5L15 21l-2.5-1.5L10 21l-2.5-1.5L5 21 4 21z"/><path d="M8 8h8"/><path d="M8 12h8"/><path d="M8 16h4"/></svg>
+        <span class="lbl">Rechnungen</span>
+      </button>
+      <button type="button" class="nav-item" data-bereich="konten" aria-current="false">
+        <svg viewBox="0 0 24 24"><path d="M12 2l8 4v6c0 5-3.4 8.6-8 10-4.6-1.4-8-5-8-10V6z"/><path d="M12 11a2.4 2.4 0 1 0 0-4.8 2.4 2.4 0 0 0 0 4.8z"/><path d="M8 16.5c.9-1.6 2.3-2.4 4-2.4s3.1.8 4 2.4"/></svg>
+        <span class="lbl">Konten</span>
+      </button>
+    </nav>
     <div class="rechts">
+      <button class="thema-schalter" id="btn-thema" role="switch" aria-checked="false"
+              title="Hell oder dunkel"
+              aria-label="Zwischen heller und dunkler Darstellung wechseln">
+        <span class="ts-bahn"><span class="ts-schieber">
+          <svg class="i-sonne" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><line x1="12" y1="1.5" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22.5"/><line x1="4.2" y1="4.2" x2="5.9" y2="5.9"/><line x1="18.1" y1="18.1" x2="19.8" y2="19.8"/><line x1="1.5" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22.5" y2="12"/><line x1="4.2" y1="19.8" x2="5.9" y2="18.1"/><line x1="18.1" y1="5.9" x2="19.8" y2="4.2"/></svg>
+          <svg class="i-mond" viewBox="0 0 24 24"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11z"/></svg>
+        </span></span>
+      </button>
       <button class="klein" id="knopf-abmelden">Abmelden</button>
     </div>
+  </div>
+
+  <div class="leiste">
+    <h1 id="leiste-titel">Übersicht</h1>
+    <div class="crumb" id="leiste-unter">Die Lage über allen Betrieben</div>
   </div>
 
   <div class="huelle">
     <div id="haus-meldung" class="meldung versteckt"></div>
 
+    <!-- ══ Übersicht ══════════════════════════════════════════════ -->
+    <section class="bereich" id="b-uebersicht">
+      <div class="karte">
+        <div class="karte-kopf">
+          <div>
+            <h2>Lage</h2>
+            <div class="sub">Alle Mandanten dieser Anlage auf einen Blick</div>
+          </div>
+        </div>
+        <div class="zahlen" id="u-zahlen"></div>
+      </div>
+
+      <div class="karte">
+        <div class="karte-kopf">
+          <div>
+            <h2>Schnellzugriff</h2>
+            <div class="sub">Die Wege, die von hier aus am häufigsten gebraucht werden</div>
+          </div>
+        </div>
+        <div class="karte-leib">
+          <div class="knopfzeile" style="margin-top:0">
+            <button type="button" class="haupt" data-springe="mandanten">Mandanten verwalten</button>
+            <button type="button" data-springe="konten">Betreiber-Konten</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Was NICHT da ist, gehoert genauso hin wie das, was da ist. Ein
+           leerer Bereich ohne diese Karte sieht aus wie ein Fehler; mit ihr
+           steht da, dass er absichtlich leer ist und worauf er wartet. -->
+      <div class="karte">
+        <div class="karte-kopf">
+          <div>
+            <h2>Was hier noch fehlt</h2>
+            <div class="sub">Offen und bewusst nicht gebaut — damit es nicht wie ein Fehler aussieht</div>
+          </div>
+        </div>
+        <div class="karte-leib">
+          <ul class="fehlt">
+            <li><b>Offerten und Rechnungen</b> sind ein Gerüst. Was abgerechnet
+              wird — Grundgebühr, Zahl der Mitarbeitenden, Einsätze —, ist noch
+              nicht entschieden, und davon hängt der Datenaufbau ab.</li>
+            <li><b>Dieses Konto hat keinen Weg zurück.</b> Geht das Passwort
+              verloren, hilft heute nur ein Eingriff in der Datenbank — und der
+              geht nur, solange höchstens ein Mandant eingetragen ist.</li>
+            <li><b>Eine eigene Datenbank für diese Ebene</b> steht noch aus.
+              Heute liegen Mandantenstamm und Betreiber-Konten in derselben
+              Datenbank wie die Betriebsdaten des ersten Mandanten.</li>
+          </ul>
+          <p class="zone-note" id="u-sitzung"></p>
+        </div>
+      </div>
+    </section>
+    <!-- ══ Mandanten ══════════════════════════════════════════ -->
+    <section class="bereich versteckt" id="b-mandanten">
     <!-- Mandanten -->
     <div class="karte">
       <div class="karte-kopf">
@@ -287,7 +552,6 @@ input:focus, select:focus { outline: 2px solid var(--accent-line); outline-offse
         </div>
         <button class="klein" id="knopf-neu">Mandant anlegen</button>
       </div>
-      <div class="zahlen" id="m-zahlen"></div>
       <div id="m-inhalt"></div>
     </div>
 
@@ -356,7 +620,10 @@ input:focus, select:focus { outline: 2px solid var(--accent-line); outline-offse
         <div id="sup-inhalt"></div>
       </div>
     </div>
+    </section>
 
+
+    <section class="bereich versteckt" id="b-konten">
     <!-- Konten -->
     <div class="karte">
       <div class="karte-kopf">
@@ -367,6 +634,33 @@ input:focus, select:focus { outline: 2px solid var(--accent-line); outline-offse
       </div>
       <div id="k-inhalt"></div>
     </div>
+    </section>
+
+    <!-- ══ Offerten ═══════════════════════════════════════════════ -->
+    <section class="bereich versteckt" id="b-offerten">
+      <div class="karte">
+        <div class="karte-kopf">
+          <div>
+            <h2>Offerten</h2>
+            <div class="sub">Angebote an Betriebe, die diese Plattform nutzen wollen</div>
+          </div>
+        </div>
+        <div id="of-inhalt"></div>
+      </div>
+    </section>
+
+    <!-- ══ Rechnungen ═════════════════════════════════════════════ -->
+    <section class="bereich versteckt" id="b-rechnungen">
+      <div class="karte">
+        <div class="karte-kopf">
+          <div>
+            <h2>Rechnungen</h2>
+            <div class="sub">Was die Mandanten für die Nutzung dieser Plattform zahlen</div>
+          </div>
+        </div>
+        <div id="re-inhalt"></div>
+      </div>
+    </section>
   </div>
 </div>
 
@@ -398,6 +692,64 @@ function melde(el, art, txt) {
 }
 function stumm(el) { zeig(el, false); }
 
+/* ── Bereiche ────────────────────────────────────────────────────
+   Ein Bereich ist sichtbar, die uebrigen nicht. Bewusst kein Nachladen
+   der Seite und kein eigener Verlaufseintrag: Der Betreiber-Bereich haelt
+   seinen Token in sessionStorage, ein Neuladen waere ein Umweg ueber die
+   Anmeldung. */
+const BEREICHE = {
+  uebersicht: ['Übersicht',  'Die Lage über allen Betrieben'],
+  mandanten:  ['Mandanten',  'Betriebe, die diese Plattform nutzen'],
+  offerten:   ['Offerten',   'Angebote an künftige Mandanten'],
+  rechnungen: ['Rechnungen', 'Was die Mandanten für die Nutzung zahlen'],
+  konten:     ['Konten',     'Wer diesen Bereich öffnen darf'],
+};
+
+function bereichZeigen(welcher) {
+  if (!BEREICHE[welcher]) { welcher = 'uebersicht'; }
+  Object.keys(BEREICHE).forEach(k => {
+    const el = $('b-' + k);
+    if (el) { zeig(el, k === welcher); }
+  });
+  document.querySelectorAll('#kopf-nav .nav-item').forEach(b => {
+    const an = b.dataset.bereich === welcher;
+    b.classList.toggle('on', an);
+    // Nicht nur eingefaerbt, sondern auch angesagt: Wer die Seite hoert
+    // statt sieht, erfaehrt aus der Farbe nichts.
+    b.setAttribute('aria-current', an ? 'page' : 'false');
+  });
+  $('leiste-titel').textContent = BEREICHE[welcher][0];
+  $('leiste-unter').textContent = BEREICHE[welcher][1];
+  // Ein Formular, das beim Bereichswechsel offen bliebe, stuende beim
+  // naechsten Besuch halb ausgefuellt da, ohne dass jemand weiss warum.
+  if (welcher !== 'mandanten') {
+    zeig($('m-form-karte'), false);
+    zeig($('sup-karte'), false);
+  }
+  window.scrollTo({ top: 0 });
+}
+
+/* ── Hell oder dunkel ────────────────────────────────────────────
+   Der Wert steht schon im Kopf der Seite am Dokument; hier wird nur noch
+   umgeschaltet und gespeichert. Derselbe Speicherschluessel wie im
+   Cockpit -- Begruendung oben beim Vorab-Skript. */
+function themaSetzen(w) {
+  const dunkel = w === 'dunkel';
+  document.documentElement.setAttribute('data-thema', dunkel ? 'dunkel' : 'hell');
+  try { localStorage.setItem('rv3_thema', dunkel ? 'dunkel' : 'hell'); } catch (e) { /* egal */ }
+  const b = $('btn-thema');
+  if (b) {
+    b.setAttribute('aria-checked', dunkel ? 'true' : 'false');
+    b.title = dunkel ? 'Auf helle Darstellung wechseln' : 'Auf dunkle Darstellung wechseln';
+  }
+  // Die Farbe der Systemleiste am Telefon mitziehen.
+  const m = document.querySelector('meta[name="theme-color"]');
+  if (m) { m.setAttribute('content', dunkel ? '#0B0D11' : '#16181D'); }
+}
+function themaUm() {
+  themaSetzen(document.documentElement.getAttribute('data-thema') === 'dunkel' ? 'hell' : 'dunkel');
+}
+
 async function ruf(pfad, daten, methode) {
   const opt = { method: methode || (daten ? 'POST' : 'GET'), headers: {} };
   if (token) { opt.headers['X-Auth-Token'] = token; }
@@ -405,7 +757,37 @@ async function ruf(pfad, daten, methode) {
   const antwort = await fetch(API + pfad, opt);
   let inhalt = {};
   try { inhalt = await antwort.json(); } catch (e) { /* leere Antwort */ }
+
+  /* Eine Sitzung, die nicht mehr traegt, ist kein Ladefehler.
+     Bis hierher malte jede Liste fuer sich "Nicht abrufbar" -- der
+     Bildschirm stand voller Fehlerkaesten, obwohl nur die Anmeldung
+     abgelaufen war, und daneben ein Knopf "Abmelden" fuer eine Sitzung,
+     die es nicht mehr gab. Dieselbe Aussage wie beim Laden der Seite:
+     zurueck zur Anmeldung, ohne Fehlermeldung.
+
+     Nur mit gesendetem Token: betreiber_anmelden.php antwortet auf ein
+     falsches Passwort ebenfalls mit 401, und das gehoert in die Meldung
+     des Anmeldefensters, nicht in einen Rueckwurf.
+     403 bleibt ausgenommen -- "Zwei-Faktor noch nicht eingerichtet" ist
+     etwas anderes als "nicht mehr angemeldet". */
+  if (antwort.status === 401 && token) { zurueckZurAnmeldung(); }
+
   return { code: antwort.status, ...inhalt };
+}
+
+/* Token wegwerfen und die Anmeldemaske zeigen. Kein Neuladen der Seite:
+   Ein halb ausgefuelltes Mandantenformular waere sonst weg, und der Grund
+   dafuer stuende nirgends. */
+function zurueckZurAnmeldung() {
+  try { sessionStorage.removeItem(SCHLUESSEL); } catch (e) { /* egal */ }
+  token = '';
+  zeig($('haus'), false);
+  zeig($('zf-tor'), false);
+  zeig($('tor'), true);
+  melde($('tor-meldung'), 'warn', 'Die Anmeldung ist abgelaufen — bitte neu anmelden.');
+  const f = $('e-pass'); if (f) { f.value = ''; }
+  const c = $('e-code'); if (c) { c.value = ''; }
+  zeig($('tor-code'), false);
 }
 
 /* ── Anmeldung ──────────────────────────────────────────────────── */
@@ -443,6 +825,7 @@ async function nachAnmeldung(zfSteht) {
   if (!zfSteht) { zeig($('zf-tor'), true); return; }
   zeig($('zf-tor'), false);
   zeig($('haus'), true);
+  bereichZeigen('uebersicht');
   await ladeAlles();
 }
 
@@ -533,18 +916,18 @@ function merker(karte, schluessel) {
 
 async function ladeMandanten() {
   const a = await ruf('betreiber_mandant_list.php');
-  const inhalt = $('m-inhalt'), zahlen = $('m-zahlen');
+  const inhalt = $('m-inhalt');
 
   if (a.code === 503) {
     // Nicht eingerichtet ist etwas anderes als "keine vorhanden".
-    zahlen.innerHTML = '';
+    uebersichtSetzen('');
     inhalt.innerHTML = leerBlock('⚙', 'Noch nicht eingerichtet',
       'Der Mandantenstamm ist auf diesem Server noch nicht angelegt. '
       + 'Die Einrichtung läuft einmalig über das Cockpit.');
     return;
   }
   if (a.status !== 'ok') {
-    zahlen.innerHTML = '';
+    uebersichtSetzen('');
     inhalt.innerHTML = leerBlock('⚠', 'Nicht abrufbar', text(a.message || 'Unbekannter Fehler.'));
     return;
   }
@@ -571,11 +954,11 @@ async function ladeMandanten() {
   /* Einheiten nicht vermischen: "Mandanten" zaehlt Betriebe, "aktiv" zaehlt
      Betriebe mit Status aktiv, "GAV offen" zaehlt Bestaetigungen. Jede Zahl
      bekommt ihren Bezug, sobald sie eine Teilmenge ist (Hausregel). */
-  zahlen.innerHTML =
+  uebersichtSetzen(
       zahlBlock('Mandanten', liste.length, null)
     + zahlBlock('Aktiv', aktiv, liste.length ? aktiv + ' von ' + liste.length : null)
     + zahlBlock('GAV offen', offen, offen ? 'Bestätigung fehlt' : 'alle bestätigt')
-    + zahlBlock('Nicht erreichbar', kaputt, kaputt ? 'Einrichtung prüfen' : 'alle erreichbar');
+    + zahlBlock('Nicht erreichbar', kaputt, kaputt ? 'Einrichtung prüfen' : 'alle erreichbar'));
 
   if (!liste.length) {
     inhalt.innerHTML = leerBlock('◇', 'Noch kein Mandant eingetragen',
@@ -634,7 +1017,7 @@ function zahlBlock(lab, wert, bezug) {
        + (bezug ? '<div class="bezug">' + text(bezug) + '</div>' : '') + '</div>';
 }
 function leerBlock(zeichen, titel, unter) {
-  return '<div class="leer"><div class="ic">' + zeichen + '</div>'
+  return '<div class="leerblock"><div class="ic">' + zeichen + '</div>'
        + '<div class="t">' + text(titel) + '</div>'
        + '<div class="u">' + text(unter) + '</div></div>';
 }
@@ -801,10 +1184,50 @@ async function kontoSchalten(id, aktiv) {
   await ladeKonten();
 }
 
+/* ── Übersicht ──────────────────────────────────────────────────
+   Sie rechnet NICHT selbst nach, sondern bekommt die Zahlen von
+   ladeMandanten() gereicht. Zwei Stellen, die dieselbe Menge zaehlen,
+   laufen irgendwann auseinander -- und es faellt erst auf, wenn zwei
+   verschiedene Zahlen nebeneinander stehen. */
+function uebersichtSetzen(zahlenHtml) {
+  const el = $('u-zahlen');
+  if (el) { el.innerHTML = zahlenHtml; }
+}
+
+/* Ein Bereich, der noch nicht gebaut ist, ist etwas anderes als einer ohne
+   Inhalt. "Noch nichts vorhanden" waere eine Falschaussage: Es ist nicht
+   leer, es gibt es noch nicht. Vier Aussagen, vier Texte -- die Hausregel,
+   die hier schon am haeufigsten verletzt wurde. */
+function geruestZeigen(id, was, warum) {
+  const el = $(id);
+  if (el) { el.innerHTML = leerBlock('◷', was, warum); }
+}
+
 /* ── Rahmen ─────────────────────────────────────────────────────── */
 async function ladeAlles() {
-  if (ich) { $('kopf-wer').textContent = ich.name + ' · ' + ich.email; }
-  $('kopf-mitte').textContent = 'Sitzung endet nach 30 Minuten ohne Nutzung';
+  /* Name und Adresse nur dann beide, wenn sie sich unterscheiden. Wer beim
+     Anlegen seine E-Mail auch als Namen eingetragen hat, sah sie hier sonst
+     zweimal nebeneinander. */
+  if (ich) {
+    const gleich = String(ich.name || '').trim().toLowerCase()
+                === String(ich.email || '').trim().toLowerCase();
+    $('kopf-wer').textContent = gleich ? ich.email : ich.name + ' · ' + ich.email;
+  }
+  const hinweis = $('u-sitzung');
+  if (hinweis) { hinweis.textContent = 'Die Sitzung endet nach 30 Minuten ohne Nutzung.'; }
+
+  /* Beide Gerueste sagen dasselbe, aber nicht mit demselben Satz: Eine
+     Offerte geht an einen Betrieb, der noch keiner ist, eine Rechnung an
+     einen, der es schon ist. */
+  geruestZeigen('of-inhalt', 'Noch nicht gebaut',
+    'Das Gerüst steht. Offerten an künftige Mandanten entstehen hier, sobald '
+    + 'feststeht, was angeboten wird — die Positionen einer Offerte sind die '
+    + 'Preise, und die sind noch nicht entschieden.');
+  geruestZeigen('re-inhalt', 'Noch nicht gebaut',
+    'Das Gerüst steht. Rechnungen an die Mandanten entstehen hier, sobald '
+    + 'entschieden ist, wonach abgerechnet wird — Grundgebühr, Zahl der '
+    + 'Mitarbeitenden oder Einsätze. Davon hängt ab, wie die Daten liegen.');
+
   await ladeMandanten();
   await ladeKonten();
 }
@@ -824,13 +1247,26 @@ $('e-code').onkeydown = e => { if (e.key === 'Enter') anmelden(); };
 $('knopf-zf-start').onclick  = zfStart;
 $('knopf-zf-fertig').onclick = zfFertig;
 $('knopf-zf-weiter').onclick = async () => {
-  zeig($('zf-tor'), false); zeig($('haus'), true); await ladeAlles();
+  zeig($('zf-tor'), false); zeig($('haus'), true);
+  bereichZeigen('uebersicht'); await ladeAlles();
 };
 $('knopf-neu').onclick        = () => formularOeffnen(null);
 $('knopf-speichern').onclick  = mandantSpeichern;
 $('knopf-abbrechen').onclick  = () => zeig($('m-form-karte'), false);
 $('knopf-sup-zu').onclick      = () => zeig($('sup-karte'), false);
 $('knopf-abmelden').onclick   = abmelden;
+$('btn-thema').onclick        = themaUm;
+document.querySelectorAll('#kopf-nav .nav-item').forEach(b => {
+  b.onclick = () => bereichZeigen(b.dataset.bereich);
+});
+// Die Schnellzugriff-Knoepfe fuehren in dieselben Bereiche. Sie tragen
+// dasselbe data-Attribut und keinen eigenen Weg -- zwei Wege in denselben
+// Bereich waeren zwei Stellen, die auseinanderlaufen koennen.
+document.querySelectorAll('[data-springe]').forEach(b => {
+  b.onclick = () => bereichZeigen(b.dataset.springe);
+});
+// Den Schalter auf den Stand bringen, den das Vorab-Skript gesetzt hat.
+themaSetzen(document.documentElement.getAttribute('data-thema') || 'hell');
 
 /* Beim Laden: Liegt ein Token in dieser Registerkarte, wird er benutzt.
    Traegt er nicht mehr, faellt die Seite auf die Anmeldung zurueck --
