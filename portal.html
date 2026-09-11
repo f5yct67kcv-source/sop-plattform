@@ -371,6 +371,21 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
             background:var(--line);border:1px solid var(--line);
             border-radius:var(--r);overflow:hidden;margin-bottom:18px}
 .kennzahlen>div{background:var(--surface);padding:12px 14px}
+
+/* Text links, Bild rechts -- und AUSDRÜCKLICH NUR im oberen Band (#kz-band).
+   Dieselbe Klasse .kennzahlen trägt auch das Band im aufgeklappten Detail
+   einer Runde, und dort stehen k-l/k-v/k-f ohne Hülle nebeneinander im
+   selben Element: Als Flex-Zeile landete dort die Beschriftung NEBEN dem
+   Wert statt darüber. Von einer bestehenden Prüfung gefangen.
+
+   min-width:0 ist kein Beiwerk: Ohne das weigern sich Rasterfelder, unter
+   ihren Inhalt zu schrumpfen -- das Band lief auf dem Handy über den
+   Kartenrand hinaus, der Ring wurde abgeschnitten und die Fusszeile mit
+   ihm. Am gerenderten Bild aufgefallen. */
+#kz-band>div{min-width:0;display:flex;align-items:center;gap:10px}
+/* Der Textteil darf schrumpfen, das Bild nicht: Sonst quetscht eine lange
+   Fusszeile den Ring zu einem Ei. */
+.k-text{flex:1 1 auto;min-width:0}
 .kennzahlen .k-l{font-size:11px;font-weight:700;letter-spacing:.06em;
                  text-transform:uppercase;color:var(--ink-3)}
 .kennzahlen .k-v{font-size:20px;font-weight:700;margin-top:3px}
@@ -386,21 +401,41 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
 /* Platz für Meter und Kurve. Zwischen Wert und Fusszeile, beide gleich
    hoch -- sonst stünden die Fusszeilen der vier Kacheln auf verschiedenen
    Höhen und die Reihe wirkte schief. */
-.k-bild{height:20px;margin:7px 0 5px;display:flex;align-items:center}
-/* Ein LEERER Bildplatz hält die Fusszeilen auf einer Höhe -- aber nur dort,
-   wo Kacheln mit und ohne Bild wirklich nebeneinander stehen. Auf dem Handy
-   ist das Band 2x2: Oben haben beide ein Bild, unten keines. Der leere Platz
-   schöbe dort nur die untere Zeile um 22 px auf, ohne etwas auszurichten.
-   Gemessen, nicht überlegt: 116/116/134/134 mit, 116/116/112/112 ohne. */
-.k-bild:empty{display:none}
-.k-bild .balken{width:100%;height:7px}
+/* Der Bildplatz steht RECHTS neben dem Text und bringt seine eigene
+   Grösse mit. flex:none, damit ihn eine lange Fusszeile nicht zusammen-
+   drückt. */
+.k-bild{flex:none;display:flex;align-items:center}
+
+/* Der Ring (ENT-527). Er braucht Höhe, die ein Balken nicht brauchte --
+   darum ist der Bildplatz mit dem Ring höher als der Streifen für die
+   Säulen. Beide stehen an derselben Stelle der Kachel, zwischen Wert und
+   Fusszeile. */
+/* Auf dem schmalen Band (2 Spalten, ~178 px je Kachel) kleiner: Ein
+   48-px-Ring liesse der Fusszeile keine Zeile. Ab 640 px wächst er. */
+.k-ring{width:38px;height:38px;flex:none;display:block;
+        /* Oben beginnen und im Uhrzeigersinn laufen. Ohne die Drehung
+           startet ein SVG-Kreis rechts auf drei Uhr -- der Ring wäre
+           nicht ablesbar. */
+        transform:rotate(-90deg)}
+.k-ring circle{fill:none;stroke-width:5}
+/* Die ungefüllte Spur ist ein HELLER TON DERSELBEN Farbe, nicht Grau:
+   So liest sich der Zustand über den ganzen Ring, nicht nur am gefüllten
+   Stück. Die Soft-Töne gibt es im Haus bereits. */
+.k-ring.voll .k-ring-spur{stroke:var(--gruen-soft)}
+.k-ring.teil .k-ring-spur{stroke:var(--warn-soft)}
+.k-ring.ab   .k-ring-spur{stroke:var(--rot-soft)}
+.k-ring.voll .k-ring-wert{stroke:var(--gruen)}
+.k-ring.teil .k-ring-wert{stroke:var(--warn)}
+.k-ring.ab   .k-ring-wert{stroke:var(--rot)}
+.k-ring-wert{stroke-linecap:round}
 /* Die Kurve zeigt die FORM des Zeitraums, nicht Werte -- darum ohne Achsen
    und bewusst flach. preserveAspectRatio="none" im Markup: Sie soll die
    Kachelbreite füllen, die Höhe bleibt fest. */
 /* Dünne Säulen, nicht Klötze: Ohne die Deckelung wurden sie bei sieben
    Tagen 48 px breit. Bei vielen Abschnitten schrumpfen sie stattdessen,
-   bis alle hineinpassen. */
-.k-kurve{display:flex;align-items:flex-end;gap:2px;height:20px;width:100%}
+   bis alle hineinpassen. Feste Breite, weil der Verlauf jetzt neben dem
+   Text steht und nicht mehr die Kachelbreite füllt. */
+.k-kurve{display:flex;align-items:flex-end;gap:2px;height:28px;width:48px;flex:none}
 .k-saeule{flex:1 1 auto;min-width:2px;max-width:12px;
           border-radius:2px 2px 0 0;background:var(--accent)}
 /* Ein Abschnitt ohne Runde: ein flacher Sockel, nicht nichts. Eine Lücke
@@ -622,10 +657,11 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
   .zeile .fortschritt{grid-column:3;grid-row:1;margin-top:0}
   .zeile .rechts{grid-column:4;grid-row:1}
   .kennzahlen{grid-template-columns:repeat(4,1fr)}
-  /* Ab hier stehen alle vier in EINER Zeile -- jetzt braucht es den
-     leeren Platz, sonst sitzen die Fusszeilen der Kacheln ohne Bild
-     22 px höher als die der anderen. */
-  .k-bild:empty{display:block}
+  /* Vier Spalten heissen mehr Platz je Kachel -- die Bilder dürfen
+     wieder ihre volle Grösse haben. */
+  #kz-band>div{gap:12px}
+  .k-ring{width:48px;height:48px}
+  .k-kurve{height:34px;width:62px}
   .v-zeile{grid-template-columns:56px 12px 1fr}
 }
 </style>
@@ -1494,7 +1530,7 @@ function kzBand(daten) {
           // kein zweites Bauteil für dieselbe Aussage. Die Füllung trägt den
           // Schweregrad, der Grund bleibt sichtbar, damit "wenig erledigt"
           // nicht wie "keine Angabe" aussieht.
-          bild: kzMeter(grad) }
+          bild: kzRing(grad) }
       // Kein Wert ist hier die richtige Auskunft. "0 %" hiesse, es sei
       // nichts erledigt worden; "100 %", es sei alles erledigt. Beides wäre
       // falsch -- es wurde nichts gemessen.
@@ -1517,41 +1553,62 @@ function kzBand(daten) {
   // Reihenfolge fest: Beschriftung, Wert, BILD, Fusszeile. Das Bild steht
   // zwischen Wert und Bezugstext, weil es denselben Wert zeigt -- die
   // Fusszeile nennt die Rohzahlen und gehört darum ans Ende.
+  // Das Bild steht NEBEN dem Text, nicht darunter (ENT-527). Unter dem
+  // Wert kostete es jeder Kachel 44 px Höhe -- auch den beiden ohne Bild,
+  // die sonst mit den Fusszeilen aus der Reihe gefallen wären. Daneben
+  // kostet es gar keine Höhe, und die Fusszeilen aller vier stehen ohne
+  // Zutun auf einer Linie.
+  //
+  // Warum "Abgebrochen" und "Fotobeleg" kein Bild bekommen: Ein Ring oder
+  // Balken zeigt einen ANTEIL. Bei vier Runden sähe ein Abbruch aus wie
+  // ein Viertel des Bildes -- genau der Eindruck "das ist System", den
+  // ENT-490 mit der nackten Zahl vermeidet.
   ziel.innerHTML = band.map(b => '<div>'
+    + '<div class="k-text">'
     + '<div class="k-l">' + esc(b.l) + '</div>'
     + '<div class="k-v">' + b.v + '</div>'
-    // Der Bildplatz steht in JEDER Kachel, auch leer. Gemessen: Ohne ihn
-    // sind die Kacheln mit Bild vier Pixel höher, und die Fusszeilen der
-    // vier stehen auf verschiedenen Höhen -- nebeneinander wirkt das
-    // unruhig, ohne dass man sagen kann warum (Hausregel Gestaltung).
-    //
-    // Warum "Abgebrochen" und "Fotobeleg" KEINEN Balken bekommen, obwohl
-    // Platz da ist: Ein Balken zeigt einen Anteil. Bei vier Runden sähe
-    // ein Abbruch aus wie ein Viertel des Bildes -- genau der Eindruck
-    // "das ist System", den ENT-490 mit der nackten Zahl vermeidet.
-    + (b.bild || '<div class="k-bild"></div>')
     + '<div class="k-f">' + esc(b.f) + '</div>'
+    + '</div>'
+    + (b.bild || '')
     + '</div>').join('');
 }
 
-/* Der Meter zum Erledigungsgrad.
+/* Der Ring zum Erledigungsgrad (ENT-527).
 
-   Ein Ring oder Kuchen aus zwei Stücken wäre hier die falsche Form: Ein
-   Verhältnis gegen eine Grenze liest man an einer Strecke ab, nicht an
-   einem Winkel. Der Balken ist ausserdem schon da -- die Liste darunter
-   benutzt ihn für dieselbe Aussage je Runde.
+   Bis ENT-500 stand hier ein Balken, mit der Begründung, ein Verhältnis
+   gegen eine Grenze lese man an einer Strecke ab und nicht an einem
+   Winkel. Der Projektinhaber hat den Ring ausdrücklich verlangt, nachdem
+   ihm der Balken vorgelegt worden war -- seine Entscheidung, und sie steht
+   als ENT-527 im Protokoll.
 
-   Die Farbe ist NIE die einzige Auskunft: Daneben stehen der Prozentwert
-   und die Rohzahlen. Das ist hier keine Feinheit, sondern nötig -- gemessen
-   liegen Grün und Bernstein unter Protanopie nur ΔE 3.6 auseinander (siehe
-   OP-501), sind also für manche Augen dieselbe Farbe. */
-function kzMeter(grad) {
+   Was dabei erhalten bleibt, weil es nicht Geschmack ist:
+   - Die FARBE ist nie die einzige Auskunft. Neben dem Ring stehen der
+     Prozentwert und die Rohzahlen. Gemessen liegen Grün und Bernstein
+     unter Protanopie nur ΔE 3.6 auseinander (OP-501) -- für manche Augen
+     dieselbe Farbe.
+   - Die UNGEFÜLLTE Spur ist ein heller Ton derselben Farbe, nicht Grau:
+     So liest sich der Zustand über den ganzen Ring und nicht nur am
+     gefüllten Stück.
+   - Der Ring beginnt oben und läuft im Uhrzeigersinn. Ein Ring, der
+     irgendwo beginnt, ist nicht ablesbar.
+
+   Die Zahl steht NICHT in der Mitte des Rings: Sie steht bereits als Wert
+   darüber, und zweimal dieselbe Zahl in einer Kachel ist eine zu viel. */
+function kzRing(grad) {
   if (grad === null) { return ''; }
   const klasse = grad >= 100 ? 'voll' : (grad > 0 ? 'teil' : 'ab');
-  return '<div class="k-bild"><div class="balken ' + klasse + '" role="img"'
-    + ' aria-label="' + grad + ' Prozent erledigt">'
-    + '<div class="fuell" style="width:' + Math.max(0, Math.min(100, grad)) + '%"></div>'
-    + '</div></div>';
+  const wert = Math.max(0, Math.min(100, grad));
+  // Radius 15.9155 => Umfang 100. Damit ist die Strichlänge direkt der
+  // Prozentwert, ohne Rechnerei mit 2*pi*r.
+  const R = 15.9155;
+  return '<div class="k-bild"><svg class="k-ring ' + klasse + '" viewBox="0 0 40 40"'
+    + ' role="img" aria-label="' + wert + ' Prozent erledigt">'
+    + '<circle class="k-ring-spur" cx="20" cy="20" r="' + R + '"/>'
+    + (wert > 0
+      ? '<circle class="k-ring-wert" cx="20" cy="20" r="' + R + '"'
+        + ' stroke-dasharray="' + wert.toFixed(1) + ' ' + (100 - wert).toFixed(1) + '"/>'
+      : '')
+    + '</svg></div>';
 }
 
 /* Der kleine Verlauf zur Zahl der Rundgänge — SÄULEN, keine Linie.

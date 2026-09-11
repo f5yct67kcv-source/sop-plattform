@@ -108,7 +108,7 @@ if ($erprobung) {
     pruef('Es gibt eine eigene, hoehere Grenze fuer die Verwaltung',
         PASSWORT_MIN_ADMIN > PASSWORT_MIN);
     // Die Laenge NICHT ausgeschrieben, sondern aus PASSWORT_MIN geschnitten.
-    // Hier stand bis ENT-519 ein festes 'blauerstuhlam' (13 Zeichen) -- das
+    // Hier stand bis ENT-533 ein festes 'blauerstuhlam' (13 Zeichen) -- das
     // trug die Aussage nur solange, wie die Verwaltungsgrenze ueber 13 lag.
     // Mit 10/12 waeren 13 Zeichen fuer BEIDE genug gewesen, und die Pruefung
     // waere rot geworden, obwohl die Regel stimmt. Genau die Sorte Pruefung,

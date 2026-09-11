@@ -465,6 +465,7 @@ for (const [datei, titel] of [
   ['pruef_zustellnachweis.php', 'KRITISCH: der Zustellnachweis fuehrt EINE Zeile je Rapport, kein Bewegungsprofil (ENT-491)'],
   ['pruef_portal_verlauf.php', 'KRITISCH: die Verlaufskurve buendelt nach Tagen/Wochen und laesst keine Luecke weg (ENT-500)'],
   ['pruef_sicherheit.php', 'KRITISCH: die Sicherheitsregeln aus ENT-501 werden WIRKLICH ausgefuehrt -- Basisadresse, Link-Schema, Push-Dienst, Sitzungs-Abdruck, Blindpruefung, Bildtyp'],
+  ['pruef_ki.php', 'KRITISCH: die KI-Erkennung sagt, WARUM sie nicht ging -- kein Schluessel, abgelehnt, Guthaben und Stoerung sind verschiedene Aussagen (ENT-530)'],
 ]) {
   let aus = '', code = 0;
   try {
@@ -504,6 +505,28 @@ const ohneEinbindung = apiDateien.filter(f => {
 check('KRITISCH: jeder Endpunkt mit Rechtepruefung bindet rechte.php ein',
   ohneEinbindung.length === 0);
 if (ohneEinbindung.length) { bad.push('ohne rechte.php: ' + ohneEinbindung.join(', ')); }
+
+// Jeder KI-Endpunkt muss den GRUND weitergeben, nicht einen Satz fuer alles
+// (ENT-530). Vier Endpunkte antworteten bis dahin auf jeden Fehlschlag mit
+// "Erkennung nicht verfuegbar" -- kein Schluessel, abgelehnter Schluessel,
+// leeres Guthaben und Stoerung sahen identisch aus, und damit liess sich
+// nicht einmal feststellen, ob ueberhaupt ein Schluessel hinterlegt ist.
+//
+// Geprueft wird nicht, wie ein Satz lautet (das steht in pruef_ki.php),
+// sondern dass die Weiche ueberhaupt benutzt wird: Auf JEDEN "=== null"-Zweig
+// eines KI-Endpunkts folgt ki_fehler_melden(). Ein neuer fuenfter Endpunkt,
+// der den Grund verschluckt, faellt hier auf.
+{
+  const kiDateien = apiDateien.filter(f => f.startsWith('ki_'));
+  check('Es gibt ueberhaupt KI-Endpunkte zu pruefen', kiDateien.length > 0);
+  for (const f of kiDateien) {
+    const q = ohneKommentar(f);
+    const zweige = (q.match(/===\s*null\s*\)\s*\{/g) || []).length;
+    const gemeldet = (q.match(/===\s*null\s*\)\s*\{\s*ki_fehler_melden\s*\(/g) || []).length;
+    check(`KRITISCH: ${f} nennt bei jedem Fehlschlag den Grund (ki_fehler_melden)`,
+      zweige > 0 && zweige === gemeldet);
+  }
+}
 
 // Eine abgeglichene Schicht ist festgeschrieben (ENT-045). Wer den Plan
 // danach aendert, verschiebt rueckwirkend die Grundlage einer Feststellung,
@@ -791,6 +814,12 @@ const OHNE_ANMELDUNG = [
   // Betriebsstammdaten, Honigtopf-Feld, eigene Bremse. Eigene Pruefung:
   // pruef_demo_anfrage.php.
   'demo_senden.php',
+  // Der Eingang der Betreiber-Ebene (ENT-524). Kann keine Sitzung
+  // verlangen, die er erst erzeugt -- dieselbe Begruendung wie login.php.
+  // Erbt Bremse (eigener Namensraum "betreiber:"), Blindpruefung gegen
+  // Zeitmessung und die gleichlautende Antwort fuer "gibt es nicht" und
+  // "Passwort falsch". Eigene Pruefung: test_betreiber.mjs.
+  'betreiber_anmelden.php',
   // Die drei Eingaenge des Kundenportals -- stehen zusaetzlich in
   // PORTAL_EINGAENGE weiter unten, weil dort die Portal-Regel greift.
   'portal_anmelden.php',
@@ -802,8 +831,12 @@ const OHNE_ANMELDUNG = [
   'beleg_oeffentlich.php',
   'beleg_entscheidung.php',
 ];
+// Drei Anmeldewege, drei Pruefstellen: die Verwaltung (require_session),
+// das Kundenportal (require_kundensession, ENT-441) und die Betreiber-Ebene
+// (require_betreiber, ENT-519). Wer einen davon ruft, ist angemeldet -- wer
+// keinen ruft, steht unten namentlich mit Grund.
 const ohneAnmeldung = apiDateien.filter(f =>
-  !/require_session\s*\(|require_kundensession\s*\(/.test(ohneKommentar(f)));
+  !/require_session\s*\(|require_kundensession\s*\(|require_betreiber(?:_voll)?\s*\(/.test(ohneKommentar(f)));
 const unbenannt = ohneAnmeldung.filter(f => !OHNE_ANMELDUNG.includes(f));
 check('KRITISCH: jeder Endpunkt ganz ohne Anmeldung steht namentlich da',
   unbenannt.length === 0);

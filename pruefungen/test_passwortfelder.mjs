@@ -92,11 +92,32 @@ check('Die laengere Mindestlaenge fuer Verwaltungszugaenge ist auffindbar', serv
 // PASSWORT_MIN und haette eine korrekte 16 dort als Abweichung gemeldet --
 // eine Pruefung, die den richtigen Zustand beanstandet, wird irgendwann
 // weggeklickt.
-const ERWARTET = datei => datei === 'backend/setup.html' ? serverMinAdmin : serverMin;
+// Welche Zahl an einer Fundstelle richtig ist, haengt nicht nur an der
+// DATEI, sondern am Konto, um das es dort geht:
+//
+//   - backend/setup.html legt das erste Konto der Anlage an, und das ist
+//     per Definition ein Verwaltungszugang (setup.php setzt ist_admin = 1).
+//   - dashboard.html traegt BEIDE Faelle: gewoehnliche Passwoerter und --
+//     seit ENT-528 -- das erste Betreiber-Konto. Fuer dieses gilt die
+//     laengere Zahl, weil betreiber_konto_anlegen.php passwort_pruefen()
+//     mit istAdmin = true aufruft.
+//
+// Darum entscheidet der Kontext der Fundstelle mit. Bis ENT-502 verglich
+// diese Pruefung stur gegen PASSWORT_MIN und haette eine korrekte 16 als
+// Abweichung gemeldet -- eine Pruefung, die den richtigen Zustand
+// beanstandet, wird irgendwann weggeklickt. Dieselbe Ueberlegung gilt hier.
+// Umlaute in beiden Schreibweisen: Der Quelltext dieses Hauses schreibt
+// Kommentare in ae/oe/ue, sichtbare Texte dagegen mit Umlaut. Wer nur eine
+// Fassung sucht, findet die andere nicht -- genau daran ist der erste
+// Versuch dieser Regel gescheitert.
+const VERWALTUNGSNIVEAU = /betreiber|m(?:ä|ae)chtigste[ns]? Konto/i;
+const ERWARTET = (datei, umfeld) =>
+  (datei === 'backend/setup.html' || VERWALTUNGSNIVEAU.test(umfeld || ''))
+    ? serverMinAdmin : serverMin;
 
 // Jede gefundene Zahl bringt ihren eigenen Sollwert mit, statt dass unten
 // pauschal ERWARTET(datei) gilt. Grund: dashboard.html nennt ZWEI Zahlen in
-// einer Zeile -- "const PW_MIN = 10, PW_MIN_ADMIN = 12;". Bis ENT-519 sah
+// einer Zeile -- "const PW_MIN = 10, PW_MIN_ADMIN = 12;". Bis ENT-533 sah
 // diese Pruefung nur die erste davon; PW_MIN_ADMIN wurde von NICHTS gegen
 // den Server verglichen. Das Cockpit haette also weiter 16 versprechen
 // koennen, waehrend der Server 12 nimmt -- genau der Fehler, gegen den es
@@ -104,14 +125,25 @@ const ERWARTET = datei => datei === 'backend/setup.html' ? serverMinAdmin : serv
 const zahlen = [];
 for (const datei of [...OBERFLAECHEN, ...NUR_MASKIERT, ...NUR_LAENGE]) {
   const text = readFileSync(`${WURZEL}/${datei}`, 'utf8');
-  // Die laengere Zahl zuerst: "const PW_MIN" trifft PW_MIN_ADMIN nicht (dort
-  // folgt ein "_" statt "="), aber die Reihenfolge macht die Absicht lesbar.
+  // Das Umfeld der Fundstelle entscheidet mit, welches Konto gemeint ist
+  // (aus dem Betreiber-Zweig). Grosszuegig nach hinten: Der Funktionsname,
+  // der das Konto benennt, steht oft mehrere Zeilen ueber der Textstelle.
+  const umfeldVon = i => text.slice(Math.max(0, i - 900), i + 150);
+  // PW_MIN_ADMIN ist die Verwaltungszahl SELBST und braucht kein Umfeld.
+  // Diese Zeile fehlte bis ENT-533: "const PW_MIN" trifft sie nicht (dort
+  // folgt ein "_" statt "="), und in dashboard.html stehen beide Zahlen in
+  // EINER Zeile -- das Cockpit haette also weiter 16 versprechen koennen,
+  // waehrend der Server 12 nimmt. Genau der Fehler, gegen den es diese Datei
+  // gibt, nur eine Zeile weiter rechts.
   for (const m of text.matchAll(/PW_MIN_ADMIN\s*=\s*(\d+)/g))              { zahlen.push([datei, 'PW_MIN_ADMIN', +m[1], serverMinAdmin]); }
-  for (const m of text.matchAll(/const PW_MIN\s*=\s*(\d+)/g))              { zahlen.push([datei, 'PW_MIN', +m[1], ERWARTET(datei)]); }
-  // Und jeder Text, der dem Nutzer eine Zahl nennt.
-  for (const m of text.matchAll(/mind(?:\.|estens)?\s+(\d+)\s+Zeichen/g))  { zahlen.push([datei, 'Text', +m[1], ERWARTET(datei)]); }
-  for (const m of text.matchAll(/min\.\s+(\d+)\s+Zeichen/g))               { zahlen.push([datei, 'Text', +m[1], ERWARTET(datei)]); }
+  // Sowohl die Konstante als auch jeder Text, der dem Nutzer eine Zahl nennt.
+  for (const m of text.matchAll(/const PW_MIN\s*=\s*(\d+)/g))              { zahlen.push([datei, 'PW_MIN', +m[1], ERWARTET(datei, umfeldVon(m.index))]); }
+  for (const m of text.matchAll(/mind(?:\.|estens)?\s+(\d+)\s+Zeichen/g))  { zahlen.push([datei, 'Text', +m[1], ERWARTET(datei, umfeldVon(m.index))]); }
+  for (const m of text.matchAll(/min\.\s+(\d+)\s+Zeichen/g))               { zahlen.push([datei, 'Text', +m[1], ERWARTET(datei, umfeldVon(m.index))]); }
 }
+// Jede gefundene Zahl bringt ihren eigenen Sollwert mit, statt dass pauschal
+// ERWARTET(datei) gilt -- nur so lassen sich die Umfeld-Regel (Betreiber) und
+// die eigene Verwaltungszahl (PW_MIN_ADMIN) nebeneinander pruefen.
 const abweichend = zahlen.filter(([, , n, soll]) => n !== soll);
 check(`KRITISCH: alle Oberflaechen nennen dieselbe Mindestlaenge wie der Server (${serverMin}, Verwaltung ${serverMinAdmin})`,
   abweichend.length === 0);

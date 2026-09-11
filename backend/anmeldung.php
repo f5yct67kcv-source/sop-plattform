@@ -124,11 +124,11 @@ function anmeld_fehlversuch(PDO $pdo, string $name, string $adresse): void
 // kuerzeres Passwort hat, kommt weiterhin rein; er wird nur beim naechsten
 // Wechsel auf die neue Laenge verpflichtet. Sonst waeren mit dem Deploy
 // schlagartig alle Konten ausgesperrt.
-// ── Neu bemessen: 10 und 12 (ENT-519, 2026-09-10) ─────────────────────
+// ── Neu bemessen: 10 und 12 (ENT-533, 2026-09-10) ─────────────────────
 //
 // Die Vorgeschichte in zwei Saetzen: ENT-289 senkte beide Laengen am
 // 2026-09-01 fuer die Erprobung auf 6, ENT-502 drehte sie am 2026-09-10
-// auf 12 und 16 zurueck. ENT-519 setzt sie am selben Tag auf 10 und 12 --
+// auf 12 und 16 zurueck. ENT-533 setzt sie am selben Tag auf 10 und 12 --
 // nicht als Rueckzug, sondern nach einer Rechnung, die vorher so nicht
 // gemacht worden war.
 //
@@ -157,7 +157,7 @@ function anmeld_fehlversuch(PDO $pdo, string $name, string $adresse): void
 // zur Zwei-Faktor-Anmeldung; ohne sie waeren es 14 gewesen. Die Pflicht
 // braucht zuerst zwei Dinge, die es nicht gibt: eine Uebersicht, wer sie
 // eingeschaltet hat, und einen Ruecksetzweg fuer ein verlorenes Geraet
-// (OP-520). Bis dahin gelten hier 12 OHNE Pflicht. Das ist bei einer
+// (OP-534). Bis dahin gelten hier 12 OHNE Pflicht. Das ist bei einer
 // Handvoll Konten vertretbar und steht ausdruecklich als Zwischenzustand
 // hier, damit es niemand fuer den fertigen Tausch haelt.
 //
@@ -282,7 +282,7 @@ function passwort_wiederholung(string $klein): bool
 // Nachschlagen verstaendlich sein.
 //
 // BEWUSST KEINE ZEICHENVORSCHRIFT (kein Zwang zu Grossbuchstabe und Zahl),
-// und mit ENT-519 auch dann nicht, als die Laengen sanken -- der Vorschlag
+// und mit ENT-533 auch dann nicht, als die Laengen sanken -- der Vorschlag
 // lag ausdruecklich auf dem Tisch ("statt 16 Zeichen: zwei Grossbuchstaben,
 // eine Zahl und mindestens 10").
 //
