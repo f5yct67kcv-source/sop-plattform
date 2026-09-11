@@ -16,6 +16,10 @@
       </a>
       <button class="hb-menu-btn" id="hbMenuBtn" aria-label="Menü" aria-expanded="false">☰</button>
     </div>
+    <div class="hb-suche">
+      <input type="search" id="hbSucheEingabe" placeholder="Suchen…" aria-label="Handbuch durchsuchen" autocomplete="off">
+      <div class="hb-suche-ergebnisse" id="hbSucheErgebnisse" hidden></div>
+    </div>
     <div class="hb-nav-wrap">
       <div class="hb-gruppe">Einstieg</div>
       <ul class="hb-nav">
@@ -31,6 +35,7 @@
         <li><a href="planung.html">Planung</a></li>
         <li><a href="kunden.html" class="aktiv">Kunden</a></li>
         <li><a href="personal.html">Personal</a></li>
+        <li><a href="lohn.html">Lohn</a></li>
         <li><a href="abgleich.html">Abgleich</a></li>
         <li><a href="betrieb.html">Betrieb</a></li>
       </ul>
@@ -69,7 +74,7 @@
         <a href="erste-schritte.html">Erste Schritte</a>).</p>
       </div>
 
-      <h2>Adressen (Kundenstamm)</h2>
+      <h2 id="adressen-kundenstamm">Adressen (Kundenstamm)</h2>
       <p>Umschalter „Alle"/„Archiviert", Suche über Name, Nummer, Kontaktperson und
       Notiz zugleich.</p>
 
@@ -104,7 +109,7 @@
       aktiven Auswahl, Objekte, Einsätze und Rapporte bleiben unverändert erhalten — es
       gibt keinen Löschweg für Kunden im eigentlichen Sinn.</p>
 
-      <h3>Kunden importieren (CSV)</h3>
+      <h3 id="kunden-importieren-csv">Kunden importieren (CSV)</h3>
       <ol class="hb-schritte">
         <li>„Importieren" → CSV-Datei wählen (aus Excel: „Datei → Speichern unter" →
         Format CSV; Trennzeichen und Umlaute erkennt das Werkzeug selbst).</li>
@@ -119,7 +124,7 @@
         Höchstens 2000 Zeilen je Durchgang.</li>
       </ol>
 
-      <h2>Objekte</h2>
+      <h2 id="objekte">Objekte</h2>
       <p>Der feste Einsatzort eines Dauerauftrags bei einem Kunden. Erscheint mindestens
       ein aktives Objekt in einer entschädigungspflichtigen Zone, zeigt die Liste einen
       durchgehenden Hinweisbalken „Auslagenersatz betrifft N Objekt(e) …" — auch bei
@@ -151,7 +156,7 @@
       daraus entstanden sind — sonst wird es beim „Entfernen" lediglich stillgelegt,
       nicht gelöscht.</p>
 
-      <h2>Rapporte</h2>
+      <h2 id="rapporte">Rapporte</h2>
       <p>Eine reine, kundenübergreifende Leseliste bereits signierter Einsatzrapporte —
       hier lässt sich nichts anlegen oder ändern, das geschieht in der Erfassung. Filter
       nach Monat und Freitext, CSV-Export der gefilterten Liste. Auf dem Handy zeigt das
@@ -166,7 +171,7 @@
         Umbenennungen lohnt sich darum Vorsicht.</p>
       </div>
 
-      <h2>Offerten &amp; Rechnungen</h2>
+      <h2 id="offerten-rechnungen">Offerten &amp; Rechnungen</h2>
       <p>Gemeinsames Formular, getrennte Listen. Status einer Offerte: Entwurf →
       Versendet → Angeschaut → Bestätigt/Abgelehnt. Eine Rechnung zeigt zusätzlich
       „Fällig" und „Offener Betrag"; abgelaufene Fristen erscheinen automatisch als
@@ -208,6 +213,8 @@
     </div>
   </div>
 </div>
+<script src="suchindex.js"></script>
+<script src="suche.js"></script>
 <script src="handbuch.js"></script>
 </body>
 </html>

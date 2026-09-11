@@ -16,6 +16,10 @@
       </a>
       <button class="hb-menu-btn" id="hbMenuBtn" aria-label="Menü" aria-expanded="false">☰</button>
     </div>
+    <div class="hb-suche">
+      <input type="search" id="hbSucheEingabe" placeholder="Suchen…" aria-label="Handbuch durchsuchen" autocomplete="off">
+      <div class="hb-suche-ergebnisse" id="hbSucheErgebnisse" hidden></div>
+    </div>
     <div class="hb-nav-wrap">
       <div class="hb-gruppe">Einstieg</div>
       <ul class="hb-nav">
@@ -31,6 +35,7 @@
         <li><a href="planung.html">Planung</a></li>
         <li><a href="kunden.html">Kunden</a></li>
         <li><a href="personal.html">Personal</a></li>
+        <li><a href="lohn.html">Lohn</a></li>
         <li><a href="abgleich.html">Abgleich</a></li>
         <li><a href="betrieb.html">Betrieb</a></li>
       </ul>
@@ -67,13 +72,13 @@
         automatisch auch.</p>
       </div>
 
-      <h2>Anmelden</h2>
+      <h2 id="anmelden">Anmelden</h2>
       <p>Name und Passwort, siehe <a href="erste-schritte.html">Erste Schritte</a>.
       „Passwort vergessen?" führt in der App zu einem echten Ablauf: Anmeldename
       eingeben → Link anfordern → E-Mail mit Reset-Link → neues Passwort setzen
       (mindestens 12&nbsp;Zeichen).</p>
 
-      <h2>Heute</h2>
+      <h2 id="heute">Heute</h2>
       <p>Karten der heute laufenden oder beginnenden Einsätze (inklusive einer über
       Mitternacht laufenden Nachtschicht von gestern), mit Kennzeichnung „Läuft
       jetzt" bzw. „Beginnt bald". Kein Einsatz heute: „Für heute bist du nicht
@@ -99,20 +104,20 @@
         die Einsatzleitung die Schicht jetzt als unbesetzt sieht.</p>
       </div>
 
-      <h2>Plan</h2>
+      <h2 id="plan">Plan</h2>
       <p>Drei Unterreiter.</p>
 
-      <h3>Plan</h3>
+      <h3 id="plan-2">Plan</h3>
       <p>Liste der kommenden eigenen Schichten.</p>
 
-      <h3>Sperren</h3>
+      <h3 id="sperren">Sperren</h3>
       <p>Auf einen Tag tippen, an dem eine Einteilung nicht möglich ist — nochmals
       tippen hebt es auf, eine Notiz ist optional. Ausdrücklich <b>keine Zusage
       oder Ablehnung</b> zu einer konkreten Schicht: Die Planung sieht die Sperre,
       eine Einteilung trotz Sperre bleibt möglich (die Sperre ist eine Mitteilung,
       kein Verbot). Ein bereits eingeteilter Tag lässt sich nicht sperren.</p>
 
-      <h3>Abwesenheit</h3>
+      <h3 id="abwesenheit">Abwesenheit</h3>
       <ol class="hb-schritte">
         <li>„Neuer Antrag": Art (Ferien/Krankheit/Unfall/Militär- oder
         Zivildienst/Schwangerschaft), Von, Bis, Bemerkung.</li>
@@ -122,17 +127,17 @@
       <p>Ferien lassen sich nicht rückwirkend beantragen. Ein abgelehnter Antrag
       zeigt die Begründung.</p>
 
-      <h2>Rapport</h2>
+      <h2 id="rapport">Rapport</h2>
       <p>Zwei Wege zum selben Datensatz:</p>
 
-      <h3>Aus der laufenden Schicht heraus</h3>
+      <h3 id="aus-der-laufenden-schicht-heraus">Aus der laufenden Schicht heraus</h3>
       <p>Nur für zugesagte, bereits begonnene Verkehrsdienst-Einsätze: Kunde, Ort,
       Zeiten und Pause sind vorbefüllt. Hat der Kunde für diesen Einsatz schon bei
       einer anderen Person unterschrieben, entfällt die eigene Unterschrift — pro
       Einsatz zählt eine. Erneutes Senden korrigiert den bereits erfassten
       Eintrag.</p>
 
-      <h3>„Neuer Rapport" (manuell)</h3>
+      <h3 id="neuer-rapport-manuell">„Neuer Rapport" (manuell)</h3>
       <ol class="hb-schritte">
         <li>Kunde aus der Liste wählen oder Name/Adresse frei eintragen, Datum,
         optional Auftragsnummer.</li>
@@ -147,11 +152,11 @@
       Statistiken, Suche, Monatsfilter und einen CSV-Export. Löschen und Drucken
       eines fremden Rapports sind dort nur für Admin-Konten sichtbar.</p>
 
-      <h2>Wächter <span class="hb-status kurz">nur mit Revierdienst-Berechtigung</span></h2>
+      <h2 id="waechter-nur-mit-revierdienst-berechtigung">Wächter <span class="hb-status kurz">nur mit Revierdienst-Berechtigung</span></h2>
       <p>Vier Kacheln: Rundgänge, Fahrzeugübernahme, Revier-Infos, Schlüsselverwaltung
       (noch nicht gebaut — „folgt in einem späteren Schritt").</p>
 
-      <h3>Rundgänge (Kontrollrunden)</h3>
+      <h3 id="rundgaenge-kontrollrunden">Rundgänge (Kontrollrunden)</h3>
       <p>Vor dem ersten Zugriff auf diesen Bereich fragt die App einmal täglich, ob
       heute ein Dienstfahrzeug übernommen wird (siehe „Fahrzeugübernahme" unten) —
       erst danach geht es weiter.</p>
@@ -186,7 +191,7 @@
         nochmals versuchen." ohne automatische Wiederholung.</p>
       </div>
 
-      <h3>Fahrzeugübernahme</h3>
+      <h3 id="fahrzeuguebernahme">Fahrzeugübernahme</h3>
       <ol class="hb-schritte">
         <li>„Ja, Fahrzeug übernehmen" — Fahrzeug wählen, Kilometerstand eintragen,
         <b>Foto vom Tacho ist Pflicht</b> („sonst ist ein Zahlenverdreher nicht mehr
@@ -198,11 +203,11 @@
         Fahrzeug erfassen".</li>
       </ol>
 
-      <h3>Revier-Infos</h3>
+      <h3 id="revier-infos">Revier-Infos</h3>
       <p>Dieselbe Mitteilungsliste wie über die Glocke (siehe unten), gefiltert auf
       die Zielgruppe „Revier".</p>
 
-      <h2>Mitteilungen</h2>
+      <h2 id="mitteilungen">Mitteilungen</h2>
       <p>Glocke oben in jeder Ansicht, mit Zähler. Markierungen „Wichtig", „Revier",
       „Neu". Eine als „Wichtig" markierte Mitteilung erscheint zusätzlich beim
       Öffnen der App als Dialog, der erst mit „Verstanden" verschwindet. Ein
@@ -213,7 +218,7 @@
       installiert wurde — im Safari-Tab nicht, unabhängig von jeder Erlaubnis. Der
       Schalter selbst zeigt bei Bedarf die nötigen Schritte an.</p>
 
-      <h2>Menü</h2>
+      <h2 id="menue">Menü</h2>
       <ul>
         <li><b>Meine Daten</b> — Personalnummer, Geburtsdatum und Geschäftsadresse
         sind nicht selbst änderbar; Adresse und Kontaktangaben schon, über
@@ -243,6 +248,8 @@
     </div>
   </div>
 </div>
+<script src="suchindex.js"></script>
+<script src="suche.js"></script>
 <script src="handbuch.js"></script>
 </body>
 </html>

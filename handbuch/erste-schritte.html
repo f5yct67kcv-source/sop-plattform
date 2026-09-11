@@ -16,6 +16,10 @@
       </a>
       <button class="hb-menu-btn" id="hbMenuBtn" aria-label="Menü" aria-expanded="false">☰</button>
     </div>
+    <div class="hb-suche">
+      <input type="search" id="hbSucheEingabe" placeholder="Suchen…" aria-label="Handbuch durchsuchen" autocomplete="off">
+      <div class="hb-suche-ergebnisse" id="hbSucheErgebnisse" hidden></div>
+    </div>
     <div class="hb-nav-wrap">
       <div class="hb-gruppe">Einstieg</div>
       <ul class="hb-nav">
@@ -31,6 +35,7 @@
         <li><a href="planung.html">Planung</a></li>
         <li><a href="kunden.html">Kunden</a></li>
         <li><a href="personal.html">Personal</a></li>
+        <li><a href="lohn.html">Lohn</a></li>
         <li><a href="abgleich.html">Abgleich</a></li>
         <li><a href="betrieb.html">Betrieb</a></li>
       </ul>
@@ -57,7 +62,7 @@
       und wer darf im Cockpit eigentlich was? Dieses Kapitel klärt das einmal gründlich,
       damit die anderen Kapitel nicht bei jedem Punkt neu darauf verweisen müssen.</p>
 
-      <h2>Wer arbeitet wo</h2>
+      <h2 id="wer-arbeitet-wo">Wer arbeitet wo</h2>
       <p>Das Werkzeug ist kein einzelner Bildschirm, sondern mehrere getrennte
       Oberflächen mit je eigenem Zweck. Dieses Handbuch deckt die drei ab, mit
       denen CUPI&nbsp;24 selbst und ihre Kundschaft täglich arbeiten:</p>
@@ -91,7 +96,7 @@
         <code>README.md</code> im Repository.</p>
       </div>
 
-      <h2>Anmelden</h2>
+      <h2 id="anmelden">Anmelden</h2>
       <p>Erfassung und Cockpit teilen sich dieselbe Anmeldung — wer in der App
       angemeldet ist, ist es beim Wechsel ins Cockpit ebenfalls (sofern die
       Berechtigung dafür besteht). Das Kundenportal hat eine eigene, davon
@@ -119,7 +124,7 @@
       <p>Passwort vergessen? Über den entsprechenden Link auf der Anmeldeseite
       lässt sich ein neues setzen.</p>
 
-      <h2>Zwei-Faktor-Anmeldung einrichten</h2>
+      <h2 id="zwei-faktor-anmeldung-einrichten">Zwei-Faktor-Anmeldung einrichten</h2>
       <p>Freiwillig, aber empfohlen für jedes Konto mit Zugang zum Cockpit — sie
       lässt sich für das eigene Konto unter <b>Betrieb → Mein Zugang:
       Zwei-Faktor-Anmeldung</b> einschalten.</p>
@@ -154,7 +159,7 @@
       eigene Passwort, auch bei laufender Sitzung. Das verhindert, dass an
       einem unbeaufsichtigten Bildschirm der Schutz mit einem Klick verschwindet.</p>
 
-      <h2>Rollen und Rechte — wer darf was</h2>
+      <h2 id="rollen-und-rechte-wer-darf-was">Rollen und Rechte — wer darf was</h2>
       <p>Es gibt keine einzelne „Admin ja/nein"-Schaltung. Zugriff ist in
       <b>20&nbsp;Bereiche</b> aufgeteilt (Einsätze, Objekte, Kunden, Personal,
       Lohn, Betrieb, Rollen …), und jeder Bereich kennt bis zu drei Stufen:</p>
@@ -247,6 +252,8 @@
     </div>
   </div>
 </div>
+<script src="suchindex.js"></script>
+<script src="suche.js"></script>
 <script src="handbuch.js"></script>
 </body>
 </html>

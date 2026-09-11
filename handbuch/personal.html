@@ -16,6 +16,10 @@
       </a>
       <button class="hb-menu-btn" id="hbMenuBtn" aria-label="Menü" aria-expanded="false">☰</button>
     </div>
+    <div class="hb-suche">
+      <input type="search" id="hbSucheEingabe" placeholder="Suchen…" aria-label="Handbuch durchsuchen" autocomplete="off">
+      <div class="hb-suche-ergebnisse" id="hbSucheErgebnisse" hidden></div>
+    </div>
     <div class="hb-nav-wrap">
       <div class="hb-gruppe">Einstieg</div>
       <ul class="hb-nav">
@@ -31,6 +35,7 @@
         <li><a href="planung.html">Planung</a></li>
         <li><a href="kunden.html">Kunden</a></li>
         <li><a href="personal.html" class="aktiv">Personal</a></li>
+        <li><a href="lohn.html">Lohn</a></li>
         <li><a href="abgleich.html">Abgleich</a></li>
         <li><a href="betrieb.html">Betrieb</a></li>
       </ul>
@@ -65,9 +70,10 @@
         Siehe <a href="erste-schritte.html">Erste Schritte</a>.
       </div>
 
-      <h2>Liste</h2>
+      <h2 id="liste">Liste</h2>
       <p>Zeigt ausschliesslich <b>aktive</b> Mitarbeitende (anders als bei Kunden gibt es
-      hier keinen Archiv-Umschalter). Suche über Name, Ort oder Personalnummer. Spalte
+      hier keinen Archiv-Umschalter). Suche über Name, Ort, PLZ, Personalnummer, E-Mail
+      oder Funktion zugleich. Spalte
       „Berechtigt" fasst Fachausweis und Ja/Nein-Merkmale (Diensthund, Schusswaffe,
       Revierdienst …) als Chips zusammen; Spalte „Rolle" zeigt nur grob „Admin" oder
       „Mitarbeit." — das tatsächliche, feinere Profil steht erst im Dossier.</p>
@@ -82,7 +88,7 @@
         <li>„Mitarbeitenden anlegen" — führt direkt zur neuen Detailseite.</li>
       </ol>
 
-      <h2>Das Personaldossier</h2>
+      <h2 id="das-personaldossier">Das Personaldossier</h2>
       <p>Acht Reiter, seit ENT-072 eine volle Seite statt einer Schublade:</p>
       <div class="hb-tabelle-wrap"><table>
         <tr><th>Reiter</th><th>Inhalt</th></tr>
@@ -111,10 +117,10 @@
         erscheint.</p>
       </div>
 
-      <h3>Vertrauliche Angaben</h3>
-      <p>16 Felder gelten als vertraulich: AHV-Nummer, Nationalität, Heimat- und
+      <h3 id="vertrauliche-angaben">Vertrauliche Angaben</h3>
+      <p>17 Felder gelten als vertraulich: AHV-Nummer, Nationalität, Heimat- und
       Geburtsort, Zivilstand, Heiratsdatum, Geburtsdatum, Geschlecht,
-      Aufenthalts-/Arbeitsbewilligung mit Gültigkeit, ZEMIS-Nummer,
+      Aufenthalts- und Arbeitsbewilligung mit je eigenem Gültigkeitsdatum, ZEMIS-Nummer,
       Strafregister-/Betreibungsregisterdatum, Dienstausweisnummer und -gültigkeit.
       Ohne das Recht „Vertrauliche Angaben" liefert der Server diese Felder gar nicht
       erst aus, und eine Änderung daran wird beim Speichern verworfen.</p>
@@ -134,7 +140,7 @@
         keine Bewertung, das gehört ins Projekt-Repository.</p>
       </div>
 
-      <h3>Verlauf</h3>
+      <h3 id="verlauf">Verlauf</h3>
       <p>Drei unterschiedene „Nichts"-Zustände, sauber getrennt:</p>
       <ul>
         <li><b>Kein Zugriff</b> — das Recht „Logbuch: lesen" fehlt.</li>
@@ -142,10 +148,11 @@
         <li><b>Keine Änderung</b> — eingerichtet, aber an dieser Akte ist seither nichts passiert.</li>
       </ul>
       <p>Änderungen an vertraulichen Feldern erscheinen im Verlauf nur als Chip
-      „geändert — Werte werden nicht mitgeschrieben": <b>niemand</b> sieht dort die
-      alten oder neuen Werte, unabhängig vom eigenen Recht.</p>
+      „geändert", mit dem kleingedruckten Zusatz „vertraulich — Werte werden nicht
+      mitgeschrieben": <b>niemand</b> sieht dort die alten oder neuen Werte, unabhängig
+      vom eigenen Recht.</p>
 
-      <h3>Dienstpläne</h3>
+      <h3 id="dienstplaene">Dienstpläne</h3>
       <p>Zeigt ausschliesslich <b>abgeglichene</b> Schichten des gewählten Monats —
       geplante, aber noch nicht geprüfte Schichten zählen bewusst nicht mit. Drei
       Kacheln: Geleistete Zeit, Zeitbonus (Art. 12 Ziff. 2 GAV), Total. Darunter
@@ -154,7 +161,7 @@
       210 Monatsstunden, Mehr-/Unterzeitsaldo, Ferienguthaben, Absenzen). CSV-Export
       pro Monat über den Knopf „CSV".</p>
 
-      <h2>Mitarbeitenden entfernen</h2>
+      <h2 id="mitarbeitenden-entfernen">Mitarbeitenden entfernen</h2>
       <p>Kein Löschen — die Person wird deaktiviert und überall abgemeldet, erfasste
       Rapporte bleiben erhalten. Eine deaktivierte Person erscheint danach in der
       Liste nicht mehr; einen Weg zurück (Archiv/Wiederherstellen wie bei Kunden)
@@ -177,6 +184,8 @@
     </div>
   </div>
 </div>
+<script src="suchindex.js"></script>
+<script src="suche.js"></script>
 <script src="handbuch.js"></script>
 </body>
 </html>

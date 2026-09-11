@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lohn – Handbuch Cockpit</title>
+<link rel="stylesheet" href="handbuch.css">
+</head>
+<body>
+<div class="hb-shell">
+  <aside class="hb-side" id="hbSide">
+    <div class="hb-brand">
+      <a href="index.html" style="text-decoration:none">
+        <span class="titel">Handbuch</span>
+        <span class="unter">Cockpit der CUPI&nbsp;24</span>
+      </a>
+      <button class="hb-menu-btn" id="hbMenuBtn" aria-label="Menü" aria-expanded="false">☰</button>
+    </div>
+    <div class="hb-suche">
+      <input type="search" id="hbSucheEingabe" placeholder="Suchen…" aria-label="Handbuch durchsuchen" autocomplete="off">
+      <div class="hb-suche-ergebnisse" id="hbSucheErgebnisse" hidden></div>
+    </div>
+    <div class="hb-nav-wrap">
+      <div class="hb-gruppe">Einstieg</div>
+      <ul class="hb-nav">
+        <li><a href="index.html">Übersicht</a></li>
+        <li><a href="erste-schritte.html">Erste Schritte</a></li>
+      </ul>
+      <div class="hb-gruppe">Erfassung (App)</div>
+      <ul class="hb-nav">
+        <li><a href="erfassung.html">Erfassung</a></li>
+      </ul>
+      <div class="hb-gruppe">Cockpit</div>
+      <ul class="hb-nav">
+        <li><a href="planung.html">Planung</a></li>
+        <li><a href="kunden.html">Kunden</a></li>
+        <li><a href="personal.html">Personal</a></li>
+        <li><a href="lohn.html" class="aktiv">Lohn</a></li>
+        <li><a href="abgleich.html">Abgleich</a></li>
+        <li><a href="betrieb.html">Betrieb</a></li>
+      </ul>
+      <div class="hb-gruppe">Weitere Oberflächen</div>
+      <ul class="hb-nav">
+        <li><a href="kundenportal.html">Kundenportal</a></li>
+      </ul>
+      <div class="hb-gruppe">Nachschlagen</div>
+      <ul class="hb-nav">
+        <li><a href="glossar.html">Glossar</a></li>
+      </ul>
+    </div>
+    <div class="hb-side-fuss">
+      Aus dem Quelltext zusammengestellt, siehe Hinweis auf der <a href="index.html">Übersicht</a>.
+    </div>
+  </aside>
+
+  <div class="hb-main">
+    <div class="hb-content">
+
+      <p class="hb-kicker">Cockpit</p>
+      <h1>Lohn</h1>
+      <p class="hb-lead">Wo der Lohn eines Betriebs entsteht: aus abgeglichenen Ist-Zeiten wird
+      der Bruttolohn. Zwei getrennte Orte für zwei getrennte Fragen — die Stammdaten einer
+      Person, und der monatliche Lauf über alle.</p>
+
+      <div class="hb-recht">
+        Recht <b>„Lohn"</b> (Gruppe Personal), Stufen lesen/schreiben — Schreiben gibt zugleich
+        einen Lohnlauf frei, kein eigenes Vier-Augen-Recht. Bewusst <b>nicht</b> Teil von
+        „Vertrauliche Angaben": ein Lohnansatz ist eine andere Vertraulichkeit als eine
+        AHV-Nummer. Nur die Rolle <b>Verwalter</b> trägt es unter den Systemrollen — auch
+        „Personaladministration" nicht. Siehe <a href="erste-schritte.html">Erste Schritte</a>.
+      </div>
+
+      <h2 id="zwei-orte-ein-thema">Zwei Orte, ein Thema</h2>
+      <div class="hb-tabelle-wrap"><table>
+        <tr><th>Ort</th><th>Zeigt</th></tr>
+        <tr><td>Reiter <b>„Lohn"</b> im Personaldossier</td><td>Lohnstammdaten <b>einer</b> Person: Ansatz, Abzüge, Zahlungsweg — erscheint erst mit dem Recht „Lohn: lesen".</td></tr>
+        <tr><td>Seitenleisten-Rubrik <b>„Lohn"</b> (Desktop)</td><td>Betriebsweite Vorgänge: Lohnläufe, Lohnarten, Sätze und Regelwerk.</td></tr>
+      </table></div>
+      <p>Der Klick auf die Rubrik „Lohn" führt direkt zu den <b>Lohnläufen</b>, nicht zum
+      Katalog dahinter — Lohnläufe sind der eigentliche Vorgang, Lohnarten und Sätze nur
+      dessen Einrichtung.</p>
+
+      <h2 id="lohnansatz-abzuege-auszahlung">Lohnansatz, Abzüge, Auszahlung</h2>
+      <p>Im Personaldossier, Reiter „Lohn". Eine Kachel „Aus dem GAV abgeleitet" zeigt
+      Lohnform, Dienstjahr, GAV-Mindestlohn und Ferienentschädigung nur lesend — diese
+      Werte entstehen aus Anstellungskategorie, Eintritt und Alter und werden dort geändert,
+      nicht hier.</p>
+
+      <h3 id="lohnansatz-erfassen">Lohnansatz erfassen</h3>
+      <ol class="hb-schritte">
+        <li>„Gültig ab" und „Ansatz" eintragen — die Einheit (CHF pro Monat/Stunde) zeigt
+        sich automatisch anhand der Anstellungskategorie.</li>
+        <li>Optional Anteil 13. Monatslohn in Prozent, Checkbox „Ferienlohn laufend
+        auszahlen" (nur zulässig bei unregelmässiger Teilzeit oder kurzen Einsätzen, laut
+        Art. 20 Ziff. 2 schriftlich im Vertrag festzuhalten).</li>
+        <li>Zuschläge nach Art. 19 (Fachausweis, Diensthund, Schusswaffe), je als Betrag
+        pro Stunde oder pro Monat.</li>
+        <li>Speichern — ein neuer Ansatz wird <b>zusätzlich</b> erfasst, nie
+        überschreibend: Eine Lohnerhöhung darf abgeschlossene Abrechnungen nicht
+        rückwirkend verändern. Ein zweites Speichern zum selben Datum korrigiert nur
+        einen Tippfehler in der bestehenden Zeile.</li>
+      </ol>
+
+      <h3 id="abzuege-und-auszahlung">Abzüge und Auszahlung</h3>
+      <p>Nichtberufsunfall (NBU) wird standardmässig <b>automatisch</b> aus den geleisteten
+      Stunden hergeleitet; eine Übersteuerung von Hand verlangt eine Begründung und zeigt
+      zum Vergleich, was die automatische Berechnung sagen würde. Dazu: Krankentaggeld,
+      berufliche Vorsorge (BVG-Beitrag der Person), Quellensteuer (Kanton, Tarifcode,
+      Kinderzahl). Bei der Auszahlung lässt sich ein Empfänger mit „Restbetrag" oder mit
+      einem festen Betrag hinterlegen (IBAN wird auf Prüfsumme geprüft) — genau ein
+      aktiver „Restbetrag"-Empfänger je Person ist zulässig.</p>
+
+      <h2 id="lohnarten">Lohnarten</h2>
+      <p>Der Katalog, aus dem sich eine Abrechnung zusammensetzt. Jede Lohnart trägt eine
+      Art (Betrag je Stunde, Prozentsatz auf einer Bemessungsgrundlage, fester Betrag,
+      Monatslohn nach Pensum, Zwischensumme, Abzug, oder „weder AHV-pflichtig noch Abzug" —
+      etwa für den Auslagenersatz nach Art. 18) und sechs Kennzeichen, die bestimmen, in
+      welche Bemessungsgrundlage sie zählt: <b>AHV</b>, <b>Ferien</b>, <b>13. Monatslohn</b>,
+      <b>BVG</b>, <b>UVG</b>, <b>Quellensteuer</b>. Der Schlüssel einer Lohnart wird beim
+      Anlegen aus der Bezeichnung gebildet und bleibt danach fix — eine spätere Umbenennung
+      würde alte Abrechnungen treffen. System-Lohnarten lassen sich nicht löschen, nur
+      deaktivieren.</p>
+
+      <h2 id="saetze-und-regelwerk">Sätze und Regelwerk</h2>
+      <p>Drei getrennte Blöcke, mit einer Kopfzeile, die zusammenfasst, was fürs laufende
+      Jahr noch fehlt:</p>
+      <ul>
+        <li><b>Was fest steht — für jeden Betrieb gleich:</b> AHV-/IV-/EO-Beitrag,
+        ALV-Beitrag, Unfallversicherung. Nur lesend, mit Warnung, wenn das hinterlegte
+        Merkblatt vor Jahresende ausläuft.</li>
+        <li><b>Was der Betrieb festlegt:</b> NBU-, KTG- und BVG-Satz — je mit
+        Gültigkeitszeitraum und Pflichtangabe „Quelle". Fehlende Sätze zeigen einen Chip
+        „fehlt".</li>
+        <li><b>Aus dem GAV — nur zur Ansicht:</b> Mindestlöhne (Anhang 1), Ferienentschädigung,
+        Vollzugskostenbeitrag PaKo, Zeitzuschlag, BVG-Eintritt. Bezugsversion sichtbar
+        vermerkt (Ausgabe 2026, gültig bis 31.12.2026); eine neue Ausgabe wird angehängt,
+        nicht überschrieben.</li>
+      </ul>
+      <p>AHV und ALV lassen sich hier <b>nicht</b> von Hand erfassen — das Werkzeug weist
+      das ausdrücklich ab: Sie gelten für jeden Betrieb gleich und stehen versioniert im
+      Regelwerk selbst.</p>
+
+      <h2 id="lohnlaeufe">Lohnläufe</h2>
+      <p>Der eigentliche monatliche Vorgang.</p>
+
+      <ol class="hb-schritte">
+        <li>Monat wählen — vorgeschlagen wird der zurückliegende, nicht der laufende
+        (der ist meist noch nicht fertig abgeglichen).</li>
+        <li>„Vorschau rechnen" — der Server rechnet live und <b>speichert nichts</b>.
+        Die Vorschau zeigt je Person Kategorie, bewertete Stunden, Brutto, Abzüge,
+        Auszahlung sowie Sperrgründe im Klartext (z. B. „kein Lohnansatz erfasst").</li>
+        <li>Mit dem Recht „Lohn: schreiben": „Lauf anlegen" — rechnet erneut und speichert
+        das Ergebnis als unveränderlichen Entwurf. Für einen Zeitraum mit bereits
+        bestehendem Lauf ist das gesperrt, bis dieser storniert wird.</li>
+        <li>„Abrechnung" je Person öffnet das Detail (siehe unten).</li>
+        <li>„Freigeben" (nur im Entwurf) → Status „freigegeben".</li>
+        <li>„Als ausbezahlt vermerken" (nur nach Freigabe) → Status „ausbezahlt" und damit
+        <b>endgültig</b>. Eine Korrektur gehört danach als eigene Zeile in den nächsten
+        Lauf, mit Verweis auf die betroffene Periode — die ausbezahlte Abrechnung selbst
+        bleibt unverändert.</li>
+        <li>„Stornieren" (nur vor der Auszahlung, mit Pflichtgrund) — der alte Lauf bleibt
+        vollständig gespeichert, ein neuer verweist als Nachfolger darauf.</li>
+      </ol>
+
+      <div class="hb-kasten hb-hinweis">
+        <p class="hb-kasten-titel">Die vier GAV-Zeitgrössen, sauber getrennt</p>
+        <p>Jede Abrechnung zeigt vier eigene Kacheln, nicht einen fertigen Stundenwert:
+        <b>Rohzeit</b> (bis minus von, ohne Pausenabzug), <b>Nettozeit</b> (Rohzeit minus
+        unbezahlter Pause), <b>Zeitbonus</b> (Art. 12 Ziff. 2: 10&nbsp;% für Nacht- und
+        Sonntagsarbeit) und <b>Bewertet</b> (Nettozeit plus Zeitbonus — die Zeit, auf der
+        der Lohn tatsächlich beruht). Ein Betrag, der sich nicht berechnen lässt, erscheint
+        nie als „0.00", sondern als eigener Hinweis „nicht gerechnet" mit Grund. Beruht eine
+        Zeile auf einer noch offenen GAV-Auslegung, trägt sie zusätzlich den Hinweis
+        „Annahme" — zugunsten der mitarbeitenden Person, bis die Auslegung geklärt ist.</p>
+      </div>
+
+      <h2 id="was-noch-nicht-funktioniert">Was (noch) nicht funktioniert</h2>
+      <p>Ausdrücklich hier vermerkt, damit niemand eine Lücke für einen Bedienfehler hält:</p>
+      <ul>
+        <li><b>Monatslohn (Kategorie A und B)</b> ist im Lohnlauf noch nicht gebaut — nur
+        Stundenlohn (Kategorie C) wird gerechnet. Personen mit Monatslohn werden mit einem
+        eigenen Sperrgrund von der Berechnung ausgenommen.</li>
+        <li><b>Kein Ausdruck, kein Export.</b> Es gibt keine PDF-, CSV- oder Druckfunktion
+        für eine Abrechnung oder einen Lauf — nur die Bildschirmansicht.</li>
+        <li><b>Zuschläge nach Art. 19 als Stundenbetrag</b> und der <b>Zeitzuschlag über
+        210 Monatsstunden</b> sind strukturell gesperrt, mit eigenem Sperrgrund.</li>
+        <li><b>Quellensteuer wird nicht gerechnet</b> — betroffene Personen sind laut
+        Hinweistext von Hand abzurechnen.</li>
+      </ul>
+
+      <div class="hb-begriffe">
+        <a href="glossar.html#rohzeit">Rohzeit</a>
+        <a href="glossar.html#nettozeit">Nettozeit</a>
+        <a href="glossar.html#bewertete-zeit">Bewertete Zeit</a>
+        <a href="glossar.html#zeitbonus">Zeitbonus</a>
+        <a href="glossar.html#lohnlauf">Lohnlauf</a>
+        <a href="glossar.html#lohnart">Lohnart</a>
+        <a href="glossar.html#bemessungsgrundlage">Bemessungsgrundlage</a>
+        <a href="glossar.html#sperrgrund">Sperrgrund</a>
+      </div>
+
+      <p class="hb-fussnote">Quelle: <code>dashboard.html</code> (Reiter „Lohn" im
+      Personaldossier, Rubrik „Lohn"), <code>backend/lohn.php</code>,
+      <code>backend/lohnlauf.php</code>, <code>backend/api/lohn*.php</code>,
+      <code>backend/rechte.php</code>, Stand 11.09.2026. Nicht am laufenden Cockpit
+      nachgeprüft — siehe Hinweis auf der <a href="index.html">Übersicht</a>.</p>
+
+    </div>
+  </div>
+</div>
+<script src="suchindex.js"></script>
+<script src="suche.js"></script>
+<script src="handbuch.js"></script>
+</body>
+</html>

@@ -16,6 +16,10 @@
       </a>
       <button class="hb-menu-btn" id="hbMenuBtn" aria-label="Menü" aria-expanded="false">☰</button>
     </div>
+    <div class="hb-suche">
+      <input type="search" id="hbSucheEingabe" placeholder="Suchen…" aria-label="Handbuch durchsuchen" autocomplete="off">
+      <div class="hb-suche-ergebnisse" id="hbSucheErgebnisse" hidden></div>
+    </div>
     <div class="hb-nav-wrap">
       <div class="hb-gruppe">Einstieg</div>
       <ul class="hb-nav">
@@ -31,6 +35,7 @@
         <li><a href="planung.html">Planung</a></li>
         <li><a href="kunden.html">Kunden</a></li>
         <li><a href="personal.html">Personal</a></li>
+        <li><a href="lohn.html">Lohn</a></li>
         <li><a href="abgleich.html">Abgleich</a></li>
         <li><a href="betrieb.html" class="aktiv">Betrieb</a></li>
       </ul>
@@ -66,7 +71,7 @@
         Seitenleisten-Rubrik für das Tagesgeschäft.</p>
       </div>
 
-      <h2>Die acht Kacheln</h2>
+      <h2 id="die-acht-kacheln">Die acht Kacheln</h2>
       <div class="hb-tabelle-wrap"><table>
         <tr><th>Kachel</th><th>Wofür</th></tr>
         <tr><td><b>Betrieb</b></td><td>Hauptdomizil, Anstellungsorte, Logo</td></tr>
@@ -79,7 +84,7 @@
         <tr><td><b>Supportanfrage</b></td><td>Ticket an den Plattform-Betreiber</td></tr>
       </table></div>
 
-      <h2>Betrieb: Hauptdomizil, Anstellungsorte, Logo</h2>
+      <h2 id="betrieb-hauptdomizil-anstellungsorte-logo">Betrieb: Hauptdomizil, Anstellungsorte, Logo</h2>
       <p><b>Hauptdomizil</b> — betriebliche Grunddaten (Firma, Adresse, Kontakt,
       Pikett-/Zentralnummer — Letztere erscheint in der App unter „Zentrale und
       Notruf", getrennt von der normalen Telefonnummer).</p>
@@ -102,17 +107,17 @@
       <p><b>Logo</b> — erscheint auf dem gedruckten Arbeitsrapport (PNG/JPEG/SVG/WebP,
       höchstens 512&nbsp;KB).</p>
 
-      <h2>Briefkopf für Rapporte</h2>
+      <h2 id="briefkopf-fuer-rapporte">Briefkopf für Rapporte</h2>
       <p>Firma, Zusatz, Fusszeile(n) sowie der QR-Rechnungsblock (Adresse + QR-IBAN
       mit Live-Prüfung, ob es sich tatsächlich um eine QR-IBAN handelt). Bleibt die
       QR-IBAN leer, zeigt eine Rechnung beim Kunden keinen Zahlteil.</p>
 
-      <h2>Rollen &amp; Berechtigungen</h2>
+      <h2 id="rollen-berechtigungen">Rollen &amp; Berechtigungen</h2>
       <p>Die Systemrollen selbst sind hier nicht änderbar (siehe
       <a href="erste-schritte.html">Erste Schritte</a>) — diese Kachel ist der Ort für
       alles Weitere.</p>
 
-      <h3>Eigenes Profil anlegen</h3>
+      <h3 id="eigenes-profil-anlegen">Eigenes Profil anlegen</h3>
       <ol class="hb-schritte">
         <li>Kachel „Profil anlegen" (am Ende des Profil-Rasters).</li>
         <li>Name und Beschreibung eingeben.</li>
@@ -123,14 +128,14 @@
         <li>„Profil speichern".</li>
       </ol>
 
-      <h3>Profile zuteilen</h3>
+      <h3 id="profile-zuteilen">Profile zuteilen</h3>
       <p>Tabelle Person × Profile: Marken anklicken speichert sofort, ohne separaten
       Speichern-Knopf. Mehrere Profile je Person sind möglich — sie addieren sich,
       je Bereich gilt die höchste gemeinsame Stufe. Ob eine Person überhaupt ins
       Cockpit kommt, ergibt sich automatisch daraus (mindestens eine „lesen"-Stufe
       irgendwo) — es gibt dafür keinen eigenen Schalter.</p>
 
-      <h3>Einsatzmerkmale</h3>
+      <h3 id="einsatzmerkmale">Einsatzmerkmale</h3>
       <p><b>Keine Rollen</b>, sondern drei Ja/Nein-Eigenschaften je Person:
       Diensthundeführer, Waffentragberechtigt, Revierdienst-berechtigt — mit Warnung,
       falls die zugehörige Bewilligung fehlt oder abgelaufen ist.</p>
@@ -144,12 +149,12 @@
         den neuen Namen und bietet sofortiges Abmelden an.</p>
       </div>
 
-      <h2>Personalnummern</h2>
+      <h2 id="personalnummern">Personalnummern</h2>
       <p>Gleiches Muster (Vorschau → Bestätigung), aber ohne Abmelde-Bezug: trägt
       ausschliesslich <b>fehlende</b> vierstellige Personalnummern nach. Sie werden
       zufällig vergeben, nicht fortlaufend, und sind danach nicht mehr änderbar.</p>
 
-      <h2>Dienstfahrzeuge</h2>
+      <h2 id="dienstfahrzeuge">Dienstfahrzeuge</h2>
       <p>Reine Stammdaten — „hier wird nichts kontrolliert und nichts gerechnet".
       Vier Gruppen: Fahrzeug (Kontrollschild, Marke, Modell …), Ausweis und
       Halterschaft, Standort und Zustand, Termine und Kilometerstand.</p>
@@ -165,7 +170,7 @@
       Übernahme/Rückgabe eines Fahrzeugs im laufenden Betrieb ist ein eigener,
       anderer Bereich (Fahrzeugübernahme in der App) — hier nur die Stammdaten.</p>
 
-      <h2>Support-Freigabe und Supportanfrage</h2>
+      <h2 id="support-freigabe-und-supportanfrage">Support-Freigabe und Supportanfrage</h2>
       <p>Betreffen den <b>Plattform-Betreiber</b> — eine andere Stelle als CUPI&nbsp;24
       selbst, zuständig für den Betrieb der Software.</p>
       <ul>
@@ -194,6 +199,8 @@
     </div>
   </div>
 </div>
+<script src="suchindex.js"></script>
+<script src="suche.js"></script>
 <script src="handbuch.js"></script>
 </body>
 </html>

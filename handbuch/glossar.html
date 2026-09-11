@@ -16,6 +16,10 @@
       </a>
       <button class="hb-menu-btn" id="hbMenuBtn" aria-label="Menü" aria-expanded="false">☰</button>
     </div>
+    <div class="hb-suche">
+      <input type="search" id="hbSucheEingabe" placeholder="Suchen…" aria-label="Handbuch durchsuchen" autocomplete="off">
+      <div class="hb-suche-ergebnisse" id="hbSucheErgebnisse" hidden></div>
+    </div>
     <div class="hb-nav-wrap">
       <div class="hb-gruppe">Einstieg</div>
       <ul class="hb-nav">
@@ -31,6 +35,7 @@
         <li><a href="planung.html">Planung</a></li>
         <li><a href="kunden.html">Kunden</a></li>
         <li><a href="personal.html">Personal</a></li>
+        <li><a href="lohn.html">Lohn</a></li>
         <li><a href="abgleich.html">Abgleich</a></li>
         <li><a href="betrieb.html">Betrieb</a></li>
       </ul>
@@ -73,14 +78,23 @@
         Hauptanstellungsort (HAO) und höchstens ein Nebenanstellungsort (NAO).</p>
       </div>
       <div class="hb-eintrag" id="auslagenersatz">
-        <h3>Auslagenersatz <span class="hb-eintrag-kapitel">→ Kunden, Planung</span></h3>
+        <h3>Auslagenersatz <span class="hb-eintrag-kapitel">→ Kunden, Planung, Abgleich</span></h3>
         <p>Fahrzeit-/Fahrkostenersatz nach Art. 18 GAV, abhängig von der
         Wegstrecke zwischen Anstellungsort und Einsatzort. Gilt nur für die Sparte
         Sicherheit — bei Reinigung entfällt die Frage, weil der GAV für private
-        Sicherheitsdienstleistungen dort nicht gilt.</p>
+        Sicherheitsdienstleistungen dort nicht gilt. Der Frankenbetrag entsteht als
+        unveränderlicher Schnappschuss im Moment des Abgleichs, sobald eine Schicht
+        auf „Anwesend" gesetzt wird.</p>
       </div>
 
       <p class="hb-az">B</p>
+      <div class="hb-eintrag" id="bemessungsgrundlage">
+        <h3>Bemessungsgrundlage <span class="hb-eintrag-kapitel">→ Lohn</span></h3>
+        <p>Eine von sechs Summen, in die eine <a href="#lohnart">Lohnart</a> einzahlen
+        kann: AHV-, Ferien-, 13.-Monatslohn-, BVG-, UVG- und
+        quellensteuerpflichtiger Lohn. Eine Lohnart trägt eines oder mehrere dieser
+        sechs Kennzeichen.</p>
+      </div>
       <div class="hb-eintrag" id="bereich-recht">
         <h3>Bereich (Recht) <span class="hb-eintrag-kapitel">→ Erste Schritte</span></h3>
         <p>Einer von 20 Zugriffs-Bereichen (Einsätze, Objekte, Kunden, Personal,
@@ -98,6 +112,14 @@
         einzelnen Betrieb (hier: CUPI&nbsp;24). Zuständig für Support-Freigabe und
         Supportanfragen; hat einen eigenen, vom Cockpit getrennten
         Betreiber-Bereich (ausserhalb dieses Handbuchs, siehe README.md).</p>
+      </div>
+      <div class="hb-eintrag" id="bewertete-zeit">
+        <h3>Bewertete Zeit <span class="hb-eintrag-kapitel">→ Lohn</span></h3>
+        <p><a href="#nettozeit">Nettozeit</a> plus <a href="#zeitbonus">Zeitbonus</a> —
+        die Zeit, auf der der Lohn tatsächlich beruht. Erscheint als eigene Kachel in
+        jeder Abrechnung, nie stillschweigend in der Nettozeit mitgerechnet. Nicht zu
+        verwechseln mit der Kategoriegrenze nach Art. 8 GAV, die auf derselben Grösse
+        beruht, aber im Cockpit an anderer Stelle (Pensen) geführt wird.</p>
       </div>
 
       <p class="hb-az">E</p>
@@ -163,6 +185,21 @@
       </div>
 
       <p class="hb-az">L</p>
+      <div class="hb-eintrag" id="lohnart">
+        <h3>Lohnart <span class="hb-eintrag-kapitel">→ Lohn</span></h3>
+        <p>Ein Baustein einer Abrechnung (z.&nbsp;B. Grundlohn, Ferienentschädigung,
+        ein Zuschlag oder ein Abzug), mit einer Art (Stundenbetrag, Prozentsatz,
+        fester Betrag, Monatslohn, Zwischensumme, Abzug) und bis zu sechs
+        Kennzeichen, welche <a href="#bemessungsgrundlage">Bemessungsgrundlage</a>
+        sie mitträgt. Der Schlüssel einer Lohnart bleibt nach dem Anlegen fix.</p>
+      </div>
+      <div class="hb-eintrag" id="lohnlauf">
+        <h3>Lohnlauf <span class="hb-eintrag-kapitel">→ Lohn</span></h3>
+        <p>Der monatliche Rechenvorgang über alle Personen: erst eine ungespeicherte
+        Vorschau, dann ein gespeicherter Entwurf, dann freigegeben, dann als
+        ausbezahlt vermerkt und damit endgültig. Eine Korrektur danach ist immer eine
+        neue Zeile im nächsten Lauf, nie eine Änderung am alten.</p>
+      </div>
       <div class="hb-eintrag" id="logbuch">
         <h3>Logbuch / Änderungsverlauf <span class="hb-eintrag-kapitel">→ Personal, Betrieb</span></h3>
         <p>Zentraler, nur lesbarer Protokollmechanismus — erscheint u.&nbsp;a. an der
@@ -185,7 +222,15 @@
         <h3>Netto <span class="hb-eintrag-kapitel">→ Abgleich</span></h3>
         <p>Im Abgleich eine reine Differenz: tatsächliche Zeit minus Pause.
         Ausdrücklich <b>keine</b> bewertete Arbeitszeit und keine GAV-Berechnung —
-        die Seite „Abgleich" hält nur fest, sie rechnet nicht.</p>
+        die Seite „Abgleich" hält nur fest, sie rechnet nicht. Derselbe Wert heisst
+        im Lohnlauf <a href="#nettozeit">Nettozeit</a>.</p>
+      </div>
+      <div class="hb-eintrag" id="nettozeit">
+        <h3>Nettozeit <span class="hb-eintrag-kapitel">→ Lohn</span></h3>
+        <p><a href="#rohzeit">Rohzeit</a> minus unbezahlter Pause — dieselbe Grösse,
+        die unter „Abgleich" schlicht <a href="#netto">Netto</a> heisst, hier aber
+        Grundlage für den <a href="#zeitbonus">Zeitbonus</a> und die
+        <a href="#bewertete-zeit">bewertete Zeit</a> ist.</p>
       </div>
 
       <p class="hb-az">O</p>
@@ -238,6 +283,11 @@
       </div>
 
       <p class="hb-az">R</p>
+      <div class="hb-eintrag" id="rohzeit">
+        <h3>Rohzeit <span class="hb-eintrag-kapitel">→ Lohn</span></h3>
+        <p>Im Lohnlauf: die Zeit von Beginn bis Ende einer Schicht, ohne jeden
+        Pausenabzug. Grundlage für die <a href="#nettozeit">Nettozeit</a>.</p>
+      </div>
       <div class="hb-eintrag" id="rapport">
         <h3>Rapport <span class="hb-eintrag-kapitel">→ Kunden, Erfassung</span></h3>
         <p>Ein von einer Person zu einer Schicht erfasster Bericht (Zeit, Pause,
@@ -290,6 +340,13 @@
         eingeteilt werden kann. Eine Mitteilung an die Planung, kein
         verbindliches Verbot — eine Einteilung trotz Sperre bleibt möglich.</p>
       </div>
+      <div class="hb-eintrag" id="sperrgrund">
+        <h3>Sperrgrund <span class="hb-eintrag-kapitel">→ Lohn</span></h3>
+        <p>Klartext-Grund, warum eine Person im Lohnlauf (noch) nicht berechnet
+        werden kann — z.&nbsp;B. fehlender Lohnansatz, Monatslohn (noch nicht
+        gebaut) oder ein GAV-Zuschlag, dessen Rechenweg fehlt. Erscheint als Chip
+        statt einer stillschweigenden Null.</p>
+      </div>
       <div class="hb-eintrag" id="stufe">
         <h3>Stufe <span class="hb-eintrag-kapitel">→ Erste Schritte</span></h3>
         <p>Verborgen, lesen oder schreiben. „Schreiben" schliesst „lesen" immer
@@ -304,7 +361,7 @@
       </div>
       <div class="hb-eintrag" id="vertrauliche-felder">
         <h3>Vertrauliche Personalfelder <span class="hb-eintrag-kapitel">→ Personal</span></h3>
-        <p>16 besonders geschützte Felder der Personalakte: AHV-Nummer,
+        <p>17 besonders geschützte Felder der Personalakte: AHV-Nummer,
         Nationalität, Heimat-/Geburtsort, Zivilstand, Geburtsdatum, Geschlecht,
         Aufenthalts-/Arbeitsbewilligung, ZEMIS-Nummer, Straf-/Betreibungsregister,
         Dienstausweis. Nur mit eigenem Recht sicht- und änderbar.</p>
@@ -352,6 +409,8 @@
     </div>
   </div>
 </div>
+<script src="suchindex.js"></script>
+<script src="suche.js"></script>
 <script src="handbuch.js"></script>
 </body>
 </html>

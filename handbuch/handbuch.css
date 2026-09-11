@@ -109,6 +109,46 @@ a:hover { color: var(--accent-hi); }
 .hb-brand .titel { display: block; font-weight: 700; font-size: 17px; letter-spacing: .01em; }
 .hb-brand .unter { display: block; font-size: 12.5px; color: var(--shell-txt); margin-top: 3px; }
 
+/* Suche */
+.hb-suche { position: relative; margin: 4px 0 6px; }
+.hb-suche input {
+  width: 100%; box-sizing: border-box;
+  background: var(--shell-hi);
+  border: 1px solid var(--shell-line);
+  color: var(--shell-txt-hi);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+  font-size: 16px;
+  font-family: inherit;
+  min-height: 44px;
+}
+.hb-suche input::placeholder { color: #6B7180; }
+.hb-suche input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.hb-suche-ergebnisse {
+  position: absolute; left: 0; right: 0; top: calc(100% + 6px);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  box-shadow: var(--sh-2);
+  max-height: 60vh;
+  overflow-y: auto;
+  z-index: 30;
+}
+.hb-suche-treffer {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 9px 13px;
+  text-decoration: none;
+  border-bottom: 1px solid var(--line-soft);
+  min-height: 44px;
+  justify-content: center;
+}
+.hb-suche-treffer:last-child { border-bottom: none; }
+.hb-suche-treffer:hover, .hb-suche-treffer.aktiv { background: var(--accent-soft); }
+.hb-suche-kapitel { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--accent); }
+.hb-suche-titel { font-size: 14px; font-weight: 600; color: var(--ink); }
+.hb-suche-text { font-size: 12.5px; color: var(--ink-2); line-height: 1.4; }
+.hb-suche-leer { padding: 12px 13px; font-size: 13.5px; color: var(--ink-3); }
+
 .hb-gruppe { margin: 18px 0 6px; padding: 0 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #6B7180; }
 .hb-nav { list-style: none; margin: 0; padding: 0; }
 .hb-nav li { margin: 1px 0; }
@@ -119,7 +159,7 @@ a:hover { color: var(--accent-hi); }
   font-size: 14.5px;
   padding: 9px 10px;
   border-radius: var(--r-sm);
-  min-height: 40px;
+  min-height: 44px;
   align-items: center;
 }
 .hb-nav a:hover { background: var(--shell-hi); color: var(--shell-txt-hi); }
@@ -193,13 +233,15 @@ a:hover { color: var(--accent-hi); }
 /* Begriffs-Chips (verlinken ins Glossar) */
 .hb-begriffe { display: flex; flex-wrap: wrap; gap: 7px; margin: 0 0 26px; }
 .hb-begriffe a {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
   background: var(--surface);
   border: 1px solid var(--line);
   color: var(--ink-2);
   border-radius: 999px;
-  padding: 5px 13px;
-  font-size: 13px;
+  padding: 0 16px;
+  font-size: 13.5px;
   text-decoration: none;
 }
 .hb-begriffe a:hover { border-color: var(--accent-line); color: var(--accent-hi); background: var(--accent-soft); }

@@ -16,6 +16,10 @@
       </a>
       <button class="hb-menu-btn" id="hbMenuBtn" aria-label="Menü" aria-expanded="false">☰</button>
     </div>
+    <div class="hb-suche">
+      <input type="search" id="hbSucheEingabe" placeholder="Suchen…" aria-label="Handbuch durchsuchen" autocomplete="off">
+      <div class="hb-suche-ergebnisse" id="hbSucheErgebnisse" hidden></div>
+    </div>
     <div class="hb-nav-wrap">
       <div class="hb-gruppe">Einstieg</div>
       <ul class="hb-nav">
@@ -31,6 +35,7 @@
         <li><a href="planung.html">Planung</a></li>
         <li><a href="kunden.html">Kunden</a></li>
         <li><a href="personal.html">Personal</a></li>
+        <li><a href="lohn.html">Lohn</a></li>
         <li><a href="abgleich.html">Abgleich</a></li>
         <li><a href="betrieb.html">Betrieb</a></li>
       </ul>
@@ -64,7 +69,7 @@
         <a href="erste-schritte.html">Erste Schritte</a>.
       </div>
 
-      <h2>Zugang einrichten (Aufgabe der Administration)</h2>
+      <h2 id="zugang-einrichten-aufgabe-der-administration">Zugang einrichten (Aufgabe der Administration)</h2>
       <p>Es wird keine Einladung verschickt — der Zugang wird angelegt, danach fordert die
       Kundschaft sich den ersten Link selbst an.</p>
 
@@ -86,7 +91,7 @@
         Anmeldelinks entwertet.</p>
       </div>
 
-      <h2>Wie sich Kundinnen und Kunden anmelden</h2>
+      <h2 id="wie-sich-kundinnen-und-kunden-anmelden">Wie sich Kundinnen und Kunden anmelden</h2>
       <ol class="hb-schritte">
         <li>E-Mail-Adresse und Passwort eingeben — oder, beim ersten Besuch bzw. bei
         vergessenem Passwort, „Link per E-Mail anfordern".</li>
@@ -100,11 +105,11 @@
       Adresse tatsächlich existiert — daraus lässt sich also nicht ablesen, ob ein Zugang
       besteht.</p>
 
-      <h2>Was zu sehen ist</h2>
+      <h2 id="was-zu-sehen-ist">Was zu sehen ist</h2>
       <p>Bis zu drei Reiter, abhängig davon, was der jeweilige Kunde tatsächlich bezieht — bei
       nur einer Art erscheint gar keine Reiterleiste.</p>
 
-      <h3>Rundgänge (Revierdienst)</h3>
+      <h3 id="rundgaenge-revierdienst">Rundgänge (Revierdienst)</h3>
       <p>Ein Kennzahlenband (Anzahl Rundgänge, Erledigungsgrad, Abbrüche, Fotobelege) über
       einer Liste abgeschlossener oder abgebrochener Kontrollrunden. <b>Laufende Runden sind
       bewusst unsichtbar</b> — der Kunde soll den Nachweis sehen, nicht die Person bei der
@@ -114,20 +119,20 @@
       gemeldete Ereignisse, die Route auf der Karte sowie einen Download „Als PDF
       herunterladen".</p>
 
-      <h3>Wachbuch</h3>
+      <h3 id="wachbuch">Wachbuch</h3>
       <p>Eine tagesweise gruppierte Chronik aller Vorgänge an den eigenen Objekten
       (Kontrollpunkt-Scans, Rundgänge, Aufgaben, Ereignisse) als Zeitleiste statt als Tabelle,
       mit Filterchips je Art. Weder hier noch in der Rundgangliste erscheint ein Personenname —
       erst im aufgeklappten Rundgang-Detail.</p>
 
-      <h3>Einsätze (Verkehrsdienst)</h3>
+      <h3 id="einsaetze-verkehrsdienst">Einsätze (Verkehrsdienst)</h3>
       <p>Eine Zeile pro Einsatz, mit Datum, Titel, Einsatzart, Personenzahl und Stunden — zwei
       getrennte Zahlen, nie zu einer vermischt. Sichtbar ist ausschliesslich, wofür bereits ein
       Kundenrapport <b>unterschrieben</b> wurde: Die Unterschrift ist der Freigabepunkt, ein
       separater täglicher Freigabeschritt entfällt dadurch. Der Inhalt entspricht bewusst 1:1
       dem physischen Blatt, inklusive Rechnungsadresse, falls eine abweichende hinterlegt ist.</p>
 
-      <h2>Was Kundinnen und Kunden nicht sehen oder tun können</h2>
+      <h2 id="was-kundinnen-und-kunden-nicht-sehen-oder-tun-koennen">Was Kundinnen und Kunden nicht sehen oder tun können</h2>
       <ul>
         <li>Keine Rechnungen, keine Offerten, keine Kalkulation — das Portal zeigt
         ausschliesslich Leistungsnachweise, keine Preise.</li>
@@ -159,6 +164,8 @@
     </div>
   </div>
 </div>
+<script src="suchindex.js"></script>
+<script src="suche.js"></script>
 <script src="handbuch.js"></script>
 </body>
 </html>

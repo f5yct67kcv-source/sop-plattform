@@ -16,6 +16,10 @@
       </a>
       <button class="hb-menu-btn" id="hbMenuBtn" aria-label="Menü" aria-expanded="false">☰</button>
     </div>
+    <div class="hb-suche">
+      <input type="search" id="hbSucheEingabe" placeholder="Suchen…" aria-label="Handbuch durchsuchen" autocomplete="off">
+      <div class="hb-suche-ergebnisse" id="hbSucheErgebnisse" hidden></div>
+    </div>
     <div class="hb-nav-wrap">
       <div class="hb-gruppe">Einstieg</div>
       <ul class="hb-nav">
@@ -31,6 +35,7 @@
         <li><a href="planung.html" class="aktiv">Planung</a></li>
         <li><a href="kunden.html">Kunden</a></li>
         <li><a href="personal.html">Personal</a></li>
+        <li><a href="lohn.html">Lohn</a></li>
         <li><a href="abgleich.html">Abgleich</a></li>
         <li><a href="betrieb.html">Betrieb</a></li>
       </ul>
@@ -58,14 +63,14 @@
       <b>Objekte</b> selbst werden, obwohl inhaltlich Planung, unter
       <a href="kunden.html">Kunden</a> verwaltet — hier nur, was daran anschliesst.</p>
 
-      <h2>Übersicht (Monatsmatrix)</h2>
+      <h2 id="uebersicht-monatsmatrix">Übersicht (Monatsmatrix)</h2>
       <p>Ein Raster: eine Zeile je Objekt (bei gemischter Sparte auch zweimal, je mit
       eigenem Sparten-Chip), Spalten = Tage. Eine Zelle zeigt die Anzahl eingeteilter
       Personen, farbcodiert nach „voll besetzt" / „teilweise besetzt" / „niemand
       eingeteilt" / „provisorisch" / „abgesagt". Auf den Objektnamen klicken springt
       in die Objektplanung, auf eine Tageszelle in den Tagesplan dieses Tages.</p>
 
-      <h2>Einsätze</h2>
+      <h2 id="einsaetze">Einsätze</h2>
       <p>Vier Kennzahlen oben, darunter eine nach Tag gruppierte Liste. Wichtig für
       die Kennzahl „Offene Schichten": Sie zählt <b>unbesetzte Plätze</b>, nicht
       Einsätze — an einem Tag können 5&nbsp;Einsätze durchaus 6&nbsp;offene Plätze
@@ -102,13 +107,13 @@
         das Werkzeug dabei nicht.</p>
       </div>
 
-      <h2>Objektplanung</h2>
+      <h2 id="objektplanung">Objektplanung</h2>
       <p>Monatsraster <b>eines</b> gewählten Objekts: eine Zeile „Alle Schichten"
       (Tagessumme), eine Zeile je Masterschicht (Ist/Soll je Tag), eine Zeile je
       Mitarbeitendem (tatsächlich zugeteilte Einsätze). Kennzahlen oben: Soll-,
       besetzte und offene Stunden.</p>
 
-      <h3>Schichten setzen</h3>
+      <h3 id="schichten-setzen">Schichten setzen</h3>
       <p>Erzeugt Einsätze aus den Masterschichten eines Objekts für einen
       Zeitraum — und setzt dabei zugleich den dauerhaften Wochentags-Bedarf an der
       Masterschicht selbst.</p>
@@ -120,7 +125,7 @@
         <li>Vorschau prüfen (neu / schon vorhanden / neue Fassung), „Übernehmen".</li>
       </ol>
 
-      <h3>Einteilen</h3>
+      <h3 id="einteilen">Einteilen</h3>
       <ol class="hb-schritte">
         <li>„Einteilen" (nur bei mindestens einer Masterschicht am Objekt aktiv):
         Schicht, Zeitraum, Personen ankreuzen.</li>
@@ -134,7 +139,7 @@
       <p>Ein Klick direkt auf eine Tageszelle in einer Masterschicht-Zeile öffnet
       denselben Dialog nur für diesen einen Tag.</p>
 
-      <h2>Masterschichten</h2>
+      <h2 id="masterschichten">Masterschichten</h2>
       <p>Verwaltet auf dem Reiter „Masterschichten" der Objekt-Detailseite (unter
       Kunden → Objekte). Vorlagen, aus denen Einsätze entstehen — „eine Änderung
       gilt immer ab einem Stichtag, bereits erzeugte Schichten bleiben
@@ -155,25 +160,25 @@
       <b>„Beschriftung"</b> ändert nur Name/Kürzel/Farbe, ohne Zeiten oder Bedarf
       anzufassen.</p>
 
-      <h2>Tagesplan</h2>
+      <h2 id="tagesplan">Tagesplan</h2>
       <p>Tagesansicht mit denselben Filtern wie „Einsätze". Zwei unterschiedliche
       Leertexte: „Kein Treffer" (es gibt Einsätze an diesem Tag, aber keiner passt
       zum Filter) gegenüber „Nichts geplant" (an diesem Tag ist tatsächlich nichts
       geplant) — zwei verschiedene Aussagen, entsprechend unterschieden.</p>
 
-      <h2>Feiertage</h2>
+      <h2 id="feiertage">Feiertage</h2>
       <p>Eigener Dialog, kein Reiter. Zeigt Datum, Feiertag und Umfang („ganzer
       Tag" oder „ab HH:MM") mit Quellenangabe — ausdrücklich <b>keine</b> Aussage
       über Zuschläge oder Entschädigung, nur eine Markierung. „Jahr eintragen"
       legt die Feiertage einmal pro Jahr an, ohne Bestehendes zu überschreiben.</p>
 
-      <h2>Zuteilung</h2>
+      <h2 id="zuteilung">Zuteilung</h2>
       <p>Kein eigener Bildschirm, drei gleichwertige Wege: die Massen-Einteilung in
       der Objektplanung (oben), ein Klick auf eine einzelne Tageszelle dort, oder
       Klick-für-Klick im Einsatzplan (unten) — Person anklicken, sofort
       gespeichert.</p>
 
-      <h2>Einsatzplan</h2>
+      <h2 id="einsatzplan">Einsatzplan</h2>
       <p>Die Detailansicht <b>eines</b> Einsatzes: links eine Personenliste mit
       Ampel-Filter (grün frei, gelb knappe Ruhezeit, rot Konflikt — mit
       Begründung), rechts ein Zeitraster im 15-Minuten-Takt mit einer Zeile je
@@ -208,6 +213,8 @@
     </div>
   </div>
 </div>
+<script src="suchindex.js"></script>
+<script src="suche.js"></script>
 <script src="handbuch.js"></script>
 </body>
 </html>
