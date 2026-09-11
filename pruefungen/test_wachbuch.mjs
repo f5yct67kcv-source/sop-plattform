@@ -370,7 +370,7 @@ check('Es zeigt Kontrollpunkt, Rundgang, Einsatz und Person',
   dr.includes('Keller') && dr.includes('Schliessrunde') && dr.includes('Nachtdienst')
   && dr.includes('Muster, Erika'));
 check('Ein vorhandenes Foto wird erwähnt, statt stillschweigend zu fehlen', dr.includes('Foto'));
-// ── Das Foto selbst (ENT-530) ──────────────────────────────────────────
+// ── Das Foto selbst (ENT-533) ──────────────────────────────────────────
 // Geprüft wird die Sache, nicht der Wortlaut: Bis hierher stand im Fenster
 // nur das Wort „vorhanden", und genau darum blieb die Zeile darüber grün,
 // während nie ein Bild zu sehen war.
@@ -457,7 +457,7 @@ check('KRITISCH: eine Runde ohne Endzeit sagt das, statt das Feld leer zu lassen
 check('Der Abbruchgrund steht auch im Fenster', dr2.includes('notfall'));
 await page.evaluate(() => { closeDrawer(); });
 
-// ══════════════ DAS FOTO IN DER RUNDGANG-DETAILANSICHT (ENT-530)
+// ══════════════ DAS FOTO IN DER RUNDGANG-DETAILANSICHT (ENT-533)
 // Der Weg, den das Seitenfenster anbietet: „Rundgang ansehen". Dort stand das
 // Ereignisfoto bis hierher als Wort „Mit Foto" da -- im SELBEN Dialog, in dem
 // der Fotobeleg eines Ersatzscans längst als Bild erscheint.

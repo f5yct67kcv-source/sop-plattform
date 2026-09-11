@@ -193,7 +193,7 @@ pruef('Die Person steht als "Nachname, Vorname" da',
 pruef('Die Bemerkung und das Foto eines Ersatzscans gehen nicht verloren',
     $scan !== null && $scan['text'] === 'Chip defekt' && $scan['hat_foto'] === true);
 
-// ══════════════ DIE NUMMER DER QUELLE (ENT-530)
+// ══════════════ DIE NUMMER DER QUELLE (ENT-533)
 // Die zusammengesetzte 'id' ("scan-302") haelt zwei Arten mit derselben
 // Nummer auseinander; sie ist eine Kennung fuer die Liste. Wer ein Foto
 // ABRUFEN will, braucht die Nummer der Quelle selbst. Sie aus der Kennung

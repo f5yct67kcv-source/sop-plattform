@@ -20538,7 +20538,7 @@ function wbOeffnen(id) {
     : '<span style="color:var(--ink-3)">keinem Einsatz zugeordnet</span>']);
   zeilen.push(['Mitarbeitende', esc(e.person)]);
   if (e.text) { zeilen.push([e.art === 'ereignis' ? 'Bemerkung' : 'Angabe', esc(e.text)]); }
-  /* Bis ENT-530 stand hier nur das Wort „vorhanden", mit dem Verweis, das
+  /* Bis ENT-533 stand hier nur das Wort „vorhanden", mit dem Verweis, das
      Bild sei in der Rundgang-Detailansicht zu finden. Dort stand es nicht --
      der Knopf „Rundgang ansehen" gleich darunter führte zu genau demselben
      Wort. Jetzt holt das Seitenfenster das Bild selbst, und zwar erst beim
@@ -20923,7 +20923,7 @@ function rgdErsatzHtml(ersatz) {
    Fotobeleg eines Ersatzscans und das Foto einer Ereignismeldung --, darum
    steht es einmal hier statt zweimal untereinander. Genau an dieser
    Doppelung ist es vorher auseinandergelaufen: Der Scan bekam sein Bild,
-   das Ereignis blieb beim Wort „Mit Foto" (ENT-530).
+   das Ereignis blieb beim Wort „Mit Foto" (ENT-533).
 
    Der Token darf nicht in die URL (test_php.mjs prüft das), darum fetch()
    mit Kopfzeile statt <img src>. */
@@ -21008,7 +21008,7 @@ function rgdEreignisHtml(e) {
     + '<div class="zeit">' + esc(String(e.erfasst_am).slice(11, 16)) + '</div>'
     + '<div><div class="art">' + esc(e.art || 'Ohne Art') + '</div>'
     + (e.bemerkung ? '<div class="bem">' + esc(e.bemerkung) + '</div>' : '')
-    // Das Bild selbst statt des Wortes „Mit Foto" (ENT-530) -- dieselbe
+    // Das Bild selbst statt des Wortes „Mit Foto" (ENT-533) -- dieselbe
     // Entscheidung wie beim Ersatzscan ein paar Zeilen weiter oben
     // (ENT-329): Das Foto IST der Inhalt der Meldung, nicht eine
     // Eigenschaft davon. Bis hierher stand im selben Dialog das eine Foto
