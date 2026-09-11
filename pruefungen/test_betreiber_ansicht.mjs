@@ -362,6 +362,44 @@ for (const [wie, breite, hoehe] of [['Desktop', 1500, 900], ['Handy', 390, 844]]
   await seite.close();
 }
 
+// ── Wie gross ist ein Mandant: vier Aussagen, vier Texte (ENT-539) ───
+//
+// Die Hausregel, die hier am haeufigsten verletzt wurde. "Nicht
+// feststellbar" als 0 auszugeben waere die schlimmste Variante: Sie sieht
+// aus wie eine Auskunft und ist eine Erfindung -- und an dieser Zahl
+// haengt spaeter eine Rechnung.
+{
+  const seite = await browser.newPage({ viewport: { width: 1500, height: 900 } });
+  await seite.goto(ADRESSE);
+  const t = await seite.evaluate(() => ({
+    nichtErhoben:   groesseZelle(undefined),
+    nichtFeststell: groesseZelle(null),
+    wirklichNull:   groesseZelle({ gesamt: 0, aktiv: 0, im_einsatz: 0 }),
+    normal:         groesseZelle({ gesamt: 12, aktiv: 9, im_einsatz: 7 }),
+    teilUnbekannt:  groesseZelle({ gesamt: 12, aktiv: 9, im_einsatz: null }),
+  }));
+  await seite.close();
+
+  const bloss = h => h.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+
+  check('KRITISCH: "nicht erhoben" sagt nicht null',       !/\b0\b/.test(bloss(t.nichtErhoben)));
+  check('KRITISCH: "nicht feststellbar" sagt nicht null',  !/\b0\b/.test(bloss(t.nichtFeststell)));
+  // Und die vier duerfen nicht dasselbe sagen -- sonst sind es keine vier
+  // Aussagen, sondern eine mit vier Anlaessen.
+  check('KRITISCH: die vier Lagen sagen vier verschiedene Dinge',
+    new Set([bloss(t.nichtErhoben), bloss(t.nichtFeststell),
+             bloss(t.wirklichNull), bloss(t.normal)]).size === 4);
+  check('Eine echte Null wird als Null gezeigt', /\b0\b/.test(bloss(t.wirklichNull)));
+  check('Der Normalfall nennt aktiv und gesamt', /9/.test(bloss(t.normal)) && /12/.test(bloss(t.normal)));
+  check('Der Normalfall nennt den Bezug, weil 9 eine Teilmenge von 12 ist',
+    /von 12/.test(bloss(t.normal)));
+  // Eine unbekannte TEILzahl darf die ganze Zelle nicht kippen -- und auch
+  // nicht als 0 erscheinen.
+  check('KRITISCH: eine unbekannte Teilzahl wird nicht zu null gerechnet',
+    /nicht feststellbar/i.test(bloss(t.teilUnbekannt))
+    && /9/.test(bloss(t.teilUnbekannt)));
+}
+
 // ── "Noch nicht gebaut" ist nicht "nichts vorhanden" ─────────────────
 //
 // Die Hausregel, die hier am haeufigsten verletzt wurde. Ein Geruest, das

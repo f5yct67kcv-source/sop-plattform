@@ -605,6 +605,99 @@ function mandant_stand(array $m): array
 }
 
 
+// ── Wie gross ist ein Mandant? (ENT-539) ──────────────────────────────
+//
+// WARUM MEHRERE ZAHLEN UND NICHT EINE: Der Projektinhaber erwägt eine
+// Staffelung nach Betriebsgrösse ("bis 10 dieser Preis, ab 11 dieser").
+// Was dabei als "ein Mitarbeiter" zählt, ist NICHT entschieden -- und für
+// einen Sicherheitsbetrieb ist der Unterschied echtes Geld: Wer viele
+// Aushilfen auf der Liste führt, hat mehr Konten als arbeitende Leute.
+//
+// Darum werden die ROHZAHLEN festgehalten, nicht das Ergebnis einer
+// Definition. Aus ihnen lässt sich jede spätere Auslegung rechnen; aus
+// einer einzigen Zahl liesse sich keine andere mehr herleiten. Dasselbe
+// Prinzip wie bei der GAV-Zeit (CLAUDE.md): nie nur den fertigen Wert.
+//
+// LESEN, NICHT SCHREIBEN: Diese Funktion zählt und rührt die Daten des
+// Mandanten nicht an. Sie zählt auch keine Namen -- nur Zeilen.
+function mandant_groesse(array $m): ?array
+{
+    try {
+        $pdo = mandant_db($m);
+        if (!hat_tabelle($pdo, 'mitarbeiter')) { return null; }
+
+        $gesamt = (int)$pdo->query('SELECT COUNT(*) FROM mitarbeiter')->fetchColumn();
+        $aktiv  = (int)$pdo->query('SELECT COUNT(*) FROM mitarbeiter WHERE aktiv = 1')->fetchColumn();
+
+        // Wer im laufenden Monat tatsächlich eingeteilt war. Die dritte
+        // Zahl, weil "auf der Liste" und "im Einsatz" bei Aushilfen weit
+        // auseinanderliegen. Fehlt die Tabelle, bleibt sie NULL -- unbekannt
+        // ist etwas anderes als null (Hausregel).
+        $imEinsatz = null;
+        if (hat_tabelle($pdo, 'einsatz_zuteilung') && hat_tabelle($pdo, 'einsaetze')) {
+            $s = $pdo->prepare(
+                'SELECT COUNT(DISTINCT z.mitarbeiter_id)
+                   FROM einsatz_zuteilung z
+                   JOIN einsaetze e ON e.id = z.einsatz_id
+                  WHERE e.datum >= ? AND e.datum <= ?'
+            );
+            $s->execute([date('Y-m-01'), date('Y-m-t')]);
+            $imEinsatz = (int)$s->fetchColumn();
+        }
+        return ['gesamt' => $gesamt, 'aktiv' => $aktiv, 'im_einsatz' => $imEinsatz];
+    } catch (Throwable $e) {
+        // Wie bei mandant_stand(): Der Treibertext kann Host und Benutzer
+        // tragen und geht nicht nach aussen.
+        return null;
+    }
+}
+
+// Den Stand eines Monats festhalten -- höchstens einmal je Mandant und
+// Monat.
+//
+// WARUM ÜBERHAUPT FESTHALTEN: Eine Staffelung nach Betriebsgrösse braucht
+// die Grösse ZUM ABRECHNUNGSZEITPUNKT. Wie viele Konten ein Betrieb im
+// September hatte, lässt sich im Dezember nicht mehr feststellen --
+// eintritt/austritt stehen zwar in `mitarbeiter`, aber nur für Zeilen, die
+// es noch gibt, und nur wenn die Daten gepflegt sind. Eine gelöschte
+// Person ist rückwirkend unsichtbar. Das ist der Grund, warum hier schon
+// gezählt wird, bevor überhaupt entschieden ist, ob nach Grösse
+// abgerechnet wird: Nachholen geht nicht, Wegwerfen schon.
+//
+// ERSTER EINTRAG GEWINNT: Ein zweiter Aufruf im selben Monat ändert nichts.
+// Sonst verschöbe sich der festgehaltene Stand mit jedem Seitenaufruf, und
+// der Wert hinge davon ab, wann jemand zuletzt hingeschaut hat.
+// Die ZAHLEN kommen von aussen und werden hier nicht geholt. Das ist keine
+// Umstaendlichkeit: mandant_groesse() baut eine Verbindung zu einer fremden
+// Datenbank auf und laesst sich darum nicht ohne Server pruefen. Getrennt
+// ist die Aufbewahrungsregel -- "hoechstens einmal je Monat, der erste
+// gewinnt" -- gegen eine Attrappe pruefbar, und genau sie ist die
+// Entscheidung. Dasselbe Vorgehen wie bei be_bootstrap_grenze() (ENT-528).
+//
+// Rueckgabe: null heisst "nichts festzuhalten" (keine Zahlen), sonst sagt
+// 'neu', ob dieser Aufruf geschrieben hat.
+function zaehlstand_festhalten(PDO $be, int $mandantId, ?array $zahlen,
+                               ?string $monat = null, ?string $stichtag = null): ?array
+{
+    if ($zahlen === null) { return null; }
+    $monat    = $monat    ?: date('Y-m');
+    $stichtag = $stichtag ?: date('Y-m-d');
+
+    $s = $be->prepare('SELECT id FROM mandant_zaehlstand WHERE mandant_id = ? AND monat = ?');
+    $s->execute([$mandantId, $monat]);
+    if ($s->fetchColumn()) { return ['neu' => false, 'monat' => $monat]; }
+
+    $be->prepare(
+        'INSERT INTO mandant_zaehlstand
+             (mandant_id, monat, stichtag, ma_gesamt, ma_aktiv, ma_im_einsatz)
+         VALUES (?, ?, ?, ?, ?, ?)'
+    )->execute([$mandantId, $monat, $stichtag,
+                (int)$zahlen['gesamt'], (int)$zahlen['aktiv'],
+                $zahlen['im_einsatz'] === null ? null : (int)$zahlen['im_einsatz']]);
+
+    return ['neu' => true, 'monat' => $monat] + $zahlen;
+}
+
 // ── Die Tabellen der Betreiber-Ebene ──────────────────────────────────
 //
 // Sie stehen HIER und nicht im Einrichtungsendpunkt, weil sie seit ENT-529
@@ -657,6 +750,35 @@ function be_tabellen(): array
 // ist der Bestandsmandant, dessen Daten schon da waren, bevor es einen
 // Mandantenstamm gab -- kein Sonderfall, sondern die dokumentierte
 // Bedeutung von "leer".
+// Der Zaehlstand je Mandant und Monat (ENT-539).
+//
+// EINE ZEILE JE MONAT, nicht je Tag: Abgerechnet wird monatlich, und ein
+// Tagesstand waere dreissigmal so viel Zeile fuer dieselbe Auskunft.
+//
+// DREI ROHZAHLEN statt einer fertigen "Groesse": Was als Mitarbeiter
+// zaehlt, ist nicht entschieden (OP-536). Aus Rohzahlen laesst sich jede
+// Auslegung rechnen, aus einer Zahl keine andere mehr herleiten.
+//
+// ma_im_einsatz ist NULLable und heisst dann "nicht feststellbar" -- die
+// Tabellen dafuer fehlten. Nicht null. Unbekannt darf nie wie keine
+// aussehen (CLAUDE.md).
+//
+// KEIN Fremdschluessel auf mandant: Der Zaehlstand ist eine
+// Abrechnungsgrundlage und muss den Mandanten ueberleben. Wer kuendigt,
+// verschwindet aus dem Stamm -- seine Rechnungen bleiben.
+'mandant_zaehlstand' => "CREATE TABLE IF NOT EXISTS mandant_zaehlstand (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  mandant_id INT UNSIGNED NOT NULL,
+  monat CHAR(7) NOT NULL,
+  stichtag DATE NOT NULL,
+  ma_gesamt INT UNSIGNED NOT NULL,
+  ma_aktiv INT UNSIGNED NOT NULL,
+  ma_im_einsatz INT UNSIGNED NULL,
+  erfasst_am DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_zaehlstand (mandant_id, monat),
+  KEY idx_zaehlstand_monat (monat)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
 'mandant' => "CREATE TABLE IF NOT EXISTS mandant (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(200) NOT NULL,
