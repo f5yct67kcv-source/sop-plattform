@@ -449,6 +449,23 @@ function rundgang_fortschritt(PDO $pdo, int $rundgangId, int $objektId, ?int $vo
             'ersatzscan' => $ersatzscan, 'erledigt' => $bestaetigt + $ersatzscan];
 }
 
+/* Groesse eines Fotobelegs. Bewusst klein gehalten -- ein Beleg fuer "war
+   ich vor Ort" braucht keine Druckaufloesung, und die App komprimiert vor
+   dem Versand (rdEsKomprimieren in app.html). Gleiche Groessenordnung wie
+   DOK_MAX/2 in einsatz_dokument.php, dort fuer PDF statt Foto.
+
+   Sie steht HIER und nicht im Endpunkt, obwohl der Ersatzscan sie zuerst
+   gebraucht hat (ENT-540): Endpunkte binden einander nie ein. Solange sie in
+   mein_rundgang_scan.php stand, war sie fuer mein_ereignis_melden.php
+   unerreichbar -- und dort steht die Zeile, die sie prueft. PHP 8 wirft dafuer
+   einen Error, der im Browser als "Unerwarteter Serverfehler" ankommt, ohne
+   zu sagen, woran es lag. Jede Ereignismeldung MIT Foto ist daran
+   gescheitert, jede ohne kam an. Der Kommentar in fahrzeug.php behauptete
+   schon vorher, sie stehe hier; jetzt stimmt das auch.
+
+   pruef_php.php prueft seither jede Hauskonstante auf Erreichbarkeit. */
+const ERSATZSCAN_FOTO_MAX = 2 * 1024 * 1024;
+
 // Erkennt JPEG/PNG anhand der Magic Bytes, nicht anhand einer vom Client
 // gemeldeten Endung oder eines MIME-Typs -- beides laesst sich frei setzen
 // (gleiches Prinzip wie bei einsatz_dokument.php, dort fuer PDF). Gibt den

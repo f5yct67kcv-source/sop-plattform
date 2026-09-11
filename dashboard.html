@@ -21019,8 +21019,15 @@ function rgdErsatzHtml(ersatz) {
 
    Der Token darf nicht in die URL (test_php.mjs prüft das), darum fetch()
    mit Kopfzeile statt <img src>. */
+/* Die noch laufenden Bildabrufe der offenen Runde. Das Rapportblatt wartet
+   auf sie (ENT-544): html2pdf rastert in dem Moment, in dem es gerufen wird
+   -- ein Bild, das dann noch laedt, fehlt im PDF, und zwar STILL. Wer die
+   Runde oeffnet und sofort auf „PDF" tippt, bekam bis hierher ein Blatt ohne
+   Bilder, ohne dass irgendetwas darauf hinwies. */
+let rgdFotoLaeuft = [];
+
 function rgdFotoHolen(d, pfad, zielId, ablage, schluessel, alt, fehlertext) {
-  fetch(API + pfad, { headers: { 'X-Auth-Token': token } })
+  return fetch(API + pfad, { headers: { 'X-Auth-Token': token } })
     .then(r => (r.ok ? r.blob() : Promise.reject(new Error('foto'))))
     .then(b => {
       if (!rgdDaten || Number(rgdDaten.id) !== Number(d.id)) { return; }  // inzwischen andere Runde
@@ -21044,18 +21051,19 @@ function rgdFotoHolen(d, pfad, zielId, ablage, schluessel, alt, fehlertext) {
    Zeile das Bild -- vorher steht dort ein Platzhalter, kein leerer Rahmen:
    „wird geladen" und „kein Foto" sind verschiedene Aussagen. */
 function rgdFotosLaden(d) {
+  rgdFotoLaeuft = [];
   (d.kontrollpunkte || []).forEach(k => {
     const e = k.erledigt;
     if (!e || !e.hat_foto || !e.scan_id) { return; }
-    rgdFotoHolen(d, 'rundgang_scan_foto.php?id=' + Number(e.scan_id),
+    rgdFotoLaeuft.push(rgdFotoHolen(d, 'rundgang_scan_foto.php?id=' + Number(e.scan_id),
       'rgdFoto' + Number(e.scan_id), rgdFotos, e.scan_id,
-      'Fotobeleg zum Ersatzscan', 'Der Fotobeleg liess sich nicht laden.');
+      'Fotobeleg zum Ersatzscan', 'Der Fotobeleg liess sich nicht laden.'));
   });
   (d.ereignisse || []).forEach(e => {
     if (!e.hat_foto || !e.id) { return; }
-    rgdFotoHolen(d, 'ereignis_foto.php?id=' + Number(e.id),
+    rgdFotoLaeuft.push(rgdFotoHolen(d, 'ereignis_foto.php?id=' + Number(e.id),
       'rgdEvFoto' + Number(e.id), rgdEreignisFotos, e.id,
-      'Foto zur Ereignismeldung', 'Das Foto liess sich nicht laden.');
+      'Foto zur Ereignismeldung', 'Das Foto liess sich nicht laden.'));
   });
 }
 
@@ -21239,6 +21247,27 @@ function rapportBlattFuellen(d) {
       : []),
   ].map(([a, v]) => kopfZeile(a, v)).join('');
 
+  /* Die Fotogroesse im Rapportblatt (ENT-544). Das Blatt ist 760 px breit
+     und wird auf A4 mit 10 mm Rand gesetzt -- 190 mm Nutzbreite, also rund
+     0,25 mm je Pixel. 440 px ergeben damit etwa 11 cm Bildbreite.
+
+     Vorgabe des Projektinhabers: „Foto muss in den Rapport und dies in einer
+     anständigen Grösse. Der Kunde will nicht in ein PDF hineinzoomen müssen,
+     um was zu erkennen." Bis hierher waren es 200 px -- gut 5 cm, ein
+     Daumennagel.
+
+     Gilt fuer BEIDE Bilder im Blatt, Fotobeleg wie Ereignisfoto: Zwei
+     Groessen nebeneinander waeren zwei Aussagen darueber, welches wichtiger
+     ist. Dieselben Werte stehen im Kundenportal (portal.html, BLATT_FOTO) --
+     es ist dasselbe Blatt, nur von der anderen Seite geholt. */
+  const blattFoto = 'max-width:440px;max-height:320px;border:1px solid #E5E8EC;'
+    + 'border-radius:4px;display:block;margin-top:8px';
+  /* Ein Bild, das die Seitengrenze kreuzt, wird von html2pdf stumpf
+     zerschnitten -- bei 200 px fiel das kaum auf, bei 440 px halbiert es das
+     Beweisstueck. Die Optionen enthalten den Modus "css", also wirkt
+     page-break-inside: Die ganze Zeile wandert auf die naechste Seite. */
+  const zeileGanz = 'page-break-inside:avoid;break-inside:avoid';
+
   const th = 'padding:6px 8px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:#6B7280;border-bottom:1.5px solid #16181D';
   const td = 'padding:7px 8px;border-bottom:1px solid #E5E8EC;font-size:13.5px;vertical-align:top';
   const lbl = 'font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#6B7280;font-weight:700;margin-bottom:6px';
@@ -21255,7 +21284,7 @@ function rapportBlattFuellen(d) {
       const grund = a.erledigt && a.erledigt.grund ? ' — ' + a.erledigt.grund : '';
       return `<div style="font-size:12px;color:#6B7280;margin-top:3px">${esc(a.bezeichnung)}: <b style="color:#14161A;font-weight:600">${esc(at)}</b>${esc(grund)}</div>`;
     }).join('');
-    return `<tr>
+    return `<tr style="${e && e.hat_foto ? zeileGanz : ''}">
       <td style="${td};white-space:nowrap;width:58px${e ? '' : ';color:#8B919D'}">${esc(e ? String(e.erfasst_am).slice(11, 16) : '–')}</td>
       <td style="${td}">${esc(k.bezeichnung)}
         ${e && e.beschreibung ? `<div style="font-size:12px;color:#6B7280;margin-top:3px">${esc(e.beschreibung)}</div>` : ''}
@@ -21263,19 +21292,27 @@ function rapportBlattFuellen(d) {
           // Das Bild selbst, wenn es geladen ist. Ist es das nicht, steht
           // wenigstens da, DASS ein Beleg vorliegt -- ein stillschweigend
           // fehlendes Foto wäre schlimmer als der Satz darüber.
-          ? `<img src="${rgdFotos[e.scan_id]}" alt="" style="max-width:200px;max-height:150px;
-              border:1px solid #E5E8EC;border-radius:4px;display:block;margin-top:6px">`
+          ? `<img src="${rgdFotos[e.scan_id]}" alt="Fotobeleg zum Ersatzscan" style="${blattFoto}">`
           : '<div style="font-size:12px;color:#6B7280;margin-top:3px">Fotobeleg vorhanden (nicht abrufbar)</div>') : ''}
         ${aufg}</td>
       <td style="${td};white-space:nowrap;width:112px${e && e.status === 'bestaetigt' ? '' : ';font-weight:600'}">${esc(stTxt)}</td>
     </tr>`;
   }).join('');
 
-  const ereignisse = (d.ereignisse || []).map(e => `<tr>
+  /* Das Ereignisfoto gehoert in den Rapport (ENT-544, ausdrueckliche Ansage
+     des Projektinhabers). Bis hierher stand nur das Wort „Mit Foto" da --
+     der Kunde wusste damit, dass es ein Bild gibt, das er nicht sieht. Das
+     ist schlechter als beides: schlechter als das Bild und schlechter als
+     Schweigen. */
+  const ereignisse = (d.ereignisse || []).map(e => `<tr style="${e.hat_foto ? zeileGanz : ''}">
       <td style="${td};white-space:nowrap;width:58px">${esc(String(e.erfasst_am).slice(11, 16))}</td>
       <td style="${td}"><b style="font-weight:600">${esc(e.art || 'Ohne Art')}</b>
         ${e.bemerkung ? `<div style="font-size:12px;color:#6B7280;margin-top:3px">${esc(e.bemerkung)}</div>` : ''}
-        ${e.hat_foto ? '<div style="font-size:12px;color:#6B7280;margin-top:3px">Mit Foto</div>' : ''}</td>
+        ${e.hat_foto ? (rgdEreignisFotos[e.id]
+          ? `<img src="${rgdEreignisFotos[e.id]}" alt="Foto zur Ereignismeldung" style="${blattFoto}">`
+          // „Vorhanden, aber nicht abrufbar" ist etwas anderes als „kein
+          // Foto" -- der Satz sagt darum nicht, es gebe keines.
+          : '<div style="font-size:12px;color:#6B7280;margin-top:3px">Foto vorhanden (nicht abrufbar)</div>') : ''}</td>
     </tr>`).join('');
 
   $('rapportBlatt').innerHTML = `
@@ -21351,7 +21388,10 @@ function rapportDateiname(d) {
 // Wege (Herunterladen und Versenden) -- zwei Erzeugungen waeren zwei
 // Gelegenheiten, verschiedene Rapporte zu erzeugen.
 function rapportPdfBauen(d) {
-  return html2pdfLaden().then(() => {
+  // allSettled und nicht all: Ein Bild, das sich nicht holen laesst, darf das
+  // PDF nicht verhindern -- an seiner Stelle steht dann „vorhanden (nicht
+  // abrufbar)".
+  return Promise.all([html2pdfLaden(), Promise.allSettled(rgdFotoLaeuft)]).then(() => {
     rapportBlattFuellen(d);
     return html2pdf().set({
       margin: 10,

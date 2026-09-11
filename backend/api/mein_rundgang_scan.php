@@ -61,11 +61,10 @@ if ($scans) {
 
 // Ersatzscan (Q-22 in sop-projekt): Fotobeleg statt technischer Pruefung,
 // wenn NFC/Geofence nicht moeglich ist (Chip zerstoert, Punkt nicht
-// auffindbar). Bewusst klein gehalten -- ein Fotobeleg fuer "war ich vor
-// Ort" braucht keine Druckaufloesung, und die App komprimiert vor dem
-// Versand (siehe rdEsKomprimieren in app.html). Gleiche Grössenordnung wie
-// DOK_MAX/2 in einsatz_dokument.php, dort fuer PDF-Dokumente statt Fotos.
-const ERSATZSCAN_FOTO_MAX = 2 * 1024 * 1024;
+// auffindbar). ERSATZSCAN_FOTO_MAX steht seit ENT-540 in rundgang.php, bei
+// ersatzscan_foto_mime() -- hier stand sie fuer den zweiten Nutzer
+// (mein_ereignis_melden.php) unerreichbar, und dessen Fotos gingen darum
+// alle verloren.
 
 $ergebnisse = [];
 foreach ($scans as $eintrag) {

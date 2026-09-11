@@ -180,15 +180,21 @@ let versandKoerper = null;
 // Ein wirklich gültiges 1x1-PNG: Ein kaputtes Bild lädt nicht und wäre
 // unsichtbar, ohne dass der Code etwas falsch macht -- die Prüfung hätte
 // dann den Test gemessen, nicht die Anwendung.
+/* 400x300 und nicht 1x1: Erst ein Bild, das GROESSER ist als der Rahmen,
+   sagt etwas darueber, wie gross es im Blatt landet. Ein Handyfoto ist
+   immer groesser. Gebraucht seit ENT-544, wo die Bildgroesse im Rapport
+   selbst zur Anforderung wurde. */
+const PNG_BREIT = 400, PNG_HOCH = 300;
 const PNG = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+  'iVBORw0KGgoAAAANSUhEUgAAAZAAAAEsCAIAAABi1XKVAAAC90lEQVR42u3UQQ0AAAgDsWmafwHIQgekSRXc4zItwAmRADAsAMMCDAvAsAAMCzAsAMMCMCzAsAAMC8CwAMMCMCwAwwIMC8CwAAwLMCwAwwIwLMCwAAwLwLAAwwIwLADDAgwLwLAAw1IBMCwAwwIMC8CwAAwLMCwAwwIwLMCwAAwLwLAAwwIwLADDAgwLwLAADAswLADDAjAswLAADAvAsADDAjAsAMMCDAvAsADDUgEwLADDAgwLwLAADAswLADDAjAswLAADAvAsADDAjAsAMMCDAvAsAAMCzAsAMMCMCzAsAAMC8CwAMMCMCwAwwIMC8CwAMMCMCwAwwIMC8CwAAwLMCwAwwIwLMCwAAwLwLAAwwIwLADDAgwLwLAADAswLADDAjAswLAADAvAsADDAjAsAMMCDAvAsADDAjAsAMMCDAvAsAAMCzAsAMMCMCzAsAAMC8CwAMMCMCwAwwIMC8CwAAwLMCwAwwIwLMCwAAwLwLAAwwIwLADDAgwLwLAAwwIwLADDAgwLwLAADAswLADDAjAswLAADAvAsADDAjAsAMMCDAvAsAAMCzAsAMMCMCzAsAAMC8CwAMMCMCwAwwIMC8CwAMMCMCwAwwIMC8CwAAwLMCwAwwIwLMCwAAwLwLAAwwIwLADDAgwLwLAADAswLADDAjAswLAADAvAsADDAjAsAMMCDAvAsADDAjAsAMMCDAvAsAAMCzAsAMMCMCzAsAAMC8CwAMMCMCwAwwIMC8CwAAwLMCwAwwIwLMCwAAwLwLAAwwIwLADDAgwLwLAAwwIwLADDAgwLwLAADAswLADDAjAswLAADAvAsADDAjAsAMMCDAvAsAAMCzAsAMMCMCzAsAAMC8CwAMMCMCzAsCQADAvAsADDAjAsAMMCDAvAsAAMCzAsAMMCMCzAsAAMC8CwAMMCMCwAwwIMC8CwAAwLMCwAwwIwLMCwAAwLwLAAwwIwLMCwVAAMC8CwAMMCMCwAwwIMC8CwAAwLMCwAwwIwLOCzBf0vcSw0UxrUAAAAAElFTkSuQmCC',
   'base64');
 const fotoRufe = [];
 let fotoKopf = null;
+let fotoVerzoegern = 0;   // ms, die der Bildabruf braucht
 const browser = await chromium.launch({ executablePath: browserPfad() });
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 page.on('pageerror', e => bad.push('JS-Fehler: ' + e.message));
-await page.route('**/api/**', r => {
+await page.route('**/api/**', async r => {
   const p = r.request().url().split('/api/')[1].split('?')[0];
   gerufen.push(p);
   const send = b => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) });
@@ -196,9 +202,13 @@ await page.route('**/api/**', r => {
   if (p.includes('rundgang_detail')) return send(DETAIL41);
   if (p.includes('rundgang_liste')) return send(RUNDGAENGE);
   if (p.includes('rundgang_spur')) return send({ status: 'ok', punkte: [], eingerichtet: true });
-  if (p.includes('rundgang_scan_foto')) {
+  if (p.includes('rundgang_scan_foto') || p.includes('ereignis_foto')) {
     fotoRufe.push(new URL(r.request().url()).search);
     fotoKopf = r.request().headers()['x-auth-token'] || null;
+    // Verzoegerbar (ENT-544): Das Blatt soll gebaut werden, WAEHREND das Bild
+    // noch unterwegs ist. Beim Gegenprobieren aufgefallen -- das Entfernen
+    // des Wartens machte vorher keine einzige Pruefung rot.
+    if (fotoVerzoegern) { await new Promise(f => setTimeout(f, fotoVerzoegern)); }
     return r.fulfill({ status: 200, contentType: 'image/png', body: PNG });
   }
   if (p.includes('rundgang_rapport_versenden')) {
@@ -425,14 +435,36 @@ check('KRITISCH: der Rapport weist den Ersatzscan aus',
   blatt.includes('Ersatzscan') && blatt.toLowerCase().includes('hinweis'));
 check('KRITISCH: und zählt ihn in der Kopfzeile als erledigt mit',
   blatt.includes('2 von 3 erledigt'));
-// Das Bild selbst, nicht der Satz „Mit Foto": Der Beleg IST der Inhalt des
-// Ersatzscans.
-check('KRITISCH: der Fotobeleg steht als Bild im Rapport',
-  await page.evaluate(() => {
-    const i = [...document.querySelectorAll('#rapportBlatt img')]
-      .filter(x => (x.getAttribute('src') || '').startsWith('blob:'));
-    return i.length === 1 && i[0].naturalWidth > 0;
-  }));
+/* Das Bild selbst, nicht der Satz „Mit Foto": Der Beleg IST der Inhalt.
+   Seit ENT-544 sind es ZWEI -- der Fotobeleg des Ersatzscans und das Foto
+   der Ereignismeldung. Bis dahin stand beim Ereignis nur das Wort, und der
+   Kunde wusste damit, dass es ein Bild gibt, das er nicht sieht. */
+const blattBilder = await page.evaluate(() => {
+  // Nur die Bilder in der TABELLE: Der Briefkopf im Blattkopf ist auch ein
+  // Bild und hat mit der Fotogroesse nichts zu tun.
+  return [...document.querySelectorAll('#rapportBlatt table img')]
+    .map(i => {
+      const b = i.getBoundingClientRect();
+      return { dekodiert: i.naturalWidth > 0, breite: Math.round(b.width),
+               hoehe: Math.round(b.height), alt: i.getAttribute('alt') || '' };
+    });
+});
+check('KRITISCH: der Fotobeleg UND das Ereignisfoto stehen als Bild im Rapport',
+  blattBilder.length === 2 && blattBilder.every(b => b.dekodiert));
+check('KRITISCH: beide sind benannt -- ein Bild ohne alt sagt nichts vorgelesen',
+  blattBilder.some(b => /Ersatzscan/.test(b.alt))
+  && blattBilder.some(b => /Ereignismeldung/.test(b.alt)));
+/* Gemessen, nicht im Quelltext nachgelesen (CLAUDE.md). Vorgabe des
+   Projektinhabers: „Der Kunde will nicht in ein PDF hineinzoomen müssen."
+   Das Blatt ist 760 px breit und wird auf 190 mm Nutzbreite gesetzt -- rund
+   0,25 mm je Pixel. Unter 300 px waere das Bild schmaler als 7,5 cm und
+   damit wieder ein Daumennagel; ueber 460 px spraenge es aus der Spalte. */
+check('KRITISCH: beide Bilder sind im Blatt in Lesegrösse, nicht als Daumennagel',
+  blattBilder.length === 2 && blattBilder.every(b => b.breite >= 300 && b.breite <= 460));
+check('KRITISCH: und nicht verzerrt -- ein gestauchtes Beweisstück sagt etwas anderes aus',
+  blattBilder.every(b => Math.abs((b.breite / b.hoehe) - (400 / 300)) < 0.05));
+check('Beide Bilder sind gleich gross -- zwei Grössen wären zwei Aussagen darüber, welches zählt',
+  blattBilder.length === 2 && blattBilder[0].breite === blattBilder[1].breite);
 // Der Entscheid des Projektinhabers zu ENT-322: keine KARTE im Rapport.
 // Beim ersten Anlauf verbot diese Prüfung jedes Bild -- und schlug damit an,
 // als in ENT-329 der Fotobeleg dazukam, der ausdrücklich gewollt ist. Eine
@@ -482,6 +514,29 @@ check('Sie trägt Objekt und Datum im Namen',
   && String(dateiname).endsWith('.pdf'));
 check('Der Knopf ist danach wieder bedienbar',
   await page.evaluate(() => !document.getElementById('rgdPdfBtn').disabled));
+
+/* Der Wettlauf (ENT-544): html2pdf rastert das Blatt in dem Moment, in dem
+   es gerufen wird. Ein Bild, das dann noch laedt, fehlt im PDF -- und zwar
+   STILL. Wer die Runde oeffnet und sofort auf „PDF" tippt, bekam bis dahin
+   ein Blatt ohne Bilder, ohne dass irgendetwas darauf hinwies.
+
+   rgdZu() leert die Bildablage, darum erzeugt Schliessen und Wiederoeffnen
+   einen echten neuen Abruf -- ohne das laege das Bild bereit und es gaebe
+   gar keinen Wettlauf. */
+await page.evaluate(() => rgdZu());
+await page.waitForTimeout(150);
+fotoVerzoegern = 900;
+await page.evaluate(() => rgdZeigen(41));
+await page.waitForTimeout(250);          // nur bis die Runde selbst da ist
+await page.click('#rgdPdfBtn');
+await page.waitForTimeout(2000);
+const eiligBilder = await page.evaluate(() =>
+  [...document.querySelectorAll('#rapportBlatt table img')]
+    .map(i => ({ alt: i.getAttribute('alt') || '', dekodiert: i.naturalWidth > 0,
+                 breite: Math.round(i.getBoundingClientRect().width) })));
+check('KRITISCH: auch beim sofortigen Klick stehen die Fotos im Blatt, nicht nur der Hinweis',
+  eiligBilder.filter(b => b.dekodiert && b.breite >= 300).length === 2);
+fotoVerzoegern = 0;
 
 // ══════════ VERSAND PER E-MAIL ════════════════════════════════════════
 await page.click('#rgdMailBtn');

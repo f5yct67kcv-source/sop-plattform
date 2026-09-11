@@ -84,10 +84,15 @@ const VOLL = {
       fortschritt: { gesamt: 0, erledigt: 0, bestaetigt: 0, ersatzscan: 0 } },
   ],
 };
-// Ein 1x1-PNG als Fotobeleg. Der Inhalt ist gleichgueltig -- geprueft wird,
-// dass ueberhaupt ein Bild ankommt und nicht ein Platzhaltertext bleibt.
+/* Ein PNG in Fotogroesse (400x300). Bis ENT-544 genuegte ein 1x1 -- da war
+   nur zu pruefen, DASS ein Bild ankommt. Seit die Bildgroesse im Blatt
+   selbst zur Anforderung geworden ist („Der Kunde will nicht in ein PDF
+   hineinzoomen müssen"), muss das Pruefbild GROESSER sein als der Rahmen:
+   Ein 1x1 wuerde nie gedeckelt und liesse offen, ob der Deckel greift. */
+const FOTO_BREIT = 400, FOTO_HOCH = 300;
+let fotoVerzoegern = 0;   // ms, die der Bildabruf braucht
 const FOTO_PNG = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+  'iVBORw0KGgoAAAANSUhEUgAAAZAAAAEsCAIAAABi1XKVAAAC90lEQVR42u3UQQ0AAAgDsWmafwHIQgekSRXc4zItwAmRADAsAMMCDAvAsAAMCzAsAMMCMCzAsAAMC8CwAMMCMCwAwwIMC8CwAAwLMCwAwwIwLMCwAAwLwLAAwwIwLADDAgwLwLAAw1IBMCwAwwIMC8CwAAwLMCwAwwIwLMCwAAwLwLAAwwIwLADDAgwLwLAADAswLADDAjAswLAADAvAsADDAjAsAMMCDAvAsADDUgEwLADDAgwLwLAADAswLADDAjAswLAADAvAsADDAjAsAMMCDAvAsAAMCzAsAMMCMCzAsAAMC8CwAMMCMCwAwwIMC8CwAMMCMCwAwwIMC8CwAAwLMCwAwwIwLMCwAAwLwLAAwwIwLADDAgwLwLAADAswLADDAjAswLAADAvAsADDAjAsAMMCDAvAsADDAjAsAMMCDAvAsAAMCzAsAMMCMCzAsAAMC8CwAMMCMCwAwwIMC8CwAAwLMCwAwwIwLMCwAAwLwLAAwwIwLADDAgwLwLAAwwIwLADDAgwLwLAADAswLADDAjAswLAADAvAsADDAjAsAMMCDAvAsAAMCzAsAMMCMCzAsAAMC8CwAMMCMCwAwwIMC8CwAMMCMCwAwwIMC8CwAAwLMCwAwwIwLMCwAAwLwLAAwwIwLADDAgwLwLAADAswLADDAjAswLAADAvAsADDAjAsAMMCDAvAsADDAjAsAMMCDAvAsAAMCzAsAMMCMCzAsAAMC8CwAMMCMCwAwwIMC8CwAAwLMCwAwwIwLMCwAAwLwLAAwwIwLADDAgwLwLAAwwIwLADDAgwLwLAADAswLADDAjAswLAADAvAsADDAjAsAMMCDAvAsAAMCzAsAMMCMCzAsAAMC8CwAMMCMCzAsCQADAvAsADDAjAsAMMCDAvAsAAMCzAsAMMCMCzAsAAMC8CwAMMCMCwAwwIMC8CwAAwLMCwAwwIwLMCwAAwLwLAAwwIwLMCwVAAMC8CwAMMCMCwAwwIMC8CwAAwLMCwAwwIwLOCzBf0vcSw0UxrUAAAAAElFTkSuQmCC',
   'base64');
 
 // Die Detailantworten, je Runde eine -- und sie stimmen mit den Zahlen der
@@ -263,7 +268,7 @@ async function setup(page) {
   await page.route('**/api/**', async route => {
     const req = route.request();
     const path = new URL(req.url()).pathname.split('/api/')[1];
-    calls.push({ path, rumpf: req.postData() });
+    calls.push({ path, suche: new URL(req.url()).search, rumpf: req.postData() });
     const send = (b, s = 200) => route.fulfill({ status: s, contentType: 'application/json', body: JSON.stringify(b) });
     if (path.includes('portal_link_anfordern')) {
       // Der echte Endpunkt antwortet IMMER so -- auch für eine Adresse, zu
@@ -301,7 +306,13 @@ async function setup(page) {
       return d ? send({ status: 'ok', rundgang: d })
                : send({ status: 'error', message: 'Dieser Rundgang ist nicht abrufbar.' }, 404);
     }
-    if (path.includes('portal_rundgang_foto')) {
+    if (path.includes('portal_rundgang_foto') || path.includes('portal_ereignis_foto')) {
+      // Verzoegerbar: Das Blatt soll gebaut werden, WAEHREND das Bild noch
+      // unterwegs ist. Ohne diesen Hebel laeuft die Pruefung immer im
+      // guenstigen Fall, und die Wartelogik bliebe eine Behauptung
+      // (beim Gegenprobieren zu ENT-544 aufgefallen: das Entfernen des
+      // Wartens machte keine einzige Pruefung rot).
+      if (fotoVerzoegern) { await new Promise(f => setTimeout(f, fotoVerzoegern)); }
       return route.fulfill({ status: 200, contentType: 'image/png', body: FOTO_PNG });
     }
     if (path.includes('portal_rundgaenge')) return send(antwort);
@@ -761,6 +772,21 @@ check('KRITISCH: nicht besuchte Punkte erscheinen ebenfalls und sind als solche 
   /Waschküche/.test(detail2) && /Nicht besucht/.test(detail2));
 check('KRITISCH: ein gemeldetes Ereignis erscheint mit Zeit und Art',
   /21:36/.test(detail2) && /Sachbeschädigung/.test(detail2));
+/* Das Foto der Ereignismeldung (ENT-544). Bis dahin stand hier nur der Satz
+   „Mit Foto festgehalten" -- der Kunde wusste damit, dass es ein Bild gibt,
+   das er nicht sieht, und im Portal gab es nicht einmal einen Weg dorthin.
+   Der Endpunkt portal_ereignis_foto.php ist mit dieser Entscheidung neu. */
+await page.waitForTimeout(400);
+check('KRITISCH: das Foto der Ereignismeldung erscheint als Bild, nicht als Satz',
+  await page.evaluate(() => {
+    const t = document.querySelectorAll('#liste .zeile')[1].nextElementSibling;
+    const i = t.querySelector('.d-ereignis .v-foto img');
+    return !!i && i.naturalWidth > 0;
+  }));
+check('KRITISCH: es kommt vom Ereignis-Endpunkt, mit der Ereignisnummer',
+  calls.some(c => c.path.includes('portal_ereignis_foto') && /ereignis_id=77/.test(c.suche || '')));
+check('Der Satz „Mit Foto festgehalten" steht nicht mehr anstelle des Bildes',
+  !/Mit Foto festgehalten/.test(detail2));
 // Der Abbruchgrund im KLARTEXT, nicht als Codewort -- und oben, nicht als
 // Fussnote: Er ist die wichtigste Aussage über die Runde.
 // Der Klartext SELBST wird serverseitig geprueft (test_php.mjs und
@@ -988,6 +1014,89 @@ check('KRITISCH: „kein Ereignis gemeldet" steht auch im Blatt, nicht ein fehle
   /kein Ereignis gemeldet/.test(blatt));
 check('KRITISCH: die eingesetzte Person steht auch im Blatt (ENT-481)',
   /Mitarbeitende/.test(blatt) && /M\. Musterperson/.test(blatt));
+
+/* ── Fotos im Blatt (ENT-544) ───────────────────────────────────────────
+   Runde 12 hat einen Fotobeleg, Runde 11 zusaetzlich ein Ereignisfoto. Das
+   Blatt von Runde 11 traegt also beide -- und zwar in Lesegroesse: Vorgabe
+   des Projektinhabers, „der Kunde will nicht in ein PDF hineinzoomen müssen,
+   um was zu erkennen". */
+/* Zwei verschiedene Runden, weil die beiden Bilder nicht in derselben
+   vorkommen: Runde 12 traegt den Fotobeleg eines Ersatzscans, Runde 11 die
+   Ereignismeldung mit Foto. Beide Blaetter werden darum einzeln gemessen und
+   danach gegeneinander gehalten. */
+const blattBilderMessen = () => page.evaluate(() =>
+  [...document.querySelectorAll('#blatt table img')]
+    .map(i => {
+      const b = i.getBoundingClientRect();
+      return { dekodiert: i.naturalWidth > 0, breite: Math.round(b.width),
+               hoehe: Math.round(b.height), alt: i.getAttribute('alt') || '' };
+    }));
+
+const bilder12 = await blattBilderMessen();
+check('KRITISCH: der Fotobeleg steht als Bild im Blatt des Kunden',
+  bilder12.some(b => /Ersatzscan/.test(b.alt) && b.dekodiert));
+
+await page.evaluate(() => document.querySelectorAll('#liste .zeile')[1].click());
+await page.waitForTimeout(600);
+const dl11 = page.waitForEvent('download', { timeout: 15000 }).catch(() => null);
+await klick('[data-pdf="11"]');
+await dl11;
+await page.waitForTimeout(300);
+const bilder11 = await blattBilderMessen();
+check('KRITISCH: das Ereignisfoto steht im Blatt des Kunden, nicht nur das Wort „Mit Foto"',
+  bilder11.some(b => /Ereignismeldung/.test(b.alt) && b.dekodiert));
+
+/* Gemessen, nicht nachgelesen. Das Blatt ist 760 px breit und wird auf
+   190 mm Nutzbreite gesetzt -- rund 0,25 mm je Pixel. Unter 300 px waere das
+   Bild schmaler als 7,5 cm und damit wieder ein Daumennagel; ueber 460 px
+   spraenge es aus der Spalte. */
+const alleBilder = [...bilder12, ...bilder11];
+check('KRITISCH: die Bilder im Blatt sind in Lesegrösse, nicht als Daumennagel',
+  alleBilder.length >= 2 && alleBilder.every(b => b.breite >= 300 && b.breite <= 460));
+check('KRITISCH: und nicht verzerrt -- ein gestauchtes Beweisstück sagt etwas anderes aus',
+  alleBilder.every(b => Math.abs((b.breite / b.hoehe) - (FOTO_BREIT / FOTO_HOCH)) < 0.05));
+check('Fotobeleg und Ereignisfoto sind gleich gross -- zwei Grössen wären zwei Aussagen',
+  alleBilder.length >= 2 && alleBilder.every(b => b.breite === alleBilder[0].breite));
+
+/* Cockpit und Portal setzen DASSELBE Blatt -- der Kunde bekommt es per Mail
+   (dashboard.html) oder holt es sich selbst (portal.html). Zwei Groessen
+   waeren zwei verschiedene Rapporte ueber denselben Rundgang, und der
+   Unterschied faellt niemandem auf, weil nie jemand beide nebeneinander
+   haelt. Verglichen werden die ZAHLEN, nicht der Wortlaut: Wer eine davon
+   aendert, wird hier rot; wer die Konstante umbenennt, findet sie nicht
+   mehr und wird ebenfalls rot. */
+const massAus = (datei, marke) => {
+  const q = readFileSync(`${WURZEL}/${datei}`, 'utf8');
+  const t = new RegExp(marke + "\\s*=\\s*'max-width:(\\d+)px;max-height:(\\d+)px").exec(q);
+  return t ? [Number(t[1]), Number(t[2])] : null;
+};
+const massCockpit = massAus('dashboard.html', 'blattFoto');
+const massPortal = massAus('portal.html', 'BLATT_FOTO');
+/* Der Wettlauf (ENT-544): html2pdf rastert das Blatt in dem Moment, in dem
+   es gerufen wird. Ein Bild, das dann noch laedt, fehlt im PDF -- und zwar
+   STILL. Wer aufklappt und sofort auf „Als PDF herunterladen" tippt, bekam
+   bis dahin ein Blatt ohne Bilder, ohne dass irgendetwas darauf hinwies.
+
+   Geprueft wird mit einer verzoegerten Bildantwort und OHNE Wartezeit nach
+   dem Aufklappen -- die Zwischenablage wird vorher geleert, sonst laege das
+   Bild schon bereit und es gaebe gar keinen Wettlauf. */
+await page.evaluate(() => { Object.keys(fotoZwischen).forEach(k => delete fotoZwischen[k]); });
+await page.evaluate(() => document.querySelectorAll('#liste .zeile')[1].click());   // zuklappen
+await page.waitForTimeout(150);
+fotoVerzoegern = 900;
+await page.evaluate(() => document.querySelectorAll('#liste .zeile')[1].click());   // wieder auf
+const dlEilig = page.waitForEvent('download', { timeout: 20000 }).catch(() => null);
+await klick('[data-pdf="11"]');          // sofort, ohne auf das Bild zu warten
+await dlEilig;
+await page.waitForTimeout(200);
+const bilderEilig = await blattBilderMessen();
+check('KRITISCH: auch beim sofortigen Klick steht das Foto im Blatt, nicht nur der Hinweis',
+  bilderEilig.some(b => /Ereignismeldung/.test(b.alt) && b.dekodiert && b.breite >= 300));
+fotoVerzoegern = 0;
+
+check('KRITISCH: Cockpit und Portal setzen dieselbe Fotogrösse ins Blatt',
+  !!massCockpit && !!massPortal
+  && massCockpit[0] === massPortal[0] && massCockpit[1] === massPortal[1]);
 // ENT-322 gilt unverändert: Der Weg gehört ins Portal, wo der Kunde ihn
 // ausdrücklich aufruft — nicht auf ein Blatt, das er beiläufig mitbekommt.
 check('KRITISCH: KEINE Karte im Blatt (ENT-322 bleibt)',
