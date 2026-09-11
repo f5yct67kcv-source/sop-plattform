@@ -448,6 +448,42 @@ function be_zf_notfallcodes_offen(PDO $pdo, int $betreiberId): int
     return is_array($h) ? count($h) : 0;
 }
 
+// ── Der Bootstrap und seine Grenze ────────────────────────────────────
+//
+// Das erste Betreiber-Konto muss von irgendwoher kommen -- es kann sich
+// nicht selbst anlegen. Der Einstieg läuft darum über die Verwaltung eines
+// Betriebs (require_verwaltung), und genau dort liegt eine Falle, die beim
+// Aufschreiben der Einrichtungsreihenfolge aufgefallen ist:
+//
+// Bei getrennten Datenbanken je Mandant hat JEDER Betrieb eine eigene
+// Verwaltung, aber alle teilen sich dieselbe Betreiber-Datenbank. Ohne
+// zusätzliche Grenze könnte die Verwaltung eines zweiten, fremden Betriebs
+// sich ein Betreiber-Konto anlegen, solange noch keines existiert -- und
+// hätte damit Zugriff auf jeden Mandanten.
+//
+// Die Grenze: Der Bootstrap läuft nur, solange der Mandantenstamm HÖCHSTENS
+// EINEN Eintrag hat. Das ist logisch dicht, ohne eine zusätzliche Regel zu
+// erfinden: Damit ein zweiter Mandant überhaupt eingetragen werden kann,
+// muss vorher jemand am Betreiber-Bereich angemeldet gewesen sein -- also
+// existiert dann zwangsläufig schon ein Konto, und der Bootstrap wird nicht
+// mehr gebraucht.
+// Die Entscheidungsregel steht als EIGENE, reine Funktion daneben --
+// dasselbe Muster wie umgebung_ist_produktion() in db.php und aus demselben
+// Grund: So laesst sie sich mit frei gewaehlten Werten pruefen, auch mit
+// dem Fall "mehrere Mandanten", den eine Pruefumgebung ohne Datenbank gar
+// nicht herstellen kann. Eine Regel, die nur im Zusammenspiel mit einer
+// Datenbank prueffbar ist, wird in der Praxis nicht geprueft.
+function be_bootstrap_grenze(int $mandanten): bool
+{
+    return $mandanten <= 1;
+}
+
+function be_bootstrap_offen(PDO $pdo): bool
+{
+    if (!hat_tabelle($pdo, 'mandant')) { return true; }
+    return be_bootstrap_grenze((int)$pdo->query('SELECT COUNT(*) FROM mandant')->fetchColumn());
+}
+
 // ── Verbindung zu einem Mandanten ─────────────────────────────────────
 //
 // WOHER DAS PASSWORT KOMMT, und warum nicht aus der Tabelle:

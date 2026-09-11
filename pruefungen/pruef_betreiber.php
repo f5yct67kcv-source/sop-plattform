@@ -151,6 +151,24 @@ $pruef('KRITISCH: nicht erreichbar wird als solches gemeldet',
 $pruef('ohne Verbindung wird keine Tabellenzahl behauptet',
     $st['tabellen'] === null);
 
+// ── 8. Die Grenze des Bootstraps ──────────────────────────────────────
+//
+// Das erste Betreiber-Konto kommt ueber die Verwaltung eines Betriebs --
+// es kann sich nicht selbst anlegen. Bei getrennten Datenbanken hat aber
+// JEDER Mandant eine eigene Verwaltung, und alle teilen sich dieselbe
+// Betreiber-Datenbank. Ohne Grenze koennte die Verwaltung eines fremden
+// Betriebs sich ein Konto ausstellen und haette Zugriff auf alle.
+//
+// Geprueft wird die reine Entscheidungsregel mit frei gewaehlten Werten --
+// der Fall "mehrere Mandanten" liesse sich hier sonst gar nicht herstellen.
+$pruef('kein Mandant eingetragen: Bootstrap offen', be_bootstrap_grenze(0) === true);
+$pruef('genau ein Mandant: Bootstrap noch offen',   be_bootstrap_grenze(1) === true);
+// Das ist die eigentliche Aussage.
+$pruef('KRITISCH: ab dem zweiten Mandanten ist der Bootstrap zu',
+    be_bootstrap_grenze(2) === false);
+$pruef('KRITISCH: auch bei vielen Mandanten bleibt er zu',
+    be_bootstrap_grenze(20) === false);
+
 echo count($bad) === 0
     ? "$ok bestanden, 0 nicht bestanden\n"
     : "$ok bestanden, " . count($bad) . " nicht bestanden\n";

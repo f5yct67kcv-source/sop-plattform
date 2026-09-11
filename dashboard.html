@@ -5086,7 +5086,7 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
     </nav>
 
     <div class="side-foot" id="sideFoot">
-      <button class="nav-item nur-desktop" id="nav-einrichtung" title="Einrichtung" onclick="openDlg('dlgEinrichtung')">
+      <button class="nav-item nur-desktop" id="nav-einrichtung" title="Einrichtung" onclick="openDlg('dlgEinrichtung'); eiBetreiberPruefen();">
         <span class="ico-wrap">
           <svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.2.5.66.86 1.19.91H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           <span class="update-punkt" id="updatePunkt"></span>
@@ -8993,6 +8993,16 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
     <div class="dlg-bd">
       <div id="eiInhalt">
         <p class="zone-note">Ein Klick auf „Prüfen und einrichten“ zeigt, was fehlt, und ergänzt es sofort.</p>
+      </div>
+      <!-- Betreiber-Bereich (ENT-519 ff.). Erscheint NUR, solange der
+           Bootstrap offen ist -- also bis das erste Betreiber-Konto steht.
+           Danach blendet er sich von selbst aus: Ein weiteres Konto legt
+           nur an, wer selbst eines hat (be_bootstrap_offen). Der Block
+           steht hier, weil das die einmalige Einrichtung ist und nicht
+           tägliche Arbeit. -->
+      <div id="eiBetreiber" style="display:none;margin-top:22px;padding-top:18px;border-top:1px solid var(--line)">
+        <div class="titel" style="margin-bottom:8px">Betreiber-Bereich</div>
+        <div id="eiBetreiberInhalt"></div>
       </div>
     </div>
     <div class="dlg-ft">
@@ -27102,7 +27112,73 @@ function pruefeUpdate() {
   }).catch(() => {});
 }
 
-function eiOeffnen() { openDlg('dlgEinrichtung'); planungEinrichten(); }
+function eiOeffnen() { openDlg('dlgEinrichtung'); planungEinrichten(); eiBetreiberPruefen(); }
+
+/* ── Einmalige Einrichtung des Betreiber-Bereichs ────────────────────
+ *
+ * Der Block erscheint nur, solange der Bootstrap offen ist. Sobald das
+ * erste Konto steht, antwortet der Endpunkt nicht mehr mit konten === 0 --
+ * und ab dem zweiten Mandanten gar nicht mehr (403). Beides blendet ihn
+ * aus, ohne dass hier eine eigene Regel dafür nötig wäre.
+ *
+ * Die Sperre sitzt im Server (require_verwaltung plus be_bootstrap_offen);
+ * was hier passiert, erspart nur den Umweg.
+ */
+function eiBetreiberPruefen() {
+  const kasten = $('eiBetreiber');
+  if (!kasten) { return; }
+  kasten.style.display = 'none';
+  api('betreiber_einrichten.php').then(({ ok, data }) => {
+    if (!ok || !data || data.status === 'error') { return; }
+    // Steht schon ein Konto, ist hier nichts mehr zu tun.
+    if (Number(data.konten) > 0) { return; }
+    kasten.style.display = '';
+    const offen = (data.offen || []).length;
+    $('eiBetreiberInhalt').innerHTML =
+        '<p class="zone-note" style="margin-top:0">Der eigene Verwaltungsbereich über den '
+      + 'Betrieben. Er wird einmal eingerichtet; danach verschwindet dieser Abschnitt.</p>'
+      + (offen
+          ? '<p class="zone-note">Es fehlen noch: ' + esc((data.offen || []).join(', ')) + '</p>'
+          : '<p class="zone-note">Die Tabellen stehen. Es fehlt noch das erste Konto.</p>')
+      + '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">'
+      + (offen
+          ? '<button type="button" class="btn btn-sm" onclick="eiBetreiberAnlegen()">Tabellen anlegen</button>'
+          : '')
+      + '<button type="button" class="btn btn-sm btn-primary" onclick="eiBetreiberKonto()"'
+      + (offen ? ' disabled' : '') + '>Erstes Konto anlegen</button>'
+      + '</div>';
+  }).catch(() => {});
+}
+
+function eiBetreiberAnlegen() {
+  api('betreiber_einrichten.php', { method: 'POST' }).then(({ ok, data }) => {
+    if (!ok || !data || data.status !== 'ok') {
+      toast((data && data.message) || 'Die Einrichtung ist fehlgeschlagen.'); return;
+    }
+    toast((data.getan || []).length + ' Schritte ausgeführt.');
+    eiBetreiberPruefen();
+  }).catch(() => toast('Die Einrichtung ist fehlgeschlagen.'));
+}
+
+function eiBetreiberKonto() {
+  const name  = window.prompt('Name für das Betreiber-Konto:', '');
+  if (name === null || !name.trim()) { return; }
+  const email = window.prompt('E-Mail-Adresse:', '');
+  if (email === null || !email.trim()) { return; }
+  /* Mindestens 16 Zeichen -- dasselbe Mass wie fuer Verwaltungskonten
+     (PASSWORT_MIN_ADMIN). Der Server prueft es ohnehin; der Hinweis hier
+     erspart den Fehlversuch. */
+  const pass = window.prompt('Passwort (mindestens 16 Zeichen, es ist das mächtigste Konto der Anlage):', '');
+  if (pass === null || !pass) { return; }
+  api('betreiber_konto_anlegen.php', { method: 'POST', body: { name, email, passwort: pass } })
+    .then(({ ok, data }) => {
+      if (!ok || !data || data.status !== 'ok') {
+        toast((data && data.message) || 'Das Konto konnte nicht angelegt werden.'); return;
+      }
+      toast('Konto angelegt. Der Bereich ist unter betreiber.html erreichbar.');
+      eiBetreiberPruefen();
+    }).catch(() => toast('Das Konto konnte nicht angelegt werden.'));
+}
 
 function planungEinrichten() {
   const b = $('eiBtn'); if (b) b.disabled = true;

@@ -70,8 +70,14 @@ if (ohneWache.length) { bad.push('ohne Wache: ' + ohneWache.join(', ')); }
 // Kehrseite, und sie ist der wichtigere Teil: Bekommt ein Einstiegspunkt
 // spaeter doch eine Wache, gehoert er aus der Liste heraus -- sonst waechst
 // eine Ausnahmeliste, die niemand mehr aufraeumt.
+// Geprueft wird, ob die Wache BEDINGUNGSLOS gerufen wird -- am Zeilenanfang
+// ohne Einrueckung. Ein Einstiegspunkt darf sie in einem if stehen haben
+// (betreiber_einrichten.php tut das seit der Bootstrap-Grenze); wer sie
+// dagegen ohne Bedingung ruft, ist kein Einstiegspunkt mehr und gehoert
+// aus der Liste.
+const WACHE_IMMER = /^require_betreiber(?:_voll)?\s*\(/m;
 const unnoetigBefreit = Object.keys(EINSTIEG).filter(f =>
-  endpunkte.includes(f) && WACHE.test(nurCode(lies(`backend/api/${f}`))));
+  endpunkte.includes(f) && WACHE_IMMER.test(nurCode(lies(`backend/api/${f}`))));
 check('kein Einstiegspunkt steht unnoetig in der Ausnahmeliste',
   unnoetigBefreit.length === 0);
 
@@ -464,6 +470,29 @@ check('fehlt die Freigabe, nennt der Bereich die Lage statt nur "verboten"',
   /SUPPORT_LAGE_TEXT/.test(betrSeite));
 check('KRITISCH: der Betreiber-Bereich setzt keine Freigabe',
   !/support_freigabe\.php/.test(betrSeite));
+
+// ── 13. Der Bootstrap ist begrenzt ───────────────────────────────────
+//
+// Die Luecke, die beim Aufschreiben der Einrichtungsreihenfolge auffiel:
+// Bei getrennten Datenbanken hat jeder Mandant eine eigene Verwaltung, aber
+// alle teilen sich die Betreiber-Datenbank. Ohne Grenze koennte die
+// Verwaltung eines FREMDEN Betriebs sich das erste Betreiber-Konto
+// ausstellen.
+const kontoNeu = nurCode(lies('backend/api/betreiber_konto_anlegen.php'));
+check('KRITISCH: das erste Konto laesst sich nur beim einzigen Mandanten anlegen',
+  /be_bootstrap_offen\([\s\S]{0,400}403/.test(kontoNeu));
+const einrCode = nurCode(lies('backend/api/betreiber_einrichten.php'));
+check('KRITISCH: auch die Einrichtung ist ab dem zweiten Mandanten geschlossen',
+  /be_bootstrap_offen\([\s\S]{0,120}require_betreiber_voll\(/.test(einrCode));
+// Und die Grenze steht an EINER Stelle, nicht zweimal nachgebaut.
+check('die Grenze steht an einer Stelle', modulCode.includes('function be_bootstrap_offen'));
+
+// Der Aufrufweg: Ohne ihn waere die Einrichtung ein Endpunkt, den niemand
+// erreicht. Er blendet sich aus, sobald ein Konto steht.
+check('KRITISCH: es gibt einen Aufrufweg fuer die Einrichtung im Cockpit',
+  cockpit.includes('betreiber_einrichten.php') && cockpit.includes('betreiber_konto_anlegen.php'));
+check('der Aufrufweg verschwindet, sobald ein Konto steht',
+  /Number\(data\.konten\) > 0[\s\S]{0,60}return/.test(cockpit));
 
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }

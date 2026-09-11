@@ -26,6 +26,14 @@ $user = require_session();
 require_verwaltung($user);
 
 $pdo    = betreiber_db();
+
+// Dieselbe Grenze wie beim ersten Konto: Sobald mehr als ein Mandant
+// eingetragen ist, läuft die Einrichtung nur noch über ein Betreiber-Konto.
+// Sie trägt den aufrufenden Betrieb als Mandant 1 ein -- ein fremder Betrieb
+// dürfte das nicht.
+if (!be_bootstrap_offen($pdo)) {
+    require_betreiber_voll();
+}
 $nurPruefen = in_array($_SERVER['REQUEST_METHOD'] ?? 'GET', ['GET', 'HEAD'], true);
 $getan  = [];
 $fehler = [];

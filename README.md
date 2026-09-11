@@ -364,6 +364,156 @@ mitunter unveraendert aus, und dann stuende der Schluessel im Browser. Das ist
 unwahrscheinlich, aber es ist kein theoretischer Fall. Festgehalten, damit es
 eine bewusste Inkaufnahme bleibt und keine Ueberraschung.
 
+## Betreiber-Bereich in Betrieb nehmen (ENT-519 bis ENT-526)
+
+Einmaliger Vorgang. Die Reihenfolge zaehlt — Schritt 4 laesst sich nur
+einmal gefahrlos ueben.
+
+### Vorweg: was Staging leisten kann und was nicht
+
+**Ein Staging-Deploy laeuft ausschliesslich gegen einen Git-Tag, der auf
+einem `main`-Commit liegt** (ENT-372, siehe Abschnitt „Staging"). Der Code
+muss also zuerst nach `main` — und ein Push auf `main` loest den
+Production-Deploy aus. Das ist kein Versehen, sondern der strukturelle
+Schutz dagegen, dass Staging-spezifischer Code entsteht; umgehen laesst es
+sich nicht.
+
+**Was daraus folgt:** Nach Schritt 2 liegt der Code in *beiden* Umgebungen.
+Was sich auf Staging gefahrlos ueben laesst, ist nicht der Code, sondern die
+**Einrichtung** — sie legt Tabellen an und erzeugt das maechtigste Konto der
+Anlage.
+
+**Was beruhigt:** Bis jemand die Einrichtung ausfuehrt, ist der Bereich
+inaktiv. `betreiber.html` ist nirgends verlinkt, die Tabellen existieren
+nicht, und jeder Endpunkt antwortet mit „noch nicht eingerichtet" (HTTP
+503). In `dashboard.html` erscheint lediglich die Kachel
+„Support-Freigabe" — und auch die nur fuer Konten mit dem Recht
+„Rollen & Berechtigungen".
+
+### 1. htaccess bei Hostpoint nachtragen (betrifft nur Staging)
+
+Production braucht diesen Schritt **nicht** — dort laedt der Deploy die
+`.htaccess` selbst hoch.
+
+`backend/betreiber.php` und `backend/support.php` sind in die
+FilesMatch-Sperrliste von `htaccess-hostpoint` aufgenommen worden. Auf
+Staging wird die `.htaccess` von Hand gepflegt (ENT-384), darum:
+
+1. Hostpoint → Explorer → `www/staging` → Web-Einstellungen fuer aktuelles
+   Verzeichnis → Passwortschutz
+2. Die vollstaendige `FilesMatch`-Zeile aus `htaccess-hostpoint` **unterhalb**
+   der Markierung `#@__HCP_END__@#` ersetzen
+3. In `staging-htaccess.synced-sha256` die Nachtragsvermerke **(a) bis (e)**
+   loeschen — sie sind dann erledigt
+
+**Wird dieser Schritt uebersprungen,** laeuft der Deploy trotzdem durch (die
+Hashes sind bereits mitgezogen, siehe die Vermerke dort). Auf Staging waeren
+`betreiber.php` und `support.php` dann per URL erreichbar. Beide enthalten
+ausschliesslich Funktionsdefinitionen und geben bei direktem Aufruf nichts
+aus, und Staging liegt zusaetzlich hinter Basic Auth — der Schritt ist
+wichtig, aber nicht dringend.
+
+### 2. Den Branch nach `main`
+
+```bash
+git checkout main && git pull
+git merge claude/elegant-darwin-vrso9j
+node pruefungen/alle.mjs      # muss 139 von 139 gruen sein
+git push
+```
+
+**Ab hier ist der Code live.** Der Production-Deploy laeuft automatisch.
+Der Betreiber-Bereich bleibt inaktiv, bis Schritt 4 ausgefuehrt wird.
+
+### 3. Tag setzen und Staging deployen
+
+```bash
+git tag qa-2026-09-11-001 main
+git push origin qa-2026-09-11-001
+```
+
+Danach in GitHub Actions: **Run workflow** → *Use workflow from:* dieser Tag
+→ Umgebung `staging`.
+
+### 4. Einrichtung ausfuehren — zuerst auf Staging
+
+Im Cockpit der **Staging**-Instanz, angemeldet mit einem Konto, das
+„Rollen & Berechtigungen: schreiben" traegt:
+
+1. Seitenleiste unten links → **Einrichtung**
+2. **„Pruefen und einrichten"** — legt unter anderem die beiden neuen
+   Tabellen `support_freigabe` und `support_zugriff` an
+3. Im selben Dialog erscheint darunter der Abschnitt **„Betreiber-Bereich"**:
+   - **„Tabellen anlegen"** → `betreiber`, `betreiber_sessions`, `mandant`,
+     `betreiber_zwei_faktor`; der laufende Betrieb wird dabei als **Mandant 1**
+     eingetragen, ohne dass eine Zeile seiner Daten bewegt wird
+   - **„Erstes Konto anlegen"** → Name, E-Mail, Passwort
+     (**mindestens 16 Zeichen** — es ist das maechtigste Konto der Anlage)
+
+Der Abschnitt verschwindet danach von selbst. Ein zweites Konto legt nur
+noch an, wer selbst eines hat (`be_bootstrap_offen`) — und ab dem zweiten
+eingetragenen Mandanten ist der Weg ganz zu.
+
+### 5. Anmelden und Zwei-Faktor einrichten
+
+`https://<staging-adresse>/betreiber.html`
+
+Beim ersten Anmelden fuehrt die Seite direkt zur Zwei-Faktor-Einrichtung —
+sie ist hier **Pflicht**, nicht freiwillig wie im Cockpit. QR-Code scannen
+oder den Schluessel abtippen, mit einem Code bestaetigen, dann erscheinen
+die **zehn Notfallcodes**. Sie werden nur einmal angezeigt.
+
+> **Bevor es weitergeht: ein zweites Betreiber-Konto anlegen.**
+> Wer Telefon **und** Notfallcodes verliert, kommt sonst nicht mehr hinein —
+> der Weg zurueck fuehrt ausschliesslich ueber ein zweites Konto
+> (`betreiber_zf_zuruecksetzen.php`), und eine Hintertuer gibt es
+> absichtlich nicht. Das zweite Konto ist keine Bequemlichkeit, sondern
+> Betriebsvoraussetzung.
+
+### 6. Auf Staging durchspielen
+
+- Mandantenliste: der Bestandsbetrieb steht als Mandant 1, Verbindung
+  „Standardverbindung", Einrichtung „erreichbar"
+- **GAV** → die Unterstellung bestaetigen (Ja/Nein) — sie wird mit Zeitpunkt
+  und Person festgehalten
+- **Support** → muss „keine gueltige Support-Freigabe" melden
+- Im Cockpit: **Administration → Betrieb → Support-Freigabe** → Zweck
+  eintragen, freigeben
+- Zurueck im Betreiber-Bereich: **Support** → jetzt kommen die
+  Diagnosedaten
+- Wieder im Cockpit: **Protokoll** → der Zugriff steht dort, mit Zeitpunkt
+  und Konto
+
+Stimmt das alles, ist der Ablauf erprobt.
+
+### 7. Dasselbe auf Production
+
+Schritt 4 und 5 auf der Produktivinstanz wiederholen. Schritt 6 ist dort
+freiwillig — die Support-Freigabe an sich selbst zu erteilen und wieder
+zurueckzuziehen schadet nichts und hinterlaesst einen Protokolleintrag.
+
+### Was dabei ausdruecklich NICHT passiert
+
+- **Kein Datenumzug.** Der laufende Betrieb behaelt seine Datenbank und wird
+  nur im Mandantenstamm eingetragen. `WHERE id = 1` bleibt an allen 14
+  Stellen richtig.
+- **Keine Aenderung an bestehenden Tabellen.** Es kommen ausschliesslich
+  neue dazu.
+- **Kein Zugriff auf Betriebsdaten** ohne Freigabe des jeweiligen Betriebs —
+  und auch mit Freigabe nur auf Diagnosedaten ohne Personenbezug.
+
+### Offen, bevor ein ZWEITER Betrieb aufgenommen wird
+
+Nicht fuer die Inbetriebnahme noetig, aber vorher zu klaeren:
+
+| | |
+|---|---|
+| **OP-518** | Eigene Datenbank fuer die Betreiber-Ebene. Heute liegen ihre Tabellen in derselben Datenbank wie die Betriebsdaten — beim zweiten Mandanten laege der Mandantenstamm sonst in der Datenbank eines Kunden |
+| **OP-526** | Deploy-Schritt fuer `__MANDANT_SECRETS__`. Ohne ihn laesst sich kein Mandant mit eigener Datenbank erreichen |
+| **DSG** | Auftragsbearbeitungsvertrag. Sobald fremde Personendaten verarbeitet werden, ist er Pflicht (ENT-524, Risiken) |
+
+---
+
 ## Skizzenmodus
 
 Der Skizzenmodus legt eine Notizebene über die laufende Seite. Gedacht, um visuell

@@ -28,6 +28,15 @@ if (!be_tabellen_da($pdo)) {
 
 $vorhanden = (int)$pdo->query('SELECT COUNT(*) FROM betreiber')->fetchColumn();
 if ($vorhanden === 0) {
+    // Bootstrap -- aber nur, solange höchstens ein Mandant eingetragen ist.
+    // Sonst könnte die Verwaltung eines fremden Betriebs sich hier ein
+    // Konto ausstellen und käme damit an jeden Mandanten. Begründung
+    // ausführlich bei be_bootstrap_offen() in backend/betreiber.php.
+    if (!be_bootstrap_offen($pdo)) {
+        json_response(['status' => 'error',
+            'message' => 'Der Betreiber-Bereich ist bereits in Betrieb. Ein weiteres Konto '
+                       . 'kann nur anlegen, wer selbst eines hat.'], 403);
+    }
     $user = require_session();
     require_verwaltung($user);
 } else {
