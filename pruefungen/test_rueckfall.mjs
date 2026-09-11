@@ -18,6 +18,14 @@ import { readFileSync } from 'fs';
 
 const ok = [], bad = [];
 const check = (n, c) => (c ? ok : bad).push(n);
+
+/* Der Zaehler nennt immer beide Zahlen; die Schreibweise haengt seit
+   ENT-541 vom Reiter ab ("1 / 2" ueber der Karte, "1 von 2
+   Kontrollpunkten" im Kopfblock des Punkte-Reiters). Geprueft wird darum
+   die Aussage, nicht der Wortlaut. */
+const zaehlerSagt = (txt, fertig, gesamt) =>
+  new RegExp(`(^|\\D)${fertig}\\D+${gesamt}(\\D|$)`)
+    .test(String(txt).replace(/\s+/g, ' ').trim());
 const APP = readFileSync(`${WURZEL}/app.html`, 'utf8');
 const textVon = async sel => (await page.$(sel)) ? (await page.textContent(sel)) : null;
 
@@ -117,8 +125,8 @@ check('KRITISCH: der offline bestätigte Punkt fällt NICHT auf "offen" zurück'
     const k = rundgangAktiv.kontrollpunkte.find(x => Number(x.id) === 1);
     return !!(k && k.erledigt && k.erledigt.status === 'bestaetigt');
   }));
-check('KRITISCH: der Zähler zeigt 2 / 2, nicht 1 / 2',
-  (await textVon('#rgsZaehler')) === '2 / 2');
+check('KRITISCH: der Zähler zeigt 2 von 2, nicht 1 von 2',
+  zaehlerSagt(await textVon('#rgsZaehler'), 2, 2));
 check('Er ist als "wartet auf Übermittlung" gekennzeichnet, nicht als fertig übermittelt',
   await page.evaluate(() => {
     const k = rundgangAktiv.kontrollpunkte.find(x => Number(x.id) === 1);
@@ -170,8 +178,8 @@ const l1 = await textVon('#rgsTimer');
 await page.waitForTimeout(2500);
 const l2 = await textVon('#rgsTimer');
 check('KRITISCH: eine laufende Runde zählt sehr wohl weiter', l1 !== l2);
-check('Und der Zähler steht wieder auf 1 / 2',
-  (await textVon('#rgsZaehler')) === '1 / 2');
+check('Und der Zähler steht wieder auf 1 von 2',
+  zaehlerSagt(await textVon('#rgsZaehler'), 1, 2));
 
 // ══════════ DIE ENDZEIT DES SERVERS HAT VORRANG ══════════════════════
 await page.evaluate(am => {

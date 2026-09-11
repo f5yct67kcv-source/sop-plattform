@@ -41,9 +41,12 @@ if ($objektId <= 0) {
 // geprueft, nicht nur in der App -- sonst liesse sich eine Vorlage eines
 // fremden Objekts unterschieben (Sperren gehoeren in den Server).
 $vorlageId = isset($input['vorlage_id']) && $input['vorlage_id'] !== '' ? (int)$input['vorlage_id'] : null;
-$fensterVon = null; $fensterBis = null;
+$fensterVon = null; $fensterBis = null; $vorlageName = null;
 if ($vorlageId !== null) {
-    $vChk = $pdo->prepare('SELECT fenster_von, fenster_bis FROM rundgang_vorlage WHERE id = ? AND objekt_id = ? AND aktiv = 1');
+    // Der NAME der Runde geht mit heraus (ENT-541): Der Kopf der laufenden
+    // Runde nennt sie beim Namen -- an einem Objekt mit "Nacht A" und
+    // "Nacht B" ist das der einzige Unterschied, den der Waechter sieht.
+    $vChk = $pdo->prepare('SELECT name, fenster_von, fenster_bis FROM rundgang_vorlage WHERE id = ? AND objekt_id = ? AND aktiv = 1');
     $vChk->execute([$vorlageId, $objektId]);
     $vRow = $vChk->fetch();
     if (!$vRow) {
@@ -51,6 +54,7 @@ if ($vorlageId !== null) {
     }
     $fensterVon = $vRow['fenster_von'];
     $fensterBis = $vRow['fenster_bis'];
+    $vorlageName = $vRow['name'];
 }
 
 // Zeitgate (ENT-279), serverseitig -- bisher stand die Zeitpruefung nur in
@@ -100,4 +104,5 @@ $rundgangId = (int)$pdo->lastInsertId();
 
 $kontrollpunkte = rundgang_kontrollpunkte_uebrig($pdo, $rundgangId, $objektId, $vorlageId);
 
-json_response(['status' => 'ok', 'rundgang_id' => $rundgangId, 'kontrollpunkte' => $kontrollpunkte]);
+json_response(['status' => 'ok', 'rundgang_id' => $rundgangId, 'kontrollpunkte' => $kontrollpunkte,
+    'vorlage_name' => $vorlageName, 'fenster_von' => $fensterVon, 'fenster_bis' => $fensterBis]);

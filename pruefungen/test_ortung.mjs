@@ -177,8 +177,23 @@ check('KRITISCH: die Entfernung ist richtig gerechnet, nicht geschätzt',
   }));
 
 // ══════════ DER KNOPF SPERRT ══════════════════════════════════════════
-check('KRITISCH: der Bestätigen-Knopf des NAHEN Punktes ist bedienbar',
+// Seit ENT-541 zeigt nicht mehr jede Zeile ihre Knoepfe: ausgeklappt sind
+// der naechste Punkt und jeder, in dessen Bereich man GERADE steht. Punkt 1
+// ist beides -- sein Knopf steht also ohne Zutun da. Das ist keine
+// Nebensache, sondern der Kern der Sache: Wer am Ziel steht, soll nicht
+// erst suchen muessen.
+check('KRITISCH: der Bestätigen-Knopf des NAHEN Punktes steht ohne Aufklappen da',
   await page.isEnabled('#rdBtn1'));
+check('KRITISCH: der ferne Punkt zeigt zugeklappt gar keine Knöpfe -- aber seine Entfernung',
+  await page.evaluate(() => {
+    const z = document.querySelectorAll('#rdListe .rd-zeile')[1];
+    return !!z && z.querySelectorAll('.rd-akt button').length === 0
+      && !!z.querySelector('.rd-ort');
+  }));
+// Aufklappen und erst dann messen: Der Riegel gilt weiterhin, er ist nur
+// nicht mehr dauernd sichtbar.
+await page.click('#rdKopf2');
+await page.waitForTimeout(250);
 check('KRITISCH: der Bestätigen-Knopf des FERNEN Punktes ist gesperrt',
   await page.isDisabled('#rdBtn2'));
 await page.screenshot({ path: `${OUT}/ortung-01-liste.png` });

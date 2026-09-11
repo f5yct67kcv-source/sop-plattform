@@ -209,17 +209,31 @@ check('Die Zahlen und die Knoepfe ueberlappen sich nicht',
 // stehen, klebte die Liste ohne Luft am Kopf, und keine Pruefung merkte es.
 await page.click('#rgsRt-punkte'); await page.waitForTimeout(600);
 const liste = await page.evaluate(() => {
-  const z = document.getElementById('rgsZchips');
+  // Seit ENT-541 traegt der Punkte-Reiter statt der Chip-Zeile einen
+  // eigenen Kopfblock -- Zustand, Name, Zeitfenster, Balken, Zahlen. Die
+  // Zahlen selbst stehen unveraendert unter #rgsZaehler/#rgsTimer; nur ihr
+  // Gehaeuse ist ein anderes. Geprueft wird, dass sie da sind und im Fluss
+  // stehen, nicht welches Gehaeuse sie tragen.
+  const kb = document.getElementById('rgpKopf');
   const k = document.querySelector('.rgs-kopf');
   const bd = document.getElementById('rgsBody');
   const erstes = bd && bd.firstElementChild;
-  return { chips: !!z, verankerung: z ? getComputedStyle(z).position : null,
+  const zahlen = document.getElementById('rgsZaehler');
+  const uhr = document.getElementById('rgsTimer');
+  return { kopfblock: !!kb, chipsWeg: !document.getElementById('rgsZchips'),
+           zahlen: zahlen ? zahlen.textContent.trim() : null,
+           uhr: uhr ? uhr.textContent.trim() : null,
+           verankerung: kb ? getComputedStyle(kb).position : null,
            luft: (erstes && k) ? erstes.getBoundingClientRect().top - k.getBoundingClientRect().bottom : -1,
            vollNoch: !!bd && bd.classList.contains('voll'),
            links: erstes ? erstes.getBoundingClientRect().left : -1 };
 });
-check('KRITISCH: auf dem Punkte-Reiter stehen dieselben Zahlen als Zeile',
-  liste.chips === true);
+check('KRITISCH: auf dem Punkte-Reiter stehen dieselben Zahlen im Kopfblock',
+  liste.kopfblock === true
+  && /\d+\D+\d+/.test(liste.zahlen || '')
+  && /^\d{2}:\d{2}:\d{2}$/.test(liste.uhr || ''));
+check('Und die Chip-Zeile steht nicht zusaetzlich da -- eine Angabe, ein Ort',
+  liste.chipsWeg === true);
 check('Dort stehen sie im Fluss, nicht als Ueberlagerung',
   liste.verankerung !== 'absolute');
 check('KRITISCH: der Vollflaechen-Modus der Karte ist dort wieder abgeraeumt',

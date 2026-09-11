@@ -704,21 +704,55 @@ svg.i-sm { width: 17px; height: 17px; }
    Rest der App, statt einer neuen Inkonsistenz (dieser eine Bildschirm
    44px, alle anderen nicht). Die Korrektur ist app-weit, keine Sache dieses
    Bildschirms allein. */
-.rd-zeile { padding: 14px 0; border-bottom: 1px solid var(--line-soft); }
+/* ══ Kontrollpunkt-Liste als Zeitleiste (ENT-541) ═══════════════════════
+   Eine Karte, darin eine Zeile je Punkt. Jede Zeile hat denselben Aufbau:
+   Zeitspalte (fest breit, damit Uhrzeiten und Striche untereinander
+   fluchten), Zeichen, Text, Kennzeichen rechts. Die feste Spaltenbreite ist
+   der Grund, warum die Liste ueberhaupt als Leiste liest -- ohne sie
+   wandern die Uhrzeiten je nach Stellenzahl.
+   Die Zeile bleibt mindestens 60 px hoch: Der Kopf ist auf offenen Zeilen
+   ein Knopf, und Bedienelemente auf dem Handy sind mindestens 44 px. */
+.rd-liste { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden; }
+.rd-zeile { border-bottom: 1px solid var(--line-soft); }
 .rd-zeile:last-child { border-bottom: none; }
-.rd-kopf { display: flex; align-items: flex-start; gap: 11px; }
-.rd-nr { flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--line-soft);
-  color: var(--ink-2); font-size: 12.5px; font-weight: 700; display: flex;
-  align-items: center; justify-content: center; }
-.rd-fertig .rd-nr { background: var(--pos-soft); color: var(--pos); }
+.rd-kopf { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 60px;
+  padding: 11px 13px; background: none; border: 0; margin: 0; text-align: left;
+  color: inherit; font: inherit; }
+button.rd-kopf { cursor: pointer; }
+button.rd-kopf:active { background: var(--line-soft); }
+.rd-fertig { display: flex; align-items: center; gap: 8px; min-height: 60px; padding: 11px 13px; }
+/* Zeitspalte: Ziffern in fester Laufweite, sonst zittert die Spalte von
+   Zeile zu Zeile. */
+.rd-zeit { flex: none; width: 40px; font-size: 13.5px; font-weight: 650; color: var(--ink-3);
+  font-variant-numeric: tabular-nums; letter-spacing: -.2px; }
+.rd-fertig .rd-zeit { color: var(--pos); }
+.rd-war-nv .rd-zeit { color: var(--warn); }
+.rd-war-es .rd-zeit { color: var(--accent); }
+.rd-jetzt .rd-zeit { color: var(--accent); font-size: 16px; }
 .rd-txt { flex: 1; min-width: 0; }
-.rd-bez { font-size: 15px; font-weight: 620; }
-.rd-meta { font-size: 12.5px; color: var(--ink-3); margin-top: 2px; }
-.rd-fertig { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.rd-haken { flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--pos-soft);
-  color: var(--pos); display: flex; align-items: center; justify-content: center; font-weight: 700; }
-.rd-haken-nv { background: var(--warn-soft); color: var(--warn); }
-.rd-haken-es { background: var(--accent-soft); color: var(--accent); font-size: 13px; }
+.rd-bez { font-size: 15px; font-weight: 620; display: block; }
+.rd-jetzt .rd-bez { color: var(--accent-hi); }
+.rd-meta { font-size: 12.5px; color: var(--ink-3); margin-top: 2px; display: block; }
+/* Das Kennzeichen rechts: was den Nachweis erbracht hat (oder erbringen
+   soll). Versal und klein -- es ordnet ein, es ruft nicht. */
+.rd-marke { flex: none; font-size: 10.5px; font-weight: 700; letter-spacing: .6px;
+  text-transform: uppercase; color: var(--ink-3); text-align: right; max-width: 96px; }
+.rd-war-nv .rd-marke { color: var(--warn); }
+.rd-war-es .rd-marke { color: var(--accent); }
+/* Die Zeile, an der man gerade dran ist. Nicht nur Farbe: Pfeil in der
+   Zeitspalte, Streifen am Rand, getoente Flaeche -- wer Blau von Grau nicht
+   unterscheidet, sieht sie trotzdem. */
+.rd-jetzt { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+/* Das Zeichen ist eine eigene, gleich breite Spalte -- auch in offenen
+   Zeilen, wo es leer bleibt. Ohne diese leere Spalte begaennen erledigte
+   und offene Zeilen an verschiedenen Stellen: gemessen 34 px Versatz, und
+   genau das macht eine Liste unruhig, ohne dass man sagen kann warum.
+   Ein blosses Zeichen statt eines Kreises -- ein Kreis je Zeile kostet
+   Breite, die auf einem 320-px-Geraet die Bezeichnung frisst. */
+.rd-haken { flex: none; width: 18px; text-align: center; color: var(--pos);
+  font-weight: 700; font-size: 15px; line-height: 1; }
+.rd-haken-nv { color: var(--warn); }
+.rd-haken-es { color: var(--accent); font-size: 12px; }
 .rd-es-vorschau { max-width: 140px; border-radius: 8px; align-self: flex-start; }
 /* Entfernung zum Kontrollpunkt (ENT-317). Drei Zustaende, drei Farben --
    "unbekannt" traegt bewusst die stille Farbe und nicht die warnende:
@@ -747,14 +781,17 @@ svg.i-sm { width: 17px; height: 17px; }
 }
 .rg-signal.an { opacity: 1; transform: translate(-50%, 0); }
 @media (prefers-reduced-motion: reduce) { .rg-signal { transition: opacity .18s ease; } }
-.rd-ort { font-size: 13px; margin: 8px 0 0 37px; font-weight: 560; }
+.rd-ort { font-size: 13px; margin: 0 13px 11px 87px; font-weight: 560; }
 .rd-ort.drin { color: var(--pos); }
 .rd-ort.weit { color: var(--warn); }
 .rd-ort.mut { color: var(--ink-3); font-weight: 400; }
-.rd-hinweis { font-size: 12.5px; color: var(--ink-3); margin: 8px 0 0 37px; }
-.rd-akt { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 0 37px; }
-.rd-nv { margin: 10px 0 0 37px; display: flex; flex-direction: column; gap: 8px; }
+.rd-hinweis { font-size: 12.5px; color: var(--ink-3); margin: 0 13px 11px 87px; }
+.rd-akt { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 13px 13px 87px; }
+.rd-nv { margin: 0 13px 13px 87px; display: flex; flex-direction: column; gap: 8px; }
 .rd-nv .inp { margin: 0; }
+/* Alles unter dem Zeilenkopf fluchtet mit dem TEXT, nicht mit der
+   Zeitspalte: 13 px Innenabstand + 40 Zeit + 8 + 18 Zeichen + 8 = 87 px. */
+.rd-einzug { margin: 0 13px 13px 87px; }
 
 /* Antippbare Zeile, die eine Unterseite oeffnet (ENT-051). Sieht aus wie ein
    Eintrag, verhaelt sich wie ein Knopf -- darum ein <button>, kein <div> mit
@@ -1107,6 +1144,43 @@ svg.i-sm { width: 17px; height: 17px; }
 /* Zaehler und Laufzeit als Chips (ENT-361, revidiert ENT-355).
    Auf der Karte als Ueberlagerung -- das kostet keine Layouthoehe, die Karte
    reicht darunter durch. Auf den Reitern ohne Karte als schmale Zeile. */
+/* ══ Kopfblock der laufenden Runde, Punkte-Reiter (ENT-541) ════════════
+   Reihenfolge von oben: Zustand, Name, Zeitfenster, Balken, Zahlen. Jede
+   Beschriftung steht UEBER ihrem Wert, nie darunter (CLAUDE.md).
+   Der Block traegt keinen eigenen Rahmen: Er ist der Kopf des Reiters, kein
+   Kasten im Kasten -- die Liste darunter ist die Karte. */
+.rgp-kopf { flex: none; }
+.rgp-lage { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700;
+  letter-spacing: .7px; text-transform: uppercase; color: var(--pos); }
+.rgp-pkt { flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--pos); }
+.rgp-kopf.pause .rgp-lage { color: var(--warn); }
+.rgp-kopf.pause .rgp-pkt { background: none; border: 2px solid var(--warn); }
+.rgp-kopf.ab .rgp-lage { color: var(--neg); }
+.rgp-kopf.ab .rgp-pkt { background: var(--neg); }
+.rgp-kopf.fertig .rgp-lage { color: var(--accent); }
+.rgp-kopf.fertig .rgp-pkt { background: var(--accent); }
+/* Die Laufzeit steht rechts in derselben Zeile wie der Zustand -- sie
+   gehoert zu ihm ("laeuft seit"), nicht zum Namen darunter. */
+.rgp-uhr { margin-left: auto; font-variant-numeric: tabular-nums; letter-spacing: 0;
+  font-size: 12.5px; font-weight: 650; color: var(--ink-2); text-transform: none; }
+.rgp-name { font-size: 25px; font-weight: 700; letter-spacing: -.5px; line-height: 1.15;
+  margin-top: 6px; color: var(--ink); overflow-wrap: anywhere; }
+.rgp-unter { font-size: 14px; color: var(--ink-2); margin-top: 3px; }
+.rgp-balken { height: 7px; border-radius: 4px; background: var(--line); overflow: hidden; margin-top: 14px; }
+.rgp-balken > span { display: block; height: 100%; border-radius: 4px; background: var(--accent);
+  transition: width .25s ease; }
+@media (prefers-reduced-motion: reduce) { .rgp-balken > span { transition: none; } }
+/* Zahl links, Restzeit rechts -- beide auf derselben Grundlinie und in
+   derselben Groesse. Zwei ungleich gesetzte Bloecke nebeneinander wirken
+   unruhig, ohne dass man sagen kann warum (CLAUDE.md). */
+.rgp-zahlen { display: flex; align-items: baseline; justify-content: space-between;
+  gap: 12px; margin-top: 7px; }
+.rgp-zahl { font-size: 14px; font-weight: 620; color: var(--ink); }
+.rgp-rest { font-size: 14px; font-weight: 620; color: var(--ink-2); text-align: right; }
+/* Ohne hinterlegtes Zeitfenster steht hier eine stille Auskunft, keine
+   Warnung -- es fehlt nichts, es gibt schlicht keines. */
+.rgp-rest.mut { color: var(--ink-3); font-weight: 500; }
+.rgp-rest.vorbei { color: var(--warn); }
 .rgs-zchips { display: flex; align-items: center; gap: 8px; flex: none; flex-wrap: wrap; }
 .rgs-zchips.auf-karte { position: absolute; left: 10px; top: 10px; z-index: 2;
   max-width: calc(100% - 20px); }
@@ -2412,6 +2486,33 @@ const W = {
     rgsLaeuft: 'Rundgang läuft',
     rgsIstPausiert: 'Rundgang pausiert',
     rgsSeit: 'seit',
+    // ══ Kopfblock und Zeitleiste der laufenden Runde (ENT-541) ══
+    // In der Zustandszeile steht sonst "Rundgang läuft"/"Rundgang
+    // pausiert"/"Rundgang abgeschlossen" -- ein blosses "Abgebrochen" fiele
+    // aus dem Muster. Das kurze Wort bleibt fuer den Banner darunter.
+    rgpAbgebrochen: 'Rundgang abgebrochen',
+    // Ohne gewaehlte Kontrollrunde umfasst der Rundgang ALLE aktiven Punkte
+    // des Objekts. Das ist eine Aussage und wird auch so geschrieben -- eine
+    // leere Zeile saehe aus, als fehlte der Name ("unbekannt" darf nie wie
+    // "keine" aussehen).
+    rgpAlleP: 'Alle Kontrollpunkte',
+    rgpPunkteSatz: 'Kontrollpunkten',
+    rgpFensterVonBis: 'Zeitfenster {von}–{bis}',
+    rgpFensterBis: 'Zeitfenster bis {bis}',
+    rgpOhneFenster: 'Ohne Zeitfenster',
+    // Rechts unter dem Balken steht eine MESSUNG, kein Urteil ueber das
+    // Tempo: wie viel vom Zeitfenster noch bleibt. "Im Rahmen" waere eine
+    // Bewertung, fuer die es keine festgelegte Regel gibt.
+    rgpRest: 'noch {t}',
+    rgpFensterVorbei: 'Zeitfenster vorbei',
+    rgpKeinFenster: 'kein Zeitfenster',
+    rgpStd: 'h',
+    rgpMin: 'min',
+    rgpNaechster: 'Nächster Kontrollpunkt',
+    rgpAufgabe: 'Aufgabe: {was}',
+    rgpAufgabenN: '{n} Aufgaben',
+    rgpOeffnen: 'Kontrollpunkt öffnen',
+    rgpSchliessen: 'Kontrollpunkt schliessen',
     rgsZumRundgang: 'Zum Rundgang',
     rgsPausieren: 'Rundgang pausieren',
     rgsFortsetzen: 'Rundgang fortsetzen',
@@ -5962,6 +6063,9 @@ function rundgangSpontanStarten(vorlageId, ausnahmeGrund, trotzDoppel) {
     if (data.ereignis_fehler) { toast(data.ereignis_fehler); }
     rundgangAktiv = { id: data.rundgang_id, einsatz_id: data.einsatz_id, status: 'vorbereitet', pausiert_seit: null,
       vorbereitet_am: jetztDatetime(), pause_minuten: 0,
+      // Name und Zeitfenster fuer den Kopfblock (ENT-541).
+      vorlage_name: data.vorlage_name || null,
+      fenster_von: data.fenster_von || null, fenster_bis: data.fenster_bis || null,
       kontrollpunkte: (data.kontrollpunkte || []).map(k => ({ ...k, erledigt: null })) };
     ladeSchichten().then(() => rundgangAnzeigen(data.einsatz_id));
   });
@@ -7207,6 +7311,9 @@ function rundgangStartenMitVorlage(einsatzId, vorlageId, ausnahmeGrund) {
     }
     rundgangAktiv = { id: data.rundgang_id, einsatz_id: einsatzId, status: 'vorbereitet', pausiert_seit: null,
       vorbereitet_am: jetztDatetime(), pause_minuten: 0,
+      // Name und Zeitfenster fuer den Kopfblock (ENT-541).
+      vorlage_name: data.vorlage_name || null,
+      fenster_von: data.fenster_von || null, fenster_bis: data.fenster_bis || null,
       kontrollpunkte: (data.kontrollpunkte || []).map(k => ({ ...k, erledigt: null })) };
     rundgangAnzeigen(einsatzId);
   });
@@ -7243,6 +7350,11 @@ function rundgangFortsetzen(einsatzId) {
       // Endpunkt liefert sie jetzt mit; ohne diese vier Zeilen kaeme die
       // Funktion "Ansprechpartner und Notruf" waehrend der Runde leer heraus.
       objekt: r.objekt || null,
+      // Name der Kontrollrunde und ihr Zeitfenster (ENT-541). Auch beim
+      // Wiedereinstieg -- sonst traegt der Kopf nach einem Reload weniger
+      // als vorher, und genau der Reload ist der haeufige Fall.
+      vorlage_name: r.vorlage_name || null,
+      fenster_von: r.fenster_von || null, fenster_bis: r.fenster_bis || null,
       kunde_name: r.kunde_name || '',
       ansprechpartner: r.ansprechpartner || [],
       zentrale: r.zentrale || null };
@@ -7377,20 +7489,19 @@ function rgLaufZeichnen() {
   if (rgsReiter === 'karte') { rgKarteZeichnen(); }
   else if (rgsReiter === 'funktionen') { rgLaufFunktionen(); }
   else {
-    // rdFortschritt bleibt bestehen, traegt aber seit ENT-306 nur noch den
-    // ZUSTAND ("abgebrochen"/"abgeschlossen"). Die Zahl steht im Kopf, wo sie
-    // auch beim Scrollen sichtbar bleibt -- sie zweimal zu zeigen waere
-    // dieselbe Angabe an zwei Orten, die auseinanderlaufen koennen.
+    // Seit ENT-541 steht hier ein eigener Kopfblock statt der Zahlen-Chips
+    // und statt #rdFortschritt: Zustand, Name der Runde, Zeitfenster,
+    // Fortschrittsbalken, Zaehler und Restzeit -- an EINER Stelle. Die
+    // beiden frueheren Traeger sind damit weg, nicht zusaetzlich da: Zwei
+    // Orte fuer denselben Zustand laufen auseinander (schon ENT-306).
     // Die Warnung gehoert AUCH hierher (ENT-320): Der Waechter steht vor
     // dem Kontrollpunkt und tippt auf "Bestaetigen", nicht auf die Karte.
     // Nur unter der Karte zu warnen hiesse, sie dort zu verstecken, wo er
     // gerade nicht hinsieht.
-    // Hier gibt es keine Karte, auf die etwas gelegt werden koennte -- darum
-    // stehen dieselben Chips als schmale Zeile oben (ENT-361).
     $('rgsBody').innerHTML =
-      rgZahlenChipsHtml(false)
+      rgLaufKopfblockHtml()
       + rgOrtungHinweisHtml()
-      + `<div id="rdFortschritt" class="rd-zustand"></div><div id="rdBanner"></div><div id="rdListe"></div>`;
+      + `<div id="rdBanner"></div><div id="rdListe" class="rd-liste"></div>`;
     rundgangListeZeichnen();
   }
   rgLaufKopfZeichnen();
@@ -7402,9 +7513,35 @@ function rgLaufKopfZeichnen() {
   if (rgsModus !== 'lauf' || !rundgangAktiv) return;
   const kps = rundgangAktiv.kontrollpunkte || [];
   const fertig = kps.filter(k => k.erledigt).length;
-  const z = $('rgsZaehler'); if (z) { z.textContent = `${fertig} / ${kps.length}`; }
+  /* Derselbe Zaehler, zwei Schreibweisen (ENT-541): Im Chip ueber der Karte
+     ist Platz fuer "5 / 8", im Kopfblock des Punkte-Reiters steht der ganze
+     Satz "5 von 8 Kontrollpunkten". Beide nennen BEIDE Zahlen -- keine Zahl
+     ohne Bezug (CLAUDE.md). Welche Schreibweise gilt, sagt das Element
+     selbst, damit es nicht zwei Nachfuehrwege gibt. */
+  const z = $('rgsZaehler');
+  if (z) {
+    z.textContent = z.dataset.satz
+      ? `${fertig} ${w('von')} ${kps.length} ${w('rgpPunkteSatz')}`
+      : `${fertig} / ${kps.length}`;
+  }
   const t = $('rgsTimer');
   if (t) { t.textContent = rgLaufzeit(); }
+  // Balken und Restzeit gibt es nur im Kopfblock; auf der Karte fehlen sie.
+  const b = $('rgpBalken');
+  if (b) { b.style.width = (kps.length ? Math.round((fertig / kps.length) * 100) : 0) + '%'; }
+  const kEl = $('rgpKopf'), lEl2 = $('rgpLage');
+  if (kEl && lEl2) {
+    const l = rgpLage();
+    kEl.className = 'rgp-kopf ' + l.kl;
+    lEl2.textContent = l.txt;
+  }
+  const rEl = $('rgpRest');
+  if (rEl) {
+    const r = rgpRestTxt();
+    rEl.textContent = r ? r.txt : '';
+    rEl.className = 'rgp-rest' + (r && r.kl ? ' ' + r.kl : '');
+    rEl.style.display = r ? '' : 'none';
+  }
   // Die Ortungsanzeige auf der Karte altert mit der Zeit ("steht seit 3 min")
   // -- sie muss darum mit demselben Takt nachgefuehrt werden wie die Uhr,
   // sonst bliebe sie auf dem Stand der letzten Positionsmeldung stehen.
@@ -8136,6 +8273,130 @@ function rgZahlenChipsHtml(aufKarte) {
   </div>`;
 }
 
+/* Wie es um die Runde steht -- eine Stelle, zwei Verwender (das Geruest
+   unten und rgLaufKopfZeichnen(), das die Zeile bei jedem Takt nachfuehrt).
+
+   "Fertig" heisst: an jedem Punkt war jemand. Das haengt an den ERFASSTEN
+   Punkten, nicht allein am Status vom Server -- eine offline gelaufene Runde
+   ist gelaufen, auch wenn die Bestaetigung noch in der Warteschlange liegt
+   (ENT-321: Erfassung zaehlt, nicht Uebermittlung). #rdFortschritt hat das
+   vor ENT-541 genauso gerechnet; ginge die Zeile hier verloren, meldete eine
+   im Funkloch vollstaendig abgelaufene Runde weiterhin "laeuft". */
+function rgpLage() {
+  const st = rundgangAktiv ? rundgangAktiv.status : null;
+  const kps = (rundgangAktiv && rundgangAktiv.kontrollpunkte) || [];
+  const alleErfasst = kps.length > 0 && kps.every(k => k.erledigt);
+  const kl = st === 'pausiert' ? 'pause' : st === 'abgebrochen' ? 'ab'
+    : (st === 'abgeschlossen' || alleErfasst) ? 'fertig' : 'laeuft';
+  const txt = kl === 'pause' ? w('rgsIstPausiert')
+    : kl === 'ab' ? w('rgpAbgebrochen')
+    : kl === 'fertig' ? w('rundgangAbgeschlossen') : w('rgsLaeuft');
+  return { kl, txt };
+}
+
+/* ══ Kopfblock der laufenden Runde, Reiter "Kontrollpunkte" (ENT-541) ══
+
+   Vorlage war ein Bildschirmfoto des Projektinhabers: Zustandszeile, Name
+   der Runde, Zeitfenster, Fortschrittsbalken, darunter links der Zaehler und
+   rechts die verbleibende Zeit. Er ersetzt die schmale Chip-Zeile aus
+   ENT-361 UND #rdFortschritt aus ENT-306 -- beide sagten einen Teil davon,
+   an zwei Stellen.
+
+   Drei Abweichungen von der Vorlage, jede mit Grund:
+
+   1. Gross steht der NAME DER RUNDE, nicht der des Objekts. Das Objekt steht
+      schon in der Kopfzeile der Seite (#rgsTitel), die immer sichtbar
+      bleibt; es hier zu wiederholen waere dieselbe Angabe an zwei Orten.
+      Der Name der Runde dagegen stand bisher nirgends -- an einem Objekt
+      mit "Nacht A" und "Nacht B" ist er das einzige Unterscheidungsmerkmal.
+   2. Rechts unter dem Balken steht "noch 49 min", nicht "im Rahmen". Eine
+      Bewertung des Tempos braucht eine festgelegte Regel; es gibt keine.
+      Die verbleibende Zeit ist dagegen gemessen und pruefbar.
+   3. Die Laufzeit steht als hh:mm:ss, nicht als "41 MIN" -- dasselbe Format
+      wie auf dem Karten-Reiter, damit nicht zwei Schreibweisen derselben
+      Zahl nebeneinander stehen.
+
+   Die Ids #rgsZaehler und #rgsTimer bleiben bewusst dieselben wie in den
+   Chips: Es zeichnet nur EIN Reiter gleichzeitig, und rgLaufKopfZeichnen()
+   fuehrt so beide Darstellungen ueber denselben Weg nach. */
+function rgLaufKopfblockHtml() {
+  if (!rundgangAktiv) { return ''; }
+  const { kl: lage, txt: lageTxt } = rgpLage();
+  return `<div class="rgp-kopf ${lage}" id="rgpKopf">
+    <div class="rgp-lage">
+      <span class="rgp-pkt" aria-hidden="true"></span>
+      <span id="rgpLage">${esc(lageTxt)}</span>
+      <span class="rgp-uhr" id="rgsTimer">–</span>
+      <span class="vh" id="rgsTimerLb">${esc(w('rgsTimerLb'))}</span>
+    </div>
+    <div class="rgp-name" id="rgpName">${esc(rundgangAktiv.vorlage_name || w('rgpAlleP'))}</div>
+    <div class="rgp-unter" id="rgpFenster">${esc(rgpFensterTxt())}</div>
+    <div class="rgp-balken"><span id="rgpBalken" style="width:0%"></span></div>
+    <div class="rgp-zahlen">
+      <span class="rgp-zahl" id="rgsZaehler" data-satz="1">–</span>
+      <span class="rgp-rest" id="rgpRest">–</span>
+    </div>
+  </div>`;
+}
+
+/* Das Zeitfenster als Text. Ohne Fenster steht "Ohne Zeitfenster" da und
+   nicht nichts: Eine leere Zeile saehe aus, als sei die Angabe verloren
+   gegangen -- "unbekannt" darf nie wie "keine" aussehen (CLAUDE.md). */
+function rgpFensterTxt() {
+  const von = rundgangAktiv ? rundgangAktiv.fenster_von : null;
+  const bis = rundgangAktiv ? rundgangAktiv.fenster_bis : null;
+  if (von && bis) { return w('rgpFensterVonBis').replace('{von}', hm(von)).replace('{bis}', hm(bis)); }
+  if (bis) { return w('rgpFensterBis').replace('{bis}', hm(bis)); }
+  return w('rgpOhneFenster');
+}
+
+/* Verbleibende Minuten im Zeitfenster, oder null, wenn es keines gibt.
+
+   Die Mitternachtsgrenze ist hier der Normalfall und nicht der Sonderfall:
+   Eine Nachtrunde laeuft von 22:00 bis 02:00. Gerechnet wird darum in
+   Minuten seit Tagesbeginn mit demselben Umbruch wie rundgangImFenster()
+   -- ohne ihn zeigte eine Runde um 23:00 Uhr "noch -1260 min". */
+function rgpRestMin() {
+  const bis = rundgangAktiv ? rundgangAktiv.fenster_bis : null;
+  if (!bis) { return null; }
+  const min = t => Number(String(t).slice(0, 2)) * 60 + Number(String(t).slice(3, 5));
+  const ende0 = min(bis);
+  if (!Number.isFinite(ende0)) { return null; }
+  let jetzt = min(jetztDatetime().slice(11, 16));
+  let ende = ende0;
+  const von = rundgangAktiv.fenster_von;
+  if (von) {
+    const start = min(von);
+    if (Number.isFinite(start) && ende <= start) {
+      ende += 1440;
+      if (jetzt < start) { jetzt += 1440; }
+    }
+  }
+  return ende - jetzt;
+}
+
+/* "noch 1 h 05 min" / "noch 49 min". Keine Sekunden: Das Zeitfenster ist auf
+   die Minute genau festgelegt, eine laufende Sekundenanzeige taeuschte eine
+   Genauigkeit vor, die die Vorgabe gar nicht hat. */
+function rgpDauerTxt(minuten) {
+  const m = Math.max(0, Math.round(minuten));
+  if (m < 60) { return `${m} ${w('rgpMin')}`; }
+  return `${Math.floor(m / 60)} ${w('rgpStd')} ${String(m % 60).padStart(2, '0')} ${w('rgpMin')}`;
+}
+
+/* Die Restzeit beantwortet "wie lange habe ich noch". Auf einer beendeten
+   oder abgebrochenen Runde gibt es diese Frage nicht mehr -- dort stuende
+   "noch 49 min" neben "Rundgang abgeschlossen" und laese sich wie eine
+   Aufforderung. Pausiert bleibt sie stehen: Das Fenster laeuft weiter. */
+function rgpRestTxt() {
+  const st = rundgangAktiv ? rundgangAktiv.status : null;
+  if (st === 'abgeschlossen' || st === 'abgebrochen') { return null; }
+  const r = rgpRestMin();
+  if (r === null) { return { txt: w('rgpKeinFenster'), kl: 'mut' }; }
+  if (r < 0) { return { txt: w('rgpFensterVorbei'), kl: 'vorbei' }; }
+  return { txt: w('rgpRest').replace('{t}', rgpDauerTxt(r)), kl: '' };
+}
+
 /* Wie es der Ortung GERADE geht -- eine Stelle, zwei Anzeigen (ENT-355).
 
    Neu ist der Zustand 'steht': Bis hierher kannte die App nur "es kommt
@@ -8536,18 +8797,9 @@ function rundgangListeZeichnen() {
   if (!rundgangAktiv) return;
   rundgangFussZeichnen();
   const kps = rundgangAktiv.kontrollpunkte;
-  const erledigt = kps.filter(k => k.erledigt).length;
-  const fEl = $('rdFortschritt');
-  if (fEl) {
-    // Als Vollseite (ENT-306) steht die Zahl im Kopf; hier bleibt der Zustand.
-    // In der Schublade (Altweg) weiterhin der ganze Satz.
-    const zustand = rundgangAktiv.status === 'abgebrochen' ? w('rundgangAbgebrochen')
-      : (kps.length > 0 && erledigt === kps.length) ? w('rundgangAbgeschlossen') : '';
-    fEl.textContent = rgsModus === 'lauf'
-      ? zustand
-      : (zustand || `${erledigt} ${w('von')} ${kps.length} ${w('erledigt')}`);
-    fEl.style.display = fEl.textContent ? '' : 'none';
-  }
+  // #rdFortschritt ist mit ENT-541 entfallen: Den Zustand der Runde nennt
+  // jetzt die Zustandszeile des Kopfblocks (#rgpLage), und zwar nur dort.
+  // Zwei Traeger fuer dieselbe Aussage laufen auseinander.
   const bEl = $('rdBanner');
   if (bEl) {
     bEl.innerHTML = rundgangAktiv.status === 'pausiert'
@@ -8555,6 +8807,9 @@ function rundgangListeZeichnen() {
       : rundgangAktiv.status === 'abgebrochen'
       ? `<div class="msg-err">${esc(RUNDGANG_ABBRUCH_GRUENDE[rundgangAktiv.abbruch_grund] || w('rundgangAbgebrochen'))}${rundgangAktiv.abbruch_freitext ? ' — ' + esc(rundgangAktiv.abbruch_freitext) : ''}</div>`
       : '';
+    // Ein leerer Banner ist kein Banner -- sonst bliebe im Rumpf (Raster mit
+    // festem Abstand) eine Luecke stehen, fuer die nichts da ist.
+    bEl.style.display = bEl.innerHTML ? '' : 'none';
   }
   const gesperrt = rundgangAktiv.status === 'pausiert' || rundgangAktiv.status === 'abgebrochen';
   const lEl = $('rdListe');
@@ -8562,38 +8817,93 @@ function rundgangListeZeichnen() {
   // jeder neuen Position neu gezeichnet (ENT-317), und was nur im Feld
   // stand, waere sonst nach Sekundenbruchteilen weg (ENT-324).
   kps.forEach(k => { if (k.offen) { rdFormularStandSichern(k); } });
-  if (lEl) { lEl.innerHTML = kps.map((k, i) => rdZeile(k, i + 1, gesperrt)).join(''); }
+  /* Der "naechste" Punkt ist der erste noch offene in der Reihenfolge der
+     Runde (ENT-541). Er ist eine reine ANZEIGE, keine Sperre: Wer vor einem
+     spaeteren Punkt steht, tippt dessen Zeile an und bekommt dieselben
+     Knoepfe. Eine erzwungene Reihenfolge waere eine fachliche Aenderung und
+     gehoerte ausserdem in den Server, nicht in die Oberflaeche.
+
+     Eine ABGEBROCHENE Runde hat keinen naechsten Punkt mehr. Der Pfeil
+     bliebe sonst auf einer Zeile stehen, zu der niemand mehr hingeht -- das
+     sieht aus wie "hier weiter" und ist das Gegenteil. Pausiert behaelt ihn:
+     Dort geht es weiter, nur spaeter. */
+  const naechster = rundgangAktiv.status === 'abgebrochen' ? null : kps.find(k => !k.erledigt);
+  const naechsterId = naechster ? Number(naechster.id) : null;
+  // Ohne laufende Nummer: Die Reihenfolge steht in der Liste selbst, und die
+  // Zeitspalte links traegt jetzt die Uhrzeit (ENT-541).
+  if (lEl) { lEl.innerHTML = kps.map(k => rdZeile(k, gesperrt, naechsterId)).join(''); }
 }
 
-function rdZeile(k, nr, gesperrt) {
+/* Welche Zeilen ihre Knoepfe ausgeklappt zeigen, ausser der naechsten
+   (ENT-541). Bewusst NICHT im localStorage: Das gilt fuer diesen Blick auf
+   diese Liste, nicht fuer morgen. */
+const rdAufgeklappt = new Set();
+
+function rdUmklappen(kontrollpunktId) {
+  const id = Number(kontrollpunktId);
+  if (rdAufgeklappt.has(id)) { rdAufgeklappt.delete(id); } else { rdAufgeklappt.add(id); }
+  rundgangListeZeichnen();
+}
+
+/* Eine Zeile der Kontrollpunkt-Liste, als Zeitleiste (ENT-541).
+
+   Aufbau, links nach rechts, fuer JEDE Zeile gleich (CLAUDE.md: gleiches
+   Muster auf beiden Seiten):
+
+     Zeitspalte | Zeichen | Bezeichnung + Unterzeile | Kennzeichen rechts
+
+   Die Zeitspalte traegt bei erledigten Punkten die Uhrzeit der Erfassung
+   -- bis hierher stand sie klein in der Meta-Zeile, obwohl sie der
+   eigentliche Nachweis ist. Bei offenen Punkten steht dort ein Pfeil (der
+   naechste) oder ein Strich (spaeter).
+
+   Das Kennzeichen rechts nennt bei erledigten Punkten, WIE der Nachweis
+   zustande kam (NFC / Geofence / Ersatzscan / nicht verfuegbar), bei
+   offenen, wie er zustande kommen soll. Bei einem Ersatzscan verschwindet
+   damit der geplante Typ aus der Zeile -- richtig so: Was zaehlt, ist der
+   erbrachte Nachweis, und der war eben KEIN NFC-Lesen.
+
+   Der gruene Haken allein sagt einem Screenreader nichts. Das Statuswort
+   steht darum unsichtbar (.vh) daneben, statt sichtbar in jeder Zeile Platz
+   zu kosten.
+
+   Knoepfe zeigt nur, wer sie gerade braucht (Entscheid des Projektinhabers,
+   2026-09-11): der naechste Punkt, jeder Punkt, in dessen Geofence man
+   GERADE steht, jeder mit offenem Formular und jeder, den man selbst
+   aufgeklappt hat. Die uebrigen bleiben eine ruhige Zeile und klappen beim
+   Antippen auf. Weggeblendet werden nur die Knoepfe -- Entfernung, NFC-
+   Hinweis und Fehlermeldung bleiben in JEDER offenen Zeile stehen: Sie
+   beantworten "wohin als naechstes" und "warum ging das nicht", und dafuer
+   darf man nicht erst tippen muessen. */
+function rdZeile(k, gesperrt, naechsterId) {
   const typLabel = k.typ === 'nfc' ? w('kpTypNfc') : w('kpTypGeofence');
   if (k.erledigt) {
     const istNv = k.erledigt.status === 'nicht_verfuegbar';
     const istEs = k.erledigt.status === 'ersatzscan';
     const zeit = String(k.erledigt.erfasst_am || '').slice(11, 16);
-    const statusTxt = istNv ? w('kpNichtVerfuegbar') : istEs ? w('kpErsatzscan') : w('kpBestaetigt') + ' ' + zeit;
     const hakenKlasse = istNv ? 'rd-haken-nv' : istEs ? 'rd-haken-es' : '';
     const hakenZeichen = istNv ? '!' : istEs ? '📷' : '✓';
+    const marke = istNv ? w('kpNichtVerfuegbar') : istEs ? w('kpErsatzscan') : typLabel;
     // Offene Aufgaben an einem bereits erfassten Punkt (ENT-305): Wer die
     // Schublade wegschiebt, muss hier sehen, dass noch etwas aussteht -- und
     // sie erneut oeffnen koennen. Ein still verschwundener Auftrag waere
     // schlimmer als die Frage selbst.
     const offen = rdAufgabenOffen(k);
     const hatAufgaben = (k.aufgaben || []).length;
-    return `<div class="rd-zeile rd-fertig">
-      <div class="rd-kopf">
-        <span class="rd-nr">${nr}</span>
-        <div class="rd-txt">
-          <div class="rd-bez">${esc(k.bezeichnung)}</div>
-          <div class="rd-meta">${esc(typLabel)} · ${esc(statusTxt)}${k.wartend ? ' · ' + esc(w('kpWirdGesendet')) : ''}</div>
-          ${offen.length ? `<button type="button" class="ab-offen" id="abOffen${Number(k.id)}"
-              onclick="rdAufgabenOeffnen(${Number(k.id)})">
-            <svg class="i i-sm" viewBox="0 0 24 24"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
-            <span>${offen.length} ${esc(offen.length === 1 ? w('abOffen') : w('abOffenMehr'))}</span>
-          </button>` : (hatAufgaben ? `<div class="ab-fertig" id="abFertig${Number(k.id)}">${esc(w('abFertig'))}</div>` : '')}
-        </div>
+    return `<div class="rd-zeile rd-fertig${istNv ? ' rd-war-nv' : istEs ? ' rd-war-es' : ''}">
+      <span class="rd-zeit">${esc(zeit || '–')}</span>
+      <span class="rd-haken ${hakenKlasse}" aria-hidden="true">${hakenZeichen}</span>
+      <div class="rd-txt">
+        <div class="rd-bez">${esc(k.bezeichnung)}</div>
+        ${(istNv || istEs) ? '' : `<span class="vh">${esc(w('kpBestaetigt'))}</span>`}
+        ${k.wartend ? `<div class="rd-meta">${esc(w('kpWirdGesendet'))}</div>` : ''}
+        ${offen.length ? `<button type="button" class="ab-offen" id="abOffen${Number(k.id)}"
+            onclick="rdAufgabenOeffnen(${Number(k.id)})">
+          <svg class="i i-sm" viewBox="0 0 24 24"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+          <span>${offen.length} ${esc(offen.length === 1 ? w('abOffen') : w('abOffenMehr'))}</span>
+        </button>` : (hatAufgaben ? `<div class="ab-fertig" id="abFertig${Number(k.id)}">${esc(w('abFertig'))}</div>` : '')}
       </div>
-      <span class="rd-haken ${hakenKlasse}">${hakenZeichen}</span>
+      <span class="rd-marke">${esc(marke)}</span>
     </div>`;
   }
   // NFC ist auf diesem Geraet ehrlich als nicht verfuegbar ausgewiesen, statt
@@ -8616,18 +8926,37 @@ function rdZeile(k, nr, gesperrt) {
     : dist === null ? `<div class="rd-ort mut">${esc(w('rdOrtUnbekannt'))}</div>`
     : drin ? `<div class="rd-ort drin">${esc(w('rdImBereich'))}</div>`
     : `<div class="rd-ort weit">${esc(w('rdEntfernung').replace('{m}', String(Math.round(dist))))}</div>`;
-  return `<div class="rd-zeile">
-    <div class="rd-kopf">
-      <span class="rd-nr">${nr}</span>
-      <div class="rd-txt">
-        <div class="rd-bez">${esc(k.bezeichnung)}</div>
-        <div class="rd-meta">${esc(typLabel)}</div>
-      </div>
-    </div>
+  const jetzt = naechsterId !== null && Number(k.id) === Number(naechsterId);
+  // Wer im Bereich steht, kann diesen Punkt JETZT bestaetigen -- dann gehoert
+  // ihm der Knopf, auch wenn er nicht an der Reihe ist. Ohne diese Zeile
+  // muesste der Waechter am Ziel erst aufklappen, was er gerade erreicht hat.
+  const auf = !gesperrt && (jetzt || drin === true || !!k.offen || rdAufgeklappt.has(Number(k.id)));
+  const aufgabenN = (k.aufgaben || []).length;
+  const aufgabenTxt = aufgabenN === 1
+    ? w('rgpAufgabe').replace('{was}', String((k.aufgaben[0] || {}).bezeichnung || ''))
+    : aufgabenN > 1 ? w('rgpAufgabenN').replace('{n}', String(aufgabenN)) : '';
+  const kopfInhalt = `
+      <span class="rd-zeit" aria-hidden="true">${jetzt ? '→' : '–'}</span>
+      <span class="rd-haken" aria-hidden="true"></span>
+      <span class="rd-txt">
+        <span class="rd-bez">${esc(k.bezeichnung)}</span>
+        ${jetzt ? `<span class="vh">${esc(w('rgpNaechster'))}</span>` : ''}
+        ${aufgabenTxt ? `<span class="rd-meta">${esc(aufgabenTxt)}</span>` : ''}
+      </span>
+      <span class="rd-marke">${esc(typLabel)}</span>`;
+  return `<div class="rd-zeile rd-offen${jetzt ? ' rd-jetzt' : ''}${auf ? ' rd-auf' : ''}">
+    ${gesperrt
+      // Pausiert oder abgebrochen gibt es nichts umzuklappen -- dann ist der
+      // Kopf kein Knopf. Ein Knopf, der nichts tut, ist schlimmer als keiner.
+      ? `<div class="rd-kopf">${kopfInhalt}</div>`
+      : `<button type="button" class="rd-kopf" id="rdKopf${Number(k.id)}"
+           aria-expanded="${auf ? 'true' : 'false'}"
+           aria-label="${esc((auf ? w('rgpSchliessen') : w('rgpOeffnen')) + ' — ' + k.bezeichnung)}"
+           onclick="rdUmklappen(${Number(k.id)})">${kopfInhalt}</button>`}
     ${gesperrt ? '' : ortTxt}
     ${!kannScannen && !gesperrt ? `<div class="rd-hinweis">${esc(w('kpNfcNichtVerfuegbarGeraet'))}</div>` : ''}
-    ${k.fehler ? `<div class="msg-err" style="margin:10px 0 0 37px">${esc(k.fehler)}</div>` : ''}
-    ${gesperrt ? '' : `
+    ${k.fehler ? `<div class="msg-err rd-einzug">${esc(k.fehler)}</div>` : ''}
+    ${!auf ? '' : `
     <div class="rd-akt">
       ${kannScannen ? `<button class="btn btn-primary" id="rdBtn${k.id}"${drin === false ? ' disabled' : ''} onclick="rdBestaetigen(${k.id})">${esc(w('kpBestaetigen'))}</button>` : ''}
       <button class="btn btn-plain" onclick="rdEsUm(${k.id})">${esc(w('kpErsatzscan'))}</button>
@@ -8644,7 +8973,7 @@ function rdZeile(k, nr, gesperrt) {
       <textarea class="inp" id="rdNvText${k.id}" rows="2" placeholder="${esc(w('kpBeschreibungPflicht'))}">${esc(k.nvText || '')}</textarea>
       <button class="btn btn-neg" onclick="rdNvSenden(${k.id})">${esc(w('kpNichtVerfuegbarMelden'))}</button>
     </div>
-    <div class="msg-err" id="rdFehler${k.id}" style="display:none;margin:10px 0 0 37px"></div>`}
+    <div class="msg-err rd-einzug" id="rdFehler${k.id}" style="display:none"></div>`}
   </div>`;
 }
 
