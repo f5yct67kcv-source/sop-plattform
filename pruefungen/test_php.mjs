@@ -6,6 +6,11 @@
 // die im erreichbaren Code gar nicht existierte, und eine Variable, die in
 // ihrer Datei nie gesetzt wird. Beide waeren beim ersten echten Aufruf
 // hochgegangen. Diese Suite schliesst genau diese Luecke.
+//
+// Ein dritter kam am 2026-09-11 dazu (ENT-540) und war monatelang produktiv:
+// eine Konstante, die nur in einem anderen ENDPUNKT stand. Endpunkte binden
+// einander nie ein. Die betroffene Zeile lief nur, wenn ein Foto dabei war --
+// darum kam jede Ereignismeldung ohne Foto an und jede mit Foto nie.
 import { WURZEL, HIER, OUT, browserPfad } from './pfade.mjs';
 import { execFileSync } from 'child_process';
 import { readFileSync, readdirSync } from 'fs';
@@ -33,6 +38,13 @@ check('KRITISCH: kein Aufruf einer unbekannten Funktion',
   !beanstandet.some(z => /unbekannten Funktion/.test(z)));
 check('KRITISCH: keine Variable, die gelesen aber nie gesetzt wird',
   !beanstandet.some(z => /nie gesetzt/.test(z)));
+// Dritte Fehlerklasse, dazugekommen mit ENT-540: eine Konstante des Hauses,
+// die in einem ANDEREN Endpunkt definiert ist. Endpunkte binden einander nie
+// ein; PHP 8 wirft dafuer einen Error, und im Browser steht "Unerwarteter
+// Serverfehler". Gefunden, weil jede Ereignismeldung MIT Foto daran
+// scheiterte und jede ohne ankam -- die Zeile lief nur im Foto-Zweig.
+check('KRITISCH: keine Hauskonstante, die vom Endpunkt aus nicht erreichbar ist',
+  !beanstandet.some(z => /nicht erreichbar/.test(z)));
 check('KRITISCH: gar keine Beanstandung', code === 0 && beanstandet.length === 0);
 
 // ── Die Layout-Pruefung wird WIRKLICH ausgefuehrt (ENT-073).
