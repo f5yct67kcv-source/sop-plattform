@@ -27,6 +27,12 @@ require_once __DIR__ . '/../kunden.php';
 require_once __DIR__ . '/../produkte.php';
 require_once __DIR__ . '/../rundgang.php';
 require_once __DIR__ . '/../fahrzeug.php';
+// Betreiber-Ebene (ENT-529): Ihre Tabellen laufen beim Einrichtungsknopf
+// mit, solange der Bootstrap offen ist -- auf Wunsch des Projektinhabers,
+// weil zwei getrennte Knoepfe fuer einen einmaligen Vorgang einer zu viel
+// sind. Die Definitionen stehen im Modul, nicht hier: Sie werden auch vom
+// eigenen Endpunkt api/betreiber_einrichten.php benutzt.
+require_once __DIR__ . '/../betreiber.php';
 // Der Lohnartenkatalog steht in lohn.php, damit Pruefungen ihn erreichen
 // (ENT-451).
 require_once __DIR__ . '/../lohn.php';
@@ -2950,6 +2956,36 @@ foreach ($verweise as [$tabelle, $spalte, $sql]) {
     // arbeitet auch ohne ihn. Scheitert er -- etwa weil eine Tabelle noch
     // MyISAM ist --, darf das den Rest nicht aufhalten.
     schritt($pdo, $sql, "Verweis $tabelle.$spalte", $getan, $fehler);
+}
+
+// ── 3b. Betreiber-Ebene (ENT-529) ─────────────────────────────────────
+//
+// Laeuft NUR, solange der Bootstrap offen ist -- also bis das erste
+// Betreiber-Konto steht oder ein zweiter Mandant eingetragen ist. Danach
+// gehoert die Ebene nicht mehr in den Einrichtungsknopf eines Betriebs:
+// Ein zweiter Mandant darf sie nicht anlegen (be_bootstrap_offen, ENT-528).
+//
+// Ein Fehlschlag hier bricht die uebrige Einrichtung NICHT ab. Die
+// Betriebstabellen sind das Wichtigere; was hier schiefgeht, wird gemeldet
+// und laesst sich ueber api/betreiber_einrichten.php nachholen.
+try {
+    $stamm = betreiber_db();
+    if (be_bootstrap_offen($stamm)) {
+        $beErgebnis = be_tabellen_anlegen($stamm, $nurPruefen);
+        foreach ($beErgebnis['getan'] as $g)  { $getan[]  = 'Betreiber-Bereich: ' . $g; }
+        foreach ($beErgebnis['offen'] as $o)  { $getan[]  = 'Betreiber-Bereich: ' . $o; }
+        foreach ($beErgebnis['fehler'] as $f) { $fehler[] = 'Betreiber-Bereich: ' . $f; }
+
+        if (!$nurPruefen) {
+            $beName = be_bestandsmandant_eintragen($stamm, $pdo);
+            if ($beName !== null) { $getan[] = 'Betreiber-Bereich: dieser Betrieb als Mandant 1 eingetragen'; }
+        } elseif (hat_tabelle($stamm, 'mandant')
+               && (int)$stamm->query('SELECT COUNT(*) FROM mandant')->fetchColumn() === 0) {
+            $getan[] = 'Betreiber-Bereich: dieser Betrieb als Mandant 1';
+        }
+    }
+} catch (Throwable $e) {
+    $fehler[] = 'Betreiber-Bereich — ' . $e->getMessage();
 }
 
 // ── 4. Ergebnis. Fehlt am Schluss etwas, wird das gesagt statt verschwiegen.

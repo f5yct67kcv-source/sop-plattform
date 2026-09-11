@@ -125,7 +125,10 @@ check('KRITISCH: der Rohtoken wird nicht in betreiber_sessions eingetragen',
 // Host, Name und Benutzer stehen dort, das Passwort kommt aus dem Deploy.
 // Wer Lesezugriff auf die Betreiber-Datenbank bekaeme, haette sonst in
 // derselben Sekunde die Zugaenge zu JEDEM Mandanten.
-const mandantSql = (einr.match(/CREATE TABLE IF NOT EXISTS mandant \(([\s\S]*?)\) ENGINE/) || [, ''])[1];
+// Die Definitionen stehen seit ENT-529 im MODUL, nicht mehr im Endpunkt --
+// sie werden von zwei Stellen angelegt (Einrichtungsknopf und eigener
+// Endpunkt), und zwei Kopien liefen irgendwann auseinander.
+const mandantSql = (modul.match(/CREATE TABLE IF NOT EXISTS mandant \(([\s\S]*?)\) ENGINE/) || [, ''])[1];
 check('die Mandantentabelle wird ueberhaupt angelegt', mandantSql.length > 0);
 check('KRITISCH: der Mandantenstamm hat kein Passwortfeld',
   mandantSql.length > 0 && !/pass|passwort|secret_wert|kennwort/i.test(
@@ -195,13 +198,46 @@ check('KRITISCH: betreiber.php ist in der .htaccess gesperrt',
 // im README und in CLAUDE.md beim Namen, und ein erklaerender Kommentar darf
 // das auch. Geprueft wird, dass der Mandantenname zur LAUFZEIT aus der
 // Tabelle betrieb kommt und nicht als Zeichenkette im INSERT steht.
-const insMandant = (nurCode(einr).match(/INSERT INTO mandant[\s\S]{0,400}?;/) || [''])[0];
+const insMandant = (modulCode.match(/INSERT INTO mandant[\s\S]{0,400}?;/) || [''])[0];
 check('KRITISCH: der Name des Bestandsbetriebs wird gelesen, nicht einprogrammiert',
-  einr.includes('SELECT firma FROM betrieb')
+  modul.includes('SELECT firma FROM betrieb')
   && insMandant.length > 0
   && !/VALUES\s*\([^)]*['"][A-Za-zÄÖÜäöü][^)]*GmbH/i.test(insMandant));
 check('der Platzhalter greift nur, wenn kein Briefkopf hinterlegt ist',
-  /trim\(\$name\)\s*===\s*''/.test(einr));
+  /trim\(\$name\)\s*===\s*''/.test(modul));
+
+// ── Eine Definition, nicht zwei (ENT-529) ────────────────────────────
+//
+// Seit die Tabellen von zwei Stellen angelegt werden, ist die eigentliche
+// Gefahr nicht mehr eine fehlende Definition, sondern eine ZWEITE, die
+// langsam auseinanderlaeuft. Man saehe es erst, wenn eine Anlage anders
+// aufgebaut waere als die andere.
+const wiederholt = ['betreiber', 'betreiber_sessions', 'mandant', 'betreiber_zwei_faktor']
+  .filter(t => {
+    // OHNE das g-Flag: Ein globaler Regex merkt sich lastIndex zwischen
+    // den .test()-Aufrufen und springt dadurch ueber Treffer hinweg. Genau
+    // daran ist die erste Fassung dieser Pruefung gescheitert -- die
+    // Gegenprobe (dieselbe Tabelle ein zweites Mal definiert) blieb gruen.
+    const muster = new RegExp(`CREATE TABLE (?:IF NOT EXISTS )?\`?${t}\`?\\b`);
+    const orte = [modul, einr, lies('backend/api/planung_einrichten.php')]
+      .filter(q => muster.test(nurCode(q)));
+    return orte.length > 1;
+  });
+check('KRITISCH: jede Betreiber-Tabelle ist an genau einer Stelle definiert',
+  wiederholt.length === 0);
+if (wiederholt.length) { bad.push('doppelt definiert: ' + wiederholt.join(', ')); }
+// Und der Einrichtungsknopf des Cockpits legt sie tatsaechlich mit an --
+// sonst waere der eigene Knopf zwar weg, aber nichts an seine Stelle
+// getreten.
+const planEinr = nurCode(lies('backend/api/planung_einrichten.php'));
+check('KRITISCH: der Einrichtungsknopf legt die Betreiber-Tabellen mit an',
+  /be_tabellen_anlegen\(/.test(planEinr));
+check('KRITISCH: er tut das nur, solange der Bootstrap offen ist',
+  /be_bootstrap_offen\([\s\S]{0,200}be_tabellen_anlegen\(/.test(planEinr));
+// Ein Fehlschlag dort darf die uebrige Einrichtung nicht abbrechen -- die
+// Betriebstabellen sind das Wichtigere.
+check('ein Fehlschlag der Betreiber-Ebene bricht die Einrichtung nicht ab',
+  /try \{[\s\S]{0,900}be_tabellen_anlegen\([\s\S]{0,900}catch \(Throwable/.test(planEinr));
 
 // ── 9. Aussperrschutz und Datensparsamkeit der neuen Endpunkte ───────
 const kontoStatus = nurCode(lies('backend/api/betreiber_konto_status.php'));

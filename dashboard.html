@@ -27133,31 +27133,24 @@ function eiBetreiberPruefen() {
     // Steht schon ein Konto, ist hier nichts mehr zu tun.
     if (Number(data.konten) > 0) { return; }
     kasten.style.display = '';
+    /* Seit ENT-529 legt "Pruefen und einrichten" die Tabellen mit an -- ein
+       eigener Knopf dafuer waere einer zu viel fuer einen einmaligen
+       Vorgang. Hier bleibt nur, was Eingaben braucht: das erste Konto.
+       Stehen die Tabellen noch nicht, sagt der Abschnitt das, statt einen
+       Knopf anzubieten, der dann im Server abprallt. */
     const offen = (data.offen || []).length;
     $('eiBetreiberInhalt').innerHTML =
         '<p class="zone-note" style="margin-top:0">Der eigene Verwaltungsbereich über den '
       + 'Betrieben. Er wird einmal eingerichtet; danach verschwindet dieser Abschnitt.</p>'
       + (offen
-          ? '<p class="zone-note">Es fehlen noch: ' + esc((data.offen || []).join(', ')) + '</p>'
+          ? '<p class="zone-note">Zuerst oben „Prüfen und einrichten“ — die Tabellen dafür '
+            + 'werden dabei mit angelegt.</p>'
           : '<p class="zone-note">Die Tabellen stehen. Es fehlt noch das erste Konto.</p>')
       + '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">'
-      + (offen
-          ? '<button type="button" class="btn btn-sm" onclick="eiBetreiberAnlegen()">Tabellen anlegen</button>'
-          : '')
       + '<button type="button" class="btn btn-sm btn-primary" onclick="eiBetreiberKonto()"'
       + (offen ? ' disabled' : '') + '>Erstes Konto anlegen</button>'
       + '</div>';
   }).catch(() => {});
-}
-
-function eiBetreiberAnlegen() {
-  api('betreiber_einrichten.php', { method: 'POST' }).then(({ ok, data }) => {
-    if (!ok || !data || data.status !== 'ok') {
-      toast((data && data.message) || 'Die Einrichtung ist fehlgeschlagen.'); return;
-    }
-    toast((data.getan || []).length + ' Schritte ausgeführt.');
-    eiBetreiberPruefen();
-  }).catch(() => toast('Die Einrichtung ist fehlgeschlagen.'));
 }
 
 function eiBetreiberKonto() {
@@ -27182,9 +27175,13 @@ function eiBetreiberKonto() {
 
 function planungEinrichten() {
   const b = $('eiBtn'); if (b) b.disabled = true;
+  // Der Betreiber-Abschnitt wird nach dem Lauf neu geprueft: Seine Tabellen
+  // entstehen seit ENT-529 hier mit, der Abschnitt muss das mitbekommen.
+  const nachher = () => { try { eiBetreiberPruefen(); } catch (e) { /* egal */ } };
   $('eiInhalt').innerHTML = '<p class="zone-note">Prüfe …</p>';
   api('planung_einrichten.php', { method: 'POST' }).then(({ ok, status, data }) => {
     if (b) b.disabled = false;
+    nachher();
     if (!ok) {
       // Ohne lesbare Antwort blieb hier nur "Einrichtung fehlgeschlagen." --
       // eine Sackgasse, die genau nichts sagt. Der Statuscode kommt mit:
