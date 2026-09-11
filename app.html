@@ -2349,7 +2349,7 @@ const W = {
     rgsKarteOhneOrt: 'ohne Koordinaten — nur in der Liste',
     rgsZentrieren: 'Zentrieren',
     rgsMeinStandort: 'Mein Standort',
-    rgsOrtungLaeuft: 'Standort wird während der Runde verfolgt',
+    rgsOrtungLaeuft: 'Standort wird während der Runde verfolgt — Punkte werden im Bereich selbst erfasst',
     rgOrtAusTitel: 'Kein Standort — die Runde lässt sich so nicht bestätigen',
     rgOrtVerweigert: 'Der Standortzugriff ist gesperrt. Ohne ihn kannst du keinen Kontrollpunkt bestätigen, und es kommt kein Signal, wenn du einen erreichst.',
     rgOrtWegIos: 'iPhone: Einstellungen › Datenschutz & Sicherheit › Ortungsdienste › Safari › „Beim Verwenden der App". Danach in Safari auf „aA" in der Adressleiste › Website-Einstellungen › Standort › Erlauben.',
@@ -2358,11 +2358,29 @@ const W = {
     rgOrtWartet: 'Standort wird gesucht …',
     rgOrtErneut: 'Erneut versuchen',
     rgSignalDrin: 'Kontrollpunkt erreicht',
+    // Zwei verschiedene Aussagen, zwei verschiedene Texte (ENT-531):
+    // "erreicht" heisst, der Radius ist betreten -- "erfasst" heisst, der
+    // Nachweis steht. Seit die Erfassung von selbst laeuft, ist das
+    // regelmaessig NICHT dasselbe: pausierte Runde, offenes Ersatzscan-
+    // Formular, Punkt ohne Koordinaten. Ein einziger Text fuer beides waere
+    // genau der Fehler, den CLAUDE.md verbietet.
+    rgSignalErfasst: 'Kontrollpunkt erfasst',
     rgsOrtungAus: 'Kein Standort — Ortung im Gerät erlauben',
     rdEntfernung: 'noch {m} m',
     rdImBereich: 'Du bist im Bereich',
     rdZuWeit: 'Noch {m} m entfernt — der Punkt lässt sich erst im Bereich bestätigen',
     rdOrtUnbekannt: 'Standort noch unbekannt',
+    // Der Zeilenhinweis, solange die automatische Erfassung zustaendig ist
+    // (ENT-531). Er ersetzt den Knopf -- ohne ihn staende dort gar nichts
+    // mehr, und der Waechter wuesste nicht, ob er noch etwas tun muss.
+    rdAutoWartet: 'Wird beim Betreten des Bereichs selbst erfasst',
+    // Und der Grund, warum der Knopf trotzdem dasteht. Zwei Lagen, zwei
+    // Texte: Der Standort wird noch GESUCHT (geht von selbst vorbei) ist
+    // etwas anderes als gesperrt, ohne Signal oder stehengeblieben (geht
+    // nicht von selbst vorbei). "Ohne laufende Ortung" waere im ersten Fall
+    // schlicht falsch -- sie laeuft ja, sie hat nur noch nichts.
+    rdAutoSucht: 'Sobald der Standort da ist, geht es von selbst — bis dahin von Hand',
+    rdAutoAus: 'Ohne laufende Ortung nicht automatisch — hier von Hand bestätigen',
     rgsReiterFunktionen: 'Funktionen',
     rgsLaufTitel: 'Rundgang',
     rgsAbbrechenModul: 'Rundgang abbrechen',
@@ -7276,7 +7294,27 @@ function rgLaufKopfZeichnen() {
   // -- sie muss darum mit demselben Takt nachgefuehrt werden wie die Uhr,
   // sonst bliebe sie auf dem Stand der letzten Positionsmeldung stehen.
   rgOrtChipZeichnen();
+  /* Und aus demselben Grund die LISTE (ENT-531).
+
+     Faellt die Ortungslage von "laeuft" auf "steht", erfasst nichts mehr von
+     selbst -- dann muss der Rueckfall-Knopf zurueckkommen. Das laesst sich
+     nicht an eine neue Position haengen: Genau in diesem Fall kommt keine
+     mehr. Ohne diese Zeile saehe der Waechter eine Zeile, die "wird selbst
+     erfasst" verspricht, waehrend die Ortung stillsteht -- also eine
+     Zusage, die niemand mehr einloest.
+
+     Der Zustand wird VOR dem Zeichnen gemerkt: rundgangListeZeichnen ruft
+     ueber den Fuss wieder hierher zurueck, und ohne die Zuweisung davor
+     liefe das endlos. */
+  const lage = rgOrtLage().art;
+  if (lage !== rgsOrtLageGezeichnet) {
+    rgsOrtLageGezeichnet = lage;
+    if (rgsReiter === 'punkte' && abPunktId === null) { rundgangListeZeichnen(); }
+  }
 }
+
+// Welche Ortungslage die Liste zuletzt gezeichnet hat (ENT-531).
+let rgsOrtLageGezeichnet = null;
 
 /* Laufzeit seit Rundgangbeginn, PAUSEN ABGEZOGEN.
    Bewusst nicht die Rohzeit: Die beginnt nach ENT-145 erst mit dem ersten
@@ -7705,7 +7743,14 @@ function rgKarteZeichnen() {
       streetViewControl: false, mapTypeControl: false, fullscreenControl: false,
       styles: rgNachtAn() ? RG_NACHT_STIL : [],
     });
-    rgKartePunkteZeichnen(d.zeigbar);
+    // Frisch gelesen, NICHT das d von oben (ENT-531): Zwischen dem Beginn
+    // dieser Funktion und dem Eintreffen der Kartenschluessel liegen
+    // Sekunden, und seit die Erfassung von selbst laeuft, faellt genau in
+    // dieses Fenster der erste Punkt -- die erste Position kommt, waehrend
+    // die Karte noch laedt. Mit dem alten d waere er blau gezeichnet
+    // worden und bliebe es bis zum naechsten Reiterwechsel: ein erfasster
+    // Punkt, der auf der Karte offen aussieht.
+    rgKartePunkteZeichnen(rgKarteDaten(rundgangAktiv ? rundgangAktiv.kontrollpunkte : []).zeigbar);
     rgStandortZeichnen();   // eine bereits bekannte Position sofort wieder zeigen
     rgKarteZentrieren();
     // Den Hinweis erst entfernen, wenn die Karte wirklich steht. Wird er
@@ -7750,6 +7795,23 @@ function rgKartePunkteZeichnen(punkte) {
     marke.addListener('click', () => rgLaufReiter('punkte'));
     rgsKartenMarken.push(marke);
   });
+}
+
+/* Nur die Punkte neu zeichnen, nicht die Karte (ENT-531).
+
+   rgKarteZeichnen() baut eine NEUE google.maps.Map -- Ausschnitt, Zoom und
+   ein gerade angetippter Punkt waeren danach weg, und der Waechter saehe
+   die Karte auf dem Startausschnitt zurueckspringen, waehrend er sie
+   verschoben hat. Fuer eine Farbaenderung ist das viel zu grob.
+
+   Steht noch keine Karte (anderer Reiter, Schluessel fehlt, laedt gerade),
+   passiert nichts: Der naechste Aufbau liest den Zustand ohnehin frisch. */
+function rgKartePunkteNachfuehren() {
+  if (rgsModus !== 'lauf' || !rundgangAktiv || !rgsKarte) { return; }
+  if (rgsReiter !== 'karte' || !$('rgsKarte')) { return; }
+  try {
+    rgKartePunkteZeichnen(rgKarteDaten(rundgangAktiv.kontrollpunkte).zeigbar);
+  } catch (e) {}
 }
 
 /* ══ Laufende Ortung waehrend der Runde (ENT-317) ═════════════════════
@@ -8140,13 +8202,88 @@ function rgSignalNoetig(war, dist, radius) {
   return { signal: false, drin: war };   // im Zwischenband: Zustand behalten
 }
 
+/* ══ Erfassung von selbst beim Betreten des Bereichs (ENT-531) ════════
+   Vom Projektinhaber verlangt: "wenn man zu meinem Kontrollpunkt kommt und
+   innerhalb des Bereiches ist, dass der Kontrollpunkt automatisch erfasst
+   und als erledigt markiert wird und man nicht noch manuell zuerst einen
+   Kontrollpunkt bestaetigen muss. Die Aufgabe ist etwas anderes. Das muss
+   man ja explizit bestaetigen."
+
+   Die WEICHE ist unveraendert dieselbe wie beim Signal (ENT-319) -- der
+   Uebergang draussen -> drinnen, mit Hysterese. Das ist kein Zufall,
+   sondern der Grund, warum hier ueberhaupt erfasst werden kann: Diese
+   Weiche schlaegt pro Eintritt genau EINMAL an. Ohne sie versuchte die App
+   bei jeder Messung erneut zu erfassen, solange jemand am Punkt steht.
+
+   AUSGELOEST WIRD OHNE VERWEILZEIT -- erster Messwert im Radius genuegt.
+   So vom Projektinhaber entschieden (ENT-531), mit Begruendung: Die Punkte
+   liegen ueberwiegend innerhalb eines Areals, durch das man nicht einfach
+   durchfaehrt, und an den meisten haengt ohnehin eine Aufgabe, die der
+   Waechter bestaetigen muss. Das verworfene Gegenstueck waren 10 Sekunden
+   Verweilzeit gegen ein Vorbeifahren.
+
+   Was die Erfassung NICHT ueberschreibt:
+   - Einen bereits erfassten Punkt (die Weiche laesst ihn gar nicht erst zu).
+   - Ein offenes Formular. Wer gerade "nicht verfuegbar" oder einen
+     Ersatzscan schreibt, meint etwas anderes als "bestaetigt"; ihm das
+     Formular unter den Fingern wegzuschreiben waere eine Falschaussage im
+     Nachweis.
+   - Eine pausierte oder abgebrochene Runde. Dort ist auch der Knopf
+     gesperrt, und der Server wiese den Scan ohnehin ab.
+
+   In allen drei Faellen kommt trotzdem das Signal -- nur mit dem anderen
+   Text: "erreicht" statt "erfasst". Angekommen und festgehalten sind zwei
+   verschiedene Aussagen und duerfen nie gleich aussehen. */
+
+// Darf dieser Punkt jetzt von selbst erfasst werden? Reine Funktion, damit
+// sich die Weiche ohne Geraet pruefen laesst -- gleiches Muster wie
+// rgSignalNoetig() und rgSpurNehmen().
+function rdAutoErfassbar(k, status, ortFrisch) {
+  if (!k || k.typ !== 'geofence' || k.erledigt) { return false; }
+  if (k.lat === null || k.lat === undefined) { return false; }
+  if (k.offen) { return false; }                     // offenes Formular gehoert ihm
+  if (status === 'pausiert' || status === 'abgebrochen' || status === 'abgeschlossen') { return false; }
+  return ortFrisch === true;
+}
+
 function rgBereichPruefen() {
   if (!rundgangAktiv || !rgsMeinOrt) { return; }
+  // Eine Position, die 90 Sekunden alt ist, sagt nichts mehr darueber, wo
+  // jemand JETZT steht -- und ein Nachweis darf nicht auf ihr beruhen. Die
+  // Schwelle ist dieselbe, ab der die Oberflaeche "Ortung steht" sagt; zwei
+  // verschiedene Zahlen fuer dieselbe Frage liefen auseinander.
+  const ortFrisch = (Date.now() - (rgsMeinOrt.zeit || 0)) < RG_ORT_STILL_MS;
+  const status = rundgangAktiv.status;
   (rundgangAktiv.kontrollpunkte || []).forEach(k => {
     if (k.typ !== 'geofence' || k.erledigt) { k._drin = false; return; }
-    const e = rgSignalNoetig(k._drin, rdEntfernungZu(k), rdRadiusVon(k));
+    const dist = rdEntfernungZu(k);
+    const e = rgSignalNoetig(k._drin, dist, rdRadiusVon(k));
     k._drin = e.drin;
-    if (e.signal) { rgSignalGeben(w('rgSignalDrin') + ' — ' + k.bezeichnung); }
+    // Fuer die ERFASSUNG zaehlt der echte Radius, nicht das Hystereseband.
+    // rgSignalNoetig laesst bis RG_SIGNAL_ABSTAND Meter ausserhalb noch als
+    // "drin" gelten, damit eine springende Messung keine Signalkette
+    // erzeugt -- diese Grosszuegigkeit darf ein Nachweis nicht erben. Der
+    // Server misst hart gegen geofence_radius_m; ein aus dem Band heraus
+    // erfasster Punkt kaeme dort als Fehler zurueck.
+    const drinEcht = dist !== null && dist <= rdRadiusVon(k);
+    const erfassen = drinEcht && rdAutoErfassbar(k, status, ortFrisch);
+    // Ein Text pro Sachverhalt: "erfasst" nur, wenn wirklich erfasst wird.
+    if (e.signal) {
+      rgSignalGeben((erfassen ? w('rgSignalErfasst') : w('rgSignalDrin')) + ' — ' + k.bezeichnung);
+    }
+    if (!erfassen) { return; }
+    // Die Erfassung haengt NICHT am Signal-Uebergang, sondern am Radius.
+    // Der Unterschied ist kein Feinschliff: Wer im Bereich steht und dort
+    // ein Ersatzscan-Formular oeffnet und wieder schliesst, hat den
+    // Uebergang laengst verbraucht. Haenge die Erfassung daran, bliebe sein
+    // Punkt liegen, bis er den Bereich verlaesst und neu betritt. Ein
+    // zweites Mal erfasst wird trotzdem nichts -- rdScanEintragen setzt
+    // k.erledigt sofort, und die Zeile darueber steigt dann aus.
+    //
+    // Durch dieselbe Tuer wie der Knopf (rdMitOrt): Der Riegel gegen
+    // "ausserhalb des Radius" bleibt genau eine Stelle. Zwei Wege zum selben
+    // Nachweis waeren zwei Stellen, an denen die Pruefung fehlen kann.
+    rdMitOrt(k, Number(k.id), { lat: rgsMeinOrt.lat, lng: rgsMeinOrt.lng }, null);
   });
 }
 
@@ -8483,6 +8620,24 @@ function rdZeile(k, nr, gesperrt) {
     : dist === null ? `<div class="rd-ort mut">${esc(w('rdOrtUnbekannt'))}</div>`
     : drin ? `<div class="rd-ort drin">${esc(w('rdImBereich'))}</div>`
     : `<div class="rd-ort weit">${esc(w('rdEntfernung').replace('{m}', String(Math.round(dist))))}</div>`;
+  /* Der Knopf ist seit ENT-531 der RUECKFALLWEG, nicht der Normalweg.
+
+     Er verschwindet genau dann, wenn die automatische Erfassung diesen Punkt
+     wirklich uebernimmt -- und steht in jedem anderen Fall da: Ortung aus,
+     gesperrt, ohne Signal, seit Minuten stehengeblieben, Punkt ohne
+     Koordinaten, oder ein offenes Formular, dem die Erfassung bewusst nicht
+     ins Handwerk pfuscht. Sonst staende der Waechter nachts vor einem Punkt,
+     den er weder automatisch noch von Hand erfassen kann.
+
+     Und die Zeile sagt in beiden Faellen, WARUM -- ein leerer Platz, wo eben
+     noch ein Knopf war, ist keine Auskunft. */
+  const ortLage = rgOrtLage().art;
+  const autoZustaendig = kannScannen && dist !== null && !k.offen
+    && ortLage === 'laeuft';
+  // 'sucht' heisst: die Ortung laeuft, hat aber noch keine Position. Das
+  // sind die ersten Sekunden jeder Runde -- und es geht von selbst vorbei.
+  const autoHinweis = autoZustaendig ? 'rdAutoWartet'
+    : ortLage === 'sucht' ? 'rdAutoSucht' : 'rdAutoAus';
   return `<div class="rd-zeile">
     <div class="rd-kopf">
       <span class="rd-nr">${nr}</span>
@@ -8493,10 +8648,12 @@ function rdZeile(k, nr, gesperrt) {
     </div>
     ${gesperrt ? '' : ortTxt}
     ${!kannScannen && !gesperrt ? `<div class="rd-hinweis">${esc(w('kpNfcNichtVerfuegbarGeraet'))}</div>` : ''}
+    ${kannScannen && !gesperrt ? `<div class="rd-hinweis" id="rdAuto${k.id}">${
+        esc(w(autoHinweis))}</div>` : ''}
     ${k.fehler ? `<div class="msg-err" style="margin:10px 0 0 37px">${esc(k.fehler)}</div>` : ''}
     ${gesperrt ? '' : `
     <div class="rd-akt">
-      ${kannScannen ? `<button class="btn btn-primary" id="rdBtn${k.id}"${drin === false ? ' disabled' : ''} onclick="rdBestaetigen(${k.id})">${esc(w('kpBestaetigen'))}</button>` : ''}
+      ${kannScannen && !autoZustaendig ? `<button class="btn btn-primary" id="rdBtn${k.id}"${drin === false ? ' disabled' : ''} onclick="rdBestaetigen(${k.id})">${esc(w('kpBestaetigen'))}</button>` : ''}
       <button class="btn btn-plain" onclick="rdEsUm(${k.id})">${esc(w('kpErsatzscan'))}</button>
       <button class="btn btn-plain" onclick="rdNvUm(${k.id})">${esc(w('kpNichtVerfuegbar'))}</button>
     </div>
@@ -8608,11 +8765,24 @@ function rdScanEintragen(k, status, ort, beschreibung, foto) {
     foto: foto || null,
   });
   rundgangListeZeichnen();
+  // Die Karte fuehrt den Punkt sofort nach (ENT-531): Seit die Erfassung von
+  // selbst laeuft, steht der Waechter waehrenddessen meist auf dem
+  // KARTEN-Reiter und nicht in der Liste -- dort war der gruene Kreis bis
+  // hierher erst nach einem Reiterwechsel zu sehen. Der Projektinhaber
+  // ausdruecklich: "dass der Kreis bereits gruen wird".
+  rgKartePunkteNachfuehren();
   rdWarteschlangeSenden();
   // Haengen an diesem Punkt Aufgaben, poppen sie jetzt auf (ENT-305). Der
   // Scan ist zu diesem Zeitpunkt bereits festgehalten -- er darf nicht davon
   // abhaengen, dass jemand die Schublade zu Ende bedient.
-  if (rdAufgabenOffen(k).length) { rdAufgabenOeffnen(k.id); }
+  //
+  // Nur, wenn nicht schon ein Blatt offen steht (ENT-531): Bei zwei
+  // ueberlappenden Bereichen fallen beide Punkte in derselben Messung, und
+  // das zweite Blatt haette das erste ueberschrieben -- dessen Aufgaben
+  // waeren vor den Augen des Waechters verschwunden. Die uebrigen bleiben
+  // als "offene Aufgaben" an ihrer Zeile stehen und lassen sich dort
+  // oeffnen.
+  if (abPunktId === null && rdAufgabenOffen(k).length) { rdAufgabenOeffnen(k.id); }
 }
 
 /* ══ Aufgabe bestaetigen waehrend der Runde (ENT-305) ══════════════════

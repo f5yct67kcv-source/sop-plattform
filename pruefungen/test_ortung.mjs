@@ -163,12 +163,29 @@ check('Die eigene Position ist im Gerät bekannt',
 // ══════════ ENTFERNUNG IN DER LISTE ═══════════════════════════════════
 await page.click('#rgsRt-punkte');
 await page.waitForTimeout(400);
+// SEIT ENT-531: Der nahe Punkt steht hier gar nicht mehr offen -- er ist
+// beim ersten Messwert von selbst erfasst worden. "Du bist im Bereich" ist
+// damit kein Dauerzustand mehr, sondern ein Augenblick. Geprueft wird
+// darum, was bleibt: Der ferne Punkt zeigt seine Entfernung.
+check('KRITISCH: der nahe Punkt ist beim Eintreffen der Position von selbst erfasst',
+  await page.evaluate(() => {
+    const k = rundgangAktiv.kontrollpunkte[0];
+    return !!k.erledigt && k.erledigt.status === 'bestaetigt';
+  }));
+// JETZT festhalten: weiter unten wird letzterScan fuer die Vorpruefung
+// zurueckgesetzt. Ohne mitgeschickte Position kann der Server die Distanz
+// nicht nachrechnen -- dann ist der Nachweis nur noch eine Behauptung des
+// Geraets. Genau darum laeuft die automatische Erfassung durch dieselbe
+// Tuer wie der Knopf (rdMitOrt) und nicht an ihr vorbei.
+const autoScan = letzterScan;
 const zeilen = await page.evaluate(() =>
   [...document.querySelectorAll('.rd-ort')].map(e => ({ txt: e.textContent.trim(), kl: e.className })));
-check('KRITISCH: beim nahen Punkt steht, dass man im Bereich ist',
-  zeilen.length === 2 && /im Bereich/.test(zeilen[0].txt) && /drin/.test(zeilen[0].kl));
 check('KRITISCH: beim fernen Punkt steht die Entfernung in Metern',
-  zeilen.length === 2 && /\d+ m/.test(zeilen[1].txt) && /weit/.test(zeilen[1].kl));
+  zeilen.length === 1 && /\d+ m/.test(zeilen[0].txt) && /weit/.test(zeilen[0].kl));
+// Der ferne Punkt bleibt offen -- eine Erfassung, die auf 890 m anschlaegt,
+// waere kein Nachweis mehr, sondern das Gegenteil davon.
+check('KRITISCH: der ferne Punkt wird NICHT von selbst erfasst',
+  await page.evaluate(() => rundgangAktiv.kontrollpunkte[1].erledigt === null));
 // Rund 890 m -- die Rechnung muss stimmen, nicht nur irgendeine Zahl zeigen.
 check('KRITISCH: die Entfernung ist richtig gerechnet, nicht geschätzt',
   await page.evaluate(() => {
@@ -176,12 +193,37 @@ check('KRITISCH: die Entfernung ist richtig gerechnet, nicht geschätzt',
     return d > 850 && d < 920;
   }));
 
-// ══════════ DER KNOPF SPERRT ══════════════════════════════════════════
-check('KRITISCH: der Bestätigen-Knopf des NAHEN Punktes ist bedienbar',
-  await page.isEnabled('#rdBtn1'));
-check('KRITISCH: der Bestätigen-Knopf des FERNEN Punktes ist gesperrt',
-  await page.isDisabled('#rdBtn2'));
+// ══════════ DER KNOPF IST DER RÜCKFALLWEG (ENT-531) ══════════════════
+// Frueher sperrte der Knopf, solange man zu weit weg war. Seit die
+// Erfassung von selbst laeuft, ist er gar nicht mehr der Normalweg: Solange
+// die Ortung traegt, ist er weg -- und die Zeile sagt, warum.
+check('KRITISCH: solange die Ortung läuft, steht kein Bestätigen-Knopf da',
+  await page.evaluate(() => !document.getElementById('rdBtn2')));
+check('KRITISCH: und die Zeile sagt, dass von selbst erfasst wird — kein leerer Platz',
+  await page.evaluate(() => {
+    const el = document.getElementById('rdAuto2');
+    return !!el && el.textContent.trim().length > 10;
+  }));
 await page.screenshot({ path: `${OUT}/ortung-01-liste.png` });
+
+// Und er kommt zurueck, sobald die Ortung NICHT mehr traegt. Ohne das
+// stuende der Waechter nachts vor einem Punkt, den er weder automatisch
+// noch von Hand erfassen kann.
+await page.evaluate(() => { rgsOrtFehler = 'verweigert'; rundgangListeZeichnen(); });
+await page.waitForTimeout(300);
+check('KRITISCH: ohne Ortung kommt der Bestätigen-Knopf zurück',
+  await page.evaluate(() => !!document.getElementById('rdBtn2')));
+check('KRITISCH: und der ferne Punkt ist dann gesperrt, nicht nur sichtbar',
+  await page.isDisabled('#rdBtn2'));
+// Die beiden Lagen brauchen zwei verschiedene Texte -- "wird selbst
+// erfasst" und "geht gerade nicht" duerfen nie gleich aussehen.
+check('KRITISCH: der Hinweis wechselt mit der Lage, er bleibt nicht stehen',
+  await page.evaluate(() => {
+    const el = document.getElementById('rdAuto2');
+    return !!el && el.textContent.trim() !== w('rdAutoWartet');
+  }));
+await page.evaluate(() => { rgsOrtFehler = null; rundgangListeZeichnen(); });
+await page.waitForTimeout(300);
 
 // ══════════ DIE VORPRÜFUNG GREIFT AUCH BEI DIREKTEM AUFRUF ════════════
 // Der gesperrte Knopf ist die Bequemlichkeit; die Pruefung in
@@ -201,14 +243,16 @@ check('Der Grund steht mit der Entfernung da, nicht nur "geht nicht"',
     return el && /\d+ m/.test(el.textContent) && el.style.display !== 'none';
   }));
 
-// ══════════ DER NAHE PUNKT GEHT DURCH ═════════════════════════════════
-await page.evaluate(() => rdBestaetigen(1));
-await page.waitForTimeout(900);
-check('KRITISCH: der Punkt IM Bereich lässt sich bestätigen',
-  await page.evaluate(() => rundgangAktiv.kontrollpunkte[0].erledigt !== null));
-check('Die Position wird beim Scan mitgeschickt, damit der Server nachprüfen kann',
-  letzterScan !== null && Array.isArray(letzterScan.scans)
-  && letzterScan.scans[0] && letzterScan.scans[0].lat !== null);
+// ══════════ DER NAHE PUNKT IST DURCH — OHNE ZUTUN ════════════════════
+// Er wurde oben bereits von selbst erfasst. Hier geht es um das, was der
+// Server danach braucht: Ohne mitgeschickte Position kann er die Distanz
+// nicht nachrechnen, und dann ist der Nachweis nur noch eine Behauptung des
+// Geraets. Genau deshalb laeuft die automatische Erfassung durch dieselbe
+// Tuer wie der Knopf (rdMitOrt) und nicht an ihr vorbei.
+check('KRITISCH: die automatische Erfassung schickt die Position mit',
+  autoScan !== null && Array.isArray(autoScan.scans)
+  && autoScan.scans.some(x => Number(x.kontrollpunkt_id) === 1
+       && x.lat !== null && x.status === 'bestaetigt'));
 
 // ══════════ ORTUNG ENDET MIT DER RUNDE ════════════════════════════════
 // Vom Projektinhaber ausdruecklich verlangt: "wenn der Rundgang beendet

@@ -113,8 +113,17 @@ check('KRITISCH: ein bereits erledigter Punkt schweigt', !e.ersteRunde.join('|')
 check('Ein NFC-Punkt ohne Koordinaten löst nichts aus', !e.ersteRunde.join('|').includes('NFC'));
 check('KRITISCH: eine zweite Messung am selben Ort löst NICHT erneut aus',
   e.nachZweiter.length === 1);
-check('Der Name des Kontrollpunkts steht im Signal, nicht nur "erreicht"',
-  e.ersteRunde[0].includes('Offen') && e.ersteRunde[0].includes('erreicht'));
+check('Der Name des Kontrollpunkts steht im Signal, nicht nur die Sachlage',
+  e.ersteRunde[0].includes('Offen') && e.ersteRunde[0].includes('—'));
+// Seit ENT-531 erfasst der Eintritt selbst. Das Signal sagt darum nicht mehr
+// "erreicht", sondern was WIRKLICH passiert ist -- hier: erfasst. Geprueft
+// wird die Unterscheidung, nicht die Vokabel: Beide Texte muessen existieren
+// und verschieden sein, sonst saehe "angekommen" wie "festgehalten" aus.
+check('KRITISCH: erreicht und erfasst sind zwei verschiedene Aussagen',
+  await page.evaluate(() => w('rgSignalDrin') !== w('rgSignalErfasst')
+    && !!w('rgSignalDrin') && !!w('rgSignalErfasst')));
+check('KRITISCH: wo erfasst wurde, sagt das Signal das auch',
+  e.ersteRunde[0].includes(await page.evaluate(() => w('rgSignalErfasst'))));
 
 // ══════════ DIE SICHTBARE RÜCKMELDUNG, GEMESSEN ══════════════════════
 await page.evaluate(() => rgSichtSignal('Kontrollpunkt erreicht — Haupteingang'));
