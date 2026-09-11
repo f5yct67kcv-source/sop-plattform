@@ -193,6 +193,20 @@ pruef('Die Person steht als "Nachname, Vorname" da',
 pruef('Die Bemerkung und das Foto eines Ersatzscans gehen nicht verloren',
     $scan !== null && $scan['text'] === 'Chip defekt' && $scan['hat_foto'] === true);
 
+// ══════════════ DIE NUMMER DER QUELLE (ENT-537)
+// Die zusammengesetzte 'id' ("scan-302") haelt zwei Arten mit derselben
+// Nummer auseinander; sie ist eine Kennung fuer die Liste. Wer ein Foto
+// ABRUFEN will, braucht die Nummer der Quelle selbst. Sie aus der Kennung
+// herauszuschneiden hiesse, deren Schreibweise zur Schnittstelle zu machen.
+$ereignis = null;
+foreach ($w['eintraege'] as $e) { if ($e['art'] === 'ereignis') { $ereignis = $e; break; } }
+pruef('KRITISCH: jeder Eintrag traegt die Nummer seiner Quelle, nicht nur die Kennung',
+    $scan !== null && $ereignis !== null
+    && $scan['quelle_id'] === 302 && $scan['id'] === 'scan-302'
+    && $ereignis['quelle_id'] === 501 && $ereignis['id'] === 'ereignis-501');
+pruef('KRITISCH: das Foto einer Ereignismeldung geht nicht verloren',
+    $ereignis !== null && $ereignis['hat_foto'] === true);
+
 // Fehlt die Kundenkopie am Einsatz, gilt die des Objekts -- sonst zeigte die
 // Zeile keinen Kunden, obwohl einer bekannt ist.
 $pdo->exec("INSERT INTO rundgang (id, einsatz_id, mitarbeiter_id, objekt_id, status, rohzeit_start, rohzeit_ende)

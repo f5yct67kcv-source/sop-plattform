@@ -662,6 +662,13 @@ function wachbuch_person(array $z): string
 function wachbuch_rahmen(array $z): array
 {
     return [
+        // Die zusammengesetzte 'id' ("ereignis-7") ist eine Kennung FUER DIE
+        // LISTE -- sie haelt zwei Arten mit derselben Nummer auseinander. Wer
+        // damit etwas ABRUFEN will (heute: das Foto), braucht die Nummer der
+        // Quelle selbst. Sie aus der Kennung herauszuschneiden hiesse, die
+        // Schreibweise der Kennung zur Schnittstelle zu machen: Ein spaeteres
+        // "ereignis_meldung-7" braeche die Oberflaeche still.
+        'quelle_id'      => (int)$z['id'],
         'kunde_id'       => isset($z['kunde_id']) && $z['kunde_id'] !== null ? (int)$z['kunde_id'] : null,
         'kunde_name'     => $z['kunde_name'] ?? null,
         'objekt_id'      => isset($z['objekt_id']) && $z['objekt_id'] !== null ? (int)$z['objekt_id'] : null,

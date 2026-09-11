@@ -52,7 +52,11 @@ const ARTEN = [
 
 let rufe = [];
 let meldenAntwort = null;      // null = Standard "ok"
-let meldenScheitert = false;   // Netzfehler erzwingen
+let meldenScheitert = false;   // Netzfehler erzwingen (gar keine Antwort)
+// Eine ANTWORT mit Fehlerstatus erzwingen -- 403, 401, 413, 503. Bis ENT-534
+// war das fuer die App dasselbe wie ein Funkloch; genau daran ist am
+// 2026-09-11 eine Meldung samt Foto haengengeblieben.
+let meldenStatus = 0;          // 0 = normal antworten
 
 const browser = await chromium.launch({ executablePath: EXE });
 const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
@@ -90,6 +94,10 @@ await page.route('**/api/**', route => {
   if (p.includes('mein_rundgang_vorlagen_alle')) return send({ status: 'ok', vorlagen: VORLAGEN_ALLE });
   if (p.includes('ereignisart_liste')) return send({ status: 'ok', arten: ARTEN });
   if (p.includes('mein_ereignis_melden')) {
+    if (meldenStatus) {
+      return route.fulfill({ status: meldenStatus, contentType: 'application/json',
+        body: JSON.stringify({ status: 'error', message: 'Kein Zugriff auf Ereignismeldungen' }) });
+    }
     if (meldenAntwort) return send(meldenAntwort);
     const m = (body.meldungen || [])[0] || {};
     return send({ status: 'ok', ergebnisse: [{ lokal_id: m.lokal_id, status: 'ok', id: 4711 }] });
@@ -242,6 +250,130 @@ check('KRITISCH: eine inhaltlich abgelehnte Meldung nennt den Grund',
   await page.isVisible('#evErr') && (await page.textContent('#evErr')).includes('nicht (mehr)'));
 check('KRITISCH: sie bleibt NICHT in der Warteschlange liegen -- sonst scheitert sie bei jedem Netzkontakt erneut',
   await page.evaluate(() => JSON.parse(localStorage.getItem('sop_ereignis_warteschlange') || '[]').length === 0));
+meldenAntwort = null;
+
+// ══════════ SERVER-ABLEHNUNG IST KEIN FUNKLOCH (ENT-534) ═════════════
+// Der gemeldete Fall vom 2026-09-11: Eine Meldung mit Foto wurde erfasst,
+// die App sagte "Gespeichert -- wird uebermittelt, sobald wieder Netz da
+// ist", und sie kam nie an. Der Server hatte GEANTWORTET und abgelehnt.
+// Beides denselben Satz sagen zu lassen ist dieselbe Familie wie
+// "unbekannt darf nie wie keine aussehen" (CLAUDE.md).
+await page.evaluate(() => localStorage.removeItem('sop_ereignis_warteschlange'));
+meldenStatus = 403;
+await vorschauOeffnen();
+await page.click('#rgsModEreignis');
+await page.waitForTimeout(350);
+await page.selectOption('#evArt', '3');
+await page.fill('#evText', 'Rauch im Treppenhaus');
+// Der Toast behaelt seinen Text auch unsichtbar. Ohne Leeren praefte die
+// Zeile darunter den Satz des VORIGEN Schrittes und bliebe gruen, egal was
+// dieser hier tut.
+await page.evaluate(() => { document.getElementById('toast').textContent = ''; });
+await page.click('#evSpeichern');
+await page.waitForTimeout(500);
+check('KRITISCH: eine abgelehnte Meldung wird NICHT als "wird uebermittelt" ausgegeben',
+  !(await page.textContent('#toast')).includes('sobald wieder Netz'));
+check('KRITISCH: der Grund des Servers steht sichtbar da',
+  await page.isVisible('#evErr')
+  && (await page.textContent('#evErr')).includes('Kein Zugriff'));
+// Ob das Formular noch steht, entscheidet ueber den naechsten Schritt --
+// gemerkt statt zweimal gefragt, damit die Suite bei Rot ROT MELDET und
+// nicht an einem fehlenden Knopf stirbt.
+const formularSteht = await page.isVisible('#evSpeichern');
+check('KRITISCH: die App bleibt auf dem Formular, statt zur Uebersicht zu springen',
+  formularSteht);
+check('KRITISCH: die Meldung ist trotzdem gesichert -- sie liegt in der Warteschlange',
+  await page.evaluate(() => JSON.parse(localStorage.getItem('sop_ereignis_warteschlange') || '[]').length === 1));
+check('KRITISCH: die Oberflaeche zeigt, dass etwas nicht uebermittelt ist',
+  (await page.evaluate(() => { const e = document.getElementById('evWartend'); return e ? e.textContent : ''; })).includes('nicht übermittelt'));
+
+// Zweimal druecken darf nicht zweimal melden: Derselbe Vorfall zweimal im
+// Wachbuch waere schlimmer als gar keiner.
+if (formularSteht) {
+  await page.click('#evSpeichern');
+  await page.waitForTimeout(400);
+}
+check('KRITISCH: ein zweiter Anlauf legt KEINE zweite Meldung an',
+  formularSteht
+  && await page.evaluate(() => JSON.parse(localStorage.getItem('sop_ereignis_warteschlange') || '[]').length === 1));
+
+// ══════════ NACHSENDEN BEIM APP-START (ENT-534) ══════════════════════
+// Bis dahin haing die Warteschlange allein am Browser-Ereignis "online".
+// Wer die Verbindung nie verliert, dessen erste gescheiterte Meldung wurde
+// NIE wiederholt -- die Scan-Warteschlange derselben App macht es seit
+// ENT-132 richtig.
+meldenStatus = 0;
+rufe = [];
+await page.reload();
+await page.waitForSelector('.app.on');
+await page.waitForTimeout(700);
+check('KRITISCH: beim App-Start wird die Ereignis-Warteschlange nachgesendet',
+  rufe.some(r => r.p.includes('mein_ereignis_melden')));
+check('KRITISCH: danach ist sie leer -- die Meldung ist angekommen',
+  await page.evaluate(() => JSON.parse(localStorage.getItem('sop_ereignis_warteschlange') || '[]').length === 0));
+
+// ══════════ NACHSENDEN BEIM OEFFNEN DER ANSICHT (ENT-534) ════════════
+await page.evaluate(erfasst => localStorage.setItem('sop_ereignis_warteschlange', JSON.stringify([
+  { lokal_id: 'evtest1', objekt_id: 7, ereignisart_id: 3, erfasst_am: erfasst,
+    bemerkung: 'Aus einer frueheren Sitzung liegengeblieben', foto: null },
+])), `${tag(-10)} 22:10:00`);
+rufe = [];
+await vorschauOeffnen();
+await page.click('#rgsModEreignis');
+await page.waitForTimeout(600);
+check('KRITISCH: das Oeffnen der Ereignisansicht sendet Liegengebliebenes nach',
+  rufe.some(r => r.p.includes('mein_ereignis_melden')));
+check('Danach ist die Warteschlange leer und der Hinweis wieder weg',
+  await page.evaluate(() => JSON.parse(localStorage.getItem('sop_ereignis_warteschlange') || '[]').length === 0)
+  && (await page.evaluate(() => { const e = document.getElementById('evWartend'); return e ? e.textContent : ''; })).trim() === '');
+
+// ══════════ EINE ABGELEHNTE VERSCHWINDET NICHT WORTLOS (ENT-534) ═════
+// Bis dahin loeschte evWarteschlangeSenden() jede inhaltlich abgelehnte
+// Meldung beim Nachsenden -- absichtlich, damit sie nicht ewig wiederholt
+// wird, aber ohne dass es je jemand erfuhr. Dieselbe App haelt es bei den
+// Aufgaben-Antworten seit jeher anders herum.
+await page.evaluate(erfasst => localStorage.setItem('sop_ereignis_warteschlange', JSON.stringify([
+  { lokal_id: 'evtest2', objekt_id: 7, ereignisart_id: 99, erfasst_am: erfasst,
+    bemerkung: 'Art zwischenzeitlich entfernt', foto: null },
+])), `${tag(-10)} 22:20:00`);
+meldenAntwort = { status: 'ok', ergebnisse: [{ lokal_id: 'evtest2', status: 'fehler',
+  message: 'Diese Ereignisart gibt es nicht (mehr).' }] };
+rufe = [];
+await vorschauOeffnen();
+await page.click('#rgsModEreignis');
+await page.waitForTimeout(600);
+check('KRITISCH: die abgelehnte Meldung wird nicht stillschweigend geloescht',
+  await page.evaluate(() => JSON.parse(localStorage.getItem('sop_ereignis_warteschlange') || '[]').length === 1));
+check('KRITISCH: ihr Grund steht in der Oberflaeche',
+  (await page.evaluate(() => { const e = document.getElementById('evWartend'); return e ? e.textContent : ''; })).includes('nicht (mehr)'));
+rufe = [];
+await page.evaluate(() => evWarteschlangeSenden());
+await page.waitForTimeout(400);
+check('KRITISCH: sie wird nicht ewig wiederholt -- ein weiterer Versuch sendet sie nicht mit',
+  !rufe.some(r => r.p.includes('mein_ereignis_melden')));
+check('KRITISCH: wegwerfen darf sie nur, wer sie gesehen hat -- es gibt einen Knopf dafuer',
+  await page.evaluate(() => !!document.querySelector('#evWartend button')));
+check('KRITISCH: der Knopf ist am Handy mindestens 44 px hoch (CLAUDE.md), gemessen',
+  await page.evaluate(() => {
+    const b = document.querySelector('#evWartend button');
+    return !!b && b.getBoundingClientRect().height >= 44;
+  }));
+check('KRITISCH: der Hinweis bleibt im Bildschirm, statt seitlich hinauszuragen',
+  await page.evaluate(() => {
+    const el = document.getElementById('evWartend');
+    const r = el.getBoundingClientRect();
+    return r.width > 0 && r.left >= -1 && r.right <= window.innerWidth + 1;
+  }));
+// Nur klicken, wenn der Knopf da ist -- sonst stirbt die Suite an einem
+// null.click(), statt die Zeile darueber rot zu melden.
+await page.evaluate(() => {
+  const b = document.querySelector('#evWartend button');
+  if (b) { b.click(); }
+});
+await page.waitForTimeout(250);
+check('Nach dem Verwerfen ist sie weg und der Hinweis auch',
+  await page.evaluate(() => JSON.parse(localStorage.getItem('sop_ereignis_warteschlange') || '[]').length === 0)
+  && (await page.evaluate(() => { const e = document.getElementById('evWartend'); return e ? e.textContent : ''; })).trim() === '');
 meldenAntwort = null;
 
 // ══════════ LEERER KATALOG ═══════════════════════════════════════════

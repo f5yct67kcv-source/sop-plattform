@@ -2440,6 +2440,18 @@ const W = {
     evSpeichern: 'Ereignis melden',
     evGemeldet: 'Ereignis gemeldet.',
     evWartet: 'Gespeichert — wird übermittelt, sobald wieder Netz da ist.',
+    // Ein Server, der ANTWORTET und ablehnt, ist etwas anderes als ein
+    // Funkloch (ENT-534). Beides denselben Satz sagen zu lassen war die
+    // gefährlichste Art, sich zu irren: Die Meldung war gespeichert — das
+    // stimmte — und wartete angeblich auf Netz. Sie wartete aber nicht auf
+    // Netz, und niemand sah je nach.
+    evAbgelehnt: 'Der Server hat die Meldung nicht angenommen. Sie bleibt gespeichert und wird beim nächsten Versuch erneut gesendet.',
+    evWartend1: '1 Meldung ist noch nicht übermittelt.',
+    evWartendN: '{n} Meldungen sind noch nicht übermittelt.',
+    evWartendHinweis: 'Sie liegen im Gerät und werden automatisch erneut gesendet.',
+    evAbgelehntListe: 'Nicht angenommen:',
+    evVerwerfen: 'Verwerfen',
+    evVerworfen: 'Meldung verworfen.',
 
     // Monatstabelle am Schreibtisch. Die drei Zustandstexte sind bewusst
     // verschieden: "wird geladen", "ging schief" und "frei" sind drei
@@ -2707,6 +2719,12 @@ function starten() {
   // Meldung noch Eintraege in localStorage, wird jetzt ein Sendeversuch
   // unternommen (ENT-132 Punkt 5).
   rdWarteschlangeSenden();
+  // Dasselbe fuer die Ereignismeldungen (ENT-534). Sie hingen bis dahin
+  // allein am Browser-Ereignis "online" -- wer die Verbindung nie verliert,
+  // dessen erste gescheiterte Meldung wurde NIE wiederholt. Genau daran ist
+  // am 2026-09-11 eine Meldung samt Foto haengengeblieben, ohne dass es
+  // jemandem auffiel.
+  evWarteschlangeSenden();
   // Den Service Worker registrieren (ENT-424). Er traegt die
   // Benachrichtigungen und macht die App auf Android installierbar.
   // Bewusst OHNE Erlaubnisfrage: Die kommt erst, wenn jemand den Schalter
@@ -5505,6 +5523,12 @@ function rgsLaufendUebernehmen(lf) {
 const EV_WARTESCHLANGE = 'sop_ereignis_warteschlange';
 let evArten = [];
 let evFoto = null;      // komprimiertes Foto (data: URL), bis gemeldet wird
+/* Die Kennung des laufenden Meldeversuchs (ENT-534). Lehnt der Server ab und
+   die Person drueckt nochmals, gehoert der zweite Anlauf zu DERSELBEN
+   Meldung -- mit einer neuen Kennung laege derselbe Vorfall zweimal in der
+   Warteschlange und spaeter zweimal im Wachbuch. Zurueckgesetzt wird sie
+   beim Zeichnen eines neuen Formulars und nach dem Erfolg. */
+let evLetzteKennung = null;
 let evObjekt = null;    // { id, name } des Objekts, zu dem gemeldet wird
 
 function evWarteschlangeLesen() {
@@ -5514,20 +5538,89 @@ function evWarteschlangeSchreiben(liste) {
   try { localStorage.setItem(EV_WARTESCHLANGE, JSON.stringify(liste)); } catch {}
 }
 
-// Sendet alle wartenden Meldungen. Der Endpunkt nimmt mehrere auf einmal --
-// wie bei den Kontrollpunkt-Scans. Eine inhaltlich abgelehnte Meldung (z.B.
-// zwischenzeitlich entfernte Ereignisart) wird NICHT ewig wiederholt: Sie
-// verschwindet aus der Warteschlange, sonst blockiert sie alle spaeteren.
+/* Sendet alle wartenden Meldungen. Der Endpunkt nimmt mehrere auf einmal --
+   wie bei den Kontrollpunkt-Scans.
+
+   Eine inhaltlich abgelehnte Meldung (z.B. zwischenzeitlich entfernte
+   Ereignisart) wird NICHT ewig wiederholt -- sonst blockiert sie alle
+   spaeteren. Bis ENT-534 verschwand sie dafuer WORTLOS aus der
+   Warteschlange: Wer gemeldet hatte, erfuhr nie, dass seine Meldung
+   verworfen wurde. Jetzt bleibt sie mit ihrem Grund liegen, wird nicht
+   mehr mitgesendet und steht in der Ereignisansicht. Wegwerfen darf sie
+   nur, wer sie gesehen hat.
+
+   Der Grundsatz dahinter ist derselbe wie bei den Aufgaben-Antworten in
+   rdWarteschlangeSenden(): "Eine abgelehnte bleibt stehen und wird erneut
+   versucht, statt lautlos zu verschwinden." Hier fehlte er. */
 function evWarteschlangeSenden() {
-  const liste = evWarteschlangeLesen();
+  const liste = evWarteschlangeLesen().filter(m => !m.abgelehnt_grund);
   if (!liste.length) return Promise.resolve();
   return api('mein_ereignis_melden.php', { method: 'POST', body: { meldungen: liste } })
     .then(({ ok, data }) => {
       if (!ok || data.status !== 'ok') return;   // bleibt liegen, naechster Versuch
-      const erledigt = new Set((data.ergebnisse || []).map(e => String(e.lokal_id)));
-      evWarteschlangeSchreiben(evWarteschlangeLesen().filter(m => !erledigt.has(String(m.lokal_id))));
+      const erg = {};
+      (data.ergebnisse || []).forEach(e => { erg[String(e.lokal_id)] = e; });
+      // Neu gelesen statt die Liste von oben zu nehmen: Zwischen Abschicken
+      // und Antwort kann eine weitere Meldung dazugekommen sein, und die
+      // darf nicht verschwinden, ohne je gesendet worden zu sein.
+      evWarteschlangeSchreiben(evWarteschlangeLesen().reduce((behalten, m) => {
+        const r = erg[String(m.lokal_id)];
+        if (!r) { behalten.push(m); return behalten; }   // gar nicht beantwortet
+        if (r.status === 'ok') { return behalten; }      // angekommen
+        behalten.push(Object.assign({}, m, {
+          abgelehnt_grund: r.message || '—', abgelehnt_am: jetztDatetime() }));
+        return behalten;
+      }, []));
+      evWartendZeichnen();
     })
     .catch(() => {});
+}
+
+/* Was noch im Geraet liegt -- in DREI verschiedenen Lagen, mit drei
+   verschiedenen Texten: nichts wartet, etwas wartet auf Uebermittlung,
+   etwas wurde nicht angenommen. Bis ENT-534 war keine davon zu sehen.
+
+   Gegenstueck zu rdWarteschlangeUeberlagern() bei den Kontrollpunkten: Was
+   im Geraet liegt, gehoert in die Anzeige -- sonst sieht "noch nicht
+   uebermittelt" aus wie "nie gemeldet". */
+function evWartendZeichnen() {
+  const ziel = $('evWartend');
+  if (!ziel) { return; }
+  const alle = evWarteschlangeLesen();
+  const wartend = alle.filter(m => !m.abgelehnt_grund);
+  const abgelehnt = alle.filter(m => m.abgelehnt_grund);
+  if (!wartend.length && !abgelehnt.length) { ziel.innerHTML = ''; return; }
+  let html = '';
+  if (wartend.length) {
+    html += '<div class="rgs-warn">'
+      + esc(wartend.length === 1 ? w('evWartend1') : w('evWartendN').replace('{n}', wartend.length))
+      + ' ' + esc(w('evWartendHinweis')) + '</div>';
+  }
+  if (abgelehnt.length) {
+    html += '<div class="rgs-warn"><b>' + esc(w('evAbgelehntListe')) + '</b>'
+      + abgelehnt.map(m => '<div style="margin-top:8px">'
+        + esc(String(m.erfasst_am || '').slice(0, 16).replace('T', ' ')) + ' — '
+        + esc(m.abgelehnt_grund)
+        + ' <button type="button" class="btn btn-plain" style="min-height:44px;margin-top:6px"'
+        + ' data-verwerfen="' + esc(String(m.lokal_id)) + '">'
+        + esc(w('evVerwerfen')) + '</button></div>').join('')
+      + '</div>';
+  }
+  ziel.innerHTML = html;
+  // Der Griff wird ANGEHAENGT, nicht als onclick-Text eingesetzt: Die Kennung
+  // stuende sonst mitten in einem Attribut, und ein Anfuehrungszeichen darin
+  // zerrisse es. Beim Gegenprobieren aufgefallen -- der Knopf war da und warf
+  // beim Antippen "Unexpected end of input".
+  ziel.querySelectorAll('button[data-verwerfen]').forEach(b =>
+    b.addEventListener('click', () => evVerwerfen(b.dataset.verwerfen)));
+}
+
+// Wegwerfen darf nur, wer den Grund gesehen hat -- darum ein eigener Knopf
+// und kein stilles Aufraeumen beim naechsten Senden.
+function evVerwerfen(lokalId) {
+  evWarteschlangeSchreiben(evWarteschlangeLesen().filter(m => String(m.lokal_id) !== String(lokalId)));
+  evWartendZeichnen();
+  toast(w('evVerworfen'));
 }
 
 /* ── Aufgaben je Kontrollpunkt (ENT-304) ──────────────────────────────
@@ -5597,11 +5690,20 @@ function evOeffnen() {
     evArten = (ok && data.status === 'ok') ? (data.arten || []) : [];
     evFormularZeichnen();
   });
+  // Dritter Anlass zum Nachsenden (ENT-534), neben App-Start und "online":
+  // Wer die Ansicht oeffnet, will melden -- der beste Zeitpunkt, um zuerst
+  // loszuwerden, was noch liegt. evWartendZeichnen() laeuft danach, damit
+  // das Ergebnis sofort sichtbar ist.
+  evWarteschlangeSenden().then(() => { if (rgsAnsicht === 'ereignis') { evWartendZeichnen(); } });
 }
 
 function evFormularZeichnen() {
   const jetzt = jetztDatetime();
+  // Ein neu gezeichnetes Formular ist ein neuer Vorgang: Die Kennung des
+  // letzten Anlaufs gilt nicht mehr weiter.
+  evLetzteKennung = null;
   $('rgsBody').innerHTML = `
+    <div id="evWartend"></div>
     <div class="f">
       <label for="evArt">${esc(w('evArt'))}</label>
       ${evArten.length ? `<select class="inp" id="evArt">
@@ -5651,6 +5753,7 @@ function evFormularZeichnen() {
     </div>
 
     <div id="evErr" class="msg-err" style="display:none"></div>`;
+  evWartendZeichnen();
   $('rgsFuss').innerHTML =
     `<button class="btn btn-primary btn-wide" id="evSpeichern" onclick="evSenden()">${esc(w('evSpeichern'))}</button>`;
 }
@@ -5709,8 +5812,11 @@ function evSenden() {
   });
 
   standort.then(ort => {
+    if (!evLetzteKennung) {
+      evLetzteKennung = 'ev' + Date.now() + Math.random().toString(36).slice(2, 7);
+    }
     const meldung = {
-      lokal_id: 'ev' + Date.now() + Math.random().toString(36).slice(2, 7),
+      lokal_id: evLetzteKennung,
       objekt_id: evObjekt ? Number(evObjekt.id) : 0,
       rundgang_id: (rundgangAktiv && rundgangAktiv.id) || null,
       einsatz_id: (rundgangAktiv && rundgangAktiv.einsatz_id) || null,
@@ -5725,12 +5831,15 @@ function evSenden() {
     // Erst lokal festhalten, dann senden -- der Erfassungszeitpunkt zaehlt,
     // nicht die Uebermittlung (ENT-132). Bricht das Netz weg, steht die
     // Meldung trotzdem und geht beim naechsten Netzkontakt raus.
-    const liste = evWarteschlangeLesen();
+    // Ersetzen statt anhaengen: Beim zweiten Anlauf derselben Meldung traegt
+    // sie dieselbe Kennung (ENT-534), und zwei Eintraege desselben Vorfalls
+    // waeren spaeter zwei Zeilen im Wachbuch.
+    const liste = evWarteschlangeLesen().filter(m => String(m.lokal_id) !== String(meldung.lokal_id));
     liste.push(meldung);
     evWarteschlangeSchreiben(liste);
 
     return api('mein_ereignis_melden.php', { method: 'POST', body: { meldungen: [meldung] } })
-      .then(({ ok, data }) => {
+      .then(({ ok, status, data }) => {
         if (btn) btn.disabled = false;
         const erg = ok && data.status === 'ok' ? (data.ergebnisse || [])[0] : null;
         if (erg && erg.status === 'fehler') {
@@ -5743,13 +5852,37 @@ function evSenden() {
         }
         if (erg && erg.status === 'ok') {
           evWarteschlangeSchreiben(evWarteschlangeLesen().filter(m => m.lokal_id !== meldung.lokal_id));
+          evLetzteKennung = null;
           toast(w('evGemeldet'));
-        } else {
-          toast(w('evWartet'));   // bleibt in der Warteschlange
+          rgSeiteZurueckZurUebersicht();
+          return;
         }
-        rgSeiteZurueckZurUebersicht();
+        if (status === 0) {
+          // WIRKLICH kein Netz: Die Anfrage ist nie bei einem Server
+          // angekommen (api() gibt dafuer status 0). Die Meldung liegt in
+          // der Warteschlange und geht beim naechsten Start, beim naechsten
+          // Oeffnen dieser Ansicht oder beim naechsten Netzkontakt raus.
+          toast(w('evWartet'));
+          rgSeiteZurueckZurUebersicht();
+          return;
+        }
+        // Der Server hat GEANTWORTET und abgelehnt -- 401 bei abgelaufener
+        // Sitzung, 403 ohne Revierdienst-Berechtigung, 413 bei zu grosser
+        // Anfrage, 503 ohne eingerichtete Tabelle. Bis ENT-534 stand hier
+        // derselbe Satz wie beim Funkloch; die Meldung galt als gespeichert
+        // und wartete angeblich auf Netz. Sie wartete nicht auf Netz.
+        //
+        // Auf der Seite bleiben statt zurueckzuspringen: Die Meldung ist
+        // gesichert, aber sie ist NICHT gemeldet, und wer das nicht sieht,
+        // geht davon aus, es waere erledigt.
+        err.textContent = (data && data.message) ? data.message : w('evAbgelehnt');
+        err.style.display = '';
+        evWartendZeichnen();
       })
       .catch(() => {
+        // Erreichbar nur, wenn schon das Schreiben in localStorage scheitert
+        // -- api() faengt den Netzfall selbst ab. Die Meldung liegt dann
+        // trotzdem in der Warteschlange.
         if (btn) btn.disabled = false;
         toast(w('evWartet'));
         rgSeiteZurueckZurUebersicht();
