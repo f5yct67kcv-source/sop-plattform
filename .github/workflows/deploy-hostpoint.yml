@@ -396,6 +396,11 @@ jobs:
           # eingebunden, nie direkt aufgerufen -- steht darum auch in
           # der Sperrliste der .htaccess.
           cp backend/betreiber.php dist/betreiber.php
+          # Support-Freigabe (ENT-526). Wird von BEIDEN Seiten eingebunden --
+          # von den support_*-Endpunkten des Betriebs und von
+          # api/betreiber_support.php -- und nie direkt aufgerufen; steht
+          # darum auch in der Sperrliste der .htaccess.
+          cp backend/support.php dist/support.php
           # Pruefung und Mailtext der Demo-Anfrage (ENT-469), eingebunden
           # von api/demo_senden.php -- steht darum auch in der Sperrliste.
           # Der ENDPUNKT heisst bewusst anders: gleicher Name hiesse mitgesperrt.

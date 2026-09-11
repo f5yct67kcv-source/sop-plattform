@@ -7510,6 +7510,18 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
               <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><path d="M3 13l2-5.5A2 2 0 0 1 6.9 6h10.2a2 2 0 0 1 1.9 1.5L21 13"/><path d="M3 13h18v4a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1v-1H6v1a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><circle cx="7" cy="15" r="1"/><circle cx="17" cy="15" r="1"/></svg></span>
               <span class="bk-kachel-lbl">Dienstfahrzeuge</span>
             </button>
+            <!-- Support-Freigabe (ENT-526). Steht hier und nicht bei den
+                 Kundenzugaengen: Es geht nicht um einen Kunden dieses
+                 Betriebs, sondern um den Betreiber der Plattform. Die Kachel
+                 erscheint nur mit dem Recht "Rollen & Berechtigungen" --
+                 wer sie bedient, oeffnet einem Betriebsfremden Einblick,
+                 und das ist dieselbe Art Entscheidung wie eine Rollenvergabe
+                 (siehe bkKachelSfSetzen). -->
+            <button type="button" class="bk-kachel" id="bkKachelSf" style="display:none"
+                    onclick="bkAbschnittZeigen('sf'); sfLaden();">
+              <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg></span>
+              <span class="bk-kachel-lbl">Support-Freigabe</span>
+            </button>
           </div>
 
           <div class="card">
@@ -7592,6 +7604,37 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
             <div style="display:flex;gap:8px;margin-top:16px">
               <button type="button" class="btn btn-primary" onclick="bkSpeichern()">Briefkopf speichern</button>
             </div>
+          </div>
+        </div>
+        </div>
+        </div>
+
+        <!-- Support-Freigabe (ENT-526). Der Plattform-Betreiber kann nur
+             hineinsehen, wenn dieser Betrieb es befristet erlaubt -- und
+             sieht dann ausschliesslich Diagnosedaten ohne Personenbezug.
+             Die Freigabe liegt bewusst in der Datenbank DIESES Betriebs:
+             laege sie beim Betreiber, koennte er sie sich selbst
+             ausstellen. Jeder Abruf steht im Protokoll unten. -->
+        <div class="bk-abschnitt" id="bkAb-sf" style="display:none">
+        <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="bkUebersichtZeigen()">Zurück</button>
+        <div class="grid">
+        <div class="card" id="sfKarte">
+          <div class="card-hd">
+            <span class="card-ic"><svg class="i" viewBox="0 0 24 24"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg></span>
+            <h3>Support-Freigabe</h3>
+          </div>
+          <div class="card-bd">
+            <div class="msg-err" id="sfErr" style="display:none"></div>
+            <div id="sfInhalt"><div style="color:var(--ink-3)">Wird geladen …</div></div>
+          </div>
+        </div>
+        <div class="card" id="sfProtokollKarte">
+          <div class="card-hd">
+            <span class="card-ic gedaempft"><svg class="i" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
+            <h3>Protokoll</h3>
+          </div>
+          <div class="card-bd">
+            <div id="sfProtokoll"><div style="color:var(--ink-3)">Wird geladen …</div></div>
           </div>
         </div>
         </div>
@@ -21698,6 +21741,140 @@ function ibanIstQrJs(iban) {
 function bkUebersichtZeigen() {
   $('bkUebersicht').style.display = '';
   document.querySelectorAll('#view-betrieb .bk-abschnitt').forEach(a => { a.style.display = 'none'; });
+  bkKachelSfSetzen();
+}
+
+/* ── Support-Freigabe (ENT-526) ──────────────────────────────────────
+ *
+ * Die Kachel erscheint nur mit dem Recht "Rollen & Berechtigungen".
+ * Begruendung wie beim Endpunkt: Eine Support-Freigabe pflegt keine Liste,
+ * sie bestimmt, dass ein Betriebsfremder Einblick bekommt -- also dieselbe
+ * Art Entscheidung wie eine Rollenvergabe.
+ *
+ * Das Ausblenden erspart nur den Umweg. Die Sperre sitzt im Server
+ * (require_recht_nach_methode auf 'rechte'): Was im Browser steht, ist
+ * Bequemlichkeit, keine Sicherung.
+ */
+function bkKachelSfSetzen() {
+  const k = $('bkKachelSf');
+  if (k) { k.style.display = darf('rechte_lesen') ? '' : 'none'; }
+}
+
+const SF_LAGE = {
+  offen:              ['gruen', 'Freigabe offen'],
+  nie_freigegeben:    ['grau',  'Noch nie freigegeben'],
+  abgelaufen:         ['grau',  'Letzte Freigabe abgelaufen'],
+  widerrufen:         ['grau',  'Letzte Freigabe widerrufen'],
+  nicht_eingerichtet: ['gelb',  'Noch nicht eingerichtet'],
+};
+
+function sfLaden() {
+  $('sfErr').style.display = 'none';
+  api('support_freigabe.php').then(({ ok, data }) => {
+    if (!ok || !data || data.status !== 'ok') {
+      $('sfInhalt').innerHTML = '<div style="color:var(--ink-3)">Nicht abrufbar.</div>';
+      return;
+    }
+    sfZeichnen(data);
+  }).catch(() => { $('sfInhalt').innerHTML = '<div style="color:var(--ink-3)">Nicht abrufbar.</div>'; });
+  sfProtokollLaden();
+}
+
+function sfZeichnen(d) {
+  const offen = d.lage === 'offen' && d.freigabe;
+  const [, wort] = SF_LAGE[d.lage] || ['grau', d.lage];
+
+  if (d.lage === 'nicht_eingerichtet') {
+    /* Nicht eingerichtet ist etwas anderes als "keine Freigabe" -- die
+       Handlung ist eine andere (einmal die Einrichtung ausfuehren). */
+    $('sfInhalt').innerHTML = '<p class="zone-note">' + esc(d.message || wort) + '</p>';
+    return;
+  }
+
+  $('sfInhalt').innerHTML =
+      '<p class="zone-note" style="margin-top:0">' + esc(d.umfang || '') + '</p>'
+    + '<div style="margin:18px 0 14px"><strong>' + esc(wort) + '</strong>'
+    + (offen
+        ? '<div style="color:var(--ink-3);font-size:13px;margin-top:4px">Erteilt von '
+          + esc(d.freigabe.freigegeben_von) + ' · gilt bis '
+          + esc(String(d.freigabe.gilt_bis).slice(0, 16))
+          + (d.freigabe.zweck ? ' · ' + esc(d.freigabe.zweck) : '') + '</div>'
+        : '')
+    + '</div>'
+    + (offen
+        ? '<button type="button" class="btn btn-sm" onclick="sfWiderrufen()">Freigabe zurückziehen</button>'
+        : '<div class="feldreihe" style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">'
+          + '<label style="flex:1 1 220px">Wofür?'
+          + '<input id="sfZweck" type="text" maxlength="200" placeholder="z. B. Rundgänge werden nicht angezeigt"></label>'
+          + '<label style="width:120px">Für wie lange?'
+          + '<select id="sfStunden">'
+          + '<option value="4">4 Stunden</option>'
+          + '<option value="24" selected>24 Stunden</option>'
+          + '<option value="72">3 Tage</option>'
+          + '<option value="168">7 Tage</option>'
+          + '</select></label>'
+          + '<button type="button" class="btn btn-sm btn-primary" onclick="sfFreigeben()">Freigeben</button>'
+          + '</div>');
+}
+
+function sfFreigeben() {
+  const zweck = ($('sfZweck') && $('sfZweck').value || '').trim();
+  if (!zweck) { toast('Bitte kurz angeben, wofür die Freigabe gilt.'); return; }
+  const stunden = Number(($('sfStunden') && $('sfStunden').value) || 24);
+  api('support_freigabe.php', { method: 'POST', body: { zweck, stunden } })
+    .then(({ ok, data }) => {
+      if (!ok || !data || data.status !== 'ok') {
+        toast((data && data.message) || 'Die Freigabe konnte nicht erteilt werden.'); return;
+      }
+      toast('Freigabe erteilt.');
+      sfLaden();
+    }).catch(() => toast('Die Freigabe konnte nicht erteilt werden.'));
+}
+
+function sfWiderrufen() {
+  api('support_freigabe.php', { method: 'POST', body: { widerrufen: true } })
+    .then(({ ok, data }) => {
+      if (!ok || !data || data.status !== 'ok') { toast('Nicht möglich.'); return; }
+      toast('Freigabe zurückgezogen.');
+      sfLaden();
+    }).catch(() => toast('Nicht möglich.'));
+}
+
+function sfProtokollLaden() {
+  api('support_protokoll.php').then(({ ok, data }) => {
+    const el = $('sfProtokoll');
+    if (!ok || !data || data.status !== 'ok') {
+      el.innerHTML = '<div style="color:var(--ink-3)">Nicht abrufbar.</div>'; return;
+    }
+    const freigaben = data.freigaben || [];
+    if (!freigaben.length) {
+      /* Vier verschiedene Aussagen brauchen vier Texte: nicht eingerichtet,
+         nie freigegeben, freigegeben aber nie genutzt, und genutzt. */
+      el.innerHTML = '<div style="color:var(--ink-3)">'
+        + (data.lage === 'nicht_eingerichtet'
+            ? 'Noch nicht eingerichtet.'
+            : 'Es wurde noch nie eine Freigabe erteilt.') + '</div>';
+      return;
+    }
+    el.innerHTML = freigaben.map(f => {
+      const zugriffe = (data.zugriffe || []).filter(z => Number(z.freigabe_id ?? -1) === Number(f.id));
+      return '<div style="padding:12px 0;border-bottom:1px solid var(--line-soft)">'
+        + '<div><strong>' + esc(String(f.freigegeben_am).slice(0, 16)) + '</strong> · '
+        + esc(f.freigegeben_von)
+        + (f.widerrufen_am ? ' · <span style="color:var(--ink-3)">zurückgezogen</span>' : '')
+        + '</div>'
+        + (f.zweck ? '<div style="color:var(--ink-3);font-size:13px">' + esc(f.zweck) + '</div>' : '')
+        + '<div style="font-size:13px;margin-top:4px">'
+        + (Number(f.zugriffe) === 0
+            ? '<span style="color:var(--ink-3)">freigegeben, aber nie eingesehen</span>'
+            : esc(String(f.zugriffe)) + ' Zugriff' + (Number(f.zugriffe) === 1 ? '' : 'e'))
+        + '</div>'
+        + zugriffe.map(z => '<div style="font-size:12.5px;color:var(--ink-3);margin-top:2px">'
+            + esc(String(z.zeitpunkt).slice(0, 16)) + ' · ' + esc(z.wer) + ' · ' + esc(z.was)
+            + '</div>').join('')
+        + '</div>';
+    }).join('');
+  }).catch(() => { $('sfProtokoll').innerHTML = '<div style="color:var(--ink-3)">Nicht abrufbar.</div>'; });
 }
 function bkAbschnittZeigen(id) {
   $('bkUebersicht').style.display = 'none';

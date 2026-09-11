@@ -58,6 +58,15 @@
 #      Auf Production greift die neue Zeile mit dem naechsten Deploy von
 #      selbst.
 #
+#  (e) support.php in die FilesMatch-Sperre aufgenommen (ENT-526,
+#      2026-09-11). Das Modul der Support-Freigabe wird von beiden Seiten
+#      eingebunden und nie direkt aufgerufen -- dieselbe Begruendung wie bei
+#      kundenportal.php und betreiber.php. Auch dieser Hash ist dem
+#      manuellen Nachtrag vorausgeeilt, aus demselben Grund wie (a), (c) und
+#      (d). STEHT AUS. Die Datei enthaelt ausschliesslich
+#      Funktionsdefinitionen und gibt bei direktem Aufruf nichts aus;
+#      Staging liegt zusaetzlich hinter der Basic-Auth-Schicht (ENT-384).
+#
 # Was das heisst: Fuer diese Aenderungen haelt der Drift-Guard den
 # Staging-Deploy NICHT an. Production ist nicht betroffen -- dort laedt der
 # Deploy die .htaccess selbst hoch. In Staging schuetzt bis zum Nachtrag die
@@ -68,6 +77,6 @@
 # von #@__HCP_END__@#). Danach diesen Absatz loeschen -- er ist der einzige
 # Hinweis darauf, dass der Hash dem Nachtrag vorausgeeilt ist.
 
-htaccess-hostpoint:0e27a3633b001370554419ab98683cc563f3d3a28693083d8b9b33ecd6a98cc9
+htaccess-hostpoint:492801e8f356a8e19d1afba741d9e9630c5fbeee99f964b9712e2a3d5fc40665
 htaccess-staging-zusatz:7b6df04b9fd9decbeb68442a6080b3e39c384e31d59273e53f938549c8e26208
 robots-staging.txt:e120f27381f482e2de05b11355c7d1818e8266d282cec8cf04bc8b33916e7583

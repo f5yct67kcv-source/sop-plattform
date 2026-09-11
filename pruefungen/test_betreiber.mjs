@@ -330,12 +330,85 @@ const MANDANT_VERBINDER = /mandant_db\s*\(|mandant_stand\s*\(/;
 const nutztMandantDb = endpunkte.filter(f => MANDANT_VERBINDER.test(nurCode(lies(`backend/api/${f}`))));
 check('es gibt ueberhaupt einen Endpunkt, der die Mandantenlage prueft',
   nutztMandantDb.length > 0);
-// Erlaubt sind nur Endpunkte, die den STAND melden -- namentlich.
-const STAND_ENDPUNKTE = ['betreiber_mandant_stand.php'];
-const heimlich = nutztMandantDb.filter(f => !STAND_ENDPUNKTE.includes(f));
-check('KRITISCH: nur der Stand-Endpunkt verbindet zu einer Mandantendatenbank',
+// Erlaubt sind genau zwei Endpunkte, namentlich -- und der zweite muss
+// zusaetzlich die drei Bedingungen des Supportzugriffs erfuellen, die
+// weiter unten einzeln geprueft werden. Die Liste ist damit nicht
+// laenger geworden, sondern strenger: Wer verbinden darf, muss Freigabe
+// UND Protokoll nachweisen.
+const DARF_VERBINDEN = {
+  'betreiber_mandant_stand.php': 'zaehlt Tabellen, liest nichts',
+  'betreiber_support.php':       'nur auf Freigabe, befristet, protokolliert (ENT-526)',
+};
+const heimlich = nutztMandantDb.filter(f => !DARF_VERBINDEN[f]);
+check('KRITISCH: nur namentlich genannte Endpunkte verbinden zu einer Mandantendatenbank',
   heimlich.length === 0);
 if (heimlich.length) { bad.push('verbindet zum Mandanten: ' + heimlich.join(', ')); }
+// Kehrseite: Verschwindet einer, gehoert er aus der Liste -- sonst deckt
+// ein veralteter Eintrag den naechsten Endpunkt gleichen Namens zu.
+const toteErlaubnis = Object.keys(DARF_VERBINDEN).filter(f => !endpunkte.includes(f));
+check('kein toter Eintrag in der Verbindungs-Erlaubnisliste', toteErlaubnis.length === 0);
+
+// ── Die drei Bedingungen des Supportzugriffs (ENT-526) ───────────────
+//
+// Der Zugriff auf einen fremden Betrieb ist die heikelste Stelle der ganzen
+// Anlage. Er haengt an drei Bedingungen, und keine davon darf still
+// wegfallen -- darum steht jede hier einzeln.
+const sup = nurCode(lies('backend/api/betreiber_support.php'));
+
+// 1. Ohne gueltige Freigabe wird abgebrochen.
+check('KRITISCH: ohne gueltige Freigabe bricht der Supportzugriff ab',
+  /support_freigabe_gueltig\([\s\S]{0,200}=== null[\s\S]{0,400}403/.test(sup));
+// Und die Freigabe wird in der Datenbank des MANDANTEN gelesen, nicht im
+// Stamm des Betreibers -- laege sie dort, koennte er sie sich selbst
+// ausstellen.
+check('KRITISCH: die Freigabe wird beim Mandanten gelesen, nicht beim Betreiber',
+  sup.indexOf('mandant_db(') < sup.indexOf('support_freigabe_gueltig('));
+
+// 2. Protokolliert wird VOR der Auslieferung. Ein Abbruch mitten im
+//    Ausliefern darf keine Luecke hinterlassen.
+check('KRITISCH: der Zugriff wird protokolliert',
+  sup.includes('support_zugriff_merken('));
+check('KRITISCH: das Protokoll entsteht vor der Auslieferung',
+  sup.indexOf('support_zugriff_merken(') < sup.lastIndexOf('json_response('));
+
+// 3. Der Umfang bleibt ohne Personenbezug. Geprueft wird die Aussage:
+//    keine Abfrage, die Zeilen aus einer Kerntabelle holt -- COUNT(*) ist
+//    etwas anderes als SELECT name.
+check('KRITISCH: es werden keine Zeilen aus Kerntabellen gelesen, nur gezaehlt',
+  !/SELECT\s+(?!COUNT)[a-z_., *]*\s+FROM\s+`?(?:mitarbeiter|einsaetze|rapporte|lohn_person|lohnlauf|kunden|objekte)`?\b/i.test(sup));
+check('KRITISCH: keine vertraulichen Personalfelder im Supportzugriff',
+  !/ma_vertrauliche_felder|ahv|aufenthalt|lohn_ansatz/i.test(sup));
+// Der Treiberfehler geht auch hier nicht nach aussen.
+check('der Verbindungsfehler nennt die Lage statt den Treibertext',
+  /catch \(Throwable \$e\)[\s\S]{0,400}mandant_verbindung_bereit/.test(sup));
+
+// ── Die Seite des Betriebs: die Freigabe gehoert ihm ─────────────────
+const frei = nurCode(lies('backend/api/support_freigabe.php'));
+// Sie haengt am Recht "Rollen & Berechtigungen", nicht an
+// "Betriebseinstellungen": Wer sie erteilt, bestimmt, dass ein
+// Betriebsfremder an Daten kommt.
+check("KRITISCH: die Freigabe haengt am Recht 'rechte', nicht an 'betrieb'",
+  /require_recht_nach_methode\(\$user, 'rechte'\)/.test(frei));
+// Wer freigibt, kommt aus der Sitzung -- nie aus der Anfrage.
+check('KRITISCH: der Freigebende kommt aus der Sitzung',
+  /\$user\['name'\]/.test(frei) && !/\$daten\['freigegeben_von'\]|\$daten\['wer'\]/.test(frei));
+// Ein Zweck ist Pflicht -- eine Freigabe ohne Grund laesst sich spaeter
+// nicht mehr einordnen.
+check('KRITISCH: ohne Zweck keine Freigabe', /\$zweck === ''[\s\S]{0,200}400/.test(frei));
+// Und sie ist befristet: Das Modul deckelt die Dauer, der Endpunkt kann
+// sie nicht umgehen.
+const supModul = nurCode(lies('backend/support.php'));
+check('KRITISCH: die Dauer ist gedeckelt',
+  /SUPPORT_STUNDEN_MAX[\s\S]{0,120}\$stunden = SUPPORT_STUNDEN_MAX/.test(supModul));
+check('KRITISCH: eine widerrufene oder abgelaufene Freigabe gilt nicht',
+  /widerrufen_am IS NULL AND gilt_bis > NOW\(\)/.test(supModul));
+// Widerruf trifft ALLE offenen, nicht nur die juengste.
+check('der Widerruf trifft jede offene Freigabe',
+  /UPDATE support_freigabe SET widerrufen_am = NOW\(\)\s*\n?\s*WHERE widerrufen_am IS NULL/.test(supModul));
+// Das Protokoll ist fuer den Betrieb einsehbar -- ein Protokoll, das nur
+// der Einsehende fuehrt, ist keines.
+check('KRITISCH: der Betrieb kann das Protokoll selbst einsehen',
+  endpunkte.length >= 0 && /SELECT[\s\S]{0,200}FROM support_zugriff/.test(nurCode(lies('backend/api/support_protokoll.php'))));
 
 // Und auch der Stand-Endpunkt liest keine Betriebsdaten -- er zaehlt
 // Tabellen. Ein SELECT auf eine Kerntabelle waere der Support-Zugriff.
@@ -352,6 +425,45 @@ check('KRITISCH: die Verbindung holt das Passwort aus dem Deploy-Secret',
 check('KRITISCH: Treiberfehler werden nicht weitergereicht',
   /catch \(Throwable \$e\)[\s\S]{0,400}nicht_erreichbar/.test(modulCode)
   && !/getMessage\(\)[\s\S]{0,120}json_response/.test(modulCode));
+
+// ── 12. Die Seite des Betriebs im Cockpit (ENT-526) ──────────────────
+//
+// Ohne diese Seite gibt es keine Freigabe -- und ohne Freigabe keinen
+// Supportzugriff. Sie gehoert darum genauso geprueft wie die Endpunkte.
+const cockpit = readFileSync(join(WURZEL, 'dashboard.html'), 'utf8');
+check('das Cockpit hat einen Abschnitt fuer die Support-Freigabe',
+  cockpit.includes('bkAb-sf') && cockpit.includes('bkKachelSf'));
+// Die Kachel haengt am Recht -- das erspart den Umweg, die Sperre sitzt im
+// Server.
+check('KRITISCH: die Kachel erscheint nur mit dem Recht "Rollen & Berechtigungen"',
+  /bkKachelSfSetzen[\s\S]{0,400}darf\('rechte_/.test(cockpit));
+// Der Zweck ist auch in der Oberflaeche Pflicht, damit niemand erst nach
+// dem Absenden erfaehrt, dass etwas fehlt.
+check('die Oberflaeche verlangt den Zweck, bevor sie absendet',
+  /function sfFreigeben[\s\S]{0,300}!zweck[\s\S]{0,120}return/.test(cockpit));
+// Der Betrieb sieht sein eigenes Protokoll.
+check('KRITISCH: das Cockpit ruft das Zugriffsprotokoll ab',
+  cockpit.includes('support_protokoll.php'));
+// Und die vier Aussagen bleiben vier: "nicht eingerichtet", "nie
+// freigegeben", "freigegeben aber nie eingesehen" und die Zugriffe selbst.
+check('KRITISCH: freigegeben-aber-nie-genutzt ist eine eigene Aussage',
+  /nie eingesehen/.test(cockpit));
+check('nicht eingerichtet ist eine eigene Aussage',
+  /nicht_eingerichtet[\s\S]{0,300}Noch nicht eingerichtet/.test(cockpit));
+// Die Freigabe wird von der Oberflaeche nicht umgangen: Sie ruft denselben
+// Endpunkt, der die Rechte prueft.
+check('die Oberflaeche geht ueber den geprueften Endpunkt',
+  /api\('support_freigabe\.php'/.test(cockpit));
+
+// Und im Betreiber-Bereich wird sichtbar, was NICHT geliefert wird --
+// sonst entsteht der Eindruck, man saehe den ganzen Betrieb.
+const betrSeite = readFileSync(join(WURZEL, 'betreiber.html'), 'utf8');
+check('KRITISCH: der Betreiber-Bereich zeigt den Umfang des Zugriffs an',
+  betrSeite.includes('sup-freigabe') && /a\.umfang/.test(betrSeite));
+check('fehlt die Freigabe, nennt der Bereich die Lage statt nur "verboten"',
+  /SUPPORT_LAGE_TEXT/.test(betrSeite));
+check('KRITISCH: der Betreiber-Bereich setzt keine Freigabe',
+  !/support_freigabe\.php/.test(betrSeite));
 
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }

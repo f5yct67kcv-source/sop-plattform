@@ -342,6 +342,21 @@ input:focus, select:focus { outline: 2px solid var(--accent-line); outline-offse
       </div>
     </div>
 
+    <!-- Supportzugriff -->
+    <div class="karte versteckt" id="sup-karte">
+      <div class="karte-kopf">
+        <div>
+          <h2 id="sup-titel">Support</h2>
+          <div class="sub">Diagnosedaten ohne Personenbezug — jeder Abruf wird beim Betrieb protokolliert</div>
+        </div>
+        <button class="klein" id="knopf-sup-zu">Schliessen</button>
+      </div>
+      <div class="karte-leib">
+        <div id="sup-freigabe"></div>
+        <div id="sup-inhalt"></div>
+      </div>
+    </div>
+
     <!-- Konten -->
     <div class="karte">
       <div class="karte-kopf">
@@ -581,7 +596,8 @@ async function ladeMandanten() {
         + '<td>' + standZelle(stand[m.id], m.verbindung_lage) + '</td>'
         + '<td style="text-align:right;white-space:nowrap">'
           + '<button class="klein" data-bearbeiten="' + m.id + '">Ändern</button> '
-          + '<button class="klein" data-gav="' + m.id + '">GAV</button>'
+          + '<button class="klein" data-gav="' + m.id + '">GAV</button> '
+          + '<button class="klein" data-support="' + m.id + '">Support</button>'
           + '</td>'
       + '</tr>').join('')
     + '</tbody></table></div>';
@@ -590,6 +606,8 @@ async function ladeMandanten() {
     b.onclick = () => formularOeffnen(liste.find(m => m.id === +b.dataset.bearbeiten)));
   inhalt.querySelectorAll('[data-gav]').forEach(b =>
     b.onclick = () => gavFragen(liste.find(m => m.id === +b.dataset.gav)));
+  inhalt.querySelectorAll('[data-support]').forEach(b =>
+    b.onclick = () => supportHolen(liste.find(m => m.id === +b.dataset.support)));
 }
 
 /* Unbekannt darf nie wie "keine" aussehen: Kommt der Stand nicht, sagt die
@@ -670,6 +688,68 @@ async function gavFragen(m) {
   await ladeMandanten();
 }
 
+/* ── Supportzugriff ─────────────────────────────────────────────── */
+/*
+ * Der Zugriff haengt an der Freigabe des Betriebs. Liegt keine vor, wird
+ * das gesagt -- samt der Lage, damit man den Kunden gezielt bitten kann,
+ * statt ihn raten zu lassen, was er tun soll. "Nie freigegeben",
+ * "abgelaufen" und "widerrufen" sind drei verschiedene Auskuenfte.
+ */
+const SUPPORT_LAGE_TEXT = {
+  nie_freigegeben:    'Dieser Betrieb hat noch nie eine Support-Freigabe erteilt.',
+  abgelaufen:         'Die letzte Freigabe ist abgelaufen.',
+  widerrufen:         'Die letzte Freigabe wurde widerrufen.',
+  nicht_eingerichtet: 'Bei diesem Betrieb ist die Support-Freigabe noch nicht eingerichtet.',
+};
+
+async function supportHolen(m) {
+  stumm($('haus-meldung'));
+  const a = await ruf('betreiber_support.php?id=' + m.id);
+
+  if (a.grund === 'keine_freigabe' || a.grund === 'nicht_eingerichtet') {
+    const lage = SUPPORT_LAGE_TEXT[a.lage] || SUPPORT_LAGE_TEXT[a.grund] || '';
+    melde($('haus-meldung'), 'warn',
+      lage + ' Die Freigabe wird im Cockpit des Betriebs erteilt und ist befristet — '
+      + 'sie lässt sich von hier aus nicht setzen.');
+    zeig($('sup-karte'), false);
+    return;
+  }
+  if (a.status !== 'ok') {
+    melde($('haus-meldung'), 'fehler', a.message || 'Nicht abrufbar.');
+    zeig($('sup-karte'), false);
+    return;
+  }
+
+  $('sup-titel').textContent = 'Support: ' + a.mandant.name;
+  $('sup-freigabe').innerHTML =
+      '<div class="meldung gut" style="margin-bottom:16px">Freigegeben von '
+    + text(a.freigabe.von) + ' bis ' + text(String(a.freigabe.gilt_bis).slice(0, 16))
+    + (a.freigabe.zweck ? ' · ' + text(a.freigabe.zweck) : '')
+    + '<br><span style="opacity:.85">' + text(a.umfang) + '</span></div>';
+
+  const fehlend = (a.fehlend || []).length;
+  $('sup-inhalt').innerHTML =
+      '<div class="tab-huelle"><table><thead><tr><th>Tabelle</th><th style="text-align:right">Datensätze</th></tr></thead><tbody>'
+    + (a.tabellen || []).map(t => '<tr><td>' + text(t.tabelle) + '</td>'
+        + '<td style="text-align:right;font-variant-numeric:tabular-nums">'
+        + (t.zeilen === 0 ? '<span style="color:var(--nix)">0</span>' : t.zeilen) + '</td></tr>').join('')
+    + (fehlend ? '<tr><td colspan="2"><span class="merker m-neg">fehlt: '
+        + a.fehlend.map(text).join(', ') + '</span></td></tr>' : '')
+    + '</tbody></table></div>'
+    + '<div style="margin-top:18px"><div class="lab" style="font-size:10.5px;font-weight:650;'
+    + 'letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3);margin-bottom:8px">'
+    + 'Rechteprofile</div>'
+    /* Unbekannt darf nie wie "keine" aussehen: Ein Betrieb ohne Profile ist
+       etwas anderes als ein Betrieb, dessen Rollentabellen fehlen. */
+    + (!a.profile ? '<div class="zweit">nicht abrufbar</div>'
+       : a.profile.length === 0 ? '<div class="zweit">keine Profile angelegt</div>'
+       : a.profile.map(p => '<span class="merker m-ruhe" style="margin:0 6px 6px 0">'
+           + text(p.name) + ' · ' + p.traeger + '</span>').join(''))
+    + '</div>';
+  zeig($('sup-karte'), true);
+  $('sup-karte').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
 /* ── Konten ─────────────────────────────────────────────────────── */
 async function ladeKonten() {
   const a = await ruf('betreiber_konto_list.php');
@@ -744,6 +824,7 @@ $('knopf-zf-weiter').onclick = async () => {
 $('knopf-neu').onclick        = () => formularOeffnen(null);
 $('knopf-speichern').onclick  = mandantSpeichern;
 $('knopf-abbrechen').onclick  = () => zeig($('m-form-karte'), false);
+$('knopf-sup-zu').onclick      = () => zeig($('sup-karte'), false);
 $('knopf-abmelden').onclick   = abmelden;
 
 /* Beim Laden: Liegt ein Token in dieser Registerkarte, wird er benutzt.
