@@ -2423,6 +2423,7 @@ const W = {
     rgsKarteOhneOrt: 'ohne Koordinaten — nur in der Liste',
     rgsZentrieren: 'Zentrieren',
     rgsMeinStandort: 'Mein Standort',
+    rgsRichtung: 'Bewegungsrichtung',
     rgsOrtungLaeuft: 'Standort wird während der Runde verfolgt',
     rgOrtAusTitel: 'Kein Standort — die Runde lässt sich so nicht bestätigen',
     rgOrtVerweigert: 'Der Standortzugriff ist gesperrt. Ohne ihn kannst du keinen Kontrollpunkt bestätigen, und es kommt kein Signal, wenn du einen erreichst.',
@@ -7546,6 +7547,8 @@ function rgLaufKopfZeichnen() {
   // -- sie muss darum mit demselben Takt nachgefuehrt werden wie die Uhr,
   // sonst bliebe sie auf dem Stand der letzten Positionsmeldung stehen.
   rgOrtChipZeichnen();
+  // Dasselbe gilt fuer den Richtungspfeil (ENT-542): Er altert ebenfalls.
+  try { rgRichtungMarkeNachfuehren(); } catch (e) {}
 }
 
 /* Laufzeit seit Rundgangbeginn, PAUSEN ABGEZOGEN.
@@ -7705,6 +7708,9 @@ function rgLaufFunktionen() {
 const RGS_MAPS_SCHLUESSEL = '__MAPS_JS_KEY__';
 let rgsMapsVersprechen = null;
 let rgsKarte = null, rgsKartenMarken = [], rgsKartenKreise = [], rgsStandortMarke = null;
+// Der Richtungspfeil (ENT-542) haengt an derselben Karte wie die
+// Standortmarke und wird ueberall zusammen mit ihr vergessen.
+let rgsRichtungsMarke = null;
 // Der Schluessel wurde vom Kartenanbieter abgelehnt (ENT-309). Eigener
 // Zustand, weil dieser Fall NICHT ueber das Versprechen laeuft: Das Skript
 // laedt, google.maps ist da, `new google.maps.Map` gelingt -- und erst
@@ -7758,6 +7764,7 @@ function rgKarteGesperrtZeigen() {
 
   karte.innerHTML = '';
   rgsKartenMarken = []; rgsKartenKreise = []; rgsStandortMarke = null;
+  rgsRichtungsMarke = null;
   let stand = $('rgsKarteStand');
   if (!stand) {
     stand = document.createElement('div');
@@ -7970,6 +7977,7 @@ function rgKarteZeichnen() {
     // Standort bliebe nach jedem Reiterwechsel unsichtbar (ENT-331; vorher
     // verdeckt davon, dass der Zentrieren-Knopf jedes Mal eine neue baute).
     rgsStandortMarke = null;
+    rgsRichtungsMarke = null;   // haengt an derselben, eben ersetzten Karte
     rgsKarte = new google.maps.Map($('rgsKarte'), {
       center: { lat: d.zeigbar[0].lat, lng: d.zeigbar[0].lng }, zoom: 17,
       streetViewControl: false, mapTypeControl: false, fullscreenControl: false,
@@ -8043,7 +8051,7 @@ function rgKartePunkteZeichnen(punkte) {
    nicht beendet, nicht im Hintergrund. Das hat der Projektinhaber
    ausdruecklich so verlangt. */
 let rgsOrtWache = null;       // Kennung von watchPosition
-let rgsMeinOrt = null;        // { lat, lng, genauigkeit, zeit } -- nur im Speicher
+let rgsMeinOrt = null;        // { lat, lng, genauigkeit, zeit, richtung, richtungZeit } -- nur im Speicher
 /* Warum KEIN Standort da ist (ENT-320). Drei Zustaende, die sich
    unterscheiden muessen:
      null            -- noch keine Antwort, es laeuft
@@ -8067,6 +8075,73 @@ function rgDistanzMeter(lat1, lng1, lat2, lng2) {
   const a = Math.sin(dLat / 2) ** 2
     + Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(dLng / 2) ** 2;
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
+}
+
+/* ══ Bewegungsrichtung (ENT-542) ═══════════════════════════════════════
+   Wunsch des Projektinhabers: "ein ganz kleiner Pfeil beim Wachmann
+   Symbol, in welche Richtung man sich gerade bewegt".
+
+   Gemeint ist die Richtung der BEWEGUNG, nicht die Blickrichtung. Das ist
+   ein Unterschied: Wer stehen bleibt und sich umdreht, bewegt sich nicht --
+   dafuer braeuchte es den Kompass des Geraets, und der verlangt auf dem
+   iPhone eine eigene Erlaubnis. Hier wird nur ausgewertet, was die Ortung
+   ohnehin schon liefert; es kommt keine zweite Abfrage dazu.
+
+   Zwei Quellen, in dieser Reihenfolge:
+   1. coords.heading des Geraets. Es rechnet aus mehr als zwei Messungen und
+      glaettet; nach Norm ist der Wert NaN im Stillstand und null, wenn das
+      Geraet ihn gar nicht liefern kann -- beides faellt hier durch.
+   2. Die Peilung zwischen voriger und neuer Position. Aber erst ab einer
+      Mindeststrecke: Zwei Messungen am selben Ort unterscheiden sich um ein
+      paar Meter Rauschen, und eine Peilung daraus zeigt irgendwohin. Ein
+      Pfeil, der im Stand kreiselt, behauptet eine Bewegung, die es nicht
+      gibt -- und das ist schlimmer als kein Pfeil.
+
+   Ist beides nichts, bleibt die zuletzt bekannte Richtung stehen, solange
+   sie frisch ist, und danach gibt es KEINEN Pfeil. "Unbekannt" darf nie wie
+   "bekannt" aussehen (CLAUDE.md) -- ein alter Pfeil ist genau das: eine
+   Richtung, die aussieht wie die aktuelle. */
+const RG_RICHTUNG_MIN_M = 12;       // darunter ist es Rauschen, keine Bewegung
+const RG_RICHTUNG_ALT_MS = 30000;   // aelter: die Richtung gilt nicht mehr
+
+/* Peilung von a nach b in Grad, 0 = Norden, im Uhrzeigersinn. Dieselbe
+   Kugelrechnung wie rgDistanzMeter() -- auf 20 m Strecke waere eine ebene
+   Naeherung zwar auch genau genug, aber zwei verschiedene Erdmodelle in
+   derselben Datei sind eine Gelegenheit, sich zu vertun. */
+function rgPeilung(vonLat, vonLng, nachLat, nachLng) {
+  const rad = Math.PI / 180;
+  const b1 = vonLat * rad, b2 = nachLat * rad, dl = (nachLng - vonLng) * rad;
+  const y = Math.sin(dl) * Math.cos(b2);
+  const x = Math.cos(b1) * Math.sin(b2) - Math.sin(b1) * Math.cos(b2) * Math.cos(dl);
+  return (Math.atan2(y, x) / rad + 360) % 360;
+}
+
+function rgRichtungBestimmen(vorher, neu, geraeteKurs) {
+  if (!neu) { return; }
+  if (Number.isFinite(geraeteKurs)) {
+    neu.richtung = ((geraeteKurs % 360) + 360) % 360;
+    neu.richtungZeit = neu.zeit;
+    return;
+  }
+  if (vorher && rgDistanzMeter(vorher.lat, vorher.lng, neu.lat, neu.lng) >= RG_RICHTUNG_MIN_M) {
+    neu.richtung = rgPeilung(vorher.lat, vorher.lng, neu.lat, neu.lng);
+    neu.richtungZeit = neu.zeit;
+    return;
+  }
+  neu.richtung = vorher ? (vorher.richtung != null ? vorher.richtung : null) : null;
+  neu.richtungZeit = vorher ? (vorher.richtungZeit || 0) : 0;
+}
+
+/* Die Richtung, die JETZT gilt -- oder null.
+
+   Das Altern wird hier geprueft und nicht beim Eintreffen einer Position:
+   watchPosition meldet nur bei BEWEGUNG. Wer stehen bleibt, bekommt keine
+   neue Meldung mehr, und eine Pruefung, die nur dort stuende, liefe nie
+   wieder. Der Pfeil bliebe stehen, bis sich jemand wieder bewegt. */
+function rgRichtungJetzt() {
+  if (!rgsMeinOrt || rgsMeinOrt.richtung == null) { return null; }
+  if (Date.now() - (rgsMeinOrt.richtungZeit || 0) > RG_RICHTUNG_ALT_MS) { return null; }
+  return rgsMeinOrt.richtung;
 }
 
 // Entfernung zu einem Kontrollpunkt, oder null wenn etwas fehlt.
@@ -8093,8 +8168,12 @@ function rgOrtungStarten() {
     // die Frage waere sinnlos. Beim ersten Anlauf stand die Zeile darunter
     // und war damit wirkungslos; von der Pruefung gefunden.
     const ersterOrt = !rgsMeinOrt;
+    const vorher = rgsMeinOrt;
     rgsMeinOrt = { lat: pos.coords.latitude, lng: pos.coords.longitude,
       genauigkeit: pos.coords.accuracy, zeit: Date.now() };
+    // Bewegungsrichtung (ENT-542) -- braucht die VORIGE Position, darum
+    // hier und nicht spaeter.
+    rgRichtungBestimmen(vorher, rgsMeinOrt, pos.coords.heading);
     // Kommt der Standort zurueck, verschwindet die Warnung von selbst --
     // wer aus dem Keller herauskommt, soll sie nicht wegklicken muessen.
     // Und beim ERSTEN Standort ebenfalls neu zeichnen, sonst bleibt
@@ -8637,6 +8716,15 @@ function rgOrtungStoppen() {
   rgWachFreigeben();
   rgsSpurLetzte = null;
   rgsOrtFehler = null;
+  /* Der Richtungspfeil geht mit der Ortung (ENT-542). Wo nicht mehr geortet
+     wird, gibt es keine aktuelle Bewegungsrichtung -- und der zuletzt
+     gezeichnete Pfeil saehe aus wie eine. Nicht auf das Altern warten: Nach
+     dem Ende der Runde steht auch die Uhr, die das Altern nachfuehrt. */
+  if (rgsMeinOrt) { rgsMeinOrt.richtung = null; rgsMeinOrt.richtungZeit = 0; }
+  if (rgsRichtungsMarke) {
+    try { rgsRichtungsMarke.setMap(null); } catch (e) {}
+    rgsRichtungsMarke = null;
+  }
   // Was noch im Geraet liegt, jetzt noch loswerden -- der Server nimmt es
   // an, solange die Runde laeuft. Endet sie in derselben Sekunde, weist er
   // es ab und die App verwirft es; beides ist besser, als es liegenzulassen.
@@ -8687,6 +8775,54 @@ function rgStandortMarkeSetzen(ort) {
 function rgStandortZeichnen() {
   if (!rgsMeinOrt) { return; }
   rgStandortMarkeSetzen({ lat: rgsMeinOrt.lat, lng: rgsMeinOrt.lng });
+  rgRichtungMarkeSetzen({ lat: rgsMeinOrt.lat, lng: rgsMeinOrt.lng }, rgRichtungJetzt());
+}
+
+/* Der Richtungspfeil (ENT-542). Eine EIGENE Marke neben dem Schild, nicht
+   ein gedrehtes Schild: Das Schild zeigt einen Menschen, und ein gekippter
+   Mensch sieht nach Umfallen aus, nicht nach Nordwest.
+
+   Der Drehpunkt (anchor) liegt UNTER der Pfeilform, auf dem Standort. Damit
+   dreht sich der Pfeil nicht um sich selbst, sondern kreist um das Schild
+   -- wie der Kegel am blauen Punkt in Karten-Apps. Der Abstand ist so
+   gewaehlt, dass er das Schild (16 px Halbhoehe) nicht beruehrt.
+
+   Ohne bekannte Richtung wird die Marke ENTFERNT, nicht versteckt und nicht
+   auf einem alten Wert stehen gelassen. */
+function rgRichtungMarkeSetzen(ort, richtung) {
+  if (!rgsKarte || !window.google) { return; }
+  if (richtung === null || richtung === undefined) {
+    if (rgsRichtungsMarke) { rgsRichtungsMarke.setMap(null); rgsRichtungsMarke = null; }
+    return;
+  }
+  const symbol = {
+    // Pfeilspitze im oberen Teil des 24er-Rasters, Drehpunkt bei (12, 24)
+    // -- also 24 Einheiten darunter, dort wo der Standort liegt.
+    path: 'M12 1.5 17 10.5 12 8.2 7 10.5z',
+    fillColor: '#F2F4F8', fillOpacity: 1,
+    strokeColor: '#0F1117', strokeWeight: 1.2,
+    scale: 1.35, rotation: richtung,
+    anchor: new google.maps.Point(12, 24),
+  };
+  if (rgsRichtungsMarke) {
+    rgsRichtungsMarke.setPosition(ort);
+    rgsRichtungsMarke.setIcon(symbol);
+    return;
+  }
+  rgsRichtungsMarke = new google.maps.Marker({
+    // Dieselbe Ebene wie das Schild: Beide gehoeren zusammen und beide
+    // bleiben unter den Kontrollpunkten, deren Zeichen die Auskunft tragen.
+    map: rgsKarte, position: ort, title: w('rgsRichtung'), zIndex: 1,
+    icon: symbol,
+  });
+}
+
+/* Im Takt der Uhr nachgefuehrt, nicht nur bei neuer Position: Wer stehen
+   bleibt, bekommt keine neue Position -- und genau dann muss der Pfeil nach
+   einer halben Minute verschwinden. */
+function rgRichtungMarkeNachfuehren() {
+  if (!rgsKarte || !rgsMeinOrt) { return; }
+  rgRichtungMarkeSetzen({ lat: rgsMeinOrt.lat, lng: rgsMeinOrt.lng }, rgRichtungJetzt());
 }
 
 /* Zentrieren: alle Punkte ins Bild, danach einmalig die eigene Position
@@ -8709,6 +8845,10 @@ function rgKarteZentrieren() {
     // Dieselbe Marke wie bei der laufenden Ortung (ENT-331) -- nicht eine
     // zweite, eigene. Der eigene Standort sieht auf beiden Wegen gleich aus.
     rgStandortMarkeSetzen({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+    // Der Pfeil kommt aus der laufenden Ortung, nicht aus diesem einen
+    // Abruf: Eine einzelne Messung hat keine Vorgaengerin und damit keine
+    // Richtung. Ist gerade eine bekannt, wird sie mitgezeichnet.
+    rgRichtungMarkeSetzen({ lat: pos.coords.latitude, lng: pos.coords.longitude }, rgRichtungJetzt());
   }, () => {}, { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 });
 }
 

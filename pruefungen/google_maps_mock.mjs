@@ -196,41 +196,7 @@ export const GOOGLE_MAPS_MOCK = `
       // koennen.
       const ic = opts.icon, lb = opts.label;
       if (ic && typeof ic.path === 'string') {
-        // Symbol mit eigener Form (ENT-331: Wachmann-Schild fuer den eigenen
-        // Standort). Die echte API zeichnet den SVG-Pfad im 24er-Raster und
-        // skaliert ihn mit 'scale'; hier steht wirklich dieser Pfad im DOM --
-        // sonst waere die Form nur im Quelltext nachlesbar und eine Pruefung
-        // koennte nicht unterscheiden, ob der Standort als Schild oder als
-        // Kreis erscheint. Der Anker verschiebt das Symbol so, dass der
-        // angegebene Punkt auf der Koordinate sitzt (Standard: Mitte).
-        const sk = ic.scale || 1;
-        const gr = 24 * sk;
-        // Ohne anchor haengt ein Symbol mit dem NULLPUNKT seines Pfades an
-        // der Koordinate -- so macht es die echte API. Hier denselben
-        // Vorgabewert zu nehmen ist keine Kleinigkeit: Eine Attrappe, die
-        // von sich aus zentriert, wuerde einen fehlenden Anker verzeihen und
-        // die Pruefung darauf waere wirkungslos (in der Gegenprobe genau so
-        // aufgefallen).
-        const ax = ic.anchor ? ic.anchor.x : 0, ay = ic.anchor ? ic.anchor.y : 0;
-        this.el.style.cssText = 'position:absolute;cursor:pointer;'
-          + 'width:' + gr + 'px;height:' + gr + 'px;'
-          + 'margin-left:' + (-ax * sk) + 'px;margin-top:' + (-ay * sk) + 'px;'
-          + 'z-index:' + (opts.zIndex || 10) + ';';
-        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        svg.setAttribute('viewBox', '0 0 24 24');
-        svg.setAttribute('width', String(gr));
-        svg.setAttribute('height', String(gr));
-        const pf = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        pf.setAttribute('d', ic.path);
-        pf.setAttribute('fill', ic.fillColor || '#000');
-        pf.setAttribute('fill-opacity', ic.fillOpacity != null ? String(ic.fillOpacity) : '1');
-        pf.setAttribute('stroke', ic.strokeColor || 'none');
-        pf.setAttribute('stroke-width', String(ic.strokeWeight || 0));
-        svg.appendChild(pf);
-        this.el.appendChild(svg);
-        this.el.dataset.symbolart = 'pfad';
-        this.el.dataset.pfad = ic.path;
-        if (ic.fillColor) { this.el.dataset.farbe = ic.fillColor; }
+        this._pfadZeichnen(ic, opts.zIndex);
       } else if (ic || lb) {
         const gr = Math.round((ic && ic.scale ? ic.scale : 12) * 2);
         this.el.dataset.symbolart = 'kreis';
@@ -258,6 +224,72 @@ export const GOOGLE_MAPS_MOCK = `
       this._ziehenEinrichten();
       this.setMap(opts.map || null);
     }
+    /* Symbol mit eigener Form. Ausgelagert, weil setIcon() dasselbe noch
+       einmal braucht -- der Richtungspfeil (ENT-542) wechselt bei jeder
+       Bewegung nur seine Drehung, nicht seine Marke. */
+    _pfadZeichnen(ic, zIndex) {
+      // Symbol mit eigener Form (ENT-331: Wachmann-Schild fuer den eigenen
+      // Standort). Die echte API zeichnet den SVG-Pfad im 24er-Raster und
+      // skaliert ihn mit 'scale'; hier steht wirklich dieser Pfad im DOM --
+      // sonst waere die Form nur im Quelltext nachlesbar und eine Pruefung
+      // koennte nicht unterscheiden, ob der Standort als Schild oder als
+      // Kreis erscheint. Der Anker verschiebt das Symbol so, dass der
+      // angegebene Punkt auf der Koordinate sitzt (Standard: Mitte).
+      const sk = ic.scale || 1;
+      const gr = 24 * sk;
+      // Ohne anchor haengt ein Symbol mit dem NULLPUNKT seines Pfades an
+      // der Koordinate -- so macht es die echte API. Hier denselben
+      // Vorgabewert zu nehmen ist keine Kleinigkeit: Eine Attrappe, die
+      // von sich aus zentriert, wuerde einen fehlenden Anker verzeihen und
+      // die Pruefung darauf waere wirkungslos (in der Gegenprobe genau so
+      // aufgefallen).
+      const ax = ic.anchor ? ic.anchor.x : 0, ay = ic.anchor ? ic.anchor.y : 0;
+      this.el.style.cssText = 'position:absolute;cursor:pointer;'
+        + 'width:' + gr + 'px;height:' + gr + 'px;'
+        + 'margin-left:' + (-ax * sk) + 'px;margin-top:' + (-ay * sk) + 'px;'
+        + 'z-index:' + (zIndex || 10) + ';';
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('viewBox', '0 0 24 24');
+      svg.setAttribute('width', String(gr));
+      svg.setAttribute('height', String(gr));
+      const pf = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      pf.setAttribute('d', ic.path);
+      pf.setAttribute('fill', ic.fillColor || '#000');
+      pf.setAttribute('fill-opacity', ic.fillOpacity != null ? String(ic.fillOpacity) : '1');
+      pf.setAttribute('stroke', ic.strokeColor || 'none');
+      pf.setAttribute('stroke-width', String(ic.strokeWeight || 0));
+      svg.appendChild(pf);
+      this.el.appendChild(svg);
+      this.el.dataset.symbolart = 'pfad';
+      this.el.dataset.pfad = ic.path;
+      if (ic.fillColor) { this.el.dataset.farbe = ic.fillColor; }
+      /* Drehung (ENT-542). Die echte API dreht das Symbol um den ANKER --
+         darum steht der Drehpunkt hier auf demselben Punkt und nicht in der
+         Mitte des Kastens. Ein Pfeil, dessen Anker ausserhalb seiner Form
+         liegt, KREIST damit um den Standort, statt sich um sich selbst zu
+         drehen; mit einem Drehpunkt in der Mitte saehe die Attrappe anders
+         aus als die Karte, und eine Messung daran waere wertlos. */
+      const dreh = Number(ic.rotation) || 0;
+      if (dreh) {
+        this.el.style.transformOrigin = (ax * sk) + 'px ' + (ay * sk) + 'px';
+        this.el.style.transform = 'rotate(' + dreh + 'deg)';
+      } else {
+        this.el.style.transformOrigin = '';
+        this.el.style.transform = '';
+      }
+      this.el.dataset.drehung = String(dreh);
+    }
+
+    /* Ein anderes Symbol an dieselbe Marke haengen. Die echte API kann das;
+       ohne diese Methode waere der Aufruf im Rundgang eine stille
+       Ausnahme und der Pfeil bliebe auf seiner ersten Richtung stehen. */
+    setIcon(ic) {
+      if (!ic || typeof ic.path !== 'string') { return; }
+      this.el.innerHTML = '';
+      this._pfadZeichnen(ic, Number(this.el.style.zIndex) || undefined);
+      this._neuZeichnen();
+    }
+
     setPosition(p) { this._pos = alsLiteral(p); this._neuZeichnen(); }
     getPosition() { return machLatLng(this._pos.lat, this._pos.lng); }
     setMap(map) {
