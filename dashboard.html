@@ -6931,11 +6931,16 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
             <div class="card-bd rdkp-karten" id="rdKrRoutenKarten"></div>
           </div>
         </div>
-        <!-- Kontrollpunkte (ENT-259): ALLE Kontrollpunkte des Objekts (NFC +
-             Geofence), nicht nur die dieser Runde zugeordneten -- anders als
-             "Routenpunkte" oben. Filterbar nach Typ/Name/Tag Identifikator.
-             "+ GPS-Punkt / Geofence anlegen" wechselt nur den Reiter zur
-             Kartenansicht, oeffnet keinen Dialog (Vorgabe Projektinhaber). -->
+        <!-- Kontrollpunkte (ENT-554, Revision von ENT-259): NUR die dieser
+             Runde bereits zugeordneten Kontrollpunkte (NFC + Geofence),
+             gefiltert nach Typ/Name/Tag Identifikator -- nicht mehr der
+             gesamte Punktekatalog des Objekts wie bis ENT-554 (das stand im
+             Code als "ENT-259" begruendet, war aber nie im
+             Entscheidungsprotokoll erfasst, siehe ENT-554/OP-555). Der
+             gesamte Objektkatalog bleibt in "Kartenansicht" einsehbar --
+             dort, nicht hier, wird ein Kontrollpunkt endgueltig geloescht.
+             "+ Kontrollpunkt anlegen" ordnet den neuen Punkt sofort dieser
+             Runde zu (rdKdSpeichern()). -->
         <div class="rdkr-panel" id="rdKrAb-kontrollpunkte" style="display:none">
           <div class="bar-tools">
             <select class="inp" id="rdKpFilterTyp" style="width:auto" onchange="rdKpTabelleZeichnen()" aria-label="Nach Typ filtern">
@@ -6946,7 +6951,7 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
             <input class="inp" type="search" id="rdKpFilterName" placeholder="Name…" oninput="rdKpTabelleZeichnen()" style="width:auto" aria-label="Nach Name filtern">
             <input class="inp" type="search" id="rdKpFilterTag" placeholder="Tag Identifikator…" oninput="rdKpTabelleZeichnen()" style="width:auto" aria-label="Nach Tag Identifikator filtern">
             <div class="sp"></div>
-            <button class="btn btn-primary btn-sm" onclick="rdKdOeffnen('neu', 'liste')">+ Kontrollpunkt anlegen</button>
+            <button class="btn btn-primary btn-sm" id="rdKpAnlegenBtn" onclick="rdKdOeffnen('neu', 'liste')">+ Kontrollpunkt anlegen</button>
           </div>
           <!-- Zwei Spalten: Liste links, dasselbe Fenster rechts wie auf der
                Kartenansicht (ENT-302). Es wird nicht kopiert, sondern beim
@@ -25974,6 +25979,10 @@ function rpListeSpeichern(neueIds) {
     if (!ok || data.status !== 'ok') { toast(data.message || 'Fehlgeschlagen.'); if (btn) btn.disabled = false; return false; }
     return loadRundgangVorlagen().then(() => {
       rdKrRoutenTabelleZeichnen();
+      // ENT-554: der Reiter "Kontrollpunkte" zeigt seither dieselbe
+      // Rundenzuordnung, gefiltert -- muss also bei jeder Aenderung der
+      // Zuordnung ebenso nachziehen wie die Routenpunkte-Tabelle hier.
+      rdKpTabelleZeichnen();
       const v = rundgangVorlagen.find(x => Number(x.id) === krTarget);
       rdKrBadgesSetzen(v ? v.punkte.length : 0);
       return true;
@@ -25992,7 +26001,11 @@ function rpVerschieben(kontrollpunktId, richtung) {
   rpListeSpeichern(ids);
 }
 
-function rpEntfernen(kontrollpunktId) {
+// "danach" (ENT-554, optional): wird nach erfolgreichem Entfernen aufgerufen
+// -- braucht das Seitenfenster rdKdSpeichern/rdKdLoeschen, um sich danach
+// selbst zu schliessen (der Punkt bleibt bestehen, verschwindet aber aus dem
+// jetzt rundenbezogen gefilterten Reiter "Kontrollpunkte" daneben).
+function rpEntfernen(kontrollpunktId, danach) {
   const v = rundgangVorlagen.find(x => Number(x.id) === krTarget);
   if (!v) return;
   const k = kontrollpunkte.find(x => Number(x.id) === Number(kontrollpunktId));
@@ -26000,7 +26013,7 @@ function rpEntfernen(kontrollpunktId) {
     'Der Kontrollpunkt selbst bleibt bestehen und lässt sich jederzeit wieder hinzufügen — nur die Zuordnung zu DIESER Runde verschwindet.',
     'Entfernen',
     () => rpListeSpeichern(v.punkte.map(p => Number(p.id)).filter(id => id !== Number(kontrollpunktId)))
-      .then(ok => { if (ok) toast('Aus der Runde entfernt.'); }));
+      .then(ok => { if (ok) { toast('Aus der Runde entfernt.'); if (danach) danach(); } }));
 }
 
 function rpHinzufuegenOeffnen() {
@@ -26057,24 +26070,44 @@ function rpHinzufuegen() {
   });
 }
 
-// Kontrollpunkte-Tabelle (ENT-259): ALLE Kontrollpunkte des Objekts (NFC +
-// Geofence), nicht nur die dieser Runde zugeordneten -- gefiltert nach
-// Typ/Name/Tag Identifikator. Eigene Funktion statt Wiederverwendung von
+// Kontrollpunkte-Tabelle (ENT-554, Revision von ENT-259): NUR die dieser
+// Runde bereits zugeordneten Kontrollpunkte (NFC + Geofence), gefiltert nach
+// Typ/Name/Tag Identifikator -- bis ENT-554 stand hier der gesamte
+// Punktekatalog des Objekts, unabhaengig von der Runde (Rueckmeldung
+// Projektinhaber: verwechselte objektweite Wiederverwendbarkeit mit
+// Rundgang-Zugehoerigkeit). Eigene Funktion statt Wiederverwendung von
 // renderKpListe() (Einrichtung, Karten statt Tabelle) -- hier verlangt der
 // Projektinhaber ausdruecklich die tabellarische Filter-Darstellung des
 // Referenzsystems.
 function rdKpTabelleZeichnen() {
   const zielTabelle = $('rdKpTabelle'), zielKarten = $('rdKpKarten');
   if (!zielTabelle || !zielKarten) return;
-  const typFilter = $('rdKpFilterTyp').value;
-  const nameFilter = $('rdKpFilterName').value.trim().toLowerCase();
-  const tagFilter = $('rdKpFilterTag').value.trim().toLowerCase();
-  if (!kontrollpunkte.length) {
-    const leer = EMPTY('Noch kein Kontrollpunkt', 'Über „+ GPS-Punkt / Geofence anlegen" oben den ersten Punkt setzen.');
+  const anlegenBtn = $('rdKpAnlegenBtn');
+  // Ohne gespeicherte Runde gibt es nichts, dem ein Punkt zugeordnet werden
+  // koennte -- gleiches Muster wie rdKrRoutenTabelleZeichnen() daneben.
+  if (!krTarget) {
+    if (anlegenBtn) anlegenBtn.disabled = true;
+    const hinweis = EMPTY('Zuerst speichern', 'Diese Kontrollrunde muss zuerst unter „Allgemeines" gespeichert werden, bevor ihr Kontrollpunkte zugeordnet werden können.');
+    zielTabelle.innerHTML = hinweis; zielKarten.innerHTML = hinweis;
+    return;
+  }
+  if (anlegenBtn) anlegenBtn.disabled = false;
+  const v = rundgangVorlagen.find(x => Number(x.id) === krTarget);
+  // Ein zwischenzeitlich am Objekt geloeschter Kontrollpunkt faellt hier
+  // still heraus statt mit einem kaputten Eintrag zu erscheinen -- gleiches
+  // Vorgehen wie in rdKrRoutenTabelleZeichnen().
+  const zugeordnet = (v ? v.punkte : [])
+    .map(p => kontrollpunkte.find(k => Number(k.id) === Number(p.id)))
+    .filter(Boolean);
+  if (!zugeordnet.length) {
+    const leer = EMPTY('Noch kein Kontrollpunkt in dieser Runde', 'Über „+ Kontrollpunkt anlegen" oben einen neuen Punkt anlegen, oder über „Routenpunkte" einen bereits am Objekt erfassten Punkt zuordnen.');
     zielTabelle.innerHTML = leer; zielKarten.innerHTML = leer;
     return;
   }
-  const gefiltert = kontrollpunkte.filter(k => {
+  const typFilter = $('rdKpFilterTyp').value;
+  const nameFilter = $('rdKpFilterName').value.trim().toLowerCase();
+  const tagFilter = $('rdKpFilterTag').value.trim().toLowerCase();
+  const gefiltert = zugeordnet.filter(k => {
     if (typFilter && k.typ !== typFilter) return false;
     if (nameFilter && !(k.bezeichnung || '').toLowerCase().includes(nameFilter)) return false;
     const tag = k.typ === 'nfc' ? (k.chip_id || '') : '';
@@ -26082,7 +26115,7 @@ function rdKpTabelleZeichnen() {
     return true;
   });
   if (!gefiltert.length) {
-    const kein = EMPTY('Kein Treffer', 'Kein Kontrollpunkt entspricht den gewählten Filtern.');
+    const kein = EMPTY('Kein Treffer', 'Kein Kontrollpunkt dieser Runde entspricht den gewählten Filtern.');
     zielTabelle.innerHTML = kein; zielKarten.innerHTML = kein;
     return;
   }
@@ -26094,7 +26127,10 @@ function rdKpTabelleZeichnen() {
     // Die ganze Zeile oeffnet das Fenster (ENT-302) -- der Knopf "Bearbeiten"
     // faellt hier weg, weil er dasselbe getan haette wie ein Klick daneben.
     // "Entfernen" bleibt ein eigener Knopf und stoppt die Weitergabe des
-    // Klicks, sonst oeffnete das Loeschen zugleich das Fenster.
+    // Klicks, sonst oeffnete das Loeschen zugleich das Fenster. Seit ENT-554
+    // ruft er rpEntfernen() (nur die Zuordnung zu DIESER Runde verschwindet)
+    // statt askDeleteKp() (objektweite Loeschung, bleibt der Kartenansicht
+    // vorbehalten).
     const offen = Number(rdKarteAuswahl) === Number(k.id);
     return `<tr class="klickbar${offen ? ' gewaehlt' : ''}" onclick="rdKdOeffnen(${Number(k.id)}, 'liste')"
                 tabindex="0" role="button" aria-label="Kontrollpunkt ${esc(k.bezeichnung)} öffnen"
@@ -26103,7 +26139,7 @@ function rdKpTabelleZeichnen() {
         <td><b>${esc(k.bezeichnung)}</b>${Number(k.aktiv) ? '' : ' <span class="chip chip-n">nicht aktiv</span>'}</td>
         <td class="nowrap">${tag}</td>
         <td class="nowrap">
-          <button class="btn btn-quiet btn-sm" onclick="event.stopPropagation();askDeleteKp(${Number(k.id)})">Entfernen</button>
+          <button class="btn btn-quiet btn-sm" onclick="event.stopPropagation();rpEntfernen(${Number(k.id)})">Entfernen</button>
         </td>
       </tr>`;
   }).join('') + `</tbody></table>`;
@@ -26125,7 +26161,7 @@ function rdKpTabelleZeichnen() {
       <div style="display:flex;gap:7px;margin-top:9px">
         <button class="btn btn-plain btn-sm" onclick="rdKdOeffnen(${Number(k.id)}, 'liste')">Öffnen</button>
         <div style="flex:1"></div>
-        <button class="btn btn-quiet btn-sm" onclick="askDeleteKp(${Number(k.id)})">Entfernen</button>
+        <button class="btn btn-quiet btn-sm" onclick="rpEntfernen(${Number(k.id)})">Entfernen</button>
       </div>
     </div>`;
   }).join('');
@@ -26702,8 +26738,12 @@ function rdKarteDetailZeichnen() {
   }
   $('rdKdErr').style.display = 'none';
   rdKdTypUm();
-  // Bei einem noch nicht gespeicherten Punkt gibt es nichts zu loeschen.
-  $('rdKdLoeschen').textContent = neu ? 'Verwerfen' : 'Löschen';
+  // Bei einem noch nicht gespeicherten Punkt gibt es nichts zu loeschen. Im
+  // Ort "liste" (Reiter "Kontrollpunkte", ENT-554) loescht der Knopf den
+  // Punkt nicht mehr objektweit, sondern nimmt ihn nur aus DIESER Runde --
+  // die Beschriftung muss das sagen, sonst kuendigt sie eine Loeschung an,
+  // die gar nicht stattfindet.
+  $('rdKdLoeschen').textContent = neu ? 'Verwerfen' : (rdKdOrt === 'liste' ? 'Aus dieser Runde entfernen' : 'Löschen');
   rdKdReiter('allgemeines');
   rdKdAufgabenLaden();
   fenster.style.display = '';
@@ -26741,6 +26781,11 @@ function rdKdZuruecksetzen() {
 
 function rdKdLoeschen() {
   if (rdKarteAuswahl === 'neu') { rdKarteDetailSchliessen(); return; }
+  // ENT-554: im Reiter "Kontrollpunkte" (ort 'liste') entfernt der Knopf den
+  // Punkt nur aus DIESER Runde -- eine objektweite Loeschung (askDeleteKp)
+  // bleibt der Kartenansicht vorbehalten, wo der Objektkatalog weiterhin
+  // vollstaendig sichtbar ist.
+  if (rdKdOrt === 'liste') { rpEntfernen(rdKarteAuswahl, rdKarteDetailSchliessen); return; }
   askDeleteKp(rdKarteAuswahl);
 }
 
@@ -26787,13 +26832,35 @@ function rdKdSpeichern() {
     rdKdAufgabenSetzen(zielId).then(fehler => {
       loadKontrollpunkte().then(() => {
         rdKarteAuswahl = zielId;
-        krPunkteAktualisieren();
-        rdKpTabelleZeichnen();
-        rdKarteVorschauZeichnen();
-        // Die Aufgaben getrennt melden, wenn dort etwas schiefging -- sonst
-        // stuende "gespeichert" da, waehrend die halbe Eingabe fehlt.
-        if (fehler) { err.textContent = fehler; err.style.display = ''; toast('Punkt gespeichert, Aufgaben nicht.'); }
-        else { toast('Kontrollpunkt gespeichert.'); }
+        // Nach dem Speichern ist der Punkt nie mehr "neu" -- die
+        // Knopfbeschriftung muss das sofort nachziehen (gleiche Regel wie in
+        // rdKarteDetailZeichnen()), sonst stuende nach dem Anlegen eines
+        // NEUEN Punkts weiterhin "Verwerfen" da, obwohl ein Klick jetzt
+        // bereits die echte Entfernen-/Loeschen-Aktion ausloest.
+        const loeschKnopf = $('rdKdLoeschen');
+        if (loeschKnopf) { loeschKnopf.textContent = rdKdOrt === 'liste' ? 'Aus dieser Runde entfernen' : 'Löschen'; }
+        // ENT-554: Ein NEUER Punkt aus dem Reiter "Kontrollpunkte" (ort
+        // 'liste') gehoert sofort zu DIESER Runde -- der Reiter zeigt seither
+        // nur noch zugeordnete Punkte, ohne diese Zuordnung waere der frisch
+        // angelegte Punkt hier sofort wieder unsichtbar. Ueber die
+        // Kartenansicht ('karte') bleibt ein neuer Punkt weiterhin objektweit
+        // ohne automatische Zuordnung -- unveraendert.
+        const eigeneRunde = neu && rdKdOrt === 'liste' && krTarget;
+        const zuordnen = eigeneRunde
+          ? rpListeSpeichern([
+              ...(rundgangVorlagen.find(x => Number(x.id) === krTarget)?.punkte.map(p => Number(p.id)) || []),
+              zielId,
+            ])
+          : Promise.resolve(true);
+        zuordnen.then(() => {
+          krPunkteAktualisieren();
+          rdKpTabelleZeichnen();
+          rdKarteVorschauZeichnen();
+          // Die Aufgaben getrennt melden, wenn dort etwas schiefging -- sonst
+          // stuende "gespeichert" da, waehrend die halbe Eingabe fehlt.
+          if (fehler) { err.textContent = fehler; err.style.display = ''; toast('Punkt gespeichert, Aufgaben nicht.'); }
+          else { toast(eigeneRunde ? 'Kontrollpunkt gespeichert und dieser Runde zugeordnet.' : 'Kontrollpunkt gespeichert.'); }
+        });
       });
     });
   });
@@ -26959,15 +27026,18 @@ function rdKarteDetailSchliessen() {
 // Anzahl-Chips der Reiterleiste (ENT-260). Die noch nicht gebauten Reiter
 // bekommen bewusst KEINEN Chip: eine "0" dort hiesse "nichts vorhanden",
 // richtig waere "noch nicht erhoben" -- und "unbekannt" darf nie wie "keine"
-// aussehen.
+// aussehen. Seit ENT-554 zeigen "Kontrollpunkte" und "Routenpunkte" dieselbe
+// rundenbezogene Zahl -- der Reiter "Kontrollpunkte" zeigt nicht mehr die
+// Gesamtzahl der Objektpunkte (kontrollpunkte.length).
 function rdKrBadgesSetzen(routenAnzahl) {
+  const anzahl = routenAnzahl !== undefined
+    ? routenAnzahl
+    : (krTarget ? (rundgangVorlagen.find(x => Number(x.id) === krTarget)?.punkte.length ?? 0) : 0);
   const kp = $('rdKrKpBadge');
-  if (kp) kp.textContent = String(kontrollpunkte.length);
+  if (kp) kp.textContent = String(anzahl);
   const rp = $('rdKrRoutenBadge');
   if (!rp) return;
-  rp.textContent = String(routenAnzahl !== undefined
-    ? routenAnzahl
-    : (krTarget ? (rundgangVorlagen.find(x => Number(x.id) === krTarget)?.punkte.length ?? 0) : 0));
+  rp.textContent = String(anzahl);
 }
 
 function rdKarteAnpassen() {
