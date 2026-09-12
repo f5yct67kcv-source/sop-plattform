@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 // Musterbetrieb fuer die Demo-Umgebung erzeugen -- Rechenkern (ENT-523,
-// Stufe 2a). Getrennt vom Endpunkt backend/api/demo_daten_erzeugen.php,
+// Stufe 2a + 2b). Getrennt vom Endpunkt backend/api/demo_daten_erzeugen.php,
 // damit sich die eigentliche Erzeugung echt gegen eine Datenbank pruefen
 // laesst, ohne require_session()/require_demo_umgebung() im Weg zu haben
 // -- gleiches Prinzip wie rundgang.php/planung.php.
@@ -11,10 +11,11 @@ declare(strict_types=1);
 // Sie FUELLT eine bereits eingerichtete, aber inhaltlich leere Demo-
 // Datenbank mit einem erfundenen, aber funktionsfaehigen Bewachungsbetrieb
 // -- Mitarbeitende, Kunden, Objekte, die aktuelle Planung (inklusive eines
-// bewusst unbesetzten Platzes heute Nacht), ein abgeschlossener Rundgang
-// von gestern mit Ereignismeldung und Fotobeleg, ein Kundenportal-Zugang.
-// Einzelheiten und die vier Grundfestlegungen: demozugang-konzept.md im
-// Projekt-Repository (ENT-523).
+// bewusst unbesetzten Platzes heute Nacht), ein vollstaendig abgeglichener
+// und ausbezahlter Lohnlauf fuer den Vormonat, ein abgeschlossener
+// Rundgang von gestern mit Ereignismeldung und Fotobeleg, ein Kundenportal-
+// Zugang. Einzelheiten und die vier Grundfestlegungen: demozugang-
+// konzept.md im Projekt-Repository (ENT-523).
 //
 // Sie legt KEINE Tabellen an und seedet KEINE Systemrollen -- das leistet
 // der bestehende Einrichtungslauf (backend/api/planung_einrichten.php),
@@ -28,24 +29,22 @@ declare(strict_types=1);
 // entfernt und DANACH diese Erzeugung erneut aufruft -- Erzeugen und
 // Leeren bleiben zwei getrennte, einzeln nachvollziehbare Schritte.
 //
-// Der Lohnlauf (Fuehrungsstation 5, "was am Monatsende herauskommt") ist
-// NICHT Teil dieser Fassung. Ein Lohnlauf durchlaeuft NBU-/BVG-/QST-
-// Herleitung und einen mehrstufigen Freigabeprozess (lohnlauf.php) -- das
-// selbst per SQL nachzubilden waere genau die Art von eigenstaendiger
-// GAV-Interpretation, die CLAUDE.md ausschliesst. Ein Nachtrag baut
-// diesen Teil ueber die echten Lohnlauf-Funktionen, nicht ueber geratene
-// Werte.
+// DER LOHNLAUF (Fuehrungsstation 5, "was am Monatsende herauskommt", Stufe
+// 2b) rechnet AUSSCHLIESSLICH ueber lohnlauf_person()/lohnlauf_nbu()/
+// lohnlauf_abzuege() aus backend/lohnlauf.php -- siehe demo_lohnlauf_erzeugen()
+// weiter unten. Das selbst per SQL nachzubilden waere genau die Art von
+// eigenstaendiger GAV-Interpretation, die CLAUDE.md ausschliesst.
 //
 // WARUM DIREKTES SQL FUER STAMMDATEN, ABER NICHT FUER ZEITWERTE
 //
-// Mitarbeitende, Kunden, Objekte sind reine Stammdaten ohne Geschaefts-
-// regel dahinter -- direktes Einfuegen ist hier so unproblematisch wie ein
-// manuell erfasster Datensatz im Cockpit. Rohzeit, Nettozeit und
-// Zeitbonus dagegen sind Rechtsgroessen (GAV private Sicherheits-
-// dienstleistungen). Sie werden darum NIE erfunden, sondern ausschliess-
-// lich ueber die bestehenden, geprueften Funktionen aus gavzeit.php
-// berechnet -- dieselbe einzige Quelle, die auch ein echter Lohnlauf
-// nutzt.
+// Mitarbeitende, Kunden, Objekte, Lohnansaetze und Abzugssaetze sind reine
+// Stammdaten ohne Geschaeftsregel dahinter -- direktes Einfuegen ist hier
+// so unproblematisch wie ein manuell erfasster Datensatz im Cockpit.
+// Rohzeit, Nettozeit, Zeitbonus und jeder Lohnbetrag dagegen sind
+// Rechtsgroessen (GAV private Sicherheitsdienstleistungen). Sie werden
+// darum NIE erfunden, sondern ausschliesslich ueber die bestehenden,
+// geprueften Funktionen aus gavzeit.php und lohnlauf.php berechnet --
+// dieselbe einzige Quelle, die auch ein echter Lohnlauf nutzt.
 //
 // Erwartet, dass db.php und rechte.php bereits geladen sind (der Aufrufer
 // -- Endpunkt oder Pruefung -- tut das), genau wie rundgang.php es
@@ -57,6 +56,7 @@ require_once __DIR__ . '/mitarbeiter.php';   // ma_login_generieren()
 require_once __DIR__ . '/planung.php';       // feiertage_solothurn()
 require_once __DIR__ . '/gavzeit.php';       // gavzeit_netto(), gavzeit_bonus_min()
 require_once __DIR__ . '/anmeldung.php';     // PASSWORT_KOSTEN
+require_once __DIR__ . '/lohnlauf.php';      // lohnlauf_person(), lohnlauf_nbu(), lohnlauf_abzuege()
 
 // Name des Musterbetriebs. Erfunden, kein Bezug zu einem realen Betrieb
 // beabsichtigt -- die Handelsregister-Pruefung VOR der ersten
@@ -76,11 +76,33 @@ function demo_tag(int $versatz): string
     return (new DateTimeImmutable('today'))->modify("$versatz days")->format('Y-m-d');
 }
 
+// Erster Tag des Kalendermonats VOR heute, als Tage-Versatz zu heute
+// (Stufe 2b) -- deckt damit einen vollen, tatsaechlich abgeschlossenen
+// Monat ab, nicht nur "vier Wochen zurueck". Ueber Monats- UND Jahres-
+// grenzen hinweg korrekt, weil relativ zu "heute" berechnet, nie fest
+// (CLAUDE.md/test_datumsfest.mjs).
+function demo_ruecklauf_versatz(): int
+{
+    $heute = new DateTimeImmutable('today');
+    return (int)$heute->diff($heute->modify('first day of last month'))->format('%r%a');
+}
+
+// Anfang und Ende desselben Vormonats als Datum -- fuer den Lohnlauf-
+// Zeitraum (demo_lohnlauf_erzeugen()), der einen Kalendermonat meint,
+// keinen Tage-Versatz.
+function demo_vormonat_bereich(): array
+{
+    $heute = new DateTimeImmutable('today');
+    return [$heute->modify('first day of last month')->format('Y-m-d'),
+            $heute->modify('last day of last month')->format('Y-m-d')];
+}
+
 function demo_daten_erzeugen_ausfuehren(PDO $pdo): void
 {
     // Ohne vorherige Einrichtung kontrolliert abbrechen, statt mit halben
     // Tabellen weiterzuarbeiten. hat_tabelle() steht in db.php.
-    foreach (['ma_funktion', 'ma_abteilung', 'objekte', 'rollen', 'einsaetze', 'rundgang', 'kontrollpunkt'] as $t) {
+    foreach (['ma_funktion', 'ma_abteilung', 'objekte', 'rollen', 'einsaetze', 'rundgang', 'kontrollpunkt',
+              'lohn_ansatz', 'lohn_abzug', 'lohnlauf'] as $t) {
         if (!hat_tabelle($pdo, $t)) {
             json_response(['status' => 'error',
                 'message' => "Einrichtung fehlt noch (Tabelle $t) -- zuerst im Cockpit auf „Einrichten“ klicken."], 503);
@@ -101,9 +123,25 @@ function demo_daten_erzeugen_ausfuehren(PDO $pdo): void
         $funktionen = demo_funktionen_abteilungen($pdo);
         $mitarbeitende = demo_mitarbeitende_erzeugen($pdo, $funktionen);
         demo_feiertage_erzeugen($pdo);
+        demo_lohn_ansatz_erzeugen($pdo, $mitarbeitende);
+        demo_lohn_abzug_erzeugen($pdo);
         $kunden = demo_kunden_erzeugen($pdo);
         $objekte = demo_objekte_erzeugen($pdo, $kunden);
-        $einsaetze = demo_einsaetze_erzeugen($pdo, $objekte, $mitarbeitende);
+
+        // Wer als Verwaltung Abgleich und Lohnlauf "durchgefuehrt" hat --
+        // dieselbe Person, die im gefuehrten Einstieg als Verwaltungsperson
+        // dient (demo_mitarbeiterliste(), erste Zeile: 'administrator').
+        $verwaltung = null;
+        foreach ($mitarbeitende as $m) {
+            if (in_array('administrator', $m['rollen'], true)) { $verwaltung = $m; break; }
+        }
+        if (!$verwaltung) {
+            throw new RuntimeException('Keine Person mit der Rolle "administrator" in demo_mitarbeiterliste() gefunden.');
+        }
+
+        $einsaetze = demo_einsaetze_erzeugen($pdo, $objekte, $mitarbeitende, (int)$verwaltung['id']);
+        [$vormonatVon, $vormonatBis] = demo_vormonat_bereich();
+        $lohnlaufId = demo_lohnlauf_erzeugen($pdo, $vormonatVon, $vormonatBis, (int)$verwaltung['id']);
         $punkteJeObjekt = demo_rundgaenge_erzeugen($pdo, $objekte, $mitarbeitende);
         demo_rundgang_mit_ereignis_erzeugen($pdo, $objekte, $punkteJeObjekt);
         demo_kundenzugang_erzeugen($pdo, $kunden);
@@ -114,7 +152,8 @@ function demo_daten_erzeugen_ausfuehren(PDO $pdo): void
     }
 
     json_response(['status' => 'ok', 'mitarbeitende' => count($mitarbeitende),
-        'kunden' => count($kunden), 'objekte' => count($objekte), 'einsaetze' => $einsaetze]);
+        'kunden' => count($kunden), 'objekte' => count($objekte), 'einsaetze' => $einsaetze,
+        'lohnlauf_id' => $lohnlaufId]);
 }
 
 // ── Betrieb ──────────────────────────────────────────────────────────
@@ -188,8 +227,9 @@ function demo_mitarbeitende_erzeugen(PDO $pdo, array $ids): array
     // keine echten Adressen.
     $orte = ['4600 Olten', '4632 Trimbach', '4500 Solothurn', '4900 Langenthal', '4665 Oftringen'];
     $einsatz = $pdo->prepare(
-        'INSERT INTO mitarbeiter (name, password_hash, ist_admin, vorname, nachname, ort, email)
-         VALUES (?, ?, ?, ?, ?, ?, ?)'
+        'INSERT INTO mitarbeiter (name, password_hash, ist_admin, vorname, nachname, ort, email,
+             anstellungskategorie, pensum_stunden, eintritt, geburtsdatum)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     );
     $funktionZuweisen = $pdo->prepare('UPDATE mitarbeiter SET personalnummer = ? WHERE id = ?');
     $rolleZuweisen = $pdo->prepare('INSERT INTO mitarbeiter_rollen (mitarbeiter_id, rolle) VALUES (?, ?)');
@@ -199,7 +239,23 @@ function demo_mitarbeitende_erzeugen(PDO $pdo, array $ids): array
     foreach (demo_mitarbeiterliste() as [$vor, $nach, $funktion, $abteilung, $rollen]) {
         $login = ma_login_generieren($vor, $nach, $pdo);
         $ort = $orte[($nr - 1) % count($orte)];
-        $einsatz->execute([$login, $hash, 0, $vor, $nach, $ort, "$login@beispiel.ch"]);
+        // Kategorie C fuer ALLE (Stufe 2b, Entscheid des Projektinhabers):
+        // Der Lohnlauf rechnet heute nur Kategorie C wirklich durch
+        // (monatslohn_offen fuer A/B, Etappe 3 deckt nur den Stundenlohn
+        // ab) -- ein Mix zeigte einzelnen Demo-Mitarbeitenden eine Sperre
+        // statt eines Ergebnisses, was in einem Verkaufsgespraech wie eine
+        // Luecke aussaehe statt wie Absicht.
+        // Eintritt und Geburtsdatum deterministisch gestreut (kein Zufall
+        // -- derselbe Lauf ergibt immer dieselben Werte, nachvollziehbar
+        // wie jeder andere Wert hier): Dienstjahr wirkt auf die Mindest-
+        // lohn-Stufe, Alter auf die Ferienentschaedigung (Art. 20) -- eine
+        // einzige, immer gleiche Person haette das nie unterschiedlich
+        // gezeigt. Relativ zu heute (demo_tag()), nie fest.
+        $eintritt = demo_tag(-(400 + ($nr * 137) % 1500));
+        $geburtsdatum = demo_tag(-(365 * 22) - (($nr * 733) % (365 * 35)));
+        $pensum = 1800 + ($nr * 53) % 400;
+        $einsatz->execute([$login, $hash, 0, $vor, $nach, $ort, "$login@beispiel.ch",
+            'C', $pensum, $eintritt, $geburtsdatum]);
         $id = (int)$pdo->lastInsertId();
         $funktionZuweisen->execute([str_pad((string)$nr, 3, '0', STR_PAD_LEFT), $id]);
         foreach ($rollen as $rolle) { $rolleZuweisen->execute([$id, $rolle]); }
@@ -208,6 +264,52 @@ function demo_mitarbeitende_erzeugen(PDO $pdo, array $ids): array
         $nr++;
     }
     return $angelegt;
+}
+
+// ── Lohn-Stammdaten (Stufe 2b) ───────────────────────────────────────
+// lohn_ansatz und lohn_abzug sind reine STAMMDATEN -- ein erfasster Satz,
+// keine berechnete Rechtsgroesse -- und darum wie Mitarbeitende/Kunden/
+// Objekte per direktem SQL vertretbar (siehe Kopfkommentar "WARUM
+// DIREKTES SQL"). Was daraus an Lohn ENTSTEHT, rechnet ausschliesslich
+// lohnlauf_person()/lohnlauf_abzuege() -- siehe demo_lohnlauf_erzeugen().
+function demo_lohn_ansatz_erzeugen(PDO $pdo, array $mitarbeitende): void
+{
+    $ein = $pdo->prepare(
+        'INSERT INTO lohn_ansatz (mitarbeiter_id, gueltig_ab, kategorie, ansatz_rappen, ferien_laufend, ml13_bp)
+         VALUES (?, ?, ?, ?, ?, ?)'
+    );
+    // Vor JEDEM erfassten Eintritt gueltig (aelteste Eintritts-Streuung
+    // reicht rund 1900 Tage zurueck, siehe demo_mitarbeitende_erzeugen()).
+    $gueltigAb = demo_tag(-1950);
+    foreach ($mitarbeitende as $i => $ma) {
+        // CHF 29.00 bis 31.90/Stunde -- durchgehend UEBER dem GAV-
+        // Mindestlohn 2026 fuer Kategorie C, Kantonsgruppe "uebrige"
+        // (hoechster Tabellenwert CHF 24.95, siehe LOHN_MINDESTLOHN in
+        // lohn.php): Kein Demo-Mitarbeitender soll die Mindestlohnwarnung
+        // zeigen -- das saehe in einem Verkaufsgespraech wie ein Fehler
+        // aus, nicht wie eine funktionierende Pruefung.
+        $ansatz = 2900 + ($i * 53) % 300;
+        $ein->execute([$ma['id'], $gueltigAb, 'C', $ansatz, 1, 833]);
+    }
+}
+
+// Betriebsweite NBU-/KTG-/BVG-Saetze. OHNE diese Eintraege bleibt der
+// Lohnlauf auf der Abzugsseite vollstaendig gesperrt -- kein Nettolohn,
+// keine Auszahlung (lohnlauf_sperrgruende()['abzug_fehlt']). AUSDRUECKLICH
+// ERFUNDEN, keine echte Police oder Kassenmeldung (Projektinhaber-
+// Entscheid, Stufe 2b) -- 'quelle' nennt das offen, damit niemand sie mit
+// einem echten Versicherer- oder Vorsorgewert verwechselt.
+function demo_lohn_abzug_erzeugen(PDO $pdo): void
+{
+    $quelle = 'Demo-Richtwert, keine echte Police (Musterbetrieb, Stufe 2b)';
+    $ein = $pdo->prepare(
+        'INSERT INTO lohn_abzug (schluessel, bezeichnung, gueltig_ab, gueltig_bis, satz_bp, quelle)
+         VALUES (?, ?, ?, NULL, ?, ?)'
+    );
+    $ab = demo_tag(-1950);
+    $ein->execute(['nbu', 'Nichtberufsunfallversicherung (Arbeitnehmer-Anteil)', $ab, 130, $quelle]);
+    $ein->execute(['ktg', 'Krankentaggeld (Arbeitnehmer-Anteil, Art. 17 Ziff. 3 GAV)', $ab, 75, $quelle]);
+    $ein->execute(['bvg', 'BVG (Arbeitnehmer-Anteil, Art. 25 Ziff. 3 GAV)', $ab, 350, $quelle]);
 }
 
 // ── Feiertage ────────────────────────────────────────────────────────
@@ -305,15 +407,18 @@ function demo_objekte_erzeugen(PDO $pdo, array $kunden): array
 // ── Einsätze ─────────────────────────────────────────────────────────
 // Ein Schichtmuster je Einsatzart -- kein Zufall, sondern dieselbe
 // Grundform, die auch ein echter Betrieb dieser Art zeigen würde.
-// [von, bis, Wochentage (1=Mo..7=So, leer=täglich), bedarf]
+// [von, bis, Wochentage (1=Mo..7=So, leer=täglich), bedarf, pause_min]
+// pause_min (Stufe 2b): unbezahlte Pause bei der rückwirkenden Abgleich-
+// Markierung vergangener Schichten (siehe demo_einsaetze_erzeugen()) --
+// dieselbe Grössenordnung, die auch ein echter Abgleich einträgt.
 function demo_schichtmuster(string $einsatzart): array
 {
     return match ($einsatzart) {
-        'Baustellenbewachung' => ['von' => '18:00', 'bis' => '06:00', 'tage' => [], 'bedarf' => 1],
-        'Revierdienst'        => ['von' => '22:00', 'bis' => '06:00', 'tage' => [], 'bedarf' => 1],
-        'Verkehrsdienst'      => ['von' => '07:00', 'bis' => '16:00', 'tage' => [1, 2, 3, 4, 5], 'bedarf' => 1],
-        'Empfang'             => ['von' => '08:00', 'bis' => '17:00', 'tage' => [1, 2, 3, 4, 5], 'bedarf' => 1],
-        default               => ['von' => '08:00', 'bis' => '17:00', 'tage' => [1, 2, 3, 4, 5], 'bedarf' => 1],
+        'Baustellenbewachung' => ['von' => '18:00', 'bis' => '06:00', 'tage' => [], 'bedarf' => 1, 'pause_min' => 60],
+        'Revierdienst'        => ['von' => '22:00', 'bis' => '06:00', 'tage' => [], 'bedarf' => 1, 'pause_min' => 30],
+        'Verkehrsdienst'      => ['von' => '07:00', 'bis' => '16:00', 'tage' => [1, 2, 3, 4, 5], 'bedarf' => 1, 'pause_min' => 30],
+        'Empfang'             => ['von' => '08:00', 'bis' => '17:00', 'tage' => [1, 2, 3, 4, 5], 'bedarf' => 1, 'pause_min' => 30],
+        default               => ['von' => '08:00', 'bis' => '17:00', 'tage' => [1, 2, 3, 4, 5], 'bedarf' => 1, 'pause_min' => 30],
     };
 }
 
@@ -391,7 +496,7 @@ function demo_objekt_teams(array $mitarbeitende, array $objekte): array
 // schichten_erzeugen.php/schichten_anlegen() in planung.php in der
 // Ausnahmeliste OHNE_SPERRE von test_php.mjs steht und ebenfalls ohne
 // diese Pruefung auskommt.
-function demo_einsaetze_erzeugen(PDO $pdo, array $objekte, array $mitarbeitende): int
+function demo_einsaetze_erzeugen(PDO $pdo, array $objekte, array $mitarbeitende, int $abgleichVon): int
 {
     $teams = demo_objekt_teams($mitarbeitende, $objekte);
 
@@ -405,6 +510,30 @@ function demo_einsaetze_erzeugen(PDO $pdo, array $objekte, array $mitarbeitende)
     $einZuteilung = $pdo->prepare(
         'INSERT INTO einsatz_zuteilung (einsatz_id, mitarbeiter_id, zusage) VALUES (?, ?, ?)'
     );
+    // Stufe 2b (Lohnlauf, ENT-523): JEDE VERGANGENE Schicht wird gleich
+    // beim Anlegen als abgeglichen markiert -- "anwesend", mit den
+    // Ist-Zeiten gleich den geplanten. Ein real gefuehrter Betrieb glicht
+    // zeitnah ab; ein Monat offener Vergangenheit saehe nicht nach einem
+    // gepflegten Betrieb aus. NUR die Vergangenheit: eine Schicht von
+    // heute oder morgen kann nicht abgeglichen sein, bevor sie stattfand
+    // -- und die bewusste Luecke heute Nacht (DEMO_UNTERBESETZTES_OBJEKT)
+    // muss ohnehin unbesetzt und offen bleiben (siehe unten).
+    // Dieselben Spalten wie einsatz_abgleich.php, gleiche Reihenfolge auf
+    // beiden Tabellen (dort UPDATE einsaetze UND einsatz_zuteilung
+    // zusammen) -- Auslagenersatz (ENT-125) bleibt bewusst aussen vor:
+    // eine eigene, zonenbasierte Berechnung, die hier niemand verlangt hat
+    // und die als Musterbetrieb-Erfindung genau die Art von geratener
+    // Zahl waere, die dieses Skript sonst vermeidet.
+    $einIstZuteilung = $pdo->prepare(
+        "UPDATE einsatz_zuteilung SET ist_status = 'anwesend', ist_von = ?, ist_bis = ?,
+             ist_pause_min = ?, ist_pause_bezahlt_ma = 0, abgeglichen_von = ?, abgeglichen_am = ?
+         WHERE einsatz_id = ? AND mitarbeiter_id = ?"
+    );
+    $einIstSchicht = $pdo->prepare(
+        "UPDATE einsaetze SET ist_status = 'anwesend', ist_von = ?, ist_bis = ?,
+             ist_pause_min = ?, ist_pause_bezahlt_ma = 0, abgeglichen_von = ?, abgeglichen_am = ?
+         WHERE id = ?"
+    );
 
     $angelegt = 0;
     foreach ($objekte as $objekt) {
@@ -417,7 +546,10 @@ function demo_einsaetze_erzeugen(PDO $pdo, array $objekte, array $mitarbeitende)
             // Einmaliger Anlass, kein Dauerauftrag: nur EIN Tag in der Zukunft.
             $tage = [DEMO_EVENT_TAGE_AB_HEUTE];
         } else {
-            $tage = range(-28, 14);
+            // Zurueck bis zum ersten Tag des Vormonats (Stufe 2b: der
+            // Lohnlauf braucht einen vollen, abgeglichenen Kalendermonat),
+            // vor bis in zwei Wochen -- wie bisher.
+            $tage = range(demo_ruecklauf_versatz(), 14);
         }
 
         $drehscheibe = 0; // rotiert NUR innerhalb des eigenen, exklusiven Teams
@@ -444,14 +576,129 @@ function demo_einsaetze_erzeugen(PDO $pdo, array $objekte, array $mitarbeitende)
             $angelegt++;
 
             $brauchtPersonen = $lueckeHeute ? 1 : $bedarf;
+            $zugeteilte = [];
             for ($p = 0; $p < $brauchtPersonen; $p++) {
                 $person = $team[$drehscheibe % count($team)];
                 $drehscheibe++;
                 $einZuteilung->execute([$einsatzId, $person['id'], 'bestätigt']);
+                $zugeteilte[] = $person['id'];
+            }
+
+            if ($versatz < 0) {
+                $abgeglichenAm = (new DateTimeImmutable($datum))->modify('+1 day 8 hours')->format('Y-m-d H:i:s');
+                $einIstSchicht->execute([$muster['von'], $muster['bis'], $muster['pause_min'],
+                    $abgleichVon, $abgeglichenAm, $einsatzId]);
+                foreach ($zugeteilte as $maId) {
+                    $einIstZuteilung->execute([$muster['von'], $muster['bis'], $muster['pause_min'],
+                        $abgleichVon, $abgeglichenAm, $einsatzId, $maId]);
+                }
             }
         }
     }
     return $angelegt;
+}
+
+// ── Lohnlauf (Stufe 2b) ──────────────────────────────────────────────
+// Baut GENAU EINEN abgeschlossenen Lohnlauf fuer den vollen Vormonat --
+// entwurf -> freigegeben -> ausbezahlt --, damit Fuehrungsstation 5 ("was
+// am Monatsende herauskommt") ein FERTIGES Ergebnis zeigt, nicht nur einen
+// leeren Bildschirm mit einem Knopf.
+//
+// Rechnet AUSSCHLIESSLICH ueber die echten Funktionen aus lohnlauf.php --
+// lohnlauf_person(), lohnlauf_nbu(), lohnlauf_abzuege() -- und speichert
+// deren Ergebnis unveraendert. Auswahl der Personen und das Schreiben in
+// lohnlauf/lohnlauf_person/lohnlauf_zeile bilden bewusst denselben Ablauf
+// nach wie backend/api/lohnlaeufe.php (aktion 'erzeugen'): dieselben
+// Spalten, dieselbe Reihenfolge, damit ein dort spaeter geaenderter Ablauf
+// hier nicht unbemerkt auseinanderlaeuft. Die Endpunkt-Datei selbst liess
+// sich nicht einbinden -- sie fuehrt beim Laden sofort require_session()
+// aus (kein Request-Kontext hier), derselbe Grund, aus dem diese Datei
+// von backend/api/demo_daten_erzeugen.php getrennt ist.
+function demo_lohnlauf_erzeugen(PDO $pdo, string $von, string $bis, int $erstelltVon): ?int
+{
+    $personenStmt = $pdo->query(
+        "SELECT id, vorname, nachname, name, personalnummer, anstellungskategorie,
+                pensum_stunden, eintritt, austritt, geburtsdatum
+         FROM mitarbeiter WHERE anstellungskategorie = 'C' ORDER BY nachname, vorname"
+    );
+
+    $vorschau = [];
+    foreach ($personenStmt->fetchAll() as $ma) {
+        $p = lohnlauf_person($pdo, $ma, $von, $bis);
+        // Wie lauf_vorschau(): eine Person ganz ohne Zeit und ohne
+        // Sperrgrund gehoert nicht in den Lauf -- eine Zeile mit lauter
+        // Nullen sieht aus wie ein Ergebnis und ist keines.
+        if ($p['roh_min'] === 0 && !$p['gesperrt_grund'] && !$p['gesperrt']
+            && $p['nicht_abgeglichen'] === 0) { continue; }
+        $p['mitarbeiter_id'] = (int)$ma['id'];
+
+        if (!$p['gesperrt_grund']) {
+            $p['nbu'] = lohnlauf_nbu($pdo, (int)$ma['id'], $bis);
+            $ab = lohnlauf_abzuege($pdo, $p, $bis, $p['nbu']);
+            $p['zeilen'] = array_merge($p['zeilen'], $ab['zeilen']);
+            $p['netto_rappen']      = $ab['netto_rappen'];
+            $p['auszahlung_rappen'] = $ab['auszahlung_rappen'];
+        } else {
+            $p['nbu'] = null;
+            $p['netto_rappen'] = null; $p['auszahlung_rappen'] = null;
+        }
+        $vorschau[] = $p;
+    }
+    if (!$vorschau) { return null; }
+
+    $einLauf = $pdo->prepare(
+        'INSERT INTO lohnlauf (periode_von, periode_bis, status, erstellt_von, bemerkung)
+         VALUES (?, ?, ?, ?, ?)'
+    );
+    $einLauf->execute([$von, $bis, 'entwurf', $erstelltVon, 'Musterbetrieb-Lohnlauf (ENT-523, Stufe 2b)']);
+    $laufId = (int)$pdo->lastInsertId();
+
+    $pIn = $pdo->prepare(
+        'INSERT INTO lohnlauf_person
+           (lauf_id, mitarbeiter_id, kategorie, lohnform, roh_min, netto_min, bonus_min,
+            bewertet_min, brutto_rappen, gesperrt_grund, gesperrt_zaehler,
+            nicht_abgeglichen, warnung, netto_rappen, auszahlung_rappen,
+            nbu_stand, nbu_herleitung)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+    );
+    $zIn = $pdo->prepare(
+        'INSERT INTO lohnlauf_zeile
+           (lauf_id, mitarbeiter_id, schluessel, bezeichnung, sortierung,
+            basis_rappen, satz_bp, menge, betrag_rappen, gesperrt_grund, annahme, hinweis)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?)'
+    );
+    foreach ($vorschau as $p) {
+        $pIn->execute([$laufId, $p['mitarbeiter_id'], $p['kategorie'], $p['lohnform'],
+            $p['roh_min'], $p['netto_min'], $p['bonus_min'], $p['bewertet_min'],
+            $p['brutto_rappen'], $p['gesperrt_grund'],
+            $p['gesperrt'] ? json_encode($p['gesperrt']) : null,
+            $p['nicht_abgeglichen'],
+            isset($p['warnung']) ? json_encode($p['warnung']) : null,
+            $p['netto_rappen'], $p['auszahlung_rappen'],
+            $p['nbu']['stand'] ?? null,
+            isset($p['nbu']) ? json_encode($p['nbu']) : null]);
+        foreach ($p['zeilen'] as $z) {
+            $zIn->execute([$laufId, $p['mitarbeiter_id'], $z['schluessel'], $z['bezeichnung'],
+                $z['sortierung'], $z['basis_rappen'], $z['satz_bp'], $z['menge'],
+                $z['betrag_rappen'], $z['gesperrt_grund'] ?? null,
+                $z['annahme'] ?? 0, $z['hinweis'] ?? null]);
+        }
+    }
+
+    // Bis "ausbezahlt" durchgestellt -- Fuehrungsstation 5 zeigt einem
+    // Interessenten ein ABGESCHLOSSENES Beispiel, nicht nur einen leeren
+    // Entwurf. Direktes UPDATE, keine erfundene Berechnung: Auch der echte
+    // Endpunkt (lohnlaeufe.php, 'freigeben'/'ausbezahlt') setzt an dieser
+    // Stelle nur Status und Zeitstempel und rechnet nicht neu -- "EIN
+    // FREIGEGEBENER LAUF WIRD NIE NEU GERECHNET".
+    $freigegebenAm = (new DateTimeImmutable($bis))->modify('+3 days')->format('Y-m-d H:i:s');
+    $ausbezahltAm  = (new DateTimeImmutable($bis))->modify('+5 days')->format('Y-m-d H:i:s');
+    $pdo->prepare('UPDATE lohnlauf SET status = ?, freigegeben_am = ?, freigegeben_von = ? WHERE id = ?')
+        ->execute(['freigegeben', $freigegebenAm, $erstelltVon, $laufId]);
+    $pdo->prepare('UPDATE lohnlauf SET status = ?, ausbezahlt_am = ?, ausbezahlt_von = ? WHERE id = ?')
+        ->execute(['ausbezahlt', $ausbezahltAm, $erstelltVon, $laufId]);
+
+    return $laufId;
 }
 
 // ── Rundgang, Kontrollpunkte, Ereignismeldung ───────────────────────
