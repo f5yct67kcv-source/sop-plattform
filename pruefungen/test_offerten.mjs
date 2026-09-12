@@ -989,6 +989,53 @@ await page.waitForTimeout(200);
 check('Auf einem anderen Kunden-Reiter loest die Rueckkehr KEINEN Offerten-Ladevorgang aus',
   belegListRufe === 0);
 
+// Nulldatum in gueltig_bis (OP-559, dieselbe Falle wie bei den Rechnungen).
+// '0000-00-00' ist truthy UND kleiner als jeder echte Tag -- eine Offerte ohne
+// Gueltigkeitsdatum stuende sonst als "abgelaufen" da. Unbekannt darf nie wie
+// laengst vorbei aussehen.
+try {
+  const pN = await browser.newPage({ viewport: { width: 1500, height: 1000 } });
+  pN.on('pageerror', e => bad.push('Nulldatum JS-Fehler: ' + e.message));
+  const NULLDATUM = { status: 'ok', naechste_nummer: 'OF-0002', belege: [
+    { id: 601, art: 'offerte', nummer: 'OF-0601', kunde_id: 1, kunde_name: 'Muster AG',
+      kundennummer: 'A0001', titel: 'Ohne echtes Gueltigkeitsdatum', referenz: null,
+      datum: tag(-10), gueltig_bis: '0000-00-00', status: 'versendet',
+      total_rappen: 12345, aktiv: 1, ist_vorlage: 0 },
+  ]};
+  await pN.route('**/api/**', async route => {
+    const url = route.request().url();
+    const send = b => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) });
+    if (url.includes('login.php')) return send({ status: 'ok', token: 't', name: 'adrian', ist_admin: true });
+    if (url.includes('me.php')) return send({ status: 'ok', name: 'adrian', ist_admin: true, rollen: [] });
+    if (url.includes('beleg_list')) {
+      const art = new URLSearchParams(url.split('?')[1] || '').get('art') || 'offerte';
+      return send(art === 'offerte' ? NULLDATUM : { status: 'ok', naechste_nummer: 'RE-1', belege: [] });
+    }
+    if (url.includes('kunden_list')) return send(KU);
+    if (url.includes('dashboard_stats')) return send(STATS);
+    return send({ status: 'ok' });
+  });
+  await pN.goto(URL);
+  await pN.fill('#gName', 'adrian'); await pN.fill('#gPass', 'x'); await pN.click('#gBtn');
+  await pN.waitForSelector('#shell.on'); await pN.waitForTimeout(400);
+  await pN.click('#nav-kunden'); await pN.waitForTimeout(150);
+  await pN.click('#nav-kunden-offerten'); await pN.waitForTimeout(400);
+
+  const zeile = (await pN.$$eval('#ofTable tbody tr', ts => ts.map(t => t.innerText.replace(/\s+/g, ' ').trim())))[0] || '';
+  check('KRITISCH: ein Nulldatum liest sich NICHT als "abgelaufen" (OP-559)',
+    zeile !== '' && !/abgelaufen/.test(zeile));
+  check('Die Offerte steht dabei trotzdem mit ihrem Betrag da',
+    /OF-0601/.test(zeile) && /123\.45/.test(zeile));
+  check('GEGENPROBE: mit echtem Datum in der Vergangenheit steht "abgelaufen" sehr wohl da',
+    await pN.evaluate(t => {
+      belege[0].gueltig_bis = t;
+      renderOfferten();
+      const tr = document.querySelector('#ofTable tbody tr');
+      return tr ? /abgelaufen/.test(tr.innerText) : false;
+    }, tag(-5)));
+  await pN.close();
+} catch (e) { bad.push('Nulldatum: ' + String(e).split('\n')[0].slice(0, 160)); }
+
 await browser.close();
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
