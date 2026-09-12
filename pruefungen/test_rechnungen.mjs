@@ -343,6 +343,56 @@ try {
   await p2.close();
 } catch (e) { bad.push('Leerzustand: ' + String(e).split('\n')[0].slice(0, 160)); }
 
+// Nulldatum in faellig_bis (OP-559). MySQL legt ausserhalb des strengen Modus
+// '0000-00-00' in eine DATE-Spalte, wenn ein leerer Text ankommt. Das ist KEIN
+// Datum -- es darf weder als "Überfällig" gelesen werden (der Vergleich
+// '0000-00-00' < heute ist wahr) noch zu "NaN Tage" fuehren (daraus wird ein
+// Invalid Date). Eigene Seite mit eigenen Daten, damit die Zaehlungen der
+// Pruefungen oben unberuehrt bleiben.
+try {
+  const p3 = await browser.newPage({ viewport: { width: 1500, height: 1000 } });
+  p3.on('pageerror', e => bad.push('Nulldatum JS-Fehler: ' + e.message));
+  const NULLDATUM = { status: 'ok', naechste_nummer: 'RE-0002', belege: [
+    { id: 501, art: 'rechnung', nummer: 'RE-0501', kunde_id: 1, kunde_name: 'Muster AG',
+      kundennummer: 'A0001', titel: 'Ohne echtes Faelligkeitsdatum', referenz: null,
+      datum: tag(-10), faellig_bis: '0000-00-00', status: 'versendet',
+      bezahlt: 0, bezahlt_am: null, total_rappen: 12345, aktiv: 1, ist_vorlage: 0 },
+  ]};
+  await p3.route('**/api/**', async route => {
+    const url = route.request().url();
+    const send = b => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) });
+    if (url.includes('login.php')) return send({ status: 'ok', token: 't', name: 'adrian', ist_admin: true });
+    if (url.includes('me.php')) return send({ status: 'ok', name: 'adrian', ist_admin: true, rollen: [] });
+    if (url.includes('beleg_list')) {
+      const art = new URLSearchParams(url.split('?')[1] || '').get('art') || 'offerte';
+      return send(art === 'rechnung' ? NULLDATUM : { status: 'ok', naechste_nummer: 'OF-1', belege: [] });
+    }
+    if (url.includes('kunden_list')) return send(KU);
+    if (url.includes('dashboard_stats')) return send(STATS);
+    return send({ status: 'ok' });
+  });
+  await p3.goto(URL);
+  await p3.fill('#gName', 'adrian'); await p3.fill('#gPass', 'x'); await p3.click('#gBtn');
+  await p3.waitForSelector('#shell.on'); await p3.waitForTimeout(400);
+  await p3.click('#nav-kunden'); await p3.waitForTimeout(150);
+  await p3.click('#nav-kunden-rechnungen'); await p3.waitForTimeout(400);
+
+  const zeile = (await p3.$$eval('#reTable tbody tr', ts => ts.map(t => t.innerText.replace(/\s+/g, ' ').trim())))[0] || '';
+  check('KRITISCH: ein Nulldatum liest sich NICHT als "Überfällig" (OP-559)',
+    zeile !== '' && !/Überfällig/.test(zeile));
+  check('KRITISCH: und ergibt kein "NaN"', !/NaN/.test(zeile));
+  check('Die Rechnung verschwindet dabei nicht -- sie steht mit ihrem Betrag da',
+    /RE-0501/.test(zeile) && /123\.45/.test(zeile));
+  check('GEGENPROBE: mit echtem Datum in der Vergangenheit steht "Überfällig" sehr wohl da',
+    await p3.evaluate(t => {
+      rechnungen[0].faellig_bis = t;
+      renderRechnungen();
+      const tr = document.querySelector('#reTable tbody tr');
+      return tr ? /Überfällig/.test(tr.innerText) : false;
+    }, tag(-5)));
+  await p3.close();
+} catch (e) { bad.push('Nulldatum: ' + String(e).split('\n')[0].slice(0, 160)); }
+
 await browser.close();
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
