@@ -26777,6 +26777,13 @@ function rdKdSpeichern() {
     rdKdAufgabenSetzen(zielId).then(fehler => {
       loadKontrollpunkte().then(() => {
         rdKarteAuswahl = zielId;
+        // Nach dem Speichern ist der Punkt nie mehr "neu" -- die
+        // Knopfbeschriftung muss das sofort nachziehen (gleiche Regel wie in
+        // rdKarteDetailZeichnen()), sonst stuende nach dem Anlegen eines
+        // NEUEN Punkts weiterhin "Verwerfen" da, obwohl ein Klick jetzt
+        // bereits die echte Entfernen-/Loeschen-Aktion ausloest.
+        const loeschKnopf = $('rdKdLoeschen');
+        if (loeschKnopf) { loeschKnopf.textContent = rdKdOrt === 'liste' ? 'Aus dieser Runde entfernen' : 'Löschen'; }
         // ENT-554: Ein NEUER Punkt aus dem Reiter "Kontrollpunkte" (ort
         // 'liste') gehoert sofort zu DIESER Runde -- der Reiter zeigt seither
         // nur noch zugeordnete Punkte, ohne diese Zuordnung waere der frisch
