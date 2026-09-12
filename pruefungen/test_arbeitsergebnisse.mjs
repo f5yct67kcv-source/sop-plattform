@@ -248,7 +248,9 @@ check('KRITISCH: die Ansicht startet auf einem verdrahteten Reiter',
 // gerenderten Farbe, nicht an einer Klasse allein.
 check('KRITISCH: die noch nicht verdrahteten Reiter sind schon an der Kachel zu erkennen',
   await page.evaluate(() => {
-    const mit = ['ereignisse', 'aufgaben', 'alarme', 'schluessel'];
+    // „ereignisse" steht seit ENT-547 NICHT mehr hier: Die Auswertung gibt
+    // es, nur an einem anderen Ort. Gedämpft bleibt, wofür es nichts gibt.
+    const mit = ['aufgaben', 'alarme', 'schluessel'];
     const ohne = ['wachbuch', 'scans', 'erledigung', 'fahrzeuguebernahmen'];
     const farbe = t => {
       const e = document.getElementById('ae-tab-' + t);
@@ -257,7 +259,9 @@ check('KRITISCH: die noch nicht verdrahteten Reiter sind schon an der Kachel zu 
     const gedaempft = farbe('alarme'), normal = farbe('erledigung');
     return !!gedaempft && !!normal && gedaempft !== normal
       && mit.every(t => farbe(t) === gedaempft)
-      && ohne.every(t => farbe(t) === normal);
+      && ohne.every(t => farbe(t) === normal)
+      // Der Verweis-Reiter trägt die volle Farbe -- er führt ja irgendwohin.
+      && farbe('ereignisse') === normal;
   }));
 // Und dort, wo Farbe allein nicht ankommt -- Vorleseprogramm, Mauszeiger.
 check('KRITISCH: die Aussage steht auch im Text, nicht nur in der Farbe',
@@ -268,6 +272,42 @@ check('KRITISCH: die Aussage steht auch im Text, nicht nur in der Farbe',
       && (e.getAttribute('aria-label') || '').includes('folgt später')
       && !!f && !f.getAttribute('title');
   }));
+
+/* ══════════ EIN REITER, DESSEN AUSWERTUNG ES ANDERSWO GIBT (ENT-547) ══
+   Dritter Zustand neben „hier verdrahtet" und „folgt später". Anlass: Der
+   Projektinhaber suchte das Foto einer Ereignismeldung in der Auswertung,
+   weil der Reiter dort steht -- und bekam „folgt später", während die volle
+   Liste seit ENT-297 unter Revierdienst › Ereignisse liegt. Der gedämpfte
+   Reiter hat nicht nur nichts gezeigt, er hat vom Vorhandenen weggeführt. */
+calls = [];
+await klick('#ae-tab-ereignisse');
+await page.waitForTimeout(150);
+const evVerweis = await page.textContent('#aeInhalt');
+check('KRITISCH: der Reiter sagt, WO die Ereignisse stehen -- nicht "folgt später"',
+  /Revierdienst/.test(evVerweis) && /Ereignisse/.test(evVerweis)
+  && !/folgt später/.test(evVerweis));
+check('KRITISCH: und er nennt, was dort zu finden ist',
+  /Zeitraum/.test(evVerweis) && /Foto/.test(evVerweis));
+check('Der Verweis kostet keinen Abruf -- geholt wird erst drüben',
+  calls.length === 0);
+check('KRITISCH: der Knopf führt wirklich in die Ereignisliste',
+  await page.evaluate(() => {
+    const k = document.getElementById('aeAnderswoBtn');
+    if (!k) { return false; }
+    k.click();
+    // Gemessen am gerenderten Zustand: die Revierdienst-Ansicht ist offen,
+    // ihr Ereignis-Abschnitt sichtbar, und die Kopfzeile sagt es auch.
+    const v = document.getElementById('view-rundgaenge');
+    const ab = document.getElementById('rdAb-ereignisse');
+    return !!v && v.classList.contains('on')
+      && !!ab && ab.getClientRects().length > 0
+      && document.getElementById('pgTitle').textContent === 'Ereignisse';
+  }));
+check('Und dort wird die Liste dann auch wirklich geholt',
+  calls.some(c => c.path.includes('ereignis_liste')));
+// Zurueck in die Auswertung fuer die weiteren Pruefungen.
+await page.evaluate(() => { go('arbeitsergebnisse'); arbeitsergebnisseOeffnen(); });
+await page.waitForTimeout(200);
 
 // ══════════ UNVERDRAHTETE REITER: BLEIBENDER HINWEIS, KEIN TOAST
 calls = [];
@@ -561,11 +601,13 @@ await page.waitForTimeout(150);
 check('KRITISCH: fehlende Einrichtung sagt das explizit -- nicht dieselbe Meldung wie ein leerer Zeitraum',
   (await page.textContent('#aeInhalt')).includes('noch nicht eingerichtet'));
 
-// ══════════ ZURUECK ZU EINEM UNVERDRAHTETEN REITER: KEIN HAENGENBLEIBEN
+// ══════════ ZURUECK ZU EINEM ANDEREN REITER: KEIN HAENGENBLEIBEN
+// Seit ENT-547 zeigt „Ereignisse" den Verweis statt „folgt später" -- der
+// Inhalt des vorigen Reiters darf trotzdem nicht stehenbleiben.
 await klick('#ae-tab-ereignisse');
 await page.waitForTimeout(100);
-check('"Ereignisse" zeigt ebenfalls den bleibenden Hinweis',
-  (await page.textContent('#aeInhalt')).includes('Ereignisse folgt später'));
+check('"Ereignisse" ersetzt den Inhalt des vorigen Reiters wirklich',
+  (await page.textContent('#aeInhalt')).includes('Revierdienst'));
 check('Der Reiter "Ereignisse" ist jetzt aktiv, "Rundgangerledigung" nicht mehr',
   await page.evaluate(() => {
     const a = document.getElementById('ae-tab-ereignisse'), b = document.getElementById('ae-tab-erledigung');

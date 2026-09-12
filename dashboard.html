@@ -20114,6 +20114,41 @@ const AE_REITER = [
     '<path d="M3 13l2-5.5A2 2 0 0 1 6.9 6h10.2a2 2 0 0 1 1.9 1.5L21 13"/><path d="M3 13h18v4a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1v-1H6v1a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><circle cx="7" cy="15" r="1"/><circle cx="17" cy="15" r="1"/>'],
 ];
 const AE_VERDRAHTET = ['wachbuch', 'scans', 'erledigung', 'fahrzeuguebernahmen'];
+
+/* Ein Reiter, dessen Auswertung es schon GIBT -- nur an einem anderen Ort
+   (ENT-547). Das ist ein DRITTER Zustand neben „hier verdrahtet" und „folgt
+   später", und er braucht einen eigenen Text: Der eine Fall heisst „gibt es
+   nicht", der andere „gibt es, zwei Klicks entfernt". Beide gleich aussehen
+   zu lassen ist dieselbe Familie wie „unbekannt darf nie wie keine
+   aussehen".
+
+   Anlass: Der Projektinhaber suchte das Foto einer Ereignismeldung in der
+   Auswertung -- weil der Reiter dort steht. Zu sehen bekam er „folgt
+   später", während die volle Liste seit ENT-297 unter Revierdienst →
+   Ereignisse liegt, mit Zeitraum, Filtern und Foto. Der gedämpfte Reiter hat
+   also nicht nur nichts gezeigt, er hat vom Vorhandenen weggeführt.
+
+   Bewusst KEINE zweite Liste an dieser Stelle: Dieselben Daten ein zweites
+   Mal zu zeigen kostet Pflege ohne neue Aussage (Optimierungsziel
+   „kleinstmögliche Software"). Ein Verweis kostet fast nichts und behebt
+   genau die Irreführung. */
+const AE_ANDERSWO = {
+  ereignisse: {
+    ort: 'Revierdienst › Ereignisse',
+    satz: 'Die gemeldeten Vorfälle haben dort ihre eigene Liste — mit Zeitraum, '
+        + 'Objekt- und Artfilter und dem Foto zur Meldung.',
+    knopf: 'Zu den Ereignissen',
+    hin: () => { go('rundgaenge'); rdAbschnittZeigen('ereignisse'); },
+  },
+};
+
+// Der Knopf im Verweis-Feld. Eigene Funktion, weil ein onclick-Text die
+// Kennung des Reiters mitten in ein Attribut setzen müsste -- daran ist
+// schon einmal ein Knopf zerbrochen (ENT-534).
+function aeAnderswoHin() {
+  const a = AE_ANDERSWO[aeTab];
+  if (a) { a.hin(); }
+}
 // Startreiter ist das Wachbuch (ENT-480): Es fuehrt zusammen, was die
 // uebrigen Reiter einzeln zeigen -- wer die Ansicht oeffnet, will zuerst
 // wissen, was ueberhaupt geschehen ist, und erst danach eine Art einzeln.
@@ -20133,13 +20168,19 @@ function arbeitsergebnisseOeffnen() {
   const ziel = $('aeReiter');
   if (!ziel) { return; }
   ziel.innerHTML = AE_REITER.map(([t, lbl, ic]) => {
-    const folgt = !AE_VERDRAHTET.includes(t);
+    const anderswo = AE_ANDERSWO[t];
+    // Ein Reiter, der anderswo hinführt, ist NICHT gedämpft: Es gibt ihn
+    // ja, nur nicht hier. Gedämpft bleibt allein, wofür es noch gar nichts
+    // gibt.
+    const folgt = !AE_VERDRAHTET.includes(t) && !anderswo;
     // title und aria-label tragen die Aussage auch dorthin, wo die
     // Dämpfung allein nicht ankommt: Vorleseprogramm und Mauszeiger.
+    const wink = folgt ? `${lbl} folgt später`
+      : (anderswo ? `${lbl} stehen unter ${anderswo.ort}` : '');
     return `
     <button type="button" class="rdkr-tab${t === aeTab ? ' aktiv' : ''}${folgt ? ' folgt' : ''}"
         id="ae-tab-${t}" data-reiter="${t}" onclick="aeGoTab('${t}')"
-        ${folgt ? `title="${esc(lbl)} folgt später" aria-label="${esc(lbl)} — folgt später"` : ''}>
+        ${wink ? `title="${esc(wink)}" aria-label="${esc(lbl)} — ${esc(wink)}"` : ''}>
       <span class="rdkr-tab-ic"><svg class="i" viewBox="0 0 24 24">${ic}</svg></span>
       <span class="rdkr-tab-lbl">${esc(lbl)}</span>
     </button>`;
@@ -20157,6 +20198,20 @@ function aeGoTab(t) {
 function aeRenderTab() {
   const inhalt = $('aeInhalt');
   if (!inhalt) { return; }
+  const anderswo = AE_ANDERSWO[aeTab];
+  if (anderswo) {
+    // Der ORT steht in der Überschrift, nicht im Fliesstext: Wer hier
+    // landet, sucht eine Auswertung und will zuerst wissen, wo sie ist.
+    const lbl = (AE_REITER.find(r => r[0] === aeTab) || [, aeTab])[1];
+    inhalt.innerHTML = `<div class="empty">
+      <div class="ic"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+      <h3>${esc(lbl)} stehen unter ${esc(anderswo.ort)}</h3>
+      <p>${esc(anderswo.satz)}</p>
+      <button class="btn btn-primary" id="aeAnderswoBtn" style="margin-top:14px"
+        onclick="aeAnderswoHin()">${esc(anderswo.knopf)}</button>
+    </div>`;
+    return;
+  }
   if (!AE_VERDRAHTET.includes(aeTab)) {
     // Der Name des Reiters steht mit im Text: „Folgt in einem späteren
     // Schritt" allein liesse offen, WAS folgt -- und wer zwei Reiter
