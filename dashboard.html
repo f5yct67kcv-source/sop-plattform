@@ -20113,7 +20113,7 @@ const AE_REITER = [
   ['fahrzeuguebernahmen', 'Fahrzeugübernahmen',
     '<path d="M3 13l2-5.5A2 2 0 0 1 6.9 6h10.2a2 2 0 0 1 1.9 1.5L21 13"/><path d="M3 13h18v4a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1v-1H6v1a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><circle cx="7" cy="15" r="1"/><circle cx="17" cy="15" r="1"/>'],
 ];
-const AE_VERDRAHTET = ['wachbuch', 'scans', 'erledigung', 'fahrzeuguebernahmen'];
+const AE_VERDRAHTET = ['wachbuch', 'scans', 'aufgaben', 'erledigung', 'fahrzeuguebernahmen'];
 
 /* Ein Reiter, dessen Auswertung es schon GIBT -- nur an einem anderen Ort
    (ENT-547). Das ist ein DRITTER Zustand neben „hier verdrahtet" und „folgt
@@ -20224,6 +20224,7 @@ function aeRenderTab() {
   }
   if (aeTab === 'wachbuch') { aeRenderWachbuch(); return; }
   if (aeTab === 'scans') { aeRenderScans(); return; }
+  if (aeTab === 'aufgaben') { aeRenderAufgaben(); return; }
   if (aeTab === 'erledigung') { aeRenderErledigung(); return; }
   if (aeTab === 'fahrzeuguebernahmen') { aeRenderUebernahmen(); return; }
 }
@@ -20775,6 +20776,158 @@ function wbFotoLaden(pfad, id, alt) {
       // Ein fehlgeschlagenes Foto darf nicht wie „kein Foto" aussehen.
       if (ziel) { ziel.innerHTML = '<span class="zone-note">Das Foto liess sich nicht laden.</span>'; }
     });
+}
+
+/* ══ AUFGABENERLEDIGUNG (ENT-548) ═══════════════════════════════════════
+   Ausdrueckliche Ansage des Projektinhabers: „Aufgabenerledigung auch
+   verdrahten."
+
+   WORIN DIESE ANSICHT SICH VOM REITER „KONTROLLPUNKTSCANS" UNTERSCHEIDET --
+   das ist die ganze Frage, und sie hat eine Vorgeschichte. ENT-311 hat eine
+   eigene Aufgabenliste ausdruecklich ABGELEHNT, mit dem Satz: „Eine zweite
+   Liste haette dieselbe Nacht ein zweites Mal erzaehlt." Dort stimmte das
+   auch: Die Scan-Ansicht zeigt jede Aufgabe an ihrem Kontrollpunkt, die
+   unbeantworteten eingereiht.
+
+   Diese Ansicht erzaehlt nicht dieselbe Nacht nochmal, sie beantwortet eine
+   andere Frage. Die Scan-Ansicht ist SCAN-ZUERST und beantwortet „was
+   geschah an diesem Punkt?". Sie beantwortet damit NICHT: „welche Aufgaben
+   sind im Zeitraum liegengeblieben?" -- dazu muesste man jede Scan-Karte
+   einzeln lesen, ueber alle Objekte und alle Naechte.
+
+   Diese hier ist AUFGABE-ZUERST und nach Zustand filterbar. Der Zweck ist
+   das Fehlende: „Unbeantwortet" ist der stillere und gefaehrlichere Fall
+   (ENT-311) -- niemand weiss, ob die Aufgabe getan wurde. Wer ihn suchen
+   will, braucht eine Liste, die danach filtert.
+
+   Derselbe Endpunkt wie bei den Scans, keine zweite Abfrage: Er liefert
+   beantwortete und unbeantwortete Aufgaben fuer den Zeitraum bereits mit
+   und kappt nichts. Darum darf der Zustandsfilter im Browser laufen -- die
+   Gesamtzahl ist vollstaendig bekannt, und „3 von 47" ist damit eine wahre
+   Aussage und keine aus einer gekappten Liste. */
+let aeAufgFilter = '';     // '' = alle; sonst ein Zustand
+let aeAufgDaten = null;    // die volle Liste des Zeitraums, ungefiltert
+
+const AE_AUFG_ZUSTAENDE = ['erledigt', 'nicht_moeglich', 'unbeantwortet'];
+
+function aeRenderAufgaben() {
+  const [von, bis] = aeVormonatBisHeute();
+  aeAufgFilter = '';
+  aeAufgDaten = null;
+  $('aeInhalt').innerHTML = `
+    <div class="bar-tools">
+      <div class="tool-gruppe">
+        <input class="inp" type="date" id="aeAufgVon" style="width:auto" value="${von}" onchange="aeLadeAufgaben()" aria-label="Zeitraum von">
+        <span class="tool-bis">bis</span>
+        <input class="inp" type="date" id="aeAufgBis" style="width:auto" value="${bis}" onchange="aeLadeAufgaben()" aria-label="Zeitraum bis">
+      </div>
+    </div>
+    <!-- Dieselbe Huelle wie die Artenleiste des Wachbuchs (.wb-kopf): Sie
+         traegt die Umbruchregeln und stellt die Zahl rechts frei. Eine
+         eigene Klasse waere eine zweite Fassung derselben Leiste. -->
+    <div class="wb-kopf" id="aeAufgFilterLeiste"></div>
+    <div id="aeAufgListe"><div class="sk" style="height:52px"></div></div>`;
+  aeLadeAufgaben();
+}
+
+function aeLadeAufgaben() {
+  // Die Felder gibt es nur, solange dieser Reiter gezeichnet ist -- dasselbe
+  // Muster wie bei den Scans.
+  const vonEl = $('aeAufgVon'), bisEl = $('aeAufgBis');
+  if (!vonEl || !bisEl) { return; }
+  const von = vonEl.value, bis = bisEl.value;
+  if (!von || !bis) { return; }
+  aeAufgFilter = '';
+  api(`rundgang_scan_liste.php?von=${encodeURIComponent(von)}&bis=${encodeURIComponent(bis)}`).then(({ ok, data }) => {
+    const gut = ok && data.status === 'ok';
+    aeAufgDaten = gut ? aeAufgabenMischen(data.aufgaben || [], data.offene_aufgaben || []) : null;
+    aeZeichneAufgaben();
+  });
+}
+
+/* Beantwortete und unbeantwortete in EINER Liste, mit demselben Zuschnitt --
+   sonst liessen sie sich nicht nebeneinander zaehlen und filtern. Die
+   Kennung der unbeantworteten traegt einen eigenen Vorsatz, damit sie nicht
+   mit der ID einer echten Antwort zusammenfaellt (gleiche Vorsicht wie in
+   aeZeichneScans). */
+function aeAufgabenMischen(beantwortet, offen) {
+  return beantwortet.concat(offen.map(o => ({
+    id: 'o' + o.rundgang_id + '-' + o.kontrollpunkt_id + '-' + o.aufgabe_id,
+    rundgang_id: o.rundgang_id,
+    erfasst_am: o.erfasst_am, status: 'unbeantwortet', grund: null,
+    bezeichnung: o.bezeichnung, kontrollpunkt_name: o.kontrollpunkt_name,
+    kunde_name: o.kunde_name, objekt_name: o.objekt_name,
+    vorname: o.vorname, nachname: o.nachname,
+  }))).sort((a, b) => String(b.erfasst_am).localeCompare(String(a.erfasst_am)));
+}
+
+function aeAufgFilterSetzen(zustand) {
+  // Nochmals auf denselben Knopf: Filter wieder weg. Ein Filter, den man nur
+  // setzen und nicht loesen kann, ist eine Falle.
+  aeAufgFilter = (aeAufgFilter === zustand) ? '' : zustand;
+  aeZeichneAufgaben();
+}
+
+function aeZeichneAufgaben() {
+  const ziel = $('aeAufgListe'), leiste = $('aeAufgFilterLeiste');
+  if (!ziel || !leiste) { return; }
+  if (!aeAufgDaten) {
+    leiste.innerHTML = '';
+    ziel.innerHTML = EMPTY('Aufgaben nicht verfügbar', 'Die Liste konnte nicht geladen werden.');
+    return;
+  }
+  const alle = aeAufgDaten;
+  // Je Zustand die WIRKLICHE Zahl im Zeitraum -- auch fuer einen, den der
+  // Filter gerade ausblendet. Ohne sie liesse sich nicht sagen, ob hinter
+  // einem gesetzten Filter noch etwas liegt (gleiche Regel wie im Wachbuch).
+  const jeZustand = {};
+  AE_AUFG_ZUSTAENDE.forEach(z => { jeZustand[z] = alle.filter(a => a.status === z).length; });
+  leiste.innerHTML = AE_AUFG_ZUSTAENDE.map(z => {
+    const [, lbl] = AE_AUFGABE_STATUS[z] || ['', z];
+    const an = aeAufgFilter === z;
+    return `<button type="button" class="wb-art${an ? ' on' : ''}" data-zustand="${z}"
+        onclick="aeAufgFilterSetzen('${z}')" aria-pressed="${an ? 'true' : 'false'}"
+        title="${esc(lbl)}: ${nf(jeZustand[z])} im Zeitraum">
+      <span>${esc(lbl)}</span><span class="n">${nf(jeZustand[z])}</span>
+    </button>`;
+  }).join('')
+    // Die Zahl steht nur da, wenn sie etwas erklaert. Eine gefilterte Zahl
+    // allein sieht aus wie die Gesamtzahl.
+    + (aeAufgFilter
+      ? `<span class="wb-zahl">${nf(jeZustand[aeAufgFilter])} von ${nf(alle.length)}</span>`
+      : '');
+
+  const liste = aeAufgFilter ? alle.filter(a => a.status === aeAufgFilter) : alle;
+  if (!liste.length) {
+    // „Kein Treffer" und „nichts vorhanden" sind verschiedene Aussagen
+    // (CLAUDE.md) -- und bei einer Aufgabenliste ist der Unterschied das
+    // Ergebnis selbst: Null „unbeantwortet" ist eine gute Nachricht, null
+    // Aufgaben im Zeitraum ist gar keine.
+    ziel.innerHTML = aeAufgFilter
+      ? EMPTY('Keine Aufgabe in diesem Zustand',
+          'Im Zeitraum liegt keine Aufgabe mit „'
+          + (AE_AUFGABE_STATUS[aeAufgFilter] || ['', aeAufgFilter])[1]
+          + '" vor. Der Filter lässt sich mit einem zweiten Klick wieder lösen.')
+      : EMPTY('Nichts vorhanden',
+          'Im gewählten Zeitraum wurde an keinem Kontrollpunkt eine Aufgabe erwartet.');
+    return;
+  }
+  ziel.innerHTML = liste.map(a => {
+    const [klasse, txt] = AE_AUFGABE_STATUS[a.status] || ['chip-n', a.status];
+    const person = [a.nachname, a.vorname].filter(Boolean).join(', ') || '–';
+    const datum = String(a.erfasst_am).slice(0, 10);
+    const zeit = String(a.erfasst_am).slice(11, 16);
+    return `<div class="ag-karte">
+        <div class="kopf"><b>${esc(a.bezeichnung)}</b><span class="chip ${klasse}">${esc(txt)}</span></div>
+        <div class="wer">${esc(a.kunde_name || '')}${a.objekt_name ? ' · ' + esc(a.objekt_name) : ''}${
+          a.kontrollpunkt_name ? ' · ' + esc(a.kontrollpunkt_name)
+            : ' · <span style="color:var(--ink-3)">Kontrollpunkt entfernt</span>'}</div>
+        <div class="zeiten">${dmy(datum)}, <b>${esc(zeit)}</b> · ${esc(person)}</div>
+        ${a.grund ? `<div class="zeiten">${esc(a.grund)}</div>` : ''}
+        ${a.rundgang_id ? `<button class="btn btn-plain btn-sm" style="margin-top:10px"
+          onclick="rgdZeigen(${Number(a.rundgang_id)})">Rundgang ansehen</button>` : ''}
+      </div>`;
+  }).join('');
 }
 
 function aeRenderScans() {

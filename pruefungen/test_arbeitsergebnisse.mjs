@@ -46,6 +46,30 @@ const SCANS = { status: 'ok', scans: [
   { id: 3, erfasst_am: `${T0} 22:15:00`, status: 'ersatzscan', beschreibung: 'NFC-Chip defekt, Foto beigelegt',
     kontrollpunkt_name: 'Garage', kunde_name: 'Beispiel Immobilien GmbH', objekt_name: 'Testliegenschaft Süd',
     titel: null, vorname: 'Hans', nachname: 'Beispiel' },
+],
+// Aufgaben fuer den Reiter „Aufgabenerledigung" (ENT-548). Alle DREI
+// Zustaende, weil der Zweck der Ansicht die Unterscheidung ist: „erledigt",
+// „nicht moeglich" (jemand hat hingeschaut und geantwortet) und
+// „unbeantwortet" (niemand hat etwas gesagt -- der stillere Fall).
+aufgaben: [
+  { id: 91, rundgang_id: 10, erfasst_am: `${T2} 20:06:00`, uebermittelt_am: `${T2} 20:06:30`,
+    status: 'erledigt', grund: null, bezeichnung: 'Licht löschen',
+    kontrollpunkt_name: 'Eingang', kunde_name: 'Muster Liegenschaften AG',
+    objekt_name: 'Testliegenschaft Nord', titel: 'Öffnungsrunde',
+    vorname: 'Erika', nachname: 'Muster' },
+  { id: 92, rundgang_id: 10, erfasst_am: `${T1} 21:12:00`, uebermittelt_am: `${T1} 21:12:30`,
+    status: 'nicht_moeglich', grund: 'Tür war verstellt', bezeichnung: 'Kellertür prüfen',
+    kontrollpunkt_name: 'Keller', kunde_name: 'Muster Liegenschaften AG',
+    objekt_name: 'Testliegenschaft Nord', titel: 'Öffnungsrunde',
+    vorname: 'Erika', nachname: 'Muster' },
+],
+// Eine unbeantwortete hat keine eigene Zeile in der Datenbank -- sie ist
+// das FEHLEN eines Eintrags und kommt darum aus einer eigenen Abfrage.
+offene_aufgaben: [
+  { rundgang_id: 11, kontrollpunkt_id: 7, kontrollpunkt_name: 'Garage',
+    aufgabe_id: 3, bezeichnung: 'Rolltor verriegeln', erfasst_am: `${T0} 22:16:00`,
+    kunde_name: 'Beispiel Immobilien GmbH', objekt_name: 'Testliegenschaft Süd',
+    titel: null, vorname: 'Hans', nachname: 'Beispiel' },
 ]};
 
 // Das Wachbuch startet die Ansicht (ENT-480). Hier reicht eine magere
@@ -250,8 +274,8 @@ check('KRITISCH: die noch nicht verdrahteten Reiter sind schon an der Kachel zu 
   await page.evaluate(() => {
     // „ereignisse" steht seit ENT-547 NICHT mehr hier: Die Auswertung gibt
     // es, nur an einem anderen Ort. Gedämpft bleibt, wofür es nichts gibt.
-    const mit = ['aufgaben', 'alarme', 'schluessel'];
-    const ohne = ['wachbuch', 'scans', 'erledigung', 'fahrzeuguebernahmen'];
+    const mit = ['alarme', 'schluessel'];
+    const ohne = ['wachbuch', 'scans', 'aufgaben', 'erledigung', 'fahrzeuguebernahmen'];
     const farbe = t => {
       const e = document.getElementById('ae-tab-' + t);
       return e ? getComputedStyle(e.querySelector('.rdkr-tab-lbl')).color : null;
@@ -308,6 +332,103 @@ check('Und dort wird die Liste dann auch wirklich geholt',
 // Zurueck in die Auswertung fuer die weiteren Pruefungen.
 await page.evaluate(() => { go('arbeitsergebnisse'); arbeitsergebnisseOeffnen(); });
 await page.waitForTimeout(200);
+
+/* ══════════ AUFGABENERLEDIGUNG (ENT-548) ═════════════════════════════
+   Ausdrueckliche Ansage des Projektinhabers. Der Reiter beantwortet eine
+   ANDERE Frage als „Kontrollpunktscans": nicht „was geschah an diesem
+   Punkt?", sondern „welche Aufgaben sind liegengeblieben?". Geprueft wird
+   genau dieser Unterschied -- eine zweite Liste derselben Nacht waere nach
+   ENT-311 ausdruecklich unerwuenscht. */
+// Ein fehlendes Element darf die Suite nicht abbrechen -- sie soll ROT
+// melden, nicht sterben (beim Gegenprobieren aufgefallen).
+const textVon = sel => page.evaluate(s2 => {
+  const e = document.querySelector(s2); return e ? e.textContent : '';
+}, sel);
+calls = [];
+await klick('#ae-tab-aufgaben');
+await page.waitForTimeout(250);
+check('KRITISCH: "Aufgabenerledigung" ist verdrahtet und holt ihre Daten',
+  calls.some(c => c.path.includes('rundgang_scan_liste')));
+check('KRITISCH: kein "folgt später" mehr',
+  !(await page.textContent('#aeInhalt')).includes('folgt später'));
+const aufgText = await textVon('#aeInhalt');
+check('KRITISCH: alle drei Zustände kommen vor -- auch der unbeantwortete',
+  /Licht löschen/.test(aufgText) && /Kellertür prüfen/.test(aufgText)
+  && /Rolltor verriegeln/.test(aufgText));
+check('KRITISCH: "Unbeantwortet" ist als eigener Zustand benannt, nicht als fehlende Zeile',
+  /Unbeantwortet/.test(aufgText));
+check('Der Grund einer nicht möglichen Aufgabe steht dabei',
+  /Tür war verstellt/.test(aufgText));
+/* Die Aufgabe steht ZUOBERST auf der Karte -- das ist der Unterschied zur
+   Scan-Ansicht, wo der Kunde oben steht und die Aufgabe eine Zeile darin
+   ist. Gemessen an der Reihenfolge im Kopf, nicht am Vorkommen des Wortes. */
+check('KRITISCH: die Ansicht ist aufgabe-zuerst, nicht scan-zuerst',
+  await page.evaluate(() => {
+    const k = document.querySelector('#aeAufgListe .ag-karte .kopf b');
+    return !!k && /Rolltor verriegeln|Licht löschen|Kellertür prüfen/.test(k.textContent);
+  }));
+
+// Je Zustand die WIRKLICHE Zahl im Zeitraum -- auch fuer einen, den der
+// Filter gerade ausblendet.
+check('KRITISCH: jeder Zustand nennt seine Zahl im Zeitraum',
+  await page.evaluate(() => {
+    const n = z => {
+      const b = document.querySelector(`#aeAufgFilterLeiste [data-zustand="${z}"] .n`);
+      return b ? b.textContent.trim() : null;
+    };
+    return n('erledigt') === '1' && n('nicht_moeglich') === '1' && n('unbeantwortet') === '1';
+  }));
+// Ohne gesetzten Filter steht KEINE Gesamtzahl daneben: Eine Zahl ohne
+// Bezug sieht aus wie die Gesamtzahl (CLAUDE.md).
+check('Ohne Filter steht keine bezugslose Zahl daneben',
+  await page.evaluate(() => !document.querySelector('#aeAufgFilterLeiste .wb-zahl')));
+
+// ── Der Filter: der eigentliche Zweck dieser Ansicht
+calls = [];
+const filterDa = await page.evaluate(() =>
+  !!document.querySelector('#aeAufgFilterLeiste [data-zustand="unbeantwortet"]'));
+if (filterDa) { await klick('#aeAufgFilterLeiste [data-zustand="unbeantwortet"]'); }
+await page.waitForTimeout(150);
+const gefiltert = await textVon('#aeAufgListe');
+check('KRITISCH: der Zustandsfilter blendet die übrigen aus',
+  /Rolltor verriegeln/.test(gefiltert) && !/Licht löschen/.test(gefiltert));
+check('KRITISCH: und die gefilterte Zahl trägt ihren Bezug -- "1 von 3"',
+  await page.evaluate(() => {
+    const z = document.querySelector('#aeAufgFilterLeiste .wb-zahl');
+    return !!z && /1\s*von\s*3/.test(z.textContent);
+  }));
+check('Der Filter kostet keinen zweiten Abruf -- die Liste ist ungekappt schon da',
+  calls.length === 0);
+check('Der gewählte Filter ist an der Schaltfläche zu sehen',
+  await page.evaluate(() => {
+    const b = document.querySelector('#aeAufgFilterLeiste [data-zustand="unbeantwortet"]');
+    return !!b && b.classList.contains('on') && b.getAttribute('aria-pressed') === 'true';
+  }));
+// Ein Filter, den man nur setzen und nicht loesen kann, ist eine Falle.
+if (filterDa) { await klick('#aeAufgFilterLeiste [data-zustand="unbeantwortet"]'); }
+await page.waitForTimeout(150);
+check('KRITISCH: ein zweiter Klick löst den Filter wieder',
+  /Licht löschen/.test(await textVon('#aeAufgListe')));
+
+// „Kein Treffer" und „nichts vorhanden" sind verschiedene Aussagen -- und
+// hier ist der Unterschied das Ergebnis selbst: null „unbeantwortet" ist
+// eine gute Nachricht, null Aufgaben im Zeitraum ist gar keine.
+await page.evaluate(() => { aeAufgDaten = []; aeZeichneAufgaben(); });
+await page.waitForTimeout(100);
+check('KRITISCH: ohne jede Aufgabe sagt die Ansicht das, statt leer zu bleiben',
+  (await textVon('#aeAufgListe')).includes('Nichts vorhanden'));
+await page.evaluate(() => {
+  aeAufgDaten = [{ id: 1, erfasst_am: '2020-01-01 10:00:00', status: 'erledigt',
+    bezeichnung: 'X', kontrollpunkt_name: 'Y', kunde_name: 'Z', objekt_name: 'Q',
+    vorname: 'A', nachname: 'B', grund: null }];
+  aeAufgFilter = 'unbeantwortet';
+  aeZeichneAufgaben();
+});
+await page.waitForTimeout(100);
+check('KRITISCH: ein Filter ohne Treffer sieht NICHT aus wie "nichts vorhanden"',
+  (await textVon('#aeAufgListe')).includes('Keine Aufgabe in diesem Zustand'));
+await klick('#ae-tab-aufgaben');
+await page.waitForTimeout(250);
 
 // ══════════ UNVERDRAHTETE REITER: BLEIBENDER HINWEIS, KEIN TOAST
 calls = [];
