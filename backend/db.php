@@ -77,6 +77,20 @@ function ist_demo(): bool
     return umgebung_ist_demo(APP_ENV);
 }
 
+// Wache fuer Endpunkte, die AUSSCHLIESSLICH in der Demo-Umgebung existieren
+// duerfen (ENT-523, erster Verwender: demo_daten_erzeugen.php). Antwortet
+// 404, nicht 403: Wer in Produktion oder Staging nach einem
+// Datenerzeugungs-Endpunkt sucht, soll dieselbe Antwort bekommen wie fuer
+// einen Pfad, den es dort schlicht nicht gibt -- kein Hinweis darauf, dass
+// ein solcher Mechanismus ueberhaupt existiert. Steht VOR jeder anderen
+// Pruefung im aufrufenden Endpunkt: Ein 403 vor dieser Wache wuerde schon
+// verraten, dass der Pfad in Produktion etwas Bekanntes ist.
+function require_demo_umgebung(): void
+{
+    if (ist_demo()) { return; }
+    json_response(['status' => 'error', 'message' => 'Nicht gefunden.'], 404);
+}
+
 // ── Die eigene Adresse (ENT-501) ──────────────────────────────────────
 //
 // ANLASS: Die Sicherheitspruefung vom 2026-09-09. Drei Stellen bauten einen

@@ -524,6 +524,13 @@ jobs:
           # von api/demo_senden.php -- steht darum auch in der Sperrliste.
           # Der ENDPUNKT heisst bewusst anders: gleicher Name hiesse mitgesperrt.
           cp backend/demo_anfrage.php dist/demo_anfrage.php
+          # Musterbetrieb-Erzeugung fuer die Demo-Umgebung (ENT-523),
+          # eingebunden von api/demo_daten_erzeugen.php -- steht darum auch
+          # in der Sperrliste. Wird fuer ALLE Umgebungen mitkopiert wie
+          # jede andere Backend-Datei; require_demo_umgebung() im Endpunkt
+          # sorgt dafuer, dass ein Aufruf ausserhalb der Demo 404 liefert,
+          # nicht die Datei-Sperrliste allein.
+          cp backend/demo_daten.php dist/demo_daten.php
           cp backend/ai.php dist/ai.php
           cp backend/planung.php dist/planung.php
           cp backend/kunden.php dist/kunden.php
