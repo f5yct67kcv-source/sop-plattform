@@ -6023,6 +6023,14 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
              gleichzeitig. "Adressen" bleibt darum der hart gesetzte Rueckfall.
              ── -->
         <div class="ku-tab" id="kv-lage">
+          <!-- Verweigert der Server die Belege (OP-558), steht hier EIN Satz
+               statt vier Kacheln mit CHF 0.00. Ein Nullbetrag waere hier die
+               schlimmste Auskunft von allen: Er sieht aus wie "nichts offen"
+               und ist doch nur "ich darf es nicht sehen". Der Inhalt wird
+               dabei nicht geleert, sondern verborgen -- er kommt vollstaendig
+               zurueck, sobald das Recht da ist. -->
+          <div class="card" id="kuLageSperre" hidden><div class="card-bd"></div></div>
+          <div id="kuLageInhalt">
           <div class="grid g-kpi" id="kuLageKpi"></div>
           <!-- Kartenkoepfe nach dem Haus-Muster der Uebersicht: Titel links,
                Abstandhalter, Kurzinfo als Pille rechts (".card-hd .note").
@@ -6057,6 +6065,7 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
               </div>
               <div class="card-bd flush"><div class="tw" id="kuLageOf"></div></div>
             </div>
+          </div>
           </div>
         </div>
         <!-- ── Adressen (bisher "Übersicht") -- Kundenliste, ueberarbeitet (ENT-040):
@@ -9564,6 +9573,22 @@ let kunden = [];
 let einsaetze = [];
 let objekte = [];
 let masterschichten = [];   // die des offenen Objekts
+// Der Satz fuer "der Server hat die Belege verweigert". Einmal geschrieben
+// und dreimal gebraucht (Offerten, Rechnungen, Uebersicht) -- dreimal
+// getippt liefe er auseinander, sobald das Recht einmal anders heisst.
+// Wortlaut nach dem Vorbild von lohnLeer(): Was fehlt, und wo es herkommt.
+const BELEG_KEIN_ZUGRIFF = ['Kein Zugriff auf Offerten und Rechnungen',
+  'Dafür braucht es das Recht „Offerten & Rechnungen“. Wer es vergibt, steht unter Administration → Rollen.'];
+
+// Ob der Server die Belegliste je Art herausgegeben hat (OP-558).
+// null = noch nicht gefragt, true = geladen, false = 403, also kein Recht.
+//
+// DREI Zustaende und nicht zwei, weil ein leeres belege[] alle drei bedeuten
+// kann: noch nicht geladen, nichts vorhanden, kein Zugriff. Das sind drei
+// verschiedene Aussagen und brauchen drei verschiedene Saetze -- die Regel,
+// die hier im Haus am haeufigsten gebrochen wurde.
+let belegZugriff = { offerte: null, rechnung: null };
+
 // Offerten und ihre Preis-Stammdaten (ENT-181). belege[] traegt nur die
 // Kopfdaten der Liste -- die Positionen holt das Formular einzeln beim
 // Oeffnen, sonst laege bei zweihundert Offerten die zehnfache Datenmenge
@@ -10069,6 +10094,13 @@ const NAV_RECHTE = {
   // Offerten haengen am eigenen Recht, nicht an 'kunden' (ENT-181): Wer
   // Adressen pflegt, sieht darum noch keine Preise.
   'nav-kunden-offerten':    'offerten_lesen',
+  // Rechnungen laufen durch DIESELBE Tabelle und DENSELBEN Endpunkt wie die
+  // Offerten (beleg_list.php, Recht 'offerten_lesen') -- der Menuepunkt stand
+  // hier trotzdem nicht und war damit fuer jeden mit 'kunden_lesen' sichtbar
+  // (OP-559 vorgelagert, behoben unter OP-558). Wer nur Adressen pflegt,
+  // klickte auf "Rechnungen" und bekam vom Server ein 403, das die Oberflaeche
+  // still verschluckte: eine leere Flaeche ohne einen einzigen Satz.
+  'nav-kunden-rechnungen':  'offerten_lesen',
   // Die Uebersicht (ENT-555) zeigt ausschliesslich Betraege aus Offerten und
   // Rechnungen -- sie haengt darum am selben Recht wie diese, nicht an
   // 'kunden_lesen'. Ohne das Recht bleibt der Punkt weg UND der Bereich
@@ -12966,8 +12998,12 @@ function pdArchivKlick(id, aktiv) {
 function loadBelege() {
   return api('beleg_list.php?art=offerte').then(({ ok, status, data }) => {
     if (status === 401) return doLogout();
-    if (status === 403) return;
+    // Frueher ein stilles `return` (OP-558): Die Flaeche blieb leer, und leer
+    // sieht aus wie "es gibt keine Offerten". Jetzt wird der Zustand vermerkt
+    // und gezeichnet -- die Antwort lautet "kein Zugriff", nicht "nichts da".
+    if (status === 403) { belegZugriff.offerte = false; renderOfferten(); return; }
     if (!ok || data.status !== 'ok') { toast(data.message || 'Offerten konnten nicht geladen werden.'); return; }
+    belegZugriff.offerte = true;
     belege = data.belege || [];
     ofNaechsteNummer = data.naechste_nummer || '';
     renderOfferten();
@@ -13015,7 +13051,7 @@ function ofKarte(b, heute) {
   const si = ofStatusInfo(b.status);
   // Gleiche Regel wie in der Tabelle: abgelaufen heisst nicht abgelehnt, und
   // bei einer bestaetigten oder abgelehnten Offerte ist das Datum belanglos.
-  const abgelaufen = b.gueltig_bis && String(b.gueltig_bis) < heute
+  const abgelaufen = !leeresDatum(b.gueltig_bis) && String(b.gueltig_bis) < heute
     && b.status !== 'bestaetigt' && b.status !== 'abgelehnt';
   const empf = ofEmpfaenger(b);
   const zeilen = [
@@ -13081,6 +13117,13 @@ function ofEmpfaenger(b) {
 }
 
 function renderOfferten() {
+  // Vor allem anderen (OP-558): Ohne Zugriff gibt es nichts zu filtern, und
+  // ein leerer Statusfilter ueber einer leeren Tabelle behauptete, es sei
+  // nichts vorhanden.
+  if (belegZugriff.offerte === false) {
+    $('ofTable').innerHTML = EMPTY(...BELEG_KEIN_ZUGRIFF);
+    return;
+  }
   const q = ($('ofQ').value || '').toLowerCase().trim();
   const statusFilter = $('ofStatus').value || '';
   const wollAktiv = ofArchivTab === 'alle' ? 1 : 0;
@@ -13153,7 +13196,7 @@ function renderOfferten() {
       // sichtbar, das Datum bekommt nur einen stillen Hinweis. Ein
       // abgelaufenes Datum bei einer bereits bestaetigten Offerte ist
       // ausserdem belanglos und wird darum nicht gekennzeichnet.
-      const abgelaufen = b.gueltig_bis && String(b.gueltig_bis) < heute
+      const abgelaufen = !leeresDatum(b.gueltig_bis) && String(b.gueltig_bis) < heute
         && b.status !== 'bestaetigt' && b.status !== 'abgelehnt';
       return `
       <tr class="click" onclick="ofOeffnen(${Number(b.id)})">
@@ -13185,8 +13228,9 @@ function renderOfferten() {
 function loadRechnungen() {
   return api('beleg_list.php?art=rechnung').then(({ ok, status, data }) => {
     if (status === 401) return doLogout();
-    if (status === 403) return;
+    if (status === 403) { belegZugriff.rechnung = false; renderRechnungen(); return; }
     if (!ok || data.status !== 'ok') { toast(data.message || 'Rechnungen konnten nicht geladen werden.'); return; }
+    belegZugriff.rechnung = true;
     rechnungen = data.belege || [];
     reNaechsteNummer = data.naechste_nummer || '';
     renderRechnungen();
@@ -13223,7 +13267,11 @@ function reEmpfaenger(b) {
 // laengst faellig ist, soll das zeigen, nicht weiterhin "Versendet".
 function reStatusInfo(b) {
   if (Number(b.bezahlt)) { return { text: 'Bezahlt', chip: 'chip-p' }; }
-  if (b.faellig_bis && String(b.faellig_bis) < isoTag()) { return { text: 'Überfällig', chip: 'chip-x' }; }
+  // leeresDatum() statt einer blossen Wahrheitspruefung (OP-559): '0000-00-00'
+  // ist truthy UND kleiner als jeder echte Tag -- eine Rechnung ohne Frist
+  // stuende damit als "Überfällig" da. Genau der Fall, fuer den es
+  // leeresDatum() gibt: unbekannt darf nie wie laengst vorbei aussehen.
+  if (!leeresDatum(b.faellig_bis) && String(b.faellig_bis) < isoTag()) { return { text: 'Überfällig', chip: 'chip-x' }; }
   return ofStatusInfo(b.status);
 }
 
@@ -13231,9 +13279,14 @@ function reStatusInfo(b) {
 // und solche ohne Faelligkeitsdatum zeigen einen Strich statt einer
 // erfundenen Zahl.
 function reFaelligTage(b) {
-  if (Number(b.bezahlt) || !b.faellig_bis) { return null; }
+  // Dieselbe Falle wie in reStatusInfo (OP-559), hier mit anderer Wirkung:
+  // aus '0000-00-00' wird ein Invalid Date, und die Rechnung darunter ergaebe
+  // "NaN Tage". Der Rueckgabewert null heisst "nicht bestimmbar" und wird
+  // oben schon als Strich gezeichnet -- er ist der richtige Platz dafuer.
+  if (Number(b.bezahlt) || leeresDatum(b.faellig_bis)) { return null; }
   const heute = new Date(); heute.setHours(0, 0, 0, 0);
   const faellig = new Date(String(b.faellig_bis).slice(0, 10) + 'T00:00:00');
+  if (Number.isNaN(faellig.getTime())) { return null; }
   return Math.round((faellig - heute) / 864e5);
 }
 function reFaelligHtml(b) {
@@ -13249,6 +13302,10 @@ function reFaelligHtml(b) {
 function reOffenRappen(b) { return Number(b.bezahlt) ? 0 : (Number(b.total_rappen) || 0); }
 
 function renderRechnungen() {
+  if (belegZugriff.rechnung === false) {
+    $('reTable').innerHTML = EMPTY(...BELEG_KEIN_ZUGRIFF);
+    return;
+  }
   const q = ($('reQ').value || '').toLowerCase().trim();
   const statusFilter = $('reStatus').value || '';
   const d = rechnungen.filter(b => {
@@ -17735,6 +17792,8 @@ const KU_LAGE_ZEILEN = 6;
 const KU_LAGE_FRIST = 30;
 
 function kuLageSkelett() {
+  $('kuLageSperre').hidden = true;
+  $('kuLageInhalt').hidden = false;
   $('kuLageKpi').innerHTML = Array.from({ length: 4 }, () =>
     `<div class="kpi"><div class="sk" style="height:12px;width:52%"></div>
      <div class="sk" style="height:28px;width:46%;margin-top:14px"></div>
@@ -17752,6 +17811,17 @@ function kuLageSkelett() {
 const kuLageChf = rappen => `<span class="waehrung">CHF</span>${chf(rappen)}`;
 
 function renderKundenLage() {
+  // Beide Listen haengen am selben Recht -- verweigert der Server eine,
+  // verweigert er beide. Ein einziger Satz statt vier Kacheln mit CHF 0.00
+  // (OP-558): "kein Zugriff" und "nichts offen" sind verschiedene Aussagen,
+  // und die zweite waere hier eine beruhigende Luege.
+  const gesperrt = belegZugriff.offerte === false || belegZugriff.rechnung === false;
+  $('kuLageSperre').hidden = !gesperrt;
+  $('kuLageInhalt').hidden = gesperrt;
+  if (gesperrt) {
+    $('kuLageSperre').querySelector('.card-bd').innerHTML = EMPTY(...BELEG_KEIN_ZUGRIFF);
+    return;
+  }
   const rAktiv = rechnungen.filter(kuLageAktiv);
   const offen  = rAktiv.filter(b => !Number(b.bezahlt));
   const mitTagen = offen.map(b => ({ b, t: kuLageUeberTage(b) }));

@@ -124,7 +124,8 @@ const OHNE_BELEGE = VOLLRECHTE.filter(r => !r.startsWith('offerten_'));
 
 // Eine angemeldete Seite mit den gewuenschten Rechten und Belegen.
 async function seite(browser, { rechte = VOLLRECHTE, viewport = { width: 1500, height: 1000 },
-                                rechnungen = RECHNUNGEN, offerten = OFFERTEN } = {}) {
+                                rechnungen = RECHNUNGEN, offerten = OFFERTEN,
+                                belegeVerweigern = false } = {}) {
   const page = await browser.newPage({ viewport });
   page.on('pageerror', e => bad.push('JS-Fehler: ' + e.message));
   await page.route('**/api/**', async route => {
@@ -136,6 +137,14 @@ async function seite(browser, { rechte = VOLLRECHTE, viewport = { width: 1500, h
     if (url.includes('login.php')) return send({ status: 'ok', token: 't', name: 'adrian', ist_admin: false, rollen: [], rechte });
     if (url.includes('me.php')) return send({ status: 'ok', name: 'adrian', ist_admin: false, rollen: [], rechte });
     if (url.includes('beleg_list')) {
+      // Der Fall aus OP-558: Der Server sagt nein, obwohl die Oberflaeche
+      // hergefunden hat. Das kann passieren, wenn das Recht waehrend der
+      // Sitzung entzogen wird -- oder wenn ein Menuepunkt an keinem Recht
+      // haengt, wie es bei "Rechnungen" der Fall war.
+      if (belegeVerweigern) {
+        return route.fulfill({ status: 403, contentType: 'application/json',
+          body: JSON.stringify({ status: 'error', message: 'Kein Zugriff' }) });
+      }
       const art = new URLSearchParams(url.split('?')[1] || '').get('art') || 'offerte';
       return send(art === 'rechnung' ? rechnungen : offerten);
     }
@@ -417,6 +426,65 @@ try {
     (await p6.evaluate(() => document.querySelectorAll('#kuLageAlter .bar').length)) === 5);
   await p6.close();
 } catch (e) { bad.push('Leerzustaende: ' + String(e).split('\n')[0].slice(0, 160)); }
+
+// ══════════════════════════════════════════ 9. WENN DER SERVER NEIN SAGT
+// OP-558: Bis hierher verschluckte die Oberflaeche ein 403 still. Die Flaeche
+// blieb leer -- und leer sieht aus wie "es gibt nichts". Auf der Uebersicht
+// waere es sogar CHF 0.00 gewesen, also eine beruhigende Zahl statt einer
+// Auskunft.
+try {
+  const p7 = await seite(browser, { belegeVerweigern: true });
+  await p7.click('#nav-kunden');
+  await p7.waitForTimeout(700);
+
+  const sperre = await p7.textContent('#kuLageSperre');
+  check('KRITISCH: verweigert der Server die Belege, sagt die Uebersicht das -- statt CHF 0.00',
+    /Kein Zugriff auf Offerten und Rechnungen/.test(sperre));
+  check('Und nennt das fehlende Recht beim Namen',
+    /Offerten & Rechnungen/.test(sperre) && /Rollen/.test(sperre));
+  check('KRITISCH: die Kacheln mit den Nullbetraegen sind dann nicht zu sehen',
+    !(await p7.isVisible('#kuLageKpi')));
+  check('GEGENPROBE: ohne Verweigerung stehen die Kacheln da und die Sperrflaeche nicht',
+    await p7.evaluate(() => {
+      belegZugriff.offerte = true; belegZugriff.rechnung = true;
+      renderKundenLage();
+      return !document.getElementById('kuLageSperre').hidden === false
+          && !document.getElementById('kuLageInhalt').hidden;
+    }));
+
+  // Dieselbe Antwort in den beiden Listen dahinter.
+  await p7.evaluate(() => { belegZugriff.offerte = false; belegZugriff.rechnung = false;
+                            renderOfferten(); renderRechnungen(); });
+  await p7.waitForTimeout(150);
+  check('KRITISCH: die Offertenliste sagt "kein Zugriff", nicht "Noch keine Offerten"',
+    /Kein Zugriff/.test(await p7.textContent('#ofTable'))
+    && !/Noch keine Offerten/.test(await p7.textContent('#ofTable')));
+  check('KRITISCH: die Rechnungsliste ebenso',
+    /Kein Zugriff/.test(await p7.textContent('#reTable'))
+    && !/Noch keine Rechnungen/.test(await p7.textContent('#reTable')));
+  await p7.close();
+} catch (e) { bad.push('Verweigerter Zugriff: ' + String(e).split('\n')[0].slice(0, 160)); }
+
+// ══════════════════════════════════════════ 10. DER MENUEPUNKT "RECHNUNGEN"
+// OP-558, der eigentliche Auslöser: Der Punkt hing an keinem Recht, der
+// Endpunkt dahinter verlangte eines.
+try {
+  const p8 = await seite(browser, { rechte: OHNE_BELEGE });
+  await p8.click('#nav-kunden');
+  await p8.waitForTimeout(400);
+  check('KRITISCH: ohne "offerten_lesen" fehlt auch der Menuepunkt "Rechnungen"',
+    !(await p8.isVisible('#nav-kunden-rechnungen')));
+  check('Und "Offerten" fehlt weiterhin -- beide haengen am selben Endpunkt',
+    !(await p8.isVisible('#nav-kunden-offerten')));
+  check('GEGENPROBE: mit dem Recht stehen beide Punkte da',
+    await p8.evaluate(() => {
+      me.rechte = [...me.rechte, 'offerten_lesen'];
+      rechteAnwenden();
+      return getComputedStyle(document.getElementById('nav-kunden-rechnungen')).display !== 'none'
+          && getComputedStyle(document.getElementById('nav-kunden-offerten')).display !== 'none';
+    }));
+  await p8.close();
+} catch (e) { bad.push('Menuepunkt Rechnungen: ' + String(e).split('\n')[0].slice(0, 160)); }
 
 await browser.close();
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
