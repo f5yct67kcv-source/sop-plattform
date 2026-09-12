@@ -296,11 +296,20 @@ svg.i-sm { width: 15px; height: 15px; }
    Gate-Palette) und nicht --ink oder --ink-2 -- gerechnet ergibt
    #868D9A auf dem Gate-Grund 5.65:1, auf dem helleren Verlauf oben
    4.72:1, bleibt also lesbar, ohne mit dem Betriebslogo zu konkurrieren.
-   Hoehe 22 px: Variante 1 des Logos (ohne Claim) hat 20 px als
-   Mindestmass; die Fassung MIT Claim braeuchte 48 px und wuerde hier
-   mit dem Betriebslogo um die Aufmerksamkeit streiten. */
-.gate-sig { margin-top: 34px; display: flex; justify-content: center; }
-.gate-sig .go-sig { height: 22px; width: auto; display: block; color: var(--ink-3); }
+   Hoehe 27 px: Die Signatur steht weit unten, weg vom Betriebslogo, und
+   darf darum groesser sein als die 22 px der ersten Fassung -- sie bleibt
+   bei 15 Prozent von dessen Hoehe. Das Mindestmass der verwendeten
+   Logofassung (ohne Claim) sind 20 px; die Fassung MIT Claim braeuchte
+   48 px und wuerde hier mit dem Betriebslogo um die Aufmerksamkeit
+   streiten.
+   "powered by" ist bewusst deutlich kleiner als das Logo: Ein Etikett in
+   derselben Groesse wie die Sache, die es beschriftet, liest sich als
+   zweite gleichrangige Angabe statt als Vorbemerkung. */
+.gate-sig { margin-top: 34px; display: flex; align-items: center;
+            justify-content: center; gap: 10px; }
+.gate-sig .go-label { font-size: 11px; letter-spacing: .08em;
+                      color: var(--ink-3); opacity: .8; }
+.gate-sig .go-sig { height: 27px; width: auto; display: block; color: var(--ink-3); }
 #gate .inp { background: var(--surface-2); }
 #gate .inp:focus { background: var(--surface); }
 #gate .pw-toggle { opacity: .75; }
@@ -336,7 +345,16 @@ svg.i-sm { width: 15px; height: 15px; }
     filter: drop-shadow(0 22px 44px rgba(0,0,0,.8)); }
   .gate-oben .sub { margin-top: 8px; font-size: 14px; letter-spacing: 2.6px; }
   .gate-oben { margin-bottom: 44px; }
-  .gate-sig { margin-top: 44px; }
+  /* Ab hier steht die Signatur als Fusszeile am unteren Bildschirmrand
+     statt im Fluss unter dem Knopf. Im Fluss klebte sie am blauen
+     Anmelden-Knopf und las sich wie dessen Fussnote; an der Bildschirm-
+     kante bindet sie an die Seite, und der grosse Abstand zum
+     Betriebslogo macht die Rangfolge eindeutig.
+     Nur ab 900 px: Darunter ist #gate bewusst scrollbar (kleines Geraet,
+     offene Tastatur, zusaetzlich eingeblendetes 2FA-Feld) -- eine fest
+     am Rand klebende Zeile wuerde dort im Weg stehen. */
+  .gate-sig { position: fixed; left: 0; right: 0; bottom: 34px;
+              margin-top: 0; z-index: 3; }
   .gate-video { display: block; position: absolute; inset: 0; width: 100%; height: 100%;
     object-fit: cover; object-position: 62% center; z-index: 0; }
   /* Deutlich kraeftiger als vor ENT-396 (.42/.58): dort schuetzte die
@@ -4877,7 +4895,6 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
     </div>
 
     <div id="gateLogin">
-      <div class="gate-msg">Bitte melden Sie sich mit Ihrem Konto an.</div>
       <div id="gateErr" class="msg-err" style="display:none"></div>
       <div class="f">
         <label for="gName">Name</label>
@@ -4926,6 +4943,7 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
          Das aria-label traegt den Namen, weil "uard OpS" ohne die
          Bildmarke wie ein Tippfehler laese. -->
     <div class="gate-sig">
+      <span class="go-label">powered by</span>
       <svg class="go-sig" viewBox="0.00 -120.22 649.83 153.56" role="img" aria-label="Guard OpS"><g transform="translate(0.0000 -120.2361) scale(0.546627)">
     <path d="M162 57 L162 35 L85 8.5 L8 35 L8 138 L85 209 L162 138 L162 98" fill="none" stroke="currentColor" stroke-width="16" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="10"/>
     <path d="M86 98 L170 98 L170 114 L76 114 Z" fill="currentColor"/>
