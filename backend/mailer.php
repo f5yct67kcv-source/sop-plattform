@@ -68,21 +68,45 @@ function platzhalter_offen(string $wert, string $ohneSchlussstriche): bool
     return $wert === '' || str_contains($wert, $ohneSchlussstriche);
 }
 
-// Staging-Mailmodus (ENT-341). Eine reine Funktion ohne Netzwerk- oder
-// $_SERVER-Zugriff -- damit sich die Umleitung fuer sich pruefen laesst,
-// ohne einen Socket zu oeffnen (gleiche Ueberlegung wie bei
-// sitzung_abgelaufen() in db.php).
+// Staging-/Demo-Mailmodus (ENT-341, um die Demo-Umgebung erweitert mit
+// ENT-523). Eine reine Funktion ohne Netzwerk- oder $_SERVER-Zugriff --
+// damit sich die Umleitung fuer sich pruefen laesst, ohne einen Socket zu
+// oeffnen (gleiche Ueberlegung wie bei sitzung_abgelaufen() in db.php).
 //
-// Ausserhalb der Produktion wird IMMER auf die konfigurierte Testadresse
-// umgeleitet, unabhaengig vom eingegebenen Empfaenger -- es gibt keinen
-// Fall, in dem eine Nicht-Produktions-Instanz einen anderen als diesen
-// einen Empfaenger anschreiben darf. Fehlt die Testadresse (Secret nicht
-// gesetzt), liefert die Funktion einen leeren Empfaenger zurueck --
-// smtp_senden() bricht dann ab, statt irgendwohin zu senden.
-function smtp_ziel(string $anEmail, string $anName, bool $produktion): array
+// Ausserhalb der Produktion wird IMMER auf eine konfigurierte Testadresse
+// umgeleitet, unabhaengig vom eingegebenen Empfaenger. Demo bekommt eine
+// EIGENE Testadresse (DEMO_TESTMAIL) statt der Staging-Adresse -- kein
+// stiller Rueckfall ueber "nicht produktion" auf STAGING_TESTMAIL, aus
+// demselben Grund wie die eigenen Secret-NAMEN im Deploy-Workflow: eine
+// Demo-Mail, die zufaellig im Staging-Testpostfach landet, waere dort
+// nicht mehr auffindbar.
+//
+// WICHTIG (ENT-523, Vorentscheidung fuer Stufe 3): Der Projektinhaber hat
+// sich fuer eine ALLOWLIST entschieden -- die spaetere Einladung an einen
+// freigegebenen Interessenten soll seine ECHTE Adresse erreichen, nicht
+// diese Testadresse. Diese Funktion baut das noch nicht: Es gibt noch
+// keine Tabelle mit freigegebenen Adressen (kommt erst mit dem
+// Zugangssystem, Stufe 3). Bis dahin verhaelt sich Demo wie Staging --
+// JEDE Mail auf die Testadresse, mit eigenem Namen und eigenem Label,
+// niemals an den eingegebenen Empfaenger. Stufe 3 erweitert genau diese
+// Stelle um die Allowlist-Ausnahme; bis dahin ist "gar keine Demo-Mail
+// kommt an" die sichere Fehlrichtung, nicht "irgendeine Demo-Mail geht an
+// eine falsche Adresse".
+//
+// Fehlt die Testadresse (Secret nicht gesetzt), liefert die Funktion einen
+// leeren Empfaenger zurueck -- smtp_senden() bricht dann ab, statt
+// irgendwohin zu senden.
+function smtp_ziel(string $anEmail, string $anName, bool $produktion, bool $istDemo = false): array
 {
     if ($produktion) {
         return [$anEmail, $anName];
+    }
+    if ($istDemo) {
+        $demoAdresse = '__DEMO_TESTMAIL__';
+        if (platzhalter_offen($demoAdresse, '__DEMO_TESTMAIL')) {
+            return ['', ''];
+        }
+        return [$demoAdresse, 'Demo-Testadresse'];
     }
     $testAdresse = '__STAGING_TESTMAIL__';
     if (platzhalter_offen($testAdresse, '__STAGING_TESTMAIL')) {
@@ -99,12 +123,13 @@ function smtp_ziel(string $anEmail, string $anName, bool $produktion): array
 // dieselbe Haltung wie bei der Empfaenger-Umleitung: eine Absicherung im
 // Server, nicht nur eine Konvention. Reine Funktion, mit frei gewaehltem
 // Namen (auch leer) pruefbar.
-function smtp_absender_name(string $konfiguriert, bool $produktion): string
+function smtp_absender_name(string $konfiguriert, bool $produktion, bool $istDemo = false): string
 {
     if ($produktion) {
         return $konfiguriert;
     }
-    return $konfiguriert === '' ? '[STAGING]' : '[STAGING] ' . $konfiguriert;
+    $praefix = $istDemo ? '[DEMO]' : '[STAGING]';
+    return $konfiguriert === '' ? $praefix : $praefix . ' ' . $konfiguriert;
 }
 
 function smtp_lesen($fp): string
@@ -191,24 +216,30 @@ function smtp_senden(string $anEmail, string $anName, string $betreff, string $h
         throw new RuntimeException('Keine gueltige Empfaengeradresse — nicht versendet.');
     }
 
-    // Staging-Mailmodus (ENT-341): ausserhalb der Produktion geht JEDE Mail
-    // ausschliesslich an die konfigurierte Testadresse, nie an den
-    // eingegebenen Empfaenger. Bewusst vor jedem Verbindungsaufbau geprueft,
-    // damit ein falscher Empfaenger nicht einmal eine Socket-Verbindung
-    // ausloest.
+    // Staging-/Demo-Mailmodus (ENT-341, ENT-523): ausserhalb der Produktion
+    // geht JEDE Mail ausschliesslich an die fuer die jeweilige Umgebung
+    // konfigurierte Testadresse, nie an den eingegebenen Empfaenger --
+    // Demo hat dabei eine EIGENE Testadresse, kein gemeinsamer Topf mit
+    // Staging (siehe smtp_ziel()). Bewusst vor jedem Verbindungsaufbau
+    // geprueft, damit ein falscher Empfaenger nicht einmal eine
+    // Socket-Verbindung ausloest.
     $produktion = ist_produktion();
-    [$zielEmail, $zielName] = smtp_ziel($anEmail, $anName, $produktion);
+    $istDemo = ist_demo();
+    [$zielEmail, $zielName] = smtp_ziel($anEmail, $anName, $produktion, $istDemo);
     if ($zielEmail === '') {
         throw new RuntimeException(
-            'Staging-Mailmodus: keine Testadresse konfiguriert (Secret STAGING_TESTMAIL fehlt) -- '
-            . 'kein Versand, auch nicht an die Testadresse.'
+            $istDemo
+                ? 'Demo-Mailmodus: keine Testadresse konfiguriert (Secret DEMO_TESTMAIL fehlt) -- '
+                  . 'kein Versand, auch nicht an die Testadresse.'
+                : 'Staging-Mailmodus: keine Testadresse konfiguriert (Secret STAGING_TESTMAIL fehlt) -- '
+                  . 'kein Versand, auch nicht an die Testadresse.'
         );
     }
     if (!$produktion) {
         // Der urspruengliche Empfaenger bleibt im Betreff sichtbar, sonst
         // liesse sich im Testpostfach nicht mehr nachvollziehen, wer
         // eigentlich angeschrieben werden sollte.
-        $betreff = '[TESTUMGEBUNG -- eigentlich an ' . $anEmail . '] ' . $betreff;
+        $betreff = ($istDemo ? '[DEMO -- eigentlich an ' : '[TESTUMGEBUNG -- eigentlich an ') . $anEmail . '] ' . $betreff;
     }
     $anEmail = $zielEmail;
     $anName = $zielName;
@@ -219,7 +250,7 @@ function smtp_senden(string $anEmail, string $anName, string $betreff, string $h
     $user = '__SMTP_USER__';
     $pass = '__SMTP_PASSWORD__';
     $absenderEmail = smtp_absender_adresse();
-    $absenderName = smtp_absender_name('__SMTP_ABSENDER_NAME__', $produktion);
+    $absenderName = smtp_absender_name('__SMTP_ABSENDER_NAME__', $produktion, $istDemo);
 
     $transport = $verschluesselung === 'ssl' ? 'ssl://' : '';
     $ctx = stream_context_create(['ssl' => ['verify_peer' => true, 'verify_peer_name' => true]]);

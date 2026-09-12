@@ -1,40 +1,48 @@
 name: Deploy Rapport-Tool zu Hostpoint
 
-# Zwei Laufzeitumgebungen, EIN Workflow (ENT-341, Variante B): main deployt
-# nach Produktion, staging nach der getrennten Testinstanz. Welches GitHub
-# Environment aktiv ist, entscheidet der REF, gegen den der Lauf ausgeloest
-# wird -- Kopierliste und Platzhalter-Ersetzung bleiben fuer beide identisch,
-# nur die WERTE hinter den Secret-Namen unterscheiden sich (Settings →
-# Environments in GitHub). Das ist der einzige dauerhafte Unterschied
-# zwischen den Umgebungen -- nicht zwei gepflegte Kopien dieses Workflows.
+# DREI Laufzeitumgebungen, EIN Workflow (ENT-341, Variante B; um Demo
+# erweitert mit ENT-523): main deployt nach Produktion, ein qa-*-Tag nach
+# der Staging-Testinstanz, ein demo-*-Tag nach der Demo-Instanz fuer
+# Interessenten. Welches GitHub Environment aktiv ist, entscheidet der
+# REF, gegen den der Lauf ausgeloest wird -- Kopierliste und Platzhalter-
+# Ersetzung bleiben fuer alle drei identisch, nur die WERTE hinter den
+# Secret-Namen unterscheiden sich (Settings → Environments in GitHub).
+# Das ist der einzige dauerhafte Unterschied zwischen den Umgebungen --
+# nicht drei gepflegte Kopien dieses Workflows.
 #
-# Staging-Secrets tragen durchgehend das Praefix STAGING_ und sind EIGENE,
-# von den Produktions-Namen VERSCHIEDENE Secret-Namen -- nicht nur eigene
-# Werte desselben Namens in einem zweiten Environment (verschaerft auf
-# Wunsch des Projektinhabers, nachdem die erste Fassung nur auf getrennte
+# Staging- UND Demo-Secrets tragen durchgehend ein eigenes Praefix
+# (STAGING_ bzw. DEMO_) und sind EIGENE, von den Produktions-Namen UND
+# voneinander VERSCHIEDENE Secret-Namen -- nicht nur eigene Werte
+# desselben Namens in einem eigenen Environment (verschaerft auf Wunsch
+# des Projektinhabers, nachdem die erste Fassung nur auf getrennte
 # Environments gesetzt hatte). Grund: GitHub faellt bei einem fehlenden
 # Environment-Secret still auf ein gleichnamiges Repository-Secret zurueck.
-# Mit identischen Namen in beiden Environments waere ein vergessenes
-# Staging-Secret KEIN Fehler, sondern ein STILLER Rueckgriff auf die
-# produktive Datenbank oder den produktiven FTP-Account -- der Lauf ginge
-# durch, richtete aber moeglicherweise Schaden an der echten Anlage an. Mit
-# eigenen Namen gibt es diesen Rueckfall strukturell nicht: Ein fehlendes
-# STAGING_DB_HOST hat keinen gleichnamigen Ersatz, sondern ist schlicht
-# leer -- und der erste Schritt unten erkennt genau das und bricht den Lauf
-# ab, bevor irgendetwas kopiert oder hochgeladen wird.
+# Mit identischen Namen in mehreren Environments waere ein vergessenes
+# Staging- oder Demo-Secret KEIN Fehler, sondern ein STILLER Rueckgriff
+# auf die produktive Datenbank oder den produktiven FTP-Account -- der
+# Lauf ginge durch, richtete aber moeglicherweise Schaden an der echten
+# Anlage an. Mit eigenen Namen gibt es diesen Rueckfall strukturell nicht:
+# Ein fehlendes STAGING_DB_HOST oder DEMO_DB_HOST hat keinen gleichnamigen
+# Ersatz, sondern ist schlicht leer -- und der erste Schritt unten erkennt
+# genau das und bricht den Lauf ab, bevor irgendetwas kopiert oder
+# hochgeladen wird. Dieselbe Trennung gilt zwischen Staging und Demo
+# UNTEREINANDER (ENT-523-N1): eine Demo-Mail landet nie im
+# Staging-Testpostfach und umgekehrt.
 #
-# Kein dauerhafter Branch "staging" mehr (ENT-372, revidiert ENT-341 Punkt
-# 5): Die neue, vom Projektinhaber als "hoechste Architekturvorgabe"
-# bezeichnete Regel verlangt, dass main alleinige Source of Truth bleibt und
-# kein Staging-spezifischer Code entstehen kann, der spaeter zurueckgemergt
-# werden muesste. Ein beschreibbarer Branch waere genau das -- ein Tag ist
-# es strukturell nicht, es laesst sich kein Commit "auf" einen Tag pushen.
-# main wird deshalb ausschliesslich per Push deployt (immer Production);
-# Staging entsteht ausschliesslich durch einen manuellen "Run workflow"
-# gegen einen Tag der Form qa-JJJJ-MM-TT-NNN, der exakt auf einem
-# bestehenden main-Commit liegt. github.ref_name liefert in diesem Fall den
-# Tag-Namen -- die Umgebungs-Logik weiter unten unterscheidet dadurch
-# unveraendert zwischen main (Production) und allem anderen (Staging).
+# Kein dauerhafter Branch "staging" oder "demo" (ENT-372, revidiert
+# ENT-341 Punkt 5): Die neue, vom Projektinhaber als "hoechste
+# Architekturvorgabe" bezeichnete Regel verlangt, dass main alleinige
+# Source of Truth bleibt und kein umgebungsspezifischer Code entstehen
+# kann, der spaeter zurueckgemergt werden muesste. Ein beschreibbarer
+# Branch waere genau das -- ein Tag ist es strukturell nicht, es laesst
+# sich kein Commit "auf" einen Tag pushen. main wird deshalb
+# ausschliesslich per Push deployt (immer Production); Staging entsteht
+# ausschliesslich durch einen manuellen "Run workflow" gegen einen Tag der
+# Form qa-JJJJ-MM-TT-NNN, Demo ausschliesslich gegen einen Tag der Form
+# demo-JJJJ-MM-TT-NNN, beide exakt auf einem bestehenden main-Commit.
+# github.ref_name liefert in diesem Fall den Tag-Namen -- die
+# Umgebungs-Logik weiter unten unterscheidet dadurch zwischen main
+# (Production), einem qa-*-Tag (Staging) und einem demo-*-Tag (Demo).
 on:
   push:
     branches: [main]
@@ -43,7 +51,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
+    environment: ${{ github.ref_name == 'main' && 'production' || (startsWith(github.ref_name, 'demo-') && 'demo' || 'staging') }}
     steps:
       - uses: actions/checkout@v4
 
@@ -95,20 +103,59 @@ jobs:
           S_ANTHROPIC_API_KEY: ${{ secrets.STAGING_ANTHROPIC_API_KEY }}
           S_MAPS_JS_KEY: ${{ secrets.STAGING_MAPS_JS_KEY }}
           S_STAGING_TESTMAIL: ${{ secrets.STAGING_TESTMAIL }}
+          # Demo (ENT-523) -- eigene, von Produktion UND Staging
+          # VERSCHIEDENE Secret-Namen, dieselbe Begruendung wie bei S_*
+          # oben. DEMO_ANTHROPIC_API_KEY ist hier -- anders als bei
+          # Produktion und Staging -- ERFORDERLICH: Der Projektinhaber hat
+          # sich bewusst fuer eine aktive KI-Funktion in der Demo
+          # entschieden (ENT-523-N1), nicht fuer die sonst uebliche
+          # "meldet sich selbst als nicht eingerichtet"-Toleranz.
+          D_DB_HOST: ${{ secrets.DEMO_DB_HOST }}
+          D_DB_NAME: ${{ secrets.DEMO_DB_NAME }}
+          D_DB_USER: ${{ secrets.DEMO_DB_USER }}
+          D_DB_PASSWORD: ${{ secrets.DEMO_DB_PASSWORD }}
+          D_HOSTPOINT_FTP_HOST: ${{ secrets.DEMO_HOSTPOINT_FTP_HOST }}
+          D_HOSTPOINT_FTP_USER: ${{ secrets.DEMO_HOSTPOINT_FTP_USER }}
+          D_HOSTPOINT_FTP_PASSWORD: ${{ secrets.DEMO_HOSTPOINT_FTP_PASSWORD }}
+          D_SMTP_HOST: ${{ secrets.DEMO_SMTP_HOST }}
+          D_SMTP_PORT: ${{ secrets.DEMO_SMTP_PORT }}
+          D_SMTP_VERSCHLUESSELUNG: ${{ secrets.DEMO_SMTP_VERSCHLUESSELUNG }}
+          D_SMTP_USER: ${{ secrets.DEMO_SMTP_USER }}
+          D_SMTP_PASSWORD: ${{ secrets.DEMO_SMTP_PASSWORD }}
+          D_SMTP_ABSENDER: ${{ secrets.DEMO_SMTP_ABSENDER }}
+          D_SMTP_ABSENDER_NAME: ${{ secrets.DEMO_SMTP_ABSENDER_NAME }}
+          D_ANTHROPIC_API_KEY: ${{ secrets.DEMO_ANTHROPIC_API_KEY }}
+          D_MAPS_JS_KEY: ${{ secrets.DEMO_MAPS_JS_KEY }}
+          # Testadresse des Demo-Mailmodus (ENT-523-N1, backend/mailer.php).
+          # EIGENES Secret, kein Rueckfall auf STAGING_TESTMAIL -- siehe
+          # Begruendung in smtp_ziel().
+          D_TESTMAIL: ${{ secrets.DEMO_TESTMAIL }}
           # Push-Benachrichtigungen (ENT-424). Eigene, von den
           # Production-Namen VERSCHIEDENE Secret-Namen fuer Staging -- kein
           # struktureller Rueckfall moeglich (ENT-343 Punkt 1). Und
           # ausdruecklich EIGENE WERTE: Ein Schluessel, den sich Staging und
           # Produktion teilen, hiesse, dass ein Testversand auf den echten
-          # Telefonen klingelt.
+          # Telefonen klingelt. Dieselbe Begruendung fuer Demo.
           P_VAPID_PRIVATE_PEM_B64: ${{ secrets.VAPID_PRIVATE_PEM_B64 }}
           P_VAPID_KONTAKT: ${{ secrets.VAPID_KONTAKT }}
           P_PUSH_CRON_SCHLUESSEL: ${{ secrets.PUSH_CRON_SCHLUESSEL }}
           S_VAPID_PRIVATE_PEM_B64: ${{ secrets.STAGING_VAPID_PRIVATE_PEM_B64 }}
           S_VAPID_KONTAKT: ${{ secrets.STAGING_VAPID_KONTAKT }}
           S_PUSH_CRON_SCHLUESSEL: ${{ secrets.STAGING_PUSH_CRON_SCHLUESSEL }}
+          D_VAPID_PRIVATE_PEM_B64: ${{ secrets.DEMO_VAPID_PRIVATE_PEM_B64 }}
+          D_VAPID_KONTAKT: ${{ secrets.DEMO_VAPID_KONTAKT }}
+          D_PUSH_CRON_SCHLUESSEL: ${{ secrets.DEMO_PUSH_CRON_SCHLUESSEL }}
         run: |
           set -euo pipefail
+
+          # Vorab ermitteln, ob der REF ein demo-*-Tag ist (ENT-523) -- eine
+          # einzelne case-Zuweisung statt eines Bash-Musterabgleichs mitten
+          # in der if/elif-Kette, damit die Kette selbst mit reinem POSIX
+          # "[ ]" auskommt, wie der Rest dieses Schritts.
+          case "${{ github.ref_name }}" in
+            demo-*) IST_DEMO_REF=1 ;;
+            *)      IST_DEMO_REF=0 ;;
+          esac
 
           if [ "${{ github.ref_name }}" = "main" ]; then
             UMGEBUNG=production
@@ -123,6 +170,7 @@ jobs:
             EFF_SMTP_ABSENDER="$P_SMTP_ABSENDER"; EFF_SMTP_ABSENDER_NAME="$P_SMTP_ABSENDER_NAME"
             EFF_ANTHROPIC_API_KEY="$P_ANTHROPIC_API_KEY"; EFF_MAPS_JS_KEY="$P_MAPS_JS_KEY"
             EFF_STAGING_TESTMAIL=""
+            EFF_DEMO_TESTMAIL=""
             EFF_VAPID_PRIVATE_PEM_B64="$P_VAPID_PRIVATE_PEM_B64"
             EFF_VAPID_KONTAKT="$P_VAPID_KONTAKT"
             EFF_PUSH_CRON_SCHLUESSEL="$P_PUSH_CRON_SCHLUESSEL"
@@ -155,6 +203,48 @@ jobs:
             [ -z "$EFF_HOSTPOINT_FTP_USER" ]     && PFLICHT_FEHLT="$PFLICHT_FEHLT HOSTPOINT_FTP_USER"
             [ -z "$EFF_HOSTPOINT_FTP_PASSWORD" ] && PFLICHT_FEHLT="$PFLICHT_FEHLT HOSTPOINT_FTP_PASSWORD"
             [ -z "$EFF_MAPS_JS_KEY" ]            && PFLICHT_FEHLT="$PFLICHT_FEHLT MAPS_JS_KEY"
+          elif [ "$IST_DEMO_REF" = "1" ]; then
+            UMGEBUNG=demo
+            EFF_DB_HOST="$D_DB_HOST"; EFF_DB_NAME="$D_DB_NAME"
+            EFF_DB_USER="$D_DB_USER"; EFF_DB_PASSWORD="$D_DB_PASSWORD"
+            EFF_HOSTPOINT_FTP_HOST="$D_HOSTPOINT_FTP_HOST"
+            EFF_HOSTPOINT_FTP_USER="$D_HOSTPOINT_FTP_USER"
+            EFF_HOSTPOINT_FTP_PASSWORD="$D_HOSTPOINT_FTP_PASSWORD"
+            EFF_SMTP_HOST="$D_SMTP_HOST"; EFF_SMTP_PORT="$D_SMTP_PORT"
+            EFF_SMTP_VERSCHLUESSELUNG="$D_SMTP_VERSCHLUESSELUNG"
+            EFF_SMTP_USER="$D_SMTP_USER"; EFF_SMTP_PASSWORD="$D_SMTP_PASSWORD"
+            EFF_SMTP_ABSENDER="$D_SMTP_ABSENDER"; EFF_SMTP_ABSENDER_NAME="$D_SMTP_ABSENDER_NAME"
+            EFF_ANTHROPIC_API_KEY="$D_ANTHROPIC_API_KEY"; EFF_MAPS_JS_KEY="$D_MAPS_JS_KEY"
+            # KEIN Rueckfall auf die Staging-Testadresse -- eigene Demo-
+            # Testadresse, eigenes Secret (siehe smtp_ziel() in mailer.php).
+            EFF_STAGING_TESTMAIL=""
+            EFF_DEMO_TESTMAIL="$D_TESTMAIL"
+            EFF_VAPID_PRIVATE_PEM_B64="$D_VAPID_PRIVATE_PEM_B64"
+            EFF_VAPID_KONTAKT="$D_VAPID_KONTAKT"
+            EFF_PUSH_CRON_SCHLUESSEL="$D_PUSH_CRON_SCHLUESSEL"
+            # Eigene Adresse (ENT-501), siehe Begruendung im Production-Zweig.
+            # Fuer Demo steht die Domain als Environment-Variable DEMO_DOMAIN
+            # bereit -- dieselbe, mit der der Verifikationsschritt weiter
+            # unten die Seite abruft. KEIN Rueckfall auf die produktive
+            # Adresse, aus demselben Grund wie bei Staging.
+            EFF_APP_BASIS_URL=""
+            if [ -n "${{ vars.DEMO_DOMAIN }}" ]; then
+              EFF_APP_BASIS_URL="https://${{ vars.DEMO_DOMAIN }}"
+            fi
+
+            PFLICHT_FEHLT=""
+            [ -z "$EFF_DB_HOST" ]                && PFLICHT_FEHLT="$PFLICHT_FEHLT DEMO_DB_HOST"
+            [ -z "$EFF_DB_NAME" ]                && PFLICHT_FEHLT="$PFLICHT_FEHLT DEMO_DB_NAME"
+            [ -z "$EFF_DB_USER" ]                && PFLICHT_FEHLT="$PFLICHT_FEHLT DEMO_DB_USER"
+            [ -z "$EFF_DB_PASSWORD" ]            && PFLICHT_FEHLT="$PFLICHT_FEHLT DEMO_DB_PASSWORD"
+            [ -z "$EFF_HOSTPOINT_FTP_HOST" ]     && PFLICHT_FEHLT="$PFLICHT_FEHLT DEMO_HOSTPOINT_FTP_HOST"
+            [ -z "$EFF_HOSTPOINT_FTP_USER" ]     && PFLICHT_FEHLT="$PFLICHT_FEHLT DEMO_HOSTPOINT_FTP_USER"
+            [ -z "$EFF_HOSTPOINT_FTP_PASSWORD" ] && PFLICHT_FEHLT="$PFLICHT_FEHLT DEMO_HOSTPOINT_FTP_PASSWORD"
+            [ -z "$EFF_MAPS_JS_KEY" ]            && PFLICHT_FEHLT="$PFLICHT_FEHLT DEMO_MAPS_JS_KEY"
+            # Anders als bei Production/Staging: hier ERFORDERLICH
+            # (ENT-523-N1 -- die KI-Funktion soll in der Demo aktiv sein,
+            # kein "meldet sich selbst als nicht eingerichtet").
+            [ -z "$EFF_ANTHROPIC_API_KEY" ]      && PFLICHT_FEHLT="$PFLICHT_FEHLT DEMO_ANTHROPIC_API_KEY"
           else
             UMGEBUNG=staging
             EFF_DB_HOST="$S_DB_HOST"; EFF_DB_NAME="$S_DB_NAME"
@@ -168,6 +258,9 @@ jobs:
             EFF_SMTP_ABSENDER="$S_SMTP_ABSENDER"; EFF_SMTP_ABSENDER_NAME="$S_SMTP_ABSENDER_NAME"
             EFF_ANTHROPIC_API_KEY="$S_ANTHROPIC_API_KEY"; EFF_MAPS_JS_KEY="$S_MAPS_JS_KEY"
             EFF_STAGING_TESTMAIL="$S_STAGING_TESTMAIL"
+            # Kein Rueckfall auf die Demo-Testadresse -- Staging und Demo
+            # teilen sich keine Mailziele (ENT-523-N1).
+            EFF_DEMO_TESTMAIL=""
             EFF_VAPID_PRIVATE_PEM_B64="$S_VAPID_PRIVATE_PEM_B64"
             EFF_VAPID_KONTAKT="$S_VAPID_KONTAKT"
             EFF_PUSH_CRON_SCHLUESSEL="$S_PUSH_CRON_SCHLUESSEL"
@@ -212,8 +305,28 @@ jobs:
             esac
           fi
 
+          # Dieselbe Absicherung fuer Demo (ENT-523): Ohne diese Pruefung
+          # wuerde ein Dispatch gegen IRGENDEINEN Ref mit einem Namen der
+          # NICHT "main" ist und NICHT mit "qa-" beginnt automatisch als
+          # UMGEBUNG=demo durchgehen (siehe if/elif/else oben) -- auch ein
+          # x-beliebiger Feature-Branch. Das GitHub-Environment "demo" soll
+          # diese Pruefung zusaetzlich extern erzwingen (Settings →
+          # Environments → demo → Deployment branches and tags, Muster
+          # demo-*), sobald es eingerichtet ist.
+          if [ "$UMGEBUNG" = "demo" ]; then
+            case "${{ github.ref_name }}" in
+              demo-*) ;;
+              *) echo "::error::Demo-Deploy abgebrochen -- Ref '${{ github.ref_name }}' ist kein demo-*-Tag (ENT-523). Demo deployt ausschliesslich gegen einen Tag der Form demo-JJJJ-MM-TT-NNN, nie gegen einen Branch."
+                 exit 1 ;;
+            esac
+          fi
+
           # Drift-Guard fuer die manuell bei Hostpoint gepflegten Staging-Dateien
-          # (ENT-384, erweitert ENT-387): Der Passwortschutz verwaltet sich
+          # (ENT-384, erweitert ENT-387; Demo braucht diesen Guard bewusst
+          # NICHT -- ENT-523-N1: Demo traegt keinen Passwortschutz, darum
+          # gibt es nichts manuell bei Hostpoint zu pflegen. Die Demo-.htaccess
+          # inklusive X-Robots-Tag entsteht vollstaendig aus dem Repository,
+          # siehe htaccess-demo-zusatz weiter unten). Der Passwortschutz verwaltet sich
           # selbst oberhalb der Markierung "#@__HCP_END__@#" in der dortigen
           # .htaccess; unterhalb davon stehen von Hand die Inhalte von
           # htaccess-hostpoint UND htaccess-staging-zusatz (X-Robots-Tag),
@@ -279,6 +392,7 @@ jobs:
             echo "EFF_ANTHROPIC_API_KEY=$EFF_ANTHROPIC_API_KEY"
             echo "EFF_MAPS_JS_KEY=$EFF_MAPS_JS_KEY"
             echo "EFF_STAGING_TESTMAIL=$EFF_STAGING_TESTMAIL"
+            echo "EFF_DEMO_TESTMAIL=$EFF_DEMO_TESTMAIL"
             echo "EFF_VAPID_PRIVATE_PEM_B64=$EFF_VAPID_PRIVATE_PEM_B64"
             echo "EFF_VAPID_KONTAKT=$EFF_VAPID_KONTAKT"
             echo "EFF_PUSH_CRON_SCHLUESSEL=$EFF_PUSH_CRON_SCHLUESSEL"
@@ -436,12 +550,23 @@ jobs:
           cp backend/push.php dist/push.php
           # Schutzeinstellungen (ENT-075). Im Repository heisst die Datei
           # bewusst ohne fuehrenden Punkt -- sonst uebersieht man sie. Wird
-          # trotzdem fuer BEIDE Umgebungen hier erzeugt (auch wenn der
+          # trotzdem fuer ALLE Umgebungen hier erzeugt (auch wenn der
           # FTP-Schritt unten sie fuer Staging von Upload/Loeschung
           # ausschliesst, ENT-384) -- so bleibt dieser Schritt umgebungs-
           # unabhaengig, und ein spaeteres Aendern der Ausschluss-Regel
           # bringt hier nichts durcheinander.
           cp htaccess-hostpoint dist/.htaccess
+          # Demo-Zusatz (ENT-523, X-Robots-Tag): ANDERS als bei Staging
+          # automatisch angehaengt statt manuell bei Hostpoint gepflegt --
+          # Demo traegt keinen Passwortschutz-Block, der ueberschrieben
+          # werden koennte (ENT-523-N1), darum gibt es keinen Grund, die
+          # Demo-.htaccess vom automatischen Deploy auszunehmen. Kein
+          # Drift-Guard noetig: Was hier steht, kommt bei jedem Deploy
+          # frisch aus dem Repository.
+          if [ "$UMGEBUNG" = "demo" ]; then
+            cat htaccess-demo-zusatz >> dist/.htaccess
+            cp robots-demo.txt dist/robots.txt
+          fi
           cp backend/api/*.php dist/api/
           # setup.php / setup.html bewusst NICHT hier -- Ersteinrichtung ist ein
           # einmaliger manueller Upload, damit die Datei nicht bei jedem Push
@@ -502,6 +627,11 @@ jobs:
           # ist unschaedlich: ist_produktion() ist dort wahr, smtp_ziel()
           # fragt die Testadresse in diesem Zweig gar nicht erst ab.
           sed -i "s|__STAGING_TESTMAIL__|$EFF_STAGING_TESTMAIL|g" dist/mailer.php
+          # Demo-Mailmodus (ENT-523-N1): dieselbe Bauart wie
+          # __STAGING_TESTMAIL__ oben, aber eine EIGENE Adresse -- Demo und
+          # Staging teilen kein Mailziel (siehe smtp_ziel() in mailer.php).
+          # Fuer main und fuer Staging ist EFF_DEMO_TESTMAIL bewusst leer.
+          sed -i "s|__DEMO_TESTMAIL__|$EFF_DEMO_TESTMAIL|g" dist/mailer.php
           # Google-Maps-Browserschluessel (ENT-341): eigener Schluessel je
           # Umgebung, in ALLEN Oberflaechen, die die Karte laden -- seit
           # ENT-474 auch im Kundenportal (Weg waehrend der Runde, hinter
@@ -543,6 +673,20 @@ jobs:
           cat > dist/qa-version.json << EOF
           {
             "qa_tag": "${{ github.ref_name }}",
+            "commit_sha": "${{ github.sha }}"
+          }
+          EOF
+
+      # Dieselbe Nachvollziehbarkeit fuer Demo (ENT-523): welcher Tag/Commit
+      # laeuft gerade auf der Demo-Instanz. Kein externer QA-Runner liest
+      # das (anders als bei Staging, ENT-435) -- der Nutzen ist rein
+      # betrieblich, beim Nachsehen vor einer Vorfuehrung.
+      - name: demo-version.json erzeugen (nur Demo)
+        if: ${{ env.UMGEBUNG == 'demo' }}
+        run: |
+          cat > dist/demo-version.json << EOF
+          {
+            "demo_tag": "${{ github.ref_name }}",
             "commit_sha": "${{ github.sha }}"
           }
           EOF
@@ -668,3 +812,53 @@ jobs:
             exit 1
           fi
           echo "Staging-Suchmaschinenausschluss verifiziert (X-Robots-Tag: noindex auf '/', robots.txt mit User-agent:*/Disallow:/ erreichbar)."
+
+      # Dieselbe zweite Schutzschicht fuer Demo (ENT-523) -- ANDERS als bei
+      # Staging OHNE Basic-Auth-Zugangsdaten: Die Demo hat keinen
+      # Passwortschutz (ENT-523-N1), ein unauthentifizierter Abruf ist hier
+      # also ein echter Nachweis, kein Artefakt eines "Require valid-user".
+      # Dieselben Waechter wie bei Staging gegen einen falschen Nachweis:
+      # kein -L/--location (ein Redirect auf einen fremden Host darf nie
+      # als Erfolg durchgehen), kein -k/--insecure (TLS wird regulaer
+      # geprueft), Netzwerkfehler/Timeout zaehlen als Fehlschlag.
+      - name: Demo-Suchmaschinenausschluss verifizieren (X-Robots-Tag, robots.txt)
+        if: ${{ env.UMGEBUNG == 'demo' }}
+        run: |
+          set -uo pipefail
+          if [ -z "${{ vars.DEMO_DOMAIN }}" ]; then
+            echo "::error::Demo-Deploy abgebrochen -- Environment-Variable DEMO_DOMAIN fehlt, der Suchmaschinenausschluss kann ohne sie nicht verifiziert werden (ENT-523)."
+            exit 1
+          fi
+
+          ROOT=$(curl -sS -D - -o /dev/null --max-time 15 --connect-timeout 10 "https://${{ vars.DEMO_DOMAIN }}/" 2>&1)
+          if [ $? -ne 0 ]; then
+            echo "::error::Suchmaschinenausschluss-Pruefung fehlgeschlagen (DNS-/TLS-/Netzwerkfehler oder Timeout beim Abruf von https://${{ vars.DEMO_DOMAIN }}/): $ROOT"
+            exit 1
+          fi
+          if ! echo "$ROOT" | head -1 | grep -qE '^HTTP/[0-9.]+ 200'; then
+            echo "::error::Demo-Startseite nicht erreichbar -- erwartet HTTP 200 auf '/', tatsaechliche Antwortzeile: $(echo "$ROOT" | head -1)"
+            exit 1
+          fi
+          if ! echo "$ROOT" | grep -qi '^X-Robots-Tag:.*noindex'; then
+            echo "::error::X-Robots-Tag fehlt oder enthaelt kein 'noindex' auf der Demo-Startseite. Kopfzeilen: $ROOT"
+            exit 1
+          fi
+
+          ROBOTS=$(curl -sS -D - --max-time 15 --connect-timeout 10 "https://${{ vars.DEMO_DOMAIN }}/robots.txt" 2>&1)
+          if [ $? -ne 0 ]; then
+            echo "::error::Suchmaschinenausschluss-Pruefung fehlgeschlagen (DNS-/TLS-/Netzwerkfehler oder Timeout beim Abruf von https://${{ vars.DEMO_DOMAIN }}/robots.txt): $ROBOTS"
+            exit 1
+          fi
+          if ! echo "$ROBOTS" | head -1 | grep -qE '^HTTP/[0-9.]+ 200'; then
+            echo "::error::robots.txt auf Demo nicht erreichbar -- erwartet HTTP 200, tatsaechliche Antwortzeile: $(echo "$ROBOTS" | head -1)"
+            exit 1
+          fi
+          if ! echo "$ROBOTS" | grep -qE '^User-agent:[[:space:]]*\*'; then
+            echo "::error::robots.txt-Inhalt unvollstaendig -- 'User-agent: *' nicht gefunden. Antwort: $ROBOTS"
+            exit 1
+          fi
+          if ! echo "$ROBOTS" | grep -qE '^Disallow:[[:space:]]*/[[:space:]]*$'; then
+            echo "::error::robots.txt-Inhalt unvollstaendig -- 'Disallow: /' nicht gefunden. Antwort: $ROBOTS"
+            exit 1
+          fi
+          echo "Demo-Suchmaschinenausschluss verifiziert (X-Robots-Tag: noindex auf '/', robots.txt mit User-agent:*/Disallow:/ erreichbar)."

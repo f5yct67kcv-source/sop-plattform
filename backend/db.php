@@ -60,6 +60,23 @@ function ist_produktion(): bool
     return umgebung_ist_produktion(APP_ENV);
 }
 
+// Demo-Umgebung fuer Interessenten (ENT-523): dieselbe Bauart wie
+// umgebung_ist_produktion() -- eigene, reine Funktion statt eines Inline-
+// Vergleichs, damit sich die Regel mit einem frei gewaehlten Wert pruefen
+// laesst, und fail-safe auf den EINEN exakten Wert "demo". Kein Rueckfall
+// ueber !ist_produktion(): Staging ist ebenfalls "nicht Produktion" und
+// darf mit der Demo-Umgebung nichts teilen -- insbesondere nicht deren
+// Mailziel (siehe mailer.php).
+function umgebung_ist_demo(string $wert): bool
+{
+    return $wert === 'demo';
+}
+
+function ist_demo(): bool
+{
+    return umgebung_ist_demo(APP_ENV);
+}
+
 // ── Die eigene Adresse (ENT-501) ──────────────────────────────────────
 //
 // ANLASS: Die Sicherheitspruefung vom 2026-09-09. Drei Stellen bauten einen

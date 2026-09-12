@@ -271,6 +271,63 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     /PFLICHT_FEHLT/.test(workflow) && /exit 1/.test(workflow));
 }
 
+// ── Dieselbe Absicherung fuer Demo (ENT-523): kein Rueckfall auf
+// Production- ODER Staging-Secrets ──────────────────────────────────────
+//
+// Warum diese Prüfung: Demo ist eine DRITTE Umgebung, nicht "Staging mit
+// anderem Namen" -- ein DEMO_DB_HOST, das GitHub bei fehlendem
+// Environment-Secret still gegen STAGING_DB_HOST oder DB_HOST aufloest,
+// waere derselbe Fehler wie oben, nur eine Umgebung weiter.
+{
+  const pflichtNamen = ['DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASSWORD',
+    'HOSTPOINT_FTP_HOST', 'HOSTPOINT_FTP_USER', 'HOSTPOINT_FTP_PASSWORD'];
+  const ohneDemoGegenstueck = pflichtNamen.filter(n =>
+    new RegExp(`secrets\\.${n}\\b`).test(workflow) && !new RegExp(`secrets\\.DEMO_${n}\\b`).test(workflow));
+  check('KRITISCH: jedes Produktions-Secret hat ein eigenes DEMO_-Gegenstück im Workflow',
+    ohneDemoGegenstueck.length === 0);
+  if (ohneDemoGegenstueck.length) { bad.push('ohne DEMO_-Gegenstück: ' + ohneDemoGegenstueck.join(', ')); }
+
+  // Konkreter Copy-Paste-Fehler statt nur "kommt DEMO_X irgendwo vor":
+  // JEDE D_<NAME>-Umgebungsvariable im Secrets-Prüfschritt (nicht nur die
+  // Pflichtnamen oben -- auch SMTP_*, MAPS_JS_KEY, ANTHROPIC_API_KEY usw.)
+  // muss zu IHREM EIGENEN secrets.DEMO_<NAME> gehören, nicht versehentlich
+  // auf secrets.STAGING_<NAME> oder secrets.<NAME> ohne Präfix zeigen.
+  // Ohne diese generische Prüfung (statt einer festen Namensliste) bliebe
+  // ein Copy-Paste-Fehler bei einem Namen ausserhalb der Pflichtliste --
+  // etwa D_MAPS_JS_KEY, das versehentlich STAGING_MAPS_JS_KEY läse --
+  // unentdeckt.
+  // Kein Umweg über einen extrahierten Schritt-Ausschnitt nötig: Der
+  // Präfix "D_" als env-Schlüssel ist eindeutig genug, er kommt im
+  // gesamten Workflow nur im Secrets-Prüfschritt vor.
+  const dVariablen = [...workflow.matchAll(/\bD_(\w+):\s*\$\{\{\s*secrets\.(\w+)\s*\}\}/g)];
+  check('KRITISCH: der Secrets-Prüfschritt deklariert überhaupt D_-Variablen (sonst liefe die vorherige Prüfung leer)',
+    dVariablen.length >= 10);
+  const falschVerdrahtet = dVariablen.filter(([, name, secretName]) => secretName !== `DEMO_${name}`);
+  check('KRITISCH: JEDE D_<NAME>-Variable im Secrets-Prüfschritt zeigt auf genau secrets.DEMO_<NAME>, keine andere',
+    falschVerdrahtet.length === 0);
+  if (falschVerdrahtet.length) {
+    bad.push('falsch verdrahtet: ' + falschVerdrahtet.map(([, n, s]) => `D_${n}→${s}`).join(', '));
+  }
+
+  // ANDERS als bei Production/Staging: DEMO_ANTHROPIC_API_KEY ist hier
+  // ERFORDERLICH (ENT-523-N1 -- der Projektinhaber hat sich bewusst fuer
+  // eine aktive KI-Funktion in der Demo entschieden). Eine Pruefung, die
+  // nur "ANTHROPIC_API_KEY kommt irgendwo vor" verlangt, wuerde grün
+  // bleiben, auch wenn er wie bei Production/Staging NICHT in die
+  // PFLICHT_FEHLT-Liste des Demo-Zweigs aufgenommen waere.
+  const demoZweig = (/elif \[ "\$IST_DEMO_REF" = "1" \][\s\S]{0,3000}?(?=\n          else)/.exec(workflow) ?? [''])[0];
+  check('KRITISCH (ENT-523-N1): DEMO_ANTHROPIC_API_KEY ist im Demo-Zweig ein PFLICHT-Secret -- anders als bei Production und Staging',
+    /\[ -z "\$EFF_ANTHROPIC_API_KEY" \][\s\S]{0,80}PFLICHT_FEHLT="\$PFLICHT_FEHLT DEMO_ANTHROPIC_API_KEY"/.test(demoZweig));
+
+  // Gegenprobe der Aussage selbst: Production und Staging duerfen diese
+  // Pflicht NICHT tragen -- sonst waere die obige Prüfung bedeutungslos
+  // (sie fände die Zeile irgendwo im Workflow, nicht spezifisch im
+  // Demo-Zweig).
+  check('KRITISCH (Gegenprobe): ANTHROPIC_API_KEY bleibt fuer Production und Staging weiterhin NICHT erforderlich',
+    !/\[ -z "\$EFF_ANTHROPIC_API_KEY" \][\s\S]{0,80}PFLICHT_FEHLT="\$PFLICHT_FEHLT ANTHROPIC_API_KEY"/.test(workflow)
+    && !/\[ -z "\$EFF_ANTHROPIC_API_KEY" \][\s\S]{0,80}PFLICHT_FEHLT="\$PFLICHT_FEHLT STAGING_ANTHROPIC_API_KEY"/.test(workflow));
+}
+
 // ── Staging deployt nur gegen qa-*-Tags, nie gegen einen Branch (ENT-372,
 // revidiert ENT-341 Punkt 5) ──────────────────────────────────────────────
 //
@@ -292,6 +349,30 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
   const qaTagAbbruch = /if\s*\[\s*"\$UMGEBUNG"\s*=\s*"staging"\s*\][\s\S]{0,300}?github\.ref_name[\s\S]{0,200}?qa-\*[\s\S]{0,300}?exit 1/;
   check('KRITISCH: ein Staging-Deploy ohne passenden qa-*-Tag bricht ab (exit 1)',
     qaTagAbbruch.test(workflow));
+}
+
+// ── Dieselbe Absicherung fuer Demo (ENT-523): nur gegen demo-*-Tags,
+// nie gegen einen Branch ──────────────────────────────────────────────────
+//
+// Warum diese Prüfung: Ohne einen eigenen Guard würde jeder Ref, der
+// weder "main" noch ein qa-*-Tag ist, automatisch als UMGEBUNG=demo
+// durchgehen (siehe die environment:-Ausdruck-Prüfung unten) -- auch ein
+// x-beliebiger Feature-Branch. Geprüft wird dieselbe AUSSAGE wie beim
+// qa-*-Guard: der Abbruch ist an github.ref_name UND exit 1 gekoppelt,
+// innerhalb des demo-Zweigs.
+{
+  const demoTagAbbruch = /if\s*\[\s*"\$UMGEBUNG"\s*=\s*"demo"\s*\][\s\S]{0,300}?github\.ref_name[\s\S]{0,200}?demo-\*[\s\S]{0,300}?exit 1/;
+  check('KRITISCH: ein Demo-Deploy ohne passenden demo-*-Tag bricht ab (exit 1)',
+    demoTagAbbruch.test(workflow));
+
+  // Gegenprobe der Aussage selbst: Der environment:-Ausdruck muss
+  // TATSÄCHLICH zwischen main, einem demo-*-Tag und allem anderen
+  // (Staging) unterscheiden -- ein Muster, das nur "demo" irgendwo im
+  // Workflow verlangt, bliebe grün, auch wenn environment: weiterhin
+  // binär waere und jeder Nicht-main-Ref als Staging durchginge (dann
+  // wuerde UMGEBUNG=demo nie erreicht, und der Guard oben liefe leer).
+  check('KRITISCH: der environment:-Ausdruck waehlt "demo" fuer jeden Ref, der mit "demo-" beginnt, unabhaengig von main',
+    /environment:\s*\$\{\{[\s\S]{0,50}github\.ref_name\s*==\s*'main'[\s\S]{0,50}&&\s*'production'[\s\S]{0,80}startsWith\(github\.ref_name,\s*'demo-'\)[\s\S]{0,30}&&\s*'demo'[\s\S]{0,30}\|\|\s*'staging'/.test(workflow));
 }
 
 // ── Hostpoint-Passwortschutz auf Staging: nie stillschweigend entfernt,
@@ -419,6 +500,67 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     !/curl\s+[^\n]*(-L\b|--location)/.test(workflow));
 }
 
+// ── Demo: automatischer Suchmaschinenausschluss statt Basic Auth
+// (ENT-523/ENT-523-N1) ──────────────────────────────────────────────────
+//
+// Warum diese Prüfung: Demo trägt bewusst KEINEN Passwortschutz (die
+// Vorentscheidung, die den ganzen Unterschied zu Staging ausmacht) -- die
+// .htaccess samt X-Robots-Tag entsteht stattdessen vollständig aus dem
+// Repository, bei jedem Deploy neu, ohne manuellen Hostpoint-Schritt und
+// ohne Drift-Guard. Ein unauthentifizierter Nachweis ist hier deshalb ein
+// ECHTER Nachweis -- anders als bei Staging, wo "Require valid-user"
+// jeden Pfad ohnehin mit 401 beantwortet. Vier Aussagen müssen gemeinsam
+// gelten: (1) htaccess-demo-zusatz und robots-demo.txt existieren mit dem
+// richtigen Inhalt, (2) beide werden im Deploy-Schritt AUSSCHLIESSLICH im
+// Demo-Zweig angehängt/kopiert, (3) der Nachweis ist ein echter,
+// UNAUTHENTIFIZIERTER HTTP-Test (kein -u, sonst wäre er ein Rückfall auf
+// die Staging-Bauart mit Zugangsdaten, die es für Demo gar nicht gibt),
+// (4) Netzwerkfehler brechen ab statt als "ok" durchzugehen.
+{
+  check('KRITISCH: htaccess-demo-zusatz existiert und setzt X-Robots-Tag: noindex dauerhaft (mit "always")',
+    existsSync(`${WURZEL}/htaccess-demo-zusatz`)
+    && /Header\s+always\s+set\s+X-Robots-Tag\s+"noindex/.test(readFileSync(`${WURZEL}/htaccess-demo-zusatz`, 'utf8')));
+
+  check('KRITISCH: robots-demo.txt existiert und sperrt tatsächlich alles (User-agent: * / Disallow: /)',
+    existsSync(`${WURZEL}/robots-demo.txt`)
+    && /^User-agent:\s*\*/m.test(readFileSync(`${WURZEL}/robots-demo.txt`, 'utf8'))
+    && /^Disallow:\s*\/\s*$/m.test(readFileSync(`${WURZEL}/robots-demo.txt`, 'utf8')));
+
+  // Gegenprobe der Aussage selbst: Ein Muster, das nur "htaccess-demo-zusatz"
+  // irgendwo im Workflow verlangt, bliebe grün, auch wenn der Anhängevorgang
+  // unbedingt liefe (dann trüge JEDE Umgebung den Demo-Zusatz). Verlangt
+  // wird die tatsächliche Kopplung an UMGEBUNG=demo im selben Bedingungsblock.
+  const demoHtaccessBlock = /if\s*\[\s*"\$UMGEBUNG"\s*=\s*"demo"\s*\][\s\S]{0,300}?fi/.exec(workflow)?.[0] ?? '';
+  check('KRITISCH: htaccess-demo-zusatz wird NUR im Demo-Zweig angehängt, robots-demo.txt NUR dort kopiert',
+    /cat htaccess-demo-zusatz >> dist\/\.htaccess/.test(demoHtaccessBlock)
+    && /cp robots-demo\.txt dist\/robots\.txt/.test(demoHtaccessBlock));
+
+  const demoSuchmaschinenSchritt = (/Demo-Suchmaschinenausschluss verifizieren[\s\S]{0,2500}/.exec(workflow) ?? [''])[0];
+
+  check('KRITISCH: der Schritt "Demo-Suchmaschinenausschluss verifizieren" existiert und läuft ausschliesslich für Demo',
+    /name:\s*Demo-Suchmaschinenausschluss verifizieren[\s\S]{0,80}if:\s*\$\{\{\s*env\.UMGEBUNG\s*==\s*'demo'\s*\}\}/.test(workflow));
+
+  check('KRITISCH: die Startseiten-Prüfung verlangt HTTP 200 UND X-Robots-Tag: noindex, beides einzeln an einen Abbruch gekoppelt',
+    /grep -qE '\^HTTP\/\[0-9\.\]\+ 200'[\s\S]{0,250}exit 1/.test(demoSuchmaschinenSchritt)
+    && /grep -qi '\^X-Robots-Tag:\.\*noindex'[\s\S]{0,250}exit 1/.test(demoSuchmaschinenSchritt));
+
+  check('KRITISCH: die robots.txt-Prüfung verlangt HTTP 200 UND User-agent: * UND Disallow: /, alle drei einzeln an einen Abbruch gekoppelt',
+    /grep -qE '\^HTTP\/\[0-9\.\]\+ 200'[\s\S]{0,600}exit 1/.test(demoSuchmaschinenSchritt)
+    && /grep -qE '\^User-agent:\[\[:space:\]\]\*\\\*'[\s\S]{0,250}exit 1/.test(demoSuchmaschinenSchritt)
+    && /grep -qE '\^Disallow:\[\[:space:\]\]\*\/\[\[:space:\]\]\*\$'[\s\S]{0,250}exit 1/.test(demoSuchmaschinenSchritt));
+
+  check('KRITISCH: beide Abrufe (Startseite UND robots.txt) brechen bei DNS-/TLS-/Netzwerkfehler oder Timeout ab, statt als "ok" durchzugehen',
+    (demoSuchmaschinenSchritt.match(/\$\?\s*-ne\s*0[\s\S]{0,300}exit 1/g) ?? []).length >= 2);
+
+  // DER Kernunterschied zu Staging, konkret geprüft statt nur behauptet:
+  // kein einziger authentifizierter Abruf (-u) im Demo-Schritt. Das ist
+  // keine Bequemlichkeit, sondern die direkte Konsequenz von ENT-523-N1 --
+  // ein "-u" hier würde bedeuten, dass doch irgendwo Demo-Basic-Auth-
+  // Zugangsdaten erwartet werden, die es laut Entscheidung nicht gibt.
+  check('KRITISCH (ENT-523-N1): der Demo-Suchmaschinenausschluss-Nachweis ist UNAUTHENTIFIZIERT -- kein "-u" im Schritt, anders als bei Staging',
+    !/-u\s+"/.test(demoSuchmaschinenSchritt));
+}
+
 // ── qa-version.json: Live-Version-Nachweis fuer den externen QA-Runner,
 // ausschliesslich Staging betreffend (ENT-435)
 // ────────────────────────────────────────────────────────────────────────
@@ -458,6 +600,45 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
   // Kopplung von Dateinamen UND if-Bedingung im selben Schritt.
   check('KRITISCH: kein anderer, unbedingter Schritt erzeugt dist/qa-version.json ausserhalb des Staging-Zweigs',
     (workflow.match(/>\s*dist\/qa-version\.json/g) ?? []).length === 1);
+}
+
+// ── demo-version.json: dieselbe Nachvollziehbarkeit für Demo (ENT-523) ───
+//
+// Warum diese Prüfung: rein betrieblicher Nutzen (welcher Tag/Commit läuft
+// gerade auf der Demo), aber derselbe Fehlerfall wie bei qa-version.json:
+// ohne die Kopplung an den Demo-Zweig würde die Datei entweder nie
+// entstehen oder -- schlimmer -- auch für Production erzeugt und
+// hochgeladen.
+{
+  const demoVersionSchritt = (/demo-version\.json erzeugen[\s\S]{0,700}/.exec(workflow) ?? [''])[0];
+
+  check('KRITISCH: der Schritt "demo-version.json erzeugen" existiert und läuft ausschliesslich für Demo (if env.UMGEBUNG == demo)',
+    /name:\s*demo-version\.json erzeugen[\s\S]{0,80}if:\s*\$\{\{\s*env\.UMGEBUNG\s*==\s*'demo'\s*\}\}/.test(workflow));
+
+  check('KRITISCH: demo_tag kommt aus github.ref_name, nicht aus einem Secret oder einem festen Text',
+    /"demo_tag":\s*"\$\{\{\s*github\.ref_name\s*\}\}"/.test(demoVersionSchritt)
+    && !/"demo_tag":\s*"\$\{\{\s*secrets\./.test(demoVersionSchritt));
+
+  check('KRITISCH: commit_sha kommt aus github.sha, nicht aus einem Secret oder einem festen Text',
+    /"commit_sha":\s*"\$\{\{\s*github\.sha\s*\}\}"/.test(demoVersionSchritt)
+    && !/"commit_sha":\s*"\$\{\{\s*secrets\./.test(demoVersionSchritt));
+
+  check('KRITISCH: demo-version.json wird VOR dem FTP-Upload erzeugt (sonst würde sie den Server nie erreichen)',
+    workflow.indexOf('demo-version.json erzeugen') > 0
+    && workflow.indexOf('demo-version.json erzeugen') < workflow.indexOf('Nach Hostpoint hochladen'));
+
+  // Gegenprobe der Aussage selbst: Verlangt die tatsächliche Kopplung von
+  // Dateinamen UND if-Bedingung im selben Schritt, nicht nur "der String
+  // demo-version.json kommt irgendwo vor".
+  check('KRITISCH: kein anderer, unbedingter Schritt erzeugt dist/demo-version.json ausserhalb des Demo-Zweigs',
+    (workflow.match(/>\s*dist\/demo-version\.json/g) ?? []).length === 1);
+
+  // Und die Gegenrichtung zu qa-version.json: die beiden Version-Dateien
+  // duerfen sich nicht vermischen -- ein Demo-Deploy darf NIE
+  // qa-version.json erzeugen und umgekehrt.
+  check('KRITISCH: qa-version.json und demo-version.json sind unabhängige Schritte, keiner erzeugt die Datei des anderen',
+    !/name:\s*qa-version\.json erzeugen[\s\S]{0,300}demo-version\.json/.test(workflow)
+    && !/name:\s*demo-version\.json erzeugen[\s\S]{0,300}qa-version\.json/.test(workflow));
 }
 
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);

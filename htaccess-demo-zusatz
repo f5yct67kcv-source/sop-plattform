@@ -1,0 +1,19 @@
+# Demo-spezifische Zusatzregel (ENT-523): X-Robots-Tag fuer die
+# Demo-Umgebung, damit Suchmaschinen sie nie indexieren.
+#
+# ANDERS ALS htaccess-staging-zusatz wird diese Datei NICHT manuell bei
+# Hostpoint eingetragen: Die Demo traegt keinen Passwortschutz (bewusst,
+# ENT-523-N1-Vorentscheidung -- das normale Cockpit-Login ist der Schutz),
+# und ohne einen von Hand gepflegten Passwortschutz-Block gibt es keinen
+# Grund, die Demo-.htaccess vom automatischen Deploy auszunehmen. Der
+# Deploy-Workflow haengt den Inhalt dieser Datei darum bei jedem
+# Demo-Deploy automatisch an htaccess-hostpoint an (siehe
+# deploy-hostpoint.yml, Schritt "Platzhalter durch echte Werte ersetzen") --
+# kein Drift-Guard noetig, weil nichts manuell gepflegt wird.
+#
+# "Header always set" statt nur "Header set": ohne "always" liefert Apache
+# den Header bei Fehlerantworten teils nicht aus -- siehe
+# htaccess-staging-zusatz, das denselben Mechanismus bereits verwendet.
+<IfModule mod_headers.c>
+  Header always set X-Robots-Tag "noindex, nofollow, noarchive"
+</IfModule>
