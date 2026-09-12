@@ -508,6 +508,20 @@ select.inp { padding-right: 30px; background-image: linear-gradient(45deg, trans
 .nav-kind.on { background: var(--shell-hi); color: var(--accent); }
 
 .side-foot { padding: 12px; border-top: 1px solid var(--shell-line); flex: none; }
+
+/* Herstellersignatur (Guard OpS). Grundzustand = Seitenleiste: ganz unten,
+   unter dem Fussteil, in der ruhigen Textfarbe der Huelle.
+   --shell-txt und nicht --shell-txt-hi: Gerechnet ergibt #9298A5 auf dem
+   Huellengrund #16181D 6,13:1 -- deutlich ueber den 3:1, die ein Sinnbild
+   braucht, und trotzdem eine Stufe unter dem aktiven Menuepunkt. Die Huelle
+   ist in BEIDEN Themen dunkel (#16181D hell / #0B0D11 dunkel), darum reicht
+   hier eine Farbe fuer beide.
+   22 px: knapp ueber dem Mindestmass der Fassung ohne Claim (20 px),
+   darunter laeuft die feine Linie der Bildmarke zu. */
+.marke-hersteller { flex: none; display: flex; align-items: center; justify-content: center;
+  padding: 13px 12px; border-top: 1px solid var(--shell-line); color: var(--shell-txt); }
+.marke-hersteller svg { display: block; height: 22px; width: auto; }
+.marke-hersteller .mh-zeichen { display: none; }
 .side-user { display: flex; align-items: center; gap: 10px; padding: 7px 8px; }
 .avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 11.5px; font-weight: 700; letter-spacing: .3px; flex: none; }
 .side-user .who { min-width: 0; }
@@ -3715,6 +3729,15 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
   .shell.schmal .side-brand, .shell.aus .side-brand { justify-content: center; padding: 0 8px; }
   .shell.schmal .side-brand .txt, .shell.aus .side-brand .txt { display: none; }
   .shell.schmal .side-user, .shell.aus .side-user { justify-content: center; padding: 7px 0; }
+  /* In der 64 px schmalen Leiste hat der Schriftzug keinen Platz -- dort
+     steht die Bildmarke allein. Bewusst NICHT zusammen mit ".shell.aus"
+     geschrieben, obwohl die beiden Zustaende sich sonst fast alle Regeln
+     teilen: In der Kopfleiste ist waagrecht Platz, und dort soll der ganze
+     Name stehen. Wer die Zeile spaeter zusammenzieht, nimmt der Kopfleiste
+     ihre Marke, ohne dass etwas kaputt aussieht. */
+  .shell.schmal .marke-hersteller { padding: 12px 6px; }
+  .shell.schmal .marke-hersteller .mh-voll { display: none; }
+  .shell.schmal .marke-hersteller .mh-zeichen { display: block; }
   .shell.schmal .side-user .who, .shell.aus .side-user .who { display: none; }
   /* Die Trennlinie zwischen den Gruppen bleibt als schmaler Strich sichtbar,
      damit die Gliederung nicht ganz verloren geht. */
@@ -3768,6 +3791,25 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
     display: flex; flex-direction: row; align-items: center; gap: 2px;
     flex: none; padding: 0; overflow: visible;
   }
+  /* Die Herstellersignatur fuellt die bis hierher leere erste Spalte.
+     "grid-row: 1; grid-column: 1" steht ausdruecklich da, ist hier aber --
+     anders als bei Logo und Navigation darueber -- nicht zwingend:
+     Gegengeprobt, ohne die Angabe landet die Marke von selbst in der einzig
+     freien Zelle, und die Leiste bleibt einzeilig. Sie steht trotzdem da,
+     weil das eine Eigenschaft der jetzigen Reihenfolge ist und keine des
+     Rasters: Kommt ein viertes Kind dazu oder wandert eines im Markup, faellt
+     die Marke ohne Angabe in eine zweite Zeile -- und zwar lautlos, so wie es
+     dem Betriebslogo schon einmal passiert ist. Den Symptomfall haelt
+     zusaetzlich eine Pruefung fest (Kopfleiste bleibt 70 px).
+     Kein Rahmen und kein Innenabstand wie in der Seitenleiste: Hier ist die
+     Signatur kein abgesetzter Fussteil, sondern der linke Anfang der Zeile.
+     26 px statt 22: In der Kopfleiste steht sie neben 24-px-Sinnbildern mit
+     Beschriftung darunter, in der Seitenleiste neben 13,5-px-Text. */
+  .shell.aus .marke-hersteller {
+    grid-row: 1; grid-column: 1; justify-self: start;
+    padding: 0; border-top: none;
+  }
+  .shell.aus .marke-hersteller svg { height: 26px; }
   .shell.aus .nav-gruppe { flex: none; }
   .shell.aus .nav-item { width: auto; min-width: 40px; min-height: 38px; margin-bottom: 0; padding: 8px 10px; }
   /* Symbole allein sagen nicht, was sie sind. In der Kopfleiste ist Platz
@@ -3887,6 +3929,23 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
      klebt darunter, nicht darüber -- sonst verdeckt sie die Navigation. */
   .shell.aus .main { padding-top: var(--kopf-h); }
   .shell.aus .topbar { top: var(--kopf-h); }
+}
+
+/* Der Schriftzug in der Kopfleiste braucht Platz, den ein schmales Fenster
+   nicht hat -- dort steht die Bildmarke allein, wie in der schmalen
+   Seitenleiste.
+   Die Grenze ist GEMESSEN, nicht gegriffen (dieselbe Lehre wie bei den
+   64 px weiter oben). Der Schriftzug ist 110 px breit, die Navigation
+   731,5 px, das Betriebslogo 109 px, dazu 2x14 px Rand. Gemessen ergibt
+   das: unter 980 px laeuft die Leiste ueber (bei 901 px um 72 px), unter
+   1000 px steht die Navigation nicht mehr in der Fenstermitte, und die
+   Luecke zwischen Schriftzug und erstem Menuepunkt betraegt bei 1000 px
+   nur 10 px. Bei 1024 px sind es 22 px, ohne Ueberlauf und mittig -- das
+   ist die erste Breite, bei der alle drei Bedingungen zugleich stimmen.
+   Ab 901 px, weil darunter die Kopfleiste gar nicht existiert (Schublade). */
+@media (min-width: 901px) and (max-width: 1023.98px) {
+  .shell.aus .marke-hersteller .mh-voll { display: none; }
+  .shell.aus .marke-hersteller .mh-zeichen { display: block; }
 }
 
 .btn-schmal { display: inline-flex; }
@@ -4876,6 +4935,41 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
 </script>
 </head>
 <body>
+<!-- ═══════════ MARKE GUARD OPS ═══════════
+     Die Zeichnung steht EINMAL da und wird ueber <use> geholt. Sie kommt in
+     dieser Datei an zwei Stellen vor -- Anmeldebildschirm und Huelle -- und
+     zwei Kopien derselben Pfaddaten koennen auseinanderlaufen, ohne dass
+     etwas kaputt aussieht: Eine spaetere Korrektur traefe dann die eine
+     Stelle und die andere nicht.
+     Inline und nicht als eigene Datei, weil der Deploy nur namentlich
+     gelistete Dateien kopiert (dieselbe Ueberlegung wie bisher schon fuer
+     die Signatur im Anmeldebildschirm). "position:absolute;width:0" statt
+     display:none: Ein per display:none verborgener Vorrat ist nicht in
+     jedem Browser ein gueltiges Ziel fuer <use>.
+     Zwei Fassungen, EINE Marke:
+       go-wort    -- Bildmarke als G plus Schriftzug ("uard OpS")
+       go-zeichen -- nur die Bildmarke, fuer schmale Stellen
+     Die Bildmarke IST das G; ohne sie laese der Schriftzug wie ein
+     Tippfehler. Darum traegt jede Verwendung ihr aria-label selbst.
+
+     ACHTUNG bei der aeusseren viewBox: <use> setzt das Symbol immer bei
+     (0,0) des AUFRUFENDEN Koordinatensystems ab, nicht am Ursprung der
+     Symbol-viewBox. Wer die viewBox des Symbols ("0 -120.22 ...") auch
+     aussen hinschreibt, verschiebt die Zeichnung um 120 Einheiten nach
+     unten und schneidet sie am Rand ab. Aussen gehoert darum "0 0 B H",
+     der Versatz steckt allein im Symbol. Das ist genau der Fehler, der
+     nicht auffaellt: Kasten, Farbe und Kontrast messen sich unveraendert,
+     nur das Bild stimmt nicht -- siehe die Tintendeckung in
+     test_marke_huelle.mjs. -->
+<svg aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden">
+  <symbol id="go-wort" viewBox="0.00 -120.22 649.83 153.56"><g transform="translate(0.0000 -120.2361) scale(0.546627)">
+    <path d="M162 57 L162 35 L85 8.5 L8 35 L8 138 L85 209 L162 138 L162 98" fill="none" stroke="currentColor" stroke-width="16" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="10"/>
+    <path d="M86 98 L170 98 L170 114 L76 114 Z" fill="currentColor"/>
+  </g>
+  <path transform="translate(98.3933 0)" d="M72.67 0.00H59.13L58.60 -10.73Q55.00 -4.87 49.13 -1.77Q43.27 1.33 35.27 1.33Q22.40 1.33 14.97 -6.57Q7.53 -14.47 7.53 -28.33V-66.67H23.93V-31.47Q23.93 -23.13 28.17 -18.30Q32.40 -13.47 39.67 -13.47Q47.20 -13.47 51.73 -18.60Q56.27 -23.73 56.27 -32.27V-66.67H72.67Z M139.40 0.00H125.13L124.20 -8.20Q120.53 -3.67 115.06 -1.17Q109.60 1.33 102.93 1.33Q95.86 1.33 90.33 -1.43Q84.80 -4.20 81.63 -9.00Q78.46 -13.80 78.46 -19.93Q78.46 -26.40 81.90 -31.30Q85.33 -36.20 91.30 -39.00Q97.26 -41.80 104.93 -41.80Q109.60 -41.80 114.30 -40.73Q119.00 -39.67 123.00 -37.73V-39.87Q123.00 -44.27 120.60 -47.47Q118.20 -50.67 114.13 -52.43Q110.06 -54.20 105.00 -54.20Q100.40 -54.20 95.80 -52.63Q91.20 -51.07 87.20 -48.00L82.53 -60.87Q88.93 -64.40 95.63 -66.20Q102.33 -68.00 108.73 -68.00Q118.13 -68.00 125.00 -64.30Q131.86 -60.60 135.63 -53.77Q139.40 -46.93 139.40 -37.67ZM106.33 -11.87Q110.66 -11.87 114.36 -13.67Q118.06 -15.47 120.43 -18.70Q122.80 -21.93 122.93 -26.13V-26.87Q119.80 -29.13 115.86 -30.37Q111.93 -31.60 107.93 -31.60Q101.80 -31.60 97.86 -28.83Q93.93 -26.07 93.93 -21.60Q93.93 -18.87 95.53 -16.63Q97.13 -14.40 99.96 -13.13Q102.80 -11.87 106.33 -11.87Z M164.93 0.00H148.53V-66.67H162.79L163.39 -54.53Q166.86 -60.93 172.76 -64.47Q178.66 -68.00 186.33 -68.00Q188.33 -68.00 190.43 -67.73Q192.53 -67.47 194.59 -66.93L192.59 -52.13Q188.46 -53.33 184.59 -53.33Q178.73 -53.33 174.29 -50.60Q169.86 -47.87 167.39 -43.03Q164.93 -38.20 164.93 -31.80Z M264.39 0.00H249.92L249.06 -9.33Q244.72 -4.33 238.52 -1.50Q232.32 1.33 224.99 1.33Q215.66 1.33 208.26 -3.20Q200.86 -7.73 196.62 -15.57Q192.39 -23.40 192.39 -33.33Q192.39 -43.27 196.62 -51.10Q200.86 -58.93 208.26 -63.47Q215.66 -68.00 224.99 -68.00Q231.92 -68.00 237.79 -65.53Q243.66 -63.07 247.99 -58.60V-100.00H264.39ZM228.66 -13.40Q233.99 -13.40 238.39 -15.83Q242.79 -18.27 245.39 -22.53Q247.99 -26.80 247.99 -32.27V-34.60Q247.99 -40.00 245.39 -44.23Q242.79 -48.47 238.39 -50.90Q233.99 -53.33 228.66 -53.33Q223.06 -53.33 218.66 -50.70Q214.26 -48.07 211.72 -43.57Q209.19 -39.07 209.19 -33.40Q209.19 -27.67 211.72 -23.13Q214.26 -18.60 218.66 -16.00Q223.06 -13.40 228.66 -13.40Z M347.85 2.00Q336.51 2.00 326.95 -1.87Q317.38 -5.73 310.31 -12.77Q303.25 -19.80 299.35 -29.30Q295.45 -38.80 295.45 -50.00Q295.45 -61.27 299.35 -70.73Q303.25 -80.20 310.31 -87.23Q317.38 -94.27 326.95 -98.13Q336.51 -102.00 347.91 -102.00Q359.25 -102.00 368.78 -98.13Q378.31 -94.27 385.38 -87.23Q392.45 -80.20 396.31 -70.73Q400.18 -61.27 400.18 -50.00Q400.18 -38.80 396.31 -29.30Q392.45 -19.80 385.38 -12.77Q378.31 -5.73 368.78 -1.87Q359.25 2.00 347.85 2.00ZM347.85 -13.47Q355.25 -13.47 361.51 -16.20Q367.78 -18.93 372.41 -23.90Q377.05 -28.87 379.61 -35.53Q382.18 -42.20 382.18 -50.00Q382.18 -57.80 379.61 -64.47Q377.05 -71.13 372.41 -76.10Q367.78 -81.07 361.51 -83.80Q355.25 -86.53 347.85 -86.53Q340.51 -86.53 334.21 -83.80Q327.91 -81.07 323.28 -76.10Q318.65 -71.13 316.05 -64.47Q313.45 -57.80 313.45 -50.00Q313.45 -42.20 316.05 -35.53Q318.65 -28.87 323.28 -23.90Q327.91 -18.93 334.21 -16.20Q340.51 -13.47 347.85 -13.47Z M423.18 33.33H406.78V-66.67H421.24L422.04 -57.33Q426.44 -62.33 432.64 -65.17Q438.84 -68.00 446.18 -68.00Q455.51 -68.00 462.88 -63.47Q470.24 -58.93 474.48 -51.10Q478.71 -43.27 478.71 -33.33Q478.71 -23.40 474.48 -15.57Q470.24 -7.73 462.88 -3.20Q455.51 1.33 446.18 1.33Q439.31 1.33 433.44 -1.13Q427.58 -3.60 423.18 -8.07ZM442.64 -13.47Q448.24 -13.47 452.61 -16.03Q456.98 -18.60 459.41 -23.10Q461.84 -27.60 461.84 -33.40Q461.84 -39.20 459.38 -43.70Q456.91 -48.20 452.58 -50.77Q448.24 -53.33 442.64 -53.33Q437.38 -53.33 433.11 -50.97Q428.84 -48.60 426.24 -44.50Q423.64 -40.40 423.18 -35.13V-31.47Q423.64 -26.20 426.21 -22.13Q428.78 -18.07 433.04 -15.77Q437.31 -13.47 442.64 -13.47Z M479.97 -10.40 488.31 -23.87Q492.91 -20.27 497.17 -17.90Q501.44 -15.53 505.77 -14.40Q510.11 -13.27 514.57 -13.27Q520.31 -13.27 524.54 -15.03Q528.77 -16.80 531.11 -19.93Q533.44 -23.07 533.44 -27.27Q533.44 -32.00 530.61 -35.17Q527.77 -38.33 523.17 -40.63Q518.57 -42.93 513.31 -45.13Q508.51 -47.13 503.61 -49.47Q498.71 -51.80 494.71 -55.03Q490.71 -58.27 488.27 -62.87Q485.84 -67.47 485.84 -74.00Q485.84 -82.47 490.11 -88.77Q494.37 -95.07 501.91 -98.50Q509.44 -101.93 519.11 -101.93Q525.91 -101.93 533.07 -100.17Q540.24 -98.40 547.24 -94.80L540.24 -80.60Q535.51 -83.40 530.17 -84.97Q524.84 -86.53 519.97 -86.53Q515.17 -86.53 511.54 -85.03Q507.91 -83.53 505.87 -80.77Q503.84 -78.00 503.84 -74.33Q503.84 -70.00 506.54 -67.00Q509.24 -64.00 513.64 -61.70Q518.04 -59.40 523.04 -57.20Q528.04 -55.00 533.07 -52.50Q538.11 -50.00 542.27 -46.60Q546.44 -43.20 548.94 -38.47Q551.44 -33.73 551.44 -27.07Q551.44 -18.40 546.94 -11.83Q542.44 -5.27 534.31 -1.63Q526.17 2.00 515.31 2.00Q505.57 2.00 496.64 -1.13Q487.71 -4.27 479.97 -10.40Z" fill="currentColor"/></symbol>
+  <symbol id="go-zeichen" viewBox="0.00 0.00 170.00 220.00"><g transform="translate(0.0000 -0.0248) scale(1.000295)"><path d="M162 57 L162 35 L85 8.5 L8 35 L8 138 L85 209 L162 138 L162 98" fill="none" stroke="currentColor" stroke-width="16" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="10"/><path d="M86 98 L170 98 L170 114 L76 114 Z" fill="currentColor"/></g></symbol>
+</svg>
+
 
 <!-- ══════════════════════════ ZUGANGS-GATE ══════════════════════════ -->
 <div id="gate">
@@ -4944,11 +5038,7 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
          Bildmarke wie ein Tippfehler laese. -->
     <div class="gate-sig">
       <span class="go-label">powered by</span>
-      <svg class="go-sig" viewBox="0.00 -120.22 649.83 153.56" role="img" aria-label="Guard OpS"><g transform="translate(0.0000 -120.2361) scale(0.546627)">
-    <path d="M162 57 L162 35 L85 8.5 L8 35 L8 138 L85 209 L162 138 L162 98" fill="none" stroke="currentColor" stroke-width="16" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="10"/>
-    <path d="M86 98 L170 98 L170 114 L76 114 Z" fill="currentColor"/>
-  </g>
-  <path transform="translate(98.3933 0)" d="M72.67 0.00H59.13L58.60 -10.73Q55.00 -4.87 49.13 -1.77Q43.27 1.33 35.27 1.33Q22.40 1.33 14.97 -6.57Q7.53 -14.47 7.53 -28.33V-66.67H23.93V-31.47Q23.93 -23.13 28.17 -18.30Q32.40 -13.47 39.67 -13.47Q47.20 -13.47 51.73 -18.60Q56.27 -23.73 56.27 -32.27V-66.67H72.67Z M139.40 0.00H125.13L124.20 -8.20Q120.53 -3.67 115.06 -1.17Q109.60 1.33 102.93 1.33Q95.86 1.33 90.33 -1.43Q84.80 -4.20 81.63 -9.00Q78.46 -13.80 78.46 -19.93Q78.46 -26.40 81.90 -31.30Q85.33 -36.20 91.30 -39.00Q97.26 -41.80 104.93 -41.80Q109.60 -41.80 114.30 -40.73Q119.00 -39.67 123.00 -37.73V-39.87Q123.00 -44.27 120.60 -47.47Q118.20 -50.67 114.13 -52.43Q110.06 -54.20 105.00 -54.20Q100.40 -54.20 95.80 -52.63Q91.20 -51.07 87.20 -48.00L82.53 -60.87Q88.93 -64.40 95.63 -66.20Q102.33 -68.00 108.73 -68.00Q118.13 -68.00 125.00 -64.30Q131.86 -60.60 135.63 -53.77Q139.40 -46.93 139.40 -37.67ZM106.33 -11.87Q110.66 -11.87 114.36 -13.67Q118.06 -15.47 120.43 -18.70Q122.80 -21.93 122.93 -26.13V-26.87Q119.80 -29.13 115.86 -30.37Q111.93 -31.60 107.93 -31.60Q101.80 -31.60 97.86 -28.83Q93.93 -26.07 93.93 -21.60Q93.93 -18.87 95.53 -16.63Q97.13 -14.40 99.96 -13.13Q102.80 -11.87 106.33 -11.87Z M164.93 0.00H148.53V-66.67H162.79L163.39 -54.53Q166.86 -60.93 172.76 -64.47Q178.66 -68.00 186.33 -68.00Q188.33 -68.00 190.43 -67.73Q192.53 -67.47 194.59 -66.93L192.59 -52.13Q188.46 -53.33 184.59 -53.33Q178.73 -53.33 174.29 -50.60Q169.86 -47.87 167.39 -43.03Q164.93 -38.20 164.93 -31.80Z M264.39 0.00H249.92L249.06 -9.33Q244.72 -4.33 238.52 -1.50Q232.32 1.33 224.99 1.33Q215.66 1.33 208.26 -3.20Q200.86 -7.73 196.62 -15.57Q192.39 -23.40 192.39 -33.33Q192.39 -43.27 196.62 -51.10Q200.86 -58.93 208.26 -63.47Q215.66 -68.00 224.99 -68.00Q231.92 -68.00 237.79 -65.53Q243.66 -63.07 247.99 -58.60V-100.00H264.39ZM228.66 -13.40Q233.99 -13.40 238.39 -15.83Q242.79 -18.27 245.39 -22.53Q247.99 -26.80 247.99 -32.27V-34.60Q247.99 -40.00 245.39 -44.23Q242.79 -48.47 238.39 -50.90Q233.99 -53.33 228.66 -53.33Q223.06 -53.33 218.66 -50.70Q214.26 -48.07 211.72 -43.57Q209.19 -39.07 209.19 -33.40Q209.19 -27.67 211.72 -23.13Q214.26 -18.60 218.66 -16.00Q223.06 -13.40 228.66 -13.40Z M347.85 2.00Q336.51 2.00 326.95 -1.87Q317.38 -5.73 310.31 -12.77Q303.25 -19.80 299.35 -29.30Q295.45 -38.80 295.45 -50.00Q295.45 -61.27 299.35 -70.73Q303.25 -80.20 310.31 -87.23Q317.38 -94.27 326.95 -98.13Q336.51 -102.00 347.91 -102.00Q359.25 -102.00 368.78 -98.13Q378.31 -94.27 385.38 -87.23Q392.45 -80.20 396.31 -70.73Q400.18 -61.27 400.18 -50.00Q400.18 -38.80 396.31 -29.30Q392.45 -19.80 385.38 -12.77Q378.31 -5.73 368.78 -1.87Q359.25 2.00 347.85 2.00ZM347.85 -13.47Q355.25 -13.47 361.51 -16.20Q367.78 -18.93 372.41 -23.90Q377.05 -28.87 379.61 -35.53Q382.18 -42.20 382.18 -50.00Q382.18 -57.80 379.61 -64.47Q377.05 -71.13 372.41 -76.10Q367.78 -81.07 361.51 -83.80Q355.25 -86.53 347.85 -86.53Q340.51 -86.53 334.21 -83.80Q327.91 -81.07 323.28 -76.10Q318.65 -71.13 316.05 -64.47Q313.45 -57.80 313.45 -50.00Q313.45 -42.20 316.05 -35.53Q318.65 -28.87 323.28 -23.90Q327.91 -18.93 334.21 -16.20Q340.51 -13.47 347.85 -13.47Z M423.18 33.33H406.78V-66.67H421.24L422.04 -57.33Q426.44 -62.33 432.64 -65.17Q438.84 -68.00 446.18 -68.00Q455.51 -68.00 462.88 -63.47Q470.24 -58.93 474.48 -51.10Q478.71 -43.27 478.71 -33.33Q478.71 -23.40 474.48 -15.57Q470.24 -7.73 462.88 -3.20Q455.51 1.33 446.18 1.33Q439.31 1.33 433.44 -1.13Q427.58 -3.60 423.18 -8.07ZM442.64 -13.47Q448.24 -13.47 452.61 -16.03Q456.98 -18.60 459.41 -23.10Q461.84 -27.60 461.84 -33.40Q461.84 -39.20 459.38 -43.70Q456.91 -48.20 452.58 -50.77Q448.24 -53.33 442.64 -53.33Q437.38 -53.33 433.11 -50.97Q428.84 -48.60 426.24 -44.50Q423.64 -40.40 423.18 -35.13V-31.47Q423.64 -26.20 426.21 -22.13Q428.78 -18.07 433.04 -15.77Q437.31 -13.47 442.64 -13.47Z M479.97 -10.40 488.31 -23.87Q492.91 -20.27 497.17 -17.90Q501.44 -15.53 505.77 -14.40Q510.11 -13.27 514.57 -13.27Q520.31 -13.27 524.54 -15.03Q528.77 -16.80 531.11 -19.93Q533.44 -23.07 533.44 -27.27Q533.44 -32.00 530.61 -35.17Q527.77 -38.33 523.17 -40.63Q518.57 -42.93 513.31 -45.13Q508.51 -47.13 503.61 -49.47Q498.71 -51.80 494.71 -55.03Q490.71 -58.27 488.27 -62.87Q485.84 -67.47 485.84 -74.00Q485.84 -82.47 490.11 -88.77Q494.37 -95.07 501.91 -98.50Q509.44 -101.93 519.11 -101.93Q525.91 -101.93 533.07 -100.17Q540.24 -98.40 547.24 -94.80L540.24 -80.60Q535.51 -83.40 530.17 -84.97Q524.84 -86.53 519.97 -86.53Q515.17 -86.53 511.54 -85.03Q507.91 -83.53 505.87 -80.77Q503.84 -78.00 503.84 -74.33Q503.84 -70.00 506.54 -67.00Q509.24 -64.00 513.64 -61.70Q518.04 -59.40 523.04 -57.20Q528.04 -55.00 533.07 -52.50Q538.11 -50.00 542.27 -46.60Q546.44 -43.20 548.94 -38.47Q551.44 -33.73 551.44 -27.07Q551.44 -18.40 546.94 -11.83Q542.44 -5.27 534.31 -1.63Q526.17 2.00 515.31 2.00Q505.57 2.00 496.64 -1.13Q487.71 -4.27 479.97 -10.40Z" fill="currentColor"/></svg>
+      <svg class="go-sig" viewBox="0.00 0.00 649.83 153.56" role="img" aria-label="Guard OpS"><use href="#go-wort"/></svg>
     </div>
   </div>
 </div>
@@ -5250,6 +5340,23 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
         <svg class="i" viewBox="0 0 24 24"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
         <span class="lbl">Abmelden</span>
       </button>
+    </div>
+
+    <!-- Herstellersignatur in der Huelle. Sie sagt, in WELCHER Software man
+         arbeitet; das Betriebslogo oben rechts sagt, WESSEN Konto das ist.
+         Links die Software, rechts der Betrieb -- dieselbe Rangfolge wie im
+         Anmeldebildschirm, nur ohne das Etikett "powered by": Dort signiert
+         die Marke eine Seite, die einem anderen gehoert, hier ist sie die
+         Seite selbst.
+         Eine Marke, zwei Fassungen: der volle Schriftzug, wo Platz ist, sonst
+         die Bildmarke allein (schmale Seitenleiste, schmales Fenster). Beide
+         zeigen auf denselben Vorrat, koennen also nicht auseinanderlaufen.
+         Bewusst kein Knopf: Ein anklickbares Logo, das auf die Uebersicht
+         fuehrt, waere ein zweiter Weg zu einem Menuepunkt, der zwei
+         Zentimeter weiter rechts schon steht. -->
+    <div class="marke-hersteller">
+      <svg class="mh-voll" viewBox="0.00 0.00 649.83 153.56" role="img" aria-label="Guard OpS"><use href="#go-wort"/></svg>
+      <svg class="mh-zeichen" viewBox="0.00 0.00 170.00 220.00" role="img" aria-label="Guard OpS"><use href="#go-zeichen"/></svg>
     </div>
   </aside>
 
