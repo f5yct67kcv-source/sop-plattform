@@ -159,13 +159,27 @@ check('Das Logo steht waagrecht wirklich mittig, nicht nur ungefaehr',
   logo !== null && mitte !== null
   && Math.abs((logo.x + logo.w / 2) - (mitte.x + mitte.w / 2)) <= 2);
 
-// ══════════ "COCKPIT" BLEIBT -- ANDERS ALS IN app.html ════════════════
+// ══════════ EINE WORTMARKE BLEIBT -- ANDERS ALS IN app.html ═══════════
 // ENT-385 hat die Wortmarke aus der Mitarbeiter-App entfernt, weil der
-// Zugang dort NICHT "Cockpit" heisst. Hier schon -- das ist tatsaechlich
-// das Cockpit. Die Marke bleibt darum ausdruecklich stehen, das ist keine
-// vergessene Aufraeumarbeit.
-check('KRITISCH: die Wortmarke "Cockpit" steht ueber dem Formular',
-  (await page.textContent('.gate-oben .wm').catch(() => '')).trim() === 'Cockpit');
+// Zugang dort NICHT das Cockpit ist. Hier schon -- die Marke bleibt darum
+// ausdruecklich stehen, das ist keine vergessene Aufraeumarbeit.
+//
+// Der TEXT der Marke ist APP_NAME (dashboard.html) und stand hier bis
+// ENT-556-N1 fest auf "Cockpit". Mit der Umbenennung auf GuardOps
+// (Projekt-Repository, ENT-556: Produktname GuardOps; "Cockpit" bleibt
+// als Hausbegriff, nur der AUSSEN sichtbare Name wechselt) zeigt genau
+// diese Stelle den Aussennamen -- sie ist Teil der "Wasserzeichen", die
+// der Projektinhaber bei dieser Entscheidung ausdruecklich mitgemeint
+// hat. Ein hartes "=== 'GuardOps'" waere hier derselbe Fehler nur mit
+// neuem Wortlaut -- bei der naechsten Umbenennung wieder rot, ohne dass
+// etwas kaputt ist. Geprueft wird darum gegen APP_NAME selbst, ueber
+// document.title: Beide werden im selben Atemzug aus derselben Konstante
+// gesetzt (dashboard.html, kurz vor dem Ende), document.title ist von
+// aussen ohne Quelltext-Zugriff auslesbar und steht schon vor jeder
+// Anmeldung fest.
+const titel = await ev(page, () => document.title);
+check('KRITISCH: die Wortmarke ueber dem Formular stimmt mit dem Fenstertitel ueberein (beide aus APP_NAME)',
+  !!titel && (await page.textContent('.gate-oben .wm').catch(() => '')).trim() === titel);
 check('Der Firmenname steht als eigene Zeile darunter',
   (await page.textContent('.gate-oben .sub').catch(() => '')).trim() !== '');
 
@@ -221,7 +235,7 @@ await ev(page, () => document.querySelector('.gate-video')?.pause());
 
 // ══════════ HAUPTFORMULAR: MEHRPUNKT-KONTRAST GEGEN DAS LAUFENDE VIDEO ═
 const TEXTE_HAUPT = [
-  ['Wortmarke "Cockpit"', '.gate-oben .wm'],
+  ["Wortmarke (APP_NAME)", '.gate-oben .wm'],
   ['Firmenname', '.gate-oben .sub'],
   ['Begleittext "Bitte melden Sie sich..."', '#gateLogin .gate-msg'],
   ['Beschriftung "Name"', 'label[for="gName"]'],
@@ -322,7 +336,7 @@ check('KRITISCH: das Eingabefeld bleibt im hellen Thema dunkel (--surface-2), di
 await ev(hell, () => document.querySelector('.gate-video')?.pause());
 await seekeZu(hell, 2.5);
 const kHell = await textKontrastAufFoto(hell, '.gate-oben .wm');
-check('KRITISCH: die Wortmarke "Cockpit" bleibt auch im hellen Thema lesbar (>= 4.5:1)',
+check('KRITISCH: die Wortmarke (APP_NAME) bleibt auch im hellen Thema lesbar (>= 4.5:1)',
   kHell !== null && kHell >= 4.5);
 await hell.close();
 
