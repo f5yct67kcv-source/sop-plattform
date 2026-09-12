@@ -213,7 +213,7 @@ try {
   check('Die Offertenkachel nennt Anzahl und wieviele bald ablaufen',
     /4 Offerten/.test(kpi[2].f) && /2 laufen bald ab/.test(kpi[2].f));
   check('KRITISCH: bezahlt im Monat ist CHF 200.00, der Vormonat CHF 100.00',
-    /200\.00/.test(kpi[3].v) && /Vormonat \(CHF 100\.00\)/.test(kpi[3].f));
+    /200\.00/.test(kpi[3].v) && /Vormonat CHF 100\.00/.test(kpi[3].f));
   check('KRITISCH: die bezahlte Rechnung OHNE Zahldatum wird genannt, nicht verschwiegen',
     /1 ohne Zahldatum/.test(kpi[3].f));
 } catch (e) { bad.push('Kennzahlen: ' + String(e).split('\n')[0].slice(0, 160)); }
@@ -333,6 +333,16 @@ try {
     mass.breiten.length === 2 && Math.abs(mass.breiten[0] - mass.breiten[1]) <= 1);
   check('KRITISCH: "CHF" ist gemessen kleiner als die Zahl -- die Regel greift wirklich',
     parseFloat(mass.waehrung) < parseFloat(mass.wert));
+  // Gemessen aufgefallen: Der laengere Fusstext dieser Kacheln liess die
+  // Delta-Pille schrumpfen, bis sie in sich umbrach -- "100" ueber "%".
+  const pille = await page.evaluate(() => {
+    const d = document.querySelector('#kuLageKpi .kpi:nth-child(4) .delta');
+    if (!d) { return null; }
+    const r = d.getBoundingClientRect();
+    return { h: r.height, zeile: parseFloat(getComputedStyle(d).fontSize) };
+  });
+  check('KRITISCH: die Delta-Pille bricht nicht in sich um (gemessen, eine Zeile)',
+    pille !== null && pille.h < pille.zeile * 2.2);
 } catch (e) { bad.push('Gestaltung: ' + String(e).split('\n')[0].slice(0, 160)); }
 
 await page.close();

@@ -954,6 +954,13 @@ tr.klickbar.gewaehlt td { background: var(--accent-soft); }
 /* Waehrungszeichen VOR der Zahl -- "CHF 1'234.50", wie auf jedem Beleg im
    Haus. Eigene Klasse statt ".unit": Die Stelle ist eine andere (vor statt
    nach der Zahl), und ".unit" haette sonst zwei Bedeutungen. */
+/* Der Fuss dieser Kacheln traegt mehr Text als der der Haupt-Uebersicht
+   (Vormonatsvergleich UND der Hinweis auf Belege ohne Zahldatum). In einer
+   Flexbox schrumpft die Delta-Pille dann und bricht in sich um -- "100" ueber
+   "%". Gemessen am gerenderten Zustand aufgefallen, nicht im Quelltext.
+   Bewusst nur hier und nicht an ".delta" selbst: Die Klasse gehoert der
+   Haupt-Uebersicht, und dort ist nichts zu reparieren. */
+#kuLageKpi .kpi-foot .delta { white-space: nowrap; flex: none; }
 .kpi-val .waehrung { font-size: 15px; font-weight: 600; color: var(--ink-3); letter-spacing: 0; margin-right: 3px; }
 .kpi-foot { margin-top: 9px; display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--ink-3); }
 .delta { display: inline-flex; align-items: center; gap: 3px; font-weight: 650; border-radius: 20px; padding: 1.5px 7px; font-size: 11px; }
@@ -17817,7 +17824,7 @@ function renderKuLageKpi(rAktiv, offen, ueber, ofOffen) {
     },
     {
       i: ic.haken, l: 'Bezahlt im Monat', v: kuLageChf(sJetzt),
-      f: `${delta(sJetzt, sVor)} <span>zum Vormonat (CHF ${chf(sVor)})`
+      f: `${delta(sJetzt, sVor)} <span>Vormonat CHF ${chf(sVor)}`
          + `${ohneZahltag ? ` · ${nf(ohneZahltag)} ohne Zahldatum` : ''}</span>`,
     },
   ];
