@@ -139,40 +139,41 @@ Staging-Secret, bricht der Deploy mit einer klaren Fehlermeldung ab, statt
 still auf den produktiven Wert zurueckzufallen (siehe „Staging" weiter
 unten).
 
-| Production-Secret | Staging-Secret | Wofuer | Woher der Wert kommt |
-|---|---|---|---|
-| `DB_HOST` | `STAGING_DB_HOST` | Datenbankserver | Hostpoint-Kundencenter → Datenbanken, je aus dem **eigenen** Account |
-| `DB_NAME` | `STAGING_DB_NAME` | Name der Datenbank | dieselbe Stelle |
-| `DB_USER` | `STAGING_DB_USER` | Datenbankbenutzer | dieselbe Stelle |
-| `DB_PASSWORD` | `STAGING_DB_PASSWORD` | Passwort dazu | dieselbe Stelle; bei Verlust dort neu setzen |
-| `HOSTPOINT_FTP_HOST` | `STAGING_HOSTPOINT_FTP_HOST` | Ziel des Deploys | Hostpoint-Kundencenter → FTP, je der **eigene** Account |
-| `HOSTPOINT_FTP_USER` | `STAGING_HOSTPOINT_FTP_USER` | FTP-Benutzer | dieselbe Stelle |
-| `HOSTPOINT_FTP_PASSWORD` | `STAGING_HOSTPOINT_FTP_PASSWORD` | Passwort dazu | dieselbe Stelle |
-| `MAPS_JS_KEY` | `STAGING_MAPS_JS_KEY` | Google-Maps-Browserschluessel (Kontrollpunkt-Karte, Geofence-Auswahl, Objektplan) | console.cloud.google.com — je Umgebung ein **eigener** Schluessel, referrer-beschraenkt auf genau die eine Domain |
-| `ANTHROPIC_API_KEY` | `STAGING_ANTHROPIC_API_KEY` | Diktat, Kundenrecherche, Planungsvorschlaege | console.anthropic.com; bei Verlust neu erzeugen, der alte laesst sich nicht anzeigen |
-| `SMTP_HOST` | `STAGING_SMTP_HOST` | Mailserver fuer den Offert-Versand (ENT-192) | Hostpoint-Kundencenter → E-Mail → SMTP-Einstellungen — **dasselbe** Postfach wie Production (ENT-367: kein zweites kostenloses Postfach ohne eigene Domain verfuegbar), Werte identisch mit `SMTP_*` |
-| `SMTP_PORT` | `STAGING_SMTP_PORT` | Port dazu (meist 587 mit `tls`, oder 465 mit `ssl`) | dieselbe Stelle |
-| `SMTP_VERSCHLUESSELUNG` | `STAGING_SMTP_VERSCHLUESSELUNG` | `tls`, `ssl` oder leer | dieselbe Stelle, je nach Port |
-| `SMTP_USER` | `STAGING_SMTP_USER` | Postfach-Login | dieselbe Stelle |
-| `SMTP_PASSWORD` | `STAGING_SMTP_PASSWORD` | Passwort dazu | dieselbe Stelle; bei Verlust dort neu setzen |
-| `SMTP_ABSENDER` | `STAGING_SMTP_ABSENDER` | Absenderadresse (muss zum jeweiligen Postfach passen) | dieselbe Stelle |
-| `SMTP_ABSENDER_NAME` | `STAGING_SMTP_ABSENDER_NAME` | Angezeigter Absendername (optional) | frei waehlbar |
-| — | `STAGING_TESTMAIL` | Zieladresse, auf die **jede** aus Staging versendete Mail umgeleitet wird | frei waehlbar, kein produktives Postfach |
-| — | `STAGING_BASIC_AUTH_USER` | Benutzername fuer den authentifizierten Suchmaschinenausschluss-Nachweis (ENT-387) | Hostpoint-Passwortschutz (Explorer → www/staging → Web-Einstellungen → Passwortschutz), eigener technischer Benutzer `qa-probe`, nicht der persoenliche Zugang |
-| — | `STAGING_BASIC_AUTH_PASSWORD` | Passwort dazu | dieselbe Stelle; eigenes starkes Zufallspasswort |
-| `VAPID_PRIVATE_PEM_B64` | `STAGING_VAPID_PRIVATE_PEM_B64` | Signierschluessel fuer Push-Benachrichtigungen (ENT-424) | selbst erzeugen, siehe unten — je Umgebung ein **eigener**, sonst klingeln Testversande auf den echten Telefonen |
-| `VAPID_KONTAKT` | `STAGING_VAPID_KONTAKT` | Absenderkontakt im Push-JWT, `mailto:…` oder `https://…` (RFC 8292 verlangt ihn) | frei waehlbar, muss erreichbar sein |
-| `PUSH_CRON_SCHLUESSEL` | `STAGING_PUSH_CRON_SCHLUESSEL` | Schluessel, mit dem der Hostpoint-Zeitgeber den Nachzuegler-Versand aufruft | selbst erzeugen: `openssl rand -hex 24` |
+| Production-Secret | Staging-Secret | Demo-Secret | Wofuer | Woher der Wert kommt |
+|---|---|---|---|---|
+| `DB_HOST` | `STAGING_DB_HOST` | `DEMO_DB_HOST` | Datenbankserver | Hostpoint-Kundencenter → Datenbanken, je aus dem **eigenen** Account |
+| `DB_NAME` | `STAGING_DB_NAME` | `DEMO_DB_NAME` | Name der Datenbank | dieselbe Stelle |
+| `DB_USER` | `STAGING_DB_USER` | `DEMO_DB_USER` | Datenbankbenutzer | dieselbe Stelle |
+| `DB_PASSWORD` | `STAGING_DB_PASSWORD` | `DEMO_DB_PASSWORD` | Passwort dazu | dieselbe Stelle; bei Verlust dort neu setzen |
+| `HOSTPOINT_FTP_HOST` | `STAGING_HOSTPOINT_FTP_HOST` | `DEMO_HOSTPOINT_FTP_HOST` | Ziel des Deploys | Hostpoint-Kundencenter → FTP, je der **eigene** Account |
+| `HOSTPOINT_FTP_USER` | `STAGING_HOSTPOINT_FTP_USER` | `DEMO_HOSTPOINT_FTP_USER` | FTP-Benutzer | dieselbe Stelle |
+| `HOSTPOINT_FTP_PASSWORD` | `STAGING_HOSTPOINT_FTP_PASSWORD` | `DEMO_HOSTPOINT_FTP_PASSWORD` | Passwort dazu | dieselbe Stelle |
+| `MAPS_JS_KEY` | `STAGING_MAPS_JS_KEY` | `DEMO_MAPS_JS_KEY` | Google-Maps-Browserschluessel (Kontrollpunkt-Karte, Geofence-Auswahl, Objektplan) | console.cloud.google.com — je Umgebung ein **eigener** Schluessel, referrer-beschraenkt auf genau die eine Domain |
+| `ANTHROPIC_API_KEY` | `STAGING_ANTHROPIC_API_KEY` | `DEMO_ANTHROPIC_API_KEY` | Diktat, Kundenrecherche, Planungsvorschlaege | console.anthropic.com; bei Verlust neu erzeugen, der alte laesst sich nicht anzeigen. **Bei Demo anders als bei Production/Staging: erforderlich, kein optionaler Ausfall** — ENT-523-N1, der Projektinhaber will die KI-Funktion in der Demo aktiv sehen |
+| `SMTP_HOST` | `STAGING_SMTP_HOST` | `DEMO_SMTP_HOST` | Mailserver fuer den Offert-Versand (ENT-192) | Hostpoint-Kundencenter → E-Mail → SMTP-Einstellungen — **dasselbe** Postfach wie Production (ENT-367: kein zweites kostenloses Postfach ohne eigene Domain verfuegbar), Werte identisch mit `SMTP_*` |
+| `SMTP_PORT` | `STAGING_SMTP_PORT` | `DEMO_SMTP_PORT` | Port dazu (meist 587 mit `tls`, oder 465 mit `ssl`) | dieselbe Stelle |
+| `SMTP_VERSCHLUESSELUNG` | `STAGING_SMTP_VERSCHLUESSELUNG` | `DEMO_SMTP_VERSCHLUESSELUNG` | `tls`, `ssl` oder leer | dieselbe Stelle, je nach Port |
+| `SMTP_USER` | `STAGING_SMTP_USER` | `DEMO_SMTP_USER` | Postfach-Login | dieselbe Stelle |
+| `SMTP_PASSWORD` | `STAGING_SMTP_PASSWORD` | `DEMO_SMTP_PASSWORD` | Passwort dazu | dieselbe Stelle; bei Verlust dort neu setzen |
+| `SMTP_ABSENDER` | `STAGING_SMTP_ABSENDER` | `DEMO_SMTP_ABSENDER` | Absenderadresse (muss zum jeweiligen Postfach passen) | dieselbe Stelle |
+| `SMTP_ABSENDER_NAME` | `STAGING_SMTP_ABSENDER_NAME` | `DEMO_SMTP_ABSENDER_NAME` | Angezeigter Absendername (optional) | frei waehlbar |
+| — | `STAGING_TESTMAIL` | `DEMO_TESTMAIL` | Zieladresse, auf die **jede** aus Staging/Demo versendete Mail umgeleitet wird | frei waehlbar, kein produktives Postfach. Bei Demo formal optional (ohne sie wird schlicht nichts verschickt, `smtp_ziel()`), praktisch aber noetig, sonst bleibt der ganze Mailversand der Demo aus |
+| — | `STAGING_BASIC_AUTH_USER` | — | Benutzername fuer den authentifizierten Suchmaschinenausschluss-Nachweis (ENT-387) | Hostpoint-Passwortschutz (Explorer → www/staging → Web-Einstellungen → Passwortschutz), eigener technischer Benutzer `qa-probe`, nicht der persoenliche Zugang. **Demo hat keinen Passwortschutz (ENT-523-N1) und darum kein Gegenstueck** |
+| — | `STAGING_BASIC_AUTH_PASSWORD` | — | Passwort dazu | dieselbe Stelle; eigenes starkes Zufallspasswort |
+| `VAPID_PRIVATE_PEM_B64` | `STAGING_VAPID_PRIVATE_PEM_B64` | `DEMO_VAPID_PRIVATE_PEM_B64` | Signierschluessel fuer Push-Benachrichtigungen (ENT-424) | selbst erzeugen, siehe unten — je Umgebung ein **eigener**, sonst klingeln Testversande auf den echten Telefonen |
+| `VAPID_KONTAKT` | `STAGING_VAPID_KONTAKT` | `DEMO_VAPID_KONTAKT` | Absenderkontakt im Push-JWT, `mailto:…` oder `https://…` (RFC 8292 verlangt ihn) | frei waehlbar, muss erreichbar sein |
+| `PUSH_CRON_SCHLUESSEL` | `STAGING_PUSH_CRON_SCHLUESSEL` | `DEMO_PUSH_CRON_SCHLUESSEL` | Schluessel, mit dem der Hostpoint-Zeitgeber den Nachzuegler-Versand aufruft | selbst erzeugen: `openssl rand -hex 24` |
 
 ### Environment-Variablen (keine Secrets)
 
-Zwei Werte sind **nicht** vertraulich und stehen darum als
+Drei Werte sind **nicht** vertraulich und stehen darum als
 Environment-Variable statt als Secret (`Settings → Environments → …
 → Variables`):
 
 | Variable | Umgebung | Wofuer |
 |---|---|---|
 | `STAGING_DOMAIN` | staging | Adresse, unter der die Verifikationsschritte die Staging-Seite abrufen (ENT-384/ENT-387) |
+| `DEMO_DOMAIN` | demo | Adresse, unter der der Verifikationsschritt die Demo-Seite abruft (ENT-523) — **erforderlich**, siehe unten |
 | `APP_BASIS_URL` | production (optional) | Adresse der Anlage, aus der jeder per E-Mail verschickte Link gebaut wird (ENT-501) |
 
 **Zu `APP_BASIS_URL` (ENT-501):** Bis dahin kam diese Adresse aus dem
@@ -190,17 +191,28 @@ traegt der Deploy die Adresse ein.
   genau der Fehler, den die alte Loesung vermeiden wollte. Fehlt
   `STAGING_DOMAIN`, verschicken die betroffenen Endpunkte dort **keinen**
   Link (und sagen das im Serverprotokoll), statt einen falschen.
+- **Demo:** Kommt aus `DEMO_DOMAIN`, aus demselben Grund kein Rueckfall auf
+  Production. Fehlt sie, bricht der Demo-Deploy sogar ganz ab — nicht erst
+  beim Linkversand: Der Verifikationsschritt „Demo-Suchmaschinenausschluss
+  verifizieren" braucht die Adresse, um die frisch deployte Seite
+  abzurufen, und ohne sie liesse sich der Suchmaschinenausschluss nicht
+  nachweisen.
 
 **Erforderlich, sonst bricht der Deploy ab** (siehe Workflow-Schritt „Umgebung
 waehlen und erforderliche Secrets pruefen"): `DB_*`, `HOSTPOINT_FTP_*` und
-`MAPS_JS_KEY` — jeweils production- oder staging-seitig, je nachdem, ob
-gegen `main` oder einen `qa-*`-Tag deployt wird —
-sowie bei Staging zusaetzlich `STAGING_TESTMAIL`. **Optional, mit
-eingebauter Ersatzmeldung statt Absturz:** `SMTP_*` (meldet „noch nicht
-eingerichtet") und `ANTHROPIC_API_KEY` (KI-Funktionen liefern dann nichts,
-statt zu scheitern) sowie `VAPID_*` und `PUSH_CRON_SCHLUESSEL` (Push meldet
-„noch nicht eingerichtet") — dieselbe Regel gilt fuer die
-`STAGING_`-Varianten.
+`MAPS_JS_KEY` — jeweils production-, staging- oder demo-seitig, je nachdem,
+ob gegen `main`, einen `qa-*`-Tag oder einen `demo-*`-Tag deployt wird —
+sowie bei Staging zusaetzlich `STAGING_TESTMAIL`, bei Demo zusaetzlich
+`DEMO_ANTHROPIC_API_KEY` (siehe Tabelle oben, ENT-523-N1) und
+`DEMO_DOMAIN` (als Environment-Variable, siehe oben — der Deploy-Lauf
+selbst kommt zwar auch ohne sie durch, scheitert aber sicher am
+Verifikationsschritt am Ende). **Optional, mit eingebauter Ersatzmeldung
+statt Absturz:** `SMTP_*` (meldet „noch nicht eingerichtet") sowie
+`ANTHROPIC_API_KEY` bei Production/Staging (KI-Funktionen liefern dann
+nichts, statt zu scheitern — bei Demo dagegen erforderlich, siehe oben)
+sowie `VAPID_*` und `PUSH_CRON_SCHLUESSEL` (Push meldet „noch nicht
+eingerichtet") — dieselbe Regel gilt fuer die `STAGING_`- und
+`DEMO_`-Varianten.
 
 ### Push-Benachrichtigungen einrichten (ENT-424)
 
@@ -376,6 +388,69 @@ und liefert nur das Ergebnis. Faellt PHP aus, liefern Webserver den Quelltext
 mitunter unveraendert aus, und dann stuende der Schluessel im Browser. Das ist
 unwahrscheinlich, aber es ist kein theoretischer Fall. Festgehalten, damit es
 eine bewusste Inkaufnahme bleibt und keine Ueberraschung.
+
+## Demo (ENT-523)
+
+Eine dritte, vollstaendig getrennte Instanz fuer Interessenten — dieselbe
+Codebasis wie Staging, aber ohne Passwortschutz (ENT-523-N1: der
+Interessent soll den Link einfach oeffnen koennen) und mit einer
+Musterbetrieb-Erzeugung (`backend/demo_daten.php`), die Staging nicht hat.
+Adresse und genaue Hostpoint-Einrichtung gehoeren dir; hier nur, was den
+Code betrifft.
+
+- **Kein dauerhafter Branch `demo`.** Wie bei Staging entsteht ein
+  Demo-Deploy **ausschliesslich manuell** ("Run workflow" in GitHub
+  Actions) gegen einen **Git-Tag** der Form `demo-JJJJ-MM-TT-NNN`, der
+  exakt auf einem bestehenden `main`-Commit liegt:
+  ```
+  git tag demo-2026-09-12-001 <main-commit>
+  git push origin demo-2026-09-12-001
+  # danach in GitHub Actions: "Run workflow" -> Use workflow from: dieser Tag
+  ```
+  Das GitHub-Environment `demo` sollte zusaetzlich ueber „Deployment
+  branches and tags" auf das Muster `demo-*` beschraenkt werden (Settings →
+  Environments → demo) — der Workflow selbst bricht ausserdem ab, wenn ein
+  Demo-Lauf gegen einen Ref ohne dieses Muster ausgeloest wird.
+- **Kein Ruckfall auf Production- oder Staging-Secrets:** Demo-Secrets
+  tragen eigene Namen (`DEMO_DB_HOST` usw., siehe Tabelle weiter oben).
+  Fehlt eines der erforderlichen, bricht der Lauf ab, bevor irgendetwas
+  kopiert oder hochgeladen wird.
+- **`APP_ENV`** wird beim Deploy explizit auf `demo` gesetzt.
+  `ist_demo()`/`umgebung_ist_demo()` in `backend/db.php` sind fail-safe:
+  nur der exakte Wert `demo` gilt als Demo. `testumgebung.js` zeigt das
+  sichtbare „TESTUMGEBUNG"-Kennzeichen entsprechend auch dort.
+- **E-Mail-Versand** geht ausschliesslich an die in `DEMO_TESTMAIL`
+  konfigurierte Adresse (`smtp_ziel()` in `backend/mailer.php`) — eine
+  **eigene**, nicht die von Staging (ENT-523-N1: die beiden teilen sich
+  keine Mailziele). Fehlt `DEMO_TESTMAIL`, wird schlicht nichts
+  verschickt, statt an eine falsche Adresse zu gehen. Der Absendername
+  traegt ausserhalb der Produktion automatisch das Praefix `[DEMO]`.
+- **Kein Passwortschutz (ENT-523-N1).** Anders als Staging braucht Demo
+  keine manuelle Hostpoint-Einrichtung fuer `.htaccess`/`robots.txt` und
+  keinen Drift-Guard: `htaccess-demo-zusatz` (X-Robots-Tag: `noindex,
+  nofollow, noarchive`) und `robots-demo.txt` (`Disallow: /`) werden bei
+  jedem Deploy **automatisch** aus dem Repository kopiert, wie jede andere
+  Datei auch. Der Suchmaschinenausschluss ist die einzige Schutzschicht;
+  nach jedem Demo-Deploy verifiziert ein eigener Schritt
+  („Demo-Suchmaschinenausschluss verifizieren") unauthentifiziert die
+  echte, gerade deployte Seite: HTTP 200 mit `X-Robots-Tag: noindex` auf
+  `/`, HTTP 200 mit `User-agent: *`/`Disallow: /` auf `/robots.txt`.
+  Netzwerkfehler, Timeouts oder eine Weiterleitung zaehlen als Fehlschlag.
+- **Musterbetrieb erzeugen:** Nach der Ersteinrichtung (unten) im Cockpit
+  unter „Betrieb → Einrichtung" zuerst `planung_einrichten.php` ausfuehren
+  wie bei jeder neuen Instanz, danach den Endpunkt
+  `api/demo_daten_erzeugen.php` einmalig aufrufen (Recht
+  `betrieb_schreiben`) — er fuellt eine leere Datenbank mit einem
+  erfundenen, funktionsfaehigen Bewachungsbetrieb samt einem
+  abgeschlossenen Lohnlauf fuer den Vormonat. Nur fuer eine **leere**
+  Datenbank gedacht; ein zweiter Lauf ohne vorherigen Reset bricht
+  kontrolliert ab, statt zu verdoppeln.
+- **Einrichtung/Zuruecksetzen** ansonsten wie bei Staging: `schema.sql`
+  einmalig in phpMyAdmin, `setup.php`/`setup.html` temporaer fuer den
+  ersten Admin-Account (danach sofort wieder loeschen), dann wie oben.
+  Ein automatischer naechtlicher Reset ist fuer die Demo vorgesehen, aber
+  noch nicht gebaut (ENT-523, Stufe 4) — bis dahin ist Zuruecksetzen
+  ebenso manuell wie bei Staging.
 
 ## Betreiber-Bereich in Betrieb nehmen (ENT-519 bis ENT-526)
 

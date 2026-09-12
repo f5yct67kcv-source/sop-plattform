@@ -39,6 +39,8 @@ function lohnlauf_sperrgruende(): array
         'keine_kategorie'    => 'Ohne Anstellungskategorie nach Art. 8 steht die Lohnform nicht fest.',
         'zeiten_unvollstaendig' => 'Die Ist-Zeiten der Schicht sind unvollständig erfasst.',
         'pause_laenger_als_schicht' => 'Die erfasste Pause ist länger als die Schicht — das ist ein Erfassungsfehler, keine Zeit.',
+        'abwesend'           => 'Die Person war laut Abgleich nicht anwesend — die Schicht fand statt, aber ohne sie. Kein Lohnanspruch für diese Schicht.',
+        'ausgefallen'        => 'Die Schicht ist laut Abgleich ausgefallen und hat nicht stattgefunden. Kein Lohnanspruch.',
         'monatslohn_offen'   => 'Für den Monatslohn (Kategorie A und B) ist der Rechenweg noch nicht gebaut — Etappe 3 deckt den Stundenlohn ab.',
         'anordnung_fehlt'    => 'Der Zuschlag ist als Stundenentschädigung vereinbart. Nach Art. 19 entsteht er aus dem angeordneten Einsatz — die Anordnung je Schicht führt das Datenmodell noch nicht.',
         'ausgleich_offen'    => 'Art. 14 Ziff. 3 lässt für die Mehrstunden über 210 die Auszahlung ODER den Ausgleich als Freizeit innerhalb von drei Monaten zu. Welches von beidem gilt, ist nicht festgelegt — bis dahin entsteht kein Betrag.',
@@ -64,6 +66,15 @@ function lohnlauf_sperrgruende(): array
 // Summe. Nur ABGEGLICHENE Schichten zaehlen: "Planung bleibt Planung"
 // (ENT-045) -- was noch offen ist, wird gezaehlt und benannt, nicht
 // stillschweigend weggelassen.
+//
+// "Abgeglichen" heisst hier: ist_status <> 'offen' -- also entschieden,
+// gleich in welche Richtung (ENT-045, einsatz_abgeglichen() in planung.php
+// verwendet dieselbe Definition). Der frueher hier stehende Vergleich auf
+// den Wert 'abgeglichen' selbst war ein Fehler: einsatz_abgleich.php
+// schreibt nach IST_STATUS ausschliesslich 'offen'/'anwesend'/'abwesend'/
+// 'ausgefallen' -- 'abgeglichen' kommt als Spaltenwert nirgends vor. Jede
+// Schicht waere also unabhaengig vom tatsaechlichen Abgleich als offen
+// gezaehlt worden, und kein Lohnlauf haette je einen Betrag ausgewiesen.
 function lohnlauf_zeiten(PDO $pdo, int $maId, string $von, string $bis): array
 {
     $sql = "SELECT z.einsatz_id, e.datum, e.sparte, e.kunde_name, e.objekt_id,
@@ -79,7 +90,8 @@ function lohnlauf_zeiten(PDO $pdo, int $maId, string $von, string $bis): array
     $schichten = [];
     $offen = 0;
     foreach ($st->fetchAll() as $r) {
-        if (($r['ist_status'] ?? 'offen') !== 'abgeglichen') { $offen++; continue; }
+        $status = $r['ist_status'] ?? 'offen';
+        if ($status === 'offen') { $offen++; continue; }
 
         $datum = (string)$r['datum'];
         $eintrag = [
@@ -94,7 +106,16 @@ function lohnlauf_zeiten(PDO $pdo, int $maId, string $von, string $bis): array
         // Reihenfolge der Pruefungen: erst was die Schicht ueberhaupt
         // ausschliesst, dann was sie unvollstaendig macht. Ein Grund je
         // Schicht -- zwei Gruende nebeneinander sagen weniger als einer.
-        if (!gavzeit_gilt($r['sparte'])) {
+        // "abwesend"/"ausgefallen" zuerst: Beide haben nach demselben
+        // Abgleich-Endpunkt nie Ist-Zeiten (siehe dessen $ohneZeit) -- ohne
+        // diese Weiche liefen sie in "zeiten_unvollstaendig" und saehen wie
+        // eine offene Erfassungsaufgabe aus, obwohl bereits entschieden ist,
+        // dass hier kein Lohnanspruch besteht.
+        if ($status === 'abwesend') {
+            $eintrag['gesperrt_grund'] = 'abwesend';
+        } elseif ($status === 'ausgefallen') {
+            $eintrag['gesperrt_grund'] = 'ausgefallen';
+        } elseif (!gavzeit_gilt($r['sparte'])) {
             $eintrag['gesperrt_grund'] = 'sparte_reinigung';
         } elseif (!gavzeit_regel($datum)) {
             $eintrag['gesperrt_grund'] = 'kein_regelwerk';
@@ -185,12 +206,19 @@ function lohnlauf_nbu_wochen(PDO $pdo, int $maId, string $bis, int $monate): arr
                 'wochen' => [], 'liste' => [], 'unbrauchbar' => 0, 'ausfalltage' => 0];
     }
 
+    // Nur "anwesend" zaehlt -- nicht der weitere Sperr-Begriff aus
+    // lohnlauf_zeiten() (dort zaehlt auch "abwesend"/"ausgefallen" als
+    // entschieden, aber beide ohne geleistete Zeit). Hier geht es um
+    // TATSAECHLICH gearbeitete Stunden fuer die UVG-Deckung -- wer nicht da
+    // war oder dessen Schicht ausfiel, hat keine Stunden geleistet, gleich
+    // wie der Lohnlauf die Schicht sonst behandelt (siehe Punkt 2 oben:
+    // gesperrte, aber tatsaechlich geleistete Zeit zaehlt hier trotzdem).
     $st = $pdo->prepare(
         "SELECT e.datum, z.ist_von, z.ist_bis, z.ist_pause_min, z.ist_pause_bezahlt_ma
            FROM einsatz_zuteilung z
            JOIN einsaetze e ON e.id = z.einsatz_id
           WHERE z.mitarbeiter_id = ? AND e.datum BETWEEN ? AND ?
-            AND e.status <> 'abgesagt' AND z.ist_status = 'abgeglichen'");
+            AND e.status <> 'abgesagt' AND z.ist_status = 'anwesend'");
     $st->execute([$maId, $start, $bis]);
 
     // Erst alle Kalenderwochen des Fensters mit null anlegen. Eine Woche
