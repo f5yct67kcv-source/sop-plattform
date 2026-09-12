@@ -2390,6 +2390,11 @@ const W = {
     rundgangVorlageWahlHinweis: 'Für dieses Objekt gibt es mehrere Kontrollrunden. Welche machst du jetzt?',
     kpErsatzscan: 'Ersatzscan',
     kpEsFotoAufnehmen: 'Foto aufnehmen',
+    // Eigener erster Satz (ENT-549): Ein Fotobeleg soll den Kontrollpunkt
+    // zeigen -- das ist enger als "die Sache, nicht die Person" und darum
+    // nicht derselbe Satz wie bei der Ereignismeldung. Der zweite Satz
+    // (fotoAnKunden) ist fuer beide derselbe.
+    kpEsFotoRegel: 'Der Fotobeleg zeigt den Kontrollpunkt, keine Personen.',
     kpEsMelden: 'Ersatzscan melden',
     kpEsFotoPflicht: 'Foto erforderlich',
     kpEsFotoFehler: 'Foto liess sich nicht verarbeiten.',
@@ -2533,6 +2538,21 @@ const W = {
     evBemerkungHinweis: 'Was war zu sehen, wer war beteiligt, was hast du unternommen?',
     evFoto: 'Foto',
     evFotoAufnehmen: 'Foto aufnehmen',
+    /* Was beim Fotografieren zu beachten ist (ENT-549). Zwei Saetze mit zwei
+       verschiedenen Aufgaben:
+
+       Der erste ist eine BETRIEBSREGEL -- was aufs Bild gehoert und was
+       nicht. Der zweite ist eine TATSACHE ueber das System, und zwar eine
+       neue: Seit ENT-544 geht das Bild mit dem Rapport an den Kunden. Bis
+       hierher stand das nirgends, wo jemand es haette lesen koennen -- wer
+       fotografiert, wusste nicht, wohin das Bild geht.
+
+       Die Tatsache steht in einer eigenen Zeichenkette, weil sie fuer BEIDE
+       Fotos im Haus gilt (Ereignismeldung und Fotobeleg). Zweimal
+       geschrieben liefe sie auseinander, sobald sich einmal etwas an der
+       Zustellung aendert. */
+    fotoAnKunden: 'Dieses Bild geht mit dem Rapport an den Kunden.',
+    evFotoRegel: 'Fotografiere die Sache, nicht die Person.',
     evFotoEntfernen: 'Entfernen',
     evErfasst: 'Festgehalten',
     evErfasstHinweis: 'Der Erfassungszeitpunkt lässt sich nicht ändern — er ist Teil des Nachweises.',
@@ -5828,6 +5848,11 @@ function evFormularZeichnen() {
         </button>
         <input type="file" accept="image/*" capture="environment" id="evFotoInput" onchange="evFotoGewaehlt()" style="display:none">
       </div>
+      <!-- Unter dem Knopf und nicht in einem Warnkasten: Es ist keine
+           Warnung, sondern die Gebrauchsanweisung fuer das Feld daneben --
+           und sie steht dort, wo das Foto ENTSTEHT (ENT-549). Eine Regel im
+           Handbuch liest niemand vor dem Auslösen. -->
+      <div class="rgs-leer" id="evFotoHinweis" style="padding:7px 0 0;font-size:12.5px">${esc(w('evFotoRegel'))} ${esc(w('fotoAnKunden'))}</div>
     </div>
 
     <!-- Bewusst KEIN zweispaltiges Kennzahlen-Raster: Der Hinweis ist
@@ -9295,6 +9320,10 @@ function rdZeile(k, gesperrt, naechsterId) {
     <div class="rd-nv" id="rdEs${k.id}"${k.offen === 'es' ? '' : ' style="display:none"'}>
       <input type="file" accept="image/*" capture="environment" id="rdEsInput${k.id}" onchange="rdEsFotoGewaehlt(${k.id})" style="display:none">
       <button class="btn btn-plain" onclick="document.getElementById('rdEsInput${k.id}').click()">${esc(w('kpEsFotoAufnehmen'))}</button>
+      <!-- Auch hier geht das Bild an den Kunden (seit ENT-455 ins Portal,
+           mit ENT-544 in Lesegroesse ins Rapport-PDF) -- und auch hier stand
+           es nirgends (ENT-549). -->
+      <div class="rgs-leer" id="rdEsFotoHinweis${k.id}" style="padding:6px 0 0;font-size:12.5px">${esc(w('kpEsFotoRegel'))} ${esc(w('fotoAnKunden'))}</div>
       <img class="rd-es-vorschau" id="rdEsVorschau${k.id}"${rdEsFotos[k.id] ? ` src="${rdEsFotos[k.id]}"` : ' style="display:none"'} alt="">
       <textarea class="inp" id="rdEsText${k.id}" rows="2" placeholder="${esc(w('kpBeschreibungPflicht'))}">${esc(k.esText || '')}</textarea>
       <button class="btn btn-neg" onclick="rdEsSenden(${k.id})">${esc(w('kpEsMelden'))}</button>
