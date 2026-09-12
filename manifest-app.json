@@ -1,6 +1,6 @@
 {
-  "name": "CUPI 24 – Mitarbeitende",
-  "short_name": "CUPI 24",
+  "name": "GuardOps – Mitarbeitende",
+  "short_name": "GuardOps",
   "start_url": "app.html",
   "scope": "./",
   "display": "standalone",

@@ -32,7 +32,8 @@ keinen Produktcode; ihre einzige Verbindung zum Server ist das
 Demo-Formular (`backend/api/demo_anfrage.php`), das eine E-Mail an die
 Adresse des Betriebs schickt — Cockpit → Administration → Einstellungen →
 Betrieb. Fehlt die Adresse oder der SMTP-Zugang, sagt die Seite das beim
-Absenden. Produktname („Wachtwerk") und Logo sind Platzhalter (OP-18);
+Absenden. Der Produktname steht seit ENT-556 fest — **GuardOps**, Domain `guardops.ch`;
+Platzhalter ist nur noch das Logo.
 Impressum, Datenschutz und AGB sind noch leere Verweise. Entwurf,
 Gestaltungsentscheide und Faktenbasis der Werbeaussagen: Projekt-Repository,
 `02-gate2-produkt-mvp/homepage-entwurf.md`.

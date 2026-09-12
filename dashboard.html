@@ -13,7 +13,7 @@
      Zustaende -- der Handy-Wert wird beim Laden von hier abgelesen und nicht
      im Skript ein zweites Mal hingeschrieben. -->
 <meta name="viewport" id="metaViewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Cockpit</title>
+<title>GuardOps</title>
 <link rel="icon" href="icons/icon-32.png" type="image/png">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <meta name="theme-color" content="#16181D">
@@ -4857,7 +4857,7 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
   <div class="gate-mitte">
     <div class="gate-oben">
       <img src="icons/icon-192.png" alt="">
-      <div class="wm" id="gateWm">Cockpit</div>
+      <div class="wm" id="gateWm">GuardOps</div>
       <div class="sub">CUPI 24 GmbH</div>
     </div>
 
@@ -4922,7 +4922,7 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
         <img src="icons/icon-192.png" alt="">
       </button>
       <div class="txt">
-        <div class="wm" id="sideWm">Cockpit</div>
+        <div class="wm" id="sideWm">GuardOps</div>
         <div class="sub">CUPI 24</div>
       </div>
     </div>
@@ -9558,9 +9558,12 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
 
 <script>
 /* ══════════════════════════════════════════════════════════════════
-   PRODUKTNAME — sobald der endgültige Name feststeht, nur hier ändern.
+   PRODUKTNAME — steht seit ENT-556 fest: GuardOps (Domain guardops.ch).
+   Nach aussen heisst die Anlage GuardOps; „Cockpit" bleibt im Haus der
+   Name dieser Verwaltungsoberfläche (Rollentexte, Kommentare, Protokoll).
+   Nur hier ändern — Fenstertitel und beide Wasserzeichen hängen daran.
    ══════════════════════════════════════════════════════════════════ */
-const APP_NAME = 'Cockpit';
+const APP_NAME = 'GuardOps';
 
 // ── Zustand
 const API = 'api/';
