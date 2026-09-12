@@ -440,7 +440,12 @@ check('Getrennte PLZ und Ort gehen so an den Server',
   upd2 && upd2.body.plz === '3000' && upd2.body.ort === 'Bern');
 
 // ══════════ KUNDEN
+// Seit ENT-555 kann der Kundenbereich auf der Uebersicht starten statt auf
+// der Adressliste. Diese Suite will die Adressliste -- darum ausdruecklich
+// dorthin, und ueber kuGoTab statt ueber den Menuepunkt: Der steht in einer
+// Gruppe, die hier nicht aufgeklappt ist.
 await page.click('#nav-kunden');
+await page.evaluate(() => kuGoTab('uebersicht'));
 await page.waitForSelector('#kuTable table');
 calls = [];
 await page.click('button:has-text("Neuer Kunde")');
@@ -518,7 +523,12 @@ await page.click('#kv-detail .ku-zurueck');   // seit ENT-048 gibt es die Klasse
 await page.waitForTimeout(200);
 
 // ══════════ DIKTAT: Kunde anlegen -- über den globalen Sprechen-Knopf (ENT-042)
+// Seit ENT-555 kann der Kundenbereich auf der Uebersicht starten statt auf
+// der Adressliste. Diese Suite will die Adressliste -- darum ausdruecklich
+// dorthin, und ueber kuGoTab statt ueber den Menuepunkt: Der steht in einer
+// Gruppe, die hier nicht aufgeklappt ist.
 await page.click('#nav-kunden');
+await page.evaluate(() => kuGoTab('uebersicht'));
 await page.waitForSelector('#kuTable table');
 calls = [];
 await page.click('#btnSprechen');

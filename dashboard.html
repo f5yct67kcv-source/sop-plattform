@@ -951,6 +951,10 @@ tr.klickbar.gewaehlt td { background: var(--accent-soft); }
 .kpi-top span { font-size: 11px; font-weight: 650; letter-spacing: .6px; text-transform: uppercase; }
 .kpi-val { font-size: 28px; font-weight: 700; letter-spacing: -.9px; line-height: 1.1; }
 .kpi-val .unit { font-size: 15px; font-weight: 600; color: var(--ink-3); letter-spacing: 0; margin-left: 2px; }
+/* Waehrungszeichen VOR der Zahl -- "CHF 1'234.50", wie auf jedem Beleg im
+   Haus. Eigene Klasse statt ".unit": Die Stelle ist eine andere (vor statt
+   nach der Zahl), und ".unit" haette sonst zwei Bedeutungen. */
+.kpi-val .waehrung { font-size: 15px; font-weight: 600; color: var(--ink-3); letter-spacing: 0; margin-right: 3px; }
 .kpi-foot { margin-top: 9px; display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--ink-3); }
 .delta { display: inline-flex; align-items: center; gap: 3px; font-weight: 650; border-radius: 20px; padding: 1.5px 7px; font-size: 11px; }
 .delta.up   { color: var(--pos); background: var(--pos-soft); }
@@ -978,6 +982,19 @@ tr.klickbar.gewaehlt td { background: var(--accent-soft); }
 .bar-fill.leer { height: 4px; flex-basis: 4px !important; background: var(--nix); border-color: var(--nix); opacity: 1; }
 .bar:hover .bar-fill { background: var(--accent-line); opacity: 1; }
 .bar.now .bar-fill { background: var(--accent); border-color: var(--accent); opacity: 1; }
+/* Balkenfarben der Kunden-Uebersicht (ENT-555). Sie stehen NACH
+   ".bar:hover .bar-fill": Diese Regel hat dieselbe Eigenspezifitaet (0,2,0)
+   wie ".bar-fill.warn" und wuerde eine weiter oben stehende Farbe beim
+   Ueberfahren stillschweigend ueberschreiben -- wirkungslos, ohne dass etwas
+   kaputtginge. Die Hover-Paarung daneben macht es unabhaengig von der
+   Reihenfolge eindeutig. Balken dieser Seite tragen kein ".now". */
+.bar-fill.warn, .bar:hover .bar-fill.warn { background: var(--warn-soft); border-color: var(--warn); opacity: 1; }
+.bar-fill.neg,  .bar:hover .bar-fill.neg  { background: var(--neg-soft);  border-color: var(--neg);  opacity: 1; }
+/* "Ohne Faelligkeitsdatum" ist WEDER faellig NOCH nicht faellig, sondern
+   unbekannt -- eine eigene, absichtlich unbunte Marke. Ausdruecklich nicht
+   ".leer": das heisst im Haus "Betrag null", und unbekannt darf nie wie
+   keine aussehen. */
+.bar-fill.unbekannt, .bar:hover .bar-fill.unbekannt { background: var(--nix); border-color: var(--nix); opacity: 1; }
 .bar-lbl { font-size: 10.5px; color: var(--ink-3); white-space: nowrap; letter-spacing: .2px; }
 .bar.now .bar-lbl { color: var(--accent); font-weight: 650; }
 .bars-axis { border-top: 1px solid var(--line); margin-top: -25px; }
@@ -4991,6 +5008,21 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
           <svg class="i chev nur-desktop" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
         </button>
         <div class="nav-kinder nur-desktop">
+          <!-- Uebersicht (ENT-555). Steht bewusst VOR "Adressen" und ist der
+               Startreiter des Bereichs: Wer "Kunden" oeffnet, soll zuerst
+               sehen, was offen ist -- nicht eine alphabetische Adressliste.
+               Haengt am Recht 'offerten_lesen' und NICHT an 'kunden_lesen':
+               Die Seite besteht ausschliesslich aus Betraegen. Wer Adressen
+               pflegen darf, aber keine Preise sehen soll, bekommt hier
+               keinen Menuepunkt, der auf ein 403 fuehrt -- und landet
+               weiterhin auf Adressen (siehe kuStartReiter()).
+               NUR DESKTOP, ausdruecklicher Entscheid des Projektinhabers:
+               Am Handy fuehrt "Kunden" weiterhin direkt auf die Adressliste.
+               Der mobile Zuschnitt ist fuer das Anruf-Szenario aus ENT-399
+               gebaut -- Rapport oder Offerte zum Kunden am Telefon, nicht
+               die Debitorenlage. Darum steht die Uebersicht auch nicht in
+               #kuMobilTabs. -->
+          <button class="nav-kind" id="nav-kunden-lage" onclick="go('kunden'); kuGoTab('lage')">Übersicht</button>
           <button class="nav-kind" id="nav-kunden-uebersicht" onclick="go('kunden'); kuGoTab('uebersicht')">Adressen</button>
           <button class="nav-kind" id="nav-kunden-objekte" onclick="go('kunden'); kuGoTab('objekte')">Objekte</button>
           <button class="nav-kind" id="nav-kunden-rapporte" onclick="go('kunden'); kuGoTab('rapporte')">Rapporte</button>
@@ -5972,6 +6004,53 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
           <button class="tab nur-schmal" id="kutab-objekte" onclick="kuGoTab('objekte')">Objekte</button>
           <button class="tab nur-schmal" id="kutab-rapporte" onclick="kuGoTab('rapporte')">Rapporte</button>
           <button class="tab nur-schmal" id="kutab-offerten" onclick="kuGoTab('offerten')">Offerten</button>
+        </div>
+
+        <!-- ── Reiter: Übersicht (ENT-555) ──────────────────────────────────
+             Das Geldbild des Kundenbereichs: was offen ist, wie alt es ist,
+             welche Offerte demnaechst verfaellt. Erster Reiter und Startseite
+             des Bereichs am Desktop.
+             Ohne "on" im Ausgangszustand -- die Startseite setzt kuGoTab()
+             ueber kuStartReiter(). Bliebe die Klasse hier stehen, saehe ein
+             Weg, der view-kunden ohne kuGoTab() erreicht, zwei offene Reiter
+             gleichzeitig. "Adressen" bleibt darum der hart gesetzte Rueckfall.
+             ── -->
+        <div class="ku-tab" id="kv-lage">
+          <div class="grid g-kpi" id="kuLageKpi"></div>
+          <!-- Kartenkoepfe nach dem Haus-Muster der Uebersicht: Titel links,
+               Abstandhalter, Kurzinfo als Pille rechts (".card-hd .note").
+               Ein gestapelter Untertitel unter dem Titel waere hier neu und
+               haette ohne eigene Regel die volle Grundschriftgroesse --
+               groesser als die Ueberschrift darueber. -->
+          <div class="card" style="margin-bottom:16px">
+            <div class="card-hd">
+              <h2>Offene Beträge nach Alter</h2>
+              <div class="sp"></div>
+              <!-- Der Bezug steht am Bild, nicht im Kleingedruckten: Die
+                   Seite sieht nur AKTIVE Belege an, und das ist eine Auswahl.
+                   Eine Zahl ohne ihren Bezug liest sich wie die Gesamtzahl. -->
+              <span class="note" id="kuLageAlterNote"></span>
+            </div>
+            <div class="card-bd" id="kuLageAlter"></div>
+          </div>
+          <div class="grid g-1-1">
+            <div class="card">
+              <div class="card-hd">
+                <h2>Am längsten überfällig</h2>
+                <div class="sp"></div>
+                <span class="note" id="kuLageMahnNote"></span>
+              </div>
+              <div class="card-bd flush"><div class="tw" id="kuLageMahn"></div></div>
+            </div>
+            <div class="card">
+              <div class="card-hd">
+                <h2>Offerten, die bald ablaufen</h2>
+                <div class="sp"></div>
+                <span class="note" id="kuLageOfNote"></span>
+              </div>
+              <div class="card-bd flush"><div class="tw" id="kuLageOf"></div></div>
+            </div>
+          </div>
         </div>
         <!-- ── Adressen (bisher "Übersicht") -- Kundenliste, ueberarbeitet (ENT-040):
              eigener Alle/Archiviert-Umschalter, sortierbare Spalten,
@@ -9983,6 +10062,12 @@ const NAV_RECHTE = {
   // Offerten haengen am eigenen Recht, nicht an 'kunden' (ENT-181): Wer
   // Adressen pflegt, sieht darum noch keine Preise.
   'nav-kunden-offerten':    'offerten_lesen',
+  // Die Uebersicht (ENT-555) zeigt ausschliesslich Betraege aus Offerten und
+  // Rechnungen -- sie haengt darum am selben Recht wie diese, nicht an
+  // 'kunden_lesen'. Ohne das Recht bleibt der Punkt weg UND der Bereich
+  // startet auf Adressen (kuStartReiter()); beides gehoert zusammen, sonst
+  // fuehrt der Bereich auf eine Seite, die es fuer diesen Benutzer nicht gibt.
+  'nav-kunden-lage':        'offerten_lesen',
   'nav-admin-mitarbeiter':  'personal_lesen',
   'nav-admin-produkte':     'leistungen_lesen',
   'nav-admin-betrieb':      ['betrieb_lesen', 'fahrzeuge_lesen', 'rechte_lesen'],
@@ -17475,11 +17560,17 @@ const TAB_CRUMB = {
 // noch das Untermenue zu (bzw. wieder auf) -- ohne den view() zu berühren,
 // denn navigieren beim Zuklappen wuerde ihn sofort wieder aufreissen.
 function kuNavKlick() {
-  if (navGruppeKompakt('kunden')) { return; }
+  // Seit ENT-555 landet der Bereich auf einem Startreiter statt auf dem, der
+  // zuletzt offen war -- dasselbe Muster wie "Betrieb" weiter oben in go():
+  // Wer ueber die Navigation erneut auf "Kunden" klickt, erwartet dieselbe
+  // Startseite wie beim ersten Mal. Welcher das ist, entscheidet
+  // kuStartReiter() (Handy und fehlendes Belegrecht fuehren auf Adressen).
+  if (navGruppeKompakt('kunden')) { kuGoTab(kuStartReiter()); return; }
   if ($('view-kunden').classList.contains('on')) {
     $('navg-kunden').classList.toggle('offen');
   } else {
     go('kunden');
+    kuGoTab(kuStartReiter());
   }
 }
 
@@ -17514,6 +17605,7 @@ function kuGoTab(t) {
     : t === 'rapporte' ? 'Alle erfassten Einsätze'
     : t === 'offerten' ? 'Angebote an Kunden'
     : t === 'rechnungen' ? 'Rechnungen an Kunden'
+    : t === 'lage' ? 'Offene Beträge aus Offerten und Rechnungen'
     : t === 'detail' ? 'Kundendetails' : 'Stammdaten';
   if (t === 'uebersicht') { kunden.length ? renderKunden() : loadKunden(); }
   if (t === 'objekte') { objekte.length ? renderObjekte() : loadObjekte(); }
@@ -17529,6 +17621,322 @@ function kuGoTab(t) {
     if (!kunden.length) { loadKunden(); }
     rechnungen.length ? renderRechnungen() : loadRechnungen();
   }
+  // Die Uebersicht (ENT-555) braucht BEIDE Listen und wird darum erst
+  // gezeichnet, wenn beide da sind. Das Geruest dazwischen ist keine Zierde:
+  // Eine leere Seite waehrend des Ladens saehe aus wie "nichts offen" -- und
+  // "noch nicht bekannt" darf nie wie "keine" aussehen.
+  if (t === 'lage') {
+    const fehlt = !rechnungen.length || !belege.length;
+    if (fehlt) { kuLageSkelett(); }
+    Promise.all([
+      rechnungen.length ? Promise.resolve() : loadRechnungen(),
+      belege.length     ? Promise.resolve() : loadBelege(),
+    ]).then(() => renderKundenLage());
+  }
+}
+
+// ══════════════════════════════════════════ KUNDEN-ÜBERSICHT (ENT-555)
+//
+// Das Geldbild des Kundenbereichs und seine Startseite am Desktop: was offen
+// ist, wie alt es ist, und welche Offerte demnächst verfällt.
+//
+// BEWUSST NUR GELD. Kunden-, Objekt- und Rapportzahlen stehen hier nicht
+// (Entscheid des Projektinhabers, 12.09.2026): Eine Seite mit zwei Themen
+// beantwortet keines davon schnell, und der Bereich hat für den Bestand
+// bereits vier eigene Listen.
+//
+// KEIN EIGENER ENDPUNKT, und das ist Absicht. Die Seite rechnet aus genau den
+// beiden Listen, die der Bereich ohnehin lädt (beleg_list.php je Art). Ein
+// Server-Endpunkt, der dieselben Summen ein zweites Mal bildet, wäre eine
+// zweite Wahrheit -- dieselbe Falle wie bei belegSummen() (siehe belege.php),
+// nur ohne den Zwang, der sie dort rechtfertigt: Hier verlässt keine Zahl das
+// Haus, sie steht auf keinem Dokument beim Kunden.
+//
+// WAS NICHT DRAUFSTEHT und warum: ein Ein-/Ausgangs-Diagramm, wie es die
+// Vorlage des Projektinhabers zeigt. Ausgehendes Geld gibt es in dieser
+// Plattform nicht -- keine Kreditoren, keine Finanzbuchhaltung (siehe die
+// Begründung zur Rubrik "Lohn" in der Navigation). Eine Kachel, die mehr
+// ankündigt als dahintersteht, ist dieselbe Fehlerfamilie wie "unbekannt
+// sieht aus wie keine".
+//
+// EBENFALLS NICHT: Teilzahlungen. "Offen" ist hier immer der volle Betrag
+// oder null, nie etwas dazwischen -- die Markierung am Beleg kennt nur
+// bezahlt/nicht bezahlt (Entscheid des Projektinhabers, 28.08.2026). Das
+// steht auch auf der Seite, sonst liest jemand sie als Buchhaltung.
+
+// Der Startreiter des Kundenbereichs.
+//
+// Zwei Gründe, warum das eine Funktion ist und keine Konstante:
+//  - Am Handy bleibt es "Adressen" (ausdrücklicher Entscheid): Der mobile
+//    Zuschnitt ist fürs Anruf-Szenario gebaut (ENT-399) -- Rapport oder
+//    Offerte zum Kunden am Telefon, nicht die Debitorenlage.
+//  - Ohne 'offerten_lesen' gibt es die Übersicht für diesen Benutzer gar
+//    nicht; sie besteht nur aus Beträgen, und der Menüpunkt fehlt dann auch
+//    (NAV_RECHTE). Beides gehört zusammen -- sonst startet der Bereich auf
+//    einer Seite, die die Navigation nicht anbietet.
+function kuStartReiter() {
+  return (!MOBIL() && darf('offerten_lesen')) ? 'lage' : 'uebersicht';
+}
+
+// Nur AKTIVE Belege. Ein archivierter ist aus dem Verkehr gezogen; seine
+// Summe gehört in keine offene Position. Vorlagen filtert bereits der Server.
+const kuLageAktiv = b => Number(b.aktiv ?? 1) === 1;
+const kuLageSumme = l => l.reduce((s, b) => s + (Number(b.total_rappen) || 0), 0);
+
+// Tage ÜBER die Fälligkeit hinaus: 3 heisst "seit drei Tagen überfällig",
+// -5 heisst "in fünf Tagen fällig", 0 heisst "heute fällig".
+//
+// null heisst UNBEKANNT, nicht "nicht fällig". Eine Rechnung ohne
+// Fälligkeitsdatum ist ein normaler Fall -- das Feld ist freiwillig, und
+// beleg_speichern.php legt dann NULL ab. Sie stillschweigend zu den nicht
+// fälligen zu zählen hiesse, genau die Aussage zu erfinden, die fehlt.
+function kuLageUeberTage(b) {
+  if (leeresDatum(b.faellig_bis)) { return null; }
+  const heute = new Date(); heute.setHours(0, 0, 0, 0);
+  const f = new Date(String(b.faellig_bis).slice(0, 10) + 'T00:00:00');
+  if (Number.isNaN(f.getTime())) { return null; }
+  return Math.round((heute - f) / 864e5);
+}
+
+// Dasselbe für die Gültigkeit einer Offerte: Tage über das "Gültig bis"
+// hinaus, null wenn keines gesetzt ist.
+function kuLageAbgelaufenTage(b) {
+  if (leeresDatum(b.gueltig_bis)) { return null; }
+  const heute = new Date(); heute.setHours(0, 0, 0, 0);
+  const g = new Date(String(b.gueltig_bis).slice(0, 10) + 'T00:00:00');
+  if (Number.isNaN(g.getTime())) { return null; }
+  return Math.round((heute - g) / 864e5);
+}
+
+// Die Altersbänder. "Heute fällig" zählt NICHT als überfällig -- dieselbe
+// Grenze wie in der Rechnungsliste (reStatusInfo: überfällig ab
+// faellig_bis < heute). Zwei Stellen im selben Bereich dürfen über dieselbe
+// Rechnung nicht zwei verschiedene Antworten geben.
+const KU_LAGE_BAENDER = [
+  { titel: 'Noch nicht fällig', stil: '',          trifft: t => t !== null && t <= 0 },
+  { titel: '1–30 Tage',         stil: 'warn',      trifft: t => t !== null && t >= 1  && t <= 30 },
+  { titel: '31–60 Tage',        stil: 'warn',      trifft: t => t !== null && t >= 31 && t <= 60 },
+  { titel: 'über 60 Tage',      stil: 'neg',       trifft: t => t !== null && t >  60 },
+  { titel: 'Ohne Datum',        stil: 'unbekannt', trifft: t => t === null },
+];
+
+// Wieviele Zeilen die beiden Listen zeigen. Darüber hinaus steht die
+// Beziehung im Kartenkopf ("die ältesten 6 von 14") -- eine gekürzte Liste
+// ohne diesen Bezug sieht aus wie die ganze.
+const KU_LAGE_ZEILEN = 6;
+// Ab wann eine Offerte als "läuft bald ab" gilt.
+const KU_LAGE_FRIST = 30;
+
+function kuLageSkelett() {
+  $('kuLageKpi').innerHTML = Array.from({ length: 4 }, () =>
+    `<div class="kpi"><div class="sk" style="height:12px;width:52%"></div>
+     <div class="sk" style="height:28px;width:46%;margin-top:14px"></div>
+     <div class="sk" style="height:11px;width:64%;margin-top:12px"></div></div>`).join('');
+  $('kuLageAlter').innerHTML = '<div class="sk" style="height:152px"></div>';
+  ['kuLageMahn', 'kuLageOf'].forEach(id => {
+    $(id).innerHTML = `<div style="padding:18px">${Array.from({ length: 3 },
+      () => '<div class="sk" style="height:14px;margin-bottom:12px"></div>').join('')}</div>`;
+  });
+  ['kuLageAlterNote', 'kuLageMahnNote', 'kuLageOfNote'].forEach(id => { $(id).textContent = ''; });
+}
+
+// Ein Frankenbetrag als Kachelwert: Währung klein VOR der Zahl, wie auf jedem
+// Beleg im Haus ("CHF 1'234.50").
+const kuLageChf = rappen => `<span class="waehrung">CHF</span>${chf(rappen)}`;
+
+function renderKundenLage() {
+  const rAktiv = rechnungen.filter(kuLageAktiv);
+  const offen  = rAktiv.filter(b => !Number(b.bezahlt));
+  const mitTagen = offen.map(b => ({ b, t: kuLageUeberTage(b) }));
+  const ueber = mitTagen.filter(x => x.t !== null && x.t >= 1)
+                        .sort((a, b) => b.t - a.t);
+
+  // "Offen" bei einer Offerte heisst: beim Kunden und noch nicht entschieden.
+  // Ein Entwurf liegt nicht beim Kunden, bestätigt und abgelehnt sind die
+  // beiden Endpunkte (siehe OF_STATUS).
+  const ofAktiv = belege.filter(kuLageAktiv);
+  const ofOffen = ofAktiv.filter(b => b.status === 'versendet' || b.status === 'angeschaut');
+
+  renderKuLageKpi(rAktiv, offen, ueber, ofOffen);
+  renderKuLageAlter(mitTagen, offen);
+  renderKuLageMahn(rAktiv, offen, ueber);
+  renderKuLageOfferten(ofAktiv, ofOffen);
+}
+
+function renderKuLageKpi(rAktiv, offen, ueber, ofOffen) {
+  const ic = {
+    geld:  '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/>',
+    uhr:   '<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/>',
+    blatt: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>',
+    haken: '<path d="M22 11.1V12a10 10 0 1 1-5.9-9.1"/><polyline points="22 4 12 14.01 9 11.01"/>',
+  };
+
+  // Bezahlt im laufenden Monat, gegen den Vormonat. Beides aus bezahlt_am --
+  // wer das Feld nicht trägt, lässt sich keinem Monat zuordnen und wird
+  // ausdrücklich genannt statt stillschweigend weggelassen.
+  const jetzt  = new Date();
+  const mJetzt = isoTag(jetzt).slice(0, 7);
+  const mVor   = isoTag(new Date(jetzt.getFullYear(), jetzt.getMonth() - 1, 1)).slice(0, 7);
+  const bezahlt = rechnungen.filter(kuLageAktiv).filter(b => Number(b.bezahlt));
+  const imMonat = m => bezahlt.filter(b => !leeresDatum(b.bezahlt_am)
+                                        && String(b.bezahlt_am).slice(0, 7) === m);
+  const sJetzt = kuLageSumme(imMonat(mJetzt));
+  const sVor   = kuLageSumme(imMonat(mVor));
+  const ohneZahltag = bezahlt.filter(b => leeresDatum(b.bezahlt_am)).length;
+
+  // Offerten, die innerhalb der Frist ablaufen ODER schon abgelaufen sind.
+  const ofFrist = ofOffen.filter(b => {
+    const t = kuLageAbgelaufenTage(b);
+    return t !== null && t >= -KU_LAGE_FRIST;
+  }).length;
+
+  const aeltester = ueber.length ? ueber[0].t : 0;
+  const anz = (n, ein, viele) => `${nf(n)} ${n === 1 ? ein : viele}`;
+
+  const karten = [
+    {
+      i: ic.geld, l: 'Offener Betrag', v: kuLageChf(kuLageSumme(offen)),
+      f: offen.length
+        ? `<span>aus ${anz(offen.length, 'Rechnung', 'Rechnungen')}</span>`
+        : '<span>keine offene Rechnung</span>',
+    },
+    {
+      // "Davon" statt "Überfällig" allein: Die Zahl ist eine Teilmenge der
+      // Kachel links, und eine Teilmenge ohne ihren Bezug liest sich wie
+      // eine eigene Gesamtgrösse.
+      i: ic.uhr, l: 'Davon überfällig', v: kuLageChf(kuLageSumme(ueber.map(x => x.b))),
+      f: ueber.length
+        ? `<span>${anz(ueber.length, 'Rechnung', 'Rechnungen')} · älteste seit ${anz(aeltester, 'Tag', 'Tagen')}</span>`
+        : '<span>keine überfällige Rechnung</span>',
+    },
+    {
+      i: ic.blatt, l: 'Offene Offerten', v: kuLageChf(kuLageSumme(ofOffen)),
+      f: ofOffen.length
+        ? `<span>${anz(ofOffen.length, 'Offerte', 'Offerten')}${ofFrist ? ` · ${nf(ofFrist)} ${ofFrist === 1 ? 'läuft' : 'laufen'} bald ab` : ''}</span>`
+        : '<span>keine Offerte beim Kunden</span>',
+    },
+    {
+      i: ic.haken, l: 'Bezahlt im Monat', v: kuLageChf(sJetzt),
+      f: `${delta(sJetzt, sVor)} <span>zum Vormonat (CHF ${chf(sVor)})`
+         + `${ohneZahltag ? ` · ${nf(ohneZahltag)} ohne Zahldatum` : ''}</span>`,
+    },
+  ];
+
+  $('kuLageKpi').innerHTML = karten.map(c => `
+    <div class="kpi">
+      <div class="kpi-top"><svg class="i i-sm" viewBox="0 0 24 24">${c.i}</svg><span>${c.l}</span></div>
+      <div class="kpi-val">${c.v}</div>
+      <div class="kpi-foot">${c.f}</div>
+    </div>`).join('');
+}
+
+function renderKuLageAlter(mitTagen, offen) {
+  $('kuLageAlterNote').textContent = offen.length
+    ? `${nf(offen.length)} offene ${offen.length === 1 ? 'Rechnung' : 'Rechnungen'} · ohne archivierte`
+    : 'ohne archivierte';
+
+  if (!offen.length) {
+    $('kuLageAlter').innerHTML = rechnungen.filter(kuLageAktiv).length
+      ? EMPTY('Alles bezahlt', 'Zurzeit ist keine Rechnung offen.')
+      : EMPTY('Noch keine Rechnungen', 'Sobald eine Rechnung erfasst ist, erscheint sie hier.');
+    return;
+  }
+
+  const baender = KU_LAGE_BAENDER.map(band => {
+    const treffer = mitTagen.filter(x => band.trifft(x.t));
+    return { titel: band.titel, stil: band.stil,
+             rappen: kuLageSumme(treffer.map(x => x.b)), anzahl: treffer.length };
+  });
+  const max = Math.max(1, ...baender.map(b => b.rappen));
+
+  $('kuLageAlter').innerHTML =
+    '<div class="bars">' + baender.map(b => {
+      // Anteil statt Pixel, wie beim Stundenverlauf. Ein Band ohne Betrag
+      // bekommt die Stummel-Marke ".leer" und KEINE Farbe -- null Franken
+      // in "über 60 Tage" rot einzufärben wäre ein Alarm ohne Anlass.
+      const leer = !b.rappen;
+      const h = Math.round((b.rappen / max) * 710) / 10;
+      const titel = `${b.titel}: CHF ${chf(b.rappen)} aus ${nf(b.anzahl)} `
+                  + (b.anzahl === 1 ? 'Rechnung' : 'Rechnungen');
+      return `<div class="bar" title="${esc(titel)}">
+        <div class="bar-val">${b.rappen ? chf(b.rappen) : ''}</div>
+        <div class="bar-fill${leer ? ' leer' : (b.stil ? ' ' + b.stil : '')}" style="flex-basis:${leer ? '4px' : h + '%'}"></div>
+        <div class="bar-lbl">${esc(b.titel)}</div>
+      </div>`;
+    }).join('') + '</div><div class="bars-axis"></div>';
+}
+
+function renderKuLageMahn(rAktiv, offen, ueber) {
+  // Vier verschiedene Aussagen, vier verschiedene Texte: nichts erfasst,
+  // alles bezahlt, alles noch in der Frist -- und der Normalfall.
+  if (!ueber.length) {
+    $('kuLageMahnNote').textContent = '';
+    $('kuLageMahn').innerHTML =
+      !rAktiv.length ? EMPTY('Noch keine Rechnungen', 'Sobald eine Rechnung erfasst ist, erscheint sie hier.')
+      : !offen.length ? EMPTY('Alles bezahlt', 'Zurzeit ist keine Rechnung offen.')
+      : EMPTY('Nichts überfällig', 'Alle offenen Rechnungen sind noch innerhalb ihrer Frist.');
+    return;
+  }
+
+  const zeigen = ueber.slice(0, KU_LAGE_ZEILEN);
+  $('kuLageMahnNote').textContent = ueber.length > zeigen.length
+    ? `die ältesten ${nf(zeigen.length)} von ${nf(ueber.length)}`
+    : `${nf(ueber.length)} ${ueber.length === 1 ? 'Rechnung' : 'Rechnungen'}`;
+
+  $('kuLageMahn').innerHTML = `<table><thead><tr>
+      <th>Nr.</th><th>Empfänger</th><th class="num">Überfällig</th><th class="num">Betrag</th>
+    </tr></thead><tbody>` + zeigen.map(x => `
+      <tr class="click" onclick="ofOeffnen(${Number(x.b.id)})">
+        <td class="nowrap strong">${esc(x.b.nummer)}</td>
+        <td>${esc(reEmpfaenger(x.b) || '–')}<div class="sec">${esc(x.b.titel || '')}</div></td>
+        <td class="num nowrap" style="color:var(--neg)">${nf(x.t)} ${x.t === 1 ? 'Tag' : 'Tage'}</td>
+        <td class="num nowrap strong">CHF ${chf(x.b.total_rappen)}</td>
+      </tr>`).join('') + '</tbody></table>';
+}
+
+function renderKuLageOfferten(ofAktiv, ofOffen) {
+  // Ohne "Gültig bis" lässt sich nicht sagen, ob eine Offerte bald abläuft.
+  // Diese Offerten fehlen in der Liste -- und genau darum werden sie im
+  // Kartenkopf genannt, statt lautlos zu verschwinden.
+  const ohneFrist = ofOffen.filter(b => kuLageAbgelaufenTage(b) === null).length;
+  const bald = ofOffen
+    .map(b => ({ b, t: kuLageAbgelaufenTage(b) }))
+    .filter(x => x.t !== null && x.t >= -KU_LAGE_FRIST)
+    .sort((a, b) => b.t - a.t);
+
+  const hinweisOhne = ohneFrist
+    ? ` · ${nf(ohneFrist)} ohne Gültigkeitsdatum` : '';
+
+  if (!bald.length) {
+    $('kuLageOfNote').textContent = hinweisOhne ? hinweisOhne.replace(' · ', '') : '';
+    $('kuLageOf').innerHTML =
+      !ofAktiv.length ? EMPTY('Noch keine Offerten', 'Sobald eine Offerte erfasst ist, erscheint sie hier.')
+      : !ofOffen.length ? EMPTY('Keine Offerte beim Kunden', 'Alle Offerten sind Entwurf, bestätigt oder abgelehnt.')
+      : EMPTY('Keine läuft bald ab', `Keine offene Offerte erreicht in den nächsten ${nf(KU_LAGE_FRIST)} Tagen ihr Ablaufdatum.`);
+    return;
+  }
+
+  const zeigen = bald.slice(0, KU_LAGE_ZEILEN);
+  $('kuLageOfNote').textContent = (bald.length > zeigen.length
+    ? `${nf(zeigen.length)} von ${nf(bald.length)}`
+    : `${nf(bald.length)} ${bald.length === 1 ? 'Offerte' : 'Offerten'}`) + hinweisOhne;
+
+  $('kuLageOf').innerHTML = `<table><thead><tr>
+      <th>Nr.</th><th>Empfänger</th><th class="num">Gültig bis</th><th class="num">Betrag</th>
+    </tr></thead><tbody>` + zeigen.map(x => {
+      // Abgelaufen und "läuft ab" sind zwei verschiedene Aussagen und
+      // bekommen zwei verschiedene Texte -- nicht beide "3 Tage".
+      const frist = x.t > 0 ? `<span style="color:var(--neg)">seit ${nf(x.t)} ${x.t === 1 ? 'Tag' : 'Tagen'} abgelaufen</span>`
+                  : x.t === 0 ? '<span style="color:var(--warn)">läuft heute ab</span>'
+                  : `noch ${nf(-x.t)} ${x.t === -1 ? 'Tag' : 'Tage'}`;
+      return `
+      <tr class="click" onclick="ofOeffnen(${Number(x.b.id)})">
+        <td class="nowrap strong">${esc(x.b.nummer)}</td>
+        <td>${esc(reEmpfaenger(x.b) || '–')}<div class="sec">${esc(x.b.titel || '')}</div></td>
+        <td class="num nowrap">${dmy(x.b.gueltig_bis)}<div class="sec">${frist}</div></td>
+        <td class="num nowrap strong">CHF ${chf(x.b.total_rappen)}</td>
+      </tr>`;
+    }).join('') + '</tbody></table>';
 }
 
 // ── Kunden-Detailseite (ENT-040) ──────────────────────────────────────────

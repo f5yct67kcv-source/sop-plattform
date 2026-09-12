@@ -497,9 +497,10 @@ try {
   ts = await mass(p, '#topSub');
   const namen = await p.evaluate(() => [...document.querySelectorAll('#topSub button')].map(b => b.textContent));
   check('KRITISCH: kompakt erscheinen die Unterkategorien oben', ts.display === 'flex');
-  // Seit ENT-181 sind es fuenf: Offerten, dann Rechnungen (Grundgeruest) kamen dazu.
+  // Seit ENT-181 waren es fuenf (Offerten, dann Rechnungen); seit ENT-555
+  // steht "Uebersicht" als Startseite des Bereichs davor.
   check('KRITISCH: mit den richtigen Namen',
-    JSON.stringify(namen) === JSON.stringify(['Adressen', 'Objekte', 'Rapporte', 'Offerten', 'Rechnungen']));
+    JSON.stringify(namen) === JSON.stringify(['Übersicht', 'Adressen', 'Objekte', 'Rapporte', 'Offerten', 'Rechnungen']));
   const markiert = await p.evaluate(() => {
     const b = document.querySelector('#topSub button.on'); return b ? b.textContent : null; });
   check('Die aktuelle ist hervorgehoben', markiert === 'Adressen');
@@ -549,7 +550,8 @@ try {
   // Der Revierdienst hat nur zwei Unterkategorien -- er ist seit ENT-421 die
   // kurze Leiste im Vergleich. Vorher war es die Administration mit drei;
   // sie hat inzwischen fuenf ("Mitteilungen" seit ENT-421, "Kundenzugaenge"
-  // seit ENT-441) und ist damit so breit wie die Kunden. Eine Breitenprobe
+  // seit ENT-441); die Kunden sind seit ENT-555 ("Übersicht") bei sechs.
+  // Eine Breitenprobe
   // zwischen zwei fast gleich breiten Leisten belegt nichts -- die Aussage
   // lautet "verschieden viele, gleiche Mitte", und dafuer braucht es einen
   // echten Unterschied. Die Zahl steht hier fest und nicht als
@@ -557,10 +559,10 @@ try {
   // ergaenzt, hier vorbeizukommen und nachzusehen, ob die Mitte noch
   // stimmt -- genau das ist der Zweck dieser Suite.
   const mPlanung = await mitteVon(() => go('planung'));
-  check('Bei den Kunden stehen fuenf Unterkategorien (ENT-181)', mKunden.anzahl === 5);
+  check('Bei den Kunden stehen sechs Unterkategorien (ENT-181, "Übersicht" seit ENT-555)', mKunden.anzahl === 6);
   check('Bei der Administration fuenf (ENT-181/ENT-421/ENT-441)', mAdmin.anzahl === 5);
   check('Bei der Planung ebenfalls vier', mPlanung.anzahl === 4);
-  check('KRITISCH: fuenf Unterkategorien stehen in der Fenstermitte',
+  check('KRITISCH: sechs Unterkategorien stehen in der Fenstermitte',
     Math.abs(mKunden.mitte - 800) <= 4);
   check('KRITISCH: fuenf ebenfalls -- die Zahl aendert die Mitte nicht',
     Math.abs(mAdmin.mitte - 800) <= 4);
