@@ -22,7 +22,12 @@ const workflow = readFileSync(`${WURZEL}/.github/workflows/deploy-hostpoint.yml`
 // Oberflaeche die Regel nicht, dass jedes geladene Skript auch
 // ausgeliefert wird. Genau die Luecke, die qrcode.js schon einmal aus dem
 // Deploy fallen liess.
-const seiten = ['index.html', 'dashboard.html', 'app.html', 'homepage.html', 'portal.html'];
+// homepage.html steht hier NICHT mehr (ENT-563/OP-565): Sie geht seit
+// guardops.ch nicht mehr nach dist/, sondern nach dist-guardops/. Wer sie
+// in dieser Liste liesse, verlangte eine cp-Zeile nach dist/, die es
+// absichtlich nicht mehr gibt. Ihre Schriften, Icons und Skripte prüft
+// stattdessen der guardops-Block ganz unten -- an derselben Frage.
+const seiten = ['index.html', 'dashboard.html', 'app.html', 'portal.html'];
 
 // Nicht nur die drei bekannten HTML-Huellen: eine oeffentliche PHP-Seite
 // (z. B. beleg_oeffentlich.php, ENT-205) kann ein eigenes <script src>
@@ -536,6 +541,23 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     && /dist-guardops\/api\/demo_senden\.php/.test(bauen));
   if (fehlendeModule.length) { bad.push('Einbindung fehlt im guardops-Bündel: ' + fehlendeModule.join(', ')); }
 
+  // Heute lädt homepage.html kein eigenes Skript -- alles steht inline. Die
+  // Prüfung steht trotzdem hier: Sobald eine Datei dazukommt, muss sie ins
+  // Bündel. Genau dieser Fallstrick liess qrcode.js schon einmal aus dem
+  // Deploy fallen, und seit die Seite nicht mehr in "seiten" oben steht,
+  // würde ihn sonst niemand mehr abfangen.
+  const skripte = [...new Set([...homepage.matchAll(/<script[^>]+src="(?!https?:)([^"]+)"/g)].map(m => m[1]))];
+  const fehlendeSkripte = skripte.filter(j => !bauen.includes(j));
+  check('KRITISCH: jedes eigene Skript, das homepage.html lädt, kommt ins guardops-Bündel',
+    fehlendeSkripte.length === 0);
+  if (fehlendeSkripte.length) { bad.push('Skript fehlt im guardops-Bündel: ' + fehlendeSkripte.join(', ')); }
+
+  // OP-565: Die Seite darf nicht auf der Testinstanz zurückkehren. Der
+  // Upload dort räumt sein Verzeichnis auf -- kommt die cp-Zeile wieder,
+  // steht dieselbe Seite wieder unter zwei Adressen.
+  check('KRITISCH: homepage.html wird NICHT mehr auf die Testinstanz ausgeliefert',
+    !/cp\s+homepage\.html\s+dist\/homepage\.html/.test(workflow));
+
   check('KRITISCH: die eigene .htaccess und robots.txt der Domain werden mitgeliefert',
     /cp\s+htaccess-guardops\s+dist-guardops\/\.htaccess/.test(bauen)
     && /cp\s+robots-guardops\.txt\s+dist-guardops\/robots\.txt/.test(bauen)
@@ -625,6 +647,18 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     check('KRITISCH: jeder Platzhalter in einer Datei des guardops-Bündels wird dort ersetzt oder bleibt mit Grund stehen',
       quellen.length >= 5 && offen.length === 0);
     if (offen.length) { bad.push('bricht den Deploy: ' + offen.join(', ')); }
+  }
+
+  // OP-566: Eine Adresse, nicht zwei. Beide Hälften müssen zusammenpassen --
+  // eine Weiterleitung ohne canonical (oder umgekehrt) lässt die Seite
+  // weiterhin zweimal erscheinen, je nachdem wie sie erreicht wird.
+  {
+    const ht = readFileSync(`${WURZEL}/htaccess-guardops`, 'utf8');
+    const kanonisch = (homepage.match(/<link rel="canonical" href="([^"]+)"/) || [])[1] || '';
+    const ziel = (ht.match(/RewriteRule \^\(\.\*\)\$ (https:\/\/[a-z0-9.-]+)\//) || [])[1] || '';
+    check('KRITISCH: die www-Weiterleitung und die kanonische Adresse der Seite nennen dieselbe Adresse',
+      kanonisch !== '' && ziel !== '' && kanonisch.replace(/\/$/, '') === ziel
+      && /RewriteCond %\{HTTP_HOST\} \^www\\\./.test(ht) && /\[R=301,L\]/.test(ht));
   }
 
   // Die beiden Bündel dürfen sich nicht ins Gehege kommen: Der Upload des

@@ -338,12 +338,15 @@ jobs:
           # Mitarbeiter-Code, also kann von dort auch nichts versehentlich
           # an einen Kunden geraten.
           cp portal.html dist/portal.html
-          # Oeffentliche Homepage (ENT-469). Eigene Seite ohne jeden
-          # Produktcode -- sie laedt weder gav.js noch eine Sitzung; ihre
-          # einzige Verbindung zum Server ist das Demo-Formular
-          # (api/demo_senden.php). Bewusst NICHT index.html: Die Wurzel
-          # bleibt die Erfassung der Mitarbeitenden (Startadresse der PWA).
-          cp homepage.html dist/homepage.html
+          # KEINE homepage.html MEHR AUF DIESER INSTANZ (ENT-563/OP-565).
+          # Die oeffentliche Seite lebt seit guardops.ch dort, und zwar als
+          # index.html auf der Wurzel. Zweimal dieselbe Seite unter zwei
+          # Adressen waere doppelter Inhalt, und die Testadresse soll gar
+          # nicht gefunden werden. Der Upload raeumt sein Zielverzeichnis
+          # auf -- die Datei verschwindet vom Server also von selbst, sobald
+          # diese Zeile fehlt. Das Buendel fuer guardops.ch baut sie weiter
+          # (siehe weiter unten); test_deploy.mjs achtet darauf, dass sie
+          # hier NICHT zurueckkehrt.
           # Betreiber-Bereich (ENT-519 bis ENT-521). Eigene Seite neben
           # dashboard.html und portal.html, mit eigener Anmeldung gegen die
           # betreiber_*-Endpunkte. Sie traegt weder Cockpit- noch

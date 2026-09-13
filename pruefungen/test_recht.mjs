@@ -1,0 +1,209 @@
+// Die Rechtsseiten von guardops.ch (ENT-563/OP-564): Impressum und
+// Datenschutzerklaerung.
+//
+// Geprueft wird am gerenderten Zustand, nicht im Quelltext -- und die
+// Aussagen der Datenschutzerklaerung werden gegen den CODE gehalten, nicht
+// gegen sich selbst. Das ist der Kern dieser Suite: Eine Datenschutz-
+// erklaerung ist eine Behauptung ueber Software. Aendert sich die Software,
+// wird sie falsch, ohne dass jemand die Seite anfasst. Genau dann soll es
+// hier rot werden.
+//
+// Was NICHT geprueft wird und auch nicht geprueft werden kann: ob der Text
+// juristisch genuegt. Das ist offen (OP-564).
+import { WURZEL, browserPfad } from './pfade.mjs';
+import { chromium } from 'playwright';
+import { readFileSync, existsSync } from 'node:fs';
+
+const ok = [], bad = [];
+const check = (n, c) => (c ? ok : bad).push(n);
+const lies = d => readFileSync(`${WURZEL}/${d}`, 'utf8');
+
+const impressum = lies('impressum.html');
+const datenschutz = lies('datenschutz.html');
+const homepage = lies('homepage.html');
+const workflow = lies('.github/workflows/deploy-hostpoint.yml');
+
+// ══════════ DIE UNFERTIGE SEITE DARF NICHT LIVE GEHEN ════════════════
+// Das Impressum traegt __IMPRESSUM_*__-Platzhalter, solange Firma, Adresse
+// und Unternehmensnummer fehlen. Ein Impressum mit erfundenen Angaben waere
+// schlimmer als keines -- also muss die Kopplung stimmen: entweder die
+// Platzhalter sind weg, ODER die Seite wird nicht ausgeliefert. Beides
+// zugleich ist der Fehler, den diese Pruefung verhindert.
+{
+  const offen = [...new Set([...impressum.matchAll(/__[A-Z][A-Z_]{2,}__/g)].map(m => m[0]))];
+  const imBuendel = /cp\s+impressum\.html\s+dist-guardops\//.test(workflow);
+  check('KRITISCH: das Impressum wird nur ausgeliefert, wenn keine Angabe mehr fehlt',
+    offen.length === 0 || !imBuendel);
+  if (offen.length) { console.log(`  ! Impressum noch offen: ${offen.join(', ')} — darum nicht im Deploy`); }
+
+  // Dieselbe Kopplung fuer die Verweise: Eine Fusszeile, die auf eine Seite
+  // zeigt, die es auf dem Server nicht gibt, ist ein 404 auf einer
+  // Verkaufsseite. "Noch nicht da" darf nicht wie "da" aussehen.
+  const verweistAufImpressum = /href="impressum\.html"/.test(homepage);
+  check('KRITISCH: die Startseite verweist nur dann aufs Impressum, wenn es auch ausgeliefert wird',
+    verweistAufImpressum === imBuendel);
+  const verweistAufDatenschutz = /href="datenschutz\.html"/.test(homepage);
+  check('KRITISCH: die Startseite verweist nur dann auf den Datenschutz, wenn er auch ausgeliefert wird',
+    verweistAufDatenschutz === /cp\s+datenschutz\.html\s+dist-guardops\//.test(workflow));
+}
+
+// ══════════ DIE AUSSAGEN GEGEN DEN CODE ══════════════════════════════
+// Jede dieser Aussagen steht so in datenschutz.html. Stimmt sie nicht mehr,
+// ist die Seite eine falsche Auskunft an den Besucher -- nicht nur ein
+// veralteter Text.
+{
+  const setztCookies = /document\.cookie|localStorage|sessionStorage|indexedDB/.test(homepage)
+    || ['backend/api/demo_senden.php', 'backend/demo_bremse.php', 'backend/demo_anfrage.php']
+       .some(d => /setcookie|session_start/i.test(lies(d)));
+  check('KRITISCH: die Behauptung "keine Cookies" stimmt mit dem Code ueberein',
+    !setztCookies && /keine Cookies/i.test(datenschutz));
+
+  // Fremde Abrufe: Die Seite behauptet, nichts von fremden Servern zu laden.
+  // test_homepage.mjs misst das am Browser; hier wird die BEHAUPTUNG an
+  // dieselbe Tatsache gekoppelt.
+  //
+  // Gemeint ist, was der Browser VON SELBST holt -- nicht jede fremde
+  // Adresse im Quelltext. Ein <link rel="canonical"> wird nie abgerufen
+  // (es ist ein Metadatum), und ein <a href> erst, wenn jemand klickt.
+  // Die erste Fassung dieser Pruefung zaehlte beides mit und schlug an,
+  // sobald die kanonische Adresse dazukam.
+  const ohneKommentare = homepage.replace(/<!--[\s\S]*?-->/g, '');
+  const holtFremd =
+    /\ssrc="https?:\/\//.test(ohneKommentare)                                  // Bild, Skript, iframe
+    || /<link\b(?![^>]*rel="canonical")[^>]*href="https?:\/\//.test(ohneKommentare)  // Stilblatt, Icon, preload
+    || /url\(\s*['"]?https?:\/\//.test(ohneKommentare);                        // CSS
+  check('KRITISCH: die Behauptung "nichts von fremden Servern" stimmt mit dem Code ueberein',
+    !holtFremd && /fremden Servern/i.test(datenschutz));
+
+  // Nichts gespeichert: Der Endpunkt darf keine Anfrage in die Datenbank
+  // schreiben. Wuerde er es je tun, waere die Seite eine Falschaussage.
+  const endpunkt = lies('backend/api/demo_senden.php');
+  check('KRITISCH: die Behauptung "nicht in einer Datenbank gespeichert" stimmt mit dem Code ueberein',
+    !/INSERT INTO|UPDATE\s+\w+\s+SET/i.test(endpunkt) && /nicht in\s*\n?\s*einer Datenbank gespeichert/i.test(datenschutz.replace(/\s+/g, ' ')));
+
+  // Die Bremse: Pruefwert statt Adresse, und die genannte Frist muss die
+  // im Code eingestellte sein -- eine Erklaerung, die 15 Minuten verspricht,
+  // waehrend der Code 60 zaehlt, ist falsch.
+  const bremse = lies('backend/demo_bremse.php');
+  const fenster = (bremse.match(/DEMO_BREMSE_FENSTER_MIN\s*=\s*(\d+)/) || [])[1];
+  check('KRITISCH: die genannte Aufbewahrungsfrist der Bremse ist die im Code eingestellte',
+    !!fenster && new RegExp(`nach ${fenster} Minuten`).test(datenschutz));
+  check('KRITISCH: die Behauptung "Pruefwert statt Adresse" stimmt mit dem Code ueberein',
+    /hash\('sha256'/.test(bremse) && /SHA-256/.test(datenschutz)
+    && !/REMOTE_ADDR[^\n]*file_put_contents/.test(bremse));
+
+  // Und die Gegenrichtung: Die Seite darf nicht MEHR versprechen, als der
+  // Code haelt. "Nicht rueckrechenbar" waere bei einer IPv4-Adresse eine
+  // Uebertreibung -- der Adressraum ist klein genug zum Durchprobieren.
+  check('KRITISCH: die Seite behauptet NICHT, der Pruefwert sei nicht rueckrechenbar',
+    !/nicht r(ü|ue)ckrechenbar|anonymisiert|unkenntlich gemacht/i.test(datenschutz));
+}
+
+// ══════════ GERENDERT ════════════════════════════════════════════════
+const browser = await chromium.launch({ executablePath: browserPfad() });
+
+// Farbwerte aus dem Cockpit, nicht aehnliche -- dieselbe Kopplung wie in
+// test_homepage.mjs.
+const dash = lies('dashboard.html');
+const block = ab => { const i = dash.indexOf(ab); return i < 0 ? '' : dash.slice(i, dash.indexOf('}', i)); };
+const marke = (b, n) => (b.match(new RegExp(`--${n}:\\s*(#[0-9A-Fa-f]{6})`)) || [])[1] || '';
+const rgb = h => `rgb(${parseInt(h.slice(1,3),16)}, ${parseInt(h.slice(3,5),16)}, ${parseInt(h.slice(5,7),16)})`;
+const hell = block(':root {');
+const dunkel = block('html[data-thema="dunkel"] {');
+
+for (const [datei, titel] of [['impressum.html', 'Impressum'], ['datenschutz.html', 'Datenschutz']]) {
+  for (const [breite, hoehe, wo] of [[1440, 900, 'Desktop'], [390, 844, 'Handy']]) {
+    const seite = await browser.newPage({ viewport: { width: breite, height: hoehe } });
+    const fremde = [];
+    seite.on('request', r => { if (/^https?:/.test(r.url())) { fremde.push(r.url()); } });
+    await seite.goto(`file://${WURZEL}/${datei}`, { waitUntil: 'load' });
+
+    check(`${titel} (${wo}): kein Abruf bei einem fremden Server`, fremde.length === 0);
+
+    const ueberlauf = await seite.evaluate(() =>
+      document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    check(`${titel} (${wo}): kein waagrechter Ueberlauf`, ueberlauf <= 0);
+
+    if (wo === 'Handy') {
+      // Jedes Bedienelement mindestens 44 px hoch -- die Regel gilt auch fuer
+      // eine reine Textseite: Die Verweise in Kopf und Fuss sind Bedienelemente.
+      const zuKlein = await seite.evaluate(() =>
+        [...document.querySelectorAll('header a, footer a')]
+          .map(a => ({ t: a.textContent.trim().slice(0, 24), h: Math.round(a.getBoundingClientRect().height) }))
+          .filter(x => x.h < 44));
+      check(`${titel} (Handy): jeder Verweis in Kopf und Fuss ist mindestens 44 px hoch`, zuKlein.length === 0);
+      if (zuKlein.length) { bad.push(`${titel}: zu klein — ` + zuKlein.map(x => `${x.t} ${x.h}px`).join(', ')); }
+
+      const klein = await seite.evaluate(() =>
+        parseFloat(getComputedStyle(document.body).fontSize));
+      check(`${titel} (Handy): der Fliesstext ist mindestens 16 px gross`, klein >= 16);
+    }
+
+    if (wo === 'Desktop') {
+      const gemessen = await seite.evaluate(() => {
+        const k = document.querySelector('.kopf');
+        const m = document.querySelector('.marke svg');
+        const v = document.querySelector('.vorzeile');
+        const h1 = document.querySelector('h1');
+        return {
+          kopfGrund: getComputedStyle(k).backgroundColor,
+          bodyGrund: getComputedStyle(document.body).backgroundColor,
+          vorzeileFarbe: getComputedStyle(v).color,
+          markeBreite: m.getBoundingClientRect().width,
+          markeHoehe: m.getBoundingClientRect().height,
+          // Ueberschrift oben, Wert darunter: Die feine Versalzeile muss
+          // UEBER dem Titel stehen, nicht darunter.
+          vorzeileOben: v.getBoundingClientRect().top,
+          titelOben: h1.getBoundingClientRect().top,
+          titelSchrift: getComputedStyle(h1).fontFamily,
+          vorzeileVersal: getComputedStyle(v).textTransform,
+        };
+      });
+      check(`${titel}: der Kopf traegt den Nachtgrund des Cockpits (${marke(dunkel, 'bg')})`,
+        gemessen.kopfGrund === rgb(marke(dunkel, 'bg')));
+      check(`${titel}: der Seitengrund traegt den hellen Grund des Cockpits (${marke(hell, 'bg')})`,
+        gemessen.bodyGrund === rgb(marke(hell, 'bg')));
+      check(`${titel}: die Vorzeile traegt den hellen Akzent des Cockpits (${marke(hell, 'accent')})`,
+        gemessen.vorzeileFarbe === rgb(marke(hell, 'accent')));
+      // 460:593 aus dem Original -- ein gestauchtes Schild faellt sonst nur
+      // jemandem auf, der es danebenhaelt.
+      check(`${titel}: die Bildmarke behaelt ihr Seitenverhaeltnis (460:593)`,
+        Math.abs(gemessen.markeBreite / gemessen.markeHoehe - 460 / 593) < 0.02);
+      check(`${titel}: die Beschriftung steht UEBER dem Titel, nicht darunter`,
+        gemessen.vorzeileOben < gemessen.titelOben);
+      check(`${titel}: der Titel steht in der schmalen Anzeigeschrift`,
+        /Archivo/.test(gemessen.titelSchrift));
+      check(`${titel}: die Vorzeile ist versalgesetzt`, gemessen.vorzeileVersal === 'uppercase');
+
+      // Die drei Schriften muessen wirklich geladen sein, nicht still auf den
+      // System-Stapel zurueckfallen.
+      const geladen = await seite.evaluate(() =>
+        [...document.fonts].filter(f => f.status === 'loaded').map(f => f.family));
+      check(`${titel}: Archivo und IBM Plex Sans sind wirklich geladen`,
+        geladen.includes('Archivo') && geladen.includes('IBM Plex Sans'));
+
+      // Der Markenname steht im HTML, nicht in einem Skript (ENT-562).
+      const namen = await seite.evaluate(() =>
+        [...document.querySelectorAll('[data-brand]')].map(e => e.textContent.trim()));
+      check(`${titel}: der Markenname steht ueberall gleich da`,
+        namen.length >= 2 && new Set(namen).size === 1 && namen[0] === 'GuardOpS');
+    }
+    await seite.close();
+  }
+}
+
+// Jeder Verweis zwischen den Seiten muss eine Datei treffen, die es gibt.
+{
+  const ziele = new Set();
+  for (const inhalt of [impressum, datenschutz]) {
+    for (const m of inhalt.matchAll(/href="([a-z0-9_.-]+\.(?:html|css))"/g)) { ziele.add(m[1]); }
+  }
+  const fehlend = [...ziele].filter(z => !existsSync(`${WURZEL}/${z}`));
+  check('KRITISCH: jeder Verweis der Rechtsseiten trifft eine vorhandene Datei', fehlend.length === 0);
+  if (fehlend.length) { bad.push('ins Leere: ' + fehlend.join(', ')); }
+}
+
+await browser.close();
+console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
+if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
+console.log('Alle Pruefungen bestanden.');

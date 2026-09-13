@@ -11,6 +11,24 @@
 # "/homepage.html" -- der Deploy legt sie deshalb als index.html ab.
 DirectoryIndex index.html
 
+# ── 1b. Eine Adresse, nicht zwei (OP-566) ────────────────────────────────
+# www.guardops.ch und guardops.ch zeigen auf dasselbe Verzeichnis. Ohne
+# diese Weiterleitung gibt es die Seite damit ZWEIMAL: fuer Suchmaschinen
+# zwei getrennte Auftritte, und die Verweise verteilen sich auf beide.
+#
+# Die kurze Adresse fuehrt -- die Marke ist kurz genug, dass "www" nichts
+# hinzufuegt. 301 heisst DAUERHAFT: Browser und Suchmaschinen merken sich
+# das lange. Eine spaetere Umkehr waere entsprechend traege.
+#
+# Greift nur, wenn Hostpoint www.guardops.ch tatsaechlich hierher zeigen
+# laesst. Tut es das nicht, laeuft die Regel schlicht nie -- sie richtet
+# keinen Schaden an.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{HTTP_HOST} ^www\.guardops\.ch$ [NC]
+  RewriteRule ^(.*)$ https://guardops.ch/$1 [R=301,L]
+</IfModule>
+
 # ── 2. Hilfsdateien gegen direkten Abruf sperren ─────────────────────────
 # Dieselbe Begruendung wie in htaccess-hostpoint: Faellt die PHP-Verarbeitung
 # aus oder ist sie falsch eingestellt, liefert der Server den Quelltext im
