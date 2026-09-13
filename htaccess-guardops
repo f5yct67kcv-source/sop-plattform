@@ -1,0 +1,68 @@
+# .htaccess fuer die oeffentliche Homepage auf ihrer eigenen Domain
+# (guardops.ch). Der Deploy legt sie als dist-guardops/.htaccess ab.
+#
+# EIGENE DATEI, NICHT htaccess-hostpoint: Dort steht die Konfiguration des
+# Rapport-Tools -- eine Anwendung mit Anmeldung, Standortzugriff, Kamera und
+# Mikrofon. Diese Seite hier ist eine Verkaufsseite. Was sie nicht braucht,
+# soll sie auch nicht erlauben.
+
+# ── 1. Startseite ────────────────────────────────────────────────────────
+# Auf der eigenen Domain gehoert die Homepage auf "/", nicht auf
+# "/homepage.html" -- der Deploy legt sie deshalb als index.html ab.
+DirectoryIndex index.html
+
+# ── 2. Hilfsdateien gegen direkten Abruf sperren ─────────────────────────
+# Dieselbe Begruendung wie in htaccess-hostpoint: Faellt die PHP-Verarbeitung
+# aus oder ist sie falsch eingestellt, liefert der Server den Quelltext im
+# Klartext aus. Diese vier Dateien werden nur von api/demo_senden.php
+# eingebunden und nie direkt aufgerufen.
+#
+# db.php steht hier mit, obwohl es auf dieser Domain ABSICHTLICH KEINE
+# Datenbank-Zugangsdaten traegt (der Deploy laesst die __DB_*__-Platzhalter
+# stehen). Die Sperre ist trotzdem richtig: Sie darf nicht davon abhaengen,
+# dass jemand sich an diese Besonderheit erinnert.
+<FilesMatch "^(db|mailer|demo_anfrage|demo_bremse)\.php$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
+
+# Sicherungskopien und Reste, die beim Hochladen entstehen koennen.
+<FilesMatch "\.(sql|bak|old|orig|log|md|yml)$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
+
+# ── 3. Schutzkopfzeilen ──────────────────────────────────────────────────
+<IfModule mod_headers.c>
+  # Die Seite darf nicht in einen fremden Rahmen gesetzt werden.
+  Header always set X-Frame-Options "DENY"
+  Header always set Content-Security-Policy "frame-ancestors 'none'"
+
+  # Der Browser soll den Inhaltstyp nicht raten.
+  Header always set X-Content-Type-Options "nosniff"
+
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+
+  # HIER BEWUSST ANDERS ALS BEIM RAPPORT-TOOL: Dort stehen Kamera, Mikrofon
+  # und Standort auf "(self)", weil der Revierdienst sie braucht. Eine
+  # Verkaufsseite braucht nichts davon -- eine leere Liste heisst "niemand,
+  # auch diese Seite nicht".
+  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
+
+  # HSTS: Der Browser merkt sich, dass diese Seite nur verschluesselt zu
+  # erreichen ist. Wirkt ERST, wenn die Seite ueber HTTPS ausgeliefert wird.
+  Header always set Strict-Transport-Security "max-age=15552000"
+</IfModule>
+
+# ── 4. Kein Verzeichnisinhalt ────────────────────────────────────────────
+Options -Indexes

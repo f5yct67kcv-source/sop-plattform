@@ -481,6 +481,121 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     (workflow.match(/>\s*dist\/qa-version\.json/g) ?? []).length === 1);
 }
 
+// ══════════ DIE HOMEPAGE AUF IHRER EIGENEN DOMAIN ════════════════════
+//
+// Seit guardops.ch gibt es ein ZWEITES Bündel (dist-guardops/) mit eigenem
+// FTP-Ziel. Damit gilt hier derselbe Fallstrick noch einmal, und zwar
+// schärfer: Die Homepage liegt dort ALLEIN. Fehlt eine Schrift, ein Icon
+// oder eine der vier Einbindungen des Endpunkts, fällt es lokal NICHT auf --
+// im Arbeitsverzeichnis liegt ja alles da -- und auf der Testinstanz auch
+// nicht, weil deren Bündel vollständig ist.
+//
+// Geprüft wird deshalb nicht gegen eine abgeschriebene Liste, sondern gegen
+// das, was homepage.html und der Endpunkt TATSÄCHLICH laden.
+{
+  const schritt = (name) => {
+    const i = workflow.indexOf(`- name: ${name}`);
+    if (i < 0) { return ''; }
+    const j = workflow.indexOf('\n      - name:', i + 10);
+    return workflow.slice(i, j < 0 ? undefined : j);
+  };
+  const bauen = schritt('Homepage-Buendel fuer guardops.ch bauen');
+  const laden = schritt('Homepage nach guardops.ch hochladen (FTPS)');
+  const hinweis = schritt('Hinweis, wenn guardops.ch noch nicht eingerichtet ist');
+  const homepage = readFileSync(`${WURZEL}/homepage.html`, 'utf8');
+
+  check('KRITISCH: es gibt einen Schritt, der das Bündel für guardops.ch baut, und einen, der es hochlädt',
+    bauen !== '' && laden !== '');
+
+  // Auf der eigenen Domain gehört die Seite auf "/", nicht auf
+  // "/homepage.html" -- sonst zeigt guardops.ch ins Leere.
+  check('KRITISCH: homepage.html wird als index.html ausgeliefert (die Seite liegt auf der Wurzel der Domain)',
+    /cp\s+homepage\.html\s+dist-guardops\/index\.html/.test(bauen));
+
+  // Aus der Datei abgeleitet, nicht abgeschrieben: jede Schrift, die
+  // homepage.html per CSS-url() holt.
+  const schriften = [...new Set([...homepage.matchAll(/url\(['"]?(fonts\/[^)'"]+)/g)].map(m => m[1]))];
+  const fehlendeSchriften = schriften.filter(f => !bauen.includes(f.split('/').pop()));
+  check('KRITISCH: jede Schrift, die homepage.html lädt, wird ins guardops-Bündel kopiert',
+    schriften.length >= 4 && fehlendeSchriften.length === 0);
+  if (fehlendeSchriften.length) { bad.push('fehlt im guardops-Bündel: ' + fehlendeSchriften.join(', ')); }
+
+  // Ebenso die Icons -- sie hängen per <link href> und og:image, nicht per
+  // <script src>: genau die Lücke, die bei den Favicons schon einmal bestand.
+  const icons = [...new Set([...homepage.matchAll(/(?:href|content)="(icons\/[^"]+)"/g)].map(m => m[1]))];
+  check('KRITISCH: die Icons der Seite werden ins guardops-Bündel kopiert',
+    icons.length >= 3 && /cp\s+icons\/guardops-\*\.png\s+dist-guardops\/icons\//.test(bauen)
+    && icons.every(i => i.startsWith('icons/guardops-')));
+
+  // Die Einbindungen des Endpunkts, aus dem Endpunkt gelesen.
+  const endpunkt = readFileSync(`${WURZEL}/backend/api/demo_senden.php`, 'utf8');
+  const noetig = [...endpunkt.matchAll(/require __DIR__ \. '\/\.\.\/([a-z_]+\.php)'/g)].map(m => m[1]);
+  const fehlendeModule = noetig.filter(m => !new RegExp(`dist-guardops/${m.replace('.', '\\.')}`).test(bauen));
+  check('KRITISCH: jede Datei, die der Endpunkt einbindet, liegt im guardops-Bündel',
+    noetig.length >= 3 && fehlendeModule.length === 0
+    && /dist-guardops\/api\/demo_senden\.php/.test(bauen));
+  if (fehlendeModule.length) { bad.push('Einbindung fehlt im guardops-Bündel: ' + fehlendeModule.join(', ')); }
+
+  check('KRITISCH: die eigene .htaccess und robots.txt der Domain werden mitgeliefert',
+    /cp\s+htaccess-guardops\s+dist-guardops\/\.htaccess/.test(bauen)
+    && /cp\s+robots-guardops\.txt\s+dist-guardops\/robots\.txt/.test(bauen)
+    && existsSync(`${WURZEL}/htaccess-guardops`) && existsSync(`${WURZEL}/robots-guardops.txt`));
+
+  // robots.txt der Verkaufsseite sagt das GEGENTEIL von robots-staging.txt:
+  // Sie soll gefunden werden. Ein versehentlich kopiertes "Disallow: /"
+  // nähme die Seite lautlos aus jeder Suchmaschine.
+  check('KRITISCH: die robots.txt von guardops.ch sperrt die Seite NICHT aus (anders als die der Testinstanz)',
+    !/^Disallow:\s*\/\s*$/m.test(readFileSync(`${WURZEL}/robots-guardops.txt`, 'utf8')));
+
+  // DER PUNKT, AN DEM ES TEUER WÜRDE: Auf guardops.ch dürfen keine
+  // Datenbank-Zugangsdaten landen. db.php wird dorthin kopiert (mailer.php
+  // bindet es ein), aber NUR mit APP_ENV ersetzt -- die __DB_*__-Platzhalter
+  // bleiben stehen. Ein sed, das sie dort einsetzte, legte die Zugangsdaten
+  // der produktiven Datenbank an einen zweiten Ort.
+  check('KRITISCH: in das guardops-Bündel wird KEIN Datenbank-Zugangsdatum eingesetzt',
+    !/__DB_(HOST|NAME|USER|PASS)__\|\$EFF_DB[^\n]*dist-guardops/.test(bauen)
+    && !/dist-guardops[^\n]*\$EFF_DB_/.test(bauen)
+    && /__APP_ENV__[^\n]*dist-guardops\/db\.php/.test(bauen));
+
+  // Und die Gegenprobe dazu im Workflow selbst: ein übersehener Platzhalter
+  // darf nicht hochgeladen werden.
+  check('KRITISCH: der Bau bricht ab, wenn ein nicht ersetzter Platzhalter im Bündel bleibt',
+    /UEBRIG=/.test(bauen) && /::error::[^\n]*Platzhalter/.test(bauen) && /exit 1/.test(bauen));
+
+  // Der Empfänger kommt aus dem Deploy -- in BEIDEN Bündeln.
+  check('KRITISCH: der Empfänger der Demo-Anfragen wird in beide Bündel eingesetzt',
+    /__DEMO_EMPFAENGER__\|\$EFF_DEMO_EMPFAENGER\|g"\s+dist\/demo_anfrage\.php/.test(workflow)
+    && /__DEMO_EMPFAENGER__\|\$EFF_DEMO_EMPFAENGER\|g"\s+dist-guardops\/demo_anfrage\.php/.test(workflow));
+
+  // Eigener Zugang, eigene Secret-NAMEN -- dieselbe Lehre wie bei Staging
+  // (ENT-343 Punkt 1): Mit gleichen Namen fiele ein fehlendes Secret still
+  // auf ein gleichnamiges Repository-Secret zurück.
+  check('KRITISCH: guardops.ch benutzt einen eigenen FTP-Zugang, nicht den des Rapport-Tools',
+    /server:\s*\$\{\{\s*env\.EFF_GUARDOPS_FTP_HOST\s*\}\}/.test(laden)
+    && /secrets\.GUARDOPS_FTP_HOST/.test(workflow)
+    && !/EFF_HOSTPOINT_FTP/.test(laden));
+
+  // Ein Staging-Lauf hat auf der echten Verkaufsdomain nichts verloren.
+  check('KRITISCH: beide guardops-Schritte laufen nur auf Production und nur mit vorhandenem Secret',
+    [bauen, laden].every(st =>
+      /env\.UMGEBUNG\s*==\s*'production'/.test(st) && /env\.EFF_GUARDOPS_FTP_HOST\s*!=\s*''/.test(st)));
+  check('KRITISCH: der Staging-Zweig setzt das guardops-Ziel leer, ohne Rückfall auf die Production-Werte',
+    /EFF_GUARDOPS_FTP_HOST=""/.test(workflow)
+    && !/EFF_GUARDOPS_FTP_HOST="\$P_GUARDOPS_FTP_HOST"[\s\S]{0,400}STAGING/.test(workflow));
+
+  // "Nicht eingerichtet" darf nicht wie "nichts zu tun" aussehen: Ohne
+  // diesen Hinweis wäre ein übersprungener Homepage-Deploy im Protokoll von
+  // einem erfolgreichen nicht zu unterscheiden.
+  check('KRITISCH: ein übersprungener Homepage-Deploy sagt das ausdrücklich, statt lautlos auszufallen',
+    hinweis !== '' && /::notice::/.test(hinweis)
+    && /env\.EFF_GUARDOPS_FTP_HOST\s*==\s*''/.test(hinweis));
+
+  // Die beiden Bündel dürfen sich nicht ins Gehege kommen: Der Upload des
+  // Rapport-Tools räumt sein Zielverzeichnis auf.
+  check('KRITISCH: die beiden Uploads haben verschiedene Quellverzeichnisse',
+    /local-dir:\s*\.\/dist\//.test(workflow) && /local-dir:\s*\.\/dist-guardops\//.test(workflow));
+}
+
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
 console.log('Alle Pruefungen bestanden.');
