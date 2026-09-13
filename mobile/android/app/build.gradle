@@ -1,10 +1,10 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace = "ch.cupi24.mitarbeiter"
+    namespace = "ch.guardops.mitarbeiter"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "ch.cupi24.mitarbeiter"
+        applicationId "ch.guardops.mitarbeiter"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

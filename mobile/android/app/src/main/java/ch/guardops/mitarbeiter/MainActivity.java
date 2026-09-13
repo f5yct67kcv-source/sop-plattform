@@ -1,4 +1,4 @@
-package ch.cupi24.mitarbeiter;
+package ch.guardops.mitarbeiter;
 
 import com.getcapacitor.BridgeActivity;
 
