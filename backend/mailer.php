@@ -20,9 +20,16 @@ require_once __DIR__ . '/db.php';
 // Platzhalter werden beim Deploy durch GitHub Actions aus GitHub Secrets
 // ersetzt (gleiches Muster wie db.php/ai.php) -- diese Datei enthaelt nie
 // echte Zugangsdaten.
+//
+// KEIN FREMDER PLATZHALTERNAME IN DIESER DATEI, auch nicht in einem
+// Kommentar: Sie geht seit ENT-563 nach guardops.ch mit, und der Bau des
+// dortigen Buendels weist jeden Platzhalter ab, der dort nicht ersetzt wird.
+// Eine blosse Erwaehnung von "__ANTHROPIC" + "_API_KEY__" in einem Kommentar
+// hat den Deploy-Lauf 474 rot gefaerbt. test_deploy.mjs prueft das seither
+// hier, statt es dem Runner zu ueberlassen.
 
-// Bewusst nur auf leeren String pruefen (wie bei __ANTHROPIC_API_KEY__ in
-// ai.php), NICHT zusaetzlich per str_contains() gegen den Platzhaltertext
+// Bewusst nur auf leeren String pruefen -- wie beim Anthropic-Schluessel in
+// ai.php --, NICHT zusaetzlich per str_contains() gegen den Platzhaltertext
 // selbst. Der Deploy-sed ersetzt JEDES Vorkommen von z.B. "__SMTP_HOST__" in
 // der Datei -- auch eines, das nur als Vergleichstext dienen sollte. Ein
 // frueherer Versuch genau das zu tun verglich den echten Wert am Ende mit

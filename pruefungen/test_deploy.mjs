@@ -590,6 +590,43 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     hinweis !== '' && /::notice::/.test(hinweis)
     && /env\.EFF_GUARDOPS_FTP_HOST\s*==\s*''/.test(hinweis));
 
+  // DIESELBE PRÜFUNG WIE AUF DEM RUNNER, NUR HIER. Der Riegel oben
+  // ("UEBRIG") läuft erst im Deploy -- und hat Lauf 474 rot gefärbt, weil
+  // mailer.php den Platzhalternamen __ANTHROPIC + _API_KEY__ in einem
+  // KOMMENTAR erwähnte. Kein Wert, kein Leck, aber der Deploy bricht ab,
+  // und gemerkt hat es niemand vorher: Die volle Regression war grün.
+  //
+  // Darum hier dieselbe Frage an den Quelltext: Jeder Platzhalter in einer
+  // Datei, die ins guardops-Bündel geht, muss dort entweder ersetzt werden
+  // oder absichtlich stehen bleiben. Ein dritter Fall bricht den Deploy.
+  {
+    // Was kopiert wird, aus den cp-Zeilen des Bau-Schritts gelesen.
+    const quellen = [...bauen.matchAll(/^\s*cp\s+(\S+)\s+dist-guardops\/\S*/gm)]
+      .map(m => m[1]).filter(q => !q.includes('*') && /\.(php|html|txt)$/.test(q));
+    // Was dort ersetzt wird.
+    const ersetzt = new Set([...bauen.matchAll(/sed -i "s\|(__[A-Z_]+__)\|/g)].map(m => m[1]));
+    // Was absichtlich stehen bleibt -- jeweils mit Grund:
+    //   __DB_*__          auf guardops.ch liegt keine Datenbank; ein stehender
+    //                     Platzhalter lässt db() laut scheitern statt still
+    //                     verbinden (ENT-563 Punkt 7).
+    //   __APP_BASIS_URL__ basis_url_pruefen() erkennt ihn und liefert null;
+    //                     die Demo-Mail enthält keinen Link auf die Anlage.
+    //   __DIR__           PHPs eigene Konstante, kein Platzhalter.
+    const absichtlich = /^(__DB_[A-Z]+__|__APP_BASIS_URL__|__DIR__)$/;
+
+    const offen = [];
+    for (const q of quellen) {
+      if (!existsSync(`${WURZEL}/${q}`)) { offen.push(`${q}: Datei fehlt`); continue; }
+      const inhalt = readFileSync(`${WURZEL}/${q}`, 'utf8');
+      for (const p of new Set([...inhalt.matchAll(/__[A-Z][A-Z_]{2,}__/g)].map(m => m[0]))) {
+        if (!ersetzt.has(p) && !absichtlich.test(p)) { offen.push(`${q}: ${p}`); }
+      }
+    }
+    check('KRITISCH: jeder Platzhalter in einer Datei des guardops-Bündels wird dort ersetzt oder bleibt mit Grund stehen',
+      quellen.length >= 5 && offen.length === 0);
+    if (offen.length) { bad.push('bricht den Deploy: ' + offen.join(', ')); }
+  }
+
   // Die beiden Bündel dürfen sich nicht ins Gehege kommen: Der Upload des
   // Rapport-Tools räumt sein Zielverzeichnis auf.
   check('KRITISCH: die beiden Uploads haben verschiedene Quellverzeichnisse',
