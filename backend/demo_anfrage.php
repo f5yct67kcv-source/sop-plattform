@@ -124,3 +124,32 @@ function demo_anfrage_html(array $w, string $eingang): string
         . '<p style="' . $schrift . ';margin:0 0 16px;white-space:pre-wrap">' . ($w['nachricht'] !== '' ? $h($w['nachricht']) : '(keine)') . '</p>'
         . '<p style="' . $schrift . ';margin:0">Antworten direkt an <a href="mailto:' . $h($w['email']) . '" style="' . $schrift . '">' . $h($w['email']) . '</a>.</p>';
 }
+
+// ── Der Empfaenger (seit der eigenen Domain) ──────────────────────────
+//
+// Bis hierher stand er in der Datenbank (betrieb.email, ENT-247). Seit die
+// Homepage auf guardops.ch liegt, gibt es dort keine -- und der Empfaenger
+// kommt aus dem Deploy, genau wie die eigene Adresse in basis_url()
+// (ENT-501). Dieselbe Regel, derselbe Aufbau: eine reine Pruefung, die sich
+// ohne Netz und ohne Datei ausfuehren laesst, und ein duenner Aufrufer
+// darueber, der den vom Deploy ersetzten Platzhalter hineinreicht.
+//
+// EIN NICHT ERSETZTER PLATZHALTER IST "NICHT EINGERICHTET", NICHT "LEER":
+// Beides gibt hier null, und der Endpunkt sagt dazu ausdruecklich 503
+// "noch nicht eingerichtet" statt "fehlgeschlagen" -- ein Interessent soll
+// es nicht "spaeter noch einmal" versuchen, wenn es nie gehen kann.
+function demo_empfaenger_pruefen(string $wert): ?string
+{
+    $wert = trim($wert);
+    if ($wert === '' || str_contains($wert, '__DEMO_EMPFAENGER')) { return null; }
+    // Kein Steuerzeichen und kein Umbruch: Die Adresse steht in einer
+    // Kopfzeile (siehe Festlegung 2 oben).
+    if (preg_match('/[\x00-\x20\x7F]/', $wert)) { return null; }
+    if (filter_var($wert, FILTER_VALIDATE_EMAIL) === false) { return null; }
+    return $wert;
+}
+
+function demo_empfaenger(): ?string
+{
+    return demo_empfaenger_pruefen('__DEMO_EMPFAENGER__');
+}
