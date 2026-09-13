@@ -31,7 +31,10 @@ const workflow = lies('.github/workflows/deploy-hostpoint.yml');
 // zugleich ist der Fehler, den diese Pruefung verhindert.
 {
   const offen = [...new Set([...impressum.matchAll(/__[A-Z][A-Z_]{2,}__/g)].map(m => m[0]))];
-  const imBuendel = /cp\s+impressum\.html\s+dist-guardops\//.test(workflow);
+  // Die echte cp-Zeile, nicht eine Erwaehnung im Kommentar daneben -- die
+  // Gegenprobe hat gezeigt, dass eine blosse Textsuche gruen bleibt, wenn
+  // nur der Kommentar den Dateinamen noch nennt.
+  const imBuendel = /^\s*cp\s+impressum\.html\s+dist-guardops\/\S+$/m.test(workflow);
   check('KRITISCH: das Impressum wird nur ausgeliefert, wenn keine Angabe mehr fehlt',
     offen.length === 0 || !imBuendel);
   if (offen.length) { console.log(`  ! Impressum noch offen: ${offen.join(', ')} — darum nicht im Deploy`); }
@@ -44,7 +47,7 @@ const workflow = lies('.github/workflows/deploy-hostpoint.yml');
     verweistAufImpressum === imBuendel);
   const verweistAufDatenschutz = /href="datenschutz\.html"/.test(homepage);
   check('KRITISCH: die Startseite verweist nur dann auf den Datenschutz, wenn er auch ausgeliefert wird',
-    verweistAufDatenschutz === /cp\s+datenschutz\.html\s+dist-guardops\//.test(workflow));
+    verweistAufDatenschutz === /^\s*cp\s+datenschutz\.html\s+dist-guardops\/\S+$/m.test(workflow));
 }
 
 // ══════════ DIE AUSSAGEN GEGEN DEN CODE ══════════════════════════════

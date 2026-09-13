@@ -505,6 +505,22 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     return workflow.slice(i, j < 0 ? undefined : j);
   };
   const bauen = schritt('Homepage-Buendel fuer guardops.ch bauen');
+  // NUR DIE ECHTEN cp-ZEILEN, nicht der Kommentartext daneben.
+  //
+  // Die erste Fassung dieser Prüfungen fragte "steht der Dateiname irgendwo
+  // im Schritt?". Die Gegenprobe deckte auf, dass das nicht genügt: Nimmt man
+  // die cp-Zeile für recht.css heraus, bleibt der Name im Kommentar darüber
+  // stehen -- und die Prüfung blieb grün, während das Stilblatt live gefehlt
+  // hätte. Genau der Fall, vor dem CLAUDE.md warnt: geprüft wird die Aussage,
+  // nicht der Wortlaut.
+  const cpZeilen = [...bauen.matchAll(/^\s*cp\s+(\S+)\s+(\S+)\s*$/gm)]
+    .map(m => ({ von: m[1], nach: m[2] }));
+  const alsMuster = q => new RegExp('^' + q.split('*')
+    .map(x => x.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('[^/]*') + '$');
+  // Wird diese Quelldatei kopiert? Beherrscht auch "icons/guardops-*.png".
+  const wirdKopiert = pfad => cpZeilen.some(z => alsMuster(z.von).test(pfad));
+  // Landet etwas unter diesem Namen im Bündel?
+  const liegtImBuendel = ziel => cpZeilen.some(z => z.nach === ziel || z.nach === ziel.replace(/[^/]+$/, ''));
   const laden = schritt('Homepage nach guardops.ch hochladen (FTPS)');
   const hinweis = schritt('Hinweis, wenn guardops.ch noch nicht eingerichtet ist');
   const homepage = readFileSync(`${WURZEL}/homepage.html`, 'utf8');
@@ -515,12 +531,16 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
   // Auf der eigenen Domain gehört die Seite auf "/", nicht auf
   // "/homepage.html" -- sonst zeigt guardops.ch ins Leere.
   check('KRITISCH: homepage.html wird als index.html ausgeliefert (die Seite liegt auf der Wurzel der Domain)',
-    /cp\s+homepage\.html\s+dist-guardops\/index\.html/.test(bauen));
+    cpZeilen.some(z => z.von === 'homepage.html' && z.nach === 'dist-guardops/index.html'));
 
-  // Aus der Datei abgeleitet, nicht abgeschrieben: jede Schrift, die
-  // homepage.html per CSS-url() holt.
-  const schriften = [...new Set([...homepage.matchAll(/url\(['"]?(fonts\/[^)'"]+)/g)].map(m => m[1]))];
-  const fehlendeSchriften = schriften.filter(f => !bauen.includes(f.split('/').pop()));
+  // Aus den Dateien abgeleitet, nicht abgeschrieben: jede Schrift, die eine
+  // gebündelte Seite per CSS-url() holt. Seit die Rechtsseiten dazugekommen
+  // sind, ist das nicht mehr nur homepage.html -- recht.css bringt eigene
+  // @font-face-Zeilen mit, und eine davon zu vergessen fiele lokal NICHT auf.
+  const cssQuellen = [...bauen.matchAll(/^\s*cp\s+(\S+\.css)\s+dist-guardops\//gm)].map(m => m[1]);
+  const mitCss = [homepage, ...cssQuellen.map(q => readFileSync(`${WURZEL}/${q}`, 'utf8'))].join('\n');
+  const schriften = [...new Set([...mitCss.matchAll(/url\(['"]?(fonts\/[^)'"]+)/g)].map(m => m[1]))];
+  const fehlendeSchriften = schriften.filter(f => !wirdKopiert(f));
   check('KRITISCH: jede Schrift, die homepage.html lädt, wird ins guardops-Bündel kopiert',
     schriften.length >= 4 && fehlendeSchriften.length === 0);
   if (fehlendeSchriften.length) { bad.push('fehlt im guardops-Bündel: ' + fehlendeSchriften.join(', ')); }
@@ -529,16 +549,15 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
   // <script src>: genau die Lücke, die bei den Favicons schon einmal bestand.
   const icons = [...new Set([...homepage.matchAll(/(?:href|content)="(icons\/[^"]+)"/g)].map(m => m[1]))];
   check('KRITISCH: die Icons der Seite werden ins guardops-Bündel kopiert',
-    icons.length >= 3 && /cp\s+icons\/guardops-\*\.png\s+dist-guardops\/icons\//.test(bauen)
-    && icons.every(i => i.startsWith('icons/guardops-')));
+    icons.length >= 3 && icons.every(i => wirdKopiert(i)));
 
   // Die Einbindungen des Endpunkts, aus dem Endpunkt gelesen.
   const endpunkt = readFileSync(`${WURZEL}/backend/api/demo_senden.php`, 'utf8');
   const noetig = [...endpunkt.matchAll(/require __DIR__ \. '\/\.\.\/([a-z_]+\.php)'/g)].map(m => m[1]);
-  const fehlendeModule = noetig.filter(m => !new RegExp(`dist-guardops/${m.replace('.', '\\.')}`).test(bauen));
+  const fehlendeModule = noetig.filter(m => !liegtImBuendel(`dist-guardops/${m}`));
   check('KRITISCH: jede Datei, die der Endpunkt einbindet, liegt im guardops-Bündel',
     noetig.length >= 3 && fehlendeModule.length === 0
-    && /dist-guardops\/api\/demo_senden\.php/.test(bauen));
+    && liegtImBuendel('dist-guardops/api/demo_senden.php'));
   if (fehlendeModule.length) { bad.push('Einbindung fehlt im guardops-Bündel: ' + fehlendeModule.join(', ')); }
 
   // Heute lädt homepage.html kein eigenes Skript -- alles steht inline. Die
@@ -547,7 +566,7 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
   // Deploy fallen, und seit die Seite nicht mehr in "seiten" oben steht,
   // würde ihn sonst niemand mehr abfangen.
   const skripte = [...new Set([...homepage.matchAll(/<script[^>]+src="(?!https?:)([^"]+)"/g)].map(m => m[1]))];
-  const fehlendeSkripte = skripte.filter(j => !bauen.includes(j));
+  const fehlendeSkripte = skripte.filter(j => !wirdKopiert(j));
   check('KRITISCH: jedes eigene Skript, das homepage.html lädt, kommt ins guardops-Bündel',
     fehlendeSkripte.length === 0);
   if (fehlendeSkripte.length) { bad.push('Skript fehlt im guardops-Bündel: ' + fehlendeSkripte.join(', ')); }
@@ -558,9 +577,35 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
   check('KRITISCH: homepage.html wird NICHT mehr auf die Testinstanz ausgeliefert',
     !/cp\s+homepage\.html\s+dist\/homepage\.html/.test(workflow));
 
+  // Jede gebündelte HTML-Seite: ihr Stilblatt muss mit, und jeder Verweis
+  // auf eine Nachbarseite muss eine Datei treffen, die AUCH im Bündel liegt.
+  // Ein Verweis auf eine Seite, die es im Repository gibt, aber nicht auf dem
+  // Server, ist live ein 404 -- und lokal fällt genau das nicht auf.
+  {
+    const seitenImBuendel = [...bauen.matchAll(/^\s*cp\s+(\S+\.html)\s+dist-guardops\/(\S+)/gm)]
+      .map(m => ({ quelle: m[1], ziel: m[2].split('/').pop() }));
+    const zielNamen = new Set(seitenImBuendel.map(x => x.ziel));
+    const fehlendeStile = [], insLeere = [];
+    for (const { quelle } of seitenImBuendel) {
+      const inhalt = readFileSync(`${WURZEL}/${quelle}`, 'utf8').replace(/<!--[\s\S]*?-->/g, '');
+      for (const m of inhalt.matchAll(/<link[^>]*rel="stylesheet"[^>]*href="(?!https?:)([^"]+)"/g)) {
+        if (!wirdKopiert(m[1])) { fehlendeStile.push(`${quelle}: ${m[1]}`); }
+      }
+      for (const m of inhalt.matchAll(/href="(?!https?:|mailto:|#)([a-z0-9_-]+\.html)"/g)) {
+        if (!zielNamen.has(m[1])) { insLeere.push(`${quelle}: ${m[1]}`); }
+      }
+    }
+    check('KRITISCH: jedes Stilblatt einer gebündelten Seite kommt mit ins Bündel',
+      seitenImBuendel.length >= 3 && fehlendeStile.length === 0);
+    if (fehlendeStile.length) { bad.push('Stilblatt fehlt: ' + fehlendeStile.join(', ')); }
+    check('KRITISCH: kein Verweis zwischen den gebündelten Seiten zeigt auf eine Datei, die nicht mitgeliefert wird',
+      insLeere.length === 0);
+    if (insLeere.length) { bad.push('live ein 404: ' + insLeere.join(', ')); }
+  }
+
   check('KRITISCH: die eigene .htaccess und robots.txt der Domain werden mitgeliefert',
-    /cp\s+htaccess-guardops\s+dist-guardops\/\.htaccess/.test(bauen)
-    && /cp\s+robots-guardops\.txt\s+dist-guardops\/robots\.txt/.test(bauen)
+    cpZeilen.some(z => z.von === 'htaccess-guardops' && z.nach === 'dist-guardops/.htaccess')
+    && cpZeilen.some(z => z.von === 'robots-guardops.txt' && z.nach === 'dist-guardops/robots.txt')
     && existsSync(`${WURZEL}/htaccess-guardops`) && existsSync(`${WURZEL}/robots-guardops.txt`));
 
   // robots.txt der Verkaufsseite sagt das GEGENTEIL von robots-staging.txt:
@@ -624,7 +669,7 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
   {
     // Was kopiert wird, aus den cp-Zeilen des Bau-Schritts gelesen.
     const quellen = [...bauen.matchAll(/^\s*cp\s+(\S+)\s+dist-guardops\/\S*/gm)]
-      .map(m => m[1]).filter(q => !q.includes('*') && /\.(php|html|txt)$/.test(q));
+      .map(m => m[1]).filter(q => !q.includes('*') && /\.(php|html|txt|css)$/.test(q));
     // Was dort ersetzt wird.
     const ersetzt = new Set([...bauen.matchAll(/sed -i "s\|(__[A-Z_]+__)\|/g)].map(m => m[1]));
     // Was absichtlich stehen bleibt -- jeweils mit Grund:

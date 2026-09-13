@@ -682,6 +682,13 @@ jobs:
           cp backend/mailer.php          dist-guardops/mailer.php
           cp backend/demo_anfrage.php    dist-guardops/demo_anfrage.php
           cp backend/demo_bremse.php     dist-guardops/demo_bremse.php
+          # Rechtsseiten (OP-564). Beide teilen sich recht.css -- zweimal
+          # derselbe Stil inline hiesse, dass beim naechsten Farbwechsel
+          # eine von beiden vergessen wird. test_deploy.mjs leitet aus den
+          # Seiten ab, welche Stilblaetter und Schriften mitmuessen.
+          cp impressum.html              dist-guardops/impressum.html
+          cp datenschutz.html            dist-guardops/datenschutz.html
+          cp recht.css                   dist-guardops/recht.css
           cp htaccess-guardops           dist-guardops/.htaccess
           cp robots-guardops.txt         dist-guardops/robots.txt
 
