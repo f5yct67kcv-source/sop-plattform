@@ -108,6 +108,46 @@ check('KRITISCH: der Demo-Knopf ist blau, nicht bernsteinfarben', kb > kr + 60 &
 check('Bernstein meldet -- nur der laufende Rundgang traegt die Warnfarbe des Cockpits, die uebrigen Zeilen Blau',
   farben.live === rgb(marke(dunkel, 'warn')) && farben.andereZeile === rgb(marke(dunkel, 'accent')));
 
+// ── Die Marke (ENT-469-N2). Gemessen, nicht im Quelltext nachgelesen:
+// Der Name steht an einer Stelle (BRAND) und muss ueberall derselbe sein;
+// die Bildmarke ist hochformatig und darf nicht zum Quadrat gestaucht werden.
+const markeGemessen = await desktop.evaluate(() => {
+  const namen = [...document.querySelectorAll('[data-brand]')].map(e => e.textContent.trim());
+  const schild = document.querySelector('.kopf .marke svg').getBoundingClientRect();
+  const wort = getComputedStyle(document.querySelector('.kopf .wortmarke'));
+  const symbol = document.querySelector('#marke');
+  return {
+    namen, titel: document.title,
+    seitenverhaeltnis: schild.width / schild.height,
+    sollverhaeltnis: (() => { const v = symbol.getAttribute('viewBox').split(/\s+/).map(Number); return v[2] / v[3]; })(),
+    hoehe: schild.height,
+    versalien: wort.textTransform,
+  };
+});
+check('KRITISCH: der Markenname steht an EINER Stelle -- alle Auszeichnungen zeigen denselben Text',
+  markeGemessen.namen.length >= 8 && new Set(markeGemessen.namen).size === 1 && markeGemessen.namen[0].length > 2);
+check('KRITISCH: kein Platzhaltername mehr auf der Seite oder im Titel',
+  !/wachtwerk/i.test(markeGemessen.namen[0] + ' ' + markeGemessen.titel));
+check('Der Seitentitel traegt den Markennamen', markeGemessen.titel.startsWith(markeGemessen.namen[0]));
+check('KRITISCH: die Bildmarke wird im eigenen Seitenverhaeltnis gezeigt, nicht gestaucht',
+  Math.abs(markeGemessen.seitenverhaeltnis - markeGemessen.sollverhaeltnis) < 0.02 && markeGemessen.hoehe > 20);
+check('Die Wortmarke steht gemischt wie im Logo, nicht in Versalien', markeGemessen.versalien === 'none');
+
+// Und der Name steht auch OHNE JavaScript da. Genau hier ist die erste
+// Fassung durchgerutscht: Ein Skript setzte den Namen beim Laden, der
+// Quelltext trug noch den Platzhalter -- mit abgeschaltetem JavaScript haette
+// der Besucher den falschen Namen gesehen, und keine Pruefung haette es
+// gemerkt, weil alle am gerenderten Zustand MIT Skript messen.
+{
+  const ohne = await browser.newContext({ javaScriptEnabled: false });
+  const seite = await ohne.newPage();
+  await seite.goto(SEITE, { waitUntil: 'load' });
+  const namen = await seite.evaluate(() => [...document.querySelectorAll('[data-brand]')].map(e => e.textContent.trim()));
+  check('KRITISCH: der Markenname steht auch ohne JavaScript ueberall gleich da',
+    namen.length >= 8 && new Set(namen).size === 1 && namen[0] === markeGemessen.namen[0]);
+  await ohne.close();
+}
+
 const masseDesktop = await desktop.evaluate(() => ({
   ueberlauf: document.documentElement.scrollWidth - document.documentElement.clientWidth,
   kopfKnoepfe: [...document.querySelectorAll('.kopf .btn')].filter(b => b.getBoundingClientRect().width > 0).length,
