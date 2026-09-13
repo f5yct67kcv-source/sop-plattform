@@ -179,6 +179,27 @@ const alsGlobPassend = (pfad, zeile) => {
 };
 const kopierteQuellen = [...workflow.matchAll(/^\s*cp\s+(\S+)\s+dist\//gm)].map(m => m[1]);
 
+/* Dasselbe fuer Dateien, die per <link> haengen -- Favicon, Apple-Touch-Icon,
+   das Bild fuer die Teilen-Vorschau (ENT-562). Dieselbe Luecke wie bei den
+   Schriften: Fehlt das Favicon auf dem Server, kracht nichts, der Browser
+   zeigt nur sein leeres Blatt -- und lokal faellt es NICHT auf, weil die
+   Datei im Arbeitsverzeichnis ja liegt. */
+for (const seite of seiten) {
+  const html = readFileSync(`${WURZEL}/${seite}`, 'utf8');
+  const quellen = [
+    ...[...html.matchAll(/<link[^>]+href="([^"]+)"/g)].map(m => m[1]),
+    ...[...html.matchAll(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/g)].map(m => m[1]),
+  ]
+    .filter((q, i, arr) => arr.indexOf(q) === i)
+    .filter(q => !/^(https?:|data:|#)/.test(q))
+    .map(q => q.replace(/^\.?\//, ''));
+  for (const q of quellen) {
+    check(`${seite} verweist auf ${q} — die Datei gibt es`, existsSync(`${WURZEL}/${q}`));
+    check(`KRITISCH: ${q} wird auch deployt (per <link>/og:image von ${seite} verwiesen)`,
+      kopierteQuellen.some(zeile => alsGlobPassend(q, zeile)));
+  }
+}
+
 for (const seite of seiten) {
   const html = readFileSync(`${WURZEL}/${seite}`, 'utf8');
   const quellen = [...html.matchAll(/url\(\s*['"]?([^'")]+)['"]?\s*\)/g)].map(m => m[1].trim())

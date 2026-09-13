@@ -4,17 +4,38 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!--
-  OEFFENTLICHE HOMEPAGE (ENT-469). Entwurf und Begleitnotiz liegen im
-  Projekt-Repository unter 02-gate2-produkt-mvp/homepage-entwurf*.
-  Produktname und Logo sind PLATZHALTER (OP-18): Der Name steht in der
-  Konstante BRAND am Dateiende und in allen <span data-brand>-Stellen, das
-  Logo als <symbol id="marke">. Alle Personen, Kunden und Objekte in den
-  Bildschirmen sind erfunden. Diese Seite laedt keinen Produktcode; ihre
-  einzige Verbindung zum Server ist das Demo-Formular (api/demo_senden.php).
+  OEFFENTLICHE HOMEPAGE (ENT-469, Marke seit ENT-562). Entwurf und
+  Begleitnotiz liegen im Projekt-Repository unter
+  02-gate2-produkt-mvp/homepage-entwurf*.
+
+  MARKE: Der Name GuardOpS steht in der Konstante BRAND am Dateiende und in
+  allen <span data-brand>-Stellen; Die Original-SVG fehlt noch, siehe unten.
+
+  DIE BILDMARKE IN <symbol id="marke"> IST NACHGEZEICHNET, nicht das
+  Original: Die Original-SVG liess sich nicht uebermitteln (der Chat nimmt
+  keine SVG an), darum aus icons/guardops-1024 vermessen und als Polygon
+  nachgebaut -- reine Geraden, 18 Punkte. Gegen das Original gerendert und
+  pixelweise verglichen: 99.3 % Deckung, die Abweichung sind einzelne
+  Kantenpixel an den Schraegen (Rasterung, kein Geometriefehler). SOBALD DIE
+  ORIGINAL-SVG VORLIEGT, wird dieser Pfad dadurch ersetzt.
+
+  DIE WORTMARKE IST GESETZT, NICHT DAS ORIGINAL: Der Schriftzug im Logo
+  steht in einer runden geometrischen Grotesk, die hier nicht vorliegt.
+  Bis dahin steht "GuardOpS" in Archivo -- sichtbar eine andere Schrift.
+
+  Alle Personen, Kunden und Objekte in den Bildschirmen sind erfunden. Diese
+  Seite laedt keinen Produktcode; ihre einzige Verbindung zum Server ist das
+  Demo-Formular (api/demo_senden.php).
 -->
-<title>Wachtwerk – Betriebssoftware für Schweizer Sicherheitsdienste</title>
+<title>GuardOpS – Betriebssoftware für Schweizer Sicherheitsdienste</title>
 <meta name="description" content="Einsatzplanung, Mitarbeiter-App, Revierdienst, Kundenportal, Offerten und Rechnungen in einer Software – für kleine und mittlere Sicherheitsdienste in der Schweiz, mit dem GAV Sicherheit im Kern.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230F1117'/%3E%3Ccircle cx='16' cy='16' r='10' fill='none' stroke='%23EEF1F7' stroke-width='2.4' stroke-dasharray='47 16' stroke-linecap='round' transform='rotate(20 16 16)'/%3E%3Ccircle cx='16' cy='16' r='3.4' fill='%23EEF1F7'/%3E%3Ccircle cx='25' cy='11.8' r='2.4' fill='%23E2B156'/%3E%3C/svg%3E">
+<link rel="icon" href="icons/guardops-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="icons/guardops-16.png" sizes="16x16" type="image/png">
+<link rel="apple-touch-icon" href="icons/guardops-180.png">
+<meta property="og:type" content="website">
+<meta property="og:title" content="GuardOpS – Betriebssoftware für Schweizer Sicherheitsdienste">
+<meta property="og:description" content="Einsatzplanung, Mitarbeiter-App, Revierdienst, Kundenportal, Offerten und Rechnungen in einer Software – mit dem GAV Sicherheit im Kern.">
+<meta property="og:image" content="icons/guardops-512.png">
 <style>
 /* Schriften selbst ausgeliefert (wie Inter fuer das Cockpit, ENT-223/OP-224):
    Kein Abruf bei Google von der oeffentlichen Seite aus. Lateinischer
@@ -111,8 +132,11 @@ p{margin:0 0 1em}
 .kopf.fest{border-bottom-color:var(--nacht-linie)}
 .kopf .wrap{display:flex;align-items:center;justify-content:space-between;height:72px;gap:24px}
 .marke{display:inline-flex;align-items:center;gap:12px;color:var(--stahl-hi)}
-.marke svg{width:30px;height:30px}
-.wortmarke{font-family:var(--display);font-stretch:115%;font-weight:700;letter-spacing:.16em;font-size:15px;text-transform:uppercase}
+/* 460:593 aus dem Original -- Breite folgt der Hoehe, sonst staucht das Schild. */
+.marke svg{height:30px;width:23.3px}
+/* Gesetzt, nicht das Original (siehe Dateikopf): gemischt wie im Logo,
+   nicht in Versalien -- "GUARDOPS" waere neben der echten Marke falsch. */
+.wortmarke{font-family:var(--display);font-stretch:103%;font-weight:600;letter-spacing:.005em;font-size:20px}
 .kopf nav{display:flex;align-items:center;gap:4px}
 .kopf nav a{font-size:15px;color:var(--stahl-2);padding:10px 14px;border-radius:4px;transition:color .15s;white-space:nowrap}
 .kopf nav .btn{display:none}
@@ -272,7 +296,7 @@ p{margin:0 0 1em}
 .po-scroll > *{min-width:560px}
 .po-kopf{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--p-line);background:var(--p-bg)}
 .po-kopf b{font-weight:600;display:flex;align-items:center;gap:8px}
-.po-kopf b svg{width:16px;height:16px;color:var(--p-accent)}
+.po-kopf b svg{height:16px;width:12.4px;color:var(--p-accent)}
 .po-kopf span{font-size:12px;color:var(--p-ink2)}
 .po-titel{padding:16px 18px 6px;font-weight:600;font-size:14px;display:flex;justify-content:space-between;align-items:baseline}
 .po-titel span{font-weight:400;font-size:12px;color:var(--p-ink3)}
@@ -507,10 +531,13 @@ p{margin:0 0 1em}
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <defs>
     <!-- Platzhalter-Marke: Kontrollpunkt-Ring mit Leuchte -->
-    <symbol id="marke" viewBox="0 0 32 32">
-      <circle cx="16" cy="16" r="12.5" fill="none" stroke="currentColor" stroke-width="2.7" stroke-dasharray="59 19.5" stroke-linecap="round" transform="rotate(20 16 16)"/>
-      <circle cx="16" cy="16" r="4.3" fill="currentColor"/>
-      <circle cx="27.3" cy="10.7" r="2.9" fill="#E2B156"/>
+    <!-- Schild-G, nachgezeichnet aus icons/guardops-1024 (siehe Dateikopf).
+         Ein einziger geschlossener Streckenzug: Aussenkante des Schilds, durch
+         die Oeffnung rechts in die Innenkante, um den Innenraum herum und ueber
+         den Querbalken zurueck. currentColor, damit dieselbe Marke auf dunklem
+         und hellem Grund sitzt. -->
+    <symbol id="marke" viewBox="0 0 460 593">
+      <path fill="currentColor" d="M230 0 460 79 460 154 416 154 416 109.9 230 46 44 109.9 44 364.4 230 535 416 364.4 416 308 206 308 233 264 460 264 460 382 230 593 0 382 0 79Z"/>
     </symbol>
     <symbol id="i-haken" viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-pfeil" viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
@@ -537,7 +564,7 @@ p{margin:0 0 1em}
 
 <header class="kopf" id="kopf">
   <div class="wrap">
-    <a class="marke" href="#" aria-label="Wachtwerk – Startseite"><svg><use href="#marke"/></svg><span class="wortmarke" data-brand>Wachtwerk</span></a>
+    <a class="marke" href="#" aria-label="GuardOpS – Startseite"><svg><use href="#marke"/></svg><span class="wortmarke" data-brand>GuardOpS</span></a>
     <nav id="nav" aria-label="Hauptnavigation">
       <a href="#ein-tag">Ein Tag</a>
       <a href="#module">Module</a>
@@ -574,7 +601,7 @@ p{margin:0 0 1em}
     </div>
     <div class="held-bild">
       <div class="cockpit" role="img" aria-label="Cockpit im dunklen Thema: Symbolleiste oben, Einsätze der Woche mit Kennzahlen, Ereignissen und Zuteilung. Beispieldaten.">
-        <div class="ck-chrome"><i></i><i></i><i></i><div class="url">cockpit.wachtwerk.ch/planung</div></div>
+        <div class="ck-chrome"><i></i><i></i><i></i><div class="url">cockpit.guardops.ch/planung</div></div>
         <div class="ck-top">
           <div class="ck-nav">
             <span><svg><use href="#i-raster"/></svg>Übersicht</span>
@@ -647,7 +674,7 @@ p{margin:0 0 1em}
       </div>
       <div class="vn-pfeil" aria-hidden="true"><svg><use href="#i-pfeil"/></svg></div>
       <div class="vn-neu">
-        <div class="marke"><svg><use href="#marke"/></svg><span class="wortmarke" data-brand>Wachtwerk</span></div>
+        <div class="marke"><svg><use href="#marke"/></svg><span class="wortmarke" data-brand>GuardOpS</span></div>
         <ul>
           <li>Einsatzplanung</li><li>Mitarbeiter-App</li><li>Rapport &amp; Abgleich</li><li>Revierdienst</li><li>Kundenportal</li><li>Offerten &amp; Rechnungen</li><li>Personal &amp; Abwesenheiten</li><li>Fahrzeuge &amp; Auslagen</li>
         </ul>
@@ -662,7 +689,7 @@ p{margin:0 0 1em}
   <div class="wrap">
     <div class="kopfzeile">
       <div>
-        <p class="vorzeile">Ein Tag mit <span data-brand>Wachtwerk</span></p>
+        <p class="vorzeile">Ein Tag mit <span data-brand>GuardOpS</span></p>
         <h2 class="display">Von 06:40 bis zur Rechnung.</h2>
       </div>
       <p class="lead">Von der Planung am Morgen über den Rundgang in der Nacht bis zur Rechnung am Monatsende: Jede Station schreibt in dieselbe Datenbasis. Nichts wird abgetippt, nichts geht per Chat verloren.</p>
@@ -1027,7 +1054,7 @@ p{margin:0 0 1em}
   <div class="wrap">
     <p class="vorzeile">Warum es das gibt</p>
     <h2 class="display">Gebaut im Betrieb, nicht am Reissbrett.</h2>
-    <p class="lead"><span data-brand>Wachtwerk</span> ist im laufenden Betrieb eines Schweizer Sicherheitsdienstes entstanden – mit zwei Sparten, Nachtschichten, Verkehrsdiensten und einem GAV, der keine Annahmen verzeiht. Jede Funktion ist da, weil sie im Alltag gefehlt hat. Und jede, die niemand brauchte, ist weggeblieben.</p>
+    <p class="lead"><span data-brand>GuardOpS</span> ist im laufenden Betrieb eines Schweizer Sicherheitsdienstes entstanden – mit zwei Sparten, Nachtschichten, Verkehrsdiensten und einem GAV, der keine Annahmen verzeiht. Jede Funktion ist da, weil sie im Alltag gefehlt hat. Und jede, die niemand brauchte, ist weggeblieben.</p>
     <div class="unter">
       <div><b>Kleinstmögliche Software</b>Nicht möglichst viel Software, sondern die kleinste, die ein echtes Problem zuverlässig löst.</div>
       <div><b>Unbekannt ist nicht «keine»</b>Nicht eingerichtet, kein Zugriff, nichts vorhanden und kein Treffer sind vier verschiedene Aussagen – und bekommen vier verschiedene Texte.</div>
@@ -1047,7 +1074,7 @@ p{margin:0 0 1em}
     </div>
     <div class="faq">
       <details open>
-        <summary><span class="frage">Für welche Betriebe ist <span data-brand>Wachtwerk</span> gedacht?</span></summary>
+        <summary><span class="frage">Für welche Betriebe ist <span data-brand>GuardOpS</span> gedacht?</span></summary>
         <p>Für kleine und mittlere Sicherheitsdienste in der Schweiz: Bewachung, Veranstaltungs- und Verkehrsdienst, Revierdienst. Betriebe mit einer zweiten Sparte, etwa Reinigung, planen beide getrennt in derselben Software.</p>
       </details>
       <details>
@@ -1063,7 +1090,7 @@ p{margin:0 0 1em}
         <p>Nein, und das ist Absicht. Sie führt Rohzeit, Nettozeit, Zeitbonus und Auslagenersatz getrennt und nachvollziehbar – als Grundlage für Ihr Lohnprogramm oder Ihre Treuhandstelle. Frankenbeträge für den Lohn entstehen dort, nicht hier.</p>
       </details>
       <details>
-        <summary><span class="frage">Ersetzt <span data-brand>Wachtwerk</span> unser Rundgang-System?</span></summary>
+        <summary><span class="frage">Ersetzt <span data-brand>GuardOpS</span> unser Rundgang-System?</span></summary>
         <p>Ja. Kontrollpunkte per NFC oder Geofence, Runden mit Zeitfenster, Aufgaben, Ereignisse mit Foto – und im Unterschied zur Insellösung mit Verbindung zu Planung, Kundenportal und Abrechnung.</p>
       </details>
       <details>
@@ -1071,7 +1098,7 @@ p{margin:0 0 1em}
         <p>Auf Servern in der Schweiz, verschlüsselt übertragen, mit Zwei-Faktor-Anmeldung für Verwaltungszugänge. Für die optionalen Diktat- und Recherchefunktionen wird ein externer KI-Anbieter angebunden – wer sie nicht will, betreibt die Software ohne.</p>
       </details>
       <details>
-        <summary><span class="frage">Was kostet <span data-brand>Wachtwerk</span>?</span></summary>
+        <summary><span class="frage">Was kostet <span data-brand>GuardOpS</span>?</span></summary>
         <p>Das hängt von der Zahl der Mitarbeitenden und den gewählten Modulen ab. Wir zeigen es Ihnen an Ihrem eigenen Beispiel – fragen Sie eine Demo an.</p>
       </details>
     </div>
@@ -1120,7 +1147,7 @@ p{margin:0 0 1em}
   <div class="wrap">
     <div class="oben">
       <div>
-        <a class="marke" href="#"><svg><use href="#marke"/></svg><span class="wortmarke" data-brand>Wachtwerk</span></a>
+        <a class="marke" href="#"><svg><use href="#marke"/></svg><span class="wortmarke" data-brand>GuardOpS</span></a>
         <p>Betriebssoftware für Sicherheitsdienste. Einsatzplanung, Mitarbeiter-App, Revierdienst, Kundenportal, Offerten und Rechnungen – in der Schweiz gebaut und betrieben.</p>
       </div>
       <div>
@@ -1137,7 +1164,7 @@ p{margin:0 0 1em}
       </div>
     </div>
     <div class="unten">
-      <span>© 2026 <span data-brand>Wachtwerk</span> · Alle Angaben ohne Gewähr</span>
+      <span>© 2026 <span data-brand>GuardOpS</span> · Alle Angaben ohne Gewähr</span>
       <span class="ch"><i aria-hidden="true"></i>Entwickelt und betrieben in der Schweiz</span>
     </div>
   </div>
@@ -1145,10 +1172,10 @@ p{margin:0 0 1em}
 
 <script>
 (function(){
-  // Platzhalter-Name: hier einmal ändern.
-  var BRAND = 'Wachtwerk';
-  var stellen = document.querySelectorAll('[data-brand]');
-  for (var i = 0; i < stellen.length; i++) stellen[i].textContent = BRAND;
+  // Der Markenname steht im HTML, nicht hier: Er ist seit ENT-562
+  // entschieden und keine Variable mehr. Ein Skript, das ihn beim Laden
+  // setzt, hiesse -- ohne JavaScript steht der falsche Name da. Die
+  // Auszeichnung data-brand bleibt, damit die Pruefung alle Stellen findet.
 
   var kopf = document.getElementById('kopf');
   var nav = document.getElementById('nav');
