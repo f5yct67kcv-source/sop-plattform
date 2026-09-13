@@ -67,6 +67,17 @@ function versuch_link_zu_verschicken(PDO $pdo, string $name): void
 {
     if (!hat_tabelle($pdo, 'passwort_reset') || !smtp_konfiguriert()) { return; }
 
+    // Ohne eigene Adresse kein Link (ENT-501). Geprueft VOR dem Anlegen des
+    // Tokens: Ein Token, das nie verschickt wird, waere ein offener
+    // Eintrag ohne Zweck. Der Fehlfall wird protokolliert und nicht
+    // verschwiegen -- nach aussen bleibt die Antwort gleichlautend, sonst
+    // verriete gerade dieser Zweig, dass es das Konto gibt.
+    $basis = basis_url();
+    if ($basis === null) {
+        error_log('Passwort-Ruecksetzung: APP_BASIS_URL ist nicht gesetzt — kein Link verschickt.');
+        return;
+    }
+
     $s = $pdo->prepare('SELECT id, ist_admin, email, email_privat, vorname, nachname FROM mitarbeiter WHERE name = ? AND aktiv = 1');
     $s->execute([$name]);
     $person = $s->fetch(PDO::FETCH_ASSOC);
@@ -105,8 +116,10 @@ function versuch_link_zu_verschicken(PDO $pdo, string $name): void
          VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 30 MINUTE))'
     )->execute([$id, $tokenHash]);
 
-    $host = (string)($_SERVER['HTTP_HOST'] ?? '');
-    $link = 'https://' . $host . '/app.html?reset=' . urlencode($tokenRoh);
+    // Die Basisadresse kommt aus dem Deploy, NICHT aus dem Host-Kopf der
+    // Anfrage (ENT-501) -- den setzt der Aufrufer, und dieser Endpunkt
+    // braucht keine Anmeldung.
+    $link = $basis . '/app.html?reset=' . urlencode($tokenRoh);
 
     $betrieb = $pdo->query('SELECT firma FROM betrieb WHERE id = 1')->fetch();
     $firma = trim((string)($betrieb['firma'] ?? '')) ?: 'Die Verwaltung';

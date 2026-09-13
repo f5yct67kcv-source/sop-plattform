@@ -25,12 +25,27 @@ if ($text === '') {
 
 $ergebnis = anthropic_recherche_kunde($text);
 if ($ergebnis === null) {
-    json_response(['status' => 'error', 'message' => 'Recherche nicht verfuegbar oder ohne Ergebnis'], 502);
+    // „Kein Ergebnis" heisst hier etwas anderes als bei der Erkennung: Der
+    // Aufruf lief, es liess sich nur keine Firma zuordnen. Alle uebrigen
+    // Gruende (kein Schluessel, abgelehnt, Guthaben, Stoerung) sind dieselben
+    // und bleiben beim gemeinsamen Text.
+    ki_fehler_melden(ki_fehlergrund() === 'kein_ergebnis'
+        ? 'Zu dieser Angabe liess sich keine Firma ermitteln. Bitte die Felder von Hand eintragen.'
+        : null);
 }
 
 $felder = [];
 foreach (['name', 'strasse', 'hausnummer', 'plz', 'ort', 'telefon', 'email', 'webseite', 'uid'] as $f) {
     $wert = trim((string)($ergebnis[$f] ?? ''));
+    // Dieselbe Sperre wie bei 'quellen' weiter unten, die es hier bis
+    // ENT-501 nicht gab: Auch 'webseite' geht als Link in die Oberflaeche
+    // (Kontaktweg der Art 'webseite', app.html). Der Unterschied zu den
+    // uebrigen Feldern ist wesentlich -- ein falscher Ortsname ist ein
+    // Fehler, ein falsches Schema ist eine Tuer. Und der Wert stammt hier
+    // nicht einmal aus dem Haus: Das Modell durchsucht dafuer das Netz.
+    if ($f === 'webseite' && $wert !== '') {
+        $wert = web_adresse_sicher($wert) ?? '';
+    }
     if ($wert !== '') {
         $felder[$f] = $wert;
     }

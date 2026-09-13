@@ -21,8 +21,24 @@ $input = json_decode(file_get_contents('php://input'), true) ?? [];
 $name = trim((string)($input['name'] ?? ''));
 $password = (string)($input['password'] ?? '');
 
-if ($name === '' || strlen($password) < 6) {
-    json_response(['status' => 'error', 'message' => 'Name erforderlich, Passwort mindestens 6 Zeichen'], 400);
+if ($name === '') {
+    json_response(['status' => 'error', 'message' => 'Name erforderlich'], 400);
+}
+// Dieselbe Regel wie ueberall sonst (ENT-502). Bis hierher stand hier ein
+// eigenes "strlen < 6" -- und damit entstand ausgerechnet das ERSTE Konto
+// der Anlage, das per Definition ein Verwaltungszugang ist (ist_admin = 1
+// weiter unten), an der Passwortregel vorbei. Aufgefallen beim
+// Zurueckdrehen der Erprobungs-Absenkung: test_passwortfelder.mjs
+// beanstandete den Text in setup.html, und dahinter lag die Pruefung, die
+// es gar nicht gab.
+//
+// istAdmin = true, weil dieses Konto eines ist. Damit gilt hier
+// PASSWORT_MIN_ADMIN, nicht die kuerzere Laenge. passwort_pruefen() kommt
+// aus anmeldung.php, das oben ohnehin schon fuer PASSWORT_KOSTEN
+// eingebunden ist.
+$pwFehler = passwort_pruefen($password, $name, true);
+if ($pwFehler !== null) {
+    json_response(['status' => 'error', 'message' => $pwFehler], 400);
 }
 
 $hash = password_hash($password, PASSWORD_DEFAULT, ['cost' => PASSWORT_KOSTEN]);

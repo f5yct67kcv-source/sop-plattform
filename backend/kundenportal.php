@@ -111,6 +111,31 @@ function kp_runde_sichtbar(int $objektId, array $objektIds, bool $laeuft): bool
     return in_array($objektId, $objektIds, true);
 }
 
+// Darf der Kunde diesen EINSATZ sehen? (Verkehrsdienst-Teil, ENT-482.)
+//
+//   (a) Der Einsatz gehoert ihm -- entweder direkt ueber einsaetze.kunde_id
+//       oder ueber ein Objekt aus kp_objekt_ids(). BEIDE Wege, nicht einer:
+//       Ein Verkehrsdienst-Einsatz hat meistens gar kein Objekt
+//       (einsaetze.objekt_id darf NULL sein, "freier Einsatz ohne Objekt"),
+//       ein Revierdienst-Einsatz hat eines. Nur ueber Objekte zu gehen --
+//       wie ENT-441 Punkt 4 es beschrieb -- liesse die Liste ausgerechnet
+//       beim Verkehrsdienst leer.
+//   (b) Der Kunde hat unterschrieben. Was er selbst gegengezeichnet hat,
+//       darf er nachlesen (ENT-441 Punkt 5); die Unterschrift haengt seit
+//       ENT-160 am Einsatz, nicht am einzelnen Rapport.
+//
+// KEIN Rueckgriff auf einsaetze.kunde_name: Das ist Freitext, genau wie
+// rapporte.kunde. Ein Tippfehler zeigte einem Kunden ein fremdes Blatt.
+//
+// Reine Funktion ohne Datenbank, damit `pruefungen/` sie ausfuehren kann.
+function kp_einsatz_sichtbar(?int $einsatzKundeId, int $sitzungKundeId,
+                             ?int $objektId, array $objektIds, bool $unterschrieben): bool
+{
+    if (!$unterschrieben) { return false; }
+    if ($einsatzKundeId !== null && $einsatzKundeId === $sitzungKundeId) { return true; }
+    return $objektId !== null && in_array($objektId, $objektIds, true);
+}
+
 // E-Mail-Adressen werden zum Nachschlagen kleingeschrieben und beschnitten.
 // Ohne das meldet sich niemand an, der seine Adresse gross tippt -- und der
 // Fehler saehe aus wie "Zugang gibt es nicht".
@@ -139,6 +164,10 @@ function require_kundensession(): array
     if (!$token) {
         json_response(['status' => 'error', 'message' => 'kein Token'], 401);
     }
+    // Verglichen wird der Abdruck, nicht der Rohwert (ENT-501) -- wie bei
+    // der Verwaltungssitzung in db.php. In kunden_sessions.token steht
+    // seither nur noch SHA-256.
+    $abdruck = sitzung_abdruck((string)$token);
     $pdo = db();
     if (!kp_tabellen_da($pdo)) {
         // Kein stilles "nicht angemeldet": Die Einrichtung ist nicht
@@ -154,7 +183,7 @@ function require_kundensession(): array
            JOIN kunden k ON k.id = z.kunde_id
           WHERE s.token = ? AND z.aktiv = 1'
     );
-    $stmt->execute([$token]);
+    $stmt->execute([$abdruck]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$row) {
         json_response(['status' => 'error',
@@ -165,7 +194,7 @@ function require_kundensession(): array
     $geboren = strtotime((string)$row['erstellt_am']) ?: $jetzt;
     $gesehen = strtotime((string)$row['letzte_nutzung']) ?: $geboren;
     if (kp_sitzung_abgelaufen($geboren, $gesehen, $jetzt)) {
-        $pdo->prepare('DELETE FROM kunden_sessions WHERE token = ?')->execute([$token]);
+        $pdo->prepare('DELETE FROM kunden_sessions WHERE token = ?')->execute([$abdruck]);
         json_response(['status' => 'error',
             'message' => 'Die Anmeldung ist abgelaufen — bitte neu anmelden.'], 401);
     }
@@ -174,7 +203,7 @@ function require_kundensession(): array
     // mehrere Endpunkte auf einmal (gleiche Ueberlegung wie in db.php).
     if ($jetzt - $gesehen > 300) {
         $pdo->prepare('UPDATE kunden_sessions SET letzte_nutzung = NOW() WHERE token = ?')
-            ->execute([$token]);
+            ->execute([$abdruck]);
     }
 
     // Gelegentlich aufraeumen -- jede tote Sitzung ist ein Token, der
@@ -225,4 +254,96 @@ function kp_objekt_ids(PDO $pdo, int $kundeId): array
     );
     $stmt->execute([$kundeId]);
     return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+}
+
+// ── Zustellnachweis (ENT-491) ─────────────────────────────────────────
+//
+// WAS HIER FESTGEHALTEN WIRD UND WAS NICHT
+//
+// Festgehalten wird: dieser Zugang hat diesen Rapport bekommen, erstmals
+// dann, zuletzt dann, so oft. Das beantwortet die Frage, um die es geht --
+// "ist der Nachweis beim Kunden angekommen".
+//
+// NICHT festgehalten wird eine Zeile je Abruf. Die waere ein
+// Bewegungsprofil: man koennte nachlesen, an welchem Abend ein
+// Betriebsfremder was gelesen hat. Fuer den Zustellnachweis braucht es das
+// nicht, und was man nicht braucht, speichert man nicht.
+//
+// Ebenfalls NICHT festgehalten: IP-Adresse, Geraet, Browser. Keines davon
+// belegt eine Zustellung besser, jedes davon macht aus dem Nachweis eine
+// Beobachtung.
+//
+// DIE TABELLE IST NACHGETRAGEN. Fehlt sie, wird nichts vermerkt und nichts
+// geworfen: Ein Rapport, der sich nicht abrufen laesst, weil der
+// Nachweisvermerk scheitert, waere der Fehler in der falschen Richtung --
+// der Nachweis dient dem Kunden, er darf ihm den Zugang nicht nehmen.
+// Aus demselben Grund faengt der Schreibweg jeden Fehler ab.
+function kp_abruf_vermerken(PDO $pdo, int $zugangId, string $art, int $bezugId): void
+{
+    if (!in_array($art, ['rundgang', 'einsatz'], true)) { return; }
+    if ($zugangId <= 0 || $bezugId <= 0) { return; }
+    if (!hat_tabelle($pdo, 'portal_abruf')) { return; }
+
+    $spalte = $art === 'rundgang' ? 'rundgang_id' : 'einsatz_id';
+    try {
+        // Kein INSERT ... ON DUPLICATE KEY: Das gibt es in SQLite nicht, und
+        // die Pruefungen laufen dort. Erst suchen, dann schreiben -- der
+        // Wettlauf zweier gleichzeitiger Abrufe desselben Zugangs kostet
+        // hier schlimmstenfalls einen Zaehlschritt, keinen Nachweis.
+        $stmt = $pdo->prepare("SELECT id FROM portal_abruf
+                                WHERE zugang_id = ? AND $spalte = ?");
+        $stmt->execute([$zugangId, $bezugId]);
+        $id = $stmt->fetchColumn();
+        if ($id) {
+            $pdo->prepare('UPDATE portal_abruf
+                              SET zuletzt_am = ?, anzahl = anzahl + 1
+                            WHERE id = ?')
+                ->execute([date('Y-m-d H:i:s'), (int)$id]);
+            return;
+        }
+        $jetzt = date('Y-m-d H:i:s');
+        $pdo->prepare("INSERT INTO portal_abruf
+                        (zugang_id, $spalte, erstmals_am, zuletzt_am, anzahl)
+                       VALUES (?, ?, ?, ?, 1)")
+            ->execute([$zugangId, $bezugId, $jetzt, $jetzt]);
+    } catch (Throwable $e) {
+        // Absichtlich still. Siehe oben: Der Vermerk darf den Abruf nicht
+        // verhindern.
+    }
+}
+
+// Das PDF entsteht im BROWSER (ENT-478) -- der Server sieht es nie. Er
+// erfaehrt nur, dass die Seite eine Erstellung gemeldet hat. Das ist eine
+// schwaechere Aussage als "der Server hat den Inhalt ausgeliefert", und
+// darum steht sie in eigenen Spalten und traegt im Cockpit einen eigenen
+// Text. Eine schwache Aussage, die wie eine starke aussieht, ist schlimmer
+// als gar keine.
+//
+// NUR UPDATE, NIE INSERT: Ohne vorherigen Abruf gibt es keine Zeile, und
+// dann passiert nichts. Damit kann dieser Weg fuer einen Rapport, den der
+// Kunde nie geholt hat, auch nichts anlegen -- und verraet nebenbei nicht,
+// welche Nummern es gibt.
+function kp_abruf_pdf_vermerken(PDO $pdo, int $zugangId, string $art, int $bezugId): bool
+{
+    if (!in_array($art, ['rundgang', 'einsatz'], true)) { return false; }
+    if ($zugangId <= 0 || $bezugId <= 0) { return false; }
+    if (!hat_tabelle($pdo, 'portal_abruf')) { return false; }
+
+    $spalte = $art === 'rundgang' ? 'rundgang_id' : 'einsatz_id';
+    try {
+        $stmt = $pdo->prepare("SELECT id, pdf_erstmals_am FROM portal_abruf
+                                WHERE zugang_id = ? AND $spalte = ?");
+        $stmt->execute([$zugangId, $bezugId]);
+        $z = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$z) { return false; }
+        $jetzt = date('Y-m-d H:i:s');
+        $pdo->prepare('UPDATE portal_abruf
+                          SET pdf_erstmals_am = COALESCE(pdf_erstmals_am, ?),
+                              pdf_anzahl = pdf_anzahl + 1
+                        WHERE id = ?')
+            ->execute([$jetzt, (int)$z['id']]);
+        return true;
+    } catch (Throwable $e) {
+        return false;
+    }
 }

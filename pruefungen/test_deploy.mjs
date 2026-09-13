@@ -17,7 +17,12 @@ const ok = [], bad = [];
 const check = (n, c) => (c ? ok : bad).push(n);
 
 const workflow = readFileSync(`${WURZEL}/.github/workflows/deploy-hostpoint.yml`, 'utf8');
-const seiten = ['index.html', 'dashboard.html', 'app.html', 'homepage.html'];
+// portal.html gehoert dazu, seit es ein Skript nachlaedt (html2pdf,
+// ENT-478). Bis dahin fehlte es hier -- und damit galt fuer diese eine
+// Oberflaeche die Regel nicht, dass jedes geladene Skript auch
+// ausgeliefert wird. Genau die Luecke, die qrcode.js schon einmal aus dem
+// Deploy fallen liess.
+const seiten = ['index.html', 'dashboard.html', 'app.html', 'homepage.html', 'portal.html'];
 
 // Nicht nur die drei bekannten HTML-Huellen: eine oeffentliche PHP-Seite
 // (z. B. beleg_oeffentlich.php, ENT-205) kann ein eigenes <script src>
@@ -120,6 +125,41 @@ for (const [datei, platzhalter] of [
   }
 }
 
+/* Die eigene Adresse der Anlage (ENT-501).
+
+   Sie steckt in jedem Link, den der Server per E-Mail verschickt -- Passwort
+   zuruecksetzen, Portalzugang, Beleg. Bis ENT-501 kam sie aus dem Host-Kopf
+   DER ANFRAGE; wer die unangemeldeten Endpunkte mit einem fremden Host-Kopf
+   aufrief, liess den Server einen Link auf die eigene Adresse verschicken.
+
+   Zwei Aussagen sind hier zu sichern, und die zweite ist die
+   sicherheitsrelevante: */
+{
+  const dbInhalt = readFileSync(`${WURZEL}/backend/db.php`, 'utf8');
+  check('db.php traegt den Platzhalter __APP_BASIS_URL__',
+    dbInhalt.includes('__APP_BASIS_URL__'));
+  check('KRITISCH: __APP_BASIS_URL__ wird beim Deploy auch ersetzt',
+    /sed -i "s\|__APP_BASIS_URL__\|\$EFF_APP_BASIS_URL\|g" dist\/db\.php/.test(workflow));
+
+  // Der Production-Zweig hat einen Rueckfall, damit ein Deploy nicht an
+  // einer nicht gesetzten Variablen scheitert und die Links dabei wortlos
+  // verschwinden.
+  const zweige = workflow.split('UMGEBUNG=staging');
+  check('Der Production-Zweig setzt eine Basisadresse',
+    /EFF_APP_BASIS_URL=/.test(zweige[0]) && /https:\/\//.test(zweige[0]));
+
+  // KRITISCH und der eigentliche Punkt: Staging darf NICHT auf die
+  // produktive Adresse zurueckfallen. Ein Staging-Link, der auf Production
+  // zeigt, waere genau der Fehler, den die urspruengliche
+  // HTTP_HOST-Loesung vermeiden wollte -- und ein Kunde bekaeme aus einem
+  // Test eine Nachricht mit einem Link in die echte Anlage.
+  const stagingZweig = (zweige[1] || '').split('fi\n')[0];
+  check('KRITISCH: Staging faellt fuer die Basisadresse NICHT auf Production zurueck',
+    /EFF_APP_BASIS_URL=""/.test(stagingZweig)
+    && /STAGING_DOMAIN/.test(stagingZweig)
+    && !/rapport\./.test(stagingZweig));
+}
+
 // Dasselbe für Dateien, die das CSS per url(...) holt -- Schriften, Bilder,
 // Hintergründe. Bis ENT-223 gab es hier gar keine solche Datei, seither
 // liegen zwei Schriftschnitte unter fonts/ (Inter, selbst ausgeliefert statt
@@ -140,7 +180,7 @@ const alsGlobPassend = (pfad, zeile) => {
 const kopierteQuellen = [...workflow.matchAll(/^\s*cp\s+(\S+)\s+dist\//gm)].map(m => m[1]);
 
 /* Dasselbe fuer Dateien, die per <link> haengen -- Favicon, Apple-Touch-Icon,
-   das Bild fuer die Teilen-Vorschau (ENT-469-N2). Dieselbe Luecke wie bei den
+   das Bild fuer die Teilen-Vorschau (ENT-562). Dieselbe Luecke wie bei den
    Schriften: Fehlt das Favicon auf dem Server, kracht nichts, der Browser
    zeigt nur sein leeres Blatt -- und lokal faellt es NICHT auf, weil die
    Datei im Arbeitsverzeichnis ja liegt. */

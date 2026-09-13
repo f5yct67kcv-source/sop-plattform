@@ -45,6 +45,16 @@ if ($anEmail === '') {
     json_response(['status' => 'error',
         'message' => 'Für diesen Kunden ist keine Haupt-E-Mail hinterlegt.'], 400);
 }
+// Hier geprueft und nicht erst beim Versand (ENT-501): smtp_senden() weist
+// eine unbrauchbare Adresse seit ENT-501 selbst ab -- aber als Ausnahme, und
+// die kaeme beim Cockpit als "Unerwarteter Serverfehler" an. Das schickt
+// jemanden auf die Suche nach dem falschen Fehler. Hier ist der
+// Zusammenhang bekannt, also steht er auch in der Meldung.
+if (!filter_var($anEmail, FILTER_VALIDATE_EMAIL)) {
+    json_response(['status' => 'error',
+        'message' => 'Die E-Mail-Adresse dieses Kunden ist unbrauchbar («' . $anEmail
+                   . '») — bitte zuerst im Kundenstamm berichtigen.'], 400);
+}
 
 if (!smtp_konfiguriert()) {
     json_response(['status' => 'error',
@@ -63,11 +73,23 @@ if (!$token) {
 $betrieb = $pdo->query("SELECT firma FROM betrieb WHERE id = 1")->fetch();
 $firma = trim((string)($betrieb['firma'] ?? ''));
 
-// Immer https, unabhaengig davon, wie der Dashboard-Aufruf selbst ankam
-// (siehe HSTS-Kopfzeile in htaccess-hostpoint): ein Kundenlink mit
-// Entscheidungs-Token soll nie unverschluesselt verschickt werden.
-$host = (string)($_SERVER['HTTP_HOST'] ?? '');
-$link = 'https://' . $host . '/api/beleg_oeffentlich.php?token=' . urlencode($token);
+// Die Basisadresse kommt aus dem Deploy (ENT-501), nicht aus dem Host-Kopf
+// des Dashboard-Aufrufs. Hier war der Kopf zwar nie von aussen steuerbar --
+// dieser Endpunkt verlangt eine Anmeldung, der Wert kam also aus dem
+// Browser der eigenen Verwaltung --, aber es bleibt dieselbe Quelle fuer
+// dieselbe Sorte Link. Eine Regel, die nur an zwei von drei Stellen gilt,
+// wird an der dritten irgendwann abgeschrieben.
+//
+// Weiterhin immer https (siehe HSTS-Kopfzeile in htaccess-hostpoint): ein
+// Kundenlink mit Entscheidungs-Token soll nie unverschluesselt verschickt
+// werden -- basis_url() laesst gar nichts anderes durch.
+$basis = basis_url();
+if ($basis === null) {
+    json_response(['status' => 'error',
+        'message' => 'Die Adresse dieser Anlage ist auf dem Server nicht hinterlegt — '
+                   . 'ohne sie lässt sich kein Kundenlink erzeugen.'], 503);
+}
+$link = $basis . '/api/beleg_oeffentlich.php?token=' . urlencode($token);
 
 $titel = BELEG_ARTEN[$beleg['art']]['titel'] ?? 'Beleg';
 $absenderName = $firma !== '' ? $firma : 'Ihr Ansprechpartner';

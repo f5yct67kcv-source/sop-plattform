@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!--
-  OEFFENTLICHE HOMEPAGE (ENT-469, Marke seit ENT-469-N2). Entwurf und
+  OEFFENTLICHE HOMEPAGE (ENT-469, Marke seit ENT-562). Entwurf und
   Begleitnotiz liegen im Projekt-Repository unter
   02-gate2-produkt-mvp/homepage-entwurf*.
 
   MARKE: Der Name GuardOpS steht in der Konstante BRAND am Dateiende und in
-  allen <span data-brand>-Stellen; damit ist OP-18 beantwortet.
+  allen <span data-brand>-Stellen; Die Original-SVG fehlt noch, siehe unten.
 
   DIE BILDMARKE IN <symbol id="marke"> IST NACHGEZEICHNET, nicht das
   Original: Die Original-SVG liess sich nicht uebermitteln (der Chat nimmt
@@ -25,7 +25,7 @@
 
   Alle Personen, Kunden und Objekte in den Bildschirmen sind erfunden. Diese
   Seite laedt keinen Produktcode; ihre einzige Verbindung zum Server ist das
-  Demo-Formular (api/demo_anfrage.php).
+  Demo-Formular (api/demo_senden.php).
 -->
 <title>GuardOpS – Betriebssoftware für Schweizer Sicherheitsdienste</title>
 <meta name="description" content="Einsatzplanung, Mitarbeiter-App, Revierdienst, Kundenportal, Offerten und Rechnungen in einer Software – für kleine und mittlere Sicherheitsdienste in der Schweiz, mit dem GAV Sicherheit im Kern.">
@@ -1119,7 +1119,7 @@ p{margin:0 0 1em}
           <li><svg><use href="#i-haken"/></svg><span><b>Von Praktikern.</b> Sie sprechen mit Leuten, die selbst Dienstpläne geschrieben haben.</span></li>
         </ul>
       </div>
-      <form class="formular" id="demoFormular" novalidate action="backend/api/demo_anfrage.php" method="post">
+      <form class="formular" id="demoFormular" novalidate action="api/demo_senden.php" method="post">
         <div class="felder">
         <div class="falle" aria-hidden="true"><label>Webseite (bitte leer lassen)<input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>
         <div class="reihe">
@@ -1172,7 +1172,7 @@ p{margin:0 0 1em}
 
 <script>
 (function(){
-  // Der Markenname steht im HTML, nicht hier: Er ist seit ENT-469-N2
+  // Der Markenname steht im HTML, nicht hier: Er ist seit ENT-562
   // entschieden und keine Variable mehr. Ein Skript, das ihn beim Laden
   // setzt, hiesse -- ohne JavaScript steht der falsche Name da. Die
   // Auszeichnung data-brand bleibt, damit die Pruefung alle Stellen findet.

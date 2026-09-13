@@ -29,6 +29,15 @@ $zielId    = (int)$zielZeile['id'];
 $zielIstAdmin = darf_verwaltung([
     'rollen' => rechte_rollen(db(), $zielId, (bool)$zielZeile['ist_admin'])]);
 
+// Augenhoehe (ENT-501): Ein fremdes Passwort zu setzen heisst, dieses Konto
+// zu uebernehmen -- die Sitzungen des Ziels werden unten ohnehin beendet.
+// Wer 'personal_schreiben' hat, konnte damit bis hierher den Verwalter
+// uebernehmen und sich anschliessend selbst jedes Recht geben. Die Pruefung
+// steht VOR dem Setzen und nicht danach: Ein abgewiesener Versuch soll das
+// Passwort gar nicht erst anfassen.
+require_augenhoehe(db(), $user, $zielId, (bool)$zielZeile['ist_admin'],
+    'Das Passwort zurueckzusetzen');
+
 $pwFehler = passwort_pruefen($password, $name, $zielIstAdmin);
 if ($pwFehler !== null) {
     json_response(['status' => 'error', 'message' => $pwFehler], 400);

@@ -38,7 +38,26 @@ const iso = d => new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString
 const vorTagen = n => { const d = new Date(); d.setDate(d.getDate() - n); return iso(d); };
 
 const VOLL = {
-  status: 'ok', kunde: 'Muster Liegenschaften AG', person: 'A. Beispielperson',
+  // je_vorhanden schickt der echte Endpunkt seit ENT-482 immer mit -- daran
+  // entscheidet die Oberflaeche, ob sie den Bereich ueberhaupt anbietet.
+  status: 'ok', je_vorhanden: true,
+  // Kennzahlen (ENT-490). Die Zahlen passen zu den vier Runden unten:
+  // 24 Punkte hinterlegt, 20 erledigt, 1 davon per Fotobeleg, 1 Abbruch.
+  // Ein Beleg, dessen Band der Liste widerspricht, prueft nichts.
+  kennzahlen: { runden: 4, abgebrochen: 1, punkte_gesamt: 24,
+                punkte_erledigt: 20, punkte_fotobeleg: 1 },
+  // Verlauf (ENT-500). Sieben Tage, damit die Kurve ueberhaupt erscheint
+  // (unter vier Abschnitten wird bewusst keine gezeichnet), und mit einer
+  // LUECKE in der Mitte: Ein Tag ohne Runde gehoert zur Zeitachse, sonst
+  // saehen drei Runden an drei Tagen aus wie drei Runden ueber drei
+  // Monate. Die Summe ist 4 und passt damit zu kennzahlen.runden.
+  verlauf: { einheit: 'tag', punkte: [
+    { ab: vorTagen(6), runden: 0 }, { ab: vorTagen(5), runden: 1 },
+    { ab: vorTagen(4), runden: 0 }, { ab: vorTagen(3), runden: 0 },
+    { ab: vorTagen(2), runden: 1 }, { ab: vorTagen(1), runden: 0 },
+    { ab: vorTagen(0), runden: 2 },
+  ] },
+  kunde: 'Muster Liegenschaften AG', person: 'A. Beispielperson',
   zeitraum: { von: vorTagen(30), bis: vorTagen(0) },
   objekte: [{ id: 1, name: 'Testliegenschaft Nord', strasse: 'Musterweg 1', ort: 'Musterort' }],
   rundgaenge: [
@@ -65,10 +84,15 @@ const VOLL = {
       fortschritt: { gesamt: 0, erledigt: 0, bestaetigt: 0, ersatzscan: 0 } },
   ],
 };
-// Ein 1x1-PNG als Fotobeleg. Der Inhalt ist gleichgueltig -- geprueft wird,
-// dass ueberhaupt ein Bild ankommt und nicht ein Platzhaltertext bleibt.
+/* Ein PNG in Fotogroesse (400x300). Bis ENT-544 genuegte ein 1x1 -- da war
+   nur zu pruefen, DASS ein Bild ankommt. Seit die Bildgroesse im Blatt
+   selbst zur Anforderung geworden ist („Der Kunde will nicht in ein PDF
+   hineinzoomen müssen"), muss das Pruefbild GROESSER sein als der Rahmen:
+   Ein 1x1 wuerde nie gedeckelt und liesse offen, ob der Deckel greift. */
+const FOTO_BREIT = 400, FOTO_HOCH = 300;
+let fotoVerzoegern = 0;   // ms, die der Bildabruf braucht
 const FOTO_PNG = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+  'iVBORw0KGgoAAAANSUhEUgAAAZAAAAEsCAIAAABi1XKVAAAC90lEQVR42u3UQQ0AAAgDsWmafwHIQgekSRXc4zItwAmRADAsAMMCDAvAsAAMCzAsAMMCMCzAsAAMC8CwAMMCMCwAwwIMC8CwAAwLMCwAwwIwLMCwAAwLwLAAwwIwLADDAgwLwLAAw1IBMCwAwwIMC8CwAAwLMCwAwwIwLMCwAAwLwLAAwwIwLADDAgwLwLAADAswLADDAjAswLAADAvAsADDAjAsAMMCDAvAsADDUgEwLADDAgwLwLAADAswLADDAjAswLAADAvAsADDAjAsAMMCDAvAsAAMCzAsAMMCMCzAsAAMC8CwAMMCMCwAwwIMC8CwAMMCMCwAwwIMC8CwAAwLMCwAwwIwLMCwAAwLwLAAwwIwLADDAgwLwLAADAswLADDAjAswLAADAvAsADDAjAsAMMCDAvAsADDAjAsAMMCDAvAsAAMCzAsAMMCMCzAsAAMC8CwAMMCMCwAwwIMC8CwAAwLMCwAwwIwLMCwAAwLwLAAwwIwLADDAgwLwLAAwwIwLADDAgwLwLAADAswLADDAjAswLAADAvAsADDAjAsAMMCDAvAsAAMCzAsAMMCMCzAsAAMC8CwAMMCMCwAwwIMC8CwAMMCMCwAwwIMC8CwAAwLMCwAwwIwLMCwAAwLwLAAwwIwLADDAgwLwLAADAswLADDAjAswLAADAvAsADDAjAsAMMCDAvAsADDAjAsAMMCDAvAsAAMCzAsAMMCMCzAsAAMC8CwAMMCMCwAwwIMC8CwAAwLMCwAwwIwLMCwAAwLwLAAwwIwLADDAgwLwLAAwwIwLADDAgwLwLAADAswLADDAjAswLAADAvAsADDAjAsAMMCDAvAsAAMCzAsAMMCMCzAsAAMC8CwAMMCMCzAsCQADAvAsADDAjAsAMMCDAvAsAAMCzAsAMMCMCzAsAAMC8CwAMMCMCwAwwIMC8CwAAwLMCwAwwIwLMCwAAwLwLAAwwIwLMCwVAAMC8CwAMMCMCwAwwIMC8CwAAwLMCwAwwIwLOCzBf0vcSw0UxrUAAAAAElFTkSuQmCC',
   'base64');
 
 // Die Detailantworten, je Runde eine -- und sie stimmen mit den Zahlen der
@@ -88,7 +112,9 @@ const punkt = (id, name, zustand, zeit, zusatz = {}) => ({
 });
 const rumpf = (id, tag, zusatz) => ({
   id, datum: tag, objekt_name: 'Testliegenschaft Nord',
-  vorname: 'Vorname', nachname: 'Nachnamenstest',
+  // Seit ENT-481 gehoert die Person dazu -- der Server setzt den Namen
+  // zusammen, die Oberflaeche zeigt ihn.
+  vorlage_name: 'Schlusskontrolle Nacht', person: 'M. Musterperson',
   rohzeit_start: `${tag} 22:04:00`, rohzeit_ende: `${tag} 22:41:00`,
   letzter_scan: `${tag} 22:39:00`, pause_minuten: 0,
   dauer: { sekunden: 2220, quelle: 'rohzeit_ende' },
@@ -113,6 +139,7 @@ const DETAILS = {
   // Runde 11: abgebrochen nach zwei Punkten -- vier wurden nie besucht.
   11: rumpf(11, vorTagen(5), {
     status: 'abgebrochen',
+    abbruch_grund: 'Stelle nicht gefunden', abbruch_freitext: 'Zugang war verschlossen',
     fortschritt: { gesamt: 6, erledigt: 2, bestaetigt: 2, ersatzscan: 0, nicht_verfuegbar: 0 },
     kontrollpunkte: [
       punkt(1, 'Eingang Nord', 'bestaetigt', `${vorTagen(5)} 21:33:00`),
@@ -122,9 +149,16 @@ const DETAILS = {
       punkt(5, 'Waschküche', null, null),
       punkt(6, 'Rückseite Veloraum', null, null),
     ],
-    ereignisse: [{ id: 77, erfasst_am: `${vorTagen(5)} 21:36:00`,
-                   art: 'Sachbeschädigung', bemerkung: 'Scheibe im Treppenhaus beschädigt',
-                   hat_foto: true }],
+    ereignisse: [
+      { id: 77, erfasst_am: `${vorTagen(5)} 21:36:00`,
+        art: 'Sachbeschädigung', bemerkung: 'Scheibe im Treppenhaus beschädigt',
+        hat_foto: true, foto_geloescht: false },
+      // Eine Meldung, deren Foto nach der Aufbewahrungsfrist entfernt wurde
+      // (ENT-545). Beim Kunden darf sie NICHT aussehen wie eine ohne Foto.
+      { id: 78, erfasst_am: `${vorTagen(5)} 21:44:00`,
+        art: 'Feststellung', bemerkung: 'Ältere Meldung',
+        hat_foto: false, foto_geloescht: true },
+    ],
   }),
   // Runde 12: vollstaendig, aber ein Punkt nur per Fotobeleg.
   12: rumpf(12, vorTagen(8), {
@@ -159,6 +193,57 @@ const WEG_VOLL = {
   ],
 };
 let wegAntwort = WEG_VOLL;
+
+// ── Verkehrsdienst: Einsätze und Kundenrapporte (ENT-482) ────────────
+const EINSAETZE_VOLL = {
+  status: 'ok', je_vorhanden: true,
+  zeitraum: { von: vorTagen(30), bis: vorTagen(0) },
+  einsaetze: [
+    { id: 70, datum: vorTagen(3), strasse: 'Musterweg 4', ort: 'Musterort',
+      einsatzart: 'Verkehrsdienst', veranstaltung: 'Musterlauf 2026',
+      personen: 2, stunden: 12.5, von: '07:00:00', bis: '13:15:00' },
+    { id: 71, datum: vorTagen(9), strasse: 'Musterstrasse 12', ort: 'Musterort',
+      einsatzart: 'Verkehrsdienst', veranstaltung: null,
+      personen: 1, stunden: 4, von: '18:00:00', bis: '22:00:00' },
+  ],
+};
+const BERICHTE = {
+  70: {
+    einsatz: { id: 70, datum: vorTagen(3), strasse: 'Musterweg 4', ort: 'Musterort',
+               einsatzart: 'Verkehrsdienst', veranstaltung: 'Musterlauf 2026' },
+    kunde: { kunde_id: 1, kunde_nr: 'K-0001', k_name: 'Muster Liegenschaften AG',
+             k_strasse: 'Musterweg', k_hausnummer: '1', k_adresszusatz: null,
+             k_plz: '0000', k_ort: 'Musterort',
+             re_name: null, re_zusatz: null, re_strasse: null, re_hausnummer: null,
+             re_plz: null, re_ort: null },
+    unterschrift: { bild: 'data:image/png;base64,'
+        + 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+      name: 'B. Unterzeichnend', am: `${vorTagen(3)} 13:20:00`, holte: 'M. Musterperson' },
+    personen: [
+      { name: 'M. Musterperson', von: '07:00:00', bis: '13:15:00', pause_min: 30,
+        netto_h: 5.75, bemerkung: 'Umleitung länger als geplant' },
+      { name: 'T. Zweitperson', von: '07:00:00', bis: '13:45:00', pause_min: 30,
+        netto_h: 6.25, bemerkung: null },
+    ],
+  },
+};
+let einsatzAntwort = { status: 'ok', je_vorhanden: false,
+  zeitraum: { von: vorTagen(30), bis: vorTagen(0) }, einsaetze: [],
+  leer_grund: 'noch_nichts_unterschrieben' };
+
+// Der Briefkopf fuers Rapportblatt (ENT-478). Erfundene Firma, erfundenes
+// Logo -- echte Betriebsdaten haben in Testdaten nichts zu suchen.
+const BRIEFKOPF = {
+  status: 'ok',
+  briefkopf: {
+    firma: 'Musterfirma Sicherheitsdienst GmbH',
+    zusatz: 'Musterweg 1 · 0000 Musterort',
+    fusszeile: 'Musterfirma Sicherheitsdienst GmbH\nMusterweg 1, 0000 Musterort',
+    fusszeile2: 'Telefon 000 000 00 00\ninfo@example.invalid',
+    logo: 'data:image/png;base64,'
+      + 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+  },
+};
 // Wie oft Google Maps angefragt wurde. Die Kernzusage von ENT-474 ist, dass
 // das VOR dem Knopfdruck NIE passiert -- ein Zaehler ist dafuer der einzige
 // belastbare Nachweis.
@@ -168,6 +253,8 @@ let antwort = VOLL;
 let anmeldeFehler = false;
 let pwFehler = null;
 let calls = [];
+// Antwort des Passwort-Endpunkts (ENT-488), von den Pruefungen gesetzt.
+let pwAendernAntwort = null;
 
 // Attrappe fuer Google Maps. Ohne sie liefe die Pruefung ins Netz -- und
 // eine Pruefung, die vom Netz abhaengt, prueft das Netz. Sie ahmt genau die
@@ -188,7 +275,7 @@ async function setup(page) {
   await page.route('**/api/**', async route => {
     const req = route.request();
     const path = new URL(req.url()).pathname.split('/api/')[1];
-    calls.push({ path, rumpf: req.postData() });
+    calls.push({ path, suche: new URL(req.url()).search, rumpf: req.postData() });
     const send = (b, s = 200) => route.fulfill({ status: s, contentType: 'application/json', body: JSON.stringify(b) });
     if (path.includes('portal_link_anfordern')) {
       // Der echte Endpunkt antwortet IMMER so -- auch für eine Adresse, zu
@@ -209,6 +296,13 @@ async function setup(page) {
       return send({ status: 'ok', token: 't', name: 'A. Beispielperson',
         kunde: 'Muster Liegenschaften AG' });
     }
+    if (path.includes('portal_briefkopf')) return send(BRIEFKOPF);
+    if (path.includes('portal_einsatz_bericht')) {
+      const id = Number(new URL(req.url()).searchParams.get('einsatz_id'));
+      return BERICHTE[id] ? send({ status: 'ok', bericht: BERICHTE[id] })
+        : send({ status: 'error', message: 'Dieser Einsatz ist nicht abrufbar.' }, 404);
+    }
+    if (path.includes('portal_einsaetze')) return send(einsatzAntwort);
     if (path.includes('portal_rundgang_weg')) return send(wegAntwort);
     if (path.includes('portal_rundgang_detail')) {
       const id = Number(new URL(req.url()).searchParams.get('rundgang_id'));
@@ -219,10 +313,22 @@ async function setup(page) {
       return d ? send({ status: 'ok', rundgang: d })
                : send({ status: 'error', message: 'Dieser Rundgang ist nicht abrufbar.' }, 404);
     }
-    if (path.includes('portal_rundgang_foto')) {
+    if (path.includes('portal_rundgang_foto') || path.includes('portal_ereignis_foto')) {
+      // Verzoegerbar: Das Blatt soll gebaut werden, WAEHREND das Bild noch
+      // unterwegs ist. Ohne diesen Hebel laeuft die Pruefung immer im
+      // guenstigen Fall, und die Wartelogik bliebe eine Behauptung
+      // (beim Gegenprobieren zu ENT-544 aufgefallen: das Entfernen des
+      // Wartens machte keine einzige Pruefung rot).
+      if (fotoVerzoegern) { await new Promise(f => setTimeout(f, fotoVerzoegern)); }
       return route.fulfill({ status: 200, contentType: 'image/png', body: FOTO_PNG });
     }
     if (path.includes('portal_rundgaenge')) return send(antwort);
+    if (path.includes('portal_passwort_aendern')) {
+      // Der Fehlerfall wird von aussen gesetzt -- so laesst sich pruefen,
+      // dass ein 401 hier NICHT als "abgemeldet" gedeutet wird.
+      if (pwAendernAntwort) { return send(pwAendernAntwort.body, pwAendernAntwort.code); }
+      return send({ status: 'ok' });
+    }
     if (path.includes('portal_abmelden')) return send({ status: 'ok' });
     return send({ status: 'ok' });
   });
@@ -255,7 +361,7 @@ async function setup(page) {
     return [...new Set(treffer)].sort();
   };
   for (const name of ['glas-grund-1', 'glas-grund-2', 'glas-grund-3', 'glas-kachel',
-                      'accent', 'accent-hi', 'warn']) {
+                      'accent', 'accent-hi', 'accent-soft', 'warn']) {
     const d = werte(dash, name), p = werte(portal, name);
     check(`KRITISCH: --${name} ist im Portal derselbe Wert wie im Cockpit`,
       p.length > 0 && d.length > 0 && JSON.stringify(d) === JSON.stringify(p));
@@ -657,11 +763,11 @@ check('KRITISCH: der Faden zwischen den Kontrollpunkten ist wirklich zu sehen',
   await page.evaluate(() => [...document.querySelectorAll('#liste .detail .v-faden')]
     .every(f => f.getBoundingClientRect().height > 10)));
 
-// Der Name der eingesetzten Person bleibt draussen, solange OP-423 offen ist
-// -- und zwar AUCH DANN, wenn der Server ihn mitschicken sollte. Der Beleg
-// trägt ihn absichtlich.
-check('KRITISCH: kein Personenname im Detail — auch wenn die Antwort einen trägt (OP-423)',
-  !/Nachnamenstest/.test(detail) && !/Vorname/.test(detail));
+// Seit ENT-481 wird 1:1 gezeigt: Der Kunde bekommt dasselbe Blatt ohnehin
+// physisch, also ist der Name kein neuer Datenfluss.
+check('KRITISCH: die eingesetzte Person steht im Detail (ENT-481)',
+  /M\. Musterperson/.test(detail));
+check('Und die Kontrollrunde daneben', /Schlusskontrolle Nacht/.test(detail));
 
 // ── Zweite Runde: abgebrochen, vier Punkte nie besucht ───────────────
 await page.evaluate(() => document.querySelectorAll('#liste .zeile')[1].click());
@@ -673,6 +779,46 @@ check('KRITISCH: nicht besuchte Punkte erscheinen ebenfalls und sind als solche 
   /Waschküche/.test(detail2) && /Nicht besucht/.test(detail2));
 check('KRITISCH: ein gemeldetes Ereignis erscheint mit Zeit und Art',
   /21:36/.test(detail2) && /Sachbeschädigung/.test(detail2));
+/* Das Foto der Ereignismeldung (ENT-544). Bis dahin stand hier nur der Satz
+   „Mit Foto festgehalten" -- der Kunde wusste damit, dass es ein Bild gibt,
+   das er nicht sieht, und im Portal gab es nicht einmal einen Weg dorthin.
+   Der Endpunkt portal_ereignis_foto.php ist mit dieser Entscheidung neu. */
+await page.waitForTimeout(400);
+check('KRITISCH: das Foto der Ereignismeldung erscheint als Bild, nicht als Satz',
+  await page.evaluate(() => {
+    const t = document.querySelectorAll('#liste .zeile')[1].nextElementSibling;
+    const i = t.querySelector('.d-ereignis .v-foto img');
+    return !!i && i.naturalWidth > 0;
+  }));
+check('KRITISCH: es kommt vom Ereignis-Endpunkt, mit der Ereignisnummer',
+  calls.some(c => c.path.includes('portal_ereignis_foto') && /ereignis_id=77/.test(c.suche || '')));
+check('Der Satz „Mit Foto festgehalten" steht nicht mehr anstelle des Bildes',
+  !/Mit Foto festgehalten/.test(detail2));
+/* Die wichtigste Hausregel an dieser Stelle (ENT-545): „entfernt" und „gab
+   es nie" duerfen beim Kunden nicht gleich aussehen. */
+check('KRITISCH: ein nach der Frist entferntes Foto wird benannt, nicht verschwiegen',
+  /Aufbewahrungsfrist/.test(detail2));
+check('KRITISCH: und die Meldung selbst bleibt sichtbar',
+  /Ältere Meldung/.test(detail2));
+// Der Abbruchgrund im KLARTEXT, nicht als Codewort -- und oben, nicht als
+// Fussnote: Er ist die wichtigste Aussage über die Runde.
+// Der Klartext SELBST wird serverseitig geprueft (test_php.mjs und
+// pruef_kundenportal.php) -- hier kaeme er aus der Attrappe, die Zusage
+// koennte gar nicht anschlagen. Geprueft wird, dass die Tafel ihn zeigt.
+check('KRITISCH: Abbruchgrund und Zusatztext stehen in der Tafel (ENT-481)',
+  /Stelle nicht gefunden/.test(detail2) && /Zugang war verschlossen/.test(detail2));
+check('KRITISCH: und zwar ganz oben in der Tafel, vor den Kennzahlen',
+  await page.evaluate(() => {
+    const t = document.querySelectorAll('#liste .zeile')[1].nextElementSibling;
+    const a = t.querySelector('.d-abbruch'), k = t.querySelector('.kennzahlen');
+    return !!a && !!k && a.getBoundingClientRect().bottom <= k.getBoundingClientRect().top + 1;
+  }));
+// Eine abgeschlossene Runde bekommt keinen leeren Abbruch-Kasten.
+check('KRITISCH: eine abgeschlossene Runde zeigt keinen Abbruch-Hinweis',
+  await page.evaluate(() => {
+    const t = document.querySelectorAll('#liste .zeile')[0].nextElementSibling;
+    return !t.querySelector('.d-abbruch');
+  }));
 
 // ── Dritte Runde: vollständig, aber mit Fotobeleg ────────────────────
 await page.evaluate(() => document.querySelectorAll('#liste .zeile')[2].click());
@@ -694,40 +840,70 @@ check('KRITISCH: der Fotobeleg erscheint als Bild, nicht als Platzhaltertext',
 check('Ein zweiter und dritter Aufklapper schliessen die vorigen nicht',
   await page.evaluate(() => document.querySelectorAll('#liste .detail').length === 3));
 
-// ══ Der Weg auf der Karte (ENT-474) ═════════════════════════════════════
-// DIE KERNZUSAGE: Er kommt erst auf den Knopf. Das ist keine Bequemlichkeit,
-// sondern der Grund, aus dem der Projektinhaber ENT-441 Punkt 3 überhaupt
-// nur so weit revidiert hat. Drei Runden sind hier aufgeklappt — wäre die
-// Spur Teil des Details, stünde sie längst dreifach geladen da.
-check('KRITISCH: das Aufklappen lädt die Bewegungsspur NICHT',
-  !calls.some(c => c.path.includes('portal_rundgang_weg')));
-check('KRITISCH: und Google wird dabei überhaupt nicht angefragt', kartenRufe === 0);
-check('Der Hinweis sagt vorher, dass die Karte von Google kommt',
-  /von Google/.test(detail3));
-// Auf dem Handy gilt dasselbe Mass wie für jedes andere Bedienelement.
-// Ohne Null-Absicherung stuerzt diese Zusage ab, statt sich zu melden, wenn
-// der Knopf fehlt -- und dann kommt die Zusammenfassung mit den BENANNTEN
-// Aussagen nie. Bei der Gegenprobe genau so passiert.
-check('KRITISCH: der Knopf ist auf dem Handy mindestens 44 px hoch',
+// ══ Der Weg auf der Karte (ENT-474, revidiert durch ENT-500) ════════════
+// UMGEKEHRTE ZUSAGE, ausdrücklich gewünscht: Der Weg kommt jetzt BEIM
+// AUFKLAPPEN, nicht mehr erst auf einen Knopf. Die alten Prüfungen standen
+// hier bis ENT-500 mit dem genauen Gegenteil ("das Aufklappen lädt die
+// Spur NICHT"). Sie sind umgeschrieben und nicht gelöscht: Was damals
+// geschützt war, ist heute die Zusage — dass der Weg wirklich von selbst
+// kommt, dass der Kunde VORHER weiss, dass Google dabei angefragt wird,
+// und dass es bei EINEM Abruf je Runde bleibt.
+//
+// Drei Runden sind hier aufgeklappt.
+check('KRITISCH: das Aufklappen holt die Bewegungsspur von selbst',
+  calls.filter(c => c.path.includes('portal_rundgang_weg')).length === 3);
+// EINMAL, nicht dreimal: Das Maps-Skript wird über ein gemeinsames
+// Versprechen geholt (kartenLaden()). Drei offene Runden ergeben drei
+// Karten, aber nur einen Bezug bei Google.
+check('KRITISCH: dafür wird Google angefragt', kartenRufe >= 1);
+check('Aber nur EINMAL je Seite, nicht je Runde', kartenRufe === 1);
+// Das ist der Preis der Bequemlichkeit, und er gehört benannt. Solange der
+// Weg erst auf einen Knopf kam, stand der Hinweis VOR dem Klick. Jetzt
+// lädt die Karte von selbst -- ein Hinweis, der dabei nur aufblitzt und
+// von der Karte überschrieben wird, ist keiner.
+check('KRITISCH: „Karte von Google" steht dauerhaft an der geladenen Karte',
   await page.evaluate(() => {
-    const k = document.querySelector('[data-weg]');
-    return !!k && k.getBoundingClientRect().height >= 44;
+    const f = document.querySelector('#liste .detail .weg-fuss');
+    return !!f && /Karte von Google/.test(f.textContent);
   }));
 
-await klick('[data-weg="12"]');
-await page.waitForTimeout(500);
-check('KRITISCH: erst der Knopf holt den Weg',
-  calls.some(c => c.path.includes('portal_rundgang_weg')));
-check('KRITISCH: und erst dann wird Google angefragt', kartenRufe === 1);
 const karte = await page.evaluate(() => ({
   gebaut: window.__karteGebaut, punkte: window.__pfadPunkte, marken: window.__marken,
   behaelter: !!document.querySelector('#liste .detail .weg-karte[data-karte]'),
   fuss: (document.querySelector('#liste .detail .weg-fuss') || {}).textContent || '',
 }));
+
+// Neu und ohne Gegenstück im alten Bau: Auf- und Zuklappen darf den Weg
+// NICHT erneut holen. Beim Knopf gab es dieses Risiko nicht -- wer nicht
+// klickt, lädt nicht. Jetzt lädt das Aufklappen, und ein Kunde, der eine
+// Runde dreimal ansieht, dürfte trotzdem nur einen Abruf auslösen.
+{
+  const vorher = calls.filter(c => c.path.includes('portal_rundgang_weg')).length;
+  const vorherKarte = kartenRufe;
+  await page.evaluate(() => document.querySelectorAll('#liste .zeile')[2].click());
+  await page.waitForTimeout(200);
+  await page.evaluate(() => document.querySelectorAll('#liste .zeile')[2].click());
+  await page.waitForTimeout(600);
+  const nachher = calls.filter(c => c.path.includes('portal_rundgang_weg')).length;
+  check('KRITISCH: Zuklappen und wieder Aufklappen holt den Weg NICHT erneut',
+    nachher === vorher);
+  if (nachher !== vorher) { bad.push(`Weg-Abrufe: ${vorher} -> ${nachher}`); }
+  check('KRITISCH: und fragt Google kein zweites Mal',
+    kartenRufe === vorherKarte);
+}
+
+// Der Knopf bleibt als Rückfall im Markup -- schlägt das automatische
+// Laden fehl, ist der Weg sonst gar nicht mehr erreichbar. Solange es
+// klappt, ist er durch die Karte ersetzt und darum nicht mehr da.
+check('Nach dem automatischen Laden steht kein Knopf mehr da',
+  await page.evaluate(() => !document.querySelector('#liste .detail [data-weg]')));
+
+// Drei offene Runden, drei Karten -- vor ENT-500 war es genau eine, weil
+// nur eine angeklickt wurde.
 check('KRITISCH: die Karte wird gebaut und der Weg als Linie darauf gezeichnet',
-  karte.gebaut === 1 && karte.behaelter && karte.punkte === 3);
+  karte.gebaut === 3 && karte.behaelter && karte.punkte === 3);
 // Eine Linie allein sagt nicht, in welche Richtung gelaufen wurde.
-check('Anfang und Ende sind markiert', karte.marken === 2);
+check('Anfang und Ende sind markiert', karte.marken === 6);
 // Die Genauigkeit gehört dazu: Ein Punkt mit 80 m Streuung sieht auf der
 // Karte genauso scharf aus wie einer mit 5 m.
 check('KRITISCH: der Fuss nennt Messpunkte UND Genauigkeit — ohne sie zieht man Schlüsse, die die Messung nicht hergibt',
@@ -739,12 +915,19 @@ await page.screenshot({ path: `${OUT}/portal-10-weg-handy.png` });
 // liefen Server und Oberfläche auseinander und die Seite behauptete eine
 // Frist, die nicht gilt.
 wegAntwort = { ...WEG_VOLL, aufbewahrung_tage: 45 };
+// Der Zwischenspeicher haelt die Runde fest -- ohne ihn zu leeren zeigte
+// das Aufklappen den alten Weg, und diese Zusage pruefte nichts.
+await page.evaluate(() => {
+  // BEIDE Speicher: Seit ENT-500 haelt wegZwischen die Bewegungsspur fest.
+  // Nur detailZwischen zu leeren zeigte weiterhin den alten Weg, und die
+  // Zusage darunter pruefte nichts.
+  Object.keys(detailZwischen).forEach(k => delete detailZwischen[k]);
+  Object.keys(wegZwischen).forEach(k => delete wegZwischen[k]);
+  laden();
+});
+await page.waitForTimeout(600);
 await page.evaluate(() => document.querySelectorAll('#liste .zeile')[2].click());
-await page.waitForTimeout(200);
-await page.evaluate(() => document.querySelectorAll('#liste .zeile')[2].click());
-await page.waitForTimeout(400);
-await klick('[data-weg="12"]');
-await page.waitForTimeout(400);
+await page.waitForTimeout(700);
 check('KRITISCH: die Aufbewahrungsfrist kommt vom Server, nicht aus dem Text',
   /45 Tage/.test(await page.evaluate(() => {
     const f = document.querySelector('#liste .detail .weg-fuss');
@@ -754,12 +937,17 @@ check('KRITISCH: die Aufbewahrungsfrist kommt vom Server, nicht aus dem Text',
 // Drei verschiedene Aussagen, drei verschiedene Texte (Hausregel).
 const wegText = async (fall) => {
   wegAntwort = fall;
+  await page.evaluate(() => {
+  // BEIDE Speicher: Seit ENT-500 haelt wegZwischen die Bewegungsspur fest.
+  // Nur detailZwischen zu leeren zeigte weiterhin den alten Weg, und die
+  // Zusage darunter pruefte nichts.
+  Object.keys(detailZwischen).forEach(k => delete detailZwischen[k]);
+  Object.keys(wegZwischen).forEach(k => delete wegZwischen[k]);
+  laden();
+});
+  await page.waitForTimeout(600);
   await page.evaluate(() => document.querySelectorAll('#liste .zeile')[2].click());
-  await page.waitForTimeout(200);
-  await page.evaluate(() => document.querySelectorAll('#liste .zeile')[2].click());
-  await page.waitForTimeout(400);
-  await klick('[data-weg="12"]');
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(700);
   return page.evaluate(() => {
     const t = document.querySelectorAll('#liste .zeile')[2].nextElementSibling;
     const h = t && t.querySelector('.weg-huelle');
@@ -778,6 +966,387 @@ check('KRITISCH: „noch nicht eingerichtet" ist ein ANDERER Text als „kein We
 check('KRITISCH: und er verrät dem Kunden nichts über den Zustand des Betriebs',
   !/Einrichtung|einrichten|Datenbank|Tabelle/i.test(nichtEing));
 wegAntwort = WEG_VOLL;
+
+// ══ Das Rapportblatt als PDF (ENT-478) ══════════════════════════════════
+// Der Kunde holt sich hier dasselbe Blatt, das er heute per Mail bekommt.
+calls = [];
+// Den Zwischenspeicher des Briefkopfs leeren: Ohne das kann die Zusage
+// „beim Aufklappen wird er nicht geholt" gar nicht anschlagen -- ein früherer
+// Aufruf hätte ihn längst abgelegt, und die Prüfung wäre eine Behauptung.
+await page.evaluate(() => { briefkopf = null; });
+await page.evaluate(() => document.querySelectorAll('#liste .zeile')[2].click());
+await page.waitForTimeout(200);
+await page.evaluate(() => document.querySelectorAll('#liste .zeile')[2].click());
+await page.waitForTimeout(500);
+
+// html2pdf wiegt rund 950 KB. Wer nur liest, soll es nie laden -- dasselbe
+// Muster wie bei der Karte, und aus demselben Grund gemessen statt behauptet.
+check('KRITISCH: html2pdf wird beim Aufklappen NICHT geladen',
+  await page.evaluate(() =>
+    !document.querySelector('script[src*="html2pdf"]')));
+check('KRITISCH: und der Briefkopf ebenso wenig',
+  !calls.some(c => c.path.includes('portal_briefkopf')));
+check('KRITISCH: der PDF-Knopf ist auf dem Handy mindestens 44 px hoch',
+  await page.evaluate(() => {
+    const k = document.querySelector('[data-pdf]');
+    return !!k && k.getBoundingClientRect().height >= 44;
+  }));
+// Ein Knopf wird NICHT über die volle Breite gestreckt, nur weil er allein
+// in seiner Zeile steht (Hausregel) -- gemessen, nicht nachgelesen.
+check('KRITISCH: und er ist nicht über die volle Breite gestreckt',
+  await page.evaluate(() => {
+    const k = document.querySelector('[data-pdf]');
+    const t = k.closest('.detail');
+    return k.getBoundingClientRect().width < t.getBoundingClientRect().width - 40;
+  }));
+
+// html2pdf wird hier WIRKLICH geladen und erzeugt ein echtes PDF -- eine
+// Attrappe prüfte nur, dass wir sie richtig aufrufen, nicht dass am Ende
+// eine Datei herauskommt.
+const dlVersprechen = page.waitForEvent('download', { timeout: 40000 }).catch(() => null);
+await klick('[data-pdf="12"]');
+const datei = await dlVersprechen;
+check('KRITISCH: der Knopf erzeugt tatsächlich eine Datei', !!datei);
+check(`Und zwar ein PDF mit sprechendem Namen (${datei ? datei.suggestedFilename() : '–'})`,
+  !!datei && /^Rapport-.+-\d{4}-\d{2}-\d{2}\.pdf$/.test(datei.suggestedFilename()));
+check('KRITISCH: erst der Klick lädt html2pdf nach',
+  await page.evaluate(() => !!document.querySelector('script[src*="html2pdf"]')));
+check('Und holt den Briefkopf', calls.some(c => c.path.includes('portal_briefkopf')));
+
+const blatt = await page.textContent('#blatt');
+check('Das Blatt trägt den Briefkopf des Betriebs',
+  /Musterfirma Sicherheitsdienst/.test(blatt));
+check('KRITISCH: es nennt Objekt, Kontrollrunde, Zeiten und Zustand',
+  /Testliegenschaft Nord/.test(blatt) && /Kontrollrunde/.test(blatt)
+  && /23:15/.test(blatt) && /Abgeschlossen/.test(blatt));
+check('KRITISCH: jeder Kontrollpunkt steht mit seiner Uhrzeit im Blatt',
+  /Eingang Nord/.test(blatt) && /Aussenbereich/.test(blatt) && /23:40/.test(blatt));
+check('Der Fotobeleg wird im Blatt ausgewiesen und erklärt',
+  /Fotobeleg/.test(blatt) && /statt technischer Bestätigung/.test(blatt));
+check('KRITISCH: „kein Ereignis gemeldet" steht auch im Blatt, nicht ein fehlender Abschnitt',
+  /kein Ereignis gemeldet/.test(blatt));
+check('KRITISCH: die eingesetzte Person steht auch im Blatt (ENT-481)',
+  /Mitarbeitende/.test(blatt) && /M\. Musterperson/.test(blatt));
+
+/* ── Fotos im Blatt (ENT-544) ───────────────────────────────────────────
+   Runde 12 hat einen Fotobeleg, Runde 11 zusaetzlich ein Ereignisfoto. Das
+   Blatt von Runde 11 traegt also beide -- und zwar in Lesegroesse: Vorgabe
+   des Projektinhabers, „der Kunde will nicht in ein PDF hineinzoomen müssen,
+   um was zu erkennen". */
+/* Zwei verschiedene Runden, weil die beiden Bilder nicht in derselben
+   vorkommen: Runde 12 traegt den Fotobeleg eines Ersatzscans, Runde 11 die
+   Ereignismeldung mit Foto. Beide Blaetter werden darum einzeln gemessen und
+   danach gegeneinander gehalten. */
+const blattBilderMessen = () => page.evaluate(() =>
+  [...document.querySelectorAll('#blatt table img')]
+    .map(i => {
+      const b = i.getBoundingClientRect();
+      return { dekodiert: i.naturalWidth > 0, breite: Math.round(b.width),
+               hoehe: Math.round(b.height), alt: i.getAttribute('alt') || '' };
+    }));
+
+const bilder12 = await blattBilderMessen();
+check('KRITISCH: der Fotobeleg steht als Bild im Blatt des Kunden',
+  bilder12.some(b => /Ersatzscan/.test(b.alt) && b.dekodiert));
+
+await page.evaluate(() => document.querySelectorAll('#liste .zeile')[1].click());
+await page.waitForTimeout(600);
+const dl11 = page.waitForEvent('download', { timeout: 15000 }).catch(() => null);
+await klick('[data-pdf="11"]');
+await dl11;
+await page.waitForTimeout(300);
+const bilder11 = await blattBilderMessen();
+check('KRITISCH: das Ereignisfoto steht im Blatt des Kunden, nicht nur das Wort „Mit Foto"',
+  bilder11.some(b => /Ereignismeldung/.test(b.alt) && b.dekodiert));
+const blatt11 = await page.textContent('#blatt');
+check('KRITISCH: ein nach der Frist entferntes Foto wird auch im Blatt benannt',
+  /Aufbewahrungsfrist/.test(blatt11) && /Ältere Meldung/.test(blatt11));
+
+/* Gemessen, nicht nachgelesen. Das Blatt ist 760 px breit und wird auf
+   190 mm Nutzbreite gesetzt -- rund 0,25 mm je Pixel. Unter 300 px waere das
+   Bild schmaler als 7,5 cm und damit wieder ein Daumennagel; ueber 460 px
+   spraenge es aus der Spalte. */
+const alleBilder = [...bilder12, ...bilder11];
+check('KRITISCH: die Bilder im Blatt sind in Lesegrösse, nicht als Daumennagel',
+  alleBilder.length >= 2 && alleBilder.every(b => b.breite >= 300 && b.breite <= 460));
+check('KRITISCH: und nicht verzerrt -- ein gestauchtes Beweisstück sagt etwas anderes aus',
+  alleBilder.every(b => Math.abs((b.breite / b.hoehe) - (FOTO_BREIT / FOTO_HOCH)) < 0.05));
+check('Fotobeleg und Ereignisfoto sind gleich gross -- zwei Grössen wären zwei Aussagen',
+  alleBilder.length >= 2 && alleBilder.every(b => b.breite === alleBilder[0].breite));
+
+/* Cockpit und Portal setzen DASSELBE Blatt -- der Kunde bekommt es per Mail
+   (dashboard.html) oder holt es sich selbst (portal.html). Zwei Groessen
+   waeren zwei verschiedene Rapporte ueber denselben Rundgang, und der
+   Unterschied faellt niemandem auf, weil nie jemand beide nebeneinander
+   haelt. Verglichen werden die ZAHLEN, nicht der Wortlaut: Wer eine davon
+   aendert, wird hier rot; wer die Konstante umbenennt, findet sie nicht
+   mehr und wird ebenfalls rot. */
+const massAus = (datei, marke) => {
+  const q = readFileSync(`${WURZEL}/${datei}`, 'utf8');
+  const t = new RegExp(marke + "\\s*=\\s*'max-width:(\\d+)px;max-height:(\\d+)px").exec(q);
+  return t ? [Number(t[1]), Number(t[2])] : null;
+};
+const massCockpit = massAus('dashboard.html', 'blattFoto');
+const massPortal = massAus('portal.html', 'BLATT_FOTO');
+/* Der Wettlauf (ENT-544): html2pdf rastert das Blatt in dem Moment, in dem
+   es gerufen wird. Ein Bild, das dann noch laedt, fehlt im PDF -- und zwar
+   STILL. Wer aufklappt und sofort auf „Als PDF herunterladen" tippt, bekam
+   bis dahin ein Blatt ohne Bilder, ohne dass irgendetwas darauf hinwies.
+
+   Geprueft wird mit einer verzoegerten Bildantwort und OHNE Wartezeit nach
+   dem Aufklappen -- die Zwischenablage wird vorher geleert, sonst laege das
+   Bild schon bereit und es gaebe gar keinen Wettlauf. */
+await page.evaluate(() => { Object.keys(fotoZwischen).forEach(k => delete fotoZwischen[k]); });
+await page.evaluate(() => document.querySelectorAll('#liste .zeile')[1].click());   // zuklappen
+await page.waitForTimeout(150);
+fotoVerzoegern = 900;
+await page.evaluate(() => document.querySelectorAll('#liste .zeile')[1].click());   // wieder auf
+const dlEilig = page.waitForEvent('download', { timeout: 20000 }).catch(() => null);
+await klick('[data-pdf="11"]');          // sofort, ohne auf das Bild zu warten
+await dlEilig;
+await page.waitForTimeout(200);
+const bilderEilig = await blattBilderMessen();
+check('KRITISCH: auch beim sofortigen Klick steht das Foto im Blatt, nicht nur der Hinweis',
+  bilderEilig.some(b => /Ereignismeldung/.test(b.alt) && b.dekodiert && b.breite >= 300));
+fotoVerzoegern = 0;
+
+check('KRITISCH: Cockpit und Portal setzen dieselbe Fotogrösse ins Blatt',
+  !!massCockpit && !!massPortal
+  && massCockpit[0] === massPortal[0] && massCockpit[1] === massPortal[1]);
+// ENT-322 gilt unverändert: Der Weg gehört ins Portal, wo der Kunde ihn
+// ausdrücklich aufruft — nicht auf ein Blatt, das er beiläufig mitbekommt.
+check('KRITISCH: KEINE Karte im Blatt (ENT-322 bleibt)',
+  !/Weg während der Runde/.test(blatt)
+  && await page.evaluate(() => !document.querySelector('#blatt .weg-karte, #blatt iframe')));
+// Das Blatt entsteht in einem eigenen Behälter, nicht als Abzug der Tafel.
+check('KRITISCH: das Blatt steht ausserhalb des Bildes, aber nicht auf display:none',
+  await page.evaluate(() => {
+    const h = document.getElementById('blattHuelle');
+    return getComputedStyle(h).display !== 'none'
+        && h.getBoundingClientRect().right < 0
+        && document.getElementById('blatt').getBoundingClientRect().height > 100;
+  }));
+
+// Der Briefkopf wird EINMAL geholt, nicht bei jedem Blatt.
+calls = [];
+const dl2 = page.waitForEvent('download', { timeout: 40000 }).catch(() => null);
+await klick('[data-pdf="12"]');
+await dl2;
+check('KRITISCH: der Briefkopf wird nur einmal geholt, nicht bei jedem PDF',
+  !calls.some(c => c.path.includes('portal_briefkopf')));
+
+// ══ Verkehrsdienst: Einsätze und Kundenrapporte (ENT-482) ═══════════════
+// Solange der Kunde keine unterschriebenen Einsätze hat, gibt es weder den
+// Einsatz-Bereich noch seine Kachel.
+//
+// GEÄNDERT MIT ENT-486: Die Leiste ist deshalb nicht mehr weg. Ein Kunde
+// mit Revierdienst hat jetzt ZWEI Reiter -- Rundgänge und Wachbuch --, und
+// zwei sind eine Wahl. Was unverändert gilt, ist die Zusage dahinter: keine
+// Kachel und kein Bereich für etwas, das der Kunde nicht bezieht.
+check('KRITISCH: ohne Einsätze bleibt der zweite Bereich ganz weg -- samt seiner Kachel',
+  await page.evaluate(() => document.getElementById('bereich-einsaetze').hidden
+    && document.getElementById('reiter-einsaetze').hidden
+    && !document.getElementById('bereich-rundgaenge').hidden));
+check('Die Leiste steht trotzdem da -- Rundgänge und Wachbuch sind zwei Reiter (ENT-486)',
+  await page.evaluate(() => !document.getElementById('reiter').hidden
+    && !document.getElementById('reiter-rundgaenge').hidden
+    && !document.getElementById('reiter-wachbuch').hidden));
+
+// ── Nur Verkehrsdienst: der Fall, der die Hausregel verletzen würde ──
+// Wer keine Rundgänge bezieht, darf KEINE leere Rundgang-Liste sehen --
+// sie sähe aus, als sei dort nichts passiert.
+antwort = { ...leer('kein_revierdienst'), je_vorhanden: false };
+einsatzAntwort = EINSAETZE_VOLL;
+await page.evaluate(() => laden());
+await page.waitForTimeout(400);
+check('KRITISCH: hat der Kunde NUR Einsätze, verschwindet der Rundgang-Bereich ganz',
+  await page.evaluate(() => document.getElementById('bereich-rundgaenge').hidden
+    && !document.getElementById('bereich-einsaetze').hidden));
+check('Und ohne zweite Art braucht es auch keine Reiterleiste',
+  await page.evaluate(() => document.getElementById('reiter').hidden));
+// „Nachweis der ausgeführten Rundgänge" bei einem reinen Verkehrsdienst-
+// Kunden wäre schlicht falsch -- die Unterzeile folgt dem, was er bezieht.
+check('KRITISCH: die Kopfzeile spricht von Einsätzen, nicht von Rundgängen',
+  /Einsätze/.test(await page.textContent('#unter'))
+  && !/Rundgänge/.test(await page.textContent('#unter')));
+
+const eListe = await page.textContent('#liste-e');
+check('KRITISCH: eine Einsatzzeile nennt Datum, Veranstaltung und Einsatzart',
+  /Musterlauf 2026/.test(eListe) && /Verkehrsdienst/.test(eListe));
+check('Ohne Veranstaltung trägt der Einsatzort die Zeile',
+  /Musterstrasse 12, Musterort/.test(eListe));
+// Zwei Einheiten, zwei Zeilen: „Personen" zählt Menschen, „Stunden" zählt
+// Zeit (Hausregel) -- gemessen, nicht im Text geraten.
+check('KRITISCH: Personen und Stunden stehen auf zwei Zeilen, nicht unter einer Überschrift',
+  /2 Personen/.test(eListe) && /12,50 Stunden/.test(eListe)
+  && await page.evaluate(() => {
+    const m = document.querySelectorAll('#liste-e .mass span');
+    return m.length >= 2
+      && Math.round(m[0].getBoundingClientRect().top) !== Math.round(m[1].getBoundingClientRect().top);
+  }));
+// Am Element gelesen und nicht am zusammengeklebten Text der Liste: Dort
+// steht "1 Person4,00 Stunden" ohne Trennzeichen, und eine Wortgrenze
+// zwischen "n" und "4" gibt es nicht.
+check('Ein Einsatz mit einer Person steht in der Einzahl da',
+  await page.evaluate(() => {
+    const zeilen = document.querySelectorAll('#liste-e .zeile');
+    const s = zeilen[1] && zeilen[1].querySelector('.mass span');
+    return !!s && s.textContent.trim() === '1 Person';
+  }));
+check('KRITISCH: die Einsatzliste scrollt die Seite nicht waagrecht',
+  await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
+
+// ── Der Kundenrapport in der Tafel ──────────────────────────────────
+await page.evaluate(() => document.querySelector('#liste-e .zeile').click());
+await page.waitForTimeout(400);
+const kr = await page.textContent('#liste-e .detail');
+check('KRITISCH: der Klick öffnet den Kundenrapport unter der Zeile',
+  await page.evaluate(() => {
+    const z = document.querySelector('#liste-e .zeile');
+    const t = z.nextElementSibling;
+    if (!t || !t.classList.contains('detail')) { return null; }
+    const a = z.getBoundingClientRect(), b = t.getBoundingClientRect();
+    return b.top >= a.bottom - 1 && Math.abs(a.width - b.width) <= 1;
+  }));
+// Das ist die Substanz des Blattes: jede Person mit IHREN Zeiten (ENT-160).
+check('KRITISCH: jede Person steht mit ihren eigenen Zeiten da (ENT-160)',
+  /M\. Musterperson/.test(kr) && /07:00 – 13:15/.test(kr)
+  && /T\. Zweitperson/.test(kr) && /07:00 – 13:45/.test(kr));
+check('KRITISCH: die Zeiten müssen NICHT übereinstimmen — und tun es hier auch nicht',
+  /13:15/.test(kr) && /13:45/.test(kr));
+check('Pause und Nettostunden je Person', /30′/.test(kr) && /5,75 h/.test(kr) && /6,25 h/.test(kr));
+check('KRITISCH: das Total steht darunter', /Total/.test(kr) && /12,00 h/.test(kr));
+check('Die Bemerkung einer Person erscheint mit ihrem Namen',
+  /Umleitung länger als geplant/.test(kr));
+check('KRITISCH: die Unterschrift des Kunden steht im Rapport, mit Name und Zeitpunkt',
+  /B\. Unterzeichnend/.test(kr) && /13:20/.test(kr) && /M\. Musterperson/.test(kr)
+  && await page.evaluate(() => !!document.querySelector('#liste-e .kr-unter img')));
+check('Kunden-Nr., Einsatzort und Einsatzart stehen im Kopf',
+  /K-0001/.test(kr) && /Musterweg 4, Musterort/.test(kr));
+// Vier Spalten passen auf 390 px nicht. Sie rollen in IHREM Behälter --
+// die SEITE bleibt stehen.
+// Die Tabelle ist breiter als der Bildschirm. Sie muss ERREICHBAR bleiben --
+// darum wird gemessen, dass ihr Behälter wirklich rollt (computed style,
+// nicht Quelltext) und dass die Seite selbst stehen bleibt. Ohne den ersten
+// Teil bewiese die Zusage nur, dass irgendwo abgeschnitten wird.
+check('KRITISCH: die breite Zeittabelle rollt in ihrem Behälter, die Seite nicht',
+  await page.evaluate(() => {
+    const w = document.querySelector('#liste-e .tw');
+    if (!w) { return false; }
+    const rollt = ['auto', 'scroll'].includes(getComputedStyle(w).overflowX);
+    return rollt && w.scrollWidth > w.clientWidth
+      && document.documentElement.scrollWidth <= window.innerWidth + 1;
+  }));
+await page.screenshot({ path: `${OUT}/portal-12-einsatz-handy.png` });
+
+// ── Das PDF des Einsatzes ───────────────────────────────────────────
+const dlE = page.waitForEvent('download', { timeout: 40000 }).catch(() => null);
+await klick('[data-art="einsatz"][data-pdf="70"]');
+const dateiE = await dlE;
+check('KRITISCH: auch der Einsatz lässt sich als PDF herunterladen', !!dateiE);
+check(`Und heisst wie das Rundgang-Blatt (${dateiE ? dateiE.suggestedFilename() : '–'})`,
+  !!dateiE && /^Rapport-.+\.pdf$/.test(dateiE.suggestedFilename()));
+const blattE = await page.textContent('#blatt');
+check('KRITISCH: das Blatt ist der Kundenrapport, nicht der Rundgang-Rapport',
+  /Kundenrapport/.test(blattE) && /Einsatz-Nr\. 70/.test(blattE)
+  && !/Rundgang-Rapport/.test(blattE));
+check('KRITISCH: mit allen Personenzeilen und dem Total',
+  /M\. Musterperson/.test(blattE) && /T\. Zweitperson/.test(blattE) && /12,00 h/.test(blattE));
+check('Und mit der Kundenadresse aus den Stammdaten',
+  /Muster Liegenschaften AG/.test(blattE) && /Musterweg 1/.test(blattE));
+check('Die Unterschrift steht auch auf dem Blatt',
+  /B\. Unterzeichnend/.test(blattE)
+  && await page.evaluate(() => !!document.querySelector('#blatt img[src^="data:image"]')));
+
+// ── Beide Arten: erst dann gibt es Reiter ───────────────────────────
+antwort = VOLL;
+await page.evaluate(() => laden());
+await page.waitForTimeout(500);
+check('KRITISCH: hat der Kunde BEIDES, erscheint die Reiterleiste',
+  await page.evaluate(() => !document.getElementById('reiter').hidden));
+check('Und die Kopfzeile nennt dann beides',
+  /Rundgänge und Einsätze/.test(await page.textContent('#unter')));
+check('Und die Rundgänge stehen zuerst -- die beiden anderen Bereiche liegen dahinter',
+  await page.evaluate(() => !document.getElementById('bereich-rundgaenge').hidden
+    && document.getElementById('bereich-einsaetze').hidden
+    && document.getElementById('bereich-wachbuch').hidden
+    && document.getElementById('reiter-rundgaenge').getAttribute('aria-selected') === 'true'));
+// Drei Bereiche, drei Kacheln (ENT-486) -- und genau EINER ist offen.
+check('KRITISCH: nie mehr als ein Bereich zugleich sichtbar',
+  await page.evaluate(() => ['rundgaenge', 'wachbuch', 'einsaetze']
+    .filter(b => !document.getElementById('bereich-' + b).hidden).length === 1));
+
+// ── Die Kachelreihe, gemessen (ENT-486) ─────────────────────────────
+// Der Projektinhaber hat ausdrücklich die grossen Kacheln der
+// Revierdienst-Übersicht im Cockpit verlangt, nicht die bisherigen Pillen.
+// Geprüft wird das Gemeinte, nicht der Klassenname: ein Sinnbild-Quadrat
+// über einer Beschriftung, gross genug zum Antippen.
+check('KRITISCH: jeder Reiter ist eine Kachel -- Sinnbild oben, Beschriftung darunter',
+  await page.evaluate(() => [...document.querySelectorAll('.reiter-taste')]
+    .filter(b => !b.hidden).every(b => {
+      const ic = b.querySelector('.r-ic'), lbl = b.querySelector('.r-lbl');
+      if (!ic || !lbl || !ic.querySelector('svg')) { return false; }
+      const i = ic.getBoundingClientRect(), l = lbl.getBoundingClientRect();
+      return i.width >= 40 && Math.abs(i.width - i.height) < 2 && i.bottom <= l.top + 1;
+    })));
+// Am Handy nebeneinander, nicht übereinander. Mit Grid und einer oberen
+// Schranke standen sie gestapelt -- 354 px Leiste vor dem ersten Inhalt.
+check('KRITISCH: am Handy stehen alle Kacheln in EINER Zeile',
+  await page.evaluate(() => {
+    const b = [...document.querySelectorAll('.reiter-taste')].filter(x => !x.hidden);
+    const oben = b.map(x => Math.round(x.getBoundingClientRect().top));
+    return b.length === 3 && new Set(oben).size === 1;
+  }));
+check('KRITISCH: und die Leiste bleibt dabei im Bildschirm',
+  await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
+check('KRITISCH: eine Kachel ist mindestens 44 px hoch (Handy-Trefferfläche)',
+  await page.evaluate(() => [...document.querySelectorAll('.reiter-taste')]
+    .filter(b => !b.hidden).every(b => b.getBoundingClientRect().height >= 44)));
+// Eine Reiterleiste, an der man nicht sieht, welcher Reiter offen ist, ist
+// keine. Gemessen an der gerenderten Farbe, nicht an einer Klasse allein.
+check('KRITISCH: der offene Reiter hebt sich sichtbar von den übrigen ab',
+  await page.evaluate(() => {
+    const an = document.getElementById('reiter-rundgaenge');
+    const aus = document.getElementById('reiter-wachbuch');
+    const f = e => getComputedStyle(e);
+    return f(an).backgroundColor !== f(aus).backgroundColor
+      && f(an).borderTopColor !== f(aus).borderTopColor;
+  }));
+// „Ganz oben" -- Vorgabe des Projektinhabers: erst wird entschieden,
+// WORAUF man sieht, dann WORIN.
+check('KRITISCH: die Kachelreihe steht über der Zeitraumwahl',
+  await page.evaluate(() => document.getElementById('reiter').getBoundingClientRect().bottom
+    <= document.getElementById('von').closest('.karte').getBoundingClientRect().top + 1));
+check('KRITISCH: die Reiter sind auf dem Handy mindestens 44 px hoch',
+  await page.evaluate(() => [...document.querySelectorAll('.reiter-taste')]
+    .every(t => t.getBoundingClientRect().height >= 44)));
+await klick('#reiter-einsaetze');
+await page.waitForTimeout(250);
+check('KRITISCH: der Reiter schaltet um',
+  await page.evaluate(() => document.getElementById('bereich-rundgaenge').hidden
+    && !document.getElementById('bereich-einsaetze').hidden
+    && document.getElementById('reiter-einsaetze').getAttribute('aria-selected') === 'true'));
+await page.screenshot({ path: `${OUT}/portal-13-reiter-handy.png` });
+
+// ── Zwei leere Zustände, zwei Texte ─────────────────────────────────
+const eLeer = async (grund) => {
+  einsatzAntwort = { status: 'ok', je_vorhanden: true, einsaetze: [], leer_grund: grund,
+    zeitraum: { von: vorTagen(30), bis: vorTagen(0) } };
+  await page.evaluate(() => laden());
+  await page.waitForTimeout(350);
+  return page.textContent('#liste-e');
+};
+const nochNichts = await eLeer('noch_nichts_unterschrieben');
+const keinTreffer = await eLeer('kein_treffer_im_zeitraum');
+check('KRITISCH: „noch nicht unterschrieben" sagt, WORAUF es wartet',
+  /unterschrieben/.test(nochNichts) && /vor Ort/.test(nochNichts));
+check('KRITISCH: und ist ein ANDERER Text als „kein Treffer im Zeitraum"',
+  nochNichts !== keinTreffer && /Zeitraum/.test(keinTreffer));
+
+einsatzAntwort = EINSAETZE_VOLL;
+await klick('#reiter-rundgaenge');
+await page.waitForTimeout(200);
+
 await page.screenshot({ path: `${OUT}/portal-08-detail-handy.png` });
 
 // Erst alles zuklappen, damit die naechste Zusage bei null anfaengt.
@@ -921,6 +1490,537 @@ calls = [];
 await klick('#abmelden');
 await page.waitForTimeout(250);
 
+// ══ Passwort ändern (ENT-488) ═══════════════════════════════════════════
+// Bis dahin konnte ein Kunde sein Passwort genau EINMAL setzen -- beim
+// ersten Besuch über den zugeschickten Link. Wer es weitergegeben hat oder
+// verdächtigt, kam ohne Anruf beim Betrieb nicht mehr heraus.
+{
+  // Das Prüfstück davor meldet ab und lässt die Abmeldebestätigung stehen --
+  // hier wird darum erst zurück auf die Maske und dann neu angemeldet.
+  // "Passwort ändern" gibt es NUR für einen angemeldeten Kunden; ohne die
+  // Anmeldung würde diese Suite eine Maske messen, die niemand sieht.
+  antwort = VOLL;
+  // Erst die Gegenrichtung: Die Kopfzeile mit dem Knopf gehört einem
+  // angemeldeten Kunden. Vorher darf sie gar nicht dastehen.
+  check('KRITISCH: vor der Anmeldung gibt es "Passwort ändern" nicht',
+    !(await page.isVisible('#pw-aendern-oeffnen')));
+  await klick('#wieder-anmelden');
+  await page.waitForTimeout(200);
+  await fuell('#email', 'a.beispiel@example.invalid');
+  await fuell('#passwort', 'ein sicheres langes wort');
+  await klick('#anmelden-pw');
+  await page.waitForSelector('#inhalt:not([hidden])', { timeout: 4000 })
+    .catch(() => bad.push('Die erneute Anmeldung führt nicht in die Liste'));
+  await page.waitForTimeout(300);
+
+  check('KRITISCH: ein angemeldeter Kunde kommt an "Passwort ändern"',
+    await page.isVisible('#pw-aendern-oeffnen'));
+  check('Der Knopf ist auf dem Handy mindestens 44 px hoch',
+    await page.evaluate(() =>
+      document.getElementById('pw-aendern-oeffnen').getBoundingClientRect().height >= 44));
+
+  await klick('#pw-aendern-oeffnen');
+  await page.waitForTimeout(200);
+  check('Der Klick öffnet das Fenster', await page.isVisible('#pw-fenster'));
+  check('KRITISCH: alle drei Felder verbergen die Eingabe',
+    await page.evaluate(() => ['pw-a-alt', 'pw-a-neu', 'pw-a-neu2']
+      .every(i => document.getElementById(i).type === 'password')));
+
+  // Ein Vertipper in der Bestätigung ist keine Serverfrage. Er darf gar
+  // nicht erst hinausgehen -- sonst wanderte ein Passwort über die Leitung,
+  // das der Kunde so nie wollte.
+  calls = [];
+  await fuell('#pw-a-alt', 'das bisherige lange wort');
+  await fuell('#pw-a-neu', 'ein neues langes wort');
+  await fuell('#pw-a-neu2', 'ein anderes langes wort');
+  await klick('#pw-a-speichern');
+  await page.waitForTimeout(250);
+  check('KRITISCH: zwei verschiedene neue Passwörter erreichen den Server gar nicht',
+    !calls.some(c => c.path.includes('portal_passwort_aendern')));
+  check('Und die Seite sagt, woran es liegt',
+    /stimmen nicht überein/.test(await page.textContent('#fehler-pw-a')));
+
+  // Das bisherige Passwort stimmt nicht: Der Server antwortet mit 401.
+  // ÜBERALL SONST heisst 401 auf dieser Seite „abgemeldet" -- hier nicht.
+  // Wer das verwechselt, wirft den Kunden bei jedem Vertipper hinaus.
+  pwAendernAntwort = { code: 401,
+    body: { status: 'error', message: 'Das bisherige Passwort stimmt nicht.' } };
+  await fuell('#pw-a-neu2', 'ein neues langes wort');
+  calls = [];
+  await klick('#pw-a-speichern');
+  await page.waitForTimeout(300);
+  {
+    const ruf = calls.find(c => c.path.includes('portal_passwort_aendern'));
+    const rumpf = JSON.parse((ruf && ruf.rumpf) || '{}');
+    check('KRITISCH: alt und neu gehen an den Server -- die Bestätigung nicht',
+      rumpf.alt === 'das bisherige lange wort' && rumpf.neu === 'ein neues langes wort'
+      && rumpf.neu2 === undefined);
+  }
+  check('KRITISCH: ein falsches bisheriges Passwort meldet das SICHTBAR',
+    await page.evaluate(() => {
+      const f = document.getElementById('fehler-pw-a');
+      return f.getClientRects().length > 0 && /bisherige Passwort stimmt nicht/.test(f.textContent);
+    }));
+  check('KRITISCH: und wirft den Kunden dabei NICHT hinaus -- 401 heisst hier nicht "abgemeldet"',
+    await page.isVisible('#inhalt') && !(await page.isVisible('#abgemeldet')));
+
+  // Der gute Fall.
+  pwAendernAntwort = null;
+  await klick('#pw-a-speichern');
+  await page.waitForTimeout(300);
+  check('KRITISCH: nach dem Ändern steht eine Bestätigung da',
+    await page.isVisible('#pw-a-fertig') && !(await page.isVisible('#pw-a-formular')));
+
+  await klick('#pw-a-zu');
+  await page.waitForTimeout(200);
+  check('Schliessen beendet das Fenster', !(await page.isVisible('#pw-fenster')));
+
+  // Der Fall, auf den es ankommt, ist ABBRECHEN -- nicht der Erfolg. Nach
+  // einem erfolgreichen Wechsel sind die Felder ohnehin leer; wer mitten im
+  // Tippen abbricht, liesse sonst sein Passwort im geschlossenen Fenster
+  // stehen. Beim Gegenprobieren aufgefallen: Die erste Fassung dieser
+  // Prüfung lief nur über den Erfolgsweg und wäre nie rot geworden.
+  await klick('#pw-aendern-oeffnen');
+  await page.waitForTimeout(200);
+  await fuell('#pw-a-alt', 'ein Passwort das niemand sehen soll');
+  await fuell('#pw-a-neu', 'noch eines davon');
+  await klick('#pw-a-schliessen');
+  await page.waitForTimeout(200);
+  check('KRITISCH: nach dem Abbrechen steht kein Passwort mehr im Fenster',
+    await page.evaluate(() => ['pw-a-alt', 'pw-a-neu', 'pw-a-neu2']
+      .every(i => document.getElementById(i).value === '')));
+  // Und beim nächsten Öffnen ist es auch nicht wieder da.
+  await klick('#pw-aendern-oeffnen');
+  await page.waitForTimeout(200);
+  check('KRITISCH: und beim nächsten Öffnen ebenso wenig',
+    await page.evaluate(() => ['pw-a-alt', 'pw-a-neu', 'pw-a-neu2']
+      .every(i => document.getElementById(i).value === '')));
+  await klick('#pw-a-schliessen');
+  await page.waitForTimeout(150);
+}
+
+// ══ Kennzahlenband (ENT-490) ════════════════════════════════════════════
+// Vier Stat-Kacheln über der Rundgangliste. Kein Diagramm -- vier Zahlen
+// sind keine Kurve.
+{
+  // Hier ist der Kunde angemeldet (der Block davor endet so) und die
+  // Attrappe steht auf VOLL.
+  antwort = VOLL;
+  await page.evaluate(() => laden());
+  await page.waitForTimeout(500);
+  // In den Rundgang-Reiter wechseln. OHNE das misst alles Folgende an einem
+  // verborgenen Element: getBoundingClientRect() liefert dann lauter Nullen,
+  // und jeder Lagevergleich wird wahr, ohne etwas zu prüfen. Genau so war
+  // die erste Fassung dieser Prüfungen -- beim Gegenprobieren aufgefallen,
+  // weil eine vertauschte Beschriftung sie nicht rot bekam.
+  await klick('#reiter-rundgaenge');
+  await page.waitForTimeout(250);
+
+  check('KRITISCH: das Band ist WIRKLICH zu sehen und trägt vier Kacheln',
+    await page.evaluate(() => {
+      const b = document.getElementById('kz-band');
+      return b.getClientRects().length > 0
+        && b.querySelectorAll(':scope > div').length === 4;
+    }));
+  // Hausregel und Stat-Kachel-Bauform sind hier dasselbe: Beschriftung oben,
+  // Wert darunter. Gemessen, nicht am Klassennamen abgelesen -- und zuerst
+  // geprüft, dass überhaupt etwas gerendert ist.
+  check('KRITISCH: in jeder Kachel steht die Beschriftung ÜBER dem Wert',
+    await page.evaluate(() => {
+      const k = [...document.querySelectorAll('#kz-band > div')];
+      return k.length === 4 && k.every(d => {
+        const l = d.querySelector('.k-l').getBoundingClientRect();
+        const v = d.querySelector('.k-v').getBoundingClientRect();
+        return l.height > 0 && v.height > 0 && l.bottom <= v.top + 1;
+      });
+    }));
+  check('Das Band steht über der Liste, nicht darunter',
+    await page.evaluate(() => {
+      const b = document.getElementById('kz-band').getBoundingClientRect();
+      const l = document.getElementById('liste').getBoundingClientRect();
+      return b.height > 0 && l.height > 0 && b.bottom <= l.top + 1;
+    }));
+
+  const bandText = await page.textContent('#kz-band');
+  check('KRITISCH: der Erledigungsgrad nennt Prozent UND die Rohzahlen',
+    /83\s*%/.test(bandText) && bandText.includes('20 von 24 Kontrollpunkten'));
+  // Bei vier Runden wäre ein Abbruch "25 %" -- das klingt nach System und ist
+  // ein Einzelfall. Über Runden wird darum gezählt, nicht gerechnet.
+  check('KRITISCH: Abbrüche stehen als ZAHL da, nicht als Prozent',
+    /Abgebrochen/.test(bandText) && bandText.includes('von 4 Rundgängen')
+    && !/Abgebrochen\s*\d+\s*%/.test(bandText.replace(/\s+/g, ' ')));
+  // Der Kunde LIEST diese Zeilen. "von 4 Rundgänge" stand hier schon einmal
+  // und fiel im Quelltext nicht auf, sondern erst am Bild.
+  check('Die Fusszeilen stehen im Dativ, nicht im Nominativ',
+    !/von \d+ Rundgänge(?!n)/.test(bandText)
+    && !/von \d+ (?:erledigten )?Kontrollpunkte(?!n)/.test(bandText));
+  check('Der Fotobeleg wird ausgewiesen, statt unter "erledigt" zu verschwinden',
+    bandText.includes('von 20 erledigten Kontrollpunkten'));
+  check('Jede Kachel nennt ihre eigene Einheit in der Fusszeile',
+    await page.evaluate(() => [...document.querySelectorAll('#kz-band .k-f')]
+      .every(f => f.textContent.trim().length > 0)));
+
+  // 0 von 0 ist NICHT 100 % und nicht 0 %. Es wurde nichts gemessen.
+  antwort = { ...VOLL, kennzahlen: { runden: 2, abgebrochen: 0, punkte_gesamt: 0,
+                                     punkte_erledigt: 0, punkte_fotobeleg: 0 } };
+  await page.evaluate(() => laden());
+  await page.waitForTimeout(400);
+  {
+    const t = await page.textContent('#kz-band');
+    check('KRITISCH: ohne hinterlegte Kontrollpunkte gibt es keinen Erledigungsgrad',
+      t.includes('nicht messbar') && t.includes('keine Kontrollpunkte hinterlegt')
+      && !/%/.test(t));
+    check('Ohne Abbruch sagt die Kachel das, statt eine nackte Null zu zeigen',
+      t.includes('alle 2 Rundgänge beendet'));
+  }
+
+  // Genau EINE Runde: "alle 1 Rundgänge beendet" wäre Unsinn, "alle Rundgang
+  // beendet" auch. Die Einzahl ist der Fall, den man beim Bauen nicht sieht,
+  // weil die Beleg-Daten immer mehrere Runden haben.
+  antwort = { ...VOLL, rundgaenge: [VOLL.rundgaenge[0]],
+              kennzahlen: { runden: 1, abgebrochen: 0, punkte_gesamt: 6,
+                            punkte_erledigt: 6, punkte_fotobeleg: 0 } };
+  await page.evaluate(() => laden());
+  await page.waitForTimeout(400);
+  {
+    const t = (await page.textContent('#kz-band')).replace(/\s+/g, ' ');
+    check('Bei genau einer Runde steht dort ein Satz und keine kaputte Mehrzahl',
+      !/alle 1 Rundgänge/.test(t) && !/alle Rundgang\b/.test(t)
+      && t.includes('der Rundgang wurde beendet'));
+  }
+
+  // Kein Rundgang im Zeitraum: Ein Band aus lauter Nullen behauptete eine
+  // Messung, die es nicht gab.
+  antwort = { ...VOLL, rundgaenge: [], leer_grund: 'kein_treffer_im_zeitraum',
+              kennzahlen: { runden: 0, abgebrochen: 0, punkte_gesamt: 0,
+                            punkte_erledigt: 0, punkte_fotobeleg: 0 } };
+  await page.evaluate(() => laden());
+  await page.waitForTimeout(400);
+  check('KRITISCH: ohne Rundgang im Zeitraum bleibt das Band ganz weg',
+    await page.evaluate(() => document.getElementById('kz-karte').hidden));
+
+  // Eine Antwort ohne das Feld (alter Server, halber Deploy) ist etwas
+  // anderes als eine mit Nullen -- auch dann kein Band aus Nullen.
+  {
+    const ohne = { ...VOLL };
+    delete ohne.kennzahlen;
+    antwort = ohne;
+    await page.evaluate(() => laden());
+    await page.waitForTimeout(400);
+    check('KRITISCH: eine Antwort ohne Kennzahlen erfindet keine',
+      await page.evaluate(() => document.getElementById('kz-karte').hidden));
+  }
+  antwort = VOLL;
+  await page.evaluate(() => laden());
+  await page.waitForTimeout(400);
+}
+
+// ══ Kopfzeile, Meter und Verlauf (ENT-500) ══════════════════════════════
+{
+  await klick('#reiter-rundgaenge');
+  await page.waitForTimeout(250);
+
+  // ── Die beiden Knöpfe im Kopf gehören zusammen ──────────────────────
+  // Bis ENT-500 sass der Abstandhalter am ZWEITEN Knopf. Dadurch klebte
+  // "Passwort ändern" am Titel und wanderte mit dessen Länge mit, während
+  // "Abmelden" allein am rechten Rand stand.
+  const kopf = await page.evaluate(() => {
+    const k = document.getElementById('kopf').getBoundingClientRect();
+    const p = document.getElementById('pw-aendern-oeffnen').getBoundingClientRect();
+    const a = document.getElementById('abmelden').getBoundingClientRect();
+    const t = document.getElementById('titel').getBoundingClientRect();
+    return { kopfRechts: k.right, pw: { l: p.left, r: p.right, h: p.height },
+             ab: { l: a.left, r: a.right }, titelRechts: t.right,
+             gleicheZeile: Math.abs(p.top - a.top) <= 1,
+             // Auf dem Handy bricht die Kopfzeile um: Die Knöpfe stehen
+             // dann UNTER dem Titel, und ein Abstand zu dessen rechter
+             // Kante wäre sinnlos. Die Zusage gilt nur, wo beide wirklich
+             // in einer Zeile stehen.
+             beimTitel: Math.abs(p.top - t.top) <= 8 };
+  });
+  check('Die beiden Kopfknöpfe stehen überhaupt nebeneinander',
+    kopf.pw.h > 0 && kopf.gleicheZeile);
+  check('KRITISCH: die Kopfknöpfe stehen als Paar beieinander, nicht auseinandergerissen',
+    kopf.ab.l - kopf.pw.r <= 24);
+  check('Auf dem Handy stehen sie unter dem Titel, nicht neben ihm',
+    kopf.beimTitel === false);
+
+  // ── Das Band steht AUSSERHALB der Rundgangkarte ─────────────────────
+  // Ausdrücklich verlangt: nicht in derselben Karte wie die Liste.
+  check('KRITISCH: das Kennzahlenband liegt nicht in der Karte der Rundgangliste',
+    await page.evaluate(() => {
+      const band = document.getElementById('kz-band');
+      const liste = document.getElementById('liste');
+      const bandKarte = band.closest('.karte');
+      const listeKarte = liste.closest('.karte');
+      return !!bandKarte && !!listeKarte && bandKarte !== listeKarte;
+    }));
+  check('Und steht darüber, nicht darunter',
+    await page.evaluate(() => {
+      const b = document.getElementById('kz-band').getBoundingClientRect();
+      const l = document.getElementById('liste').getBoundingClientRect();
+      return b.height > 0 && l.height > 0 && b.bottom <= l.top + 1;
+    }));
+
+  // ── Der Ring zum Erledigungsgrad (ENT-527) ──────────────────────────
+  // Bis ENT-500 stand hier ein Balken; der Projektinhaber hat den Ring
+  // verlangt, nachdem ihm der Balken vorgelegt worden war. Die Prüfungen
+  // sind UMGESCHRIEBEN, nicht gelöscht: Was sie geschützt haben -- der
+  // Anteil ist wirklich der Wert, die Spur bleibt sichtbar, die Farbe
+  // steht nie allein -- gilt für den Ring genauso.
+  const ring = await page.evaluate(() => {
+    const k = [...document.querySelectorAll('#kz-band > div')]
+      .find(d => /Erledigungsgrad/.test(d.textContent));
+    if (!k) { return null; }
+    const r = k.querySelector('svg.k-ring');
+    if (!r) { return { ring: false }; }
+    const spur = r.querySelector('.k-ring-spur');
+    const wert = r.querySelector('.k-ring-wert');
+    const rr = r.getBoundingClientRect();
+    const kr = k.getBoundingClientRect();
+    const karte = document.getElementById('kz-karte').getBoundingClientRect();
+    const strich = wert ? (wert.getAttribute('stroke-dasharray') || '') : '';
+    return { ring: true, sichtbar: rr.height > 0 && rr.width > 0,
+             rund: Math.abs(rr.width - rr.height) <= 1,
+             strich,
+             // Der Bogen ist die Länge selbst: Radius 15.9155 ergibt
+             // Umfang 100, also ist der erste Strichwert der Prozentwert.
+             bogen: Number(strich.split(/\s+/)[0] || -1),
+             spurFarbe: spur ? getComputedStyle(spur).stroke : '',
+             wertFarbe: wert ? getComputedStyle(wert).stroke : '',
+             // Oben beginnen, im Uhrzeigersinn: Ohne die Drehung startet
+             // ein SVG-Kreis auf drei Uhr und der Ring ist nicht ablesbar.
+             gedreht: getComputedStyle(r).transform,
+             // Nichts darf aus der KARTE laufen. Genau das ist beim Bauen
+             // passiert: Ohne min-width:0 an den Rasterfeldern schob der
+             // Ring die Kachel auf, sie wuchs über die Karte hinaus, und
+             // Ring wie Fusszeile wurden abgeschnitten.
+             //
+             // Gemessen wird Kachel gegen KARTE, nicht Ring gegen Kachel:
+             // Der Ring bleibt in seiner Kachel, die Kachel wächst. Die
+             // erste Fassung mass die falsche Ebene und blieb beim
+             // Gegenprobieren grün.
+             ueber: kr.right > karte.right + 0.5 || kr.left < karte.left - 0.5 };
+  });
+  check('KRITISCH: der Erledigungsgrad trägt einen Ring', !!ring && ring.ring);
+  check('Er ist wirklich gerendert', !!ring && ring.sichtbar);
+  check('Und rund, nicht zum Ei gequetscht', !!ring && ring.rund);
+  // 20 von 24 = 83 %.
+  check('KRITISCH: der Bogen entspricht dem Prozentwert',
+    !!ring && Math.abs(ring.bogen - 83) < 1);
+  // Die ungefüllte Spur ist ein heller Ton DERSELBEN Farbe, nicht Grau --
+  // so liest sich der Zustand über den ganzen Ring. Und sie muss überhaupt
+  // sichtbar sein: Ohne sie sähe "wenig erledigt" aus wie "keine Angabe".
+  check('KRITISCH: die Spur ist sichtbar und nicht durchsichtig',
+    !!ring && ring.spurFarbe && !/rgba\(0, 0, 0, 0\)|transparent|none/.test(ring.spurFarbe));
+  check('KRITISCH: Spur und Bogen sind verschiedene Töne derselben Farbe',
+    !!ring && ring.spurFarbe !== ring.wertFarbe);
+  check('KRITISCH: der Ring beginnt oben und nicht auf drei Uhr',
+    !!ring && /matrix/.test(ring.gedreht) && ring.gedreht !== 'none');
+  check('KRITISCH: das Band läuft nicht aus seiner Karte heraus',
+    !!ring && ring.ueber === false);
+  // Und derselbe Blick auf ALLE vier Kacheln, nicht nur auf die mit Ring.
+  check('KRITISCH: keine Kachel des Bandes ragt über die Karte hinaus',
+    await page.evaluate(() => {
+      const karte = document.getElementById('kz-karte').getBoundingClientRect();
+      return [...document.querySelectorAll('#kz-band > div')].every(d => {
+        const r = d.getBoundingClientRect();
+        return r.right <= karte.right + 0.5 && r.left >= karte.left - 0.5;
+      });
+    }));
+  // Und nichts wird abgeschnitten: Der Inhalt jeder Kachel muss in sie
+  // hineinpassen, sonst steht die Fusszeile halb ausserhalb.
+  check('KRITISCH: der Inhalt bleibt in seiner Kachel, nichts wird beschnitten',
+    await page.evaluate(() =>
+      [...document.querySelectorAll('#kz-band > div')].every(d =>
+        d.scrollWidth <= d.clientWidth + 1)));
+  // Die Farbe ist NIE die einzige Auskunft -- gemessen liegen Grün und
+  // Bernstein unter Protanopie nur ΔE 3.6 auseinander (OP-501).
+  //
+  // Der Text wird EIGENSTÄNDIG gelesen und nicht aus der Messung oben:
+  // Sonst fällt diese Zusage schon mit, wenn nur der Balken fehlt -- sie
+  // kann dann nie aus eigenem Recht anschlagen. Beim Gegenprobieren genau
+  // so aufgefallen.
+  const gradText = await page.evaluate(() => {
+    const k = [...document.querySelectorAll('#kz-band > div')]
+      .find(d => /Erledigungsgrad/.test(d.textContent));
+    return k ? k.textContent.replace(/\s+/g, ' ') : '';
+  });
+  check('KRITISCH: die Farbe steht nie allein — Prozentwert UND Rohzahlen daneben',
+    /83/.test(gradText) && /20 von 24/.test(gradText));
+
+  // ── Die Verlaufskurve ───────────────────────────────────────────────
+  const kurve = await page.evaluate(() => {
+    const k = [...document.querySelectorAll('#kz-band > div')]
+      .find(d => /RUNDGÄNGE/i.test(d.querySelector('.k-l').textContent));
+    const s = k && k.querySelector('.k-kurve');
+    if (!s) { return { da: false }; }
+    const r = s.getBoundingClientRect();
+    const saeulen = [...s.querySelectorAll('.k-saeule')];
+    const br = saeulen.map(x => x.getBoundingClientRect().width);
+    return { da: true, hoehe: r.height, breite: r.width,
+             titel: s.getAttribute('title') || '',
+             beschriftung: s.getAttribute('aria-label') || '',
+             linie: saeulen.length > 0, anzahl: saeulen.length,
+             saeuleBreit: Math.max(...br, 0),
+             leere: saeulen.filter(x => x.classList.contains('k-null')).length,
+             hoehen: saeulen.map(x => Math.round(x.getBoundingClientRect().height)),
+             // Keine Säule darf über ihren Platz hinauswachsen. Genau das
+             // ist passiert: Die Klasse ".leer" trägt im Portal schon der
+             // Leerzustand einer Liste (padding:28px), seine Regel steht
+             // weiter unten und gewann -- die Säulen wurden 56 px hoch und
+             // legten sich über den Wert. Nur am Bild zu sehen.
+             ueber: saeulen.filter(x =>
+               x.getBoundingClientRect().top < r.top - 0.5
+               || x.getBoundingClientRect().bottom > r.bottom + 0.5).length };
+  });
+  check('KRITISCH: die Rundgang-Kachel trägt einen Verlauf', kurve.da && kurve.linie);
+  check('Er ist wirklich gerendert', kurve.da && kurve.hoehe > 0 && kurve.breite > 0);
+  check('Je Abschnitt eine Säule -- sieben Tage, sieben Säulen', kurve.anzahl === 7);
+  // Dünne Marken (Gestaltungsregel für Diagramme). Ohne Deckelung wurden
+  // die Säulen bei sieben Tagen 48 px breit und lasen sich als Klötze --
+  // am gerenderten Bild aufgefallen, nicht im Quelltext.
+  check('KRITISCH: die Säulen bleiben schmal und werden nicht zu Klötzen',
+    kurve.saeuleBreit > 0 && kurve.saeuleBreit <= 14);
+  // Ein Tag ohne Runde ist ein flacher Sockel, keine Lücke: "hier fehlt
+  // eine Angabe" und "hier war keine Runde" sind zwei Aussagen.
+  check('KRITISCH: Tage ohne Runde stehen als flacher Sockel da, nicht als Lücke',
+    kurve.leere === 4 && kurve.hoehen.every(h => h > 0));
+  check('KRITISCH: keine Säule wächst aus ihrem Platz heraus über den Wert',
+    kurve.ueber === 0);
+  // Gegen die GEMESSENE Höhe des Platzes, nicht gegen eine abgeschriebene
+  // Zahl: Die Säulen sind mit ENT-527 höher geworden, und eine feste 20
+  // hätte hier nur den alten Stand festgehalten.
+  check('Der Sockel bleibt flach und wird nicht zur vollen Säule',
+    Math.max(...kurve.hoehen) <= kurve.hoehe && Math.min(...kurve.hoehen) <= 4);
+  // Der Höchstwert (2) muss höher stehen als der kleinere (1).
+  check('Die Säulen bilden die Werte ab, nicht alle dieselbe Höhe',
+    new Set(kurve.hoehen).size >= 3);
+  // Eine Kurve ohne Achsen muss sagen, worüber sie läuft -- sonst ist sie
+  // Zierrat. Und wer sie nicht sehen kann, braucht denselben Satz.
+  check('KRITISCH: sie nennt Zeitraum und Höchstwert im Titel',
+    /Tage|Wochen/.test(kurve.titel) && /Rundg/.test(kurve.titel));
+  check('Der Titel steht auch als Beschriftung für Vorleseprogramme da',
+    !!kurve.beschriftung && kurve.beschriftung === kurve.titel
+    && kurve.beschriftung.length > 10);
+
+  // ── Zu wenige Abschnitte: lieber keine Kurve als eine erfundene ─────
+  // Eine Kurve durch zwei Punkte ist eine Gerade und behauptet einen
+  // Verlauf, den niemand gemessen hat.
+  const kurveBei = async (verlauf) => {
+    antwort = { ...VOLL, verlauf };
+    await page.evaluate(() => laden());
+    await page.waitForTimeout(400);
+    return page.evaluate(() => !!document.querySelector('#kz-band .k-kurve'));
+  };
+  check('KRITISCH: bei nur zwei Abschnitten wird keine Kurve gezeichnet',
+    (await kurveBei({ einheit: 'tag', punkte: [
+      { ab: '2026-01-01', runden: 2 }, { ab: '2026-01-02', runden: 4 }] })) === false);
+  check('KRITISCH: bei lauter Nullen ebenfalls nicht — eine Linie am Boden sieht aus wie „nichts gemessen"',
+    (await kurveBei({ einheit: 'tag', punkte: [
+      { ab: '2026-01-01', runden: 0 }, { ab: '2026-01-02', runden: 0 },
+      { ab: '2026-01-03', runden: 0 }, { ab: '2026-01-04', runden: 0 },
+      { ab: '2026-01-05', runden: 0 }] })) === false);
+  check('Eine Antwort ganz ohne Verlauf erfindet keinen',
+    (await kurveBei(undefined)) === false);
+  check('Ab vier Abschnitten mit Inhalt erscheint sie',
+    (await kurveBei({ einheit: 'woche', punkte: [
+      { ab: '2026-01-05', runden: 3 }, { ab: '2026-01-12', runden: 0 },
+      { ab: '2026-01-19', runden: 5 }, { ab: '2026-01-26', runden: 2 }] })) === true);
+
+  antwort = VOLL;
+  await page.evaluate(() => laden());
+  await page.waitForTimeout(400);
+}
+
+// ══ Datenschutzhinweis und Zustellnachweis (ENT-491) ════════════════════
+// Der Hinweis ist die Bedingung dafür, dass überhaupt mitgeschrieben werden
+// darf. Geprüft wird darum beides zusammen -- und der Hinweis zuerst.
+{
+  // Der Verweis steht in der Fusszeile, also unten. Sichtbar heisst hier:
+  // wirklich gerendert, nicht nur im Baum vorhanden.
+  check('KRITISCH: der Datenschutzhinweis ist von der Seite aus erreichbar',
+    await page.evaluate(() => {
+      const k = document.getElementById('ds-oeffnen');
+      return !!k && k.getClientRects().length > 0;
+    }));
+  // Hausregel Handy: mindestens 44 px. Ein Verweis ist genauso schwer zu
+  // treffen wie ein Knopf.
+  check('Der Verweis ist auf dem Handy gross genug zum Treffen',
+    await page.evaluate(() =>
+      document.getElementById('ds-oeffnen').getBoundingClientRect().height >= 44));
+
+  await klick('#ds-oeffnen');
+  await page.waitForTimeout(300);
+  check('KRITISCH: der Klick öffnet den Hinweis wirklich',
+    await page.evaluate(() =>
+      document.getElementById('ds-fenster').getClientRects().length > 0));
+
+  const ds = (await page.textContent('#ds-fenster')).replace(/\s+/g, ' ');
+  // Der Hinweis muss jede Sache benennen, die tatsächlich gespeichert wird.
+  // Ein Hinweis, der die Hälfte verschweigt, ist schlechter als keiner --
+  // er behauptet Vollständigkeit.
+  check('KRITISCH: der Hinweis nennt den Zustellnachweis beim Namen',
+    /Zustellnachweis/.test(ds) && /abgerufen/.test(ds));
+  check('Er nennt die Stammangaben des Zugangs',
+    /Name/.test(ds) && /E-Mail/.test(ds) && /Funktion/.test(ds));
+  check('Er nennt die Anmeldung', /Anmeldung/.test(ds));
+  check('Er nennt die PDF-Meldung und sagt, dass das PDF im Browser entsteht',
+    /PDF/.test(ds) && /Browser/.test(ds));
+  // Und das Gegenstück: Was NICHT erhoben wird, ist die eigentliche Zusage.
+  check('KRITISCH: er sagt ausdrücklich, dass keine IP-Adresse gespeichert wird',
+    /IP-Adresse/.test(ds) && /nicht gespeichert/.test(ds));
+  check('KRITISCH: er sagt, dass kein Verlauf einzelner Besuche entsteht',
+    /Verlauf einzelner Besuche/i.test(ds) && /nicht eine je Aufruf/i.test(ds));
+  check('Er sagt, wie lange der Nachweis bleibt', /gelöscht/.test(ds));
+  // Seit ENT-500 lädt die Karte beim Aufklappen von selbst -- der Browser
+  // des Kunden fragt dabei bei Google an, ohne dass er etwas anklickt.
+  // Ein Hinweis, der das verschweigt, wäre nach der Umstellung falsch.
+  check('KRITISCH: er sagt, dass der Browser die Karte bei Google holt',
+    /Google/.test(ds) && /Browser/.test(ds));
+  check('Und stellt klar, dass der Weg selbst NICHT von Google kommt',
+    /nicht\s+von dort|stammt von uns/.test(ds));
+  check('Er nennt einen Weg für Auskunft und Löschung',
+    /Auskunft/.test(ds) && /Löschung/.test(ds));
+
+  // Angemeldet nennt der Hinweis den Betrieb -- ein „wenden Sie sich an
+  // jemanden" ohne Namen ist keine Anlaufstelle.
+  check('KRITISCH: angemeldet nennt der Hinweis den Betrieb namentlich',
+    /Musterfirma Sicherheitsdienst GmbH/.test(await page.textContent('#ds-kontakt')));
+
+  await klick('#ds-zu');
+  await page.waitForTimeout(200);
+  check('Der Hinweis lässt sich wieder schliessen',
+    await page.evaluate(() => document.getElementById('ds-fenster').hidden));
+
+  // ── Der Zustellnachweis wird gemeldet ────────────────────────────────
+  // Erst die Tafel öffnen (dort steht der PDF-Knopf), dann herunterladen.
+  calls.length = 0;
+  await klick('#reiter-rundgaenge');
+  await page.waitForTimeout(200);
+  await klick('#liste .zeile[data-art="rundgang"]');
+  await page.waitForTimeout(700);
+  const pdfKnopf = await page.$('[data-pdf]');
+  check('Der PDF-Knopf steht in der aufgeklappten Tafel', !!pdfKnopf);
+  if (pdfKnopf) {
+    await pdfKnopf.click();
+    // html2pdf wird erst beim Klick nachgeladen und braucht danach Zeit.
+    await page.waitForTimeout(4000);
+    const meldung = calls.find(c => c.path.includes('portal_abruf_pdf'));
+    check('KRITISCH: nach dem Herunterladen wird der Zustellnachweis gemeldet', !!meldung);
+    if (meldung) {
+      const rumpf = JSON.parse(meldung.rumpf || '{}');
+      check('Die Meldung nennt Art und Nummer des Rapports',
+        rumpf.art === 'rundgang' && Number(rumpf.id) === 10);
+      // Keine kunde_id, kein Name, keine Kennung des Geräts: Der Server
+      // kennt den Zugang aus der Sitzung (ENT-441), alles andere wäre eine
+      // Angabe, die er nicht braucht und nicht prüfen kann.
+      check('KRITISCH: die Meldung schickt NICHTS ausser Art und Nummer',
+        Object.keys(rumpf).sort().join(',') === 'art,id');
+    }
+  }
+}
+
 // ══ Desktop ═════════════════════════════════════════════════════════════
 // Jede Änderung am Handy-Layout wird zusätzlich am Desktop geprüft, und
 // umgekehrt (CLAUDE.md).
@@ -935,11 +2035,60 @@ await fuell('#passwort', 'ein sicheres langes wort', gross);
 await klick('#anmelden-pw', gross);
 await gross.waitForTimeout(300);
 check('Die Liste erscheint auch am Desktop', await gross.isVisible('#inhalt'));
-// Die Seite darf am breiten Bildschirm nicht über die volle Breite laufen --
-// eine Textzeile über 1440 px ist unlesbar.
+// Bis ENT-500 stand hier eine Obergrenze von 940 px. Der Projektinhaber
+// hat sie ausdrücklich aufgehoben: Auf einem breiten Bildschirm blieb die
+// Hälfte leer, während die Rundgangzeilen sich drängten.
+//
+// Der Grund hinter der alten Grenze bleibt aber richtig -- eine Textzeile
+// über die volle Breite ist unlesbar. Er gilt jetzt dort, wo wirklich
+// Fliesstext steht (der Datenschutzhinweis), nicht für die ganze Seite:
+// Die Rundgangliste ist eine Tabelle aus Datum, Objekt, Fortschritt und
+// Zustand, kein Fliesstext.
 const breite = await gross.evaluate(() =>
   Math.round(document.querySelector('.buehne').getBoundingClientRect().width));
-check('KRITISCH: der Inhalt bleibt am Desktop auf lesbarer Breite', breite <= 940);
+check('KRITISCH: die Seite nutzt die Breite des Bildschirms', breite >= 1200);
+
+// Die Kopfzeile steht am Desktop in EINER Zeile -- hier greift die Zusage,
+// die auf dem Handy sinnlos wäre. Bis ENT-500 sass der Abstandhalter am
+// zweiten Knopf: "Passwort ändern" klebte am Titel und wanderte mit dessen
+// Länge mit, während "Abmelden" allein am rechten Rand stand.
+{
+  const k = await gross.evaluate(() => {
+    const kopf = document.getElementById('kopf').getBoundingClientRect();
+    const p = document.getElementById('pw-aendern-oeffnen').getBoundingClientRect();
+    const a = document.getElementById('abmelden').getBoundingClientRect();
+    const t = document.getElementById('titel').getBoundingClientRect();
+    return { kopfRechts: kopf.right, pl: p.left, pr: p.right, pt: p.top,
+             al: a.left, ar: a.right, tr: t.right, tt: t.top };
+  });
+  check('Am Desktop steht die Kopfzeile in einer Zeile',
+    Math.abs(k.pt - k.tt) <= 24);
+  check('KRITISCH: die beiden Knöpfe stehen als Paar zusammen',
+    k.al - k.pr <= 24);
+  check('KRITISCH: das Paar steht am rechten Rand, nicht am Titel',
+    k.kopfRechts - k.ar <= 8 && k.pl - k.tr > 100);
+}
+// Dieselbe Zahl wie im Cockpit, aus dessen Quelle gelesen statt
+// abgeschrieben -- zwei Hausmasse, die auseinanderlaufen, sieht niemand.
+{
+  const dash = readFileSync(`${WURZEL}/dashboard.html`, 'utf8');
+  const cockpit = Number((dash.match(/\.content \{[^}]*max-width:\s*(\d+)px/) || [])[1]);
+  const portalQuelle = readFileSync(`${WURZEL}/portal.html`, 'utf8');
+  const portal = Number((portalQuelle.match(/\.buehne\{max-width:(\d+)px/) || [])[1]);
+  check('Das Breitenmass ist in beiden Oberflächen auffindbar',
+    cockpit > 0 && portal > 0);
+  check('KRITISCH: Portal und Cockpit tragen dasselbe Breitenmass',
+    cockpit === portal);
+}
+const dsBreite = await gross.evaluate(async () => {
+  document.getElementById('ds-oeffnen').click();
+  await new Promise(f => setTimeout(f, 250));
+  const w = document.querySelector('#ds-fenster .fenster').getBoundingClientRect().width;
+  document.getElementById('ds-zu').click();
+  return Math.round(w);
+});
+check('KRITISCH: der Fliesstext des Hinweises bleibt auf lesbarer Zeilenlänge',
+  dsBreite > 0 && dsBreite <= 620);
 const lDesktop = await lage(gross);
 check('KRITISCH: auch am Desktop steht der Zustand rechts vom Datum',
   lDesktop.markeLinks > lDesktop.datumRechts);
@@ -1016,8 +2165,8 @@ check('KRITISCH: am Desktop stehen die vier Kennzahlen auf EINER Zeile',
 const detailD = await gross.textContent('#liste .detail');
 check('Auch am Desktop stehen die Kontrollpunkte mit ihren Uhrzeiten da',
   /22:07/.test(detailD) && /Eingang Nord/.test(detailD));
-check('KRITISCH: und auch am Desktop kein Personenname (OP-423)',
-  !/Nachnamenstest/.test(detailD) && !/Vorname/.test(detailD));
+check('KRITISCH: und auch am Desktop steht die Person da (ENT-481)',
+  /M\. Musterperson/.test(detailD));
 // Der nicht besuchte Punkt gehört auch hier ins Bild.
 await gross.evaluate(() => document.querySelectorAll('#liste .zeile')[1].click());
 await gross.waitForTimeout(300);

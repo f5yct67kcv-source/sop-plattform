@@ -240,14 +240,16 @@ try {
   check('Die Bereiche lassen sich aus rechte.php ueberhaupt ablesen', BEREICHE.length > 0);
   // Einundzwanzig seit ENT-441: 'portal' (Kundenzugaenge) kam dazu -- der
   // einzige Bereich, der einen Zugang fuer Menschen ausserhalb des Betriebs
-  // oeffnet. Genau dafuer steht die feste Zahl hier.
-  check('KRITISCH: es sind die 21 Bereiche aus ENT-440/ENT-441 -- die feste Zahl zwingt jeden, der einen ergaenzt, hier vorbeizukommen',
-    BEREICHE.length === 21);
+  // oeffnet. Zweiundzwanzig seit ENT-451: 'lohn'. Genau dafuer steht die
+  // feste Zahl hier -- sie hat beim Lohnbaustein zwei echte Fehler
+  // aufgedeckt (das Recht landete zuerst bei der falschen Rolle).
+  check('KRITISCH: es sind die 22 Bereiche aus ENT-440/ENT-441/ENT-451 -- die feste Zahl zwingt jeden, der einen ergaenzt, hier vorbeizukommen',
+    BEREICHE.length === 22);
   check('KRITISCH: jeder Bereich kennt mindestens die Stufe "lesen"',
     BEREICHE.every(b => b.stufen.includes('lesen')));
   check('KRITISCH: das Logbuch hat keine Schreibstufe (ENT-077: es ist nur lesend)',
     !(BEREICHE.find(b => b.schluessel === 'logbuch') || { stufen: ['schreiben'] }).stufen.includes('schreiben'));
-  check('Daraus ergeben sich 38 Rechte', ALLE_RECHTE.length === 38);
+  check('Daraus ergeben sich 40 Rechte', ALLE_RECHTE.length === 40);
 
   // Die fuenf Systemrollen: Server gegen Rueckfallliste der Oberflaeche.
   const phpRollen = [...RECHTE_PHP.matchAll(/^const ROLLE_\w+\s*=\s*'([a-z]+)';/gm)].map(m => m[1]);
@@ -588,8 +590,8 @@ try {
   await page.waitForTimeout(500);
   check('Ein eigenes Profil lässt sich öffnen', await sichtbar('rvEditKarte'));
   const m = (await page.textContent('#rvEditInhalt')).replace(/\s+/g, ' ');
-  check('KRITISCH: die Matrix zeigt alle 21 Bereiche',
-    await page.evaluate(() => document.querySelectorAll('#rvEditInhalt .rm-zeile').length) === 21);
+  check('KRITISCH: die Matrix zeigt alle 22 Bereiche',
+    await page.evaluate(() => document.querySelectorAll('#rvEditInhalt .rm-zeile').length) === 22);
   check('Sie sind in die sechs Gruppen geteilt',
     await page.evaluate(() => document.querySelectorAll('#rvEditInhalt .rm-gruppe-hd').length) === 6);
   check('KRITISCH: Bereiche ohne Schreibweg zeigen zwei Schalter statt drei — ein Schreibschalter ohne Schreibweg wäre eine Behauptung',

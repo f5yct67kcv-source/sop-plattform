@@ -6,9 +6,14 @@
 // die im erreichbaren Code gar nicht existierte, und eine Variable, die in
 // ihrer Datei nie gesetzt wird. Beide waeren beim ersten echten Aufruf
 // hochgegangen. Diese Suite schliesst genau diese Luecke.
+//
+// Ein dritter kam am 2026-09-11 dazu (ENT-540) und war monatelang produktiv:
+// eine Konstante, die nur in einem anderen ENDPUNKT stand. Endpunkte binden
+// einander nie ein. Die betroffene Zeile lief nur, wenn ein Foto dabei war --
+// darum kam jede Ereignismeldung ohne Foto an und jede mit Foto nie.
 import { WURZEL, HIER, OUT, browserPfad } from './pfade.mjs';
 import { execFileSync } from 'child_process';
-import { readFileSync } from 'fs';
+import { readFileSync, readdirSync } from 'fs';
 import { dirname, resolve } from 'path';
 
 const ok = [], bad = [];
@@ -33,6 +38,13 @@ check('KRITISCH: kein Aufruf einer unbekannten Funktion',
   !beanstandet.some(z => /unbekannten Funktion/.test(z)));
 check('KRITISCH: keine Variable, die gelesen aber nie gesetzt wird',
   !beanstandet.some(z => /nie gesetzt/.test(z)));
+// Dritte Fehlerklasse, dazugekommen mit ENT-540: eine Konstante des Hauses,
+// die in einem ANDEREN Endpunkt definiert ist. Endpunkte binden einander nie
+// ein; PHP 8 wirft dafuer einen Error, und im Browser steht "Unerwarteter
+// Serverfehler". Gefunden, weil jede Ereignismeldung MIT Foto daran
+// scheiterte und jede ohne ankam -- die Zeile lief nur im Foto-Zweig.
+check('KRITISCH: keine Hauskonstante, die vom Endpunkt aus nicht erreichbar ist',
+  !beanstandet.some(z => /nicht erreichbar/.test(z)));
 check('KRITISCH: gar keine Beanstandung', code === 0 && beanstandet.length === 0);
 
 // ── Die Layout-Pruefung wird WIRKLICH ausgefuehrt (ENT-073).
@@ -295,6 +307,53 @@ check('KRITISCH: alle Hilfsdateien im Web-Verzeichnis sind gegen direkten Abruf 
   imWurzel.length > 0 && ungesperrt.length === 0);
 if (ungesperrt.length) { bad.push('nicht gesperrt: ' + ungesperrt.join(', ')); }
 
+// DIE KEHRSEITE, und sie hat 2026-09-09 im Livesystem zugeschlagen:
+// <FilesMatch> greift auf den DATEINAMEN, nicht auf den Pfad. Der Deploy
+// legt Hilfsdateien nach dist/ und Endpunkte nach dist/api/ -- traegt ein
+// ENDPUNKT denselben Namen wie eine gesperrte Hilfsdatei, sperrt die Regel
+// ihn mit. So war api/lohnlauf.php im Betrieb nicht erreichbar: Der
+// Webserver antwortete 403, BEVOR PHP startete. Im PHP war nichts zu
+// finden -- Rechte und Sitzung stimmten, der Bereich blieb leer.
+//
+// Geprueft wird die Kollision selbst, nicht ein Dateiname: Die Namensliste
+// kommt aus der echten FilesMatch-Zeile, die Endpunkte aus dem echten
+// Verzeichnis.
+const gesperrteNamen = ((ht.match(/<FilesMatch "\^\(([^)]*)\)\\\.php\$">/) || [])[1] || '').split('|');
+const endpunkte = readdirSync(`${WURZEL}/backend/api`)
+  .filter(f => f.endsWith('.php')).map(f => f.slice(0, -4));
+// Am 2026-09-10 auf Weisung des Projektinhabers geleert: demo_anfrage.php
+// war die letzte bekannte Kollision und ist umbenannt (api/demo_senden.php).
+// Die Liste bleibt stehen, damit ein kuenftiger Fall aus einem fremden
+// Bereich gemeldet werden kann, ohne die Suite dauerhaft rot zu faerben.
+const KOLLISION_BEKANNT = [];
+const kollisionen = endpunkte.filter(n => gesperrteNamen.includes(n));
+check('KRITISCH: kein Endpunkt traegt den Namen einer gesperrten Hilfsdatei',
+  gesperrteNamen.length > 3
+  && kollisionen.filter(n => !KOLLISION_BEKANNT.includes(n)).length === 0);
+kollisionen.filter(n => KOLLISION_BEKANNT.includes(n)).forEach(n => {
+  console.log(`  ! api/${n}.php traegt einen gesperrten Namen — im Betrieb 403, fremder Bereich, gemeldet`);
+});
+
+// DER ZWEITE FEHLER AM DEMO-FORMULAR, und er wog schwerer als die
+// Namenskollision: homepage.html rief "backend/api/demo_anfrage.php" auf --
+// den Pfad im REPOSITORY. Der Deploy legt die Endpunkte aber nach dist/api/
+// und erzeugt gar kein dist/backend/ (mkdir -p dist/api ...). Im Betrieb
+// lief die Anfrage damit in ein 404, noch bevor die Sperrliste ueberhaupt
+// zum Zug kam. Der Browsertest fiel darauf nicht herein: Er faengt die
+// Anfrage per Route ab und traf denselben falschen Pfad.
+//
+// Geprueft wird deshalb die ausgelieferte Datei selbst: Kein Aufruf darf
+// den Repo-Pfad tragen. Kommentare duerfen backend/... nennen -- gesucht
+// wird nur, wo der Pfad als WERT steht (nach Anfuehrungszeichen oder =).
+const seiten = [...deploy.matchAll(/cp (\w+\.html) dist\//g)].map(m => m[1]);
+const mitRepoPfad = seiten.filter(f => {
+  try { return /["'=]backend\/api\//.test(readFileSync(`${WURZEL}/${f}`, 'utf8')); }
+  catch { return false; }
+});
+check('KRITISCH: keine ausgelieferte Seite ruft einen Endpunkt ueber den Repo-Pfad auf',
+  seiten.length > 0 && mitRepoPfad.length === 0);
+if (mitRepoPfad.length) { bad.push('ruft backend/api/ auf: ' + mitRepoPfad.join(', ')); }
+
 check('Kein Einbetten in fremde Seiten (Clickjacking)',
   /X-Frame-Options *"DENY"/.test(ht) && /frame-ancestors 'none'/.test(ht));
 check('Der Browser raet den Inhaltstyp nicht', /X-Content-Type-Options *"nosniff"/.test(ht));
@@ -304,6 +363,49 @@ check('KRITISCH: gegen alte Apache-Fassungen abgesichert -- ein Fehler hier legt
 check('Kopfzeilen nur, wenn das Modul da ist', /IfModule mod_headers\.c/.test(ht));
 check('Das Mikrofon bleibt erlaubt -- das Diktat braucht es',
   /microphone=\(self\)/.test(ht));
+
+// ── Permissions-Policy gegen das, was die Oberflaechen wirklich benutzen
+//    (ENT-501) ───────────────────────────────────────────────────────────
+//
+// ANLASS: Die Kopfzeile stand seit ENT-075 auf "geolocation=()" -- eine
+// LEERE Erlaubnisliste, die den Standort auch fuer die eigene Seite sperrt.
+// Sie stammt aus der Zeit VOR dem Revierdienst und ist nie nachgezogen
+// worden. app.html braucht navigator.geolocation inzwischen an neun
+// Stellen; am Standort haengt damit auch der Alleinarbeiterschutz.
+//
+// Warum das niemandem auffiel: Die Browser-Suiten bilden die Serverantwort
+// nach und sehen die .htaccess nie. Eine Schutzeinstellung, die eine
+// Funktion des Betriebs abschaltet, sieht im Quelltext richtig aus.
+//
+// Geprueft wird die AUSSAGE: Keine Funktion, die eine der Oberflaechen
+// tatsaechlich aufruft, darf in der Kopfzeile auf einer leeren Liste
+// stehen. Die Zuordnung Funktion -> Aufrufmuster steht hier, damit eine
+// kuenftig ergaenzte Sperre denselben Abgleich bekommt.
+const BROWSERFUNKTION = {
+  geolocation: /navigator\.geolocation\b/,
+  camera:      /getUserMedia\s*\(/,
+  microphone:  /getUserMedia\s*\(|webkitSpeechRecognition|\bSpeechRecognition\b/,
+};
+const oberflaechen = ['app.html', 'dashboard.html', 'portal.html', 'index.html']
+  .map(n => readFileSync(`${WURZEL}/${n}`, 'utf8')).join('\n');
+const policy = (ht.match(/Permissions-Policy\s+"([^"]*)"/) || [null, ''])[1];
+check('Es gibt ueberhaupt eine Permissions-Policy zu pruefen', policy.trim() !== '');
+const gesperrtObwohlBenutzt = Object.entries(BROWSERFUNKTION)
+  .filter(([funktion, muster]) => {
+    const leer = new RegExp(funktion + '\\s*=\\s*\\(\\s*\\)').test(policy);
+    return leer && muster.test(oberflaechen);
+  })
+  .map(([funktion]) => funktion);
+check('KRITISCH: keine Browserfunktion ist gesperrt, die eine Oberflaeche tatsaechlich benutzt',
+  gesperrtObwohlBenutzt.length === 0);
+if (gesperrtObwohlBenutzt.length) {
+  bad.push('per Kopfzeile gesperrt, aber benutzt: ' + gesperrtObwohlBenutzt.join(', '));
+}
+// Gegenrichtung: Die Zuordnung oben darf nicht ins Leere laufen. Trifft
+// KEIN Muster mehr, prueft der Abgleich nichts mehr und ist gruen, ohne
+// etwas zu wissen -- dieselbe Falle wie eine Ausnahmeliste ohne Datei.
+check('Die Zuordnung Browserfunktion -> Aufrufmuster trifft ueberhaupt etwas',
+  Object.values(BROWSERFUNKTION).some(m => m.test(oberflaechen)));
 check('Die HTTPS-Umleitung ist NICHT scharf geschaltet -- sie kann die Seite unerreichbar machen',
   /# *RewriteRule \^ https/.test(ht));
 check('Es steht drin, wie man die Datei wieder loswird, wenn sie Aerger macht',
@@ -357,6 +459,8 @@ if (zfBeanstandet.length) { zfBeanstandet.forEach(z => bad.push('PHP-Zweifaktor:
 // Rechteregel nie vorbei.
 for (const [datei, titel] of [
   ['pruef_rechte.php',  'KRITISCH: die Rollen geben genau die entschiedenen Rechte'],
+  ['pruef_lohn.php', 'KRITISCH: Lohnform, Mindestlohn, Ferienentschaedigung und PaKo-Beitrag stimmen mit dem GAV ueberein (ENT-451)'],
+  ['pruef_lohnlauf.php', 'KRITISCH: der Lohnlauf zaehlt nur abgeglichene Schichten, sperrt Reinigung und rechnet nichts auf fehlender Grundlage (ENT-451)'],
   ['pruef_logbuch.php', 'KRITISCH: das Logbuch haelt fest, wer was geaendert hat'],
   ['pruef_einsatz_abgeschlossen.php', 'KRITISCH: "abgeschlossen" verlangt ALLE zugesagten Rapporte (ENT-128)'],
   ['pruef_rundgang.php', 'KRITISCH: Geofence-Pruefung und Restliste der Kontrollpunkte stimmen (ENT-132/ENT-145/ENT-180)'],
@@ -369,6 +473,12 @@ for (const [datei, titel] of [
   ['pruef_mitteilung_antwort.php', 'KRITISCH: auf einen fremden oder nicht sichtbaren Termin laesst sich nicht zusagen (ENT-436)'],
   ['pruef_mitteilung_liste.php', 'KRITISCH: die Antwortliste eines Termins nennt ALLE Empfaenger, auch die ohne Antwort (ENT-436)'],
   ['pruef_kundenportal.php', 'KRITISCH: Sitzungsablauf, Einmal-Code und E-Mail-Abgleich des Kundenportals stimmen (ENT-441)'],
+  ['pruef_wachbuch.php', 'KRITISCH: das Wachbuch fuehrt vier Quellen richtig zusammen, sortiert und kappt sie (ENT-480)'],
+  ['pruef_ereignis_foto_frist.php', 'KRITISCH: die Aufbewahrungsfrist fuer Ereignisfotos greift wirklich -- Bild weg, Meldung bleibt, Vermerk steht (ENT-545)'],
+  ['pruef_zustellnachweis.php', 'KRITISCH: der Zustellnachweis fuehrt EINE Zeile je Rapport, kein Bewegungsprofil (ENT-491)'],
+  ['pruef_portal_verlauf.php', 'KRITISCH: die Verlaufskurve buendelt nach Tagen/Wochen und laesst keine Luecke weg (ENT-500)'],
+  ['pruef_sicherheit.php', 'KRITISCH: die Sicherheitsregeln aus ENT-501 werden WIRKLICH ausgefuehrt -- Basisadresse, Link-Schema, Push-Dienst, Sitzungs-Abdruck, Blindpruefung, Bildtyp'],
+  ['pruef_ki.php', 'KRITISCH: die KI-Erkennung sagt, WARUM sie nicht ging -- kein Schluessel, abgelehnt, Guthaben und Stoerung sind verschiedene Aussagen (ENT-530)'],
 ]) {
   let aus = '', code = 0;
   try {
@@ -408,6 +518,28 @@ const ohneEinbindung = apiDateien.filter(f => {
 check('KRITISCH: jeder Endpunkt mit Rechtepruefung bindet rechte.php ein',
   ohneEinbindung.length === 0);
 if (ohneEinbindung.length) { bad.push('ohne rechte.php: ' + ohneEinbindung.join(', ')); }
+
+// Jeder KI-Endpunkt muss den GRUND weitergeben, nicht einen Satz fuer alles
+// (ENT-530). Vier Endpunkte antworteten bis dahin auf jeden Fehlschlag mit
+// "Erkennung nicht verfuegbar" -- kein Schluessel, abgelehnter Schluessel,
+// leeres Guthaben und Stoerung sahen identisch aus, und damit liess sich
+// nicht einmal feststellen, ob ueberhaupt ein Schluessel hinterlegt ist.
+//
+// Geprueft wird nicht, wie ein Satz lautet (das steht in pruef_ki.php),
+// sondern dass die Weiche ueberhaupt benutzt wird: Auf JEDEN "=== null"-Zweig
+// eines KI-Endpunkts folgt ki_fehler_melden(). Ein neuer fuenfter Endpunkt,
+// der den Grund verschluckt, faellt hier auf.
+{
+  const kiDateien = apiDateien.filter(f => f.startsWith('ki_'));
+  check('Es gibt ueberhaupt KI-Endpunkte zu pruefen', kiDateien.length > 0);
+  for (const f of kiDateien) {
+    const q = ohneKommentar(f);
+    const zweige = (q.match(/===\s*null\s*\)\s*\{/g) || []).length;
+    const gemeldet = (q.match(/===\s*null\s*\)\s*\{\s*ki_fehler_melden\s*\(/g) || []).length;
+    check(`KRITISCH: ${f} nennt bei jedem Fehlschlag den Grund (ki_fehler_melden)`,
+      zweige > 0 && zweige === gemeldet);
+  }
+}
 
 // Eine abgeglichene Schicht ist festgeschrieben (ENT-045). Wer den Plan
 // danach aendert, verschiebt rueckwirkend die Grundlage einer Feststellung,
@@ -665,6 +797,87 @@ const totEintraege = NUR_EIGENE_DATEN.filter(f => !apiDateien.includes(f));
 check('Die Ausnahmeliste nennt nur Endpunkte, die es gibt', totEintraege.length === 0);
 if (totEintraege.length) { bad.push('Ausnahme ohne Datei: ' + totEintraege.join(', ')); }
 
+// ── Endpunkte ganz OHNE Anmeldung (ENT-501) ───────────────────────────
+//
+// DIE LUECKE, die diese Liste schliesst: Die Rechtepruefung oben steigt in
+// ihrer ersten Zeile aus, sobald eine Datei kein require_session() enthaelt
+// ("login.php u.ae."). Das ist fuer den Anmelde-Endpunkt richtig -- es hiess
+// aber auch, dass ein NEUER Endpunkt, der require_session() schlicht
+// VERGISST, nirgends auffaellt: Er wird uebersprungen, nicht gemeldet, und
+// steht in keiner Ausnahmeliste. Genau die Sorte Fehler, vor der CLAUDE.md
+// warnt -- etwas Neues, das die Regel nicht erbt.
+//
+// Darum eine zweite Liste, und sie ist absichtlich vollstaendig: JEDER
+// Endpunkt, der weder eine Verwaltungs- noch eine Kundensitzung verlangt,
+// steht hier namentlich mit dem Grund. Kommt ein elfter dazu, wird die
+// Pruefung rot.
+const OHNE_ANMELDUNG = [
+  // Der Eingang selbst -- er kann keine Sitzung verlangen, die er erst
+  // erzeugt. Eigene Pruefungen: Bremse, zweiter Faktor, Notfallcodes.
+  'login.php',
+  // Loeschen der eigenen Sitzung. Wirkt nur mit dem Token, den man ohnehin
+  // schon hat, und kann nichts ausser dem eigenen Eintrag treffen.
+  'logout.php',
+  // Ruecksetzung per Mail (ENT-373). Verwaltungskonten sind ausdruecklich
+  // ausgenommen, die Antwort ist immer gleichlautend, eigene Bremse unter
+  // dem Namensraum "reset:". Eigene Pruefung: pruef_passwort_reset.php.
+  'passwort_vergessen.php',
+  'passwort_zuruecksetzen.php',
+  // Formular der oeffentlichen Homepage (ENT-469). Empfaenger fest aus den
+  // Betriebsstammdaten, Honigtopf-Feld, eigene Bremse. Eigene Pruefung:
+  // pruef_demo_anfrage.php.
+  'demo_senden.php',
+  // Der Eingang der Betreiber-Ebene (ENT-524). Kann keine Sitzung
+  // verlangen, die er erst erzeugt -- dieselbe Begruendung wie login.php.
+  // Erbt Bremse (eigener Namensraum "betreiber:"), Blindpruefung gegen
+  // Zeitmessung und die gleichlautende Antwort fuer "gibt es nicht" und
+  // "Passwort falsch". Eigene Pruefung: test_betreiber.mjs.
+  'betreiber_anmelden.php',
+  // Die drei Eingaenge des Kundenportals -- stehen zusaetzlich in
+  // PORTAL_EINGAENGE weiter unten, weil dort die Portal-Regel greift.
+  'portal_anmelden.php',
+  'portal_link_anfordern.php',
+  'portal_neues_passwort.php',
+  // Beleg-Ansicht und Kundenentscheid am oeffentlichen Link (ENT-192/205).
+  // Der Ausweis ist ein versand_token mit 256 Bit -- ein Kunde hat kein
+  // Konto. Bis ENT-501 standen diese beiden nirgends benannt.
+  'beleg_oeffentlich.php',
+  'beleg_entscheidung.php',
+];
+// Drei Anmeldewege, drei Pruefstellen: die Verwaltung (require_session),
+// das Kundenportal (require_kundensession, ENT-441) und die Betreiber-Ebene
+// (require_betreiber, ENT-519). Wer einen davon ruft, ist angemeldet -- wer
+// keinen ruft, steht unten namentlich mit Grund.
+const ohneAnmeldung = apiDateien.filter(f =>
+  !/require_session\s*\(|require_kundensession\s*\(|require_betreiber(?:_voll)?\s*\(/.test(ohneKommentar(f)));
+const unbenannt = ohneAnmeldung.filter(f => !OHNE_ANMELDUNG.includes(f));
+check('KRITISCH: jeder Endpunkt ganz ohne Anmeldung steht namentlich da',
+  unbenannt.length === 0);
+if (unbenannt.length) { bad.push('ohne Anmeldung und unbenannt: ' + unbenannt.join(', ')); }
+
+// Die Kehrseite, und sie ist der wichtigere Teil: Bekommt einer dieser
+// Endpunkte spaeter eine Sitzungspruefung, muss er hier VERSCHWINDEN. Sonst
+// deckt ein veralteter Eintrag den naechsten Endpunkt gleichen Namens zu --
+// dieselbe Ueberlegung wie bei totEintraege oben.
+const toteOhneAnmeldung = OHNE_ANMELDUNG.filter(f => !ohneAnmeldung.includes(f));
+check('Die Liste "ohne Anmeldung" nennt nur Endpunkte, die es auch wirklich sind',
+  toteOhneAnmeldung.length === 0);
+if (toteOhneAnmeldung.length) {
+  bad.push('steht als "ohne Anmeldung", prueft aber doch: ' + toteOhneAnmeldung.join(', '));
+}
+
+// Zwei weitere Regeln aus ENT-501 -- "die eigene Adresse kommt nie aus der
+// Anfrage" und "eine Sitzung wird nur ueber ihren Abdruck angesprochen" --
+// stehen BEWUSST NICHT hier, sondern in pruef_sicherheit.php.
+//
+// Grund, und er ist beim Schreiben dieser Pruefung aufgefallen: Der
+// Kommentarfilter oben (ohneKommentar) ist ein Muster, kein Zerteiler. Er
+// haelt die beiden Schraegstriche in der Zeichenkette 'https://' fuer einen
+// Kommentarbeginn und loescht den Rest der Zeile -- ausgerechnet die Zeile,
+// in der ein wieder eingebautes HTTP_HOST staende. Die Gegenprobe blieb
+// dadurch gruen. Fuer diese beiden Regeln zerteilt darum PHP selbst
+// (token_get_all), genau wie es pruef_sql.php aus demselben Grund tut.
+
 // ── Kundenportal (ENT-441) ────────────────────────────────────────────
 // Die Endpunkte des Portals gehen einen ANDEREN Weg als alle uebrigen: Sie
 // pruefen kein Recht aus rechte.php, weil ein Kundenzugang keine Rechte hat
@@ -707,21 +920,125 @@ if (portalMitAdminSitzung.length) {
   bad.push('Portal mit Verwaltungssitzung: ' + portalMitAdminSitzung.join(', '));
 }
 
-// Kein Personenname aus dem Personal verlaesst den Server ueber das Portal.
-// ENT-441 hat ihn aus der Portalliste herausgehalten, und WELCHE Fassung
-// (aus / nur Vorname / voll) im Detail erscheinen soll, ist Gegenstand von
-// OP-423 und nicht entschieden. Bis dahin gilt die sparsame Vorbelegung.
+// Namen von Mitarbeitenden gehen seit ENT-481 ueber das Portal hinaus -- der
+// Projektinhaber hat entschieden, den Rapport „1:1" zu zeigen, weil der Kunde
+// ohnehin schon eine physische Kopie davon bekommt. Die fruehere Pruefung
+// („kein Portal-Endpunkt liest Namen") ist damit gegenstandslos und wurde
+// ENTFERNT statt aufgeweicht -- eine Pruefung, deren Grundlage weggefallen
+// ist, taeuscht Schutz vor.
 //
-// Geprueft wird die MECHANIK, nicht ein Wortlaut: Ohne Verbund auf
-// `mitarbeiter` und ohne die beiden Spalten kann ein Name gar nicht erst in
-// die Antwort geraten. Faellt der Entscheid spaeter anders aus, wird diese
-// Pruefung bewusst angepasst -- dann steht es im Protokoll.
-const portalMitNamen = portalDateien.filter(f =>
-  /\bJOIN\s+mitarbeiter\b/i.test(ohneKommentar(f))
-  || /\b(?:vorname|nachname)\b/i.test(ohneKommentar(f)));
-check('KRITISCH: kein Portal-Endpunkt liest Namen von Mitarbeitenden — OP-423 ist offen',
-  portalMitNamen.length === 0);
-if (portalMitNamen.length) { bad.push('Portal mit Personennamen: ' + portalMitNamen.join(', ')); }
+// Was an ihre Stelle tritt, gilt weiter und ist die eigentliche Grenze: Die
+// VERTRAULICHEN Personalfelder (ma_vertrauliche_felder(), CLAUDE.md) haben in
+// keinem Portal-Endpunkt etwas zu suchen. Ein Name auf einem Rapport ist
+// etwas anderes als eine AHV-Nummer.
+const VERTRAULICH = ['ahv_nr', 'nationalitaet', 'heimatort', 'geburtsort', 'zivilstand',
+  'heiratsdatum', 'geburtsdatum', 'geschlecht', 'aufenthaltsbewilligung',
+  'aufenthalt_gueltig_bis', 'arbeitsbewilligung', 'arbeit_gueltig_bis', 'zemis_nr',
+  'strafregister_datum', 'betreibung_datum', 'dienstausweis_nr', 'dienstausweis_gueltig_bis'];
+// Die Liste wird gegen die Quelle geprueft, statt sie zu behaupten: Kommt in
+// mitarbeiter.php ein Feld dazu, faellt es hier auf, statt still unbewacht
+// zu bleiben.
+{
+  const quelle = readFileSync(`${WURZEL}/backend/mitarbeiter.php`, 'utf8');
+  const block = quelle.slice(quelle.indexOf('function ma_vertrauliche_felder'));
+  const echt = [...block.slice(0, block.indexOf('}')).matchAll(/'([a-z_]+)'/g)].map(m => m[1]);
+  check('KRITISCH: die Liste der vertraulichen Felder stimmt mit mitarbeiter.php ueberein',
+    echt.length > 0 && JSON.stringify([...echt].sort()) === JSON.stringify([...VERTRAULICH].sort()));
+}
+const portalMitVertraulichem = portalDateien.filter(f => {
+  const text = ohneKommentar(f);
+  return VERTRAULICH.some(feld => new RegExp('\\b' + feld + '\\b').test(text));
+});
+check('KRITISCH: kein Portal-Endpunkt liest vertrauliche Personalfelder',
+  portalMitVertraulichem.length === 0);
+if (portalMitVertraulichem.length) {
+  bad.push('Portal mit vertraulichen Feldern: ' + portalMitVertraulichem.join(', '));
+}
+
+// Wer im Portal ein Passwort SETZT, muss sich ausgewiesen haben (ENT-488).
+// Zwei Wege sind erlaubt und nur zwei: das bisherige Passwort vorzeigen, oder
+// den zugeschickten Link -- der IST der Ausweis (ENT-448). Ein dritter
+// Endpunkt, der password_hash schreibt, ohne eines von beidem zu verlangen,
+// waere die Uebernahme eines fremden Zugangs per Anfrage.
+//
+// Namentlich benannt und nicht ueber ein Muster erkannt: Ein dritter Weg
+// soll auffallen, nicht durchrutschen -- dieselbe Bauart wie bei
+// ── Zustellnachweis: was das Portal ueber den Kunden festhaelt (ENT-491) ──
+//
+// Der Datenschutzhinweis im Portal sagt dem Kunden zu: keine IP-Adresse,
+// kein Geraet, kein Browser. Eine Zusage, die nur im Text steht, ist eine
+// Behauptung -- hier wird sie pruefbar. Geprueft wird die AUSSAGE (es wird
+// nicht danach gegriffen), nicht der Wortlaut des Hinweises.
+{
+  const GREIFT_NACH = /\$_SERVER\s*\[\s*['"](?:REMOTE_ADDR|HTTP_USER_AGENT|HTTP_X_FORWARDED_FOR|HTTP_REFERER)['"]\s*\]/;
+  const neugierig = portalDateien.filter(f => GREIFT_NACH.test(ohneKommentar(f)));
+  check('KRITISCH: kein Portal-Endpunkt greift nach IP-Adresse, Geraet oder Browser',
+    neugierig.length === 0);
+  if (neugierig.length) { bad.push('greift nach Geraetedaten: ' + neugierig.join(', ')); }
+
+  // Der Vermerk gehoert HINTER die Zuschnittspruefung. Davor hielte er
+  // fest, dass jemand nach einer FREMDEN Nummer gefragt hat -- das ist
+  // keine Zustellung, sondern eine Beobachtung, und sie stuende in einer
+  // Tabelle, die es dafuer nicht gibt.
+  const vermerker = portalDateien.filter(f => /kp_abruf_vermerken\s*\(/.test(ohneKommentar(f)));
+  check('Es gibt ueberhaupt Endpunkte, die einen Zustellnachweis schreiben',
+    vermerker.length >= 2);
+  const zuFrueh = vermerker.filter(f => {
+    const t = ohneKommentar(f);
+    const vermerk = t.search(/kp_abruf_vermerken\s*\(/);
+    // Die letzte Stelle, an der der Endpunkt den Zuschnitt durchsetzt:
+    // entweder eine Sichtbarkeitsfrage oder der gemeinsame Abbruch.
+    const wachen = [...t.matchAll(/kp_\w*sichtbar\s*\(|nichtAbrufbar\s*\(\s*\)/g)]
+      .map(m => m.index);
+    return !wachen.length || vermerk < Math.max(...wachen);
+  });
+  check('KRITISCH: der Zustellnachweis wird erst NACH der Zuschnittspruefung geschrieben',
+    zuFrueh.length === 0);
+  if (zuFrueh.length) { bad.push('vermerkt zu frueh: ' + zuFrueh.join(', ')); }
+}
+
+// PORTAL_EINGAENGE.
+{
+  const PW_OHNE_ALTES = ['portal_neues_passwort.php'];   // der Link ist der Ausweis
+  const setzen = portalDateien.filter(f => /password_hash\s*=\s*\?/.test(ohneKommentar(f)));
+  const ohneNachweis = setzen.filter(f => !PW_OHNE_ALTES.includes(f)
+    && !/password_verify\s*\(/.test(ohneKommentar(f)));
+  check('Es gibt ueberhaupt Portal-Endpunkte zu pruefen, die ein Passwort setzen',
+    setzen.length >= 2);
+  check('KRITISCH: jeder Portal-Endpunkt, der ein Passwort setzt, verlangt einen Ausweis',
+    ohneNachweis.length === 0);
+  if (ohneNachweis.length) { bad.push('Passwort ohne Ausweis: ' + ohneNachweis.join(', ')); }
+  const totePw = PW_OHNE_ALTES.filter(f => !apiDateien.includes(f));
+  check('Die Ausnahmeliste fuer den Linkweg nennt nur Endpunkte, die es gibt', totePw.length === 0);
+}
+
+// Der Abbruchgrund verlaesst den Server als KLARTEXT, nicht als Codewort
+// (ENT-324, jetzt auch fuers Portal). Zwei Seiten derselben Regel:
+//   - Der Endpunkt schlaegt im Katalog nach.
+//   - portal.html traegt KEINE eigene Kopie des Katalogs. Eine zweite Kopie
+//     liefe beim naechsten Grund auseinander, und der Kunde bekaeme dann ein
+//     Codewort zu lesen.
+// Nicht nur das Detail: JEDER Portal-Endpunkt, der einen Abbruchgrund
+// weitergibt, muss ihn aufloesen. Mit dem Wachbuch (ENT-484) gibt es einen
+// zweiten -- und ein dritter soll nicht wieder einzeln nachgetragen werden
+// muessen, sondern von selbst auffallen.
+{
+  const mitGrund = portalDateien.filter(f => /\babbruch_grund\b/.test(ohneKommentar(f)));
+  const ohneKatalog = mitGrund.filter(f => !/RUNDGANG_ABBRUCH_GRUENDE\s*\[/.test(ohneKommentar(f)));
+  check('Es gibt ueberhaupt Portal-Endpunkte mit Abbruchgrund zu pruefen', mitGrund.length >= 2);
+  check('KRITISCH: jeder Portal-Endpunkt loest den Abbruchgrund ueber den Katalog auf',
+    ohneKatalog.length === 0);
+  if (ohneKatalog.length) { bad.push('Abbruchgrund ohne Katalog: ' + ohneKatalog.join(', ')); }
+}
+{
+  const rd = readFileSync(`${WURZEL}/backend/rundgang.php`, 'utf8');
+  const block = rd.slice(rd.indexOf('const RUNDGANG_ABBRUCH_GRUENDE'));
+  const codes = [...block.slice(0, block.indexOf('];')).matchAll(/'([a-z_]+)'\s*=>/g)].map(m => m[1]);
+  const portalText = readFileSync(`${WURZEL}/portal.html`, 'utf8');
+  check('Der Katalog der Abbruchgruende ist ueberhaupt gefunden', codes.length >= 3);
+  check('KRITISCH: portal.html traegt keine eigene Kopie des Abbruchgrund-Katalogs',
+    !codes.some(c => portalText.includes(c)));
+}
 
 // Die Bewegungsspur geht seit ENT-474 zum Kunden -- aber ueber GENAU EINEN
 // Endpunkt, der sie erst auf einen Knopfdruck hin liefert.
@@ -743,11 +1060,28 @@ const toteSpur = PORTAL_SPUR_ERLAUBT.filter(f => !apiDateien.includes(f));
 check('Die Ausnahmeliste fuer die Spur nennt nur Endpunkte, die es gibt', toteSpur.length === 0);
 if (toteSpur.length) { bad.push('Spur-Ausnahme ohne Datei: ' + toteSpur.join(', ')); }
 
-// Und der eine erlaubte Weg fragt dieselbe Sichtbarkeitsregel wie das Detail
-// und das Foto. Ohne sie kaeme ein Kunde durch blosses Hochzaehlen an die
-// Aufenthaltsspur einer fremden Runde -- ausgerechnet am heikelsten Ort.
-check('KRITISCH: der Spur-Endpunkt fragt dieselbe Sichtbarkeitsregel wie Detail und Foto',
-  /kp_runde_sichtbar\s*\(/.test(ohneKommentar('portal_rundgang_weg.php')));
+/* Jeder Portal-Endpunkt, der den Inhalt EINER Runde nach ihrer Nummer
+   herausgibt, fragt dieselbe Sichtbarkeitsregel. Ohne sie kaeme ein Kunde
+   durch blosses Hochzaehlen einer Zahl an den Nachweis einer fremden Runde.
+
+   Namentlich und nicht ueber ein Muster -- gleiche Begruendung wie bei
+   PORTAL_EINGAENGE: Ein vierter Weg soll auffallen, statt stillschweigend
+   durch eine Regel zu rutschen, die ihn zufaellig nicht erfasst. Die
+   Listenansichten (portal_rundgaenge, portal_wachbuch) stehen bewusst NICHT
+   hier: Sie schneiden ueber kp_objekt_ids() zu und geben nie eine einzelne
+   fremde Nummer heraus.
+
+   portal_ereignis_foto.php ist mit ENT-544 dazugekommen. */
+const PORTAL_NACH_NUMMER = ['portal_rundgang_detail.php', 'portal_rundgang_foto.php',
+  'portal_rundgang_weg.php', 'portal_ereignis_foto.php'];
+const ohneSichtbarkeit = PORTAL_NACH_NUMMER.filter(f =>
+  !/kp_runde_sichtbar\s*\(/.test(ohneKommentar(f)));
+check('KRITISCH: jeder Weg zu EINER Runde fragt dieselbe Sichtbarkeitsregel',
+  ohneSichtbarkeit.length === 0);
+if (ohneSichtbarkeit.length) { bad.push('ohne kp_runde_sichtbar: ' + ohneSichtbarkeit.join(', ')); }
+const toteNachNummer = PORTAL_NACH_NUMMER.filter(f => !apiDateien.includes(f));
+check('Die Liste nennt nur Endpunkte, die es gibt', toteNachNummer.length === 0);
+if (toteNachNummer.length) { bad.push('Sichtbarkeits-Liste ohne Datei: ' + toteNachNummer.join(', ')); }
 
 // DIE KERNREGEL. Ein Portal-Endpunkt, der eine kunde_id oder zugang_id aus// DIE KERNREGEL. Ein Portal-Endpunkt, der eine kunde_id oder zugang_id aus
 // der Anfrage naehme, liesse jeden angemeldeten Kunden die Daten jedes

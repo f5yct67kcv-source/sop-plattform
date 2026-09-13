@@ -659,19 +659,21 @@ check('Passwortblatt fragt das bisherige Passwort', await page.isVisible('#pwAlt
     mass.polster >= mass.w && mass.innerhalb);
   await page.fill('#pwNeu', '');
 }
+// Drei Zeichen bleiben zu kurz -- die Schwelle ist mit ENT-502 wieder 12
+// (Erprobungs-Absenkung aus ENT-289 zurueckgenommen).
 await page.fill('#pwNeu', '123');
 await page.click('#pwBtn');
 await page.waitForTimeout(200);
 check('Zu kurzes Passwort wird abgefangen', await page.isVisible('#pwErr'));
 check('Zu kurzes Passwort wird nicht gesendet', !rufe.some(r => r.p.includes('mein_passwort')));
 await page.fill('#pwAlt', 'geheim');
-await page.fill('#pwNeu', 'neuesGeheim');
+await page.fill('#pwNeu', 'neuesLangesWort');
 await page.click('#pwBtn');
 await page.waitForTimeout(300);
 const pw = rufe.filter(r => r.p.includes('mein_passwort'));
 check('Passwortwechsel wird gesendet', pw.length === 1);
 check('Passwortwechsel sendet beide Passwoerter',
-  pw.length === 1 && pw[0].body.alt === 'geheim' && pw[0].body.neu === 'neuesGeheim');
+  pw.length === 1 && pw[0].body.alt === 'geheim' && pw[0].body.neu === 'neuesLangesWort');
 check('Blatt schliesst nach dem Passwortwechsel',
   !(await page.evaluate(() => document.getElementById('blatt').classList.contains('on'))));
 
@@ -680,7 +682,7 @@ passwortAntwort = [{ status: 'error', message: 'Das bisherige Passwort stimmt ni
 await page.click('#v-menu button[onclick="passwortBlatt()"]');
 await page.waitForTimeout(200);
 await page.fill('#pwAlt', 'falsch');
-await page.fill('#pwNeu', 'neuesGeheim');
+await page.fill('#pwNeu', 'neuesLangesWort');
 await page.click('#pwBtn');
 await page.waitForTimeout(300);
 check('Falsches altes Passwort wird gemeldet',

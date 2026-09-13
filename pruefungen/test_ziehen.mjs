@@ -203,6 +203,59 @@ await page.waitForTimeout(150);
 await page.evaluate(() => zeige('heute'));
 await page.waitForTimeout(300);
 
+// ══════════════ DIE STATUSLEISTE (ENT-477)
+// Der Abschluss der Sockel-Geschichte. Nach ENT-429, ENT-439 und ENT-475
+// steht fest: Der fehlende Streifen ist NICHT BEMALBAR -- was unterhalb
+// des Bereichs der Seite liegt, schneidet iOS ab. Es gibt darum keinen
+// Weg ueber CSS, sondern nur ueber die Ursache: "black-translucent" weg,
+// dann gibt iOS der App gar keinen zu kurzen Bereich mehr.
+//
+// Gemessen wird am DOM, nicht im Quelltext -- und geprueft wird die
+// AUSSAGE ("kein durchscheinender Balken mehr"), nicht die Schreibweise.
+const kopfangaben = await page.evaluate(() => {
+  const lies = n => {
+    const m = document.querySelector('meta[name="' + n + '"]');
+    return m ? m.getAttribute('content') : null;
+  };
+  return { balken: lies('apple-mobile-web-app-status-bar-style'),
+           sicht: lies('viewport'), vollbild: lies('apple-mobile-web-app-capable') };
+});
+check('KRITISCH: die App verlangt keinen durchscheinenden Statusbalken mehr',
+  kopfangaben.balken !== null && !kopfangaben.balken.includes('translucent'));
+// viewport-fit=cover muss BLEIBEN: Daran haengt der untere
+// Sicherheitsabstand ueber dem Home-Balken. Ohne ihn waere der Streifen
+// oben weg und dafuer unten einer da.
+check('KRITISCH: viewport-fit=cover bleibt (daran haengt der untere Abstand)',
+  (kopfangaben.sicht || '').includes('viewport-fit=cover'));
+check('Die App laeuft weiterhin im Vollbild vom Startbildschirm',
+  kopfangaben.vollbild === 'yes');
+// Und der Preis der Umstellung: Ohne oberen Sicherheitsabstand darf die
+// Kopfzeile nicht zusammenfallen. Gemessen, nicht angenommen --
+// env(safe-area-inset-top) ist im Prueflauf 0, also genau der Zustand
+// nach der Umstellung.
+const kopfLage = await page.evaluate(() => {
+  const k = document.querySelector('.kopf');
+  const r = k.getBoundingClientRect();
+  const cs = getComputedStyle(k);
+  // Nur die SICHTBAREN: Der Konto-Knopf gehoert zum Schreibtisch und ist
+  // am Handy ausgeblendet -- er hat dort keine Hoehe und auch keine
+  // Trefferflaeche, die jemand braeuchte.
+  const knoepfe = [...k.querySelectorAll('button')]
+    .filter(b => getComputedStyle(b).display !== 'none')
+    .map(b => Math.round(b.getBoundingClientRect().height));
+  return { oben: Math.round(r.top), polsterOben: Math.round(parseFloat(cs.paddingTop)),
+           hoehe: Math.round(r.height), knoepfe };
+});
+check('KRITISCH: ohne oberen Sicherheitsabstand beginnt die Kopfzeile am Bildschirmrand',
+  kopfLage.oben === 0);
+check('Sie behaelt dabei ihr eigenes Polster', kopfLage.polsterOben >= 14);
+check('KRITISCH: ihre sichtbaren Knoepfe bleiben gross genug zum Treffen',
+  kopfLage.knoepfe.length >= 2 && kopfLage.knoepfe.every(h => h >= 40));
+// Und sie faellt nicht zusammen: Ohne den oberen Sicherheitsabstand
+// bleibt sie hoch genug fuer Name und Datum uebereinander.
+check('KRITISCH: die Kopfzeile bleibt hoch genug fuer Name und Datum',
+  kopfLage.hoehe >= 70);
+
 // ══════════════ SOCKEL: die Messung
 // Die drei Werte, die sockelMessen() liest, werden vorübergehend
 // überschrieben und danach wieder entfernt -- der Browser liefert sie

@@ -1,10 +1,19 @@
 // Auswertung > "Arbeitsergebnisse" (ENT-243, umgebaut in ENT-325): eine
 // eigene Ansicht mit derselben Kachelreihe wie "Kontrollrunde ändern"
 // (.rdkr-reiter/.rdkr-tab), nicht mehr eine Schublade mit einer senkrechten
-// Reiterliste. Volles Gerüst, aber nur "Kontrollpunktscans",
-// "Rundgangerledigung" und "Fahrzeugübernahmen" (ENT-346) tatsächlich
-// verdrahtet; die übrigen fünf haben noch kein Datenmodell und sagen das
-// sichtbar, statt auszusehen wie die anderen und dann nichts zu zeigen.
+// Reiterliste. Volles Gerüst, aber nur verdrahtet, was eine Datengrundlage
+// hat: "Wachbuch" (ENT-480), "Kontrollpunktscans", "Rundgangerledigung" und
+// "Fahrzeugübernahmen" (ENT-346).
+//
+// Die vier übrigen sagen sichtbar, dass sie folgen, statt auszusehen wie die
+// anderen und dann nichts zu zeigen. Zwei davon haben wirklich kein
+// Datenmodell (Alarme, Schlüsselprotokoll — OP-426); "Ereignisse" und
+// "Aufgabenerledigung" haben eines, stehen aber seit ENT-480 im Wachbuch und
+// bekommen erst mit einer eigenen Entscheidung eine eigene Vollansicht.
+//
+// Das Wachbuch selbst prüft test_wachbuch.mjs — hier geht es nur um die
+// Kachelreihe und darum, dass die vier verdrahteten Reiter ihren Endpunkt
+// rufen.
 import { WURZEL, OUT, browserPfad } from './pfade.mjs';
 import { chromium } from 'playwright';
 
@@ -37,7 +46,37 @@ const SCANS = { status: 'ok', scans: [
   { id: 3, erfasst_am: `${T0} 22:15:00`, status: 'ersatzscan', beschreibung: 'NFC-Chip defekt, Foto beigelegt',
     kontrollpunkt_name: 'Garage', kunde_name: 'Beispiel Immobilien GmbH', objekt_name: 'Testliegenschaft Süd',
     titel: null, vorname: 'Hans', nachname: 'Beispiel' },
+],
+// Aufgaben fuer den Reiter „Aufgabenerledigung" (ENT-548). Alle DREI
+// Zustaende, weil der Zweck der Ansicht die Unterscheidung ist: „erledigt",
+// „nicht moeglich" (jemand hat hingeschaut und geantwortet) und
+// „unbeantwortet" (niemand hat etwas gesagt -- der stillere Fall).
+aufgaben: [
+  { id: 91, rundgang_id: 10, erfasst_am: `${T2} 20:06:00`, uebermittelt_am: `${T2} 20:06:30`,
+    status: 'erledigt', grund: null, bezeichnung: 'Licht löschen',
+    kontrollpunkt_name: 'Eingang', kunde_name: 'Muster Liegenschaften AG',
+    objekt_name: 'Testliegenschaft Nord', titel: 'Öffnungsrunde',
+    vorname: 'Erika', nachname: 'Muster' },
+  { id: 92, rundgang_id: 10, erfasst_am: `${T1} 21:12:00`, uebermittelt_am: `${T1} 21:12:30`,
+    status: 'nicht_moeglich', grund: 'Tür war verstellt', bezeichnung: 'Kellertür prüfen',
+    kontrollpunkt_name: 'Keller', kunde_name: 'Muster Liegenschaften AG',
+    objekt_name: 'Testliegenschaft Nord', titel: 'Öffnungsrunde',
+    vorname: 'Erika', nachname: 'Muster' },
+],
+// Eine unbeantwortete hat keine eigene Zeile in der Datenbank -- sie ist
+// das FEHLEN eines Eintrags und kommt darum aus einer eigenen Abfrage.
+offene_aufgaben: [
+  { rundgang_id: 11, kontrollpunkt_id: 7, kontrollpunkt_name: 'Garage',
+    aufgabe_id: 3, bezeichnung: 'Rolltor verriegeln', erfasst_am: `${T0} 22:16:00`,
+    kunde_name: 'Beispiel Immobilien GmbH', objekt_name: 'Testliegenschaft Süd',
+    titel: null, vorname: 'Hans', nachname: 'Beispiel' },
 ]};
+
+// Das Wachbuch startet die Ansicht (ENT-480). Hier reicht eine magere
+// Antwort -- die Zeitleiste selbst prüft test_wachbuch.mjs.
+const WACHBUCH = { status: 'ok', gezeigt: 0, gesamt: 0, gekuerzt: false,
+  je_art: { scan: 0, rundgang: 0, aufgabe: 0, ereignis: 0 },
+  quellen: { scans: 'ok', runden: 'ok', aufgaben: 'ok', ereignisse: 'ok' }, eintraege: [] };
 
 const RUNDGAENGE = { status: 'ok', rundgaenge: [
   { id: 10, einsatz_id: 1, objekt_id: 1, mitarbeiter_id: 5, status: 'abgeschlossen',
@@ -146,6 +185,7 @@ function setup(page) {
     const send = b => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) });
     if (path.includes('login')) return send({ status: 'ok', token: 't', name: 'adrian', ist_admin: true });
     if (path.includes('dashboard_stats')) return send({ status: 'ok', kpi: {}, verlauf: [], angemeldet: [], pro_mitarbeiter: [], letzte_rapporte: [] });
+    if (path.includes('wachbuch_liste')) return send(WACHBUCH);
     if (path.includes('rundgang_scan_liste')) return send(SCANS);
     if (path.includes('rundgang_liste')) return send(RUNDGAENGE);
     if (path.includes('fahrzeug_uebernahme_liste')) return send(UEBERNAHMEN);
@@ -221,7 +261,7 @@ check('Jede Kachel trägt ein Sinnbild',
 // „classList of null" abzustürzen -- beim Gegenprobieren aufgefallen.
 check('KRITISCH: die Ansicht startet auf einem verdrahteten Reiter',
   await page.evaluate(() => {
-    const e = document.getElementById('ae-tab-scans');
+    const e = document.getElementById('ae-tab-wachbuch');
     return !!e && e.classList.contains('aktiv');
   }));
 // „Unbekannt darf nie wie keine aussehen": Ein Reiter, der aussieht wie die
@@ -232,36 +272,182 @@ check('KRITISCH: die Ansicht startet auf einem verdrahteten Reiter',
 // gerenderten Farbe, nicht an einer Klasse allein.
 check('KRITISCH: die noch nicht verdrahteten Reiter sind schon an der Kachel zu erkennen',
   await page.evaluate(() => {
-    const mit = ['wachbuch', 'ereignisse', 'aufgaben', 'alarme', 'schluessel'];
-    const ohne = ['scans', 'erledigung', 'fahrzeuguebernahmen'];
+    // „ereignisse" steht seit ENT-547 NICHT mehr hier: Die Auswertung gibt
+    // es, nur an einem anderen Ort. Gedämpft bleibt, wofür es nichts gibt.
+    const mit = ['alarme', 'schluessel'];
+    const ohne = ['wachbuch', 'scans', 'aufgaben', 'erledigung', 'fahrzeuguebernahmen'];
     const farbe = t => {
       const e = document.getElementById('ae-tab-' + t);
       return e ? getComputedStyle(e.querySelector('.rdkr-tab-lbl')).color : null;
     };
-    const gedaempft = farbe('wachbuch'), normal = farbe('erledigung');
+    const gedaempft = farbe('alarme'), normal = farbe('erledigung');
     return !!gedaempft && !!normal && gedaempft !== normal
       && mit.every(t => farbe(t) === gedaempft)
-      && ohne.every(t => farbe(t) === normal);
+      && ohne.every(t => farbe(t) === normal)
+      // Der Verweis-Reiter trägt die volle Farbe -- er führt ja irgendwohin.
+      && farbe('ereignisse') === normal;
   }));
 // Und dort, wo Farbe allein nicht ankommt -- Vorleseprogramm, Mauszeiger.
 check('KRITISCH: die Aussage steht auch im Text, nicht nur in der Farbe',
   await page.evaluate(() => {
-    const e = document.getElementById('ae-tab-wachbuch');
+    const e = document.getElementById('ae-tab-alarme');
     const f = document.getElementById('ae-tab-erledigung');
     return !!e && (e.getAttribute('title') || '').includes('folgt später')
       && (e.getAttribute('aria-label') || '').includes('folgt später')
       && !!f && !f.getAttribute('title');
   }));
 
+/* ══════════ EIN REITER, DESSEN AUSWERTUNG ES ANDERSWO GIBT (ENT-547) ══
+   Dritter Zustand neben „hier verdrahtet" und „folgt später". Anlass: Der
+   Projektinhaber suchte das Foto einer Ereignismeldung in der Auswertung,
+   weil der Reiter dort steht -- und bekam „folgt später", während die volle
+   Liste seit ENT-297 unter Revierdienst › Ereignisse liegt. Der gedämpfte
+   Reiter hat nicht nur nichts gezeigt, er hat vom Vorhandenen weggeführt. */
+calls = [];
+await klick('#ae-tab-ereignisse');
+await page.waitForTimeout(150);
+const evVerweis = await page.textContent('#aeInhalt');
+check('KRITISCH: der Reiter sagt, WO die Ereignisse stehen -- nicht "folgt später"',
+  /Revierdienst/.test(evVerweis) && /Ereignisse/.test(evVerweis)
+  && !/folgt später/.test(evVerweis));
+check('KRITISCH: und er nennt, was dort zu finden ist',
+  /Zeitraum/.test(evVerweis) && /Foto/.test(evVerweis));
+check('Der Verweis kostet keinen Abruf -- geholt wird erst drüben',
+  calls.length === 0);
+check('KRITISCH: der Knopf führt wirklich in die Ereignisliste',
+  await page.evaluate(() => {
+    const k = document.getElementById('aeAnderswoBtn');
+    if (!k) { return false; }
+    k.click();
+    // Gemessen am gerenderten Zustand: die Revierdienst-Ansicht ist offen,
+    // ihr Ereignis-Abschnitt sichtbar, und die Kopfzeile sagt es auch.
+    const v = document.getElementById('view-rundgaenge');
+    const ab = document.getElementById('rdAb-ereignisse');
+    return !!v && v.classList.contains('on')
+      && !!ab && ab.getClientRects().length > 0
+      && document.getElementById('pgTitle').textContent === 'Ereignisse';
+  }));
+check('Und dort wird die Liste dann auch wirklich geholt',
+  calls.some(c => c.path.includes('ereignis_liste')));
+// Zurueck in die Auswertung fuer die weiteren Pruefungen.
+await page.evaluate(() => { go('arbeitsergebnisse'); arbeitsergebnisseOeffnen(); });
+await page.waitForTimeout(200);
+
+/* ══════════ AUFGABENERLEDIGUNG (ENT-548) ═════════════════════════════
+   Ausdrueckliche Ansage des Projektinhabers. Der Reiter beantwortet eine
+   ANDERE Frage als „Kontrollpunktscans": nicht „was geschah an diesem
+   Punkt?", sondern „welche Aufgaben sind liegengeblieben?". Geprueft wird
+   genau dieser Unterschied -- eine zweite Liste derselben Nacht waere nach
+   ENT-311 ausdruecklich unerwuenscht. */
+// Ein fehlendes Element darf die Suite nicht abbrechen -- sie soll ROT
+// melden, nicht sterben (beim Gegenprobieren aufgefallen).
+const textVon = sel => page.evaluate(s2 => {
+  const e = document.querySelector(s2); return e ? e.textContent : '';
+}, sel);
+calls = [];
+await klick('#ae-tab-aufgaben');
+await page.waitForTimeout(250);
+check('KRITISCH: "Aufgabenerledigung" ist verdrahtet und holt ihre Daten',
+  calls.some(c => c.path.includes('rundgang_scan_liste')));
+check('KRITISCH: kein "folgt später" mehr',
+  !(await page.textContent('#aeInhalt')).includes('folgt später'));
+const aufgText = await textVon('#aeInhalt');
+check('KRITISCH: alle drei Zustände kommen vor -- auch der unbeantwortete',
+  /Licht löschen/.test(aufgText) && /Kellertür prüfen/.test(aufgText)
+  && /Rolltor verriegeln/.test(aufgText));
+check('KRITISCH: "Unbeantwortet" ist als eigener Zustand benannt, nicht als fehlende Zeile',
+  /Unbeantwortet/.test(aufgText));
+check('Der Grund einer nicht möglichen Aufgabe steht dabei',
+  /Tür war verstellt/.test(aufgText));
+/* Die Aufgabe steht ZUOBERST auf der Karte -- das ist der Unterschied zur
+   Scan-Ansicht, wo der Kunde oben steht und die Aufgabe eine Zeile darin
+   ist. Gemessen an der Reihenfolge im Kopf, nicht am Vorkommen des Wortes. */
+check('KRITISCH: die Ansicht ist aufgabe-zuerst, nicht scan-zuerst',
+  await page.evaluate(() => {
+    const k = document.querySelector('#aeAufgListe .ag-karte .kopf b');
+    return !!k && /Rolltor verriegeln|Licht löschen|Kellertür prüfen/.test(k.textContent);
+  }));
+
+// Je Zustand die WIRKLICHE Zahl im Zeitraum -- auch fuer einen, den der
+// Filter gerade ausblendet.
+check('KRITISCH: jeder Zustand nennt seine Zahl im Zeitraum',
+  await page.evaluate(() => {
+    const n = z => {
+      const b = document.querySelector(`#aeAufgFilterLeiste [data-zustand="${z}"] .n`);
+      return b ? b.textContent.trim() : null;
+    };
+    return n('erledigt') === '1' && n('nicht_moeglich') === '1' && n('unbeantwortet') === '1';
+  }));
+// Ohne gesetzten Filter steht KEINE Gesamtzahl daneben: Eine Zahl ohne
+// Bezug sieht aus wie die Gesamtzahl (CLAUDE.md).
+check('Ohne Filter steht keine bezugslose Zahl daneben',
+  await page.evaluate(() => !document.querySelector('#aeAufgFilterLeiste .wb-zahl')));
+
+// ── Der Filter: der eigentliche Zweck dieser Ansicht
+calls = [];
+const filterDa = await page.evaluate(() =>
+  !!document.querySelector('#aeAufgFilterLeiste [data-zustand="unbeantwortet"]'));
+if (filterDa) { await klick('#aeAufgFilterLeiste [data-zustand="unbeantwortet"]'); }
+await page.waitForTimeout(150);
+const gefiltert = await textVon('#aeAufgListe');
+check('KRITISCH: der Zustandsfilter blendet die übrigen aus',
+  /Rolltor verriegeln/.test(gefiltert) && !/Licht löschen/.test(gefiltert));
+check('KRITISCH: und die gefilterte Zahl trägt ihren Bezug -- "1 von 3"',
+  await page.evaluate(() => {
+    const z = document.querySelector('#aeAufgFilterLeiste .wb-zahl');
+    return !!z && /1\s*von\s*3/.test(z.textContent);
+  }));
+check('Der Filter kostet keinen zweiten Abruf -- die Liste ist ungekappt schon da',
+  calls.length === 0);
+check('Der gewählte Filter ist an der Schaltfläche zu sehen',
+  await page.evaluate(() => {
+    const b = document.querySelector('#aeAufgFilterLeiste [data-zustand="unbeantwortet"]');
+    return !!b && b.classList.contains('on') && b.getAttribute('aria-pressed') === 'true';
+  }));
+// Ein Filter, den man nur setzen und nicht loesen kann, ist eine Falle.
+if (filterDa) { await klick('#aeAufgFilterLeiste [data-zustand="unbeantwortet"]'); }
+await page.waitForTimeout(150);
+check('KRITISCH: ein zweiter Klick löst den Filter wieder',
+  /Licht löschen/.test(await textVon('#aeAufgListe')));
+
+// „Kein Treffer" und „nichts vorhanden" sind verschiedene Aussagen -- und
+// hier ist der Unterschied das Ergebnis selbst: null „unbeantwortet" ist
+// eine gute Nachricht, null Aufgaben im Zeitraum ist gar keine.
+await page.evaluate(() => { aeAufgDaten = []; aeZeichneAufgaben(); });
+await page.waitForTimeout(100);
+check('KRITISCH: ohne jede Aufgabe sagt die Ansicht das, statt leer zu bleiben',
+  (await textVon('#aeAufgListe')).includes('Nichts vorhanden'));
+await page.evaluate(() => {
+  aeAufgDaten = [{ id: 1, erfasst_am: '2020-01-01 10:00:00', status: 'erledigt',
+    bezeichnung: 'X', kontrollpunkt_name: 'Y', kunde_name: 'Z', objekt_name: 'Q',
+    vorname: 'A', nachname: 'B', grund: null }];
+  aeAufgFilter = 'unbeantwortet';
+  aeZeichneAufgaben();
+});
+await page.waitForTimeout(100);
+check('KRITISCH: ein Filter ohne Treffer sieht NICHT aus wie "nichts vorhanden"',
+  (await textVon('#aeAufgListe')).includes('Keine Aufgabe in diesem Zustand'));
+await klick('#ae-tab-aufgaben');
+await page.waitForTimeout(250);
+
 // ══════════ UNVERDRAHTETE REITER: BLEIBENDER HINWEIS, KEIN TOAST
 calls = [];
-await klick('#ae-tab-wachbuch');
+await klick('#ae-tab-alarme');
 await page.waitForTimeout(150);
 // Der Name steht im Hinweis: Zwei Reiter hintereinander angetippt zeigten
 // sonst zweimal denselben Satz, und man wüsste nicht, ob sich etwas tat.
-check('KRITISCH: "Wachbuch" zeigt einen bleibenden Hinweis statt nichts zu tun',
-  (await page.textContent('#aeInhalt')).includes('Wachbuch folgt später'));
+check('KRITISCH: "Alarme" zeigt einen bleibenden Hinweis statt nichts zu tun',
+  (await page.textContent('#aeInhalt')).includes('Alarme folgt später'));
 check('Kein API-Aufruf fuer einen unverdrahteten Reiter', calls.length === 0);
+
+// Und das Gegenstueck: der verdrahtete Reiter ruft wirklich seinen Endpunkt.
+// Ohne diese Aussage bliebe die Suite gruen, wenn "Wachbuch" nur so AUSSAEHE
+// wie verdrahtet und in Wirklichkeit nichts täte.
+calls = [];
+await klick('#ae-tab-wachbuch');
+await page.waitForTimeout(200);
+check('KRITISCH: "Wachbuch" ruft wachbuch_liste.php auf',
+  calls.some(c => c.path.includes('wachbuch_liste')));
 
 // ══════════ KONTROLLPUNKTSCANS: ECHTE DATEN, DREI STATUS-ARTEN
 await klick('#ae-tab-scans');
@@ -536,11 +722,13 @@ await page.waitForTimeout(150);
 check('KRITISCH: fehlende Einrichtung sagt das explizit -- nicht dieselbe Meldung wie ein leerer Zeitraum',
   (await page.textContent('#aeInhalt')).includes('noch nicht eingerichtet'));
 
-// ══════════ ZURUECK ZU EINEM UNVERDRAHTETEN REITER: KEIN HAENGENBLEIBEN
+// ══════════ ZURUECK ZU EINEM ANDEREN REITER: KEIN HAENGENBLEIBEN
+// Seit ENT-547 zeigt „Ereignisse" den Verweis statt „folgt später" -- der
+// Inhalt des vorigen Reiters darf trotzdem nicht stehenbleiben.
 await klick('#ae-tab-ereignisse');
 await page.waitForTimeout(100);
-check('"Ereignisse" zeigt ebenfalls den bleibenden Hinweis',
-  (await page.textContent('#aeInhalt')).includes('Ereignisse folgt später'));
+check('"Ereignisse" ersetzt den Inhalt des vorigen Reiters wirklich',
+  (await page.textContent('#aeInhalt')).includes('Revierdienst'));
 check('Der Reiter "Ereignisse" ist jetzt aktiv, "Rundgangerledigung" nicht mehr',
   await page.evaluate(() => {
     const a = document.getElementById('ae-tab-ereignisse'), b = document.getElementById('ae-tab-erledigung');

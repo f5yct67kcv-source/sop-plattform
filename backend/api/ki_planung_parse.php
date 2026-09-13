@@ -64,7 +64,7 @@ $erlaubteIds = array_map('intval', array_column($vorlagen, 'id'));
 if ($art === 'masterplan') {
     $e = anthropic_extract_masterplan($text, $vorlagen, $heute, $monat);
     if ($e === null) {
-        json_response(['status' => 'error', 'message' => 'Erkennung nicht verfuegbar'], 502);
+        ki_fehler_melden();
     }
     $felder = ['mo', 'di', 'mi', 'do', 'fr', 'sa', 'so', 'feiertag'];
     $raus = [];
@@ -101,7 +101,7 @@ $mitarbeiter = db()->query(
 
 $e = anthropic_extract_zuteilung($text, $vorlagen, $mitarbeiter, $heute, $monat);
 if ($e === null) {
-    json_response(['status' => 'error', 'message' => 'Erkennung nicht verfuegbar'], 502);
+    ki_fehler_melden();
 }
 
 $msId = (int)($e['masterschicht_id'] ?? 0);

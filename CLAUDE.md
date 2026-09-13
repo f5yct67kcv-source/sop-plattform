@@ -64,6 +64,30 @@ Diese sind schon einmal gebrochen worden, jedes Mal beim Bauen von etwas
   die man am Browser vorbei umgehen kann, ist keine. Was im Browser steht,
   erspart nur den Umweg.
 
+Die folgenden vier sind mit **ENT-501** dazugekommen, nach der
+Sicherheitsprüfung vom 2026-09-09. Jede davon wird von `pruef_sicherheit.php`
+oder `test_php.mjs` durchgesetzt — nicht, weil man ihnen nicht traut,
+sondern weil genau diese Sorte Regel hier schon mehrfach an etwas **Neuem**
+gescheitert ist, das sie nicht geerbt hat:
+
+- **Die eigene Adresse kommt aus dem Deploy, nie aus der Anfrage.**
+  `basis_url()` in `backend/db.php` ist die einzige Quelle für jeden Link,
+  den der Server verschickt. `$_SERVER['HTTP_HOST']` hat im Backend nichts
+  mehr zu suchen — der Kopf gehört dem Aufrufer, nicht uns.
+- **An ein Konto, das Rollen vergeben darf, kommt nur heran, wer das selbst
+  darf.** `require_augenhoehe()` in `backend/rechte.php` vor jedem Weg, der
+  ein fremdes Konto übernehmbar oder unbrauchbar macht — heute Passwort
+  zurücksetzen und deaktivieren. Ein `personal_schreiben` ist kein
+  `rechte_schreiben`.
+- **Eine Sitzung wird nur über ihren Abdruck angesprochen.**
+  `sitzung_abdruck()`; in `sessions` und `kunden_sessions` steht nie der
+  Rohwert. (`versand_token` beim Beleg-Link ist etwas anderes und bleibt
+  roh.)
+- **Jeder Endpunkt ohne jede Anmeldung steht namentlich in `test_php.mjs`**
+  (Liste `OHNE_ANMELDUNG`) — mit Grund. Die Rechteprüfung dort übergeht
+  Dateien ohne `require_session()`; ohne diese zweite Liste bliebe ein
+  vergessenes `require_session()` grün.
+
 ## Gestaltung
 
 - **Gemessen, nicht nachgelesen.** Grössen, Positionen und Abstände am

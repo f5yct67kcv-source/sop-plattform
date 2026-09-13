@@ -11,7 +11,7 @@
 //      felder mindestens 16 px Schrift. Der Demo-Knopf steht in der
 //      Kopfleiste genau einmal.
 //   4. Das Formular: Ohne Pflichtangaben geht nichts zum Server; mit ihnen
-//      geht genau EIN JSON-Aufruf an api/demo_anfrage.php, das Fallenfeld
+//      geht genau EIN JSON-Aufruf an api/demo_senden.php, das Fallenfeld
 //      bleibt leer, und die Antwort des Servers erscheint -- Erfolg wie
 //      "nicht eingerichtet" (503) sind zwei verschiedene Texte.
 import { WURZEL, OUT, browserPfad } from './pfade.mjs';
@@ -42,7 +42,7 @@ desktop.on('request', r => { if (/^https?:/.test(r.url())) { fremdeAbrufe.push(r
 // Browser weist den Aufruf vorher als Cross-Origin ab).
 const aufrufe = [];
 let antwort = { status: 200, body: { status: 'ok', message: 'Vielen Dank. Wir melden uns innert eines Arbeitstages.' } };
-await desktop.route('**/backend/api/demo_anfrage.php', async route => {
+await desktop.route('**/api/demo_senden.php', async route => {
   const r = route.request();
   aufrufe.push({ methode: r.method(), typ: r.headers()['content-type'] || '', daten: r.postDataJSON() });
   await route.fulfill({ status: antwort.status, contentType: 'application/json', body: JSON.stringify(antwort.body) });
@@ -108,7 +108,7 @@ check('KRITISCH: der Demo-Knopf ist blau, nicht bernsteinfarben', kb > kr + 60 &
 check('Bernstein meldet -- nur der laufende Rundgang traegt die Warnfarbe des Cockpits, die uebrigen Zeilen Blau',
   farben.live === rgb(marke(dunkel, 'warn')) && farben.andereZeile === rgb(marke(dunkel, 'accent')));
 
-// ── Die Marke (ENT-469-N2). Gemessen, nicht im Quelltext nachgelesen:
+// ── Die Marke (ENT-562). Gemessen, nicht im Quelltext nachgelesen:
 // Der Name steht an einer Stelle (BRAND) und muss ueberall derselbe sein;
 // die Bildmarke ist hochformatig und darf nicht zum Quadrat gestaucht werden.
 const markeGemessen = await desktop.evaluate(() => {

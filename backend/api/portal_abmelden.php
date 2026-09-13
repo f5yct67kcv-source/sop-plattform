@@ -16,6 +16,7 @@ require_once __DIR__ . '/../kundenportal.php';
 $zugang = require_kundensession();
 
 $token = $_SERVER['HTTP_X_AUTH_TOKEN'] ?? '';
-db()->prepare('DELETE FROM kunden_sessions WHERE token = ?')->execute([$token]);
+db()->prepare('DELETE FROM kunden_sessions WHERE token = ?')
+    ->execute([sitzung_abdruck((string)$token)]);
 
 json_response(['status' => 'ok']);

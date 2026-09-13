@@ -25,6 +25,21 @@ const OBERFLAECHEN = ['dashboard.html', 'app.html', 'index.html'];
 // Anlage offen auf dem Bildschirm.
 const NUR_MASKIERT = ['backend/setup.html'];
 
+// Nur der Zahlenabgleich, nicht die Auge-Pflicht (ENT-502).
+//
+// portal.html hat kein Auge -- das ist als OP-489 offen und eine eigene
+// Entscheidung, keine, die hier nebenbei erzwungen werden soll. Die
+// Mindestlaenge muss dort aber trotzdem stimmen: Das Portal ruft
+// passwort_pruefen() ueber portal_neues_passwort.php und
+// portal_passwort_aendern.php auf, unterliegt also derselben Regel.
+//
+// Genau hier lag eine Luecke: portal.html stand in KEINER dieser Listen
+// und versprach bis ENT-502 "mindestens 6 Zeichen", waehrend der Server
+// laengst mehr verlangte. Dieselbe Sorte Fehler wie bei index.html nach
+// ENT-289 -- nur diesmal in der Datei, die Betriebsfremde zu sehen
+// bekommen.
+const NUR_LAENGE = ['portal.html'];
+
 // Ein Eingabefeld gilt als Passwortfeld, wenn seine id danach aussieht.
 // Absichtlich ueber die id und nicht ueber type="password": Wer type
 // abschreibt, findet nur die Felder, die schon richtig sind.
@@ -67,20 +82,87 @@ check(`Geprueft: ${gezaehlt} Passwortfelder in ${OBERFLAECHEN.length + NUR_MASKI
 // verlangte nach ENT-289 noch 12, waehrend der Server 6 nahm.
 const php = readFileSync(`${WURZEL}/backend/anmeldung.php`, 'utf8');
 const serverMin = Number((php.match(/const PASSWORT_MIN\s*=\s*(\d+)/) || [])[1]);
+const serverMinAdmin = Number((php.match(/const PASSWORT_MIN_ADMIN\s*=\s*(\d+)/) || [])[1]);
 check('Die Mindestlaenge des Servers ist ueberhaupt auffindbar', serverMin > 0);
+check('Die laengere Mindestlaenge fuer Verwaltungszugaenge ist auffindbar', serverMinAdmin > 0);
 
+// setup.html legt das ERSTE Konto der Anlage an, und das ist per Definition
+// ein Verwaltungszugang (setup.php setzt ist_admin = 1). Dort gilt darum
+// die laengere Zahl (ENT-502). Bis dahin verglich diese Pruefung stur gegen
+// PASSWORT_MIN und haette eine korrekte 16 dort als Abweichung gemeldet --
+// eine Pruefung, die den richtigen Zustand beanstandet, wird irgendwann
+// weggeklickt.
+// Welche Zahl an einer Fundstelle richtig ist, haengt nicht nur an der
+// DATEI, sondern am Konto, um das es dort geht:
+//
+//   - backend/setup.html legt das erste Konto der Anlage an, und das ist
+//     per Definition ein Verwaltungszugang (setup.php setzt ist_admin = 1).
+//   - dashboard.html traegt BEIDE Faelle: gewoehnliche Passwoerter und --
+//     seit ENT-528 -- das erste Betreiber-Konto. Fuer dieses gilt die
+//     laengere Zahl, weil betreiber_konto_anlegen.php passwort_pruefen()
+//     mit istAdmin = true aufruft.
+//
+// Darum entscheidet der Kontext der Fundstelle mit. Bis ENT-502 verglich
+// diese Pruefung stur gegen PASSWORT_MIN und haette eine korrekte 16 als
+// Abweichung gemeldet -- eine Pruefung, die den richtigen Zustand
+// beanstandet, wird irgendwann weggeklickt. Dieselbe Ueberlegung gilt hier.
+// Umlaute in beiden Schreibweisen: Der Quelltext dieses Hauses schreibt
+// Kommentare in ae/oe/ue, sichtbare Texte dagegen mit Umlaut. Wer nur eine
+// Fassung sucht, findet die andere nicht -- genau daran ist der erste
+// Versuch dieser Regel gescheitert.
+const VERWALTUNGSNIVEAU = /betreiber|m(?:ä|ae)chtigste[ns]? Konto/i;
+const ERWARTET = (datei, umfeld) =>
+  (datei === 'backend/setup.html' || VERWALTUNGSNIVEAU.test(umfeld || ''))
+    ? serverMinAdmin : serverMin;
+
+// Jede gefundene Zahl bringt ihren eigenen Sollwert mit, statt dass unten
+// pauschal ERWARTET(datei) gilt. Grund: dashboard.html nennt ZWEI Zahlen in
+// einer Zeile -- "const PW_MIN = 10, PW_MIN_ADMIN = 12;". Bis ENT-533 sah
+// diese Pruefung nur die erste davon; PW_MIN_ADMIN wurde von NICHTS gegen
+// den Server verglichen. Das Cockpit haette also weiter 16 versprechen
+// koennen, waehrend der Server 12 nimmt -- genau der Fehler, gegen den es
+// diese Datei ueberhaupt gibt, nur eine Zeile weiter rechts.
 const zahlen = [];
-for (const datei of [...OBERFLAECHEN, ...NUR_MASKIERT]) {
+for (const datei of [...OBERFLAECHEN, ...NUR_MASKIERT, ...NUR_LAENGE]) {
   const text = readFileSync(`${WURZEL}/${datei}`, 'utf8');
+  // Das Umfeld der Fundstelle entscheidet mit, welches Konto gemeint ist
+  // (aus dem Betreiber-Zweig). Grosszuegig nach hinten: Der Funktionsname,
+  // der das Konto benennt, steht oft mehrere Zeilen ueber der Textstelle.
+  const umfeldVon = i => text.slice(Math.max(0, i - 900), i + 150);
+  // PW_MIN_ADMIN ist die Verwaltungszahl SELBST und braucht kein Umfeld.
+  // Diese Zeile fehlte bis ENT-533: "const PW_MIN" trifft sie nicht (dort
+  // folgt ein "_" statt "="), und in dashboard.html stehen beide Zahlen in
+  // EINER Zeile -- das Cockpit haette also weiter 16 versprechen koennen,
+  // waehrend der Server 12 nimmt. Genau der Fehler, gegen den es diese Datei
+  // gibt, nur eine Zeile weiter rechts.
+  for (const m of text.matchAll(/PW_MIN_ADMIN\s*=\s*(\d+)/g))              { zahlen.push([datei, 'PW_MIN_ADMIN', +m[1], serverMinAdmin]); }
   // Sowohl die Konstante als auch jeder Text, der dem Nutzer eine Zahl nennt.
-  for (const m of text.matchAll(/const PW_MIN\s*=\s*(\d+)/g))              { zahlen.push([datei, 'PW_MIN', +m[1]]); }
-  for (const m of text.matchAll(/mind(?:\.|estens)?\s+(\d+)\s+Zeichen/g))  { zahlen.push([datei, 'Text', +m[1]]); }
-  for (const m of text.matchAll(/min\.\s+(\d+)\s+Zeichen/g))               { zahlen.push([datei, 'Text', +m[1]]); }
+  for (const m of text.matchAll(/const PW_MIN\s*=\s*(\d+)/g))              { zahlen.push([datei, 'PW_MIN', +m[1], ERWARTET(datei, umfeldVon(m.index))]); }
+  for (const m of text.matchAll(/mind(?:\.|estens)?\s+(\d+)\s+Zeichen/g))  { zahlen.push([datei, 'Text', +m[1], ERWARTET(datei, umfeldVon(m.index))]); }
+  for (const m of text.matchAll(/min\.\s+(\d+)\s+Zeichen/g))               { zahlen.push([datei, 'Text', +m[1], ERWARTET(datei, umfeldVon(m.index))]); }
 }
-const abweichend = zahlen.filter(([, , n]) => n !== serverMin);
-check(`KRITISCH: alle Oberflaechen nennen dieselbe Mindestlaenge wie der Server (${serverMin})`,
+// Jede gefundene Zahl bringt ihren eigenen Sollwert mit, statt dass pauschal
+// ERWARTET(datei) gilt -- nur so lassen sich die Umfeld-Regel (Betreiber) und
+// die eigene Verwaltungszahl (PW_MIN_ADMIN) nebeneinander pruefen.
+const abweichend = zahlen.filter(([, , n, soll]) => n !== soll);
+check(`KRITISCH: alle Oberflaechen nennen dieselbe Mindestlaenge wie der Server (${serverMin}, Verwaltung ${serverMinAdmin})`,
   abweichend.length === 0);
-abweichend.forEach(([d, art, n]) => bad.push(`${d}: ${art} sagt ${n}, der Server verlangt ${serverMin}`));
+abweichend.forEach(([d, art, n, soll]) => bad.push(`${d}: ${art} sagt ${n}, der Server verlangt ${soll}`));
+
+// Waechter fuer die Verwaltungszahl selbst: Ohne ihn waere oben alles gruen,
+// sobald PW_MIN_ADMIN aus dem Cockpit verschwindet -- eine leere Menge
+// erfuellt jede Bedingung, und die Maske faellt still auf die kuerzere Zahl
+// zurueck.
+check('Das Cockpit kennt die laengere Zahl fuer Verwaltungszugaenge ueberhaupt',
+  zahlen.some(([d, art]) => d === 'dashboard.html' && art === 'PW_MIN_ADMIN'));
+
+// Und die Stelle, die das erste Konto anlegt, muss die Regel ueberhaupt
+// AUFRUFEN. setup.php hatte bis ENT-502 ein eigenes "strlen < 6" -- der
+// erste Verwaltungszugang der Anlage entstand damit an der Passwortregel
+// vorbei, und der Text im Formular war das einzige, was davon zu sehen war.
+const setupPhp = readFileSync(`${WURZEL}/backend/setup.php`, 'utf8');
+check('KRITISCH: setup.php prueft das erste Passwort mit der gemeinsamen Regel',
+  /passwort_pruefen\s*\([^)]*true\s*\)/.test(setupPhp) && !/strlen\(\$password\)\s*</.test(setupPhp));
 
 // Die Schwelle war 6, solange index.html den Verwaltungsbereich trug: Dort
 // standen drei der Angaben (Passwort beim Anlegen, PIN, Zuruecksetzen). Mit

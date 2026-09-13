@@ -93,6 +93,17 @@ await page.click('#blRundgang button');
 await page.waitForTimeout(300);
 
 // ══════════ NFC-PUNKT: ERSATZSCAN IST DIE EINZIGE ALTERNATIVE ZU "NICHT VERFUEGBAR"
+// Seit ENT-541 zeigt eine Zeile ihre Knoepfe erst, wenn sie an der Reihe
+// ist oder angetippt wurde. Punkt 1 ist hier der naechste, Punkt 2 also
+// zugeklappt -- ein Tipp auf die Zeile bringt dieselben Knoepfe wie zuvor.
+check('KRITISCH: die zugeklappte Zeile zeigt keine Knöpfe, aber ihre Bezeichnung',
+  await page.evaluate(() => {
+    const z = document.querySelectorAll('#rdListe .rd-zeile')[1];
+    return !!z && z.querySelectorAll('.rd-akt button').length === 0
+      && (z.querySelector('.rd-bez') || {}).textContent === 'Kellerraum';
+  }));
+await page.click('#rdKopf2');
+await page.waitForTimeout(250);
 check('NFC-Punkt (Kellerraum) hat keinen Bestaetigen-Knopf', !(await page.isVisible('#rdBtn2')));
 check('KRITISCH: NFC-Punkt bietet trotzdem einen Ersatzscan-Knopf an',
   await page.isVisible('#rdListe .rd-zeile:nth-child(2) button:has-text("Ersatzscan")'));
@@ -104,6 +115,46 @@ await page.click('#rdListe .rd-zeile:nth-child(2) button:has-text("Ersatzscan")'
 await page.waitForTimeout(150);
 check('Der Knopf klappt das Ersatzscan-Formular auf',
   await page.evaluate(() => document.getElementById('rdEs2').style.display !== 'none'));
+
+// ══════════ WAS BEIM FOTOGRAFIEREN GILT (ENT-549) ═════════════════════
+// Der Fotobeleg geht seit ENT-455 ins Kundenportal und seit ENT-544 in
+// Lesegroesse ins Rapport-PDF. Bis ENT-549 stand das nirgends, wo es jemand
+// vor dem Ausloesen haette lesen koennen.
+//
+// Geprueft wird nicht der Wortlaut, sondern (1) dass an der Ausloesestelle
+// ueberhaupt eine Regel steht und (2) dass der Satz ueber den Kunden
+// DERSELBE ist wie beim Ereignisfoto -- eine Zeichenkette, zwei Orte. Faellt
+// er an einem der beiden Orte weg, wird das hier rot.
+check('KRITISCH: an der Stelle, wo der Fotobeleg entsteht, steht eine Regel dazu',
+  await page.evaluate(() => {
+    const el = document.getElementById('rdEsFotoHinweis2');
+    if (!el) return false;
+    const regel = w('kpEsFotoRegel');
+    return regel.length > 10 && el.textContent.includes(regel)
+      && getComputedStyle(el).display !== 'none';
+  }));
+check('KRITISCH: dort steht auch, dass das Bild an den Kunden geht -- derselbe Satz wie beim Ereignisfoto',
+  await page.evaluate(() => {
+    const el = document.getElementById('rdEsFotoHinweis2');
+    const satz = w('fotoAnKunden');
+    return !!el && satz.length > 10 && el.textContent.includes(satz);
+  }));
+// Und die beiden Regeln sind NICHT derselbe Satz: Ein Fotobeleg zeigt den
+// Kontrollpunkt, eine Vorfallmeldung zeigt den Vorfall. Wer das zu einem
+// Satz zusammenzieht, verliert eine der beiden Aussagen.
+check('Die Regel fuer den Fotobeleg ist eine andere als die fuer die Vorfallmeldung',
+  await page.evaluate(() => w('kpEsFotoRegel') !== w('evFotoRegel')));
+// Gemessen, nicht nachgelesen (CLAUDE.md).
+check('KRITISCH: der Hinweis steht UNTER dem Auslöser und ist lesbar -- gemessen',
+  await page.evaluate(() => {
+    const h = document.getElementById('rdEsFotoHinweis2');
+    const k = document.querySelector('#rdEs2 button');
+    if (!h || !k) return false;
+    const r = h.getBoundingClientRect();
+    return r.top >= k.getBoundingClientRect().bottom - 1
+      && parseFloat(getComputedStyle(h).fontSize) >= 12
+      && r.height > 0 && r.left >= -1 && r.right <= innerWidth + 1;
+  }));
 
 rufe = [];
 await page.click('#rdEs2 button:has-text("Ersatzscan melden")');

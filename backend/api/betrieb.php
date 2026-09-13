@@ -40,7 +40,29 @@ $user = require_session();
 // jedem Ausdruck durch die Leitung geht -- und base64 waechst beim Transport
 // ohnehin um rund ein Drittel.
 const LOGO_MAX = 512 * 1024;
-const LOGO_MIME_ERLAUBT = ['image/png', 'image/jpeg', 'image/svg+xml', 'image/webp'];
+// SVG ist seit ENT-501 NICHT mehr dabei. Grund: Ein SVG ist kein Bild,
+// sondern ein Dokument -- es darf <script> enthalten. Bis hierher war das
+// Logo ausserdem der einzige Upload im ganzen Haus, dessen Typ NUR aus der
+// Angabe des Browsers stammte; ueberall sonst (Fotos, PDF, Unterschrift)
+// wird am Inhalt geprueft. Beides ist unten zusammen behoben.
+//
+// Fuer ein Logo im Briefkopf verliert PNG/JPEG/WebP nichts: Es wird
+// hoechstens ein paar hundert Pixel breit gezeigt.
+// Ein bereits gespeichertes SVG-Logo bleibt unberuehrt -- dieser Zweig
+// laeuft nur, wenn ein NEUES Logo mitgeschickt wird.
+const LOGO_MIME_ERLAUBT = ['image/png', 'image/jpeg', 'image/webp'];
+
+// Welcher Bildtyp steckt WIRKLICH in diesen Bytes? Gibt null zurueck, wenn
+// es keiner der erlaubten ist. Gleiche Bauart wie ersatzscan_foto_mime()
+// in rundgang.php -- die Angabe des Browsers ist ein Vorschlag, kein Beleg.
+function logo_mime_am_inhalt(string $roh): ?string
+{
+    if (str_starts_with($roh, "\x89PNG\r\n\x1a\n"))     { return 'image/png'; }
+    if (str_starts_with($roh, "\xFF\xD8\xFF"))          { return 'image/jpeg'; }
+    if (strlen($roh) > 12 && str_starts_with($roh, 'RIFF')
+        && substr($roh, 8, 4) === 'WEBP')               { return 'image/webp'; }
+    return null;
+}
 
 function betrieb_lesen(bool $mitLogo): array {
     $r = db()->query(
@@ -118,11 +140,24 @@ if (isset($in['logo'])) {
     $mime = (string)($in['logo_mime'] ?? '');
     if (!in_array($mime, LOGO_MIME_ERLAUBT, true)) {
         json_response(['status' => 'error',
-            'message' => 'Nur PNG, JPEG, SVG oder WebP.'], 400);
+            'message' => 'Nur PNG, JPEG oder WebP.'], 400);
     }
     $roh = base64_decode((string)$in['logo'], true);
     if ($roh === false || $roh === '') {
         json_response(['status' => 'error', 'message' => 'Das Bild liess sich nicht lesen.'], 400);
+    }
+    // Massgeblich ist der Inhalt, nicht die Angabe (ENT-501). Weicht beides
+    // ab, wird abgewiesen statt stillschweigend der erkannte Typ genommen:
+    // Eine Datei, die anders aussieht als angekuendigt, ist ein Grund zum
+    // Nachfragen und nicht zum Zurechtbiegen.
+    $echt = logo_mime_am_inhalt($roh);
+    if ($echt === null) {
+        json_response(['status' => 'error',
+            'message' => 'Die Datei ist kein PNG, JPEG oder WebP.'], 400);
+    }
+    if ($echt !== $mime) {
+        json_response(['status' => 'error',
+            'message' => 'Die Datei ist kein ' . $mime . ', sondern ein ' . $echt . '.'], 400);
     }
     if (strlen($roh) > LOGO_MAX) {
         json_response(['status' => 'error',

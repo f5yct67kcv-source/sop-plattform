@@ -65,7 +65,7 @@ pruef('Jedes p/a/td-Element der HTML-Fassung traegt sein eigenes font-family',
 pruef('Der Betreff nennt die Firma', demo_anfrage_betreff($p['werte']) === 'Demo-Anfrage von Muster Sicherheitsdienst AG');
 
 // ══════════ ENDPUNKT, AM QUELLTEXT ═══════════════════════════════════
-$q = file_get_contents(__DIR__ . '/../backend/api/demo_anfrage.php');
+$q = file_get_contents(__DIR__ . '/../backend/api/demo_senden.php');
 $q = preg_replace('/\/\/[^\n]*/', '', (string)$q);   // Kommentare zaehlen nicht
 pruef('KRITISCH: der Endpunkt existiert', $q !== '');
 pruef('Nur POST wird angenommen', (bool)preg_match("/REQUEST_METHOD'\] !== 'POST'/", $q));

@@ -45,6 +45,76 @@ const EREIGNISART_PARALLELRUNDE = 'Rundgang trotz anderer Einteilung';
    gelten fuer die Lohnabrechnung, nicht fuer Aufenthaltsdaten. */
 const RUNDGANG_SPUR_TAGE = 90;
 
+/* Wie lange das Foto einer Ereignismeldung aufbewahrt wird (ENT-545).
+   Vorgabe des Projektinhabers: „Aufbewahrungsfrist fuer Ereignisfotos auf
+   90 Tage wie die Spur." Dieselbe Zahl, derselbe Gedanke -- und trotzdem
+   zwei Konstanten und nicht eine: Es sind zwei Entscheidungen ueber zwei
+   verschiedene Daten. Wuerde die eine spaeter geaendert, aenderte eine
+   gemeinsame Konstante stillschweigend auch die andere mit.
+
+   ZWEI Unterschiede zur Spur, beide wesentlich:
+
+   1. Geloescht wird das FOTO, nicht die MELDUNG. Die Meldung ist der
+      Nachweis -- was beobachtet wurde, wann, von wem, an welchem Objekt.
+      Sie bleibt. Nur das Bild verschwindet, und das ist der Teil, der
+      Personen, fremdes Eigentum oder ein Kennzeichen zeigen kann (OP-544).
+
+   2. Dass es EINES GAB, bleibt stehen (foto_geloescht_am). Ohne diese
+      Spalte saehe eine Meldung nach 90 Tagen genauso aus wie eine, zu der
+      nie jemand ein Foto gemacht hat -- „geloescht" und „gab es nie" waeren
+      dieselbe Anzeige. Das ist die Hausregel, die hier am oeftesten
+      gebrochen wurde: „unbekannt darf nie wie keine aussehen". */
+const EREIGNIS_FOTO_TAGE = 90;
+
+/* Abgelaufene Ereignisfotos wegraeumen.
+
+   Bewusst am Schreibweg und nicht in einem separaten Aufraeumlauf --
+   gleiche Begruendung wie bei der Spur (ENT-318): Ein Loeschauftrag, den
+   jemand von Hand starten muss, wird nie gestartet, und dann liegen Bilder
+   jahrelang herum, obwohl ihre Frist laengst um ist. Bei einer
+   Aufbewahrungsfrist ist das kein Schoenheitsfehler, sondern der Verlust
+   der Frist selbst.
+
+   UPDATE und nicht DELETE: siehe oben, Punkt 1.
+
+   LIMIT, damit ein einzelner Aufruf nicht in eine lange Sperre laeuft --
+   Fotos sind LONGBLOBs, und ein Rundumschlag ueber Jahre haenge an einer
+   Tabelle, auf die gleichzeitig gemeldet wird.
+
+   Der Aufrufer bekommt nichts zurueck und darf nicht scheitern: Das
+   Aufraeumen ist Beiwerk seines eigentlichen Auftrags. */
+function ereignis_fotos_aufraeumen(PDO $pdo): void
+{
+    try {
+        if (!hat_tabelle($pdo, 'ereignis_meldung')
+            || !hat_spalte($pdo, 'ereignis_meldung', 'foto_geloescht_am')) { return; }
+        // Die Grenze wird in PHP gerechnet und nicht mit DATE_SUB(NOW())
+        // im SQL: So laesst sich diese Funktion WIRKLICH ausfuehren und
+        // pruefen (pruef_ereignis_foto_frist.php laeuft gegen SQLite), statt
+        // dass eine Pruefung nur nachliest, dass der Code dasteht.
+        $grenze = date('Y-m-d H:i:s', strtotime('-' . EREIGNIS_FOTO_TAGE . ' days'));
+        // Erst suchen, dann leeren -- statt "UPDATE ... LIMIT", das es nur in
+        // MySQL gibt. Die Begrenzung bleibt: Fotos sind LONGBLOBs, und ein
+        // Rundumschlag ueber Jahre haenge an einer Tabelle, auf die
+        // gleichzeitig gemeldet wird.
+        $suchen = $pdo->prepare(
+            'SELECT id FROM ereignis_meldung
+              WHERE foto IS NOT NULL AND erfasst_am < ?
+              ORDER BY erfasst_am LIMIT 200'
+        );
+        $suchen->execute([$grenze]);
+        $faellig = $suchen->fetchAll(PDO::FETCH_COLUMN);
+        if (!$faellig) { return; }
+        $pdo->prepare(
+            'UPDATE ereignis_meldung
+                SET foto = NULL, foto_mime = NULL, foto_geloescht_am = ?
+              WHERE id IN (' . implode(',', array_fill(0, count($faellig), '?')) . ')'
+        )->execute(array_merge([date('Y-m-d H:i:s')], $faellig));
+    } catch (Throwable $e) {
+        // Das Aufraeumen darf den Aufrufer nicht scheitern lassen.
+    }
+}
+
 // Haversine-Distanz in Metern zwischen zwei Koordinaten.
 function geo_distanz_meter(float $lat1, float $lng1, float $lat2, float $lng2): float
 {
@@ -449,6 +519,23 @@ function rundgang_fortschritt(PDO $pdo, int $rundgangId, int $objektId, ?int $vo
             'ersatzscan' => $ersatzscan, 'erledigt' => $bestaetigt + $ersatzscan];
 }
 
+/* Groesse eines Fotobelegs. Bewusst klein gehalten -- ein Beleg fuer "war
+   ich vor Ort" braucht keine Druckaufloesung, und die App komprimiert vor
+   dem Versand (rdEsKomprimieren in app.html). Gleiche Groessenordnung wie
+   DOK_MAX/2 in einsatz_dokument.php, dort fuer PDF statt Foto.
+
+   Sie steht HIER und nicht im Endpunkt, obwohl der Ersatzscan sie zuerst
+   gebraucht hat (ENT-540): Endpunkte binden einander nie ein. Solange sie in
+   mein_rundgang_scan.php stand, war sie fuer mein_ereignis_melden.php
+   unerreichbar -- und dort steht die Zeile, die sie prueft. PHP 8 wirft dafuer
+   einen Error, der im Browser als "Unerwarteter Serverfehler" ankommt, ohne
+   zu sagen, woran es lag. Jede Ereignismeldung MIT Foto ist daran
+   gescheitert, jede ohne kam an. Der Kommentar in fahrzeug.php behauptete
+   schon vorher, sie stehe hier; jetzt stimmt das auch.
+
+   pruef_php.php prueft seither jede Hauskonstante auf Erreichbarkeit. */
+const ERSATZSCAN_FOTO_MAX = 2 * 1024 * 1024;
+
 // Erkennt JPEG/PNG anhand der Magic Bytes, nicht anhand einer vom Client
 // gemeldeten Endung oder eines MIME-Typs -- beides laesst sich frei setzen
 // (gleiches Prinzip wie bei einsatz_dokument.php, dort fuer PDF). Gibt den
@@ -593,4 +680,460 @@ function rundgang_punkte_der_runde(PDO $pdo, int $objektId, ?int $vorlageId): ar
     );
     $stmt->execute([$objektId]);
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+/* ══ WACHBUCH (ENT-480) ═══════════════════════════════════════════════
+   Eine chronologische Chronik dessen, was im Revierdienst tatsaechlich
+   geschehen ist: Kontrollpunkt erfasst, Rundgang erledigt oder
+   abgebrochen, Aufgabe beantwortet, Ereignis gemeldet.
+
+   KEIN neuer Datenbestand -- alle vier Arten liegen bereits vor. Das
+   Wachbuch fuehrt sie zusammen und sortiert sie nach der Zeit; es
+   schreibt nichts und rechnet nichts. Damit ist es genau das, was das
+   Projektprotokoll (revierdienst-tool-kernfrage.md, Abschnitt 8) als
+   Wachbuch beschrieben hat: "kein neuer Datentyp ... eine zweite,
+   umfassendere Ansicht derselben Basis".
+
+   Warum hier und nicht im Endpunkt: Der Endpunkt kann nur gegen einen
+   echten Server laufen. Diese Funktion laeuft in pruef_wachbuch.php gegen
+   eine wirkliche Datenbank -- eine Zusammenfuehrung aus vier Quellen mit
+   Sortierung und Kappung ist genau die Art Logik, die man nicht am
+   Bildschirm nachsieht, sondern ausfuehrt.
+
+   Alle vier Quellen haengen am selben Recht ('rundgaenge'); der Endpunkt
+   prueft es EINMAL. Faehrt hier je eine fuenfte Quelle mit einem anderen
+   Recht dazu, saehe dieselbe Liste fuer zwei Personen verschieden aus,
+   ohne es zu sagen -- darum bleiben Fahrzeug-Uebernahmen (Recht
+   'fahrzeuge') bewusst draussen; sie haben ihren eigenen Reiter.
+
+   NICHT enthalten: unbeantwortete Aufgaben (ENT-311). Eine unbeantwortete
+   Aufgabe ist das FEHLEN eines Eintrags und hat darum keinen eigenen
+   Zeitpunkt. Sie in eine Zeitleiste zu stellen hiesse, ihr einen zu
+   erfinden. Sichtbar bleibt sie im Reiter "Kontrollpunktscans", der sie
+   an ihren Scan bindet. */
+const WACHBUCH_GRENZE = 400;
+
+/* Die vier Arten, in der Reihenfolge, in der sie bei gleicher Sekunde
+   stehen sollen: Der Rundgang schliesst ab, was die Scans davor getan
+   haben -- er gehoert darum ueber sie, nicht darunter. Ohne diese feste
+   Ordnung wechselte die Reihenfolge zweier gleichzeitiger Eintraege von
+   Abfrage zu Abfrage, und dieselbe Nacht saehe zweimal anders aus. */
+const WACHBUCH_RANG = ['rundgang' => 3, 'ereignis' => 2, 'aufgabe' => 1, 'scan' => 0];
+
+/* Ein Zeitpunkt fuer die Runde, aus drei Quellen in fester Reihenfolge
+   (gleiche Dreier-Regel wie rundgang_dauer(), ENT-321): abgebrochen_am
+   gilt nur beim Abbruch, rohzeit_ende beim regulaeren Ende, und wo der
+   Server keines von beiden gesetzt hat, ist der letzte Scan das, was
+   zuletzt nachweislich geschah. Eine Runde ohne alle drei hat keinen
+   Zeitpunkt und kann in einer Zeitleiste nicht stehen -- ihr einen zu
+   erfinden waere schlimmer, als sie wegzulassen. */
+const WACHBUCH_RUNDE_ZEIT =
+    'COALESCE(r.abgebrochen_am, r.rohzeit_ende,
+              (SELECT MAX(sz.erfasst_am) FROM rundgang_scan sz WHERE sz.rundgang_id = r.id))';
+
+/* Person als "Nachname, Vorname" -- dieselbe Schreibweise wie in der
+   Scan-Auswertung. Leer bleibt sie nie: Ein Eintrag ohne Namen ist ein
+   Nachweis ohne Urheber, und "-" sagt das, statt es zu verschweigen. */
+function wachbuch_person(array $z): string
+{
+    $n = trim(implode(', ', array_filter([
+        trim((string)($z['nachname'] ?? '')), trim((string)($z['vorname'] ?? '')),
+    ], static fn($t) => $t !== '')));
+    return $n !== '' ? $n : '–';
+}
+
+/* Die Angaben, die jeder Eintrag traegt, ganz gleich aus welcher Quelle:
+   wohin die drei Verweise fuehren (Kunde, Objekt, Rundgang) und wer es
+   war. Einmal hier statt viermal unten -- vier Schreibweisen derselben
+   Zuordnung waeren vier Gelegenheiten, eine davon zu vergessen. */
+function wachbuch_rahmen(array $z): array
+{
+    return [
+        // Die zusammengesetzte 'id' ("ereignis-7") ist eine Kennung FUER DIE
+        // LISTE -- sie haelt zwei Arten mit derselben Nummer auseinander. Wer
+        // damit etwas ABRUFEN will (heute: das Foto), braucht die Nummer der
+        // Quelle selbst. Sie aus der Kennung herauszuschneiden hiesse, die
+        // Schreibweise der Kennung zur Schnittstelle zu machen: Ein spaeteres
+        // "ereignis_meldung-7" braeche die Oberflaeche still.
+        'quelle_id'      => (int)$z['id'],
+        'kunde_id'       => isset($z['kunde_id']) && $z['kunde_id'] !== null ? (int)$z['kunde_id'] : null,
+        'kunde_name'     => $z['kunde_name'] ?? null,
+        'objekt_id'      => isset($z['objekt_id']) && $z['objekt_id'] !== null ? (int)$z['objekt_id'] : null,
+        'objekt_name'    => $z['objekt_name'] ?? null,
+        'rundgang_id'    => isset($z['rundgang_id']) && $z['rundgang_id'] !== null ? (int)$z['rundgang_id'] : null,
+        'rundgang_name'  => $z['rundgang_name'] ?? null,
+        'fenster_von'    => $z['fenster_von'] ?? null,
+        'fenster_bis'    => $z['fenster_bis'] ?? null,
+        'einsatz_id'     => isset($z['einsatz_id']) && $z['einsatz_id'] !== null ? (int)$z['einsatz_id'] : null,
+        'einsatz_titel'  => $z['einsatz_titel'] ?? null,
+        'person'         => wachbuch_person($z),
+    ];
+}
+
+/* Eine Quelle abfragen: zaehlen, dann die neuesten holen.
+
+   Gezaehlt wird SEPARAT und nicht aus der Menge der geholten Zeilen: Wird
+   gekappt, ist "400 von 1238" eine Aussage, "400" allein sieht aus wie
+   die Gesamtzahl. Genau der Fall, vor dem die Hausregel warnt -- keine
+   Zahl ohne Bezug, sobald etwas greift.
+
+   Bricht eine Quelle weg (fehlende Spalte nach einem halben Einrichten),
+   faellt nicht das ganze Wachbuch aus. Der Aufrufer erfaehrt es ueber
+   'quellen' und sagt es weiter -- eine luecken­hafte Liste, die aussieht
+   wie eine vollstaendige, ist schlimmer als gar keine. */
+function wachbuch_quelle(PDO $pdo, string $sql, string $zaehlSql, array $werte,
+                        int $grenze, bool $holen = true): ?array
+{
+    try {
+        $z = $pdo->prepare($zaehlSql);
+        $z->execute($werte);
+        $anzahl = (int)$z->fetchColumn();
+        // Gezaehlt wird IMMER, geholt nur, was der Filter durchlaesst. Sonst
+        // stuende neben einem gesetzten Filter keine Zahl mehr fuer das, was
+        // er ausblendet -- und ein Filter, der alles ausblendet, saehe aus
+        // wie "nichts vorhanden".
+        if (!$holen) { return ['anzahl' => $anzahl, 'zeilen' => []]; }
+        $s = $pdo->prepare($sql . ' LIMIT ' . (int)($grenze + 1));
+        $s->execute($werte);
+        return ['anzahl' => $anzahl, 'zeilen' => $s->fetchAll(PDO::FETCH_ASSOC)];
+    } catch (Throwable $e) {
+        return null;
+    }
+}
+
+/* $objekte: null = kein Zuschnitt, eine Zahl = ein Objekt, ein Feld =
+   mehrere. Die Liste braucht das Kundenportal (ENT-484): Dort ist der
+   Zuschnitt nicht EIN Objekt, sondern alles, was dem angemeldeten Kunden
+   gehoert -- und nichts sonst.
+
+   $optionen kennt zwei Schalter, beide fuer das Portal, beide bewusst
+   einzeln benannt statt hinter einem Wort "portal" versteckt:
+
+     'nur_beendete_runden'      -- Vorgaenge einer noch laufenden Runde
+                                   bleiben draussen. Ein Kunde soll den
+                                   Nachweis sehen, nicht die Person bei der
+                                   Arbeit (ENT-441 Punkt 5). Im Cockpit gilt
+                                   das NICHT: Die Einsatzleitung soll gerade
+                                   sehen, was gerade laeuft.
+     'nur_ereignisse_mit_runde' -- nur Meldungen, die an einer Runde
+                                   haengen. Meldungen ausserhalb einer Runde
+                                   hat ein Kunde noch nie gesehen; sie hier
+                                   mitzuliefern waere ein neuer Datenfluss
+                                   und keine Darstellungsfrage. */
+function wachbuch_eintraege(PDO $pdo, string $von, string $bis,
+                            $objekte = null, int $grenze = WACHBUCH_GRENZE,
+                            ?array $arten = null, array $optionen = []): array
+{
+    $abVon = $von . ' 00:00:00';
+    $bisEnde = $bis . ' 23:59:59';
+    $objektIds = $objekte === null ? null
+        : array_values(array_map('intval', is_array($objekte) ? $objekte : [$objekte]));
+    // Eine LEERE Liste ist etwas anderes als gar kein Zuschnitt: Sie heisst
+    // „dieser Zugang hat kein einziges Objekt" und muss NICHTS liefern. Ohne
+    // diese Unterscheidung ergaebe ein leeres Feld eine Abfrage ohne
+    // Einschraenkung -- ein Kundenzugang ohne Objekte saehe die Chronik
+    // aller. Das ist keine Randbedingung, das ist die Grenze selbst.
+    if ($objektIds !== null && !$objektIds) {
+        return ['eintraege' => [], 'gezeigt' => 0, 'gesamt' => 0, 'gekuerzt' => false,
+                'grenze' => $grenze, 'je_art' => [], 'quellen' => []];
+    }
+    $nurBeendet = !empty($optionen['nur_beendete_runden']);
+    $nurEreignisMitRunde = !empty($optionen['nur_ereignisse_mit_runde']);
+    // Ein leeres Filterfeld heisst "alles", nicht "nichts": Wer keine Art
+    // waehlt, will die ganze Chronik, nicht eine leere Seite.
+    $will = static function (string $art) use ($arten): bool {
+        return $arten === null || $arten === [] || in_array($art, $arten, true);
+    };
+    $eintraege = [];
+    $gesamt = 0;
+    // Je Art die WIRKLICHE Zahl im Zeitraum -- auch fuer eine Art, die der
+    // Filter gerade ausblendet. Ohne sie liesse sich nicht sagen, ob hinter
+    // einem gesetzten Filter noch etwas liegt.
+    $jeArt = [];
+    // Drei verschiedene Aussagen je Quelle, nie dieselbe: vorhanden und
+    // abgefragt / gar nicht eingerichtet / eingerichtet, aber nicht
+    // abfragbar. "Unbekannt" darf nie wie "keine" aussehen.
+    $quellen = [];
+
+    /* Der gemeinsame Zusatz zur WHERE-Bedingung: Objektzuschnitt und, wo
+       verlangt, die Beschraenkung auf beendete Runden. Text UND Werte kommen
+       aus DERSELBEN Funktion und in derselben Reihenfolge -- getrennt
+       gepflegt liefen sie irgendwann auseinander, und eine verschobene
+       Reihenfolge der Platzhalter ist der Fehler, den niemand sieht: Die
+       Abfrage laeuft, sie filtert nur nach dem Falschen.
+
+       $rundgangAlias ist null, wo die Quelle ohnehin nur beendete Runden
+       kennt (die Runden selbst) oder wo die Runde nur per LEFT JOIN
+       danebensteht (Ereignisse) -- dort wuerde die Bedingung jede Zeile
+       ohne Runde stillschweigend mitloeschen. */
+    $zusatz = static function (string $objektAlias, ?string $rundgangAlias)
+            use ($objektIds, $nurBeendet): array {
+        $wo = ''; $werte = [];
+        if ($objektIds !== null) {
+            $wo .= " AND $objektAlias.objekt_id IN ("
+                . implode(',', array_fill(0, count($objektIds), '?')) . ')';
+            $werte = array_merge($werte, $objektIds);
+        }
+        if ($nurBeendet && $rundgangAlias !== null) {
+            $wo .= " AND $rundgangAlias.status NOT IN ("
+                . implode(',', array_fill(0, count(RUNDGANG_OFFENE_STATUS), '?')) . ')';
+            $werte = array_merge($werte, RUNDGANG_OFFENE_STATUS);
+        }
+        return [$wo, $werte];
+    };
+
+    // ── 1. Kontrollpunkt erfasst ──────────────────────────────────────
+    if (!hat_tabelle($pdo, 'rundgang_scan')) {
+        $quellen['scans'] = 'fehlt';
+    } else {
+        $foto = hat_spalte($pdo, 'rundgang_scan', 'foto_mime') ? 's.foto_mime' : 'NULL';
+        [$zWo, $zWerte] = $zusatz('r', 'r');
+        $rumpf = "FROM rundgang_scan s
+                  JOIN rundgang r ON r.id = s.rundgang_id
+                  JOIN einsaetze e ON e.id = r.einsatz_id
+                  JOIN objekte o ON o.id = r.objekt_id
+                  JOIN mitarbeiter m ON m.id = r.mitarbeiter_id
+                  LEFT JOIN kontrollpunkt k ON k.id = s.kontrollpunkt_id
+                  LEFT JOIN rundgang_vorlage rv ON rv.id = r.rundgang_vorlage_id
+                 WHERE s.erfasst_am >= ? AND s.erfasst_am <= ?" . $zWo;
+        $t = wachbuch_quelle($pdo,
+            "SELECT s.id, s.erfasst_am AS zeit, s.uebermittelt_am, s.status, s.beschreibung,
+                    s.kontrollpunkt_id, k.bezeichnung AS punkt_name, $foto AS foto_mime,
+                    r.id AS rundgang_id, rv.name AS rundgang_name,
+                    rv.fenster_von, rv.fenster_bis,
+                    o.id AS objekt_id, o.name AS objekt_name,
+                    e.id AS einsatz_id, e.titel AS einsatz_titel,
+                    COALESCE(e.kunde_id, o.kunde_id) AS kunde_id,
+                    COALESCE(e.kunde_name, o.kunde_name) AS kunde_name,
+                    m.vorname, m.nachname
+             $rumpf ORDER BY s.erfasst_am DESC, s.id DESC",
+            "SELECT COUNT(*) $rumpf", array_merge([$abVon, $bisEnde], $zWerte), $grenze, $will('scan'));
+        if ($t === null) { $quellen['scans'] = 'fehler'; } else {
+            $quellen['scans'] = 'ok';
+            $jeArt['scan'] = $t['anzahl'];
+            if ($will('scan')) { $gesamt += $t['anzahl']; }
+            foreach ($t['zeilen'] as $z) {
+                $eintraege[] = wachbuch_rahmen($z) + [
+                    'art'             => 'scan',
+                    'id'              => 'scan-' . (int)$z['id'],
+                    'zeit'            => $z['zeit'],
+                    'uebermittelt_am' => $z['uebermittelt_am'],
+                    'status'          => $z['status'],
+                    // Ein Scan auf einen inzwischen entfernten Kontrollpunkt
+                    // behaelt seinen Nachweiswert -- der Punkt fehlt, die
+                    // Durchfuehrung nicht. Der Text sagt genau das.
+                    'punkt_name'      => $z['punkt_name'],
+                    'punkt_id'        => $z['kontrollpunkt_id'] !== null ? (int)$z['kontrollpunkt_id'] : null,
+                    'text'            => $z['beschreibung'],
+                    'hat_foto'        => $z['foto_mime'] !== null,
+                ];
+            }
+        }
+    }
+
+    // ── 2. Rundgang erledigt oder abgebrochen ─────────────────────────
+    if (!hat_tabelle($pdo, 'rundgang')) {
+        $quellen['runden'] = 'fehlt';
+    } else {
+        $zeit = WACHBUCH_RUNDE_ZEIT;
+        // Kein Rundgang-Alias fuer den Zusatz: Diese Quelle kennt ohnehin nur
+        // beendete Runden, eine zweite Statusbedingung waere eine zweite
+        // Wahrheit ueber denselben Sachverhalt.
+        [$zWo, $zWerte] = $zusatz('r', null);
+        $rumpf = "FROM rundgang r
+                  JOIN einsaetze e ON e.id = r.einsatz_id
+                  JOIN objekte o ON o.id = r.objekt_id
+                  JOIN mitarbeiter m ON m.id = r.mitarbeiter_id
+                  LEFT JOIN rundgang_vorlage rv ON rv.id = r.rundgang_vorlage_id
+                 WHERE r.status IN ('abgeschlossen', 'abgebrochen')
+                   AND $zeit >= ? AND $zeit <= ?" . $zWo;
+        $t = wachbuch_quelle($pdo,
+            "SELECT r.id, $zeit AS zeit, r.status, r.rohzeit_start, r.rohzeit_ende,
+                    r.pause_minuten, r.abbruch_grund, r.abbruch_freitext,
+                    (SELECT COUNT(*) FROM rundgang_scan sc WHERE sc.rundgang_id = r.id) AS scans_anzahl,
+                    r.id AS rundgang_id, rv.name AS rundgang_name,
+                    rv.fenster_von, rv.fenster_bis,
+                    o.id AS objekt_id, o.name AS objekt_name,
+                    e.id AS einsatz_id, e.titel AS einsatz_titel,
+                    COALESCE(e.kunde_id, o.kunde_id) AS kunde_id,
+                    COALESCE(e.kunde_name, o.kunde_name) AS kunde_name,
+                    m.vorname, m.nachname
+             $rumpf ORDER BY zeit DESC, r.id DESC",
+            "SELECT COUNT(*) $rumpf", array_merge([$abVon, $bisEnde], $zWerte), $grenze, $will('rundgang'));
+        if ($t === null) { $quellen['runden'] = 'fehler'; } else {
+            $quellen['runden'] = 'ok';
+            $jeArt['rundgang'] = $t['anzahl'];
+            if ($will('rundgang')) { $gesamt += $t['anzahl']; }
+            foreach ($t['zeilen'] as $z) {
+                $eintraege[] = wachbuch_rahmen($z) + [
+                    'art'             => 'rundgang',
+                    'id'              => 'rundgang-' . (int)$z['id'],
+                    'zeit'            => $z['zeit'],
+                    'uebermittelt_am' => null,
+                    'status'          => $z['status'],
+                    'rohzeit_start'   => $z['rohzeit_start'],
+                    'rohzeit_ende'    => $z['rohzeit_ende'],
+                    'pause_minuten'   => (int)($z['pause_minuten'] ?? 0),
+                    'abbruch_grund'   => $z['abbruch_grund'],
+                    // Der Freitext eines Abbruchs steht IM Eintrag, nicht nur
+                    // in der Detailansicht: Wer die Nacht durchliest, soll den
+                    // Grund sehen, ohne jede abgebrochene Runde einzeln zu
+                    // oeffnen.
+                    'text'            => $z['abbruch_freitext'],
+                    'scans_anzahl'    => (int)($z['scans_anzahl'] ?? 0),
+                    'hat_foto'        => false,
+                ];
+            }
+        }
+    }
+
+    // ── 3. Aufgabe beantwortet ────────────────────────────────────────
+    if (!hat_tabelle($pdo, 'rundgang_aufgabe')) {
+        $quellen['aufgaben'] = 'fehlt';
+    } else {
+        [$zWo, $zWerte] = $zusatz('r', 'r');
+        $rumpf = "FROM rundgang_aufgabe ra
+                  JOIN rundgang r ON r.id = ra.rundgang_id
+                  JOIN einsaetze e ON e.id = r.einsatz_id
+                  JOIN objekte o ON o.id = r.objekt_id
+                  JOIN mitarbeiter m ON m.id = r.mitarbeiter_id
+                  LEFT JOIN kontrollpunkt k ON k.id = ra.kontrollpunkt_id
+                  LEFT JOIN rundgang_vorlage rv ON rv.id = r.rundgang_vorlage_id
+                 WHERE ra.erfasst_am >= ? AND ra.erfasst_am <= ?" . $zWo;
+        $t = wachbuch_quelle($pdo,
+            "SELECT ra.id, ra.erfasst_am AS zeit, ra.uebermittelt_am, ra.status,
+                    ra.grund, ra.bezeichnung,
+                    ra.kontrollpunkt_id, k.bezeichnung AS punkt_name,
+                    r.id AS rundgang_id, rv.name AS rundgang_name,
+                    rv.fenster_von, rv.fenster_bis,
+                    o.id AS objekt_id, o.name AS objekt_name,
+                    e.id AS einsatz_id, e.titel AS einsatz_titel,
+                    COALESCE(e.kunde_id, o.kunde_id) AS kunde_id,
+                    COALESCE(e.kunde_name, o.kunde_name) AS kunde_name,
+                    m.vorname, m.nachname
+             $rumpf ORDER BY ra.erfasst_am DESC, ra.id DESC",
+            "SELECT COUNT(*) $rumpf", array_merge([$abVon, $bisEnde], $zWerte), $grenze, $will('aufgabe'));
+        if ($t === null) { $quellen['aufgaben'] = 'fehler'; } else {
+            $quellen['aufgaben'] = 'ok';
+            $jeArt['aufgabe'] = $t['anzahl'];
+            if ($will('aufgabe')) { $gesamt += $t['anzahl']; }
+            foreach ($t['zeilen'] as $z) {
+                $eintraege[] = wachbuch_rahmen($z) + [
+                    'art'             => 'aufgabe',
+                    'id'              => 'aufgabe-' . (int)$z['id'],
+                    'zeit'            => $z['zeit'],
+                    'uebermittelt_am' => $z['uebermittelt_am'],
+                    'status'          => $z['status'],
+                    // Der Text stammt aus rundgang_aufgabe, NICHT aus dem
+                    // Katalog: Er ist im Moment der Erledigung kopiert worden,
+                    // und eine spaetere Umbenennung darf den Beleg von letzter
+                    // Nacht nicht rueckwirkend aendern.
+                    'bezeichnung'     => $z['bezeichnung'],
+                    'punkt_name'      => $z['punkt_name'],
+                    'punkt_id'        => $z['kontrollpunkt_id'] !== null ? (int)$z['kontrollpunkt_id'] : null,
+                    'text'            => $z['grund'],
+                    'hat_foto'        => false,
+                ];
+            }
+        }
+    }
+
+    // ── 4. Ereignis gemeldet ──────────────────────────────────────────
+    if (!hat_tabelle($pdo, 'ereignis_meldung')) {
+        $quellen['ereignisse'] = 'fehlt';
+    } else {
+        // Der Rundgang haengt hier nur per LEFT JOIN daneben -- eine Meldung
+        // kann ohne laufende Runde entstehen. Darum die beiden Bedingungen
+        // von Hand statt ueber den Zusatz: "r.status NOT IN (...)" allein
+        // waere bei fehlender Runde NULL und loeschte jede runden-lose
+        // Meldung still mit, auch wenn sie erlaubt waere.
+        [$zWo, $zWerte] = $zusatz('v', null);
+        if ($nurEreignisMitRunde) { $zWo .= ' AND v.rundgang_id IS NOT NULL'; }
+        if ($nurBeendet) {
+            $zWo .= ' AND (v.rundgang_id IS NULL OR r.status NOT IN ('
+                . implode(',', array_fill(0, count(RUNDGANG_OFFENE_STATUS), '?')) . '))';
+            $zWerte = array_merge($zWerte, RUNDGANG_OFFENE_STATUS);
+        }
+        // Die Spalte kommt mit ENT-545 dazu; fehlt sie noch, gilt „nicht
+        // geloescht" -- dieselbe Vorsicht wie bei rundgang_scan.foto_mime
+        // weiter oben. Eine fehlende Spalte darf die Chronik nicht abwerfen.
+        $weg = hat_spalte($pdo, 'ereignis_meldung', 'foto_geloescht_am')
+            ? 'v.foto_geloescht_am' : 'NULL';
+        $rumpf = "FROM ereignis_meldung v
+                  JOIN objekte o ON o.id = v.objekt_id
+                  JOIN mitarbeiter m ON m.id = v.mitarbeiter_id
+                  LEFT JOIN ereignisart ea ON ea.id = v.ereignisart_id
+                  LEFT JOIN einsaetze e ON e.id = v.einsatz_id
+                  LEFT JOIN rundgang r ON r.id = v.rundgang_id
+                  LEFT JOIN rundgang_vorlage rv ON rv.id = r.rundgang_vorlage_id
+                 WHERE v.erfasst_am >= ? AND v.erfasst_am <= ?" . $zWo;
+        $t = wachbuch_quelle($pdo,
+            "SELECT v.id, v.erfasst_am AS zeit, v.vorfall_am, v.uebermittelt_am,
+                    v.bemerkung, v.foto_mime, $weg AS foto_geloescht_am, v.lat, v.lng,
+                    ea.bezeichnung AS art_name,
+                    v.rundgang_id, rv.name AS rundgang_name,
+                    rv.fenster_von, rv.fenster_bis,
+                    o.id AS objekt_id, o.name AS objekt_name,
+                    e.id AS einsatz_id, e.titel AS einsatz_titel,
+                    COALESCE(e.kunde_id, o.kunde_id) AS kunde_id,
+                    COALESCE(e.kunde_name, o.kunde_name) AS kunde_name,
+                    m.vorname, m.nachname
+             $rumpf ORDER BY v.erfasst_am DESC, v.id DESC",
+            "SELECT COUNT(*) $rumpf", array_merge([$abVon, $bisEnde], $zWerte), $grenze, $will('ereignis'));
+        if ($t === null) { $quellen['ereignisse'] = 'fehler'; } else {
+            $quellen['ereignisse'] = 'ok';
+            $jeArt['ereignis'] = $t['anzahl'];
+            if ($will('ereignis')) { $gesamt += $t['anzahl']; }
+            foreach ($t['zeilen'] as $z) {
+                $eintraege[] = wachbuch_rahmen($z) + [
+                    'art'             => 'ereignis',
+                    'id'              => 'ereignis-' . (int)$z['id'],
+                    'zeit'            => $z['zeit'],
+                    'uebermittelt_am' => $z['uebermittelt_am'],
+                    'status'          => null,
+                    // Ohne hinterlegte Art bleibt das Feld leer statt "Sonstiges"
+                    // -- eine erfundene Kategorie waere eine Aussage, die
+                    // niemand getroffen hat. Die Oberflaeche sagt dann
+                    // "ohne Art", nicht nichts.
+                    'bezeichnung'     => $z['art_name'],
+                    // Der Vorfallzeitpunkt ergaenzt den Erfassungszeitpunkt und
+                    // ersetzt ihn nie (ENT-295): Einsortiert wird nach dem
+                    // Erfassen, gesagt wird beides.
+                    'vorfall_am'      => $z['vorfall_am'],
+                    'text'            => $z['bemerkung'],
+                    'hat_foto'        => $z['foto_mime'] !== null,
+                    // „Es gab eines, die Frist ist um" ist etwas anderes als
+                    // „es gab nie eines" (ENT-545).
+                    'foto_geloescht'  => $z['foto_geloescht_am'] !== null,
+                ];
+            }
+        }
+    }
+
+    // Zusammenfuehren: neueste zuoberst, bei gleicher Sekunde nach der
+    // festen Rangfolge oben und zuletzt nach der Kennung -- damit dieselbe
+    // Abfrage zweimal dieselbe Reihenfolge ergibt.
+    usort($eintraege, static function (array $a, array $b): int {
+        $c = strcmp((string)$b['zeit'], (string)$a['zeit']);
+        if ($c !== 0) { return $c; }
+        $c = (WACHBUCH_RANG[$b['art']] ?? 0) <=> (WACHBUCH_RANG[$a['art']] ?? 0);
+        if ($c !== 0) { return $c; }
+        return strcmp((string)$b['id'], (string)$a['id']);
+    });
+
+    $gekuerzt = count($eintraege) > $grenze;
+    if ($gekuerzt) { $eintraege = array_slice($eintraege, 0, $grenze); }
+
+    return [
+        'eintraege' => $eintraege,
+        // "gezeigt" und "gesamt" sind zwei verschiedene Zahlen und stehen
+        // darum getrennt da. Sie in einer zusammenzufassen hiesse, eine
+        // gekuerzte Liste wie eine vollstaendige aussehen zu lassen.
+        'gezeigt'   => count($eintraege),
+        'gesamt'    => $gesamt,
+        'gekuerzt'  => $gekuerzt || $gesamt > count($eintraege),
+        'grenze'    => $grenze,
+        'je_art'    => $jeArt,
+        'quellen'   => $quellen,
+    ];
 }

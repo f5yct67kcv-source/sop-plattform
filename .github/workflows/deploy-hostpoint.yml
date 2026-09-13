@@ -126,6 +126,25 @@ jobs:
             EFF_VAPID_PRIVATE_PEM_B64="$P_VAPID_PRIVATE_PEM_B64"
             EFF_VAPID_KONTAKT="$P_VAPID_KONTAKT"
             EFF_PUSH_CRON_SCHLUESSEL="$P_PUSH_CRON_SCHLUESSEL"
+            # Eigene Adresse der Anlage (ENT-501). Sie steckt in jedem Link,
+            # den der Server per E-Mail verschickt -- Passwort zuruecksetzen,
+            # Portalzugang, Beleg. Bis ENT-501 kam sie aus dem Host-Kopf DER
+            # ANFRAGE; wer die unangemeldeten Endpunkte mit einem fremden
+            # Host-Kopf aufrief, liess den Server einen Link auf die eigene
+            # Adresse verschicken. Jetzt weiss der Deploy-Lauf, wohin er
+            # deployt, und traegt es ein -- dieselbe Ueberlegung wie bei
+            # APP_ENV.
+            #
+            # Kein Secret: Die Adresse ist oeffentlich und steht in README.md.
+            # Ueber die Environment-Variable APP_BASIS_URL ueberschreibbar,
+            # falls die Anlage einmal unter einer anderen Adresse laeuft --
+            # ohne sie gilt die heutige, damit ein Deploy nicht an einer
+            # nicht gesetzten Variablen scheitert und die Links dabei
+            # wortlos verschwinden.
+            EFF_APP_BASIS_URL="${{ vars.APP_BASIS_URL }}"
+            if [ -z "$EFF_APP_BASIS_URL" ]; then
+              EFF_APP_BASIS_URL="https://rapport.itufeden.myhostpoint.ch"
+            fi
 
             PFLICHT_FEHLT=""
             [ -z "$EFF_DB_HOST" ]                && PFLICHT_FEHLT="$PFLICHT_FEHLT DB_HOST"
@@ -152,6 +171,20 @@ jobs:
             EFF_VAPID_PRIVATE_PEM_B64="$S_VAPID_PRIVATE_PEM_B64"
             EFF_VAPID_KONTAKT="$S_VAPID_KONTAKT"
             EFF_PUSH_CRON_SCHLUESSEL="$S_PUSH_CRON_SCHLUESSEL"
+            # Eigene Adresse (ENT-501), siehe Begruendung im Production-Zweig.
+            # Fuer Staging steht die Domain bereits als Environment-Variable
+            # STAGING_DOMAIN bereit -- dieselbe, mit der die beiden
+            # Verifikationsschritte weiter unten die Seite abrufen. KEIN
+            # Rueckfall auf die produktive Adresse: Ein Staging-Link, der auf
+            # Produktion zeigt, waere genau der Fehler, den die urspruengliche
+            # HTTP_HOST-Loesung vermeiden wollte. Fehlt die Variable, bleibt
+            # der Platzhalter stehen, basis_url() liefert null und die
+            # betroffenen Endpunkte verschicken keinen Link, statt einen
+            # falschen.
+            EFF_APP_BASIS_URL=""
+            if [ -n "${{ vars.STAGING_DOMAIN }}" ]; then
+              EFF_APP_BASIS_URL="https://${{ vars.STAGING_DOMAIN }}"
+            fi
 
             PFLICHT_FEHLT=""
             [ -z "$EFF_DB_HOST" ]                && PFLICHT_FEHLT="$PFLICHT_FEHLT STAGING_DB_HOST"
@@ -249,6 +282,7 @@ jobs:
             echo "EFF_VAPID_PRIVATE_PEM_B64=$EFF_VAPID_PRIVATE_PEM_B64"
             echo "EFF_VAPID_KONTAKT=$EFF_VAPID_KONTAKT"
             echo "EFF_PUSH_CRON_SCHLUESSEL=$EFF_PUSH_CRON_SCHLUESSEL"
+            echo "EFF_APP_BASIS_URL=$EFF_APP_BASIS_URL"
           } >> "$GITHUB_ENV"
 
           # Mehrzeiliger Wert -- eigener Heredoc-Block statt einer einfachen
@@ -274,9 +308,15 @@ jobs:
           # Oeffentliche Homepage (ENT-469). Eigene Seite ohne jeden
           # Produktcode -- sie laedt weder gav.js noch eine Sitzung; ihre
           # einzige Verbindung zum Server ist das Demo-Formular
-          # (api/demo_anfrage.php). Bewusst NICHT index.html: Die Wurzel
+          # (api/demo_senden.php). Bewusst NICHT index.html: Die Wurzel
           # bleibt die Erfassung der Mitarbeitenden (Startadresse der PWA).
           cp homepage.html dist/homepage.html
+          # Betreiber-Bereich (ENT-519 bis ENT-521). Eigene Seite neben
+          # dashboard.html und portal.html, mit eigener Anmeldung gegen die
+          # betreiber_*-Endpunkte. Sie traegt weder Cockpit- noch
+          # Mitarbeiter- noch Portalcode -- dieselbe Trennung wie bei den
+          # Anmeldewegen selbst.
+          cp betreiber.html dist/betreiber.html
           # gav.js traegt die GAV-Regeln fuer BEIDE Oberflaechen (ENT-049).
           # Fehlt sie hier, laden dashboard.html und app.html ins Leere und
           # rechnen gar nichts mehr -- derselbe Fallstrick wie bei ENT-040.
@@ -351,8 +391,24 @@ jobs:
           # Wird nur von den portal_*-Endpunkten eingebunden, nie direkt
           # aufgerufen -- steht darum auch in der Sperrliste der .htaccess.
           cp backend/kundenportal.php dist/kundenportal.php
+          # Konten, Sitzungen und Mandantenstamm der Betreiber-Ebene
+          # (ENT-524). Wird nur von den betreiber_*-Endpunkten
+          # eingebunden, nie direkt aufgerufen -- steht darum auch in
+          # der Sperrliste der .htaccess.
+          cp backend/betreiber.php dist/betreiber.php
+          # Support-Freigabe (ENT-526). Wird von BEIDEN Seiten eingebunden --
+          # von den support_*-Endpunkten des Betriebs und von
+          # api/betreiber_support.php -- und nie direkt aufgerufen; steht
+          # darum auch in der Sperrliste der .htaccess.
+          cp backend/support.php dist/support.php
+          # Supportvorgaenge (ENT-538). Die Gegenstuecke sind die Endpunkte
+          # support_anfrage.php (Kundenseite) und
+          # betreiber_support_vorgang.php (Vorrat) -- die kommen ueber
+          # backend/api/*.php mit.
+          cp backend/supportvorgang.php dist/supportvorgang.php
           # Pruefung und Mailtext der Demo-Anfrage (ENT-469), eingebunden
-          # von api/demo_anfrage.php -- steht darum auch in der Sperrliste.
+          # von api/demo_senden.php -- steht darum auch in der Sperrliste.
+          # Der ENDPUNKT heisst bewusst anders: gleicher Name hiesse mitgesperrt.
           cp backend/demo_anfrage.php dist/demo_anfrage.php
           cp backend/ai.php dist/ai.php
           cp backend/planung.php dist/planung.php
@@ -373,6 +429,9 @@ jobs:
           cp backend/produkte.php dist/produkte.php
           cp backend/mailer.php dist/mailer.php
           cp backend/ferien.php dist/ferien.php
+          cp backend/lohn.php dist/lohn.php
+          cp backend/gavzeit.php dist/gavzeit.php
+          cp backend/lohnlauf.php dist/lohnlauf.php
           cp backend/mitteilungen.php dist/mitteilungen.php
           cp backend/push.php dist/push.php
           # Schutzeinstellungen (ENT-075). Im Repository heisst die Datei
@@ -402,6 +461,13 @@ jobs:
           # Quelle der Wahrheit verwenden.
           sed -i "s|__APP_ENV__|$UMGEBUNG|g" dist/db.php
           sed -i "s|__APP_ENV__|$UMGEBUNG|g" dist/testumgebung.js
+          # Eigene Adresse (ENT-501). Bleibt sie leer -- bei Staging ohne
+          # gesetzte STAGING_DOMAIN --, steht weiterhin woertlich
+          # "__APP_BASIS_URL__" in dist/db.php; basis_url() erkennt das und
+          # liefert null, und die betroffenen Endpunkte verschicken dann
+          # keinen Link statt eines falschen (dieselbe Bauart wie bei SMTP
+          # und Push oben).
+          sed -i "s|__APP_BASIS_URL__|$EFF_APP_BASIS_URL|g" dist/db.php
           sed -i "s|__ANTHROPIC_API_KEY__|$EFF_ANTHROPIC_API_KEY|g" dist/ai.php
           # SMTP fuer den Offert-Versand (ENT-192). Bleiben die Secrets ungesetzt,
           # steht weiterhin woertlich "__SMTP_HOST__" usw. in dist/mailer.php --

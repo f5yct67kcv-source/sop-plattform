@@ -56,6 +56,18 @@ $antwort = [
     'zeitraum' => ['von' => $von, 'bis' => $bis],
     'objekte'  => [],
     'rundgaenge' => [],
+    // Von Anfang an dabei, nicht erst nach der Schleife: Der fruehe Ausstieg
+    // "kein Revierdienst" antwortet sonst ohne dieses Feld, und die
+    // Oberflaeche muesste sein Fehlen von einer Null unterscheiden.
+    'kennzahlen' => ['runden' => 0, 'abgebrochen' => 0,
+                     'punkte_gesamt' => 0, 'punkte_erledigt' => 0, 'punkte_fotobeleg' => 0],
+    // Der Verlauf (ENT-500): je Zeitabschnitt die Zahl der Runden, fuer die
+    // kleine Kurve in der Kachel. Aus demselben Grund wie die Kennzahlen im
+    // SERVER gebuendelt und nicht im Browser aus der Liste gerechnet: Die
+    // Liste ist der gewaehlte Zeitraum, und wuerde sie je gekuerzt, zeigte
+    // eine im Browser gerechnete Kurve die gekuerzte Menge und saehe aus wie
+    // das Ganze (ENT-490).
+    'verlauf' => ['einheit' => null, 'punkte' => []],
 ];
 
 // Vier verschiedene Aussagen, vier verschiedene Antworten (Hausregel:
@@ -63,6 +75,12 @@ $antwort = [
 // Liste leer ist -- die Oberflaeche soll das nicht aus einer Anzahl 0
 // erraten muessen, denn dabei entsteht regelmaessig der Satz „keine
 // Rundgaenge", wo „kein Revierdienst eingerichtet" richtig waere.
+// „Gibt es ueberhaupt je einen" wird OHNE Zeitraum gefragt. Die Oberflaeche
+// entscheidet daran, ob sie den Revierdienst-Teil ueberhaupt anbietet
+// (ENT-482) -- und das darf sich nicht aendern, nur weil jemand den Zeitraum
+// verstellt.
+$antwort['je_vorhanden'] = false;
+
 if (!$objektIds) {
     $antwort['leer_grund'] = 'kein_revierdienst';
     json_response($antwort);
@@ -80,6 +98,12 @@ $antwort['objekte'] = array_map(static fn(array $o): array => [
 ], $os->fetchAll(PDO::FETCH_ASSOC));
 
 $offen = implode(',', array_fill(0, count(RUNDGANG_OFFENE_STATUS), '?'));
+
+$je = $pdo->prepare("SELECT 1 FROM rundgang WHERE objekt_id IN ($platz)
+                       AND status NOT IN ($offen) LIMIT 1");
+$je->execute([...$objektIds, ...RUNDGANG_OFFENE_STATUS]);
+$antwort['je_vorhanden'] = (bool)$je->fetchColumn();
+
 $sql = "SELECT r.id, r.objekt_id, r.status, r.rundgang_vorlage_id,
                r.rohzeit_start, r.rohzeit_ende, r.pause_minuten,
                e.datum, o.name AS objekt_name,
@@ -95,10 +119,53 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute([...$objektIds, ...RUNDGANG_OFFENE_STATUS, $von, $bis]);
 $zeilen = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+/* Kennzahlen zum Zeitraum (ENT-490). Fuenf ROHE Zahlen, keine fertigen
+   Prozente: Wie sie dargestellt werden -- und ob ueberhaupt, wenn der
+   Nenner null ist -- entscheidet die Oberflaeche. Ein Prozentwert aus dem
+   Server waere eine zweite Stelle, an der ueber "0 von 0" befunden wird.
+
+   Alles stammt aus DENSELBEN Zeilen, die unten die Liste fuellen. Eine
+   eigene Abfrage waere eine zweite Wahrheit ueber denselben Zeitraum, und
+   sie liefe irgendwann auseinander -- der Kunde saehe dann ein Band, das
+   der Liste darunter widerspricht.
+
+   BEWUSST OHNE Ereignisse: Die zaehlt das Wachbuch bereits, und zwar nach
+   einer eigenen Regel (nur Meldungen an einer beendeten Runde, ENT-484).
+   Sie hier ein zweites Mal zu zaehlen hiesse, zwei Zahlen fuer dieselbe
+   Sache zu haben. */
+$kz = $antwort['kennzahlen'];
+
+/* Der Verlauf (ENT-500).
+   TAGE ODER WOCHEN, entschieden am Zeitraum und nicht am Geschmack: Bis
+   einschliesslich 31 Tagen je Tag, darueber je Woche. Andernfalls haette
+   ein Jahresbereich 365 Striche (unlesbar) und eine Woche einen einzigen
+   (keine Kurve).
+   LUECKEN GEHOEREN DAZU: Vorbelegt wird JEDER Abschnitt mit null, auch der
+   ohne Runde. Nur die vorhandenen aneinanderzureihen ergaebe eine Kurve
+   ohne Zeitachse -- drei Runden an drei aufeinanderfolgenden Tagen saehen
+   aus wie drei Runden ueber drei Monate. */
+$vonTag = new DateTimeImmutable($von);
+$bisTag = new DateTimeImmutable($bis);
+$tage   = (int)$vonTag->diff($bisTag)->days + 1;
+$jeTag  = $tage <= 31;
+$schluessel = static function (string $datum) use ($jeTag): string {
+    $d = new DateTimeImmutable($datum);
+    // Wochen beginnen am Montag (ISO 8601) -- die Schweiz zaehlt so, und
+    // eine Woche, die am Erfassungstag beginnt, waere bei jedem Aufruf eine
+    // andere.
+    return $jeTag ? $d->format('Y-m-d')
+                  : $d->modify('monday this week')->format('Y-m-d');
+};
+$eimer = [];
+for ($t = $vonTag; $t <= $bisTag; $t = $t->modify('+1 day')) {
+    $eimer[$schluessel($t->format('Y-m-d'))] = 0;
+}
+
 foreach ($zeilen as $r) {
     $vorlageId = $r['rundgang_vorlage_id'] !== null ? (int)$r['rundgang_vorlage_id'] : null;
     $dauer = rundgang_dauer($r['rohzeit_start'], $r['rohzeit_ende'], $r['letzter_scan'],
         (int)$r['pause_minuten'], (string)$r['status']);
+    $fortschritt = rundgang_fortschritt($pdo, (int)$r['id'], (int)$r['objekt_id'], $vorlageId);
     $antwort['rundgaenge'][] = [
         'id'           => (int)$r['id'],
         'datum'        => (string)$r['datum'],
@@ -107,17 +174,40 @@ foreach ($zeilen as $r) {
         'status'       => (string)$r['status'],
         'beginn'       => $r['rohzeit_start'],
         'dauer'        => $dauer,
-        'fortschritt'  => rundgang_fortschritt($pdo, (int)$r['id'], (int)$r['objekt_id'], $vorlageId),
+        'fortschritt'  => $fortschritt,
     ];
+
+    $kz['runden']++;
+    if ((string)$r['status'] === 'abgebrochen') { $kz['abgebrochen']++; }
+    // Punkte einer Runde OHNE hinterlegte Kontrollpunkte zaehlen mit null
+    // mit -- sie druecken den Erledigungsgrad nicht, sie sind schlicht nicht
+    // gemessen. Genau darum liefert der Server den Nenner mit: Ist er null,
+    // gibt es keinen Grad, und die Oberflaeche sagt das statt "100 %".
+    $kz['punkte_gesamt']    += (int)$fortschritt['gesamt'];
+    $kz['punkte_erledigt']  += (int)$fortschritt['erledigt'];
+    $kz['punkte_fotobeleg'] += (int)$fortschritt['ersatzscan'];
+
+    $k = $schluessel((string)$r['datum']);
+    // Sollte eine Runde ausserhalb des Zeitraums stehen, waere das ein
+    // Fehler in der Abfrage -- sie bekommt dann KEINEN eigenen Eimer,
+    // sondern faellt auf. Ein stillschweigend angelegter Eimer verschoebe
+    // die Zeitachse.
+    if (isset($eimer[$k])) { $eimer[$k]++; }
 }
+$antwort['kennzahlen'] = $kz;
+$antwort['verlauf'] = [
+    'einheit' => $jeTag ? 'tag' : 'woche',
+    'punkte'  => array_map(
+        static fn(string $ab, int $n): array => ['ab' => $ab, 'runden' => $n],
+        array_keys($eimer), array_values($eimer)),
+];
 
 if (!$antwort['rundgaenge']) {
     // Zwei verschiedene Gruende, zwei verschiedene Texte: Hat es je einen
     // Rundgang gegeben, ist der Zeitraum schuld -- dann darf dort nicht
     // stehen, es sei nie etwas erfasst worden.
-    $je = $pdo->prepare("SELECT 1 FROM rundgang WHERE objekt_id IN ($platz) LIMIT 1");
-    $je->execute($objektIds);
-    $antwort['leer_grund'] = $je->fetchColumn() ? 'kein_treffer_im_zeitraum' : 'noch_nichts_erfasst';
+    $antwort['leer_grund'] = $antwort['je_vorhanden']
+        ? 'kein_treffer_im_zeitraum' : 'noch_nichts_erfasst';
 }
 
 json_response($antwort);

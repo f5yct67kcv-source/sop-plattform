@@ -35,7 +35,7 @@ $mitarbeiter = db()->query(
 
 $e = anthropic_route_diktat($text, $kunden, $mitarbeiter, $heute);
 if ($e === null) {
-    json_response(['status' => 'error', 'message' => 'Erkennung nicht verfuegbar'], 502);
+    ki_fehler_melden();
 }
 
 $bereich = (string)($e['bereich'] ?? '');

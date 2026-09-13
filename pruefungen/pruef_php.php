@@ -41,6 +41,34 @@ function erreichbar(string $datei, array $gesehen = []): array {
     return $gesehen;
 }
 
+/* Welche Konstanten kennt dieser Satz Dateien? Gesucht wird beides:
+   "const NAME =" und "define('NAME'".
+
+   Warum es das braucht: Eine Konstante, die in einem ANDEREN Endpunkt steht,
+   ist von hier aus nicht erreichbar -- Endpunkte binden einander nie ein.
+   PHP 8 wirft dafuer keinen Hinweis, sondern einen Error, und der kommt im
+   Browser als "Unerwarteter Serverfehler" an, ohne zu sagen, woran es lag.
+
+   Genau so ist es passiert (ENT-540): mein_ereignis_melden.php prueft die
+   Fotogroesse gegen ERSATZSCAN_FOTO_MAX, definiert war die Konstante aber
+   nur in mein_rundgang_scan.php. Die Zeile lief NUR, wenn ein Foto dabei
+   war -- darum kamen Meldungen ohne Foto an und solche mit Foto nie. Ein
+   Kommentar in fahrzeug.php behauptete sogar, sie stehe in rundgang.php;
+   geglaubt hatte es also schon jemand. */
+function konstanten_in(array $dateien): array {
+    $namen = [];
+    foreach ($dateien as $d => $_) {
+        $roh = file_get_contents($d);
+        if (preg_match_all('/\bconst\s+([A-Z_][A-Z0-9_]*)\s*=/', $roh, $m)) {
+            foreach ($m[1] as $n) { $namen[$n] = true; }
+        }
+        if (preg_match_all('/\bdefine\s*\(\s*[\'"]([A-Z_][A-Z0-9_]*)[\'"]/', $roh, $m)) {
+            foreach ($m[1] as $n) { $namen[$n] = true; }
+        }
+    }
+    return $namen;
+}
+
 function funktionen_in(array $dateien): array {
     $namen = [];
     foreach ($dateien as $d => $_) {
@@ -51,10 +79,17 @@ function funktionen_in(array $dateien): array {
     return $namen;
 }
 
+$alleDateien = [];
+foreach (array_merge(glob("$WURZEL/*.php"), glob("$WURZEL/api/*.php")) as $d) {
+    $alleDateien[realpath($d)] = true;
+}
+$hauskonstanten = konstanten_in($alleDateien);
+
 foreach (glob("$WURZEL/api/*.php") as $endpunkt) {
     $geprueft++;
     $dateien = erreichbar($endpunkt);
     $bekannt = funktionen_in($dateien);
+    $erreichbareKonstanten = konstanten_in($dateien);
     $quelle = file_get_contents($endpunkt);
 
     // ── Aufrufe unbekannter Funktionen
@@ -80,6 +115,33 @@ foreach (glob("$WURZEL/api/*.php") as $endpunkt) {
                              'bool', 'self', 'parent', 'catch', 'if', 'for', 'foreach', 'while', 'switch'], true)) { continue; }
         $fehler[] = sprintf('%s Zeile %d: Aufruf der unbekannten Funktion %s()',
             basename($endpunkt), $t[2], $t[1]);
+    }
+
+    // ── Konstanten des Hauses, die von hier aus nicht erreichbar sind
+    $gemeldeteK = [];
+    for ($i = 0; $i < count($marken); $i++) {
+        $t = $marken[$i];
+        if (!is_array($t) || $t[0] !== T_STRING) { continue; }
+        $name = $t[1];
+        if (!isset($hauskonstanten[$name]) || isset($erreichbareKonstanten[$name])) { continue; }
+        if (isset($gemeldeteK[$name])) { continue; }
+        // Kein Funktionsaufruf (naechstes Zeichen "(") und kein Klassen-
+        // oder Objektzugriff -- beides waere etwas anderes als eine
+        // Konstante, auch wenn der Name gleich geschrieben ist.
+        $j = $i + 1;
+        while ($j < count($marken) && is_array($marken[$j]) && $marken[$j][0] === T_WHITESPACE) { $j++; }
+        if ($j < count($marken) && $marken[$j] === '(') { continue; }
+        $k = $i - 1;
+        while ($k >= 0 && is_array($marken[$k]) && $marken[$k][0] === T_WHITESPACE) { $k--; }
+        if ($k >= 0) {
+            $v = $marken[$k];
+            if ($v === '->' || $v === '::'
+                || (is_array($v) && in_array($v[0], [T_OBJECT_OPERATOR, T_DOUBLE_COLON, T_CONST], true))) { continue; }
+        }
+        $gemeldeteK[$name] = 1;
+        $fehler[] = sprintf('%s Zeile %d: %s ist von hier nicht erreichbar '
+            . '(im Haus definiert, aber nicht in einer eingebundenen Datei)',
+            basename($endpunkt), $t[2], $name);
     }
 
     // ── Gelesene, aber nie gesetzte Variablen

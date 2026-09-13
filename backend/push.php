@@ -263,10 +263,49 @@ function push_jwt(string $aud, ?int $jetzt = null): ?string
  * Der Ursprung eines Endpunkts -- "https://web.push.apple.com/xyz…" wird
  * zu "https://web.push.apple.com".
  */
+// Die Dienste, an die ein Web-Push ueberhaupt gehen kann. Ausdrueckliche
+// Liste und nicht "irgendein https" (ENT-501):
+//
+// Bis hierher genuegte ein gueltiges https-Schema. Damit konnte JEDE
+// angemeldete Person -- push_einrichtung.php verlangt bewusst kein
+// besonderes Recht, jeder darf sein eigenes Geraet anmelden -- eine
+// beliebige Adresse als "Endpunkt" hinterlegen, und der Server rief sie
+// danach von sich aus auf. Der Antwortcode wird vermerkt; damit laesst sich
+// abtasten, was vom Server aus erreichbar ist (SSRF).
+//
+// Ein Push-Endpunkt ist nie eine frei gewaehlte Adresse: Er kommt aus
+// PushSubscription.endpoint des Browsers und zeigt immer auf den
+// Push-Dienst des jeweiligen Herstellers. Eine Liste ist hier also keine
+// Einschraenkung des Normalbetriebs, sondern seine Beschreibung.
+//
+// Wenn ein Hersteller kuenftig eine neue Domain benutzt, faellt das
+// unmittelbar auf: push_einrichtung.php antwortet dann "Kein gueltiger
+// Endpunkt" -- ein sichtbares Nein statt einer stillen Oeffnung.
+const PUSH_DIENSTE = [
+    'android.googleapis.com',            // Chrome (alt)
+    'fcm.googleapis.com',                // Chrome/Android
+    'updates.push.services.mozilla.com', // Firefox
+    'web.push.apple.com',                // Safari/iOS
+    'notify.windows.com',                // Edge/Windows
+];
+
+// Gehoert dieser Rechnername zu einem der Dienste oben? Entweder genau der
+// Name oder eine Unterdomain davon -- ".notify.windows.com" mit fuehrendem
+// Punkt geprueft, damit "boesenotify.windows.com" NICHT passt.
+function push_dienst_bekannt(string $host): bool
+{
+    $host = strtolower(rtrim($host, '.'));
+    foreach (PUSH_DIENSTE as $dienst) {
+        if ($host === $dienst || str_ends_with($host, '.' . $dienst)) { return true; }
+    }
+    return false;
+}
+
 function push_ursprung(string $endpunkt): ?string
 {
     $t = parse_url($endpunkt);
     if (!isset($t['scheme'], $t['host']) || $t['scheme'] !== 'https') { return null; }
+    if (!push_dienst_bekannt((string)$t['host'])) { return null; }
     return $t['scheme'] . '://' . $t['host'];
 }
 
@@ -326,9 +365,27 @@ function push_antwort_deuten(int $code): string
  */
 function push_zustellen(array $abo, bool $wichtig): array
 {
-    $ursprung = push_ursprung((string)($abo['endpunkt'] ?? ''));
-    if ($ursprung === null) {
+    // Zwei verschiedene Fehler, und sie brauchen zwei verschiedene Folgen
+    // (ENT-501). Bis hierher gab es nur "keine https-Adresse" -> entfernen.
+    // Mit der Dienstliste in push_ursprung() kaeme ein zweiter Grund dazu,
+    // und der darf NICHT dasselbe tun: Nimmt ein Hersteller kuenftig eine
+    // Domain, die hier fehlt, wuerde sonst bei jedem Versand ein voellig
+    // gueltiges Abo geloescht -- und die Benachrichtigungen waeren auf den
+    // echten Telefonen still weg, ohne dass jemand den Grund saehe.
+    //
+    // Darum: kaputte Adresse -> entfernen (das war nie ein Abo). Unbekannter
+    // Dienst -> Fehler mit Begruendung, Abo bleibt stehen. Dieselbe
+    // Hausregel wie ueberall: "unbekannt" darf nie wie "keine" aussehen.
+    $endpunkt = (string)($abo['endpunkt'] ?? '');
+    $teile    = parse_url($endpunkt);
+    if (!isset($teile['scheme'], $teile['host']) || $teile['scheme'] !== 'https') {
         return ['code' => 0, 'ausgang' => 'entfernen', 'meldung' => 'Endpunkt ist keine https-Adresse'];
+    }
+    $ursprung = push_ursprung($endpunkt);
+    if ($ursprung === null) {
+        return ['code' => 0, 'ausgang' => 'fehler',
+                'meldung' => 'Unbekannter Push-Dienst (' . $teile['host'] . ') — '
+                           . 'nicht zugestellt. Gehoert er dazu, muss er in PUSH_DIENSTE ergaenzt werden.'];
     }
     $jwt = push_jwt($ursprung);
     $pub = push_oeffentlicher_schluessel();

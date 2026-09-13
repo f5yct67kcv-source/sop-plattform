@@ -91,16 +91,142 @@ try {
     Math.abs(m.begr.top - m.zeit.top) < 1 && m.zeit.left >= m.begr.right - 1);
   check('Und die beiden füllen die Zeile zusammen aus',
     Math.abs((m.begr.width + m.zeit.width + 16) - m.flow) < 1.5);
-  // Gleich hohe Karten in der ersten Zeile: Die Begruessung war gemessen
-  // 267 px hoch, die Zeitkarte 308 -- nebeneinander sah das aus, als sei
-  // eine abgeschnitten. Geprueft an der KARTE, nicht am Container: Der
-  // Container ist durch den Flex-Fluss ohnehin immer gleich hoch, die Karte
-  // darin war es nicht.
-  check('KRITISCH: beide Karten der ersten Zeile sind gleich hoch',
-    await page.evaluate(() => {
-      const h = w => document.querySelector(`[data-widget="${w}"] > .card`).getBoundingClientRect().height;
-      return Math.abs(h('begruessung') - h('zeit')) < 1;
+  // Gleich hohe Karten in JEDER Zeile, nicht nur in der ersten.
+  //
+  // Geprueft an der KARTE, nicht am Container: Der Container ist durch den
+  // Flex-Fluss ohnehin immer gleich hoch -- genau das war die Falle. Zu sehen
+  // ist die Karte darin, und die behielt ihr eigenes Inhaltsmass.
+  //
+  // Bis zum 10.09.2026 stand hier dieselbe Pruefung nur fuer die erste Zeile
+  // (Begruessung 267 px neben Zeitkarte 308 px). Sie blieb gruen, waehrend
+  // die Zeilen darunter auseinanderliefen -- die erste Zeile war die
+  // einzige mit einer Ausnahmeregel. Gemessen bei 1500 px, bevor die Regel
+  // fuer alle galt:
+  //     Kennzahlen neben Schnellzugriff          51 px zu hoch
+  //     Angemeldete Benutzer neben Stundenverlauf 105 px zu hoch
+  //     Stunden je Mitarbeitende neben Rapporten  11 px zu hoch
+  //
+  // Nicht an einer Zahl festgemacht und nicht an bestimmten Containern: Die
+  // Aussage ist "was nebeneinander steht, endet gleich" -- die haelt auch,
+  // wenn jemand die Reihenfolge aendert oder ein Container dazukommt.
+  const unterkanten = await page.evaluate(() => {
+    const zeilen = new Map();
+    for (const el of document.querySelectorAll('#dashFlow .dash-item')) {
+      if (getComputedStyle(el).display === 'none') { continue; }
+      const karte = el.querySelector(':scope > .card, :scope > .grid');
+      if (!karte) { continue; }
+      const y = Math.round(el.getBoundingClientRect().top);
+      if (!zeilen.has(y)) { zeilen.set(y, []); }
+      const kr = karte.getBoundingClientRect();
+      zeilen.get(y).push({ id: el.dataset.widget, unten: kr.bottom, oben: kr.top });
+    }
+    return [...zeilen.values()].filter(z => z.length > 1).map(z => ({
+      ids: z.map(x => x.id).join(' + '),
+      versatz: Math.round(Math.max(...z.map(x => x.unten)) - Math.min(...z.map(x => x.unten))),
+      versatzOben: Math.round(Math.max(...z.map(x => x.oben)) - Math.min(...z.map(x => x.oben))),
     }));
+  });
+  // Ein gemeinsamer Takt fuer die Zeilen (Entscheid Projektinhaber,
+  // 10.09.2026). Buendig in sich war jede Zeile schon; ueber die Seite
+  // hinweg blieben die Baender ungleich hoch -- gemessen 246 / 314 / 224 /
+  // 253 / 262 px, fuenf Masse ohne Rhythmus. Eine Untergrenze von 260 px
+  // macht daraus 260 / 314 / 260 / 260 / 262.
+  //
+  // Geprueft wird die Untergrenze, nicht die Liste der Hoehen: Waechst ein
+  // Container durch mehr Inhalt ueber 260, ist das richtig und soll nicht
+  // rot werden. Und nicht die CSS-Zahl abgelesen, sondern der gerenderte
+  // Container gemessen -- eine min-height kann wirkungslos bleiben.
+  const zuFlach = await page.evaluate(() =>
+    [...document.querySelectorAll('#dashFlow .dash-item')]
+      .filter(el => getComputedStyle(el).display !== 'none' && !el.classList.contains('dh'))
+      .map(el => ({ id: el.dataset.widget, h: Math.round(el.getBoundingClientRect().height) }))
+      .filter(x => x.h < 260));
+  check('KRITISCH: keine Zeile faellt unter das gemeinsame Mass von 260 px'
+    + (zuFlach.length ? ' — ' + zuFlach.map(x => `${x.id}: ${x.h} px`).join(', ') : ''),
+    zuFlach.length === 0);
+
+  // Die Untergrenze darf die gezogene Hoehe nicht aushebeln: Wer eine Karte
+  // auf 120 px zieht, will 120 px.
+  //
+  // Zwei Faelle, und sie sind NICHT dasselbe -- gemessen, nicht vermutet:
+  //   a) Beide Container der Zeile gezogen -> die Zeile folgt auf 120 px.
+  //      Hier muss die Untergrenze weichen, sonst bliebe die Zeile auf 260
+  //      und beide Karten stuenden wieder in einer Leerflaeche. Das leistet
+  //      das :not(.dh) im Regelwerk.
+  //   b) Nur EINE gezogen, die Nachbarin frei -> die Zeile bleibt so hoch,
+  //      wie die Nachbarin sie braucht (260), und unter der gezogenen Karte
+  //      bleibt Platz. Das ist keine Panne, sondern die Rechnung einer Zeile:
+  //      Sie kann nicht flacher sein als ihr hoechster Inhalt. Was zaehlt,
+  //      ist dass die KARTE dem Zug folgt.
+  const gezogen = await page.evaluate(() => {
+    const g = id => document.querySelector(`#dashFlow [data-widget="${id}"]`);
+    const mass = id => ({ container: Math.round(g(id).getBoundingClientRect().height),
+      karte: Math.round(g(id).querySelector(':scope > .card').getBoundingClientRect().height) });
+    const zieh = (id, h) => { g(id).classList.add('dh'); g(id).style.setProperty('--dh', h + 'px'); };
+    const los  = id => { g(id).classList.remove('dh'); g(id).style.removeProperty('--dh'); };
+    zieh('angemeldet', 120);
+    const einzeln = mass('angemeldet');
+    zieh('verlauf', 120);
+    const beide = { a: mass('angemeldet'), v: mass('verlauf') };
+    los('angemeldet'); los('verlauf');
+    return { einzeln, beide };
+  });
+  check(`KRITISCH: sind beide Container einer Zeile gezogen, weicht das gemeinsame `
+    + `Mass (auf 120 px gezogen: ${gezogen.beide.a.container} / ${gezogen.beide.v.container} px)`,
+    gezogen.beide.a.container === 120 && gezogen.beide.v.container === 120
+      && gezogen.beide.a.karte === 120 && gezogen.beide.v.karte === 120);
+  check(`Ist nur einer gezogen, folgt wenigstens die Karte dem Zug `
+    + `(Karte ${gezogen.einzeln.karte} px in einer ${gezogen.einzeln.container} px hohen Zeile)`,
+    gezogen.einzeln.karte === 120);
+
+  const schief = unterkanten.filter(z => z.versatz > 1);
+  // Auch die OBERKANTEN. Bis zum 10.09.2026 hat diese Pruefung nur unten
+  // gemessen -- und blieb gruen, waehrend das Kennzahlenraster mit seinem
+  // eigenen margin-top von 8 px (ENT-428) acht Pixel zu tief begann. Der
+  // Projektinhaber hat genau diese Stelle rot eingekringelt: "noch immer
+  // nicht 100% exakt". Eine Kante ist kein halbes Ding; wer nur unten misst,
+  // sieht die Haelfte.
+  const schiefOben = unterkanten.filter(z => z.versatzOben > 1);
+  check('KRITISCH: in jeder Zeile beginnen die Karten auf gleicher Höhe'
+    + (schiefOben.length ? ' — ' + schiefOben.map(z => `${z.ids}: ${z.versatzOben} px`).join(', ') : ''),
+    unterkanten.length >= 3 && schiefOben.length === 0);
+
+  // Und der Abstand ZWISCHEN den Zeilen muss links wie rechts derselbe sein.
+  // Derselbe Fehler von der anderen Seite gesehen: Ein eigener Aussenrand an
+  // einem Container addiert sich zur gap des Flusses, und die Spalte daneben
+  // hat ihn nicht. Gemessen war der Abstand von Zeile 1 zu Zeile 2 links
+  // 24 px und rechts 16.
+  const abstaende = await page.evaluate(() => {
+    const spalten = { links: [], rechts: [] };
+    for (const el of document.querySelectorAll('#dashFlow .dash-item')) {
+      if (getComputedStyle(el).display === 'none') { continue; }
+      const karte = el.querySelector(':scope > .card, :scope > .grid');
+      if (!karte) { continue; }
+      const r = karte.getBoundingClientRect();
+      const cr = el.getBoundingClientRect();
+      // Volle Breite gehoert keiner Spalte -- sie hat keinen Nachbarn, mit
+      // dem sich ein Abstand vergleichen liesse.
+      if (cr.width > document.getElementById('dashFlow').getBoundingClientRect().width - 20) { continue; }
+      (cr.left < document.getElementById('dashFlow').getBoundingClientRect().left + cr.width / 2
+        ? spalten.links : spalten.rechts).push({ id: el.dataset.widget, oben: r.top, unten: r.bottom });
+    }
+    const luecken = s => s.sort((a, b) => a.oben - b.oben)
+      .slice(1).map((x, i) => ({ zwischen: `${s[i].id}→${x.id}`, luecke: Math.round(x.oben - s[i].unten) }));
+    return { links: luecken(spalten.links), rechts: luecken(spalten.rechts) };
+  });
+  const ungleich = abstaende.links
+    .map((l, i) => ({ l, r: abstaende.rechts[i] }))
+    .filter(p => p.r && Math.abs(p.l.luecke - p.r.luecke) > 1);
+  check('KRITISCH: der Abstand zwischen zwei Zeilen ist links wie rechts gleich'
+    + (ungleich.length ? ' — ' + ungleich.map(p => `${p.l.zwischen}: ${p.l.luecke} px vs ${p.r.zwischen}: ${p.r.luecke} px`).join(', ') : ''),
+    abstaende.links.length >= 2 && ungleich.length === 0);
+
+  // Die Zahl der Zeilen wird mitgeprueft: Ohne sie bestuende die Pruefung
+  // auch dann, wenn gar nichts mehr nebeneinander steht und die Liste leer
+  // bleibt -- eine Pruefung, die nie etwas zu pruefen hat, ist keine.
+  check('KRITISCH: in jeder Zeile enden die Karten auf gleicher Höhe'
+    + (schief.length ? ' — ' + schief.map(z => `${z.ids}: ${z.versatz} px`).join(', ') : ''),
+    unterkanten.length >= 3 && schief.length === 0);
   check('Die Kennzahlen rücken in die zweite Zeile', m.kpi.top > m.begr.bottom - 1);
   check('KRITISCH: die Ereignisse bleiben auf voller Breite',
     Math.abs(m.erg.width - m.flow) < 1.5);
@@ -145,6 +271,26 @@ check('Zurücksetzen, Abbrechen, Speichern in dieser Reihenfolge',
 check('Jeder Container zeigt jetzt sein Werkzeug',
   await page.evaluate(n => document.querySelectorAll('.dash-werk').length === n &&
     [...document.querySelectorAll('.dash-werk')].every(w => getComputedStyle(w).display !== 'none'), STANDARD.length));
+
+// Der gestrichelte Rahmen zeigt den Container. Wenn die Karte darin nicht bis
+// an seine Unterkante reicht, verspricht der Bearbeitungsmodus eine
+// Ausrichtung, die die normale Ansicht nicht liefert -- man sieht dort eine
+// saubere Reihe und danach wieder eine krumme. Genau das war die Rückmeldung
+// des Projektinhabers vom 10.09.2026: "auch die bearbeitungsfenster löst das
+// problem nicht sauber". Gemessen vor der Behebung bis zu 105 px Luft
+// zwischen Karte und Rahmen.
+const rahmenLuft = await page.evaluate(() =>
+  [...document.querySelectorAll('#dashFlow .dash-item')]
+    .filter(el => getComputedStyle(el).display !== 'none')
+    .map(el => {
+      const karte = el.querySelector(':scope > .card, :scope > .grid');
+      return { id: el.dataset.widget,
+               luft: karte ? Math.round(el.getBoundingClientRect().bottom - karte.getBoundingClientRect().bottom) : 0 };
+    }).filter(x => x.luft > 1));
+check('KRITISCH: der gestrichelte Rahmen endet dort, wo die Karte endet'
+  + (rahmenLuft.length ? ' — ' + rahmenLuft.map(x => `${x.id}: ${x.luft} px`).join(', ') : ''),
+  rahmenLuft.length === 0);
+
 await page.screenshot({ path: OUT + '/71-bearbeiten.png' });
 
 // ══════════ MIT PFEILEN VERSCHIEBEN
@@ -305,6 +451,18 @@ check('KRITISCH: "Mitarbeitende" und "Kunden" verschwinden auf dem Handy -- Best
   kachelnMobil[2].label === 'Mitarbeitende' && !kachelnMobil[2].sichtbar
     && kachelnMobil[3].label === 'Kunden' && !kachelnMobil[3].sichtbar);
 check('Alle vier Kacheln bleiben trotzdem im DOM', kachelnMobil.length === 4);
+
+// Das gemeinsame Zeilenmass gilt NUR am Schreibtisch. Untereinander gibt es
+// keine Zeile, deren Takt man halten koennte -- eine kurze Karte auf 260 px
+// zu heben waere allein Leerlauf. Geprueft daran, dass wirklich noch eine
+// flacher ist: Eine Pruefung, die auch dann bestuende, wenn alle ueber 260
+// liegen, sagt nichts ueber die Medienabfrage aus.
+const flachMobil = await page.evaluate(() =>
+  [...document.querySelectorAll('#dashFlow .dash-item')]
+    .filter(el => getComputedStyle(el).display !== 'none')
+    .map(el => Math.round(el.getBoundingClientRect().height)));
+check(`KRITISCH: auf dem Handy greift das Zeilenmass nicht (flachster Container `
+  + `${Math.min(...flachMobil)} px)`, Math.min(...flachMobil) < 260);
 
 await browser.close();
 

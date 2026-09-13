@@ -71,3 +71,40 @@ export async function mitWiederholung(rote, starte) {
   }
   return { echt, wackelig };
 }
+
+/* Die Zeilen, die erklaeren WAS schiefging -- nicht der ganze Auswurf.
+   Die Suiten melden jede gefallene Pruefung als "  ✗ <Name>". */
+export function gruende(text) {
+  return String(text || '').split('\n')
+    .filter(z => /✗|FEHLGESCHLAGEN|^\s+- /.test(z)).slice(0, 8);
+}
+
+/* Was ueber eine Suite zu melden ist, die im PARALLELEN Lauf gefallen und
+   allein bestanden hat (OP-527).
+
+   Bis hierher wurde dieser Fall nur gezaehlt: Der Laeufer sagte, eine Suite
+   sei parallel gefallen, aber nie welche Pruefung darin. Der Text des
+   parallelen Laufs -- der einzige Ort, an dem das steht -- wurde
+   weggeworfen, weil der Wiederholungslauf gruen war und keine Gruende hat.
+   Ohne den Namen der gefallenen Pruefung bleibt beim naechsten Mal nur
+   Raten, und genau daran ist OP-527 steckengeblieben.
+
+   `parallelText` ist der Auswurf des ERSTEN (parallelen) Laufs, nicht der
+   des Wiederholungslaufs. Rueckgabe: die Zeilen, die auszugeben sind. */
+export function wackelBericht(name, parallelText) {
+  const zeilen = [`  gruen ${name} (allein bestanden)`];
+  const z = gruende(parallelText);
+  if (z.length) {
+    zeilen.push('        im parallelen Lauf gefallen:');
+    z.forEach(y => zeilen.push('        ' + y.trim()));
+    return zeilen;
+  }
+  // Keine ✗-Zeilen: Dann hat die Suite abgebrochen, statt Pruefungen zu
+  // melden -- ein Browser, der unter Last nicht startet, sieht so aus.
+  // Die letzten Zeilen sagen dann mehr als gar nichts.
+  const rest = String(parallelText || '').split('\n').filter(y => y.trim()).slice(-4);
+  if (!rest.length) { return zeilen; }
+  zeilen.push('        im parallelen Lauf ohne Pruefmeldung abgebrochen:');
+  rest.forEach(y => zeilen.push('        ' + y.trim()));
+  return zeilen;
+}

@@ -41,7 +41,7 @@ try {
     // Alle anderen Sitzungen beenden -- die aktuelle bleibt bestehen.
     $token = $_SERVER['HTTP_X_AUTH_TOKEN'] ?? '';
     $pdo->prepare('DELETE FROM sessions WHERE mitarbeiter_id = ? AND token <> ?')
-        ->execute([(int)$user['id'], $token]);
+        ->execute([(int)$user['id'], sitzung_abdruck((string)$token)]);
     $pdo->commit();
 } catch (Throwable $e) {
     $pdo->rollBack();
