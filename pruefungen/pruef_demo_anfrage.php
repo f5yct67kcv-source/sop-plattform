@@ -12,7 +12,8 @@ require __DIR__ . '/../backend/demo_bremse.php';
 
 // ══════════ RECHENKERN, ECHT AUSGEFUEHRT ═════════════════════════════
 $gut = ['firma' => ' Muster Sicherheitsdienst AG ', 'name' => 'A. Beispielperson',
-    'email' => 'a.beispiel@example.invalid', 'groesse' => '11 – 30', 'nachricht' => "Zeile 1\r\nZeile 2"];
+    'email' => 'a.beispiel@example.invalid', 'telefon' => '079 123 45 67',
+    'groesse' => '11 – 30', 'nachricht' => "Zeile 1\r\nZeile 2"];
 $p = demo_anfrage_pruefen($gut);
 pruef('Eine vollstaendige Anfrage wird angenommen', $p['fehler'] === []);
 pruef('Randleerzeichen werden entfernt', $p['werte']['firma'] === 'Muster Sicherheitsdienst AG');
@@ -20,8 +21,23 @@ pruef('Die Nachricht behaelt ihre Umbrueche (nur im Rumpf, LF statt CRLF)',
     $p['werte']['nachricht'] === "Zeile 1\nZeile 2");
 
 $leer = demo_anfrage_pruefen([]);
-pruef('KRITISCH: ohne Firma, Name und E-Mail wird abgewiesen -- alle drei Felder benannt',
-    isset($leer['fehler']['firma'], $leer['fehler']['name'], $leer['fehler']['email']));
+pruef('KRITISCH: ohne Firma, Name, E-Mail und Telefon wird abgewiesen -- alle vier Felder benannt',
+    isset($leer['fehler']['firma'], $leer['fehler']['name'], $leer['fehler']['email'],
+          $leer['fehler']['telefon']));
+
+// Telefon: geprueft werden die ZIFFERN, nicht die Schreibweise. Alle drei
+// Formen unten sind dieselbe Nummer und muessen durchkommen; eine zu kurze
+// Eingabe darf es nicht.
+foreach (['079 123 45 67', '+41 79 123 45 67', '0041 79/123 45 67', '(079) 123-45-67'] as $form) {
+    pruef("Die Telefonschreibweise \"$form\" wird angenommen",
+        demo_anfrage_pruefen(array_merge($gut, ['telefon' => $form]))['fehler'] === []);
+}
+foreach (['', '  ', '12345', 'ruf mich an', '079 12'] as $murks) {
+    pruef("KRITISCH: \"$murks\" wird als Telefonnummer abgewiesen",
+        isset(demo_anfrage_pruefen(array_merge($gut, ['telefon' => $murks]))['fehler']['telefon']));
+}
+pruef('KRITISCH: gezaehlt werden nur Ziffern, Trennzeichen zaehlen nicht mit',
+    demo_telefon_ziffern('+41 79/123 45 67') === 11 && demo_telefon_ziffern('----') === 0);
 
 $falscheMail = demo_anfrage_pruefen(array_merge($gut, ['email' => 'keine adresse']));
 pruef('KRITISCH: eine ungueltige E-Mail-Adresse wird abgewiesen', isset($falscheMail['fehler']['email']));
@@ -53,6 +69,10 @@ $html = demo_anfrage_html($p['werte'], '01.01.2000 12:00');
 pruef('Der Reintext nennt Firma, Name, E-Mail und die Nachricht',
     str_contains($text, 'Muster Sicherheitsdienst AG') && str_contains($text, 'A. Beispielperson')
     && str_contains($text, 'a.beispiel@example.invalid') && str_contains($text, "Zeile 1\nZeile 2"));
+// Eine Nummer, die nur im Formular steht und nicht in der Mail, waere fuer
+// den Empfaenger nicht vorhanden -- beide Fassungen muessen sie tragen.
+pruef('KRITISCH: Reintext UND HTML-Fassung nennen die Telefonnummer',
+    str_contains($text, '079 123 45 67') && str_contains($html, '079 123 45 67'));
 $boese = demo_anfrage_pruefen(array_merge($gut, ['nachricht' => '<script>alert(1)</script>']));
 $htmlBoese = demo_anfrage_html($boese['werte'], '01.01.2000 12:00');
 pruef('KRITISCH: die HTML-Fassung maskiert Eingaben (kein rohes <script>)',
@@ -152,6 +172,33 @@ pruef('KRITISCH: kann die Bremse ihren Zaehler nicht oeffnen, meldet sie einen F
 @rmdir(demo_bremse_datei($adr, $dazwischen)); @rmdir($dazwischen);
 array_map('unlink', (array)glob($tmp . '/*.txt')); @rmdir($tmp);
 
+// ══════════ ZUSTELLBARKEIT, OHNE NETZ GEPRUEFT ═══════════════════════
+// Der Nachschlag wird eingespeist: Diese Suite darf nicht davon abhaengen, ob
+// der Rechner, auf dem sie laeuft, gerade ins DNS kommt -- sonst pruefte sie
+// die Leitung statt die Logik.
+$kennt = fn(array $vorhanden) => fn(string $d) => in_array($d, $vorhanden, true);
+
+pruef('KRITISCH: eine Adresse mit Mailserver gilt als zustellbar',
+    demo_adresse_zustellbar('a@beispiel.invalid', $kennt(['beispiel.invalid', DEMO_KONTROLL_DOMAIN])) === true);
+pruef('KRITISCH: eine Adresse ohne Mailserver wird erkannt -- der Fall "info@test.cha"',
+    demo_adresse_zustellbar('info@test.cha', $kennt([DEMO_KONTROLL_DOMAIN])) === false);
+pruef('KRITISCH: antwortet der Namensdienst gar nicht, lautet das Urteil "nicht pruefbar" -- NICHT "gibt es nicht"',
+    demo_adresse_zustellbar('info@test.cha', $kennt([])) === null);
+pruef('Ohne @-Zeichen gibt es keine Domain, also auch keinen Mailserver',
+    demo_adresse_zustellbar('keine-adresse', $kennt([DEMO_KONTROLL_DOMAIN])) === false);
+pruef('Getrennt wird am LETZTEN @, nicht am ersten',
+    demo_domain('"a@b"@beispiel.invalid') === 'beispiel.invalid');
+
+// Die Kontrolldomain kostet einen zweiten Nachschlag. Im Normalfall darf er
+// gar nicht erst stattfinden.
+$gefragt = [];
+demo_adresse_zustellbar('a@beispiel.invalid', function (string $d) use (&$gefragt) {
+    $gefragt[] = $d;
+    return true;
+});
+pruef('Im Normalfall wird nur EINE Domain nachgeschlagen, nicht zusaetzlich die Kontrolle',
+    $gefragt === ['beispiel.invalid']);
+
 // ══════════ ENDPUNKT, AM QUELLTEXT ═══════════════════════════════════
 $q = file_get_contents(__DIR__ . '/../backend/api/demo_senden.php');
 $q = preg_replace('/\/\/[^\n]*/', '', (string)$q);   // Kommentare zaehlen nicht
@@ -188,6 +235,14 @@ pruef('KRITISCH: keine zwei Antworten tragen denselben Text',
     count($texte[1]) >= 6 && count($texte[1]) === count(array_unique($texte[1])));
 pruef('Der Versand wird nur versucht, wenn SMTP eingerichtet ist',
     strpos($q, 'smtp_konfiguriert()') < strpos($q, 'smtp_senden('));
+// Abgewiesen wird NUR das belegte "gibt es nicht". Ein Vergleich auf "falsy"
+// statt auf === false wuerde auch das "nicht pruefbar" (null) abweisen und
+// damit einem Interessenten bei gestoertem Namensdienst sagen, seine Adresse
+// sei falsch.
+pruef('KRITISCH: nur ein belegtes "gibt es nicht" weist ab, nicht auch "nicht pruefbar"',
+    (bool)preg_match('/demo_adresse_zustellbar\([^;]*===\s*false/', $q));
+pruef('KRITISCH: der Nachschlag geschieht erst NACH dem Fallenfeld -- ein Skript loest keinen aus',
+    strpos($q, 'demo_ist_falle(') < strpos($q, 'demo_adresse_zustellbar('));
 
 // ══════════ AUSGABE ══════════════════════════════════════════════════
 echo "\n$ok bestanden, " . count($bad) . " nicht bestanden\n";

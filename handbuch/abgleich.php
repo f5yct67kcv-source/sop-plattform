@@ -1,0 +1,172 @@
+<?php require __DIR__ . '/_guard.php'; ?>
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Abgleich – Handbuch Cockpit</title>
+<link rel="stylesheet" href="handbuch.css">
+</head>
+<body>
+<div class="hb-shell">
+  <aside class="hb-side" id="hbSide">
+    <div class="hb-brand">
+      <a href="index.php" style="text-decoration:none">
+        <span class="titel">Handbuch</span>
+        <span class="unter">Cockpit von GuardOpS</span>
+      </a>
+      <button class="hb-menu-btn" id="hbMenuBtn" aria-label="Menü" aria-expanded="false">☰</button>
+    </div>
+    <div class="hb-suche">
+      <input type="search" id="hbSucheEingabe" placeholder="Suchen…" aria-label="Handbuch durchsuchen" autocomplete="off">
+      <div class="hb-suche-ergebnisse" id="hbSucheErgebnisse" hidden></div>
+    </div>
+    <div class="hb-nav-wrap">
+      <div class="hb-gruppe">Einstieg</div>
+      <ul class="hb-nav">
+        <li><a href="index.php">Übersicht</a></li>
+        <li><a href="erste-schritte.php">Erste Schritte</a></li>
+      </ul>
+      <div class="hb-gruppe">Erfassung (App)</div>
+      <ul class="hb-nav">
+        <li><a href="erfassung.php">Erfassung</a></li>
+      </ul>
+      <div class="hb-gruppe">Cockpit</div>
+      <ul class="hb-nav">
+        <li><a href="planung.php">Planung</a></li>
+        <li><a href="kunden.php">Kunden</a></li>
+        <li><a href="personal.php">Personal</a></li>
+        <li><a href="lohn.php">Lohn</a></li>
+        <li><a href="abgleich.php" class="aktiv">Abgleich</a></li>
+        <li><a href="betrieb.php">Betrieb</a></li>
+      </ul>
+      <div class="hb-gruppe">Weitere Oberflächen</div>
+      <ul class="hb-nav">
+        <li><a href="kundenportal.php">Kundenportal</a></li>
+      </ul>
+      <div class="hb-gruppe">Nachschlagen</div>
+      <ul class="hb-nav">
+        <li><a href="glossar.php">Glossar</a></li>
+      </ul>
+    </div>
+    <div class="hb-side-fuss">
+      Aus dem Quelltext zusammengestellt, siehe Hinweis auf der <a href="index.php">Übersicht</a>.
+    </div>
+  </aside>
+
+  <div class="hb-main">
+    <div class="hb-content">
+
+      <p class="hb-kicker">Cockpit</p>
+      <h1>Abgleich</h1>
+      <p class="hb-lead">Geplante gegen tatsächlich gearbeitete Zeiten abgleichen. Der
+      Name steht im Cockpit für genau eine Seite (die Ist-Zeiten); zwei verwandte
+      Themen liegen an anderer Stelle in der Navigation — dieses Kapitel sagt, wo.</p>
+
+      <div class="hb-kasten hb-hinweis">
+        <p class="hb-kasten-titel">Drei Themen, drei Orte</p>
+        <p><b>Ist-Zeiten</b> (unten auf dieser Seite) ist der eigentliche Menüpunkt
+        „Abgleich". <b>Rapporte</b> — die von Mitarbeitenden erfassten und vom Kunden
+        unterschriebenen Berichte — stehen als Liste im Kapitel
+        <a href="kunden.php">Kunden</a>, obwohl sie rechtemässig zum Bereich
+        „Abgleich" gehören. <b>Pensen</b> liegt unter „Auswertung". <b>Ruhezeit</b>
+        hat keine eigene Seite — nur eine Warnung beim Einteilen in der Planung
+        (siehe unten).</p>
+      </div>
+
+      <h2 id="ist-zeiten">Ist-Zeiten</h2>
+      <p>Zeigt Schichten der Vergangenheit, unabhängig vom Status — eine
+      abgeglichene Zeile verschwindet nicht aus der Liste, sie wird nur
+      festgeschrieben. Filter: Zeitraum, Status (Alle/Nur offene/Nur abgeglichene),
+      Sparte, Suche. Kopfzeile meldet, wie viele Zeilen noch auf den Abgleich
+      warten.</p>
+
+      <ol class="hb-schritte">
+        <li>Zeitraum/Filter setzen.</li>
+        <li>Zeile direkt in der Tabelle bearbeiten (Von/Bis/Pause) oder über das
+        Stift-Symbol die Detail-Schublade öffnen.</li>
+        <li>In der Schublade: „Was ist passiert?" wählen — <b>Anwesend</b>,
+        <b>Abwesend</b> oder <b>Ausgefallen</b> (die Schicht fand gar nicht statt).
+        Bei Anwesenheit Zeiten und Pause eintragen; eine automatische Meldung warnt,
+        wenn die erfasste Pause unter dem gesetzlichen Minimum liegt.</li>
+        <li>Liegt bereits ein Rapport der Person vor, lässt er sich mit einem Klick
+        auf „Rapportzeiten übernehmen" in die Ist-Felder holen (überträgt nur,
+        speichert nichts von selbst).</li>
+        <li>„Abgleich speichern" — die Zeile gilt danach als festgeschrieben.</li>
+      </ol>
+
+      <p>Mehrere Zeilen auf einmal: ankreuzen, in der Sammelleiste einheitliche
+      Zeit/Pause setzen, „Abgleichen". Ein CSV-Export deckt die aktuell gefilterte
+      Liste ab.</p>
+
+      <div class="hb-kasten hb-regel">
+        <p class="hb-kasten-titel">Stunden werden hier nicht gerechnet — eine Ausnahme gibt es</p>
+        <p>Die Seite selbst sagt es wörtlich: <i>„Hier wird nur festgehalten, nicht
+        gerechnet."</i> Aus den erfassten Ist-Zeiten berechnet diese Seite
+        <b>keine</b> Stunden oder Zuschläge — das wäre eine Auslegung des GAV. Die
+        angezeigte Spalte „Netto" ist eine reine Differenz (Zeit minus Pause), keine
+        bewertete Arbeitszeit. Rohzeit, bewertete Zeit, Zeitbonus und Zeitzuschlag als
+        GAV-Grössen entstehen an anderer Stelle (Lohnläufe), nicht im Abgleich.</p>
+        <p><b>Eine Ausnahme:</b> Sobald eine Zeile auf „Anwesend" gesetzt und
+        gespeichert wird, entsteht im Hintergrund sehr wohl ein Frankenbetrag — der
+        Auslagenersatz nach Art. 18 GAV wird als unveränderlicher Schnappschuss
+        festgehalten (sichtbar nicht hier, sondern unter „Auslagenersatz" in der
+        Auswertung). Der Hinweistext auf der Seite selbst nennt das nicht mehr
+        korrekt — er stammt aus der Zeit vor dieser Ergänzung.</p>
+      </div>
+
+      <p>Eine festgeschriebene Zeile lässt sich nur über „Sperre aufheben und
+      bearbeiten" wieder öffnen (mit Rückfrage — die bisher erfassten Ist-Zeiten
+      gehen dabei verloren). Dieselbe Sperre wirkt auch umgekehrt: In der Planung
+      lässt sich eine bereits abgeglichene Schicht nicht mehr verschieben, löschen
+      oder umbesetzen, solange die Sperre steht (siehe <a href="planung.php">Planung</a>).</p>
+
+      <h2 id="pensen-unter-auswertung">Pensen <span class="hb-status kurz">unter „Auswertung"</span></h2>
+      <p>Jahresstunden je Person gegen die Grenzen der Anstellungskategorie nach
+      Art. 8 GAV (C bis 900&nbsp;Std., B bis 1'800, A bis 2'300 — ausdrücklich
+      inklusive Ferien, Zeitbonus und Zeitzuschlag). Reine Auswertung, nichts lässt
+      sich hier ändern.</p>
+      <ul>
+        <li>Jahr wählen, optional sortieren (Stunden, Nähe zur Grenze, Name) oder auf
+        Personen mit hinterlegter Kategorie einschränken.</li>
+        <li>Jede Zeile zeigt geleistete Zeit, Zeitbonus getrennt ausgewiesen, sowie
+        einen Balken mit Grenz- und Toleranzmarke (5&nbsp;%).</li>
+        <li>Warnstufen: Näherung an die Grenze, Überschreitung, Überschreitung über
+        die Toleranz hinaus, sowie unabhängig davon ein Hinweis ab 1'000
+        tatsächlich gearbeiteten Stunden.</li>
+      </ul>
+      <p>Durchgehender Hinweis unten: Die Zahlen sind <b>Mindestwerte</b> — Ferien,
+      Feiertagsbonus, Zeitzuschlag über 210 Monatsstunden und noch nicht
+      abgeglichene Schichten fehlen.</p>
+
+      <h2 id="ruhezeit">Ruhezeit</h2>
+      <p>Keine eigene Seite. Beim Zuteilen einer Person zu einem Einsatz (in der
+      Planung) erscheint bei Bedarf eine Warnung wie „Nur 8&nbsp;h Ruhezeit seit/bis
+      zu „…" — verlangt sind 11". Die Warnung <b>blockiert nichts</b> — die
+      Zuteilung bleibt möglich. Eine Übersicht vergangener oder anstehender
+      Unterschreitungen ist im Code als „später" vorgemerkt, existiert aber noch
+      nicht.</p>
+
+      <div class="hb-begriffe">
+        <a href="glossar.php#ist-status">Ist-Status</a>
+        <a href="glossar.php#netto">Netto</a>
+        <a href="glossar.php#festgeschrieben">Festgeschrieben / abgeglichen</a>
+        <a href="glossar.php#pensum">Pensum / Kategorie</a>
+        <a href="glossar.php#ruhezeit">Ruhezeit</a>
+        <a href="glossar.php#zeitbonus">Zeitbonus</a>
+      </div>
+
+      <p class="hb-fussnote">Quelle: <code>dashboard.html</code>
+      (<code>view-abgleich</code>, Zeile 5750; <code>view-pensen</code>, Zeile 6420),
+      <code>backend/api/einsatz_abgleich.php</code>, <code>gav.js</code>, Stand
+      11.09.2026. Nicht am laufenden Cockpit nachgeprüft — siehe Hinweis auf der
+      <a href="index.php">Übersicht</a>.</p>
+
+    </div>
+  </div>
+</div>
+<script src="suchindex.js"></script>
+<script src="suche.js"></script>
+<script src="handbuch.js"></script>
+</body>
+</html>

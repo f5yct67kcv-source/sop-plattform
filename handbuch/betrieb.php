@@ -1,0 +1,207 @@
+<?php require __DIR__ . '/_guard.php'; ?>
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Betrieb – Handbuch Cockpit</title>
+<link rel="stylesheet" href="handbuch.css">
+</head>
+<body>
+<div class="hb-shell">
+  <aside class="hb-side" id="hbSide">
+    <div class="hb-brand">
+      <a href="index.php" style="text-decoration:none">
+        <span class="titel">Handbuch</span>
+        <span class="unter">Cockpit von GuardOpS</span>
+      </a>
+      <button class="hb-menu-btn" id="hbMenuBtn" aria-label="Menü" aria-expanded="false">☰</button>
+    </div>
+    <div class="hb-suche">
+      <input type="search" id="hbSucheEingabe" placeholder="Suchen…" aria-label="Handbuch durchsuchen" autocomplete="off">
+      <div class="hb-suche-ergebnisse" id="hbSucheErgebnisse" hidden></div>
+    </div>
+    <div class="hb-nav-wrap">
+      <div class="hb-gruppe">Einstieg</div>
+      <ul class="hb-nav">
+        <li><a href="index.php">Übersicht</a></li>
+        <li><a href="erste-schritte.php">Erste Schritte</a></li>
+      </ul>
+      <div class="hb-gruppe">Erfassung (App)</div>
+      <ul class="hb-nav">
+        <li><a href="erfassung.php">Erfassung</a></li>
+      </ul>
+      <div class="hb-gruppe">Cockpit</div>
+      <ul class="hb-nav">
+        <li><a href="planung.php">Planung</a></li>
+        <li><a href="kunden.php">Kunden</a></li>
+        <li><a href="personal.php">Personal</a></li>
+        <li><a href="lohn.php">Lohn</a></li>
+        <li><a href="abgleich.php">Abgleich</a></li>
+        <li><a href="betrieb.php" class="aktiv">Betrieb</a></li>
+      </ul>
+      <div class="hb-gruppe">Weitere Oberflächen</div>
+      <ul class="hb-nav">
+        <li><a href="kundenportal.php">Kundenportal</a></li>
+      </ul>
+      <div class="hb-gruppe">Nachschlagen</div>
+      <ul class="hb-nav">
+        <li><a href="glossar.php">Glossar</a></li>
+      </ul>
+    </div>
+    <div class="hb-side-fuss">
+      Aus dem Quelltext zusammengestellt, siehe Hinweis auf der <a href="index.php">Übersicht</a>.
+    </div>
+  </aside>
+
+  <div class="hb-main">
+    <div class="hb-content">
+
+      <p class="hb-kicker">Cockpit</p>
+      <h1>Betrieb</h1>
+      <p class="hb-lead">Acht Kacheln für alles, was den Betrieb als Ganzes betrifft, statt
+      eine einzelne Kunden- oder Personalakte — von den Anstellungsorten bis zur
+      Rollenvergabe.</p>
+
+      <div class="hb-kasten hb-hinweis">
+        <p class="hb-kasten-titel">Zwei Namen für denselben Bereich</p>
+        <p>Im Cockpit selbst heisst der Knopf <b>„Einstellungen"</b> (unter
+        „Administration", nur am Desktop). Im Code, im Entscheidungsprotokoll und
+        darum auch in diesem Handbuch trägt derselbe Bereich weiterhin den älteren
+        Namen <b>„Betrieb"</b> — nicht zu verwechseln mit der gleichnamigen
+        Seitenleisten-Rubrik für das Tagesgeschäft.</p>
+      </div>
+
+      <h2 id="die-acht-kacheln">Die acht Kacheln</h2>
+      <div class="hb-tabelle-wrap"><table>
+        <tr><th>Kachel</th><th>Wofür</th></tr>
+        <tr><td><b>Betrieb</b></td><td>Hauptdomizil, Anstellungsorte, Logo</td></tr>
+        <tr><td><b>Briefkopf für Rapporte</b></td><td>Kopf-/Fusszeile und QR-Rechnungsdaten auf dem Kundenrapport</td></tr>
+        <tr><td><b>Mein Zugang: Zwei-Faktor-Anmeldung</b></td><td>Eigene 2FA — siehe <a href="erste-schritte.php">Erste Schritte</a></td></tr>
+        <tr><td><b>Rollen &amp; Berechtigungen</b></td><td>Profile, Zuteilung, Einsatzmerkmale, Login-Namen</td></tr>
+        <tr><td><b>Personalnummern</b></td><td>Fehlende Personalnummern nachtragen</td></tr>
+        <tr><td><b>Dienstfahrzeuge</b></td><td>Fahrzeug-Stammdaten</td></tr>
+        <tr><td><b>Support-Freigabe</b></td><td>Befristeter Diagnose-Zugriff für den Plattform-Betreiber — nur mit Recht „Rollen &amp; Berechtigungen"</td></tr>
+        <tr><td><b>Supportanfrage</b></td><td>Ticket an den Plattform-Betreiber</td></tr>
+      </table></div>
+
+      <h2 id="betrieb-hauptdomizil-anstellungsorte-logo">Betrieb: Hauptdomizil, Anstellungsorte, Logo</h2>
+      <p><b>Hauptdomizil</b> — betriebliche Grunddaten (Firma, Adresse, Kontakt,
+      Pikett-/Zentralnummer — Letztere erscheint in der App unter „Zentrale und
+      Notruf", getrennt von der normalen Telefonnummer).</p>
+
+      <p><b>Anstellungsorte</b> — GAV-relevant (Art. 18 Ziff. 2): höchstens zwei,
+      davon genau ein Hauptanstellungsort (HAO) und höchstens ein
+      Nebenanstellungsort (NAO). Von hier aus misst das Werkzeug die Wegstrecke zu
+      jedem Objekt.</p>
+
+      <ol class="hb-schritte">
+        <li>Bezeichnung, Rolle (HAO/NAO — solange kein HAO existiert, automatisch
+        HAO), Adresse eintragen; bei zwei Orten zusätzlich die Wegstrecke
+        zwischen ihnen (entscheidet nach Art. 18 Ziff. 3, ob im
+        Nebenanstellungsgebiet überhaupt etwas geschuldet ist).</li>
+        <li>„Hinzufügen" bzw. „Speichern" beim Ändern.</li>
+      </ol>
+      <p>Löschen fragt eigens nach — damit verschwinden auch alle von diesem Ort aus
+      hinterlegten Wegstrecken zu Objekten.</p>
+
+      <p><b>Logo</b> — erscheint auf dem gedruckten Arbeitsrapport (PNG/JPEG/SVG/WebP,
+      höchstens 512&nbsp;KB).</p>
+
+      <h2 id="briefkopf-fuer-rapporte">Briefkopf für Rapporte</h2>
+      <p>Firma, Zusatz, Fusszeile(n) sowie der QR-Rechnungsblock (Adresse + QR-IBAN
+      mit Live-Prüfung, ob es sich tatsächlich um eine QR-IBAN handelt). Bleibt die
+      QR-IBAN leer, zeigt eine Rechnung beim Kunden keinen Zahlteil.</p>
+
+      <h2 id="rollen-berechtigungen">Rollen &amp; Berechtigungen</h2>
+      <p>Die Systemrollen selbst sind hier nicht änderbar (siehe
+      <a href="erste-schritte.php">Erste Schritte</a>) — diese Kachel ist der Ort für
+      alles Weitere.</p>
+
+      <h3 id="eigenes-profil-anlegen">Eigenes Profil anlegen</h3>
+      <ol class="hb-schritte">
+        <li>Kachel „Profil anlegen" (am Ende des Profil-Rasters).</li>
+        <li>Name und Beschreibung eingeben.</li>
+        <li>Je Bereich (gruppiert nach Planung, Abgleich, Kunden, Personal,
+        Revierdienst und Administration) eine Stufe wählen: <b>verborgen</b>,
+        <b>lesen</b> oder <b>schreiben</b> — „schreiben" steht nur dort zur Wahl,
+        wo es serverseitig überhaupt einen Schreibweg gibt.</li>
+        <li>„Profil speichern".</li>
+      </ol>
+
+      <h3 id="profile-zuteilen">Profile zuteilen</h3>
+      <p>Tabelle Person × Profile: Marken anklicken speichert sofort, ohne separaten
+      Speichern-Knopf. Mehrere Profile je Person sind möglich — sie addieren sich,
+      je Bereich gilt die höchste gemeinsame Stufe. Ob eine Person überhaupt ins
+      Cockpit kommt, ergibt sich automatisch daraus (mindestens eine „lesen"-Stufe
+      irgendwo) — es gibt dafür keinen eigenen Schalter.</p>
+
+      <h3 id="einsatzmerkmale">Einsatzmerkmale</h3>
+      <p><b>Keine Rollen</b>, sondern drei Ja/Nein-Eigenschaften je Person:
+      Diensthundeführer, Waffentragberechtigt, Revierdienst-berechtigt — mit Warnung,
+      falls die zugehörige Bewilligung fehlt oder abgelaufen ist.</p>
+
+      <div class="hb-kasten hb-achtung">
+        <p class="hb-kasten-titel">Login-Namen umstellen — ein harter Schnitt</p>
+        <p>Massen-Migration auf das Muster <code>vorname.nachname</code>: erst
+        „Vorschau laden", dann Bestätigung. Danach gilt der alte Login-Name sofort
+        nicht mehr — jede betroffene Person muss den neuen kennen, bevor sie sich
+        wieder anmelden kann. Ist das eigene Konto betroffen, meldet das Werkzeug
+        den neuen Namen und bietet sofortiges Abmelden an.</p>
+      </div>
+
+      <h2 id="personalnummern">Personalnummern</h2>
+      <p>Gleiches Muster (Vorschau → Bestätigung), aber ohne Abmelde-Bezug: trägt
+      ausschliesslich <b>fehlende</b> vierstellige Personalnummern nach. Sie werden
+      zufällig vergeben, nicht fortlaufend, und sind danach nicht mehr änderbar.</p>
+
+      <h2 id="dienstfahrzeuge">Dienstfahrzeuge</h2>
+      <p>Reine Stammdaten — „hier wird nichts kontrolliert und nichts gerechnet".
+      Vier Gruppen: Fahrzeug (Kontrollschild, Marke, Modell …), Ausweis und
+      Halterschaft, Standort und Zustand, Termine und Kilometerstand.</p>
+      <ol class="hb-schritte">
+        <li>Formular ausfüllen, „Hinzufügen"/„Speichern".</li>
+        <li>„Aufkleber" erzeugt einen druckbaren QR-Code fürs Fahrzeug (verlinkt in
+        der App auf die Kilometerstand-Erfassung bei der Übernahme).</li>
+        <li>Beim Löschen: Ist das Fahrzeug nur vorübergehend nicht im Einsatz, ist
+        „Ausser Betrieb" der richtige Weg, nicht Löschen.</li>
+      </ol>
+      <p>Jede Fahrzeugkarte trägt unten einen eigenen Änderungsverlauf (dasselbe
+      Logbuch wie bei der Personalakte). Die Kilometerkontrolle bei
+      Übernahme/Rückgabe eines Fahrzeugs im laufenden Betrieb ist ein eigener,
+      anderer Bereich (Fahrzeugübernahme in der App) — hier nur die Stammdaten.</p>
+
+      <h2 id="support-freigabe-und-supportanfrage">Support-Freigabe und Supportanfrage</h2>
+      <p>Betreffen den <b>Plattform-Betreiber</b> — eine andere Stelle als CUPI&nbsp;24
+      selbst, zuständig für den Betrieb der Software.</p>
+      <ul>
+        <li><b>Support-Freigabe:</b> befristeter Diagnose-Zugriff (4&nbsp;Std. / 24&nbsp;Std.
+        [Standard] / 3&nbsp;Tage / 7&nbsp;Tage) mit Zweckangabe, jederzeit zurückziehbar.
+        Ein Protokoll darunter listet jede je erteilte Freigabe und jeden einzelnen
+        Zugriff darauf — oder ausdrücklich „freigegeben, aber nie eingesehen".</li>
+        <li><b>Supportanfrage:</b> ein Ticket-Kanal, unabhängig von einer Freigabe.
+        Ausdrücklicher Hinweis am Feld: Was hier eingetragen wird, liegt in der
+        Datenbank des Betreibers, nicht der eigenen.</li>
+      </ul>
+
+      <div class="hb-begriffe">
+        <a href="glossar.php#anstellungsort">Anstellungsort / HAO / NAO</a>
+        <a href="glossar.php#profil">Profil</a>
+        <a href="glossar.php#einsatzmerkmal">Einsatzmerkmal</a>
+        <a href="glossar.php#betreiber">Betreiber</a>
+        <a href="glossar.php#logbuch">Logbuch / Änderungsverlauf</a>
+      </div>
+
+      <p class="hb-fussnote">Quelle: <code>dashboard.html</code> (<code>view-betrieb</code>,
+      Markup ab Zeile 7494), <code>backend/rechte.php</code>, Stand 11.09.2026. Nicht
+      am laufenden Cockpit nachgeprüft — siehe Hinweis auf der
+      <a href="index.php">Übersicht</a>.</p>
+
+    </div>
+  </div>
+</div>
+<script src="suchindex.js"></script>
+<script src="suche.js"></script>
+<script src="handbuch.js"></script>
+</body>
+</html>
