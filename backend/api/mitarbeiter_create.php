@@ -57,6 +57,17 @@ if ($gelesen['fehler']) {
 }
 $s = $gelesen['spalten'];
 
+// Wer die vertraulichen Angaben nicht sehen darf, darf sie auch nicht setzen
+// (ENT-077) -- Anlegen ist ein Schreibvorgang wie Aendern. Ohne diese Sperre
+// koennte ein Profil mit personal_schreiben ohne personal_vertraulich_schreiben
+// beim Anlegen AHV-Nummer, Aufenthaltsbewilligung etc. mitschicken, obwohl es
+// dieselben Felder beim Bearbeiten nicht setzen duerfte (gleiche Regel wie in
+// mitarbeiter_update.php).
+if (!darf($user, 'personal_vertraulich_schreiben')) {
+    $verboten = array_intersect(array_keys($s), ma_vertrauliche_felder());
+    foreach ($verboten as $feld) { unset($s[$feld]); }
+}
+
 // Das SQL wird aus der Feldliste gebaut und nicht von Hand geschrieben:
 // Spaltenzahl, Platzhalterzahl und Wertezahl koennen so nicht mehr
 // auseinanderlaufen. Genau dieser Fehler ist beim Kundenstamm zweimal

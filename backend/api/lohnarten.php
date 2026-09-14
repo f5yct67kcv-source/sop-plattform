@@ -104,15 +104,34 @@ $bem    = trim((string)($input['bemerkung'] ?? '')) ?: null;
 if ($id > 0) {
     // Der Schluessel bleibt, was er war -- eine Umbenennung wuerde alte
     // Abrechnungszeilen von ihrer Lohnart trennen.
-    $pdo->prepare(
-        'UPDATE lohnart SET bezeichnung = ?, art = ?, basis_schluessel = ?, satz_bp = ?,
-             ahv_pflichtig = ?, ferien_pflichtig = ?, ml13_pflichtig = ?,
-             bvg_pflichtig = ?, uvg_pflichtig = ?, qst_pflichtig = ?,
-             gav_grundlage = ?, sortierung = ?, aktiv = ?, bemerkung = ?,
-             geaendert_von = ?, geaendert_am = NOW()
-         WHERE id = ?'
-    )->execute(array_merge([$bezeichnung, $art, $basis, $satzBp], $kz,
-        [$gav, $sortierung, $aktiv, $bem, (int)$user['id'], $id]));
+    //
+    // Systemlohnarten sind die Bemessungsgrundlage der GAV-Berechnung
+    // (lohnlauf_grundlagen() prueft ihre *_pflichtig-Kennzeichen live bei
+    // jedem Lohnlauf). Der Loeschschutz weiter oben schuetzt sie vor
+    // Entfernen -- ohne denselben Schutz beim Aendern liesse sich z.B.
+    // ahv_pflichtig einer Systemlohnart auf 0 setzen und die AHV-Basis ab
+    // dem naechsten Lauf verfaelschen. Nur Beschriftung/Sichtbarkeit bleiben
+    // bei Systemlohnarten aenderbar, die Berechnungs-Kennzeichen nicht.
+    $stSystem = $pdo->prepare('SELECT system FROM lohnart WHERE id = ?');
+    $stSystem->execute([$id]);
+    $istSystem = (int)($stSystem->fetchColumn() ?: 0) === 1;
+    if ($istSystem) {
+        $pdo->prepare(
+            'UPDATE lohnart SET bezeichnung = ?, sortierung = ?, aktiv = ?, bemerkung = ?,
+                 geaendert_von = ?, geaendert_am = NOW()
+             WHERE id = ?'
+        )->execute([$bezeichnung, $sortierung, $aktiv, $bem, (int)$user['id'], $id]);
+    } else {
+        $pdo->prepare(
+            'UPDATE lohnart SET bezeichnung = ?, art = ?, basis_schluessel = ?, satz_bp = ?,
+                 ahv_pflichtig = ?, ferien_pflichtig = ?, ml13_pflichtig = ?,
+                 bvg_pflichtig = ?, uvg_pflichtig = ?, qst_pflichtig = ?,
+                 gav_grundlage = ?, sortierung = ?, aktiv = ?, bemerkung = ?,
+                 geaendert_von = ?, geaendert_am = NOW()
+             WHERE id = ?'
+        )->execute(array_merge([$bezeichnung, $art, $basis, $satzBp], $kz,
+            [$gav, $sortierung, $aktiv, $bem, (int)$user['id'], $id]));
+    }
 } else {
     try {
         $pdo->prepare(

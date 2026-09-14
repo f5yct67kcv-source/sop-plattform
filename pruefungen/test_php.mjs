@@ -584,6 +584,31 @@ if (ohneEinbindung.length) { bad.push('ohne rechte.php: ' + ohneEinbindung.join(
   if (toteAusnahmen.length) { bad.push('Ausnahme ohne Datei: ' + toteAusnahmen.join(', ')); }
 }
 
+// System-Lohnarten sind die Bemessungsgrundlage der GAV-Berechnung
+// (lohnlauf_grundlagen() prueft ihre *_pflichtig-Kennzeichen live bei jedem
+// Lohnlauf). lohnarten.php schuetzt sie beim Loeschen explizit -- diese
+// Pruefung gibt es, weil derselbe Schutz beim AENDERN fehlte (Security-Audit
+// 2026-09-14): jeder mit lohn_schreiben konnte z.B. ahv_pflichtig einer
+// Systemlohnart auf 0 setzen. Geprueft wird die Unterscheidung selbst, nicht
+// ihr Wortlaut: der Aenderungs-Zweig muss 'system' abfragen UND zwei
+// getrennte UPDATE-Anweisungen enthalten (eingeschraenkt fuer System-,
+// vollstaendig fuer Nicht-System-Lohnarten) -- eine Ruecknahme auf eine
+// einzige, unbedingte UPDATE-Anweisung macht die Pruefung rot.
+{
+  const quelle = ohneKommentar('lohnarten.php');
+  const start = quelle.indexOf('if ($id > 0)');
+  // Grenze ist der INSERT-Zweig (Neuanlage), nicht das naechste "} else {" --
+  // der Aenderungs-Zweig darf selbst verschachtelte if/else enthalten
+  // (System- vs. Nicht-System-Lohnart), ohne die Pruefung zu verkuerzen.
+  const ende = quelle.indexOf('INSERT INTO lohnart', start);
+  const aenderungsZweig = start === -1 ? '' : quelle.slice(start, ende === -1 ? undefined : ende);
+  const prueftSystem = /system/i.test(aenderungsZweig);
+  const getrennteUpdates = (aenderungsZweig.match(/UPDATE lohnart SET/g) || []).length >= 2;
+  check('KRITISCH: das Aendern einer System-Lohnart schuetzt die Berechnungs-Kennzeichen wie das Loeschen',
+    prueftSystem && getrennteUpdates);
+  if (!(prueftSystem && getrennteUpdates)) { bad.push('lohnarten.php: Systemschutz beim Aendern fehlt oder unvollstaendig'); }
+}
+
 // "Abgeschlossen" (ENT-128): der eigentliche Rechenkern
 // (einsatz_vollstaendig_rapportiert) laeuft echt gegen SQLite in
 // pruef_einsatz_abgeschlossen.php -- hier nur, dass rapport_create.php und
@@ -953,6 +978,29 @@ check('KRITISCH: kein Portal-Endpunkt liest vertrauliche Personalfelder',
   portalMitVertraulichem.length === 0);
 if (portalMitVertraulichem.length) {
   bad.push('Portal mit vertraulichen Feldern: ' + portalMitVertraulichem.join(', '));
+}
+
+// Wer aus ma_eingabe_lesen() die volle Mitarbeiter-Feldliste uebernimmt
+// (Anlegen UND Aendern), muss vertrauliche Felder herausfiltern, wenn das
+// Recht personal_vertraulich_schreiben fehlt -- sonst koennte ein Profil mit
+// blossem personal_schreiben sie setzen. Genau diese Sperre fehlte in
+// mitarbeiter_create.php (Security-Audit 2026-09-14), waehrend
+// mitarbeiter_update.php sie hatte -- ein neuer Schreibweg, der die Regel
+// nicht geerbt hatte. Geprueft werden die beiden Bausteine der Sperre
+// (Rechtename plus Feldliste), nicht ihr genauer Wortlaut: Eine Umformulierung
+// des Kommentars laesst die Pruefung gruen, das Verschwinden von darf(...)
+// oder ma_vertrauliche_felder() macht sie rot.
+{
+  const nutztVolleEingabe = apiDateien.filter(f => /ma_eingabe_lesen\s*\(/.test(ohneKommentar(f)));
+  const ohneVertraulichFilter = nutztVolleEingabe.filter(f => {
+    const q = ohneKommentar(f);
+    return !(/personal_vertraulich_schreiben/.test(q) && /ma_vertrauliche_felder\s*\(/.test(q));
+  });
+  check('KRITISCH: jeder Endpunkt mit voller Mitarbeiter-Eingabe filtert vertrauliche Felder ohne personal_vertraulich_schreiben',
+    ohneVertraulichFilter.length === 0);
+  if (ohneVertraulichFilter.length) {
+    bad.push('ma_eingabe_lesen ohne Vertraulich-Filter: ' + ohneVertraulichFilter.join(', '));
+  }
 }
 
 // Wer im Portal ein Passwort SETZT, muss sich ausgewiesen haben (ENT-488).
