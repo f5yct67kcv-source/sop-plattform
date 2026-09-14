@@ -229,6 +229,11 @@ if ($doppelt) {
 }
 
 $kontrollpunkte = rundgang_kontrollpunkte_uebrig($pdo, $rundgangId, (int)$v['objekt_id'], $vorlageId);
+// Name und Zeitfenster mit heraus (ENT-541) -- derselbe Kopf wie beim
+// geplanten Start. Beides liegt hier schon vor ($v), es fehlte nur der Weg
+// nach draussen.
 json_response(['status' => 'ok', 'einsatz_id' => $einsatzId, 'rundgang_id' => $rundgangId,
                'kontrollpunkte' => $kontrollpunkte, 'ereignis_fehler' => $ereignisFehler,
-               'entfallen' => $entfallen ?? []]);
+               'entfallen' => $entfallen ?? [],
+               'vorlage_name' => $v['name'], 'fenster_von' => $v['fenster_von'],
+               'fenster_bis' => $v['fenster_bis']]);

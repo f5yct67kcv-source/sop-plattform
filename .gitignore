@@ -36,3 +36,10 @@ pruefungen/package-lock.json
 # bewusst versioniert -- das sind die nativen Projekte selbst, kein
 # Build-Output.
 mobile/node_modules/
+
+# Ausgabe von staging-htaccess-bauen.py (ENT-538). Sie traegt den
+# Passwortschutz-Block aus der Staging-.htaccess von Hostpoint -- also
+# fremde Konfiguration und moeglicherweise Pfade, die niemanden etwas
+# angehen. Die Datei entsteht bei Bedarf neu und gehoert nie ins
+# Repository.
+staging-htaccess-fertig.txt

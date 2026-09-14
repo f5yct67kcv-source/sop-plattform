@@ -108,9 +108,15 @@ $rundgang['kontrollpunkte'] = rundgang_punkte_mit_aufgaben($pdo, $rundgangId, $p
 // Kilobyte hat. Ob eines vorliegt, steht als Kennzeichen mit drin.
 $ereignisse = [];
 if (hat_tabelle($pdo, 'ereignis_meldung')) {
+    // ENT-545: Dass ein Foto nach der Aufbewahrungsfrist entfernt wurde, ist
+    // eine andere Aussage als „es gab keines" -- und die Spalte kann auf
+    // einer noch nicht eingerichteten Datenbank fehlen.
+    $weg = hat_spalte($pdo, 'ereignis_meldung', 'foto_geloescht_am')
+        ? 'em.foto_geloescht_am IS NOT NULL' : '0';
     $eStmt = $pdo->prepare(
         'SELECT em.id, em.erfasst_am, em.vorfall_am, em.bemerkung,
-                em.foto_mime IS NOT NULL AS hat_foto, ea.bezeichnung AS art
+                em.foto_mime IS NOT NULL AS hat_foto,
+                ' . $weg . ' AS foto_geloescht, ea.bezeichnung AS art
            FROM ereignis_meldung em
            LEFT JOIN ereignisart ea ON ea.id = em.ereignisart_id
           WHERE em.rundgang_id = ?
@@ -119,6 +125,7 @@ if (hat_tabelle($pdo, 'ereignis_meldung')) {
     $eStmt->execute([$rundgangId]);
     foreach ($eStmt->fetchAll(PDO::FETCH_ASSOC) as $e) {
         $e['hat_foto'] = (bool)$e['hat_foto'];
+        $e['foto_geloescht'] = (bool)$e['foto_geloescht'];
         $ereignisse[] = $e;
     }
 }

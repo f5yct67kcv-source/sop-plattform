@@ -9,7 +9,7 @@
 // Geprueft wird mit erfundenen "Suiten" -- Funktionen, die eine Weile
 // brauchen und ein Ergebnis liefern. Kein echter Browser, keine echte
 // Zeitmessung; nur die Frage, ob der Laeufer tut, was er verspricht.
-import { poolLauf, mitWiederholung } from './lauf.mjs';
+import { poolLauf, mitWiederholung, wackelBericht } from './lauf.mjs';
 import { readFileSync } from 'fs';
 import { WURZEL } from './pfade.mjs';
 
@@ -127,6 +127,44 @@ const warte = ms => new Promise(r => setTimeout(r, ms));
   check('Ohne rote Suite wird nichts wiederholt', aufrufe === 0);
 }
 
+// ══════════ WAS BEIM WACKELKANDIDATEN GEMELDET WIRD ═══════════════════
+// OP-527: Zweimal ist eine Suite nur im parallelen Lauf gefallen, und
+// beide Male stand hinterher nur die Zahl da -- nie, WELCHE Pruefung fiel.
+// Der Text des parallelen Laufs ist der einzige Ort, an dem das steht.
+// Geprueft wird die Aussage ("der Name der gefallenen Pruefung kommt
+// durch"), nicht der Wortlaut der Meldung.
+{
+  // Die gefallene Pruefung steht bewusst WEIT VORNE. So kann sie nur ueber
+  // den ✗-Weg durchkommen und nicht zufaellig ueber den Rueckfall auf die
+  // letzten Zeilen -- daran ist die erste Fassung dieser Pruefung
+  // gescheitert: Sie blieb in der Gegenprobe gruen, weil der Rueckfall
+  // dieselbe Zeile mitnahm.
+  const ausParallel = [
+    '  ✗ KRITISCH: die Summe stimmt mit den Einzelposten ueberein',
+    'Nachgeplauder 1', 'Nachgeplauder 2', 'Nachgeplauder 3',
+    'Nachgeplauder 4', 'Nachgeplauder 5',
+    '12 bestanden, 1 nicht bestanden',
+  ].join('\n');
+  const bericht = wackelBericht('test_beispiel.mjs', ausParallel).join('\n');
+  check('KRITISCH: der Bericht nennt die im parallelen Lauf gefallene Pruefung',
+    bericht.includes('die Summe stimmt mit den Einzelposten ueberein'));
+  check('Die Suite selbst steht weiterhin darin', bericht.includes('test_beispiel.mjs'));
+  check('Er sagt dazu, dass sie allein bestanden hat', /allein bestanden/.test(bericht));
+
+  // Bricht die Suite ab, statt Pruefungen zu melden -- ein Browser, der
+  // unter Last nicht startet --, gibt es keine ✗-Zeile. Dann ist der
+  // Abbruchgrund das einzige Brauchbare und darf nicht verschwinden.
+  const abbruch = wackelBericht('test_beispiel.mjs',
+    'browserType.launch: Timeout 30000ms exceeded').join('\n');
+  check('KRITISCH: auch ohne ✗-Zeile kommt der Abbruchgrund durch',
+    abbruch.includes('Timeout 30000ms exceeded'));
+
+  // Ohne jeden Text darf er nicht behaupten, es gebe einen Grund.
+  const leer = wackelBericht('test_beispiel.mjs', '').join('\n');
+  check('Ohne Auswurf wird kein Grund erfunden',
+    leer.includes('test_beispiel.mjs') && !/gefallen|abgebrochen/.test(leer));
+}
+
 // ══════════ DER LAEUFER SELBST ════════════════════════════════════════
 const ALLE = readFileSync(`${WURZEL}/pruefungen/alle.mjs`, 'utf8');
 
@@ -141,6 +179,10 @@ check('KRITISCH: rote Suiten werden vor dem Urteil einzeln wiederholt',
 // sichtbar machen soll.
 check('KRITISCH: eine nur parallel rote Suite wird GEMELDET, nicht stillschweigend geschluckt',
   /wackelig\.length/.test(ALLE) && /Nur im parallelen Lauf rot/.test(ALLE));
+// Der Bericht oben nuetzt nur, wenn der Laeufer ihn auch mit dem Text des
+// PARALLELEN Laufs fuettert -- der des Wiederholungslaufs ist ja gruen.
+check('KRITISCH: der Laeufer meldet den Wackelkandidaten mit dem Auswurf des parallelen Laufs',
+  /wackelBericht\(/.test(ALLE) && /ergebnisse\[suiten\.indexOf/.test(ALLE));
 check('Es gibt einen Weg zurueck zum seriellen Lauf, um so etwas nachzustellen',
   /--seriell/.test(ALLE));
 check('Die Warnung vor dem Schieben bei Rot steht weiterhin da',

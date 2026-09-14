@@ -23,6 +23,18 @@ import { WURZEL, OUT, browserPfad } from './pfade.mjs';
 import { chromium } from 'playwright';
 
 const EXE = browserPfad();
+
+/* Der Zaehler nennt IMMER beide Zahlen -- wie er sie schreibt, haengt seit
+   ENT-541 vom Reiter ab: ueber der Karte ist Platz fuer "1 / 3", im
+   Kopfblock des Punkte-Reiters steht der ganze Satz "1 von 3
+   Kontrollpunkten". Geprueft wird darum die Aussage (beide Zahlen, in
+   dieser Reihenfolge) und nicht der Wortlaut -- eine Pruefung auf den
+   genauen Text bliebe gruen, wenn eine der beiden Zahlen verschwaende,
+   solange der Rest stimmt, und wird rot, sobald jemand nur anders
+   formuliert. Genau andersherum, als sie soll (CLAUDE.md). */
+const zaehlerSagt = (txt, fertig, gesamt) =>
+  new RegExp(`(^|\\D)${fertig}\\D+${gesamt}(\\D|$)`)
+    .test(String(txt).replace(/\s+/g, ' ').trim());
 const ok = [], bad = [];
 const check = (n, c) => (c ? ok : bad).push(n);
 
@@ -244,9 +256,9 @@ check('KRITISCH: Start ruft mein_rundgang_starten.php mit der richtigen einsatz_
 check('KRITISCH: die laufende Runde oeffnet als Vollseite mit Reitern',
   await page.isVisible('#rgSeite') && await page.isVisible('#rgsReiter'));
 check('KRITISCH: der Zaehler zeigt 0 von 3 -- nichts vorbelegt',
-  (await page.textContent('#rgsZaehler')) === '0 / 3');
+  zaehlerSagt(await page.textContent('#rgsZaehler'), 0, 3));
 check('KRITISCH: der Zaehler nennt beide Zahlen, nicht nur die erledigten (CLAUDE.md: keine Zahl ohne Bezug)',
-  (await page.textContent('#rgsZaehler')).includes('/'));
+  /3/.test(await page.textContent('#rgsZaehler')));
 check('Der Timer laeuft und steht im Kopf',
   /^\d{2}:\d{2}:\d{2}$/.test((await page.textContent('#rgsTimer')).trim()));
 check('Alle drei Kontrollpunkte erscheinen in der richtigen Reihenfolge',
@@ -272,7 +284,7 @@ check('KRITISCH: eine Ablehnung durch den Server macht den Punkt wieder offen, n
   await page.evaluate(() => !!document.getElementById('rdBtn1')));
 check('KRITISCH: die Fehlermeldung samt Distanz wird angezeigt (ENT-182)',
   (await page.textContent('#rdListe')).includes('438m entfernt'));
-check('Der Zaehler bleibt bei 0 von 3', (await page.textContent('#rgsZaehler')) === '0 / 3');
+check('Der Zaehler bleibt bei 0 von 3', zaehlerSagt(await page.textContent('#rgsZaehler'), 0, 3));
 
 // ══════════════════════════════ GEOFENCE: ERFOLGREICH ══════════════════════
 rufe = [];
@@ -280,7 +292,7 @@ await page.evaluate(() => { window.__geoKoord = { lat: 47.20001, lng: 7.80001 };
 await page.click('#rdBtn1');
 await page.waitForTimeout(400);
 check('Der Punkt zeigt jetzt "Bestätigt"', (await page.textContent('#rdListe')).includes('Bestätigt'));
-check('KRITISCH: der Zaehler zaehlt jetzt 1 von 3', (await page.textContent('#rgsZaehler')) === '1 / 3');
+check('KRITISCH: der Zaehler zaehlt jetzt 1 von 3', zaehlerSagt(await page.textContent('#rgsZaehler'), 1, 3));
 check('KRITISCH: der Zeitstempel ist geraeteseitig im MySQL-Format (Offline-Prinzip, ENT-132)',
   /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(
     rufe.find(r => r.p.includes('mein_rundgang_scan')).body.scans[0].erfasst_am));
@@ -348,8 +360,11 @@ await page.click('#rgsRt-punkte');
 await page.waitForTimeout(250);
 check('KRITISCH: kein Pausiert-Hinweis mehr',
   !(await page.textContent('#rdBanner')).includes('pausiert'));
+// Welche Zeile ihre Knoepfe zeigt, entscheidet seit ENT-541 die Reihe --
+// geprueft wird darum, dass es UEBERHAUPT wieder Aktionen gibt, nicht an
+// welchem Punkt. Waehrend der Pause waren es null (Pruefung oben).
 check('KRITISCH: die Kontrollpunkt-Aktionen sind nach dem Fortsetzen wieder da',
-  await page.evaluate(() => !!document.getElementById('rdBtn3')));
+  await page.evaluate(() => document.querySelectorAll('#rdListe .rd-akt button').length > 0));
 
 // ══════════════════════════════ NICHT VERFUEGBAR (NFC-Punkt) ══════════════
 check('Die Beschreibung ist zunaechst eingeklappt',
@@ -372,7 +387,7 @@ check('KRITISCH: "nicht verfuegbar" sendet Status und Beschreibung',
   !!nvGesendet && nvGesendet.body.scans[0].status === 'nicht_verfuegbar'
   && nvGesendet.body.scans[0].beschreibung === 'Chip abgerissen');
 check('KRITISCH: der Zaehler zaehlt "nicht verfuegbar" ebenfalls als erledigt (ENT-145)',
-  (await page.textContent('#rgsZaehler')) === '2 / 3');
+  zaehlerSagt(await page.textContent('#rgsZaehler'), 2, 3));
 check('Der Punkt zeigt ein Warnsymbol statt eines Hakens',
   await page.evaluate(() => !!document.querySelector('.rd-haken-nv')));
 
@@ -383,7 +398,7 @@ await page.evaluate(() => { window.__geoKoord = { lat: 47.20001, lng: 7.80001 };
 await page.click('#rdBtn3');
 await page.waitForTimeout(400);
 check('KRITISCH: bei einer offline erfassten Meldung bleibt der Punkt sofort als erledigt sichtbar (Erfassung zaehlt, nicht Uebermittlung)',
-  (await page.textContent('#rdFortschritt')).includes('Rundgang abgeschlossen'));
+  (await page.textContent('#rgpLage')).includes('Rundgang abgeschlossen'));
 check('KRITISCH: der Hinweis "wird uebermittelt" erscheint, solange die Meldung nicht angekommen ist',
   (await page.textContent('#rdListe')).includes('wird übermittelt'));
 const wartend = await page.evaluate(() => JSON.parse(localStorage.getItem('sop_rundgang_warteschlange') || '[]'));
@@ -446,7 +461,7 @@ check('KRITISCH: nach Verlust des In-Memory-Zustands zeigt der Knopf "Fortsetzen
 await page.click('#blRundgang button:has-text("Rundgang fortsetzen")');
 await page.waitForTimeout(300);
 check('KRITISCH: Fortsetzen zeigt den tatsaechlichen Serverstand -- der bereits bestaetigte Punkt bleibt erledigt',
-  (await page.textContent('#rgsZaehler')) === '1 / 3');
+  zaehlerSagt(await page.textContent('#rgsZaehler'), 1, 3));
 // Die Laufzeit kommt beim Fortsetzen vom SERVER (vorbereitet_am), nicht vom
 // Geraet: Wer die Runde auf einem zweiten Geraet fortsetzt, soll dieselbe
 // Zeit sehen -- eine geraeteseitig neu gestartete Uhr zeigte 00:00:00.
@@ -474,9 +489,9 @@ const abbruchRuf = rufe.find(r => r.p.includes('mein_rundgang_abbrechen'));
 check('KRITISCH: Abbrechen sendet Grund und Freitext an den Server',
   !!abbruchRuf && abbruchRuf.body.grund === 'notfall_gebunden' && abbruchRuf.body.freitext.includes('Kollege krank'));
 check('KRITISCH: die Checkliste zeigt danach "Abgebrochen", nicht mehr den Fortschritt',
-  (await page.textContent('#rdFortschritt')).includes('Abgebrochen'));
+  (await page.textContent('#rgpLage')).includes('abgebrochen'));
 check('Der Zaehler im Kopf steht dabei weiterhin auf dem tatsaechlichen Stand',
-  (await page.textContent('#rgsZaehler')) === '1 / 3');
+  zaehlerSagt(await page.textContent('#rgsZaehler'), 1, 3));
 check('KRITISCH: der Abbruchgrund wird angezeigt', (await page.textContent('#rdBanner')).includes('Durch Notfall anderweitig gebunden'));
 check('KRITISCH: bereits bestaetigte Kontrollpunkte bleiben nach dem Abbruch sichtbar (ENT-146 Punkt 3)',
   (await page.textContent('#rdListe')).includes('Bestätigt'));
@@ -529,7 +544,7 @@ const abbruchAusPause = rufe.find(r => r.p.includes('mein_rundgang_abbrechen'));
 check('KRITISCH: der Abbruch aus der Pause heraus erreicht tatsaechlich den Server',
   !!abbruchAusPause && abbruchAusPause.body.grund === 'notfall_gebunden');
 check('KRITISCH: die Checkliste zeigt danach "Abgebrochen"',
-  (await page.textContent('#rdFortschritt')).includes('Abgebrochen'));
+  (await page.textContent('#rgpLage')).includes('abgebrochen'));
 await page.click('#rgsRt-funktionen');
 await page.waitForTimeout(200);
 check('KRITISCH: nach dem Abbruch steht weder Pausieren noch Abbrechen mehr da',
@@ -547,7 +562,16 @@ await page.waitForTimeout(250);
 await page.click('#blRundgang button:has-text("Rundgang starten")');
 await page.waitForTimeout(300);
 check('Am Desktop bleibt die Checkliste vollstaendig bedienbar',
-  await page.isVisible('#rdListe') && await page.isVisible('#rdBtn3'));
+  await page.isVisible('#rdListe') && await page.isVisible('#rdBtn1'));
+// Auch am Desktop kommt man an einen Punkt heran, der nicht an der Reihe
+// ist (ENT-541). Zugeklappt heisst erreichbar, nicht gesperrt -- eine
+// Sperre waere eine fachliche Aenderung und gehoerte in den Server.
+check('KRITISCH: am Desktop klappt eine zugeklappte Zeile auf und zeigt ihre Knöpfe',
+  await page.evaluate(() => !document.getElementById('rdBtn3')));
+await page.click('#rdKopf3');
+await page.waitForTimeout(250);
+check('KRITISCH: nach dem Antippen steht der Bestätigen-Knopf des dritten Punktes da',
+  await page.isVisible('#rdBtn3'));
 check('KRITISCH: am Desktop kein Seiten-Scroll', await page.evaluate(() =>
   document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1));
 // Die Seite haelt am Desktop App-Breite (ENT-294) -- die Reiterleiste darf

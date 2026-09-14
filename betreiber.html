@@ -5,6 +5,33 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
 <title>Betreiber-Bereich</title>
+<meta name="theme-color" content="#16181D">
+<script>
+/* Muss VOR dem ersten Zeichnen laufen, sonst blitzt die helle Fassung kurz
+   auf, bevor die dunkle greift (ENT-029, gleiche Bauart wie im Cockpit).
+
+   BEWUSST DERSELBE SPEICHERSCHLUESSEL wie dashboard.html: Es ist dasselbe
+   Geraet und derselbe Mensch. Wer im Cockpit auf dunkel gestellt hat,
+   erwartet nicht, dass die Ebene darueber wieder hell aufgeht -- genau das
+   war die Beanstandung. Ohne gespeicherte Wahl entscheidet die Einstellung
+   des Betriebssystems.
+
+   Eigener try: Ein Speicher, der nicht lesbar ist (privates Fenster),
+   darf nicht die ganze Seite mitreissen. */
+(function () {
+  var w = '';
+  try { w = localStorage.getItem('rv3_thema') || ''; } catch (e) { /* egal */ }
+  if (!w) {
+    w = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+      ? 'dunkel' : 'hell';
+  }
+  document.documentElement.setAttribute('data-thema', w);
+  if (w === 'dunkel') {
+    var m = document.querySelector('meta[name="theme-color"]');
+    if (m) { m.setAttribute('content', '#0B0D11'); }
+  }
+})();
+</script>
 <style>
 /* Betreiber-Bereich (ENT-519 bis ENT-521).
    Eigene Seite neben dashboard.html und portal.html -- dieselbe Trennung
@@ -24,9 +51,41 @@
   --pos:#0E7C55; --pos-soft:#E6F6EF;
   --neg:#C2382A; --neg-soft:#FCEDEB;
   --warn:#9A6B08; --warn-soft:#FBF3E0;
-  --shell:#16181D; --shell-txt:#9298A5; --shell-txt-hi:#F3F5F8;
+  --shell:#16181D; --shell-hi:#1E2128; --shell-line:#272B33;
+  --shell-txt:#9298A5; --shell-txt-hi:#F3F5F8;
   --nix:#D8DCE2;
 }
+
+/* Dieselben Werte wie im Cockpit (dashboard.html). Sie stehen hier als
+   Kopie und nicht in einer gemeinsamen Datei, weil der Deploy nur
+   namentlich gelistete Dateien kopiert und jede weitere Datei ein weiterer
+   Weg ist, auf dem etwas fehlen kann. test_betreiber_ansicht.mjs misst am
+   gerenderten Zustand, dass beide Seiten dieselbe Flaeche und dieselbe
+   Schriftfarbe zeigen -- auseinanderlaufen koennen sie also nicht
+   unbemerkt. */
+html[data-thema="dunkel"] {
+  --bg:#0F1117; --surface:#161B27; --surface-2:#1E2535;
+  --line:#2A3147; --line-soft:#232A3B; --line-hi:#3B4560;
+  --ink:#F2F4F8; --ink-2:#B6BCC8; --ink-3:#868D9A;
+  --accent:#7098F7; --accent-hi:#8DAEFA; --accent-soft:#1A2440; --accent-line:#2D3D63;
+  --pos:#4FCE96; --pos-soft:#10281E;
+  --neg:#F27F70; --neg-soft:#2E1A18;
+  --warn:#E2B156; --warn-soft:#2B2314;
+  --shell:#0B0D11; --shell-hi:#14171C; --shell-line:#23272F;
+  --shell-txt:#8A919E; --shell-txt-hi:#F2F4F8;
+  --nix:#3B4560;
+  /* Damit der Browser Bildlaufleisten und eingebaute Bedienelemente dunkel
+     zeichnet -- sonst steht ein weisses Auswahlmenue im dunklen Formular. */
+  color-scheme: dark;
+}
+/* Randfaelle, die sich nicht ueber einen Wert loesen lassen -- dieselben
+   wie im Cockpit. Ein Eingabefeld auf --surface waere im Dunkeln nicht von
+   der Karte zu unterscheiden, auf der es liegt. */
+html[data-thema="dunkel"] input,
+html[data-thema="dunkel"] select { background: var(--surface-2); }
+html[data-thema="dunkel"] input:focus,
+html[data-thema="dunkel"] select:focus { background: var(--surface); }
+html[data-thema="dunkel"] button.gefahr { border-color: #4A2823; }
 * { box-sizing: border-box; }
 body {
   margin: 0; background: var(--bg); color: var(--ink);
@@ -44,10 +103,55 @@ body {
   padding: 18px 24px;
   display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px;
 }
+/* Marke, Bereichsname, Konto -- in dieser Reihenfolge untereinander.
+   --shell-txt-hi wie der Bereichsname darunter: Dieser Bereich gehoert dem
+   Betreiber der Plattform selbst, die Marke tritt hier nicht zurueck.
+   22 px: ueber dem Mindestmass der Fassung ohne Claim (20 px) und knapp
+   ueber dem 16-px-Bereichsnamen -- die Marke fuehrt, ohne den Kopf
+   aufzublaehen. */
+.kopf-links { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; }
+.kopf-marke { height: 22px; width: auto; display: block; color: var(--shell-txt-hi); }
 .kopf .titel { font-size: 16px; font-weight: 650; letter-spacing: -.01em; }
 .kopf .unter { font-size: 12.5px; color: var(--shell-txt); margin-top: 2px; }
-.kopf .mitte { text-align: center; font-size: 12px; color: var(--shell-txt); }
 .kopf .rechts { justify-self: end; display: flex; gap: 10px; align-items: center; }
+
+/* ── Navigationsband ──────────────────────────────────────────────
+   Dieselbe Bauart wie die Kopfleiste des Cockpits, wenn dort die
+   Seitenleiste eingeklappt ist: Symbol oben, Beschriftung darunter --
+   "Ueberschrift oben, Wert darunter" gilt auch hier. Symbole allein
+   sagen nicht, was sie sind.
+
+   Es steht in Spalte 2 des Rasters 1fr auto 1fr und damit in der Mitte
+   des FENSTERS, nicht in der Mitte des Rests zwischen Titel und
+   Abmelden-Knopf. Die beiden Aussenspalten sind verschieden breit; mit
+   einem Abstandhalter saesse die Navigation sichtbar daneben. */
+.kopf-nav { display: flex; align-items: center; gap: 2px; }
+.kopf-nav .nav-item {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 4px; min-width: 84px; min-height: 44px; padding: 5px 10px;
+  border: 0; background: transparent; border-radius: 8px;
+  color: var(--shell-txt); font: inherit; cursor: pointer;
+  transition: background .13s, color .13s;
+}
+.kopf-nav .nav-item .lbl {
+  font-size: 12px; font-weight: 650; letter-spacing: .2px;
+  line-height: 1.1; white-space: nowrap;
+}
+.kopf-nav .nav-item svg { width: 19px; height: 19px; fill: none; stroke: currentColor;
+  stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.kopf-nav .nav-item:hover { background: var(--shell-hi); color: var(--shell-txt-hi); border-color: transparent; }
+.kopf-nav .nav-item.on { background: var(--shell-hi); color: var(--shell-txt-hi); }
+.kopf-nav .nav-item.on svg { stroke: var(--accent); }
+
+/* ── Titelleiste ──────────────────────────────────────────────────
+   Auf dem Handy ist sie der einzige Ort, der sagt, wo man ist
+   (Hausregel): Titel deutlich, Unterzeile lesbar. */
+.leiste {
+  background: var(--surface); border-bottom: 1px solid var(--line);
+  padding: 16px 24px;
+}
+.leiste h1 { margin: 0; font-size: 19px; font-weight: 700; letter-spacing: -.02em; }
+.leiste .crumb { font-size: 12.5px; color: var(--ink-2); margin-top: 2px; }
 
 .huelle { max-width: 1120px; margin: 0 auto; padding: 28px 24px 64px; }
 
@@ -98,6 +202,39 @@ td .zweit { font-size: 12.5px; color: var(--ink-3); margin-top: 2px; }
 .m-warn { background: var(--warn-soft); color: var(--warn); }
 .m-ruhe { background: var(--line-soft); color: var(--ink-2); }
 
+/* ── Supportvorgaenge (ENT-538) ─────────────────────────────────────
+   Das Abzeichen am Reiter ist der eigentliche Melder: Es steht in JEDEM
+   Bereich im Blick, nicht nur auf der Uebersicht. Wer an den Rechnungen
+   sitzt, soll trotzdem sehen, dass eine Anfrage wartet.
+
+   Es zeigt NUR, was auf uns wartet (neu + in Arbeit). 'wartet auf Kunde'
+   ist absichtlich nicht dabei -- ein Abzeichen, das auch fremde Bringschuld
+   mitzaehlt, steht dauerhaft da und wird dann nicht mehr gelesen. */
+.nav-item { position: relative; }
+.nav-item .abz {
+  position: absolute; top: 2px; right: 2px;
+  min-width: 17px; height: 17px; padding: 0 4px;
+  border-radius: 999px; background: var(--neg); color: #fff;
+  font-size: 10.5px; font-weight: 700; line-height: 17px; text-align: center;
+}
+/* Der Verlauf. Zwei Seiten, zwei Ausrichtungen -- damit auf einen Blick
+   erkennbar ist, wer zuletzt geschrieben hat, ohne den Namen zu lesen. */
+.sv-verlauf { display: flex; flex-direction: column; gap: 10px; }
+.sv-n {
+  max-width: 78%; padding: 10px 13px; border-radius: 12px;
+  border: 1px solid var(--line); background: var(--surface);
+}
+.sv-n .wer { font-size: 11px; text-transform: uppercase; letter-spacing: .04em;
+             color: var(--ink-3); margin-bottom: 4px; }
+.sv-n .txt { font-size: 13.5px; color: var(--ink); white-space: pre-wrap;
+             overflow-wrap: anywhere; }
+.sv-kunde     { align-self: flex-start; }
+.sv-betreiber { align-self: flex-end; background: var(--line-soft); }
+/* Am Handy ist die Breitenbegrenzung keine Hilfe mehr, sondern nur noch
+   eine schmale Spalte -- die Ausrichtung allein traegt die Unterscheidung. */
+@media (max-width: 640px) { .sv-n { max-width: 92%; } }
+.sv-kontext { font-size: 12px; color: var(--ink-3); margin-top: 6px; }
+
 /* ── Bedienelemente: mindestens 44 px hoch (Hausregel) ────────────── */
 button, .knopf {
   min-height: 44px; padding: 0 18px; border-radius: 9px;
@@ -116,6 +253,47 @@ button.klein { min-height: 36px; padding: 0 12px; font-size: 13px; }
    allein in seiner Zeile steht (Hausregel). */
 .knopfzeile { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
 
+/* ── Umschalter hell/dunkel ───────────────────────────────────────
+   Dasselbe Bedienelement wie im Cockpit (ENT-029), mit einem
+   Unterschied: Der Knopf ist 44 px hoch, die sichtbare Bahn liegt mit
+   ihren 30 px mittig darin. Im Cockpit sitzt der Schalter in einer
+   Werkzeugleiste, hier in der Kopfzeile -- und die Hausregel
+   "mindestens 44 px" gilt fuer den Knopf, nicht fuer das Bild darauf.
+   Die Trefferflaeche waechst, das Aussehen bleibt gleich.
+
+   Eigene Farben statt --bg/--surface: Diese Kopfzeile ist in BEIDEN
+   Themen dunkel (--shell). Ein Schalter auf --bg waere im hellen Thema
+   eine grelle Kachel auf grauem Grund. */
+.thema-schalter {
+  min-height: 44px; width: 52px; padding: 0; border: 0; background: none;
+  display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.thema-schalter:hover { border-color: transparent; }
+.ts-bahn {
+  width: 52px; height: 30px; border-radius: 999px; position: relative;
+  border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.08);
+  transition: background .18s, border-color .18s;
+}
+.thema-schalter:hover .ts-bahn { border-color: rgba(255,255,255,.34); }
+.ts-schieber {
+  position: absolute; top: 2px; left: 2px; width: 24px; height: 24px; border-radius: 50%;
+  background: #F3F5F8; display: flex; align-items: center; justify-content: center;
+  transition: transform .2s;
+}
+.ts-schieber svg {
+  width: 14px; height: 14px; fill: none; stroke-width: 2.1;
+  stroke-linecap: round; stroke-linejoin: round; position: absolute; transition: opacity .16s;
+}
+.ts-schieber .i-sonne { stroke: #9A6B08; opacity: 1; }
+.ts-schieber .i-mond  { stroke: #2F5BD7; opacity: 0; }
+html[data-thema="dunkel"] .ts-bahn { background: var(--accent-soft); border-color: var(--accent-line); }
+html[data-thema="dunkel"] .ts-schieber { transform: translateX(22px); }
+html[data-thema="dunkel"] .ts-schieber .i-sonne { opacity: 0; }
+html[data-thema="dunkel"] .ts-schieber .i-mond  { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .ts-bahn, .ts-schieber, .ts-schieber svg { transition: none; }
+}
+
 label { display: block; font-size: 12.5px; font-weight: 600; color: var(--ink-2); margin-bottom: 6px; }
 input, select {
   width: 100%; min-height: 44px; padding: 0 13px;
@@ -124,19 +302,53 @@ input, select {
   /* 16 px, sonst zoomt iOS beim Hineintippen hinein und bleibt dort. */
   font: inherit; font-size: 16px;
 }
-input:focus, select:focus { outline: 2px solid var(--accent-line); outline-offset: 1px; border-color: var(--accent); }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent-line); outline-offset: 1px; border-color: var(--accent); }
+/* Dieselben Kanten wie bei input, aber ohne dessen min-height -- die
+   bestimmt bei einem mehrzeiligen Feld die Zeilenzahl, und 44 px waeren
+   eine Zeile. 16 px Schrift aus demselben Grund wie oben: darunter zoomt
+   iOS hinein und bleibt dort. */
+textarea {
+  width: 100%; padding: 11px 13px; border: 1px solid var(--line-hi);
+  border-radius: 9px; background: var(--surface); color: var(--ink);
+  font: inherit; font-size: 16px; line-height: 1.45; resize: vertical;
+}
 .feld { margin-bottom: 16px; }
 .feld .hinweis { font-size: 12px; color: var(--ink-3); margin-top: 5px; }
 .raster2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 0 16px; }
 
-/* ── Leerzustaende: vier verschiedene Aussagen, vier Texte ────────── */
-.leer { padding: 40px 24px; text-align: center; }
-.leer .ic {
+/* ── Leerzustaende: vier verschiedene Aussagen, vier Texte ──────────
+   Die Klasse hiess "leer" und kollidierte damit mit ".wert.leer" (eine
+   Kennzahl steht auf null). Gemessen war ein Nullwert dadurch 118 px hoch
+   statt 38 und mittig statt links: Er erbte das 40-px-Polster und die
+   Zentrierung des Leerzustands. Im Quelltext sah beides richtig aus --
+   zwei voneinander unabhaengige Regeln, die zufaellig denselben Namen
+   tragen. Genau der Fall, fuer den die Hausregel "gemessen, nicht
+   nachgelesen" da ist. */
+.leerblock { padding: 40px 24px; text-align: center; }
+.leerblock .ic {
   width: 40px; height: 40px; border-radius: 11px; background: var(--line-soft);
   display: grid; place-items: center; margin: 0 auto 12px; font-size: 18px;
 }
-.leer .t { font-size: 14.5px; font-weight: 600; }
-.leer .u { font-size: 13px; color: var(--ink-3); margin-top: 5px; max-width: 42ch; margin-inline: auto; }
+.leerblock .t { font-size: 14.5px; font-weight: 600; }
+.leerblock .u { font-size: 13px; color: var(--ink-3); margin-top: 5px; max-width: 42ch; margin-inline: auto; }
+
+/* Ein Bereich ist eine Gruppe von Karten; sichtbar ist immer genau einer. */
+.bereich > .karte:last-child { margin-bottom: 0; }
+
+/* "Was hier noch fehlt": keine Aufzaehlungspunkte, dafuer Luft zwischen
+   den Zeilen -- es sind Saetze, keine Stichworte. */
+ul.fehlt { margin: 0; padding: 0; list-style: none; }
+ul.fehlt li {
+  font-size: 13.5px; color: var(--ink-2); line-height: 1.55;
+  padding-left: 16px; position: relative; margin-bottom: 12px;
+}
+ul.fehlt li:last-child { margin-bottom: 0; }
+ul.fehlt li::before {
+  content: ''; position: absolute; left: 0; top: 8px;
+  width: 6px; height: 6px; border-radius: 50%; background: var(--nix);
+}
+ul.fehlt b { color: var(--ink); font-weight: 620; }
+.zone-note { font-size: 12.5px; color: var(--ink-3); margin: 16px 0 0; }
 
 .meldung { padding: 13px 16px; border-radius: 9px; font-size: 13.5px; margin-bottom: 16px; }
 .meldung.fehler { background: var(--neg-soft); color: var(--neg); }
@@ -147,6 +359,18 @@ input:focus, select:focus { outline: 2px solid var(--accent-line); outline-offse
 /* ── Anmeldung ────────────────────────────────────────────────────── */
 .tor { min-height: 100dvh; display: grid; place-items: center; padding: 24px; }
 .tor-karte { width: 100%; max-width: 420px; }
+/* Die Marke ueber der Anmeldekarte. --ink-2 statt --ink: deutlich lesbar,
+   aber nicht so schwarz, dass sie das Formular darunter erschlaegt. 30 px,
+   weil hier -- anders als in der Kopfzeile -- nichts daneben steht. */
+.tor-marke { display: flex; justify-content: center; margin-bottom: 22px; color: var(--ink-2); }
+.tor-marke svg { height: 30px; width: auto; display: block; }
+/* Der Raster-Mittelpunkt von .tor gilt fuer JEDES Kind einzeln. Mit zwei
+   Kindern stuenden Marke und Karte in zwei Rasterzeilen, jede fuer sich
+   mittig -- zusammen aber nicht mehr in der Mitte des Bildschirms. Darum
+   bekommt .tor bei der Anmeldung eine Spalte, in der beide als EIN Block
+   stehen. */
+#tor { grid-auto-flow: row; align-content: center; justify-items: center; }
+#tor > .tor-marke, #tor > .tor-karte { width: 100%; max-width: 420px; }
 .code-feld { letter-spacing: .35em; text-align: center; font-size: 22px; font-variant-numeric: tabular-nums; }
 .geheim {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 15px;
@@ -166,18 +390,79 @@ input:focus, select:focus { outline: 2px solid var(--accent-line); outline-offse
       border: 1px solid var(--line); border-radius: 9px; margin-bottom: 16px; }
 .qr svg { display: block; width: 180px; height: 180px; }
 
+/* Fuenf Reiter zu je 84 px passen unter rund 900 px nicht mehr neben
+   Titel und Abmelden-Knopf. Sie bekommen dann eine eigene Zeile ueber die
+   ganze Breite und scrollen darin waagrecht -- die SEITE selbst scrollt
+   nie quer, das ist der Unterschied (Hausregel). */
+@media (max-width: 900px) {
+  .kopf { grid-template-columns: 1fr auto; row-gap: 10px; }
+  .kopf-nav {
+    grid-row: 2; grid-column: 1 / -1; justify-content: flex-start;
+    overflow-x: auto; scrollbar-width: none; margin: 0 -4px; padding: 0 4px;
+  }
+  .kopf-nav::-webkit-scrollbar { display: none; }
+  .kopf-nav .nav-item { min-width: 76px; flex: none; }
+}
 @media (max-width: 700px) {
   .huelle { padding: 20px 16px 48px; }
-  .kopf { padding: 14px 16px; grid-template-columns: 1fr auto; }
-  .kopf .mitte { display: none; }
+  .kopf { padding: 14px 16px; }
+  .leiste { padding: 14px 16px; }
+  .leiste h1 { font-size: 17px; }
   .karte-leib { padding: 16px; }
 }
 </style>
 </head>
 <body>
+<!-- ═══════════ MARKE GUARD OPS ═══════════
+     Dieselbe Zeichnung wie im Cockpit (dashboard.html). Sie steht hier ein
+     zweites Mal, weil die Oberflaechen getrennte Dateien sind und der Deploy
+     nur namentlich gelistete Dateien kopiert -- eine gemeinsame SVG-Datei
+     waere eine zusaetzliche Datei im Deploy und damit eine zusaetzliche
+     Fehlerquelle. Dass es wirklich dieselbe Zeichnung ist, haelt
+     test_marke_portale.mjs fest: Es vergleicht die Pfaddaten Zeichen fuer
+     Zeichen mit dem Cockpit.
+
+     Anders als im Cockpit und im Kundenportal signiert die Marke hier
+     nicht -- dieser Bereich gehoert nicht einem Betrieb, sondern dem
+     Betreiber der Plattform. Darum steht sie oben und ohne "powered by".
+     Inline und nicht als eigene Datei, weil der Deploy nur namentlich
+     gelistete Dateien kopiert (dieselbe Ueberlegung wie bisher schon fuer
+     die Signatur im Anmeldebildschirm). "position:absolute;width:0" statt
+     display:none: Ein per display:none verborgener Vorrat ist nicht in
+     jedem Browser ein gueltiges Ziel fuer <use>.
+     Hier steht nur der Schriftzug (go-wort); die Fassung "nur Bildmarke"
+     aus dem Cockpit wird in diesem Bereich nirgends gebraucht.
+     Die Bildmarke IST das G; ohne sie laese der Schriftzug wie ein
+     Tippfehler. Darum traegt jede Verwendung ihr aria-label selbst.
+
+     ACHTUNG bei der aeusseren viewBox: <use> setzt das Symbol immer bei
+     (0,0) des AUFRUFENDEN Koordinatensystems ab, nicht am Ursprung der
+     Symbol-viewBox. Wer die viewBox des Symbols ("0 -120.22 ...") auch
+     aussen hinschreibt, verschiebt die Zeichnung um 120 Einheiten nach
+     unten und schneidet sie am Rand ab. Aussen gehoert darum "0 0 B H",
+     der Versatz steckt allein im Symbol. Das ist genau der Fehler, der
+     nicht auffaellt: Kasten, Farbe und Kontrast messen sich unveraendert,
+     nur das Bild stimmt nicht -- siehe die Tintendeckung in
+     test_marke_huelle.mjs. -->
+<svg aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden">
+  <symbol id="go-wort" viewBox="0.00 -120.22 649.83 153.56"><g transform="translate(0.0000 -120.2361) scale(0.546627)">
+    <path d="M162 57 L162 35 L85 8.5 L8 35 L8 138 L85 209 L162 138 L162 98" fill="none" stroke="currentColor" stroke-width="16" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="10"/>
+    <path d="M86 98 L170 98 L170 114 L76 114 Z" fill="currentColor"/>
+  </g>
+  <path transform="translate(98.3933 0)" d="M72.67 0.00H59.13L58.60 -10.73Q55.00 -4.87 49.13 -1.77Q43.27 1.33 35.27 1.33Q22.40 1.33 14.97 -6.57Q7.53 -14.47 7.53 -28.33V-66.67H23.93V-31.47Q23.93 -23.13 28.17 -18.30Q32.40 -13.47 39.67 -13.47Q47.20 -13.47 51.73 -18.60Q56.27 -23.73 56.27 -32.27V-66.67H72.67Z M139.40 0.00H125.13L124.20 -8.20Q120.53 -3.67 115.06 -1.17Q109.60 1.33 102.93 1.33Q95.86 1.33 90.33 -1.43Q84.80 -4.20 81.63 -9.00Q78.46 -13.80 78.46 -19.93Q78.46 -26.40 81.90 -31.30Q85.33 -36.20 91.30 -39.00Q97.26 -41.80 104.93 -41.80Q109.60 -41.80 114.30 -40.73Q119.00 -39.67 123.00 -37.73V-39.87Q123.00 -44.27 120.60 -47.47Q118.20 -50.67 114.13 -52.43Q110.06 -54.20 105.00 -54.20Q100.40 -54.20 95.80 -52.63Q91.20 -51.07 87.20 -48.00L82.53 -60.87Q88.93 -64.40 95.63 -66.20Q102.33 -68.00 108.73 -68.00Q118.13 -68.00 125.00 -64.30Q131.86 -60.60 135.63 -53.77Q139.40 -46.93 139.40 -37.67ZM106.33 -11.87Q110.66 -11.87 114.36 -13.67Q118.06 -15.47 120.43 -18.70Q122.80 -21.93 122.93 -26.13V-26.87Q119.80 -29.13 115.86 -30.37Q111.93 -31.60 107.93 -31.60Q101.80 -31.60 97.86 -28.83Q93.93 -26.07 93.93 -21.60Q93.93 -18.87 95.53 -16.63Q97.13 -14.40 99.96 -13.13Q102.80 -11.87 106.33 -11.87Z M164.93 0.00H148.53V-66.67H162.79L163.39 -54.53Q166.86 -60.93 172.76 -64.47Q178.66 -68.00 186.33 -68.00Q188.33 -68.00 190.43 -67.73Q192.53 -67.47 194.59 -66.93L192.59 -52.13Q188.46 -53.33 184.59 -53.33Q178.73 -53.33 174.29 -50.60Q169.86 -47.87 167.39 -43.03Q164.93 -38.20 164.93 -31.80Z M264.39 0.00H249.92L249.06 -9.33Q244.72 -4.33 238.52 -1.50Q232.32 1.33 224.99 1.33Q215.66 1.33 208.26 -3.20Q200.86 -7.73 196.62 -15.57Q192.39 -23.40 192.39 -33.33Q192.39 -43.27 196.62 -51.10Q200.86 -58.93 208.26 -63.47Q215.66 -68.00 224.99 -68.00Q231.92 -68.00 237.79 -65.53Q243.66 -63.07 247.99 -58.60V-100.00H264.39ZM228.66 -13.40Q233.99 -13.40 238.39 -15.83Q242.79 -18.27 245.39 -22.53Q247.99 -26.80 247.99 -32.27V-34.60Q247.99 -40.00 245.39 -44.23Q242.79 -48.47 238.39 -50.90Q233.99 -53.33 228.66 -53.33Q223.06 -53.33 218.66 -50.70Q214.26 -48.07 211.72 -43.57Q209.19 -39.07 209.19 -33.40Q209.19 -27.67 211.72 -23.13Q214.26 -18.60 218.66 -16.00Q223.06 -13.40 228.66 -13.40Z M347.85 2.00Q336.51 2.00 326.95 -1.87Q317.38 -5.73 310.31 -12.77Q303.25 -19.80 299.35 -29.30Q295.45 -38.80 295.45 -50.00Q295.45 -61.27 299.35 -70.73Q303.25 -80.20 310.31 -87.23Q317.38 -94.27 326.95 -98.13Q336.51 -102.00 347.91 -102.00Q359.25 -102.00 368.78 -98.13Q378.31 -94.27 385.38 -87.23Q392.45 -80.20 396.31 -70.73Q400.18 -61.27 400.18 -50.00Q400.18 -38.80 396.31 -29.30Q392.45 -19.80 385.38 -12.77Q378.31 -5.73 368.78 -1.87Q359.25 2.00 347.85 2.00ZM347.85 -13.47Q355.25 -13.47 361.51 -16.20Q367.78 -18.93 372.41 -23.90Q377.05 -28.87 379.61 -35.53Q382.18 -42.20 382.18 -50.00Q382.18 -57.80 379.61 -64.47Q377.05 -71.13 372.41 -76.10Q367.78 -81.07 361.51 -83.80Q355.25 -86.53 347.85 -86.53Q340.51 -86.53 334.21 -83.80Q327.91 -81.07 323.28 -76.10Q318.65 -71.13 316.05 -64.47Q313.45 -57.80 313.45 -50.00Q313.45 -42.20 316.05 -35.53Q318.65 -28.87 323.28 -23.90Q327.91 -18.93 334.21 -16.20Q340.51 -13.47 347.85 -13.47Z M423.18 33.33H406.78V-66.67H421.24L422.04 -57.33Q426.44 -62.33 432.64 -65.17Q438.84 -68.00 446.18 -68.00Q455.51 -68.00 462.88 -63.47Q470.24 -58.93 474.48 -51.10Q478.71 -43.27 478.71 -33.33Q478.71 -23.40 474.48 -15.57Q470.24 -7.73 462.88 -3.20Q455.51 1.33 446.18 1.33Q439.31 1.33 433.44 -1.13Q427.58 -3.60 423.18 -8.07ZM442.64 -13.47Q448.24 -13.47 452.61 -16.03Q456.98 -18.60 459.41 -23.10Q461.84 -27.60 461.84 -33.40Q461.84 -39.20 459.38 -43.70Q456.91 -48.20 452.58 -50.77Q448.24 -53.33 442.64 -53.33Q437.38 -53.33 433.11 -50.97Q428.84 -48.60 426.24 -44.50Q423.64 -40.40 423.18 -35.13V-31.47Q423.64 -26.20 426.21 -22.13Q428.78 -18.07 433.04 -15.77Q437.31 -13.47 442.64 -13.47Z M479.97 -10.40 488.31 -23.87Q492.91 -20.27 497.17 -17.90Q501.44 -15.53 505.77 -14.40Q510.11 -13.27 514.57 -13.27Q520.31 -13.27 524.54 -15.03Q528.77 -16.80 531.11 -19.93Q533.44 -23.07 533.44 -27.27Q533.44 -32.00 530.61 -35.17Q527.77 -38.33 523.17 -40.63Q518.57 -42.93 513.31 -45.13Q508.51 -47.13 503.61 -49.47Q498.71 -51.80 494.71 -55.03Q490.71 -58.27 488.27 -62.87Q485.84 -67.47 485.84 -74.00Q485.84 -82.47 490.11 -88.77Q494.37 -95.07 501.91 -98.50Q509.44 -101.93 519.11 -101.93Q525.91 -101.93 533.07 -100.17Q540.24 -98.40 547.24 -94.80L540.24 -80.60Q535.51 -83.40 530.17 -84.97Q524.84 -86.53 519.97 -86.53Q515.17 -86.53 511.54 -85.03Q507.91 -83.53 505.87 -80.77Q503.84 -78.00 503.84 -74.33Q503.84 -70.00 506.54 -67.00Q509.24 -64.00 513.64 -61.70Q518.04 -59.40 523.04 -57.20Q528.04 -55.00 533.07 -52.50Q538.11 -50.00 542.27 -46.60Q546.44 -43.20 548.94 -38.47Q551.44 -33.73 551.44 -27.07Q551.44 -18.40 546.94 -11.83Q542.44 -5.27 534.31 -1.63Q526.17 2.00 515.31 2.00Q505.57 2.00 496.64 -1.13Q487.71 -4.27 479.97 -10.40Z" fill="currentColor"/></symbol>
+</svg>
+
 
 <!-- ── Anmeldung ─────────────────────────────────────────────────── -->
 <div id="tor" class="tor">
+  <!-- Auf der Anmeldung steht die Marke ueber der Karte und nicht darin:
+       Die Karte ist das Formular, die Marke sagt, wessen Bereich das
+       ueberhaupt ist. Nur hier, nicht im Zwei-Faktor-Schritt daneben --
+       dort ist man schon drin, und eine zweite Marke im selben Ablauf
+       waere eine Wiederholung. -->
+  <div class="tor-marke">
+    <svg viewBox="0.00 0.00 649.83 153.56" role="img" aria-label="Guard OpS"><use href="#go-wort"/></svg>
+  </div>
   <div class="karte tor-karte">
     <div class="karte-kopf">
       <div>
@@ -265,19 +550,141 @@ input:focus, select:focus { outline: 2px solid var(--accent-line); outline-offse
 <!-- ── Hauptansicht ──────────────────────────────────────────────── -->
 <div id="haus" class="versteckt">
   <div class="kopf">
-    <div>
+    <!-- Die Marke steht UEBER dem Bereichsnamen, nicht daneben. Gemessen:
+         Der Schriftzug ist 110 px breit, der Textblock rund 130 px; neben-
+         einander braucht die erste Rasterspalte gut 250 px, bei 1100 px
+         Fensterbreite stehen ihr aber nur 245 px zu. Das Raster waere
+         uebergelaufen und haette dabei die Navigation aus der Fenstermitte
+         geschoben -- 1fr auto 1fr haelt die Mitte nur, solange beide
+         Aussenspalten ihren Inhalt fassen. Uebereinander braucht die Spalte
+         nur die Breite des breiteren von beiden. -->
+    <div class="kopf-links">
+      <svg class="kopf-marke" viewBox="0.00 0.00 649.83 153.56" role="img" aria-label="Guard OpS"><use href="#go-wort"/></svg>
       <div class="titel">Betreiber-Bereich</div>
       <div class="unter" id="kopf-wer"></div>
     </div>
-    <div class="mitte" id="kopf-mitte"></div>
+    <nav class="kopf-nav" id="kopf-nav" aria-label="Bereiche">
+      <button type="button" class="nav-item on" data-bereich="uebersicht" aria-current="page">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+        <span class="lbl">Übersicht</span>
+      </button>
+      <button type="button" class="nav-item" data-bereich="mandanten" aria-current="false">
+        <svg viewBox="0 0 24 24"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-5h6v5"/><path d="M9 10h.01"/><path d="M15 10h.01"/></svg>
+        <span class="lbl">Mandanten</span>
+      </button>
+      <button type="button" class="nav-item" data-bereich="offerten" aria-current="false">
+        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h5"/></svg>
+        <span class="lbl">Offerten</span>
+      </button>
+      <button type="button" class="nav-item" data-bereich="rechnungen" aria-current="false">
+        <svg viewBox="0 0 24 24"><path d="M4 3h16v18l-2.5-1.5L15 21l-2.5-1.5L10 21l-2.5-1.5L5 21 4 21z"/><path d="M8 8h8"/><path d="M8 12h8"/><path d="M8 16h4"/></svg>
+        <span class="lbl">Rechnungen</span>
+      </button>
+      <button type="button" class="nav-item" data-bereich="support" aria-current="false">
+        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span class="lbl">Support</span>
+        <span class="abz" id="nav-sv-abz" hidden>0</span>
+      </button>
+      <button type="button" class="nav-item" data-bereich="konten" aria-current="false">
+        <svg viewBox="0 0 24 24"><path d="M12 2l8 4v6c0 5-3.4 8.6-8 10-4.6-1.4-8-5-8-10V6z"/><path d="M12 11a2.4 2.4 0 1 0 0-4.8 2.4 2.4 0 0 0 0 4.8z"/><path d="M8 16.5c.9-1.6 2.3-2.4 4-2.4s3.1.8 4 2.4"/></svg>
+        <span class="lbl">Konten</span>
+      </button>
+    </nav>
     <div class="rechts">
+      <button class="thema-schalter" id="btn-thema" role="switch" aria-checked="false"
+              title="Hell oder dunkel"
+              aria-label="Zwischen heller und dunkler Darstellung wechseln">
+        <span class="ts-bahn"><span class="ts-schieber">
+          <svg class="i-sonne" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><line x1="12" y1="1.5" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22.5"/><line x1="4.2" y1="4.2" x2="5.9" y2="5.9"/><line x1="18.1" y1="18.1" x2="19.8" y2="19.8"/><line x1="1.5" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22.5" y2="12"/><line x1="4.2" y1="19.8" x2="5.9" y2="18.1"/><line x1="18.1" y1="5.9" x2="19.8" y2="4.2"/></svg>
+          <svg class="i-mond" viewBox="0 0 24 24"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11z"/></svg>
+        </span></span>
+      </button>
       <button class="klein" id="knopf-abmelden">Abmelden</button>
     </div>
+  </div>
+
+  <div class="leiste">
+    <h1 id="leiste-titel">Übersicht</h1>
+    <div class="crumb" id="leiste-unter">Die Lage über allen Betrieben</div>
   </div>
 
   <div class="huelle">
     <div id="haus-meldung" class="meldung versteckt"></div>
 
+    <!-- ══ Übersicht ══════════════════════════════════════════════ -->
+    <section class="bereich" id="b-uebersicht">
+      <div class="karte">
+        <div class="karte-kopf">
+          <div>
+            <h2>Lage</h2>
+            <div class="sub">Alle Mandanten dieser Anlage auf einen Blick</div>
+          </div>
+        </div>
+        <div class="zahlen" id="u-zahlen"></div>
+      </div>
+
+      <!-- Support gleich unter der Lage, nicht am Ende: Eine Anfrage, die
+           seit gestern wartet, ist dringender als die Frage, wie viele
+           Mandanten es gibt. -->
+      <div class="karte">
+        <div class="karte-kopf">
+          <div>
+            <h2>Support</h2>
+            <div class="sub">Anfragen der Mandanten aus der Plattform</div>
+          </div>
+        </div>
+        <div class="zahlen" id="u-sv-zahlen"></div>
+        <div class="karte-leib">
+          <div id="u-sv-hinweis" class="zone-note"></div>
+          <div class="knopfzeile" style="margin-top:10px">
+            <button type="button" class="haupt" data-springe="support">Zum Arbeitsvorrat</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="karte">
+        <div class="karte-kopf">
+          <div>
+            <h2>Schnellzugriff</h2>
+            <div class="sub">Die Wege, die von hier aus am häufigsten gebraucht werden</div>
+          </div>
+        </div>
+        <div class="karte-leib">
+          <div class="knopfzeile" style="margin-top:0">
+            <button type="button" class="haupt" data-springe="mandanten">Mandanten verwalten</button>
+            <button type="button" data-springe="konten">Betreiber-Konten</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Was NICHT da ist, gehoert genauso hin wie das, was da ist. Ein
+           leerer Bereich ohne diese Karte sieht aus wie ein Fehler; mit ihr
+           steht da, dass er absichtlich leer ist und worauf er wartet. -->
+      <div class="karte">
+        <div class="karte-kopf">
+          <div>
+            <h2>Was hier noch fehlt</h2>
+            <div class="sub">Offen und bewusst nicht gebaut — damit es nicht wie ein Fehler aussieht</div>
+          </div>
+        </div>
+        <div class="karte-leib">
+          <ul class="fehlt">
+            <li><b>Offerten und Rechnungen</b> sind ein Gerüst. Was abgerechnet
+              wird — Grundgebühr, Zahl der Mitarbeitenden, Einsätze —, ist noch
+              nicht entschieden, und davon hängt der Datenaufbau ab.</li>
+            <li><b>Dieses Konto hat keinen Weg zurück.</b> Geht das Passwort
+              verloren, hilft heute nur ein Eingriff in der Datenbank — und der
+              geht nur, solange höchstens ein Mandant eingetragen ist.</li>
+            <li><b>Eine eigene Datenbank für diese Ebene</b> steht noch aus.
+              Heute liegen Mandantenstamm und Betreiber-Konten in derselben
+              Datenbank wie die Betriebsdaten des ersten Mandanten.</li>
+          </ul>
+          <p class="zone-note" id="u-sitzung"></p>
+        </div>
+      </div>
+    </section>
+    <!-- ══ Mandanten ══════════════════════════════════════════ -->
+    <section class="bereich versteckt" id="b-mandanten">
     <!-- Mandanten -->
     <div class="karte">
       <div class="karte-kopf">
@@ -287,7 +694,6 @@ input:focus, select:focus { outline: 2px solid var(--accent-line); outline-offse
         </div>
         <button class="klein" id="knopf-neu">Mandant anlegen</button>
       </div>
-      <div class="zahlen" id="m-zahlen"></div>
       <div id="m-inhalt"></div>
     </div>
 
@@ -356,7 +762,58 @@ input:focus, select:focus { outline: 2px solid var(--accent-line); outline-offse
         <div id="sup-inhalt"></div>
       </div>
     </div>
+    </section>
 
+
+    <!-- ══ Support ════════════════════════════════════════════ -->
+    <section class="bereich versteckt" id="b-support">
+      <div class="karte">
+        <div class="karte-kopf">
+          <div>
+            <h2>Arbeitsvorrat</h2>
+            <div class="sub">Was die Mandanten gemeldet haben</div>
+          </div>
+          <div class="knopfzeile" style="margin-top:0">
+            <button type="button" class="klein" id="knopf-sv-neu">Nur offene</button>
+            <button type="button" class="klein" id="knopf-sv-alle">Alle</button>
+          </div>
+        </div>
+        <div id="sv-inhalt"></div>
+      </div>
+
+      <!-- Der einzelne Vorgang. Steht als eigene Karte UNTER der Liste und
+           nicht in einem Fenster darueber: Wer antwortet, will die Liste
+           daneben behalten -- und ein Fenster, das man wegklicken muss, um
+           nachzusehen, kostet genau den Blick, den man gerade braucht. -->
+      <div class="karte versteckt" id="sv-karte">
+        <div class="karte-kopf">
+          <div>
+            <h2 id="sv-titel">Vorgang</h2>
+            <div class="sub" id="sv-unter"></div>
+          </div>
+          <div class="knopfzeile" style="margin-top:0">
+            <button type="button" class="klein" id="knopf-sv-zu">Schliessen</button>
+          </div>
+        </div>
+        <div class="karte-leib">
+          <div class="sv-kontext" id="sv-kontext"></div>
+          <div class="sv-verlauf" id="sv-verlauf" style="margin-top:14px"></div>
+
+          <div style="margin-top:16px">
+            <label for="sv-antwort">Antwort</label>
+            <textarea id="sv-antwort" rows="4"
+                      placeholder="Antwort an den Betrieb — sie erscheint in dessen Plattform."></textarea>
+          </div>
+          <div class="knopfzeile">
+            <button type="button" class="haupt" id="knopf-sv-senden">Antworten</button>
+            <button type="button" id="knopf-sv-arbeit">In Arbeit</button>
+            <button type="button" id="knopf-sv-erledigt">Erledigt</button>
+          </div>
+          <div id="sv-meldung" class="meldung versteckt"></div>
+        </div>
+      </div>
+    </section>
+    <section class="bereich versteckt" id="b-konten">
     <!-- Konten -->
     <div class="karte">
       <div class="karte-kopf">
@@ -367,6 +824,33 @@ input:focus, select:focus { outline: 2px solid var(--accent-line); outline-offse
       </div>
       <div id="k-inhalt"></div>
     </div>
+    </section>
+
+    <!-- ══ Offerten ═══════════════════════════════════════════════ -->
+    <section class="bereich versteckt" id="b-offerten">
+      <div class="karte">
+        <div class="karte-kopf">
+          <div>
+            <h2>Offerten</h2>
+            <div class="sub">Angebote an Betriebe, die diese Plattform nutzen wollen</div>
+          </div>
+        </div>
+        <div id="of-inhalt"></div>
+      </div>
+    </section>
+
+    <!-- ══ Rechnungen ═════════════════════════════════════════════ -->
+    <section class="bereich versteckt" id="b-rechnungen">
+      <div class="karte">
+        <div class="karte-kopf">
+          <div>
+            <h2>Rechnungen</h2>
+            <div class="sub">Was die Mandanten für die Nutzung dieser Plattform zahlen</div>
+          </div>
+        </div>
+        <div id="re-inhalt"></div>
+      </div>
+    </section>
   </div>
 </div>
 
@@ -398,6 +882,68 @@ function melde(el, art, txt) {
 }
 function stumm(el) { zeig(el, false); }
 
+/* ── Bereiche ────────────────────────────────────────────────────
+   Ein Bereich ist sichtbar, die uebrigen nicht. Bewusst kein Nachladen
+   der Seite und kein eigener Verlaufseintrag: Der Betreiber-Bereich haelt
+   seinen Token in sessionStorage, ein Neuladen waere ein Umweg ueber die
+   Anmeldung. */
+const BEREICHE = {
+  uebersicht: ['Übersicht',  'Die Lage über allen Betrieben'],
+  mandanten:  ['Mandanten',  'Betriebe, die diese Plattform nutzen'],
+  offerten:   ['Offerten',   'Angebote an künftige Mandanten'],
+  rechnungen: ['Rechnungen', 'Was die Mandanten für die Nutzung zahlen'],
+  support:    ['Support',    'Anfragen der Mandanten, die auf eine Antwort warten'],
+  konten:     ['Konten',     'Wer diesen Bereich öffnen darf'],
+};
+
+function bereichZeigen(welcher) {
+  if (!BEREICHE[welcher]) { welcher = 'uebersicht'; }
+  Object.keys(BEREICHE).forEach(k => {
+    const el = $('b-' + k);
+    if (el) { zeig(el, k === welcher); }
+  });
+  document.querySelectorAll('#kopf-nav .nav-item').forEach(b => {
+    const an = b.dataset.bereich === welcher;
+    b.classList.toggle('on', an);
+    // Nicht nur eingefaerbt, sondern auch angesagt: Wer die Seite hoert
+    // statt sieht, erfaehrt aus der Farbe nichts.
+    b.setAttribute('aria-current', an ? 'page' : 'false');
+  });
+  $('leiste-titel').textContent = BEREICHE[welcher][0];
+  $('leiste-unter').textContent = BEREICHE[welcher][1];
+  // Ein Formular, das beim Bereichswechsel offen bliebe, stuende beim
+  // naechsten Besuch halb ausgefuellt da, ohne dass jemand weiss warum.
+  if (welcher !== 'mandanten') {
+    zeig($('m-form-karte'), false);
+    zeig($('sup-karte'), false);
+  }
+  // Derselbe Grund: Ein halb getippter Antworttext beim naechsten Besuch
+  // waere ein Raetsel.
+  if (welcher !== 'support') { zeig($('sv-karte'), false); }
+  window.scrollTo({ top: 0 });
+}
+
+/* ── Hell oder dunkel ────────────────────────────────────────────
+   Der Wert steht schon im Kopf der Seite am Dokument; hier wird nur noch
+   umgeschaltet und gespeichert. Derselbe Speicherschluessel wie im
+   Cockpit -- Begruendung oben beim Vorab-Skript. */
+function themaSetzen(w) {
+  const dunkel = w === 'dunkel';
+  document.documentElement.setAttribute('data-thema', dunkel ? 'dunkel' : 'hell');
+  try { localStorage.setItem('rv3_thema', dunkel ? 'dunkel' : 'hell'); } catch (e) { /* egal */ }
+  const b = $('btn-thema');
+  if (b) {
+    b.setAttribute('aria-checked', dunkel ? 'true' : 'false');
+    b.title = dunkel ? 'Auf helle Darstellung wechseln' : 'Auf dunkle Darstellung wechseln';
+  }
+  // Die Farbe der Systemleiste am Telefon mitziehen.
+  const m = document.querySelector('meta[name="theme-color"]');
+  if (m) { m.setAttribute('content', dunkel ? '#0B0D11' : '#16181D'); }
+}
+function themaUm() {
+  themaSetzen(document.documentElement.getAttribute('data-thema') === 'dunkel' ? 'hell' : 'dunkel');
+}
+
 async function ruf(pfad, daten, methode) {
   const opt = { method: methode || (daten ? 'POST' : 'GET'), headers: {} };
   if (token) { opt.headers['X-Auth-Token'] = token; }
@@ -405,7 +951,37 @@ async function ruf(pfad, daten, methode) {
   const antwort = await fetch(API + pfad, opt);
   let inhalt = {};
   try { inhalt = await antwort.json(); } catch (e) { /* leere Antwort */ }
+
+  /* Eine Sitzung, die nicht mehr traegt, ist kein Ladefehler.
+     Bis hierher malte jede Liste fuer sich "Nicht abrufbar" -- der
+     Bildschirm stand voller Fehlerkaesten, obwohl nur die Anmeldung
+     abgelaufen war, und daneben ein Knopf "Abmelden" fuer eine Sitzung,
+     die es nicht mehr gab. Dieselbe Aussage wie beim Laden der Seite:
+     zurueck zur Anmeldung, ohne Fehlermeldung.
+
+     Nur mit gesendetem Token: betreiber_anmelden.php antwortet auf ein
+     falsches Passwort ebenfalls mit 401, und das gehoert in die Meldung
+     des Anmeldefensters, nicht in einen Rueckwurf.
+     403 bleibt ausgenommen -- "Zwei-Faktor noch nicht eingerichtet" ist
+     etwas anderes als "nicht mehr angemeldet". */
+  if (antwort.status === 401 && token) { zurueckZurAnmeldung(); }
+
   return { code: antwort.status, ...inhalt };
+}
+
+/* Token wegwerfen und die Anmeldemaske zeigen. Kein Neuladen der Seite:
+   Ein halb ausgefuelltes Mandantenformular waere sonst weg, und der Grund
+   dafuer stuende nirgends. */
+function zurueckZurAnmeldung() {
+  try { sessionStorage.removeItem(SCHLUESSEL); } catch (e) { /* egal */ }
+  token = '';
+  zeig($('haus'), false);
+  zeig($('zf-tor'), false);
+  zeig($('tor'), true);
+  melde($('tor-meldung'), 'warn', 'Die Anmeldung ist abgelaufen — bitte neu anmelden.');
+  const f = $('e-pass'); if (f) { f.value = ''; }
+  const c = $('e-code'); if (c) { c.value = ''; }
+  zeig($('tor-code'), false);
 }
 
 /* ── Anmeldung ──────────────────────────────────────────────────── */
@@ -443,6 +1019,7 @@ async function nachAnmeldung(zfSteht) {
   if (!zfSteht) { zeig($('zf-tor'), true); return; }
   zeig($('zf-tor'), false);
   zeig($('haus'), true);
+  bereichZeigen('uebersicht');
   await ladeAlles();
 }
 
@@ -531,20 +1108,44 @@ function merker(karte, schluessel) {
   return '<span class="merker ' + klasse + '">' + text(wort) + '</span>';
 }
 
+/* Wie gross ein Betrieb ist (ENT-539).
+
+   VIER AUSSAGEN, VIER TEXTE -- die Hausregel, die hier am haeufigsten
+   verletzt wurde:
+     - nicht erhoben   : der Zaehlstand ist auf diesem Server noch nicht da
+     - nicht feststellbar : der Mandant ist gerade nicht erreichbar
+     - 0 Mitarbeitende : erreichbar, gezaehlt, und es sind wirklich keine
+     - eine Zahl       : der Normalfall
+   "Nicht feststellbar" als "0" auszugeben waere die schlimmste Variante:
+   Sie sieht aus wie eine Auskunft und ist eine Erfindung. */
+function groesseZelle(g) {
+  if (g === undefined) { return '<span class="merker m-ruhe">nicht erhoben</span>'; }
+  if (g === null)      { return '<span class="merker m-warn">nicht feststellbar</span>'; }
+  const zweit = g.im_einsatz === null || g.im_einsatz === undefined
+    ? 'diesen Monat nicht feststellbar'
+    : g.im_einsatz + ' diesen Monat im Einsatz';
+  /* "aktiv" und "gesamt" sind zwei Einheiten und stehen darum nicht unter
+     einer Ueberschrift zusammengezaehlt. Die zweite Zeile nennt den Bezug,
+     sobald die Zahl eine Teilmenge ist (Hausregel). */
+  return '<strong>' + g.aktiv + '</strong>'
+       + (g.gesamt !== g.aktiv ? ' <span style="color:var(--ink-3)">von ' + g.gesamt + '</span>' : '')
+       + '<div class="zweit">' + text(zweit) + '</div>';
+}
+
 async function ladeMandanten() {
   const a = await ruf('betreiber_mandant_list.php');
-  const inhalt = $('m-inhalt'), zahlen = $('m-zahlen');
+  const inhalt = $('m-inhalt');
 
   if (a.code === 503) {
     // Nicht eingerichtet ist etwas anderes als "keine vorhanden".
-    zahlen.innerHTML = '';
+    uebersichtSetzen('');
     inhalt.innerHTML = leerBlock('⚙', 'Noch nicht eingerichtet',
       'Der Mandantenstamm ist auf diesem Server noch nicht angelegt. '
       + 'Die Einrichtung läuft einmalig über das Cockpit.');
     return;
   }
   if (a.status !== 'ok') {
-    zahlen.innerHTML = '';
+    uebersichtSetzen('');
     inhalt.innerHTML = leerBlock('⚠', 'Nicht abrufbar', text(a.message || 'Unbekannter Fehler.'));
     return;
   }
@@ -561,6 +1162,22 @@ async function ladeMandanten() {
     if (st.status === 'ok') { (st.mandanten || []).forEach(m => { stand[m.id] = m; }); }
   } catch (e) { /* Stand bleibt unbekannt */ }
 
+  /* Die Groessen kommen aus demselben Grund aus einem eigenen Endpunkt:
+     Er verbindet sich zu jeder Mandantendatenbank. Schlaegt er fehl,
+     bleibt die Liste stehen -- eine unbekannte Groesse ist kein Grund,
+     gar nichts zu zeigen.
+
+     POST und nicht GET: Derselbe Aufruf haelt den Stand des laufenden
+     Monats fest. Das geschieht hoechstens einmal je Mandant und Monat,
+     der erste Eintrag gewinnt. Warum ueberhaupt: Wie gross ein Betrieb im
+     September war, laesst sich im Dezember nicht mehr feststellen, und
+     eine Staffelung nach Groesse braucht genau das (ENT-539). */
+  let groesse = {};
+  try {
+    const gr = await ruf('betreiber_zaehlstand.php', null, 'POST');
+    if (gr.status === 'ok') { (gr.heute || []).forEach(m => { groesse[m.id] = m.zahlen; }); }
+  } catch (e) { /* Groesse bleibt unbekannt */ }
+
   const aktiv = liste.filter(m => m.status === 'aktiv').length;
   const offen = liste.filter(m => m.gav_lage === 'unbestaetigt').length;
   const kaputt = liste.filter(m => {
@@ -571,11 +1188,11 @@ async function ladeMandanten() {
   /* Einheiten nicht vermischen: "Mandanten" zaehlt Betriebe, "aktiv" zaehlt
      Betriebe mit Status aktiv, "GAV offen" zaehlt Bestaetigungen. Jede Zahl
      bekommt ihren Bezug, sobald sie eine Teilmenge ist (Hausregel). */
-  zahlen.innerHTML =
+  uebersichtSetzen(
       zahlBlock('Mandanten', liste.length, null)
     + zahlBlock('Aktiv', aktiv, liste.length ? aktiv + ' von ' + liste.length : null)
     + zahlBlock('GAV offen', offen, offen ? 'Bestätigung fehlt' : 'alle bestätigt')
-    + zahlBlock('Nicht erreichbar', kaputt, kaputt ? 'Einrichtung prüfen' : 'alle erreichbar');
+    + zahlBlock('Nicht erreichbar', kaputt, kaputt ? 'Einrichtung prüfen' : 'alle erreichbar'));
 
   if (!liste.length) {
     inhalt.innerHTML = leerBlock('◇', 'Noch kein Mandant eingetragen',
@@ -584,11 +1201,12 @@ async function ladeMandanten() {
   }
 
   inhalt.innerHTML = '<div class="tab-huelle"><table><thead><tr>'
-    + '<th>Mandant</th><th>Status</th><th>GAV</th><th>Einrichtung</th><th></th>'
+    + '<th>Mandant</th><th>Grösse</th><th>Status</th><th>GAV</th><th>Einrichtung</th><th></th>'
     + '</tr></thead><tbody>'
     + liste.map(m => '<tr>'
         + '<td><strong>' + text(m.name) + '</strong>'
           + '<div class="zweit">' + (m.kanton ? 'Kanton ' + text(m.kanton) : 'Kanton nicht gesetzt') + '</div></td>'
+        + '<td>' + groesseZelle(groesse[m.id]) + '</td>'
         + '<td>' + merker(STATUS_TEXT, m.status) + '</td>'
         + '<td>' + merker(GAV_TEXT, m.gav_lage)
           + (m.gav_bestaetigt_am ? '<div class="zweit">' + text(m.gav_bestaetigt_am.slice(0, 10)) + '</div>' : '')
@@ -634,7 +1252,7 @@ function zahlBlock(lab, wert, bezug) {
        + (bezug ? '<div class="bezug">' + text(bezug) + '</div>' : '') + '</div>';
 }
 function leerBlock(zeichen, titel, unter) {
-  return '<div class="leer"><div class="ic">' + zeichen + '</div>'
+  return '<div class="leerblock"><div class="ic">' + zeichen + '</div>'
        + '<div class="t">' + text(titel) + '</div>'
        + '<div class="u">' + text(unter) + '</div></div>';
 }
@@ -801,12 +1419,286 @@ async function kontoSchalten(id, aktiv) {
   await ladeKonten();
 }
 
+/* ── Übersicht ──────────────────────────────────────────────────
+   Sie rechnet NICHT selbst nach, sondern bekommt die Zahlen von
+   ladeMandanten() gereicht. Zwei Stellen, die dieselbe Menge zaehlen,
+   laufen irgendwann auseinander -- und es faellt erst auf, wenn zwei
+   verschiedene Zahlen nebeneinander stehen. */
+function uebersichtSetzen(zahlenHtml) {
+  const el = $('u-zahlen');
+  if (el) { el.innerHTML = zahlenHtml; }
+}
+
+/* Ein Bereich, der noch nicht gebaut ist, ist etwas anderes als einer ohne
+   Inhalt. "Noch nichts vorhanden" waere eine Falschaussage: Es ist nicht
+   leer, es gibt es noch nicht. Vier Aussagen, vier Texte -- die Hausregel,
+   die hier schon am haeufigsten verletzt wurde. */
+function geruestZeigen(id, was, warum) {
+  const el = $(id);
+  if (el) { el.innerHTML = leerBlock('◷', was, warum); }
+}
+
+
+/* ── Supportvorgaenge (ENT-538) ─────────────────────────────────────
+   Der Arbeitsvorrat. Die Zahlen kommen vom Server, nicht aus der Liste --
+   der Zaehler oben zaehlt ueber ALLE Vorgaenge, die Liste zeigt je nach
+   Filter nur einen Teil. Beides aus derselben Liste zu rechnen hiesse:
+   Sobald ein Filter greift, zaehlt der Zaehler etwas anderes, als er sagt.
+
+   SV_STATUS_TEXT bildet die vier Status ab. Vier, nicht zwei -- 'wartet
+   auf Kunde' ist weder offen noch erledigt, und genau das ist der Grund,
+   warum es ihn gibt. */
+const SV_STATUS_TEXT = {
+  neu:              ['m-neg',  'Neu'],
+  in_arbeit:        ['m-warn', 'In Arbeit'],
+  wartet_auf_kunde: ['m-ruhe', 'Wartet auf Kunde'],
+  erledigt:         ['m-pos',  'Erledigt'],
+};
+let svNurOffen = true;
+let svAktuell  = 0;
+
+function svAbzeichenSetzen(offen) {
+  const el = $('nav-sv-abz');
+  if (!el) { return; }
+  el.hidden = !offen;
+  el.textContent = offen > 99 ? '99+' : String(offen);
+  /* Angesagt, nicht nur eingefaerbt: Wer die Seite hoert statt sieht,
+     erfaehrt aus einer roten Scheibe nichts. */
+  const knopf = el.closest('.nav-item');
+  if (knopf) {
+    knopf.setAttribute('aria-label', offen
+      ? 'Support — ' + offen + ' ' + (offen === 1 ? 'Anfrage wartet' : 'Anfragen warten')
+      : 'Support');
+  }
+}
+
+async function ladeSupport() {
+  const inhalt = $('sv-inhalt');
+  const a = await ruf('betreiber_support_vorgang.php');
+
+  /* Vier Aussagen, vier Texte (Hausregel). Nicht eingerichtet, nicht
+     abrufbar, nichts vorhanden und kein Treffer sind verschiedene Dinge --
+     hier sind alle vier moeglich, und drei davon waeren als "keine
+     Anfragen" eine Falschaussage. */
+  if (a.lage === 'nicht_eingerichtet' || a.code === 503) {
+    svAbzeichenSetzen(0);
+    uebersichtSupportSetzen(null, 'nicht_eingerichtet');
+    /* Nicht nur sagen, dass etwas fehlt, sondern den Handgriff anbieten:
+       Der Einrichtungsknopf des Cockpits erscheint nur, SOLANGE der
+       Bootstrap offen ist (ENT-529) -- auf einer Anlage mit bestehendem
+       Betreiber-Konto gäbe es sonst keinen Weg mehr, eine neu
+       dazugekommene Tabelle anzulegen. */
+    inhalt.innerHTML = leerBlock('⚙', 'Noch nicht eingerichtet',
+      'Die Tabellen für den Supportkanal fehlen auf diesem Server. '
+      + 'Das Einrichten legt an, was fehlt — es löscht und leert nichts.')
+      + '<div class="knopfzeile" style="justify-content:center">'
+      + '<button type="button" class="haupt" id="knopf-sv-einrichten">Jetzt einrichten</button>'
+      + '</div>';
+    const k = $('knopf-sv-einrichten');
+    if (k) { k.onclick = svEinrichten; }
+    return;
+  }
+  if (a.status !== 'ok') {
+    svAbzeichenSetzen(0);
+    uebersichtSupportSetzen(null, 'fehler');
+    inhalt.innerHTML = leerBlock('⚠', 'Nicht abrufbar',
+      text(a.message || 'Unbekannter Fehler.'));
+    return;
+  }
+
+  const alle = a.vorgaenge || [];
+  svAbzeichenSetzen(a.offen || 0);
+  uebersichtSupportSetzen(alle, 'ok', a.offen || 0);
+
+  const liste = svNurOffen
+    ? alle.filter(v => v.status === 'neu' || v.status === 'in_arbeit')
+    : alle;
+
+  if (!alle.length) {
+    inhalt.innerHTML = leerBlock('◇', 'Noch keine Anfrage',
+      'Sobald ein Mandant etwas meldet, erscheint es hier.');
+    return;
+  }
+  /* "Kein Treffer" und "nichts vorhanden" sind verschiedene Aussagen --
+     ein Filter, der alles ausblendet, darf nie wie ein leerer Vorrat
+     aussehen (Hausregel). */
+  if (!liste.length) {
+    inhalt.innerHTML = leerBlock('◔', 'Nichts Offenes',
+      'Alle ' + alle.length + ' Vorgänge sind erledigt oder warten auf den Kunden. '
+      + 'Mit „Alle" sind sie weiterhin einsehbar.');
+    return;
+  }
+
+  inhalt.innerHTML = '<div class="tab-huelle"><table><thead><tr>'
+    + '<th>Betrieb</th><th>Anliegen</th><th>Status</th><th>Eingegangen</th><th></th>'
+    + '</tr></thead><tbody>'
+    + liste.map(v => '<tr>'
+        + '<td><strong>' + text(v.mandant) + '</strong>'
+          + '<div class="zweit">' + text(v.art_wort) + '</div></td>'
+        + '<td><strong>' + text(v.betreff) + '</strong>'
+          + '<div class="zweit">' + text(v.melder_name || 'Ohne Namen')
+          + ' · ' + v.nachrichten + (v.nachrichten === 1 ? ' Nachricht' : ' Nachrichten')
+          /* Wer zuletzt geschrieben hat, ist die Information, die sagt, ob
+             hier noch etwas von uns erwartet wird. */
+          + (v.letzte_seite === 'kunde' ? ' · zuletzt der Betrieb' : '')
+          + '</div></td>'
+        + '<td>' + merker(SV_STATUS_TEXT, v.status) + '</td>'
+        + '<td>' + text(svDatum(v.eroeffnet_am)) + '</td>'
+        + '<td style="text-align:right;white-space:nowrap">'
+          + '<button class="klein" data-sv="' + v.id + '">Öffnen</button></td>'
+      + '</tr>').join('')
+    + '</tbody></table></div>';
+
+  inhalt.querySelectorAll('[data-sv]').forEach(b =>
+    b.onclick = () => svOeffnen(+b.dataset.sv));
+}
+
+/* Datum ohne Uhrzeit-Genauigkeit, die niemand braucht -- aber MIT dem
+   Hinweis, wenn es heute war: "heute" liest sich schneller als ein
+   Datum, das man erst mit dem Kalender vergleichen muss. */
+function svDatum(roh) {
+  if (!roh) { return 'unbekannt'; }
+  const d = String(roh).slice(0, 10);
+  const heute = new Date().toISOString().slice(0, 10);
+  if (d === heute) { return 'heute'; }
+  const teile = d.split('-');
+  return teile.length === 3 ? teile[2] + '.' + teile[1] + '.' + teile[0] : d;
+}
+
+/* Die Karte auf der Uebersicht. Eigener Zahlenblock statt Anhaengsel an
+   u-zahlen: Jene Zahlen zaehlen Betriebe, diese zaehlen Vorgaenge --
+   Einheiten werden nicht vermischt (Hausregel). */
+function uebersichtSupportSetzen(liste, lage, offen) {
+  const zahlen  = $('u-sv-zahlen');
+  const hinweis = $('u-sv-hinweis');
+  if (!zahlen) { return; }
+
+  if (lage !== 'ok') {
+    zahlen.innerHTML = '';
+    hinweis.textContent = lage === 'nicht_eingerichtet'
+      ? 'Der Supportkanal ist auf diesem Server noch nicht eingerichtet.'
+      : 'Der Stand liess sich nicht abrufen.';
+    return;
+  }
+
+  const zaehl = st => (liste || []).filter(v => v.status === st).length;
+  const wartet = zaehl('wartet_auf_kunde');
+  zahlen.innerHTML =
+      zahlBlock('Wartet auf uns', offen, (liste || []).length
+        ? offen + ' von ' + liste.length : null)
+    + zahlBlock('Neu', zaehl('neu'), null)
+    + zahlBlock('In Arbeit', zaehl('in_arbeit'), null)
+    + zahlBlock('Beim Kunden', wartet, wartet ? 'Antwort steht aus' : null);
+
+  hinweis.textContent = offen
+    ? (offen === 1 ? 'Eine Anfrage wartet auf eine Antwort.'
+                   : offen + ' Anfragen warten auf eine Antwort.')
+    : 'Nichts offen.';
+}
+
+/* Legt an, was fehlt. Derselbe Endpunkt, den das Cockpit beim Bootstrap
+   ruft -- er ist gefahrlos mehrfach aufrufbar und löscht nichts. */
+async function svEinrichten() {
+  const k = $('knopf-sv-einrichten');
+  if (k) { k.disabled = true; k.textContent = 'Wird eingerichtet …'; }
+  const a = await ruf('betreiber_einrichten.php', {});
+  if (a.status !== 'ok') {
+    /* Der Grund gehört hierher, nicht in ein allgemeines "ging nicht": Wer
+       das liest, muss wissen, ob er selbst etwas tun kann. Der Endpunkt
+       meldet in 'fehler', eine abgelehnte Anfrage in 'message'. */
+    const grund = (a.fehler && a.fehler.length) ? a.fehler.join(' · ')
+                : (a.message || 'Der Server hat die Einrichtung abgelehnt.');
+    $('sv-inhalt').innerHTML = leerBlock('⚠', 'Einrichtung nicht möglich', text(grund));
+    return;
+  }
+  await ladeSupport();
+}
+
+async function svOeffnen(id) {
+  svAktuell = id;
+  const a = await ruf('betreiber_support_vorgang.php?id=' + id);
+  if (a.status !== 'ok') {
+    melde($('sv-meldung'), 'fehler', a.message || 'Der Vorgang liess sich nicht laden.');
+    return;
+  }
+  const v = a.vorgang;
+  zeig($('sv-karte'), true);
+  $('sv-titel').textContent = v.betreff;
+  $('sv-unter').textContent = sv_wort(v) ;
+  /* Der Kontext, den die Anfrage selbst mitgebracht hat -- er erspart die
+     Rueckfrage, mit der ein Supportfall sonst beginnt. Jede Angabe, die
+     fehlt, wird als fehlend benannt statt weggelassen. */
+  $('sv-kontext').innerHTML =
+      '<b>Bildschirm:</b> ' + text(v.bildschirm || 'nicht mitgeschickt')
+    + ' &nbsp;·&nbsp; <b>Umgebung:</b> ' + text(v.umgebung || 'nicht mitgeschickt')
+    + ' &nbsp;·&nbsp; <b>Rolle:</b> ' + text(v.melder_rolle || 'nicht mitgeschickt');
+
+  $('sv-verlauf').innerHTML = (a.nachrichten || []).map(n =>
+      '<div class="sv-n ' + (n.seite === 'kunde' ? 'sv-kunde' : 'sv-betreiber') + '">'
+    + '<div class="wer">' + text(n.autor || (n.seite === 'kunde' ? 'Betrieb' : 'Support'))
+    + ' · ' + text(svDatum(n.erstellt_am)) + '</div>'
+    + '<div class="txt">' + text(n.text) + '</div></div>').join('');
+  $('sv-antwort').value = '';
+  stumm($('sv-meldung'));
+  $('sv-karte').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function sv_wort(v) {
+  const st = SV_STATUS_TEXT[v.status];
+  return (st ? st[1] : 'Unbekannt') + ' · eingegangen ' + svDatum(v.eroeffnet_am);
+}
+
+async function svAntworten() {
+  const txt = $('sv-antwort').value.trim();
+  if (!txt) { melde($('sv-meldung'), 'fehler', 'Bitte etwas schreiben.'); return; }
+  const a = await ruf('betreiber_support_vorgang.php', { id: svAktuell, text: txt });
+  if (a.status !== 'ok') {
+    melde($('sv-meldung'), 'fehler', a.message || 'Nicht gespeichert.'); return;
+  }
+  melde($('sv-meldung'), 'gut', 'Antwort gespeichert — der Vorgang wartet jetzt auf den Betrieb.');
+  await svOeffnen(svAktuell);
+  await ladeSupport();
+}
+
+async function svStatus(status) {
+  const a = await ruf('betreiber_support_vorgang.php', { id: svAktuell, status: status });
+  if (a.status !== 'ok') {
+    melde($('sv-meldung'), 'fehler', a.message || 'Nicht gespeichert.'); return;
+  }
+  await svOeffnen(svAktuell);
+  await ladeSupport();
+}
+
 /* ── Rahmen ─────────────────────────────────────────────────────── */
 async function ladeAlles() {
-  if (ich) { $('kopf-wer').textContent = ich.name + ' · ' + ich.email; }
-  $('kopf-mitte').textContent = 'Sitzung endet nach 30 Minuten ohne Nutzung';
+  /* Name und Adresse nur dann beide, wenn sie sich unterscheiden. Wer beim
+     Anlegen seine E-Mail auch als Namen eingetragen hat, sah sie hier sonst
+     zweimal nebeneinander. */
+  if (ich) {
+    const gleich = String(ich.name || '').trim().toLowerCase()
+                === String(ich.email || '').trim().toLowerCase();
+    $('kopf-wer').textContent = gleich ? ich.email : ich.name + ' · ' + ich.email;
+  }
+  const hinweis = $('u-sitzung');
+  if (hinweis) { hinweis.textContent = 'Die Sitzung endet nach 30 Minuten ohne Nutzung.'; }
+
+  /* Beide Gerueste sagen dasselbe, aber nicht mit demselben Satz: Eine
+     Offerte geht an einen Betrieb, der noch keiner ist, eine Rechnung an
+     einen, der es schon ist. */
+  geruestZeigen('of-inhalt', 'Noch nicht gebaut',
+    'Das Gerüst steht. Offerten an künftige Mandanten entstehen hier, sobald '
+    + 'feststeht, was angeboten wird — die Positionen einer Offerte sind die '
+    + 'Preise, und die sind noch nicht entschieden.');
+  geruestZeigen('re-inhalt', 'Noch nicht gebaut',
+    'Das Gerüst steht. Rechnungen an die Mandanten entstehen hier, sobald '
+    + 'entschieden ist, wonach abgerechnet wird — Grundgebühr, Zahl der '
+    + 'Mitarbeitenden oder Einsätze. Davon hängt ab, wie die Daten liegen.');
+
   await ladeMandanten();
   await ladeKonten();
+  /* Zuletzt, aber auf jeder Seite sichtbar: Das Abzeichen am Reiter steht
+     auch dann im Blick, wenn gerade ein anderer Bereich offen ist. */
+  await ladeSupport();
 }
 
 async function abmelden() {
@@ -824,13 +1716,32 @@ $('e-code').onkeydown = e => { if (e.key === 'Enter') anmelden(); };
 $('knopf-zf-start').onclick  = zfStart;
 $('knopf-zf-fertig').onclick = zfFertig;
 $('knopf-zf-weiter').onclick = async () => {
-  zeig($('zf-tor'), false); zeig($('haus'), true); await ladeAlles();
+  zeig($('zf-tor'), false); zeig($('haus'), true);
+  bereichZeigen('uebersicht'); await ladeAlles();
 };
 $('knopf-neu').onclick        = () => formularOeffnen(null);
 $('knopf-speichern').onclick  = mandantSpeichern;
 $('knopf-abbrechen').onclick  = () => zeig($('m-form-karte'), false);
 $('knopf-sup-zu').onclick      = () => zeig($('sup-karte'), false);
+$('knopf-sv-zu').onclick       = () => zeig($('sv-karte'), false);
+$('knopf-sv-senden').onclick   = svAntworten;
+$('knopf-sv-arbeit').onclick   = () => svStatus('in_arbeit');
+$('knopf-sv-erledigt').onclick = () => svStatus('erledigt');
+$('knopf-sv-neu').onclick      = () => { svNurOffen = true;  ladeSupport(); };
+$('knopf-sv-alle').onclick     = () => { svNurOffen = false; ladeSupport(); };
 $('knopf-abmelden').onclick   = abmelden;
+$('btn-thema').onclick        = themaUm;
+document.querySelectorAll('#kopf-nav .nav-item').forEach(b => {
+  b.onclick = () => bereichZeigen(b.dataset.bereich);
+});
+// Die Schnellzugriff-Knoepfe fuehren in dieselben Bereiche. Sie tragen
+// dasselbe data-Attribut und keinen eigenen Weg -- zwei Wege in denselben
+// Bereich waeren zwei Stellen, die auseinanderlaufen koennen.
+document.querySelectorAll('[data-springe]').forEach(b => {
+  b.onclick = () => bereichZeigen(b.dataset.springe);
+});
+// Den Schalter auf den Stand bringen, den das Vorab-Skript gesetzt hat.
+themaSetzen(document.documentElement.getAttribute('data-thema') || 'hell');
 
 /* Beim Laden: Liegt ein Token in dieser Registerkarte, wird er benutzt.
    Traegt er nicht mehr, faellt die Seite auf die Anmeldung zurueck --

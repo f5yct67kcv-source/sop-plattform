@@ -126,4 +126,11 @@ try {
     // Das Aufraeumen darf die Uebermittlung nicht scheitern lassen.
 }
 
+// Und die abgelaufenen Ereignisfotos gleich mit (ENT-545). Hier und nicht
+// anderswo, weil dieser Endpunkt der Herzschlag des Revierdienstes ist: Er
+// laeuft, solange jemand unterwegs ist. Zwei Aufbewahrungsfristen, zwei
+// Regeln -- aber derselbe Takt, und damit an EINER Stelle nachlesbar,
+// was hier turnusmaessig verschwindet.
+ereignis_fotos_aufraeumen($pdo);
+
 json_response(['status' => 'ok', 'gespeichert' => $gespeichert, 'verworfen' => $verworfen]);

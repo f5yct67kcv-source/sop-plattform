@@ -107,9 +107,19 @@ if ($erprobung) {
 } else {
     pruef('Es gibt eine eigene, hoehere Grenze fuer die Verwaltung',
         PASSWORT_MIN_ADMIN > PASSWORT_MIN);
+    // Die Laenge NICHT ausgeschrieben, sondern aus PASSWORT_MIN geschnitten.
+    // Hier stand bis ENT-533 ein festes 'blauerstuhlam' (13 Zeichen) -- das
+    // trug die Aussage nur solange, wie die Verwaltungsgrenze ueber 13 lag.
+    // Mit 10/12 waeren 13 Zeichen fuer BEIDE genug gewesen, und die Pruefung
+    // waere rot geworden, obwohl die Regel stimmt. Genau die Sorte Pruefung,
+    // die man beim naechsten Mal wegklickt. Ein Passwort von exakt
+    // PASSWORT_MIN Zeichen ist per Definition fuer Mitarbeitende gerade
+    // genug und fuer die Verwaltung gerade zu wenig -- die Aussage haelt bei
+    // jeder Zahl, solange ADMIN groesser ist als MIN.
+    $knapp = substr($wort, 0, PASSWORT_MIN);
     pruef('KRITISCH: was fuer Mitarbeitende reicht, reicht fuer die Verwaltung nicht',
-        passwort_pruefen('blauerstuhlam', 'x', false) === null
-        && passwort_pruefen('blauerstuhlam', 'x', true) !== null);
+        passwort_pruefen($knapp, 'x', false) === null
+        && passwort_pruefen($knapp, 'x', true) !== null);
 }
 pruef('Die Meldung sagt, dass es an der Verwaltung liegt',
     str_contains((string)passwort_pruefen('kurz', 'x', true), 'Verwaltungszugänge'));

@@ -194,11 +194,30 @@ check('KRITISCH: die Entfernung ist richtig gerechnet, nicht geschätzt',
   }));
 
 // ══════════ DER KNOPF IST DER RÜCKFALLWEG (ENT-531) ══════════════════
-// Frueher sperrte der Knopf, solange man zu weit weg war. Seit die
+// Zwei Aenderungen treffen hier aufeinander, und zusammen ergeben sie etwas
+// anderes als jede fuer sich:
+//   ENT-541 klappt nur den naechsten Punkt und den auf, in dessen Bereich
+//           man gerade steht. Zugeklappte Zeilen zeigen keine Knoepfe.
+//   ENT-531 erfasst den Punkt im Bereich von selbst -- er ist erledigt,
+//           bevor irgendein Knopf gebraucht wuerde.
+// Punkt 1 ist darum gar nicht mehr offen (oben geprueft). Punkt 2 rueckt
+// damit auf den Platz des naechsten und steht von selbst offen -- genau so
+// soll es sein: Der eine Punkt, der noch aussteht, zeigt sich.
+check('KRITISCH: der ferne Punkt ist jetzt der nächste und steht offen',
+  await page.evaluate(() => {
+    const z = document.querySelector('#rdListe .rd-zeile.rd-jetzt');
+    return !!z && z.classList.contains('rd-auf') && !!z.querySelector('.rd-ort');
+  }));
+// Frueher sperrte der Knopf hier, solange man zu weit weg war. Seit die
 // Erfassung von selbst laeuft, ist er gar nicht mehr der Normalweg: Solange
 // die Ortung traegt, ist er weg -- und die Zeile sagt, warum.
 check('KRITISCH: solange die Ortung läuft, steht kein Bestätigen-Knopf da',
   await page.evaluate(() => !document.getElementById('rdBtn2')));
+check('Die anderen beiden Wege bleiben — Ersatzscan und "nicht verfügbar"',
+  await page.evaluate(() => {
+    const z = document.querySelector('#rdListe .rd-zeile.rd-jetzt');
+    return !!z && z.querySelectorAll('.rd-akt button').length === 2;
+  }));
 check('KRITISCH: und die Zeile sagt, dass von selbst erfasst wird — kein leerer Platz',
   await page.evaluate(() => {
     const el = document.getElementById('rdAuto2');

@@ -115,22 +115,46 @@ const ERWARTET = (datei, umfeld) =>
   (datei === 'backend/setup.html' || VERWALTUNGSNIVEAU.test(umfeld || ''))
     ? serverMinAdmin : serverMin;
 
+// Jede gefundene Zahl bringt ihren eigenen Sollwert mit, statt dass unten
+// pauschal ERWARTET(datei) gilt. Grund: dashboard.html nennt ZWEI Zahlen in
+// einer Zeile -- "const PW_MIN = 10, PW_MIN_ADMIN = 12;". Bis ENT-533 sah
+// diese Pruefung nur die erste davon; PW_MIN_ADMIN wurde von NICHTS gegen
+// den Server verglichen. Das Cockpit haette also weiter 16 versprechen
+// koennen, waehrend der Server 12 nimmt -- genau der Fehler, gegen den es
+// diese Datei ueberhaupt gibt, nur eine Zeile weiter rechts.
 const zahlen = [];
 for (const datei of [...OBERFLAECHEN, ...NUR_MASKIERT, ...NUR_LAENGE]) {
   const text = readFileSync(`${WURZEL}/${datei}`, 'utf8');
-  // Das Umfeld der Fundstelle entscheidet mit, welches Konto gemeint ist.
-  // Grosszuegig nach hinten: Der Funktionsname, der das Konto benennt, steht
-  // oft mehrere Zeilen ueber der Textstelle.
+  // Das Umfeld der Fundstelle entscheidet mit, welches Konto gemeint ist
+  // (aus dem Betreiber-Zweig). Grosszuegig nach hinten: Der Funktionsname,
+  // der das Konto benennt, steht oft mehrere Zeilen ueber der Textstelle.
   const umfeldVon = i => text.slice(Math.max(0, i - 900), i + 150);
+  // PW_MIN_ADMIN ist die Verwaltungszahl SELBST und braucht kein Umfeld.
+  // Diese Zeile fehlte bis ENT-533: "const PW_MIN" trifft sie nicht (dort
+  // folgt ein "_" statt "="), und in dashboard.html stehen beide Zahlen in
+  // EINER Zeile -- das Cockpit haette also weiter 16 versprechen koennen,
+  // waehrend der Server 12 nimmt. Genau der Fehler, gegen den es diese Datei
+  // gibt, nur eine Zeile weiter rechts.
+  for (const m of text.matchAll(/PW_MIN_ADMIN\s*=\s*(\d+)/g))              { zahlen.push([datei, 'PW_MIN_ADMIN', +m[1], serverMinAdmin]); }
   // Sowohl die Konstante als auch jeder Text, der dem Nutzer eine Zahl nennt.
-  for (const m of text.matchAll(/const PW_MIN\s*=\s*(\d+)/g))              { zahlen.push([datei, 'PW_MIN', +m[1], umfeldVon(m.index)]); }
-  for (const m of text.matchAll(/mind(?:\.|estens)?\s+(\d+)\s+Zeichen/g))  { zahlen.push([datei, 'Text', +m[1], umfeldVon(m.index)]); }
-  for (const m of text.matchAll(/min\.\s+(\d+)\s+Zeichen/g))               { zahlen.push([datei, 'Text', +m[1], umfeldVon(m.index)]); }
+  for (const m of text.matchAll(/const PW_MIN\s*=\s*(\d+)/g))              { zahlen.push([datei, 'PW_MIN', +m[1], ERWARTET(datei, umfeldVon(m.index))]); }
+  for (const m of text.matchAll(/mind(?:\.|estens)?\s+(\d+)\s+Zeichen/g))  { zahlen.push([datei, 'Text', +m[1], ERWARTET(datei, umfeldVon(m.index))]); }
+  for (const m of text.matchAll(/min\.\s+(\d+)\s+Zeichen/g))               { zahlen.push([datei, 'Text', +m[1], ERWARTET(datei, umfeldVon(m.index))]); }
 }
-const abweichend = zahlen.filter(([d, , n, u]) => n !== ERWARTET(d, u));
+// Jede gefundene Zahl bringt ihren eigenen Sollwert mit, statt dass pauschal
+// ERWARTET(datei) gilt -- nur so lassen sich die Umfeld-Regel (Betreiber) und
+// die eigene Verwaltungszahl (PW_MIN_ADMIN) nebeneinander pruefen.
+const abweichend = zahlen.filter(([, , n, soll]) => n !== soll);
 check(`KRITISCH: alle Oberflaechen nennen dieselbe Mindestlaenge wie der Server (${serverMin}, Verwaltung ${serverMinAdmin})`,
   abweichend.length === 0);
-abweichend.forEach(([d, art, n, u]) => bad.push(`${d}: ${art} sagt ${n}, der Server verlangt ${ERWARTET(d, u)}`));
+abweichend.forEach(([d, art, n, soll]) => bad.push(`${d}: ${art} sagt ${n}, der Server verlangt ${soll}`));
+
+// Waechter fuer die Verwaltungszahl selbst: Ohne ihn waere oben alles gruen,
+// sobald PW_MIN_ADMIN aus dem Cockpit verschwindet -- eine leere Menge
+// erfuellt jede Bedingung, und die Maske faellt still auf die kuerzere Zahl
+// zurueck.
+check('Das Cockpit kennt die laengere Zahl fuer Verwaltungszugaenge ueberhaupt',
+  zahlen.some(([d, art]) => d === 'dashboard.html' && art === 'PW_MIN_ADMIN'));
 
 // Und die Stelle, die das erste Konto anlegt, muss die Regel ueberhaupt
 // AUFRUFEN. setup.php hatte bis ENT-502 ein eigenes "strlen < 6" -- der

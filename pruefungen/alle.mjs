@@ -26,7 +26,7 @@ import { execFile } from 'child_process';
 import { readdirSync } from 'fs';
 import { cpus } from 'os';
 import { HIER } from './pfade.mjs';
-import { poolLauf, mitWiederholung } from './lauf.mjs';
+import { poolLauf, mitWiederholung, gruende, wackelBericht } from './lauf.mjs';
 
 const argumente = process.argv.slice(2);
 const seriell = argumente.includes('--seriell');
@@ -75,11 +75,6 @@ function starte(name) {
   });
 }
 
-// Zeilen, die erklaeren WAS schiefging -- nicht der ganze Auswurf.
-function gruende(text) {
-  return text.split('\n').filter(z => /✗|FEHLGESCHLAGEN|^\s+- /.test(z)).slice(0, 8);
-}
-
 const start = Date.now();
 console.log(`${suiten.length} Suiten, ${bahnen} ${bahnen === 1 ? 'Bahn' : 'Bahnen'}.\n`);
 
@@ -105,7 +100,15 @@ if (verdaechtig.length) {
     console.log(`  ROT   ${x.name}`);
     gruende(x.ergebnis.text).forEach(z => console.log('        ' + z.trim()));
   });
-  wackelig.forEach(x => console.log(`  gruen ${x} (allein bestanden)`));
+  // Auch beim Wackelkandidaten sagen, WAS gefallen ist -- und zwar aus dem
+  // PARALLELEN Lauf. Der Wiederholungslauf war gruen und hat keine Gruende.
+  // Ohne das nennt der Hinweis unten nur die Suite, nie die Pruefung darin
+  // (OP-527). Die Entscheidung darueber steht in lauf.mjs, damit sie ohne
+  // Browser pruefbar ist.
+  wackelig.forEach(x => {
+    wackelBericht(x, (ergebnisse[suiten.indexOf(x)] || {}).text)
+      .forEach(z => console.log(z));
+  });
 }
 
 const sek = Math.round((Date.now() - start) / 1000);

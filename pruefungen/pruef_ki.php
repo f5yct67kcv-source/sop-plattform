@@ -72,12 +72,26 @@ pruef('KRITISCH: 404 ist eine Frage an den Zugang, kein Programmfehler',
     ki_fehler_einordnen(0, 404, '{"error":{"message":"model: claude-irgendwas"}}') === 'modell_nicht_verfuegbar');
 pruef('KRITISCH: 413 ist eine Groessenfrage, kein Programmfehler',
     ki_fehler_einordnen(0, 413, '') === 'anfrage_zu_gross');
+// Ein Schluessel fuer die ganze Organisation statt fuer einen Workspace: Die
+// Schnittstelle antwortet mit 400, der Rumpf ist aber in Ordnung. Ohne eigenen
+// Grund saehe die Einrichtungsfrage wie ein Programmfehler aus -- genau das ist
+// am 11.09.2026 passiert.
+$wsMeldung = '{"error":{"message":"This API key is not scoped to a workspace, so this request must '
+    . 'include the anthropic-workspace-id header with the ID of the workspace to use."}}';
+pruef('KRITISCH: ein Schluessel ohne Workspace ist eine Einrichtungsfrage, kein Programmfehler',
+    ki_fehler_einordnen(0, 400, $wsMeldung) === 'schluessel_ohne_workspace');
+pruef('KRITISCH: erkannt am Kopfnamen, nicht am Wortlaut der Meldung',
+    ki_fehler_einordnen(0, 400, '{"error":{"message":"anders formuliert, anthropic-workspace-id fehlt"}}')
+        === 'schluessel_ohne_workspace');
+pruef('Ein gewoehnlicher 400 bleibt ein Programmfehler',
+    ki_fehler_einordnen(0, 400, '{"error":{"message":"messages: unexpected role"}}') === 'anfrage_abgelehnt');
 
 // ══════════ VIER SACHVERHALTE, VIER SAETZE ════════════════════════════
 // Die Regel aus CLAUDE.md: "Unbekannt" darf nie wie "keine" aussehen.
 $gruende = ['nicht_eingerichtet', 'schluessel_abgelehnt', 'guthaben_leer', 'zu_viele_anfragen',
     'dienst_gestoert', 'zeit_abgelaufen', 'nicht_erreichbar', 'anfrage_abgelehnt',
-    'inhalt_abgelehnt', 'kein_ergebnis', 'modell_nicht_verfuegbar', 'anfrage_zu_gross'];
+    'inhalt_abgelehnt', 'kein_ergebnis', 'modell_nicht_verfuegbar', 'anfrage_zu_gross',
+    'schluessel_ohne_workspace'];
 
 // Jeder Grund, den die Einordnung ueberhaupt herstellen kann, muss auch einen
 // eigenen Satz haben. Ohne diese Pruefung koennte jemand einen neuen Grund
@@ -88,6 +102,7 @@ foreach ([[0,401],[0,403],[0,429],[0,500],[0,529],[0,402],[0,400],[0,404],[0,413
     $hergestellt[ki_fehler_einordnen($cf, $hc, '')] = true;
 }
 $hergestellt[ki_fehler_einordnen(0, 400, 'your credit balance is too low')] = true;
+$hergestellt[ki_fehler_einordnen(0, 400, 'anthropic-workspace-id')] = true;
 $fehlend = array_diff(array_keys($hergestellt), $gruende);
 pruef('KRITISCH: jeder herstellbare Grund steht in der Satzliste -- keiner faellt still durch',
     $fehlend === []);

@@ -272,7 +272,8 @@ check('KRITISCH: ein zweiter Startversuch derselben, schon laufenden Vorlage zei
 // dort nur noch den Zustand (abgebrochen/abgeschlossen) und ist waehrend der
 // laufenden Runde leer.
 check('KRITISCH: stattdessen wird die bereits laufende Runde fortgesetzt (kein neuer Start)',
-  await laufOffen(page) && (await page.textContent('#rgsZaehler')).includes('/'));
+  // Beide Zahlen, unabhaengig von der Schreibweise des Reiters (ENT-541).
+  await laufOffen(page) && /\d+\D+\d+/.test(await page.textContent('#rgsZaehler')));
 
 spontanerEinsatz = null;
 aktiverSpontanRundgang = null;

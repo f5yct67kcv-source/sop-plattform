@@ -1,40 +1,48 @@
 name: Deploy Rapport-Tool zu Hostpoint
 
-# Zwei Laufzeitumgebungen, EIN Workflow (ENT-341, Variante B): main deployt
-# nach Produktion, staging nach der getrennten Testinstanz. Welches GitHub
-# Environment aktiv ist, entscheidet der REF, gegen den der Lauf ausgeloest
-# wird -- Kopierliste und Platzhalter-Ersetzung bleiben fuer beide identisch,
-# nur die WERTE hinter den Secret-Namen unterscheiden sich (Settings →
-# Environments in GitHub). Das ist der einzige dauerhafte Unterschied
-# zwischen den Umgebungen -- nicht zwei gepflegte Kopien dieses Workflows.
+# DREI Laufzeitumgebungen, EIN Workflow (ENT-341, Variante B; um Demo
+# erweitert mit ENT-523): main deployt nach Produktion, ein qa-*-Tag nach
+# der Staging-Testinstanz, ein demo-*-Tag nach der Demo-Instanz fuer
+# Interessenten. Welches GitHub Environment aktiv ist, entscheidet der
+# REF, gegen den der Lauf ausgeloest wird -- Kopierliste und Platzhalter-
+# Ersetzung bleiben fuer alle drei identisch, nur die WERTE hinter den
+# Secret-Namen unterscheiden sich (Settings → Environments in GitHub).
+# Das ist der einzige dauerhafte Unterschied zwischen den Umgebungen --
+# nicht drei gepflegte Kopien dieses Workflows.
 #
-# Staging-Secrets tragen durchgehend das Praefix STAGING_ und sind EIGENE,
-# von den Produktions-Namen VERSCHIEDENE Secret-Namen -- nicht nur eigene
-# Werte desselben Namens in einem zweiten Environment (verschaerft auf
-# Wunsch des Projektinhabers, nachdem die erste Fassung nur auf getrennte
+# Staging- UND Demo-Secrets tragen durchgehend ein eigenes Praefix
+# (STAGING_ bzw. DEMO_) und sind EIGENE, von den Produktions-Namen UND
+# voneinander VERSCHIEDENE Secret-Namen -- nicht nur eigene Werte
+# desselben Namens in einem eigenen Environment (verschaerft auf Wunsch
+# des Projektinhabers, nachdem die erste Fassung nur auf getrennte
 # Environments gesetzt hatte). Grund: GitHub faellt bei einem fehlenden
 # Environment-Secret still auf ein gleichnamiges Repository-Secret zurueck.
-# Mit identischen Namen in beiden Environments waere ein vergessenes
-# Staging-Secret KEIN Fehler, sondern ein STILLER Rueckgriff auf die
-# produktive Datenbank oder den produktiven FTP-Account -- der Lauf ginge
-# durch, richtete aber moeglicherweise Schaden an der echten Anlage an. Mit
-# eigenen Namen gibt es diesen Rueckfall strukturell nicht: Ein fehlendes
-# STAGING_DB_HOST hat keinen gleichnamigen Ersatz, sondern ist schlicht
-# leer -- und der erste Schritt unten erkennt genau das und bricht den Lauf
-# ab, bevor irgendetwas kopiert oder hochgeladen wird.
+# Mit identischen Namen in mehreren Environments waere ein vergessenes
+# Staging- oder Demo-Secret KEIN Fehler, sondern ein STILLER Rueckgriff
+# auf die produktive Datenbank oder den produktiven FTP-Account -- der
+# Lauf ginge durch, richtete aber moeglicherweise Schaden an der echten
+# Anlage an. Mit eigenen Namen gibt es diesen Rueckfall strukturell nicht:
+# Ein fehlendes STAGING_DB_HOST oder DEMO_DB_HOST hat keinen gleichnamigen
+# Ersatz, sondern ist schlicht leer -- und der erste Schritt unten erkennt
+# genau das und bricht den Lauf ab, bevor irgendetwas kopiert oder
+# hochgeladen wird. Dieselbe Trennung gilt zwischen Staging und Demo
+# UNTEREINANDER (ENT-523-N1): eine Demo-Mail landet nie im
+# Staging-Testpostfach und umgekehrt.
 #
-# Kein dauerhafter Branch "staging" mehr (ENT-372, revidiert ENT-341 Punkt
-# 5): Die neue, vom Projektinhaber als "hoechste Architekturvorgabe"
-# bezeichnete Regel verlangt, dass main alleinige Source of Truth bleibt und
-# kein Staging-spezifischer Code entstehen kann, der spaeter zurueckgemergt
-# werden muesste. Ein beschreibbarer Branch waere genau das -- ein Tag ist
-# es strukturell nicht, es laesst sich kein Commit "auf" einen Tag pushen.
-# main wird deshalb ausschliesslich per Push deployt (immer Production);
-# Staging entsteht ausschliesslich durch einen manuellen "Run workflow"
-# gegen einen Tag der Form qa-JJJJ-MM-TT-NNN, der exakt auf einem
-# bestehenden main-Commit liegt. github.ref_name liefert in diesem Fall den
-# Tag-Namen -- die Umgebungs-Logik weiter unten unterscheidet dadurch
-# unveraendert zwischen main (Production) und allem anderen (Staging).
+# Kein dauerhafter Branch "staging" oder "demo" (ENT-372, revidiert
+# ENT-341 Punkt 5): Die neue, vom Projektinhaber als "hoechste
+# Architekturvorgabe" bezeichnete Regel verlangt, dass main alleinige
+# Source of Truth bleibt und kein umgebungsspezifischer Code entstehen
+# kann, der spaeter zurueckgemergt werden muesste. Ein beschreibbarer
+# Branch waere genau das -- ein Tag ist es strukturell nicht, es laesst
+# sich kein Commit "auf" einen Tag pushen. main wird deshalb
+# ausschliesslich per Push deployt (immer Production); Staging entsteht
+# ausschliesslich durch einen manuellen "Run workflow" gegen einen Tag der
+# Form qa-JJJJ-MM-TT-NNN, Demo ausschliesslich gegen einen Tag der Form
+# demo-JJJJ-MM-TT-NNN, beide exakt auf einem bestehenden main-Commit.
+# github.ref_name liefert in diesem Fall den Tag-Namen -- die
+# Umgebungs-Logik weiter unten unterscheidet dadurch zwischen main
+# (Production), einem qa-*-Tag (Staging) und einem demo-*-Tag (Demo).
 on:
   push:
     branches: [main]
@@ -43,7 +51,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
+    environment: ${{ github.ref_name == 'main' && 'production' || (startsWith(github.ref_name, 'demo-') && 'demo' || 'staging') }}
     steps:
       - uses: actions/checkout@v4
 
@@ -77,6 +85,37 @@ jobs:
           P_SMTP_ABSENDER_NAME: ${{ secrets.SMTP_ABSENDER_NAME }}
           P_ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           P_MAPS_JS_KEY: ${{ secrets.MAPS_JS_KEY }}
+          # Empfaenger der Demo-Anfragen von der Homepage. Stand bis hierher
+          # in der Datenbank (betrieb.email); seit die Homepage auf ihrer
+          # eigenen Domain liegt, gibt es dort keine. Gleiche Regel wie bei
+          # APP_BASIS_URL: aus dem Deploy, nie aus der Anfrage (ENT-501).
+          # NICHT erforderlich -- fehlt der Wert, sagt das Formular
+          # ausdruecklich "noch nicht eingerichtet" (503), statt mit einem
+          # Platzhalter zu arbeiten.
+          P_DEMO_EMPFAENGER: ${{ secrets.DEMO_EMPFAENGER }}
+          # Eigener FTP-Zugang fuer guardops.ch, beschraenkt auf
+          # /home/itufeden/www/guardops.ch. Eigene Secret-NAMEN aus demselben
+          # Grund wie bei Staging (ENT-343 Punkt 1): kein stiller Rueckfall.
+          # NICHT erforderlich -- fehlen sie, wird die Homepage-Domain
+          # uebersprungen und das Rapport-Tool trotzdem ausgeliefert.
+          P_GUARDOPS_FTP_HOST: ${{ secrets.GUARDOPS_FTP_HOST }}
+          P_GUARDOPS_FTP_USER: ${{ secrets.GUARDOPS_FTP_USER }}
+          P_GUARDOPS_FTP_PASSWORD: ${{ secrets.GUARDOPS_FTP_PASSWORD }}
+          # Eigenes Postfach info@guardops.ch fuer die Demo-Anfrage-Mail
+          # (ENT-569/OP-569, sop-projekt), statt sie ueber das mit CUPI 24s
+          # eigenen Kunden-Mails geteilte Produktions-Postfach zu schicken
+          # (ENT-371). Eigene Secret-NAMEN aus demselben Grund wie bei
+          # GUARDOPS_FTP_* und Staging (ENT-343 Punkt 1): kein stiller
+          # Rueckfall auf die geteilten SMTP_*-Werte. NICHT erforderlich --
+          # fehlen sie, bleibt __SMTP_HOST__ im guardops-Buendel unersetzt,
+          # smtp_konfiguriert() erkennt das und das Formular sagt "noch
+          # nicht eingerichtet" (503), statt lautlos ueber das falsche
+          # Postfach zu senden.
+          P_GUARDOPS_SMTP_HOST: ${{ secrets.GUARDOPS_SMTP_HOST }}
+          P_GUARDOPS_SMTP_PORT: ${{ secrets.GUARDOPS_SMTP_PORT }}
+          P_GUARDOPS_SMTP_VERSCHLUESSELUNG: ${{ secrets.GUARDOPS_SMTP_VERSCHLUESSELUNG }}
+          P_GUARDOPS_SMTP_USER: ${{ secrets.GUARDOPS_SMTP_USER }}
+          P_GUARDOPS_SMTP_PASSWORD: ${{ secrets.GUARDOPS_SMTP_PASSWORD }}
           # Staging -- eigene, von Produktion VERSCHIEDENE Secret-Namen.
           S_DB_HOST: ${{ secrets.STAGING_DB_HOST }}
           S_DB_NAME: ${{ secrets.STAGING_DB_NAME }}
@@ -94,21 +133,61 @@ jobs:
           S_SMTP_ABSENDER_NAME: ${{ secrets.STAGING_SMTP_ABSENDER_NAME }}
           S_ANTHROPIC_API_KEY: ${{ secrets.STAGING_ANTHROPIC_API_KEY }}
           S_MAPS_JS_KEY: ${{ secrets.STAGING_MAPS_JS_KEY }}
+          S_DEMO_EMPFAENGER: ${{ secrets.STAGING_DEMO_EMPFAENGER }}
           S_STAGING_TESTMAIL: ${{ secrets.STAGING_TESTMAIL }}
+          # Demo (ENT-523) -- eigene, von Produktion UND Staging
+          # VERSCHIEDENE Secret-Namen, dieselbe Begruendung wie bei S_*
+          # oben. DEMO_ANTHROPIC_API_KEY ist hier -- anders als bei
+          # Produktion und Staging -- ERFORDERLICH: Der Projektinhaber hat
+          # sich bewusst fuer eine aktive KI-Funktion in der Demo
+          # entschieden (ENT-523-N1), nicht fuer die sonst uebliche
+          # "meldet sich selbst als nicht eingerichtet"-Toleranz.
+          D_DB_HOST: ${{ secrets.DEMO_DB_HOST }}
+          D_DB_NAME: ${{ secrets.DEMO_DB_NAME }}
+          D_DB_USER: ${{ secrets.DEMO_DB_USER }}
+          D_DB_PASSWORD: ${{ secrets.DEMO_DB_PASSWORD }}
+          D_HOSTPOINT_FTP_HOST: ${{ secrets.DEMO_HOSTPOINT_FTP_HOST }}
+          D_HOSTPOINT_FTP_USER: ${{ secrets.DEMO_HOSTPOINT_FTP_USER }}
+          D_HOSTPOINT_FTP_PASSWORD: ${{ secrets.DEMO_HOSTPOINT_FTP_PASSWORD }}
+          D_SMTP_HOST: ${{ secrets.DEMO_SMTP_HOST }}
+          D_SMTP_PORT: ${{ secrets.DEMO_SMTP_PORT }}
+          D_SMTP_VERSCHLUESSELUNG: ${{ secrets.DEMO_SMTP_VERSCHLUESSELUNG }}
+          D_SMTP_USER: ${{ secrets.DEMO_SMTP_USER }}
+          D_SMTP_PASSWORD: ${{ secrets.DEMO_SMTP_PASSWORD }}
+          D_SMTP_ABSENDER: ${{ secrets.DEMO_SMTP_ABSENDER }}
+          D_SMTP_ABSENDER_NAME: ${{ secrets.DEMO_SMTP_ABSENDER_NAME }}
+          D_ANTHROPIC_API_KEY: ${{ secrets.DEMO_ANTHROPIC_API_KEY }}
+          D_MAPS_JS_KEY: ${{ secrets.DEMO_MAPS_JS_KEY }}
+          # Testadresse des Demo-Mailmodus (ENT-523-N1, backend/mailer.php).
+          # EIGENES Secret, kein Rueckfall auf STAGING_TESTMAIL -- siehe
+          # Begruendung in smtp_ziel().
+          D_TESTMAIL: ${{ secrets.DEMO_TESTMAIL }}
           # Push-Benachrichtigungen (ENT-424). Eigene, von den
           # Production-Namen VERSCHIEDENE Secret-Namen fuer Staging -- kein
           # struktureller Rueckfall moeglich (ENT-343 Punkt 1). Und
           # ausdruecklich EIGENE WERTE: Ein Schluessel, den sich Staging und
           # Produktion teilen, hiesse, dass ein Testversand auf den echten
-          # Telefonen klingelt.
+          # Telefonen klingelt. Dieselbe Begruendung fuer Demo.
           P_VAPID_PRIVATE_PEM_B64: ${{ secrets.VAPID_PRIVATE_PEM_B64 }}
           P_VAPID_KONTAKT: ${{ secrets.VAPID_KONTAKT }}
           P_PUSH_CRON_SCHLUESSEL: ${{ secrets.PUSH_CRON_SCHLUESSEL }}
           S_VAPID_PRIVATE_PEM_B64: ${{ secrets.STAGING_VAPID_PRIVATE_PEM_B64 }}
           S_VAPID_KONTAKT: ${{ secrets.STAGING_VAPID_KONTAKT }}
           S_PUSH_CRON_SCHLUESSEL: ${{ secrets.STAGING_PUSH_CRON_SCHLUESSEL }}
+          D_VAPID_PRIVATE_PEM_B64: ${{ secrets.DEMO_VAPID_PRIVATE_PEM_B64 }}
+          D_VAPID_KONTAKT: ${{ secrets.DEMO_VAPID_KONTAKT }}
+          D_PUSH_CRON_SCHLUESSEL: ${{ secrets.DEMO_PUSH_CRON_SCHLUESSEL }}
         run: |
           set -euo pipefail
+
+          # Vorab ermitteln, ob der REF ein demo-*-Tag ist (ENT-523) -- eine
+          # einzelne case-Zuweisung statt eines Bash-Musterabgleichs mitten
+          # in der if/elif-Kette, damit die Kette selbst mit reinem POSIX
+          # "[ ]" auskommt, wie der Rest dieses Schritts.
+          case "${{ github.ref_name }}" in
+            demo-*) IST_DEMO_REF=1 ;;
+            *)      IST_DEMO_REF=0 ;;
+          esac
 
           if [ "${{ github.ref_name }}" = "main" ]; then
             UMGEBUNG=production
@@ -123,9 +202,19 @@ jobs:
             EFF_SMTP_ABSENDER="$P_SMTP_ABSENDER"; EFF_SMTP_ABSENDER_NAME="$P_SMTP_ABSENDER_NAME"
             EFF_ANTHROPIC_API_KEY="$P_ANTHROPIC_API_KEY"; EFF_MAPS_JS_KEY="$P_MAPS_JS_KEY"
             EFF_STAGING_TESTMAIL=""
+            EFF_DEMO_TESTMAIL=""
             EFF_VAPID_PRIVATE_PEM_B64="$P_VAPID_PRIVATE_PEM_B64"
             EFF_VAPID_KONTAKT="$P_VAPID_KONTAKT"
             EFF_PUSH_CRON_SCHLUESSEL="$P_PUSH_CRON_SCHLUESSEL"
+            EFF_DEMO_EMPFAENGER="$P_DEMO_EMPFAENGER"
+            EFF_GUARDOPS_FTP_HOST="$P_GUARDOPS_FTP_HOST"
+            EFF_GUARDOPS_FTP_USER="$P_GUARDOPS_FTP_USER"
+            EFF_GUARDOPS_FTP_PASSWORD="$P_GUARDOPS_FTP_PASSWORD"
+            EFF_GUARDOPS_SMTP_HOST="$P_GUARDOPS_SMTP_HOST"
+            EFF_GUARDOPS_SMTP_PORT="$P_GUARDOPS_SMTP_PORT"
+            EFF_GUARDOPS_SMTP_VERSCHLUESSELUNG="$P_GUARDOPS_SMTP_VERSCHLUESSELUNG"
+            EFF_GUARDOPS_SMTP_USER="$P_GUARDOPS_SMTP_USER"
+            EFF_GUARDOPS_SMTP_PASSWORD="$P_GUARDOPS_SMTP_PASSWORD"
             # Eigene Adresse der Anlage (ENT-501). Sie steckt in jedem Link,
             # den der Server per E-Mail verschickt -- Passwort zuruecksetzen,
             # Portalzugang, Beleg. Bis ENT-501 kam sie aus dem Host-Kopf DER
@@ -155,6 +244,70 @@ jobs:
             [ -z "$EFF_HOSTPOINT_FTP_USER" ]     && PFLICHT_FEHLT="$PFLICHT_FEHLT HOSTPOINT_FTP_USER"
             [ -z "$EFF_HOSTPOINT_FTP_PASSWORD" ] && PFLICHT_FEHLT="$PFLICHT_FEHLT HOSTPOINT_FTP_PASSWORD"
             [ -z "$EFF_MAPS_JS_KEY" ]            && PFLICHT_FEHLT="$PFLICHT_FEHLT MAPS_JS_KEY"
+          elif [ "$IST_DEMO_REF" = "1" ]; then
+            UMGEBUNG=demo
+            EFF_DB_HOST="$D_DB_HOST"; EFF_DB_NAME="$D_DB_NAME"
+            EFF_DB_USER="$D_DB_USER"; EFF_DB_PASSWORD="$D_DB_PASSWORD"
+            EFF_HOSTPOINT_FTP_HOST="$D_HOSTPOINT_FTP_HOST"
+            EFF_HOSTPOINT_FTP_USER="$D_HOSTPOINT_FTP_USER"
+            EFF_HOSTPOINT_FTP_PASSWORD="$D_HOSTPOINT_FTP_PASSWORD"
+            EFF_SMTP_HOST="$D_SMTP_HOST"; EFF_SMTP_PORT="$D_SMTP_PORT"
+            EFF_SMTP_VERSCHLUESSELUNG="$D_SMTP_VERSCHLUESSELUNG"
+            EFF_SMTP_USER="$D_SMTP_USER"; EFF_SMTP_PASSWORD="$D_SMTP_PASSWORD"
+            EFF_SMTP_ABSENDER="$D_SMTP_ABSENDER"; EFF_SMTP_ABSENDER_NAME="$D_SMTP_ABSENDER_NAME"
+            EFF_ANTHROPIC_API_KEY="$D_ANTHROPIC_API_KEY"; EFF_MAPS_JS_KEY="$D_MAPS_JS_KEY"
+            # KEIN Rueckfall auf die Staging-Testadresse -- eigene Demo-
+            # Testadresse, eigenes Secret (siehe smtp_ziel() in mailer.php).
+            EFF_STAGING_TESTMAIL=""
+            EFF_DEMO_TESTMAIL="$D_TESTMAIL"
+            EFF_VAPID_PRIVATE_PEM_B64="$D_VAPID_PRIVATE_PEM_B64"
+            EFF_VAPID_KONTAKT="$D_VAPID_KONTAKT"
+            EFF_PUSH_CRON_SCHLUESSEL="$D_PUSH_CRON_SCHLUESSEL"
+            # Der Empfaenger der Demo-ANFRAGEN von der guardops.ch-Homepage
+            # (ENT-563) -- eine andere Sache als diese Demo-UMGEBUNG (ENT-523),
+            # nur der Name ist sich zufaellig aehnlich. Die Demo-Umgebung
+            # betreibt kein eigenes Kontaktformular; leer, aus demselben Grund
+            # wie EFF_GUARDOPS_FTP_* gleich hier drunter und im Staging-Zweig
+            # weiter unten.
+            EFF_DEMO_EMPFAENGER=""
+            # guardops.ch ist die ECHTE Verkaufsdomain, nur fuer Production
+            # gedacht (siehe Pruefung "beide guardops-Schritte laufen nur auf
+            # Production" in test_deploy.mjs). Leer, kein Rueckfall auf die
+            # Production-Werte -- dieselbe Begruendung wie im Staging-Zweig.
+            EFF_GUARDOPS_FTP_HOST=""
+            EFF_GUARDOPS_FTP_USER=""
+            EFF_GUARDOPS_FTP_PASSWORD=""
+            # Eigenes SMTP-Postfach info@guardops.ch der Demo-Anfrage-Mail
+            # (ENT-570) -- wie EFF_GUARDOPS_FTP_* zwei Zeilen darueber nur fuer
+            # Production gedacht, dieselbe Begruendung.
+            EFF_GUARDOPS_SMTP_HOST=""
+            EFF_GUARDOPS_SMTP_PORT=""
+            EFF_GUARDOPS_SMTP_VERSCHLUESSELUNG=""
+            EFF_GUARDOPS_SMTP_USER=""
+            EFF_GUARDOPS_SMTP_PASSWORD=""
+            # Eigene Adresse (ENT-501), siehe Begruendung im Production-Zweig.
+            # Fuer Demo steht die Domain als Environment-Variable DEMO_DOMAIN
+            # bereit -- dieselbe, mit der der Verifikationsschritt weiter
+            # unten die Seite abruft. KEIN Rueckfall auf die produktive
+            # Adresse, aus demselben Grund wie bei Staging.
+            EFF_APP_BASIS_URL=""
+            if [ -n "${{ vars.DEMO_DOMAIN }}" ]; then
+              EFF_APP_BASIS_URL="https://${{ vars.DEMO_DOMAIN }}"
+            fi
+
+            PFLICHT_FEHLT=""
+            [ -z "$EFF_DB_HOST" ]                && PFLICHT_FEHLT="$PFLICHT_FEHLT DEMO_DB_HOST"
+            [ -z "$EFF_DB_NAME" ]                && PFLICHT_FEHLT="$PFLICHT_FEHLT DEMO_DB_NAME"
+            [ -z "$EFF_DB_USER" ]                && PFLICHT_FEHLT="$PFLICHT_FEHLT DEMO_DB_USER"
+            [ -z "$EFF_DB_PASSWORD" ]            && PFLICHT_FEHLT="$PFLICHT_FEHLT DEMO_DB_PASSWORD"
+            [ -z "$EFF_HOSTPOINT_FTP_HOST" ]     && PFLICHT_FEHLT="$PFLICHT_FEHLT DEMO_HOSTPOINT_FTP_HOST"
+            [ -z "$EFF_HOSTPOINT_FTP_USER" ]     && PFLICHT_FEHLT="$PFLICHT_FEHLT DEMO_HOSTPOINT_FTP_USER"
+            [ -z "$EFF_HOSTPOINT_FTP_PASSWORD" ] && PFLICHT_FEHLT="$PFLICHT_FEHLT DEMO_HOSTPOINT_FTP_PASSWORD"
+            [ -z "$EFF_MAPS_JS_KEY" ]            && PFLICHT_FEHLT="$PFLICHT_FEHLT DEMO_MAPS_JS_KEY"
+            # Anders als bei Production/Staging: hier ERFORDERLICH
+            # (ENT-523-N1 -- die KI-Funktion soll in der Demo aktiv sein,
+            # kein "meldet sich selbst als nicht eingerichtet").
+            [ -z "$EFF_ANTHROPIC_API_KEY" ]      && PFLICHT_FEHLT="$PFLICHT_FEHLT DEMO_ANTHROPIC_API_KEY"
           else
             UMGEBUNG=staging
             EFF_DB_HOST="$S_DB_HOST"; EFF_DB_NAME="$S_DB_NAME"
@@ -168,9 +321,28 @@ jobs:
             EFF_SMTP_ABSENDER="$S_SMTP_ABSENDER"; EFF_SMTP_ABSENDER_NAME="$S_SMTP_ABSENDER_NAME"
             EFF_ANTHROPIC_API_KEY="$S_ANTHROPIC_API_KEY"; EFF_MAPS_JS_KEY="$S_MAPS_JS_KEY"
             EFF_STAGING_TESTMAIL="$S_STAGING_TESTMAIL"
+            # Kein Rueckfall auf die Demo-Testadresse -- Staging und Demo
+            # teilen sich keine Mailziele (ENT-523-N1).
+            EFF_DEMO_TESTMAIL=""
             EFF_VAPID_PRIVATE_PEM_B64="$S_VAPID_PRIVATE_PEM_B64"
             EFF_VAPID_KONTAKT="$S_VAPID_KONTAKT"
             EFF_PUSH_CRON_SCHLUESSEL="$S_PUSH_CRON_SCHLUESSEL"
+            EFF_DEMO_EMPFAENGER="$S_DEMO_EMPFAENGER"
+            # guardops.ch ist die ECHTE Verkaufsdomain. Ein Staging-Lauf hat
+            # dort nichts verloren -- darum hier leer und KEIN Rueckfall auf
+            # die Production-Werte. Der Schritt unten ueberspringt sich damit
+            # von selbst.
+            EFF_GUARDOPS_FTP_HOST=""
+            EFF_GUARDOPS_FTP_USER=""
+            EFF_GUARDOPS_FTP_PASSWORD=""
+            # Dasselbe gilt fuer das eigene SMTP-Postfach von guardops.ch --
+            # ein Staging-Lauf baut das guardops-Buendel ohnehin nie (siehe
+            # Schritt unten), diese Zeilen sind nur die Absicherung dazu.
+            EFF_GUARDOPS_SMTP_HOST=""
+            EFF_GUARDOPS_SMTP_PORT=""
+            EFF_GUARDOPS_SMTP_VERSCHLUESSELUNG=""
+            EFF_GUARDOPS_SMTP_USER=""
+            EFF_GUARDOPS_SMTP_PASSWORD=""
             # Eigene Adresse (ENT-501), siehe Begruendung im Production-Zweig.
             # Fuer Staging steht die Domain bereits als Environment-Variable
             # STAGING_DOMAIN bereit -- dieselbe, mit der die beiden
@@ -212,8 +384,28 @@ jobs:
             esac
           fi
 
+          # Dieselbe Absicherung fuer Demo (ENT-523): Ohne diese Pruefung
+          # wuerde ein Dispatch gegen IRGENDEINEN Ref mit einem Namen der
+          # NICHT "main" ist und NICHT mit "qa-" beginnt automatisch als
+          # UMGEBUNG=demo durchgehen (siehe if/elif/else oben) -- auch ein
+          # x-beliebiger Feature-Branch. Das GitHub-Environment "demo" soll
+          # diese Pruefung zusaetzlich extern erzwingen (Settings →
+          # Environments → demo → Deployment branches and tags, Muster
+          # demo-*), sobald es eingerichtet ist.
+          if [ "$UMGEBUNG" = "demo" ]; then
+            case "${{ github.ref_name }}" in
+              demo-*) ;;
+              *) echo "::error::Demo-Deploy abgebrochen -- Ref '${{ github.ref_name }}' ist kein demo-*-Tag (ENT-523). Demo deployt ausschliesslich gegen einen Tag der Form demo-JJJJ-MM-TT-NNN, nie gegen einen Branch."
+                 exit 1 ;;
+            esac
+          fi
+
           # Drift-Guard fuer die manuell bei Hostpoint gepflegten Staging-Dateien
-          # (ENT-384, erweitert ENT-387): Der Passwortschutz verwaltet sich
+          # (ENT-384, erweitert ENT-387; Demo braucht diesen Guard bewusst
+          # NICHT -- ENT-523-N1: Demo traegt keinen Passwortschutz, darum
+          # gibt es nichts manuell bei Hostpoint zu pflegen. Die Demo-.htaccess
+          # inklusive X-Robots-Tag entsteht vollstaendig aus dem Repository,
+          # siehe htaccess-demo-zusatz weiter unten). Der Passwortschutz verwaltet sich
           # selbst oberhalb der Markierung "#@__HCP_END__@#" in der dortigen
           # .htaccess; unterhalb davon stehen von Hand die Inhalte von
           # htaccess-hostpoint UND htaccess-staging-zusatz (X-Robots-Tag),
@@ -279,10 +471,20 @@ jobs:
             echo "EFF_ANTHROPIC_API_KEY=$EFF_ANTHROPIC_API_KEY"
             echo "EFF_MAPS_JS_KEY=$EFF_MAPS_JS_KEY"
             echo "EFF_STAGING_TESTMAIL=$EFF_STAGING_TESTMAIL"
+            echo "EFF_DEMO_TESTMAIL=$EFF_DEMO_TESTMAIL"
             echo "EFF_VAPID_PRIVATE_PEM_B64=$EFF_VAPID_PRIVATE_PEM_B64"
             echo "EFF_VAPID_KONTAKT=$EFF_VAPID_KONTAKT"
             echo "EFF_PUSH_CRON_SCHLUESSEL=$EFF_PUSH_CRON_SCHLUESSEL"
             echo "EFF_APP_BASIS_URL=$EFF_APP_BASIS_URL"
+            echo "EFF_DEMO_EMPFAENGER=$EFF_DEMO_EMPFAENGER"
+            echo "EFF_GUARDOPS_FTP_HOST=$EFF_GUARDOPS_FTP_HOST"
+            echo "EFF_GUARDOPS_FTP_USER=$EFF_GUARDOPS_FTP_USER"
+            echo "EFF_GUARDOPS_FTP_PASSWORD=$EFF_GUARDOPS_FTP_PASSWORD"
+            echo "EFF_GUARDOPS_SMTP_HOST=$EFF_GUARDOPS_SMTP_HOST"
+            echo "EFF_GUARDOPS_SMTP_PORT=$EFF_GUARDOPS_SMTP_PORT"
+            echo "EFF_GUARDOPS_SMTP_VERSCHLUESSELUNG=$EFF_GUARDOPS_SMTP_VERSCHLUESSELUNG"
+            echo "EFF_GUARDOPS_SMTP_USER=$EFF_GUARDOPS_SMTP_USER"
+            echo "EFF_GUARDOPS_SMTP_PASSWORD=$EFF_GUARDOPS_SMTP_PASSWORD"
           } >> "$GITHUB_ENV"
 
           # Mehrzeiliger Wert -- eigener Heredoc-Block statt einer einfachen
@@ -296,7 +498,7 @@ jobs:
 
       - name: Platzhalter durch echte Werte ersetzen
         run: |
-          mkdir -p dist/api dist/icons dist/fonts dist/img
+          mkdir -p dist/api dist/icons dist/fonts dist/img dist/handbuch
           cp index.html dist/index.html
           cp dashboard.html dist/dashboard.html
           cp app.html dist/app.html
@@ -305,12 +507,15 @@ jobs:
           # Mitarbeiter-Code, also kann von dort auch nichts versehentlich
           # an einen Kunden geraten.
           cp portal.html dist/portal.html
-          # Oeffentliche Homepage (ENT-469). Eigene Seite ohne jeden
-          # Produktcode -- sie laedt weder gav.js noch eine Sitzung; ihre
-          # einzige Verbindung zum Server ist das Demo-Formular
-          # (api/demo_senden.php). Bewusst NICHT index.html: Die Wurzel
-          # bleibt die Erfassung der Mitarbeitenden (Startadresse der PWA).
-          cp homepage.html dist/homepage.html
+          # KEINE homepage.html MEHR AUF DIESER INSTANZ (ENT-563/OP-565).
+          # Die oeffentliche Seite lebt seit guardops.ch dort, und zwar als
+          # index.html auf der Wurzel. Zweimal dieselbe Seite unter zwei
+          # Adressen waere doppelter Inhalt, und die Testadresse soll gar
+          # nicht gefunden werden. Der Upload raeumt sein Zielverzeichnis
+          # auf -- die Datei verschwindet vom Server also von selbst, sobald
+          # diese Zeile fehlt. Das Buendel fuer guardops.ch baut sie weiter
+          # (siehe weiter unten); test_deploy.mjs achtet darauf, dass sie
+          # hier NICHT zurueckkehrt.
           # Betreiber-Bereich (ENT-519 bis ENT-521). Eigene Seite neben
           # dashboard.html und portal.html, mit eigener Anmeldung gegen die
           # betreiber_*-Endpunkte. Sie traegt weder Cockpit- noch
@@ -401,10 +606,26 @@ jobs:
           # api/betreiber_support.php -- und nie direkt aufgerufen; steht
           # darum auch in der Sperrliste der .htaccess.
           cp backend/support.php dist/support.php
+          # Supportvorgaenge (ENT-538). Die Gegenstuecke sind die Endpunkte
+          # support_anfrage.php (Kundenseite) und
+          # betreiber_support_vorgang.php (Vorrat) -- die kommen ueber
+          # backend/api/*.php mit.
+          cp backend/supportvorgang.php dist/supportvorgang.php
           # Pruefung und Mailtext der Demo-Anfrage (ENT-469), eingebunden
           # von api/demo_senden.php -- steht darum auch in der Sperrliste.
           # Der ENDPUNKT heisst bewusst anders: gleicher Name hiesse mitgesperrt.
           cp backend/demo_anfrage.php dist/demo_anfrage.php
+          # Musterbetrieb-Erzeugung fuer die Demo-Umgebung (ENT-523),
+          # eingebunden von api/demo_daten_erzeugen.php -- steht darum auch
+          # in der Sperrliste. Wird fuer ALLE Umgebungen mitkopiert wie
+          # jede andere Backend-Datei; require_demo_umgebung() im Endpunkt
+          # sorgt dafuer, dass ein Aufruf ausserhalb der Demo 404 liefert,
+          # nicht die Datei-Sperrliste allein.
+          cp backend/demo_daten.php dist/demo_daten.php
+          # Bremse des Demo-Formulars (dateibasiert, keine Datenbank). Sie
+          # steht wie jede Hilfsdatei in der Sperrliste von htaccess-hostpoint
+          # -- test_php.mjs gleicht beides gegeneinander ab.
+          cp backend/demo_bremse.php dist/demo_bremse.php
           cp backend/ai.php dist/ai.php
           cp backend/planung.php dist/planung.php
           cp backend/kunden.php dist/kunden.php
@@ -431,13 +652,34 @@ jobs:
           cp backend/push.php dist/push.php
           # Schutzeinstellungen (ENT-075). Im Repository heisst die Datei
           # bewusst ohne fuehrenden Punkt -- sonst uebersieht man sie. Wird
-          # trotzdem fuer BEIDE Umgebungen hier erzeugt (auch wenn der
+          # trotzdem fuer ALLE Umgebungen hier erzeugt (auch wenn der
           # FTP-Schritt unten sie fuer Staging von Upload/Loeschung
           # ausschliesst, ENT-384) -- so bleibt dieser Schritt umgebungs-
           # unabhaengig, und ein spaeteres Aendern der Ausschluss-Regel
           # bringt hier nichts durcheinander.
           cp htaccess-hostpoint dist/.htaccess
+          # Demo-Zusatz (ENT-523, X-Robots-Tag): ANDERS als bei Staging
+          # automatisch angehaengt statt manuell bei Hostpoint gepflegt --
+          # Demo traegt keinen Passwortschutz-Block, der ueberschrieben
+          # werden koennte (ENT-523-N1), darum gibt es keinen Grund, die
+          # Demo-.htaccess vom automatischen Deploy auszunehmen. Kein
+          # Drift-Guard noetig: Was hier steht, kommt bei jedem Deploy
+          # frisch aus dem Repository.
+          if [ "$UMGEBUNG" = "demo" ]; then
+            cat htaccess-demo-zusatz >> dist/.htaccess
+            cp robots-demo.txt dist/robots.txt
+          fi
           cp backend/api/*.php dist/api/
+          # Handbuch (Nachschlagewerk fuers Cockpit, rollenunabhaengig hinter
+          # einem eigenen Zugangs-Ticket, siehe handbuch/_guard.php und
+          # backend/api/handbuch_ticket.php). Bleibt als eigener Unterordner
+          # erhalten -- anders als backend/, das oben abgeflacht in dist/
+          # landet. handbuch/_guard.php erreicht db.php darum ueber
+          # '../db.php' (dist/handbuch/../db.php = dist/db.php), nicht ueber
+          # '../backend/db.php' wie im rohen Repository.
+          cp handbuch/*.php dist/handbuch/
+          cp handbuch/*.css dist/handbuch/
+          cp handbuch/*.js dist/handbuch/
           # setup.php / setup.html bewusst NICHT hier -- Ersteinrichtung ist ein
           # einmaliger manueller Upload, damit die Datei nicht bei jedem Push
           # automatisch neu auf den Server kommt.
@@ -487,6 +729,12 @@ jobs:
           sed -i "s|__SMTP_PASSWORD__|$EFF_SMTP_PASSWORD|g" dist/mailer.php
           sed -i "s|__SMTP_ABSENDER__|$EFF_SMTP_ABSENDER|g" dist/mailer.php
           sed -i "s|__SMTP_ABSENDER_NAME__|$EFF_SMTP_ABSENDER_NAME|g" dist/mailer.php
+          # Empfaenger der Demo-Anfragen. Fehlt das Secret, bleibt der
+          # Platzhalter stehen -- demo_empfaenger_pruefen() erkennt ihn und
+          # liefert null, das Formular sagt dann "noch nicht eingerichtet"
+          # (503) statt an eine Unsinn-Adresse zu senden. Gleiche Bauart wie
+          # basis_url_pruefen() (ENT-501).
+          sed -i "s|__DEMO_EMPFAENGER__|$EFF_DEMO_EMPFAENGER|g" dist/demo_anfrage.php
           # Staging-Mailmodus (ENT-341): Ausserhalb der Produktion leitet
           # mailer.php JEDE Mail auf diese Adresse um -- unabhaengig davon,
           # ueber welches Postfach (siehe SMTP_* oben) sie verschickt wird.
@@ -497,6 +745,11 @@ jobs:
           # ist unschaedlich: ist_produktion() ist dort wahr, smtp_ziel()
           # fragt die Testadresse in diesem Zweig gar nicht erst ab.
           sed -i "s|__STAGING_TESTMAIL__|$EFF_STAGING_TESTMAIL|g" dist/mailer.php
+          # Demo-Mailmodus (ENT-523-N1): dieselbe Bauart wie
+          # __STAGING_TESTMAIL__ oben, aber eine EIGENE Adresse -- Demo und
+          # Staging teilen kein Mailziel (siehe smtp_ziel() in mailer.php).
+          # Fuer main und fuer Staging ist EFF_DEMO_TESTMAIL bewusst leer.
+          sed -i "s|__DEMO_TESTMAIL__|$EFF_DEMO_TESTMAIL|g" dist/mailer.php
           # Google-Maps-Browserschluessel (ENT-341): eigener Schluessel je
           # Umgebung, in ALLEN Oberflaechen, die die Karte laden -- seit
           # ENT-474 auch im Kundenportal (Weg waehrend der Runde, hinter
@@ -542,6 +795,20 @@ jobs:
           }
           EOF
 
+      # Dieselbe Nachvollziehbarkeit fuer Demo (ENT-523): welcher Tag/Commit
+      # laeuft gerade auf der Demo-Instanz. Kein externer QA-Runner liest
+      # das (anders als bei Staging, ENT-435) -- der Nutzen ist rein
+      # betrieblich, beim Nachsehen vor einer Vorfuehrung.
+      - name: demo-version.json erzeugen (nur Demo)
+        if: ${{ env.UMGEBUNG == 'demo' }}
+        run: |
+          cat > dist/demo-version.json << EOF
+          {
+            "demo_tag": "${{ github.ref_name }}",
+            "commit_sha": "${{ github.sha }}"
+          }
+          EOF
+
       - name: Nach Hostpoint hochladen (FTPS)
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
@@ -582,6 +849,148 @@ jobs:
       # (z. B. ein eigener, produktiver Auth-Mechanismus) waere kein Nachweis
       # fuer DIESEN Schutz. Netzwerkfehler und Timeouts zaehlen ausdruecklich
       # als Fehlschlag, nicht als "nicht pruefbar, also ok".
+      # ══════════ DIE HOMEPAGE AUF IHRER EIGENEN DOMAIN ══════════════════
+      #
+      # guardops.ch liegt bei Hostpoint unter /home/itufeden/www/guardops.ch
+      # -- NEBEN /home/itufeden/www/rapport, nicht darin. Der aufraeumende
+      # Upload oben kommt dort also nicht hin, und dieser hier nicht ans
+      # Rapport-Tool. Beide FTP-Zugaenge sind von Hostpoint auf ihr eigenes
+      # Verzeichnis beschraenkt; eigene Secret-NAMEN aus demselben Grund wie
+      # bei Staging (ENT-343 Punkt 1).
+      #
+      # NUR PRODUCTION: Ein Staging-Lauf hat auf der echten Verkaufsdomain
+      # nichts verloren -- der Staging-Zweig oben setzt EFF_GUARDOPS_FTP_HOST
+      # deshalb ausdruecklich leer, ohne Rueckfall.
+      #
+      # UEBERSPRINGT SICH, SOLANGE DIE SECRETS FEHLEN -- und sagt das dann
+      # auch (Schritt darunter). Der Deploy des Rapport-Tools darf nicht rot
+      # werden, nur weil die Homepage-Domain noch nicht eingerichtet ist;
+      # lautlos ausfallen darf er aber ebenso wenig.
+      - name: Homepage-Buendel fuer guardops.ch bauen
+        if: ${{ env.UMGEBUNG == 'production' && env.EFF_GUARDOPS_FTP_HOST != '' }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist-guardops/api dist-guardops/icons dist-guardops/fonts
+
+          # Auf der eigenen Domain gehoert die Homepage auf "/", nicht auf
+          # "/homepage.html" -- darum hier index.html.
+          cp homepage.html dist-guardops/index.html
+
+          # Schriften: dieselben vier, die homepage.html per CSS-url() holt.
+          # Fehlt eine, faellt sie live lautlos auf den System-Stapel zurueck
+          # und lokal faellt es NICHT auf -- derselbe Fallstrick wie beim
+          # Rapport-Tool. test_deploy.mjs gleicht diese Liste gegen die
+          # tatsaechlich in homepage.html benutzten Dateien ab.
+          # Die Lizenzen muessen die Schriften begleiten (SIL OFL 1.1).
+          cp fonts/archivo-variable-latin.woff2   dist-guardops/fonts/
+          cp fonts/plex-sans-variable-latin.woff2 dist-guardops/fonts/
+          cp fonts/plex-mono-400-latin.woff2      dist-guardops/fonts/
+          cp fonts/plex-mono-500-latin.woff2      dist-guardops/fonts/
+          cp fonts/archivo-OFL.txt                dist-guardops/fonts/
+          cp fonts/ibm-plex-LICENSE.txt           dist-guardops/fonts/
+          cp icons/guardops-*.png                 dist-guardops/icons/
+
+          # Der Endpunkt und seine vier Einbindungen. KEIN anmeldung.php und
+          # kein Produktcode -- die Seite hat mit dem Rapport-Tool nichts zu
+          # tun ausser diesem einen Formular.
+          cp backend/api/demo_senden.php dist-guardops/api/demo_senden.php
+          cp backend/db.php              dist-guardops/db.php
+          cp backend/mailer.php          dist-guardops/mailer.php
+          cp backend/demo_anfrage.php    dist-guardops/demo_anfrage.php
+          cp backend/demo_bremse.php     dist-guardops/demo_bremse.php
+          # Rechtsseiten (OP-564). Beide teilen sich recht.css -- zweimal
+          # derselbe Stil inline hiesse, dass beim naechsten Farbwechsel
+          # eine von beiden vergessen wird. test_deploy.mjs leitet aus den
+          # Seiten ab, welche Stilblaetter und Schriften mitmuessen.
+          cp impressum.html              dist-guardops/impressum.html
+          cp datenschutz.html            dist-guardops/datenschutz.html
+          cp recht.css                   dist-guardops/recht.css
+          cp htaccess-guardops           dist-guardops/.htaccess
+          cp robots-guardops.txt         dist-guardops/robots.txt
+
+          # HIER STEHEN ABSICHTLICH KEINE DATENBANK-ZUGANGSDATEN. db.php wird
+          # frisch aus backend/ kopiert und bekommt NUR APP_ENV -- die
+          # __DB_*__-Platzhalter bleiben stehen. db() ist traege und wird von
+          # diesem Endpunkt nie aufgerufen; wuerde es je jemand tun, scheitert
+          # es laut an einem unbrauchbaren DSN, statt sich still zu verbinden.
+          # Die Zugangsdaten der produktiven Datenbank liegen damit an genau
+          # einer Stelle statt an zweien.
+          sed -i "s|__APP_ENV__|$UMGEBUNG|g" dist-guardops/db.php
+
+          # EIGENES POSTFACH, NICHT DAS GETEILTE PRODUKTIONS-POSTFACH
+          # (ENT-569/OP-569, sop-projekt). Bis hierher bekam mailer.php in
+          # diesem Buendel dieselben EFF_SMTP_*-Werte wie das Rapport-Tool --
+          # dasselbe Postfach, das CUPI 24s eigene Kunden-Mails verschickt
+          # (ENT-371). Die Demo-Anfrage-Mail geht aber an den Betreiber
+          # selbst und soll erkennbar UND beantwortbar als GuardOpS laufen.
+          # Host/Port/Verschluesselung/Benutzer/Passwort kommen darum aus
+          # EFF_GUARDOPS_SMTP_* (eigene Secret-Namen, kein stiller Rueckfall,
+          # ENT-343 Punkt 1); sind sie leer (Secrets noch nicht angelegt),
+          # bleibt __SMTP_HOST__ als Platzhalter stehen, smtp_konfiguriert()
+          # erkennt das und das Formular sagt "noch nicht eingerichtet"
+          # (503) -- kein Versand ueber die falsche Kennung.
+          #
+          # Absenderadresse und -name sind HIER bewusst feste Literale statt
+          # eines Secrets: info@guardops.ch und "GuardOpS" sind die oeffent-
+          # lich beworbene Adresse und Marke, keine Zugangsdaten (gleiche
+          # Einordnung wie bei APP_BASIS_URL, ENT-501). Gelten unabhaengig
+          # davon, ob die GUARDOPS_SMTP_*-Secrets schon gesetzt sind -- das
+          # allein sendet noch keine Mail, siehe smtp_konfiguriert() oben.
+          sed -i "s|__SMTP_HOST__|$EFF_GUARDOPS_SMTP_HOST|g"               dist-guardops/mailer.php
+          sed -i "s|__SMTP_PORT__|$EFF_GUARDOPS_SMTP_PORT|g"               dist-guardops/mailer.php
+          sed -i "s|__SMTP_VERSCHLUESSELUNG__|$EFF_GUARDOPS_SMTP_VERSCHLUESSELUNG|g" dist-guardops/mailer.php
+          sed -i "s|__SMTP_USER__|$EFF_GUARDOPS_SMTP_USER|g"               dist-guardops/mailer.php
+          sed -i "s|__SMTP_PASSWORD__|$EFF_GUARDOPS_SMTP_PASSWORD|g"       dist-guardops/mailer.php
+          sed -i "s|__SMTP_ABSENDER__|info@guardops.ch|g"                 dist-guardops/mailer.php
+          sed -i "s|__SMTP_ABSENDER_NAME__|GuardOpS|g"                    dist-guardops/mailer.php
+          sed -i "s|__STAGING_TESTMAIL__||g"                              dist-guardops/mailer.php
+          # Dieselbe Ueberlegung wie bei __STAGING_TESTMAIL__ direkt darueber:
+          # guardops.ch laeuft ausschliesslich als Production (siehe Pruefung
+          # weiter unten), smtp_ziel() fragt die Demo-Testadresse also nie ab
+          # -- der Platzhalter bleibt sonst woertlich stehen, weil dieser
+          # Bauschritt aelter ist als __DEMO_TESTMAIL__ in mailer.php
+          # (ENT-523, erst mit diesem Merge zusammengefuehrt).
+          sed -i "s|__DEMO_TESTMAIL__||g"                                 dist-guardops/mailer.php
+          sed -i "s|__DEMO_EMPFAENGER__|$EFF_DEMO_EMPFAENGER|g"           dist-guardops/demo_anfrage.php
+
+          # Kein uebersehener Platzhalter darf hochgeladen werden. Erlaubt
+          # bleiben genau die zwei Familien, die HIER absichtlich stehen:
+          # __DB_*__ (siehe oben) und __APP_BASIS_URL__ -- basis_url_pruefen()
+          # erkennt den stehengebliebenen Platzhalter und liefert null, die
+          # Demo-Mail enthaelt ohnehin keinen Link auf die eigene Anlage.
+          UEBRIG=$(grep -rhos '__[A-Z_]\{3,\}__' dist-guardops/ \
+                   | grep -v -e '^__DB_' -e '^__APP_BASIS_URL__$' -e '^__DIR__$' \
+                   | sort -u || true)
+          if [ -n "$UEBRIG" ]; then
+            echo "::error::Nicht ersetzte Platzhalter im guardops-Buendel: $UEBRIG"
+            exit 1
+          fi
+
+          echo "Buendel fuer guardops.ch:"
+          find dist-guardops -type f | sort
+
+      - name: Homepage nach guardops.ch hochladen (FTPS)
+        if: ${{ env.UMGEBUNG == 'production' && env.EFF_GUARDOPS_FTP_HOST != '' }}
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ env.EFF_GUARDOPS_FTP_HOST }}
+          username: ${{ env.EFF_GUARDOPS_FTP_USER }}
+          password: ${{ env.EFF_GUARDOPS_FTP_PASSWORD }}
+          protocol: ftps
+          local-dir: ./dist-guardops/
+          # Der Zugang ist von Hostpoint auf /home/itufeden/www/guardops.ch
+          # beschraenkt -- daher "/", nicht der volle Pfad. Genau wie beim
+          # Upload des Rapport-Tools weiter oben.
+          server-dir: /
+
+      # "NICHT EINGERICHTET" DARF NICHT WIE "NICHTS ZU TUN" AUSSEHEN: Ohne
+      # diesen Schritt waere ein Deploy ohne GUARDOPS_FTP_*-Secrets von einem
+      # erfolgreichen Homepage-Deploy im Protokoll nicht zu unterscheiden.
+      - name: Hinweis, wenn guardops.ch noch nicht eingerichtet ist
+        if: ${{ env.UMGEBUNG == 'production' && env.EFF_GUARDOPS_FTP_HOST == '' }}
+        run: |
+          echo "::notice::guardops.ch wurde NICHT beliefert -- die Secrets GUARDOPS_FTP_HOST/USER/PASSWORD fehlen im Environment production. Das Rapport-Tool ist davon nicht betroffen und wurde regulaer ausgeliefert."
+
       - name: Staging-Passwortschutz verifizieren
         if: ${{ env.UMGEBUNG == 'staging' }}
         run: |
@@ -663,3 +1072,53 @@ jobs:
             exit 1
           fi
           echo "Staging-Suchmaschinenausschluss verifiziert (X-Robots-Tag: noindex auf '/', robots.txt mit User-agent:*/Disallow:/ erreichbar)."
+
+      # Dieselbe zweite Schutzschicht fuer Demo (ENT-523) -- ANDERS als bei
+      # Staging OHNE Basic-Auth-Zugangsdaten: Die Demo hat keinen
+      # Passwortschutz (ENT-523-N1), ein unauthentifizierter Abruf ist hier
+      # also ein echter Nachweis, kein Artefakt eines "Require valid-user".
+      # Dieselben Waechter wie bei Staging gegen einen falschen Nachweis:
+      # kein -L/--location (ein Redirect auf einen fremden Host darf nie
+      # als Erfolg durchgehen), kein -k/--insecure (TLS wird regulaer
+      # geprueft), Netzwerkfehler/Timeout zaehlen als Fehlschlag.
+      - name: Demo-Suchmaschinenausschluss verifizieren (X-Robots-Tag, robots.txt)
+        if: ${{ env.UMGEBUNG == 'demo' }}
+        run: |
+          set -uo pipefail
+          if [ -z "${{ vars.DEMO_DOMAIN }}" ]; then
+            echo "::error::Demo-Deploy abgebrochen -- Environment-Variable DEMO_DOMAIN fehlt, der Suchmaschinenausschluss kann ohne sie nicht verifiziert werden (ENT-523)."
+            exit 1
+          fi
+
+          ROOT=$(curl -sS -D - -o /dev/null --max-time 15 --connect-timeout 10 "https://${{ vars.DEMO_DOMAIN }}/" 2>&1)
+          if [ $? -ne 0 ]; then
+            echo "::error::Suchmaschinenausschluss-Pruefung fehlgeschlagen (DNS-/TLS-/Netzwerkfehler oder Timeout beim Abruf von https://${{ vars.DEMO_DOMAIN }}/): $ROOT"
+            exit 1
+          fi
+          if ! echo "$ROOT" | head -1 | grep -qE '^HTTP/[0-9.]+ 200'; then
+            echo "::error::Demo-Startseite nicht erreichbar -- erwartet HTTP 200 auf '/', tatsaechliche Antwortzeile: $(echo "$ROOT" | head -1)"
+            exit 1
+          fi
+          if ! echo "$ROOT" | grep -qi '^X-Robots-Tag:.*noindex'; then
+            echo "::error::X-Robots-Tag fehlt oder enthaelt kein 'noindex' auf der Demo-Startseite. Kopfzeilen: $ROOT"
+            exit 1
+          fi
+
+          ROBOTS=$(curl -sS -D - --max-time 15 --connect-timeout 10 "https://${{ vars.DEMO_DOMAIN }}/robots.txt" 2>&1)
+          if [ $? -ne 0 ]; then
+            echo "::error::Suchmaschinenausschluss-Pruefung fehlgeschlagen (DNS-/TLS-/Netzwerkfehler oder Timeout beim Abruf von https://${{ vars.DEMO_DOMAIN }}/robots.txt): $ROBOTS"
+            exit 1
+          fi
+          if ! echo "$ROBOTS" | head -1 | grep -qE '^HTTP/[0-9.]+ 200'; then
+            echo "::error::robots.txt auf Demo nicht erreichbar -- erwartet HTTP 200, tatsaechliche Antwortzeile: $(echo "$ROBOTS" | head -1)"
+            exit 1
+          fi
+          if ! echo "$ROBOTS" | grep -qE '^User-agent:[[:space:]]*\*'; then
+            echo "::error::robots.txt-Inhalt unvollstaendig -- 'User-agent: *' nicht gefunden. Antwort: $ROBOTS"
+            exit 1
+          fi
+          if ! echo "$ROBOTS" | grep -qE '^Disallow:[[:space:]]*/[[:space:]]*$'; then
+            echo "::error::robots.txt-Inhalt unvollstaendig -- 'Disallow: /' nicht gefunden. Antwort: $ROBOTS"
+            exit 1
+          fi
+          echo "Demo-Suchmaschinenausschluss verifiziert (X-Robots-Tag: noindex auf '/', robots.txt mit User-agent:*/Disallow:/ erreichbar)."

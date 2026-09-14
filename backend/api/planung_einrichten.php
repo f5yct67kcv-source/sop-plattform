@@ -578,6 +578,32 @@ CREATE TABLE IF NOT EXISTS kunden_kontaktweg (
   FOREIGN KEY (mitarbeiter_id) REFERENCES mitarbeiter(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+// Zugangs-Ticket fuers Cockpit-Handbuch (statische Seiten unter handbuch/,
+// ausserhalb von backend/api/). Dieselbe Bauart wie passwort_reset oben --
+// SHA-256-Hash, nicht der Rohwert, dieselbe Begruendung (256 Bit Zufall
+// brauchen kein Salz, dafuer einen direkten indizierten Treffer).
+//
+// EIGENES Ticket statt Weiterreichen des echten Sitzungs-Tokens: Das
+// Handbuch ist statischer Text ohne vertrauliche Inhalte (Entscheid des
+// Projektinhabers) -- ein Leck hier darf nie die volle Sitzung eines
+// Verwaltungszugangs preisgeben. Das Ticket steht als HttpOnly-Cookie,
+// Pfad /handbuch/, nie in der Adresszeile (ENT-075: dort landet ein Token
+// in Server-Protokollen, Verlauf und ueber die Schulter mitgelesen).
+//
+// mitarbeiter_id nur fuer die Nachvollziehbarkeit, nicht fuer die Pruefung
+// selbst -- die laeuft allein ueber den Hash-Treffer mit gueltigem
+// laeuft_ab, wie bei passwort_reset.
+'handbuch_ticket' => "CREATE TABLE handbuch_ticket (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  mitarbeiter_id INT NOT NULL,
+  token_hash CHAR(64) NOT NULL,
+  erstellt_am DATETIME DEFAULT CURRENT_TIMESTAMP,
+  laeuft_ab DATETIME NOT NULL,
+  UNIQUE KEY uq_token (token_hash),
+  KEY idx_person (mitarbeiter_id),
+  FOREIGN KEY (mitarbeiter_id) REFERENCES mitarbeiter(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
 // Die Rollen selbst (ENT-440). Bis dahin standen sie ausschliesslich im
 // Code; seit ENT-440 gibt es neben den fuenf gesperrten SYSTEMROLLEN eigene
 // Profile. `system = 1` heisst: von hier gesaet, nicht aenderbar und nicht
@@ -901,6 +927,10 @@ CREATE TABLE IF NOT EXISTS kunden_kontaktweg (
   bemerkung TEXT NULL,
   foto LONGBLOB NULL,
   foto_mime VARCHAR(50) NULL,
+  -- Wann das Foto wegen der Aufbewahrungsfrist entfernt wurde (ENT-545).
+  -- Ohne diese Spalte saehe eine Meldung nach 90 Tagen aus wie eine, zu der
+  -- nie jemand ein Foto gemacht hat.
+  foto_geloescht_am DATETIME NULL,
   lat DECIMAL(10,7) NULL,
   lng DECIMAL(10,7) NULL,
   KEY idx_objekt (objekt_id, erfasst_am),
@@ -2581,6 +2611,11 @@ $spalten = [
     // Dasselbe fuer Vorfallmeldungen (ENT-297): Sie erscheinen im Feed und
     // muessen sich dort abhaken lassen wie alles andere auch.
     ['ereignis_meldung', 'gesehen_am', 'ALTER TABLE ereignis_meldung ADD COLUMN gesehen_am DATETIME NULL'],
+    // Aufbewahrungsfrist fuer Ereignisfotos (ENT-545): Nach 90 Tagen wird das
+    // Bild entfernt, die Meldung bleibt. Der Zeitpunkt haelt fest, DASS es
+    // eines gab -- „geloescht" und „gab es nie" duerfen nicht gleich aussehen.
+    ['ereignis_meldung', 'foto_geloescht_am',
+     'ALTER TABLE ereignis_meldung ADD COLUMN foto_geloescht_am DATETIME NULL'],
 
     // Explizite Berechtigung "macht Revierdienst" (ENT-284) -- ersetzt die
     // bisherige Herleitung aus der Schicht-Historie (ENT-234) als einzige
