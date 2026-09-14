@@ -33,16 +33,16 @@
       </ul>
       <div class="hb-gruppe">Cockpit</div>
       <ul class="hb-nav">
-        <li><a href="planung.php">Planung</a></li>
-        <li><a href="kunden.php">Kunden</a></li>
+        <li><a href="hb-planung.php">Planung</a></li>
+        <li><a href="hb-kunden.php">Kunden</a></li>
         <li><a href="personal.php" class="aktiv">Personal</a></li>
-        <li><a href="lohn.php">Lohn</a></li>
+        <li><a href="hb-lohn.php">Lohn</a></li>
         <li><a href="abgleich.php">Abgleich</a></li>
         <li><a href="betrieb.php">Betrieb</a></li>
       </ul>
       <div class="hb-gruppe">Weitere Oberflächen</div>
       <ul class="hb-nav">
-        <li><a href="kundenportal.php">Kundenportal</a></li>
+        <li><a href="hb-kundenportal.php">Kundenportal</a></li>
       </ul>
       <div class="hb-gruppe">Nachschlagen</div>
       <ul class="hb-nav">
