@@ -114,6 +114,16 @@ function smtp_absender_name(string $konfiguriert, bool $produktion): string
     return $konfiguriert === '' ? '[STAGING]' : '[STAGING] ' . $konfiguriert;
 }
 
+// Effektiver Absendername fuer EINEN Versand: $absenderNameFest ueberschreibt
+// das Secret, wenn gesetzt -- Begruendung siehe Kommentar bei smtp_senden().
+// Eigene, reine Funktion statt der Entscheidung inline in smtp_senden(),
+// damit sie ohne Socket mit frei gewaehlten Werten pruefbar ist -- gleiche
+// Bauart wie smtp_absender_name() und smtp_ziel() oben.
+function smtp_absender_name_effektiv(?string $absenderNameFest, bool $produktion): string
+{
+    return smtp_absender_name($absenderNameFest ?? '__SMTP_ABSENDER_NAME__', $produktion);
+}
+
 function smtp_lesen($fp): string
 {
     $antwort = '';
@@ -158,8 +168,16 @@ function smtp_befehl($fp, string $befehl, array $erwarteteCodes): string
    Ohne Anhang bleibt der Aufbau EXAKT wie bisher -- der Offert-Versand
    (ENT-192) laeuft produktiv und soll von dieser Erweiterung nichts
    merken. */
+/* $absenderNameFest (optional): ueberschreibt das SMTP_ABSENDER_NAME-Secret
+   fuer GENAU DIESEN Versand. Grund: Dasselbe Secret beschriftet auch die
+   Offert-Mails, die CUPI 24 als Mandantin an IHRE eigenen Kunden verschickt
+   (ENT-192) -- dort muss "Cupi 24 GmbH" stehen bleiben. Die Demo-Anfrage-
+   Mail von guardops.ch (api/demo_senden.php) geht dagegen an den Betreiber
+   selbst und muss als GuardOpS erkennbar sein, unabhaengig davon, was im
+   geteilten Secret steht. null (Default) laesst jeden bestehenden Aufrufer
+   unveraendert -- das Secret gilt weiter wie bisher. */
 function smtp_senden(string $anEmail, string $anName, string $betreff, string $html, string $text,
-                     array $anhaenge = []): void
+                     array $anhaenge = [], ?string $absenderNameFest = null): void
 {
     if (!smtp_konfiguriert()) {
         throw new RuntimeException('Der E-Mail-Versand ist noch nicht eingerichtet (SMTP-Zugangsdaten fehlen).');
@@ -226,7 +244,7 @@ function smtp_senden(string $anEmail, string $anName, string $betreff, string $h
     $user = '__SMTP_USER__';
     $pass = '__SMTP_PASSWORD__';
     $absenderEmail = smtp_absender_adresse();
-    $absenderName = smtp_absender_name('__SMTP_ABSENDER_NAME__', $produktion);
+    $absenderName = smtp_absender_name_effektiv($absenderNameFest, $produktion);
 
     $transport = $verschluesselung === 'ssl' ? 'ssl://' : '';
     $ctx = stream_context_create(['ssl' => ['verify_peer' => true, 'verify_peer_name' => true]]);

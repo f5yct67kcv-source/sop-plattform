@@ -188,6 +188,32 @@ pruef('KRITISCH: keine zwei Antworten tragen denselben Text',
     count($texte[1]) >= 6 && count($texte[1]) === count(array_unique($texte[1])));
 pruef('Der Versand wird nur versucht, wenn SMTP eingerichtet ist',
     strpos($q, 'smtp_konfiguriert()') < strpos($q, 'smtp_senden('));
+// Absendername der Betreiber-Mail: fest "GuardOpS", NICHT das geteilte
+// SMTP_ABSENDER_NAME-Secret (das beschriftet daneben die Offert-Mails an
+// CUPI-24-eigene Kunden, ENT-192 -- dort muss "Cupi 24 GmbH" stehen
+// bleiben). Der Betreff der Statement-Klammer wird ueber ";" begrenzt,
+// damit die Pruefung nicht versehentlich in die naechste Anweisung laeuft.
+pruef('KRITISCH: die Betreiber-Mail traegt einen festen Absendernamen "GuardOpS" -- nicht das mit den Kundenmails geteilte SMTP_ABSENDER_NAME-Secret',
+    (bool)preg_match('/smtp_senden\([^;]*absenderNameFest:\s*\'GuardOpS\'[^;]*\)/', $q));
+
+// ══════════ KEIN AUSREISSER: absenderNameFest bleibt EXKLUSIV hier ═════
+// Das Argument existiert nur, damit DIESE eine Mail (an den Betreiber
+// selbst) unabhaengig vom geteilten Secret als GuardOpS erkennbar ist.
+// Tauchte es in einem anderen Aufrufer auf, liefe dort echte Kundenpost
+// ploetzlich unter einem falschen Absender.
+// mailer.php ist die Definitionsstelle (Parameter + Doku) und bewusst
+// ausgenommen -- gesucht werden ANDERE Aufrufer von smtp_senden(...), die
+// das Argument ebenfalls setzen.
+$ausreisser = [];
+foreach (array_merge(glob(__DIR__ . '/../backend/*.php') ?: [],
+                      glob(__DIR__ . '/../backend/api/*.php') ?: []) as $datei) {
+    if (in_array(basename($datei), ['demo_senden.php', 'mailer.php'], true)) { continue; }
+    if (str_contains((string)file_get_contents($datei), 'absenderNameFest')) {
+        $ausreisser[] = basename($datei);
+    }
+}
+pruef('KRITISCH: absenderNameFest wird NUR von demo_senden.php benutzt -- ' . implode(', ', $ausreisser),
+    $ausreisser === []);
 
 // ══════════ AUSGABE ══════════════════════════════════════════════════
 echo "\n$ok bestanden, " . count($bad) . " nicht bestanden\n";
