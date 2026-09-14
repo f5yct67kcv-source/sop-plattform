@@ -277,6 +277,14 @@ jobs:
             EFF_GUARDOPS_FTP_HOST=""
             EFF_GUARDOPS_FTP_USER=""
             EFF_GUARDOPS_FTP_PASSWORD=""
+            # Eigenes SMTP-Postfach info@guardops.ch der Demo-Anfrage-Mail
+            # (ENT-570) -- wie EFF_GUARDOPS_FTP_* zwei Zeilen darueber nur fuer
+            # Production gedacht, dieselbe Begruendung.
+            EFF_GUARDOPS_SMTP_HOST=""
+            EFF_GUARDOPS_SMTP_PORT=""
+            EFF_GUARDOPS_SMTP_VERSCHLUESSELUNG=""
+            EFF_GUARDOPS_SMTP_USER=""
+            EFF_GUARDOPS_SMTP_PASSWORD=""
             # Eigene Adresse (ENT-501), siehe Begruendung im Production-Zweig.
             # Fuer Demo steht die Domain als Environment-Variable DEMO_DOMAIN
             # bereit -- dieselbe, mit der der Verifikationsschritt weiter
