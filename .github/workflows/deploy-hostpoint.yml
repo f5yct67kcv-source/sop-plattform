@@ -362,7 +362,7 @@ jobs:
 
       - name: Platzhalter durch echte Werte ersetzen
         run: |
-          mkdir -p dist/api dist/icons dist/fonts dist/img
+          mkdir -p dist/api dist/icons dist/fonts dist/img dist/handbuch
           cp index.html dist/index.html
           cp dashboard.html dist/dashboard.html
           cp app.html dist/app.html
@@ -516,6 +516,16 @@ jobs:
           # bringt hier nichts durcheinander.
           cp htaccess-hostpoint dist/.htaccess
           cp backend/api/*.php dist/api/
+          # Handbuch (Nachschlagewerk fuers Cockpit, rollenunabhaengig hinter
+          # einem eigenen Zugangs-Ticket, siehe handbuch/_guard.php und
+          # backend/api/handbuch_ticket.php). Bleibt als eigener Unterordner
+          # erhalten -- anders als backend/, das oben abgeflacht in dist/
+          # landet. handbuch/_guard.php erreicht db.php darum ueber
+          # '../db.php' (dist/handbuch/../db.php = dist/db.php), nicht ueber
+          # '../backend/db.php' wie im rohen Repository.
+          cp handbuch/*.php dist/handbuch/
+          cp handbuch/*.css dist/handbuch/
+          cp handbuch/*.js dist/handbuch/
           # setup.php / setup.html bewusst NICHT hier -- Ersteinrichtung ist ein
           # einmaliger manueller Upload, damit die Datei nicht bei jedem Push
           # automatisch neu auf den Server kommt.
