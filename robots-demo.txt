@@ -1,0 +1,5 @@
+# Demo-only (ENT-523) -- nicht fuer Production. Vom Demo-Deploy automatisch
+# als robots.txt ausgeliefert (anders als robots-staging.txt: kein
+# manueller Hostpoint-Schritt, siehe htaccess-demo-zusatz).
+User-agent: *
+Disallow: /

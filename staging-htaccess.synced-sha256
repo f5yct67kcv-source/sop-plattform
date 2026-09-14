@@ -77,14 +77,26 @@
 #      Funktionsdefinitionen und gibt bei direktem Aufruf nichts aus;
 #      Staging liegt zusaetzlich hinter der Basic-Auth-Schicht (ENT-384).
 #
-#  (g) demo_bremse.php in die FilesMatch-Sperre aufgenommen (2026-09-13).
+#  (g) demo_daten.php in die FilesMatch-Sperre aufgenommen (ENT-523,
+#      2026-09-12). Der Musterbetrieb-Erzeugungskern fuer die Demo-Umgebung
+#      wird ausschliesslich von api/demo_daten_erzeugen.php eingebunden und
+#      nie direkt aufgerufen -- dieselbe Begruendung wie bei (d), (e) und
+#      (f). Auch dieser Hash ist dem manuellen Nachtrag vorausgeeilt, aus
+#      demselben Grund wie (a), (c), (d), (e) und (f). STEHT AUS. Staging
+#      betreibt ohnehin keine Demo-Umgebung -- require_demo_umgebung() in
+#      demo_daten_erzeugen.php liefert dort so oder so 404 --, trotzdem
+#      enthaelt demo_daten.php selbst wie die anderen Faelle ausschliesslich
+#      Funktionsdefinitionen und gibt bei direktem Aufruf nichts aus;
+#      Staging liegt zusaetzlich hinter der Basic-Auth-Schicht (ENT-384).
+#
+#  (h) demo_bremse.php in die FilesMatch-Sperre aufgenommen (2026-09-13).
 #      Die dateibasierte Bremse des Demo-Formulars ersetzt dort die
 #      MySQL-Anmeldebremse, weil die Homepage auf ihrer eigenen Domain
 #      (guardops.ch) ohne Datenbank laeuft. Sie wird nur von
 #      api/demo_senden.php eingebunden und nie direkt aufgerufen --
 #      dieselbe Begruendung wie bei (d), (e) und (f). Auch dieser Hash ist
 #      dem manuellen Nachtrag vorausgeeilt, aus demselben Grund wie (a),
-#      (c) bis (f). STEHT AUS. Die Datei enthaelt ausschliesslich
+#      (c) bis (g). STEHT AUS. Die Datei enthaelt ausschliesslich
 #      Funktionsdefinitionen und gibt bei direktem Aufruf nichts aus;
 #      Staging liegt zusaetzlich hinter der Basic-Auth-Schicht (ENT-384).
 #
@@ -98,6 +110,6 @@
 # von #@__HCP_END__@#). Danach diesen Absatz loeschen -- er ist der einzige
 # Hinweis darauf, dass der Hash dem Nachtrag vorausgeeilt ist.
 
-htaccess-hostpoint:b11c01a1d3f31854a07c49d05130f784df3d61cbd8c8f6e2a9cb5a65eaf9b62d
+htaccess-hostpoint:45ea75e0483c92b457c0920cb4b3432f51df7b06c868840955e175c3c047e0ed
 htaccess-staging-zusatz:7b6df04b9fd9decbeb68442a6080b3e39c384e31d59273e53f938549c8e26208
 robots-staging.txt:e120f27381f482e2de05b11355c7d1818e8266d282cec8cf04bc8b33916e7583
