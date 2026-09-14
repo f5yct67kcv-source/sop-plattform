@@ -80,17 +80,6 @@ check('KRITISCH (ENT-371 Bedingung 4): ausserhalb der Produktion traegt der Abse
 check('KRITISCH: ein leerer Absendername bleibt ausserhalb der Produktion trotzdem als Staging erkennbar',
     smtp_absender_name('', false) === '[STAGING]');
 
-// smtp_absender_name_effektiv() -- Absender-Ueberschreibung je Versand
-// (guardops.ch-Demo-Mail, siehe mailer.php/demo_senden.php). Das
-// SMTP_ABSENDER_NAME-Secret beschriftet daneben weiterhin die Offert-Mails
-// an CUPI-24-eigene Kunden -- die Ueberschreibung darf das NICHT beruehren.
-check('KRITISCH: ohne Ueberschreibung (null) bleibt weiterhin das konfigurierte Secret massgeblich',
-    smtp_absender_name_effektiv(null, true) === '__SMTP_ABSENDER_NAME__');
-check('KRITISCH: mit Ueberschreibung wird das Secret ignoriert -- der feste Name gilt',
-    smtp_absender_name_effektiv('GuardOpS', true) === 'GuardOpS');
-check('KRITISCH: die Ueberschreibung bleibt ausserhalb der Produktion ebenfalls als Staging erkennbar (ENT-371 Bedingung 4 gilt auch hier)',
-    smtp_absender_name_effektiv('GuardOpS', false) === '[STAGING] GuardOpS');
-
 echo "\n" . $ok . ' bestanden, ' . count($bad) . " nicht bestanden\n";
 if ($bad) { foreach ($bad as $b) { echo '  x ' . $b . "\n"; } exit(1); }
 echo "Alle Pruefungen bestanden.\n";

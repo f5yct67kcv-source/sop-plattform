@@ -642,6 +642,39 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     && /secrets\.GUARDOPS_FTP_HOST/.test(workflow)
     && !/EFF_HOSTPOINT_FTP/.test(laden));
 
+  // Eigenes Postfach fuer die Demo-Mail (ENT-569/OP-569, sop-projekt):
+  // getrennt vom Produktions-Postfach, das auch CUPI 24s eigene Kunden-
+  // Mails verschickt (ENT-371). Dieselbe Lehre wie beim FTP-Zugang oben --
+  // eigene Secret-NAMEN, kein stiller Rueckfall (ENT-343 Punkt 1).
+  check('KRITISCH: guardops.ch benutzt ein eigenes SMTP-Postfach, nicht das mit CUPI 24s Kunden-Mails geteilte Produktions-Postfach',
+    /__SMTP_HOST__\|\$EFF_GUARDOPS_SMTP_HOST\|g"\s+dist-guardops\/mailer\.php/.test(bauen)
+    && /__SMTP_PORT__\|\$EFF_GUARDOPS_SMTP_PORT\|g"\s+dist-guardops\/mailer\.php/.test(bauen)
+    && /__SMTP_VERSCHLUESSELUNG__\|\$EFF_GUARDOPS_SMTP_VERSCHLUESSELUNG\|g"\s+dist-guardops\/mailer\.php/.test(bauen)
+    && /__SMTP_USER__\|\$EFF_GUARDOPS_SMTP_USER\|g"\s+dist-guardops\/mailer\.php/.test(bauen)
+    && /__SMTP_PASSWORD__\|\$EFF_GUARDOPS_SMTP_PASSWORD\|g"\s+dist-guardops\/mailer\.php/.test(bauen)
+    && /secrets\.GUARDOPS_SMTP_HOST/.test(workflow)
+    && !/EFF_SMTP_HOST/.test(bauen) && !/EFF_SMTP_PASSWORD/.test(bauen));
+
+  // Absenderadresse und -name sind hier feste Literale, kein Secret --
+  // info@guardops.ch und "GuardOpS" sind oeffentlich, keine Zugangsdaten
+  // (gleiche Einordnung wie bei APP_BASIS_URL, ENT-501).
+  check('KRITISCH: Absenderadresse und -name der Demo-Mail sind info@guardops.ch / GuardOpS, fest und nicht aus einem Secret',
+    /__SMTP_ABSENDER__\|info@guardops\.ch\|g"\s+dist-guardops\/mailer\.php/.test(bauen)
+    && /__SMTP_ABSENDER_NAME__\|GuardOpS\|g"\s+dist-guardops\/mailer\.php/.test(bauen));
+
+  // Das Rapport-Tool selbst bleibt unberuehrt: sein Buendel (dist/) traegt
+  // weiterhin die geteilten Produktions-Werte -- sonst zeigten CUPI 24s
+  // eigene Offert-Mails ploetzlich den falschen Absender.
+  check('KRITISCH: das Rapport-Tool-Buendel (dist/) behaelt seine eigene, unveraenderte SMTP-Identitaet',
+    /__SMTP_ABSENDER__\|\$EFF_SMTP_ABSENDER\|g"\s+dist\/mailer\.php/.test(workflow)
+    && /__SMTP_ABSENDER_NAME__\|\$EFF_SMTP_ABSENDER_NAME\|g"\s+dist\/mailer\.php/.test(workflow));
+
+  // Fehlen die Secrets, soll der Deploy NICHT abbrechen -- dieselbe Regel
+  // wie bei DEMO_EMPFAENGER und GUARDOPS_FTP_*: smtp_konfiguriert() meldet
+  // "nicht eingerichtet" (503), statt den ganzen Lauf rot zu faerben.
+  check('Fehlende GUARDOPS_SMTP_*-Secrets lassen den Deploy NICHT scheitern',
+    !/PFLICHT_FEHLT="\$PFLICHT_FEHLT GUARDOPS_SMTP/.test(workflow));
+
   // Ein Staging-Lauf hat auf der echten Verkaufsdomain nichts verloren.
   check('KRITISCH: beide guardops-Schritte laufen nur auf Production und nur mit vorhandenem Secret',
     [bauen, laden].every(st =>

@@ -88,14 +88,8 @@ if (!smtp_konfiguriert()) {
 
 $eingang = date('d.m.Y H:i');
 try {
-    // Absendername fest "GuardOpS", NICHT das SMTP_ABSENDER_NAME-Secret:
-    // Dasselbe Secret beschriftet auch die Offert-Mails, die CUPI 24 als
-    // Mandantin an ihre eigenen Kunden verschickt (ENT-192) -- dort muss
-    // "Cupi 24 GmbH" stehen bleiben. Diese Mail hier geht an den Betreiber
-    // selbst und muss als GuardOpS erkennbar sein (siehe mailer.php).
     smtp_senden($empfaenger, '', demo_anfrage_betreff($w),
-        demo_anfrage_html($w, $eingang), demo_anfrage_text($w, $eingang),
-        absenderNameFest: 'GuardOpS');
+        demo_anfrage_html($w, $eingang), demo_anfrage_text($w, $eingang));
 } catch (Throwable $e) {
     json_response(['status' => 'error',
         'message' => 'Die Anfrage konnte nicht übermittelt werden. Bitte versuchen Sie es später noch einmal.'], 502);
