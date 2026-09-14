@@ -683,6 +683,20 @@ if (ohneEinbindung.length) { bad.push('ohne rechte.php: ' + ohneEinbindung.join(
   if (!ohneLeck) { bad.push('betreiber.php: be_tabellen_anlegen() reicht $e->getMessage() durch'); }
 }
 
+// Gleicher Fund, gleiche Datei-uebergreifende Regel: planung_einrichten.php
+// hat denselben Tabellen-Anlegen-Mechanismus wie be_tabellen_anlegen() oben
+// und hatte denselben Treiberfehler-Leak (Security-Audit 2026-09-14).
+{
+  const quelle = readFileSync(`${WURZEL}/backend/api/planung_einrichten.php`, 'utf8');
+  const start = quelle.indexOf('foreach ($tabellen as $name => $sql)');
+  const ende = quelle.indexOf('\n}', start);
+  const block = quelle.slice(start, ende === -1 ? undefined : ende);
+  const ohneLeck = !/\$e->getMessage\(\)/.test(block);
+  check('KRITISCH: planung_einrichten.php gibt den rohen Treiberfehler beim Tabellenanlegen nicht an den Client zurueck',
+    ohneLeck);
+  if (!ohneLeck) { bad.push('planung_einrichten.php: Tabellen-Schleife reicht $e->getMessage() durch'); }
+}
+
 // portal.html: bk.logo (data:-URI aus dem Backend) muss wie jede andere
 // Interpolation ueber esc() laufen, unabhaengig davon, dass die serverseitige
 // MIME-Pruefung aktuell schon schuetzt (Verteidigung in der Tiefe).

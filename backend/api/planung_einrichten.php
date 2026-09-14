@@ -1923,7 +1923,10 @@ foreach ($tabellen as $name => $sql) {
         $pdo->exec($sql);
         $getan[] = "Tabelle $name angelegt";
     } catch (Throwable $e) {
-        $fehler[] = "Tabelle $name — " . $e->getMessage();
+        // Der Treiberfehler kann Verbindungsdetails enthalten und geht nicht
+        // nach aussen -- gleiche Haltung wie in betreiber.php
+        // (Security-Audit 2026-09-14, dort ursprünglich gefunden).
+        $fehler[] = "Tabelle $name konnte nicht angelegt werden.";
     }
 }
 
