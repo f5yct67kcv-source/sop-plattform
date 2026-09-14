@@ -318,8 +318,11 @@ check('Beim Öffnen steht der Reiter "Allgemeines" mit Name/Beschreibung da', aw
 check('KRITISCH: die Reiterleiste ist sichtbar', await page.isVisible('#rdKrReiter'));
 check('KRITISCH: die Beschreibung wird vorbefüllt', (await page.inputValue('#rdKrBeschreibung')) === 'Erste Kontrolle nach Schichtbeginn');
 check('KRITISCH: der Routenpunkte-Reiter zeigt die richtige Anzahl (2)', (await page.textContent('#rdKrRoutenBadge')).trim() === '2');
-check('KRITISCH: der Kontrollpunkte-Reiter zeigt die Anzahl aller Punkte des Objekts (3, inkl. dem noch nicht zugeordneten "Garage")',
-  (await page.textContent('#rdKrKpBadge')).trim() === '3');
+// ENT-554: Der Kontrollpunkte-Reiter zeigt seither dieselbe rundenbezogene
+// Zahl wie "Routenpunkte" (2), nicht mehr die Gesamtzahl aller Objektpunkte
+// (3, inkl. dem an dieser Runde noch nicht zugeordneten "Garage").
+check('KRITISCH: der Kontrollpunkte-Reiter zeigt die Anzahl der DIESER Runde zugeordneten Punkte (2), nicht die Gesamtzahl des Objekts (3, "Garage" zählt nicht mit)',
+  (await page.textContent('#rdKrKpBadge')).trim() === '2');
 check('KRITISCH: der aktive Reiter ist als solcher markiert',
   await page.evaluate(() => document.querySelector('#rdKrReiter .rdkr-tab.aktiv')?.dataset.reiter === 'allgemeines'));
 
