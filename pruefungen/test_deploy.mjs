@@ -22,7 +22,12 @@ const workflow = readFileSync(`${WURZEL}/.github/workflows/deploy-hostpoint.yml`
 // Oberflaeche die Regel nicht, dass jedes geladene Skript auch
 // ausgeliefert wird. Genau die Luecke, die qrcode.js schon einmal aus dem
 // Deploy fallen liess.
-const seiten = ['index.html', 'dashboard.html', 'app.html', 'homepage.html', 'portal.html'];
+// homepage.html steht hier NICHT mehr (ENT-563/OP-565): Sie geht seit
+// guardops.ch nicht mehr nach dist/, sondern nach dist-guardops/. Wer sie
+// in dieser Liste liesse, verlangte eine cp-Zeile nach dist/, die es
+// absichtlich nicht mehr gibt. Ihre Schriften, Icons und Skripte prüft
+// stattdessen der guardops-Block ganz unten -- an derselben Frage.
+const seiten = ['index.html', 'dashboard.html', 'app.html', 'portal.html'];
 
 // Nicht nur die drei bekannten HTML-Huellen: eine oeffentliche PHP-Seite
 // (z. B. beleg_oeffentlich.php, ENT-205) kann ein eigenes <script src>
@@ -178,6 +183,27 @@ const alsGlobPassend = (pfad, zeile) => {
   return new RegExp(`^${muster}$`).test(pfad);
 };
 const kopierteQuellen = [...workflow.matchAll(/^\s*cp\s+(\S+)\s+dist\//gm)].map(m => m[1]);
+
+/* Dasselbe fuer Dateien, die per <link> haengen -- Favicon, Apple-Touch-Icon,
+   das Bild fuer die Teilen-Vorschau (ENT-562). Dieselbe Luecke wie bei den
+   Schriften: Fehlt das Favicon auf dem Server, kracht nichts, der Browser
+   zeigt nur sein leeres Blatt -- und lokal faellt es NICHT auf, weil die
+   Datei im Arbeitsverzeichnis ja liegt. */
+for (const seite of seiten) {
+  const html = readFileSync(`${WURZEL}/${seite}`, 'utf8');
+  const quellen = [
+    ...[...html.matchAll(/<link[^>]+href="([^"]+)"/g)].map(m => m[1]),
+    ...[...html.matchAll(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/g)].map(m => m[1]),
+  ]
+    .filter((q, i, arr) => arr.indexOf(q) === i)
+    .filter(q => !/^(https?:|data:|#)/.test(q))
+    .map(q => q.replace(/^\.?\//, ''));
+  for (const q of quellen) {
+    check(`${seite} verweist auf ${q} — die Datei gibt es`, existsSync(`${WURZEL}/${q}`));
+    check(`KRITISCH: ${q} wird auch deployt (per <link>/og:image von ${seite} verwiesen)`,
+      kopierteQuellen.some(zeile => alsGlobPassend(q, zeile)));
+  }
+}
 
 for (const seite of seiten) {
   const html = readFileSync(`${WURZEL}/${seite}`, 'utf8');
@@ -458,6 +484,232 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
   // Kopplung von Dateinamen UND if-Bedingung im selben Schritt.
   check('KRITISCH: kein anderer, unbedingter Schritt erzeugt dist/qa-version.json ausserhalb des Staging-Zweigs',
     (workflow.match(/>\s*dist\/qa-version\.json/g) ?? []).length === 1);
+}
+
+// ══════════ DIE HOMEPAGE AUF IHRER EIGENEN DOMAIN ════════════════════
+//
+// Seit guardops.ch gibt es ein ZWEITES Bündel (dist-guardops/) mit eigenem
+// FTP-Ziel. Damit gilt hier derselbe Fallstrick noch einmal, und zwar
+// schärfer: Die Homepage liegt dort ALLEIN. Fehlt eine Schrift, ein Icon
+// oder eine der vier Einbindungen des Endpunkts, fällt es lokal NICHT auf --
+// im Arbeitsverzeichnis liegt ja alles da -- und auf der Testinstanz auch
+// nicht, weil deren Bündel vollständig ist.
+//
+// Geprüft wird deshalb nicht gegen eine abgeschriebene Liste, sondern gegen
+// das, was homepage.html und der Endpunkt TATSÄCHLICH laden.
+{
+  const schritt = (name) => {
+    const i = workflow.indexOf(`- name: ${name}`);
+    if (i < 0) { return ''; }
+    const j = workflow.indexOf('\n      - name:', i + 10);
+    return workflow.slice(i, j < 0 ? undefined : j);
+  };
+  const bauen = schritt('Homepage-Buendel fuer guardops.ch bauen');
+  // NUR DIE ECHTEN cp-ZEILEN, nicht der Kommentartext daneben.
+  //
+  // Die erste Fassung dieser Prüfungen fragte "steht der Dateiname irgendwo
+  // im Schritt?". Die Gegenprobe deckte auf, dass das nicht genügt: Nimmt man
+  // die cp-Zeile für recht.css heraus, bleibt der Name im Kommentar darüber
+  // stehen -- und die Prüfung blieb grün, während das Stilblatt live gefehlt
+  // hätte. Genau der Fall, vor dem CLAUDE.md warnt: geprüft wird die Aussage,
+  // nicht der Wortlaut.
+  const cpZeilen = [...bauen.matchAll(/^\s*cp\s+(\S+)\s+(\S+)\s*$/gm)]
+    .map(m => ({ von: m[1], nach: m[2] }));
+  const alsMuster = q => new RegExp('^' + q.split('*')
+    .map(x => x.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('[^/]*') + '$');
+  // Wird diese Quelldatei kopiert? Beherrscht auch "icons/guardops-*.png".
+  const wirdKopiert = pfad => cpZeilen.some(z => alsMuster(z.von).test(pfad));
+  // Landet etwas unter diesem Namen im Bündel?
+  const liegtImBuendel = ziel => cpZeilen.some(z => z.nach === ziel || z.nach === ziel.replace(/[^/]+$/, ''));
+  const laden = schritt('Homepage nach guardops.ch hochladen (FTPS)');
+  const hinweis = schritt('Hinweis, wenn guardops.ch noch nicht eingerichtet ist');
+  const homepage = readFileSync(`${WURZEL}/homepage.html`, 'utf8');
+
+  check('KRITISCH: es gibt einen Schritt, der das Bündel für guardops.ch baut, und einen, der es hochlädt',
+    bauen !== '' && laden !== '');
+
+  // Auf der eigenen Domain gehört die Seite auf "/", nicht auf
+  // "/homepage.html" -- sonst zeigt guardops.ch ins Leere.
+  check('KRITISCH: homepage.html wird als index.html ausgeliefert (die Seite liegt auf der Wurzel der Domain)',
+    cpZeilen.some(z => z.von === 'homepage.html' && z.nach === 'dist-guardops/index.html'));
+
+  // Aus den Dateien abgeleitet, nicht abgeschrieben: jede Schrift, die eine
+  // gebündelte Seite per CSS-url() holt. Seit die Rechtsseiten dazugekommen
+  // sind, ist das nicht mehr nur homepage.html -- recht.css bringt eigene
+  // @font-face-Zeilen mit, und eine davon zu vergessen fiele lokal NICHT auf.
+  const cssQuellen = [...bauen.matchAll(/^\s*cp\s+(\S+\.css)\s+dist-guardops\//gm)].map(m => m[1]);
+  const mitCss = [homepage, ...cssQuellen.map(q => readFileSync(`${WURZEL}/${q}`, 'utf8'))].join('\n');
+  const schriften = [...new Set([...mitCss.matchAll(/url\(['"]?(fonts\/[^)'"]+)/g)].map(m => m[1]))];
+  const fehlendeSchriften = schriften.filter(f => !wirdKopiert(f));
+  check('KRITISCH: jede Schrift, die homepage.html lädt, wird ins guardops-Bündel kopiert',
+    schriften.length >= 4 && fehlendeSchriften.length === 0);
+  if (fehlendeSchriften.length) { bad.push('fehlt im guardops-Bündel: ' + fehlendeSchriften.join(', ')); }
+
+  // Ebenso die Icons -- sie hängen per <link href> und og:image, nicht per
+  // <script src>: genau die Lücke, die bei den Favicons schon einmal bestand.
+  const icons = [...new Set([...homepage.matchAll(/(?:href|content)="(icons\/[^"]+)"/g)].map(m => m[1]))];
+  check('KRITISCH: die Icons der Seite werden ins guardops-Bündel kopiert',
+    icons.length >= 3 && icons.every(i => wirdKopiert(i)));
+
+  // Die Einbindungen des Endpunkts, aus dem Endpunkt gelesen.
+  const endpunkt = readFileSync(`${WURZEL}/backend/api/demo_senden.php`, 'utf8');
+  const noetig = [...endpunkt.matchAll(/require __DIR__ \. '\/\.\.\/([a-z_]+\.php)'/g)].map(m => m[1]);
+  const fehlendeModule = noetig.filter(m => !liegtImBuendel(`dist-guardops/${m}`));
+  check('KRITISCH: jede Datei, die der Endpunkt einbindet, liegt im guardops-Bündel',
+    noetig.length >= 3 && fehlendeModule.length === 0
+    && liegtImBuendel('dist-guardops/api/demo_senden.php'));
+  if (fehlendeModule.length) { bad.push('Einbindung fehlt im guardops-Bündel: ' + fehlendeModule.join(', ')); }
+
+  // Heute lädt homepage.html kein eigenes Skript -- alles steht inline. Die
+  // Prüfung steht trotzdem hier: Sobald eine Datei dazukommt, muss sie ins
+  // Bündel. Genau dieser Fallstrick liess qrcode.js schon einmal aus dem
+  // Deploy fallen, und seit die Seite nicht mehr in "seiten" oben steht,
+  // würde ihn sonst niemand mehr abfangen.
+  const skripte = [...new Set([...homepage.matchAll(/<script[^>]+src="(?!https?:)([^"]+)"/g)].map(m => m[1]))];
+  const fehlendeSkripte = skripte.filter(j => !wirdKopiert(j));
+  check('KRITISCH: jedes eigene Skript, das homepage.html lädt, kommt ins guardops-Bündel',
+    fehlendeSkripte.length === 0);
+  if (fehlendeSkripte.length) { bad.push('Skript fehlt im guardops-Bündel: ' + fehlendeSkripte.join(', ')); }
+
+  // OP-565: Die Seite darf nicht auf der Testinstanz zurückkehren. Der
+  // Upload dort räumt sein Verzeichnis auf -- kommt die cp-Zeile wieder,
+  // steht dieselbe Seite wieder unter zwei Adressen.
+  check('KRITISCH: homepage.html wird NICHT mehr auf die Testinstanz ausgeliefert',
+    !/cp\s+homepage\.html\s+dist\/homepage\.html/.test(workflow));
+
+  // Jede gebündelte HTML-Seite: ihr Stilblatt muss mit, und jeder Verweis
+  // auf eine Nachbarseite muss eine Datei treffen, die AUCH im Bündel liegt.
+  // Ein Verweis auf eine Seite, die es im Repository gibt, aber nicht auf dem
+  // Server, ist live ein 404 -- und lokal fällt genau das nicht auf.
+  {
+    const seitenImBuendel = [...bauen.matchAll(/^\s*cp\s+(\S+\.html)\s+dist-guardops\/(\S+)/gm)]
+      .map(m => ({ quelle: m[1], ziel: m[2].split('/').pop() }));
+    const zielNamen = new Set(seitenImBuendel.map(x => x.ziel));
+    const fehlendeStile = [], insLeere = [];
+    for (const { quelle } of seitenImBuendel) {
+      const inhalt = readFileSync(`${WURZEL}/${quelle}`, 'utf8').replace(/<!--[\s\S]*?-->/g, '');
+      for (const m of inhalt.matchAll(/<link[^>]*rel="stylesheet"[^>]*href="(?!https?:)([^"]+)"/g)) {
+        if (!wirdKopiert(m[1])) { fehlendeStile.push(`${quelle}: ${m[1]}`); }
+      }
+      for (const m of inhalt.matchAll(/href="(?!https?:|mailto:|#)([a-z0-9_-]+\.html)"/g)) {
+        if (!zielNamen.has(m[1])) { insLeere.push(`${quelle}: ${m[1]}`); }
+      }
+    }
+    check('KRITISCH: jedes Stilblatt einer gebündelten Seite kommt mit ins Bündel',
+      seitenImBuendel.length >= 3 && fehlendeStile.length === 0);
+    if (fehlendeStile.length) { bad.push('Stilblatt fehlt: ' + fehlendeStile.join(', ')); }
+    check('KRITISCH: kein Verweis zwischen den gebündelten Seiten zeigt auf eine Datei, die nicht mitgeliefert wird',
+      insLeere.length === 0);
+    if (insLeere.length) { bad.push('live ein 404: ' + insLeere.join(', ')); }
+  }
+
+  check('KRITISCH: die eigene .htaccess und robots.txt der Domain werden mitgeliefert',
+    cpZeilen.some(z => z.von === 'htaccess-guardops' && z.nach === 'dist-guardops/.htaccess')
+    && cpZeilen.some(z => z.von === 'robots-guardops.txt' && z.nach === 'dist-guardops/robots.txt')
+    && existsSync(`${WURZEL}/htaccess-guardops`) && existsSync(`${WURZEL}/robots-guardops.txt`));
+
+  // robots.txt der Verkaufsseite sagt das GEGENTEIL von robots-staging.txt:
+  // Sie soll gefunden werden. Ein versehentlich kopiertes "Disallow: /"
+  // nähme die Seite lautlos aus jeder Suchmaschine.
+  check('KRITISCH: die robots.txt von guardops.ch sperrt die Seite NICHT aus (anders als die der Testinstanz)',
+    !/^Disallow:\s*\/\s*$/m.test(readFileSync(`${WURZEL}/robots-guardops.txt`, 'utf8')));
+
+  // DER PUNKT, AN DEM ES TEUER WÜRDE: Auf guardops.ch dürfen keine
+  // Datenbank-Zugangsdaten landen. db.php wird dorthin kopiert (mailer.php
+  // bindet es ein), aber NUR mit APP_ENV ersetzt -- die __DB_*__-Platzhalter
+  // bleiben stehen. Ein sed, das sie dort einsetzte, legte die Zugangsdaten
+  // der produktiven Datenbank an einen zweiten Ort.
+  check('KRITISCH: in das guardops-Bündel wird KEIN Datenbank-Zugangsdatum eingesetzt',
+    !/__DB_(HOST|NAME|USER|PASS)__\|\$EFF_DB[^\n]*dist-guardops/.test(bauen)
+    && !/dist-guardops[^\n]*\$EFF_DB_/.test(bauen)
+    && /__APP_ENV__[^\n]*dist-guardops\/db\.php/.test(bauen));
+
+  // Und die Gegenprobe dazu im Workflow selbst: ein übersehener Platzhalter
+  // darf nicht hochgeladen werden.
+  check('KRITISCH: der Bau bricht ab, wenn ein nicht ersetzter Platzhalter im Bündel bleibt',
+    /UEBRIG=/.test(bauen) && /::error::[^\n]*Platzhalter/.test(bauen) && /exit 1/.test(bauen));
+
+  // Der Empfänger kommt aus dem Deploy -- in BEIDEN Bündeln.
+  check('KRITISCH: der Empfänger der Demo-Anfragen wird in beide Bündel eingesetzt',
+    /__DEMO_EMPFAENGER__\|\$EFF_DEMO_EMPFAENGER\|g"\s+dist\/demo_anfrage\.php/.test(workflow)
+    && /__DEMO_EMPFAENGER__\|\$EFF_DEMO_EMPFAENGER\|g"\s+dist-guardops\/demo_anfrage\.php/.test(workflow));
+
+  // Eigener Zugang, eigene Secret-NAMEN -- dieselbe Lehre wie bei Staging
+  // (ENT-343 Punkt 1): Mit gleichen Namen fiele ein fehlendes Secret still
+  // auf ein gleichnamiges Repository-Secret zurück.
+  check('KRITISCH: guardops.ch benutzt einen eigenen FTP-Zugang, nicht den des Rapport-Tools',
+    /server:\s*\$\{\{\s*env\.EFF_GUARDOPS_FTP_HOST\s*\}\}/.test(laden)
+    && /secrets\.GUARDOPS_FTP_HOST/.test(workflow)
+    && !/EFF_HOSTPOINT_FTP/.test(laden));
+
+  // Ein Staging-Lauf hat auf der echten Verkaufsdomain nichts verloren.
+  check('KRITISCH: beide guardops-Schritte laufen nur auf Production und nur mit vorhandenem Secret',
+    [bauen, laden].every(st =>
+      /env\.UMGEBUNG\s*==\s*'production'/.test(st) && /env\.EFF_GUARDOPS_FTP_HOST\s*!=\s*''/.test(st)));
+  check('KRITISCH: der Staging-Zweig setzt das guardops-Ziel leer, ohne Rückfall auf die Production-Werte',
+    /EFF_GUARDOPS_FTP_HOST=""/.test(workflow)
+    && !/EFF_GUARDOPS_FTP_HOST="\$P_GUARDOPS_FTP_HOST"[\s\S]{0,400}STAGING/.test(workflow));
+
+  // "Nicht eingerichtet" darf nicht wie "nichts zu tun" aussehen: Ohne
+  // diesen Hinweis wäre ein übersprungener Homepage-Deploy im Protokoll von
+  // einem erfolgreichen nicht zu unterscheiden.
+  check('KRITISCH: ein übersprungener Homepage-Deploy sagt das ausdrücklich, statt lautlos auszufallen',
+    hinweis !== '' && /::notice::/.test(hinweis)
+    && /env\.EFF_GUARDOPS_FTP_HOST\s*==\s*''/.test(hinweis));
+
+  // DIESELBE PRÜFUNG WIE AUF DEM RUNNER, NUR HIER. Der Riegel oben
+  // ("UEBRIG") läuft erst im Deploy -- und hat Lauf 474 rot gefärbt, weil
+  // mailer.php den Platzhalternamen __ANTHROPIC + _API_KEY__ in einem
+  // KOMMENTAR erwähnte. Kein Wert, kein Leck, aber der Deploy bricht ab,
+  // und gemerkt hat es niemand vorher: Die volle Regression war grün.
+  //
+  // Darum hier dieselbe Frage an den Quelltext: Jeder Platzhalter in einer
+  // Datei, die ins guardops-Bündel geht, muss dort entweder ersetzt werden
+  // oder absichtlich stehen bleiben. Ein dritter Fall bricht den Deploy.
+  {
+    // Was kopiert wird, aus den cp-Zeilen des Bau-Schritts gelesen.
+    const quellen = [...bauen.matchAll(/^\s*cp\s+(\S+)\s+dist-guardops\/\S*/gm)]
+      .map(m => m[1]).filter(q => !q.includes('*') && /\.(php|html|txt|css)$/.test(q));
+    // Was dort ersetzt wird.
+    const ersetzt = new Set([...bauen.matchAll(/sed -i "s\|(__[A-Z_]+__)\|/g)].map(m => m[1]));
+    // Was absichtlich stehen bleibt -- jeweils mit Grund:
+    //   __DB_*__          auf guardops.ch liegt keine Datenbank; ein stehender
+    //                     Platzhalter lässt db() laut scheitern statt still
+    //                     verbinden (ENT-563 Punkt 7).
+    //   __APP_BASIS_URL__ basis_url_pruefen() erkennt ihn und liefert null;
+    //                     die Demo-Mail enthält keinen Link auf die Anlage.
+    //   __DIR__           PHPs eigene Konstante, kein Platzhalter.
+    const absichtlich = /^(__DB_[A-Z]+__|__APP_BASIS_URL__|__DIR__)$/;
+
+    const offen = [];
+    for (const q of quellen) {
+      if (!existsSync(`${WURZEL}/${q}`)) { offen.push(`${q}: Datei fehlt`); continue; }
+      const inhalt = readFileSync(`${WURZEL}/${q}`, 'utf8');
+      for (const p of new Set([...inhalt.matchAll(/__[A-Z][A-Z_]{2,}__/g)].map(m => m[0]))) {
+        if (!ersetzt.has(p) && !absichtlich.test(p)) { offen.push(`${q}: ${p}`); }
+      }
+    }
+    check('KRITISCH: jeder Platzhalter in einer Datei des guardops-Bündels wird dort ersetzt oder bleibt mit Grund stehen',
+      quellen.length >= 5 && offen.length === 0);
+    if (offen.length) { bad.push('bricht den Deploy: ' + offen.join(', ')); }
+  }
+
+  // OP-566: Eine Adresse, nicht zwei. Beide Hälften müssen zusammenpassen --
+  // eine Weiterleitung ohne canonical (oder umgekehrt) lässt die Seite
+  // weiterhin zweimal erscheinen, je nachdem wie sie erreicht wird.
+  {
+    const ht = readFileSync(`${WURZEL}/htaccess-guardops`, 'utf8');
+    const kanonisch = (homepage.match(/<link rel="canonical" href="([^"]+)"/) || [])[1] || '';
+    const ziel = (ht.match(/RewriteRule \^\(\.\*\)\$ (https:\/\/[a-z0-9.-]+)\//) || [])[1] || '';
+    check('KRITISCH: die www-Weiterleitung und die kanonische Adresse der Seite nennen dieselbe Adresse',
+      kanonisch !== '' && ziel !== '' && kanonisch.replace(/\/$/, '') === ziel
+      && /RewriteCond %\{HTTP_HOST\} \^www\\\./.test(ht) && /\[R=301,L\]/.test(ht));
+  }
+
+  // Die beiden Bündel dürfen sich nicht ins Gehege kommen: Der Upload des
+  // Rapport-Tools räumt sein Zielverzeichnis auf.
+  check('KRITISCH: die beiden Uploads haben verschiedene Quellverzeichnisse',
+    /local-dir:\s*\.\/dist\//.test(workflow) && /local-dir:\s*\.\/dist-guardops\//.test(workflow));
 }
 
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);

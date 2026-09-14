@@ -158,6 +158,51 @@ check('KRITISCH: Zeitpunkt und Hinweis stehen untereinander, nicht als ungleiche
 check('Ein abweichender Vorfallzeitpunkt ist möglich, aber eingeklappt und optional',
   await page.evaluate(() => getComputedStyle(document.querySelector('#evKlappZeit .rgs-klapp-bd')).display === 'none'));
 
+// ══════════ WAS BEIM FOTOGRAFIEREN GILT (ENT-549) ═════════════════════
+// Zwei verschiedene Aussagen, darum zwei Pruefungen:
+//
+//  1. Die BETRIEBSREGEL, was aufs Bild gehoert. Geprueft wird, DASS an der
+//     Ausloesestelle eine steht -- nicht ihr Wortlaut. Der darf sich
+//     aendern, ohne dass hier etwas rot wird.
+//  2. Die TATSACHE, dass das Bild an den Kunden geht. Sie gilt seit ENT-544
+//     fuer BEIDE Fotos im Haus und steht darum in einer einzigen
+//     Zeichenkette. Geprueft wird die Verknuepfung: der gerenderte Hinweis
+//     enthaelt genau diese Zeichenkette. Wird sie umformuliert, bleibt die
+//     Pruefung gruen; verschwindet sie an einer der beiden Stellen, wird
+//     sie rot. Genau das ist der Fehler, der hier passieren kann.
+check('KRITISCH: an der Stelle, wo das Ereignisfoto entsteht, steht eine Regel dazu',
+  await page.evaluate(() => {
+    const el = document.getElementById('evFotoHinweis');
+    if (!el) return false;
+    const regel = w('evFotoRegel');
+    return regel.length > 10 && el.textContent.includes(regel)
+      && getComputedStyle(el).display !== 'none';
+  }));
+check('KRITISCH: dort steht auch, dass das Bild an den Kunden geht (seit ENT-544 wahr, stand nirgends)',
+  await page.evaluate(() => {
+    const el = document.getElementById('evFotoHinweis');
+    const satz = w('fotoAnKunden');
+    return !!el && satz.length > 10 && el.textContent.includes(satz);
+  }));
+// Gemessen, nicht nachgelesen (CLAUDE.md): Der Hinweis nuetzt nichts, wenn
+// er ueber dem Knopf steht, ausserhalb des Bildschirms liegt oder so klein
+// ist, dass ihn niemand liest.
+check('KRITISCH: der Hinweis steht UNTER dem Auslöser, nicht darüber -- gemessen',
+  await page.evaluate(() => {
+    const h = document.getElementById('evFotoHinweis');
+    const k = document.querySelector('#evFotoBereich button');
+    if (!h || !k) return false;
+    return h.getBoundingClientRect().top >= k.getBoundingClientRect().bottom - 1;
+  }));
+check('KRITISCH: der Hinweis ist lesbar und bleibt im Bildschirm -- gemessen',
+  await page.evaluate(() => {
+    const el = document.getElementById('evFotoHinweis');
+    if (!el) return false;
+    const r = el.getBoundingClientRect();
+    return parseFloat(getComputedStyle(el).fontSize) >= 12
+      && r.height > 0 && r.left >= -1 && r.right <= innerWidth + 1;
+  }));
+
 // ══════════ PFLICHTFELD ═══════════════════════════════════════════════
 rufe = [];
 await page.click('#evSpeichern');
