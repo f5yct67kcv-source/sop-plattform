@@ -327,8 +327,27 @@ check('KRITISCH: der Knopf führt wirklich in die Ereignisliste',
       && !!ab && ab.getClientRects().length > 0
       && document.getElementById('pgTitle').textContent === 'Ereignisse';
   }));
+// WARTEN, NICHT HOFFEN (OP-567). Der Klick im Prueffall darueber stoesst
+// den Abruf an -- der ist asynchron. Bis ENT-568 stand hier die blosse
+// Frage, ob er schon in `calls` steht, ohne jeden Wart. Unter Last kam die
+// Anfrage haeufig erst danach an: In vier gleichzeitigen Laeufen fiel
+// einer, immer auf genau dieser Zeile, und zwar auch auf einem sonst
+// unveraenderten origin/main.
+//
+// Kein groesseres Zeitfenster als Abhilfe -- das waere derselbe Wettlauf,
+// nur seltener. Stattdessen wird gewartet, BIS der Abruf da ist, mit einer
+// Frist als Abbruch. Im Normalfall kostet das nichts: Sobald die Anfrage
+// eintrifft, geht es weiter.
+async function warteAufAufruf(teil, frist = 3000) {
+  const ende = Date.now() + frist;
+  while (Date.now() < ende) {
+    if (calls.some(c => c.path.includes(teil))) { return true; }
+    await page.waitForTimeout(25);
+  }
+  return false;
+}
 check('Und dort wird die Liste dann auch wirklich geholt',
-  calls.some(c => c.path.includes('ereignis_liste')));
+  await warteAufAufruf('ereignis_liste'));
 // Zurueck in die Auswertung fuer die weiteren Pruefungen.
 await page.evaluate(() => { go('arbeitsergebnisse'); arbeitsergebnisseOeffnen(); });
 await page.waitForTimeout(200);

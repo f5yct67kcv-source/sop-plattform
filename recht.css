@@ -1,0 +1,101 @@
+/* ═══════════════════════════════════════════════════════════════════
+   Stilblatt der Rechtsseiten (Impressum, Datenschutzerklaerung).
+   
+   EIGENE DATEI, NICHT INLINE: Anders als homepage.html sind das ZWEI
+   Seiten mit demselben Gesicht. Zweimal derselbe Stil inline hiesse,
+   dass beim naechsten Farbwechsel eine von beiden vergessen wird --
+   derselbe Fallstrick wie bei gav.js/zeitwahl.js im Cockpit.
+   
+   DIE FARBWERTE SIND DIESELBEN WIE IM COCKPIT, nicht aehnliche
+   (ENT-469-N1). test_recht.mjs liest sie aus dashboard.html und misst
+   sie am gerenderten Zustand -- nicht im Quelltext nachgelesen.
+   ═══════════════════════════════════════════════════════════════════ */
+
+@font-face{font-family:"Archivo";font-style:normal;font-weight:100 900;font-stretch:62% 125%;font-display:swap;src:url(fonts/archivo-variable-latin.woff2) format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:"IBM Plex Sans";font-style:normal;font-weight:100 700;font-display:swap;src:url(fonts/plex-sans-variable-latin.woff2) format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+
+:root{
+  --nacht:#0F1117; --nacht-2:#161B27; --nacht-linie:#2A3147;
+  --nebel:#F7F8FA; --weiss:#FFFFFF; --linie:#E5E8EC;
+  --tinte:#14161A; --tinte-2:#545B67; --tinte-3:#8B919D;
+  --stahl-hi:#F2F4F8; --stahl:#B6BCC8;
+  --blau:#7098F7; --blau-tief:#2F5BD7;
+  --display:"Archivo","Arial Narrow","Helvetica Neue",Arial,sans-serif;
+  --body:"IBM Plex Sans","Helvetica Neue",Arial,sans-serif;
+}
+
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--nebel);color:var(--tinte);
+     font-family:var(--body);font-size:17px;line-height:1.65;
+     -webkit-font-smoothing:antialiased}
+
+/* ── Kopfbereich ────────────────────────────────────────────────── */
+.kopf{background:var(--nacht);border-bottom:1px solid var(--nacht-linie)}
+.kopf .innen{max-width:820px;margin:0 auto;padding:18px 24px;
+             display:flex;align-items:center;gap:12px}
+/* 460:593 aus dem Original -- Breite folgt der Hoehe, sonst staucht das Schild. */
+.marke svg{height:28px;width:21.7px;color:var(--stahl-hi);display:block}
+.marke{display:flex;align-items:center;gap:10px;text-decoration:none;
+       color:var(--stahl-hi);
+       /* 44 px Trefferflaeche auf dem Handy, ohne den Kopf aufzublaehen. */
+       min-height:44px}
+.wortmarke{font-family:var(--display);font-stretch:103%;font-weight:600;
+           letter-spacing:.005em;font-size:19px}
+.zurueck{margin-left:auto;color:var(--stahl);text-decoration:none;font-size:15px;
+         display:inline-flex;align-items:center;min-height:44px}
+.zurueck:hover{color:var(--stahl-hi)}
+
+/* ── Inhalt ─────────────────────────────────────────────────────── */
+main{max-width:820px;margin:0 auto;padding:56px 24px 72px}
+
+/* Ueberschrift oben, Wert darunter -- die feine Versalzeile steht UEBER
+   dem grossen Titel, nicht darunter. */
+.vorzeile{font-family:var(--display);font-size:12px;font-weight:600;
+          letter-spacing:.14em;text-transform:uppercase;color:var(--blau-tief);
+          margin:0 0 10px}
+h1{font-family:var(--display);font-stretch:96%;font-weight:700;
+   font-size:clamp(30px,5vw,42px);line-height:1.12;letter-spacing:-.015em;
+   margin:0 0 14px;overflow-wrap:anywhere}
+.stand{color:var(--tinte-3);font-size:15px;margin:0 0 44px}
+
+h2{font-family:var(--display);font-stretch:100%;font-weight:650;
+   font-size:22px;line-height:1.25;letter-spacing:-.005em;
+   margin:44px 0 12px;overflow-wrap:anywhere}
+h2:first-of-type{margin-top:0}
+h3{font-family:var(--body);font-weight:600;font-size:17px;margin:26px 0 6px}
+p{margin:0 0 16px}
+ul{margin:0 0 16px;padding-left:22px}
+li{margin:0 0 7px}
+a{color:var(--blau-tief);text-decoration:underline;text-underline-offset:2px}
+a:hover{text-decoration-thickness:2px}
+
+/* Die Angabenkarte: Firma, Adresse, Kontakt. Beschriftung oben, Wert
+   darunter -- und auf beiden Seiten dasselbe Muster. */
+.karte{background:var(--weiss);border:1px solid var(--linie);border-radius:12px;
+       padding:26px 28px;margin:0 0 32px}
+.felder{display:grid;grid-template-columns:repeat(auto-fit,minmax(0,220px));
+        gap:22px 32px;margin:0}
+.feld dt{font-family:var(--display);font-size:11px;font-weight:600;
+         letter-spacing:.12em;text-transform:uppercase;color:var(--tinte-3);
+         margin:0 0 3px}
+.feld dd{margin:0;font-size:17px;overflow-wrap:anywhere}
+
+/* Ein Hinweis, der auffallen soll, ohne zu schreien. Bernstein meldet. */
+.hinweis{background:#FDF6E7;border:1px solid #E8D6A8;border-left:3px solid #9A6B08;
+         border-radius:8px;padding:16px 20px;margin:0 0 32px;font-size:16px}
+.hinweis p:last-child{margin-bottom:0}
+
+/* ── Fusszeile ──────────────────────────────────────────────────── */
+.fuss{border-top:1px solid var(--linie);background:var(--weiss)}
+.fuss .innen{max-width:820px;margin:0 auto;padding:26px 24px;
+             display:flex;flex-wrap:wrap;gap:10px 26px;align-items:center;
+             font-size:15px;color:var(--tinte-2)}
+.fuss a{display:inline-flex;align-items:center;min-height:44px}
+
+@media (max-width:520px){
+  body{font-size:16px}
+  main{padding:40px 20px 56px}
+  .karte{padding:22px 20px}
+  .kopf .innen,.fuss .innen{padding-left:20px;padding-right:20px}
+}

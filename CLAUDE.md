@@ -1,9 +1,20 @@
 # CLAUDE.md — Arbeitsregeln für dieses Repository
 
-Internes Werkzeug der CUPI 24 GmbH. Entwickelt unter der Ausnahme aus
-ENT-008/ENT-012 (rein interne Nutzung, kein Verkauf). Die Projektregeln,
-das Entscheidungsprotokoll und die offenen Punkte liegen im **Projekt-
+Die Plattform **GuardOpS** — Guard Operations Software. **Inhaberin und
+Betreiberin ist die `pzu consulting gmbh`**; die **CUPI 24 GmbH ist
+Mandantin**, nicht Betreiberin (ENT-568). Die Projektregeln, das
+Entscheidungsprotokoll und die offenen Punkte liegen im **Projekt-
 Repository** (`sop-projekt`), nicht hier.
+
+~~Entwickelt unter der Ausnahme aus ENT-008/ENT-012 (rein interne Nutzung,
+kein Verkauf).~~ Diese Ausnahme trägt seit ENT-568 nicht mehr: Es gibt eine
+Inhaberin, eine Marke, eine öffentliche Verkaufsseite und eine Mandantin —
+keine der Bedingungen ist mehr erfüllt. Die Sorgfaltspflichten bleiben
+davon unberührt und gelten ohne Ausnahme: GAV-Logik, Qualität, Gestaltung.
+
+**Was das für Testdaten heisst:** CUPI 24 ist als Mandantin eine *Kundin*.
+Ihr Name, ihre Adresse und die ihrer Leute fallen damit unter die
+Vertraulichkeitsregel weiter unten — nicht mehr unter „eigener Betrieb".
 
 **Am Projekt arbeiten mehrere Sitzungen gleichzeitig.** Alles unten folgt
 daraus.

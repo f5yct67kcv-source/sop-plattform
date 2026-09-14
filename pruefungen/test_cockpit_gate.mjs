@@ -223,7 +223,13 @@ await ev(page, () => document.querySelector('.gate-video')?.pause());
 const TEXTE_HAUPT = [
   ['Wortmarke "Cockpit"', '.gate-oben .wm'],
   ['Firmenname', '.gate-oben .sub'],
-  ['Begleittext "Bitte melden Sie sich..."', '#gateLogin .gate-msg'],
+  // Der frueher hier gepruefte Begleittext "Bitte melden Sie sich..." ist
+  // entfernt (auf Ansage des Projektinhabers: die Maske erklaert sich
+  // selbst). An seiner Stelle liegt jetzt die Herstellersignatur auf dem
+  // Video -- als Fusszeile sogar ueber dem unteren Bildbereich, wo die
+  // Strassenlaternen stehen. Sie braucht denselben Nachweis.
+  ['Etikett "powered by"', '.gate-sig .go-label'],
+  ['Herstellersignatur (Logo)', '.gate-sig .go-sig'],
   ['Beschriftung "Name"', 'label[for="gName"]'],
   ['Beschriftung "Passwort"', 'label[for="gPass"]'],
 ];
