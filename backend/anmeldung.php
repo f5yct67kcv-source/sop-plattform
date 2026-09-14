@@ -59,7 +59,17 @@ function hat_tabelle_anmeldung(PDO $pdo): bool
 {
     static $da = null;
     if ($da === null) {
-        $da = (bool)$pdo->query("SHOW TABLES LIKE 'anmeldeversuche'")->fetchColumn();
+        // Treiberabhaengig: Produktion laeuft auf MySQL, die PHP-Kernpruefungen
+        // (pruef_beleg_oeffentlich_rendern.php u.a., Security-Audit 2026-09-14)
+        // fuehren echten Code gegen SQLite aus. SHOW TABLES ist reines
+        // MySQL-Syntax und wuerde dort mit einem Syntaxfehler abbrechen --
+        // die Faelle sind nicht "Tabelle fehlt", die Funktion soll gleich
+        // reagieren, nur die Abfrage ist je Treiber verschieden.
+        $da = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite'
+            ? (bool)$pdo->query(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'anmeldeversuche'"
+              )->fetchColumn()
+            : (bool)$pdo->query("SHOW TABLES LIKE 'anmeldeversuche'")->fetchColumn();
         if (!$da) {
             error_log('SICHERHEIT: Tabelle "anmeldeversuche" fehlt — die Bremse gegen '
                 . 'Passwort-Raten ist AUSSER BETRIEB. Im Cockpit unten links '

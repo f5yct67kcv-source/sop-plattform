@@ -65,6 +65,10 @@ function json_response($data, int $status = 200): void { http_response_code($sta
 
 require __DIR__ . '/../backend/belege.php';
 require __DIR__ . '/../backend/qrrechnung.php';
+// anmeldung.php (Bremse, Security-Audit 2026-09-14): hat_tabelle_anmeldung()
+// erkennt den sqlite-Treiber selbst und faellt ohne anmeldeversuche-Tabelle
+// auf "keine Bremse" zurueck -- keine eigene Tabelle noetig.
+require __DIR__ . '/../backend/anmeldung.php';
 
 // Die eigentliche Datei einlesen und ihre eigenen require-Zeilen entfernen
 // (db.php/belege.php/qrrechnung.php sind oben schon geladen) -- der Rest
