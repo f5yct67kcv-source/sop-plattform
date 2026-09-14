@@ -1,3 +1,4 @@
+<?php require __DIR__ . '/_guard.php'; ?>
 <!DOCTYPE html>
 <html lang="de">
 <head>
@@ -10,7 +11,7 @@
 <div class="hb-shell">
   <aside class="hb-side" id="hbSide">
     <div class="hb-brand">
-      <a href="index.html" style="text-decoration:none">
+      <a href="index.php" style="text-decoration:none">
         <span class="titel">Handbuch</span>
         <span class="unter">Cockpit von GuardOpS</span>
       </a>
@@ -23,29 +24,29 @@
     <div class="hb-nav-wrap">
       <div class="hb-gruppe">Einstieg</div>
       <ul class="hb-nav">
-        <li><a href="index.html" class="aktiv">Übersicht</a></li>
-        <li><a href="erste-schritte.html">Erste Schritte</a></li>
+        <li><a href="index.php" class="aktiv">Übersicht</a></li>
+        <li><a href="erste-schritte.php">Erste Schritte</a></li>
       </ul>
       <div class="hb-gruppe">Erfassung (App)</div>
       <ul class="hb-nav">
-        <li><a href="erfassung.html">Erfassung</a></li>
+        <li><a href="erfassung.php">Erfassung</a></li>
       </ul>
       <div class="hb-gruppe">Cockpit</div>
       <ul class="hb-nav">
-        <li><a href="planung.html">Planung</a></li>
-        <li><a href="kunden.html">Kunden</a></li>
-        <li><a href="personal.html">Personal</a></li>
-        <li><a href="lohn.html">Lohn</a></li>
-        <li><a href="abgleich.html">Abgleich</a></li>
-        <li><a href="betrieb.html">Betrieb</a></li>
+        <li><a href="planung.php">Planung</a></li>
+        <li><a href="kunden.php">Kunden</a></li>
+        <li><a href="personal.php">Personal</a></li>
+        <li><a href="lohn.php">Lohn</a></li>
+        <li><a href="abgleich.php">Abgleich</a></li>
+        <li><a href="betrieb.php">Betrieb</a></li>
       </ul>
       <div class="hb-gruppe">Weitere Oberflächen</div>
       <ul class="hb-nav">
-        <li><a href="kundenportal.html">Kundenportal</a></li>
+        <li><a href="kundenportal.php">Kundenportal</a></li>
       </ul>
       <div class="hb-gruppe">Nachschlagen</div>
       <ul class="hb-nav">
-        <li><a href="glossar.html">Glossar</a></li>
+        <li><a href="glossar.php">Glossar</a></li>
       </ul>
     </div>
     <div class="hb-side-fuss">
@@ -81,16 +82,19 @@
       </div>
 
       <div class="hb-kasten hb-hinweis">
-        <p class="hb-kasten-titel">Noch nicht veröffentlicht</p>
-        <p>Dieser Ordner ist Teil des Repositorys, aber <b>nicht</b> Teil der
-        Deploy-Dateiliste (<code>.github/workflows/deploy-hostpoint.yml</code>) —
-        er geht beim nächsten Push nicht automatisch live. Ob und wie das
-        Handbuch erreichbar werden soll (öffentlich, oder hinter derselben
-        Anmeldung wie das Cockpit), ist eine eigene, noch offene Entscheidung.</p>
+        <p class="hb-kasten-titel">Wie dieser Zugang funktioniert</p>
+        <p>Diese Seiten sind über den öffentlichen Server erreichbar, aber
+        nicht öffentlich: Jede Seite verlangt ein kurzlebiges Zugangs-Ticket
+        (4&nbsp;Stunden gültig, als HttpOnly-Cookie), das ausschliesslich der
+        Knopf „Handbuch" im Cockpit ausstellt — erreichbar für jeden
+        angemeldeten Cockpit-Zugang, unabhängig von Rolle oder Bereich
+        (Entscheid des Projektinhabers: keine vertraulichen Inhalte hier).
+        Ohne gültiges Ticket zeigt jede Seite nur einen Hinweis, nie den
+        Inhalt. Nur am Desktop verlinkt, nicht in der mobilen App.</p>
       </div>
 
       <h2>Wer arbeitet wo</h2>
-      <p>Ausführlich in <a href="erste-schritte.html">Erste Schritte</a>. Kurzform:
+      <p>Ausführlich in <a href="erste-schritte.php">Erste Schritte</a>. Kurzform:
       die <b>App</b> (Erfassung) für alle Mitarbeitenden, das <b>Cockpit</b> für
       Personen mit Verwaltungsrecht, das <b>Kundenportal</b> für die Kundschaft.
       Zwei weitere Oberflächen — die öffentliche Homepage und der
@@ -99,43 +103,43 @@
 
       <h2>Kapitel</h2>
       <div class="hb-karten">
-        <a class="hb-karte" href="erste-schritte.html">
+        <a class="hb-karte" href="erste-schritte.php">
           <p class="titel">Erste Schritte <span class="hb-status erste-fassung">Erste Fassung</span></p>
           <p class="text">Anmelden, Zwei-Faktor-Anmeldung, Rollen und Rechte im Überblick.</p>
         </a>
-        <a class="hb-karte" href="erfassung.html">
+        <a class="hb-karte" href="erfassung.php">
           <p class="titel">Erfassung <span class="hb-status erste-fassung">Erste Fassung</span></p>
           <p class="text">Die mobile App: Einsätze, Rapport, Rundgänge, Fahrzeugübernahme, Mitteilungen.</p>
         </a>
-        <a class="hb-karte" href="planung.html">
+        <a class="hb-karte" href="planung.php">
           <p class="titel">Planung <span class="hb-status erste-fassung">Erste Fassung</span></p>
           <p class="text">Einsätze, Objektplanung, Masterschichten, Tagesplan, Feiertage, Zuteilung.</p>
         </a>
-        <a class="hb-karte" href="kunden.html">
+        <a class="hb-karte" href="kunden.php">
           <p class="titel">Kunden <span class="hb-status erste-fassung">Erste Fassung</span></p>
           <p class="text">Kundenstamm, Import, KI-Recherche, Objekte, Rapporte, Offerten &amp; Rechnungen.</p>
         </a>
-        <a class="hb-karte" href="personal.html">
+        <a class="hb-karte" href="personal.php">
           <p class="titel">Personal <span class="hb-status erste-fassung">Erste Fassung</span></p>
           <p class="text">Mitarbeitende, Personaldossier, vertrauliche Angaben, Verlauf, Dienstpläne.</p>
         </a>
-        <a class="hb-karte" href="lohn.html">
+        <a class="hb-karte" href="lohn.php">
           <p class="titel">Lohn <span class="hb-status erste-fassung">Erste Fassung</span></p>
           <p class="text">Lohnansatz, Lohnarten, Sätze und Regelwerk, Lohnläufe — Rohzeit, Nettozeit, Zeitbonus und Bewertet sauber getrennt.</p>
         </a>
-        <a class="hb-karte" href="abgleich.html">
+        <a class="hb-karte" href="abgleich.php">
           <p class="titel">Abgleich <span class="hb-status erste-fassung">Erste Fassung</span></p>
           <p class="text">Ist-Zeiten, Pensen und Ruhezeit — und wo Rapporte tatsächlich stehen.</p>
         </a>
-        <a class="hb-karte" href="betrieb.html">
+        <a class="hb-karte" href="betrieb.php">
           <p class="titel">Betrieb <span class="hb-status erste-fassung">Erste Fassung</span></p>
           <p class="text">Hauptdomizil, Briefkopf, Rollen &amp; Berechtigungen, Fahrzeuge, Support.</p>
         </a>
-        <a class="hb-karte" href="kundenportal.html">
+        <a class="hb-karte" href="kundenportal.php">
           <p class="titel">Kundenportal <span class="hb-status erste-fassung">Erste Fassung</span></p>
           <p class="text">Was Kundinnen und Kunden sehen — und wie ein Zugang entsteht.</p>
         </a>
-        <a class="hb-karte" href="glossar.html">
+        <a class="hb-karte" href="glossar.php">
           <p class="titel">Glossar</p>
           <p class="text">Über 40 Begriffe, wie sie im Cockpit tatsächlich verwendet werden.</p>
         </a>

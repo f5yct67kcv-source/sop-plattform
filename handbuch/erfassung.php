@@ -1,3 +1,4 @@
+<?php require __DIR__ . '/_guard.php'; ?>
 <!DOCTYPE html>
 <html lang="de">
 <head>
@@ -10,7 +11,7 @@
 <div class="hb-shell">
   <aside class="hb-side" id="hbSide">
     <div class="hb-brand">
-      <a href="index.html" style="text-decoration:none">
+      <a href="index.php" style="text-decoration:none">
         <span class="titel">Handbuch</span>
         <span class="unter">Cockpit von GuardOpS</span>
       </a>
@@ -23,33 +24,33 @@
     <div class="hb-nav-wrap">
       <div class="hb-gruppe">Einstieg</div>
       <ul class="hb-nav">
-        <li><a href="index.html">Übersicht</a></li>
-        <li><a href="erste-schritte.html">Erste Schritte</a></li>
+        <li><a href="index.php">Übersicht</a></li>
+        <li><a href="erste-schritte.php">Erste Schritte</a></li>
       </ul>
       <div class="hb-gruppe">Erfassung (App)</div>
       <ul class="hb-nav">
-        <li><a href="erfassung.html" class="aktiv">Erfassung</a></li>
+        <li><a href="erfassung.php" class="aktiv">Erfassung</a></li>
       </ul>
       <div class="hb-gruppe">Cockpit</div>
       <ul class="hb-nav">
-        <li><a href="planung.html">Planung</a></li>
-        <li><a href="kunden.html">Kunden</a></li>
-        <li><a href="personal.html">Personal</a></li>
-        <li><a href="lohn.html">Lohn</a></li>
-        <li><a href="abgleich.html">Abgleich</a></li>
-        <li><a href="betrieb.html">Betrieb</a></li>
+        <li><a href="planung.php">Planung</a></li>
+        <li><a href="kunden.php">Kunden</a></li>
+        <li><a href="personal.php">Personal</a></li>
+        <li><a href="lohn.php">Lohn</a></li>
+        <li><a href="abgleich.php">Abgleich</a></li>
+        <li><a href="betrieb.php">Betrieb</a></li>
       </ul>
       <div class="hb-gruppe">Weitere Oberflächen</div>
       <ul class="hb-nav">
-        <li><a href="kundenportal.html">Kundenportal</a></li>
+        <li><a href="kundenportal.php">Kundenportal</a></li>
       </ul>
       <div class="hb-gruppe">Nachschlagen</div>
       <ul class="hb-nav">
-        <li><a href="glossar.html">Glossar</a></li>
+        <li><a href="glossar.php">Glossar</a></li>
       </ul>
     </div>
     <div class="hb-side-fuss">
-      Aus dem Quelltext zusammengestellt, siehe Hinweis auf der <a href="index.html">Übersicht</a>.
+      Aus dem Quelltext zusammengestellt, siehe Hinweis auf der <a href="index.php">Übersicht</a>.
     </div>
   </aside>
 
@@ -73,7 +74,7 @@
       </div>
 
       <h2 id="anmelden">Anmelden</h2>
-      <p>Name und Passwort, siehe <a href="erste-schritte.html">Erste Schritte</a>.
+      <p>Name und Passwort, siehe <a href="erste-schritte.php">Erste Schritte</a>.
       „Passwort vergessen?" führt in der App zu einem echten Ablauf: Anmeldename
       eingeben → Link anfordern → E-Mail mit Reset-Link → neues Passwort setzen
       (mindestens 12&nbsp;Zeichen).</p>
@@ -233,17 +234,17 @@
       </ul>
 
       <div class="hb-begriffe">
-        <a href="glossar.html#rundgang">Rundgang / Kontrollrunde</a>
-        <a href="glossar.html#kontrollpunkt">Kontrollpunkt</a>
-        <a href="glossar.html#fotobeleg">Ersatzscan</a>
-        <a href="glossar.html#sperren">Sperren</a>
-        <a href="glossar.html#zeitbonus">Zeitbonus</a>
-        <a href="glossar.html#abgeglichen">Abgeglichen</a>
+        <a href="glossar.php#rundgang">Rundgang / Kontrollrunde</a>
+        <a href="glossar.php#kontrollpunkt">Kontrollpunkt</a>
+        <a href="glossar.php#fotobeleg">Ersatzscan</a>
+        <a href="glossar.php#sperren">Sperren</a>
+        <a href="glossar.php#zeitbonus">Zeitbonus</a>
+        <a href="glossar.php#abgeglichen">Abgeglichen</a>
       </div>
 
       <p class="hb-fussnote">Quelle: <code>index.html</code>, <code>app.html</code>,
       <code>unterschrift.js</code>, Stand 11.09.2026. Nicht am laufenden Gerät
-      nachgeprüft — siehe Hinweis auf der <a href="index.html">Übersicht</a>.</p>
+      nachgeprüft — siehe Hinweis auf der <a href="index.php">Übersicht</a>.</p>
 
     </div>
   </div>

@@ -5320,6 +5320,19 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
         </span>
         <span class="lbl" id="navEinrichtungLbl">Einrichtung</span>
       </button>
+      <!-- Nachschlagewerk fuers Cockpit (Entscheid des Projektinhabers):
+           rollenunabhaengig fuer jeden Cockpit-Zugang, nur am Desktop, nie
+           in der mobilen App -- "nur-desktop" wie bei "Einrichtung" darueber.
+           Kein View-Wechsel wie bei go(): das Handbuch ist eine eigene,
+           statische Dateisammlung ausserhalb des Cockpit-SPA. Der Klick
+           holt zuerst ein kurzlebiges Zugangs-Ticket (handbuchOeffnen(),
+           siehe unten) und oeffnet danach ein neues Fenster/Tab -- die
+           Sperre selbst sitzt serverseitig in handbuch/_guard.php, dieser
+           Knopf ist nur der bequeme Weg dorthin. -->
+      <button class="nav-item nur-desktop" id="nav-handbuch" title="Handbuch" onclick="handbuchOeffnen()">
+        <svg class="i" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        <span class="lbl">Handbuch</span>
+      </button>
       <div class="side-user">
         <div class="avatar" id="uAvatar">–</div>
         <div class="who">
@@ -10035,6 +10048,29 @@ function api(path, opts) {
     headers,
     body: opts.body ? JSON.stringify(opts.body) : undefined
   }).then(r => r.json().then(data => ({ ok: r.ok, status: r.status, data })).catch(() => ({ ok: false, status: r.status, data: {} })));
+}
+
+// ══════════════════════════════════════════ HANDBUCH
+// handbuch/ ist eine eigene, statische Dateisammlung ausserhalb des SPA
+// (siehe handbuch/index.php) -- der Knopf im Seitenfuss holt zuerst ein
+// kurzlebiges Zugangs-Ticket und oeffnet das Handbuch dann in einem neuen
+// Fenster/Tab. Das leere Fenster wird SOFORT geoeffnet, noch vor dem
+// await -- sonst wertet mancher Browser den spaeteren window.open() nach
+// der Wartezeit nicht mehr als Nutzerhandlung und blockiert ihn.
+async function handbuchOeffnen() {
+  const fenster = window.open('', '_blank');
+  try {
+    const r = await api('handbuch_ticket.php', { method: 'POST' });
+    if (!r.ok) {
+      if (fenster) { fenster.close(); }
+      alert(r.data && r.data.message ? r.data.message : 'Handbuch konnte nicht geöffnet werden.');
+      return;
+    }
+    if (fenster) { fenster.location.href = 'handbuch/index.php'; }
+  } catch (e) {
+    if (fenster) { fenster.close(); }
+    alert('Handbuch konnte nicht geöffnet werden.');
+  }
 }
 
 // ══════════════════════════════════════════ ZUGANG

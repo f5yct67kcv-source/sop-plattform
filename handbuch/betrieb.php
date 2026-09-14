@@ -1,3 +1,4 @@
+<?php require __DIR__ . '/_guard.php'; ?>
 <!DOCTYPE html>
 <html lang="de">
 <head>
@@ -10,7 +11,7 @@
 <div class="hb-shell">
   <aside class="hb-side" id="hbSide">
     <div class="hb-brand">
-      <a href="index.html" style="text-decoration:none">
+      <a href="index.php" style="text-decoration:none">
         <span class="titel">Handbuch</span>
         <span class="unter">Cockpit von GuardOpS</span>
       </a>
@@ -23,33 +24,33 @@
     <div class="hb-nav-wrap">
       <div class="hb-gruppe">Einstieg</div>
       <ul class="hb-nav">
-        <li><a href="index.html">Übersicht</a></li>
-        <li><a href="erste-schritte.html">Erste Schritte</a></li>
+        <li><a href="index.php">Übersicht</a></li>
+        <li><a href="erste-schritte.php">Erste Schritte</a></li>
       </ul>
       <div class="hb-gruppe">Erfassung (App)</div>
       <ul class="hb-nav">
-        <li><a href="erfassung.html">Erfassung</a></li>
+        <li><a href="erfassung.php">Erfassung</a></li>
       </ul>
       <div class="hb-gruppe">Cockpit</div>
       <ul class="hb-nav">
-        <li><a href="planung.html">Planung</a></li>
-        <li><a href="kunden.html">Kunden</a></li>
-        <li><a href="personal.html">Personal</a></li>
-        <li><a href="lohn.html">Lohn</a></li>
-        <li><a href="abgleich.html">Abgleich</a></li>
-        <li><a href="betrieb.html" class="aktiv">Betrieb</a></li>
+        <li><a href="planung.php">Planung</a></li>
+        <li><a href="kunden.php">Kunden</a></li>
+        <li><a href="personal.php">Personal</a></li>
+        <li><a href="lohn.php">Lohn</a></li>
+        <li><a href="abgleich.php">Abgleich</a></li>
+        <li><a href="betrieb.php" class="aktiv">Betrieb</a></li>
       </ul>
       <div class="hb-gruppe">Weitere Oberflächen</div>
       <ul class="hb-nav">
-        <li><a href="kundenportal.html">Kundenportal</a></li>
+        <li><a href="kundenportal.php">Kundenportal</a></li>
       </ul>
       <div class="hb-gruppe">Nachschlagen</div>
       <ul class="hb-nav">
-        <li><a href="glossar.html">Glossar</a></li>
+        <li><a href="glossar.php">Glossar</a></li>
       </ul>
     </div>
     <div class="hb-side-fuss">
-      Aus dem Quelltext zusammengestellt, siehe Hinweis auf der <a href="index.html">Übersicht</a>.
+      Aus dem Quelltext zusammengestellt, siehe Hinweis auf der <a href="index.php">Übersicht</a>.
     </div>
   </aside>
 
@@ -76,7 +77,7 @@
         <tr><th>Kachel</th><th>Wofür</th></tr>
         <tr><td><b>Betrieb</b></td><td>Hauptdomizil, Anstellungsorte, Logo</td></tr>
         <tr><td><b>Briefkopf für Rapporte</b></td><td>Kopf-/Fusszeile und QR-Rechnungsdaten auf dem Kundenrapport</td></tr>
-        <tr><td><b>Mein Zugang: Zwei-Faktor-Anmeldung</b></td><td>Eigene 2FA — siehe <a href="erste-schritte.html">Erste Schritte</a></td></tr>
+        <tr><td><b>Mein Zugang: Zwei-Faktor-Anmeldung</b></td><td>Eigene 2FA — siehe <a href="erste-schritte.php">Erste Schritte</a></td></tr>
         <tr><td><b>Rollen &amp; Berechtigungen</b></td><td>Profile, Zuteilung, Einsatzmerkmale, Login-Namen</td></tr>
         <tr><td><b>Personalnummern</b></td><td>Fehlende Personalnummern nachtragen</td></tr>
         <tr><td><b>Dienstfahrzeuge</b></td><td>Fahrzeug-Stammdaten</td></tr>
@@ -114,7 +115,7 @@
 
       <h2 id="rollen-berechtigungen">Rollen &amp; Berechtigungen</h2>
       <p>Die Systemrollen selbst sind hier nicht änderbar (siehe
-      <a href="erste-schritte.html">Erste Schritte</a>) — diese Kachel ist der Ort für
+      <a href="erste-schritte.php">Erste Schritte</a>) — diese Kachel ist der Ort für
       alles Weitere.</p>
 
       <h3 id="eigenes-profil-anlegen">Eigenes Profil anlegen</h3>
@@ -184,17 +185,17 @@
       </ul>
 
       <div class="hb-begriffe">
-        <a href="glossar.html#anstellungsort">Anstellungsort / HAO / NAO</a>
-        <a href="glossar.html#profil">Profil</a>
-        <a href="glossar.html#einsatzmerkmal">Einsatzmerkmal</a>
-        <a href="glossar.html#betreiber">Betreiber</a>
-        <a href="glossar.html#logbuch">Logbuch / Änderungsverlauf</a>
+        <a href="glossar.php#anstellungsort">Anstellungsort / HAO / NAO</a>
+        <a href="glossar.php#profil">Profil</a>
+        <a href="glossar.php#einsatzmerkmal">Einsatzmerkmal</a>
+        <a href="glossar.php#betreiber">Betreiber</a>
+        <a href="glossar.php#logbuch">Logbuch / Änderungsverlauf</a>
       </div>
 
       <p class="hb-fussnote">Quelle: <code>dashboard.html</code> (<code>view-betrieb</code>,
       Markup ab Zeile 7494), <code>backend/rechte.php</code>, Stand 11.09.2026. Nicht
       am laufenden Cockpit nachgeprüft — siehe Hinweis auf der
-      <a href="index.html">Übersicht</a>.</p>
+      <a href="index.php">Übersicht</a>.</p>
 
     </div>
   </div>

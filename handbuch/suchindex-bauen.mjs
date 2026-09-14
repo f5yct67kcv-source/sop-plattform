@@ -15,8 +15,8 @@ import path from 'node:path';
 const HIER = path.dirname(fileURLToPath(import.meta.url));
 
 const KAPITEL = [
-  'erste-schritte.html', 'erfassung.html', 'planung.html', 'kunden.html',
-  'personal.html', 'lohn.html', 'abgleich.html', 'betrieb.html', 'kundenportal.html',
+  'erste-schritte.php', 'erfassung.php', 'planung.php', 'kunden.php',
+  'personal.php', 'lohn.php', 'abgleich.php', 'betrieb.php', 'kundenportal.php',
 ];
 
 function slug(text) {
@@ -90,18 +90,18 @@ for (const datei of KAPITEL) {
 }
 
 // Glossar: jeder .hb-eintrag mit id ist bereits verankert.
-const glossarPfad = path.join(HIER, 'glossar.html');
+const glossarPfad = path.join(HIER, 'glossar.php');
 const glossarHtml = readFileSync(glossarPfad, 'utf8');
 const eintragMuster = /<div class="hb-eintrag" id="([^"]+)">\s*<h3>([\s\S]*?)<\/h3>\s*<p>([\s\S]*?)<\/p>/g;
 let gm;
 while ((gm = eintragMuster.exec(glossarHtml)) !== null) {
   eintraege.push({
-    datei: 'glossar.html', anker: gm[1], ebene: 2,
+    datei: 'glossar.php', anker: gm[1], ebene: 2,
     titel: textOhneTags(gm[2]), kapitel: 'Glossar',
     text: textOhneTags(gm[3]).slice(0, 160),
   });
 }
-eintraege.splice(1, 0, { datei: 'glossar.html', anker: '', ebene: 1, titel: 'Glossar', kapitel: 'Glossar', text: '' });
+eintraege.splice(1, 0, { datei: 'glossar.php', anker: '', ebene: 1, titel: 'Glossar', kapitel: 'Glossar', text: '' });
 
 const ausgabe = `// Automatisch erzeugt von suchindex-bauen.mjs — nicht von Hand ändern.\n`
   + `// Quelle sind die Überschriften der Kapitel-Dateien und des Glossars.\n`

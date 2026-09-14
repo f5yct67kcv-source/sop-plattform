@@ -1,3 +1,4 @@
+<?php require __DIR__ . '/_guard.php'; ?>
 <!DOCTYPE html>
 <html lang="de">
 <head>
@@ -10,7 +11,7 @@
 <div class="hb-shell">
   <aside class="hb-side" id="hbSide">
     <div class="hb-brand">
-      <a href="index.html" style="text-decoration:none">
+      <a href="index.php" style="text-decoration:none">
         <span class="titel">Handbuch</span>
         <span class="unter">Cockpit von GuardOpS</span>
       </a>
@@ -23,33 +24,33 @@
     <div class="hb-nav-wrap">
       <div class="hb-gruppe">Einstieg</div>
       <ul class="hb-nav">
-        <li><a href="index.html">Übersicht</a></li>
-        <li><a href="erste-schritte.html" class="aktiv">Erste Schritte</a></li>
+        <li><a href="index.php">Übersicht</a></li>
+        <li><a href="erste-schritte.php" class="aktiv">Erste Schritte</a></li>
       </ul>
       <div class="hb-gruppe">Erfassung (App)</div>
       <ul class="hb-nav">
-        <li><a href="erfassung.html">Erfassung</a></li>
+        <li><a href="erfassung.php">Erfassung</a></li>
       </ul>
       <div class="hb-gruppe">Cockpit</div>
       <ul class="hb-nav">
-        <li><a href="planung.html">Planung</a></li>
-        <li><a href="kunden.html">Kunden</a></li>
-        <li><a href="personal.html">Personal</a></li>
-        <li><a href="lohn.html">Lohn</a></li>
-        <li><a href="abgleich.html">Abgleich</a></li>
-        <li><a href="betrieb.html">Betrieb</a></li>
+        <li><a href="planung.php">Planung</a></li>
+        <li><a href="kunden.php">Kunden</a></li>
+        <li><a href="personal.php">Personal</a></li>
+        <li><a href="lohn.php">Lohn</a></li>
+        <li><a href="abgleich.php">Abgleich</a></li>
+        <li><a href="betrieb.php">Betrieb</a></li>
       </ul>
       <div class="hb-gruppe">Weitere Oberflächen</div>
       <ul class="hb-nav">
-        <li><a href="kundenportal.html">Kundenportal</a></li>
+        <li><a href="kundenportal.php">Kundenportal</a></li>
       </ul>
       <div class="hb-gruppe">Nachschlagen</div>
       <ul class="hb-nav">
-        <li><a href="glossar.html">Glossar</a></li>
+        <li><a href="glossar.php">Glossar</a></li>
       </ul>
     </div>
     <div class="hb-side-fuss">
-      Aus dem Quelltext zusammengestellt, siehe Hinweis auf der <a href="index.html">Übersicht</a>.
+      Aus dem Quelltext zusammengestellt, siehe Hinweis auf der <a href="index.php">Übersicht</a>.
     </div>
   </aside>
 
@@ -235,19 +236,19 @@
       verändert werden können.</p>
 
       <div class="hb-begriffe">
-        <a href="glossar.html#rolle">Rolle</a>
-        <a href="glossar.html#recht">Recht</a>
-        <a href="glossar.html#bereich-recht">Bereich (Rechte)</a>
-        <a href="glossar.html#stufe">Stufe</a>
-        <a href="glossar.html#zwei-faktor">Zwei-Faktor-Anmeldung</a>
-        <a href="glossar.html#sitzung">Sitzung</a>
+        <a href="glossar.php#rolle">Rolle</a>
+        <a href="glossar.php#recht">Recht</a>
+        <a href="glossar.php#bereich-recht">Bereich (Rechte)</a>
+        <a href="glossar.php#stufe">Stufe</a>
+        <a href="glossar.php#zwei-faktor">Zwei-Faktor-Anmeldung</a>
+        <a href="glossar.php#sitzung">Sitzung</a>
       </div>
 
       <p class="hb-fussnote">Quelle: <code>backend/rechte.php</code>,
       <code>backend/api/login.php</code>, <code>backend/zweifaktor.php</code>
       und die zugehörigen Endpunkte, gelesen am 11.09.2026. Nicht am
       laufenden Cockpit nachgeprüft — siehe Hinweis auf der
-      <a href="index.html">Übersicht</a>.</p>
+      <a href="index.php">Übersicht</a>.</p>
 
     </div>
   </div>
