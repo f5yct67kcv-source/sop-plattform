@@ -14,6 +14,7 @@ require_recht($user, 'einsaetze_schreiben');
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(['status' => 'error', 'message' => 'nur POST'], 405);
 }
+ki_aufruf_pruefen(db(), (int)$user['id']);
 
 $input = json_decode(file_get_contents('php://input'), true) ?? [];
 $bild = trim((string)($input['bild'] ?? ''));

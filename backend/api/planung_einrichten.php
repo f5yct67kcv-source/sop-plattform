@@ -1899,6 +1899,18 @@ CREATE TABLE IF NOT EXISTS lohnlauf_zeile (
   KEY idx_support_zugriff_freigabe (freigabe_id, zeitpunkt)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+// Kostenbremse gegen die vier KI-Endpunkte (Security-Audit 2026-09-14):
+// jeder Aufruf traegt einen Zeitstempel, ki_aufruf_erlaubt() zaehlt die
+// Zeile je Konto im Zeitfenster. Bewusst kein dauerhaftes Protokoll --
+// gleiche Haltung wie bei anmeldeversuche: nur ein Kurzzeitgedaechtnis fuer
+// die Bremse, keine Sammlung, wer wann eine KI-Funktion genutzt hat.
+'ki_aufrufe' => "CREATE TABLE IF NOT EXISTS ki_aufrufe (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  mitarbeiter_id INT NOT NULL,
+  zeitpunkt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_person_zeit (mitarbeiter_id, zeitpunkt)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
 ];
 
 foreach ($tabellen as $name => $sql) {

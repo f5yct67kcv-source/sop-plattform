@@ -17,11 +17,18 @@ require_recht($user, 'einsaetze_schreiben');
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(['status' => 'error', 'message' => 'nur POST'], 405);
 }
+ki_aufruf_pruefen(db(), (int)$user['id']);
 
 $input = json_decode(file_get_contents('php://input'), true) ?? [];
 $text = trim((string)($input['text'] ?? ''));
 if ($text === '') {
     json_response(['status' => 'error', 'message' => 'Text erforderlich'], 400);
+}
+// Ohne Laengenlimit koennte eine einzelne Anfrage beliebig viele Tokens und
+// damit Kosten verursachen -- verstaerkt sonst die Kostenbremse oben
+// (Security-Audit 2026-09-14).
+if (mb_strlen($text) > 4000) {
+    json_response(['status' => 'error', 'message' => 'Der Text ist zu lang (höchstens 4000 Zeichen).'], 400);
 }
 $heute = trim((string)($input['heute'] ?? ''));
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $heute)) {

@@ -710,6 +710,29 @@ if (ohneEinbindung.length) { bad.push('ohne rechte.php: ' + ohneEinbindung.join(
   if (ohneBremse.length) { bad.push('Beleg-Endpunkt ohne Bremse: ' + ohneBremse.join(', ')); }
 }
 
+// KI-Endpunkte: Kostenbremse gegen unbegrenzte Anfragen an einen externen,
+// kostenpflichtigen Anbieter. Namentliche Liste wie beim personal_lesen-Fund
+// oben -- ein fuenfter KI-Endpunkt soll auffallen.
+{
+  const KI_ENDPUNKTE = ['ki_router_parse.php', 'ki_einsatz_bild.php',
+    'ki_planung_parse.php', 'ki_kunden_recherche.php'];
+  const ohneBremse = KI_ENDPUNKTE.filter(f => !/ki_aufruf_pruefen\s*\(/.test(ohneKommentar(f)));
+  check('KRITISCH: jeder KI-Endpunkt hat eine Kostenbremse (ki_aufruf_pruefen)',
+    ohneBremse.length === 0);
+  if (ohneBremse.length) { bad.push('KI-Endpunkt ohne Kostenbremse: ' + ohneBremse.join(', ')); }
+}
+
+// Laengenbegrenzung auf KI-Freitext-Eingaben (verstaerkt sonst die
+// Kostenbremse oben: eine einzelne Anfrage koennte sonst beliebig teuer
+// gemacht werden).
+{
+  const KI_MIT_FREITEXT = ['ki_router_parse.php', 'ki_kunden_recherche.php', 'ki_planung_parse.php'];
+  const ohneLimit = KI_MIT_FREITEXT.filter(f => !/mb_strlen\s*\(\s*\$text\s*\)/.test(ohneKommentar(f)));
+  check('KRITISCH: jeder KI-Endpunkt mit Freitext begrenzt dessen Laenge',
+    ohneLimit.length === 0);
+  if (ohneLimit.length) { bad.push('KI-Endpunkt ohne Laengenbegrenzung: ' + ohneLimit.join(', ')); }
+}
+
 // "Abgeschlossen" (ENT-128): der eigentliche Rechenkern
 // (einsatz_vollstaendig_rapportiert) laeuft echt gegen SQLite in
 // pruef_einsatz_abgeschlossen.php -- hier nur, dass rapport_create.php und

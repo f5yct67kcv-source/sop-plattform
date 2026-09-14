@@ -209,6 +209,57 @@ function ki_fehler_melden(?string $eigenerText = null): void
     ], $f['code']);
 }
 
+// ── Kostenbremse (Security-Audit 2026-09-14) ──────────────────────────
+//
+// Keiner der vier KI-Endpunkte hatte eine Obergrenze: ein einzelnes Konto
+// konnte insbesondere ueber ki_kunden_recherche.php (bis zu vier Runden
+// Sonnet-5 mit Websuche je Aufruf) unbegrenzt Kosten verursachen. Die
+// Bremse zaehlt JEDEN Aufruf, nicht nur erfolgreiche -- die Kosten
+// entstehen beim Absenden an den Anbieter, nicht erst beim Ergebnis.
+const KI_AUFRUFE_FENSTER_MIN = 60;
+const KI_AUFRUFE_MAX = 20;
+
+// Gleiche Haltung wie hat_tabelle_anmeldung() in anmeldung.php: fehlt die
+// Tabelle, wird NICHT gesperrt -- ein fehlendes Kurzzeitgedaechtnis soll
+// niemanden aus dem eigenen Werkzeug aussperren. Der Ausfall wird
+// stattdessen laut geloggt, einmal je Prozess.
+function ki_aufrufe_tabelle_da(PDO $pdo): bool
+{
+    static $da = null;
+    if ($da === null) {
+        $da = (bool)$pdo->query("SHOW TABLES LIKE 'ki_aufrufe'")->fetchColumn();
+        if (!$da) {
+            error_log('SICHERHEIT: Tabelle "ki_aufrufe" fehlt — die Kostenbremse gegen '
+                . 'KI-Missbrauch ist AUSSER BETRIEB. Im Cockpit unten links '
+                . '„Einrichtung" ausfuehren.');
+        }
+    }
+    return $da;
+}
+
+// Prueft die Bremse und beendet den Ablauf selbst, wenn sie greift -- sonst
+// zaehlt sie den laufenden Aufruf mit und kehrt zurueck. Jeder der vier
+// KI-Endpunkte ruft dies als Erstes nach der Rechtepruefung.
+function ki_aufruf_pruefen(PDO $pdo, int $mitarbeiterId): void
+{
+    if (!ki_aufrufe_tabelle_da($pdo)) { return; }
+    $s = $pdo->prepare(
+        'SELECT COUNT(*) FROM ki_aufrufe WHERE mitarbeiter_id = ?
+           AND zeitpunkt > DATE_SUB(NOW(), INTERVAL ' . KI_AUFRUFE_FENSTER_MIN . ' MINUTE)'
+    );
+    $s->execute([$mitarbeiterId]);
+    if ((int)$s->fetchColumn() >= KI_AUFRUFE_MAX) {
+        json_response(['status' => 'error',
+            'message' => 'Diese KI-Funktion wurde in der letzten Stunde zu oft genutzt. Bitte später erneut versuchen.',
+            'grund' => 'zu_haeufig'], 429);
+    }
+    $pdo->prepare('INSERT INTO ki_aufrufe (mitarbeiter_id) VALUES (?)')->execute([$mitarbeiterId]);
+    // Gelegentlich aufraeumen -- gleiches Muster wie anmeld_fehlversuch().
+    if (random_int(1, 20) === 1) {
+        $pdo->exec('DELETE FROM ki_aufrufe WHERE zeitpunkt < DATE_SUB(NOW(), INTERVAL 1 DAY)');
+    }
+}
+
 // Den Rumpf bauen. Eigene Funktion, damit der Fehlerfall ohne Netz und ohne
 // Schluessel pruefbar ist -- in ki_aufruf greift die Schluesselpruefung
 // vorher, und der Fall waere dort nie erreichbar.
