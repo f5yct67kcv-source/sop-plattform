@@ -243,6 +243,20 @@ jobs:
             EFF_VAPID_PRIVATE_PEM_B64="$D_VAPID_PRIVATE_PEM_B64"
             EFF_VAPID_KONTAKT="$D_VAPID_KONTAKT"
             EFF_PUSH_CRON_SCHLUESSEL="$D_PUSH_CRON_SCHLUESSEL"
+            # Der Empfaenger der Demo-ANFRAGEN von der guardops.ch-Homepage
+            # (ENT-563) -- eine andere Sache als diese Demo-UMGEBUNG (ENT-523),
+            # nur der Name ist sich zufaellig aehnlich. Die Demo-Umgebung
+            # betreibt kein eigenes Kontaktformular; leer, aus demselben Grund
+            # wie EFF_GUARDOPS_FTP_* gleich hier drunter und im Staging-Zweig
+            # weiter unten.
+            EFF_DEMO_EMPFAENGER=""
+            # guardops.ch ist die ECHTE Verkaufsdomain, nur fuer Production
+            # gedacht (siehe Pruefung "beide guardops-Schritte laufen nur auf
+            # Production" in test_deploy.mjs). Leer, kein Rueckfall auf die
+            # Production-Werte -- dieselbe Begruendung wie im Staging-Zweig.
+            EFF_GUARDOPS_FTP_HOST=""
+            EFF_GUARDOPS_FTP_USER=""
+            EFF_GUARDOPS_FTP_PASSWORD=""
             # Eigene Adresse (ENT-501), siehe Begruendung im Production-Zweig.
             # Fuer Demo steht die Domain als Environment-Variable DEMO_DOMAIN
             # bereit -- dieselbe, mit der der Verifikationsschritt weiter

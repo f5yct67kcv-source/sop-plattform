@@ -341,7 +341,7 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
   // nur "ANTHROPIC_API_KEY kommt irgendwo vor" verlangt, wuerde grün
   // bleiben, auch wenn er wie bei Production/Staging NICHT in die
   // PFLICHT_FEHLT-Liste des Demo-Zweigs aufgenommen waere.
-  const demoZweig = (/elif \[ "\$IST_DEMO_REF" = "1" \][\s\S]{0,3000}?(?=\n          else)/.exec(workflow) ?? [''])[0];
+  const demoZweig = (/elif \[ "\$IST_DEMO_REF" = "1" \][\s\S]{0,5000}?(?=\n          else)/.exec(workflow) ?? [''])[0];
   check('KRITISCH (ENT-523-N1): DEMO_ANTHROPIC_API_KEY ist im Demo-Zweig ein PFLICHT-Secret -- anders als bei Production und Staging',
     /\[ -z "\$EFF_ANTHROPIC_API_KEY" \][\s\S]{0,80}PFLICHT_FEHLT="\$PFLICHT_FEHLT DEMO_ANTHROPIC_API_KEY"/.test(demoZweig));
 
