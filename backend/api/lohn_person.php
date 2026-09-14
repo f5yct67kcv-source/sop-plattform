@@ -221,6 +221,21 @@ $eintragId = (int)($input['eintrag_id'] ?? 0);
 if ($loeschen) {
     $tabelle = ['ansatz' => 'lohn_ansatz', 'abzug' => 'lohn_person', 'zahlung' => 'lohn_zahlung'][$was];
     if ($eintragId <= 0) { json_response(['status' => 'error', 'message' => 'eintrag_id fehlt'], 400); }
+    // lohn_ansatz/lohn_person sind historisiert (Kopfkommentar oben): eine
+    // Zeile, deren Gueltigkeitszeitraum bereits in einem freigegebenen/
+    // ausbezahlten Lohnlauf gerechnet wurde, bleibt stehen. lohn_zahlung hat
+    // kein Gueltigkeitsdatum und ist davon nicht betroffen (Security-Audit
+    // 2026-09-14).
+    if ($tabelle !== 'lohn_zahlung') {
+        $vorhanden = $pdo->prepare("SELECT gueltig_ab FROM $tabelle WHERE id = ? AND mitarbeiter_id = ?");
+        $vorhanden->execute([$eintragId, $id]);
+        $gueltigAb = $vorhanden->fetchColumn();
+        if ($gueltigAb !== false && lohn_person_regel_gesperrt($pdo, $tabelle, $id, (string)$gueltigAb)) {
+            json_response(['status' => 'error',
+                'message' => 'Dieser Zeitraum wurde bereits in einem freigegebenen oder ausbezahlten '
+                           . 'Lohnlauf verwendet und lässt sich nicht mehr löschen.'], 409);
+        }
+    }
     $del = $pdo->prepare("DELETE FROM $tabelle WHERE id = ? AND mitarbeiter_id = ?");
     $del->execute([$eintragId, $id]);
     json_response(lohn_person_lesen($id, $stichtag));

@@ -42,6 +42,7 @@ require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../rechte.php';
 require_once __DIR__ . '/../planung.php';
 require_once __DIR__ . '/../lohn.php';
+require_once __DIR__ . '/../lohnlauf.php';   // lohn_abzug_gesperrt() (Security-Audit 2026-09-14)
 
 $user = require_session();
 require_recht($user, 'lohn_lesen');
@@ -132,6 +133,17 @@ $pdo = db();
 
 if (!empty($input['loeschen'])) {
     if ($id <= 0) { json_response(['status' => 'error', 'message' => 'id fehlt'], 400); }
+    // Ein Zeitraum, der bereits in einem freigegebenen/ausbezahlten Lohnlauf
+    // gerechnet wurde, bleibt stehen -- "wird nur angehaengt" gilt auch fuers
+    // Loeschen (Security-Audit 2026-09-14).
+    $vorhanden = $pdo->prepare('SELECT gueltig_ab, gueltig_bis FROM lohn_abzug WHERE id = ?');
+    $vorhanden->execute([$id]);
+    $z = $vorhanden->fetch();
+    if ($z && lohn_abzug_gesperrt($pdo, (string)$z['gueltig_ab'], $z['gueltig_bis'])) {
+        json_response(['status' => 'error',
+            'message' => 'Dieser Zeitraum wurde bereits in einem freigegebenen oder ausbezahlten '
+                       . 'Lohnlauf verwendet und lässt sich nicht mehr löschen.'], 409);
+    }
     $pdo->prepare('DELETE FROM lohn_abzug WHERE id = ?')->execute([$id]);
     $liste = abzuege_lesen();
     json_response(['status' => 'ok', 'abzuege' => $liste, 'fehlend' => abzuege_fehlend($liste),
@@ -212,6 +224,20 @@ $bem = trim((string)($input['bemerkung'] ?? '')) ?: null;
 $werte = [$schluessel, lohn_abzug_schluessel()[$schluessel], $ab, $bis ?: null,
           $satzBp, $fix, $hoechst, $quelle, $bem, (int)$user['id']];
 if ($id > 0) {
+    // Derselbe Schutz wie beim Loeschen: ein bereits verwendeter Zeitraum
+    // wird nicht mehr umdatiert oder umgerechnet (Security-Audit
+    // 2026-09-14). Geprueft wird der BISHERIGE Zeitraum der Zeile, nicht der
+    // neu eingegebene -- eine Korrektur an einer noch nicht verwendeten
+    // Zeile bleibt moeglich.
+    $vorhanden = $pdo->prepare('SELECT gueltig_ab, gueltig_bis FROM lohn_abzug WHERE id = ?');
+    $vorhanden->execute([$id]);
+    $z = $vorhanden->fetch();
+    if ($z && lohn_abzug_gesperrt($pdo, (string)$z['gueltig_ab'], $z['gueltig_bis'])) {
+        json_response(['status' => 'error',
+            'message' => 'Dieser Zeitraum wurde bereits in einem freigegebenen oder ausbezahlten '
+                       . 'Lohnlauf verwendet und lässt sich nicht mehr ändern. '
+                       . 'Ein neuer Satz mit späterem Gültig-ab-Datum bleibt möglich.'], 409);
+    }
     $werte[] = $id;
     $pdo->prepare(
         'UPDATE lohn_abzug SET schluessel = ?, bezeichnung = ?, gueltig_ab = ?, gueltig_bis = ?,

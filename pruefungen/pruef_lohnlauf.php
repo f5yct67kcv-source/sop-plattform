@@ -655,5 +655,68 @@ pruef('Und der Hinweis nennt weiterhin das Merkblatt, nicht die erfasste Quelle'
     str_contains((string)$zn['ahv']['hinweis'], 'Merkblatt 2.01')
     && !str_contains((string)$zn['ahv']['hinweis'], 'erfunden'));
 
+// ══════════ AENDERUNGSSCHUTZ DES REGELWERKS (Security-Audit 2026-09-14) ══
+//
+// lohn_abzug_gesperrt()/lohn_person_regel_gesperrt() entscheiden, ob ein
+// Zeitraum bereits in einem freigegebenen/ausbezahlten Lohnlauf verwendet
+// wurde. Echt gegen SQLite geprueft, nicht nur ob der Aufruf im Quelltext
+// steht -- sonst faellt eine falsche Bedingung (z.B. Status- oder
+// Datumsvergleich vertauscht) nie auf.
+$pdo->exec('CREATE TABLE lohnlauf (id INTEGER PRIMARY KEY, periode_von TEXT, periode_bis TEXT,
+            status TEXT)');
+$pdo->exec('CREATE TABLE lohnlauf_person (lauf_id INT, mitarbeiter_id INT)');
+
+// ── lohn_abzug: eigenes gueltig_bis, keine Personenbindung ──────────────
+$pdo->exec("INSERT INTO lohn_abzug VALUES (30,'bvg','BVG','2026-01-01',NULL,900,NULL,NULL,'Test')");
+pruef('Ohne jeden Lohnlauf ist ein Zeitraum nicht gesperrt',
+    lohn_abzug_gesperrt($pdo, '2026-01-01', null) === false);
+
+$pdo->exec("INSERT INTO lohnlauf VALUES (1,'2026-03-01','2026-03-31','entwurf')");
+pruef('KRITISCH: ein blosser Entwurf sperrt noch nicht',
+    lohn_abzug_gesperrt($pdo, '2026-01-01', null) === false);
+
+$pdo->exec("INSERT INTO lohnlauf VALUES (2,'2026-05-01','2026-05-31','freigegeben')");
+pruef('KRITISCH: ein freigegebener Lohnlauf sperrt einen offenen (gueltig_bis NULL) Zeitraum, der ihn ueberdeckt',
+    lohn_abzug_gesperrt($pdo, '2026-01-01', null) === true);
+
+$pdo->exec("INSERT INTO lohn_abzug VALUES (31,'bvg','BVG','2026-07-01','2026-07-31',900,NULL,NULL,'Test')");
+pruef('Ein Zeitraum ausserhalb jedes freigegebenen/ausbezahlten Lohnlaufs bleibt frei',
+    lohn_abzug_gesperrt($pdo, '2026-07-01', '2026-07-31') === false);
+
+$pdo->exec("INSERT INTO lohnlauf VALUES (3,'2026-09-01','2026-09-30','ausbezahlt')");
+pruef('KRITISCH: auch "ausbezahlt" sperrt, nicht nur "freigegeben"',
+    lohn_abzug_gesperrt($pdo, '2026-09-01', '2026-09-30') === true);
+
+// ── lohn_ansatz/lohn_person: kein eigenes gueltig_bis, Grenze ist die
+// naechste Zeile derselben Person ───────────────────────────────────────
+$MA_SPERR = 77;
+$pdo->exec("INSERT INTO lohn_ansatz (id, mitarbeiter_id, gueltig_ab, kategorie, ansatz_rappen)
+            VALUES (90, $MA_SPERR, '2026-01-01', 'C', 2500)");
+pruef('Ohne verknuepften Lohnlauf ist die Zeile nicht gesperrt',
+    lohn_person_regel_gesperrt($pdo, 'lohn_ansatz', $MA_SPERR, '2026-01-01') === false);
+
+$pdo->exec("INSERT INTO lohnlauf VALUES (4,'2026-05-01','2026-05-31','freigegeben')");
+$pdo->exec("INSERT INTO lohnlauf_person VALUES (4, $MA_SPERR)");
+pruef('KRITISCH: ein freigegebener Lohnlauf einer anderen Person sperrt NICHT',
+    lohn_person_regel_gesperrt($pdo, 'lohn_ansatz', 999, '2026-01-01') === false);
+pruef('KRITISCH: ein freigegebener Lohnlauf DIESER Person im offenen Zeitraum sperrt',
+    lohn_person_regel_gesperrt($pdo, 'lohn_ansatz', $MA_SPERR, '2026-01-01') === true);
+
+// Eine zweite, spaetere Zeile derselben Person setzt die Grenze der ersten:
+// ein Lohnlauf NACH dieser Grenze darf nur noch die neue Zeile sperren, die
+// laengst abgeloeste erste nicht mehr. Eigene Person (78), damit der bereits
+// verknuepfte Mai-Lohnlauf (4) von oben das Ergebnis nicht verfaelscht.
+$MA_GRENZE = 78;
+$pdo->exec("INSERT INTO lohn_ansatz (id, mitarbeiter_id, gueltig_ab, kategorie, ansatz_rappen)
+            VALUES (91, $MA_GRENZE, '2026-01-01', 'C', 2500)");
+$pdo->exec("INSERT INTO lohn_ansatz (id, mitarbeiter_id, gueltig_ab, kategorie, ansatz_rappen)
+            VALUES (92, $MA_GRENZE, '2026-06-01', 'C', 2600)");
+$pdo->exec("INSERT INTO lohnlauf VALUES (5,'2026-08-01','2026-08-31','freigegeben')");
+$pdo->exec("INSERT INTO lohnlauf_person VALUES (5, $MA_GRENZE)");
+pruef('KRITISCH: die abgeloeste erste Zeile bleibt fuer einen Lohnlauf NACH ihrer Grenze (August) ungesperrt',
+    lohn_person_regel_gesperrt($pdo, 'lohn_ansatz', $MA_GRENZE, '2026-01-01') === false);
+pruef('KRITISCH: die neue, noch gueltige Zeile wird vom selben Lohnlauf (August) gesperrt',
+    lohn_person_regel_gesperrt($pdo, 'lohn_ansatz', $MA_GRENZE, '2026-06-01') === true);
+
 echo $ok . " Pruefungen bestanden\n";
 if ($bad) { echo count($bad) . " FEHLGESCHLAGEN:\n - " . implode("\n - ", $bad) . "\n"; exit(1); }

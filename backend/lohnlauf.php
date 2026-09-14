@@ -849,3 +849,55 @@ function lohnlauf_person(PDO $pdo, array $ma, string $von, string $bis): array
     }
     return $kopf;
 }
+
+// ══════════════════════════════════════════════════════════════════════════
+// AENDERUNGSSCHUTZ DES REGELWERKS (Security-Audit 2026-09-14)
+//
+// lohn_abzuege.php und lohn_person.php liessen sich frei aendern/loeschen,
+// auch fuer Zeitraeume, die bereits in einem freigegebenen oder ausbezahlten
+// Lohnlauf verwendet wurden -- ein Widerspruch zum eigenen Kopfkommentar
+// ("wird nur angehaengt"/"wird nie ueberschrieben") und zu CLAUDE.md Teil B
+// ("eine spaetere Revision darf abgeschlossene Abrechnungen nie rueckwirkend
+// veraendern"). Ein bereits ERZEUGTER Lohnlauf selbst ist davon nicht
+// betroffen -- lauf_lesen() liest ausschliesslich aus den Snapshot-Tabellen
+// lohnlauf_person/lohnlauf_zeile, nie live aus diesen Regelwerk-Tabellen.
+// Geschuetzt wird die Nachvollziehbarkeit des Regelwerks selbst: eine Zeile,
+// die schon einmal gerechnet wurde, muss dieselbe bleiben.
+//
+// 'entwurf' sperrt noch nicht -- ein Entwurf wird ohnehin verworfen oder neu
+// gerechnet, bevor er etwas bedeutet.
+const LOHN_REGELWERK_SPERR_STATUS = ['freigegeben', 'ausbezahlt'];
+
+// lohn_abzug hat ein eigenes gueltig_bis -- direkter Bereichsvergleich gegen
+// jeden betriebsweiten Lohnlauf im ueberlappenden Zeitraum (keine
+// Personenbindung, der Satz gilt fuer alle).
+function lohn_abzug_gesperrt(PDO $pdo, string $gueltigAb, ?string $gueltigBis): bool
+{
+    $s = $pdo->prepare(
+        "SELECT COUNT(*) FROM lohnlauf
+          WHERE status IN ('" . implode("','", LOHN_REGELWERK_SPERR_STATUS) . "')
+            AND periode_von <= ? AND periode_bis >= ?"
+    );
+    $s->execute([$gueltigBis ?? '9999-12-31', $gueltigAb]);
+    return (int)$s->fetchColumn() > 0;
+}
+
+// lohn_ansatz/lohn_person haben kein eigenes gueltig_bis -- eine Zeile gilt
+// bis zur naechsten Zeile derselben Person (oder offen in die Zukunft, wenn
+// es keine gibt). $tabelle ist nie aus einer Anfrage abgeleitet, sondern
+// hier fest 'lohn_ansatz' oder 'lohn_person'.
+function lohn_person_regel_gesperrt(PDO $pdo, string $tabelle, int $mitarbeiterId, string $gueltigAb): bool
+{
+    $n = $pdo->prepare("SELECT MIN(gueltig_ab) FROM $tabelle WHERE mitarbeiter_id = ? AND gueltig_ab > ?");
+    $n->execute([$mitarbeiterId, $gueltigAb]);
+    $naechste = $n->fetchColumn();
+    $bis = $naechste ? date('Y-m-d', strtotime((string)$naechste . ' -1 day')) : '9999-12-31';
+    $s = $pdo->prepare(
+        "SELECT COUNT(*) FROM lohnlauf l
+           JOIN lohnlauf_person lp ON lp.lauf_id = l.id AND lp.mitarbeiter_id = ?
+          WHERE l.status IN ('" . implode("','", LOHN_REGELWERK_SPERR_STATUS) . "')
+            AND l.periode_von <= ? AND l.periode_bis >= ?"
+    );
+    $s->execute([$mitarbeiterId, $bis, $gueltigAb]);
+    return (int)$s->fetchColumn() > 0;
+}

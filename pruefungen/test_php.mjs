@@ -733,6 +733,25 @@ if (ohneEinbindung.length) { bad.push('ohne rechte.php: ' + ohneEinbindung.join(
   if (ohneLimit.length) { bad.push('KI-Endpunkt ohne Laengenbegrenzung: ' + ohneLimit.join(', ')); }
 }
 
+// lohn_abzuege.php/lohn_person.php: DELETE und (bei lohn_abzuege.php) UPDATE
+// muessen den Aenderungsschutz aufrufen (echtes Verhalten gegen SQLite in
+// pruef_lohnlauf.php geprueft, hier nur die Verdrahtung). Ohne diese Prueung
+// koennte ein kuenftiger Umbau den Aufruf entfernen, ohne dass es auffaellt.
+{
+  const abzuege = ohneKommentar('lohn_abzuege.php');
+  const abzuegeVerdrahtet = /lohn_abzug_gesperrt\s*\(/.test(abzuege)
+    && (abzuege.match(/lohn_abzug_gesperrt\s*\(/g) || []).length >= 2;
+  check('KRITISCH: lohn_abzuege.php prueft den Aenderungsschutz bei Loeschen UND Aendern',
+    abzuegeVerdrahtet);
+  if (!abzuegeVerdrahtet) { bad.push('lohn_abzuege.php: lohn_abzug_gesperrt() fehlt oder nur einmal verdrahtet'); }
+
+  const person = ohneKommentar('lohn_person.php');
+  const personVerdrahtet = /lohn_person_regel_gesperrt\s*\(/.test(person);
+  check('KRITISCH: lohn_person.php prueft den Aenderungsschutz beim Loeschen',
+    personVerdrahtet);
+  if (!personVerdrahtet) { bad.push('lohn_person.php: lohn_person_regel_gesperrt() fehlt'); }
+}
+
 // "Abgeschlossen" (ENT-128): der eigentliche Rechenkern
 // (einsatz_vollstaendig_rapportiert) laeuft echt gegen SQLite in
 // pruef_einsatz_abgeschlossen.php -- hier nur, dass rapport_create.php und
