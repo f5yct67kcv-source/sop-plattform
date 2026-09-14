@@ -609,6 +609,91 @@ if (ohneEinbindung.length) { bad.push('ohne rechte.php: ' + ohneEinbindung.join(
   if (!(prueftSystem && getrennteUpdates)) { bad.push('lohnarten.php: Systemschutz beim Aendern fehlt oder unvollstaendig'); }
 }
 
+// ── Nachtrag Security-Audit 2026-09-14 -- sechs weitere Funde ──────────────
+
+// einsatz_abgleich.php: die Zeit-Validierung muss den Wertebereich pruefen,
+// nicht nur die Ziffernanzahl -- "25:99" floss frueher unbemerkt in die
+// GAV-Zeitrechnung ein. Das tatsaechliche Muster wird aus der Datei
+// extrahiert und in JS gegen echte Gut-/Schlechtwerte geprueft, statt nur
+// nachzusehen, ob irgendein Muster da ist.
+{
+  const quelle = readFileSync(`${WURZEL}/backend/api/einsatz_abgleich.php`, 'utf8');
+  const treffer = quelle.match(/return preg_match\('\/(\^.*?\$)\/'/);
+  const muster = treffer ? new RegExp(treffer[1]) : null;
+  const gueltig = !!muster && muster.test('23:59') && muster.test('00:00');
+  const ungueltig = !!muster && !muster.test('25:99') && !muster.test('24:00') && !muster.test('12:60');
+  check('KRITISCH: die Zeit-Validierung im Abgleich akzeptiert nur gueltige Uhrzeiten (00-23:00-59)',
+    gueltig && ungueltig);
+  if (!(gueltig && ungueltig)) { bad.push('einsatz_abgleich.php: Zeit-Regex akzeptiert ungueltige Uhrzeiten'); }
+}
+
+// abwesenheit_saldo.php: altersjahr ist aus dem vertraulichen Feld
+// geburtsdatum abgeleitet und darf nicht an blosses personal_lesen
+// durchgereicht werden (nur eigene Person oder personal_vertraulich_lesen).
+{
+  const quelle = ohneKommentar('abwesenheit_saldo.php');
+  const geschuetzt = /personal_vertraulich_lesen/.test(quelle) && /altersjahr/.test(quelle);
+  check('KRITISCH: abwesenheit_saldo.php schuetzt das abgeleitete Lebensalter wie ein vertrauliches Feld',
+    geschuetzt);
+  if (!geschuetzt) { bad.push('abwesenheit_saldo.php: altersjahr ohne personal_vertraulich-Schutz'); }
+}
+
+// KI-Endpunkte: Namen gehen an einen externen Anbieter -- dieselbe
+// Rechtestufe wie der direkte Weg (mitarbeiter_list.php verlangt
+// personal_lesen). Namentliche Liste, kein Muster: ein vierter KI-Endpunkt
+// soll auffallen, nicht stillschweigend durchrutschen.
+{
+  const KI_MIT_NAMENSLISTE = ['ki_router_parse.php', 'ki_einsatz_bild.php', 'ki_planung_parse.php'];
+  const ohnePersonalLesen = KI_MIT_NAMENSLISTE.filter(f =>
+    !/darf\(\$user,\s*'personal_lesen'\)/.test(ohneKommentar(f)));
+  check('KRITISCH: jeder KI-Endpunkt mit Mitarbeiter-Namensliste prueft personal_lesen',
+    ohnePersonalLesen.length === 0);
+  if (ohnePersonalLesen.length) { bad.push('KI-Endpunkt ohne personal_lesen: ' + ohnePersonalLesen.join(', ')); }
+}
+
+// lohnarten.php: die Spalte 'bemessung' entscheidet, OB eine Lohnart
+// ueberhaupt einen Betrag traegt -- ohne sie in INSERT und UPDATE waere jede
+// neu angelegte Lohnart wirkungslos, ohne dass das sichtbar waere.
+{
+  const quelle = ohneKommentar('lohnarten.php');
+  const insertZweig = quelle.slice(quelle.indexOf('INSERT INTO lohnart'));
+  const start = quelle.indexOf('if ($id > 0)');
+  const updateZweig = quelle.slice(start, quelle.indexOf('INSERT INTO lohnart', start));
+  // Das SQL-Zuweisungsmuster, nicht das blosse Wort -- sonst haette schon
+  // die PHP-Variable $bemessung im array_merge() die Pruefung gruen gehalten,
+  // ohne dass die Spalte tatsaechlich in der SQL-Anweisung steht.
+  const inInsert = /,\s*bemessung\s*,/.test(insertZweig.replace(/\s+/g, ' '));
+  const inUpdate = /bemessung\s*=\s*\?/.test(updateZweig);
+  check('KRITISCH: lohnarten.php setzt die Spalte bemessung beim Anlegen und Aendern',
+    inInsert && inUpdate);
+  if (!(inInsert && inUpdate)) { bad.push('lohnarten.php: bemessung fehlt in INSERT und/oder UPDATE'); }
+}
+
+// betreiber.php: be_tabellen_anlegen() darf den rohen PDO-Fehlertext nicht
+// an den Client durchreichen (kann Host/Benutzer der DB-Verbindung
+// enthalten) -- wie an den beiden anderen Fehlerstellen derselben Datei.
+{
+  const quelle = readFileSync(`${WURZEL}/backend/betreiber.php`, 'utf8');
+  const start = quelle.indexOf('function be_tabellen_anlegen');
+  const ende = quelle.indexOf('\nfunction ', start + 1);
+  const funktion = quelle.slice(start, ende === -1 ? undefined : ende);
+  const ohneLeck = !/\$e->getMessage\(\)/.test(funktion);
+  check('KRITISCH: be_tabellen_anlegen() gibt den rohen Treiberfehler nicht an den Client zurueck',
+    ohneLeck);
+  if (!ohneLeck) { bad.push('betreiber.php: be_tabellen_anlegen() reicht $e->getMessage() durch'); }
+}
+
+// portal.html: bk.logo (data:-URI aus dem Backend) muss wie jede andere
+// Interpolation ueber esc() laufen, unabhaengig davon, dass die serverseitige
+// MIME-Pruefung aktuell schon schuetzt (Verteidigung in der Tiefe).
+{
+  const quelle = readFileSync(`${WURZEL}/portal.html`, 'utf8');
+  const ungeschuetzt = quelle.includes("+ bk.logo +");
+  check('KRITISCH: portal.html escaped bk.logo vor der Interpolation',
+    !ungeschuetzt);
+  if (ungeschuetzt) { bad.push('portal.html: bk.logo ohne esc()'); }
+}
+
 // "Abgeschlossen" (ENT-128): der eigentliche Rechenkern
 // (einsatz_vollstaendig_rapportiert) laeuft echt gegen SQLite in
 // pruef_einsatz_abgeschlossen.php -- hier nur, dass rapport_create.php und

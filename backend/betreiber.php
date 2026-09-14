@@ -878,7 +878,10 @@ function be_tabellen_anlegen(PDO $pdo, bool $nurPruefen = false): array
             $pdo->exec($sql);
             $getan[] = 'Tabelle ' . $name . ' angelegt';
         } catch (Throwable $e) {
-            $fehler[] = 'Tabelle ' . $name . ' — ' . $e->getMessage();
+            // Wie bei mandant_stand()/mandant_groesse(): Der Treibertext kann
+            // Host und Benutzer der Verbindung tragen und geht nicht nach
+            // aussen (Security-Audit 2026-09-14).
+            $fehler[] = 'Tabelle ' . $name . ' konnte nicht angelegt werden.';
         }
     }
     return ['getan' => $getan, 'offen' => $offen, 'fehler' => $fehler];

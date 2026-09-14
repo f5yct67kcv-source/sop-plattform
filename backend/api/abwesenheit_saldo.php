@@ -95,6 +95,15 @@ if ($ergebnis['anspruch_tage'] !== null) {
     }
 }
 
+// altersjahr ist aus dem vertraulichen Feld geburtsdatum abgeleitet (faktisch
+// das Geburtsjahr) -- nur mit personal_vertraulich_lesen oder fuer die eigene
+// Person ausliefern, sonst haette blosses personal_lesen (z.B. Administrator)
+// Zugriff auf ein Feld, das personal_vertraulich eigentlich schuetzt
+// (Security-Audit 2026-09-14).
+if ($mitarbeiterId !== (int)$user['id'] && !darf($user, 'personal_vertraulich_lesen')) {
+    unset($ergebnis['altersjahr']);
+}
+
 json_response(['status' => 'ok', 'eingerichtet' => true, 'jahr' => $jahr,
     'mitarbeiter_id' => $mitarbeiterId] + $ergebnis + [
     'bezogen_tage' => $bezogen,

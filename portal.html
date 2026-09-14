@@ -2674,7 +2674,7 @@ function blattEinsatzFuellen(b, bk) {
     + '<td style="' + td + ';text-align:right;font-weight:600">' + zahl2(p.netto_h) + ' h</td>'
     + '</tr>').join('');
   const logo = bk.logo
-    ? '<img src="' + bk.logo + '" alt="" style="max-height:88px;max-width:260px;display:block;'
+    ? '<img src="' + esc(bk.logo) + '" alt="" style="max-height:88px;max-width:260px;display:block;'
       + 'margin:0 auto 8px">' : '';
   const bkText = (bk.firma
       ? '<div style="font-weight:700;color:#14161A;font-size:13px">' + esc(bk.firma) + '</div>' : '')
@@ -2878,7 +2878,7 @@ function blattFuellen(d, bk) {
     + '</td></tr>').join('');
 
   const logo = bk.logo
-    ? '<img src="' + bk.logo + '" alt="" style="max-height:88px;max-width:260px;display:block;'
+    ? '<img src="' + esc(bk.logo) + '" alt="" style="max-height:88px;max-width:260px;display:block;'
       + 'margin:0 auto 8px">' : '';
   const bkText = (bk.firma
       ? '<div style="font-weight:700;color:#14161A;font-size:13px">' + esc(bk.firma) + '</div>' : '')

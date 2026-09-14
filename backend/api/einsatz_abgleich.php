@@ -55,7 +55,10 @@ if (count($zeilen) > 500) {
 
 $zeit = function ($wert): ?string {
     $wert = trim((string)$wert);
-    return preg_match('/^\d{2}:\d{2}(:\d{2})?$/', $wert) ? substr($wert, 0, 5) : null;
+    // Wertebereich pruefen, nicht nur Ziffernanzahl -- "25:99" passte hier
+    // frueher durch und floss unbemerkt falsch in die GAV-Zeitrechnung ein
+    // (Security-Audit 2026-09-14).
+    return preg_match('/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/', $wert) ? substr($wert, 0, 5) : null;
 };
 
 $pdo = db();

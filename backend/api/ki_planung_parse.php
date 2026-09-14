@@ -95,9 +95,13 @@ if ($art === 'masterplan') {
 }
 
 // ── Zuteilung
-$mitarbeiter = db()->query(
+// Namen gehen in den Prompt an den externen KI-Anbieter -- dieselbe
+// Rechtestufe wie beim direkten Weg (mitarbeiter_list.php verlangt
+// personal_lesen). Ohne das Recht bleibt die Liste leer statt den
+// Personalbestand extern preiszugeben (Security-Audit 2026-09-14).
+$mitarbeiter = darf($user, 'personal_lesen') ? db()->query(
     'SELECT id, name, vorname, nachname FROM mitarbeiter WHERE aktiv = 1 ORDER BY name'
-)->fetchAll();
+)->fetchAll() : [];
 
 $e = anthropic_extract_zuteilung($text, $vorlagen, $mitarbeiter, $heute, $monat);
 if ($e === null) {

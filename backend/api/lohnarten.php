@@ -26,7 +26,7 @@ function lohnarten_lesen(): array
     return array_map(function ($r) {
         foreach (['id','satz_bp','system','sortierung','aktiv','ahv_pflichtig',
                   'ferien_pflichtig','ml13_pflichtig','bvg_pflichtig',
-                  'uvg_pflichtig','qst_pflichtig'] as $f) {
+                  'uvg_pflichtig','qst_pflichtig','bemessung'] as $f) {
             if (isset($r[$f]) && $r[$f] !== null) { $r[$f] = (int)$r[$f]; }
         }
         return $r;
@@ -100,6 +100,12 @@ $gav    = trim((string)($input['gav_grundlage'] ?? '')) ?: null;
 $sortierung = (int)($input['sortierung'] ?? 100);
 $aktiv  = isset($input['aktiv']) && !$input['aktiv'] ? 0 : 1;
 $bem    = trim((string)($input['bemerkung'] ?? '')) ?: null;
+// Beantwortet eine andere Frage als die sechs *_pflichtig-Kennzeichen: OB die
+// Zeile ueberhaupt einen Betrag der Abrechnungsperiode traegt (siehe
+// lohnart_startbestand() in lohn.php). Ohne diese Spalte bliebe jede ueber
+// die Oberflaeche neu angelegte Lohnart wirkungslos (Security-Audit
+// 2026-09-14).
+$bemessung = !empty($input['bemessung']) ? 1 : 0;
 
 if ($id > 0) {
     // Der Schluessel bleibt, was er war -- eine Umbenennung wuerde alte
@@ -125,11 +131,11 @@ if ($id > 0) {
         $pdo->prepare(
             'UPDATE lohnart SET bezeichnung = ?, art = ?, basis_schluessel = ?, satz_bp = ?,
                  ahv_pflichtig = ?, ferien_pflichtig = ?, ml13_pflichtig = ?,
-                 bvg_pflichtig = ?, uvg_pflichtig = ?, qst_pflichtig = ?,
+                 bvg_pflichtig = ?, uvg_pflichtig = ?, qst_pflichtig = ?, bemessung = ?,
                  gav_grundlage = ?, sortierung = ?, aktiv = ?, bemerkung = ?,
                  geaendert_von = ?, geaendert_am = NOW()
              WHERE id = ?'
-        )->execute(array_merge([$bezeichnung, $art, $basis, $satzBp], $kz,
+        )->execute(array_merge([$bezeichnung, $art, $basis, $satzBp], $kz, [$bemessung],
             [$gav, $sortierung, $aktiv, $bem, (int)$user['id'], $id]));
     }
 } else {
@@ -138,11 +144,11 @@ if ($id > 0) {
             'INSERT INTO lohnart
                (schluessel, bezeichnung, art, basis_schluessel, satz_bp,
                 ahv_pflichtig, ferien_pflichtig, ml13_pflichtig,
-                bvg_pflichtig, uvg_pflichtig, qst_pflichtig,
+                bvg_pflichtig, uvg_pflichtig, qst_pflichtig, bemessung,
                 gav_grundlage, system, sortierung, aktiv, bemerkung,
                 geaendert_von, geaendert_am)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,0,?,?,?,?,NOW())'
-        )->execute(array_merge([$schluessel, $bezeichnung, $art, $basis, $satzBp], $kz,
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,0,?,?,?,?,NOW())'
+        )->execute(array_merge([$schluessel, $bezeichnung, $art, $basis, $satzBp], $kz, [$bemessung],
             [$gav, $sortierung, $aktiv, $bem, (int)$user['id']]));
     } catch (Throwable $e) {
         json_response(['status' => 'error',

@@ -41,9 +41,13 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $heute)) {
 }
 
 $kunden = db()->query('SELECT name FROM kunden ORDER BY name')->fetchAll(PDO::FETCH_COLUMN);
-$mitarbeiter = db()->query(
+// Namen gehen in den Prompt an den externen KI-Anbieter -- dieselbe
+// Rechtestufe wie beim direkten Weg (mitarbeiter_list.php verlangt
+// personal_lesen). Ohne das Recht bleibt die Liste leer statt den
+// Personalbestand extern preiszugeben (Security-Audit 2026-09-14).
+$mitarbeiter = darf($user, 'personal_lesen') ? db()->query(
     'SELECT name, vorname, nachname FROM mitarbeiter WHERE aktiv = 1 ORDER BY name'
-)->fetchAll();
+)->fetchAll() : [];
 
 $e = anthropic_extract_einsatz_bild($bild, $mimeType, $kunden, $mitarbeiter, $heute);
 if ($e === null) {
