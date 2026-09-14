@@ -181,14 +181,26 @@ check('KRITISCH: der Name der Runde steht da -- an einem Objekt mit mehreren Run
   (kopf.name?.tx || '') === 'Runde Nacht A');
 check('KRITISCH: das Zeitfenster steht darunter',
   /Zeitfenster \d{2}:\d{2}–\d{2}:\d{2}/.test(kopf.fenster?.tx || ''));
+/* Gegen den GEZEICHNETEN Stand geprueft, nicht gegen eine feste Zahl.
+   Seit ENT-531 erfasst sich ein Punkt, in dessen Bereich man steht, von
+   selbst -- die Fixture hat einen solchen (Punkt 8, genau auf der
+   vorgetaeuschten Position), und damit ist die Zahl der erledigten Punkte
+   keine Konstante der Testdaten mehr. Eine einbetonierte 5 haette hier nur
+   noch das Datum der Fixture geprueft, nicht die Aussage. */
+const fertigN = await page.evaluate(() =>
+  document.querySelectorAll('#rdListe .rd-zeile.rd-fertig').length);
+const gesamtN = await page.evaluate(() =>
+  document.querySelectorAll('#rdListe .rd-zeile').length);
 check('KRITISCH: der Zaehler nennt BEIDE Zahlen und die Einheit (CLAUDE.md: keine Zahl ohne Bezug)',
-  /5\D+9\D*Kontrollpunkten/.test((kopf.zahl?.tx || '').replace(/\s+/g, ' ')));
+  new RegExp(`${fertigN}\\D+${gesamtN}\\D*Kontrollpunkten`)
+    .test((kopf.zahl?.tx || '').replace(/\s+/g, ' ')));
 check('KRITISCH: rechts steht eine Messung, kein Urteil ueber das Tempo',
   /^noch \d+ min$/.test(kopf.rest?.tx || ''));
 // Der Balken ist der einzige Teil, den man nur MESSEN kann: Eine
 // CSS-Breite, die nicht ankommt, faellt im Quelltext nicht auf.
-check('KRITISCH: der Balken zeigt tatsaechlich den Anteil der erledigten Punkte (5 von 9 = 56 %)',
-  kopf.anteil !== null && Math.abs(kopf.anteil - 56) <= 2);
+check('KRITISCH: der Balken zeigt tatsaechlich den Anteil der erledigten Punkte',
+  kopf.anteil !== null
+  && Math.abs(kopf.anteil - Math.round(fertigN / gesamtN * 100)) <= 2);
 // Aufbau: Ueberschrift oben, Wert darunter -- nie umgekehrt (CLAUDE.md).
 check('Zustand steht ueber dem Namen, der Name ueber dem Zeitfenster',
   kopf.lage.t < kopf.name.t && kopf.name.t < kopf.fenster.t
@@ -236,9 +248,25 @@ check('KRITISCH: die Aufgabe am naechsten Punkt steht da, bevor man hingeht',
   /Aufgabe: Fenster pruefen/.test(zeilen[5].meta));
 
 // ══════════ KNOEPFE NUR, WO SIE GEBRAUCHT WERDEN ═════════════════════
-check('KRITISCH: der naechste Punkt zeigt seine drei Knoepfe', zeilen[5].knoepfe === 3);
-check('KRITISCH: wer IM BEREICH eines spaeteren Punktes steht, bekommt dessen Knoepfe ohne Zutun',
-  zeilen[7].knoepfe === 3 && /Du bist im Bereich/.test(zeilen[7].ort));
+/* Seit ENT-531 sind es am naechsten Punkt ZWEI statt drei: Solange die
+   Ortung traegt, erfasst sich ein Geofence-Punkt beim Betreten von selbst --
+   "Bestaetigen" ist nur noch der Rueckfallweg und steht darum nicht da.
+   Ersatzscan und "nicht verfuegbar" bleiben; sie sagen etwas anderes als
+   "bestaetigt" und kann keine Automatik entscheiden. An ihre Stelle tritt
+   ein Hinweis, damit kein leerer Platz zurueckbleibt. */
+check('KRITISCH: der naechste Punkt zeigt seine Knoepfe ohne Aufklappen', zeilen[5].knoepfe === 2);
+check('KRITISCH: statt des Knopfes sagt die Zeile, dass von selbst erfasst wird',
+  await page.evaluate(() => {
+    const el = document.getElementById('rdAuto6');
+    return !!el && el.textContent.trim().length > 10;
+  }));
+/* Und der staerkste Fall von "ohne Zutun": Wer im Bereich eines SPAETEREN
+   Punktes steht, bekommt nicht dessen Knoepfe -- der Punkt ist schon
+   erfasst. Das ist genau die Aenderung aus ENT-531, hier an der laengeren
+   Runde nachgeprueft. Die Reihenfolge ist dabei keine Sperre: Punkt 8 geht
+   vor Punkt 6 durch, wenn man vor Punkt 8 steht. */
+check('KRITISCH: wer IM BEREICH eines spaeteren Punktes steht, hat ihn bereits erfasst',
+  zeilen[7].knoepfe === 0 && /Bestätigt/.test(zeilen[7].text));
 check('KRITISCH: die uebrigen Zeilen bleiben ruhig -- keine Knoepfe',
   zeilen[6].knoepfe === 0);
 check('KRITISCH: eine zugeklappte NFC-Zeile sagt trotzdem, warum hier kein Scan geht',
