@@ -16,6 +16,7 @@
 declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require __DIR__ . '/../belege.php';
+require __DIR__ . '/../anmeldung.php';   // Bremse gegen Token-Raten (ENT-075/Security-Audit 2026-09-14)
 
 function entscheidung_zurueck(string $token): void
 {
@@ -41,10 +42,23 @@ try {
     }
 
     $pdo = db();
+    // Gleiche Bremse wie beleg_oeffentlich.php: nur je Absender-Adresse, kein
+    // gemeinsamer Namensraum ueber alle Tokens (Security-Audit 2026-09-14).
+    $adresse = anmeld_adresse();
+    [, $fehlerAdresse] = anmeld_zaehlen($pdo, 'belegtoken', $adresse);
+    $sperre = anmeld_sperre(0, $fehlerAdresse);
+    if ($sperre > 0) {
+        http_response_code(429);
+        header('Content-Type: text/html; charset=utf-8');
+        echo "Zu viele Anfragen. Bitte in $sperre Minuten erneut versuchen.";
+        exit;
+    }
+
     $s = $pdo->prepare('SELECT id, art, status, gueltig_bis, entscheidung_am FROM belege WHERE versand_token = ?');
     $s->execute([$token]);
     $b = $s->fetch();
     if (!$b) {
+        anmeld_fehlversuch($pdo, 'belegtoken', $adresse);
         http_response_code(404);
         header('Content-Type: text/html; charset=utf-8');
         echo 'Dieser Link ist nicht (mehr) gültig.';

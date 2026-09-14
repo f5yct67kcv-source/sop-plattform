@@ -694,6 +694,22 @@ if (ohneEinbindung.length) { bad.push('ohne rechte.php: ' + ohneEinbindung.join(
   if (ungeschuetzt) { bad.push('portal.html: bk.logo ohne esc()'); }
 }
 
+// Oeffentliche Beleg-Endpunkte (ENT-192): auch ohne Anmeldung eine Bremse
+// gegen wiederholte Anfragen, wie jeder andere anmeldungsfreie Endpunkt im
+// Haus (Login, Passwort-Reset, Portal-Link). Geprueft werden die
+// tatsaechlichen Bausteine der Bremse (Zaehlung UND Sperr-Entscheidung),
+// nicht nur ob irgendein Wort dazu im Code steht.
+{
+  const BELEG_OEFFENTLICH = ['beleg_oeffentlich.php', 'beleg_entscheidung.php'];
+  const ohneBremse = BELEG_OEFFENTLICH.filter(f => {
+    const q = ohneKommentar(f);
+    return !(/anmeld_zaehlen\s*\(/.test(q) && /anmeld_sperre\s*\(/.test(q));
+  });
+  check('KRITISCH: die oeffentlichen Beleg-Endpunkte haben eine Bremse gegen wiederholte Anfragen',
+    ohneBremse.length === 0);
+  if (ohneBremse.length) { bad.push('Beleg-Endpunkt ohne Bremse: ' + ohneBremse.join(', ')); }
+}
+
 // "Abgeschlossen" (ENT-128): der eigentliche Rechenkern
 // (einsatz_vollstaendig_rapportiert) laeuft echt gegen SQLite in
 // pruef_einsatz_abgeschlossen.php -- hier nur, dass rapport_create.php und

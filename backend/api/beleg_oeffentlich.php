@@ -22,6 +22,7 @@ declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require __DIR__ . '/../belege.php';
 require __DIR__ . '/../qrrechnung.php';
+require __DIR__ . '/../anmeldung.php';   // Bremse gegen Token-Raten (ENT-075/Security-Audit 2026-09-14)
 
 function portal_esc(?string $s): string
 {
@@ -109,10 +110,26 @@ try {
     }
 
     $pdo = db();
+    // Nur je Absender-Adresse gebremst (kein Namensraum je Token): Der
+    // Tokenraum selbst (256 Bit) macht Erraten schon praktisch aussichtslos,
+    // die Bremse ist Verteidigung in der Tiefe. Ein GEMEINSAMER Namensraum
+    // ueber alle Tokens haette hier das falsche Verhalten: er wuerde bei
+    // wenigen system-weiten Fehlversuchen ALLE Kunden aussperren, nicht nur
+    // die ratende Adresse (Security-Audit 2026-09-14).
+    $adresse = anmeld_adresse();
+    [, $fehlerAdresse] = anmeld_zaehlen($pdo, 'belegtoken', $adresse);
+    $sperre = anmeld_sperre(0, $fehlerAdresse);
+    if ($sperre > 0) {
+        portal_fehler('Zu viele Anfragen', "Bitte in $sperre Minuten erneut versuchen.", 429);
+    }
+
     $s = $pdo->prepare('SELECT * FROM belege WHERE versand_token = ?');
     $s->execute([$token]);
     $b = $s->fetch();
     if (!$b) {
+        // Nur ECHTE Fehlversuche zaehlen -- ein Kunde, der seinen eigenen
+        // gueltigen Link mehrfach oeffnet, soll sich nicht selbst aussperren.
+        anmeld_fehlversuch($pdo, 'belegtoken', $adresse);
         portal_fehler('Link ungültig', 'Dieser Link ist nicht (mehr) gültig. '
             . 'Bitte wenden Sie sich an den Absender.');
     }
