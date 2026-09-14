@@ -168,7 +168,19 @@ check('Die leeren Pflichtfelder sind als ungueltig markiert und eine Meldung ste
   await desktop.evaluate(() =>
     document.querySelector('[name="firma"]').getAttribute('aria-invalid') === 'true'
     && document.querySelector('[name="email"]').getAttribute('aria-invalid') === 'true'
+    && document.querySelector('[name="telefon"]').getAttribute('aria-invalid') === 'true'
     && document.getElementById('demoMeldung').classList.contains('zeigen')));
+
+// Pflicht heisst auch: man sieht es VOR dem Absenden. Gemessen wird der
+// gerenderte Stern, nicht das Attribut allein -- ein required ohne sichtbares
+// Zeichen erfuehrt der Besucher erst durch die Fehlermeldung.
+check('KRITISCH: jedes Pflichtfeld traegt ein sichtbares Zeichen und required',
+  await desktop.evaluate(() => ['firma', 'name', 'email', 'telefon'].every(n => {
+    const feld = document.querySelector(`[name="${n}"]`);
+    if (!feld || !feld.required) { return false; }
+    const stern = feld.closest('label').querySelector('.pflicht');
+    return !!stern && stern.getBoundingClientRect().width > 0;
+  })));
 
 check('Das Fallenfeld ist da, aber fuer Menschen nicht sichtbar',
   await desktop.evaluate(() => {
@@ -183,6 +195,17 @@ await fuell(desktop, '[name="firma"]', 'Muster Sicherheitsdienst AG');
 await fuell(desktop, '[name="name"]', 'A. Beispielperson');
 await fuell(desktop, '[name="email"]', 'a.beispiel@example.invalid');
 await fuell(desktop, '[name="nachricht"]', 'Revierdienst mit Kundenportal');
+// Alles ausser der Nummer: Es darf trotzdem nichts zum Server gehen.
+await klick(desktop, '#demoKnopf');
+await desktop.waitForTimeout(200);
+check('KRITISCH: ohne Telefonnummer geht kein Aufruf zum Server', aufrufe.length === 0);
+// Eine zu kurze Nummer ist so wenig eine Nummer wie gar keine.
+await fuell(desktop, '[name="telefon"]', '079 12');
+await klick(desktop, '#demoKnopf');
+await desktop.waitForTimeout(200);
+check('KRITISCH: eine zu kurze Telefonnummer geht ebenfalls nicht durch', aufrufe.length === 0);
+
+await fuell(desktop, '[name="telefon"]', '079 123 45 67');
 await klick(desktop, '#demoKnopf');
 await desktop.waitForTimeout(400);
 check('KRITISCH: mit Pflichtangaben geht genau EIN Aufruf zum Server', aufrufe.length === 1);
@@ -190,6 +213,7 @@ const a = aufrufe[0] || {};
 check('KRITISCH: der Aufruf ist ein POST mit JSON und traegt die Felder',
   a.methode === 'POST' && /application\/json/.test(a.typ) && a.daten
   && a.daten.firma === 'Muster Sicherheitsdienst AG' && a.daten.email === 'a.beispiel@example.invalid'
+  && a.daten.telefon === '079 123 45 67'
   && a.daten.nachricht === 'Revierdienst mit Kundenportal');
 check('KRITISCH: das Fallenfeld wird leer mitgeschickt (ein Mensch fuellt es nicht)',
   a.daten && a.daten.website === '');
@@ -206,6 +230,7 @@ antwort = { status: 503, body: { status: 'error', message: 'Der Empfang von Anfr
 await fuell(desktop, '[name="firma"]', 'Muster Sicherheitsdienst AG');
 await fuell(desktop, '[name="name"]', 'A. Beispielperson');
 await fuell(desktop, '[name="email"]', 'a.beispiel@example.invalid');
+await fuell(desktop, '[name="telefon"]', '079 123 45 67');
 await klick(desktop, '#demoKnopf');
 await desktop.waitForTimeout(400);
 check('KRITISCH: die Fehlermeldung des Servers erscheint woertlich ("nicht eingerichtet"), als Fehler gekennzeichnet',

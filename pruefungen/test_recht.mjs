@@ -100,6 +100,23 @@ const workflow = lies('.github/workflows/deploy-hostpoint.yml');
   // Uebertreibung -- der Adressraum ist klein genug zum Durchprobieren.
   check('KRITISCH: die Seite behauptet NICHT, der Pruefwert sei nicht rueckrechenbar',
     !/nicht r(ü|ue)ckrechenbar|anonymisiert|unkenntlich gemacht/i.test(datenschutz));
+
+  // Jedes Feld, das das Formular erhebt, muss in der Erklaerung vorkommen --
+  // sonst sammelt die Seite mehr, als sie zugibt. Die Zuordnung Feldname zu
+  // Wort steht hier: Kommt ein Feld dazu, das hier fehlt, faellt die Pruefung
+  // ebenfalls. Ein neues Feld laesst sich damit nicht stillschweigend
+  // ergaenzen, ohne dass jemand die Erklaerung anfasst.
+  const WORT_ZUM_FELD = { firma: 'Firma', name: 'Name', email: 'E-Mail-Adresse',
+    telefon: 'Telefonnummer', groesse: 'Mitarbeitende', nachricht: 'Nachricht' };
+  const erhoben = [...homepage.matchAll(/<(?:input|select|textarea)[^>]*\bname="([a-zA-Z]+)"/g)]
+    .map(m => m[1])
+    .filter(n => n !== 'website');   // Das Fallenfeld erhebt nichts, es faengt Skripte.
+  const ohneZuordnung = erhoben.filter(n => !WORT_ZUM_FELD[n]);
+  const ungenannt = erhoben.filter(n => WORT_ZUM_FELD[n] && !datenschutz.includes(WORT_ZUM_FELD[n]));
+  check('KRITISCH: jedes Feld, das das Formular erhebt, steht in der Datenschutzerklaerung',
+    erhoben.length >= 5 && ohneZuordnung.length === 0 && ungenannt.length === 0);
+  if (ohneZuordnung.length) { bad.push('Feld ohne Zuordnung in dieser Pruefung: ' + ohneZuordnung.join(', ')); }
+  if (ungenannt.length) { bad.push('Feld fehlt in der Datenschutzerklaerung: ' + ungenannt.join(', ')); }
 }
 
 // ══════════ GERENDERT ════════════════════════════════════════════════

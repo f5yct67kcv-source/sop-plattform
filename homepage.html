@@ -498,6 +498,10 @@ p{margin:0 0 1em}
 .formular select{appearance:none;-webkit-appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--stahl) 50%),linear-gradient(135deg,var(--stahl) 50%,transparent 50%);background-position:calc(100% - 18px) 21px,calc(100% - 13px) 21px;background-size:5px 5px;background-repeat:no-repeat}
 .formular .btn{width:100%;justify-content:center;margin-top:4px}
 .formular .hinweis{margin:14px 0 0;font-size:13px;color:var(--stahl)}
+/* Pflichtfeld-Stern: Bernstein, weil er Aufmerksamkeit will, nicht Blau --
+   Blau bedient hier Knoepfe und Verweise. Der Unterstrich, den Browser an
+   <abbr> haengen, wird abgeschaltet; der Stern ist kein Kuerzel zum Lesen. */
+.formular .pflicht{color:var(--signal);text-decoration:none;font-weight:700}
 .formular .meldung{display:none;margin-top:14px;padding:12px 14px;border:1px solid var(--blau);border-radius:6px;color:var(--blau-hi);font-size:14px;line-height:1.5}
 .formular .meldung.zeigen{display:block}
 .formular .meldung.fehler{border-color:#F27F70;color:#FF9A8C}
@@ -1128,16 +1132,17 @@ p{margin:0 0 1em}
         <div class="felder">
         <div class="falle" aria-hidden="true"><label>Webseite (bitte leer lassen)<input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>
         <div class="reihe">
-          <label>Firma<input type="text" name="firma" autocomplete="organization" placeholder="Muster Sicherheitsdienst AG"></label>
-          <label>Name<input type="text" name="name" autocomplete="name" placeholder="Vor- und Nachname"></label>
+          <label><span>Firma <abbr class="pflicht" title="Pflichtfeld">*</abbr></span><input type="text" name="firma" required autocomplete="organization" placeholder="Muster Sicherheitsdienst AG"></label>
+          <label><span>Name <abbr class="pflicht" title="Pflichtfeld">*</abbr></span><input type="text" name="name" required autocomplete="name" placeholder="Vor- und Nachname"></label>
         </div>
         <div class="reihe">
-          <label>E-Mail<input type="email" name="email" autocomplete="email" placeholder="name@firma.ch"></label>
-          <label>Mitarbeitende<select name="groesse"><option>bis 10</option><option>11 – 30</option><option>31 – 80</option><option>über 80</option></select></label>
+          <label><span>E-Mail <abbr class="pflicht" title="Pflichtfeld">*</abbr></span><input type="email" name="email" required autocomplete="email" placeholder="name@firma.ch"></label>
+          <label><span>Telefon <abbr class="pflicht" title="Pflichtfeld">*</abbr></span><input type="tel" name="telefon" required autocomplete="tel" placeholder="079 123 45 67"></label>
         </div>
-        <label>Was beschäftigt Sie am meisten?<textarea name="nachricht" placeholder="z. B. Revierdienst mit Kundenportal, GAV-Stunden, Offerten"></textarea></label>
+        <label><span>Mitarbeitende</span><select name="groesse"><option>bis 10</option><option>11 – 30</option><option>31 – 80</option><option>über 80</option></select></label>
+        <label><span>Was beschäftigt Sie am meisten?</span><textarea name="nachricht" placeholder="z. B. Revierdienst mit Kundenportal, GAV-Stunden, Offerten"></textarea></label>
         <button class="btn primaer" type="submit" id="demoKnopf">Demo anfragen <svg><use href="#i-pfeil"/></svg></button>
-        <p class="hinweis">Wir melden uns innert eines Arbeitstages. Keine Newsletter, keine Weitergabe.</p>
+        <p class="hinweis"><abbr class="pflicht" title="Pflichtfeld">*</abbr> Pflichtfeld. Wir melden uns innert eines Arbeitstages. Keine Newsletter, keine Weitergabe.</p>
         <div class="meldung" id="demoMeldung" role="status" aria-live="polite"></div>
         </div>
         <div class="danke" id="demoDanke" role="status"><b>Anfrage erhalten.</b><p id="demoDankeText">Vielen Dank. Wir melden uns innert eines Arbeitstages.</p></div>
@@ -1212,17 +1217,24 @@ p{margin:0 0 1em}
     e.preventDefault();
     var daten = {
       firma: feld('firma').value.trim(), name: feld('name').value.trim(),
-      email: feld('email').value.trim(), groesse: feld('groesse').value,
+      email: feld('email').value.trim(), telefon: feld('telefon').value.trim(),
+      groesse: feld('groesse').value,
       nachricht: feld('nachricht').value.trim(), website: feld('website').value
     };
+    // Dieselben Regeln wie im Rechenkern (backend/demo_anfrage.php): beim
+    // Telefon zaehlen die Ziffern, nicht die Schreibweise. Ob es die
+    // E-Mail-Adresse wirklich gibt, kann nur der Server sagen -- der Browser
+    // kann keinen Mailserver nachschlagen.
     var fehlend = [];
-    ['firma','name','email'].forEach(function(n){
-      var leer = daten[n] === '' || (n === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(daten[n]));
-      feld(n).setAttribute('aria-invalid', leer ? 'true' : 'false');
-      if (leer) fehlend.push(n);
+    ['firma','name','email','telefon'].forEach(function(n){
+      var fehlt = daten[n] === ''
+        || (n === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(daten[n]))
+        || (n === 'telefon' && daten[n].replace(/\D+/g, '').length < 9);
+      feld(n).setAttribute('aria-invalid', fehlt ? 'true' : 'false');
+      if (fehlt) fehlend.push(n);
     });
     if (fehlend.length) {
-      melde('Bitte Firma, Name und eine gültige E-Mail-Adresse angeben.', true);
+      melde('Bitte Firma, Name, Telefon und eine gültige E-Mail-Adresse angeben.', true);
       feld(fehlend[0]).focus();
       return;
     }

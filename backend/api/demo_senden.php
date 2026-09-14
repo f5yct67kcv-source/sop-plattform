@@ -26,6 +26,9 @@ declare(strict_types=1);
 //     von derselben Adresse sind kein Interessent mehr. Kann die Bremse
 //     nicht zaehlen, wird ABGELEHNT, nicht gesendet -- siehe dort.
 //   - Das Fallenfeld: gefuellt heisst Skript. Antwort wie sonst, keine Mail.
+//   - Die Zustellbarkeit der angegebenen Adresse (demo_adresse_zustellbar()).
+//     Sie weist nur ab, was nachweislich keinen Mailserver hat -- ist der
+//     Namensdienst gestoert, wird durchgelassen statt falsch beschuldigt.
 //
 // DER EMPFAENGER KOMMT AUS DEM DEPLOY, NIE AUS DER ANFRAGE: demo_empfaenger()
 // reicht den vom Deploy ersetzten Platzhalter durch eine Pruefung -- dieselbe
@@ -74,6 +77,16 @@ $w = $geprueft['werte'];
 // Skript erkannt: dieselbe Antwort wie fuer Menschen, aber keine Mail.
 if (demo_ist_falle($in)) {
     json_response(['status' => 'ok', 'message' => DEMO_DANKE]);
+}
+
+// Gibt es die Adresse ueberhaupt? Erst NACH dem Fallenfeld, damit ein Skript
+// keinen Nachschlag ausloest. null heisst "nicht pruefbar" und laesst durch --
+// nur ein belegtes "diese Domain gibt es nicht" weist ab (siehe
+// demo_adresse_zustellbar()).
+if (demo_adresse_zustellbar($w['email']) === false) {
+    json_response(['status' => 'error',
+        'message' => 'Zu dieser E-Mail-Adresse gibt es keinen Mailserver. Bitte die Schreibweise prüfen.',
+        'felder' => ['email' => 'Diese Adresse konnten wir nicht erreichen.']], 400);
 }
 
 $empfaenger = demo_empfaenger();
