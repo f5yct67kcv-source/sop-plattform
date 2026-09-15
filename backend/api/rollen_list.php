@@ -66,9 +66,20 @@ $leute = $pdo->query(
        FROM mitarbeiter ORDER BY nachname, vorname, name'
 )->fetchAll();
 $rollenAlle = rechte_rollen_alle($pdo);
+// Die vier Einsatzmerkmale (diensthundefuehrer, waffentragberechtigt,
+// revierdienst_berechtigt und ihre Bewilligungsdaten) sind Personaldaten im
+// Sinn des Bereichs 'personal' -- 'rechte_lesen' deckt nur die Rollenseite
+// selbst ab, nicht diese Felder (Security-Audit 2026-09-15, dasselbe
+// Prinzip wie mitarbeiter_list.php). Weggelassen statt auf false gesetzt:
+// "kein Zugriff" darf nie wie "nein" aussehen.
+$darfPersonal = darf($user, 'personal_lesen');
 foreach ($leute as &$p) {
     $p['rollen'] = $rollenAlle[(int)$p['id']]
         ?? [$p['ist_admin'] ? ROLLE_VERWALTUNG : ROLLE_MITARBEITEND];
+    if (!$darfPersonal) {
+        unset($p['diensthundefuehrer'], $p['waffentragberechtigt'], $p['revierdienst_berechtigt'],
+              $p['diensthund_bewilligung_bis'], $p['waffe_bewilligung_bis']);
+    }
 }
 unset($p);
 

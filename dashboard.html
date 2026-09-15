@@ -10170,8 +10170,12 @@ function utAbmelden() {
   doLogout();
 }
 
-function doLogout() {
-  api('logout.php', { method: 'POST' }).catch(() => {});
+async function doLogout() {
+  // await, wie in portal.html/betreiber.html (Security-Audit 2026-09-15):
+  // ohne das kann der Browser den fetch beim sofort folgenden Reload
+  // abbrechen, bevor logout.php die Server-Sitzung geloescht hat -- die
+  // Oberflaeche zeigt dann "abgemeldet", obwohl der Token noch gilt.
+  try { await api('logout.php', { method: 'POST' }); } catch (e) { /* egal */ }
   localStorage.removeItem('rv3_token'); localStorage.removeItem('rv3_user');
   location.reload();
 }
@@ -12333,6 +12337,14 @@ function renderChart() {
 }
 
 function renderAngemeldet() {
+  // null (kein personal_lesen, Security-Audit 2026-09-15) ist eine andere
+  // Aussage als eine leere Liste -- "kein Zugriff" darf nie wie "niemand
+  // angemeldet" aussehen.
+  if (stats.angemeldet === null) {
+    $('angemeldetCount').textContent = '';
+    $('angemeldet').innerHTML = EMPTY('Kein Zugriff', 'Dafür braucht es „Personal: lesen".');
+    return;
+  }
   const a = stats.angemeldet || [];
   $('angemeldetCount').textContent = a.length ? a.length + (a.length === 1 ? ' Sitzung' : ' Sitzungen') : '';
   if (!a.length) { $('angemeldet').innerHTML = EMPTY('Niemand angemeldet', 'Sobald sich jemand anmeldet, erscheint er hier.'); return; }
@@ -12737,6 +12749,12 @@ function glockeZeileGeklickt(i) {
 }
 
 function renderProMa() {
+  // null (kein personal_lesen, Security-Audit 2026-09-15) ist eine andere
+  // Aussage als "keine Mitarbeitenden" -- siehe renderAngemeldet().
+  if (stats.pro_mitarbeiter === null) {
+    $('proMa').innerHTML = EMPTY('Kein Zugriff', 'Dafür braucht es „Personal: lesen".');
+    return;
+  }
   const p = stats.pro_mitarbeiter || [];
   if (!p.length) { $('proMa').innerHTML = EMPTY('Keine Mitarbeitenden', 'Konten werden in der Erfassung angelegt.'); return; }
   const max = Math.max(1, ...p.map(x => Number(x.stunden)));
@@ -23803,11 +23821,21 @@ function rvMerkmaleZeichnen() {
   const zeile = p => `<tr>
     <td class="rz-name"><b>${esc(fullName(p) || p.name)}</b>
       <span>${esc(p.personalnummer || '–')}</span></td>
-    ${RV_MERKMALE.map(([feld, datumFeld]) => `<td>
+    ${RV_MERKMALE.map(([feld, datumFeld]) => {
+      // Fehlt das Feld ganz (kein personal_lesen, Security-Audit
+      // 2026-09-15), ist das eine ANDERE Aussage als "nein" -- ein
+      // deaktivierter "nein"-Knopf saehe fuer diese Person aus wie ein
+      // gesetzter Fakt, den es hier schlicht nicht gibt.
+      if (!(feld in p)) {
+        return `<td><span class="rz-marke" style="opacity:.55;cursor:default" aria-disabled="true"
+          title="Kein Zugriff auf Personaldaten (Recht „Personal: lesen“ fehlt)">–</span></td>`;
+      }
+      return `<td>
       <button type="button" class="rz-marke${Number(p[feld]) === 1 ? ' an' : ''}"
         ${nurLesen ? 'disabled' : ''} aria-pressed="${Number(p[feld]) === 1}"
         onclick="rmkUmschalten(${Number(p.id)},'${feld}')">${Number(p[feld]) === 1 ? 'ja' : 'nein'}</button>
-      ${warnung(p, feld, datumFeld)}</td>`).join('')}
+      ${warnung(p, feld, datumFeld)}</td>`;
+    }).join('')}
   </tr>`;
 
   $('rmkInhalt').innerHTML = `

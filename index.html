@@ -423,8 +423,12 @@ function doLogin(name, password) {
   });
 }
 
-function doLogout() {
-  apiCall('logout.php', { method: 'POST' }).catch(() => {});
+async function doLogout() {
+  // await, wie in portal.html/betreiber.html (Security-Audit 2026-09-15):
+  // ohne das kann der Browser den fetch beim sofort folgenden Reload
+  // abbrechen, bevor logout.php die Server-Sitzung geloescht hat -- die
+  // Oberflaeche zeigt dann "abgemeldet", obwohl der Token noch gilt.
+  try { await apiCall('logout.php', { method: 'POST' }); } catch (e) { /* egal */ }
   authToken = ''; currentUser = null;
   localStorage.removeItem('rv3_token'); localStorage.removeItem('rv3_user');
   location.reload();

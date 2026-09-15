@@ -87,6 +87,13 @@ $letzte = db()->query(
      LIMIT 8'
 )->fetchAll();
 
+// 'angemeldet' (wer ist gerade eingeloggt) und 'pro_mitarbeiter' (Stunden je
+// Person) sind Personendaten im Sinn des Bereichs 'personal' --
+// require_verwaltung() laesst aber schon ein einziges Bereichsrecht durch,
+// nicht nur 'personal_lesen' (Security-Audit 2026-09-15). Weggelassen statt
+// leer: "kein Zugriff" darf nie wie "niemand angemeldet" aussehen.
+$darfPersonal = darf($user, 'personal_lesen');
+
 json_response([
     'status' => 'ok',
     'stand'  => date('c'),
@@ -100,8 +107,8 @@ json_response([
         'rapporte_total'    => (int)($counts['rapporte_total'] ?? 0),
     ],
     'verlauf'         => $verlauf,
-    'angemeldet'      => $angemeldet,
-    'pro_mitarbeiter' => $proMitarbeiter,
+    'angemeldet'      => $darfPersonal ? $angemeldet : null,
+    'pro_mitarbeiter' => $darfPersonal ? $proMitarbeiter : null,
     'letzte_rapporte' => $letzte,
     'ereignisse'            => $ereignisse['ereignisse'],
     'ereignisse_gesamt'     => $ereignisse['gesamt'],

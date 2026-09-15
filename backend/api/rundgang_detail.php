@@ -51,6 +51,12 @@ $rundgang = $stmt->fetch(PDO::FETCH_ASSOC);
 if (!$rundgang) {
     json_response(['status' => 'error', 'message' => 'Rundgang nicht gefunden'], 404);
 }
+// Die Kunden-E-Mail-Adresse gehoert zum Bereich 'kunden', nicht 'rundgaenge'
+// (Security-Audit 2026-09-15) -- rundgaenge_lesen (z.B. eine reine
+// Waechter-Rolle) soll sie nicht automatisch mitbekommen.
+if (!darf($user, 'kunden_lesen')) {
+    unset($rundgang['kunde_email']);
+}
 
 $objektId = (int)$rundgang['objekt_id'];
 $vorlageId = $rundgang['rundgang_vorlage_id'] !== null ? (int)$rundgang['rundgang_vorlage_id'] : null;

@@ -2887,8 +2887,12 @@ function anmelden() {
     starten();
   });
 }
-function abmelden() {
-  api('logout.php', { method: 'POST' });
+async function abmelden() {
+  // await, wie in portal.html/betreiber.html (Security-Audit 2026-09-15):
+  // ohne das kann der Browser den fetch beim sofort folgenden Reload
+  // abbrechen, bevor logout.php die Server-Sitzung geloescht hat -- die
+  // Oberflaeche zeigt dann "abgemeldet", obwohl der Token noch gilt.
+  try { await api('logout.php', { method: 'POST' }); } catch (e) { /* egal */ }
   localStorage.removeItem('rv3_token'); localStorage.removeItem('rv3_user');
   location.reload();
 }
