@@ -99,13 +99,27 @@ const e = await page.evaluate(() => {
       geofence_radius_m: 20, erledigt: null },
   ] };
   rgsMeinOrt = { lat: 47.35, lng: 7.9, genauigkeit: 5, zeit: Date.now() };
+  /* Seit ENT-576 liegen fuenf Sekunden zwischen Eintritt und Erfassung, und
+     der Ton gehoert der Erfassung. Die erste Messung startet also nur die
+     Frist; damit die Suite nicht fuenf Sekunden wartet, wird deren Beginn
+     zurueckdatiert -- derselbe Weg wie im Betrieb, nur ohne die Wartezeit. */
+  rgBereichPruefen();
+  const beimEintritt = gerufen.slice();
+  rundgangAktiv.kontrollpunkte.forEach(k => {
+    if (k._drinSeit) { k._drinSeit -= RG_AUTO_VERWEIL_MS; }
+  });
   rgBereichPruefen();
   const ersteRunde = gerufen.slice();
-  rgBereichPruefen();            // zweite Messung am selben Ort
+  rgBereichPruefen();            // dritte Messung am selben Ort
   const nachZweiter = gerufen.slice();
   window.rgSignalGeben = echt;
-  return { ersteRunde, nachZweiter };
+  return { beimEintritt, ersteRunde, nachZweiter };
 });
+// Neu mit ENT-576: Der Eintritt selbst schweigt, solange die Frist laeuft --
+// sonst piepte es zweimal pro Punkt, und danach schaltet der Waechter den
+// Ton ab.
+check('KRITISCH: beim Eintritt in den Radius schweigt es, solange die Frist läuft',
+  e.beimEintritt.length === 0);
 check('KRITISCH: der offene Punkt löst aus', e.ersteRunde.length === 1
   && e.ersteRunde[0].includes('Offen'));
 // Wer an einem schon bestaetigten Punkt vorbeigeht, bekommt keine Meldung.
