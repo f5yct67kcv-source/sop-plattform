@@ -192,18 +192,25 @@ function zf_einrichten(PDO $pdo, int $person): string
 
 // Code pruefen UND gegen Wiederverwendung sperren. Ohne das koennte jemand,
 // der einen Code mitliest, ihn innerhalb desselben Fensters selbst benutzen.
+//
+// ATOMAR (Security-Audit 2026-09-15): Pruefung und Verbrauch liefen frueher
+// als zwei getrennte Schritte (SELECT, dann UPDATE) -- zwischen beiden lag
+// ein Zeitfenster, in dem zwei nahezu gleichzeitige Anfragen mit demselben
+// Code beide die Wiederverwendungspruefung haetten bestehen koennen (TOCTOU).
+// Das UPDATE traegt die Bedingung jetzt selbst; rowCount() sagt, ob DIESER
+// Aufruf das Fenster tatsaechlich als erster verbraucht hat.
 function zf_code_einloesen(PDO $pdo, int $person, string $eingabe, int $jetzt): bool
 {
     $st = zf_stand($pdo, $person);
     if ($st === null) { return false; }
     $fenster = zf_pruefen((string)$st['geheimnis'], $eingabe, $jetzt);
     if ($fenster === null) { return false; }
-    if ($st['letztes_fenster'] !== null && (int)$st['letztes_fenster'] >= $fenster) {
-        return false;                    // dieser Code war schon dran
-    }
-    $pdo->prepare('UPDATE zwei_faktor SET letztes_fenster = ? WHERE mitarbeiter_id = ?')
-        ->execute([$fenster, $person]);
-    return true;
+    $u = $pdo->prepare(
+        'UPDATE zwei_faktor SET letztes_fenster = ?
+          WHERE mitarbeiter_id = ? AND (letztes_fenster IS NULL OR letztes_fenster < ?)'
+    );
+    $u->execute([$fenster, $person, $fenster]);
+    return $u->rowCount() === 1;
 }
 
 function zf_bestaetigen(PDO $pdo, int $person): void
@@ -248,6 +255,11 @@ function zf_notfallcodes_offen(PDO $pdo, int $person): int
 }
 
 // Einen Notfallcode einloesen. Er gilt genau einmal.
+//
+// ATOMAR (Security-Audit 2026-09-15): dieselbe TOCTOU-Korrektur wie bei
+// zf_code_einloesen() -- das UPDATE traegt die Bedingung benutzt_am IS NULL
+// jetzt selbst, statt sich auf den bereits gelesenen (moeglicherweise
+// veralteten) Stand zu verlassen.
 function zf_notfallcode_einloesen(PDO $pdo, int $person, string $eingabe): bool
 {
     if (!zf_tabellen_da($pdo)) { return false; }
@@ -258,9 +270,10 @@ function zf_notfallcode_einloesen(PDO $pdo, int $person, string $eingabe): bool
     $s->execute([$person]);
     foreach ($s->fetchAll() as $zeile) {
         if (password_verify($code, (string)$zeile['code_hash'])) {
-            $pdo->prepare('UPDATE zwei_faktor_codes SET benutzt_am = NOW() WHERE id = ?')
-                ->execute([(int)$zeile['id']]);
-            return true;
+            $u = $pdo->prepare('UPDATE zwei_faktor_codes SET benutzt_am = NOW()
+                                WHERE id = ? AND benutzt_am IS NULL');
+            $u->execute([(int)$zeile['id']]);
+            return $u->rowCount() === 1;
         }
     }
     return false;

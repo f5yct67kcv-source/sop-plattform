@@ -83,6 +83,35 @@ pruef('Abgetippt ohne Bindestrich und in Grossbuchstaben wird trotzdem erkannt',
 // ── Die Entscheidung des Projektinhabers
 pruef('Ein Geraet wird 14 Tage gemerkt, wie entschieden', ZF_GERAET_TAGE === 14);
 
+// ══════════════ zf_code_einloesen()/zf_notfallcode_einloesen() --
+// ATOMARER VERBRAUCH (Security-Audit 2026-09-15)
+//
+// Beide Funktionen enthalten NOW() im UPDATE (MySQL-Syntax) -- dieselbe
+// Grenze wie bei passwort_vergessen.php/anmeldung.php (siehe dortige
+// Vermerke): eine echte Ausfuehrung gegen den SQLite-Stub ist nicht
+// moeglich. Ein echter Wettlauf zweier gleichzeitiger Anfragen liesse sich
+// ausserdem in einem einzelnen, synchronen Testprozess ohnehin nicht
+// herstellen. Geprueft wird darum am Quelltext: Verbrauch UND Pruefung
+// muessen in EINEM bedingten UPDATE stecken (WHERE ... IS NULL/< ?), und
+// das Ergebnis muss von rowCount() abhaengen -- nicht von einem separat
+// gelesenen, potenziell veralteten Stand.
+$zfQuelle = file_get_contents(__DIR__ . '/../backend/zweifaktor.php');
+pruef('KRITISCH: zf_code_einloesen() traegt die Wiederverwendungssperre im UPDATE selbst '
+    . '(WHERE letztes_fenster IS NULL OR letztes_fenster < ?), nicht als separate Vorabpruefung',
+    (bool)preg_match(
+        "/function zf_code_einloesen\([\\s\\S]{0,600}?UPDATE zwei_faktor SET letztes_fenster = \\?\\s*"
+        . "\\n\\s*WHERE mitarbeiter_id = \\? AND \\(letztes_fenster IS NULL OR letztes_fenster < \\?\\)/",
+        $zfQuelle));
+pruef('KRITISCH: zf_code_einloesen() gibt das Ergebnis ueber rowCount() zurueck, nicht unbedingt true',
+    (bool)preg_match('/function zf_code_einloesen\([\s\S]{0,700}?return \$u->rowCount\(\) === 1;/', $zfQuelle));
+pruef('KRITISCH: zf_notfallcode_einloesen() traegt "benutzt_am IS NULL" im UPDATE selbst, nicht nur im SELECT davor',
+    (bool)preg_match(
+        "/function zf_notfallcode_einloesen\([\\s\\S]{0,900}?UPDATE zwei_faktor_codes SET benutzt_am = NOW\\(\\)\\s*"
+        . "\\n\\s*WHERE id = \\? AND benutzt_am IS NULL/",
+        $zfQuelle));
+pruef('KRITISCH: zf_notfallcode_einloesen() gibt das Ergebnis ueber rowCount() zurueck, nicht unbedingt true',
+    (bool)preg_match('/function zf_notfallcode_einloesen\([\s\S]{0,900}?return \$u->rowCount\(\) === 1;/', $zfQuelle));
+
 echo count($bad) === 0 ? "$ok Pruefungen bestanden\n" : '';
 foreach ($bad as $b) { echo "X $b\n"; }
 exit(count($bad) === 0 ? 0 : 1);
