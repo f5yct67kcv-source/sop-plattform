@@ -385,7 +385,15 @@ export const GOOGLE_MAPS_MOCK = `
     }
     setCenter(p) { this._center = alsLiteral(p); this._neuZeichnen(); }
     getCenter() { return machLatLng(this._center.lat, this._center.lng); }
-    setRadius(r) { this._radius = r; }
+    setRadius(r) {
+      this._radius = r;
+      // Auch am DOM nachfuehren, nicht nur im Objekt: Dieselbe Ueberlegung
+      // wie beim Bauen (ENT-308) -- ein Radius, der sich aendert, muss sich
+      // am gerenderten Zustand ablesen lassen, sonst ist eine Pruefung
+      // darauf eine Behauptung ueber die Attrappe statt ueber die App
+      // (gebraucht fuer die mitwachsende Fuellung, ENT-579).
+      this.el.dataset.radius = String(r);
+    }
     getRadius() { return this._radius; }
     setMap(map) {
       if (this._map) { this._map._entfernen(this); this.el.remove(); }
