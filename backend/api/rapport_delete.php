@@ -20,6 +20,17 @@ $vorher = db()->prepare('SELECT einsatz_id FROM rapporte WHERE id = ?');
 $vorher->execute([$id]);
 $einsatzId = (int)($vorher->fetchColumn() ?: 0);
 
+// ENT-045 (Security-Audit 2026-09-15): der Rapport-Beleg selbst ist der
+// Nachweis (Ist-Zeiten, Unterschrift), auf dem eine bereits abgeglichene
+// Schicht beruht -- er darf nicht ersatzlos verschwinden, nur weil
+// "rapporte" nicht namentlich zu den drei gesperrten Tabellen gehoert.
+// Bisher war nur die nachgelagerte Statusruecknahme auf einsaetze
+// (unten) gegen die Festschreibung geschuetzt, nicht das DELETE selbst.
+if ($einsatzId > 0 && einsatz_abgeglichen(db(), $einsatzId)) {
+    json_response(['status' => 'error',
+        'message' => 'Dieser Rapport gehört zu einer bereits abgeglichenen Schicht und kann nicht mehr gelöscht werden.'], 409);
+}
+
 db()->prepare('DELETE FROM rapporte WHERE id = ?')->execute([$id]);
 
 // Wird durch das Loeschen ein zuvor vollstaendig rapportierter Einsatz wieder

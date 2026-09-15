@@ -57,10 +57,22 @@ if ($nettoH < 0) {
 }
 
 // Unterschrift optional: nur ein data:image/png;base64,... akzeptieren, Groesse begrenzen.
+//
+// Der Inhalt wird geprueft, nicht nur die Behauptung im Text-Praefix
+// (Security-Audit 2026-09-15): Vorher pruefte diese Stelle nur, dass die
+// Zeichenkette WIE ein Data-URI aussieht -- nie, ob wirklich ein PNG darin
+// steckt. Dasselbe Prinzip wie ueberall sonst im Haus (logo_mime_am_inhalt()
+// in betrieb.php, ersatzscan_foto_mime() in rundgang.php): am Inhalt
+// pruefen, nicht an der Angabe.
 $sig = $d['sig'] ?? null;
 if ($sig !== null) {
-    if (!is_string($sig) || strlen($sig) > 2_000_000 || !preg_match('#^data:image/png;base64,[A-Za-z0-9+/=]+$#', $sig)) {
+    if (!is_string($sig) || strlen($sig) > 2_000_000
+        || !preg_match('#^data:image/png;base64,[A-Za-z0-9+/=]+$#', $sig)) {
         json_response(['status' => 'error', 'message' => 'ungueltige Unterschrift'], 400);
+    }
+    $sigRoh = base64_decode(substr($sig, strlen('data:image/png;base64,')), true);
+    if ($sigRoh === false || !str_starts_with($sigRoh, "\x89PNG\r\n\x1a\n")) {
+        json_response(['status' => 'error', 'message' => 'Die Unterschrift ist kein gültiges PNG.'], 400);
     }
 }
 
