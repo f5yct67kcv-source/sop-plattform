@@ -382,6 +382,46 @@ const takte = await page.evaluate(async () => {
 check('KRITISCH: zwei Takte zeichnen die Liste ein paar Mal neu, nicht hundertfach',
   takte > 0 && takte <= 8);
 
+/* Und nach der Erfassung hoert das Nachziehen auf. Bis zur Gegenprobe blieb
+   k._autoRest an einem erfassten Punkt fuer immer auf seinem letzten Wert
+   stehen -- der Takt hielt "irgendwo laeuft eine Frist" bis zum Ende der
+   Runde fuer wahr und zeichnete die Liste jede Sekunde neu, fuer nichts. */
+const ruhe = await page.evaluate(async () => {
+  abPunktId = null;
+  rgsModus = 'lauf';
+  rgsReiter = 'punkte';
+  rundgangAktiv = { id: 898, status: 'laeuft', einsatz_id: 1,
+    vorbereitet_am: null, gestartet_am: null, pause_minuten: 0,
+    kontrollpunkte: [
+    { id: 78, bezeichnung: 'Punkt', typ: 'geofence', lat: 47.3500, lng: 7.9000,
+      geofence_radius_m: 25, erledigt: null, aufgaben: [] }] };
+  try { localStorage.removeItem('sop_rundgang_warteschlange'); } catch (e) {}
+  rgLaufZeichnen();
+  rgOrtungStoppen();
+  rgsOrtWache = -1;
+  const k = rundgangAktiv.kontrollpunkte[0];
+  rgsMeinOrt = { lat: 47.3500, lng: 7.9000, genauigkeit: 8, zeit: Date.now() };
+  erfassenJetzt();
+  const erledigt = !!k.erledigt;
+  // Zwei Takte nach der Erfassung: Es darf hoechstens einmal nachgezogen
+  // werden (das letzte Abraeumen der Countdown-Zeile), danach ist Ruhe.
+  let n = 0;
+  const echt = window.rundgangListeZeichnen;
+  window.rundgangListeZeichnen = function () { n++; return echt.apply(this, arguments); };
+  rgLaufKopfZeichnen();
+  const nachErstem = n;
+  rgLaufKopfZeichnen();
+  rgLaufKopfZeichnen();
+  window.rundgangListeZeichnen = echt;
+  rgsModus = null; rgsReiter = 'karte'; abPunktId = null; rgsOrtWache = null;
+  return { erledigt, rest: k._autoRest, seit: k._drinSeit, nachErstem, gesamt: n };
+});
+check('Vorbedingung: der Punkt ist erfasst', ruhe.erledigt === true);
+check('KRITISCH: die Frist wird am erfassten Punkt aufgeräumt, nicht stehengelassen',
+  ruhe.rest === null && ruhe.seit === null);
+check('KRITISCH: und der Takt zeichnet danach nicht endlos weiter',
+  ruhe.gesamt <= 1);
+
 // Und der Fall, in dem der Countdown ohne Erfassung endet: Die Ortung
 // bleibt stehen. Dann kommt per Definition keine neue Position mehr, die
 // neu zeichnen koennte -- ohne eigenes Nachziehen bliebe "wird in 3 s
@@ -701,6 +741,177 @@ check('Vorbedingung: die Karte stand beim Erfassen noch nicht',
   rennen.karteSchonDa === false);
 check('KRITISCH: ein während des Kartenaufbaus erfasster Punkt ist danach trotzdem grün',
   rennen.erledigt === true && rennen.farben.length === 1 && gruen(rennen.farben[0]));
+
+// ══════════ DER KREIS FÜLLT SICH (ENT-579) ═══════════════════════════
+// Vom Projektinhaber: "sehr cool waere, wenn sich der Kreis innerhalb der 5
+// sekunden fuellt. wenn die sekunden abgelaufen ist wird er voll."
+const anteil = await page.evaluate(() => {
+  const f = (seit, jetzt) => rgFuellAnteil(seit, jetzt);
+  const t = 2000000;
+  return {
+    ohne: f(null, t),
+    start: f(t, t),
+    viertel: f(t - RG_AUTO_VERWEIL_MS / 4, t),
+    halb: f(t - RG_AUTO_VERWEIL_MS / 2, t),
+    voll: f(t - RG_AUTO_VERWEIL_MS, t),
+    darueber: f(t - RG_AUTO_VERWEIL_MS * 10, t),
+  };
+});
+check('KRITISCH: ohne laufende Frist ist der Kreis leer', anteil.ohne === 0);
+check('KRITISCH: beim Eintreten beginnt er bei null', anteil.start === 0);
+check('KRITISCH: nach einem Viertel der Zeit ist er ein Viertel voll',
+  Math.abs(anteil.viertel - 0.25) < 0.02);
+check('Und nach der Hälfte halb', Math.abs(anteil.halb - 0.5) < 0.02);
+check('KRITISCH: wenn die Sekunden abgelaufen sind, ist er voll', anteil.voll === 1);
+// Sonst waere der Kreis nach zehn Sekunden zehnmal so gross wie der
+// Geofence -- ein Kreis, der ueber seinen eigenen Bereich hinauswaechst,
+// behauptet einen Radius, den es nicht gibt.
+check('KRITISCH: und er wächst nicht über den Radius hinaus', anteil.darueber === 1);
+
+// Welcher Punkt gefuellt wird. Bei zwei ueberlappenden Bereichen nur EINER
+// -- zwei wachsende Kreise uebereinander sind nicht mehr zu lesen.
+const kandidat = await page.evaluate(() => {
+  const g = kps => { const k = rgFuellKandidat(kps); return k ? Number(k.id) : null; };
+  const pkt = (z) => Object.assign({ id: 1, typ: 'geofence', lat: 47.35, lng: 7.9,
+    erledigt: null, _autoRest: 3 }, z);
+  return {
+    normal: g([pkt({})]),
+    keiner: g([pkt({ _autoRest: null })]),
+    erledigt: g([pkt({ erledigt: { status: 'bestaetigt' } })]),
+    nfc: g([pkt({ typ: 'nfc', lat: null })]),
+    ohneOrt: g([pkt({ lat: null })]),
+    zweiNurEiner: g([pkt({ id: 5 }), pkt({ id: 6 })]),
+    leer: g([]),
+  };
+});
+check('KRITISCH: der zählende Punkt wird gefüllt', kandidat.normal === 1);
+check('Wo nichts zählt, wird nichts gefüllt', kandidat.keiner === null);
+check('Ein erledigter Punkt wird nicht gefüllt', kandidat.erledigt === null);
+check('Ein NFC-Punkt hat keinen Bereich, der sich füllen könnte', kandidat.nfc === null);
+check('Ein Punkt ohne Koordinaten ebenfalls nicht', kandidat.ohneOrt === null);
+check('KRITISCH: bei zwei zählenden Punkten füllt sich nur einer', kandidat.zweiNurEiner === 5);
+check('Eine leere Runde wirft nicht', kandidat.leer === null);
+
+// Und am gerenderten Zustand: Der Kreis muss WIRKLICH wachsen.
+const waechst = await page.evaluate(async () => {
+  abPunktId = null;
+  rgsModus = 'lauf';
+  rgsReiter = 'karte';
+  rgsKarte = null;
+  rundgangAktiv = { id: 897, status: 'laeuft', einsatz_id: 1,
+    vorbereitet_am: null, gestartet_am: null, pause_minuten: 0,
+    objekt: { id: 7, name: 'Musterobjekt' }, kunde_name: 'Muster AG',
+    ansprechpartner: [], zentrale: null, kontrollpunkte: [
+    // Zuerst weit weg: Solange die Karte laedt, meldet die echte Ortung
+    // Positionen, und ein Punkt unter den Fuessen wuerde die Frist samt
+    // Fuellung schon vor der ersten Messung starten.
+    { id: 81, bezeichnung: 'Punkt', typ: 'geofence', lat: 47.3580, lng: 7.9000,
+      geofence_radius_m: 25, erledigt: null, aufgaben: [] }] };
+  try { localStorage.removeItem('sop_rundgang_warteschlange'); } catch (e) {}
+  rgLaufZeichnen();
+  await new Promise(r => setTimeout(r, 800));
+  rgOrtungStoppen();
+  rgsOrtWache = -1;                   // Wache gilt als gesetzt, meldet nichts
+  const kreise = () => [...document.querySelectorAll('.gm-mock-circle')]
+    .map(el => Number(el.dataset.radius));
+  const vorDrin = kreise().length;
+  // Und jetzt steht der Waechter davor.
+  rundgangAktiv.kontrollpunkte[0].lat = 47.3500;
+  rgsMeinOrt = { lat: 47.3500, lng: 7.9000, genauigkeit: 8, zeit: Date.now() };
+  rgBereichPruefen();
+  rgFuellungNachfuehren();
+  await new Promise(r => setTimeout(r, 120));
+  const frueh = kreise();
+  await new Promise(r => setTimeout(r, 1500));
+  const spaeter = kreise();
+  // Bis zum Ende laufen lassen -- ueber den Sekundentakt, wie im Betrieb.
+  rgTimerStarten();
+  const k = rundgangAktiv.kontrollpunkte[0];
+  for (let i = 0; i < 80 && !k.erledigt; i++) { await new Promise(r => setTimeout(r, 100)); }
+  rgTimerStoppen();
+  await new Promise(r => setTimeout(r, 200));
+  const danach = kreise();
+  const nochFuellung = rgsFuellKreis !== null;
+  rgsModus = null; rgsReiter = 'karte'; abPunktId = null; rgsOrtWache = null;
+  return { vorDrin, frueh, spaeter, danach, nochFuellung, erledigt: !!k.erledigt,
+    radius: 25 };
+});
+check('Vorbedingung: vorher stand nur der Geofence-Kreis', waechst.vorDrin === 1);
+check('KRITISCH: während der Frist kommt ein zweiter Kreis dazu — die Füllung',
+  waechst.frueh.length === 2);
+// Er beginnt klein. Waere er sofort voll, waere es keine Fuellung.
+check('KRITISCH: die Füllung beginnt klein',
+  Math.min(...waechst.frueh) < waechst.radius * 0.35);
+check('KRITISCH: und sie wächst messbar weiter',
+  Math.min(...waechst.spaeter) > Math.min(...waechst.frueh));
+check('KRITISCH: sie bleibt innerhalb des Geofence-Kreises',
+  Math.max(...waechst.spaeter) <= waechst.radius);
+check('KRITISCH: nach der Erfassung ist die Füllung weg — der Punkt selbst ist jetzt grün',
+  waechst.erledigt === true && waechst.nochFuellung === false
+  && waechst.danach.length === 1);
+
+// Auf dem Punkte-Reiter gibt es keine Karte, auf der etwas wachsen koennte.
+// Ein Kreis, der an einer nicht sichtbaren Karte haengt, kostet nur Akku.
+const nichtAufListe = await page.evaluate(async () => {
+  // Erst eine Fuellung wirklich starten -- sonst prueft der Fall nur, dass
+  // nichts entsteht, wo ohnehin nichts war.
+  abPunktId = null;
+  rgsModus = 'lauf';
+  rgsReiter = 'karte';
+  rgsKarte = null;
+  rundgangAktiv = { id: 899, status: 'laeuft', einsatz_id: 1,
+    vorbereitet_am: null, gestartet_am: null, pause_minuten: 0,
+    objekt: { id: 7, name: 'Musterobjekt' }, kunde_name: 'Muster AG',
+    ansprechpartner: [], zentrale: null, kontrollpunkte: [
+    { id: 82, bezeichnung: 'Punkt', typ: 'geofence', lat: 47.3580, lng: 7.9000,
+      geofence_radius_m: 25, erledigt: null, aufgaben: [] }] };
+  try { localStorage.removeItem('sop_rundgang_warteschlange'); } catch (e) {}
+  rgLaufZeichnen();
+  await new Promise(r => setTimeout(r, 800));
+  rgOrtungStoppen();
+  rgsOrtWache = -1;
+  rundgangAktiv.kontrollpunkte[0].lat = 47.3500;
+  rgsMeinOrt = { lat: 47.3500, lng: 7.9000, genauigkeit: 8, zeit: Date.now() };
+  rgBereichPruefen();
+  rgFuellungNachfuehren();
+  const lief = rgsFuellKreis !== null;
+  // Und jetzt auf die Liste wechseln.
+  rgsReiter = 'punkte';
+  rgFuellungNachfuehren();
+  const weg = rgsFuellKreis === null;
+  const kreise = document.querySelectorAll('.gm-mock-circle').length;
+  rgsModus = null; rgsReiter = 'karte'; abPunktId = null; rgsOrtWache = null;
+  return { lief, weg, kreise };
+});
+check('Vorbedingung: auf der Karte lief eine Füllung', nichtAufListe.lief === true);
+check('KRITISCH: beim Wechsel auf den Punkte-Reiter wird sie abgeräumt — ein Kreis an einer unsichtbaren Karte kostet nur Akku',
+  nichtAufListe.weg === true && nichtAufListe.kreise === 1);
+
+// ══════════ DER TON WECKT SEINEN KANAL (ENT-579) ═════════════════════
+// Seit ENT-576 liegen fuenf Sekunden zwischen Antippen und Erfassung. iOS
+// haelt den Tonkanal bei jeder Unterbrechung an -- ein Anruf, eine
+// Mitteilung, ein kurz gesperrter Bildschirm. Vorher stieg der Ton dann
+// wortlos aus und blieb fuer den Rest der Runde weg.
+const ton = await page.evaluate(() => {
+  const echt = rgsTonKanal;
+  let geweckt = 0, oszillatoren = 0;
+  const knoten = () => ({ connect() {}, start() {}, stop() {},
+    frequency: { value: 0 }, type: '',
+    gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} } });
+  rgsTonKanal = {
+    state: 'suspended', currentTime: 0, destination: {},
+    resume() { geweckt++; this.state = 'running'; },
+    createOscillator() { oszillatoren++; return knoten(); },
+    createGain() { return knoten(); },
+  };
+  const ergebnis = rgTonSignal();
+  rgsTonKanal = echt;
+  return { geweckt, oszillatoren, ergebnis };
+});
+check('KRITISCH: ein angehaltener Tonkanal wird geweckt statt stumm übergangen',
+  ton.geweckt === 1);
+check('KRITISCH: und der Ton wird trotzdem geplant — er spielt, sobald der Kanal läuft',
+  ton.oszillatoren >= 1 && ton.ergebnis === true);
 
 // ══════════ GEMESSEN, NICHT NACHGELESEN ══════════════════════════════
 // Die Zeile hat einen Hinweis dazubekommen, wo vorher ein Knopf stand. Was
