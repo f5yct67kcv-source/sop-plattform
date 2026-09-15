@@ -226,6 +226,17 @@ $sql = 'UPDATE mitarbeiter SET ' . implode(', ', array_map(fn($f) => "$f = ?", a
      . ' WHERE id = ?';
 db()->prepare($sql)->execute(array_merge(array_values($s), [$eigeneId]));
 
+// Andere Sitzungen beenden, wie bei mein_passwort.php (Security-Audit
+// 2026-09-15): email_privat ist die Adresse fuer die Passwort-
+// Wiederherstellung -- eine Aenderung braucht bereits das aktuelle
+// Passwort (oben), soll aber genauso wie ein Passwortwechsel andere,
+// moeglicherweise fremde Sitzungen beenden. Die eigene bleibt bestehen.
+if ($mailNeu) {
+    $token = $_SERVER['HTTP_X_AUTH_TOKEN'] ?? '';
+    db()->prepare('DELETE FROM sessions WHERE mitarbeiter_id = ? AND token <> ?')
+        ->execute([$eigeneId, sitzung_abdruck((string)$token)]);
+}
+
 // Ins Logbuch -- mit dem Mitarbeitenden als Akteur (ENT-077 schreibt den
 // Namen mit, nicht nur die ID). Damit sieht die Verwaltung in der
 // Personalakte, WER wann WAS geaendert hat, ohne dafuer freigeben zu

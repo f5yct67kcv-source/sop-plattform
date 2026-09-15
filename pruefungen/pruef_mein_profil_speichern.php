@@ -34,6 +34,9 @@ $pdo->exec('CREATE TABLE mitarbeiter (
 $pdo->exec('CREATE TABLE aenderungslog (id INTEGER PRIMARY KEY, zeitpunkt TEXT,
     akteur_id INT, akteur_name TEXT, bereich TEXT, objekt_id INT, feld TEXT,
     wert_alt TEXT, wert_neu TEXT, werte_verborgen INT)');
+// Fuer die Sitzungs-Invalidierung nach einer email_privat-Aenderung
+// (Security-Audit 2026-09-15, dasselbe Prinzip wie mein_passwort.php).
+$pdo->exec('CREATE TABLE sessions (token TEXT PRIMARY KEY, mitarbeiter_id INT)');
 
 // Kein festes Datum nahe beim heutigen Tag (test_datumsfest) -- die
 // Anlegedaten liegen bewusst weit zurueck und werden nie verglichen.
@@ -70,6 +73,21 @@ function hat_tabelle(PDO $pdo, string $t, bool $frisch = false): bool {
     return (bool)$r->fetch();
 }
 function db(): PDO { global $pdo; return $pdo; }
+// Echte Implementierung wie in backend/db.php (Security-Audit 2026-09-15) --
+// keine Verkuerzung, damit die Pruefung unten wirklich denselben Abdruck
+// vergleicht, den der Endpunkt beim DELETE bildet.
+function sitzung_abdruck(string $token): string { return hash('sha256', $token); }
+
+// Zwei Sitzungen derselben Person (die eigene, "gerade benutzte", und eine
+// zweite -- z.B. ein zweites Geraet oder ein gestohlener Token): so laesst
+// sich pruefen, dass die email_privat-Aenderung die FREMDE loescht und die
+// EIGENE stehen laesst.
+const EIGENER_TOKEN = 'eigener-token-fuer-die-pruefung';
+$pdo->exec("INSERT INTO sessions (token, mitarbeiter_id) VALUES ("
+    . $pdo->quote(hash('sha256', EIGENER_TOKEN)) . ", 1)");
+$pdo->exec("INSERT INTO sessions (token, mitarbeiter_id) VALUES ("
+    . $pdo->quote(hash('sha256', 'fremder-token-fuer-die-pruefung')) . ", 1)");
+$_SERVER['HTTP_X_AUTH_TOKEN'] = EIGENER_TOKEN;
 
 // Wer angemeldet ist, entscheidet die Sitzung -- hier fest Person 1. Genau
 // das ist der Punkt: Der Endpunkt darf ausser dieser Person niemanden
@@ -92,6 +110,12 @@ function json_response($data, int $status = 200): void {
         'logbuch' => $pdo->query('SELECT akteur_id, akteur_name, bereich, objekt_id,
                                          feld, wert_alt, wert_neu, werte_verborgen
                                   FROM aenderungslog ORDER BY id')->fetchAll(),
+        // Wie viele Sitzungen von Person 1 nach dem Aufruf noch stehen --
+        // Security-Audit 2026-09-15: nach einer email_privat-Aenderung
+        // soll nur die eigene (EIGENER_TOKEN) uebrig bleiben.
+        'sitzungen_person1' => (int)$pdo->query(
+            'SELECT COUNT(*) FROM sessions WHERE mitarbeiter_id = 1'
+        )->fetchColumn(),
     ];
     http_response_code($status);
     echo json_encode($data);

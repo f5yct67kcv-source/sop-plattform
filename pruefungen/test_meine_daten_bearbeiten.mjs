@@ -107,12 +107,20 @@ try {
     email_privat2: 'neu@beispiel.invalid', passwort: PW });
   check('Mit richtigem Passwort geht die neue Adresse durch',
     richtig.status === 'ok' && richtig.pruefung.ich.email_privat === 'neu@beispiel.invalid');
+  // Security-Audit 2026-09-15: die Bremse aus mein_passwort.php gilt jetzt
+  // auch hier. Der Aufbau (siehe pruef_mein_profil_speichern.php) seedet
+  // zwei Sitzungen derselben Person -- nur die eigene (der mitgeschickte
+  // Token) darf nach der Aenderung noch stehen.
+  check('KRITISCH: eine geaenderte private E-Mail beendet andere Sitzungen -- die eigene bleibt',
+    richtig.pruefung.sitzungen_person1 === 1);
 
   // Ein Formular schickt das unveraenderte Feld bei jedem Speichern mit --
   // eine Passwortabfrage beim Ummelden der Wohnadresse waere Theater.
   const adresse = aufruf({ email_privat: 'privat@beispiel.invalid', strasse: 'Ohnepasswort' });
   check('Unveraenderte E-Mail verlangt kein Passwort',
     adresse.status === 'ok' && adresse.pruefung.ich.strasse === 'Ohnepasswort');
+  check('KRITISCH: bleibt die private E-Mail unveraendert, bleiben auch andere Sitzungen stehen',
+    adresse.pruefung.sitzungen_person1 === 2);
 } catch (e) { check('Abschnitt E-Mail/Passwort ohne Abbruch: ' + e.message, false); }
 
 // ── Eingabepruefung ───────────────────────────────────────────────────────
