@@ -32,8 +32,27 @@ if (!in_array($mimeType, ['image/png', 'image/jpeg', 'image/webp', 'image/gif'],
 if (strlen($bild) > 8_000_000) {
     json_response(['status' => 'error', 'message' => 'Das Bild ist zu gross (höchstens ca. 6 MB)'], 413);
 }
-if (base64_decode($bild, true) === false) {
+$bildRoh = base64_decode($bild, true);
+if ($bildRoh === false || $bildRoh === '') {
     json_response(['status' => 'error', 'message' => 'Bilddaten ungueltig'], 400);
+}
+// Massgeblich ist der Inhalt, nicht die Angabe (Security-Audit 2026-09-15,
+// gleiches Prinzip wie logo_mime_am_inhalt() in betrieb.php): der Client-Wert
+// $mimeType ging bisher unveraendert als media_type an die externe
+// Anthropic-API weiter -- jede Byte-Folge liess sich damit unter falschem
+// Typ-Label verschicken.
+function ki_bild_mime_am_inhalt(string $roh): ?string
+{
+    if (str_starts_with($roh, "\x89PNG\r\n\x1a\n")) { return 'image/png'; }
+    if (str_starts_with($roh, "\xFF\xD8\xFF"))      { return 'image/jpeg'; }
+    if (strlen($roh) > 12 && str_starts_with($roh, 'RIFF')
+        && substr($roh, 8, 4) === 'WEBP')           { return 'image/webp'; }
+    if (str_starts_with($roh, 'GIF87a') || str_starts_with($roh, 'GIF89a')) { return 'image/gif'; }
+    return null;
+}
+$bildEcht = ki_bild_mime_am_inhalt($bildRoh);
+if ($bildEcht === null || $bildEcht !== $mimeType) {
+    json_response(['status' => 'error', 'message' => 'Der Bildinhalt passt nicht zur angegebenen Typangabe.'], 400);
 }
 
 $heute = trim((string)($input['heute'] ?? ''));
