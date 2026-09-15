@@ -129,6 +129,12 @@ const check = (n, c) => (c ? ok : bad).push(n);
 const browser = await chromium.launch({ executablePath: EXE });
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 2 });
 page.on('pageerror', e => bad.push('JS-Fehler: ' + e.message));
+// Die Gelb-Warnung weiter unten wird gegen einen festen RGB-Wert des
+// HELLEN Themas geprueft -- unabhaengig von der App-Vorgabe fest
+// verankert, sonst vertauscht ein spaeterer Wechsel der Standardfarbe
+// (wie am 2026-09-15 von hell auf dunkel) stillschweigend die gemessene
+// Farbe gegen die dunkle Fassung.
+await page.addInitScript(() => { try { localStorage.setItem('rv3_thema', 'hell'); } catch (e) {} });
 await setup(page);
 
 await page.goto(URL);

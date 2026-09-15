@@ -4891,12 +4891,12 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
 <script>
 /* Muss VOR dem ersten Zeichnen laufen, sonst blitzt die helle Fassung
    kurz auf, bevor die dunkle greift (ENT-029). Ohne gespeicherte Wahl
-   entscheidet die Einstellung des Betriebssystems. */
+   gilt dunkel als Vorgabe -- unabhaengig vom Systemthema, auf Wunsch des
+   Projektinhabers. Wer selbst umschaltet (themaSetzen()), bleibt bei der
+   eigenen Wahl: Nur der ERSTE Eindruck vor jeder eigenen Entscheidung
+   aendert sich. */
 (function () {
-  var w = localStorage.getItem('rv3_thema');
-  if (!w) {
-    w = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dunkel' : 'hell';
-  }
+  var w = localStorage.getItem('rv3_thema') || 'dunkel';
   document.documentElement.setAttribute('data-thema', w);
 })();
 /* Liquid Glass (ENT-418, Voreinstellung nach ENT-419). Aus demselben
