@@ -82,7 +82,7 @@ foreach ($scans as $eintrag) {
         continue;
     }
 
-    $kp = $pdo->prepare('SELECT * FROM kontrollpunkt WHERE id = ? AND objekt_id = ?');
+    $kp = $pdo->prepare('SELECT * FROM kontrollpunkt WHERE id = ? AND objekt_id = ? AND aktiv = 1');
     $kp->execute([$kontrollpunktId, $rundgang['objekt_id']]);
     $kontrollpunkt = $kp->fetch();
     if (!$kontrollpunkt) {
@@ -210,14 +210,20 @@ foreach ($aufgaben as $eintrag) {
     }
 
     // Die Aufgabe muss an DIESEM Punkt haengen und aktiv sein. Im Formular
-    // ist nichts anderes anklickbar -- ueber die Anfrage schon.
+    // ist nichts anderes anklickbar -- ueber die Anfrage schon. Der
+    // Kontrollpunkt muss ausserdem zum Objekt des eigenen, aktiven
+    // Rundgangs gehoeren -- sonst liesse sich ueber eine fremde
+    // kontrollpunkt_id/aufgabe_id-Kombination eine Aufgaben-Antwort mit dem
+    // Klartextnamen eines fremden Objekts in den eigenen Ereignis-Feed
+    // (und damit ins Kundenportal des EIGENEN Kunden) einschleusen (IDOR,
+    // Security-Audit 2026-09-15). Dasselbe Muster wie beim Scan oben.
     $kat = $pdo->prepare(
         'SELECT a.bezeichnung, k.bezeichnung AS punkt FROM kontrollpunkt_aufgabe ka
            JOIN objekt_aufgabe a ON a.id = ka.aufgabe_id AND a.aktiv = 1
            JOIN kontrollpunkt k ON k.id = ka.kontrollpunkt_id
-          WHERE ka.kontrollpunkt_id = ? AND ka.aufgabe_id = ?'
+          WHERE ka.kontrollpunkt_id = ? AND ka.aufgabe_id = ? AND k.objekt_id = ?'
     );
-    $kat->execute([$kpId, $aufgabeId]);
+    $kat->execute([$kpId, $aufgabeId, (int)$rundgang['objekt_id']]);
     $katZeile = $kat->fetch(PDO::FETCH_ASSOC);
     if (!$katZeile) {
         $melde('Diese Aufgabe gehoert nicht zu diesem Kontrollpunkt');

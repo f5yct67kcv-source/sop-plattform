@@ -169,6 +169,12 @@ try {
        Automatismus ueberschreiben darf. */
     $entfallen = [];
     foreach ($doppelt as $d) {
+        // ENT-045 (Security-Audit 2026-09-15): doppelbelegungen() filtert
+        // nicht nach Abgleich-Status -- ohne diese Pruefung koennte eine
+        // bereits abgeglichene (festgeschriebene) fremde Zuteilungszeile
+        // hier stillschweigend auf "entfallen" gesetzt werden. Dieselbe
+        // Sperre wie in planung.php::umplanen().
+        if (einsatz_abgeglichen($pdo, (int)$d['einsatz_id'])) { continue; }
         $up = $pdo->prepare(
             "UPDATE einsatz_zuteilung SET zusage = 'entfallen'
               WHERE einsatz_id = ? AND mitarbeiter_id = ? AND zusage NOT IN ('abgelehnt', 'entfallen')"
