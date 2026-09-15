@@ -425,6 +425,91 @@ async function vorratSeite(antwort, breite = 1500) {
     kachel && !kachel.versteckt);
   check('Die Kachel fuehrt in den Supportabschnitt', kachel && /bkAb|sa/.test(kachel.ruft));
 
+  // ── Der kurze Weg aus dem Kontomenue (ENT-538) ────────────────────
+  //
+  // Wer nicht weiterkommt, sucht Hilfe dort, wo er steht -- nicht in einem
+  // Einstellungsbereich, den er in dem Moment erst finden muss. Geprueft
+  // wird, dass der Eintrag da ist, gross genug und WIRKLICH im Supportteil
+  // landet: Ein Menuepunkt, der die Ansicht wechselt und dann doch auf der
+  // Uebersicht stehen bleibt, sieht aus wie ein Fehler der Seite.
+  {
+    // ── ZUERST DER ZUSTAND, IN DEM DER EINTRAG GESUCHT WIRD ──────────
+    //
+    // Die Huelle hat drei Zustaende: Seitenleiste, schmal und "aus" -- und
+    // nur im letzten klappt das Logo oben rechts ein Menue auf. Genau dort
+    // sucht man den Eintrag, und genau dort hat diese Suite ihn zuerst NICHT
+    // geprueft: Sie nahm die Klasse "aus" weg und mass die ausgeklappte
+    // Seitenleiste. Ein Eintrag, der nur dort erscheint und im Menue fehlte,
+    // waere gruen durchgelaufen.
+    await seite.evaluate(() => {
+      for (let i = 0; i < 4 && !document.getElementById('shell').classList.contains('aus'); i++) {
+        seiteUm();
+      }
+      document.getElementById('btnMarke').click();
+    });
+    await seite.waitForTimeout(250);
+    const imMenue = await seite.evaluate(() => {
+      const sh = document.getElementById('shell');
+      const k = document.getElementById('nav-support');
+      const ab = document.getElementById('nav-abmelden');
+      if (!k) { return { da: false }; }
+      const r = k.getBoundingClientRect();
+      return { da: true, zustand: sh.className,
+               sichtbar: k.offsetParent !== null && getComputedStyle(k).display !== 'none',
+               hoehe: r.height,
+               // Im Menue stehen die Eintraege untereinander -- der Support
+               // gehoert ueber das Abmelden, nicht darunter.
+               ueberAbmelden: !!ab && r.top < ab.getBoundingClientRect().top };
+    });
+    check('KRITISCH: die Huelle laesst sich ueberhaupt in den Kopfleisten-Zustand schalten',
+      /\baus\b/.test(imMenue.zustand || ''));
+    check('KRITISCH: im Menue unter dem Logo steht der Support-Eintrag',
+      imMenue.da && imMenue.sichtbar && imMenue.hoehe > 0);
+    check('Er steht dort ueber dem Abmelden', imMenue.ueberAbmelden);
+
+    await seite.evaluate(() => { document.getElementById('shell').classList.remove('aus'); });
+    const m = await seite.evaluate(() => {
+      const k = document.getElementById('nav-support');
+      if (!k) { return null; }
+      const r = k.getBoundingClientRect();
+      const ein = document.getElementById('nav-einrichtung');
+      return { hoehe: r.height, sichtbar: k.offsetParent !== null,
+               einrichtungHoehe: ein ? ein.getBoundingClientRect().height : 0,
+               beschriftung: (k.querySelector('.lbl') || {}).textContent,
+               // Neben der Einrichtung, nicht zwischen den Ortswechseln.
+               unterEinrichtung: !!ein && (ein.compareDocumentPosition(k)
+                 & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+               vorAbmelden: (document.getElementById('nav-abmelden')
+                 .compareDocumentPosition(k) & Node.DOCUMENT_POSITION_PRECEDING) !== 0 };
+    });
+    check('KRITISCH: das Kontomenue traegt einen Eintrag "Support"',
+      !!m && /Support/.test(m.beschriftung || ''));
+    // NICHT die 44-px-Schwelle: Die gilt laut CLAUDE.md fuer das HANDY, und
+    // dort erscheint dieser Eintrag gar nicht (nur-desktop). Am Desktop
+    // misst der ganze Fussteil 38 px -- eine 44er-Schwelle haette hier
+    // gemeldet, dass der Bestand die Regel bricht, statt zu pruefen, was
+    // gemeint ist. Die Aussage lautet: gleiches Muster wie die Nachbarn.
+    check('Er ist sichtbar', m && m.sichtbar && m.hoehe > 0);
+    check('KRITISCH: er ist genauso gross wie der Eintrag daneben (gleiches Muster)',
+      m && Math.abs(m.hoehe - m.einrichtungHoehe) < 1);
+    check('Er steht bei der Einrichtung und vor dem Abmelden',
+      m && m.unterEinrichtung && m.vorAbmelden);
+
+    // Und er fuehrt wirklich hin -- gemessen am gerenderten Zustand, nicht
+    // am onclick-Text.
+    await seite.evaluate(() => { document.getElementById('nav-support').click(); });
+    await seite.waitForTimeout(250);
+    const angekommen = await seite.evaluate(() => {
+      const ab = document.getElementById('bkAb-sa');
+      const view = document.getElementById('view-betrieb');
+      return { abschnittOffen: !!ab && getComputedStyle(ab).display !== 'none',
+               ansichtOffen: !!view && getComputedStyle(view).display !== 'none' };
+    });
+    check('KRITISCH: der Eintrag oeffnet die Administration', angekommen.ansichtOffen);
+    check('KRITISCH: und landet im Supportteil, nicht auf der Uebersicht',
+      angekommen.abschnittOffen);
+  }
+
   // Die Statuswoerter des Betriebs: "wartet auf Kunde" heisst aus seiner
   // Sicht "Antwort erhalten" -- derselbe Zustand, die andere Blickrichtung.
   await seite.evaluate(() => go('betrieb'));
@@ -465,6 +550,77 @@ async function vorratSeite(antwort, breite = 1500) {
     zeilen.every(z => z.hoehe >= 44));
   check('KRITISCH: der Status ist eingefaerbt und nicht nur Text',
     zeilen.every(z => z.chip && z.chipFarbe && z.chipFarbe !== 'rgba(0, 0, 0, 0)'));
+
+  // ── Am Handy (ENT-538, auf Wunsch des Projektinhabers) ───────────
+  //
+  // Der mobile Zuschnitt ist eine eigene Entscheidung, keine Folge davon,
+  // dass es die Funktion am Desktop gibt (Hausregel). Er ist getroffen --
+  // und damit gehoert geprueft, dass er traegt UND dass er nicht als
+  // Nebenwirkung die Administration oeffnet, die dort seit ENT-235 zu ist.
+  {
+    await seite.setViewportSize({ width: 390, height: 844 });
+    await seite.evaluate(() => { go('uebersicht'); });
+    await seite.waitForTimeout(200);
+
+    const eintrag = await seite.evaluate(() => {
+      document.getElementById('btnMarke').click();
+      const k = document.getElementById('nav-support');
+      return { sichtbar: k.offsetParent !== null,
+               display: getComputedStyle(k).display,
+               hoehe: k.getBoundingClientRect().height };
+    });
+    await seite.waitForTimeout(200);
+    check('KRITISCH: am Handy ist der Support-Eintrag sichtbar',
+      eintrag.sichtbar && eintrag.display !== 'none');
+    check('KRITISCH: am Handy erreicht er die 44-px-Trefferflaeche', eintrag.hoehe >= 44);
+
+    await seite.evaluate(() => { document.getElementById('nav-support').click(); });
+    await seite.waitForTimeout(350);
+    const mobil = await seite.evaluate(() => {
+      const ab = document.getElementById('bkAb-sa');
+      const btr = document.getElementById('saBetreff');
+      const txt = document.getElementById('saText');
+      return {
+        offen: !!ab && getComputedStyle(ab).display !== 'none',
+        querlauf: document.documentElement.scrollWidth - window.innerWidth,
+        betreffSchrift: btr ? parseFloat(getComputedStyle(btr).fontSize) : 0,
+        textSchrift: txt ? parseFloat(getComputedStyle(txt).fontSize) : 0,
+        schubladeZu: !document.getElementById('side').classList.contains('auf'),
+      };
+    });
+    check('KRITISCH: am Handy landet der Eintrag im Supportteil', mobil.offen);
+    check('KRITISCH: am Handy laeuft nichts seitlich ueber', mobil.querlauf <= 0);
+    check('KRITISCH: die Eingabefelder tragen 16 px (sonst zoomt iOS hinein)',
+      mobil.betreffSchrift >= 16 && mobil.textSchrift >= 16);
+    check('Die Schublade ist danach zu -- man steht im Inhalt, nicht im Menue',
+      mobil.schubladeZu);
+
+    // DIE NEBENWIRKUNG, die es zu vermeiden galt: Ueber "Zurueck" darf man
+    // am Handy NICHT in die Kacheluebersicht der Administration geraten --
+    // die ist dort nach ENT-235 bewusst nicht erreichbar.
+    await seite.evaluate(() => {
+      document.querySelector('#bkAb-sa .bk-zurueck').click();
+    });
+    await seite.waitForTimeout(350);
+    const danach = await seite.evaluate(() => ({
+      adminOffen: getComputedStyle(document.getElementById('view-betrieb')).display !== 'none',
+      kachelnSichtbar: [...document.querySelectorAll('.bk-kachel')]
+        .filter(e => e.offsetParent !== null).length,
+    }));
+    check('KRITISCH: "Zurueck" fuehrt am Handy NICHT in die Administration',
+      !danach.adminOffen && danach.kachelnSichtbar === 0);
+
+    // Am Desktop bleibt es beim gewohnten Weg: zurueck in die Kacheln.
+    await seite.setViewportSize({ width: 1400, height: 900 });
+    await seite.evaluate(() => { go('betrieb'); bkAbschnittZeigen('sa'); });
+    await seite.waitForTimeout(250);
+    await seite.evaluate(() => { document.querySelector('#bkAb-sa .bk-zurueck').click(); });
+    await seite.waitForTimeout(250);
+    const desktopZurueck = await seite.evaluate(() =>
+      [...document.querySelectorAll('.bk-kachel')].filter(e => e.offsetParent !== null).length);
+    check('KRITISCH: am Desktop fuehrt "Zurueck" weiterhin in die Kacheluebersicht',
+      desktopZurueck > 0);
+  }
 
   // Leer ist etwas anderes als nicht abrufbar.
   await seite.evaluate(() => saListeZeichnen([]));
