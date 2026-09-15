@@ -32,6 +32,12 @@ require_once __DIR__ . '/../lohn.php';
 // zustimmt.
 require_once __DIR__ . '/../gavzeit.php';
 require_once __DIR__ . '/../lohnlauf.php';
+// Jede Aenderung an Lohnansatz, -abzug oder Zahlungsweg (inkl. IBAN) wird
+// protokolliert (Security-Audit 2026-09-15, gleiches Prinzip wie ENT-077):
+// wer wann welchen Zahlungsweg geaendert hat, war bislang nirgends
+// nachvollziehbar -- der klassische Betrugsvektor "IBAN-Umleitung" hinterliess
+// keine Spur.
+require_once __DIR__ . '/../logbuch.php';
 
 $user = require_session();
 require_recht($user, 'lohn_lesen');
@@ -238,6 +244,7 @@ if ($loeschen) {
     }
     $del = $pdo->prepare("DELETE FROM $tabelle WHERE id = ? AND mitarbeiter_id = ?");
     $del->execute([$eintragId, $id]);
+    logbuch_schreiben($pdo, $user, 'lohn', $id, $was . '_geloescht', (string)$eintragId, null);
     json_response(lohn_person_lesen($id, $stichtag));
 }
 
@@ -278,6 +285,13 @@ if ($was === 'ansatz') {
               zuschlag_waffe_art = VALUES(zuschlag_waffe_art),
               zuschlag_waffe_rappen = VALUES(zuschlag_waffe_rappen),
               bemerkung = VALUES(bemerkung), erfasst_von = VALUES(erfasst_von)';
+    // Der Stand VOR dem Schreiben -- nur fuer DENSELBEN Gueltigkeitszeitraum
+    // (der ON DUPLICATE KEY-Schluessel), sonst liesse sich Anlegen nicht von
+    // Aendern unterscheiden. logbuch_vergleichen() schreibt daraus je
+    // Unterschied eine Zeile (dasselbe Muster wie in fahrzeuge.php).
+    $vorAnsatz = $pdo->prepare('SELECT * FROM lohn_ansatz WHERE mitarbeiter_id = ? AND gueltig_ab = ?');
+    $vorAnsatz->execute([$id, $ab]);
+    $vorAnsatzZeile = $vorAnsatz->fetch(PDO::FETCH_ASSOC) ?: [];
     $pdo->prepare($sql)->execute([
         $id, $ab, $kategorie, $rappen,
         !empty($input['ferien_laufend']) ? 1 : 0,
@@ -291,6 +305,23 @@ if ($was === 'ansatz') {
         trim((string)($input['bemerkung'] ?? '')) ?: null,
         (int)$user['id'],
     ]);
+    if ($vorAnsatzZeile) {
+        $nachAnsatz = [
+            'kategorie' => $kategorie, 'ansatz_rappen' => $rappen,
+            'ferien_laufend' => !empty($input['ferien_laufend']) ? 1 : 0,
+            'ml13_bp' => isset($input['ml13_bp']) && $input['ml13_bp'] !== '' ? (int)$input['ml13_bp'] : null,
+            'zuschlag_fachausweis_art' => $art($input['zuschlag_fachausweis_art'] ?? null),
+            'zuschlag_fachausweis_rappen' => lohn_rappen_aus($input['zuschlag_fachausweis'] ?? null),
+            'zuschlag_hund_art' => $art($input['zuschlag_hund_art'] ?? null),
+            'zuschlag_hund_rappen' => lohn_rappen_aus($input['zuschlag_hund'] ?? null),
+            'zuschlag_waffe_art' => $art($input['zuschlag_waffe_art'] ?? null),
+            'zuschlag_waffe_rappen' => lohn_rappen_aus($input['zuschlag_waffe'] ?? null),
+            'bemerkung' => trim((string)($input['bemerkung'] ?? '')) ?: null,
+        ];
+        logbuch_vergleichen($pdo, $user, 'lohn', $id, $vorAnsatzZeile, $nachAnsatz);
+    } else {
+        logbuch_schreiben($pdo, $user, 'lohn', $id, 'ansatz_angelegt', null, $ab . ': ' . number_format($rappen / 100, 2, '.', ''));
+    }
     json_response(lohn_person_lesen($id, $stichtag));
 }
 
@@ -347,6 +378,10 @@ if ($was === 'abzug') {
               qst_pflichtig = VALUES(qst_pflichtig), qst_kanton = VALUES(qst_kanton),
               qst_tarifcode = VALUES(qst_tarifcode), qst_kinder = VALUES(qst_kinder),
               bemerkung = VALUES(bemerkung), erfasst_von = VALUES(erfasst_von)';
+    // Der Stand VOR dem Schreiben, wie bei 'ansatz' oben.
+    $vorAbzug = $pdo->prepare('SELECT * FROM lohn_person WHERE mitarbeiter_id = ? AND gueltig_ab = ?');
+    $vorAbzug->execute([$id, $ab]);
+    $vorAbzugZeile = $vorAbzug->fetch(PDO::FETCH_ASSOC) ?: [];
     $pdo->prepare($sql)->execute([
         $id, $ab,
         $nbuWert,
@@ -366,6 +401,22 @@ if ($was === 'abzug') {
         trim((string)($input['bemerkung'] ?? '')) ?: null,
         (int)$user['id'],
     ]);
+    if ($vorAbzugZeile) {
+        $nachAbzug = [
+            'nbu_pflichtig' => $nbuWert, 'nbu_grund' => $nbuWert === null ? null : $nbuGrund,
+            'ktg_pflichtig' => !empty($input['ktg_pflichtig']) ? 1 : 0,
+            'bvg_angeschlossen' => !empty($input['bvg_angeschlossen']) ? 1 : 0,
+            'bvg_beitrag_rappen' => lohn_rappen_aus($input['bvg_beitrag'] ?? null),
+            'qst_pflichtig' => $qstPflichtig ? 1 : 0,
+            'qst_kanton' => $qstPflichtig ? $qstKanton : null,
+            'qst_tarifcode' => $qstPflichtig ? (trim((string)($input['qst_tarifcode'] ?? '')) ?: null) : null,
+            'qst_kinder' => $qstPflichtig && $input['qst_kinder'] !== '' ? (int)($input['qst_kinder'] ?? 0) : null,
+            'bemerkung' => trim((string)($input['bemerkung'] ?? '')) ?: null,
+        ];
+        logbuch_vergleichen($pdo, $user, 'lohn', $id, $vorAbzugZeile, $nachAbzug);
+    } else {
+        logbuch_schreiben($pdo, $user, 'lohn', $id, 'abzug_angelegt', null, $ab);
+    }
     json_response(lohn_person_lesen($id, $stichtag));
 }
 
@@ -404,14 +455,30 @@ $felder = [
     trim((string)($input['bemerkung'] ?? '')) ?: null,
     (int)$user['id'],
 ];
+$nachZahlung = [
+    'reihenfolge' => (int)($input['reihenfolge'] ?? 1), 'art' => $zart, 'betrag_rappen' => $betrag,
+    // IBAN bewusst NICHT ohneWerte: anders als beim Passwort ist der Wert
+    // selbst der Zweck der Protokollierung -- eine IBAN-Umleitung muss sich
+    // im Logbuch nachvollziehen lassen (Security-Audit 2026-09-15).
+    'iban' => $iban,
+    'empfaenger' => trim((string)($input['empfaenger'] ?? '')) ?: null,
+    'bank' => trim((string)($input['bank'] ?? '')) ?: null,
+    'aktiv' => isset($input['aktiv']) && !$input['aktiv'] ? 0 : 1,
+    'bemerkung' => trim((string)($input['bemerkung'] ?? '')) ?: null,
+];
 if ($eintragId > 0) {
     $felder[] = $eintragId;
+    // Der Stand VOR dem Schreiben.
+    $vorZahlung = $pdo->prepare('SELECT * FROM lohn_zahlung WHERE id = ? AND mitarbeiter_id = ?');
+    $vorZahlung->execute([$eintragId, $id]);
+    $vorZahlungZeile = $vorZahlung->fetch(PDO::FETCH_ASSOC) ?: [];
     $pdo->prepare(
         'UPDATE lohn_zahlung SET mitarbeiter_id = ?, reihenfolge = ?, art = ?, betrag_rappen = ?,
              iban = ?, empfaenger = ?, bank = ?, aktiv = ?, bemerkung = ?,
              geaendert_von = ?, geaendert_am = NOW()
          WHERE id = ?'
     )->execute($felder);
+    if ($vorZahlungZeile) { logbuch_vergleichen($pdo, $user, 'lohn', $id, $vorZahlungZeile, $nachZahlung); }
 } else {
     $pdo->prepare(
         'INSERT INTO lohn_zahlung
@@ -419,5 +486,6 @@ if ($eintragId > 0) {
             aktiv, bemerkung, geaendert_von, geaendert_am)
          VALUES (?,?,?,?,?,?,?,?,?,?,NOW())'
     )->execute($felder);
+    logbuch_schreiben($pdo, $user, 'lohn', $id, 'zahlung_angelegt', null, $iban);
 }
 json_response(lohn_person_lesen($id, $stichtag));

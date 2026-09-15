@@ -120,6 +120,34 @@ pruef('Der Verlauf eines Fahrzeugs enthaelt keine fremden Bereiche',
 pruef('KRITISCH: ein unbekannter Bereich wird weiterhin abgewiesen',
     logbuch_schreiben($pdo, $chefin, 'erfundenerbereich', 1, 'x', 'a', 'b') === false);
 
+// ══════════════ DER BEREICH 'betrieb' (Security-Audit 2026-09-15)
+// Dasselbe Prinzip wie beim Bereich 'fahrzeug' oben: faellt 'betrieb' aus
+// LOGBUCH_BEREICHE, hoert die Protokollierung der Betriebsstammdaten
+// (u.a. die QR-Rechnungs-IBAN) lautlos auf -- darum hier ausgefuehrt.
+pruef('KRITISCH: der Bereich "betrieb" wird angenommen',
+    logbuch_schreiben($pdo, $chefin, 'betrieb', 1, 'qr_iban', 'CH44 alt', 'CH44 neu') === true);
+pruef('KRITISCH: eine IBAN-Aenderung steht mit altem UND neuem Wert im Verlauf',
+    (function () use ($pdo) {
+        $e = logbuch_lesen($pdo, 'betrieb', 1);
+        return count($e) === 1 && $e[0]['feld'] === 'qr_iban'
+            && $e[0]['wert_alt'] === 'CH44 alt' && $e[0]['wert_neu'] === 'CH44 neu';
+    })());
+
+// ══════════════ DER BEREICH 'lohn' (Security-Audit 2026-09-15)
+// Dasselbe Prinzip: faellt 'lohn' aus der Liste, hoert die Protokollierung
+// von Lohnansatz/-abzug/Zahlungsweg (inkl. IBAN) lautlos auf -- der
+// klassische Betrugsvektor "IBAN-Umleitung" hinterliesse dann wieder keine
+// Spur.
+pruef('KRITISCH: der Bereich "lohn" wird angenommen',
+    logbuch_schreiben($pdo, $chefin, 'lohn', 12, 'zahlung_angelegt', null, 'CH00 neu') === true);
+pruef('KRITISCH: eine neue Zahlungsangabe steht im Verlauf der richtigen Person',
+    (function () use ($pdo) {
+        $e = logbuch_lesen($pdo, 'lohn', 12);
+        return count($e) === 1 && $e[0]['feld'] === 'zahlung_angelegt' && $e[0]['wert_neu'] === 'CH00 neu';
+    })());
+pruef('Der Verlauf einer Person im Bereich "lohn" enthaelt keine fremden Personen',
+    logbuch_lesen($pdo, 'lohn', 99) === []);
+
 // Ein misslungener Eintrag darf das Speichern nicht verhindern
 $pdo->exec('DROP TABLE aenderungslog');
 $konnte = true;

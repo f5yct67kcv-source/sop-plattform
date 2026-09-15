@@ -41,7 +41,11 @@ declare(strict_types=1);
 // Kilometerstand, dass dies mit einem Logeintrag registriert wird."* Am
 // Kilometerstand haengt spaeter die Kontrolle gefahrener Strecken -- eine
 // Zahl, die sich spurlos aendern laesst, traegt keine Kontrolle.
-const LOGBUCH_BEREICHE = ['mitarbeiter', 'fahrzeug'];
+// 'betrieb' und 'lohn' seit Security-Audit 2026-09-15: Betriebsstammdaten
+// (u.a. die QR-Rechnungs-IBAN, das Hauptdomizil, die Pikett-Nummer) sowie
+// Lohnansatz/-abzug/Zahlungsweg (ebenfalls inkl. IBAN) waren die einzigen
+// Schreibstellen im ganzen Haus, deren Aenderungen spurlos blieben.
+const LOGBUCH_BEREICHE = ['mitarbeiter', 'fahrzeug', 'betrieb', 'lohn'];
 
 function logbuch_tabelle_da(PDO $pdo): bool
 {

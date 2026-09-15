@@ -27,6 +27,12 @@ declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../rechte.php';
 require_once __DIR__ . '/../qrrechnung.php';
+// Jede Aenderung an den Betriebsstammdaten wird protokolliert
+// (Security-Audit 2026-09-15, gleiches Prinzip wie ENT-077/ENT-330): vorher
+// war hier -- anders als bei mitarbeiter/fahrzeug -- ueberhaupt nichts
+// nachvollziehbar, obwohl darunter die QR-Rechnungs-IBAN und das
+// Hauptdomizil liegen.
+require_once __DIR__ . '/../logbuch.php';
 
 $user = require_session();
 
@@ -133,6 +139,8 @@ if (!empty($in['logo_weg'])) {
     $pdo->prepare('UPDATE betrieb SET logo = NULL, logo_mime = NULL, logo_groesse = NULL,
                    geaendert_am = NOW(), geaendert_von = ? WHERE id = 1')
         ->execute([(int)$user['id']]);
+    // ohneWerte: das Logo selbst ist Binaerdaten, kein Vergleichswert.
+    logbuch_schreiben($pdo, $user, 'betrieb', 1, 'logo', null, null, true);
     json_response(['status' => 'ok', 'betrieb' => betrieb_lesen(true)]);
 }
 
@@ -170,6 +178,8 @@ if (isset($in['logo'])) {
     $st->bindValue(3, strlen($roh), PDO::PARAM_INT);
     $st->bindValue(4, (int)$user['id'], PDO::PARAM_INT);
     $st->execute();
+    // ohneWerte: das Logo selbst ist Binaerdaten, kein Vergleichswert.
+    logbuch_schreiben($pdo, $user, 'betrieb', 1, 'logo', null, $mime, true);
     json_response(['status' => 'ok', 'betrieb' => betrieb_lesen(true)]);
 }
 
@@ -221,6 +231,12 @@ if (array_key_exists('domizil_strasse', $in)) {
     if ($dEmail !== '' && (mb_strlen($dEmail) > 200 || !filter_var($dEmail, FILTER_VALIDATE_EMAIL))) {
         json_response(['status' => 'error', 'message' => 'Die E-Mail-Adresse ist ungueltig.'], 400);
     }
+    // Der Stand VOR dem Schreiben -- logbuch_vergleichen() schreibt daraus
+    // je Unterschied eine Zeile (dasselbe Muster wie in fahrzeuge.php).
+    $vorDomizil = $pdo->query(
+        'SELECT domizil_strasse, domizil_plz, domizil_ort, firma, telefon, email, pikett_telefon
+           FROM betrieb WHERE id = 1'
+    )->fetch(PDO::FETCH_ASSOC) ?: [];
     $pdo->prepare('UPDATE betrieb SET domizil_strasse = ?, domizil_plz = ?, domizil_ort = ?,
                    firma = ?, telefon = ?, email = ?, pikett_telefon = ?,
                    geaendert_am = NOW(), geaendert_von = ? WHERE id = 1')
@@ -228,6 +244,15 @@ if (array_key_exists('domizil_strasse', $in)) {
                    $dOrt === '' ? null : $dOrt, $dFirma, $dTelefon === '' ? null : $dTelefon,
                    $dEmail === '' ? null : $dEmail, $dPikett === '' ? null : $dPikett,
                    (int)$user['id']]);
+    logbuch_vergleichen($pdo, $user, 'betrieb', 1, $vorDomizil, [
+        'domizil_strasse' => $dStrasse === '' ? null : $dStrasse,
+        'domizil_plz' => $dPlz === '' ? null : $dPlz,
+        'domizil_ort' => $dOrt === '' ? null : $dOrt,
+        'firma' => $dFirma,
+        'telefon' => $dTelefon === '' ? null : $dTelefon,
+        'email' => $dEmail === '' ? null : $dEmail,
+        'pikett_telefon' => $dPikett === '' ? null : $dPikett,
+    ]);
     json_response(['status' => 'ok', 'betrieb' => betrieb_lesen(true)]);
 }
 
@@ -269,6 +294,14 @@ if (mb_strlen($qrStrasse) > 200 || mb_strlen($qrOrt) > 100) {
         'message' => 'Strasse/Ort für die QR-Rechnung sind zu lang.'], 400);
 }
 
+// Der Stand VOR dem Schreiben -- logbuch_vergleichen() schreibt daraus je
+// Unterschied eine Zeile (dasselbe Muster wie in fahrzeuge.php). Insbesondere
+// qr_iban ist die Empfaengeradresse jeder QR-Rechnung -- eine Aenderung hier
+// muss nachvollziehbar bleiben.
+$vorQr = $pdo->query(
+    'SELECT firma, zusatz, fusszeile, fusszeile2, qr_iban, qr_strasse, qr_hausnummer, qr_plz, qr_ort
+       FROM betrieb WHERE id = 1'
+)->fetch(PDO::FETCH_ASSOC) ?: [];
 $pdo->prepare('UPDATE betrieb SET firma = ?, zusatz = ?, fusszeile = ?, fusszeile2 = ?,
                qr_iban = ?, qr_strasse = ?, qr_hausnummer = ?, qr_plz = ?, qr_ort = ?,
                geaendert_am = NOW(), geaendert_von = ? WHERE id = 1')
@@ -276,5 +309,12 @@ $pdo->prepare('UPDATE betrieb SET firma = ?, zusatz = ?, fusszeile = ?, fusszeil
                $qrIban === '' ? null : $qrIban, $qrStrasse === '' ? null : $qrStrasse,
                $qrHausnummer === '' ? null : $qrHausnummer, $qrPlz === '' ? null : $qrPlz,
                $qrOrt === '' ? null : $qrOrt, (int)$user['id']]);
+logbuch_vergleichen($pdo, $user, 'betrieb', 1, $vorQr, [
+    'firma' => $firma, 'zusatz' => $zusatz,
+    'fusszeile' => $fuss === '' ? null : $fuss, 'fusszeile2' => $fuss2 === '' ? null : $fuss2,
+    'qr_iban' => $qrIban === '' ? null : $qrIban, 'qr_strasse' => $qrStrasse === '' ? null : $qrStrasse,
+    'qr_hausnummer' => $qrHausnummer === '' ? null : $qrHausnummer,
+    'qr_plz' => $qrPlz === '' ? null : $qrPlz, 'qr_ort' => $qrOrt === '' ? null : $qrOrt,
+]);
 
 json_response(['status' => 'ok', 'betrieb' => betrieb_lesen(true)]);
