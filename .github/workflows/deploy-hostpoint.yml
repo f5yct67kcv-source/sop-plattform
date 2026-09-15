@@ -1096,12 +1096,16 @@ jobs:
           # Rapport-Tools und bei den GuardOpS-Literalen im guardops-Buendel).
           sed -i "s|__APP_BASIS_URL__|https://betreiber.guardops.ch|g" dist-betreiber/db.php
 
-          # Kein uebersehener Platzhalter darf hochgeladen werden -- anders
-          # als beim guardops-Buendel bleibt hier KEINE Familie absichtlich
-          # stehen, weil dieses Buendel eine echte Datenbankverbindung
-          # braucht.
+          # Kein uebersehener Platzhalter darf hochgeladen werden. Anders als
+          # beim guardops-Buendel braucht dieses hier eine echte
+          # Datenbankverbindung (__DB_*__ wird oben ersetzt) -- ausgenommen
+          # bleiben nur die eigenen, noch unersetzten Platzhalter der
+          # separaten Betreiber-Datenbank (__BETREIBER_DB_*__,
+          # __MANDANT_SECRETS__ in backend/betreiber.php, OP-518):
+          # betreiber_db() faellt bei leerem/unersetztem Platzhalter bewusst
+          # auf db() zurueck, siehe Kommentar dort.
           UEBRIG=$(grep -rhos '__[A-Z_]\{3,\}__' dist-betreiber/ \
-                   | grep -v -e '^__DIR__$' \
+                   | grep -v -e '^__DIR__$' -e '^__BETREIBER_DB_[A-Z]\+__$' -e '^__MANDANT_SECRETS__$' \
                    | sort -u || true)
           if [ -n "$UEBRIG" ]; then
             echo "::error::Nicht ersetzte Platzhalter im betreiber-Buendel: $UEBRIG"
