@@ -123,6 +123,16 @@ await page.waitForSelector('.app.on');
 await page.waitForTimeout(400);
 await page.evaluate(() => ladeSchichten().then(() => rundgangFortsetzen(71)));
 await page.waitForTimeout(1400);
+/* Die Verweilzeit aus ENT-576 abwarten. Bewusst durch WARTEN und nicht
+   durch Vorziehen der Frist: Diese Suite geht den ganzen echten Weg
+   (anmelden, Schichten, Runde) und soll auch hier das echte Zusammenspiel
+   aus Ortung und Sekundentakt pruefen. Grosszuegig statt knapp -- unter
+   paralleler Last kommt ein Takt spaeter (siehe OP-464/OP-485). */
+for (let i = 0; i < 100; i++) {
+  if (await page.evaluate(() => !!(rundgangAktiv
+      && rundgangAktiv.kontrollpunkte[0].erledigt))) { break; }
+  await page.waitForTimeout(200);
+}
 
 // ══════════ DIE ORTUNG DARF DIE RUNDE NICHT MITREISSEN ═══════════════
 // Beim Bauen stand rgOrtungNachfuehren() eine Zeile zu frueh -- vor dem

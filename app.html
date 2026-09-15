@@ -2518,6 +2518,12 @@ const W = {
     rgsOrtungAus: 'Kein Standort — Ortung im Gerät erlauben',
     rdEntfernung: 'noch {m} m',
     rdImBereich: 'Du bist im Bereich',
+    // Die Zeile waehrend der Verweilzeit (ENT-576). Sie muss sagen, dass
+    // gerade etwas laeuft -- ein Bereich, in dem man steht und in dem
+    // sichtbar nichts geschieht, sieht aus wie ein Bereich, der nicht
+    // greift. Das ist dieselbe Familie wie "unbekannt darf nie wie keine
+    // aussehen".
+    rdAutoZaehlt: 'Im Bereich — wird in {s} s erfasst',
     rdZuWeit: 'Noch {m} m entfernt — der Punkt lässt sich erst im Bereich bestätigen',
     rdOrtUnbekannt: 'Standort noch unbekannt',
     // Der Zeilenhinweis, solange die automatische Erfassung zustaendig ist
@@ -7683,10 +7689,49 @@ function rgLaufKopfZeichnen() {
   }
   // Dasselbe gilt fuer den Richtungspfeil (ENT-542): Er altert ebenfalls.
   try { rgRichtungMarkeNachfuehren(); } catch (e) {}
+  /* Und die Verweilzeit (ENT-576) -- sie braucht diesen Takt, sonst gibt es
+     sie gar nicht.
+
+     watchPosition meldet nur bei BEWEGUNG. Wer am Punkt steht, bekommt
+     minutenlang keine neue Position; haenge die Frist allein an die
+     Positionsmeldungen, liefe sie fuer den Stehenden nie ab -- also genau
+     fuer den, der am Kontrollpunkt seine Arbeit tut.
+
+     Die zuletzt bekannte Position dafuer zu verwenden ist richtig und keine
+     Nachlaessigkeit: rgBereichPruefen() verwirft sie ohnehin, sobald sie
+     aelter als RG_ORT_STILL_MS ist. Wer eine Minute stillsteht, ist noch
+     dort, wo die letzte Messung ihn sah. */
+  /* Beides nur im AEUSSEREN Durchlauf. rundgangListeZeichnen() ruft ueber
+     den Fuss wieder hierher zurueck; ohne diesen Riegel riefe der innere
+     Durchlauf erneut neu zeichnen, und das liefe endlos, solange eine Frist
+     laeuft. Der Riegel aus der Ortungslage darueber trug hier nicht: Dort
+     aendert sich der verglichene Zustand, hier nicht. */
+  if (rgsKopfTaktLaeuft) { return; }
+  rgsKopfTaktLaeuft = true;
+  try {
+    rgBereichPruefen();
+    /* Die Zeile nachziehen, solange irgendwo eine Frist laeuft. Das
+       "zuletzt" im Vergleich ist kein Feinschliff: Ohne es bliebe nach dem
+       letzten Countdown-Schritt "wird in 1 s erfasst" stehen, weil danach
+       nichts mehr neu zeichnet. */
+    const zaehltWer = (rundgangAktiv.kontrollpunkte || []).some(k => k._autoRest);
+    const nachziehen = zaehltWer || rgsAutoZaehlteZuletzt;
+    rgsAutoZaehlteZuletzt = zaehltWer;
+    if (nachziehen && rgsReiter === 'punkte' && abPunktId === null) {
+      rundgangListeZeichnen();
+    }
+  } catch (e) {
+  } finally {
+    rgsKopfTaktLaeuft = false;
+  }
 }
 
 // Welche Ortungslage die Liste zuletzt gezeichnet hat (ENT-531).
 let rgsOrtLageGezeichnet = null;
+// Lief beim letzten Takt irgendwo eine Verweilzeit? (ENT-576)
+let rgsAutoZaehlteZuletzt = false;
+// Riegel gegen den Ruecklauf ueber den Fuss (ENT-576).
+let rgsKopfTaktLaeuft = false;
 
 /* Laufzeit seit Rundgangbeginn, PAUSEN ABGEZOGEN.
    Bewusst nicht die Rohzeit: Die beginnt nach ENT-145 erst mit dem ersten
@@ -8987,6 +9032,37 @@ function rgSignalNoetig(war, dist, radius) {
 // Darf dieser Punkt jetzt von selbst erfasst werden? Reine Funktion, damit
 // sich die Weiche ohne Geraet pruefen laesst -- gleiches Muster wie
 // rgSignalNoetig() und rgSpurNehmen().
+/* Wie lange jemand im Bereich stehen muss, bevor erfasst wird (ENT-576).
+
+   ENT-531 hatte ausdruecklich KEINE Verweilzeit -- erster Messwert im
+   Radius genuegte. Der Projektinhaber nach dem ersten Betrieb: "es klappt,
+   wird aber etwas zu zackig gruen. ich oeffne die runde, und swippt grad in
+   den aufgabebereich des kontrollpunkts."
+
+   Das ist der Fall, den die sofortige Erfassung am schlechtesten bedient:
+   Wer die Runde oeffnet, waehrend er schon am Punkt steht, hat den Punkt
+   erfasst und das Aufgabenblatt vor der Nase, bevor er hingesehen hat. Fuenf
+   Sekunden geben ihm den Moment, sich zu orientieren -- und sie sind
+   nebenbei genau der Schutz gegen ein Vorbeifahren, den ENT-531 verworfen
+   hatte. */
+const RG_AUTO_VERWEIL_MS = 5000;
+
+/* Verbleibende Sekunden bis zur Erfassung. Reine Funktion, damit sich die
+   Frist ohne Geraet pruefen laesst -- gleiches Muster wie rgSignalNoetig()
+   und rgSpurNehmen().
+
+   Drei Antworten, weil es drei Lagen gibt:
+     null -- es wird gar nicht gezaehlt (niemand steht im Bereich)
+     0    -- die Frist ist um, jetzt wird erfasst
+     > 0  -- so viele Sekunden stehen noch aus
+   Aufgerundet: Wer 4,2 Sekunden vor sich hat, liest "5" und dann "4" --
+   abgerundet begaenne die Anzeige bei 4 und der erste Schritt fehlte. */
+function rdAutoRestSek(drinSeit, jetzt) {
+  if (!drinSeit) { return null; }
+  const rest = RG_AUTO_VERWEIL_MS - (jetzt - drinSeit);
+  return rest <= 0 ? 0 : Math.ceil(rest / 1000);
+}
+
 function rdAutoErfassbar(k, status, ortFrisch) {
   if (!k || k.typ !== 'geofence' || k.erledigt) { return false; }
   if (k.lat === null || k.lat === undefined) { return false; }
@@ -9015,12 +9091,42 @@ function rgBereichPruefen() {
     // Server misst hart gegen geofence_radius_m; ein aus dem Band heraus
     // erfasster Punkt kaeme dort als Fehler zurueck.
     const drinEcht = dist !== null && dist <= rdRadiusVon(k);
-    const erfassen = drinEcht && rdAutoErfassbar(k, status, ortFrisch);
-    // Ein Text pro Sachverhalt: "erfasst" nur, wenn wirklich erfasst wird.
-    if (e.signal) {
-      rgSignalGeben((erfassen ? w('rgSignalErfasst') : w('rgSignalDrin')) + ' — ' + k.bezeichnung);
+    /* Seit wann jemand im Bereich steht (ENT-576). Bewusst UNABHAENGIG
+       davon, ob gerade erfasst werden darf: Wer fuenf Sekunden am Punkt
+       steht und dabei ein Ersatzscan-Formular offen hatte, hat trotzdem
+       fuenf Sekunden dort gestanden -- schliesst er es, wird sofort
+       erfasst und nicht noch einmal gewartet.
+
+       Beim Verlassen zurueckgesetzt: Wer zwei Sekunden hineinschaut,
+       weggeht und spaeter wiederkommt, faengt neu an. Sonst summierten
+       sich zwei Vorbeifahrten zu einem Nachweis. */
+    if (!drinEcht) { k._drinSeit = null; }
+    else if (!k._drinSeit) { k._drinSeit = Date.now(); }
+    const darf = drinEcht && rdAutoErfassbar(k, status, ortFrisch);
+    const rest = darf ? rdAutoRestSek(k._drinSeit, Date.now()) : null;
+    const erfassen = rest === 0;
+    const zaehlt = rest !== null && rest > 0;
+    // Was die Zeile anzeigt, solange die Frist laeuft.
+    k._autoRest = zaehlt ? rest : null;
+    /* Ein Signal pro Punkt, und zwar im Augenblick der ERFASSUNG.
+
+       Bis ENT-576 fielen Eintritt und Erfassung zusammen, darum sass das
+       Signal am Eintritt. Jetzt liegen fuenf Sekunden dazwischen, und die
+       Frage wird echt: Am Eintritt zu piepen und dann noch einmal beim
+       Erfassen waere zweimal pro Punkt -- genau das, wonach der Waechter
+       den Ton abschaltet (ENT-319). Am Eintritt allein zu piepen hiesse,
+       den Ton auf "du bist ungefaehr da" zu setzen und den Augenblick
+       stumm zu lassen, in dem der Nachweis entsteht.
+
+       Darum: Laeuft die Frist, schweigt der Eintritt -- der Ton kommt
+       fuenf Sekunden spaeter und heisst dann wirklich "erfasst". Wo gar
+       nicht erfasst werden kann (pausiert, offenes Formular), bleibt es
+       beim Eintrittssignal mit dem anderen Text. */
+    if (e.signal && !zaehlt && !erfassen) {
+      rgSignalGeben(w('rgSignalDrin') + ' — ' + k.bezeichnung);
     }
     if (!erfassen) { return; }
+    rgSignalGeben(w('rgSignalErfasst') + ' — ' + k.bezeichnung);
     // Die Erfassung haengt NICHT am Signal-Uebergang, sondern am Radius.
     // Der Unterschied ist kein Feinschliff: Wer im Bereich steht und dort
     // ein Ersatzscan-Formular oeffnet und wieder schliesst, hat den
@@ -9494,10 +9600,24 @@ function rdZeile(k, gesperrt, naechsterId) {
   const drin = dist === null ? null : dist <= rdRadiusVon(k);
   // "Standort noch unbekannt" ist zu harmlos, wenn er GESPERRT ist -- das
   // eine geht vorbei, das andere nie (ENT-320).
+  const ortLage = rgOrtLage().art;
+  /* Ob die automatische Erfassung diesen Punkt gerade uebernimmt. Steht
+     bewusst VOR dem Ortstext: Beide Zeilen der Zeile muessen aus derselben
+     Quelle stammen. Beim Messen am gerenderten Zustand standen sonst
+     "wird in 5 s erfasst" und "ohne laufende Ortung nicht automatisch"
+     uebereinander -- zwei Zeilen, die einander widersprachen, weil die eine
+     aus k._autoRest kam und die andere aus rgOrtLage(). */
+  const autoZustaendig = kannScannen && dist !== null && !k.offen
+    && ortLage === 'laeuft';
+  // Der Countdown gilt nur, solange die Automatik auch wirklich zustaendig
+  // ist -- sonst verspricht er etwas, das niemand einloest.
+  const zaehltRest = autoZustaendig ? k._autoRest : null;
   const ortTxt = !kannScannen ? ''
     : rgsOrtFehler === 'verweigert' ? `<div class="rd-ort weit">${esc(w('rgOrtAusTitel'))}</div>`
     : dist === null ? `<div class="rd-ort mut">${esc(w('rdOrtUnbekannt'))}</div>`
-    : drin ? `<div class="rd-ort drin">${esc(w('rdImBereich'))}</div>`
+    : drin ? `<div class="rd-ort drin" id="rdOrt${k.id}">${esc(zaehltRest
+        ? w('rdAutoZaehlt').replace('{s}', String(zaehltRest))
+        : w('rdImBereich'))}</div>`
     : `<div class="rd-ort weit">${esc(w('rdEntfernung').replace('{m}', String(Math.round(dist))))}</div>`;
   /* Der Knopf ist seit ENT-531 der RUECKFALLWEG, nicht der Normalweg.
 
@@ -9507,9 +9627,6 @@ function rdZeile(k, gesperrt, naechsterId) {
      Koordinaten, oder ein offenes Formular, dem die Erfassung bewusst nicht
      ins Handwerk pfuscht. Sonst staende der Waechter nachts vor einem Punkt,
      den er weder automatisch noch von Hand erfassen kann. */
-  const ortLage = rgOrtLage().art;
-  const autoZustaendig = kannScannen && dist !== null && !k.offen
-    && ortLage === 'laeuft';
   /* Und der Text dazu. Drei Lagen, drei Aussagen: Die Automatik ist
      zustaendig / der Standort wird noch GESUCHT (geht von selbst vorbei) /
      die Ortung traegt nicht (geht nicht von selbst vorbei). "Ohne laufende
@@ -9554,7 +9671,7 @@ function rdZeile(k, gesperrt, naechsterId) {
     ${!kannScannen && !gesperrt ? `<div class="rd-hinweis">${esc(w('kpNfcNichtVerfuegbarGeraet'))}</div>` : ''}
     ${k.fehler ? `<div class="msg-err rd-einzug">${esc(k.fehler)}</div>` : ''}
     ${!auf ? '' : `
-    ${kannScannen ? `<div class="rd-hinweis rd-einzug" id="rdAuto${k.id}">${
+    ${kannScannen && !zaehltRest ? `<div class="rd-hinweis rd-einzug" id="rdAuto${k.id}">${
         esc(w(autoHinweis))}</div>` : ''}
     <div class="rd-akt">
       ${kannScannen && !autoZustaendig ? `<button class="btn btn-primary" id="rdBtn${k.id}"${drin === false ? ' disabled' : ''} onclick="rdBestaetigen(${k.id})">${esc(w('kpBestaetigen'))}</button>` : ''}
