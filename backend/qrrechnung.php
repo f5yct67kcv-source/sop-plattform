@@ -132,17 +132,28 @@ function qrr_referenz(string $rechnungsnummer): string
 // $empfaenger: ['name'=>, 'strasse'=>, 'hausnummer'=>, 'plz'=>, 'ort'=>] des
 //   Kunden, oder null, wenn unbekannt -- der Debitor-Block bleibt dann leer,
 //   was der Standard ausdruecklich erlaubt.
+// Ein eingebettetes \n/\r wuerde beim implode("\n", ...) in qr_spc_payload()
+// eine zusaetzliche Zeile erzeugen und alle nachfolgenden der 31 SPC-Felder
+// verschieben -- dieselbe Injektionsklasse, die fuer das Feld email bereits
+// behoben wurde (ENT-501/SMTP-Injection), hier auf jedes Freitextfeld
+// angewendet, das in den Zahlteil eingeht (Security-Audit 2026-09-15).
+function qr_feld_bereinigen(string $wert, int $maxLaenge): string
+{
+    $bereinigt = preg_replace('/[\x00-\x1F\x7F]+/', ' ', $wert) ?? '';
+    return mb_substr(trim($bereinigt), 0, $maxLaenge);
+}
+
 function qr_spc_zeilen(array $betrieb, float $betragChf, string $rechnungsnummer, ?array $empfaenger): array
 {
     $iban = iban_normalisieren((string)$betrieb['qr_iban']);
     $leer7 = ['', '', '', '', '', '', ''];
     $debitor = $empfaenger ? [
         'S',
-        mb_substr((string)$empfaenger['name'], 0, 70),
-        mb_substr((string)$empfaenger['strasse'], 0, 70),
-        mb_substr((string)($empfaenger['hausnummer'] ?? ''), 0, 16),
-        mb_substr((string)$empfaenger['plz'], 0, 16),
-        mb_substr((string)$empfaenger['ort'], 0, 35),
+        qr_feld_bereinigen((string)$empfaenger['name'], 70),
+        qr_feld_bereinigen((string)$empfaenger['strasse'], 70),
+        qr_feld_bereinigen((string)($empfaenger['hausnummer'] ?? ''), 16),
+        qr_feld_bereinigen((string)$empfaenger['plz'], 16),
+        qr_feld_bereinigen((string)$empfaenger['ort'], 35),
         'CH',
     ] : $leer7;
 
@@ -150,11 +161,11 @@ function qr_spc_zeilen(array $betrieb, float $betragChf, string $rechnungsnummer
         'SPC', '0200', '1',
         $iban,
         'S',
-        mb_substr((string)$betrieb['firma'], 0, 70),
-        mb_substr((string)$betrieb['qr_strasse'], 0, 70),
-        mb_substr((string)($betrieb['qr_hausnummer'] ?? ''), 0, 16),
-        mb_substr((string)$betrieb['qr_plz'], 0, 16),
-        mb_substr((string)$betrieb['qr_ort'], 0, 35),
+        qr_feld_bereinigen((string)$betrieb['firma'], 70),
+        qr_feld_bereinigen((string)$betrieb['qr_strasse'], 70),
+        qr_feld_bereinigen((string)($betrieb['qr_hausnummer'] ?? ''), 16),
+        qr_feld_bereinigen((string)$betrieb['qr_plz'], 16),
+        qr_feld_bereinigen((string)$betrieb['qr_ort'], 35),
         'CH',
     ], $leer7, [
         number_format($betragChf, 2, '.', ''),

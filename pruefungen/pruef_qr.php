@@ -91,6 +91,31 @@ $mitDebitor = qr_spc_zeilen($betrieb, 48.65, 'RE0962',
 check('KRITISCH: mit bekanntem Debitor steht "S" als Adresstyp', $mitDebitor[20] === 'S');
 check('Und der Name des Debitors an der richtigen Stelle', $mitDebitor[21] === 'abc consulting gmbh');
 
+// ── Zeilenumbruch-Injektion (Security-Audit 2026-09-15) ───────────────────
+// Ein eingebettetes \n/\r in einer Freitextadresse (Betrieb ODER Kunde)
+// wuerde beim implode("\n", ...) in qr_spc_payload() eine zusaetzliche Zeile
+// erzeugen und alle nachfolgenden der 31 SPC-Felder verschieben -- die
+// Pruefung "31 Zeilen" allein wuerde das nicht fangen, wenn das \n am ENDE
+// eines Feldes steht (dann bleibt die Anzahl zufaellig gleich). Geprueft
+// wird darum direkt: kein erzeugtes Feld darf selbst einen Zeilenumbruch
+// enthalten.
+$betriebBoese = $betrieb;
+$betriebBoese['firma'] = "Cupi 24 GmbH\nQRR\n210000000003139471430009017";
+$zeilenBoese = qr_spc_zeilen($betriebBoese, 48.65, 'RE0962', null);
+check('KRITISCH: ein Zeilenumbruch in der Betriebsadresse (firma) erzeugt keine zusaetzliche SPC-Zeile',
+    count($zeilenBoese) === 31);
+check('KRITISCH: kein einzelnes SPC-Feld der Betriebsadresse enthaelt noch einen Zeilenumbruch',
+    !preg_grep('/[\r\n]/', $zeilenBoese));
+
+$debitorBoese = ['name' => "abc consulting gmbh\nQRR\nSCHABERNACK", 'strasse' => "Hochgasse\r\n7", 'hausnummer' => '7', 'plz' => '4632', 'ort' => 'Trimbach'];
+$zeilenDebitorBoese = qr_spc_zeilen($betrieb, 48.65, 'RE0962', $debitorBoese);
+check('KRITISCH: ein Zeilenumbruch in der Kundenadresse (Debitor) erzeugt keine zusaetzliche SPC-Zeile',
+    count($zeilenDebitorBoese) === 31);
+check('KRITISCH: kein einzelnes SPC-Feld der Kundenadresse enthaelt noch einen Zeilenumbruch',
+    !preg_grep('/[\r\n]/', $zeilenDebitorBoese));
+check('Der Kundenname bleibt inhaltlich erkennbar (nur der Umbruch wird entfernt, nicht der Text)',
+    str_starts_with($zeilenDebitorBoese[21], 'abc consulting gmbh'));
+
 echo count($bad) === 0 ? "$ok Pruefungen bestanden\n" : '';
 foreach ($bad as $b) { echo "X $b\n"; }
 exit(count($bad) === 0 ? 0 : 1);
