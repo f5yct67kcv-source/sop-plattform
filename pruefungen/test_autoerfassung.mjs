@@ -34,9 +34,17 @@ const tag = n => iso(new Date(Date.now() + n * 864e5));
 check('KRITISCH: es gibt eine eigene, prüfbare Weiche für die Erfassung',
   /function rdAutoErfassbar/.test(APP));
 // Der Server bleibt die letzte Instanz -- daran aendert die Automatik
-// nichts. Sonst genuegte ein veraenderter Browser.
-check('KRITISCH: die Erfassung läuft durch dieselbe Tür wie der Knopf (rdMitOrt)',
-  /function rgBereichPruefen[\s\S]{0,3000}rdMitOrt\(k,/.test(APP));
+// nichts. Sonst genuegte ein veraenderter Browser. Geprueft am VERHALTEN,
+// nicht am Quelltext: Eine Regex ueber die Funktion wurde mit jeder
+// Erweiterung laenger und waere irgendwann stillschweigend gerissen.
+const durchDieselbeTuer = () => page.evaluate(() => {
+  const rufe = [];
+  const echt = window.rdMitOrt;
+  window.rdMitOrt = function (k) { rufe.push(Number(k.id)); return echt.apply(this, arguments); };
+  erfassenJetzt();
+  window.rdMitOrt = echt;
+  return rufe;
+});
 
 const browser = await chromium.launch({ executablePath: EXE });
 const page = await browser.newPage({
@@ -57,6 +65,17 @@ await page.goto(`file://${WURZEL}/app.html`);
 await page.waitForTimeout(300);
 
 // Ein Punkt genau auf der Position, einer 900 m entfernt.
+/* Die Verweilzeit aus ENT-576 vorziehen, statt in jeder Pruefung fuenf
+   Sekunden zu warten. Der erste Durchlauf startet die Frist, dann wird ihr
+   Beginn zurueckdatiert, der zweite erfasst. Das prueft denselben Weg wie
+   der Betrieb -- nur ohne die Wartezeit. */
+await page.evaluate(() => {
+  window.fristVorziehen = () => (rundgangAktiv.kontrollpunkte || []).forEach(k => {
+    if (k._drinSeit) { k._drinSeit -= RG_AUTO_VERWEIL_MS; }
+  });
+  window.erfassenJetzt = () => { rgBereichPruefen(); fristVorziehen(); rgBereichPruefen(); };
+});
+
 // Dieselbe Ausgangslage, aber innerhalb des Browsers aufrufbar -- fuer
 // Faelle, die mehrere Schritte in EINEM evaluate brauchen.
 await page.evaluate(() => {
@@ -119,10 +138,343 @@ check('KRITISCH: eine abgeschlossene Runde erfasst nichts', L.beendet === false)
 // steht -- ein Nachweis darf nicht auf ihr beruhen.
 check('KRITISCH: eine veraltete Position erfasst nichts', L.alterOrt === false);
 
+// ══════════ DIE VERWEILZEIT (ENT-576) ════════════════════════════════
+// Der Projektinhaber nach dem ersten Betrieb: "es klappt, wird aber etwas zu
+// zackig gruen. ich oeffne die runde, und swippt grad in den aufgabebereich
+// des kontrollpunkts." ENT-531 hatte die Verweilzeit ausdruecklich
+// verworfen; ENT-576 holt sie mit 5 Sekunden nach.
+const frist = await page.evaluate(() => {
+  const f = (seit, jetzt) => rdAutoRestSek(seit, jetzt);
+  const t = 1000000;
+  return {
+    ms: RG_AUTO_VERWEIL_MS,
+    garNicht: f(null, t),
+    ganzFrisch: f(t, t),
+    haelfte: f(t - 2500, t),
+    knappDavor: f(t - 4999, t),
+    genau: f(t - 5000, t),
+    laengstUm: f(t - 60000, t),
+  };
+});
+check('KRITISCH: die Frist ist gesetzt und liegt in einer sinnvollen Groesse',
+  frist.ms >= 2000 && frist.ms <= 15000);
+// Drei Antworten fuer drei Lagen -- null heisst "es zaehlt gar nicht" und
+// darf nie mit 0 ("jetzt erfassen") verwechselt werden.
+check('KRITISCH: wer nicht im Bereich steht, hat gar keine Frist', frist.garNicht === null);
+check('KRITISCH: wer gerade eingetreten ist, wird NICHT sofort erfasst', frist.ganzFrisch > 0);
+check('Auf halbem Weg steht noch etwas aus', frist.haelfte > 0 && frist.haelfte <= 3);
+check('KRITISCH: eine Millisekunde vor Ablauf wird noch nicht erfasst', frist.knappDavor > 0);
+check('KRITISCH: nach Ablauf wird erfasst', frist.genau === 0);
+check('Und danach bleibt es dabei', frist.laengstUm === 0);
+// Aufgerundet: Wer 4,2 s vor sich hat, soll "5" lesen und dann "4" --
+// abgerundet begaenne die Anzeige bei 4 und der erste Schritt fehlte.
+check('Die Anzeige beginnt bei der vollen Sekundenzahl, nicht eine darunter',
+  frist.ganzFrisch === Math.round(frist.ms / 1000));
+
+// Der Fall, der den Anlass gab: Runde geoeffnet, waehrend man schon im
+// Bereich steht. Vorher war der Punkt sofort gruen und das Aufgabenblatt
+// sprang auf, bevor jemand hingesehen hatte.
+const sofort = await page.evaluate(() => {
+  abPunktId = null;
+  rundgangAktiv = { id: 890, status: 'laeuft', einsatz_id: 1, kontrollpunkte: [
+    { id: 71, bezeichnung: 'Punkt', typ: 'geofence', lat: 47.3500, lng: 7.9000,
+      geofence_radius_m: 25, erledigt: null,
+      aufgaben: [{ id: 81, bezeichnung: 'Türe kontrollieren', information: null, erledigt: null }] }] };
+  try { localStorage.removeItem('sop_rundgang_warteschlange'); } catch (e) {}
+  try { localStorage.removeItem('sop_rundgang_aufgaben'); } catch (e) {}
+  rgsMeinOrt = { lat: 47.3500, lng: 7.9000, genauigkeit: 8, zeit: Date.now() };
+  rgBereichPruefen();                       // erste Messung beim Oeffnen
+  const k = rundgangAktiv.kontrollpunkte[0];
+  const nachOeffnen = { erledigt: !!k.erledigt, blatt: abPunktId, rest: k._autoRest };
+  // Zweite Messung eine Sekunde spaeter -- immer noch zu frueh.
+  k._drinSeit = Date.now() - 1000;
+  rgBereichPruefen();
+  const nachEinerSek = { erledigt: !!k.erledigt, rest: k._autoRest };
+  // Und jetzt die Frist vorziehen, statt fuenf Sekunden zu warten.
+  k._drinSeit = Date.now() - RG_AUTO_VERWEIL_MS;
+  rgBereichPruefen();
+  return { nachOeffnen, nachEinerSek,
+    danach: { erledigt: !!rundgangAktiv.kontrollpunkte[0].erledigt, blatt: abPunktId } };
+});
+check('KRITISCH: beim Oeffnen der Runde im Bereich wird NICHT sofort erfasst',
+  sofort.nachOeffnen.erledigt === false);
+check('KRITISCH: und das Aufgabenblatt springt nicht auf', sofort.nachOeffnen.blatt === null);
+check('KRITISCH: die Zeile sagt, dass gerade gezaehlt wird — kein stummes Warten',
+  sofort.nachOeffnen.rest > 0);
+check('Auch nach einer Sekunde ist noch nichts erfasst',
+  sofort.nachEinerSek.erledigt === false && sofort.nachEinerSek.rest > 0);
+check('KRITISCH: nach Ablauf der Frist wird erfasst', sofort.danach.erledigt === true);
+check('KRITISCH: und dann poppt die Aufgabe auf', sofort.danach.blatt === 71);
+
+// Wer den Bereich wieder verlaesst, faengt neu an -- sonst summierten sich
+// zwei Vorbeifahrten zu einem Nachweis.
+const verlassen = await page.evaluate(() => {
+  abPunktId = null;
+  rundgangAktiv = { id: 891, status: 'laeuft', einsatz_id: 1, kontrollpunkte: [
+    { id: 72, bezeichnung: 'Punkt', typ: 'geofence', lat: 47.3500, lng: 7.9000,
+      geofence_radius_m: 25, erledigt: null, aufgaben: [] }] };
+  try { localStorage.removeItem('sop_rundgang_warteschlange'); } catch (e) {}
+  const k = rundgangAktiv.kontrollpunkte[0];
+  rgsMeinOrt = { lat: 47.3500, lng: 7.9000, genauigkeit: 8, zeit: Date.now() };
+  rgBereichPruefen();
+  // Vier der fuenf Sekunden sind vorbei -- eine steht noch aus.
+  k._drinSeit -= RG_AUTO_VERWEIL_MS - 1000;
+  rgBereichPruefen();
+  const kurzDavor = k._autoRest;
+  // Jetzt weg: 890 m, ausserhalb auch des Hysteresebands.
+  rgsMeinOrt = { lat: 47.3580, lng: 7.9000, genauigkeit: 8, zeit: Date.now() };
+  rgBereichPruefen();
+  const nachWeg = { seit: k._drinSeit, rest: k._autoRest };
+  // Und zurueck. Die Frist muss von vorn beginnen, nicht bei der einen
+  // Sekunde weitermachen, die noch ausstand.
+  rgsMeinOrt = { lat: 47.3500, lng: 7.9000, genauigkeit: 8, zeit: Date.now() };
+  rgBereichPruefen();
+  return { kurzDavor, nachWeg, wiederRest: k._autoRest,
+    voll: Math.round(RG_AUTO_VERWEIL_MS / 1000), erledigt: !!k.erledigt };
+});
+check('Vorbedingung: kurz vor Ablauf steht genau noch eine Sekunde aus',
+  verlassen.kurzDavor === 1);
+check('KRITISCH: beim Verlassen wird die Frist verworfen',
+  verlassen.nachWeg.seit === null && verlassen.nachWeg.rest === null);
+check('KRITISCH: beim Wiederkommen beginnt sie von vorn — zwei kurze Besuche ergeben keinen Nachweis',
+  verlassen.wiederRest === verlassen.voll && verlassen.erledigt === false);
+
+// ══════════ DER TAKT TREIBT DIE FRIST, NICHT DIE BEWEGUNG ════════════
+// Der wichtigste Fall im Betrieb und der unauffaelligste im Code:
+// watchPosition meldet nur bei BEWEGUNG. Wer am Kontrollpunkt steht und
+// seine Arbeit tut, erzeugt keine neue Position -- haengt die Frist allein
+// an den Positionsmeldungen, liefe sie fuer ihn nie ab. Geprueft wird darum
+// OHNE jede weitere Positionsmeldung und ohne Aufruf von Hand: nur die Uhr.
+const taktAn = await page.evaluate(async () => {
+  abPunktId = null;
+  rgsModus = 'lauf';
+  rgsReiter = 'punkte';
+  rundgangAktiv = { id: 892, status: 'laeuft', einsatz_id: 1,
+    vorbereitet_am: null, gestartet_am: null, pause_minuten: 0,
+    kontrollpunkte: [
+    { id: 73, bezeichnung: 'Punkt', typ: 'geofence', lat: 47.3500, lng: 7.9000,
+      geofence_radius_m: 25, erledigt: null, aufgaben: [] }] };
+  try { localStorage.removeItem('sop_rundgang_warteschlange'); } catch (e) {}
+  const k = rundgangAktiv.kontrollpunkte[0];
+  rgsMeinOrt = { lat: 47.3500, lng: 7.9000, genauigkeit: 8, zeit: Date.now() };
+  rgBereichPruefen();                 // die eine Messung beim Eintreffen
+  const sofortErledigt = !!k.erledigt;
+  k._drinSeit -= RG_AUTO_VERWEIL_MS;  // die Frist ist abgelaufen
+  rgTimerStarten();                   // ab jetzt nur noch die Uhr
+  // Grosszuegig warten statt auf eine feste Frist zu messen: Unter Last
+  // kann ein Sekundentakt spaeter kommen (siehe OP-464/OP-485).
+  for (let i = 0; i < 40 && !k.erledigt; i++) {
+    await new Promise(r => setTimeout(r, 100));
+  }
+  rgTimerStoppen();
+  // Aufraeumen: Die folgenden Pruefungen bauen ihre eigene Lage auf und
+  // duerfen den Reiter-/Moduszustand von hier nicht erben.
+  rgsModus = null; rgsReiter = 'karte'; abPunktId = null;
+  return { sofortErledigt, danach: !!k.erledigt };
+});
+check('Vorbedingung: die eine Messung allein erfasst noch nicht', taktAn.sofortErledigt === false);
+check('KRITISCH: die Frist läuft auch OHNE neue Position ab — wer stillsteht, wird erfasst',
+  taktAn.danach === true);
+
+// ══════════ EIN SIGNAL PRO PUNKT, IM AUGENBLICK DER ERFASSUNG ════════
+// Bis ENT-576 fielen Eintritt und Erfassung zusammen. Jetzt liegen fuenf
+// Sekunden dazwischen -- und die Versuchung ist, beides zu melden. Zweimal
+// pro Punkt zu piepen ist genau das, wonach der Waechter den Ton abschaltet
+// (ENT-319); dann ist die ganze Funktion weg.
+const toene = await page.evaluate(() => {
+  abPunktId = null;
+  rundgangAktiv = { id: 893, status: 'laeuft', einsatz_id: 1, kontrollpunkte: [
+    { id: 74, bezeichnung: 'Punkt', typ: 'geofence', lat: 47.3500, lng: 7.9000,
+      geofence_radius_m: 25, erledigt: null, aufgaben: [] }] };
+  try { localStorage.removeItem('sop_rundgang_warteschlange'); } catch (e) {}
+  const gerufen = [];
+  const echt = window.rgSignalGeben;
+  window.rgSignalGeben = t => gerufen.push(t);
+  rgsMeinOrt = { lat: 47.3500, lng: 7.9000, genauigkeit: 8, zeit: Date.now() };
+  rgBereichPruefen();                       // Eintritt
+  const beimEintritt = gerufen.length;
+  rgBereichPruefen(); rgBereichPruefen();    // waehrend die Frist laeuft
+  const waehrendFrist = gerufen.length;
+  fristVorziehen();
+  rgBereichPruefen();                       // Erfassung
+  window.rgSignalGeben = echt;
+  return { beimEintritt, waehrendFrist, gesamt: gerufen.length, texte: gerufen,
+    erfasstWort: w('rgSignalErfasst') };
+});
+check('KRITISCH: beim Eintritt schweigt es — der Ton gehört dem Augenblick der Erfassung',
+  toene.beimEintritt === 0);
+check('KRITISCH: und während die Frist läuft, piept es nicht im Sekundentakt',
+  toene.waehrendFrist === 0);
+check('KRITISCH: genau EIN Signal pro Punkt', toene.gesamt === 1);
+check('KRITISCH: und es sagt "erfasst", nicht "erreicht"',
+  toene.texte[0].includes(toene.erfasstWort));
+
+// ══════════ DER TAKT ZEICHNET NACH, OHNE SICH ZU VERHEDDERN ══════════
+// Der Takt zeichnet die Zeile neu, damit der Countdown laeuft -- und das
+// Neuzeichnen ruft ueber den Fuss wieder in den Takt zurueck. Ohne Riegel
+// laeuft das endlos, und die Seite steht.
+const nachziehen = await page.evaluate(async () => {
+  abPunktId = null;
+  rgsModus = 'lauf';
+  rgsReiter = 'punkte';
+  rundgangAktiv = { id: 894, status: 'laeuft', einsatz_id: 1,
+    vorbereitet_am: null, gestartet_am: null, pause_minuten: 0,
+    kontrollpunkte: [
+    { id: 75, bezeichnung: 'Punkt', typ: 'geofence', lat: 47.3500, lng: 7.9000,
+      geofence_radius_m: 25, erledigt: null, aufgaben: [] }] };
+  try { localStorage.removeItem('sop_rundgang_warteschlange'); } catch (e) {}
+  rgLaufZeichnen();
+  const k = rundgangAktiv.kontrollpunkte[0];
+  rgsMeinOrt = { lat: 47.3500, lng: 7.9000, genauigkeit: 8, zeit: Date.now() };
+  rgBereichPruefen();
+  const zuerst = k._autoRest;
+  rgTimerStarten();
+  // Zwei Takte abwarten -- danach muss die Anzeige gesunken sein.
+  await new Promise(r => setTimeout(r, 2300));
+  const gesunken = k._autoRest;
+  const zeileTxt = (document.getElementById('rdOrt75') || {}).textContent || '';
+  // Und bis zum Ende laufen lassen.
+  for (let i = 0; i < 60 && !k.erledigt; i++) { await new Promise(r => setTimeout(r, 100)); }
+  rgTimerStoppen();
+  const txtDanach = (document.getElementById('rdOrt75') || {}).textContent || '';
+  rgsModus = null; rgsReiter = 'karte'; abPunktId = null;
+  return { zuerst, gesunken, zeileTxt, erledigt: !!k.erledigt, txtDanach };
+});
+check('Vorbedingung: die Frist beginnt bei der vollen Sekundenzahl', nachziehen.zuerst >= 4);
+check('KRITISCH: der Takt zählt herunter, ohne sich im Neuzeichnen zu verfangen',
+  nachziehen.gesunken !== null && nachziehen.gesunken < nachziehen.zuerst);
+check('KRITISCH: und die Zeile zeigt die verbleibenden Sekunden wirklich an',
+  /\d/.test(nachziehen.zeileTxt) && nachziehen.zeileTxt.length > 5);
+check('KRITISCH: am Ende wird erfasst', nachziehen.erledigt === true);
+// Ein Countdown, der bei "1 s" stehenbleibt, waere schlimmer als gar keiner.
+check('KRITISCH: und die Countdown-Zeile bleibt danach nicht stehen',
+  nachziehen.txtDanach === '' || !/\d\s*s/.test(nachziehen.txtDanach));
+
+// Wie OFT dabei neu gezeichnet wird. Der Takt zeichnet die Zeile neu, und
+// das Neuzeichnen ruft ueber den Fuss wieder in den Takt zurueck: ohne
+// Riegel ist das eine Endlosschleife. Sie faellt sonst NICHT auf -- der
+// Takt faengt seine Fehler ab, verschluckt damit auch den Stapelueberlauf,
+// und der Countdown liefe weiter, waehrend das Geraet heiss wird. Gezaehlt
+// statt gehofft.
+const takte = await page.evaluate(async () => {
+  abPunktId = null;
+  rgsModus = 'lauf';
+  rgsReiter = 'punkte';
+  rundgangAktiv = { id: 895, status: 'laeuft', einsatz_id: 1,
+    vorbereitet_am: null, gestartet_am: null, pause_minuten: 0,
+    kontrollpunkte: [
+    { id: 76, bezeichnung: 'Punkt', typ: 'geofence', lat: 47.3500, lng: 7.9000,
+      geofence_radius_m: 25, erledigt: null, aufgaben: [] }] };
+  try { localStorage.removeItem('sop_rundgang_warteschlange'); } catch (e) {}
+  rgLaufZeichnen();
+  rgsMeinOrt = { lat: 47.3500, lng: 7.9000, genauigkeit: 8, zeit: Date.now() };
+  rgBereichPruefen();
+  let n = 0;
+  const echt = window.rundgangListeZeichnen;
+  window.rundgangListeZeichnen = function () { n++; return echt.apply(this, arguments); };
+  rgTimerStarten();
+  await new Promise(r => setTimeout(r, 2300));
+  rgTimerStoppen();
+  window.rundgangListeZeichnen = echt;
+  rgsModus = null; rgsReiter = 'karte'; abPunktId = null;
+  return n;
+});
+check('KRITISCH: zwei Takte zeichnen die Liste ein paar Mal neu, nicht hundertfach',
+  takte > 0 && takte <= 8);
+
+/* Und nach der Erfassung hoert das Nachziehen auf. Bis zur Gegenprobe blieb
+   k._autoRest an einem erfassten Punkt fuer immer auf seinem letzten Wert
+   stehen -- der Takt hielt "irgendwo laeuft eine Frist" bis zum Ende der
+   Runde fuer wahr und zeichnete die Liste jede Sekunde neu, fuer nichts. */
+const ruhe = await page.evaluate(async () => {
+  abPunktId = null;
+  rgsModus = 'lauf';
+  rgsReiter = 'punkte';
+  rundgangAktiv = { id: 898, status: 'laeuft', einsatz_id: 1,
+    vorbereitet_am: null, gestartet_am: null, pause_minuten: 0,
+    kontrollpunkte: [
+    { id: 78, bezeichnung: 'Punkt', typ: 'geofence', lat: 47.3500, lng: 7.9000,
+      geofence_radius_m: 25, erledigt: null, aufgaben: [] }] };
+  try { localStorage.removeItem('sop_rundgang_warteschlange'); } catch (e) {}
+  rgLaufZeichnen();
+  rgOrtungStoppen();
+  rgsOrtWache = -1;
+  const k = rundgangAktiv.kontrollpunkte[0];
+  rgsMeinOrt = { lat: 47.3500, lng: 7.9000, genauigkeit: 8, zeit: Date.now() };
+  erfassenJetzt();
+  const erledigt = !!k.erledigt;
+  // Zwei Takte nach der Erfassung: Es darf hoechstens einmal nachgezogen
+  // werden (das letzte Abraeumen der Countdown-Zeile), danach ist Ruhe.
+  let n = 0;
+  const echt = window.rundgangListeZeichnen;
+  window.rundgangListeZeichnen = function () { n++; return echt.apply(this, arguments); };
+  rgLaufKopfZeichnen();
+  const nachErstem = n;
+  rgLaufKopfZeichnen();
+  rgLaufKopfZeichnen();
+  window.rundgangListeZeichnen = echt;
+  rgsModus = null; rgsReiter = 'karte'; abPunktId = null; rgsOrtWache = null;
+  return { erledigt, rest: k._autoRest, seit: k._drinSeit, nachErstem, gesamt: n };
+});
+check('Vorbedingung: der Punkt ist erfasst', ruhe.erledigt === true);
+check('KRITISCH: die Frist wird am erfassten Punkt aufgeräumt, nicht stehengelassen',
+  ruhe.rest === null && ruhe.seit === null);
+check('KRITISCH: und der Takt zeichnet danach nicht endlos weiter',
+  ruhe.gesamt <= 1);
+
+// Und der Fall, in dem der Countdown ohne Erfassung endet: Die Ortung
+// bleibt stehen. Dann kommt per Definition keine neue Position mehr, die
+// neu zeichnen koennte -- ohne eigenes Nachziehen bliebe "wird in 3 s
+// erfasst" fuer immer stehen, waehrend in Wahrheit gar nichts mehr laeuft.
+// Dieselbe Familie wie "unbekannt darf nie wie keine aussehen".
+const stehen = await page.evaluate(async () => {
+  abPunktId = null;
+  rgsModus = 'lauf';
+  rgsReiter = 'punkte';
+  rundgangAktiv = { id: 896, status: 'laeuft', einsatz_id: 1,
+    vorbereitet_am: null, gestartet_am: null, pause_minuten: 0,
+    kontrollpunkte: [
+    { id: 77, bezeichnung: 'Punkt', typ: 'geofence', lat: 47.3500, lng: 7.9000,
+      geofence_radius_m: 25, erledigt: null, aufgaben: [] }] };
+  try { localStorage.removeItem('sop_rundgang_warteschlange'); } catch (e) {}
+  rgLaufZeichnen();
+  /* Die echte Ortung hier abschalten. Sie laeuft in dieser Umgebung
+     wirklich (die Pruefung gibt eine Position vor) und zeichnet bei jeder
+     Meldung selbst nach -- damit waere nicht mehr zu erkennen, ob das
+     NACHZIEHEN AUS DEM TAKT wirkt oder nur eine neue Position. Beim ersten
+     Anlauf war genau das der Fall: Die Pruefung blieb gruen, auch als das
+     Nachziehen ausgebaut war. */
+  /* Die echte Ortung abschalten, die Wache aber als GESETZT belassen. Das
+     ist genau die Lage, um die es geht: Die Verfolgung laeuft (der Browser
+     hat sie registriert), es kommt nur nichts mehr an -- der haeufigste
+     Fall draussen, wenn sich der Bildschirm sperrt. Wuerde hier einfach
+     gestoppt, waere die Lage 'aus' statt 'steht', und der Countdown
+     erschiene gar nicht erst. */
+  rgOrtungStoppen();
+  rgsOrtWache = -1;
+  const k = rundgangAktiv.kontrollpunkte[0];
+  rgsMeinOrt = { lat: 47.3500, lng: 7.9000, genauigkeit: 8, zeit: Date.now() };
+  rgBereichPruefen();
+  rundgangListeZeichnen();            // der Countdown steht jetzt in der Zeile
+  const txtVorher = (document.getElementById('rdOrt77') || {}).textContent || '';
+  // Die Ortung bleibt stehen: die Position altert ueber die Schwelle hinaus.
+  // Ab hier kommt per Definition nichts mehr, was von selbst neu zeichnet.
+  rgsMeinOrt.zeit = Date.now() - RG_ORT_STILL_MS - 5000;
+  rgLaufKopfZeichnen();               // ein Takt
+  const txtNachher = (document.getElementById('rdOrt77') || {}).textContent || '';
+  rgsModus = null; rgsReiter = 'karte'; abPunktId = null; rgsOrtWache = null;
+  return { txtVorher, txtNachher, erledigt: !!k.erledigt };
+});
+check('Vorbedingung: vorher lief der Countdown sichtbar', /\d\s*s/.test(stehen.txtVorher));
+check('KRITISCH: bleibt die Ortung stehen, verschwindet der Countdown — er verspricht sonst etwas, das niemand einlöst',
+  !/\d\s*s/.test(stehen.txtNachher));
+check('KRITISCH: und erfasst wird auf einer veralteten Position ohnehin nichts',
+  stehen.erledigt === false);
+
 // ══════════ IM BEREICH: ES PASSIERT VON SELBST ═══════════════════════
 await bauen();
 const e1 = await page.evaluate(() => {
-  rgBereichPruefen();
+  erfassenJetzt();
   return {
     nah: rundgangAktiv.kontrollpunkte[0].erledigt,
     fern: rundgangAktiv.kontrollpunkte[1].erledigt,
@@ -130,6 +482,15 @@ const e1 = await page.evaluate(() => {
       status: x.status, lat: x.lat })),
   };
 });
+check('KRITISCH: die Erfassung läuft durch dieselbe Tür wie der Knopf (rdMitOrt)',
+  (await (async () => { await bauen(); return durchDieselbeTuer(); })()).join() === '1');
+await bauen();
+const e1b = await page.evaluate(() => { erfassenJetzt(); return {
+  nah: rundgangAktiv.kontrollpunkte[0].erledigt,
+  fern: rundgangAktiv.kontrollpunkte[1].erledigt,
+  schlange: rdWarteschlangeLesen().map(x => ({ id: Number(x.kontrollpunkt_id),
+    status: x.status, lat: x.lat })) }; });
+Object.assign(e1, e1b);
 check('KRITISCH: der Punkt im Bereich ist ohne jeden Klick erledigt',
   !!e1.nah && e1.nah.status === 'bestaetigt');
 // 890 m. Eine Erfassung, die hier anschlaegt, ist das Gegenteil eines
@@ -150,6 +511,7 @@ const e2 = await page.evaluate(async () => {
   let n = 0;
   const echt = window.rdScanEintragen;
   window.rdScanEintragen = function () { n++; return echt.apply(this, arguments); };
+  rgBereichPruefen(); fristVorziehen();
   for (let i = 0; i < 11; i++) { rgBereichPruefen(); }
   window.rdScanEintragen = echt;
   return n;
@@ -170,7 +532,7 @@ const band = await page.evaluate(() => {
   // Erst drin (setzt _drin = true), dann knapp ausserhalb des Radius, aber
   // innerhalb des Hysteresebands.
   rgsMeinOrt = { lat: 47.3500, lng: 7.9000, genauigkeit: 8, zeit: Date.now() };
-  rgBereichPruefen();
+  erfassenJetzt();
   const nachDrin = !!rundgangAktiv.kontrollpunkte[0].erledigt;
   rundgangAktiv.kontrollpunkte[0].erledigt = null;   // zuruecksetzen
   rundgangAktiv.kontrollpunkte[0]._drin = true;
@@ -216,9 +578,11 @@ const nachtrag = await page.evaluate(() => {
       geofence_radius_m: 25, erledigt: null, offen: 'es', aufgaben: [] }] };
   try { localStorage.removeItem('sop_rundgang_warteschlange'); } catch (e) {}
   rgsMeinOrt = { lat: 47.3500, lng: 7.9000, genauigkeit: 8, zeit: Date.now() };
-  rgBereichPruefen();
+  erfassenJetzt();
   const mitFormular = !!rundgangAktiv.kontrollpunkte[0].erledigt;
   rundgangAktiv.kontrollpunkte[0].offen = null;      // Formular geschlossen
+  // Die Frist lief waehrenddessen weiter -- wer fuenf Sekunden dort stand,
+  // hat fuenf Sekunden dort gestanden, auch mit offenem Formular.
   rgBereichPruefen();                                // naechste Messung
   return { mitFormular, danach: !!rundgangAktiv.kontrollpunkte[0].erledigt };
 });
@@ -233,7 +597,7 @@ const pause = await page.evaluate(() => {
       geofence_radius_m: 25, erledigt: null, aufgaben: [] }] };
   try { localStorage.removeItem('sop_rundgang_warteschlange'); } catch (e) {}
   rgsMeinOrt = { lat: 47.3500, lng: 7.9000, genauigkeit: 8, zeit: Date.now() };
-  rgBereichPruefen();
+  erfassenJetzt();
   const inPause = !!rundgangAktiv.kontrollpunkte[0].erledigt;
   rundgangAktiv.status = 'laeuft';
   rgBereichPruefen();
@@ -254,7 +618,7 @@ const auf = await page.evaluate(() => {
   try { localStorage.removeItem('sop_rundgang_warteschlange'); } catch (e) {}
   try { localStorage.removeItem('sop_rundgang_aufgaben'); } catch (e) {}
   rgsMeinOrt = { lat: 47.3500, lng: 7.9000, genauigkeit: 8, zeit: Date.now() };
-  rgBereichPruefen();
+  erfassenJetzt();
   return {
     punktErledigt: !!rundgangAktiv.kontrollpunkte[0].erledigt,
     blattPunkt: abPunktId,
@@ -287,7 +651,7 @@ const zwei = await page.evaluate(() => {
   try { localStorage.removeItem('sop_rundgang_warteschlange'); } catch (e) {}
   try { localStorage.removeItem('sop_rundgang_aufgaben'); } catch (e) {}
   rgsMeinOrt = { lat: 47.3500, lng: 7.9000, genauigkeit: 8, zeit: Date.now() };
-  rgBereichPruefen();
+  erfassenJetzt();
   return { beide: rundgangAktiv.kontrollpunkte.every(k => !!k.erledigt),
     blattPunkt: abPunktId,
     karten: document.querySelectorAll('#blBody .ab-karte').length };
@@ -331,7 +695,7 @@ const karte = await page.evaluate(async () => {
   // Jetzt steht der Waechter im Bereich. Kein Reiterwechsel, kein Klick.
   rundgangAktiv.kontrollpunkte[0].lat = 47.3500;
   rgsMeinOrt = { lat: 47.3500, lng: 7.9000, genauigkeit: 8, zeit: Date.now() };
-  rgBereichPruefen();
+  erfassenJetzt();
   return { vorher, nachher: farben(),
     erledigt: !!rundgangAktiv.kontrollpunkte[0].erledigt };
 });
@@ -368,7 +732,7 @@ const rennen = await page.evaluate(async () => {
   rgLaufZeichnen();                 // Karte beginnt zu laden
   rgOrtungStoppen();                // die echte Ortung soll hier nicht dazwischen
   const karteSchonDa = !!rgsKarte;  // Vorbedingung: sie ist es noch NICHT
-  rgBereichPruefen();               // Position trifft ein, waehrend sie laedt
+  erfassenJetzt();                  // Position trifft ein, waehrend sie laedt
   await new Promise(r => setTimeout(r, 900));
   return { karteSchonDa, farben: farben(),
     erledigt: !!rundgangAktiv.kontrollpunkte[0].erledigt };
@@ -377,6 +741,177 @@ check('Vorbedingung: die Karte stand beim Erfassen noch nicht',
   rennen.karteSchonDa === false);
 check('KRITISCH: ein während des Kartenaufbaus erfasster Punkt ist danach trotzdem grün',
   rennen.erledigt === true && rennen.farben.length === 1 && gruen(rennen.farben[0]));
+
+// ══════════ DER KREIS FÜLLT SICH (ENT-579) ═══════════════════════════
+// Vom Projektinhaber: "sehr cool waere, wenn sich der Kreis innerhalb der 5
+// sekunden fuellt. wenn die sekunden abgelaufen ist wird er voll."
+const anteil = await page.evaluate(() => {
+  const f = (seit, jetzt) => rgFuellAnteil(seit, jetzt);
+  const t = 2000000;
+  return {
+    ohne: f(null, t),
+    start: f(t, t),
+    viertel: f(t - RG_AUTO_VERWEIL_MS / 4, t),
+    halb: f(t - RG_AUTO_VERWEIL_MS / 2, t),
+    voll: f(t - RG_AUTO_VERWEIL_MS, t),
+    darueber: f(t - RG_AUTO_VERWEIL_MS * 10, t),
+  };
+});
+check('KRITISCH: ohne laufende Frist ist der Kreis leer', anteil.ohne === 0);
+check('KRITISCH: beim Eintreten beginnt er bei null', anteil.start === 0);
+check('KRITISCH: nach einem Viertel der Zeit ist er ein Viertel voll',
+  Math.abs(anteil.viertel - 0.25) < 0.02);
+check('Und nach der Hälfte halb', Math.abs(anteil.halb - 0.5) < 0.02);
+check('KRITISCH: wenn die Sekunden abgelaufen sind, ist er voll', anteil.voll === 1);
+// Sonst waere der Kreis nach zehn Sekunden zehnmal so gross wie der
+// Geofence -- ein Kreis, der ueber seinen eigenen Bereich hinauswaechst,
+// behauptet einen Radius, den es nicht gibt.
+check('KRITISCH: und er wächst nicht über den Radius hinaus', anteil.darueber === 1);
+
+// Welcher Punkt gefuellt wird. Bei zwei ueberlappenden Bereichen nur EINER
+// -- zwei wachsende Kreise uebereinander sind nicht mehr zu lesen.
+const kandidat = await page.evaluate(() => {
+  const g = kps => { const k = rgFuellKandidat(kps); return k ? Number(k.id) : null; };
+  const pkt = (z) => Object.assign({ id: 1, typ: 'geofence', lat: 47.35, lng: 7.9,
+    erledigt: null, _autoRest: 3 }, z);
+  return {
+    normal: g([pkt({})]),
+    keiner: g([pkt({ _autoRest: null })]),
+    erledigt: g([pkt({ erledigt: { status: 'bestaetigt' } })]),
+    nfc: g([pkt({ typ: 'nfc', lat: null })]),
+    ohneOrt: g([pkt({ lat: null })]),
+    zweiNurEiner: g([pkt({ id: 5 }), pkt({ id: 6 })]),
+    leer: g([]),
+  };
+});
+check('KRITISCH: der zählende Punkt wird gefüllt', kandidat.normal === 1);
+check('Wo nichts zählt, wird nichts gefüllt', kandidat.keiner === null);
+check('Ein erledigter Punkt wird nicht gefüllt', kandidat.erledigt === null);
+check('Ein NFC-Punkt hat keinen Bereich, der sich füllen könnte', kandidat.nfc === null);
+check('Ein Punkt ohne Koordinaten ebenfalls nicht', kandidat.ohneOrt === null);
+check('KRITISCH: bei zwei zählenden Punkten füllt sich nur einer', kandidat.zweiNurEiner === 5);
+check('Eine leere Runde wirft nicht', kandidat.leer === null);
+
+// Und am gerenderten Zustand: Der Kreis muss WIRKLICH wachsen.
+const waechst = await page.evaluate(async () => {
+  abPunktId = null;
+  rgsModus = 'lauf';
+  rgsReiter = 'karte';
+  rgsKarte = null;
+  rundgangAktiv = { id: 897, status: 'laeuft', einsatz_id: 1,
+    vorbereitet_am: null, gestartet_am: null, pause_minuten: 0,
+    objekt: { id: 7, name: 'Musterobjekt' }, kunde_name: 'Muster AG',
+    ansprechpartner: [], zentrale: null, kontrollpunkte: [
+    // Zuerst weit weg: Solange die Karte laedt, meldet die echte Ortung
+    // Positionen, und ein Punkt unter den Fuessen wuerde die Frist samt
+    // Fuellung schon vor der ersten Messung starten.
+    { id: 81, bezeichnung: 'Punkt', typ: 'geofence', lat: 47.3580, lng: 7.9000,
+      geofence_radius_m: 25, erledigt: null, aufgaben: [] }] };
+  try { localStorage.removeItem('sop_rundgang_warteschlange'); } catch (e) {}
+  rgLaufZeichnen();
+  await new Promise(r => setTimeout(r, 800));
+  rgOrtungStoppen();
+  rgsOrtWache = -1;                   // Wache gilt als gesetzt, meldet nichts
+  const kreise = () => [...document.querySelectorAll('.gm-mock-circle')]
+    .map(el => Number(el.dataset.radius));
+  const vorDrin = kreise().length;
+  // Und jetzt steht der Waechter davor.
+  rundgangAktiv.kontrollpunkte[0].lat = 47.3500;
+  rgsMeinOrt = { lat: 47.3500, lng: 7.9000, genauigkeit: 8, zeit: Date.now() };
+  rgBereichPruefen();
+  rgFuellungNachfuehren();
+  await new Promise(r => setTimeout(r, 120));
+  const frueh = kreise();
+  await new Promise(r => setTimeout(r, 1500));
+  const spaeter = kreise();
+  // Bis zum Ende laufen lassen -- ueber den Sekundentakt, wie im Betrieb.
+  rgTimerStarten();
+  const k = rundgangAktiv.kontrollpunkte[0];
+  for (let i = 0; i < 80 && !k.erledigt; i++) { await new Promise(r => setTimeout(r, 100)); }
+  rgTimerStoppen();
+  await new Promise(r => setTimeout(r, 200));
+  const danach = kreise();
+  const nochFuellung = rgsFuellKreis !== null;
+  rgsModus = null; rgsReiter = 'karte'; abPunktId = null; rgsOrtWache = null;
+  return { vorDrin, frueh, spaeter, danach, nochFuellung, erledigt: !!k.erledigt,
+    radius: 25 };
+});
+check('Vorbedingung: vorher stand nur der Geofence-Kreis', waechst.vorDrin === 1);
+check('KRITISCH: während der Frist kommt ein zweiter Kreis dazu — die Füllung',
+  waechst.frueh.length === 2);
+// Er beginnt klein. Waere er sofort voll, waere es keine Fuellung.
+check('KRITISCH: die Füllung beginnt klein',
+  Math.min(...waechst.frueh) < waechst.radius * 0.35);
+check('KRITISCH: und sie wächst messbar weiter',
+  Math.min(...waechst.spaeter) > Math.min(...waechst.frueh));
+check('KRITISCH: sie bleibt innerhalb des Geofence-Kreises',
+  Math.max(...waechst.spaeter) <= waechst.radius);
+check('KRITISCH: nach der Erfassung ist die Füllung weg — der Punkt selbst ist jetzt grün',
+  waechst.erledigt === true && waechst.nochFuellung === false
+  && waechst.danach.length === 1);
+
+// Auf dem Punkte-Reiter gibt es keine Karte, auf der etwas wachsen koennte.
+// Ein Kreis, der an einer nicht sichtbaren Karte haengt, kostet nur Akku.
+const nichtAufListe = await page.evaluate(async () => {
+  // Erst eine Fuellung wirklich starten -- sonst prueft der Fall nur, dass
+  // nichts entsteht, wo ohnehin nichts war.
+  abPunktId = null;
+  rgsModus = 'lauf';
+  rgsReiter = 'karte';
+  rgsKarte = null;
+  rundgangAktiv = { id: 899, status: 'laeuft', einsatz_id: 1,
+    vorbereitet_am: null, gestartet_am: null, pause_minuten: 0,
+    objekt: { id: 7, name: 'Musterobjekt' }, kunde_name: 'Muster AG',
+    ansprechpartner: [], zentrale: null, kontrollpunkte: [
+    { id: 82, bezeichnung: 'Punkt', typ: 'geofence', lat: 47.3580, lng: 7.9000,
+      geofence_radius_m: 25, erledigt: null, aufgaben: [] }] };
+  try { localStorage.removeItem('sop_rundgang_warteschlange'); } catch (e) {}
+  rgLaufZeichnen();
+  await new Promise(r => setTimeout(r, 800));
+  rgOrtungStoppen();
+  rgsOrtWache = -1;
+  rundgangAktiv.kontrollpunkte[0].lat = 47.3500;
+  rgsMeinOrt = { lat: 47.3500, lng: 7.9000, genauigkeit: 8, zeit: Date.now() };
+  rgBereichPruefen();
+  rgFuellungNachfuehren();
+  const lief = rgsFuellKreis !== null;
+  // Und jetzt auf die Liste wechseln.
+  rgsReiter = 'punkte';
+  rgFuellungNachfuehren();
+  const weg = rgsFuellKreis === null;
+  const kreise = document.querySelectorAll('.gm-mock-circle').length;
+  rgsModus = null; rgsReiter = 'karte'; abPunktId = null; rgsOrtWache = null;
+  return { lief, weg, kreise };
+});
+check('Vorbedingung: auf der Karte lief eine Füllung', nichtAufListe.lief === true);
+check('KRITISCH: beim Wechsel auf den Punkte-Reiter wird sie abgeräumt — ein Kreis an einer unsichtbaren Karte kostet nur Akku',
+  nichtAufListe.weg === true && nichtAufListe.kreise === 1);
+
+// ══════════ DER TON WECKT SEINEN KANAL (ENT-579) ═════════════════════
+// Seit ENT-576 liegen fuenf Sekunden zwischen Antippen und Erfassung. iOS
+// haelt den Tonkanal bei jeder Unterbrechung an -- ein Anruf, eine
+// Mitteilung, ein kurz gesperrter Bildschirm. Vorher stieg der Ton dann
+// wortlos aus und blieb fuer den Rest der Runde weg.
+const ton = await page.evaluate(() => {
+  const echt = rgsTonKanal;
+  let geweckt = 0, oszillatoren = 0;
+  const knoten = () => ({ connect() {}, start() {}, stop() {},
+    frequency: { value: 0 }, type: '',
+    gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} } });
+  rgsTonKanal = {
+    state: 'suspended', currentTime: 0, destination: {},
+    resume() { geweckt++; this.state = 'running'; },
+    createOscillator() { oszillatoren++; return knoten(); },
+    createGain() { return knoten(); },
+  };
+  const ergebnis = rgTonSignal();
+  rgsTonKanal = echt;
+  return { geweckt, oszillatoren, ergebnis };
+});
+check('KRITISCH: ein angehaltener Tonkanal wird geweckt statt stumm übergangen',
+  ton.geweckt === 1);
+check('KRITISCH: und der Ton wird trotzdem geplant — er spielt, sobald der Kanal läuft',
+  ton.oszillatoren >= 1 && ton.ergebnis === true);
 
 // ══════════ GEMESSEN, NICHT NACHGELESEN ══════════════════════════════
 // Die Zeile hat einen Hinweis dazubekommen, wo vorher ein Knopf stand. Was
@@ -454,6 +989,65 @@ const mass = async () => seite.evaluate(() => {
       <= document.documentElement.clientWidth + 1,
   };
 });
+// Und der Countdown am gerenderten Zustand -- der Punkt liegt dafuer kurz
+// im Bereich. Gemessen, nicht nachgelesen (CLAUDE.md).
+// Die Ortung laeuft dabei WEITER -- sonst zeigte die Zeile den Countdown
+// und daneben "ohne laufende Ortung nicht automatisch". Genau dieser
+// Widerspruch stand beim ersten Messen auf dem Bildschirm.
+await seite.evaluate(() => {
+  const k = rundgangAktiv.kontrollpunkte[0];
+  k.lat = 47.3500;
+  rgsMeinOrt = { lat: 47.3500, lng: 7.9000, genauigkeit: 8, zeit: Date.now() };
+  rgBereichPruefen();
+  rundgangListeZeichnen();
+});
+await seite.waitForTimeout(300);
+const zaehlZeile = await seite.evaluate(() => {
+  const el = document.getElementById('rdOrt41');
+  if (!el) { return null; }
+  const r = el.getBoundingClientRect();
+  return { txt: el.textContent.trim(), schrift: parseFloat(getComputedStyle(el).fontSize),
+    sichtbar: el.offsetParent !== null && r.height > 0,
+    imBild: r.left >= 0 && r.right <= window.innerWidth + 1,
+    ueberlauf: document.documentElement.scrollWidth
+      <= document.documentElement.clientWidth + 1 };
+});
+check('KRITISCH: die Countdown-Zeile steht sichtbar da', !!zaehlZeile && zaehlZeile.sichtbar);
+check('KRITISCH: sie nennt die verbleibenden Sekunden', !!zaehlZeile && /\d/.test(zaehlZeile.txt));
+check('KRITISCH: sie sagt auch, WOZU gezählt wird — eine nackte Zahl wäre keine Auskunft',
+  !!zaehlZeile && zaehlZeile.txt.length > 12);
+check('Sie ist lesbar gross und läuft nicht aus dem Bild',
+  !!zaehlZeile && zaehlZeile.schrift >= 12 && zaehlZeile.imBild && zaehlZeile.ueberlauf);
+// Beide Zeilen der Zeile muessen aus derselben Quelle stammen. Ein
+// Countdown neben "geht gerade nicht automatisch" sind zwei Aussagen, von
+// denen eine falsch ist -- und der Waechter weiss nicht, welche.
+check('KRITISCH: kein Widerspruch — neben dem Countdown steht nicht "geht nicht automatisch"',
+  await seite.evaluate(() => {
+    const zaehlt = document.getElementById('rdOrt41');
+    const hinweis = document.getElementById('rdAuto41');
+    if (!zaehlt || !/\d\s*s/.test(zaehlt.textContent)) { return true; }
+    // Der Countdown ist die genauere Aussage; der allgemeine Hinweis
+    // daneben waere bestenfalls doppelt und schlimmstenfalls das Gegenteil.
+    return !hinweis || hinweis.textContent.trim() === w('rdAutoWartet');
+  }));
+check('Solange gezählt wird, steht der allgemeine Hinweis nicht zusätzlich da',
+  await seite.evaluate(() => !document.getElementById('rdAuto41')));
+check('KRITISCH: und solange gezählt wird, steht kein Bestätigen-Knopf da',
+  await seite.evaluate(() => !document.getElementById('rdBtn41')));
+await seite.screenshot({ path: `${OUT}/autoerfassung-05-countdown-handy.png` });
+/* Zurueck in die Ausgangslage. Die Ortung muss dabei WIRKLICH wieder
+   laufen: Die folgenden Messungen pruefen den Hinweis, der nur erscheint,
+   solange die Automatik zustaendig ist -- und das haengt an rgOrtLage(). */
+await seite.evaluate(() => {
+  const k = rundgangAktiv.kontrollpunkte[0];
+  k.lat = 47.3580; k._drinSeit = null; k._autoRest = null;
+  rgsMeinOrt = { lat: 47.3500, lng: 7.9000, genauigkeit: 8, zeit: Date.now() };
+  rundgangListeZeichnen();
+});
+await seite.waitForTimeout(600);
+check('Vorbedingung: die Ortung läuft für die folgenden Messungen wieder',
+  await seite.evaluate(() => rgOrtLage().art === 'laeuft'));
+
 const handy = await mass();
 // Vorbedingung: Es wird an etwas WIRKLICH Sichtbarem gemessen.
 check('Vorbedingung: die Zeile ist tatsächlich gerendert, nicht 0 × 0', handy.hinweisDa);

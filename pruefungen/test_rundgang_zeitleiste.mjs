@@ -145,6 +145,17 @@ async function seite(breite = 390) {
   await page.waitForSelector('.app.on'); await page.waitForTimeout(400);
   await page.evaluate(() => ladeSchichten().then(() => rundgangFortsetzen(71)));
   await page.waitForTimeout(1500);
+  /* Punkt 8 der Testdaten liegt genau auf der vorgetaeuschten Position. Seit
+     ENT-576 wird er nicht mehr sofort erfasst, sondern erst nach einer
+     Verweilzeit von fuenf Sekunden -- die muss abgewartet werden, sonst
+     messen Zaehler, Balken und Zeilen einen Zwischenstand. Grosszuegig
+     statt knapp: unter paralleler Last kommt ein Takt spaeter
+     (OP-464/OP-485). */
+  for (let i = 0; i < 100; i++) {
+    if (await page.evaluate(() => !!(rundgangAktiv
+        && rundgangAktiv.kontrollpunkte.some(k => Number(k.id) === 8 && k.erledigt)))) { break; }
+    await page.waitForTimeout(200);
+  }
   await page.click('#rgsRt-punkte'); await page.waitForTimeout(600);
   return page;
 }
