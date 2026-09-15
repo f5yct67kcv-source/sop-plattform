@@ -1,0 +1,192 @@
+<?php require __DIR__ . '/_guard.php'; ?>
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Personal – Handbuch Cockpit</title>
+<link rel="stylesheet" href="handbuch.css">
+</head>
+<body>
+<div class="hb-shell">
+  <aside class="hb-side" id="hbSide">
+    <div class="hb-brand">
+      <a href="index.php" style="text-decoration:none">
+        <span class="titel">Handbuch</span>
+        <span class="unter">Cockpit von GuardOpS</span>
+      </a>
+      <button class="hb-menu-btn" id="hbMenuBtn" aria-label="Menü" aria-expanded="false">☰</button>
+    </div>
+    <div class="hb-suche">
+      <input type="search" id="hbSucheEingabe" placeholder="Suchen…" aria-label="Handbuch durchsuchen" autocomplete="off">
+      <div class="hb-suche-ergebnisse" id="hbSucheErgebnisse" hidden></div>
+    </div>
+    <div class="hb-nav-wrap">
+      <div class="hb-gruppe">Einstieg</div>
+      <ul class="hb-nav">
+        <li><a href="index.php">Übersicht</a></li>
+        <li><a href="erste-schritte.php">Erste Schritte</a></li>
+      </ul>
+      <div class="hb-gruppe">Erfassung (App)</div>
+      <ul class="hb-nav">
+        <li><a href="erfassung.php">Erfassung</a></li>
+      </ul>
+      <div class="hb-gruppe">Cockpit</div>
+      <ul class="hb-nav">
+        <li><a href="planung.php">Planung</a></li>
+        <li><a href="kunden.php">Kunden</a></li>
+        <li><a href="personal.php" class="aktiv">Personal</a></li>
+        <li><a href="lohn.php">Lohn</a></li>
+        <li><a href="abgleich.php">Abgleich</a></li>
+        <li><a href="betrieb.php">Betrieb</a></li>
+      </ul>
+      <div class="hb-gruppe">Weitere Oberflächen</div>
+      <ul class="hb-nav">
+        <li><a href="kundenportal.php">Kundenportal</a></li>
+      </ul>
+      <div class="hb-gruppe">Nachschlagen</div>
+      <ul class="hb-nav">
+        <li><a href="glossar.php">Glossar</a></li>
+      </ul>
+    </div>
+    <div class="hb-side-fuss">
+      Aus dem Quelltext zusammengestellt, siehe Hinweis auf der <a href="index.php">Übersicht</a>.
+    </div>
+  </aside>
+
+  <div class="hb-main">
+    <div class="hb-content">
+
+      <p class="hb-kicker">Cockpit</p>
+      <h1>Personal</h1>
+      <p class="hb-lead">Liste, Personaldossier und Bearbeitungsfläche für die Belegschaft.
+      Das Dossier hat acht Reiter — vier davon bilden die eigentliche Personalakte
+      (Person, Anstellung, Einsatz, Zugang), dazu eine frei anpassbare Übersicht,
+      Lohn und Verlauf (je nur mit eigenem Recht sichtbar) sowie Dienstpläne.</p>
+
+      <div class="hb-recht">
+        Lesen/Ändern der Akte: Recht <b>„Mitarbeitende"</b>. Vertrauliche Angaben:
+        zusätzlich <b>„Vertrauliche Angaben"</b>. Verlauf: <b>„Logbuch"</b>. Lohn:
+        <b>„Lohn"</b>. Rollen zuteilen: <b>„Rollen &amp; Berechtigungen: schreiben"</b>.
+        Siehe <a href="erste-schritte.php">Erste Schritte</a>.
+      </div>
+
+      <h2 id="liste">Liste</h2>
+      <p>Zeigt ausschliesslich <b>aktive</b> Mitarbeitende (anders als bei Kunden gibt es
+      hier keinen Archiv-Umschalter). Suche über Name, Ort, PLZ, Personalnummer, E-Mail
+      oder Funktion zugleich. Spalte
+      „Berechtigt" fasst Fachausweis und Ja/Nein-Merkmale (Diensthund, Schusswaffe,
+      Revierdienst …) als Chips zusammen; Spalte „Rolle" zeigt nur grob „Admin" oder
+      „Mitarbeit." — das tatsächliche, feinere Profil steht erst im Dossier.</p>
+
+      <ol class="hb-schritte">
+        <li>„Neuer Mitarbeitender" — Vorname und Nachname sind Pflicht, daraus ergibt
+        sich als Vorschau der Login-Name <code>vorname.nachname</code>.</li>
+        <li>Passwort vergeben: mindestens 10 Zeichen, mindestens <b>12</b>, sobald ein
+        Profil ausser „Personal" (die einfache Belegschaftsrolle) gewählt wird.</li>
+        <li>Optional ein Profil ankreuzen (verlangt eigenes Recht dafür) — ohne Auswahl
+        gilt automatisch das kleinste Profil.</li>
+        <li>„Mitarbeitenden anlegen" — führt direkt zur neuen Detailseite.</li>
+      </ol>
+
+      <h2 id="das-personaldossier">Das Personaldossier</h2>
+      <p>Acht Reiter, seit ENT-072 eine volle Seite statt einer Schublade:</p>
+      <div class="hb-tabelle-wrap"><table>
+        <tr><th>Reiter</th><th>Inhalt</th></tr>
+        <tr><td><b>Übersicht</b></td><td>Frei anpassbare Kachelzusammenfassung — nicht dasselbe wie die Akte selbst.</td></tr>
+        <tr><td><b>Person</b></td><td>Adresse, Kontakt, Personendaten und Bewilligungen (grösstenteils vertraulich).</td></tr>
+        <tr><td><b>Anstellung</b></td><td>Betriebliches (Personalnummer, Funktion, Eintritt …), Kategorie/Pensum nach Art. 8 GAV.</td></tr>
+        <tr><td><b>Einsatz</b></td><td>Fachausweis, Diensthund-/Waffenbewilligung, Einsatzbereiche, Dienstausweis.</td></tr>
+        <tr><td><b>Zugang</b></td><td>Befristung, Login-Name, Profile (nur lesend), „Angelegt am".</td></tr>
+        <tr><td><b>Lohn</b></td><td>Nur mit Recht „Lohn" sichtbar — eigenes Thema, hier nicht behandelt.</td></tr>
+        <tr><td><b>Dienstpläne</b></td><td>Abgeglichene Schichten des Monats, mit CSV-Export.</td></tr>
+        <tr><td><b>Verlauf</b></td><td>Nur mit Recht „Logbuch" sichtbar — Änderungshistorie.</td></tr>
+      </table></div>
+
+      <p>Die vier mittleren Reiter (Person/Anstellung/Einsatz/Zugang) sind
+      <b>vollständig und nicht konfigurierbar</b> — anders als die Übersicht, bewusst:
+      „ein ausgeblendetes Feld wäre hier nicht von einem leeren zu unterscheiden."
+      Ist ein ganzer Reiter leer, steht dort ausdrücklich „Unter „…" noch nichts
+      erfasst", nicht einfach eine leere Fläche.</p>
+
+      <div class="hb-kasten hb-hinweis">
+        <p class="hb-kasten-titel">„gültig bis"-Felder warnen von selbst</p>
+        <p>Jedes Datumsfeld dieser Art (Ausweiskategorie, Arbeitsbewilligung,
+        Diensthund-/Waffenbewilligung, Dienstausweis …) zeigt automatisch einen Chip
+        „abgelaufen" oder „läuft bald ab" (innerhalb von 60 Tagen) — nicht nur in der
+        Kachel „Zu beachten" auf der Übersicht, sondern überall, wo das Feld
+        erscheint.</p>
+      </div>
+
+      <h3 id="vertrauliche-angaben">Vertrauliche Angaben</h3>
+      <p>17 Felder gelten als vertraulich: AHV-Nummer, Nationalität, Heimat- und
+      Geburtsort, Zivilstand, Heiratsdatum, Geburtsdatum, Geschlecht,
+      Aufenthalts- und Arbeitsbewilligung mit je eigenem Gültigkeitsdatum, ZEMIS-Nummer,
+      Strafregister-/Betreibungsregisterdatum, Dienstausweisnummer und -gültigkeit.
+      Ohne das Recht „Vertrauliche Angaben" liefert der Server diese Felder gar nicht
+      erst aus, und eine Änderung daran wird beim Speichern verworfen.</p>
+
+      <div class="hb-kasten hb-luecke">
+        <p class="hb-kasten-titel">Befund: „unbekannt" sieht hier wie „keine" aus</p>
+        <p>Das Werkzeug hält an anderer Stelle ausdrücklich fest, dass ein fehlendes
+        Recht nie wie ein leeres Feld aussehen darf. Bei den vertraulichen
+        Personalfeldern ist das nach dem heutigen Stand des Codes <b>nicht</b>
+        umgesetzt: Eine ausgeblendete Zeile in der Leseansicht sieht optisch genauso
+        aus wie ein echt leeres Feld, und im Bearbeitungsformular erscheinen die
+        meisten dieser Felder als ganz normal beschreibbar, auch ohne das nötige
+        Recht — eine dort eingetragene Änderung wird beim Speichern kommentarlos
+        verworfen, die Oberfläche meldet trotzdem „Angaben gespeichert". Der Server
+        liefert dafür bereits ein eigenes Kennzeichen mit, das die Oberfläche aber
+        nicht auswertet. Für dieses Handbuch beschrieben, damit es nicht überrascht —
+        keine Bewertung, das gehört ins Projekt-Repository.</p>
+      </div>
+
+      <h3 id="verlauf">Verlauf</h3>
+      <p>Drei unterschiedene „Nichts"-Zustände, sauber getrennt:</p>
+      <ul>
+        <li><b>Kein Zugriff</b> — das Recht „Logbuch: lesen" fehlt.</li>
+        <li><b>Logbuch noch nicht eingerichtet</b> — technischer Zustand, mit Verweis auf „Einrichtung".</li>
+        <li><b>Keine Änderung</b> — eingerichtet, aber an dieser Akte ist seither nichts passiert.</li>
+      </ul>
+      <p>Änderungen an vertraulichen Feldern erscheinen im Verlauf nur als Chip
+      „geändert", mit dem kleingedruckten Zusatz „vertraulich — Werte werden nicht
+      mitgeschrieben": <b>niemand</b> sieht dort die alten oder neuen Werte, unabhängig
+      vom eigenen Recht.</p>
+
+      <h3 id="dienstplaene">Dienstpläne</h3>
+      <p>Zeigt ausschliesslich <b>abgeglichene</b> Schichten des gewählten Monats —
+      geplante, aber noch nicht geprüfte Schichten zählen bewusst nicht mit. Drei
+      Kacheln: Geleistete Zeit, Zeitbonus (Art. 12 Ziff. 2 GAV), Total. Darunter
+      ausdrücklich der Hinweis „Das ist keine Arbeitszeitabrechnung nach Art. 12
+      Ziff. 5" mit Aufzählung, was fehlt (Feiertagszuschlag, 25&nbsp;%-Zuschlag über
+      210 Monatsstunden, Mehr-/Unterzeitsaldo, Ferienguthaben, Absenzen). CSV-Export
+      pro Monat über den Knopf „CSV".</p>
+
+      <h2 id="mitarbeitenden-entfernen">Mitarbeitenden entfernen</h2>
+      <p>Kein Löschen — die Person wird deaktiviert und überall abgemeldet, erfasste
+      Rapporte bleiben erhalten. Eine deaktivierte Person erscheint danach in der
+      Liste nicht mehr; einen Weg zurück (Archiv/Wiederherstellen wie bei Kunden)
+      gibt es für Personal nicht.</p>
+
+      <div class="hb-begriffe">
+        <a href="glossar.php#personaldossier">Personaldossier</a>
+        <a href="glossar.php#vertrauliche-felder">Vertrauliche Personalfelder</a>
+        <a href="glossar.php#zeitbonus">Zeitbonus</a>
+        <a href="glossar.php#abgeglichen">Abgeglichen</a>
+        <a href="glossar.php#profil">Profil</a>
+      </div>
+
+      <p class="hb-fussnote">Quelle: <code>dashboard.html</code> (<code>view-mitarbeiter</code>,
+      Markup ab Zeile 5808), <code>backend/mitarbeiter.php</code>,
+      <code>backend/api/mitarbeiter_*.php</code>, Stand 11.09.2026. Nicht am
+      laufenden Cockpit nachgeprüft — siehe Hinweis auf der
+      <a href="index.php">Übersicht</a>.</p>
+
+    </div>
+  </div>
+</div>
+<script src="suchindex.js"></script>
+<script src="suche.js"></script>
+<script src="handbuch.js"></script>
+</body>
+</html>

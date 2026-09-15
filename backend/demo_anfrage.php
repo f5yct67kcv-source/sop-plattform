@@ -30,7 +30,15 @@ declare(strict_types=1);
 const DEMO_MAX_FIRMA     = 120;
 const DEMO_MAX_NAME      = 120;
 const DEMO_MAX_EMAIL     = 200;
+const DEMO_MAX_TELEFON   = 40;
 const DEMO_MAX_NACHRICHT = 2000;
+// Telefon bewusst grosszuegig: +41 79 123 45 67, 079/123 45 67 und
+// 0041791234567 sind dieselbe Nummer, alle drei richtig geschrieben. Geprueft
+// werden darum nur die ZIFFERN, nicht das Format -- eine strenge Formregel
+// wiese vor allem gueltige Nummern ab. Neun ist die Untergrenze, unter der
+// keine erreichbare Nummer mehr liegt (Schweizer Nummern haben zehn; mit
+// Landesvorwahl und ohne die fuehrende Null sind es neun).
+const DEMO_TELEFON_MIN_ZIFFERN = 9;
 // Feste Liste wie im Formular -- eine andere Angabe wird nicht abgewiesen,
 // sondern als "keine Angabe" behandelt: Die Groesse ist Zusatzinformation,
 // keine Bedingung fuer ein Gespraech.
@@ -55,6 +63,13 @@ function demo_einzeilig(mixed $wert, int $max): string
     return mb_substr(trim($s), 0, $max);
 }
 
+// Wie viele Ziffern stecken in der Eingabe? Alles andere -- Pluszeichen,
+// Leerschlaege, Schraegstriche, Klammern, Bindestriche -- faellt weg.
+function demo_telefon_ziffern(string $wert): int
+{
+    return strlen((string)preg_replace('/\D+/', '', $wert));
+}
+
 // Prueft und bereinigt die Eingabe. Gibt ['fehler' => [feld => text],
 // 'werte' => [...]] zurueck; leeres 'fehler' heisst: annehmbar.
 function demo_anfrage_pruefen(array $in): array
@@ -63,6 +78,7 @@ function demo_anfrage_pruefen(array $in): array
         'firma'     => demo_einzeilig($in['firma'] ?? '', DEMO_MAX_FIRMA),
         'name'      => demo_einzeilig($in['name'] ?? '', DEMO_MAX_NAME),
         'email'     => demo_einzeilig($in['email'] ?? '', DEMO_MAX_EMAIL),
+        'telefon'   => demo_einzeilig($in['telefon'] ?? '', DEMO_MAX_TELEFON),
         'groesse'   => demo_einzeilig($in['groesse'] ?? '', 20),
         // Die Nachricht darf Umbrueche tragen -- sie steht nur im Rumpf.
         'nachricht' => mb_substr(trim(str_replace("\r\n", "\n", (string)($in['nachricht'] ?? ''))), 0, DEMO_MAX_NACHRICHT),
@@ -76,6 +92,9 @@ function demo_anfrage_pruefen(array $in): array
     }
     if ($werte['email'] === '' || filter_var($werte['email'], FILTER_VALIDATE_EMAIL) === false) {
         $fehler['email'] = 'Bitte eine gültige E-Mail-Adresse angeben.';
+    }
+    if (demo_telefon_ziffern($werte['telefon']) < DEMO_TELEFON_MIN_ZIFFERN) {
+        $fehler['telefon'] = 'Bitte eine Telefonnummer angeben, unter der wir Sie erreichen.';
     }
     if (!in_array($werte['groesse'], DEMO_GROESSEN, true)) {
         $werte['groesse'] = '';
@@ -96,6 +115,7 @@ function demo_anfrage_text(array $w, string $eingang): string
         . $zeile('Firma:', $w['firma'])
         . $zeile('Name:', $w['name'])
         . $zeile('E-Mail:', $w['email'])
+        . $zeile('Telefon:', $w['telefon'])
         . $zeile('Mitarbeitende:', $w['groesse'] !== '' ? $w['groesse'] : 'keine Angabe')
         . $zeile('Eingegangen:', $eingang)
         . "\nNachricht:\n" . ($w['nachricht'] !== '' ? $w['nachricht'] : '(keine)') . "\n\n"
@@ -117,10 +137,95 @@ function demo_anfrage_html(array $w, string $eingang): string
         . $zeile('Firma', $w['firma'])
         . $zeile('Name', $w['name'])
         . $zeile('E-Mail', $w['email'])
+        . $zeile('Telefon', $w['telefon'])
         . $zeile('Mitarbeitende', $w['groesse'] !== '' ? $w['groesse'] : 'keine Angabe')
         . $zeile('Eingegangen', $eingang)
         . '</table>'
         . '<p style="' . $schrift . ';margin:16px 0 4px;color:#545B67">Nachricht</p>'
         . '<p style="' . $schrift . ';margin:0 0 16px;white-space:pre-wrap">' . ($w['nachricht'] !== '' ? $h($w['nachricht']) : '(keine)') . '</p>'
         . '<p style="' . $schrift . ';margin:0">Antworten direkt an <a href="mailto:' . $h($w['email']) . '" style="' . $schrift . '">' . $h($w['email']) . '</a>.</p>';
+}
+
+// ── Der Empfaenger (seit der eigenen Domain) ──────────────────────────
+//
+// Bis hierher stand er in der Datenbank (betrieb.email, ENT-247). Seit die
+// Homepage auf guardops.ch liegt, gibt es dort keine -- und der Empfaenger
+// kommt aus dem Deploy, genau wie die eigene Adresse in basis_url()
+// (ENT-501). Dieselbe Regel, derselbe Aufbau: eine reine Pruefung, die sich
+// ohne Netz und ohne Datei ausfuehren laesst, und ein duenner Aufrufer
+// darueber, der den vom Deploy ersetzten Platzhalter hineinreicht.
+//
+// EIN NICHT ERSETZTER PLATZHALTER IST "NICHT EINGERICHTET", NICHT "LEER":
+// Beides gibt hier null, und der Endpunkt sagt dazu ausdruecklich 503
+// "noch nicht eingerichtet" statt "fehlgeschlagen" -- ein Interessent soll
+// es nicht "spaeter noch einmal" versuchen, wenn es nie gehen kann.
+function demo_empfaenger_pruefen(string $wert): ?string
+{
+    $wert = trim($wert);
+    if ($wert === '' || str_contains($wert, '__DEMO_EMPFAENGER')) { return null; }
+    // Kein Steuerzeichen und kein Umbruch: Die Adresse steht in einer
+    // Kopfzeile (siehe Festlegung 2 oben).
+    if (preg_match('/[\x00-\x20\x7F]/', $wert)) { return null; }
+    if (filter_var($wert, FILTER_VALIDATE_EMAIL) === false) { return null; }
+    return $wert;
+}
+
+function demo_empfaenger(): ?string
+{
+    return demo_empfaenger_pruefen('__DEMO_EMPFAENGER__');
+}
+
+// ── Gibt es die angegebene Adresse ueberhaupt? ────────────────────────
+//
+// ANLASS: Der Projektinhaber hat am 2026-09-14 absichtlich "info@test.cha"
+// eingegeben, und die Anfrage ging durch. FILTER_VALIDATE_EMAIL prueft nur
+// die SCHREIBWEISE, und die ist dort tadellos -- es gibt die Endung ".cha"
+// bloss nicht. Wer sich vertippt, wartet danach vergeblich auf Antwort, und
+// wir halten eine Anfrage in der Hand, die sich nicht beantworten laesst.
+//
+// DREI ZUSTAENDE, NICHT ZWEI -- der Grund fuer die Kontrolldomain:
+// checkdnsrr() liefert false sowohl fuer „diese Domain gibt es nicht" als
+// auch fuer „der Namensdienst antwortet gerade nicht". Das zweite als das
+// erste zu melden hiesse, einem Interessenten zu sagen, seine Adresse sei
+// falsch, obwohl wir es gar nicht wissen -- genau der Fehler, den die Regel
+// „unbekannt darf nie wie keine aussehen" meint. Darum wird bei einem
+// Fehlschlag zusaetzlich eine Domain nachgeschlagen, von der wir wissen,
+// dass es sie gibt. Faellt die auch durch, liegt es am Namensdienst: dann
+// gilt die Adresse als nicht pruefbar (null) und wird DURCHGELASSEN.
+//
+// Die Kontrolle laeuft nur im Fehlerfall -- der Normalfall kostet einen
+// einzigen, meist zwischengespeicherten Nachschlag.
+const DEMO_KONTROLL_DOMAIN = 'guardops.ch';
+
+function demo_domain(string $email): string
+{
+    $pos = strrpos($email, '@');
+    return $pos === false ? '' : substr($email, $pos + 1);
+}
+
+// Ein Mailserver gilt als vorhanden, wenn es einen MX-Eintrag gibt -- oder,
+// wie RFC 5321 es zulaesst, ersatzweise einen A/AAAA-Eintrag, der dann
+// implizit als Mailziel dient. Fehlt die Funktion (abgeschaltet auf manchen
+// Hostpaketen), wird nichts behauptet: siehe Aufrufer.
+function demo_hat_mailserver(string $domain): bool
+{
+    return checkdnsrr($domain, 'MX')
+        || checkdnsrr($domain, 'A')
+        || checkdnsrr($domain, 'AAAA');
+}
+
+// true = zustellbar, false = diese Domain gibt es nicht,
+// null = nicht pruefbar (Namensdienst gestoert oder abgeschaltet).
+// $nachschlag ist einspeisbar, damit sich alle drei Faelle ohne Netz pruefen
+// lassen -- dieselbe Bauart wie die einspeisbare Zeit in demo_bremse.php.
+function demo_adresse_zustellbar(string $email, ?callable $nachschlag = null): ?bool
+{
+    if ($nachschlag === null) {
+        if (!function_exists('checkdnsrr')) { return null; }
+        $nachschlag = 'demo_hat_mailserver';
+    }
+    $domain = demo_domain($email);
+    if ($domain === '') { return false; }
+    if ($nachschlag($domain)) { return true; }
+    return $nachschlag(DEMO_KONTROLL_DOMAIN) ? false : null;
 }

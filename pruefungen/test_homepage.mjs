@@ -108,6 +108,46 @@ check('KRITISCH: der Demo-Knopf ist blau, nicht bernsteinfarben', kb > kr + 60 &
 check('Bernstein meldet -- nur der laufende Rundgang traegt die Warnfarbe des Cockpits, die uebrigen Zeilen Blau',
   farben.live === rgb(marke(dunkel, 'warn')) && farben.andereZeile === rgb(marke(dunkel, 'accent')));
 
+// ── Die Marke (ENT-562). Gemessen, nicht im Quelltext nachgelesen:
+// Der Name steht an einer Stelle (BRAND) und muss ueberall derselbe sein;
+// die Bildmarke ist hochformatig und darf nicht zum Quadrat gestaucht werden.
+const markeGemessen = await desktop.evaluate(() => {
+  const namen = [...document.querySelectorAll('[data-brand]')].map(e => e.textContent.trim());
+  const schild = document.querySelector('.kopf .marke svg').getBoundingClientRect();
+  const wort = getComputedStyle(document.querySelector('.kopf .wortmarke'));
+  const symbol = document.querySelector('#marke');
+  return {
+    namen, titel: document.title,
+    seitenverhaeltnis: schild.width / schild.height,
+    sollverhaeltnis: (() => { const v = symbol.getAttribute('viewBox').split(/\s+/).map(Number); return v[2] / v[3]; })(),
+    hoehe: schild.height,
+    versalien: wort.textTransform,
+  };
+});
+check('KRITISCH: der Markenname steht an EINER Stelle -- alle Auszeichnungen zeigen denselben Text',
+  markeGemessen.namen.length >= 8 && new Set(markeGemessen.namen).size === 1 && markeGemessen.namen[0].length > 2);
+check('KRITISCH: kein Platzhaltername mehr auf der Seite oder im Titel',
+  !/wachtwerk/i.test(markeGemessen.namen[0] + ' ' + markeGemessen.titel));
+check('Der Seitentitel traegt den Markennamen', markeGemessen.titel.startsWith(markeGemessen.namen[0]));
+check('KRITISCH: die Bildmarke wird im eigenen Seitenverhaeltnis gezeigt, nicht gestaucht',
+  Math.abs(markeGemessen.seitenverhaeltnis - markeGemessen.sollverhaeltnis) < 0.02 && markeGemessen.hoehe > 20);
+check('Die Wortmarke steht gemischt wie im Logo, nicht in Versalien', markeGemessen.versalien === 'none');
+
+// Und der Name steht auch OHNE JavaScript da. Genau hier ist die erste
+// Fassung durchgerutscht: Ein Skript setzte den Namen beim Laden, der
+// Quelltext trug noch den Platzhalter -- mit abgeschaltetem JavaScript haette
+// der Besucher den falschen Namen gesehen, und keine Pruefung haette es
+// gemerkt, weil alle am gerenderten Zustand MIT Skript messen.
+{
+  const ohne = await browser.newContext({ javaScriptEnabled: false });
+  const seite = await ohne.newPage();
+  await seite.goto(SEITE, { waitUntil: 'load' });
+  const namen = await seite.evaluate(() => [...document.querySelectorAll('[data-brand]')].map(e => e.textContent.trim()));
+  check('KRITISCH: der Markenname steht auch ohne JavaScript ueberall gleich da',
+    namen.length >= 8 && new Set(namen).size === 1 && namen[0] === markeGemessen.namen[0]);
+  await ohne.close();
+}
+
 const masseDesktop = await desktop.evaluate(() => ({
   ueberlauf: document.documentElement.scrollWidth - document.documentElement.clientWidth,
   kopfKnoepfe: [...document.querySelectorAll('.kopf .btn')].filter(b => b.getBoundingClientRect().width > 0).length,
@@ -128,7 +168,19 @@ check('Die leeren Pflichtfelder sind als ungueltig markiert und eine Meldung ste
   await desktop.evaluate(() =>
     document.querySelector('[name="firma"]').getAttribute('aria-invalid') === 'true'
     && document.querySelector('[name="email"]').getAttribute('aria-invalid') === 'true'
+    && document.querySelector('[name="telefon"]').getAttribute('aria-invalid') === 'true'
     && document.getElementById('demoMeldung').classList.contains('zeigen')));
+
+// Pflicht heisst auch: man sieht es VOR dem Absenden. Gemessen wird der
+// gerenderte Stern, nicht das Attribut allein -- ein required ohne sichtbares
+// Zeichen erfuehrt der Besucher erst durch die Fehlermeldung.
+check('KRITISCH: jedes Pflichtfeld traegt ein sichtbares Zeichen und required',
+  await desktop.evaluate(() => ['firma', 'name', 'email', 'telefon'].every(n => {
+    const feld = document.querySelector(`[name="${n}"]`);
+    if (!feld || !feld.required) { return false; }
+    const stern = feld.closest('label').querySelector('.pflicht');
+    return !!stern && stern.getBoundingClientRect().width > 0;
+  })));
 
 check('Das Fallenfeld ist da, aber fuer Menschen nicht sichtbar',
   await desktop.evaluate(() => {
@@ -143,6 +195,17 @@ await fuell(desktop, '[name="firma"]', 'Muster Sicherheitsdienst AG');
 await fuell(desktop, '[name="name"]', 'A. Beispielperson');
 await fuell(desktop, '[name="email"]', 'a.beispiel@example.invalid');
 await fuell(desktop, '[name="nachricht"]', 'Revierdienst mit Kundenportal');
+// Alles ausser der Nummer: Es darf trotzdem nichts zum Server gehen.
+await klick(desktop, '#demoKnopf');
+await desktop.waitForTimeout(200);
+check('KRITISCH: ohne Telefonnummer geht kein Aufruf zum Server', aufrufe.length === 0);
+// Eine zu kurze Nummer ist so wenig eine Nummer wie gar keine.
+await fuell(desktop, '[name="telefon"]', '079 12');
+await klick(desktop, '#demoKnopf');
+await desktop.waitForTimeout(200);
+check('KRITISCH: eine zu kurze Telefonnummer geht ebenfalls nicht durch', aufrufe.length === 0);
+
+await fuell(desktop, '[name="telefon"]', '079 123 45 67');
 await klick(desktop, '#demoKnopf');
 await desktop.waitForTimeout(400);
 check('KRITISCH: mit Pflichtangaben geht genau EIN Aufruf zum Server', aufrufe.length === 1);
@@ -150,6 +213,7 @@ const a = aufrufe[0] || {};
 check('KRITISCH: der Aufruf ist ein POST mit JSON und traegt die Felder',
   a.methode === 'POST' && /application\/json/.test(a.typ) && a.daten
   && a.daten.firma === 'Muster Sicherheitsdienst AG' && a.daten.email === 'a.beispiel@example.invalid'
+  && a.daten.telefon === '079 123 45 67'
   && a.daten.nachricht === 'Revierdienst mit Kundenportal');
 check('KRITISCH: das Fallenfeld wird leer mitgeschickt (ein Mensch fuellt es nicht)',
   a.daten && a.daten.website === '');
@@ -166,6 +230,7 @@ antwort = { status: 503, body: { status: 'error', message: 'Der Empfang von Anfr
 await fuell(desktop, '[name="firma"]', 'Muster Sicherheitsdienst AG');
 await fuell(desktop, '[name="name"]', 'A. Beispielperson');
 await fuell(desktop, '[name="email"]', 'a.beispiel@example.invalid');
+await fuell(desktop, '[name="telefon"]', '079 123 45 67');
 await klick(desktop, '#demoKnopf');
 await desktop.waitForTimeout(400);
 check('KRITISCH: die Fehlermeldung des Servers erscheint woertlich ("nicht eingerichtet"), als Fehler gekennzeichnet',

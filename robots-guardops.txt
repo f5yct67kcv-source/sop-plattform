@@ -1,0 +1,10 @@
+# robots.txt fuer guardops.ch -- die oeffentliche Verkaufsseite.
+#
+# Sie SOLL gefunden werden: Genau umgekehrt zur Testinstanz, deren eigene
+# robots.txt alles aussperrt (ENT-387).
+#
+# Kein Sitemap-Eintrag: Es gibt eine einzige Seite, dafuer braucht es keine
+# Sitemap. Sobald eine zweite dazukommt (Impressum, Datenschutz), gehoert
+# hier eine Zeile "Sitemap: https://guardops.ch/sitemap.xml" hin.
+User-agent: *
+Disallow:

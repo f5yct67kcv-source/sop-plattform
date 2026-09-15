@@ -45,15 +45,19 @@ $pdo->exec("INSERT INTO einsaetze VALUES
   (4,'2026-07-15','reinigung','Kunde',NULL,'geplant'),
   (5,'2026-07-16','sicherheit','Kunde',NULL,'geplant'),
   (6,'2026-07-17','sicherheit','Kunde',NULL,'abgesagt'),
-  (7,'2026-07-20','sicherheit','Kunde',NULL,'geplant')");
+  (7,'2026-07-20','sicherheit','Kunde',NULL,'geplant'),
+  (8,'2026-07-21','sicherheit','Kunde',NULL,'geplant'),
+  (9,'2026-07-22','sicherheit','Kunde',NULL,'geplant')");
 $pdo->exec("INSERT INTO einsatz_zuteilung VALUES
-  (1,1,'abgeglichen','08:00','18:00',60,0),
-  (2,1,'abgeglichen','08:00','12:00',0,0),
-  (3,1,'abgeglichen','22:00','02:00',0,0),
-  (4,1,'abgeglichen','08:00','12:00',0,0),
+  (1,1,'anwesend','08:00','18:00',60,0),
+  (2,1,'anwesend','08:00','12:00',0,0),
+  (3,1,'anwesend','22:00','02:00',0,0),
+  (4,1,'anwesend','08:00','12:00',0,0),
   (5,1,'offen','08:00','12:00',0,0),
-  (6,1,'abgeglichen','08:00','12:00',0,0),
-  (7,1,'abgeglichen','08:00','12:00',300,0)");
+  (6,1,'anwesend','08:00','12:00',0,0),
+  (7,1,'anwesend','08:00','12:00',300,0),
+  (8,1,'abwesend',NULL,NULL,NULL,NULL),
+  (9,1,'ausgefallen',NULL,NULL,NULL,NULL)");
 $pdo->exec("INSERT INTO lohn_ansatz VALUES
   (1,1,'2024-01-01','C',2500,1,833,NULL,NULL,'monat',15000,'stunde',200)");
 
@@ -72,6 +76,35 @@ pruef('KRITISCH: eine Reinigungsschicht wird gesperrt statt nach dem Sicherheits
     ($zeit['gesperrt']['sparte_reinigung'] ?? 0) === 1);
 pruef('KRITISCH: eine Pause laenger als die Schicht wird als Erfassungsfehler gesperrt, nicht negativ gerechnet',
     ($zeit['gesperrt']['pause_laenger_als_schicht'] ?? 0) === 1);
+
+// KRITISCH, Regressionstest fuer einen echten Fehler (gefunden 2026-09-12):
+// lohnlauf_zeiten() verglich ist_status auf den Wert 'abgeglichen' -- ein
+// Wert, den einsatz_abgleich.php nach seiner eigenen IST_STATUS-Liste nie
+// schreibt (nur 'offen'/'anwesend'/'abwesend'/'ausgefallen'). Jede echte
+// Schicht waere also, unabhaengig vom tatsaechlichen Abgleich, als offen
+// gezaehlt worden -- kein Lohnlauf haette je einen Betrag ausgewiesen. Die
+// Fixture oben schrieb bis zu dieser Pruefung denselben falschen Wert und
+// haette den Fehler nie gefangen (CLAUDE.md: "nicht den Quelltext
+// abschreiben"). Jetzt steht dort 'anwesend', wie der echte Abgleich es
+// schreibt.
+pruef('KRITISCH: eine als "anwesend" abgeglichene Schicht zaehlt mit (Regression: der Vergleich auf den nie geschriebenen Wert "abgeglichen")',
+    $zeit['nicht_abgeglichen'] === 1
+    && count(array_filter($zeit['schichten'], fn($s) => $s['einsatz_id'] === 1)) === 1
+    && $zeit['summe']['roh_min'] > 0);
+// "abwesend"/"ausgefallen" sind ENTSCHIEDEN (kein 'offen'), aber ohne
+// Lohnanspruch -- eine dritte Aussage neben "zaehlt" und "noch offen".
+// Beide haben nie Ist-Zeiten (siehe $ohneZeit in einsatz_abgleich.php);
+// ohne eigenen Grund fielen sie in "zeiten_unvollstaendig" und saehen aus
+// wie eine offene Erfassungsaufgabe, obwohl bereits entschieden ist, dass
+// hier nichts zu zahlen ist.
+pruef('KRITISCH: eine abwesende Person zaehlt NICHT als nicht abgeglichen, sondern bekommt den eigenen Grund "abwesend"',
+    $zeit['nicht_abgeglichen'] === 1
+    && ($zeit['gesperrt']['abwesend'] ?? 0) === 1
+    && ($zeit['gesperrt']['zeiten_unvollstaendig'] ?? 0) === 0);
+pruef('KRITISCH: eine ausgefallene Schicht zaehlt NICHT als nicht abgeglichen, sondern bekommt den eigenen Grund "ausgefallen"',
+    ($zeit['gesperrt']['ausgefallen'] ?? 0) === 1);
+pruef('Weder "abwesend" noch "ausgefallen" tragen eine Zeit in die Summe ein',
+    count(array_filter($zeit['schichten'], fn($s) => in_array($s['einsatz_id'], [8, 9], true) && $s['roh_min'] !== null)) === 0);
 
 // ── Die Zeitsummen, einzeln nachvollziehbar ──────────────────────────────
 // Mi 01.07. 08:00-18:00 = 600 roh, 540 netto, kein Bonusfenster
@@ -166,7 +199,7 @@ pruef('KRITISCH: ein erst kuenftig gueltiger Ansatz greift nicht rueckwirkend',
 // ── Mindestlohnwarnung ───────────────────────────────────────────────────
 $pdo->exec("INSERT INTO lohn_ansatz VALUES
   (3,4,'2024-01-01','C',2000,1,NULL,NULL,NULL,NULL,NULL,NULL,NULL)");
-$pdo->exec("INSERT INTO einsatz_zuteilung VALUES (1,4,'abgeglichen','08:00','18:00',60,0)");
+$pdo->exec("INSERT INTO einsatz_zuteilung VALUES (1,4,'anwesend','08:00','18:00',60,0)");
 $tief = lohnlauf_person($pdo, ['id' => 4, 'anstellungskategorie' => 'C',
     'eintritt' => '2024-03-01', 'geburtsdatum' => '2000-05-04'], $VON, $BIS);
 pruef('KRITISCH: ein Grundlohn unter dem GAV-Mindestlohn erzeugt eine Warnung',
@@ -187,7 +220,7 @@ for ($t = 1; $t <= 22; $t++) {
     $pdo->exec("INSERT INTO einsaetze VALUES ($id,'$datum','sicherheit','Kunde',NULL,'geplant')");
     // 08:00-18:00 mit 0 Pause: 600 Minuten, kein Nacht- oder Sonntagsfenster,
     // damit die Schwelle ohne Bonusanteil erreicht wird.
-    $pdo->exec("INSERT INTO einsatz_zuteilung VALUES ($id,5,'abgeglichen','08:00','18:00',0,0)");
+    $pdo->exec("INSERT INTO einsatz_zuteilung VALUES ($id,5,'anwesend','08:00','18:00',0,0)");
     $id++;
 }
 $pdo->exec("INSERT INTO lohn_ansatz VALUES
@@ -289,7 +322,7 @@ pruef('KRITISCH: aber weder ferien- noch 13.-ML-pflichtig -- sonst gaebe es Feri
 $gruende = lohnlauf_sperrgruende();
 $benutzt = ['sparte_reinigung', 'kein_regelwerk', 'kein_ansatz', 'keine_kategorie',
             'zeiten_unvollstaendig', 'pause_laenger_als_schicht', 'monatslohn_offen',
-            'anordnung_fehlt', 'ausgleich_offen'];
+            'anordnung_fehlt', 'ausgleich_offen', 'abwesend', 'ausgefallen'];
 pruef('KRITISCH: zu jedem verwendeten Sperrgrund gibt es einen erklaerenden Satz',
     count(array_diff($benutzt, array_keys($gruende))) === 0);
 pruef('Und keiner dieser Saetze ist leer',
@@ -306,13 +339,17 @@ $pdo->exec("INSERT INTO einsaetze VALUES
     (901,'2026-07-13','reinigung','Kunde',1,'geplant'),
     (902,'2026-07-05','bewachung','Kunde',1,'geplant'),
     (903,'2026-06-15','bewachung','Kunde',1,'abgesagt'),
-    (904,'2026-06-22','bewachung','Kunde',1,'geplant')");
+    (904,'2026-06-22','bewachung','Kunde',1,'geplant'),
+    (905,'2026-05-18','bewachung','Kunde',1,'geplant'),
+    (906,'2026-05-25','bewachung','Kunde',1,'geplant')");
 $pdo->exec("INSERT INTO einsatz_zuteilung VALUES
-    (900,$mkw,'abgeglichen','08:00','18:00',60,0),
-    (901,$mkw,'abgeglichen','08:00','18:00',0,0),
-    (902,$mkw,'abgeglichen','08:00','18:00',0,0),
-    (903,$mkw,'abgeglichen','08:00','18:00',0,0),
-    (904,$mkw,'offen','08:00','18:00',0,0)");
+    (900,$mkw,'anwesend','08:00','18:00',60,0),
+    (901,$mkw,'anwesend','08:00','18:00',0,0),
+    (902,$mkw,'anwesend','08:00','18:00',0,0),
+    (903,$mkw,'anwesend','08:00','18:00',0,0),
+    (904,$mkw,'offen','08:00','18:00',0,0),
+    (905,$mkw,'abwesend',NULL,NULL,NULL,NULL),
+    (906,$mkw,'ausgefallen',NULL,NULL,NULL,NULL)");
 
 $w = lohnlauf_nbu_wochen($pdo, $mkw, '2026-07-31', 3);
 
@@ -362,6 +399,17 @@ pruef('Eine abgesagte Schicht zaehlt nicht mit',
     abs($w['wochen'][date('o-\WW', strtotime('2026-06-15'))] - 0.0) < 0.001);
 pruef('Eine nicht abgeglichene Schicht zaehlt nicht mit',
     abs($w['wochen'][date('o-\WW', strtotime('2026-06-22'))] - 0.0) < 0.001);
+// KRITISCH, Regression zur selben Ursache wie oben bei lohnlauf_zeiten():
+// diese Abfrage verglich denselben nie geschriebenen Wert 'abgeglichen'.
+// Mit dem Fehler haette KEINE Schicht je zu den Wochenstunden beigetragen
+// -- die Pruefungen fuer 900/901/902 waeren bereits vorher rot gewesen.
+// Zusaetzlich, gezielt fuer die neue Weiche: "abwesend" und "ausgefallen"
+// sind entschieden, aber ohne geleistete Zeit -- fuer die UVG-Unterstellung
+// zaehlen sie darum wie eine abgesagte oder offene Schicht: gar nicht.
+pruef('Eine abwesende Person zaehlt fuer die NBU-Unterstellung nicht mit',
+    abs($w['wochen'][date('o-\WW', strtotime('2026-05-18'))] - 0.0) < 0.001);
+pruef('Eine ausgefallene Schicht zaehlt fuer die NBU-Unterstellung nicht mit',
+    abs($w['wochen'][date('o-\WW', strtotime('2026-05-25'))] - 0.0) < 0.001);
 
 // Und die Kette bis zum Ergebnis: aus den Wochen wird die Unterstellung.
 $uvgP = lohn_uvg('2025-06-30');

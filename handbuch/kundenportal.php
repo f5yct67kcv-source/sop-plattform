@@ -1,0 +1,172 @@
+<?php require __DIR__ . '/_guard.php'; ?>
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kundenportal – Handbuch Cockpit</title>
+<link rel="stylesheet" href="handbuch.css">
+</head>
+<body>
+<div class="hb-shell">
+  <aside class="hb-side" id="hbSide">
+    <div class="hb-brand">
+      <a href="index.php" style="text-decoration:none">
+        <span class="titel">Handbuch</span>
+        <span class="unter">Cockpit von GuardOpS</span>
+      </a>
+      <button class="hb-menu-btn" id="hbMenuBtn" aria-label="Menü" aria-expanded="false">☰</button>
+    </div>
+    <div class="hb-suche">
+      <input type="search" id="hbSucheEingabe" placeholder="Suchen…" aria-label="Handbuch durchsuchen" autocomplete="off">
+      <div class="hb-suche-ergebnisse" id="hbSucheErgebnisse" hidden></div>
+    </div>
+    <div class="hb-nav-wrap">
+      <div class="hb-gruppe">Einstieg</div>
+      <ul class="hb-nav">
+        <li><a href="index.php">Übersicht</a></li>
+        <li><a href="erste-schritte.php">Erste Schritte</a></li>
+      </ul>
+      <div class="hb-gruppe">Erfassung (App)</div>
+      <ul class="hb-nav">
+        <li><a href="erfassung.php">Erfassung</a></li>
+      </ul>
+      <div class="hb-gruppe">Cockpit</div>
+      <ul class="hb-nav">
+        <li><a href="planung.php">Planung</a></li>
+        <li><a href="kunden.php">Kunden</a></li>
+        <li><a href="personal.php">Personal</a></li>
+        <li><a href="lohn.php">Lohn</a></li>
+        <li><a href="abgleich.php">Abgleich</a></li>
+        <li><a href="betrieb.php">Betrieb</a></li>
+      </ul>
+      <div class="hb-gruppe">Weitere Oberflächen</div>
+      <ul class="hb-nav">
+        <li><a href="kundenportal.php" class="aktiv">Kundenportal</a></li>
+      </ul>
+      <div class="hb-gruppe">Nachschlagen</div>
+      <ul class="hb-nav">
+        <li><a href="glossar.php">Glossar</a></li>
+      </ul>
+    </div>
+    <div class="hb-side-fuss">
+      Aus dem Quelltext zusammengestellt, siehe Hinweis auf der <a href="index.php">Übersicht</a>.
+    </div>
+  </aside>
+
+  <div class="hb-main">
+    <div class="hb-content">
+
+      <p class="hb-kicker">Weitere Oberflächen</p>
+      <h1>Kundenportal</h1>
+      <p class="hb-lead">Eine eigenständige, vom Cockpit unabhängige Oberfläche (<code>portal.html</code>) —
+      eigene Tabellen, eigene Anmeldung, eigene Sitzungsprüfung (ENT-441). Kundinnen und Kunden
+      sehen hier den Nachweis der Dienstleistungen an ihren eigenen Objekten: nichts
+      Internes, nichts von anderen Kunden.</p>
+
+      <div class="hb-recht">
+        Zugänge einrichten verlangt das Recht <b>„Kundenzugänge zum Portal": schreiben</b> —
+        laut Rollenübersicht nur die Rolle <b>Verwalter</b> ohne Weiteres. Siehe
+        <a href="erste-schritte.php">Erste Schritte</a>.
+      </div>
+
+      <h2 id="zugang-einrichten-aufgabe-der-administration">Zugang einrichten (Aufgabe der Administration)</h2>
+      <p>Es wird keine Einladung verschickt — der Zugang wird angelegt, danach fordert die
+      Kundschaft sich den ersten Link selbst an.</p>
+
+      <ol class="hb-schritte">
+        <li>Cockpit → <b>Administration → Kundenzugänge</b> öffnen.</li>
+        <li>Neuen Zugang anlegen: Kunde auswählen (Pflicht, wird später nicht mehr umgehängt),
+        Name, E-Mail-Adresse (das ist zugleich der Login-Name — muss eindeutig sein), Funktion
+        optional (reine interne Notiz, erscheint im Portal selbst nirgends).</li>
+        <li>Speichern. Die Person kann sich ab jetzt über „Link per E-Mail anfordern" auf der
+        Portal-Anmeldeseite selbst ein Passwort setzen.</li>
+      </ol>
+
+      <div class="hb-kasten hb-achtung">
+        <p class="hb-kasten-titel">Zwei getrennte Schalter, leicht zu verwechseln</p>
+        <p>Ein Kunde im Stammdatensatz zu archivieren sperrt seinen Portalzugang
+        <b>nicht automatisch</b>. Beides sind zwei getrennte Handlungen — wer einen Kunden
+        beendet, muss den zugehörigen Zugang unter „Kundenzugänge" separat auf <b>inaktiv</b>
+        setzen. Eine Sperre wirkt dafür sofort: laufende Sitzungen werden beendet, offene
+        Anmeldelinks entwertet.</p>
+      </div>
+
+      <h2 id="wie-sich-kundinnen-und-kunden-anmelden">Wie sich Kundinnen und Kunden anmelden</h2>
+      <ol class="hb-schritte">
+        <li>E-Mail-Adresse und Passwort eingeben — oder, beim ersten Besuch bzw. bei
+        vergessenem Passwort, „Link per E-Mail anfordern".</li>
+        <li>Der Link (30 Minuten gültig, nur einmal einlösbar) führt direkt zu „Passwort
+        festlegen" — mindestens 10 Zeichen, darf den Teil vor dem @ der eigenen
+        E-Mail-Adresse nicht enthalten.</li>
+        <li>Danach sofort angemeldet. Die Sitzung bleibt bis zu 90 Tage gültig, spätestens
+        aber nach 30 Tagen ohne Nutzung abgelaufen.</li>
+      </ol>
+      <p>Aus Sicherheitsgründen antwortet die Anmeldung immer gleich, egal ob die eingegebene
+      Adresse tatsächlich existiert — daraus lässt sich also nicht ablesen, ob ein Zugang
+      besteht.</p>
+
+      <h2 id="was-zu-sehen-ist">Was zu sehen ist</h2>
+      <p>Bis zu drei Reiter, abhängig davon, was der jeweilige Kunde tatsächlich bezieht — bei
+      nur einer Art erscheint gar keine Reiterleiste.</p>
+
+      <h3 id="rundgaenge-revierdienst">Rundgänge (Revierdienst)</h3>
+      <p>Ein Kennzahlenband (Anzahl Rundgänge, Erledigungsgrad, Abbrüche, Fotobelege) über
+      einer Liste abgeschlossener oder abgebrochener Kontrollrunden. <b>Laufende Runden sind
+      bewusst unsichtbar</b> — der Kunde soll den Nachweis sehen, nicht die Person bei der
+      Arbeit (ENT-441). Eine angeklickte Runde zeigt Start/Ende/Dauer, bei Abbruch den Grund im
+      Klartext, jeden Kontrollpunkt einzeln (mit Marke „Bestätigt" / „Fotobeleg" / „Nicht
+      verfügbar" / „Nicht besucht" — auch nicht besuchte Punkte werden aufgeführt),
+      gemeldete Ereignisse, die Route auf der Karte sowie einen Download „Als PDF
+      herunterladen".</p>
+
+      <h3 id="wachbuch">Wachbuch</h3>
+      <p>Eine tagesweise gruppierte Chronik aller Vorgänge an den eigenen Objekten
+      (Kontrollpunkt-Scans, Rundgänge, Aufgaben, Ereignisse) als Zeitleiste statt als Tabelle,
+      mit Filterchips je Art. Weder hier noch in der Rundgangliste erscheint ein Personenname —
+      erst im aufgeklappten Rundgang-Detail.</p>
+
+      <h3 id="einsaetze-verkehrsdienst">Einsätze (Verkehrsdienst)</h3>
+      <p>Eine Zeile pro Einsatz, mit Datum, Titel, Einsatzart, Personenzahl und Stunden — zwei
+      getrennte Zahlen, nie zu einer vermischt. Sichtbar ist ausschliesslich, wofür bereits ein
+      Kundenrapport <b>unterschrieben</b> wurde: Die Unterschrift ist der Freigabepunkt, ein
+      separater täglicher Freigabeschritt entfällt dadurch. Der Inhalt entspricht bewusst 1:1
+      dem physischen Blatt, inklusive Rechnungsadresse, falls eine abweichende hinterlegt ist.</p>
+
+      <h2 id="was-kundinnen-und-kunden-nicht-sehen-oder-tun-koennen">Was Kundinnen und Kunden nicht sehen oder tun können</h2>
+      <ul>
+        <li>Keine Rechnungen, keine Offerten, keine Kalkulation — das Portal zeigt
+        ausschliesslich Leistungsnachweise, keine Preise.</li>
+        <li>Keine laufenden Rundgänge, keine internen Planungsnotizen oder -titel.</li>
+        <li>Nur Objekte, für die tatsächlich Kontrollpunkte oder bereits Rundgänge bestehen.</li>
+        <li>Keinen Einblick in andere Kunden — die Zuordnung kommt serverseitig immer aus der
+        eigenen Sitzung, nie aus der Anfrage selbst.</li>
+      </ul>
+      <p>Ein eigener Link „Datenschutzhinweis" auf der Anmeldeseite listet genau, was das
+      Portal über die Kundschaft speichert (Name, E-Mail, Funktion, letzte Anmeldung, welcher
+      Rapport wann abgerufen wurde) und was ausdrücklich nicht (IP-Adresse, Gerät,
+      Einzelbesuchsverlauf).</p>
+
+      <div class="hb-begriffe">
+        <a href="glossar.php#kundenzugang">Kundenzugang</a>
+        <a href="glossar.php#zustellnachweis">Zustellnachweis</a>
+        <a href="glossar.php#wachbuch">Wachbuch</a>
+        <a href="glossar.php#revierdienst">Revierdienst</a>
+        <a href="glossar.php#verkehrsdienst">Verkehrsdienst</a>
+        <a href="glossar.php#kundenrapport">Kundenrapport</a>
+        <a href="glossar.php#fotobeleg">Fotobeleg / Ersatzscan</a>
+      </div>
+
+      <p class="hb-fussnote">Quelle: <code>portal.html</code> vollständig gelesen, alle
+      <code>backend/api/portal_*.php</code>, <code>backend/kundenportal.php</code>,
+      <code>backend/api/kundenzugang_*.php</code>, Stand 11.09.2026. Nicht am laufenden
+      Portal nachgeprüft — siehe Hinweis auf der <a href="index.php">Übersicht</a>.</p>
+
+    </div>
+  </div>
+</div>
+<script src="suchindex.js"></script>
+<script src="suche.js"></script>
+<script src="handbuch.js"></script>
+</body>
+</html>
