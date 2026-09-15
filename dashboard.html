@@ -8563,7 +8563,7 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
       <div class="msg-err" id="rmErr" style="display:none"></div>
       <div class="f">
         <label for="rmEmpfaenger">Empfänger</label>
-        <input class="inp" id="rmEmpfaenger" type="email" placeholder="name@firma.ch" autocomplete="off">
+        <select class="inp" id="rmEmpfaenger"></select>
       </div>
       <p class="note" id="rmHinweis" style="margin-top:10px"></p>
     </div>
@@ -22382,12 +22382,21 @@ function rgdMailOeffnen() {
   if (!rgdDaten) { return; }
   $('rmErr').style.display = 'none';
   $('rmText').textContent = (rgdDaten.objekt_name || '') + ' · ' + dmy(rgdDaten.datum);
-  // Vorbelegt mit der hinterlegten Kundenadresse, aber frei aenderbar: Ein
-  // Rapport geht mal an den Kunden, mal an die eigene Leitung.
-  $('rmEmpfaenger').value = rgdDaten.kunde_email || '';
-  $('rmHinweis').textContent = rgdDaten.kunde_email
-    ? 'Vorbelegt mit der Haupt-E-Mail des Kunden. Der Rapport geht als PDF im Anhang.'
-    : 'Für diesen Kunden ist keine E-Mail hinterlegt. Der Rapport geht als PDF im Anhang.';
+  // Seit ENT-585 keine freie Adresse mehr: nur was am Objekt oder am Kunden
+  // als Kontaktweg hinterlegt ist -- dieselbe Liste, die der Server
+  // durchsetzt (rundgang_rapport_versenden.php). Eine Sperre, die man am
+  // Browser vorbei umgehen kann, ist keine (CLAUDE.md) -- das Auswahlfeld
+  // hier erspart nur den Umweg über eine abgelehnte Anfrage.
+  const adressen = rgdDaten.empfaenger_adressen || [];
+  const sel = $('rmEmpfaenger');
+  sel.innerHTML = adressen.length
+    ? adressen.map(a => `<option value="${esc(a)}">${esc(a)}</option>`).join('')
+    : '<option value="" disabled selected>keine hinterlegt</option>';
+  sel.disabled = adressen.length === 0;
+  $('rmBtn').disabled = adressen.length === 0;
+  $('rmHinweis').textContent = adressen.length
+    ? 'Der Rapport geht als PDF im Anhang an die hinterlegte Adresse.'
+    : 'Für dieses Objekt oder seinen Kunden ist keine E-Mail-Adresse hinterlegt (Ansprechpartner am Objekt oder beim Kunden erfassen). Der Versand ist erst danach möglich.';
   openDlg('dlgRapportMail');
 }
 
@@ -22396,11 +22405,11 @@ function rgdMailSenden() {
   const empfaenger = $('rmEmpfaenger').value.trim();
   const err = $('rmErr');
   err.style.display = 'none';
-  // Die gleiche Pruefung steht im Server (ENT-322) -- hier nur, damit der
-  // Fehler ohne Umweg sichtbar wird. Eine Sperre gehoert in den Server,
-  // nicht nur in die Oberflaeche.
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(empfaenger)) {
-    err.textContent = 'Bitte eine gültige E-Mail-Adresse angeben.';
+  // Die gleiche Pruefung steht im Server (ENT-322/ENT-585) -- hier nur,
+  // damit der Fehler ohne Umweg sichtbar wird. Eine Sperre gehoert in den
+  // Server, nicht nur in die Oberflaeche.
+  if (!empfaenger || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(empfaenger)) {
+    err.textContent = 'Bitte eine hinterlegte Adresse auswählen.';
     err.style.display = ''; return;
   }
   const btn = $('rmBtn'), alt = btn.textContent;

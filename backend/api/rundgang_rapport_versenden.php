@@ -60,17 +60,56 @@ if (!str_starts_with($pdf, '%PDF-')) {
 $pdo = db();
 $stmt = $pdo->prepare(
     'SELECT r.id, r.status, r.rohzeit_start, r.rohzeit_ende, r.pause_minuten,
-            e.datum, e.kunde_name, o.name AS objekt_name,
+            e.datum, e.kunde_name, e.kunde_id, o.id AS objekt_id, o.name AS objekt_name,
+            kd.email AS kunde_email,
             (SELECT MAX(s.erfasst_am) FROM rundgang_scan s WHERE s.rundgang_id = r.id) AS letzter_scan
        FROM rundgang r
        JOIN einsaetze e ON e.id = r.einsatz_id
        JOIN objekte o ON o.id = r.objekt_id
+       LEFT JOIN kunden kd ON kd.id = e.kunde_id
       WHERE r.id = ?'
 );
 $stmt->execute([$rundgangId]);
 $r = $stmt->fetch(PDO::FETCH_ASSOC);
 if (!$r) {
     json_response(['status' => 'error', 'message' => 'Rundgang nicht gefunden'], 404);
+}
+
+// Nicht mehr frei eingebbar (ENT-585, sop-projekt OP-573): Ein Revierrapport
+// nennt Mitarbeitende mit Namen und Uhrzeiten und ist damit ein
+// Personendaten-Versand. Ohne diese Schranke koennte die versendende Person
+// ihn an jede beliebige Adresse schicken -- und ein einmal verschicktes PDF
+// entzieht sich jeder Loeschfrist (siehe sop-projekt,
+// dsg-auftragsbearbeitungsvertrag-vorbereitung.md, Abschnitt 6). Erlaubt ist
+// darum nur eine Adresse, die am Objekt oder an dessen Kunde als
+// Kontaktweg hinterlegt ist -- an BEIDEN, aus demselben Grund wie beim
+// Rapportversand der Ansprechpartner (ENT-300): Der Objektkontakt ist oft
+// die Person vor Ort, der Kundenkontakt die Zentrale, und beide sollen den
+// Rapport bekommen koennen.
+$erlaubt = [];
+if ($r['kunde_email'] !== null && trim((string)$r['kunde_email']) !== '') {
+    $erlaubt[] = (string)$r['kunde_email'];
+}
+if (hat_tabelle($pdo, 'objekt_kontaktweg')) {
+    $ow = $pdo->prepare(
+        "SELECT wert FROM objekt_kontaktweg WHERE objekt_id = ? AND art = 'email'"
+    );
+    $ow->execute([(int)$r['objekt_id']]);
+    $erlaubt = array_merge($erlaubt, $ow->fetchAll(PDO::FETCH_COLUMN));
+}
+if ($r['kunde_id'] !== null && hat_tabelle($pdo, 'kunden_kontaktweg')) {
+    $kw = $pdo->prepare(
+        "SELECT wert FROM kunden_kontaktweg WHERE kunde_id = ? AND art = 'email'"
+    );
+    $kw->execute([(int)$r['kunde_id']]);
+    $erlaubt = array_merge($erlaubt, $kw->fetchAll(PDO::FETCH_COLUMN));
+}
+$erlaubtKlein = array_map(static fn(string $w): string => mb_strtolower(trim($w)), $erlaubt);
+if (!in_array(mb_strtolower($empfaenger), $erlaubtKlein, true)) {
+    json_response(['status' => 'error', 'message' => $erlaubt
+        ? 'Diese Adresse ist für Objekt oder Kunde nicht als Kontaktweg hinterlegt.'
+        : 'Für dieses Objekt oder seinen Kunden ist noch keine E-Mail-Adresse als Kontaktweg hinterlegt.'
+    ], 422);
 }
 
 if (!smtp_konfiguriert()) {

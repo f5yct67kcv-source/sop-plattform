@@ -90,6 +90,19 @@ check('KRITISCH: Betreff und Text kommen NICHT aus der Anfrage',
 check('Ein unbekannter Rundgang wird abgewiesen', /'Rundgang nicht gefunden'/.test(VERSAND));
 check('Fehlt die SMTP-Einrichtung, sagt der Endpunkt das, statt still zu scheitern',
   /!smtp_konfiguriert\(\)/.test(VERSAND));
+// ENT-585 (sop-projekt OP-573): nicht mehr frei eingebbar -- nur eine am
+// Objekt oder am Kunden hinterlegte Adresse. Eine Sperre, die man am
+// Browser vorbei umgehen kann, ist keine (CLAUDE.md) -- darum hier gegen
+// den SERVER geprueft, nicht nur gegen das Auswahlfeld im Dashboard.
+check('KRITISCH: die Empfängeradresse muss am Objekt oder am Kunden hinterlegt sein',
+  /in_array\(mb_strtolower\(\$empfaenger\), \$erlaubtKlein, true\)/.test(VERSAND));
+check('KRITISCH: die Objekt-Ansprechpartner (ENT-300) zaehlen als hinterlegt',
+  /objekt_kontaktweg WHERE objekt_id = \? AND art = 'email'/.test(VERSAND));
+check('KRITISCH: die Kunden-Ansprechpartner zaehlen ebenfalls',
+  /kunden_kontaktweg WHERE kunde_id = \? AND art = 'email'/.test(VERSAND));
+check('Ohne jede hinterlegte Adresse ist die Meldung eine andere als bei einer falschen Auswahl',
+  /keine E-Mail-Adresse als Kontaktweg hinterlegt/.test(VERSAND)
+  && /nicht als Kontaktweg hinterlegt/.test(VERSAND));
 
 // ══════════ SERVER: DER ANHANG IM MAILAUFBAU ══════════════════════════
 // Ein Anhang ist kein zweiter Text, sondern ein zweiter Teil NEBEN der
@@ -135,6 +148,10 @@ const RUNDGAENGE = { status: 'ok', rundgaenge: [
 const DETAIL41 = { status: 'ok', rundgang: {
   id: 41, status: 'abgeschlossen', datum: heute,
   kunde_name: 'Musterliegenschaften AG', kunde_email: 'empfang@musterliegenschaften.example',
+  // ENT-585: nur diese zwei Adressen sind "hinterlegt" -- eine vom Kunden,
+  // eine vom Objekt-Ansprechpartner (ENT-300). Die Auswahl im Dashboard
+  // darf keine dritte, frei eingegebene Adresse anbieten (siehe unten).
+  empfaenger_adressen: ['empfang@musterliegenschaften.example', 'hauswart@musterobjekt.example'],
   objekt_name: 'Musterobjekt', strasse: 'Musterweg 4', ort: '9999 Musterdorf',
   titel: 'Schliessrunde', vorlage_name: 'Schlusskontrolle',
   vorname: 'Max', nachname: 'Muster',
@@ -561,16 +578,16 @@ check('KRITISCH: der Versand fragt nach einem Empfänger',
   await page.evaluate(() => document.getElementById('dlgRapportMail').classList.contains('on')));
 check('Die hinterlegte Kundenadresse ist vorbelegt',
   await page.inputValue('#rmEmpfaenger') === 'empfang@musterliegenschaften.example');
-// Eine Adresse ohne @ ergibt beim Server einen Fehler -- der Weg dorthin
-// dauert aber, und der Rapport waere umsonst erzeugt.
-await page.fill('#rmEmpfaenger', 'keine-adresse');
-await page.click('#rmBtn');
-await page.waitForTimeout(300);
-check('KRITISCH: eine unbrauchbare Adresse wird sofort beanstandet',
-  await page.isVisible('#rmErr'));
-check('Und es wird nichts versendet', versandKoerper === null);
+// ENT-585: kein Freitext mehr -- nur die tatsaechlich hinterlegten Adressen
+// stehen zur Auswahl. Eine Sperre, die man am Browser vorbei umgehen kann,
+// ist keine (CLAUDE.md); dass eine NICHT hinterlegte Adresse serverseitig
+// abgelehnt wird, ist oben gegen den PHP-Quelltext geprueft, nicht hier.
+check('KRITISCH: die Auswahl bietet genau die hinterlegten Adressen an, nichts frei Eingebbares',
+  JSON.stringify(await page.evaluate(() =>
+    [...document.querySelectorAll('#rmEmpfaenger option')].map(o => o.value)))
+  === JSON.stringify(['empfang@musterliegenschaften.example', 'hauswart@musterobjekt.example']));
 
-await page.fill('#rmEmpfaenger', 'leitung@example.ch');
+await page.selectOption('#rmEmpfaenger', 'hauswart@musterobjekt.example');
 await page.click('#rmBtn');
 await page.waitForTimeout(1200);
 check('KRITISCH: der Rapport wird versendet', versandKoerper !== null);

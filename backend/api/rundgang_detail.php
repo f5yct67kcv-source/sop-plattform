@@ -197,4 +197,25 @@ if (hat_tabelle($pdo, 'portal_abruf')) {
 }
 $rundgang['zustellung'] = $zustellung;
 
+// Erlaubte Empfaenger fuer den Rapportversand (ENT-585, sop-projekt
+// OP-573): dieselbe Quelle, die rundgang_rapport_versenden.php serverseitig
+// durchsetzt. Hier nur zusammengestellt, damit die Oberflaeche eine Auswahl
+// statt eines Freitextfelds anbieten kann -- die Sperre selbst sitzt im
+// Server, nicht in dieser Liste (CLAUDE.md).
+$empfaengerAdressen = [];
+if ($rundgang['kunde_email'] !== null && trim((string)$rundgang['kunde_email']) !== '') {
+    $empfaengerAdressen[] = (string)$rundgang['kunde_email'];
+}
+if (hat_tabelle($pdo, 'objekt_kontaktweg')) {
+    $ow = $pdo->prepare("SELECT wert FROM objekt_kontaktweg WHERE objekt_id = ? AND art = 'email'");
+    $ow->execute([$objektId]);
+    $empfaengerAdressen = array_merge($empfaengerAdressen, $ow->fetchAll(PDO::FETCH_COLUMN));
+}
+if ($rundgang['kunde_id'] !== null && hat_tabelle($pdo, 'kunden_kontaktweg')) {
+    $kw = $pdo->prepare("SELECT wert FROM kunden_kontaktweg WHERE kunde_id = ? AND art = 'email'");
+    $kw->execute([(int)$rundgang['kunde_id']]);
+    $empfaengerAdressen = array_merge($empfaengerAdressen, $kw->fetchAll(PDO::FETCH_COLUMN));
+}
+$rundgang['empfaenger_adressen'] = array_values(array_unique($empfaengerAdressen));
+
 json_response(['status' => 'ok', 'rundgang' => $rundgang]);
