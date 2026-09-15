@@ -120,13 +120,82 @@ body::before{
 .kopf #pw-aendern-oeffnen + #abmelden{margin-left:0}
 
 /* Der Empfang vor der Anmeldung: gross, mittig, mit dem Logo darueber --
-   dieselbe Ordnung wie die Anmeldeseite des Cockpits. */
+   dieselbe Ordnung wie die Anmeldeseite des Cockpits. Betriebslogo und
+   -name vorne, nicht die Software: Hier kommt der KUNDE DES BETRIEBS
+   herein, und die Marke GuardOpS signiert nur klein in der Fusszeile
+   (siehe .hersteller weiter unten und test_marke_portale.mjs) -- zwei
+   Marken an derselben, vorderen Stelle streiten vor dem Kunden eines
+   Kunden. */
 .empfang{text-align:center;padding:22px 4px 30px}
 .empfang img{width:104px;height:104px;border-radius:50%;
-             filter:drop-shadow(0 16px 32px rgba(0,0,0,.28))}
+             filter:drop-shadow(0 16px 32px rgba(0,0,0,.5))}
 .empfang h1{margin:18px 0 0;font-size:23px;font-weight:800;letter-spacing:-.4px}
 .empfang .sub{margin-top:6px;color:var(--ink-3);
               font-size:12px;font-weight:640;letter-spacing:2px;text-transform:uppercase}
+
+/* ══════════ ANMELDE-BEREICH: dieselbe Video-Gate-Bildsprache wie
+   #gate in dashboard.html (ENT-392/394/396/398) -- Video-/Fotohintergrund
+   am Desktop, Text direkt darauf statt in einer weissen Karte, eigene
+   feste dunkle Palette unabhaengig vom Geraetethema. portal.html traegt
+   bewusst keinen Cockpit-Code (ENT-441 Punkt 8, siehe Dateikopf), darum
+   stehen Bildpfade und Werte hier als Kopie; test_portal.mjs haelt sie mit
+   dashboard.html synchron. Umfasst Empfang UND alle Anmeldeschritte
+   (Adresse, Passwort setzen, Fertig-Meldungen) -- auf Wunsch des
+   Projektinhabers dieselbe Flaeche wie im Cockpit, nicht nur der Kopf. */
+:root{ --gate-schleier: linear-gradient(rgba(10,11,15,.66), rgba(10,11,15,.82)); }
+.gate-video, .gate-schleier{ display:none; }
+#gate-bereich{
+  position:relative; margin:-28px -16px 0; padding:40px 16px 54px;
+  background: radial-gradient(80% 68% at 50% 14%, #1C2639 0%, rgba(28,38,57,0) 66%),
+              var(--gate-schleier), #0F1117;
+}
+@media (min-width:900px){
+  #gate-bereich{
+    background: radial-gradient(80% 68% at 50% 14%, #1C2639 0%, rgba(28,38,57,0) 66%),
+                var(--gate-schleier),
+                url('img/anmeldung-nacht.webp') 62% center / cover no-repeat, #0F1117;
+  }
+  .gate-video{ display:block; position:absolute; inset:0; width:100%; height:100%;
+    object-fit:cover; object-position:62% center; z-index:0; }
+  .gate-schleier{ display:block; position:absolute; inset:0; z-index:1;
+    background:var(--gate-schleier); }
+  @media (prefers-reduced-motion: reduce){ .gate-video, .gate-schleier{ display:none; } }
+}
+.gate-mitte{ position:relative; z-index:2; max-width:400px; margin:0 auto; }
+
+/* EINE Grundfarbe fuer alles Unbeschriftete hier drin (etwa das blosse
+   "✓" bei "Passwort gesetzt"/"abgemeldet") -- gegen das GERAETETHEMA
+   gerechnet waere schwarzer Text auf dem jetzt immer dunklen Grund im
+   hellen Systemthema unlesbar. Einzelne Klassen mit eigener Farbe
+   (.hinweis, .fehler, label) ueberschreiben das gezielt weiter unten. */
+#gate-bereich{color:#fff}
+#gate-bereich .empfang h1{color:#fff}
+/* Karten OHNE Kartenflaeche innerhalb des Gates: Text liegt direkt auf
+   dem Video/Foto, wie im Cockpit seit ENT-396 -- eine weisse Kachel
+   ueber dem Bild waere zweimal dieselbe Aussage ("hier ist ein
+   Formular"). Ausserhalb von #gate-bereich (angemeldeter Bereich)
+   bleibt .karte unveraendert die Glaskachel von vorhin. */
+#gate-bereich .karte{background:transparent;border:0;box-shadow:none;padding:0;margin-bottom:0}
+#gate-bereich label{color:rgba(255,255,255,.72)}
+/* Nicht auf ".feld .wert" beschraenkt: "Ihr Passwort ist gesetzt."/
+   "erfolgreich abgemeldet." tragen dieselbe Klasse OHNE ".feld"
+   drumherum (siehe HTML) -- sonst bliebe genau dort die dunkle
+   Grundfarbe stehen. */
+#gate-bereich .wert{color:#fff}
+#gate-bereich .hinweis{color:rgba(255,255,255,.62)}
+/* --rot ist je Geraetethema unterschiedlich dunkel/hell gesetzt (siehe
+   :root oben) -- der Gate-Grund ist aber IMMER dunkel. Im hellen
+   Systemthema waere das dunkle --rot auf dunklem Grund kaum lesbar,
+   genau die Situation, die bei einem Anmeldefehler zaehlt. Fester,
+   heller Ton wie im dunklen Systemthema, unabhaengig vom Geraet. */
+#gate-bereich .fehler{color:#F27F70}
+#gate-bereich input{background:rgba(255,255,255,.09);border-color:rgba(255,255,255,.22);color:#fff}
+#gate-bereich input::placeholder{color:rgba(255,255,255,.4)}
+#gate-bereich input:focus{outline-color:#fff}
+#gate-bereich .knopf.still{background:rgba(255,255,255,.12);color:#fff;border-color:rgba(255,255,255,.26)}
+#gate-bereich .code-weg{border-color:rgba(255,255,255,.18);background:rgba(255,255,255,.05)}
+#gate-bereich .code-weg.hervor{border-color:var(--accent);background:rgba(255,255,255,.1)}
+#gate-bereich .code-weg.hervor .hinweis{color:#fff}
 
 /* Beschriftung OBEN, Wert darunter -- nie umgekehrt (Hausregel). */
 .feld{display:block}
@@ -871,10 +940,100 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
     </div>
   </div>
 
-  <div class="empfang" id="empfang">
-    <img src="icons/icon-192.png" alt="">
-    <h1>Herzlich willkommen im Kundenportal</h1>
-    <div class="sub">CUPI 24 GmbH</div>
+  <div id="gate-bereich">
+    <video class="gate-video" autoplay muted loop playsinline>
+      <source src="img/anmeldung-nacht.webm" type="video/webm">
+      <source src="img/anmeldung-nacht.mp4" type="video/mp4">
+    </video>
+    <div class="gate-schleier"></div>
+    <div class="gate-mitte">
+
+      <div class="empfang" id="empfang">
+        <img src="icons/icon-192.png" alt="">
+        <h1>Herzlich willkommen im Kundenportal</h1>
+        <div class="sub">CUPI 24 GmbH</div>
+      </div>
+
+      <!-- Schritt 1: Adresse und Passwort (der Normalfall) -->
+      <div class="karte" id="schritt-adresse" hidden>
+        <div class="feld" style="margin-bottom:16px">
+          <div class="bez">Anmeldung</div>
+          <div class="wert">Mit Ihrer hinterlegten E-Mail-Adresse</div>
+        </div>
+        <label for="email">E-Mail-Adresse</label>
+        <input id="email" type="email" autocomplete="email" inputmode="email"
+               placeholder="name@beispiel.ch">
+        <div style="margin-top:14px">
+          <label for="passwort">Passwort</label>
+          <input id="passwort" type="password" autocomplete="current-password"
+                 placeholder="Ihr Passwort">
+        </div>
+        <div class="knopfzeile">
+          <button class="knopf" id="anmelden-pw">Anmelden</button>
+        </div>
+        <p class="fehler" id="fehler-adresse" hidden></p>
+        <div id="code-weg" class="code-weg">
+          <p class="hinweis" style="margin:0">
+            <strong>Passwort vergessen?</strong> Oder zum ersten Mal hier —
+            dann haben Sie noch keines.</p>
+          <div class="knopfzeile" style="margin-top:10px">
+            <button class="knopf still" id="link-holen">Link per E-Mail anfordern</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Schritt 3: Passwort festlegen. Erscheint nach einer Code-Anmeldung,
+           solange noch keines gesetzt ist -- danach nie wieder. -->
+      <div class="karte" id="schritt-passwort" hidden>
+        <div class="feld" style="margin-bottom:16px">
+          <div class="bez">Passwort festlegen</div>
+          <div class="wert" id="pw-titel">Wählen Sie Ihr Passwort</div>
+        </div>
+        <p class="hinweis" style="margin:0 0 16px">
+          Damit melden Sie sich künftig direkt an, ohne Code. Eine merkbare
+          Wortfolge ist sicherer als ein kurzes Passwort mit Sonderzeichen.</p>
+        <label for="pw-neu">Neues Passwort</label>
+        <input id="pw-neu" type="password" autocomplete="new-password"
+               placeholder="mindestens 10 Zeichen">
+        <div style="margin-top:14px">
+          <label for="pw-neu2">Zur Bestätigung noch einmal</label>
+          <input id="pw-neu2" type="password" autocomplete="new-password">
+        </div>
+        <div class="knopfzeile">
+          <button class="knopf" id="pw-speichern">Passwort speichern</button>
+        </div>
+        <p class="fehler" id="fehler-passwort" hidden></p>
+      </div>
+
+      <!-- Bestaetigung nach dem Setzen des Passworts. Sie steht ausdruecklich
+           zwischen Setzen und Uebersicht: Wer sein Passwort gerade festgelegt
+           hat, soll es bestaetigt bekommen und nicht raten muessen, ob es
+           gespeichert wurde -- die Uebersicht allein sagt darueber nichts. -->
+      <div class="karte" id="pw-fertig" hidden style="text-align:center">
+        <div style="font-size:34px;line-height:1;margin-bottom:12px" aria-hidden="true">✓</div>
+        <div class="wert" style="font-size:17px">Ihr Passwort ist gesetzt.</div>
+        <p class="hinweis" style="margin-top:8px">
+          Ab jetzt melden Sie sich mit Ihrer E-Mail-Adresse und diesem Passwort an —
+          ohne Code.</p>
+        <div class="knopfzeile" style="justify-content:center">
+          <button class="knopf" id="pw-weiter">Weiter zur Übersicht</button>
+        </div>
+      </div>
+
+      <!-- Abmeldebestaetigung. Ohne sie stand nach dem Abmelden sofort wieder
+           die Anmeldemaske da -- das sieht aus, als sei etwas schiefgegangen,
+           und man weiss nicht, ob man die Seite jetzt schliessen kann. -->
+      <div class="karte" id="abgemeldet" hidden style="text-align:center">
+        <div style="font-size:34px;line-height:1;margin-bottom:12px" aria-hidden="true">✓</div>
+        <div class="wert" style="font-size:17px">Sie haben sich erfolgreich abgemeldet.</div>
+        <p class="hinweis" style="margin-top:8px">
+          Sie können dieses Fenster jetzt schliessen.</p>
+        <div class="knopfzeile" style="justify-content:center">
+          <button class="knopf still" id="wieder-anmelden">Erneut anmelden</button>
+        </div>
+      </div>
+
+    </div>
   </div>
 
   <div class="kopf" id="kopf" hidden>
@@ -885,97 +1044,6 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
     </div>
     <button class="knopf still" id="pw-aendern-oeffnen">Passwort ändern</button>
     <button class="knopf still" id="abmelden">Abmelden</button>
-  </div>
-
-  <!-- Schritt 1: Adresse und Passwort (der Normalfall) -->
-  <div class="karte" id="schritt-adresse" hidden>
-    <div class="feld" style="margin-bottom:16px">
-      <div class="bez">Anmeldung</div>
-      <div class="wert">Mit Ihrer hinterlegten E-Mail-Adresse</div>
-    </div>
-    <label for="email">E-Mail-Adresse</label>
-    <input id="email" type="email" autocomplete="email" inputmode="email"
-           placeholder="name@beispiel.ch">
-    <div style="margin-top:14px">
-      <label for="passwort">Passwort</label>
-      <input id="passwort" type="password" autocomplete="current-password"
-             placeholder="Ihr Passwort">
-    </div>
-    <div class="knopfzeile">
-      <button class="knopf" id="anmelden-pw">Anmelden</button>
-    </div>
-    <p class="fehler" id="fehler-adresse" hidden></p>
-    <!-- Ein eigener Weg und kein versteckter Link: Beim ERSTEN Mal hat
-         niemand ein Passwort, und wer eines vergessen hat, sucht genau
-         hier. Beides fuehrt ueber denselben Einmal-Code -- damit geht nie
-         ein Passwort per Mail hinaus.
-         "Passwort vergessen" steht VORNE: Sobald das Portal laeuft, ist das
-         der haeufigere der beiden Faelle -- eine Erstanmeldung hat jeder
-         Zugang genau einmal.
-         Der Kasten hebt sich hervor, sobald eine Anmeldung fehlgeschlagen
-         ist. Das entscheidet der BROWSER aus dem, was er ohnehin weiss --
-         der Server wird dafuer NICHT gefragt, ob zu dieser Adresse ein
-         Passwort hinterlegt ist. Eine solche Auskunft verriete, dass es die
-         Adresse gibt, und damit, dass diese Firma Kunde ist. -->
-    <div id="code-weg" class="code-weg">
-      <p class="hinweis" style="margin:0">
-        <strong>Passwort vergessen?</strong> Oder zum ersten Mal hier —
-        dann haben Sie noch keines.</p>
-      <div class="knopfzeile" style="margin-top:10px">
-        <button class="knopf still" id="link-holen">Link per E-Mail anfordern</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Schritt 3: Passwort festlegen. Erscheint nach einer Code-Anmeldung,
-       solange noch keines gesetzt ist -- danach nie wieder. -->
-  <div class="karte" id="schritt-passwort" hidden>
-    <div class="feld" style="margin-bottom:16px">
-      <div class="bez">Passwort festlegen</div>
-      <div class="wert" id="pw-titel">Wählen Sie Ihr Passwort</div>
-    </div>
-    <p class="hinweis" style="margin:0 0 16px">
-      Damit melden Sie sich künftig direkt an, ohne Code. Eine merkbare
-      Wortfolge ist sicherer als ein kurzes Passwort mit Sonderzeichen.</p>
-    <label for="pw-neu">Neues Passwort</label>
-    <input id="pw-neu" type="password" autocomplete="new-password"
-           placeholder="mindestens 10 Zeichen">
-    <div style="margin-top:14px">
-      <label for="pw-neu2">Zur Bestätigung noch einmal</label>
-      <input id="pw-neu2" type="password" autocomplete="new-password">
-    </div>
-    <div class="knopfzeile">
-      <button class="knopf" id="pw-speichern">Passwort speichern</button>
-    </div>
-    <p class="fehler" id="fehler-passwort" hidden></p>
-  </div>
-
-  <!-- Bestaetigung nach dem Setzen des Passworts. Sie steht ausdruecklich
-       zwischen Setzen und Uebersicht: Wer sein Passwort gerade festgelegt
-       hat, soll es bestaetigt bekommen und nicht raten muessen, ob es
-       gespeichert wurde -- die Uebersicht allein sagt darueber nichts. -->
-  <div class="karte" id="pw-fertig" hidden style="text-align:center">
-    <div style="font-size:34px;line-height:1;margin-bottom:12px" aria-hidden="true">✓</div>
-    <div class="wert" style="font-size:17px">Ihr Passwort ist gesetzt.</div>
-    <p class="hinweis" style="margin-top:8px">
-      Ab jetzt melden Sie sich mit Ihrer E-Mail-Adresse und diesem Passwort an —
-      ohne Code.</p>
-    <div class="knopfzeile" style="justify-content:center">
-      <button class="knopf" id="pw-weiter">Weiter zur Übersicht</button>
-    </div>
-  </div>
-
-  <!-- Abmeldebestaetigung. Ohne sie stand nach dem Abmelden sofort wieder
-       die Anmeldemaske da -- das sieht aus, als sei etwas schiefgegangen,
-       und man weiss nicht, ob man die Seite jetzt schliessen kann. -->
-  <div class="karte" id="abgemeldet" hidden style="text-align:center">
-    <div style="font-size:34px;line-height:1;margin-bottom:12px" aria-hidden="true">✓</div>
-    <div class="wert" style="font-size:17px">Sie haben sich erfolgreich abgemeldet.</div>
-    <p class="hinweis" style="margin-top:8px">
-      Sie können dieses Fenster jetzt schliessen.</p>
-    <div class="knopfzeile" style="justify-content:center">
-      <button class="knopf still" id="wieder-anmelden">Erneut anmelden</button>
-    </div>
   </div>
 
   <!-- Angemeldet -->
@@ -1139,6 +1207,13 @@ function zeige(welche) {
   const drin = (welche === 'inhalt');
   $('empfang').hidden = drin;
   $('kopf').hidden = !drin;
+  // Das Video-Gate ist der RAHMEN um Empfang und Anmeldeschritte (siehe
+  // #gate-bereich) -- er traegt eigenen Hintergrund/Padding und wuerde
+  // sonst nach der Anmeldung als leerer dunkler Streifen ueber dem
+  // Arbeitskopf stehenbleiben, obwohl alle seine Kinder schon verborgen
+  // sind. Ein Container blendet sich nicht von selbst aus, nur weil sein
+  // Inhalt es tut.
+  $('gate-bereich').hidden = drin;
 }
 
 function fehler(id, text) {
