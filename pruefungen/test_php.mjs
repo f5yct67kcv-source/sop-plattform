@@ -558,7 +558,11 @@ if (ohneEinbindung.length) { bad.push('ohne rechte.php: ' + ohneEinbindung.join(
   const OHNE_SPERRE = {
     'einsatz_abgleich.php':   'setzt die Sperre selbst -- muss schreiben duerfen',
     'schichten_erzeugen.php': 'legt nur neue Schichten an; eine neue kann nicht abgeglichen sein',
-    'mein_rundgang_spontan_starten.php': 'legt nur einen neuen Einsatz samt eigener Zuteilung an (ENT-282) -- gleicher Grund wie schichten_erzeugen.php',
+    // KEINE Ausnahme mehr (Security-Audit 2026-09-15): Die alte Begruendung
+    // ("legt nur einen neuen Einsatz samt eigener Zuteilung an") deckte den
+    // Seitenffekt aus ENT-347 nicht ab -- die Datei aendert zusaetzlich eine
+    // BESTEHENDE, fremde einsatz_zuteilung-Zeile (Kollisions-Absage) und
+    // braucht darum dieselbe Sperrpruefung wie jeder andere Schreibweg.
     'meine_zusage.php':       'aendert nur die eigene Zu-/Absage, nicht den Plan',
     // Setzt nur einen Zeitstempel "gesehen" auf der Zuteilung. Der Plan, die
     // Zeiten und der Abgleich bleiben unberuehrt -- eine gelesene Meldung
@@ -764,6 +768,177 @@ if (ohneEinbindung.length) { bad.push('ohne rechte.php: ' + ohneEinbindung.join(
   check('KRITISCH: lohn_person.php prueft den Aenderungsschutz beim Loeschen',
     personVerdrahtet);
   if (!personVerdrahtet) { bad.push('lohn_person.php: lohn_person_regel_gesperrt() fehlt'); }
+}
+
+// betrieb.php: jeder der vier Schreibzweige (Logo setzen, Logo entfernen,
+// Hauptdomizil, Textfelder/QR-Daten) muss das Logbuch aufrufen -- vorher war
+// keine einzige Aenderung an Betriebsstammdaten (u.a. die QR-Rechnungs-IBAN)
+// nachvollziehbar (Security-Audit 2026-09-15). Das eigentliche Verhalten von
+// logbuch_schreiben()/logbuch_vergleichen() laeuft echt gegen SQLite in
+// pruef_logbuch.php -- hier nur, dass betrieb.php sie tatsaechlich an allen
+// vier Stellen aufruft.
+{
+  const q = ohneKommentar('betrieb.php');
+  const treffer = (q.match(/logbuch_(schreiben|vergleichen)\s*\(/g) || []).length;
+  check('KRITISCH: betrieb.php protokolliert an allen vier Schreibzweigen (Logo x2, Domizil, Textfelder/QR)',
+    treffer >= 4);
+  if (treffer < 4) { bad.push(`betrieb.php: nur ${treffer} von 4 erwarteten Logbuch-Aufrufen gefunden`); }
+}
+
+// lohn_person.php: jeder Schreibzweig (Anlegen/Aendern von Ansatz, Abzug,
+// Zahlungsweg inkl. IBAN, sowie Loeschen) muss ebenfalls das Logbuch
+// aufrufen -- derselbe Befund wie bei betrieb.php, hier mit direktem Bezug
+// zu echten Loehnen (Security-Audit 2026-09-15).
+{
+  const q = ohneKommentar('lohn_person.php');
+  const treffer = (q.match(/logbuch_(schreiben|vergleichen)\s*\(/g) || []).length;
+  check('KRITISCH: lohn_person.php protokolliert Aenderungen an Ansatz/Abzug/Zahlungsweg',
+    treffer >= 1);
+  if (treffer < 1) { bad.push('lohn_person.php: kein Logbuch-Aufruf gefunden'); }
+}
+
+// mein_profil_speichern.php: eine Aenderung von email_privat (die Adresse
+// fuer die Passwort-Wiederherstellung) muss andere Sitzungen beenden, wie
+// bei mein_passwort.php (Security-Audit 2026-09-15) -- vorher blieben
+// fremde Sitzungen nach einer solchen Aenderung unangetastet stehen.
+{
+  const q = ohneKommentar('mein_profil_speichern.php');
+  check('KRITISCH: mein_profil_speichern.php beendet andere Sitzungen nach email_privat-Aenderung',
+    /if \(\$mailNeu\) \{\s*\n\s*\$token = \$_SERVER\['HTTP_X_AUTH_TOKEN'\] \?\? '';\s*\n\s*db\(\)->prepare\('DELETE FROM sessions WHERE mitarbeiter_id = \? AND token <> \?'\)/.test(q));
+}
+
+// Abmelden in app.html/dashboard.html/index.html: der Server-Aufruf muss
+// AWAITED werden, bevor die Seite neu laedt (Security-Audit 2026-09-15) --
+// sonst kann der Browser den fetch beim Reload abbrechen, bevor logout.php
+// die Server-Sitzung wirklich loescht (dasselbe Muster wie bereits korrekt
+// in portal.html/betreiber.html).
+{
+  const dateien = [
+    ['app.html', 'abmelden', 'api'],
+    ['dashboard.html', 'doLogout', 'api'],
+    ['index.html', 'doLogout', 'apiCall'],
+  ];
+  for (const [datei, fn, aufruf] of dateien) {
+    const inhalt = readFileSync(`${WURZEL}/${datei}`, 'utf8');
+    const m = inhalt.match(new RegExp(`async function ${fn}\\(\\) \\{([\\s\\S]*?)\\n\\}`));
+    check(`KRITISCH: ${datei}::${fn}() ist async`, m !== null);
+    if (m) {
+      check(`KRITISCH: ${datei}::${fn}() awaitet den Logout-Aufruf, bevor localStorage geleert wird`,
+        new RegExp(`await ${aufruf}\\('logout\\.php'`).test(m[1]));
+    } else {
+      bad.push(`${datei}: ${fn}() nicht als async function gefunden (Umbau?)`);
+    }
+  }
+}
+
+// Drei Endpunkte lieferten Personen-/Kundendaten aus einer FREMDEN Domaene
+// heraus, ohne das dafuer eigentlich zustaendige Recht zu pruefen
+// (Security-Audit 2026-09-15) -- dasselbe Muster dreimal: dashboard_stats.php
+// (Stunden je Person + Sitzungsliste ohne personal_lesen), rollen_list.php
+// (Waffentrage-/Diensthundefuehrer-Merkmale ohne personal_lesen),
+// rundgang_detail.php (Kunden-E-Mail ohne kunden_lesen).
+{
+  const dash = ohneKommentar('dashboard_stats.php');
+  check('KRITISCH: dashboard_stats.php prueft personal_lesen, bevor es Stunden-/Sitzungsdaten je Person ausliefert',
+    /\$darfPersonal = darf\(\$user, .personal_lesen.\);[\s\S]{0,800}'angemeldet'\s*=>\s*\$darfPersonal \? \$angemeldet : null/.test(dash));
+
+  const rollen = ohneKommentar('rollen_list.php');
+  check('KRITISCH: rollen_list.php prueft personal_lesen, bevor es Waffentrage-/Diensthundefuehrer-Merkmale ausliefert',
+    /\$darfPersonal = darf\(\$user, .personal_lesen.\);/.test(rollen)
+    && /if \(!\$darfPersonal\) \{\s*\n\s*unset\(\$p\['diensthundefuehrer'\]/.test(rollen));
+
+  const detail = ohneKommentar('rundgang_detail.php');
+  check('KRITISCH: rundgang_detail.php prueft kunden_lesen, bevor es die Kunden-E-Mail ausliefert',
+    /if \(!darf\(\$user, .kunden_lesen.\)\) \{\s*\n\s*unset\(\$rundgang\['kunde_email'\]\);/.test(detail));
+}
+
+// dashboard.html: die Frontend-Seite der beiden Personal-Felder oben muss
+// "kein Zugriff" (null) von "keine Daten" ([]) unterscheiden -- sonst waere
+// der Backend-Fix wirkungslos, weil `stats.angemeldet || []` beides gleich
+// behandelt (CLAUDE.md: "unbekannt darf nie wie keine aussehen").
+{
+  const dh = readFileSync(`${WURZEL}/dashboard.html`, 'utf8');
+  check('KRITISCH: renderAngemeldet() unterscheidet "kein Zugriff" von "niemand angemeldet"',
+    /function renderAngemeldet\(\) \{\s*\n[\s\S]{0,200}if \(stats\.angemeldet === null\)/.test(dh));
+  check('KRITISCH: renderProMa() unterscheidet "kein Zugriff" von "keine Mitarbeitenden"',
+    /function renderProMa\(\) \{\s*\n[\s\S]{0,200}if \(stats\.pro_mitarbeiter === null\)/.test(dh));
+}
+
+// ki_einsatz_bild.php: das hochgeladene Bild muss am tatsaechlichen Inhalt
+// geprueft werden, nicht nur an der Client-Angabe des mimeType -- sonst
+// liesse sich jede Byte-Folge unter falschem Typ-Label an die externe
+// Anthropic-API senden (Security-Audit 2026-09-15).
+{
+  const q = ohneKommentar('ki_einsatz_bild.php');
+  check('KRITISCH: ki_einsatz_bild.php prueft die echten Magic Bytes des Bildinhalts',
+    /function ki_bild_mime_am_inhalt\s*\(/.test(q));
+  check('KRITISCH: bei Abweichung von der Client-Angabe wird abgelehnt, nicht stillschweigend weitergereicht',
+    /\$bildEcht = ki_bild_mime_am_inhalt\s*\(\s*\$bildRoh\s*\);\s*\n\s*if\s*\(\s*\$bildEcht === null \|\| \$bildEcht !== \$mimeType\s*\)/.test(q));
+}
+
+// rapport_create.php: die Kunden-Unterschrift muss am tatsaechlichen Inhalt
+// (PNG-Magic-Bytes) geprueft werden, nicht nur am Text-Praefix der
+// Data-URI (Security-Audit 2026-09-15) -- dasselbe Prinzip wie bei jedem
+// anderen Bild-Upload im Haus.
+{
+  const q = ohneKommentar('rapport_create.php');
+  const m = q.match(/if\s*\(\$sig !== null\)\s*\{([\s\S]*?)\n\}/);
+  check('KRITISCH: der Unterschrift-Validierungsblock existiert wie erwartet', m !== null);
+  if (m) {
+    const block = m[1];
+    check('KRITISCH: die Unterschrift wird base64-dekodiert (nicht nur als Text geprueft)',
+      /\$sigRoh = base64_decode\s*\(/.test(block));
+    check('KRITISCH: die dekodierten Bytes werden gegen die echten PNG-Magic-Bytes geprueft',
+      /str_starts_with\s*\(\s*\$sigRoh\s*,\s*"\\x89PNG/.test(block));
+  } else {
+    bad.push('rapport_create.php: Unterschrift-Validierungsblock nicht gefunden (Umbau?)');
+  }
+}
+
+// rapport_delete.php: DELETE FROM rapporte muss selbst gegen eine bereits
+// abgeglichene Schicht gesperrt sein (ENT-045-Geist, Security-Audit
+// 2026-09-15) -- die vorhandene Sperrpruefung schuetzte bisher nur die
+// nachgelagerte Statusruecknahme auf einsaetze, nicht das Loeschen des
+// Belegs selbst. Geprueft wird die REIHENFOLGE: die Pruefung muss VOR dem
+// DELETE stehen, sonst waere sie wirkungslos (genau dieser Fehler wurde
+// gefunden).
+{
+  const q = ohneKommentar('rapport_delete.php');
+  const posPruefung = q.search(/if\s*\(\$einsatzId > 0 && einsatz_abgeglichen\(/);
+  const posDelete = q.indexOf("DELETE FROM rapporte WHERE id = ?");
+  check('KRITISCH: rapport_delete.php prueft die Festschreibung VOR dem Loeschen des Belegs',
+    posPruefung !== -1 && posDelete !== -1 && posPruefung < posDelete);
+  if (posPruefung === -1 || posDelete === -1 || posPruefung >= posDelete) {
+    bad.push('rapport_delete.php: Sperrpruefung fehlt oder steht nach dem DELETE');
+  }
+}
+
+// mein_rundgang_scan.php: die Aufgaben-Antwort-Abfrage MUSS an das Objekt
+// des eigenen, aktiven Rundgangs gebunden sein -- sonst liesse sich ueber
+// eine fremde kontrollpunkt_id/aufgabe_id-Kombination der Klartextname eines
+// fremden Objekts in den eigenen Ereignis-Feed einschleusen (IDOR,
+// Security-Audit 2026-09-15). Der Scan-Zweig hatte diese Bindung bereits;
+// hier wird geprueft, dass der Aufgaben-Zweig sie ebenfalls hat -- nicht nur
+// irgendwo im Wort "objekt_id" im Datei, sondern in genau dieser Abfrage.
+{
+  const q = ohneKommentar('mein_rundgang_scan.php');
+  const m = q.match(/\$kat = \$pdo->prepare\(([\s\S]*?)\);\s*\n\s*\$kat->execute\(\[([\s\S]*?)\]\);/);
+  check('KRITISCH: die Aufgaben-Antwort-Abfrage (kontrollpunkt_aufgabe) existiert wie erwartet',
+    m !== null);
+  if (m) {
+    const [, sql, params] = m;
+    check('KRITISCH: die Aufgaben-Antwort-Abfrage bindet den Kontrollpunkt an das eigene Rundgang-Objekt (k.objekt_id = ?)',
+      /k\.objekt_id\s*=\s*\?/.test(sql));
+    check('KRITISCH: dieser Objektwert wird auch tatsaechlich an die Abfrage uebergeben',
+      /\$rundgang\[.objekt_id.\]/.test(params));
+  } else {
+    bad.push('mein_rundgang_scan.php: Aufgaben-Antwort-Abfrage nicht gefunden (Umbau?)');
+  }
+  // Kleinerer Fund derselben Pruefung: der Kontrollpunkt-Lookup beim Scan
+  // selbst filtert nicht aktiv=1, obwohl die Anzeige-Liste
+  // (rundgang_kontrollpunkte_uebrig()) das bereits tut.
+  check('Der Kontrollpunkt-Lookup beim Scan filtert aktiv=1 wie die Anzeige-Liste',
+    /SELECT \* FROM kontrollpunkt WHERE id = \? AND objekt_id = \? AND aktiv = 1/.test(q));
 }
 
 // "Abgeschlossen" (ENT-128): der eigentliche Rechenkern
