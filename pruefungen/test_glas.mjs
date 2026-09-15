@@ -58,6 +58,13 @@ async function starte(vorbelegt) {
   if (vorbelegt !== undefined) {
     await page.addInitScript(v => { try { localStorage.setItem('rv3_glas', v); } catch (e) {} }, vorbelegt);
   }
+  // Diese Suite braucht einen VERLAESSLICHEN Start in Hell (Abschnitt 6
+  // vergleicht "hell" gegen "dunkel" ueber einen einzigen Klick auf
+  // #btnThema) -- unabhaengig davon, welches Thema die Anlage ohne
+  // gespeicherte Wahl gerade als Vorgabe zeigt. Ohne diese Zeile haette ein
+  // spaeterer Wechsel der App-Vorgabe (wie am 2026-09-15 geschehen) die
+  // Abschnitte 6/7 stillschweigend vertauscht.
+  await page.addInitScript(() => { try { localStorage.setItem('rv3_thema', 'hell'); } catch (e) {} });
   await page.route('**/api/**', route => {
     const u = route.request().url();
     const send = b => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) });

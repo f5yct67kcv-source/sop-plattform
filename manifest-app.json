@@ -1,6 +1,6 @@
 {
-  "name": "CUPI 24 – Mitarbeitende",
-  "short_name": "CUPI 24",
+  "name": "GuardOpS – Mitarbeitende",
+  "short_name": "GuardOpS",
   "start_url": "app.html",
   "scope": "./",
   "display": "standalone",
@@ -8,7 +8,7 @@
   "theme_color": "#16181D",
   "lang": "de",
   "icons": [
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+    { "src": "icons/guardops-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/guardops-512.png", "sizes": "512x512", "type": "image/png" }
   ]
 }

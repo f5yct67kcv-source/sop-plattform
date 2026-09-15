@@ -370,6 +370,57 @@ pruef('KRITISCH: der heutige unbesetzte Platz bleibt "offen" -- nicht faelschlic
         $ohneQuelle === 0);
 }
 
+// ── demo_musterbetrieb_bereits_da(): das Signal fuer "schon erzeugt" ───
+// GEGENPROBE-PROTOKOLL: Vorher fragte demo_daten_erzeugen_ausfuehren()
+// stattdessen "COUNT(*) FROM mitarbeiter > 0" ab. Der tatsaechlich
+// gefundene Fehler: An der Stelle, an der diese Frage gestellt wird,
+// enthaelt mitarbeiter STRUKTURELL IMMER schon einen Datensatz -- das
+// Bootstrap-Konto aus setup.php, ueber dessen Sitzung der Endpunkt
+// (api/demo_daten_erzeugen.php, require_session()) ueberhaupt erst
+// erreichbar war. Die alte Pruefung haette JEDEN echten Aufruf abgelehnt,
+// unabhaengig vom tatsaechlichen Zustand des Musterbetriebs -- kein
+// theoretischer Fall, sondern der Grund, warum der Endpunkt gegen eine
+// echte Demo-Datenbank noch nie erfolgreich lief. Ein Test, der nur "die
+// Funktion existiert" verlangt haette, waere daran vorbeigelaufen --
+// verlangt wird die Aussage selbst: ein uebriggebliebenes Bootstrap-Konto
+// allein loest die Sperre nicht aus, ein echter Kunde oder ein echtes
+// Objekt schon.
+{
+    $pdo3 = new PDO('sqlite::memory:', null, null, [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+    ]);
+    $pdo3->exec('CREATE TABLE kunden (id INTEGER PRIMARY KEY, name TEXT)');
+    $pdo3->exec('CREATE TABLE objekte (id INTEGER PRIMARY KEY, name TEXT)');
+    $pdo3->exec('CREATE TABLE mitarbeiter (id INTEGER PRIMARY KEY, name TEXT)');
+
+    pruef('KRITISCH: ganz leere kunden/objekte -- noch KEIN Musterbetrieb -- loesen die Sperre nicht aus',
+        demo_musterbetrieb_bereits_da($pdo3) === false);
+
+    // Die Kernaussage: ein uebriggebliebenes Bootstrap-Konto allein macht
+    // den Musterbetrieb NICHT zu einem bereits erzeugten.
+    $pdo3->exec("INSERT INTO mitarbeiter (name) VALUES ('bootstrap-admin')");
+    pruef('KRITISCH (Gegenprobe des gefundenen Fehlers): ein uebriggebliebenes Bootstrap-Konto allein loest die "bereits erzeugt"-Sperre NICHT aus',
+        demo_musterbetrieb_bereits_da($pdo3) === false);
+
+    // Die Kernaussage in der anderen Richtung: sobald tatsaechlich ein
+    // Kunde existiert, IST der Musterbetrieb erzeugt, und ein zweiter Lauf
+    // muss abgelehnt werden -- sonst verdoppelte er alles.
+    $pdo3->exec("INSERT INTO kunden (name) VALUES ('Test-Kunde AG')");
+    pruef('KRITISCH: ein vorhandener Kunde loest die "bereits erzeugt"-Sperre aus, trotz uebriggebliebenem Bootstrap-Konto',
+        demo_musterbetrieb_bereits_da($pdo3) === true);
+
+    $pdo4 = new PDO('sqlite::memory:', null, null, [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+    ]);
+    $pdo4->exec('CREATE TABLE kunden (id INTEGER PRIMARY KEY, name TEXT)');
+    $pdo4->exec('CREATE TABLE objekte (id INTEGER PRIMARY KEY, name TEXT)');
+    $pdo4->exec("INSERT INTO objekte (name) VALUES ('Testobjekt')");
+    pruef('KRITISCH: ein vorhandenes Objekt loest die "bereits erzeugt"-Sperre ebenso aus wie ein Kunde',
+        demo_musterbetrieb_bereits_da($pdo4) === true);
+}
+
 echo "\n" . $ok . ' bestanden, ' . count($bad) . " nicht bestanden\n";
 if ($bad) { foreach ($bad as $b) { echo '  x ' . $b . "\n"; } exit(1); }
 echo "Alle Pruefungen bestanden.\n";

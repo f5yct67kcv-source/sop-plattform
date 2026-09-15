@@ -24,10 +24,15 @@ declare(strict_types=1);
 // bricht sie kontrolliert ab (siehe demo_daten_erzeugen_ausfuehren()
 // unten), statt halb zu arbeiten.
 //
-// Sie LEERT NICHTS. Der naechtliche Reset (ENT-523, Stufe 4, noch nicht
-// gebaut) ist ein eigener Schritt, der zuerst die vorhandenen Musterdaten
-// entfernt und DANACH diese Erzeugung erneut aufruft -- Erzeugen und
-// Leeren bleiben zwei getrennte, einzeln nachvollziehbare Schritte.
+// Sie LEERT KEINE MUSTERDATEN. Der naechtliche Reset (ENT-523, Stufe 4,
+// noch nicht gebaut) ist ein eigener Schritt, der zuerst die vorhandenen
+// Musterdaten entfernt und DANACH diese Erzeugung erneut aufruft --
+// Erzeugen und Leeren bleiben zwei getrennte, einzeln nachvollziehbare
+// Schritte. Einzige Ausnahme, siehe demo_daten_erzeugen_ausfuehren(): das
+// EINE Bootstrap-Konto aus setup.php wird geraeumt. Das ist kein
+// Musterdaten-Leeren, sondern das Aufraeumen eines Einweg-Zugangs, der
+// seinen einzigen Zweck -- die Einrichtung ueberhaupt erst ausloesen --
+// bereits erfuellt hat, bevor dieser Endpunkt ueberhaupt erreichbar war.
 //
 // DER LOHNLAUF (Fuehrungsstation 5, "was am Monatsende herauskommt", Stufe
 // 2b) rechnet AUSSCHLIESSLICH ueber lohnlauf_person()/lohnlauf_nbu()/
@@ -97,6 +102,24 @@ function demo_vormonat_bereich(): array
             $heute->modify('last day of last month')->format('Y-m-d')];
 }
 
+// Zuverlaessiges Signal "Musterbetrieb wurde bereits erzeugt". Geprueft
+// wird ueber kunden/objekte, NICHT ueber mitarbeiter: Nur diese beiden
+// Tabellen fuellt ausschliesslich diese Datei selbst, darum bedeutet
+// "leer" hier wirklich "noch nie gelaufen". mitarbeiter dagegen enthaelt
+// an der Stelle, an der demo_daten_erzeugen_ausfuehren() diese Frage
+// stellt, STRUKTURELL IMMER schon einen Eintrag: das Bootstrap-Konto aus
+// setup.php, ueber dessen Sitzung der Endpunkt (api/demo_daten_erzeugen.php,
+// require_session()) ueberhaupt erst aufgerufen werden konnte. Eine
+// Pruefung auf "mitarbeiter leer" waere als Vorbedingung nie erreichbar
+// gewesen -- genau der Fehler, an dem der erste echte Aufruf gegen die
+// Demo-Datenbank gescheitert ist, bevor diese Funktion hier stand.
+function demo_musterbetrieb_bereits_da(PDO $pdo): bool
+{
+    $kunden = (int)$pdo->query('SELECT COUNT(*) FROM kunden')->fetchColumn();
+    $objekte = (int)$pdo->query('SELECT COUNT(*) FROM objekte')->fetchColumn();
+    return $kunden > 0 || $objekte > 0;
+}
+
 function demo_daten_erzeugen_ausfuehren(PDO $pdo): void
 {
     // Ohne vorherige Einrichtung kontrolliert abbrechen, statt mit halben
@@ -108,17 +131,26 @@ function demo_daten_erzeugen_ausfuehren(PDO $pdo): void
                 'message' => "Einrichtung fehlt noch (Tabelle $t) -- zuerst im Cockpit auf „Einrichten“ klicken."], 503);
         }
     }
-    // Nie auf einen bereits gefuellten Betrieb schreiben (kein Loeschen
-    // hier, siehe Kopf) -- ein zweiter Lauf ohne vorherigen Reset waere
-    // sonst eine stille Verdoppelung aller Mitarbeitenden und Objekte.
-    $bereitsDa = (int)$pdo->query('SELECT COUNT(*) FROM mitarbeiter')->fetchColumn();
-    if ($bereitsDa > 0) {
+    // Nie auf einen bereits gefuellten Betrieb schreiben (kein Leeren von
+    // Musterdaten hier, siehe Kopf) -- ein zweiter Lauf ohne vorherigen
+    // Reset waere sonst eine stille Verdoppelung aller Mitarbeitenden und
+    // Objekte.
+    if (demo_musterbetrieb_bereits_da($pdo)) {
         json_response(['status' => 'error',
-            'message' => 'Es sind bereits Mitarbeitende vorhanden -- dieser Lauf ist nur fuer eine leere Datenbank gedacht.'], 409);
+            'message' => 'Es sind bereits Kunden oder Objekte vorhanden -- dieser Lauf ist nur fuer einen noch nicht erzeugten Musterbetrieb gedacht.'], 409);
     }
 
     $pdo->beginTransaction();
     try {
+        // Das Bootstrap-Konto aus setup.php raeumen: Es hatte genau einen
+        // Zweck -- die Einrichtung ueberhaupt erst ausloesen -- und ist
+        // danach ueberfluessig. ENT-523 Punkt 4 sieht die Anmeldung als
+        // "eine erfundene Mitarbeiterin" vor, nie als das Bootstrap-Konto
+        // selbst. Mit ON DELETE CASCADE (schema.sql) faellt seine Sitzung
+        // gleich mit -- schlaegt der Rest dieser Transaktion fehl, kommt
+        // mit dem ROLLBACK auch die Sitzung zurueck, niemand bleibt ohne
+        // Zugang stranden.
+        $pdo->exec('DELETE FROM mitarbeiter');
         demo_betrieb_setzen($pdo);
         $funktionen = demo_funktionen_abteilungen($pdo);
         $mitarbeitende = demo_mitarbeitende_erzeugen($pdo, $funktionen);

@@ -120,6 +120,12 @@ const rufe = [];
 const browser = await chromium.launch({ executablePath: EXE });
 const page = await browser.newPage({ viewport: { width: 1500, height: 1000 } });
 page.on('pageerror', e => bad.push('JS-Fehler: ' + e.message));
+// Die Deckkraft-Schwelle beim Verschieben des Dialogs (weiter unten) ist
+// gegen das HELLE Glas gerechnet -- unabhaengig von der App-Vorgabe fest
+// verankert, sonst vertauscht ein spaeterer Wechsel der Standardfarbe
+// (wie am 2026-09-15 von hell auf dunkel) stillschweigend den gemessenen
+// Ausgangswert.
+await page.addInitScript(() => { try { localStorage.setItem('rv3_thema', 'hell'); } catch (e) {} });
 await page.route('**/api/**', route => {
   const req = route.request(), p = req.url().split('/api/')[1].split('?')[0];
   let body = null;
