@@ -433,6 +433,40 @@ async function vorratSeite(antwort, breite = 1500) {
   // landet: Ein Menuepunkt, der die Ansicht wechselt und dann doch auf der
   // Uebersicht stehen bleibt, sieht aus wie ein Fehler der Seite.
   {
+    // ── ZUERST DER ZUSTAND, IN DEM DER EINTRAG GESUCHT WIRD ──────────
+    //
+    // Die Huelle hat drei Zustaende: Seitenleiste, schmal und "aus" -- und
+    // nur im letzten klappt das Logo oben rechts ein Menue auf. Genau dort
+    // sucht man den Eintrag, und genau dort hat diese Suite ihn zuerst NICHT
+    // geprueft: Sie nahm die Klasse "aus" weg und mass die ausgeklappte
+    // Seitenleiste. Ein Eintrag, der nur dort erscheint und im Menue fehlte,
+    // waere gruen durchgelaufen.
+    await seite.evaluate(() => {
+      for (let i = 0; i < 4 && !document.getElementById('shell').classList.contains('aus'); i++) {
+        seiteUm();
+      }
+      document.getElementById('btnMarke').click();
+    });
+    await seite.waitForTimeout(250);
+    const imMenue = await seite.evaluate(() => {
+      const sh = document.getElementById('shell');
+      const k = document.getElementById('nav-support');
+      const ab = document.getElementById('nav-abmelden');
+      if (!k) { return { da: false }; }
+      const r = k.getBoundingClientRect();
+      return { da: true, zustand: sh.className,
+               sichtbar: k.offsetParent !== null && getComputedStyle(k).display !== 'none',
+               hoehe: r.height,
+               // Im Menue stehen die Eintraege untereinander -- der Support
+               // gehoert ueber das Abmelden, nicht darunter.
+               ueberAbmelden: !!ab && r.top < ab.getBoundingClientRect().top };
+    });
+    check('KRITISCH: die Huelle laesst sich ueberhaupt in den Kopfleisten-Zustand schalten',
+      /\baus\b/.test(imMenue.zustand || ''));
+    check('KRITISCH: im Menue unter dem Logo steht der Support-Eintrag',
+      imMenue.da && imMenue.sichtbar && imMenue.hoehe > 0);
+    check('Er steht dort ueber dem Abmelden', imMenue.ueberAbmelden);
+
     await seite.evaluate(() => { document.getElementById('shell').classList.remove('aus'); });
     const m = await seite.evaluate(() => {
       const k = document.getElementById('nav-support');
