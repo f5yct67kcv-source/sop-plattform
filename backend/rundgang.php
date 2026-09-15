@@ -115,6 +115,55 @@ function ereignis_fotos_aufraeumen(PDO $pdo): void
     }
 }
 
+/* Wie lange das Foto eines Fotobelegs (Ersatzscan) aufbewahrt wird
+   (ENT-584, sop-projekt OP-557/OP-573). Bisher gab es dafuer KEINE Frist --
+   eine Luecke, keine Entscheidung: ENT-545 hat nur ueber Ereignisfotos
+   entschieden, weil OP-544 nur zu Ereignisfotos gefragt wurde. Ein
+   Fotobeleg geht seit ENT-455 denselben Weg zum Kunden und kann dieselben
+   Personen zeigen -- nur ohne Frist laenger.
+
+   Eigene Konstante statt EREIGNIS_FOTO_TAGE mitzubenutzen, auch wenn die
+   Zahl gleich ist -- gleiche Begruendung wie dort: zwei Entscheidungen
+   ueber zwei verschiedene Daten. Wuerde eine der beiden Fristen spaeter
+   fuer sich geaendert, aenderte eine gemeinsame Konstante die andere
+   stillschweigend mit. */
+const RUNDGANG_SCAN_FOTO_TAGE = 90;
+
+/* Abgelaufene Fotobelege wegraeumen -- gleicher Aufbau wie
+   ereignis_fotos_aufraeumen() oben, nur auf rundgang_scan statt
+   ereignis_meldung:
+     - UPDATE, nicht DELETE: der Scan-Eintrag bleibt der Nachweis, dass der
+       Kontrollpunkt per Ersatzscan bestaetigt wurde.
+     - foto_geloescht_am haelt fest, DASS es ein Foto gab -- sonst saehe ein
+       Ersatzscan nach Ablauf der Frist aus wie ein regulaerer Scan ohne
+       Foto, und "geloescht" waere wieder nicht von "gab es nie" zu
+       unterscheiden.
+     - LIMIT 200, gleicher Grund: Fotos sind LONGBLOBs.
+     - Der Aufrufer bekommt nichts zurueck und darf nicht scheitern. */
+function rundgang_scan_fotos_aufraeumen(PDO $pdo): void
+{
+    try {
+        if (!hat_tabelle($pdo, 'rundgang_scan')
+            || !hat_spalte($pdo, 'rundgang_scan', 'foto_geloescht_am')) { return; }
+        $grenze = date('Y-m-d H:i:s', strtotime('-' . RUNDGANG_SCAN_FOTO_TAGE . ' days'));
+        $suchen = $pdo->prepare(
+            'SELECT id FROM rundgang_scan
+              WHERE foto IS NOT NULL AND erfasst_am < ?
+              ORDER BY erfasst_am LIMIT 200'
+        );
+        $suchen->execute([$grenze]);
+        $faellig = $suchen->fetchAll(PDO::FETCH_COLUMN);
+        if (!$faellig) { return; }
+        $pdo->prepare(
+            'UPDATE rundgang_scan
+                SET foto = NULL, foto_mime = NULL, foto_geloescht_am = ?
+              WHERE id IN (' . implode(',', array_fill(0, count($faellig), '?')) . ')'
+        )->execute(array_merge([date('Y-m-d H:i:s')], $faellig));
+    } catch (Throwable $e) {
+        // Das Aufraeumen darf den Aufrufer nicht scheitern lassen.
+    }
+}
+
 // Haversine-Distanz in Metern zwischen zwei Koordinaten.
 function geo_distanz_meter(float $lat1, float $lng1, float $lat2, float $lng2): float
 {

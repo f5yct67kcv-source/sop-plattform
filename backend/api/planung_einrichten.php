@@ -2532,6 +2532,13 @@ $spalten = [
     ['rundgang_scan', 'foto',      'ALTER TABLE rundgang_scan ADD COLUMN foto LONGBLOB NULL AFTER beschreibung'],
     ['rundgang_scan', 'foto_mime', 'ALTER TABLE rundgang_scan ADD COLUMN foto_mime VARCHAR(50) NULL AFTER foto'],
 
+    // Aufbewahrungsfrist fuer Fotobelege (ENT-584, sop-projekt OP-557/OP-573):
+    // bisher keine Frist, unbefristet in der Datenbank. Gleiches Muster wie
+    // ereignis_meldung.foto_geloescht_am (ENT-545) -- Vermerk, DASS es ein
+    // Foto gab, bleibt stehen, auch wenn das Bild selbst geloescht wird.
+    ['rundgang_scan', 'foto_geloescht_am',
+     'ALTER TABLE rundgang_scan ADD COLUMN foto_geloescht_am DATETIME NULL AFTER foto_mime'],
+
     // Ereignis-Feed und Glocke (ENT-197): eigener Zeitstempel, getrennt von
     // entscheidung_am -- siehe Kommentar am CREATE TABLE oben.
     ['belege', 'entscheidung_gesehen_am',

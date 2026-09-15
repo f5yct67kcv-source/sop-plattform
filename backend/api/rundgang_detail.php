@@ -76,9 +76,15 @@ $rundgang['fortschritt'] = rundgang_fortschritt($pdo, $rundgangId, $objektId, $v
 // vorkommt; ein Nachweis, in dem das Fehlende fehlt, ist keiner.
 // Die id kommt mit (ENT-329): Ohne sie liesse sich das Foto eines
 // Ersatzscans nicht abrufen -- rundgang_scan_foto.php braucht sie.
+// "hat_foto=false" bedeutet seit ENT-584 zwei verschiedene Dinge: nie eines
+// gemacht, oder eines gemacht und nach Fristablauf geloescht (ENT-545 hat
+// dieselbe Unterscheidung fuer Ereignisfotos eingefuehrt -- "unbekannt darf
+// nie wie keine aussehen"). scan_foto_geloescht macht das unterscheidbar.
+$scanFotoWeg = hat_spalte($pdo, 'rundgang_scan', 'foto_geloescht_am')
+    ? 'foto_geloescht_am IS NOT NULL' : '0';
 $scans = $pdo->prepare(
     'SELECT id, kontrollpunkt_id, status, erfasst_am, uebermittelt_am, beschreibung,
-            foto_mime IS NOT NULL AS hat_foto
+            foto_mime IS NOT NULL AS hat_foto, ' . $scanFotoWeg . ' AS foto_geloescht
        FROM rundgang_scan WHERE rundgang_id = ?'
 );
 $scans->execute([$rundgangId]);
@@ -92,6 +98,7 @@ foreach ($scans->fetchAll(PDO::FETCH_ASSOC) as $s) {
             'uebermittelt_am' => $s['uebermittelt_am'],
             'beschreibung'  => $s['beschreibung'],
             'hat_foto'      => (bool)$s['hat_foto'],
+            'foto_geloescht' => (bool)$s['foto_geloescht'],
         ];
     }
 }

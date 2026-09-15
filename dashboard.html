@@ -22240,7 +22240,13 @@ function rapportBlattFuellen(d) {
           // wenigstens da, DASS ein Beleg vorliegt -- ein stillschweigend
           // fehlendes Foto wäre schlimmer als der Satz darüber.
           ? `<img src="${rgdFotos[e.scan_id]}" alt="Fotobeleg zum Ersatzscan" style="${blattFoto}">`
-          : '<div style="font-size:12px;color:#6B7280;margin-top:3px">Fotobeleg vorhanden (nicht abrufbar)</div>') : ''}
+          : '<div style="font-size:12px;color:#6B7280;margin-top:3px">Fotobeleg vorhanden (nicht abrufbar)</div>')
+          // "Nach der Frist entfernt" ist seit ENT-584 auch beim Fotobeleg
+          // eine dritte Aussage, nicht dasselbe wie "nie fotografiert"
+          // (gleiche Unterscheidung wie beim Ereignisfoto, ENT-545).
+          : (e && e.foto_geloescht
+            ? `<div style="font-size:12px;color:#6B7280;margin-top:3px">${esc(FOTO_WEG_TEXT)}</div>`
+            : '')}
         ${aufg}</td>
       <td style="${td};white-space:nowrap;width:112px${e && e.status === 'bestaetigt' ? '' : ';font-weight:600'}">${esc(stTxt)}</td>
     </tr>`;

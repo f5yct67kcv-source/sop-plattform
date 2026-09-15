@@ -84,9 +84,14 @@ $vorlageId = $r['rundgang_vorlage_id'] !== null ? (int)$r['rundgang_vorlage_id']
 // hiesse, dass ein ausgelassener Kontrollpunkt im Nachweis gar nicht
 // vorkommt; ein Nachweis, in dem das Fehlende fehlt, ist keiner
 // (ENT-441 Punkt 3, wortgleich zur Begruendung in rundgang_detail.php).
+// "hat_foto=false" bedeutet seit ENT-584 zwei verschiedene Dinge: nie eines
+// gemacht, oder eines gemacht und nach Fristablauf geloescht -- gleiche
+// Unterscheidung wie bei Ereignisfotos unten (ENT-545).
+$scanFotoWeg = hat_spalte($pdo, 'rundgang_scan', 'foto_geloescht_am')
+    ? 'foto_geloescht_am IS NOT NULL' : '0';
 $scans = $pdo->prepare(
     'SELECT id, kontrollpunkt_id, status, erfasst_am, beschreibung,
-            foto_mime IS NOT NULL AS hat_foto
+            foto_mime IS NOT NULL AS hat_foto, ' . $scanFotoWeg . ' AS foto_geloescht
        FROM rundgang_scan WHERE rundgang_id = ?'
 );
 $scans->execute([$rundgangId]);
@@ -99,6 +104,7 @@ foreach ($scans->fetchAll(PDO::FETCH_ASSOC) as $s) {
             'erfasst_am'   => $s['erfasst_am'],
             'beschreibung' => $s['beschreibung'],
             'hat_foto'     => (bool)$s['hat_foto'],
+            'foto_geloescht' => (bool)$s['foto_geloescht'],
         ];
     }
 }

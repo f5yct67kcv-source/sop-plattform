@@ -475,6 +475,7 @@ for (const [datei, titel] of [
   ['pruef_kundenportal.php', 'KRITISCH: Sitzungsablauf, Einmal-Code und E-Mail-Abgleich des Kundenportals stimmen (ENT-441)'],
   ['pruef_wachbuch.php', 'KRITISCH: das Wachbuch fuehrt vier Quellen richtig zusammen, sortiert und kappt sie (ENT-480)'],
   ['pruef_ereignis_foto_frist.php', 'KRITISCH: die Aufbewahrungsfrist fuer Ereignisfotos greift wirklich -- Bild weg, Meldung bleibt, Vermerk steht (ENT-545)'],
+  ['pruef_rundgang_scan_foto_frist.php', 'KRITISCH: die Aufbewahrungsfrist fuer Fotobelege greift wirklich -- Bild weg, Scan bleibt, Vermerk steht (ENT-584)'],
   ['pruef_zustellnachweis.php', 'KRITISCH: der Zustellnachweis fuehrt EINE Zeile je Rapport, kein Bewegungsprofil (ENT-491)'],
   ['pruef_portal_verlauf.php', 'KRITISCH: die Verlaufskurve buendelt nach Tagen/Wochen und laesst keine Luecke weg (ENT-500)'],
   ['pruef_sicherheit.php', 'KRITISCH: die Sicherheitsregeln aus ENT-501 werden WIRKLICH ausgefuehrt -- Basisadresse, Link-Schema, Push-Dienst, Sitzungs-Abdruck, Blindpruefung, Bildtyp'],

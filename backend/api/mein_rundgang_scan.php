@@ -290,5 +290,12 @@ foreach ($aufgaben as $eintrag) {
     $aufgabenErgebnisse[] = ['aufgabe_id' => $aufgabeId, 'kontrollpunkt_id' => $kpId, 'status' => 'ok'];
 }
 
+// Abgelaufene Fotobelege wegraeumen (ENT-584). Hier und nicht nur im
+// Positions-Endpunkt: Dies ist die Stelle, an der Fotobelege ENTSTEHEN --
+// gleiche Begruendung wie bei ereignis_fotos_aufraeumen() in
+// mein_ereignis_melden.php (ENT-545). Ein Rundgang ohne laufende Ortung
+// raeumte sonst nie auf.
+rundgang_scan_fotos_aufraeumen($pdo);
+
 json_response(['status' => 'ok', 'rundgang_status' => $rundgang['status'],
     'ergebnisse' => $ergebnisse, 'aufgaben_ergebnisse' => $aufgabenErgebnisse]);

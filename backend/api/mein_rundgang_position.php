@@ -133,4 +133,8 @@ try {
 // was hier turnusmaessig verschwindet.
 ereignis_fotos_aufraeumen($pdo);
 
+// Dritte Frist im selben Takt (ENT-584): Fotobelege waren bisher die
+// einzige Ausnahme ohne jede Aufbewahrungsgrenze.
+rundgang_scan_fotos_aufraeumen($pdo);
+
 json_response(['status' => 'ok', 'gespeichert' => $gespeichert, 'verworfen' => $verworfen]);
