@@ -116,6 +116,17 @@ jobs:
           P_GUARDOPS_SMTP_VERSCHLUESSELUNG: ${{ secrets.GUARDOPS_SMTP_VERSCHLUESSELUNG }}
           P_GUARDOPS_SMTP_USER: ${{ secrets.GUARDOPS_SMTP_USER }}
           P_GUARDOPS_SMTP_PASSWORD: ${{ secrets.GUARDOPS_SMTP_PASSWORD }}
+          # Eigener FTP-Zugang fuer betreiber.guardops.ch, beschraenkt auf
+          # /home/itufeden/betreiber.guardops.ch (ENT-580, erste Etappe des
+          # schrittweisen Umzugs weg von itufeden.myhostpoint.ch). Eigene
+          # Secret-NAMEN aus demselben Grund wie bei GUARDOPS_FTP_* und
+          # Staging (ENT-343 Punkt 1): kein stiller Rueckfall. NICHT
+          # erforderlich -- fehlen sie, wird diese Domain uebersprungen und
+          # das Rapport-Tool trotzdem ausgeliefert, genau wie bei
+          # GUARDOPS_FTP_* oben.
+          P_BETREIBER_FTP_HOST: ${{ secrets.BETREIBER_FTP_HOST }}
+          P_BETREIBER_FTP_USER: ${{ secrets.BETREIBER_FTP_USER }}
+          P_BETREIBER_FTP_PASSWORD: ${{ secrets.BETREIBER_FTP_PASSWORD }}
           # Staging -- eigene, von Produktion VERSCHIEDENE Secret-Namen.
           S_DB_HOST: ${{ secrets.STAGING_DB_HOST }}
           S_DB_NAME: ${{ secrets.STAGING_DB_NAME }}
@@ -215,6 +226,9 @@ jobs:
             EFF_GUARDOPS_SMTP_VERSCHLUESSELUNG="$P_GUARDOPS_SMTP_VERSCHLUESSELUNG"
             EFF_GUARDOPS_SMTP_USER="$P_GUARDOPS_SMTP_USER"
             EFF_GUARDOPS_SMTP_PASSWORD="$P_GUARDOPS_SMTP_PASSWORD"
+            EFF_BETREIBER_FTP_HOST="$P_BETREIBER_FTP_HOST"
+            EFF_BETREIBER_FTP_USER="$P_BETREIBER_FTP_USER"
+            EFF_BETREIBER_FTP_PASSWORD="$P_BETREIBER_FTP_PASSWORD"
             # Eigene Adresse der Anlage (ENT-501). Sie steckt in jedem Link,
             # den der Server per E-Mail verschickt -- Passwort zuruecksetzen,
             # Portalzugang, Beleg. Bis ENT-501 kam sie aus dem Host-Kopf DER
@@ -285,6 +299,12 @@ jobs:
             EFF_GUARDOPS_SMTP_VERSCHLUESSELUNG=""
             EFF_GUARDOPS_SMTP_USER=""
             EFF_GUARDOPS_SMTP_PASSWORD=""
+            # betreiber.guardops.ch ist wie guardops.ch nur fuer Production
+            # gedacht (ENT-580) -- dieselbe Begruendung wie bei
+            # EFF_GUARDOPS_FTP_* zwei Absaetze weiter oben.
+            EFF_BETREIBER_FTP_HOST=""
+            EFF_BETREIBER_FTP_USER=""
+            EFF_BETREIBER_FTP_PASSWORD=""
             # Eigene Adresse (ENT-501), siehe Begruendung im Production-Zweig.
             # Fuer Demo steht die Domain als Environment-Variable DEMO_DOMAIN
             # bereit -- dieselbe, mit der der Verifikationsschritt weiter
@@ -343,6 +363,12 @@ jobs:
             EFF_GUARDOPS_SMTP_VERSCHLUESSELUNG=""
             EFF_GUARDOPS_SMTP_USER=""
             EFF_GUARDOPS_SMTP_PASSWORD=""
+            # betreiber.guardops.ch ist wie guardops.ch nur fuer Production
+            # gedacht (ENT-580) -- dieselbe Begruendung wie bei
+            # EFF_GUARDOPS_FTP_* direkt darueber.
+            EFF_BETREIBER_FTP_HOST=""
+            EFF_BETREIBER_FTP_USER=""
+            EFF_BETREIBER_FTP_PASSWORD=""
             # Eigene Adresse (ENT-501), siehe Begruendung im Production-Zweig.
             # Fuer Staging steht die Domain bereits als Environment-Variable
             # STAGING_DOMAIN bereit -- dieselbe, mit der die beiden
@@ -485,6 +511,9 @@ jobs:
             echo "EFF_GUARDOPS_SMTP_VERSCHLUESSELUNG=$EFF_GUARDOPS_SMTP_VERSCHLUESSELUNG"
             echo "EFF_GUARDOPS_SMTP_USER=$EFF_GUARDOPS_SMTP_USER"
             echo "EFF_GUARDOPS_SMTP_PASSWORD=$EFF_GUARDOPS_SMTP_PASSWORD"
+            echo "EFF_BETREIBER_FTP_HOST=$EFF_BETREIBER_FTP_HOST"
+            echo "EFF_BETREIBER_FTP_USER=$EFF_BETREIBER_FTP_USER"
+            echo "EFF_BETREIBER_FTP_PASSWORD=$EFF_BETREIBER_FTP_PASSWORD"
           } >> "$GITHUB_ENV"
 
           # Mehrzeiliger Wert -- eigener Heredoc-Block statt einer einfachen
@@ -990,6 +1019,118 @@ jobs:
         if: ${{ env.UMGEBUNG == 'production' && env.EFF_GUARDOPS_FTP_HOST == '' }}
         run: |
           echo "::notice::guardops.ch wurde NICHT beliefert -- die Secrets GUARDOPS_FTP_HOST/USER/PASSWORD fehlen im Environment production. Das Rapport-Tool ist davon nicht betroffen und wurde regulaer ausgeliefert."
+
+      # ══════════ DER BETREIBER-BEREICH AUF SEINER EIGENEN ADRESSE ═══════
+      #
+      # ENT-580: Erste Etappe des schrittweisen Umzugs weg von
+      # itufeden.myhostpoint.ch. betreiber.guardops.ch liegt bei Hostpoint
+      # unter /home/itufeden/betreiber.guardops.ch -- NEBEN
+      # /home/itufeden/www/rapport, nicht darin. Eigener FTP-Zugang, auf
+      # genau dieses Verzeichnis beschraenkt, eigene Secret-NAMEN aus
+      # demselben Grund wie bei Staging (ENT-343 Punkt 1).
+      #
+      # ANDERS ALS DAS GUARDOPS-BUENDEL TRAEGT DIESES HIER ECHTE
+      # DATENBANK-ZUGANGSDATEN: betreiber.php und seine API-Endpunkte
+      # brauchen Zugriff auf dieselbe Datenbank wie das Rapport-Tool, weil
+      # betreiber_db() aktuell auf db() zurueckfaellt (ENT-519). Die
+      # Produktions-Zugangsdaten liegen damit an zwei Orten auf dem Server
+      # -- bewusst in Kauf genommen (ENT-580), geschuetzt durch
+      # htaccess-betreiber mit derselben Sperrliste wie htaccess-hostpoint,
+      # nur auf die tatsaechlich mitgelieferten Dateien verengt.
+      #
+      # NUR PRODUCTION: Ein Staging- oder Demo-Lauf hat auf dieser Adresse
+      # nichts verloren -- die Zweige oben setzen EFF_BETREIBER_FTP_HOST
+      # deshalb ausdruecklich leer, ohne Rueckfall.
+      #
+      # UEBERSPRINGT SICH, SOLANGE DIE SECRETS FEHLEN -- und sagt das dann
+      # auch (Schritt darunter), genau wie beim guardops-Buendel oben.
+      - name: Betreiber-Buendel fuer betreiber.guardops.ch bauen
+        if: ${{ env.UMGEBUNG == 'production' && env.EFF_BETREIBER_FTP_HOST != '' }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist-betreiber/api dist-betreiber/fonts
+
+          # Auf der eigenen Adresse gehoert der Betreiber-Bereich auf "/",
+          # nicht auf "/betreiber.html".
+          cp betreiber.html dist-betreiber/index.html
+
+          # Einzige lokale Schriftdatei, die betreiber.html per CSS-url()
+          # holt (siehe @font-face in betreiber.html). Fehlt sie, faellt
+          # die Schrift live lautlos auf den System-Stapel zurueck, lokal
+          # faellt es NICHT auf -- derselbe Fallstrick wie beim Rapport-Tool
+          # und beim guardops-Buendel. Lizenz muss die Schrift begleiten
+          # (SIL OFL 1.1).
+          cp fonts/inter-latin.woff2   dist-betreiber/fonts/
+          cp fonts/inter-LICENSE.txt   dist-betreiber/fonts/
+
+          # Genau die Backend-Dateien, die betreiber.php und seine
+          # API-Endpunkte tatsaechlich per require_once einbinden (siehe
+          # Kopf von backend/betreiber.php) -- keine der anderen rund 30
+          # Backend-Dateien des Rapport-Tools, die der Betreiber-Bereich
+          # nicht braucht (planung.php, kunden.php, mitarbeiter.php, lohn.php
+          # usw.). htaccess-betreiber sperrt genau diese Liste.
+          cp backend/db.php            dist-betreiber/db.php
+          cp backend/anmeldung.php     dist-betreiber/anmeldung.php
+          cp backend/zweifaktor.php    dist-betreiber/zweifaktor.php
+          cp backend/rechte.php        dist-betreiber/rechte.php
+          cp backend/support.php       dist-betreiber/support.php
+          cp backend/supportvorgang.php dist-betreiber/supportvorgang.php
+          cp backend/betreiber.php     dist-betreiber/betreiber.php
+          cp backend/api/betreiber_*.php dist-betreiber/api/
+          cp htaccess-betreiber        dist-betreiber/.htaccess
+          cp robots-betreiber.txt      dist-betreiber/robots.txt
+
+          # ECHTE Produktions-Datenbank -- dieselben Werte wie das
+          # Rapport-Tool oben (EFF_DB_*), nicht die leeren Platzhalter wie
+          # beim guardops-Buendel. Siehe Kopf dieses Abschnitts.
+          sed -i "s|__DB_HOST__|$EFF_DB_HOST|g" dist-betreiber/db.php
+          sed -i "s|__DB_NAME__|$EFF_DB_NAME|g" dist-betreiber/db.php
+          sed -i "s|__DB_USER__|$EFF_DB_USER|g" dist-betreiber/db.php
+          sed -i "s|__DB_PASS__|$EFF_DB_PASSWORD|g" dist-betreiber/db.php
+          sed -i "s|__APP_ENV__|$UMGEBUNG|g" dist-betreiber/db.php
+
+          # Eigene Adresse (ENT-501, ENT-580) -- FESTES LITERAL, kein Secret
+          # und keine Environment-Variable: betreiber.guardops.ch ist die
+          # entschiedene, oeffentlich sichtbare Adresse dieser Etappe, keine
+          # Zugangsdaten (gleiche Einordnung wie bei EFF_APP_BASIS_URL des
+          # Rapport-Tools und bei den GuardOpS-Literalen im guardops-Buendel).
+          sed -i "s|__APP_BASIS_URL__|https://betreiber.guardops.ch|g" dist-betreiber/db.php
+
+          # Kein uebersehener Platzhalter darf hochgeladen werden -- anders
+          # als beim guardops-Buendel bleibt hier KEINE Familie absichtlich
+          # stehen, weil dieses Buendel eine echte Datenbankverbindung
+          # braucht.
+          UEBRIG=$(grep -rhos '__[A-Z_]\{3,\}__' dist-betreiber/ \
+                   | grep -v -e '^__DIR__$' \
+                   | sort -u || true)
+          if [ -n "$UEBRIG" ]; then
+            echo "::error::Nicht ersetzte Platzhalter im betreiber-Buendel: $UEBRIG"
+            exit 1
+          fi
+
+          echo "Buendel fuer betreiber.guardops.ch:"
+          find dist-betreiber -type f | sort
+
+      - name: Betreiber-Bereich nach betreiber.guardops.ch hochladen (FTPS)
+        if: ${{ env.UMGEBUNG == 'production' && env.EFF_BETREIBER_FTP_HOST != '' }}
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ env.EFF_BETREIBER_FTP_HOST }}
+          username: ${{ env.EFF_BETREIBER_FTP_USER }}
+          password: ${{ env.EFF_BETREIBER_FTP_PASSWORD }}
+          protocol: ftps
+          local-dir: ./dist-betreiber/
+          # Der Zugang ist von Hostpoint auf
+          # /home/itufeden/betreiber.guardops.ch beschraenkt -- daher "/",
+          # nicht der volle Pfad. Genau wie bei den beiden Uploads oben.
+          server-dir: /
+
+      # "NICHT EINGERICHTET" DARF NICHT WIE "NICHTS ZU TUN" AUSSEHEN, genau
+      # wie beim guardops-Buendel oben.
+      - name: Hinweis, wenn betreiber.guardops.ch noch nicht eingerichtet ist
+        if: ${{ env.UMGEBUNG == 'production' && env.EFF_BETREIBER_FTP_HOST == '' }}
+        run: |
+          echo "::notice::betreiber.guardops.ch wurde NICHT beliefert -- die Secrets BETREIBER_FTP_HOST/USER/PASSWORD fehlen im Environment production. Das Rapport-Tool ist davon nicht betroffen und wurde regulaer ausgeliefert."
 
       - name: Staging-Passwortschutz verifizieren
         if: ${{ env.UMGEBUNG == 'staging' }}
