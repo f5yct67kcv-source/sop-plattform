@@ -701,7 +701,14 @@ function rechte_verwaltung_zahl(PDO $pdo, int $ausser = 0): int
     }
     $zahl = 0;
     foreach ($proPerson as $rollen) {
-        if (in_array('rechte_' . STUFE_SCHREIBEN, rechte_aus_rollen($rollen, $defs), true)) { $zahl++; }
+        // Seit hat_verwaltungsumfang() (Sicherheitsaudit Lauf 2) reicht das
+        // blosse Recht rechte_schreiben nicht mehr, um Profile tatsaechlich
+        // vergeben zu koennen -- der Aussperrschutz muss darum dieselbe
+        // Messlatte anlegen wie rechte_setzen()/rolle_speichern() selbst.
+        // Ohne das zaehlte hier jemand mit, der es in Wirklichkeit gar
+        // nicht mehr ausueben kann, und der Schutz waere nur eine
+        // Behauptung.
+        if (hat_verwaltungsumfang(['rollen' => $rollen], $defs)) { $zahl++; }
     }
     return $zahl;
 }
@@ -758,6 +765,34 @@ function require_augenhoehe(PDO $pdo, array $akteur, int $zielId,
     ], 403);
 }
 
+// Traegt der Handelnde selbst mindestens den Rechteumfang der Systemrolle
+// "Verwaltung"? Entscheid des Projektinhabers, Sicherheitsaudit Lauf 2
+// (2026-09-15): Das blosse Recht rechte_schreiben genuegte bisher, um
+// Profile anzulegen/zu aendern und sie zuzuteilen -- ein eigenes Profil mit
+// NUR diesem einen Recht (ohne personal_schreiben, lohn_schreiben usw.)
+// konnte sich damit selbst jedes andere Recht geben, inklusive Lohn und
+// vertraulicher Personaldaten. Wer die Systemrolle traegt, ist immer
+// ausreichend; ein eigenes Profil zaehlt nur, wenn seine abgeleiteten
+// Rechte eine ECHTE Obermenge der Verwaltungsrechte sind -- keine
+// Naeherung, sonst waere die Pruefung genau die Luecke, die sie schliessen
+// soll.
+function hat_verwaltungsumfang(array $akteur, ?array $defs = null): bool
+{
+    $rollen = is_array($akteur['rollen'] ?? null) ? $akteur['rollen'] : [];
+    if (in_array(ROLLE_VERWALTUNG, $rollen, true)) { return true; }
+    $eigeneRechte = is_array($akteur['rechte'] ?? null)
+        ? $akteur['rechte'] : rechte_aus_rollen($rollen, $defs);
+    $verwaltungsRechte = rechte_aus_rollen([ROLLE_VERWALTUNG]);
+    return array_diff($verwaltungsRechte, $eigeneRechte) === [];
+}
+
+// Der einheitliche Abweisungstext fuer alle drei Aufrufer unten
+// (rechte_setzen, rolle_speichern, rolle_loeschen) -- eine Formulierung,
+// nicht drei, die auseinanderlaufen koennten.
+const VERWALTUNGSUMFANG_FEHLERTEXT = 'Rollen vergeben und Profile ändern darf nur, '
+    . 'wer selbst die Systemrolle „Verwaltung" trägt (oder ein eigenes Profil mit '
+    . 'mindestens demselben Rechteumfang).';
+
 // Setzt die Rollen einer Person. Gibt eine Meldung zurueck, wenn es nicht
 // geht -- oder null bei Erfolg.
 //
@@ -771,7 +806,10 @@ function rechte_setzen(PDO $pdo, int $zielId, array $rollen, array $akteur): ?st
     if (!rechte_tabelle_da($pdo)) {
         return 'Die Einrichtung ist noch nicht gelaufen — bitte zuerst unten links „Einrichtung" ausführen.';
     }
-    $defs   = rollen_definitionen($pdo);
+    $defs = rollen_definitionen($pdo);
+    if (!hat_verwaltungsumfang($akteur, $defs)) {
+        return VERWALTUNGSUMFANG_FEHLERTEXT;
+    }
     $rollen = array_values(array_unique(array_filter(
         $rollen,
         fn($r) => is_string($r) && isset($defs[$r])
@@ -854,6 +892,9 @@ function rolle_speichern(PDO $pdo, ?string $schluessel, string $titel, string $t
     if (!rollen_tabellen_da($pdo)) {
         return ['fehler' => 'Die Einrichtung ist noch nicht gelaufen — bitte zuerst unten links „Einrichtung" ausführen.'];
     }
+    if (!hat_verwaltungsumfang($akteur, rollen_definitionen($pdo))) {
+        return ['fehler' => VERWALTUNGSUMFANG_FEHLERTEXT];
+    }
     $titel = trim($titel);
     if ($titel === '') { return ['fehler' => 'Das Profil braucht einen Namen.']; }
     if (mb_strlen($titel) > 60) { return ['fehler' => 'Der Name ist zu lang (höchstens 60 Zeichen).']; }
@@ -932,6 +973,9 @@ function rolle_loeschen(PDO $pdo, string $schluessel, array $akteur): ?string
 {
     if (!rollen_tabellen_da($pdo)) {
         return 'Die Einrichtung ist noch nicht gelaufen.';
+    }
+    if (!hat_verwaltungsumfang($akteur, rollen_definitionen($pdo))) {
+        return VERWALTUNGSUMFANG_FEHLERTEXT;
     }
     if (ist_systemrolle($schluessel)) {
         return 'Systemrollen lassen sich nicht löschen.';

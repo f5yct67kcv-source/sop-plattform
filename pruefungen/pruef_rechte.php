@@ -303,7 +303,11 @@ $pdo->exec('CREATE TABLE rollen_rechte (id INTEGER PRIMARY KEY AUTOINCREMENT, ro
 $pdo->exec("INSERT INTO mitarbeiter VALUES (1,'chefin',1,1),(2,'planer',0,1),(3,'hilfe',0,1),(4,'weg',1,0)");
 $pdo->exec("INSERT INTO mitarbeiter_rollen (mitarbeiter_id, rolle) VALUES
             (1,'verwaltung'),(2,'planung'),(3,'mitarbeitend'),(4,'verwaltung')");
-$chefin = ['id' => 1, 'name' => 'chefin'];
+// Entspricht dem echten Stand aus require_session() (db.php): rollen UND
+// rechte werden dort immer mitgeliefert, nie nur die blosse id/name -- und
+// entspricht der Saat oben (mitarbeiter_rollen: chefin traegt 'verwaltung').
+$chefin = ['id' => 1, 'name' => 'chefin', 'rollen' => ['verwaltung'],
+           'rechte' => rechte_aus_rollen(['verwaltung'])];
 
 // Die Systemrollen so saeen, wie es die Einrichtung tut.
 $ein = $pdo->prepare('INSERT INTO rollen (schluessel, titel, text, system) VALUES (?, ?, ?, 1)');
@@ -451,13 +455,33 @@ pruef('Die Meldung sagt, was zu tun ist', str_contains((string)$fehler, 'Rollen 
 pruef('KRITISCH: und das Recht steht danach unveraendert da',
     in_array('rechte_schreiben', rechte_aus_rollen(rechte_rollen($pdo, 1), rollen_definitionen($pdo)), true));
 
-// Der eigentliche Fortschritt: Auch ein EIGENES Profil mit dem Recht zaehlt.
-// Am Rollennamen festgemacht haette die Sperre hier zugeschlagen, obwohl
-// jemand anders sehr wohl noch Profile vergeben kann.
-$vertret = rolle_speichern($pdo, null, 'Rechteverwaltung', 'Nur Profile vergeben.',
+// ── hat_verwaltungsumfang() (Sicherheitsaudit Lauf 2, 2026-09-15) ─────────
+// Vorher zaehlte hier jedes eigene Profil mit blossem "rechte: schreiben"
+// als Vertretung -- genau die Luecke, ueber die sich ein Konto ohne jedes
+// andere Recht selbst Lohn und vertrauliche Personaldaten geben konnte.
+// Jetzt zaehlt nur, wer selbst mindestens den Rechteumfang der Systemrolle
+// "verwaltung" traegt.
+$eng = rolle_speichern($pdo, null, 'Nur Rechte', 'Nur Profile vergeben, sonst nichts.',
     ['rechte' => STUFE_SCHREIBEN], $chefin)['schluessel'];
+rechte_setzen($pdo, 3, [$eng], $chefin);
+pruef('KRITISCH: ein eigenes Profil mit NUR "Rollen & Berechtigungen: schreiben" zaehlt NICHT mehr als Vertretung',
+    rechte_verwaltung_zahl($pdo, 1) === 0);
+pruef('KRITISCH: die Verwaltung darf ihre Rolle darum NICHT abgeben -- niemand sonst koennte dann wirklich noch etwas vergeben',
+    rechte_setzen($pdo, 1, ['personal'], $chefin) !== null);
+pruef('KRITISCH: ein Konto mit nur diesem engen Profil kann sich selbst kein weiteres Recht geben',
+    rechte_setzen($pdo, 3, ['personal', $eng], ['id' => 3, 'name' => 'hilfe',
+        'rollen' => [$eng], 'rechte' => rechte_aus_rollen([$eng], rollen_definitionen($pdo))]) !== null);
+
+// Der eigentliche Fortschritt aus ENT-440 bleibt aber erhalten: Ein eigenes
+// Profil zaehlt, solange es TATSAECHLICH densalben Umfang traegt wie die
+// Systemrolle -- am Rollennamen festgemacht haette die Sperre hier
+// zugeschlagen, obwohl jemand anders wirklich alles kann, was die
+// Verwaltung auch koennte.
+$verwaltungStufen = system_rollen()[ROLLE_VERWALTUNG]['stufen'];
+$vertret = rolle_speichern($pdo, null, 'Rechteverwaltung', 'Traegt denselben Umfang wie die Verwaltung.',
+    $verwaltungStufen, $chefin)['schluessel'];
 rechte_setzen($pdo, 3, [$vertret], $chefin);
-pruef('KRITISCH: ein eigenes Profil mit "Rollen & Berechtigungen: schreiben" zaehlt als Vertretung',
+pruef('KRITISCH: ein eigenes Profil mit demselben Rechteumfang wie die Verwaltung zaehlt als Vertretung',
     rechte_verwaltung_zahl($pdo, 1) === 1);
 pruef('KRITISCH: damit darf die Verwaltung ihre Rolle abgeben',
     rechte_setzen($pdo, 1, ['personal'], $chefin) === null);
@@ -466,23 +490,42 @@ pruef('KRITISCH: es bleibt immer mindestens eine Person uebrig, die Profile verg
 
 // Und der Fall, der die beiden Bauarten des Aussperrschutzes UNTERSCHEIDET.
 // Ohne ihn bliebe die Pruefung auch dann gruen, wenn die Sperre wieder am
-// Rollennamen "verwaltung" haengt statt am Recht -- gefunden durch eine
-// Gegenprobe, die nicht anschlug (CLAUDE.md: eine Pruefung, die nie
-// angeschlagen hat, ist eine Behauptung).
+// Rollennamen "verwaltung" haengt statt am tatsaechlichen Umfang -- gefunden
+// durch eine Gegenprobe, die nicht anschlug (CLAUDE.md: eine Pruefung, die
+// nie angeschlagen hat, ist eine Behauptung).
 //
 // Stand hier: Person 1 hat nur noch 'personal', Person 3 traegt das eigene
-// Profil mit 'rechte: schreiben' und ist damit die EINZIGE aktive Person,
-// die noch Profile vergeben kann -- ohne jemals die Systemrolle
+// Profil mit vollem Verwaltungsumfang und ist damit die EINZIGE aktive
+// Person, die noch Profile vergeben kann -- ohne jemals die Systemrolle
 // "verwaltung" gehabt zu haben.
+$person3Akteur = ['id' => 3, 'name' => 'hilfe', 'rollen' => [$vertret],
+    'rechte' => rechte_aus_rollen([$vertret], rollen_definitionen($pdo))];
 pruef('Vorbedingung: genau eine Person kann noch Profile vergeben, und zwar ueber ein eigenes Profil',
     rechte_verwaltung_zahl($pdo, 0) === 1
     && !in_array(ROLLE_VERWALTUNG, rechte_rollen($pdo, 3), true)
-    && in_array('rechte_schreiben', rechte_aus_rollen(rechte_rollen($pdo, 3), rollen_definitionen($pdo)), true));
-$fehler2 = rechte_setzen($pdo, 3, ['mitarbeitend'], $chefin);
+    && hat_verwaltungsumfang($person3Akteur, rollen_definitionen($pdo)));
+$fehler2 = rechte_setzen($pdo, 3, ['mitarbeitend'], $person3Akteur);
 pruef('KRITISCH: auch wer das Recht nur ueber ein EIGENES Profil hat, kann sich nicht selbst aussperren',
     $fehler2 !== null);
 pruef('KRITISCH: und das Profil steht danach unveraendert da',
     in_array('rechte_schreiben', rechte_aus_rollen(rechte_rollen($pdo, 3), rollen_definitionen($pdo)), true));
+
+// ── Wer NICHT den vollen Umfang traegt, kommt an rechte_setzen()/
+// rolle_speichern()/rolle_loeschen() erst gar nicht heran -- unabhaengig
+// vom Aussperrschutz oben, der nur die Zahl der VERBLEIBENDEN Vertretungen
+// betrifft. Eine Planerin (Systemrolle 'planung', kein Rechte-Recht) darf
+// weder Profile aendern noch zuteilen noch loeschen.
+$planerin = ['id' => 2, 'name' => 'planer', 'rollen' => ['planung'],
+    'rechte' => rechte_aus_rollen(['planung'])];
+pruef('KRITISCH: rechte_setzen() weist eine Person ohne Verwaltungsumfang ab',
+    str_contains((string)rechte_setzen($pdo, 2, ['personal'], $planerin), 'Verwaltung'));
+pruef('KRITISCH: rolle_speichern() weist eine Person ohne Verwaltungsumfang ab',
+    str_contains((string)(rolle_speichern($pdo, null, 'Sollte nicht gehen', '', ['kunden' => STUFE_LESEN], $planerin)['fehler'] ?? ''),
+        'Verwaltung'));
+pruef('KRITISCH: rolle_loeschen() weist eine Person ohne Verwaltungsumfang ab',
+    str_contains((string)rolle_loeschen($pdo, $eng, $planerin), 'Verwaltung'));
+pruef('KRITISCH: das enge Profil steht nach dem abgewiesenen Loeschversuch noch da',
+    isset(rollen_definitionen($pdo)[$eng]));
 
 // ── Sammelabfrage
 $alle = rechte_rollen_alle($pdo);
