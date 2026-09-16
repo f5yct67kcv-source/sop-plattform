@@ -2699,8 +2699,22 @@ const PW_MIN = 10;
 
 const WOCHENTAG = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
 
+// ── Native App-Huelle (ENT-588) ─────────────────────────────────────────
+// Capacitor haengt sich unter window.Capacitor ein -- so meldet sich jede
+// Capacitor-Huelle, unabhaengig von iOS/Android. Im Browser gibt es dieses
+// Objekt nie.
+function nativeAppHuelle() {
+  return typeof window !== 'undefined'
+      && !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+}
+
 // ── Zustand
-const API = 'api/';
+// In der Huelle (Variante A, ENT-588) ist der API-Pfad NICHT relativ: Die
+// Herkunft dort ist capacitor://localhost (iOS) bzw. http://localhost
+// (Android), eine relative Adresse zeigte ins Buendel statt auf den
+// Server. Im Browser bleibt der bisherige, relative Pfad -- gleiche
+// Herkunft wie das Backend, kein CORS noetig.
+const API = nativeAppHuelle() ? 'https://rapport.itufeden.myhostpoint.ch/api/' : 'api/';
 let token = localStorage.getItem('rv3_token') || '';
 let ich = JSON.parse(localStorage.getItem('rv3_user') || 'null');
 let schichten = [];
@@ -4082,7 +4096,10 @@ function fzuKachelHinweisZeigen() {
 // fehlt eines, gibt es keinen Weg, und das ist eine Eigenschaft des
 // Geraets, keine Einstellung.
 function pushMoeglichHier() {
-  return typeof navigator !== 'undefined' && 'serviceWorker' in navigator
+  // In der nativen Huelle (ENT-588, Variante A) bleibt der Service Worker
+  // aus -- unnoetig und dort eher stoerend, siehe nativeAppHuelle().
+  return !nativeAppHuelle()
+      && typeof navigator !== 'undefined' && 'serviceWorker' in navigator
       && typeof window !== 'undefined' && 'PushManager' in window
       && 'Notification' in window;
 }
