@@ -286,7 +286,14 @@ svg.i-sm { width: 15px; height: 15px; }
    zentrierter Inhalt oben abgeschnitten wird. */
 .gate-mitte { margin: auto; width: 100%; max-width: 348px; position: relative; z-index: 2; }
 .gate-oben { text-align: center; margin-bottom: 34px; }
-.gate-oben img { width: 104px; height: 104px; filter: drop-shadow(0 16px 32px rgba(0,0,0,.75)); }
+/* Das Vektorzeichen (go-zeichen) statt der Raster-Bildmarke (ENT-568-Nachtrag):
+   icons/guardops-192.png ist nur 192x192px gross und wirkte bei den 176px
+   des Desktop-Breakpunkts unten bereits kantig -- eine groessere Anzeige
+   haette das nur verschaerft. Das Symbol steckt ohnehin schon inline im
+   Kopf dieser Datei (siehe die <svg>-Vorratsstelle oben, dieselbe Marke wie
+   in .gate-sig und .marke-hersteller), darum keine neue Datei noetig. */
+.gate-oben .marke { width: 128px; height: 128px; color: var(--ink);
+  filter: drop-shadow(0 16px 32px rgba(0,0,0,.75)); }
 .gate-oben .wm { margin-top: 18px; color: var(--ink); font-size: 20px; font-weight: 700; letter-spacing: -.3px; }
 .gate-oben .sub { margin-top: 4px; color: var(--ink-2);
   font-size: 12px; font-weight: 640; letter-spacing: 2px; text-transform: uppercase; }
@@ -367,7 +374,7 @@ svg.i-sm { width: 15px; height: 15px; }
     url('img/anmeldung-nacht.webp') 62% center / cover no-repeat,
     #0F1117; }
   .gate-mitte { max-width: 400px; }
-  .gate-oben img { width: 176px; height: 176px;
+  .gate-oben .marke { width: 208px; height: 208px;
     filter: drop-shadow(0 22px 44px rgba(0,0,0,.8)); }
   .gate-oben .sub { margin-top: 8px; font-size: 14px; letter-spacing: 2.6px; }
   .gate-oben .gate-demo-gruss { margin-top: 20px; font-size: 17px; }
@@ -5000,7 +5007,7 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
   <div class="gate-schleier"></div>
   <div class="gate-mitte">
     <div class="gate-oben">
-      <img src="icons/guardops-192.png" alt="">
+      <svg class="marke" viewBox="0.00 0.00 170.00 220.00" role="img" aria-label="GuardOpS"><use href="#go-zeichen"/></svg>
       <div class="wm" id="gateWm">Cockpit</div>
       <div class="sub">GuardOpS</div>
       <div class="gate-demo-gruss" id="gateDemoGruss" hidden>Willkommen im Demobereich</div>
