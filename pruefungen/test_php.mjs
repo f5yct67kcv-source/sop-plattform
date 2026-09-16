@@ -468,6 +468,20 @@ if (zfBeanstandet.length) { zfBeanstandet.forEach(z => bad.push('PHP-Zweifaktor:
   }
 }
 
+// Dieselbe Ueberlegung gilt fuer die native App-Huelle (ENT-588): app.html
+// ist die Quelle, mobile/www/index.html ist eine reine Kopie davon fuer das
+// Capacitor-Buendel (Variante A). Laufen sie auseinander, testet man die
+// eine Fassung und ausgeliefert wird im Store die andere.
+{
+  const appHtml = readFileSync(`${WURZEL}/app.html`, 'utf8');
+  const mobilHtml = readFileSync(`${WURZEL}/mobile/www/index.html`, 'utf8');
+  check('KRITISCH: app.html und mobile/www/index.html sind gleich '
+      + '(sonst "python3 mobile-buendel-erstellen.py" ausfuehren)', appHtml === mobilHtml);
+  if (appHtml !== mobilHtml) {
+    bad.push(`app.html ${appHtml.length} Zeichen gegen mobile/www/index.html ${mobilHtml.length} Zeichen`);
+  }
+}
+
 // Rollen und Logbuch (ENT-077). Beide laufen gegen eine echte Datenbank
 // (SQLite im Arbeitsspeicher), nicht gegen einen nachgebauten Ablauf -- die
 // Browser-Suiten taeuschen die Serverantwort vor und kaemen an einer
