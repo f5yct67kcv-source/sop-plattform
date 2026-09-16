@@ -1591,7 +1591,13 @@ jobs:
           # GuardOpS, in dashboard.html, app.html UND index.html: keiner
           # dieser drei Dateien wird hier angefasst ausser der einen Zeile
           # unten.
-          sed -i "s|<svg class=\"marke\" viewBox=\"0.00 0.00 649.83 153.56\" role=\"img\" aria-label=\"Guard OpS\"><use href=\"#go-wort\"/></svg>|<img class=\"marke\" src=\"icons/cupi24-badge.png\" alt=\"CUPI 24 GmbH\">|" \
+          # Eigene, kleinere Groesse (Befund des Projektinhabers, Lauf 524):
+          # .gate-oben .marke ist auf die WORTMARKE zugeschnitten (Rechteck
+          # 4.23:1, ~57/80px hoch bei 240/340px Breite) -- beim Siegel
+          # (quadratisch) macht dieselbe Breite es doppelt so hoch wie
+          # vorgesehen und wirkt zu gross. Eigener, bündel-lokaler
+          # Ueberschreibungs-Block statt die geteilte Regel zu aendern.
+          sed -i "s|<svg class=\"marke\" viewBox=\"0.00 0.00 649.83 153.56\" role=\"img\" aria-label=\"Guard OpS\"><use href=\"#go-wort\"/></svg>|<img class=\"marke\" src=\"icons/cupi24-badge.png\" alt=\"CUPI 24 GmbH\"><style>.gate-oben .marke{width:130px}@media (min-width:900px){.gate-oben .marke{width:170px}}</style>|" \
             dist-cupi24/dashboard.html
 
           # Name in den beiden Manifesten (ENT-568, offene Frage): Diese
