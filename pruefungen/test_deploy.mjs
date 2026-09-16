@@ -341,7 +341,7 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
   // nur "ANTHROPIC_API_KEY kommt irgendwo vor" verlangt, wuerde grün
   // bleiben, auch wenn er wie bei Production/Staging NICHT in die
   // PFLICHT_FEHLT-Liste des Demo-Zweigs aufgenommen waere.
-  const demoZweig = (/elif \[ "\$IST_DEMO_REF" = "1" \][\s\S]{0,5000}?(?=\n          else)/.exec(workflow) ?? [''])[0];
+  const demoZweig = (/elif \[ "\$IST_DEMO_REF" = "1" \][\s\S]{0,7000}?(?=\n          else)/.exec(workflow) ?? [''])[0];
   check('KRITISCH (ENT-523-N1): DEMO_ANTHROPIC_API_KEY ist im Demo-Zweig ein PFLICHT-Secret -- anders als bei Production und Staging',
     /\[ -z "\$EFF_ANTHROPIC_API_KEY" \][\s\S]{0,80}PFLICHT_FEHLT="\$PFLICHT_FEHLT DEMO_ANTHROPIC_API_KEY"/.test(demoZweig));
 
@@ -1069,13 +1069,15 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     const endpunktPfade = endpunkte.map(e => `backend/api/${e}`);
     for (const p of endpunktPfade) { quellen.push(p); }
     const ersetzt = new Set([...bauen.matchAll(/sed -i "s\|(__[A-Z_]+__)\|/g)].map(m => m[1]));
-    // __BETREIBER_DB_*__ und __MANDANT_SECRETS__ (backend/betreiber.php):
-    // eigene, noch unersetzte Platzhalter fuer die separate
-    // Betreiber-Datenbank (OP-518) -- betreiber_db() faellt bei leerem/
-    // unersetztem Platzhalter bewusst auf db() zurueck, siehe Kommentar
-    // dort. Dasselbe gilt unveraendert im Rapport-Tool-Buendel (dist/).
-    // __DIR__ ist PHPs eigene Konstante, kein Platzhalter.
-    const absichtlich = /^(__BETREIBER_DB_[A-Z]+__|__MANDANT_SECRETS__|__DIR__)$/;
+    // __BETREIBER_DB_*__ (backend/betreiber.php) wird seit OP-518 auch hier
+    // oben per sed ersetzt -- notfalls mit einer leeren Zeichenkette, wenn
+    // die vier Secrets noch nicht gesetzt sind; betreiber_db() faellt dann
+    // bewusst auf db() zurueck (siehe Kommentar dort). Es steht darum NICHT
+    // mehr in dieser Ausnahmeliste, sondern muss ueber "ersetzt" oben
+    // gefunden werden wie jeder andere Platzhalter. __MANDANT_SECRETS__
+    // bleibt eigene, noch unersetzte Ausnahme -- eigenes, noch offenes
+    // Thema (OP-526). __DIR__ ist PHPs eigene Konstante, kein Platzhalter.
+    const absichtlich = /^(__MANDANT_SECRETS__|__DIR__)$/;
     const offen = [];
     for (const q of quellen) {
       if (!existsSync(`${WURZEL}/${q}`)) { offen.push(`${q}: Datei fehlt`); continue; }
@@ -1256,6 +1258,134 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
   check('KRITISCH: alle vier Uploads haben verschiedene Quellverzeichnisse',
     /local-dir:\s*\.\/dist\//.test(workflow) && /local-dir:\s*\.\/dist-guardops\//.test(workflow)
     && /local-dir:\s*\.\/dist-betreiber\//.test(workflow) && /local-dir:\s*\.\/dist-portal\//.test(workflow));
+}
+
+// ══════════ CUPI 24 AUF IHRER EIGENEN ADRESSE ═══════════════════════════
+//
+// ENT-589: FÜNFTES Bündel (dist-cupi24/) -- und ANDERS als die schlanken
+// betreiber-/portal-Bündel oben keine Teilmenge, sondern der VOLLE
+// Dateiumfang des Rapport-Tools (Cockpit, Waechter-App, Kundenportal,
+// Betreiber-Bereich), weil CUPI 24 das komplette Werkzeug nutzt. Geprüft
+// wird deshalb nicht gegen eine eigene, abgeschriebene Liste, sondern GEGEN
+// DEN HAUPTSCHRITT SELBST ("Platzhalter durch echte Werte ersetzen", der
+// dist/ baut): jede Datei, die dort nach dist/ kopiert wird, muss auch im
+// cupi24-Schritt landen, und umgekehrt keine zusätzliche -- sonst laufen
+// die beiden Kopierlisten irgendwann still auseinander.
+{
+  const schritt = (name) => {
+    const i = workflow.indexOf(`- name: ${name}`);
+    if (i < 0) { return ''; }
+    const j = workflow.indexOf('\n      - name:', i + 10);
+    return workflow.slice(i, j < 0 ? undefined : j);
+  };
+  const hauptschritt = schritt('Platzhalter durch echte Werte ersetzen');
+  const bauen = schritt('Rapport-Tool-Buendel fuer cupi24.guardops.ch bauen');
+  const laden = schritt('Rapport-Tool nach cupi24.guardops.ch hochladen (FTPS)');
+  const hinweis = schritt('Hinweis, wenn cupi24.guardops.ch noch nicht eingerichtet ist');
+
+  check('KRITISCH: es gibt einen Schritt, der das Bündel für cupi24.guardops.ch baut, und einen, der es hochlädt',
+    hauptschritt !== '' && bauen !== '' && laden !== '');
+
+  // Jede "cp QUELLE ZIEL"-Zeile aus beiden Schritten, ZIEL relativ zum
+  // jeweiligen dist-Ordner -- so lassen sich beide Listen direkt
+  // gegeneinander abgleichen, unabhängig von Kommentaren oder Reihenfolge.
+  const zielRelativ = (text, praefix) => [...text.matchAll(/^\s*cp\s+(\S+)\s+(\S+)\s*$/gm)]
+    .map(m => m[2])
+    .filter(z => z.startsWith(praefix))
+    .map(z => z.slice(praefix.length));
+
+  const hauptZiele  = new Set(zielRelativ(hauptschritt, 'dist/'));
+  const cupi24Ziele = new Set(zielRelativ(bauen, 'dist-cupi24/'));
+
+  // robots.txt ist im Hauptschritt ausschliesslich Teil des
+  // "if UMGEBUNG = demo"-Zweigs (Production liefert dort gar keine aus) --
+  // der cupi24-Schritt läuft nie in Demo (siehe Gate weiter unten), braucht
+  // sie also folgerichtig nicht. Einzige bewusste Ausnahme von der
+  // Eins-zu-eins-Forderung, mit Begründung, nicht stillschweigend.
+  const fehltInCupi24 = [...hauptZiele].filter(z => !cupi24Ziele.has(z) && z !== 'robots.txt');
+  const zusaetzlichInCupi24 = [...cupi24Ziele].filter(z => !hauptZiele.has(z));
+
+  check('KRITISCH: jede Datei, die der Hauptschritt nach dist/ kopiert, landet auch im cupi24-Bündel (voller Dateiumfang, ENT-589)',
+    hauptZiele.size >= 20 && fehltInCupi24.length === 0);
+  if (fehltInCupi24.length) { bad.push('fehlt im cupi24-Bündel: ' + fehltInCupi24.join(', ')); }
+
+  check('KRITISCH: das cupi24-Bündel kopiert keine Datei, die der Hauptschritt nicht auch kopiert (sonst laufen die Listen auseinander)',
+    zusaetzlichInCupi24.length === 0);
+  if (zusaetzlichInCupi24.length) { bad.push('nur im cupi24-Bündel, nicht im Hauptschritt: ' + zusaetzlichInCupi24.join(', ')); }
+
+  check('KRITISCH: die eigene .htaccess der Adresse wird mitgeliefert',
+    cupi24Ziele.has('.htaccess')
+    && /cp\s+htaccess-cupi24\s+dist-cupi24\/\.htaccess/.test(bauen)
+    && existsSync(`${WURZEL}/htaccess-cupi24`));
+
+  // Die Sperrliste der .htaccess muss genau die Backend-Dateien treffen,
+  // die dieses Bündel tatsächlich direkt unter dist-cupi24/ mitbringt (nicht
+  // unter dist-cupi24/api/, die Regel greift auf den Dateinamen).
+  {
+    const htC = readFileSync(`${WURZEL}/htaccess-cupi24`, 'utf8');
+    const gesperrt = new Set((htC.match(/<FilesMatch "\^\(([a-z_|]+)\)\\\.php\$">/) || [])[1]?.split('|') ?? []);
+    const mitgeliefertePhp = [...bauen.matchAll(/^\s*cp\s+(\S+)\s+(dist-cupi24\/\S+\.php)\s*$/gm)]
+      .map(m => m[2])
+      .filter(z => !z.startsWith('dist-cupi24/api/'))
+      .map(z => z.replace('dist-cupi24/', '').replace(/\.php$/, ''));
+    const ungeschuetzt = mitgeliefertePhp.filter(m => !gesperrt.has(m));
+    check('KRITISCH: die .htaccess von cupi24.guardops.ch sperrt jede mitgelieferte Backend-Hilfsdatei gegen direkten Abruf',
+      mitgeliefertePhp.length >= 15 && ungeschuetzt.length === 0);
+    if (ungeschuetzt.length) { bad.push('ungeschützt im cupi24-Bündel: ' + ungeschuetzt.join(', ')); }
+  }
+
+  // ECHTE Produktions-Datenbank -- dieselben Werte wie der Hauptschritt
+  // (EFF_DB_*), weil CUPI 24 der Bestandsmandant ist und keine eigene
+  // Datenbank braucht (mandant_db() faellt fuer die "standardverbindung"
+  // auf db() zurueck, backend/betreiber.php).
+  check('KRITISCH: in das cupi24-Bündel werden dieselben Produktions-Datenbank-Zugangsdaten eingesetzt wie ins Rapport-Tool',
+    /__DB_HOST__\|\$EFF_DB_HOST\|g"\s+dist-cupi24\/db\.php/.test(bauen)
+    && /__DB_NAME__\|\$EFF_DB_NAME\|g"\s+dist-cupi24\/db\.php/.test(bauen)
+    && /__DB_USER__\|\$EFF_DB_USER\|g"\s+dist-cupi24\/db\.php/.test(bauen)
+    && /__DB_PASS__\|\$EFF_DB_PASSWORD\|g"\s+dist-cupi24\/db\.php/.test(bauen));
+
+  // Eigene Adresse (ENT-501, ENT-589): festes Literal, keine Environment-
+  // Variable und kein Secret -- und bewusst NICHT über die globale
+  // EFF_APP_BASIS_URL (die trägt weiterhin die alte Adresse für den
+  // Hauptschritt), sondern eine lokale Ersetzung nur für dieses Bündel.
+  check('KRITISCH: cupi24.guardops.ch bekommt seine eigene, feste APP_BASIS_URL, unabhängig von der des Hauptschritts',
+    /__APP_BASIS_URL__\|https:\/\/cupi24\.guardops\.ch\|g"\s+dist-cupi24\/db\.php/.test(bauen));
+
+  // ECHTES Produktions-Postfach -- dasselbe wie der Hauptschritt, kein
+  // eigenes wie beim guardops-Bündel: CUPI 24 ist Mandantin desselben
+  // Kernprodukts, keine separate Marketingseite.
+  check('KRITISCH: in das cupi24-Bündel werden dieselben Produktions-SMTP-Zugangsdaten eingesetzt wie ins Rapport-Tool',
+    /__SMTP_HOST__\|\$EFF_SMTP_HOST\|g"\s+dist-cupi24\/mailer\.php/.test(bauen)
+    && /__SMTP_USER__\|\$EFF_SMTP_USER\|g"\s+dist-cupi24\/mailer\.php/.test(bauen)
+    && /__SMTP_PASSWORD__\|\$EFF_SMTP_PASSWORD\|g"\s+dist-cupi24\/mailer\.php/.test(bauen));
+
+  check('KRITISCH: der Bau bricht ab, wenn ein nicht ersetzter Platzhalter im cupi24-Bündel bleibt',
+    /UEBRIG=/.test(bauen) && /::error::[^\n]*Platzhalter/.test(bauen) && /exit 1/.test(bauen));
+
+  // Eigener FTP-Zugang, eigene Secret-NAMEN -- keiner der vier bestehenden.
+  check('KRITISCH: cupi24.guardops.ch benutzt einen eigenen FTP-Zugang, keinen der vier bestehenden Bündel',
+    /server:\s*\$\{\{\s*env\.EFF_CUPI24_FTP_HOST\s*\}\}/.test(laden)
+    && /secrets\.CUPI24_FTP_HOST/.test(workflow)
+    && !/EFF_HOSTPOINT_FTP/.test(laden) && !/EFF_GUARDOPS_FTP/.test(laden)
+    && !/EFF_BETREIBER_FTP/.test(laden) && !/EFF_PORTAL_FTP/.test(laden));
+
+  // Ein Staging- oder Demo-Lauf hat auf dieser Adresse nichts verloren --
+  // dieselbe Begründung wie bei den vier anderen Bündeln.
+  check('KRITISCH: beide cupi24-Schritte laufen nur auf Production und nur mit vorhandenem Secret',
+    [bauen, laden].every(st =>
+      /env\.UMGEBUNG\s*==\s*'production'/.test(st) && /env\.EFF_CUPI24_FTP_HOST\s*!=\s*''/.test(st)));
+  check('KRITISCH: sowohl der Demo- als auch der Staging-Zweig setzen das cupi24-Ziel leer, ohne Rückfall auf die Production-Werte',
+    (workflow.match(/EFF_CUPI24_FTP_HOST=""/g) || []).length >= 2);
+
+  check('KRITISCH: ein übersprungener cupi24-Deploy sagt das ausdrücklich, statt lautlos auszufallen',
+    hinweis !== '' && /::notice::/.test(hinweis)
+    && /env\.EFF_CUPI24_FTP_HOST\s*==\s*''/.test(hinweis));
+
+  // Alle FÜNF Bündel müssen sich gegenseitig aus dem Weg bleiben.
+  check('KRITISCH: alle fünf Uploads haben verschiedene Quellverzeichnisse',
+    /local-dir:\s*\.\/dist\//.test(workflow) && /local-dir:\s*\.\/dist-guardops\//.test(workflow)
+    && /local-dir:\s*\.\/dist-betreiber\//.test(workflow) && /local-dir:\s*\.\/dist-portal\//.test(workflow)
+    && /local-dir:\s*\.\/dist-cupi24\//.test(workflow));
 }
 
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
