@@ -1095,6 +1095,169 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     && /local-dir:\s*\.\/dist-betreiber\//.test(workflow));
 }
 
+// ENT-580: VIERTES Bündel (dist-portal/), zweite Etappe des Umzugs nach dem
+// Betreiber-Bereich. Wie dist-betreiber mit ECHTER Datenbankverbindung,
+// zusätzlich mit ECHTEN SMTP-Zugangsdaten (das Kundenportal verschickt
+// Zugangslink-/Passwort-Mails). Geprüft wird wieder gegen das, was
+// kundenportal.php und seine Endpunkte TATSÄCHLICH einbinden.
+{
+  const schritt = (name) => {
+    const i = workflow.indexOf(`- name: ${name}`);
+    if (i < 0) { return ''; }
+    const j = workflow.indexOf('\n      - name:', i + 10);
+    return workflow.slice(i, j < 0 ? undefined : j);
+  };
+  const bauen = schritt('Portal-Buendel fuer portal.guardops.ch bauen');
+  const laden = schritt('Kundenportal nach portal.guardops.ch hochladen (FTPS)');
+  const hinweis = schritt('Hinweis, wenn portal.guardops.ch noch nicht eingerichtet ist');
+  const cpZeilen = [...bauen.matchAll(/^\s*cp\s+(\S+)\s+(\S+)\s*$/gm)]
+    .map(m => ({ von: m[1], nach: m[2] }));
+  const alsMuster = q => new RegExp('^' + q.split('*')
+    .map(x => x.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('[^/]*') + '$');
+  const wirdKopiert = pfad => cpZeilen.some(z => alsMuster(z.von).test(pfad));
+  const liegtImBuendel = ziel => cpZeilen.some(z => z.nach === ziel || z.nach === ziel.replace(/[^/]+$/, ''));
+  const portalHtml = readFileSync(`${WURZEL}/portal.html`, 'utf8');
+
+  check('KRITISCH: es gibt einen Schritt, der das Bündel für portal.guardops.ch baut, und einen, der es hochlädt',
+    bauen !== '' && laden !== '');
+
+  // Auf der eigenen Adresse gehört das Portal auf "/", nicht auf
+  // "/portal.html" -- sonst zeigt portal.guardops.ch ins Leere.
+  check('KRITISCH: portal.html wird als index.html ausgeliefert (die Seite liegt auf der Wurzel der Adresse)',
+    cpZeilen.some(z => z.von === 'portal.html' && z.nach === 'dist-portal/index.html'));
+
+  // Aus der Seite abgeleitet: Hintergrundfoto/-video der Anmeldemaske
+  // (url()/<source> in portal.html). Keine eigene Schriftdatei -- anders
+  // als betreiber.html nutzt portal.html den System-Schriftstapel.
+  const bilder = [...new Set([
+    ...[...portalHtml.matchAll(/url\(['"]?(img\/[^)'"]+)/g)].map(m => m[1]),
+    ...[...portalHtml.matchAll(/<source\s+src="(img\/[^"]+)"/g)].map(m => m[1]),
+  ])];
+  const fehlendeBilder = bilder.filter(f => !wirdKopiert(f));
+  check('KRITISCH: jedes Hintergrundbild/-video, das portal.html lädt, wird ins portal-Bündel kopiert',
+    bilder.length >= 2 && fehlendeBilder.length === 0);
+  if (fehlendeBilder.length) { bad.push('fehlt im portal-Bündel: ' + fehlendeBilder.join(', ')); }
+
+  // Jeder portal_*-Endpunkt im Repository muss im Bündel landen.
+  const endpunkte = readdirSync(`${WURZEL}/backend/api`).filter(f => /^portal_.*\.php$/.test(f));
+  check('KRITISCH: jeder portal_*-Endpunkt aus backend/api wird ins portal-Bündel kopiert',
+    endpunkte.length >= 10 && endpunkte.every(e => wirdKopiert(`backend/api/${e}`)));
+
+  // Die Einbindungen von kundenportal.php UND all seinen Endpunkten, aus
+  // den Dateien selbst gelesen -- genau die Backend-Dateien, die dieses
+  // schlanke Bündel tatsächlich braucht.
+  const kundenportalPhp = readFileSync(`${WURZEL}/backend/kundenportal.php`, 'utf8');
+  const endpunktQuellen = endpunkte.map(e => readFileSync(`${WURZEL}/backend/api/${e}`, 'utf8'));
+  const noetigeModule = [...new Set(
+    [kundenportalPhp, ...endpunktQuellen].join('\n')
+      .matchAll(/require(?:_once)? __DIR__ \. '\/(?:\.\.\/)?([a-z_]+\.php)'/g))]
+    .map(m => m[1])
+    .filter(m => m !== 'kundenportal.php');
+  const fehlendeModule = noetigeModule.filter(m => !liegtImBuendel(`dist-portal/${m}`));
+  check('KRITISCH: jede Datei, die kundenportal.php oder einer seiner Endpunkte einbindet, liegt im portal-Bündel',
+    noetigeModule.length >= 3 && fehlendeModule.length === 0
+    && liegtImBuendel('dist-portal/kundenportal.php'));
+  if (fehlendeModule.length) { bad.push('Einbindung fehlt im portal-Bündel: ' + fehlendeModule.join(', ')); }
+
+  check('KRITISCH: die eigene .htaccess und robots.txt der Adresse werden mitgeliefert',
+    cpZeilen.some(z => z.von === 'htaccess-portal' && z.nach === 'dist-portal/.htaccess')
+    && cpZeilen.some(z => z.von === 'robots-portal.txt' && z.nach === 'dist-portal/robots.txt')
+    && existsSync(`${WURZEL}/htaccess-portal`) && existsSync(`${WURZEL}/robots-portal.txt`));
+
+  // Anders als guardops.ch: Diese Adresse SOLL nicht gefunden werden
+  // (ENT-580) -- dasselbe "Disallow: /" wie beim Betreiber-Bereich.
+  check('KRITISCH: die robots.txt von portal.guardops.ch sperrt die Seite aus',
+    /^Disallow:\s*\/\s*$/m.test(readFileSync(`${WURZEL}/robots-portal.txt`, 'utf8')));
+
+  // Die Sperrliste der .htaccess muss genau die Backend-Dateien treffen,
+  // die dieses Bündel tatsächlich mitbringt.
+  {
+    const ht = readFileSync(`${WURZEL}/htaccess-portal`, 'utf8');
+    const gesperrt = new Set((ht.match(/<FilesMatch "\^\(([a-z_|]+)\)\\\.php\$">/) || [])[1]?.split('|') ?? []);
+    const mitgeliefertePhp = cpZeilen
+      .filter(z => z.nach.startsWith('dist-portal/') && z.nach.endsWith('.php') && !z.nach.startsWith('dist-portal/api/'))
+      .map(z => z.nach.replace('dist-portal/', '').replace(/\.php$/, ''));
+    const ungeschuetzt = mitgeliefertePhp.filter(m => !gesperrt.has(m));
+    check('KRITISCH: die .htaccess von portal.guardops.ch sperrt jede mitgelieferte Backend-Datei gegen direkten Abruf',
+      mitgeliefertePhp.length >= 3 && ungeschuetzt.length === 0);
+    if (ungeschuetzt.length) { bad.push('ungeschützt im portal-Bündel: ' + ungeschuetzt.join(', ')); }
+  }
+
+  // ECHTE Datenbankverbindung -- das Kundenportal ist Kernbestandteil
+  // desselben Tools, keine Ausnahme wie beim Betreiber-Bereich/OP-518.
+  check('KRITISCH: in das portal-Bündel werden dieselben Produktions-Datenbank-Zugangsdaten eingesetzt wie ins Rapport-Tool',
+    /__DB_HOST__\|\$EFF_DB_HOST\|g"\s+dist-portal\/db\.php/.test(bauen)
+    && /__DB_NAME__\|\$EFF_DB_NAME\|g"\s+dist-portal\/db\.php/.test(bauen)
+    && /__DB_USER__\|\$EFF_DB_USER\|g"\s+dist-portal\/db\.php/.test(bauen)
+    && /__DB_PASS__\|\$EFF_DB_PASSWORD\|g"\s+dist-portal\/db\.php/.test(bauen));
+
+  // ECHTE Produktions-SMTP-Werte -- dasselbe Postfach, über das das
+  // Kundenportal seine Zugangslink-/Passwort-Mails schon heute verschickt.
+  // Kein eigenes Postfach wie beim guardops-Bündel.
+  check('KRITISCH: in das portal-Bündel werden dieselben Produktions-SMTP-Zugangsdaten eingesetzt wie ins Rapport-Tool',
+    /__SMTP_HOST__\|\$EFF_SMTP_HOST\|g"\s+dist-portal\/mailer\.php/.test(bauen)
+    && /__SMTP_USER__\|\$EFF_SMTP_USER\|g"\s+dist-portal\/mailer\.php/.test(bauen)
+    && /__SMTP_PASSWORD__\|\$EFF_SMTP_PASSWORD\|g"\s+dist-portal\/mailer\.php/.test(bauen));
+
+  // Eigene Adresse (ENT-501, ENT-580): festes Literal.
+  check('KRITISCH: portal.guardops.ch bekommt seine eigene, feste APP_BASIS_URL',
+    /__APP_BASIS_URL__\|https:\/\/portal\.guardops\.ch\|g"\s+dist-portal\/db\.php/.test(bauen));
+
+  // Kartenausschnitt der Rundgänge braucht denselben Maps-Schlüssel wie das
+  // Rapport-Tool.
+  check('KRITISCH: portal.guardops.ch bekommt den Maps-Schlüssel für den Kartenausschnitt der Rundgänge',
+    /__MAPS_JS_KEY__\|\$EFF_MAPS_JS_KEY\|g"\s+dist-portal\/index\.html/.test(bauen));
+
+  check('KRITISCH: der Bau bricht ab, wenn ein nicht ersetzter Platzhalter im portal-Bündel bleibt',
+    /UEBRIG=/.test(bauen) && /::error::[^\n]*Platzhalter/.test(bauen) && /exit 1/.test(bauen));
+
+  // Eigener FTP-Zugang, eigene Secret-NAMEN.
+  check('KRITISCH: portal.guardops.ch benutzt einen eigenen FTP-Zugang, weder den des Rapport-Tools noch den von guardops.ch/betreiber.guardops.ch',
+    /server:\s*\$\{\{\s*env\.EFF_PORTAL_FTP_HOST\s*\}\}/.test(laden)
+    && /secrets\.PORTAL_FTP_HOST/.test(workflow)
+    && !/EFF_HOSTPOINT_FTP/.test(laden) && !/EFF_GUARDOPS_FTP/.test(laden) && !/EFF_BETREIBER_FTP/.test(laden));
+
+  // Ein Staging- oder Demo-Lauf hat auf dieser Adresse nichts verloren.
+  check('KRITISCH: beide portal-Schritte laufen nur auf Production und nur mit vorhandenem Secret',
+    [bauen, laden].every(st =>
+      /env\.UMGEBUNG\s*==\s*'production'/.test(st) && /env\.EFF_PORTAL_FTP_HOST\s*!=\s*''/.test(st)));
+  check('KRITISCH: der Staging-Zweig setzt das portal-Ziel leer, ohne Rückfall auf die Production-Werte',
+    /EFF_PORTAL_FTP_HOST=""/.test(workflow)
+    && !/EFF_PORTAL_FTP_HOST="\$P_PORTAL_FTP_HOST"[\s\S]{0,400}STAGING/.test(workflow));
+
+  check('KRITISCH: ein übersprungener Portal-Deploy sagt das ausdrücklich, statt lautlos auszufallen',
+    hinweis !== '' && /::notice::/.test(hinweis)
+    && /env\.EFF_PORTAL_FTP_HOST\s*==\s*''/.test(hinweis));
+
+  // Jeder Platzhalter in einer Datei, die ins portal-Bündel geht, muss dort
+  // entweder ersetzt werden oder mit Grund stehen bleiben (hier: keine
+  // absichtlich offenen Platzhalter, anders als beim betreiber-Bündel).
+  {
+    const quellen = [...bauen.matchAll(/^\s*cp\s+(\S+)\s+dist-portal\/\S*/gm)]
+      .map(m => m[1]).filter(q => !q.includes('*') && /\.(php|html|txt)$/.test(q));
+    const endpunktPfade = endpunkte.map(e => `backend/api/${e}`);
+    for (const p of endpunktPfade) { quellen.push(p); }
+    const ersetzt = new Set([...bauen.matchAll(/sed -i "s\|(__[A-Z_]+__)\|/g)].map(m => m[1]));
+    const absichtlich = /^__DIR__$/;
+    const offen = [];
+    for (const q of quellen) {
+      if (!existsSync(`${WURZEL}/${q}`)) { offen.push(`${q}: Datei fehlt`); continue; }
+      const inhalt = readFileSync(`${WURZEL}/${q}`, 'utf8');
+      for (const p of new Set([...inhalt.matchAll(/__[A-Z][A-Z_]{2,}__/g)].map(m => m[0]))) {
+        if (!ersetzt.has(p) && !absichtlich.test(p)) { offen.push(`${q}: ${p}`); }
+      }
+    }
+    check('KRITISCH: jeder Platzhalter in einer Datei des portal-Bündels wird dort ersetzt',
+      quellen.length >= 3 && offen.length === 0);
+    if (offen.length) { bad.push('bricht den Deploy: ' + offen.join(', ')); }
+  }
+
+  // Alle vier Bündel müssen sich gegenseitig aus dem Weg bleiben.
+  check('KRITISCH: alle vier Uploads haben verschiedene Quellverzeichnisse',
+    /local-dir:\s*\.\/dist\//.test(workflow) && /local-dir:\s*\.\/dist-guardops\//.test(workflow)
+    && /local-dir:\s*\.\/dist-betreiber\//.test(workflow) && /local-dir:\s*\.\/dist-portal\//.test(workflow));
+}
+
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
 console.log('Alle Pruefungen bestanden.');
