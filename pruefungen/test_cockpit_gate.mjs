@@ -144,9 +144,12 @@ check('KRITISCH: und auch keinen Schatten mehr, der eine Kartenkante andeuten wu
   form !== null && form.schatten === 'none');
 
 // ══════════ LOGO RAHMENLOS UND GROSS, WIE IN app.html ══════════════════
+// Seit dem Wechsel vom blossen "G"-Zeichen auf die volle Wortmarke
+// (2026-09-16) ist die Marke ein Rechteck (~4.23:1), kein Quadrat mehr --
+// darum nur noch die Breite geprueft, nicht mehr zusaetzlich die Hoehe.
 const logo = await mass(page, '.gate-oben .marke');
 check('KRITISCH: das Logo ist auf dem Desktop deutlich groesser als die alten 66 px',
-  logo !== null && logo.w >= 150 && logo.h >= 150);
+  logo !== null && logo.w >= 150);
 const fassung = await ev(page, () => {
   const c = getComputedStyle(document.querySelector('.gate-oben .marke'));
   return { grund: c.backgroundColor, radius: c.borderRadius, padding: c.paddingTop, schatten: c.boxShadow };
@@ -166,8 +169,13 @@ check('Das Logo steht waagrecht wirklich mittig, nicht nur ungefaehr',
 // vergessene Aufraeumarbeit.
 check('KRITISCH: die Wortmarke "Cockpit" steht ueber dem Formular',
   (await page.textContent('.gate-oben .wm').catch(() => '')).trim() === 'Cockpit');
-check('Der Firmenname steht als eigene Zeile darunter',
-  (await page.textContent('.gate-oben .sub').catch(() => '')).trim() !== '');
+// Die fruehere eigene Zeile ".sub" ("GuardOpS") ist mit dem Wechsel vom
+// "G"-Zeichen auf die volle Wortmarke (2026-09-16) entfallen: Die Marke
+// selbst traegt den Firmennamen jetzt, eine zweite Zeile wuerde ihn
+// verdoppeln. Nachweis dafuer steht bei der Bildbeschriftung der Marke.
+check('KRITISCH: die Wortmarke traegt den Firmennamen als Bildbeschriftung, keine doppelte Textzeile mehr',
+  (await page.getAttribute('.gate-oben .marke', 'aria-label').catch(() => '') || '').toLowerCase().includes('guard')
+  && (await ev(page, () => !document.querySelector('.gate-oben .sub'))));
 
 // ══════════ EIGENE, VOM SEITENTHEMA UNABHAENGIGE FARBPALETTE ══════════
 const grund = await ev(page, () => getComputedStyle(document.getElementById('gate')).backgroundColor);
@@ -222,7 +230,10 @@ await ev(page, () => document.querySelector('.gate-video')?.pause());
 // ══════════ HAUPTFORMULAR: MEHRPUNKT-KONTRAST GEGEN DAS LAUFENDE VIDEO ═
 const TEXTE_HAUPT = [
   ['Wortmarke "Cockpit"', '.gate-oben .wm'],
-  ['Firmenname', '.gate-oben .sub'],
+  // Die frueher hier zusaetzlich gepruefte Zeile ".sub" ("GuardOpS") ist mit
+  // dem Wechsel vom "G"-Zeichen auf die volle Wortmarke (2026-09-16)
+  // entfallen -- die Marke traegt den Firmennamen jetzt selbst, siehe
+  // test_cockpit_gate.mjs weiter oben.
   // Der frueher hier gepruefte Begleittext "Bitte melden Sie sich..." ist
   // entfernt (auf Ansage des Projektinhabers: die Maske erklaert sich
   // selbst). An seiner Stelle liegt jetzt die Herstellersignatur auf dem
