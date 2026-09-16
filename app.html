@@ -2714,7 +2714,7 @@ function nativeAppHuelle() {
 // (Android), eine relative Adresse zeigte ins Buendel statt auf den
 // Server. Im Browser bleibt der bisherige, relative Pfad -- gleiche
 // Herkunft wie das Backend, kein CORS noetig.
-const API = nativeAppHuelle() ? 'https://rapport.itufeden.myhostpoint.ch/api/' : 'api/';
+const API = nativeAppHuelle() ? 'https://cupi24.guardops.ch/api/' : 'api/';
 let token = localStorage.getItem('rv3_token') || '';
 let ich = JSON.parse(localStorage.getItem('rv3_user') || 'null');
 let schichten = [];
