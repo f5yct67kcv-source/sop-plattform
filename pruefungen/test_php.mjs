@@ -334,6 +334,21 @@ kollisionen.filter(n => KOLLISION_BEKANNT.includes(n)).forEach(n => {
   console.log(`  ! api/${n}.php traegt einen gesperrten Namen — im Betrieb 403, fremder Bereich, gemeldet`);
 });
 
+// Dieselbe Kollision, derselbe Mechanismus -- diesmal fuer handbuch/, das
+// eigene, von backend/api/ unabhaengige .php-Dateien in einem eigenen
+// Unterordner ausliefert (siehe deploy-hostpoint.yml). Traf hier bereits
+// zu: handbuch/planung.php, kunden.php, lohn.php und kundenportal.php
+// kollidierten mit den gleichnamigen Hilfsdateien und wurden am
+// 2026-09-14 auf das Praefix "hb-" umbenannt (siehe suchindex-bauen.mjs).
+const handbuchSeiten = readdirSync(`${WURZEL}/handbuch`)
+  .filter(f => f.endsWith('.php')).map(f => f.slice(0, -4));
+const handbuchKollisionen = handbuchSeiten.filter(n => gesperrteNamen.includes(n));
+check('KRITISCH: keine Handbuch-Seite traegt den Namen einer gesperrten Hilfsdatei',
+  gesperrteNamen.length > 3 && handbuchKollisionen.length === 0);
+if (handbuchKollisionen.length) {
+  bad.push('handbuch/ kollidiert mit der Sperrliste: ' + handbuchKollisionen.join(', '));
+}
+
 // DER ZWEITE FEHLER AM DEMO-FORMULAR, und er wog schwerer als die
 // Namenskollision: homepage.html rief "backend/api/demo_anfrage.php" auf --
 // den Pfad im REPOSITORY. Der Deploy legt die Endpunkte aber nach dist/api/

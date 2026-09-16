@@ -33,16 +33,16 @@
       </ul>
       <div class="hb-gruppe">Cockpit</div>
       <ul class="hb-nav">
-        <li><a href="planung.php">Planung</a></li>
-        <li><a href="kunden.php">Kunden</a></li>
+        <li><a href="hb-planung.php">Planung</a></li>
+        <li><a href="hb-kunden.php">Kunden</a></li>
         <li><a href="personal.php">Personal</a></li>
-        <li><a href="lohn.php">Lohn</a></li>
+        <li><a href="hb-lohn.php">Lohn</a></li>
         <li><a href="abgleich.php">Abgleich</a></li>
         <li><a href="betrieb.php">Betrieb</a></li>
       </ul>
       <div class="hb-gruppe">Weitere Oberflächen</div>
       <ul class="hb-nav">
-        <li><a href="kundenportal.php">Kundenportal</a></li>
+        <li><a href="hb-kundenportal.php">Kundenportal</a></li>
       </ul>
       <div class="hb-gruppe">Nachschlagen</div>
       <ul class="hb-nav">
@@ -111,11 +111,11 @@
           <p class="titel">Erfassung <span class="hb-status erste-fassung">Erste Fassung</span></p>
           <p class="text">Die mobile App: Einsätze, Rapport, Rundgänge, Fahrzeugübernahme, Mitteilungen.</p>
         </a>
-        <a class="hb-karte" href="planung.php">
+        <a class="hb-karte" href="hb-planung.php">
           <p class="titel">Planung <span class="hb-status erste-fassung">Erste Fassung</span></p>
           <p class="text">Einsätze, Objektplanung, Masterschichten, Tagesplan, Feiertage, Zuteilung.</p>
         </a>
-        <a class="hb-karte" href="kunden.php">
+        <a class="hb-karte" href="hb-kunden.php">
           <p class="titel">Kunden <span class="hb-status erste-fassung">Erste Fassung</span></p>
           <p class="text">Kundenstamm, Import, KI-Recherche, Objekte, Rapporte, Offerten &amp; Rechnungen.</p>
         </a>
@@ -123,7 +123,7 @@
           <p class="titel">Personal <span class="hb-status erste-fassung">Erste Fassung</span></p>
           <p class="text">Mitarbeitende, Personaldossier, vertrauliche Angaben, Verlauf, Dienstpläne.</p>
         </a>
-        <a class="hb-karte" href="lohn.php">
+        <a class="hb-karte" href="hb-lohn.php">
           <p class="titel">Lohn <span class="hb-status erste-fassung">Erste Fassung</span></p>
           <p class="text">Lohnansatz, Lohnarten, Sätze und Regelwerk, Lohnläufe — Rohzeit, Nettozeit, Zeitbonus und Bewertet sauber getrennt.</p>
         </a>
@@ -135,7 +135,7 @@
           <p class="titel">Betrieb <span class="hb-status erste-fassung">Erste Fassung</span></p>
           <p class="text">Hauptdomizil, Briefkopf, Rollen &amp; Berechtigungen, Fahrzeuge, Support.</p>
         </a>
-        <a class="hb-karte" href="kundenportal.php">
+        <a class="hb-karte" href="hb-kundenportal.php">
           <p class="titel">Kundenportal <span class="hb-status erste-fassung">Erste Fassung</span></p>
           <p class="text">Was Kundinnen und Kunden sehen — und wie ein Zugang entsteht.</p>
         </a>

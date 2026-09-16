@@ -926,6 +926,338 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     /local-dir:\s*\.\/dist\//.test(workflow) && /local-dir:\s*\.\/dist-guardops\//.test(workflow));
 }
 
+// ══════════ DER BETREIBER-BEREICH AUF SEINER EIGENEN ADRESSE ═════════
+//
+// ENT-580: DRITTES Bündel (dist-betreiber/), diesmal mit ECHTER
+// Datenbankverbindung -- anders als guardops.ch, wo bewusst keine liegt.
+// Geprüft wird wieder gegen das, was betreiber.php und seine Endpunkte
+// TATSÄCHLICH einbinden, nicht gegen eine abgeschriebene Liste.
+{
+  const schritt = (name) => {
+    const i = workflow.indexOf(`- name: ${name}`);
+    if (i < 0) { return ''; }
+    const j = workflow.indexOf('\n      - name:', i + 10);
+    return workflow.slice(i, j < 0 ? undefined : j);
+  };
+  const bauen = schritt('Betreiber-Buendel fuer betreiber.guardops.ch bauen');
+  const laden = schritt('Betreiber-Bereich nach betreiber.guardops.ch hochladen (FTPS)');
+  const hinweis = schritt('Hinweis, wenn betreiber.guardops.ch noch nicht eingerichtet ist');
+  const cpZeilen = [...bauen.matchAll(/^\s*cp\s+(\S+)\s+(\S+)\s*$/gm)]
+    .map(m => ({ von: m[1], nach: m[2] }));
+  const alsMuster = q => new RegExp('^' + q.split('*')
+    .map(x => x.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('[^/]*') + '$');
+  const wirdKopiert = pfad => cpZeilen.some(z => alsMuster(z.von).test(pfad));
+  const liegtImBuendel = ziel => cpZeilen.some(z => z.nach === ziel || z.nach === ziel.replace(/[^/]+$/, ''));
+  const betreiberHtml = readFileSync(`${WURZEL}/betreiber.html`, 'utf8');
+
+  check('KRITISCH: es gibt einen Schritt, der das Bündel für betreiber.guardops.ch baut, und einen, der es hochlädt',
+    bauen !== '' && laden !== '');
+
+  // Auf der eigenen Adresse gehört der Bereich auf "/", nicht auf
+  // "/betreiber.html" -- sonst zeigt betreiber.guardops.ch ins Leere.
+  check('KRITISCH: betreiber.html wird als index.html ausgeliefert (die Seite liegt auf der Wurzel der Adresse)',
+    cpZeilen.some(z => z.von === 'betreiber.html' && z.nach === 'dist-betreiber/index.html'));
+
+  // Aus der Seite abgeleitet: jede Schrift, die betreiber.html per
+  // CSS-url() holt.
+  const schriften = [...new Set([...betreiberHtml.matchAll(/url\(['"]?(fonts\/[^)'"]+)/g)].map(m => m[1]))];
+  const fehlendeSchriften = schriften.filter(f => !wirdKopiert(f));
+  check('KRITISCH: jede Schrift, die betreiber.html lädt, wird ins betreiber-Bündel kopiert',
+    schriften.length >= 1 && fehlendeSchriften.length === 0);
+  if (fehlendeSchriften.length) { bad.push('fehlt im betreiber-Bündel: ' + fehlendeSchriften.join(', ')); }
+
+  // Jeder betreiber_*-Endpunkt im Repository muss im Bündel landen -- sonst
+  // meldet die Oberfläche unter der neuen Adresse einen Fehler, sobald sie
+  // einen der noch fehlenden Endpunkte aufruft.
+  const endpunkte = readdirSync(`${WURZEL}/backend/api`).filter(f => /^betreiber_.*\.php$/.test(f));
+  check('KRITISCH: jeder betreiber_*-Endpunkt aus backend/api wird ins betreiber-Bündel kopiert',
+    endpunkte.length >= 10 && endpunkte.every(e => wirdKopiert(`backend/api/${e}`)));
+
+  // Die Einbindungen von betreiber.php UND all seinen Endpunkten, aus den
+  // Dateien selbst gelesen -- genau die Backend-Dateien, die dieses
+  // schlanke Bündel tatsächlich braucht, nicht die rund 30 Dateien des
+  // Rapport-Tool-Bündels. betreiber.php selbst bindet nur db.php und
+  // zweifaktor.php ein; anmeldung.php, rechte.php, support.php und
+  // supportvorgang.php kommen erst über die einzelnen Endpunkte dazu.
+  const betreiberPhp = readFileSync(`${WURZEL}/backend/betreiber.php`, 'utf8');
+  const endpunktQuellen = endpunkte.map(e => readFileSync(`${WURZEL}/backend/api/${e}`, 'utf8'));
+  const noetigeModule = [...new Set(
+    [betreiberPhp, ...endpunktQuellen].join('\n')
+      .matchAll(/require(?:_once)? __DIR__ \. '\/(?:\.\.\/)?([a-z_]+\.php)'/g))]
+    .map(m => m[1])
+    .filter(m => m !== 'betreiber.php');
+  const fehlendeModule = noetigeModule.filter(m => !liegtImBuendel(`dist-betreiber/${m}`));
+  check('KRITISCH: jede Datei, die betreiber.php oder einer seiner Endpunkte einbindet, liegt im betreiber-Bündel',
+    noetigeModule.length >= 5 && fehlendeModule.length === 0
+    && liegtImBuendel('dist-betreiber/betreiber.php'));
+  if (fehlendeModule.length) { bad.push('Einbindung fehlt im betreiber-Bündel: ' + fehlendeModule.join(', ')); }
+
+  check('KRITISCH: die eigene .htaccess und robots.txt der Adresse werden mitgeliefert',
+    cpZeilen.some(z => z.von === 'htaccess-betreiber' && z.nach === 'dist-betreiber/.htaccess')
+    && cpZeilen.some(z => z.von === 'robots-betreiber.txt' && z.nach === 'dist-betreiber/robots.txt')
+    && existsSync(`${WURZEL}/htaccess-betreiber`) && existsSync(`${WURZEL}/robots-betreiber.txt`));
+
+  // Anders als guardops.ch: Diese Adresse SOLL nicht gefunden werden
+  // (ENT-580) -- dasselbe "Disallow: /" wie bei der Testinstanz und der
+  // Demo, nicht das offene "Disallow:" der Verkaufsseite.
+  check('KRITISCH: die robots.txt von betreiber.guardops.ch sperrt die Seite aus',
+    /^Disallow:\s*\/\s*$/m.test(readFileSync(`${WURZEL}/robots-betreiber.txt`, 'utf8')));
+
+  // Die Sperrliste der .htaccess muss genau die Backend-Dateien treffen,
+  // die dieses Bündel tatsächlich mitbringt -- weder mehr (toter Verweis)
+  // noch weniger (eine ungeschützte Datei mit echten DB-Zugangsdaten).
+  {
+    const ht = readFileSync(`${WURZEL}/htaccess-betreiber`, 'utf8');
+    const gesperrt = new Set((ht.match(/<FilesMatch "\^\(([a-z_|]+)\)\\\.php\$">/) || [])[1]?.split('|') ?? []);
+    const mitgeliefertePhp = cpZeilen
+      .filter(z => z.nach.startsWith('dist-betreiber/') && z.nach.endsWith('.php') && !z.nach.startsWith('dist-betreiber/api/'))
+      .map(z => z.nach.replace('dist-betreiber/', '').replace(/\.php$/, ''));
+    const ungeschuetzt = mitgeliefertePhp.filter(m => !gesperrt.has(m));
+    check('KRITISCH: die .htaccess von betreiber.guardops.ch sperrt jede mitgelieferte Backend-Datei gegen direkten Abruf',
+      mitgeliefertePhp.length >= 5 && ungeschuetzt.length === 0);
+    if (ungeschuetzt.length) { bad.push('ungeschützt im betreiber-Bündel: ' + ungeschuetzt.join(', ')); }
+  }
+
+  // DER PUNKT, AN DEM ES TEUER WÜRDE, WENN ES FEHLTE: Anders als bei
+  // guardops.ch braucht dieses Bündel eine ECHTE Datenbankverbindung
+  // (betreiber_db() fällt auf db() zurück, ENT-519) -- dieselben
+  // Zugangsdaten wie das Rapport-Tool, damit betreiber.php tatsächlich
+  // etwas findet.
+  check('KRITISCH: in das betreiber-Bündel werden dieselben Produktions-Datenbank-Zugangsdaten eingesetzt wie ins Rapport-Tool',
+    /__DB_HOST__\|\$EFF_DB_HOST\|g"\s+dist-betreiber\/db\.php/.test(bauen)
+    && /__DB_NAME__\|\$EFF_DB_NAME\|g"\s+dist-betreiber\/db\.php/.test(bauen)
+    && /__DB_USER__\|\$EFF_DB_USER\|g"\s+dist-betreiber\/db\.php/.test(bauen)
+    && /__DB_PASS__\|\$EFF_DB_PASSWORD\|g"\s+dist-betreiber\/db\.php/.test(bauen));
+
+  // Eigene Adresse (ENT-501, ENT-580): festes Literal, keine Environment-
+  // Variable und kein Secret -- dieselbe Einordnung wie bei den
+  // GuardOpS-Literalen im guardops-Bündel.
+  check('KRITISCH: betreiber.guardops.ch bekommt seine eigene, feste APP_BASIS_URL',
+    /__APP_BASIS_URL__\|https:\/\/betreiber\.guardops\.ch\|g"\s+dist-betreiber\/db\.php/.test(bauen));
+
+  // Dieselbe Gegenprobe wie beim guardops-Bündel: ein übersehener
+  // Platzhalter darf hier nicht hochgeladen werden. Anders als dort bleibt
+  // hier KEINE Familie absichtlich stehen (kein __DIR__ ausgenommen).
+  check('KRITISCH: der Bau bricht ab, wenn ein nicht ersetzter Platzhalter im betreiber-Bündel bleibt',
+    /UEBRIG=/.test(bauen) && /::error::[^\n]*Platzhalter/.test(bauen) && /exit 1/.test(bauen));
+
+  // Eigener FTP-Zugang, eigene Secret-NAMEN -- weder der des Rapport-Tools
+  // noch der von guardops.ch (ENT-343 Punkt 1).
+  check('KRITISCH: betreiber.guardops.ch benutzt einen eigenen FTP-Zugang, weder den des Rapport-Tools noch den von guardops.ch',
+    /server:\s*\$\{\{\s*env\.EFF_BETREIBER_FTP_HOST\s*\}\}/.test(laden)
+    && /secrets\.BETREIBER_FTP_HOST/.test(workflow)
+    && !/EFF_HOSTPOINT_FTP/.test(laden) && !/EFF_GUARDOPS_FTP/.test(laden));
+
+  // Ein Staging- oder Demo-Lauf hat auf dieser Adresse nichts verloren.
+  check('KRITISCH: beide betreiber-Schritte laufen nur auf Production und nur mit vorhandenem Secret',
+    [bauen, laden].every(st =>
+      /env\.UMGEBUNG\s*==\s*'production'/.test(st) && /env\.EFF_BETREIBER_FTP_HOST\s*!=\s*''/.test(st)));
+  check('KRITISCH: der Staging-Zweig setzt das betreiber-Ziel leer, ohne Rückfall auf die Production-Werte',
+    /EFF_BETREIBER_FTP_HOST=""/.test(workflow)
+    && !/EFF_BETREIBER_FTP_HOST="\$P_BETREIBER_FTP_HOST"[\s\S]{0,400}STAGING/.test(workflow));
+
+  check('KRITISCH: ein übersprungener Betreiber-Deploy sagt das ausdrücklich, statt lautlos auszufallen',
+    hinweis !== '' && /::notice::/.test(hinweis)
+    && /env\.EFF_BETREIBER_FTP_HOST\s*==\s*''/.test(hinweis));
+
+  // Dieselbe Frage an den Quelltext wie beim guardops-Bündel: Jeder
+  // Platzhalter in einer Datei, die ins betreiber-Bündel geht, muss dort
+  // entweder ersetzt werden oder mit Grund stehen bleiben.
+  {
+    const quellen = [...bauen.matchAll(/^\s*cp\s+(\S+)\s+dist-betreiber\/\S*/gm)]
+      .map(m => m[1]).filter(q => !q.includes('*') && /\.(php|html|txt)$/.test(q));
+    const endpunktPfade = endpunkte.map(e => `backend/api/${e}`);
+    for (const p of endpunktPfade) { quellen.push(p); }
+    const ersetzt = new Set([...bauen.matchAll(/sed -i "s\|(__[A-Z_]+__)\|/g)].map(m => m[1]));
+    // __BETREIBER_DB_*__ und __MANDANT_SECRETS__ (backend/betreiber.php):
+    // eigene, noch unersetzte Platzhalter fuer die separate
+    // Betreiber-Datenbank (OP-518) -- betreiber_db() faellt bei leerem/
+    // unersetztem Platzhalter bewusst auf db() zurueck, siehe Kommentar
+    // dort. Dasselbe gilt unveraendert im Rapport-Tool-Buendel (dist/).
+    // __DIR__ ist PHPs eigene Konstante, kein Platzhalter.
+    const absichtlich = /^(__BETREIBER_DB_[A-Z]+__|__MANDANT_SECRETS__|__DIR__)$/;
+    const offen = [];
+    for (const q of quellen) {
+      if (!existsSync(`${WURZEL}/${q}`)) { offen.push(`${q}: Datei fehlt`); continue; }
+      const inhalt = readFileSync(`${WURZEL}/${q}`, 'utf8');
+      for (const p of new Set([...inhalt.matchAll(/__[A-Z][A-Z_]{2,}__/g)].map(m => m[0]))) {
+        if (!ersetzt.has(p) && !absichtlich.test(p)) { offen.push(`${q}: ${p}`); }
+      }
+    }
+    check('KRITISCH: jeder Platzhalter in einer Datei des betreiber-Bündels wird dort ersetzt',
+      quellen.length >= 5 && offen.length === 0);
+    if (offen.length) { bad.push('bricht den Deploy: ' + offen.join(', ')); }
+  }
+
+  // Alle drei Bündel müssen sich gegenseitig aus dem Weg bleiben.
+  check('KRITISCH: alle drei Uploads haben verschiedene Quellverzeichnisse',
+    /local-dir:\s*\.\/dist\//.test(workflow) && /local-dir:\s*\.\/dist-guardops\//.test(workflow)
+    && /local-dir:\s*\.\/dist-betreiber\//.test(workflow));
+}
+
+// ENT-580: VIERTES Bündel (dist-portal/), zweite Etappe des Umzugs nach dem
+// Betreiber-Bereich. Wie dist-betreiber mit ECHTER Datenbankverbindung,
+// zusätzlich mit ECHTEN SMTP-Zugangsdaten (das Kundenportal verschickt
+// Zugangslink-/Passwort-Mails). Geprüft wird wieder gegen das, was
+// kundenportal.php und seine Endpunkte TATSÄCHLICH einbinden.
+{
+  const schritt = (name) => {
+    const i = workflow.indexOf(`- name: ${name}`);
+    if (i < 0) { return ''; }
+    const j = workflow.indexOf('\n      - name:', i + 10);
+    return workflow.slice(i, j < 0 ? undefined : j);
+  };
+  const bauen = schritt('Portal-Buendel fuer portal.guardops.ch bauen');
+  const laden = schritt('Kundenportal nach portal.guardops.ch hochladen (FTPS)');
+  const hinweis = schritt('Hinweis, wenn portal.guardops.ch noch nicht eingerichtet ist');
+  const cpZeilen = [...bauen.matchAll(/^\s*cp\s+(\S+)\s+(\S+)\s*$/gm)]
+    .map(m => ({ von: m[1], nach: m[2] }));
+  const alsMuster = q => new RegExp('^' + q.split('*')
+    .map(x => x.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('[^/]*') + '$');
+  const wirdKopiert = pfad => cpZeilen.some(z => alsMuster(z.von).test(pfad));
+  const liegtImBuendel = ziel => cpZeilen.some(z => z.nach === ziel || z.nach === ziel.replace(/[^/]+$/, ''));
+  const portalHtml = readFileSync(`${WURZEL}/portal.html`, 'utf8');
+
+  check('KRITISCH: es gibt einen Schritt, der das Bündel für portal.guardops.ch baut, und einen, der es hochlädt',
+    bauen !== '' && laden !== '');
+
+  // Auf der eigenen Adresse gehört das Portal auf "/", nicht auf
+  // "/portal.html" -- sonst zeigt portal.guardops.ch ins Leere.
+  check('KRITISCH: portal.html wird als index.html ausgeliefert (die Seite liegt auf der Wurzel der Adresse)',
+    cpZeilen.some(z => z.von === 'portal.html' && z.nach === 'dist-portal/index.html'));
+
+  // Aus der Seite abgeleitet: Hintergrundfoto/-video der Anmeldemaske
+  // (url()/<source> in portal.html). Keine eigene Schriftdatei -- anders
+  // als betreiber.html nutzt portal.html den System-Schriftstapel.
+  const bilder = [...new Set([
+    ...[...portalHtml.matchAll(/url\(['"]?(img\/[^)'"]+)/g)].map(m => m[1]),
+    ...[...portalHtml.matchAll(/<source\s+src="(img\/[^"]+)"/g)].map(m => m[1]),
+  ])];
+  const fehlendeBilder = bilder.filter(f => !wirdKopiert(f));
+  check('KRITISCH: jedes Hintergrundbild/-video, das portal.html lädt, wird ins portal-Bündel kopiert',
+    bilder.length >= 2 && fehlendeBilder.length === 0);
+  if (fehlendeBilder.length) { bad.push('fehlt im portal-Bündel: ' + fehlendeBilder.join(', ')); }
+
+  // Jeder portal_*-Endpunkt im Repository muss im Bündel landen.
+  const endpunkte = readdirSync(`${WURZEL}/backend/api`).filter(f => /^portal_.*\.php$/.test(f));
+  check('KRITISCH: jeder portal_*-Endpunkt aus backend/api wird ins portal-Bündel kopiert',
+    endpunkte.length >= 10 && endpunkte.every(e => wirdKopiert(`backend/api/${e}`)));
+
+  // Die Einbindungen von kundenportal.php UND all seinen Endpunkten, aus
+  // den Dateien selbst gelesen -- genau die Backend-Dateien, die dieses
+  // schlanke Bündel tatsächlich braucht.
+  const kundenportalPhp = readFileSync(`${WURZEL}/backend/kundenportal.php`, 'utf8');
+  const endpunktQuellen = endpunkte.map(e => readFileSync(`${WURZEL}/backend/api/${e}`, 'utf8'));
+  const noetigeModule = [...new Set(
+    [kundenportalPhp, ...endpunktQuellen].join('\n')
+      .matchAll(/require(?:_once)? __DIR__ \. '\/(?:\.\.\/)?([a-z_]+\.php)'/g))]
+    .map(m => m[1])
+    .filter(m => m !== 'kundenportal.php');
+  const fehlendeModule = noetigeModule.filter(m => !liegtImBuendel(`dist-portal/${m}`));
+  check('KRITISCH: jede Datei, die kundenportal.php oder einer seiner Endpunkte einbindet, liegt im portal-Bündel',
+    noetigeModule.length >= 3 && fehlendeModule.length === 0
+    && liegtImBuendel('dist-portal/kundenportal.php'));
+  if (fehlendeModule.length) { bad.push('Einbindung fehlt im portal-Bündel: ' + fehlendeModule.join(', ')); }
+
+  check('KRITISCH: die eigene .htaccess und robots.txt der Adresse werden mitgeliefert',
+    cpZeilen.some(z => z.von === 'htaccess-portal' && z.nach === 'dist-portal/.htaccess')
+    && cpZeilen.some(z => z.von === 'robots-portal.txt' && z.nach === 'dist-portal/robots.txt')
+    && existsSync(`${WURZEL}/htaccess-portal`) && existsSync(`${WURZEL}/robots-portal.txt`));
+
+  // Anders als guardops.ch: Diese Adresse SOLL nicht gefunden werden
+  // (ENT-580) -- dasselbe "Disallow: /" wie beim Betreiber-Bereich.
+  check('KRITISCH: die robots.txt von portal.guardops.ch sperrt die Seite aus',
+    /^Disallow:\s*\/\s*$/m.test(readFileSync(`${WURZEL}/robots-portal.txt`, 'utf8')));
+
+  // Die Sperrliste der .htaccess muss genau die Backend-Dateien treffen,
+  // die dieses Bündel tatsächlich mitbringt.
+  {
+    const ht = readFileSync(`${WURZEL}/htaccess-portal`, 'utf8');
+    const gesperrt = new Set((ht.match(/<FilesMatch "\^\(([a-z_|]+)\)\\\.php\$">/) || [])[1]?.split('|') ?? []);
+    const mitgeliefertePhp = cpZeilen
+      .filter(z => z.nach.startsWith('dist-portal/') && z.nach.endsWith('.php') && !z.nach.startsWith('dist-portal/api/'))
+      .map(z => z.nach.replace('dist-portal/', '').replace(/\.php$/, ''));
+    const ungeschuetzt = mitgeliefertePhp.filter(m => !gesperrt.has(m));
+    check('KRITISCH: die .htaccess von portal.guardops.ch sperrt jede mitgelieferte Backend-Datei gegen direkten Abruf',
+      mitgeliefertePhp.length >= 3 && ungeschuetzt.length === 0);
+    if (ungeschuetzt.length) { bad.push('ungeschützt im portal-Bündel: ' + ungeschuetzt.join(', ')); }
+  }
+
+  // ECHTE Datenbankverbindung -- das Kundenportal ist Kernbestandteil
+  // desselben Tools, keine Ausnahme wie beim Betreiber-Bereich/OP-518.
+  check('KRITISCH: in das portal-Bündel werden dieselben Produktions-Datenbank-Zugangsdaten eingesetzt wie ins Rapport-Tool',
+    /__DB_HOST__\|\$EFF_DB_HOST\|g"\s+dist-portal\/db\.php/.test(bauen)
+    && /__DB_NAME__\|\$EFF_DB_NAME\|g"\s+dist-portal\/db\.php/.test(bauen)
+    && /__DB_USER__\|\$EFF_DB_USER\|g"\s+dist-portal\/db\.php/.test(bauen)
+    && /__DB_PASS__\|\$EFF_DB_PASSWORD\|g"\s+dist-portal\/db\.php/.test(bauen));
+
+  // ECHTE Produktions-SMTP-Werte -- dasselbe Postfach, über das das
+  // Kundenportal seine Zugangslink-/Passwort-Mails schon heute verschickt.
+  // Kein eigenes Postfach wie beim guardops-Bündel.
+  check('KRITISCH: in das portal-Bündel werden dieselben Produktions-SMTP-Zugangsdaten eingesetzt wie ins Rapport-Tool',
+    /__SMTP_HOST__\|\$EFF_SMTP_HOST\|g"\s+dist-portal\/mailer\.php/.test(bauen)
+    && /__SMTP_USER__\|\$EFF_SMTP_USER\|g"\s+dist-portal\/mailer\.php/.test(bauen)
+    && /__SMTP_PASSWORD__\|\$EFF_SMTP_PASSWORD\|g"\s+dist-portal\/mailer\.php/.test(bauen));
+
+  // Eigene Adresse (ENT-501, ENT-580): festes Literal.
+  check('KRITISCH: portal.guardops.ch bekommt seine eigene, feste APP_BASIS_URL',
+    /__APP_BASIS_URL__\|https:\/\/portal\.guardops\.ch\|g"\s+dist-portal\/db\.php/.test(bauen));
+
+  // Kartenausschnitt der Rundgänge braucht denselben Maps-Schlüssel wie das
+  // Rapport-Tool.
+  check('KRITISCH: portal.guardops.ch bekommt den Maps-Schlüssel für den Kartenausschnitt der Rundgänge',
+    /__MAPS_JS_KEY__\|\$EFF_MAPS_JS_KEY\|g"\s+dist-portal\/index\.html/.test(bauen));
+
+  check('KRITISCH: der Bau bricht ab, wenn ein nicht ersetzter Platzhalter im portal-Bündel bleibt',
+    /UEBRIG=/.test(bauen) && /::error::[^\n]*Platzhalter/.test(bauen) && /exit 1/.test(bauen));
+
+  // Eigener FTP-Zugang, eigene Secret-NAMEN.
+  check('KRITISCH: portal.guardops.ch benutzt einen eigenen FTP-Zugang, weder den des Rapport-Tools noch den von guardops.ch/betreiber.guardops.ch',
+    /server:\s*\$\{\{\s*env\.EFF_PORTAL_FTP_HOST\s*\}\}/.test(laden)
+    && /secrets\.PORTAL_FTP_HOST/.test(workflow)
+    && !/EFF_HOSTPOINT_FTP/.test(laden) && !/EFF_GUARDOPS_FTP/.test(laden) && !/EFF_BETREIBER_FTP/.test(laden));
+
+  // Ein Staging- oder Demo-Lauf hat auf dieser Adresse nichts verloren.
+  check('KRITISCH: beide portal-Schritte laufen nur auf Production und nur mit vorhandenem Secret',
+    [bauen, laden].every(st =>
+      /env\.UMGEBUNG\s*==\s*'production'/.test(st) && /env\.EFF_PORTAL_FTP_HOST\s*!=\s*''/.test(st)));
+  check('KRITISCH: der Staging-Zweig setzt das portal-Ziel leer, ohne Rückfall auf die Production-Werte',
+    /EFF_PORTAL_FTP_HOST=""/.test(workflow)
+    && !/EFF_PORTAL_FTP_HOST="\$P_PORTAL_FTP_HOST"[\s\S]{0,400}STAGING/.test(workflow));
+
+  check('KRITISCH: ein übersprungener Portal-Deploy sagt das ausdrücklich, statt lautlos auszufallen',
+    hinweis !== '' && /::notice::/.test(hinweis)
+    && /env\.EFF_PORTAL_FTP_HOST\s*==\s*''/.test(hinweis));
+
+  // Jeder Platzhalter in einer Datei, die ins portal-Bündel geht, muss dort
+  // entweder ersetzt werden oder mit Grund stehen bleiben (hier: keine
+  // absichtlich offenen Platzhalter, anders als beim betreiber-Bündel).
+  {
+    const quellen = [...bauen.matchAll(/^\s*cp\s+(\S+)\s+dist-portal\/\S*/gm)]
+      .map(m => m[1]).filter(q => !q.includes('*') && /\.(php|html|txt)$/.test(q));
+    const endpunktPfade = endpunkte.map(e => `backend/api/${e}`);
+    for (const p of endpunktPfade) { quellen.push(p); }
+    const ersetzt = new Set([...bauen.matchAll(/sed -i "s\|(__[A-Z_]+__)\|/g)].map(m => m[1]));
+    const absichtlich = /^__DIR__$/;
+    const offen = [];
+    for (const q of quellen) {
+      if (!existsSync(`${WURZEL}/${q}`)) { offen.push(`${q}: Datei fehlt`); continue; }
+      const inhalt = readFileSync(`${WURZEL}/${q}`, 'utf8');
+      for (const p of new Set([...inhalt.matchAll(/__[A-Z][A-Z_]{2,}__/g)].map(m => m[0]))) {
+        if (!ersetzt.has(p) && !absichtlich.test(p)) { offen.push(`${q}: ${p}`); }
+      }
+    }
+    check('KRITISCH: jeder Platzhalter in einer Datei des portal-Bündels wird dort ersetzt',
+      quellen.length >= 3 && offen.length === 0);
+    if (offen.length) { bad.push('bricht den Deploy: ' + offen.join(', ')); }
+  }
+
+  // Alle vier Bündel müssen sich gegenseitig aus dem Weg bleiben.
+  check('KRITISCH: alle vier Uploads haben verschiedene Quellverzeichnisse',
+    /local-dir:\s*\.\/dist\//.test(workflow) && /local-dir:\s*\.\/dist-guardops\//.test(workflow)
+    && /local-dir:\s*\.\/dist-betreiber\//.test(workflow) && /local-dir:\s*\.\/dist-portal\//.test(workflow));
+}
+
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
 console.log('Alle Pruefungen bestanden.');
