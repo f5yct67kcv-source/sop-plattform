@@ -492,8 +492,9 @@ function be_bootstrap_offen(PDO $pdo): bool
 // Secrets -- nie den Wert (ENT-519). Der Wert kommt wie jede andere
 // Zugangsangabe aus dem Deploy.
 //
-// Ein eigener Platzhalter je Mandant (__DB_PASS_MANDANT_2__ und so fort)
-// skaliert nicht: Der Deploy müsste für jeden neuen Kunden geändert werden.
+// Ein eigener Platzhalter je Mandant ("__DB_PASS_MANDANT" + "_2__" und so
+// fort) skaliert nicht: Der Deploy müsste für jeden neuen Kunden geändert
+// werden.
 // Stattdessen EIN Platzhalter, der ein JSON-Objekt trägt --
 // {"DB_PASS_MANDANT_2":"...", ...}. Ein neuer Mandant heisst dann: einen
 // Eintrag im Secret ergänzen, kein Codeeingriff.

@@ -38,8 +38,14 @@ require_once __DIR__ . '/../demo_reset.php'; // demo_reset_*()
 // eines Aufrufers nicht (404).
 require_demo_umgebung();
 
-// Beim Deploy ersetzt (sed -i, wie __PUSH_CRON_SCHLUESSEL__ in
+// Beim Deploy ersetzt (sed -i, wie "__PUSH_CRON" + "_SCHLUESSEL__" in
 // push_versand.php). Ungesetzt heisst: dieser Weg ist zu.
+//
+// KEIN FREMDER PLATZHALTERNAME IN DIESER DATEI, auch nicht in einem
+// Kommentar: Seit ENT-589 geht sie auch nach dist-cupi24/ mit (ueber
+// backend/api/*.php), und der Bau des dortigen Buendels weist jeden
+// Platzhalter ab, der dort nicht ersetzt wird -- derselbe Fehler wie bei
+// mailer.php/Lauf 474 hat das hier in Lauf 521 ausgeloest.
 const DEMO_RESET_SCHLUESSEL = '__DEMO_RESET_TOKEN__';
 
 $mitgegeben = (string)($_GET['schluessel'] ?? '');

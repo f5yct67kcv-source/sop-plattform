@@ -11,11 +11,17 @@ declare(strict_types=1);
 
 // ── Zeitgeber-Geheimnis ─────────────────────────────────────────────
 // Zeitsicherer Vergleich (hash_equals) des beim Deploy per sed-Ersetzung
-// gesetzten Platzhalters, wie __PUSH_CRON_SCHLUESSEL__ in push_versand.php.
-// Eigene, kleine Kopie statt eines Aufrufs von push_zeitgeber_lage()
-// (push.php) -- jene ist fest an das Praefix "__PUSH_CRON" gebunden, und
-// push.php ist ein produktiv genutztes Modul, das fuer eine reine
-// Demo-Angelegenheit nicht angefasst werden muss.
+// gesetzten Platzhalters, wie "__PUSH_CRON" + "_SCHLUESSEL__" in
+// push_versand.php. Eigene, kleine Kopie statt eines Aufrufs von
+// push_zeitgeber_lage() (push.php) -- jene ist fest an das Praefix
+// "__PUSH_CRON" gebunden, und push.php ist ein produktiv genutztes Modul,
+// das fuer eine reine Demo-Angelegenheit nicht angefasst werden muss.
+//
+// KEIN FREMDER PLATZHALTERNAME IN DIESER DATEI, auch nicht in einem
+// Kommentar: Seit ENT-589 geht sie auch nach dist-cupi24/ mit, und der Bau
+// des dortigen Buendels weist jeden Platzhalter ab, der dort nicht ersetzt
+// wird -- derselbe Fehler wie bei mailer.php/Lauf 474 hat das hier in
+// Lauf 521 ausgeloest (siehe push.php fuer die Parallel-Ursache).
 function demo_reset_zeitgeber_lage(string $erwartet, string $mitgegeben): string
 {
     if ($erwartet === '' || str_starts_with($erwartet, '__DEMO_RESET')) {
