@@ -1,0 +1,69 @@
+# .htaccess fuer den Betreiber-Bereich auf seiner eigenen Adresse
+# (betreiber.guardops.ch, ENT-580). Der Deploy legt sie als
+# dist-betreiber/.htaccess ab.
+#
+# EIGENE DATEI, NICHT htaccess-hostpoint UND NICHT htaccess-guardops: Anders
+# als beim Rapport-Tool gibt es hier weder Standort- noch Kamera- noch
+# Mikrofonzugriff -- der Betreiber-Bereich ist eine Verwaltungsoberflaeche,
+# kein Feldeinsatz. Anders als bei der Homepage traegt dieses Buendel
+# ECHTE Datenbank-Zugangsdaten (dieselben wie das Rapport-Tool, weil
+# betreiber_db() aktuell auf db() zurueckfaellt, ENT-519) -- die Sperrliste
+# unten ist darum genauso ernst zu nehmen wie bei htaccess-hostpoint.
+
+# ── 1. Startseite ────────────────────────────────────────────────────────
+# Auf der eigenen Adresse gehoert der Betreiber-Bereich auf "/", nicht auf
+# "/betreiber.html" -- der Deploy legt ihn deshalb als index.html ab.
+DirectoryIndex index.html
+
+# ── 2. Hilfsdateien gegen direkten Abruf sperren ─────────────────────────
+# Dieselbe Begruendung wie in htaccess-hostpoint: Faellt die PHP-Verarbeitung
+# aus oder ist sie falsch eingestellt, liefert der Server den Quelltext im
+# Klartext aus -- hier stuenden dann die Produktions-Datenbank-Zugangsdaten
+# offen. Genau die Dateien, die dieses Buendel tatsaechlich mitbringt
+# (siehe deploy-hostpoint.yml, Schritt "Betreiber-Buendel fuer
+# betreiber.guardops.ch bauen"); test_deploy.mjs gleicht beides ab.
+<FilesMatch "^(db|anmeldung|zweifaktor|rechte|support|supportvorgang|betreiber)\.php$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
+
+# Sicherungskopien und Reste, die beim Hochladen entstehen koennen.
+<FilesMatch "\.(sql|bak|old|orig|log|md|yml)$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
+
+# ── 3. Schutzkopfzeilen ──────────────────────────────────────────────────
+<IfModule mod_headers.c>
+  Header always set X-Frame-Options "DENY"
+  Header always set Content-Security-Policy "frame-ancestors 'none'"
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+
+  # Kein Standort, keine Kamera, kein Mikrofon -- der Betreiber-Bereich
+  # braucht nichts davon. Eine leere Liste heisst "niemand, auch diese
+  # Seite nicht" (anders als beim Rapport-Tool, das den Revierdienst
+  # traegt).
+  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
+
+  Header always set Strict-Transport-Security "max-age=15552000"
+
+  # Nicht indexiert (ENT-580): Der Betreiber-Bereich ist kein oeffentlicher
+  # Inhalt, analog zu Staging/Demo. Direkt hier statt als separater
+  # "Zusatz" wie bei htaccess-demo-zusatz, weil diese Datei ohnehin nur
+  # fuer genau diese eine, dedizierte Adresse gilt.
+  Header always set X-Robots-Tag "noindex, nofollow, noarchive"
+</IfModule>
+
+# ── 4. Kein Verzeichnisinhalt ────────────────────────────────────────────
+Options -Indexes

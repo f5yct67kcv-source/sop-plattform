@@ -439,21 +439,31 @@ Code betrifft.
   echte, gerade deployte Seite: HTTP 200 mit `X-Robots-Tag: noindex` auf
   `/`, HTTP 200 mit `User-agent: *`/`Disallow: /` auf `/robots.txt`.
   Netzwerkfehler, Timeouts oder eine Weiterleitung zaehlen als Fehlschlag.
-- **Musterbetrieb erzeugen:** Nach der Ersteinrichtung (unten) im Cockpit
-  unter „Betrieb → Einrichtung" zuerst `planung_einrichten.php` ausfuehren
-  wie bei jeder neuen Instanz, danach den Endpunkt
+- **Musterbetrieb erzeugen (nur bei der Ersteinrichtung von Hand):** Im
+  Cockpit unter „Betrieb → Einrichtung" zuerst `planung_einrichten.php`
+  ausfuehren wie bei jeder neuen Instanz, danach den Endpunkt
   `api/demo_daten_erzeugen.php` einmalig aufrufen (Recht
   `betrieb_schreiben`) — er fuellt eine leere Datenbank mit einem
   erfundenen, funktionsfaehigen Bewachungsbetrieb samt einem
-  abgeschlossenen Lohnlauf fuer den Vormonat. Nur fuer eine **leere**
-  Datenbank gedacht; ein zweiter Lauf ohne vorherigen Reset bricht
+  abgeschlossenen Lohnlauf fuer den Vormonat. Die Vorbedingung prueft
+  `kunden`/`objekte` (nicht `mitarbeiter`) und vertraegt sich darum mit dem
+  einen Bootstrap-Konto aus `setup.php`, ohne das der Endpunkt ueberhaupt
+  erst erreichbar waere; ein zweiter Lauf ohne vorherigen Reset bricht
   kontrolliert ab, statt zu verdoppeln.
-- **Einrichtung/Zuruecksetzen** ansonsten wie bei Staging: `schema.sql`
-  einmalig in phpMyAdmin, `setup.php`/`setup.html` temporaer fuer den
-  ersten Admin-Account (danach sofort wieder loeschen), dann wie oben.
-  Ein automatischer naechtlicher Reset ist fuer die Demo vorgesehen, aber
-  noch nicht gebaut (ENT-523, Stufe 4) — bis dahin ist Zuruecksetzen
-  ebenso manuell wie bei Staging.
+- **Einrichtung** ansonsten wie bei Staging: `schema.sql` einmalig in
+  phpMyAdmin, `setup.php`/`setup.html` temporaer fuer den ersten
+  Admin-Account (danach sofort wieder loeschen), dann wie oben.
+- **Naechtlicher Reset (ENT-523 Punkt 3, automatisch seit Stufe 4):**
+  `.github/workflows/demo-reset.yml` ruft taeglich um 02:00 UTC (MEZ 03:00,
+  MESZ 04:00) `api/demo_reset_ausfuehren.php` auf — der leert die gesamte
+  Demo-Datenbank und ruft anschliessend dieselbe Musterbetrieb-Erzeugung
+  wie oben erneut auf. Ausgeloest ueber ein Geheimnis in der Adresse, nicht
+  ueber eine Sitzung (gleiches Prinzip wie `PUSH_CRON_SCHLUESSEL` bei
+  `api/push_versand.php`) — dafuer im GitHub-Environment „demo" zusaetzlich
+  zu den bestehenden `DEMO_*`-Secrets ein **`DEMO_RESET_TOKEN`** eintragen
+  (langer, zufaelliger Wert) und einmal deployen. Laesst sich unter
+  Actions → „Demo naechtlich zuruecksetzen" → „Run workflow" auch von Hand
+  ausloesen, etwa zwischen zwei Interessenten am selben Tag.
 
 ## Betreiber-Bereich in Betrieb nehmen (ENT-519 bis ENT-526)
 

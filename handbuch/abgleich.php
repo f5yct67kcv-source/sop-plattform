@@ -33,16 +33,16 @@
       </ul>
       <div class="hb-gruppe">Cockpit</div>
       <ul class="hb-nav">
-        <li><a href="planung.php">Planung</a></li>
-        <li><a href="kunden.php">Kunden</a></li>
+        <li><a href="hb-planung.php">Planung</a></li>
+        <li><a href="hb-kunden.php">Kunden</a></li>
         <li><a href="personal.php">Personal</a></li>
-        <li><a href="lohn.php">Lohn</a></li>
+        <li><a href="hb-lohn.php">Lohn</a></li>
         <li><a href="abgleich.php" class="aktiv">Abgleich</a></li>
         <li><a href="betrieb.php">Betrieb</a></li>
       </ul>
       <div class="hb-gruppe">Weitere Oberflächen</div>
       <ul class="hb-nav">
-        <li><a href="kundenportal.php">Kundenportal</a></li>
+        <li><a href="hb-kundenportal.php">Kundenportal</a></li>
       </ul>
       <div class="hb-gruppe">Nachschlagen</div>
       <ul class="hb-nav">
@@ -68,7 +68,7 @@
         <p><b>Ist-Zeiten</b> (unten auf dieser Seite) ist der eigentliche Menüpunkt
         „Abgleich". <b>Rapporte</b> — die von Mitarbeitenden erfassten und vom Kunden
         unterschriebenen Berichte — stehen als Liste im Kapitel
-        <a href="kunden.php">Kunden</a>, obwohl sie rechtemässig zum Bereich
+        <a href="hb-kunden.php">Kunden</a>, obwohl sie rechtemässig zum Bereich
         „Abgleich" gehören. <b>Pensen</b> liegt unter „Auswertung". <b>Ruhezeit</b>
         hat keine eigene Seite — nur eine Warnung beim Einteilen in der Planung
         (siehe unten).</p>
@@ -119,7 +119,7 @@
       bearbeiten" wieder öffnen (mit Rückfrage — die bisher erfassten Ist-Zeiten
       gehen dabei verloren). Dieselbe Sperre wirkt auch umgekehrt: In der Planung
       lässt sich eine bereits abgeglichene Schicht nicht mehr verschieben, löschen
-      oder umbesetzen, solange die Sperre steht (siehe <a href="planung.php">Planung</a>).</p>
+      oder umbesetzen, solange die Sperre steht (siehe <a href="hb-planung.php">Planung</a>).</p>
 
       <h2 id="pensen-unter-auswertung">Pensen <span class="hb-status kurz">unter „Auswertung"</span></h2>
       <p>Jahresstunden je Person gegen die Grenzen der Anstellungskategorie nach

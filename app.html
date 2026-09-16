@@ -6,8 +6,8 @@
      viewport-fit=cover bleibt: es haelt den Inhalt aus der Notch. -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Cockpit</title>
-<link rel="icon" href="icons/icon-32.png" type="image/png">
-<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" href="icons/guardops-32.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/guardops-180.png">
 <meta name="theme-color" content="#161B27">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <!-- ══ ENT-477: "black" statt "black-translucent" ═══════════════════
@@ -45,8 +45,8 @@
      sie hält dann eben nichts mehr frei, weil nichts mehr freizuhalten
      ist. -->
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
-<meta name="apple-mobile-web-app-title" content="CUPI 24">
-<link rel="apple-touch-icon" href="icons/icon-180.png">
+<meta name="apple-mobile-web-app-title" content="GuardOpS">
+<link rel="apple-touch-icon" href="icons/guardops-180.png">
 <!-- Eigenes Manifest (ENT-424), nicht das von index.html: Dort steht
      start_url "./" -- eine von app.html aus installierte App landete damit
      auf der Rapport-Erfassung statt in der Mitarbeiter-App. Zwei Seiten,
@@ -1883,8 +1883,8 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
  <div class="gate-schleier"></div>
  <div class="gate-mitte">
   <div class="gate-oben">
-    <img src="icons/icon-192.png" alt="">
-    <div class="sub">CUPI 24 GmbH</div>
+    <img src="icons/guardops-192.png" alt="">
+    <div class="sub">GuardOpS</div>
   </div>
   <div class="gate-form" id="gate-login">
     <div id="gErr" class="msg-err" style="display:none"></div>
@@ -7720,6 +7720,9 @@ function rgLaufKopfZeichnen() {
     if (nachziehen && rgsReiter === 'punkte' && abPunktId === null) {
       rundgangListeZeichnen();
     }
+    // Und der mitwachsende Kreis auf der Karte (ENT-579). Hier wird nur an-
+    // und abgeschaltet; die Bewegung selbst laeuft in eigenen Bildern.
+    try { rgFuellungNachfuehren(); } catch (e) {}
   } catch (e) {
   } finally {
     rgsKopfTaktLaeuft = false;
@@ -7890,6 +7893,11 @@ function rgLaufFunktionen() {
 const RGS_MAPS_SCHLUESSEL = '__MAPS_JS_KEY__';
 let rgsMapsVersprechen = null;
 let rgsKarte = null, rgsKartenMarken = [], rgsKartenKreise = [], rgsStandortMarke = null;
+/* Der mitwachsende Kreis waehrend der Verweilzeit (ENT-579). Bewusst NICHT
+   in rgsKartenKreise: Der wird von rgKartePunkteZeichnen() bei jeder
+   Aenderung abgeraeumt und neu gebaut, und dabei waere die laufende
+   Fuellung jedes Mal weg. */
+let rgsFuellKreis = null, rgsFuellPunktId = null, rgsFuellBild = null;
 // Der Richtungspfeil (ENT-542) haengt an derselben Karte wie die
 // Standortmarke und wird ueberall zusammen mit ihr vergessen.
 let rgsRichtungsMarke = null;
@@ -7968,6 +7976,11 @@ function rgKarteGesperrtZeigen() {
   karte.innerHTML = '';
   rgsKartenMarken = []; rgsKartenKreise = []; rgsStandortMarke = null;
   rgsRichtungsMarke = null;
+  // Die Fuellung haengt an der eben geleerten Karte und ist damit weg --
+  // sie muss auch vergessen werden, sonst haelt die App einen Kreis fuer
+  // gesetzt, der in keinem Dokument mehr steht (dieselbe Falle wie bei der
+  // Standortmarke, ENT-331).
+  rgFuellungAus();
   // Die Karte selbst gilt damit ebenfalls als weg (ENT-543) -- sonst hielte
   // der Aktualisierungsweg eine Karte fuer stehend, die es nicht mehr gibt.
   rgsKarte = null; rgsKarteEl = null; rgsKartenSignatur = null;
@@ -8336,6 +8349,86 @@ function rgKartenSignatur(punkte) {
 }
 
 // Farbe UND Form: erledigt ist gefuellt-gruen mit Haken, offen ist blau mit
+/* ══ Der Kreis fuellt sich waehrend der Verweilzeit (ENT-579) ═════════
+   Vom Projektinhaber verlangt: "sehr cool waere, wenn sich der Kreis
+   innerhalb der 5 sekunden fuellt. wenn die sekunden abgelaufen ist wird er
+   voll."
+
+   Umgesetzt als zweiter Kreis IM Geofence-Kreis, dessen Radius von 0 auf
+   den vollen Radius waechst -- nicht als gedrehter Tortenausschnitt. Grund:
+   Ein wachsender Radius ist genau das, was google.maps.Circle kann; ein
+   Sektor braeuchte eine eigene Overlay-Ebene mit eigener Projektion. Die
+   einfache Loesung genuegt hier ("kleinstmoegliche Software").
+
+   Die Fuellung ist SCHMUCK, keine Aussage: Der Nachweis haengt allein an
+   rgBereichPruefen(). Faellt die Karte aus, faellt nur das Bild aus --
+   darum steht alles hier in try/catch und niemand fragt sie etwas. */
+function rgFuellungAus() {
+  if (rgsFuellBild !== null) {
+    try { cancelAnimationFrame(rgsFuellBild); } catch (e) {}
+    rgsFuellBild = null;
+  }
+  if (rgsFuellKreis) {
+    try { rgsFuellKreis.setMap(null); } catch (e) {}
+    rgsFuellKreis = null;
+  }
+  rgsFuellPunktId = null;
+}
+
+/* Welcher Punkt gerade gefuellt werden soll -- oder null. Reine Funktion,
+   damit sich die Weiche ohne Karte pruefen laesst. Gefuellt wird nur der
+   EINE Punkt, dessen Frist laeuft; bei zwei ueberlappenden Bereichen der
+   erste. Zwei wachsende Kreise uebereinander waeren nicht mehr zu lesen. */
+function rgFuellKandidat(kontrollpunkte) {
+  return (kontrollpunkte || []).find(k =>
+    k && k.typ === 'geofence' && !k.erledigt && k._autoRest > 0
+    && k.lat !== null && k.lat !== undefined) || null;
+}
+
+// Wie voll der Kreis ist: 0 beim Eintreten, 1 wenn die Frist um ist.
+// Reine Funktion -- die Rechnung ist der eigentliche Inhalt.
+function rgFuellAnteil(drinSeit, jetzt) {
+  if (!drinSeit) { return 0; }
+  const v = (jetzt - drinSeit) / RG_AUTO_VERWEIL_MS;
+  return v <= 0 ? 0 : v >= 1 ? 1 : v;
+}
+
+function rgFuellungNachfuehren() {
+  if (rgsModus !== 'lauf' || !rundgangAktiv || !rgsKarte || rgsReiter !== 'karte') {
+    rgFuellungAus(); return;
+  }
+  const k = rgFuellKandidat(rundgangAktiv.kontrollpunkte);
+  if (!k) { rgFuellungAus(); return; }
+  if (rgsFuellPunktId !== Number(k.id)) {
+    // Anderer Punkt als zuletzt -- der alte Kreis gehoert weg.
+    rgFuellungAus();
+    try {
+      rgsFuellKreis = new google.maps.Circle({
+        map: rgsKarte, center: { lat: Number(k.lat), lng: Number(k.lng) }, radius: 0,
+        // Gruen wie ein erfasster Punkt: Was hier waechst, wird gleich gruen.
+        strokeColor: '#4FCE96', strokeOpacity: 0, strokeWeight: 0,
+        fillColor: '#4FCE96', fillOpacity: 0.35, clickable: false, zIndex: 2,
+      });
+      rgsFuellPunktId = Number(k.id);
+    } catch (e) { rgFuellungAus(); return; }
+  }
+  /* Eigenes Bild pro Rahmen statt im Sekundentakt: Ein Kreis, der einmal je
+     Sekunde um ein Fuenftel springt, sieht kaputt aus und nicht gefuellt.
+     requestAnimationFrame haelt von selbst an, wenn die Seite in den
+     Hintergrund geht -- der Akku zahlt also nur, solange man hinsieht. */
+  const rahmen = () => {
+    rgsFuellBild = null;
+    if (!rgsFuellKreis || !rundgangAktiv) { return; }
+    const p = rundgangAktiv.kontrollpunkte.find(x => Number(x.id) === rgsFuellPunktId);
+    if (!p || p.erledigt || !(p._autoRest > 0)) { rgFuellungAus(); return; }
+    try {
+      rgsFuellKreis.setRadius(rdRadiusVon(p) * rgFuellAnteil(p._drinSeit, Date.now()));
+    } catch (e) { rgFuellungAus(); return; }
+    rgsFuellBild = requestAnimationFrame(rahmen);
+  };
+  if (rgsFuellBild === null) { rgsFuellBild = requestAnimationFrame(rahmen); }
+}
+
 // Nummer, "nicht verfuegbar"/Ersatzscan tragen ein Ausrufezeichen. Wer die
 // Farben nicht unterscheidet, liest die Zeichen.
 function rgKartePunkteZeichnen(punkte) {
@@ -8569,6 +8662,11 @@ function rgOrtungStarten() {
     try { rgStandortZeichnen(); } catch (e) {}
     try { rgSpurAufnehmen(rgsMeinOrt); } catch (e) {}
     try { rgBereichPruefen(); } catch (e) {}
+    /* Die Fuellung schon hier anstossen, nicht erst beim naechsten
+       Sekundentakt (ENT-579): Der Takt kaeme bis zu eine Sekunde spaeter,
+       und der Kreis begaenne dann sichtbar bei einem Fuenftel statt bei
+       Null. Beim ERSTEN Zwanzigstel der Frist faellt das am meisten auf. */
+    try { rgFuellungNachfuehren(); } catch (e) {}
     // Die Liste zeigt Entfernungen -- sie muss mitwandern. Nur wenn sie
     // gerade sichtbar ist: sonst wuerde ein offenes Formular (Ersatzscan,
     // "nicht verfuegbar") beim naechsten Positionswechsel weggeworfen.
@@ -8622,7 +8720,21 @@ function rgTonEntsperren() {
 /* Zwei kurze, hohe Toene -- durchdringender als ein langer tiefer, und
    unverwechselbar gegenueber einer Mitteilung des Telefons. */
 function rgTonSignal() {
-  if (!rgsTonKanal || rgsTonKanal.state !== 'running') { return false; }
+  if (!rgsTonKanal) { return false; }
+  /* Einen eingeschlafenen Kanal aufwecken statt stumm aufzugeben (ENT-579).
+
+     Bis hierher stieg diese Funktion bei jedem Zustand ausser 'running'
+     wortlos aus. Das war richtig, solange Eintritt und Erfassung derselbe
+     Augenblick waren -- der lag Sekundenbruchteile nach dem Antippen, mit
+     dem der Kanal entsperrt wurde. Seit ENT-576 liegen fuenf Sekunden
+     dazwischen, und iOS haelt den Tonkanal bei jeder Unterbrechung an: ein
+     Anruf, eine Mitteilung, ein kurz gesperrter Bildschirm. Danach waere
+     der Ton fuer den Rest der Runde weg gewesen, ohne dass es auffaellt.
+
+     resume() ist asynchron -- darum wird TROTZDEM geplant: Ein auf einem
+     angehaltenen Kanal geplanter Ton spielt, sobald er wieder laeuft, weil
+     dessen Uhr in der Zwischenzeit stillsteht. */
+  try { if (rgsTonKanal.state !== 'running') { rgsTonKanal.resume(); } } catch (e) {}
   try {
     const jetzt = rgsTonKanal.currentTime;
     [[880, 0], [1320, 0.16]].forEach(([hz, ab]) => {
@@ -9080,7 +9192,17 @@ function rgBereichPruefen() {
   const ortFrisch = (Date.now() - (rgsMeinOrt.zeit || 0)) < RG_ORT_STILL_MS;
   const status = rundgangAktiv.status;
   (rundgangAktiv.kontrollpunkte || []).forEach(k => {
-    if (k.typ !== 'geofence' || k.erledigt) { k._drin = false; return; }
+    if (k.typ !== 'geofence' || k.erledigt) {
+      /* Auch die Frist zuruecksetzen, nicht nur k._drin (ENT-579).
+         Bis hierher blieb k._autoRest an einem erfassten Punkt fuer immer
+         auf seinem letzten Wert stehen -- die Zeile darunter steigt ja aus,
+         bevor sie ihn anfasst. Folge: Der Sekundentakt hielt bis zum Ende
+         der Runde "irgendwo laeuft eine Frist" fuer wahr und zeichnete die
+         Liste jede Sekunde neu, fuer nichts. Aufgefallen bei der
+         Gegenprobe, nicht im Betrieb. */
+      k._drin = false; k._drinSeit = null; k._autoRest = null;
+      return;
+    }
     const dist = rdEntfernungZu(k);
     const e = rgSignalNoetig(k._drin, dist, rdRadiusVon(k));
     k._drin = e.drin;

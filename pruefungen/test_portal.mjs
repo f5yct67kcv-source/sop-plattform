@@ -2030,6 +2030,21 @@ await setup(gross);
 await gross.goto(SEITE);
 await gross.evaluate(() => localStorage.clear());
 await gross.goto(SEITE);
+
+// KRITISCH (Befund des Projektinhabers, 2026-09-16 -- portal.guardops.ch
+// im Vergleich zum Cockpit): Das Video-Gate muss am Desktop den GANZEN
+// Bildschirm decken, unabhaengig von der Hoehe seines eigenen Inhalts --
+// dieselbe Bauart wie #gate in dashboard.html (ENT-392/394/396/398).
+// Vorher stand hier nur "position:relative" innerhalb von .buehne: Der
+// Rahmen reichte nur so weit wie die Anmeldemaske selbst hoch war, mit
+// sichtbarem Eigenhintergrund der Seite rundherum.
+const gateMass = await gross.evaluate(() => {
+  const r = document.getElementById('gate-bereich').getBoundingClientRect();
+  return { breite: Math.round(r.width), hoehe: Math.round(r.height) };
+});
+check('KRITISCH: das Video-Gate deckt am Desktop den ganzen Bildschirm, nicht nur seinen eigenen Inhalt',
+  gateMass.breite >= 1440 && gateMass.hoehe >= 900);
+
 await fuell('#email', 'a.beispiel@example.invalid', gross);
 await fuell('#passwort', 'ein sicheres langes wort', gross);
 await klick('#anmelden-pw', gross);

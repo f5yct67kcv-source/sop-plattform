@@ -69,25 +69,16 @@ let { browser, page } = await starte();
 check('Der Schalter ist in der Kopfzeile', await page.isVisible('#btnThema'));
 check('Er ist als Schalter ausgezeichnet',
   await page.evaluate(() => $('btnThema').getAttribute('role') === 'switch'));
-check('Ohne Wahl startet es hell',
-  await page.evaluate(() => document.documentElement.getAttribute('data-thema') === 'hell'));
-check('Der Schalter meldet „aus"',
-  await page.evaluate(() => $('btnThema').getAttribute('aria-checked') === 'false'));
-check('Er trägt eine sprechende Beschriftung',
-  (await page.getAttribute('#btnThema', 'title')).includes('dunkle'));
-
-await page.click('#btnThema');
-await page.waitForTimeout(350);
-check('Ein Klick schaltet auf dunkel',
+// Seit dem Entscheid des Projektinhabers gilt dunkel als Vorgabe, unabhaengig
+// vom Systemthema -- vorher entschied hier das Betriebssystem.
+check('Ohne Wahl startet es dunkel',
   await page.evaluate(() => document.documentElement.getAttribute('data-thema') === 'dunkel'));
 check('Der Schalter meldet „an"',
   await page.evaluate(() => $('btnThema').getAttribute('aria-checked') === 'true'));
-check('Die Wahl wird gespeichert',
-  await page.evaluate(() => localStorage.getItem('rv3_thema') === 'dunkel'));
-check('Die Systemleiste zieht mit',
-  await page.evaluate(() => document.querySelector('meta[name="theme-color"]').content === '#0B0D11'));
+check('Er trägt eine sprechende Beschriftung',
+  (await page.getAttribute('#btnThema', 'title')).includes('helle'));
 
-// ══════════════ ES IST WIRKLICH DUNKEL
+// ══════════════ ES IST WIRKLICH DUNKEL -- schon als Vorgabe, ohne Klick
 // Die Flaeche, auf der ein Text wirklich liegt -- nicht der Seitengrund.
 await page.addInitScript(() => {});
 const echterGrund = sel => page.evaluate(s => {
@@ -161,11 +152,17 @@ check('Eingabefelder sind im Dunkeln lesbar', kontrast(feld.text, feld.grund) >=
 check('Eingabefelder heben sich vom Fenster ab', feld.grund !== 'rgba(0, 0, 0, 0)');
 await page.evaluate(() => closeDlg('dlgAnwenden'));
 
-// ══════════════ ZURÜCK AUF HELL
+// ══════════════ EIN KLICK WECHSELT AUF HELL
 await page.click('#btnThema');
 await page.waitForTimeout(350);
-check('Zurück auf hell',
+check('Ein Klick schaltet auf hell',
   await page.evaluate(() => document.documentElement.getAttribute('data-thema') === 'hell'));
+check('Der Schalter meldet „aus"',
+  await page.evaluate(() => $('btnThema').getAttribute('aria-checked') === 'false'));
+check('Die Wahl wird gespeichert',
+  await page.evaluate(() => localStorage.getItem('rv3_thema') === 'hell'));
+check('Die Systemleiste zieht mit',
+  await page.evaluate(() => document.querySelector('meta[name="theme-color"]').content === '#16181D'));
 const hell = await page.evaluate(() => ({
   grund: getComputedStyle(document.body).backgroundColor,
   text: getComputedStyle(document.querySelector('.topbar h1')).color,

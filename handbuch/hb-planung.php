@@ -33,16 +33,16 @@
       </ul>
       <div class="hb-gruppe">Cockpit</div>
       <ul class="hb-nav">
-        <li><a href="planung.php" class="aktiv">Planung</a></li>
-        <li><a href="kunden.php">Kunden</a></li>
+        <li><a href="hb-planung.php" class="aktiv">Planung</a></li>
+        <li><a href="hb-kunden.php">Kunden</a></li>
         <li><a href="personal.php">Personal</a></li>
-        <li><a href="lohn.php">Lohn</a></li>
+        <li><a href="hb-lohn.php">Lohn</a></li>
         <li><a href="abgleich.php">Abgleich</a></li>
         <li><a href="betrieb.php">Betrieb</a></li>
       </ul>
       <div class="hb-gruppe">Weitere Oberflächen</div>
       <ul class="hb-nav">
-        <li><a href="kundenportal.php">Kundenportal</a></li>
+        <li><a href="hb-kundenportal.php">Kundenportal</a></li>
       </ul>
       <div class="hb-gruppe">Nachschlagen</div>
       <ul class="hb-nav">
@@ -62,7 +62,7 @@
       <p class="hb-lead">Einsätze anlegen, Objekte über Masterschichten mit Bedarf
       versehen, Mitarbeitende zuteilen. Fünf Ansichten plus ein Dialog (Feiertage);
       <b>Objekte</b> selbst werden, obwohl inhaltlich Planung, unter
-      <a href="kunden.php">Kunden</a> verwaltet — hier nur, was daran anschliesst.</p>
+      <a href="hb-kunden.php">Kunden</a> verwaltet — hier nur, was daran anschliesst.</p>
 
       <h2 id="uebersicht-monatsmatrix">Übersicht (Monatsmatrix)</h2>
       <p>Ein Raster: eine Zeile je Objekt (bei gemischter Sparte auch zweimal, je mit

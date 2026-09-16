@@ -1,0 +1,70 @@
+name: Demo naechtlich zuruecksetzen
+
+# Naechtlicher Reset der Demo-Instanz (ENT-523 Punkt 3, Stufe 4). Ruft
+# backend/api/demo_reset_ausfuehren.php ueber HTTPS auf -- der eigentliche
+# Rechenkern (Datenbank leeren, Musterbetrieb "Aareblick Sicherheit AG" neu
+# erzeugen) steht in backend/demo_reset.php, nicht hier. Der Endpunkt
+# traegt bewusst einen anderen Namen als die Hilfsdatei (siehe Kopfkommentar
+# dort) -- sonst spraeche ihn htaccess-hostpoint mit. Getrennt vom
+# Deploy-Workflow (deploy-hostpoint.yml): Ein Reset ist kein Deploy,
+# braucht keinen Checkout und keine FTP-Zugangsdaten, nur einen
+# HTTPS-Aufruf mit dem Zeitgeber-Geheimnis.
+#
+# Uhrzeit 02:00 UTC, ganzjaehrig fest -- GitHub Actions kennt keine
+# zeitzonenbewusste Zeitplanung. Das liegt in MEZ um 03:00, in MESZ um
+# 04:00; beides ausserhalb jeder plausiblen Geschaeftszeit, darum ist die
+# Verschiebung um eine Stunde im Sommer hier folgenlos.
+#
+# workflow_dispatch zusaetzlich zum Zeitplan: damit sich ein Reset auch von
+# Hand ausloesen laesst, ohne bis zur naechsten Nacht zu warten -- etwa
+# zwischen zwei Interessenten am selben Tag (siehe Begruendung im
+# Entscheidungsprotokoll, ENT-523 Punkt 3).
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    # Dasselbe GitHub-Environment "demo" wie beim Deploy-Workflow (dort
+    # ueber eine Bedingung ausgewaehlt, hier immer fest, weil dieser
+    # Workflow nur die Demo kennt) -- liefert DEMO_DOMAIN und das neue
+    # Secret DEMO_RESET_TOKEN aus derselben, bereits eingerichteten Quelle.
+    environment: demo
+    steps:
+      - name: Voraussetzungen pruefen
+        env:
+          DEMO_DOMAIN: ${{ vars.DEMO_DOMAIN }}
+          DEMO_RESET_TOKEN: ${{ secrets.DEMO_RESET_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "$DEMO_DOMAIN" ]; then
+            echo "::error::Environment-Variable DEMO_DOMAIN fehlt im GitHub-Environment 'demo' -- Reset uebersprungen."
+            exit 1
+          fi
+          if [ -z "$DEMO_RESET_TOKEN" ]; then
+            echo "::error::Secret DEMO_RESET_TOKEN fehlt im GitHub-Environment 'demo' -- Reset uebersprungen. Unter Settings -> Environments -> demo eintragen, danach einmal nach main pushen (das Secret wird erst beim naechsten Deploy in die Anlage eingetragen)."
+            exit 1
+          fi
+
+      - name: Demo zuruecksetzen
+        env:
+          DEMO_DOMAIN: ${{ vars.DEMO_DOMAIN }}
+          DEMO_RESET_TOKEN: ${{ secrets.DEMO_RESET_TOKEN }}
+        run: |
+          set -euo pipefail
+          ANTWORT=$(curl -sS -X POST --max-time 120 --connect-timeout 15 \
+            -w '\n%{http_code}' \
+            "https://$DEMO_DOMAIN/backend/api/demo_reset_ausfuehren.php?schluessel=$DEMO_RESET_TOKEN")
+          CODE=$(echo "$ANTWORT" | tail -n1)
+          BODY=$(echo "$ANTWORT" | sed '$d')
+          echo "$BODY"
+          if [ "$CODE" != "200" ]; then
+            echo "::error::Demo-Reset fehlgeschlagen (HTTP $CODE): $BODY"
+            exit 1
+          fi
+          case "$BODY" in
+            *'"status":"ok"'*) echo "Reset erfolgreich." ;;
+            *) echo "::error::Demo-Reset antwortete mit HTTP 200, aber ohne status:ok: $BODY"; exit 1 ;;
+          esac

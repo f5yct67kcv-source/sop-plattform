@@ -38,6 +38,11 @@
 
   var istDemo = APP_ENV === 'demo';
 
+  // Fuer andere Skripte auf derselben Seite lesbar, z. B. den Gruss auf der
+  // Anmeldemaske in dashboard.html -- ohne eigene __APP_ENV__-Ersetzung dort
+  // anzulegen, die die Deploy-sed-Zeile (siehe oben) erst noch kennen muesste.
+  window.APP_UMGEBUNG_DEMO = istDemo;
+
   var hinweis = document.createElement('div');
   hinweis.textContent = istDemo ? 'DEMO — BEISPIELDATEN' : 'TESTUMGEBUNG';
   hinweis.setAttribute('role', 'status');

@@ -1,0 +1,72 @@
+# .htaccess fuer das Kundenportal auf seiner eigenen Adresse
+# (portal.guardops.ch, ENT-580). Der Deploy legt sie als
+# dist-portal/.htaccess ab.
+#
+# EIGENE DATEI, NICHT htaccess-hostpoint UND NICHT htaccess-betreiber: Das
+# Kundenportal traegt weder Betreiber- noch Rundgang-Verwaltungscode,
+# sondern genau die Backend-Dateien, die kundenportal.php und seine
+# API-Endpunkte tatsaechlich per require_once/require einbinden. Es traegt
+# ECHTE Datenbank- und SMTP-Zugangsdaten (dieselben wie das Rapport-Tool --
+# das Kundenportal ist Kernbestandteil desselben Tools, keine Ausnahme wie
+# beim Betreiber-Bereich/OP-518) -- die Sperrliste unten ist darum genauso
+# ernst zu nehmen wie bei htaccess-hostpoint.
+
+# ── 1. Startseite ────────────────────────────────────────────────────────
+# Auf der eigenen Adresse gehoert das Kundenportal auf "/", nicht auf
+# "/portal.html" -- der Deploy legt es deshalb als index.html ab.
+DirectoryIndex index.html
+
+# ── 2. Hilfsdateien gegen direkten Abruf sperren ─────────────────────────
+# Dieselbe Begruendung wie in htaccess-hostpoint: Faellt die PHP-Verarbeitung
+# aus oder ist sie falsch eingestellt, liefert der Server den Quelltext im
+# Klartext aus -- hier stuenden dann die Produktions-Datenbank- und
+# SMTP-Zugangsdaten offen. Genau die Dateien, die dieses Buendel
+# tatsaechlich mitbringt (siehe deploy-hostpoint.yml, Schritt
+# "Portal-Buendel fuer portal.guardops.ch bauen"); test_deploy.mjs
+# gleicht beides ab.
+<FilesMatch "^(db|anmeldung|kundenportal|rundgang|mailer)\.php$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
+
+# Sicherungskopien und Reste, die beim Hochladen entstehen koennen.
+<FilesMatch "\.(sql|bak|old|orig|log|md|yml)$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
+
+# ── 3. Schutzkopfzeilen ──────────────────────────────────────────────────
+<IfModule mod_headers.c>
+  Header always set X-Frame-Options "DENY"
+  Header always set Content-Security-Policy "frame-ancestors 'none'"
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+
+  # Kein Standort, keine Kamera, kein Mikrofon -- das Kundenportal ist ein
+  # reines Leseportal fuer Kunden (Rundgaenge, Wachbuch, Einsatzberichte),
+  # keine Erfassungsoberflaeche. Eine leere Liste heisst "niemand, auch
+  # diese Seite nicht" (anders als beim Rapport-Tool, das den Revierdienst
+  # traegt).
+  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
+
+  Header always set Strict-Transport-Security "max-age=15552000"
+
+  # Nicht indexiert (ENT-580): Das Kundenportal ist kein oeffentlicher
+  # Inhalt, analog zu Betreiber-Bereich und Staging/Demo. Direkt hier statt
+  # als separater "Zusatz", weil diese Datei ohnehin nur fuer genau diese
+  # eine, dedizierte Adresse gilt.
+  Header always set X-Robots-Tag "noindex, nofollow, noarchive"
+</IfModule>
+
+# ── 4. Kein Verzeichnisinhalt ────────────────────────────────────────────
+Options -Indexes
