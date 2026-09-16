@@ -1362,6 +1362,62 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
   check('KRITISCH: der Bau bricht ab, wenn ein nicht ersetzter Platzhalter im cupi24-Bündel bleibt',
     /UEBRIG=/.test(bauen) && /::error::[^\n]*Platzhalter/.test(bauen) && /exit 1/.test(bauen));
 
+  // DIESELBE PRÜFUNG WIE AUF DEM RUNNER, NUR HIER (vgl. der guardops-Block
+  // weiter oben, der Lauf 474 zur Lehre hat). Lauf 521 hat dieselbe Lehre
+  // hier wiederholt: eine blosse Erwähnung eines Platzhalternamens in einem
+  // Kommentar (push.php: __DB_HOST__, demo_reset.php:
+  // __PUSH_CRON_SCHLUESSEL__, betreiber.php: __DB_PASS_MANDANT_2__) hat den
+  // Deploy abgebrochen, obwohl die volle Regression grün war -- der
+  // UEBRIG-Riegel oben läuft erst im echten Runner. Anders als beim
+  // guardops-Block kopiert dieser Schritt auch über Wildcards
+  // (backend/api/*.php, handbuch/*), darum werden die hier expandiert statt
+  // übersprungen.
+  {
+    const cpZeilenCupi = [...bauen.matchAll(/^\s*cp\s+(\S+)\s+(dist-cupi24\/\S*)\s*$/gm)]
+      .map(m => ({ von: m[1], nach: m[2] }));
+    const alsMusterCupi = m => new RegExp('^' + m.split('*')
+      .map(x => x.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('.*') + '$');
+    // { quelle, ziel } -- ZIEL bleibt erhalten, weil die Ersetzung unten
+    // pro ZIELDATEI gilt (sed -i wirkt nur auf die eine genannte Datei).
+    // Ohne diese Zuordnung würde ein "sed ... db.php" fälschlich auch eine
+    // blosse Kommentar-Erwähnung desselben Platzhalters in push.php decken
+    // -- genau die Lücke, die Lauf 521 durchgelassen hat.
+    const quellenCupi = [];
+    for (const { von, nach } of cpZeilenCupi) {
+      if (!von.includes('*')) { quellenCupi.push({ quelle: von, ziel: nach }); continue; }
+      const schraegstrich = von.lastIndexOf('/');
+      const verz = von.slice(0, schraegstrich);
+      const muster = alsMusterCupi(von.slice(schraegstrich + 1));
+      if (!existsSync(`${WURZEL}/${verz}`)) { continue; }
+      for (const datei of readdirSync(`${WURZEL}/${verz}`)) {
+        if (muster.test(datei)) { quellenCupi.push({ quelle: `${verz}/${datei}`, ziel: `${nach}${datei}` }); }
+      }
+    }
+    const textDateienCupi = quellenCupi.filter(q => /\.(php|html|js|css|txt|json)$/.test(q.quelle));
+    // Platzhalter je ZIELDATEI, nicht global -- derselbe sed-Aufruf betrifft
+    // nur die eine genannte Datei.
+    const ersetztJeZiel = new Map();
+    for (const m of bauen.matchAll(/sed -i "s\|(__[A-Z][A-Z0-9_]*__)\|[^"]*\|g"\s+(\S+)/g)) {
+      const [, platzhalter, ziel] = m;
+      if (!ersetztJeZiel.has(ziel)) { ersetztJeZiel.set(ziel, new Set()); }
+      ersetztJeZiel.get(ziel).add(platzhalter);
+    }
+    const absichtlichCupi = /^(__MANDANT_SECRETS__|__DIR__)$/;
+
+    const offenCupi = [];
+    for (const { quelle, ziel } of textDateienCupi) {
+      if (!existsSync(`${WURZEL}/${quelle}`)) { offenCupi.push(`${quelle}: Datei fehlt`); continue; }
+      const inhalt = readFileSync(`${WURZEL}/${quelle}`, 'utf8');
+      const ersetztHier = ersetztJeZiel.get(ziel) ?? new Set();
+      for (const p of new Set([...inhalt.matchAll(/__[A-Z][A-Z0-9_]*__/g)].map(m => m[0]))) {
+        if (!ersetztHier.has(p) && !absichtlichCupi.test(p)) { offenCupi.push(`${ziel}: ${p}`); }
+      }
+    }
+    check('KRITISCH: jeder Platzhalter in jeder Datei des cupi24-Bündels (auch über Wildcards kopierte) wird GENAU IN DIESER DATEI ersetzt oder bleibt mit Grund stehen',
+      textDateienCupi.length >= 40 && offenCupi.length === 0);
+    if (offenCupi.length) { bad.push('bricht den cupi24-Deploy: ' + offenCupi.join(', ')); }
+  }
+
   // Eigener FTP-Zugang, eigene Secret-NAMEN -- keiner der vier bestehenden.
   check('KRITISCH: cupi24.guardops.ch benutzt einen eigenen FTP-Zugang, keinen der vier bestehenden Bündel',
     /server:\s*\$\{\{\s*env\.EFF_CUPI24_FTP_HOST\s*\}\}/.test(laden)
