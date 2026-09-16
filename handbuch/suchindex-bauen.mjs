@@ -14,9 +14,15 @@ import path from 'node:path';
 
 const HIER = path.dirname(fileURLToPath(import.meta.url));
 
+// planung/kunden/lohn/kundenportal tragen das Praefix "hb-": Ohne es
+// kollidieren die Dateinamen mit der Sperrliste in htaccess-hostpoint, die
+// fuer die gleichnamigen Backend-Hilfsdateien gedacht ist (Apache sperrt
+// nach Dateiname, nicht nach Pfad -- traf api/lohnlauf.php schon einmal am
+// 2026-09-09 genauso). test_php.mjs prueft seither, dass keine Datei unter
+// handbuch/ wieder unpraefixiert denselben Namen traegt.
 const KAPITEL = [
-  'erste-schritte.php', 'erfassung.php', 'planung.php', 'kunden.php',
-  'personal.php', 'lohn.php', 'abgleich.php', 'betrieb.php', 'kundenportal.php',
+  'erste-schritte.php', 'erfassung.php', 'hb-planung.php', 'hb-kunden.php',
+  'personal.php', 'hb-lohn.php', 'abgleich.php', 'betrieb.php', 'hb-kundenportal.php',
 ];
 
 function slug(text) {
