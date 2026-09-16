@@ -763,3 +763,50 @@ function ma_stempel(PDO $pdo, string $spalte, string $wo, $wert): void
     if (!$pdo->query('SHOW COLUMNS FROM mitarbeiter LIKE ' . $pdo->quote($spalte))->fetch()) { return; }
     $pdo->prepare("UPDATE mitarbeiter SET $spalte = NOW() WHERE $wo = ?")->execute([$wert]);
 }
+
+// Aktive Konten mit laengst vergangenem Austrittsdatum (ENT-598).
+// Deaktivieren geschieht heute nur von Hand (aktiv = 0) -- vergisst das
+// jemand im Tagesgeschaeft, bleibt der Zugang bestehen, obwohl die Person
+// nicht mehr im Betrieb ist. `austritt` ist dafuer das praezisere Signal
+// als "schon lange nicht mehr angemeldet": Ferien, Militaer oder eine
+// laengere Krankheit erzeugen ebenfalls wochenlange Pausen, ohne dass
+// etwas falsch waere -- ein vergangenes Austrittsdatum bei weiterhin
+// aktivem Konto hat dagegen keine harmlose Erklaerung.
+function ma_ausgetreten_aber_aktiv(PDO $pdo): array
+{
+    $s = $pdo->prepare(
+        "SELECT id, name, vorname, nachname, austritt, austritt_erinnerung_am
+           FROM mitarbeiter
+          WHERE aktiv = 1 AND austritt IS NOT NULL AND austritt < ?
+          ORDER BY austritt"
+    );
+    $s->execute([date('Y-m-d')]);
+    return $s->fetchAll();
+}
+
+// Beansprucht atomar alle heute faelligen Personen und gibt sie zurueck
+// (ENT-598) -- reine Datenbanklogik, ohne Wissen darueber, WER benachrichtigt
+// wird oder WIE. austritt_erinnerung_am haelt fest, wer heute schon
+// gemeldet wurde, damit derselbe Zeitgeber-Lauf (mehrmals stuendlich, siehe
+// push_versand.php) niemanden zweimal zaehlt. Die WHERE-Bedingung TRAEGT
+// die gesamte Sperre -- nur ein UPDATE, das tatsaechlich eine Zeile trifft,
+// beansprucht die Person; das schuetzt auch gegen zwei sich ueberschneidende
+// Laeufe, gleiches Prinzip wie sv_erinnerung_merken() in supportvorgang.php.
+// Das eigentliche Verschicken (Empfaenger suchen, Mail zusammensetzen,
+// senden) steht in push_versand.php: rechte.php und mailer.php sind dort
+// schon eingebunden, mitarbeiter.php braucht keins von beiden fuer sich
+// selbst.
+function ma_austritt_erinnerung_faellige(PDO $pdo): array
+{
+    $heute = date('Y-m-d');
+    $faellig = [];
+    foreach (ma_ausgetreten_aber_aktiv($pdo) as $m) {
+        $c = $pdo->prepare(
+            "UPDATE mitarbeiter SET austritt_erinnerung_am = ?
+              WHERE id = ? AND (austritt_erinnerung_am IS NULL OR austritt_erinnerung_am < ?)"
+        );
+        $c->execute([$heute, (int)$m['id'], $heute]);
+        if ($c->rowCount() === 1) { $faellig[] = $m; }
+    }
+    return $faellig;
+}

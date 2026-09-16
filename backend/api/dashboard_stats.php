@@ -4,6 +4,7 @@ declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../rechte.php';
 require_once __DIR__ . '/../ereignisse.php';
+require_once __DIR__ . '/../mitarbeiter.php';   // ma_ausgetreten_aber_aktiv() (ENT-598)
 
 $user = require_session();
 require_verwaltung($user);
@@ -94,6 +95,12 @@ $letzte = db()->query(
 // leer: "kein Zugriff" darf nie wie "niemand angemeldet" aussehen.
 $darfPersonal = darf($user, 'personal_lesen');
 
+// Austritts-Erinnerung (ENT-598): eigenes, engeres Recht als die beiden
+// Felder oben -- die Empfaengerentscheidung (personal_schreiben) gilt
+// gleichermassen fuer den Dashboard-Hinweis wie fuer die E-Mail aus
+// ma_austritt_erinnerung_versenden().
+$darfPersonalSchreiben = darf($user, 'personal_schreiben');
+
 json_response([
     'status' => 'ok',
     'stand'  => date('c'),
@@ -109,6 +116,7 @@ json_response([
     'verlauf'         => $verlauf,
     'angemeldet'      => $darfPersonal ? $angemeldet : null,
     'pro_mitarbeiter' => $darfPersonal ? $proMitarbeiter : null,
+    'ausgetreten_aktiv' => $darfPersonalSchreiben ? ma_ausgetreten_aber_aktiv(db()) : null,
     'letzte_rapporte' => $letzte,
     'ereignisse'            => $ereignisse['ereignisse'],
     'ereignisse_gesamt'     => $ereignisse['gesamt'],

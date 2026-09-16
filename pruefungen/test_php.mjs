@@ -477,6 +477,7 @@ for (const [datei, titel] of [
   ['pruef_lohn.php', 'KRITISCH: Lohnform, Mindestlohn, Ferienentschaedigung und PaKo-Beitrag stimmen mit dem GAV ueberein (ENT-451)'],
   ['pruef_lohnlauf.php', 'KRITISCH: der Lohnlauf zaehlt nur abgeglichene Schichten, sperrt Reinigung und rechnet nichts auf fehlender Grundlage (ENT-451)'],
   ['pruef_logbuch.php', 'KRITISCH: das Logbuch haelt fest, wer was geaendert hat'],
+  ['pruef_mitarbeiter_austritt.php', 'KRITISCH: ein ausgetretenes, aber weiterhin aktives Konto wird gefunden und hoechstens einmal pro Tag gemeldet (ENT-598)'],
   ['pruef_einsatz_abgeschlossen.php', 'KRITISCH: "abgeschlossen" verlangt ALLE zugesagten Rapporte (ENT-128)'],
   ['pruef_rundgang.php', 'KRITISCH: Geofence-Pruefung und Restliste der Kontrollpunkte stimmen (ENT-132/ENT-145/ENT-180)'],
   ['pruef_ereignisse.php', 'KRITISCH: die Ereignis-Arten und ihre Abhakbarkeit stimmen (ENT-090/ENT-197)'],
@@ -871,6 +872,11 @@ if (ohneEinbindung.length) { bad.push('ohne rechte.php: ' + ohneEinbindung.join(
   const dash = ohneKommentar('dashboard_stats.php');
   check('KRITISCH: dashboard_stats.php prueft personal_lesen, bevor es Stunden-/Sitzungsdaten je Person ausliefert',
     /\$darfPersonal = darf\(\$user, .personal_lesen.\);[\s\S]{0,800}'angemeldet'\s*=>\s*\$darfPersonal \? \$angemeldet : null/.test(dash));
+  // Austritts-Erinnerung (ENT-598): eigenes, engeres Recht als oben -- der
+  // Projektinhaber hat 'personal_schreiben' als Empfaengerkreis bestimmt,
+  // nicht das breitere 'personal_lesen'.
+  check('KRITISCH: dashboard_stats.php prueft personal_schreiben, bevor es ausgetretene aktive Konten nennt',
+    /\$darfPersonalSchreiben = darf\(\$user, .personal_schreiben.\);[\s\S]{0,900}'ausgetreten_aktiv'\s*=>\s*\$darfPersonalSchreiben \? ma_ausgetreten_aber_aktiv\(db\(\)\) : null/.test(dash));
 
   const rollen = ohneKommentar('rollen_list.php');
   check('KRITISCH: rollen_list.php prueft personal_lesen, bevor es Waffentrage-/Diensthundefuehrer-Merkmale ausliefert',
@@ -943,6 +949,23 @@ if (ohneEinbindung.length) { bad.push('ohne rechte.php: ' + ohneEinbindung.join(
   check('KRITISCH: rundgang_rapport_versenden.php schreibt einen Logbuch-Eintrag nach dem Versand',
     /logbuch_schreiben\(\$pdo,\s*\$user,\s*'rundgang',\s*\$rundgangId,\s*'rapport_versendet',\s*null,\s*\$empfaenger\)/
       .test(nachVersand));
+}
+
+// push_versand.php: die Austritts-Erinnerung (ENT-598) muss tatsaechlich an
+// die richtigen Empfaenger und mit dem richtigen Recht gehen. Echte
+// Zuteilungslogik (wer ist faellig, kein taeglicher Spam) ist in
+// pruef_mitarbeiter_austritt.php gegen SQLite geprueft -- hier nur, dass
+// push_versand.php sie tatsaechlich verdrahtet, statt sie ungenutzt daneben
+// stehen zu lassen.
+{
+  const versandQuelle = ohneKommentar('push_versand.php');
+  check('KRITISCH: push_versand.php ruft die Austritts-Erinnerung im Zeitgeber-Nachlauf auf',
+    /\$austrittNachlauf\s*=\s*austritt_erinnerung_versenden\(\$pdo\)/.test(versandQuelle));
+  check('KRITISCH: die Austritts-Erinnerung geht an "personal_schreiben", nicht an ein anderes Recht',
+    /rechte_mitarbeiter_mit_recht\(\$pdo,\s*'personal_schreiben'\)/.test(versandQuelle));
+  check('KRITISCH: jede Zeile im Nachlauf verwendet dieselbe Zuteilungsfunktion (kein zweiter, ungeprueften Weg)',
+    /ma_austritt_erinnerung_faellige\(\$pdo\)/.test(versandQuelle)
+    && /smtp_senden\(\(string\)\$p\['email'\]/.test(versandQuelle));
 }
 
 // dashboard.html: die Frontend-Seite der beiden Personal-Felder oben muss

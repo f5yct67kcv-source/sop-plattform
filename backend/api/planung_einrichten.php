@@ -2198,6 +2198,13 @@ $spalten = [
     // ohne ihn laesst sich nicht sagen, wer noch beschaeftigt ist -- und die
     // Jahresstunden nach Art. 8 haengen am Zeitraum.
     ['mitarbeiter', 'austritt',         "ALTER TABLE mitarbeiter ADD COLUMN austritt DATE NULL AFTER eintritt"],
+    // Wann zuletzt wegen eines laengst vergangenen Austritts bei noch
+    // aktivem Konto erinnert wurde (ENT-598) -- verhindert, dass derselbe
+    // Fall bei jedem Lauf des Zeitgebers (alle 15 Minuten) erneut per Mail
+    // gemeldet wird. Steht am Mitarbeiter, nicht in einer eigenen Tabelle:
+    // der Zustand gehoert zu genau dieser Person, nicht zu einer separaten
+    // Erinnerungsliste.
+    ['mitarbeiter', 'austritt_erinnerung_am', "ALTER TABLE mitarbeiter ADD COLUMN austritt_erinnerung_am DATE NULL AFTER austritt"],
     //
     // Personenstand und Versicherung.
     ['mitarbeiter', 'ahv_nr',           "ALTER TABLE mitarbeiter ADD COLUMN ahv_nr VARCHAR(16) NULL"],

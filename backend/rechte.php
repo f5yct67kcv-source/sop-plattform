@@ -860,6 +860,28 @@ function rechte_rollen_alle(PDO $pdo): array
     return $karte;
 }
 
+// Alle aktiven Personen mit E-Mail-Adresse, die ein bestimmtes Recht
+// tragen (ENT-598) -- fuer Sammel-Benachrichtigungen wie die
+// Austritts-Erinnerung. Baut auf rechte_rollen_alle() statt selbst zu
+// fragen: eine Person traegt ein Recht genau dann, wenn eine ihrer Rollen
+// es ableitet -- dieselbe Ableitung wie in darf(), nur ueber alle Personen
+// statt ueber einen einzelnen $user.
+function rechte_mitarbeiter_mit_recht(PDO $pdo, string $recht): array
+{
+    $ids = [];
+    foreach (rechte_rollen_alle($pdo) as $maId => $rollen) {
+        if (in_array($recht, rechte_aus_rollen($rollen), true)) { $ids[] = $maId; }
+    }
+    if (!$ids) { return []; }
+    $platzhalter = implode(',', array_fill(0, count($ids), '?'));
+    $s = $pdo->prepare(
+        "SELECT id, name, vorname, nachname, email FROM mitarbeiter
+          WHERE aktiv = 1 AND email IS NOT NULL AND email <> '' AND id IN ($platzhalter)"
+    );
+    $s->execute($ids);
+    return $s->fetchAll();
+}
+
 // ── Profile anlegen und aendern (ENT-440) ─────────────────────────────
 // Aus dem Titel einen Schluessel machen. Der Schluessel steht in
 // mitarbeiter_rollen und in den Antworten; er bleibt fest, auch wenn der

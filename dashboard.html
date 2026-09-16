@@ -1662,6 +1662,11 @@ th.sortbar.aktiv .pf { opacity: 1; color: var(--accent); }
   border-bottom: 1px solid var(--line); font-size: 12.5px; line-height: 1.55; }
 .erg-luecke b { color: var(--warn); }
 .erg-luecke span { display: block; color: var(--ink-2); margin-top: 2px; }
+/* Als eigenstaendiger Seiten-Banner statt als oberste Zeile einer Liste
+   (ENT-598): eigener Rahmen und Radius, keine border-bottom-Trennlinie zu
+   einer Liste, die hier nicht folgt. */
+.austritt-warnung { border: 1px solid var(--warn-line, var(--line)); border-radius: var(--r-md, 10px);
+  margin: 0 0 16px; }
 
 /* Aufgeklappte Ereigniszeile (ENT-090). Sie sitzt unter der Zeile statt in
    einem Fenster: Wer drei Ereignisse pruefen will, soll sie nebeneinander
@@ -5528,6 +5533,10 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
 
       <!-- ─────────── ÜBERSICHT ─────────── -->
       <section class="view on" id="view-uebersicht">
+        <!-- Austritts-Erinnerung (ENT-598): bewusst KEIN dash-item -- ein
+             Compliance-Hinweis darf sich nicht wegziehen oder ausblenden
+             lassen wie ein gewoehnliches Widget. -->
+        <div class="erg-luecke austritt-warnung" id="austrittWarnung" style="display:none"></div>
         <div class="dash-flow" id="dashFlow" ondragover="ordDragUeber(event)" ondrop="ordDropFlaeche(event)">
 
           <div class="dash-item dw-halb" data-widget="begruessung">
@@ -12085,6 +12094,7 @@ function loadStats() {
     if (!ok || data.status !== 'ok') { toast(data.message || 'Kennzahlen konnten nicht geladen werden.'); return; }
     stats = data;
     renderKpi(); renderChart(); renderAngemeldet(); renderLetzte(); renderProMa(); renderEreignisse();
+    renderAustrittWarnung();
   });
 }
 
@@ -12842,6 +12852,22 @@ function renderProMa() {
       </div>
       <div class="h">${nf(m.stunden, 1)}<span style="font-size:11px;color:var(--ink-3);font-weight:600"> h</span></div>
     </div>`).join('');
+}
+
+// null (kein personal_schreiben) heisst: Banner bleibt versteckt, so wie
+// jemand ohne dieses Recht auch keinen entsprechenden Menuepunkt sieht --
+// anders als renderAngemeldet()/renderProMa() ist das hier kein Datenblock,
+// den jemand aktiv aufsucht, sondern ein Hinweis, der nur erscheint, wenn
+// es etwas zu melden gibt (ENT-598).
+function renderAustrittWarnung() {
+  const el = $('austrittWarnung');
+  const liste = stats.ausgetreten_aktiv;
+  if (!liste || !liste.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  const namen = liste.map(m => `${esc(fullName(m))} <span style="color:var(--ink-3)">— Austritt ${dmy(m.austritt)}</span>`);
+  el.style.display = '';
+  el.innerHTML = `
+    <b>${liste.length === 1 ? 'Ein ausgetretenes Konto ist noch aktiv.' : liste.length + ' ausgetretene Konten sind noch aktiv.'}</b>
+    <span>${namen.join(' · ')}. Zugang prüfen und bei Bedarf deaktivieren — Personal → Konto → „Aktiv" abwählen.</span>`;
 }
 
 // ══════════════════════════════════════════ RAPPORTE

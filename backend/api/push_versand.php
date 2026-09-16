@@ -32,9 +32,59 @@ require_once __DIR__ . '/../push.php';
 require_once __DIR__ . '/../betreiber.php';
 require_once __DIR__ . '/../mailer.php';
 require_once __DIR__ . '/../supportvorgang.php';
+require_once __DIR__ . '/../mitarbeiter.php';   // ma_austritt_erinnerung_versenden() (ENT-598)
 
 // Beim Deploy ersetzt. Ungesetzt heisst: Der Zeitgeber-Weg ist zu.
 const PUSH_ZEITGEBER_SCHLUESSEL = '__PUSH_CRON_SCHLUESSEL__';
+
+// Verschickt die Sammel-Erinnerung an alle mit 'personal_schreiben' -- genau
+// die Rolle, die Austrittsdatum und Kontostatus ohnehin pflegt (ENT-598).
+// ma_austritt_erinnerung_faellige() (mitarbeiter.php) uebernimmt die
+// atomare Zuteilung; hier steht nur, WER die Mail bekommt und WIE sie
+// aussieht -- rechte.php und mailer.php sind in dieser Datei ohnehin schon
+// eingebunden.
+function austritt_erinnerung_versenden(PDO $pdo): array
+{
+    try {
+        $faellig = ma_austritt_erinnerung_faellige($pdo);
+    } catch (Throwable $e) {
+        return ['versendet' => 0, 'fehler' => db_fehlermeldung($e)];
+    }
+    if (!$faellig) { return ['versendet' => 0]; }
+
+    $empfaenger = rechte_mitarbeiter_mit_recht($pdo, 'personal_schreiben');
+    if (!$empfaenger) { return ['versendet' => 0, 'betroffen' => count($faellig), 'ohne_empfaenger' => true]; }
+
+    $zeilen = array_map(function ($m) {
+        $name = trim(($m['vorname'] ?? '') . ' ' . ($m['nachname'] ?? '')) ?: $m['name'];
+        return $name . ' — Austritt am ' . date('d.m.Y', strtotime((string)$m['austritt']));
+    }, $faellig);
+
+    $betreff = count($faellig) === 1
+        ? 'Ausgetretenes Konto noch aktiv'
+        : count($faellig) . ' ausgetretene Konten noch aktiv';
+    $text = "Folgende Konten sind laut Austrittsdatum nicht mehr im Betrieb, aber noch aktiv:\n\n"
+        . implode("\n", $zeilen)
+        . "\n\nBitte pruefen und bei Bedarf deaktivieren.";
+    $esc = static fn(string $s): string => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
+    $html = '<p>Folgende Konten sind laut Austrittsdatum nicht mehr im Betrieb, aber noch aktiv:</p>'
+        . '<ul>' . implode('', array_map(fn($z) => '<li>' . $esc($z) . '</li>', $zeilen)) . '</ul>'
+        . '<p>Bitte prüfen und bei Bedarf deaktivieren.</p>';
+
+    $versendet = 0;
+    foreach ($empfaenger as $p) {
+        $name = trim(($p['vorname'] ?? '') . ' ' . ($p['nachname'] ?? '')) ?: $p['name'];
+        try {
+            smtp_senden((string)$p['email'], $name, $betreff, $html, $text);
+            $versendet++;
+        } catch (Throwable $e) {
+            // Ein Fehlschlag bei einer Empfaengerin darf die anderen nicht
+            // verhindern -- jede Adresse ist ein eigener Versand.
+            continue;
+        }
+    }
+    return ['versendet' => $versendet, 'betroffen' => count($faellig)];
+}
 
 $mitgegeben = (string)($_GET['schluessel'] ?? '');
 $lage = push_zeitgeber_lage(PUSH_ZEITGEBER_SCHLUESSEL, $mitgegeben);
@@ -110,9 +160,17 @@ try {
                         'fehler' => db_fehlermeldung($e)];
 }
 
+/* ── Dritte Aufgabe desselben Zeitgebers: Austritts-Erinnerung (ENT-598) ──
+   Gleicher Grund wie beim Supportvorgang oben: kein eigener Cronjob, und
+   VOR den Push-Aussteigern, weil ein fehlendes Push-Setup nichts darueber
+   aussagt, ob irgendwo ein laengst ausgetretenes Konto noch aktiv ist. Die
+   Funktion schreibt in DIESELBE (Mandanten-)Datenbank wie der Push-Versand,
+   anders als der Support-Nachlauf. */
+$austrittNachlauf = austritt_erinnerung_versenden($pdo);
+
 if (!hat_tabelle($pdo, 'mitteilungen') || !hat_tabelle($pdo, 'push_abo')) {
     json_response(['status' => 'ok', 'eingerichtet' => false, 'verschickt' => 0,
-        'support' => $supportNachlauf,
+        'support' => $supportNachlauf, 'austritt' => $austrittNachlauf,
         'meldung' => 'Die Tabellen fehlen — einmal „Einrichtung" ausführen.']);
 }
 if (!push_konfiguriert()) {
@@ -121,7 +179,7 @@ if (!push_konfiguriert()) {
     // Aber auch nicht als Erfolg -- die Antwort sagt ausdruecklich, dass
     // nichts eingerichtet ist.
     json_response(['status' => 'ok', 'eingerichtet' => false, 'verschickt' => 0,
-        'support' => $supportNachlauf,
+        'support' => $supportNachlauf, 'austritt' => $austrittNachlauf,
         'meldung' => 'Auf dem Server fehlt der Push-Schlüssel.']);
 }
 
@@ -142,4 +200,5 @@ json_response([
     'verschickt'   => count($bilanzen),
     'mitteilungen' => $bilanzen,
     'support'      => $supportNachlauf,
+    'austritt'     => $austrittNachlauf,
 ]);
