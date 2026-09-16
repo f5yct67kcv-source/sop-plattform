@@ -37,6 +37,8 @@ jobs:
       - name: Naechsten freien demo-JJJJ-MM-TT-NNN-Namen ermitteln und Tag pushen
         run: |
           set -euo pipefail
+          git config user.email "actions@github.com"
+          git config user.name "GitHub Actions"
           git fetch --tags --force
 
           HEUTE=$(date -u +%F)
