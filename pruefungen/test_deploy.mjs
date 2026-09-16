@@ -341,7 +341,7 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
   // nur "ANTHROPIC_API_KEY kommt irgendwo vor" verlangt, wuerde grün
   // bleiben, auch wenn er wie bei Production/Staging NICHT in die
   // PFLICHT_FEHLT-Liste des Demo-Zweigs aufgenommen waere.
-  const demoZweig = (/elif \[ "\$IST_DEMO_REF" = "1" \][\s\S]{0,5000}?(?=\n          else)/.exec(workflow) ?? [''])[0];
+  const demoZweig = (/elif \[ "\$IST_DEMO_REF" = "1" \][\s\S]{0,7000}?(?=\n          else)/.exec(workflow) ?? [''])[0];
   check('KRITISCH (ENT-523-N1): DEMO_ANTHROPIC_API_KEY ist im Demo-Zweig ein PFLICHT-Secret -- anders als bei Production und Staging',
     /\[ -z "\$EFF_ANTHROPIC_API_KEY" \][\s\S]{0,80}PFLICHT_FEHLT="\$PFLICHT_FEHLT DEMO_ANTHROPIC_API_KEY"/.test(demoZweig));
 
@@ -1069,13 +1069,15 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     const endpunktPfade = endpunkte.map(e => `backend/api/${e}`);
     for (const p of endpunktPfade) { quellen.push(p); }
     const ersetzt = new Set([...bauen.matchAll(/sed -i "s\|(__[A-Z_]+__)\|/g)].map(m => m[1]));
-    // __BETREIBER_DB_*__ und __MANDANT_SECRETS__ (backend/betreiber.php):
-    // eigene, noch unersetzte Platzhalter fuer die separate
-    // Betreiber-Datenbank (OP-518) -- betreiber_db() faellt bei leerem/
-    // unersetztem Platzhalter bewusst auf db() zurueck, siehe Kommentar
-    // dort. Dasselbe gilt unveraendert im Rapport-Tool-Buendel (dist/).
-    // __DIR__ ist PHPs eigene Konstante, kein Platzhalter.
-    const absichtlich = /^(__BETREIBER_DB_[A-Z]+__|__MANDANT_SECRETS__|__DIR__)$/;
+    // __BETREIBER_DB_*__ (backend/betreiber.php) wird seit OP-518 auch hier
+    // oben per sed ersetzt -- notfalls mit einer leeren Zeichenkette, wenn
+    // die vier Secrets noch nicht gesetzt sind; betreiber_db() faellt dann
+    // bewusst auf db() zurueck (siehe Kommentar dort). Es steht darum NICHT
+    // mehr in dieser Ausnahmeliste, sondern muss ueber "ersetzt" oben
+    // gefunden werden wie jeder andere Platzhalter. __MANDANT_SECRETS__
+    // bleibt eigene, noch unersetzte Ausnahme -- eigenes, noch offenes
+    // Thema (OP-526). __DIR__ ist PHPs eigene Konstante, kein Platzhalter.
+    const absichtlich = /^(__MANDANT_SECRETS__|__DIR__)$/;
     const offen = [];
     for (const q of quellen) {
       if (!existsSync(`${WURZEL}/${q}`)) { offen.push(`${q}: Datei fehlt`); continue; }
