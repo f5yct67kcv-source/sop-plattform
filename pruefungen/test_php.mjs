@@ -843,6 +843,16 @@ const OHNE_ANMELDUNG = [
   // Konto. Bis ENT-501 standen diese beiden nirgends benannt.
   'beleg_oeffentlich.php',
   'beleg_entscheidung.php',
+  // Naechtlicher Demo-Reset (ENT-523 Punkt 3), ausgeloest ueber einen
+  // GitHub-Actions-Zeitgeber ohne jede Sitzung -- gleiches Prinzip wie
+  // push_versand.php (dort STEHT require_session() aber im Quelltext, als
+  // Rueckfall fuer den angemeldeten Weg, und faellt darum selbst nicht
+  // unter diese Liste). Eigene Bremse: demo_reset_zeitgeber_lage()
+  // vergleicht zeitsicher (hash_equals) gegen ein beim Deploy gesetztes
+  // Geheimnis, zusaetzlich abgeriegelt durch require_demo_umgebung() --
+  // ausserhalb der Demo existiert der Endpunkt aus Sicht eines Aufrufers
+  // nicht (404).
+  'demo_reset_ausfuehren.php',
 ];
 // Drei Anmeldewege, drei Pruefstellen: die Verwaltung (require_session),
 // das Kundenportal (require_kundensession, ENT-441) und die Betreiber-Ebene
