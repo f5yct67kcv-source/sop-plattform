@@ -290,6 +290,7 @@ svg.i-sm { width: 15px; height: 15px; }
 .gate-oben .wm { margin-top: 18px; color: var(--ink); font-size: 20px; font-weight: 700; letter-spacing: -.3px; }
 .gate-oben .sub { margin-top: 4px; color: var(--ink-2);
   font-size: 12px; font-weight: 640; letter-spacing: 2px; text-transform: uppercase; }
+.gate-oben .gate-demo-gruss { margin-top: 16px; color: var(--ink); font-size: 15px; font-weight: 650; }
 .gate-msg { font-size: 13px; color: var(--ink-2); margin-bottom: 20px; line-height: 1.6; }
 /* Herstellersignatur unter der Anmeldung (Guard OpS). Sie steht bewusst
    NACH beiden Zustaenden (#gateLogin und #gateDenied) und damit ausserhalb
@@ -369,6 +370,7 @@ svg.i-sm { width: 15px; height: 15px; }
   .gate-oben img { width: 176px; height: 176px;
     filter: drop-shadow(0 22px 44px rgba(0,0,0,.8)); }
   .gate-oben .sub { margin-top: 8px; font-size: 14px; letter-spacing: 2.6px; }
+  .gate-oben .gate-demo-gruss { margin-top: 20px; font-size: 17px; }
   .gate-oben { margin-bottom: 44px; }
   .gate-video { display: block; position: absolute; inset: 0; width: 100%; height: 100%;
     object-fit: cover; object-position: 62% center; z-index: 0; }
@@ -4998,9 +5000,10 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
   <div class="gate-schleier"></div>
   <div class="gate-mitte">
     <div class="gate-oben">
-      <img src="icons/icon-192.png" alt="">
+      <img src="icons/guardops-192.png" alt="">
       <div class="wm" id="gateWm">Cockpit</div>
-      <div class="sub">CUPI 24 GmbH</div>
+      <div class="sub">GuardOpS</div>
+      <div class="gate-demo-gruss" id="gateDemoGruss" hidden>Willkommen im Demobereich</div>
     </div>
 
     <div id="gateLogin">
@@ -32726,6 +32729,10 @@ $('gName').addEventListener('keydown', e => { if (e.key === 'Enter') $('gPass').
 document.title = APP_NAME;
 $('gateWm').textContent = APP_NAME;
 $('sideWm').textContent = APP_NAME;
+
+// Gruss auf der Anmeldemaske nur in der Demo-Umgebung (testumgebung.js setzt
+// das Flag) -- ein echter Mandant soll nie "Willkommen im Demobereich" lesen.
+if (window.APP_UMGEBUNG_DEMO) { $('gateDemoGruss').hidden = false; }
 
 // Wer automatisch abgemeldet wurde, steht sonst vor einer leeren
 // Anmeldemaske und haelt es fuer einen Fehler (ENT-293). "Abgelaufen" und
