@@ -782,6 +782,14 @@ function be_tabellen(): array
 'mandant' => "CREATE TABLE IF NOT EXISTS mandant (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(200) NOT NULL,
+  -- Eigene Ausliefer-Adresse dieses Mandanten unter guardops.ch (ENT-589),
+  -- z. B. 'cupi24' fuer cupi24.guardops.ch. Rein informativ -- KEINE
+  -- Server-Logik liest diese Spalte zur Laufzeit, um zu entscheiden, welche
+  -- Datenbank oder Konfiguration gilt (ENT-501: die eigene Adresse kommt
+  -- ausschliesslich aus dem Deploy-Buendel des jeweiligen Mandanten, nie aus
+  -- einer Anfrage oder einer Tabellenzeile). Leer, solange ein Mandant noch
+  -- unter der geteilten Testadresse laeuft.
+  subdomain VARCHAR(100) NOT NULL DEFAULT '',
   status ENUM('aktiv','gesperrt','gekuendigt') NOT NULL DEFAULT 'aktiv',
   kanton CHAR(2) NULL,
   gav_unterstellt TINYINT(1) NULL,
@@ -888,10 +896,35 @@ function be_tabellen_anlegen(PDO $pdo, bool $nurPruefen = false): array
 // wenn der Stamm noch leer ist. Der Name kommt aus der Tabelle `betrieb`
 // der MANDANTEN-Datenbank und nicht aus dem Quelltext (Hausregel
 // Vertraulichkeit: im Code steht kein echter Firmenname).
+//
+// Die Subdomain dagegen ist bewusst ein festes Literal, kein aus der
+// Datenbank hergeleiteter Wert: CUPI 24 ist der Bestandsmandant und liefert
+// seit ENT-589 unter cupi24.guardops.ch aus -- das ist eine getroffene
+// Entscheidung, keine Konfiguration (Hausregel: Konfigurierbarkeit ist kein
+// Qualitaetsmerkmal).
 function be_bestandsmandant_eintragen(PDO $stamm, PDO $betrieb): ?string
 {
     if (!hat_tabelle($stamm, 'mandant')) { return null; }
-    if ((int)$stamm->query('SELECT COUNT(*) FROM mandant')->fetchColumn() !== 0) { return null; }
+    if ((int)$stamm->query('SELECT COUNT(*) FROM mandant')->fetchColumn() !== 0) {
+        // Die Zeile besteht schon -- aus der Zeit vor ENT-589, als es die
+        // Spalte noch nicht gab, oder aus einem frueheren Lauf dieser
+        // Funktion. Nachtragen, aber nur, wenn es GENAU einen Mandanten
+        // gibt: Sobald ein zweiter dazukommt, waere nicht mehr eindeutig,
+        // welche Zeile der Bestandsmandant ist, und ein Erraten waere genau
+        // die Art Annahme, die hier nichts verloren hat. Wiederholbar und
+        // ungefaehrlich: geschrieben wird nur dort, wo noch nichts steht.
+        if (hat_spalte($stamm, 'mandant', 'subdomain')
+            && (int)$stamm->query('SELECT COUNT(*) FROM mandant')->fetchColumn() === 1) {
+            $mid = (int)$stamm->query(
+                "SELECT id FROM mandant WHERE subdomain IS NULL OR subdomain = '' LIMIT 1"
+            )->fetchColumn();
+            if ($mid > 0) {
+                $stamm->prepare('UPDATE mandant SET subdomain = ? WHERE id = ?')
+                    ->execute(['cupi24', $mid]);
+            }
+        }
+        return null;
+    }
 
     $name = '';
     try {
@@ -902,8 +935,8 @@ function be_bestandsmandant_eintragen(PDO $stamm, PDO $betrieb): ?string
     if (trim($name) === '') { $name = 'Bestandsbetrieb (Name nachtragen)'; }
 
     $stamm->prepare(
-        'INSERT INTO mandant (name, status, db_host, db_name, db_user, secret_name)
-         VALUES (?, \'aktiv\', \'\', \'\', \'\', \'\')'
+        'INSERT INTO mandant (name, subdomain, status, db_host, db_name, db_user, secret_name)
+         VALUES (?, \'cupi24\', \'aktiv\', \'\', \'\', \'\', \'\')'
     )->execute([$name]);
     return $name;
 }

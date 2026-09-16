@@ -2624,6 +2624,12 @@ $spalten = [
     // waffentragberechtigt: eine bewusst gesetzte Berechtigung statt einer
     // Vermutung aus vergangenen Einsaetzen.
     ['mitarbeiter', 'revierdienst_berechtigt', 'ALTER TABLE mitarbeiter ADD COLUMN revierdienst_berechtigt TINYINT(1) NOT NULL DEFAULT 0'],
+    // Eigene Ausliefer-Adresse je Mandant (ENT-589) -- siehe Kommentar an der
+    // Spalte in backend/betreiber.php. `mandant` entsteht sonst ueber
+    // be_tabellen_anlegen() (CREATE TABLE IF NOT EXISTS) und bekommt die
+    // Spalte dort bereits neu; dieser Eintrag traegt sie fuer eine Anlage
+    // nach, deren `mandant`-Tabelle schon vor ENT-589 entstanden ist.
+    ['mandant', 'subdomain', "ALTER TABLE mandant ADD COLUMN subdomain VARCHAR(100) NOT NULL DEFAULT '' AFTER name"],
 ];
 // Vor dem Loop merken, ob die neue Berechtigungs-Spalte schon da war -- nur
 // wenn sie JETZT, in diesem Lauf, neu entsteht, darf der Nachtrag weiter
