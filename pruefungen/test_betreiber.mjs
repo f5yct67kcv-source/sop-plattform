@@ -536,6 +536,37 @@ check('KRITISCH: es gibt einen Aufrufweg fuer die Einrichtung im Cockpit',
 check('der Aufrufweg verschwindet, sobald ein Konto steht',
   /Number\(data\.konten\) > 0[\s\S]{0,60}return/.test(cockpit));
 
+// ── 14. Kein Bootstrap aus der Demo (ENT-587) ────────────────────────
+//
+// Die Demo-Umgebung teilt ein einziges, veroeffentlichtes Anmeldekonto mit
+// Verwaltungsrechten -- genau die Voraussetzung, die der Bootstrap braucht.
+// Ohne diese Wache koennte jede Person mit dem Demo-Zugang sich hier ein
+// Betreiber-Konto ausstellen, und weil der naechtliche Reset der
+// Demo-Musterdaten noch nicht gebaut ist, bliebe der Bootstrap fuer alle
+// folgenden Demo-Besuche dauerhaft geschlossen.
+//
+// Geprueft wird die STRUKTUR: ist_demo() muss INNERHALB des
+// Bootstrap-Zweigs (bevor die Mandantengrenze ueberhaupt geprueft wird)
+// mit einem Fehlerstatus abbrechen -- nicht irgendwo in der Datei.
+check('KRITISCH (ENT-587): der Bootstrap ist in der Demo-Umgebung gesperrt, '
+  + 'noch vor der Mandantengrenze',
+  /if\s*\(\$vorhanden === 0\)\s*\{[\s\S]{0,400}?ist_demo\(\)[\s\S]{0,200}?403\)[\s\S]{0,600}?be_bootstrap_offen\(/
+    .test(kontoNeu));
+// Gegenprobe fuer die Regex selbst: Ein ist_demo()-Aufruf ausserhalb des
+// Bootstrap-Zweigs (z. B. nur irgendwo im Dateikopf) darf NICHT gruen
+// machen -- deshalb verlangt das Muster oben "if ($vorhanden === 0) {"
+// unmittelbar davor, nicht nur "ist_demo() ... 403" irgendwo im Text.
+check('die Demo-Wache liest tatsaechlich ist_demo() aus backend/db.php, keine eigene Kopie',
+  !/function\s+ist_demo/.test(kontoNeu));
+
+// Auch die Oberflaeche zeigt den Abschnitt in der Demo gar nicht erst an --
+// sonst saehe man einen Knopf, der im Server ohnehin abprallt ("gesperrt"
+// darf nicht wie "es gibt hier nichts zu tun" aussehen). Verankert am
+// Funktionskopf (nicht irgendwo in der Datei), damit ein APP_UMGEBUNG_DEMO
+// an falscher Stelle nicht ebenfalls gruen macht.
+check('KRITISCH (ENT-587): der Betreiber-Abschnitt bleibt in der Demo ausgeblendet',
+  /function eiBetreiberPruefen\(\)[\s\S]{0,450}?APP_UMGEBUNG_DEMO[\s\S]{0,40}return/.test(cockpit));
+
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
 console.log('Alle Pruefungen bestanden.');

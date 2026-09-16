@@ -28517,6 +28517,10 @@ function eiBetreiberPruefen() {
   const kasten = $('eiBetreiber');
   if (!kasten) { return; }
   kasten.style.display = 'none';
+  // Der Bootstrap ist in der Demo serverseitig gesperrt (ENT-587) -- der
+  // Abschnitt bleibt hier zusaetzlich ausgeblendet, damit niemand mit dem
+  // geteilten Demo-Zugang einen Knopf sieht, der im Server ohnehin abprallt.
+  if (window.APP_UMGEBUNG_DEMO) { return; }
   api('betreiber_einrichten.php').then(({ ok, data }) => {
     if (!ok || !data || data.status === 'error') { return; }
     // Steht schon ein Konto, ist hier nichts mehr zu tun.
