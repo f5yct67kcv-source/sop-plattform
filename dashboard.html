@@ -286,10 +286,18 @@ svg.i-sm { width: 15px; height: 15px; }
    zentrierter Inhalt oben abgeschnitten wird. */
 .gate-mitte { margin: auto; width: 100%; max-width: 348px; position: relative; z-index: 2; }
 .gate-oben { text-align: center; margin-bottom: 34px; }
-.gate-oben img { width: 104px; height: 104px; filter: drop-shadow(0 16px 32px rgba(0,0,0,.75)); }
+/* Die volle Wortmarke (go-wort) statt des blossen "G"-Zeichens (Befund des
+   Projektinhabers, 2026-09-16): das G allein liest sich wie ein Kuerzel,
+   nicht wie der Markenname. go-wort steckt schon inline im Kopf dieser
+   Datei (dieselbe Zeichnung wie .gate-sig), darum keine neue Datei noetig.
+   Die Marke bring den Namen selbst mit -- die vorherige eigene Zeile
+   ".sub" ("GuardOpS") entfaellt darum, sonst stuende der Name zweimal da.
+   Breite statt Hoehe gesetzt (height:auto): die Wortmarke ist ein Rechteck
+   (Seitenverhaeltnis ~4.23:1), kein Quadrat wie das vorherige Zeichen. */
+.gate-oben .marke { width: 240px; height: auto; color: var(--ink);
+  filter: drop-shadow(0 16px 32px rgba(0,0,0,.75)); }
 .gate-oben .wm { margin-top: 18px; color: var(--ink); font-size: 20px; font-weight: 700; letter-spacing: -.3px; }
-.gate-oben .sub { margin-top: 4px; color: var(--ink-2);
-  font-size: 12px; font-weight: 640; letter-spacing: 2px; text-transform: uppercase; }
+.gate-oben .gate-demo-gruss { margin-top: 16px; color: var(--ink); font-size: 15px; font-weight: 650; }
 .gate-msg { font-size: 13px; color: var(--ink-2); margin-bottom: 20px; line-height: 1.6; }
 /* Herstellersignatur unter der Anmeldung (Guard OpS). Sie steht bewusst
    NACH beiden Zustaenden (#gateLogin und #gateDenied) und damit ausserhalb
@@ -366,9 +374,9 @@ svg.i-sm { width: 15px; height: 15px; }
     url('img/anmeldung-nacht.webp') 62% center / cover no-repeat,
     #0F1117; }
   .gate-mitte { max-width: 400px; }
-  .gate-oben img { width: 176px; height: 176px;
+  .gate-oben .marke { width: 340px; height: auto;
     filter: drop-shadow(0 22px 44px rgba(0,0,0,.8)); }
-  .gate-oben .sub { margin-top: 8px; font-size: 14px; letter-spacing: 2.6px; }
+  .gate-oben .gate-demo-gruss { margin-top: 20px; font-size: 17px; }
   .gate-oben { margin-bottom: 44px; }
   .gate-video { display: block; position: absolute; inset: 0; width: 100%; height: 100%;
     object-fit: cover; object-position: 62% center; z-index: 0; }
@@ -4998,9 +5006,9 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
   <div class="gate-schleier"></div>
   <div class="gate-mitte">
     <div class="gate-oben">
-      <img src="icons/icon-192.png" alt="">
+      <svg class="marke" viewBox="0.00 0.00 649.83 153.56" role="img" aria-label="Guard OpS"><use href="#go-wort"/></svg>
       <div class="wm" id="gateWm">Cockpit</div>
-      <div class="sub">CUPI 24 GmbH</div>
+      <div class="gate-demo-gruss" id="gateDemoGruss" hidden>Willkommen im Demobereich</div>
     </div>
 
     <div id="gateLogin">
@@ -5073,11 +5081,11 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
       <button type="button" class="marken-knopf" id="btnMarke" onclick="markenMenuUm(event)"
               aria-haspopup="true" aria-expanded="false" aria-controls="sideFoot"
               title="Konto, Einrichtung und Abmelden" aria-label="Konto, Einrichtung und Abmelden">
-        <img src="icons/icon-192.png" alt="">
+        <img src="icons/guardops-192.png" alt="">
       </button>
       <div class="txt">
         <div class="wm" id="sideWm">Cockpit</div>
-        <div class="sub">CUPI 24</div>
+        <div class="sub">GuardOpS</div>
       </div>
     </div>
 
@@ -28514,6 +28522,10 @@ function eiBetreiberPruefen() {
   const kasten = $('eiBetreiber');
   if (!kasten) { return; }
   kasten.style.display = 'none';
+  // Der Bootstrap ist in der Demo serverseitig gesperrt (ENT-587) -- der
+  // Abschnitt bleibt hier zusaetzlich ausgeblendet, damit niemand mit dem
+  // geteilten Demo-Zugang einen Knopf sieht, der im Server ohnehin abprallt.
+  if (window.APP_UMGEBUNG_DEMO) { return; }
   api('betreiber_einrichten.php').then(({ ok, data }) => {
     if (!ok || !data || data.status === 'error') { return; }
     // Steht schon ein Konto, ist hier nichts mehr zu tun.
@@ -32726,6 +32738,10 @@ $('gName').addEventListener('keydown', e => { if (e.key === 'Enter') $('gPass').
 document.title = APP_NAME;
 $('gateWm').textContent = APP_NAME;
 $('sideWm').textContent = APP_NAME;
+
+// Gruss auf der Anmeldemaske nur in der Demo-Umgebung (testumgebung.js setzt
+// das Flag) -- ein echter Mandant soll nie "Willkommen im Demobereich" lesen.
+if (window.APP_UMGEBUNG_DEMO) { $('gateDemoGruss').hidden = false; }
 
 // Wer automatisch abgemeldet wurde, steht sonst vor einer leeren
 // Anmeldemaske und haelt es fuer einen Fehler (ENT-293). "Abgelaufen" und

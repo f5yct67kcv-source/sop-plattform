@@ -127,6 +127,22 @@ jobs:
           P_BETREIBER_FTP_HOST: ${{ secrets.BETREIBER_FTP_HOST }}
           P_BETREIBER_FTP_USER: ${{ secrets.BETREIBER_FTP_USER }}
           P_BETREIBER_FTP_PASSWORD: ${{ secrets.BETREIBER_FTP_PASSWORD }}
+          # Eigene Datenbank der Betreiber-Ebene (OP-518, sop-projekt/
+          # 00-projekt/offene-punkte.md): Mandantenstamm, Betreiber-Konten
+          # und Support-Vorgaenge sollen NICHT in derselben Datenbank liegen
+          # wie der erste Mandant. Eigene Secret-NAMEN aus demselben Grund
+          # wie bei BETREIBER_FTP_* oben: kein stiller Rueckfall. NICHT
+          # erforderlich -- fehlen sie, faellt betreiber_db() weiterhin
+          # bewusst auf db() zurueck (siehe Kopf von backend/betreiber.php).
+          # Das ist der heutige, unveraenderte Normalfall und ausdruecklich
+          # KEIN Fehlerzustand, solange OP-518 auf der Hostpoint-/Secret-
+          # Seite noch nicht abgeschlossen ist. Nur fuer Production -- die
+          # Betreiber-Ebene als eigene Datenbank ist wie BETREIBER_FTP_*
+          # ein Production-Konzept.
+          P_BETREIBER_DB_HOST: ${{ secrets.BETREIBER_DB_HOST }}
+          P_BETREIBER_DB_NAME: ${{ secrets.BETREIBER_DB_NAME }}
+          P_BETREIBER_DB_USER: ${{ secrets.BETREIBER_DB_USER }}
+          P_BETREIBER_DB_PASSWORD: ${{ secrets.BETREIBER_DB_PASSWORD }}
           # Eigener FTP-Zugang fuer portal.guardops.ch, beschraenkt auf
           # /home/itufeden/www/portal.guardops.ch (ENT-580, zweite Etappe
           # des schrittweisen Umzugs). Eigene Secret-NAMEN aus demselben
@@ -137,6 +153,18 @@ jobs:
           P_PORTAL_FTP_HOST: ${{ secrets.PORTAL_FTP_HOST }}
           P_PORTAL_FTP_USER: ${{ secrets.PORTAL_FTP_USER }}
           P_PORTAL_FTP_PASSWORD: ${{ secrets.PORTAL_FTP_PASSWORD }}
+          # Eigener FTP-Zugang fuer cupi24.guardops.ch (ENT-589): CUPI 24
+          # ist Mandantin (ENT-568), das Rapport-Tool zieht mit dem vollen
+          # Dateiumfang von der geteilten Testadresse
+          # rapport.itufeden.myhostpoint.ch auf ihre eigene Adresse um.
+          # Eigene Secret-NAMEN aus demselben Grund wie bei PORTAL_FTP_* und
+          # Staging (ENT-343 Punkt 1): kein stiller Rueckfall. NICHT
+          # erforderlich -- fehlen sie, wird diese Domain uebersprungen und
+          # das Rapport-Tool auf der bisherigen Adresse trotzdem
+          # ausgeliefert, genau wie bei PORTAL_FTP_* oben.
+          P_CUPI24_FTP_HOST: ${{ secrets.CUPI24_FTP_HOST }}
+          P_CUPI24_FTP_USER: ${{ secrets.CUPI24_FTP_USER }}
+          P_CUPI24_FTP_PASSWORD: ${{ secrets.CUPI24_FTP_PASSWORD }}
           # Staging -- eigene, von Produktion VERSCHIEDENE Secret-Namen.
           S_DB_HOST: ${{ secrets.STAGING_DB_HOST }}
           S_DB_NAME: ${{ secrets.STAGING_DB_NAME }}
@@ -183,6 +211,10 @@ jobs:
           # EIGENES Secret, kein Rueckfall auf STAGING_TESTMAIL -- siehe
           # Begruendung in smtp_ziel().
           D_TESTMAIL: ${{ secrets.DEMO_TESTMAIL }}
+          # Zeitgeber-Zugang fuer den naechtlichen Reset (ENT-523 Punkt 3,
+          # api/demo_reset.php) -- gleiches Prinzip wie D_PUSH_CRON_SCHLUESSEL
+          # weiter unten, nur umgebungsgebunden statt produktionsweit.
+          D_RESET_TOKEN: ${{ secrets.DEMO_RESET_TOKEN }}
           # Push-Benachrichtigungen (ENT-424). Eigene, von den
           # Production-Namen VERSCHIEDENE Secret-Namen fuer Staging -- kein
           # struktureller Rueckfall moeglich (ENT-343 Punkt 1). Und
@@ -224,6 +256,9 @@ jobs:
             EFF_ANTHROPIC_API_KEY="$P_ANTHROPIC_API_KEY"; EFF_MAPS_JS_KEY="$P_MAPS_JS_KEY"
             EFF_STAGING_TESTMAIL=""
             EFF_DEMO_TESTMAIL=""
+            # Nur die Demo-Umgebung kennt einen Reset -- kein Zeitgeber-Zugang
+            # ausserhalb von ihr, aus demselben Grund wie EFF_DEMO_TESTMAIL.
+            EFF_DEMO_RESET_TOKEN=""
             EFF_VAPID_PRIVATE_PEM_B64="$P_VAPID_PRIVATE_PEM_B64"
             EFF_VAPID_KONTAKT="$P_VAPID_KONTAKT"
             EFF_PUSH_CRON_SCHLUESSEL="$P_PUSH_CRON_SCHLUESSEL"
@@ -239,9 +274,22 @@ jobs:
             EFF_BETREIBER_FTP_HOST="$P_BETREIBER_FTP_HOST"
             EFF_BETREIBER_FTP_USER="$P_BETREIBER_FTP_USER"
             EFF_BETREIBER_FTP_PASSWORD="$P_BETREIBER_FTP_PASSWORD"
+            # OP-518: bleiben die vier Secrets ungesetzt (die echte zweite
+            # Datenbank existiert noch nicht), ist $EFF_BETREIBER_DB_* leer --
+            # betreiber_db() faellt dann bewusst auf db() zurueck, siehe
+            # Kopf von backend/betreiber.php. Kein Pflichtwert weiter unten,
+            # aus demselben Grund wie bei EFF_BETREIBER_FTP_*: ein fehlendes
+            # Secret darf den gesamten Deploy nicht rot werden lassen.
+            EFF_BETREIBER_DB_HOST="$P_BETREIBER_DB_HOST"
+            EFF_BETREIBER_DB_NAME="$P_BETREIBER_DB_NAME"
+            EFF_BETREIBER_DB_USER="$P_BETREIBER_DB_USER"
+            EFF_BETREIBER_DB_PASSWORD="$P_BETREIBER_DB_PASSWORD"
             EFF_PORTAL_FTP_HOST="$P_PORTAL_FTP_HOST"
             EFF_PORTAL_FTP_USER="$P_PORTAL_FTP_USER"
             EFF_PORTAL_FTP_PASSWORD="$P_PORTAL_FTP_PASSWORD"
+            EFF_CUPI24_FTP_HOST="$P_CUPI24_FTP_HOST"
+            EFF_CUPI24_FTP_USER="$P_CUPI24_FTP_USER"
+            EFF_CUPI24_FTP_PASSWORD="$P_CUPI24_FTP_PASSWORD"
             # Eigene Adresse der Anlage (ENT-501). Sie steckt in jedem Link,
             # den der Server per E-Mail verschickt -- Passwort zuruecksetzen,
             # Portalzugang, Beleg. Bis ENT-501 kam sie aus dem Host-Kopf DER
@@ -287,6 +335,7 @@ jobs:
             # Testadresse, eigenes Secret (siehe smtp_ziel() in mailer.php).
             EFF_STAGING_TESTMAIL=""
             EFF_DEMO_TESTMAIL="$D_TESTMAIL"
+            EFF_DEMO_RESET_TOKEN="$D_RESET_TOKEN"
             EFF_VAPID_PRIVATE_PEM_B64="$D_VAPID_PRIVATE_PEM_B64"
             EFF_VAPID_KONTAKT="$D_VAPID_KONTAKT"
             EFF_PUSH_CRON_SCHLUESSEL="$D_PUSH_CRON_SCHLUESSEL"
@@ -318,11 +367,25 @@ jobs:
             EFF_BETREIBER_FTP_HOST=""
             EFF_BETREIBER_FTP_USER=""
             EFF_BETREIBER_FTP_PASSWORD=""
+            # Die eigene Datenbank der Betreiber-Ebene (OP-518) ist wie
+            # betreiber.guardops.ch nur fuer Production gedacht -- dieselbe
+            # Begruendung wie bei EFF_BETREIBER_FTP_* direkt darueber. Der
+            # heutige Rueckfall auf db() in betreiber_db() bleibt fuer Demo
+            # damit unveraendert bestehen.
+            EFF_BETREIBER_DB_HOST=""
+            EFF_BETREIBER_DB_NAME=""
+            EFF_BETREIBER_DB_USER=""
+            EFF_BETREIBER_DB_PASSWORD=""
             # portal.guardops.ch ist wie betreiber.guardops.ch nur fuer
             # Production gedacht (ENT-580) -- dieselbe Begruendung.
             EFF_PORTAL_FTP_HOST=""
             EFF_PORTAL_FTP_USER=""
             EFF_PORTAL_FTP_PASSWORD=""
+            # cupi24.guardops.ch ist wie portal.guardops.ch nur fuer
+            # Production gedacht (ENT-589) -- dieselbe Begruendung.
+            EFF_CUPI24_FTP_HOST=""
+            EFF_CUPI24_FTP_USER=""
+            EFF_CUPI24_FTP_PASSWORD=""
             # Eigene Adresse (ENT-501), siehe Begruendung im Production-Zweig.
             # Fuer Demo steht die Domain als Environment-Variable DEMO_DOMAIN
             # bereit -- dieselbe, mit der der Verifikationsschritt weiter
@@ -362,6 +425,7 @@ jobs:
             # Kein Rueckfall auf die Demo-Testadresse -- Staging und Demo
             # teilen sich keine Mailziele (ENT-523-N1).
             EFF_DEMO_TESTMAIL=""
+            EFF_DEMO_RESET_TOKEN=""
             EFF_VAPID_PRIVATE_PEM_B64="$S_VAPID_PRIVATE_PEM_B64"
             EFF_VAPID_KONTAKT="$S_VAPID_KONTAKT"
             EFF_PUSH_CRON_SCHLUESSEL="$S_PUSH_CRON_SCHLUESSEL"
@@ -387,11 +451,23 @@ jobs:
             EFF_BETREIBER_FTP_HOST=""
             EFF_BETREIBER_FTP_USER=""
             EFF_BETREIBER_FTP_PASSWORD=""
+            # Die eigene Datenbank der Betreiber-Ebene (OP-518) ist wie
+            # betreiber.guardops.ch nur fuer Production gedacht -- dieselbe
+            # Begruendung wie bei EFF_BETREIBER_FTP_* direkt darueber.
+            EFF_BETREIBER_DB_HOST=""
+            EFF_BETREIBER_DB_NAME=""
+            EFF_BETREIBER_DB_USER=""
+            EFF_BETREIBER_DB_PASSWORD=""
             # portal.guardops.ch ist wie betreiber.guardops.ch nur fuer
             # Production gedacht (ENT-580) -- dieselbe Begruendung.
             EFF_PORTAL_FTP_HOST=""
             EFF_PORTAL_FTP_USER=""
             EFF_PORTAL_FTP_PASSWORD=""
+            # cupi24.guardops.ch ist wie portal.guardops.ch nur fuer
+            # Production gedacht (ENT-589) -- dieselbe Begruendung.
+            EFF_CUPI24_FTP_HOST=""
+            EFF_CUPI24_FTP_USER=""
+            EFF_CUPI24_FTP_PASSWORD=""
             # Eigene Adresse (ENT-501), siehe Begruendung im Production-Zweig.
             # Fuer Staging steht die Domain bereits als Environment-Variable
             # STAGING_DOMAIN bereit -- dieselbe, mit der die beiden
@@ -521,6 +597,7 @@ jobs:
             echo "EFF_MAPS_JS_KEY=$EFF_MAPS_JS_KEY"
             echo "EFF_STAGING_TESTMAIL=$EFF_STAGING_TESTMAIL"
             echo "EFF_DEMO_TESTMAIL=$EFF_DEMO_TESTMAIL"
+            echo "EFF_DEMO_RESET_TOKEN=$EFF_DEMO_RESET_TOKEN"
             echo "EFF_VAPID_PRIVATE_PEM_B64=$EFF_VAPID_PRIVATE_PEM_B64"
             echo "EFF_VAPID_KONTAKT=$EFF_VAPID_KONTAKT"
             echo "EFF_PUSH_CRON_SCHLUESSEL=$EFF_PUSH_CRON_SCHLUESSEL"
@@ -537,9 +614,21 @@ jobs:
             echo "EFF_BETREIBER_FTP_HOST=$EFF_BETREIBER_FTP_HOST"
             echo "EFF_BETREIBER_FTP_USER=$EFF_BETREIBER_FTP_USER"
             echo "EFF_BETREIBER_FTP_PASSWORD=$EFF_BETREIBER_FTP_PASSWORD"
+            # Steht wie EFF_DB_PASSWORD oben im Klartext im Log-Text dieses
+            # Schritts -- ungefaehrlich, weil GitHub jeden Wert, der einmal
+            # ueber "secrets." referenziert wurde (hier: secrets.BETREIBER_
+            # DB_PASSWORD), im Log maskiert, unabhaengig davon, ueber wie
+            # viele Variablen er danach noch laeuft (siehe Begruendung oben).
+            echo "EFF_BETREIBER_DB_HOST=$EFF_BETREIBER_DB_HOST"
+            echo "EFF_BETREIBER_DB_NAME=$EFF_BETREIBER_DB_NAME"
+            echo "EFF_BETREIBER_DB_USER=$EFF_BETREIBER_DB_USER"
+            echo "EFF_BETREIBER_DB_PASSWORD=$EFF_BETREIBER_DB_PASSWORD"
             echo "EFF_PORTAL_FTP_HOST=$EFF_PORTAL_FTP_HOST"
             echo "EFF_PORTAL_FTP_USER=$EFF_PORTAL_FTP_USER"
             echo "EFF_PORTAL_FTP_PASSWORD=$EFF_PORTAL_FTP_PASSWORD"
+            echo "EFF_CUPI24_FTP_HOST=$EFF_CUPI24_FTP_HOST"
+            echo "EFF_CUPI24_FTP_USER=$EFF_CUPI24_FTP_USER"
+            echo "EFF_CUPI24_FTP_PASSWORD=$EFF_CUPI24_FTP_PASSWORD"
           } >> "$GITHUB_ENV"
 
           # Mehrzeiliger Wert -- eigener Heredoc-Block statt einer einfachen
@@ -677,6 +766,10 @@ jobs:
           # sorgt dafuer, dass ein Aufruf ausserhalb der Demo 404 liefert,
           # nicht die Datei-Sperrliste allein.
           cp backend/demo_daten.php dist/demo_daten.php
+          # Rechenkern des naechtlichen Demo-Resets (ENT-523 Punkt 3),
+          # eingebunden von api/demo_reset.php -- gleiche Begruendung wie bei
+          # backend/demo_daten.php zwei Zeilen darueber.
+          cp backend/demo_reset.php dist/demo_reset.php
           # Bremse des Demo-Formulars (dateibasiert, keine Datenbank). Sie
           # steht wie jede Hilfsdatei in der Sperrliste von htaccess-hostpoint
           # -- test_php.mjs gleicht beides gegeneinander ab.
@@ -747,6 +840,19 @@ jobs:
           sed -i "s|__DB_NAME__|$EFF_DB_NAME|g" dist/db.php
           sed -i "s|__DB_USER__|$EFF_DB_USER|g" dist/db.php
           sed -i "s|__DB_PASS__|$EFF_DB_PASSWORD|g" dist/db.php
+          # Platzhalter der separaten Betreiber-Datenbank (OP-518, sop-projekt/
+          # 00-projekt/offene-punkte.md). Bleiben die vier Secrets BETREIBER_
+          # DB_HOST/NAME/USER/PASSWORD ungesetzt, ist $EFF_BETREIBER_DB_* leer
+          # -- die Ersetzung traegt dann eine leere Zeichenkette statt des
+          # woertlichen Platzhalters ein, und betreiber_db() faellt bei
+          # leerem Namen bewusst auf db() zurueck (siehe Kopf von
+          # backend/betreiber.php). Das ist der heutige, unveraenderte
+          # Normalfall -- KEIN neuer Fehlerzustand, nur ueber eine leere
+          # Variable statt einen liegen gebliebenen Platzhalter hergestellt.
+          sed -i "s|__BETREIBER_DB_HOST__|$EFF_BETREIBER_DB_HOST|g" dist/betreiber.php
+          sed -i "s|__BETREIBER_DB_NAME__|$EFF_BETREIBER_DB_NAME|g" dist/betreiber.php
+          sed -i "s|__BETREIBER_DB_USER__|$EFF_BETREIBER_DB_USER|g" dist/betreiber.php
+          sed -i "s|__BETREIBER_DB_PASS__|$EFF_BETREIBER_DB_PASSWORD|g" dist/betreiber.php
           # APP_ENV (ENT-341, Revision): explizite Umgebungskennung statt
           # Ableitung aus dem Hostnamen -- traegt sowohl db.php als auch
           # testumgebung.js, damit Backend und die drei Frontends dieselbe
@@ -805,6 +911,10 @@ jobs:
           # Staging teilen kein Mailziel (siehe smtp_ziel() in mailer.php).
           # Fuer main und fuer Staging ist EFF_DEMO_TESTMAIL bewusst leer.
           sed -i "s|__DEMO_TESTMAIL__|$EFF_DEMO_TESTMAIL|g" dist/mailer.php
+          # Zeitgeber-Zugang fuer den naechtlichen Demo-Reset (ENT-523 Punkt 3,
+          # api/demo_reset.php) -- fuer main und Staging bewusst leer, aus
+          # demselben Grund wie EFF_DEMO_TESTMAIL zwei Zeilen darueber.
+          sed -i "s|__DEMO_RESET_TOKEN__|$EFF_DEMO_RESET_TOKEN|g" dist/api/demo_reset_ausfuehren.php
           # Google-Maps-Browserschluessel (ENT-341): eigener Schluessel je
           # Umgebung, in ALLEN Oberflaechen, die die Karte laden -- seit
           # ENT-474 auch im Kundenportal (Weg waehrend der Runde, hinter
@@ -1113,6 +1223,16 @@ jobs:
           sed -i "s|__DB_NAME__|$EFF_DB_NAME|g" dist-betreiber/db.php
           sed -i "s|__DB_USER__|$EFF_DB_USER|g" dist-betreiber/db.php
           sed -i "s|__DB_PASS__|$EFF_DB_PASSWORD|g" dist-betreiber/db.php
+          # Platzhalter der separaten Betreiber-Datenbank (OP-518). Bleiben
+          # die vier Secrets ungesetzt, ist $EFF_BETREIBER_DB_* leer und
+          # betreiber_db() faellt bewusst auf db() zurueck -- derselbe
+          # heutige Normalfall wie im Hauptschritt (dist/) oben, hier nur
+          # zusaetzlich mit den bereits echten dist-betreiber/db.php-Werten
+          # daneben.
+          sed -i "s|__BETREIBER_DB_HOST__|$EFF_BETREIBER_DB_HOST|g" dist-betreiber/betreiber.php
+          sed -i "s|__BETREIBER_DB_NAME__|$EFF_BETREIBER_DB_NAME|g" dist-betreiber/betreiber.php
+          sed -i "s|__BETREIBER_DB_USER__|$EFF_BETREIBER_DB_USER|g" dist-betreiber/betreiber.php
+          sed -i "s|__BETREIBER_DB_PASS__|$EFF_BETREIBER_DB_PASSWORD|g" dist-betreiber/betreiber.php
           sed -i "s|__APP_ENV__|$UMGEBUNG|g" dist-betreiber/db.php
 
           # Eigene Adresse (ENT-501, ENT-580) -- FESTES LITERAL, kein Secret
@@ -1124,14 +1244,19 @@ jobs:
 
           # Kein uebersehener Platzhalter darf hochgeladen werden. Anders als
           # beim guardops-Buendel braucht dieses hier eine echte
-          # Datenbankverbindung (__DB_*__ wird oben ersetzt) -- ausgenommen
-          # bleiben nur die eigenen, noch unersetzten Platzhalter der
-          # separaten Betreiber-Datenbank (__BETREIBER_DB_*__,
-          # __MANDANT_SECRETS__ in backend/betreiber.php, OP-518):
-          # betreiber_db() faellt bei leerem/unersetztem Platzhalter bewusst
-          # auf db() zurueck, siehe Kommentar dort.
+          # Datenbankverbindung (__DB_*__ wird oben ersetzt). Seit OP-518
+          # werden auch die eigenen Platzhalter der separaten Betreiber-
+          # Datenbank (__BETREIBER_DB_*__) hier oben IMMER ersetzt --
+          # notfalls mit einer leeren Zeichenkette, wenn die vier Secrets
+          # noch nicht gesetzt sind; betreiber_db() faellt dann bewusst auf
+          # db() zurueck, siehe Kommentar dort. Ein stehen gebliebener
+          # __BETREIBER_DB_*__-Platzhalter waere ab jetzt also ein echter
+          # Fehler (z. B. eine vergessene sed-Zeile oben), keine bewusste
+          # Ausnahme mehr. __MANDANT_SECRETS__ in backend/betreiber.php
+          # bleibt ausgenommen -- eigenes, noch offenes Thema (OP-526), von
+          # dieser Aenderung nicht betroffen.
           UEBRIG=$(grep -rhos '__[A-Z_]\{3,\}__' dist-betreiber/ \
-                   | grep -v -e '^__DIR__$' -e '^__BETREIBER_DB_[A-Z]\+__$' -e '^__MANDANT_SECRETS__$' \
+                   | grep -v -e '^__DIR__$' -e '^__MANDANT_SECRETS__$' \
                    | sort -u || true)
           if [ -n "$UEBRIG" ]; then
             echo "::error::Nicht ersetzte Platzhalter im betreiber-Buendel: $UEBRIG"
@@ -1287,6 +1412,208 @@ jobs:
         if: ${{ env.UMGEBUNG == 'production' && env.EFF_PORTAL_FTP_HOST == '' }}
         run: |
           echo "::notice::portal.guardops.ch wurde NICHT beliefert -- die Secrets PORTAL_FTP_HOST/USER/PASSWORD fehlen im Environment production. Das Rapport-Tool ist davon nicht betroffen und wurde regulaer ausgeliefert."
+
+      # ══════════ CUPI 24 AUF IHRER EIGENEN ADRESSE ══════════════════════
+      #
+      # ENT-589: CUPI 24 ist Mandantin (ENT-568), nicht Betreiberin -- und
+      # liefert das Rapport-Tool kuenftig unter cupi24.guardops.ch statt
+      # unter der geteilten Testadresse rapport.itufeden.myhostpoint.ch. Das
+      # ist zugleich das WIEDERVERWENDBARE MUSTER fuer jeden weiteren
+      # Mandanten: ein eigenes Verzeichnis, beim Deploy fest bestueckt mit
+      # eigener EFF_APP_BASIS_URL, nicht eine Laufzeit-Entscheidung anhand
+      # des angefragten Hostnamens (ENT-501 -- pruef_sicherheit.php Abschnitt
+      # 7a schlaegt genau darauf an).
+      #
+      # ANDERS ALS DIE SCHLANKEN BUENDEL OBEN (dist-betreiber/, dist-portal/)
+      # TRAEGT DIESES HIER DEN VOLLEN DATEIUMFANG: CUPI 24 nutzt das
+      # komplette Rapport-Tool -- Cockpit, Waechter-App, Kundenportal,
+      # Betreiber-Bereich eingeschlossen (ein Betreiber-Konto ist an keinen
+      # Mandanten gebunden, siehe backend/betreiber.php) --, nicht nur einen
+      # einzelnen Bereich. Die Kopierliste unten ist darum bewusst dieselbe
+      # wie beim Hauptschritt "Platzhalter durch echte Werte ersetzen" oben,
+      # nur nach dist-cupi24/ statt nach dist/. Wer dort eine Zeile
+      # aendert, muss sie HIER nachziehen -- test_deploy.mjs vergleicht
+      # beide Kopierlisten gegen den tatsaechlichen Quelltext, nicht nur
+      # gegeneinander.
+      #
+      # ECHTE PRODUKTIONS-DATENBANK UND ECHTES PRODUKTIONS-POSTFACH: CUPI 24
+      # ist der Bestandsmandant und braucht dieselbe Datenbank wie das
+      # heutige Rapport-Tool (mandant_db() faellt fuer die "standard-
+      # verbindung" auf db() zurueck, siehe backend/betreiber.php) -- keine
+      # neue Datenbank, kein neues Secret.
+      #
+      # NUR PRODUCTION, UEBERSPRINGT SICH OHNE SECRETS -- dieselbe
+      # Begruendung wie bei den Buendeln oben. Die alte Adresse
+      # (rapport.itufeden.myhostpoint.ch, Schritt "Nach Hostpoint hoch-
+      # laden") wird von diesem Schritt NICHT abgeschaltet -- beide laufen
+      # vorerst parallel, das Abschalten ist eine spaetere, eigene
+      # Entscheidung.
+      - name: Rapport-Tool-Buendel fuer cupi24.guardops.ch bauen
+        if: ${{ env.UMGEBUNG == 'production' && env.EFF_CUPI24_FTP_HOST != '' }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist-cupi24/api dist-cupi24/icons dist-cupi24/fonts dist-cupi24/img dist-cupi24/handbuch
+
+          cp index.html dist-cupi24/index.html
+          cp dashboard.html dist-cupi24/dashboard.html
+          cp app.html dist-cupi24/app.html
+          cp portal.html dist-cupi24/portal.html
+          cp betreiber.html dist-cupi24/betreiber.html
+          cp gav.js dist-cupi24/gav.js
+          cp zeitwahl.js dist-cupi24/zeitwahl.js
+          cp qrcode.js dist-cupi24/qrcode.js
+          cp unterschrift.js dist-cupi24/unterschrift.js
+          cp testumgebung.js dist-cupi24/testumgebung.js
+          cp html2pdf.bundle.min.js dist-cupi24/html2pdf.bundle.min.js
+          cp manifest.json dist-cupi24/manifest.json
+          cp manifest-app.json dist-cupi24/manifest-app.json
+          cp sw.js dist-cupi24/sw.js
+          cp icons/*.png dist-cupi24/icons/
+          cp fonts/*.woff2 dist-cupi24/fonts/
+          cp fonts/inter-LICENSE.txt dist-cupi24/fonts/inter-LICENSE.txt
+          cp fonts/archivo-OFL.txt dist-cupi24/fonts/archivo-OFL.txt
+          cp fonts/ibm-plex-LICENSE.txt dist-cupi24/fonts/ibm-plex-LICENSE.txt
+          cp img/anmeldung-nacht.webp dist-cupi24/img/anmeldung-nacht.webp
+          cp img/anmeldung-nacht.webm dist-cupi24/img/anmeldung-nacht.webm
+          cp img/anmeldung-nacht.mp4 dist-cupi24/img/anmeldung-nacht.mp4
+          cp backend/db.php dist-cupi24/db.php
+          cp backend/kundenportal.php dist-cupi24/kundenportal.php
+          cp backend/betreiber.php dist-cupi24/betreiber.php
+          cp backend/support.php dist-cupi24/support.php
+          cp backend/supportvorgang.php dist-cupi24/supportvorgang.php
+          cp backend/demo_anfrage.php dist-cupi24/demo_anfrage.php
+          cp backend/demo_daten.php dist-cupi24/demo_daten.php
+          cp backend/demo_reset.php dist-cupi24/demo_reset.php
+          cp backend/demo_bremse.php dist-cupi24/demo_bremse.php
+          cp backend/ai.php dist-cupi24/ai.php
+          cp backend/planung.php dist-cupi24/planung.php
+          cp backend/kunden.php dist-cupi24/kunden.php
+          cp backend/mitarbeiter.php dist-cupi24/mitarbeiter.php
+          cp backend/layout.php dist-cupi24/layout.php
+          cp backend/anmeldung.php dist-cupi24/anmeldung.php
+          cp backend/zweifaktor.php dist-cupi24/zweifaktor.php
+          cp backend/rechte.php dist-cupi24/rechte.php
+          cp backend/logbuch.php dist-cupi24/logbuch.php
+          cp backend/ereignisse.php dist-cupi24/ereignisse.php
+          cp backend/auslagen.php dist-cupi24/auslagen.php
+          cp backend/rundgang.php dist-cupi24/rundgang.php
+          cp backend/fahrzeug.php dist-cupi24/fahrzeug.php
+          cp backend/geofence_bereich.php dist-cupi24/geofence_bereich.php
+          cp backend/belege.php dist-cupi24/belege.php
+          cp backend/qrrechnung.php dist-cupi24/qrrechnung.php
+          cp backend/produkte.php dist-cupi24/produkte.php
+          cp backend/mailer.php dist-cupi24/mailer.php
+          cp backend/ferien.php dist-cupi24/ferien.php
+          cp backend/lohn.php dist-cupi24/lohn.php
+          cp backend/gavzeit.php dist-cupi24/gavzeit.php
+          cp backend/lohnlauf.php dist-cupi24/lohnlauf.php
+          cp backend/mitteilungen.php dist-cupi24/mitteilungen.php
+          cp backend/push.php dist-cupi24/push.php
+          cp htaccess-cupi24 dist-cupi24/.htaccess
+          cp backend/api/*.php dist-cupi24/api/
+          cp handbuch/*.php dist-cupi24/handbuch/
+          cp handbuch/*.css dist-cupi24/handbuch/
+          cp handbuch/*.js dist-cupi24/handbuch/
+          # setup.php / setup.html bewusst NICHT hier -- dieselbe Begruendung
+          # wie beim Hauptschritt oben.
+
+          # ECHTE Produktions-Datenbank -- dieselben Werte wie das
+          # Rapport-Tool oben (EFF_DB_*). CUPI 24 ist der Bestandsmandant,
+          # keine eigene Datenbank noetig (siehe Kopf dieses Abschnitts).
+          sed -i "s|__DB_HOST__|$EFF_DB_HOST|g" dist-cupi24/db.php
+          sed -i "s|__DB_NAME__|$EFF_DB_NAME|g" dist-cupi24/db.php
+          sed -i "s|__DB_USER__|$EFF_DB_USER|g" dist-cupi24/db.php
+          sed -i "s|__DB_PASS__|$EFF_DB_PASSWORD|g" dist-cupi24/db.php
+          # Platzhalter der separaten Betreiber-Datenbank (OP-518). Bleiben
+          # die vier Secrets ungesetzt, ist $EFF_BETREIBER_DB_* leer und
+          # betreiber_db() faellt bewusst auf db() zurueck -- derselbe
+          # heutige Normalfall wie im Hauptschritt (dist/) und im
+          # betreiber-Buendel oben.
+          sed -i "s|__BETREIBER_DB_HOST__|$EFF_BETREIBER_DB_HOST|g" dist-cupi24/betreiber.php
+          sed -i "s|__BETREIBER_DB_NAME__|$EFF_BETREIBER_DB_NAME|g" dist-cupi24/betreiber.php
+          sed -i "s|__BETREIBER_DB_USER__|$EFF_BETREIBER_DB_USER|g" dist-cupi24/betreiber.php
+          sed -i "s|__BETREIBER_DB_PASS__|$EFF_BETREIBER_DB_PASSWORD|g" dist-cupi24/betreiber.php
+          sed -i "s|__APP_ENV__|$UMGEBUNG|g" dist-cupi24/db.php
+          sed -i "s|__APP_ENV__|$UMGEBUNG|g" dist-cupi24/testumgebung.js
+
+          # Eigene Adresse (ENT-501, ENT-589) -- FESTES LITERAL, kein Secret
+          # und keine Environment-Variable: cupi24.guardops.ch ist die
+          # entschiedene, oeffentlich sichtbare Adresse dieses Mandanten.
+          # Bewusst NICHT ueber die globale EFF_APP_BASIS_URL (die traegt
+          # weiterhin die alte Adresse fuer den Hauptschritt oben) -- eigene,
+          # lokale Ersetzung nur fuer dieses Buendel, genau wie bei
+          # dist-betreiber/ und dist-portal/ weiter oben.
+          sed -i "s|__APP_BASIS_URL__|https://cupi24.guardops.ch|g" dist-cupi24/db.php
+
+          sed -i "s|__ANTHROPIC_API_KEY__|$EFF_ANTHROPIC_API_KEY|g" dist-cupi24/ai.php
+
+          # ECHTES Produktions-Postfach -- dasselbe wie das Rapport-Tool
+          # oben. Kein eigenes Postfach wie beim guardops-Buendel: CUPI 24
+          # ist Mandantin des Kernprodukts, keine separate Marketingseite.
+          sed -i "s|__SMTP_HOST__|$EFF_SMTP_HOST|g" dist-cupi24/mailer.php
+          sed -i "s|__SMTP_PORT__|$EFF_SMTP_PORT|g" dist-cupi24/mailer.php
+          sed -i "s|__SMTP_VERSCHLUESSELUNG__|$EFF_SMTP_VERSCHLUESSELUNG|g" dist-cupi24/mailer.php
+          sed -i "s|__SMTP_USER__|$EFF_SMTP_USER|g" dist-cupi24/mailer.php
+          sed -i "s|__SMTP_PASSWORD__|$EFF_SMTP_PASSWORD|g" dist-cupi24/mailer.php
+          sed -i "s|__SMTP_ABSENDER__|$EFF_SMTP_ABSENDER|g" dist-cupi24/mailer.php
+          sed -i "s|__SMTP_ABSENDER_NAME__|$EFF_SMTP_ABSENDER_NAME|g" dist-cupi24/mailer.php
+          sed -i "s|__DEMO_EMPFAENGER__|$EFF_DEMO_EMPFAENGER|g" dist-cupi24/demo_anfrage.php
+          # Dieser Schritt laeuft ausschliesslich in Production (siehe
+          # Bedingung oben) -- EFF_STAGING_TESTMAIL und EFF_DEMO_TESTMAIL
+          # sind dort immer leer, dieselbe Bauart wie beim Hauptschritt.
+          sed -i "s|__STAGING_TESTMAIL__|$EFF_STAGING_TESTMAIL|g" dist-cupi24/mailer.php
+          sed -i "s|__DEMO_TESTMAIL__|$EFF_DEMO_TESTMAIL|g" dist-cupi24/mailer.php
+          sed -i "s|__DEMO_RESET_TOKEN__|$EFF_DEMO_RESET_TOKEN|g" dist-cupi24/api/demo_reset_ausfuehren.php
+          sed -i "s|__MAPS_JS_KEY__|$EFF_MAPS_JS_KEY|g" dist-cupi24/dashboard.html
+          sed -i "s|__MAPS_JS_KEY__|$EFF_MAPS_JS_KEY|g" dist-cupi24/portal.html
+          sed -i "s|__MAPS_JS_KEY__|$EFF_MAPS_JS_KEY|g" dist-cupi24/app.html
+          sed -i "s|__VAPID_PRIVATE_PEM_B64__|$EFF_VAPID_PRIVATE_PEM_B64|g" dist-cupi24/push.php
+          sed -i "s|__VAPID_KONTAKT__|$EFF_VAPID_KONTAKT|g" dist-cupi24/push.php
+          sed -i "s|__PUSH_CRON_SCHLUESSEL__|$EFF_PUSH_CRON_SCHLUESSEL|g" dist-cupi24/api/push_versand.php
+
+          # Kein uebersehener Platzhalter darf hochgeladen werden. Genau wie
+          # im betreiber-Buendel und im Hauptschritt (dist/) oben werden die
+          # eigenen Platzhalter der separaten Betreiber-Datenbank
+          # (__BETREIBER_DB_*__) seit OP-518 hier oben IMMER ersetzt --
+          # notfalls mit einer leeren Zeichenkette, solange die vier Secrets
+          # noch nicht gesetzt sind; betreiber_db() faellt dann bewusst auf
+          # db() zurueck. Ausgenommen bleibt nur noch __MANDANT_SECRETS__ in
+          # backend/betreiber.php -- eigenes, noch offenes Thema (OP-526).
+          UEBRIG=$(grep -rhos '__[A-Z_]\{3,\}__' dist-cupi24/ \
+                   | grep -v -e '^__DIR__$' -e '^__MANDANT_SECRETS__$' \
+                   | sort -u || true)
+          if [ -n "$UEBRIG" ]; then
+            echo "::error::Nicht ersetzte Platzhalter im cupi24-Buendel: $UEBRIG"
+            exit 1
+          fi
+
+          echo "Buendel fuer cupi24.guardops.ch:"
+          find dist-cupi24 -type f | sort
+
+      - name: Rapport-Tool nach cupi24.guardops.ch hochladen (FTPS)
+        if: ${{ env.UMGEBUNG == 'production' && env.EFF_CUPI24_FTP_HOST != '' }}
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ env.EFF_CUPI24_FTP_HOST }}
+          username: ${{ env.EFF_CUPI24_FTP_USER }}
+          password: ${{ env.EFF_CUPI24_FTP_PASSWORD }}
+          protocol: ftps
+          local-dir: ./dist-cupi24/
+          # Der Zugang ist von Hostpoint auf das Document-Root der Subdomain
+          # beschraenkt -- daher "/", nicht der volle Pfad. Genau wie bei den
+          # Uploads oben. ACHTUNG (Lehre aus dem Portal-Umzug, ENT-580): der
+          # FTP-Account MUSS auf den tatsaechlichen Document-Root der
+          # Subdomain zeigen, nicht auf einen gleichnamigen Pfad ohne "www/"
+          # -- sonst laden die Dateien unbemerkt an eine unbediente Stelle
+          # hoch (403 trotz erfolgreichem Upload).
+          server-dir: /
+
+      # "NICHT EINGERICHTET" DARF NICHT WIE "NICHTS ZU TUN" AUSSEHEN, genau
+      # wie bei den Buendeln oben.
+      - name: Hinweis, wenn cupi24.guardops.ch noch nicht eingerichtet ist
+        if: ${{ env.UMGEBUNG == 'production' && env.EFF_CUPI24_FTP_HOST == '' }}
+        run: |
+          echo "::notice::cupi24.guardops.ch wurde NICHT beliefert -- die Secrets CUPI24_FTP_HOST/USER/PASSWORD fehlen im Environment production. Das Rapport-Tool auf der bisherigen Adresse ist davon nicht betroffen und wurde regulaer ausgeliefert."
 
       - name: Staging-Passwortschutz verifizieren
         if: ${{ env.UMGEBUNG == 'staging' }}

@@ -28,6 +28,21 @@ if (!be_tabellen_da($pdo)) {
 
 $vorhanden = (int)$pdo->query('SELECT COUNT(*) FROM betreiber')->fetchColumn();
 if ($vorhanden === 0) {
+    // NIE IN DER DEMO (ENT-587). Die Demo-Umgebung teilt ein einziges,
+    // veroeffentlichtes Anmeldekonto mit Verwaltungsrechten -- genau die
+    // Voraussetzung fuer den Bootstrap. Ohne diese Wache koennte jede
+    // Person mit dem Demo-Zugang sich hier ein Betreiber-Konto ausstellen,
+    // und weil der naechtliche Reset der Demo-Musterdaten (ENT-523 Stufe 4)
+    // noch nicht gebaut ist, bliebe der Bootstrap fuer alle folgenden
+    // Demo-Besuche dauerhaft geschlossen -- ein geteilter Anmeldezugang
+    // haette den Zustand der gesamten Demo veraendert. Das gilt unabhaengig
+    // davon, ob betreiber_db() gerade auf die Demo-Datenbank oder auf eine
+    // eigene faellt (ENT-519): Diese Wache soll nicht davon abhaengen,
+    // welche Datenbank gerade dahinter steht.
+    if (ist_demo()) {
+        json_response(['status' => 'error',
+            'message' => 'Der Betreiber-Bereich lässt sich aus der Demo-Umgebung nicht einrichten.'], 403);
+    }
     // Bootstrap -- aber nur, solange höchstens ein Mandant eingetragen ist.
     // Sonst könnte die Verwaltung eines fremden Betriebs sich hier ein
     // Konto ausstellen und käme damit an jeden Mandanten. Begründung

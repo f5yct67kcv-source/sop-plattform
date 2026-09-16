@@ -144,11 +144,14 @@ check('KRITISCH: und auch keinen Schatten mehr, der eine Kartenkante andeuten wu
   form !== null && form.schatten === 'none');
 
 // ══════════ LOGO RAHMENLOS UND GROSS, WIE IN app.html ══════════════════
-const logo = await mass(page, '.gate-oben img');
+// Seit dem Wechsel vom blossen "G"-Zeichen auf die volle Wortmarke
+// (2026-09-16) ist die Marke ein Rechteck (~4.23:1), kein Quadrat mehr --
+// darum nur noch die Breite geprueft, nicht mehr zusaetzlich die Hoehe.
+const logo = await mass(page, '.gate-oben .marke');
 check('KRITISCH: das Logo ist auf dem Desktop deutlich groesser als die alten 66 px',
-  logo !== null && logo.w >= 150 && logo.h >= 150);
+  logo !== null && logo.w >= 150);
 const fassung = await ev(page, () => {
-  const c = getComputedStyle(document.querySelector('.gate-oben img'));
+  const c = getComputedStyle(document.querySelector('.gate-oben .marke'));
   return { grund: c.backgroundColor, radius: c.borderRadius, padding: c.paddingTop, schatten: c.boxShadow };
 });
 check('KRITISCH: das Logo traegt keine weisse Flaeche und keinen Rahmen mehr dahinter',
@@ -159,6 +162,31 @@ check('Das Logo steht waagrecht wirklich mittig, nicht nur ungefaehr',
   logo !== null && mitte !== null
   && Math.abs((logo.x + logo.w / 2) - (mitte.x + mitte.w / 2)) <= 2);
 
+// ══════════ TINTENDECKUNG: DIE ZEICHNUNG STECKT WIRKLICH IM KASTEN ═════
+// Genau der Fehler, den diese Pruefung bisher NICHT gefangen haette (Befund
+// des Projektinhabers, 2026-09-16): die aeussere <svg>-viewBox trug versehentlich
+// den Versatz der Symbol-viewBox ("0 -120.22 ...") statt der neutralen
+// Aussen-viewBox ("0 0 ..."), siehe die ACHTUNG-Notiz beim <symbol id="go-wort">.
+// Die Kastengroesse (oben) blieb davon unberuehrt -- nur die Zeichnung darin
+// rutschte aus dem Sichtfenster. Dieselbe getBBox()/getScreenCTM()-Technik
+// wie in test_gate_signatur.mjs weist das jetzt am gerenderten Zustand nach.
+const tinte = await ev(page, () => {
+  const svg = document.querySelector('.gate-oben .marke');
+  if (!svg) { return null; }
+  const rBox = svg.getBoundingClientRect();
+  const bb = svg.getBBox(), m = svg.getScreenCTM();
+  const pt = (x, y) => { const q = svg.createSVGPoint(); q.x = x; q.y = y; return q.matrixTransform(m); };
+  const a = pt(bb.x, bb.y), b = pt(bb.x + bb.width, bb.y + bb.height);
+  return {
+    imKasten: a.x >= rBox.left - 1 && a.y >= rBox.top - 1 && b.x <= rBox.right + 1 && b.y <= rBox.bottom + 1,
+    deckungB: (b.x - a.x) / rBox.width, deckungH: (b.y - a.y) / rBox.height,
+  };
+});
+check('KRITISCH: die Wortmarke-Zeichnung liegt in ihrem eigenen Kasten, statt daraus verschoben zu sein',
+  tinte !== null && tinte.imKasten);
+check('KRITISCH: die Wortmarke fuellt ihren Kasten wirklich, statt grossteils leer/abgeschnitten zu sein',
+  tinte !== null && tinte.deckungB >= 0.90 && tinte.deckungH >= 0.85);
+
 // ══════════ "COCKPIT" BLEIBT -- ANDERS ALS IN app.html ════════════════
 // ENT-385 hat die Wortmarke aus der Mitarbeiter-App entfernt, weil der
 // Zugang dort NICHT "Cockpit" heisst. Hier schon -- das ist tatsaechlich
@@ -166,8 +194,13 @@ check('Das Logo steht waagrecht wirklich mittig, nicht nur ungefaehr',
 // vergessene Aufraeumarbeit.
 check('KRITISCH: die Wortmarke "Cockpit" steht ueber dem Formular',
   (await page.textContent('.gate-oben .wm').catch(() => '')).trim() === 'Cockpit');
-check('Der Firmenname steht als eigene Zeile darunter',
-  (await page.textContent('.gate-oben .sub').catch(() => '')).trim() !== '');
+// Die fruehere eigene Zeile ".sub" ("GuardOpS") ist mit dem Wechsel vom
+// "G"-Zeichen auf die volle Wortmarke (2026-09-16) entfallen: Die Marke
+// selbst traegt den Firmennamen jetzt, eine zweite Zeile wuerde ihn
+// verdoppeln. Nachweis dafuer steht bei der Bildbeschriftung der Marke.
+check('KRITISCH: die Wortmarke traegt den Firmennamen als Bildbeschriftung, keine doppelte Textzeile mehr',
+  (await page.getAttribute('.gate-oben .marke', 'aria-label').catch(() => '') || '').toLowerCase().includes('guard')
+  && (await ev(page, () => !document.querySelector('.gate-oben .sub'))));
 
 // ══════════ EIGENE, VOM SEITENTHEMA UNABHAENGIGE FARBPALETTE ══════════
 const grund = await ev(page, () => getComputedStyle(document.getElementById('gate')).backgroundColor);
@@ -222,7 +255,10 @@ await ev(page, () => document.querySelector('.gate-video')?.pause());
 // ══════════ HAUPTFORMULAR: MEHRPUNKT-KONTRAST GEGEN DAS LAUFENDE VIDEO ═
 const TEXTE_HAUPT = [
   ['Wortmarke "Cockpit"', '.gate-oben .wm'],
-  ['Firmenname', '.gate-oben .sub'],
+  // Die frueher hier zusaetzlich gepruefte Zeile ".sub" ("GuardOpS") ist mit
+  // dem Wechsel vom "G"-Zeichen auf die volle Wortmarke (2026-09-16)
+  // entfallen -- die Marke traegt den Firmennamen jetzt selbst, siehe
+  // test_cockpit_gate.mjs weiter oben.
   // Der frueher hier gepruefte Begleittext "Bitte melden Sie sich..." ist
   // entfernt (auf Ansage des Projektinhabers: die Maske erklaert sich
   // selbst). An seiner Stelle liegt jetzt die Herstellersignatur auf dem

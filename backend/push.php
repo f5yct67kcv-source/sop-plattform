@@ -45,9 +45,16 @@
 declare(strict_types=1);
 
 // ── Das Geheimnis ─────────────────────────────────────────────────────
-// Beim Deploy ersetzt, derselbe Mechanismus wie __DB_HOST__ und __SMTP_*__.
-// Bleibt es ungesetzt, meldet push_konfiguriert() "nicht eingerichtet" --
-// es wird nichts verschickt und nichts behauptet.
+// Beim Deploy ersetzt, derselbe Mechanismus wie "__DB" + "_HOST__" und
+// __SMTP_*__. Bleibt es ungesetzt, meldet push_konfiguriert() "nicht
+// eingerichtet" -- es wird nichts verschickt und nichts behauptet.
+//
+// KEIN FREMDER PLATZHALTERNAME IN DIESER DATEI, auch nicht in einem
+// Kommentar: Seit ENT-589 geht sie auch nach dist-cupi24/ mit, und der Bau
+// des dortigen Buendels weist jeden Platzhalter ab, der dort nicht ersetzt
+// wird. Eine blosse, ausgeschriebene Erwaehnung von "__DB" + "_HOST__" hat
+// genau das in Lauf 521 ausgeloest -- gleicher Fehler wie bei
+// mailer.php/Lauf 474 (siehe dort).
 //
 // Wert: base64 der PEM-Datei des privaten P-256-Schluessels, EINZEILIG
 // (die Ersetzung im Deploy ist ein sed-Aufruf und vertraegt keine
