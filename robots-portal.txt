@@ -1,0 +1,4 @@
+# robots.txt fuer portal.guardops.ch (ENT-580) -- kein oeffentlicher
+# Inhalt, analog zu betreiber.guardops.ch und zur Testinstanz.
+User-agent: *
+Disallow: /
