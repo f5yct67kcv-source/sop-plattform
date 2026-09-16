@@ -785,6 +785,21 @@ if (ohneEinbindung.length) { bad.push('ohne rechte.php: ' + ohneEinbindung.join(
   if (!personVerdrahtet) { bad.push('lohn_person.php: lohn_person_regel_gesperrt() fehlt'); }
 }
 
+// abwesenheit_entscheiden.php: derselbe Aenderungsschutz wie oben, jetzt auch
+// fuer Abwesenheiten -- sonst koennte eine spaet genehmigte oder
+// zurueckgenommene Krankheits-/Unfall-Abwesenheit die rollierende UVG-
+// Ausfalltage-Zaehlung eines kuenftigen Lohnlaufs veraendern (Security-Audit
+// Lauf 2, ENT-577-Restpunkt "unklare Rueckwirkung"). Echtes Verhalten gegen
+// SQLite in pruef_lohnlauf.php geprueft, hier nur die Verdrahtung VOR dem
+// UPDATE.
+{
+  const entscheiden = ohneKommentar('abwesenheit_entscheiden.php');
+  const vorUpdate = entscheiden.split(/UPDATE\s+abwesenheiten/)[0] || '';
+  check('KRITISCH: abwesenheit_entscheiden.php prueft den Aenderungsschutz, bevor entschieden wird',
+    /abwesenheit_gesperrt\s*\(\$pdo,\s*\(int\)\$antrag\['mitarbeiter_id'\],\s*\(string\)\$antrag\['von'\],\s*\(string\)\$antrag\['bis'\]\)/
+      .test(vorUpdate));
+}
+
 // betrieb.php: jeder der vier Schreibzweige (Logo setzen, Logo entfernen,
 // Hauptdomizil, Textfelder/QR-Daten) muss das Logbuch aufrufen -- vorher war
 // keine einzige Aenderung an Betriebsstammdaten (u.a. die QR-Rechnungs-IBAN)

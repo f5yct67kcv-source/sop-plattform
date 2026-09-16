@@ -766,5 +766,27 @@ pruef('KRITISCH: die abgeloeste erste Zeile bleibt fuer einen Lohnlauf NACH ihre
 pruef('KRITISCH: die neue, noch gueltige Zeile wird vom selben Lohnlauf (August) gesperrt',
     lohn_person_regel_gesperrt($pdo, 'lohn_ansatz', $MA_GRENZE, '2026-06-01') === true);
 
+// ── abwesenheit_gesperrt(): eigenes von/bis statt einer abgeleiteten
+// Gueltigkeit, sonst dieselbe Logik (Security-Audit Lauf 2, 2026-09-16,
+// ENT-577-Restpunkt "unklare Rueckwirkung") ─────────────────────────────
+$MA_ABW = 79;
+pruef('Ohne jeden Lohnlauf ist eine Abwesenheit nicht gesperrt',
+    abwesenheit_gesperrt($pdo, $MA_ABW, '2026-03-10', '2026-03-12') === false);
+
+$pdo->exec("INSERT INTO lohnlauf VALUES (6,'2026-03-01','2026-03-31','entwurf')");
+pruef('KRITISCH: ein blosser Entwurf sperrt eine Abwesenheit noch nicht',
+    abwesenheit_gesperrt($pdo, $MA_ABW, '2026-03-10', '2026-03-12') === false);
+
+$pdo->exec("UPDATE lohnlauf SET status = 'freigegeben' WHERE id = 6");
+$pdo->exec("INSERT INTO lohnlauf_person VALUES (6, $MA_ABW)");
+pruef('KRITISCH: ein freigegebener Lohnlauf einer anderen Person sperrt NICHT',
+    abwesenheit_gesperrt($pdo, 999, '2026-03-10', '2026-03-12') === false);
+pruef('KRITISCH: ein freigegebener Lohnlauf DIESER Person, der den Abwesenheitszeitraum ueberdeckt, sperrt',
+    abwesenheit_gesperrt($pdo, $MA_ABW, '2026-03-10', '2026-03-12') === true);
+pruef('Eine Abwesenheit ausserhalb des gesperrten Zeitraums bleibt frei',
+    abwesenheit_gesperrt($pdo, $MA_ABW, '2026-04-01', '2026-04-03') === false);
+pruef('KRITISCH: eine nur teilweise ueberlappende Abwesenheit sperrt ebenfalls (irgendein gemeinsamer Tag genuegt)',
+    abwesenheit_gesperrt($pdo, $MA_ABW, '2026-03-31', '2026-04-05') === true);
+
 echo $ok . " Pruefungen bestanden\n";
 if ($bad) { echo count($bad) . " FEHLGESCHLAGEN:\n - " . implode("\n - ", $bad) . "\n"; exit(1); }

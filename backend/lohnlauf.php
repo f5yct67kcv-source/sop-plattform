@@ -929,3 +929,25 @@ function lohn_person_regel_gesperrt(PDO $pdo, string $tabelle, int $mitarbeiterI
     $s->execute([$mitarbeiterId, $bis, $gueltigAb]);
     return (int)$s->fetchColumn() > 0;
 }
+
+// Abwesenheiten (Security-Audit Lauf 2, 2026-09-16, ENT-577-Restpunkt
+// "unklare Rueckwirkung"): dieselbe Sperre wie oben, nur mit einem
+// eigenen von/bis statt einer aus der naechsten Zeile abgeleiteten
+// Gueltigkeit -- eine Abwesenheit traegt ihren Zeitraum bereits direkt.
+// Ein bereits ERZEUGTER Lohnlauf aendert sich dadurch nicht (siehe
+// Kommentarkopf oben): lauf_lesen() liest nur den Schnappschuss. Was diese
+// Sperre verhindert, ist etwas anderes -- dass eine spaeter genehmigte
+// oder zurueckgenommene Krankheits-/Unfall-Abwesenheit fuer einen bereits
+// abgerechneten Zeitraum in die rollierende UVG-Ausfalltage-Zaehlung eines
+// KUENFTIGEN Lohnlaufs einfliesst, ohne dass jemand das je entschieden hat.
+function abwesenheit_gesperrt(PDO $pdo, int $mitarbeiterId, string $von, string $bis): bool
+{
+    $s = $pdo->prepare(
+        "SELECT COUNT(*) FROM lohnlauf l
+           JOIN lohnlauf_person lp ON lp.lauf_id = l.id AND lp.mitarbeiter_id = ?
+          WHERE l.status IN ('" . implode("','", LOHN_REGELWERK_SPERR_STATUS) . "')
+            AND l.periode_von <= ? AND l.periode_bis >= ?"
+    );
+    $s->execute([$mitarbeiterId, $bis, $von]);
+    return (int)$s->fetchColumn() > 0;
+}

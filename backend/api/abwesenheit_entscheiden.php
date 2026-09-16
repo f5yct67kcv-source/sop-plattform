@@ -8,6 +8,7 @@ declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../rechte.php';
 require_once __DIR__ . '/../ferien.php';
+require_once __DIR__ . '/../lohnlauf.php';   // abwesenheit_gesperrt() (Security-Audit Lauf 2, 2026-09-16)
 
 $user = require_session();
 require_recht($user, 'abwesenheiten_schreiben');
@@ -30,10 +31,24 @@ if ($status === 'abgelehnt' && $grund === '') {
 if (mb_strlen($grund) > 500) { $grund = mb_substr($grund, 0, 500); }
 
 $pdo = db();
-$s = $pdo->prepare('SELECT id FROM abwesenheiten WHERE id = ?');
+$s = $pdo->prepare('SELECT id, mitarbeiter_id, von, bis FROM abwesenheiten WHERE id = ?');
 $s->execute([$id]);
-if (!$s->fetch()) {
+$antrag = $s->fetch();
+if (!$antrag) {
     json_response(['status' => 'error', 'message' => 'Antrag nicht gefunden'], 404);
+}
+
+// Nur der Status aendert sich hier (nie von/bis/typ), aber auch das darf
+// einen bereits abgerechneten Zeitraum nicht mehr beeinflussen -- dieselbe
+// Sperre wie bei Lohnansatz/-abzug (lohn_person.php/lohn_abzuege.php,
+// Security-Audit 2026-09-14). Ohne sie koennte eine spaet genehmigte oder
+// zurueckgenommene Krankheits-/Unfall-Abwesenheit die UVG-Ausfalltage-
+// Zaehlung eines KUENFTIGEN Lohnlaufs veraendern (rollierendes Zeitfenster,
+// lohnlauf_nbu_wochen()), ohne dass das je entschieden wurde.
+if (abwesenheit_gesperrt($pdo, (int)$antrag['mitarbeiter_id'], (string)$antrag['von'], (string)$antrag['bis'])) {
+    json_response(['status' => 'error',
+        'message' => 'Dieser Zeitraum wurde bereits in einem freigegebenen oder ausbezahlten '
+                   . 'Lohnlauf verwendet und laesst sich nicht mehr entscheiden.'], 409);
 }
 
 // Erneutes Entscheiden ueberschreibt bewusst, statt eine eigene
