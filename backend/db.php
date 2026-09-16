@@ -26,6 +26,43 @@ function json_response($data, int $status = 200): void {
     exit;
 }
 
+// ── CORS fuer die native App-Huelle (ENT-588) ───────────────────────────
+// Web-App und Backend laufen unter derselben Herkunft -- ein Browser
+// schickt darum nie einen Origin-Kopf, der hier etwas veraendert. Die
+// Capacitor-Huelle ist eine FREMDE Herkunft (capacitor://localhost unter
+// iOS, http://localhost unter Android): ohne diese Kopfzeilen blockt der
+// eigene WebView jede Antwort, bevor ihr JavaScript sie sieht.
+//
+// Nur eine feste, bekannte Liste wird erlaubt, nie ein Platzhalter oder ein
+// Stern: Die Sitzung haengt am Kopf X-Auth-Token, nicht an einem Cookie --
+// ein blind erlaubter fremder Ursprung koennte ihn sonst mitlesen.
+const APP_NATIVE_HERKUENFTE = ['capacitor://localhost', 'http://localhost'];
+
+// Reine Funktion -- pruefbar mit einem frei gewaehlten Wert, ohne echten
+// Request (gleiche Ueberlegung wie bei basis_url_pruefen()).
+function cors_erlaubte_herkunft(string $herkunft): ?string {
+    return in_array($herkunft, APP_NATIVE_HERKUENFTE, true) ? $herkunft : null;
+}
+
+function cors_kopfzeilen_setzen(): void {
+    $erlaubt = cors_erlaubte_herkunft($_SERVER['HTTP_ORIGIN'] ?? '');
+    if ($erlaubt !== null) {
+        header('Access-Control-Allow-Origin: ' . $erlaubt);
+        header('Vary: Origin');
+        header('Access-Control-Allow-Headers: Content-Type, X-Auth-Token');
+        header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+    }
+    // Vor jeder Anfrage mit eigenem Kopf (hier: X-Auth-Token) schickt der
+    // WebView einen Vorab-Aufruf ohne Anmeldedaten und erwartet nur die
+    // Kopfzeilen oben zurueck. require_session() wuerde ihn sonst mit 401
+    // abweisen, bevor die eigentliche Anfrage je startet.
+    if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
+        http_response_code(204);
+        exit;
+    }
+}
+cors_kopfzeilen_setzen();
+
 // ── Umgebung (ENT-341, verschaerft auf Wunsch des Projektinhabers) ─────
 // Explizit beim Deploy gesetzt -- derselbe Platzhalter-Mechanismus wie bei
 // __DB_HOST__ usw. -- NICHT aus dem Hostnamen abgeleitet. Ein Hostname kann

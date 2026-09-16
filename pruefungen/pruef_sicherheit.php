@@ -20,6 +20,7 @@ declare(strict_types=1);
 //   4. sitzung_abdruck()    -- in der Datenbank steht nur der Abdruck
 //   5. passwort_blindpruefung() -- die Antwortzeit verraet kein Konto
 //   6. logo_mime_am_inhalt()-- der Bildtyp kommt aus den Bytes
+//   7. cors_erlaubte_herkunft() -- nur die native App-Huelle kommt durch (ENT-588)
 
 $wurzel = dirname(__DIR__);
 $ok = 0; $bad = [];
@@ -54,6 +55,8 @@ hol($push,      '/function push_dienst_bekannt.*?\n\}/s',    'push_dienst_bekann
 hol($anmeldung, '/^const PASSWORT_BLIND_HASH\s*=\s*\'[^\']+\';/m', 'PASSWORT_BLIND_HASH');
 hol($anmeldung, '/function passwort_blindpruefung.*?\n\}/s', 'passwort_blindpruefung()');
 hol($betrieb,   '/function logo_mime_am_inhalt.*?\n\}/s',    'logo_mime_am_inhalt()');
+hol($db,        "/const APP_NATIVE_HERKUENFTE\s*=\s*\[.*?\];/s", 'APP_NATIVE_HERKUENFTE');
+hol($db,        '/function cors_erlaubte_herkunft.*?\n\}/s', 'cors_erlaubte_herkunft()');
 
 // ══════════════════════════════════════════════════════════════════════
 // 1. Die eigene Adresse kommt aus dem Deploy (S-01)
@@ -180,7 +183,25 @@ pruef('KRITISCH: PHP-Quelltext wird nicht als Bild angenommen',
 pruef('Leere Bytes ergeben keinen Typ', logo_mime_am_inhalt('') === null);
 
 // ══════════════════════════════════════════════════════════════════════
-// 7. Zwei Regeln ueber den GANZEN Quelltext
+// 7. Nur die native App-Huelle kommt durch CORS durch (ENT-588)
+//
+// Der Angriff, den das verhindert: Die Sitzung haengt am Kopf
+// X-Auth-Token statt an einem Cookie. Ein CORS-Stern oder eine blind
+// gespiegelte Herkunft liesse JEDE fremde Seite diesen Kopf im Browser
+// mitlesen, sobald sie ihn irgendwie an eine angemeldete Person schickt.
+pruef('Die native App-Huelle wird erkannt (iOS)',
+    cors_erlaubte_herkunft('capacitor://localhost') === 'capacitor://localhost');
+pruef('Die native App-Huelle wird erkannt (Android)',
+    cors_erlaubte_herkunft('http://localhost') === 'http://localhost');
+pruef('KRITISCH: eine fremde Herkunft wird abgewiesen',
+    cors_erlaubte_herkunft('https://angreifer.example') === null);
+pruef('KRITISCH: leer wird abgewiesen', cors_erlaubte_herkunft('') === null);
+pruef('KRITISCH: kein Wildcard -- Gross-/Kleinschreibung und Zusatz aendern nichts',
+    cors_erlaubte_herkunft('CAPACITOR://LOCALHOST') === null
+    && cors_erlaubte_herkunft('capacitor://localhost.angreifer.example') === null);
+
+// ══════════════════════════════════════════════════════════════════════
+// 8. Zwei Regeln ueber den GANZEN Quelltext
 //
 // Sie stehen hier und nicht in test_php.mjs, und das ist beim Schreiben
 // aufgefallen: Der dortige Kommentarfilter ist ein Muster, kein Zerteiler.
