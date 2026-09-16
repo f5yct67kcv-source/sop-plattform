@@ -64,6 +64,18 @@ if ($lage !== 'ok') {
     // 403 -- beides bevor irgendetwas verschickt wird.
     $user = require_session();
     require_recht($user, 'mitteilungen_schreiben');
+    // NUR fuer diesen Weg: der Zeitgeber-Weg oben BLEIBT GET, weil ein
+    // Hostpoint-Cronjob nichts anderes kann als eine Adresse aufzurufen
+    // (siehe README) -- dort ist das kein Versehen, sondern die einzige
+    // Form, die ein Cronjob hat, und durch den zeitsicher verglichenen
+    // Schluessel abgesichert. Der angemeldete Weg dagegen hat diesen Zwang
+    // nicht: er braucht nur einen echten Klick aus dem Cockpit. Ein GET mit
+    // Schreibwirkung laesst sich durch einen blossen Linkaufruf (Browser-
+    // Verlauf, Vorschau-Bots, ein versehentlich geteilter Link) ausloesen,
+    // ein POST nicht. Security-Audit Lauf 2 (ENT-577/ENT-578, Punkt 4).
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        json_response(['status' => 'error', 'message' => 'nur POST'], 405);
+    }
 }
 
 $pdo = db();

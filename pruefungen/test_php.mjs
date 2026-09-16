@@ -883,6 +883,22 @@ if (ohneEinbindung.length) { bad.push('ohne rechte.php: ' + ohneEinbindung.join(
     /SELECT\s+id,\s*name,\s*einsatzart,\s*aktiv\s+FROM\s+objekte/.test(revierdienst));
 }
 
+// push_versand.php hat zwei Wege hinein: den Zeitgeber (Cronjob, nur GET
+// moeglich, durch ein zeitsicher verglichenes Secret geschuetzt) und die
+// angemeldete Person mit 'mitteilungen_schreiben'. Nur der zweite Weg
+// bekommt hier eine Methodenpruefung -- ein GET mit Schreibwirkung liesse
+// sich sonst durch einen blossen Linkaufruf ausloesen (Security-Audit
+// Lauf 2, ENT-577/ENT-578 Punkt 4). Der Zeitgeber-Weg bleibt unangetastet.
+{
+  const versand = ohneKommentar('push_versand.php');
+  const [vorLage, nachLage] = versand.split(/if\s*\(\s*\$lage\s*!==\s*'ok'\s*\)/);
+  check('Der Zeitgeber-Weg in push_versand.php bleibt ohne Methodenzwang (ein Cronjob kann nur GET)',
+    typeof vorLage === 'string' && !/REQUEST_METHOD/.test(vorLage));
+  check('KRITISCH: push_versand.php verlangt POST fuer den angemeldeten Weg, nicht fuer den Zeitgeber',
+    typeof nachLage === 'string'
+    && /require_recht\(\$user,\s*'mitteilungen_schreiben'\);[\s\S]{0,200}REQUEST_METHOD'\]\s*!==\s*'POST'/.test(nachLage));
+}
+
 // dashboard.html: die Frontend-Seite der beiden Personal-Felder oben muss
 // "kein Zugriff" (null) von "keine Daten" ([]) unterscheiden -- sonst waere
 // der Backend-Fix wirkungslos, weil `stats.angemeldet || []` beides gleich
