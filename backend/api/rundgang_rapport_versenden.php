@@ -15,6 +15,7 @@ declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../rechte.php';
 require_once __DIR__ . '/../rundgang.php';
+require_once __DIR__ . '/../logbuch.php';
 require __DIR__ . '/../mailer.php';
 
 $user = require_session();
@@ -126,5 +127,13 @@ try {
 } catch (Throwable $ex) {
     json_response(['status' => 'error', 'message' => 'Versand fehlgeschlagen: ' . $ex->getMessage()], 502);
 }
+
+// Die Empfaengerwahl bleibt frei (siehe Kommentarkopf) -- der Projektinhaber
+// hat entschieden, das nicht einzuschraenken, sondern nachvollziehbar zu
+// machen (Security-Audit Lauf 2, ENT-577-Restpunkt). Kein Fehler beim
+// Protokollieren darf den bereits erfolgten Versand nachtraeglich als
+// gescheitert melden -- logbuch_schreiben() wirft nichts, ein misslungener
+// Eintrag bleibt darum unbemerkt fuer den Aufrufer, nicht blockierend.
+logbuch_schreiben($pdo, $user, 'rundgang', $rundgangId, 'rapport_versendet', null, $empfaenger);
 
 json_response(['status' => 'ok', 'empfaenger' => $empfaenger, 'dateiname' => $dateiname]);

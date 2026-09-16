@@ -915,6 +915,21 @@ if (ohneEinbindung.length) { bad.push('ohne rechte.php: ' + ohneEinbindung.join(
     && /\$eintraege\s*=\s*\$gefunden\s*\?\s*logbuch_lesen\([^)]*\)\s*:\s*\[\]/.test(listQuelle));
 }
 
+// rundgang_rapport_versenden.php: die Empfaengerwahl bleibt frei (Entscheid
+// des Projektinhabers), aber jeder Versand muss ins Logbuch -- sonst bleibt
+// ein Rapport mit Mitarbeiternamen und Arbeitszeiten spurlos an eine
+// beliebige Adresse verschickbar (Security-Audit Lauf 2, ENT-577-Restpunkt
+// "freie Empfaengerwahl"). Geprueft wird, dass der Logbuch-Aufruf NACH dem
+// erfolgreichen smtp_senden() steht (ein Fehlschlag endet vorher mit
+// json_response()) und die Zieladresse mitfuehrt.
+{
+  const versendenQuelle = ohneKommentar('rundgang_rapport_versenden.php');
+  const nachVersand = versendenQuelle.split(/smtp_senden\(/)[1] || '';
+  check('KRITISCH: rundgang_rapport_versenden.php schreibt einen Logbuch-Eintrag nach dem Versand',
+    /logbuch_schreiben\(\$pdo,\s*\$user,\s*'rundgang',\s*\$rundgangId,\s*'rapport_versendet',\s*null,\s*\$empfaenger\)/
+      .test(nachVersand));
+}
+
 // dashboard.html: die Frontend-Seite der beiden Personal-Felder oben muss
 // "kein Zugriff" (null) von "keine Daten" ([]) unterscheiden -- sonst waere
 // der Backend-Fix wirkungslos, weil `stats.angemeldet || []` beides gleich

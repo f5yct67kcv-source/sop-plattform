@@ -45,7 +45,13 @@ declare(strict_types=1);
 // (u.a. die QR-Rechnungs-IBAN, das Hauptdomizil, die Pikett-Nummer) sowie
 // Lohnansatz/-abzug/Zahlungsweg (ebenfalls inkl. IBAN) waren die einzigen
 // Schreibstellen im ganzen Haus, deren Aenderungen spurlos blieben.
-const LOGBUCH_BEREICHE = ['mitarbeiter', 'fahrzeug', 'betrieb', 'lohn'];
+// 'rundgang' seit Security-Audit Lauf 2, 2026-09-16 (ENT-577, Restpunkt
+// "freie Empfaengerwahl"): rundgang_rapport_versenden.php verschickt einen
+// Rapport mit Mitarbeiternamen und Arbeitszeiten an eine frei eingetippte
+// Adresse. Der Projektinhaber hat entschieden, die freie Wahl zu belassen,
+// aber nachvollziehbar zu machen -- kein Feld-Vorher/Nachher wie bei den
+// anderen Bereichen, sondern je Versand ein Eintrag mit der Zieladresse.
+const LOGBUCH_BEREICHE = ['mitarbeiter', 'fahrzeug', 'betrieb', 'lohn', 'rundgang'];
 
 function logbuch_tabelle_da(PDO $pdo): bool
 {

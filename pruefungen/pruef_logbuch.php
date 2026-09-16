@@ -148,6 +148,22 @@ pruef('KRITISCH: eine neue Zahlungsangabe steht im Verlauf der richtigen Person'
 pruef('Der Verlauf einer Person im Bereich "lohn" enthaelt keine fremden Personen',
     logbuch_lesen($pdo, 'lohn', 99) === []);
 
+// ══════════════ DER BEREICH 'rundgang' (Security-Audit Lauf 2, 2026-09-16)
+// Dasselbe Prinzip: faellt 'rundgang' aus der Liste, hoert die
+// Nachvollziehbarkeit des Rapport-Versands lautlos auf. Anders als bei den
+// uebrigen Bereichen gibt es kein "vorher" -- ein Versand ist ein Ereignis,
+// kein Feldwechsel, darum wert_alt = null.
+pruef('KRITISCH: der Bereich "rundgang" wird angenommen',
+    logbuch_schreiben($pdo, $chefin, 'rundgang', 5, 'rapport_versendet', null, 'kunde@example.ch') === true);
+pruef('KRITISCH: ein Versand steht mit der Zieladresse im Verlauf des richtigen Rundgangs',
+    (function () use ($pdo) {
+        $e = logbuch_lesen($pdo, 'rundgang', 5);
+        return count($e) === 1 && $e[0]['feld'] === 'rapport_versendet'
+            && $e[0]['wert_alt'] === null && $e[0]['wert_neu'] === 'kunde@example.ch';
+    })());
+pruef('Der Verlauf eines Rundgangs enthaelt keine fremden Rundgaenge',
+    logbuch_lesen($pdo, 'rundgang', 99) === []);
+
 // Ein misslungener Eintrag darf das Speichern nicht verhindern
 $pdo->exec('DROP TABLE aenderungslog');
 $konnte = true;
