@@ -162,6 +162,31 @@ check('Das Logo steht waagrecht wirklich mittig, nicht nur ungefaehr',
   logo !== null && mitte !== null
   && Math.abs((logo.x + logo.w / 2) - (mitte.x + mitte.w / 2)) <= 2);
 
+// ══════════ TINTENDECKUNG: DIE ZEICHNUNG STECKT WIRKLICH IM KASTEN ═════
+// Genau der Fehler, den diese Pruefung bisher NICHT gefangen haette (Befund
+// des Projektinhabers, 2026-09-16): die aeussere <svg>-viewBox trug versehentlich
+// den Versatz der Symbol-viewBox ("0 -120.22 ...") statt der neutralen
+// Aussen-viewBox ("0 0 ..."), siehe die ACHTUNG-Notiz beim <symbol id="go-wort">.
+// Die Kastengroesse (oben) blieb davon unberuehrt -- nur die Zeichnung darin
+// rutschte aus dem Sichtfenster. Dieselbe getBBox()/getScreenCTM()-Technik
+// wie in test_gate_signatur.mjs weist das jetzt am gerenderten Zustand nach.
+const tinte = await ev(page, () => {
+  const svg = document.querySelector('.gate-oben .marke');
+  if (!svg) { return null; }
+  const rBox = svg.getBoundingClientRect();
+  const bb = svg.getBBox(), m = svg.getScreenCTM();
+  const pt = (x, y) => { const q = svg.createSVGPoint(); q.x = x; q.y = y; return q.matrixTransform(m); };
+  const a = pt(bb.x, bb.y), b = pt(bb.x + bb.width, bb.y + bb.height);
+  return {
+    imKasten: a.x >= rBox.left - 1 && a.y >= rBox.top - 1 && b.x <= rBox.right + 1 && b.y <= rBox.bottom + 1,
+    deckungB: (b.x - a.x) / rBox.width, deckungH: (b.y - a.y) / rBox.height,
+  };
+});
+check('KRITISCH: die Wortmarke-Zeichnung liegt in ihrem eigenen Kasten, statt daraus verschoben zu sein',
+  tinte !== null && tinte.imKasten);
+check('KRITISCH: die Wortmarke fuellt ihren Kasten wirklich, statt grossteils leer/abgeschnitten zu sein',
+  tinte !== null && tinte.deckungB >= 0.90 && tinte.deckungH >= 0.85);
+
 // ══════════ "COCKPIT" BLEIBT -- ANDERS ALS IN app.html ════════════════
 // ENT-385 hat die Wortmarke aus der Mitarbeiter-App entfernt, weil der
 // Zugang dort NICHT "Cockpit" heisst. Hier schon -- das ist tatsaechlich
