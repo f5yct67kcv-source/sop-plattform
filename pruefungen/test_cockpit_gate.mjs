@@ -144,11 +144,11 @@ check('KRITISCH: und auch keinen Schatten mehr, der eine Kartenkante andeuten wu
   form !== null && form.schatten === 'none');
 
 // ══════════ LOGO RAHMENLOS UND GROSS, WIE IN app.html ══════════════════
-const logo = await mass(page, '.gate-oben img');
+const logo = await mass(page, '.gate-oben .marke');
 check('KRITISCH: das Logo ist auf dem Desktop deutlich groesser als die alten 66 px',
   logo !== null && logo.w >= 150 && logo.h >= 150);
 const fassung = await ev(page, () => {
-  const c = getComputedStyle(document.querySelector('.gate-oben img'));
+  const c = getComputedStyle(document.querySelector('.gate-oben .marke'));
   return { grund: c.backgroundColor, radius: c.borderRadius, padding: c.paddingTop, schatten: c.boxShadow };
 });
 check('KRITISCH: das Logo traegt keine weisse Flaeche und keinen Rahmen mehr dahinter',
