@@ -852,6 +852,22 @@ if (ohneEinbindung.length) { bad.push('ohne rechte.php: ' + ohneEinbindung.join(
     /if \(!darf\(\$user, .kunden_lesen.\)\) \{\s*\n\s*unset\(\$rundgang\['kunde_email'\]\);/.test(detail));
 }
 
+// objekte_revierdienst.php gibt der Waechter-Rolle (nur 'kontrollpunkte_lesen')
+// einen Objekt-Waehler -- der braucht laut dashboard.html (rdObjektFuellen())
+// ausschliesslich id und name. Bis zur Behebung lieferte derselbe Endpunkt
+// zusaetzlich Kundenname, Objektadresse, Kanton, Bemerkung, Auslastung und
+// Anfahrtsdistanzen fuer JEDES Objekt der Firma, nicht nur die eigenen
+// (Security-Audit Lauf 2, ENT-577/ENT-578). Geprueft wird die SELECT-Liste,
+// nicht nur ein spaeteres unset(): Was nie abgefragt wird, kann nicht
+// versehentlich wieder mitgegeben werden.
+{
+  const revierdienst = ohneKommentar('objekte_revierdienst.php');
+  check('KRITISCH: objekte_revierdienst.php fragt keine Kunden- oder Adressfelder mehr ab',
+    !/kunde_name|kunde_id|\bstrasse\b|\bplz\b|\bort\b|\bkanton\b|bemerkung|masterschichten|objekt_distanz/.test(revierdienst));
+  check('objekte_revierdienst.php liefert weiterhin id, name, einsatzart und aktiv',
+    /SELECT\s+id,\s*name,\s*einsatzart,\s*aktiv\s+FROM\s+objekte/.test(revierdienst));
+}
+
 // dashboard.html: die Frontend-Seite der beiden Personal-Felder oben muss
 // "kein Zugriff" (null) von "keine Daten" ([]) unterscheiden -- sonst waere
 // der Backend-Fix wirkungslos, weil `stats.angemeldet || []` beides gleich

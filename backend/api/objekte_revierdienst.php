@@ -26,8 +26,24 @@
 // Das wuerde aber aendern, WAS im Waehler steht: heute stehen dort alle
 // Objekte. Ob der Waehler kuratiert werden soll, ist eine Produktfrage und
 // keine Rechte-Frage; sie gehoert dem Projektinhaber (siehe OP-230), nicht
-// in einen Fehlerbehebung. Darum liefert dieser Endpunkt exakt dieselbe
-// Menge wie bisher.
+// in einen Fehlerbehebung. Darum liefert dieser Endpunkt dieselbe MENGE an
+// Objekten wie bisher.
+//
+// NUR NAME UND ID (Security-Audit Lauf 2, ENT-577/ENT-578, behoben hier)
+//
+// Was aber sehr wohl eine Rechte-Frage ist: welche FELDER je Objekt
+// herauskommen. 'kontrollpunkte_lesen' ist dasselbe Recht wie bei
+// kontrollpunkt_liste.php und rundgang_vorlage_liste.php -- beide verlangen
+// dort zusaetzlich eine einzelne objekt_id und liefern nur zu GENAU diesem
+// Objekt etwas. Dieser Endpunkt lieferte bisher als einziger mit demselben
+// Recht die komplette Firma auf einmal: Kundenname, Objektadresse, Kanton,
+// Bemerkung, dazu Auslastung (masterschichten) und Anfahrtsdistanzen -- fuer
+// jedes Objekt, nicht nur die eigenen. rdObjektFuellen() in dashboard.html,
+// die einzige Stelle, die dieses JSON liest, baut daraus nur eine
+// Auswahlliste aus $('id') und $('name'). Der Rest ging ungenutzt, aber
+// vollstaendig lesbar an jeden mit, der nur die Waechter-Rolle traegt.
+// Wer die volle Objektliste mit Kundenbezug braucht, hat dafuer bereits
+// objekt_list.php -- an 'plan', dem dafuer zustaendigen Recht.
 declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../rechte.php';
@@ -36,50 +52,12 @@ $user = require_session();
 require_recht($user, 'kontrollpunkte_lesen');
 
 $objekte = db()->query(
-    'SELECT id, kunde_id, kunde_name, name, strasse, plz, ort, kanton, einsatzart, sparte, aktiv, bemerkung, erstellt_am
-     FROM objekte ORDER BY aktiv DESC, name'
+    'SELECT id, name, einsatzart, aktiv FROM objekte ORDER BY aktiv DESC, name'
 )->fetchAll();
 
-// Dieselben abgeleiteten Felder wie objekt_list.php mitliefern, damit die
-// geteilte objekte-Liste in dashboard.html dieselbe Form behaelt, egal
-// welcher der beiden Endpunkte sie zuerst gefuellt hat. Sonst fehlten
-// openObjekt() und der Objektliste unter Kunden stillschweigend Felder,
-// je nachdem, welche Ansicht zuerst offen war.
-$heute = date('Y-m-d');
-
-$distanzen = [];
-try {
-    foreach (db()->query('SELECT objekt_id, anstellungsort_id, km, quelle, ermittelt_am FROM objekt_distanz') as $d) {
-        $distanzen[(int)$d['objekt_id']][(int)$d['anstellungsort_id']] = [
-            'km' => (float)$d['km'],
-            'quelle' => $d['quelle'],
-            'ermittelt_am' => $d['ermittelt_am'],
-        ];
-    }
-} catch (Throwable $e) {
-    $distanzen = [];
-}
-
-$stmt = db()->prepare(
-    'SELECT objekt_id, COUNT(*) AS anzahl, COALESCE(SUM(arbeitszeit_h), 0) AS stunden
-     FROM masterschichten
-     WHERE gueltig_ab <= ? AND (gueltig_bis IS NULL OR gueltig_bis >= ?)
-     GROUP BY objekt_id'
-);
-$stmt->execute([$heute, $heute]);
-$proObjekt = [];
-foreach ($stmt->fetchAll() as $r) {
-    $proObjekt[(int)$r['objekt_id']] = ['anzahl' => (int)$r['anzahl'], 'stunden' => (float)$r['stunden']];
-}
-
-$objekte = array_map(function ($o) use ($proObjekt, $distanzen) {
+$objekte = array_map(function ($o) {
     $o['id'] = (int)$o['id'];
-    $o['kunde_id'] = $o['kunde_id'] === null ? null : (int)$o['kunde_id'];
     $o['aktiv'] = (int)$o['aktiv'];
-    $z = $proObjekt[$o['id']] ?? ['anzahl' => 0, 'stunden' => 0];
-    $o['masterschichten'] = $z['anzahl'];
-    $o['stunden_je_einsatz'] = $z['stunden'];
-    $o['distanzen'] = $distanzen[$o['id']] ?? [];
     return $o;
 }, $objekte);
 
