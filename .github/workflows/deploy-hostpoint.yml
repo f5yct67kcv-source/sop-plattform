@@ -1571,6 +1571,39 @@ jobs:
           sed -i "s|__VAPID_KONTAKT__|$EFF_VAPID_KONTAKT|g" dist-cupi24/push.php
           sed -i "s|__PUSH_CRON_SCHLUESSEL__|$EFF_PUSH_CRON_SCHLUESSEL|g" dist-cupi24/api/push_versand.php
 
+          # CUPI-24-eigenes Branding (ENT-589, mandantenseitig -- schliesst
+          # die zwei offenen Punkte aus ENT-568). Betrifft NUR dieses
+          # Buendel: die geteilten Flaechen (guardops.ch, betreiber.*,
+          # portal.*) bleiben GuardOpS, weil dort ENT-568 das so entschieden
+          # hat. Reine Dateinamen-Ersetzung fuer Favicon/App-Icons/PWA-
+          # Vorschaubilder -- die Dateien selbst liegen unter icons/cupi24-*
+          # (oben per icons/*.png mitkopiert).
+          sed -i "s|icons/guardops-|icons/cupi24-|g" \
+            dist-cupi24/dashboard.html dist-cupi24/app.html dist-cupi24/index.html \
+            dist-cupi24/manifest.json dist-cupi24/manifest-app.json
+          sed -i "s|icons/icon-32.png|icons/cupi24-32.png|; s|icons/icon-180.png|icons/cupi24-180.png|" \
+            dist-cupi24/dashboard.html
+
+          # Die Anmeldemaske des Cockpits (gate-oben, ENT-579) zeigt das
+          # CUPI-24-Siegel statt der GuardOpS-Wortmarke -- das ist die
+          # einzige Stelle, die wechselt. "powered by Guard OpS" (go-sig,
+          # mh-voll/mh-zeichen -- Herstellerhinweis) bleibt unveraendert
+          # GuardOpS, in dashboard.html, app.html UND index.html: keiner
+          # dieser drei Dateien wird hier angefasst ausser der einen Zeile
+          # unten.
+          sed -i "s|<svg class=\"marke\" viewBox=\"0.00 0.00 649.83 153.56\" role=\"img\" aria-label=\"Guard OpS\"><use href=\"#go-wort\"/></svg>|<img class=\"marke\" src=\"icons/cupi24-badge.png\" alt=\"CUPI 24 GmbH\">|" \
+            dist-cupi24/dashboard.html
+
+          # Name in den beiden Manifesten (ENT-568, offene Frage): Diese
+          # Dateien sind mandantenseitig -- auf dem Telefon einer CUPI-24-
+          # Mitarbeiterin ist "GuardOpS" die falsche Auskunft. PUSH_TITEL in
+          # sw.js braucht KEINE Ersetzung: die Datei traegt schon "CUPI 24"
+          # (nie auf GuardOpS umgestellt, absichtlich, siehe ENT-568).
+          sed -i "s|GuardOpS – Mitarbeitende|CUPI 24 – Mitarbeitende|; s|\"short_name\": \"GuardOpS\"|\"short_name\": \"CUPI 24\"|" \
+            dist-cupi24/manifest-app.json
+          sed -i "s|Stundenrapport – GuardOpS|Stundenrapport – CUPI 24|" \
+            dist-cupi24/manifest.json
+
           # Kein uebersehener Platzhalter darf hochgeladen werden. Genau wie
           # im betreiber-Buendel und im Hauptschritt (dist/) oben werden die
           # eigenen Platzhalter der separaten Betreiber-Datenbank
