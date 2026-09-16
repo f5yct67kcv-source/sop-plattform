@@ -1442,6 +1442,37 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     /local-dir:\s*\.\/dist\//.test(workflow) && /local-dir:\s*\.\/dist-guardops\//.test(workflow)
     && /local-dir:\s*\.\/dist-betreiber\//.test(workflow) && /local-dir:\s*\.\/dist-portal\//.test(workflow)
     && /local-dir:\s*\.\/dist-cupi24\//.test(workflow));
+
+  // CUPI-24-eigenes Branding (ENT-589, schliesst die zwei offenen Punkte
+  // aus ENT-568): Anmeldemaske und App-Icons zeigen auf cupi24.guardops.ch
+  // das CUPI-24-Siegel statt der GuardOpS-Marke. Die geteilten Flächen
+  // (guardops.ch, betreiber.*, portal.*) bleiben ENT-568-konform GuardOpS
+  // -- darum wird hier geprüft, dass die neuen Zeichenketten NUR im
+  // cupi24-Bau-Schritt vorkommen, nirgends sonst im Workflow.
+  check('KRITISCH: die CUPI-24-Icon-Dateien liegen im Repository (Favicon/App-Icons + Siegel für die Anmeldemaske)',
+    ['icons/cupi24-16.png', 'icons/cupi24-32.png', 'icons/cupi24-180.png',
+     'icons/cupi24-192.png', 'icons/cupi24-512.png', 'icons/cupi24-badge.png']
+      .every(p => existsSync(`${WURZEL}/${p}`)));
+
+  check('KRITISCH: die Anmeldemaske (gate-oben) des Cockpits zeigt im cupi24-Bündel das CUPI-24-Siegel statt der GuardOpS-Wortmarke',
+    /class=\\"marke\\"/.test(bauen) && /cupi24-badge\.png/.test(bauen)
+    && /dist-cupi24\/dashboard\.html/.test(bauen));
+
+  check('KRITISCH: beide Web-App-Manifeste tragen im cupi24-Bündel den CUPI-24-Namen statt GuardOpS',
+    /CUPI 24 – Mitarbeitende/.test(bauen) && /dist-cupi24\/manifest-app\.json/.test(bauen)
+    && /Stundenrapport – CUPI 24/.test(bauen) && /dist-cupi24\/manifest\.json/.test(bauen));
+
+  {
+    const swjs = readFileSync(`${WURZEL}/sw.js`, 'utf8');
+    check('KRITISCH: PUSH_TITEL in sw.js ist mandantenseitig und trägt bereits "CUPI 24" (ENT-568) -- keine Ersetzung im Deploy nötig',
+      /const PUSH_TITEL = 'CUPI 24'/.test(swjs));
+  }
+
+  for (const tok of ['icons/cupi24-', 'cupi24-badge.png']) {
+    const zaehlung = (text) => (text.match(new RegExp(tok.replace(/[.]/g, '\\.'), 'g')) || []).length;
+    check(`KRITISCH: "${tok}" kommt im ganzen Workflow ausschliesslich im cupi24-Bau-Schritt vor -- sonst bliebe das GuardOpS-Branding der geteilten Bündel nicht unangetastet`,
+      zaehlung(bauen) > 0 && zaehlung(workflow) === zaehlung(bauen));
+  }
 }
 
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
