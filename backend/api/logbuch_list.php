@@ -25,17 +25,28 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 $pdo  = db();
 $name = trim((string)($_GET['name'] ?? ''));
 $id   = 0;
+// Ein unbekannter Name antwortet NICHT mit 404: Wer dieses Recht traegt,
+// koennte sonst per Namensraten durchprobieren, wer im Betrieb ueberhaupt
+// als Mitarbeiter gefuehrt wird -- unabhaengig davon, ob er sonst irgendein
+// Recht auf Personendaten hat (Security-Audit Lauf 2, ENT-577/ENT-578,
+// Restpunkt "Informationslecke"). Die Oberflaeche fragt ohnehin nie einen
+// frei getippten Namen ab, sondern immer den einer bereits offenen,
+// bereits berechtigten Personalakte (mdVerlauf() in dashboard.html) -- ein
+// unbekannter Name kommt praktisch nur durch einen manuell gebauten Aufruf
+// vor, nie durch die App selbst.
+$gefunden = true;
 if ($name !== '') {
     $s = $pdo->prepare('SELECT id FROM mitarbeiter WHERE name = ?');
     $s->execute([$name]);
     $id = (int)$s->fetchColumn();
-    if ($id === 0) {
-        json_response(['status' => 'error', 'message' => 'Mitarbeitende(r) nicht gefunden'], 404);
-    }
+    $gefunden = $id > 0;
 }
 
 $grenze    = (int)($_GET['grenze'] ?? 200);
-$eintraege = logbuch_lesen($pdo, 'mitarbeiter', $id, $grenze);
+// Ein unbekannter Name liefert einen leeren Verlauf -- ungefiltert abfragen
+// wuerde stattdessen in den "alle Personen"-Zweig fallen (logbuch_lesen()
+// behandelt jede Zahl <= 0 gleich), und damit MEHR preisgeben als gefragt.
+$eintraege = $gefunden ? logbuch_lesen($pdo, 'mitarbeiter', $id, $grenze) : [];
 
 json_response([
     'status'    => 'ok',

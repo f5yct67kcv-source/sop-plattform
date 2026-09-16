@@ -899,6 +899,22 @@ if (ohneEinbindung.length) { bad.push('ohne rechte.php: ' + ohneEinbindung.join(
     && /require_recht\(\$user,\s*'mitteilungen_schreiben'\);[\s\S]{0,200}REQUEST_METHOD'\]\s*!==\s*'POST'/.test(nachLage));
 }
 
+// logbuch_list.php: ein unbekannter Name antwortete bisher mit 404 --
+// jeder mit dem Recht 'logbuch_lesen' konnte damit per Namensraten
+// durchprobieren, wer ueberhaupt als Mitarbeiter gefuehrt wird (Security-
+// Audit Lauf 2, ENT-577/ENT-578, Restpunkt "Informationslecke"). Geprueft
+// wird direkt, dass kein error-Zweig mit 404 mehr existiert UND dass ein
+// nicht gefundener Name in einen LEEREN Verlauf laeuft, nicht in den
+// "alle Personen"-Zweig (der bei jeder Zahl <= 0 greift).
+{
+  const listQuelle = ohneKommentar('logbuch_list.php');
+  check('KRITISCH: logbuch_list.php antwortet nicht mehr mit 404 bei unbekanntem Namen',
+    !/404/.test(listQuelle));
+  check('KRITISCH: ein unbekannter Name liefert einen leeren, nicht den vollen Verlauf',
+    /\$gefunden\s*=\s*\$id\s*>\s*0;/.test(listQuelle)
+    && /\$eintraege\s*=\s*\$gefunden\s*\?\s*logbuch_lesen\([^)]*\)\s*:\s*\[\]/.test(listQuelle));
+}
+
 // dashboard.html: die Frontend-Seite der beiden Personal-Felder oben muss
 // "kein Zugriff" (null) von "keine Daten" ([]) unterscheiden -- sonst waere
 // der Backend-Fix wirkungslos, weil `stats.angemeldet || []` beides gleich
