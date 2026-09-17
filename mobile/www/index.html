@@ -237,6 +237,20 @@ svg.i-sm { width: 17px; height: 17px; }
 .btn-pos { background: var(--pos-soft); color: var(--pos); border-color: var(--pos-line); }
 .btn-neg { background: var(--neg-soft); color: var(--neg); border-color: var(--neg-line); }
 .btn-wide { width: 100%; }
+/* Ein Knopf, der allein in seiner Zeile steht, wird nicht ueber die volle
+   Breite gestreckt, nur weil Platz da ist. Gestreckt sass der Einstieg im
+   Reiter "Rapport" als breiter Farbblock direkt unter dem Kopf und las
+   sich wie dessen Fortsetzung. Schmaler und mittig steht er als eigenes
+   Element da. .btn ist inline-flex -- fuers Mittigstellen ueber
+   margin-inline braucht es display:flex. Die Obergrenze haelt ihn am
+   Desktop in Knopfgroesse, statt ihn auf 72 % von 1200 px mitwachsen zu
+   lassen. */
+.btn-mitte, .cta-unter { width: 72%; max-width: 280px; margin-inline: auto; }
+.btn-mitte { display: flex; }
+/* Die Unterzeile gehoert zum Knopf und bekommt darum dieselbe Breite --
+   sonst stuende sie weiter mittig, waehrend der Knopf am Schreibtisch nach
+   links rueckt. */
+.cta-unter { font-size: 13px; color: var(--ink-3); text-align: center; margin-bottom: 6px; }
 /* Ein Knopf mit Unterzeile (ENT-324). Der Grundknopf ist eine waagrechte
    Flex-Reihe mit nowrap -- ein zweizeiliger Inhalt braucht darum beides
    umgestellt, sonst stuenden Titel und Erklaerung nebeneinander und der
@@ -1732,6 +1746,12 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
      Text; sie ueber 1590 px zu ziehen macht sie nicht lesbarer, nur
      leerer. Dieselbe Grenze wie fuer jede andere Textseite. */
   #plan-inhalt-sperren, #plan-inhalt-abwesenheit { max-width: 1200px; }
+  /* Aus demselben Grund steht der mittige Knopf am Schreibtisch links:
+     Mittig in einer 1200 px breiten Spalte schwebte er allein ueber der
+     linksbuendigen Ueberschrift und der Liste darunter -- gemessen, Mitte
+     bei 626 px gegen eine Kante bei 26 px. Am Handy bleibt er mittig; dort
+     ist die Spalte schmal und die Unterzeile steht ohnehin mittig. */
+  .btn-mitte, .cta-unter { margin-inline: 0 auto; }
 
   /* ── Zweite Leiste (ENT-447) ────────────────────────────────────────
      Am Schreibtisch fuehrt die Schreibtisch-Leiste, die Handy-Leiste
@@ -3976,11 +3996,11 @@ function zeichneRapport() {
   // in der App statt extern in Safari zu oeffnen (anders als der
   // Cockpit-Link: dashboard.html gehoert nicht zum Werkzeug der Waechter
   // und wird bewusst nicht mitgebuendelt).
-  let html = `<a class="btn btn-primary btn-wide" href="${nativeAppHuelle() ? 'rapport-tool.html' : 'index.html'}" style="margin-bottom:8px">
+  let html = `<a class="btn btn-primary btn-mitte" href="${nativeAppHuelle() ? 'rapport-tool.html' : 'index.html'}" style="margin-top:10px;margin-bottom:8px">
       <svg class="i i-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       ${esc(w('neuerRapport'))}
     </a>
-    <p style="font-size:13px;color:var(--ink-3);text-align:center;margin-bottom:6px">${esc(w('zurErfassung'))}</p>
+    <p class="cta-unter">${esc(w('zurErfassung'))}</p>
     <div class="titel">${esc(w('meineRapporte'))}</div>`;
 
   if (!rapporte.length) {
