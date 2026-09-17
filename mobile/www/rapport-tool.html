@@ -68,13 +68,21 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
    gehoert in die Mitte des BILDSCHIRMS, nicht in die Mitte des Rests
    zwischen "App" und Abmelden. Die beiden sind verschieden breit -- mit
    space-between sass "Stundenrapport" sichtbar links der Mitte. */
-header { background: var(--shell); color: #fff; padding: calc(env(safe-area-inset-top) + 12px) 16px 12px; min-height: 58px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; position: sticky; top: 0; z-index: 200; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+header { background: var(--shell); color: #fff; padding: calc(env(safe-area-inset-top) + 7px) 16px 7px; min-height: 58px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; position: sticky; top: 0; z-index: 200; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+/* Ohne diese beiden Zeilen streckt das Raster seine Kinder auf die volle
+   Spaltenbreite (Vorgabe "stretch"): Der Zurueck-Knopf war dadurch 114 px
+   breit statt 44 -- gemessen, nicht angenommen. */
+header > :first-child { justify-self: start; }
 header > :last-child { justify-self: end; }
 header h1 { font-size: 15px; font-weight: 700; }
 /* Kopfzeile: nur noch Weg zurueck, Logo und Abmelden. Alles andere war
    Zierde und hat den Blick vom Formular abgezogen (ENT-028). */
+/* 44 px, nicht 38: Projektregel fuer Trefferflaechen am Handy. Der
+   Aussenabstand der Kopfzeile ist dafuer von 12 auf 7 px gesetzt -- so
+   waechst die Kopfzeile nicht mit, sie bleibt bei 58 px. Beide Knoepfe
+   tragen dieselbe Klasse und sind damit gleich gross. */
 .kopf-btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-  min-height: 38px; min-width: 38px; padding: 0 11px; border-radius: 9px; border: 1px solid var(--shell-line);
+  min-height: 44px; min-width: 44px; padding: 0 11px; border-radius: 9px; border: 1px solid var(--shell-line);
   background: var(--shell-hi); color: var(--shell-txt-hi); font: inherit; font-size: 13px; font-weight: 620;
   text-decoration: none; cursor: pointer; white-space: nowrap; }
 .kopf-btn:hover { background: #262A33; }
@@ -140,7 +148,24 @@ select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
 html[data-thema="dunkel"] .field select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%239298A5' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--luft); margin-bottom: var(--luft); }
 
-.net-display { background: var(--green-bg); border: 1.5px solid var(--green-line); border-radius: 10px; padding: 14px 18px; text-align: center; margin-bottom: 0; }
+/* Die beiden Zeitfelder brauchen Platz fuer zwei Ziffern und den Pfeil,
+   nicht die halbe Spalte. Ueber die volle Breite gezogen wirkten sie
+   wuchtig und nahmen dem Container die Luft. Nur hier gesetzt --
+   zeitwahl.js liegt auch in app.html und im Cockpit, dort bleibt es
+   unveraendert. */
+.field .zeitwahl { width: auto; }
+.field .zeitwahl select { flex: 0 0 auto; width: 4.6em; padding-left: 12px; padding-right: 30px;
+  background-position: right 10px center; }
+
+/* Die Summe ist das Ergebnis der drei Felder darueber, kein viertes Feld
+   -- sie darf abgesetzt stehen (2026-09-17, Projektinhaber: "nicht alles
+   so reingequetscht").
+   Der Wert ist der DOPPELTE Grundabstand, nicht der einfache: Der
+   Aussenabstand des Feldes darueber und dieser hier verschmelzen zu ihrem
+   groesseren Wert, statt sich zu addieren. Mit var(--luft) blieb es
+   darum bei 14 px und die Aenderung war wirkungslos -- gemessen, nicht
+   gerechnet. */
+.net-display { background: var(--green-bg); border: 1.5px solid var(--green-line); border-radius: 10px; padding: 18px; text-align: center; margin-top: calc(var(--luft) * 2); margin-bottom: 0; }
 .net-val { font-size: 32px; font-weight: 800; color: var(--green); line-height: 1; }
 .net-lbl { font-size: 11px; color: var(--green); font-weight: 600; margin-top: 3px; text-transform: uppercase; letter-spacing: .5px; }
 
@@ -252,9 +277,11 @@ tr:hover td { background: var(--accent-light); }
 </div>
 
 <header>
+  <!-- Nur der Pfeil, ohne Beschriftung: Damit ist der Knopf so gross wie
+       der Abmelden-Knopf rechts, und die Kopfzeile steht symmetrisch. Der
+       Weg bleibt ueber title/aria-label benannt. -->
   <a class="kopf-btn" href="app.html" id="btn-zurueck" title="Zurück zur App" aria-label="Zurück zur App">
     <svg viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-    <span>App</span>
   </a>
   <div style="min-width:0">
     <h1 id="h-title">Stundenrapport</h1>
@@ -302,12 +329,12 @@ tr:hover td { background: var(--accent-light); }
       </div>
       <div class="field" id="field-strasse">
         <label><span id="lbl-strasse">Strasse (Einsatzort)</span> <span class="req">*</span></label>
-        <input type="text" id="strasse" placeholder="z.B. Bahnhofstrasse 12">
+        <input type="text" id="strasse">
         <div class="err-msg" id="err-strasse">Pflichtfeld</div>
       </div>
       <div class="field" id="field-ort">
         <label><span id="lbl-ort">Ort / PLZ</span> <span class="req">*</span></label>
-        <input type="text" id="ort" placeholder="z.B. 3011 Bern">
+        <input type="text" id="ort">
         <div class="err-msg" id="err-ort">Pflichtfeld</div>
       </div>
       <div class="row2">
@@ -598,8 +625,12 @@ const T = {
     'th':['Datum','Mitarbeiter','Kunde','Adresse','Art','Zeit','Pause','Netto','Unterschrift / Unterzeichner',''],
     'no-data':'Keine Rapporte vorhanden.','del':'Löschen','ph-filter':'Suche...','ph-new-ma':'Name hinzufügen...',
     'ph-signame':'Vor- und Nachname',
-    'ph-kunde':'z.B. Stadt Bern','ph-strasse':'z.B. Bahnhofstrasse 12',
-    'ph-ort':'z.B. 3011 Bern',
+    // Strasse und Ort tragen absichtlich KEINEN Eintrag mehr: Die
+    // Beschriftung sagt bereits, was hineingehoert (2026-09-17,
+    // Projektinhaber). Ein leerer Eintrag taugt dafuer nicht -- t() faellt
+    // bei einem leeren Wert auf den Schluessel zurueck, im Feld stuende
+    // dann "ph-strasse".
+    'ph-kunde':'z.B. Stadt Bern',
     'ph-bem':'Besondere Vorkommnisse...',
     'stat-r':'Rapporte','stat-h':'Stunden','stat-ma':'Mitarbeiter',
     'min':'Min.','tDel':'Rapport gelöscht.',
@@ -630,7 +661,7 @@ function applyLang() {
   t('pa').forEach((tx,i) => { p.options[i].text = tx; p.options[i].value = pVals[i]; });
 
   const phs = {'filterQ':'ph-filter','newMaInput':'ph-new-ma','bemerkung':'ph-bem',
-    'kunde':'ph-kunde','strasse':'ph-strasse','ort':'ph-ort','sigName':'ph-signame'};
+    'kunde':'ph-kunde','sigName':'ph-signame'};
   Object.entries(phs).forEach(([id,k]) => { const el=document.getElementById(id); if(el) el.placeholder=t(k); });
   calcNet();
 }
