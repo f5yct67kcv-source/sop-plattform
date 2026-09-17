@@ -47,15 +47,31 @@ ADRESSE="${GUARDOPS_URL:-https://cupi24.guardops.ch}"
 DIENST="guardops-dev"
 MERKDATEI="$HOME/.guardops-dev-user"
 
-# "./dev-anmelden.sh vergessen" loescht das Gemerkte wieder.
-if [ "${1:-}" = "vergessen" ]; then
-  rm -f "$MERKDATEI"
-  if command -v security >/dev/null 2>&1; then
-    security delete-generic-password -s "$DIENST" >/dev/null 2>&1 || true
-  fi
-  echo "Gemerkte Zugangsdaten geloescht."
-  exit 0
-fi
+# Aufrufarten, in beliebiger Reihenfolge kombinierbar:
+#   ./dev-anmelden.sh                    -- wie gehabt
+#   ./dev-anmelden.sh vorname.nachname   -- Namen gleich mitgeben, keine Frage
+#   ./dev-anmelden.sh ohne-sync          -- nicht synchronisieren
+#   ./dev-anmelden.sh vergessen          -- Gemerktes wieder loeschen
+#
+# Den Namen mitgeben zu koennen ist kein Luxus: Beim ersten Lauf ist noch
+# nichts gemerkt, und die Frage danach erscheint erst NACH der langen
+# Ausgabe von "cap sync". Wer da nicht hinsieht, haelt das wartende Skript
+# fuer ein haengendes.
+NAME_ARG=""
+MIT_SYNC=1
+for arg in "$@"; do
+  case "$arg" in
+    vergessen)
+      rm -f "$MERKDATEI"
+      if command -v security >/dev/null 2>&1; then
+        security delete-generic-password -s "$DIENST" >/dev/null 2>&1 || true
+      fi
+      echo "Gemerkte Zugangsdaten geloescht."
+      exit 0 ;;
+    ohne-sync) MIT_SYNC=0 ;;
+    *) NAME_ARG="$arg" ;;
+  esac
+done
 
 # Das Synchronisieren gehoert in dieses Skript, nicht davor: "npx cap sync"
 # schreibt ios/App/App/public/ komplett neu -- genau den Ordner, in den
@@ -63,7 +79,7 @@ fi
 # Reihenfolge-Verwechslung ein stiller Fehlschlag (die Anmeldemaske kam
 # einfach wieder). Jetzt kann es nur noch in der richtigen Reihenfolge
 # laufen. Ueberspringen mit "./dev-anmelden.sh ohne-sync".
-if [ "${1:-}" != "ohne-sync" ] && command -v npx >/dev/null 2>&1; then
+if [ "$MIT_SYNC" = "1" ] && command -v npx >/dev/null 2>&1; then
   echo "Synchronisiere das Buendel (npx cap sync ios) ..."
   npx cap sync ios
 fi
@@ -74,12 +90,15 @@ if [ ! -f "$ZIEL" ]; then
   exit 1
 fi
 
-# Reihenfolge: Umgebung, dann Gemerktes, dann fragen.
-NAME="${GUARDOPS_USER:-}"
+# Reihenfolge: Argument, dann Umgebung, dann Gemerktes, dann fragen.
+NAME="${NAME_ARG:-${GUARDOPS_USER:-}}"
 if [ -z "$NAME" ] && [ -f "$MERKDATEI" ]; then
   NAME=$(cat "$MERKDATEI")
 fi
 if [ -z "$NAME" ]; then
+  printf '\n'
+  echo "Noch kein Name gemerkt -- einmal eintippen, danach nie wieder."
+  echo "(Oder beim naechsten Mal gleich mitgeben: ./dev-anmelden.sh vorname.nachname)"
   printf 'Anmeldename: '
   read -r NAME
 fi
