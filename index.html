@@ -325,6 +325,11 @@ tr:hover td { background: var(--accent-light); }
 })();
 </script>
 
+<!-- Bleibt leer und unsichtbar, solange die Einrichtung durchlaeuft. Steht
+     ueber den Reitern, weil ein halb eingerichtetes Formular sonst
+     benutzbar aussieht. -->
+<div class="err-msg" id="initFehler" style="display:none;margin:12px 16px 0"></div>
+
 <div class="tabs">
   <div class="tab active" onclick="showTab('erfassen')" id="tab-erfassen">Erfassen</div>
   <div class="tab" onclick="showTab('uebersicht')" id="tab-uebersicht">Übersicht</div>
@@ -1056,12 +1061,34 @@ const fmtDate = d => d ? d.split('-').reverse().join('.') : '';
 function showToast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2800);}
 
 // ── INIT
+// Jeder Schritt einzeln: Diese Datei laedt drei eigenstaendige Skripte
+// (zeitwahl.js, unterschrift.js, testumgebung.js). Fehlt eines davon,
+// warf der erste Aufruf, der es braucht -- und alles Weitere blieb
+// ungetan, obwohl es damit nichts zu tun hat. Genau so liefen die drei
+// schon einmal ins Leere, ohne dass ein Fehler das gemeldet haette
+// (Befund im Kopf von mobile-buendel-erstellen.py); im Buendel liegen sie
+// seither, gemeldet wurde ein Ausfall aber immer noch nicht.
+// Die Meldung ist bewusst sichtbar und nicht nur in der Konsole: Ohne
+// Unterschriftenfeld ist der Rapport unvollstaendig, das muss VOR dem
+// Ausfuellen auffallen und nicht erst beim Kunden vor Ort.
+function initSchritt(was, fn) {
+  try { fn(); }
+  catch (e) {
+    const el = document.getElementById('initFehler');
+    if (el) {
+      el.textContent = 'Ein Teil der Seite konnte nicht geladen werden (' + was
+        + '). Bitte die App schliessen und neu oeffnen.';
+      el.style.display = '';
+    }
+  }
+}
+
 document.addEventListener('DOMContentLoaded',()=>{
-  document.getElementById('datum').value=today();
-  sigEinrichten();
-  applyLang();
-  calcNet();
-  if (authToken && currentUser) { afterLogin(); }
+  initSchritt('Datum', ()=>{ document.getElementById('datum').value=today(); });
+  initSchritt('Unterschrift', sigEinrichten);
+  initSchritt('Beschriftungen', applyLang);
+  initSchritt('Zeitberechnung', calcNet);
+  if (authToken && currentUser) { initSchritt('Anmeldung', afterLogin); }
   else { document.getElementById('loginName').focus(); }
   // Zurueck-Knopf und Abmelden-Knopf sind schon direkt nach der Kopfzeile
   // gesetzt (siehe dort) -- sie duerfen nicht von dieser Kette abhaengen.

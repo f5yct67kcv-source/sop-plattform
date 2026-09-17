@@ -240,6 +240,37 @@ check('Ein 401 nennt den Grund, statt den Nutzer stumm hinauszuwerfen',
   }));
 await p9.close();
 
+// ══════════ EIN FEHLENDES BEGLEITSKRIPT LEGT NICHT ALLES LAHM ══════════
+// index.html laedt zeitwahl.js, unterschrift.js und testumgebung.js als
+// eigene Dateien. Fehlte eine, warf der erste Aufruf, der sie braucht, und
+// die ganze Einrichtung darunter blieb ungetan -- stumm. Geprueft wird
+// beides: dass der Rest weiterlaeuft UND dass der Ausfall benannt wird.
+const p10 = await b.newPage({ viewport: { width: 390, height: 844 } });
+await mock(p10, false);
+await p10.route('**/unterschrift.js', r => r.abort());
+// Angemeldet starten: Nur dann laeuft afterLogin() -- der LETZTE Schritt
+// der Kette, hinter dem ausgefallenen Skript. Woran man den Ausfall sonst
+// festmachen koennte, traegt die Seite schon im Markup (netVal steht dort
+// fest auf "7.50 h"), das wuerde nichts beweisen.
+await p10.addInitScript(() => {
+  localStorage.setItem('rv3_token', 't');
+  localStorage.setItem('rv3_user', JSON.stringify({ name: 'dario.beispiel', ist_admin: false }));
+});
+await p10.goto(`file://${WURZEL}/index.html`);
+await p10.waitForTimeout(600);
+check('Faellt ein Begleitskript aus, sagt die Seite das, statt still halb zu funktionieren',
+  await p10.evaluate(() => {
+    const el = document.getElementById('initFehler');
+    return !!el && el.style.display !== 'none' && el.textContent.trim().length > 0;
+  }));
+check('Trotz fehlendem Begleitskript laufen die Schritte DAHINTER weiter (die Anmeldung greift)',
+  await p10.evaluate(() =>
+    getComputedStyle(document.getElementById('loginScreen')).display === 'none'
+    && document.getElementById('maDisplay').value === 'dario.beispiel'));
+check('Trotz fehlendem Begleitskript ist der Zurueck-Knopf da',
+  await p10.isVisible('#btn-zurueck'));
+await p10.close();
+
 await b.close();
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(x => console.log('  ✗ ' + x)); process.exit(1); }
