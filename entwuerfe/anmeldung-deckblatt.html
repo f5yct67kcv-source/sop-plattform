@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Entwurf — einheitliche Anmeldung</title>
+<style>
+/* ══════════════════════════════════════════════════════════════════════
+   DECKBLATT-ENTWURF — Fassade der Anmeldemasken, ohne jede Funktion.
+   Kein Backend, kein Formular, keine Anmeldung. Nur Optik.
+   Diese Datei wird nicht ausgeliefert (steht in keinem Deploy-Buendel).
+
+   Der Rahmen um die Entwuerfe (Kopf, Reiter, Notizen) ist BEWUSST hell
+   und nuechtern gehalten, damit man ihn nie mit dem Produkt verwechselt.
+   Alles innerhalb der Buehne ist der Vorschlag.
+
+   Statt @media-Abfragen schalten hier die Klassen .g-desktop / .g-handy:
+   Die Buehne ist ein Kasten IN einer Seite, eine Medienabfrage wuerde die
+   Fensterbreite messen und nicht die des Kastens. Im echten Bau bleibt es
+   bei den Abfragen, wie heute schon.
+   ══════════════════════════════════════════════════════════════════════ */
+@font-face {
+  font-family: 'Inter'; font-style: normal; font-weight: 400 700; font-display: swap;
+  src: url(../fonts/inter-latin.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2212, U+FEFF, U+FFFD;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: #F7F8FA; color: #14161A;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased;
+}
+
+/* ── Rahmen des Entwurfs ──────────────────────────────────────────── */
+.e-kopf { background: #16181D; color: #F3F5F8; padding: 18px 24px;
+  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px; }
+.e-kopf .links { display: flex; flex-direction: column; gap: 4px; }
+.e-kopf .titel { font-size: 16px; font-weight: 650; letter-spacing: -.01em; }
+.e-kopf .unter { font-size: 12.5px; color: #9298A5; }
+.e-kopf .fahne { justify-self: center; font-size: 11px; font-weight: 700; letter-spacing: .1em;
+  text-transform: uppercase; color: #E2B156; border: 1px solid #4A3E1E; background: #2B2314;
+  padding: 6px 12px; border-radius: 999px; }
+.e-kopf .rechts { justify-self: end; font-size: 12.5px; color: #9298A5; }
+
+.e-leiste { background: #FFFFFF; border-bottom: 1px solid #E5E8EC;
+  padding: 14px 24px; display: flex; flex-wrap: wrap; gap: 18px; align-items: center;
+  position: sticky; top: 0; z-index: 10; }
+.e-gruppe { display: flex; flex-direction: column; gap: 6px; }
+.e-gruppe > .bez { font-size: 11px; font-weight: 650; letter-spacing: .4px;
+  text-transform: uppercase; color: #545B67; }
+.e-schalter { display: flex; flex-wrap: wrap; gap: 6px; }
+.e-schalter button {
+  appearance: none; font: inherit; font-size: 13px; font-weight: 600;
+  min-height: 36px; padding: 0 13px; border-radius: 9px; cursor: pointer;
+  background: #FFFFFF; border: 1px solid #D6DAE1; color: #14161A;
+}
+.e-schalter button:hover { border-color: #2F5BD7; }
+.e-schalter button[aria-pressed="true"] { background: #2F5BD7; border-color: #2F5BD7; color: #fff; }
+.e-schalter button .neben { font-weight: 500; opacity: .7; }
+
+.e-buehne { padding: 26px 24px 8px; display: flex; justify-content: center; }
+/* Der Rahmen ist ein Fenster, kein Bildschirm-Abbild: eine duenne Kante,
+   damit man sieht, wo die Flaeche aufhoert, sonst nichts. */
+.rahmen { position: relative; border-radius: 16px; overflow: hidden;
+  border: 1px solid #D6DAE1; box-shadow: 0 24px 60px -28px rgba(10,13,20,.55);
+  background: #0F1117; width: 100%; }
+.rahmen.d { max-width: 1180px; height: 720px; }
+.rahmen.h { max-width: 390px; height: 800px; }
+.rahmen-mass { position: absolute; left: 12px; top: 12px; z-index: 40;
+  font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase;
+  color: #868D9A; background: rgba(15,17,23,.72); border: 1px solid #2A3147;
+  padding: 4px 9px; border-radius: 999px; pointer-events: none; }
+
+.e-notizen { max-width: 1180px; margin: 0 auto; padding: 22px 24px 56px; }
+.e-notizen h2 { font-size: 15px; font-weight: 700; letter-spacing: -.01em;
+  margin: 26px 0 10px; }
+.e-karten { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.e-karte { background: #FFFFFF; border: 1px solid #E5E8EC; border-radius: 12px; padding: 14px 16px; }
+.e-karte .k { font-size: 11px; font-weight: 650; letter-spacing: .4px;
+  text-transform: uppercase; color: #545B67; margin-bottom: 6px; }
+.e-karte p { margin: 0; font-size: 13.5px; color: #14161A; line-height: 1.55; }
+.e-karte p + p { margin-top: 8px; color: #545B67; }
+.e-frage { background: #FBF3E0; border: 1px solid #E8D9AE; border-radius: 12px;
+  padding: 14px 16px; margin-bottom: 10px; }
+.e-frage .k { font-size: 11px; font-weight: 650; letter-spacing: .4px;
+  text-transform: uppercase; color: #9A6B08; margin-bottom: 6px; }
+.e-frage p { margin: 0; font-size: 13.5px; line-height: 1.55; }
+.e-frage p + p { margin-top: 8px; }
+.e-frage b { font-weight: 650; }
+
+/* ══════════════════════════════════════════════════════════════════════
+   DER VORSCHLAG — ein Gate, vier (sechs) Beschriftungen
+   ══════════════════════════════════════════════════════════════════════ */
+.gate {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  overflow-y: auto; padding: 32px 22px;
+  color: var(--ink);
+  /* Eigene, feste Palette: die Anmeldung haengt nicht am Farbthema der
+     Seite dahinter. Uebernommen aus dem heutigen Cockpit-Gate. */
+  --bg:#0F1117; --surface:#161B27; --surface-2:#1E2535;
+  --line:#2A3147; --line-hi:#3B4560;
+  --ink:#F2F4F8; --ink-2:#B6BCC8; --ink-3:#868D9A;
+  --accent:#7098F7;
+  --neg:#F27F70; --neg-soft:#2E1A18;
+  --schleier: linear-gradient(rgba(10,11,15,.66), rgba(10,11,15,.82));
+  background: radial-gradient(112% 62% at 50% 12%, #1A2334 0%, rgba(26,35,52,0) 60%), #0F1117;
+  color-scheme: dark;
+}
+.gate.g-desktop {
+  padding: 40px 22px;
+  background:
+    radial-gradient(80% 68% at 50% 14%, #1C2639 0%, rgba(28,38,57,0) 66%),
+    var(--schleier),
+    url('../img/anmeldung-nacht.webp') 62% center / cover no-repeat,
+    #0F1117;
+}
+/* margin:auto statt Zentrierung ueber den Container: reicht die Hoehe
+   nicht, bleibt der obere Rand erreichbar, statt abgeschnitten zu werden. */
+.g-mitte { margin: auto; width: 100%; max-width: 348px; position: relative; z-index: 2; }
+.gate.g-desktop .g-mitte { max-width: 400px; }
+
+/* ── Markenblock ─────────────────────────────────────────────────────
+   Eine Zeile Logo, darunter der Bereichsname, darunter die Unterzeile.
+   Ueberschrift oben, Wert darunter -- und auf allen vier Masken dieselbe
+   Ordnung, damit sie nebeneinander nicht nach vier Herstellern aussehen. */
+.g-oben { text-align: center; margin-bottom: 34px; }
+.gate.g-desktop .g-oben { margin-bottom: 44px; }
+
+/* Logoplatz. Zwei Fassungen, EIN Platz:
+   .marke-wort  -- die Guard-OpS-Wortmarke (Rechteck, Breite gesetzt)
+   .marke-bild  -- das Logo des Mandanten (Quadrat, Hoehe gesetzt)
+   Beide enden auf derselben Grundlinie und haben denselben Abstand nach
+   unten, damit der Wechsel den Rest der Maske nicht verschiebt. */
+.g-logo { display: flex; align-items: flex-end; justify-content: center; height: 96px; }
+.gate.g-desktop .g-logo { height: 132px; }
+.marke-wort { width: 240px; height: auto; color: var(--ink);
+  filter: drop-shadow(0 16px 32px rgba(0,0,0,.75)); }
+.gate.g-desktop .marke-wort { width: 340px;
+  filter: drop-shadow(0 22px 44px rgba(0,0,0,.8)); }
+.marke-bild { height: 96px; width: auto; display: block;
+  filter: drop-shadow(0 16px 32px rgba(0,0,0,.7)); }
+.gate.g-desktop .marke-bild { height: 132px;
+  filter: drop-shadow(0 22px 44px rgba(0,0,0,.75)); }
+
+.g-bereich { margin-top: 18px; color: var(--ink); font-size: 20px;
+  font-weight: 700; letter-spacing: -.3px; }
+.gate.g-desktop .g-bereich { font-size: 23px; }
+/* Die Unterzeile sagt, WESSEN Bereich das ist oder WOFUER er da ist --
+   nie dasselbe noch einmal, was schon im Logo oder im Bereichsnamen steht. */
+.g-unter { margin-top: 7px; color: var(--ink-2); font-size: 13.5px; font-weight: 500; }
+.gate.g-desktop .g-unter { font-size: 14.5px; }
+
+/* ── Formular ────────────────────────────────────────────────────────
+   Beschriftung oben, Feld darunter. Ueberall dieselbe Bauart -- heute
+   steht sie auf drei der vier Masken unterschiedlich. */
+.g-form { display: block; }
+.f { margin-bottom: 14px; }
+.f label { display: block; font-size: 11px; font-weight: 650; color: var(--ink-2);
+  letter-spacing: .4px; text-transform: uppercase; margin-bottom: 6px; }
+.inp {
+  width: 100%; min-height: 46px; padding: 11px 13px;
+  font: inherit; font-size: 16px;          /* 16 px: darunter zoomt iOS hinein */
+  color: var(--ink); background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: 10px;
+}
+.inp::placeholder { color: var(--ink-3); }
+.inp:focus { outline: 2px solid var(--accent); outline-offset: 1px; background: var(--surface); }
+.pw-feld { position: relative; }
+.pw-feld .inp { padding-right: 50px; }
+.pw-auge { position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+  min-width: 44px; min-height: 44px; background: none; border: none; cursor: pointer;
+  font-size: 17px; color: var(--ink-3); opacity: .8; }
+
+.knopf {
+  appearance: none; font: inherit; font-size: 15px; font-weight: 650;
+  width: 100%; min-height: 46px; border-radius: 10px; cursor: pointer;
+  border: 1px solid transparent; margin-top: 6px;
+}
+/* #2F5BD7 statt des helleren --accent: Weiss darauf ergibt 5.8:1,
+   auf #7098F7 nur 2.8:1 -- gerechnet, nicht geschaetzt. */
+.knopf.haupt { background: #2F5BD7; color: #fff; }
+.knopf.haupt:hover { background: #2549B0; }
+.knopf.stumm { background: rgba(255,255,255,.06); border-color: var(--line-hi); color: var(--ink); margin-top: 10px; }
+.knopf.stumm:hover { background: rgba(255,255,255,.1); }
+/* Ein Textknopf wird nicht ueber die volle Breite gestreckt, nur weil er
+   allein in seiner Zeile steht (Hausregel). */
+.g-textknopf { display: block; margin: 14px auto 0; appearance: none; background: none;
+  border: none; font: inherit; font-size: 13px; font-weight: 600; color: var(--accent);
+  cursor: pointer; min-height: 44px; padding: 0 8px; }
+
+.g-hinweis { margin-top: 16px; padding: 12px 14px; border-radius: 10px;
+  background: rgba(255,255,255,.05); border: 1px solid var(--line);
+  font-size: 12.5px; color: var(--ink-2); line-height: 1.55; }
+.g-hinweis b { color: var(--ink); font-weight: 650; }
+.g-fehler { margin-bottom: 14px; padding: 11px 13px; border-radius: 10px;
+  background: var(--neg-soft); border: 1px solid #5A2C26; color: #FFC9BF;
+  font-size: 13px; line-height: 1.5; }
+
+/* ── Fuss ────────────────────────────────────────────────────────────
+   Zwei Faelle, bewusst getrennt:
+   1. Oben steht ein fremdes Logo (Mandant) -> Guard OpS signiert unten.
+   2. Oben steht Guard OpS selbst          -> keine zweite Signatur,
+      sondern die Rechtszeile. Sonst stuende der Name zweimal auf einer
+      Maske, die sonst kaum Text hat. */
+.g-fuss { flex: none; margin-top: 34px; display: flex; align-items: center;
+  justify-content: center; gap: 10px; position: relative; z-index: 2; }
+.g-fuss .sig-label { font-size: 11px; letter-spacing: .08em; color: var(--ink-3); opacity: .8; }
+.g-fuss .sig-marke { height: 27px; width: auto; display: block; color: var(--ink-3); }
+.g-fuss .recht { font-size: 12px; color: var(--ink-3); }
+.g-fuss .recht a { color: var(--ink-3); text-decoration: none; padding: 10px 4px; }
+.g-fuss .recht a:hover { color: var(--ink-2); text-decoration: underline; }
+.g-fuss .recht .trenn { opacity: .5; padding: 0 4px; }
+
+/* Demo-Fahne. Bleibt, wo sie ist -- sie gehoert zur Umgebung, nicht zur
+   Maske, und darf darum auch aussehen wie ein Aufkleber. */
+.g-demo { position: absolute; right: 14px; bottom: 14px; z-index: 3;
+  font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: #C9F3E0; background: #10281E; border: 1px solid #1F5B41;
+  padding: 7px 12px; border-radius: 8px; }
+
+.nurdesktop { display: none; }
+.gate.g-desktop .nurdesktop { display: block; }
+</style>
+</head>
+<body>
+
+<svg aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden">
+<symbol id="go-wort" viewBox="0.00 -120.22 649.83 153.56"><g transform="translate(0.0000 -120.2361) scale(0.546627)">
+    <path d="M162 57 L162 35 L85 8.5 L8 35 L8 138 L85 209 L162 138 L162 98" fill="none" stroke="currentColor" stroke-width="16" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="10"/>
+    <path d="M86 98 L170 98 L170 114 L76 114 Z" fill="currentColor"/>
+  </g>
+  <path transform="translate(98.3933 0)" d="M72.67 0.00H59.13L58.60 -10.73Q55.00 -4.87 49.13 -1.77Q43.27 1.33 35.27 1.33Q22.40 1.33 14.97 -6.57Q7.53 -14.47 7.53 -28.33V-66.67H23.93V-31.47Q23.93 -23.13 28.17 -18.30Q32.40 -13.47 39.67 -13.47Q47.20 -13.47 51.73 -18.60Q56.27 -23.73 56.27 -32.27V-66.67H72.67Z M139.40 0.00H125.13L124.20 -8.20Q120.53 -3.67 115.06 -1.17Q109.60 1.33 102.93 1.33Q95.86 1.33 90.33 -1.43Q84.80 -4.20 81.63 -9.00Q78.46 -13.80 78.46 -19.93Q78.46 -26.40 81.90 -31.30Q85.33 -36.20 91.30 -39.00Q97.26 -41.80 104.93 -41.80Q109.60 -41.80 114.30 -40.73Q119.00 -39.67 123.00 -37.73V-39.87Q123.00 -44.27 120.60 -47.47Q118.20 -50.67 114.13 -52.43Q110.06 -54.20 105.00 -54.20Q100.40 -54.20 95.80 -52.63Q91.20 -51.07 87.20 -48.00L82.53 -60.87Q88.93 -64.40 95.63 -66.20Q102.33 -68.00 108.73 -68.00Q118.13 -68.00 125.00 -64.30Q131.86 -60.60 135.63 -53.77Q139.40 -46.93 139.40 -37.67ZM106.33 -11.87Q110.66 -11.87 114.36 -13.67Q118.06 -15.47 120.43 -18.70Q122.80 -21.93 122.93 -26.13V-26.87Q119.80 -29.13 115.86 -30.37Q111.93 -31.60 107.93 -31.60Q101.80 -31.60 97.86 -28.83Q93.93 -26.07 93.93 -21.60Q93.93 -18.87 95.53 -16.63Q97.13 -14.40 99.96 -13.13Q102.80 -11.87 106.33 -11.87Z M164.93 0.00H148.53V-66.67H162.79L163.39 -54.53Q166.86 -60.93 172.76 -64.47Q178.66 -68.00 186.33 -68.00Q188.33 -68.00 190.43 -67.73Q192.53 -67.47 194.59 -66.93L192.59 -52.13Q188.46 -53.33 184.59 -53.33Q178.73 -53.33 174.29 -50.60Q169.86 -47.87 167.39 -43.03Q164.93 -38.20 164.93 -31.80Z M264.39 0.00H249.92L249.06 -9.33Q244.72 -4.33 238.52 -1.50Q232.32 1.33 224.99 1.33Q215.66 1.33 208.26 -3.20Q200.86 -7.73 196.62 -15.57Q192.39 -23.40 192.39 -33.33Q192.39 -43.27 196.62 -51.10Q200.86 -58.93 208.26 -63.47Q215.66 -68.00 224.99 -68.00Q231.92 -68.00 237.79 -65.53Q243.66 -63.07 247.99 -58.60V-100.00H264.39ZM228.66 -13.40Q233.99 -13.40 238.39 -15.83Q242.79 -18.27 245.39 -22.53Q247.99 -26.80 247.99 -32.27V-34.60Q247.99 -40.00 245.39 -44.23Q242.79 -48.47 238.39 -50.90Q233.99 -53.33 228.66 -53.33Q223.06 -53.33 218.66 -50.70Q214.26 -48.07 211.72 -43.57Q209.19 -39.07 209.19 -33.40Q209.19 -27.67 211.72 -23.13Q214.26 -18.60 218.66 -16.00Q223.06 -13.40 228.66 -13.40Z M347.85 2.00Q336.51 2.00 326.95 -1.87Q317.38 -5.73 310.31 -12.77Q303.25 -19.80 299.35 -29.30Q295.45 -38.80 295.45 -50.00Q295.45 -61.27 299.35 -70.73Q303.25 -80.20 310.31 -87.23Q317.38 -94.27 326.95 -98.13Q336.51 -102.00 347.91 -102.00Q359.25 -102.00 368.78 -98.13Q378.31 -94.27 385.38 -87.23Q392.45 -80.20 396.31 -70.73Q400.18 -61.27 400.18 -50.00Q400.18 -38.80 396.31 -29.30Q392.45 -19.80 385.38 -12.77Q378.31 -5.73 368.78 -1.87Q359.25 2.00 347.85 2.00ZM347.85 -13.47Q355.25 -13.47 361.51 -16.20Q367.78 -18.93 372.41 -23.90Q377.05 -28.87 379.61 -35.53Q382.18 -42.20 382.18 -50.00Q382.18 -57.80 379.61 -64.47Q377.05 -71.13 372.41 -76.10Q367.78 -81.07 361.51 -83.80Q355.25 -86.53 347.85 -86.53Q340.51 -86.53 334.21 -83.80Q327.91 -81.07 323.28 -76.10Q318.65 -71.13 316.05 -64.47Q313.45 -57.80 313.45 -50.00Q313.45 -42.20 316.05 -35.53Q318.65 -28.87 323.28 -23.90Q327.91 -18.93 334.21 -16.20Q340.51 -13.47 347.85 -13.47Z M423.18 33.33H406.78V-66.67H421.24L422.04 -57.33Q426.44 -62.33 432.64 -65.17Q438.84 -68.00 446.18 -68.00Q455.51 -68.00 462.88 -63.47Q470.24 -58.93 474.48 -51.10Q478.71 -43.27 478.71 -33.33Q478.71 -23.40 474.48 -15.57Q470.24 -7.73 462.88 -3.20Q455.51 1.33 446.18 1.33Q439.31 1.33 433.44 -1.13Q427.58 -3.60 423.18 -8.07ZM442.64 -13.47Q448.24 -13.47 452.61 -16.03Q456.98 -18.60 459.41 -23.10Q461.84 -27.60 461.84 -33.40Q461.84 -39.20 459.38 -43.70Q456.91 -48.20 452.58 -50.77Q448.24 -53.33 442.64 -53.33Q437.38 -53.33 433.11 -50.97Q428.84 -48.60 426.24 -44.50Q423.64 -40.40 423.18 -35.13V-31.47Q423.64 -26.20 426.21 -22.13Q428.78 -18.07 433.04 -15.77Q437.31 -13.47 442.64 -13.47Z M479.97 -10.40 488.31 -23.87Q492.91 -20.27 497.17 -17.90Q501.44 -15.53 505.77 -14.40Q510.11 -13.27 514.57 -13.27Q520.31 -13.27 524.54 -15.03Q528.77 -16.80 531.11 -19.93Q533.44 -23.07 533.44 -27.27Q533.44 -32.00 530.61 -35.17Q527.77 -38.33 523.17 -40.63Q518.57 -42.93 513.31 -45.13Q508.51 -47.13 503.61 -49.47Q498.71 -51.80 494.71 -55.03Q490.71 -58.27 488.27 -62.87Q485.84 -67.47 485.84 -74.00Q485.84 -82.47 490.11 -88.77Q494.37 -95.07 501.91 -98.50Q509.44 -101.93 519.11 -101.93Q525.91 -101.93 533.07 -100.17Q540.24 -98.40 547.24 -94.80L540.24 -80.60Q535.51 -83.40 530.17 -84.97Q524.84 -86.53 519.97 -86.53Q515.17 -86.53 511.54 -85.03Q507.91 -83.53 505.87 -80.77Q503.84 -78.00 503.84 -74.33Q503.84 -70.00 506.54 -67.00Q509.24 -64.00 513.64 -61.70Q518.04 -59.40 523.04 -57.20Q528.04 -55.00 533.07 -52.50Q538.11 -50.00 542.27 -46.60Q546.44 -43.20 548.94 -38.47Q551.44 -33.73 551.44 -27.07Q551.44 -18.40 546.94 -11.83Q542.44 -5.27 534.31 -1.63Q526.17 2.00 515.31 2.00Q505.57 2.00 496.64 -1.13Q487.71 -4.27 479.97 -10.40Z" fill="currentColor"/></symbol>
+  <symbol id="go-zeichen" viewBox="0.00 0.00 170.00 220.00"><g transform="translate(0.0000 -0.0248) scale(1.000295)"><path d="M162 57 L162 35 L85 8.5 L8 35 L8 138 L85 209 L162 138 L162 98" fill="none" stroke="currentColor" stroke-width="16" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="10"/><path d="M86 98 L170 98 L170 114 L76 114 Z" fill="currentColor"/></g></symbol>
+</svg>
+
+<header class="e-kopf">
+  <div class="links">
+    <div class="titel">Einheitliche Anmeldung</div>
+    <div class="unter">Deckblatt-Entwurf für die Masken auf guardops.ch</div>
+  </div>
+  <div class="fahne">Entwurf — Fassade ohne Funktion</div>
+  <div class="rechts">Nichts davon ist gebaut oder entschieden</div>
+</header>
+
+<div class="e-leiste">
+  <div class="e-gruppe">
+    <div class="bez">Bereich</div>
+    <div class="e-schalter" id="schalter-bereich"></div>
+  </div>
+  <div class="e-gruppe">
+    <div class="bez">Ansicht</div>
+    <div class="e-schalter" id="schalter-geraet">
+      <button type="button" data-geraet="d" aria-pressed="true">Desktop</button>
+      <button type="button" data-geraet="h" aria-pressed="false">Handy</button>
+    </div>
+  </div>
+</div>
+
+<div class="e-buehne">
+  <div class="rahmen d" id="rahmen">
+    <div class="rahmen-mass" id="mass"></div>
+    <div class="gate g-desktop" id="gate"></div>
+  </div>
+</div>
+
+<div class="e-notizen">
+  <h2>Was auf allen Masken gleich wird</h2>
+  <div class="e-karten">
+    <div class="e-karte">
+      <div class="k">Aufbau</div>
+      <p>Logo, Bereichsname, Unterzeile — in dieser Reihenfolge, mit denselben Abständen.</p>
+      <p>Heute: Cockpit ohne Karte, Betreiber-Bereich in einer Karte, Kundenportal mit Karte plus eigener Begrüssungsüberschrift.</p>
+    </div>
+    <div class="e-karte">
+      <div class="k">Felder</div>
+      <p>Beschriftung in Versalien über dem Feld, 46 px hoch, 16 px Schrift, gleiche Ecken, gleicher Fokusring. Passwortfeld überall mit Auge.</p>
+      <p>Heute: drei verschiedene Feldhöhen, Betreiber-Bereich ohne Auge.</p>
+    </div>
+    <div class="e-karte">
+      <div class="k">Grund</div>
+      <p>Dieselbe Nachtszene und derselbe Schleier auf allen vier Adressen, am Desktop als Video, am Handy als Verlauf.</p>
+      <p>Heute: Betreiber-Bereich als einzige Maske auf grauem Grund und abhängig vom Farbthema des Geräts.</p>
+    </div>
+    <div class="e-karte">
+      <div class="k">Farben und Schrift</div>
+      <p>Eine feste dunkle Palette für die Anmeldung, unabhängig vom Farbthema dahinter. Inter, dieselben Farbwerte wie im Cockpit.</p>
+      <p>Weiss auf <b>#2F5BD7</b> statt auf dem helleren Blau: 5.8:1 statt 2.8:1.</p>
+    </div>
+    <div class="e-karte">
+      <div class="k">Logo</div>
+      <p>Ein Platz, zwei Fassungen: Guard-OpS-Wortmarke oder das Logo des Mandanten. Beide auf derselben Grundlinie, der Wechsel verschiebt nichts.</p>
+      <p>cupi24.guardops.ch behält sein Logo — GuardOpS signiert dort nur unten.</p>
+    </div>
+    <div class="e-karte">
+      <div class="k">Fuss</div>
+      <p>Fremdes Logo oben → „powered by Guard OpS“ unten. Guard OpS oben → stattdessen Impressum und Datenschutz.</p>
+      <p>Heute steht auf demo.guardops.ch der Name zweimal auf derselben Maske.</p>
+    </div>
+  </div>
+
+  <h2>Was ich vorher von dir wissen muss</h2>
+  <div class="e-frage">
+    <div class="k">Frage 1 — Umfang</div>
+    <p>Du nennst vier Bereiche. Anmeldemasken gibt es aber <b>sechs</b>: dazu die Wächter-App
+      (<code>app.html</code>) und die Rapporterfassung (<code>index.html</code>). Beide haben
+      wieder ein eigenes Layout. Sie sind hier als Reiter 5 und 6 mitgezeichnet.</p>
+    <p><b>Empfehlung:</b> alle sechs in einem Zug. Wer vier angleicht und zwei stehen lässt,
+      hat am Ende zwei Sorten Anmeldung statt vier — der Aufwand für die zwei zusätzlichen
+      ist klein, weil es dieselben Bausteine sind.</p>
+  </div>
+  <div class="e-frage">
+    <div class="k">Frage 2 — Betreiber-Bereich auf dem Nachtbild</div>
+    <p>Der Betreiber-Bereich ist der einzige, den kein Kunde je sieht. Er auf demselben
+      Bild wie das Cockpit heisst: gleiche Optik, gleiche Verwechslungsgefahr beim
+      Anmelden mit dem falschen Konto.</p>
+    <p><b>Empfehlung:</b> trotzdem dasselbe Bild, aber den Bereichsnamen dort deutlich
+      grösser als auf den anderen Masken. Gleiche Familie, unterscheidbarer Kopf.</p>
+  </div>
+  <div class="e-frage">
+    <div class="k">Frage 3 — Mandantenlogo, woher</div>
+    <p>Auf cupi24.guardops.ch steht heute das CUPI-Logo schon vor der Anmeldung. Im
+      Quelltext finde ich keinen Weg, der es dorthin bringt — ein Logo aus der Datenbank
+      des Mandanten gäbe es erst nach der Anmeldung.</p>
+    <p><b>Empfehlung:</b> das Logo je Mandant beim Deploy mitliefern (eine Datei pro
+      Bündel, wie die Symbole heute schon). Dann braucht die Anmeldemaske keinen
+      Serverzugriff, bevor jemand angemeldet ist. Sag mir bitte, wie es heute
+      tatsächlich dorthin kommt — dann ziehe ich das nach.</p>
+  </div>
+  <div class="e-frage">
+    <div class="k">Frage 4 — heller Modus</div>
+    <p>Dieser Entwurf ist nur dunkel. Der Betreiber-Bereich folgt heute als einziger dem
+      Farbthema des Geräts und geht bei jemandem mit heller Einstellung hell auf.</p>
+    <p><b>Empfehlung:</b> Anmeldung immer dunkel, auf allen sechs Masken. Ein Bildschirm
+      ohne Bedienung dahinter braucht keine zwei Fassungen, und das Nachtbild trägt
+      keinen hellen Modus.</p>
+  </div>
+
+  <h2>Was dieses Deckblatt nicht ist</h2>
+  <div class="e-karten">
+    <div class="e-karte">
+      <div class="k">Keine Funktion</div>
+      <p>Die Felder nehmen Text an, sonst nichts. Kein Knopf tut etwas, es gibt keine
+        Verbindung zu einem Server.</p>
+    </div>
+    <div class="e-karte">
+      <div class="k">Keine Entscheidung</div>
+      <p>Solange nichts im Entscheidungsprotokoll steht, ist das hier ein Vorschlag —
+        auch wenn er dir gefällt.</p>
+    </div>
+    <div class="e-karte">
+      <div class="k">Nicht gemessen</div>
+      <p>Die Masse stammen aus dem Entwurf, nicht aus dem gerenderten Zustand der echten
+        Seiten. Das kommt beim Bauen, nicht beim Zeichnen.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+/* Nur Umschalterei fuer den Entwurf. Keine Produktlogik. */
+var BEREICHE = [
+  {
+    id: 'cockpit-demo', reiter: 'Cockpit', neben: 'demo',
+    adresse: 'demo.guardops.ch',
+    logo: 'wort', bereich: 'Cockpit', unter: 'Demobereich — Beispieldaten',
+    felder: [
+      { label: 'Name', typ: 'text', platz: '' },
+      { label: 'Passwort', typ: 'pw', platz: '' }
+    ],
+    knopf: 'Anmelden', fuss: 'recht', demo: true
+  },
+  {
+    id: 'cockpit-mandant', reiter: 'Cockpit', neben: 'cupi24',
+    adresse: 'cupi24.guardops.ch',
+    logo: 'cupi', bereich: 'Cockpit', unter: 'CUPI 24 GmbH',
+    felder: [
+      { label: 'Name', typ: 'text', platz: '' },
+      { label: 'Passwort', typ: 'pw', platz: '' }
+    ],
+    knopf: 'Anmelden', fuss: 'sig'
+  },
+  {
+    id: 'betreiber', reiter: 'Betreiber-Bereich', neben: '',
+    adresse: 'betreiber.guardops.ch',
+    logo: 'wort', bereich: 'Betreiber-Bereich', unter: 'Verwaltung der Mandanten',
+    gross: true,
+    felder: [
+      { label: 'E-Mail', typ: 'text', platz: 'name@firma.ch' },
+      { label: 'Passwort', typ: 'pw', platz: '' }
+    ],
+    knopf: 'Anmelden',
+    hinweis: '<b>Zweiter Faktor ist hier Pflicht.</b> Nach dem Passwort folgt der Code aus der Authenticator-App.',
+    fuss: 'recht'
+  },
+  {
+    id: 'portal', reiter: 'Kundenportal', neben: '',
+    adresse: 'portal.guardops.ch',
+    logo: 'wort', bereich: 'Kundenportal', unter: 'Zugang für Auftraggeber',
+    felder: [
+      { label: 'E-Mail-Adresse', typ: 'text', platz: 'name@beispiel.ch' },
+      { label: 'Passwort', typ: 'pw', platz: '' }
+    ],
+    knopf: 'Anmelden',
+    zweit: 'Link per E-Mail anfordern',
+    hinweis: '<b>Passwort vergessen?</b> Oder zum ersten Mal hier — dann haben Sie noch keines.',
+    fuss: 'recht'
+  },
+  {
+    id: 'app', reiter: 'Mitarbeiter-App', neben: 'nicht in deiner Liste',
+    adresse: 'guardops.ch/app.html',
+    logo: 'wort', bereich: 'Mitarbeiter-App', unter: 'Schichten, Rapporte, Spesen',
+    felder: [
+      { label: 'Name', typ: 'text', platz: '' },
+      { label: 'Passwort', typ: 'pw', platz: '' }
+    ],
+    knopf: 'Anmelden', textknopf: 'Passwort vergessen?', fuss: 'recht'
+  },
+  {
+    id: 'rapport', reiter: 'Rapporterfassung', neben: 'nicht in deiner Liste',
+    adresse: 'guardops.ch/index.html',
+    logo: 'wort', bereich: 'Rapporterfassung', unter: 'Schichtrapport ohne Umweg',
+    felder: [
+      { label: 'Name', typ: 'text', platz: '' },
+      { label: 'Passwort', typ: 'pw', platz: '' }
+    ],
+    knopf: 'Anmelden', textknopf: 'Passwort vergessen?', fuss: 'recht'
+  }
+];
+
+var aktuell = BEREICHE[0];
+var geraet = 'd';
+
+function esc(s) {
+  return String(s).replace(/[&<>"]/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+  });
+}
+
+function logoHtml(b) {
+  if (b.logo === 'cupi') {
+    return '<img class="marke-bild" src="../logo-quellen/cupi24-original.png" alt="CUPI 24 GmbH">';
+  }
+  return '<svg class="marke-wort" viewBox="0.00 0.00 649.83 153.56" role="img" '
+       + 'aria-label="Guard OpS"><use href="#go-wort"/></svg>';
+}
+
+function feldHtml(f, i) {
+  var id = 'f' + i;
+  if (f.typ === 'pw') {
+    return '<div class="f"><label for="' + id + '">' + esc(f.label) + '</label>'
+         + '<div class="pw-feld"><input class="inp" id="' + id + '" type="password" '
+         + 'placeholder="' + esc(f.platz || '') + '">'
+         + '<button type="button" class="pw-auge" aria-label="Passwort anzeigen">👁</button>'
+         + '</div></div>';
+  }
+  return '<div class="f"><label for="' + id + '">' + esc(f.label) + '</label>'
+       + '<input class="inp" id="' + id + '" type="text" placeholder="'
+       + esc(f.platz || '') + '"></div>';
+}
+
+function fussHtml(b) {
+  if (b.fuss === 'sig') {
+    return '<div class="g-fuss"><span class="sig-label">powered by</span>'
+         + '<svg class="sig-marke" viewBox="0.00 0.00 649.83 153.56" role="img" '
+         + 'aria-label="Guard OpS"><use href="#go-wort"/></svg></div>';
+  }
+  return '<div class="g-fuss"><div class="recht"><a href="#">Impressum</a>'
+       + '<span class="trenn">·</span><a href="#">Datenschutz</a></div></div>';
+}
+
+function zeichnen() {
+  var b = aktuell;
+  var gate = document.getElementById('gate');
+  gate.className = 'gate ' + (geraet === 'd' ? 'g-desktop' : 'g-handy');
+
+  var html = '<div class="g-mitte">'
+    + '<div class="g-oben">'
+    +   '<div class="g-logo">' + logoHtml(b) + '</div>'
+    +   '<div class="g-bereich"' + (b.gross ? ' style="font-size:' + (geraet === 'd' ? '28px' : '24px') + '"' : '') + '>'
+    +     esc(b.bereich) + '</div>'
+    +   '<div class="g-unter">' + esc(b.unter) + '</div>'
+    + '</div>'
+    + '<div class="g-form">'
+    +   b.felder.map(feldHtml).join('')
+    +   '<button type="button" class="knopf haupt">' + esc(b.knopf) + '</button>'
+    /* Der Hinweis steht VOR dem Nebenknopf, den er erklaert -- eine
+       Erlaeuterung unter dem Knopf liest man erst, wenn man ihn schon
+       gedrueckt oder uebergangen hat. */
+    +   (b.hinweis ? '<div class="g-hinweis">' + b.hinweis + '</div>' : '')
+    +   (b.zweit ? '<button type="button" class="knopf stumm">' + esc(b.zweit) + '</button>' : '')
+    +   (b.textknopf ? '<button type="button" class="g-textknopf">' + esc(b.textknopf) + '</button>' : '')
+    + '</div>'
+    + '</div>'
+    + fussHtml(b)
+    + (b.demo ? '<div class="g-demo">Demo — Beispieldaten</div>' : '');
+
+  gate.innerHTML = html;
+
+  var rahmen = document.getElementById('rahmen');
+  rahmen.className = 'rahmen ' + geraet;
+  document.getElementById('mass').textContent =
+    b.adresse + '  ·  ' + (geraet === 'd' ? '1180 × 720' : '390 × 800');
+}
+
+var sb = document.getElementById('schalter-bereich');
+BEREICHE.forEach(function (b, i) {
+  var kn = document.createElement('button');
+  kn.type = 'button';
+  kn.innerHTML = esc(b.reiter) + (b.neben ? ' <span class="neben">' + esc(b.neben) + '</span>' : '');
+  kn.setAttribute('aria-pressed', i === 0 ? 'true' : 'false');
+  kn.addEventListener('click', function () {
+    aktuell = b;
+    Array.prototype.forEach.call(sb.children, function (k) { k.setAttribute('aria-pressed', 'false'); });
+    kn.setAttribute('aria-pressed', 'true');
+    zeichnen();
+  });
+  sb.appendChild(kn);
+});
+
+Array.prototype.forEach.call(document.querySelectorAll('#schalter-geraet button'), function (kn) {
+  kn.addEventListener('click', function () {
+    geraet = kn.dataset.geraet;
+    Array.prototype.forEach.call(kn.parentNode.children, function (k) {
+      k.setAttribute('aria-pressed', 'false');
+    });
+    kn.setAttribute('aria-pressed', 'true');
+    zeichnen();
+  });
+});
+
+zeichnen();
+</script>
+</body>
+</html>
