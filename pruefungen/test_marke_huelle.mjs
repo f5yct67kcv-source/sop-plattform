@@ -229,6 +229,21 @@ await h.close();
 // getBBox einen leeren Kasten.
 const g = await seite(1440, 1000);
 await g.waitForTimeout(400);
+// Seit dem 2026-09-17 signiert Guard OpS nur noch da, wo oben ein FREMDES
+// Logo haengt -- sonst stuende der Name zweimal auf derselben Maske. Ohne
+// Mandantenlogo ist die Signatur also zu Recht unsichtbar, und getBBox
+// maesse einen leeren Kasten. Darum wird hier derselbe Umbau nachgebaut,
+// den .github/workflows/deploy-hostpoint.yml im cupi24-Buendel macht:
+// <svg class="marke"> raus, <img class="marke"> rein.
+await g.evaluate(() => {
+  const svg = document.querySelector('.gate-oben svg.marke');
+  if (!svg) { return; }
+  const img = document.createElement('img');
+  img.className = 'marke'; img.src = 'icons/cupi24-badge.png'; img.alt = 'Mandantenlogo';
+  img.style.width = '170px';
+  svg.replaceWith(img);
+});
+await g.waitForTimeout(120);
 const mg = await g.evaluate(() => {
   const svg = document.querySelector('.gate-sig .go-sig');
   if (!svg) { return null; }
