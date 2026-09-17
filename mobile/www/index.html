@@ -3971,7 +3971,8 @@ function zeichneRapport() {
   // Keine Stundensumme mehr aus den Rapporten (ENT-049) -- massgeblich ist
   // die abgeglichene Zeit unter Profil > Meine Stunden. Eine zweite Zahl
   // zwei Fingertipps daneben haette ihr nur widersprochen.
-  let html = `<a class="btn btn-primary btn-wide" href="index.html" style="margin-bottom:8px">
+  let html = `<a class="btn btn-primary btn-wide" href="${nativeAppHuelle() ? 'https://cupi24.guardops.ch/index.html' : 'index.html'}"
+       ${nativeAppHuelle() ? 'target="_blank" rel="noopener"' : ''} style="margin-bottom:8px">
       <svg class="i i-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       ${esc(w('neuerRapport'))}
     </a>
