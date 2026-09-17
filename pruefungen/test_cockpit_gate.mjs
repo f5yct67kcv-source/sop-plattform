@@ -280,7 +280,7 @@ const TEXTE_HAUPT = [
   // man keinen Kontrast. Ihren Nachweis fuehrt test_gate_signatur.mjs im
   // nachgebauten Mandantenfall.
   ['Rechtszeile (Impressum)', '.gate-recht a'],
-  ['Anmeldehilfe-Knopf', '.gate-recht .gate-hilfe-knopf'],
+  ['Anmeldehilfe-Knopf', '#gateHilfeKnopf'],
   ['Beschriftung "Name"', 'label[for="gName"]'],
   ['Beschriftung "Passwort"', 'label[for="gPass"]'],
 ];
@@ -456,10 +456,19 @@ check('KRITISCH: und zwar absolut auf guardops.ch -- relativ liefen sie in diese
 await fuss.close();
 const fussHandy = await seiteOeffnen('dunkel', 390, 844);
 const ziele = await ev(fussHandy, () =>
-  [...document.querySelectorAll('.gate-recht a, .gate-recht button')]
+  [...document.querySelectorAll('.gate-recht a, #gateHilfeKnopf')]
     .map(e => Math.round(e.getBoundingClientRect().height)));
-check('KRITISCH: die Ziele im Fuss sind am Handy mindestens 44 px hoch',
+check('KRITISCH: Rechtszeile und Anmeldehilfe sind am Handy mindestens 44 px hoch',
   Array.isArray(ziele) && ziele.length === 3 && ziele.every(h => h >= 44));
+// Die Hilfe gehoert zum Anmeldeknopf, nicht zum Fuss: Wer nicht
+// hereinkommt, sucht die Antwort dort, wo er gescheitert ist.
+check('KRITISCH: der Hilfe-Knopf steht im Anmeldeblock, unter dem Anmeldeknopf',
+  await ev(fussHandy, () => {
+    const k = document.getElementById('gateHilfeKnopf');
+    const b = document.getElementById('gBtn');
+    return !!k && !!b && !!k.closest('#gateLogin')
+      && k.getBoundingClientRect().top >= b.getBoundingClientRect().bottom - 1;
+  }));
 await fussHandy.close();
 
 // ══════════════════════════════════════════════════════════════════════

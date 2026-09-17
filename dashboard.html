@@ -385,12 +385,19 @@ svg.i-sm { width: 15px; height: 15px; }
    (CLAUDE.md), und die muss stehen, egal wie hoch die Zeile gerade ist.
    inline-flex, weil ein min-height an einem Inline-Element wirkungslos
    bliebe -- die Regel waere da und taete nichts. */
-.gate-recht a, .gate-recht .gate-hilfe-knopf {
-  color: var(--ink-2); text-decoration: none; font: inherit; background: none;
-  border: none; cursor: pointer; padding: 0 6px;
-  min-height: 44px; display: inline-flex; align-items: center; }
-.gate-recht a:hover, .gate-recht .gate-hilfe-knopf:hover {
-  color: var(--ink); text-decoration: underline; }
+.gate-recht a {
+  color: var(--ink-2); text-decoration: none; font: inherit;
+  padding: 0 6px; min-height: 44px; display: inline-flex; align-items: center; }
+.gate-recht a:hover { color: var(--ink); text-decoration: underline; }
+/* Der Hilfe-Knopf sitzt unter dem Anmeldeknopf. Nicht ueber die volle
+   Breite gestreckt, nur weil er allein in seiner Zeile steht (Hausregel) --
+   und deutlich leiser als der Anmeldeknopf darueber: Es ist der Weg fuer
+   den Ausnahmefall, nicht der zweite Hauptweg. */
+.gate-hilfe-knopf {
+  display: block; margin: 14px auto 0; appearance: none; background: none;
+  border: none; font: inherit; font-size: 13px; font-weight: 600;
+  color: var(--ink-2); cursor: pointer; min-height: 44px; padding: 0 10px; }
+.gate-hilfe-knopf:hover { color: var(--ink); text-decoration: underline; }
 .gate-recht .trenn { opacity: .5; }
 /* Die Hilfe ist ein Textfeld, kein Formular -- und genau das ist der
    Punkt: Wer hier eine Adresse eintippen koennte, um ein Passwort
@@ -399,7 +406,7 @@ svg.i-sm { width: 15px; height: 15px; }
    nicht geben (Ansage des Projektinhabers, 2026-09-17).
    test_cockpit_gate.mjs weist nach, dass im Gate ausser Name, Passwort
    und 2FA-Code kein Eingabefeld steht. */
-.gate-hilfe { max-width: 348px; padding: 12px 14px; border-radius: 10px;
+.gate-hilfe { margin-top: 10px; padding: 12px 14px; border-radius: 10px;
   background: rgba(15,17,23,.72); border: 1px solid var(--line);
   font-size: 12.5px; line-height: 1.55; color: var(--ink-2); text-align: center; }
 .gate-hilfe[hidden] { display: none; }
@@ -5137,6 +5144,14 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
         </label>
       </div>
       <button class="btn btn-primary btn-wide" id="gBtn" onclick="doLogin()">Anmelden</button>
+      <!-- Die Anmeldehilfe steht beim Anmeldeknopf und nicht im Fuss
+           (Ansage des Projektinhabers, 2026-09-17): Wer nicht hereinkommt,
+           sucht die Antwort dort, wo er gerade gescheitert ist, nicht am
+           unteren Bildrand zwischen Impressum und Datenschutz. -->
+      <button type="button" class="gate-hilfe-knopf" id="gateHilfeKnopf"
+              aria-expanded="false" aria-controls="gateHilfe"
+              onclick="gateHilfeUmschalten()">Probleme bei der Anmeldung?</button>
+      <div class="gate-hilfe" id="gateHilfe" hidden></div>
     </div>
 
     <div id="gateDenied" style="display:none">
@@ -5171,12 +5186,7 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
         <a href="https://guardops.ch/impressum.html">Impressum</a>
         <span class="trenn" aria-hidden="true">·</span>
         <a href="https://guardops.ch/datenschutz.html">Datenschutz</a>
-        <span class="trenn" aria-hidden="true">·</span>
-        <button type="button" class="gate-hilfe-knopf" id="gateHilfeKnopf"
-                aria-expanded="false" aria-controls="gateHilfe"
-                onclick="gateHilfeUmschalten()">Probleme bei der Anmeldung?</button>
       </div>
-      <div class="gate-hilfe" id="gateHilfe" hidden></div>
     </div>
 </div>
 
